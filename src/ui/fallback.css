@@ -1,0 +1,39 @@
+/* Plain paper fallback for the pc- classes, used until Painter's src/art/ui.css exists.
+   Not the painted theme: no torn paper, no ink icons, no hand lettering yet. */
+:root { --pc-paper: #f4efe4; --pc-ink: #2c3350; --pc-sepia: #6b5a48; --pc-wash: rgba(244, 239, 228, 0.86); }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-paper); }
+#pc-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+.pc-hud { position: fixed; inset: 0; pointer-events: none; color: var(--pc-ink);
+  font: 15px/1.35 Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; user-select: none; }
+.pc-label { letter-spacing: 0.06em; font-style: italic; color: var(--pc-sepia); }
+.pc-title { font-size: 34px; letter-spacing: 0.12em; color: var(--pc-ink); margin-bottom: 6px; }
+.pc-panel { background: var(--pc-wash); border-radius: 3px 9px 4px 11px / 10px 4px 9px 3px;
+  box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.25), 0 6px 24px rgba(44, 51, 80, 0.12); padding: 22px 30px; }
+.pc-button { display: inline-flex; align-items: center; gap: 9px; margin: 0 9px; padding: 7px 15px 7px 8px;
+  background: var(--pc-wash); border-radius: 4px 10px 5px 9px / 9px 4px 10px 5px;
+  box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.3); font-size: 17px; }
+kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc-paper); background: var(--pc-ink);
+  border-radius: 4px; padding: 5px 8px; letter-spacing: 0.04em; }
+.pc-prompt { position: absolute; left: 0; right: 0; bottom: 13%; text-align: center; opacity: 0;
+  transition: opacity 0.25s ease; }
+.pc-prompt.pc-on { opacity: 1; }
+.pc-gauges { position: absolute; left: 50%; bottom: 6.5%; transform: translateX(-50%); display: flex; gap: 22px; }
+.pc-gauge { opacity: 0; transition: opacity 0.4s ease; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.pc-gauge.pc-on { opacity: 0.9; }
+.pc-gauge b { display: block; width: 120px; height: 5px; border-radius: 3px; background: rgba(107, 90, 72, 0.22); overflow: hidden; }
+.pc-gauge i { display: block; height: 100%; width: 100%; background: var(--pc-ink); border-radius: 3px; }
+.pc-gauge-fuel i { background: #b5553c; }
+.pc-readout { position: absolute; left: 4.5%; bottom: 5.5%; font-size: 12px; opacity: 0.75; white-space: pre; }
+.pc-reticle { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -3px 0 0 -3px; border-radius: 50%;
+  background: var(--pc-ink); opacity: 0; }
+.pc-reticle.pc-on { opacity: 0.35; }
+.pc-start { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center;
+  opacity: 0; transition: opacity 0.5s ease; max-width: 520px; }
+.pc-start.pc-on { opacity: 1; }
+.pc-help { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; text-align: left; font-size: 13px; }
+.pc-help em { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; opacity: 0.7; }
+.pc-help kbd { font-size: 11px; padding: 3px 6px; margin-right: 5px; }
+#pc-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--pc-paper); color: var(--pc-sepia); font: italic 18px Georgia, serif; letter-spacing: 0.08em;
+  transition: opacity 0.8s ease; pointer-events: none; }
+#pc-loading.pc-done { opacity: 0; }

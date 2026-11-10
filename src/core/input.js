@@ -1,0 +1,57 @@
+// Keyboard and mouse. Pointer lock when the browser grants it; when it does not (an embedded
+// frame, a headless test), holding the left button and dragging looks around instead.
+const GAME_KEYS = new Set([
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyV', 'KeyC', 'KeyX', 'Space', 'ShiftLeft', 'ShiftRight',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab',
+]);
+
+export class Input {
+  constructor(el, doc = document) {
+    this.el = el;
+    this.keys = new Set();
+    this.edges = new Set();
+    this.dx = 0; this.dy = 0; this.wheel = 0;
+    this.locked = false;
+    this.dragging = false;
+    this.used = false;                    // any input at all yet (for the first-run hint)
+    this._lx = 0; this._ly = 0;
+
+    doc.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;       // leave browser shortcuts alone
+      if (GAME_KEYS.has(e.code)) e.preventDefault();
+      if (!e.repeat) { this.edges.add(e.code); this.keys.add(e.code); this.used = true; }
+    });
+    doc.addEventListener('keyup', (e) => { this.keys.delete(e.code); });
+    window.addEventListener('blur', () => { this.keys.clear(); this.dragging = false; });
+
+    el.addEventListener('mousedown', (e) => {
+      this.used = true;
+      if (e.button !== 0) return;
+      this.dragging = true; this._lx = e.clientX; this._ly = e.clientY;
+      if (!this.locked && el.requestPointerLock) {
+        try { const p = el.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* drag-look instead */ }
+      }
+    });
+    doc.addEventListener('mouseup', () => { this.dragging = false; });
+    doc.addEventListener('mousemove', (e) => {
+      if (this.locked) { this.dx += e.movementX || 0; this.dy += e.movementY || 0; }
+      else if (this.dragging) {
+        this.dx += e.clientX - this._lx; this.dy += e.clientY - this._ly;
+        this._lx = e.clientX; this._ly = e.clientY;
+      }
+    });
+    doc.addEventListener('pointerlockchange', () => { this.locked = doc.pointerLockElement === el; });
+    el.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); e.preventDefault(); }, { passive: false });
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  down(code) { return this.keys.has(code); }
+  axis(neg, pos) { return (this.keys.has(pos) ? 1 : 0) - (this.keys.has(neg) ? 1 : 0); }
+
+  // Everything that happened since the last frame, consumed once.
+  take() {
+    const out = { edges: this.edges, dx: this.dx, dy: this.dy, wheel: this.wheel };
+    this.edges = new Set(); this.dx = 0; this.dy = 0; this.wheel = 0;
+    return out;
+  }
+}

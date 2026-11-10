@@ -5,7 +5,7 @@
 // is tested against sampleSurface along its length and the camera is lifted over terrain first,
 // and only pulled in when lifting is not enough.
 import {
-  V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, rotateAround,
+  V, add, sub, scale, addScaled, len, norm, tangent, rotateAround,
   clamp, mix, damp, qLook, qSlerp, qRotate, lerp,
 } from '../core/vec.js';
 
@@ -152,5 +152,3 @@ export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
 export function blendPose(a, b, t) {
   return { p: lerp(a.p, b.p, t), q: qSlerp(a.q, b.q, t), fov: mix(a.fov, b.fov, t) };
 }
-
-export { dot as _dot };

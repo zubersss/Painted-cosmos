@@ -107,5 +107,5 @@ export class Ephemeris {
 // Height above the base radius where flight stops being "in the atmosphere" and becomes space.
 // Airless bodies still get a thin near-surface zone so that landing logic has room to work.
 export function spaceAltitude(body) {
-  return Math.max(body.atmosphereHeight || 0, body.radius * 0.12);
+  return body.spaceAltitude || Math.max(body.atmosphereHeight || 0, body.radius * 0.2);
 }
