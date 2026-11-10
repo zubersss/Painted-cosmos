@@ -66,11 +66,9 @@ export function chooseFrame(eph, t, P, current) {
     const b = eph.body(id);
     const d = len(sub(P, eph.position(id, t)));
     const isCurrent = current.kind === 'body' && current.id === id;
-    const soi = eph.soiRadius(id) * (isCurrent ? 1.08 : 1);
-    if (d > soi) continue;
-    if (!pick || (b.parent && !eph.body(pick.id).parent) || (d - b.radius < pick.alt && !!b.parent === !!eph.body(pick.id).parent)) {
-      pick = { id, alt: d - b.radius };
-    }
+    if (d > eph.soiRadius(id) * (isCurrent ? 1.08 : 1)) continue;
+    const cand = { id, alt: d - b.radius, moon: !!b.parent };
+    if (!pick || (cand.moon && !pick.moon) || (cand.moon === pick.moon && cand.alt < pick.alt)) pick = cand;
   }
   if (!pick) return HELIO;
   const b = eph.body(pick.id);

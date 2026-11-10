@@ -1,7 +1,7 @@
 // Orbital math: where every body is, how it is turned, and what time it is where you stand.
 // Pure (no three). "Universe" frame: the sun sits at the origin, the planets orbit in the XZ
 // plane, +Y is ecliptic north, metres, seconds. All values are JS doubles.
-import { V, add, sub, norm, dot, cross, scale, qFromAxisAngle, qMul, qConj, qRotate, wrapAngle } from './vec.js';
+import { V, add, sub, len, norm, dot, scale, qFromAxisAngle, qMul, qConj, qRotate, wrapAngle } from './vec.js';
 
 const TAU = Math.PI * 2;
 
@@ -96,7 +96,7 @@ export class Ephemeris {
   nearest(P, t) {
     let best = null;
     for (const id of this.ids) {
-      const d = Math.hypot(...Object.values(sub(P, this.position(id, t))));
+      const d = len(sub(P, this.position(id, t)));
       const alt = d - this.bodies[id].radius;
       if (!best || alt < best.altitude) best = { id, distance: d, altitude: alt };
     }
@@ -109,5 +109,3 @@ export class Ephemeris {
 export function spaceAltitude(body) {
   return Math.max(body.atmosphereHeight || 0, body.radius * 0.12);
 }
-
-export { cross as _cross };
