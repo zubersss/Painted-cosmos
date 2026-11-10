@@ -9,9 +9,13 @@ here, write the request in your notes file and report it; the coordinator record
   this game was attached to the session, and the only reachable repositories are the owner's
   other projects, which the brief says to leave alone. Separate cloud threads would have had no
   shared remote to sync through, so the brief's fallback applies.
-- **Repository:** `/home/user/painted-cosmos` (local git, no remote yet). Shared work branch:
-  **`cosmos`**. `main` holds the bootstrap commit and receives the finished game at M4.
-  There is nothing to push to; "commit and push" means **commit**. Commit often.
+- **Repository:** `/home/user/painted-cosmos`. Shared work branch: **`cosmos`**. `main` holds the
+  bootstrap commit and receives the finished game at M4.
+  **UPDATE 2026-11-10: a remote now exists**, `origin` = `https://github.com/zubersss/painted-cosmos`
+  (the owner created it for this game). `tools/commit.sh` now pushes `cosmos` after every commit,
+  so keep using it exactly as before and commit often; nothing else changes. Both roles stay on
+  the one shared branch in the one working tree. At M4, Pilot opens the one pull request
+  `cosmos` -> `main` (the owner has given permission to merge it).
 - **Both roles work in the same working tree.** You see each other's files the moment they are
   saved, including half-written ones. Rules that keep this safe:
   1. Commit with `tools/commit.sh painter "msg"` or `tools/commit.sh pilot "msg"`. It stages and
@@ -153,3 +157,7 @@ it goes on to the next milestone's work.
 ## E. Settled outcomes (log)
 
 - 2026-11-10: bootstrap as described in A. Branch for both roles: `cosmos`.
+- 2026-11-10: the owner created `zubersss/painted-cosmos`; attached as `origin`; `main` and `cosmos`
+  pushed; `tools/commit.sh` pushes after each commit. The two roles keep sharing one branch
+  (they were already mid-work in one tree; splitting now would only add merge work).
+  GitHub Pages is to be served from `main` after the M4 merge.

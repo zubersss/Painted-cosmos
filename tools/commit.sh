@@ -22,7 +22,20 @@ for attempt in 1 2 3 4 5 6; do
     if git diff --cached --quiet -- "${use[@]}"; then echo "nothing to commit for $role"; rm -f /tmp/pc-commit-$$.err; exit 0; fi
     if git -c user.name="Painted Cosmos ${role^}" -c user.email="noreply@anthropic.com" \
          commit -q -m "[$role] $msg" -- "${use[@]}" 2>>/tmp/pc-commit-$$.err; then
-      git log --oneline -1; rm -f /tmp/pc-commit-$$.err; exit 0
+      git log --oneline -1; rm -f /tmp/pc-commit-$$.err
+      # Push the shared branch if a remote exists. Never fatal: the commit is safe locally and the
+      # next commit pushes it too. (Both roles push the same local ref, so it is always a fast-forward.)
+      if git remote get-url origin >/dev/null 2>&1; then
+        branch="$(git branch --show-current)"
+        pushed=0
+        for p in 1 2 3 4; do
+          if timeout 120 git push -q origin "$branch" 2>/tmp/pc-push-$$.err; then pushed=1; break; fi
+          sleep $((2 ** p))
+        done
+        if [ "$pushed" -eq 1 ]; then echo "pushed $branch"; else echo "push failed (commit is safe locally; will go up with the next push): $(tail -1 /tmp/pc-push-$$.err 2>/dev/null)"; fi
+        rm -f /tmp/pc-push-$$.err
+      fi
+      exit 0
     fi
   fi
   if grep -q "index.lock" /tmp/pc-commit-$$.err 2>/dev/null; then sleep $((attempt)); continue; fi
