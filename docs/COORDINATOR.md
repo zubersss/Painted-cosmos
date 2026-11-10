@@ -161,3 +161,5 @@ it goes on to the next milestone's work.
   pushed; `tools/commit.sh` pushes after each commit. The two roles keep sharing one branch
   (they were already mid-work in one tree; splitting now would only add merge work).
   GitHub Pages is to be served from `main` after the M4 merge.
+- 2026-11-10: the owner switched GitHub Pages on, serving `main` at the root. It shows nothing
+  playable until the M4 merge. Address: `https://zubersss.github.io/Painted-cosmos/`.
