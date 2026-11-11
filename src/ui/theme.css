@@ -1,0 +1,158 @@
+/* The painted interface (art bible 8). Layout and the paper look; the lettering, the paper
+   tile, the torn-edge filters, the ink rings and the cursor are made in src/ui/paint.js and
+   arrive here as custom properties and SVG. Nothing in this file animates except the three
+   loading dabs (two changes a second) and slow fades: the theme cannot shimmer.
+
+   Paper: every panel and slip is a piece of torn cold-press paper (::before carries the
+   generated tile and the torn-edge filter, so the lettering on top stays crisp). Ink on
+   paper is what makes the interface readable on a pale wash and on the indigo of space. */
+:root { --pc-paper: #f4efe4; --pc-ink: #2f3a5d; --pc-dark: #232a45; --pc-sepia: #584435; --pc-accent: #b6623c;
+  --pc-paper-img: none; --pc-cursor: crosshair; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-paper); }
+#pc-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: var(--pc-cursor), crosshair; }
+.pc-hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; color: var(--pc-dark); user-select: none;
+  font: 15px/1.35 Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; cursor: var(--pc-cursor), default; }
+.pc-hud.pc-waiting > :not(.pc-start) { visibility: hidden; }
+.pc-hud.pc-paneled > :not(.pc-panel) { visibility: hidden; }
+.pc-ink { display: block; overflow: visible; }
+.pc-icon { display: block; flex: none; }
+.pc-label { color: var(--pc-sepia); }
+
+/* ---- paper ---- */
+.pc-panel, .pc-button, .pc-readout, .pc-gauge, .pc-notice, .pc-hint, .pc-mark span, .pc-newsketch, .pc-stats {
+  position: relative; isolation: isolate; }
+.pc-panel::before, .pc-button::before, .pc-readout::before, .pc-gauge::before, .pc-notice::before, .pc-hint::before,
+.pc-mark span::before, .pc-newsketch::before, .pc-stats::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.16), inset 0 0 14px rgba(88, 68, 53, 0.13);
+  filter: url(#pc-rag) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+.pc-panel::before { inset: -4px; box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.14), inset 0 0 34px rgba(88, 68, 53, 0.14);
+  filter: url(#pc-torn) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
+.pc-panel { padding: 22px 30px; }
+
+/* ---- prompt: a key in ink, an action in the hand ---- */
+kbd { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 25px; height: 24px; padding: 0 7px;
+  color: var(--pc-paper); background: var(--pc-ink); border-radius: 5px 7px 4px 8px / 7px 4px 8px 5px; filter: url(#pc-rough); }
+.pc-prompt { position: absolute; left: 0; right: 0; bottom: 16%; display: flex; justify-content: center; gap: 18px; opacity: 0;
+  transition: opacity 0.25s ease; }
+.pc-prompt.pc-on { opacity: 1; }
+.pc-button { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px 7px 9px; }
+
+/* ---- gauges: a wash filling a pencilled bar ---- */
+.pc-gauges { position: absolute; left: 50%; bottom: 9.5%; transform: translateX(-50%); display: flex; gap: 22px; }
+.pc-gauge { opacity: 0; transition: opacity 0.4s ease; display: flex; align-items: center; gap: 7px; padding: 4px 12px 4px 8px; }
+.pc-gauge.pc-on { opacity: 1; }
+.pc-gauge .pc-label { color: var(--pc-dark); }
+.pc-gauge > b { display: block; width: 118px; height: 8px; box-sizing: border-box; border: 1.3px solid var(--pc-ink);
+  border-radius: 4px 6px 4px 7px / 6px 4px 7px 4px; overflow: hidden; filter: url(#pc-rough); }
+.pc-gauge > b > i { display: block; height: 100%; width: 100%; background: #4d60b2; opacity: 0.72; }
+.pc-gauge-fuel > b > i { background: var(--pc-accent); }
+
+.pc-readout { position: absolute; left: 7%; bottom: 9.5%; padding: 7px 13px 5px; opacity: 0; transition: opacity 1.2s ease; }
+.pc-readout.pc-on { opacity: 1; }
+.pc-reticle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50% 44% 52% 46%;
+  background: var(--pc-dark); box-shadow: 0 0 0 1.5px rgba(244, 239, 228, 0.7); opacity: 0; }
+.pc-reticle.pc-on { opacity: 0.5; }
+.pc-notice { position: absolute; left: 0; right: 0; bottom: 24%; width: max-content; max-width: 80%; margin: 0 auto; padding: 7px 16px 5px;
+  opacity: 0; transition: opacity 0.5s ease; }
+.pc-notice.pc-on { opacity: 1; }
+.pc-hint { position: absolute; left: 0; right: 0; top: 8.5%; margin: 0 auto; width: max-content; max-width: 86%; padding: 6px 14px 4px;
+  opacity: 0; transition: opacity 0.6s ease; }
+.pc-hint.pc-on { opacity: 1; }
+
+/* ---- markers: a ring pulled round a world with a loaded brush, its name on a slip ---- */
+.pc-marks { position: absolute; inset: 0; overflow: hidden; }
+.pc-mark { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.pc-mark i { position: absolute; left: 0; top: 0; display: block; }
+.pc-mark svg { position: absolute; overflow: visible; }
+.pc-ring-ink { fill: none; stroke: rgba(35, 42, 69, 0.55); stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; }
+.pc-ring-paper { fill: none; stroke: var(--pc-paper); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: url(#pc-rough); }
+.pc-mark-body .pc-ring-ink { stroke-width: 2.6; stroke: rgba(35, 42, 69, 0.4); }
+.pc-mark-body .pc-ring-paper { stroke-width: 1.3; opacity: 0.85; }
+.pc-mark span { position: absolute; left: 0; transform: translateX(-50%); width: max-content; padding: 4px 9px 2px; color: var(--pc-dark); }
+.pc-mark span .pc-ink { position: relative; }
+.pc-mark-body span { opacity: 0.85; }
+
+/* ---- the frame read-out is an instrument, not part of the painting: plain type on a slip ---- */
+.pc-stats { position: absolute; left: 7%; top: 9%; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre;
+  color: var(--pc-dark); padding: 8px 12px; display: none; }
+.pc-stats.pc-on { display: block; }
+
+/* ---- the title and help card (also the loading screen) ---- */
+#pc-loading { position: fixed; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 7vh; box-sizing: border-box; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  color: var(--pc-sepia); font: italic 18px Georgia, serif; letter-spacing: 0.08em; transition: opacity 0.8s ease; pointer-events: none; }
+#pc-loading.pc-done { opacity: 0; }
+.pc-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 548px;
+  padding: 26px 36px 24px; opacity: 0; transition: opacity 0.5s ease; display: flex; flex-direction: column; align-items: center; }
+.pc-start.pc-on { opacity: 1; }
+.pc-title { color: var(--pc-dark); margin-bottom: 4px; }
+.pc-start .pc-sub { margin-top: 2px; }
+.pc-status { display: flex; align-items: center; gap: 10px; margin: 13px auto 2px; padding: 7px 18px 5px; color: var(--pc-paper);
+  background: var(--pc-ink); border-radius: 6px 12px 7px 11px / 11px 6px 12px 7px; filter: url(#pc-rough); }
+.pc-status.pc-wait { color: var(--pc-dark); background: none; filter: none; }
+.pc-dabs { display: none; gap: 5px; }
+.pc-status.pc-wait .pc-dabs { display: flex; }
+.pc-dabs b { width: 9px; height: 9px; border-radius: 55% 45% 50% 48% / 48% 52% 46% 54%; background: var(--pc-accent); opacity: 0.16; }
+/* Three dabs laid one after another: two steps a second, no tweening (a hand, not a spinner). */
+.pc-dabs b:nth-child(1) { animation: pc-dab1 2s steps(1) infinite; }
+.pc-dabs b:nth-child(2) { animation: pc-dab2 2s steps(1) infinite; background: #dba436; }
+.pc-dabs b:nth-child(3) { animation: pc-dab3 2s steps(1) infinite; background: #4d60b2; }
+@keyframes pc-dab1 { 0% { opacity: 0.16; } 25%, 100% { opacity: 0.8; } }
+@keyframes pc-dab2 { 0%, 25% { opacity: 0.16; } 50%, 100% { opacity: 0.8; } }
+@keyframes pc-dab3 { 0%, 50% { opacity: 0.16; } 75%, 100% { opacity: 0.8; } }
+.pc-help { align-self: stretch; margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 26px; color: var(--pc-dark); }
+.pc-help > span { display: flex; align-items: center; gap: 9px; }
+.pc-help em { grid-column: 1 / -1; margin-top: 8px; padding-bottom: 4px; color: var(--pc-sepia); border-bottom: 1.2px solid rgba(88, 68, 53, 0.4); }
+.pc-help kbd { height: 21px; min-width: 22px; padding: 0 6px; }
+
+/* ---- the map ---- */
+.pc-map { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 720px;
+  padding: 18px 22px 16px; display: none; flex-direction: column; align-items: center; pointer-events: auto; }
+.pc-map.pc-on { display: flex; }
+.pc-map canvas { display: block; width: 680px; height: 400px; margin: 4px auto 8px; cursor: var(--pc-cursor), pointer; }
+.pc-map-line { color: var(--pc-dark); min-height: 18px; }
+
+/* ---- the sketchbook ---- */
+.pc-book { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 860px;
+  padding: 18px 24px 14px; display: none; pointer-events: auto; text-align: left; }
+.pc-book.pc-on { display: block; }
+.pc-book-head { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 1.2px solid rgba(88, 68, 53, 0.4);
+  padding-bottom: 6px; margin-bottom: 10px; }
+.pc-book .pc-title { margin: 0; }
+.pc-book-tally { color: var(--pc-dark); }
+.pc-book-body { display: grid; grid-template-columns: 128px 1fr; gap: 0 18px; }
+.pc-book-tabs { display: flex; flex-direction: column; gap: 3px; }
+.pc-book-tab { all: unset; cursor: var(--pc-cursor), pointer; display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 9px 4px; color: var(--pc-dark); border-radius: 4px 9px 5px 10px / 9px 4px 10px 5px; }
+.pc-book-tab span { color: var(--pc-sepia); }
+.pc-book-tab.pc-dim b { opacity: 0.5; }
+.pc-book-tab.pc-on { background: var(--pc-ink); color: var(--pc-paper); filter: url(#pc-rough); }
+.pc-book-tab.pc-on b { opacity: 1; }
+.pc-book-tab.pc-on span { color: var(--pc-paper); }
+.pc-book-page { min-height: 440px; }
+.pc-book-world { color: var(--pc-dark); margin-bottom: 3px; }
+.pc-book-sub { margin-bottom: 4px; color: var(--pc-dark); }
+.pc-book-kind { margin: 11px 0 6px; }
+.pc-book-grid { display: grid; grid-template-columns: repeat(5, 130px); gap: 8px 13px; }
+.pc-sketch { margin: 0; }
+.pc-sketch-frame { width: 130px; height: 73px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: 1.2px dashed rgba(88, 68, 53, 0.55); border-radius: 3px 6px 4px 7px / 6px 3px 7px 4px; background: rgba(88, 68, 53, 0.05);
+  color: var(--pc-sepia); }
+.pc-sketch.pc-on .pc-sketch-frame { border: none; background: #fbf8f1; padding: 3px;
+  box-shadow: 0 0 0 1px rgba(88, 68, 53, 0.45), 1px 2px 5px rgba(35, 42, 69, 0.25); }
+.pc-sketch:nth-child(3n+1).pc-on .pc-sketch-frame { transform: rotate(-0.8deg); }
+.pc-sketch:nth-child(3n+2).pc-on .pc-sketch-frame { transform: rotate(0.6deg); }
+.pc-sketch-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pc-sketch figcaption { margin-top: 4px; min-height: 30px; color: var(--pc-sepia); }
+.pc-sketch.pc-on figcaption { color: var(--pc-dark); }
+.pc-book-foot { margin-top: 8px; padding-top: 8px; border-top: 1.2px solid rgba(88, 68, 53, 0.3); display: flex; justify-content: center;
+  color: var(--pc-dark); }
+
+/* A new page in the sketchbook, shown as it is made: the sketch on a slip of paper. */
+.pc-newsketch { position: absolute; right: 6.5%; top: 9.5%; width: min(204px, 23vw); padding: 7px 7px 8px; color: var(--pc-dark);
+  opacity: 0; transform: translateY(-14px) rotate(4deg) scale(0.92); transition: opacity 0.7s ease, transform 0.7s ease; }
+.pc-newsketch.pc-on { opacity: 1; transform: rotate(1.6deg); }
+.pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; box-shadow: 0 0 0 1px rgba(88, 68, 53, 0.4); }
+.pc-newsketch b { display: block; margin-top: 7px; font-weight: normal; }
+.pc-newsketch span { display: block; margin-top: 1px; }

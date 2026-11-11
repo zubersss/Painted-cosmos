@@ -1,19 +1,32 @@
 // The sketchbook: one page per world, with a small sketch for every landscape walked and every
 // view found (kept at the moment it happened), and empty frames for the ones still to find.
 // B opens and closes it; the arrow keys (or a click on a tab) turn the pages.
-// A plain paper look until Painter's theme arrives.
-function el(tag, cls, parent, text) {
+// Painted like the rest of the interface (src/ui/paint.js): torn paper, hand lettering.
+import { ink, SIZE } from './paint.js';
+
+// el(tag, class, parent, text, size): `text` is lettered by hand at `size` (cap height, px).
+function el(tag, cls, parent, text, size) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
+  if (text != null) ink(e, text, size || SIZE.small);
   if (parent) parent.appendChild(e);
   return e;
+}
+
+// Break a caption into lines of at most `n` letters (lettering does not wrap by itself).
+function wrap(text, n) {
+  const out = [''];
+  for (const w of String(text).split(' ')) {
+    if (out[out.length - 1].length + w.length + 1 > n && out[out.length - 1]) out.push(w);
+    else out[out.length - 1] += (out[out.length - 1] ? ' ' : '') + w;
+  }
+  return out.join('\n');
 }
 
 export function createBook(root) {
   const panel = el('div', 'pc-panel pc-book', root);
   const head = el('div', 'pc-book-head', panel);
-  el('div', 'pc-title', head, 'sketchbook');
+  ink(el('div', 'pc-title', head), 'sketchbook', SIZE.head + 3, { rough: true, tracking: 1.1 });
   const tally = el('div', 'pc-label pc-book-tally', head, '');
   const body = el('div', 'pc-book-body', panel);
   const tabs = el('div', 'pc-book-tabs', body);
@@ -30,8 +43,8 @@ export function createBook(root) {
     const t = el('figure', 'pc-sketch' + (x.done ? ' pc-on' : '') + (kind === 'vista' ? ' pc-sketch-vista' : ''), parent);
     const frame = el('div', 'pc-sketch-frame', t);
     if (x.done && x.sketch) { const img = el('img', '', frame); img.alt = x.name; img.draggable = false; img.src = x.sketch; }
-    else el('span', '', frame, x.done ? 'no sketch kept' : kind === 'vista' ? 'a view to find' : 'not yet walked');
-    el('figcaption', '', t, x.name);
+    else el('span', '', frame, x.done ? 'no sketch kept' : kind === 'vista' ? 'a view to find' : 'not yet walked', SIZE.tiny);
+    el('figcaption', '', t, wrap(x.name, 19), SIZE.tiny);
     return t;
   }
 
@@ -41,30 +54,30 @@ export function createBook(root) {
     pages.forEach((q, i) => {
       const c = count(q);
       const b = el('button', 'pc-book-tab' + (i === at ? ' pc-on' : '') + (q.visited ? '' : ' pc-dim'), tabs);
-      el('b', '', b, q.name);
-      el('span', '', b, c.total ? `${c.done}/${c.total}` : '');
+      el('b', '', b, q.name, SIZE.body);
+      el('span', '', b, c.total ? `${c.done}/${c.total}` : '', SIZE.tiny);
       b.addEventListener('click', () => { at = i; draw(); });
     });
     page.innerHTML = '';
     if (!p) return;
     const nb = p.biomes.filter((x) => x.done).length, nv = p.vistas.filter((x) => x.done).length;
-    el('div', 'pc-book-world', page, p.name);
+    el('div', 'pc-book-world', page, p.name, SIZE.head);
     el('div', 'pc-label pc-book-sub', page, !p.visited ? 'not yet visited' + (p.biomes.length ? `: ${p.biomes.length} landscapes and ${p.vistas.length} views wait here` : '')
       : `${nb} of ${p.biomes.length} landscape${p.biomes.length === 1 ? '' : 's'} walked` + (p.vistas.length ? `, ${nv} of ${p.vistas.length} views found` : ''));
     if (p.biomes.length) {
-      el('div', 'pc-label pc-book-kind', page, 'landscapes');
+      el('div', 'pc-label pc-book-kind', page, 'landscapes', SIZE.tiny);
       const g = el('div', 'pc-book-grid', page);
       for (const x of p.biomes) tile(g, x, 'biome');
     }
     if (p.vistas.length) {
-      el('div', 'pc-label pc-book-kind', page, 'views');
+      el('div', 'pc-label pc-book-kind', page, 'views', SIZE.tiny);
       const g = el('div', 'pc-book-grid', page);
       for (const x of p.vistas) tile(g, x, 'vista');
     }
     let done = 0, total = 0;
     for (const q of pages) { const c = count(q); done += c.done; total += c.total; }
-    tally.textContent = total ? `${done} of ${total} pages drawn` : '';
-    foot.textContent = (hintText ? hintText + '  \u00b7  ' : '') + 'arrow keys turn the page, B closes';
+    ink(tally, total ? `${done} of ${total} pages drawn` : '', SIZE.small);
+    ink(foot, (hintText ? hintText + '\n' : '') + 'arrow keys turn the page, B closes', SIZE.small, { align: 'center' });
     // Fit the open book inside small windows (its laid-out size is not changed by the scale).
     panel.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / (panel.offsetWidth + 30), window.innerHeight / (panel.offsetHeight + 30))));
   }

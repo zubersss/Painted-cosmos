@@ -1,9 +1,10 @@
 // The planet map: a small ink-and-wash chart of the system on a paper panel. Click a world (or
 // use the arrow keys) to choose where the pulse drive should take you; M or Enter closes it.
-// Drawn in code on a 2D canvas with the fallback palette until Painter's theme supplies its own.
+// Drawn in code on a 2D canvas; names and the line under the chart are lettered by hand.
 import { BODIES, BODY_IDS } from '../data/bodies.js';
+import { ink, inkOnCanvas, SIZE } from './paint.js';
 
-const INK = '#2c3350', SEPIA = '#6b5a48', PAPER = '#f4efe4';
+const INK = '#232a45', SEPIA = '#584435';
 // Mock pigments per body (the painted palettes are Painter's; these only tell the dots apart).
 const TINT = {
   mercury: '#b9a58a', venus: '#d9b860', earth: '#7fa98c', moon: '#b8b8b4', mars: '#c5805c',
@@ -21,10 +22,10 @@ function el(tag, cls, parent, text) {
 
 export function createMap(root, { onSelect } = {}) {
   const panel = el('div', 'pc-panel pc-map', root);
-  el('div', 'pc-title', panel, 'the system');
+  ink(el('div', 'pc-title', panel), 'the system', SIZE.head + 3, { rough: true, tracking: 1.1 });
   const canvas = el('canvas', '', panel);
   canvas.width = W * 2; canvas.height = H * 2;
-  const line = el('div', 'pc-label', panel, '');
+  const line = el('div', 'pc-label pc-map-line', panel);
   const g = canvas.getContext('2d');
   let open = false, spots = [], selected = null, here = null, last = null;
 
@@ -35,7 +36,7 @@ export function createMap(root, { onSelect } = {}) {
   function draw(data) {
     last = data;
     g.setTransform(2, 0, 0, 2, 0, 0);
-    g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
+    g.clearRect(0, 0, W, H);                         // the chart is drawn straight on the panel's paper
     const cx = W / 2, cy = H / 2 + 4;
     // Orbits: broken, slightly uneven ink lines.
     g.lineCap = 'round';
@@ -76,16 +77,13 @@ export function createMap(root, { onSelect } = {}) {
         g.strokeStyle = '#b5553c'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x - size - 9, y + size + 7); g.lineTo(x - size - 3, y + size + 2); g.stroke();
         g.beginPath(); g.moveTo(x - size - 9, y + size + 7); g.lineTo(x - size - 2, y + size + 8); g.stroke();
       }
-      g.fillStyle = id === selected ? INK : SEPIA;
-      g.font = (id === selected ? 'italic 600 13px' : 'italic 12px') + ' Georgia, serif';
-      g.textAlign = 'center';
       // A moon's name goes under its dot so it does not sit on its planet's name.
-      g.fillText(b.name, x, pp ? y + size + 13 : y - size - 7);
+      inkOnCanvas(g, b.name, x, pp ? y + size + 13 : y - size - 7, id === selected ? 10.4 : 9.2, { align: 'center', color: id === selected ? INK : SEPIA, halo: 'rgba(244, 239, 228, 0.7)', seed: 2 });
       spots.push({ id, x, y, size });
     }
     const t = data.target;
-    line.textContent = t ? `${t.name}: ${fmt(t.distance)} away, about ${Math.max(1, Math.round(t.eta))} s by pulse drive`
-      : 'click a world to set a course';
+    ink(line, t ? `${t.name}: ${fmt(t.distance)} away, about ${Math.max(1, Math.round(t.eta))} s by pulse drive`
+      : 'click a world, or use the arrow keys, to set a course', SIZE.body);
   }
 
   function pick(id) {

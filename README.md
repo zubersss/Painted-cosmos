@@ -4,7 +4,7 @@ A calm exploration game for desktop browsers: walk, use the jetpack, board your 
 through the atmosphere into space with no loading screen, and land again. Every frame is meant
 to look like a watercolour landscape on cold-press paper.
 
-Status: milestone 3 (sketchbook, views to find, sound). See `docs/notes/` and `docs/lead/TRACK.md`
+Status: milestone 3 (sketchbook with sketches, views to find, sound, the painted interface). See `docs/notes/` and `docs/lead/TRACK.md`
 for what is done and what is not.
 
 ## Play
@@ -50,7 +50,7 @@ Anywhere
 
 | Key | Action |
 | --- | --- |
-| B | the sketchbook: worlds visited, landscapes walked, views found, and where the nearest unfound view is |
+| B | the sketchbook: a page per world with a sketch of every landscape walked and every view found (arrow keys turn the pages) |
 | H | the help card (these controls) |
 | ` (backquote) | frame read-out: frame time, triangles, draw calls, render scale, quality tier |
 
@@ -60,7 +60,8 @@ continues from there on the next visit. Add `?fresh=1` to the address to start a
 If the browser will not capture the mouse (or reports nonsense while it does), the game says so
 and you look around by holding the left button and dragging.
 
-Each world has marked views to find: walk up to one and it goes into the sketchbook. All sound
+Each world has marked views to find: walk up to one and it goes into the sketchbook, with a
+small sketch of the moment (so does every landscape the first time you walk into it). All sound
 is made in code (wind that follows the real wind, rain, thunder, the ship, the jetpack,
 footsteps, a quiet pad per planet); `?audio=0` turns it off.
 
@@ -103,7 +104,9 @@ the tier at 0, the machine cannot hold 60 frames a second in that view.
     node tests/trip.mjs              # Earth to Mars to Saturn in one sitting, then a reload
                                      # that continues from the save
     node tests/lockcheck.mjs         # the pointer-lock fallback
-    node tests/m3check.mjs           # starting tier, look hint, sketchbook, help, a view found, audio
+    node tests/m3check.mjs           # starting tier, look hint, sketchbook and its sketches, help, a view found, audio
+    node tests/audiocheck.mjs        # the sound, measured: every situation rendered through the game's
+                                     # own audio graph and checked for level, clipping, DC, clicks
     node tests/tour.mjs              # every biome of every body at 960x540: contact sheets in
                                      # docs/lead/evidence/tour-<body>.jpg (slow in software GL)
 
@@ -112,7 +115,9 @@ the tier at 0, the machine cannot hold 60 frames a second in that view.
     index.html, src/main.js      boot
     src/core/                    simulation (pure), presenter, providers, stubs
     src/player/, src/ship/       explorer, cameras, flight (pure, unit-tested)
-    src/ui/                      HUD
+    src/ui/                      the painted interface: HUD, map, sketchbook; paper, ink and hand
+                                 lettering made in code (paint.js, lettering.js, theme.css)
+    src/audio/                   all sound, made in code
     src/data/bodies.js           physical data per body
     src/render, src/world, src/art   the painted pipeline, worlds and models (Painter)
     src/physics                  physical models (Physics)

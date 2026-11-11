@@ -283,7 +283,7 @@ export class Game {
         const title = w.kind === 'vista' ? w.name : hit ? hit.name : pretty(w.id);
         const pr = this.bookProgress();
         this.lastSketch = { key: k, title, t };
-        if (this.hud && this.hud.showSketch) this.hud.showSketch(url, title, `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}  \u00b7  B opens the sketchbook`);
+        if (this.hud && this.hud.showSketch) this.hud.showSketch(url, title, `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}\nB opens the sketchbook`);
         if (this.audio) this.audio.event('sketch');
       }
       break;                                // one picture a frame is plenty
@@ -399,6 +399,7 @@ export class Game {
     const panelOpen = (this.map && this.map.open) || (this.book && this.book.open);
     hud.setPrompt(panelOpen ? null : sim.promptNow);
     if (panelOpen && hud.sketchShown) hud.hideSketch();
+    if (hud.root) hud.root.classList.toggle('pc-paneled', !!panelOpen);      // an open panel has the page to itself
     if (hud.setHint) {
       // Until the player has looked around once (and again whenever the capture is lost), say how.
       const need = this.started && !this.input.looked && !panelOpen && this.hintOn !== false;
