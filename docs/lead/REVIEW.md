@@ -10,6 +10,82 @@ are relative, never a claim about a real GPU.
 
 ---
 
+## Review 3: 2026-11-11, at commit `22a10c3` (Painter's `ff51af7` and `1e1801e`, Physics' P2 work in progress)
+
+Short pass, during M2. What I ran:
+- Frame cost standing at the spawn of every body in the integrated game (quality 1, 400x225,
+  clean export of `ee4c336`; counters from the game's read-out).
+- `tests/contract.test.mjs`: 40 landings (the spawn and three other places on each of the ten
+  bodies) and the Earth-Mars-Saturn trip on Painter's real worlds with Physics on.
+- `node --test src/physics/` on a clean export of `22a10c3`: 158 pass.
+  `node --test src/world/*.test.mjs`: 12 pass.
+- The scripted trip and the M1 loop inside the painted worlds (results in Pilot's notes).
+- Looked at `docs/shots/painter/` (960x540): venus, neptune, mercury from orbit.
+
+### PAINTER (M2 in progress)
+
+MUST FIX (M2)
+
+1. **Neptune's spawn is over budget: 727 k triangles at quality 1** (`kelp_forests`; budget
+   600 k). Every other body is inside it:
+
+   | body (biome at the spawn) | triangles | draw calls |
+   | --- | --- | --- |
+   | mercury (obsidian_fields) | 442 k | 296 |
+   | venus (lava_rivers) | 312 k | 183 |
+   | earth (temperate_forest) | 450 k | 266 |
+   | moon (mare) | 333 k | 166 |
+   | mars (dry_riverbeds) | 457 k | 247 |
+   | jupiter (storm_wall) | 390 k | 206 |
+   | saturn (gold_islands) | 394 k | 240 |
+   | uranus (ice_shelves) | 334 k | 170 |
+   | **neptune (kelp_forests)** | **727 k** | 295 |
+   | pluto (lilac_mountains) | 443 k | 190 |
+
+SHOULD FIX
+
+2. **`world.busy` never drains after moving to another body.** After a teleport to each
+   planet in turn it sat at 138 to 197 for 90 s and more (it reaches 0 on Earth at boot). If
+   those are jobs for bodies the camera has left, they should be dropped; if they are for the
+   body in view, something is starved. It is my readiness signal (`__pcReady`, `settle()`).
+3. **`world.update` while building**: 8.5 ms on Mercury, 9.4 on Mars, 8.8 on Neptune, 6.3 on
+   Earth (smoothed, right after arrival). Budget 5 ms a frame, upheld by the coordinator.
+4. **Venus, fungal towers** (`docs/shots/painter/venus-fungal_towers.jpg`): the strongest idea
+   so far, and the busiest frame: every stalk carries the same ruler-straight vertical hatch
+   (AB 4), the orange foreground shapes are flat cut-outs with hard edges, and nothing recedes
+   into the "amber cloud" the brief asks for (AB 5). Thin it: fewer, larger shapes far away.
+5. **Neptune, storm seas**: a calm lake under a fair sky. Lovely, not a storm sea. With
+   Physics' waves and weather now available this is the frame that should move most in M3.
+
+GOOD
+
+- Every body can be landed on and walked on, in every biome I tried: 40 of 40 landings,
+  28 biomes, three of them afloat on Jupiter's and Neptune's liquid.
+- Mars and Saturn arrived first, as planned, and the scripted trip plays through them.
+- Space from orbit (`mercury-orbit.jpg`): the pepper of review 1 is gone; a soft wash with
+  salt marks and a pale rim on the globe. Review 1 item 8 closed.
+- `1e1801e` takes up review 2's items: violet shade glaze, wandering shores, and the Physics
+  flora field is wired (not yet seen by me in the game: for review 4).
+
+### PHYSICS (P2 in progress)
+
+No MUST FIX.
+
+- GOOD: asked for and delivered within the hour: `cmd.brake` (the drive field as a named
+  brake, vacuum only by my choice; my special case is gone), a tested lift-off through the
+  gear, a line about the step functions moving `st.p` in place. 158 tests pass on a clean
+  export.
+- SHOULD FIX: at one point during the restart recovery 7 of 154 tests failed in the working
+  tree (uncommitted, mid-edit). Nothing wrong with that, but the other two roles run your
+  tests from the same tree: commit green, or say in the notes when the tree is known red.
+- SHOULD FIX: in the browser, under load, I still see a worst `physics.update` frame of about
+  5 ms on the read-out (0.3 to 0.6 ms on average). Software GL and three busy processes make
+  that number soft; it wants one look on a quiet machine.
+- Open on my side, not yours: I do not yet call the gear lift-off (my sequence still sets the
+  velocity for 2.8 s). First thing in M3 with the real ship model.
+
+---
+
 ## Review 2: 2026-11-11, at commit `a9c02bc` (includes Painter's `b2bfcae` and `6a31de3`, Physics' `b0ad22b`)
 
 What I ran:
