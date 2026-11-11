@@ -5,10 +5,12 @@ here, write the request in your notes file and report it; the coordinator record
 
 ## A. How this build is set up (and why)
 
-- **Mode: two parallel subagents in one session, one shared branch.** No GitHub repository for
-  this game was attached to the session, and the only reachable repositories are the owner's
-  other projects, which the brief says to leave alone. Separate cloud threads would have had no
-  shared remote to sync through, so the brief's fallback applies.
+- **Mode: parallel subagents in one session, one shared branch.** No GitHub repository for
+  this game was attached when the session began, so the brief's fallback applied: the roles run
+  as subagents sharing one branch and one working tree.
+- **UPDATE 2026-11-11: there are now THREE workers.** The owner asked for a third role,
+  **PHYSICS**, devoted to how everything moves (section F below). This replaces the brief's
+  "exactly two". PAINTER and PILOT keep their ownership and milestones unchanged.
 - **Repository:** `/home/user/painted-cosmos`. Shared work branch: **`cosmos`**. `main` holds the
   bootstrap commit and receives the finished game at M4.
   **UPDATE 2026-11-10: a remote now exists**, `origin` = `https://github.com/zubersss/painted-cosmos`
@@ -16,9 +18,10 @@ here, write the request in your notes file and report it; the coordinator record
   so keep using it exactly as before and commit often; nothing else changes. Both roles stay on
   the one shared branch in the one working tree. At M4, Pilot opens the one pull request
   `cosmos` -> `main` (the owner has given permission to merge it).
-- **Both roles work in the same working tree.** You see each other's files the moment they are
+- **All roles work in the same working tree.** You see each other's files the moment they are
   saved, including half-written ones. Rules that keep this safe:
-  1. Commit with `tools/commit.sh painter "msg"` or `tools/commit.sh pilot "msg"`. It stages and
+  1. Commit with `tools/commit.sh painter "msg"`, `tools/commit.sh pilot "msg"` or
+     `tools/commit.sh physics "msg"`. It stages and
      commits only your own paths. Never `git add -A`, `git add .`, `git commit -a`, `git stash`,
      `git reset --hard`, `git checkout -- <path>`, `git clean`, rebase, or amend.
   2. Never create, edit, move, or delete a file outside your ownership list, not even to fix an
@@ -29,11 +32,13 @@ here, write the request in your notes file and report it; the coordinator record
      `node tools/shot.mjs /index.html out.jpg --root <dir>`.
   4. Scratch files (trial screenshots, logs, experiments) go in your own scratch directory
      outside the repo, never in the repo: `/home/user/.pc-scratch/painter/` or
-     `/home/user/.pc-scratch/pilot/`.
-  5. Do not start further agents or threads. There are exactly two workers.
+     `/home/user/.pc-scratch/pilot/`, `/home/user/.pc-scratch/physics/`.
+  5. Do not start further agents or threads. Only the owner adds workers.
 - **Extra ownership (not named in the brief):**
   PILOT also owns `/.nojekyll`, `/.gitignore`, `/package.json` (dev only, if wanted),
   `/docs/shots/pilot/**`. PAINTER also owns `/docs/shots/painter/**`.
+  PHYSICS owns `/src/physics/**`, `/physics-lab.html`, `/docs/notes/physics.md`,
+  `/docs/shots/physics/**`.
   The coordinator owns `/docs/BRIEF.md`, `/docs/COORDINATOR.md`, `/tools/**`.
 - **Bootstrap done by the coordinator (one time, so neither role waits):**
   `vendor/three/` (Three.js r187, pinned: `three.module.js` + `three.core.js` + LICENSE; owned
@@ -154,6 +159,59 @@ verified, needs for the other role, contract changes, and the next step. The coo
 records outcomes below, and resumes the role at once. A role that finishes early does not wait:
 it goes on to the next milestone's work.
 
+## F. The third role: PHYSICS (added by the owner on 2026-11-11)
+
+The owner's words: "Make 1 more agent that focuses on the physics of the game from the wind the
+grass trees sand how you interact with them how they move displace around you and around each
+other just focusing on the physics aspect from acceleration of the ship to running try to get
+the physics to be as realistic as possible with the weather as well from how rain behaves to
+storms and snow and weather on the other planets hyperfocus on making the physics for this
+agent's role".
+
+**Division of labour.** PHYSICS decides how things move: the physical models and their
+constants (forces, masses, drag, friction, stiffness, fall speeds, wind and weather behaviour).
+PILOT still decides how input becomes commands, the assist layer (auto-level, landing assist,
+cushioning), the cameras, the state machine, the frame budget, and the architecture. PAINTER
+still decides how every bit of it is drawn. PHYSICS never draws game visuals and never edits
+another role's files: it ships models, fields, and buffers; PILOT and PAINTER wire them into
+their own files.
+
+**Tie-breaks (extends section 5 of the brief).** Look: Painter. Control feel, performance,
+architecture: Pilot. Physical behaviour: Physics. Where a realistic model would make the player
+fight the controls, keep the realistic model and add or strengthen an assist on top of it,
+rather than faking the physics underneath. Still stuck after one exchange: the coordinator.
+
+**C14. Physics contract (starting shape; PHYSICS owns the final API and documents it at the top
+of `docs/notes/physics.md`).** Everything in `src/physics/**` is pure logic with no `three` and
+no DOM, on the same plain `{x,y,z}` vectors as `src/core/vec.js`, in **body-local** coordinates,
+metres and seconds, deterministic for a given seed and time, allocation-free in hot loops.
+- `src/physics/index.js`: `createPhysics({ sampleSurface, seed }) -> physics`.
+  `physics.update(dt, frame)` once per frame, called by Pilot (and by Painter in the gallery),
+  with `frame = { bodyId, time, focus (body-local point the simulation centres on), sunDir,
+  disturbers: [{ kind: 'explorer'|'ship'|'jet'|'downwash', p, v, radius, strength }] }`.
+  `physics.setQuality(0|1|2)`.
+- Environment queries (cheap, callable many times per frame):
+  `physics.air(bodyId, p) -> { density, wind: {x,y,z}, gust01, temperature }`,
+  `physics.weather(bodyId, p) -> { kind, intensity01, precipitation, wetness01, snowDepth,
+  visibility01, lightning }`,
+  `physics.ground(bodyId, unitDir) -> { material, friction, restitution, sink, drag }`.
+- Dynamics models for Pilot's controllers (pure step functions in the style of
+  `stepExplorer` / `stepFlight`): explorer body (traction, acceleration, slopes, wading, wind
+  load, jetpack) and ship body (thrust, drag, gravity, hover, landing gear, turbulence, pulse
+  acceleration). Pilot calls them from `src/player` and `src/ship` and keeps its assists on top.
+- Fields and buffers for Painter (typed arrays; Painter wraps them in textures and attributes):
+  a wind-and-disturbance field around `focus` for flora, with a GLSL chunk (exported as a
+  string) that bends a plant from that field so the shader and the CPU model agree; a ground
+  deformation field (footprints, trails, landing marks, drifts); particle buffers per kind
+  (rain, snow, dust, sand, ash, spores, leaves, spray) with positions, velocities, sizes, ages.
+- Additive hook: `world.setPhysics(physics)` (Painter implements, Pilot calls once after
+  creating both), so the world reads the fields in `world.update`.
+- Budget: all of physics within about 2 ms of CPU per frame at quality 1 on a laptop; Pilot
+  polices it.
+- Tests live next to the code (`src/physics/**/*.test.mjs`, run with
+  `node --test src/physics/`); Pilot adds that command to "every check".
+- Timing: PAINTER and PILOT finish M1 as planned and start wiring physics in during M2.
+
 ## E. Settled outcomes (log)
 
 - 2026-11-10: bootstrap as described in A. Branch for both roles: `cosmos`.
@@ -163,3 +221,6 @@ it goes on to the next milestone's work.
   GitHub Pages is to be served from `main` after the M4 merge.
 - 2026-11-10: the owner switched GitHub Pages on, serving `main` at the root. It shows nothing
   playable until the M4 merge. Address: `https://zubersss.github.io/Painted-cosmos/`.
+- 2026-11-11: the owner added a third worker, PHYSICS (section F). Ownership: `src/physics/**`,
+  `physics-lab.html`, its notes and shots. Tie-break added: physical behaviour goes to Physics;
+  realism is kept and made forgiving with assists, not faked. Same branch, same tree, same rules.
