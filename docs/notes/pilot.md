@@ -4,9 +4,35 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Status
 
-**M2 (Pilot's half): in place; see "Verified" for what is proven and "Not verified" for what
-is not.** M1 is closed (coordinator). I am also the LEAD DEVELOPER: `docs/lead/REFERENCES.md`,
-`REVIEW.md` (review 2 closes PAINTER's M1), `TRACK.md`.
+**M3 (Pilot's half): in place** (sketchbook and vistas, audio, title and help, HUD legibility,
+careful starting tier, the tour script); M2 is accepted (coordinator); review 4 waits for the
+fresh PAINTER's report. I am also the LEAD DEVELOPER: `docs/lead/REFERENCES.md`, `REVIEW.md`,
+`TRACK.md`.
+
+What M3 added:
+- **Vistas and the sketchbook.** Walking within 14 m of a vista's spot on foot finds it: a line
+  on screen, a three-note chime, `world.setVistaFound(body, id, true)`, and an immediate save.
+  B opens the sketchbook (`src/ui/book.js`): each world, the landscapes walked (biome ids and
+  how many of the world's total), the views found, and where the nearest unfound view is.
+- **Audio** (`src/audio/audio.js`, WebAudio, no files): a wind bed that follows
+  `physics.here.air` (speed and gusts) and fades to silence in space and on airless bodies;
+  rain by `weather.precipitation.intensity01`; thunder when `lightning.thunderIn` reaches
+  zero; the ship (two oscillators that follow thrust, a whine for the pulse, air over the hull
+  by speed); the jetpack; footsteps on the stride; a pad per planet that breathes in and out
+  over about 100 s; paper and brush sounds for panels and prompts. It starts on the first
+  click or key (browsers require that) and every gain moves on a ramp. `?audio=0` is silence.
+- **Title and help.** The start card is the title ("a watercolour to walk into", or "your
+  journey continues on Mars" after a save); H shows it again as the help card.
+- **HUD legibility** (coordinator's item 2): read-outs, gauges, notices and marker labels sit
+  on slips of paper (ink on paper reads over any wash, light or indigo); the prompt has an
+  ink edge. Still the fallback look; PAINTER's theme replaces it.
+- **Looking around** (item 5): until the player has looked once, and again whenever the mouse
+  capture is lost, a line at the top says how ("click the picture..." or "hold the left mouse
+  button and drag to look around").
+- **Weak GPUs** (item 4): the game starts at quality 1 and render scale 0.75 and climbs; it
+  never starts high and falls. README says so next to the read-out key.
+- **The tour** (item 1): `node tests/tour.mjs` stands in every biome of every body in the
+  integrated game at 960x540 and quality 1 and writes `docs/lead/evidence/tour-<body>.jpg`.
 
 What M2 added:
 - **Pulse drive** (`src/ship/pulse.js`): F in space. Accelerates at 400 m/s2 along the nose,
@@ -232,19 +258,53 @@ Pulse (`src/ship/pulse.js` PULSE): top speed 30 km/s, 400 m/s2, spool 0.9 s, let
 ## Needs from the other
 
 ### From PAINTER
-1. **Mars and Saturn first** (as you plan), so the trip can be played in the painted worlds;
-   each needs a spawn-like flat dry place under the arrival point less than it needs detail.
-2. **Markers.** My planet markers are DOM rings. If you would rather paint them (a brush ring
-   and a hand-lettered name in the sheet pass), tell me the hook; I can hand you
-   `[{ id, x, y, r, label, sub, kind }]` in screen pixels each frame.
-3. **Pulse.** In PULSE `setMood.speed01` is 1 and the ship's `animate` mode is `'pulse'`.
-   M3: streak and soften the far washes with it.
-4. **`sampleObstacles`**: is the list capped (I see about 260 at 70 m)? If so, nearest first?
-5. `world.update` worst frames are still above 5 ms (REVIEW 2, item 4).
-6. `src/art/ui.css` and the text helper when you get to them (M3). Class names in use:
-   `pc-hud`, `pc-panel`, `pc-button`, `pc-title`, `pc-label`, plus mine: `pc-prompt`,
-   `pc-gauge`, `pc-readout`, `pc-reticle`, `pc-start`, `pc-help`, `pc-notice`, `pc-marks`,
-   `pc-mark` (`-target`, `-body`, `-edge`), `pc-stats`, `pc-map`, state class `pc-on`.
+(Written to be read cold by the fresh PAINTER. The contract is `docs/COORDINATOR.md` C1 to C14;
+this is what the game consumes today and what is open.)
+
+What I call, every frame, in this order: place `world.sun` and every root in `world.bodies`
+(the camera is always at the scene origin; never use `camera.position` as a place on a
+planet); `physics.update`; `world.update(dt, camera.position, activeBodyId)`;
+`painter.setMood({ bodyId, biomeWeights, biomeId, timeOfDay, altitude01, inSpace01, speed01 })`;
+`painter.render(scene, camera, dt)`. Once: `world.setPhysics(physics)`. Also used:
+`sampleSurface` (I read `radius`, `normal`, `slope`, `liquidRadius`, `biomeId`, `biomeWeights`,
+`canopyHeight`), `getSpawn`, `sampleObstacles(bodyId, dir, radius)` (radius 45 m or less),
+`getVistas`, `setVistaFound`, `getBiomes`, `findBiome`, `busy`, `setBuildBudget`,
+`createExplorer` / `createShip` with `userData.seat` and `userData.hatch`.
+
+Open, most important first:
+1. **Cost on every planet** (REVIEW 3, MUST FIX 1): Neptune's spawn measured 727 k triangles at
+   quality 1 against a budget of 600 k and 350 draw calls (300 k at quality 0, 1.2 M at
+   quality 2). Measure in the integrated game with the read-out (` key, or
+   `index.html?stats=1&quality=1&dynres=0`), not only in the gallery.
+2. **`world.busy` must reach 0** when the view is built, also after the camera has moved to
+   another body. It is my readiness signal (`window.__pcReady`, `__pc.settle()`), and the tour
+   waits on it: a frame that never settles is captured after 75 s and marked "(unsettled)".
+3. **`world.update` inside 5 ms a frame** while building (REVIEW 3 measured 8.5 to 9.4 ms on
+   Mercury, Mars and Neptune right after arrival).
+4. **Terrain ceiling**: keep walkable ground below `radius + 0.8 x spaceAltitude(body)`
+   (`src/data/bodies.js`; `tests/contract.test.mjs` checks it). Tell me if a body needs more.
+5. **Liquid edges**: where a biome's liquid ends against a neighbour without one, the liquid
+   surface must come down to the ground, not stop as a wall. The landing assist now treats a
+   wall as a wall, but an explorer wading into one is in trouble.
+6. **When landforms change, spawns may move**: `getSpawn(body)` must stay dry, with a slope
+   under 20 degrees and room for a 9 m ship 16 m away (also checked by the contract test).
+7. **Vistas**: I find one when the explorer is within 14 m of `unitDir` on foot. Put them where
+   a walker can stand (not on a cliff face or under liquid), and paint the marker so it can be
+   seen from about 100 m. `setVistaFound(body, id, true)` is called at once and again after a
+   load.
+8. **Markers**: `painter.setMarks(list)` for M3, as you proposed: I will send
+   `[{ id, x, y, r, label, sub, kind: 'target' | 'body' | 'edge', angle }]` in CSS pixels each
+   frame and remove my DOM rings.
+9. **Pulse**: in PULSE `setMood.speed01` is 1 and the ship's `animate` mode is `'pulse'`:
+   streak and soften the far washes.
+10. **The ui theme** (`src/art/ui.css`) and the text helper. Class names in use: `pc-hud`,
+    `pc-panel`, `pc-button`, `pc-title`, `pc-label`, plus mine: `pc-prompt`, `pc-gauge`,
+    `pc-readout`, `pc-reticle`, `pc-start`, `pc-help`, `pc-notice`, `pc-hint`, `pc-marks`,
+    `pc-mark` (`-target`, `-body`, `-edge`), `pc-stats`, `pc-map`, `pc-book`, state `pc-on`.
+11. **Real models**: the cockpit view puts the camera at `userData.seat` looking along -Z with
+    a 0.12 m near plane; `animate` receives explorer `{ mode: 'idle'|'walk'|'jet'|'fall'|'wade',
+    speed, jet01, lookPitch }` (the "walk" is a 4.2 m/s jog) and ship `{ mode: 'landed'|'hover'|
+    'fly'|'pulse', throttle01, gear01, canopy01 }`.
 
 ### From PHYSICS
 1. A `brake` (drive-field) command for `stepShipBody` in vacuum, so my special case can go

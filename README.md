@@ -4,7 +4,7 @@ A calm exploration game for desktop browsers: walk, use the jetpack, board your 
 through the atmosphere into space with no loading screen, and land again. Every frame is meant
 to look like a watercolour landscape on cold-press paper.
 
-Status: milestone 2 (the system: fly between worlds). See `docs/notes/` and `docs/lead/TRACK.md`
+Status: milestone 3 (sketchbook, views to find, sound). See `docs/notes/` and `docs/lead/TRACK.md`
 for what is done and what is not.
 
 ## Play
@@ -50,6 +50,8 @@ Anywhere
 
 | Key | Action |
 | --- | --- |
+| B | the sketchbook: worlds visited, landscapes walked, views found, and where the nearest unfound view is |
+| H | the help card (these controls) |
 | ` (backquote) | frame read-out: frame time, triangles, draw calls, render scale, quality tier |
 
 The game saves itself when you land, when you step out, and every 20 seconds on foot, and
@@ -58,7 +60,16 @@ continues from there on the next visit. Add `?fresh=1` to the address to start a
 If the browser will not capture the mouse (or reports nonsense while it does), the game says so
 and you look around by holding the left button and dragging.
 
+Each world has marked views to find: walk up to one and it goes into the sketchbook. All sound
+is made in code (wind that follows the real wind, rain, thunder, the ship, the jetpack,
+footsteps, a quiet pad per planet); `?audio=0` turns it off.
+
 ## Is it fast enough on my machine?
+
+The game starts carefully (medium quality at three-quarter resolution) and climbs by itself
+when the machine has room: the resolution after a few seconds, the quality tier after about
+twelve. It never starts at the expensive setting and falls from there.
+
 
 Press the backquote key (or open the page with `?stats=1`). The read-out shows the frame time in
 milliseconds (16.7 is 60 frames a second), the worst recent frame, how many triangles and draw
@@ -76,6 +87,7 @@ the tier at 0, the machine cannot hold 60 frames a second in that view.
 | `dynres=0` `scale=0.75` `quality=1` | pin the dynamic resolution controller |
 | `pointerlock=0` | never capture the pointer; drag to look |
 | `stats=1` | show the frame read-out from the start |
+| `audio=0` | silence |
 | `fresh=1` / `save=0` | forget the saved game / never save |
 | `stub=physics` | turn the physical models off (the explorer and ship then move by simple rules) |
 
@@ -91,6 +103,9 @@ the tier at 0, the machine cannot hold 60 frames a second in that view.
     node tests/trip.mjs              # Earth to Mars to Saturn in one sitting, then a reload
                                      # that continues from the save
     node tests/lockcheck.mjs         # the pointer-lock fallback
+    node tests/m3check.mjs           # starting tier, look hint, sketchbook, help, a view found, audio
+    node tests/tour.mjs              # every biome of every body at 960x540: contact sheets in
+                                     # docs/lead/evidence/tour-<body>.jpg (slow in software GL)
 
 ## Layout
 
