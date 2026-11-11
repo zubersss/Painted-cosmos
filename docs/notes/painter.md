@@ -62,7 +62,9 @@ near ground, rain as a glaze, dark washes), commit `6bb6c91`. The third agent's 
 ## M3 block 2: explorer and ship, near ground, glazes, dark washes (fourth PAINTER agent)
 
 INTEGRATION: ready (`6bb6c91`; the game on a clean export loads, plays on foot, in the
-cockpit and in the chase view with no console error; 19 world tests pass).
+cockpit and in the chase view with no console error; 19 world tests pass; the project's
+105 tests pass on a clean export of `09a8338`. In the working tree one of PILOT's tests failed
+while PHYSICS was mid-save: test from an export).
 
 ### What is in, the frame that shows it, my verdict
 Frames in `docs/shots/painter/`, 960x540 unless said, quality 1, gallery from a clean export.
