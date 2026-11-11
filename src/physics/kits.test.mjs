@@ -166,7 +166,7 @@ test('the floor: far marks are never smaller than the least size, there are fewe
   const out1 = new Float32Array(12);
   expandStreaks(near, DRAW.rain, eye, out1);
   assert.ok(Math.abs(len(sub(V(out1, 1), V(out1, 0))) - DRAW.rain.width) < 1e-6, 'at 2 m: its own width');
-  expandDabs(near, { ...DRAW.snow, exposure: 0 }, eye, out1);
+  expandDabs(near, { ...DRAW.snow, exposure: 0, near: 0 }, eye, out1);
   assert.ok(Math.abs(len(sub(V(out1, 1), V(out1, 0))) - DRAW.snow.size) < 1e-6);
   // 4000 of a kind at one distance, each with its own size (as the simulation gives them)
   const N = 4000, many = (d) => buf(Array.from({ length: N }, (_, i) => ({ p: [Math.sin(i) * 0.3 * d, Math.cos(i * 1.3) * 0.2 * d, -d], v: [0, -6.5, 0], size: 0.0008 + 0.0000031 * i + 0.0007 * Math.abs(Math.sin(i * 12.9898)) })));
