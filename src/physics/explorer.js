@@ -575,19 +575,31 @@ function stepOnce(st, cmd, dt, env, T) {
       { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
       px = _dir.x * s1.radius; py = _dir.y * s1.radius; pz = _dir.z * s1.radius;
       const vn = vx * n1x + vy * n1y + vz * n1z;
+      let hipIn = 0;
       if (vn < 0) {
-        // inelastic landing; Coulomb friction impulse on the tangential part
+        // (P11) A LEGGED landing. Until P11 this was the landing of a rigid block: the whole normal speed
+        // gone in one step and a Coulomb impulse (kinetic friction x that speed) off the tangential part,
+        // so a jump from a walk came down with the legs straight (hip 0 on the landing frame and after)
+        // and lost half its forward speed at the touch (4.17 to 2.04 m/s on Earth, 4.13 to 2.19 on the
+        // Moon: the filmstrips). A person lands on the legs: the feet stop, the hips go on down and the
+        // legs take them up over their stroke (legCatch at most, legFold deep: up to 5.2 m/s), and since
+        // no blow is struck there is no friction impulse: the forward speed is kept, as in every stride
+        // of a run. Only the part of the normal speed the stroke cannot take is a blow, with its friction.
+        const soft = Math.min(-vn, Math.sqrt(2 * T.legCatch * T.legFold)), hard = -vn - soft;
         vx -= vn * n1x; vy -= vn * n1y; vz -= vn * n1z;
-        const vt = Math.hypot(vx, vy, vz);
-        const G1 = env.ground ? env.ground(s1, _gnd) : DEFAULT_GROUND;
-        const cut = G1.kinetic * (-vn);
-        const m = vt > 1e-6 ? Math.max(0, 1 - cut / vt) : 0;
-        vx *= m; vy *= m; vz *= m;
+        if (hard > 0) {
+          const vt = Math.hypot(vx, vy, vz);
+          const G1 = env.ground ? env.ground(s1, _gnd) : DEFAULT_GROUND;
+          const cut = G1.kinetic * hard;
+          const m = vt > 1e-6 ? Math.max(0, 1 - cut / vt) : 0;
+          vx *= m; vy *= m; vz *= m;
+        }
         B.impact = -vn;
+        hipIn = -soft * (n1x * _dir.x + n1y * _dir.y + n1z * _dir.z);
       }
       // touching down only counts when buoyancy does not carry the body there
       const l1 = (s1.liquidRadius || 0) > s1.radius ? s1.liquidRadius - s1.radius : 0;
-      if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * _dir.x + vy * _dir.y + vz * _dir.z; }
+      if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * _dir.x + vy * _dir.y + vz * _dir.z + hipIn; }
     }
     B.support = 0; B.brace = 0; B.paceCap = 1e9; B.clamber01 = 0; B.clamberT = 0;
     if (!grounded) { B.hip = 0; B.hipV = 0; B.trend = 0; B.grip = 0; }

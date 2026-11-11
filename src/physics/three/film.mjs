@@ -55,6 +55,12 @@ const PAGE_HELPERS = `(() => {
       if (!v) return { n };
       for (let i = 0; i < n; i++) { x += v[i * st]; y += v[i * st + 1]; z += v[i * st + 2]; s += Math.hypot(v[i * st], v[i * st + 1], v[i * st + 2]); }
       const m = L.enuV({ x: x / n, y: y / n, z: z / n }); return { n, e: r2(m.e), nn: r2(m.n), u: r2(m.u), sp: r2(s / n) }; },
+    // where the particles of a kind are: how many, their centre (east, north of the focus; m over the ground there), how
+    // many lie within r metres of the focus
+    where(kind, r = 30) { const b = ph.particles[kind], n = b.count; if (!n) return { n: 0 };
+      let e = 0, nn = 0, h = 0, near = 0; const q = { x: 0, y: 0, z: 0 };
+      for (let i = 0; i < n; i++) { q.x = b.origin.x + b.pos[i * 3]; q.y = b.origin.y + b.pos[i * 3 + 1]; q.z = b.origin.z + b.pos[i * 3 + 2]; const p = L.enu(q); e += p.e; nn += p.n; h += p.h; if (Math.hypot(p.e, p.n) < r) near++; }
+      return { n, e: r2(e / n), nn: r2(nn / n), h: r2(h / n), near }; },
     here() { const h = ph.here; return { wx: h.weather.kind, wind: r2(h.air.speed), gust: r2(h.air.gust01 || 0), rate: r2(h.weather.precipitation.rate) }; },
   };
 })()`;
@@ -106,16 +112,55 @@ export const SUBJECTS = {
     q: 'body=moon&hour=10&t=60&pre=1&follow=1&dist=9&pitch=6&up=1.6&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.05, 0.5, 0.8], tile: [213, 192], cols: 6, frames: 18, dt: 0.4, sub: 24,
     before: `(L) => { L.run(1, 1 / 60, (i, t, ctl) => { ctl.wish = [4.2, 0]; }); }`,
     each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; if (i === 1) ctl.jump = true; }`, probe: `(L) => P.ex()` },
-  'explorer-jet': { note: 'Earth spawn: a 2.5 s jetpack burn from standing, the coast, the fall and the landing; the camera follows from 30 m; 2 frames a second',
-    q: SPAWN + '&t=60&pre=1&follow=1&dist=30&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.6], tile: [213, 180], cols: 6, frames: 18, dt: 0.5, sub: 30,
+  'explorer-jet': { note: 'Earth spawn: a 2.5 s jetpack burn from standing, the coast, the fall and the landing; the camera follows from 30 m; a frame every 0.55 s',
+    q: SPAWN + '&t=60&pre=1&follow=1&dist=30&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.6], tile: [213, 180], cols: 6, frames: 24, dt: 0.55, sub: 33,
     each: `(i, t, ctl) => { ctl.wish = [0, 0]; ctl.jet = t < 2.5 ? 1 : 0; }`, probe: `(L) => P.ex()` },
   // the walker goes east from the spawn until its legs first reach the end of their stroke (clamber01 > 0.6: a boulder,
-  // a ledge), is put back 5 m before that place, and the strip is the walk over it
+  // a ledge), is put back 16 m before that place and walks up to 3 m from it unseen; the strip is the walk over it
   'explorer-clamber': { note: 'the Moon: a walk (4.2 m/s) over the first boulder east of the spawn that makes the legs clamber; the camera follows; 6 frames a second',
     q: 'body=moon&hour=10&t=60&pre=1&follow=1&dist=7&pitch=8&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [213, 144], cols: 6, frames: 18, dt: 1 / 6, sub: 10,
     before: `(L) => { let found = null; for (let i = 0; i < 60 * 240 && !found; i++) { L.ctl.wish = [4.2, 0]; L.run(1 / 60, 1 / 60); if (L.ex.phys && L.ex.phys.clamber01 > 0.6) found = L.enu(L.ex.p); }
-      window.__found = found; if (!found) return; const p = L.at(found.e - 5, found.n); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0; L.run(0.2, 1 / 60, (i, t, ctl) => { ctl.wish = [0, 0]; }); }`,
+      window.__found = found; if (!found) return; const p = L.at(found.e - 16, found.n); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0;
+      for (let i = 0; i < 60 * 20 && L.enu(L.ex.p).e < found.e - 3; i++) { L.ctl.wish = [4.2, 0]; L.run(1 / 60, 1 / 60); } }`,
     each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; }`, probe: `(L) => { const x = P.ex(); x.found = window.__found ? P.r2(window.__found.e) : -1; return x; }` },
+  // ---- the ship (ship=fly: the real gear and flight models through PILOT's sequence) ----
+  // (numbers: height of the hull's origin over the ground (m), climb and ground speed (m/s), feet on the ground, the share
+  //  of the weight the lift carries, the wash speed at the ground (m/s), the grass under the hull (lean deg, flattened 0..1),
+  //  dust in the air)
+  'ship-liftoff': { note: 'Earth spawn: the ship stands on its legs, lifts off and climbs to 6 m; 4 frames a second',
+    q: SPAWN + '&t=60&pre=9&explorer=0&ship=fly&shipAway=0&shipAlt=6&dist=17&pitch=6&up=3&yaw=70', w: 640, h: 360, crop: [0.2, 0.1, 0.6, 0.8], tile: [213, 160], cols: 6, frames: 18, dt: 0.25, sub: 15,
+    each: `(i, t, ctl) => { if (i >= 2) ctl.ship = 'up'; }`,
+    probe: `(L) => { const s = P.ship(), b = P.bend(0, 2), o = { h: s.h, vu: s.vu, vh: s.vh, feet: s.feet, lift: s.lift, wash: s.wash, grass: b.deg, flat: b.flat, dust: P.parts('dust').n }; return o; }` },
+  'ship-hover': { note: 'Earth spawn, 176 s (the storm: 11 m/s at 10 m, gusting): the ship holds 6 m; 5 frames a second',
+    q: SPAWN + '&t=166&pre=1&explorer=0&ship=fly&shipAway=0&shipAlt=6&dist=17&pitch=6&up=3&yaw=70', w: 640, h: 360, crop: [0.2, 0.1, 0.6, 0.8], tile: [213, 160], cols: 6, frames: 18, dt: 0.2, sub: 12,
+    before: `(L) => { L.run(9, 1 / 60, (i, t, ctl) => { ctl.ship = 'up'; }); }`,
+    each: `(i, t, ctl) => { ctl.ship = 'up'; }`,
+    probe: `(L) => { const s = P.ship(), w = P.windEN(0, 2, 6); return { h: s.h, e: s.e, n: s.n, vu: s.vu, vh: s.vh, windE: w.e, windN: w.n, wash: s.wash, grass: P.bend(0, 2).deg }; }` },
+  'ship-land': { note: 'Earth spawn: from a hover at 6 m the ship comes down, the gear takes it at 1 m and the legs take the weight; 3 frames a second',
+    q: SPAWN + '&t=50&pre=1&explorer=0&ship=fly&shipAway=0&shipAlt=6&dist=17&pitch=6&up=3&yaw=70', w: 640, h: 360, crop: [0.2, 0.1, 0.6, 0.8], tile: [213, 160], cols: 6, frames: 24, dt: 1 / 3, sub: 20,
+    before: `(L) => { L.run(9, 1 / 60, (i, t, ctl) => { ctl.ship = 'up'; }); }`,
+    each: `(i, t, ctl) => { ctl.ship = 'down'; }`,
+    probe: `(L) => { const s = P.ship(), b = P.bend(0, 2); return { h: s.h, vu: s.vu, feet: s.feet, lift: s.lift, wash: s.wash, asleep: s.asleep, grass: b.deg, flat: b.flat, dust: P.parts('dust').n }; }` },
+  // ---- what falls and what is blown ----
+  // (numbers: how many particles, their mean velocity east / north / up and mean speed (m/s), the wind 2 m up (east, north))
+  'rain-turn': { note: 'Earth spawn, 176 s: rain in the storm while the camera turns 40 degrees a second; 15 frames a second',
+    q: SPAWN + '&t=172&pre=4&explorer=0&dist=10&pitch=4&up=2.5&yaw=30', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [320, 216], frames: 12, dt: 1 / 15, sub: 4,
+    each: `(i, t, ctl) => { ctl.yawRate = 40; }`,
+    probe: `(L) => { const r = P.parts('rain'), w = P.windEN(0, 0, 2); return { rain: r.n, ve: r.e, vn: r.nn, vu: r.u, windE: w.e, windN: w.n, leaves: P.parts('leaves').n, yaw: P.r2(L.yaw * 57.3) }; }` },
+  'snow-blizzard': { note: 'Earth, 62.4 N: snow in a blizzard (bands, the skim over the ground); 10 frames a second',
+    q: 'body=earth&lat=62.41&lon=49.46&t=150&hour=12&pre=10&explorer=0&dist=10&pitch=5&up=1.5&yaw=30', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [320, 216], frames: 12, dt: 0.1, sub: 6,
+    probe: `(L) => { const r = P.parts('snow'), w = P.windEN(0, 0, 2), k = P.parts('sand'), d = P.parts('dust'); return { snow: r.n, ve: r.e, vn: r.nn, vu: r.u, windE: w.e, windN: w.n, skim: k.n, skimSp: k.sp || 0, powder: d.n }; }` },
+  'mars-dust': { note: 'Mars, the dunes in a dust storm: veils and blowing sand; 6 frames a second',
+    q: 'body=mars&biome=dust_dunes&find=dust&hour=11&pre=12&explorer=0&dist=10&pitch=5&up=1.2&yaw=30', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [320, 216], frames: 12, dt: 1 / 6, sub: 10,
+    probe: `(L) => { const d = P.parts('dust'), k = P.parts('sand'), w = P.windEN(0, 0, 2); return { dust: d.n, ve: d.e, vn: d.nn, vu: d.u, sand: k.n, sandSp: k.sp || 0, windE: w.e, windN: w.n }; }` },
+  'leaves-gust': { note: 'Earth spawn, 176 s: leaves torn off in the storm; 10 frames a second',
+    q: SPAWN + '&t=172&pre=4&explorer=0&dist=12&pitch=4&up=3&yaw=210', w: 640, h: 360, crop: [0.2, 0.15, 0.6, 0.7], tile: [320, 210], frames: 12, dt: 0.1, sub: 6,
+    probe: `(L) => { const r = P.parts('leaves'), w = P.windEN(0, 0, 2), x = P.where('leaves', 15); return { leaves: r.n, near: x.near, ve: r.e, vn: r.nn, vu: r.u, sp: r.sp, windE: w.e, windN: w.n, h: x.h }; }` },
+  // ---- water: the camera is turned toward where the spray is ----
+  'sea-neptune': { note: 'Neptune, the storm coast at 40 s (waves 2.8 m): the surf and the spray, looking where the spray is; 6 frames a second',
+    q: 'body=neptune&biome=storm_seas&t=34&hour=11&pre=6&explorer=0&dist=14&pitch=7&up=1.5', w: 640, h: 360, crop: [0.15, 0.15, 0.7, 0.7], tile: [320, 180], frames: 12, dt: 1 / 6, sub: 10,
+    before: `(L) => { const x = P.where('spray', 40); window.__spray = x; if (x.n) L.yaw = Math.atan2(-x.e, x.nn); }`,
+    probe: `(L) => { const x = P.where('spray', 40), r = P.parts('spray'), s = L.info().seaState || {}; return { spray: x.n, near: x.near, e: x.e, n: x.nn, h: x.h, sp: r.sp, vu: r.u, Hs: s.Hs, cover: s.cover, spume: P.r2(L.physics.here.blown.spume || 0), surf: P.r2(L.physics.here.blown.surf || 0) }; }` },
 };
 
 function arg(name, d) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : d; }
