@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Pathspec-limited commit for the shared branch. Commits ONLY the caller's own files, so the
 # roles can commit from the same working tree without ever sweeping up each other's work.
-# Usage: tools/commit.sh painter|pilot|physics|coordinator "message"
+# Usage: tools/commit.sh painter|pilot|physics|coordinator|art "message"
 set -u
 role="${1:-}"; msg="${2:-}"
-if [ -z "$role" ] || [ -z "$msg" ]; then echo "usage: tools/commit.sh painter|pilot|physics|coordinator \"message\"" >&2; exit 2; fi
+if [ -z "$role" ] || [ -z "$msg" ]; then echo "usage: tools/commit.sh painter|pilot|physics|coordinator|art \"message\"" >&2; exit 2; fi
 cd "$(git rev-parse --show-toplevel)" || exit 2
 case "$role" in
   painter) paths=(src/render src/world src/art src/data/looks.js gallery.html docs/notes/painter.md docs/shots/painter) ;;
   pilot) paths=(index.html src/main.js src/core src/player src/ship src/space src/ui src/audio src/data/bodies.js vendor tests README.md docs/notes/pilot.md docs/shots/pilot docs/lead .nojekyll .gitignore package.json) ;;
   physics) paths=(src/physics physics-lab.html docs/notes/physics.md docs/shots/physics) ;;
   coordinator) paths=(docs/BRIEF.md docs/COORDINATOR.md tools) ;;
+  # The owner's art pass (multi-agent workflow, by planet group): each body's look data and its evidence.
+  art) paths=(src/data/looks docs/shots/art) ;;
   *) echo "unknown role: $role" >&2; exit 2 ;;
 esac
 use=()
