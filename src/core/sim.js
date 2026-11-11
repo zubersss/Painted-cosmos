@@ -331,8 +331,10 @@ export class Sim {
       physics.ship.disturbers(this.sh, out);
     }
     const t0 = now();
+    // (eye: where the lens is, body-local, so that falling snow is simulated round the camera.)
+    const eye = bodyId && this.camPose && this.camFrame.kind === 'body' && this.camFrame.rotating && this.camFrame.id === bodyId ? this.camPose.p : null;
     physics.update(dt, {
-      bodyId, time: this.t, focus,
+      bodyId, time: this.t, focus, eye,
       sunDir: bodyId ? this.eph.sunDirLocal(bodyId, this.t) : null,
       disturbers: out,
     });
@@ -546,10 +548,17 @@ export class Sim {
       gravity: body.gravity, radius: body.radius, altGround: this.sh.altGround, time: this.t,
     };
     if (this.physics) {
-      // The pace of each world: commanded speeds scale with the fourth root of how thin its air
-      // is against Earth's (Mars and the airless bodies 1.6 x, Jupiter 1.25 x, Venus 0.75 x).
+      // The pace of each world (PHYSICS' levers of P6, taken): commanded speeds scale with how
+      // thin its air is against Earth's, to the power 0.4: Neptune 50, Saturn 52, Uranus 58,
+      // Jupiter 62 m/s near the ground, Mars and the airless worlds 138, Venus 35 (its air decides).
       const A = this.physics.data && this.physics.data.ATMOSPHERES ? this.physics.data.ATMOSPHERES[f.id] : null;
-      env.speedScale = A ? clamp(Math.pow(1.225 / Math.max(A.rho0 || 0, 0.02), 0.25), 0.75, 1.6) : 1;
+      const rho0 = A ? A.rho0 || 0 : 1.225;
+      env.speedScale = clamp(Math.pow(1.225 / Math.max(rho0, 0.02), 0.4), 0.75, 3);
+      // The drive field turns the velocity onto the nose with at most this sideways acceleration,
+      // so thin-air worlds turn wide at their speed; and where the air cannot stop the ship, X
+      // has a little of the field brake (stops from 138 m/s in about 4 s).
+      env.carveAccel = 40;
+      env.airBrake = rho0 < 0.3 ? 0.15 : 0;
       // Air (density, wind, gusts) exists only in the ground frame; above it the ship is in vacuum.
       if (f.rotating) this.physics.bindEnv(f.id, env); else env.air = VACUUM_AIR;
       env.shipBody = this.physics.ship.step;

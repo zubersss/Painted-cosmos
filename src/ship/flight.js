@@ -194,7 +194,13 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     // the speed, so steering stays arcade while every change of speed keeps its mass.
     // (PHYSICS' suggestion, taken: no carve at low speed, where a little slide reads as weight;
     // full carve from 70 m/s, so a turn at cruise does not cost a third of the speed.)
-    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: smoothstep(20, 70, st.speed), brake: inAir ? 0 : 1 }, dt, env);
+    const cmd = st._cmd || (st._cmd = { hover: true });
+    cmd.target = target; cmd.tau = tauBody; cmd.boost = !inAir; cmd.carve01 = smoothstep(20, 70, st.speed);
+    // In vacuum the field brake is whole; in thin air (Mars, the airless worlds' ground frame)
+    // X gets the share the world allows (env.airBrake); in thick air the thrusters and the air do it.
+    cmd.brake = inAir ? (input.cut ? env.airBrake || 0 : 0) : 1;
+    cmd.carveAccel = env.carveAccel;           // undefined: unbounded, as before
+    body(st, cmd, dt, env);
     v = { x: st.v.x, y: st.v.y, z: st.v.z };
     st.p = p0;
   } else {

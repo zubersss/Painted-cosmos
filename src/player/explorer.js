@@ -27,7 +27,7 @@ export const EXPLORER = Object.freeze({
   jetStartDelay: 0.16,       // hold Space this long after a jump before the jetpack lights
   terminalFall: 24,          // m/s: falls stay gentle, there is no fall damage
   softFallHeight: 3,         // metres above ground where a fast fall is cushioned
-  softFallSpeed: 7,          // m/s touchdown speed after cushioning
+  softFallSpeed: 4,          // m/s touchdown speed after cushioning (a hop ends on bent knees)
   maxSlope: 0.80,            // rad (46 deg): steeper ground cannot be walked up
   slideSlope: 0.96,          // rad (55 deg): steeper ground slides you down
   slideSpeed: 5,             // m/s
@@ -257,7 +257,8 @@ function stepExplorerBodied(st, input, dt, env, T) {
   cmd.jetMaxRise = jetRiseCap(env.gravity, T);
   // Suit thrusters help the boots start and stop (PHYSICS' named assist force): without them a
   // 100 kg explorer at this pace takes 0.6 s and 1.2 m to stop on grass.
-  cmd.assistAccel = T.assistAccel;
+  // The suit's help scales with the world's gravity: light worlds let you slide a little.
+  cmd.assistAccel = T.assistAccel * Math.min(1, Math.max(0.45, (env.gravity || 9) / 9));
   // Falls are held to a gentle terminal speed, then eased down to a soft touchdown.
   // (0.45 m/s per metre: from the top of a jetpack hop the fall is gathered in early, not
   // caught at the last moment.)
