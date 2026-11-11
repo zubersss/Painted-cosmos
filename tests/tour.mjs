@@ -15,7 +15,7 @@
 //
 // For a long tour in software GL run one body per process (the browser tires):
 //   for b in mercury venus earth; do node tests/tour.mjs --bodies $b; done
-// Usage: node tests/tour.mjs [--bodies earth,mars] [--root dir] [--quality 2] [--settle-frames 300 --settle 3600] [--w 960 --h 540]
+// Usage: node tests/tour.mjs [--bodies earth,mars] [--root dir] [--quality 2] [--settle-frames 300 --settle 3600] [--first 1] [--w 960 --h 540]
 //                            [--hour 10] [--settle 120] [--out dir] [--vistas 0] [--orbit 0]
 //                            [--label "text for the sheet's header"] [--query "stub=1"]
 //                            [--sheets dir (default docs/lead/evidence)]
@@ -26,7 +26,7 @@ import { execSync } from 'node:child_process';
 import { parseArgs, repo, settleWorld } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 
-const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/tour', w: 960, h: 540, quality: 2, hour: 10, settle: 3600, 'settle-frames': 300, vistas: 1, orbit: 1, label: '', query: '', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto' });
+const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/tour', w: 960, h: 540, quality: 2, hour: 10, settle: 3600, 'settle-frames': 300, first: 0, vistas: 1, orbit: 1, label: '', query: '', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto' });
 const W = Number(opt.w), H = Number(opt.h), SETTLE = Number(opt.settle);
 const sheets = opt.sheets || path.join(repo, 'docs/lead/evidence');
 fs.mkdirSync(opt.out, { recursive: true });
@@ -98,6 +98,12 @@ try {
   for (const body of String(opt.bodies).split(',')) {
     let places = await page.evaluate(planPlaces, body);
     if (String(opt.vistas) === '0') places = places.filter((p) => p.kind !== 'vista');
+    // --first 1: only the spawn (third person, as a player arrives) and the first vista: the
+    // two places per body where review 6 judges the look at the top tier.
+    if (String(opt.first) === '1') {
+      const sp = await page.evaluate((bid) => { const d = window.__pc.world.getSpawn(bid).unitDir, l = Math.hypot(d.x, d.y, d.z); return [d.x / l, d.y / l, d.z / l]; }, body);
+      places = [{ kind: 'biome', id: 'spawn', name: 'the spawn', dir: sp, moved: 0 }].concat(places.filter((p) => p.kind === 'vista').slice(0, 1));
+    }
     // A vista that is the very place and heading of a biome frame is the same picture: one frame.
     const frames = [];
     const same = (a, b) => a.dir && b.dir && Math.hypot(a.dir[0] - b.dir[0], a.dir[1] - b.dir[1], a.dir[2] - b.dir[2]) * 3000 < 4 && Math.abs((a.heading || 0) - (b.heading || 0)) < 2;

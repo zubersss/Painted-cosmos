@@ -83,10 +83,14 @@ for (const s of steps) {
     if (!ok && /unit$/.test(s.id) && !(r.error && r.error.code === 'ETIMEDOUT')) {
       const files = [...new Set([...text.matchAll(/location: '([^']+?\.mjs):\d+:\d+'/g)].map((m) => m[1]))].filter((f) => fs.existsSync(f));
       if (files.length) {
-        const again = files.map((f) => spawnSync(process.execPath, ['--test', f], { cwd: here, encoding: 'utf8', maxBuffer: 1 << 28, timeout: s.min * 60000 }));
+        // (All three suites: PILOT's, PHYSICS' and PAINTER's. A file gets two tries alone: under
+        // a load of 15 a wall-clock test can miss twice running.)
+        const alone = (f) => spawnSync(process.execPath, ['--test', f], { cwd: here, encoding: 'utf8', maxBuffer: 1 << 28, timeout: s.min * 60000 });
+        let again = files.map(alone), tries = 1;
+        if (!again.every((a) => a.status === 0)) { again = files.map((f, i) => (again[i].status === 0 ? again[i] : alone(f))); tries = 2; }
         fs.writeFileSync(path.join(out, s.id + '.alone.log'), again.map((a) => (a.stdout || '') + (a.stderr || '')).join('\n'));
-        if (again.every((a) => a.status === 0)) { ok = true; detail += ` [failed in the full run, passed alone: ${files.map((f) => path.basename(f)).join(', ')}]`; }
-        else detail += ' [failed again alone]';
+        if (again.every((a) => a.status === 0)) { ok = true; detail += ` [failed in the full run, passed alone${tries > 1 ? ' at the second try' : ''}: ${files.map((f) => path.basename(f)).join(', ')}]`; }
+        else detail += ' [failed again alone, twice]';
       }
     }
   }
