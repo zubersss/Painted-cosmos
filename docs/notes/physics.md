@@ -3,6 +3,107 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P11 (eighth PHYSICS agent; read this block first; P10 and older below hold for everything not named here)
+
+**Where things stand.** `node --test src/physics/` 246 tests pass; PILOT's 115 pass on a clean export with my
+files. Nothing half-edited, no job running. Scratch: `/home/user/.pc-scratch/physics/p11/` (`ex.sh`: a clean
+export of HEAD with the working `src/physics` and `physics-lab.html` laid over it, into `p11/root`;
+`series.mjs`: wind and the lean of grass and a trunk at the real spawn, 10 s windows; `spectrum.mjs`: the mast
+at 10 m against Kaimal; `rainv.mjs`: rain speeds by height; `land.mjs`: a jump and its landing; `prof.mjs`:
+`physics.update` in four weathers, `Q=2` for the top tier; `before/`, `after/`: strips and logs).
+
+**The filmstrip tool (item 1).** `node src/physics/three/film.mjs <subject>[,..] | all | list [--root <export>]
+[--out <dir>] [--tag t] [--q "a=b"] [--quality 2]`. Each subject opens the painted lab (the game's kits) with
+the clock stopped; `__lab.film({frames, dt, sub, crop, tile, cols, each, probe})` advances the simulation at a
+fixed step, draws, copies the crop into one sheet IN THE SAME TASK as the draw, and reads that frame's numbers
+from the simulation. Output: `motion-<subject>.jpg` and `.json` (the numbers per frame, the URL, `info()`).
+A strip takes 75 to 125 s here. Also new in the painted lab: `lab.ctl` (`wish [e, n]` m/s, `jump`, `jet`,
+`yawRate` deg/s, `follow`, `ship 'rest'|'up'|'down'`), `lab.run(seconds, dt, each)` (unseen), `lab.enu(p)`,
+`lab.at(e, n, h)`, `ship=fly` (the real gear and flight models through PILOT's sequence and numbers), and the
+explorer drawn as a torso on legs of the model's own length (`legs=0`: the old capsule).
+The subjects (table in `film.mjs`): look-around, grass-breeze / -gust / -storm / -walker, tree-breeze / -gust /
+-storm, explorer-run / -jump / -jump-moon / -jet / -clamber, ship-liftoff / -hover / -land, rain-turn,
+snow-blizzard, mars-dust, leaves-gust, sea-neptune.
+
+**What the strips showed and what was done (item 2).** Strips in `docs/shots/physics/motion-*.jpg` with their
+numbers in `.json`; all rendered from `p11/root` = a clean export of the head of the moment (`ca8710f`, then
+`2c6b25b`) with my working files over it; 640 x 360 viewport, quality 1.
+- *Grass, breeze (opened before and after).* Before: twelve identical frames; the lean changed 0.01 degrees
+  in 0.8 s (in a 2 m/s breeze the shortest period in the wind was 17 s). After: 2 to 7 degrees, changing 2 to
+  3 degrees a second; in the picture the motion is slight, as it should be in light air.
+- *Grass, storm (opened after).* Before: three blades a metre apart within 0.6 degrees of each other, the
+  meadow one sheet. After: 58, 50 and 30 to 45 degrees at the same instant, a blade swinging 20 degrees in a
+  quarter second and back; no popping seen; splash rings grow on the ground.
+- *Grass and the walker (opened).* The walker crosses at 1.61 m/s, even spacing; stems under the path go to
+  83 degrees (flat 0.98), 1 m to the side 27 to 38 degrees as it passes, 1.4 m behind 55 to 66 degrees; a
+  pale ground mark stays behind it. **The parting is not legible in the picture**: the blades are sparse
+  strokes and the crop cut the walker at the waist (re-frame it; see For PAINTER).
+- *Trees, storm (opened before).* Before: trunks pinned at 12.4 and 14.3 degrees (the limit), nothing moving
+  in 1.2 s but branch tips (8 cm). After (numbers; the after strip is stored, not opened): 4.2 falling to
+  3.2 and 11.9 to 9.6 degrees in 1.2 s, branch tips 6 to 9 cm.
+- *Explorer, run (not opened).* 4.2 m/s walk; the run reaches 6.1 m/s after 1.2 s (never the 7.4 asked in
+  that time); stop from 6.1 m/s in 0.75 s and 2.6 m.
+- *Explorer, jump (opened after).* Before: landed with straight legs and lost half its forward speed at the
+  touch. After: the legs fold 0.31 m and straighten in half a second, speed kept; reads as a landing.
+  The Moon strip (`after/motion-explorer-jump-moon.jpg`, before the fix, not stored): 6.5 m high, 5 s.
+- *Explorer, jetpack (not opened).* 2.5 s burn to 19.8 m/s, apex 49 m, falls at the 9 m/s of the descent
+  assist, lands at 10.3 s: the legs take 5.2 m/s, the rest is a blow (hip -0.37).
+- *Explorer, clamber: NOT SEEN.* Walking east from the Moon spawn the legs first reach the end of their
+  stroke 711 to 762 m out; a second pass over that place at 3 m/s did not clamber. No strip.
+- *Ship (none opened).* Lift-off: wash 13 to 26 m/s as the lift ramps, feet off at lift 0.83, 4 m/s climb,
+  overshoots 6 m by 0.5 m; grass under the hull flat 0.99 before, 0.58 after it has gone. Hover in the
+  storm (9 to 14 m/s at 6 m): holds within 5 cm and 0.06 m/s; a 9 cm bob at 0.4 Hz is the lab script's
+  height hold. Landing: first foot at 0.43 m/s, three feet 0.3 s later, the gear travels 16 cm, then 5 cm
+  more as the lift hands the weight over. **The descent stalls for about a second between 1.3 and 1.0 m**
+  (0.1 m/s where the script asks 0.6): the flight model will not sink in ground effect; not followed up.
+- *Rain while the camera turns (opened).* Streaks keep their slant while the trees slide: in the world.
+  Drops 1.44 mm, falling 3.6 to 4.6 m/s, moving 11 to 16.6 m/s across (the wind at their height plus 2.5 to
+  3.5 m/s carried from above): 15 to 20 degrees below level in a 13 m/s wind, which is right. Faint and few.
+- *Snow, blizzard (opened).* Level strokes, 14 m/s, falling 0.6 m/s; the density swings from nearly empty
+  to dense within a second (the bands); 500 skim grains at 5.5 to 5.9 m/s. Nothing wrong seen.
+- *Mars dust, leaves (not opened).* Dust 478 marks at 9.5 m/s in an 11 to 14 m/s wind, sand 540 to 672
+  grains at 1.8 to 2 m/s; leaves 101 to 115 in the air at 15 m/s, falling 1.5 m/s.
+- *Neptune's sea (opened).* **Spray is still not identified in a picture.** 5 drops at the start of the
+  strip, 681 two seconds later (the camera was turned toward the first five); level pale dashes cross the
+  frame, the sea does not visibly heave in 2 s although Hs is 2.77 m, a foam-rimmed pool in the foreground
+  does not change, and a pale rectangle with straight edges stands in the sky (see For PAINTER).
+
+**The wind against masts (item 3; `wind.js`, `air.js`, `wind.test.mjs` "P11 a mast at 10 m").** The pattern
+was NOT twice as sharp as masts: at equal intensity its 1 s rate of change was 0.6 of Kaimal's. What was
+wrong was the shape: 1 to 5 % of the variance under 4 s where Kaimal has 13 to 22 %, a quarter too much at
+15 to 60 s, and gust tops cut by the clamp (gust factor 1.36). Now four octaves (90, 34, 13, 5 m), clamp at
+3.3 sigma: TI 0.173 to 0.179 (I = 0.172), G(3 s, 600 s) 1.37 to 1.44, shares by period within 0.07 of
+Kaimal from 10 minutes to 1 s, p99 of the 1 s rate 0.78 to 0.93 of Kaimal's. The two fine octaves are a
+separate level (`gustFineAt`), added exactly at point queries (`airAt`) and node by node for plants
+(`AirGrid.fine`, `sampleWind` o[8]); the grid's fields, which particles ride in, keep the two large ones.
+
+**Flutter and trunks (`flora.js`, `flora.glsl.js`).** `flutterAt` / `pcPhysBend`: three frozen eddy trains
+(0.9, 1.7, 3.2 m) carried by the blade-height wind, through the blade's own response, along and across the
+load; phases in `uPhysWave.z`, `.w` and `uPhysWavePhase.w` (no new uniform). Trunks: `stiffFlex 0.19,
+stiffMax 0.30` (3 degrees at 8 m/s, 5.2 at 11, 12 at 20), `branchGain 1.3`.
+
+**The landing (`explorer.js`).** The feet stop, the hips go on down, the legs take up to 5.2 m/s over their
+stroke; no friction impulse unless the stroke is exceeded. `st.phys.impact` unchanged.
+
+**API added (all additive).** `wind.js`: `gustFineAt`, `gustLevelFull`, `WIND.gustLength3`, `gustLength4`,
+`gustWeights`, `gustNorm`, `gustMax` (`gustLevelAt` now returns +-`gustMax`, not +-1); `air.js`: `AirGrid.fine`,
+`sampleWind` writes o[8] when o has room; `flora.js`: `flutterAt`, `FLUT_D`, `FLUT_PH`, `FLORA.flutter*`,
+`FloraField.flutPhase`; `uniforms.uPhysWave[2..3]` and `uPhysWavePhase[3]` are flutter phases (were the
+constants 0.45, 0.45 and 0); painted lab: `__lab.film`, `run`, `ctl`, `ex`, `sh`, `enu`, `enuV`, `at`, `yaw`.
+
+**Cost (item 4, `prof.mjs`, load average 9 to 11).** `physics.update` median, quality 1: Mars dust storm 0.79
+ms, blizzard 1.50, storm in the forest 0.71, Neptune's sea 0.82. Quality 2: 1.02, 2.21, 1.08, 1.56 ms. Worst
+frames 8 to 150 ms in both tiers: the machine's. The storm frame was not re-shot.
+
+**Not done, in order.** 1. Spray in a picture (find the surf line by `P.where('spray')` AFTER the count has
+grown, or shoot with `kits=lab`). 2. A clamber strip (needs a place: PILOT's boulder run knows some).
+3. The ship's stall in ground effect before the gear takes over. 4. The strips not opened: tree-storm after,
+explorer-run, explorer-jet, ship x 3, mars-dust, leaves-gust; grass-gust and tree-gust / -breeze not filmed
+after the change. 5. The seam when the near field re-anchors (0.4 m/s in one frame; older than P11;
+`index.test.mjs` reports it). 6. Particles ride a wind 2 to 3 m/s faster than `physics.air` gives at their
+height near a wood (the wake is applied differently). 7. No cross-wind turbulence: the wind's direction
+never wobbles. 8. Sea waves in motion (shore, surf) were not judged.
+
 ## Hand-over P10 (seventh PHYSICS agent; read this block first; P9, P8 and P7 below hold for everything not named here)
 
 **Where things stand.** `node --test src/physics/` 244 tests; PILOT's 115 pass on a clean export with my files.
@@ -887,6 +988,22 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+**P11, at the top (behaviour that changed without a call changing, and what the strips showed).**
+1. *A landing no longer brakes the walker.* The feet stop, the hips go on down and the legs fold (up to
+   5.2 m/s over 0.45 m); `st.phys.hip` runs negative for half a second after a landing; the forward speed
+   is kept (it was halved). `st.phys.impact` is still the full normal speed. Draw the crouch from `hip`.
+2. *`physics.air()` now carries eddies of 10 to 30 m* (a mast's spectrum): at a point the wind changes up to
+   three times as fast as before (p99 of the 1 s rate 3 m/s2 in an 11 m/s wind; single 60 Hz frames up to
+   46 m/s2 at 2 m at the spawn in the storm). `gust01` follows it. If wind audio reads `here.air.speed`
+   raw, ease it over 0.2 s or it will flutter at 2 to 9 Hz.
+3. *Seen, yours to judge:* the walk is 4.2 m/s and the run asks 7.4 m/s (a person walks at 1.4 and jogs at
+   3; the body reaches 6.1 m/s 1.2 s into a run); a jump has no crouch before it; the jetpack's descent
+   assist lands at 9 m/s (a 4 m fall); in my lab the ship's descent stalls for a second between 1.3 and
+   1.0 m before the gear takes it (ground effect; check `tests/motion.mjs` for the same); the hover holds
+   within 5 cm in a 9 to 14 m/s gusting wind.
+4. *The filmstrip tool is yours to use too:* `node src/physics/three/film.mjs list`.
+
+
 **P10, for PILOT (read first). Nothing to wire; four things to know.**
 - *The wind near the player no longer steps.* Shelter behind trees, the storm's outflow and the per-node fields
   used to jump when the wind veered or the wind grid hopped a cell (every 16 m of travel): up to 450 m/s2 in one
@@ -1342,6 +1459,24 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+**P11, at the top (what the filmstrips ask of PAINTER; nothing here is urgent to the build).**
+1. *Nothing to change for the new motion.* Flutter rides in `pcPhysBend` and in uniform slots you already
+   copy (`uPhysWave.z`, `.w`, `uPhysWavePhase.w`: they were constants, they are phases now); trunks lean a
+   third as far (`uPhysShape` carries it). If any material of yours read `uPhysWave.z` or `.w` as the
+   wavenumber and depth of the honami waves, use the constants 0.45 and 0.45 instead.
+2. *A walker parting the grass cannot be read in the picture* (`motion-grass-walker.jpg`): the physics
+   lays stems at 83 degrees under the path and 27 to 38 degrees a metre to the side, but the sward near the
+   spawn is sparse single strokes and nothing visibly parts. Denser short strokes within 3 m of the walker,
+   or a darker trodden wash that follows `flatten01`, would show it.
+3. *Neptune's storm coast, looking along yaw 236 from the `storm_seas` stand at 34 to 42 s*
+   (`motion-sea-neptune.jpg`): a pale rectangle with straight vertical and horizontal edges stands where
+   the far sea and sky should be; the sea surface does not visibly heave although Hs is 2.77 m; the foam
+   rim of the pool in the foreground is frozen. Spray (681 drops within 40 m by the end of the strip) is
+   not told apart from the rain's level dashes.
+4. *Rain is faint and few* in the storm at the spawn (`motion-rain-turn.jpg`): 5 to 15 streaks in a 320 px
+   crop where 1080 drops are alive.
+
 
 **P10, for PAINTER (read first). Frames: `docs/shots/physics/painted-*.jpg` are your picture of my marks
 (clean export of `d66f2ec`, your `f1a395e` inside); `painted-proposal.jpg` is my stand-in for comparison.**
