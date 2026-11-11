@@ -12,7 +12,7 @@ import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
   qLook, qRotate, qConj, qMul, qFromAxisAngle, rotateAround,
 } from './vec.js';
-import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample, scrambleFor } from '../player/explorer.js';
+import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../player/explorer.js';
 import {
   CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom,
 } from '../player/camera.js';
@@ -197,7 +197,7 @@ export class Sim {
       // Trunks and boulders: looked up once a frame around the explorer, hit every step.
       if (first) this.nearObstacles = this.obstaclesNear(this.bodyId, this.ex.p, 9);
       const moving = I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight') !== 0 || I.axis('KeyS', 'KeyW') + I.axis('ArrowDown', 'ArrowUp') !== 0;
-      if (collideObstacles(this.ex, this.nearObstacles, undefined, { moving, dt: h, scramble: scrambleFor(BODIES[this.bodyId].gravity) }) && this.ex.grounded) {
+      if (collideObstacles(this.ex, this.nearObstacles, undefined, { moving, dt: h }) && this.ex.grounded) {
         // Pushed sideways on sloping ground: put the feet back on it.
         const d = norm(this.ex.p);
         this.ex.p = scale(d, Math.max(len(this.ex.p), this.explorerEnv(this.bodyId).sample(d).radius));
@@ -498,7 +498,7 @@ export class Sim {
     let env = this._envs[bodyId];
     if (!env) {
       // The explorer's ground: the world's, with low boulders as rises to walk over.
-      env = { sample: scrambleSample(this.sampler(bodyId), () => this.nearObstacles, undefined, scrambleFor(BODIES[bodyId].gravity)), gravity: BODIES[bodyId].gravity };
+      env = { sample: scrambleSample(this.sampler(bodyId), () => this.nearObstacles), gravity: BODIES[bodyId].gravity };
       if (this.physics) {
         this.physics.bindEnv(bodyId, env);
         env.bodyStep = this.physics.explorer.step;

@@ -13,9 +13,6 @@ export const EXPLORER = Object.freeze({
   eyeHeight: 1.62,
   scramble: 1.3,             // m: anything this low (a boulder, a stump) is walked over, not round
   scrambleSkirt: 0.7,        // m: the rise onto it begins this far outside its edge
-  scrambleMinGravity: 0,     // m/s^2: on worlds lighter than this boulders are walked round instead (0: never; a switch
-                             // kept for the coordinator's ruling of 2026-11-11: on the Moon's highlands walking round
-                             // them trapped a run in five of eight headings, so the clamber is slowed there instead)
   walkSpeed: 4.2,            // m/s, a relaxed walk
   runSpeed: 7.4,             // m/s with Shift
   groundAccel: 26,           // m/s^2 toward the wished velocity on the ground (snappy stop/start)
@@ -25,7 +22,6 @@ export const EXPLORER = Object.freeze({
   jetThrust: 17,             // m/s^2 upward while burning (gravity is subtracted from this)
   jetMaxRise: 8.5,           // m/s cap on climb speed (rises in light gravity, see jetRiseCap)
   assistAccel: 4,            // m/s^2 of suit-thruster help for starting and stopping (with PHYSICS)
-  clamberLight: 0.45,        // least share of the walking pace over a boulder on a light world (with PHYSICS)
   windAirCap: 12,            // m/s: off the ground the suit holds off whatever wind is beyond this (PHYSICS' cmd.shelter01)
   windPace: 0.012,           // per m/s of wind along the walk: a headwind takes a little of the pace, a tailwind adds a little
   windPaceMin: 0.75,         // ...never less than this share of the pace (3.15 m/s walking into any gale)
@@ -255,19 +251,7 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const f = tangent(input.viewFwd || st.fwd, up, st.fwd);
   const right = cross(f, up);
   const wish = clampLen(add(scale(f, input.moveZ || 0), scale(right, input.moveX || 0)), 1);
-  let maxSpeed = input.run ? T.runSpeed : T.walkSpeed;
-  // Low boulders are ground, and they are clambered over: on one, or a pace before one, the
-  // explorer goes at a walk at most (slower where gravity is light, or a boulder is a ramp).
-  if (wasGrounded && (wish.x !== 0 || wish.y !== 0 || wish.z !== 0)) {
-    // (Looked for under the feet, a pace ahead, and as far ahead as the body needs to slow down.)
-    const g = env.gravity || 9, far = Math.min(10, Math.max(2.4, len(st.v) * 1.4));
-    let rise = env.sample(up).scramble || 0;
-    for (const d of [1.2, far * 0.5, far]) rise = Math.max(rise, env.sample(norm(addScaled(st.p, wish, d))).scramble || 0);
-    // No faster than a walk, and slower where gravity is light (2.1 m/s on the Moon). This is not
-    // enough on the Moon or Pluto: stepping off the far side of a 1.2 m boulder the body floats
-    // down for half a second (feet 0.97 m off the falling ground); that needs PHYSICS' legs.
-    if (rise > 0.08) maxSpeed = Math.min(maxSpeed, T.walkSpeed * Math.min(1, Math.max(T.clamberLight, Math.sqrt(g / 9))));
-  }
+  const maxSpeed = input.run ? T.runSpeed : T.walkSpeed;
 
   let jump = false;
   if (input.jump && (wasGrounded || floating)) { jump = true; st.jumpHeld = 0; }
@@ -361,17 +345,14 @@ export function jetRiseCap(gravity, T = EXPLORER) {
 // ground instead: a rounded rise the explorer walks up and over. This wraps a sampler so that
 // the ground it reports carries those rises (`list()` returns the obstacles near the explorer).
 // Both movement models (the built-in one and PHYSICS') see the ground only through env.sample.
-// How tall a thing may be and still be walked over on a world of this gravity (0: nothing is).
-export function scrambleFor(gravity, E = EXPLORER) { return (gravity || 9) >= E.scrambleMinGravity ? E.scramble : 0; }
-
-export function scrambleSample(sample, list, E = EXPLORER, limit = E.scramble) {
+export function scrambleSample(sample, list, E = EXPLORER) {
   return (d) => {
     const s = sample(d);
     const obs = list();
     if (!obs || !obs.length) return s;
     let rise = 0;
     for (const o of obs) {
-      if (o.height > limit) continue;
+      if (o.height > E.scramble) continue;
       const R = s.radius, dx = (d.x - o.unitDir.x) * R, dy = (d.y - o.unitDir.y) * R, dz = (d.z - o.unitDir.z) * R;
       const reach = o.radius + E.scrambleSkirt, d2 = dx * dx + dy * dy + dz * dz;
       if (d2 >= reach * reach) continue;
@@ -380,7 +361,7 @@ export function scrambleSample(sample, list, E = EXPLORER, limit = E.scramble) {
       if (h > rise) rise = h;
     }
     if (rise <= 0 || (s.liquidRadius || 0) > s.radius + rise) return s;
-    return { ...s, radius: s.radius + rise, scramble: rise };      // (scramble: metres of boulder under the feet)
+    return { ...s, radius: s.radius + rise };
   };
 }
 
@@ -392,7 +373,7 @@ export function collideObstacles(st, obstacles, bodyRadius = 0.35, help = null) 
   let hits = 0, c1 = null, c2 = null;
   const r = len(st.p), up = scale(st.p, 1 / r);
   for (const ob of obstacles) {
-    if (ob.height <= (help && help.scramble != null ? help.scramble : EXPLORER.scramble)) continue;   // low things are ground (scrambleSample)
+    if (ob.height <= EXPLORER.scramble) continue;          // low things are ground (scrambleSample)
     if (st.altitude > ob.height) continue;
     const d = reject(sub(st.p, scale(ob.unitDir, r)), up);
     const dist = len(d);
