@@ -23,6 +23,67 @@ is judged at the top tier from now on.
 
 ---
 
+## Review 6, first half: the mechanics on the changed worlds (2026-11-11, runs by the sixth PILOT agent)
+
+**Carried forward, not re-run.** The sixth PILOT agent made every run below and was stopped by
+a usage limit before it could put them here; the seventh copies its draft
+(`/home/user/.pc-scratch/pilot/run6/review-mech.md`) onto the record unchanged in substance.
+The evidence is the sixth agent's, on the commits it names; I have not repeated it.
+
+Everything on one clean tree: PAINTER `ad17d2c` (block 6), PHYSICS `f0b58ea` (P12), PILOT
+`54ba154` (built with `tests/cleantree.sh`; no "WIP snapshot"). Browser runs at quality 0,
+400x225, `scale=0.5`: they prove the play, not the picture. PAINTER's block 7 (`b022507`) and
+PHYSICS' P13 (the gait) came after these runs.
+
+| run | result |
+| --- | --- |
+| PILOT's unit tests (`node --test tests/*.test.mjs`; the contract test lands on and walks at every spawn) | 116 of 116 pass |
+| landing survey (scratch `run6/landsurvey.mjs`: 24 spots a body, from 55 m with the assist, PHYSICS on) | 235 of 240 land, 3 refused as too steep and 2 as blocked, each with its word; no timeout. The same count as before the spawns moved |
+| at every spawn (scratch `run6/spawncheck.mjs`, pure simulation): walk to the ship, board, lift off, come down, land, step out | ten of ten: the ship stands 16 m off on a berth of 0 to 5.8 degrees, dry; boarding after 1.8 to 2.5 s of walking; every landing on the first E where the script was below 90 m and slow (on Saturn and Pluto it was not, and the screen said so: "Come down below 90 m to land", "Slow down to land: no air to slow the ship here, hold X") |
+| a run from every spawn, eight headings, 20 s each (same script) | 66 to 164 m made good, stalled 0.1 to 0.8 s, on eight bodies. **Venus**: six of eight headings end in the lava (27 to 46 m made good, 11 to 15 s under 1 m/s). **Jupiter**: two headings stop at the bench's cliff (84 degrees; as designed, the jetpack is the way) |
+| Earth, Mars, Saturn in the painted world, reload from the save (`node tests/all.mjs --only painted-trip`) | PASS, 47 checks, 653 s |
+| the grand tour, eight planets in one sitting (`node tests/grandtour.mjs`) | PASSED: 8 of 8 landed on the first E, no bounce, no reload, no console error; 1619 s of play, 36 minutes |
+| the Moon and Pluto (`--bodies moon,pluto --from earth`) | PASSED: 2 of 2, 319 s of play |
+
+**GOOD.** Nothing that landed, walked or left before fails after the spawns moved and
+`sampleObstacles` changed (PAINTER's block 5 and 6).
+
+**Fixed by the sixth agent (PILOT), from what the runs showed**
+1. **The lava of Venus holds a wader, and nothing said so.** The new first landing stands 25 m
+   from a lava river; PHYSICS' lava (viscosity 100 Pa s, Stokes drag) slows a runner from
+   5.5 m/s to 0.4 m/s within five seconds of the bank and to 0.32 m/s swimming (60 s to cross
+   20 m); walking back out takes 10 s, the jetpack lifts out in 1.5 s. Thick lava is right and
+   has character; a new player pressing W into the first thing the view shows should be told
+   the way out. Now, after 2.5 s of pushing in a thick liquid: "The lava is thick: hold Space
+   and the jetpack lifts you out", once per wade (`6130796`; test on the real Venus).
+2. **A player never saw the first views PAINTER composed.** The game starts at Earth's spawn;
+   every other world's spawn is reached only through the debug door. The grand tour came down
+   in the spawn's own biome on one world of eight (Mars, by chance); on Venus it landed among
+   fungal towers, on Saturn in honey mist, on Jupiter in the hanging gardens. So "does the
+   first view say which world it is" was judged at places no player stands on arrival. Now a
+   world not yet walked on shows **"a place to land"**: a small ring on the spot its first
+   view was painted from, or an arrow at the picture's edge when it lies round the curve of
+   the world; it goes for good once the world has been walked on, and the player may land
+   anywhere else (in the snapshot `1186819`, PILOT's files; seen in a browser over Venus; the
+   trip checks it on Mars and Saturn: stub trip 49 checks pass; README). Not yet seen: the
+   ring on the ground at 1080p, and whether the arrow's label clears the read-out in a small
+   window (at 640x360 it runs under it, as the target's arrow always could).
+3. `tests/tour.mjs` could not run at all (`lastSettle` was declared below the top-level run
+   that uses it; nobody had run the tour since settle is counted in frames): `73ff24b`. And
+   `tour --first 1` now takes the spawn frame as the world's own arrival, facing the way
+   `getSpawn` says (`5a5b691`).
+
+**Information, not findings**: obstacles within 30 m of each spawn (trunks or towers /
+boulders): Mercury 29 / 26, Venus 11 / 33 (towers to 22 m), Earth 56 / 0, Moon 0 / 12, Mars
+4 / 20, Jupiter none within 120 m, Saturn 14 / 13, Uranus 3 / 28, Neptune 38 / 16, Pluto 3 / 57.
+
+**Not in this half** (waits for the coordinator's word, after PAINTER's block 7 lands): the
+motion set, the weather set at the top tier, `node tests/all.mjs` in full, the Moon boulder
+run against the measure as ruled (no boulder lifts the feet more than 0.3 m and the body is
+never thrown up more than 0.3 m without a jump), settle times.
+
+---
+
 ## Before review 6: the picture in motion, the Moon run, the head in a browser (2026-11-11, fifth PILOT agent)
 
 Not a milestone review: evidence gathered for review 6, with findings a role can act on now.
