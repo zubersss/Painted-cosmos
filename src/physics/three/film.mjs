@@ -199,7 +199,7 @@ export const SUBJECTS = {
     q: SPAWN + '&t=166&pre=1&explorer=0&ship=fly&shipAway=0&shipAlt=6&dist=17&pitch=6&up=3&yaw=70', w: 640, h: 360, crop: [0.2, 0.1, 0.6, 0.8], tile: [213, 160], cols: 6, frames: 18, dt: 0.2, sub: 12,
     before: `(L) => { L.run(9, 1 / 60, (i, t, ctl) => { ctl.ship = 'up'; }); }`,
     each: `(i, t, ctl) => { ctl.ship = 'up'; }`,
-    probe: `(L) => { const s = P.ship(), w = P.windEN(0, 2, 6); return { h: s.h, e: s.e, n: s.n, vu: s.vu, vh: s.vh, windE: w.e, windN: w.n, wash: s.wash, grass: P.bend(0, 2).deg }; }` },
+    probe: `(L) => { const s = P.ship(), w = P.windEN(0, 2, 6); const B = (L.sh.phys && L.sh.phys.buffetAngle) || {}, D = 180 / Math.PI; return { h: s.h, e: s.e, n: s.n, vu: s.vu, vh: s.vh, windE: w.e, windN: w.n, roll: P.r2((B.roll || 0) * D), pitch: P.r2((B.pitch || 0) * D), yaw: P.r2((B.yaw || 0) * D), wash: s.wash, grass: P.bend(0, 2).deg }; }` },
   'ship-land': { note: 'Earth spawn: from a hover at 6 m the ship comes down, the gear takes it at 1 m and the legs take the weight; 3 frames a second',
     q: SPAWN + '&t=50&pre=1&explorer=0&ship=fly&shipAway=0&shipAlt=6&dist=17&pitch=6&up=3&yaw=70', w: 640, h: 360, crop: [0.2, 0.1, 0.6, 0.8], tile: [213, 160], cols: 6, frames: 24, dt: 1 / 3, sub: 20,
     before: `(L) => { L.run(9, 1 / 60, (i, t, ctl) => { ctl.ship = 'up'; }); }`,

@@ -350,6 +350,10 @@ function driveShip(dt) {
     sh.phys.downwash.thrust = physics.ship.tuning.mass * body.gravity * 0.3;
   }
   shipObj.position.set(sh.p.x, sh.p.y, sh.p.z); shipObj.quaternion.set(sh.q.x, sh.q.y, sh.q.z, sh.q.w);
+  // (P15) the hull drawn as the game should draw it: the attitude off the commanded one (st.phys.buffetAngle: the chop,
+  // and since P13 the wind's moments on the hull against the attitude hold: pitch, roll and the weathercock's yaw)
+  const BA = sh.phys && sh.phys.buffetAngle;
+  if (BA) { shipObj.rotateX(BA.pitch || 0); shipObj.rotateZ(BA.roll || 0); shipObj.rotateY(BA.yaw || 0); }
 }
 
 // ---- the kit materials: PAINTER's contract ------------------------------------------------------------
