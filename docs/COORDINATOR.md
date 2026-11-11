@@ -510,3 +510,24 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
 - 2026-11-11: **the second PAINTER agent reported being past two thirds of its capacity and is
   replaced by a third in the same role** (stopped by the coordinator so that two PAINTERs never
   write at once). M3 for PAINTER starts with weather in the picture.
+- 2026-11-11: **PHYSICS stage P6 accepted** (third PHYSICS agent, `b146000`; the coordinator
+  re-ran the tests: 208 pass; PILOT's 102 pass on it). (1) Crawl measured mark by mark at 60 Hz
+  and removed: blizzard pops 11.7 a second to 0, dust-storm billows 7.6 to 0, rain strokes
+  vanishing whole 85.8 to 0.8; particles carry `left` and fade; snow lives in its own 8 m box
+  round the eye (`frame.eye` in `physics.update`). (2) Two real bugs fixed: particles were
+  published on the tangent plane of the frame's anchor (rain ended up to 18 m above the ground
+  380 m from where a session began), and weather entered over the sea bed (no rain over deep
+  water). (3) Branch sway (`pcPhysBranch`, no new texture) and drifts (`physics.fields.drift`:
+  snow and sand gather in the lee and in hollows, scoured from windward faces). (4) The game
+  played on six worlds: the bodies obey the models; what is physically off is in the assists
+  (one turn rate of 42 deg/s on every world, cruise speeds bunched, feet never leaving the
+  ground, every jetpack fall ending at 7 m/s, an empty first second of throttle). Five optional
+  one-line levers for PILOT are in its notes (`eye`, `carveAccel`, `speedScale` with `brake`,
+  `assistAccel` by gravity, `softFallSpeed` 4). Worst frame 0.36 to 1.01 ms. Not done: the
+  silhouette test in `PROP_VERT`; flake tumble and dust-tuft shape.
+- 2026-11-11: the third PHYSICS agent has about a quarter of its context left. **The PHYSICS
+  role pauses until PAINTER's weather block is reported**; a fresh PHYSICS agent then tunes the
+  marks, waves, branches and drifts against the painted picture and re-flies PILOT's levers.
+- 2026-11-11: coordinator's recommendation on the levers (feel is PILOT's call): take them. The
+  brief gives every planet its own "gravity feel" and the owner asked for realism; today every
+  world but Venus flies and walks the same.
