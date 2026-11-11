@@ -351,3 +351,22 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   ruler-straight). **PAINTER's M2 is not accepted yet: a second pass on landforms and on
   faceted kits comes before M3.** How is PAINTER's call; that each biome shows its named
   feature is the brief's requirement and the coordinator holds it.
+- 2026-11-11: **PHYSICS stage P2 accepted** (`0f56a40`; the coordinator re-ran the tests: 158
+  pass). Every world has its own weather with a lab preset (`physics-lab.html?planet=...`); all
+  particle kinds filled (ballistic in vacuum); ground rims, filled prints, pad prints, scour;
+  canopy wakes and crown coupling; wind waves with `physics.water` (GLSL + JS twin); lava and
+  cloud-froth liquids; `cmd.brake`; lift-off on the gear; every biome id mapped, with a test.
+  Shader against JS: max 2.5 mm on a 2 m tip. Worst reproducible frame 0.29 to 0.51 ms.
+  Default seed is now 18 (a thunderstorm crosses the Earth spawn at 10:40 to 13:20).
+- 2026-11-11: rulings on PHYSICS's questions. (1) Ground words: `ochre_basins` stays dust and
+  `nitrogen_dunes` stays snow (physical behaviour is PHYSICS's call). (2) Cloud seas carry the
+  explorer as a light froth, so nobody is stranded (no fail state); PAINTER and PILOT may ask
+  for a different depth, not for sinking. (3) `fog01`, `dust01`, `haze01` and
+  `precipitation.intensity01` changed meaning in P2; read the notes before using them.
+- 2026-11-11: **Division of labour for drawing the physics** (coordinator; PAINTER is the
+  bottleneck and nothing of the weather is in the picture yet). PHYSICS builds optional draw
+  kits under `src/physics/three/`: three.js geometry, attribute layout and per-frame updates
+  for rain, snow, loose particles, ground marks and the water surface, each taking a material
+  factory. PAINTER supplies the materials (its wash chunks, its MRT outputs), decides the look,
+  adds the objects under the body roots in `world.update`, and may replace any kit with its own.
+  The pure core of `src/physics` stays three-free; only `src/physics/three/` imports three.
