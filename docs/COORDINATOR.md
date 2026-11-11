@@ -35,7 +35,7 @@ here, write the request in your notes file and report it; the coordinator record
      `/home/user/.pc-scratch/pilot/`, `/home/user/.pc-scratch/physics/`.
   5. Do not start further agents or threads. Only the owner adds workers.
 - **Extra ownership (not named in the brief):**
-  PILOT also owns `/.nojekyll`, `/.gitignore`, `/package.json` (dev only, if wanted),
+  PILOT also owns `/docs/lead/**` (section G), `/.nojekyll`, `/.gitignore`, `/package.json` (dev only, if wanted),
   `/docs/shots/pilot/**`. PAINTER also owns `/docs/shots/painter/**`.
   PHYSICS owns `/src/physics/**`, `/physics-lab.html`, `/docs/notes/physics.md`,
   `/docs/shots/physics/**`.
@@ -212,6 +212,47 @@ metres and seconds, deterministic for a given seed and time, allocation-free in 
   `node --test src/physics/`); Pilot adds that command to "every check".
 - Timing: PAINTER and PILOT finish M1 as planned and start wiring physics in during M2.
 
+## G. Lead developer: PILOT (added by the owner on 2026-11-11)
+
+The owner's words: "Make pilot also a lead developer that keeps check of the work of the others
+and makes sure we're on the right track and double checks stuff to make sure it looks good and
+works well using reference for games that already do exist that have good physics and weather
+and everything my game would need, if a lead doesn't exist already". No lead existed (the
+coordinator is a switchboard and tie-breaker, not a reviewer of the work), so PILOT is now also
+the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
+
+**The lead's files** (owned by PILOT): `/docs/lead/**`.
+- `docs/lead/REFERENCES.md`: what good looks like. For each system the game needs (on-foot
+  movement, jetpack, ship flight and landing, ground-to-space transition, wind in foliage, plants
+  parting around the player, sand and snow deformation, rain, storms, snow, weather transitions,
+  other-planet weather, water, day and night, stable painterly rendering, minimal HUD, ambience),
+  one to three existing games widely held to do it well, the specific observable behaviours that
+  make it good (timings, magnitudes, what the player sees and feels), and a concrete acceptance
+  check for our game derived from each.
+- `docs/lead/REVIEW.md`: dated reviews per role, each finding with its evidence (a screenshot
+  file, a test, a measurement) and the reference check it fails, sorted into MUST FIX (blocks
+  the milestone), SHOULD FIX, and GOOD (keep).
+- `docs/lead/TRACK.md`: the path to the brief's "Done means", as a checklist with status, how
+  each item was verified and by whom, risks, and what is off track.
+
+**Rules.**
+1. References are for behaviour and technique only. Nothing from any existing game is copied:
+   no names, characters, ships, art, music, levels, UI, or look. The look is judged against the
+   art bible (a watercolor painting), never against another game's style.
+2. The lead verifies; it does not take anyone's word. It re-runs the other roles' tests, opens
+   their pages (`gallery.html`, `physics-lab.html`) headless, studies their evidence shots, and
+   plays the integrated build.
+3. The lead never edits another role's files. It says what is wrong and why, with evidence; the
+   owner of the domain decides how to fix it. Tie-breaks are unchanged (look: Painter; physical
+   behaviour: Physics; control feel, performance, architecture: Pilot). A disagreement gets one
+   exchange in notes, then the coordinator decides.
+4. PAINTER and PHYSICS read `docs/lead/REVIEW.md` and `REFERENCES.md` at every sync and answer
+   each MUST FIX in their own notes ("fixed in <commit>" or "disagree, because ...").
+5. A role's milestone is done only when the lead's MUST FIX list for it is empty or the
+   coordinator has waived an item.
+6. The lead's own domain (controls, flight, UI, audio, integration) is reviewed by the other two
+   in their notes and by the coordinator at each milestone.
+
 ## E. Settled outcomes (log)
 
 - 2026-11-10: bootstrap as described in A. Branch for both roles: `cosmos`.
@@ -224,3 +265,5 @@ metres and seconds, deterministic for a given seed and time, allocation-free in 
 - 2026-11-11: the owner added a third worker, PHYSICS (section F). Ownership: `src/physics/**`,
   `physics-lab.html`, its notes and shots. Tie-break added: physical behaviour goes to Physics;
   realism is kept and made forgiving with assists, not faked. Same branch, same tree, same rules.
+- 2026-11-11: the owner made PILOT the lead developer as well (section G): reference benchmarks
+  from existing games, verified reviews of the other roles, a track sheet, milestone sign-off.
