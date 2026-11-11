@@ -51,15 +51,17 @@ frames in the game, `--only id,id` re-shoots some and keeps the rest), `node tes
 clean export (`tools/export-head.sh <dir>`, then `cd <dir>`), one browser at a time.
 
 **Unfinished, and where each item starts.**
-1. *Review 5's open MUST FIX* (`docs/lead/REVIEW.md`). PAINTER: the budget (re-measure with
-   `node tests/cost.mjs --places "earth:vista:earth-temperate_forest-1,earth:spawn:spawn"
-   --qualities 0,1` and `node tests/weather.mjs --only earth-storm,earth-storm-day`: wanted 600 k
-   and 350 at quality 1, 300 k at quality 0, in fair weather and in the storm) and the pepper
-   (open `weather.jpg` after `node tests/weather.mjs`: storm sky, night, Neptune's sky; and a
-   frame in space: `docs/shots/pilot/m2-pulse.jpg` shows how to make one). PHYSICS: storms
-   bring wind (scratch `run3/wind.mjs` prints `physics.air` at 2, 10 and 30 m at the place and
-   time of each weather frame; `R-STORM-5`, `R-STORM-2`, `R-SNOW-3`). When both report, record
-   review 6 and say whether M3 is closed.
+1. *The one open MUST FIX* (addendum to review 5 in `docs/lead/REVIEW.md`): PAINTER's vista
+   `earth-temperate_forest-1` is at 611 k / 339 at quality 1 and 304 k at quality 0 on
+   `0de3fb4`. When PAINTER reports: `tools/export-head.sh <dir>; cd <dir>; node tests/cost.mjs
+   --places "earth:vista:earth-temperate_forest-1,earth:spawn:spawn" --qualities 0,1` (wanted
+   600 k and 350, 300 k), and `node tests/weather.mjs --only earth-storm,earth-storm-day` for
+   the storm (550 k after dark today). Then record review 6 and say whether M3 is closed.
+   Never test a commit whose message begins "WIP snapshot" (the coordinator's backups, may be
+   mid-edit): test the last commit the role made itself. Also wanted when the machine is
+   quiet: the tour on the current head (`node tests/tour.mjs --bodies <one body>`, ten
+   bodies, about two hours; last run on `ded1435`), and PAINTER's space pass (stars, pulse
+   streaks) and near-ground strokes on snow looked at when it reports.
 2. *M4*, when the coordinator says so and not before: `node tests/all.mjs --export` must print
    ALL PASSED on the final head; then one pull request `cosmos` -> `main` through the REST API
    (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), merge, GitHub Pages from
@@ -101,6 +103,23 @@ half done; three MUST FIX open for the others (two PAINTER, one PHYSICS; `REVIEW
 | Cost at three tiers, `node tests/cost.mjs` | export of `83c604c` | 36 measurements, no console errors; one view over: `earth-temperate_forest-1` 306 k (quality 0), 614 k / 341 (quality 1), 818 k (quality 2); the rest 145 k to 283 k, 291 k to 549 k, 324 k to 756 k |
 | A run from the spawn, eight headings, 25 s each (pure simulation, real ground, obstacles, physics) | export of `62d3529` with my `sim.js` and `src/player` | before: Mars 5 m in one heading, Mercury 5 m in one; after: Mars 170 to 179 m, Mercury 144 to 163 m, Earth 106 (a 41 degree slope) to 174 m, Venus 123 to 130 m (thick air), the giants 130 to 195 m |
 | Unit tests | working tree | 105 pass (two more camera and two more obstacle tests) |
+
+### After the coordinator's two relays (same run; all on `0de3fb4` unless said)
+
+- Re-measured for the addendum to review 5: the vista 611 k / 339 (quality 1) and 304 k
+  (quality 0), still over; the storm after dark 550 k / 300; pepper gone from the washes
+  (storm sky, Neptune, night, space, pulse); storms windy (10 to 23 m/s above the wood, 12 to
+  25 in the blizzard, 10 to 20 in Mars' dust storm). In the browser, with real keys, through
+  the storm at the spawn: walk 3.5 to 4.0 m/s in every heading, a hop carried 4 m, the ship
+  hands-off moves 0.5 m in 15 s and lands in 9 s with sink held; no console errors.
+- PAINTER's six points on the interface taken (`pencilRing`, a veil of paper behind an open
+  panel, dry-brush orbits, `pc-torn-b/-c`, `pc-rag-b/-c`); `.pc-cockpit` moves the read-out
+  and the gauge to the top and the prompt above the cowl; `CAMERA.boom` 5.2 m.
+- PHYSICS' re-fly: a stalled sink lands (`Sim._sink`: sink held, under 14 m, no descent for
+  1.5 s, slower than 5 m/s; faster, the screen says "Slow down to land"); `env.speedScale`
+  is 1.7 at most under 60 m and the full value above 400 m; the wall-clock assertions in
+  `tests/physics.test.mjs` and `tests/contract.test.mjs` only assert with `PC_TIMING=1`.
+- Not done: the tour on the current head; PHYSICS' Moon hover was not reproduced (guarded).
 
 ### What this run added
 
@@ -571,22 +590,19 @@ Second PILOT agent:
 
 ### After review 5 (third PILOT agent; details and evidence in `docs/lead/REVIEW.md`)
 
-From PAINTER:
-1. The two MUST FIX of M3: the budget at `earth-temperate_forest-1` (614 k at quality 1,
-   306 k at quality 0) and in the storm after dark (606 k), and the pepper.
-2. What storms after dark submit that storms by day do not (24 k triangles, 13 draw calls).
-3. The near-ground layer under fresh snow (green flicks on the snowfield) and on lawns (dark
-   teeth); the white specks round the crowns in the lightning frame; puddles that read as
-   holes; Neptune's sea under a storm sky.
-4. Two second-site vistas with a wall in front of the easel: `mercury-crystal_gardens-2`,
-   `uranus-frozen_waves-2` (the camera no longer shows the back of a hat there; it shows the
-   wall).
-5. A look at the interface: `docs/shots/pilot/ui-title.jpg`, `ui-book.jpg`, `ui-map.jpg`,
-   `ui-flight.jpg`, `ui-space.jpg`, `ui-foot.jpg`. Say what is wrong; I change it.
-6. Still wanted from review 4: `world.setBuildBudget(ms, { fixed: true })`.
+From PAINTER (state after the addendum, on `0de3fb4`):
+1. The one MUST FIX left: `earth-temperate_forest-1` at 611 k (quality 1) and 304 k (quality 0).
+2. Stars in space (there are none) and the pulse streaks; the border's hard dots in dark
+   scenes; the white specks round the crowns in the lightning frame; near strokes on snow and
+   as spikes on Saturn; puddles; Neptune's sea under cloud.
+3. Two second-site vistas with a wall in front of the easel: `mercury-crystal_gardens-2`,
+   `uranus-frozen_waves-2`.
+4. A second look at the interface after your six points (`docs/shots/pilot/ui-*.jpg`, re-shot).
+5. Is the cockpit right with the slips at the top (`docs/lead/evidence/space-recheck.jpg`,
+   first frame)? The boom is 5.2 m, as you suggested.
 
-From PHYSICS:
-1. The MUST FIX: storms bring their own wind (P1).
+From PHYSICS (P1 is closed; P2, P3, P4, P6 are with your fifth agent):
+1. Thank you for the wind; walked and flown, it is safe.
 2. The first storm of the default seed before about 400 s, so that it falls in daylight (P2).
 3. Neptune's `storm_seas`: a storm sky and a swell that can be seen (P3).
 4. Wind on the explorer (P6): at 33 m/s a walk downwind makes 0.6 m/s, upwind 3.5, across 2.9,

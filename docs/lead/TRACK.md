@@ -14,11 +14,12 @@ M1 and M2 are closed. M3 is the live milestone and most of it is in: Pilot's hal
 (sketchbook, sound, title and help, HUD, the painted interface in its second pass, tiers,
 gamepad, touchdown on the legs); weather is in the game (review 5: twelve frames in the game
 itself, cost counted); the real explorer and ship are in every frame; a near-ground stroke
-layer and a rain glaze are being committed as this is written. **Three MUST FIX are open**:
-for Painter the frame budget in one view (Earth's first vista, 614 k triangles against 600 k
-at quality 1 and 306 k against 300 k at quality 0; the storm at the spawn after dark, 606 k)
-and the pepper in dark washes and space; for Physics, storms that bring no wind (a
-thunderstorm at 1 to 3 m/s where the player stands). M4 is prepared: one command runs every
+layer and a rain glaze are in. **One MUST FIX is open** (review 5's addendum, on `0de3fb4`):
+for Painter, the frame budget in one view (Earth's first vista: 611 k triangles against 600 k
+at quality 1, 304 k against 300 k at quality 0). Closed at that re-measure: the pepper in the
+dark washes and in space, the storm after dark (550 k), and Physics' storms without wind
+(now 16 to 25 m/s; walked and flown in the browser).
+M4 is prepared: one command runs every
 check and prints a table (`node tests/all.mjs --export`), the README is complete for a new
 player, the critique of the other two domains is in Pilot's notes. The two things nobody has
 been able to check are still the frame rate on a real GPU and how the game sounds.
@@ -63,10 +64,10 @@ been able to check are still the frame rate on a real GPU and how the game sound
 | Touchdown on the landing legs | Pilot + Physics | DONE: the assist hands the hull to the gear a metre up; 0.6 m/s sink, three feet down, asleep within 5 s on Earth, the Moon and Jupiter; 40 landings and the 240-spot survey unchanged | Lead: `tests/physics.test.mjs`, `tests/contract.test.mjs`, play-through with Physics (0.80 m/s) |
 | Gamepad ("if cheap") | Pilot | DONE with a simulated pad (never a real one): standard layout, analog sticks, the same keys | Lead: `tests/gamepad.test.mjs`, `m3check` |
 | Freeze-frame tour of every biome and every vista on every body | Lead | DONE as an instrument: `node tests/tour.mjs` writes `docs/lead/evidence/tour-<body>.jpg` and `.json`; says on the sheet what did not settle, who stands in liquid, what each frame cost | Lead: sheets |
-| Weather in the game: sky, haze, light, wet ground, fresh snow, waves, Physics' marks drawn by the world | Painter + Physics | PART (review 5, in the game itself): the storm by day passes as a watercolour of a wet wood; the blizzard is the best frame; cost is small (kits 1 to 5 draw calls, at most 3.5 k triangles). Open: rain as pale opaque strokes (a glaze was committed after the review's frames), white specks round the crowns in the lightning frame, the near-ground layer drawn on top of fresh snow, puddles that read as holes, Neptune's sea untouched by its storm sky, a dust storm with nothing in the air near the eye. **Physics MUST FIX: storms bring no wind** | Lead: `docs/lead/evidence/weather.jpg`, `.json` (`node tests/weather.mjs`) |
-| Frame budget with weather, real models and the near-ground layer (600 k / 350 at quality 1; 300 k at quality 0; 1.2 M at quality 2) | Painter | **MUST FIX**, by a hair: Earth's vista `temperate_forest-1` 614 k / 341 at quality 1 and 306 k at quality 0; the storm at the Earth spawn after dark 606 k / 315. Every other dearest view is inside (291 k to 549 k at quality 1; at most 818 k at quality 2); every draw-call count is inside | Lead: `docs/lead/evidence/cost.json` (`node tests/cost.mjs`), `weather.json` |
-| Pepper in dark washes and in space | Painter | **MUST FIX** (the coordinator's ruling): still in every dark wash of review 5's frames (storm sky, night, Neptune's sky and sea, the border under a storm). Painter committed a change to the dark washes after those frames; not yet re-measured | Lead: `weather.jpg` |
-| Storms bring their own wind | Physics | **MUST FIX** (review 5, P1): thunderstorm at the spawn 1.1 to 2.6 m/s at 2 m and under 9 m/s above the canopy; blizzard 1.4 to 9 m/s; dust storm on Mars 2 to 3 m/s | Lead: measured in Node on the export (`physics.air`) |
+| Weather in the game: sky, haze, light, wet ground, fresh snow, waves, Physics' marks drawn by the world | Painter + Physics | PART (review 5, in the game itself): the storm by day passes as a watercolour of a wet wood; the blizzard is the best frame; cost is small (kits 1 to 5 draw calls, at most 3.5 k triangles). Open: rain as pale opaque strokes (a glaze was committed after the review's frames), white specks round the crowns in the lightning frame, the near-ground layer drawn on top of fresh snow, puddles that read as holes, Neptune's sea untouched by its storm sky, a dust storm with nothing in the air near the eye. Physics' storm wind is in since (see below) | Lead: `docs/lead/evidence/weather.jpg`, `.json` (`node tests/weather.mjs`) |
+| Frame budget with weather, real models and the near-ground layer (600 k / 350 at quality 1; 300 k at quality 0; 1.2 M at quality 2) | Painter | **MUST FIX, the only one open**: Earth's vista `temperate_forest-1` 611 k / 339 at quality 1 and 304 k at quality 0 on `0de3fb4` (614 k and 306 k before Painter's trim). Everything else is inside: the storm at the spawn after dark 550 k / 300, the other dearest views 291 k to 549 k at quality 1, at most 818 k at quality 2; every draw-call count is inside | Lead: `docs/lead/evidence/cost.json`, `cost-recheck.json` (`node tests/cost.mjs`) |
+| Pepper in dark washes and in space | Painter | DONE for the washes (addendum to review 5: storm sky, Neptune's sky, night, space, pulse, looked at 1:1). Left as SHOULD FIX: the ragged border's hard dots in dark scenes; no stars in space | Lead: `weather-recheck.jpg`, `space-recheck.jpg` |
+| Storms bring their own wind | Physics | DONE (P7.4): thunderstorm 10 to 23 m/s above the wood, blizzard 12 to 25 at 10 m, dust storm 10 to 20; walked and flown in the browser through the storm at the spawn (walk 3.5 to 4.0 m/s in every heading, hop carried 4 m, ship lands) | Lead: Node on the export, `run3/stormwalk.mjs` in the browser |
 | Real explorer and ship models | Painter | DONE as far as the lead has looked: in every third-person frame of review 5, one draw call each, a cast shade under both; not yet judged in motion or in the cockpit | Lead: `weather.jpg`, `cost.json` |
 | Motion (wind, water, day-night), space washes, art pass on the weakest biome of every planet | Painter | PART: grass leans from the explorer and lies down under the ship, waves move, dusk and night are in the weather sheet; space washes and the art pass not started as far as the lead knows | |
 | On foot nobody fights the ground | Pilot | DONE: boulders up to 1.3 m are walked over; wedged between two trunks the suit walks round one; a run from each spawn makes 100 m and more in 25 s in every heading on eight bodies except up a 41 degree slope | Lead: `tests/explorer.test.mjs`, scratch `run3/spawnrun.mjs` |
@@ -79,7 +80,7 @@ been able to check are still the frame rate on a real GPU and how the game sound
 | Every check, one command, one table | Pilot | DONE: `node tests/all.mjs --export` (a clean export of the last commit; three unit suites, the brief's static rules, eight scripted browser runs). Last run: export of `db22516`, 12 of 13 pass (the thirteenth was a fault in the step itself, fixed). ALLCHECKS_FINAL |
 | README for a new player | Pilot | DONE: where to play, the first minute, every control, the read-out line by line, what the tiers draw, what was never verified on real hardware; the static step of `all.mjs` fails if a control of the help card is missing from it |
 | Blunt critique of the other two domains, as a player | each role | Pilot's is in `docs/notes/pilot.md` ("Critique swap"); Painter's and Physics' of the others are theirs to write |
-| Fix the worst issues | all | TODO: the three MUST FIX above first |
+| Fix the worst issues | all | TODO: the one MUST FIX above first, then each role's SHOULD FIX list (review 5 and its addendum) |
 | One pull request `cosmos` -> `main` through the REST API, merged; GitHub Pages from `main` | Pilot | TODO, once, when the coordinator says so (`docs/COORDINATOR.md` section E has the commands). `index.html` has only relative URLs (checked by `all.mjs`) |
 
 ## "Done means" checklist (the brief), line by line
@@ -102,11 +103,13 @@ been able to check are still the frame rate on a real GPU and how the game sound
 1. **Frame rate is unmeasured.** Every claim about 60 fps is reasoning from triangle counts
    and pass counts. Someone must open the game on a real integrated GPU and read the `
    read-out before the pull request; until then this is the largest risk in the project.
-2. **Painter is still the critical path**: two MUST FIX, the art pass on the weakest biome of
-   every planet, space washes, the look of flight, and a review of the interface, with one
-   role. The budget overrun is 2 % in one view; the pepper is in every dark frame.
-3. **Weather has no wind** (Physics' MUST FIX). Everything that already follows the wind will
-   show it the day the storms bring it; today a storm is a change of light and some marks.
+2. **Painter is still the critical path**: one MUST FIX (1.8 % in one view), then stars and
+   the pulse in space, the art pass on the weakest biome of every planet, and the SHOULD FIX
+   list of review 5, with one role on its fifth agent.
+3. **Nothing has been judged in motion.** Every look judgement is a still; every feel
+   judgement is a number from a 60 Hz simulation or a browser at one to three frames a
+   second. The tour was last run on `ded1435` (review 4), before weather, models and the
+   near-ground layer.
 4. **The first storm a new player meets arrives after dark** (day length against the default
    seed). Cheap to move (Physics' seed, or the hour the game begins).
 5. **Nobody has heard the sound, held a real mouse or a real pad to it.** Measured levels and

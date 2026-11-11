@@ -10,6 +10,72 @@ are relative, never a claim about a real GPU.
 
 ---
 
+## Review 5, addendum: the three MUST FIX re-measured, 2026-11-11, at commit `0de3fb4`
+
+Asked for by the coordinator after PAINTER's M3 block 2 (`6bb6c91`) and PHYSICS' P7
+(`62d061a`, `c11ca37`). Everything on a clean export of `0de3fb4` (their own commits, not a
+WIP snapshot), in the game, one browser at a time. Evidence: `docs/lead/evidence/
+weather-recheck.jpg` and `.json` (five weather frames), `cost-recheck.json`,
+`space-recheck.jpg` (cockpit above the air, orbit, space with a target, the pulse),
+`player-recheck.jpg` (night on foot, low flight, cockpit in flight, Saturn at dusk).
+
+**Verdict: two of the three are closed. One is left, for PAINTER, by 1.8 %.**
+
+| MUST FIX | Before (review 5) | Now, on `0de3fb4` | Verdict |
+| --- | --- | --- | --- |
+| PAINTER 1, the budget: vista `earth-temperate_forest-1`, quality 1 | 614 k / 341 | **611 k / 339** (budget 600 k / 350) | **OPEN**: 11 k triangles over |
+| the same vista, quality 0 | 306 k | **304 k** (budget 300 k) | **OPEN**: 4 k over |
+| the storm at the Earth spawn after dark | 606 k / 315 | 550 k / 300 (by day 527 k / 287) | closed |
+| the Earth spawn in fair weather (not a MUST; for scale) | 549 k / 294 | 546 k / 294; quality 0: 272 k | inside |
+| PAINTER 2, pepper in dark washes and space | hard specks in every dark wash | none in the storm sky, Neptune's sky, the night at the spawn, space or the pulse frame, looked at 1:1 | **closed** for the washes (see below for what is left) |
+| PHYSICS P1, storms bring wind | thunderstorm under 9 m/s above the wood; blizzard 1.4 to 9; dust storm 2 to 3 | thunderstorm 10 to 23 m/s at 30 m, 4 to 11 at 10 m inside the wood, 3 to 8 at 2 m; blizzard 12 to 25 at 10 m (`visibility01` 0.25); dust storm 10 to 20 at 10 m | **closed** (`R-STORM-5` as reworded: in the open at 10 m) |
+
+Other dearest views re-measured at quality 1 and 0: Mercury's crystal garden 420 k / 326 and
+217 k; Venus' fungal towers 547 k / 265 and 208 k; Jupiter's hanging gardens 508 k / 238 and
+231 k. PAINTER's trim moved the spawn and the storm; it did not move the vista (614 k to
+611 k), which looks down a longer run of full trees than the spawn does.
+`node tests/cost.mjs --places "earth:vista:earth-temperate_forest-1" --qualities 0,1`.
+
+**The windy storm in the game** (asked for: P7.3 and P7.4 had never run in a browser).
+- The weather frames again (`weather-recheck.jpg`): no console errors. The storm by day now
+  has the rain as a soft slanted glaze (review 5's item 3: **closed**; it is the wind that
+  slants it), a closed sky in the blizzard (`overcast` 0.83, was 0.54), and Neptune's storm
+  coast under cloud for the first time ("mist", `overcast` 0.54, `storm` 0.68).
+- Walked and flown with real key events in the browser at the spawn, clock 660 to 760 s
+  (scratch `run3/stormwalk.mjs`): wind at the explorer 0.9 to 6.1 m/s in gusts and lulls,
+  12.5 m/s at the hovering ship; W, S, A and D each held five seconds make 3.5 to 4.0 m/s,
+  feet on the ground throughout; a 2.5 s jetpack hop is carried 4 m; the ship, hands off for
+  15 s, moves 0.5 m; sink held, it lands in 9 s. No console errors.
+- The same in the pure simulation at 60 Hz, in the blizzard on the open meadow (17.5 m/s at
+  the explorer): the walk holds 4.2 m/s in every heading, a hop is carried 18.5 m, the ship
+  drifts 0.5 m in 25 s and lands. PHYSICS' riskiest change is safe to walk and fly in.
+
+**What is left of the pepper, and what the new frames show** (all SHOULD FIX, PAINTER):
+- The ragged border is still a row of hard dark dots in every dark scene; and dark specks
+  remain along crown edges against the storm sky.
+- The lightning frame still has white dust round the crowns (review 5, item 4).
+- **Space has no stars**: in the four frames above the air there is not one (art bible 8:
+  spattered masking-fluid stars, salt). The washes themselves are right. The pulse frame is
+  still a still picture (PAINTER's next item).
+- The near-ground layer is denser and reads more like grass on the lawn than at `62d3529`;
+  on Saturn's plain and at night it is still rows of dark spikes. Not re-checked on snow.
+- Neptune's sea is still the same clear blue under the new cloud.
+
+**PILOT, since review 5** (the coordinator's relay of PAINTER's and PHYSICS' findings):
+PAINTER's six points on the interface taken; the HUD's lower slips move to the top in the
+cockpit so the three dials show (`space-recheck.jpg`, first frame); the boom is 5.2 m (was
+6.4); a sink that stalls near the ground lands or says why (PHYSICS' hover at 4.1 m on the
+Moon: not reproduced in six tries over sloping, bouldered ground, guarded all the same); the
+thin-air worlds fly at about 78 m/s under 60 m and reach 138 m/s above 400 m; the three
+wall-clock assertions in my unit tests no longer fail on a busy machine. **The step of
+`tests/all.mjs` that failed on `db22516` was my fault** (it pinned the quality tier that the
+check then reads); fixed.
+
+Not done in this addendum: the tour (114 frames, about two hours of a quiet machine) was not
+re-run on `0de3fb4`; nothing was judged in motion.
+
+---
+
 ## Review 5 (weather in the game; M3 in progress): 2026-11-11, at commit `62d3529`
 
 Not a milestone gate: PAINTER's M3 block 2 (real models, near-ground layer, rain glaze, pepper)
