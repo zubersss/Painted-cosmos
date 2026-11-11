@@ -114,7 +114,7 @@ test('the GLSL twin declares what the uniforms object carries, and shares the fr
 });
 
 test('waves come in sets: the height swells and fades along the sea, the sets travel at half the wave speed, and nothing repeats like wallpaper', () => {
-  const F = new WaterField(), frame = { version: 1 };
+  const F = new WaterField({ swell: false }), frame = { version: 1 };
   for (let i = 0; i < 600; i++) F.update(1 / 60, frame, 15, 0, 0, 200, 2500, 9.81, 1.2, 999, 0, 0);
   // the local height of the sea (largest elevation within a wavelength) along the wind
   const L = F.length, local = (x) => { let m = 0; for (let s = 0; s < 24; s++) m = Math.max(m, Math.abs(F.heightAt(x + s * L / 24, 0))); return m; };
@@ -187,7 +187,8 @@ test('in the game loop: a swimmer trails a wake, a hovering ship presses rings o
 });
 
 // ---- the sea for a painter's own liquid: slope, crest direction, crests, foam ----------------------
-const gale = (U = 18, seconds = 20, F = new WaterField()) => { const frame = { version: 1 }; for (let i = 0; i < seconds * 60; i++) F.update(1 / 60, frame, U * 0.8, U * 0.6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0); return F; };
+// (the wind sea alone: the swell an open sea has under it since P7 has its own test)
+const gale = (U = 18, seconds = 20, F = new WaterField({ swell: false })) => { const frame = { version: 1 }; for (let i = 0; i < seconds * 60; i++) F.update(1 / 60, frame, U * 0.8, U * 0.6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0); return F; };
 
 test('surfaceAt: the slope is the slope of heightAt, wakes included, and the crest direction lies along the crests', () => {
   const F = gale(18);
@@ -270,4 +271,57 @@ test('the chunk carries the same formulas as the twin: constants, uniforms and f
   assert.equal((WATER_GLSL.match(/{/g) || []).length, (WATER_GLSL.match(/}/g) || []).length);
   assert.equal((WATER_GLSL.match(/\(/g) || []).length, (WATER_GLSL.match(/\)/g) || []).length);
   // (the numbers of chunk and twin are compared in a real GL context: physics-lab.html, window.__lab.waterAgreement())
+});
+
+// ---- P7: the swell, and the crest as a line ------------------------------------------------------
+
+test('an open sea has a swell under its wind sea: several times longer, higher, seen far out; a lake has none; the foam still covers what the law says', () => {
+  const frame = { version: 1 }, o = {};
+  const run = (U, fetch, seconds = 30, F = new WaterField()) => { for (let i = 0; i < seconds * 60; i++) F.update(1 / 60, frame, U * 0.8, U * 0.6, 0, 200, fetch, 9.81, 1.225, 999, 0, 0); return F; };
+  for (const U of [8, 16, 30]) {
+    const F = run(U, 2500), sea = windSea(U, 2500, 9.81, 1.225, 999, 200), far = windSea(U, 2500 * WATER.swellFetch, 9.81, 1.225, 999, 200);
+    assert.equal(F.open, 1);
+    const Ls = 2 * Math.PI / F.k[3], As = F.amp[3];
+    assert.ok(Math.abs(Ls / far.length - 1) < 0.05 && Ls > 3.5 * F.length, `U ${U}: swell ${Ls.toFixed(0)} m long on a ${F.length.toFixed(1)} m sea`);
+    assert.ok(Math.abs(2 * As / (far.height * WATER.swellDecay) - 1) < 0.05 && 2 * As > 0.9 * sea.height, `U ${U}: swell ${(2 * As).toFixed(2)} m high, wind sea ${sea.height.toFixed(2)} m`);
+    assert.ok(2 * As / Ls < 0.04, 'a swell is not steep');
+    // the sea measures what it says: 4 sigma of the whole surface is `significant`
+    let v = 0; for (let k = 0; k < 6000; k++) { const h = F.heightAt(k * 1.37 * Ls, k * 0.73 * Ls); v += h * h; }
+    assert.ok(Math.abs(4 * Math.sqrt(v / 6000) / F.significant - 1) < 0.1 && F.significant > F.height * 1.3, `4 sigma ${(4 * Math.sqrt(v / 6000)).toFixed(2)} against ${F.significant.toFixed(2)} (wind sea ${F.height.toFixed(2)})`);
+    // foam: the share of the surface that breaks is still the law's, with the swell under it
+    if (F.foamAt < 1e8) {
+      let foam = 0, N = 0;
+      for (let j = 0; j < 260; j++) for (let i = 0; i < 260; i++) { F.surfaceAt(i * 2.7 + j * 0.31, j * 3.1, o); N++; if (o.height > F.foamAt) foam++; }
+      assert.ok(Math.abs(foam / N / F.cover - 1) < 0.3, `U ${U}: ${(100 * foam / N).toFixed(2)} % of the surface breaks, the law says ${(100 * F.cover).toFixed(2)} %`);
+    }
+  }
+  // a lake, a pond: the four trains of the wind sea and nothing else
+  for (const fetch of [40, 400]) { const F = run(12, fetch), G = run(12, fetch, 30, new WaterField({ swell: false })); assert.equal(F.open, 0); for (let i = 0; i < 4; i++) assert.ok(Math.abs(F.amp[i] - G.amp[i]) < 1e-12 && Math.abs(F.k[i] - G.k[i]) < 1e-12); assert.ok(Math.abs(F.significant / F.height - 1) < 0.01); }
+  // it outlasts the wind: a minute after the gale has dropped to a breeze the wind sea has all but gone, the swell is still half itself
+  const F = run(24, 2500, 40), a0 = F.amp[3], h0 = F.height;
+  run(3, 2500, 60, F);
+  assert.ok(F.height < 0.25 * h0 && F.amp[3] > 0.45 * a0, `wind sea ${(F.height / h0).toFixed(2)} of what it was, swell ${(F.amp[3] / a0).toFixed(2)}`);
+  // and nothing jumps while it changes: the surface at the focus moves no faster than its waves
+  let worst = 0, prev = F.heightAt(0, 0);
+  for (let i = 0; i < 600; i++) { F.update(1 / 60, frame, 20, 5, 0, 200, 2500, 9.81, 1.225, 999, 0, 0); const h = F.heightAt(0, 0); worst = Math.max(worst, Math.abs(h - prev)); prev = h; }
+  assert.ok(worst < 0.08, `the surface at the focus moves ${worst.toFixed(3)} m a frame at most`);
+});
+
+test('the crest as a line: a narrow stroke along the top of the high waves, a small share of the cap; GLSL twin present', () => {
+  const frame = { version: 1 }, o = {};
+  const F = new WaterField(); for (let i = 0; i < 1800; i++) F.update(1 / 60, frame, 14, 10, 0, 200, 2500, 9.81, 1.225, 999, 0, 0);
+  let cap = 0, line = 0, N = 0;
+  for (let j = 0; j < 300; j++) for (let i = 0; i < 300; i++) {
+    F.surfaceAt(i * 0.83 + j * 0.21, j * 0.97, o); N++;
+    if (o.crest01 > 0.5) cap++;
+    if (o.line01 > 0.5) { line++; assert.ok(o.crest01 > 0.5, 'the line lies on the cap'); assert.ok(o.height > 0, 'on a top'); }
+  }
+  assert.ok(line > 0 && line / N < 0.035 && line < 0.3 * cap, `line on ${(100 * line / N).toFixed(1)} % of the sea, cap on ${(100 * cap / N).toFixed(1)} %`);
+  // across a wave the line is narrow: walking along the way the waves run, each run of line01 > 0.5 is under a fifth of the main wavelength
+  const dx = F.dir[0], dz = F.dir[1]; let run = 0, longest = 0, runs = 0, total = 0;
+  for (let k = 0; k < 40000; k++) { F.surfaceAt(dx * k * 0.05, dz * k * 0.05, o); if (o.line01 > 0.5) { run++; longest = Math.max(longest, run); } else { if (run > 0) { runs++; total += run; } run = 0; } }
+  const mean = total / runs * 0.05, Ls = 2 * Math.PI / F.k[3];
+  // (a line a seventh of the short wavelength wide on average; the widest, where the chop is flat on top of a swell, a small part of the swell)
+  assert.ok(runs > 20 && mean < 0.16 * F.length && longest * 0.05 < 0.12 * Ls, `the line is ${mean.toFixed(2)} m wide on average (widest ${(longest * 0.05).toFixed(2)} m) on a ${F.length.toFixed(1)} m sea over a ${Ls.toFixed(0)} m swell`);
+  assert.ok(WATER_GLSL.includes('float pcPhysWaterCrestLine(vec3 w, vec2 along)'));
 });

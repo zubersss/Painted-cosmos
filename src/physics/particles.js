@@ -49,7 +49,10 @@ export const PARTICLES = Object.freeze({
   dripShare: 0.14,     // drips after rain, as a share of the rain capacity, under a closed soaked canopy
   dripWet: 0.35,       // ground wetness below which the canopy has drained
   dripSize: 0.0045,    // m: drops gather on a leaf tip until they are this big
-  events: 256,         // capacity of the splash / settle event ring
+  events: 512,         // capacity of the splash / settle event ring (256 before P7)
+  ringRate: 90,        // a second in a downpour: splashes and ripples laid near the focus for the drops the particles stand for
+  ringRadius: 10,      // m round the focus
+  ringFar: 16,         // m: a particle's own landing is recorded only this near the focus (a ring further off is under a pixel)
   flutter: 0.28,       // m/s: sideways flutter of a falling snowflake
 });
 
@@ -91,6 +94,7 @@ export class Particles {
     this._wp = new Float32Array(16 * 3);       // 4 x 4 wind patch: we, wn, gust
     this._hfl = new Float32Array(25);          // height factor every metre, 0..24 m
     this.time = 0;
+    this._ring = 0;                            // rings owed near the focus (P7)
   }
 
   setQuality(q) { this.quality = q; }
@@ -313,7 +317,7 @@ export class Particles {
         if (hit || gone || (y < bottom && !snowy)) {
           if (hit) {
             const sp = Math.hypot(vx, vy, vz);
-            this._event(frame, x, gy, z, snowy ? EVENT.settle : wet ? EVENT.ripple : EVENT.splash, clamp01(sp * b.size[i] * 60), b.size[i]);
+            if (Math.abs(x - bx) < PARTICLES.ringFar && Math.abs(z - bz) < PARTICLES.ringFar) this._event(frame, x, gy, z, snowy ? EVENT.settle : wet ? EVENT.ripple : EVENT.splash, clamp01(sp * b.size[i] * 60), b.size[i]);
           }
           if (draining || i >= want) {
             // retire: move the last live particle into this slot
@@ -348,6 +352,35 @@ export class Particles {
       publish(b, frame, alive);
     }
     void other;
+    // (P7) The rings the drops stand for. Rain of 25 mm/h lands over a thousand drops a second on
+    // every square metre; the particles are a few hundred a second over the whole box, and a ring
+    // is only seen near by. So near the focus as many more land as a painter would put in: up to
+    // ringRate a second, within ringRadius, more of them nearer; each where the ground or the
+    // liquid is, none under the hull, fewer under leaves, as the drops themselves.
+    if (h > 0 && target === this.buffers.rain && pr.reachesGround01 > 0.5) {
+      this._ring += PARTICLES.ringRate * clamp01(pr.intensity01) * h;
+      if (this._ring > 8) this._ring = 8;
+      const rng = this.rng;
+      while (this._ring >= 1) {
+        this._ring -= 1;
+        const a = rng() * 6.2831853, r = PARTICLES.ringRadius * rng(), x = fx + Math.cos(a) * r, z = fz + Math.sin(a) * r, fate = rng(), big = rng();
+        let gy = near ? near.heightAt(x, z, NaN) : NaN; if (gy !== gy) gy = air.terrain.heightAt(x, z, groundF);
+        let lq = near ? near.liquidAt(x, z) : NaN; if (lq !== lq) lq = air.terrain.liquidAt(x, z); if (lq !== lq) lq = liquid0;
+        const onLiquid = lq > gy; if (onLiquid) gy = lq;
+        if (canopyH > 1) {
+          let u = (x - fx) / 16 + 1.5, v = (z - fz) / 16 + 1.5; u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
+          const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv;
+          const c01 = cp[iv * 4 + iu] * (1 - fu) * (1 - fv) + cp[iv * 4 + iu + 1] * fu * (1 - fv) + cp[iv * 4 + iu + 4] * (1 - fu) * fv + cp[iv * 4 + iu + 5] * fu * fv;
+          if (c01 > 0.05 && fate < c01 * (1 - through)) continue;
+        }
+        let dry = false;
+        for (let k = 0; k < nSH; k++) { const so = k * 4, dx = x - SH[so], dz = z - SH[so + 1]; if (dx * dx + dz * dz < SH[so + 3] * SH[so + 3] && gy < SH[so + 2]) { dry = true; break; } }
+        if (dry) continue;
+        const size = (pr.dropSize || 0.002) * (0.6 + 0.9 * big);
+        // on liquid a ripple, on the ground a crown: as the drops themselves
+        this._event(frame, x, gy, z, onLiquid ? EVENT.ripple : EVENT.splash, clamp01((pr.fallSpeed || 6) * size * 60), size);
+      }
+    } else this._ring = 0;
   }
 
   _spawn(b, i, fx, fz, y, snow, R = PARTICLES.radius) {

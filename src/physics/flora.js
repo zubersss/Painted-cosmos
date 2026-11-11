@@ -44,7 +44,15 @@ export const FLORA = Object.freeze({
   waveAmp: 0.45,                // modulation depth of the soft load at full gust
   // contact pushes
   pushLoad: 2.6,                // load a body puts on plants it touches
-  pushReach: 0.45,              // m beyond the body radius that plants are still pushed
+  pushReach: 0.7,               // m beyond the body radius that plants are still pushed (0.45 before P7: stems
+                                //   lean on their neighbours; a walker parts the grass about two metres wide)
+  // the wake (P7): a stem pushed over does not come all the way back at once. A share of the
+  // push stays as a lean (the way it was pushed: aside and along the walker's path), set in a
+  // quarter of a second of contact, and goes over wakeTime: at a walk the parted wake trails
+  // some ten metres behind (measured: grass 0.6 m off the path leans 60 degrees as the walker passes, 25 degrees
+  // 3 m behind, 17 degrees 7.5 m behind, nothing half a minute later). And where the body itself went the grass is pressed down sooner.
+  wakeShare: 0.2, wakeSet: 0.25, wakeTime: 6,
+  trampleTime: 0.7,             // s under a body for most of the trampled set to form (2.5 before P7: a walker left none)
   pushHz: 1.6, pushDamp: 0.55,  // spring-back of a released plant: one small overshoot
   contactHz: 7,                 // how fast a plant gives way to a body
   flatRecover: 1.2,             // s: elastic recovery of flattened plants
@@ -106,6 +114,7 @@ export class FloraField {
     this._tmpM = new Float32Array(M * M * 4);
     this._tmpA = new Uint8Array(M * M);
     this._tg = new Float32Array(M * M * 4);      // push targets of this step (zero between steps)
+    this._st = new Float32Array(M * M * 2);      // the lean a pushed plant keeps for a while (the wake)
     this._can = new Float32Array(N * N);         // canopy closure per bend cell
     this._cpl = new Float32Array(N * N * 4);     // scratch for the crown coupling
     this.ci = 0; this.cj = 0;                    // bend grid centre, in cells
@@ -136,7 +145,7 @@ export class FloraField {
   }
 
   reset() {
-    this.bend.fill(0); this.wind.fill(0); this.push.fill(0); this._vel.fill(0); this._pv.fill(0); this._fl.fill(0); this._act.fill(0); this._tg.fill(0);
+    this.bend.fill(0); this.wind.fill(0); this.push.fill(0); this._vel.fill(0); this._pv.fill(0); this._fl.fill(0); this._act.fill(0); this._tg.fill(0); this._st.fill(0);
     this.active = 0;
   }
 
@@ -183,6 +192,7 @@ export class FloraField {
       scrollField(this.push, this._tmpM, M, 4, di, dj, 0);
       scrollField(this._pv, this._tmpM, M, 2, di, dj, 0);
       scrollField(this._fl, this._tmpM, M, 2, di, dj, 0);
+      scrollField(this._st, this._tmpM, M, 2, di, dj, 0);
       scrollField(this._act, this._tmpA, M, 1, di, dj, 0);
       this.mi = pi; this.mj = pj; this.pushVersion++;
     }
@@ -353,11 +363,19 @@ export class FloraField {
     oscCoef(TAU * FLORA.pushHz, FLORA.pushDamp, h, _coef, 0);
     oscCoef(TAU * FLORA.contactHz, 1.0, h, _coef, 4);
     const ke = 1 - Math.exp(-h / FLORA.flatRecover), kp = 1 - Math.exp(-h / FLORA.flatSet), ks = Math.exp(-h / FLORA.shakeDecay);
+    const st = this._st, kw = 1 - Math.exp(-h / FLORA.wakeSet), kr = Math.exp(-h / FLORA.wakeTime), kt = 1 - Math.exp(-h / FLORA.trampleTime);
     let active = 0;
     for (let n = 0; n < M * M; n++) {
       if (!act[n]) continue;
       const o = n * 4, o2 = n * 2;
-      const te = tg[o], tn = tg[o + 1], tf = tg[o + 2], ts = tg[o + 3];
+      let te = tg[o], tn = tg[o + 1]; const tf = tg[o + 2], ts = tg[o + 3];
+      // the wake: while it is pushed a share of the push sets in; released, the plant comes back to
+      // that lean (with its own swing), and the lean goes slowly
+      const touched = te !== 0 || tn !== 0;
+      if (touched) {
+        const we2 = te * FLORA.wakeShare, wn2 = tn * FLORA.wakeShare;
+        if (we2 * we2 + wn2 * wn2 > st[o2] * st[o2] + st[o2 + 1] * st[o2 + 1]) { st[o2] += (we2 - st[o2]) * kw; st[o2 + 1] += (wn2 - st[o2 + 1]) * kw; }
+      } else { st[o2] *= kr; st[o2 + 1] *= kr; te = st[o2]; tn = st[o2 + 1]; }
       // giving way to a body is fast and critically damped; springing back is the plant's own
       const pushing = te * te + tn * tn > push[o] * push[o] + push[o + 1] * push[o + 1];
       const c = pushing ? 4 : 0;
@@ -367,12 +385,12 @@ export class FloraField {
       push[o + 1] = tn + _coef[c] * d + _coef[c + 1] * v; pv[o2 + 1] = _coef[c + 2] * d + _coef[c + 3] * v;
       // flatten: pressed down at once, elastic part recovers in a second, trampled part in a minute
       if (tf > fl[o2]) fl[o2] = tf; else fl[o2] -= fl[o2] * ke;
-      if (tf > 0.9) fl[o2 + 1] += (0.6 - fl[o2 + 1]) * (1 - Math.exp(-h / 2.5)); else fl[o2 + 1] -= fl[o2 + 1] * kp;
+      if (tf > 0.9) fl[o2 + 1] += (0.6 - fl[o2 + 1]) * kt; else fl[o2 + 1] -= fl[o2 + 1] * kp;
       push[o + 2] = Math.max(fl[o2], fl[o2 + 1]);
       push[o + 3] = ts > push[o + 3] ? ts : push[o + 3] * ks;
       tg[o] = tg[o + 1] = tg[o + 2] = tg[o + 3] = 0;
       const e = Math.abs(push[o]) + Math.abs(push[o + 1]) + Math.abs(pv[o2]) * 0.1 + Math.abs(pv[o2 + 1]) * 0.1 + push[o + 2] + push[o + 3];
-      if (e < 0.004 && te === 0 && tn === 0 && tf === 0) { act[n] = 0; push[o] = push[o + 1] = push[o + 2] = push[o + 3] = 0; pv[o2] = pv[o2 + 1] = 0; fl[o2] = fl[o2 + 1] = 0; }
+      if (e < 0.004 && !touched && tf === 0) { act[n] = 0; push[o] = push[o + 1] = push[o + 2] = push[o + 3] = 0; pv[o2] = pv[o2 + 1] = 0; fl[o2] = fl[o2 + 1] = 0; st[o2] = st[o2 + 1] = 0; }
       else active++;
     }
     this.active = active;

@@ -21,6 +21,7 @@
 //   height and slope        to lift the surface and tilt its normal
 //   along                   the way the crests lie there (the direction a stroke should run)
 //   crest01                 0 on the flanks and in the troughs, 1 on the tops of the higher waves
+//   line01                  the crest as a line: 1 along the very top of a high wave (P7)
 //   foam01                  where the sea is breaking now (whitecaps)
 // Whitecaps: the share of the sea surface that is white grows steeply with the wind, about
 // 3.84e-6 U^3.41 (Monahan and O'Muircheartaigh 1980): 1 % at 10 m/s, 4 % at 15, 10 % at 20.
@@ -60,7 +61,21 @@ export const WATER = Object.freeze({
   foamMin: 5e-4,                   // below this share the sea does not break at all
   foamEdge: 0.06,                  // x Hs: the width of the edge of a foam patch
   surfBreak: 0.78,                 // a wave breaks when it is this fraction of the depth high
+  // Swell (P7). On an open sea the longest train is not part of the local wind sea: it is the
+  // sea the same wind raised over the open water beyond the game's fetch (swellFetch times as
+  // far), which has outrun it: longer (its period grows with the cube root of the fetch), and
+  // lower than that sea was where it was raised (swellDecay: it has spread and lost its steep
+  // short waves). It follows the wind slowly (swellTime) and outlasts it. A 10 m chop is under
+  // the brush 60 m out; a 60 m swell is seen to the horizon.
+  swellFetch: 12, swellDecay: 0.5, swellTime: 90,
+  swellCalm: 0.8,                  // x the body's prevailing wind: the least wind the swell was raised by (it comes from elsewhere)
+  swellOpen: [600, 2000],          // m of fetch: no swell on a pond or a lake; all of it on an open sea
+  // the crest LINE: within this slope (in units of the sea's rms slope, along the way the waves run) of the very top
+  // (on one train: 0 at the top, 1 a twenty-fifth of a wavelength either side of it)
+  lineIn: 0.12, lineOut: 0.36,
 });
+// 4 sigma of the surface for unit Hs of the four standard trains (the sets add 1 + group^2 / 2 to each train's variance)
+const VARG = 1 + 0.45 * 0.45 / 2;
 
 // Fetch (m) by biome: how far the wind can work on the liquid there. Game scale.
 export const FETCH = {
@@ -97,8 +112,10 @@ export function windSea(U, F, g, rhoAir, rhoLiq, depth, o = {}) {
   return o;
 }
 
-const _t = {};
+const _t = {}, _s = {};
 const NT = 4;
+// 4 sigma of the standard four trains for Hs = 1 (0.992: they were chosen to make it 1)
+const STD4 = 4 * Math.sqrt(0.125 * WATER.shares.reduce((a, x) => a + x * x, 0) * VARG);
 const COS = WATER.spread.map(Math.cos), SIN = WATER.spread.map(Math.sin);
 const GCOS = WATER.spread.map((a) => Math.cos(a + WATER.groupTurn)), GSIN = WATER.spread.map((a) => Math.sin(a + WATER.groupTurn));
 const GK = 1 / WATER.groupWaves;            // group wavenumber as a fraction of the train's
@@ -110,28 +127,39 @@ export const wakeLength = (amp) => 0.8 + 14 * amp;
 // distribution is measured once, on first use: every phase of every train and of its groups
 // taken evenly (a Kronecker sequence), sorted, and the upper quantiles tabulated against log W.
 const QN = 25, QLO = -3.4, QHI = -0.4;         // log10 of the share: 0.04 % .. 40 %
+// (P7) one row for each share of the surface's variance that the longest train holds: the standard four
+// (0.15), and four seas with more and more swell under them (a sea that is mostly one long train has
+// shorter tails still). Elevations in units of the significant height of the whole (4 sigma / STD4).
+const QR = 5, R0 = WATER.shares[3] * WATER.shares[3] / WATER.shares.reduce((a, x) => a + x * x, 0), R1 = 0.95;
 let _quant = null;
 function quantiles() {
   if (_quant) return _quant;
   const N = 30000, v = new Float32Array(N), sh = WATER.shares, g = WATER.group;
   const al = [2, 3, 5, 7, 11, 13, 17, 19].map((p) => Math.sqrt(p) % 1);       // independent over the rationals
-  for (let n = 0; n < N; n++) {
-    let h = 0;
-    for (let i = 0; i < NT; i++) { const a = TAU * ((n + 1) * al[i] % 1), e = TAU * ((n + 1) * al[i + 4] % 1); h += 0.5 * sh[i] * (1 + g * Math.sin(e)) * Math.sin(a); }
-    v[n] = h;
+  const rest = 0.25 * (sh[0] * sh[0] + sh[1] * sh[1] + sh[2] * sh[2]);
+  _quant = new Float32Array(QN * QR);
+  for (let row = 0; row < QR; row++) {
+    const r = R0 + (R1 - R0) * row / (QR - 1), a3 = Math.sqrt(r / (1 - r) * rest), unit = 4 * Math.sqrt(0.5 * VARG * (rest + a3 * a3)) / STD4;
+    for (let n = 0; n < N; n++) {
+      let h = 0;
+      for (let i = 0; i < NT; i++) { const a = TAU * ((n + 1) * al[i] % 1), e = TAU * ((n + 1) * al[i + 4] % 1); h += (i === NT - 1 ? a3 : 0.5 * sh[i]) * (1 + g * Math.sin(e)) * Math.sin(a); }
+      v[n] = h / unit;
+    }
+    v.sort();
+    for (let k = 0; k < QN; k++) { const W = Math.pow(10, QLO + (QHI - QLO) * k / (QN - 1)); _quant[row * QN + k] = v[Math.min(N - 1, Math.max(0, Math.round(N * (1 - W))))]; }
   }
-  v.sort();
-  _quant = new Float32Array(QN);
-  for (let k = 0; k < QN; k++) { const W = Math.pow(10, QLO + (QHI - QLO) * k / (QN - 1)); _quant[k] = v[Math.min(N - 1, Math.max(0, Math.round(N * (1 - W))))]; }
   return _quant;
 }
-// elevation / Hs above which a share `cover` of the sea surface stands
-export function foamLevel(cover) {
+// elevation / (significant height) above which a share `cover` of the sea surface stands.
+// swell01 (optional): the share of the surface's variance that the longest train holds (a sea with a swell under it)
+export function foamLevel(cover, swell01 = R0) {
   const q = quantiles();
   let t = (Math.log10(cover > 1e-9 ? cover : 1e-9) - QLO) / (QHI - QLO) * (QN - 1);
   t = t < 0 ? 0 : t > QN - 1 ? QN - 1 : t;
   const i = Math.min(QN - 2, t | 0);
-  return q[i] + (q[i + 1] - q[i]) * (t - i);
+  let rr = (swell01 - R0) / (R1 - R0) * (QR - 1); rr = rr < 0 ? 0 : rr > QR - 1 ? QR - 1 : rr;
+  const j = Math.min(QR - 2, rr | 0), fj = rr - j, a = j * QN + i, b = a + QN;
+  return (q[a] + (q[a + 1] - q[a]) * (t - i)) * (1 - fj) + (q[b] + (q[b + 1] - q[b]) * (t - i)) * fj;
 }
 // share of the sea surface that is white, from how steep the sea is (0..1, as windSea's whitecap01)
 export const foamCover = (whitecap01) => WATER.foamMax * Math.pow(whitecap01 > 0 ? whitecap01 : 0, WATER.foamPower);
@@ -143,7 +171,9 @@ export function surf01(Hs, depth) {
 
 const _wk3 = new Float64Array(3);
 export class WaterField {
-  constructor() {
+  // opts.swell: false = the wind sea alone, also on an open sea (tests of the wind sea)
+  constructor(opts = {}) {
+    this.swellOn = opts.swell !== false;
     this.height = 0;               // significant wave height at the focus now (m), smoothed
     this.period = 0; this.length = 0; this.speed = 0; this.steepness = 0; this.whitecap01 = 0;
     this.dir = new Float64Array(2); this.dir[0] = 1;      // wave direction (frame axes), smoothed
@@ -163,6 +193,9 @@ export class WaterField {
     this.wake = new Float32Array(WATER.wakes * 4);
     this.wakeHead = 0;
     quantiles();                   // (measured here, while loading, not in the first played frame)
+    // swell (P7): the wind it remembers, its height and length, how open the sea is (0 pond .. 1 open sea),
+    // and the significant height of everything together (wind sea and swell: 4 sigma of the surface)
+    this.swellWind = 0; this.swellHeight = 0; this.swellLength = 0; this.open = 0; this.significant = 0; this.slope = 0;
     this.cover = 0;                // share of the surface that is breaking (whitecaps), 0 .. foamMax
     this.foamAt = 1e9;             // elevation (m) above which the sea is breaking now (1e9: it is not)
     // uPhysWaterSea: Hs (m), the elevation above which the sea breaks (m), the width of that edge (m), whitecap cover
@@ -190,7 +223,9 @@ export class WaterField {
   // the focus or -1e9. depth: liquid depth there (m). fetch: m. g, rhoAir, rhoLiq as windSea.
   // fx, fz: the focus (grid position): when the waves lengthen or turn, the pattern pivots
   // about the watcher, not about the frame's origin (which would sweep the crests past them).
-  update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0) {
+  // prevailing (optional, m/s): the wind that prevails over this body's seas: somewhere out there it is
+  // blowing, so an open sea has a swell on a calm day too (WATER.swellCalm of it)
+  update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0, prevailing = 0) {
     if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.gphase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; this.wake.fill(0); }
     this.level = level; this.present = level > -1e8; this.g = g;
     const U = Math.hypot(we, wn);
@@ -213,16 +248,29 @@ export class WaterField {
       const d0 = this.dir[0] + (we / U - this.dir[0]) * kd, d1 = this.dir[1] + (wn / U - this.dir[1]) * kd, l = Math.hypot(d0, d1) || 1;
       this.dir[0] = d0 / l; this.dir[1] = d1 / l;
     }
+    // the swell from the open side: the sea this wind raises over the open water beyond the game's fetch
+    this.open = this.present && this.swellOn ? smoothstep(WATER.swellOpen[0], WATER.swellOpen[1], fetch) : 0;
+    const ks = 1 - Math.exp(-h / (fresh ? 0.2 : WATER.swellTime));
+    this.swellWind += (U - this.swellWind) * (U > this.swellWind ? 1 - Math.exp(-h / (fresh ? 0.2 : WATER.growTime)) : ks);   // (it rises with the sea and outlasts the wind)
+    if (this.open > 0) {
+      windSea(Math.max(this.swellWind, WATER.swellCalm * prevailing), fetch * WATER.swellFetch, g, rhoAir, rhoLiq, depth > 0 ? depth : 1e9, _s);
+      const kq = fresh ? kh : ks;
+      this.swellHeight += (_s.height * WATER.swellDecay - this.swellHeight) * kq;
+      if (_s.length > 0) this.swellLength += (_s.length - this.swellLength) * (this.swellLength > 0 ? kq : 1);
+    } else { this.swellHeight = 0; }
     const u = this.uniforms, d0 = this.dir[0], d1 = this.dir[1];
+    let var4 = 0, slope4 = 0;
     for (let i = 0; i < NT; i++) {
-      const L = this.length * WATER.lengths[i];
+      let L = this.length * WATER.lengths[i], A = 0.5 * this.height * WATER.shares[i];
+      // (the longest train is the swell where the sea is open: never shorter than it was, never lower)
+      if (i === NT - 1 && this.open > 0) { L += (Math.max(L, this.swellLength) - L) * this.open; A += (Math.max(A, 0.5 * this.swellHeight) - A) * this.open; }
       const k = L > 0.02 ? TAU / L : 0;
       // deep-water dispersion for each train: omega^2 = g k (longer waves travel faster)
       const om = Math.sqrt(g * k);
       const nkx = k * (d0 * COS[i] - d1 * SIN[i]), nkz = k * (d0 * SIN[i] + d1 * COS[i]);
       const ngx = k * GK * (d0 * GCOS[i] - d1 * GSIN[i]), ngz = k * GK * (d0 * GSIN[i] + d1 * GCOS[i]);
       this.k[i] = k; this.omega[i] = om;
-      this.amp[i] = 0.5 * this.height * WATER.shares[i];
+      this.amp[i] = A; var4 += A * A; slope4 += A * A * k * k;
       // at the focus the phase only ever advances by omega dt, whatever the wave vector does
       this.phase[i] = (this.phase[i] + (nkx - this.kx[i]) * fx + (nkz - this.kz[i]) * fz + om * h) % (TAU * 4096);
       // the groups travel at half the phase speed: their phase advances at (k / n) (c / 2) = omega / (2 n)
@@ -233,8 +281,13 @@ export class WaterField {
     u.uPhysWaterDir[0] = d0; u.uPhysWaterDir[1] = d1; u.uPhysWakeG = g;
     // whitecaps: how much of the surface is breaking, and so how high it has to stand to break
     this.cover = foamCover(this.whitecap01);
-    this.foamAt = this.cover > WATER.foamMin && this.height > 0.02 ? this.height * foamLevel(this.cover) : 1e9;
-    const S = u.uPhysWaterSea; S[0] = this.height; S[1] = this.foamAt; S[2] = Math.max(1e-4, this.height * WATER.foamEdge); S[3] = this.foamAt < 1e8 ? this.cover : 0;
+    // (the significant height of all four trains together, the swell with them: 4 sigma. The foam level is
+    // measured for the standard four in units of their Hs; with a swell under them the surface stands
+    // higher by the ratio of the two)
+    this.significant = 4 * Math.sqrt(0.5 * var4 * VARG) / STD4;
+    this.slope = Math.sqrt(0.5 * slope4 * VARG);          // rms slope of the surface
+    this.foamAt = this.cover > WATER.foamMin && this.height > 0.02 ? this.significant * foamLevel(this.cover, var4 > 0 ? this.amp[NT - 1] * this.amp[NT - 1] / var4 : R0) : 1e9;
+    const S = u.uPhysWaterSea; S[0] = this.significant; S[1] = this.foamAt; S[2] = Math.max(1e-4, this.height * WATER.foamEdge); S[3] = this.foamAt < 1e8 ? this.cover : 0;
     // wakes age and die
     const W = this.wake;
     for (let w = 0; w < W.length; w += 4) {
@@ -303,8 +356,10 @@ export class WaterField {
     h += wk[0]; he += wk[1]; hn += wk[2];
     const dl = Math.hypot(Dx, Dz) || 1;
     o.height = h; o.de = he; o.dn = hn; o.ax = -Dz / dl; o.az = Dx / dl;
-    const hs = this.height > 1e-4 ? this.height : 1e-4;
+    const hs = this.significant > 1e-4 ? this.significant : 1e-4;
     o.crest01 = smoothstep(WATER.crestLow, WATER.crestHigh, h / hs);
+    // the crest LINE: on a high wave, where the surface stops rising along the way the waves run
+    o.line01 = o.crest01 * (1 - smoothstep(WATER.lineIn, WATER.lineOut, Math.abs(he * Dx + hn * Dz) / dl / (this.slope > 1e-6 ? this.slope : 1e-6)));
     o.foam01 = this.foamAt < 1e8 ? smoothstep(this.foamAt, this.foamAt + Math.max(1e-4, this.height * WATER.foamEdge), h) : 0;
     return o;
   }
@@ -401,6 +456,15 @@ vec2 pcPhysWaterCrest(vec3 w) {
   float hs = max(uPhysWaterSea.x, 1e-4);
   float foam = uPhysWaterSea.y < 1e8 ? smoothstep(uPhysWaterSea.y, uPhysWaterSea.y + uPhysWaterSea.z, w.x) : 0.0;
   return vec2(smoothstep(${f(WATER.crestLow)}, ${f(WATER.crestHigh)}, w.x / hs), foam);
+}
+// The crest as a LINE (P7), from what pcPhysWaterD returned: 1 along the very top of a high wave (where the
+// surface stops rising along the way the waves run), 0 a twelfth of a wavelength either side. crest01 is the
+// whole top of the wave (a cap: a white sheet from near by); this is the stroke a painter leaves bare.
+float pcPhysWaterCrestLine(vec3 w, vec2 along) {
+  float hs = max(uPhysWaterSea.x, 1e-4);
+  vec4 ak = uPhysWaterAmp * uPhysWaterK;                       // (the sea's rms slope, from its four trains)
+  float s = abs(dot(w.yz, vec2(along.y, -along.x))) / max(sqrt(${f(0.5 * (1 + 0.45 * 0.45 / 2))} * dot(ak, ak)), 1e-6);
+  return smoothstep(${f(WATER.crestLow)}, ${f(WATER.crestHigh)}, w.x / hs) * (1.0 - smoothstep(${f(WATER.lineIn)}, ${f(WATER.lineOut)}, s));
 }
 // The surf at a shore: 0..1, how far a wave of this sea has broken in liquid depth metres deep.
 float pcPhysWaterSurf(float depth) {

@@ -397,3 +397,27 @@ test('far from the anchor of the frame the rain still ends on the ground (the gr
   for (let i = 0; i < b.count; i++) { const vx = b.vel[i * 3], vy = b.vel[i * 3 + 1], vz = b.vel[i * 3 + 2], dn = -(vx * u.x + vy * u.y + vz * u.z); down += dn; side += vx * fr.ex + vy * fr.ey + vz * fr.ez + dn * (fr.ex * u.x + fr.ey * u.y + fr.ez * u.z); }
   void side; assert.ok(down / b.count > 3);
 });
+
+// ---- P7 ---------------------------------------------------------------------------------------------
+
+test('rings near the focus: in a downpour there are enough of them alive within ten metres to be seen, on ground and on water', () => {
+  const count = (w, kind, life) => {
+    const E = w.physics.particles.events, F = w.physics.focus; let n = 0, near = 0;
+    for (let k = 0; k < E.capacity; k++) {
+      const o = k * 8; if (!(E.data[o + 4] > 0) || E.data[o + 3] !== kind || w.physics.time - E.data[o + 5] > life) continue;
+      n++;
+      if (Math.hypot(E.origin.x + E.data[o] - F.x, E.origin.y + E.data[o + 1] - F.y, E.origin.z + E.data[o + 2] - F.z) < PARTICLES.ringRadius + 0.5) near++;
+    }
+    return { n, near };
+  };
+  assert.ok(PARTICLES.events >= 512 && PARTICLES.ringRate >= 60);
+  const w = rainy(); run(w, 6);
+  const g = count(w, EVENT.splash, 0.28);
+  assert.ok(g.near >= 12, `${g.near} crowns alive within ${PARTICLES.ringRadius} m on the ground (${g.n} in all)`);
+  const s = rainy('earth', { sea: BODIES.earth.radius + 2 }); run(s, 6);
+  const r = count(s, EVENT.ripple, 1.4);
+  assert.ok(r.near >= 60 && r.n <= PARTICLES.events, `${r.near} ripples alive within ${PARTICLES.ringRadius} m on the water (${r.n} in all)`);
+  // every one of them on the surface it fell on
+  const E = s.physics.particles.events;
+  for (let k = 0; k < E.capacity; k++) { const o = k * 8; if (E.data[o + 4] > 0) assert.ok(Math.abs(len(V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2])) - s.R - 2) < 0.3, 'on the water'); }
+});

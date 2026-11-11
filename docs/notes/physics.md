@@ -893,6 +893,46 @@ lines there (`draw.rain = ...`, `draw.snow = ...`) are now exactly my defaults a
   (it was spread over 14 m: the blots against the sky in `wx-mars-dust.jpg`). Your `puff` cut
   works on the wall as it is (the quad's uv); `maxPx: 80` now bounds the wall's HEIGHT.
   Kicked dust in clear air is the round puff it was.
+- *Sea.* Three things, none needs a new uniform (`syncPhysWater` as you have it carries all):
+  1. **A swell on open seas.** Where the fetch is open (`sea_coast`, `storm_seas`,
+     `gold_islands`, `sky_islands`: fetch over 2 km; nothing on ponds and lakes) the fourth,
+     longest train is now a swell: the sea the same wind raises over twelve times the game's
+     fetch, at half its height, which follows the wind over a minute and a half and outlasts
+     it; on a calm day it is what the body's prevailing wind raises (Earth's coast in a 1 m/s
+     calm: 16 m long, 0.2 m high over 1.2 m ripples). Neptune's `storm_seas` in its usual
+     wind: wind sea 0.5 m high and 5.9 m long, swell 0.8 m and 30 m; in the 34 m/s gale of
+     your frame about 1.7 m and 59 m. It arrives through `uPhysWaterK.w` / `uPhysWaterAmp.w`
+     and `pcPhysWater` as it is: your far strokes can follow `along` out to the horizon.
+  2. **`uPhysWaterSea.x` is now the significant height of everything together** (wind sea
+     and swell: 4 sigma of the surface), so `crest01`, your `shoal` and `pcPhysWaterSurf`
+     scale with what is really there. The foam level is re-measured for a sea with a swell
+     under it: the foam still covers the share the law gives (tested within 30 %), and sits
+     mostly on the tops of the swell, in lines.
+  3. **The crest as a line**: `float pcPhysWaterCrestLine(vec3 w, vec2 along)` (w and along
+     from `pcPhysWaterD`): 1 along the very top of a high wave (where the surface stops rising
+     along the way the waves run), 0 a twenty-fifth of a wavelength either side. Measured: the
+     line lies on 1 to 3 % of the sea where `crest01 > 0.5` lies on 12 to 17 %. This is what
+     you built by hand ("height high and the slope along the wave direction near zero"); use it
+     for the bare-paper stroke and, times `foam01`, to make foam a streak instead of a patch.
+     CPU twin: `physics.fields.water.sample(p).line01`. `physics.water()` gained `swell`
+     (m) and `swellLength` (m).
+- *Splash rings.* More of them where they can be seen: besides each particle's own landing
+  (now only recorded within 16 m of the focus) up to 90 rings a second are laid within 10 m of
+  the focus in a downpour, more of them nearer, for the drops the particles stand for (real
+  rain of that rate lands a thousand drops a second on every square metre): crowns on the
+  ground, ripples on liquid at its surface, none under the hull, fewer under leaves. The event
+  ring holds 512 (was 256; the kit sizes itself from it: at most 1024 more triangles).
+  Measured in a downpour: 12 or more crowns alive at any moment within 10 m on the ground
+  (they live 0.28 s), 60 or more ripples on water (1.4 s). On water: tested (kind, height).
+- *Grass.* The push round a walker reaches 0.7 m beyond the body (was 0.45): parted about two
+  metres wide. And a **wake**: a pushed plant keeps a fifth of the push as a lean, the way it
+  was pushed (out and along the walker's path), which goes over six seconds; where the body
+  went the grass is pressed down sooner (0.7 s of contact, was 2.5) and stays so for a minute.
+  Measured with a walker at 1.5 m/s against a twin world without one: grass 0.6 m off the path
+  leans 60 degrees as the walker passes, 25 degrees 3 m behind, 17 degrees 7.5 m behind,
+  nothing half a minute later; `flatten01` on the path 0.3 behind the walker. Nothing to wire:
+  it is in the `push` texture you already read (RG lean, B flatten). The wash under the ship is
+  as it was.
 - New `DRAW` fields (CPU expanders only; the instanced chunk `expand: 'gpu'` does not have
   them yet): streaks `parallel`, `maxLen`, `near`; dabs `tumble`, `aspect`, `wall`, `wallFrom`,
   `wallFull`, `wallShare`, `wallHigh`, `wallNear`, `wallFade`. All documented at the top of

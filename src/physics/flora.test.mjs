@@ -98,8 +98,11 @@ test('the explorer pushes grass aside; it springs back, damped, and is still aga
   const trace = [];
   run(w, 6, { t0: 103, each: () => trace.push(F.plantBend(beside, 0).e - before.e) });
   let peak = 0; for (let i = 60; i < trace.length; i++) peak = Math.max(peak, Math.abs(trace[i]));
-  assert.ok(Math.abs(trace[30]) < Math.abs(trace[0]) * 0.6, 'half a second later it has mostly sprung back');
-  assert.ok(peak < Math.abs(trace[0]) * 0.35, 'and the swing dies away');
+  // (P7: it comes back to the lean it keeps for a while, the wake, not all the way; that goes in some eight seconds)
+  assert.ok(Math.abs(trace[30]) < Math.abs(trace[0]) * 0.7 && trace[30] > trace[0] * 0.2, `half a second later it has sprung back to its wake lean: ${trace[30] / trace[0]}`);
+  assert.ok(peak < Math.abs(trace[0]) * 0.62, 'and the swing dies away');
+  const end = trace[trace.length - 1] / trace[0];
+  assert.ok(end > 0.05 && end < 0.45, `six seconds later some of the lean is left: ${end}`);
   // trampled grass stays down for a minute or so, then the field goes back to sleep
   run(w, 20, { t0: 109, hz: 20 });
   const tr = F.plantBend(w.focus, 0).flatten01;
@@ -107,6 +110,38 @@ test('the explorer pushes grass aside; it springs back, damped, and is still aga
   run(w, 420, { t0: 129, hz: 10 });
   assert.equal(w.physics.stats.pushCells, 0, 'the push field goes back to sleep');
   assert.ok(Math.abs(F.plantBend(w.focus, 0).flatten01) < 1e-6);
+});
+
+test('a walker leaves a parted wake: about two metres wide where they are, leaning out and along their path, trailing metres behind, gone in half a minute', () => {
+  // two worlds alike, one with a walker: what differs is the walker's doing (the wind is the same in both)
+  const w = world(), c = world();
+  run(w, 2); run(c, 2);
+  const F = w.physics.fields.flora, G = c.physics.fields.flora, fr = w.physics.fields.frame;
+  const at = (e, n) => V(w.focus.x + fr.ex * e + fr.nx * n, w.focus.y + fr.ey * e + fr.ny * n, w.focus.z + fr.ez * e + fr.nz * n);
+  const d = (e, n) => { const a = F.plantBend(at(e, n), 0), b = G.plantBend(at(e, n), 0); return { n: a.n - b.n, e: a.e - b.e, flat: a.flatten01 }; };
+  // walk east at 1.5 m/s for 6 s: from 9 m west of the focus to the focus
+  const speed = 1.5, T = 6;
+  const body = (t) => [{ kind: 'explorer', p: at(-speed * (T - (t - 102)), 0), v: V(fr.ex * speed, fr.ey * speed, fr.ez * speed), radius: 0.35, strength: 1, grounded: true }];
+  run(w, T, { t0: 102, disturbers: body }); run(c, T, { t0: 102 });
+  // where the walker is: parted on both sides, out to a metre from the path (two metres wide), not at a metre and a half
+  assert.ok(d(0, 0.6).n > 0.6 && d(0, -0.6).n < -0.6 && d(0, 1).n > 0.25, `parted beside the walker: ${d(0, 0.6).n}, ${d(0, -0.6).n}; a metre off ${d(0, 1).n}`);
+  assert.ok(Math.abs(d(0, 1.5).n) < 0.02, 'not a metre and a half away');
+  // behind: 3 m back (2 s ago) the grass still leans out and along the path; 7.5 m back (5 s ago) less
+  const b3l = d(-3, 0.6), b3r = d(-3, -0.6), b7 = d(-7.5, 0.6);
+  assert.ok(b3l.n > 0.2 && b3r.n < -0.2 && b3l.n < 0.7 * d(0, 0.6).n, `the wake 3 m behind leans out: ${b3l.n}, ${b3r.n}`);
+  assert.ok(b3l.e > 0.08 && b3r.e > 0.08, `and along the path: ${b3l.e}`);
+  assert.ok(b7.n > 0.1 && b7.n < b3l.n, `7.5 m behind less: ${b7.n}`);
+  // on the path itself the grass is pressed down (trampled), still so behind
+  assert.ok(d(-3, 0).flat > 0.15 && d(-7.5, 0).flat > 0.15, `trampled on the path: ${d(-3, 0).flat}`);
+  // ahead of the walker nothing has moved
+  assert.ok(Math.abs(d(2.5, 0.6).n) < 1e-6 && Math.abs(d(2.5, 0.6).e) < 1e-6, 'nothing ahead');
+  // the walker is gone: half a minute later the wake has closed (the trampled path is still faintly there)
+  run(w, 30, { t0: 108, hz: 20 }); run(c, 30, { t0: 108, hz: 20 });
+  // (what is left is the pressed grass answering the wind differently, not a lean)
+  assert.ok(Math.abs(d(-3, 0.6).n) < 0.25 * b3l.n, `closed: ${d(-3, 0.6).n} against ${b3l.n}`);
+  assert.ok(d(-3, 0).flat > 0.05, 'the path is still faintly pressed');
+  run(w, 420, { t0: 138, hz: 10 });
+  assert.equal(w.physics.stats.pushCells, 0, 'and the field sleeps again');
 });
 
 test('a jet from above blows plants radially outward and flattens the centre', () => {

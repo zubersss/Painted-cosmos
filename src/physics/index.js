@@ -279,7 +279,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       }
     }
     // (until the ground under the focus has been sampled, nothing is known about the liquid here)
-    water.update(dt, frame, airGrid.cwe, airGrid.cwn, coverKnown ? liqLevel : -1e9, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz);
+    water.update(dt, frame, airGrid.cwe, airGrid.cwn, coverKnown ? liqLevel : -1e9, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;
@@ -386,12 +386,14 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (bodyId === active && airGrid.inside(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z))) {
       o.present = water.present;
       o.height = water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0;
-      o.significant = water.height; o.period = water.period; o.length = water.length; o.speed = water.speed;
+      o.significant = water.significant; o.period = water.period; o.length = water.length; o.speed = water.speed;
+      o.swell = water.open > 0 ? water.swellHeight * water.open : 0; o.swellLength = water.open > 0 ? water.swellLength : 0;
       o.steepness = water.steepness; o.whitecap01 = water.whitecap01; o.whitecapCover = water.foamAt < 1e8 ? water.cover : 0;
       dir.x = frame.ex * water.dir[0] + frame.nx * water.dir[1]; dir.y = frame.ey * water.dir[0] + frame.ny * water.dir[1]; dir.z = frame.ez * water.dir[0] + frame.nz * water.dir[1];
     } else {
       const a = air(bodyId, p, _wa, 10), body = BODIES[bodyId];
       windSea(a.speed, FETCH_DEFAULT, body.gravity, a.density, liquidOf(bodyId).density, 1e9, _ws);
+      o.swell = 0; o.swellLength = 0;
       o.present = true; o.height = 0; o.significant = _ws.height; o.period = _ws.period; o.length = _ws.length; o.speed = _ws.speed;
       o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01; o.whitecapCover = foamCover(_ws.whitecap01);
       const s = a.speed > 1e-6 ? 1 / a.speed : 0; dir.x = a.wind.x * s; dir.y = a.wind.y * s; dir.z = a.wind.z * s;
