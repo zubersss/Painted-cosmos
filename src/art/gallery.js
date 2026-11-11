@@ -92,7 +92,7 @@ function applyPreset(name, dir) {
   if (name === 'orbit') {
     // banded worlds are drawn from over the low latitudes, where the belts run across the disc
     if (LOOKS[bodyId].bands && Math.abs(d.y) > 0.38) { const k = Math.sqrt((1 - 0.38 * 0.38) / Math.max(1e-6, d.x * d.x + d.z * d.z)); d.set(d.x * k, 0.38 * Math.sign(d.y), d.z * k); if (d.lengthSq() < 0.5) d.set(0.925, 0.38, 0); d.normalize(); }
-    state.pos.copy(d).multiplyScalar(R * 2.6); state.pitch = -Math.PI / 2 + 0.001;
+    state.pos.copy(d).multiplyScalar(R * num('odist', 2.6)); state.pitch = -Math.PI / 2 + 0.001;
   }
   else if (name === 'high') { state.pos.copy(at(0, 0, 420)); state.pitch = -0.5; state.yaw = 0.6; }
   else if (name === 'jet') { state.pos.copy(at(0, -6, 30)); state.pitch = -0.30; state.yaw = num('jyaw', 0.9); }
@@ -329,6 +329,8 @@ function placeExplorer(side, dt) {
 let cockpit = null;
 function placeShip(dt) {
   if (cockpit) { ship.object3D.position.copy(cockpit.p).sub(state.pos); ship.object3D.quaternion.copy(cockpit.q); }
+  // chase=1: the ship ahead of the camera, flying where the camera looks (space and pulse frames)
+  else if (P.get('chase') === '1') { ship.object3D.position.set(num('cside', 0), -num('cdown', 2.6), -num('cdist', 13)).applyQuaternion(camera.quaternion).add(camera.position); ship.object3D.quaternion.copy(camera.quaternion); }
   else placeModel(ship, Math.sin(state.yaw) * num('sdist', 14) - Math.cos(state.yaw) * 6, Math.cos(state.yaw) * num('sdist', 14) + Math.sin(state.yaw) * 6, num('hover', 0), MP.sface);
   ship.animate({ mode: MP.smode, gear01: MP.gear == null ? undefined : MP.gear, canopy01: MP.canopy, throttle01: MP.throttle == null ? undefined : MP.throttle, snap: frozenT != null }, frozenT != null ? 0 : dt);
   if (P.get('cockpit') === '1') {
@@ -393,7 +395,7 @@ function tick(now) {
   if (P.get('near') === '0' && world._near) world._near.mesh.visible = false;     // (the picture without the near ground strokes)
   if (frozenT != null) painter.setTime(frozenT);
   const L = world.getLighting();
-  painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0, sky: forcedSky || (physics && physics.here ? physics.here.sky : null) });
+  painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: num('speed01', 0), sky: forcedSky || (physics && physics.here ? physics.here.sky : null) });
   painter.render(scene, camera, frozenT != null ? 0 : dt);
   frames++;
   if (settled && frames >= 3 && world.busy === 0 && (!physicsWanted || (physics && (world.kits || P.get('kits') === '0')))) window.__pcReady = true;

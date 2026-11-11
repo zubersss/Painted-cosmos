@@ -152,7 +152,10 @@ void main() {
   // stay dark, so the land is drawn by what the snow could not lie on.
   float upf = dot(nL, normalize(vBody));
   float snowC = pcSnowCover(upf, mix(ma.g, mb.g, lf) * 0.45 + n2.b * 0.30 + n1.a * 0.25, vPar.z);
-  c = pcWetWash(c, 1.0 - snowC);
+  // (where the trees' shade lies the wet wash is laid thinner: wet shade on a wet lawn was a
+  // row of dark hard-edged holes)
+  float sunny = pcDapple(vBody, vPar.z * mix(0.82, 1.0, mid));
+  c = pcWetWash(c, (1.0 - snowC) * mix(0.35, 1.0, sunny));
   c = mix(c, mix(vec3(1.0), vec3(0.90, 0.93, 1.0), smoothstep(0.42, 0.70, n1.g) * 0.55), snowC);
 
   // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks.
@@ -174,7 +177,6 @@ void main() {
   // light in soft value steps; shadows are glazes
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
-  float sunny = pcDapple(vBody, vPar.z * mix(0.82, 1.0, mid));
   if (near > 0.0) sunny = min(sunny, 1.0 - pcCast(vBody, (ma.g - 0.5) * 0.34 + (n2.b - 0.5) * 0.16));
   x = mix(min(x, 0.44) - (1.0 - smoothstep(0.30, 0.50, n1.g)) * 0.22 * vPar.z, x, sunny);
   x += (n1.g - 0.5) * 0.10 + (mix(fa.b, fb.b, lf) - 0.5) * 0.06 * near;
@@ -186,11 +188,14 @@ void main() {
   float dryM = mix(smoothstep(0.60, 0.69, fa.b * 0.62 + fa.r * 0.38), smoothstep(0.60, 0.69, fb.b * 0.62 + fb.r * 0.38), lf);
   c = mix(c, vec3(1.0), dryM * vPar.x * markFade * (0.24 + 0.16 * lvl));
   // standing water after rain: small pale shapes of sky lying in the flats near the eye
-  float pud = uWx.y * (1.0 - snowC) * smoothstep(0.990, 0.999, upf) * near * (1.0 - vPar.z * 0.6);
+  // (a puddle is a pale, soft-edged piece of sky: it runs into the wet ground round it, with
+  // no rim, and is palest in its middle)
+  float pud = uWx.y * (1.0 - snowC) * smoothstep(0.985, 0.999, upf) * near * (1.0 - vPar.z * 0.6);
   if (pud > 0.01) {
-    pud *= smoothstep(0.70, 0.76, texture(uNoise3D, vBody / 3.1 + 0.43).r * 0.7 + n2.a * 0.3) * smoothstep(0.50, 0.62, n1.a);
-    c = mix(c, mix(uHaze, vec3(1.0), 0.25), pud * 0.6);
-  }
+    float pn = texture(uNoise3D, vBody / 3.1 + 0.43).r * 0.7 + n2.a * 0.3;
+    pud *= smoothstep(0.63, 0.79, pn) * smoothstep(0.47, 0.65, n1.a);
+    c = mix(c, mix(uHaze, vec3(1.0), 0.35), pud * 0.70);
+  } else pud = 0.0;
 
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
@@ -201,6 +206,7 @@ void main() {
   float wet = max(max(vPar.y, f * 0.9), limb);
   // wet ground and falling rain or snow: edges soften, far layers run into each other
   wet = max(wet, max(uWx.y * 0.45 * (1.0 - snowC), uWx.w * smoothstep(10.0, 90.0, dist) * 0.9));
+  wet = max(wet, smoothstep(0.0, 0.25, pud));      // a puddle's edge is wet in wet
   pcWrite(c, wet, nV, -vView.z, 1.0);
 }
 `;
@@ -364,6 +370,11 @@ void main() {
   // rain stipples the surface: it mirrors less and takes the sky's value
   mirror *= (1.0 - 0.45 * uWx.w) * (1.0 - 0.6 * rough);
   c = mix(own, pcDensity(c * mix(vec3(1.0), vLiq.rgb, 0.35), 1.12 + (r3.g - 0.5) * 0.35 - hN * 0.40), mirror);
+
+  // under a closed sky the water takes the storm: its wash is laid heavier and glazed with
+  // the sky's own indigo (a sea under a thunderhead is darker than the land, never a clear blue)
+  float stormy = uWx.x * (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
+  c = pcDensity(mix(c, c * uGlaze, stormy * 0.55), 1.0 + stormy * (0.50 + (r3.b - 0.5) * 0.5));
 
   // horizontal strokes of reflected sky where the surface is ruffled
   float ruf = smoothstep(0.585, 0.66, r1.b * 0.55 + r2.g * 0.45);
@@ -992,7 +1003,7 @@ ${FLORA_GLSL}
 uniform float uPhysOn;
 attribute vec3 iRoot;   // root relative to uOrigin (body-local metres)
 attribute vec4 iAxis;   // xyz the way the stroke grows (unit), w its length (0 = an empty slot)
-attribute vec4 iPar;    // x width (m), y width at half length (share), z hash, w born (s)
+attribute vec4 iPar;    // x width (m), y width at half length (share; 2 a grass flick, 3 a flick left crisp), z hash, w born (s)
 attribute vec4 iCol;    // wash; a: curl of the tip (share of the length)
 attribute vec2 iExt;    // x canopy shade at the root, y how much it gives to a push (0 rigid .. 1 grass)
 uniform vec3 uOrigin;
@@ -1007,8 +1018,13 @@ varying vec3 vCol;
 varying vec4 vS;        // x along the stroke 0..1, y across -1..1, z hash, w canopy
 varying float vFog;
 varying float vFlat;
+varying float vAcc;
+varying float vLoad;
 void main() {
   float t = position.y, side = position.x, h = iPar.z;
+  bool flick = iPar.y > 1.5;
+  vLoad = flick ? 0.4 : 1.0;
+  vAcc = flick ? iPar.y - 2.0 : step(fract(h * 13.7), 0.5);
   vec3 root = iRoot;
   vec3 toCam = uCamLocal - root;
   float di = length(toCam);
@@ -1016,7 +1032,8 @@ void main() {
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(0.8, 2.6, di);
   float flex = iExt.y;
-  float len = iAxis.w * vis * mix(1.0, 0.45, uWx.z * flex);      // fresh snow buries most of a blade
+  // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
+  float len = iAxis.w * vis * (1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w)));
   vec3 ax = iAxis.xyz;
   vec3 up = normalize(root + uOrigin);
   // what has pushed through here: a blade leans with the load, and where it was trodden or
@@ -1033,7 +1050,11 @@ void main() {
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
   // (close to the eye a blade is as slender as a blade is; farther off it is as broad as the brush must be)
-  float wid = max(iPar.x * mix(0.42, 1.0, smoothstep(2.0, 7.5, di)), wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0)) * (1.0 + 0.7 * vFlat);
+  // (a flick is narrow where the brush touched down, full a third of the way up, and runs out
+  // to a point: a lancet, not a tooth)
+  float prof = flick ? (t < 0.25 ? 0.40 : (t < 0.75 ? 1.0 : 0.0)) : (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0));
+  float wid = max(iPar.x * mix(0.42, 1.0, smoothstep(2.0, 7.5, di)), wPx * (flick ? 1.7 : 2.3)) * prof * (1.0 + 0.25 * vFlat);
+  if (flick && t > 0.25 && t < 0.75) t = 0.34;
   vec3 rel = ax * (len * t) + sd * (side * wid * min(1.0, vis * 3.0) + iCol.a * len * t * t);
   if (flex > 0.01 && len > 0.0) {
     if (uPhysOn > 0.5) {
@@ -1063,15 +1084,19 @@ varying vec3 vCol;
 varying vec4 vS;
 varying float vFog;
 varying float vFlat;
+varying float vAcc;
+varying float vLoad;
 void main() {
   #include <logdepthbuf_fragment>
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
   // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks
   vec4 n2 = texture(uNoise3D, vBody * vec3(7.0, 2.0, 7.0) + vS.z * 3.0);
   if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
-  float d = 1.0 + (0.55 - vS.x) * 0.7 + (vS.z - 0.5) * 0.5 + (n1.r - 0.5) * 0.5;
-  vec3 c = pcWetWash(pcDensity(vCol, d), 1.0);
-  c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.42));     // snow on the tips; trodden grass shows its pale side
+  // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
+  // mark pooled by the sheet as well was a black comma)
+  float d = 1.0 + (0.55 - vS.x) * 0.7 * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
+  vec3 c = pcWetWash(pcDensity(vCol, d), mix(1.0, 0.4, 1.0 - vLoad));
+  c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.16));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
@@ -1082,7 +1107,8 @@ void main() {
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
   c = pcAtmos(c, vFog);
   // a third of the strokes are the crisp accents the brush leaves as drawn; the rest belong to the wash
-  pcWrite(c, max(0.2, vFog * 0.9), nV, -vView.z, (fract(vS.z * 13.7) < 0.5 ? 6.0 : 4.0) + vS.z * 0.9);
+  // the accents are left as the brush drew them; the rest belong to the ground's wash
+  pcWrite(c, max(vAcc > 0.5 ? 0.2 : 0.45, vFog * 0.9), nV, -vView.z, (vAcc > 0.5 ? 6.0 : 4.0) + vS.z * 0.9);
 }
 `;
 

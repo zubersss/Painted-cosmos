@@ -12,10 +12,10 @@ import { NearGround } from './nearground.js';
 import { getSurface, sampleSurfacePure, getVistasPure, getStandPure } from './surface.js';
 import { PlanetTerrain } from './terrain.js';
 import { sampleObstaclesPure } from './obstacles.js';
-import { makeSky, makeSkyUniforms } from './sky.js';
+import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
-import { G, GLAZES, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms, makeWashMaterial } from '../render/materials.js';
 
@@ -23,6 +23,8 @@ const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quater
 const _up = new THREE.Vector3(), _east = new THREE.Vector3(), _north = new THREE.Vector3();
 const Y = new THREE.Vector3(0, 1, 0), _hup = new THREE.Vector3();
 
+// the wash that, laid with k more pigment (the density model), comes out as c
+function undens(c, k) { return k < 1e-4 ? c : (-(1 - k) + Math.sqrt((1 - k) * (1 - k) + 4 * k * Math.min(1, Math.max(0, c)))) / (2 * k); }
 function lerp3(out, a, b, t) { out.set(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t); }
 
 export function createWorld(scene) {
@@ -31,6 +33,11 @@ export function createWorld(scene) {
   const skyU = makeSkyUniforms();
   const sky = makeSky(skyU);
   scene.add(sky);
+  // stars and pulse streaks: laid over the brushed sky as a glaze
+  const skyGlaze = makeSkyGlaze(skyU);
+  scene.add(skyGlaze);
+  GLAZES.push(skyGlaze);
+  let glazeWhy = '';
 
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
@@ -132,6 +139,27 @@ export function createWorld(scene) {
   // one pixel of the scene pass at one metre (the near strokes are never thinner than the brush)
   let nearPixel = 0.002;
   FRAME_HOOKS.push((camera, info) => { if (camera.isPerspectiveCamera && info.internalHeight) nearPixel = 2 * Math.tan(camera.fov * Math.PI / 360) / info.internalHeight; });
+  // the sky's glaze: the pulse drive's streaks run out from where the ship is heading (the
+  // ship's model says when the drive is on; at a full cruise in space a faint set of drags)
+  const _fq = new THREE.Quaternion();
+  let glazeT = -1;
+  FRAME_HOOKS.push((camera) => {
+    const u = skyGlaze.material.uniforms, now = G.uTime.value, dt = glazeT < 0 ? 0 : Math.min(0.1, Math.max(0, now - glazeT));
+    glazeT = now;
+    const on = MOTION.pulse && performance.now() - MOTION.pulseAt < 600 ? 1 : 0;
+    MOTION.pulse01 += (on - MOTION.pulse01) * (dt > 0 ? 1 - Math.exp(-dt / 0.45) : 1);
+    if (MOTION.pulse01 < 0.002 && !on) MOTION.pulse01 = 0;
+    const cruise = THREE.MathUtils.smoothstep(MOTION.speed01, 0.85, 1.0) * MOTION.space01 * 0.16;
+    const S = Math.max(MOTION.pulse01, cruise);
+    u.uStreak.value.set(S, now * 0.9, nearPixel, 0);
+    let ship = null;
+    if (S > 0.003) for (const o of scene.children) if (o.userData && o.userData.pcCaster === 'ship' && o.visible) { ship = o; break; }
+    if (ship) u.uTravel.value.set(0, 0, -1).applyQuaternion(ship.getWorldQuaternion(_fq));
+    else camera.getWorldDirection(u.uTravel.value);
+    // (nothing to lay by day on the ground: the object sits the frame out)
+    skyGlaze.visible = S > 0.003 || skyU.uAtmo.value.x > 0.001 || skyU.uAtmo.value.y < 0.999;
+    glazeWhy = `S ${S.toFixed(3)} space ${skyU.uAtmo.value.x.toFixed(3)} day ${skyU.uAtmo.value.y.toFixed(4)} pulse ${MOTION.pulse01.toFixed(3)} speed ${MOTION.speed01.toFixed(2)}`;
+  });
   FRAME_HOOKS.push((camera, info) => {
     if (!kits) return;
     const id = physics && physics.here && physics.here.bodyId, root = id && bodies.get(id);
@@ -167,7 +195,7 @@ export function createWorld(scene) {
   }
 
   let frameNo = 0, lastWall = 0, wallDt = 16, fixedSlice = false;
-  const SKY_KEYS = ['cloud', 'overcast', 'haze', 'fog', 'dust', 'wet', 'snow', 'rain', 'snowfall', 'storm'];
+  const SKY_KEYS = ['cloud', 'overcast', 'haze', 'fog', 'dust', 'wet', 'snow', 'rain', 'snowfall', 'storm', 'fresh'];
   const skyEase = { on: false, body: null, v: {} };
   function update(dt, cameraPos, activeBodyId) {
     frameNo++;
@@ -311,9 +339,8 @@ export function createWorld(scene) {
         skyEase.v.flash = skRaw.flash || 0; skyEase.on = true; skyEase.body = st.id;
         sk = skyEase.v;
       } else skyEase.on = false;
-      // (where rain or snow is falling the sky is closed, whatever the cover says)
-      const fall = sk ? Math.max(sk.rain, sk.snowfall) * air : 0;
-      const oc = sk ? Math.max(sk.overcast, 0.75 * fall) * air : 0, storm = sk ? sk.storm * air : 0;
+      // (PHYSICS closes the sky itself where rain or snow falls: nothing is added here)
+      const oc = sk ? sk.overcast * air : 0, storm = sk ? sk.storm * air : 0;
       const hazeK = sk ? Math.min(1, Math.max(0.04, sk.haze / 0.8)) : 1;          // fair weather (0.8 and up) is my clear day
       const lostV = sk ? 1 - hazeK : 0;                                           // how much of the view the weather has taken
       const dustW = sk ? Math.min(1, sk.dust * (0.25 + 1.5 * lostV)) * air : 0, fogW = sk ? Math.min(1, sk.fog * (0.2 + 1.2 * lostV)) * air : 0;
@@ -339,13 +366,21 @@ export function createWorld(scene) {
         tmpKey.light.lerp(_pale.copy(_dust).lerp(_white, 0.55), dustW * 0.6);
         _storm.lerp(_pale.copy(_dust).multiplyScalar(0.74), dustW * 0.9);
       }
+      // night: the sheet lays the night's key over everything (far more pigment in every wash:
+      // post.js). The sky's own washes are laid that much lighter here, so that they land on
+      // the values the look gives them.
+      const nightK = (1 - dayness) * (1 - space01);
+      SHEET.night = nightK;
+      if (nightK > 0.003) { const k = 0.81 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
       bu.uGlaze.value.copy(tmpKey.glaze);
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
       bu.uDayness.value = dayness;
       if (lastActive && st.id !== lastActive) freshSnow = 0;
       freshSnow = Math.min(1, Math.max(0, freshSnow + dt * (veilS > 0.02 ? veilS / 22 : -1 / 300)));
-      const snowC = sk ? (WX.forced ? sk.snow : Math.min(sk.snow, freshSnow)) * air : 0;
+      // (PHYSICS' twelfth number, `fresh`, is the cover of fresh snow alone: that is what is
+      // laid over the painted ground; the older model above stands in where it is not given)
+      const snowC = sk ? (skRaw.fresh != null ? sk.fresh : WX.forced ? sk.snow : Math.min(sk.snow, freshSnow)) * air : 0;
       bu.uWx.value.set(Math.min(1, oc + dustW * 0.6), sk ? sk.wet * air : 0, snowC, Math.max(veilR, veilS));
       skyU.uWxSky.value.set(Math.min(1, oc + dustW * 0.5), storm, veilR, veilS);
       skyU.uStormWash.value.copy(_storm);
@@ -367,7 +402,7 @@ export function createWorld(scene) {
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
       // cloud cover: the world's own share in fair weather, closing in as the weather says
-      const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8, fall), 0.12, 0.9) : look.cloud;
+      const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8), 0.12, 0.9) : look.cloud;
       skyU.uCloud.value.set(body.radius + atmH * 0.55, cover, Math.max(900, atmH * 3.2), 0.0006);
       skyU.uAtmo.value.set(space01, dayness, 0.042, body.radius);
       st.root.getWorldQuaternion(_q);
@@ -387,7 +422,7 @@ export function createWorld(scene) {
       skyU.uSunDirL.value.copy(_v2.sub(cameraPos)).normalize();
       skyU.uBodyInv.value.identity();
       skyU.uCamL.value.set(0, 1, 0);
-      SHEET.grade.set(1, 1, 1); SHEET.valid = true;
+      SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0;
       const du = defaultBodyUniforms();
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0);
       lighting.bodyId = null; lighting.space01 = 1;
@@ -467,6 +502,7 @@ export function createWorld(scene) {
     // north toward east, radians); else the painter's easel; else the biome's first site
     findBiome(bodyId, biomeId) { return getStandPure(bodyId, biomeId); },
     get _near() { const st = state.get(lastActive || 'earth'); return st && st.near; },
+    get _glaze() { return glazeWhy; },
     get _flora() { const st = state.get(lastActive || 'earth'); return st && st.flora; },
     get _prof() { return Object.assign({}, prof, this._flora ? this._flora.prof : {}); },
     _profReset() { prof.terrain = 0; const fl = this._flora; if (fl) { const p = fl.prof; p.wanted = p.build = p.retier = 0; } },

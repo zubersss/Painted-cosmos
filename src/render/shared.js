@@ -44,6 +44,9 @@ export const G = {
   // the scene pass's second target (normal, log depth, region) and its size: glazes test their
   // depth against it by hand (set by the post passes)
   uSceneAux: { value: null }, uSceneRes: { value: new THREE.Vector2(2, 2) },
+  // the scene pass's colour (what lies behind a glaze, before the brush): the star glaze reads
+  // how dark the sky is there
+  uSceneCol: { value: null },
 };
 
 // Things laid as a GLAZE over the painted scene (rain): objects whose material blends. They are
@@ -93,7 +96,12 @@ export function skyNow(physics, bodyId) {
 export const SHEET = {
   grade: new THREE.Vector3(1, 1, 1),
   valid: false,
+  night: 0,      // 0 day .. 1 night on the ground: the sheet's night key (see post.js)
 };
+
+// How the picture is moving: the painter writes speed01 from the mood, the ship's model says
+// when the pulse drive is on (its animate state), the world eases pulse01 and lays the streaks.
+export const MOTION = { speed01: 0, space01: 0, pulse: false, pulseAt: -1, pulse01: 0 };
 
 // Quality tier (0 low, 1 medium, 2 high): set by the painter, read by the world to scale how
 // far flora is drawn.

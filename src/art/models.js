@@ -11,6 +11,7 @@
 // parts are moved by a matrix palette (render/materials.js, makeFigureMaterial).
 import * as THREE from 'three';
 import { makeFigureMaterial } from '../render/materials.js';
+import { MOTION } from '../render/shared.js';
 
 // ---- small vector and noise helpers ---------------------------------------------------------
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -423,6 +424,8 @@ export function createShip() {
     const k = first || s.snap ? 1 : 1 - Math.exp(-6 * dt); first = false;
     const gear = clamp01(s.gear01 == null ? (mode === 'landed' || mode === 'hover' ? 1 : 0) : s.gear01);
     const can = clamp01(s.canopy01 || 0);
+    // (the world lays the pulse drive's streaks over the sky while this says so)
+    MOTION.pulse = mode === 'pulse'; MOTION.pulseAt = performance.now();
     const want = mode === 'pulse' ? 2.6 : mode === 'landed' ? clamp01(s.throttle01 || 0) * 0.5 : 0.22 + 0.9 * clamp01(s.throttle01 == null ? (mode === 'fly' ? 0.6 : 0.15) : s.throttle01);
     thr += (want - thr) * k; hov += ((mode === 'hover' ? 1 : 0) - hov) * k;
     // gear: the legs fold away as it comes up (nose leg back under the belly, the outriggers up to the wings)

@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, ensureGlobals } from './shared.js';
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
@@ -37,7 +37,7 @@ const GRADES = [   // hour, sheet grade (used only when no world has published o
 export function createPainter(renderer) {
   ensureGlobals();
   const post = new Post(renderer);
-  let quality = 1, renderScale = 1, outW = 2, outH = 2;
+  let quality = 1, renderScale = 1, outW = 2, outH = 2, graphite = 0.4;
   const mood = { bodyId: null, biomeWeights: null, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0 };
   const swapped = [], glazed = [];
   const info = { internalWidth: 2, internalHeight: 2, quality: 1 };
@@ -48,7 +48,7 @@ export function createPainter(renderer) {
   function applySize() {
     const t = TIERS[quality];
     post.sectors = t.sectors;
-    post.sheetUniforms.uPig.value.w = t.graphite;
+    graphite = t.graphite; post.sheetUniforms.uPig.value.w = graphite;
     post.setSize(outW, outH, Math.min(1, Math.max(0.3, t.scale * renderScale)));
     info.internalWidth = post.inW; info.internalHeight = post.inH; info.quality = quality;
   }
@@ -106,6 +106,13 @@ export function createPainter(renderer) {
     else gradeFromHour(mood.timeOfDay == null ? 12 : mood.timeOfDay, post.sheetUniforms.uGrade.value);
     // weather on the sheet: a storm shifts the whole value key (more pigment, the paper stays
     // the brightest value); lightning is bare paper showing through for a frame or two
+    // the night key: deep washes, broader and wetter brushwork, hardly any pencil
+    const night = SHEET.valid ? SHEET.night : 0;
+    post.sheetUniforms.uNight.value = night;
+    post.sheetUniforms.uPig.value.w = graphite * (1 - 0.75 * night);
+    const ub = post.absUniforms.uBrush.value;
+    ub.x = 0.0036 * (1 + 0.45 * night); ub.y = 0.0085 * (1 + 0.30 * night); ub.z = 0.013 * (1 + 0.5 * night);
+    MOTION.speed01 = +mood.speed01 || 0; MOTION.space01 = +mood.inSpace01 || 0;
     post.sheetUniforms.uWxSheet.value.set(WX.key, Math.max(WX.flash, mood.sky && !WX.forced ? mood.sky.flash || 0 : 0), 0, 0);
     const prevTarget = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;
@@ -139,7 +146,7 @@ export function createPainter(renderer) {
       if (o.pooling != null) u.uPig.value.x = o.pooling;
       if (o.granulation != null) u.uPig.value.y = o.granulation;
       if (o.wobble != null) u.uPig.value.z = o.wobble;
-      if (o.graphite != null) u.uPig.value.w = o.graphite;
+      if (o.graphite != null) { graphite = o.graphite; u.uPig.value.w = graphite; }
       if (o.border != null) u.uBorder.value.w = o.border ? 1 : 0;
       if (o.abstraction != null) a.uAbstraction.value = o.abstraction;
       if (o.bleed != null) a.uBrush.value.w = o.bleed;

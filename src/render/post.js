@@ -110,6 +110,7 @@ uniform vec4 uPig;        // edge pooling, granulation, wobble px (at 1080p), gr
 uniform vec4 uBorder;     // width, raggedness, pooling, enabled
 uniform vec2 uBoil;
 uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm), y lightning flash
+uniform float uNight;     // the night key: 0 day .. 1 night on the ground
 varying vec2 vUv;
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
@@ -126,6 +127,11 @@ void main() {
   vec4 c = texture(tAbs, uv);
   vec3 col = c.rgb;
   float wet = c.a;
+  // night is its own painting, not the day darkened: the hue narrows to the night's indigo,
+  // and (below) every wash carries far more pigment, so the darks and middles run together
+  // into a few deep masses while whatever was left as paper stays paper: the reserved lights
+  float lit0 = dot(col, W);
+  col = mix(col, vec3(lit0) * vec3(0.88, 0.97, 1.13), 0.58 * uNight * (1.0 - smoothstep(0.80, 0.97, lit0)));
   float lum = dot(col, W);
 
   // pigment pools just inside the border of each wash: wide (compare with the blurred
@@ -159,6 +165,7 @@ void main() {
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
   d += uWxSheet.x * (0.75 + 0.5 * plo.r);
+  d += uNight * (0.68 + 0.26 * plo.r);
 
   // ragged unpainted border: the wash simply stops, and pools where it stops
   vec2 bd = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);
@@ -172,7 +179,7 @@ void main() {
   // dry edge: near the border the brush skips the paper's peaks
   // (a loaded dark wash skips far less: a few broad flecks of paper, never a pale rim with dark specks in it)
   float skL = smoothstep(0.46, 0.62, mix(ph, pmid.r, 0.65));
-  float skD = smoothstep(0.60, 0.70, psoft.r * 0.6 + plo.r * 0.4 + (pmed - 0.5) * 0.3) * 0.75;
+  float skD = smoothstep(0.63, 0.72, psoft.r * 0.6 + plo.r * 0.4 + (pmed - 0.5) * 0.2) * 0.55;
   float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * mix(skL, skD, dark) * uBorder.w;
 
   col = clamp(col - (col - col * col) * (d - 1.0), 0.0, 1.0);
@@ -197,17 +204,25 @@ void main() {
   // lightning: for a frame or two the paper shows through. The sky and the lights go bare,
   // the darks stay as silhouettes against them
   if (uWxSheet.y > 0.003) {
-    float isSky = 1.0 - step(0.5, texture(tAux, uv).w);
-    float lift = uWxSheet.y * (isSky * (0.55 + 0.45 * plo.r) + (1.0 - isSky) * smoothstep(0.25, 0.75, dot(col, W)) * 0.55);
+    // (how much of the neighbourhood is open sky: the gaps in a crown are part of the crown,
+    // a lone sky pixel there lifted to paper was a fringe of white specks round every tree)
+    vec2 o2 = uInTexel * 3.0;
+    float isSky = 5.0 - step(0.5, texture(tAux, uv).w) - step(0.5, texture(tAux, uv + vec2(o2.x, o2.y)).w) - step(0.5, texture(tAux, uv + vec2(-o2.x, o2.y)).w)
+      - step(0.5, texture(tAux, uv + vec2(o2.x, -o2.y)).w) - step(0.5, texture(tAux, uv + vec2(-o2.x, -o2.y)).w);
+    isSky = smoothstep(0.55, 1.0, isSky * 0.2);
+    // (the thin parts of the cloud light up most: the sky's own values, not the paper's, shape the flash)
+    float lift = uWxSheet.y * (isSky * (0.62 + 0.33 * smoothstep(0.0, 0.42, dot(sur, W))) + (1.0 - isSky) * smoothstep(0.25, 0.75, dot(col, W)) * 0.55);
     col = mix(col, vec3(1.0), clamp(lift, 0.0, 0.92));
   }
   // nothing is pure black: the darkest darks are dense indigo and sepia
-  col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoft.r - 0.5));
+  col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoft.r - 0.5) + uNight * vec3(0.035, 0.045, 0.075));
   col = mix(vec3(1.0), col, painted * (1.0 - skip * 0.8));
 
   // paper: warm off-white, lit so its tooth shows faintly even where it is bare
   float relief = (ph - 0.5) * 0.055 * mix(1.0, 0.35, dark) + (plo.g - 0.5) * 0.02;
-  vec3 outc = uPaperColor * col * (1.0 + relief) * mix(vec3(1.0), uGrade, painted);
+  // the last glaze over the sheet (night indigo, dusk gold); at night what was reserved stays paper
+  float reserve = max(smoothstep(0.90, 0.985, dot(col, W)) * uNight, min(uWxSheet.y, 1.0) * smoothstep(0.45, 0.80, dot(col, W)));
+  vec3 outc = uPaperColor * col * (1.0 + relief) * mix(vec3(1.0), mix(uGrade, vec3(1.0), reserve), painted);
   gl_FragColor = vec4(outc, 1.0);
 }
 `;
@@ -276,6 +291,7 @@ export class Post {
       uBorder: { value: new THREE.Vector4(0.030, 0.034, 0.9, 1) },
       uBoil: { value: new THREE.Vector2(0, 0) },
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uNight: { value: 0 },
     };
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms);
     this.debugView = 0;
@@ -302,7 +318,7 @@ export class Post {
     this.mPrep.uniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uRes.value.set(inW, inH);
-    G.uSceneAux.value = this.rtScene.textures[1]; G.uSceneRes.value.set(inW, inH);
+    G.uSceneAux.value = this.rtScene.textures[1]; G.uSceneRes.value.set(inW, inH); G.uSceneCol.value = this.rtScene.textures[0];
     this.sheetUniforms.uOutRes.value.set(outW, outH);
     this.sheetUniforms.uInTexel.value.set(1 / inW, 1 / inH);
   }

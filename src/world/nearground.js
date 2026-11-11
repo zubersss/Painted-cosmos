@@ -182,26 +182,47 @@ export class NearGround {
     for (let q = 0; q < st.needle; q++) kinds.push(2);
     for (let q = 0; q < st.ripple; q++) kinds.push(4);
     for (let q = 0; q < st.dab + (st.blade - nBlade > 3 ? 1 : 0); q++) kinds.push(3);
+    // Grass grows in tufts, not in rows: a cell has one tuft, or two, or (one in five) none; a
+    // tuft is a handful of flicks from nearly one root, fanned, one or two of them long. Tufts
+    // differ in size, so the sward is uneven in spacing and in height.
+    const t1 = hash3i(i, j, 4, seed), t2 = hash3i(i, j, 5, seed), t3 = hash3i(i, j, 6, seed), t4 = hash3i(i, j, 7, seed);
+    const nTuft = t1 < 0.20 ? 0 : t1 < 0.74 ? 1 : 2;
+    const tu = [(t2 - 0.5) * 0.5, (t4 - 0.5) * 0.5], tv = [(t3 - 0.5) * 0.5, (t2 * 7.13 % 1 - 0.5) * 0.5], tsz = [0.55 + 1.0 * t3 * t3, 0.5 + 0.9 * t4];
     for (let k = 0; k < PER; k++) {
       // (dealt in a shuffled order, so that the half laid at the low tier is a fair sample)
       const kind = kinds.length ? kinds[(k * 5 + ((pick * 8) | 0)) % PER] : undefined;
       if (kind === undefined || (lowQ && (k & 1)) || !this.free.length) continue;
+      if ((kind === 0 || kind === 2) && nTuft === 0) continue;      // (a bare patch: no tuft, no cluster of splinters)
       const o = this.free.pop(); slots.push(o); if (o >= this.high) this.high = o + 1;
       const q1 = hash3i(i, j, 10 + k, seed), q2 = hash3i(i, j, 20 + k, seed), q3 = hash3i(i, j, 30 + k, seed), q4 = hash3i(i, j, 40 + k, seed), q5 = hash3i(i, j, 50 + k, seed);
       // where in the clump: on the ground's plane, up to half a metre from its centre
-      const ang = q1 * 6.2832, rad = (kind === 0 || kind === 1 ? (q2 < 0.75 ? 0.04 + 0.30 * q2 : 0.2 + 0.4 * q2) : 0.06 + 0.45 * Math.sqrt(q2)), ou = Math.cos(ang) * rad, ov = Math.sin(ang) * rad, dh = ou * gu + ov * gv - 0.02;
+      const tf = nTuft === 2 ? (k & 1) : 0;
+      const ang = q1 * 6.2832, rad = (kind === 0 ? 0.015 + 0.07 * q2 : kind === 2 ? 0.02 + 0.13 * q2 : kind === 1 ? (q2 < 0.75 ? 0.04 + 0.30 * q2 : 0.2 + 0.4 * q2) : 0.06 + 0.45 * Math.sqrt(q2));
+      const inT = kind === 0 || kind === 2;
+      const ou = Math.cos(ang) * rad + (inT ? tu[tf] : 0), ov = Math.sin(ang) * rad + (inT ? tv[tf] : 0), dh = ou * gu + ov * gv - 0.02;
       Ro[o * 3] = px + ux * ou + vx * ov + x * dh; Ro[o * 3 + 1] = py + uy * ou + vy * ov + y * dh; Ro[o * 3 + 2] = pz + uz * ou + vz * ov + z * dh;
       let len, wid, mid, curl, tilt, flex, cr, cg, cb;
       if (kind === 0) {            // a grass blade: one flick of the brush
-        len = 0.15 + 0.40 * q3 * q3; wid = 0.026 + 0.018 * q4; mid = 0.62; curl = (q5 - 0.5) * 0.7; tilt = 0.18 + 0.60 * q4; flex = 1;
-        const L = st.leaf, c = L ? L[q5 < 0.10 ? 0 : q5 < 0.42 ? 1 : 2] : null, gm = q5 < 0.42 ? 0.45 : 0.25;
-        if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); } else { cr = dens(gr, 1.5); cg = dens(gg, 1.5); cb = dens(gb, 1.5); }
+        // (a flick: pressed on at the root, lifted off to a point, curved; most are short, the
+        // tuft's leader is long; the outer ones lean far over)
+        const lead = k < 2 && q3 > 0.35;
+        const pv = (q5 * 9.7) % 1, acc = pv < 0.14;
+        len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.7 : 1) * (acc ? 1.25 : 1); wid = 0.020 + 0.018 * q4; curl = (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5; tilt = 0.08 + 0.85 * q4 * q4; flex = 1;
+        // most are close to the ground's own value (a little richer, or a little paler: the
+        // sunlit and the dry); one in seven is a darker accent, and only those are left crisp
+        const L = st.leaf;
+        const c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? 0.48 : 0.66;
+        if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); } else { cr = gr; cg = gg; cb = gb; }
+        const dk = acc ? 1.06 : pv < 0.36 ? 0.86 : 1.14;
+        cr = dens(cr, dk); cg = dens(cg, dk); cb = dens(cb, dk);
+        mid = acc ? 3 : 2;      // (2 and up: the flick shape; 3: an accent)
       } else if (kind === 1) {     // reed stubble
         len = 0.45 + 0.55 * q3; wid = 0.024 + 0.012 * q4; mid = 0.86; curl = (q5 - 0.5) * 0.25; tilt = 0.04 + 0.16 * q4; flex = 0.7;
         const c = st.leaf ? st.leaf[1] : [gr, gg, gb];
         cr = dens(lerp(c[0], gr, 0.45), 1.3); cg = dens(lerp(c[1], gg, 0.45), 1.3); cb = dens(lerp(c[2], gb, 0.45), 1.3);
       } else if (kind === 2) {     // frost needles, crystal splinters: half catch the light, half are its shadow
-        len = 0.09 + 0.22 * q3; wid = 0.028 + 0.022 * q4; mid = 0.46; curl = 0; tilt = 0.75 * q4; flex = 0;
+        // (splinters stand in clusters, like the tufts: a few from one root, unequal, one of them tall)
+        len = (0.06 + 0.26 * q3 * q3) * tsz[tf] * (k < 2 && q3 > 0.4 ? 1.6 : 1); wid = 0.026 + 0.020 * q4; mid = q5 > 0.8 ? 3 : 2; curl = 0; tilt = 0.85 * q4 * q4; flex = 0;
         const c = st.shard ? st.shard[q5 < 0.5 ? 0 : st.shard.length - 1] : null;
         if (c && c.length === 3) { cr = c[0]; cg = c[1]; cb = c[2]; }
         else if (q5 < 0.5) { cr = lerp(gr, 0.95, 0.6); cg = lerp(gg, 0.97, 0.6); cb = lerp(gb, 1.0, 0.6); }
