@@ -62,6 +62,35 @@ export const EXPLORER_BODY = Object.freeze({
                           // more than that tears the grip off and the body flies
   crestFilter: 0.15,      // (retired in P9: the stroke of the legs does this now; kept, unused)
   crestLaunch: true,      // leave the ground when it falls away faster than gravity (low-g bounding)
+  // GAIT (P13). The stride-averaged body above (st.p, st.v: the path, the pace, the stops) is carried by
+  // legs that step. Within the stride the hips ride the mechanics of a legged walker:
+  //   a WALK is an inverted pendulum: the hips vault over the stance foot on a leg that rolls over the
+  //     foot (a rocker of gaitRocker x the leg), lowest when both feet are down, highest over the foot,
+  //     slowest at the top (potential and kinetic energy change places);
+  //   a RUN is a spring-mass: a ballistic flight under the planet's own gravity between contacts in
+  //     which the leg, a spring, turns the body round (half a sine of force whose impulse carries the
+  //     weight over the whole step), lowest at mid-stance, highest in flight, braked in the first half
+  //     of the contact and driven in the second.
+  // How long the steps are follows dynamic similarity (Alexander): the same Froude number v^2 / g L
+  // gives the same gait and the same step in leg lengths, on any planet. See gaitOf().
+  gaitFr: 0.5,            // the walk becomes a run at this Froude number (2.0 m/s on Earth with a 0.9 m leg; people
+                          // change at 0.5 in normal and in reduced gravity: Kram, Domingo and Ferris 1997)
+  walkStep: 1.10,         // step / leg in a walk = walkStep Fr^walkStepExp: 0.72 m at 1.4 m/s on Earth, and the
+  walkStepExp: 0.21,      //   step grows as v^0.42 (Grieve 1968)
+  walkDuty: 0.65,         // share of the stride a foot is down in a walk: walkDuty - walkDutyFr Fr (0.6 at 1.4 m/s)
+  walkDutyFr: 0.2,
+  runStep: 1.20,          // step / leg in a run = runStep Fr^runStepExp (the form of Alexander and Jayes 1983):
+  runStepExp: 0.34,       //   1.1 m at 3 m/s, 1.5 m at 5 m/s, 2.0 m at 7.4 m/s on Earth
+  gaitSweep: 0.52,        // rad: half the angle the stance leg sweeps in a run (the body travels 2 L sin = 0.9 m in contact)
+  runDutyMax: 0.43,       // the largest share of the stride a foot is down in a run (a jog just above the change)
+  gaitRocker: 0.3,        // the foot's roll-over radius over the leg length (McGeer; Gard and Childress: 0.3)
+  recovery: 0.65,         // share of the walk's rise and fall that comes back as speed (pendular recovery, 0.6-0.7)
+  stepWidth: 0.16,        // m between the lines of the two feet
+  // A jump has an anticipation: the legs fold before they push. For jumpCrouch seconds after the command
+  // the hips fall (no faster than gravity: nothing can pull them down) toward jumpPush below standing,
+  // then the push comes, with the take-off speed below. 0 = the push at once (as before P13). PILOT's
+  // lever: cmd.jumpCrouch overrides it.
+  jumpCrouch: 0.12,       // s
   // jumping: the legs do the same work on any planet, so the take-off speed depends on gravity:
   //   v^2 = jumpSpeed^2 + 2 jumpPush (jumpG0 - g)
   jumpSpeed: 4.8,         // m/s at jumpG0 (PILOT's tuning: a suit-assisted hop of 1.3 m on Earth)
@@ -114,6 +143,30 @@ export const EXPLORER_BODY_STATE = () => ({
   friction: 0.7,
   dust: 0,                // 0..1 fines raised by the feet right now
   speedGround: 0,         // m/s along the ground
+  // (P13) the jump's anticipation
+  jumpT: 0, jumpT0: 0,    // s left of the crouch before the push, and its whole length
+  crouch01: 0,            // 0 .. 1 through the crouch before a jump (0 at any other time)
+  // (P13) the gait. st.p and st.v are the stride's mean; these are the stride within it.
+  gait: 0,                // 0 standing (or not stepping: in the air, sliding), 1 walk, 2 run
+  stride: 0.25,           // phase of the stride, 0 .. 1: the LEFT foot lands at 0, the RIGHT at 0.5
+  stepPhase: 0,           // phase of the step, 0 .. 1 since the last footfall
+  cadence: 0,             // steps a second
+  stepLength: 0,          // m
+  duty: 1,                // share of the stride each foot is down (over 0.5 a walk, under it a run)
+  footDown: 3,            // which feet are down: 1 left, 2 right, 3 both, 0 neither (a flight of the run; st.grounded stays true)
+  flight: 0,              // 1 in a flight phase of the run
+  bob: 0,                 // m: the hips off their standing height because of the stride (below: negative)
+  bobV: 0,                // m/s
+  ride: 0,                // m: hip + bob: everything the legs do, one number for a figure's hips
+  pulse: 0,               // m/s: the forward speed within the stride less its mean (st.v)
+  surge: 0,               // m: the body ahead of (+) or behind st.p within the stride (the integral of pulse)
+  load: 1,                // the legs' vertical force over the weight right now (0 in a flight, 2 to 4 at a run's mid-stance)
+  steps: 0,               // footfalls so far (compare with your own count to catch each one)
+  footfall: null,         // the last footfall: { n, foot (0 left, 1 right, 2 both: a landing), p: {x,y,z} body-local, force (N, the stance's peak), speed (m/s the foot meets the ground at) }
+  footfalls: null,        // the last four (a ring: footfalls[n & 3])
+  feet: null,             // [left, right]: { fwd (m ahead of st.p along heading), up (m off the ground), side (m to the right), down (0 | 1) }
+  heading: null,          // unit vector the body is travelling along (kept when it stops)
+  gaitAmp: 0, gaitK: 1, gaitV: 0, bobFix: 0, bobMean: 0,
 });
 
 const _air = { density: 1.225, wind: { x: 0, y: 0, z: 0 } };
@@ -148,6 +201,126 @@ function holdAhead(c, w, vh, feet, hD, T) {
   if (!(hD === hD)) return false;
   const m = vh > 0.3 ? clamp(w / vh, -2, 2) : 0;
   return c + m * T.look - hD > T.legReach + T.gripDepth && feet - hD <= T.clamber;
+}
+
+// ---- (P13) the gait ------------------------------------------------------------------------------------
+// The stride of a walker of leg T.legLength moving at v (m/s) under gravity g (m/s^2; in a liquid, what
+// buoyancy leaves): which gait, how long a step, how many a second, how long each foot is down, and how
+// the hips move. `was` (the gait a moment ago) gives the change a little hysteresis. Fills and returns out:
+//   gait 1 walk | 2 run (0 at rest), fr (Froude number), step (m), period (s a step), cadence (steps / s),
+//   duty (share of the stride a foot is down), contact (s a foot is down), flight (s in the air a step),
+//   drop (m the hips are under standing at a run's touch-down), dip (m they go on down to mid-stance; in a
+//   walk: m under standing at double support), rise (m over touch-down at the top of a flight), peak (the
+//   stance's largest vertical force over the weight).
+export function gaitOf(v, g, T = EXPLORER_BODY, out = {}, was = 0) {
+  const L = T.legLength, gE = g > 0.3 ? g : 0.3, fr = v * v / (gE * L), k = (1 - T.gaitRocker) * L;
+  out.fr = fr;
+  if (!(v > 1e-3)) { out.gait = 0; out.step = 0; out.period = 0; out.cadence = 0; out.duty = 1; out.contact = 0; out.flight = 0; out.drop = 0; out.dip = 0; out.rise = 0; out.peak = 1; out.A = 0; return out; }
+  if (fr > T.gaitFr * (was === 2 ? 0.9 : was === 1 ? 1.1 : 1)) {
+    const s = L * T.runStep * Math.pow(fr, T.runStepExp), duty = Math.min(T.runDutyMax, L * Math.sin(T.gaitSweep) / s);
+    const P = s / v, tc = 2 * duty * P, tf = P - tc;
+    out.gait = 2; out.step = s; out.period = P; out.cadence = 1 / P; out.duty = duty; out.contact = tc; out.flight = tf;
+    out.A = 0.5 * Math.PI * gE * P / tc;                 // peak of the half sine whose impulse carries the weight over the step
+    out.drop = k * (1 - Math.cos(duty * s / L));         // the leg lands slanted: the hips are that much under standing
+    out.dip = gE * tc * (P / (2 * Math.PI) - tc / 8); out.rise = gE * tf * tf / 8; out.peak = out.A / gE;
+  } else {
+    const s = L * T.walkStep * Math.pow(fr, T.walkStepExp), duty = Math.max(0.52, T.walkDuty - T.walkDutyFr * fr), P = s / v;
+    out.gait = 1; out.step = s; out.period = P; out.cadence = 1 / P; out.duty = duty; out.contact = 2 * duty * P; out.flight = 0;
+    out.A = 0; out.drop = 0; out.dip = k * (1 - Math.cos(0.5 * s / L)); out.rise = 0; out.peak = 1 + fr;
+  }
+  return out;
+}
+// The hips off their standing height (m) at phase ph of a step (0 = a footfall) of the stride o (gaitOf).
+function bobAt(ph, o, gE, T) {
+  if (o.gait === 2) {
+    const tc = o.contact, t = ph * o.period;
+    if (t < tc) { const a = Math.PI / tc; return -o.drop - 0.5 * gE * o.flight * t + o.A * (t - Math.sin(a * t) / a) / a - 0.5 * gE * t * t; }
+    const u = t - tc; return -o.drop + 0.5 * gE * (o.flight - u) * u;
+  }
+  if (o.gait === 1) {
+    // the arc over the leading foot; while both feet are down the weight passes from the arc over the trailing one
+    const L = T.legLength, k = (1 - T.gaitRocker) * L, ds = 2 * o.duty - 1, s = o.step;
+    const yl = -k * (1 - Math.cos((ph - 0.5 * (1 + ds)) * s / L));
+    if (ph >= ds) return yl;
+    const yt = -k * (1 - Math.cos((ph + 0.5 * (1 - ds)) * s / L)), w = ph / ds;
+    return yt + (yl - yt) * w * w * (3 - 2 * w);
+  }
+  return 0;
+}
+// The forward speed within the step less its mean (m/s).
+function pulseAt(ph, o, gE, v, dy, T) {
+  if (o.gait === 2) {
+    // the leg's force lies along the leg: it brakes while the foot is ahead of the hips and drives when it is behind
+    const tc = o.contact, t = ph * o.period, k = o.A * v / T.legLength, mean = -k * 0.03014 * tc * tc * tc / o.period;
+    if (t >= tc) return -mean;
+    const a = Math.PI / tc, ca = Math.cos(a * t);
+    return -k * (0.5 * tc * (1 - ca) / a + t * ca / a - Math.sin(a * t) / (a * a)) - mean;
+  }
+  if (o.gait === 1) return v > 0.2 ? clamp(-T.recovery * gE * dy / v, -0.3 * v, 0.3 * v) : 0;
+  return 0;
+}
+const _gt = {};
+const mkFall = () => ({ n: 0, foot: 0, p: { x: 0, y: 0, z: 0 }, force: 0, speed: 0 });
+function footfall(B, foot, x, y, z, force, speed) {
+  const f = B.footfalls[++B.steps & 3];
+  f.n = B.steps; f.foot = foot; f.p.x = x; f.p.y = y; f.p.z = z; f.force = force; f.speed = speed; B.footfall = f;
+}
+// One step of the stride: called at the end of every body step, after st.p and st.v are set. It reads the
+// body and writes only the gait's own numbers: the body's path and pace are not touched by it.
+function stepGait(B, st, dt, grounded, gE, env, T) {
+  if (!B.feet) {
+    B.feet = [{ fwd: 0, up: 0, side: -0.5 * T.stepWidth, down: 1 }, { fwd: 0, up: 0, side: 0.5 * T.stepWidth, down: 1 }];
+    B.heading = { x: 0, y: 0, z: 0 }; B.footfalls = [mkFall(), mkFall(), mkFall(), mkFall()]; B.footfall = null;
+    if (!(B.stride >= 0)) { B.stride = 0.25; B.steps = 0; B.gaitAmp = 0; B.gaitK = 1; B.gaitV = 0; B.bobFix = 0; B.bobMean = 0; B.bob = 0; B.surge = 0; }
+  }
+  const px = st.p.x, py = st.p.y, pz = st.p.z, r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r;
+  const v = B.speedGround, H = B.heading;
+  if (v > 0.1) { const vv = st.v.x * ux + st.v.y * uy + st.v.z * uz; H.x = (st.v.x - vv * ux) / v; H.y = (st.v.y - vv * uy) / v; H.z = (st.v.z - vv * uz) / v; }
+  const stepping = grounded && B.slip01 < 0.5 && B.submerged01 < 0.7;
+  if (grounded && B.impact > 0) {
+    // a landing is a footfall of both feet, where the body came down
+    footfall(B, 2, px, py, pz, T.mass * (gE + Math.min(T.legCatch, B.impact * B.impact / (2 * T.legFold))), B.impact);
+  }
+  if (stepping) B.gaitV = v;
+  const o = gaitOf(Math.max(B.gaitV, 0.12), gE, T, _gt, B.gaitK);
+  // how much of the stride there is: none at rest, in the air or sliding; less while the legs are folded on a clamber
+  const ampT = stepping ? smoothstep(0.1, 0.5, v) * (1 - smoothstep(0.3, 0.9, B.clamber01)) : 0;
+  B.gaitAmp += (ampT - B.gaitAmp) * (1 - Math.exp(-dt / 0.08));
+  if (B.gaitAmp < 1e-4 && ampT === 0) B.gaitAmp = 0;
+  const amp = B.gaitAmp;
+  let fell = -1;
+  if (stepping && v > 0.05) {
+    const s0 = B.stride, s1 = s0 + v * dt / (2 * o.step);
+    if (s1 >= 1) { B.stride = s1 - Math.floor(s1); fell = 0; } else { B.stride = s1; if (s0 < 0.5 && s1 >= 0.5) fell = 1; }
+  }
+  const ph = (B.stride * 2) % 1, raw = bobAt(ph, o, gE, T);
+  B.bobFix *= Math.exp(-dt / 0.15); if (B.bobFix < 1e-5 && B.bobFix > -1e-5) B.bobFix = 0;
+  if (o.gait !== B.gaitK) { B.bobFix = B.bob - raw * amp; B.gaitK = o.gait; }     // a change of gait does not jerk the hips
+  const bob = raw * amp + B.bobFix;
+  B.bobV = (bob - B.bob) / dt; B.bob = bob;
+  B.bobMean += (raw - B.bobMean) * (1 - Math.exp(-dt / Math.max(0.25, o.period)));
+  B.pulse = pulseAt(ph, o, gE, B.gaitV, raw - B.bobMean, T) * amp;
+  B.surge = (B.surge + B.pulse * dt) * Math.exp(-dt);
+  B.ride = B.hip + bob;
+  B.gait = amp > 0.02 ? o.gait : 0; B.stepPhase = ph; B.cadence = stepping && v > 0.05 ? v / o.step : 0; B.stepLength = o.step; B.duty = o.duty;
+  // the feet: down for `duty` of the stride, carried back under the hips; then swung forward to the next footfall
+  const X = o.duty * o.step * amp, lift = (o.gait === 2 ? 0.12 + 0.1 * Math.min(1, B.gaitV / 7) : 0.07) * amp;
+  let down = 0;
+  for (let i = 0; i < 2; i++) {
+    const F = B.feet[i]; let p = B.stride - 0.5 * i; if (p < 0) p += 1;
+    if (p < o.duty || amp < 0.02) { F.fwd = X * (1 - 2 * Math.min(1, p / o.duty)); F.up = 0; F.down = grounded ? 1 : 0; if (grounded) down |= 1 << i; }
+    else { const u = (p - o.duty) / (1 - o.duty); F.fwd = X * (2 * (u - Math.sin(2 * Math.PI * u) / (2 * Math.PI)) - 1); F.up = lift * Math.sin(Math.PI * Math.sqrt(u)); F.down = 0; }
+  }
+  B.footDown = down; B.flight = grounded && down === 0 ? 1 : 0;
+  B.load = !grounded ? 0 : o.gait === 2 && amp > 0.02 ? (ph * o.period < o.contact ? 1 - amp + amp * o.peak * Math.sin(Math.PI * ph * o.period / o.contact) : 1 - amp) : 1;
+  if (fell >= 0 && amp > 0.02) {
+    // where the foot comes down: ahead of the body by half the stance's travel, to its own side, on the ground there
+    const sd = (fell ? 0.5 : -0.5) * T.stepWidth, rx = H.y * uz - H.z * uy, ry = H.z * ux - H.x * uz, rz = H.x * uy - H.y * ux;
+    const x = px + H.x * X + rx * sd, y = py + H.y * X + ry * sd, z = pz + H.z * X + rz * sd, l = Math.hypot(x, y, z) || 1;
+    _dir2.x = x / l; _dir2.y = y / l; _dir2.z = z / l;
+    const gr = env.sample(_dir2).radius;
+    footfall(B, fell, _dir2.x * gr, _dir2.y * gr, _dir2.z * gr, T.mass * gE * (1 - amp + amp * o.peak), o.gait === 2 ? 0.5 * gE * o.flight : 0.25 * v);
+  }
 }
 
 // One step of the body.
@@ -244,8 +417,18 @@ function stepOnce(st, cmd, dt, env, T) {
   B.impact = 0;
   // floating: buoyancy carries the whole weight, the feet leave the bottom
   if (grounded && buoy >= 1) grounded = false;
-  // jump
-  if (cmd.jump && (grounded || sub > 0.3)) {
+  // jump. (P13) On the ground the legs fold first (see jumpCrouch): the push comes when the crouch is over.
+  let jumpNow = false;
+  if (cmd.jump && (grounded || sub > 0.3) && !(B.jumpT > 0)) {
+    const tcr = cmd.jumpCrouch != null ? cmd.jumpCrouch : T.jumpCrouch;
+    if (grounded && tcr > 0) { B.jumpT = tcr; B.jumpT0 = tcr; } else jumpNow = true;
+  }
+  if (B.jumpT > 0) {
+    if (!grounded) B.jumpT = 0;                          // the ground has gone from under the crouch: nothing to push on
+    else if ((B.jumpT -= dt) <= 0.5 * dt) { B.jumpT = 0; jumpNow = true; }
+  }
+  B.crouch01 = B.jumpT > 0 ? 1 - B.jumpT / B.jumpT0 : 0;
+  if (jumpNow) {
     const vj = jumpSpeedFor(g, T) * (grounded ? 1 : 0.5);
     const vv = vx * ux + vy * uy + vz * uz;
     const add = Math.max(0, vj - Math.max(0, vv));
@@ -394,7 +577,7 @@ function stepOnce(st, cmd, dt, env, T) {
     let dh = h1 - r;
     const gr = dh / dt;                                  // m/s the ground rises under the feet
     // the walker looks ahead while its legs are working (and for half a second after)
-    const working = hip0 < -0.06 || hip0 > 0.1;
+    const working = !(B.jumpT > 0) && (hip0 < -0.06 || hip0 > 0.1);   // (a crouch before a jump is not a clamber)
     let looked = false, feat = false, hD = NaN;
     if ((working || B.clamberT > 0) && vh > 0.2) {
       hD = groundAhead(env, p1x, p1y, p1z, sx, sy, sz, T.look); looked = true;
@@ -412,6 +595,7 @@ function stepOnce(st, cmd, dt, env, T) {
     // level the hips over the ground; about to climb down, stay low instead of standing up on top
     let tgt = h1;
     if (feat && hD < h1) tgt = Math.max(h1 - fold, hD);   // (false when hD is unknown)
+    if (B.jumpT > 0) tgt = Math.min(tgt, h1 - Math.min(fold, T.jumpPush));   // (P13) folding before a jump
     const om = 1 / T.legTime, y0 = c0 - (tgt - dh), v0 = w - gr, ee = Math.exp(-om * dt), kk = v0 + om * y0;
     let c1 = tgt + (y0 + kk * dt) * ee, w1 = gr + (v0 - om * kk * dt) * ee;
     {
@@ -630,6 +814,7 @@ function stepOnce(st, cmd, dt, env, T) {
   st.p.x = px; st.p.y = py; st.p.z = pz;
   st.v.x = vx; st.v.y = vy; st.v.z = vz;
   st.grounded = grounded;
+  stepGait(B, st, dt, grounded, g * (1 - buoy), env, T);
   return st;
 }
 

@@ -129,8 +129,13 @@ const actorMat = makeWashMaterial({ color: 0x8a4a3a, wet: 0.1, id: 5.0 });
 const legsOn = Q.get('legs') !== '0';
 const exMesh = new THREE.Group(); exMesh.visible = Q.get('explorer') !== '0';
 const exTorso = new THREE.Mesh(legsOn ? new THREE.CapsuleGeometry(0.27, 0.36, 4, 10) : new THREE.CapsuleGeometry(0.28, 1.2, 4, 10), actorMat);
-const exLegs = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 1, 8), actorMat); exLegs.visible = legsOn;
-exMesh.add(exTorso, exLegs);
+// (P13) two legs and two boots, each from its hip joint to its foot, where the gait has the foot (st.phys.feet: ahead of
+// or behind the body, off the ground in its swing), under hips that ride the stride (st.phys.ride) and surge with it.
+const exLegs = [0, 1].map(() => new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.07, 1, 8), actorMat));
+const exBoots = [0, 1].map(() => new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.3), actorMat));
+for (const m of [...exLegs, ...exBoots]) m.visible = legsOn;
+exMesh.add(exTorso, ...exLegs, ...exBoots);
+const _h = new THREE.Vector3(), _rt = new THREE.Vector3(), _bk = new THREE.Vector3(), _mb = new THREE.Matrix4(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
 root.add(exMesh);
 // (P11) scripted control, for the filmstrips. All optional; null/0 = the page's own behaviour.
 //   wish: [east, north] m/s the explorer wishes to move at (null: the circle of walk= / circle=)
@@ -151,9 +156,22 @@ function driveExplorer(dt) {
   ctl.jump = false;
   _u.set(ex.p.x, ex.p.y, ex.p.z).normalize();
   exMesh.position.set(ex.p.x, ex.p.y, ex.p.z);
-  exMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _u);
-  if (legsOn) { const leg = 0.9 + (ex.phys ? ex.phys.hip : 0); exLegs.scale.y = leg; exLegs.position.y = leg * 0.5; exTorso.position.y = leg + 0.36; }
-  else exTorso.position.y = 0.88;
+  // the figure faces the way it travels: x right, y up, -z ahead
+  const B = ex.phys || {}, H = B.heading;
+  if (H && (H.x || H.y || H.z)) _h.set(H.x, H.y, H.z); else _h.copy(east0);
+  _h.addScaledVector(_u, -_h.dot(_u)).normalize(); _rt.crossVectors(_h, _u); _bk.copy(_h).negate();
+  exMesh.quaternion.setFromRotationMatrix(_mb.makeBasis(_rt, _u, _bk));
+  if (legsOn) {
+    const hipY = 0.9 + (B.ride != null ? B.ride : B.hip || 0), sur = B.surge || 0;
+    exTorso.position.set(0, hipY + 0.36, -sur);
+    for (let i = 0; i < 2; i++) {
+      const F = B.feet ? B.feet[i] : null, side = F ? F.side : (i ? 0.08 : -0.08), fwd = F ? F.fwd : 0, up = F ? F.up : 0;
+      _a.set(side, hipY, -sur); _b.set(side, Math.min(up + 0.04, hipY - 0.2), -fwd);
+      const leg = exLegs[i]; leg.position.copy(_a).add(_b).multiplyScalar(0.5); leg.scale.y = _a.distanceTo(_b);
+      leg.quaternion.setFromUnitVectors(_Y, _a.sub(_b).normalize());
+      exBoots[i].position.set(side, _b.y, -fwd - 0.06);
+    }
+  } else exTorso.position.y = 0.88;
 }
 
 // ---- the ship: the real gear model for standing, a scripted hover otherwise; a painted slab on legs ----

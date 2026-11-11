@@ -1,7 +1,7 @@
 // Tests: the explorer as a body with mass. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stepExplorerBody, EXPLORER_BODY as T, explorerTerminal, jumpSpeedFor, sustainableSpeed } from './explorer.js';
+import { stepExplorerBody, EXPLORER_BODY as T, explorerTerminal, jumpSpeedFor, sustainableSpeed, gaitOf } from './explorer.js';
 import { makeWorld, V, norm, len, dot } from './testworld.mjs';
 
 const R = 4000;
@@ -376,5 +376,115 @@ test('P12 legs: stepping off the far side of a 0.72 m boulder gives no upward ki
     assert.ok(st.p.x >= 14, `${name} ${v} m/s: got over it`);
     assert.ok(kick <= 0.4 && rise <= 0.05, `${name} ${v} m/s: leaves the ground at +${kick.toFixed(2)} m/s and rises ${rise.toFixed(2)} m`);
     assert.ok(air < 0.5, `${name} ${v} m/s: ${air.toFixed(2)} s in the air`);
+  }
+});
+
+// ---- (P13) the gait ----------------------------------------------------------------------------------
+// a steady pace on level grass: the stride's numbers over the last `secs` seconds
+function stride(g, pace, secs = 6) {
+  const sim = make({ g }); let lo = 1e9, hi = -1e9, fl = 0, n = 0, s0 = 0, air = 0, lowPh = 0, hiPh = 0, vAtHi = 0, vAtLo = 0;
+  const falls = [];
+  run(sim, 6 + secs, { wish: V(pace, 0, 0), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, { each: (t, st) => {
+    const B = st.phys; if (!st.grounded) air++;
+    if (t <= 6) { s0 = B.steps; return; }
+    if (B.bob < lo) { lo = B.bob; lowPh = B.stepPhase; vAtLo = B.pulse; } if (B.bob > hi) { hi = B.bob; hiPh = B.stepPhase; vAtHi = B.pulse; }
+    fl += B.flight; n++;
+    if (B.footfall && (!falls.length || falls[falls.length - 1].n !== B.footfall.n)) falls.push({ n: B.footfall.n, foot: B.footfall.foot, p: { ...B.footfall.p }, force: B.footfall.force });
+  } });
+  const B = sim.st.phys;
+  return { sim, B, lo, hi, bob: hi - lo, flight: fl / n, counted: (B.steps - s0) / secs, air, lowPh, hiPh, vAtLo, vAtHi, falls };
+}
+
+test('P13 gait: a stroll is a walk, PILOT\'s walk and run are runs; the hips rise and fall a few centimetres with every step', () => {
+  const a = stride(9, 1.5), b = stride(9, 4.2), c = stride(9, 7.4);
+  assert.equal(a.B.gait, 1); assert.equal(b.B.gait, 2); assert.equal(c.B.gait, 2);
+  // a walk: both feet down for part of every step, never neither; 4 to 7 cm of rise (people: 3 to 5 cm at this pace)
+  assert.equal(a.flight, 0); assert.ok(a.B.duty > 0.5);
+  assert.ok(a.bob > 0.035 && a.bob < 0.07, `walk bob ${a.bob}`);
+  assert.ok(a.hi > -0.005 && a.hi <= 1e-9, 'a walker is at standing height over the stance foot, never above it');
+  // a run: a flight in every step; 5 to 9 cm between mid-stance and the top of the flight (runners: 6 to 10 cm)
+  for (const r of [b, c]) { assert.ok(r.flight > 0.25 && r.flight < 0.7, `flight ${r.flight}`); assert.ok(r.B.duty < 0.5); assert.ok(r.bob > 0.05 && r.bob < 0.09, `run bob ${r.bob}`); assert.ok(r.hi < 0, 'a runner rides below standing height'); }
+  // cadence: 1.8 to 2.2 steps a second strolling, 2.7 to 3.2 at 4.2 m/s, 3.3 to 3.9 at 7.4 m/s; and it is the cadence the footfalls come at
+  for (const [r, lo, hi] of [[a, 1.8, 2.2], [b, 2.7, 3.2], [c, 3.3, 3.9]]) {
+    assert.ok(r.B.cadence > lo && r.B.cadence < hi, `cadence ${r.B.cadence}`);
+    assert.ok(Math.abs(r.counted - r.B.cadence) < 0.25, `counted ${r.counted} against ${r.B.cadence}`);
+    assert.ok(Math.abs(r.B.cadence * r.B.stepLength - r.B.speedGround) < 1e-6, 'cadence x step length is the pace');
+    assert.equal(r.air, 0, 'st.grounded stays true through the stride (the flights of a run are the gait\'s own)');
+  }
+});
+
+test('P13 gait: a walk is lowest with both feet down and slowest at the top; a run is lowest in mid-stance, highest in flight, and falls as a free body between', () => {
+  const a = stride(9, 1.5), b = stride(9, 4.2);
+  const ds = 2 * a.B.duty - 1;
+  assert.ok(a.lowPh < ds + 0.02, `walk lowest at step phase ${a.lowPh}, double support until ${ds}`);
+  assert.ok(a.vAtHi < 0 && a.vAtLo > 0, 'the walk is slowest over the foot and fastest at double support (the pendulum)');
+  const o = gaitOf(4.2, 9), fc = o.contact / o.period;
+  assert.ok(Math.abs(b.lowPh - 0.5 * fc) < 0.06, `run lowest at ${b.lowPh}, mid-stance ${0.5 * fc}`);
+  assert.ok(Math.abs(b.hiPh - 0.5 * (1 + fc)) < 0.06, `run highest at ${b.hiPh}, mid-flight ${0.5 * (1 + fc)}`);
+  assert.ok(Math.abs(o.rise - 9 * o.flight * o.flight / 8) < 1e-9, 'the flight is ballistic under the planet\'s gravity');
+  // the stance's force carries the weight over the whole step: its impulse (half a sine: 2/pi x peak x contact) = g x period
+  assert.ok(Math.abs(2 / Math.PI * o.peak * 9 * o.contact - 9 * o.period) < 1e-9);
+  assert.ok(o.peak > 2 && o.peak < 3, `peak force ${o.peak} body weights at 4.2 m/s (runners: 2 to 3)`);
+});
+
+test('P13 gait: on the Moon the same run is a lope (longer steps, fewer of them, most of the time in flight); in heavy gravity short quick steps', () => {
+  const e = stride(9, 7.4), m = stride(2.2, 7.4), h = gaitOf(7.4, 24.8), ge = gaitOf(7.4, 9), gm = gaitOf(7.4, 2.2);
+  assert.ok(m.B.stepLength > 1.5 * e.B.stepLength, `steps ${e.B.stepLength} m on Earth, ${m.B.stepLength} m on the Moon`);
+  assert.ok(m.B.cadence < 0.7 * e.B.cadence);
+  assert.ok(gm.flight > 2 * ge.flight && m.flight > 0.65, `flight ${ge.flight} s on Earth, ${gm.flight} s on the Moon (${m.flight} of the time)`);
+  assert.ok(Math.abs(gm.contact - ge.contact) < 1e-9, 'the foot is down as long: the leg sweeps the same angle at the same pace');
+  assert.ok(h.step < 0.75 * ge.step && h.cadence > 1.35 * ge.cadence && h.flight < 0.5 * ge.flight, 'heavy gravity: short, quick, hardly off the ground');
+  // dynamic similarity: the same Froude number, the same gait and the same step in leg lengths
+  const a = gaitOf(Math.sqrt(2 * 9 * T.legLength), 9), b = gaitOf(Math.sqrt(2 * 2.2 * T.legLength), 2.2);
+  assert.ok(Math.abs(a.step - b.step) < 1e-9 && a.gait === b.gait && Math.abs(a.duty - b.duty) < 1e-9);
+  // the walk becomes a run at Froude 0.5: 2.0 m/s on Earth, 1.0 m/s on the Moon
+  assert.equal(gaitOf(1.9, 9).gait, 1); assert.equal(gaitOf(2.2, 9).gait, 2); assert.equal(gaitOf(0.9, 2.2).gait, 1); assert.equal(gaitOf(1.1, 2.2).gait, 2);
+});
+
+test('P13 gait: footfalls alternate, a step length apart, each to its own side, on the ground, with the stance\'s force; a landing is one of both feet', () => {
+  for (const [g, pace] of [[9, 1.5], [9, 7.4], [2.2, 4.2]]) {
+    const r = stride(g, pace), f = r.falls;
+    assert.ok(f.length >= 6, `${f.length} footfalls`);
+    for (let i = 1; i < f.length; i++) {
+      assert.equal(f[i].n, f[i - 1].n + 1, 'none missed'); assert.equal(f[i].foot, 1 - f[i - 1].foot, 'left, right, left');
+      const d = len({ x: f[i].p.x - f[i - 1].p.x, y: f[i].p.y - f[i - 1].p.y, z: f[i].p.z - f[i - 1].p.z }), want = Math.hypot(r.B.stepLength, T.stepWidth);
+      assert.ok(Math.abs(d - want) < 0.03 + pace / 60, `${d} m between footfalls, step ${want}`);
+      assert.ok(Math.abs(len(f[i].p) - R) < 1e-6, 'on the ground');
+    }
+    const o = gaitOf(pace, g);
+    assert.ok(Math.abs(f[f.length - 1].force - T.mass * g * o.peak) < 1, `force ${f[f.length - 1].force} N`);
+  }
+  const sim = make({ alt: 2 }); let fall = null;
+  run(sim, 2, { wish: V() }, { each: (t, st) => { if (st.phys.footfall && !fall) fall = { ...st.phys.footfall }; } });
+  assert.ok(fall && fall.foot === 2 && fall.speed > 5 && fall.force > T.mass * 9, 'a 2 m drop lands on both feet');
+});
+
+test('P13 gait: it does not touch the body: the path and the pace are the stride\'s mean, the same to the last digit with or without it', () => {
+  // (the gait reads st.p and st.v and writes only its own numbers; two runs with different stride phases must agree exactly)
+  const a = make({ world: { bumps: { amp: 0.3, length: 9 } } }), b = make({ world: { bumps: { amp: 0.3, length: 9 } } });
+  stepExplorerBody(b.st, { wish: V() }, 1 / 60, b.env); b.st.phys.stride = 0.77;
+  stepExplorerBody(a.st, { wish: V() }, 1 / 60, a.env);
+  const cmd = (t) => ({ wish: t < 3 ? V(7.4, 0, 0) : t < 5 ? V(0, 4.2, 0) : V(), assistAccel: 4 });
+  run(a, 7, cmd); run(b, 7, cmd);
+  assert.deepEqual(a.st.p, b.st.p); assert.deepEqual(a.st.v, b.st.v);
+  assert.equal(a.st.phys.gait, 0); assert.ok(Math.abs(a.st.phys.bob) < 1e-9 && Math.abs(a.st.phys.ride) < 1e-3, 'standing again, the hips are at standing height');
+  assert.equal(a.st.phys.footDown, 3);
+});
+
+test('P13 jump: the legs fold before they push: the feet leave the ground jumpCrouch after the command, the hips dropping no faster than gravity; cmd.jumpCrouch 0 is the old jump', () => {
+  for (const g of [9, 2.2]) {
+    const sim = make({ g }); let tOff = -1, low = 0, c1 = 0;
+    run(sim, 0.5, { wish: V() });
+    run(sim, 0.6, (t) => ({ wish: V(), jump: t === 0 }), { each: (t, st) => { if (st.grounded && tOff < 0) { low = Math.min(low, st.phys.hip); c1 = Math.max(c1, st.phys.crouch01); } else if (tOff < 0) tOff = t; } });
+    assert.ok(Math.abs(tOff - T.jumpCrouch) < 1.01 / 60, `g ${g}: off the ground after ${tOff} s`);
+    assert.ok(low < 0 && -low <= 0.5 * g * T.jumpCrouch * T.jumpCrouch + 1e-9, `g ${g}: the hips fell ${-low} m, free fall gives ${0.5 * g * T.jumpCrouch * T.jumpCrouch}`);
+    assert.ok(c1 > 0.7, 'crouch01 runs up to the push');
+    const s2 = make({ g }); run(s2, 0.5, { wish: V() });
+    stepExplorerBody(s2.st, { wish: V(), jump: true, jumpCrouch: 0 }, 1 / 60, s2.env);
+    assert.equal(s2.st.grounded, false); assert.ok(Math.abs(vert(s2.st) - (jumpSpeedFor(g) - g / 60)) < 0.02, 'the same take-off speed at once');
+    // and the same height either way
+    let top = 0; run(sim, 6, { wish: V() }, { each: () => { top = Math.max(top, altOf(sim)); } });
+    let top2 = 0; run(s2, 6, { wish: V() }, { each: () => { top2 = Math.max(top2, altOf(s2)); } });
+    assert.ok(Math.abs(top - top2) < 0.01 && top > 1, `the same height either way: ${top} m and ${top2} m`);
   }
 });

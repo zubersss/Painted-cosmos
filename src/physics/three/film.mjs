@@ -43,7 +43,10 @@ const PAGE_HELPERS = `(() => {
     wind(e, n, h) { const w = ph.air(L.bodyId, L.at(e, n, h), a, h).wind; return r2(Math.hypot(w.x, w.y, w.z)); },
     windEN(e, n, h) { const w = L.enuV(ph.air(L.bodyId, L.at(e, n, h), a, h).wind); return { e: r2(w.e), n: r2(w.n) }; },
     // the explorer: where (east, north, feet over the ground), how fast (over the ground, upward), the legs
-    ex() { const p = L.enu(L.ex.p), v = L.enuV(L.ex.v), B = L.ex.phys || {}; return { e: r2(p.e), n: r2(p.n), h: r3(p.h), vh: r2(Math.hypot(v.e, v.n)), vu: r2(v.u), hip: r3(B.hip || 0), clamber: r2(B.clamber01 || 0), gnd: L.ex.grounded ? 1 : 0 }; },
+    ex() { const p = L.enu(L.ex.p), v = L.enuV(L.ex.v), B = L.ex.phys || {}; return { e: r2(p.e), n: r2(p.n), h: r3(p.h), vh: r2(Math.hypot(v.e, v.n)), vu: r2(v.u), hip: r3(B.hip || 0), clamber: r2(B.clamber01 || 0), gnd: L.ex.grounded ? 1 : 0,
+      // (P13) the gait: the hips off standing with the stride in it (m), which gait (0 stand 1 walk 2 run), the stride's phase, feet down
+      // (1 left, 2 right, 3 both, 0 none: a flight), footfalls so far
+      ride: r3(B.ride || 0), gait: B.gait || 0, stride: r2(B.stride || 0), feet: B.footDown == null ? -1 : B.footDown, steps: B.steps || 0 }; },
     // the ship: height of its origin over the ground, speeds, feet down, lift, tilt (deg from the local up), wash
     ship() { const s = L.sh, p = L.enu(s.p), v = L.enuV(s.v), B = s.phys || {}, q = s.q;
       const ux = 2 * (q.x * q.y - q.w * q.z), uy = 1 - 2 * (q.x * q.x + q.z * q.z), uz = 2 * (q.y * q.z + q.w * q.x), r = Math.hypot(s.p.x, s.p.y, s.p.z);
@@ -124,6 +127,19 @@ export const SUBJECTS = {
   'explorer-run': { note: 'Earth spawn: a walk (4.2 m/s) for 0.6 s, a run (7.4 m/s) for 1.2 s, then stop; the camera follows; 7 frames a second',
     q: SPAWN + '&t=60&pre=1&follow=1&dist=7&pitch=6&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [213, 144], cols: 6, frames: 18, dt: 0.15, sub: 9,
     each: `(i, t, ctl) => { ctl.wish = t < 0.6 ? [4.2, 0] : t < 1.8 ? [7.4, 0] : [0, 0]; }`, probe: `(L) => P.ex()` },
+  // (P13) the gait, at a steady pace, from the side, close, fast enough a strip to see each step
+  'explorer-walk': { note: "Earth spawn: PILOT's walk (4.2 m/s, by its gait a jog: Froude 2.2), steady; the camera follows from the side; 15 frames a second",
+    q: SPAWN + '&t=60&pre=1&follow=1&dist=5&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.62], tile: [213, 186], cols: 6, frames: 18, dt: 1 / 15, sub: 4,
+    before: `(L) => { L.run(1.5, 1 / 60, (i, t, ctl) => { ctl.wish = [4.2, 0]; }); }`, each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; }`, probe: `(L) => P.ex()` },
+  'explorer-stroll': { note: 'Earth spawn: a stroll (1.5 m/s: a walking gait, Froude 0.28), steady; 10 frames a second',
+    q: SPAWN + '&t=60&pre=1&follow=1&dist=5&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.62], tile: [213, 186], cols: 6, frames: 18, dt: 1 / 10, sub: 6,
+    before: `(L) => { L.run(1.5, 1 / 60, (i, t, ctl) => { ctl.wish = [1.5, 0]; }); }`, each: `(i, t, ctl) => { ctl.wish = [1.5, 0]; }`, probe: `(L) => P.ex()` },
+  'explorer-walk-moon': { note: "the Moon: PILOT's walk (4.2 m/s), steady; 10 frames a second",
+    q: 'body=moon&hour=10&t=60&pre=1&follow=1&dist=5&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.62], tile: [213, 186], cols: 6, frames: 18, dt: 1 / 10, sub: 6,
+    before: `(L) => { L.run(2.5, 1 / 60, (i, t, ctl) => { ctl.wish = [4.2, 0]; }); }`, each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; }`, probe: `(L) => P.ex()` },
+  'explorer-run-moon': { note: "the Moon: PILOT's run (7.4 m/s), steady; 12 frames a second",
+    q: 'body=moon&hour=10&t=60&pre=1&follow=1&dist=5&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.62], tile: [213, 186], cols: 6, frames: 18, dt: 1 / 12, sub: 5,
+    before: `(L) => { L.run(3.5, 1 / 60, (i, t, ctl) => { ctl.wish = [7.4, 0]; }); }`, each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => P.ex()` },
   'explorer-jump': { note: 'Earth spawn: a jump from a walk (4.2 m/s) and its landing; the camera follows; 12 frames a second',
     q: SPAWN + '&t=60&pre=1&follow=1&dist=7&pitch=6&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.1, 0.5, 0.7], tile: [213, 168], cols: 6, frames: 18, dt: 1 / 12, sub: 5,
     before: `(L) => { L.run(1, 1 / 60, (i, t, ctl) => { ctl.wish = [4.2, 0]; }); }`,
