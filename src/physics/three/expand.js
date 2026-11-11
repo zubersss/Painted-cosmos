@@ -208,39 +208,51 @@ export function expandRings(events, frame, time, lift, pos, data) {
 
 // The liquid surface near the focus: an (N+1) x (N+1) grid of `step` metres, centred on the
 // lattice point nearest grid position (cx, cz) (it moves in whole steps, so vertices never
-// swim under the waves), at radius frame.r0 + level, lifted by the waves.
+// swim under the waves), at radius frame.r0 + level, lifted by the waves and the wakes.
 //   water: physics.fields.water.field (WaterField).  pos, nrm: Float32Array((N+1)^2 * 3),
 //   body-local relative to the frame's anchor (frame.ox, oy, oz); nrm may be null.
 // Returns the number of vertices.
-export function expandWater(water, frame, cx, cz, N, step, pos, nrm) {
+const _ws = new Float64Array(4), _wc = new Float64Array(4), _gs = new Float64Array(4), _gc = new Float64Array(4);
+const _dws = new Float64Array(4), _dwc = new Float64Array(4), _dgs = new Float64Array(4), _dgc = new Float64Array(4);
+export function expandWater(water, frame, cx, cz, N, step, pos, nrm, group = 0.45) {
   const x0 = Math.round(cx / step) * step - N * step * 0.5, z0 = Math.round(cz / step) * step - N * step * 0.5;
-  const kx = water.kx, kz = water.kz, amp = water.amp, ph = water.phase, R = frame.r0 + water.level;
+  const kx = water.kx, kz = water.kz, gx = water.gx, gz = water.gz, amp = water.amp, ph = water.phase, gph = water.gphase, R = frame.r0 + water.level;
+  const NT = amp.length;
   const ex = frame.ex, ey = frame.ey, ez = frame.ez, nx = frame.nx, ny = frame.ny, nz = frame.nz;
-  // along a row each train's phase advances by a fixed angle: turn (sin, cos) instead of
-  // calling the trigonometry at every vertex
-  const d0c = Math.cos(kx[0] * step), d0s = Math.sin(kx[0] * step), d1c = Math.cos(kx[1] * step), d1s = Math.sin(kx[1] * step), d2c = Math.cos(kx[2] * step), d2s = Math.sin(kx[2] * step);
-  const a0 = amp[0], a1 = amp[1], a2 = amp[2];
+  // along a row each train's phase (and its groups') advances by a fixed angle: turn
+  // (sin, cos) instead of calling the trigonometry at every vertex
+  for (let t = 0; t < NT; t++) { _dwc[t] = Math.cos(kx[t] * step); _dws[t] = Math.sin(kx[t] * step); _dgc[t] = Math.cos(gx[t] * step); _dgs[t] = Math.sin(gx[t] * step); }
+  let wakes = false; for (let w = 3; w < water.wake.length; w += 4) if (water.wake[w] > 0) { wakes = true; break; }
   let v = 0;
   for (let j = 0; j <= N; j++) {
     const z = z0 + j * step;
-    let p0 = kx[0] * x0 + kz[0] * z - ph[0], p1 = kx[1] * x0 + kz[1] * z - ph[1], p2 = kx[2] * x0 + kz[2] * z - ph[2];
-    let s0 = Math.sin(p0), c0 = Math.cos(p0), s1 = Math.sin(p1), c1 = Math.cos(p1), s2 = Math.sin(p2), c2 = Math.cos(p2);
+    for (let t = 0; t < NT; t++) { const a = kx[t] * x0 + kz[t] * z - ph[t], e = gx[t] * x0 + gz[t] * z - gph[t]; _ws[t] = Math.sin(a); _wc[t] = Math.cos(a); _gs[t] = Math.sin(e); _gc[t] = Math.cos(e); }
     // the point of the tangent plane under the start of the row, and the step along it
     let qx = frame.ox + ex * x0 + nx * z, qy = frame.oy + ey * x0 + ny * z, qz = frame.oz + ez * x0 + nz * z;
     for (let i = 0; i <= N; i++, v += 3) {
-      const h = a0 * s0 + a1 * s1 + a2 * s2;
+      let h = 0, he = 0, hn = 0;
+      for (let t = 0; t < NT; t++) {
+        const A = amp[t];
+        if (A !== 0) {
+          const env = 1 + group * _gs[t];
+          h += A * env * _ws[t];
+          if (nrm) { const c = A * env * _wc[t], gg = A * group * _gc[t] * _ws[t]; he += c * kx[t] + gg * gx[t]; hn += c * kz[t] + gg * gz[t]; }
+        }
+        let tt = _ws[t] * _dwc[t] + _wc[t] * _dws[t]; _wc[t] = _wc[t] * _dwc[t] - _ws[t] * _dws[t]; _ws[t] = tt;
+        tt = _gs[t] * _dgc[t] + _gc[t] * _dgs[t]; _gc[t] = _gc[t] * _dgc[t] - _gs[t] * _dgs[t]; _gs[t] = tt;
+      }
+      if (wakes) {
+        const x = x0 + i * step, hw = water.wakeAt(x, z);
+        if (hw !== 0) { h += hw; if (nrm) { he += (water.wakeAt(x + 0.05, z) - hw) * 20; hn += (water.wakeAt(x, z + 0.05) - hw) * 20; } }
+      }
       const l = 1 / Math.sqrt(qx * qx + qy * qy + qz * qz), ux = qx * l, uy = qy * l, uz = qz * l, r = R + h;
       pos[v] = ux * r - frame.ox; pos[v + 1] = uy * r - frame.oy; pos[v + 2] = uz * r - frame.oz;
       if (nrm) {
         // up - slope: (up) - dh/deast * east - dh/dnorth * north, normalised
-        const he = a0 * c0 * kx[0] + a1 * c1 * kx[1] + a2 * c2 * kx[2], hn = a0 * c0 * kz[0] + a1 * c1 * kz[1] + a2 * c2 * kz[2];
         const mx = ux - he * ex - hn * nx, my = uy - he * ey - hn * ny, mz = uz - he * ez - hn * nz;
         const ml = 1 / Math.sqrt(mx * mx + my * my + mz * mz);
         nrm[v] = mx * ml; nrm[v + 1] = my * ml; nrm[v + 2] = mz * ml;
       }
-      let t = s0 * d0c + c0 * d0s; c0 = c0 * d0c - s0 * d0s; s0 = t;
-      t = s1 * d1c + c1 * d1s; c1 = c1 * d1c - s1 * d1s; s1 = t;
-      t = s2 * d2c + c2 * d2s; c2 = c2 * d2c - s2 * d2s; s2 = t;
       qx += ex * step; qy += ey * step; qz += ez * step;
     }
   }

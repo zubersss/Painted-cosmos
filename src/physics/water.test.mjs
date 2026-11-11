@@ -56,7 +56,7 @@ test('the sea state at the focus rises and falls slowly, and the JS twin is boun
   }
   assert.ok(F.height < 0.2, 'fallen a minute after: ' + F.height);
   assert.ok(worst < 0.002, 'no jump: ' + worst + ' m per frame');
-  const sum = F.amp[0] + F.amp[1] + F.amp[2];
+  const sum = (F.amp[0] + F.amp[1] + F.amp[2] + F.amp[3]) * (1 + WATER.group);
   for (let k = 0; k < 500; k++) assert.ok(Math.abs(F.heightAt(k * 1.7, k * 0.9)) <= sum + 1e-9);
   // waves run downwind: the crest pattern moves along +x
   const G = new WaterField(); for (let i = 0; i < 3000; i++) G.update(1 / 60, frame, 15, 0, 0, 50, 2500, 9, 1.2, 999);
@@ -90,7 +90,7 @@ test('in the game loop: waves on a windy coast, none on dry land, none without a
       q = V(q.x + e.x * 40 / 60, q.y, q.z + e.z * 40 / 60); const l = len(q); q = V(q.x * sea.R / l, q.y * sea.R / l, q.z * sea.R / l); sea.t += 1 / 60;
       sea.physics.update(1 / 60, { bodyId: 'earth', time: sea.t, focus: q });
       const h = sea.physics.fields.water.heightAt(q);
-      let bound = 0.004; for (let k = 0; k < 3; k++) bound += Wf.amp[k] * (Wf.k[k] * 40 + Wf.omega[k]) / 60;
+      let bound = 0.004; for (let k = 0; k < 4; k++) bound += Wf.amp[k] * (1 + WATER.group) * (Wf.k[k] * 40 + Wf.omega[k] + WATER.group * Wf.k[k] / WATER.groupWaves * 40) / 60;
       if (prev != null) { worst = Math.max(worst, Math.abs(h - prev)); excess = Math.max(excess, Math.abs(h - prev) - bound * 1.1); }
       prev = h;
     }
@@ -106,7 +106,7 @@ test('in the game loop: waves on a windy coast, none on dry land, none without a
 
 test('the GLSL twin declares what the uniforms object carries, and shares the frame block with the flora chunk', async () => {
   const { FLORA_GLSL } = await import('./flora.glsl.js');
-  for (const n of ['pcPhysWater', 'pcPhysWaterHeight', 'uPhysWaterDir', 'uPhysWaterK', 'uPhysWaterAmp', 'uPhysWaterPhase', '#ifndef PC_PHYS_FRAME']) assert.ok(WATER_GLSL.includes(n), n);
+  for (const n of ['pcPhysWater', 'pcPhysWaterHeight', 'pcPhysWake', 'uPhysWaterDir', 'uPhysWaterK', 'uPhysWaterAmp', 'uPhysWaterPhase', 'uPhysWaterGroup', 'uPhysWake', 'uPhysWakeG', '#ifndef PC_PHYS_FRAME']) assert.ok(WATER_GLSL.includes(n), n);
   assert.ok(FLORA_GLSL.includes('#ifndef PC_PHYS_FRAME') && FLORA_GLSL.includes('pcPhysGrid'));
   const both = FLORA_GLSL + WATER_GLSL;
   assert.equal((both.match(/#ifndef PC_PHYS_FRAME/g) || []).length, 2);
