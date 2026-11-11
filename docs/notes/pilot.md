@@ -83,10 +83,11 @@ open until review 4. M3: my half in place and extended (below). I am also the LE
 | `node --test src/world/*.test.mjs` | same | 17 pass |
 | `node tests/playthrough.mjs` (stubs, kinematic) | same | PASSED, 37 checks |
 | the same with PHYSICS (`stub=render,world,art&fresh=1`) | same | PASSED, 37 checks |
-| the same in the painted world (400x225, `scale=0.5&quality=0`) | same | PASSED, 37 checks, no console errors |
+| the same in the painted world (400x225, `scale=0.5&quality=0`) | same, and again on the export of `5d411f2` (theme, legs, gamepad in) | PASSED both times, 37 checks, no console errors; ground to space 18 s; touchdown through the legs at 1.14 m/s |
 | `node tests/trip.mjs` (stub visuals, PHYSICS) | same | PASSED, 47 checks (Earth, Mars, Saturn, reload from the save) |
 | the trip in the painted world (400x225) | same | 45 of 47: Earth to Mars to Saturn flown, landed and walked (460 km in 68 s, 888 km in 95.2 s; `honey_mist`), autosave written. The two failures were mine: I passed `fresh=1` in the query, so the reload at the end forgot the save. The script now strips it. |
-| the painted trip again | export of `a46647f` | FAILED on Saturn: E was pressed as the prompt went out over rough ground (two frames a second, two browsers running), nothing happened, and the script flew on. Not a landing fault (see the survey below), but a real paper cut: fixed in the game (the prompt has hysteresis, E without it says why) and in the script (it presses E like a player, again if needed). Not yet re-run after the fix. |
+| the painted trip again | export of `a46647f` | FAILED on Saturn: E was pressed as the prompt went out over rough ground (two frames a second, two browsers running), nothing happened, and the script flew on. Not a landing fault (see the survey below), but a real paper cut: fixed in the game (the prompt has hysteresis, E without it says why) and in the script (it presses E like a player, again if needed). |
+| the painted trip, after those fixes, the legs and the theme | export of `5d411f2` | **PASSED, 47 checks**, no console errors: Earth to Mars (459 km in 69 s, landed and walked in `rust_canyons`), Mars to Saturn (887 km in 94.9 s, `honey_mist`), both touchdowns on the legs, read-out 178 k triangles and 94 calls on Saturn at quality 0, and the reload continued on Saturn from the save |
 | `node tests/m3check.mjs` | export of `e17a917`; working tree after the sketchbook | PASSED, 17 checks; 26 checks now |
 | `node tests/lockcheck.mjs` | export of `e17a917` | PASSED, 7 checks |
 | `node tests/audiocheck.mjs` | working tree | PASSED (table under "Audio, measured") |
@@ -417,7 +418,26 @@ objects in their notes.
     (`planSpeedChange`) is the natural replacement and I will swap it in when the painted
     pulse effect exists to judge it against.
 
+12. **The interface is painted in the DOM, not in the scene** (since the coordinator's ruling
+    that the theme is mine): torn paper, lettering and rings are SVG and CSS over the canvas,
+    generated in code at start-up, static. It costs the renderer nothing, cannot shimmer, and
+    stays crisp at any render scale. The price: HUD paper does not share the frame's own
+    grain. If PAINTER wants HUD marks inside the painting it can still offer a hook; nothing
+    is waiting on one.
+13. **Sketches are kept beside the save, not in it** (`painted-cosmos.sketches`): the save
+    stays a few hundred bytes and can never fail because a picture did not fit.
+14. **Touchdown belongs to the legs** (with PHYSICS, on dry ground): the assist stops a metre
+    up; LANDED begins at the first foot's contact, so the player can step out while the hull
+    is still settling.
+
 ### Tuning numbers (feel target: unhurried, weightless, generous)
+
+Landing on the legs (`LEGS` in `src/core/sim.js`): hand-over 1.0 m above the ground, sink
+0.6 m/s, lift fading over 1.5 s. Landing prompt: below 90 m and 75 m/s, kept up to 105 m and
+85 m/s once shown. Gamepad (`PAD` in `src/core/gamepad.js`): dead zone 0.16, look 1050 px/s
+(about 2.4 rad/s on foot) with a 1.7 power curve. Sketch: 192x108 JPEG at 0.72, 2.5 s after
+entering a landscape, 0.5 s after finding a view. Sound: master 0.75 into a compressor at
+-14 dB, 4:1 (`src/audio/audio.js`; the measured table is under "Audio, measured").
 
 Explorer (`src/player/explorer.js` EXPLORER): walk 4.2 m/s, run 7.4 m/s, ground accel 26 m/s2,
 air control 6 (11 while jetting), jump 4.8 m/s (about 1.3 m on Earth), jetpack thrust 17 m/s2
@@ -525,7 +545,7 @@ Answered (so you need not ask again):
   earlier): all in "Answers to the other".
 
 Open:
-1. The last metre of a landing on the legs is not wired (Handover item 4).
+1. (Done: the last metre of a landing is on your legs; `tests/physics.test.mjs`.)
 2. `stepShipBody` and `stepExplorerBody` move `st.p` in place; I keep the starting point by
    value. Keep that documented.
 3. Under load in the browser the read-out shows a worst `physics.update` frame of about 5 ms
