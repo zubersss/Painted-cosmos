@@ -7,7 +7,6 @@ import { cellsAt, weatherAt, DEFAULT_SEED } from './weather.js';
 import { MARK, MARK_STRIDE, DeformField, DEFORM } from './deform.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len, dot } from './testworld.mjs';
-import { epoch0 } from './testworld.mjs';
 
 // a physics instance centred where it is raining (or snowing) right now
 function rainy(bodyId = 'earth', { biome = 'alpine_meadow', pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 5, sea = 0 } = {}) {
@@ -199,7 +198,7 @@ test('prints on loose ground have a rim; on mud they do not; the depth field pil
   assert.ok(hi > 0.02 && lo < -0.002, `trough ${hi} and pile ${lo}`);
 });
 
-test('falling snow fills prints in; in clear weather they last over a minute', () => epoch0(() => {
+test('falling snow fills prints in; in clear weather they last over a minute', () => {
   const snowy = rainy('earth', { biome: 'stub-polar', pred: (x) => x.precipitation.type === 'snow' && x.precipitation.rate > 4 });
   const fr0 = () => snowy.physics.fields.frame;
   run(snowy, 2);
@@ -231,14 +230,23 @@ test('falling snow fills prints in; in clear weather they last over a minute', (
   // no weather: the same print is still there after a minute
   const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
   const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
-  // (at 30 degrees north, in the calm of the horse latitudes: no sand is blowing)
-  let q = V(0, R * 0.5, R * Math.sqrt(0.75));
+  // (at 30 degrees north, in the calm of the horse latitudes: no sand is blowing. P9: on Earth's clock as the
+  // game has it the one fixed longitude this used had weather of its own at t = 50 and the print was blown in,
+  // so the probe is the first longitude on that latitude with a light wind and nothing falling for the minute)
+  let q = null;
+  for (let k = 0; k < 24 && !q; k++) {
+    const a = k * Math.PI / 12, c = V(Math.sin(a) * Math.sqrt(0.75), 0.5, Math.cos(a) * Math.sqrt(0.75));
+    let calm = true;
+    for (const t of [50, 75, 100, 122]) { const w = weatherAt('earth', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 0.3, sun01: 0.5, wind: 4 }, {}); if (w.precipitation.rate > 0 || w.dust01 > 0.02 || w.storm01 > 0.05 || w.windFactor > 1.3) calm = false; }
+    if (calm) q = V(c.x * R, c.y * R, c.z * R);
+  }
+  assert.ok(q, 'a calm dry minute somewhere along 30 degrees north');
   for (let i = 0; i < 120; i++) { q = V(q.x + 4 / 60, q.y, q.z); const r = len(q); q = V(q.x * R / r, q.y * R / r, q.z * R / r); physics.update(1 / 60, { bodyId: 'earth', time: 50 + i / 60, focus: q, disturbers: [{ kind: 'explorer', p: q, v: V(4, 0, 0), radius: 0.35, strength: 1, grounded: true }] }); }
   const depth = physics.fields.deform.marks.data[8], born = physics.fields.deform.marks.data[10], life = physics.fields.deform.marks.data[11];
   for (let i = 0; i < 70 * 20; i++) physics.update(1 / 20, { bodyId: 'earth', time: 52 + i / 20, focus: q });
   assert.equal(physics.fields.deform.marks.data[8], depth);
   assert.ok(life > 60 && born + life > 52 + 70, 'life ' + life);
-}));
+});
 
 test('the ship leaves three pad prints where it comes down, and a jet scours a dish with a ring', () => {
   const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
@@ -354,8 +362,11 @@ test('over deep water the weather enters above the surface, not above the bed', 
   assert.ok(ripples > 20, `${ripples} ripples`);
 });
 
-test('every particle says how long it has left: a flake by its fall to the ground, dust by its life', () => epoch0(() => {
-  const w = rainy('earth', { pred: (x) => x.precipitation.type === 'snow' && x.precipitation.intensity01 > 0.6 });
+test('every particle says how long it has left: a flake by its fall to the ground, dust by its life', () => {
+  // (P9: on Earth's clock as the game has it the first heavy snow found is a blizzard, 12 m/s and gusty, where a
+  // flake's vertical speed of the moment (0.3 to 0.9 m/s, fluttering) is not its rate of fall and h / fall is no
+  // reference; the reference holds in a steady snowfall, so the probe is the first one that is not a blizzard)
+  const w = rainy('earth', { pred: (x) => x.precipitation.type === 'snow' && x.precipitation.intensity01 > 0.6 && x.kind !== 'blizzard' });
   w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
   run(w, 8);
   const b = w.physics.particles.snow, u = norm(w.focus);
@@ -372,7 +383,7 @@ test('every particle says how long it has left: a flake by its fall to the groun
   run(w, 3, { each: () => { const now = new Map(); for (let i = 0; i < b.count; i++) now.set(b.size[i], b.left[i]); for (const [id, l] of seen) if (!now.has(id)) lastLeft.push(l); seen.clear(); for (const [id, l] of now) seen.set(id, l); } });
   lastLeft.sort((x, y) => x - y);
   assert.ok(lastLeft.length > 50 && lastLeft[Math.floor(lastLeft.length * 0.98)] < 0.08, `${lastLeft.length} landings; 98 % were announced to within ${lastLeft[Math.floor(lastLeft.length * 0.98)].toFixed(3)} s`);
-}));
+});
 
 test('far from the anchor of the frame the rain still ends on the ground (the grid is a plane, the ground is not)', () => {
   const w = rainy('earth');

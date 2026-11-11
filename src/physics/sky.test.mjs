@@ -62,7 +62,6 @@ test('continuous in time: nothing but the flash moves by more than a tenth in a 
 import { createPhysics } from './index.js';
 import { windLarge } from './wind.js';
 import { makeWorld } from './testworld.mjs';
-import { epoch0 } from './testworld.mjs';
 
 test('fresh snow is a number of its own: it gathers while snow falls, is never more than the snow that lies, and a green meadow in fair weather has none', () => {
   const find = (id, pred) => { for (let t = 0; t < 9000; t += 41) for (const c of cellsAt(id, t)) { const w = weatherAt(id, c.x, c.y, c.z, 2, t + 15, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {}); if (pred(w)) return { c, t: t + 15 }; } throw new Error('not found'); };

@@ -6,10 +6,10 @@ Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/s
 ## Hand-over P9 (sixth PHYSICS agent; read this block first, then P8 and P7 below, which hold for everything not named here)
 
 **Where things stand.** `node --test src/physics/` 230 pass; PILOT's 114 pass on a clean export with my files
-(commit `9667015`). Nothing half-edited. The owner has removed every triangle and draw-call budget (COORDINATOR E,
+(run at the last commit of P9). Nothing half-edited. The owner has removed every triangle and draw-call budget (COORDINATOR E,
 last entry): no count is a reason to thin a kit; `physics.update` is still measured as a worst frame.
 
-**Done in P9: item 1 only, the legs** (`src/physics/explorer.js`, "LEGS, 1 / 2 / 2b / 3" in the code; four tests at
+**Done in P9, item 1: the legs** (`src/physics/explorer.js`, "LEGS, 1 / 2 / 2b / 3" in the code; four tests at
 the end of `explorer.test.mjs`).
 - *The model.* `st.p` is the feet; the mass rides at the hips. `phys.hip` is the leg length now less standing
   (-`legFold` 0.45 m folded .. +`legReach` 0.28 m reaching down), `phys.hipV` the hips' vertical speed. The legs
@@ -41,19 +41,36 @@ the end of `explorer.test.mjs`).
   stepped down in contact; a vertical ledge of 0.73 to 1.35 m is dropped off from a crouch; `stickGap`,
   `crestFilter`, `phys.unload`, `phys.vvPrev` are retired (kept, unused).
 
-**Not done (items 2, 3, 4 of the P9 order), in order:**
-1. *Five tests at Earth's old weather start* (`testworld.mjs epoch0`): not looked into. The failure messages
-   and where they live are in the P8 hand-over below, "Not done" 1. Start with "cover gained with nothing
-   falling: 0.00011" (`sky.test.mjs`, fresh snow under a clear sky) and "323 low flakes, 7 wrong"
-   (`particles.test.mjs`): those two may be real faults.
-2. *The gust pattern races when the mean wind changes fast* (52 m/s2 in one frame at 30 m, t = 241 s at the Earth
+**Done in P9, item 2: the five tests that ran at Earth's old weather start.** All five run on the game's clock
+again (`REGIMES.earth.epoch` 480); nothing uses `epoch0` (the helper stays in `testworld.mjs`). **All five were
+stale probes; none hid a fault.**
+- `sky.test.mjs`, fresh snow under a clear sky ("cover gained with nothing falling: 0.00011"): the first three
+  quarter-seconds of a snow front (0.02 to 0.03 mm/h falling, sky number 0.001 to 0.005) were counted as dry by
+  the test's own 0.005 threshold. The test counts any snow as falling now; limits unchanged.
+- `sky.test.mjs`, the painter's words ("cloud 0.49"): not the storm search (its first storm has cloud 0.96,
+  overcast 0.97, rain 0.90) but the fair-day probe, one fixed place at t = 20, half cloudy on the new clock. Now
+  the first place at t = 20 with an open sky, nothing falling and no fog (663 of 800 places qualify).
+- `particles.test.mjs`, particle life ("323 low flakes, 7 wrong"): the first heavy snow on the new clock is a
+  blizzard (12 m/s, gusty); the test's reference, height over the vertical speed of the moment, is a calm-air
+  formula and a fluttering flake's speed of the moment is not its rate of fall. Checked in that blizzard: 98 % of
+  landings are still announced to within 0.08 s (the property that matters), so `left` is right and the reference
+  was not. The probe is the first heavy snowfall that is not a blizzard.
+- `particles.test.mjs`, prints ("no message": it was `assert.equal(depth)` at the end, 0 against 0.052): the
+  "calm desert at 30 degrees north" was one fixed longitude that has weather of its own at t = 50 on the new
+  clock. Now the first longitude on that latitude with a light wind and nothing falling for the minute.
+- `weather.test.mjs`, the snow pack ("no pack of its own: 0.027"): the fixed place has 27 mm of fresh snow at
+  t = 100 on the new clock; depth = fresh and standing = 0 still held. Now the first place where nothing has
+  fallen lately.
+
+**Not done (items 3 and 4 of the P9 order), in order:**
+1. *The gust pattern races when the mean wind changes fast* (52 m/s2 in one frame at 30 m, t = 241 s at the Earth
    spawn): the pattern is advected by `tau x wind` with tau up to 48 s (`wind.js`); advect by the integral of the
    wind (a phase kept as state) or cap the pattern's speed through the air at the gust front's own.
-3. *Item 4*: spray off the sea in a gale (only bodies emit spray: `loose.js`); dust walls softer and more
+2. *Item 4*: spray off the sea in a gale (only bodies emit spray: `loose.js`); dust walls softer and more
    numerous (no kit cap any more); PAINTER asks (via the coordinator) for **leaves as a long thin mark, aspect 3:1
    or more, turning as it flies** (they read as dark round balls at night: `docs/shots/painter/night-storm.jpg`);
    re-shoot and open the Neptune coast frame in the painted lab; whether anything uses `expand: 'gpu'`.
-4. Legs, left open: (a) in PILOT's Sim on Mars at a run the legs are off their standing length (`clamber01` > 0.3)
+3. Legs, left open: (a) in PILOT's Sim on Mars at a run the legs are off their standing length (`clamber01` > 0.3)
    40 % of the time on plain ground: the hips float over dips in low gravity, which costs one more ground sample
    on those steps; not profiled inside `Sim`. (b) A vertical ledge between 0.73 and 1.35 m is dropped off, not
    climbed down hand over hand (the feet would have to be on the face). (c) `phys.clamber01`, `phys.brace` are
