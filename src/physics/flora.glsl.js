@@ -61,19 +61,19 @@ vec4 pcPhysBend(vec3 root, float stiff01) {
            + ${f(WAVE_A[2])} * sin(uPhysWave.z * ${f(WAVE_K[2])} * dot(${rot(2)}, g) - uPhysWavePhase.z);
   L *= 1.0 + uPhysWave.w * (1.0 - stiff01) * (0.35 + 0.65 * gust) * ws;
   vec2 nuv = (g - uPhysNearMap.xy) * uPhysNearMap.z + 0.5;
-  float flat = 0.0, shake = 0.0;
+  float flatten = 0.0, shake = 0.0;
   if (nuv.x > 0.0 && nuv.y > 0.0 && nuv.x < 1.0 && nuv.y < 1.0) {
     vec4 p = pcPhysTex(uPhysPush, nuv, uPhysNearMap.w);
     L += p.xy * (1.0 - 0.85 * stiff01);
-    flat = p.z * (1.0 - stiff01);
+    flatten = p.z * (1.0 - stiff01);
     shake = p.w;
   }
   float load = length(L);
   float flex = mix(uPhysShape.x, uPhysShape.z, stiff01);
   float amax = mix(uPhysShape.y, uPhysShape.w, stiff01);
   float ang = amax * (1.0 - exp(-flex * load));
-  ang = mix(ang, ${f(FLORA.flatAngle)}, flat);
-  return vec4(L * (load > 1e-6 ? ang / load : 0.0), flat, shake);
+  ang = mix(ang, ${f(FLORA.flatAngle)}, flatten);
+  return vec4(L * (load > 1e-6 ? ang / load : 0.0), flatten, shake);
 }
 
 // Where a point of the plant goes. rel: the point relative to the root (body-local axes, m).
