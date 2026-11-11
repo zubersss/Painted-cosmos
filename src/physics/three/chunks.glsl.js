@@ -144,7 +144,10 @@ float pcPhysMarkRim(vec2 uv, float kind) {
 }
 float pcPhysRingCover(vec2 uv, float age01) {
   float d = length(uv * 2.0 - 1.0);
-  float w = mix(0.22, 0.07, age01);
-  return smoothstep(1.0 - 2.0 * w, 1.0 - w, d) * (1.0 - smoothstep(1.0 - w, 1.0, d)) * (1.0 - age01);
+  // (P12, from the lead's review: rings read as thin white line ellipses.) Born small and SOFT: a broad band
+  // on a ring 2 cm across that comes up over the first eighth of its life (it was at full strength in its
+  // first frame); thinning as it spreads; gone by fading, never by vanishing (the last factor reaches 0).
+  float w = mix(0.30, 0.10, age01);
+  return smoothstep(1.0 - 2.0 * w, 1.0 - w, d) * (1.0 - smoothstep(1.0 - w, 1.0, d)) * smoothstep(0.0, 0.12, age01) * (1.0 - age01);
 }
 `;

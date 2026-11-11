@@ -516,6 +516,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       sample(p, out) { return water.surfaceAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), out || {}); },
       // 0..1: how far this sea's waves have broken where the liquid is `depth` m deep (the surf at a shore)
       surf01(depth) { return water.present ? surf01(water.height, depth) : 0; },
+      // (P12) the swash: level (m over the still level) of the water's edge on a beach of this slope at body-local p
+      runup(p, slope = 0.07) { return water.runupAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), slope); },
       field: water,
     },
     air: airGrid,             // the wind grid itself (for the lab and for debugging)

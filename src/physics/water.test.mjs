@@ -325,3 +325,28 @@ test('the crest as a line: a narrow stroke along the top of the high waves, a sm
   assert.ok(runs > 20 && mean < 0.16 * F.length && longest * 0.05 < 0.12 * Ls, `the line is ${mean.toFixed(2)} m wide on average (widest ${(longest * 0.05).toFixed(2)} m) on a ${F.length.toFixed(1)} m sea over a ${Ls.toFixed(0)} m swell`);
   assert.ok(WATER_GLSL.includes('float pcPhysWaterCrestLine(vec3 w, vec2 along)'));
 });
+
+test('P12 the swash: the water runs up a beach in a third of the wave period and drains back in two thirds, as high as Stockdon\'s beaches', () => {
+  const frame = { version: 1 }, F = new WaterField();
+  for (let i = 0; i < 40 * 60; i++) F.update(1 / 60, frame, 16 * 0.8, 16 * 0.6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0);
+  const L = 2 * Math.PI / F.k[3], q = Math.sqrt(F.significant * L), T = 2 * Math.PI / F.omega[3], slope = 0.07;
+  // a minute at one place on the shore, 120 Hz
+  let lo = 9, hi = -9, mean = 0, up = 0, down = 0, prev = F.runupAt(3, 5, slope), n = 0;
+  for (let i = 0; i < 60 * 120; i++) {
+    F.update(1 / 120, frame, 16 * 0.8, 16 * 0.6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0);
+    const r = F.runupAt(3, 5, slope); lo = Math.min(lo, r); hi = Math.max(hi, r); mean += r; n++;
+    if (r > prev) up++; else down++; prev = r;
+  }
+  mean /= n;
+  console.log(`# swash on a 0.07 beach: sea ${F.significant.toFixed(2)} m, long train ${L.toFixed(0)} m, period ${T.toFixed(1)} s: set-up ${mean.toFixed(2)} m, the edge between ${lo.toFixed(2)} and ${hi.toFixed(2)} m (${((hi - lo) / slope).toFixed(1)} m up and down the beach), rising ${(up / n * 100).toFixed(0)} % of the time`);
+  assert.ok(Math.abs(mean - 0.35 * slope * q) < 0.05 * slope * q + 0.01, `set-up ${mean} against ${0.35 * slope * q}`);
+  // (sets of waves: the largest swing is the mean one times 1 + WATER.group)
+  assert.ok(hi - lo > 0.75 * slope * q * 0.95 && hi - lo < 0.75 * slope * q * (1 + WATER.group) * 1.05, `swing ${hi - lo} against ${0.75 * slope * q}`);
+  assert.ok(up / n > 0.28 && up / n < 0.40, `the uprush takes ${(up / n).toFixed(2)} of the time (a third)`);
+  // a steeper beach is climbed higher, a flat one hardly; a wall never more than twice the wave height; no sea, no swash
+  assert.ok(F.runupAt(3, 5, 0.14) - F.runupAt(3, 5, 0) !== 0 && Math.abs(F.runupAt(3, 5, 0)) < 1e-9);
+  let wall = 0; for (let i = 0; i < 600; i++) { F.update(1 / 60, frame, 16 * 0.8, 16 * 0.6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0); wall = Math.max(wall, F.runupAt(3, 5, 50) - 0.35 * 50 * q); }
+  assert.ok(wall <= F.significant * (1 + WATER.group) * 1.01, `on a wall ${wall} m over the set-up, the sea ${F.significant}`);
+  assert.equal(new WaterField().runupAt(0, 0, 0.07), 0);
+  assert.ok(WATER_GLSL.includes('float pcPhysWaterRunup(vec3 p, float slope)') && WATER_GLSL.includes('vec3 pcPhysWaterLong(vec3 p)'));
+});

@@ -34,6 +34,7 @@ import { BODIES } from '../../data/bodies.js';
 import { LOOKS, pig, dilute } from '../../data/looks.js';
 import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, MATERIAL_IDS } from '../index.js';
 import { weatherAt, cellsAt } from '../weather.js';
+import { scrambleSample, EXPLORER as PILOT_EXPLORER } from '../../player/explorer.js';
 import { createPhysicsKits } from './kits.js';
 import { SHAPE_GLSL } from './chunks.glsl.js';
 import { DRAW_PAINTED } from './expand.js';
@@ -101,7 +102,27 @@ const focus0 = at(0, 0);
 const speedK = num('speed', 1), walk = num('walk', 0), circle = num('circle', 5);
 const ex = { p: { x: 0, y: 0, z: 0 }, v: { x: 0, y: 0, z: 0 }, grounded: true };
 { const p = at(circle, 0); ex.p.x = p.x; ex.p.y = p.y; ex.p.z = p.z; }
-const envEx = physics.bindEnv(bodyId, { sample: (d) => world.sampleSurface(bodyId, d), gravity: body.gravity });
+// (P12) rock=<height m>: a low boulder in the explorer's way, rockAt=<m east of the focus> (default 6), rockR=<its
+// radius> (default 0.6), on PILOT's own ground profile (src/player/explorer.js scrambleSample, imported: the
+// radius raised by a smoothstep dome that begins 0.7 m outside the boulder's edge). The world does not know it,
+// so the lab draws it: the same profile as a painted mound.
+const rockH = num('rock', 0), rockAt = num('rockAt', 6), rockR = num('rockR', 0.6);
+const rocks = [];
+if (rockH > 0) {
+  const c = at(rockAt, 0); rocks.push({ unitDir: c.clone().normalize(), radius: rockR, height: rockH });
+  const reach = rockR + PILOT_EXPLORER.scrambleSkirt, seg = 40, rings = 14, pos = [], idx = [];
+  const upR = c.clone().normalize(), g0 = c.length();
+  for (let j = 0; j <= rings; j++) for (let i = 0; i < seg; i++) {
+    const rr = reach * j / rings, a = i / seg * Math.PI * 2, q = 1 - rr / reach, h = rockH * q * q * (3 - 2 * q);
+    const d = upR.clone().multiplyScalar(g0).addScaledVector(east0, Math.cos(a) * rr).addScaledVector(north0, Math.sin(a) * rr).normalize();
+    const p = d.multiplyScalar(surfR(d) + h + 0.01); pos.push(p.x, p.y, p.z);
+  }
+  for (let j = 0; j < rings; j++) for (let i = 0; i < seg; i++) { const a = j * seg + i, b = j * seg + (i + 1) % seg, c2 = a + seg, d2 = b + seg; idx.push(a, c2, b, b, c2, d2); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, makeWashMaterial({ color: 0x77706a, id: 7.0 })); mesh.name = 'lab-rock'; root.add(mesh);
+}
+const groundEx = rocks.length ? scrambleSample((d) => world.sampleSurface(bodyId, d), () => rocks) : (d) => world.sampleSurface(bodyId, d);
+const envEx = physics.bindEnv(bodyId, { sample: groundEx, gravity: body.gravity });
 const actorMat = makeWashMaterial({ color: 0x8a4a3a, wet: 0.1, id: 5.0 });
 // (P11) the figure: a torso that rides at the hips on legs whose length is the model's (0.9 m + st.phys.hip),
 // so what the legs do (fold on a landing, reach down a step, clamber) is in the picture. legs=0: one capsule.
@@ -390,8 +411,9 @@ buildKits();
 let yaw = num('yaw', 30) * Math.PI / 180;
 const pitch = num('pitch', 12) * Math.PI / 180, dist = num('dist', 9), lookUp = num('up', 1.0);
 const camLocal = new THREE.Vector3(), target = new THREE.Vector3();
+const lookAt0 = at(num('lookE', 0), num('lookN', 0));      // (P12) lookE=, lookN=: what the still camera looks at, m from the focus
 function placeCamera() {
-  const f = ctl.follow ? _t.set(ex.p.x, ex.p.y, ex.p.z) : _t.copy(focus0);
+  const f = ctl.follow ? _t.set(ex.p.x, ex.p.y, ex.p.z) : _t.copy(lookAt0);
   target.copy(f).addScaledVector(up0, lookUp);
   camLocal.copy(target).addScaledVector(east0, Math.sin(yaw) * Math.cos(pitch) * dist).addScaledVector(north0, -Math.cos(yaw) * Math.cos(pitch) * dist).addScaledVector(up0, Math.sin(pitch) * dist);
   // keep the eye above the ground

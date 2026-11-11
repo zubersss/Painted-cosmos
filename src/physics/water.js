@@ -61,6 +61,7 @@ export const WATER = Object.freeze({
   foamMin: 5e-4,                   // below this share the sea does not break at all
   foamEdge: 0.06,                  // x Hs: the width of the edge of a foam patch
   surfBreak: 0.78,                 // a wave breaks when it is this fraction of the depth high
+  swashSetup: 0.35, swashSwing: 0.75,   // (P12) set-up and incident swash over slope x sqrt(H0 L0) (Stockdon et al. 2006)
   // Swell (P7). On an open sea the longest train is not part of the local wind sea: it is the
   // sea the same wind raised over the open water beyond the game's fetch (swellFetch times as
   // far), which has outrun it: longer (its period grows with the cube root of the fetch), and
@@ -366,6 +367,23 @@ export class WaterField {
 
   // Elevation of the surface above its still level at grid position (x, z), metres.
   // The JS twin of pcPhysWaterHeight in WATER_GLSL.
+  // (P12) THE SWASH: the level of the water's edge on a beach of this slope (rise over run) at grid position
+  // (x, z), in metres above the still level: the water stands at the contour of the bed that is this high
+  // (negative: it has drawn back to where the still water is that deep). Each wave of the long train runs
+  // up in a third of its period and drains back in two thirds; sets of high waves reach further.
+  // Stockdon et al. 2006 (ten field experiments on natural beaches): set-up 0.35 b sqrt(H0 L0), incident
+  // swash 0.75 b sqrt(H0 L0) from its lowest to its highest (b the beach slope, H0 and L0 the height and
+  // length of the waves offshore), never more than twice the wave height (a wave surging up a wall).
+  runupAt(x, z, slope) {
+    const i = NT - 1;
+    if (!this.present || !(this.amp[i] > 0) || !(this.k[i] > 0)) return 0;
+    const q = Math.sqrt(this.significant * TAU / this.k[i]), b = slope > 0 ? slope : 0;
+    const swing = Math.min(WATER.swashSwing * b * q, 2 * this.significant);
+    const a = this.kx[i] * x + this.kz[i] * z - this.phase[i];
+    const env = 1 + WATER.group * Math.sin(this.gx[i] * x + this.gz[i] * z - this.gphase[i]);
+    return WATER.swashSetup * b * q + 0.5 * swing * env * (Math.cos(a) + 0.5 * Math.sin(2 * a)) * 0.7698229407236336;
+  }
+
   heightAt(x, z) {
     let s = 0;
     for (let i = 0; i < NT; i++) {
@@ -434,6 +452,20 @@ vec3 pcPhysWake(vec2 g) {
   return o;
 }
 
+// (P12) The long train alone (the swell where the sea is open, else the longest wave of the wind sea; its
+// wavelength is 6.2831853 / uPhysWaterK.w): xyz as pcPhysWaterD. For water far from the eye, where the mesh
+// is too coarse for the short trains but can still carry this one: on Neptune's storm coast the short
+// trains are 7 to 11 m long and 0.2 m high and this one is 52 m long and 0.87 m high, so a surface that
+// stops heaving 6 short wavelengths out (64 m) is flat although the sea is 2.8 m high.
+vec3 pcPhysWaterLong(vec3 p) {
+  vec2 g = pcPhysGrid(p);
+  vec2 d = uPhysWaterDir;
+  vec3 o = vec3(0.0);
+  vec2 D = vec2(0.0);
+${train(3)}
+  return o;
+}
+
 // Elevation (m) of the liquid surface above its still level at a body-local point, and its
 // slope along the frame's east and north axes: xyz = (height, dh/deast, dh/dnorth).
 // along: the way the crests lie at this point (unit, frame axes): the direction a stroke runs.
@@ -470,6 +502,20 @@ float pcPhysWaterCrestLine(vec3 w, vec2 along) {
   vec4 ak = uPhysWaterAmp * uPhysWaterK;                       // (the sea's rms slope, from its four trains)
   float s = abs(dot(w.yz, vec2(along.y, -along.x))) / max(sqrt(${f(0.5 * (1 + 0.45 * 0.45 / 2))} * dot(ak, ak)), 1e-6);
   return smoothstep(${f(WATER.crestLow)}, ${f(WATER.crestHigh)}, w.x / hs) * (1.0 - smoothstep(${f(WATER.lineIn)}, ${f(WATER.lineOut)}, s));
+}
+// (P12) The swash: the level (m above the still level) of the water's edge on a beach of this slope (rise over
+// run; 0.07 is a sandy beach) at a body-local point: where the still depth plus this is under zero the bed is
+// bare for the moment (wet sand), and the edge of the water lies where they sum to zero. It runs up in a third
+// of the long train's period and drains back in two thirds. Twin of WaterField.runupAt.
+float pcPhysWaterRunup(vec3 p, float slope) {
+  float k = uPhysWaterK.w;
+  if (uPhysWaterAmp.w <= 0.0 || k <= 0.0) return 0.0;
+  vec2 g = pcPhysGrid(p), d = uPhysWaterDir;
+  vec2 di = vec2(d.x * ${f(COS[3])} - d.y * ${f(SIN[3])}, d.x * ${f(SIN[3])} + d.y * ${f(COS[3])});
+  vec2 gi = vec2(d.x * ${f(GCOS[3])} - d.y * ${f(GSIN[3])}, d.x * ${f(GSIN[3])} + d.y * ${f(GCOS[3])}) * ${f(GK)};
+  float q = sqrt(uPhysWaterSea.x * 6.2831853 / k), b = max(slope, 0.0);
+  float a = k * dot(di, g) - uPhysWaterPhase.w, env = 1.0 + ${f(WATER.group)} * sin(k * dot(gi, g) - uPhysWaterGroup.w);
+  return ${f(WATER.swashSetup)} * b * q + 0.5 * min(${f(WATER.swashSwing)} * b * q, 2.0 * uPhysWaterSea.x) * env * (cos(a) + 0.5 * sin(2.0 * a)) * ${f(1 / 1.299)};
 }
 // The surf at a shore: 0..1, how far a wave of this sea has broken in liquid depth metres deep.
 float pcPhysWaterSurf(float depth) {

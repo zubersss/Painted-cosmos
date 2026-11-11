@@ -66,6 +66,26 @@ const PAGE_HELPERS = `(() => {
 })()`;
 
 const SPAWN = 'body=earth&hour=12.3';
+// (P12) put the explorer `e0` metres east of the focus, at rest or at a run-up speed, before a clamber strip
+const CLAMBER_BEFORE = (e0, v = 0) => `(L) => { const p = L.at(${e0}, 0); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0; L.ex.grounded = true;
+  ${v ? `for (let i = 0; i < 600 && L.enu(L.ex.p).e < 2.2; i++) { L.ctl.wish = [${v}, 0]; L.run(1 / 60, 1 / 60); }` : ''} }`;
+// (P12) move the focus (the hidden explorer; follow=1) to the waterline nearest the place, `up` metres up the beach,
+// look along the shore turned `turn` radians toward the water, let the sea settle there for 6 s, then `more`
+const SHORE_BEFORE = (up, turn, more = '') => `(L) => {
+  const D = (e, n) => { const p = L.at(e, n), l = Math.hypot(p.x, p.y, p.z), s = L.world.sampleSurface(L.bodyId, { x: p.x / l, y: p.y / l, z: p.z / l }); return (s.liquidRadius || 0) - s.radius; };
+  const wet = D(0, 0) > 0; let hit = null;
+  for (let r = 4; r <= 900 && !hit; r += 4) for (let k = 0; k < 32 && !hit; k++) { const a = k / 32 * 2 * Math.PI; if ((D(Math.cos(a) * r, Math.sin(a) * r) > 0) !== wet) hit = { a, r }; }
+  window.__shore = hit; if (!hit) return;
+  let lo = hit.r - 4, hi = hit.r; for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; if ((D(Math.cos(hit.a) * m, Math.sin(hit.a) * m) > 0) !== wet) hi = m; else lo = m; }
+  // (out: the unit vector from land to water along the ray)
+  const out = wet ? -1 : 1, rr = hi - out * ${up}, e = Math.cos(hit.a) * rr, n = Math.sin(hit.a) * rr;
+  const p = L.at(e, n); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0;
+  window.__shore = { e, n, r: hi, oe: Math.cos(hit.a) * out, on: Math.sin(hit.a) * out, wet };
+  L.yaw = hit.a + ${turn} * out;
+  L.run(6, 1 / 30); ${more} }`;
+const SHORE_PROBE = `(L) => { const W = L.physics.fields.water, F = W.field, s = L.info().seaState || {}, S = window.__shore || {}, b = L.physics.here.blown, o = {};
+  const lvl = (d) => { const me = L.enu(L.ex.p), p = L.at(me.e + S.oe * d, me.n + S.on * d); const w = W.heightAt ? W.heightAt(p, o) : null; return w == null ? null : P.r2(typeof w === 'number' ? w : (w.height != null ? w.height : NaN)); };
+  return { Hs: s.Hs, length: s.length, breaking: s.breaking ? 1 : 0, cover: s.cover, surf: P.r2(b.surf || 0), spume: P.r2(b.spume || 0), spray: L.physics.particles.spray.count, w6: lvl(8), w20: lvl(22), runup: F.runup != null ? P.r2(F.runup) : null, swash: F.swash != null ? P.r2(F.swash) : null }; }`;
 export const SUBJECTS = {
   // ---- where things are: four views round the Earth spawn, 90 degrees apart (not a motion strip) ----
   'look-around': { note: 'four views round the spawn (yaw 30, 120, 210, 300), to choose a framing',
@@ -156,6 +176,36 @@ export const SUBJECTS = {
   'leaves-gust': { note: 'Earth spawn, 176 s: leaves torn off in the storm; 10 frames a second',
     q: SPAWN + '&t=172&pre=4&explorer=0&dist=12&pitch=4&up=3&yaw=210', w: 640, h: 360, crop: [0.2, 0.15, 0.6, 0.7], tile: [320, 210], frames: 12, dt: 0.1, sub: 6,
     probe: `(L) => { const r = P.parts('leaves'), w = P.windEN(0, 0, 2), x = P.where('leaves', 15); return { leaves: r.n, near: x.near, ve: r.e, vn: r.nn, vu: r.u, sp: r.sp, windE: w.e, windN: w.n, h: x.h }; }` },
+  // ---- (P12) a clamber: a 1 m boulder (radius 0.6 m, PILOT's ground profile) 6 m east of the focus; the camera
+  // stands south of it and does not move. (numbers: P.ex() and the height of the ground under the feet over the plain) ----
+  'clamber-walk': { note: 'Earth spawn: a walk (4.2 m/s) over a 1 m boulder; 8 frames a second',
+    q: SPAWN + '&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 8, sub: 8,
+    before: CLAMBER_BEFORE(1.5), each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; }`, probe: `(L) => P.ex()` },
+  'clamber-run': { note: 'Earth spawn: a run (7.4 m/s) over a 1 m boulder; 10 frames a second',
+    q: SPAWN + '&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 10, sub: 6,
+    before: CLAMBER_BEFORE(-6, 7.4), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => P.ex()` },
+  'clamber-walk-moon': { note: 'the Moon: a walk (4.2 m/s) over a 1 m boulder; 6 frames a second',
+    q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 6, sub: 10,
+    before: CLAMBER_BEFORE(1.5), each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; }`, probe: `(L) => P.ex()` },
+  'clamber-run-moon': { note: 'the Moon: a run (7.4 m/s) over a 1 m boulder; 8 frames a second',
+    q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 8, sub: 8,
+    before: CLAMBER_BEFORE(-8, 7.4), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => P.ex()` },
+  // ---- (P12) waves on a shore: the focus is moved to the waterline nearest the place, 2 m up the beach; the camera
+  // looks along the shore, turned a little toward the water. (numbers: the sea state, the run-up line (m up the beach
+  // from the still waterline), the surf and foam the model reports, the height of the water 6 and 20 m out) ----
+  'shore-earth': { note: 'Earth, sea_coast: waves running up the beach; 4 frames a second for 6 s',
+    q: 'body=earth&biome=sea_coast&hour=12&t=60&pre=4&explorer=0&follow=1&dist=11&pitch=9&up=0.6', w: 640, h: 360, crop: [0, 0.2, 1, 0.7], tile: [320, 126], cols: 4, frames: 24, dt: 0.25, sub: 15,
+    before: SHORE_BEFORE(2, 0.5), probe: SHORE_PROBE },
+  'shore-neptune': { note: 'Neptune, storm_seas at 40 s (waves 2.8 m, 29 m/s): the surf line along the shore; 4 frames a second for 6 s',
+    q: 'body=neptune&biome=storm_seas&t=34&hour=11&pre=4&explorer=0&follow=1&dist=16&pitch=8&up=1', w: 640, h: 360, crop: [0, 0.15, 1, 0.75], tile: [320, 135], cols: 4, frames: 24, dt: 0.25, sub: 15,
+    before: SHORE_BEFORE(4, 0.5), probe: SHORE_PROBE },
+  // ---- (P12) spray, and nothing else: every other kit is hidden, so each pale dash in the picture is a drop of spray.
+  // The focus stands at the waterline; after 12 s (the count has grown) the camera is turned to where the spray is. ----
+  'spray-neptune': { note: 'Neptune, storm_seas, 46 to 49 s: spray alone (rain, rings and marks hidden), looking where it is; 4 frames a second',
+    q: 'body=neptune&biome=storm_seas&t=34&hour=11&pre=4&explorer=0&follow=1&dist=12&pitch=4&up=1.6', w: 640, h: 360, crop: [0, 0.1, 1, 0.8], tile: [320, 144], cols: 4, frames: 12, dt: 0.25, sub: 15,
+    before: SHORE_BEFORE(1, 0, `L.run(8, 1 / 30); const x = P.where('spray', 60), me = L.enu(L.ex.p); window.__spray = x; if (x.n) L.yaw = Math.atan2(-(x.e - me.e), x.nn - me.n);`),
+    each: `(i, t, ctl, L) => { if (L.kits) for (const o of L.kits.objects) o.userData.hide = !/spray/.test(o.name || ''); }`,
+    probe: `(L) => { const x = P.where('spray', 60), r = P.parts('spray'), s = L.info().seaState || {}, me = L.enu(L.ex.p); return { spray: x.n, e: P.r2(x.e - me.e), n: P.r2(x.nn - me.n), h: x.h, near: x.near, sp: r.sp, ve: r.e, vn: r.nn, vu: r.u, Hs: s.Hs, spume: P.r2(L.physics.here.blown.spume || 0), surf: P.r2(L.physics.here.blown.surf || 0) }; }` },
   // ---- water: the camera is turned toward where the spray is ----
   'sea-neptune': { note: 'Neptune, the storm coast at 40 s (waves 2.8 m): the surf and the spray, looking where the spray is; 6 frames a second',
     q: 'body=neptune&biome=storm_seas&t=34&hour=11&pre=6&explorer=0&dist=14&pitch=7&up=1.5', w: 640, h: 360, crop: [0.15, 0.15, 0.7, 0.7], tile: [320, 180], frames: 12, dt: 1 / 6, sub: 10,
