@@ -3,7 +3,63 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
-## Hand-over P8 (fifth PHYSICS agent; read this block first, then the P7 hand-over below, which still holds for everything not named here)
+## Hand-over P9 (sixth PHYSICS agent; read this block first, then P8 and P7 below, which hold for everything not named here)
+
+**Where things stand.** `node --test src/physics/` 230 pass; PILOT's 114 pass on a clean export with my files
+(commit `9667015`). Nothing half-edited. The owner has removed every triangle and draw-call budget (COORDINATOR E,
+last entry): no count is a reason to thin a kit; `physics.update` is still measured as a worst frame.
+
+**Done in P9: item 1 only, the legs** (`src/physics/explorer.js`, "LEGS, 1 / 2 / 2b / 3" in the code; four tests at
+the end of `explorer.test.mjs`).
+- *The model.* `st.p` is the feet; the mass rides at the hips. `phys.hip` is the leg length now less standing
+  (-`legFold` 0.45 m folded .. +`legReach` 0.28 m reaching down), `phys.hipV` the hips' vertical speed. The legs
+  level the hips over the ground (critically damped, `legTime` 0.12 s) but only push: the hips fall no faster than
+  gravity (less v2/r), are raised at most at `legLift` 9 m/s2 and caught at `legCatch` 30. So a feature lower than
+  the stroke (0.73 m) passes under the hips at any speed. At the end of the stroke the ground acts: *folded out*
+  (ground rising faster than the hips can be lifted) the body is braced against the face and goes on at the pace
+  the hips can be raised (never faster than gravity and a hold can stop them within a quarter of the stroke; a
+  face higher than `clamber` 1.35 m in one step is a wall and stops the body); *reached out* (ground falling away
+  faster than the hips fall) the limbs hold on if there is a hold, pull the hips down (`gripAccel` 10 m/s2), and
+  the walker holds the pace at which its feet can follow the ground a `look` (1.2 m) ahead (`phys.paceCap`, braked
+  through the hold at `braceAccel` 20 m/s2). With no hold, or a drop beyond a clamber, or more than `braceDv`
+  2.5 m/s to take up in one grab, the feet leave the ground with the hips' velocity: a fall, or a bound in low
+  gravity, as before. A hold exists where the ground a look ahead lies more than reach + `gripDepth` (0.2 m) below
+  the line the hips move on (a convex thing at limb scale: a rock, a ledge, a ridge of radius under about 3.5 m),
+  or where the feet stand on something that rose over 0.1 m out of the ground the legs last stood on
+  (`phys.base`, carried on at the hill's own rate `phys.trend`); it is kept (`phys.grip`) until the legs are
+  back at standing length. With a hold the tilt of the rock under the boot does not count (the feet stand on
+  holds); a face too steep to hold by friction but within a clamber is stepped up. Ground steps longer than
+  `legStep` 0.15 m are split (at most 4): a run at 60 Hz is one step as before, at 20 Hz three.
+- *Why the body slows.* Legs cannot pull on the ground. Past a 1.3 m boulder the hips must come down 0.57 m
+  after the stroke is used: by gravity alone that takes 0.34 s on Earth and 0.84 s on the Moon. Staying in contact
+  therefore means a clambering pace, lower in low gravity; the grip (hands on the rock) is what makes it a walking
+  pace rather than a crawl on the Moon. This is the physics behind PILOT's "clamber at a walking pace".
+- *Measured* (scripts in `/home/user/.pc-scratch/physics/p9/`): see the tables in "For PILOT".
+- *Kept exactly*: jumps, the jetpack, falls from drops beyond a clamber, bounding over rolling ground in low
+  gravity (the old test passes unchanged), every other explorer test (none relaxed). *Changed without a call
+  changing*: a run across boulders is slower (it no longer teleports up and down them); a drop of 0.3 to 0.73 m is
+  stepped down in contact; a vertical ledge of 0.73 to 1.35 m is dropped off from a crouch; `stickGap`,
+  `crestFilter`, `phys.unload`, `phys.vvPrev` are retired (kept, unused).
+
+**Not done (items 2, 3, 4 of the P9 order), in order:**
+1. *Five tests at Earth's old weather start* (`testworld.mjs epoch0`): not looked into. The failure messages
+   and where they live are in the P8 hand-over below, "Not done" 1. Start with "cover gained with nothing
+   falling: 0.00011" (`sky.test.mjs`, fresh snow under a clear sky) and "323 low flakes, 7 wrong"
+   (`particles.test.mjs`): those two may be real faults.
+2. *The gust pattern races when the mean wind changes fast* (52 m/s2 in one frame at 30 m, t = 241 s at the Earth
+   spawn): the pattern is advected by `tau x wind` with tau up to 48 s (`wind.js`); advect by the integral of the
+   wind (a phase kept as state) or cap the pattern's speed through the air at the gust front's own.
+3. *Item 4*: spray off the sea in a gale (only bodies emit spray: `loose.js`); dust walls softer and more
+   numerous (no kit cap any more); PAINTER asks (via the coordinator) for **leaves as a long thin mark, aspect 3:1
+   or more, turning as it flies** (they read as dark round balls at night: `docs/shots/painter/night-storm.jpg`);
+   re-shoot and open the Neptune coast frame in the painted lab; whether anything uses `expand: 'gpu'`.
+4. Legs, left open: (a) in PILOT's Sim on Mars at a run the legs are off their standing length (`clamber01` > 0.3)
+   40 % of the time on plain ground: the hips float over dips in low gravity, which costs one more ground sample
+   on those steps; not profiled inside `Sim`. (b) A vertical ledge between 0.73 and 1.35 m is dropped off, not
+   climbed down hand over hand (the feet would have to be on the face). (c) `phys.clamber01`, `phys.brace` are
+   there for PILOT's animation and sound; nobody reads them yet.
+
+## Hand-over P8 (fifth PHYSICS agent; still holds for everything P9 does not name)
 
 **Where things stand.** `node --test src/physics/` 226 pass; PILOT's 105 pass on a clean export with my files
 (`tests/physics.test.mjs:27` failed once in three full runs under load and passed alone, 9 of 9; my own timing
@@ -707,6 +763,50 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+**P9, for PILOT (read first): the explorer has legs.**
+- *Nothing to wire.* `physics.explorer.step` is the same call. Keep "low boulders are ground" exactly as
+  `scrambleSample` has it: **the radius raised, the normal left that of the ground underneath**. That is the
+  profile the legs are tested on; a vertical face is climbed too (up to 1.35 m), but a smooth dome is what keeps
+  the feet down. You do not need a clamber speed limit of your own any more: the body holds its own pace over a
+  feature (`phys.paceCap`), lower in low gravity. If you keep one, it only needs to be the walking pace.
+- *New in `st.phys`* (additive): `hip` (m, -0.45 folded .. +0.28 reaching), `hipV` (m/s), `clamber01` (0 striding
+  .. 1 legs at the end of their stroke), `grip` (1 while the limbs hold a feature), `paceCap` (m/s, 1e9 when
+  free), `brace` (m/s of forward speed lost this frame against a face or to a hold: a thump for sound or camera).
+  For the figure: draw the feet at `st.p` and the hips at standing height + `hip`.
+- *Behaviour that changed without a call changing*: a run across boulders is slower (the old body went up and
+  down them at full speed in one frame each way); a step down of up to 0.73 m is taken in contact; a wall higher
+  than 1.35 m met in a single step stops the body where the old one was lifted onto it.
+- *Tables.* The pure body over P8's bump (1.3 m high, 2.6 m across, flanks to 57 degrees, its own normals),
+  highest the feet come off the ground / time off the ground / slowest pace:
+
+  | | before (P8) | P9 |
+  | --- | --- | --- |
+  | Earth walk 4.2 | stalls on it | 0.00 m, 0 s, 1.7 m/s |
+  | Earth run 7.4 | 1.4 m, 0.7 s | 0.00 m, 0 s, 1.7 m/s |
+  | Mars walk | 1.6 m | 0.00 m, 0 s, 1.4 m/s |
+  | Mars run | 2.3 m | 0.00 m, 0 s, 1.4 m/s |
+  | Moon walk | 3.2 m, 3.6 s | 0.00 m, 0 s, 1.3 m/s |
+  | Moon run | 5.9 m, 5.1 s | 0.00 m, 0 s, 1.35 m/s |
+
+  Through your `stepExplorer` + `scrambleSample` + `collideObstacles` over 62 boulders in 165 m (radius 0.3 to
+  1.3 m, height 0.3 to 1.3 m; `p9/field.mjs`), feet highest / time off the ground / mean speed:
+
+  | | before, 60 Hz | before, 30 Hz | P9, 60 Hz | P9, 30 Hz | P9, 20 Hz |
+  | --- | --- | --- | --- | --- | --- |
+  | Earth walk | 0 m, 4.18 m/s | 0 m | 0 m, 4.00 m/s | 0 m | 0 m |
+  | Earth run | 0 m, 7.28 m/s | 1.14 m, 2.0 s | 0 m, 4.09 m/s | 0 m | 0 m |
+  | Mars walk | 0 m, 4.16 m/s | 0 m | 0 m, 2.71 m/s | 0 m | 0 m |
+  | Mars run | 0 m, 7.16 m/s | 1.13 m, 3.7 s | 0 m, 2.75 m/s | 0 m | 0 m |
+  | Moon walk | 0 m, 4.13 m/s | 0 m | 0.21 m, 0.4 s, 1.90 m/s | 0.20 m | 0.26 m |
+  | Moon run | 0 m, 7.04 m/s | 1.08 m, 4.3 s | 0.21 m, 0.4 s, 1.90 m/s | 0.20 m | 0.24 m |
+
+  (Before, at 60 Hz, the body never left the ground on your profile only because one frame's drop stayed under
+  its 0.28 m reach: it was lifted and dropped 1.3 m in a sixth of a second at full speed, and flew at 30 Hz.)
+  In your `Sim` on the real ground, 8 headings of 25 s from each spawn (`p9/simrun.mjs`), feet highest / time
+  off the ground of 200 s / made good: Moon walk 0.92 m, 2.6 s, 3.14 m/s before; 0.26 m, 0.6 s, 3.11 m/s now.
+  Moon run 0.92 m, 2.6 s, 4.57 before; 0.26 m, 1.1 s, 4.42 now. Mars run 0.11 m, 3.8 s, 5.39 before; 0.03 m,
+  0.2 s, 5.29 now. Mars walk and Earth: 0 before and now, same speed made good.
+
 **P8, for PILOT (read first).**
 - *New storm times (Earth only; every Earth weather time of before is 480 s earlier; no other body moved).* At
   the spawn: fair 0 to 120 s, first drops 140 s, thunderstorm 160 to 320 s (12:04 to 14:37 of the first day;
@@ -1102,6 +1202,13 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+**P9, for PAINTER (read first).** Nothing of yours has to change. New and free to use: the explorer's
+`st.phys.hip` (m: the legs' length now less standing, -0.45 folded to +0.28 reaching down), `clamber01`, `grip`
+and `brace` (see "For PILOT", P9): a figure can crouch onto a rock and put a hand on it from these. Your request
+for leaves as a long thin tumbling mark (aspect 3:1 or more) reached me through the coordinator and is NOT done:
+it is first on the list for the next PHYSICS agent, with softer and more numerous dust walls and spray off the sea
+(there is no kit budget any more, so none of these will be thinned for a count).
 
 Written to be read cold. `physics` is the object PILOT made with `createPhysics` and hands you
 through `world.setPhysics(physics)`; `physics.update` has already run when `world.update` is
