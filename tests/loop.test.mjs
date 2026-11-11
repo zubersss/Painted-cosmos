@@ -113,9 +113,12 @@ test('M1 loop on Earth: walk, jetpack, board, lift off, reach space, return, lan
   assert.ok(moon.distance > 10e3 && moon.distance < 45e3);
 
   // -- come back down ------------------------------------------------------------------------------
-  // Point the nose at the planet, throttle up.
-  play(sim, pad, 6, opts({ each: () => { const a = sim.aimAt('earth'); pad.dx += a.yawDeg * RAD / FEEL.mouseShip * 0.1; pad.dy -= a.pitchDeg * RAD / FEEL.mouseShip * 0.1; } }));
-  assert.ok(Math.abs(sim.aimAt('earth').pitchDeg) < 6, 'nose on the planet');
+  // Point the nose down at the planet (near a body the nose stops at the pitch limit, so the
+  // planet can fill the view but the ship cannot loop), throttle up.
+  play(sim, pad, 6, opts({ each: () => holdPitch(sim, pad, -60) }));
+  assert.ok(Math.abs(sim.info().ship.pitchDeg + 60) < 4, 'nose toward the planet: ' + sim.info().ship.pitchDeg);
+  play(sim, pad, 3, opts({ each: () => { pad.dy += 30; } }));
+  assert.ok(sim.info().ship.pitchDeg >= -SHIP.pitchLimit * 180 / Math.PI - 0.5, 'pitch limit holds in orbit');
   pad.press('KeyW');
   play(sim, pad, 1.2, opts());
   pad.release('KeyW');
