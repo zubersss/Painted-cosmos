@@ -867,7 +867,8 @@ export class Sim {
   }
 
   // Teleport: { body, dir:[x,y,z] | lat, lon (degrees), altitude, hour, ship: bool,
-  //             pitchDeg (ship nose above the horizon), throttle }.
+  //             pitchDeg (ship nose above the horizon), throttle,
+  //             heading, lookPitch (degrees: where the view faces on foot), firstPerson }.
   teleport(o = {}) {
     const body = o.body && BODIES[o.body] ? o.body : this.bodyId;
     let dir = null;
@@ -877,6 +878,19 @@ export class Sim {
       dir = V(Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo));
     }
     this.spawnOn(body, dir, { hour: o.hour, altitude: o.ship ? 0 : o.altitude });
+    if (o.heading != null && !o.ship) {
+      // Face a compass heading on foot (degrees from local north toward east), as a painter's
+      // easel is described (world.getVistas / findBiome: yaw, pitch).
+      const up = norm(this.ex.p);
+      const east = tangent(cross(Y, up), up, V(1, 0, 0));
+      const north = cross(up, east);
+      const a = (o.heading * Math.PI) / 180;
+      const fwd = add(scale(north, Math.cos(a)), scale(east, Math.sin(a)));
+      this.footCam = createFootCamera(fwd, up);
+      this.ex.fwd = tangent(fwd, up);
+      if (o.lookPitch != null) this.footCam.pitch = clamp((o.lookPitch * Math.PI) / 180, CAMERA.pitchMin, CAMERA.pitchMax);
+    }
+    if (o.firstPerson != null && !o.ship) this.footCam.firstPerson = !!o.firstPerson;
     if (o.ship) {
       // Sit in the ship, hovering at the given altitude above the ground.
       const sample = this.sampler(body);

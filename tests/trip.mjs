@@ -7,7 +7,7 @@
 import { RAD, MOUSE_FOOT, parseArgs, startRun, finish } from './browser.mjs';
 
 const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/trip', w: 640, h: 360, query: 'stub=render,world,art' });
-opt.query += '&dynres=0&pointerlock=0&card=0&fresh=1';
+opt.query += '&dynres=0&pointerlock=0&card=0&fresh=1';      // (the reload at the end drops every fresh=1)
 const run = await startRun(opt);
 const { page, check, info, shot, look, gameWait, until, holdPitch, aimShipAt, log } = run;
 const summary = { legs: [], timings: {} };
@@ -142,7 +142,7 @@ try {
   check(saved && saved.bodyId === 'saturn' && saved.state === 'ON_FOOT', 'autosave wrote the visit to Saturn');
   check(i.frames > frames0 - 1, 'one sitting: the page was never reloaded during the trip');
   // (The painted pipeline in software GL can take over 30 s to load: no default time limit.)
-  await page.goto(run.baseUrl + '/index.html?' + opt.query.replace('&fresh=1', ''), { timeout: 600000, waitUntil: 'commit' });
+  await page.goto(run.baseUrl + '/index.html?' + opt.query.replace(/&?fresh=1/g, ''), { timeout: 600000, waitUntil: 'commit' });
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 300000, polling: 200 });
   i = await info();
   check(i.body === 'saturn' && i.state === 'ON_FOOT', 'after a reload the game continues on Saturn: ' + i.body + ' ' + i.state);

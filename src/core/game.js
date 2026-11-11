@@ -22,7 +22,7 @@ export class Game {
     this.explorerModel = explorer; this.shipModel = ship; this.input = input; this.hud = hud;
     this.map = map || null; this.autosave = autosave || null; this.dyn = dyn || null;
     this.showStats = false;
-    this.stats = { frameMs: 16.7, worstMs: 0, worldMs: 0, tris: 0, calls: 0, window: [] };
+    this.stats = { frameMs: 16.7, worstMs: 0, worldMs: 0, worldWindow: [], worldPeakMs: 0, tris: 0, calls: 0, window: [] };
     this.uiNotice = null; this.uiNoticeUntil = 0;
     this._marks = []; this._p = new THREE.Vector3();
     const q = params || new URLSearchParams();
@@ -147,7 +147,12 @@ export class Game {
     // World, mood, paint.
     const tw = performance.now();
     world.update(dt, cam.position, v.active ? v.active.id : null);
-    st0.worldMs += (performance.now() - tw - st0.worldMs) * 0.08;
+    const wms = performance.now() - tw;
+    st0.worldMs += (wms - st0.worldMs) * 0.08;
+    // The worst world.update of the last 90 frames (the budget is a worst frame, not an average).
+    st0.worldWindow.push(wms);
+    if (st0.worldWindow.length > 90) st0.worldWindow.shift();
+    if (wms > st0.worldPeakMs) st0.worldPeakMs = wms;
     // Additive: the weather as eleven 0..1 numbers a painter can use (PHYSICS' `here.sky`:
     // cloud, overcast, haze, fog, dust, wet, snow, rain, snowfall, storm, flash), or null.
     sim.mood.sky = sim.physics && sim.physics.here && sim.physics.here.bodyId ? sim.physics.here.sky || null : null;
@@ -314,7 +319,7 @@ export class Game {
       `frame  ${s.frameMs.toFixed(1)} ms   worst ${worst.toFixed(0)} ms   ${fps.toFixed(0)} fps`,
       `scene  ${k(s.tris)} triangles   ${s.calls} draw calls`,
       `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}`,
-      `world ${s.worldMs.toFixed(1)} ms   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
+      `world ${s.worldMs.toFixed(1)} ms (worst ${Math.max(0, ...s.worldWindow).toFixed(1)})   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
     ].join('\n');
   }
 
@@ -323,7 +328,10 @@ export class Game {
     return {
       ...this.sim.info(), near: this.camera.near, far: this.camera.far,
       marks: this._marks.map((m) => ({ kind: m.kind, label: m.label, x: Math.round(m.x), y: Math.round(m.y), r: Math.round(m.r) })),
-      stats: { frameMs: +s.frameMs.toFixed(1), worldMs: +s.worldMs.toFixed(2), tris: s.tris, calls: s.calls, shown: this.showStats },
+      stats: {
+        frameMs: +s.frameMs.toFixed(1), worldMs: +s.worldMs.toFixed(2), worldWorstMs: +Math.max(0, ...s.worldWindow).toFixed(2),
+        worldPeakMs: +s.worldPeakMs.toFixed(2), tris: s.tris, calls: s.calls, shown: this.showStats,
+      },
       mapOpen: !!(this.map && this.map.open), bookOpen: !!(this.book && this.book.open), uiNotice: this.uiNotice,
       audio: this.audio ? { state: this.audio.state, ready: this.audio.ready, mix: this.audio.debug() } : null,
     };
