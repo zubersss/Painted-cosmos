@@ -85,6 +85,7 @@ function applyPreset(name, dir) {
   if (name === 'orbit') { state.pos.copy(d).multiplyScalar(R * 2.6); state.pitch = -Math.PI / 2 + 0.001; }
   else if (name === 'high') { state.pos.copy(at(0, 0, 420)); state.pitch = -0.5; state.yaw = 0.6; }
   else if (name === 'jet') { state.pos.copy(at(0, -6, 30)); state.pitch = -0.30; state.yaw = num('jyaw', 0.9); }
+  else if (name === 'vista') { state.pos.copy(at(0, 0, 9)); state.pitch = -0.10; state.yaw = num('jyaw', 0.9); }
   else if (name === 'canopy') { state.pos.copy(at(4, 16, 1.6)); state.pitch = 1.05; state.yaw = 0.4; }
   else if (name === 'trees') { state.pos.copy(at(0, 2, 1.7)); state.pitch = 0.06; state.yaw = 0.2; }
   else { state.pos.copy(at(0, 0, 1.7)); state.pitch = -0.04; state.yaw = 0; }   // 'stream' / default
@@ -137,7 +138,7 @@ function applyTime() { world.setTime(bodyId, state.time); $('time').value = stat
 
 function setBody(id) {
   bodyId = id; $('body').value = id; fillBiomes();
-  gotoBiome(P.get('biome') || world.getBiomes(bodyId)[0].id, P.get('cam') || 'stream');
+  gotoBiome(P.get('biome') || null, P.get('cam') || 'stream');
   const here = world.sampleSurface(bodyId, state.pos.clone().normalize());
   $('biome').value = here.biomeId;
   applyTime();

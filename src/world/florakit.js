@@ -280,3 +280,87 @@ export function flowerGeometry(seed) {
   }
   return B.build();
 }
+
+// ---------------------------------------------------------------------------------------------
+// Kits for the other worlds. Same contract: (seed, lod) -> geometry, lod 0 near, 1 mid.
+
+// A fungal tower: a pale leaning stalk under a broad drooping cap, with a smaller cap or two.
+export function fungusGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 12 + rnd() * 5, lean = (rnd() - 0.5) * 2.5, lz = (rnd() - 0.5) * 1.6;
+  const segs = lod ? 2 : 6, sides = lod ? 4 : 7, pts = [], rad = [];
+  for (let i = 0; i <= segs; i++) { const t = i / segs; pts.push(V(lean * t * t + (lod ? 0 : (rnd() - 0.5) * 0.12), t * H, lz * t * t)); rad.push((0.62 - 0.26 * t) * (i === 0 ? 1.4 : 1) * (0.9 + rnd() * 0.2)); }
+  tube(B, pts, rad, sides, { part: 0, swayK: 0.15, swayH: H, hash: rnd() });
+  const top = pts[segs], cc = V(top.x, H * 0.9, top.z);
+  const r = 4.2 + rnd() * 1.6;
+  blob(B, V(top.x, H + 0.4, top.z), r, r * 0.34, r * (0.9 + rnd() * 0.2), rnd, { massC: cc, massK: 0.2, sway: 0.2, shade0: 0.0, shadeK: 0.9, droop: 0.55, noise: 0.14, flatBottom: 0.5, uvScale: 4 });
+  if (!lod) {
+    for (let k = 0; k < 2; k++) {
+      const t = 0.45 + 0.2 * k + rnd() * 0.08, f = t * segs, i = Math.min(segs - 1, Math.floor(f)), p = pts[i].clone().lerp(pts[i + 1], f - i);
+      const a = rnd() * 6.283, rr = 1.4 + rnd() * 0.9;
+      blob(B, V(p.x + Math.cos(a) * 1.3, p.y, p.z + Math.sin(a) * 1.3), rr, rr * 0.32, rr, rnd, { massC: cc, massK: 0.2, sway: 0.2, shade0: 0.15, shadeK: 0.9, droop: 0.5, noise: 0.14, flatBottom: 0.5, uvScale: 2 });
+    }
+  }
+  return B.build();
+}
+
+// A crystal cluster: a few tilted, tapering prisms (thin = reed-like needles).
+export function crystalGeometry(seed, lod, thin) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = lod ? 2 : (thin ? 5 : 4) + ((rnd() * 2) | 0);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * 6.283, tilt = (i === 0 ? 0.08 : 0.2 + rnd() * 0.5) * (thin ? 0.35 : 1);
+    const H = (thin ? 5 + rnd() * 3.5 : 2.6 + rnd() * 3.4) * (i === 0 ? 1.25 : 0.8), r0 = thin ? 0.09 + rnd() * 0.06 : 0.38 + rnd() * 0.34;
+    const off = i === 0 ? 0 : (thin ? 0.4 : 0.6) + rnd() * 0.5;
+    const bx = Math.cos(a) * off, bz = Math.sin(a) * off, dx = Math.cos(a) * Math.sin(tilt), dz = Math.sin(a) * Math.sin(tilt), dy = Math.cos(tilt);
+    const pts = [V(bx, -0.2, bz), V(bx + dx * H * 0.72, dy * H * 0.72, bz + dz * H * 0.72), V(bx + dx * H, dy * H, bz + dz * H)];
+    tube(B, pts, [r0, r0 * 0.82, 0.02], lod ? 4 : 5, { part: 4, shade: 0.25 + 0.5 * rnd(), sway0: 0, hash: rnd() });
+  }
+  return B.build();
+}
+
+// A pinnacle of rock or ice: one tall tapering form, wind-carved.
+export function spireGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 9 + rnd() * 6, r = 2.0 + rnd() * 1.0;
+  blob(B, V((rnd() - 0.5) * 0.6, H * 0.46, (rnd() - 0.5) * 0.6), r, H * 0.56, r * (0.8 + rnd() * 0.4), rnd, { detail: lod ? 1 : 2, part: 4, noise: 0.24, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: 0.86, flatBottom: 0.2, uvScale: 2 });
+  if (!lod) blob(B, V(1.6 + rnd(), H * 0.16, (rnd() - 0.5) * 2), r * 0.6, H * 0.2, r * 0.6, rnd, { detail: 1, part: 4, noise: 0.25, massK: 0, sway: 0, shade0: 0.2, shadeK: 0.8, taper: 0.8, uvScale: 1 });
+  return B.build();
+}
+
+// Kelp: tall ribbons that sway.
+export function kelpGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = lod ? 3 : 6;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.283 + rnd(), dir = V(Math.cos(a), 0, Math.sin(a)), r0 = rnd() * 0.5;
+    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 7 + rnd() * 5, 0.32 + rnd() * 0.2, 0.10 + rnd() * 0.16, rnd, { segs: lod ? 3 : 6, leaf: 1, sway: 1.6 });
+  }
+  return B.build();
+}
+
+// A frozen wave: a crest of ice that leans over and curls.
+export function waveGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 5 + rnd() * 3, base = B.count;
+  blob(B, V(0, H * 0.5, 0), 3.2 + rnd(), H * 0.55, 1.3 + rnd() * 0.5, rnd, { detail: lod ? 1 : 2, part: 4, noise: 0.2, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: 0.55, flatBottom: 0.2, uvScale: 2 });
+  // curl: shear the upper part forward and down
+  for (let i = base; i < B.count; i++) { const y = B.p[i * 3 + 1] / H; if (y > 0) { B.p[i * 3 + 2] += y * y * 2.6; B.p[i * 3 + 1] -= Math.max(0, y - 0.7) * 2.2; } }
+  return B.build();
+}
+
+// A small crystal shard cluster for the undergrowth.
+export function shardGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  for (let i = 0; i < 3; i++) {
+    const a = rnd() * 6.283, tilt = 0.15 + rnd() * 0.6, H = 0.35 + rnd() * 0.55, r0 = 0.07 + rnd() * 0.07, off = i ? 0.12 + rnd() * 0.12 : 0;
+    const bx = Math.cos(a) * off, bz = Math.sin(a) * off, dx = Math.cos(a) * Math.sin(tilt), dz = Math.sin(a) * Math.sin(tilt), dy = Math.cos(tilt);
+    tube(B, [V(bx, -0.05, bz), V(bx + dx * H * 0.7, dy * H * 0.7, bz + dz * H * 0.7), V(bx + dx * H, dy * H, bz + dz * H)], [r0, r0 * 0.8, 0.008], 4, { part: 4, shade: 0.3 + 0.4 * rnd(), hash: rnd() });
+  }
+  return B.build();
+}
+
+export const TALL_KITS = {
+  broadleaf: birchGeometry, conifer: pineGeometry, fungus: fungusGeometry,
+  crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: spireGeometry, kelp: kelpGeometry, wave: waveGeometry,
+};

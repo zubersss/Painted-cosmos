@@ -13,6 +13,7 @@ import { PlanetTerrain } from './terrain.js';
 import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
+import { makeRing, makeCloudShell } from './orbit.js';
 import { makeBodyUniforms, SHEET } from '../render/shared.js';
 import { defaultBodyUniforms } from '../render/materials.js';
 
@@ -41,15 +42,23 @@ export function createWorld(scene) {
     bodies.set(id, root);
     const bu = makeBodyUniforms();
     const look = getLook(id);
+    if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }
     const st = {
-      id, root, bu, look, body: BODIES[id],
+      id, root, bu, look, body: BODIES[id], clouds: null, cloudR: 0,
       terrain: new PlanetTerrain(id, root, bu, skyU),
       flora: null,
       forcedTime: null,
       camLocal: new THREE.Vector3(0, BODIES[id].radius * 4, 0),
       found: new Set(),
     };
-    if (id === 'earth') st.flora = new Flora(id, root, bu);
+    if (look.flora) st.flora = new Flora(id, root, bu);
+    if (look.rings) root.add(makeRing(bu, BODIES[id].radius, look.rings));
+    if (look.cloud > 0.05 && BODIES[id].atmosphereHeight > 0) {
+      // seen from outside, the deck hugs the planet
+      st.cloudR = BODIES[id].radius + Math.min(BODIES[id].atmosphereHeight * 0.22, BODIES[id].radius * 0.045) + 60;
+      st.clouds = makeCloudShell(bu, st.cloudR, look);
+      root.add(st.clouds);
+    }
     state.set(id, st);
   }
 
@@ -107,6 +116,13 @@ export function createWorld(scene) {
         bu.uSunDirL.value.copy(bu.uSunDirW.value).applyQuaternion(_q.clone().invert());
       }
       const isActive = st === active;
+      if (st.clouds) {
+        // the deck gathers as you leave the atmosphere and thins away as you come down through it
+        const a01 = THREE.MathUtils.smoothstep(st.camLocal.length() - st.body.radius, st.body.atmosphereHeight * 0.6, st.body.atmosphereHeight * 1.6);
+        st.clouds.visible = a01 > 0.02;
+        const cu = st.clouds.material.uniforms.uCloud.value;
+        cu.x = st.look.cloud * a01; cu.y = Math.max(900, st.body.atmosphereHeight * 3.2);
+      }
       st.terrain.detail = isActive;
       // one shared time budget per frame: terrain first, flora with what is left
       const tb = performance.now();
@@ -115,7 +131,7 @@ export function createWorld(scene) {
       if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, budgetMs - (performance.now() - tb)) : 0);
       if (!isActive) {
         // far bodies: plain daylight, no haze
-        bu.uFog.value.set(1e-7, 6, 0, 0);
+        bu.uFog.value.set(1e-7, 6, 0, 1);
         bu.uDayness.value = 1;
       }
     }
@@ -123,7 +139,12 @@ export function createWorld(scene) {
       const st = active, bu = st.bu, look = st.look, body = st.body;
       const camR = st.camLocal.length();
       _up.copy(st.camLocal).normalize();
-      const ground = sampleSurfacePure(st.id, _up.x, _up.y, _up.z).radius;
+      const here = sampleSurfacePure(st.id, _up.x, _up.y, _up.z);
+      const ground = here.radius;
+      // some biomes are mistier than others: blend the visibility by what is under the camera
+      let mist = 0;
+      for (const b of look.biomes) { const w = here.biomeWeights[b.id]; if (w) mist += w * (b.mist || 1); }
+      mist = mist || 1;
       const alt = camR - ground;
       const atmH = Math.max(1, body.atmosphereHeight || 1);
       const space01 = body.atmosphereHeight > 0 ? THREE.MathUtils.smoothstep(camR - body.radius, atmH * 0.55, atmH * 1.15) : 1;
@@ -140,8 +161,8 @@ export function createWorld(scene) {
       const dayness = 1 - wNight;
       bu.uDayness.value = dayness;
       const v0 = look.visibility[0], v1 = look.visibility[1];
-      const vis = v0 + (v1 - v0) * THREE.MathUtils.smoothstep(alt, 6, 160) + 40000 * space01;
-      bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, 0);
+      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) + 40000 * space01;
+      bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, space01);
       // sky
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
       skyU.uCamL.value.copy(st.camLocal);
@@ -200,9 +221,9 @@ export function createWorld(scene) {
       const s = S.sites.find((x) => x.b === bi);
       return s ? { unitDir: { x: s.x, y: s.y, z: s.z } } : null;
     },
-    get _flora() { return state.get('earth').flora; },
-    get _prof() { return Object.assign({}, prof, state.get('earth').flora.prof); },
-    _profReset() { prof.terrain = 0; const p = state.get('earth').flora.prof; p.wanted = p.build = p.retier = 0; },
+    get _flora() { const st = state.get(lastActive || 'earth'); return st && st.flora; },
+    get _prof() { return Object.assign({}, prof, this._flora ? this._flora.prof : {}); },
+    _profReset() { prof.terrain = 0; const fl = this._flora; if (fl) { const p = fl.prof; p.wanted = p.build = p.retier = 0; } },
     bodyUniforms(bodyId) { const st = state.get(bodyId); return st ? st.bu : null; },
     // Trunks and boulders within `radius` metres of a point (not part of sampleSurface):
     // -> [{ unitDir, radius, height, kind }]

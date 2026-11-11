@@ -29,7 +29,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
-    uFog: b.uFog, uDayness: b.uDayness,
+    uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB,
   }, own || {});
 }
 
@@ -54,6 +54,7 @@ varying vec3 vView;
 varying vec4 vCol;
 varying vec3 vCol2;
 varying vec4 vPar;
+varying vec3 vUpV;
 void main() {
   float d = distance(position, uCamLocal);
   float m = clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0);
@@ -62,6 +63,7 @@ void main() {
   vAnch = p + uAnchor;
   vNL = normal;
   vNV = normalMatrix * normal;
+  vUpV = normalMatrix * normalize(vBody);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vView = mv.xyz;
   vCol = aColor; vCol2 = aColor2.rgb; vPar = aParams;
@@ -79,7 +81,10 @@ varying vec3 vNL;
 varying vec3 vView;
 varying vec4 vCol;
 varying vec3 vCol2;
+uniform vec3 uHueA;
+uniform vec3 uHueB;
 varying vec4 vPar;
+varying vec3 vUpV;
 void main() {
   #include <logdepthbuf_fragment>
   vec3 nV = normalize(vNV);
@@ -105,11 +110,15 @@ void main() {
   float flick = smoothstep(0.58, 0.68, st2.r * 0.8 + st.b * 0.25) * near;
   d += flick * 0.75;
   // neighbouring pigments run into each other: drifts of green and of warm earth
-  vec3 hueA = c * vec3(0.84, 0.99, 0.80);
-  vec3 hueB = c * vec3(1.0, 0.90, 0.80);
+  vec3 hueA = c * uHueA;
+  vec3 hueB = c * uHueB;
   c = mix(c, hueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
   c = mix(c, hueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * mid);
   c = pcDensity(c, d);
+
+  // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks
+  float crack = (1.0 - smoothstep(0.03, 0.11, st.a)) * near + (1.0 - smoothstep(0.02, 0.08, pcTri(vAnch, nL, 1.0 / 32.0).a)) * mid;
+  c = pcDensity(c, 1.0 + crack * vPar.w * 2.6);
 
   // light in soft value steps; shadows are glazes
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
@@ -126,7 +135,11 @@ void main() {
 
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
-  float wet = max(vPar.y, f * 0.9);
+  // from space the limb of the planet thins into its haze, toward bare paper
+  vec3 upV = normalize(vUpV);
+  float limb = pow(1.0 - clamp(dot(upV, normalize(-vView)), 0.0, 1.0), 2.5) * uFog.w;
+  c = mix(c, mix(uHaze, vec3(1.0), 0.4), limb);
+  float wet = max(max(vPar.y, f * 0.9), limb);
   pcWrite(c, wet, nV, -vView.z, 1.0);
 }
 `;
@@ -150,16 +163,21 @@ export function makeTerrainMaterial(bodyU) {
 const WATER_VERT = /* glsl */`
 ${VERT_PARS}
 attribute float aDepth;
+attribute vec4 aLiq;      // liquid wash colour, and how much it mirrors
+attribute vec4 aLiqP;     // x glow (lava), y cloud (a sea of cloud)
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 varying vec3 vBody;
 varying vec3 vToCam;
 varying vec3 vView;
 varying float vDepth;
+varying vec4 vLiq;
+varying vec2 vLiqP;
 void main() {
   vBody = position + uOrigin;
   vToCam = uCamLocal - position;
   vDepth = aDepth;
+  vLiq = aLiq; vLiqP = aLiqP.xy;
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
@@ -182,6 +200,8 @@ varying vec3 vBody;
 varying vec3 vToCam;
 varying vec3 vView;
 varying float vDepth;
+varying vec4 vLiq;
+varying vec2 vLiqP;
 
 // Mirror the painting itself: march the reflected ray through last frame's depth.
 // Returns uv and a confidence.
@@ -235,27 +255,38 @@ void main() {
   vec3 hit = pcReflect(vView, Rv);
   vec3 refl = texture(uPrevTex, hit.xy).rgb;
   c = mix(c, refl, hit.z * uPrevOn);
-  // water takes a little of its own colour and deepens the mirror
-  c = pcDensity(c * vec3(0.93, 0.965, 0.955), 1.12 + (r3.g - 0.5) * 0.35);
+  // the liquid's own wash: water takes a little of it and deepens the mirror; matte liquids
+  // (lava, acid, a sea of cloud) are mostly their own colour
+  float mirror = vLiq.a;
+  vec3 own = pcDensity(vLiq.rgb, 1.0 + (r3.g - 0.5) * 1.3 + (r1.r - 0.5) * 0.6);
+  // lava: paper-bright where it runs hot, dark crust drifting on it
+  vec4 r4 = texture(uNoise3D, vBody / 9.0 + drift * 0.4);
+  own = mix(own, vec3(1.0, 0.975, 0.86), vLiqP.x * smoothstep(0.50, 0.72, r4.r));
+  own = mix(own, vec3(0.30, 0.22, 0.24), vLiqP.x * smoothstep(0.56, 0.70, r4.g + (r2.b - 0.5) * 0.3));
+  // cloud sea: bare-paper billows with soft shaded hollows
+  vec4 r5 = texture(uNoise3D, vBody / 47.0 + drift * 0.2);
+  own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));
+  own = mix(own, own * uGlaze, vLiqP.y * (1.0 - smoothstep(0.30, 0.52, r5.g)) * 0.6);
+  c = mix(own, pcDensity(c * mix(vec3(1.0), vLiq.rgb, 0.35), 1.12 + (r3.g - 0.5) * 0.35), mirror);
 
   // horizontal strokes of reflected sky where the surface is ruffled
   float ruf = smoothstep(0.585, 0.66, r1.b * 0.55 + r2.g * 0.45);
-  c = mix(c, skyc, ruf * 0.55);
+  c = mix(c, skyc, ruf * 0.55 * mirror);
 
   // the bed shows through where the water is shallow or seen from above
   float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
   float shallow = 1.0 - smoothstep(0.02, 0.42, vDepth);
   vec3 bed = pcDensity(uBed, 1.0 + (r3.b - 0.5) * 0.8);
-  c = mix(c, bed * mix(vec3(1.0), c, 0.45), clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9));
+  c = mix(c, bed * mix(vec3(1.0), c, 0.45), clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
   c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDepth)) * 0.35);
   // bare-paper glints: broken dashes where ripples catch the light
   float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDepth) * uDayness;
-  glint *= 1.0 - smoothstep(40.0, 120.0, dist);
+  glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y);
   c = mix(c, vec3(1.0), glint);
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
-  pcWrite(c, 0.7, normalize(normalMatrix * up), -vView.z, 2.0);
+  pcWrite(c, mix(0.7, 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
 `;
 
@@ -287,8 +318,10 @@ attribute vec4 aData;     // x sway, y part, z inner shade, w blob hash
 attribute vec3 aMass;     // soft "mass" normal of the whole crown
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
 #ifdef PC_FAR
-  attribute vec2 aInst2;  // species (0 birch, 1 pine, 2 autumn birch)
+  attribute vec2 aInst2;  // species index into the far tables
   varying float vSpecies;
+  uniform float uFarTaper[8];
+  uniform float uFarTrunk[8];
 #endif
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
@@ -329,8 +362,11 @@ void main() {
   vec3 lp = position;
   #ifdef PC_FAR
     vSpecies = aInst2.x;
-    float pine = 1.0 - step(0.5, abs(aInst2.x - 1.0));
-    lp.xz *= 1.0 - pine * 0.80 * uv.y * step(0.5, aData.y);   // pines taper to a point
+    int fsi = int(aInst2.x + 0.5);
+    float crown = step(0.5, aData.y);
+    lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;                 // pines, spires: taper to a point
+    // rock-like kinds have no trunk: the form stands on the ground
+    lp = mix(lp * mix(uFarTrunk[fsi], 1.0, crown), vec3(lp.x * 1.5, (lp.y - 0.30) * 1.45, lp.z * 1.5), crown * (1.0 - uFarTrunk[fsi]));
   #endif
   lp += pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);
   vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
@@ -360,11 +396,11 @@ uniform vec4 uLeafP;   // raggedness, sky holes, dab scale, wetness
 uniform vec3 uAccent;
 uniform float uCanopy;
 #ifdef PC_FAR
-  uniform vec3 uFarA[3];
-  uniform vec3 uFarB[3];
-  uniform vec3 uFarC[3];
-  uniform vec3 uFarBarkA[3];
-  uniform vec3 uFarBarkB[3];
+  uniform vec3 uFarA[8];
+  uniform vec3 uFarB[8];
+  uniform vec3 uFarC[8];
+  uniform vec3 uFarBarkA[8];
+  uniform vec3 uFarBarkB[8];
   varying float vSpecies;
 #endif
 varying vec3 vBody;
@@ -520,9 +556,12 @@ export function makePropMaterial(bodyU, opts = {}) {
   if (opts.far) {
     // far trees of every species share one mesh: per-instance species picks the washes
     defines.PC_FAR = 1;
-    const arr = (k) => ({ value: opts.far.map((f) => new THREE.Vector3().fromArray(f[k])) });
+    const pad = (a) => { while (a.length < 8) a.push(a[a.length - 1].clone ? a[a.length - 1].clone() : a[a.length - 1]); return a; };
+    const arr = (k) => ({ value: pad(opts.far.map((f) => new THREE.Vector3().fromArray(f[k]))) });
     own.uFarA = arr('leafA'); own.uFarB = arr('leafB'); own.uFarC = arr('leafC');
     own.uFarBarkA = arr('barkA'); own.uFarBarkB = arr('barkB');
+    own.uFarTaper = { value: pad(opts.far.map((f) => f.taper || 0)) };
+    own.uFarTrunk = { value: pad(opts.far.map((f) => (f.trunk ? 1 : 0))) };
   }
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),

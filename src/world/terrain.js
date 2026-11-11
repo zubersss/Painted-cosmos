@@ -106,6 +106,8 @@ export class PlanetTerrain {
       const wg = new THREE.BufferGeometry();
       wg.setAttribute('position', new THREE.BufferAttribute(d.water.positions, 3));
       wg.setAttribute('aDepth', new THREE.BufferAttribute(d.water.depth, 1));
+      wg.setAttribute('aLiq', new THREE.BufferAttribute(d.water.liq, 4, true));
+      wg.setAttribute('aLiqP', new THREE.BufferAttribute(d.water.liqP, 4, true));
       wg.setIndex(new THREE.BufferAttribute(d.water.indices, 1));
       wg.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
       const wm = new THREE.Mesh(wg, this.waterMaterial);

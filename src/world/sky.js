@@ -103,12 +103,17 @@ void main() {
     vec3 dw = normalize(vDirW);
     vec4 s1 = texture(uNoise3D, dw * 0.9 + 0.4);
     vec4 s2 = texture(uNoise3D, dw * 2.9);
-    vec3 sp = mix(vec3(0.19, 0.23, 0.42), vec3(0.30, 0.33, 0.44), s1.r);
-    sp = dens(sp, 1.0 + (s2.g - 0.5) * 1.3 + (s1.b - 0.5) * 0.8);
-    vec4 st = texture(uNoise3D, dw * 13.0);
-    vec4 st2 = texture(uNoise3D, dw * 31.0 + 0.5);
-    float star = smoothstep(0.80, 0.83, st.b * 0.55 + st2.r * 0.45);
-    sp = mix(sp, vec3(1.0), star);
+    // deep indigo and Payne's grey laid wet, with salt blooms and spattered masking-fluid stars
+    vec3 sp = mix(vec3(0.21, 0.25, 0.46), vec3(0.33, 0.36, 0.50), s1.r);
+    sp = mix(sp, vec3(0.40, 0.33, 0.56), smoothstep(0.55, 0.80, s1.g) * 0.6);          // a violet nebula drift
+    sp = dens(sp, 1.0 + (s2.g - 0.5) * 0.9 + (s1.b - 0.5) * 0.7);
+    vec4 sa = texture(uNoise3D, dw * 6.3 + 0.2);
+    float salt = smoothstep(0.66, 0.80, sa.r * 0.6 + s2.b * 0.4);                         // salt: pale crystalline blooms
+    sp = mix(sp, vec3(0.62, 0.66, 0.82), salt * 0.55);
+    vec4 st = texture(uNoise3D, dw * 17.0);
+    vec4 st2 = texture(uNoise3D, dw * 43.0 + 0.5);
+    float star = smoothstep(0.795, 0.815, st.b * 0.55 + st2.r * 0.45) + smoothstep(0.86, 0.88, st.r * 0.5 + st2.g * 0.5);
+    sp = mix(sp, vec3(1.0), clamp(star, 0.0, 1.0));
     float sunS = 1.0 - smoothstep(uAtmo.z * 0.82, uAtmo.z, ang);
     sp = mix(sp, vec3(1.0, 0.985, 0.93), clamp(halo, 0.0, 1.0));
     sp = mix(sp, vec3(1.0), sunS);
@@ -118,7 +123,7 @@ void main() {
     col = mix(col, sp, uAtmo.x);
   }
 
-  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = vec4(0.0, 0.0, 20.0, 0.0);
 }
 `;

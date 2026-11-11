@@ -57,6 +57,8 @@ export function makeBodyUniforms() {
     uHaze: { value: new THREE.Vector3(0.93, 0.955, 0.975) },             // distance fades to this (near paper)
     uFog: { value: new THREE.Vector4(1 / 4000, 5, 1, 0) },               // 1/visibility, bands, max, altitude01
     uDayness: { value: 1 },                                              // 1 day .. 0 night
+    uHueA: { value: new THREE.Vector3(0.84, 0.99, 0.80) },               // the two drifts of neighbouring pigment in ground washes
+    uHueB: { value: new THREE.Vector3(1.0, 0.90, 0.80) },
   };
 }
 

@@ -2,7 +2,7 @@
 // Trees and boulders are not part of sampleSurface; this gives the game their trunks and
 // stones near a point so it can collide with them. It shares the placement cells (and their
 // cache) with the flora renderer, so what you bump into is exactly what is painted.
-import { placeTrees, placeUnder, INST_STRIDE, K_PINE, U_ROCK } from './floraplace.js';
+import { placeTrees, placeUnder, INST_STRIDE, U_ROCK } from './floraplace.js';
 import { getSurface } from './surface.js';
 import { dirToFace } from './cubesphere.js';
 
@@ -49,7 +49,8 @@ const _cells = [];
 export function sampleObstaclesPure(bodyId, dx, dy, dz, radius) {
   const S = getSurface(bodyId);
   const res = [];
-  if (!S.biomes.some((b) => b.terrain === 'forest')) return res;
+  if (!S.hasFlora && !S.biomes.some((b) => b.small)) return res;
+  const specs = (S.look.flora && S.look.flora.tall) || [];
   const il = 1 / Math.hypot(dx, dy, dz), x = dx * il, y = dy * il, z = dz * il;
   const rad = Math.min(60, Math.max(0.5, radius || 3));
   const R = S.R, r2 = (rad / R) * (rad / R) * 1.02;
@@ -63,8 +64,8 @@ export function sampleObstaclesPure(bodyId, dx, dy, dz, radius) {
   for (let i = 0; i < _cells.length; i += 3) {
     const t = treeCell(S, _cells[i], _cells[i + 1], _cells[i + 2]);
     for (let k = 0; k < t.count; k++) {
-      const o = k * INST_STRIDE, sc = t.data[o + 3], pine = t.data[o + 5] === K_PINE;
-      add(t.data, o, (pine ? 0.40 : 0.30) * sc, (pine ? 16 : 11.5) * sc, 'tree');
+      const o = k * INST_STRIDE, sc = t.data[o + 3], sp = specs[t.data[o + 5]], ob = (sp && sp.obs) || [0.3, 10], ks = (sp && sp.scale) || 1;
+      add(t.data, o, ob[0] * sc / ks, ob[1] * sc / ks, 'tree');
     }
   }
   if (rad <= 30) {

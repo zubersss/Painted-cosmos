@@ -12,8 +12,8 @@
 import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
-import { INST_STRIDE, K_BIRCH, K_PINE, K_BIRCH_AUTUMN, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED } from './floraplace.js';
-import { birchGeometry, pineGeometry, farTreeGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry } from './florakit.js';
+import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
+import { TALL_KITS, farTreeGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY } from '../render/shared.js';
@@ -24,6 +24,8 @@ const UNDER_FAR = 60, GRASS_NEAR = 15;
 const RANGE_SCALE = [0.42, 0.82, 1.0];
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
+// the shared far form sized per kit: width, height (metres at instance scale 1), taper
+const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [8, 7.5, 0.5] };
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
@@ -50,31 +52,37 @@ export class Flora {
     this.hidden = false;
     this.prof = { wanted: 0, build: 0, retier: 0 };
 
-    const birchBark = { barkA: [0.975, 0.965, 0.945], barkB: [0.27, 0.24, 0.26] };
-    const birchLeaf = { leafA: [0.76, 0.85, 0.42], leafB: [0.58, 0.75, 0.36], leafC: [0.31, 0.51, 0.37] };
-    const autumnLeaf = { leafA: [0.96, 0.82, 0.32], leafB: [0.93, 0.64, 0.28], leafC: [0.72, 0.42, 0.26] };
-    const pineBark = { barkA: [0.74, 0.54, 0.42], barkB: [0.40, 0.28, 0.25] };
-    const pineLeaf = { leafA: [0.44, 0.62, 0.43], leafB: [0.31, 0.51, 0.44], leafC: [0.17, 0.28, 0.35] };
-    const birchP = { barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10 };
+    this.bodyUniforms = bodyUniforms;
+    this.look = this.S.look.flora || { tall: [], under: null };
+    this.ready = false;
+  }
+
+  // Kits and materials are made the first time the body is visited.
+  _init() {
+    this.ready = true;
+    const bodyUniforms = this.bodyUniforms, L = this.look;
+    this.species = L.tall.map((sp, i) => {
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double });
+      const gen = TALL_KITS[sp.kit];
+      const fd = sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit];
+      return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
+    });
+    const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
+    const sh = U.shard || U.rock;
     this.mats = {
-      birch: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch' }, birchBark, birchLeaf, birchP)),
-      birchAutumn: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch-autumn' }, birchBark, autumnLeaf, birchP)),
-      pine: makePropMaterial(bodyUniforms, Object.assign({ name: 'pine', barkP: [0.50, 1, 0.9, 0.6], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.05 }, pineBark, pineLeaf)),
-      far: makePropMaterial(bodyUniforms, {
+      far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
-        far: [Object.assign({}, birchBark, birchLeaf), Object.assign({}, pineBark, pineLeaf), Object.assign({}, birchBark, autumnLeaf)],
-      }),
-      under: makePropMaterial(bodyUniforms, { name: 'under', leafA: [0.80, 0.85, 0.38], leafB: [0.54, 0.71, 0.31], leafC: [0.35, 0.51, 0.31], accent: [0.86, 0.29, 0.17], wind: 0.07, doubleSide: true }),
-      bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: [0.64, 0.77, 0.37], leafB: [0.45, 0.63, 0.36], leafC: [0.24, 0.41, 0.36], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04 }),
-      rock: makePropMaterial(bodyUniforms, { name: 'rock', barkA: [0.80, 0.79, 0.83], barkB: [0.47, 0.45, 0.55], wind: 0 }),
+        far: L.tall.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' })),
+      }) : null,
+      under: makePropMaterial(bodyUniforms, { name: 'under', leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true }),
+      bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04 }),
+      rock: makePropMaterial(bodyUniforms, { name: 'rock', barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
+      shard: makePropMaterial(bodyUniforms, { name: 'shard', barkA: sh[0], barkB: sh[1], wind: 0 }),
     };
-    // geometry kits, generated once
     this.kit = {
-      birch0: [birchGeometry(11, 0), birchGeometry(12, 0)], birch1: birchGeometry(13, 1),
-      pine0: [pineGeometry(21, 0), pineGeometry(22, 0)], pine1: pineGeometry(23, 1),
       far: farTreeGeometry(5),
       grass: grassGeometry(31), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51),
-      rock: rockGeometry(61), flower: flowerGeometry(71),
+      rock: rockGeometry(61), flower: flowerGeometry(71), shard: shardGeometry(91),
     };
   }
 
@@ -148,11 +156,9 @@ export class Flora {
       chunk.rel[i * 3] = _p.x; chunk.rel[i * 3 + 1] = _p.y; chunk.rel[i * 3 + 2] = _p.z;
       if (chunk.kind === 'far') add('2', i, this.kit.far, this.mats.far, true);
       else {
-        const kind = d[o + 5], v = d[o + 6] % 2;
-        const pine = kind === K_PINE;
-        const mat = pine ? this.mats.pine : kind === K_BIRCH_AUTUMN ? this.mats.birchAutumn : this.mats.birch;
-        add('0:' + kind + ':' + v, i, (pine ? this.kit.pine0 : this.kit.birch0)[v], mat);
-        add('1:' + kind, i, pine ? this.kit.pine1 : this.kit.birch1, mat);
+        const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
+        add('0:' + kind + ':' + v, i, sp.geo0[v], sp.mat);
+        add('1:' + kind, i, sp.geo1, sp.mat);
       }
     }
     chunk.groups = Object.values(groups);
@@ -198,9 +204,9 @@ export class Flora {
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
         if (g.far) {
           // the unit far tree: size it to the species; thinned ones stand in for three
-          const pine = d[o + 5] === K_PINE;
+          const fd = this.species[d[o + 5]].far;
           const big = t === 3 ? 1.5 : 1;
-          const sxz = (pine ? 14.5 : 13.5) * big, sy = (pine ? 16.5 : 11.8) * (t === 3 ? 1.15 : 1);
+          const sxz = fd[0] * big, sy = fd[1] * (t === 3 ? 1.15 : 1);
           for (let q = 0; q < 4; q++) { im[wo + q] = mat[mo + q] * sxz; im[wo + 4 + q] = mat[mo + 4 + q] * sy; im[wo + 8 + q] = mat[mo + 8 + q] * sxz; im[wo + 12 + q] = mat[mo + 12 + q]; }
           ib[w * 2] = d[o + 5]; ib[w * 2 + 1] = 0;
         } else {
@@ -230,7 +236,7 @@ export class Flora {
       const t = underCell(this.S, chunk.face, chunk.ix, chunk.iy);
       n = t.count; d = t.data;
     }
-    const lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [] };
+    const lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [], shard: [] };
     const grass = chunk.kind === 'under';
     for (let i = 0; i < n; i++) {
       const o = i * INST_STRIDE, kind = d[o + 5];
@@ -241,6 +247,7 @@ export class Flora {
       else if (kind === U_FLOWER) lists.flower.push(i);
       else if (kind === U_BUSH) lists.bush.push(i);
       else if (kind === U_ROCK || kind === U_STONE) lists.rock.push(i);
+      else if (kind === U_SHARD) lists.shard.push(i);
     }
     const make = (list, geo, mat, lod, near, skipLow) => {
       if (!list.length) return;
@@ -272,6 +279,7 @@ export class Flora {
     make(lists.flower, this.kit.flower, this.mats.under, [0, UNDER_FAR * 0.8, 0.5, 0.75], 0);
     make(lists.bush, this.kit.bush, this.mats.bush, [0, UNDER_FAR, 0.3, 0.8], 0, true);
     make(lists.rock, this.kit.rock, this.mats.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
+    make(lists.shard, this.kit.shard, this.mats.shard, [0, UNDER_FAR, 0.3, 0.85], 0);
   }
 
   _disposeChunk(chunk) {
@@ -324,6 +332,7 @@ export class Flora {
     const show = active && alt < 2500;
     this.group.visible = show && !this.hidden;
     if (!show) return;
+    if (!this.ready) this._init();
     const k = this.rangeScale;
     const t0 = performance.now();
     const prof = this.prof;
@@ -335,8 +344,10 @@ export class Flora {
     }
     if (this.lastTreeEval.distanceTo(camLocal) > 20) {
       this.lastTreeEval.copy(camLocal);
-      this._wanted(TREE_LEVEL, this.treeSize, T1 * k * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
-      this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * k * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
+      if (this.species.length) {
+        this._wanted(TREE_LEVEL, this.treeSize, T1 * k * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
+        this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * k * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
+      }
       this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
     }
     if (this.lastUnderEval.distanceTo(camLocal) > 8) {

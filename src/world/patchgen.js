@@ -37,7 +37,8 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const _col = new Float32Array(E * E * 10);
+const CS = 16;   // floats kept per sample: wash, far wash, parameters, liquid look
+const _col = new Float32Array(E * E * CS);
 let _s = null;
 
 function b8(v) { v = v * 255 + 0.5; return v < 0 ? 0 : v > 255 ? 255 : v | 0; }
@@ -70,10 +71,11 @@ export function stepPatch(job, deadline) {
       if (inner) {
         if (s.h < minH) minH = s.h; if (s.h > maxH) maxH = s.h;
         if (s.lq !== NOLQ && s.lq > s.h - 0.5) anyWater = true;
-        const c = k * 10;
+        const c = k * CS;
         _col[c] = s.r; _col[c + 1] = s.g; _col[c + 2] = s.b;
         _col[c + 3] = s.r2; _col[c + 4] = s.g2; _col[c + 5] = s.b2;
         _col[c + 6] = s.dry; _col[c + 7] = s.wet; _col[c + 8] = s.canopy; _col[c + 9] = s.aux;
+        _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud;
       }
     }
   }
@@ -108,7 +110,7 @@ export function stepPatch(job, deadline) {
         mor[o + 1] = (_py[k1] + _py[k2]) * 0.5 - _py[k];
         mor[o + 2] = (_pz[k1] + _pz[k2]) * 0.5 - _pz[k];
       }
-      const c = k * 10, q = (j * V + i) * 4;
+      const c = k * CS, q = (j * V + i) * 4;
       col[q] = b8(_col[c]); col[q + 1] = b8(_col[c + 1]); col[q + 2] = b8(_col[c + 2]); col[q + 3] = 255;
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + 9]);
@@ -135,6 +137,7 @@ export function stepPatch(job, deadline) {
   let water = null;
   if (anyWater) {
     const wpos = new Float32Array(V * V * 3), wdep = new Float32Array(V * V);
+    const wliq = new Uint8Array(V * V * 4), wlp = new Uint8Array(V * V * 4);
     for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
       const k = (j + 1) * E + (i + 1), o = (j * V + i) * 3;
       const h = _hh[k], lq = _lq[k];
@@ -143,6 +146,9 @@ export function stepPatch(job, deadline) {
       const sc = (R + hw) / (R + h);
       wpos[o] = _px[k] * sc - ox; wpos[o + 1] = _py[k] * sc - oy; wpos[o + 2] = _pz[k] * sc - oz;
       wdep[j * V + i] = has ? lq - h : -1.5;
+      const c = k * CS, q = (j * V + i) * 4;
+      wliq[q] = b8(_col[c + 10]); wliq[q + 1] = b8(_col[c + 11]); wliq[q + 2] = b8(_col[c + 12]); wliq[q + 3] = b8(_col[c + 13]);
+      wlp[q] = b8(_col[c + 14]); wlp[q + 1] = b8(_col[c + 15]);
     }
     const widx = [];
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -150,7 +156,7 @@ export function stepPatch(job, deadline) {
       if (wdep[a] > -0.45 || wdep[b] > -0.45 || wdep[c] > -0.45 || wdep[d] > -0.45) widx.push(a, b, d, a, d, c);
     }
     // thin water (a brook) is left to the terrain's far colour on coarse patches
-    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, indices: new Uint16Array(widx) };
+    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, liq: wliq, liqP: wlp, indices: new Uint16Array(widx) };
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,

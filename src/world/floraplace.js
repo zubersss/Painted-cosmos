@@ -7,7 +7,8 @@ import { hash3i, smoothstep, clamp } from './noise.js';
 
 // kinds
 export const K_BIRCH = 0, K_PINE = 1, K_BIRCH_AUTUMN = 2;
-export const U_GRASS = 0, U_FERN = 1, U_BUSH = 2, U_ROCK = 3, U_FLOWER = 4, U_STONE = 5, U_REED = 6;
+export const U_GRASS = 0, U_FERN = 1, U_BUSH = 2, U_ROCK = 3, U_FLOWER = 4, U_STONE = 5, U_REED = 6, U_SHARD = 7;
+const SMALL = [['grass', U_GRASS], ['fern', U_FERN], ['bush', U_BUSH], ['rock', U_ROCK], ['flower', U_FLOWER], ['reed', U_REED], ['shard', U_SHARD]];
 
 const STRIDE = 12;   // x y z (body-local position), scale, yaw, kind, variant, seed, hue, value, canopy, lean
 export const INST_STRIDE = STRIDE;
@@ -40,15 +41,16 @@ export function placeTrees(S, face, level, ix, iy, grid) {
         if (r3 >= 0.62 * (0.14 + 0.86 * clump)) continue;
         S.sample(x, y, z, s, true);
         if (r3 >= 0.62 * (0.14 + 0.86 * clump) * s.trees) continue;
-        if (s.lq !== NOLQ && s.lq > s.h - 0.15) continue;
         const bi = S.biomes[s.top];
-        if (bi.terrain !== 'forest') continue;
-        // birches keep to their own groups: the species choice follows the clump field too
+        if (!bi.tall) continue;
+        if (!bi.tallWet && s.lq !== NOLQ && s.lq > s.h - 0.15) continue;
+        // each species keeps to its own groups: the choice follows the clump field too
         const grove = n3(x * fd + 21.0, y * fd + 4.0, z * fd - 13.0);
-        const birch = r4 < clamp(s.birch + grove * 0.55, 0.04, 0.97);
-        const kind = birch ? (bi.autumn ? K_BIRCH_AUTUMN : K_BIRCH) : K_PINE;
+        const birch = r4 < clamp(s.birch + grove * 0.55, bi.tall[0] === bi.tall[1] ? 1 : 0.04, bi.tall[0] === bi.tall[1] ? 1 : 0.97);
+        const kind = birch ? bi.tall[0] : bi.tall[1];
+        const spec = S.look.flora.tall[kind];
         const rr = R + s.h - 0.12;
-        const scale = (birch ? 0.74 : 0.80) + 0.56 * r5 * r5 + 0.12 * s.glade;
+        const scale = ((birch ? 0.74 : 0.80) + 0.56 * r5 * r5 + 0.12 * s.glade) * (spec.scale || 1);
         out.push(x * rr, y * rr, z * rr, scale, r1 * 6.2831853, kind, (r2 * 3) | 0, hash3i(a, b, 6 + k, seed),
           (r5 - 0.5) * 2, (r4 - 0.5) * 2 * 0.6, s.canopy, birch ? 0.02 + 0.15 * r2 * r2 : 0.02 * r2);
       }
@@ -70,9 +72,25 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       faceToDir(face, u0 + span * (a + 0.05 + 0.9 * r1) / grid, v0 + span * (b + 0.05 + 0.9 * r2) / grid, _d);
       S.sample(_d[0], _d[1], _d[2], s, true);
       const bi = S.biomes[s.top];
-      if (bi.terrain !== 'forest') continue;
       const inWater = s.lq !== NOLQ && s.lq > s.h;
       let kind = -1, scale = 1, sink = 0.03;
+      if (bi.terrain !== 'forest') {
+        // other biomes: a table of densities per kind
+        if (!bi.small || inWater || r3 >= s.under) continue;
+        let acc = 0;
+        for (let q = 0; q < SMALL.length; q++) {
+          const dn = bi.small[SMALL[q][0]];
+          if (!dn) continue;
+          acc += dn;
+          if (r4 < acc) { kind = SMALL[q][1]; break; }
+        }
+        if (kind < 0) continue;
+        scale = kind === U_ROCK ? 0.4 + 1.6 * r5 * r5 : kind === U_SHARD ? 0.6 + 1.6 * r5 * r5 : 0.65 + 0.8 * r5;
+        sink = kind === U_ROCK ? 0.2 * scale : 0.04;
+        const rr = R + s.h - sink;
+        out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, (r1 * 3) | 0, hash3i(a, b, 6, seed), (r5 - 0.5) * 2, (r3 - 0.5) * 1.2, s.canopy, 0.1 * r1);
+        continue;
+      }
       const edge = s.lq !== NOLQ ? s.lq - s.h : -9;   // > 0 under water
       if (edge > -0.30 && edge < 0.16 && r3 < 0.34 && r4 < 0.62 + 0.3 * Math.sin(r1 * 40)) {
         // reeds crowd the water's edge in clumps

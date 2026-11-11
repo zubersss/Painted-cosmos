@@ -178,5 +178,5 @@ test('obstacles: trunks near the spawn, none inside the landing clearing', () =>
   assert.ok(wide.filter((o) => o.kind === 'tree').length > 5);
   for (const o of wide) { assert.ok(o.radius > 0.1 && o.radius < 2); assert.ok(o.height > 0.2 && o.height < 30); }
   assert.deepEqual(wide, sampleObstaclesPure('earth', sp.x, sp.y, sp.z, 40));
-  assert.equal(sampleObstaclesPure('mars', 0.3, 0.5, 0.8, 30).length, 0);
+  for (const id of BODY_IDS) { const sp2 = getSurface(id).getSpawn(); assert.ok(Array.isArray(sampleObstaclesPure(id, sp2.x, sp2.y, sp2.z, 40))); }
 });
