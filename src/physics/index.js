@@ -20,6 +20,7 @@ import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
+import { skyNumbers, SKY } from './sky.js';
 import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength } from './water.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed } from './explorer.js';
@@ -74,6 +75,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     weather: { kind: 'clear', intensity01: 0, precipitation: { type: 'none', rate: 0, intensity01: 0, fallSpeed: 0, dropSize: 0, species: null, reachesGround01: 1, frozen01: 0, hail01: 0 }, wetness01: 0, snowDepth: 0, visibility01: 1, visibility: WEATHER.clearVisibility, cloud01: 0, fog01: 0, dust01: 0, haze01: 0, storm01: 0, front01: 0, windFactor: 1, temperature: 0, lightning: { rate: 0, flash01: 0, nextIn: Infinity, thunderIn: Infinity, thunder01: 0, last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } } },
     cover,
     groundHeight: 0,          // m above the body's base radius, under the focus
+    sky: skyNumbers(null, {}),  // the weather as eleven numbers 0..1 for a painter (sky.js), refreshed by update()
   };
   // Small weather near the focus, refreshed by update(): dust devils (features.js).
   const features = { devils };
@@ -199,6 +201,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const dist = f.disturbers || null;
     flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality, devils);
     const t4 = now();
+    skyNumbers(here.weather, here.sky);        // the weather as a painter needs it (sky.js)
     // the hull keeps the rain off what is under it
     { let ns = 0; const SH = particles.shelters;
       if (dist) for (let k = 0; k < dist.length && ns < 4; k++) { const D = dist[k]; if (D.kind !== 'ship' || !D.p) continue; const o = ns * 4; SH[o] = frame.lx(D.p.x, D.p.y, D.p.z); SH[o + 1] = frame.lz(D.p.x, D.p.y, D.p.z); SH[o + 2] = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0 + 2.2; SH[o + 3] = (D.radius || 4.2) * 0.85; ns++; }
@@ -446,6 +449,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     get time() { return time; },
     air, weather, ground, bindEnv,
     water: waterAt,
+    sky: (weather, out) => skyNumbers(weather || here.weather, out),   // the same numbers for any weather() result
     here,                     // air, weather and cover at the focus, refreshed by update()
     focus,                    // {x,y,z} body-local: the focus of the last update (read-only)
     features,                 // { devils: [...] with .count }: dust devils near the focus
@@ -473,5 +477,5 @@ export {
   stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed,
   stepShipBody, stepShipGear, wakeShip, SHIP_BODY, shipTopSpeed, shipTerminal, downwashSpeed, groundEffect, gearSag,
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
-  FLORA_GLSL, WATER_GLSL, WATER, windSea, fetchOf, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
+  FLORA_GLSL, WATER_GLSL, WATER, windSea, fetchOf, skyNumbers, SKY, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
 };
