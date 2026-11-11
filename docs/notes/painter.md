@@ -44,15 +44,18 @@ budget 600 k triangles / 350 draw calls):
 
 `sampleSurface`: 4.5 to 8.5 microseconds a call on every body (Node, 20 000 calls each).
 Not measured in M2: quality 0 and 2 on the new planets, `world.update` worst frame on the new
-planets, anything on a real GPU. Mercury's crystal gardens and Jupiter's gardens were measured
-before I thinned them further; the numbers above are after.
+planets, anything on a real GPU. Jupiter's hanging gardens measured 645 k before I thinned
+them; the table shows the result after.
 
 Evidence (`docs/shots/painter/`, 960x540, quality 1, `ui=0&t=0`): `<body>-orbit.jpg`
 (`cam=orbit`) and `<body>-<biome>.jpg` for mars, saturn, mercury, venus, jupiter, uranus,
 neptune and earth's five other biomes (41 files). Camera per biome: `cam=vista` (a low, dry,
 gentle spot near the biome's first site, looking at the highest ground), `cam=stream` for
-biomes with pools or rivers, `cam=shore` for seas. I looked at every frame as a contact sheet,
-not each at full size.
+biomes with pools or rivers, `cam=shore` for seas. What I actually looked at: contact sheets
+(thumbnails) of mercury, venus, jupiter, uranus, neptune and earth. I did **not** look at the
+committed mars and saturn frames or `neptune-kelp_forests.jpg` (I saw earlier 640x360 trial
+frames of mars and saturn from the same code). `earth-sea_coast.jpg` and
+`jupiter-sky_islands.jpg` predate the last shoreline change.
 
 Known weak (blunt): jupiter and saturn sky-islands are bare lumps in a pale sea; uranus teal
 sinkholes and venus lava and acid frames do not show the liquid (the camera did not find it);
@@ -265,6 +268,6 @@ quality 1 unless noted):
 ## Tests
 
 - `node --test src/world/*.test.mjs`: 12 tests of pure logic (all ten bodies for the ceiling, vistas and obstacles)
-- (was) 12 tests of pure logic (noise, cube-sphere, biome
+  (noise, cube-sphere, biome
   coverage, `sampleSurface` purity, spawn, liquid, vistas, patch edges, mesh / sample agreement,
   terrain ceiling, flora determinism, obstacles).
