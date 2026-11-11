@@ -5,8 +5,20 @@ Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/s
 
 ## Hand-over P15 (thirteenth PHYSICS agent; read this block first; P14 and older below hold for everything not named here)
 
-**Where things stand.** P15 item 1 (leaves that can be seen) done. Items 2 (the shore), 3 (are the crowns sheltered
-twice?), 4 (three strips to re-film) follow in that order. Scratch: `/home/user/.pc-scratch/physics/p15/` (`ex.sh`: a
+**Where things stand.** All four P15 items done and committed (`6f9fdd8` leaves, then the shore, the crowns' shelter,
+the three strips). `node --test src/physics/` 268 pass; PILOT's 123 pass on a clean export of HEAD with my files.
+**Next, in order:** (1) the coordinator's word on the fetch (item 2: the sea state from the water that is there, not
+the biome's 2500 m; it would calm Neptune's lagoon coast to a chop); (2) the Moon clamber's check at the face, on PILOT's
+word (item 4); (3) the lead's findings as the coordinator gives them; (4) P14 and P13's open items.
+**API added (additive):** `particles.<kind>.turn` (and internal `_tp`); `here.blown.leaves`, `.litter`, `.leafStock01`;
+`BLOWN.leafFlux, leafTornMax, leafStock, leafAutumn, leafRecover, leafFetch, leafLitter, litterFrom, litterFull, leafRo,
+leafRock`; `LOOSE.leaves.tumble`; `air.js wakeAt(wk, wkH, z)`, `AIR.wakeFull`; `sampleWind` [9] [10] [11] when the array has
+room; lab: `__lab.eye`, `info().place`, `info().seed`, the hull draws `buffetAngle`; film subjects `leaves-front`,
+`leaves-front-detail`, `shore-earth-calm`, `shore-earth-breeze`, `sea-out-earth-breeze`, `sea-out-neptune`; helper
+`P.nearEye`; `SHORE_PROBE` columns `runup`, `reach`, `slope`, `w80`, `deep`; `CROWN_PROBE` `w2`, `uc`, `load`.
+**Behaviour changed without a call changing:** leaves (count, where they come from, `turb` 0.5 -> 0.9, `leafCalm` now in
+units of torn, capacities 800 / 3000 / 6000); the kit's leaf quads are mirrored while a leaf shows its other side; the
+lee of trees thins above half their height for the particles' air and `profileAt`, and the crowns take it at their height. Scratch: `/home/user/.pc-scratch/physics/p15/` (`ex.sh`: a
 clean export of HEAD with the working physics over it into `p15/root`; `forest.mjs <biome> <k> <secs>`: leaves in the
 Node test world, wind scaled down k times; `timing.mjs <q> <k>`: physics.update in a closed wood gale; `diag.mjs`: where
 the leaves are in the painted lab).
