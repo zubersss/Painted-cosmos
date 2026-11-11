@@ -226,6 +226,10 @@ top tier; mechanics runs may pin a low tier (say which).
    `hip`, `clamber01`, `grounded` in `animate` (PAINTER's figure does not read them yet).
    The wind's sound is eased over 0.4 s already. All eight motion rows were shot before P11:
    re-shoot at review 6.
+8. **Spot check after the last fixes** (clean tree PAINTER `4c2cf51`, PHYSICS `6d588d6`, mine
+   with every fix above): `node tests/all.mjs --only unit,static,play-stub,trip-stub,m3`:
+   ALL 5 PASSED (116 unit tests, 37, 47 and 29 checks). The three painted steps and the
+   whole table were NOT run again after these fixes: review 6 runs the lot.
 
 ## Status
 
