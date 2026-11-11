@@ -274,3 +274,85 @@ test('cmd.shelter01 is the share of the wind force the suit cancels: none by def
   assert.ok(ice(0) > 1 && ice(1) === 0, 'blown across the ice without it, standing with it: ' + [ice(0), ice(1)]);
   const still = make(); run(still, 5, { wish: V(4.2, 0, 0), shelter01: 1 }); assert.ok(Math.abs(speed(still.st) - 4.2) < 0.01, 'still air: nothing changes');
 });
+
+// ---- P9: legs ---------------------------------------------------------------------------------------
+// Ground with low boulders on it, near the pole (0,0,1) of a sphere of radius R, x and y in metres.
+// `pilot`: PILOT's own profile (src/player/explorer.js scrambleSample): the radius raised by a smoothstep
+// dome that begins `skirt` outside the boulder's edge, the normal left that of the ground underneath.
+// Otherwise a cosine dome over the same footprint with its own normals (flanks to 64 degrees).
+function boulders(rocks, { pilot = true, skirt = 0.7, step = null } = {}) {
+  const h = (x, y) => {
+    let top = step ? step(x) : 0;
+    for (const o of rocks) {
+      const d = Math.hypot(x - o.x, y - o.y), reach = o.radius + (o.skirt == null ? skirt : o.skirt);
+      if (d >= reach) continue;
+      const q = 1 - d / reach, v = pilot ? o.height * q * q * (3 - 2 * q) : o.height * 0.5 * (1 - Math.cos(Math.PI * q));
+      if (v > top) top = v;
+    }
+    return top;
+  };
+  const sample = (d) => {
+    const l = Math.hypot(d.x, d.y, d.z), x = d.x / l * R, y = d.y / l * R, e = 0.02;
+    const gx = pilot ? 0 : (h(x + e, y) - h(x - e, y)) / (2 * e), gy = pilot ? 0 : (h(x, y + e) - h(x, y - e)) / (2 * e), nl = Math.hypot(gx, gy, 1);
+    return { radius: R + h(x, y), liquidRadius: 0, normal: { x: d.x / l - gx / nl, y: d.y / l - gy / nl, z: d.z / l / nl }, biomeId: 'test' };
+  };
+  return sample;
+}
+function cross(sample, g, v, { hz = 60, secs = 40, until = 1e9, jumpAt = -1, air = 1.225 } = {}) {
+  const st = { p: V(0, 0, sample(V(0, 0, 1)).radius), v: V(), grounded: true };
+  const env = { sample, gravity: g, air: (p, o) => { o.density = air; o.wind.x = o.wind.y = o.wind.z = 0; return o; } };
+  const out = { top: 0, airTime: 0, slowest: Infinity, still: 0, t: 0, st };
+  for (let i = 0; i < secs * hz && st.p.x < until; i++) {
+    const t = i / hz;
+    stepExplorerBody(st, { wish: V(v, 0, 0), jump: jumpAt >= 0 && Math.abs(t - jumpAt) < 0.5 / hz, assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env);
+    out.top = Math.max(out.top, len(st.p) - sample(st.p).radius);
+    if (!st.grounded) out.airTime += 1 / hz;
+    if (t > 1.5) { const sp = Math.hypot(st.v.x, st.v.y); out.slowest = Math.min(out.slowest, sp); if (sp < 0.3) out.still += 1 / hz; }
+    out.t = t;
+  }
+  return out;
+}
+const FIELD = (() => { let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647; const a = [{ x: 6, y: 0, radius: 0.6, height: 1.3 }, { x: 70, y: 0, radius: 0.3, height: 1.3 }];
+  for (let i = 0; i < 24; i++) a.push({ x: 10 + i * 2.4 + rnd() * 1.5, y: (rnd() - 0.5) * 2.4, radius: 0.3 + rnd(), height: 0.3 + rnd() }); return a; })();
+
+test('legs: a walk and a run across a field of low boulders never lift the feet 0.3 m off the ground, and never stall (Earth, Mars, Moon; 60 and 20 Hz)', () => {
+  for (const pilot of [true, false]) for (const [name, g, air] of [['Earth', 9.81, 1.225], ['Mars', 3.71, 0.02], ['Moon', 1.62, 0]]) for (const v of [4.2, 7.4]) for (const hz of [60, 20]) {
+    const o = cross(boulders(FIELD, { pilot }), g, v, { hz, until: 75, air }), tag = `${pilot ? "PILOT's profile" : 'steep normals'} ${name} ${v} m/s ${hz} Hz`;
+    assert.ok(o.top <= 0.3, `${tag}: feet ${o.top.toFixed(2)} m off the ground`);
+    assert.ok(o.st.p.x >= 75, `${tag}: did not get across, x ${o.st.p.x.toFixed(1)} after ${o.t.toFixed(0)} s`);
+    assert.ok(o.still < 0.5 && 75 / o.t > 1.2, `${tag}: stalled (${o.still.toFixed(2)} s under 0.3 m/s, mean ${(75 / o.t).toFixed(2)} m/s)`);
+  }
+});
+
+test('legs: the 1.3 m boulder that flew the body in P8 (57 degree flanks) is clambered: no air at all, at a clambering pace', () => {
+  const rock = [{ x: 12, y: 0, radius: 1.3, height: 1.3, skirt: 0 }];
+  for (const g of [9, 3.7, 1.62]) for (const v of [4.2, 7.4]) {
+    const o = cross(boulders(rock, { pilot: false }), g, v, { until: 20, air: 0 });
+    assert.ok(o.top < 0.05 && o.airTime === 0, `g ${g} v ${v}: ${o.top.toFixed(2)} m, ${o.airTime.toFixed(2)} s in the air`);
+    assert.ok(o.slowest > 0.5 && o.slowest < 3 && o.st.p.x >= 20, `g ${g} v ${v}: slowest ${o.slowest.toFixed(2)} m/s`);
+  }
+});
+
+test('legs: a feature lower than their stroke is taken in stride, and one the hips must climb costs pace: more in low gravity', () => {
+  const low = cross(boulders([{ x: 12, y: 0, radius: 0.4, height: 0.4 }]), 9.81, 7.4, { until: 20 });
+  assert.ok(low.slowest > 7.2 && low.airTime === 0, 'a 0.4 m rock at a run: slowest ' + low.slowest.toFixed(2));
+  const pace = (g) => cross(boulders([{ x: 12, y: 0, radius: 0.6, height: 1.3 }]), g, 7.4, { until: 20, air: 0 }).slowest;
+  assert.ok(pace(9.81) < 4.5 && pace(1.62) < pace(9.81), `Earth ${pace(9.81).toFixed(2)}, Moon ${pace(1.62).toFixed(2)}`);
+});
+
+test('legs: what is not a low feature is as it was: a cliff is a fall, a wall stops the body, a jump is a jump, and a step up to a clamber high is climbed', () => {
+  const cliff = cross(boulders([], { step: (x) => (x > 12 ? -3 : 0) }), 9.81, 4.2, { until: 20 });
+  assert.ok(cliff.top > 2.5 && cliff.airTime > 0.6, 'a 3 m cliff: ' + cliff.top.toFixed(2) + ' m, ' + cliff.airTime.toFixed(2) + ' s');
+  const wall = cross(boulders([], { step: (x) => (x > 12 ? 2.5 : 0) }), 9.81, 4.2, { secs: 8 });
+  assert.ok(wall.st.p.x < 12.01 && wall.st.grounded, 'a 2.5 m wall: x ' + wall.st.p.x.toFixed(2));
+  const up = cross(boulders([], { step: (x) => (x > 12 ? 1.3 : 0) }), 1.62, 4.2, { until: 20, air: 0 });
+  assert.ok(up.st.p.x >= 20 && up.top < 0.3, 'a 1.3 m step on the Moon: x ' + up.st.p.x.toFixed(1));
+  const rock = [{ x: 12, y: 0, radius: 0.6, height: 1.3 }];
+  const hop = cross(boulders(rock), 9.81, 4.2, { until: 20, jumpAt: 3.4 });
+  assert.ok(hop.top > 0.9, 'a jump from the boulder: ' + hop.top.toFixed(2) + ' m');
+  // standing on it: at rest, exactly
+  const st = { p: V(0, 0, 0), v: V(), grounded: true }, sample = boulders(rock), d = norm(V(11.6 / R, 0, 1)), env = { sample, gravity: 1.62 };
+  const r0 = sample(d).radius; st.p = V(d.x * r0, d.y * r0, d.z * r0);
+  for (let i = 0; i < 240; i++) stepExplorerBody(st, {}, 1 / 60, env);
+  assert.ok(st.grounded && len(st.v) === 0 && Math.abs(len(st.p) - r0) < 1e-6, 'standing on the flank on the Moon');
+});

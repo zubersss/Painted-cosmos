@@ -34,8 +34,33 @@ export const EXPLORER_BODY = Object.freeze({
   runFoothold: 4.5,       // m/s: above this speed footholds no longer help
   arrest: 0.85,           // sliding out of control, the body digs in heels and hands: friction is this
                           // fraction of the holding traction (never less than the kinetic coefficient)
-  stickGap: 0.28,         // m: how far the feet reach down to keep contact over an edge
-  crestFilter: 0.15,      // s: the legs absorb bumps shorter than this before the body goes ballistic
+  // LEGS (P9). st.p is the feet; the mass rides at the hips, one leg above them. The legs are a
+  // suspension with a stroke: they fold and reach so the feet follow the ground while the hips
+  // take a smoother path. Over a feature lower than the stroke (legFold + legReach = 0.73 m) the
+  // hips do not move at all, at any speed. Over one up to `clamber` high the hips must rise and
+  // fall, and the limbs keep the body attached: they hold the rock (grip), and the walker holds
+  // its pace to what gravity and that grip can follow. See "legs" in stepExplorerBody.
+  legLength: 0.9,         // m: hip height standing (documentation: the dynamics need only the stroke)
+  legFold: 0.45,          // m the legs shorten: a deep crouch, the foot placed up on something
+  legReach: 0.28,         // m the feet reach below the standing stance to keep contact (a step down)
+  stickGap: 0.28,         // (the name of legReach before P9; kept, unused)
+  legTime: 0.12,          // s: time constant with which the legs level the hips (critically damped)
+  legLift: 9.0,           // m/s^2: the hardest the legs raise the hips (the same legs as legAccel)
+  trendTime: 0.3,         // s over which the rise of the ground counts as the slope of a hill, not a feature
+  legCatch: 30,           // m/s^2: the hardest they take up a descending body (eccentric: 3 g)
+  clamber: 1.35,          // m: a leg and a half. A rise or a drop within it is clambered in contact,
+                          // hands on the rock; a drop beyond it is a fall
+  gripAccel: 10,          // m/s^2 the limbs holding a feature pull the body toward it (1 kN). Only a
+                          // convex feature gives a hold; open ground does not (see gripDepth)
+  gripDepth: 0.2,         // m: there is a hold when the ground `look` ahead lies this far (beyond the
+                          // reach) below the line the hips are moving on: a rock, a ledge, a sharp
+                          // ridge (crest radius under about 3.5 m), not a rolling crest
+  legStep: 0.15,          // m: the longest step over the ground the legs take in one piece (longer frames are split, 4 at most)
+  look: 1.2,              // m ahead the walker looks while its legs are working (one more sample)
+  braceAccel: 20,         // m/s^2 the limbs on a hold brake the body with (2 kN), not limited by the soles' grip
+  braceDv: 2.5,           // m/s of forward speed the limbs take up in one hold on the way down;
+                          // more than that tears the grip off and the body flies
+  crestFilter: 0.15,      // (retired in P9: the stroke of the legs does this now; kept, unused)
   crestLaunch: true,      // leave the ground when it falls away faster than gravity (low-g bounding)
   // jumping: the legs do the same work on any planet, so the take-off speed depends on gravity:
   //   v^2 = jumpSpeed^2 + 2 jumpPush (jumpG0 - g)
@@ -71,8 +96,17 @@ export const EXPLORER_BODY_STATE = () => ({
   submerged01: 0,         // fraction of the body under liquid
   windAccel: 0,           // m/s^2 the wind is pushing with
   lean: 0,                // rad the body must lean into the wind to balance it: atan(windAccel / g)
-  unload: 0,              // filtered vertical acceleration of the ground being followed
+  unload: 0,              // (retired in P9, always 0)
   vvPrev: 0,
+  hip: 0,                 // m: leg length now minus standing (-legFold folded .. +legReach reaching down)
+  hipV: 0,                // m/s: vertical speed of the hips
+  trend: 0,               // m/s: the rate the ground has been rising under the feet (filtered over trendTime)
+  base: 0,                // radius of the ground where the legs last stood at their standing length, carried on at `trend`
+  clamber01: 0,           // 0 striding .. 1 legs at the end of their stroke (clambering over something)
+  clamberT: 0,            // s left of looking ahead after the legs last worked
+  grip: 0,                // 1 while the limbs hold a feature (taken at a convex edge, kept until standing again)
+  paceCap: 1e9,           // m/s: the pace the walker holds so its feet can follow the ground ahead
+  brace: 0,               // m/s of forward speed lost this step against a face or to a hold
   support: 0,             // m/s^2 of normal support from the ground (0 when floating or airborne)
   impact: 0,              // m/s of the last landing (normal speed), set on the landing step
   puff: 0,                // the same, held and decaying over 0.1 s (for dust and sound, read once a frame)
@@ -85,6 +119,7 @@ export const EXPLORER_BODY_STATE = () => ({
 const _air = { density: 1.225, wind: { x: 0, y: 0, z: 0 } };
 const _gnd = {};
 const _dir = { x: 0, y: 0, z: 0 };
+const _dir2 = { x: 0, y: 0, z: 0 };
 const DEFAULT_GROUND = { material: 'soil', friction: 0.7, kinetic: 0.55, foothold: 0.3, restitution: 0.1, sink: 0.015, drag: 0.03, dust: 0.1 };
 const DEFAULT_LIQUID = { density: 999, viscosity: 1.14e-3 };
 
@@ -96,6 +131,23 @@ export function jumpSpeedFor(g, T = EXPLORER_BODY) {
 // Terminal fall speed of the explorer in air of density rho under gravity g.
 export function explorerTerminal(g, rho, T = EXPLORER_BODY) {
   return rho > 0 ? Math.sqrt(2 * T.mass * g / (rho * T.cdaFall)) : Infinity;
+}
+
+// The ground `dist` metres ahead of (px,py,pz) along (hx,hy,hz): its radius (one sample). NaN when not moving.
+function groundAhead(env, px, py, pz, hx, hy, hz, dist) {
+  const l = Math.hypot(hx, hy, hz);
+  if (!(l > 1e-9)) return NaN;
+  const k = dist / l, x = px + hx * k, y = py + hy * k, z = pz + hz * k, r = Math.hypot(x, y, z) || 1;
+  _dir2.x = x / r; _dir2.y = y / r; _dir2.z = z / r;
+  return env.sample(_dir2).radius;
+}
+// Is there something for the limbs to hold? Yes when the ground `look` ahead (radius hD) lies well below
+// the line the hips are moving on (c: hips less a leg, w: their vertical speed, vh: their speed over the
+// ground): a convex feature at the scale of a limb; and when that ground is within a clamber of the feet.
+function holdAhead(c, w, vh, feet, hD, T) {
+  if (!(hD === hD)) return false;
+  const m = vh > 0.3 ? clamp(w / vh, -2, 2) : 0;
+  return c + m * T.look - hD > T.legReach + T.gripDepth && feet - hD <= T.clamber;
 }
 
 // One step of the body.
@@ -117,6 +169,22 @@ export function explorerTerminal(g, rho, T = EXPLORER_BODY) {
 //          liquidOf(surface) -> { density, viscosity }   optional: the liquid at a place (lava, cloud froth) }
 // Returns st. Sets st.grounded, st.p, st.v and st.phys.*; never allocates after the first call.
 export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
+  // On the ground a step is never longer than the legs resolve (legStep): at a low frame rate a run would
+  // otherwise cross the flank of a boulder in two samples. At 60 Hz a run is one step, as before.
+  if (st.grounded && dt > 0 && st.v) {
+    let n = Math.ceil(Math.hypot(st.v.x, st.v.y, st.v.z) * dt / T.legStep);
+    if (n > 1) {
+      if (!(n <= 4)) n = 4;
+      const jump = cmd.jump, h = dt / n;
+      let brace = 0;
+      for (let i = 0; i < n; i++) { stepOnce(st, cmd, h, env, T); brace += st.phys.brace; if (i === 0 && jump) cmd.jump = false; }
+      cmd.jump = jump; st.phys.brace = brace;
+      return st;
+    }
+  }
+  return stepOnce(st, cmd, dt, env, T);
+}
+function stepOnce(st, cmd, dt, env, T) {
   const B = st.phys || (st.phys = EXPLORER_BODY_STATE());
   if (!(dt > 0)) return st;
   let px = st.p.x, py = st.p.y, pz = st.p.z;
@@ -192,6 +260,22 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
 
   if (onGround) {
     // ================= on the ground: dynamics in the plane of the terrain ===================
+    // LEGS, 1: what carries the body. On open ground the facet under the boots does (exactly as
+    // before). Clambering, with a hold on a feature (B.grip), the feet stand on holds and the body
+    // is carried on its limbs, not on the facet: gravity acts along the path of the hips, and the
+    // tilt of the rock under the boot does not count.
+    let q = B.grip ? 0 : 1;
+    // A face too steep to hold by friction, but low (the ground one look ahead is within a
+    // clamber of the feet), is a step: the walker goes up it on its legs and hands.
+    if (q > 0 && qlen > 1e-6 && nu < 0.995 && Math.sqrt(1 - nu * nu) / nu > G.friction + G.foothold && qx * nx + qy * ny + qz * nz < 0) {
+      const hS = groundAhead(env, px, py, pz, qx, qy, qz, T.look);
+      if (hS - r <= T.clamber) q = 0;
+    }
+    if (q < 1) {
+      nx = ux + (nx - ux) * q; ny = uy + (ny - uy) * q; nz = uz + (nz - uz) * q;
+      const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+      nu = nx * ux + ny * uy + nz * uz;
+    }
     const support = g * nu * (1 - buoy);               // normal acceleration the ground supplies
     // velocity along the surface
     let d = vx * nx + vy * ny + vz * nz;
@@ -222,7 +306,8 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
       const k = (qx * nx + qy * ny + qz * nz) / nu;
       tx = qx - ux * k; ty = qy - uy * k; tz = qz - uz * k;
       const tl = Math.hypot(tx, ty, tz);
-      if (tl > 1e-9) { const m = qlen / tl; tx *= m; ty *= m; tz *= m; }
+      // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
+      if (tl > 1e-9) { const m = Math.min(qlen, B.paceCap) / tl; tx *= m; ty *= m; tz *= m; }
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;
@@ -233,7 +318,9 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
     // ... by leg power: the propulsive part times the speed cannot exceed legPower / mass
     if (sp > 0.3) {
       const al = (fx * sx + fy * sy + fz * sz) / sp;
-      const pmax = T.legPower / T.mass / sp;
+      // (the legs' power also lifts the hips when they rise faster than the ground carries them)
+      const lift = Math.max(0, B.hipV - (sx * ux + sy * uy + sz * uz));
+      const pmax = Math.max(0.2 * T.legPower / T.mass, T.legPower / T.mass - g * (1 - buoy) * lift) / sp;
       if (al > pmax) { const cut = (al - pmax) / sp; fx -= sx * cut; fy -= sy * cut; fz -= sz * cut; fl = Math.hypot(fx, fy, fz); }
     }
     // ... and by the friction circle. A walker does not spin their feet: they push only as hard
@@ -272,37 +359,146 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
     // integrate along the surface
     sx += (ex + fx + zx) * dt; sy += (ey + fy + zy) * dt; sz += (ez + fz + zz) * dt;
     if (liqK > 0) { const m = 1 / (1 + (liqK * Math.hypot(sx, sy, sz) + visc * Math.min(depth, T.height)) * dt); sx *= m; sy *= m; sz *= m; }
+    // LEGS, 2b: with a hold on the rock the limbs brace the body back to that pace (braceAccel), whatever the soles grip
+    if (B.grip && B.paceCap < 1e8) {
+      const sn = Math.hypot(sx, sy, sz);
+      if (sn > B.paceCap) { const m = Math.max(B.paceCap, sn - T.braceAccel * dt) / sn; sx *= m; sy *= m; sz *= m; }
+    }
     // snap to rest: never creep
     if (qlen < 1e-6 && B.slip01 === 0 && Math.hypot(sx, sy, sz) < 0.02) { sx = sy = sz = 0; }
 
-    // move, then meet the ground again
+    // ---- LEGS, 3: the feet follow the ground, the hips ride above them --------------------------
+    // c is the radius of the hips less one leg (c = the ground when standing), B.hip = c - ground,
+    // B.hipV the hips' vertical speed. The legs level the hips over the ground (critically damped,
+    // legTime) but can only push: the hips fall no faster than gravity, are raised no harder than
+    // legLift and caught no harder than legCatch. Between the fold and the reach of the legs the
+    // ground may do what it likes under the feet; at the end of the stroke the ground acts:
+    //   folded out (the ground rises faster than the hips can be raised): the body is braced
+    //     against the face and goes on at the pace its hips can be lifted, never faster than
+    //     gravity (and a hold) can stop them again within the stroke;
+    //   reached out (the ground falls away faster than the hips fall): with a hold (a convex
+    //     feature, holdAhead) the limbs pull the hips down, gripAccel at most, and brace; with
+    //     none, or a drop beyond a clamber, the feet leave the ground: a fall, or a bound in low
+    //     gravity, with the hips' own velocity.
+    const fold = T.legFold, reach = T.legReach;
+    const hip0 = B.hip, c0 = r + hip0, w = B.hipV;
+    const su = sx * ux + sy * uy + sz * uz;
+    const vh = Math.sqrt(Math.max(0, sx * sx + sy * sy + sz * sz - su * su));
+    // (the hips' weight in this radial frame: gravity less buoyancy less v^2/r, the round world falling away)
+    const gE = g * (1 - buoy) - vh * vh / r;
     let p1x = px + sx * dt, p1y = py + sy * dt, p1z = pz + sz * dt;
-    const r1 = Math.hypot(p1x, p1y, p1z) || 1;
+    let r1 = Math.hypot(p1x, p1y, p1z) || 1;
     _dir.x = p1x / r1; _dir.y = p1y / r1; _dir.z = p1z / r1;
-    const s1 = env.sample(_dir);
-    const gap = r1 - s1.radius;
-    let n1x = s1.normal.x, n1y = s1.normal.y, n1z = s1.normal.z;
-    { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
-    const vsep = sx * n1x + sy * n1y + sz * n1z;
-    // does the ground fall away faster than gravity can follow? (filtered: legs absorb bumps)
-    const vvNow = sx * _dir.x + sy * _dir.y + sz * _dir.z;
-    const aFollow = (vvNow - B.vvPrev) / dt;
-    B.vvPrev = vvNow;
-    B.unload += (aFollow - B.unload) * (1 - Math.exp(-dt / T.crestFilter));
-    const launch = T.crestLaunch && B.unload < -g * (1 - buoy) * 1.05 && sp > 1.5;
-    if (gap > T.stickGap || vsep > Math.sqrt(2 * g * T.stickGap) || launch) {
-      // off an edge or over a crest: ballistic from here
+    let s1 = env.sample(_dir);
+    let h1 = s1.radius, n1x = s1.normal.x, n1y = s1.normal.y, n1z = s1.normal.z;
+    let dh = h1 - r;
+    const gr = dh / dt;                                  // m/s the ground rises under the feet
+    // the walker looks ahead while its legs are working (and for half a second after)
+    const working = hip0 < -0.06 || hip0 > 0.1;
+    let looked = false, feat = false, hD = NaN;
+    if ((working || B.clamberT > 0) && vh > 0.2) {
+      hD = groundAhead(env, p1x, p1y, p1z, sx, sy, sz, T.look); looked = true;
+      // (what stands out of the ground the legs last stood on, B.base, is a feature too: a hold underfoot)
+      feat = holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber);
+      // a hold once taken is kept until the legs are back at their standing length on plain ground
+      if (feat) B.grip = 1; else if (B.grip && r - hD <= T.clamber) feat = true;
+    } else if (B.grip) feat = true;                      // (standing still on it, the hold is kept)
+    B.clamberT = working ? 0.5 : Math.max(0, B.clamberT - dt);
+    if (!working && B.clamberT <= 0) B.grip = 0;
+    const pull = feat ? T.gripAccel : 0;
+    const trend = Math.max(0, B.trend);
+    if (!working) { B.trend += (clamp(gr, -20, 20) - B.trend) * (1 - Math.exp(-dt / T.trendTime)); B.base = r; }   // (a feature the legs are working on is not a hill)
+    else B.base += B.trend * dt;
+    // level the hips over the ground; about to climb down, stay low instead of standing up on top
+    let tgt = h1;
+    if (feat && hD < h1) tgt = Math.max(h1 - fold, hD);   // (false when hD is unknown)
+    const om = 1 / T.legTime, y0 = c0 - (tgt - dh), v0 = w - gr, ee = Math.exp(-om * dt), kk = v0 + om * y0;
+    let c1 = tgt + (y0 + kk * dt) * ee, w1 = gr + (v0 - om * kk * dt) * ee;
+    {
+      let a = (w1 - w) / dt, cut = false;
+      const aMax = w < -0.2 ? T.legCatch : T.legLift, aMin = T.crestLaunch ? -(gE + pull) : -1e9;
+      if (a > aMax) { a = aMax; cut = true; } else if (a < aMin) { a = aMin; cut = true; }
+      let wn = w + a * dt;
+      // the legs do not throw the hips up: beyond the rate the ground has been rising at (B.trend, the
+      // slope of the hill being climbed) they raise them no faster than gravity, and a hold, can stop
+      // again within the reach that is left
+      // (the reach is counted from where the ground was before the legs began to work, B.base, carried on
+      // at that rate: what rises under the feet may fall away again as fast)
+      if (a > 0 && gE > 0) { const cap = trend + Math.sqrt(Math.max(0, 2 * (gE + pull) * (B.base + reach - c0))); if (wn > cap) { wn = Math.max(w, cap); cut = true; } }
+      if (cut) { w1 = wn; c1 = c0 + 0.5 * (w + w1) * dt; }
+    }
+    let lam = 1, held = true;
+    if (c1 < h1 - fold) {
+      // folded out
+      const capB = Math.max(w, Math.sqrt(Math.max(0, 0.5 * (gE + pull) * (fold + reach))));   // (a quarter of the stroke: the rest is kept for the far side)
+      const cUp = Math.min(c0 + capB * dt, Math.max(c0, r + reach));
+      if (h1 - fold <= cUp) { c1 = h1 - fold; w1 = Math.max(w1, Math.min(capB, (c1 - c0) / dt)); }
+      else if (dh > T.clamber && vh * dt > 1e-6) { c1 = Math.max(c0, r - fold); w1 = 0; lam = 0; }   // a wall, not a step: it stops the body
+      else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; }
+    } else if (c1 > h1 + reach) {
+      // reached out
+      if (!looked) { hD = groundAhead(env, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber); if (feat) B.grip = 1; }
+      held = false;
+      if (feat || !T.crestLaunch) {
+        const gp = gE + T.gripAccel, cLow = c0 + w * dt - 0.5 * gp * dt * dt;    // the lowest the hold can bring the hips
+        if (h1 + reach >= cLow) { c1 = h1 + reach; w1 = Math.max((c1 - c0) / dt, w - gp * dt); held = true; }
+        else if (cLow <= r + reach + 1e-6 || !T.crestLaunch) {
+          const l2 = dh < -1e-9 ? clamp01((cLow - reach - r) / dh) : 0;
+          if ((1 - l2) * vh <= T.braceDv || !T.crestLaunch) { lam = l2; c1 = cLow; w1 = w - gp * dt; held = true; }
+        }
+      }
+    }
+    B.brace = 0;
+    if (held && lam < 1) {
+      // braced: the feet take only part of the step, and the rest of the forward speed is lost
+      B.brace = (1 - lam) * vh;
+      sx *= lam; sy *= lam; sz *= lam;
+      p1x = px + sx * dt; p1y = py + sy * dt; p1z = pz + sz * dt;
+      r1 = Math.hypot(p1x, p1y, p1z) || 1;
+      _dir.x = p1x / r1; _dir.y = p1y / r1; _dir.z = p1z / r1;
+      s1 = env.sample(_dir);
+      h1 = s1.radius; n1x = s1.normal.x; n1y = s1.normal.y; n1z = s1.normal.z;
+      if (c1 < h1 - fold) c1 = h1 - fold;                // (a face the legs cannot fold onto: the hips are heaved up it)
+      else if (c1 > h1 + reach) c1 = h1 + reach;
+    }
+    if (!held) {
+      // the feet leave the ground at full stretch, with the hips' velocity
       grounded = false;
-      vx = sx; vy = sy; vz = sz;
-      px = p1x; py = p1y; pz = p1z;
-      B.unload = 0;
+      const rr = Math.max(h1, c1 - reach), vv1 = w1 - su;
+      px = _dir.x * rr; py = _dir.y * rr; pz = _dir.z * rr;
+      vx = sx + vv1 * ux; vy = sy + vv1 * uy; vz = sz + vv1 * uz;
+      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.clamberT = 0; B.grip = 0;
     } else {
-      px = _dir.x * s1.radius; py = _dir.y * s1.radius; pz = _dir.z * s1.radius;
+      px = _dir.x * h1; py = _dir.y * h1; pz = _dir.z * h1;
+      B.hip = clamp(c1 - h1, -fold, reach); B.hipV = w1;
+      // the pace the feet can follow: the hips must be down within reach of the ground one look
+      // ahead by the time the feet are there
+      B.paceCap = 1e9;
+      if (feat && hD === hD) {
+        const gp = Math.max(0.1, gE + T.gripAccel), D = c1 - hD - reach;
+        if (D > 0) {
+          B.paceCap = T.look * gp / (w1 + Math.sqrt(w1 * w1 + 2 * gp * D));
+          // ... and on the way there the ground must not fall away faster than the hips can be
+          // brought down within the reach that is left: v x slope <= -w + sqrt(2 (g + grip) room)
+          const slope = Math.max(vh > 0.2 ? -(h1 - r) / (vh * lam * dt + 1e-9) : 0, (h1 - hD) / T.look);
+          if (slope > 0.05) { const cap = (-w1 + Math.sqrt(2 * gp * Math.max(0, reach - B.hip))) / slope; if (cap < B.paceCap) B.paceCap = cap; }
+          if (B.paceCap < 0.5) B.paceCap = 0.5;
+        }
+      }
+      // the velocity lies along the ground as the legs carry it (see LEGS, 1) at the new place
+      { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
+      const q1 = q === 0 || B.grip ? 0 : 1;
+      if (q1 < 1) {
+        n1x = _dir.x + (n1x - _dir.x) * q1; n1y = _dir.y + (n1y - _dir.y) * q1; n1z = _dir.z + (n1z - _dir.z) * q1;
+        const l = Math.hypot(n1x, n1y, n1z); n1x /= l; n1y /= l; n1z /= l;
+      }
+      const vsep = sx * n1x + sy * n1y + sz * n1z;
       vx = sx - vsep * n1x; vy = sy - vsep * n1y; vz = sz - vsep * n1z;
       // keep the speed when the slope merely changes under the feet
       const a = Math.hypot(sx, sy, sz), b = Math.hypot(vx, vy, vz);
       if (b > 1e-6 && a > b && vsep > 0) { const m = a / b; vx *= m; vy *= m; vz *= m; }
     }
+    B.clamber01 = grounded ? clamp01(Math.max(-B.hip / fold, B.hip / reach)) : 0;
     B.support = grounded ? support : 0;
     B.jetUse = 0;
   }
@@ -391,9 +587,10 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
       }
       // touching down only counts when buoyancy does not carry the body there
       const l1 = (s1.liquidRadius || 0) > s1.radius ? s1.liquidRadius - s1.radius : 0;
-      if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.vvPrev = vx * _dir.x + vy * _dir.y + vz * _dir.z; B.unload = 0; }
+      if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * _dir.x + vy * _dir.y + vz * _dir.z; }
     }
-    B.support = 0;
+    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.clamber01 = 0; B.clamberT = 0;
+    if (!grounded) { B.hip = 0; B.hipV = 0; B.trend = 0; B.grip = 0; }
     B.slip01 = grounded ? 0 : B.slip01 * 0.9;
     B.scramble01 = 0;
   }
