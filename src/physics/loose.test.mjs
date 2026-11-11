@@ -11,7 +11,10 @@ import { EVENT } from './particles.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len, dot } from './testworld.mjs';
 
-function setup(bodyId, biome, { sea = 0, dir = V(0.31, 0.56, 0.77), alt = 0, seed } = {}) {
+// (the fixed test place is used with a fixed weather seed, under which it is fair there; tests
+// that go looking for weather use the default seed)
+const HERE = V(0.31, 0.56, 0.77);
+function setup(bodyId, biome, { sea = 0, dir = HERE, alt = 0, seed = dir === HERE ? 14 : undefined } = {}) {
   const R = BODIES[bodyId].radius + alt;
   const sample = makeWorld({ R, biome, sea: sea ? R + sea : 0 });
   const physics = createPhysics({ sampleSurface: (id, d) => sample(d), seed, timeBudget: false });

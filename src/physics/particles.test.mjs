@@ -127,7 +127,11 @@ test('the same shower on other worlds: Neptune methane, Jupiter water', () => {
   const sj = stats(j.physics.particles.rain, norm(j.focus));
   const e = rainy(); run(e, 6);
   const se = stats(e.physics.particles.rain, norm(e.focus));
-  assert.ok(sj.fall > se.fall * 1.2, `Jupiter (thinner air, stronger gravity) ${sj.fall} vs Earth ${se.fall}`);
+  // (the two showers are not equally heavy, so their drops are not the same size: compare
+  // the fall speed per root of drop diameter, which is what gravity and air density set)
+  const size = (b) => { let a = 0; for (let i = 0; i < b.count; i++) a += b.size[i]; return a / b.count; };
+  const kj = sj.fall / Math.sqrt(size(j.physics.particles.rain)), ke = se.fall / Math.sqrt(size(e.physics.particles.rain));
+  assert.ok(kj > ke * 1.3, `Jupiter (thinner air, stronger gravity) ${kj.toFixed(0)} vs Earth ${ke.toFixed(0)} m/s per root metre`);
 });
 
 test('stable at 20 Hz and with a hitch; quality changes the count', () => {

@@ -83,7 +83,10 @@ test('in the game loop: waves on a windy coast, none on dry land, none without a
     let q = p; const e = norm(V(-q.z, 0, q.x));
     for (let i = 0; i < 60 * 14; i++) { q = V(q.x + e.x * 40 / 60, q.y, q.z + e.z * 40 / 60); const l = len(q); q = V(q.x * sea.R / l, q.y * sea.R / l, q.z * sea.R / l); sea.t += 1 / 60; sea.physics.update(1 / 60, { bodyId: 'earth', time: sea.t, focus: q }); const h = sea.physics.fields.water.heightAt(q); if (prev != null) worst = Math.max(worst, Math.abs(h - prev)); prev = h; }
     assert.ok(sea.physics.stats.reanchors > before, 're-anchored');
-    assert.ok(worst < 0.12, 'largest change of the surface under the walker in one frame: ' + worst);
+    // the most a frame can change it: every train at its steepest, crossed at 40 m/s plus its own speed
+    const Wf = sea.physics.fields.water.field; let bound = 0.004;
+    for (let i = 0; i < 3; i++) bound += Wf.amp[i] * (Wf.k[i] * 40 + Wf.omega[i]) / 60;
+    assert.ok(worst < bound * 1.25, `largest change of the surface under the walker in one frame: ${worst} (waves alone allow ${bound})`);
     const dry = mk('earth', 'desert_canyon', 0); const pd = run(dry, norm(V(0.6, 0.04, 0.8)), 20);
     assert.equal(dry.physics.water('earth', pd, {}).present, false);
     assert.equal(dry.physics.fields.water.heightAt(pd), 0);

@@ -25,6 +25,7 @@ export const WEATHER = Object.freeze({
   snowLife: 30 * 3600,     // real s before fresh snow settles into the base layer
   slot: 9,                 // s: lightning scheduling slot
   frontReach: 1.3,         // gust front runs this many cell radii ahead of the core
+  coldShare: 0.35,         // water a system gives as snow, as a fraction of what it would rain
   passTime: 40,            // s: no system is smaller than the distance it drifts in this time
   edgeTime: 30,            // s: how long the edge of a drifting system takes to pass
   clearVisibility: 20000,  // m: visual range of clean air (Koschmieder, real scale)
@@ -153,7 +154,7 @@ function cellAt(bodyId, R, regime, s, i, t, c) {
   // A system carried on a fast jet is a big one: it is never smaller than the distance it
   // travels in WEATHER.passTime, so even the fastest weather takes that long to arrive.
   c.r = Math.max(mix(regime.radius[0], regime.radius[1], hash3(i, 4, gen, s)) * K.size, Math.hypot(c.ve, vn) * WEATHER.passTime) * (0.75 + 0.25 * env);
-  c.w = env * strength;
+  c.w = env * strength; c.s = strength; c.env = env;
   c.kind = K; c.kindId = kid; c.age = age; c.life = life; c.gen = gen; c.i = i;
   c.swirl = 0; c.spin = 0;
   return true;
@@ -164,7 +165,7 @@ function spotAt(R, sp, i, t, c) {
   const lon = sp.lon * Math.PI / 180 + sp.drift / (R * cla) * t;
   c.x = cla * Math.sin(lon); c.y = Math.sin(lat); c.z = cla * Math.cos(lon);
   c.r = sp.radius;
-  c.w = sp.strength * (0.9 + 0.1 * Math.sin(t / 97 + i));
+  c.w = sp.strength * (0.9 + 0.1 * Math.sin(t / 97 + i)); c.s = c.w; c.env = 1;
   c.kind = KINDS[sp.kind]; c.kindId = sp.kind; c.age = t; c.life = Infinity; c.gen = 0; c.i = i;
   c.swirl = sp.swirl; c.spin = sp.spin;
   c.ve = sp.drift; c.vn = 0;
@@ -227,9 +228,11 @@ function gather(bodyId, ux, uy, uz, t, seed) {
       // A bank of fog, dust or haze. The extinction (in clear-air units) is shaped so that the
       // visual range closes in steadily on the way in: visibility01 = 1 / sqrt(1 + ext) falls
       // in proportion to the depth into the bank, and the edge is a gradual veil, never a wall.
-      const veil = core;
+      // (At the middle of a full-grown bank of strength s the extinction is s^2 E, as thick as
+      // its kind and strength say.)
+      const veil = _c.w > 0 ? core / _c.w * _c.env : 0;
       if (veil > 0) {
-        const E = WEATHER.clearVisibility / K.vis, q = 1 - (1 - 1 / Math.sqrt(1 + E)) * veil;
+        const E = _c.s * _c.s * WEATHER.clearVisibility / K.vis, q = 1 - (1 - 1 / Math.sqrt(1 + E)) * veil;
         const ext = 1 / (q * q) - 1;
         if (K === KINDS.fog) a.fog += ext; else if (K === KINDS.dust) a.dust += ext; else a.haze += ext;
       }
@@ -319,7 +322,7 @@ export function moistureAt(bodyId, ux, uy, uz, t, seed, env, o = {}) {
     if (_p.rate <= 0) continue;
     const mm = _p.rate * dl * ts / 3600;                 // mm of water that fell in this slice
     water += mm * (1 - _p.frozen) * Math.exp(-lag / dryTau);
-    const depth = mm * _p.frozen * WEATHER.snowRatio / 1000;     // m of fresh snow
+    const depth = mm * _p.frozen * WEATHER.coldShare * WEATHER.snowRatio / 1000;     // m of fresh snow
     snow += Math.max(0, depth * Math.exp(-lag / settleTau) - meltPerS * lag * 0.5);
   }
   // melting snow keeps the ground wet
@@ -365,7 +368,9 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   }
   const rIce = regime && regime.liquid === 'frost' ? 0 : a.rateIce * moist * below;
   const rOther = Math.max(0, rate - rIce - rFrost);
-  const rSolid = rOther * frozen + rIce, rLiquid = rOther * (1 - frozen);
+  // cold air holds less vapour (Clausius-Clapeyron): the same system snows less water than it rains
+  const rSolid = rOther * frozen * WEATHER.coldShare + rIce, rLiquid = rOther * (1 - frozen);
+  rate = rSolid + rLiquid + rFrost;
   // virga: drops evaporate on the way down in hot dry air (Venus) and only reach high ground
   let reach = 1;
   if (regime && regime.virga > 0) reach = smoothstep(regime.virga * 0.6, regime.virga * 1.4, altitude);
@@ -397,7 +402,8 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   if (!(pr.fallSpeed < 1e4)) pr.fallSpeed = 0;
   // 0..1 for drawing and for particle counts: saturates around a downpour
   // (a millimetre of snow is far more flakes than a millimetre of rain is drops)
-  pr.intensity01 = type === 'none' ? 0 : clamp01(1 - Math.exp(-(rLiquid / 9 + rSolid / 1.2 + rFrost / 0.1)));
+  // (it rises from nothing at the 0.02 mm/h below which nothing is said to fall)
+  pr.intensity01 = type === 'none' ? 0 : clamp01(1 - Math.exp(-(rLiquid / 9 + rSolid / 1.2 + rFrost / 0.1) * clamp01((rate - 0.02) / 0.06)));
 
   // ---- fog and mist: a local condition (calm, damp, cool air) plus drifting fog banks --------
   const fogBiome = env && env.fog != null ? env.fog : 0.2;

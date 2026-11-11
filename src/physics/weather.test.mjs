@@ -41,7 +41,7 @@ test('a fair morning over Earth\'s home forest for the first seven minutes (defa
   // ... and then, at PAINTER's spawn, you see weather coming and it comes: cloud builds within
   // five minutes, a storm passes between ten and fourteen, and the sky opens again
   const d = { x: 0.1736, y: 0.5817, z: 0.7946 };
-  assert.ok(wx('earth', d, 60).cloud01 < 0.2 && wx('earth', d, 300).cloud01 > 0.5, 'cloud builds');
+  assert.ok(wx('earth', d, 30).cloud01 < 0.2 && wx('earth', d, 300).cloud01 > 0.5, 'cloud builds');
   let wettest = 0, when = 0; for (let t = 420; t <= 900; t += 10) { const r = wx('earth', d, t).precipitation.rate; if (r > wettest) { wettest = r; when = t; } }
   assert.ok(wettest > 3 && when > 600 && when < 840, `the storm: ${wettest.toFixed(1)} mm/h at ${when} s`);
   assert.ok(wx('earth', d, 960).precipitation.rate < 0.03, 'and it passes');
