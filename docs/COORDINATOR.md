@@ -1169,3 +1169,39 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   descent, the hull in gusts and the hard check at a boulder on the Moon, each judged with
   PILOT's levers in mind; (3) trees and leaves that read in a storm; (4) the Earth shore
   seen; then review 6's findings as they come.
+- 2026-11-11: **PHYSICS P13 accepted (tenth agent; `60423e0` gait, `d2d0006`, `52fd659`,
+  `2e6ce74`)**. The coordinator re-ran on a clean export of the head: `node --test
+  src/physics/` 262 pass, `node --test tests/*.test.mjs` 117 pass; and opened the walk strip
+  (the stand-in figure plainly steps, two legs scissoring, the torso lower at mid-stance).
+  **A gait**: the body PILOT tuned (`st.p`, `st.v`) is the stride's mean and is untouched
+  (the same commands with two stride phases give the same place and velocity to the last
+  digit). Within the stride: gait and step length by dynamic similarity (Froude number, leg
+  0.9 m: a walk below 0.5, so under 2.0 m/s on Earth and 1.0 m/s on the Moon); the walk an
+  inverted pendulum, the run a spring-mass with a ballistic flight under the planet's own
+  gravity. Earth at 4.2 m/s: steps of 1.41 m, 3.0 a second, 36 % of the time in flight, a
+  bob of 6.8 cm; the Moon at 4.2 m/s: 2.27 m, 1.85 a second, 61 % in flight. Footfalls with
+  moment, place, foot and force. A crouch of 0.12 s before a jump (`cmd.jumpCrouch`; the
+  feet leave 0.12 s after the command, height unchanged). PILOT's "walk" of 4.2 m/s is by
+  its gait a run.
+  **Three judgements**: the descent brake eases in (largest change of acceleration in a step
+  9 to under 1.2 m/s2; the five seconds at one speed were the lab's limit, the game's is
+  PILOT's wrapper); `buffetAngle` now carries the wind's moments on the hull against an
+  attitude hold (roll 0.2 to 0.7 degrees in 6.5 to 10 m/s gusts, 0.9 to 4.8 in 14 to
+  26 m/s; a new `.yaw`); at a boulder's face the legs take the body's speed up over a stride
+  (2.2 m/s lost in one step before, 0.5 now, at 7.4 m/s on the Moon).
+  **To wire, PILOT**: pass `phys.ride` (hip plus stride bob) where `hip` is passed, with
+  `stride`, `footDown`, `feet`, `surge`, `crouch01`, `gait`; keep the camera on `st.p`;
+  footsteps from `phys.footfall` when `phys.steps` changes; `rotateY(buf.yaw)` on the drawn
+  hull. **To wire, PAINTER**: boots placed by `feet`, hips hung by `ride`, no walk cycle on
+  its own clock, the swinging leg's knee folded; `pcPhysBranch` is called nowhere in
+  `src/world` or `src/render`, so no branch moves in the game (the three lines are in
+  PHYSICS's notes); leaves as dabs of at least 8 px.
+  **Not done**: branches (their swing is tied to the trunk's lean, which P11 made stiff:
+  7 cm at the tip where a gale gives 0.3 to 0.6 m); leaves (five to ten times the count in
+  a gale); the Earth shore seen only before PAINTER wired the run-up (the water's edge does
+  not move); the jetpack, hover and Moon clamber strips not re-filmed. The tenth PHYSICS
+  agent is out of context and is replaced by an eleventh.
+- 2026-11-11: **PHYSICS's order for P14** (coordinator): (1) branches driven by their own
+  wind load, proved in a stand-in crown; leaves that can be seen in a gale; (2) the shore
+  once PAINTER has wired the run-up; the three strips not re-filmed; then review 6's
+  findings.
