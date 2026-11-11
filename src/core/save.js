@@ -37,6 +37,7 @@ export function snapshot(sim) {
     ship: { bodyId: sim.shFrame.id, p: r3(sim.sh.p), q: { x: sim.sh.q.x, y: sim.sh.q.y, z: sim.sh.q.z, w: sim.sh.q.w } },
     target: sim.target, targetLocked: !!sim.targetLocked,
     visited: Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)])),
+    vistas: Object.fromEntries(Object.entries(sim.vistas || {}).map(([k, v]) => [k, Object.keys(v)])),
   };
 }
 
@@ -94,6 +95,11 @@ export function restore(sim, d) {
   for (const [id, list] of Object.entries(d.visited || {})) {
     if (!BODIES[id] || !Array.isArray(list)) continue;
     sim.visited[id] = { biomes: Object.fromEntries(list.filter((b) => typeof b === 'string').map((b) => [b, true])) };
+  }
+  sim.vistas = {};
+  for (const [id, list] of Object.entries(d.vistas || {})) {
+    if (!BODIES[id] || !Array.isArray(list)) continue;
+    sim.vistas[id] = Object.fromEntries(list.filter((b) => typeof b === 'string').map((b) => [b, true]));
   }
   sim.transition = null;
   sim.pulse = null;

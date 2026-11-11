@@ -121,3 +121,39 @@ test('autosave writes on arrival and at intervals on foot, not in the air and no
   assert.equal(bad.update(sim), false);
   assert.equal(bad.ok, false);
 });
+
+test('vistas: walking up to one finds it once, the sketchbook lists it, and it survives a save', () => {
+  const spawn = stubSpawn('earth').unitDir;
+  // One vista 40 m ahead of the spawn along +x (roughly), one far away.
+  const near = (() => { const k = 40 / 4000; const d = { x: spawn.x + k, y: spawn.y, z: spawn.z }; const l = Math.hypot(d.x, d.y, d.z); return { x: d.x / l, y: d.y / l, z: d.z / l }; })();
+  const vistas = [{ id: 'v1', name: 'The first view', unitDir: near }, { id: 'v2', name: 'Far side', unitDir: { x: -spawn.x, y: -spawn.y, z: -spawn.z } }];
+  const calls = [];
+  const sim = newSim({ getVistas: (id) => (id === 'earth' ? vistas : []) });
+  sim.onVistaFound = (b, v) => calls.push(b + ':' + v);
+  const pad = new Pad();
+  play(sim, pad, 0.3);
+  const nv = sim.nearestVista();
+  assert.equal(nv.name, 'The first view');
+  assert.ok(Math.abs(nv.distance - 40) < 3, 'distance ' + nv.distance);
+  // Turn toward it and walk.
+  pad.dx += (nv.bearingDeg * Math.PI / 180) / 0.0023;
+  pad.press('KeyW');
+  play(sim, pad, 20, { until: () => calls.length > 0 });
+  pad.release('KeyW');
+  assert.deepEqual(calls, ['earth:v1']);
+  assert.match(sim.notice.text, /The first view/);
+  play(sim, pad, 3);
+  assert.equal(calls.length, 1, 'found once');
+  const book = sim.sketchbook().find((b) => b.id === 'earth');
+  assert.deepEqual(book.vistasFound, ['The first view']);
+  assert.equal(book.vistasTotal, 2);
+  assert.ok(book.visited && book.biomes.length >= 1);
+  assert.equal(sim.nearestVista().name, 'Far side');
+  const b = newSim({ getVistas: (id) => (id === 'earth' ? vistas : []) });
+  assert.equal(restore(b, JSON.parse(JSON.stringify(snapshot(sim)))), true);
+  assert.deepEqual(b.sketchbook().find((x) => x.id === 'earth').vistasFound, ['The first view']);
+  // A world without vistas, or one that throws, is no problem.
+  const c = newSim({ getVistas: () => { throw new Error('no'); } });
+  play(c, pad, 0.2);
+  assert.equal(c.nearestVista(), null);
+});

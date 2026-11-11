@@ -69,3 +69,30 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
 .pc-map.pc-on { display: block; }
 .pc-map canvas { display: block; width: 680px; height: 400px; margin: 4px auto 6px; cursor: pointer; }
 .pc-map .pc-title { font-size: 22px; margin: 0; }
+/* Read-outs sit on a slip of paper: ink on paper is readable over any wash, light or indigo. */
+.pc-readout { background: rgba(244, 239, 228, 0.82); padding: 5px 11px 6px; border-radius: 3px 8px 4px 9px / 8px 3px 9px 4px;
+  box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.28); color: var(--pc-ink); font-style: italic; font-size: 13px; text-shadow: none; }
+.pc-readout.pc-on { opacity: 0.96; }
+.pc-gauges { background: rgba(244, 239, 228, 0.0); }
+.pc-gauge.pc-on { background: rgba(244, 239, 228, 0.82); padding: 4px 10px; border-radius: 3px 8px 4px 9px / 8px 3px 9px 4px;
+  box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.28); text-shadow: none; opacity: 0.96; }
+.pc-gauge .pc-label { color: var(--pc-ink); }
+.pc-notice { background: rgba(244, 239, 228, 0.82); width: max-content; max-width: 80%; margin: 0 auto; padding: 5px 14px;
+  border-radius: 4px 10px 5px 9px / 9px 4px 10px 5px; text-shadow: none; left: 0; right: 0; }
+.pc-mark span { background: rgba(244, 239, 228, 0.78); width: max-content; left: 50%; transform: translateX(-50%); padding: 1px 7px;
+  border-radius: 3px 7px 4px 8px / 7px 3px 8px 4px; text-shadow: none; }
+.pc-button { box-shadow: 0 0 0 1.5px rgba(44, 51, 80, 0.55), 2px 3px 0 rgba(44, 51, 80, 0.12); background: rgba(244, 239, 228, 0.94); }
+.pc-hint { position: absolute; left: 0; right: 0; top: 8.5%; margin: 0 auto; width: max-content; max-width: 86%; padding: 4px 13px;
+  background: rgba(244, 239, 228, 0.85); border-radius: 4px 9px 5px 8px / 8px 4px 9px 5px; font-size: 13px; font-style: italic;
+  color: var(--pc-ink); opacity: 0; transition: opacity 0.6s ease; box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.28); }
+.pc-hint.pc-on { opacity: 0.95; }
+.pc-book { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 620px;
+  padding: 16px 24px 14px; display: none; pointer-events: auto; text-align: left; }
+.pc-book.pc-on { display: block; }
+.pc-book .pc-title { font-size: 22px; text-align: center; margin-bottom: 8px; }
+.pc-book-row { display: grid; grid-template-columns: 86px 1fr; gap: 0 12px; padding: 4px 0; opacity: 0.45; font-size: 13px;
+  border-top: 1px solid rgba(107, 90, 72, 0.16); }
+.pc-book-row.pc-on { opacity: 1; }
+.pc-book-row b { grid-row: span 2; color: var(--pc-ink); font-size: 15px; }
+.pc-book-foot { margin-top: 8px; text-align: center; font-size: 13px; color: var(--pc-ink); }
+.pc-start .pc-sub { margin-top: 2px; }

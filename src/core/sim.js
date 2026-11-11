@@ -33,6 +33,7 @@ export const FEEL = Object.freeze({
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const Y = V(0, 1, 0);
+export const VISTA_RANGE = 14;      // metres: this close to a vista's spot, on foot, and it is yours
 const VACUUM = { density: 0, wind: V(), speed: 0, gust01: 0, turbulence: 0, temperature: 3, pressure: 0, soundSpeed: 0, viscosity: 0 };
 const VACUUM_AIR = (p, out) => (out ? Object.assign(out, VACUUM) : VACUUM);
 
@@ -42,7 +43,12 @@ export class Sim {
   // sampleObstacles(bodyId, {x,y,z}, radius) -> [{ unitDir, radius, height }] (optional).
   // physics (optional): the object from createPhysics (src/physics). Without it the explorer
   // and the ship move by Pilot's own kinematic rules.
-  constructor({ sampleSurface, getSpawn, sampleObstacles, physics, seat, hatch, body, hour }) {
+  // getVistas(bodyId) -> [{ id, name, unitDir }] (optional): the marked views to find on foot.
+  constructor({ sampleSurface, getSpawn, sampleObstacles, getVistas, physics, seat, hatch, body, hour }) {
+    this.getVistas = getVistas || null;
+    this.vistas = {};              // bodyId -> { vistaId: true } found so far
+    this.onVistaFound = null;      // (bodyId, vistaId) -> void, set by the presenter
+    this._vistaList = {};
     this.sampleSurface = sampleSurface;
     this.sampleObstacles = sampleObstacles || null;
     this.physics = physics || null;
@@ -150,6 +156,7 @@ export class Sim {
     for (let i = 0; i < steps; i++) this.step(h, inp, i === 0);
     this.updatePhysics(simDt);
     this.noteVisit();
+    this.checkVistas();
     this.frameCount++;
     return simDt;
   }
@@ -278,6 +285,72 @@ export class Sim {
     const ms = now() - t0;
     this.physicsMs += (ms - this.physicsMs) * 0.1;
     if (ms > this.physicsWorstMs || this.frameCount % 600 === 0) this.physicsWorstMs = ms;
+  }
+
+  // Vistas of a body as plain objects (cached): [{ id, name, dir }].
+  vistasOf(bodyId) {
+    if (this._vistaList[bodyId]) return this._vistaList[bodyId];
+    let list = [];
+    if (this.getVistas) {
+      try {
+        list = (this.getVistas(bodyId) || []).filter((v) => v && v.unitDir && v.id != null)
+          .map((v) => ({ id: String(v.id), name: v.name || 'a view', dir: norm(V(v.unitDir.x, v.unitDir.y, v.unitDir.z)) }));
+      } catch { list = []; }
+    }
+    this._vistaList[bodyId] = list;
+    return list;
+  }
+
+  // Walking up to a vista finds it (within VISTA_RANGE metres of its spot, on foot).
+  checkVistas() {
+    if (this.sm.state !== S.ON_FOOT) return;
+    const list = this.vistasOf(this.bodyId);
+    if (!list.length) return;
+    const found = this.vistas[this.bodyId] || (this.vistas[this.bodyId] = {});
+    const r = len(this.ex.p), up = scale(this.ex.p, 1 / r);
+    for (const v of list) {
+      if (found[v.id]) continue;
+      const d = Math.acos(Math.min(1, dot(up, v.dir))) * r;
+      if (d < VISTA_RANGE) {
+        found[v.id] = true;
+        this.say('A view for the sketchbook: ' + v.name, 6);
+        this.emit('vista');
+        if (this.onVistaFound) this.onVistaFound(this.bodyId, v.id);
+      }
+    }
+  }
+
+  // The nearest vista not yet found on the current body: { name, distance, bearingDeg (+ right
+  // of where the camera looks) } or null.
+  nearestVista() {
+    const list = this.vistasOf(this.bodyId);
+    const found = this.vistas[this.bodyId] || {};
+    const r = len(this.ex.p), up = scale(this.ex.p, 1 / r);
+    let best = null;
+    for (const v of list) {
+      if (found[v.id]) continue;
+      const d = Math.acos(Math.min(1, dot(up, v.dir))) * r;
+      if (!best || d < best.distance) best = { id: v.id, name: v.name, distance: d, dir: v.dir };
+    }
+    if (!best) return null;
+    const to = tangent(sub(best.dir, up), up, this.footCam.viewFwd);
+    best.bearingDeg = Math.atan2(dot(cross(this.footCam.viewFwd, to), scale(up, -1)), dot(this.footCam.viewFwd, to)) * 180 / Math.PI;
+    return best;
+  }
+
+  // What the sketchbook shows: per body, the biomes stood on and the vistas found.
+  sketchbook() {
+    const out = [];
+    for (const id of this.eph.ids) {
+      const list = this.vistasOf(id);
+      const found = this.vistas[id] || {};
+      out.push({
+        id, name: BODIES[id].name, visited: !!this.visited[id],
+        biomes: this.visited[id] ? Object.keys(this.visited[id].biomes) : [],
+        vistasFound: list.filter((v) => found[v.id]).map((v) => v.name), vistasTotal: list.length,
+      });
+    }
+    return out;
   }
 
   // The sketchbook's raw data: every body and biome the explorer has stood on.
@@ -756,6 +829,7 @@ export class Sim {
     out.pulse = this.pulse ? { v: this.pulse.v, block: this.pulse.block, cancel: this.pulse.cancel } : null;
     out.notice = this.notice ? this.notice.text : null;
     out.visited = Object.fromEntries(Object.entries(this.visited).map(([k, v]) => [k, Object.keys(v.biomes)]));
+    out.vistas = Object.fromEntries(Object.entries(this.vistas).map(([k, v]) => [k, Object.keys(v)]));
     out.physics = this.physics ? { ms: this.physicsMs, worstMs: this.physicsWorstMs } : null;
     const env = this.flightEnv();
     const f = qRotate(sh.q, V(0, 0, -1));
