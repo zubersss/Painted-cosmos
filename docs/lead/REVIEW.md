@@ -45,6 +45,27 @@ Body by body, as I open them:
   frames, 162 s): **the best frame of the body**, a plain watercolour of a sun-baked basin,
   sepia crack lines, soft far hills, a granulated sky. From orbit (9 frames): a pale blue-grey
   blotched ball, still no dark side; painted but anonymous.
+- **Earth.** Spawn (temperate forest; 9 frames, 52 s: the title card had built it): passes.
+  A meadow in a birch and pine wood with the stream on the left and the ship waiting under
+  the trees ahead: crowns as dabbed masses with soft edges, birch bark as dark marks, the far
+  wood fading to paper. It says Earth at once. Two things are digital: the far bank's birches
+  stand as a **picket fence** (white verticals of one height at one spacing, left of the ship),
+  and the figure is a smooth shaded doll in a painted scene. Vista, Temperate Forest (43
+  frames, 432 s): the stream study, still the reference painting, but the fence is now the
+  subject: a single row of white trunks crosses the whole width at one height behind the
+  water; and the near red flowers on the bank are flat orange-red ellipses with hard rims
+  (block 6 gave near flowers a lobed edge; these are not near enough for it, or are another
+  kit). From orbit (9 frames): a mottled globe with a rose-ochre land and white cloud;
+  painted; the cloud's edges are still crisp in places.
+- **The Moon.** Spawn (38 frames, 185 s): a silver-grey plain under an indigo sky with
+  spattered stars, the ship to the right: quiet, minimal, and it does pass as a wash study.
+  But the brief's one image for the Moon is **Earth in the sky**, and the first view faces
+  away from it: nothing in the frame says "Earth's moon" rather than "a grey world at night".
+  The horizon is a ruler-straight line of identical pale boulder blobs. Vista, Silver Mare
+  (28 frames, 103 s): almost the same view from a few metres away (the vista is beside the
+  spawn); the near boulders are smooth pale slabs with hard violet outlines, like ice floes or
+  soap, not rock. From orbit (24 frames): a pale cratered disc on indigo, painted; no dark
+  side.
 
 ---
 

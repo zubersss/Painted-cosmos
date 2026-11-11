@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER b022507, PHYSICS 2e6ce74, PILOT 5a5b691; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 52.1,
+   "settledFrames": 9,
+   "tris": 1445167,
+   "calls": 463,
+   "worldWorstMs": 609.2,
+   "physicsWorstMs": 362.3,
+   "stoodIn": "temperate_forest",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "earth-temperate_forest-1",
+   "name": "Temperate Forest",
+   "alsoVista": null,
+   "settledSeconds": 432.4,
+   "settledFrames": 43,
+   "tris": 1488059,
+   "calls": 480,
+   "worldWorstMs": 600.6,
+   "physicsWorstMs": 362.3,
+   "stoodIn": "temperate_forest",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 19,
+    "biome": "temperate_forest",
+    "radius": 4023.0774630512387
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 38.4,
+   "settledFrames": 9,
+   "tris": 73775,
+   "calls": 46,
+   "worldWorstMs": 600.6,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}
