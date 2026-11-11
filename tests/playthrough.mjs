@@ -236,7 +236,12 @@ try {
   await page.keyboard.down('KeyS');
   i = await until((x) => x.ship.throttle < 0.3, 8, holdPitch(-10));
   await page.keyboard.up('KeyS');
-  i = await until((x) => x.ship.canLand, 150, async (x) => holdPitch(x.ship.altGround > 110 ? -18 : -7)(x));
+  // (If a slow machine let S run the throttle down too far, a touch of W brings it back: a ship
+  // with no way on does not descend along its nose.)
+  i = await until((x) => x.ship.canLand, 200, async (x) => {
+    await holdPitch(x.ship.altGround > 110 ? -18 : -7)(x);
+    if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await sleep(120); await page.keyboard.up('KeyW'); }
+  });
   check(i.ship.canLand && i.prompt === 'Land here', 'landing prompt shows');
   check(i.ship.bounces === 0, 'never touched the ground on the way down');
   await shot('10-land-prompt', '10-land-prompt');

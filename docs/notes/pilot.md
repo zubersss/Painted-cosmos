@@ -36,14 +36,21 @@ What M2 added:
   draw calls, render scale, quality tier, `world.update` ms, `physics.update` ms. In the README.
 
 ### Verified (how)
-- `node --test tests/*.test.mjs`: 91 pass. Beyond M1's set: pulse advice and speed profile; the
+- `node --test tests/*.test.mjs`: 92 pass. Beyond M1's set: pulse advice and speed profile; the
   Earth-Mars-Saturn trip in the pure simulation on stubs (lift off, map target, aim, pulse,
   land, step out, twice); the same trip on PAINTER's real worlds with PHYSICS and the real
   obstacles (lands in `dry_riverbeds` and `crystal_reeds`); save round trip, bad saves, a
   storage that throws; the M1 loop, a full-throttle dive on three bodies, the landing gear and
   the start/stop assist through PHYSICS' models; trunk collision and a low pass over the real
   forest (hull above every tree top).
-- `node --test src/physics/` (125 pass) and `node --test src/world/*.test.mjs`: run by me.
+- Landing anywhere: `tests/contract.test.mjs` sets the ship down at the spawn and at three
+  other places on **each of the ten bodies** (40 landings in 28 biomes on PAINTER's real
+  worlds, PHYSICS on; three of them afloat on Jupiter's and Neptune's liquid), checks a soft
+  touchdown, that the parked ship stays put and upright on its gear, and that the explorer
+  steps out and walks.
+- `node --test src/physics/` and `node --test src/world/*.test.mjs`: run by me at each sync
+  (PAINTER 12 pass; PHYSICS 125 pass at `b0ad22b`, 7 of 154 failing in its uncommitted P2
+  working tree after the restart: its to fix, reported in REVIEW 3).
 - `node tests/playthrough.mjs --keep` (stub world, kinematic): PASSED, 37 checks.
 - `node tests/playthrough.mjs --query "stub=render,world,art&fresh=1"` (stub visuals, PHYSICS
   on): PASSED, 37 checks.
@@ -217,10 +224,7 @@ Pulse (`src/ship/pulse.js` PULSE): top speed 30 km/s, 400 m/s2, spool 0.9 s, let
    top of yours (twice the distance per frame). Fixed on my side; worth a line in your guide.
 
 ### From the COORDINATOR
-- `tools/shot.mjs` has no way to lengthen the screenshot timeout (Playwright's 30 s default);
-  the painted forest in software GL can take longer than that for one frame and the tool then
-  dies with an unhandled error. A `--shot-timeout ms` option would help all three roles. I
-  work around it with `tests/capture.mjs`.
+Nothing open. (`--shot-timeout` arrived in `1087406`; thank you.)
 
 ## Answers to the other
 

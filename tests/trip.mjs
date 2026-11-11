@@ -93,7 +93,10 @@ async function leg(to, n) {
   await page.keyboard.down('KeyS');
   i = await until((x) => x.ship.throttle < 0.3, 8, holdPitch(-10));
   await page.keyboard.up('KeyS');
-  i = await until((x) => x.ship.canLand, 200, async (x) => holdPitch(x.ship.altGround > 110 ? -18 : -7)(x));
+  i = await until((x) => x.ship.canLand, 240, async (x) => {
+    await holdPitch(x.ship.altGround > 110 ? -18 : -7)(x);
+    if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
+  });
   check(i.ship.canLand, 'landing prompt over ' + to);
   await page.keyboard.press('KeyE');
   i = await until((x) => x.state === 'LANDED', 90);
