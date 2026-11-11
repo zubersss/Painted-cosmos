@@ -838,7 +838,8 @@ export class Sim {
 
   explorerVisible() {
     const st = this.sm.state;
-    if (st === S.ON_FOOT) return !this.footCam.firstPerson;
+    // Hidden in first person, and while a squeezed boom has slid the view into the eyes.
+    if (st === S.ON_FOOT) return !this.footCam.firstPerson && !(this.footCam.tight01 > 0.3);
     if (st === S.BOARDING && this.transition) return this.transition.dir === 'in' ? this.transition.t / this.transition.dur < 0.72 : true;
     return false;
   }

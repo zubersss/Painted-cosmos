@@ -4,7 +4,7 @@ import { EXPLORER, createExplorerState, stepExplorer, collideObstacles } from '.
 import { createFootCamera, lookFootCamera, updateFootCamera, CAMERA } from '../src/player/camera.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { makeWorld, arc, V, norm, dot, sub, scale, len } from './helpers.mjs';
-import { tangent, cross, rotateAround, qRotate } from '../src/core/vec.js';
+import { tangent, cross, rotateAround, qRotate, add } from '../src/core/vec.js';
 
 const DT = 1 / 60;
 const R = 4000;
@@ -269,6 +269,38 @@ test('third-person camera stops in front of the ship instead of going inside it'
   // With nothing in the way the boom is full length again.
   for (let i = 0; i < 240; i++) pose = updateFootCamera(cam, feet, DT, sample, undefined, []);
   assert.ok(Math.abs(cam.boomNow - CAMERA.boom) < 0.05);
+});
+
+test('in a thicket the squeezed third-person view slides into the eyes, and back out when there is room', () => {
+  const sample = makeWorld({ R });
+  const feet = scale(start, R);
+  const cam = createFootCamera(fwd0, start);
+  cam.pitch = 0;
+  // A crystal (or trunk) 1.6 m behind the explorer, at pivot height: the boom has 0.85 m left.
+  const crystal = [{ p: sub(scale(start, R + CAMERA.pivotHeight), scale(fwd0, 1.6)), radius: 0.4 }];
+  let pose;
+  for (let i = 0; i < 120; i++) pose = updateFootCamera(cam, feet, DT, sample, undefined, crystal);
+  assert.ok(cam.tight01 > 0.95, 'the view is the explorer\'s own: ' + cam.tight01);
+  const eye = add(scale(start, R + 1.62), scale(fwd0, 0.1));
+  assert.ok(len(sub(pose.p, eye)) < 0.15, 'camera at eye height, at the face: ' + len(sub(pose.p, eye)));
+  assert.ok(dot(pose.look, fwd0) > 0.99, 'looking where the player looks');
+  assert.ok(len(sub(pose.p, crystal[0].p)) > 0.4 + 0.3, 'never inside the crystal');
+  // Half squeezed (a hull 3.4 m behind): partly forward, never a jump.
+  const cam2 = createFootCamera(fwd0, start); cam2.pitch = 0;
+  const hull = [{ p: sub(scale(start, R + CAMERA.pivotHeight), scale(fwd0, 3.4)), radius: 1.2 }];
+  let last = null, worst = 0;
+  for (let i = 0; i < 180; i++) {
+    const q = updateFootCamera(cam2, feet, DT, sample, undefined, i < 90 ? hull : []);
+    // (The boom snaps in within a few frames when something appears behind the explorer: that
+    // is the old rule. What is measured here is everything after it, and the way back out.)
+    if (last && i > 20) worst = Math.max(worst, len(sub(q.p, last.p)));
+    last = q;
+    if (i === 89) assert.ok(cam2.tight01 > 0.05 && cam2.tight01 < 0.95, 'half squeezed is half way: ' + cam2.tight01);
+  }
+  assert.ok(worst < 0.25, 'the way back out is continuous (largest step ' + worst.toFixed(2) + ' m a frame)');
+  // Room again: third person, full boom.
+  for (let i = 0; i < 300; i++) pose = updateFootCamera(cam, feet, DT, sample, undefined, []);
+  assert.ok(cam.tight01 === 0 && Math.abs(cam.boomNow - CAMERA.boom) < 0.05);
 });
 
 test('tree trunks are solid: walking into one slides round it; the jetpack goes over', () => {

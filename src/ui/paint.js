@@ -70,8 +70,15 @@ export function installTheme(doc = typeof document !== 'undefined' ? document : 
   const tile = paperTile();
   if (tile) st.setProperty('--pc-paper-img', `url(${tile})`);
   st.setProperty('--pc-cursor', cursorUrl());
+  // Pencil: three loose frames for the sketches not yet made, and a rule drawn along a page.
+  st.setProperty('--pc-frame-a', pencilFrame(130, 73, 1)); st.setProperty('--pc-frame-b', pencilFrame(130, 73, 2));
+  st.setProperty('--pc-frame-c', pencilFrame(130, 73, 3)); st.setProperty('--pc-rule', pencilRule(1)); st.setProperty('--pc-rule-b', pencilRule(2));
   // Filters. pc-torn: the ragged edge of a torn sheet (panels). pc-rag: the same, finer, for
-  // small slips. pc-rough: the broken edge of ink or a wash on rough paper.
+  // small slips. pc-rough: the broken edge of ink or a wash on rough paper. pc-wash: a small
+  // wash (a key, a tab): an uneven edge, and pigment settled into the grain so that the paper
+  // shows through in specks. pc-stroke: the body of one broad stroke of a loaded brush (a
+  // wandering edge, dense pigment). pc-brush: where that stroke runs dry: long streaks along
+  // it where the hairs ran out of paint.
   const holder = doc.createElement('div');
   holder.id = 'pc-defs';
   holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
@@ -79,6 +86,9 @@ export function installTheme(doc = typeof document !== 'undefined' ? document : 
     <filter id="pc-torn" x="-4%" y="-6%" width="108%" height="112%"><feTurbulence type="fractalNoise" baseFrequency="0.028 0.034" numOctaves="3" seed="11" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="11" xChannelSelector="R" yChannelSelector="G"/></filter>
     <filter id="pc-rag" x="-6%" y="-20%" width="112%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.06 0.075" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter>
     <filter id="pc-rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" seed="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.7" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="pc-wash" x="-18%" y="-30%" width="136%" height="160%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.1 0.13" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="4.2" xChannelSelector="R" yChannelSelector="G" result="d"/><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.5 0 0 0 1.6" result="ga"/><feComposite in="d" in2="ga" operator="in"/></filter>
+    <filter id="pc-stroke" x="-7%" y="-34%" width="114%" height="168%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.03 0.075" numOctaves="2" seed="9" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G" result="d"/><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="5" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.7 0 0 0 1.32" result="ga"/><feComposite in="d" in2="ga" operator="in"/></filter>
+    <filter id="pc-brush" x="-7%" y="-34%" width="114%" height="168%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.03 0.075" numOctaves="2" seed="9" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G" result="d"/><feTurbulence type="fractalNoise" baseFrequency="0.007 0.25" numOctaves="2" seed="5" result="s"/><feColorMatrix in="s" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -2.6 0 0 0 2.25" result="sa"/><feComposite in="d" in2="sa" operator="in"/></filter>
   </defs></svg>`;
   (doc.body || doc.documentElement).appendChild(holder);
   return true;
@@ -111,6 +121,47 @@ export function inkOnCanvas(g, text, x, y, size = SIZE.small, opts = {}) {
   g.stroke(new Path2D(p.d));
   g.restore();
   return p.width;
+}
+
+// Graphite, as a CSS image. A loose frame: each side drawn twice with a soft pencil, bowed a
+// little, running past the corners; a few hatching strokes in one corner where the drawing
+// will start. The wobble is fixed by `seed`, so three seeds give three different frames.
+const GRAPHITE = '#5a5048';
+function svgUrl(svg) { return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`; }
+export function pencilFrame(w = 130, h = 73, seed = 1) {
+  const r = (i) => hash(seed * 31 + i, 7 + seed) - 0.5;
+  const m = 5, x0 = m, y0 = m, x1 = w - m, y1 = h - m;
+  let d1 = '', d2 = '', n = 0;
+  const side = (ax, ay, bx, by, pass) => {
+    const len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len;
+    const o0 = 1.5 + 4.5 * (r(n++) + 0.5), o1 = 1.5 + 4.5 * (r(n++) + 0.5);      // how far past each corner
+    const j = () => r(n++) * (pass ? 3.2 : 2.2);
+    const sx = ax - ux * o0 + j(), sy = ay - uy * o0 + j(), ex = bx + ux * o1 + j(), ey = by + uy * o1 + j();
+    const bow = r(n++) * 3.4;
+    const cx = (sx + ex) / 2 - uy * bow, cy = (sy + ey) / 2 + ux * bow;
+    return `M${sx.toFixed(1)} ${sy.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+  };
+  for (const pass of [0, 1]) {
+    const d = side(x0, y0, x1, y0, pass) + side(x1, y0, x1, y1, pass) + side(x1, y1, x0, y1, pass) + side(x0, y1, x0, y0, pass);
+    if (pass) d2 = d; else d1 = d;
+  }
+  // hatching: five quick strokes in a corner (which corner depends on the seed)
+  let hatch = '';
+  const left = seed % 2 === 0, hx = left ? x0 + 6 : x1 - 30, hy = y1 - 6;
+  for (let i = 0; i < 5; i++) {
+    const a = hx + i * 5 + r(n++) * 2, b = hy + r(n++) * 2, l = 9 + i * 2.2 + r(n++) * 3;
+    hatch += `M${a.toFixed(1)} ${b.toFixed(1)}l${(l * 0.62).toFixed(1)} ${(-l * 0.78).toFixed(1)}`;
+  }
+  return svgUrl(`<svg xmlns="${SVG}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><filter id="g" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="${seed}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.3" xChannelSelector="R" yChannelSelector="G"/></filter><g fill="none" stroke="${GRAPHITE}" stroke-linecap="round" filter="url(#g)"><path d="${d1}" stroke-width="1.15" opacity="0.62"/><path d="${d2}" stroke-width="0.8" opacity="0.36"/><path d="${hatch}" stroke-width="0.8" opacity="0.3"/></g></svg>`);
+}
+
+// A rule drawn freehand along the page: it wanders a pixel, and the pencil was lifted once.
+export function pencilRule(seed = 1) {
+  const r = (i) => hash(seed * 17 + i, 3) - 0.5;
+  const y = (i) => (3 + r(i) * 1.7).toFixed(2), lift = 230 + r(9) * 120;
+  const a = `M2 ${y(1)}C${(lift * 0.3).toFixed(0)} ${y(2)} ${(lift * 0.7).toFixed(0)} ${y(3)} ${lift.toFixed(0)} ${y(4)}`;
+  const b = `M${(lift - 9).toFixed(0)} ${y(5)}C${(lift + 60).toFixed(0)} ${y(6)} ${(lift + 140).toFixed(0)} ${y(7)} 398 ${y(8)}`;
+  return svgUrl(`<svg xmlns="${SVG}" width="400" height="6" viewBox="0 0 400 6" preserveAspectRatio="none"><g fill="none" stroke="${GRAPHITE}" stroke-linecap="round"><path d="${a}" stroke-width="1.2" opacity="0.6" vector-effect="non-scaling-stroke"/><path d="${b}" stroke-width="1.05" opacity="0.5" vector-effect="non-scaling-stroke"/></g></svg>`);
 }
 
 // A ring pulled once round with a loaded brush: not quite closed, not quite round. Path data

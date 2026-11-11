@@ -38,18 +38,30 @@ export function createMap(root, { onSelect } = {}) {
     g.setTransform(2, 0, 0, 2, 0, 0);
     g.clearRect(0, 0, W, H);                         // the chart is drawn straight on the panel's paper
     const cx = W / 2, cy = H / 2 + 4;
-    // Orbits: broken, slightly uneven ink lines.
-    g.lineCap = 'round';
+    // Orbits: pencilled freehand. Each is pulled round in three or four strokes that do not
+    // quite meet and do not quite keep their distance; where two strokes overlap the line is
+    // doubled. The wobble is fixed per orbit, so the chart never moves.
+    g.lineCap = 'round'; g.lineJoin = 'round';
     BODY_IDS.forEach((id, n) => {
       const b = BODIES[id];
       if (b.parent) return;
       const r = R(b.orbitRadius);
-      g.strokeStyle = 'rgba(107, 90, 72, 0.33)'; g.lineWidth = 0.9;
-      const segs = 40;
-      for (let i = 0; i < segs; i++) {
-        if (wob(i, n) < 0.16) continue;                               // the brush skips
-        const a0 = (i / segs) * Math.PI * 2, a1 = ((i + 0.92) / segs) * Math.PI * 2;
-        g.beginPath(); g.ellipse(cx, cy, r * 1.55, r * (0.98 + 0.03 * wob(i, n + 9)), 0, a0, a1); g.stroke();
+      const ox = (wob(n, 3) - 0.5) * 2.4, oy = (wob(n, 4) - 0.5) * 2;
+      const rad = (a) => 1 + 0.011 * Math.sin(2 * a + n * 1.7) + 0.007 * Math.sin(5 * a + n * 4.1) + 0.004 * Math.sin(11 * a + n);
+      const strokes = 3 + (n % 2), turn = wob(n, 5) * Math.PI * 2;
+      for (let k = 0; k < strokes; k++) {
+        const a0 = turn + (k / strokes) * Math.PI * 2 + (wob(n, 20 + k) - 0.5) * 0.12;
+        const a1 = turn + ((k + 1) / strokes) * Math.PI * 2 + (wob(n, 30 + k) - 0.2) * 0.16;      // some overlap, some gap
+        const lift = 1 + (wob(n, 40 + k) - 0.5) * 0.012;                                           // each stroke sits a hair in or out
+        g.strokeStyle = `rgba(90, 80, 72, ${(0.3 + 0.16 * wob(n, 50 + k)).toFixed(2)})`; g.lineWidth = 0.75 + 0.35 * wob(n, 60 + k);
+        g.beginPath();
+        const steps = Math.max(8, Math.round((a1 - a0) * 14));
+        for (let i = 0; i <= steps; i++) {
+          const a = a0 + ((a1 - a0) * i) / steps, q = r * rad(a) * lift;
+          const x = cx + ox + Math.cos(a) * q * 1.55, y = cy + oy + Math.sin(a) * q;
+          if (i) g.lineTo(x, y); else g.moveTo(x, y);
+        }
+        g.stroke();
       }
     });
     // The sun: bare paper with a warm halo.
@@ -67,9 +79,21 @@ export function createMap(root, { onSelect } = {}) {
       let x = cx + Math.sin(ang) * r * 1.55, y = cy - Math.cos(ang) * r;
       if (pp) { const a2 = Math.atan2(p.x - pp.x, p.z - pp.z); x += Math.sin(a2) * 13; y -= Math.cos(a2) * 13; }
       const size = pp ? 3.2 : 4 + b.radius / 900;
-      // A wash dot with a darker pooled edge.
-      g.fillStyle = TINT[id] || '#bbb'; g.beginPath(); g.arc(x, y, size, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = 'rgba(44, 51, 80, 0.45)'; g.lineWidth = 0.8; g.beginPath(); g.arc(x + 0.3, y + 0.3, size, 0.3, Math.PI * 1.7); g.stroke();
+      // A dab of wash: not round, thin in the middle, the pigment pooled along its edge; then
+      // a pen line most of the way round, a little off register.
+      const k = BODY_IDS.indexOf(id), tint = TINT[id] || '#bbbbbb';
+      const rgb = [1, 3, 5].map((i) => parseInt(tint.slice(i, i + 2), 16)).join(', ');
+      const wash = g.createRadialGradient(x - size * 0.2, y - size * 0.25, size * 0.1, x, y, size * 1.08);
+      wash.addColorStop(0, `rgba(${rgb}, 0.6)`); wash.addColorStop(0.62, `rgba(${rgb}, 0.82)`); wash.addColorStop(0.9, `rgba(${rgb}, 1)`); wash.addColorStop(1, `rgba(${rgb}, 0.9)`);
+      g.fillStyle = wash; g.beginPath();
+      const N = 9;
+      const pt = (i) => { const a = (i / N) * Math.PI * 2, q = size * (1 + 0.2 * (wob(k, 70 + ((i % N) + N) % N) - 0.5)); return [x + Math.cos(a) * q, y + Math.sin(a) * q]; };
+      for (let i = 0; i <= N; i++) {
+        const p0 = pt(i), p1 = pt(i + 1), mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2;
+        if (!i) g.moveTo(mx, my); else g.quadraticCurveTo(p0[0], p0[1], mx, my);
+      }
+      g.fill();
+      g.strokeStyle = 'rgba(44, 51, 80, 0.5)'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(x + 0.4, y + 0.3, size * 1.02, size * 0.96, 0.4, 0.5 + wob(k, 80), Math.PI * 1.75 + wob(k, 81)); g.stroke();
       if (id === selected) {
         g.strokeStyle = INK; g.lineWidth = 1.4; g.beginPath(); g.ellipse(x, y, size + 6, size + 5, 0.3, 0.2, Math.PI * 2 - 0.15); g.stroke();
       }

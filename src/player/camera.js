@@ -20,6 +20,8 @@ export const CAMERA = Object.freeze({
   boomMax: 14,
   pivotHeight: 2.05,         // the boom pivots above the head so the landscape fills the frame
   clearance: 0.45,           // metres the camera keeps above ground and liquid
+  boomTight: 2.3,            // a boom squeezed shorter than this starts to slide into the eyes
+  boomEye: 1.3,              // ...and at this length the view is the explorer's own (a thicket)
   firstPersonClearance: 0.25,
   shipBoom: 15,              // metres behind the ship
   shipBoomFast: 21,
@@ -45,6 +47,7 @@ export function createFootCamera(viewFwd, up) {
     boomNow: CAMERA.boom,            // boom after collision, smoothed
     lift: 0,                         // extra height from terrain avoidance, smoothed
     firstPerson: false,
+    tight01: 0,                      // 0 = the boom has room; 1 = squeezed into the explorer's eyes
   };
 }
 
@@ -79,6 +82,7 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = 
   const look = norm(add(scale(f, Math.cos(cam.pitch)), scale(up, Math.sin(cam.pitch))));
 
   if (cam.firstPerson) {
+    cam.tight01 = 0;
     let p = add(addScaled(feet, up, 1.62), scale(f, 0.1));
     const need = clearanceAt(sample, p, C.firstPersonClearance);
     if (need > 0) p = addScaled(p, norm(p), need);
@@ -114,7 +118,24 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = 
 
   // Aim at a point ahead of the pivot so the explorer stays in the lower third of the frame.
   const aim = add(pivot, scale(look, 9));
-  const dir = norm(sub(aim, p), look);
+  let dir = norm(sub(aim, p), look);
+
+  // A thicket (trunks, crystals, a hull at the explorer's back): a boom squeezed to a metre or
+  // two frames the back of a head and nothing else. Rather than that, the view slides forward
+  // into the explorer's own eyes while the boom is short, and back out when there is room.
+  // (Only things in the way squeeze the boom this far; the player's own wheel stops at boomMin.)
+  const tight = clamp((C.boomTight - cam.boomNow) / (C.boomTight - C.boomEye), 0, 1);
+  const want = tight * tight * (3 - 2 * tight);
+  // Its own ease in time (a third of a second): the boom itself snaps in within a few frames.
+  cam.tight01 = mix(cam.tight01 || 0, want, damp(want > cam.tight01 ? 9 : 5, dt));
+  if (Math.abs(cam.tight01 - want) < 0.003) cam.tight01 = want;
+  if (cam.tight01 > 0) {
+    let eye = add(addScaled(feet, up, 1.62), scale(f, 0.1));
+    const lift1 = clearanceAt(sample, eye, C.firstPersonClearance);
+    if (lift1 > 0) eye = addScaled(eye, norm(eye), lift1);
+    p = lerp(p, eye, cam.tight01);
+    dir = norm(lerp(dir, look, cam.tight01), look);
+  }
   return { p, q: qLook(dir, norm(p)), fov: C.fovFoot, look: dir };
 }
 
