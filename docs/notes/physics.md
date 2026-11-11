@@ -865,6 +865,39 @@ called (in the gallery you call `physics.update(dt, { bodyId, time, focus, sunDi
 Everything of mine is in **body-local** coordinates (C3). Nothing below is required: each part
 stands alone, in the order I would wire them.
 
+**Changed in P7 (tuned against your `wx-*.jpg` frames; your list in "What looks wrong in the
+physics as painted", answered item by item). Nothing you call changed its name or arguments;
+the DEFAULTS of `DRAW_PAINTED` changed, and since `src/world/index.js` spreads `D.rain` and
+`D.snow` before its own numbers, you get all of it without touching a line. Your two override
+lines there (`draw.rain = ...`, `draw.snow = ...`) are now exactly my defaults and can go.**
+- *Rain.* `DRAW_PAINTED.rain` is `{ width 0.05, exposure 0.12, minPx 4 }` (yours) plus
+  `parallel: 1` (every stroke of a frame takes ONE direction in the picture: the mean motion of
+  the rain relative to the eye as the picture plane sees it; the strokes lie in the picture
+  plane at their drop's depth, so they cannot cross; looking straight down the rain they are
+  dots), `maxLen: 1.2` (m: no stroke longer on any world; Jupiter's would be 3.6 m),
+  `near: 6` (nothing nearer the eye than 2.4 m, whole from 6 m: your `length(vView) < 3.2`
+  discard is no longer needed) and `share: 0.25` (measured in the open in a thunderstorm at
+  960x540, fov 50: 106 strokes in view with your table, 37 now; 0.6 strokes a second go out
+  whole, 2.0 before).
+- *Snow.* `DRAW_PAINTED.snow` is your `{ size 0.07, minPx 3.5, maxPx 6.5, varySize 0.5 }` plus
+  `tumble: 1.2, aspect: 0.5`: every flake has a shape of its own (short side 0.5 to 1 of its
+  long side) and lies at an angle of its own that turns slowly (0.4 to 1.2 rad/s, half of them
+  each way); driven by wind it turns into its motion and is drawn out as before. The quad is
+  that oval's box: your `flake` cut (`vPcUv`) follows it. The lab's `DRAW.snow` has it too.
+- *Dust.* In a dust storm the marks are no longer about twenty round patches: as the weather's
+  dust load (`weather.dustLoad01`) goes from 0.25 to 0.7 the dabs go over to low walls (first
+  fewer: 1 in 20 is kept; then wider): level (long side along the picture's horizon, short side
+  the local up), four times as wide as high, at most 2.2 m high (so up to 8.8 m wide), nothing
+  nearer than 3.6 m, growing and going over 1.2 s more than a puff. Measured in Mars' storm:
+  4 to 5 in view, none popping. And the storm's dust is now carried within 3.6 m of the ground
+  (it was spread over 14 m: the blots against the sky in `wx-mars-dust.jpg`). Your `puff` cut
+  works on the wall as it is (the quad's uv); `maxPx: 80` now bounds the wall's HEIGHT.
+  Kicked dust in clear air is the round puff it was.
+- New `DRAW` fields (CPU expanders only; the instanced chunk `expand: 'gpu'` does not have
+  them yet): streaks `parallel`, `maxLen`, `near`; dabs `tumble`, `aspect`, `wall`, `wallFrom`,
+  `wallFull`, `wallShare`, `wallHigh`, `wallNear`, `wallFade`. All documented at the top of
+  `src/physics/three/expand.js`.
+
 **Changed in P6 (`16d5305`), all of it additive; nothing you would have written against C, D
 or E breaks:**
 - `DRAW_PAINTED` is now exported from `src/physics/three/index.js` (it was a constant inside
