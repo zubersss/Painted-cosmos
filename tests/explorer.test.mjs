@@ -367,3 +367,39 @@ test('wedged between two trunks with the key held, the explorer walks round one 
   for (let i = 0; i < 2 / DT; i++) { stepExplorer(idle, { viewFwd: fwd0 }, DT, env); collideObstacles(idle, pair, undefined, { moving: false, dt: DT }); }
   assert.ok(idle.speed < 0.05 && !idle.detour, 'standing in the pocket, the explorer stands');
 });
+
+test('the suit\'s share of the wind: a little of it in the pace on the ground, most of a gale held off in the air', () => {
+  // PHYSICS' body is replaced by a recorder: this checks the command PILOT sends it.
+  const R = 4000, p0 = V(0, R, 0);
+  const world = makeWorld({ R });
+  const command = (wind, { grounded = true, altitude = 0, keys = { moveZ: 1 } } = {}) => {
+    let seen = null;
+    const env = {
+      sample: world, gravity: 9,
+      air: (p, out) => { out.wind = wind; out.density = 1.2; return out; },
+      bodyStep: (st, cmd) => { seen = { shelter01: cmd.shelter01, wish: Math.hypot(cmd.wish.x, cmd.wish.y, cmd.wish.z) }; },
+    };
+    const st = createExplorerState(scale(p0, 1 + altitude / R), V(0, 0, -1));
+    st.grounded = grounded; st.altitude = altitude;
+    stepExplorer(st, { viewFwd: V(0, 0, -1), ...keys }, 1 / 60, env);
+    return seen;
+  };
+  const walk = EXPLORER.walkSpeed;
+  // On the ground: nothing cancelled (the lean and the push are PHYSICS' own); the pace gives a little.
+  const calm = command(V(0, 0, 0)), head = command(V(0, 0, 19)), tail = command(V(0, 0, -19)), side = command(V(19, 0, 0));
+  assert.equal(calm.shelter01, 0);
+  assert.ok(Math.abs(calm.wish - walk) < 1e-9, 'still air: the walking pace');
+  assert.ok(head.wish < walk * 0.8 && head.wish > 3, `into a 19 m/s wind: ${head.wish.toFixed(2)} m/s`);
+  assert.ok(tail.wish > walk * 1.05 && tail.wish <= walk * EXPLORER.windPaceMax + 1e-9, `with it: ${tail.wish.toFixed(2)} m/s`);
+  assert.ok(Math.abs(side.wish - walk) < 1e-9, 'across it: the walking pace');
+  assert.equal(head.shelter01, 0);
+  // No heading asks for less than 3 m/s, in any gale.
+  for (const w of [30, 45, 60]) assert.ok(command(V(0, 0, w)).wish >= 3, `into ${w} m/s: ${command(V(0, 0, w)).wish.toFixed(2)} m/s`);
+  // Standing still asks for nothing.
+  assert.equal(command(V(0, 0, 30), { keys: {} }).wish, 0);
+  // Off the ground: a breeze is left alone, a gale is cut to what a wind of windAirCap would do.
+  assert.equal(command(V(0, 0, 8), { grounded: false, altitude: 10 }).shelter01, 0);
+  const gale = command(V(0, 0, 40), { grounded: false, altitude: 10 });
+  assert.ok(Math.abs(gale.shelter01 - (1 - (EXPLORER.windAirCap / 40) ** 2)) < 1e-9, `40 m/s in the air: shelter ${gale.shelter01.toFixed(3)}`);
+  assert.ok(gale.shelter01 > 0.85 && gale.shelter01 < 1);
+});

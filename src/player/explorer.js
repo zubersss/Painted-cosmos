@@ -22,6 +22,10 @@ export const EXPLORER = Object.freeze({
   jetThrust: 17,             // m/s^2 upward while burning (gravity is subtracted from this)
   jetMaxRise: 8.5,           // m/s cap on climb speed (rises in light gravity, see jetRiseCap)
   assistAccel: 4,            // m/s^2 of suit-thruster help for starting and stopping (with PHYSICS)
+  windAirCap: 12,            // m/s: off the ground the suit holds off whatever wind is beyond this (PHYSICS' cmd.shelter01)
+  windPace: 0.012,           // per m/s of wind along the walk: a headwind takes a little of the pace, a tailwind adds a little
+  windPaceMin: 0.75,         // ...never less than this share of the pace (3.15 m/s walking into any gale)
+  windPaceMax: 1.1,
   jetFuelSeconds: 4.2,       // seconds of continuous burn on a full tank
   rechargeGroundSeconds: 2.2,  // seconds to refill standing on the ground
   rechargeAirDelay: 0.9,     // seconds after burning before it starts refilling in the air
@@ -40,6 +44,8 @@ export const EXPLORER = Object.freeze({
   swimSpeed: 2.6,
   turnRate: 11,              // 1/s: how fast the body turns to face where it walks
 });
+
+const _airCmd = {};          // scratch for the air at the walker (the command to PHYSICS' body)
 
 export function createExplorerState(p, fwd) {
   const up = norm(p);
@@ -253,7 +259,25 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const jetOn = !!input.jet && (!wasGrounded || jump) && st.jumpHeld >= T.jetStartDelay && st.fuel > 0;
 
   const cmd = st.cmd || (st.cmd = { wish: V(), jump: false, jet: 0, jetMaxRise: T.jetMaxRise, descentLimit: 0, airControl: 1 });
-  cmd.wish.x = wish.x * maxSpeed; cmd.wish.y = wish.y * maxSpeed; cmd.wish.z = wish.z * maxSpeed;
+  // The suit's share of the wind (feel, on PHYSICS' lever cmd.shelter01). On the ground the
+  // wind is PHYSICS' own: the body leans into it, and a little of it shows in the pace (into
+  // a 19 m/s blizzard a walk makes 3.2 m/s, with it 4.6; never under three quarters). Off the
+  // ground the suit's thrusters hold off whatever is beyond a fresh breeze (windAirCap), so a
+  // hop in Earth's storms drifts as PHYSICS has it and a hop in Neptune's gale (40 m/s at the
+  // top of it) is carried about a dozen metres, not across the beach and off the cliff.
+  cmd.shelter01 = 0;
+  let pace = 1;
+  if (env.air) {
+    const w = env.air(st.p, _airCmd, wasGrounded ? 1 : Math.max(0, st.altitude || 0) + 1).wind;
+    if (!wasGrounded) {
+      // The force goes with the square of the wind: keep what a wind of windAirCap would give.
+      const W = Math.hypot(w.x, w.y, w.z);
+      if (W > T.windAirCap) cmd.shelter01 = 1 - (T.windAirCap / W) ** 2;
+    } else if (T.windPace > 0 && (wish.x !== 0 || wish.y !== 0 || wish.z !== 0)) {
+      pace = Math.min(T.windPaceMax, Math.max(T.windPaceMin, 1 + T.windPace * (w.x * wish.x + w.y * wish.y + w.z * wish.z)));
+    }
+  }
+  cmd.wish.x = wish.x * maxSpeed * pace; cmd.wish.y = wish.y * maxSpeed * pace; cmd.wish.z = wish.z * maxSpeed * pace;
   cmd.jump = jump;
   cmd.jet = jetOn ? 1 : 0;
   cmd.jetMaxRise = jetRiseCap(env.gravity, T);
