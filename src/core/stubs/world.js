@@ -351,6 +351,8 @@ export function createWorld(scene) {
     },
     getVistas(bodyId) { return stubVistas(bodyId).map((v) => ({ ...v, unitDir: new THREE.Vector3(v.unitDir.x, v.unitDir.y, v.unitDir.z) })); },
     getSpawn(bodyId) { const s = stubSpawn(bodyId).unitDir; return { unitDir: new THREE.Vector3(s.x, s.y, s.z) }; },
+    // The stub has no trees or boulders (Painter's world returns upright cylinders here).
+    sampleObstacles() { return []; },
     setTime(bodyId, hours) { forcedTime[bodyId] = hours; },
     setVistaFound(bodyId, vistaId, isFound) { found[bodyId + ':' + vistaId] = !!isFound; },
     _debug: { stubBodies, forcedTime, found },

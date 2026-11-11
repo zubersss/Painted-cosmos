@@ -12,7 +12,7 @@ import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
   qLook, qRotate, qConj, qMul, qFromAxisAngle, rotateAround,
 } from './vec.js';
-import { EXPLORER, createExplorerState, stepExplorer } from '../player/explorer.js';
+import { EXPLORER, createExplorerState, stepExplorer, collideObstacles } from '../player/explorer.js';
 import {
   CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose,
 } from '../player/camera.js';
@@ -35,8 +35,11 @@ const Y = V(0, 1, 0);
 export class Sim {
   // sampleSurface(bodyId, {x,y,z}) -> contract surface;  getSpawn(bodyId) -> {x,y,z} or null;
   // seat / hatch: ship-local points from the ship model (COORDINATOR.md C10).
-  constructor({ sampleSurface, getSpawn, seat, hatch, body, hour }) {
+  // sampleObstacles(bodyId, {x,y,z}, radius) -> [{ unitDir, radius, height }] (optional).
+  constructor({ sampleSurface, getSpawn, sampleObstacles, seat, hatch, body, hour }) {
     this.sampleSurface = sampleSurface;
+    this.sampleObstacles = sampleObstacles || null;
+    this.nearObstacles = [];
     this.getSpawn = getSpawn || (() => null);
 
     this.eph = new Ephemeris(BODIES);
@@ -151,6 +154,13 @@ export class Sim {
         viewFwd: this.footCam.viewFwd,
         faceView: this.footCam.firstPerson,
       }, h, { sample: this.sampler(this.bodyId), gravity: BODIES[this.bodyId].gravity });
+      // Trunks and boulders: looked up once a frame around the explorer, hit every step.
+      if (first) this.nearObstacles = this.obstaclesNear(this.bodyId, this.ex.p, 9);
+      if (collideObstacles(this.ex, this.nearObstacles) && this.ex.grounded) {
+        // Pushed sideways on sloping ground: put the feet back on it.
+        const d = norm(this.ex.p);
+        this.ex.p = scale(d, Math.max(len(this.ex.p), this.sampler(this.bodyId)(d).radius));
+      }
       if (pressed('KeyE') && this.boardable()) this.beginBoarding();
     } else if (st === S.BOARDING) {
       this.stepBoarding(h);
@@ -178,6 +188,19 @@ export class Sim {
         this.sm.dispatch(EV.abortLanding);
       }
     }
+  }
+
+  // Obstacles around a body-local point, as plain objects (copied: the world may reuse its own).
+  obstaclesNear(bodyId, p, radius) {
+    if (!this.sampleObstacles) return [];
+    let list;
+    try { list = this.sampleObstacles(bodyId, norm(p), radius); } catch { return []; }
+    const out = [];
+    if (list) for (const o of list) {
+      if (!o || !o.unitDir) continue;
+      out.push({ unitDir: norm(V(o.unitDir.x, o.unitDir.y, o.unitDir.z)), radius: o.radius || 0.3, height: o.height == null ? 3 : o.height });
+    }
+    return out;
   }
 
   emit(type) { this.events.push({ type, t: this.t }); if (this.events.length > 40) this.events.shift(); }
@@ -299,7 +322,8 @@ export class Sim {
       // E lands. So does simply sinking onto the ground: nobody should have to hunt for a key.
       const settle = sh.altGround < SHIP.minClearance + 1.2 && sh.speed < 5 && I.down('KeyC');
       if ((pressed('KeyE') && this.landable()) || settle) {
-        if (beginLanding(sh, this.sampler(this.shFrame.id))) this.sm.dispatch(EV.beginLanding);
+        const trees = this.obstaclesNear(this.shFrame.id, sh.p, 80);
+        if (beginLanding(sh, this.sampler(this.shFrame.id), undefined, trees)) this.sm.dispatch(EV.beginLanding);
         else this.emit('too-steep');
       }
     }
@@ -317,6 +341,12 @@ export class Sim {
     if (this.shFrame.kind === 'body' && this.shFrame.rotating && this.shFrame.id === this.bodyId
         && len(sub(this.sh.p, this.ex.p)) < 40) {
       hull = [-2.9, 0, 2.9].map((z) => ({ p: add(this.sh.p, qRotate(this.sh.q, V(0, 1.7, z))), radius: 2.2 }));
+    }
+    // Trunks between the camera and the explorer pull the boom in as well.
+    if (this.nearObstacles.length) {
+      const r = len(this.ex.p) + CAMERA.pivotHeight;
+      const trunks = this.nearObstacles.filter((o) => o.height > CAMERA.pivotHeight).map((o) => ({ p: scale(o.unitDir, r), radius: o.radius + 0.3 }));
+      hull = hull ? hull.concat(trunks) : trunks;
     }
     return updateFootCamera(this.footCam, this.ex.p, dt, this.sampler(this.bodyId), undefined, hull);
   }

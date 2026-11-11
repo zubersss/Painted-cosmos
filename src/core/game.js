@@ -28,6 +28,7 @@ export class Game {
         const sp = world.getSpawn ? world.getSpawn(bodyId) : null;
         return sp && sp.unitDir ? V(sp.unitDir.x, sp.unitDir.y, sp.unitDir.z) : null;
       },
+      sampleObstacles: world.sampleObstacles ? (bodyId, d, radius) => world.sampleObstacles(bodyId, scratch.set(d.x, d.y, d.z), radius) : null,
       seat: ud.seat, hatch: ud.hatch,
       body: q.get('body'), hour: q.has('time') ? Number(q.get('time')) : null,
     });

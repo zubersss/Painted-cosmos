@@ -4,32 +4,62 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Status
 
-M1 (Pilot's half): **in progress, loop working on stubs** (see "Verified" below for what is proven).
+**M1 (Pilot's half): met.** Walk, jetpack, board, lift off to orbit, land again, step out:
+on my stubs and inside PAINTER's real painted world. I am also the LEAD DEVELOPER since
+2026-11-11: see `docs/lead/REFERENCES.md`, `REVIEW.md`, `TRACK.md`.
 
 - Boot: `index.html` + `src/main.js`. Renderer from `RENDERER_OPTIONS`, camera, providers,
   frame loop, `window.__pc`, `window.__pcReady`.
-- Integration switch: `src/core/providers.js`. Flags `REAL_READY = { render, world, art, ui }`
-  are all `false` today, so the default page runs on my stubs (with a console *warning*).
-  `?real=1` (or `?real=world,render`) tries your modules ahead of the flag; `?stub=1` forces
-  stubs. A real module that fails to import falls back to its stub with a warning.
+- Integration switch: `src/core/providers.js`. `REAL_READY = { render: true, world: true,
+  art: true, ui: false }` since commit `15e77f9`: **the default page runs PAINTER's modules.**
+  `?stub=1` forces my stubs (console *warning*). A real module that fails to import falls
+  back to its stub with a warning. `ui` waits for `src/art/ui.css`.
 - Pure simulation (`src/core/sim.js`, no three, no DOM): state machine, explorer, ship,
   cameras, frames, orbits. Presenter (`src/core/game.js`) places roots, models and camera and
   calls `world.update` -> `painter.setMood` -> `painter.render`.
 - Stubs (`src/core/stubs/`): all ten bodies as noise spheres with a small cube-sphere quadtree,
   liquid on some, the sun, plain renderer into a float-depth target, stub explorer and ship.
 
-### Verified
-- `node --test tests/*.test.mjs`: 62 tests pass (orbits, frames and floating origin, state
-  machine, explorer, cameras, ship flight, landing assist, dynamic resolution, stub contract,
-  and `tests/loop.test.mjs`, which plays the whole loop through the pure simulation).
-- `node tests/playthrough.mjs`: the same loop in headless Chromium with real key and mouse
-  events. (Result and screenshots: see the end of this section once the run is recorded.)
+### Verified (how)
+- `node --test tests/*.test.mjs`: 67 tests pass. Orbits, frames and floating origin, the state
+  machine, explorer (walk, run, slopes, sliding, wading, floating, jetpack and fuel), cameras
+  (never under ground or liquid, never inside the ship), ship flight (hover, throttle, bank,
+  pitch limit, flare, cushion, bounce), landing assist, dynamic resolution, the stub contract,
+  PAINTER's real `sampleSurface` contract on all ten bodies, and `tests/loop.test.mjs`, which
+  plays the whole loop through the pure simulation with scripted keys and mouse.
+- `node tests/playthrough.mjs --keep` (stub world, 640x360, headless Chromium, real key and
+  mouse events, 37 checks, fails on any console error): PASSED. Ground to space 18.2 s.
+  Evidence: `docs/shots/pilot/01-on-foot.jpg`, `02-jetpack.jpg`, `03-board-prompt.jpg`,
+  `05-liftoff.jpg`, `06-climb.jpg`, `07-orbit.jpg`, `08-moon.jpg`, `10-land-prompt.jpg`,
+  `12-stepped-out.jpg`.
+- The same script inside PAINTER's real world (`--query "scale=0.5&quality=0" --w 480 --h 270`,
+  clean export of `bb8ec30`, before the forest's flora was committed): PASSED, no console
+  errors. A run on the current HEAD with the forest is recorded below if it finished.
+- Real-world frames from the integrated game at `19f72ce`: `docs/shots/pilot/real-01-on-foot.jpg`
+  (the clearing, the explorer, the ship), `real-02-orbit.jpg`, `real-03-flight.jpg` (over the
+  canopy with the landing prompt).
 
 ### Not verified / not done
-- Real-GPU frame rate: cannot be measured here. Software GL runs the stub at about 60 fps at
-  960x540, which says nothing about the painted pipeline.
-- Pointer lock in a real browser (headless uses the drag-look fallback).
+- Real-GPU frame rate: cannot be measured here. In software GL the painted forest runs at
+  0.4 to 1 fps at 640x360 (4.4 M triangles a frame, see REVIEW), the stub at 20 to 60.
+- Pointer lock: headless Chromium grants the lock but reports meaningless deltas for synthetic
+  mouse events, so every scripted run uses `pointerlock=0` (drag to look). The locked path is
+  the same code plus a spike guard, but nobody has moved a real mouse through it.
+- Trees and rocks are not collided with yet (`world.sampleObstacles` arrived; M2).
 - Pulse drive, planet map, save, audio, painted HUD: later milestones.
+- Physics is not wired in (M2, per the coordinator).
+
+### What I saw playing the slice in the painted world
+- It works on first contact: spawn in the clearing by the brook at 09:30, the ship 16 m away,
+  walk, jetpack over the trees, board, climb out through a sky that turns to indigo wash,
+  the planet as a painted ball below, back down, land, step out. One flag flip to integrate.
+- Ugly or clunky, blunt list (details and evidence in `docs/lead/REVIEW.md`): the forest costs
+  4.4 M triangles a frame; foliage is stippled rather than brushed; trunks and the brook bank
+  are ruler-straight; the foreground is one flat wash; I walk and fly straight through trees;
+  the ship can be told to land in a wood; my HUD ink needed a halo to survive space.
+- Contract mismatches: none. Two adjustments on my side: `spaceAltitude` raised to 420 m on
+  the Moon and Pluto (their mountains reach 267 m and 245 m), and readiness reads
+  `world.busy`.
 
 ## Decisions
 
@@ -45,8 +75,11 @@ objects in their notes.
    turns beneath a parked ship but never leaves it behind); the sun's frame beyond. State
    changes follow the frame: ground frame = ATMOSPHERE, otherwise SPACE.
 3. **`spaceAltitude(body)` and `soiRadius(body)` live in `src/data/bodies.js`** (additive
-   exports). `spaceAltitude = max(atmosphereHeight, 0.2 * radius)`: earth 800 m, moon 280 m,
-   mars 600 m, mercury 440 m, pluto 320 m, jupiter 1400 m. `soiRadius = 4 * radius`.
+   exports). `spaceAltitude = max(atmosphereHeight, 0.2 * radius)` unless the body sets its
+   own: earth 800 m, mars 600 m, mercury 440 m, jupiter 1400 m; **moon and pluto 420 m**
+   (overrides, because their painted mountains reach 250 m and more). `soiRadius = 4 * radius`.
+   Inside a body's sphere of influence the ship's "up" is away from the body; it eases to the
+   ecliptic's up only in the outer third.
 4. **Day and night come from real spin.** Earth's spin phase is set at boot so that the spawn
    point is at 09:30 local solar time. `setMood.timeOfDay` is the true local solar time at the
    camera. I never call `world.setTime` in play.
@@ -90,59 +123,74 @@ and 750 m/s by 5 x the space altitude; velocity time constant 1.0 s in air, 1.7 
 (X brake: 0.45 x); throttle 0.55 /s; nose follows the mouse at 7.5 /s up to 1.6 rad/s; bank
 0.55 rad per rad/s up to 0.62 rad; lift-off 2.8 s to a 9 m hover; landing glide 14 m/s,
 descent 13 m/s easing to 1.1 m/s at touchdown, refuses sites steeper than 35 deg.
-Measured: ground to space in about 17 s at full throttle and 55 deg; boarding 1.25 s; stepping
-out 0.95 s.
+Measured: ground to space in 18.2 s at full throttle and 48 deg (19 to 25 s in the painted
+world, where the script flies it at lower frame rates); boarding 1.25 s; stepping out 0.95 s;
+landing assist from the prompt to wheels down about 8 s, touching at 1.1 m/s.
 
 Mouse: 0.0023 rad/px on foot, 0.0017 rad/px in the ship.
 
 ## Needs from the other
 
 ### From PAINTER
-1. **Terrain ceiling.** Keep all walkable ground (floating islands included) below
-   `radius + 0.8 * spaceAltitude(body)`. Above `spaceAltitude` the ship leaves the ground frame
-   and stops sampling terrain. If a body needs taller terrain, say so and I will raise its
-   `spaceAltitude` in `bodies.js`.
-2. **Readiness.** I set `window.__pcReady` when `world.busy === 0` for two frames (your `busy`
-   getter; thank you). Keep it meaning "nothing left to build for the current camera".
-3. **`liquidRadius`** in `sampleSurface` (C1). Wading, floating, the camera's water clearance
-   and landing on liquid all read it. Without it I treat everything as dry.
-4. **Models (C10):** `userData.seat` and `userData.hatch` on the ship. The cockpit view puts
-   the camera exactly at `seat` looking along -Z with a 0.12 m near plane: whatever is in front
-   of that point is what the player sees. `hatch` should be on the ground beside the hull,
-   2 to 3 m from the centre line; the explorer steps out there facing away from the ship.
-5. **`animate(state, dt)`** receives: explorer `{ mode: 'idle'|'walk'|'jet'|'fall'|'wade', speed,
+1. **Read `docs/lead/REVIEW.md`, review 1.** Three MUST FIX items for your M1: the triangle
+   budget (600 k and 350 draw calls at quality 1), stippled foliage, ruler-straight trunks and
+   bank. Answer each in your notes.
+2. **Terrain ceiling.** Keep all walkable ground (floating islands included) below
+   `radius + 0.8 * spaceAltitude(body)` (`import { spaceAltitude } from src/data/bodies.js`).
+   `tests/contract.test.mjs` checks it. If a body needs more, tell me and I raise it.
+3. **Models (C10).** The cockpit view puts the camera exactly at `userData.seat` looking along
+   -Z with a 0.12 m near plane: whatever is in front of that point is what the player sees.
+   When the real ship arrives, give it a canopy frame that looks right from there.
+4. **`animate(state, dt)`** receives: explorer `{ mode: 'idle'|'walk'|'jet'|'fall'|'wade', speed,
    jet01, lookPitch }`; ship `{ mode: 'landed'|'hover'|'fly'|'pulse', throttle01, gear01,
    canopy01 }`. During boarding the explorer walks to the hatch (mode 'walk') while `canopy01`
-   rises to 1 and falls back; then the explorer model is hidden (`visible = false`).
-6. **Trees and rocks are not in `sampleSurface`,** so the explorer and both cameras pass
-   through them. For M1 that is acceptable; please fade or part strokes that are within about
-   1 m of the camera so a trunk never fills the screen. If you can give me a cheap
-   `world.sampleObstacles(bodyId, unitDir, radius) -> [{ unitDir, radius, height }]` later I
-   will collide with trunks and boulders.
-7. **Foreign objects.** My stub explorer and ship use `MeshLambertMaterial` and
-   `MeshBasicMaterial`; later markers will too. Your `standInFor` covers that. I add no lights.
+   rises to 1 and falls back; then I set the explorer's `visible = false`.
+5. **`src/art/ui.css`** and the text helper when you get to them (M3). Class names in use:
+   `pc-hud`, `pc-panel`, `pc-button`, `pc-title`, `pc-label`, plus mine: `pc-prompt`,
+   `pc-gauge`, `pc-readout`, `pc-reticle`, `pc-start`, `pc-help`, state class `pc-on`.
 
 ### From PHYSICS
-Nothing yet. `stepExplorer(st, input, dt, env)` and `stepFlight(st, input, dt, env)` take
-everything about the world through `env` (`env.sample`, `env.gravity`, and for the ship `up`,
-`altitude`, `spaceAlt`), so your air, ground and weather can come in the same way in M2.
+1. The table promised in COORDINATOR section F: each of your constants, which of my `EXPLORER`
+   / `SHIP` numbers it replaces, and which assist you expect me to keep on top.
+2. Keep the worst frame of `physics.update` under 2 ms (I measured one of 6.8 ms in 600).
+3. `stepExplorerBody` and `stepShipBody` take `env`; so do mine. In M2 I will call yours from
+   inside `stepExplorer` and `stepFlight` behind the same `env`, so tell me if `bindEnv` needs
+   anything my `env` does not carry (`sample`, `gravity`, and for the ship `up`, `altitude`,
+   `spaceAlt`, `hasBody`).
+
+### From the COORDINATOR
+- `tools/shot.mjs` has no way to lengthen the screenshot timeout (Playwright's 30 s default);
+  the painted forest in software GL can take longer than that for one frame and the tool then
+  dies with an unhandled error. A `--shot-timeout ms` option would help all three roles. I
+  work around it with `tests/capture.mjs`.
 
 ## Answers to the other
 
-- PAINTER (from reading `src/world/index.js` and `src/render/index.js` mid-flight, no notes
-  file yet): your shapes match the contract as I consume it. I pass `sampleSurface` a
-  `THREE.Vector3` and copy `radius`, `normal.x/y/z`, `slope`, `liquidRadius`, `biomeId`,
-  `biomeWeights` out at once, so you may return scratch objects. I call
+- PAINTER asked: **which near/far do I run?** On foot `near 0.08`, cockpit `0.12`, chase camera
+  `0.35` rising to `4` with clear air (about 330 m up); `far` is 1.2 x the far side of the
+  farthest body: about 1.67e6 m from Earth today, up to about 2.9e6 at Pluto. Reversed depth is
+  on wherever `EXT_clip_control` exists (I pass exactly one of the two depth options so three
+  does not warn).
+- PAINTER asked: **do I call `setTime`?** Never in play. Day and night are the real spin; Earth's
+  spin phase is set at boot so the spawn is at 09:30. `setMood.timeOfDay` is the true local
+  solar time at the camera; you can ignore it, as you say.
+- PAINTER: `sampleObstacles` received, thank you. I will collide the explorer with trunks and
+  boulders, keep the cameras out of them, and make the landing assist avoid them in M2.
+- PAINTER: your shapes match the contract as I consume it. I pass `sampleSurface` a
+  `THREE.Vector3` and copy the result at once, so you may return scratch objects. I call
   `root.updateWorldMatrix(false, false)` on every root and on the sun before `world.update`,
   and `camera.updateMatrixWorld()`; children are left to you and the renderer.
-- PAINTER: `setMood` fields I send every frame: `bodyId` (the body whose frame the camera is
-  in, or `null` in deep space), `biomeWeights` (from `sampleSurface` under the camera, `{}`
-  above twice the space altitude), `biomeId` (additive, the heaviest), `timeOfDay` (hours),
+- PAINTER: `setMood` fields every frame: `bodyId` (the body whose frame the camera is in, or
+  `null` in deep space), `biomeWeights` (from `sampleSurface` under the camera, `{}` above
+  twice the space altitude), `biomeId` (additive, the heaviest), `timeOfDay` (hours),
   `altitude01` (camera height over base radius / spaceAltitude, clamped), `inSpace01`
   (smoothstep from 0.75 to 1.6 x spaceAltitude; 1 in deep space), `speed01` (ship speed / 750,
   or walking speed / 40).
-- COORDINATOR / PHYSICS: section F and C14 read. Integration of `createPhysics` is mine from
-  M2; I will keep `env` as the single doorway and police the 2 ms budget.
+- PAINTER (your idea): agreed, the controller drives `setRenderScale` first and only drops a
+  tier after 3 s pinned at the minimum scale (`src/core/dynres.js`).
+- PHYSICS: API read. Your density profile reproducing my speed envelope is exactly right.
+  Integration is mine from M2; `env` stays the single doorway.
+- COORDINATOR: sections F and G read. Lead files are in `docs/lead/`.
 
 ## Ideas and critique
 
@@ -151,5 +199,8 @@ everything about the world through `env` (`env.sample`, `env.gravity`, and for t
   walk will feel like sliding.
 - (to PAINTER) From orbit at 5 km the whole globe fits the frame with FOV 62. That frame is
   where "how each planet looks from orbit" will be judged; the terminator crosses the disc.
-- (self) The climb from ground to space takes about 17 s. If the painted atmosphere transition
+- (self) The climb from ground to space takes about 18 s. If the painted atmosphere transition
   deserves longer, I will slow `speedAtmoTop` rather than thicken the atmosphere.
+- (to PAINTER) The explorer placeholder's hat is charming; keep a silhouette that readable.
+- (to PHYSICS) A plain 2D canvas in `physics-lab.html` that plots the wind field, a gust front
+  and a footprint trail would let the rest of us see your work without the painter in the loop.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EXPLORER, createExplorerState, stepExplorer } from '../src/player/explorer.js';
+import { EXPLORER, createExplorerState, stepExplorer, collideObstacles } from '../src/player/explorer.js';
 import { createFootCamera, lookFootCamera, updateFootCamera, CAMERA } from '../src/player/camera.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { makeWorld, arc, V, norm, dot, sub, scale, len } from './helpers.mjs';
@@ -269,4 +269,27 @@ test('third-person camera stops in front of the ship instead of going inside it'
   // With nothing in the way the boom is full length again.
   for (let i = 0; i < 240; i++) pose = updateFootCamera(cam, feet, DT, sample, undefined, []);
   assert.ok(Math.abs(cam.boomNow - CAMERA.boom) < 0.05);
+});
+
+test('tree trunks are solid: walking into one slides round it; the jetpack goes over', () => {
+  const env = { sample: makeWorld({ R }), gravity: 9 };
+  const st = createExplorerState(scale(start, R), fwd0);
+  // A trunk 6 m ahead, a little off the line of travel.
+  const right = cross(fwd0, start);
+  const trunkDir = norm(sub(start, scale(sub(scale(fwd0, -6), scale(right, 0.15)), 1 / R)));
+  const trunk = [{ unitDir: trunkDir, radius: 0.4, height: 12 }];
+  let minGap = Infinity;
+  for (let i = 0; i < 5 / DT; i++) {
+    stepExplorer(st, { moveZ: 1, viewFwd: fwd0 }, DT, env);
+    collideObstacles(st, trunk);
+    minGap = Math.min(minGap, arc(st.p, trunkDir, R));
+  }
+  assert.ok(minGap >= 0.4 + 0.35 - 1e-3, 'never inside the trunk: ' + minGap);
+  assert.ok(arc(st.p, start, R) > 14, 'slid round it and kept going: ' + arc(st.p, start, R));
+  assert.ok(Math.abs(len(st.p) - R) < 1e-6 && st.grounded, 'still on the ground');
+  // Above the top of the obstacle nothing is hit.
+  const air = createExplorerState(scale(trunkDir, R + 13), fwd0);
+  air.altitude = 13; air.grounded = false;
+  assert.equal(collideObstacles(air, trunk), 0);
+  assert.equal(collideObstacles(st, []), 0);
 });

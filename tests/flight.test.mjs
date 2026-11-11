@@ -244,3 +244,21 @@ test('chase camera stays above the terrain and behind the ship', () => {
   }
   assert.ok(minClear >= CAMERA.shipClearance * 0.95, 'camera clearance ' + minClear);
 });
+
+test('landing assist keeps clear of trees when there is open ground within reach', () => {
+  const sample = makeWorld({ R });
+  // A copse right under the ship: trunks every 4 m in a 20 m square.
+  const east = cross(north, start);
+  const trees = [];
+  for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+    trees.push({ unitDir: norm(add(add(start, scale(north, (i * 4) / R)), scale(east, (j * 4) / R))), radius: 0.4, height: 15 });
+  }
+  const p = scale(start, R + 60);
+  const site = findLandingSite(p, sample, undefined, trees);
+  assert.ok(site, 'found a site');
+  let nearest = Infinity;
+  for (const t of trees) nearest = Math.min(nearest, arc(site.dir, t.unitDir, R));
+  assert.ok(nearest >= SHIP.landClearance, 'clear of every trunk: ' + nearest);
+  // With no obstacles the spot straight below is chosen.
+  assert.ok(arc(findLandingSite(p, sample).dir, start, R) < 0.01);
+});

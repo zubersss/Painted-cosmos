@@ -228,3 +228,27 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
 export function yawView(viewFwd, up, angle) {
   return tangent(rotateAround(viewFwd, up, angle), up, viewFwd);
 }
+
+// Solid things that are not in the heightfield: tree trunks, boulders (world.sampleObstacles).
+// Each is an upright cylinder { unitDir, radius, height } standing on the ground. The explorer
+// is pushed out sideways and loses only the part of the velocity that points into it, so
+// walking into a trunk slides round it. Above the top (jetpack) there is nothing to hit.
+export function collideObstacles(st, obstacles, bodyRadius = 0.35) {
+  if (!obstacles || !obstacles.length) return 0;
+  let hits = 0;
+  for (const ob of obstacles) {
+    if (st.altitude > ob.height) continue;
+    const r = len(st.p);
+    const up = scale(st.p, 1 / r);
+    const d = reject(sub(st.p, scale(ob.unitDir, r)), up);
+    const dist = len(d);
+    const min = ob.radius + bodyRadius;
+    if (dist >= min) continue;
+    const n = dist > 1e-4 ? scale(d, 1 / dist) : scale(st.fwd, -1);
+    st.p = scale(norm(addScaled(st.p, n, min - dist)), r);
+    const vn = dot(st.v, n);
+    if (vn < 0) st.v = addScaled(st.v, n, -vn);
+    hits++;
+  }
+  return hits;
+}

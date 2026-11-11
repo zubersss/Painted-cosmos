@@ -41,7 +41,8 @@ const summary = { stages: [], timings: {} };
 
 async function shot(name, keepAs) {
   const file = path.join(opt.out, name + '.jpg');
-  await page.screenshot({ path: file, type: 'jpeg', quality: 86 });
+  // A single painted-forest frame can take longer than Playwright's default 30 s in software GL.
+  await page.screenshot({ path: file, type: 'jpeg', quality: 86, timeout: 300000 });
   if (opt.keep && keepAs) fs.copyFileSync(file, path.join(keepDir, keepAs + '.jpg'));
   return file;
 }

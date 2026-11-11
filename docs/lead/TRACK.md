@@ -4,7 +4,7 @@ Owner: PILOT as lead developer. Updated at every sync. Status words: DONE (verif
 and how), PART (works, with the stated gap), TODO, RISK.
 A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it.
 
-Last update: 2026-11-11 (M1 in progress).
+Last update: 2026-11-11, after review 1 (commit `19f72ce`).
 
 ## Milestone 1: vertical slice
 
@@ -17,10 +17,12 @@ Last update: 2026-11-11 (M1 in progress).
 | Descend, landing assist with prompt, soft bounce, step out | Pilot | DONE | Pilot: `tests/flight.test.mjs` (touchdown under 1.8 m/s; never inside terrain in 10 min of careless flying), play-through |
 | State machine with the seven states | Pilot | DONE | Pilot: `tests/state.test.mjs` |
 | Floating origin, orbits, spin, sun, depth | Pilot | DONE | Pilot: `tests/orbits.test.mjs`; screenshots from 0.08 m near plane to orbit |
-| Watercolour pipeline | Painter | PART | Lead: see REVIEW (first pass) |
-| Earth temperate forest passes the freeze-frame test | Painter | TODO (no flora in the last committed build) | Lead: see REVIEW |
-| Merge both ways: the slice plays inside the painted forest | Pilot | PART: Painter's render, world and art are the default since commit 15e77f9 | Lead: play-through against a clean export of HEAD; see REVIEW |
-| Physics models (added by the owner on 2026-11-11) | Physics | Started (atmosphere, wind); wiring is M2 | Lead: see REVIEW |
+| Watercolour pipeline | Painter | PART: the sheet is convincing; the cost is not (REVIEW 1, Painter MUST FIX 1) | Lead: gallery captures, frame-cost probe |
+| Earth temperate forest passes the freeze-frame test | Painter | PART: birch and pine forest, brook and canopy are in; three MUST FIX open (triangle budget, stippled foliage, ruler-straight trunks and bank) | Lead: `docs/lead/evidence/painter-19f72ce-*.jpg` |
+| Merge both ways: the slice plays inside the painted forest | Pilot | DONE: Painter's render, world and art are the default since `15e77f9`; the scripted loop passes inside the real world | Lead: `node tests/playthrough.mjs --query "scale=0.5&quality=0"` on a clean export; `docs/shots/pilot/real-0*.jpg` |
+| Physics models (added by the owner on 2026-11-11) | Physics | Ahead of plan: API facade, atmosphere, wind, weather, ground, explorer and ship bodies, fields, 72 tests; no lab page or shots yet; wiring is M2 | Lead: `node --test src/physics/`, 600-frame timing run |
+
+**M1 verdict.** Pilot's half: met. Painter's half: not yet (three MUST FIX). Physics: no M1 gate.
 
 ## Milestone 2: the system
 
@@ -53,7 +55,7 @@ TODO. Pull request `cosmos` -> `main`; GitHub Pages serves `main`
 
 | Requirement | Status |
 | --- | --- |
-| A new player can open index.html and start on Earth in the forest | PART: starts at Painter's spawn in the home forest biome; no trees yet |
+| A new player can open index.html and start on Earth in the forest | DONE: spawn in the clearing by the brook, the ship 16 m away (`docs/shots/pilot/real-01-on-foot.jpg`) |
 | Walk, jetpack, board, reach space | DONE (Pilot) |
 | Land on all eight planets, different biomes on each | TODO |
 | Every frame passes the freeze-frame test | TODO: see REVIEW |
@@ -63,11 +65,12 @@ TODO. Pull request `cosmos` -> `main`; GitHub Pages serves `main`
 
 ## Risks and what is off track
 
-1. **Frame rate cannot be measured in this sandbox.** Software GL runs the painted pipeline at
-   about 20 fps at 480x270 standing still and far lower while terrain builds. This says little
-   about a real GPU, but the pipeline has four full-screen passes plus a multi-target scene
-   pass, so the risk is real. Mitigation: dynamic resolution and tiers exist; someone must run
-   it on real hardware before M4. Until then every claim about 60 fps is reasoning, not fact.
+1. **Frame rate: the largest risk in the project.** It cannot be measured in this sandbox,
+   but the forest submits 4.4 M triangles and 887 draw calls a frame at quality 1, on top of a
+   multi-target scene pass and four full-screen passes. That will not hold 60 fps at 1080p on
+   an integrated GPU. A budget is set in REVIEW 1 (600 k triangles, 350 calls at quality 1).
+   Dynamic resolution and tiers exist but only cut pixels, not triangles. Someone must run the
+   game on real hardware before M4; until then every claim about 60 fps is reasoning.
 2. **Hitches while moving.** Terrain and flora are built on the main thread in time slices; in
    software GL the frame time during a walk rises sharply. Needs a measurement of build time
    per frame (`R-SPACE-1`).
@@ -75,5 +78,7 @@ TODO. Pull request `cosmos` -> `main`; GitHub Pages serves `main`
    run. Mitigation in place: checks run against `tools/export-head.sh`.
 4. **Scope added mid-flight** (physics, weather, deformation). M2 now carries wiring work for
    Pilot that the original plan did not have. The frame budget has to absorb about 2 ms of CPU.
-5. **Trees and rocks have no collision** (they are not in `sampleSurface`). The explorer and
-   the cameras pass through them. Asked of Painter in Pilot's notes.
+5. **Trees and rocks have no collision yet.** Painter delivered `world.sampleObstacles`; Pilot
+   wires it first thing in M2 (explorer, cameras, landing sites).
+6. **Pointer lock is untested** (headless reports nonsense deltas under lock). First thing to
+   try when a person opens the game.

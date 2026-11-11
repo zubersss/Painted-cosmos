@@ -60,3 +60,40 @@ test('real sampleSurface is deterministic and cheap enough for 30 calls a frame'
     assert.ok(ms < 0.25, `${id}: ${ms.toFixed(3)} ms per sample (budget: 30 samples within about 2 ms, with slack for a busy machine)`);
   }
 });
+
+// ---- the real forest: trunks are solid --------------------------------------------------------
+let obstacles = null;
+try { obstacles = await import('../src/world/obstacles.js'); } catch { /* optional */ }
+const skipObs = skip || (obstacles && obstacles.sampleObstaclesPure ? false : 'Painter obstacles not importable');
+
+test('walking through the real forest never ends up inside a trunk or under the ground', { skip: skipObs }, async () => {
+  const { Sim } = await import('../src/core/sim.js');
+  const { Pad, play, len, norm, dot } = await import('./helpers.mjs');
+  const sim = new Sim({
+    sampleSurface: (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z),
+    getSpawn: (id) => surface.getSurface(id).getSpawn(),
+    sampleObstacles: (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r),
+  });
+  const pad = new Pad();
+  let seen = 0, worst = Infinity, under = 0;
+  pad.press('KeyW');
+  for (let leg = 0; leg < 6; leg++) {
+    pad.dx += 380;                                    // turn about 50 degrees each leg
+    play(sim, pad, 12, {
+      each: () => {
+        const r = len(sim.ex.p);
+        for (const o of sim.nearObstacles) {
+          seen++;
+          if (sim.ex.altitude > o.height) continue;
+          const gap = Math.acos(Math.min(1, dot(norm(sim.ex.p), o.unitDir))) * r - o.radius;
+          worst = Math.min(worst, gap);
+        }
+        const s = surface.sampleSurfacePure('earth', sim.ex.p.x / r, sim.ex.p.y / r, sim.ex.p.z / r);
+        if (r < s.radius - 0.01) under++;
+      },
+    });
+  }
+  assert.ok(seen > 0, 'the forest has obstacles near the spawn');
+  assert.ok(worst >= 0.3, 'closest approach to a trunk surface: ' + worst.toFixed(3) + ' m');
+  assert.equal(under, 0, 'never under the ground');
+});

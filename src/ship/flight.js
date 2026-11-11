@@ -47,6 +47,7 @@ export const SHIP = Object.freeze({
   landMaxDescent: 13,        // m/s
   landMinDescent: 1.1,       // m/s at touchdown: soft
   landMaxSlope: 0.62,        // rad: steeper spots are refused
+  landClearance: 6,          // m: trees and boulders closer than this to the spot count against it
 });
 
 export function createShipState(p, q) {
@@ -246,21 +247,31 @@ export function beginLiftoff(st) {
 // ---- landing assist ------------------------------------------------------------------------
 // Choose where to set down: the flattest dry spot under or near the ship. Returns a site
 // { dir, floor, normal, liquid, slope } or null when everything nearby is too steep.
-export function findLandingSite(p, sample, T = SHIP) {
+// `obstacles` (optional): [{ unitDir, radius }] trees and boulders to keep clear of.
+export function findLandingSite(p, sample, T = SHIP, obstacles = null) {
   const up = norm(p);
   const r = len(p);
   const a = tangent(V(0.31, 0.77, 0.55), up);
   const b = cross(up, a);
   let best = null;
+  const crowd = (dir) => {
+    // How badly a spot is hemmed in: 0 when nothing stands within the ship's footprint.
+    let c = 0;
+    if (obstacles) for (const ob of obstacles) {
+      const gap = Math.acos(Math.min(1, dot(dir, ob.unitDir))) * r - ob.radius;
+      if (gap < T.landClearance) c += 1 + (T.landClearance - gap);
+    }
+    return c;
+  };
   const consider = (dir, distance) => {
     const g = floorAt(sample, scale(dir, r));
-    const score = g.slope * 60 + (g.liquid ? 14 : 0) + distance * 0.35;
+    const score = g.slope * 60 + (g.liquid ? 14 : 0) + distance * 0.35 + crowd(dir) * 25;
     if (g.slope <= T.landMaxSlope && (!best || score < best.score)) {
       best = { dir, floor: g.floor, normal: g.normal, liquid: g.liquid, slope: g.slope, score, distance };
     }
   };
   consider(up, 0);
-  for (const ring of [12, 26, 45]) {
+  for (const ring of obstacles && obstacles.length ? [12, 26, 45, 70] : [12, 26, 45]) {
     for (let i = 0; i < 8; i++) {
       const ang = (i / 8) * Math.PI * 2 + ring;
       const off = add(scale(a, Math.cos(ang) * ring), scale(b, Math.sin(ang) * ring));
@@ -270,8 +281,8 @@ export function findLandingSite(p, sample, T = SHIP) {
   return best;
 }
 
-export function beginLanding(st, sample, T = SHIP) {
-  const site = findLandingSite(st.p, sample, T);
+export function beginLanding(st, sample, T = SHIP, obstacles = null) {
+  const site = findLandingSite(st.p, sample, T, obstacles);
   if (!site) return false;
   st.landing = { ...site, phase: 'glide', t: 0 };
   st.liftoff = null;
