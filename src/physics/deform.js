@@ -52,7 +52,7 @@ export class DeformField {
     this.N = N; this.cell = DEFORM.cell;
     this.depth = new Float32Array(N * N);
     this._tmp = new Float32Array(N * N);
-    this.ci = 0; this.cj = 0;
+    this.ci = -0; this.cj = -0;     // ((P17) -0: Math.round's -0 never changes the field's kind of storage; see FloraField)
     this.frameVersion = -1;
     this.version = 0;
     // marks: positions relative to marks.origin (body-local axes)

@@ -48,7 +48,7 @@ export class DriftField {
     this.f = new Float32Array(N * N);              // the factor now
     this.eq = new Float32Array(N * N).fill(NaN);   // its equilibrium (NaN: not worked out yet)
     this._tmp = new Float32Array(N * N);
-    this.ci = 0; this.cj = 0;                      // grid cell under the centre
+    this.ci = -0; this.cj = -0;                    // grid cell under the centre ((P17) -0: see FloraField's)
     this.de = 1; this.dn = 0;                      // the way the drifting wind blows (unit, toward)
     this.level = 0;                                // m of loose material on level ground here
     this.row = 0; this.version = 0; this.frameVersion = -1; this.fresh = true;

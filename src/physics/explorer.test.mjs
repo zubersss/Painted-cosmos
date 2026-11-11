@@ -549,3 +549,61 @@ test('P16 the way ahead: a run at a 1 m boulder sheds its pace with its soles be
     assert.equal(ahead, 0, `a ${k * 100} % hill read as a face in ${ahead} steps`);
   }
 });
+
+test('P17 the way ahead, tried: a boulder met off the middle of the path (its flank a lower, narrower hump) is crossed with no brace and no hold checking the run (Moon, Mars, Earth)', async () => {
+  // Until P17 the way ahead counted only rises over the legs' stroke as faces: the flank of a 1 m boulder 0.5 m off the
+  // line of the run is a 0.67 m hump, and a run at 6 m/s met it braced (two steps of 0.5 m/s) and held back over the top
+  // (6 -> 2.9 m/s in a quarter of a second on the Moon). Now it is tried with the body itself and met at its pace.
+  const { scrambleSample } = await import('../player/explorer.js');
+  for (const g of [2.2, 3.7, 9]) {
+    for (const off of [0, 0.3, 0.5, 0.55]) {
+      const c = norm(V(Math.sin(12 / R), off / R, Math.cos(12 / R)));
+      const sample = scrambleSample((d) => ({ radius: R, normal: { x: d.x, y: d.y, z: d.z }, liquidRadius: 0 }), () => [{ unitDir: c, radius: 0.6, height: 1 }]);
+      const st = { p: V(0, 0, R), v: V(), grounded: true }, env = { sample, gravity: g };
+      let brace = 0, worst = 0, vPrev = 0, air = 0, top = 0, held = 0, least = 1e9;
+      for (let i = 0; i < 60 * 8; i++) {
+        const t = Math.atan2(st.p.x, st.p.z);
+        stepExplorerBody(st, { wish: V(6 * Math.cos(t), 0, -6 * Math.sin(t)) }, 1 / 60, env);
+        const B = st.phys, v = B.speedGround, x = t * R;
+        if (x > 4 && x < 16) {
+          brace = Math.max(brace, B.brace); if (!st.grounded) air++; top = Math.max(top, len(st.p) - sample(norm(st.p)).radius);
+          worst = Math.max(worst, vPrev - v); least = Math.min(least, v);
+          if (B.grip && B.paceCap < 1e8 && v > B.paceCap + 0.05) held++;
+        }
+        vPrev = v;
+      }
+      assert.ok(brace < 0.05, `g ${g}, ${off} m off: braced ${brace.toFixed(2)} m/s in a step`);
+      assert.ok(held === 0, `g ${g}, ${off} m off: a hold checked the run in ${held} steps`);
+      assert.ok(worst <= g / 60 + 0.05, `g ${g}, ${off} m off: ${worst.toFixed(3)} m/s lost in one step (the soles give ${(g / 60).toFixed(3)})`);
+      assert.ok(air === 0 && top < 0.05, `g ${g}, ${off} m off: in contact (${air} steps in the air, feet ${top.toFixed(3)} m up)`);
+      assert.ok(least > 2.2, `g ${g}, ${off} m off: no slower than ${least.toFixed(2)} m/s over it`);
+    }
+  }
+});
+
+test('P17: strideBob is the hips the body lays in a steady stride (for a figure drawn without the body)', async () => {
+  const { strideBob, bobAt, gaitOf, stepExplorerBody, EXPLORER_BODY } = await import('./explorer.js');
+  const { createPhysics } = await import('./index.js');
+  assert.equal(typeof createPhysics({ sampleSurface: () => ({ radius: 1, normal: { x: 0, y: 1, z: 0 } }) }).explorer.bob, 'function');
+  for (const [v, g] of [[1.4, 9.81], [4.2, 9.81], [6.5, 9.81], [3, 1.62]]) {
+    const R = 4000, env = { sample: (d) => ({ radius: R, normal: d, liquidRadius: 0 }), gravity: g };
+    const st = { p: { x: 0, y: 0, z: R }, v: { x: v, y: 0, z: 0 }, grounded: true };
+    let worst = 0, span = 0, lo = 1e9, hi = -1e9;
+    for (let i = 0; i < 60 * 8; i++) {
+      const r = Math.hypot(st.p.x, st.p.y, st.p.z), ux = st.p.x / r, uz = st.p.z / r;
+      stepExplorerBody(st, { wish: { x: v * uz, y: 0, z: -v * ux } }, 1 / 60, env);
+      const B = st.phys;
+      if (i > 60 * 5) {
+        const want = strideBob(B.gaitV, g, B.stride);
+        worst = Math.max(worst, Math.abs(B.bob - want * B.gaitAmp - B.bobFix)); lo = Math.min(lo, B.bob); hi = Math.max(hi, B.bob);
+        // the same as bobAt on gaitOf, which is what it wraps
+        const o = gaitOf(Math.max(B.gaitV, 0.12), g, EXPLORER_BODY, {});
+        assert.equal(want, bobAt((B.stride * 2) % 1, o, g));
+      }
+    }
+    span = hi - lo;
+    assert.ok(worst < 1e-9, `v ${v} g ${g}: the body's bob and strideBob differ by ${worst}`);
+    assert.ok(span > 0.01, `v ${v} g ${g}: the hips move ${span.toFixed(3)} m over a stride`);
+  }
+});
+

@@ -25,7 +25,7 @@ import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01 } from './util.js';
 import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE } from './water.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
-import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf } from './explorer.js';
+import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf, strideBob } from './explorer.js';
 import {
   stepShipBody, stepShipGear, wakeShip, SHIP_BODY, shipTopSpeed, shipTerminal, downwashSpeed, groundEffect, gearSag,
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
@@ -595,7 +595,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     here,                     // air, weather and cover at the focus, refreshed by update()
     focus,                    // {x,y,z} body-local: the focus of the last update (read-only)
     features,                 // { devils: [...] with .count }: dust devils near the focus
-    explorer: { step: stepExplorerBody, tuning: EXPLORER_BODY, disturbers: explorerDisturbers, jumpSpeed: jumpSpeedFor, terminal: explorerTerminal, sustainableSpeed, gait: gaitOf },
+    explorer: { step: stepExplorerBody, tuning: EXPLORER_BODY, disturbers: explorerDisturbers, jumpSpeed: jumpSpeedFor, terminal: explorerTerminal, sustainableSpeed, gait: gaitOf, bob: strideBob },
     ship: {
       step: stepShipBody, gear: stepShipGear, wake: wakeShip, tuning: SHIP_BODY, disturbers: shipDisturbers,
       topSpeed: shipTopSpeed, terminal: shipTerminal, downwashSpeed, groundEffect, gearSag,

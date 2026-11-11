@@ -3,6 +3,125 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P17 (fifteenth PHYSICS agent; read this block first; P16 and older below hold for everything not named here)
+
+**Where things stand.** Item 1 (quality 2 confirmed, and made cheaper at every quality), item 2 (the boulder met off the
+middle of the path) and the coordinator's two asks from PAINTER (no puff at the boot on a meadow; `bobAt` exported) are
+done. Item 3 (P13 and P14's open items) is NOT started: see "Next". Tests: `node --test src/physics/` 279 pass (4 new),
+PILOT's `node --test tests/*.test.mjs` 140 pass, on a clean export of `085d5e1` with my files (`p17/ex.sh`). Scratch:
+`/home/user/.pc-scratch/physics/p17/` (`storm.mjs <root> <scenario|all|more|worst> <q> [runs] [secs] [kit]`: physics.update
+and the weather kit in the worst storms, wall per frame (its per-frame thread CPU is NOT trustworthy: see item 1), `ALLOC=1`
+heap per frame, `WALK=line` a run at 6 m/s instead of a 5 m circle, `reg.mjs` resolves `three` for the kit; `block.mjs <root>
+<scenario> <q> [secs] [line]`: physics.update alone, main-thread CPU over a whole block (the trustworthy number);
+`blockmatrix.sh`: head against the working tree; `side.mjs <root> <body> <h> <pace> <assist> [offsets]`: a run past a boulder off the line of the run;
+`probecost.mjs`: the body step's cost with the trials; `hill.mjs`; `head/`: an export of `7509a6e` as it was).
+**Next, in order:** (1) P13/P14's open items as P16 listed them (the sea is still one state round the focus; waves do not
+turn toward the longest fetch; nothing under one second in the gust pattern; the strips `tree-gust`, `clamber-walk-moon`
+and the storm frame not opened; the lab stand-in has no knee); (2) the air grid still makes about 400 KB of garbage a
+frame (below: the gust functions are called per node with twelve numbers each); (3) re-film `clamber-run-moon` with a
+boulder off the line (`side.mjs` has the numbers; no strip was made: the art pass had the machine).
+**API added (additive):** `strideBob(v, g, stride, T?, o?)` and `bobAt(ph, o, gE, T?)` exported from `explorer.js`,
+`physics.explorer.bob` (= strideBob); `util.js fsin, fcos`; `TerrainGrid.groundQ(q)`; explorer tunings `aheadProbe`,
+`aheadProbeBefore`, `aheadProbeAfter`, `aheadProbeMargin`, `aheadProbeTries`; state `st.phys.probe`, `.seen`, `.noTry`,
+`st.phys.ahead.tried` and `.hold`; `KICK.stepDust`; loose.js `Loose._move`, particles.js `Particles._fall` (internal).
+**Behaviour changed without a call changing:** (1) a run at a hump it would have to brake on (anything with a top that the
+legs must work on: a rise of more than their 0.45 m fold) slows before it with its soles to the pace the body itself
+crosses it at, tried in a ghost run; the flank of a boulder off the line of the run is no longer met with a brace;
+(2) a step or a landing on grass (0.02 of loose fines) or bare rock raises no dust puff (KICK.stepDust 0.05); soil,
+gravel, sand, dust, ash, litter and moss as before; (3) none in the numbers of the weather: the per-particle loops are
+the same arithmetic (sin and cos to 6e-8, sqrt for Math.hypot), the leaf count of the q2 test is identical before and after
+(3997).
+
+**1. Quality 2 in the worst storms (the hardening review's confirmation; PILOT may let physics.setQuality follow the
+tier).** Measured in Node on this machine (a 2.1 GHz Xeon, 4 CPUs, load average 10 to 22 from the art pass's browsers
+throughout), `p17/storm.mjs`: the explorer walking a 5 m circle at 1.4 m/s with the game's camera (5.2 m boom, 2 m up), the
+weather kit expanding every buffer each frame as the world's kit does (PAINTER's draw table), 60 Hz. Places: the Earth spawn
+at the first storm's gust front (146-152 s) and height (161-167 s); a closed wood in a 22 m/s gale (Node world, canopy 0.75
+at 14 m); Neptune's storm coast (44-50 s, 2 m up the beach; rain 2950 at q2); a Mars dust storm (dust_dunes stand, dust
+0.83: dust 1200, sand 2250 at q2); an Earth blizzard (62.4 N, 160-166 s: snow 2765, the skim 1255); and the heaviest, a run
+at 6 m/s into a tall wood at the storm (canopy 0.6 at 23 m, 21 m/s: 5000 to 5500 leaves at q2, the cap is 6000).
+- *Main-thread CPU a frame* (`p17/block.mjs`: the walker's path worked out first, then the measured 5 s of frames call
+  physics.update and nothing else, and `process.threadCpuUsage` is read once before and once after the block; the better
+  of 2 runs; head and these files one after the other; the particle counts come out the same in both, the arithmetic
+  being the same), physics.update at q2 / q1:
+
+  | storm (q2 counts) | head q2 | P17 q2 | head q1 | P17 q1 |
+  |---|---|---|---|---|
+  | Earth gust front (rain 565, leaves 1273) | 1.06 ms | 0.88 | 1.08 | 0.79 |
+  | Earth storm (rain 1734, leaves 606) | 0.85 | 0.79 | 1.03 | 0.71 |
+  | closed wood, 22 m/s (leaves 1702) | 0.90 | 0.84 | 0.87 | 0.77 |
+  | Neptune storm coast (rain 2945) | 1.08 | 0.82 | 0.71 | 0.72 |
+  | Mars dust storm (dust 1220, sand 2423) | 1.48 | 1.27 | 0.87 | 0.84 |
+  | Earth blizzard (snow 2764, skim 1191) | 1.56 | 1.50 | 1.17 | 1.08 |
+  | run into a tall wood at the storm (leaves 5028; q1 2994) | 2.27 | 1.93 | 1.57 | 1.17 |
+
+  Wall clock in the same blocks (load 19 to 22): head 0.9 to 7.2 ms, P17 1.0 to 2.5 ms (the wait for a core dominates).
+  The weather kit (wall, best of 3 runs per frame, `storm.mjs`): 0.1 to 0.3 ms in these storms, 0.7 ms in the blizzard and
+  in the tall wood, about the same before and after. (A first table in this hand-over's draft read the thread clock per
+  frame around each update: Linux spreads that clock's ticks over the whole thread, so short windows come out low. Only
+  whole blocks are trustworthy; the table above is that.)
+- *Verdict*: quality 2 fits. The heaviest storm a player can stand in (a run into a tall wood at the storm, 5000 leaves in
+  the box, the cap 6000 not reached) costs physics.update 1.9 ms of CPU a frame on this 2.1 GHz server core and the kit
+  0.7: 2.6 of the 16.7 ms; every other storm 0.8 to 1.5 ms and 0.1 to 0.7. Nothing the player sees was cut: no cap, count
+  or sampling rate changed. Quality 2 costs 0.1 to 0.8 ms a frame more than quality 1 where a storm fills the buffers
+  (rain, dust, sand, snow, leaves in a tall wood), nothing where it does not.
+- *What was made cheaper, and why it was slow* (found with V8's own tools: `--cpu-prof` line ticks, `--trace-deopt`,
+  `%GetOptimizationStatus`, a sampling heap profile that keeps collected objects):
+  (a) **a deoptimisation loop**: `FloraField._pushStep` was thrown away and rebuilt about 300 times in 12 s at Neptune's
+  coast (every other frame): Math.round hands back -0 for a focus just west or south of the anchor, and the grid centre
+  fields changed their kind of storage. The centres now start as -0 (flora, near, deform, drift); 0 deopts after.
+  (b) **two long updates never optimised whole**: `Loose.update` and `Particles.update` ran their particle loops only as
+  on-the-fly (OSR) code, so every lookup per particle stayed a call and every number handed over was boxed on the heap.
+  Each kind's loop is now its own method (`Loose._move`, `Particles._fall`, the code moved verbatim), optimised whole.
+  (c) **the ground lookups per particle** go through `TerrainGrid.groundQ(q)` (a scratch array in and out: nothing boxed).
+  (d) **`Math.hypot` is twenty times slower than `Math.sqrt` in V8** and `x % 1` three times slower than `x - floor(x)`: in
+  the particle loops they are replaced; sin and cos of the flutter, the tumble and the leaf's mark use `fsin`/`fcos`
+  (util.js: within 6e-8, 2.5 times faster). Heap garbage of physics.update at q2: Neptune's coast 933 -> 478 KB a frame, the
+  blizzard 1392 -> 548 KB (process heap between clean frames). What is left is mostly the air grid (gustLevelAt,
+  gustCrossAt, gustFineAt per node, twelve numbers each, and noise3): Next (2).
+- *Tests*: `P17: quality 2 ... in a gale through a tall wood` (index.test.mjs): 3997 leaves at q2, mean under 2 ms under
+  PC_TIMING (the same limit as quality 1's budget tests), measured as main-thread CPU where Node has `threadCpuUsage`: in the
+  full suite under PC_TIMING (the test files run side by side, load 19) the wall clock gave 2.08 ms against 1.55 to 1.84
+  alone; the wait for a core is not the frame's cost. The other timing tests keep the wall clock and passed.
+
+**2. The boulder met off the middle of the path (`explorer.js`, mine).** P16 read the way ahead along the path and called a
+face only a rise over the legs' stroke (0.73 m). The flank of a 1 m boulder 0.4 to 0.55 m off the line of the run is a
+lower, narrower hump (0.67 m at 0.5 m off): not a face to P16, but the body still met it braced (two steps of 0.5 m/s) and
+held back over its top by the limbs (P13's hold, 20 m/s^2): 6 -> 2.9 m/s in a quarter of a second on the Moon. The reading
+was not too narrow (the body is a point: it feels only the path's own section, which is what was read); the criterion was.
+Now (EXPLORER_BODY.aheadProbe): anything with a top that the legs must work on (a rise of more than their fold within the
+span) is read along the path once (20 samples, 0.2 m apart, from 0.6 m short of the span to 2.6 m beyond the far point),
+and the body itself is run over that profile in a ghost (the same step function, the walker's own normals, no world
+samples) at trial paces, one trial a body step: the wished pace, the law's, then halving; the fastest that crosses with no
+brace, no hold checking it and the feet never off the ground, less 8 %, is the pace to meet it at, and the face is held to
+until the body is back on its feet past its top. Ground that goes on rising (a hill, a ledge) is not tried: P16's reading
+holds there (a 20 % and a 40 % hill: the same numbers as before). Runs at 6 m/s past a 1 m boulder (PILOT's profile, no
+assist), speed before, least over it, worst loss in one step, brace:
+
+  | world, off the line | head | P17 |
+  |---|---|---|
+  | Moon 0 / 0.4 / 0.5 / 0.55 m | 2.78, 0.03, 0 / 3.09, 0.50, 0.5 / 2.87, 0.50, 0.5 / 4.55, 0.36, 0 | 2.54, 0.03, 0 / 3.06, 0.02, 0 / 3.40, 0.02, 0 / 3.58, 0.02, 0 |
+  | Mars 0 / 0.4 / 0.5 / 0.55 m | 2.75, 0.05, 0 / 3.43, 0.28, 0.15 / 3.13, 0.50, 0.5 / 4.04, 0.39, 0 | 2.88, 0.05, 0 / 3.40, 0.05, 0 / 3.92, 0.05, 0 / 4.27, 0.05, 0 |
+  | Earth 0 / 0.4 / 0.5 / 0.55 m | 2.74, 0.10, 0 / 4.09, 0.09, 0 / 4.11, 0.50, 0.5 / 6.00 | 2.88, 0.10, 0 / 4.10, 0.09, 0 / 4.79, 0.08, 0 / 6.00 |
+
+  At 7.4 m/s past 0.7 m and 1.2 m boulders, 0 to 0.7 m off, on the Moon and Earth: head braced in 4 of 16 runs (and lost
+  7.4 -> 4.7 m/s to the hold in one more); P17 in none, the worst step 0.11 m/s. Feet never off the ground in any run.
+  *Cost*: a trial is a ghost run of 1 to 2.5 s of body steps; the worst body step with a trial in it was 0.9 ms (best of 7
+  runs, 2.1 GHz Xeon), once in each of up to six steps when a feature comes into reading; the mean body step 7.5 -> 13 us
+  over a run at a boulder. Only while running (over 2.5 m/s).
+- *Tests*: new `P17 the way ahead, tried` (explorer.test.mjs): Moon, Mars (3.7), Earth, 0 to 0.55 m off: no brace, no
+  hold, the worst step within the soles' grip, in contact, never under 2.2 m/s. P16's test passes unchanged.
+
+**3. PAINTER's two asks (by the coordinator).** (a) *A puff at the boot on a meadow*: decided physically: a living sward's
+roots bind the soil and its blades cover it; a step raises none. Each kicked grain is drawn as a puff, and the meadow's 0.02
+of loose fines came out as a lone puff now and then on a run or a landing (8 in 6 s of running with 12 landings, measured
+on head). `KICK.stepDust` 0.05: no foot kick below it (grass 0.02, rock 0.03, glass, crystal); soil 0.15, gravel, sand,
+dust, ash, litter (0.06) and moss (0.08) as before. New test `P17: a step on a living sward raises no puff` (fails on head
+with 8, passes now; the sand still smokes under the same run). (b) *`bobAt` exported* with a small helper:
+`strideBob(v, g, stride)` is the hips' height off standing in a steady stride exactly as stepGait lays it (tested equal to
+the body's own `st.phys.bob` to 1e-9 at 1.4, 4.2, 6.5 m/s on Earth and 3 m/s on the Moon); `physics.explorer.bob` too.
+For PAINTER: see "For PAINTER", P17.
+
 ## Hand-over P16 (fourteenth PHYSICS agent; read this block first; P15 and older below hold for everything not named here)
 
 **Where things stand.** Items 1 (import cycles), 2 (the fetch) and 3 (the Moon run at the boulder) are done; no hardening
@@ -1129,6 +1248,21 @@ physics.ship.stepPulse(ps = { a, v }, vWant, dt);  pulseBrakeDistance(v)
 
 ### Fields and buffers (typed arrays; PAINTER wraps them in textures and attributes)
 
+**Added in P17 (all additive; nothing was renamed or removed):**
+```js
+import { strideBob, bobAt } from './src/physics/explorer.js';
+strideBob(v, g, stride, T = EXPLORER_BODY, o = null)  // m: the hips off their standing height at `stride` (0..1: left foot
+                                                      //   down at 0, right at 0.5) of a steady stride at v m/s under g,
+                                                      //   as stepGait lays it (no easing in or out); o: a gaitOf result to reuse
+bobAt(ph, o, gE, T = EXPLORER_BODY)                   // the same at phase ph of a step (0 = a footfall) of stride o (gaitOf)
+physics.explorer.bob                                  // = strideBob
+// explorer.js EXPLORER_BODY: aheadProbe 0.2, aheadProbeBefore 0.6, aheadProbeAfter 2.6, aheadProbeMargin 0.92,
+//   aheadProbeTries 6; st.phys.probe (the feature being tried), .seen, .noTry; st.phys.ahead.tried, .hold
+// util.js: fsin(x), fcos(x) (within 6e-8 of Math.sin / Math.cos)
+// near.js: TerrainGrid.groundQ(q): q[0] x, q[1] z in; q[2] heightAt(x, z, NaN), q[3] liquidAt(x, z) out
+// loose.js: KICK.stepDust 0.05 (no puff at the boot below it)
+```
+
 **Added in P16 (all additive; nothing was renamed or removed):**
 ```js
 physics.water(bodyId, p).fetch, .depth   // m: the fetch this sea was raised over (measured; FETCH_DEFAULT 800 away from the
@@ -1535,6 +1669,20 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+### P17, first (fifteenth PHYSICS agent)
+- **physics.setQuality may follow the render tier** (the hardening review's P13, `physics-quality-never-follows-tier`):
+  confirmed. At quality 2 in the heaviest storm a player can stand in (a run into a tall wood at the storm: 5000 leaves)
+  physics.update costs 1.9 ms and the weather kit 0.7 ms of main-thread CPU a frame on this 2.1 GHz server core; the other
+  storms 0.8 to 1.5 ms and 0.1 to 0.7 ms (the hand-over, P17 item 1). The change is yours: `physics.setQuality(q)` next to each
+  `painter.setQuality(q)` in `src/main.js` (main.js:131 and :189 in the review's tree), with the same 0 / 1 / 2.
+- **The runner slows for boulders it would clip** (P17 item 2): running over 2.5 m/s, a hump with a top within reading
+  (a boulder met square on or at its flank) is read once (20 more `env.sample` calls) and tried with the body itself over
+  six body steps; the run then eases to the pace it crosses at with no brace (as P16 does for square faces). One body
+  step in each of those six can take up to 0.9 ms (best of 7, the ghost runs of the trials): your sim step sees it once
+  per boulder approached at a run. `aheadFrom` set very high in EXPLORER_BODY turns all reading ahead off, as before.
+- **No puff at the boot on grass or bare rock** (KICK.stepDust): if any audio or HUD keyed on `here.blown` or the dust
+  buffer for footsteps on meadows, it now hears nothing there (it never should have).
 
 ### P16, first (fourteenth PHYSICS agent)
 - **Nothing to wire.** Three behaviours change under the same calls:
@@ -2093,6 +2241,21 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P17, first (fifteenth PHYSICS agent): the gallery's gait formula, and the puff on the meadow
+- **`strideBob` instead of the copy** (you asked, through the coordinator): in `src/art/gallery.js` `gaitPose`, the twelve
+  lines that compute `bob` from `gaitOf`'s numbers (from `const ph = (GAIT.s * 2) % 1, L = ...` to the end of the `else if
+  (o.gait === 1)` block) can become, with `strideBob` added to the import from `'../physics/explorer.js'`:
+  `const bob = strideBob(Math.max(0.12, GAIT.v), GAIT.g, GAIT.s, T, o);` (keep `ph` if the feet use it). It is exactly the
+  body's own `st.phys.bob` in a steady stride (tested to 1e-9). One difference: your copy used max(0.3, g) for the hips'
+  fall, the body uses g; they differ only under 0.3 m/s^2 (nowhere in the game). `physics.explorer.bob` is the same function.
+- **The pale round puff at the boot on grass** was the physics: a run or a landing on a meadow put up a lone dust grain now
+  and then (the meadow's 0.02 of loose fines), and each grain is drawn as a puff. A living sward raises none: there is no
+  puff on grass or rock now (KICK.stepDust). Soil, gravel, sand, dust, ash, litter and moss still smoke under a step. Nothing
+  to change on your side; if a puff still shows on a meadow, tell me where (it would be soil under the grass in your
+  materials: `groundAt` takes it from the biome's ground and the slope).
+- **Nothing else changed in what you draw**: quality 2's counts are as they were (rain 3200, leaves 6000), the per-particle
+  arithmetic is the same to 6e-8 (the q2 test's leaf count is identical before and after).
 
 ### P16, first (fourteenth PHYSICS agent): the sea now comes from the water that is there (a world decision for you)
 
@@ -2919,6 +3082,17 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     the hips (about 2.75 m/s for 1 m on any world), so the run's speed above that is shed by the soles, within the grip,
     before the face, not by the face. A bound that kept the run's pace (the energy of the climb only) would break the
     measure: the coordinator's to allow, not mine.
+36. **(P17) What the runner must brake for is tried, not guessed.** A hump with a top is read along the path once and the
+    body's own step function is run over it (a ghost) at trial paces; the fastest clean crossing less 8 % is the pace to
+    meet it at. A fitted law cannot follow every section of every boulder; the body is the law. Rising ground that does
+    not come down (hills, ledges) keeps P16's reading. The trials cost up to 0.9 ms in a body step, six steps per feature.
+37. **(P17) The hot loops stay optimisable.** Per-particle work lives in methods of one loop (`_move`, `_fall`), calls in
+    it pass no numbers (`groundQ` through a scratch array), no `Math.hypot` or `% 1` inside it, and fields that Math.round
+    writes start as -0. V8's own tools found each of these (`--trace-deopt`, `%GetOptimizationStatus`, a heap profile
+    that keeps collected objects); keep checking them after a change to a loop: the tests measure time only under
+    PC_TIMING, and a lost optimisation shows first as garbage and deopts, not as a failed test.
+38. **(P17) A step raises no puff from a living sward** (KICK.stepDust 0.05): grass and bare rock give none; the puff is
+    the visible part of loose fines, and a meadow has too few to show.
 
 ## Needs from the others
 

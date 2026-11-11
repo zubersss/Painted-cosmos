@@ -104,7 +104,7 @@
 //           that travels with the wind (eye.bandE, bandN: how far the wind has carried it; eye.band01:
 //           how much of this the wind of the moment calls for; the kit sets all three), so a flake
 //           stays in its band while both are carried along.
-import { noise3 } from '../util.js';     // (the lattice noise of the physics, -1..1: for the bands of what falls in a wind)
+import { noise3, fsin, fcos } from '../util.js';     // (the lattice noise of the physics, -1..1: for the bands of what falls in a wind)
 
 export const DRAW = Object.freeze({
   rain: Object.freeze({ shape: 'streak', width: 0.012, exposure: 0.04, min: 0.05, fadeIn: 0.1, fadeOut: 0.08, vary: 0, minPx: 1.2 }),
@@ -351,10 +351,10 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
         // its long side, so that it is seen broadside (aspect), then edge-on (a line), then broadside
         const r1 = S[i] * 27183.31, f1 = r1 - Math.floor(r1), r2 = S[i] * 65537.17, f2 = r2 - Math.floor(r2);
         a = age * spin * (f2 < 0.5 ? -(0.4 + 0.9 * f1) : 0.4 + 0.9 * f1) + f2 * 6.2831853;
-        if (TU) { const ct = Math.cos(TU[i]); lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(ct)) * (ct < 0 ? -1 : 1); }
-        else lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(Math.cos(age * flip * (0.6 + 0.8 * f2) + f1 * 6.2831853)));
+        if (TU) { const ct = fcos(TU[i]); lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(ct)) * (ct < 0 ? -1 : 1); }
+        else lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(fcos(age * flip * (0.6 + 0.8 * f2) + f1 * 6.2831853)));
       }
-      const c = Math.cos(a), s = Math.sin(a);
+      const c = fcos(a), s = fsin(a);          // (P17: fsin / fcos, util.js: within 6e-8, 2 to 3 times faster)
       ax = eye.rx * c + eye.ux * s; ay = eye.ry * c + eye.uy * s; az = eye.rz * c + eye.uz * s;
       bx = eye.ux * c - eye.rx * s; by = eye.uy * c - eye.ry * s; bz = eye.uz * c - eye.rz * s;
     } else if (h > 0 && (ex > 0 || tumble > 0)) {
@@ -384,7 +384,7 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
         // the motion: the two are added as ellipses (second moments), so the mark turns toward the
         // motion steadily as the wind rises and only ever turns fast while it is all but round
         const r1 = S[i] * 27183.31, f1 = r1 - Math.floor(r1), r2 = S[i] * 65537.17, f2 = r2 - Math.floor(r2);
-        const th = f2 * 6.2831853 + age * tumble * (f2 < 0.5 ? -(0.35 + 0.65 * f1) : 0.35 + 0.65 * f1), ct = Math.cos(th), st = Math.sin(th);
+        const th = f2 * 6.2831853 + age * tumble * (f2 < 0.5 ? -(0.35 + 0.65 * f1) : 0.35 + 0.65 * f1), ct = fcos(th), st = fsin(th);
         const sh = h * (aspect + (1 - aspect) * f1), A2 = h * h, B2 = sh * sh, Q = la * la - A2;
         const xx = A2 * ct * ct + B2 * st * st + Q * mc * mc, yy = A2 * st * st + B2 * ct * ct + Q * ms * ms, xy = (A2 - B2) * ct * st + Q * mc * ms;
         const df = xx - yy, rr = Math.sqrt(df * df + 4 * xy * xy), tr = xx + yy;

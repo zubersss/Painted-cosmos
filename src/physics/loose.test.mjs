@@ -198,6 +198,28 @@ test('jets scour loose ground: a ring of dust in air, a fast flat sheet in vacuu
   assert.equal(hi.physics.particles.dust.count, 0);
 });
 
+test('P17: a step on a living sward raises no puff (a run and landings on a dry meadow); bare soil and sand do', () => {
+  // PAINTER saw a pale round puff at the boot now and then on grass: each kicked grain is drawn as a puff, and a run or a
+  // landing on the meadow's 0.02 of loose fines came out as a lone one. Roots bind the soil and the blades cover it.
+  const dustOf = (bodyId, biome) => {
+    const w = setup(bodyId, biome), P = w.physics.particles; let most = 0, born = 0, last = 0;
+    run(w, 1);
+    const fr = w.physics.fields.frame, v = V(fr.ex * 6, fr.ey * 6, fr.ez * 6);
+    let k = 0;
+    run(w, 6, { disturbers: () => {
+      w.focus = V(w.focus.x + v.x / 60, w.focus.y + v.y / 60, w.focus.z + v.z / 60); const l = len(w.focus); w.focus = V(w.focus.x * w.R / l, w.focus.y * w.R / l, w.focus.z * w.R / l);
+      k++;
+      return [{ kind: 'explorer', p: w.focus, v, radius: 0.35, strength: 1, grounded: true, kick: 0.025, impact: k % 30 === 0 ? 3 : 0 }];   // a run, a landing of 3 m/s twice a second
+    }, each: () => { const n = P.dust.count; if (n > last) born += n - last; last = n; if (n > most) most = n; } });
+    return { most, born, here: w.physics.here.weather };
+  };
+  const meadow = dustOf('earth', 'alpine_meadow');
+  assert.ok(meadow.here.wetness01 < 0.05, 'a dry meadow: wetness ' + meadow.here.wetness01);
+  assert.equal(meadow.born, 0, 'puffs off the grass in 6 s of running and 12 landings: ' + meadow.born);
+  const sand = dustOf('earth', 'desert_canyon');
+  assert.ok(sand.born > 5, 'the sand smokes under the same run: ' + sand.born);
+});
+
 test('wading throws spray and leaves rings; snow kicks up as powder', () => {
   const w = setup('earth', 'sea_coast', { sea: 0.4 }); run(w, 1); walk(w, 3, 2.5);
   const P = w.physics.particles;

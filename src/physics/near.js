@@ -103,7 +103,7 @@ export class TerrainGrid {
     this.gz = new Float32Array(N * N);         // ground slope d h / d north
     this.valid = new Uint8Array(N * N);
     this.cover = withCover ? new Float32Array(N * N * coverWidth) : null;
-    this.ci = 0; this.cj = 0;                  // grid centre, in cells from the anchor
+    this.ci = -0; this.cj = -0;                // grid centre, in cells from the anchor ((P17) -0: see FloraField's)
     this.order = spiralOrder(N);
     this.invalid = N * N;
     this.frameVersion = -1;
@@ -193,6 +193,26 @@ export class TerrainGrid {
     const ws = w00 + w10 + w01 + w11;
     if (ws < 0.25) return fallback;
     return (this.h[n] * w00 + this.h[n + 1] * w10 + this.h[n + N] * w01 + this.h[n + N + 1] * w11) / ws;
+  }
+
+  // (P17) Both lookups at once for the per-particle loops, through a scratch array: reads x = q[0], z = q[1]; writes
+  // q[2] = heightAt(x, z, NaN) and q[3] = liquidAt(x, z), exactly. Called with numbers, a function that is not inlined
+  // (a long loop spends its inlining budget early) is handed each one in a fresh heap box, and its answer comes back
+  // in another: three thousand raindrops looked up twice a frame were half a megabyte of garbage a frame. Through q
+  // nothing is boxed.
+  groundQ(q) {
+    const N = this.N, x = q[0], z = q[1];
+    const u = x / this.cell - this.ci + this.half, v = z / this.cell - this.cj + this.half, va = this.valid;
+    const ir = Math.round(u), jr = Math.round(v);
+    if (ir < 0 || jr < 0 || ir > N - 1 || jr > N - 1) q[3] = NaN; else { const m = jr * N + ir; q[3] = va[m] ? this.lq[m] : NaN; }
+    if (u < 0 || v < 0 || u > N - 1 || v > N - 1) { q[2] = NaN; return; }
+    let i = Math.floor(u), j = Math.floor(v);
+    if (i > N - 2) i = N - 2; if (j > N - 2) j = N - 2;
+    const fu = u - i, fv = v - j, n = j * N + i, h = this.h;
+    const w00 = (1 - fu) * (1 - fv) * va[n], w10 = fu * (1 - fv) * va[n + 1];
+    const w01 = (1 - fu) * fv * va[n + N], w11 = fu * fv * va[n + N + 1];
+    const ws = w00 + w10 + w01 + w11;
+    q[2] = ws < 0.25 ? NaN : (h[n] * w00 + h[n + 1] * w10 + h[n + N] * w01 + h[n + N + 1] * w11) / ws;
   }
 
   // Liquid surface (radius - r0) at (x, z): -1e9 where the nearest node is dry, NaN where it is

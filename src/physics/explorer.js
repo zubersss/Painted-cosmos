@@ -76,6 +76,20 @@ export const EXPLORER_BODY = Object.freeze({
   aheadMargin: 0.8,       // share of the grip (and the assist) the walker plans to brake with
   aheadPace: 1.75,        // m/s at a rise of a metre over the fold, in that law (3.85, 2.75, 2.15 m/s for 0.8, 1.0, 1.2 m)
   aheadExp: 0.75,
+  // (P17) THE WAY AHEAD, TRIED. The law above was fitted to faces met square on; the flank of a boulder at the edge of the
+  // path is a lower, narrower hump (0.67 of its height 0.5 m off the middle of a 1.3 m dome) that the law did not count
+  // as a face (its rise is under the stroke), and the body met it as before: braced at the face (two steps of 0.5 m/s)
+  // and held back over the top (6 -> 2.9 m/s in 0.25 s on the Moon). Now anything the legs must work on (a rise of more
+  // than their fold within aheadSpan) is read along the path once, aheadProbe apart from aheadProbeBefore short of the
+  // far point to aheadProbeAfter beyond it, and the body itself is run over that profile (a ghost: the same step
+  // function, no world samples) at trial paces, one a step: the fastest that crosses with no brace, no hold checking
+  // it and the feet never off the ground, less aheadProbeMargin, is the pace to meet it at. The law stands in while
+  // the trials run (six steps at most) for faces over the stroke.
+  aheadProbe: 0.2,        // m between the samples of a feature's profile
+  aheadProbeBefore: 0.6,  // m read short of the far point (and the span)
+  aheadProbeAfter: 2.6,   // m read beyond it (a 1.3 m dome seen at its foot lies within that)
+  aheadProbeMargin: 0.92, // the pace planned, as a share of the fastest trial that crossed clean (and the pace is tried that much faster)
+  aheadProbeTries: 6,     // trials at most (a bisection between 0.5 m/s and the pace: about a sixth of a metre a second)
   // GAIT (P13). The stride-averaged body above (st.p, st.v: the path, the pace, the stops) is carried by
   // legs that step. Within the stride the hips ride the mechanics of a legged walker:
   //   a WALK is an inverted pendulum: the hips vault over the stance foot on a leg that rolls over the
@@ -152,6 +166,9 @@ export const EXPLORER_BODY_STATE = () => ({
   paceCap: 1e9,           // m/s: the pace the walker holds so its feet can follow the ground ahead
   paceAhead: 1e9,         // (P16) m/s: the pace it holds now to meet a face it has seen ahead at the pace it can climb it
   ahead: null,            // (P16) that face: { x, y, z (unit), rise (m), vc (m/s) } or null
+  probe: null,            // (P17) a feature being tried (see EXPLORER_BODY.aheadProbe): its profile, the trials so far
+  seen: null,             // (P17) the end of the way ahead known (a feature tried): { x, y, z (unit), d (m along) } or null
+  noTry: null,            // (P17) the end of ground read and found to go on rising (not tried: P16's reading holds there)
   brace: 0,               // m/s of forward speed lost this step against a face or to a hold
   support: 0,             // m/s^2 of normal support from the ground (0 when floating or airborne)
   impact: 0,              // m/s of the last landing (normal speed), set on the landing step
@@ -215,32 +232,157 @@ function groundAhead(env, px, py, pz, hx, hy, hz, dist) {
 // soles to brake from this pace; a face the hips must climb (a rise of more than the stroke within aheadSpan, and more
 // than the stroke over the line of the ground being run on, within a clamber) is remembered; the pace held is what still
 // meets it at the pace it can be crossed in contact. aB: the braking the grip and the assist can give (m/s^2).
-function wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T) {
+// (P17) Anything the legs must work on (a rise of more than their fold) is tried: see EXPLORER_BODY.aheadProbe. vw: the
+// pace wished for (a feature is tried at the faster of it and the pace now).
+function wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh) {
   const stroke = T.legFold + T.legReach, ab = Math.max(0.3, T.aheadMargin * aB);
   const r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r;
   let hx = sx, hy = sy, hz = sz; const hu = hx * ux + hy * uy + hz * uz; hx -= hu * ux; hy -= hu * uy; hz -= hu * uz;
   const hl = Math.hypot(hx, hy, hz);
-  if (!(hl > 1e-9) || !(gE > 0)) { B.paceAhead = 1e9; B.ahead = null; return; }
+  if (!(hl > 1e-9) || !(gE > 0)) { B.paceAhead = 1e9; B.ahead = null; if (B.probe) B.probe.active = false; B.seen = null; B.noTry = null; return; }
   hx /= hl; hy /= hl; hz /= hl;
   // the face remembered: still ahead and on the path?
   let A = B.ahead;
-  if (A) { const dx = A.x - ux, dy = A.y - uy, dz = A.z - uz, d = (dx * hx + dy * hy + dz * hz) * r, side = Math.hypot(dx * r - d * hx, dy * r - d * hy, dz * r - d * hz); A.d = d; if (d < -0.5 || side > 1.0) A = B.ahead = null; }
+  if (A) { A.d = alongWay(A, ux, uy, uz, hx, hy, hz, r, A.hold || 0.5); if (A.d < -1e8) A = B.ahead = null; }
+  // (P17) the way known up to here (a feature tried: clear, or its face remembered), and the feature being tried
+  if (B.seen) { B.seen.d = alongWay(B.seen, ux, uy, uz, hx, hy, hz, r); if (B.seen.d < -1e8) B.seen = null; }
+  if (B.noTry) { B.noTry.d = alongWay(B.noTry, ux, uy, uz, hx, hy, hz, r); if (B.noTry.d < -1e8) B.noTry = null; }
+  const Q = B.probe;
+  if (Q && Q.active) { Q.d = alongWay(Q, ux, uy, uz, hx, hy, hz, r); if (Q.d < -1e8) Q.active = false; }
   // read the way: the far point, and aheadSpan short of it
   // (read only while running; a face already seen is kept, slow or not, until it is passed or off the path)
   const d = Math.min(T.aheadMax, vh * vh / (2 * ab)) + T.look;
   if (vh > T.aheadFrom && d > T.aheadSpan + 0.5) {
-    const hN = groundAhead(env, px, py, pz, hx, hy, hz, d - T.aheadSpan), hF = groundAhead(env, px, py, pz, hx, hy, hz, d);   // (_dir2: the far point)
-    const slope = B.trend > 0 ? B.trend / vh : 0, rise = hF - h1 - slope * d;
-    if (hF - hN > stroke && rise > stroke && hF - h1 <= T.clamber) {
-      const vc = Math.max(0.5, T.aheadPace / Math.pow(Math.max(0.05, rise - T.legFold), T.aheadExp));
-      const cost = (q) => Math.sqrt(q.vc * q.vc + 2 * ab * Math.max(0, q.d - T.look));
-      const N = { x: _dir2.x, y: _dir2.y, z: _dir2.z, rise, vc, d };
-      // (the same face read again a little further on: it is as high as its highest reading; another face: the dearer)
-      if (A && Math.abs(N.d - A.d) < T.aheadSpan) { if (N.vc < A.vc) { A.vc = N.vc; A.rise = N.rise; } }
-      else if (!A || cost(N) < cost(A)) A = B.ahead = N;
+    if (Q && Q.active) {
+      // (P17) one trial a step; when the trials are done the feature is a face to meet at its pace, or clear
+      if (probeTrial(Q, env, T)) {
+        Q.active = false;
+        B.seen = { x: Q.end.x, y: Q.end.y, z: Q.end.z, d: Q.end.d };
+        if (Q.vc < 1e8) {
+          // (a face tried is held to until the body is back on its feet beyond its top, as in the trials: hold, m past its point)
+          const N = { x: Q.x, y: Q.y, z: Q.z, rise: Q.rise, vc: Q.vc, d: Q.d, tried: true, hold: Math.max(0.5, Q.xTop - Q.xFar + T.look + 0.3) };
+          // (the law's stand-in for this feature gives way to what was tried; another face: the dearer)
+          if (A && !A.tried && Math.abs(N.d - A.d) < T.aheadSpan + T.aheadProbeAfter) { A.x = N.x; A.y = N.y; A.z = N.z; A.d = N.d; A.vc = N.vc; A.rise = N.rise; A.tried = true; A.hold = N.hold; }
+          else if (!A || paceCost(N, ab, T) < paceCost(A, ab, T)) A = B.ahead = N;
+        } else if (A && !A.tried && Math.abs(Q.d - A.d) < T.aheadSpan + T.aheadProbeAfter) A = B.ahead = null;   // tried: no slowing
+      }
+    } else {
+      const hN = groundAhead(env, px, py, pz, hx, hy, hz, d - T.aheadSpan), hF = groundAhead(env, px, py, pz, hx, hy, hz, d);   // (_dir2: the far point)
+      const slope = B.trend > 0 ? B.trend / vh : 0, rise = hF - h1 - slope * d;
+      const known = B.seen && d <= B.seen.d;
+      if (!known && hF - hN > T.legFold && rise > T.legFold && hF - h1 <= T.clamber) {
+        const fx = _dir2.x, fy = _dir2.y, fz = _dir2.z;
+        // the law stands in while it is tried (faces over the stroke, as in P16)
+        if (hF - hN > stroke && rise > stroke) {
+          const vc = Math.max(0.5, T.aheadPace / Math.pow(Math.max(0.05, rise - T.legFold), T.aheadExp));
+          const N = { x: fx, y: fy, z: fz, rise, vc, d, tried: false };
+          // (the same face read again a little further on: it is as high as its highest reading; another face: the dearer)
+          if (A && Math.abs(N.d - A.d) < T.aheadSpan) { if (N.vc < A.vc && !A.tried) { A.vc = N.vc; A.rise = N.rise; } }
+          else if (!A || paceCost(N, ab, T) < paceCost(A, ab, T)) A = B.ahead = N;
+        }
+        if (!(A && A.tried && Math.abs(d - A.d) < T.aheadSpan) && !(B.noTry && d <= B.noTry.d)) probeStart(B, env, px, py, pz, h1, hx, hy, hz, r, d, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
+      }
     }
   }
   B.paceAhead = A ? Math.sqrt(A.vc * A.vc + 2 * ab * Math.max(0, A.d - T.look)) : 1e9;
+}
+
+// Where a remembered point (unit direction P) lies on the way from (ux, uy, uz) along (hx, hy, hz): how far along it (m),
+// or -1e9 when it is `behind` m behind or more than a metre off the path.
+function alongWay(P, ux, uy, uz, hx, hy, hz, r, behind = 0.5) {
+  const dx = P.x - ux, dy = P.y - uy, dz = P.z - uz, d = (dx * hx + dy * hy + dz * hz) * r;
+  const ex = dx * r - d * hx, ey = dy * r - d * hy, ez = dz * r - d * hz;
+  return d < -behind || ex * ex + ey * ey + ez * ez > 1.0 ? -1e9 : d;
+}
+// The pace to hold now to meet face q at its pace, braking at ab (the dearer of two faces is the one that asks less now).
+function paceCost(q, ab, T) { return Math.sqrt(q.vc * q.vc + 2 * ab * Math.max(0, q.d - T.look)); }
+
+// ---- (P17) the way ahead, tried ------------------------------------------------------------------------
+// The feature's profile along the path, relative to the ground under the walker, from aheadProbeBefore short of the
+// span to aheadProbeAfter beyond the far point at d; the trials then run the body itself over it.
+function probeStart(B, env, px, py, pz, h1, hx, hy, hz, r, d, rise, v, fx, fy, fz, T) {
+  const n = Math.max(2, Math.min(40, Math.round((T.aheadSpan + T.aheadProbeBefore + T.aheadProbeAfter) / T.aheadProbe) + 1));
+  let Q = B.probe;
+  if (!Q || Q.prof.length < n) Q = B.probe = { active: false, prof: new Float64Array(n), nsl: new Float64Array(n), n: 0, step: T.aheadProbe, x: 0, y: 0, z: 0, d: 0, rise: 0, lo: 0, hi: 0, law: 0, tries: 0, vc: 1e9, surf: null, end: { x: 0, y: 0, z: 0, d: 0 }, R: r, g: 0, env: null };
+  const s0 = Math.max(0.2, d - T.aheadSpan - T.aheadProbeBefore);
+  // (each sample's height, and the slope along the way its own normal gives: the ghost meets the ground with the normals
+  // the walker will meet it with, which need not be the profile's own: PILOT's boulders keep the level ground's)
+  for (let i = 0; i < n; i++) {
+    const k = s0 + i * T.aheadProbe, x = px + hx * k, y = py + hy * k, z = pz + hz * k, rr = Math.hypot(x, y, z) || 1;
+    _dir2.x = x / rr; _dir2.y = y / rr; _dir2.z = z / rr;
+    const sm = env.sample(_dir2), nm = sm.normal, nu = nm ? nm.x * _dir2.x + nm.y * _dir2.y + nm.z * _dir2.z : 1;
+    Q.prof[i] = sm.radius - h1;
+    Q.nsl[i] = nm && nu > 0.05 ? -(nm.x * hx + nm.y * hy + nm.z * hz) / nu : 0;
+  }
+  Q.end.x = _dir2.x; Q.end.y = _dir2.y; Q.end.z = _dir2.z; Q.end.d = s0 + (n - 1) * T.aheadProbe;
+  // the ground there (for its grip): the far point's own surface, kept
+  _dir2.x = fx; _dir2.y = fy; _dir2.z = fz;
+  { const s = env.sample(_dir2); Q.surf = Q.surf || {}; for (const k in s) Q.surf[k] = s[k]; }
+  Q.n = n; Q.step = T.aheadProbe; Q.x = fx; Q.y = fy; Q.z = fz; Q.d = d; Q.rise = rise; Q.R = r; Q.xFar = d - s0;
+  // (the ghost runs from a little before the ground starts to rise to where the body is back on its feet past the top)
+  { let i0 = 0, it = 0; while (i0 < n - 1 && Q.prof[i0] - Q.prof[0] < 0.05) i0++; for (let i = 1; i < n; i++) if (Q.prof[i] > Q.prof[it]) it = i; Q.x0 = Math.max(0, i0 - 1) * Q.step - 1.5; Q.xTop = it * Q.step; }
+  // (the trials run a margin faster than the pace: the body's limits are sharp (a hold that takes over at a few
+  // millimetres more rise), and the ghost's ground is the profile, not the ground itself)
+  Q.lo = 0.5; Q.hi = v / T.aheadProbeMargin; Q.tries = 0; Q.vc = 1e9; Q.active = true; Q.parent = env;
+  // (only what comes down again is tried: a hump, a boulder. Ground that goes on rising (a hill, a ledge) keeps P16's
+  // reading: a hill is run at the pace the legs' power allows, a ledge over the stroke is the law's face. The way is
+  // known to the profile's end either way, so a long slope is read once in every few metres, not every step.)
+  if (Q.prof[n - 1] > Q.prof[Math.round(Q.xTop / Q.step)] - T.legFold) { Q.active = false; B.noTry = { x: Q.end.x, y: Q.end.y, z: Q.end.z, d: Q.end.d }; }
+  Q.law = rise > T.legFold + 0.05 ? Math.max(0.5, Math.min(Q.hi, T.aheadPace / Math.pow(rise - T.legFold, T.aheadExp) / T.aheadProbeMargin)) : 0;
+  return Q;
+}
+// One trial: the pace to try is the pace wished for first, then the law's (when it is under that), then the middle of
+// what is left. Returns true when the trials are done (Q.vc: the pace to meet it at, 1e9 when no slowing is needed).
+function probeTrial(Q, env, T) {
+  const v = Q.tries === 0 ? Q.hi : Q.tries === 1 && Q.law > Q.lo && Q.law < Q.hi ? Q.law : 0.5 * (Q.lo + Q.hi);
+  const ok = ghostCrosses(Q, v, env, T);
+  Q.tries++;
+  if (ok) { if (Q.tries === 1) { Q.vc = 1e9; return true; } Q.lo = v; } else Q.hi = v;
+  if (Q.tries >= T.aheadProbeTries || Q.hi - Q.lo < 0.15) { Q.vc = Math.max(0.5, Q.lo * T.aheadProbeMargin); return true; }
+  return false;
+}
+// The ghost: the body run at a steady wish of v over Q's profile laid along a great circle of radius Q.R (no world
+// samples). It crosses when no step braces, no hold checks it below the pace it holds, and the feet never leave the
+// ground, from 1.5 m before the ground starts to rise until it is back on its feet (no hold, the hips within 5 cm of
+// standing) a look and 0.3 m past the top (the hold reads the ground a look ahead), or 0.3 m beyond the profile.
+const _gq = [0, 1, 2, 3].map(() => ({ radius: 0, normal: { x: 0, y: 1, z: 0 }, liquidRadius: 0, slope: 0, isLiquid: false }));
+let _gk = 0, _gQ = null;
+const _gst = { p: { x: 0, y: 0, z: 1 }, v: { x: 0, y: 0, z: 0 }, grounded: true, phys: null };
+const _gcmd = { wish: { x: 0, y: 0, z: 0 } };
+const _gT = new WeakMap();
+function ghostSample(dir) {
+  const Q = _gQ, x = Math.atan2(dir.x, dir.z) * Q.R, u = x / Q.step, P = Q.prof, n = Q.n;
+  let h, sl;
+  const S = Q.nsl;
+  if (u <= 0) { h = P[0]; sl = S[0]; } else if (u >= n - 1) { h = P[n - 1]; sl = S[n - 1]; }
+  else { const i = Math.floor(u), f = u - i; h = P[i] + (P[i + 1] - P[i]) * f; sl = S[i] + (S[i + 1] - S[i]) * f; }
+  const o = _gq[_gk = (_gk + 1) & 3], t = x / Q.R, ex = Math.cos(t), ez = -Math.sin(t), l = 1 / Math.sqrt(1 + sl * sl);
+  o.radius = Q.R + h; o.normal.x = (dir.x - ex * sl) * l; o.normal.y = dir.y * l; o.normal.z = (dir.z - ez * sl) * l; o.slope = Math.atan(Math.abs(sl));
+  return o;
+}
+function ghostCrosses(Q, v, env, T) {
+  let Tg = _gT.get(T);
+  if (!Tg) { Tg = Object.freeze({ ...T, aheadFrom: 1e9 }); _gT.set(T, Tg); }     // (the ghost does not read ahead itself)
+  const P = Q.parent;
+  const genv = Q.env || (Q.env = { sample: ghostSample, gravity: 0, ground: null, liquid: undefined });
+  genv.gravity = P.gravity; genv.liquid = P.liquid; genv.ground = P.ground ? (s, out) => P.ground(Q.surf, out) : undefined;
+  _gQ = Q;
+  const st = _gst, R = Q.R, end = (Q.n - 1) * Q.step + 0.3;
+  let t = Q.x0 / R, rr = R + Q.prof[0];
+  st.p.x = Math.sin(t) * rr; st.p.y = 0; st.p.z = Math.cos(t) * rr;
+  st.v.x = Math.cos(t) * v; st.v.y = 0; st.v.z = -Math.sin(t) * v;
+  st.grounded = true; st.phys = null;
+  for (let k = 0; k < 900; k++) {
+    t = Math.atan2(st.p.x, st.p.z);
+    _gcmd.wish.x = Math.cos(t) * v; _gcmd.wish.y = 0; _gcmd.wish.z = -Math.sin(t) * v;
+    stepExplorerBody(st, _gcmd, 1 / 60, genv, Tg);
+    const B = st.phys;
+    if (!st.grounded || B.brace > 1e-3) return false;
+    if (B.grip && B.paceCap < 1e8) { const sp = Math.hypot(st.v.x, st.v.y, st.v.z); if (sp > B.paceCap + 0.02) return false; }
+    const x = t * R;
+    if (x > end || (x > Q.xTop + T.look + 0.3 && !B.grip && B.hip > -0.05 && B.hip < 0.05)) return true;
+  }
+  return false;
 }
 
 // Is there something for the limbs to hold? Yes when the ground `look` ahead (radius hD) lies well below
@@ -280,7 +422,8 @@ export function gaitOf(v, g, T = EXPLORER_BODY, out = {}, was = 0) {
   return out;
 }
 // The hips off their standing height (m) at phase ph of a step (0 = a footfall) of the stride o (gaitOf).
-function bobAt(ph, o, gE, T) {
+// (P17) Exported, with strideBob below, for a figure drawn without the body (PAINTER's gallery asked: no copy of the formula).
+export function bobAt(ph, o, gE, T = EXPLORER_BODY) {
   if (o.gait === 2) {
     const tc = o.contact, t = ph * o.period;
     if (t < tc) { const a = Math.PI / tc; return -o.drop - 0.5 * gE * o.flight * t + o.A * (t - Math.sin(a * t) / a) / a - 0.5 * gE * t * t; }
@@ -295,6 +438,15 @@ function bobAt(ph, o, gE, T) {
     return yt + (yl - yt) * w * w * (3 - 2 * w);
   }
   return 0;
+}
+// (P17) The hips off their standing height (m) at `stride` (0..1: the left foot lands at 0, the right at 0.5) of a steady
+// stride at v m/s over the ground under gravity g (in a liquid, what buoyancy leaves), as stepGait lays them (stepGait
+// also eases the stride in and out and smooths a change of gait; a steady stride has neither). o: a gaitOf result for
+// this v and g to reuse (optional).
+const _gtB = {};
+export function strideBob(v, g, stride, T = EXPLORER_BODY, o = null) {
+  const s = stride - Math.floor(stride), ph = (s * 2) % 1;
+  return bobAt(ph, o || gaitOf(Math.max(v, 0.12), g, T, _gtB), g, T);
 }
 // The forward speed within the step less its mean (m/s).
 function pulseAt(ph, o, gE, v, dy, T) {
@@ -739,7 +891,7 @@ function stepOnce(st, cmd, dt, env, T) {
         }
       }
       // (P16) the way ahead (see EXPLORER_BODY.aheadFrom)
-      wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0), T);
+      wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0), T, qlen);
       // the velocity lies along the ground as the legs carry it (see LEGS, 1) at the new place
       { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
       const q1 = q === 0 || B.grip ? 0 : 1;

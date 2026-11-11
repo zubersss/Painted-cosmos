@@ -223,8 +223,12 @@ export class FloraField {
     this._st = new Float32Array(M * M * 2);      // the lean a pushed plant keeps for a while (the wake)
     this._can = new Float32Array(N * N);         // canopy closure per bend cell
     this._cpl = new Float32Array(N * N * 4);     // scratch for the crown coupling
-    this.ci = 0; this.cj = 0;                    // bend grid centre, in cells
-    this.mi = 0; this.mj = 0;                    // push grid centre, in near cells
+    // (P17) the grid centres start as -0: Math.round hands back -0 for a focus just west or south of the anchor, and a
+    // field that held small integers until then changes its kind of storage at that moment. V8 then threw away the
+    // optimised push step and rebuilt it every other frame (300 times in 12 s at Neptune's storm coast, measured with
+    // --trace-deopt). Starting as a non-integer number the field never changes kind.
+    this.ci = -0; this.cj = -0;                  // bend grid centre, in cells
+    this.mi = -0; this.mj = -0;                  // push grid centre, in near cells
     this.frameVersion = -1;
     this.version = 0;                            // bumps every update (re-upload bend and wind)
     this.pushVersion = 0;                        // bumps when the push field changed

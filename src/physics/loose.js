@@ -23,7 +23,7 @@ import { saltationThreshold } from './weather.js';
 import { MATERIAL_INDEX, MATERIAL_NONE, materialNow } from './ground.js';
 import { BODIES } from '../data/bodies.js';
 import { PARTICLES, EVENT, publish } from './particles.js';
-import { clamp01, smoothstep, noise3 } from './util.js';
+import { clamp01, smoothstep, noise3, fsin, fcos } from './util.js';
 import { snowTransport01 } from './drift.js';
 
 // species: row of atmosphere.SPECIES for the fall speed.  life: [min, max] seconds.
@@ -54,6 +54,11 @@ export const KICK = Object.freeze({
   perMetre: 5,          // dust grains raised per metre walked on the loosest ground
   landing: 10,          // grains per m/s of landing speed
   up: 1.1,              // m/s: typical upward speed of a kicked grain
+  // (P17) a step raises a puff only from ground with loose fines at its surface: dry bare soil (0.15), gravel (0.2), sand,
+  // dust, ash, and a little from dry litter (0.06) and moss (0.08). A living sward (grass 0.02: the roots bind the soil
+  // and the blades cover it) and rock (0.03) give none: no puff at the boot. (Before, a run or a landing on a meadow put
+  // up a lone puff now and then: each grain is drawn as a puff, and the meadow's 0.02 was a chance of one a step.)
+  stepDust: 0.05,
   jetRate: 90,          // grains per second per unit of jet load on the loosest ground
   jetSpeedMax: 14,      // m/s: fastest a grain leaves a jet's footprint
   // Once sand is hopping, each impact keeps it going at a lower wind than was needed to start
@@ -137,6 +142,7 @@ export const BLOWN = Object.freeze({
 
 const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
 const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
+const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
 
 export class Loose {
@@ -463,6 +469,7 @@ export class Loose {
           const kick = D.kick != null ? D.kick : gp.dust * clamp01(0.15 + sp / 6);
           const dusty = powder ? 0.5 : kick;
           if (!grounded || dusty < 0.02) continue;
+          if (!powder && gp.dust < KICK.stepDust) continue;      // (P17) a sward or bare rock: no puff (KICK.stepDust)
           // behind the heels: back along the motion, upward, a little sideways
           let n = KICK.perMetre * dusty * sp * h + KICK.landing * (powder ? 0.5 : gp.dust) * (D.impact || 0) * h / 0.1 + rng() * 0.999;
           const kind = powder ? 'snow' : 'dust';
@@ -507,107 +514,121 @@ export class Loose {
     }
 
     // ---- motion ---------------------------------------------------------------------------------------
-    const ex = frame.ex, ey = frame.ey, ez = frame.ez, ax = frame.ax, ay = frame.ay, az = frame.az, nx = frame.nx, ny = frame.ny, nz = frame.nz;
-    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) {
-      const name = LOOSE_KINDS[kk], K = LOOSE[name], b = P.buffers[name];
-      b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
-      let alive = b._n;
-      if (alive === 0) { b.count = 0; continue; }
-      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left, HG = b.hag;
-      const turb = K.turb * sigma, puff = K.puff || 0;
-      const TU = K.tumble > 0 ? b.turn : null, TP = b._tp, ro0 = BLOWN.leafRo[0], roD = BLOWN.leafRo[1] - ro0, rk0 = BLOWN.leafRock[0], rkD = BLOWN.leafRock[1] - rk0;
-      const seaLevel = this._seaLevel, overSea = name === 'spray' && seaLevel > -1e8;
-      for (let i = 0; i < alive; i++) {
-        const o = i * 3;
-        let x = Pp[o], y = Pp[o + 1], z = Pp[o + 2];
-        const age = AG[i] + h;
-        let dead = age > LF[i] || Math.abs(x - fx) > Rr + 6 || Math.abs(z - fz) > Rr + 6;
-        let vx = V[o], vy = V[o + 1], vz = V[o + 2];
-        let left = LF[i] - age;                                   // what is left of its life
-        if (!dead) {
-          // wind at the particle
-          // (P12: between the four grid nodes round it, each with its own profile; see particles.js)
-          let u = (x - wtx) * 0.0625, v = (z - wtz) * 0.0625;
-          u = u < 0 ? 0 : u > 3.999 ? 3.999 : u; v = v < 0 ? 0 : v > 3.999 ? 3.999 : v;
-          const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu;
-          let hz = y - groundY;
-          // (spray rides the wind over the sea, which may lie below the ground the focus stands on)
-          if (overSea && y - seaLevel > hz) hz = y - seaLevel;
-          hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
-          const ih = hz | 0, fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
-          const h00 = (ht[t0] + (ht[t0 + 1] - ht[t0]) * fh) * (1 - fu) * (1 - fv), h10 = (ht[t0 + 25] + (ht[t0 + 26] - ht[t0 + 25]) * fh) * fu * (1 - fv);
-          const h01 = (ht[t0 + 125] + (ht[t0 + 126] - ht[t0 + 125]) * fh) * (1 - fu) * fv, h11 = (ht[t0 + 150] + (ht[t0 + 151] - ht[t0 + 150]) * fh) * fu * fv;
-          let we = wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11;
-          let wn = wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11;
-          let wu = 0;
-          const vt = VT[i], ph = PH[i];
-          if (turb > 0) { const a = ph + age * (1.1 + ph * 0.2); we += Math.cos(a) * turb; wn += Math.sin(a * 1.27) * turb; wu += Math.sin(a * 0.71 + 1.3) * turb * 0.4 * Math.min(1, hz); }
-          // the parcel of air it was thrown up with, mixing away
-          if (EJ && age < puff * 4) { const k = Math.exp(-age / puff); we += EJ[o] * k; wu += EJ[o + 1] * k; wn += EJ[o + 2] * k; }
-          if (K.flutter > 0) { const fl = Math.min(1, K.flutter * vt), a = ph * 3 + age * (2.2 + ph * 0.4); we += Math.cos(a) * fl; wn += Math.sin(a * 1.3) * fl; }
-          // a dust devil nearby: swirl, inflow and updraught (Rankine vortex)
-          if (devils) for (let d = 0; d < devils.count; d++) {
-            const D = devils[d];
-            const dx = x - D.x, dz = z - D.z, r = Math.hypot(dx, dz);
-            if (r > D.radius * 6 || hz > D.height || !(D.strength > 0)) continue;
-            const rc = D.radius, f = (r < rc ? r / rc : rc / r) * D.strength, ir = r > 1e-3 ? 1 / r : 0;
-            we += (-dz * ir * D.spin - dx * ir * 0.35) * D.speed * f;
-            wn += (dx * ir * D.spin - dz * ir * 0.35) * D.speed * f;
-            wu += D.up * D.strength * (r < rc * 1.5 ? 1 : rc * 1.5 / r);
-          }
-          // weight, then drag toward the air (implicit; no drag at all when vt is "infinite")
-          let rx = vx - we, ry = vy - g * h - wu, rz = vz - wn;
-          const m = vt < 1e4 ? 1 / (1 + g / (vt * vt) * Math.hypot(rx, ry, rz) * h) : 1;
-          rx *= m; ry *= m; rz *= m;
-          vx = we + rx; vy = wu + ry; vz = wn + rz;
-          x += vx * h; y += vy * h; z += vz * h;
-          // (P15) a leaf turns about its long side at its slip through the air (BLOWN.leafRo): end over end, or rocking
-          if (TU) {
-            const own = ph * 0.15915494, w = 2 * (ro0 + roD * (own * 7.31 % 1)) * Math.sqrt(rx * rx + ry * ry + rz * rz) / (0.6 * SZ[i]);
-            if (own * 3.7 % 1 < K.tumble) { let t = TP[i] + (own * 13.1 % 1 < 0.5 ? -w : w) * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = t; }
-            else { let t = TP[i] + 0.5 * w * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = (rk0 + rkD * (own * 5.3 % 1)) * Math.sin(t); }
-          }
-          // the ground
-          HG[i] = y - groundY;
-          if (y < groundY + 4) {
-            let gy = near ? near.heightAt(x, z, NaN) : NaN;
-            if (gy !== gy) gy = air.terrain.heightAt(x, z, groundY);
-            HG[i] = y > gy ? y - gy : 0;
-            // a drop that falls back into the liquid is gone (it used to sink to the bed, unseen)
-            if (overSea && vy < 0 && near) { const lq = near.liquidAt(x, z); if (lq === lq && lq > gy) { if (y < lq - 0.03) dead = true; else HG[i] = y - lq; } }
-            if (y <= gy) {
-              if (K.ground === 1 && vy < 0) {
-                // saltation: the grain rebounds with about half its speed at a steeper angle,
-                // as long as the wind keeps feeding it (otherwise it comes to rest)
-                const s = Math.hypot(vx, vy, vz) * K.rest;
-                if (s > 0.25 && age < LF[i] - 0.2) { y = gy + 0.005; const hs = Math.hypot(vx, vz) || 1; vx = vx / hs * s * 0.75; vz = vz / hs * s * 0.75; vy = s * 0.65; } else dead = true;
-              } else if (K.ground === 2 && vy < 0) {
-                if (-vy > 2 && PH[i] < 100) { y = gy + 0.01; vy = -vy * K.rest; vx *= 0.6; vz *= 0.6; PH[i] += 100; P._event(frame, x, gy, z, EVENT.bounce, clamp01(-vy / 8), SZ[i]); } else dead = true;
-              } else dead = true;
-            } else if (K.lands) {
-              // it will land first: its height over the ground, at the rate that has been closing (particles.js)
-              const alt = y - gy, a0 = b._alt[i]; b._alt[i] = alt;
-              const rate = a0 < 1e8 ? b._rate[i] + ((a0 - alt) / h - b._rate[i]) * (h < 0.15 ? h / 0.15 : 1) : -vy; b._rate[i] = rate;
-              if (rate > 0.05) { const tl = alt / rate; if (tl < left) left = tl; }
-            }
+    // (P17) each kind is stepped by its own method (_move). Inside this long update V8 optimised the loops only on the
+    // fly (on-stack replacement) and never the whole: per particle, what it called stayed calls, each number handed
+    // over in a fresh heap box (half a megabyte of garbage a frame in a blizzard, measured). A method of one loop is
+    // optimised whole and its lookups inlined. The arithmetic is the same, line for line.
+    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils);
+  }
+
+  // One kind's step (see update, "motion").
+  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils) {
+    const P = this.P, Rr = PARTICLES.radius, wv = P._wv, ht = P._ht, wtx = P._wtx, wtz = P._wtz;
+    const K = LOOSE[name], b = P.buffers[name];
+    b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
+    let alive = b._n;
+    if (alive === 0) { b.count = 0; return; }
+    const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left, HG = b.hag;
+    const turb = K.turb * sigma, puff = K.puff || 0;
+    const TU = K.tumble > 0 ? b.turn : null, TP = b._tp, ro0 = BLOWN.leafRo[0], roD = BLOWN.leafRo[1] - ro0, rk0 = BLOWN.leafRock[0], rkD = BLOWN.leafRock[1] - rk0;
+    const seaLevel = this._seaLevel, overSea = name === 'spray' && seaLevel > -1e8;
+    for (let i = 0; i < alive; i++) {
+      const o = i * 3;
+      let x = Pp[o], y = Pp[o + 1], z = Pp[o + 2];
+      const age = AG[i] + h;
+      let dead = age > LF[i] || Math.abs(x - fx) > Rr + 6 || Math.abs(z - fz) > Rr + 6;
+      let vx = V[o], vy = V[o + 1], vz = V[o + 2];
+      let left = LF[i] - age;                                   // what is left of its life
+      if (!dead) {
+        // wind at the particle
+        // (P12: between the four grid nodes round it, each with its own profile; see particles.js)
+        let u = (x - wtx) * 0.0625, v = (z - wtz) * 0.0625;
+        u = u < 0 ? 0 : u > 3.999 ? 3.999 : u; v = v < 0 ? 0 : v > 3.999 ? 3.999 : v;
+        const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu;
+        let hz = y - groundY;
+        // (spray rides the wind over the sea, which may lie below the ground the focus stands on)
+        if (overSea && y - seaLevel > hz) hz = y - seaLevel;
+        hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
+        const ih = hz | 0, fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
+        const h00 = (ht[t0] + (ht[t0 + 1] - ht[t0]) * fh) * (1 - fu) * (1 - fv), h10 = (ht[t0 + 25] + (ht[t0 + 26] - ht[t0 + 25]) * fh) * fu * (1 - fv);
+        const h01 = (ht[t0 + 125] + (ht[t0 + 126] - ht[t0 + 125]) * fh) * (1 - fu) * fv, h11 = (ht[t0 + 150] + (ht[t0 + 151] - ht[t0 + 150]) * fh) * fu * fv;
+        let we = wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11;
+        let wn = wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11;
+        let wu = 0;
+        const vt = VT[i], ph = PH[i];
+        // (P17: fsin / fcos, util.js: within 6e-8 of Math.sin and 2 to 3 times faster; and sqrt for Math.hypot, which is
+        // twenty times slower in V8: the same arithmetic, half the cost of this loop at thousands of leaves)
+        if (turb > 0) { const a = ph + age * (1.1 + ph * 0.2); we += fcos(a) * turb; wn += fsin(a * 1.27) * turb; wu += fsin(a * 0.71 + 1.3) * turb * 0.4 * Math.min(1, hz); }
+        // the parcel of air it was thrown up with, mixing away
+        if (EJ && age < puff * 4) { const k = Math.exp(-age / puff); we += EJ[o] * k; wu += EJ[o + 1] * k; wn += EJ[o + 2] * k; }
+        if (K.flutter > 0) { const fl = Math.min(1, K.flutter * vt), a = ph * 3 + age * (2.2 + ph * 0.4); we += fcos(a) * fl; wn += fsin(a * 1.3) * fl; }
+        // a dust devil nearby: swirl, inflow and updraught (Rankine vortex)
+        if (devils) for (let d = 0; d < devils.count; d++) {
+          const D = devils[d];
+          const dx = x - D.x, dz = z - D.z, r = Math.hypot(dx, dz);
+          if (r > D.radius * 6 || hz > D.height || !(D.strength > 0)) continue;
+          const rc = D.radius, f = (r < rc ? r / rc : rc / r) * D.strength, ir = r > 1e-3 ? 1 / r : 0;
+          we += (-dz * ir * D.spin - dx * ir * 0.35) * D.speed * f;
+          wn += (dx * ir * D.spin - dz * ir * 0.35) * D.speed * f;
+          wu += D.up * D.strength * (r < rc * 1.5 ? 1 : rc * 1.5 / r);
+        }
+        // weight, then drag toward the air (implicit; no drag at all when vt is "infinite")
+        let rx = vx - we, ry = vy - g * h - wu, rz = vz - wn;
+        const sl = Math.sqrt(rx * rx + ry * ry + rz * rz), m = vt < 1e4 ? 1 / (1 + g / (vt * vt) * sl * h) : 1;
+        rx *= m; ry *= m; rz *= m;
+        vx = we + rx; vy = wu + ry; vz = wn + rz;
+        x += vx * h; y += vy * h; z += vz * h;
+        // (P15) a leaf turns about its long side at its slip through the air (BLOWN.leafRo): end over end, or rocking
+        // (P17: own in [0, 1), so `own * k % 1` is own * k less its floor, exactly; the slip is the one just damped)
+        if (TU) {
+          const own = ph * 0.15915494, f7 = own * 7.31, w = 2 * (ro0 + roD * (f7 - Math.floor(f7))) * sl * m / (0.6 * SZ[i]);
+          const f3 = own * 3.7, f13 = own * 13.1;
+          if (f3 - Math.floor(f3) < K.tumble) { let t = TP[i] + (f13 - Math.floor(f13) < 0.5 ? -w : w) * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = t; }
+          else { const f5 = own * 5.3; let t = TP[i] + 0.5 * w * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = (rk0 + rkD * (f5 - Math.floor(f5))) * fsin(t); }
+        }
+        // the ground
+        HG[i] = y - groundY;
+        if (y < groundY + 4) {
+          // (P17: TerrainGrid.groundQ, through a scratch array: nothing boxed, nothing to collect)
+          const GQ = _gq; GQ[0] = x; GQ[1] = z;
+          let gy = NaN, lqN = NaN;
+          if (near) { near.groundQ(GQ); gy = GQ[2]; lqN = GQ[3]; }
+          if (gy !== gy) { air.terrain.groundQ(GQ); gy = GQ[2] === GQ[2] ? GQ[2] : groundY; }
+          HG[i] = y > gy ? y - gy : 0;
+          // a drop that falls back into the liquid is gone (it used to sink to the bed, unseen)
+          if (overSea && vy < 0 && near) { const lq = lqN; if (lq === lq && lq > gy) { if (y < lq - 0.03) dead = true; else HG[i] = y - lq; } }
+          if (y <= gy) {
+            if (K.ground === 1 && vy < 0) {
+              // saltation: the grain rebounds with about half its speed at a steeper angle,
+              // as long as the wind keeps feeding it (otherwise it comes to rest)
+              const s = Math.hypot(vx, vy, vz) * K.rest;
+              if (s > 0.25 && age < LF[i] - 0.2) { y = gy + 0.005; const hs = Math.hypot(vx, vz) || 1; vx = vx / hs * s * 0.75; vz = vz / hs * s * 0.75; vy = s * 0.65; } else dead = true;
+            } else if (K.ground === 2 && vy < 0) {
+              if (-vy > 2 && PH[i] < 100) { y = gy + 0.01; vy = -vy * K.rest; vx *= 0.6; vz *= 0.6; PH[i] += 100; P._event(frame, x, gy, z, EVENT.bounce, clamp01(-vy / 8), SZ[i]); } else dead = true;
+            } else dead = true;
+          } else if (K.lands) {
+            // it will land first: its height over the ground, at the rate that has been closing (particles.js)
+            const alt = y - gy, a0 = b._alt[i]; b._alt[i] = alt;
+            const rate = a0 < 1e8 ? b._rate[i] + ((a0 - alt) / h - b._rate[i]) * (h < 0.15 ? h / 0.15 : 1) : -vy; b._rate[i] = rate;
+            if (rate > 0.05) { const tl = alt / rate; if (tl < left) left = tl; }
           }
         }
-        if (dead) {
-          alive--;
-          if (i < alive) {
-            const s = alive * 3;
-            Pp[o] = Pp[s]; Pp[o + 1] = Pp[s + 1]; Pp[o + 2] = Pp[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; HG[i] = HG[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive]; b.turn[i] = b.turn[alive]; TP[i] = TP[alive];
-            if (EJ) { EJ[o] = EJ[s]; EJ[o + 1] = EJ[s + 1]; EJ[o + 2] = EJ[s + 2]; }
-            i--;
-          }
-          continue;
-        }
-        Pp[o] = x; Pp[o + 1] = y; Pp[o + 2] = z; V[o] = vx; V[o + 1] = vy; V[o + 2] = vz; AG[i] = age; LT[i] = left;
       }
-      b._n = alive; b.count = alive;
-      publish(b, frame, alive);                       // (on the curved ground: particles.js)
+      if (dead) {
+        alive--;
+        if (i < alive) {
+          const s = alive * 3;
+          Pp[o] = Pp[s]; Pp[o + 1] = Pp[s + 1]; Pp[o + 2] = Pp[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
+          VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; HG[i] = HG[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive]; b.turn[i] = b.turn[alive]; TP[i] = TP[alive];
+          if (EJ) { EJ[o] = EJ[s]; EJ[o + 1] = EJ[s + 1]; EJ[o + 2] = EJ[s + 2]; }
+          i--;
+        }
+        continue;
+      }
+      Pp[o] = x; Pp[o + 1] = y; Pp[o + 2] = z; V[o] = vx; V[o + 1] = vy; V[o + 2] = vz; AG[i] = age; LT[i] = left;
     }
+    b._n = alive; b.count = alive;
+    publish(b, frame, alive);                       // (on the curved ground: particles.js)
   }
 
   // (P15) The reference wind's speed (m/s, gusts and the lee of trees in it) at (dx, dz) from the focus, bilinear on the
