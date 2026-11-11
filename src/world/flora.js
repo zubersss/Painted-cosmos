@@ -22,7 +22,7 @@ import { QUALITY } from '../render/shared.js';
 const T0 = 52, T1 = 128, T_THIN = 300, T_FAR = 470;
 const UNDER_FAR = 60, GRASS_NEAR = 15;
 const RANGE_SCALE = [0.42, 0.82, 1.0];
-const TRIM = [0.82, 0.88];
+const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
