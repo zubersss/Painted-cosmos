@@ -103,7 +103,7 @@ const SHORE_PROBE = `(L) => { const W = L.physics.fields.water, F = W.field, s =
 // slope; reach: how far up the beach that is from the still waterline (m; the explorer stands SHORE_BEFORE's 'up' m up it).
 // (P14) the stand-in crowns: look across the wind at the crowns; the numbers of three tips of the middle tree
 const CROWN_BEFORE = `(L) => { const w = P.windEN(0, 0, 10); L.yaw = Math.atan2(w.n, w.e); }`;
-const CROWN_PROBE = `(L) => { const o = {}, r = {}; for (const i of [0, 3, 5]) { L.crownTip(0, i, o); r['b' + i] = [P.r3(o.e), P.r3(o.n), P.r3(o.up)]; r['hz' + i] = P.r2(o.hz); } r.set = P.r3(o.set); return { w10: P.wind(0, 0, 10), trunk: P.bend(0, 0, 1).deg, ...r }; }`;
+const CROWN_PROBE = `(L) => { const o = {}, r = {}; for (const i of [0, 3, 5]) { L.crownTip(0, i, o); r['b' + i] = [P.r3(o.e), P.r3(o.n), P.r3(o.up)]; r['hz' + i] = P.r2(o.hz); } r.set = P.r3(o.set); const U1 = L.physics.fields.flora.uniforms.uPhysBranch[0]; return { w10: P.wind(0, 0, 10), w2: P.wind(0, 0, 2), uc: P.r2(Math.sqrt(Math.max(0, o.load || 0)) * U1), load: P.r2(o.load || 0), trunk: P.bend(0, 0, 1).deg, ...r }; }`;
 export const SUBJECTS = {
   // ---- where things are: four views round the Earth spawn, 90 degrees apart (not a motion strip) ----
   'look-around': { note: 'four views round the spawn (yaw 30, 120, 210, 300), to choose a framing',

@@ -24,6 +24,7 @@
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
 import { devilWind } from './features.js';
+import { wakeAt } from './air.js';     // (P15; a cycle with air.js, safe: called at run time only)
 
 export const FLORA = Object.freeze({
   N: 32, cell: 8,               // bend / wind field
@@ -191,7 +192,7 @@ export const CLOCK_W = Math.sqrt(2 * 1.69 * Math.log(FLORA.clockR[1] / FLORA.clo
 export const CLOCK_ID = [[13.1, 17.3, 23.9, 29.3], [31.7, 37.1, 41.3, 43.7], [47.9, 53.3, 59.1, 61.7]];
 export const CLOCK_M = [1, 2, 3, 2];          // without a number per branch: whole lobes round the trunk
 
-const _s = new Float64Array(9);
+const _s = new Float64Array(12);
 const _coef = new Float64Array(8);
 const _tmp2 = new Float64Array(2);
 const _dwf = new Float64Array(3);
@@ -337,7 +338,10 @@ export class FloraField {
         if (swirl && devilWind(devils, x, z, 0.5, _dwf)) { we += _dwf[0] / (hs > 0.05 ? hs : 0.05); wn += _dwf[1] / (hs > 0.05 ? hs : 0.05); }
         const sp = Math.sqrt(we * we + wn * wn);
         // load = q / qRef along the wind, at the height each class lives at
-        const ls = kq * sp * hs * hs, lt = kq * sp * ht * ht;
+        // (P15) the crowns (the stiff class, at the canopy's top or stiffHeight) take the lee of taller trees upwind as it
+        // is at their height (air.js wakeAt), not as it is near the ground, which is what we, wn carry
+        const zc = _s[11] > FLORA.stiffHeight ? _s[11] : FLORA.stiffHeight, wkc = _s[9] < 1 && _s[9] > 0.01 ? wakeAt(_s[9], _s[10], zc) / _s[9] : 1;
+        const ls = kq * sp * hs * hs, lt = kq * sp * ht * ht * wkc * wkc;
         const tse = we * ls, tsn = wn * ls, tte = we * lt, ttn = wn * lt;
         let d = bend[o] - tse, v = vel[o];
         bend[o] = tse + a11 * d + a12 * v; vel[o] = a21 * d + a22 * v;
@@ -352,7 +356,7 @@ export class FloraField {
         wind[o + 2] = g01 < 0 ? 0 : g01 > 1 ? 1 : g01;
         wind[o + 3] = _s[3] * sp * h2;
         this._can[n] = _s[7];
-        gsum += wind[o + 2]; se += we * hs; sn += wn * hs; tsum += wind[o + 3]; sce += we * ht; scn += wn * ht;
+        gsum += wind[o + 2]; se += we * hs; sn += wn * hs; tsum += wind[o + 3]; sce += we * ht * wkc; scn += wn * ht * wkc;
       }
     }
     // ---- crowns loading their neighbours --------------------------------------------------------

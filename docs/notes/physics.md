@@ -70,6 +70,26 @@ landward of the waterline): `runup` (m over the still level), `reach` (m up the 
   wind from the focus; the biome's fetch only where the liquid runs off the grid). It would turn that coast's storm surf
   into a steep chop unless PAINTER's open sea is elsewhere; so not done without a word from the coordinator.
 
+**3. Are the crowns sheltered twice? No (checked; one corner fixed).** Inside a wood no stand upwind is taller or denser
+than the place, so `AirGrid` casts no wake there and a crown feels the canopy's own profile, `heightFactor` at the
+canopy's top: d = 0.65 hc and zr = min(1 m, 0.1 hc). Against the standard profile (d = 2/3 hc, z0 = 0.1 hc, matched to
+the open log law at the 60 m blending height) the code gives MORE at the top, not less: 0.53 of the reference 10 m wind
+at a 14 m top (standard 0.44), 0.41 at 10 m (0.40), 0.66 at 20 m (0.50); the 1 m cap on zr is why. So 30 m/s of regional
+wind gives 13 m/s at a 14 m canopy top by the standard profile and 16 by the code: the 11 to 18 m/s the crowns feel at the
+storm's height is the profile, not a second shelter. (The twelfth agent's "8 to 9 m/s at the top for 20.5 m/s" is the
+same ratio; the 5 m/s it saw at 240 s was the lab's stand-in birch, which stands in the spawn's CLEARING behind the wood.)
+What was wrong: the crowns took the lee of taller trees upwind (`sampleWind` multiplies it into the reference) as it is
+near the ground, at any height; the particles and `profileAt` kept it whole up to the trees' full height. Now one shape,
+`air.js wakeAt(wk, wkH, z)` (new export): whole up to `AIR.wakeFull` 0.5 of their height, half the loss at their height,
+gone at 1.5 x (Heisler and DeWalle 1988; Wang and Takle 1996), used by the particles' air, `profileAt` and the crowns
+(`flora.js`: the stiff class's load takes `wakeAt` at the canopy top or 10 m over the ground-level wake). `sampleWind`
+also writes [9] the wake, [10] its trees' height, [11] the canopy height when the array has room (additive).
+Numbers (painted lab, `crown-storm` at 167 s, numbers only, not re-opened): the stand-in crown in the clearing 15.0 to
+16.2 m/s before, 15.2 to 16.4 after (it is at 10 m behind a 14 m wood: the wake is still nearly whole there); the walker
+at 2 m 8.5 to 10.4 m/s before, 8.6 to 10.8 after (the frames differ by the grid's learning, not by the change: 2 m is
+under half the height of anything that casts a lee there). A crown taller than the wood upwind now feels up to the whole
+wind above 1.5 x that wood's height. PILOT's suite passes.
+
 ## Hand-over P14 (twelfth PHYSICS agent; read this block first; P13 and older below hold for everything not named here)
 
 **Where things stand.** Item 1 of P14 (trees alive in a storm) is done and committed; items 2 (leaves), 3 (the

@@ -28,7 +28,7 @@ import { SPECIES, terminalVelocity, meanFreePath } from './atmosphere.js';
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES } from './atmosphere.js';
 import { heightFactor, WIND } from './wind.js';
-import { AIR } from './air.js';
+import { AIR, wakeAt } from './air.js';
 import { makeRng, clamp01, smoothstep } from './util.js';
 
 export const PARTICLES = Object.freeze({
@@ -203,11 +203,8 @@ export class Particles {
         const sg = z0 + 31 * c01 + 977 * hc + 7919 * wk + 104729 * wkH;
         if (!moved && sg === sig[pn]) continue;
         sig[pn] = sg;
-        const top = wkH * AIR.wakeTop;
         for (let k = 0, o = pn * 25; k < 25; k++) {
-          let f = heightFactor(k, z0, hc, c01);
-          if (wk < 1 && wkH > 0) f *= 1 - (1 - wk) * (1 - smoothstep(wkH, top, k));
-          ht[o + k] = f;
+          ht[o + k] = heightFactor(k, z0, hc, c01) * wakeAt(wk, wkH, k);
         }
       }
     }

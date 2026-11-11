@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
 import { WIND, gustLevel, gustLevelAt, gustPhase } from './wind.js';
-import { AIR } from './air.js';
+import { AIR, wakeAt } from './air.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm } from './testworld.mjs';
 
@@ -178,4 +178,17 @@ test('the lee of a wood follows a veering wind at the pace the air crosses the f
   assert.ok(moved > 0.3, 'the wake is there: ' + moved);
   assert.ok(step < 1.6 / 60, 'no step: ' + step);
   assert.ok(AIR.shelterAdjust > 0);
+});
+
+// (P15) are the crowns sheltered twice? Inside a wood no stand upwind is taller or denser, so there is no wake and the
+// crowns feel the canopy's own profile; behind a wood the lee is whole low down and thins with height (windbreak and
+// forest-edge measurements: at the top of the trees that cast it a third to a half of the loss near the ground).
+test('the lee of trees upwind is whole low down, half at their height, gone at one and a half times it', () => {
+  const H = 14, wk = 0.4;
+  assert.equal(wakeAt(wk, H, 2), wk, 'the walker at 2 m behind a 14 m wood: the whole lee');
+  assert.equal(wakeAt(wk, H, 0.5 * H), wk);
+  assert.ok(Math.abs(wakeAt(wk, H, H) - (1 - 0.6 * 0.5)) < 1e-9, 'at the trees\' height half the loss: ' + wakeAt(wk, H, H));
+  assert.equal(wakeAt(wk, H, 1.5 * H), 1);
+  let prev = 0; for (let z = 0; z <= 25; z += 0.5) { const f = wakeAt(wk, H, z); assert.ok(f >= prev - 1e-12 && f <= 1, 'rises with height'); prev = f; }
+  assert.equal(wakeAt(1, H, 3), 1); assert.equal(wakeAt(wk, 0, 3), 1);
 });

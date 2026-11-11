@@ -17,6 +17,13 @@ import { FLORA } from './flora.js';
 import { devilWind } from './features.js';
 import { clamp, clamp01, smoothstep } from './util.js';
 
+// (P15) The wind left at height z (m) in the lee of trees of height wkH that leave wk of it near the ground: whole up
+// to AIR.wakeFull of their height, gone at AIR.wakeTop. One shape for the particles' air, profileAt and the crowns.
+export function wakeAt(wk, wkH, z) {
+  if (!(wk < 1) || !(wkH > 0)) return 1;
+  return 1 - (1 - wk) * (1 - smoothstep(wkH * AIR.wakeFull, wkH * AIR.wakeTop, z));
+}
+
 export const AIR = Object.freeze({
   gridN: 17,              // nodes per side of the wind grid
   gridCell: 16,           // m between nodes (256 m across)
@@ -26,6 +33,12 @@ export const AIR = Object.freeze({
   wakeLength: 5,          // ... recovering over this many tree heights downwind (a shelter belt
                           // protects out to 10-15 heights; Wang and Takle 1996)
   wakeTop: 1.5,           // the wake reaches this many canopy heights up
+  // (P15) ... and is whole only below this share of their height: behind a forest edge or a dense belt the quiet zone
+  // lies under half to two thirds of its height, and at its top the speed is lost by a third to a quarter of what is lost
+  // near the ground (Heisler and DeWalle 1988; Wang and Takle 1996). Until P15 the wake was whole up to the full height
+  // (particles, profileAt) and, for the crowns (sampleWind), at every height: a crown in a clearing behind a wood felt
+  // the wood's ground-level lee at its own height and above.
+  wakeFull: 0.5,
   shelterAdjust: 48,      // m: shelter and wakes follow a veering wind as the air crosses this much fetch
                           // (the time it takes is this over the wind speed, kept between 1 and 6 s)
   shelterLearn: 0.4,      // s: a node whose upwind search reaches newly sampled ground takes it in over this
@@ -312,6 +325,8 @@ export class AirGrid {
   //   [4..6] wind height factors at blade height, crown height and 2 m, [7] canopy01,
   //   [8] (P11; only if o has room) the factor of the fine eddies on we / wn: multiply by it for what a
   //   thing standing at one place feels (plants); leave it out for what is carried along (particles).
+//   (P15; each only if o has room) [9] the wake factor that is in [0] and [1], [10] the height of the trees casting
+//   it (m), [11] the canopy height here (m): what stands higher than the ground takes the wake as wakeAt has it there.
   // (A typed array, not an object: storing a double in an object field can allocate.)
   sampleWind(x, z, o) {
     const N = this.N, T = this.terrain;
@@ -328,6 +343,10 @@ export class AirGrid {
     o[2] = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
     o[3] = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
     if (o.length > 8) o[8] = this.fine[n] * w00 + this.fine[n + 1] * w10 + this.fine[n + N] * w01 + this.fine[n + N + 1] * w11;
+    // (P15) [9] the wake factor in [0] and [1] (so that what stands higher can take it out: wakeAt), [10] the height of
+    // the trees that cast it (m); only if o has room
+    if (o.length > 10) { o[9] = wk; o[10] = this.wakeH[n] * w00 + this.wakeH[n + 1] * w10 + this.wakeH[n + N] * w01 + this.wakeH[n + N + 1] * w11; }
+    if (o.length > 11) o[11] = 0;
     // height factors from the nodes whose ground is known
     const va = T.valid, c = T.cover;
     const v00 = w00 * va[n], v10 = w10 * va[n + 1], v01 = w01 * va[n + N], v11 = w11 * va[n + N + 1];
@@ -338,6 +357,7 @@ export class AirGrid {
       o[5] = (c[a + 1] * v00 + c[b + 1] * v10 + c[d + 1] * v01 + c[e + 1] * v11) * k;
       o[6] = (c[a + 2] * v00 + c[b + 2] * v10 + c[d + 2] * v01 + c[e + 2] * v11) * k;
       o[7] = (c[a - 7] * v00 + c[b - 7] * v10 + c[d - 7] * v01 + c[e - 7] * v11) * k;     // canopy01
+      if (o.length > 11) o[11] = (c[a - 6] * v00 + c[b - 6] * v10 + c[d - 6] * v01 + c[e - 6] * v11) * k;   // (P15) canopy height (m)
     } else { o[4] = HF0[0]; o[5] = HF0[1]; o[6] = HF0[2]; o[7] = 0; }
     return o;
   }
@@ -361,7 +381,7 @@ export class AirGrid {
       const m = n + (k & 1) + (k & 2 ? N : 0), a = m * CW, ok = va[m];
       let fn = heightFactor(zh, ok ? c[a] : WIND.refRoughness, ok ? c[a + 2] : 0, ok ? c[a + 1] : 0);
       const wk = this.wake[m], wkH = this.wakeH[m];
-      if (wk < 1 && wkH > 0) fn *= 1 - (1 - wk) * (1 - smoothstep(wkH, wkH * AIR.wakeTop, zh));
+      if (wk < 1 && wkH > 0) fn *= wakeAt(wk, wkH, zh);
       f += w * fn;
     }
     return f;
