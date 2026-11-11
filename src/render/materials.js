@@ -429,7 +429,7 @@ void main() {
   float qd = dot(vBody, D3);
   float lk = max(0.0, log2(max(13.0 * fwidth(qd), 1.0e-3) / 8.5) / 1.3785);
   // (far: where a pixel is wider than the brush can draw a wave in, a metre or two of sea)
-  float farSea = smoothstep(0.5, 2.2, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, uPhysWaterSea.x) * liq * deep;
+  float farSea = smoothstep(0.35, 1.6, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, uPhysWaterSea.x) * liq * deep;
   if (farSea > 0.01) {
     float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * uPhysWaterSea.w;
     float sw = 0.0, wh = 0.0, hol = 0.0;
@@ -443,14 +443,17 @@ void main() {
       wh += wgt * smoothstep(0.80, 0.88, s) * (1.0 - smoothstep(0.93, 1.0, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
       hol += wgt * smoothstep(0.28, 0.52, s) * (1.0 - smoothstep(0.66, 0.76, s)) * smoothstep(0.35, 0.60, br);
     }
-    c = pcDensity(c, 1.0 + farSea * (hol * 0.55 - sw * 0.25));
-    c = mix(c, skyc, farSea * sw * 0.40);
+    c = pcDensity(c, 1.0 + farSea * (hol * 0.75 - sw * 0.25));
+    c = mix(c, skyc, farSea * sw * 0.50);
     farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq, farWhite);
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
-  float f = pcFogAmount(dist);
+  // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
+  // swallow the far water whole, strokes and all, and a storm sea painted as a pale blank is
+  // no sea; the painter keeps it darker than the sky to the horizon and lets the stacks go pale)
+  float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea);
   c = pcAtmos(c, f);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
