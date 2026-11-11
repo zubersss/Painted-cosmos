@@ -250,7 +250,7 @@ export const LOOKS = {
       B('sky_islands', 'Cream Sky-Islands', 'islands', ['yellowOchre', 'cadOrange', 'rawSienna', 'sapGreen', 'neutralTint'], 'cadScarlet', ['yellowOchre', 'sapGreen', 'rawSienna'],
         { t: { amp: 170 }, liquid: { color: [0.98, 0.90, 0.76], refl: 0, cloud: 1 }, tall: [0, 0], tallD: 0.22, tallMix: 1, small: { grass: 0.4, rock: 0.04, flower: 0.04 } }),
       B('storm_wall', 'Storm-Wall Cliffs', 'ridged', ['burntSienna', 'alizarin', 'rawUmber', 'neutralTint', 'cadOrange'], 'lemonYellow', ['burntSienna', 'alizarin', 'rawUmber'],
-        { t: { amp: 620, wl: 1100, strata: 0.7 }, mist: 0.7, tall: [1, 1], tallD: 0.14, tallMix: 1, small: { rock: 0.08 }, phys: { ground: 'rock' } }),
+        { t: { amp: 620, wl: 1100, strata: 0.7 }, mist: 1.5, tall: [1, 1], tallD: 0.14, tallMix: 1, small: { rock: 0.08 }, phys: { ground: 'rock' } }),
       B('hanging_gardens', 'Hanging Gardens', 'terraced', ['sapGreen', 'viridian', 'quinGold', 'rawSienna', 'cobaltViolet'], 'roseMadder', ['sapGreen', 'viridian', 'quinGold'],
         { t: { amp: 150, steps: 6 }, tall: [0, 0], tallD: 0.42, tallMix: 1, small: { fern: 0.2, flower: 0.12, bush: 0.05, grass: 0.3 } }),
       B('lightning_plains', 'Lightning Plains', 'flat', ['neutralTint', 'paynesGrey', 'yellowOchre', 'cobaltViolet', 'indigo'], 'lemonYellow', ['neutralTint', 'yellowOchre', 'paynesGrey'],

@@ -9,6 +9,7 @@ import { createPainter, RENDERER_OPTIONS } from '../render/index.js';
 import { createWorld } from '../world/index.js';
 import { createExplorer, createShip } from './models.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
+import { LOOKS } from '../data/looks.js';
 
 const P = new URLSearchParams(location.search);
 const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.get(k) : d);
@@ -98,7 +99,11 @@ function gotoBiome(biomeId, preset) {
   if (!biomeId || here.biomeId === biomeId) spot = spawn; else spot = world.findBiome(bodyId, biomeId) || spawn;
   applyPreset(preset || 'stream', spot.unitDir);
   if (preset === 'stream' || !preset) aimAlongStream();
-  if (preset === 'vista') aimVista(1.7);
+  if (preset === 'vista') {
+    const here2 = world.sampleSurface(bodyId, state.pos.clone().normalize());
+    const bi = LOOKS[bodyId].biomes.find((b) => b.id === here2.biomeId);
+    aimVista(1.7, !!bi && ['canyon', 'mesa', 'terraced', 'ridged', 'alpine', 'crater', 'sinkholes'].includes(bi.terrain), !!bi && (bi.terrain === 'islands' || bi.terrain === 'coast'));
+  }
   if (preset === 'shore') { aimAlongStream(); state.yaw += 1.0; }
 }
 
@@ -139,7 +144,7 @@ function aimAlongStream() {
 
 // Where a painter would set the easel: gentle, dry, open ground a little above most of what
 // is around, facing the direction with the most relief (and any liquid) in it.
-function aimVista(eye) {
+function aimVista(eye, low, sea) {
   const R = BODIES[bodyId].radius;
   const base = state.pos.clone().normalize();
   frame(base);
@@ -149,11 +154,15 @@ function aimVista(eye) {
   const c = [];
   for (let a = 0; a < 20; a++) for (let r = 0; r <= 360; r += 40) { const p = pt(base, a / 20 * 6.283, r); c.push({ p, s: world.sampleSurface(bodyId, p) }); }
   const hs = c.map((x) => top(x.s)).sort((x, y) => x - y);
-  const want = (hs[Math.floor(hs.length * 0.6)] + hs[Math.floor(hs.length * 0.9)]) / 2;
+  // walls, terraces and peaks are painted from below; open country from a rise
+  const want = low ? hs[Math.floor(hs.length * 0.12)] : (hs[Math.floor(hs.length * 0.6)] + hs[Math.floor(hs.length * 0.9)]) / 2;
   let best = null, bc = 1e9;
   for (const x of c) {
     if (x.s.isLiquid || x.s.slope > 0.35) continue;
-    const cost = Math.abs(x.s.radius - want) * 0.05 + x.s.slope * 8 + (x.s.canopyHeight > 0 ? 4 : 0);
+    // never set the easel inside a thicket or against a trunk
+    let cost = Math.abs(x.s.radius - want) * 0.05 + x.s.slope * 8 + (x.s.canopyHeight > 0 ? 12 : 0) + world.sampleObstacles(bodyId, x.p, 10).length * 25;
+    // islands and coasts: stand near the edge, where the sea is in the picture
+    if (sea) { let n = 0; for (let a = 0; a < 8; a++) if (world.sampleSurface(bodyId, pt(x.p, a / 8 * 6.283, 110)).isLiquid) n++; cost += n ? -n * 1.2 : 20; }
     if (cost < bc) { bc = cost; best = x; }
   }
   if (!best) return;
@@ -166,7 +175,7 @@ function aimVista(eye) {
       const q = world.sampleSurface(bodyId, pt(best.p, ang, r)), el = (top(q) - (best.s.radius + eye)) / r;
       if (el < lo) lo = el; if (el > hi) hi = el; if (q.isLiquid) liq++;
     }
-    const sc = (hi - lo) + Math.min(liq, 3) * 0.06 - Math.max(0, hi - 0.45) * 0.9;   // relief, water, but not nose to a wall
+    const sc = sea ? liq * 0.3 + (hi - lo) * 0.5 - Math.max(0, hi - 0.4) : low ? Math.min(hi, 0.55) + 0.3 * (hi - lo) - Math.max(0, hi - 0.6) : (hi - lo) + Math.min(liq, 3) * 0.06 - Math.max(0, hi - 0.45) * 0.9;   // relief, water, but not nose to a wall
     if (sc > bs) { bs = sc; by = ang; }
   }
   state.yaw = by; state.pitch = 0.03;

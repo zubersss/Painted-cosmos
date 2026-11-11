@@ -546,7 +546,7 @@ void main() {
     // the silhouette is nibbled and the tones wander: a wash, not a faceted solid
     vec4 nr = texture(uNoise3D, vBody / 2.3 + 0.3);
     float rimR = 1.0 - abs(dot(nV, V));
-    if (rimR > 0.90 - 0.36 * smoothstep(0.42, 0.74, nr.r)) discard;
+    if (rimR > 0.92 - 0.20 * smoothstep(0.42, 0.74, nr.r)) discard;
     c = mix(barkA, barkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
     c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5);
     x = dot(nV, sunV) * 0.5 + 0.5;

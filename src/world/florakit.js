@@ -331,10 +331,10 @@ export function spireGeometry(seed, lod) {
 // Kelp: tall ribbons that sway.
 export function kelpGeometry(seed, lod) {
   const rnd = mulberry32(seed), B = new Builder();
-  const n = lod ? 3 : 6;
+  const n = lod ? 4 : 9;
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * 6.283 + rnd(), dir = V(Math.cos(a), 0, Math.sin(a)), r0 = rnd() * 0.5;
-    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 7 + rnd() * 5, 0.32 + rnd() * 0.2, 0.10 + rnd() * 0.16, rnd, { segs: lod ? 3 : 6, leaf: 1, sway: 1.6 });
+    const a = (i / n) * 6.283 + rnd(), dir = V(Math.cos(a), 0, Math.sin(a)), r0 = rnd() * 0.7;
+    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 6 + rnd() * 6, 0.13 + rnd() * 0.12, 0.10 + rnd() * 0.2, rnd, { segs: lod ? 3 : 6, leaf: 1, sway: 1.6 });
   }
   return B.build();
 }
