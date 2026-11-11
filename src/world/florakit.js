@@ -313,18 +313,33 @@ export function crystalGeometry(seed, lod, thin) {
     const H = (thin ? 5 + rnd() * 3.5 : 2.6 + rnd() * 3.4) * (i === 0 ? 1.25 : 0.8), r0 = thin ? 0.09 + rnd() * 0.06 : 0.38 + rnd() * 0.34;
     const off = i === 0 ? 0 : (thin ? 0.4 : 0.6) + rnd() * 0.5;
     const bx = Math.cos(a) * off, bz = Math.sin(a) * off, dx = Math.cos(a) * Math.sin(tilt), dz = Math.sin(a) * Math.sin(tilt), dy = Math.cos(tilt);
-    const pts = [V(bx, -0.2, bz), V(bx + dx * H * 0.72, dy * H * 0.72, bz + dz * H * 0.72), V(bx + dx * H, dy * H, bz + dz * H)];
-    tube(B, pts, [r0, r0 * 0.82, 0.02], lod ? 5 : 8, { part: 4, shade: 0.25 + 0.5 * rnd(), sway0: 0, hash: rnd() });
+    // needles bow a little and thicken unevenly: a brush stroke, not a ruled line
+    const bow = (thin ? 0.09 : 0.035) * H * (rnd() - 0.5) * 2, ba = rnd() * 6.283, ox = Math.cos(ba) * bow, oz = Math.sin(ba) * bow;
+    const pts = [], rad = [], ns = lod ? 2 : 4;
+    for (let q = 0; q <= ns; q++) {
+      const tq = q / ns, arc = Math.sin(Math.PI * tq);
+      pts.push(V(bx + dx * H * tq + ox * arc, q === 0 ? -0.2 : dy * H * tq, bz + dz * H * tq + oz * arc));
+      rad.push(q === ns ? 0.02 : r0 * (1 - 0.30 * tq) * (0.85 + 0.3 * rnd()));
+    }
+    tube(B, pts, rad, lod ? 5 : 7, { part: 4, shade: 0.25 + 0.5 * rnd(), sway0: 0, hash: rnd() });
   }
   return B.build();
 }
 
-// A pinnacle of rock or ice: one tall tapering form, wind-carved.
-export function spireGeometry(seed, lod) {
+// A pinnacle of rock or ice: one tall tapering form, wind-carved. spec.slim: a slender needle
+// that leans downwind and hooks over at the tip.
+export function spireGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
-  const H = 9 + rnd() * 6, r = 2.0 + rnd() * 1.0;
-  blob(B, V((rnd() - 0.5) * 0.6, H * 0.46, (rnd() - 0.5) * 0.6), r, H * 0.56, r * (0.8 + rnd() * 0.4), rnd, { detail: lod ? 1 : 2, part: 4, noise: 0.24, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: 0.86, flatBottom: 0.2, uvScale: 2 });
-  if (!lod) blob(B, V(1.6 + rnd(), H * 0.16, (rnd() - 0.5) * 2), r * 0.6, H * 0.2, r * 0.6, rnd, { detail: 1, part: 4, noise: 0.25, massK: 0, sway: 0, shade0: 0.2, shadeK: 0.8, taper: 0.8, uvScale: 1 });
+  const slim = spec && spec.slim;
+  const H = slim ? 8 + rnd() * 5 : 9 + rnd() * 6, r = slim ? 1.05 + rnd() * 0.5 : 2.0 + rnd() * 1.0;
+  const base = B.count;
+  blob(B, V((rnd() - 0.5) * 0.6, H * 0.46, (rnd() - 0.5) * 0.6), r, H * 0.56, r * (0.8 + rnd() * 0.4), rnd, { detail: lod ? 1 : 2, part: 4, noise: slim ? 0.30 : 0.24, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: slim ? 0.80 : 0.86, flatBottom: 0.2, uvScale: 2 });
+  if (!lod) blob(B, V(1.6 + rnd(), H * 0.16, (rnd() - 0.5) * 2), r * 0.6, H * (slim ? 0.32 : 0.2), r * 0.6, rnd, { detail: 1, part: 4, noise: 0.25, massK: 0, sway: 0, shade0: 0.2, shadeK: 0.8, taper: 0.8, uvScale: 1 });
+  if (slim) {
+    // carved by one wind: the whole form leans along +Z, the more the higher, and the tip hooks
+    const lean = 0.22 + rnd() * 0.16;
+    for (let i = base; i < B.count; i++) { const t = Math.max(0, B.p[i * 3 + 1] / H); B.p[i * 3 + 2] += t * t * H * lean; B.p[i * 3 + 1] -= t * t * t * H * 0.07; B.p[i * 3] *= 1 - 0.25 * Math.sin(t * 9 + seed) * (1 - t); }
+  }
   return B.build();
 }
 
@@ -339,13 +354,36 @@ export function kelpGeometry(seed, lod) {
   return B.build();
 }
 
-// A frozen wave: a crest of ice that leans over and curls.
+// A frozen wave: a long back rising to a crest whose lip curls over a hollow, caught in ice.
+// A profile (back toe, crest, lip, hollow, front toe) swept along the crest line, tapering
+// and swinging forward toward both ends. Local +Z is the way the wave was running.
 export function waveGeometry(seed, lod) {
   const rnd = mulberry32(seed), B = new Builder();
-  const H = 5 + rnd() * 3, base = B.count;
-  blob(B, V(0, H * 0.5, 0), 3.2 + rnd(), H * 0.55, 1.3 + rnd() * 0.5, rnd, { detail: lod ? 1 : 2, part: 4, noise: 0.2, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: 0.55, flatBottom: 0.2, uvScale: 2 });
-  // curl: shear the upper part forward and down
-  for (let i = base; i < B.count; i++) { const y = B.p[i * 3 + 1] / H; if (y > 0) { B.p[i * 3 + 2] += y * y * 2.6; B.p[i * 3 + 1] -= Math.max(0, y - 0.7) * 2.2; } }
+  const H = 6.5 + rnd() * 4.5, L = 9 + rnd() * 6, lean = 1.0 + rnd() * 0.5;
+  // [z, y, shade] across the wave, in units of H
+  const P = lod
+    ? [[-0.80, 0, 0.75], [-0.25, 0.70, 0.4], [0.15, 1.0, 0.0], [0.62 * lean, 0.72, 0.2], [0.24, 0.36, 0.95], [0.40, 0, 0.7]]
+    : [[-0.80, 0, 0.75], [-0.52, 0.34, 0.6], [-0.24, 0.72, 0.4], [0.02, 0.95, 0.15], [0.28 * lean, 1.0, 0.0], [0.56 * lean, 0.88, 0.05], [0.70 * lean, 0.66, 0.2], [0.62 * lean, 0.50, 0.5], [0.36, 0.48, 0.9], [0.16, 0.24, 1.0], [0.40, 0, 0.7]];
+  const st = lod ? 4 : 8, np = P.length;
+  const rows = [];
+  for (let i = 0; i <= st; i++) {
+    const a = i / st, xx = (a - 0.5) * L;
+    const k = Math.pow(Math.sin(Math.PI * (0.06 + 0.88 * a)), 0.7) * (0.82 + 0.3 * rnd());     // taper to the ends
+    const fwd = (Math.abs(a - 0.5) * 2) ** 2 * 1.6 + (rnd() - 0.5) * 0.3;                         // the ends run ahead
+    const row = [];
+    for (let j = 0; j < np; j++) {
+      const z = P[j][0] * H * (0.75 + 0.25 * k) + fwd, y = P[j][1] * H * k;
+      // normal: perpendicular to the profile, pointing out of the ice
+      const p0 = P[Math.max(0, j - 1)], p1 = P[Math.min(np - 1, j + 1)];
+      let ny = (p1[0] - p0[0]), nz = -(p1[1] - p0[1]); const l = Math.hypot(ny, nz) || 1; ny /= l; nz /= l;
+      row.push(B.vert(xx + (rnd() - 0.5) * 0.25, y - (j === 0 || j === np - 1 ? 0.3 : 0), z, 0, ny, nz, 0, ny, nz, a * 3, j / (np - 1) * 2, 0, 4, P[j][2], 0.5));
+    }
+    rows.push(row);
+  }
+  for (let i = 0; i < st; i++) for (let j = 0; j < np - 1; j++) {
+    const a = rows[i][j], b = rows[i + 1][j], c = rows[i][j + 1], d = rows[i + 1][j + 1];
+    B.tri(a, c, b); B.tri(b, c, d);
+  }
   return B.build();
 }
 
@@ -395,5 +433,5 @@ export function shardGeometry(seed) {
 
 export const TALL_KITS = {
   broadleaf: birchGeometry, conifer: pineGeometry, fungus: fungusGeometry,
-  crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: spireGeometry, kelp: kelpGeometry, wave: waveGeometry, vine: vineGeometry,
+  crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: (seed, lod, spec) => spireGeometry(seed, lod, spec), kelp: kelpGeometry, wave: waveGeometry, vine: vineGeometry,
 };

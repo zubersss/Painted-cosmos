@@ -69,22 +69,35 @@ export class Flora {
       return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
-    const sh = U.shard || U.rock;
-    this.mats = {
+    this.U = U;
+    this.pal = new Map();
+    this.mats = Object.assign({
       far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
         far: L.tall.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine' })),
       }) : null,
-      under: makePropMaterial(bodyUniforms, { name: 'under', leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
-      bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
-      rock: makePropMaterial(bodyUniforms, { name: 'rock', barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
-      shard: makePropMaterial(bodyUniforms, { name: 'shard', barkA: sh[0], barkB: sh[1], wind: 0 }),
-    };
+    }, this._underMats(U, ''));
     this.kit = {
       far: farTreeGeometry(5),
       grass: grassGeometry(31), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51),
       rock: rockGeometry(61), flower: flowerGeometry(71), shard: shardGeometry(91),
     };
+  }
+
+  // The undergrowth washes: the body's, or a biome's own where it names them (looks: biome.under).
+  _underMats(U, tag) {
+    const bodyUniforms = this.bodyUniforms, sh = U.shard || U.rock;
+    return {
+      under: makePropMaterial(bodyUniforms, { name: 'under' + tag, leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
+      bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
+      rock: makePropMaterial(bodyUniforms, { name: 'rock' + tag, barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
+      shard: makePropMaterial(bodyUniforms, { name: 'shard' + tag, barkA: sh[0], barkB: sh[1], wind: 0 }),
+    };
+  }
+  _palette(bi) {
+    let m = this.pal.get(bi);
+    if (!m) { m = this._underMats(Object.assign({}, this.U, this.S.biomes[bi].under), '-' + bi); this.pal.set(bi, m); }
+    return m;
   }
 
   get busy() { return this.queue.length; }
@@ -238,10 +251,14 @@ export class Flora {
       const t = underCell(this.S, chunk.face, chunk.ix, chunk.iy);
       n = t.count; d = t.data;
     }
-    const lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [], shard: [] };
-    const grass = chunk.kind === 'under';
+    // one set of lists per palette in the cell (nearly always one: two where biomes meet)
+    const sets = new Map();
+    const grass = chunk.kind === 'under', biomes = this.S.biomes;
     for (let i = 0; i < n; i++) {
       const o = i * INST_STRIDE, kind = d[o + 5];
+      const pk = biomes[d[o + 6]] && biomes[d[o + 6]].under ? d[o + 6] : -1;
+      let lists = sets.get(pk);
+      if (!lists) { lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [], shard: [] }; sets.set(pk, lists); }
       if (kind === U_GRASS) { if (grass) (d[o + 7] < 0.55 ? lists.gn : lists.gf).push(i); }
       else if (grass) continue;
       else if (kind === U_FERN) lists.fern.push(i);
@@ -275,14 +292,17 @@ export class Flora {
     };
     // grass: the seed (0..1) sets how far each tuft is drawn; short-range tufts get their own
     // mesh so cells beyond that range do not submit them at all
-    make(lists.gn, this.kit.grass, this.mats.under, [0, GRASS_NEAR / 0.775, 1.0, 0.6], GRASS_NEAR);
-    make(lists.gf, this.kit.grass, this.mats.under, [0, 30, 0.9, 0.6], 0);
-    make(lists.fern, this.kit.fern, this.mats.under, [0, UNDER_FAR, 0.5, 0.75], 0);
-    make(lists.reed, this.kit.reed, this.mats.under, [0, UNDER_FAR, 0.4, 0.8], 0);
-    make(lists.flower, this.kit.flower, this.mats.under, [0, UNDER_FAR * 0.8, 0.5, 0.75], 0);
-    make(lists.bush, this.kit.bush, this.mats.bush, [0, UNDER_FAR, 0.3, 0.8], 0, true);
-    make(lists.rock, this.kit.rock, this.mats.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
-    make(lists.shard, this.kit.shard, this.mats.shard, [0, UNDER_FAR, 0.3, 0.85], 0);
+    for (const [pk, lists] of sets) {
+      const M = pk < 0 ? this.mats : this._palette(pk);
+      make(lists.gn, this.kit.grass, M.under, [0, GRASS_NEAR / 0.775, 1.0, 0.6], GRASS_NEAR);
+      make(lists.gf, this.kit.grass, M.under, [0, 30, 0.9, 0.6], 0);
+      make(lists.fern, this.kit.fern, M.under, [0, UNDER_FAR, 0.5, 0.75], 0);
+      make(lists.reed, this.kit.reed, M.under, [0, UNDER_FAR, 0.4, 0.8], 0);
+      make(lists.flower, this.kit.flower, M.under, [0, UNDER_FAR * 0.8, 0.5, 0.75], 0);
+      make(lists.bush, this.kit.bush, M.bush, [0, UNDER_FAR, 0.3, 0.8], 0, true);
+      make(lists.rock, this.kit.rock, M.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
+      make(lists.shard, this.kit.shard, M.shard, [0, UNDER_FAR, 0.3, 0.85], 0);
+    }
   }
 
   _disposeChunk(chunk) {

@@ -109,6 +109,9 @@ function gotoBiome(biomeId, preset) {
       state.pos.copy(d).multiplyScalar(surf(d) + v.eye);
       state.yaw = v.yaw; state.pitch = v.pitch;
       window.__pcVantage = v;
+      // the hour a painter would choose for this place, unless the address names one
+      const bb = LOOKS[bodyId].biomes.find((b) => b.id === (biomeId || here2.biomeId));
+      if (bb && bb.hour != null && !P.has('time')) state.time = bb.hour;
     } else aimVista(1.7, false, false);
   }
   if (preset === 'shore') { aimAlongStream(); state.yaw += 1.0; }

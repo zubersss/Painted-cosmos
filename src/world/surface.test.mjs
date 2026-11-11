@@ -180,3 +180,33 @@ test('obstacles: trunks near the spawn, none inside the landing clearing', () =>
   assert.deepEqual(wide, sampleObstaclesPure('earth', sp.x, sp.y, sp.z, 40));
   for (const id of BODY_IDS) { const sp2 = getSurface(id).getSpawn(); assert.ok(Array.isArray(sampleObstaclesPure(id, sp2.x, sp2.y, sp2.z, 40))); }
 });
+
+test('every planet has a level, dry arrival place with room for the ship', () => {
+  for (const id of ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'moon', 'pluto']) {
+    const S = getSurface(id), sp = S.getSpawn();
+    const s = sampleSurfacePure(id, sp.x, sp.y, sp.z);
+    assert.ok(!s.isLiquid, id + ' spawn is dry');
+    assert.ok(s.slope < 0.12, id + ' spawn slope ' + s.slope.toFixed(3));
+    let ux = -sp.z, uz = sp.x; const l = Math.hypot(ux, uz); ux /= l; uz /= l;
+    const vx = sp.y * uz, vy = sp.z * ux - sp.x * uz, vz = -sp.y * ux;
+    for (let a = 0; a < 12; a++) for (const r of [4, 8, 12]) {
+      const ca = Math.cos(a * Math.PI / 6) * r / S.R, sa = Math.sin(a * Math.PI / 6) * r / S.R;
+      const q = sampleSurfacePure(id, sp.x + ux * ca + vx * sa, sp.y + vy * sa, sp.z + uz * ca + vz * sa);
+      assert.ok(!q.isLiquid, id + ': liquid ' + r + ' m from the spawn');
+      assert.ok(q.slope < 0.30, id + ': slope ' + q.slope.toFixed(2) + ' at ' + r + ' m from the spawn');
+    }
+  }
+});
+
+test('sampleSurface stays cheap on every body', () => {
+  // budget (lead review 1): under 0.05 ms a call. Best of three runs: the machine is shared.
+  for (const id of BODY_IDS) {
+    let best = 1e9;
+    for (let run = 0; run < 3; run++) {
+      const t0 = performance.now();
+      for (let i = 0; i < 3000; i++) { const y = 1 - 2 * (i + 0.5) / 3000, r = Math.sqrt(1 - y * y), a = i * 2.399963 + run; sampleSurfacePure(id, Math.cos(a) * r, y, Math.sin(a) * r); }
+      best = Math.min(best, (performance.now() - t0) / 3000);
+    }
+    assert.ok(best < 0.05, id + ': ' + (best * 1000).toFixed(1) + ' us a call');
+  }
+});

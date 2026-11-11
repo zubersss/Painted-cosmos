@@ -15,6 +15,7 @@ const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at 
 const MORPH_B = 0.98;
 const ANCHOR = 64;          // stroke textures repeat with periods that divide this (metres)
 const KEEP_FRAMES = 240;    // unused children are disposed after this many updates
+const RELIEF_K = 1.6, RELIEF_MAX = 0.7;
 
 let _sharedIndex = null;
 function sharedIndex() {
@@ -41,6 +42,8 @@ class Node {
     this.avgR = R;
     this.lastUsed = 0;
     this.dist = 0;
+    this.boost = 1;      // steep ground is refined from further away (set once the patch exists)
+    this.pBoost = 1;     // the parent's boost: sets where this patch has fully morphed into it
   }
 }
 
@@ -91,7 +94,7 @@ export class PlanetTerrain {
     const anchor = new THREE.Vector3(((d.origin[0] % ANCHOR) + ANCHOR) % ANCHOR, ((d.origin[1] % ANCHOR) + ANCHOR) % ANCHOR, ((d.origin[2] % ANCHOR) + ANCHOR) % ANCHOR);
     const camRel = new THREE.Vector3();
     // level L merges into its parent at the parent's split distance
-    const mergeUnit = node.level === 0 ? 1e12 : node.size * 2;
+    const mergeUnit = node.level === 0 ? 1e12 : node.size * 2 * node.pBoost;
     const terrain = this;
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       const u = material.uniforms;
@@ -126,6 +129,9 @@ export class PlanetTerrain {
     node.center.copy(origin);
     node.boundR = d.boundR;
     node.avgR = this.R + (d.minH + d.maxH) * 0.5;
+    // cliffs cut across a coarse grid as a row of teeth: where a patch holds a lot of relief
+    // for its size, its children are called for sooner
+    node.boost = 1 + Math.min(RELIEF_MAX, Math.max(0, ((d.maxH - d.minH) / node.size - 0.10) * RELIEF_K));
     node.ready = true; node.queued = false;
     this.patchCount++;
   }
@@ -172,12 +178,12 @@ export class PlanetTerrain {
     node.lastUsed = this.frame;
     const d = this._nodeDist(node);
     node.dist = d;
-    const split = this.detail && node.level < this.maxLevel && d < this.splitK * node.size;
+    const split = this.detail && node.level < this.maxLevel && d < this.splitK * node.boost * node.size;
     if (split) {
       if (!node.children) {
         const l = node.level + 1, x = node.ix * 2, y = node.iy * 2;
         node.children = [new Node(node.face, l, x, y, this.R), new Node(node.face, l, x + 1, y, this.R), new Node(node.face, l, x, y + 1, this.R), new Node(node.face, l, x + 1, y + 1, this.R)];
-        for (const c of node.children) c.avgR = node.avgR;
+        for (const c of node.children) { c.avgR = node.avgR; c.pBoost = node.boost; }
       }
       let all = true;
       for (const c of node.children) { if (!c.ready) { all = false; c.dist = d; c.lastUsed = this.frame; this._request(c); } }

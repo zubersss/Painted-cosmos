@@ -114,11 +114,12 @@ void main() {
   // wash turbulence: the pigment load drifts, so no area is flat colour
   float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.40 * near;
   // broken colour: darker touches of the brush inside the wash
-  float dab = mix(smoothstep(0.56, 0.63, ma.r), smoothstep(0.56, 0.63, mb.r), lf) * markFade;
-  d += dab * 0.36 * (1.0 - vPar.x * 0.5);
+  // (soft-edged and of uneven size: touches laid into a damp wash, not a pattern of dots)
+  float dab = mix(smoothstep(0.50, 0.66, ma.r * 0.72 + ma.a * 0.28), smoothstep(0.50, 0.66, mb.r * 0.72 + mb.a * 0.28), lf) * markFade;
+  d += dab * 0.30 * (1.0 - vPar.x * 0.5);
   // small crisp marks: grass, twigs, grit, laid with the tip of the brush
-  float flick = mix(smoothstep(0.655, 0.685, fa.g * 0.72 + ma.b * 0.28), smoothstep(0.655, 0.685, fb.g * 0.72 + mb.b * 0.28), lf) * markFade;
-  d += flick * 0.62;
+  float flick = mix(smoothstep(0.668, 0.70, fa.g * 0.72 + ma.b * 0.28), smoothstep(0.668, 0.70, fb.g * 0.72 + mb.b * 0.28), lf) * markFade;
+  d += flick * 0.50 * (0.25 + 1.25 * vPar.x) * smoothstep(1.5, 7.0, dist);    // grit shows on rough ground, hardly at all on smooth sand or ice
   // neighbouring pigments run into each other: drifts of green and of warm earth
   vec3 hueA = c * uHueA;
   vec3 hueB = c * uHueB;

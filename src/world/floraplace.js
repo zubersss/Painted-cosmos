@@ -10,7 +10,7 @@ export const K_BIRCH = 0, K_PINE = 1, K_BIRCH_AUTUMN = 2;
 export const U_GRASS = 0, U_FERN = 1, U_BUSH = 2, U_ROCK = 3, U_FLOWER = 4, U_STONE = 5, U_REED = 6, U_SHARD = 7;
 const SMALL = [['grass', U_GRASS], ['fern', U_FERN], ['bush', U_BUSH], ['rock', U_ROCK], ['flower', U_FLOWER], ['reed', U_REED], ['shard', U_SHARD]];
 
-const STRIDE = 12;   // x y z (body-local position), scale, yaw, kind, variant, seed, hue, value, canopy, lean
+const STRIDE = 12;   // x y z (body-local position), scale, yaw, kind, variant (trees) or biome index (undergrowth), seed, hue, value, canopy, lean
 export const INST_STRIDE = STRIDE;
 
 let _s = null;
@@ -28,7 +28,7 @@ export function placeTrees(S, face, level, ix, iy, grid) {
   const s = _s, R = S.R;
   const span = 2 / (1 << level), u0 = -1 + ix * span, v0 = -1 + iy * span;
   const seed = cellSeed(face, level, ix, iy, 911);
-  const n3 = S.nC.n3, fc = R / 17, fd = R / 52;
+  const n3 = S.nC.n3, fc = R / 17, fd = R / 52, fg = R / 160;
   const out = [];
   for (let b = 0; b < grid; b++) {
     for (let a = 0; a < grid; a++) {
@@ -44,6 +44,8 @@ export function placeTrees(S, face, level, ix, iy, grid) {
         const bi = S.biomes[s.top];
         if (!bi.tall) continue;
         if (!bi.tallWet && s.lq !== NOLQ && s.lq > s.h - 0.15) continue;
+        // outside the woods, tall things stand in groups with empty stretches between them
+        if (bi.terrain !== 'forest' && (bi.tallD || 0) < 0.36 && r3 >= 0.62 * (0.14 + 0.86 * clump) * s.trees * (0.06 + 0.94 * smoothstep(-0.30, 0.18, n3(x * fg - 4.0, y * fg + 13.0, z * fg + 7.0)) * 1.25)) continue;
         // each species keeps to its own groups: the choice follows the clump field too
         const grove = n3(x * fd + 21.0, y * fd + 4.0, z * fd - 13.0);
         const birch = r4 < clamp(s.birch + grove * 0.55, bi.tall[0] === bi.tall[1] ? 1 : 0.04, bi.tall[0] === bi.tall[1] ? 1 : 0.97);
@@ -51,7 +53,7 @@ export function placeTrees(S, face, level, ix, iy, grid) {
         const spec = S.look.flora.tall[kind];
         const rr = R + s.h - 0.12;
         const scale = ((birch ? 0.74 : 0.80) + 0.56 * r5 * r5 + 0.12 * s.glade) * (spec.scale || 1);
-        out.push(x * rr, y * rr, z * rr, scale, r1 * 6.2831853, kind, (r2 * 3) | 0, hash3i(a, b, 6 + k, seed),
+        out.push(x * rr, y * rr, z * rr, scale, spec.slim ? 0.6 + (r1 - 0.5) * 0.7 : r1 * 6.2831853, kind, (r2 * 3) | 0, hash3i(a, b, 6 + k, seed),
           (r5 - 0.5) * 2, (r4 - 0.5) * 2 * 0.6, s.canopy, birch ? 0.02 + 0.15 * r2 * r2 : 0.02 * r2);
       }
     }
@@ -122,7 +124,7 @@ export function placeUnder(S, face, level, ix, iy, grid) {
         scale = kind === U_ROCK ? 0.4 + 1.6 * r5 * r5 : kind === U_SHARD ? 0.6 + 1.6 * r5 * r5 : 0.65 + 0.8 * r5;
         sink = kind === U_ROCK ? 0.2 * scale : 0.04;
         const rr = R + s.h - sink;
-        out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, (r1 * 3) | 0, hash3i(a, b, 6, seed), (r5 - 0.5) * 2, (r3 - 0.5) * 1.2, s.canopy, 0.1 * r1);
+        out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, s.top, hash3i(a, b, 6, seed), (r5 - 0.5) * 2, (r3 - 0.5) * 1.2, s.canopy, 0.1 * r1);
         continue;
       }
       const edge = s.lq !== NOLQ ? s.lq - s.h : -9;   // > 0 under water
@@ -144,7 +146,7 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       if (kind < 0) continue;
       const rr = R + s.h - sink;
       const reed = kind === U_REED;
-      out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, (r1 * 3) | 0, hash3i(a, b, 6, seed),
+      out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, s.top, hash3i(a, b, 6, seed),
         reed ? -0.2 - 0.8 * r5 : (r5 - 0.5) * 2 + (s.glade - 0.5) * 0.8, reed ? 0.5 + 0.8 * r4 : (r4 - 0.5) * 2 * 0.6, s.canopy, 0.1 * r1);
     }
   }

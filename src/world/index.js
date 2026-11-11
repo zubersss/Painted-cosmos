@@ -56,8 +56,11 @@ export function createWorld(scene) {
     if (look.rings) root.add(makeRing(bu, BODIES[id].radius, look.rings));
     if (look.cloud > 0.05 && BODIES[id].atmosphereHeight > 0) {
       // seen from outside, the deck hugs the planet
-      st.cloudR = BODIES[id].radius + Math.min(BODIES[id].atmosphereHeight * 0.22, BODIES[id].radius * 0.045) + 60;
-      st.clouds = makeCloudShell(bu, st.cloudR, look);
+      st.cloudR = BODIES[id].radius + ((look.deck && look.deck.height) || Math.min(BODIES[id].atmosphereHeight * 0.22, BODIES[id].radius * 0.045) + 60);
+      // a great storm stands over the first site of the biome that names it
+      let stormDir = null;
+      if (look.deck && look.deck.storm) { const S = getSurface(id), bi = S.biomes.findIndex((b) => b.id === look.deck.storm.over), s0 = S.sites.find((x) => x.b === bi); if (s0) stormDir = s0; }
+      st.clouds = makeCloudShell(bu, st.cloudR, look, stormDir);
       root.add(st.clouds);
     }
     state.set(id, st);
@@ -126,7 +129,8 @@ export function createWorld(scene) {
         const a01 = THREE.MathUtils.smoothstep(st.camLocal.length() - st.body.radius, st.body.atmosphereHeight * 0.6, st.body.atmosphereHeight * 1.6);
         st.clouds.visible = a01 > 0.02;
         const cu = st.clouds.material.uniforms.uCloud.value;
-        cu.x = st.look.cloud * a01; cu.y = Math.max(900, st.body.atmosphereHeight * 3.2);
+        // banded worlds close into a full deck seen from outside
+        cu.x = (st.look.bands ? 1 : st.look.cloud) * a01; cu.y = Math.max(900, st.body.atmosphereHeight * 3.2);
       }
       st.terrain.detail = isActive;
       // One shared time slice per frame. When terrain and flora both have work they take

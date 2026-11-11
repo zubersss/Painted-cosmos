@@ -69,9 +69,12 @@ void main() {
 }`;
 const CLOUD_FRAG = /* glsl */`
 ${FRAG_PARS}
-uniform vec4 uCloud;      // coverage, feature size, drift, bands
+uniform vec4 uCloud;      // coverage, feature size, drift, bands (0 = scattered cloud, 1 = a full banded deck)
+uniform vec4 uDeck;       // number of belts pole to pole, how far the weather pushes their edges, white streaks, wetness
 uniform vec3 uBandA;
 uniform vec3 uBandB;
+uniform vec4 uStorm;      // a great storm: unit direction, and its angular radius (0 = none)
+uniform vec3 uStormCol;
 varying vec3 vPos;
 varying vec3 vNV;
 varying vec3 vView;
@@ -80,32 +83,55 @@ void main() {
   vec3 q = vPos / uCloud.y + vec3(uTime * uCloud.z, 0.0, uTime * uCloud.z * 0.6);
   float c1 = texture(uNoise3D, q).r, c2 = texture(uNoise3D, q * 2.7 + 0.31).g, c3 = texture(uNoise3D, q * 7.3).b;
   float v = c1 * 0.60 + c2 * 0.28 + c3 * 0.12;
-  // banded worlds: the cloud deck follows the latitude in long soft stripes
-  float lat = normalize(vPos).y;
-  float stripe = 0.5 + 0.5 * sin(lat * 15.0 + (c1 - 0.5) * 3.0);
+  // banded worlds: belts of wash laid along the latitude, their edges pushed about by the weather
+  vec3 nrm = normalize(vPos);
+  float lat = asin(clamp(nrm.y, -1.0, 1.0)) / 1.5708;
+  float wob = ((c1 - 0.5) + (c2 - 0.5) * 0.45) * uDeck.y;
+  float sv = sin((lat + wob) * uDeck.x * 3.14159 + 0.6);
+  float stripe = smoothstep(-0.20, 0.20, sv + (c3 - 0.5) * 0.35);
   v += (stripe - 0.5) * 0.30 * uCloud.w;
+  // the great storm: an oval twice as long as it is tall, turning on itself
+  float storm = 0.0, spiral = 0.0;
+  if (uStorm.w > 0.0) {
+    vec3 sd = normalize(uStorm.xyz);
+    vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), sd));
+    vec3 north = cross(sd, east);
+    vec3 dv = nrm - sd;
+    float de = dot(dv, east) * 0.55, dn = dot(dv, north);
+    float r = length(vec2(de, dn)) / uStorm.w;
+    spiral = sin(atan(dn, de) * 2.0 + r * 8.0 + (c2 - 0.5) * 3.5);
+    storm = (1.0 - smoothstep(0.72, 1.0, r + (c2 - 0.5) * 0.22)) * step(0.0, dot(nrm, sd));
+  }
   float th = 1.0 - uCloud.x;
-  if (v < th) discard;
+  if (max(v, storm * uCloud.x) < th) discard;
   vec3 nV = normalize(vNV);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5 + (c2 - 0.5) * 0.25;
-  vec3 c = mix(vec3(1.0), mix(uBandA, uBandB, stripe), 0.30 + uCloud.w * 0.60);
-  c = pcDensity(c, 0.8 + smoothstep(th, th + 0.25, v) * 0.7);
+  vec3 belt = mix(uBandA, uBandB, stripe);
+  vec3 c = mix(mix(vec3(1.0), belt, 0.30), belt, uCloud.w);
+  c = pcDensity(c, 0.8 + smoothstep(th, th + 0.25, v) * 0.7 + (c1 - 0.5) * 0.5 * uCloud.w);
+  // white streaks of high cloud drawn out along the wind: bare paper
+  float streak = smoothstep(0.64, 0.72, texture(uNoise3D, vec3(q.x * 0.45, q.y * 3.6, q.z * 0.45) + 0.4).r + (c3 - 0.5) * 0.15);
+  c = mix(c, vec3(1.0), streak * uDeck.z);
+  c = mix(c, pcDensity(uStormCol, 1.0 + spiral * 0.5), storm);
   c = pcTone(c, pcLevel(x, 0.08));
   float limb = pow(1.0 - clamp(dot(nV, normalize(-vView)), 0.0, 1.0), 2.5);
   c = mix(c, mix(uHaze, vec3(1.0), 0.4), limb);
-  pcWrite(c, 1.0, nV, -vView.z, 0.6);
+  pcWrite(c, mix(1.0, uDeck.w, uCloud.w), nV, -vView.z, 0.6);
 }`;
 
-export function makeCloudShell(bodyU, radius, look) {
+export function makeCloudShell(bodyU, radius, look, stormDir) {
   ensureGlobals();
-  const sky = look.sky.day;
+  const sky = look.sky.day, D = look.deck || {};
   const mat = new THREE.ShaderMaterial({
     name: 'pc-cloudshell',
     uniforms: Object.assign({
       uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime,
-      uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands || 0) },
-      uBandA: { value: new THREE.Vector3().fromArray(sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(look.deck || sky.cloudShade) },
+      uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands ? 1 : 0) },
+      uDeck: { value: new THREE.Vector4(D.belts || 7, D.wobble == null ? 0.10 : D.wobble, D.streaks || 0, D.wet == null ? 0.55 : D.wet) },
+      uBandA: { value: new THREE.Vector3().fromArray(D.a || sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(D.b || sky.cloudShade) },
+      uStorm: { value: stormDir ? new THREE.Vector4(stormDir.x, stormDir.y, stormDir.z, D.storm ? D.storm.size : 0.22) : new THREE.Vector4(0, 1, 0, 0) },
+      uStormCol: { value: new THREE.Vector3().fromArray((D.storm && D.storm.color) || [0.80, 0.36, 0.30]) },
     }, bodyU),
     vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG,
   });

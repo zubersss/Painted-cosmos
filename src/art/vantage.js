@@ -32,9 +32,9 @@ const WANT = {
   ridged: { relief: 1.6, layers: 1.0, liquid: 0, beyond: 0, steep: 0.8, below: 0.2, high: 0.22, flora: 0.5 },
   alpine: { relief: 2.0, layers: 1.0, liquid: 0, beyond: 0, steep: 0.6, below: 0, high: 0.24, flora: 0.3 },
   dunes: { relief: 1.2, layers: 2.4, liquid: 0, beyond: 0, steep: 0.2, below: 0.3, high: 0.08, flora: 0 },
-  crater: { relief: 0.8, layers: 0.8, liquid: 0, beyond: 0, steep: 0.6, below: 2.4, high: 0.06, flora: 0 },
-  basin: { relief: 0.6, layers: 0.8, liquid: 0, beyond: 0, steep: 0.2, below: 1.0, high: 0.06, flora: 0 },
-  sinkholes: { relief: 0.5, layers: 0.5, liquid: 2.0, beyond: 1.2, steep: 1.2, below: 1.6, high: 0.06, flora: 0 },
+  crater: { relief: 0.8, layers: 0.8, liquid: 0, beyond: 0, steep: 0.6, below: 0.8, high: 0.06, flora: 0, bowl: 3.5, perch: 0.6 },
+  basin: { relief: 0.6, layers: 0.8, liquid: 0, beyond: 0, steep: 0.2, below: 0.6, high: 0.06, flora: 0, bowl: 1.5 },
+  sinkholes: { relief: 0.5, layers: 0.5, liquid: 2.0, beyond: 1.2, steep: 1.2, below: 1.6, high: 0.06, flora: 0, bowl: 1.5 },
   riverbed: { relief: 0.6, layers: 0.5, liquid: 1.6, beyond: 1.0, steep: 0.2, below: 0.2, high: 0.10, flora: 0.8 },
   wetland: { relief: 0.2, layers: 0.2, liquid: 1.6, beyond: 1.2, steep: 0, below: 0, high: 0.05, flora: 0.6 },
   flat: { relief: 0.6, layers: 0.4, liquid: 0, beyond: 0, steep: 0.2, below: 0.2, high: 0.05, flora: 0.8 },
@@ -68,7 +68,8 @@ function scan(S, d, eyeR, sc) {
       step(d, f, ang, r, R, p);
       S.sample(p[0], p[1], p[2], o, r > 8 && r < 260);
       const wetL = o.lq !== NOLQ && o.lq > o.h;
-      const liq = wetL || (sc.bedW > 0 && r > 8 && r < 260 && o.s < sc.bedW);     // a dry river bed counts as the water it once held
+      // a dry river bed counts as the water it once held, a floor of fog as the sea it looks like
+      const liq = wetL || (sc.bedW > 0 && r > 8 && r < 260 && o.s < sc.bedW) || (sc.fogL != null && o.h < sc.fogL);
       const top = R + (wetL ? o.lq : o.h);
       const th = r / R;
       const el = Math.atan2(top * Math.cos(th) - eyeR, top * Math.sin(th));
@@ -87,24 +88,26 @@ function scan(S, d, eyeR, sc) {
 
 function scoreView(sc, a0, W) {
   // the frame covers the bearings a0 - HALF .. a0 + HALF
-  let hi = -9, lo = 9, nvis = 0;
+  let hi = -9, nvis = 0;
+  const els = sc.els;
   for (let c = -HALF; c <= HALF; c++) {
     const a = (a0 + c + NAZ) % NAZ;
     if (sc.sky[a] > hi) hi = sc.sky[a];
-    for (let i = 3; i < NR; i++) { const k = a * NR + i; if (sc.vis[k] && RS[i] > 14) { if (sc.el[k] < lo) lo = sc.el[k]; nvis++; } }
+    // what there is to paint: the ground beyond the foreground, and any water from close by
+    for (let i = 3; i < NR; i++) { const k = a * NR + i; if (sc.vis[k] && (RS[i] > 30 || (sc.liq[k] && RS[i] > 7))) els[nvis++] = sc.el[k]; }
   }
-  if (!nvis) return null;
-  lo = Math.max(lo, hi - 0.80);
-  // set the frame so the tallest thing stands a little under the top edge, and what lies below
-  // the eye is still in it
-  let pitch = hi - Math.max(0.16, Math.min(0.34, 0.16 + (hi - 0.10) * 0.6));
-  if (W.below > 1) pitch = Math.min(pitch, Math.max(hi - 0.40, (hi + lo) * 0.5 + 0.03));   // a hollow to look down into
-  pitch = Math.max(-0.30, Math.min(0.24, pitch));
+  if (nvis < 4) return null;
+  // the low edge of what there is to paint beyond the foreground (15th percentile)
+  const part = els.subarray(0, nvis); part.sort();
+  const lo = Math.max(part[Math.floor(nvis * 0.15)], hi - 0.80);
+  // centre the frame on what there is to paint, a little high: rather more sky than bare ground
+  let pitch = Math.max(hi - 0.34, Math.min(lo + 0.40, (hi + lo) * 0.5 + 0.08));
+  pitch = Math.max(-0.30, Math.min(0.26, pitch));
   const top = pitch + VFOV, bot = pitch - VFOV;
-  let area = 0, liquid = 0, steep = 0, below = 0, flora = 0, own = 0, layers = 0, beyond = 0, skyA = 0, m1 = 0, m2 = 0, near = 0, hiWall = 0, wallA = 0, fore = 0;
+  let area = 0, liquid = 0, steep = 0, below = 0, flora = 0, own = 0, layers = 0, beyond = 0, skyA = 0, m1 = 0, m2 = 0, near = 0, hiWall = 0, wallA = 0, fore = 0, bowl = 0;
   for (let c = -HALF; c <= HALF; c++) {
     const a = (a0 + c + NAZ) % NAZ;
-    let hmax = -9, lastVisR = 0, sawLiq = false, got = false;
+    let hmax = -9, lastVisR = 0, sawLiq = false, got = false, pit = 9, hollow = false;
     for (let i = 0; i < NR; i++) {
       const k = a * NR + i;
       if (!sc.vis[k]) continue;
@@ -114,9 +117,10 @@ function scoreView(sc, a0, W) {
         area += g; own += g * sc.own[k];
         if (sc.liq[k]) { liquid += g; sawLiq = true; }
         else if (sawLiq && !got) { beyond++; got = true; }
-        if (sc.steep[k] > 0.7 && !sc.liq[k]) steep += g * Math.min(1, sc.steep[k] / 1.6);
+        if (sc.steep[k] > 0.55 && !sc.liq[k]) steep += g * Math.min(1, sc.steep[k] / 1.4);
         if (sc.el[k] < -0.10 && RS[i] > 20) below += g;
         flora += g * Math.min(1, sc.trees[k] * 2.5) * (RS[i] > 14 && RS[i] < 180 ? 1 : 0);
+        if (RS[i] > 18 && RS[i] < 420) { if (sc.el[k] < pit) pit = sc.el[k]; else if (pit < -0.09 && sc.el[k] > pit + 0.07) hollow = true; }
         if (RS[i] < 12) near += g;
         if (RS[i] < 28 && !sc.liq[k]) fore += g;
         if (lastVisR > 0 && RS[i] > lastVisR * 1.6 && i < NR - 1) layers++;
@@ -126,6 +130,7 @@ function scoreView(sc, a0, W) {
       lastVisR = RS[i];
       hmax = sc.el[k];
     }
+    if (hollow) bowl++;
     const s = Math.min(top, Math.max(bot, sc.sky[a]));
     skyA += (top - s);
     m1 += sc.sky[a]; m2 += sc.sky[a] * sc.sky[a];
@@ -142,6 +147,7 @@ function scoreView(sc, a0, W) {
   s += W.beyond * (beyond / n);
   s += W.steep * Math.min(1, (steep / area) / 0.30);
   s += W.below * Math.min(1, (below / area) / 0.35);
+  s += (W.bowl || 0) * (bowl / n);                           // a hollow with its far wall in view
   s += W.flora * Math.min(1, (flora / area) / 0.25);
   s -= Math.abs(hi - W.high - 0.06) * 2.2;                   // the skyline about where this kind of place wants it
   s -= Math.max(0, 0.14 - skyFrac) * 6 + Math.max(0, skyFrac - 0.55) * 3;   // some sky, not mostly sky
@@ -186,7 +192,7 @@ export function findVantage(bodyId, biomeId, opts = {}) {
   const W = Object.assign({}, WANT[B.terrain] || WANT.default, B.want || {});
   const eye = opts.eye || 1.7;
   const o = makeSample(S.nB);
-  const sc = { o, bi, bedW: B.terrain === 'riverbed' && !(B.t && B.t.wet) ? ((B.t && B.t.bedW) || 6.5) : 0, el: new Float32Array(NAZ * NR), gap: new Float32Array(NAZ * NR), steep: new Float32Array(NAZ * NR), trees: new Float32Array(NAZ * NR), own: new Float32Array(NAZ * NR), liq: new Uint8Array(NAZ * NR), vis: new Uint8Array(NAZ * NR), sky: new Float32Array(NAZ) };
+  const sc = { o, bi, fogL: B.t && B.t.fog ? B.t.fog[0] : null, els: new Float32Array(NAZ * NR), bedW: B.terrain === 'riverbed' && !(B.t && B.t.wet) ? ((B.t && B.t.bedW) || 6.5) : 0, el: new Float32Array(NAZ * NR), gap: new Float32Array(NAZ * NR), steep: new Float32Array(NAZ * NR), trees: new Float32Array(NAZ * NR), own: new Float32Array(NAZ * NR), liq: new Uint8Array(NAZ * NR), vis: new Uint8Array(NAZ * NR), sky: new Float32Array(NAZ) };
   const sites = S.sites.filter((s) => s.b === bi).slice(0, opts.sites || 2);
   const p = [0, 0, 0], q = [0, 0, 0];
   const cands = [];
@@ -211,17 +217,58 @@ export function findVantage(bodyId, biomeId, opts = {}) {
       }
     }
   }
+  // where water is the subject, also try the easel at the water's edge: from each spot walk
+  // to the nearest shore and stand a few steps back from it
+  if (W.liquid >= 1.5 && sc.fogL == null) {
+    const base = cands.length;
+    for (let ci = 0; ci < base; ci++) {
+      const c = cands[ci], fc = frameAt(c.d);
+      let found = null;
+      for (let r = 6; r < 220 && !found; r += (r < 40 ? 3 : 8)) {
+        for (let a = 0; a < 12 && !found; a++) {
+          step(c.d, fc, a * Math.PI / 6 + ci, r, R, p);
+          S.sample(p[0], p[1], p[2], o, false);
+          if (o.lq !== NOLQ && o.lq > o.h) found = [a * Math.PI / 6 + ci, r];
+        }
+      }
+      if (!found) continue;
+      // back from the waterline until the ground is dry and less than a step above it
+      for (let back = 2.5; back < 14; back += 1.5) {
+        step(c.d, fc, found[0], Math.max(0, found[1] - back), R, p);
+        S.sample(p[0], p[1], p[2], o, true);
+        if (o.lq !== NOLQ && o.lq > o.h - 0.25) continue;
+        if (o.w[bi] < 0.9) break;
+        const h0 = o.h, fp = frameAt(p);
+        let rough = 0;
+        for (let t = 0; t < 4; t++) { step(p, fp, t * Math.PI / 2, 3.5, R, q); rough = Math.max(rough, Math.abs(S.heightAt(q[0], q[1], q[2]) - h0)); }
+        if (rough < 2.2) cands.push({ d: [p[0], p[1], p[2]], h: h0, rough: rough * 0.5, dens: o.trees, perch: 0 });
+        break;
+      }
+    }
+  }
   let best = null;
   const tops = [];
   for (const c of cands) {
     scan(S, c.d, R + c.h + eye, sc);
     const ringAt = S.look.rings ? ringSky(S, c.d, R + c.h + eye) : null;
+    // the bearing along which this biome's crests (dunes, fins) run at this spot
+    let crest = null;
+    if (W.along) {
+      const ax = (B.t && B.t.axis) || (B.terrain === 'spires' ? [0.62, 0.30, -0.72] : [0.36, 0.48, 0.80]), f = frameAt(c.d);
+      crest = Math.atan2(ax[0] * f.e[0] + ax[1] * f.e[1] + ax[2] * f.e[2], ax[0] * f.n[0] + ax[1] * f.n[1] + ax[2] * f.n[2]) + Math.PI / 2;
+    }
     let cb = null;
     for (let a = 0; a < NAZ; a++) {
       const v = scoreView(sc, a, W);
       if (!v) continue;
       v.s += -c.rough * 0.3 + (W.perch || 0) * c.perch - c.dens * 0.8;
+      if (B.t && B.t.fog && c.h < B.t.fog[0] + B.t.fog[1]) v.s -= 2.5;      // paint the fog from above it
       if (ringAt) v.s += (W.rings || 0.3) * ringIn(ringAt, a, v.pitch);
+      if (W.along && crest != null) {
+        // crests are best drawn running away into the picture, a little off the line of sight
+        let da = Math.abs(a / NAZ * Math.PI * 2 - crest) % Math.PI; if (da > Math.PI / 2) da = Math.PI - da;
+        v.s += W.along * Math.max(0, 1 - Math.abs(da - 0.42) / 0.55);
+      }
       if (!cb || v.s > cb.s) { cb = v; cb.a = a; }
     }
     if (cb) tops.push({ c, v: cb });

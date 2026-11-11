@@ -85,7 +85,11 @@ function mkSky(zenith, horizon, o) {
 //   liquid: { level, color, refl (0 matte .. 1 mirror), glow (lava), cloud (cloud sea) }
 //   tall: [a, b] indices into the body's flora.tall, tallD density, tallMix share of a
 //   small: densities of undergrowth kinds { grass, fern, bush, rock, flower, reed, shard }
+//   under: this biome's own undergrowth washes, any of { leaf, bush, accent, rock, shard }
+//     (otherwise the body's flora.under)
 //   mist: multiplies the visibility; phys: { ground } for PHYSICS where its guess is wrong
+//   twilight: 0..1, the place lies in a lasting half-light; want: what the easel looks for
+//     (src/art/vantage.js); hang: { kit, d } trailing plants on cliff lips
 function B(id, name, terrain, pigments, accent, ground, extra) {
   return Object.assign({ id, name, terrain, pigments, accent, ground }, extra || {});
 }
@@ -97,6 +101,7 @@ export const LOOKS = {
     seed: 'earth-7',
     seaLevel: 0,
     cloud: 0.45,
+    deck: { height: 560 },
     visibility: [185, 2600],   // metres at ground level, and from high up
     sky: EARTH_SKY,
     flora: {
@@ -113,19 +118,21 @@ export const LOOKS = {
         ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1] }),
       B('autumn_woodland', 'Autumn Woodland', 'forest',
         ['quinGold', 'burntSienna', 'cadOrange', 'rawUmber', 'oliveGreen', 'ultramarine', 'cobaltViolet'], 'alizarin',
-        ['quinGold', 'burntSienna', 'rawUmber'], { autumn: 1, tall: [2, 1] }),
+        ['quinGold', 'burntSienna', 'rawUmber'], { autumn: 1, tall: [2, 1],
+          under: { leaf: [[0.92, 0.82, 0.40], [0.80, 0.64, 0.34], [0.54, 0.42, 0.30]], bush: [[0.90, 0.66, 0.34], [0.72, 0.46, 0.30], [0.44, 0.30, 0.30]] } }),
       B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
         ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
         ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185 }, mist: 6, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.5, flower: 0.16, rock: 0.05, bush: 0.02 } }),
       B('sea_coast', 'Sea Cliffs and Coast', 'coast',
         ['cerulean', 'ultramarine', 'viridian', 'yellowOchre', 'rawUmber', 'davysGrey'], 'cadOrange',
-        ['yellowOchre', 'oliveGreen', 'davysGrey'], { t: { cliff: 52, stacks: 0.5, strata: 0.5 }, mist: 4, liquid: { color: [0.52, 0.72, 0.84], refl: 0.6 }, tall: [1, 0], tallD: 0.10, tallMix: 0.7, small: { grass: 0.45, rock: 0.05, bush: 0.05, flower: 0.03 } }),
+        ['yellowOchre', 'oliveGreen', 'davysGrey'], { t: { cliff: 52, stacks: 0.5, strata: 0.5 }, mist: 4, under: { leaf: [[0.88, 0.87, 0.52], [0.70, 0.75, 0.44], [0.46, 0.56, 0.42]] }, liquid: { color: [0.52, 0.72, 0.84], refl: 0.6 }, tall: [1, 0], tallD: 0.10, tallMix: 0.7, small: { grass: 0.45, rock: 0.05, bush: 0.05, flower: 0.03 } }),
       B('desert_canyon', 'Desert Canyon', 'canyon',
         ['burntSienna', 'rawSienna', 'yellowOchre', 'cobaltViolet', 'ultramarine', 'burntUmber'], 'turquoise',
-        ['yellowOchre', 'rawSienna', 'burntSienna'], { t: { strata: 1, amp: 210, wl: 600, steps: 3, dil: 0.2 }, mist: 5, small: { rock: 0.06, grass: 0.03, bush: 0.02 }, phys: { ground: 'sand' } }),
+        ['yellowOchre', 'rawSienna', 'burntSienna'], { t: { strata: 1, amp: 210, wl: 600, steps: 3, dil: 0.2 }, mist: 5, small: { rock: 0.06, grass: 0.03, bush: 0.02 }, phys: { ground: 'sand' },
+          under: { leaf: [[0.88, 0.84, 0.56], [0.74, 0.72, 0.46], [0.54, 0.54, 0.40]], bush: [[0.78, 0.80, 0.60], [0.60, 0.66, 0.52], [0.42, 0.48, 0.44]], rock: [[0.92, 0.74, 0.58], [0.62, 0.40, 0.32]], accent: [0.30, 0.70, 0.69] } }),
       B('misty_wetland', 'Misty Wetland', 'wetland',
         ['oliveGreen', 'viridian', 'rawUmber', 'paynesGrey', 'yellowOchre', 'davysGrey'], 'lemonYellow',
-        ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, liquid: { color: [0.74, 0.82, 0.84], refl: 0.9 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
+        ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.46], [0.64, 0.66, 0.38], [0.42, 0.46, 0.34]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.74, 0.82, 0.84], refl: 0.9 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
     ],
     // Hand-placed biome sites: [latitude, longitude, biomeId]. The first one holds the spawn.
     sites: [
@@ -139,7 +146,7 @@ export const LOOKS = {
   },
 
   mars: {
-    seed: 'mars-3', seaLevel: null, cloud: 0.12, visibility: [520, 5000],
+    seed: 'mars-3', seaLevel: null, cloud: 0.12, visibility: [520, 5000], deck: { height: 330 },
     sky: mkSky([0.88, 0.72, 0.60], [0.985, 0.90, 0.80], { glaze: [0.74, 0.66, 0.80], light: [1.0, 0.95, 0.86], duskHorizon: [0.72, 0.84, 0.97], duskLight: [0.92, 0.94, 1.0], duskGrade: [0.94, 0.95, 1.0] }),
     flora: {
       tall: [
@@ -152,11 +159,11 @@ export const LOOKS = {
       B('rust_canyons', 'Rust Canyons', 'canyon', ['burntSienna', 'rawSienna', 'burntUmber', 'cobaltViolet', 'yellowOchre'], 'turquoise', ['rawSienna', 'burntSienna', 'burntUmber'],
         { t: { strata: 1, amp: 200, steps: 3, dil: 0.16, wl: 620 }, tall: [1, 1], tallD: 0.05, tallMix: 1, small: { rock: 0.07, bush: 0.012 }, phys: { ground: 'rock' } }),
       B('dust_dunes', 'Dust-Storm Dunes', 'dunes', ['rawSienna', 'yellowOchre', 'burntSienna', 'roseMadder', 'sepia'], 'cerulean', ['yellowOchre', 'rawSienna', 'burntSienna'],
-        { t: { amp: 13, wl: 150, dil: 0.26 }, mist: 1.0, want: { perch: 1.5 }, small: { rock: 0.006 }, phys: { ground: 'sand' } }),
+        { t: { amp: 24, wl: 150, slip: 0.2, ride: 0.22, swell: 22, dil: 0.26, lee: 0.3 }, mist: 1.3, hour: 16.2, want: { perch: 1.0, steep: 0.8, high: 0.06, relief: 1.4, along: 2.5, layers: 1.2 }, small: { rock: 0.006 }, phys: { ground: 'sand' } }),
       B('polar_frost', 'Polar Frost Fields', 'terraced', ['davysGrey', 'roseMadder', 'cobaltBlue', 'rawSienna', 'neutralTint'], 'cadOrange', ['mint', 'davysGrey', 'roseMadder'],
-        { t: { amp: 40, steps: 6, wl: 760, crack: 0.8, frost: 0.85, strata: 0.7, riser: [0.84, 0.93] }, want: { high: 0.05, steep: 0.9, layers: 1.6, perch: 0.6 }, small: { shard: 0.10, rock: 0.02 }, phys: { ground: 'ice' } }),
+        { t: { amp: 40, steps: 6, wl: 760, crack: 0.8, frost: 0.85, strata: 0.7, riser: [0.84, 0.93] }, want: { high: 0.05, steep: 0.9, layers: 1.6, perch: 0.6 }, under: { rock: [[0.94, 0.92, 0.93], [0.68, 0.62, 0.70]], shard: [[0.97, 0.98, 0.99], [0.76, 0.84, 0.93]] }, small: { shard: 0.035, rock: 0.02 }, phys: { ground: 'ice' } }),
       B('dry_riverbeds', 'Dry Riverbeds', 'riverbed', ['rawSienna', 'burntUmber', 'alizarin', 'yellowOchre', 'sepia'], 'alizarin', ['yellowOchre', 'rawSienna', 'burntUmber'],
-        { t: { amp: 26, dil: 0.28, bedW: 10, bedD: 2.8 }, tall: [0, 0], tallD: 0.42, tallMix: 1, small: { rock: 0.05, grass: 0.22, bush: 0.03 }, phys: { ground: 'gravel' } }),
+        { t: { amp: 26, dil: 0.28, bedW: 10, bedD: 2.8, bedPale: 0.55 }, tall: [0, 0], tallD: 0.42, tallMix: 1, small: { rock: 0.05, grass: 0.22, bush: 0.03 }, phys: { ground: 'gravel' } }),
     ],
     sites: [[10, 0, 'dry_riverbeds'], [-8, 60, 'rust_canyons'], [25, -60, 'dust_dunes'], [72, 20, 'polar_frost'], [-74, -40, 'polar_frost'], [-30, -20, 'rust_canyons'], [35, 110, 'dust_dunes'], [-20, 140, 'dry_riverbeds'],
       [5, -130, 'rust_canyons'], [-45, 80, 'dust_dunes'], [50, -150, 'dry_riverbeds'], [-10, -80, 'dust_dunes'], [60, 100, 'polar_frost'], [-55, -150, 'polar_frost'], [30, 40, 'rust_canyons'], [-35, 30, 'dry_riverbeds']],
@@ -166,6 +173,7 @@ export const LOOKS = {
     seed: 'saturn-3', seaLevel: 0, cloud: 0.5, visibility: [620, 3600],
     rings: { inner: 1.35, outer: 2.25, color: [0.93, 0.86, 0.66] },
     bands: 0.5,
+    deck: { height: 340, belts: 7, wobble: 0.05, a: [0.99, 0.95, 0.78], b: [0.93, 0.80, 0.52], streaks: 0.15, wet: 0.6 },
     sky: mkSky([0.90, 0.84, 0.60], [0.99, 0.95, 0.80], { glaze: [0.74, 0.70, 0.86], light: [1.0, 0.97, 0.86] }),
     flora: {
       tall: [
@@ -181,7 +189,7 @@ export const LOOKS = {
       B('crystal_reeds', 'Crystal Reed Fields', 'flat', ['mint', 'lemonYellow', 'cerulean', 'davysGrey', 'cobaltViolet'], 'roseMadder', ['lemonYellow', 'mint', 'davysGrey'],
         { t: { amp: 10 }, tall: [0, 0], tallD: 0.55, tallMix: 1, small: { shard: 0.22, grass: 0.12 }, phys: { ground: 'gravel' } }),
       B('ring_shadow', 'Ring-Shadow Twilight', 'rolling', ['cobaltViolet', 'neutralTint', 'indigo', 'yellowOchre', 'paynesGrey'], 'quinGold', ['cobaltViolet', 'neutralTint', 'indigo'],
-        { t: { amp: 60, wl: 520, dusk: 0.35 }, twilight: 0.75, want: { rings: 0.8 }, tall: [2, 2], tallD: 0.10, tallMix: 1, small: { rock: 0.05, flower: 0.06, shard: 0.03 } }),
+        { t: { amp: 60, wl: 520, dusk: 0.35 }, twilight: 0.75, want: { rings: 0.8 }, under: { leaf: [[0.80, 0.76, 0.80], [0.62, 0.58, 0.72], [0.42, 0.40, 0.58]], rock: [[0.76, 0.72, 0.82], [0.44, 0.40, 0.58]], accent: [0.92, 0.74, 0.30] }, tall: [2, 2], tallD: 0.10, tallMix: 1, small: { rock: 0.05, flower: 0.06, shard: 0.03 } }),
       B('honey_mist', 'Honey Mist Valleys', 'ridged', ['quinGold', 'rawSienna', 'yellowOchre', 'oliveGreen', 'sepia'], 'cerulean', ['quinGold', 'yellowOchre', 'rawSienna'],
         { t: { amp: 230, wl: 900 }, mist: 0.30, tall: [1, 1], tallD: 0.30, tallMix: 1, small: { grass: 0.4, bush: 0.05, rock: 0.03 } }),
     ],
@@ -204,16 +212,17 @@ export const LOOKS = {
       B('ochre_basins', 'Cracked Ochre Basins', 'basin', ['yellowOchre', 'rawSienna', 'burntUmber', 'neutralTint', 'sepia'], 'cadOrange', ['yellowOchre', 'rawSienna', 'burntUmber'],
         { t: { crack: 1.0 }, small: { rock: 0.025 }, phys: { ground: 'rock' } }),
       B('obsidian_fields', 'Obsidian Glass Fields', 'flat', ['indigo', 'paynesGrey', 'neutralTint', 'cobaltViolet', 'sepia'], 'turquoise', ['paynesGrey', 'indigo', 'neutralTint'],
-        { t: { amp: 14, crack: 0.5, gloss: 1, dil: 0.12 }, tall: [2, 2], tallD: 0.22, tallMix: 1, small: { rock: 0.03, shard: 0.05 }, phys: { ground: 'rock' } }),
+        { t: { amp: 14, crack: 0.5, gloss: 1, dil: 0.12 }, under: { rock: [[0.50, 0.52, 0.64], [0.20, 0.22, 0.34]], shard: [[0.62, 0.66, 0.80], [0.26, 0.28, 0.44]] }, tall: [2, 2], tallD: 0.22, tallMix: 1, small: { rock: 0.03, shard: 0.05 }, phys: { ground: 'rock' } }),
       B('crystal_gardens', 'Twilight Crystal Gardens', 'rolling', ['cobaltViolet', 'roseMadder', 'cerulean', 'neutralTint', 'indigo'], 'lemonYellow', ['cobaltViolet', 'roseMadder', 'neutralTint'],
         { t: { amp: 45, wl: 380, dusk: 0.2 }, twilight: 0.45, tall: [0, 1], tallD: 0.26, tallMix: 0.55, small: { shard: 0.12, rock: 0.02 } }),
       B('shadow_craters', 'Frozen Shadow Craters', 'crater', ['davysGrey', 'cobaltBlue', 'neutralTint', 'indigo', 'paynesGrey'], 'mint', ['davysGrey', 'cobaltBlue', 'neutralTint'],
-        { t: { frost: 0.9, dusk: 0.25 }, twilight: 0.5, small: { rock: 0.03 }, phys: { ground: 'ice' } }),
+        { t: { frost: 0.9, dusk: 0.25 }, twilight: 0.5, under: { rock: [[0.88, 0.91, 0.96], [0.52, 0.58, 0.74]] }, small: { rock: 0.03 }, phys: { ground: 'ice' } }),
     ],
   },
 
   venus: {
     seed: 'venus-3', seaLevel: null, cloud: 0.85, visibility: [230, 1000], bands: 0.6,
+    deck: { height: 450, belts: 3.2, wobble: 0.42, a: [0.99, 0.94, 0.66], b: [0.93, 0.70, 0.36], streaks: 0.35, wet: 0.7 },
     sky: mkSky([0.90, 0.76, 0.40], [0.99, 0.91, 0.62], { glaze: [0.74, 0.62, 0.66], light: [1.0, 0.94, 0.72], cloudShade: [0.86, 0.66, 0.44] }),
     flora: {
       tall: [
@@ -231,12 +240,13 @@ export const LOOKS = {
       B('acid_terraces', 'Acid Lake Terraces', 'terraced', ['lemonYellow', 'oliveGreen', 'yellowOchre', 'viridian', 'rawUmber'], 'turquoise', ['lemonYellow', 'yellowOchre', 'oliveGreen'],
         { t: { amp: 150, steps: 12, pools: 1, wl: 430, riser: [0.72, 0.90] }, liquid: { color: [0.80, 0.92, 0.50], refl: 0.45 }, small: { shard: 0.06, rock: 0.03 } }),
       B('pale_mesas', 'Pale Mesas', 'mesa', ['yellowOchre', 'davysGrey', 'rawSienna', 'neutralTint', 'roseMadder'], 'cobaltViolet', ['yellowOchre', 'davysGrey', 'rawSienna'],
-        { t: { amp: 330, strata: 0.7, wl: 520, fog: [100, 40] }, mist: 2.6, want: { perch: 1.2 }, small: { rock: 0.05, bush: 0.015 }, phys: { ground: 'rock' } }),
+        { t: { amp: 330, strata: 0.7, wl: 520, fog: [100, 40] }, mist: 2.6, want: { perch: 1.2, liquid: 1.6, beyond: 2.4, steep: 1.0, below: 0.5, high: 0.08, relief: 1.2 }, under: { rock: [[0.94, 0.89, 0.76], [0.68, 0.58, 0.50]], bush: [[0.90, 0.84, 0.56], [0.74, 0.66, 0.44], [0.50, 0.44, 0.36]] }, small: { rock: 0.05, bush: 0.015 }, phys: { ground: 'rock' } }),
     ],
   },
 
   jupiter: {
     seed: 'jupiter-3', seaLevel: 0, cloud: 0.6, visibility: [600, 3200], bands: 1.0,
+    deck: { height: 720, belts: 9, wobble: 0.07, a: [0.99, 0.94, 0.80], b: [0.92, 0.62, 0.38], streaks: 0.25, wet: 0.45, storm: { over: 'storm_wall', size: 0.20, color: [0.80, 0.34, 0.28] } },
     sky: mkSky([0.90, 0.78, 0.62], [0.99, 0.93, 0.80], { glaze: [0.72, 0.66, 0.84], light: [1.0, 0.95, 0.84], cloudShade: [0.90, 0.68, 0.50] }),
     flora: {
       tall: [
@@ -251,12 +261,15 @@ export const LOOKS = {
       B('sky_islands', 'Cream Sky-Islands', 'islands', ['yellowOchre', 'cadOrange', 'rawSienna', 'sapGreen', 'neutralTint'], 'cadScarlet', ['yellowOchre', 'sapGreen', 'rawSienna'],
         { t: { amp: 110, cliff: 120, veil: 34, wl: 430, strata: 0.6, dil: 0.26 }, mist: 1.5, want: { perch: 0.6 }, liquid: { color: [0.98, 0.90, 0.76], refl: 0, cloud: 1 }, tall: [0, 0], tallD: 0.22, tallMix: 1, small: { grass: 0.4, rock: 0.04, flower: 0.04 } }),
       B('storm_wall', 'Storm-Wall Cliffs', 'wall', ['burntSienna', 'alizarin', 'rawUmber', 'neutralTint', 'cadOrange'], 'lemonYellow', ['burntSienna', 'alizarin', 'rawUmber'],
-        { t: { amp: 600, wl: 1500, strata: 0.9, dil: 0.22 }, mist: 1.6, twilight: 0.35, tall: [1, 1], tallD: 0.07, tallMix: 1, small: { rock: 0.08 }, phys: { ground: 'rock' } }),
+        { t: { amp: 600, wl: 1500, strata: 0.9, dil: 0.22 }, mist: 2.4, twilight: 0.35, want: { close: 0.2 }, tall: [1, 1], tallD: 0.09, tallMix: 1, small: { rock: 0.08 }, phys: { ground: 'rock' } }),
       B('hanging_gardens', 'Hanging Gardens', 'terraced', ['sapGreen', 'viridian', 'quinGold', 'rawSienna', 'cobaltViolet'], 'roseMadder', ['sapGreen', 'viridian', 'quinGold'],
-        { t: { amp: 170, steps: 6, wl: 640, riser: [0.865, 0.93], strata: 0.5, under: 0.5 }, want: { close: 0.35, high: 0.30, steep: 2.2 }, hang: { kit: 3, d: 0.9 }, tall: [0, 0], tallD: 0.30, tallMix: 1, small: { fern: 0.2, flower: 0.12, bush: 0.05, grass: 0.3 } }),
+        { t: { amp: 170, steps: 6, wl: 640, riser: [0.865, 0.93], strata: 0.5, under: 0.5 }, want: { close: 0.5, high: 0.34, steep: 2.6, flora: 0, layers: 0.8 }, hang: { kit: 3, d: 0.9 }, tall: [0, 0], tallD: 0.16, tallMix: 1, small: { fern: 0.2, flower: 0.12, bush: 0.05, grass: 0.3 } }),
       B('lightning_plains', 'Lightning Plains', 'flat', ['neutralTint', 'paynesGrey', 'yellowOchre', 'cobaltViolet', 'indigo'], 'lemonYellow', ['neutralTint', 'yellowOchre', 'paynesGrey'],
-        { t: { amp: 12, crack: 0.9, dusk: 0.3, pits: 1.3 }, twilight: 0.4, tall: [2, 2], tallD: 0.16, tallMix: 1, small: { rock: 0.03, shard: 0.14, grass: 0.06 } }),
+        { t: { amp: 12, crack: 0.9, dusk: 0.3, pits: 1.3 }, twilight: 0.4, under: { leaf: [[0.80, 0.78, 0.66], [0.62, 0.60, 0.60], [0.42, 0.42, 0.52]], rock: [[0.72, 0.70, 0.76], [0.36, 0.36, 0.48]] }, tall: [2, 2], tallD: 0.16, tallMix: 1, small: { rock: 0.03, shard: 0.14, grass: 0.06 } }),
     ],
+    // the Great Red Spot stands over the first storm-wall site, south of the equator
+    sites: [[8, 0, 'sky_islands'], [-22, 40, 'storm_wall'], [30, -60, 'hanging_gardens'], [-5, 150, 'lightning_plains'], [45, 90, 'sky_islands'], [-50, -30, 'hanging_gardens'], [-35, 110, 'sky_islands'], [60, -130, 'lightning_plains'],
+      [-65, 60, 'lightning_plains'], [20, -150, 'storm_wall'], [70, 20, 'hanging_gardens'], [-15, -100, 'sky_islands'], [0, 95, 'hanging_gardens'], [-45, -150, 'storm_wall'], [35, 30, 'lightning_plains'], [-75, -90, 'sky_islands']],
   },
 
   uranus: {
@@ -264,7 +277,7 @@ export const LOOKS = {
     sky: mkSky([0.60, 0.86, 0.84], [0.93, 0.985, 0.96], { glaze: [0.64, 0.74, 0.88], light: [0.97, 1.0, 0.96] }),
     flora: {
       tall: [
-        { kit: 'wave', scale: 1.0, bark: [[0.90, 0.98, 0.96], [0.42, 0.74, 0.76]], leaf: [[0.90, 0.98, 0.96], [0.68, 0.88, 0.86], [0.42, 0.74, 0.76]], far: [9, 9, 0.5], obs: [1.5, 7] },
+        { kit: 'wave', scale: 1.0, bark: [[0.84, 0.96, 0.94], [0.26, 0.60, 0.68]], leaf: [[0.84, 0.96, 0.94], [0.58, 0.84, 0.84], [0.26, 0.60, 0.68]], far: [9, 9, 0.5], obs: [1.5, 9] },
         { kit: 'spire', scale: 0.8, bark: [[0.92, 0.98, 0.98], [0.52, 0.78, 0.84]], leaf: [[0.92, 0.98, 0.98], [0.74, 0.90, 0.92], [0.52, 0.78, 0.84]], far: [7, 12, 0.85], obs: [1.6, 9] },
       ],
       under: { leaf: [[0.80, 0.94, 0.86], [0.62, 0.84, 0.80], [0.42, 0.66, 0.70]], accent: [0.90, 0.60, 0.70], bush: [[0.74, 0.92, 0.86], [0.54, 0.78, 0.78], [0.36, 0.58, 0.66]], rock: [[0.92, 0.97, 0.96], [0.60, 0.78, 0.82]], shard: [[0.94, 0.99, 0.98], [0.56, 0.84, 0.86]] },
@@ -275,20 +288,21 @@ export const LOOKS = {
       B('frozen_waves', 'Frozen-Wave Forest', 'dunes', ['turquoise', 'viridian', 'cobaltBlue', 'mint', 'indigo'], 'lemonYellow', ['turquoise', 'mint', 'cobaltBlue'],
         { t: { amp: 16, wl: 90, slip: 0.2, lee: 0.6, swell: 14, ride: 0.3 }, tall: [0, 0], tallD: 0.50, tallMix: 1, small: { shard: 0.15 }, phys: { ground: 'ice' } }),
       B('pearl_fog', 'Pearl Fog Flats', 'flat', ['davysGrey', 'mint', 'roseMadder', 'cerulean', 'neutralTint'], 'cobaltViolet', ['davysGrey', 'mint', 'roseMadder'],
-        { t: { amp: 6, dil: 0.55 }, mist: 0.22, small: { shard: 0.04, rock: 0.02 }, phys: { ground: 'ice' } }),
+        { t: { amp: 6, dil: 0.55 }, mist: 0.10, small: { shard: 0.10, rock: 0.04 }, phys: { ground: 'ice' } }),
       B('teal_sinkholes', 'Glowing Teal Sinkholes', 'sinkholes', ['viridian', 'turquoise', 'indigo', 'mint', 'paynesGrey'], 'lemonYellow', ['viridian', 'turquoise', 'indigo'],
-        { t: { amp: 40 }, liquid: { color: [0.55, 0.94, 0.86], refl: 0.15, glow: 0.6 }, small: { shard: 0.08, rock: 0.04, bush: 0.02 } }),
+        { t: { amp: 40 }, want: { perch: -2.5, below: 0.2, bowl: 0, steep: 1.8, liquid: 2.2 }, liquid: { color: [0.55, 0.94, 0.86], refl: 0.15, glow: 0.6 }, small: { shard: 0.08, rock: 0.04, bush: 0.02 } }),
     ],
   },
 
   neptune: {
-    seed: 'neptune-3', seaLevel: 0, cloud: 0.42, visibility: [460, 2800], bands: 0.8, deck: [0.46, 0.56, 0.90],
+    seed: 'neptune-3', seaLevel: 0, cloud: 0.42, visibility: [460, 2800], bands: 0.8,
+    deck: { height: 310, belts: 5, wobble: 0.16, a: [0.50, 0.62, 0.93], b: [0.27, 0.35, 0.74], streaks: 0.9, wet: 0.6 },
     sky: mkSky([0.34, 0.46, 0.84], [0.80, 0.88, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
     flora: {
       tall: [
         { kit: 'spire', scale: 1.2, bark: [[0.40, 0.42, 0.52], [0.16, 0.18, 0.28]], leaf: [[0.40, 0.42, 0.52], [0.27, 0.29, 0.40], [0.16, 0.18, 0.28]], far: [7, 12, 0.85], obs: [1.8, 13] },
         { kit: 'kelp', scale: 1.0, double: 1, bark: [[0.50, 0.44, 0.80], [0.26, 0.24, 0.56]], leaf: [[0.62, 0.56, 0.90], [0.42, 0.40, 0.78], [0.24, 0.26, 0.56]], leafP: [0.6, 0.1, 1.0, 0.4], wind: 0.5, far: [5, 10, 0.5], obs: [0.4, 9] },
-        { kit: 'spire', scale: 1.0, bark: [[0.90, 0.95, 0.99], [0.50, 0.66, 0.90]], leaf: [[0.90, 0.95, 0.99], [0.72, 0.82, 0.95], [0.50, 0.66, 0.90]], far: [7, 12, 0.85], obs: [1.6, 11] },
+        { kit: 'spire', scale: 1.9, slim: 1, bark: [[0.90, 0.95, 0.99], [0.44, 0.60, 0.90]], leaf: [[0.90, 0.95, 0.99], [0.70, 0.80, 0.95], [0.44, 0.60, 0.90]], far: [5, 14, 0.9], obs: [1.4, 13] },
       ],
       under: { leaf: [[0.62, 0.74, 0.70], [0.44, 0.58, 0.66], [0.30, 0.40, 0.58]], accent: [0.92, 0.90, 0.50], bush: [[0.52, 0.60, 0.80], [0.38, 0.44, 0.70], [0.24, 0.28, 0.54]], rock: [[0.50, 0.52, 0.62], [0.22, 0.24, 0.36]], shard: [[0.92, 0.96, 0.99], [0.56, 0.70, 0.92]] },
     },
@@ -298,7 +312,7 @@ export const LOOKS = {
       B('kelp_forests', 'Blue-Violet Kelp Forests', 'rolling', ['cobaltViolet', 'ultramarine', 'viridian', 'indigo', 'neutralTint'], 'roseMadder', ['cobaltViolet', 'ultramarine', 'viridian'],
         { t: { amp: 40, wl: 420 }, tall: [1, 1], tallD: 0.5, tallMix: 1, small: { fern: 0.12, bush: 0.04, flower: 0.05 } }),
       B('ice_spires', 'Wind-Carved Ice Spires', 'spires', ['cerulean', 'cobaltBlue', 'davysGrey', 'mint', 'indigo'], 'cobaltViolet', ['cerulean', 'davysGrey', 'cobaltBlue'],
-        { t: { amp: 36, wl: 46, frost: 0.55, strata: 0.3 }, tall: [2, 2], tallD: 0.22, tallMix: 1, small: { shard: 0.14 }, phys: { ground: 'ice' } }),
+        { t: { amp: 11, wl: 52, frost: 0.55 }, want: { flora: 1.6, layers: 0.6 }, tall: [2, 2], tallD: 0.34, tallMix: 1, small: { shard: 0.14 }, phys: { ground: 'ice' } }),
       B('aurora_tundra', 'Aurora Tundra', 'flat', ['viridian', 'neutralTint', 'cobaltBlue', 'mint', 'indigo'], 'lemonYellow', ['neutralTint', 'viridian', 'cobaltBlue'],
         { t: { amp: 12, ponds: 1, crack: 0.3 }, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 } }),
     ],

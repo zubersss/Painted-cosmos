@@ -12,6 +12,9 @@
 import { BODIES } from '../data/bodies.js';
 import { LOOKS, pig, dilute, mixc } from '../data/looks.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
+import { dirToFace } from './cubesphere.js';
+
+const _cf = {};
 
 const NOT = {};
 const SNOW = [0.97, 0.98, 1.0];
@@ -267,21 +270,36 @@ class Surface {
     b.r2 += (0.80 - b.r2) * wl; b.g2 += (0.87 - b.g2) * wl; b.b2 += (0.93 - b.b2) * wl;
   }
 
-  // Impact craters: one per cell of a 3D grid, where the cell's crater ball meets the surface.
-  // Returns a height offset: a bowl with a raised rim.
-  _craters(x, y, z, cell, depth, rimH) {
-    const R = this.R, px = x * R / cell, py = y * R / cell, pz = z * R / cell;
-    const ix = Math.floor(px), iy = Math.floor(py), iz = Math.floor(pz), sd = this.seed | 0;
-    const h4 = hash3i(ix, iy, iz, sd ^ 313);
-    if (h4 > 0.7) return 0;
-    const cx = ix + 0.3 + 0.4 * hash3i(ix, iy, iz, sd), cy = iy + 0.3 + 0.4 * hash3i(ix, iy, iz, sd ^ 77), cz = iz + 0.3 + 0.4 * hash3i(ix, iy, iz, sd ^ 191);
-    const rr = 0.15 + 0.14 * (h4 / 0.7);
-    const dx = px - cx, dy = py - cy, dz = pz - cz;
-    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) / rr;
-    if (d > 1.7) return 0;
-    const bowl = d < 1 ? -(1 - d * d) : 0;
-    const e = d - 1.02;
-    return (bowl * depth + Math.exp(-e * e / 0.035) * rimH) * (rr / 0.29);
+  // Impact craters, scattered on a grid of cells laid over each face of the cube-sphere (one
+  // crater a cell, most cells; anywhere in its cell, so nothing lines up). Returns a height
+  // offset: a bowl with a flat floor and a steep inner wall, a raised rim, a gentle apron.
+  _craters(x, y, z, cell, depth, rimH, keep) {
+    dirToFace(x, y, z, _cf);
+    const n = Math.max(2, Math.round(this.R * 1.5708 / cell));
+    const fu = (_cf.u + 1) * 0.5 * n, fv = (_cf.v + 1) * 0.5 * n;
+    const bx = Math.floor(fu - 0.5), by = Math.floor(fv - 0.5);     // the 2 x 2 cells whose craters can reach this point
+    const sd = (this.seed ^ Math.imul(cell | 0, 7919)) | 0, f = _cf.face;
+    const kp = keep == null ? 0.72 : keep;
+    let out = 0, wob = 2;
+    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
+      const ix = bx + i, iy = by + j;
+      if (ix < 0 || iy < 0 || ix >= n || iy >= n) continue;
+      const h4 = hash3i(ix, iy, f, sd);
+      if (h4 > kp) continue;
+      const rr = 0.12 + 0.17 * (h4 / kp), reach = rr * 1.75;
+      let cx = ix + hash3i(ix, iy, f + 7, sd), cy = iy + hash3i(ix, iy, f + 13, sd);
+      cx = cx < reach ? reach : cx > n - reach ? n - reach : cx;     // whole craters only: none cut by the edge of a face
+      cy = cy < reach ? reach : cy > n - reach ? n - reach : cy;
+      const dx = fu - cx, dy = fv - cy;
+      let d = Math.sqrt(dx * dx + dy * dy) / rr;
+      if (d > 1.75) continue;
+      if (wob === 2) wob = this.nC.n3(x * this.R / (cell * 0.16) + 3.0, y * this.R / (cell * 0.16), z * this.R / (cell * 0.16) - 5.0) * 0.09;
+      d *= 1 + wob;                                                  // a lumpy outline, never a circle
+      const bowl = d < 1 ? -(1 - Math.pow(d, 2.6)) : 0;
+      const rim = d < 1 ? Math.exp(-(1 - d) * (1 - d) / 0.012) : Math.exp(-(d - 1) * 3.4) * (1 - smoothstep(1.45, 1.75, d));
+      out += (bowl * depth + rim * rimH) * (rr / 0.29);
+    }
+    return out;
   }
 
   // Small tables of rock standing alone (sea stacks, islets of a sky-archipelago): one per
@@ -425,19 +443,19 @@ class Surface {
       shade = face * 0.10;
     } else if (k === 'spires') {
       // wind-carved fins: rows of narrow blades standing along the wind, notched into spires
-      const wl = T.wl || 46, amp = T.amp || 34;
+      const wl = T.wl || 46, amp = T.amp || 12;
       const ax = T.axis || [0.62, 0.30, -0.72];
       const warp = A.n3(X / 170 + 2.0, Y / 170, Z / 170) * 0.9 + C.n3(X / 40, Y / 40, Z / 40) * 0.12;
       const u = (X * ax[0] + Y * ax[1] + Z * ax[2]) / wl + warp;
       const cu = Math.abs(u - Math.floor(u) - 0.5) * 2;
       const env = smoothstep(-0.20, 0.30, A.n3(X / 150 + 7.0, Y / 150, Z / 150 - 3.0));
-      const fin = Math.pow(Math.max(0, 1 - cu / (T.fin || 0.34)), 1.3);
+      const fin = Math.pow(Math.max(0, 1 - cu / (T.fin || 0.55)), 1.6);
       const sp = 0.5 + 0.5 * C.n3(X / 17 + 1.0, Y / 17, Z / 17);
       const hgt = fin * env * (0.30 + 0.70 * sp * sp * 1.6);
       h = 22 + A.n3(X / 800, Y / 800, Z / 800 + 5.0) * 16 + amp * Math.min(1.15, hgt) + C.n3(X / 9, Y / 9, Z / 9) * 0.25;
       t = clamp(0.15 + hgt * 0.8, 0, 1); dry = 0.5; wet = 0.15;
-      grow = 1 - smoothstep(0.04, 0.2, hgt);
-      meadow = grow;
+      grow = 0.25 + 0.75 * smoothstep(0.05, 0.45, hgt);      // the spires stand along the scoured ridges
+      meadow = 1 - smoothstep(0.1, 0.4, hgt);
       shade = smoothstep(0.1, 0.5, hgt) * 0.22;
     } else if (k === 'wetland') {
       this._base(c);
@@ -466,9 +484,9 @@ class Surface {
       const am = 0.35 + 0.65 * smoothstep(-0.45, 0.35, A.n3(X / (wl * 3.1) + 9.0, Y / (wl * 3.1), Z / (wl * 3.1) + 2.0));
       const am2 = smoothstep(-0.25, 0.35, C.n3(X / (wl * 0.8) + 2.0, Y / (wl * 0.8) + 5.0, Z / (wl * 0.8)) + 0.25);
       const swell = A.n3(X / 700, Y / 700, Z / 700);
-      const km = (T.ride == null ? 0.42 : T.ride) * am2 * (1 - 0.75 * lee);
+      const km = (T.ride == null ? 0.42 : T.ride) * am2 * (1 - lee) * (1 - smoothstep(0.45, 0.85, p));   // on the long backs only: the crest stays one clean line
       h = 24 + swell * (T.swell || 30) + amp * am * (0.75 + 0.5 * swell) * p + amp * km * pm + C.n3(X / 8, Y / 8, Z / 8) * 0.10;
-      t = clamp(0.2 + 0.5 * p * am + 0.3 * pm * am2, 0, 1); dry = 0.35; wet = 0.25;
+      t = clamp(0.2 + 0.5 * p * am + 0.3 * pm * am2, 0, 1); dry = 0.16; wet = 0.25;
       shade = Math.max(lee * (0.35 + 0.65 * am), leem * am2 * 0.8) * (T.lee == null ? 0.5 : T.lee);
       meadow = 1 - Math.max(lee, leem);
     } else if (k === 'ridged') {
@@ -480,9 +498,9 @@ class Surface {
       grow = 1 - smoothstep(0.35, 0.6, rd);
       meadow = grow;
     } else if (k === 'crater' || k === 'basin') {
-      const big = this._craters(x, y, z, k === 'crater' ? 430 : 520, k === 'crater' ? 62 : 12, k === 'crater' ? 24 : 6);
-      const sml = this._craters(x + 0.37, y - 0.11, z + 0.23, k === 'crater' ? 150 : 190, k === 'crater' ? 13 : 5, k === 'crater' ? 4.5 : 2.5);
-      const tiny = this._craters(x - 0.21, y + 0.43, z - 0.17, 47, k === 'crater' ? 3.4 : 1.6, k === 'crater' ? 1.3 : 0.7);
+      const big = this._craters(x, y, z, k === 'crater' ? (T.cell || 400) : 520, k === 'crater' ? 58 : 12, k === 'crater' ? 20 : 6, k === 'crater' ? 0.9 : 0.72);
+      const sml = this._craters(x, y, z, k === 'crater' ? 150 : 190, k === 'crater' ? 13 : 5, k === 'crater' ? 4.5 : 2.5);
+      const tiny = this._craters(x, y, z, 47, k === 'crater' ? 3.4 : 1.6, k === 'crater' ? 1.3 : 0.7, 0.5);
       const cr = big + sml + tiny;
       h = 44 + cr + A.n3(x * R / 1300, y * R / 1300, z * R / 1300) * 26 + C.n3(x * R / 14, y * R / 14, z * R / 14) * 0.4;
       t = clamp(0.55 + cr * 0.035, 0, 1); dry = 0.55; wet = 0.12;
@@ -558,7 +576,7 @@ class Surface {
     if (shade > 0) { const kd = shade * 0.9, kg = Math.min(1, shade * 1.7); b.r -= (b.r - b.r * b.r) * kd; b.g -= (b.g - b.g * b.g) * kd; b.b -= (b.b - b.b * b.b) * kd * 0.6; b.r *= 1 - 0.26 * kg; b.g *= 1 - 0.28 * kg; b.b *= 1 - 0.08 * kg; }
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
     if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
-    if (bed > 0) mix3(b, pal.low, bed * 0.6);
+    if (bed > 0) { mix3(b, pal.low, bed * 0.6); if (T.bedPale) { const kb = bed * T.bedPale; b.r += (0.97 - b.r) * kb; b.g += (0.95 - b.g) * kb; b.b += (0.93 - b.b) * kb; } }
     if (T.dusk) { const d = T.dusk; b.r *= 1 - 0.30 * d; b.g *= 1 - 0.30 * d; b.b *= 1 - 0.12 * d; }
     // fog lying in the low ground: the wash thins toward paper below its level
     if (T.fog) { const fk = (1 - smoothstep(T.fog[0] - T.fog[1], T.fog[0] + T.fog[1], h + v * T.fog[1] * 2.5)) * 0.82; b.r += (0.99 - b.r) * fk; b.g += (0.975 - b.g) * fk; b.b += (0.93 - b.b) * fk; wet = wet + (1 - wet) * fk; }
@@ -667,6 +685,20 @@ class Surface {
         } else {
           if (o.lq !== NOLQ && o.lq > o.h - 1) continue;
           cost = Math.hypot(i, j) * 0.05;
+          // room for the ship: level and dry all round, out to 13 m
+          const h0 = o.h;
+          let steep = 0, wetNear = false;
+          for (let a = 0; a < 8 && !wetNear; a++) {
+            const ca = Math.cos(a * Math.PI / 4), sa = Math.sin(a * Math.PI / 4);
+            for (const r of [6.5, 13]) {
+              const e = r / this.R, qx = p[0] + (ux * ca + vx * sa) * e, qy = p[1] + (uy * ca + vy * sa) * e, qz = p[2] + (uz * ca + vz * sa) * e;
+              this.sample(qx, qy, qz, o, false);
+              if (o.lq !== NOLQ && o.lq > o.h - 0.3) { wetNear = true; break; }
+              steep = Math.max(steep, Math.abs(o.h - h0) / r);
+            }
+          }
+          if (wetNear) continue;
+          cost += steep * 60;
         }
         // flatness: compare with neighbours 5 m away
         const e = 5 / this.R, x = p[0], y = p[1], z = p[2];
