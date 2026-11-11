@@ -77,6 +77,13 @@ agent verified it on clean exports and finished it. Everything below was rendere
 export (`tools/export-head.sh`) at the top tier (quality 2), 960 x 540, and **opened** unless
 it says otherwise.
 
+(Relayed for item 3, PHYSICS `1a7ed8c`: add `uPhysBranchClock` to `PHYS`; per-vertex `aBranchId`
+(one number per branch with its foliage, -1 on the trunk) and `aLeaf01`; in the tree shader
+`id = aBranchId < 0 ? -1 : fract(aBranchId + treeHash)`, `pb = pcPhysBend(root, 1.0)`,
+`rel += pcPhysCrown(rel, up, H, root, pb, id, aLeaf01)`, then `pcPhysDisplace`; branches reach
+0.27 H; mid and far tiers may skip it; reference `physics-lab.html?painted=1&crown=0,0`. Strip:
+Earth spawn storm, clock 160 to 170 s, gust front 149 s.)
+
 ### Item 1: verifying block 7 part 1 (tenth agent)
 
 - **Walk** (`node tests/motion.mjs --only walk`, clean export of `20b6bb5`; sheet
