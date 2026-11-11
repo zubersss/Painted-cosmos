@@ -369,7 +369,8 @@ export function createWorld(scene) {
       // night: the sheet lays the night's key over everything (far more pigment in every wash:
       // post.js). The sky's own washes are laid that much lighter here, so that they land on
       // the values the look gives them.
-      const nightK = (1 - dayness) * (1 - space01);
+      // (a wet night under a closed sky is dark enough by its own washes: the key is eased there)
+      const nightK = (1 - dayness) * (1 - space01) * (1 - 0.30 * oc);
       SHEET.night = nightK;
       if (nightK > 0.003) { const k = 0.81 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
       bu.uGlaze.value.copy(tmpKey.glaze);

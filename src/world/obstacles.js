@@ -80,7 +80,9 @@ export function sampleObstaclesPure(bodyId, dx, dy, dz, radius, soft) {
         if (t.data[o + 5] !== U_ROCK) continue;
         const sc = t.data[o + 3];
         if (sc < 0.7) continue;                       // small stones are stepped over
-        add(t.data, o, 0.62 * sc, 0.5 * sc, 'rock');
+        // (the drawn boulder: a blob 0.78 of its scale high, sunk 0.2 to 0.25 of it: its top stands
+        // 0.53 to 0.58 of the scale over the ground beside it; the largest is about 1.2 m)
+        add(t.data, o, 0.62 * sc, 0.58 * sc, 'rock');
       }
     }
   }
