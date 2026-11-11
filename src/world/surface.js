@@ -776,6 +776,8 @@ class Surface {
     if (!best) best = [s0.x, s0.y, s0.z];
     this._spawn = { x: best[0], y: best[1], z: best[2] };
     if (isForest) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 11 });
+    // (a stand of kelp or crystal is opened round the first landing too: the first view is not a wall a metre from the eye)
+    else if (this.biomes[s0.b].tall) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 15 });
     return this._spawn;
   }
 }
