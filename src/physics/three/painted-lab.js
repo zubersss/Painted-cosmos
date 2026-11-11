@@ -51,7 +51,16 @@ painter.setQuality(quality);
 if (Q.has('scale')) painter.setRenderScale(num('scale', 1));
 const physics = createPhysics({ sampleSurface: (id, d) => world.sampleSurface(id, d), seed: Q.has('seed') ? num('seed', 18) : undefined });
 physics.setQuality(Math.min(2, Math.max(0, quality | 0)));
-world.setPhysics(physics);
+// Who draws the kits (P10). The world draws them itself since PAINTER wired them (world.setPhysics builds the
+// kits with PAINTER's own material factory, src/render/kitmat.js: that IS the game's picture of what the physics
+// hands over), so that is the default here. Until P10 this page ALSO built its own set with the stand-in factory
+// below, and every frame from P5 to P9 showed each mark twice, once in each ink.
+//   kits=painter (default)  the world's kits, PAINTER's materials: the game's picture
+//   kits=lab                this page's kits and stand-in materials only (what the physics proposes: the fields
+//                           a material can read, shown used: dust veils by opacity and softness, leaves, spume)
+//   kits=0                  none
+const kitMode = Q.get('kits') === '0' ? 'none' : Q.get('kits') === 'lab' ? 'lab' : 'painter';
+world.setPhysics(physics, { kits: kitMode === 'painter' });
 const root = world.bodies.get(bodyId);
 
 // ---- where and when --------------------------------------------------------------------------------
@@ -307,7 +316,7 @@ const blendRoot = new THREE.Group();
 function buildKits() {
   if (kits) kits.dispose();
   kitMaterials.length = 0; blendScene = null; rainMesh = null;
-  if (Q.get('kits') === '0') { kits = null; return; }
+  if (kitMode !== 'lab') { kits = null; return; }
   kits = createPhysicsKits(physics, {
     makeMaterial: (kind, info) => (kind === 'rain' && rainMode === 'blend' ? makeBlendRain(info) : glazeOn && GLAZED[kind] ? makeGlaze(kind, info) : makeKitMaterial(kind, info)),
     weather: { draw: { ...DRAW_LAB, rain: RAIN[rainMode] || DRAW_LAB.rain }, expand: Q.get('expand') === 'gpu' ? 'gpu' : 'cpu' },
@@ -408,6 +417,9 @@ function info() {
   const counts = {}; for (const k of ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray']) if (P[k].count) counts[k] = P[k].count;
   return { body: bodyId, t: +time.toFixed(1), wx: w.kind, rate: +w.precipitation.rate.toFixed(1), wind: +a.speed.toFixed(1), wet: +w.wetness01.toFixed(2), vis: +w.visibility01.toFixed(2), particles: counts,
     marks: physics.fields.deform.marks.total, sea: physics.fields.water.field.present ? +physics.fields.water.field.height.toFixed(2) : null,
+    // (P10) the sea PAINTER's far-sea gate reads (uPhysWaterSea: Hs, breaking level, edge, whitecap cover), the 10 m wind, what the wind raises
+    seaState: physics.fields.water.field.present ? { Hs: +physics.fields.water.field.significant.toFixed(2), cover: +physics.fields.water.field.cover.toFixed(3), breaking: physics.fields.water.field.foamAt < 1e8, length: +physics.fields.water.field.length.toFixed(1) } : null,
+    u10: +Math.hypot(physics.fields.air.cwe, physics.fields.air.cwn).toFixed(1), blown: r3(physics.here.blown), kitMode,
     kits: kits ? { calls: kits.stats.drawCalls, tris: kits.stats.triangles, verts: kits.stats.vertices, ms: +cost.kits.toFixed(3), cover: r3(kits.weather.stats.cover), size: r3(kits.weather.stats.size) } : null,
     sky: r3(physics.here.sky), hides: { falling: +(w.precipitation.extinction * 24).toFixed(3), dust: +(w.dustExtinction * 24).toFixed(3) },
     frame: { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, internal: painter.info.internalWidth + 'x' + painter.info.internalHeight },

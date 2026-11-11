@@ -71,7 +71,7 @@ export const BLOWN = Object.freeze({
   streamSpeed: 0.55,      // x the 10 m wind: how fast the bands travel downwind
   // Blowing snow: dry snow on the ground is moved like sand, lower and slower (drift.js
   // snowTransport01 says how hard); a ground blizzard is knee deep, a skim in a moderate wind.
-  snowRate: 1.0,          // of the sand capacity per 1.6 s at full transport
+  snowRate: 0.6,          // of the sand capacity per 1.6 s at full transport
   // Leaves: in a breeze a tree lets go of one now and then; the load on a leaf stalk goes with the
   // square of the wind and the share of stalks that fail rises as steeply again with the load, so
   // what is torn off goes with the fourth power of the wind; a gust front (the wind rising) strips
@@ -116,6 +116,7 @@ export class Loose {
     this.surf01 = 0;                     // 0..1: how hard the sea is breaking on a shore near the focus
     this._gustPrev = 0; this._gustRise = 0;
     this._shore = new Float32Array(96).fill(1e9); this._shoreN = 0; this._shoreI = 0;   // places found shallow (surf)
+    this._seaLevel = -1e9;               // the still level of the liquid near the focus (from sea()), for the spray
     this.saltation01 = 0;                // 0..1: how hard sand is blowing at the focus right now
     this._wade = 0;
     this._T = 288;                       // K: air temperature at the focus (frozen ground glazes, warm ground muds)
@@ -394,6 +395,7 @@ export class Loose {
       if (alive === 0) { b.count = 0; continue; }
       const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left, HG = b.hag;
       const turb = K.turb * sigma, puff = K.puff || 0;
+      const seaLevel = this._seaLevel, overSea = name === 'spray' && seaLevel > -1e8;
       for (let i = 0; i < alive; i++) {
         const o = i * 3;
         let x = Pp[o], y = Pp[o + 1], z = Pp[o + 2];
@@ -407,7 +409,10 @@ export class Loose {
           u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
           const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, q = (iv * 4 + iu) * 3;
           const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
-          let hz = y - groundY; hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
+          let hz = y - groundY;
+          // (spray rides the wind over the sea, which may lie below the ground the focus stands on)
+          if (overSea && y - seaLevel > hz) hz = y - seaLevel;
+          hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
           const ih = hz | 0, hf = hfl[ih] + (hfl[ih + 1] - hfl[ih]) * (hz - ih);
           let we = (wp[q] * w00 + wp[q + 3] * w10 + wp[q + 12] * w01 + wp[q + 15] * w11) * hf;
           let wn = (wp[q + 1] * w00 + wp[q + 4] * w10 + wp[q + 13] * w01 + wp[q + 16] * w11) * hf;
@@ -439,6 +444,8 @@ export class Loose {
             let gy = near ? near.heightAt(x, z, NaN) : NaN;
             if (gy !== gy) gy = air.terrain.heightAt(x, z, groundY);
             HG[i] = y > gy ? y - gy : 0;
+            // a drop that falls back into the liquid is gone (it used to sink to the bed, unseen)
+            if (overSea && vy < 0 && near) { const lq = near.liquidAt(x, z); if (lq === lq && lq > gy) { if (y < lq - 0.03) dead = true; else HG[i] = y - lq; } }
             if (y <= gy) {
               if (K.ground === 1 && vy < 0) {
                 // saltation: the grain rebounds with about half its speed at a steeper angle,
@@ -480,7 +487,7 @@ export class Loose {
   streamAt(x, z, time, ue, un, u10) {
     const al = x * ue + z * un - BLOWN.streamSpeed * u10 * time, ac = z * ue - x * un;
     const snake = BLOWN.streamSnake * noise3(al / BLOWN.streamWave, ac / 60, time * 0.03, 911);
-    const v = noise3(al / BLOWN.streamLength, (ac + snake) / BLOWN.streamWidth, time * 0.11, 733);
+    const v = noise3(al / BLOWN.streamLength, (ac + snake) / BLOWN.streamWidth, time * 0.04, 733);     // (a band lasts some ten seconds)
     return smoothstep(0.02, 0.4, v);
   }
 
@@ -501,6 +508,7 @@ export class Loose {
   sea(dt, water, near, fx, fz, cwe, cwn, g, air = null) {
     const h = dt > 0.1 ? 0.1 : dt, P = this.P, rng = this.rng, carry = this._carry;
     this.spume01 = 0; this.surf01 = 0;
+    this._seaLevel = water && water.present ? water.level : -1e9;
     if (!(h > 0) || !water || !water.present || !(water.significant > 0.03)) return;
     const Rr = PARTICLES.radius, capY = PARTICLES.capacity.spray[P.quality];
     const u10 = Math.hypot(cwe, cwn), Hs = water.significant, lvl = water.level;

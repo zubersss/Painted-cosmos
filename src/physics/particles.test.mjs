@@ -440,3 +440,30 @@ test('rings near the focus: in a downpour there are enough of them alive within 
   const E = s.physics.particles.events;
   for (let k = 0; k < E.capacity; k++) { const o = k * 8; if (E.data[o + 4] > 0) assert.ok(Math.abs(len(V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2])) - s.R - 2) < 0.3, 'on the water'); }
 });
+
+test('a ground blizzard (P10): in a blizzard the wind moves the snow along the ground: a skim of hopping grains, the powder over it, both of snow, both low', async () => {
+  const { MATERIAL_INDEX } = await import('./ground.js');
+  const w = rainy('earth', { pred: (x) => x.kind === 'blizzard' });
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 8);
+  const P = w.physics.particles, skim = P.sand, powder = P.dust, U = Math.hypot(w.physics.fields.air.cwe, w.physics.fields.air.cwn);
+  assert.ok(U > 9, 'a blizzard blows: ' + U.toFixed(1) + ' m/s');
+  assert.ok(w.physics.here.blown.snow > 0.5, 'blown.snow ' + w.physics.here.blown.snow);
+  assert.ok(skim.count > 150 && powder.count > 20, `the skim ${skim.count}, the powder ${powder.count}`);
+  const hs = []; let along = 0;
+  const fr = w.physics.fields.frame, G = w.physics.fields.air, ue = G.cwe / U, un = G.cwn / U;
+  for (let i = 0; i < skim.count; i++) {
+    assert.equal(skim.mat[i], MATERIAL_INDEX.snow, 'the skim is snow'); hs.push(skim.hag[i]);
+    const ve = skim.vel[i * 3] * fr.ex + skim.vel[i * 3 + 1] * fr.ey + skim.vel[i * 3 + 2] * fr.ez, vn = skim.vel[i * 3] * fr.nx + skim.vel[i * 3 + 1] * fr.ny + skim.vel[i * 3 + 2] * fr.nz;
+    if (ve * ue + vn * un > 0.5) along++;
+  }
+  hs.sort((a, b) => a - b);
+  assert.ok(hs[hs.length >> 1] < 0.35 && hs[Math.floor(hs.length * 0.95)] < 1.2, `knee deep at most: median ${hs[hs.length >> 1].toFixed(2)} m, 95 % under ${hs[Math.floor(hs.length * 0.95)].toFixed(2)} m`);
+  assert.ok(along > skim.count * 0.85, 'going downwind: ' + along + ' of ' + skim.count);
+  let high = 0; for (let i = 0; i < powder.count; i++) { assert.equal(powder.mat[i], MATERIAL_INDEX.snow); if (powder.hag[i] > 3) high++; }
+  assert.ok(high < powder.count * 0.1, 'the powder stays low: ' + high + ' of ' + powder.count + ' over 3 m');
+  // where no snow lies, or in a light wind, there is none (a fair day at the test place)
+  const calm = rainy('earth', { pred: (x) => x.kind === 'clear' });
+  calm.physics.warmUp({ bodyId: calm.bodyId, time: calm.t0, focus: calm.focus }); run(calm, 3);
+  assert.equal(calm.physics.here.blown.snow, 0);
+});

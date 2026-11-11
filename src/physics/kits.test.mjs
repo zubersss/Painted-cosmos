@@ -511,3 +511,86 @@ test('dust in a storm: low level veils, wider than high, instead of round puffs 
   }
   assert.ok(worst < 0.5, `largest step in width: ${worst} m`);
 });
+
+// ---- P10: the marks pushed for quality (leaves, veils, driving snow, the skim of blowing sand) -------------
+test('a leaf is a thin mark, not a ball: never broader than a third of its length, a line when edge-on, turning and tumbling as it flies', async () => {
+  const { expandDabs: ED } = await import('./three/expand.js');
+  const eye = makeEye(); eye.pix = 0;
+  const D = { ...DRAW.leaves, ...DRAW_PAINTED.leaves, minPx: 0, fadeIn: 0, fadeOut: 0, near: 0 };
+  const n = 400, list = Array.from({ length: n }, (_, i) => ({ p: [(i % 20) - 10, (i % 7) - 3, -15], v: [6, -1, 0], size: 1e-4 + i * 3.1e-7, age: 2 }));
+  const b = buf(list), o = new Float32Array(n * 12);
+  const shape = (q) => { const a = len(sub(V(o, q * 4 + 1), V(o, q * 4))), c = len(sub(V(o, q * 4 + 3), V(o, q * 4))); return [Math.max(a, c), Math.min(a, c), sub(V(o, q * 4 + 1), V(o, q * 4))]; };
+  ED(b, D, eye, o);
+  let thin = 0, widest = 0; const first = [];
+  for (let q = 0; q < n; q++) { const [L, S, dir] = shape(q); assert.ok(Math.abs(L - D.size) < 1e-6, 'its length is its own: ' + L); widest = Math.max(widest, S / L); if (S / L < 0.12) thin++; first.push([S / L, Math.atan2(dir[1], dir[0])]); }
+  assert.ok(widest <= D.aspect + 1e-6, 'never broader than 1 in 3: ' + widest);
+  assert.ok(thin > n * 0.1, 'some are seen edge-on: ' + thin + ' of ' + n);
+  // a third of a second later each has turned in the picture and shows another face
+  for (let i = 0; i < n; i++) b.age[i] = 2.33;
+  ED(b, D, eye, o);
+  let turned = 0, faced = 0, cw = 0;
+  for (let q = 0; q < n; q++) { const [L, S, dir] = shape(q); const da = Math.atan2(dir[1], dir[0]) - first[q][1], w = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(w) > 0.15) turned++; if (w < 0) cw++; if (Math.abs(S / L - first[q][0]) > 0.03) faced++; }
+  assert.ok(turned > n * 0.8 && faced > n * 0.6, `turning ${turned}, tumbling ${faced} of ${n}`);
+  assert.ok(cw > n * 0.3 && cw < n * 0.7, 'some one way, some the other: ' + cw);
+});
+
+test('dust is handed over as veils: opacity most at the ground and thinning upward, softer upward and in a storm, coming and going with the mark', async () => {
+  const { expandVeils } = await import('./three/expand.js');
+  const D = { ...DRAW.dust, ...DRAW_PAINTED.dust }, eye = makeEye();
+  const hs = [0, 0.5, 1, 2, 3, 6], b = buf(hs.map((h, i) => ({ p: [i, h, -10], v: [9, 0, 0], size: 1e-5 * (i + 1), age: 5 })));
+  b.hag = Float32Array.from(hs); b.left = new Float32Array(hs.length).fill(9);
+  const o = new Float32Array(hs.length * 12);
+  eye.wall01 = 0; assert.equal(expandVeils(b, D, eye, o), hs.length);
+  for (let i = 0; i < hs.length; i++) { for (let k = 1; k < 4; k++) assert.equal(o[i * 12 + k * 3], o[i * 12], 'the same on its four vertices'); assert.equal(o[i * 12 + 2], 0, 'a puff in clear air'); }
+  for (let i = 1; i < hs.length; i++) assert.ok(o[i * 12] <= o[(i - 1) * 12] + 1e-6 && o[i * 12 + 1] >= o[(i - 1) * 12 + 1] - 1e-6, 'thinner and softer upward');
+  assert.ok(Math.abs(o[0] - D.veilLow) < 1e-6 && Math.abs(o[5 * 12] - D.veilHigh) < 1e-6 && o[5 * 12 + 1] === 1, `ground ${o[0]}, aloft ${o[5 * 12]}`);
+  const soft0 = o[1];
+  eye.wall01 = 0.9; expandVeils(b, D, eye, o);
+  assert.ok(o[2] === 1 && o[1] > soft0, 'in a storm: a streamer, softer than a puff');
+  // newborn and dying marks hide nothing (they come and go, they do not pop)
+  b.age[0] = 0; b.left[1] = 0; expandVeils(b, D, eye, o);
+  assert.ok(o[0] === 0 && o[12] === 0 && o[24] > 0.3);
+  // and in the storm there are many low veils, not a few blots: six in ten marks, each far wider than high
+  assert.ok(D.wallShare >= 0.5 && D.wall >= 8 && D.wallHigh <= 1.2 && D.veil);
+});
+
+test('driving snow: in 19 m/s a flake is a level stroke, not a dot and not taken away; the snow comes in bands that travel with the wind', () => {
+  const eye = makeEye(); eye.pix = 0.002; eye.radius = 8;
+  const D = { ...DRAW.snow, ...DRAW_PAINTED.snow, fadeIn: 0, fadeOut: 0, near: 0, cell: 0 };
+  const n = 3000, U = 19;
+  const list = Array.from({ length: n }, (_, i) => ({ p: [((i * 7919) % 1000) / 1000 * 14 - 7, ((i * 104729) % 1000) / 1000 * 4 - 2, -4 - ((i * 1299709) % 1000) / 1000 * 3], v: [U, -1, 0], size: 1e-4 + i * 2.9e-7, age: 3 }));
+  const b = buf(list), o = new Float32Array(n * 12);
+  const along = (q) => sub(V(o, q * 4 + 1), V(o, q * 4)), across = (q) => sub(V(o, q * 4 + 3), V(o, q * 4));
+  eye.band01 = 0; expandDabs(b, D, eye, o);
+  let drawn = 0, level = 0, longest = 0;
+  for (let q = 0; q < n; q++) { const a = along(q), l = len(a), s = len(across(q)); if (l < 1e-4 || s < 1e-4) continue; drawn++; longest = Math.max(longest, l); if (l > 3 * s && Math.abs(a[1]) < 0.12 * l) level++; }
+  assert.ok(drawn > n * 0.5, 'the flakes are there: ' + drawn + ' of ' + n);
+  assert.ok(level > drawn * 0.9 && longest > 0.25, `level strokes: ${level} of ${drawn}, the longest ${longest.toFixed(2)} m`);
+  // (with the old limit of three flake sizes the same flakes were taken away as hairlines)
+  const o3 = new Float32Array(n * 12); expandDabs(b, { ...D, streak: 3 }, eye, o3);
+  let old = 0; for (let q = 0; q < n; q++) if (len(sub(V(o3, q * 4 + 3), V(o3, q * 4))) > 1e-4) old++;
+  assert.ok(old < drawn * 0.5, 'the old table drew ' + old);
+  // bands: where the pattern is thin most flakes are not drawn; a flake carried with the wind keeps its place in it
+  // (over a field many bands wide, with no least size, so that only the bands thin anything)
+  const m = 6000, Db = { ...D, minPx: 0, maxPx: 0 };
+  const wide = buf(Array.from({ length: m }, (_, i) => ({ p: [((i * 7919) % 1000) / 1000 * 120 - 60, ((i * 104729) % 1000) / 1000 * 4 - 2, -4 - ((i * 1299709) % 1000) / 1000 * 80], v: [U, -1, 0], size: 1e-4 + i * 2.9e-7, age: 3 })));
+  const ob = new Float32Array(m * 12), oc = new Float32Array(m * 12);
+  const width = (a, q) => len(sub(V(a, q * 4 + 3), V(a, q * 4)));
+  eye.pix = 0; eye.radius = 0; eye.band01 = 1; eye.bandWe = 1; eye.bandWn = 0; eye.bandE = 0; eye.bandN = 0;
+  expandDabs(wide, Db, eye, ob);
+  let kept = 0; for (let q = 0; q < m; q++) if (width(ob, q) > 1e-4) kept++;
+  assert.ok(kept > m * 0.45 && kept < m * 0.75, `banded: ${kept} of ${m} (bands ${D.bands}: between 1 - bands and all of them, half and half)`);
+  const dt = 0.5; for (let i = 0; i < m; i++) wide.pos[i * 3] += U * dt;      // east is +x in makeEye
+  eye.bandE = U * dt; eye.x = U * dt;                                          // (the eye goes along too, so only the bands could change a mark)
+  expandDabs(wide, Db, eye, oc);
+  let moved = 0; for (let q = 0; q < m; q++) if (Math.abs(width(oc, q) - width(ob, q)) > 1e-4) moved++;
+  assert.equal(moved, 0, 'a flake stays in its band while both are carried along');
+});
+
+test('blowing sand is a skim: its strokes lie along the ground whatever the grain is doing', () => {
+  const eye = makeEye(); eye.pix = 0.002;
+  const D = { ...DRAW.sand, ...DRAW_PAINTED.sand, fadeIn: 0, fadeOut: 0, near: 0, minPx: 0 };
+  const b = buf([{ p: [0, 0.1, -8], v: [3, 4, 0], size: 1e-4, age: 1 }, { p: [1, 0.1, -8], v: [3, -4, 1], size: 2e-4, age: 1 }]), o = new Float32Array(24);
+  assert.ok(D.level); expandStreaks(b, D, eye, o);
+  for (let q = 0; q < 2; q++) { const head = V(o, q * 4), tail = V(o, q * 4 + 3), mid0 = [(V(o, q * 4)[1] + V(o, q * 4 + 1)[1]) / 2, (V(o, q * 4 + 2)[1] + V(o, q * 4 + 3)[1]) / 2]; assert.ok(Math.abs(mid0[0] - mid0[1]) < 1e-3, 'level: ' + mid0); assert.ok(len(sub(head, tail)) > 0.3); }
+});
