@@ -36,9 +36,9 @@ the game sounds.
 
 | Item | Owner | Status | Verified how, by whom |
 | --- | --- | --- | --- |
-| Full solar-system flight, pulse drive, markers | Pilot | DONE (markers are DOM rings until the painted theme) | Lead: `tests/pulse.test.mjs`, `node tests/trip.mjs` (47 checks) |
+| Full solar-system flight, pulse drive, markers | Pilot | DONE (markers are brushed ink rings with lettered names since the painted theme) | Lead: `tests/pulse.test.mjs`, `node tests/trip.mjs` (47 checks) |
 | Landing anywhere | Pilot | DONE: 40 of 40 scripted landings on ten bodies in the contract test; a wider survey of 240 spots lands 235, and the 5 refusals say why on screen | Lead: `tests/contract.test.mjs`; survey in Pilot's notes |
-| Planet map, save | Pilot | DONE (fallback look) | Lead: the trip (click sets the course; a reload continues from the save) |
+| Planet map, save | Pilot | DONE (painted theme) | Lead: the trip (click sets the course; a reload continues from the save) |
 | Physics wired in | Pilot + Physics | DONE on Pilot's side | Lead: `tests/physics.test.mjs`; play-through and trip with Physics on |
 | Frame read-out for the owner | Pilot | DONE (` key, `?stats=1`; now with the worst `world.update` frame) | Lead: the trip checks it shows numbers |
 | All eight planets with 4+ biomes each | Painter | PART: every body has 4+ biomes with their own palette, liquid and kits and can be walked; the named landform is missing or weak in many (the coordinator's and Painter's own tables); third pass in progress | Lead: review 4 will judge every tour sheet |
@@ -54,11 +54,11 @@ the game sounds.
 | Sketchbook and vistas | Pilot | DONE: views found on foot; a sketch of the painted frame for every landscape walked and view found, shown as it is made, kept beside the save; a page per world with empty frames for what is left | Lead: `tests/sketches.test.mjs`, `node tests/m3check.mjs` (26 checks) |
 | Audio, all procedural | Pilot | DONE and measured: 22 situations rendered through the game's graph; no clipping, no DC, no clicks, peak -5.3 dBFS; rain follows what falls and what it falls on; footsteps by ground. Nobody has heard it | Lead: `node tests/audiocheck.mjs` |
 | Title screen, help card | Pilot | DONE: the title card is the loading screen; legible; H shows it again | Lead: frames at 960x540 and 640x360, `m3check` |
-| HUD | Pilot | PART: prompt, gauges, read-out, notice, markers, look hint, sketch slip, all legible on paper slips; the painted theme is being built | Lead: evidence frames |
-| Painted UI theme (art bible 8): torn paper, ink icons, hand lettering, painted markers, cursor, loading | Pilot (moved from Painter by the coordinator, 2026-11-11) | see Pilot's notes for its state; look to be reviewed by Painter | Lead: frames in `docs/shots/pilot/` |
+| HUD | Pilot | DONE in the painted theme (see the next row): prompt, gauges, read-out, notice, markers, look hint, sketch slip; legible on a pale wash and on indigo | Lead: `ui-flight.jpg`, `ui-space.jpg` |
+| Painted UI theme (art bible 8): torn paper, ink icons, hand lettering, painted markers, cursor, loading | Pilot (moved from Painter by the coordinator, 2026-11-11) | PART: first pass in and used everywhere (title and help card, HUD slips, prompt, gauges, markers, map, sketchbook): generated cold-press paper with torn edges, a stroke font drawn in code, ink keycaps and rings, brush-tip cursor, loading dabs; static, so no shimmer; the frame read-out stays plain type on purpose. Waiting for Painter's review of the look | Lead: `docs/shots/pilot/ui-*.jpg` (six frames at 960x540), `m3check`, play-through |
 | Performance tiers and dynamic resolution | Pilot | PART: controller unit-tested; starts at tier 1 and scale 0.75 and climbs; never run on a real GPU | Lead: `tests/dynres.test.mjs`, `m3check` |
-| Touchdown on the landing legs | Pilot + Physics | TODO: recipe complete in Physics' notes; plan in Pilot's handover | |
-| Gamepad ("if cheap") | Pilot | TODO: plan in Pilot's handover | |
+| Touchdown on the landing legs | Pilot + Physics | DONE: the assist hands the hull to the gear a metre up; 0.6 m/s sink, three feet down, asleep within 5 s on Earth, the Moon and Jupiter; 40 landings and the 240-spot survey unchanged | Lead: `tests/physics.test.mjs`, `tests/contract.test.mjs`, play-through with Physics (0.80 m/s) |
+| Gamepad ("if cheap") | Pilot | DONE with a simulated pad (never a real one): standard layout, analog sticks, the same keys | Lead: `tests/gamepad.test.mjs`, `m3check` |
 | Freeze-frame tour of every biome and every vista on every body | Lead | DONE as an instrument: `node tests/tour.mjs` writes `docs/lead/evidence/tour-<body>.jpg` and `.json`; says on the sheet what did not settle, who stands in liquid, what each frame cost | Lead: sheets |
 | Weather in the picture: sky, haze, ground and water reading `setMood.sky`, then Physics' draw kits | Painter (+ Physics kits) | TODO: Painter's first M3 block. Physics side is ready: eleven sky numbers, kits inside the budget, ink per ground material, the sea as a chunk | Lead: Physics' tests (190) and lab frames |
 | Motion (wind, water, day-night), space washes, art pass on the weakest biome of every planet | Painter | TODO | |
@@ -83,7 +83,7 @@ stays relative. Only when the coordinator says so, and only once.
 | Every frame along the way passes the freeze-frame test | TODO: the home forest passed (review 2); the other 40 biomes, the vistas, orbit, space, night, weather and the interface have not. The tour is the instrument; review 4 is the first full judgement |
 | No console errors | DONE for every scripted run so far (they fail on any) |
 | The frame-rate target holds (60 fps at 1080p on an integrated GPU, never under 30) | RISK: cannot be measured here. Triangle and draw-call budgets are set and policed; dynamic resolution and three tiers exist; the read-out is there for the owner |
-| The README lists the controls | DONE (to be extended when the gamepad and the theme land) |
+| The README lists the controls | DONE (keyboard, mouse and gamepad) |
 
 ## Risks and what is off track
 

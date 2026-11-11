@@ -65,6 +65,55 @@ Interim finding for PAINTER, measured during this run (no need to wait for revie
 `world.busy` does not reach 0 on the committed state (item 3). If the fix is in your working
 tree, say in your notes which commit carries it.
 
+---
+
+## Interim notes: 2026-11-11, second PILOT agent (not a milestone review)
+
+What I ran is in `docs/notes/pilot.md` ("Ground truth"): every check on clean exports, the
+painted play-through and trip, a landing survey of 240 spots, and the new tour on Earth.
+
+### PAINTER (interim: your pass has not been reported, so nothing here is a verdict)
+
+Seen on the tour sheet of Earth taken from your committed work-in-progress (export of
+`a46647f`, 960x540, quality 1; the sheet is in my scratch, not in the repo, because it is not
+your reported state):
+- Better than the frames the coordinator turned down: `desert_canyon` now faces a banded wall
+  with a mesa behind it, `alpine_meadow` has a mountain, `sea_coast` has cliffs round a cove,
+  and the easels put the camera where the landform is. Keep going this way.
+- **Nothing settled**: `world.busy` stood at 65 to 412 after 90 s in all eight frames on foot
+  (it reached 0 in 7.6 s from orbit). This will be a MUST FIX in review 4 if it is still so.
+- From orbit the globe is covered in hard-edged white patches with a ring of dashes round the
+  limb: it reads as torn paper rather than cloud and rim. Look at it before you report.
+- Cost was inside the budget in every frame (165 k to 420 k triangles, 118 to 244 calls), but
+  on unsettled frames that proves little.
+
+### PHYSICS
+
+No MUST FIX. Used this run exactly as written in your notes: the touchdown recipe (the gear
+takes the last metre: 0.6 m/s sink, three feet down and asleep within 5 s on Earth, the Moon
+and Jupiter, `tests/physics.test.mjs`), `sky.rain`, `cover.canopy01`,
+`particles.system.dripping`, `thunderIn` / `thunder01` and `st.phys.material` for the sound.
+Your reading of the flight pace is right (the giants and Earth within 10 m/s): leave the
+envelope, let the wind tell the giants apart; I will take a proposal when you have flown it.
+
+### PILOT (self-review of this run; the other roles and the coordinator review this domain)
+
+Added: the sketchbook's sketches, the measured and retuned sound, the painted interface
+(paper, lettering, ink markers, cursor), touchdown on the legs, a gamepad, a tour that stands
+where the game sends the player. Weak or unverified, bluntly:
+- The interface theme is a first pass by someone who is not the painter. The lettering is
+  neat rather than beautiful (one weight, no thick-and-thin), the paper slips cast a drop
+  shadow that a real sheet on a painting would not, the icons are only four. PAINTER's call.
+- The sound is measured, not heard. Timbres are still guesses (the ship is two oscillators).
+- The gamepad has only met a simulated pad.
+- The painted trip failed once on Saturn because E was pressed just as the prompt went out;
+  fixed with hysteresis and a spoken reason; the re-run's result is in my notes.
+- Sketches are 192x108: charming at thumbnail size, soft if ever shown larger.
+- Planet markers and all HUD slips are DOM over the canvas: they do not get the painting's
+  own paper grain or the ragged border treatment of the frame itself.
+
+---
+
 ## Review 3: 2026-11-11, at commit `22a10c3` (Painter's `ff51af7` and `1e1801e`, Physics' P2 work in progress)
 
 Short pass, during M2. What I ran:

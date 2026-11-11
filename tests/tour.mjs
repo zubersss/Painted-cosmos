@@ -1,7 +1,8 @@
 // The freeze-frame tour: the lead's instrument for "every frame passes the freeze-frame test".
 // In the integrated game, for every body:
 //   - stand in every biome, on dry and gentle ground of that biome (the world's own place for
-//     it, checked here, and moved to the nearest standable spot if it is not one);
+//     it, checked here, and moved to the nearest standable spot if it is not one); when that
+//     place is the painter's easel the frame is taken in first person, facing as the painter did;
 //   - stand at every vista (world.getVistas): the views the game sends the player to, facing
 //     the way the painter faced when the world says so (yaw, pitch);
 //   - look at the body from orbit, from the ship.
@@ -145,7 +146,10 @@ async function measure() {
 
 async function capture(body, pl) {
   const t0 = Date.now();
-  await page.evaluate(({ b, pl, hour }) => { window.__pc.teleport({ body: b, dir: pl.dir, hour, heading: pl.heading == null ? undefined : pl.heading, lookPitch: pl.lookPitch == null ? undefined : pl.lookPitch }); }, { b: body, pl, hour: Number(opt.hour) });
+  // A biome frame taken from the painter's own easel is the picture as it was painted: first
+  // person, nothing in the way. Every other frame is third person, as the player arrives.
+  const easel = pl.kind === 'biome' && pl.heading != null;
+  await page.evaluate(({ b, pl, hour, easel }) => { window.__pc.teleport({ body: b, dir: pl.dir, hour, heading: pl.heading == null ? undefined : pl.heading, lookPitch: pl.lookPitch == null ? undefined : pl.lookPitch, firstPerson: easel }); }, { b: body, pl, hour: Number(opt.hour), easel });
   const settled = await settle();
   await page.waitForTimeout(900);                 // let the explorer come to rest and the read-out count a frame
   const m = await measure();
@@ -191,6 +195,7 @@ async function writeSheet(body, frames) {
     const what = f.kind === 'biome' ? `biome <b>${esc(f.id)}</b>` : f.kind === 'vista' ? `vista <b>${esc(f.name)}</b>` : '<b>from orbit</b>';
     const bits = [];
     if (f.alsoVista) bits.push(`also the vista "${esc(f.alsoVista)}"`);
+    if (f.kind === 'biome' && f.heading != null) bits.push('from the easel, first person');
     if (f.moved) bits.push(`moved ${f.moved} m from the world's place to stand on dry, gentle ground${f.otherBiome ? ' (of ' + esc(f.otherBiome) + ')' : ''}`);
     if (f.file) bits.push(f.settled == null ? '' : `settled in ${f.settled} s`, `${k(f.tris)} triangles, ${f.calls} draw calls`, `world.update worst ${f.worldWorstMs} ms`);
     const flags = (f.flags || []).map((x) => `<span class="bad">${esc(x)}</span>`).join(' ');

@@ -30,7 +30,7 @@ in Node and the real page in headless Chromium; `window.__pc` is the debug door 
 
 **Every check** (run all of them before claiming anything; numbers from this run are under
 "Ground truth"):
-`node --test tests/*.test.mjs` (98), `node --test src/physics/`, `node --test src/world/*.test.mjs`,
+`node --test tests/*.test.mjs` (102), `node --test src/physics/`, `node --test src/world/*.test.mjs`,
 `node tests/playthrough.mjs` (add `--query "stub=render,world,art&fresh=1"` for PHYSICS on,
 `--query "scale=0.5&quality=0&fresh=1" --w 400 --h 225` run from a clean export for the painted
 world), `node tests/trip.mjs` (painted: `--query "scale=0.5&quality=0" --w 400 --h 225`; do
@@ -46,23 +46,18 @@ two browser runs at once on this machine make each other flaky.
 1. *Review 4* (lead), when the coordinator says PAINTER has reported: what to measure is
    written at the top of `docs/lead/REVIEW.md` ("Review 4: what will be measured"). The tour
    is ready for it. M2 as a whole closes when review 4 has no MUST FIX.
-2. *The painted UI theme is PILOT's now* (coordinator ruling, 2026-11-11): art-bible rule 8,
-   built under `src/ui/**`, all in code: torn paper panels with grain, ink-and-wash icons,
-   hand-lettered type (a stroke font, not a system italic), painted planet markers, a painted
-   cursor and loading state, the sketchbook pages. Legible on paper and on indigo; no shimmer.
-   Colours from `src/data/looks.js`. Evidence frames go in `docs/shots/pilot/`; PAINTER reviews
-   the look in its notes and I change what it asks. State of it: see "Status".
-3. *Touchdown on the legs*: the landing assist still sets the hull on the floor and then hands
-   it to the gear (`stepLanding` in `flight.js`, `Sim.stepParked`). The complete recipe is in
-   `docs/notes/physics.md` ("Open on your side"). Plan: in `Sim.step` (LANDING), when
-   `stepLanding` reports the hull about 1 m up over a dry site, switch to
-   `physics.ship.gear(sh, { lift01: 1, hold: up * -0.6 })` until `sh.phys.contacts > 0`, then
-   dispatch touchdown with `sh.lift01 = 1` (`stepParked` already fades it over 1.5 s). Afloat
-   and without PHYSICS keep today's path. Re-run `tests/contract.test.mjs` (40 landings).
-4. *Gamepad* ("if cheap" in the brief): not started. Plan: a pure `src/core/gamepad.js` that
-   turns `navigator.getGamepads()[0]` into the same axes, held keys and edges `Input` already
-   gives (left stick WASD, right stick look, A Space, B C, X E, Y V, LB X, RB F, triggers
-   throttle in the ship and run on foot, Back M, Start H, d-pad up B), polled in `Input.take`.
+2. *The painted UI theme is PILOT's* (coordinator ruling, 2026-11-11; art-bible rule 8). A
+   first pass is in and used everywhere: `src/ui/paint.js` (paper tile, torn-edge filters,
+   `ink()` lettering into an element, `inkOnCanvas`, `ringPath`, `iconSvg`, cursor),
+   `src/ui/lettering.js` (the stroke font: glyph table `G`, `letterPath`), `src/ui/theme.css`
+   (layout and the paper look). What is left: PAINTER's review of the look (frames
+   `docs/shots/pilot/ui-*.jpg`; change what it asks), more icons, lettering with thick and
+   thin, the frame read-out (plain type on purpose), and anything the painted frames show.
+   To letter new text: `ink(el, text, SIZE.body)`; never set `textContent` on HUD elements.
+3. *Flight pace per world*: PHYSICS will fly it and may propose a wider spread for the giants;
+   the lever is `env.speedScale` in `Sim.flightEnv`.
+4. *A real gamepad and a real mouse*: the mapping (`src/core/gamepad.js`) and pointer lock
+   have only met simulated devices.
 5. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
    `planSpeedChange` once the painted pulse effect exists to judge it against.
 6. *M4*: critique swap, every check, one pull request `cosmos` -> `main` through the REST API
@@ -144,6 +139,37 @@ open until review 4. M3: my half in place and extended (below). I am also the LE
 - **Landing**: the prompt keeps 15 m and 10 m/s of hysteresis so it does not flicker over
   rough ground; E without the prompt says "Come down below 90 m to land" or "Slow down to
   land" instead of nothing.
+- **Touchdown on the legs** (Handover item 4 of the first agent, PHYSICS' recipe): the
+  assist brings the hull to 1.0 m over a dry site, then `physics.ship.gear` lets it down at
+  0.6 m/s on a weightless lift until a foot touches; the state becomes LANDED there and the
+  lift fades over 1.5 s while the legs take the weight (`Sim.beginLandingGear`,
+  `stepLandingGear`, `LEGS` in `sim.js`; `stepLanding` returns `'gear'`). No foot starts in
+  the ground (the hull is lifted clear of a bank first). Afloat and without PHYSICS the old
+  path stays. Verified: `tests/physics.test.mjs` on Earth, the Moon and Jupiter (sink 1.5 m/s
+  or less, three feet down, asleep within 5 s, legs inside their travel, upright, step out);
+  40 landings in the contract test; survey 235 of 240 as before (median 6.4 s); the browser
+  play-through with PHYSICS touched down at 0.80 m/s.
+- **Gamepad** (`src/core/gamepad.js`, pure; polled in `Input.take`): left stick walks (analog;
+  in the ship turn and throttle), right stick looks, A Space, B C, X E, Y V, LB X, RB F,
+  triggers throttle in the ship and RT runs on foot, L3 run, Back M, Start H, d-pad up B,
+  left and right turn pages, down closes. `Input.axis` is analog now. Verified:
+  `tests/gamepad.test.mjs` (3) and `m3check` with a simulated pad (walked 5.7 m at 4.2 m/s,
+  opened and closed the sketchbook). Never tried with a real pad.
+- **The painted interface** (coordinator's ruling: mine now). Everything the player reads is
+  painted in code: panels and slips are torn cold-press paper (a 192 px tile of mottled,
+  toothed paper generated on a canvas; edges torn by an SVG turbulence displacement on the
+  slip's backing, so the lettering stays crisp); all text is hand lettering from a stroke
+  font drawn in code (76 glyphs, each a few pen strokes; curves through the points; a fixed
+  wobble per letter and place, so nothing shimmers); keys are ink keycaps; gauges are a wash
+  in a pencilled bar with an ink-and-wash icon; planet markers are one pull of a brush
+  (paper-white over a thin ink line) with the name on a slip; the cursor is a brush-tip
+  cross; loading is three dabs laid two a second. Colours come from `src/data/looks.js`
+  (`PAPER`, indigo, sepia, burnt sienna). The frame read-out stays plain type (an instrument).
+  The stylesheet is `src/ui/theme.css` (`fallback.css` is gone). Verified: six frames at
+  960x540 in `docs/shots/pilot/` (`ui-title`, `ui-foot`, `ui-book`, `ui-flight`, `ui-space`,
+  `ui-map`), read at full size: legible on a pale wash and on indigo; `m3check`, play-through
+  and lock check pass with it. Not verified: PAINTER has not reviewed the look; no frame
+  over the painted world at 960x540 yet (see "Ground truth" for the run in progress).
 
 ### Audio, measured (OfflineAudioContext through the game's graph; 44.1 kHz; last 8 s)
 
