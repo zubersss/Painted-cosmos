@@ -165,13 +165,10 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   const inAir = env.hasBody && env.altitude < env.spaceAlt;
   const tau = mix(T.tauSpace, T.tauAtmo, inAir ? 1 : 0) * (input.cut ? T.brakeFactor : 1);
   let v;
-  // In vacuum the drive field that makes the pulse possible is also the brake: asking for much
-  // less speed than the ship has (X, or throttling down) sheds it at the kinematic rate. The
-  // body model's retro thrusters (10 m/s^2) would take over a minute from cruise, and "let go
-  // and it stops" is the promise of this ship. Acceleration and all flight in air stay with
-  // the body model.
-  const fieldBrake = !inAir && (input.cut || dot(st.v, f) > st.throttle * vmax + 60 || len(st.v) > vmax + 60);
-  const body = env.shipBody && !st.liftoff && env.pulseSpeed == null && !fieldBrake ? env.shipBody : null;
+  // In vacuum the drive field that makes the pulse possible is also the brake (PHYSICS'
+  // `cmd.brake`): it sheds the speed the 14 m/s2 retro thrusters cannot, so X or throttling
+  // down stops the ship in seconds, not minutes. Flight in air stays on thrusters alone.
+  const body = env.shipBody && !st.liftoff && env.pulseSpeed == null ? env.shipBody : null;
   if (env.pulseSpeed != null) {
     // Pulse drive: the speed is the drive's, the direction is the nose.
     v = add(st.v, scale(sub(scale(f, env.pulseSpeed), st.v), damp(5, dt)));
@@ -193,7 +190,7 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     // the speed, so steering stays arcade while every change of speed keeps its mass.
     // (PHYSICS' suggestion, taken: no carve at low speed, where a little slide reads as weight;
     // full carve at speed, where thrusters alone would feel like ice.)
-    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: smoothstep(40, 120, st.speed) }, dt, env);
+    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: smoothstep(40, 120, st.speed), brake: inAir ? 0 : 1 }, dt, env);
     v = { x: st.v.x, y: st.v.y, z: st.v.z };
     st.p = p0;
   } else {

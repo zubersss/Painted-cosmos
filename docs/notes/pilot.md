@@ -156,8 +156,9 @@ objects in their notes.
       the cushion allows, `tau` drops to 0.22 s so the computer closes the error at once.
       The cushion now also plans with a deceleration (6.5 m/s2) at any height, because a hull
       with mass needs room to stop.
-    - Assist of my own in vacuum: X or throttling down brakes with the drive field at the
-      kinematic rate (the retro thrusters alone would need over a minute from cruise).
+    - In vacuum X or throttling down brakes with the drive field: PHYSICS' `cmd.brake: 1`
+      (up to 160 m/s2, only ever slowing), which replaced my own special case. In air the
+      brake is off and the ship stops on its thrusters.
     - Parked ship: `stepShipGear` (legs settle the hull, then sleep). Landing sites: friction
       (`tan(slope) < 0.8 x ground friction`) instead of `landMaxSlope`. Afloat: my own rest.
     - Lift-off, the landing assist's glide and descent, and the pulse drive are still mine.
