@@ -813,3 +813,32 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   better painting; (2) PHYSICS's picture critiques (the storm's ground loses its sun, the
   blizzard needs figure and ground, dust as a soft glaze, a swell line and white horses on
   Neptune); (3) the far-world pop and fade; (4) the lead's remaining SHOULD FIX list.
+- 2026-11-11: **PHYSICS P9 accepted (sixth agent; `9667015` legs, `f6d0a29`, `9b708e2`)**.
+  The coordinator re-ran on a clean export of the head: `node --test src/physics/` 230 pass,
+  `node --test tests/*.test.mjs` 114 pass; no test is pinned to the old weather start.
+  **The explorer has legs** (`src/physics/explorer.js`): the mass rides at the hips on legs
+  that fold 0.45 m and reach 0.28 m and level the hips with a 0.12 s time constant; a
+  feature under the 0.73 m stroke passes under at any speed; over a taller one the body is
+  braced and clambers at the pace its hips can be raised and lowered; a face over 1.35 m met
+  in one step is a wall; with no hold or a drop beyond 1.35 m the feet leave the ground as
+  before; ground steps over 0.15 m are split so 20 Hz behaves like 60 Hz. Measured: the pure
+  body over the 1.3 m bump stays down on Earth, Mars and the Moon (was 1.4 to 5.9 m in the
+  air); through PILOT's own wrapper over 62 boulders at most 0.26 m off the ground on the
+  Moon at 20 to 60 Hz (the old body flew 1.1 m at 30 Hz); in PILOT's `Sim` on the real
+  ground at most 0.26 m (Moon), 0.03 m (Mars), 0 m (Earth). **The lead's measure (0.3 m) is
+  met by the body alone**; the walk-over stays on everywhere and PILOT needs no clamber
+  limit of its own. Behaviour changed without a call changing: a run through a dense boulder
+  field is about 4.1 m/s on Earth, 2.75 on Mars, 1.9 on the Moon (was about 7); a step down
+  of up to 0.73 m is taken in contact; a wall over 1.35 m stops the body. Additive:
+  `EXPLORER_BODY` leg constants, `st.phys.hip`, `hipV`, `clamber01`, `grip`, `brace`.
+  PILOT must keep `scrambleSample` as it is (radius raised, the normal that of the ground
+  underneath). **The five tests at the old weather start were all stale probes; none hid a
+  fault**; each now probes a place found on the game's clock. Not started: the racing gust
+  pattern, spray, softer dust walls, leaves as thin marks, the Neptune lab frame, the
+  instanced kit path; the cost of the legs in the body step is not profiled. The sixth
+  PHYSICS agent is out of context and is replaced by a seventh.
+- 2026-11-11: **PHYSICS's order for P10** (coordinator): (1) the racing gust pattern in the
+  first storm; (2) the owner's quality push on what PHYSICS hands the picture, rendered in
+  the painted lab and opened: dust as many soft walls, leaves as thin tumbling marks, spray
+  off a gale sea, a blizzard that drives; (3) the cost of the legs; (4) the instanced kit
+  path.
