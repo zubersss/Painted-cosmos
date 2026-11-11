@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, ensureGlobals } from './shared.js';
+import { G, SHEET, QUALITY, ensureGlobals } from './shared.js';
 import { makeWashMaterial, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 
 export { makeWashMaterial, bindBodyUniforms, defaultBodyUniforms };
@@ -57,7 +57,7 @@ export function createPainter(renderer) {
     applySize();
   }
 
-  function setQuality(q) { quality = Math.max(0, Math.min(2, q | 0)); applySize(); }
+  function setQuality(q) { quality = Math.max(0, Math.min(2, q | 0)); QUALITY.level = quality; applySize(); }
   function setRenderScale(s) { renderScale = Math.max(0.3, Math.min(1, +s || 1)); applySize(); }
   function setMood(m) { if (m) Object.assign(mood, m); }
 

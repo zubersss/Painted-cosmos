@@ -136,7 +136,7 @@ void main() {
 
   // granulation: pigment settles into the valleys of the paper, strongest in darks and wets
   float ph = paper.r;
-  float gran = (0.52 - ph) * (0.30 + 1.1 * (1.0 - lum)) * (0.55 + 0.9 * wet);
+  float gran = ((0.52 - ph) * 0.36 + (0.5 - pmid.r) * 0.85 + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum)) * (0.55 + 0.8 * wet);
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
 
   // ragged unpainted border: the wash simply stops, and pools where it stops
@@ -145,10 +145,10 @@ void main() {
   float corner = smoothstep(0.0, 0.08, bd.x) * smoothstep(0.0, 0.08, bd.y);
   float bn = b + (plo.g - 0.5) * uBorder.y + (pmid.g - 0.5) * uBorder.y * 0.45 + (paper.g - 0.5) * 0.006 - (1.0 - corner) * 0.012;
   float painted = mix(1.0, smoothstep(uBorder.x * 0.72, uBorder.x, bn), uBorder.w);
-  float lip = smoothstep(uBorder.x * 2.2, uBorder.x, bn) * painted * uBorder.w;
+  float lip = (1.0 - smoothstep(uBorder.x, uBorder.x * 2.2, bn)) * painted * uBorder.w;
   d += lip * uBorder.z * (0.4 + 0.6 * plo.r);
   // dry edge: near the border the brush skips the paper's peaks
-  float skip = smoothstep(uBorder.x * 1.6, uBorder.x * 0.9, bn) * smoothstep(0.50, 0.62, ph) * uBorder.w;
+  float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * smoothstep(0.50, 0.62, ph) * uBorder.w;
 
   col = clamp(col - (col - col * col) * (d - 1.0), 0.0, 1.0);
 
@@ -158,9 +158,12 @@ void main() {
   vec4 a1 = texture(tAux, guv + vec2(uInTexel.x * 1.5, 0.0));
   vec4 a2 = texture(tAux, guv + vec2(0.0, uInTexel.y * 1.5));
   float dz = max(abs(a1.z - a0.z), abs(a2.z - a0.z));
-  float idc = max(abs(floor(a1.w) - floor(a0.w)), abs(floor(a2.w) - floor(a0.w)));
+  float c0 = floor(a0.w), c1 = floor(a1.w), c2 = floor(a2.w);
+  // region changes count only where a solid thing (prop, character) meets something else
+  float solid = max(step(2.5, c0) * step(c0, 3.5) + step(4.5, c0), max(step(2.5, c1) * step(c1, 3.5) + step(4.5, c1), step(2.5, c2) * step(c2, 3.5) + step(4.5, c2)));
+  float idc = max(abs(c1 - c0), abs(c2 - c0)) * min(solid, 1.0);
   float fol = max(step(3.5, a0.w) * step(a0.w, 4.99), max(step(3.5, a1.w) * step(a1.w, 4.99), step(3.5, a2.w) * step(a2.w, 4.99)));
-  float line = max(smoothstep(0.10, 0.30, dz), min(idc, 1.0) * 0.8) * (1.0 - fol * 0.85);
+  float line = max(smoothstep(0.12, 0.34, dz) * 0.8, min(idc, 1.0) * 0.7) * (1.0 - fol * 0.85);
   line *= smoothstep(0.34, 0.60, plo.r + (pmid.r - 0.5) * 0.5) * (0.35 + 0.65 * smoothstep(0.35, 0.6, ph)) * (1.0 - smoothstep(6.5, 9.5, a0.z));
   col *= mix(vec3(1.0), vec3(0.46, 0.46, 0.50), line * uPig.w);
 
@@ -208,6 +211,16 @@ export class Post {
     this.rtAbs = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.UnsignedByteType });
     this.rtAbs.texture.minFilter = THREE.LinearFilter; this.rtAbs.texture.magFilter = THREE.LinearFilter;
 
+    // last frame's painting + depth, kept for the water's reflections
+    this.rtPrev = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.HalfFloatType });
+    this.rtPrev.texture.minFilter = THREE.LinearFilter; this.rtPrev.texture.magFilter = THREE.LinearFilter;
+    this.mKeep = fsMaterial(/* glsl */`
+      uniform sampler2D tAbs; uniform highp sampler2D tAux; varying vec2 vUv;
+      void main() { gl_FragColor = vec4(texture(tAbs, vUv).rgb, texture(tAux, vUv).z); }`,
+      { tAbs: { value: this.rtAbs.texture }, tAux: { value: this.rtScene.textures[1] } });
+    G.uPrevTex.value = this.rtPrev.texture;
+    this.prevFrames = 0;
+
     this.mBackdrop = fsMaterial(BACKDROP_FRAG, {});
     this.mPrep = fsMaterial(PREP_FRAG, { tScene: { value: this.rtScene.textures[0] }, uTexel: { value: new THREE.Vector2() } });
     this.absUniforms = {
@@ -249,6 +262,8 @@ export class Post {
     this.rtScene.setSize(inW, inH);
     this.rtHalf.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
     this.rtAbs.setSize(inW, inH);
+    this.rtPrev.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
+    this.prevFrames = 0; G.uPrevOn.value = 0;
     this.mPrep.uniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uRes.value.set(inW, inH);
@@ -275,6 +290,9 @@ export class Post {
   finish() {
     this._pass(this.mPrep, this.rtHalf);
     this._pass(this.mAbs[this.sectors], this.rtAbs);
+    this._pass(this.mKeep, this.rtPrev);
+    this.prevFrames++;
+    G.uPrevOn.value = this.prevFrames >= 1 ? 1 : 0;
     if (this.debugView) {
       const m = this.mCopy;
       m.uniforms.uMode.value = this.debugView;
@@ -287,6 +305,6 @@ export class Post {
   }
 
   dispose() {
-    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtAbs.dispose();
+    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose();
   }
 }

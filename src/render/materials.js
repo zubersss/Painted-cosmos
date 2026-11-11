@@ -101,14 +101,22 @@ void main() {
   // broken colour: darker brush touches inside the wash
   float dab = smoothstep(0.30, 0.62, st.g + (n2.b - 0.5) * 0.3) * near;
   d += dab * 0.42 * (1.0 - vPar.x * 0.6);
+  // short dark strokes: grass, twigs and litter suggested by the side of the brush
+  float flick = smoothstep(0.60, 0.70, st2.r * 0.8 + st.b * 0.25) * near;
+  d += flick * 0.55;
+  // neighbouring pigments run into each other: drifts of green and of warm earth
+  vec3 hueA = c * vec3(0.84, 0.99, 0.80);
+  vec3 hueB = c * vec3(1.0, 0.90, 0.80);
+  c = mix(c, hueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
+  c = mix(c, hueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * mid);
   c = pcDensity(c, d);
 
   // light in soft value steps; shadows are glazes
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
   float sunny = pcDapple(vBody, vPar.z * mix(0.82, 1.0, mid));
-  x *= mix(0.40, 1.0, sunny);
-  x += (n1.g - 0.5) * 0.16 + (st.b - 0.5) * 0.06 * near;
+  x = mix(min(x, 0.44) - (1.0 - smoothstep(0.30, 0.50, n1.g)) * 0.22 * vPar.z, x, sunny);
+  x += (n1.g - 0.5) * 0.10 + (st.b - 0.5) * 0.06 * near;
   float lvl = pcLevel(x, 0.045);
   c = pcTone(c, lvl);
 
@@ -166,43 +174,88 @@ uniform vec3 uSkyHorizon;
 uniform vec3 uReflDark;
 uniform vec3 uBed;
 uniform float uTreeLine;
+uniform highp sampler2D uPrevTex;
+uniform float uPrevOn;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
 varying vec3 vBody;
 varying vec3 vToCam;
 varying vec3 vView;
 varying float vDepth;
+
+// Mirror the painting itself: march the reflected ray through last frame's depth.
+// Returns uv and a confidence.
+vec3 pcReflect(vec3 P, vec3 R) {
+  float t = 0.7;
+  vec2 uv = vec2(0.5);
+  float conf = 0.0;
+  for (int i = 0; i < 12; i++) {
+    vec3 p = P + R * t;
+    vec4 cp = projectionMatrix * vec4(p, 1.0);
+    if (cp.w <= 0.0) break;
+    vec2 q = cp.xy / cp.w * 0.5 + 0.5;
+    if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) break;
+    uv = q;
+    float sd = exp2(texture(uPrevTex, q).a) - 1.0;
+    float rd = -p.z;
+    conf = 0.55;
+    if (sd < rd && rd - sd < max(2.5, t * 0.9)) { conf = 1.0; break; }
+    if (sd > 4.0e5) conf = 1.0;      // open sky behind this point
+    t *= 1.7;
+  }
+  vec2 e = min(uv, 1.0 - uv);
+  return vec3(uv, conf * smoothstep(0.0, 0.08, min(e.x, e.y)));
+}
+
 void main() {
   #include <logdepthbuf_fragment>
   if (vDepth < 0.0) discard;
   vec3 up = normalize(vBody);
   vec3 Vd = normalize(vToCam);
   float dist = length(vView);
-  vec3 drift = uSunDirL * 0.0 + vec3(uTime * 0.012, uTime * 0.007, -uTime * 0.009);
+  vec3 drift = vec3(uTime * 0.012, uTime * 0.007, -uTime * 0.009);
   vec4 r1 = texture(uNoise3D, vBody / 4.6 + drift);
   vec4 r2 = texture(uNoise3D, vBody / 1.35 - drift * 1.7);
   vec4 r3 = texture(uNoise3D, vBody / 17.0);
-  vec3 n = normalize(up + (r1.xyz - 0.5) * 0.16 + (r2.xyz - 0.5) * 0.07);
+  vec3 n = normalize(up + (r1.xyz - 0.5) * 0.13 + (r2.xyz - 0.5) * 0.06);
   vec3 r = reflect(-Vd, n);
   float re = dot(r, up);
-  // what the water mirrors: sky above a ragged tree line, dark banks below it
+
+  // what the water mirrors when the painting cannot tell us: sky above a ragged tree line
   float line = uTreeLine + (r3.r - 0.5) * 0.30;
   float skyAmt = smoothstep(line - 0.05, line + 0.05, re + (r1.g - 0.5) * 0.18);
   vec3 skyc = mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0));
-  skyc = mix(skyc, vec3(1.0), 0.25);
+  skyc = mix(skyc, vec3(1.0), 0.30);
   vec3 dark = pcDensity(uReflDark, 1.0 + (r3.g - 0.5) * 0.9);
   vec3 c = mix(dark, skyc, skyAmt);
+
+  // the painting, mirrored: soft vertical reflections broken by the ripples
+  vec3 nV = normalize(normalMatrix * n);
+  vec3 Rv = reflect(normalize(vView), nV);
+  vec3 hit = pcReflect(vView, Rv);
+  vec3 refl = texture(uPrevTex, hit.xy).rgb;
+  c = mix(c, refl, hit.z * uPrevOn);
+  // water takes a little of its own colour and deepens the mirror
+  c = pcDensity(c * vec3(0.93, 0.965, 0.955), 1.12 + (r3.g - 0.5) * 0.35);
+
+  // horizontal strokes of reflected sky where the surface is ruffled
+  float ruf = smoothstep(0.585, 0.66, r1.b * 0.55 + r2.g * 0.45);
+  c = mix(c, skyc, ruf * 0.55);
+
   // the bed shows through where the water is shallow or seen from above
   float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
-  float shallow = smoothstep(0.42, 0.02, vDepth);
-  c = mix(c, uBed * mix(vec3(1.0), dark, 0.35), clamp((1.0 - fres) * 0.5 + shallow * 0.75, 0.0, 0.92));
+  float shallow = 1.0 - smoothstep(0.02, 0.42, vDepth);
+  vec3 bed = pcDensity(uBed, 1.0 + (r3.b - 0.5) * 0.8);
+  c = mix(c, bed * mix(vec3(1.0), c, 0.45), clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9));
   // pigment pools at the water's edge
-  c = pcDensity(c, 1.0 + smoothstep(0.10, 0.0, vDepth) * 0.6);
-  // bare-paper glints: broken horizontal dashes where ripples catch the light
-  float glint = smoothstep(0.71, 0.76, r2.r * 0.62 + r1.b * 0.38) * (0.35 + 0.65 * skyAmt) * smoothstep(0.05, 0.25, vDepth) * uDayness;
+  c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDepth)) * 0.35);
+  // bare-paper glints: broken dashes where ripples catch the light
+  float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDepth) * uDayness;
+  glint *= 1.0 - smoothstep(40.0, 120.0, dist);
   c = mix(c, vec3(1.0), glint);
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
-  vec3 nV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
-  pcWrite(c, 0.75, nV, -vView.z, 2.0);
+  pcWrite(c, 0.7, normalize(normalMatrix * up), -vView.z, 2.0);
 }
 `;
 
@@ -212,9 +265,10 @@ export function makeWaterMaterial(bodyU, skyU) {
     uniforms: baseUniforms(bodyU, {
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
       uSkyZenith: skyU.uSkyZenith, uSkyHorizon: skyU.uSkyHorizon,
-      uReflDark: { value: new THREE.Vector3(0.36, 0.47, 0.36) },
+      uReflDark: { value: new THREE.Vector3(0.40, 0.52, 0.42) },
       uBed: { value: new THREE.Vector3(0.80, 0.70, 0.52) },
-      uTreeLine: { value: 0.42 },
+      uTreeLine: { value: 0.30 },
+      uPrevTex: G.uPrevTex, uPrevOn: G.uPrevOn,
     }),
     vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
   });
@@ -235,6 +289,7 @@ attribute vec4 aInst;     // per instance: x hue, y value, z seed, w spare
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uLod;        // min distance, max distance, jitter, fade start fraction
+uniform vec2 uThin;       // beyond this distance half the instances drop out; the rest grow by y
 uniform float uWind;
 uniform float uTime;
 varying vec3 vBody;
@@ -252,12 +307,16 @@ void main() {
     vec4 inst = aInst;
   #else
     mat4 im = mat4(1.0);
-    vec4 inst = vec4(0.0, 0.0, 0.5, 0.0);
+    vec4 inst = vec4(0.0, 0.0, 0.5, 0.7);
   #endif
   vec3 io = im[3].xyz;
   float di = distance(io, uCamLocal);
   float j = 1.0 + (inst.z - 0.5) * uLod.z;
   float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di));
+  // far away: fewer, larger strokes
+  float dv = uThin.x * (0.75 + inst.z);
+  vis *= 1.0 - step(inst.z, 0.5) * smoothstep(dv * 0.9, dv, di);
+  vis *= 1.0 + uThin.y * smoothstep(uThin.x * 0.8, uThin.x * 1.2, di);
   vec3 lp = position;
   float ph = inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13));
   float sway = sin(uTime * 1.1 + ph) * 0.6 + sin(uTime * 2.7 + ph * 1.9) * 0.3;
@@ -307,23 +366,29 @@ void main() {
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   vec4 n1 = texture(uNoise3D, vBody / 9.0);
   float seed = vInst.z;
+  float canopy = vInst.w * uCanopy;
   float near = 1.0 - smoothstep(30.0, 110.0, length(vView));
   vec3 c; float wet = 0.05; float id = 3.0; float x; float soft = 0.05;
 
   if (part < 0.5) {
     // ---- bark: a pale or warm wash with dry-brushed marks
-    vec2 tuv = mix(vec2(vUv.x * 2.0 + seed * 3.0, vUv.y * 0.55 + seed * 5.0), vec2(vUv.y * 0.30 + seed * 3.0, vUv.x * 3.0 + seed * 5.0), uBarkP.y);
+    vec2 tuv = mix(vec2(vUv.x * 1.5 + seed * 3.0, vUv.y * 1.15 + seed * 5.0), vec2(vUv.y * 0.30 + seed * 3.0, vUv.x * 3.0 + seed * 5.0), uBarkP.y);
     vec4 st = texture(uStrokeTex, tuv);
-    float marks = smoothstep(uBarkP.x, uBarkP.x + 0.07, st.r * 0.78 + st.b * 0.30 + (n1.b - 0.5) * 0.25);
-    float base = smoothstep(uBarkP.z, 0.0, vUv.y + (st.b - 0.5) * 1.3);
+    vec4 stb = texture(uStrokeTex, vec2(vUv.x * 1.0 + seed * 9.0, vUv.y * 0.21 + seed * 2.0));
+    // dashes (lenticels), plus a few larger dark scars
+    float marks = smoothstep(uBarkP.x, uBarkP.x + 0.05, st.r * 0.92 + st.b * 0.14 + (n1.b - 0.5) * 0.10);
+    marks = max(marks, smoothstep(0.80, 0.86, stb.g + (st.r - 0.5) * 0.25) * (1.0 - uBarkP.y));
+    float base = 1.0 - smoothstep(0.0, uBarkP.z, vUv.y + (st.b - 0.5) * 1.3);
     float twig = smoothstep(0.0, 1.0, vData.z);   // thin branches read dark
     c = mix(uBarkA, uBarkB, clamp(max(max(marks, base * 0.9), twig), 0.0, 1.0));
     c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7);
     x = dot(nV, sunV) * 0.5 + 0.5;
-    x *= mix(0.42, 1.0, pcDapple(vBody, uCanopy));
+    x *= mix(0.55, 1.0, pcDapple(vBody, canopy * 0.8));
     x += (n1.g - 0.5) * 0.12;
     float lvl = pcLevel(x, 0.06);
-    c = pcTone(c, lvl);
+    // pale bark takes a thinner shadow wash: the trunks stay the lights of the picture
+    float pale = smoothstep(0.55, 0.9, dot(uBarkA, vec3(0.333)));
+    c = mix(pcTone(c, lvl), pcTone(c, max(lvl, 1.0) * 0.5 + 1.0), pale * 0.75);
     float dryM = smoothstep(0.56, 0.68, st.g * 0.5 + st.r * 0.6);
     c = mix(c, vec3(1.0), dryM * uBarkP.w * near * 0.5);
     id = 3.0 + seed * 0.9;
@@ -341,7 +406,9 @@ void main() {
     c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.9 + vInst.y * 0.5);
     x = dot(mV, sunV) * 0.5 + 0.5;
     x = x * (1.0 - vData.z * 0.55);
-    x *= mix(0.62, 1.0, pcDapple(vBody, uCanopy * 0.6));
+    float through = pow(max(dot(-V, sunV), 0.0), 1.5);
+    x = max(x, through * (0.50 + 0.45 * st.g + (n2.r - 0.5) * 0.5));
+    x *= mix(0.62, 1.0, pcDapple(vBody, canopy * 0.6));
     x += (st.g - 0.35) * 0.22 + (n2.g - 0.5) * 0.16;
     float lvl = pcLevel(x, 0.07);
     c = pcTone(c, lvl);
@@ -355,7 +422,7 @@ void main() {
     c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5);
     vec3 upV = normalize(vMassV);
     x = dot(upV, sunV) * 0.5 + 0.5;
-    x *= mix(0.42, 1.0, pcDapple(vBody, uCanopy));
+    x *= mix(0.42, 1.0, pcDapple(vBody, canopy));
     x += (n1.g - 0.5) * 0.14 + vUv.y * 0.10;
     float lvl = pcLevel(x, 0.06);
     c = pcTone(c, lvl);
@@ -364,7 +431,7 @@ void main() {
   } else if (part < 3.5) {
     // ---- accent: one touch of pure pigment
     c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.6);
-    x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, uCanopy));
+    x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, canopy));
     c = pcTone(c, pcLevel(x + 0.2, 0.08));
     id = 3.0 + seed * 0.9;
   } else {
@@ -373,7 +440,7 @@ void main() {
     c = mix(uBarkA, uBarkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
     c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9);
     x = dot(nV, sunV) * 0.5 + 0.5;
-    x *= mix(0.45, 1.0, pcDapple(vBody, uCanopy));
+    x *= mix(0.45, 1.0, pcDapple(vBody, canopy));
     x += (n1.g - 0.5) * 0.18 + (st.b - 0.5) * 0.1;
     float lvl = pcLevel(x, 0.04);
     c = pcTone(c, lvl);
@@ -394,6 +461,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uniforms: baseUniforms(bodyU, {
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
       uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
+      uThin: { value: new THREE.Vector2(1e9, 0) },
       uWind: { value: opts.wind == null ? 0.06 : opts.wind },
       uBarkA: v3(opts.barkA, [0.95, 0.94, 0.92]), uBarkB: v3(opts.barkB, [0.30, 0.27, 0.27]),
       uBarkP: { value: new THREE.Vector4().fromArray(opts.barkP || [0.62, 0, 1.0, 0.5]) },
@@ -401,7 +469,7 @@ export function makePropMaterial(bodyU, opts = {}) {
       uLeafC: v3(opts.leafC, [0.30, 0.48, 0.40]),
       uLeafP: { value: new THREE.Vector4().fromArray(opts.leafP || [0.8, 0.25, 1.0, 0.45]) },
       uAccent: v3(opts.accent, [0.85, 0.29, 0.17]),
-      uCanopy: { value: opts.canopy == null ? 0.7 : opts.canopy },
+      uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
     }),
     vertexShader: PROP_VERT, fragmentShader: PROP_FRAG,
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,

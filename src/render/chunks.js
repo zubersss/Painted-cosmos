@@ -47,9 +47,9 @@ float pcLevel(float x, float soft) {
 //   3 sunlit: the local wash diluted so paper shows, warmed by the light
 //   2 local colour   1 one cool glaze   0 two glazes, pigment pooling
 vec3 pcTone(vec3 c, float level) {
-  vec3 lit = mix(c, vec3(1.0), 0.36) * uLight;
+  vec3 lit = mix(c, vec3(1.0), 0.30) * uLight;
   vec3 g1 = c * uGlaze;
-  vec3 g2 = pcDensity(g1 * uGlaze, 1.35);
+  vec3 g2 = pcDensity(g1 * pow(uGlaze, vec3(0.75)), 1.3);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, c, clamp(level - 1.0, 0.0, 1.0));
   r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
@@ -81,7 +81,9 @@ float pcDapple(vec3 bodyPos, float canopy) {
   float b = texture(uNoise3D, pp / 4.1 + 0.37).g;
   float v = a * 0.68 + b * 0.32;
   float th = mix(0.05, 0.585, canopy);
-  return smoothstep(th - 0.05, th + 0.05, v);
+  // mostly a crisp-edged glaze, here and there feathered where the wash was still wet
+  float w = mix(0.012, 0.075, smoothstep(0.55, 0.75, texture(uNoise3D, pp / 23.0 + 0.7).b));
+  return smoothstep(th - w, th + w, v);
 }
 
 // Triplanar lookup into the stroke atlas (p in metres, anchored; n body-local normal).

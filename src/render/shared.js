@@ -34,6 +34,8 @@ export const G = {
   uNoise3D: { value: null },
   uStrokeTex: { value: null },
   uPaperColor: { value: new THREE.Vector3(paper[0], paper[1], paper[2]) },
+  uPrevTex: { value: null },    // last frame's painting (rgb) and log depth (a), half resolution
+  uPrevOn: { value: 0 },
 };
 
 export function ensureGlobals() {
@@ -62,3 +64,7 @@ export const SHEET = {
   grade: new THREE.Vector3(1, 1, 1),
   valid: false,
 };
+
+// Quality tier (0 low, 1 medium, 2 high): set by the painter, read by the world to scale how
+// far flora is drawn.
+export const QUALITY = { level: 1 };

@@ -7,7 +7,7 @@ import { hash3i } from './noise.js';
 
 // kinds
 export const K_BIRCH = 0, K_PINE = 1, K_BIRCH_AUTUMN = 2;
-export const U_GRASS = 0, U_FERN = 1, U_BUSH = 2, U_ROCK = 3, U_FLOWER = 4, U_STONE = 5;
+export const U_GRASS = 0, U_FERN = 1, U_BUSH = 2, U_ROCK = 3, U_FLOWER = 4, U_STONE = 5, U_REED = 6;
 
 const STRIDE = 12;   // x y z (body-local position), scale, yaw, kind, variant, seed, hue, value, canopy, lean
 export const INST_STRIDE = STRIDE;
@@ -63,11 +63,15 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       if (bi.terrain !== 'forest') continue;
       const inWater = s.lq !== NOLQ && s.lq > s.h;
       let kind = -1, scale = 1, sink = 0.03;
-      if (inWater) {
+      const edge = s.lq !== NOLQ ? s.lq - s.h : -9;   // > 0 under water
+      if (edge > -0.30 && edge < 0.16 && r3 < 0.34 && r4 < 0.62 + 0.3 * Math.sin(r1 * 40)) {
+        // reeds crowd the water's edge in clumps
+        kind = U_REED; scale = 0.7 + 0.7 * r5; sink = 0.02;
+      } else if (inWater) {
         // a few stones break the surface of the stream
-        if (r3 < 0.035 && s.lq - s.h < 0.5) { kind = U_STONE; scale = 0.35 + 0.5 * r5; sink = 0.1; }
+        if (r3 < 0.045 && s.lq - s.h < 0.5) { kind = U_STONE; scale = 0.4 + 0.7 * r5; sink = 0.1; }
       } else if (s.rock > 0.35 && r3 < 0.10) { kind = U_ROCK; scale = 0.6 + 1.5 * r5 * r5; sink = 0.25 * scale; }
-      else if (s.s < 7 && r3 < 0.045) { kind = U_ROCK; scale = 0.3 + 0.6 * r5; sink = 0.12; }       // bank boulders
+      else if (s.s < 7 && r3 < 0.010) { kind = U_ROCK; scale = 0.3 + 0.6 * r5; sink = 0.12; }       // bank boulders
       else if (r3 < s.under * 0.62) {
         const damp = s.s < 16 ? 1 - s.s / 16 : 0;
         if (r4 < 0.10 + 0.22 * damp) { kind = U_FERN; scale = 0.7 + 0.7 * r5; }

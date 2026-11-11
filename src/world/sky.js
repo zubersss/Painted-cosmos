@@ -57,11 +57,12 @@ void main() {
   vec4 n1 = texture(uNoise3D, d * 1.3 + 0.17);
   vec4 n2 = texture(uNoise3D, d * 4.1);
   float turb = (n1.r - 0.5) * 0.9 + (n2.g - 0.5) * 0.35;
-  float back = smoothstep(0.80, 0.86, n1.a) * (1.0 - smoothstep(0.86, 0.93, n1.a));
-  sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) + back * 0.9 * (1.0 - t));
-  sky = mix(sky, vec3(1.0), smoothstep(0.86, 0.95, n1.a) * 0.35 * (1.0 - t));
+  float bf = n1.a + (n2.b - 0.5) * 0.10;
+  float back = smoothstep(0.84, 0.90, bf) * (1.0 - smoothstep(0.90, 0.95, bf));
+  sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) + back * 0.38 * (1.0 - t));
+  sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
   // below the horizon (seen from high up): haze
-  sky = mix(sky, uHaze, smoothstep(0.02, -0.12, e));
+  sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
 
   // ---- clouds: bare paper with soft violet undersides, on a shell around the planet
   float rc = length(uCamL);

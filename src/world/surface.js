@@ -106,12 +106,12 @@ class Surface {
           p.moss = dilute(mixc(pig('oliveGreen'), pig('rawUmber'), 0.4), 0.25);
           p.litter = dilute(mixc(pig('cadOrange'), pig('burntSienna'), 0.5), 0.35);
         } else {
-          p.grassLight = dilute(mixc(pig('sapGreen'), pig('quinGold'), 0.42), 0.52);
-          p.grassMid = dilute(mixc(pig('sapGreen'), pig('quinGold'), 0.12), 0.30);
+          p.grassLight = dilute(mixc(pig('sapGreen'), pig('quinGold'), 0.36), 0.42);
+          p.grassMid = dilute(mixc(pig('sapGreen'), pig('quinGold'), 0.10), 0.22);
           p.moss = dilute(mixc(pig('hookersGreen'), pig('sapGreen'), 0.45), 0.26);
           p.litter = dilute(mixc(pig('burntSienna'), pig('rawUmber'), 0.45), 0.40);
         }
-        p.mud = dilute(mixc(pig('rawUmber'), pig('burntSienna'), 0.25), 0.34);
+        p.mud = dilute(mixc(pig('rawUmber'), pig('sapGreen'), 0.25), 0.40);
         p.bed = dilute(mixc(pig('quinGold'), pig('rawUmber'), 0.55), 0.40);
         p.rock = dilute(mixc(pig('ultramarine'), pig('burntSienna'), 0.5), 0.62);
         if (bi.autumn) {
@@ -216,14 +216,14 @@ class Surface {
     b.lq = L - 0.4;
     if (!full) return;
     const fg = R / 125, fp = R / 270, fv = R / 26;
-    const glade = smoothstep(0.08, 0.48, nA(x * fg + 61.0, y * fg + 3.0, z * fg - 17.0));
+    const glade = smoothstep(0.24, 0.62, nA(x * fg + 61.0, y * fg + 3.0, z * fg - 17.0));
     const pz = smoothstep(-0.12, 0.34, nA(x * fp - 23.0, y * fp + 41.0, z * fp + 9.0) + (b.h - L) * 0.018 - 0.1) * smoothstep(7, 30, s);
     const v1 = nC(x * fv - 3.0, y * fv, z * fv + 21.0);
     set3(b, pal.grassMid);
     mix3(b, pal.grassLight, clamp(glade * 0.8 + v1 * 0.4 + 0.1, 0, 1));
     mix3(b, pal.litter, clamp(pz * (1 - glade * 0.85) * (0.72 + v1 * 0.3), 0, 1));
     mix3(b, pal.moss, smoothstep(15, 4.5, s) * 0.55 * (1 - glade * 0.5));
-    mix3(b, pal.mud, smoothstep(w0 + 1.7, w0 + 0.25, s) * 0.9);
+    mix3(b, pal.mud, smoothstep(w0 + 1.0, w0 + 0.1, s) * 0.8);
     mix3(b, pal.bed, smoothstep(w0 + 0.35, w0 - 0.5, s));
     mix3(b, pal.rock, rk * 0.92);
     const bedm = smoothstep(w0 + 0.6, w0 - 0.3, s);
@@ -232,7 +232,7 @@ class Surface {
     const open = smoothstep(w0 + 0.6, w0 + 3.6, s);
     b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open, 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
-    b.birch = clamp(1 - pz * 0.9, 0.05, 1);
+    b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s), 0, 1);
     b.rock = rk; b.s = s; b.glade = glade; b.aux = pz;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines
@@ -413,7 +413,7 @@ class Surface {
         let cost;
         if (isForest) {
           if (o.rock > 0.05) continue;
-          cost = Math.abs(o.s - 13) * 0.5 + (1 - o.glade) * 6 + Math.hypot(i, j) * 0.02;
+          cost = Math.abs(o.s - 12) * 0.5 + Math.abs(o.glade - 0.25) * 5 + Math.hypot(i, j) * 0.02;
         } else {
           if (o.lq !== NOLQ && o.lq > o.h - 1) continue;
           cost = Math.hypot(i, j) * 0.05;

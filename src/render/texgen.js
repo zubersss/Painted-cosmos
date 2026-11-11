@@ -143,12 +143,14 @@ export function genPaper(size = 512) {
     for (let x = 0; x < size; x++) {
       const u = x / size, v = y / size;
       // cold-press: rounded bumps about 5 px across, with finer tooth and a few long fibres
-      let bumps = n(u * 96, v * 96, 0.5, 96, 96, 4);
-      bumps = 1 - Math.abs(bumps) * 2.0;                       // billowed: pebbly cells
+      // pressed hills with isolated pits between them (pigment settles in the pits)
+      const b1 = n(u * 100, v * 100, 0.5, 100, 100, 4) + 0.45 * m(u * 180, v * 180, 6.5, 180, 180, 4);
+      const pit = Math.min(1, Math.max(0, (b1 - 0.12) / 0.5));
+      const bumps = 0.62 - pit * pit * (3 - 2 * pit) * 1.1;
       const tooth = m(u * 230, v * 230, 1.5, 230, 230, 4);
       const fib = Math.pow(Math.max(0, 1 - Math.abs(n(u * 14, v * 120, 2.5, 14, 120, 4)) * 3.2), 3) * 0.5
         + Math.pow(Math.max(0, 1 - Math.abs(m(u * 110, v * 12, 3.5, 110, 12, 4)) * 3.2), 3) * 0.5;
-      const h = 0.5 + (bumps - 0.35) * 0.42 + tooth * 0.16 + fib * 0.22 + lof(u, v, 0) * 0.10;
+      const h = 0.5 + (bumps - 0.35) * 0.48 + tooth * 0.14 + fib * 0.20 + lof(u, v, 0) * 0.10;
       data[k++] = to8(h); data[k++] = to8(0.5 + lof(u, v, 0) * 0.85); data[k++] = to8(0.5 + lof(u, v, 1) * 0.85); data[k++] = to8(0.5 + lof(u, v, 2) * 0.85);
     }
   }

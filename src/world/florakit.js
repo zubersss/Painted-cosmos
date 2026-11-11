@@ -112,44 +112,47 @@ function stroke(B, root, dir, len, width, arch, rnd, opts) {
 function V(x, y, z) { return new THREE.Vector3(x, y, z); }
 
 // ---------------------------------------------------------------------------------------------
+// lod: 0 full (near), 1 medium, 2 low (far)
 export function birchGeometry(seed, lod) {
   const rnd = mulberry32(seed), B = new Builder();
   const H = 10.5 + rnd() * 2.5;
   const lean = (rnd() - 0.5) * 0.9, bend = (rnd() - 0.5) * 1.2, lz = (rnd() - 0.5) * 0.7;
-  const segs = lod ? 4 : 10, sides = lod ? 5 : 8;
+  const segs = lod === 0 ? 10 : lod === 1 ? 4 : 2, sides = lod === 0 ? 8 : lod === 1 ? 5 : 4;
   const pts = [], rad = [];
   for (let i = 0; i <= segs; i++) {
     const t = i / segs, y = t * H;
-    pts.push(V(lean * t + bend * Math.sin(t * 2.6) * 0.35 + (lod ? 0 : (rnd() - 0.5) * 0.05), y, lz * t * t + (lod ? 0 : (rnd() - 0.5) * 0.05)));
-    rad.push((0.185 - 0.13 * Math.pow(t, 0.8)) * (i === 0 ? 1.35 : 1));
+    pts.push(V(lean * t + bend * Math.sin(t * 2.6) * 0.35 + (lod ? 0 : (rnd() - 0.5) * 0.06), y, lz * t * t + (lod ? 0 : (rnd() - 0.5) * 0.06)));
+    rad.push((0.215 - 0.15 * Math.pow(t, 0.8)) * (i === 0 ? 1.4 : 1));
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.5, swayH: H, hash: rnd() });
   const top = pts[segs];
   const crownC = V(top.x * 0.85, H * 0.72, top.z * 0.85);
-  const at = (t) => { const f = t * segs, i = Math.min(segs - 1, Math.floor(f)), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
-  if (!lod) {
+  const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
+  if (lod === 0) {
     // a few thin dark branches reaching into the crown
     const nb = 4 + ((rnd() * 2) | 0);
     for (let k = 0; k < nb; k++) {
-      const t0 = 0.42 + 0.5 * (k / nb) + rnd() * 0.05, p0 = at(t0);
-      const ang = rnd() * 6.283, len = 1.6 + rnd() * 1.6;
+      const t0 = 0.40 + 0.5 * (k / nb) + rnd() * 0.05, p0 = at(t0);
+      const ang = rnd() * 6.283, len = 1.8 + rnd() * 1.8;
       const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * 0.55, p0.z + Math.sin(ang) * len * 0.55);
       const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * 0.8, p0.z + Math.sin(ang) * len);
-      tube(B, [p0, p1, p2], [0.05, 0.032, 0.012], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd() });
+      tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd() });
     }
-    // crown: airy, hanging clusters
-    const nBlobs = 8 + ((rnd() * 3) | 0);
+  }
+  if (lod < 2) {
+    // crown: hanging clusters that merge into one airy mass
+    const nBlobs = lod === 0 ? 10 + ((rnd() * 3) | 0) : 4;
     for (let k = 0; k < nBlobs; k++) {
-      const t0 = 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(Math.min(1, t0));
-      const spread = (1.0 - Math.abs(t0 - 0.72) * 1.5) * 2.1 + 0.3;
-      const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd());
-      const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? 0.5 : 0), p0.z + Math.sin(ang) * rr);
-      const r = 0.95 + rnd() * 0.75;
-      blob(B, c, r, r * (0.62 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3 });
+      const t0 = 0.44 + 0.60 * (k / (nBlobs - 1)), p0 = at(t0);
+      const spread = Math.max(0.2, (1.0 - Math.abs(t0 - 0.70) * 1.7)) * 2.5 + 0.2;
+      const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd()) * (lod ? 0.6 : 1);
+      const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? (t0 - 1) * H : 0), p0.z + Math.sin(ang) * rr);
+      const r = (lod ? 2.0 : 1.25) + rnd() * (lod ? 0.6 : 0.85);
+      blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: lod ? 5 : 3.4 });
     }
   } else {
-    const r = 2.5;
-    blob(B, V(top.x * 0.8, H * 0.74, top.z * 0.8), r, r * 1.25, r, rnd, { massK: 0.2, sway: 0.8, shade0: 0.0, shadeK: 0.75, noise: 0.3, uvScale: 5 });
+    const r = 3.1;
+    blob(B, V(top.x * 0.8, H * 0.66, top.z * 0.8), r, r * 1.45, r, rnd, { massK: 0.2, sway: 0.8, shade0: 0.0, shadeK: 0.75, noise: 0.34, uvScale: 6 });
   }
   return B.build();
 }
@@ -158,35 +161,37 @@ export function pineGeometry(seed, lod) {
   const rnd = mulberry32(seed), B = new Builder();
   const H = 14 + rnd() * 4;
   const lean = (rnd() - 0.5) * 0.4;
-  const segs = lod ? 3 : 8, sides = lod ? 5 : 8;
+  const segs = lod === 0 ? 8 : lod === 1 ? 3 : 2, sides = lod === 0 ? 8 : lod === 1 ? 5 : 4;
   const pts = [], rad = [];
   for (let i = 0; i <= segs; i++) {
     const t = i / segs;
     pts.push(V(lean * t * t + (lod ? 0 : (rnd() - 0.5) * 0.04), t * H, (lod ? 0 : (rnd() - 0.5) * 0.04)));
-    rad.push((0.30 - 0.25 * Math.pow(t, 0.9)) * (i === 0 ? 1.3 : 1));
+    rad.push((0.31 - 0.26 * Math.pow(t, 0.9)) * (i === 0 ? 1.3 : 1));
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.35, swayH: H, hash: rnd() });
   const crownC = V(lean * 0.5, H * 0.62, 0);
-  if (!lod) {
+  if (lod === 0) {
     // dead branch stubs below the crown
     for (let k = 0; k < 3; k++) {
       const y = H * (0.18 + 0.07 * k + rnd() * 0.04), ang = rnd() * 6.283, len = 0.6 + rnd() * 0.9;
       tube(B, [V(0, y, 0), V(Math.cos(ang) * len, y + 0.1, Math.sin(ang) * len)], [0.045, 0.012], 4, { part: 0, shade: 0.7, hash: rnd() });
     }
-    const tiers = 7 + ((rnd() * 2) | 0);
+  }
+  if (lod < 2) {
+    const tiers = lod === 0 ? 7 + ((rnd() * 2) | 0) : 4;
     for (let k = 0; k < tiers; k++) {
       const t = k / (tiers - 1);
       const y = H * (0.36 + 0.60 * t);
-      const r = (3.1 - 2.5 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3);
+      const r = (3.4 - 2.7 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3) * (lod ? 1.12 : 1);
       const off = (1 - t) * 0.5;
       const c = V(lean * (y / H) * (y / H) + (rnd() - 0.5) * off, y, (rnd() - 0.5) * off);
-      blob(B, c, r, r * 0.42 + 0.25, r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: 4 });
+      blob(B, c, r, r * (lod ? 0.6 : 0.42) + 0.25, r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: lod ? 5 : 4 });
     }
-    blob(B, V(lean, H * 1.0, 0), 0.45, 0.9, 0.45, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2 });
+    if (lod === 0) blob(B, V(lean, H * 1.0, 0), 0.45, 0.9, 0.45, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2 });
   } else {
     for (let k = 0; k < 2; k++) {
-      const t = k, y = H * (0.50 + 0.30 * t), r = 2.6 - 1.2 * t;
-      blob(B, V(lean * 0.5, y, 0), r, r * 1.15, r, rnd, { detail: 1, massC: crownC, massK: 0.3, sway: 0.4 + 0.4 * t, shade0: 0.15 - 0.1 * t, shadeK: 0.8, droop: 0.5, noise: 0.3, uvScale: 5 });
+      const y = H * (0.50 + 0.30 * k), r = 2.9 - 1.3 * k;
+      blob(B, V(lean * 0.5, y, 0), r, r * 1.2, r, rnd, { detail: 0, massC: crownC, massK: 0.3, sway: 0.4 + 0.4 * k, shade0: 0.15 - 0.1 * k, shadeK: 0.8, droop: 0.5, noise: 0.3, uvScale: 6 });
     }
   }
   return B.build();
@@ -194,23 +199,35 @@ export function pineGeometry(seed, lod) {
 
 export function grassGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
-  const n = 6;
+  const n = 9;
   for (let i = 0; i < n; i++) {
     const ang = (i / n) * 6.283 + rnd() * 0.8;
     const dir = V(Math.cos(ang), 0, Math.sin(ang));
-    const r0 = rnd() * 0.12;
-    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 0.42 + rnd() * 0.42, 0.045 + rnd() * 0.03, 0.25 + rnd() * 0.55, rnd, { segs: 3, sway: 0.5 });
+    const r0 = rnd() * 0.10;
+    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 0.20 + rnd() * 0.30, 0.014 + rnd() * 0.012, 0.15 + rnd() * 0.5, rnd, { segs: 2, sway: 0.5 });
+  }
+  return B.build();
+}
+
+export function reedGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const ang = rnd() * 6.283;
+    const dir = V(Math.cos(ang), 0, Math.sin(ang));
+    const r0 = rnd() * 0.22;
+    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 0.7 + rnd() * 0.7, 0.016 + rnd() * 0.012, 0.06 + rnd() * 0.22, rnd, { segs: 3, sway: 0.8 });
   }
   return B.build();
 }
 
 export function fernGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
-  const n = 7;
+  const n = 9;
   for (let i = 0; i < n; i++) {
     const ang = (i / n) * 6.283 + rnd() * 0.5;
     const dir = V(Math.cos(ang), 0, Math.sin(ang));
-    stroke(B, V(0, 0, 0), dir, 0.75 + rnd() * 0.4, 0.14 + rnd() * 0.06, 0.85 + rnd() * 0.3, rnd, { segs: 5, leaf: 1, sway: 0.35 });
+    stroke(B, V(0, 0, 0), dir, 0.45 + rnd() * 0.3, 0.05 + rnd() * 0.03, 0.75 + rnd() * 0.35, rnd, { segs: 4, leaf: 1, sway: 0.35 });
   }
   return B.build();
 }
