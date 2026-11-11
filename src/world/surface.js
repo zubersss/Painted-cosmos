@@ -13,7 +13,7 @@ import { BODIES } from '../data/bodies.js';
 import { LOOKS, pig, dilute, mixc } from '../data/looks.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
 import { dirToFace } from './cubesphere.js';
-import { EASELS } from '../art/easels.js';
+import { EASELS, STANDS } from '../art/easels.js';
 
 const _cf = {};
 
@@ -802,6 +802,14 @@ export function getEaselPure(bodyId, biomeId) {
   const bi = S.biomes.findIndex((b) => b.id === biomeId);
   const s0 = S.sites.find((x) => x.b === bi);
   return s0 ? { unitDir: { x: s0.x, y: s0.y, z: s0.z }, yaw: 0, pitch: 0 } : null;
+}
+
+// Where to arrive in a biome: its stand (a spot that shows the biome whichever way one
+// faces), else its easel, else its first site. -> { unitDir, yaw, pitch } | null
+export function getStandPure(bodyId, biomeId) {
+  const e = STANDS[bodyId] && STANDS[bodyId][biomeId];
+  if (e) { const l = 1 / Math.hypot(e[0], e[1], e[2]); return { unitDir: { x: e[0] * l, y: e[1] * l, z: e[2] * l }, yaw: e[3] * D2R, pitch: 0 }; }
+  return getEaselPure(bodyId, biomeId);
 }
 
 // The marked views of a body: first each biome's easel (the view its picture was painted

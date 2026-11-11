@@ -290,10 +290,11 @@ export function findVantage(bodyId, biomeId, opts = {}) {
       const ax = (B.t && B.t.axis) || (B.terrain === 'spires' ? [0.62, 0.30, -0.72] : [0.36, 0.48, 0.80]), f = frameAt(c.d);
       crest = Math.atan2(ax[0] * f.e[0] + ax[1] * f.e[1] + ax[2] * f.e[2], ax[0] * f.n[0] + ax[1] * f.n[1] + ax[2] * f.n[2]) + Math.PI / 2;
     }
-    let cb = null;
+    let cb = null, sum = 0;
     for (let a = 0; a < NAZ; a++) {
       const v = scoreView(sc, a, W);
-      if (!v) continue;
+      if (!v) { sum -= 3; continue; }
+      sum += v.s;
       v.s += -c.rough * 0.3 + (W.perch || 0) * c.perch - c.dens * 0.8;
       if (B.t && B.t.fog && c.h < B.t.fog[0] + B.t.fog[1]) v.s -= 2.5;      // paint the fog from above it
       if (ringAt) v.s += (W.rings || 0.3) * ringIn(ringAt, a, v.pitch);
@@ -310,6 +311,8 @@ export function findVantage(bodyId, biomeId, opts = {}) {
       }
       if (!cb || v.s > cb.s) { cb = v; cb.a = a; }
     }
+    // opts.round: a place to arrive at rather than a picture: good whichever way one faces
+    if (cb && opts.round) cb.s = 0.8 * (sum / NAZ) + 0.2 * cb.s + (W.perch || 0) * c.perch - c.rough * 1.5;
     if (cb) tops.push({ c, v: cb });
   }
   tops.sort((x, y) => y.v.s - x.v.s);

@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { BODIES, BODY_IDS, SUN } from '../data/bodies.js';
 import { getLook } from '../data/looks.js';
-import { getSurface, sampleSurfacePure, getVistasPure, getEaselPure } from './surface.js';
+import { getSurface, sampleSurfacePure, getVistasPure, getStandPure } from './surface.js';
 import { PlanetTerrain } from './terrain.js';
 import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
@@ -99,9 +99,12 @@ export function createWorld(scene) {
     return out.normalize();
   }
 
-  let frameNo = 0;
+  let frameNo = 0, lastWall = 0, wallDt = 16;
   function update(dt, cameraPos, activeBodyId) {
     frameNo++;
+    const nowW = performance.now();
+    // the frame time, smoothed over about twenty frames: one long frame changes nothing
+    wallDt += ((lastWall ? Math.min(1000, nowW - lastWall) : 16) - wallDt) * 0.05; lastWall = nowW;
     const active = activeBodyId && state.has(activeBodyId) ? state.get(activeBodyId) : null;
     // PHYSICS' flora field for the body it is running on (it has already updated this frame)
     syncPhysFlora(physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id) ? physics.fields.flora : null);
@@ -135,7 +138,9 @@ export function createWorld(scene) {
       st.terrain.detail = isActive;
       // One shared time slice per frame. When terrain and flora both have work they take
       // turns at going first, so no frame pays for a full slice of each.
-      const tb = performance.now(), slice = budgetMs * 0.8;
+      // (when frames are already very slow, as in software rendering, building is given a
+      // share of the frame instead of a fixed few milliseconds, or nothing would ever settle)
+      const tb = performance.now(), slice = (wallDt > 80 ? Math.max(budgetMs, Math.min(220, wallDt * 0.3)) : budgetMs) * 0.8;
       if (isActive && st.flora && (frameNo & 1) && st.flora.busy > 0 && st.terrain.busy > 0) {
         st.flora.update(st.camLocal, true, slice);
         st.terrain.update(st.camLocal, Math.max(0, slice - (performance.now() - tb)));
@@ -240,9 +245,10 @@ export function createWorld(scene) {
     setBuildBudget(ms) { budgetMs = Math.max(0.5, +ms || 5); },
     getLighting() { return lighting; },
     getBiomes(bodyId) { return getLook(bodyId).biomes.map((b) => ({ id: b.id, name: b.name })); },
-    // a place to stand in a biome: the painter's easel for it (and which way the painter
-    // faced: yaw from local north toward east, pitch, radians), or the biome's first site
-    findBiome(bodyId, biomeId) { return getEaselPure(bodyId, biomeId); },
+    // a place to arrive at in a biome: level, dry, and showing what the biome is whichever
+    // way one faces (src/art/easels.js, STANDS), with the best way to face (yaw from local
+    // north toward east, radians); else the painter's easel; else the biome's first site
+    findBiome(bodyId, biomeId) { return getStandPure(bodyId, biomeId); },
     get _flora() { const st = state.get(lastActive || 'earth'); return st && st.flora; },
     get _prof() { return Object.assign({}, prof, this._flora ? this._flora.prof : {}); },
     _profReset() { prof.terrain = 0; const fl = this._flora; if (fl) { const p = fl.prof; p.wanted = p.build = p.retier = 0; } },
