@@ -26,6 +26,8 @@ uniform vec3 uSunDirL;
 uniform vec3 uGlaze;
 uniform vec3 uLight;
 uniform vec3 uHaze;
+uniform vec4 uHazeUp;  // under a closed sky: rgb the sky's own wash overhead, a how far the far air takes it high in the view (0: one haze at every height)
+uniform vec3 uUpW;     // up at the eye, scene space
 uniform vec4 uFog;
 uniform float uTime;
 uniform float uDayness;
@@ -80,6 +82,19 @@ vec3 pcAtmos(vec3 c, float f) {
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62);
   return mix(cool, uHaze, f);
+}
+// The far end of anything is the sky behind it. Under a closed sky that is the pale band only low down:
+// higher in the view the sky is the cloud's own heavy wash (the sky's gradient, see sky.js), and a far
+// cliff that went to paper there stood in a storm sky as a pale cut-out with ruled edges.
+vec3 pcHazeAt(vec3 viewPos) {
+  if (uHazeUp.a < 0.004) return uHaze;
+  float e = clamp(dot(normalize(viewPos), mat3(viewMatrix) * uUpW), 0.0, 1.0);
+  return mix(uHaze, uHazeUp.rgb, uHazeUp.a * (1.0 - pow(1.0 - e, 2.4)));
+}
+vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
+  float l = dot(c, vec3(0.3, 0.5, 0.2));
+  vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62);
+  return mix(cool, pcHazeAt(viewPos), f);
 }
 
 // Dappled light: a leaf-shadow pattern projected along the sun direction, anchored to the

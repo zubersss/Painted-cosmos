@@ -94,6 +94,17 @@ export function createWorld(scene) {
   }
 
   let budgetMs = 5;
+  // The wash clock (s): what washes in, eases and grows runs on it. It follows the game's own frame time
+  // while the game's clock runs (a test that steps the clock sees what a player sees at that pace) and the
+  // wall's when the game's clock stands (so a held picture still settles).
+  let washNow = 1, washWall = 0;
+  // An arrival: the eye is somewhere it was not a frame ago (a first frame low over a world, a leap of
+  // more than 60 m). Streaming has nothing to ease from there, so the picture is held as bare paper
+  // while the land is laid under it at full speed, and then comes up out of the paper as one
+  // (SHEET.laid, post.js). `busy` stays above 0 until it has.
+  const veil = { on: false, lift: -1, wall: 0, frames: 0, calm: 0 };
+  const VEIL_LIFT = 1.2;      // seconds the picture takes to come up
+  const _camL = new THREE.Vector3();
   const prof = { terrain: 0 };
   let physics = null;
   let lastActive = null;
@@ -207,6 +218,9 @@ export function createWorld(scene) {
   function update(dt, cameraPos, activeBodyId) {
     frameNo++;
     const nowW = performance.now();
+    const washStep = dt > 0 ? Math.min(dt, 0.1) : washWall ? Math.min(0.1, Math.max(0.02, (nowW - washWall) / 1000)) : 0;
+    washNow += washStep;
+    washWall = nowW;
     // the frame time, smoothed over about twenty frames: one long frame changes nothing
     wallDt += ((lastWall ? Math.min(1000, nowW - lastWall) : 16) - wallDt) * 0.05; lastWall = nowW;
     const active = activeBodyId && state.has(activeBodyId) ? state.get(activeBodyId) : null;
@@ -221,6 +235,12 @@ export function createWorld(scene) {
     let hzn = -1, closedSky = false, farVeil = 0;
     if (active) {
       active.root.updateMatrixWorld(true);
+      _camL.copy(cameraPos); active.root.worldToLocal(_camL);
+      if (!active.camPrev) active.camPrev = new THREE.Vector3(1e9, 0, 0);
+      if (_camL.length() - active.body.radius < 2500 && (active.seenFrame !== frameNo - 1 || active.camPrev.distanceToSquared(_camL) > 3600)) {
+        veil.on = true; veil.lift = -1; veil.wall = nowW; veil.frames = 0; veil.calm = 0;
+      }
+      active.camPrev.copy(_camL); active.seenFrame = frameNo;
       active.root.getWorldPosition(_hup);
       _hup.subVectors(cameraPos, _hup);
       const cr = _hup.length();
@@ -288,13 +308,14 @@ export function createWorld(scene) {
       // (when frames are already very slow, as in software rendering, building is given a
       // share of the frame instead of a fixed few milliseconds, or nothing would ever settle)
       const tb = performance.now(), slice = (wallDt > 80 && !fixedSlice ? Math.max(budgetMs, Math.min(220, wallDt * 0.3)) : budgetMs) * 0.8;
-      if (isActive && st.flora && (frameNo & 1) && st.flora.busy > 0 && st.terrain.busy > 0) {
-        st.flora.update(st.camLocal, true, slice);
-        st.terrain.update(st.camLocal, Math.max(0, slice - (performance.now() - tb)));
+      if (st.flora && !st.flora.groundReady) st.flora.groundReady = (f, u, v) => veil.on || st.terrain.settledAt(f, u, v);
+      if (isActive && st.flora && (frameNo & 1) && st.flora.queue.length > 0 && st.terrain.busy > 0) {
+        st.flora.update(st.camLocal, true, slice, washNow);
+        st.terrain.update(st.camLocal, Math.max(0, slice - (performance.now() - tb)), washNow, veil.on);
       } else {
-        st.terrain.update(st.camLocal, isActive ? slice : 0);
+        st.terrain.update(st.camLocal, isActive ? slice : 0, washNow, veil.on);
         if (isActive) { const tt = performance.now() - tb; if (tt > prof.terrain) prof.terrain = tt; }
-        if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, slice - (performance.now() - tb)) : 0);
+        if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, slice - (performance.now() - tb)) : 0, washNow);
       }
       if (!isActive) {
         if (st.near) st.near.update(st.camLocal, false);
@@ -308,7 +329,7 @@ export function createWorld(scene) {
           if (farVeil > 0.01) bu.uHaze.value.lerp(skyU.uStormWash.value, Math.min(1, skyU.uWxSky.value.y * 1.25) * farVeil * 0.85);
         }
         else bu.uFog.value.set(1e-7, 6, 0, st.limbK);
-        bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0); bu.uStorm.value = 0;
+        bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0); bu.uStorm.value = 0; bu.uHazeUp.value.w = 0;
       }
     }
     if (active) {
@@ -318,8 +339,25 @@ export function createWorld(scene) {
       const here = sampleSurfacePure(st.id, _up.x, _up.y, _up.z);
       const ground = here.radius;
       // the near ground: one layer of strokes round the eye (built on first use, in what is left of the slice)
-      if (!st.near) st.near = new NearGround(st.id, st.root, bu);
-      st.near.update(st.camLocal, true, camR - ground, Math.max(0.6, wallDt > 80 && !fixedSlice ? Math.min(110, wallDt * 0.15) : budgetMs * 0.25), dt, nearPixel);     // (in slow frames a share of the frame, like the terrain)
+      if (!st.near) {
+        st.near = new NearGround(st.id, st.root, bu);
+        // (strokes come last: when the ground under the eye has settled and what stands on it has been laid)
+        st.near.groundReady = (f, u, v) => veil.on || (st.terrain.settledAt(f, u, v) && !(st.flora && (st.flora.held.length || washNow - st.flora.lastRelease < 0.3)));
+      }
+      st.near.update(st.camLocal, true, camR - ground, Math.max(0.6, wallDt > 80 && !fixedSlice ? Math.min(110, wallDt * 0.15) : budgetMs * 0.25), washStep, nearPixel);
+      // the held picture: it comes up when nothing is left to lay (or, on a machine too slow for that, after 20 s and 240 frames)
+      if (veil.on) {
+        veil.frames++;
+        if (veil.lift < 0) {
+          const left = st.terrain.busy + (st.flora ? st.flora.queue.length + st.flora.held.length : 0) + st.near.pending;
+          veil.calm = left === 0 ? veil.calm + 1 : 0;
+          if (veil.calm >= 2 || (nowW - veil.wall > 20000 && veil.frames > 240)) veil.lift = washNow;
+          SHEET.laid = 0;
+        } else {
+          SHEET.laid = Math.min(1, (washNow - veil.lift) / VEIL_LIFT);
+          if (SHEET.laid >= 1) veil.on = false;
+        }
+      } else SHEET.laid = 1;     // (in slow frames a share of the frame, like the terrain)
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
       let mist = 0, twi = 0;
@@ -399,6 +437,9 @@ export function createWorld(scene) {
       bu.uGlaze.value.copy(tmpKey.glaze);
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
+      // (under a closed sky the far air takes the sky's own wash high in the view: see pcHazeAt)
+      bu.uHazeUp.value.set(tmpKey.zenith.x, tmpKey.zenith.y, tmpKey.zenith.z, oc * 0.9 * (1 - space01));
+      bu.uUpW.value.copy(_hup);
       bu.uDayness.value = dayness;
       if (lastActive && st.id !== lastActive) freshSnow = 0;
       freshSnow = Math.min(1, Math.max(0, freshSnow + dt * (veilS > 0.02 ? veilS / 22 : -1 / 300)));
@@ -450,7 +491,7 @@ export function createWorld(scene) {
       skyU.uSunDirL.value.copy(_v2.sub(cameraPos)).normalize();
       skyU.uBodyInv.value.identity();
       skyU.uCamL.value.set(0, 1, 0);
-      SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0;
+      SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0; SHEET.laid = 1; veil.on = false;
       const du = defaultBodyUniforms();
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0);
       lighting.bodyId = null; lighting.space01 = 1;
@@ -508,7 +549,9 @@ export function createWorld(scene) {
 
   function busy() {
     let n = 0;
-    for (const st of state.values()) { n += st.terrain.busy; if (st.flora) n += st.flora.busy; if (st.near) n += st.near.busy; }
+    // (the ground easing into a finer look counts on the world one stands on: a frame taken at 0 shows nothing half arrived)
+    if (veil.on) n++;
+    for (const st of state.values()) { n += st.terrain.busy + (st.terrain.easing && st.terrain.detail && st.id === lastActive ? 1 : 0); if (st.flora) n += st.flora.busy; if (st.near) n += st.near.busy; }
     return n;
   }
 

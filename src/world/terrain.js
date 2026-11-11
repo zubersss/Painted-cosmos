@@ -15,6 +15,7 @@ const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at 
 const MORPH_B = 0.98;
 const ANCHOR = 64;          // stroke textures repeat with periods that divide this (metres)
 const KEEP_FRAMES = 240;    // unused children are disposed after this many updates
+const EASE_T = 0.3;         // seconds a patch that has taken over from its parent takes to slide from the parent's look to its own
 const RELIEF_K = 1.6, RELIEF_MAX = 0.7;
 
 let _sharedIndex = null;
@@ -42,6 +43,9 @@ class Node {
     this.avgR = R;
     this.lastUsed = 0;
     this.dist = 0;
+    this.shown = -1e9;   // when it took over from its parent (the wash clock, s): it eases out of the parent's look from then
+    this.seen = -9;      // the last update in which it was drawn
+    this.handed = -9;    // the last update in which its children were drawn in its place
     this.boost = 1;      // steep ground is refined from further away (set once the patch exists)
     this.pBoost = 1;     // the parent's boost: sets where this patch has fully morphed into it
   }
@@ -65,7 +69,7 @@ export class PlanetTerrain {
     for (let f = 0; f < 6; f++) this.roots.push(new Node(f, 0, 0, 0, this.R));
     this.queue = [];
     this.job = null; this.jobNode = null;
-    this.frame = 0;
+    this.frame = 0; this.now = 0; this.easing = false;
     this.camLocal = new THREE.Vector3(0, this.R * 3, 0);
     this.camDir = new THREE.Vector3(0, 1, 0);
     this.visible = [];
@@ -87,6 +91,10 @@ export class PlanetTerrain {
     g.setAttribute('aColor', new THREE.BufferAttribute(d.colors, 4, true));
     g.setAttribute('aColor2', new THREE.BufferAttribute(d.colors2, 4, true));
     g.setAttribute('aParams', new THREE.BufferAttribute(d.params, 4, true));
+    g.setAttribute('aColorP', new THREE.BufferAttribute(d.colorsP, 4, true));
+    g.setAttribute('aColor2P', new THREE.BufferAttribute(d.colors2P, 4, true));
+    g.setAttribute('aParamsP', new THREE.BufferAttribute(d.paramsP, 4, true));
+    g.setAttribute('aNormalP', new THREE.BufferAttribute(d.normalsP, 3));
     g.setIndex(sharedIndex());
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
     const mesh = new THREE.Mesh(g, this.material);
@@ -104,7 +112,10 @@ export class PlanetTerrain {
       u.uOrigin.value.copy(origin); u.uAnchor.value.copy(anchor);
       u.uCamLocal.value.copy(camRel.subVectors(terrain.camLocal, origin));
       const mergeUnit = mergeUnit0 * (1 + (node.pBoost - 1) * terrain.boostK);
-      u.uMorph.value.set(mergeUnit * terrain.splitK * MORPH_A, mergeUnit * terrain.splitK * MORPH_B);
+      // (a patch that took over from its parent a moment ago still wears the parent's look and eases out of it)
+      let worn = 0;
+      if (node.level > 0) { const a = (terrain.now - node.shown) / EASE_T; if (a < 1) { const e = a < 0 ? 0 : a; worn = 1 - e * e * (3 - 2 * e); } }
+      u.uMorph.value.set(mergeUnit * terrain.splitK * MORPH_A, mergeUnit * terrain.splitK * MORPH_B, worn);
       material.uniformsNeedUpdate = true;
     };
     this.group.add(mesh);
@@ -178,40 +189,77 @@ export class PlanetTerrain {
     return Math.max(0, _v.copy(this.camLocal).sub(node.center).length() - node.boundR);
   }
 
-  _select(node) {
+  // Is the ground at a place (cube face, u, v) on the paper as it will stay: drawn at the level its distance
+  // asks for, and in its own look? (What grows on it is laid only then: far ground settles first.)
+  settledAt(face, u, v) {
+    let n = this.roots[face];
+    const fr = this.frame;
+    for (;;) {
+      if (n.seen === fr) return !n.split && this.now - n.shown >= EASE_T;
+      if (!n.children) return false;
+      n = n.children[(u >= (n.u0 + n.u1) * 0.5 ? 1 : 0) + (v >= (n.v0 + n.v1) * 0.5 ? 2 : 0)];
+    }
+  }
+
+  // `ahead`: the node is not drawn yet (an ancestor is still easing into its own look); its children are
+  // asked for all the same, so the ground is ready the moment it may be shown.
+  _select(node, ahead) {
     node.lastUsed = this.frame;
     const d = this._nodeDist(node);
     node.dist = d;
     const split = this.detail && node.level < this.maxLevel && d < this.splitK * (1 + (node.boost - 1) * this.boostK) * node.size;
+    node.split = split;
     if (split) {
       if (!node.children) {
         const l = node.level + 1, x = node.ix * 2, y = node.iy * 2;
         node.children = [new Node(node.face, l, x, y, this.R), new Node(node.face, l, x + 1, y, this.R), new Node(node.face, l, x, y + 1, this.R), new Node(node.face, l, x + 1, y + 1, this.R)];
-        for (const c of node.children) { c.avgR = node.avgR; c.pBoost = node.boost; }
+        for (const c of node.children) { c.avgR = node.avgR; c.pBoost = node.boost; c.parent = node; }
       }
       let all = true;
       for (const c of node.children) { if (!c.ready) { all = false; c.dist = d; c.lastUsed = this.frame; this._request(c); } }
-      if (all) { for (const c of node.children) this._select(c); return; }
+      if (all) {
+        // children take over only from a parent that wears its own look: one that came a moment ago is
+        // still sliding out of ITS parent's, and what the children would slide from is not on the paper yet
+        // (`handed`: it gave way to its children in the last frame already)
+        const settled = ahead ? false : this.instant || node.level === 0 || node.handed >= this.frame - 1 || (node.seen >= this.frame - 1 && this.now - node.shown >= EASE_T);
+        if (settled) { node.handed = this.frame; for (const c of node.children) this._select(c, false); return; }
+        for (const c of node.children) this._select(c, true);
+      }
     } else if (node.children) {
       // keep finer patches around for a while, then let them go
       let stale = true;
       for (const c of node.children) if (this.frame - c.lastUsed < KEEP_FRAMES) stale = false;
       if (stale) { for (const c of node.children) this._dispose(c); node.children = null; }
     }
-    if (node.ready) this.visible.push(node);
+    if (node.ready && !ahead) this.visible.push(node);
   }
 
   // camLocal: camera position in this body's local frame. budgetMs: time allowed for building.
-  update(camLocal, budgetMs) {
+  // now: the wash clock (s); without it the ground does not ease (every patch is in its own look at once).
+  // instant: nothing eases (the picture is held while the land is laid: an arrival).
+  update(camLocal, budgetMs, now, instant) {
     this.frame++;
+    this.now = now == null ? this.now + 1e3 : now;
+    this.instant = !!instant;
     this.splitK = SPLIT_BY_QUALITY[QUALITY.level] || 1.12;
     this.boostK = QUALITY.level === 0 ? 0.15 : 1;     // the low tier spends little on cliffs
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();
     for (const n of this.visible) { n.mesh.visible = false; if (n.water) n.water.visible = false; }
     this.visible.length = 0;
-    for (const r of this.roots) this._select(r);
-    for (const n of this.visible) { n.mesh.visible = true; if (n.water) n.water.visible = true; }
+    for (const r of this.roots) this._select(r, false);
+    const fr = this.frame, vis = this.visible;
+    // which of them are new on the paper, and from where: one that takes over from its parent (drawn in the
+    // last frame) eases out of the parent's look; one that takes over from its own children is their look already
+    for (const n of vis) n.fresh = n.seen < fr - 1;
+    for (const n of vis) {
+      if (n.fresh) n.shown = !this.instant && n.parent && n.parent.seen >= fr - 1 ? this.now : -1e9;
+      else if (this.instant) n.shown = -1e9;
+      n.mesh.visible = true; if (n.water) n.water.visible = true;
+    }
+    let easing = false;
+    for (const n of vis) { n.seen = fr; if (this.now - n.shown < EASE_T) easing = true; }
+    this.easing = easing;
     if (!this.detail && (this.queue.length || this.job)) {
       // not the body the camera is on: nothing is wanted beyond the six root patches
       for (const n of this.queue) n.queued = false;

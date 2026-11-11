@@ -30,7 +30,7 @@ function baseUniforms(bodyU, own) {
   const b = bodyU || defaultBodyUniforms();
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK,
-    uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
+    uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
     uFog: b.uFog, uDayness: b.uDayness, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
 }
@@ -49,10 +49,14 @@ attribute vec3 aMorph;
 attribute vec4 aColor;
 attribute vec4 aColor2;
 attribute vec4 aParams;
+attribute vec4 aColorP;   // the same vertex as the parent patch paints it (washes, parameters, normal): a patch
+attribute vec4 aColor2P;  // that has just taken over from its parent shows exactly what the parent showed
+attribute vec4 aParamsP;  // and slides to its own look, so the ground never changes in one frame
+attribute vec3 aNormalP;
 uniform vec3 uOrigin;     // patch origin, body-local metres
 uniform vec3 uAnchor;     // patch origin modulo the stroke tile period
 uniform vec3 uCamLocal;   // camera relative to the patch origin, body-local axes
-uniform vec2 uMorph;      // distance range over which this level morphs to its parent
+uniform vec3 uMorph;      // xy: distance range over which this level morphs to its parent; z: how much of the parent's look it still wears (it took over a moment ago)
 varying vec3 vBody;
 varying vec3 vAnch;
 varying vec3 vNV;
@@ -64,16 +68,17 @@ varying vec4 vPar;
 varying vec3 vUpV;
 void main() {
   float d = distance(position, uCamLocal);
-  float m = clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0);
+  float m = max(clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0), uMorph.z);
   vec3 p = position + aMorph * m;
   vBody = p + uOrigin;
   vAnch = p + uAnchor;
-  vNL = normal;
-  vNV = normalMatrix * normal;
+  vec3 nrm = normalize(normal + aNormalP * m);
+  vNL = nrm;
+  vNV = normalMatrix * nrm;
   vUpV = normalMatrix * normalize(vBody);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vView = mv.xyz;
-  vCol = aColor; vCol2 = aColor2.rgb; vPar = aParams;
+  vCol = mix(aColor, aColorP, m); vCol2 = mix(aColor2.rgb, aColor2P.rgb, m); vPar = mix(aParams, aParamsP, m);
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }
@@ -200,7 +205,7 @@ void main() {
   } else pud = 0.0;
 
   float f = pcFogAmount(dist);
-  c = pcAtmos(c, f);
+  c = pcAtmosV(c, f, vView);
   // from space the limb of the planet thins into its haze, toward bare paper
   vec3 upV = normalize(vUpV);
   float limb = pow(1.0 - clamp(dot(upV, normalize(-vView)), 0.0, 1.0), 2.5) * uFog.w;
@@ -218,7 +223,7 @@ export function makeTerrainMaterial(bodyU) {
     name: 'pc-terrain',
     uniforms: baseUniforms(bodyU, {
       uOrigin: { value: new THREE.Vector3() }, uAnchor: { value: new THREE.Vector3() },
-      uCamLocal: { value: new THREE.Vector3() }, uMorph: { value: new THREE.Vector2(1e8, 2e8) },
+      uCamLocal: { value: new THREE.Vector3() }, uMorph: { value: new THREE.Vector3(1e8, 2e8, 0) },
     }),
     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
   });
@@ -257,7 +262,9 @@ void main() {
   // and they die away at the waterline, so the shore does not crawl
   float lam = 6.2831853 / max(uPhysWaterK.x, 1e-3);
   float carry = 1.0 - smoothstep(2.2 * lam * uWaveLod, 6.0 * lam * uWaveLod, distance(p, uCamLocal));
-  float shoal = smoothstep(0.0, 1.0, aDepth / max(uPhysWaterSea.x * 1.3, 0.05));
+  // (a wave keeps its height into the shallows and falls away only over the last of the depth: with the
+  // whole height asked for at 1.3 times the wave's own, a 2.8 m sea lay flat for the first 30 m off a shelving shore)
+  float shoal = smoothstep(0.0, 1.0, aDepth / max(uPhysWaterSea.x * 0.45, 0.05));
   p += normalize(vBody) * ((w.x + vWake.x) * carry * shoal);
   vBody = p + uOrigin;
   vToCam = uCamLocal - p;
@@ -421,8 +428,13 @@ void main() {
   // broken edge of swash that can still be seen from far off)
   float sz = pcPhysWaterSurf(vDepth);
   float surf = sz * sz * smoothstep(0.50, 0.85, hN + (r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5);
-  float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDepth)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
-  surf = max(surf, swash * smoothstep(0.40, 0.60, r2.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
+  // (the swash runs up the shore with each wave and draws back, and its lace is carried in with the
+  // waves, torn anew as it goes: a rim drawn from a still pattern was frozen from frame to frame)
+  vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
+  float run = 0.5 + 0.5 * clamp(wv.x / hs, -1.0, 1.0) * smoothstep(0.04, 0.35, uPhysWaterSea.x);
+  vec4 rsw = texture(uNoise3D, (vBody - D3 * (uTime * 0.55)) / 1.35);
+  float swash = (1.0 - smoothstep(0.03, (0.05 + 0.22 * hs) * (0.30 + 1.25 * run), vDepth)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
+  surf = max(surf, swash * smoothstep(0.40, 0.60, rsw.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
   // far off, where the waves are finer than the brush can hold: the swell as a painter lays it,
   // long broken strokes lying the way the crests lie (anchored to the planet), the hollow before
   // each one darker, and on a sea that is breaking a white horse here and there along them
@@ -430,14 +442,15 @@ void main() {
   // (seen across the water a swell 20 m long is a hair's breadth on the sheet: the strokes are
   // spaced by what the brush can hold there, a dozen pixels, in octaves that give way to one
   // another with distance, each one fixed to the planet)
-  vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
   vec3 A3 = normalize(cross(up, D3));
+  // (a sea running high: deeper hollows, paler backs and more white horses, so a gale reads from the shore)
+  float gale = smoothstep(0.6, 2.6, uPhysWaterSea.x);
   float qd = dot(vBody, D3);
   float lk = max(0.0, log2(max(13.0 * fwidth(qd), 1.0e-3) / 8.5) / 1.3785);
   // (far: where a pixel is wider than the brush can draw a wave in, a metre or two of sea)
   float farSea = smoothstep(0.35, 1.6, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, uPhysWaterSea.x) * liq * deep;
   if (farSea > 0.01) {
-    float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * uPhysWaterSea.w;
+    float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * uPhysWaterSea.w - 0.13 * gale;
     float sw = 0.0, wh = 0.0, hol = 0.0;
     for (int i = 0; i < 2; i++) {
       float L = 8.5 * pow(2.6, k0 + float(i)), wgt = i == 0 ? 1.0 - kf : kf;
@@ -446,11 +459,11 @@ void main() {
       float br = texture(uNoise3D, vec3(dot(vBody, A3) / (L * 4.0), id * 0.371, id * 0.117)).r;
       float ln = smoothstep(0.70, 0.82, s) * (1.0 - smoothstep(0.92, 1.0, s));
       sw += wgt * ln * smoothstep(0.40, 0.54, br);
-      wh += wgt * smoothstep(0.80, 0.88, s) * (1.0 - smoothstep(0.93, 1.0, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
+      wh += wgt * smoothstep(0.80 - 0.05 * gale, 0.88 - 0.05 * gale, s) * (1.0 - smoothstep(0.93, 1.0, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
       hol += wgt * smoothstep(0.28, 0.52, s) * (1.0 - smoothstep(0.66, 0.76, s)) * smoothstep(0.35, 0.60, br);
     }
-    c = pcDensity(c, 1.0 + farSea * (hol * 0.75 - sw * 0.25));
-    c = mix(c, skyc, farSea * sw * 0.50);
+    c = pcDensity(c, 1.0 + farSea * (hol * (0.75 + 0.60 * gale) - sw * 0.25));
+    c = mix(c, skyc, farSea * sw * (0.50 + 0.22 * gale));
     farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq, farWhite);
@@ -461,7 +474,7 @@ void main() {
   // no sea; the painter keeps it darker than the sky to the horizon and lets the stacks go pale)
   // (and what glows is seen through the haze: lava keeps its fire into the distance)
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
-  c = pcAtmos(c, f);
+  c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
 `;
@@ -658,8 +671,11 @@ void main() {
     if (hole > 0.0 && texture(uNoise3D, vBody / 0.9).r * 0.8 + 0.08 < hole) discard;
   }
   // a wash being laid (or lifted): broken strokes that fill in, anchored to the thing itself
+  // (the touches are sized to the distance, in steps: about a hundredth of it and four times that, so a far
+  // crown fills in by a few blotches over the half second and is never a stipple of single pixels)
   if (vWash < 0.999) {
-    float wn = texture(uNoise3D, vBody / 2.3).g * 0.5 + texture(uNoise3D, vBody / 0.6).b * 0.5;
+    float ws = exp2(floor(log2(max(vd, 30.0) / 60.0) + 0.5));
+    float wn = texture(uNoise3D, vBody / (2.3 * ws)).g * 0.5 + texture(uNoise3D, vBody / (0.6 * ws)).b * 0.5;
     wn = clamp((wn - 0.5) * 1.5 + 0.5, 0.02, 0.98);
     if (vWash >= 0.0 ? wn > vWash : wn < 1.0 + vWash) discard;
   }
@@ -782,7 +798,7 @@ void main() {
     c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));
     id = 3.0 + seed * 0.9;
   }
-  c = pcAtmos(c, vFog);
+  c = pcAtmosV(c, vFog, vView);
   wet = max(max(wet, vFog * 0.85), uWx.w * smoothstep(10.0, 90.0, vd) * 0.9);
   pcWrite(c, wet, nV, -vView.z, id);
 }
@@ -934,7 +950,7 @@ void main() {
   #endif
   c = pcTone(c, lvl);
   float f = pcFogAmount(length(vView));
-  c = pcAtmos(c, f);
+  c = pcAtmosV(c, f, vView);
   pcWrite(c, max(uWash.z, f * 0.8), nV, -vView.z, uWash.w);
 }
 `;
@@ -1033,7 +1049,7 @@ void main() {
   lit = mix(lit, vec3(1.0), dryM * vMat.x * 0.16 * clamp(lvl - 1.0, 0.0, 1.5));
   c = mix(lit, vCol, vMat.z);
   float f = pcFogAmount(length(vView));
-  c = pcAtmos(c, f);
+  c = pcAtmosV(c, f, vView);
   pcWrite(c, max(vMat.y, f * 0.8), nV, -vView.z, uFig.w);
 }
 `;
@@ -1228,7 +1244,7 @@ void main() {
   float lvl = pcLevel(x, 0.05);
   c = pcTone(c, lvl);
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
-  c = pcAtmos(c, vFog);
+  c = pcAtmosV(c, vFog, vView);
   // the accents are left as the brush drew them; the rest belong to the ground's wash, and
   // the farther rings' touches are softer still
   pcWrite(c, max(max(vAcc > 0.5 ? 0.2 : 0.45, uNear2.z), vFog * 0.9), nV, -vView.z, (vAcc > 0.5 ? 6.0 : 4.0) + vS.z * 0.9);

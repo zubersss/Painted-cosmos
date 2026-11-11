@@ -135,7 +135,7 @@ void main() {
   // the ink: that of the ground the thing came from, where it came from the ground
   vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${shapeOf(kind, info)}
-  c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
+  c = pcAtmosV(pcTone(c, 2.0), pcFogAmount(length(vView)), vView);
   ${info.veil && (kind === 'dust' || kind === 'ash' || kind === 'sand') ? 'c = mix(c, vec3(0.985, 0.975, 0.955), lift);' : ''}
   ${glaze ? 'if (log2(1.0 + max(-vView.z, 0.0)) > texture(uSceneAux, gl_FragCoord.xy / uSceneRes).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,

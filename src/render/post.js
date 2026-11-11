@@ -111,6 +111,7 @@ uniform vec4 uBorder;     // width, raggedness, pooling, enabled
 uniform vec2 uBoil;
 uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm), y lightning flash
 uniform float uNight;     // the night key: 0 day .. 1 night on the ground
+uniform float uLaid;      // 1 the picture is on the paper; 0 bare paper; between: it comes up from the paper as one
 varying vec2 vUv;
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
@@ -127,6 +128,16 @@ void main() {
   vec4 c = texture(tAbs, uv);
   vec3 col = c.rgb;
   float wet = c.a;
+  // A picture being laid (an arrival): the washes come up out of the bare paper as one, the sky and the
+  // far end a little before the ground at the feet, in broad soft tides that follow the paper: never
+  // a piece at a time, never a stipple.
+  float laid = 1.0;
+  if (uLaid < 0.999) {
+    float when = 0.40 * (1.0 - vUv.y) + 0.28 * plo.r + 0.10 * pmid.r;
+    laid = smoothstep(0.0, 0.62, uLaid * 1.42 - when);
+    col = mix(vec3(1.0), col, laid);
+    wet *= laid;
+  }
   // night is its own painting, not the day darkened: the hue narrows to the night's indigo,
   // and (below) every wash carries far more pigment, so the darks and middles run together
   // into a few deep masses while whatever was left as paper stays paper: the reserved lights
@@ -199,7 +210,7 @@ void main() {
   float line = max(smoothstep(0.14, 0.38, dz) * 0.6, min(idc, 1.0) * 0.38) * (1.0 - fol * 0.85);
   line *= 1.0 - max(step(5.5, a0.w), max(step(5.5, a1.w), step(5.5, a2.w)));   // nothing is outlined in the air
   line *= smoothstep(0.50, 0.70, plo.r + (pmid.r - 0.5) * 0.7) * (0.30 + 0.70 * smoothstep(0.35, 0.6, ph)) * (1.0 - smoothstep(6.5, 9.5, a0.z));
-  col *= mix(vec3(1.0), vec3(0.46, 0.46, 0.50), line * uPig.w);
+  col *= mix(vec3(1.0), vec3(0.46, 0.46, 0.50), line * uPig.w * laid);
 
   // lightning: for a frame or two the paper shows through. The sky and the lights go bare,
   // the darks stay as silhouettes against them
@@ -291,7 +302,7 @@ export class Post {
       uBorder: { value: new THREE.Vector4(0.030, 0.034, 0.9, 1) },
       uBoil: { value: new THREE.Vector2(0, 0) },
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
-      uNight: { value: 0 },
+      uNight: { value: 0 }, uLaid: { value: 1 },
     };
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms);
     this.debugView = 0;

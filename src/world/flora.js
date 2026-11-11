@@ -24,6 +24,8 @@ const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
+const HOLD_MAX = 6;                    // seconds a built cell waits at most for its ground to be on the paper
+const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
@@ -32,7 +34,7 @@ const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungu
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
 const _Y = new THREE.Vector3(0, 1, 0);
-const _ff = {}, _dd = [0, 0, 0];
+const _ff = {}, _dd = [0, 0, 0], _laid = [false, false, false, false];
 
 export class Flora {
   constructor(bodyId, root, bodyUniforms) {
@@ -50,6 +52,9 @@ export class Flora {
     this.farSize = this.treeSize * 2;       // far trees are batched in cells twice as large
     this.rangeScale = 1; this.lastScale = -1;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
+    this.lastRelease = -10;
+    this.held = [];                    // cells that are built and wait for their ground (see update)
+    this.groundReady = null;           // (face, u, v) -> is the ground there on the paper as it will stay (set by the world)
     this.focusV = new THREE.Vector4(); this._focusFrame = -1; this._focusCam = null;       // the wash clock (s): real time, in steps of at most 0.1 s (it runs when the wind's clock is frozen too)
     this.retierCursor = 0;
     this.starved = 0;
@@ -107,7 +112,7 @@ export class Flora {
   }
 
   // (still busy while a wash is being laid: a frame taken when this reaches 0 shows nothing half arrived)
-  get busy() { return this.queue.length + (this.group.visible && this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0); }
+  get busy() { return this.queue.length + (this.group.visible ? this.held.length + (this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0) : 0); }
 
   // An InstancedMesh with room for `cap` instances that shares the kit geometry's buffers.
   _instanced(chunk, geo, mat, cap, lod, far) {
@@ -150,7 +155,12 @@ export class Flora {
     if (chunk.kind === 'far') {
       // the four tree cells under this far cell, concatenated
       const parts = [];
-      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) { const t = treeCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count; }
+      // (which tree cell each tree came from: while that cell's own trees are not laid, the far form stands in for them)
+      chunk.partEnd = []; chunk.partKey = [];
+      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) {
+        const t = treeCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count;
+        chunk.partEnd.push(n); chunk.partKey.push(chunk.face * 1e8 + (chunk.ix * 2 + a) * 1e4 + chunk.iy * 2 + b);
+      }
       d = new Float32Array(n * INST_STRIDE);
       let o = 0;
       for (const t of parts) { d.set(t.data.subarray(0, t.count * INST_STRIDE), o); o += t.count * INST_STRIDE; }
@@ -221,6 +231,13 @@ export class Flora {
     // 600 k triangles): full trees and middle trees hand over a little sooner
     const trim0 = QUALITY.level === 1 ? TRIM[0] : 1, trim1 = QUALITY.level === 1 ? TRIM[1] : 1;
     let changed = false;
+    // a far cell: are the trees of its four tree cells laid? Where they are not (not built yet, or waiting
+    // for their ground), the far form stands in at any distance, and changes hands when they come
+    let pe = null, laid = null, part = 0;
+    if (chunk.kind === 'far') {
+      pe = chunk.partEnd; laid = _laid;
+      for (let q = 0; q < 4; q++) { const nc = this.treeChunks.get(chunk.partKey[q]); laid[q] = !!(nc && nc.built && !nc.held && !nc.dead); }
+    }
     for (let i = 0; i < n; i++) {
       const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -232,6 +249,7 @@ export class Flora {
       else if (dist < T_THIN * j) t = 2;
       else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
+      if (pe) { while (i >= pe[part]) part++; if (t >= 0 && t < 2 && !laid[part]) t = 2; }
       if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
     }
     chunk.tierPos.copy(this.camLocal);
@@ -384,7 +402,7 @@ export class Flora {
         const span = 2 / cells;
         faceToDir(_ff.face, -1 + (ix + 0.5) * span, -1 + (iy + 0.5) * span, _dd);
         const h = this.S.heightAt(_dd[0], _dd[1], _dd[2]);
-        map.set(key, { key, face: _ff.face, ix, iy, size, kind, isTree: kind === 'near' || kind === 'far', origin: new THREE.Vector3(_dd[0], _dd[1], _dd[2]).multiplyScalar(R + h), meshes: [], built: false, queued: false, dead: false });
+        map.set(key, { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far', origin: new THREE.Vector3(_dd[0], _dd[1], _dd[2]).multiplyScalar(R + h), meshes: [], built: false, queued: false, dead: false });
       }
     }
     for (const [key, ch] of map) {
@@ -394,17 +412,42 @@ export class Flora {
     for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
   }
 
-  // budgetMs: time this call may spend building and re-tiering.
-  update(camLocal, active, budgetMs) {
+  // A cell is built when its turn comes and laid on the paper when its ground is there as it will stay
+  // (or after HOLD_MAX seconds): on an arrival the far ground settles first, so the far masses wash in
+  // first, then the trees round the eye, then what grows under them. Nothing is laid on ground that is
+  // still sliding into place.
+  _hold(ch) {
+    ch.held = true; ch.heldAt = this.washNow;
+    for (const m of ch.meshes) m.visible = false;
+    this.held.push(ch);
+  }
+  _release(ch) {
+    ch.held = false;
+    const now = this.washNow;
+    if (now > ch.heldAt) this.lastRelease = now;      // (it did wait: the near ground's strokes come after it)
+    if (ch.isTree) {
+      this._retier(ch);
+      // the far forms that stood in for these trees are lifted out as the trees are laid
+      if (ch.kind === 'near') { const far = this.farChunks.get(ch.face * 1e8 + (ch.ix >> 1) * 1e4 + (ch.iy >> 1)); if (far && far.built && !far.held && !far.dead) this._retier(far); }
+    } else {
+      for (const m of ch.meshes) { m.userData.laid = now; m.visible = !(m.userData.skipLow && QUALITY.level === 0); }
+      if (ch.meshes.length) this.lastLaid = now;
+    }
+  }
+
+  // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
+  update(camLocal, active, budgetMs, now) {
     this.camLocal.copy(camLocal);
     this.rangeScale = RANGE_SCALE[QUALITY.level] || 1;
-    { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
+    if (now != null) this.washNow = now;
+    else { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
     const alt = camLocal.length() - this.R;
     const show = active && alt < 2500;
     this.group.visible = show && !this.hidden;
     if (!show) {
       // nothing to build for a body the camera is not on
       if (this.queue.length) { for (const ch of this.queue) ch.queued = false; this.queue.length = 0; }
+      if (this.held.length) { for (const ch of this.held) if (!ch.dead) this._release(ch); this.held.length = 0; }
       this.lastTreeEval.set(1e9, 0, 0); this.lastUnderEval.set(1e9, 0, 0);
       return;
     }
@@ -451,8 +494,8 @@ export class Flora {
     let spent = false;
     if (this.queue.length) {
       const q = this.queue, cam = this.camLocal;
-      for (const ch of q) ch.dist = ch.origin.distanceTo(cam) - (ch.isTree ? 0 : 60);
-      q.sort((a, b) => b.dist - a.dist);
+      for (const ch of q) ch.dist = ch.origin.distanceTo(cam);
+      q.sort((a, b) => (b.rank - a.rank) || (b.dist - a.dist));     // pop() takes the far masses first, then the nearest
       let built = 0;
       while (q.length) {
         const ch = q[q.length - 1];
@@ -477,12 +520,24 @@ export class Flora {
         }
         q.pop();
         ch.queued = false;
-        if (ch.isTree) { this._buildTrees(ch); this._retier(ch); } else this._buildUnder(ch);
+        if (ch.isTree) this._buildTrees(ch); else this._buildUnder(ch);
         ch.built = true; built++;
+        this._hold(ch);
         this.est[ch.kind] += (Math.min(8, performance.now() - ts) - this.est[ch.kind]) * 0.2;
       }
       this.starved = built ? 0 : this.starved + 1;
       spent = performance.now() - t0 >= budgetMs;
+    }
+    // lay the cells whose ground has come
+    if (this.held.length) {
+      const h = this.held, ready = this.groundReady, wn = this.washNow;
+      let w = 0;
+      for (let a = 0; a < h.length; a++) {
+        const ch = h[a];
+        if (ch.dead) continue;
+        if (!ready || wn - ch.heldAt > HOLD_MAX || ready(ch.face, ch.fu, ch.fv)) this._release(ch); else h[w++] = ch;
+      }
+      h.length = w;
     }
     let t2 = performance.now(); if (t2 - t1 > prof.build) prof.build = t2 - t1;
     // re-tier: chunks near a tier boundary react to a few metres of travel, far ones to more
@@ -491,7 +546,7 @@ export class Flora {
       const nearR = T1 * k * (1 + JIT * 0.5) + this.treeSize;
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
-        if (!ch.built || !ch.n) continue;
+        if (!ch.built || !ch.n || ch.held) continue;
         if (ch.washUntil && this.washNow > ch.washUntil) { this._retier(ch, true); continue; }
         const moved = ch.tierPos.distanceTo(camLocal);
         if (moved < 3) continue;

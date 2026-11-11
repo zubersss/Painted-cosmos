@@ -86,6 +86,9 @@ export function stepPatch(job, deadline) {
   const nv = PATCH_VERTS;
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), mor = new Float32Array(nv * 3);
   const col = new Uint8Array(nv * 4), col2 = new Uint8Array(nv * 4), par = new Uint8Array(nv * 4);
+  // the same vertex as the parent's (half resolution) mesh paints it: its washes, its parameters and its
+  // normal there, so a patch can show exactly what its parent showed and slide to its own look
+  const colP = new Uint8Array(nv * 4), col2P = new Uint8Array(nv * 4), parP = new Uint8Array(nv * 4), norP = new Float32Array(nv * 3);
   let boundR2 = 0;
   for (let j = 0; j < V; j++) {
     for (let i = 0; i < V; i++) {
@@ -114,8 +117,32 @@ export function stepPatch(job, deadline) {
       col[q] = b8(_col[c]); col[q + 1] = b8(_col[c + 1]); col[q + 2] = b8(_col[c + 2]); col[q + 3] = b8(1 - _col[c + 16]);
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + 9]);
+      if (!io && !jo) {
+        // the parent's own normal here: its grid is twice as wide (at the border the apron is one cell deep)
+        const il2 = i > 0 ? k - 2 : k - 1, ir2 = i < N ? k + 2 : k + 1, jl2 = j > 0 ? k - 2 * E : k - E, jr2 = j < N ? k + 2 * E : k + E;
+        const ax2 = _px[ir2] - _px[il2], ay2 = _py[ir2] - _py[il2], az2 = _pz[ir2] - _pz[il2];
+        const bx2 = _px[jr2] - _px[jl2], by2 = _py[jr2] - _py[jl2], bz2 = _pz[jr2] - _pz[jl2];
+        const mx = ay2 * bz2 - az2 * by2, my = az2 * bx2 - ax2 * bz2, mz = ax2 * by2 - ay2 * bx2;
+        const im = 1 / Math.sqrt(mx * mx + my * my + mz * mz);
+        norP[o] = mx * im; norP[o + 1] = my * im; norP[o + 2] = mz * im;
+      }
     }
   }
+  // the parent's look at every vertex: its own at the vertices they share, halfway between two of them elsewhere
+  for (let j = 0; j < V; j++) {
+    for (let i = 0; i < V; i++) {
+      const v = j * V + i, io = i & 1, jo = j & 1;
+      const v1 = io && !jo ? v - 1 : !io && jo ? v - V : io ? v - V - 1 : v, v2 = io && !jo ? v + 1 : !io && jo ? v + V : io ? v + V + 1 : v;
+      for (let t = 0; t < 4; t++) {
+        colP[v * 4 + t] = (col[v1 * 4 + t] + col[v2 * 4 + t] + 1) >> 1;
+        col2P[v * 4 + t] = (col2[v1 * 4 + t] + col2[v2 * 4 + t] + 1) >> 1;
+        parP[v * 4 + t] = (par[v1 * 4 + t] + par[v2 * 4 + t] + 1) >> 1;
+      }
+      if (io || jo) for (let t = 0; t < 3; t++) norP[v * 3 + t] = (norP[v1 * 3 + t] + norP[v2 * 3 + t]) * 0.5;
+    }
+  }
+  // (kept as the difference from the vertex's own normal, like the morph of its place)
+  for (let v = 0; v < V * V * 3; v++) norP[v] -= nor[v];
   // 3. skirts: copies of the border pulled toward the planet centre
   const size = (Math.PI * 0.5 * R) / (1 << level);
   const drop = Math.max(0.4, (size / N) * 0.75);
@@ -128,7 +155,8 @@ export function stepPatch(job, deadline) {
     nor[o] = nor[p]; nor[o + 1] = nor[p + 1]; nor[o + 2] = nor[p + 2];
     mor[o] = mor[p]; mor[o + 1] = mor[p + 1]; mor[o + 2] = mor[p + 2];
     const a = dst * 4, b = src * 4;
-    for (let t = 0; t < 4; t++) { col[a + t] = col[b + t]; col2[a + t] = col2[b + t]; par[a + t] = par[b + t]; }
+    norP[o] = norP[p]; norP[o + 1] = norP[p + 1]; norP[o + 2] = norP[p + 2];
+    for (let t = 0; t < 4; t++) { col[a + t] = col[b + t]; col2[a + t] = col2[b + t]; par[a + t] = par[b + t]; colP[a + t] = colP[b + t]; col2P[a + t] = col2P[b + t]; parP[a + t] = parP[b + t]; }
   };
   for (let k = 0; k < V; k++) {
     skirt(S0 + k, k); skirt(S0 + V + k, N * V + k); skirt(S0 + 2 * V + k, k * V); skirt(S0 + 3 * V + k, k * V + N);
@@ -160,6 +188,7 @@ export function stepPatch(job, deadline) {
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
+    colorsP: colP, colors2P: col2P, paramsP: parP, normalsP: norP,
     water, boundR: Math.sqrt(boundR2) + drop, minH, maxH, size,
   };
 }

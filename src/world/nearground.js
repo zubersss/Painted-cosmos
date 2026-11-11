@@ -29,6 +29,8 @@ const RINGS = [
   { name: 'mid', cell: 1.9, range: [0, 40, 66], per: 7, inner: [6, 13], soft: 0.6, alt: 90, step: 1 },
   { name: 'far', cell: 6.5, range: [0, 0, 240], per: 5, inner: [38, 66], soft: 0.8, alt: 200, step: 1 },
 ];
+const GROW_T = 0.7;      // seconds a clump laid inside the range takes to grow in (the shader's measure)
+const HOLD_T = 6;        // seconds the strokes wait at most for their ground
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 const sstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -96,29 +98,39 @@ class Ring {
     this.map = new Map();            // cell key -> the slots of its clump (null: nothing there)
     this.free = []; for (let i = N - 1; i >= 0; i--) this.free.push(i);
     this.high = 0; this.lo = N; this.hi = -1; this.all = true;
-    this.pending = []; this.li = 1e9; this.lj = 1e9; this.lf = -1; this.now = 0; this.filled = false; this.range = 0;
+    this.pending = []; this.li = 1e9; this.lj = 1e9; this.lf = -1; this.now = 0; this.filled = false; this.range = 0; this.lastGrown = -10; this.okAt = -10;
     this.s = makeSample(S.nB); this.d = [0, 0, 0]; this.fo = { face: 0, u: 0, v: 0 };
   }
 
-  get busy() { return this.mesh.visible ? this.pending.length : 0; }
+  // (still busy while clumps laid inside the range are growing in: a frame taken at 0 shows a whole sward)
+  get busy() { return this.mesh.visible ? this.pending.length + (this.now - this.lastGrown < GROW_T + 0.1 ? 1 : 0) : 0; }
   get triangles() { return this.mesh.visible ? this.high * 3 : 0; }
 
   clear() {
     this.map.clear(); this.free.length = 0; for (let i = this.N - 1; i >= 0; i--) this.free.push(i);
     this.pending.length = 0; this.lf = -1; this.filled = false; this.high = 0;
+    this.lo = this.N; this.hi = -1;
     this.aAxis.array.fill(0); this.all = true;
   }
   hide() { if (this.mesh.visible) { this.mesh.visible = false; this.clear(); } }
 
-  update(camLocal, alt, sliceMs, dt, pixel) {
+  update(camLocal, alt, sliceMs, dt, pixel, ready) {
     const cfg = this.cfg, RANGE = cfg.range[QUALITY.level] || 0;
     if (!(RANGE > 0) || alt > cfg.alt) { this.hide(); return 0; }
     if (RANGE !== this.range) { this.range = RANGE; if (this.mesh.visible) this.clear(); }
     this.mesh.visible = true;
-    this.now += Math.max(dt || 0, 1 / 60);
+    this.now += dt > 0 ? dt : 0;
     const R = this.S.R, n = this.n, CELL = cfg.cell;
     if (!this.hasOrigin || this.origin.distanceToSquared(camLocal) > 300 * 300) {
-      this.origin.copy(camLocal); this.hasOrigin = true; this.clear();
+      if (!this.hasOrigin || this.origin.distanceToSquared(camLocal) > 900 * 900) this.clear();
+      else {
+        // the eye has moved on: the marks keep their places, written against the new origin (the sward
+        // used to be taken up and laid again here, every 300 m of a walk)
+        const dx = camLocal.x - this.origin.x, dy = camLocal.y - this.origin.y, dz = camLocal.z - this.origin.z, a = this.aRoot.array;
+        for (let o = 0, e = this.high * 3; o < e; o += 3) { a[o] -= dx; a[o + 1] -= dy; a[o + 2] -= dz; }
+        this.all = true;
+      }
+      this.origin.copy(camLocal); this.hasOrigin = true;
       this.material.uniforms.uOrigin.value.copy(this.origin);
       this.mesh.position.copy(this.origin); this.mesh.updateMatrixWorld(true);
     }
@@ -130,6 +142,7 @@ class Ring {
     const il = 1 / camLocal.length(), cx = camLocal.x * il, cy = camLocal.y * il, cz = camLocal.z * il;
     const fo = dirToFace(cx, cy, cz, this.fo), d = this.d;
     const i0 = Math.floor((fo.u * 0.5 + 0.5) * n), j0 = Math.floor((fo.v * 0.5 + 0.5) * n);
+    const ef = fo.face, eu = fo.u, ev = fo.v;        // (the eye's place on the cube: `fo` is used again below)
     if (fo.face !== this.lf || Math.max(Math.abs(i0 - this.li), Math.abs(j0 - this.lj)) >= cfg.step) {
       this.lf = fo.face; this.li = i0; this.lj = j0;
       const f0 = fo.face, pad = cfg.step * CELL, reach = (RANGE + 0.4 + pad) / R, K = Math.ceil((RANGE + 1 + pad) / (CELL * 0.62));
@@ -164,13 +177,19 @@ class Ring {
       this.pending.sort((p, q) => q[0] - p[0]);          // nearest last: popped first
     }
     // lay the clumps that are due, nearest first, inside the time allowed
+    // (strokes are laid on ground that is on the paper as it will stay, and after what stands on it: on an
+    // arrival they wait, at most HOLD_T seconds, and then grow in from the feet outward; a clump at the
+    // rim of the range has no size yet and needs no growing)
     let spent = 0;
-    if (this.pending.length) {
-      const t0 = performance.now(), grown = this.filled ? this.now : -10;
+    const ok = !ready || ready(ef, eu, ev);
+    if (ok) this.okAt = this.now;
+    if (this.pending.length && (ok || this.now - this.okAt > HOLD_T)) {
+      const t0 = performance.now();
       let guard = 0;
       while (this.pending.length && (guard++ < 3 || (guard & 3) || performance.now() - t0 < sliceMs)) {
-        const p = this.pending.pop();
-        this.lay(p[1], p[2], p[3], p[4], p[0] * R > RANGE * 0.9 ? -10 : grown);
+        const p = this.pending.pop(), rim = p[0] * R > RANGE * 0.9;
+        this.lay(p[1], p[2], p[3], p[4], rim ? -10 : this.now);
+        if (!rim) this.lastGrown = this.now;
       }
       if (!this.pending.length) this.filled = true;
       spent = performance.now() - t0;
@@ -495,8 +514,10 @@ export class NearGround {
     root.add(this.mesh);
     this.rings = RINGS.map((cfg) => new Ring(cfg, S, styles, this.mesh, bu, bodyId));
     this.lastQ = QUALITY.level;
+    this.groundReady = null;         // (face, u, v) -> may strokes be laid round this place yet (set by the world)
   }
   get busy() { let n = 0; if (this.mesh.visible) for (const r of this.rings) n += r.busy; return n; }
+  get pending() { let n = 0; if (this.mesh.visible) for (const r of this.rings) if (r.mesh.visible) n += r.pending.length; return n; }
   get triangles() { let n = 0; for (const r of this.rings) n += r.triangles; return n; }
   clear() { for (const r of this.rings) r.clear(); }
 
@@ -508,6 +529,6 @@ export class NearGround {
     // (walking, a few cells come due each frame and the slice is never filled; after a landing or
     // a leap the whole sward is due and arrives nearest first over a few seconds, inside the slice)
     let left = sliceMs;
-    for (const r of this.rings) left -= r.update(camLocal, alt, Math.max(0.15, left), dt, pixel);
+    for (const r of this.rings) left -= r.update(camLocal, alt, Math.max(0.15, left), dt, pixel, this.groundReady);
   }
 }

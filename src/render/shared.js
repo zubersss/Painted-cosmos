@@ -41,6 +41,7 @@ export const G = {
   // [centre body-local, half length], [axis body-local, half width]; uCastK the two strengths
   uCast: { value: [new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1), new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1)] },
   uCastK: { value: new THREE.Vector2(0, 0) },
+  uNoHazeUp: { value: new THREE.Vector4(0, 0, 0, 0) }, uUpW0: { value: new THREE.Vector3(0, 1, 0) },   // (for body uniforms made before these existed)
   // the scene pass's second target (normal, log depth, region) and its size: glazes test their
   // depth against it by hand (set by the post passes)
   uSceneAux: { value: null }, uSceneRes: { value: new THREE.Vector2(2, 2) },
@@ -71,6 +72,8 @@ export function makeBodyUniforms() {
     uGlaze: { value: new THREE.Vector3(0.66, 0.69, 0.90) },              // cool shadow glaze
     uLight: { value: new THREE.Vector3(1.0, 0.985, 0.93) },              // sunlit wash tint
     uHaze: { value: new THREE.Vector3(0.93, 0.955, 0.975) },             // distance fades to this (near paper)
+    uHazeUp: { value: new THREE.Vector4(0, 0, 0, 0) },                   // under a closed sky: the sky's wash overhead, and how far the far air takes it high in the view
+    uUpW: { value: new THREE.Vector3(0, 1, 0) },                         // up at the eye, scene space
     uFog: { value: new THREE.Vector4(1 / 4000, 5, 1, 0) },               // 1/visibility, bands, max, altitude01
     uStorm: { value: 0 },                                                // 0 .. 1: under a storm cloud nothing is lit
     uDayness: { value: 1 },                                              // 1 day .. 0 night
@@ -98,6 +101,7 @@ export const SHEET = {
   grade: new THREE.Vector3(1, 1, 1),
   valid: false,
   night: 0,      // 0 day .. 1 night on the ground: the sheet's night key (see post.js)
+  laid: 1,       // 1: the picture is on the paper; 0: bare paper (an arrival: the land is being laid under it); between: it comes up as one
 };
 
 // How the picture is moving: the painter writes speed01 from the mood, the ship's model says

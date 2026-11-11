@@ -109,6 +109,7 @@ export function createPainter(renderer) {
     // the night key: deep washes, broader and wetter brushwork, hardly any pencil
     const night = SHEET.valid ? SHEET.night : 0;
     post.sheetUniforms.uNight.value = night;
+    post.sheetUniforms.uLaid.value = SHEET.valid ? SHEET.laid : 1;
     post.sheetUniforms.uPig.value.w = graphite * (1 - 0.75 * night);
     const ub = post.absUniforms.uBrush.value;
     ub.x = 0.0036 * (1 + 0.45 * night); ub.y = 0.0085 * (1 + 0.30 * night); ub.z = 0.013 * (1 + 0.5 * night);
