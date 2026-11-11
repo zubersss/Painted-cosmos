@@ -627,7 +627,7 @@ function info() {
     kits: kits ? { calls: kits.stats.drawCalls, tris: kits.stats.triangles, verts: kits.stats.vertices, ms: +cost.kits.toFixed(3), cover: r3(kits.weather.stats.cover), size: r3(kits.weather.stats.size) } : null,
     sky: r3(physics.here.sky), hides: { falling: +(w.precipitation.extinction * 24).toFixed(3), dust: +(w.dustExtinction * 24).toFixed(3) },
     frame: { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, internal: painter.info.internalWidth + 'x' + painter.info.internalHeight },
-    ms: { physics: +cost.phys.toFixed(2), world: +cost.world.toFixed(2) }, rain: rainMode, biome: world.sampleSurface(bodyId, up0).biomeId };
+    ms: { physics: +cost.phys.toFixed(2), world: +cost.world.toFixed(2) }, rain: rainMode, biome: world.sampleSurface(bodyId, up0).biomeId, place: [+up0.x.toFixed(6), +up0.y.toFixed(6), +up0.z.toFixed(6)], seed: physics.seed };
 }
 
 // ---- measuring ----------------------------------------------------------------------------------------

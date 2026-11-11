@@ -87,12 +87,20 @@ const SHORE_BEFORE = (up, turn, more = '') => `(L) => {
   // (out: the unit vector from land to water along the ray)
   const out = wet ? -1 : 1, rr = hi - out * ${up}, e = Math.cos(hit.a) * rr, n = Math.sin(hit.a) * rr;
   const p = L.at(e, n); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0;
-  window.__shore = { e, n, r: hi, oe: Math.cos(hit.a) * out, on: Math.sin(hit.a) * out, wet };
+  // (P15) the beach's slope: the ground's height over the still liquid 10 m landward of the waterline, over 10
+  const S0 = (e, n) => { const p = L.at(e, n), l = Math.hypot(p.x, p.y, p.z); return L.world.sampleSurface(L.bodyId, { x: p.x / l, y: p.y / l, z: p.z / l }); };
+  const rl = hi - out * 10, rw = hi + out * 3, lq = S0(Math.cos(hit.a) * rw, Math.sin(hit.a) * rw).liquidRadius || 0;
+  const slope = Math.max(0.005, (S0(Math.cos(hit.a) * rl, Math.sin(hit.a) * rl).radius - lq) / 10);
+  // (P15) the liquid's depth 20, 40, 80, 160 and 320 m out from the waterline along the ray (negative: dry land there)
+  const deep = [20, 40, 80, 160, 320].map((d) => { const r = hi + out * d, q = S0(Math.cos(hit.a) * r, Math.sin(hit.a) * r); return +(((q.liquidRadius || 0) > q.radius ? q.liquidRadius - q.radius : -1)).toFixed(1); });
+  window.__shore = { e, n, r: hi, oe: Math.cos(hit.a) * out, on: Math.sin(hit.a) * out, wet, slope, up: ${up}, deep };
   L.yaw = hit.a + ${turn} * out;
   L.run(6, 1 / 30); ${more} }`;
 const SHORE_PROBE = `(L) => { const W = L.physics.fields.water, F = W.field, s = L.info().seaState || {}, S = window.__shore || {}, b = L.physics.here.blown, o = {};
   const lvl = (d) => { const me = L.enu(L.ex.p), p = L.at(me.e + S.oe * d, me.n + S.on * d); const w = W.heightAt ? W.heightAt(p, o) : null; return w == null ? null : P.r2(typeof w === 'number' ? w : (w.height != null ? w.height : NaN)); };
-  return { Hs: s.Hs, length: s.length, breaking: s.breaking ? 1 : 0, cover: s.cover, surf: P.r2(b.surf || 0), spume: P.r2(b.spume || 0), spray: L.physics.particles.spray.count, w6: lvl(8), w20: lvl(22), runup: F.runup != null ? P.r2(F.runup) : null, swash: F.swash != null ? P.r2(F.swash) : null }; }`;
+  return { Hs: s.Hs, length: s.length, breaking: s.breaking ? 1 : 0, cover: s.cover, surf: P.r2(b.surf || 0), spume: P.r2(b.spume || 0), spray: L.physics.particles.spray.count, w6: lvl(8), w20: lvl(22), w80: lvl(82), runup: W.runup ? P.r2(W.runup(L.ex.p, S.slope || 0.07)) : null, reach: W.runup ? P.r2(W.runup(L.ex.p, S.slope || 0.07) / (S.slope || 0.07)) : null, slope: P.r3(S.slope || 0), deep: (S.deep || []).join('/') }; }`;
+// (P15) runup: the level of the water's edge over the still level (m) by the physics' own swash (Stockdon) at the beach's
+// slope; reach: how far up the beach that is from the still waterline (m; the explorer stands SHORE_BEFORE's 'up' m up it).
 // (P14) the stand-in crowns: look across the wind at the crowns; the numbers of three tips of the middle tree
 const CROWN_BEFORE = `(L) => { const w = P.windEN(0, 0, 10); L.yaw = Math.atan2(w.n, w.e); }`;
 const CROWN_PROBE = `(L) => { const o = {}, r = {}; for (const i of [0, 3, 5]) { L.crownTip(0, i, o); r['b' + i] = [P.r3(o.e), P.r3(o.n), P.r3(o.up)]; r['hz' + i] = P.r2(o.hz); } r.set = P.r3(o.set); return { w10: P.wind(0, 0, 10), trunk: P.bend(0, 0, 1).deg, ...r }; }`;
@@ -243,6 +251,21 @@ export const SUBJECTS = {
   'shore-earth': { note: 'Earth, sea_coast: waves running up the beach; 4 frames a second for 6 s',
     q: 'body=earth&biome=sea_coast&hour=12&t=60&pre=4&explorer=0&follow=1&dist=11&pitch=9&up=0.6', w: 640, h: 360, crop: [0, 0.2, 1, 0.7], tile: [320, 126], cols: 4, frames: 24, dt: 0.25, sub: 15,
     before: SHORE_BEFORE(2, 0.5), probe: SHORE_PROBE },
+  // (P15) the same beach in the calmest air it has in two and a half hours (2.4 m/s at 480 s) and in a fresh breeze
+  // (8.8 m/s at 1150 s); w80: the water's height 80 m out (beyond PAINTER's first 64 m)
+  'shore-earth-calm': { note: 'Earth, sea_coast at 480 s (light air, 2.4 m/s): waves running up the beach; 4 frames a second for 6 s',
+    q: 'body=earth&biome=sea_coast&hour=12&t=468&pre=4&explorer=0&follow=1&dist=11&pitch=9&up=0.6', w: 640, h: 360, crop: [0, 0.2, 1, 0.7], tile: [320, 126], cols: 4, frames: 24, dt: 0.25, sub: 15,
+    before: SHORE_BEFORE(2, 0.5), probe: SHORE_PROBE },
+  'shore-earth-breeze': { note: 'Earth, sea_coast at 1150 s (a fresh breeze, 8.8 m/s): waves running up the beach; 4 frames a second for 6 s',
+    q: 'body=earth&biome=sea_coast&hour=12&t=1138&pre=4&explorer=0&follow=1&dist=11&pitch=9&up=0.6', w: 640, h: 360, crop: [0, 0.2, 1, 0.7], tile: [320, 126], cols: 4, frames: 24, dt: 0.25, sub: 15,
+    before: SHORE_BEFORE(2, 0.5), probe: SHORE_PROBE },
+  // (P15) out to sea from the waterline, low (does the sea heave beyond PAINTER's first 64 m? white horses?), a frame every 0.5 s
+  'sea-out-earth-breeze': { note: 'Earth, sea_coast at 1150 s (8.8 m/s, Hs 0.64 m): out to sea from 2 m up the beach, the eye 1.6 m up; a frame every 0.5 s',
+    q: 'body=earth&biome=sea_coast&hour=12&t=1138&pre=4&explorer=0&follow=1&dist=4&pitch=2&up=1.6&fov=58', w: 640, h: 360, crop: [0, 0.1, 1, 0.8], tile: [320, 144], cols: 4, frames: 12, dt: 0.5, sub: 30,
+    before: SHORE_BEFORE(2, 0, `const S = window.__shore; if (S) L.yaw = Math.atan2(-S.oe, S.on);`), probe: SHORE_PROBE },
+  'sea-out-neptune': { note: 'Neptune, storm_seas at 44 to 50 s (30 m/s, Hs 2.8 m): out to sea from 4 m up the beach, the eye 1.6 m up; a frame every 0.5 s',
+    q: 'body=neptune&biome=storm_seas&t=34&hour=11&pre=4&explorer=0&follow=1&dist=4&pitch=2&up=1.6&fov=58', w: 640, h: 360, crop: [0, 0.1, 1, 0.8], tile: [320, 144], cols: 4, frames: 12, dt: 0.5, sub: 30,
+    before: SHORE_BEFORE(4, 0, `const S = window.__shore; if (S) L.yaw = Math.atan2(-S.oe, S.on);`), probe: SHORE_PROBE },
   'shore-neptune': { note: 'Neptune, storm_seas at 40 s (waves 2.8 m, 29 m/s): the surf line along the shore; 4 frames a second for 6 s',
     q: 'body=neptune&biome=storm_seas&t=34&hour=11&pre=4&explorer=0&follow=1&dist=16&pitch=8&up=1', w: 640, h: 360, crop: [0, 0.15, 1, 0.75], tile: [320, 135], cols: 4, frames: 24, dt: 0.25, sub: 15,
     before: SHORE_BEFORE(4, 0.5), probe: SHORE_PROBE },

@@ -43,6 +43,33 @@ uniformly over the box whatever stood there, and 190 showed as specks. Now:
 - **For PAINTER** (top of "For PAINTER"): leaves read at full size; at half size they are specks because the floor keeps
   their ink (a 3 px leaf drawn at 10 px is drawn 1 in 11). See there.
 
+**2. The shore (verification; no model changed).** The probe's run-up columns printed null (it read `field.runup`, which
+never existed): `SHORE_PROBE` now reads `physics.fields.water.runup(p, slope)` at the beach's own slope (measured 10 m
+landward of the waterline): `runup` (m over the still level), `reach` (m up the beach from the still waterline), `slope`,
+`w80` (the water's height 80 m out), `deep` (the liquid's depth 20/40/80/160/320 m out along the ray, -1 dry). Lab
+`info()` also gives `place` and `seed`. Strips from `p15/root` (a clean export of HEAD = PAINTER's committed water,
+`b022507`'s recipe), `kits=painter`, all OPENED:
+- `shore-earth-calm` (480 s: 2.4 m/s, the calmest this coast gets in 2.5 h; Hs 0.31 m of old sea): reach 0.3 to 1.1 m on a
+  0.07 beach (2 to 8 cm of height), a period of about 4 s. In the picture the foam line and the wet band change shape a
+  little from frame to frame: the edge moves, barely.
+- `shore-earth-breeze` (1150 s: 8.8 m/s, Hs 0.64 m, whitecap cover 1.3 %): reach 0.5 to 1.9 m, period 3.5 s; 80 m out
+  +-0.3 m. `sea-out-earth-breeze` (the eye 1.6 m up, out across the water): the swash zone's foam spreads up the sand and
+  draws back with the reach (frames 0, 7: long; 5: short). **Water runs up and drains back: yes.** White horses: none to
+  be seen (the water is a channel 20 to 40 m wide: 1.5 m deep 20 m out, dry 40 m out).
+- `shore-neptune` (44 to 50 s: 30 m/s, Hs 2.8 m, cover 15 %): reach 1.5 to 7.3 m on a 0.13 beach, period about 5 s; a
+  tongue of foam runs into a hollow and drains from it (frames 0 to 7). `sea-out-neptune`: the run-up again; rain is long
+  thin slanting strokes, spray tiny white dots low over the water's far edge (370 to 470 drops at 47 to 48 s): told apart
+  by shape and place, but the dots are a pixel or two. The foam is a leopard pattern (white with round dark holes): PAINTER's.
+- **The sea beyond 64 m cannot be judged at these places**: the water they face is small. Neptune's storm_seas shore faces a
+  lagoon 0.3 m deep 20 m out, 3.4 m at 80 m, DRY at 160 m; Earth's sea_coast shore a channel. The physics puts +-0.75 m
+  (Neptune) and +-0.3 m (Earth) 80 m out, and PAINTER's committed shader carries the long train to 2.2 to 6 of its lengths.
+- **A fault on my side, found, NOT changed (a decision for the coordinator)**: the sea state comes from the biome's fetch
+  (`water.js FETCH`: sea_coast and storm_seas 2500 m), not from the water that is there. A 30 m/s wind over a lagoon 150 m
+  across raises Hs about 0.2 m (fetch-limited growth), and 3.4 m of depth holds at most 2.6 m; the 2.8 m surf on that
+  lagoon is not physical. The fix is mine: measure the fetch upwind over the liquid the terrain grid knows (march up the
+  wind from the focus; the biome's fetch only where the liquid runs off the grid). It would turn that coast's storm surf
+  into a steep chop unless PAINTER's open sea is elsewhere; so not done without a word from the coordinator.
+
 ## Hand-over P14 (twelfth PHYSICS agent; read this block first; P13 and older below hold for everything not named here)
 
 **Where things stand.** Item 1 of P14 (trees alive in a storm) is done and committed; items 2 (leaves), 3 (the
