@@ -970,3 +970,39 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   opened, with a verdict each on jitter, popping, sliding, things frozen, pace; fix what is
   wrong. (3) The gust pattern's sharpness against what masts measure. (4) `physics.update`
   at the top tier.
+- 2026-11-11: **PAINTER block 5 accepted (seventh agent; `cf2058a`, `84a6d93`, `59e3731`,
+  `3af362b`, `c0e6d03`, notes `4c2cf51`)**. The coordinator re-ran on a clean export of the
+  head: 19 world tests and PILOT's 115 pass; and opened the before and after pair of all
+  seven worlds and the Mars dust frame on two sheets. In: a fault from block 4 fixed (the
+  cloud shell of every banded world did not compile since `uStorm` was added; its uniform is
+  now `uSpot`); on Venus, Mercury, Jupiter, Saturn, Uranus, Neptune and Pluto the ground has
+  second and third washes in patches, crust and stones lie in drifts, tall growth is of all
+  ages, non-forest spawns with tall growth have a 15 m clearing; the dust glaze reads
+  PHYSICS's veil fields; leaves are a glaze; Neptune's sea is a deep body to the horizon
+  under its storm (haze was swallowing it); no orange dot in `earth-arrives`; on Earth the
+  tufts lean one way and the seam at 17 m is gone. Triangles at the spawns now 0.78 M
+  (Uranus) to 1.63 M (Pluto); settle 137 to 283 s here (information).
+  **Coordinator's verdict, world by world**: Neptune (from kelp straps across the lens to a
+  clearing with tussocks at four depths and a flowered moss floor) and Mercury (from a wall
+  of blades to a field to the horizon) are large gains; Jupiter is a green meadow now but
+  nothing in the first view says "island in a sea of cloud"; Pluto is richer and busy;
+  Uranus was the best and barely changed; **Venus is still a grey stony plain with no lava
+  and no fungal tower in the first view, and Saturn is still the palest and emptiest, with
+  no rings in its sky**. None is at the standard of the Earth forest vista. The dust veils
+  are there but faint.
+  Not seen: any second or third biome after the push; any world from orbit since the cloud
+  shell was repaired; leaves, sand skim and blown snow blowing. Not started: the brush at
+  full resolution, the two vistas in a thicket, Mercury and Neptune from orbit, Mars' dune
+  crests, branch sway and drifts, the explorer's face, the UI look review.
+  Contract: `sampleObstacles` returns more (spires on Pluto; more boulders on Venus,
+  Mercury, Pluto, Uranus; obstacles near the Mercury, Neptune, Jupiter and Saturn spawns
+  moved by the clearing). The world test "sampleSurface stays cheap on every body" is a
+  wall-clock test with a 50 us limit and fails under load (57 us on Uranus beside renders;
+  6 to 13 us alone). The seventh PAINTER agent is out of context and is replaced by an eighth.
+- 2026-11-11: **Plan to the end** (coordinator). PAINTER's block 6 is the last art block
+  before lead review 6: (1) each world's idea in its first view (Venus, Saturn, Jupiter
+  first), (2) worlds from orbit, (3) the weather leftovers, (4) the brush, (5) the short
+  list. Then review 6 (every check on the head; the tour at tier 1 for coverage and at the
+  top tier for the spawn and first vista of each body; the motion set), M3 closes, M4's
+  critique swap fixes the worst of what review 6 finds, and PILOT opens and merges the one
+  pull request.
