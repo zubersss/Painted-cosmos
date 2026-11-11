@@ -102,7 +102,7 @@ try {
     // two places per body where review 6 judges the look at the top tier.
     if (String(opt.first) === '1') {
       const sp = await page.evaluate((bid) => { const d = window.__pc.world.getSpawn(bid).unitDir, l = Math.hypot(d.x, d.y, d.z); return [d.x / l, d.y / l, d.z / l]; }, body);
-      places = [{ kind: 'biome', id: 'spawn', name: 'the spawn', dir: sp, moved: 0 }].concat(places.filter((p) => p.kind === 'vista').slice(0, 1));
+      places = [{ kind: 'biome', id: 'spawn', name: 'the spawn', dir: sp, spawn: true, moved: 0 }].concat(places.filter((p) => p.kind === 'vista').slice(0, 1));
     }
     // A vista that is the very place and heading of a biome frame is the same picture: one frame.
     const frames = [];
@@ -162,7 +162,7 @@ async function capture(body, pl) {
   // A biome frame taken from the painter's own easel is the picture as it was painted: first
   // person, nothing in the way. Every other frame is third person, as the player arrives.
   const easel = pl.kind === 'biome' && pl.heading != null;
-  await page.evaluate(({ b, pl, hour, easel }) => { window.__pc.teleport({ body: b, dir: pl.dir, hour, heading: pl.heading == null ? undefined : pl.heading, lookPitch: pl.lookPitch == null ? undefined : pl.lookPitch, firstPerson: easel }); }, { b: body, pl, hour: Number(opt.hour), easel });
+  await page.evaluate(({ b, pl, hour, easel }) => { window.__pc.teleport({ body: b, dir: pl.spawn ? undefined : pl.dir, hour, heading: pl.heading == null ? undefined : pl.heading, lookPitch: pl.lookPitch == null ? undefined : pl.lookPitch, firstPerson: easel }); }, { b: body, pl, hour: Number(opt.hour), easel });
   const settled = await settle();
   await page.waitForTimeout(900);                 // let the explorer come to rest and the read-out count a frame
   const m = await measure();
@@ -171,8 +171,9 @@ async function capture(body, pl) {
   const flags = [];
   if (settled == null) flags.push(`NOT SETTLED after ${lastSettle.frames} frames (world.busy ${m.busy})`);
   if (pl.problem) flags.push(pl.problem.toUpperCase());
-  if (m.liquidDepth > 0.3 || pl.at.liquid > 0.3) flags.push(`STANDING IN LIQUID (${Math.max(m.liquidDepth, pl.at.liquid)} m)`);
-  if (pl.kind === 'vista' && pl.at.slopeDeg >= 35) flags.push(`ON A ${pl.at.slopeDeg} DEGREE SLOPE`);
+  const at = pl.at || { liquid: 0, slopeDeg: 0 };          // the spawn of --first 1 comes without a look at its ground
+  if (m.liquidDepth > 0.3 || at.liquid > 0.3) flags.push(`STANDING IN LIQUID (${Math.max(m.liquidDepth, at.liquid)} m)`);
+  if (pl.kind === 'vista' && at.slopeDeg >= 35) flags.push(`ON A ${at.slopeDeg} DEGREE SLOPE`);
   if (pl.kind === 'biome' && pl.id !== 'spawn' && m.biome && m.biome !== pl.id) flags.push('STOOD IN ' + m.biome);
   const f = { ...pl, file, settled, settledFrames: lastSettle.frames, flags, found: null, tris: m.tris, calls: m.calls, worldWorstMs: m.worldWorstMs, physicsWorstMs: m.physicsWorstMs, stoodIn: m.biome, seconds: Math.round((Date.now() - t0) / 1000) };
   log(`${body} ${pl.kind} ${pl.id}: ${settled == null ? 'NOT SETTLED (busy ' + m.busy + ')' : 'settled in ' + settled + ' s'}, ${Math.round(m.tris / 1000)} k tris, ${m.calls} calls, world worst ${m.worldWorstMs} ms${pl.moved ? ', moved ' + pl.moved + ' m' : ''}${flags.length ? ' | ' + flags.join('; ') : ''} (${f.seconds} s)`);
