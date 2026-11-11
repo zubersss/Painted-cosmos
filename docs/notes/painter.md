@@ -6,60 +6,197 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
-Written by the sixth PAINTER agent at the end of M3 block 4, "the quality push" (the owner's
-instruction: no triangle budget, the best picture). My commits: `573c10d`, `aeff8a6`, the one
-after it ("Quality push 3") and the notes commit. The fifth agent's block 3 and the earlier
-records follow.
+Written by the seventh PAINTER agent at the end of M3 block 5 ("the push on the other worlds",
+the owner's instruction: no triangle budget, the best picture). My commits: `cf2058a` (a shader
+that had not compiled since block 4), `84a6d93` (the push, part 1), `59e3731` (the weather ruling),
+`3af362b` (veils lifted, frames) and the notes commit. Block 4 and the earlier records follow.
 
-- **Where things stand**: the Earth forest (spawn and the lead's vista) is pushed and judged
-  at the top tier; Moon and Mars were looked at after the same push; the weather critique and
-  the far-world flaws are in code, partly verified (see "M3 block 4" for what was opened).
-  Venus, Mercury, the giants and Pluto got the new near ground with everything else but
-  nobody has opened them since.
+- **Where things stand**: all ten bodies have been opened at their spawn at the top tier. The
+  seven that nobody had opened (Venus, Mercury, Jupiter, Saturn, Uranus, Neptune, Pluto) are
+  pushed once: one round of code, one round of corrections, frames in
+  `docs/shots/painter/push-<world>.jpg` (before left, after right). They are better paintings
+  than they were and none of them is yet at the standard of the Earth forest vista. The
+  weather ruling of the coordinator (dust veils, leaves, sand skim, Neptune's far sea) is in
+  code; see "M3 block 5" for what was seen in a frame and what was not.
 - **Where the new things are** (all in my files):
-  `src/world/nearground.js`: the sward. Three rings (`RINGS`: fine 0.6 m cells to 17 m, mid
-  1.9 m to 66 m, far 6.5 m to 240 m at the top tier; ranges per tier in the table), each one
-  instanced mesh; `layFine` (flicks in tufts, flowers on stalks, fallen leaves, twigs, stones
-  and moss by water), `layBroad` (fan-brush touches, fern fronds, drifts of flowers and fallen
-  leaves as dashes, stones, dune ripples, splinter clusters); `styleOf` turns a biome's
-  `small` table into shares. Stroke kinds are `iPar.y` (2 flick, 3 crisp flick, 4 fan, 5 round
-  touch, 6 laid flat, +0.25 crisp); the shapes are cut in `NEAR_VERT/FRAG`
-  (`src/render/materials.js`).
-  `src/world/flora.js`: `T0 90, T1 190, T_THIN 420, T_FAR 600`, `UNDER_FAR 110`,
-  `RANGE_SCALE [0.28, 0.6, 1]` (the lower tiers keep roughly what they had).
-  `src/data/looks.js`: Earth `under.flowers`, `under.litter`; the forest's `mist: 1.25`.
-  `src/render/chunks.js` `uStorm` in `pcLevel` (nothing is lit under a storm cloud);
-  `src/world/index.js` sets it, with `sunless`, the blue-grey veil of falling snow, `farVeil`
-  (a far world lost into the cloud in front of it) and `dabFade` (ball over terrain between 8
-  and 12 px); `src/render/kitmat.js`: dust, ash and sand are glazes (`GLAZE`);
-  the far sea's swell strokes are in the water fragment shader (search `farSea`).
-- **How to work here**: as before: render from a clean export, two renders at a time, the
-  machine is shared and was at load 10 to 18 all block. A top-tier game frame at 1280x720
-  took 5 to 9 s, a game run 5 to 12 minutes. Scratch tools in `/home/user/.pc-scratch/painter/m6/`
-  (may be gone): `mkexp.sh <name>` (export of HEAD plus my working files), `g.mjs <export>
-  <prefix> spawn,vista,walk` (the GAME at the top tier: time to ready, `world.update` times,
-  triangles and calls with `BD=1` a per-object breakdown, frames; `BODY=moon`, `W=480 H=270`
-  for timing), `s.sh "<query>" out.jpg` (a gallery frame; `ROOT=<export>`), `bodies.sh`,
-  `crop.py`, `pair.py`.
-- **Rules that bit me**: (1) kill only your own processes, by PID: `pkill -f` with a loose
-  pattern can take another role's render with it. (2) In software rendering the build slice
-  grows with the frame time (`wallDt > 80`), the near ground's too: `world.update` in
-  milliseconds says nothing here; `src/world/busy.test.mjs` prices one arriving frame at 60
-  frames a second and is the check that matters (it failed when I gave the near ground more
-  of the frame after a landing; I took that out). (3) A mark darker than its ground, cut with
-  a regular comb, is a row of teeth however it is coloured: a fan touch is one body of wash
-  with only its top broken. (4) Seen across water or flat ground, anything spaced in metres
-  is a hair's breadth on the sheet: space strokes by pixel footprint (`fwidth`) in octaves.
-  (5) to (9): the fifth agent's rules below still hold.
-- **Next**: (1) open Venus, Mercury, Jupiter, Saturn, Uranus, Neptune and Pluto at their
-  spawns at the top tier (`BODY=venus node g.mjs ...`) and repaint what is thin; the giants'
-  cloud seas and the ice worlds have no sward of their own yet beyond splinters and stones.
-  (2) See the far sea in PHYSICS' own hurricane (I only saw the strokes with their gate forced
-  on) and the blizzard with flakes in it (the gallery's forced sky has no flakes). (3) The
-  lead's SHOULD FIX list, unchanged: the two vistas in a thicket, Mercury and Neptune from
-  orbit, Mars' dune crests, branch sway and drifts, the explorer's face. (4) PILOT's eight
-  interface frames want a look review (not done). (5) The brush itself at full resolution
-  was not touched: a 12-sector, two-ring abstraction pass is the experiment I would try.
+  `src/world/surface.js` `_generic`: `t.patch` (looks.js: a list of `{ c, wl, thr, soft, amt }`),
+  second and third washes laid in patches over a generic biome's ground. `getSpawn` opens a
+  clearing (r 15) round a non-forest spawn whose biome has tall growth.
+  `src/world/nearground.js`: `crust` (flat touches lying on the ground, kind LYING, in all
+  three rings; colours `under.crust`; gathered by the field `crusty`), `stony` and `needly`
+  (stones and splinters stand in drifts and companies with bare ground between), `gm` (how far
+  a blade's wash is pulled to the ground's), `flowerSize` and `under.stalk` (fungi are flowers
+  with broad heads), a tuft's flicks lean one way (the "V" pairs), `RINGS` fine to 23 m and mid
+  from 6 m (the change of hand at 17 m).
+  `src/world/floraplace.js`: a tall spec with `vary: 1` is a stand of all ages (scale 0.30 to
+  1.45: the young ones are the middle storey). `src/world/florakit.js`: `blob` takes `rough`
+  and `ledge`; spires are cut at detail 3 with ledges, a buttress and fallen blocks, boulders
+  at detail 2. `src/data/looks.js`: every one of the seven worlds has `patch`, `near`,
+  `under.crust` (and `flowers`, `litter` where things grow); Pluto has a tall kit (penitent
+  spires). `src/render/kitmat.js`: `SHAPES.veil` (PHYSICS' dust veils by `vPcData.y/z/w`,
+  used when `info.veil`), `SHAPES.leaf` (leaves are a glaze now), a heavier `sandStreak`.
+  `src/render/materials.js` water: the far sea's gate opens nearer and the fog on it is cut by
+  up to 0.45 where the far-sea strokes are laid. `src/world/orbit.js`: the cloud shell's storm
+  uniform is `uSpot` (it collided with the body's `uStorm`).
+- **How to work here**: as before: render from a clean export, two renders at a time, kill
+  only your own processes by PID. Scratch tools in `/home/user/.pc-scratch/painter/m7/` (may
+  be gone): `mkexp.sh <name>` (export of HEAD plus my working files), `q.sh <export> <prefix>
+  body...` (the spawn of each body at the top tier, 960x540, with a draw breakdown; one frame
+  took 2.5 to 5 minutes under a load of 13 to 17), `g.mjs`, `pair.py`, `join.py`, `crop.py`,
+  `where.mjs` (each body's spawn biome), `kc.mjs` (forces every PHYSICS kit object to draw one
+  quad and reports shader errors: but kits are made lazily, so dust is only compiled in a dust
+  storm). `node tests/weather.mjs --root <export> --only mars-dust,neptune-gale --out <dir>
+  --sheets <dir>` is the lead's weather set; it needs 7 minutes to be ready and then many
+  minutes a shot here (game clock at software speed).
+- **Rules that bit me**: (1) a shader uniform name is global to a material: the body's
+  uniforms are spread into every painted material, so a new body uniform must not share a name
+  with any material's own (block 4's `uStorm` broke `pc-cloudshell` for a whole block and no
+  test saw it: a shader compiles only when its object is first drawn; look at the console of a
+  frame from Mercury or from orbit, not only of the Earth spawn). (2) Bright marks sown evenly
+  are confetti whatever they are meant to be: gather them with a field and leave bare ground.
+  (3) A mark pulled 60 % to its ground's wash is invisible on ochre: `gm`. (4) The debug spawn
+  of a world is the first site's biome, not its signature (Venus spawns on the lava plain, not
+  in the fungal forest; Mercury in the obsidian field; Pluto on the lilac mountains).
+  (5) to (13): the earlier agents' rules below still hold.
+- **Next**: (1) open each pushed world once more and correct it (list of weak points per
+  world in "M3 block 5"); open each world's signature biome that is not its spawn (Venus'
+  fungal towers above all: it has the new looks and nobody has seen them). (2) The weather
+  frames not seen. (3) The brush at full resolution (not touched in two blocks). (4) The
+  lead's SHOULD FIX list, unchanged: the two vistas in a thicket (the new clearing does not
+  apply to vistas), Mercury and Neptune from orbit, Mars' dune crests, branch sway and drifts,
+  the explorer's face; the look review of PILOT's interface frames.
+
+## M3 block 5: the push on the other worlds, the weather ruling (seventh PAINTER agent)
+
+All frames are the game at the top tier (quality 2), third person at the spawn, 960x540,
+on a clean export with my working files laid over it. "Opened" means with my own eyes.
+
+**0. A fault found on the way.** Since block 4 the cloud shell (`pc-cloudshell`, every banded
+world seen from outside, and the far worlds' decks) did not compile: the body uniform
+`uStorm` (a float) collided with the shell's own `uStorm` (a vec4, the Great Red Spot). The
+console of the Mercury spawn showed it. Renamed the shell's to `uSpot`; the Mercury frame
+after it has no console error. Not seen in a frame from orbit.
+
+**1. The seven worlds.** What each spawn is, what was raised, the frame, the verdict.
+Common to all: the ground is no longer one wash (patches of a second and third wash at a few
+metres and at tens of metres); what lies on it lies in drifts (crust, stones, splinters) with
+bare ground between; tall growth is of all ages; spires and boulders are finely cut.
+- **Venus** (spawn: lava plain, not the fungal forest). Before: a grey-olive plain sown
+  evenly with pebbles, six cones on the horizon. After: dark flows, sulphur and ember patches,
+  boulders in drifts, spires from 2 m to 14 m. `push-venus.jpg` (both opened, before at full
+  size, after on a sheet of four). Verdict: the better painting and calmer; still no lava in
+  the first view (the spawn keeps 13 m from liquid and the river is far), and the small dark
+  dashes are still a little evenly sown. The fungal forest has new looks (young fungi as
+  flowers with caps, litter, mould crust, towers of all ages): NOT opened.
+- **Mercury** (spawn: obsidian field). Before: the easel a metre behind a wall of grey
+  blades, neither explorer nor ship in sight. After: a clearing, a field of blades of all
+  sizes to the horizon, plates of glass and ash drifts. `push-mercury.jpg` (both opened).
+  Verdict: from a wall to a place; still busy (many small pale splinters, blue-violet
+  boulders that are too saturated).
+- **Jupiter** (spawn: sky-island top). Before: an ochre plain with sparse green flicks.
+  After: a green meadow with bare ochre patches, shrubs, boulders, trees of all ages.
+  `push-jupiter.jpg` (before opened at full size; the stored after is the last round, NOT
+  opened; I opened the first round's, which differs by the gathered stones and the tufts). Verdict:
+  the largest gain of the seven, a landscape now; nothing in the first view says "island in a
+  sea of cloud" (the edge is 200 m away), and the flower drifts did not show in the frame.
+- **Saturn** (spawn: gold island top). Before: a pale gold blank with flicks. After: olive
+  and honey patches, violet flowers, mint crystal shards, shrubs, trees of all ages.
+  `push-saturn.jpg` (both opened, the after on a sheet of four). Verdict: better, still
+  the palest and emptiest of the seven; the ring arcs are not in the first view's sky; the
+  shrubs, a heap of earth in the first round, are a low olive mound now.
+- **Uranus** (spawn: ice shelf). Before: already the best of the seven (mint ice, cracks,
+  teardrop spires in haze). After: frost drifts and deep aqua patches, spires of all sizes in
+  three bands. `push-uranus.jpg` (before opened on a sheet; the stored after is the last round, NOT opened;
+  I opened the first round's).
+  Verdict: richer and still calm; the terrace itself is not in view.
+- **Neptune** (spawn: kelp forest). Before: the easel inside a kelp clump, flat violet straps
+  across the whole sheet, the explorer hidden. After: a clearing; kelp in tussocks of all
+  sizes at four depths, a moss floor with drifts of yellow stars. `push-neptune.jpg` (both
+  opened). Verdict: a painting now; a frond is still a flat strap of one tone.
+- **Pluto** (spawn: lilac mountains). Before: pale ground, blobby boulders, a far ridge under
+  an indigo sky (a good composition, thin near ground). After: frost and rose patches, more
+  stones, penitent spires in companies on the slopes. `push-pluto.jpg` (both opened on
+  sheets). Verdict: richer, a boulder field under the ridge; the shards are fewer but still
+  read violet-blue in their shadows, the right of the sheet is busy with stones, and the far
+  penitents are a stipple on the hill.
+Weaker biomes than the spawn, by the code and not by a frame: none was opened this block.
+
+**2. Numbers** (information, not a limit; software rendering, load 13 to 17, 960x540).
+Time to "click to begin", frames, `world.update` summed, triangles / draw calls, before -> after:
+Venus 73 s / 43 / 2.5 s / 448 k / 230 -> 141 s / 41 / 3.4 s / 830 k / 242;
+Mercury 97 s / 48 / 1.7 s / 678 k / 506 -> 178 s / 48 / 4.7 s / 985 k / 498;
+Neptune 118 s / 49 / 2.3 s / 599 k / 268 -> 200 s / 41 / 4.0 s / 1.02 M / 291;
+Pluto 133 s / 47 / 3.1 s / 668 k / 296 -> 246 s / 57 / 4.5 s / 1.63 M / 487;
+Jupiter 180 s / 50 / 3.7 s / 728 k / 318 -> 283 s / 58 / 4.5 s / 1.01 M / 354;
+Saturn 179 s / 46 / 4.7 s / 696 k / 320 -> 213 s / 48 / 3.8 s / 1.07 M / 376;
+Uranus 115 s / 48 / 2.3 s / 515 k / 224 -> 137 s / 51 / 3.3 s / 779 k / 238.
+Earth spawn on the clean export of the head, 960x540, with two other jobs of mine running:
+404 s / 54 frames / 4.4 s / 1.44 M / 465 (block 4: 3.35 s of building, 1.36 M): the single
+strokes to 23 m cost about a second of building.
+The world is settled (`world.busy` 0) by the time the title is ready in every run. The frame
+counts hardly move: the longer wall time is each software frame drawing more.
+`node --test src/world/*.test.mjs`: 19 pass (the slice test among them) after every change
+in the working tree. On the clean export of the head: 19 pass in two runs of four; twice
+"sampleSurface stays cheap on every body" failed (57 us a call on Uranus against a limit of
+50) while two renders ran beside it: it is a wall-clock test; measured alone a call costs 6 to
+13 us on every body (Pluto 5.6 -> 10.0 with its patches, the others unchanged).
+`node --test tests/*.test.mjs` on the same export: 115 pass. The game loads on it and stands
+at the Earth spawn with no console error (`push-earth-spawn-b5.jpg`, opened at full size).
+
+**3. The weather ruling** (coordinator, this block). In code: (1) the dust glaze reads
+PHYSICS' veil fields: a streamer is one level drag, densest above its foot, thinning to its
+top and ends, broken where the brush ran dry, lifted toward paper; a puff stays round and
+soft; (2) leaves are a glaze (a lens), so a thin leaf is not brushed away; (3) blown sand is
+paler and heavier; blown snow comes through the dust kit with the snow's ink and is lifted
+the same way; (4) `D.snow` was already spread; (5) the far sea: the gate was not the fault,
+the gale's murk swallowed the strokes; the fog on the sea is cut by up to 0.45 where the far
+strokes are laid, the strokes begin nearer and are stronger. (6) noted: Mars' dark dashes are my ripple strokes.
+SEEN in the game with the lead's `tests/weather.mjs` at the top tier on a clean export:
+`mars-dust` with the first version of the veil (opened at full size, not stored): a hazy
+dune with a few pale drags of sand and NO veil to be seen: a veil in the dust's own middle
+tone is lost against the haze behind it. Since then the veil is lifted toward paper after the
+air is laid over it (commit `3af362b`); `push-mars-dust.jpg` is that
+version in the game (opened on a sheet of two): pale level drags at two or three depths over
+the far dune and across the middle ground, soft, no blot, no console error; fainter than
+PHYSICS' stand-in (`docs/shots/physics/painted-proposal.jpg`, top left, opened once) and the
+explorer is not half veiled: the opacity gain (`vPcData.y * 1.5` in `SHAPES.veil`) can go up.
+`neptune-gale` under PHYSICS' own sky (`push-neptune-gale.jpg`, opened on a sheet): the sea
+is a deep ultramarine body to a horizon under slate murk, the stacks and the cliff pale
+ghosts in it, foam on the shore, two white horses: a storm sea now and not a blank; the far
+swell strokes are still faint and the white horses few. The blizzard: left as it is (the
+coordinator saw it work). Leaves, blown snow: in code, the leaf glaze compiled (forced to
+draw at the Earth spawn, no error), not seen blowing. `earth-arrives` (the far world as an
+orange dot before the storm cloud): `push-earth-arrives.jpg` (the game, PHYSICS' own front,
+opened on a sheet of two): a slate bank, slanted rain, the wood in the cloud's shadow, and
+no dot in front of the cloud. Passes in this frame; where the far world stood at that moment
+I did not check, so it is one frame's evidence.
+
+**4. Earth.** The "V" pairs (a tuft's flicks now lean about one direction; only the first two
+or a third of the dark ones are crisp) and the change of hand at 17 m (single strokes to
+23 m, fan touches from 6 m): `push-earth-spawn-b5.jpg` (960x540, opened at full size): the
+meadow runs to the wood without a seam I can find and the tufts read as tufts; a few dark
+flicks still stand in pairs at the sheet's foot. Not compared side by side with block 4's
+frame at the same size. The brush: not touched.
+
+Frames removed because they no longer show the truth: `push-dust.jpg` (the gallery's forced
+dust under the old glaze; see `push-mars-dust.jpg`) and `push-neptune-swell-forced.jpg` (the
+swell with its gate forced; see `push-neptune-gale.jpg`). Block 4's text below still names them.
+
+**Contract changes (additive)**: looks: `t.patch`, `near.crust / gm / flowerSize`,
+`under.crust / stalk`, tall spec `vary`; Pluto has tall growth now, so `sampleObstacles`
+returns spires there (true radius and height by scale: 1.4 m x 13 m at scale 1, most are a
+third of that); more boulders on Venus, Mercury, Pluto and Uranus (the same rule: scale
+0.7 and up are obstacles, 0.62 x 0.58 of the scale). A non-forest spawn with tall growth has
+a clearing of 15 m. Fallen blocks at a spire's foot are inside its own outline and are not
+separate obstacles. Nothing else added to `sampleObstacles`.
+
+**Needs.** From PILOT: nothing new; the top-tier settle time-outs as before. From PHYSICS:
+nothing new; the veil fields are read as handed over.
+
+**Weak / not done**: one round only on each world and three of the seven last frames not
+re-opened; no signature biome off the spawn opened; item 2's frames as listed; the Earth
+changes unseen; the brush, the vistas in a thicket, Mercury and Neptune from orbit, Mars'
+crests, branch sway and drifts, the explorer's face, the UI look review: not started.
 
 ## M3 block 4: the quality push (sixth PAINTER agent)
 
