@@ -417,3 +417,19 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   How rain is drawn (a thin streak in an opaque pass will alias and crawl) is PAINTER's
   decision; PHYSICS prototypes the options there and shows them. PAINTER's first M3 item is
   wiring the kits (weather in the picture), then the real explorer and ship.
+- 2026-11-11: **PHYSICS stage P4 accepted as reported** (`c5f8088`, 175 tests). The lab runs
+  inside the real painted pipeline (`physics-lab.html?painted=1`, source
+  `src/physics/three/painted-lab.js`, public exports only) with a reference
+  `makeKitMaterial(kind, info)` that works with PAINTER's chunks, both targets and the post
+  pass. Honest verdicts on its six painted frames: rain reads (as broad strokes) and footprints
+  read; snow, the Mars dust storm and Neptune's sea fail; grass parting unjudged. Measured: the
+  post pass erases marks under about 3 internal pixels, so thin or stippled rain only adds
+  shimmer; **broad strokes are the only rain that is there**. Storm kit cost 0.1 to 0.2 ms,
+  4 to 5 draw calls, 3.2 k triangles. Not done: agreement inside `PROP_VERT`, branch rate, drifts.
+- 2026-11-11: **Finding (PHYSICS, upheld by the coordinator after looking at the frames): kits
+  alone cannot paint weather.** A storm with a sunny sky is not a storm. PAINTER's sky, haze,
+  sheet, ground wash and liquid material must read `physics.here.weather` and the wave chunk.
+  Six gaps in PAINTER's contract are listed in `docs/notes/physics.md` (uniform constructor for
+  `FRAG_PARS`, chunks re-exported from `index.js`, a way to glaze instead of bringing ink, the
+  3 px floor of the post pass, the wave chunk on PAINTER's liquid, weather in sky and haze).
+  This is PAINTER's first M3 block: weather in the picture.
