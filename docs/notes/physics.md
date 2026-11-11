@@ -793,6 +793,54 @@ Measured at `dc5a4d9`, default seed:
   foot more than 25 cm up never prints.
 - `physics.update` in this loop: 0.25-0.32 ms mean on foot, 0.60 flying.
 
+### The integrated game in the browser (P3, job 2)
+
+Played in headless Chromium (software WebGL2, 480x270, `dynres=0&pointerlock=0&scale=0.5&
+quality=0&stats=1&card=0&fresh=1&save=0`) with real key events, on Earth, Mars and Neptune:
+walk, stop, run, running jump, a 3 s jetpack hop; then `__pc.teleport({ body, ship: true })`
+and W for 8 s, X to a stop, C/E to land, Space to lift off. State was read from `window.__pc`,
+never written (script and screenshots: `/home/user/.pc-scratch/physics/browserplay.mjs`,
+`play/`). No console errors on any world. 3-8 frames a second, so game time advances in
+steps of up to 0.25 s: the bodies behave the same as at 60 Hz (the Node numbers above), which
+is the first thing this run shows.
+
+| | Earth (forest, litter) | Mars (gravel, 0.018 kg/m3) | Neptune (moss, ice fall, 10-19 m/s wind) |
+|---|---|---|---|
+| walk; stop | 4.20 m/s; 0.72 s, 0.84 m | 4.20; 0.77 s, 1.11 m | 4.20; 0.68 s, 0.78 m |
+| running jump | 0.97 m, 0.77 s | 2.33 m, 1.90 s | 0.58 m, 0.57 s |
+| jetpack 3 s: top, climb, fastest sink | 27.9 m, 8.4, 13.4 m/s | 50.0 m, 11.9, 16.1 m/s | 24.5 m, 8.4, 12.6 m/s |
+| hover 4 s: drift, vertical speed | 0.07 m, 0.02 m/s (5 m/s wind) | 0.00 m (5 m/s, thin air) | 1.83 m, 1.32 m/s (19 m/s) |
+| throttle, speed each second | 10 35 45 46 | 12 34 45 46 | 10 31 43 45 46 |
+| X from 46 m/s | 3.77 s, 93 m | 3.87 s, 94 m | 3.70 s, 89 m |
+| landing: leg stroke; at rest | 10.8 cm; 9.3/8.2/8.2 | 4.9 cm; 4.9/4.3/4.3 | 10.9 cm; 10.9/9.7/9.6 |
+| `physics.update` on the read-out | 0.76 ms avg | 0.73 | 0.80 |
+
+What behaves wrong, or does not show:
+1. **The three worlds fly the same until the wind blows.** Speed each second, cruise and
+   braking are identical to a few percent. That is honest for a 4.2 t craft with 2.2 g of
+   engine at 46 m/s (drag is 5 % of the thrust on Earth and nothing on Mars), and PILOT's
+   speed envelope caps cruise at the same 46 m/s everywhere near the ground. The worlds differ
+   where the physics has something to say: jump (0.58 m on Neptune, 2.33 on Mars), leg stroke
+   on landing (4.9 against 10.9 cm), and the hover: rock steady on Mars, pushed 1.8 m and
+   bobbing at 1.3 m/s in Neptune's 19 m/s wind. If the ship should feel each world at low
+   speed too, the lever is the envelope (let cruise near the ground be what the engines and
+   the air give: 131 m/s on Earth, 78 on Venus, unlimited on Mars), not the body model.
+2. **The jetpack hop on Mars** climbs at 11.9 m/s (8.4 elsewhere) to 50 m and comes down at
+   16 m/s; on Earth 13.4 m/s. The catch near the ground works on all three (touchdown about
+   7 m/s) but the fall before it is long and fast for a calm game.
+3. **Coming down on C takes 14-16 s from 18 m** (about 1.2 m/s): the cushion turns the last
+   stretch into a wait. E, where the prompt offers it, is quicker.
+4. **Lift-off is still the position curve**: altitude reads 0.0 for 2-3 s and then jumps to
+   2-3 m; my gear only sees the first instant (wash 3.6-10 kN while the feet are down).
+5. **`physics.update` reads 0.7-0.8 ms on average in the browser** against 0.25-0.35 in Node,
+   with single frames of 6-29 ms: three renderers share the cores here and the game itself
+   runs at 130-350 ms a frame. Not a number about physics; it wants a quiet machine.
+6. **Nothing of the weather, the marks or the waves is in the picture** (as expected: the
+   kits are not wired yet). The push field is live around the explorer (370-385 cells
+   pushed, 11-16 marks after a short walk), but at this resolution I cannot see grass part.
+   Neptune's spawn is so dark at that hour that nothing at all can be judged there.
+7. On Mars the explorer spawned standing on top of a boulder. Harmless, odd.
+
 ## Ideas and critique
 
 Blunt, as asked. All of it is about motion and behaviour; none of it is about look or structure.
