@@ -825,8 +825,9 @@ What behaves wrong, or does not show:
    bobbing at 1.3 m/s in Neptune's 19 m/s wind. If the ship should feel each world at low
    speed too, the lever is the envelope (let cruise near the ground be what the engines and
    the air give at sea level: 251 m/s on Earth, 35 on Venus, 279 on Neptune, 1960 on Mars),
-   not the body model. Venus is the telling one: its air would hold this ship to 35 m/s, and
-   today it cruises there at 46 like everywhere else.
+   not the body model. Venus already shows it (through your `Sim` in Node, not flown in the
+   browser): its air holds the ship to 38 m/s and stops it from there in 2.6 s, against 46
+   and 3.7 on Earth and Mars. It is the one world where the air decides below your cap.
 2. **The jetpack hop on Mars** climbs at 11.9 m/s (8.4 elsewhere) to 50 m and comes down at
    16 m/s; on Earth 13.4 m/s. The catch near the ground works on all three (touchdown about
    7 m/s) but the fall before it is long and fast for a calm game.
