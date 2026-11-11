@@ -445,3 +445,18 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   three workers; the old PHYSICS agent is retired and must not be resumed.
 - 2026-11-11: PAINTER now exports `makePaintUniforms` and the scene chunks publicly for kits
   built outside its tree (`ebd9b4d`): gaps 1 and 2 of PHYSICS's list.
+- 2026-11-11: **PILOT's M3 half is in place** (`08cc1f1`; the coordinator re-ran
+  `node --test tests/*.test.mjs`: 93 pass): vistas found within 14 m with a chime and a save,
+  sketchbook (B), procedural audio (wind, rain, thunder on its delay, ship, jetpack, footsteps,
+  a pad per planet, UI sounds; `?audio=0`), title and help card (H), read-outs on paper slips,
+  a look hint, start at tier 1 and scale 0.75 and climb, per-world flight pace from air
+  density, `setMood.sky` (PHYSICS's eleven numbers), `tests/m3check.mjs`, and `tests/tour.mjs`
+  (every biome of every body in the integrated game at 960x540, quality 1; sheets in
+  `docs/lead/evidence/tour-<body>.jpg`; one body per process). Not verified: nobody has heard
+  the audio; most tour frames were "(unsettled)" because `world.busy` did not reach 0; painted
+  browser runs not repeated after M3; HUD and markers still the fallback look.
+- 2026-11-11: **PILOT agent replaced, same role (lead duty included).** The first PILOT agent
+  reported that it was at the limit of its working context; `docs/notes/pilot.md` opens with a
+  handover and the lead files stand alone. A fresh PILOT takes over with the same ownership
+  and rules. Still three workers; the old PILOT agent is retired and must not be resumed.
+  All three roles are now on their second agent.
