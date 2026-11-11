@@ -356,3 +356,25 @@ test('legs: what is not a low feature is as it was: a cliff is a fall, a wall st
   for (let i = 0; i < 240; i++) stepExplorerBody(st, {}, 1 / 60, env);
   assert.ok(st.grounded && len(st.v) === 0 && Math.abs(len(st.p) - r0) < 1e-6, 'standing on the flank on the Moon');
 });
+
+test('P12 legs: stepping off the far side of a 0.72 m boulder gives no upward kick (Moon, Mars, Earth; a walk and a run)', () => {
+  // The ground rises 0.72 m over a metre (PILOT's smoothstep skirt) and its far side falls away in one frame.
+  // Before: the hips, heaved up the face at up to 2 m/s, were still rising at 1.1 m/s when the step down had been
+  // taken, and the body left the far ground at +0.9 to +1.5 m/s: 0.25 to 0.30 m of rise and 1.1 to 1.25 s in the
+  // air on the Moon (PILOT's trace of the game: +1.06 m/s, 0.29 m, 1.4 s).
+  const h = (x) => x < 8 ? 0 : x < 9 ? 0.72 * (x - 8) * (x - 8) * (3 - 2 * (x - 8)) : 0;
+  const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z); return { radius: R + h(d.x / l * R), liquidRadius: 0, normal: { x: d.x / l, y: d.y / l, z: d.z / l }, biomeId: 'test' }; };
+  for (const [name, g] of [['Moon', 1.62], ['Mars', 3.71], ['Earth', 9.81]]) for (const v of [4.2, 7.4]) {
+    const st = { p: V(0, 0, R), v: V(), grounded: true }, env = { sample, gravity: g, air: (p, o) => { o.density = 0; o.wind.x = o.wind.y = o.wind.z = 0; return o; } };
+    let kick = 0, rise = 0, rel = 0, was = true, air = 0;
+    for (let i = 0; i < 60 * 12 && st.p.x < 14; i++) {
+      stepExplorerBody(st, { wish: V(v, 0, 0), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / 60, env);
+      const r = len(st.p), vu = dot(st.v, st.p) / r;
+      if (!st.grounded) { if (was) { kick = Math.max(kick, vu); rel = r; } rise = Math.max(rise, r - rel); air += 1 / 60; }
+      was = st.grounded;
+    }
+    assert.ok(st.p.x >= 14, `${name} ${v} m/s: got over it`);
+    assert.ok(kick <= 0.4 && rise <= 0.05, `${name} ${v} m/s: leaves the ground at +${kick.toFixed(2)} m/s and rises ${rise.toFixed(2)} m`);
+    assert.ok(air < 0.5, `${name} ${v} m/s: ${air.toFixed(2)} s in the air`);
+  }
+});

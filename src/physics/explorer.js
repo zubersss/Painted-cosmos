@@ -464,6 +464,16 @@ function stepOnce(st, cmd, dt, env, T) {
     if (!held) {
       // the feet leave the ground at full stretch, with the hips' velocity
       grounded = false;
+      // (P12) ... but not thrown up by its own limbs. Hips that were being heaved up a face (capB above:
+      // a speed chosen because the hold can stop it again within the stroke) still had half that speed
+      // when the far side fell away in one frame: the step down was taken in contact, legs at full
+      // reach, hips still rising at 1.1 m/s, and a frame later the feet left the ground of the far side
+      // at +0.9 to +1.5 m/s: 0.3 m of rise and 1.2 s in the air on the Moon (PILOT's trace: +1.06 m/s).
+      // The hold that the speed was lent against is the last thing to let go, and it lets go a body
+      // that is not rising faster than the ground it has been running on rises (B.trend: a hill still
+      // launches a runner at its own slope). Only while the legs are at work on a feature: a runner
+      // whose legs are not working has the ground's own velocity and keeps it.
+      if (gE > 0 && (working || B.grip) && w1 > Math.max(0, B.trend)) w1 = Math.max(0, B.trend);
       const rr = Math.max(h1, c1 - reach), vv1 = w1 - su;
       px = _dir.x * rr; py = _dir.y * rr; pz = _dir.z * rr;
       vx = sx + vv1 * ux; vy = sy + vv1 * uy; vz = sz + vv1 * uz;
