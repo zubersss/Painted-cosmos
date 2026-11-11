@@ -96,6 +96,8 @@ physics.update(dt, {
   time,          // seconds on the simulation clock (sim.t). Weather and wind are functions of it.
   focus,         // {x,y,z} body-local point the near field centres on (explorer feet, or the ship)
   sunDir,        // {x,y,z} body-local unit vector toward the sun (optional: day/night temperature, dawn mist)
+  eye,           // {x,y,z} body-local position of the camera (optional, new in P6): snow is simulated in an
+                 //   8 m box round it (the focus when absent, or when the eye is over 60 m from the focus)
   disturbers,    // [{ kind:'explorer'|'ship'|'jet'|'downwash', p, v, radius, strength, grounded?,
                  //    kick?, impact? (explorer: dust raised by the feet), q?, legContact? (ship: pad prints) }]
 });              //   explorer/ship: strength 1; jet/downwash: strength = thrust in newtons
@@ -232,14 +234,19 @@ physics.glsl.water              // pcPhysWater(p) -> vec3(height, dh/deast, dh/d
                                 //   Shares the frame uniforms with the flora chunk (guarded: include both freely)
 
 // draw kits (the only folder that imports three; optional; see "For PAINTER", C)
-import { createPhysicsKits, createWeatherKit, createMarksKit, createWaterKit, DRAW, INKED, PARTICLE_GLSL, SHAPE_GLSL } from './src/physics/three/index.js';
+import { createPhysicsKits, createWeatherKit, createMarksKit, createWaterKit, DRAW, DRAW_PAINTED, cellFor, INKED, PARTICLE_GLSL, SHAPE_GLSL } from './src/physics/three/index.js';
 const kits = createPhysicsKits(physics, { makeMaterial(kind, info), weather?: { draw?, expand?: 'cpu' | 'gpu', kinds?, rings? } | false, marks?, water?: {} (off by default) });
 kits.update(bodyRoot, camera, internalHeightPx);   kits.objects;   kits.stats { ms, drawCalls, vertices, triangles };   kits.dispose()
 kits.weather.stats.cover   // { rain?, snow?, dust? }: the share of what the physics says the kind hides that its marks paint
 kits.weather.stats.size    // { snow, dust, ... }: the size (m) dabs are drawn at now
 // DRAW[kind] options (override any through weather.draw): width, exposure, min, size, grow, spin, fadeIn, vary,
 //   minPx (floor, thins the kind), maxPx (ceiling), share, exposure + smear (dabs drawn out along their motion),
-//   varySize, cell (m: the kind is shown modulo a cell round the eye), sizeMax + fill (dabs sized by the physics)
+//   varySize, cell (m: the kind is shown modulo a cell round the eye), sizeMax + fill (dabs sized by the physics),
+//   new in P6: fadeOut (s: shrinks to nothing over its last moments, from buf.left), strobe (s, the frame time) +
+//   streak (dab sizes): a dab is drawn out at least as far as it travels in a frame and is gone as a hairline,
+//   near (m: nothing nearer the eye than 0.4 of it)
+// DRAW_PAINTED (new export, was in painted-lab.js): the overrides for PAINTER's pipeline; pass as weather.draw
+// cellFor(D, eye, buf): the cell in use (the nearest to D.cell that divides the kind's simulated box)
 
 physics.fields.deform
   .depth  Float32Array(64*64)     // m pressed into the ground, 0.5 m cells (trail trough); .uniforms.uPhysDeformMap
@@ -252,7 +259,12 @@ physics.fields.deform
 physics.particles.rain / .snow / .hail / .dust / .sand / .ash / .spores / .leaves / .spray
   // { count, capacity, pos Float32Array(3n) (relative to .origin, body-local axes), vel (3n), size (n), age (n),
   //   mat Uint8Array(n) (the ground it was raised from: an index into physics.data.MATERIAL_IDS; 255 =
-  //   MATERIAL_NONE: rain, falling snow, hail, leaves, spores, ash), origin, species }
+  //   MATERIAL_NONE: rain, falling snow, hail, leaves, spores, ash), origin, species,
+  //   left Float32Array(n) (new in P6: seconds until it is gone, where the physics can tell: its life ending, or
+  //   its landing foretold from the rate its height over the ground is closing; 1e9 otherwise),
+  //   radius (new in P6: half-width in m of the box the kind is simulated in: 24, snow 8) }
+  // Positions are on the curved ground (P6 fix): radius r0 + height on the line through the grid point; before,
+  // they lay on the tangent plane at the frame's anchor and left the ground by d^2 / 2R (18 m at 380 m on Earth).
   // rain, snow: the weather. hail: storm cores (bounces). dust: kicked up, storms, devils, ambient haze. sand: saltation,
   // kicks, scour. leaves / spores / ash: the biome's own, on the wind. spray: wading, thruster wash over liquid.
   // In vacuum the same kinds fly as clean parabolas (no drag, no drift).
@@ -428,6 +440,12 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
    ```
    `bodyId` is the body whose ground frame the focus is in, else `null`. `sunDir` is the unit
    vector from the body toward the sun in that body's local (rotating) frame.
+   **New in P6, one field, optional: `eye`**, the camera's position in the same body-local
+   frame (`{ x, y, z }`): `this.physics.update(simDt, { ..., eye })`. Snow is simulated in a box
+   16 m across round it, so the flakes are where the lens is and each lands on the ground it
+   is over. Without it the box is round the focus and the kit wraps it round the camera (it
+   works, but a flake shown a box away from where it is melts over the wrong ground). An eye
+   over 60 m from the focus (the map, a free camera) is ignored.
 2. **env.** `physics.bindEnv(bodyId, env)` adds `air`, `ground`, `liquid`, and `gravity` /
    `radius` when missing. Your explorer env (`sample`, `gravity`) needs nothing more. Your ship
    env (`up`, `altitude`, `spaceAlt`, `hasBody`, `sample`) needs one more field for ground effect
@@ -583,6 +601,21 @@ called (in the gallery you call `physics.update(dt, { bodyId, time, focus, sunDi
 Everything of mine is in **body-local** coordinates (C3). Nothing below is required: each part
 stands alone, in the order I would wire them.
 
+**Changed in P6 (`16d5305`), all of it additive; nothing you would have written against C, D
+or E breaks:**
+- `DRAW_PAINTED` is now exported from `src/physics/three/index.js` (it was a constant inside
+  the lab). Pass it as `weather: { draw: DRAW_PAINTED }`.
+- Particle buffers gained `left` (seconds until the particle is gone) and `radius`; the kits
+  read them. The draw table gained `fadeOut`, `strobe`, `streak`, `near` (C, "Nothing pops").
+- The instanced variant (`expand: 'gpu'`) gained the instance attribute `aPcLeft` and the
+  uniform `uPcDraw3` (both arrive through the geometry and `info.uniforms`).
+- `physics.update` takes an optional `eye` (the camera, body-local): pass it in the gallery.
+- No uniform, chunk or call of A, B, D or E changed. `makeKitMaterial` in the lab is unchanged.
+- Two fixes you will see: rain, snow, dust and splash rings now lie on the curved ground far
+  from where the session started (they floated up to 18 m over it), and it rains over deep
+  water (the weather entered 18 m over the sea BED, so over a sea deeper than that it fell
+  under the surface and nothing showed).
+
 ### A. Plants in the wind (wired by your predecessor in `1e1801e`; one cheap improvement open)
 - Three fields, `physics.fields.flora`: `.bend` (32x32 RGBA: RG soft-plant load east/north, BA
   stiff-plant load; 8 m cells), `.wind` (32x32: RG wind at 2 m in m/s, B gust 0..1, A turbulence
@@ -643,7 +676,7 @@ do"): one opaque pass, no blending, holes by `discard`. Each kit hands your fact
 **vertex chunk that defines `vec3 pcKitPosition()`** plus three varyings.
 
 ```js
-import { createPhysicsKits, SHAPE_GLSL } from '../physics/three/index.js';   // the only folder of mine that imports three
+import { createPhysicsKits, SHAPE_GLSL, DRAW_PAINTED } from '../physics/three/index.js';   // the only folder of mine that imports three
 const kits = createPhysicsKits(physics, { makeMaterial, weather: { draw: DRAW_PAINTED } });   // once
 // every frame, after physics.update and after PILOT has placed the body roots:
 kits.update(bodyRootOf(physics.here.bodyId), camera, painter.info.internalHeight);   // INTERNAL pixels: the floor is yours
@@ -707,14 +740,28 @@ how large the least mark is (`minPx`, in your internal pixels: 3 or more):
   than that. `kits.weather.stats.cover.<kind>` is the share the marks paint: storm rain
   0.66, a blizzard's flakes 0.03 to 0.55, storm dust 1. **What is missing from 1 is veil, and
   the veil is yours** (E below).
-- Snow is sparse to simulate (a real snowfall is thousands of flakes a cubic metre; I carry
-  2000 in 60 000). With `cell: 9` each flake is shown at its place modulo an 18 m cell round
-  the eye: the same flakes on their own simulated paths, all of them near the lens, none
-  under the hull. Flakes are drawn out along their motion (`exposure`, `smear`), differ in
-  size (`varySize`), and are never larger than `maxPx`.
+- Snow (changed in P6). Single flakes only read near the lens, so the physics simulates the
+  2000 it carries in a box 16 m across round the EYE (PILOT passes the camera as `frame.eye`
+  to `physics.update`; in the gallery pass it yourself: `eye: cameraPositionBodyLocal`; without
+  it the box is round the focus). Each flake lands on the ground it is over, is caught by the
+  crowns it is under and stopped by the hull, and rides the air up and down slopes. The kit
+  shows the box modulo itself round the camera it is given, so nothing changes for you; `cell`
+  in the draw table is rounded to a size that divides the box (9 becomes 8). Flakes are drawn
+  out along their motion (`exposure`, `smear`), differ in size (`varySize`), and are never
+  larger than `maxPx`.
+- **Nothing pops or strobes (new in P6; measured, numbers under Status).** Every particle
+  carries `left`, the seconds until it is gone, and the kits shrink a mark to nothing over its
+  kind's `fadeOut` (dust 0.7 s: a 2 m billow no longer vanishes between two frames; snow 0.3 s;
+  rain 0.08 s: a stroke thins to a point over its last 40 cm). A dab is drawn out at least as
+  far as it travels in a frame (`strobe`, the frame time, 20 ms), so driving snow is slanted
+  strokes that overlap from frame to frame; one that would have to be more than `streak` (3)
+  sizes long is a hairline and shrinks away (gone at 4.8). Nothing is drawn nearer the eye than
+  0.4 of `near` (snow 3 m, dust 2.5 m). You need do nothing: the defaults are in `DRAW`, and
+  `DRAW_PAINTED` inherits them.
 - Dust in a storm is sized from the dust in the air (up to `sizeMax`; say what share of its
   quad your puff inks with `fill`): 2 m billows where there were 0.5 m blots.
-- The lab's set for your pipeline (`DRAW_PAINTED` in `painted-lab.js`): rain 7 cm wide, 140 ms
+- The set for your pipeline (`DRAW_PAINTED`, exported from `src/physics/three/index.js` since
+  P6; it was a constant inside `painted-lab.js`): rain 7 cm wide, 140 ms
   exposure, floor 3 px; snow 10 cm, floor 4 px, ceiling 10 px, exposure 40 ms, smear 1.2,
   varySize 0.4, cell 9; dust 0.5 m growing 0.35 m/s, floor 8 px, ceiling 80 px, sizeMax 2.6,
   fill 0.3, exposure 120 ms; hail 5 cm; sand 3.5 cm; spray 4 cm; ash 9 cm; spores 5 cm;
@@ -729,8 +776,9 @@ The rest of the contract:
   can carry a material at all.
 - `info.region`: my suggestion for your region id (2.x rain, hail, spray, snow, rings; 1.x
   marks, dust, sand, ash; 4.x leaves, spores). Yours to change.
-- Nothing needs blending: particles are born small, grow in, and shrink to nothing at the
-  edge of the simulated volume (24 m) or of their cell; shapes inside a quad are cut with `discard`.
+- Nothing needs blending: particles are born small, grow in, shrink to nothing at the edge of
+  the simulated volume (24 m) or of their cell and over their last moments; shapes inside a
+  quad are cut with `discard`.
 - Budget (PILOT's conditions): at most 12 draw calls for all kits (one per kind that has
   anything in the air, rings, marks) and, with every buffer full at the highest quality, 31 k
   triangles; typical: a downpour 3 to 5 calls and 3 k triangles, a blizzard 4 and 3.6 k, fair
@@ -750,7 +798,9 @@ The kinds, and what `vPcUv` / `vPcData` mean:
 3. **Instanced variant** (`weather: { expand: 'gpu' }`): one quad, instanced; the instance
    attributes are my arrays themselves (no copy). Same `pcKitPosition()`, same varyings, with
    `vPcData` = (shade, age s, grain size m, speed m/s); needs `info.uniforms` in the material
-   (the kit keeps them current). Take this one for the final weather; take the cpu one today.
+   (the kit keeps them current; P6 added `uPcDraw3` there and the instance attribute `aPcLeft`
+   in the geometry: nothing to do if you spread `info.uniforms` as the example does). Take
+   this one for the final weather; take the cpu one today.
 4. **`ring`**: the splash of a drop, the ripple it leaves on liquid, the puff where a flake
    settles, a hailstone's bounce: flat on the ground, growing with age. `vPcData` = (kind 0
    splash / 1 ripple / 2 settle / 3 bounce, strength 0..1, age 0..1, drop size m).
