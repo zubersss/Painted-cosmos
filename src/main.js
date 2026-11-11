@@ -84,6 +84,14 @@ async function boot() {
 
   const world = prov.createWorld(scene);
   const painter = prov.createPainter(renderer);
+  // Painter's targets have half-float attachments: without float colour buffers every pass is an
+  // incomplete framebuffer and the sheet stays dark under the HUD (hardening review gap 12, seen
+  // in Chromium with both extensions hidden). Say so, unless the painter declares a fallback.
+  if (!gl.floatTargets && prov.using.render === 'real' && painter.floatFallback !== true) {
+    say('Painted Cosmos needs a graphics feature this browser or driver does not offer (float colour buffers in WebGL 2): try a current Chrome, Edge, Firefox or Safari, with hardware acceleration on.');
+    window.__pcNoGL = true;
+    return;
+  }
   if (painter._attachWorld && world.isStub) painter._attachWorld(world);
   // Build the first view quickly while the loading sheet is up, then go back to a frame budget.
   if (world.setBuildBudget) world.setBuildBudget(40);
@@ -294,13 +302,17 @@ async function boot() {
 }
 
 // Compile every shader the game will draw before the first frame counts (hardening review P3).
-// PAINTER's hooks, when they exist, build what is otherwise made late (every world's dabs and
-// flora, the weather kits: world.prewarm) and draw the post-process materials of every tier once
-// (painter.prewarm); three then compiles every material in the scene graph, visible or not
-// (compileAsync uses KHR_parallel_shader_compile where it exists). It compiles with a render
-// target bound, because the scene is drawn into Painter's targets and three keys a program by
-// the target's colour space: compiled for the screen, each would be compiled again at its first
-// real draw. Never hangs the card: 45 s at most. Resolves to what it did, for the read-out.
+// PAINTER's hooks, when they exist (A2): world.prewarm() makes what is otherwise made late (every
+// world's dabs and flora washes, the weather kits) and puts it where a compile of the scene finds
+// it; painter.prewarm(scene, camera) compiles the scene as its scene pass draws it (into its own
+// target) and lays each post-process pass once. Without the painter's hook, three compiles every
+// material in the scene graph here, visible or not, with a render target bound: the scene is
+// drawn into Painter's targets, and three keys a program by the bound target's colour space, so
+// a compile for the screen would be compiled again at its first real draw. Then each program is
+// asked for its uniforms, which waits for its link here, behind the card (without
+// KHR_parallel_shader_compile the compile returns at once while the GPU process is still
+// linking). A safety net of 90 s keeps a driver that never reports completion from holding the
+// card. Resolves to what it did, for the read-out (window.__pc.warm).
 async function prewarm({ world, painter, renderer, scene, camera }) {
   const t0 = performance.now();
   const programs = () => (renderer.info && renderer.info.programs ? renderer.info.programs.length : 0);
@@ -308,7 +320,8 @@ async function prewarm({ world, painter, renderer, scene, camera }) {
   const steps = [];
   const work = (async () => {
     if (typeof world.prewarm === 'function') { await world.prewarm(); steps.push('world'); }
-    if (typeof renderer.compileAsync === 'function') {
+    if (typeof painter.prewarm === 'function') { await painter.prewarm(scene, camera); steps.push('painter'); }
+    else if (typeof renderer.compileAsync === 'function') {
       const rt = new THREE.WebGLRenderTarget(2, 2);
       const prev = renderer.getRenderTarget();
       let done;
@@ -316,16 +329,13 @@ async function prewarm({ world, painter, renderer, scene, camera }) {
       finally { renderer.setRenderTarget(prev); }
       await done;
       rt.dispose();
-      // Without KHR_parallel_shader_compile the promise resolves at once while the GPU process
-      // may still be linking; asking each program for its uniforms waits for the link here,
-      // behind the card, instead of in the first frames of play.
-      try { for (const p of renderer.info.programs || []) if (p && p.getUniforms) p.getUniforms(); } catch { /* the draw will tell */ }
       steps.push('scene');
     }
-    if (typeof painter.prewarm === 'function') { await painter.prewarm(); steps.push('painter'); }
+    try { for (const p of renderer.info.programs || []) if (p && p.getUniforms) p.getUniforms(); } catch { /* the draw will tell */ }
+    steps.push('linked');
   })();
   let timer = null;
-  const late = new Promise((resolve) => { timer = setTimeout(() => resolve('timeout'), 45000); });
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve('timeout'), 90000); });
   const how = await Promise.race([work.then(() => 'done'), late]);
   clearTimeout(timer);
   return { how, steps, ms: Math.round(performance.now() - t0), programs: programs() - p0 };

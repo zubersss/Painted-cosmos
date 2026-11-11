@@ -156,6 +156,115 @@ top tier; mechanics runs may pin a low tier (say which).
    voices pass the sound check, nobody has heard them), and the picture at 60 frames a
    second (the motion set measures frames, it does not watch them).
 
+## Eighth agent (the hardening review's fixes; record, newest last)
+
+Order: `docs/lead/HARDENING.md` section 2, P1 to P15, then gaps 12 and 16. Scratch:
+`/home/user/.pc-scratch/pilot/run8/` (`mkwork.sh` = a fresh export of the head with my changed
+files over it, in `run8/work`; `probe.mjs <root> <cases>` = my browser checks, one Chromium at a
+time; `before/` = an export of `a671ca7`, the head before my first commit).
+
+1. **P1, sound inside a gesture (was broken).** `main.js` listens (capture phase) for
+   pointerdown, mousedown, keydown, touchend and click and calls `audio.start(true)`;
+   `audio.start(gesture)` makes the context, or resumes it, only when `gesture` is set (a given
+   `context`, the tests' OfflineAudioContext, needs none); `game.js` no longer starts sound from
+   the frame loop. A pad-only player gets one line, "Click or press a key for sound". Checked in
+   Chromium with `--autoplay-policy=user-gesture-required` (probe `audio`, `pad`): before any
+   input the state is `off`; one click makes the context inside the `pointerdown` handler with
+   `navigator.userActivation.isActive` true, and it runs; two key presses then make no second
+   context and call no resume; no AudioContext warning. A standard pad holding A, no click, 5 s:
+   no context, no resume, no warning, the line on screen.
+2. **P2, non-standard pads (was broken).** `Input.pollPad` reads only `mapping === 'standard'`
+   pads; any other device is ignored and said once ("A controller that is not a standard
+   gamepad is connected: it is not used"). I chose the review's smallest fix over "learn each
+   axis's rest": a trigger resting at -1 passes through 0 when pressed, and Chrome reports 0 on
+   every axis before a device's first report, so a learned rest can be learned wrong; the README
+   already promised the standard layout. Unit (`tests/gamepad.test.mjs`, 1 new: fails on the old
+   file); browser (`hotas`): a throttle at -1 on axis 2 with the card up, 4 s: no turn, the card
+   stays, the game does not start, the line once.
+3. **P4 + P8, the frame-rate controller.** I adopted the review's candidate (`dynres.js`: a
+   slow frame moves the average at most to 2.5x it or 50 ms; the panic needs 3 of the last 5
+   frames over the line; a panic during a probe takes back only the probe; a refresh or rAF cap
+   is learned when shedding 40 % of the picture leaves a steady interval within 3 %, forgotten
+   after 3 s well under it) after reading it line by line, with three changes: the jitter guard
+   is 2.5 ms, not 1.5 (it is the second guard: the first is that shedding did not move the
+   interval, and for a CPU-bound machine or a cost that does not scale, restoring the best
+   picture is right anyway); the budget object is cached (the candidate allocated one a frame);
+   the read-out's render-scale line says `capped at N fps`. Its 5 tests are kept
+   (`tests/dynres-sweep.test.mjs`); the review's scenarios (`sweep/synth/sim/scen.mjs`) give the
+   candidate's exact results with my file, and `jit.mjs` finds the caps at +-0.3 to +-4 ms of
+   jitter. P8: `physics.setQuality` beside each `painter.setQuality` (probe `quality`:
+   `?quality=0`, `1`, none -> `__pc.physics.quality` 0, 1, 2).
+4. **P3, the shader prewarm.** On the first settle `main.js` runs `prewarm()` behind the card
+   ("mixing the colours"), and `__pcReady` waits for it: `world.prewarm()` and
+   `painter.prewarm(scene, camera)` when PAINTER has them (their A2, in progress in PAINTER's
+   working files as I write); else three's `compileAsync` of the whole scene graph with a 2x2
+   render target bound (three keys a program by the bound target's colour space: compiled for
+   the screen, every scene material would be compiled twice); then each program's
+   `getUniforms()` to wait for the link. 90 s safety net. Real game, tier 0, 480x270, the same
+   steps on both trees (night, day, a storm, fair, the ship at 300 m, space; the state log
+   confirms ATMOSPHERE and SPACE were reached): **before** (`a671ca7`) 15 programs at ready, 23
+   scene materials without one, `pc-sky-glaze` linked at night and `pc-wash` at day, in play;
+   **after** 20 programs at ready (the warm step compiled 5 in 128 ms), none without one, and no
+   program linked after ready. Space frame `run8/out/prewarm-space.jpg` (opened: the ship among
+   painted stars, markers, the read-out).
+5. **P5, pointer lock.** A refusal within 1.5 s of an unlock says "Click again to capture the
+   mouse" and keeps trying; other refusals (one per request: the promise and the event both say
+   it) fall back at the third. The flick filter: every delta over 120 px still goes through the
+   hold-back test; the line for an impossible spike scales with the game's frame time (at most
+   3x; `take(dt)` smooths it); a held delta is a flick if the next one follows it **or the one
+   before led into it** (at 30 fps a flick's last frame is under 15 % of the one before, which
+   the old rule called a lone jump). I first scaled every line by the time since the previous
+   event, as the review proposed: lockcheck then failed (the headless stream's window-sized
+   jumps arrive seconds apart on a slow page and passed as flicks; pitch thrown 1.37 rad). The
+   recorded stream is now a unit test. Nonsense falls back once until the next click, then for
+   good. The map and the sketchbook let go of the lock (`input.release()`). Measured (Node,
+   the real handlers, one move and one `take()` a frame; three 180-degree flicks in 180 ms, 250
+   ms apart): lock kept and 100 % of the turn at 20, 24, 30, 40 and 60 fps; the old file lost
+   the lock at 20, 30 and 40 fps and applied 7, 13 and 89 %. `tests/lockcheck.mjs` updated for
+   the one re-arm: PASSED (pitch moved 0.046 rad, drag-look 0.092 rad for 40 px).
+6. **P6, keyboard layouts.** `bindingOf(code, key)`: walking keys (W A S D, Space, Shift,
+   arrows, Tab, backquote) by position; the action keys E V C X F M B H by the letter printed on
+   the key; anything else by position (so an action whose letter sits on a walking key, Dvorak's
+   E on QWERTY's D, or is printed nowhere, a Cyrillic layout, keeps its QWERTY place). Each press
+   is exactly one binding (the review's "add the alias too" would make Dvorak's X open the
+   sketchbook as it brakes, and Colemak's F board as it pulses). `keyLabels(getLayoutMap())`
+   relabels the help card and the prompts in Chromium ("Z Q S D" on AZERTY; Dvorak ", A O E"
+   and "." for E); only characters the hand lettering can draw.
+7. **P7** drawing buffer at most 3.7 MP (`OUTPUT_MAX_PIXELS`, the coordinator's ruling): probe
+   `dpr`: 2560x1440 at DPR 1.5 -> 2564x1442 (3.70 MP), 1920x1080 at 1 -> 1920x1080, 1440x900 at 2
+   -> 2160x1350. **P9** the wheel in notches of 120 px (lines x16, pages x100), at most 3 an
+   event. **P10** `audio.pause()/resume()` on visibilitychange (probe: hidden -> `suspended`,
+   shown -> `running`, the wind's gain coming back). **P11** repeats hold the key, a Meta keyup
+   clears all. **P12** a `matchMedia` resolution watch that re-arms (code only: cannot be
+   provoked headless). **P13** no WebGL 2 -> one sentence on the bare sheet, no console error
+   (`run8/out/nogl2.jpg`, opened). **P14** a classic script in `index.html` (no import maps ->
+   "needs a current browser"; the module script's `onerror` or an early error -> "could not be
+   loaded: reload the page"; 15 s without `main.js` running -> "still loading..."): book.js
+   answered 404 -> the message at once (`modfail.jpg`, opened). **P15** context lost -> "the
+   paper is being redrawn", 5 s -> "the graphics driver stopped: reload the page (your journey is
+   saved)", the sound paused; restored -> cleared, frames go on (`lost-late.jpg`,
+   `lost-after.jpg`, opened). The bare sheet's plain messages are centred with side margins (at
+   400 px they ran to the left edge).
+8. **Gap 12, no float colour buffers.** Real game with EXT_color_buffer_float and
+   EXT_color_buffer_half_float hidden (getExtension and getSupportedExtensions in an init
+   script): three warns, every pass into PAINTER's half-float targets is an incomplete
+   framebuffer (GL_INVALID_FRAMEBUFFER_OPERATION on clear and every draw), and the player sees a
+   dark empty sheet inside the ragged border with the HUD on it (`run8/out/nofloat.jpg`,
+   opened). Mine now: `probeGL()` reads the extensions, and with the real painter and no
+   `painter.floatFallback === true` the sheet says "Painted Cosmos needs a graphics feature this
+   browser or driver does not offer (float colour buffers in WebGL 2): try a current Chrome,
+   Edge, Firefox or Safari, with hardware acceleration on." (probe: within 7 s, no console
+   message). The fallback itself is PAINTER's: "For PAINTER (eighth PILOT agent)" below.
+9. **Gap 16, a save made swimming.** It did restore on the bed (`restore` stood the feet on the
+   ground radius under 6 m of water: 0.00 m above the bed in the new test on the old file).
+   Now, in liquid deeper than `EXPLORER.swimDepth`, the explorer comes back afloat, feet 1.25 m
+   under the surface, not grounded (`tests/save.test.mjs`, 1 new).
+10. **README**: layouts, the touchpad, Esc and "click again", the map releasing the mouse, the
+    pad (standard layout only, sound needs a click), sound starting on the first click and
+    going quiet in a hidden tab, the loading card compiling shaders, hitches, frame-rate caps
+    and `capped at N fps`, the 3.7 MP picture, physics following the tier, Safari and Firefox
+    never run, the old-browser and no-WebGL sentences.
+
 ## Seventh agent (review 6, the tour; record, newest last)
 
 1. **Review 6's first half put on record** from the sixth agent's draft (its runs, its
@@ -931,6 +1040,45 @@ Second PILOT agent:
 - The stylesheet is `src/ui/theme.css`; `src/art/ui.css` and `painter.setMarks` are not needed.
 
 ## Needs from the other
+
+### For PAINTER (eighth PILOT agent, the hardening review; 2026-11-11)
+
+1. **A2, the prewarm hooks: my side is in (`src/main.js` `prewarm()`) and works with yours as
+   they stand in your working files.** Call order, on the first settle, behind the card:
+   `await world.prewarm()`, then `await painter.prewarm(scene, camera)` (when it exists I do not
+   compile the scene myself), then every program's `getUniforms()` (waits for each link), and
+   `__pcReady` once that is done and the view has settled again (or 300 frames on). Measured on
+   the head (`932cd9d`) plus my files plus your working render/world/art files, real game, tier
+   0, 480x270: steps world, painter, linked in 320 ms; 25 programs and 125 scene materials at
+   ready, none without a program; no program linked after ready through night, day, a storm,
+   fair, the ship at 300 m and space. Without your hooks my fallback compiles the scene with a
+   2x2 target bound (your `renderer.outputColorSpace = LinearSRGB` makes that unnecessary, and
+   harmless). Not checked by me: a landing on another world after ready (your hooks are meant to
+   cover every world's flora: your check). **One more thing for A2:** a tier change (the
+   controller dropping to tier 1 or 0 under load) changes defines (the 4-sector brush and the
+   rest) and compiles at the worst moment, on a machine already struggling; if
+   `painter.prewarm` laid each tier's post passes once (the review names `mAbs[4]`, `mAbs[8]`,
+   `mSheet`), that stall would go too.
+2. **Gap 12, no float colour buffers (low priority: rare on desktop WebGL 2).** With
+   EXT_color_buffer_float and EXT_color_buffer_half_float hidden, every pass into your half-float
+   attachments is an incomplete framebuffer (`post.js`: `rtScene.textures[1]` :264, `rtHalf`
+   :268, `rtPrev` :276) and the sheet is dark and empty under the HUD (my
+   `run8/out/nofloat.jpg`). I now stop with a plain sentence unless `painter.floatFallback ===
+   true`. A fallback, if you want one: when `!renderer.extensions.has('EXT_color_buffer_float')
+   && !renderer.extensions.has('EXT_color_buffer_half_float')`, make those three attachments
+   `UnsignedByteType`, pack what needs the precision (the depth `mKeep` reads from `tAux.z` for
+   the water's reflections) into two 8-bit channels, and set `floatFallback = true` on the
+   painter object; the game then runs.
+3. A1 (log depth written in the vertex shader when EXT_clip_control is missing) needs nothing
+   from me.
+
+### For PHYSICS (eighth PILOT agent)
+
+1. **P8 is live:** `physics.setQuality(q)` now follows the controller's tier (at start and at
+   every change; measured: `?quality=0`, `1`, none -> 0, 1, 2). The top tier therefore runs your
+   quality 2 (rain 3200, leaves 6000, 12 samples a frame): the review asks you to confirm a storm
+   at quality 2 stays inside your frame budget with your `PC_TIMING=1` tests.
+
 
 ### Before review 6 (fifth PILOT agent, 2026-11-11; evidence in `docs/lead/REVIEW.md`, "Before review 6")
 
