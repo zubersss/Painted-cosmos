@@ -143,10 +143,15 @@ void main() {
   // In light and middle washes the pigment sits in the pits of the paper: a fine speckle. In
   // a dark wash the pits are full: what shows there is the broad soft settling of the pigment
   // (the same paper, out of focus), never a hard speck at the size of a pixel.
-  float dark = 1.0 - smoothstep(0.24, 0.58, lum);
+  // (A saturated middle wash, Neptune's ultramarine sky, counts as dark: there the pits read
+  // as pepper over the whole wash. So does anything under the night's glaze, whatever it was
+  // by day. Only the light washes keep the fine speckle, and even there it is a little soft.)
+  float gl = dot(uGrade, W);
+  float dark = 1.0 - smoothstep(0.42, 0.80, lum * gl);
   dark = max(dark, uWxSheet.x * 1.15 * (1.0 - smoothstep(0.50, 0.88, lum)));     // under a storm key the middle washes are dark too
   vec4 psoft = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 3.6);
-  float pits = (0.52 - ph) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmid.r) * 0.85;
+  float pfine = texture(tPaper, puv, 1.5).r, pmed = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 1.2).r;
+  float pits = (0.52 - pfine) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmed) * 0.85;
   float settle = (0.5 - psoft.r) * 0.7 + (0.5 - plo.r) * 0.8;
   dark = min(dark, 1.0);
   float gran = (mix(pits, settle, dark) + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet) * mix(1.0, 0.4, dark);
@@ -159,12 +164,16 @@ void main() {
   vec2 bd = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);
   float b = min(bd.x, bd.y);
   float corner = smoothstep(0.0, 0.08, bd.x) * smoothstep(0.0, 0.08, bd.y);
-  float bn = b + (plo.g - 0.5) * uBorder.y + (pmid.g - 0.5) * uBorder.y * 0.45 + (paper.g - 0.5) * 0.006 - (1.0 - corner) * 0.012;
+  // (the edge of a dark wash is ragged in broad pieces only: fine tooth there is a row of dots)
+  float bn = b + (plo.g - 0.5) * uBorder.y + (mix(pmid.g, psoft.g, dark) - 0.5) * uBorder.y * 0.45 + (paper.g - 0.5) * 0.006 * (1.0 - dark) - (1.0 - corner) * 0.012;
   float painted = mix(1.0, smoothstep(uBorder.x * 0.72, uBorder.x, bn), uBorder.w);
   float lip = (1.0 - smoothstep(uBorder.x, uBorder.x * 2.2, bn)) * painted * uBorder.w;
   d += lip * uBorder.z * (0.4 + 0.6 * plo.r);
   // dry edge: near the border the brush skips the paper's peaks
-  float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * smoothstep(0.46, 0.62, mix(ph, pmid.r, 0.65)) * uBorder.w;
+  // (a loaded dark wash skips far less: a few broad flecks of paper, never a pale rim with dark specks in it)
+  float skL = smoothstep(0.46, 0.62, mix(ph, pmid.r, 0.65));
+  float skD = smoothstep(0.60, 0.70, psoft.r * 0.6 + plo.r * 0.4 + (pmed - 0.5) * 0.3) * 0.75;
+  float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * mix(skL, skD, dark) * uBorder.w;
 
   col = clamp(col - (col - col * col) * (d - 1.0), 0.0, 1.0);
 

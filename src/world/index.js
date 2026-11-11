@@ -17,11 +17,11 @@ import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { G, GLAZES, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
-import { defaultBodyUniforms } from '../render/materials.js';
+import { defaultBodyUniforms, makeWashMaterial } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(), _east = new THREE.Vector3(), _north = new THREE.Vector3();
-const Y = new THREE.Vector3(0, 1, 0);
+const Y = new THREE.Vector3(0, 1, 0), _hup = new THREE.Vector3();
 
 function lerp3(out, a, b, t) { out.set(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t); }
 
@@ -52,10 +52,10 @@ export function createWorld(scene) {
       flora: null,
       forcedTime: null,
       camLocal: new THREE.Vector3(0, BODIES[id].radius * 4, 0),
-      found: new Set(),
+      found: new Set(), ring: null, dab: null, farTier: 2,
     };
     if (look.flora) st.flora = new Flora(id, root, bu);
-    if (look.rings) root.add(makeRing(bu, BODIES[id].radius, look.rings));
+    if (look.rings) { st.ring = makeRing(bu, BODIES[id].radius, look.rings); root.add(st.ring); }
     if (look.cloud > 0.05 && BODIES[id].atmosphereHeight > 0) {
       // seen from outside, the deck hugs the planet
       st.cloudR = BODIES[id].radius + ((look.deck && look.deck.height) || Math.min(BODIES[id].atmosphereHeight * 0.22, BODIES[id].radius * 0.045) + 60);
@@ -66,6 +66,20 @@ export function createWorld(scene) {
       root.add(st.clouds);
     }
     state.set(id, st);
+  }
+
+  // A far world as a dab: one ball in the wash it shows from afar (its cloud deck, or the mean
+  // of its grounds), lit by its own sun.
+  function makeDab(st) {
+    const d = st.look.deck, c = [0, 0, 0];
+    if (d && d.a && d.b) { for (let k = 0; k < 3; k++) c[k] = d.a[k] * 0.55 + d.b[k] * 0.45; }
+    else { const S = getSurface(st.id); for (const p of S.pal) for (let k = 0; k < 3; k++) c[k] += p.mid[k] / S.pal.length; }
+    const m = makeWashMaterial({ bodyUniforms: st.bu, wet: 0.55, dry: 0, scale: st.body.radius * 0.9, id: 1 });
+    m.uniforms.uColor.value.set(c[0], c[1], c[2]);
+    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(st.body.radius, 3), m);
+    mesh.name = 'dab-' + st.id; mesh.visible = false;
+    st.root.add(mesh);
+    return mesh;
   }
 
   let budgetMs = 5;
@@ -109,7 +123,7 @@ export function createWorld(scene) {
       // internal pixels survive the brush), rain a little broader and longer: a few strokes
       const D = K.DRAW_PAINTED, draw = {};
       for (const k in D) draw[k] = { ...D[k] };
-      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5, share: Math.min(1, (D.rain.share || 0.25) * 1.6) };
+      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5 };      // (the share drawn is PHYSICS': it follows how hard it rains)
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
       for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
@@ -166,9 +180,43 @@ export function createWorld(scene) {
     const physHere = physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id);
     syncPhysWater(physHere ? physics.fields.water : null);
     PHYSW.uWaveLod.value = QUALITY.level === 0 ? 0.6 : 1;
+    // A far world that cannot be seen is not drawn: one wholly under the horizon of the world we
+    // stand on, or behind its closed sky (it used to be submitted all the same: Neptune behind
+    // the thunderstorm at the Earth spawn was 24 k triangles and 13 draw calls of nothing).
+    let hzn = -1, closedSky = false;
+    if (active) {
+      active.root.updateMatrixWorld(true);
+      active.root.getWorldPosition(_hup);
+      _hup.subVectors(cameraPos, _hup);
+      const cr = _hup.length();
+      if (cr > 1) {
+        _hup.divideScalar(cr);
+        hzn = Math.PI / 2 + Math.acos(Math.min(1, (active.body.radius * 0.92) / cr));    // (the lowest ground there could be)
+        closedSky = skyU.uWxSky.value.x > 0.6 && skyU.uAtmo.value.x < 0.3 && lastActive === active.id;
+      }
+    }
     for (const st of state.values()) {
       const root = st.root;
       root.updateMatrixWorld(true);
+      // tier 2: the world itself; 1: a dab (one small washed ball: what a brush makes of a disc a
+      // few pixels across, where the terrain was 14 k to 25 k triangles); 0: nothing
+      let tier = 2;
+      if (st !== active) {
+        root.getWorldPosition(_v).sub(cameraPos);
+        const dist = Math.max(1, _v.length()), rpx = st.body.radius / dist / nearPixel;
+        tier = rpx < 1.3 ? 0 : rpx < (st.farTier === 2 ? 8 : 10) ? 1 : 2;
+        if (hzn > 0 && tier) {
+          const reach = st.body.radius * (st.ring ? 2.6 : 1.12) + (st.body.atmosphereHeight || 0);
+          const fromUp = Math.acos(Math.max(-1, Math.min(1, _v.dot(_hup) / dist)));
+          if (closedSky || fromUp - Math.asin(Math.min(1, reach / dist)) > hzn) tier = 0;
+        }
+      }
+      st.farTier = tier;
+      const seen = tier === 2;
+      st.terrain.group.visible = seen;
+      if (st.ring) st.ring.visible = tier > 0;
+      if (tier === 1 && !st.dab) st.dab = makeDab(st);
+      if (st.dab) st.dab.visible = tier === 1;
       root.getWorldQuaternion(_q);
       // camera in body-local coordinates
       st.camLocal.copy(cameraPos);
@@ -188,7 +236,7 @@ export function createWorld(scene) {
       if (st.clouds) {
         // the deck gathers as you leave the atmosphere and thins away as you come down through it
         const a01 = THREE.MathUtils.smoothstep(st.camLocal.length() - st.body.radius, st.body.atmosphereHeight * 0.6, st.body.atmosphereHeight * 1.6);
-        st.clouds.visible = a01 > 0.02;
+        st.clouds.visible = seen && a01 > 0.02;
         const cu = st.clouds.material.uniforms.uCloud.value;
         // banded worlds close into a full deck seen from outside
         cu.x = (st.look.bands ? 1 : st.look.cloud) * a01; cu.y = Math.max(900, st.body.atmosphereHeight * 3.2);
@@ -209,8 +257,11 @@ export function createWorld(scene) {
       }
       if (!isActive) {
         if (st.near) st.near.update(st.camLocal, false);
-        // far bodies: plain daylight, no haze
-        bu.uFog.value.set(1e-7, 6, 0, 1);
+        // far bodies: plain daylight; seen through the air of the world we stand on they are
+        // veiled by its sky (a pale disc by day, as the moon is), clear at night and from space
+        const veil = active && lastActive === active.id ? (1 - skyU.uAtmo.value.x) * skyU.uAtmo.value.y * 0.72 : 0;
+        if (veil > 0.01) { bu.uFog.value.set(1, 6, veil, 1); bu.uHaze.value.copy(skyU.uSkyZenith.value).lerp(skyU.uSkyHorizon.value, 0.45); }
+        else bu.uFog.value.set(1e-7, 6, 0, 1);
         bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0);
       }
     }
