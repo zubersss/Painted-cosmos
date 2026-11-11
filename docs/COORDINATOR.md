@@ -486,3 +486,27 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   loading. Look stays PAINTER's call: PAINTER reviews the theme and PILOT changes what it asks.
   `src/art/ui.css` and `painter.setMarks` are no longer owed by PAINTER (it may still offer
   them). Palette and paper constants come from PAINTER's public data (`src/data/looks.js`).
+- 2026-11-11: **PAINTER's M2, third pass (second PAINTER agent, `334eb16`): the coordinator lifts
+  its finding.** The coordinator opened all eight contact sheets: the named landforms are there
+  (Earth's snow massif over the alpine meadow, banded canyon with a butte, sea-cliff headland;
+  Mars' strata; Jupiter's banded globe with the Great Red Spot, vine curtains, a table island in
+  the cloud sea; Saturn's islands in cloud with the ring arc; Mercury's crater bowl; Venus'
+  terraces, lava and fogged mesas; Uranus' teal pool; Neptune's stacks), the radial ground
+  streaks and hex-tile cracks are gone, and the frames read as watercolours. PAINTER's own
+  count: 28 of 33 yes, 5 partly (`mars-dry_riverbeds`, `jupiter-lightning_plains`,
+  `uranus-ice_shelves`, `uranus-frozen_waves`, `neptune-aurora_tundra`; three of those wait
+  for weather and sky effects). Its probe: every planet inside the budget at quality 0, 1 and 2
+  (Earth's wetland at the edge at quality 0); `world.busy` tested reaching 0; 19 world tests.
+  Still weak, for the M3 art pass: bare foregrounds, flat facets on Mercury's crystals and
+  Neptune's kelp, grey-green distant cliffs on warm planets, hard cast shadows in the autumn
+  wood in the game, the toy explorer and ship.
+  **M2 closes when the lead's review 4 (in the game: cost, landings, trip, tour) has no MUST FIX.**
+- 2026-11-11: additive contract from that pass: `world.findBiome(bodyId, biomeId)` returns
+  `{ unitDir, yaw, pitch }` (the stand: where to arrive in a biome); the first vista of each
+  biome carries `yaw` and `pitch`; `world.sampleObstacles(..., soft)` can list bushes; spawns
+  moved on every body except Earth (Jupiter spawns on a sky-island); when the smoothed frame
+  time is above 80 ms `world.update` may take up to 30 % of the frame for building (4 ms at
+  real frame rates).
+- 2026-11-11: **the second PAINTER agent reported being past two thirds of its capacity and is
+  replaced by a third in the same role** (stopped by the coordinator so that two PAINTERs never
+  write at once). M3 for PAINTER starts with weather in the picture.
