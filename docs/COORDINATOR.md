@@ -583,3 +583,39 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   `__pc.flash(frames)`. Additive: `Sim.teleport({ heading, lookPitch, firstPerson })`,
   `getSpawn` may carry `yaw` / `pitch`, storage key `painted-cosmos.sketches`.
   The second PILOT agent is at its context limit and is replaced by a third.
+- 2026-11-11: **PAINTER M3 block 2 (fourth agent, code `6bb6c91`, notes `afd9eef`)**. In: the
+  real explorer and ship (`src/art/models.js`; one mesh and one draw call each, were 8 and 17;
+  C10 kept; `userData.pcCaster` makes the world lay their shade), the near-ground stroke layer
+  (`src/world/nearground.js`; one instanced draw call, at most 6400 strokes; trodden blades lie
+  over and stay down, the ship's wash lays a disc), rain as a glaze (a blended pass after the
+  abstraction pass, `GLAZES` in `src/render/shared.js`), soft settling instead of pits in dark
+  washes (sheet pass), sky numbers eased with a 0.9 s time constant, `setBuildBudget(ms,
+  { fixed: true })`, a look review of the UI theme in PAINTER's notes. Cost in the gallery at
+  quality 1: Earth spawn 516 k / 280, forest easel 546 k / 299; in the game, third person at
+  the spawn, 527 k / 285 (paid for by earlier tree hand-over, `TRIM` in `src/world/flora.js`).
+  **Not re-measured in the game at the lead's vista**: the two MUST items (cost, pepper) stay
+  open until the lead measures them. Not done: branch sway and drift wiring, lightning looked
+  at, the lead's SHOULD FIX list.
+  The coordinator opened `models-game`, `models-forest`, `wx-earth-storm` at full size and
+  `models-cockpit`, `models-mars`, `models-poses`, `wx-jupiter-storm`, `wx-grass-part`,
+  `wx-grass-wash` on a sheet. Verdict: the explorer, the ship and the cockpit read as painted
+  things and are accepted; the rain glaze is accepted. **Coordinator finding (look, agrees
+  with the lead's review 5 item 5)**: on Earth's lawn the near strokes are small dark
+  hard-edged triangles, evenly spread: they read as teeth, the most digital thing in the
+  frame. Wanted: brush flicks (curved, tapering, in loose tufts, most of them close to the
+  ground's own value, a few darker accents), none on fresh snow.
+- 2026-11-11: **Lead review 5 (third PILOT agent, `caa25f3`, at `62d3529`; not a gate)**:
+  weather set of twelve frames in the game, cost at three tiers on every body
+  (`tests/cost.mjs`), `tests/all.mjs` (every check, one table). Open MUST FIX: PAINTER two
+  (cost: the forest vista 614 k at quality 1 and 306 k at quality 0, the storm at the spawn
+  after dark 606 k; pepper, worst in Neptune's sky), PHYSICS one (storms bring no wind;
+  PHYSICS reports it done in P7). PILOT's own: the camera in a thicket slides into the eyes,
+  low boulders are walked over, README complete.
+- 2026-11-11: the fourth PAINTER agent is at about 85 % of its context and is replaced by a
+  fifth. **PAINTER's order for M3 block 3** (coordinator): (1) close the two MUST items at
+  the lead's own measure (`node tests/cost.mjs --places "earth:vista:earth-temperate_forest-1"`,
+  the storm after dark; pepper in Neptune's sky, in space and in a pulse frame); (2) day-night
+  and space art pass, pulse streaks from `speed01` (the brief's M3 list); (3) the near strokes
+  as brush flicks and none on snow, the white fringe in the lightning frame, puddles as soft
+  pale sky; (4) as capacity allows, the rest of review 5's SHOULD FIX list, then branch sway
+  and drifts. A repaint of the weakest biome per planet moves to M4's critique swap.
