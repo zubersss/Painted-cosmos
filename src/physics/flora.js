@@ -281,7 +281,8 @@ export class FloraField {
             mag = FLORA.pushLoad * (D.strength == null ? 1 : D.strength) * (1 - smoothstep(R * 0.5, reach, d));
             // plants ahead of a moving body are pushed forward as well as aside
             if (sp > 0.2) { const f = Math.min(0.6, sp / 6); ex = dx * (1 - f) + vx / sp * f; ez = dz * (1 - f) + vz / sp * f; }
-            if (hgt < 0.4 && d < R * 0.9) flat = 1;
+            // under the body itself the plants are pressed flat (falling off over one cell)
+            if (hgt < 0.4) flat = 1 - smoothstep(R, R + nc, d);
             shake = clamp01(mag * (0.2 + sp / 3));
           }
           // strongest disturber wins per cell
