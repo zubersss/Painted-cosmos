@@ -4,118 +4,125 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
-Kept current by the fourth PILOT agent (2026-11-11, part 1 of its order: own items, the
-owner's instruction on quality, three relays from the coordinator). Everything below is true
-at the commit that contains this section.
+Kept current by the fifth PILOT agent (2026-11-11, part 1 of its order: what nobody had
+checked, the motion instrument, the first ten minutes; three relays from the coordinator
+folded in). Everything below is true at the commit that contains this section.
 
 **How to work here.** Read `docs/COORDINATOR.md` (section A, section G, the end of the log in
-E), then this section, then `docs/lead/TRACK.md` and the newest review in
+E), then this section, then `docs/lead/TRACK.md` and the newest block of
 `docs/lead/REVIEW.md`. One shared branch (`cosmos`), one working tree, three roles. Commit only
 with `tools/commit.sh pilot "msg"` (it pushes). Never edit `src/render`, `src/world`,
 `src/art`, `src/physics`, `gallery.html`, `physics-lab.html`, `tools/`, or the other roles'
-notes. Scratch files go in `/home/user/.pc-scratch/pilot/` (this run: `run3/`).
-You are also the LEAD: `docs/lead/REFERENCES.md` (checks), `REVIEW.md` (dated reviews with
+notes. Scratch files go in `/home/user/.pc-scratch/pilot/` (this run: `run5/`).
+You are also the LEAD: `docs/lead/REFERENCES.md` (checks), `REVIEW.md` (dated findings with
 evidence you ran yourself), `TRACK.md` (the path to done). Read long files by section and keep
-command output short: three PILOT agents' worth of context has gone into this role.
-Things that cost me time: the other two commit every few minutes, so say in every finding
-which commit it was measured on, and export again before each browser run; their working tree
-is often mid-save (a Node probe that imports `src/physics` from the working tree can fail for a
-minute: run probes against an export, `ROOT=<export> node probe.mjs`); `sampleObstaclesPure`
-lists boulders (`kind: 'rock'`) only for a radius of 30 m or less; wall-clock time is the
-scarce thing in a browser run (a painted frame takes one to three seconds), so queue the next
-run behind the last with `until grep -q EXIT log; do sleep 5; done; ...` in the background.
+command output short: four PILOT agents' worth of context has gone into this role.
+
+**Things that cost me time.**
+- The head is rarely clean: the coordinator's "WIP snapshot" commits put the other roles'
+  half-written files into it. `tests/cleantree.sh <dir> <painter-commit> <pilot-commit>
+  <physics-commit>` builds a clean tree from each role's own last commit (find them with `git
+  log --format='%h %an: %s' -12`); run every browser check inside it (`cd <dir>; node
+  tests/...`). Say in every finding what it was measured on.
+- **One frame at the top tier takes 5 to 15 s here** (1.4 M triangles, software rendering, a
+  load of 15 to 18 with two other agents rendering). The game's clock advances 0.25 s a frame
+  at most, so a top-tier run plays at about a sixtieth of real time: 30 frames are 5 to 7
+  minutes, the eight motion scenes took 55, and a whole flight to another world at the top
+  tier does not finish in hours. Mechanics at `quality=0&scale=0.5`, 400x225 (a leg of the
+  grand tour takes 4 minutes); the look at the top tier in short, fixed-step runs.
+- Never run two browsers at once (yours or another role's makes both flaky); waiting is
+  `until grep -q EXIT log; do sleep 10; done` in the foreground (10 minutes at most a call).
+- A canvas is only readable in the task that drew it: step and grab in ONE `page.evaluate`
+  (my first motion frames came back black).
+- `sampleObstaclesPure` lists boulders (`kind: 'rock'`) only for a radius of 30 m or less.
 
 **The code in one paragraph.** `src/core/sim.js` is the whole game as pure logic (no three, no
 DOM): state machine (`state.js`), explorer (`src/player/explorer.js`: the built-in step, the
-command to PHYSICS' body model, obstacles: `scrambleSample` makes low boulders ground,
-`collideObstacles` pushes out of tall ones and walks round one of two when wedged), cameras
-(`src/player/camera.js`: a squeezed boom slides the view into the eyes, `boomRoom`), ship
-(`src/ship/flight.js`), pulse (`src/ship/pulse.js`), frames and floating origin (`frames.js`),
-orbits (`orbits.js`), save (`save.js`), the sketchbook's pictures (`sketches.js`).
-`src/core/game.js` presents it with three (places roots, models, camera; markers, HUD, audio,
-map, sketchbook, sketch capture; the read-out with its `weather` line). `src/core/providers.js`
-switches between my stubs (`src/core/stubs/`) and the real modules; `src/main.js` boots (the
-world builds PHYSICS' weather kits itself in `world.setPhysics`: never build kits here).
-`src/ui/` is the HUD (`hud.js`), the map, the sketchbook (`book.js`) and the look (`paint.js`
-makes paper, filters, pencil frames and rules; `lettering.js` the stroke font; `theme.css`).
-`src/audio/audio.js` is all sound. `window.__pc` is the debug door (`info()`, `teleport()`,
-`settle()`, `setClock(t)`, `setHour(h)`, `flash(frames)`).
+command to PHYSICS' body model, obstacles), cameras (`src/player/camera.js`), ship
+(`src/ship/flight.js`), pulse (`src/ship/pulse.js`; `sim.pulse.dest` is where a pulse is
+bound), frames and floating origin (`frames.js`), orbits, save, the sketchbook's pictures.
+`src/core/game.js` presents it with three (roots, models, camera; markers, HUD, audio, map,
+sketchbook; the read-out). `src/core/providers.js` switches between my stubs and the real
+modules; `src/main.js` boots and runs the loop. `src/ui/` is the HUD, the map, the sketchbook
+and the look; `src/audio/audio.js` is all sound (now also a hiss of blown sand and snow and a
+wash of surf from PHYSICS' `here.blown`). `window.__pc` is the debug door: `info()`,
+`teleport()`, `settle()`, `setClock(t)`, `setHour(h)`, `setTimeScale(k)`, `flash(frames)`, and
+new: **`hold(true)` stops the frame loop and `step(dt, n)` runs n frames of exactly dt
+seconds** (tests drive the clock; nothing depends on the machine's pace).
 
 **Every check.** One command: `node tests/all.mjs --export` (a clean export of the last
-commit; three unit suites, the brief's static rules, eight scripted browser runs, one table;
-`--list`, `--only a,b`, `--skip a,b`; about 35 minutes in software GL). The lead's
-instruments, for looking and measuring rather than passing: `node tests/tour.mjs --bodies
-<one body>` (every biome and vista, fair weather held, sheets in `docs/lead/evidence`; one body
-per process, `--sheets <dir>` for trials), `node tests/weather.mjs` (the weather set: twelve
-frames in the game, `--only id,id` re-shoots some and keeps the rest), `node tests/cost.mjs`
-(triangles and draw calls at quality 0, 1, 2 at the dearest tour frame of each body;
-`--places "earth:vista:earth-temperate_forest-1"`, `--shoot` for frames). Run them inside a
-clean export (`tools/export-head.sh <dir>`, then `cd <dir>`), one browser at a time.
+commit: use it only when the head is clean, else build the tree with `tests/cleantree.sh` and run
+`node tests/all.mjs` inside it; three unit suites, the static rules, eight browser runs, one
+table; a unit file that fails in the full run gets two tries alone; 42 minutes on
+2026-11-11). The lead's instruments, for looking and measuring rather than passing, all run
+inside a clean tree, one at a time:
+- `node tests/tour.mjs --bodies <one body>` every biome and vista, fair weather held, sheets
+  in `docs/lead/evidence`; **top tier by default now**; `--quality 1` for coverage; `--first
+  1` shoots only the spawn and the first vista (review 6's top-tier pass); settle is counted
+  in frames (`--settle-frames 300`), seconds are only the safety net.
+- `node tests/weather.mjs` the weather set (twelve frames; top tier by default now; `--only`).
+- `node tests/motion.mjs` **the picture in motion** (new): eight scenes of consecutive frames
+  at a fixed step, a sheet and numbers each (`docs/lead/evidence/motion-<scene>.jpg`,
+  `motion.json`; `--only still,turn`; what each number means is in its header; 55 minutes for
+  all eight at the top tier). The in-page part is `tests/motionlib.mjs`: any page with a
+  canvas can use it (its header says how; PHYSICS was told).
+- `node tests/boulderrun.mjs --body moon --biome crater_fields` a run across a boulder field
+  in the game with real keys at 30 steps a second (new; 6 minutes at quality 0).
+- `node tests/grandtour.mjs` all planets in one sitting; `--bodies moon,pluto --from earth`
+  flew the other two; **`--beats 1`** saves a frame with the HUD and the screen's words at
+  every beat and records the camera through every change of state (`<out>/beats.json`).
+- `node tests/cost.mjs` triangles and draw calls (reports only).
 
-**The rule that changed everything (the owner, 2026-11-11): there is no triangle budget.**
-`docs/COORDINATOR.md`, end of section E. No count of triangles or draw calls is a gate. The
-game starts at tier 2 and full resolution; `src/core/dynres.js` (rewritten) steps down when
-the measured frame time asks (under 30 fps at once, a tier with it when the smallest picture
-could not reach 30; a run of three frames over 250 ms is load, one is a hitch), climbs by
-single careful steps that back off when they do not hold (so it also climbs behind a display
-refresh), and is not fed while the first view loads (`main.js`: `judged`, `dyn.rest()`).
-`?quality=N` pins the tier (resolution still adapts); `?dynres=0` pins both. `tests/cost.mjs`
-only reports. The look is judged at the top tier (tour, weather set, review 6); mechanics
-runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdrawn" marks.
+**The rule that governs quality (the owner, 2026-11-11): there is no triangle budget.** The
+game starts at tier 2 and full resolution; `src/core/dynres.js` steps down when the measured
+frame time asks. `?quality=N` pins the tier; `?dynres=0` pins both. The look is judged at the
+top tier; mechanics runs may pin a low tier (say which).
 
-**What part 1 did** (commits `895a178` to `fd677b5` and the one that holds this text; details under
-"Fourth agent, part 1" below):
-1. Weather set on PHYSICS' new storm times: `tests/weather.mjs` re-shot (twelve frames,
-   sheet opened). New ids: `earth-start`, `earth-before`, `earth-arrives`, `earth-storm`,
-   `earth-flash`, `earth-after`, `earth-storm-night`, `earth-flash-night`, `earth-blizzard`
-   (lat 62.41 lon 49.46 at 190 s), `mars-dust`, `neptune-gale`, `neptune-gale-forced`.
-2. `tests/grandtour.mjs`: all eight planets in one browser sitting (see its header; results
-   below; `--from <body>` resumes; records in `<out>/grandtour.json`).
-3. `tests/guards.test.mjs`: the stalled sink, the thin-air pace, the thin-air words,
-   `mood.pulse01`; each guard test fails with its guard taken out.
-4. The suit's share of the wind (`EXPLORER.windAirCap` 12 m/s through PHYSICS'
-   `cmd.shelter01`; `windPace`), a word when thin air limits the ship (`Sim.thinAirWord`,
-   `slowWord`), `mood.pulse01`, the landing word ("Setting down on level ground 12 m away"),
-   boulders clambered at a walk, one trunk met dead on stepped round, `all.mjs` re-runs a
-   failed unit file alone once.
+**What part 1 of this run did** (details in "Fifth agent, part 1" below; findings in REVIEW,
+"Before review 6").
+1. Every check on `da6d42d`: ALL 13 PASSED.
+2. The Moon and Pluto landed on in the browser (ten bodies is the full set); fixed "Moon is
+   in the way" at arrival at the Moon.
+3. The Moon boulder run in the game: no boulder lifts the feet more than 0.16 m; one run off a
+   crater rim sails 2.4 s (for PHYSICS).
+4. The motion set, first measurements (REVIEW has the table and nine findings).
+5. The first ten minutes: see the record below.
+6. From the relays: settle counted in frames; README says what each tier draws; sound for
+   `here.blown`; `tour --first`; two tries alone for a failed unit file.
 
 **Unfinished, and where each item starts.**
-1. *Part 2, lead review 6* (only on the coordinator's message): on a clean export of the head
-   (never a "WIP snapshot" commit): the tour body by body at the top tier (`node
-   tests/tour.mjs --bodies <one body>`, about two hours and more now that scenes are fuller;
-   check its query pins `quality=2`), `node tests/all.mjs --export`, `node tests/weather.mjs`
-   (it runs at quality 1 by default: pass `--quality 2`), the grand tour, judge the frames
-   against the art bible, say how long the Earth spawn takes to settle, write review 6,
-   update TRACK. No MUST FIX is open against anyone.
-2. *The UI frames* are new (`docs/shots/pilot/ui-title`, `-help`, `-foot`, `-book`,
-   `-flight`, `-cockpit`, `-space`, `-map`: 960x540, top tier, over the real painted world;
-   scratch `run4/ui-shots.mjs <export> <outdir> 2`). PAINTER has still not reviewed the look.
-   Left: at 400 px wide the sketch slip runs off the right edge; the HUD on foot shows
-   nothing at rest (by design: no prompt, no notice), so `ui-foot` is the bare picture.
-3. *Boulders* (coordinator's ruling "boulders, legs and launches"): settled by PHYSICS' legs
-   (P9). My clamber limit and the switch that made boulders block on light worlds are out
-   again (they are in the history between `32c5c86` and `b67c410`, a WIP snapshot that holds
-   their removal); `scrambleSample` is exactly as PHYSICS tested it. Measured by me on the
-   export of `b67c410`, pure simulation, real ground, a run (Shift+W, 14 s, eight headings)
-   from the stand with the most boulders (scratch `run4/boulders.mjs <body>`): Moon
-   `highlands` 0.18 m at most (0.97 before the legs), 82 to 98 m made; Mars `rust_canyons`
-   and Earth `desert_canyon` 0.00 m. Review 6 wants the Moon looked at once in the browser.
-   Without the legs, for the record: boulders that block trapped a run on the Moon's
-   highlands in five of eight headings (3 to 26 m in 25 s).
-4. *Walking into a trunk*: one trunk or boulder met dead on is stepped round after 0.12 s
-   (`collideObstacles`: `hits >= 1`). A 25 s straight walk through the home forest makes 96
-   to 102 m in each of eight headings and stops for 0.1 s at most (it was 1.5 s in one
-   heading; scratch `run4/straight.mjs`). The pace still touches 0 for that tenth of a
-   second; sliding round with no dip at all needs steering before contact (not done).
-5. *Flight pace per world* and *pulse profile* (PHYSICS' `planSpeedChange`): as before.
-6. *M4*, when the coordinator says so and not before: `node tests/all.mjs --export` must print
-   ALL PASSED on the final head; then one pull request `cosmos` -> `main` through the REST API
-   (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), merge, GitHub Pages from
-   `main` (`https://zubersss.github.io/Painted-cosmos/`). The final message to the owner is
-   described at the end of section 5 of the brief; the README already says how to play.
-7. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner; the
-   new controller has only met model machines and software rendering), a real mouse under
-   pointer lock, a real gamepad, how the sound sounds.
+1. *Part 2, lead review 6* (only on the coordinator's message; the coordinator's plan):
+   build a clean tree; `node tests/all.mjs`; the tour **at tier 1 for coverage** (`node
+   tests/tour.mjs --bodies <body> --quality 1`, body by body: settles, console errors, the
+   landform present) and **at the top tier for the spawn and the first vista of each body**
+   (`--first 1`: about six minutes a place); `node tests/weather.mjs` (top tier; the dust and
+   gust-front frames will have changed: PAINTER's glaze now reads PHYSICS' veils);
+   `node tests/motion.mjs` (re-shoot all eight; compare with the table in REVIEW);
+   `node tests/boulderrun.mjs` on the Moon, Mars (`--body mars --biome rust_canyons`) and
+   Earth (`--body earth --biome desert_canyon`); how long each spawn takes to settle, in
+   frames and seconds (the tour's json has both); then judge against the art bible and the
+   checks, write review 6 above the "Before review 6" block, update TRACK.
+   **Re-run because `sampleObstacles` changed in PAINTER's block 5** (Pluto has tall spires,
+   more boulders on Venus, Mercury, Pluto, Uranus, a 15 m clearing at every spawn that is not
+   a forest): `node tests/grandtour.mjs` (all eight) and `--bodies moon,pluto --from earth`,
+   `tests/trip.mjs`, the contract and walk tests (inside `all.mjs`); say what changed.
+2. *Open findings of mine* (REVIEW, "Before review 6"): none is a MUST FIX yet. The measure
+   for boulders should read "never thrown up more than 0.3 m and no boulder lifts the feet
+   more than 0.3 m" unless PHYSICS rules that a crater rim must be held.
+3. *The UI*: at 400 px wide the sketch slip runs off the right edge; PAINTER has still not
+   reviewed the look of the HUD.
+4. *Walking into a trunk*, *flight pace per world*, *pulse profile*: as the fourth agent left
+   them (see "Fourth agent, part 1" below).
+5. *M4*, when the coordinator says so and not before: `node tests/all.mjs` must print ALL
+   PASSED on the final clean head; then one pull request `cosmos` -> `main` through the REST
+   API (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), merge, GitHub Pages
+   from `main`. The final message to the owner is described at the end of section 5 of the
+   brief; the README already says how to play.
+6. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner; the
+   controller has only met model machines and software rendering), a real mouse under
+   pointer lock, a real gamepad, how the sound sounds (levels are measured: the two new
+   voices pass the sound check, nobody has heard them), and the picture at 60 frames a
+   second (the motion set measures frames, it does not watch them).
 
 ## Fifth agent, part 1 (record, newest last)
 
@@ -172,6 +179,31 @@ runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdra
    compile on `23dea80` ("'uStorm': redefinition": the shared chunk's `uniform float uStorm`
    of the quality push against the cloud shell's `uniform vec4 uStorm`). PAINTER found it too
    and fixed it in `cf2058a`.
+4. **The motion set** (`tests/motion.mjs`, `tests/motionlib.mjs`; the debug door's `hold` and
+   `step`). Eight scenes at the top tier, 960x540, 30 steps a second, each a sheet in
+   `docs/lead/evidence/motion-<scene>.jpg` and a row in `motion.json`. The table and the
+   findings are in REVIEW ("Before review 6"); in short: the same instant paints the same
+   picture (0 change), standing in the wind 0.30 % a frame with sky, paper and ground wash
+   still, nothing sticks to the screen in a turn; for PAINTER: arrival is a pop (the canopy,
+   575 k triangles, in one frame) and then a second of pops, tiers change in one frame, a
+   near poppy is a flat disc; for PHYSICS: splash rings are white line ellipses. Shot twice
+   for still, turn, walk and storm (PHYSICS `9b708e2`, then `bf73de5` after its wind fixes:
+   the storm's pops went from 3 to 1; the older frames and sheets are in scratch
+   `run5/motion-9b708e2/`). Every sheet opened. Scratch helpers: `run5/stuckmap.mjs` (where
+   fine detail stays on the screen, block by block), `run5/strip.mjs` (the same crop of
+   several frames, stacked), `run5/trace.mjs` (the Moon run replayed in the pure simulation).
+5. **From the coordinator's relays.** Settle is counted in game frames (`settleWorld` in
+   `tests/browser.mjs`: 300 frames at most, an hour as the safety net; tour, weather set, cost
+   and motion set use it and record both); the tour and the weather set default to the top
+   tier; `tour --first 1`; README's tier table carries PAINTER's lines; `all.mjs` gives a
+   failed unit file two tries alone (it already covered all three suites); nothing of mine
+   reached into `world._near`. Sound for PHYSICS' `here.blown` (my call: yes): a dry hiss for
+   sand or snow (band-passed noise at 4.6 or 6.4 kHz, level 0.07 at full, eased over 0.6 s,
+   0.3 of it inside the ship) and a wash for surf and spume (low-passed noise breathing about
+   once in eight seconds, level 0.17, eased over 0.9 s); `tests/audiocheck.mjs` has "blown
+   sand in a gale" (peak -10.7 dBFS) and "a breaking sea in a gale" (-6.6 dBFS) and
+   "everything at once" stays at -5.6 dBFS: PASSED (no clipping, no clicks, no DC). Nobody
+   has heard them.
 
 ## Status
 
