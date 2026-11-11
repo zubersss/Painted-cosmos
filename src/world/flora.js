@@ -8,6 +8,7 @@ import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { placeTrees, placeUnder, INST_STRIDE, K_BIRCH, K_PINE, K_BIRCH_AUTUMN, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED } from './floraplace.js';
 import { birchGeometry, pineGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
+import { treeCell, underCell } from './obstacles.js';
 import { QUALITY } from '../render/shared.js';
 
 const TREE_LEVEL = 6, UNDER_LEVEL = 8;
@@ -103,7 +104,7 @@ export class Flora {
   }
 
   _buildTrees(chunk) {
-    const t = placeTrees(this.S, chunk.face, TREE_LEVEL, chunk.ix, chunk.iy, 18);
+    const t = treeCell(this.S, chunk.face, chunk.ix, chunk.iy);
     // tiers 0 and 1 keep the three variants; the far tier uses one mesh per species
     const groups = [{}, {}, {}];
     for (let i = 0; i < t.count; i++) {
@@ -126,7 +127,7 @@ export class Flora {
   }
 
   _buildUnder(chunk) {
-    const t = placeUnder(this.S, chunk.face, UNDER_LEVEL, chunk.ix, chunk.iy, 17);
+    const t = underCell(this.S, chunk.face, chunk.ix, chunk.iy);
     const groups = {};
     for (let i = 0; i < t.count; i++) {
       const o = i * INST_STRIDE, key = t.data[o + 5] * 10 + t.data[o + 6];

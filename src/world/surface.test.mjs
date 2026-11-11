@@ -5,7 +5,9 @@ import { makeNoise, hashString, hash2i } from './noise.js';
 import { faceToDir, dirToFace } from './cubesphere.js';
 import { getSurface, sampleSurfacePure, getVistasPure, makeSample, NOLQ } from './surface.js';
 import { buildPatchData, patchIndices, PATCH_VERTS, PATCH_N } from './patchgen.js';
-import { BODY_IDS, BODIES } from '../data/bodies.js';
+import { BODY_IDS, BODIES, spaceAltitude } from '../data/bodies.js';
+import { sampleObstaclesPure } from './obstacles.js';
+import { placeTrees, INST_STRIDE } from './floraplace.js';
 import { LOOKS } from '../data/looks.js';
 
 test('noise is deterministic, bounded and seed-dependent', () => {
@@ -137,4 +139,42 @@ test('mesh at the finest level agrees with sampleSurface', () => {
     const s = sampleSurfacePure('earth', x / r, y / r, z / r);
     assert.ok(Math.abs(s.radius - r) < 0.01, 'radius differs by ' + Math.abs(s.radius - r));
   }
+});
+
+test('terrain stays below 0.8 x the space altitude on every body (Pilot need 1)', () => {
+  for (const id of BODY_IDS) {
+    const S = getSurface(id), o = makeSample(S.nB);
+    let max = -1e9;
+    for (let i = 0; i < 30000; i++) {
+      const y = 1 - 2 * (i + 0.5) / 30000, r = Math.sqrt(1 - y * y), a = i * 2.399963;
+      S.sample(Math.cos(a) * r, y, Math.sin(a) * r, o, false);
+      if (o.h > max) max = o.h;
+    }
+    assert.ok(max < 0.8 * spaceAltitude(BODIES[id]), id + ' reaches ' + max.toFixed(0) + ' m');
+  }
+});
+
+test('flora placement is deterministic and trees stand on dry forest ground', () => {
+  const S = getSurface('earth'), sp = S.getSpawn(), f = dirToFace(sp.x, sp.y, sp.z, {});
+  const ix = Math.floor((f.u + 1) / 2 * 64), iy = Math.floor((f.v + 1) / 2 * 64);
+  const a = placeTrees(S, f.face, 6, ix, iy, 18), b = placeTrees(S, f.face, 6, ix, iy, 18);
+  assert.ok(a.count > 20, 'trees in the home chunk: ' + a.count);
+  assert.deepEqual(a.data, b.data);
+  for (let i = 0; i < a.count; i++) {
+    const o = i * INST_STRIDE, x = a.data[o], y = a.data[o + 1], z = a.data[o + 2], r = Math.hypot(x, y, z);
+    const s = sampleSurfacePure('earth', x, y, z);
+    assert.ok(!s.isLiquid);
+    assert.ok(Math.abs(s.radius - r) < 0.3);
+  }
+});
+
+test('obstacles: trunks near the spawn, none inside the landing clearing', () => {
+  const S = getSurface('earth'), sp = S.getSpawn();
+  const near = sampleObstaclesPure('earth', sp.x, sp.y, sp.z, 6);
+  assert.equal(near.filter((o) => o.kind === 'tree').length, 0);
+  const wide = sampleObstaclesPure('earth', sp.x, sp.y, sp.z, 40);
+  assert.ok(wide.filter((o) => o.kind === 'tree').length > 5);
+  for (const o of wide) { assert.ok(o.radius > 0.1 && o.radius < 2); assert.ok(o.height > 0.2 && o.height < 30); }
+  assert.deepEqual(wide, sampleObstaclesPure('earth', sp.x, sp.y, sp.z, 40));
+  assert.equal(sampleObstaclesPure('mars', 0.3, 0.5, 0.8, 30).length, 0);
 });

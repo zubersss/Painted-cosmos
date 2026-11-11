@@ -367,7 +367,9 @@ void main() {
   vec4 n1 = texture(uNoise3D, vBody / 9.0);
   float seed = vInst.z;
   float canopy = vInst.w * uCanopy;
-  float near = 1.0 - smoothstep(30.0, 110.0, length(vView));
+  float vd = length(vView);
+  float near = 1.0 - smoothstep(30.0, 110.0, vd);
+  if (vd < 1.6 && texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1 > smoothstep(0.35, 1.6, vd)) discard;
   vec3 c; float wet = 0.05; float id = 3.0; float x; float soft = 0.05;
 
   if (part < 0.5) {

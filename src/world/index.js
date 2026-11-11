@@ -10,6 +10,7 @@ import { BODIES, BODY_IDS, SUN } from '../data/bodies.js';
 import { getLook } from '../data/looks.js';
 import { getSurface, sampleSurfacePure, getVistasPure } from './surface.js';
 import { PlanetTerrain } from './terrain.js';
+import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
 import { makeBodyUniforms, SHEET } from '../render/shared.js';
@@ -196,6 +197,9 @@ export function createWorld(scene) {
       return s ? { unitDir: { x: s.x, y: s.y, z: s.z } } : null;
     },
     bodyUniforms(bodyId) { const st = state.get(bodyId); return st ? st.bu : null; },
+    // Trunks and boulders within `radius` metres of a point (not part of sampleSurface):
+    // -> [{ unitDir, radius, height, kind }]
+    sampleObstacles(bodyId, unitDir, radius) { return sampleObstaclesPure(bodyId, unitDir.x, unitDir.y, unitDir.z, radius); },
     // PHYSICS hook (COORDINATOR C14): the motion source for flora and weather. Stored now, read
     // by the flora and weather drawing as those fields arrive.
     setPhysics(p) { physics = p || null; },

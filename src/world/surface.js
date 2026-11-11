@@ -393,22 +393,27 @@ class Surface {
     return o.h;
   }
 
-  // A good first landing spot: earth -> a clearing by the stream in the first forest site.
+  // A good first landing spot: earth -> a clearing by the stream in the first forest site,
+  // where the brook is narrow and the wood stands close around.
   getSpawn() {
     if (this._spawn) return this._spawn;
     const s0 = this.sites[0];
-    let best = null, bestCost = 1e9;
     const o = makeSample(this.nB);
     // tangent frame at the site
     let ux = -s0.z, uy = 0, uz = s0.x; let l = Math.hypot(ux, uy, uz) || 1; ux /= l; uy /= l; uz /= l;
     const vx = s0.y * uz - s0.z * uy, vy = s0.z * ux - s0.x * uz, vz = s0.x * uy - s0.y * ux;
     const isForest = this.biomes[s0.b].terrain === 'forest';
     const step = 6 / this.R, N = 46;
+    const at = (i, j, out) => {
+      let x = s0.x + (ux * i + vx * j) * step, y = s0.y + (uy * i + vy * j) * step, z = s0.z + (uz * i + vz * j) * step;
+      const k = 1 / Math.hypot(x, y, z); out[0] = x * k; out[1] = y * k; out[2] = z * k; return out;
+    };
+    const p = [0, 0, 0], q = [0, 0, 0];
+    const cands = [];
     for (let j = -N; j <= N; j++) {
       for (let i = -N; i <= N; i++) {
-        let x = s0.x + (ux * i + vx * j) * step, y = s0.y + (uy * i + vy * j) * step, z = s0.z + (uz * i + vz * j) * step;
-        l = 1 / Math.hypot(x, y, z); x *= l; y *= l; z *= l;
-        this.sample(x, y, z, o, true);
+        at(i, j, p);
+        this.sample(p[0], p[1], p[2], o, true);
         if (o.w[s0.b] < 0.97) continue;
         let cost;
         if (isForest) {
@@ -419,13 +424,37 @@ class Surface {
           cost = Math.hypot(i, j) * 0.05;
         }
         // flatness: compare with neighbours 5 m away
-        const e = 5 / this.R;
+        const e = 5 / this.R, x = p[0], y = p[1], z = p[2];
         const h1 = this.heightAt(x + ux * e, y + uy * e, z + uz * e), h2 = this.heightAt(x + vx * e, y + vy * e, z + vz * e);
         const h3 = this.heightAt(x - ux * e, y - uy * e, z - uz * e), h4 = this.heightAt(x - vx * e, y - vy * e, z - vz * e);
         cost += (Math.abs(h1 - h3) + Math.abs(h2 - h4)) * 1.2;
-        if (cost < bestCost) { bestCost = cost; best = [x, y, z]; }
+        cands.push({ i, j, cost });
       }
     }
+    cands.sort((a, b) => a.cost - b.cost);
+    let best = null, bestCost = 1e9;
+    if (isForest) {
+      // refine the best candidates: measure how wide the water really is beside each one
+      for (let c = 0; c < Math.min(60, cands.length); c++) {
+        const cd = cands[c];
+        let wmin = 1e9;
+        for (let a = 0; a < 16; a++) {
+          const ca = Math.cos(a * Math.PI / 8), sa = Math.sin(a * Math.PI / 8);
+          let first = -1, last = -1;
+          for (let r = 1; r <= 40; r += 1) {
+            at(cd.i + ca * r / 6, cd.j + sa * r / 6, q);
+            this.sample(q[0], q[1], q[2], o, false);
+            const wet = o.lq !== NOLQ && o.lq > o.h;
+            if (wet) { if (first < 0) first = r; last = r; } else if (first >= 0) break;
+          }
+          if (first >= 0 && last < 40) { const w = last - first + 1; if (w < wmin) wmin = w; }
+        }
+        if (wmin > 100) continue;
+        const cost = cd.cost + Math.abs(wmin - 5) * 0.8;
+        if (cost < bestCost) { bestCost = cost; best = at(cd.i, cd.j, [0, 0, 0]); }
+      }
+    }
+    if (!best && cands.length) best = at(cands[0].i, cands[0].j, [0, 0, 0]);
     if (!best) best = [s0.x, s0.y, s0.z];
     this._spawn = { x: best[0], y: best[1], z: best[2] };
     if (isForest) this.clearings.push({ x: best[0], y: best[1], z: best[2], r: 11 });

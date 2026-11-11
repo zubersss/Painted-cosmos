@@ -136,7 +136,7 @@ void main() {
 
   // granulation: pigment settles into the valleys of the paper, strongest in darks and wets
   float ph = paper.r;
-  float gran = ((0.52 - ph) * 0.36 + (0.5 - pmid.r) * 0.85 + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum)) * (0.55 + 0.8 * wet);
+  float gran = ((0.52 - ph) * 0.36 + (0.5 - pmid.r) * 0.85 + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet);
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
 
   // ragged unpainted border: the wash simply stops, and pools where it stops

@@ -81,8 +81,9 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       }
       if (kind < 0) continue;
       const rr = R + s.h - sink;
+      const reed = kind === U_REED;
       out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, (r1 * 3) | 0, hash3i(a, b, 6, seed),
-        (r5 - 0.5) * 2 + (s.glade - 0.5) * 0.8, (r4 - 0.5) * 2 * 0.6, s.canopy, 0.1 * r1);
+        reed ? -0.2 - 0.8 * r5 : (r5 - 0.5) * 2 + (s.glade - 0.5) * 0.8, reed ? 0.5 + 0.8 * r4 : (r4 - 0.5) * 2 * 0.6, s.canopy, 0.1 * r1);
     }
   }
   return { count: out.length / STRIDE, data: new Float32Array(out) };

@@ -9,7 +9,8 @@ export function getTextures() {
   const n3 = new THREE.Data3DTexture(genNoise3D(64), 64, 64, 64);
   n3.format = THREE.RGBAFormat; n3.type = THREE.UnsignedByteType;
   n3.wrapS = n3.wrapT = n3.wrapR = THREE.RepeatWrapping;
-  n3.minFilter = THREE.LinearFilter; n3.magFilter = THREE.LinearFilter;
+  // mipmapped, so far-away lookups average out instead of shimmering
+  n3.minFilter = THREE.LinearMipmapLinearFilter; n3.magFilter = THREE.LinearFilter; n3.generateMipmaps = true;
   n3.unpackAlignment = 1; n3.needsUpdate = true;
 
   const st = new THREE.DataTexture(genStrokes(256), 256, 256, THREE.RGBAFormat, THREE.UnsignedByteType);
