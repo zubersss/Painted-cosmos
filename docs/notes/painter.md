@@ -4,7 +4,7 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 
 ## Status
 
-INTEGRATION: ready (commit `b2bfcae` and later; render, world and art are all usable)
+INTEGRATION: ready (commit `c9e19bd`; render, world and art are all usable)
 
 M1 (Painter's half): the temperate forest is built and the three MUST FIX of lead review 1 are
 answered below with numbers and frames. Waiting on the lead's re-review.
@@ -179,7 +179,7 @@ quality 1 unless noted):
   part (noise-dithered) so a trunk never fills the screen; `canopyHeight` for the ship.
 - PILOT critique (ground readable underfoot): the ground wash carries dabs, flicks and dry
   brush at 2 m and 8 m scales anchored to the planet; it should read as moving at a walk.
-- PHYSICS (C14) 1: `canopy01` and `canopyHeight` are on `sampleSurface` (commit `b2bfcae`).
+- PHYSICS (C14) 1: `canopy01` and `canopyHeight` are on `sampleSurface` (commit `c9e19bd`).
 - PHYSICS 2: plant heights and stiffness are exported as `FLORA_PHYS` from
   `src/world/florakit.js`: grass 0.5 m / 0, reed 1.4 / 0.05, fern 0.6 / 0.05, flower 0.58 / 0,
   bush 1.3 / 0.35, birch 13 / 1, pine 18 / 1 (model height before instance scale, stiffness).
