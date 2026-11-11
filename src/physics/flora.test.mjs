@@ -5,13 +5,14 @@ import { createPhysics } from './index.js';
 import { FLORA, PlantSim, plantDisplace, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { oscStep, TAU } from './util.js';
+import { setWindScale, WINDS } from './wind.js';
 import { makeWorld, V, norm, len } from './testworld.mjs';
 
 const R = 4000;
-function world(bodyId = 'earth', biome = 'alpine_meadow') {
+function world(bodyId = 'earth', biome = 'alpine_meadow', dir = V(0.3, 0.55, 0.78)) {
   const sample = makeWorld({ R, biome });
   const physics = createPhysics({ sampleSurface: (id, d) => sample(d), seed: 7, timeBudget: false });
-  const d = norm(V(0.3, 0.55, 0.78));
+  const d = norm(dir);
   const focus = V(d.x * R, d.y * R, d.z * R);
   return { physics, focus, bodyId, d };
 }
@@ -174,7 +175,7 @@ test('a single PlantSim agrees with the field for a plant of the reference frequ
     const x = fr.lx(w.focus.x, w.focus.y, w.focus.z), z = fr.lz(w.focus.x, w.focus.y, w.focus.z);
     // (sampled at the centre of the field cell the plant is compared with)
     const cx = (F.ci + 0.5) * F.cell, cz = (F.cj + 0.5) * F.cell;
-    const s = new Float64Array(7); w.physics.fields.air.sampleWind(cx, cz, s);
+    const s = new Float64Array(8); w.physics.fields.air.sampleWind(cx, cz, s);
     plant.step(1 / 60, s[0] * s[4], s[1] * s[4], w.physics.here.air.density);
     const i = (F.N / 2) * F.N + F.N / 2;
     const fe = F.bend[i * 4], fn = F.bend[i * 4 + 1];
@@ -212,4 +213,76 @@ test('the GLSL chunk is self-consistent with the JS model', () => {
   assert.equal(U.uPhysWindMap[3], 32); assert.equal(U.uPhysNearMap[3], 64);
   // braces balance
   assert.equal((FLORA_GLSL.match(/{/g) || []).length, (FLORA_GLSL.match(/}/g) || []).length);
+});
+
+test('plants shelter each other: the wind is slower in the lee of a wood, and recovers downwind and overhead', () => {
+  // find which way the wind blows here, then plant a round wood upwind of the focus
+  const probe = world(); run(probe, 1);
+  const a0 = probe.physics.here.air, sp0 = a0.speed;
+  assert.ok(sp0 > 0.5);
+  const wdir = norm(a0.wind), up = norm(probe.focus);
+  const upwind = norm(V(probe.focus.x - wdir.x * 62, probe.focus.y - wdir.y * 62, probe.focus.z - wdir.z * 62));
+  const sample = makeWorld({ R, biome: 'alpine_meadow', stand: { dir: upwind, radius: 30, canopy01: 0.9, canopyHeight: 14 } });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), seed: 7, timeBudget: false });
+  const w = { physics, focus: probe.focus, bodyId: 'earth' };
+  run(w, 3);
+  const side = norm(V(up.y * wdir.z - up.z * wdir.y, up.z * wdir.x - up.x * wdir.z, up.x * wdir.y - up.y * wdir.x));
+  const at = (along, across, h) => { const p = V(w.focus.x + wdir.x * along + side.x * across, w.focus.y + wdir.y * along + side.y * across, w.focus.z + wdir.z * along + side.z * across); const l = len(p); return physics.air('earth', V(p.x * R / l, p.y * R / l, p.z * R / l), {}, h).speed; };
+  // 32 m behind the edge of the wood (about two tree heights) against the same distance out to the side
+  const lee = at(0, 0, 2), open = (at(0, 90, 2) + at(0, -90, 2)) / 2;
+  assert.ok(lee < open * 0.75, `in the lee ${lee.toFixed(2)} m/s, in the open ${open.toFixed(2)} m/s`);
+  const far = at(60, 0, 2);
+  assert.ok(far > lee * 1.15, `further downwind it recovers: ${far.toFixed(2)}`);
+  const over = at(0, 0, 28), overOpen = (at(0, 90, 28) + at(0, -90, 28)) / 2;
+  assert.ok(over > overOpen * 0.85, `above the tree tops there is no shelter: ${over.toFixed(2)} vs ${overOpen.toFixed(2)}`);
+  // and the grass in the lee bends less than the grass in the open
+  const F = physics.fields.flora;
+  const bend = (along, across) => { let s = 0; for (let k = 0; k < 120; k++) { run(w, 1 / 60, { t0: 200 + k / 60 }); s += F.plantBend(V(w.focus.x + wdir.x * along + side.x * across, w.focus.y + wdir.y * along + side.y * across, w.focus.z + wdir.z * along + side.z * across), 0).load; } return s / 120; };
+  assert.ok(bend(0, 0) < bend(0, 90) * 0.8);
+});
+
+test('crowns load their neighbours: a push on one crown spreads through a closed wood, not through scattered trees', () => {
+  const spread = (canopy01) => {
+    const mk = () => {
+      const sample = makeWorld({ R, biome: 'alpine_meadow', stand: { dir: norm(V(0.3, 0.55, 0.78)), radius: 5000, canopy01, canopyHeight: 14 } });
+      const physics = createPhysics({ sampleSurface: (id, d) => sample(d), seed: 7, timeBudget: false });
+      const w = { physics, focus: V(...Object.values(norm(V(0.3, 0.55, 0.78))).map((c) => c * R)), bodyId: 'earth' };
+      run(w, 4);
+      return w;
+    };
+    const a = mk(), b = mk();
+    const N = 32, o = ((N / 2) * N + N / 2) * 4;
+    b.physics.fields.flora.field.bend[o + 2] += 1;                 // one crown shoved a long way east
+    run(a, 0.7, { t0: 104 }); run(b, 0.7, { t0: 104 });
+    const A = a.physics.fields.flora.bend, B = b.physics.fields.flora.bend;
+    const nb = (B[o + 4 + 2] - A[o + 4 + 2] + B[o - 4 + 2] - A[o - 4 + 2] + B[o + N * 4 + 2] - A[o + N * 4 + 2] + B[o - N * 4 + 2] - A[o - N * 4 + 2]) / 4;
+    let total = 0; for (let k = 2; k < A.length; k += 4) total += Math.abs(B[k] - A[k]);
+    return { neighbours: nb, self: B[o + 2] - A[o + 2], total };
+  };
+  const closed = spread(1), open = spread(0.05);
+  assert.ok(Math.abs(open.neighbours) < 1e-9, 'scattered trees do not touch: ' + open.neighbours);
+  assert.ok(Math.abs(closed.neighbours) > 0.01, 'in a closed canopy the neighbours are moved: ' + closed.neighbours);
+  assert.ok(Math.abs(closed.self) < Math.abs(open.self), `and the shoved crown is held back: ${closed.self.toFixed(3)} against ${open.self.toFixed(3)}`);
+  assert.ok(closed.total < 4 && open.total < 4, 'nothing grows');
+});
+
+test('gusts travel through the grass: a plant downwind bends like its upwind neighbour, a moment later', () => {
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.35);                        // a windy day, so that gusts cross the gap in seconds
+    const w = world('earth', 'alpine_meadow', V(0.6, 0.04, 0.8)); run(w, 5);      // in the trade winds
+    const F = w.physics.fields.flora, air = w.physics.fields.air, fr = w.physics.fields.frame;
+    const u = Math.hypot(air.cwe, air.cwn), de = air.cwe / u, dn = air.cwn / u, gap = 32;
+    assert.ok(u > 4, 'wind ' + u);
+    const at = (m) => V(w.focus.x + (fr.ex * de + fr.nx * dn) * m, w.focus.y + (fr.ey * de + fr.ny * dn) * m, w.focus.z + (fr.ez * de + fr.nz * dn) * m);
+    const a = [], b = [];
+    run(w, 90, { t0: 105, hz: 30, each: () => { a.push(F.plantBendLite(at(0), 0).load); b.push(F.plantBendLite(at(gap), 0).load); } });
+    const corr = (lag) => { let sxy = 0, sxx = 0, syy = 0, mx = 0, my = 0; const n = a.length - lag; for (let i = 0; i < n; i++) { mx += a[i]; my += b[i + lag]; } mx /= n; my /= n; for (let i = 0; i < n; i++) { sxy += (a[i] - mx) * (b[i + lag] - my); sxx += (a[i] - mx) ** 2; syy += (b[i + lag] - my) ** 2; } return sxy / Math.sqrt(sxx * syy + 1e-30); };
+    let best = -1, bestLag = 0;
+    for (let lag = 0; lag < 30 * 15; lag++) { const c = corr(lag); if (c > best) { best = c; bestLag = lag; } }
+    const lagS = bestLag / 30, expect = gap / u;
+    assert.ok(best > 0.6, 'the downwind plant repeats the upwind one: correlation ' + best.toFixed(2));
+    assert.ok(lagS > expect * 0.5 && lagS < expect * 2, `after ${lagS.toFixed(1)} s; the wind (${u.toFixed(1)} m/s) covers ${gap} m in ${expect.toFixed(1)} s`);
+    assert.ok(corr(0) < best - 0.03, 'and not at the same moment');
+  } finally { setWindScale('earth', s0); }
 });

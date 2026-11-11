@@ -6,7 +6,9 @@ const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
 // R: radius.  sea: radius of a liquid shell (0 = none).  biome: biome id everywhere.
 // cone: { dir, radius (m), height (m) }  a hill with straight sides (slope = atan(height / radius)).
 // bowl: { dir, radius, depth }.  bumps: { amp (m), length (m) }  rolling sinusoidal ground.
-export function makeWorld({ R = 4000, sea = 0, biome = 'test', cone = null, bowl = null, bumps = null } = {}) {
+// stand: { dir, radius (m), canopy01, canopyHeight }  a round wood: samples carry canopy01 and
+//        canopyHeight (PAINTER's additive fields), 0 outside it.
+export function makeWorld({ R = 4000, sea = 0, biome = 'test', cone = null, bowl = null, bumps = null, stand = null } = {}) {
   const height = (d) => {
     let h = 0;
     if (cone) { const a = Math.acos(Math.min(1, dot(d, cone.dir))) * R; if (a < cone.radius) h += cone.height * (1 - a / cone.radius); }
@@ -24,7 +26,9 @@ export function makeWorld({ R = 4000, sea = 0, biome = 'test', cone = null, bowl
     const ha = (at(1, 0) - at(-1, 0)) / (2 * e * R), hb = (at(0, 1) - at(0, -1)) / (2 * e * R);
     const n = norm({ x: d.x - a.x * ha - b.x * hb, y: d.y - a.y * ha - b.y * hb, z: d.z - a.z * ha - b.z * hb });
     const radius = R + h;
-    return { radius, normal: n, slope: Math.acos(Math.min(1, dot(n, d))), liquidRadius: sea, isLiquid: sea > radius, biomeId: biome, biomeWeights: { [biome]: 1 } };
+    const out = { radius, normal: n, slope: Math.acos(Math.min(1, dot(n, d))), liquidRadius: sea, isLiquid: sea > radius, biomeId: biome, biomeWeights: { [biome]: 1 } };
+    if (stand) { const a = Math.acos(Math.min(1, dot(d, stand.dir))) * R; const inside = a < stand.radius; out.canopy01 = inside ? stand.canopy01 : 0; out.canopyHeight = inside ? stand.canopyHeight : 0; }
+    return out;
   };
   sample.forBody = (bodyId, dir) => sample(dir);
   return sample;

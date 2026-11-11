@@ -6,6 +6,7 @@
 // snow depth and temperature (from weather.js) then change the contact honestly: wet rock
 // loses nearly half its grip, soil turns to mud, ice is slippery only near its melting point.
 import { clamp, clamp01, mix, smoothstep } from './util.js';
+import { fetchOf } from './water.js';
 
 // muS / muK: static and kinetic friction of a lugged rubber boot sole, dry.
 // wet: multiplier on both at wetness 1.   foothold: extra holding traction on a slope from
@@ -333,7 +334,7 @@ export function groundAt(bodyId, surface, state, out = {}) {
 // Climate fields of the ground alone (no wetness or snow applied): what air.js and weather.js
 // need to know about a place. Cheaper than groundAt.
 export function coverAt(bodyId, surface, out = {}) {
-  let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0 = 0, snowBase = 0, dT = 0, wsum = 0, lv = 0, spo = 0, ash = 0;
+  let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0 = 0, snowBase = 0, dT = 0, wsum = 0, lv = 0, spo = 0, ash = 0, fetch = 0;
   const bw = surface && surface.biomeWeights;
   if (bw) {
     for (const id in bw) {
@@ -343,14 +344,14 @@ export function coverAt(bodyId, surface, out = {}) {
       wsum += w;
       canopy += b.canopy * w; canopyH += b.canopyH * b.canopy * w; moist += b.moist * w; fog += b.fog * w;
       dustSrc += b.dustSrc * w; z0 += b.z0 * w; snowBase += b.snowBase * w; dT += b.dT * w;
-      lv += ab[0] * w; spo += ab[1] * w; ash += ab[2] * w;
+      lv += ab[0] * w; spo += ab[1] * w; ash += ab[2] * w; fetch += fetchOf(id) * w;
     }
   }
   if (!(wsum > 0)) {
     const id = surface && surface.biomeId;
     const b = biomePhysics(bodyId, id), ab = AIRBORNE[id] || NO_AIRBORNE;
     wsum = 1; canopy = b.canopy; canopyH = b.canopyH * b.canopy; moist = b.moist; fog = b.fog; dustSrc = b.dustSrc; z0 = b.z0; snowBase = b.snowBase; dT = b.dT;
-    lv = ab[0]; spo = ab[1]; ash = ab[2];
+    lv = ab[0]; spo = ab[1]; ash = ab[2]; fetch = fetchOf(id);
   }
   const inv = 1 / wsum;
   out.canopyHeight = canopy > 1e-6 ? canopyH / canopy : 0;
@@ -360,7 +361,7 @@ export function coverAt(bodyId, surface, out = {}) {
   if (surface && surface.canopy01 != null) { out.canopy01 = clamp01(surface.canopy01); if (surface.canopyHeight != null) out.canopyHeight = surface.canopyHeight; }
   out.moist = moist * inv; out.fog = fog * inv; out.dustSource = dustSrc * inv;
   out.z0 = Math.max(z0 * inv, 1e-5); out.snowBase = snowBase * inv; out.dT = dT * inv;
-  out.leaves = lv * inv; out.spores = spo * inv; out.ash = ash * inv;
+  out.leaves = lv * inv; out.spores = spo * inv; out.ash = ash * inv; out.fetch = fetch * inv;
   // open liquid is far smoother than any land
   if (surface && (surface.liquidRadius || 0) > surface.radius) { out.z0 = 0.0002; out.canopy01 = 0; out.dustSource = 0; out.leaves = 0; }
   return out;

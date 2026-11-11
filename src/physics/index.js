@@ -20,6 +20,7 @@ import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
+import { WaterField, WATER_GLSL, WATER, windSea, fetchOf } from './water.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed } from './explorer.js';
 import {
@@ -27,7 +28,8 @@ import {
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
 } from './ship.js';
 
-export const PHYSICS_VERSION = 1;
+export const PHYSICS_VERSION = 2;
+const FETCH_DEFAULT = 800;     // m: fetch assumed for a sea state asked about away from the focus
 
 export const QUALITY = Object.freeze({
   samples: [4, 8, 12],        // sampleSurface calls per frame in steady state, per quality tier
@@ -53,6 +55,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField(SHIP_BODY.legs);
   const _fill = { snow: 0, sand: 0 };
+  const water = new WaterField();
+  let liqLevel = -1e9, liqDepth = 0, liqScan = 0;
 
   let quality = 1;
   let warming = false;
@@ -62,7 +66,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   let lastMoist = -1e9, moistX = 1e9, moistZ = 1e9;
   const focus = { x: 0, y: 1, z: 0 };
   const moist = { wetness01: 0, snowDepth: 0, freshSnow: 0 };
-  const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0 };
+  const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0, fetch: 80 };
   const here = {
     bodyId: null,
     air: { density: 0, wind: { x: 0, y: 0, z: 0 }, speed: 0, gust01: 0, turbulence: 0, temperature: 0, pressure: 0, soundSpeed: 0, viscosity: 0, altitude: 0, height: 0, near: false },
@@ -138,7 +142,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       frame.anchor(bodyId, _d3[0] * rf, _d3[1] * rf, _d3[2] * rf);
       const dr = r0 - frame.r0;
       near.rebase(frame, X, Z, dr); airGrid.terrain.rebase(frame, X, Z, dr);
-      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z);
+      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); water.rebase(frame, X, Z);
+      if (liqLevel > -1e8) liqLevel += dr;
       fx = frame.lx(fp.x, fp.y, fp.z); fz = frame.lz(fp.x, fp.y, fp.z);
       moistX -= X; moistZ -= Z; stats.reanchors++;
     }
@@ -198,6 +203,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     _fill.snow = pr.type === 'snow' || pr.type === 'ice' || pr.type === 'frost' ? pr.rate * pr.frozen01 * WEATHER.snowRatio * WEATHER.timeScale / 3.6e6 : 0;
     _fill.sand = loose.saltation01;
     deform.update(dt, frame, fx, fz, dist, groundOfGrid, body.gravity, time, _fill);
+    // liquid near the focus (looked for a few times a second) and the waves the wind raises on it
+    if (--liqScan <= 0) {
+      liqScan = 20; liqLevel = -1e9; liqDepth = 0;
+      const T = airGrid.terrain, lq = T.lq, hh = T.h, va = T.valid;
+      for (let n = 0; n < lq.length; n++) if (va[n] && lq[n] > liqLevel) { liqLevel = lq[n]; liqDepth = lq[n] - hh[n]; }
+      const l2 = near.liquidAt(fx, fz);
+      if (l2 === l2 && l2 > -1e8) { liqLevel = l2; liqDepth = Math.max(liqDepth, l2 - gh); }
+    }
+    water.update(dt, frame, airGrid.cwe, airGrid.cwn, liqLevel, liqDepth, cover.fetch || 80, body.gravity, here.air.density, liquidOf(bodyId).density);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;
@@ -291,6 +305,30 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     return groundAt(bodyId, s, st, o);
   }
 
+  // The liquid surface at body-local point p: its waves. Near the focus this is the simulated
+  // sea state (the same three wave trains PAINTER draws); elsewhere an estimate from the wind.
+  //   -> { present, height (elevation at p now, m), significant (m), period (s), length (m),
+  //        speed (m/s), steepness, whitecap01, dir {x,y,z} (body-local, the way the waves run) }
+  const _ws = {}, _wa = { wind: { x: 0, y: 0, z: 0 } };
+  function waterAt(bodyId, p, out) {
+    const o = out || {};
+    const dir = o.dir || (o.dir = { x: 0, y: 0, z: 0 });
+    if (bodyId === active && airGrid.inside(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z))) {
+      o.present = water.present;
+      o.height = water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0;
+      o.significant = water.height; o.period = water.period; o.length = water.length; o.speed = water.speed;
+      o.steepness = water.steepness; o.whitecap01 = water.whitecap01;
+      dir.x = frame.ex * water.dir[0] + frame.nx * water.dir[1]; dir.y = frame.ey * water.dir[0] + frame.ny * water.dir[1]; dir.z = frame.ez * water.dir[0] + frame.nz * water.dir[1];
+    } else {
+      const a = air(bodyId, p, _wa, 10), body = BODIES[bodyId];
+      windSea(a.speed, FETCH_DEFAULT, body.gravity, a.density, liquidOf(bodyId).density, 1e9, _ws);
+      o.present = true; o.height = 0; o.significant = _ws.height; o.period = _ws.period; o.length = _ws.length; o.speed = _ws.speed;
+      o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01;
+      const s = a.speed > 1e-6 ? 1 / a.speed : 0; dir.x = a.wind.x * s; dir.y = a.wind.y * s; dir.z = a.wind.z * s;
+    }
+    return o;
+  }
+
   // Add physics to an env object for the explorer or ship step functions:
   //   env.air(p, out, height), env.ground(surface, out), env.liquid, and gravity / radius if missing.
   // With no body (deep space) the env is returned as it is: no air, no gravity.
@@ -350,6 +388,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       depthAt(p) { return deform.depthAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)); },
       field: deform,
     },
+    water: {
+      uniforms: water.uniforms,   // uPhysWaterDir[2], uPhysWaterK[3], uPhysWaterAmp[3], uPhysWaterPhase[3]
+      heightAt(p) { return water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0; },
+      field: water,
+    },
     air: airGrid,             // the wind grid itself (for the lab and for debugging)
     near,
   };
@@ -365,6 +408,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     setWindScale,
     get time() { return time; },
     air, weather, ground, bindEnv,
+    water: waterAt,
     here,                     // air, weather and cover at the focus, refreshed by update()
     features,                 // { devils: [...] with .count }: dust devils near the focus
     explorer: { step: stepExplorerBody, tuning: EXPLORER_BODY, disturbers: explorerDisturbers, jumpSpeed: jumpSpeedFor, terminal: explorerTerminal, sustainableSpeed },
@@ -375,7 +419,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     },
     fields,
     particles: Object.assign({ events: particles.events, system: particles }, particles.buffers),
-    glsl: { flora: FLORA_GLSL },
+    glsl: { flora: FLORA_GLSL, water: WATER_GLSL },
     // reference data
     data: { ATMOSPHERES, WINDS, REGIMES, MATERIALS, BIOMES, SPECIES },
     util: {
@@ -391,5 +435,5 @@ export {
   stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed,
   stepShipBody, stepShipGear, wakeShip, SHIP_BODY, shipTopSpeed, shipTerminal, downwashSpeed, groundEffect, gearSag,
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
-  FLORA_GLSL, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
+  FLORA_GLSL, WATER_GLSL, WATER, windSea, fetchOf, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
 };

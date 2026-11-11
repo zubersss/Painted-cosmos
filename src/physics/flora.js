@@ -50,10 +50,15 @@ export const FLORA = Object.freeze({
   flatRecover: 1.2,             // s: elastic recovery of flattened plants
   flatSet: 60,                  // s: recovery of the trampled (plastic) part
   shakeDecay: 0.7,              // s
+  // crowns that touch load each other: in a closed canopy a tree cannot sway far from its
+  // neighbours, so a wood moves in slow masses and the collisions take energy out (Rudnicki et
+  // al. 2008). Rate (1/s) at which the stiff response of a cell is drawn toward the mean of
+  // its four neighbours, times the canopy closure there.
+  crownCoupling: 0.9,
   jetSpread: 0.25,              // jet footprint radius grows by this x height above the ground
 });
 
-const _s = new Float64Array(7);
+const _s = new Float64Array(8);
 const _coef = new Float64Array(8);
 const _tmp2 = new Float64Array(2);
 const _dwf = new Float64Array(3);
@@ -81,6 +86,8 @@ export class FloraField {
     this._tmpM = new Float32Array(M * M * 4);
     this._tmpA = new Uint8Array(M * M);
     this._tg = new Float32Array(M * M * 4);      // push targets of this step (zero between steps)
+    this._can = new Float32Array(N * N);         // canopy closure per bend cell
+    this._cpl = new Float32Array(N * N * 4);     // scratch for the crown coupling
     this.ci = 0; this.cj = 0;                    // bend grid centre, in cells
     this.mi = 0; this.mj = 0;                    // push grid centre, in near cells
     this.frameVersion = -1;
@@ -192,9 +199,26 @@ export class FloraField {
         const g01 = 0.5 + 0.5 * _s[2];
         wind[o + 2] = g01 < 0 ? 0 : g01 > 1 ? 1 : g01;
         wind[o + 3] = _s[3] * sp * h2;
+        this._can[n] = _s[7];
         gsum += wind[o + 2]; se += we * hs; sn += wn * hs;
       }
     }
+    // ---- crowns loading their neighbours --------------------------------------------------------
+    if (FLORA.crownCoupling > 0) {
+      const cp = this._cpl, can = this._can, kc = FLORA.crownCoupling * h;
+      for (let n = 0; n < N * N; n++) { const o = n * 4; cp[o] = bend[o + 2]; cp[o + 1] = bend[o + 3]; cp[o + 2] = vel[o + 2]; cp[o + 3] = vel[o + 3]; }
+      for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
+        const n = j * N + i, c = can[n];
+        if (c < 0.2) continue;
+        const k = 1 - Math.exp(-kc * c), o = n * 4, l = o - 4, r = o + 4, d = o - N * 4, u = o + N * 4;
+        // position and velocity both: touching crowns share load and damp their relative motion
+        bend[o + 2] += ((cp[l] + cp[r] + cp[d] + cp[u]) * 0.25 - cp[o]) * k;
+        bend[o + 3] += ((cp[l + 1] + cp[r + 1] + cp[d + 1] + cp[u + 1]) * 0.25 - cp[o + 1]) * k;
+        vel[o + 2] += ((cp[l + 2] + cp[r + 2] + cp[d + 2] + cp[u + 2]) * 0.25 - cp[o + 2]) * k;
+        vel[o + 3] += ((cp[l + 3] + cp[r + 3] + cp[d + 3] + cp[u + 3]) * 0.25 - cp[o + 3]) * k;
+      }
+    }
+
     // ---- travelling waves ------------------------------------------------------------------------
     const inv = 1 / (N * N);
     se *= inv; sn *= inv;

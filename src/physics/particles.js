@@ -47,7 +47,7 @@ function makeBuffer(cap) {
   };
 }
 
-const _w = new Float64Array(7);
+const _w = new Float64Array(8);
 
 export class Particles {
   constructor(seed, quality = 1) {

@@ -15,10 +15,15 @@ export const FLORA_GLSL = /* glsl */`
 uniform sampler2D uPhysBend;   // RG: soft-plant load (east, north), BA: stiff-plant load
 uniform sampler2D uPhysWind;   // RG: wind at 2 m (m/s), B: gust01, A: turbulence (m/s)
 uniform sampler2D uPhysPush;   // RG: push load (east, north), B: flatten01, A: shake01
+#ifndef PC_PHYS_FRAME
+#define PC_PHYS_FRAME
 uniform vec3 uPhysAnchor;      // body-local anchor of the field frame (m)
 uniform vec3 uPhysEast;        // unit axes of the frame, body-local
 uniform vec3 uPhysNorth;
 uniform vec3 uPhysUp;
+// Position of a body-local point in the field frame (metres along east and north).
+vec2 pcPhysGrid(vec3 p) { vec3 d = p - uPhysAnchor; return vec2(dot(d, uPhysEast), dot(d, uPhysNorth)); }
+#endif
 uniform vec4 uPhysWindMap;     // xy: centre of the bend/wind field (m along east/north), z: 1/size, w: texels per side
 uniform vec4 uPhysNearMap;     // the same for the push field
 uniform vec4 uPhysWave;        // xy: wave direction, z: wavenumber (rad/m), w: amplitude
@@ -39,12 +44,6 @@ vec4 pcPhysTex(sampler2D t, vec2 uv, float n) {
     vec4 e = texelFetch(t, c + ivec2(0, 1), 0), g = texelFetch(t, c + ivec2(1, 1), 0);
     return mix(mix(a, b, w.x), mix(e, g, w.x), w.y);
   #endif
-}
-
-// Position of a body-local point in the field frame (metres along east and north).
-vec2 pcPhysGrid(vec3 p) {
-  vec3 d = p - uPhysAnchor;
-  return vec2(dot(d, uPhysEast), dot(d, uPhysNorth));
 }
 
 // The bend of a plant rooted at body-local point root. stiff01: 0 grass .. 1 tree.

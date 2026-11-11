@@ -22,6 +22,10 @@ export const AIR = Object.freeze({
   gridCell: 16,           // m between nodes (256 m across)
   shelterStep: 24,        // m: step of the upwind search for higher ground
   shelterSteps: 5,        // 120 m of fetch
+  wakeDrop: 0.75,         // a dense stand of trees takes this much off the wind just behind it ...
+  wakeLength: 5,          // ... recovering over this many tree heights downwind (a shelter belt
+                          // protects out to 10-15 heights; Wang and Takle 1996)
+  wakeTop: 1.5,           // the wake reaches this many canopy heights up
   aloftGain: 1.2,         // wind in the free air above the surface layer: 1 + this at 60 % of the atmosphere
   aloftGainVenus: 12,     // Venus: slow at the ground, fast aloft (super-rotation)
 });
@@ -35,7 +39,7 @@ const _cs = { biomeWeights: null, biomeId: null, liquidRadius: 0, radius: 0 };
 // Per node of the wind grid: z0, canopy01, canopyH, moist, fog, dustSrc, dT, snowBase, and the
 // wind height factors at blade height, crown height and 2 m (computed once, when the node's
 // ground is sampled, so the flora field never has to redo them).
-const CW = 14;
+const CW = 15;
 function coverInto(surface, arr, o) {
   coverAt(_coverBody, surface, _cov);
   arr[o] = _cov.z0; arr[o + 1] = _cov.canopy01; arr[o + 2] = _cov.canopyHeight; arr[o + 3] = _cov.moist;
@@ -43,7 +47,7 @@ function coverInto(surface, arr, o) {
   arr[o + 8] = heightFactor(FLORA.softHeight, _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 9] = heightFactor(Math.max(FLORA.stiffHeight, _cov.canopyHeight), _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 10] = heightFactor(2, _cov.z0, _cov.canopyHeight, _cov.canopy01);
-  arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash;
+  arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash; arr[o + 14] = _cov.fetch;
 }
 const HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)];
 let _coverBody = 'earth';
@@ -59,6 +63,8 @@ export class AirGrid {
     this.gust = new Float32Array(N * N);      // travelling gust level -1..1
     this.shel = new Float32Array(N * N).fill(1);   // terrain shelter / speed-up factor
     this.I = new Float32Array(N * N).fill(0.17);   // turbulence intensity at 10 m
+    this.wake = new Float32Array(N * N).fill(1);   // wind left near the ground in the lee of trees upwind (0..1)
+    this.wakeH = new Float32Array(N * N);          // height of the canopy that casts it (m)
     this.bodyId = null;
     this.time = 0;
     this.ready = false;
@@ -126,6 +132,22 @@ export class AirGrid {
           if (a > sx) sx = a;
         }
         if (sx < -1.4) sx = 0;
+        // plants sheltering each other: a stand of trees (or a reed bed, or a hedge) upwind
+        // casts a wake of slower air downwind of itself, deepest just behind it
+        let drop = 0, dropH = 0;
+        const c0 = T.cover[n * CW + 1], hc0 = T.cover[n * CW + 2];
+        for (let k = 1; k <= AIR.shelterSteps; k++) {
+          const dd = k * AIR.shelterStep;
+          const m = T.nearest(x - dwe * dd, z - dwn * dd);
+          if (m < 0 || m === n) continue;
+          const c = T.cover[m * CW + 1], hc = T.cover[m * CW + 2];
+          if (!(c > 0.05) || !(hc > 0.5)) continue;
+          // only what stands taller and denser than the place itself shelters it
+          const more = clamp01((c * hc - c0 * hc0) / (c * hc));
+          const r = AIR.wakeDrop * c * more * Math.exp(-dd / (AIR.wakeLength * hc));
+          if (r > drop) { drop = r; dropH = hc; }
+        }
+        this.wake[n] = 1 - drop; this.wakeH[n] = dropH;
         const sl = Math.sqrt(1 + T.gx[n] * T.gx[n] + T.gz[n] * T.gz[n]);
         const lee = -(T.gx[n] * dwe + T.gz[n] * dwn) / sl;
         this.shel[n] = clamp(shelterFactor(sx) * (0.5 + 0.5 * slopeFactor(lee)), 0.08, 1.6);
@@ -162,7 +184,7 @@ export class AirGrid {
 
   // Wind only (the per-frame hot path). Writes seven numbers into the typed array `o`:
   //   [0] we, [1] wn (reference wind, frame axes), [2] gust (-1..1), [3] turbulence intensity,
-  //   [4..6] wind height factors at blade height, crown height and 2 m.
+  //   [4..6] wind height factors at blade height, crown height and 2 m, [7] canopy01.
   // (A typed array, not an object: storing a double in an object field can allocate.)
   sampleWind(x, z, o) {
     const N = this.N, T = this.terrain;
@@ -172,8 +194,10 @@ export class AirGrid {
     if (i > N - 2) i = N - 2; if (j > N - 2) j = N - 2;
     const fu = u - i, fv = v - j, n = j * N + i;
     const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
-    o[0] = this.we[n] * w00 + this.we[n + 1] * w10 + this.we[n + N] * w01 + this.we[n + N + 1] * w11;
-    o[1] = this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11;
+    // (this sampler serves things near the ground, so the lee of trees upwind is applied here)
+    const wk = this.wake[n] * w00 + this.wake[n + 1] * w10 + this.wake[n + N] * w01 + this.wake[n + N + 1] * w11;
+    o[0] = (this.we[n] * w00 + this.we[n + 1] * w10 + this.we[n + N] * w01 + this.we[n + N + 1] * w11) * wk;
+    o[1] = (this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11) * wk;
     o[2] = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
     o[3] = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
     // height factors from the nodes whose ground is known
@@ -185,7 +209,8 @@ export class AirGrid {
       o[4] = (c[a] * v00 + c[b] * v10 + c[d] * v01 + c[e] * v11) * k;
       o[5] = (c[a + 1] * v00 + c[b + 1] * v10 + c[d + 1] * v01 + c[e + 1] * v11) * k;
       o[6] = (c[a + 2] * v00 + c[b + 2] * v10 + c[d + 2] * v01 + c[e + 2] * v11) * k;
-    } else { o[4] = HF0[0]; o[5] = HF0[1]; o[6] = HF0[2]; }
+      o[7] = (c[a - 7] * v00 + c[b - 7] * v10 + c[d - 7] * v01 + c[e - 7] * v11) * k;     // canopy01
+    } else { o[4] = HF0[0]; o[5] = HF0[1]; o[6] = HF0[2]; o[7] = 0; }
     return o;
   }
 
@@ -204,6 +229,8 @@ export class AirGrid {
     o.wn = this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11;
     o.gust = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
     o.I = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
+    o.wake = this.wake[n] * w00 + this.wake[n + 1] * w10 + this.wake[n + N] * w01 + this.wake[n + N + 1] * w11;
+    o.wakeH = Math.max(this.wakeH[n], this.wakeH[n + 1], this.wakeH[n + N], this.wakeH[n + N + 1]);
     // ground and cover: valid nodes only
     const va = T.valid, c = T.cover;
     const v00 = w00 * va[n], v10 = w10 * va[n + 1], v01 = w01 * va[n + N], v11 = w11 * va[n + N + 1];
@@ -229,7 +256,7 @@ export class AirGrid {
     const c = this.terrain.cover, a = n * CW;
     o.z0 = c[a]; o.canopy01 = c[a + 1]; o.canopyHeight = c[a + 2]; o.moist = c[a + 3];
     o.fog = c[a + 4]; o.dustSource = c[a + 5]; o.dT = c[a + 6]; o.snowBase = c[a + 7];
-    o.leaves = c[a + 11]; o.spores = c[a + 12]; o.ash = c[a + 13];
+    o.leaves = c[a + 11]; o.spores = c[a + 12]; o.ash = c[a + 13]; o.fetch = c[a + 14];
     return true;
   }
 }
@@ -273,7 +300,9 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     let zh = height;
     if (zh == null) zh = _s.h === _s.h ? r - (frame.r0 + _s.h) : 10;
     if (zh < 0) zh = 0;
-    const f = heightFactor(zh, _s.z0, _s.canopyH, _s.canopy01) * aloftFactor(bodyId, zh);
+    let f = heightFactor(zh, _s.z0, _s.canopyH, _s.canopy01) * aloftFactor(bodyId, zh);
+    // in the lee of trees upwind the air near the ground is slower; above their tops it is not
+    if (_s.wake < 1 && _s.wakeH > 0) f *= 1 - (1 - _s.wake) * (1 - smoothstep(_s.wakeH, _s.wakeH * AIR.wakeTop, zh));
     const we0 = _s.we * f, wn0 = _s.wn * f;
     // the flow follows the ground: vertical component from the slope, fading with height
     let wu = (we0 * _s.gx + wn0 * _s.gz) * Math.exp(-zh / 25);
