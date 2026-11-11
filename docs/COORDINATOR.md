@@ -1205,3 +1205,9 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   wind load, proved in a stand-in crown; leaves that can be seen in a gale; (2) the shore
   once PAINTER has wired the run-up; the three strips not re-filmed; then review 6's
   findings.
+- 2026-11-11: **The owner switched the session's model** and asked to continue without
+  redoing finished work. The three running agents (PILOT 6 in review 6, PAINTER 9 in block
+  7, PHYSICS 11 in P14) were asked to finish the item in hand, commit, write a handover and
+  report; their committed work stands. Every agent started from here runs on the new model
+  at extra-high effort (the coordinator's reading of the owner's "extra"). Coordinator
+  commits carry the new attribution line.
