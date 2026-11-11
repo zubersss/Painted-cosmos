@@ -12,6 +12,20 @@
 <canvas id="pc-canvas"></canvas>
 <div id="pc-hud"></div>
 <div id="pc-loading"></div>
-<script type="module" src="./src/main.js"></script>
+<script>
+// Before the game's modules: plain words if they cannot run (no import maps: Safari before 16.4)
+// or do not arrive (a failed request). src/main.js sets __pcBooting as soon as it runs.
+(function () {
+  function say(t) { var el = document.getElementById('pc-loading'); if (el) { el.className = ''; el.textContent = t; } }
+  if (!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'))) {
+    window.__pcOld = true;
+    say('Painted Cosmos needs a current browser: Chrome, Edge or Firefox, or Safari 16.4 or newer.');
+  }
+  window.__pcLoadFailed = function () { if (!window.__pcBooting && !window.__pcOld) say('the game could not be loaded: reload the page'); };
+  window.addEventListener('error', function () { window.__pcLoadFailed(); });
+  setTimeout(function () { if (!window.__pcBooting && !window.__pcOld) say('still loading\u2026 if nothing changes, reload the page'); }, 15000);
+})();
+</script>
+<script type="module" src="./src/main.js" onerror="window.__pcLoadFailed && window.__pcLoadFailed()"></script>
 </body>
 </html>

@@ -44,3 +44,32 @@ test('no pad, or a broken one, is nothing at all', () => {
     assert.equal(r.active, false); assert.deepEqual(r.edges, []);
   }
 });
+
+// Hardening review P2: a device that is not in the standard layout (a flight stick's throttle,
+// wheel pedals) can rest an axis at -1 or +1; read as the right stick it spun the camera and
+// started the title card by itself. Only a standard pad is read; the other is said once.
+test('only a standard pad is read: a throttle resting at -1 neither turns the view nor counts as input', async () => {
+  if (!globalThis.window) globalThis.window = { addEventListener() {} };
+  const { Input } = await import('../src/core/input.js');
+  const stub = () => ({ addEventListener() {}, pointerLockElement: null, exitPointerLock() {} });
+  const hotas = { id: 'throttle', mapping: '', connected: true, axes: [0, 0, -1, 0], buttons: [{ pressed: false, value: 0 }] };
+  const xbox = { id: 'xbox', mapping: 'standard', connected: true, ...pad() };
+  const saved = navigator.getGamepads;
+  try {
+    navigator.getGamepads = () => [hotas, xbox];
+    let input = new Input(stub(), {}, stub());
+    let r = input.take(1 / 60);
+    assert.ok(input.pad, 'the standard pad is read');
+    assert.equal(r.dx, 0); assert.equal(input.pad.lookX, 0);
+    assert.equal(input.used, false, 'a resting throttle is not input');
+    assert.equal(input.message, null, 'nothing to say while a standard pad is there');
+    navigator.getGamepads = () => [null, hotas];
+    input = new Input(stub(), {}, stub());
+    for (let i = 0; i < 30; i++) r = input.take(1 / 60);
+    assert.equal(input.pad, null, 'the throttle alone is not a pad');
+    assert.equal(r.dx, 0); assert.equal(input.used, false);
+    assert.match(input.message, /not a standard gamepad/);
+    input.message = null; input.take(1 / 60);
+    assert.equal(input.message, null, 'said once');
+  } finally { navigator.getGamepads = saved; }
+});

@@ -8,7 +8,7 @@
 import { BODIES } from '../data/bodies.js';
 import { S } from './state.js';
 import { bodyFrame } from './frames.js';
-import { createExplorerState } from '../player/explorer.js';
+import { createExplorerState, EXPLORER } from '../player/explorer.js';
 import { createFootCamera, createShipCamera } from '../player/camera.js';
 import { createShipState } from '../ship/flight.js';
 import { norm, len, tangent, qNorm, qRotate, V } from './vec.js';
@@ -81,8 +81,13 @@ export function restore(sim, d) {
   sim.shipCam = createShipCamera();
   sim.bodyId = d.bodyId;
   const eg = onGround(d.bodyId, d.explorer.p);
-  const feet = { x: eg.dir.x * eg.radius, y: eg.dir.y * eg.radius, z: eg.dir.z * eg.radius };
+  // In liquid deeper than the swimming depth the explorer floats, feet that far under the
+  // surface: a game saved while swimming comes back swimming, not standing on the bed.
+  const deep = eg.floor - eg.radius > EXPLORER.swimDepth;
+  const rFeet = deep ? eg.floor - EXPLORER.swimDepth : eg.radius;
+  const feet = { x: eg.dir.x * rFeet, y: eg.dir.y * rFeet, z: eg.dir.z * rFeet };
   sim.ex = createExplorerState(feet, tangent(d.explorer.fwd, eg.dir, qRotate(q, V(0, 0, -1))));
+  if (deep) { sim.ex.grounded = false; sim.ex.swimming = true; }
   if (num(d.explorer.fuel)) sim.ex.fuel = Math.min(1, Math.max(0, d.explorer.fuel));
   const view = d.view || {};
   sim.footCam = createFootCamera(vec(view.fwd) ? view.fwd : sim.ex.fwd, eg.dir);

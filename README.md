@@ -10,7 +10,8 @@ and nothing can go wrong: the ship will not let you crash and the explorer canno
 
 **In the browser:** <https://zubersss.github.io/Painted-cosmos/> (GitHub Pages, served from the
 `main` branch). A desktop browser with WebGL 2 is needed (a current Chrome, Edge, Firefox or
-Safari); a keyboard and mouse, or a gamepad.
+Safari 16.4 or newer; the page says so in a sentence if yours cannot run it); a keyboard and
+mouse, or a gamepad.
 
 **From a copy of this repository:** the game is plain ES modules with no build step and makes
 no network requests once loaded. Serve the folder with any static server and open it:
@@ -20,8 +21,9 @@ no network requests once loaded. Serve the folder with any static server and ope
 (Opening `index.html` straight from the disk does not work: browsers do not load modules from
 `file:` addresses.)
 
-**The first minute.** The title card is also the loading screen: it says "click to begin" when
-the first view is painted. Click. You stand in a clearing in Earth's forest, the ship a few
+**The first minute.** The title card is also the loading screen: it prepares the paper,
+mixes the colours (every shader the journey needs is compiled here, so that nothing stalls
+later) and says "click to begin" when the first view is painted. Click. You stand in a clearing in Earth's forest, the ship a few
 steps away. Walk to it with `W A S D`, press `E` to board, hold `Space` to lift off, push the
 throttle with `W` and point the nose at the sky. Above the air, press `M`, choose a world,
 point at its marker and press `F`. Near a world the drive lets go by itself; fly down, and
@@ -32,6 +34,11 @@ the curve): the spot its first view was painted from. You may land anywhere else
 
 ## Controls
 
+The walking and flying keys are read by where they sit, the action keys by the letter on
+them: on an AZERTY keyboard you walk with `Z Q S D` and open the map with the key marked `M`;
+on Dvorak or Colemak, `E`, `F`, `X` and the rest are the keys with those letters. Chrome and
+Edge tell the game your layout, and the help card and the prompts then name your keys.
+
 On foot
 
 | Key | Action |
@@ -41,7 +48,7 @@ On foot
 | C | stroll: a true walk (1.7 m/s) in place of the usual easy lope (4.2 m/s); C again for the pace. A gamepad stick tilted a little strolls too |
 | Space | jump; hold to fire the jetpack (it refills on the ground). From a stand the legs fold for an eighth of a second first; from a run, half that |
 | mouse | look (click the picture to capture the pointer; or hold the left button and drag) |
-| mouse wheel | camera closer / farther |
+| mouse wheel | camera closer / farther (a touchpad swipe moves it a little at a time) |
 | V | first person / third person |
 | E | board the ship when you are next to it |
 
@@ -70,24 +77,30 @@ Anywhere
 | B | the sketchbook: a page per world with a sketch of every landscape walked and every view found (arrow keys turn the pages) |
 | H | the help card (these controls) |
 | ` (backquote) | the frame read-out (explained under "Is it fast enough on my machine?") |
-| Esc | releases the mouse; closes the map or the sketchbook |
+| Esc | releases the mouse (click the picture to capture it again; if the browser says "too soon", click once more); closes the map or the sketchbook |
 
 A gamepad works too (standard layout): left stick walks (in the ship: turn and throttle), right stick looks
 (points the nose), A is Space, B is C, X is E, Y is V, LB brakes, RB is the pulse drive, the
 triggers are the throttle in the ship (the right one runs on foot), Back opens the map, Start
 the help card, d-pad up the sketchbook (left and right turn its pages, down closes it).
-Not tried with a real pad: the mapping is tested with a simulated one.
+A device the browser does not report in the standard layout (a flight stick, pedals, a pad it
+cannot map) is not used, and the game says so once. Browsers do not let a gamepad start
+sound: click or press a key once (the game reminds you). Not tried with a real pad: the
+mapping is tested with a simulated one.
 
 The game saves itself when you land, when you step out, and every 20 seconds on foot, and
 continues from there on the next visit. Add `?fresh=1` to the address to start again on Earth.
 
-If the browser will not capture the mouse (or reports nonsense while it does), the game says so
-and you look around by holding the left button and dragging.
+Opening the map or the sketchbook lets go of the mouse, so that you can click on the page; a
+click on the picture captures it again. If the browser keeps refusing to capture the mouse (three
+times in a row, not just after Esc), or reports nonsense while it does (twice), the game says
+so and you look around by holding the left button and dragging.
 
 Each world has marked views to find: walk up to one and it goes into the sketchbook, with a
 small sketch of the moment (so does every landscape the first time you walk into it). All sound
 is made in code (wind that follows the real wind, rain, thunder, the ship, the jetpack,
-footsteps, a quiet pad per planet); `?audio=0` turns it off.
+footsteps, a quiet pad per planet); `?audio=0` turns it off. It starts with your first click
+or key press (browsers allow no sound before one) and goes quiet while the tab is hidden.
 
 ## Is it fast enough on my machine?
 
@@ -103,7 +116,20 @@ is not left at a crawl (within about two seconds it is on a setting it can hold)
 over budget, the resolution steps down after half a second. It climbs back carefully: one
 small step of resolution after a few steady seconds, a quality tier only after twelve seconds
 at full resolution; a step that does not hold is taken back and tried again less often. It
-does not judge frames while the first view is loading.
+does not judge frames while the first view is loading, and one slow frame (a hitch) moves it
+only a little: it sheds load when slow frames keep coming. **A frame-rate cap is not load:**
+on a 50 Hz screen, or with Chrome's Energy Saver or Safari's Low Power Mode holding the page
+to 30 frames a second, giving up picture would not make the game any faster; when shedding
+two fifths of the picture leaves the frame time where it was, the game takes the best picture
+back and treats that rate as its target (the read-out then says `capped at 30 fps`). A
+machine held back by its processor rather than its graphics keeps the best picture for the
+same reason. The physical models (rain, snow, falling leaves, the samples of the ground)
+follow the tier too, so a lower tier eases the processor as well.
+
+**The size of the picture.** The game draws at the window's size, at up to 1.5 pixels per
+point on a high-density screen, and at most about 2560x1440 (3.7 million pixels): a 1080p
+screen and a Retina laptop keep every pixel, a 4K monitor is painted at about 1440p and
+enlarged by the browser.
 
 **The quality tiers.** There is no triangle budget: the high tier is the painting as it is
 meant to be seen, and the lower tiers exist so that a weaker machine still plays.
@@ -129,7 +155,7 @@ five lines:
 | --- | --- | --- |
 | `frame` | the average frame time in milliseconds, the worst frame of the last ninety, frames a second | 16.7 ms is 60 frames a second; 33 ms is 30 |
 | `scene` | triangles and draw calls of the whole frame (every pass) | information only: there is no budget |
-| `render scale`, `quality tier` | what the game has settled on; `(pinned)` if the address fixed them | 1.00 and tier 2 on a machine that copes |
+| `render scale`, `quality tier` | what the game has settled on; `(pinned)` if the address fixed them; `capped at N fps` when it found the screen or the browser holding the frame rate | 1.00 and tier 2 on a machine that copes |
 | `world`, `physics` | milliseconds a frame spent building the landscape and stepping the physical models, with their worst recent frame | a few milliseconds each; a long `world` worst is a hitch while new ground is built |
 | `weather` | what the weather's own marks cost (rain, snow, dust, ripples: "kits"), and what the sky is doing | `fair`, or for example `overcast 0.94  rain 0.92  storm 0.84  wet 0.96` |
 
@@ -139,15 +165,20 @@ If `frame` sits above 17 ms with the scale at 0.50 and the tier at 0, the machin
 ## Never verified on real hardware
 
 Everything in this game was built and tested in a sandbox with a software renderer and
-scripted input. These four things have never been checked on a real machine by anyone:
+scripted input. These things have never been checked on a real machine by anyone:
 
 - **Frame rate on a real GPU.** The logic that steps the tier and the resolution down and up
   is unit-tested against model machines, but no frame time has been measured on any graphics
   card. The read-out above is there so that you can.
-- **A real mouse under pointer lock.** Mouse look is tested with synthetic events. If the
-  browser will not capture the mouse (or reports nonsense while it does), the game says so
-  and falls back to holding the left button and dragging; that fallback is tested.
-- **A real gamepad.** The standard mapping is tested with a simulated pad only.
+- **A real mouse under pointer lock.** Mouse look is tested with synthetic events (fast
+  turns at 20 to 60 frames a second among them). If the browser will not capture the mouse
+  (or reports nonsense while it does), the game says so and falls back to holding the left
+  button and dragging; that fallback is tested.
+- **A real gamepad, other keyboard layouts.** The standard mapping is tested with a simulated
+  pad only; AZERTY, Dvorak and Colemak with simulated key events.
+- **Safari and Firefox.** Only Chromium was run here: the rule that sound starts on a click,
+  frame-rate caps and a change of screen scale are written to the browsers' documented
+  behaviour, not observed in them.
 - **How it sounds.** Every sound is made in code and its levels are measured (no clipping, no
   clicks, peak about -5 dB), but nobody has listened to it. `?audio=0` turns it off.
 

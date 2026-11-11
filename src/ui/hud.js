@@ -45,17 +45,24 @@ export function createHud(root) {
   const statusText = el('span', '', status, 'click to begin', SIZE.prompt);
   status.insertAdjacentHTML('beforeend', '<i class="pc-dabs"><b></b><b></b><b></b></i>');
   const help = el('div', 'pc-help pc-label', card);
+  // Keys named by code are relabelled for the player's keyboard layout (setKeyLabels; the
+  // walking keys are by position, so on AZERTY "W A S D" reads "Z Q S D").
   const rows = [
-    ['W A S D', 'walk'], ['Shift', 'run'], ['C', 'stroll / pace'], ['Space', 'jump, hold for the jetpack'],
-    ['E', 'board, land, step out'], ['V', 'first / third person'],
-    ['in the ship', ''], ['Space', 'lift off, rise'], ['C', 'sink'], ['W S', 'throttle'], ['A D', 'turn'],
-    ['mouse', 'point the nose'], ['X', 'brake'], ['F', 'pulse drive (in space)'], ['M', 'map'],
-    ['anywhere', ''], ['B', 'sketchbook'], ['H', 'this card'], ['`', 'frame read-out'], ['pad', 'a gamepad works too'],
+    [['KeyW', 'KeyA', 'KeyS', 'KeyD'], 'walk'], ['Shift', 'run'], [['KeyC'], 'stroll / pace'], ['Space', 'jump, hold for the jetpack'],
+    [['KeyE'], 'board, land, step out'], [['KeyV'], 'first / third person'],
+    ['in the ship', ''], ['Space', 'lift off, rise'], [['KeyC'], 'sink'], [['KeyW', 'KeyS'], 'throttle'], [['KeyA', 'KeyD'], 'turn'],
+    ['mouse', 'point the nose'], [['KeyX'], 'brake'], [['KeyF'], 'pulse drive (in space)'], [['KeyM'], 'map'],
+    ['anywhere', ''], [['KeyB'], 'sketchbook'], [['KeyH'], 'this card'], ['`', 'frame read-out'], ['pad', 'a gamepad works too'],
   ];
+  let labels = {};
+  const keyName = (k) => (Array.isArray(k) ? k.map((c) => labels[c] || c.slice(3)).join(' ') : k);
+  const promptKey = (k) => (typeof k === 'string' && k.length === 1 && labels['Key' + k]) || k;
+  const keyEls = [];
   for (const [k, t] of rows) {
     if (!t) { el('em', '', help, k, SIZE.small); continue; }
     const row = el('span', '', help);
-    el('kbd', '', row, k, SIZE.key);
+    const kb = el('kbd', '', row, keyName(k), SIZE.key);
+    if (Array.isArray(k)) keyEls.push([kb, k]);
     el('span', '', row, t, SIZE.body);
   }
 
@@ -80,11 +87,19 @@ export function createHud(root) {
       prompt.innerHTML = '';
       prompt.classList.toggle('pc-on', !!p);
       if (!p) return;
-      const add = (k, t) => { const s = el('span', 'pc-button', prompt); el('kbd', '', s, k, SIZE.key); el('span', '', s, t, SIZE.prompt); };
+      const add = (k, t) => { const s = el('span', 'pc-button', prompt); el('kbd', '', s, promptKey(k), SIZE.key); el('span', '', s, t, SIZE.prompt); };
       add(p.key, p.text);
       if (p.key2) add(p.key2, p.text2);
     },
     promptText() { return lastPrompt; },
+    // Key names for this keyboard layout ({ KeyW: 'Z', ... } from src/core/input.js keyLabels).
+    setKeyLabels(map) {
+      labels = map || {};
+      for (const [kb, k] of keyEls) ink(kb, keyName(k), SIZE.key);
+      lastPrompt = '';                    // the next prompt is drawn afresh with the new names
+      fit();
+    },
+    keyLabel: (code) => labels[code] || code.slice(3),
     setFuel(f, show) {
       fuel.classList.toggle('pc-on', !!show);
       fuelBar.style.width = Math.round(f * 100) + '%';

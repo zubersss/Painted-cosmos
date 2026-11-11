@@ -125,7 +125,7 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 
 /* ---- the title and help card (also the loading screen) ---- */
 #pc-loading { position: fixed; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: center;
-  padding-bottom: 7vh; box-sizing: border-box; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  padding: 0 8vw 7vh; text-align: center; box-sizing: border-box; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
   color: var(--pc-sepia); font: italic 18px Georgia, serif; letter-spacing: 0.08em; transition: opacity 0.8s ease; pointer-events: none; }
 #pc-loading.pc-done { opacity: 0; }
 .pc-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 548px;

@@ -10,6 +10,7 @@ const run = await startRun(opt);
 const { page, check, info, shot, gameWait } = run;
 const state = () => page.evaluate(() => ({
   locked: window.__pc.game.input.locked, use: window.__pc.game.input.usePointerLock,
+  rearm: !!window.__pc.game.input._rearm, trips: window.__pc.game.input._trips || 0,
   pitch: window.__pc.sim.footCam.pitch, notice: window.__pc.info().uiNotice,
 }));
 try {
@@ -21,12 +22,19 @@ try {
   check(s.locked === true, 'the browser granted the lock');
   const pitch0 = s.pitch;
   // A few ordinary drags: under the lock these arrive as window-sized jumps that undo themselves.
-  for (let i = 0; i < 4; i++) {
+  // The first time the game lets go of the lock it tries it once more at the next click (a
+  // glitch when focus returns is not a broken browser); the second time it is for good.
+  let sawRearm = false;
+  for (let i = 0; i < 12; i++) {
     await page.mouse.move(run.cx, run.cy); await page.mouse.down();
     await page.mouse.move(run.cx + 30, run.cy - 20, { steps: 3 }); await page.mouse.up();
     await gameWait(0.15);
+    s = await state();
+    if (s.rearm) sawRearm = true;
+    if (s.use === false && !s.rearm && s.trips >= 2) break;
   }
   s = await state();
+  check(sawRearm || s.trips >= 2, 'the first time, it tried the lock once more at the next click (trips ' + s.trips + ')');
   check(s.use === false && s.locked === false, 'the game stopped trusting the lock and released it');
   check(/drag to look/.test(s.notice || ''), 'and says so on screen: "' + s.notice + '"');
   check(Math.abs(s.pitch - pitch0) < 0.5, 'the nonsense did not throw the view about: pitch moved ' + (s.pitch - pitch0).toFixed(3) + ' rad');

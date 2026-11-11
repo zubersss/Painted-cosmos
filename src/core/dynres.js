@@ -17,8 +17,17 @@
 //     controller then tries one small step up; if the step does not hold it is taken back and
 //     the next try waits twice as long (a step that holds halves the wait again). A tier is tried only at full resolution, starts at a
 //     lower scale, and if it does not hold the wait before the next try triples.
-// One slow frame is a hitch (tab switch, shader compile) and is ignored; a run of them is load.
+// One slow frame is a hitch (tab switch, shader compile, a world built on arrival): it moves
+// the average by a bounded step (at most 2.5 x the average, or 50 ms), and the panic needs 3 of
+// the last 5 frames over the line; a run of them is load.
+// A refresh or frame-rate cap is not load (a 50 Hz panel, Chrome's Energy Saver, Safari's Low
+// Power Mode, a 30 Hz TV): no setting can beat its interval. When shedding at least 40 % of
+// the picture leaves a steady interval where it was, the controller goes back to where that
+// descent began and takes the interval as its budget (capMs); it forgets it once frames run
+// well under it for 3 s. A machine held back by its CPU looks the same and is treated the same:
+// shedding pixels would buy it nothing.
 // The caller does not feed frames while the world is loading (rest() clears the memory).
+// (Hardening review 2026-11, P4: the candidate patch it tested in Node, adopted by PILOT.)
 
 export const DYNRES = Object.freeze({
   targetMs: 16.7,
@@ -43,6 +52,10 @@ export const DYNRES = Object.freeze({
   emaRate: 6,                // 1/s smoothing of the frame time
   ignoreAboveMs: 250,        // one frame this slow is a hitch, not load...
   hitchRun: 3,               // ...this many in a row are load
+  capJudge: 2.5,             // seconds after the first step down: nothing shed helped -> not the GPU's load
+  capJitter: 2.5,            // ms: a refresh or rAF cap gives near-constant intervals (a second guard: the
+                             // first is that shedding 40 % of the picture did not move the interval)
+  capMaxMs: 42,              // no display or battery saver caps slower than 24 Hz: anything slower is load
 });
 
 export class DynamicResolution {
@@ -58,6 +71,7 @@ export class DynamicResolution {
     this.tierChanges = 0;
     this.probeBackoff = 1;     // grows when a step up had to be taken back
     this.upPenalty = 1;        // grows when a tier-up had to be undone
+    this.capMs = opts.capMs || 0;   // a frame interval no setting can beat (refresh or rAF cap), 0 = none known
     this.rest();
   }
 
@@ -70,6 +84,22 @@ export class DynamicResolution {
     this.sinceUp = Infinity;        // seconds since the last step up in scale
     this.probing = false;           // a step up is on trial
     this.sinceTierUp = Infinity;
+    this.avg = this.ema; this.dev = 0;   // the same average never reset by a change, and its jitter
+    this.slowRing = 0;                   // last 5 raw frames over the panic line (bits)
+    this.descent = null;                 // { avg, scale, quality, t } from the first step down
+    this.capLow = 0;
+  }
+
+  // The lines the frame time is judged against: the defaults, or stretched to a known cap.
+  // (Recomputed only when the cap changes: the frame loop allocates nothing here.)
+  budget() {
+    const T = this.T, c = this.capMs;
+    if (this._B && this._Bcap === c) return this._B;
+    const f = Math.max(1, c / T.targetMs);
+    this._Bcap = c;
+    this._B = !c ? { target: T.targetMs, high: T.highMs, low: T.lowMs, panic: T.panicMs, tierUp: T.tierUpMs }
+      : { target: T.targetMs * f, high: Math.max(T.highMs, 1.1 * c), low: T.lowMs * f, panic: Math.max(T.panicMs, 1.8 * c), tierUp: T.tierUpMs * f };
+    return this._B;
   }
 
   // Feed one frame. dtMs is the real time the last frame took. Returns
@@ -82,7 +112,34 @@ export class DynamicResolution {
       if (++this.slowRun < T.hitchRun) return same();
     } else this.slowRun = 0;
     const dt = Math.min(dtMs, 500) / 1000;
-    this.ema += (dtMs - this.ema) * (1 - Math.exp(-T.emaRate * dt));
+    const B = this.budget();
+    // One long frame (a compile, a build) moves the average a bounded step; a run of them is load.
+    const x = this.slowRun >= T.hitchRun ? dtMs : Math.min(dtMs, Math.max(2.5 * this.ema, 50));
+    const kw = 1 - Math.exp(-T.emaRate * Math.min(x, 500) / 1000);
+    this.ema += (x - this.ema) * kw;
+    this.dev += (Math.abs(x - this.avg) - this.dev) * kw;
+    this.avg += (x - this.avg) * kw;
+    this.slowRing = ((this.slowRing << 1) | (dtMs > B.panic ? 1 : 0)) & 31;
+    let slowN = 0; for (let b = this.slowRing; b; b >>= 1) slowN += b & 1;
+    // A cap that lifted (charger back in, the display changed): forget it.
+    if (this.capMs && this.avg < 0.8 * this.capMs) { this.capLow += dt; if (this.capLow > 3) { this.capMs = 0; this.capLow = 0; } } else this.capLow = 0;
+    // Did the last descent help? If everything was shed and the interval did not move, and it is
+    // steady, it is a cap (refresh, battery saver, low power mode) or the CPU: go back, and take it as the budget.
+    if (this.descent) {
+      const D = this.descent; D.t += dt;
+      // how much of the picture was shed since the descent began (a tier counts as about 40 %)
+      const kept = (this.scale / D.scale) ** 2 * 0.6 ** Math.max(0, D.quality - this.quality);
+      if (this.avg < 0.9 * D.avg) this.descent = null;
+      else if (D.t >= T.capJudge && kept <= 0.6 && this.avg >= 0.97 * D.avg && this.avg <= T.capMaxMs && this.dev < T.capJitter) {
+        const s0 = this.scale, q0 = this.quality;
+        this.capMs = Math.max(this.capMs, this.avg);
+        this.scale = D.scale; this.quality = D.quality; this.descent = null;
+        this.over = 0; this.under = 0; this.steady = 0; this.atMin = 0; this.atMax = 0;
+        this.ema = this.avg; this.downCooldown = T.tierDownCooldown; this.upCooldown = T.tierUpCooldown;
+        const changed = this.scale !== s0 || this.quality !== q0; if (changed) this.changes++;
+        return { scale: this.scale, quality: this.quality, changed };
+      } else if (D.t >= 2 * T.capJudge) this.descent = null;
+    }
     this.downCooldown = Math.max(0, this.downCooldown - dt);
     this.upCooldown = Math.max(0, this.upCooldown - dt);
     this.sinceUp += dt; this.sinceTierUp += dt;
@@ -90,8 +147,8 @@ export class DynamicResolution {
     const ms = this.ema;
     const scale0 = this.scale, quality0 = this.quality;
 
-    if (ms > T.highMs) { this.over += dt; this.under = 0; this.steady = 0; }
-    else if (ms < T.lowMs) { this.under += dt; this.steady += dt; this.over = 0; }
+    if (ms > B.high) { this.over += dt; this.under = 0; this.steady = 0; }
+    else if (ms < B.low) { this.under += dt; this.steady += dt; this.over = 0; }
     else { this.over = Math.max(0, this.over - dt); this.under = Math.max(0, this.under - dt); if (this.over === 0) this.steady += dt; }
 
     // ---- down: fast ---------------------------------------------------------------------------
@@ -102,18 +159,23 @@ export class DynamicResolution {
       this.atMin = 0; this.atMax = 0;
       this.downCooldown = T.tierDownCooldown; this.upCooldown = T.tierUpCooldown;
     };
-    if (ms > T.panicMs) {
+    if (ms > B.panic && slowN >= 3) {
       // What the smallest picture of this tier would cost, if cost goes with pixels.
       const floor = ms * (T.minScale / this.scale) ** 2;
-      if (floor > T.panicMs && this.quality > this.minQuality && this.downCooldown === 0) {
+      if (this.probing) {
+        // The step up on trial is what broke: take back just that, and try less often.
+        this.scale = Math.max(T.minScale, this.scale - T.stepUp);
+        this.probeBackoff = Math.min(T.probeBackoffMax, this.probeBackoff * 2);
+        this.sinceUp = Infinity; this.probing = false;
+      } else if (floor > B.panic && this.quality > this.minQuality && this.downCooldown === 0) {
         tierDown();
         this.scale = T.minScale;
       } else if (this.scale > T.minScale) {
-        this.scale = Math.max(T.minScale, Math.min(this.scale - T.stepDown * 2.5, this.scale * Math.sqrt(T.targetMs / ms)));
+        this.scale = Math.max(T.minScale, Math.min(this.scale - T.stepDown * 2.5, this.scale * Math.sqrt(B.target / ms)));
       }
       if (this.scale !== scale0 || this.quality !== quality0) {
         this.over = 0; this.steady = 0;
-        this.ema = Math.min(this.ema, T.panicMs);      // let the new setting prove itself
+        this.ema = Math.min(this.ema, B.panic);      // let the new setting prove itself
       }
     } else if (this.over >= T.downAfter && this.scale > T.minScale) {
       if (this.sinceUp < T.probeWindow) {
@@ -123,7 +185,7 @@ export class DynamicResolution {
         this.sinceUp = Infinity; this.probing = false;
       } else {
         // Scale the step by how far over budget we are.
-        this.scale = Math.max(T.minScale, this.scale - T.stepDown * Math.min(3, ms / T.targetMs));
+        this.scale = Math.max(T.minScale, this.scale - T.stepDown * Math.min(3, ms / B.target));
       }
       this.over = 0; this.steady = 0;
     }
@@ -137,10 +199,10 @@ export class DynamicResolution {
     this.scale = Math.round(this.scale * 1000) / 1000;
 
     // ---- the tier: only when resolution alone cannot answer ---------------------------------------
-    const pinnedLow = this.scale <= T.minScale + 1e-6 && ms > T.highMs;
-    const pinnedHigh = this.scale >= T.maxScale - 1e-6 && this.over === 0 && ms < T.highMs;
+    const pinnedLow = this.scale <= T.minScale + 1e-6 && ms > B.high;
+    const pinnedHigh = this.scale >= T.maxScale - 1e-6 && this.over === 0 && ms < B.high;
     this.atMin = pinnedLow ? this.atMin + dt : 0;
-    this.atMax = pinnedHigh ? this.atMax + dt * (ms < T.tierUpMs ? 2 : 1) : 0;
+    this.atMax = pinnedHigh ? this.atMax + dt * (ms < B.tierUp ? 2 : 1) : 0;
     if (this.quality === quality0) {
       if (this.atMin >= T.tierDownAfter && this.quality > this.minQuality && this.downCooldown === 0) {
         tierDown();
@@ -154,6 +216,7 @@ export class DynamicResolution {
     }
     const changed = this.scale !== scale0 || this.quality !== quality0;
     if (changed) this.changes++;
+    if ((this.scale < scale0 - 1e-9 || this.quality < quality0) && !this.descent) this.descent = { avg: this.avg, scale: scale0, quality: quality0, t: 0 };
     return { scale: this.scale, quality: this.quality, changed };
   }
 }

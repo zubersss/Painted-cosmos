@@ -5,6 +5,7 @@ import { S } from '../src/core/state.js';
 import { snapshot, validate, restore, writeSave, readSave, clearSave, AutoSave, SAVE_KEY, SAVE_VERSION } from '../src/core/save.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { Pad, play, len, sub } from './helpers.mjs';
+import { norm } from '../src/core/vec.js';
 
 const newSim = (opts = {}) => new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, ...opts });
 function memoryStorage() {
@@ -156,4 +157,22 @@ test('vistas: walking up to one finds it once, the sketchbook lists it, and it s
   const c = newSim({ getVistas: () => { throw new Error('no'); } });
   play(c, pad, 0.2);
   assert.equal(c.nearestVista(), null);
+});
+
+// Hardening review gap 16: a game saved while swimming used to come back on the bed of the sea.
+test('a game saved while swimming comes back afloat, not on the bed', () => {
+  const sea = (id, d) => { const s = stubSurface(id, d); return { ...s, liquidRadius: s.radius + 6, isLiquid: true }; };
+  const a = newSim({ sampleSurface: sea });
+  const pad = new Pad();
+  play(a, pad, 3);
+  const bed = sea('earth', norm(a.ex.p)).radius;
+  assert.ok(len(a.ex.p) > bed + 4, 'swimming before the save: ' + (len(a.ex.p) - bed).toFixed(2) + ' m above the bed');
+  const snap = snapshot(a);
+  assert.ok(snap, 'a swimmer can be saved');
+  const b = newSim({ sampleSurface: sea });
+  assert.equal(restore(b, JSON.parse(JSON.stringify(snap))), true);
+  const h = len(b.ex.p) - bed;
+  assert.ok(Math.abs(h - (6 - 1.25)) < 0.05, 'restored afloat, feet 1.25 m under the surface: ' + h.toFixed(2) + ' m above the bed');
+  play(b, pad, 2);
+  assert.ok(len(b.ex.p) - bed > 4, 'and stays afloat: ' + (len(b.ex.p) - bed).toFixed(2) + ' m');
 });

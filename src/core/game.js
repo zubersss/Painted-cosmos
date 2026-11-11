@@ -66,7 +66,12 @@ export class Game {
     this.input.inShip = isInShip(sim.sm.state);
     const raw = this.input.take(realDt);
     // Keys that belong to the interface, not to the explorer or the ship.
-    if (this.audio && this.input.used) this.audio.start();
+    // Sound starts inside a click or a key press (main.js), never from here. A gamepad press is
+    // not a gesture to the browser: a player using only the pad is told once how to get sound.
+    if (this.audio && !this._soundAsked && this.input.pad && this.input.pad.active && this.audio.enabled && this.audio.state !== 'running') {
+      this._soundAsked = true;
+      this.uiNotice = 'Click or press a key for sound'; this.uiNoticeUntil = performance.now() + 9000;
+    }
     if (raw.edges.has('KeyM')) { if (this.book && this.book.open) this.book.hide(); this.toggleMap(); }
     if (raw.edges.has('KeyB')) { if (this.map && this.map.open) this.map.hide(); this.toggleBook(); }
     if (raw.edges.has('KeyH') && this.started) {
@@ -207,18 +212,25 @@ export class Game {
     };
   }
 
+  // A panel wants the cursor ("click a world"): opening one lets go of the mouse lock; a click
+  // on the painting takes it again.
   toggleMap() {
     if (!this.map) return;
-    if (this.map.open) this.map.hide(); else this.map.show(this.mapData());
+    if (this.map.open) this.map.hide(); else { this.map.show(this.mapData()); this.releaseMouse(); }
     if (this.audio) this.audio.event('paper');
   }
 
   toggleBook() {
     if (!this.book) return;
     if (this.book.open) this.book.hide();
-    else this.book.show(this.bookPages(), this.sim.sm.state === S.ON_FOOT ? this.sim.nearestVista() : null, this.sim.mood.bodyId || this.sim.bodyId);
+    else {
+      this.book.show(this.bookPages(), this.sim.sm.state === S.ON_FOOT ? this.sim.nearestVista() : null, this.sim.mood.bodyId || this.sim.bodyId);
+      this.releaseMouse();
+    }
     if (this.audio) this.audio.event('paper');
   }
+
+  releaseMouse() { if (this.input && this.input.release) this.input.release(); }
 
   // ---- the sketchbook ---------------------------------------------------------------------------
   // The landscapes a world has (id and name), from the world when it can say, else from what
@@ -539,7 +551,7 @@ export class Game {
     return [
       `frame  ${s.frameMs.toFixed(1)} ms   worst ${worst.toFixed(0)} ms   ${fps.toFixed(0)} fps`,
       `scene  ${k(s.tris)} triangles   ${s.calls} draw calls`,
-      `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}`,
+      `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}${d && d.capMs ? `   capped at ${(1000 / d.capMs).toFixed(0)} fps` : ''}`,
       `world ${s.worldMs.toFixed(1)} ms (worst ${Math.max(0, ...s.worldWindow).toFixed(1)})   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
       this.weatherText(k),
     ].join('\n');

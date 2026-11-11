@@ -72,12 +72,24 @@ export function createAudio({ enabled = true, context = null } = {}) {
     o.connect(g).connect(master); o.start(t); o.stop(t + 0.09);
   }
 
-  function start() {
-    if (!enabled || ctx) { if (ctx && ctx.state === 'suspended' && !context) ctx.resume().catch(() => {}); return; }
+  // start(gesture): `gesture` is true only when called from inside a click, tap or key press
+  // (main.js listens for them). Browsers let a page start sound only there: a context made or
+  // resumed anywhere else stays suspended (Safari for the whole session, Chrome when the only
+  // input is a gamepad) and Chrome warns at every try. So the context is made, and resumed,
+  // only inside a gesture; never from the frame loop. A given `context` (tests) needs none.
+  let hidden = false, faded = false;
+  function start(gesture = false) {
+    if (!enabled) return;
+    if (ctx) {
+      if (gesture && !hidden && !context && ctx.state === 'suspended') ctx.resume().then(unfade, () => {});
+      return;
+    }
+    if (!gesture && !context) return;
     try {
       const AC = context ? null : window.AudioContext || window.webkitAudioContext;
       if (!context && !AC) return;
       ctx = context || new AC();
+      if (!context && ctx.state === 'suspended') ctx.resume().catch(() => {});   // older WebKit makes it suspended even in a gesture
       const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
       master = ctx.createGain(); master.gain.value = 0;
       master.connect(comp).connect(ctx.destination);
@@ -227,8 +239,33 @@ export function createAudio({ enabled = true, context = null } = {}) {
     }
   }
 
+  // A hidden tab stops the frame loop, so the mixer would hold its last levels (a jetpack's
+  // hiss playing on from a background tab): fade to silence and suspend; back on show.
+  function pause() {
+    hidden = true;
+    if (!ctx || context || !master) return;
+    const t = ctx.currentTime, g = master.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0, t + 0.05);
+    faded = true;
+    setTimeout(() => { if (hidden && ctx.state === 'running') ctx.suspend().catch(() => {}); }, 80);
+  }
+  function unfade() {
+    if (hidden || !faded) return;
+    faded = false;
+    const t = ctx.currentTime, g = master.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(0, t); g.setTargetAtTime(0.75, t, 0.25);
+  }
+  function resume() {
+    hidden = false;
+    if (!ctx || context || !master) return;
+    // A page that has had a gesture may resume without one (Chrome); where it may not, the
+    // next click or key press resumes it (start(true)) and the sound comes back then.
+    if (ctx.state === 'suspended') ctx.resume().then(unfade, () => {}); else unfade();
+  }
+
   return {
-    start, update, event,
+    start, update, event, pause, resume,
+    get enabled() { return enabled; },
     get ready() { return ready; },
     get state() { return ctx ? ctx.state : 'off'; },
     debug: () => (ready ? { wind: node.wind.gain.gain.value, ship: node.shipGain.gain.value, pad: node.padGain.gain.value, rain: node.rain.gain.gain.value, rainLow: node.rainLow.gain.gain.value, rainHull: node.rainHull.gain.gain.value, hiss: node.hiss.gain.gain.value, surf: node.surf.gain.gain.value, lastState } : null),
