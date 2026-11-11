@@ -51,6 +51,9 @@ export const SHIP_BODY = Object.freeze({
   inertia: Object.freeze([30700, 40950, 15000]),   // kg m^2 about the ship's right, up and forward axes
   sleepSpeed: 0.02,        // m/s and rad/s below which a settled ship goes to sleep
   sleepTime: 0.6,          // s
+  // the drive field as a brake (an ASSIST for "let go and it stops"; see cmd.brake)
+  fieldBrake: 160,         // m/s^2 at most: the pulse field at 40 % (the crew feel none of it)
+  fieldBrakeSpool: 0.35,   // s for the field to come on and go off
   // pulse drive
   pulseAccel: 400,         // m/s^2 at full pulse (inertial dampers: the crew feel none of it)
   pulseJerk: 260,          // m/s^3: how fast the acceleration may change
@@ -68,6 +71,8 @@ export const SHIP_BODY_STATE = () => ({
   heat01: 0,                        // 0..1 entry heating indicator (~ sqrt(rho) v^3)
   downwash: { thrust: 0, speed: 0, q: 0, radius: 0 },   // ventral thruster wake
   groundEffect: 1,
+  brake01: 0,                       // spooled field brake command
+  fieldBrake: 0,                    // m/s^2 the drive field is shedding right now (for a glow or a sound)
   // touchdown
   w: { x: 0, y: 0, z: 0 },          // angular velocity (rad/s, frame coordinates)
   legLoad: new Float32Array(3),     // N on each leg
@@ -122,7 +127,13 @@ export function groundEffect(h, T = SHIP_BODY) {
 //                          vector toward the target direction with time constant tau, without
 //                          changing the speed (a force at right angles to the motion does no
 //                          work). 1 = the nose-following feel of an arcade ship; 0 = pure
-//                          thrusters, and the ship slides wide in turns like a hovercraft. }
+//                          thrusters, and the ship slides wide in turns like a hovercraft.
+//          brake           0..1, an ASSIST (default 0): the drive field (the one behind the pulse)
+//                          sheds the speed the thrusters cannot: whatever part of "close the
+//                          error in tau" the retro thrusters fall short of, up to
+//                          SHIP_BODY.fieldBrake m/s^2, and only ever slowing the ship. It acts
+//                          on hull and crew alike, so it adds nothing to gLoad. PILOT decides
+//                          where it is allowed (it asked for vacuum only). }
 //   env: { up:{x,y,z} | null   unit vector away from the body (null in deep space)
 //          gravity          m/s^2 at the body's surface (0 or missing in deep space)
 //          radius           m: base radius of the body, for inverse-square gravity (optional)
@@ -227,6 +238,26 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
         let dx = ax0 + (bx - ax0) * k, dy = ay0 + (by - ay0) * k, dz = az0 + (bz - az0) * k;
         const dl = Math.hypot(dx, dy, dz);
         if (dl > 1e-9) { vx = dx / dl * sp; vy = dy / dl * sp; vz = dz / dl * sp; }
+      }
+    }
+  }
+  // ---- assist: the drive field as a brake ---------------------------------------------------------
+  B.brake01 += (clamp01(cmd.brake || 0) - B.brake01) * (1 - Math.exp(-dt / T.fieldBrakeSpool));
+  B.fieldBrake = 0;
+  if (B.brake01 > 1e-3 && tg) {
+    // the speed the flight computer wanted to have shed by now, against what it has
+    const ex = vx - tg.x, ey = vy - tg.y, ez = vz - tg.z, e = Math.hypot(ex, ey, ez);
+    const e0 = Math.hypot(st.v.x - tg.x, st.v.y - tg.y, st.v.z - tg.z);
+    const want = e0 * Math.exp(-dt / tau);
+    if (e > want && e > 1e-6) {
+      let dv = Math.min(e - want, T.fieldBrake * B.brake01 * dt);
+      // only ever slowing: no more than the part of the error that lies along the motion
+      const sp = Math.hypot(vx, vy, vz);
+      const along = sp > 1e-6 ? (ex * vx + ey * vy + ez * vz) / (e * sp) : 0;
+      if (along > 0) {
+        dv *= along;
+        vx -= ex / e * dv; vy -= ey / e * dv; vz -= ez / e * dv;
+        B.fieldBrake = dv / dt;
       }
     }
   }

@@ -38,6 +38,13 @@ test('a fair morning over Earth\'s home forest for the first seven minutes (defa
       assert.ok(['clear', 'breeze', 'overcast', 'mist', 'windy'].includes(w.kind), w.kind);
     }
   }
+  // ... and then, at PAINTER's spawn, you see weather coming and it comes: cloud builds within
+  // five minutes, a storm passes between ten and fourteen, and the sky opens again
+  const d = { x: 0.1736, y: 0.5817, z: 0.7946 };
+  assert.ok(wx('earth', d, 60).cloud01 < 0.2 && wx('earth', d, 300).cloud01 > 0.5, 'cloud builds');
+  let wettest = 0, when = 0; for (let t = 420; t <= 900; t += 10) { const r = wx('earth', d, t).precipitation.rate; if (r > wettest) { wettest = r; when = t; } }
+  assert.ok(wettest > 3 && when > 600 && when < 840, `the storm: ${wettest.toFixed(1)} mm/h at ${when} s`);
+  assert.ok(wx('earth', d, 960).precipitation.rate < 0.03, 'and it passes');
 });
 
 test('cells are born, drift with the wind, and die; nothing teleports while alive', () => {
@@ -218,5 +225,44 @@ test('no NaN anywhere, any time, any altitude', () => {
     assert.ok(w.intensity01 >= 0 && w.intensity01 <= 1 && w.visibility01 > 0 && w.visibility01 <= 1);
     const m = moistureAt(id, d.x, d.y, d.z, k * 91.7, DEFAULT_SEED, { T: w.temperature }, {});
     assert.ok(Number.isFinite(m.wetness01) && Number.isFinite(m.snowDepth) && m.snowDepth >= 0);
+  }
+});
+
+test('edges: a fog or dust bank closes in at 5 % of visibility01 a second at most; nothing steps where systems overlap or the air crosses freezing', () => {
+  // a watcher standing still while each live system passes over, on every body with weather
+  const worst = { bank: 0, any: 0, inten: 0, pi: 0 };
+  for (const id of ['earth', 'mars', 'venus', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']) {
+    const R = BODIES[id].radius;
+    for (let n = 0; n < 12; n++) {
+      const t0 = 500 + n * 977;
+      for (const c of cellsAt(id, t0, 14)) for (const off of [0.5, 0.95]) {
+        const d = c.r * off / R;
+        let tx = -c.z, tz = c.x; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+        let ux = c.x + tx * d, uy = c.y, uz = c.z + tz * d; const l = Math.hypot(ux, uy, uz); ux /= l; uy /= l; uz /= l;
+        let pv = null, pi = 0, pp = 0;
+        for (let k = 0; k < 120; k += 1) {
+          const w = weatherAt(id, ux, uy, uz, 2, t0 + k, 14, { moist: 0.5 }, {});
+          if (pv != null) {
+            const dv = Math.abs(w.visibility01 - pv);
+            worst.any = Math.max(worst.any, dv);
+            if (w.precipitation.rate < 0.02) worst.bank = Math.max(worst.bank, dv);
+            worst.inten = Math.max(worst.inten, Math.abs(w.intensity01 - pi));
+            worst.pi = Math.max(worst.pi, Math.abs(w.precipitation.intensity01 - pp));
+          }
+          pv = w.visibility01; pi = w.intensity01; pp = w.precipitation.intensity01;
+        }
+      }
+    }
+  }
+  assert.ok(worst.bank <= 0.05, 'fog, dust and haze: ' + worst.bank.toFixed(4) + ' per second');
+  assert.ok(worst.any <= 0.125, 'with precipitation (a snow squall is the steepest): ' + worst.any.toFixed(4) + ' per second');
+  assert.ok(worst.inten <= 0.08, 'intensity01: ' + worst.inten.toFixed(4) + ' per second');
+  assert.ok(worst.pi <= 0.08, 'precipitation.intensity01: ' + worst.pi.toFixed(4) + ' per second');
+});
+
+test('a fast system is a big one: the quickest weather on any world still takes half a minute to arrive', () => {
+  for (const id of ['jupiter', 'saturn', 'neptune', 'uranus']) for (let n = 0; n < 10; n++) for (const c of cellsAt(id, 300 + n * 811, 14)) {
+    const v = Math.hypot(c.ve, c.vn);
+    if (c.life < 1e8) assert.ok(c.r >= v * WEATHER.passTime * 0.75 - 1e-6, `${id}: r ${c.r.toFixed(0)} m at ${v.toFixed(1)} m/s`);
   }
 });

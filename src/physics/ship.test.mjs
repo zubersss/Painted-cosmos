@@ -269,3 +269,30 @@ test('extreme inputs never produce NaN', () => {
   const L = landing({ drop: 40, sink: 80 }); settle(L, 5); assert.ok(finite(L.st));
   const sim = flight(); sim.st.v = V(NaN, 0, 0); fly(sim, 1, { target: V(), tau: 1 }); assert.ok(finite(sim.st));
 });
+
+test('field brake (assist): in vacuum the ship stops from cruise in seconds, never speeds up, and the crew feel only the thrusters', () => {
+  const run = (brake) => {
+    const st = { p: V(0, 0, 0), v: V(0, 0, -750), q: { x: 0, y: 0, z: 0, w: 1 } };
+    let t = 0, gMax = 0, worstGain = 0, peak = 0;
+    while (Math.hypot(st.v.x, st.v.y, st.v.z) > 5 && t < 200) {
+      const s0 = Math.hypot(st.v.x, st.v.y, st.v.z);
+      stepShipBody(st, { target: V(0, 0, 0), tau: 1.7 * 0.45, hover: false, boost: true, brake }, 1 / 60, { up: null, gravity: 0 });
+      worstGain = Math.max(worstGain, Math.hypot(st.v.x, st.v.y, st.v.z) - s0);
+      if (t > 1) gMax = Math.max(gMax, st.phys.gLoad);
+      peak = Math.max(peak, st.phys.fieldBrake);
+      t += 1 / 60;
+    }
+    return { t, gMax, worstGain, peak };
+  };
+  const off = run(0), on = run(1);
+  assert.ok(off.t > 45, 'thrusters alone: ' + off.t.toFixed(1) + ' s');
+  assert.ok(on.t > 3 && on.t < 9, 'with the field: ' + on.t.toFixed(1) + ' s');
+  assert.ok(on.peak <= T.fieldBrake + 1e-9 && on.peak > 100, 'field deceleration ' + on.peak);
+  assert.ok(on.worstGain <= 1e-9, 'never speeds the ship up');
+  assert.ok(on.gMax <= T.accelReverse / 9.81 + 0.05, 'felt: ' + on.gMax + ' g');
+  // it only ever slows: asked to speed up, the brake does nothing
+  const st = { p: V(0, 0, 0), v: V(0, 0, -100), q: { x: 0, y: 0, z: 0, w: 1 } };
+  for (let i = 0; i < 120; i++) stepShipBody(st, { target: V(0, 0, -700), tau: 1.7, hover: false, boost: true, brake: 1 }, 1 / 60, { up: null, gravity: 0 });
+  assert.equal(st.phys.fieldBrake, 0);
+  assert.ok(st.v.z < -180 && st.v.z > -100 - 60 * 2 - 1, 'accelerating on the main drive only: ' + st.v.z);
+});

@@ -136,7 +136,7 @@ export class Loose {
     // ---- emitters: the weather and the biome --------------------------------------------------
     if (h > 0) {
       // dust storm / dust haze: fine dust carried through the whole box
-      const dust01 = wx ? wx.dust01 : 0;
+      const dust01 = wx ? wx.dustLoad01 || 0 : 0;
       const bd = P.buffers.dust, capD = PARTICLES.capacity.dust[P.quality];
       if (dust01 > 0.03 && rho > 0) {
         carry[0] += capD * 0.6 * dust01 * h / 5;

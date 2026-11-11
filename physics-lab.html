@@ -77,7 +77,7 @@ if (findQ) {
   const want = (w) => (findQ === 'rain' ? w.precipitation.type === 'rain' && w.precipitation.rate > 6
     : findQ === 'snow' ? w.precipitation.type === 'snow' && w.precipitation.rate > 2.5 && w.temperature < 266
     : findQ === 'thunderstorm' ? w.storm01 > 0.6 && w.lightning.rate > 2
-    : findQ === 'dust' ? w.dust01 > 0.5 : w.kind === findQ);
+    : findQ === 'dust' ? w.dust01 > 0.8 : w.kind === findQ);
   let found = false;
   for (let t = time; t < time + 9000 && !found; t += 41) for (const c of cellsAt(bodyId, t, physics.seed)) {
     const w = weatherAt(bodyId, c.x, c.y, c.z, 0, t + 20, physics.seed, { moist: 1, sun01: 0.5, wind: 4, dustSource: 1, dT: (physics.data.BIOMES[biome] || { dT: 0 }).dT }, {});

@@ -25,6 +25,8 @@ export const WEATHER = Object.freeze({
   snowLife: 30 * 3600,     // real s before fresh snow settles into the base layer
   slot: 9,                 // s: lightning scheduling slot
   frontReach: 1.3,         // gust front runs this many cell radii ahead of the core
+  passTime: 40,            // s: no system is smaller than the distance it drifts in this time
+  edgeTime: 30,            // s: how long the edge of a drifting system takes to pass
   clearVisibility: 20000,  // m: visual range of clean air (Koschmieder, real scale)
 });
 
@@ -96,7 +98,7 @@ for (const id in REGIMES) {
 
 // The default seed puts a fair morning over Earth's home forest for the first minutes of play
 // (weather.test.mjs checks it). Change it only together with that test.
-export const DEFAULT_SEED = 14;
+export const DEFAULT_SEED = 18;
 
 // (the last lookup is remembered: building a string key on every call would allocate)
 const seedCache = {};
@@ -146,12 +148,14 @@ function cellAt(bodyId, R, regime, s, i, t, c) {
   const lat = clamp(lat0 + vn / R * ts, -1.45, 1.45);
   const cla = Math.cos(lat);
   c.x = cla * Math.sin(lon); c.y = Math.sin(lat); c.z = cla * Math.cos(lon);
-  c.r = mix(regime.radius[0], regime.radius[1], hash3(i, 4, gen, s)) * K.size * (0.75 + 0.25 * env);
+  // velocity of the centre (east, north), for the lab and for gust-front direction
+  c.ve = regime.steer * _pv[0] + own; c.vn = vn;
+  // A system carried on a fast jet is a big one: it is never smaller than the distance it
+  // travels in WEATHER.passTime, so even the fastest weather takes that long to arrive.
+  c.r = Math.max(mix(regime.radius[0], regime.radius[1], hash3(i, 4, gen, s)) * K.size, Math.hypot(c.ve, vn) * WEATHER.passTime) * (0.75 + 0.25 * env);
   c.w = env * strength;
   c.kind = K; c.kindId = kid; c.age = age; c.life = life; c.gen = gen; c.i = i;
   c.swirl = 0; c.spin = 0;
-  // velocity of the centre (east, north), for the lab and for gust-front direction
-  c.ve = regime.steer * _pv[0] + own; c.vn = vn;
   return true;
 }
 // A storm that never dies: fixed latitude, steady drift in longitude, a slow breathing strength.
@@ -188,12 +192,12 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
 }
 
 const _c = {};
-const _acc = { rate: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0 };
+const _acc = { rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0 };
 
 // Sum the influence of every cell on unit direction (ux,uy,uz) at time t into _acc.
 function gather(bodyId, ux, uy, uz, t, seed) {
   const a = _acc;
-  a.rate = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
+  a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
   a.ox = a.oy = a.oz = 0; a.storm = 0; a.top = null; a.topW = 0; a.topCell = -1; a.topGen = 0; a.front = 0;
   const regime = REGIMES[bodyId];
   if (!regime || !regime.cells) return a;
@@ -208,17 +212,29 @@ function gather(bodyId, ux, uy, uz, t, seed) {
     if (d >= reach) continue;
     const K = _c.kind;
     const x = d / _c.r;
-    const core = (1 - smoothstep(0.45, 1, x)) * _c.w;              // precipitation footprint
-    const cover = (1 - smoothstep(0.7, 1.15, x)) * _c.w;           // cloud shield is wider
+    // The edges are smeared by turbulent mixing as the system travels: the faster it drifts,
+    // the wider they are (an edge takes about WEATHER.edgeTime to pass).
+    const x0 = clamp(1 - Math.hypot(_c.ve, _c.vn) * WEATHER.edgeTime / _c.r, 0.2, 0.45);
+    const core = (1 - smoothstep(x0, 1, x)) * _c.w;                // precipitation footprint
+    const cover = (1 - smoothstep(x0 + 0.25, 1.15, x)) * _c.w;     // cloud shield is wider
     if (core > 0) {
-      a.rate += K.rate * core * core;
+      const rr = K.rate * core * core;
+      a.rate += rr;
+      if (K === KINDS.ice) a.rateIce += rr; else if (K === KINDS.frost) a.rateFrost += rr;
       a.flash += K.flash * core;
-      if (K.vis > 0) {
-        // extinction in clear-air units; it thickens as the square of the way in, so the edge
-        // of a fog bank or a dust storm is a gradual veil and never a wall
-        const ext = core * core * WEATHER.clearVisibility / K.vis;
+    }
+    if (K.vis > 0) {
+      // A bank of fog, dust or haze. The extinction (in clear-air units) is shaped so that the
+      // visual range closes in steadily on the way in: visibility01 = 1 / sqrt(1 + ext) falls
+      // in proportion to the depth into the bank, and the edge is a gradual veil, never a wall.
+      const veil = core;
+      if (veil > 0) {
+        const E = WEATHER.clearVisibility / K.vis, q = 1 - (1 - 1 / Math.sqrt(1 + E)) * veil;
+        const ext = 1 / (q * q) - 1;
         if (K === KINDS.fog) a.fog += ext; else if (K === KINDS.dust) a.dust += ext; else a.haze += ext;
       }
+    }
+    if (core > 0) {
       if (K === KINDS.storm) a.storm = Math.max(a.storm, core);
       if (core > a.topW) { a.topW = core; a.top = _c.kindId; a.topCell = i; a.topGen = _c.gen; }
     }
@@ -339,6 +355,17 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   let rate = a.rate * moist * below;
   const melt = regime && regime.melt != null ? regime.melt : 1e9;
   const frozen = melt < 1e8 ? 1 - smoothstep(melt - 1.0, melt + 1.5, T) : (melt > 0 ? 1 : 0);
+  // What falls, in three continuous shares (so that nothing steps where two systems overlap or
+  // the air crosses freezing): frost, solid (snow and ice crystals) and liquid.
+  let rFrost = regime && regime.liquid === 'frost' ? rate : a.rateFrost * moist * below;
+  if (regime && regime.frostBelow > 0) {
+    // frost only falls from air colder than this; it fades in over the last few degrees
+    const k = 1 - smoothstep(regime.frostBelow - 4, regime.frostBelow, T);
+    rate -= rFrost * (1 - k); rFrost *= k;
+  }
+  const rIce = regime && regime.liquid === 'frost' ? 0 : a.rateIce * moist * below;
+  const rOther = Math.max(0, rate - rIce - rFrost);
+  const rSolid = rOther * frozen + rIce, rLiquid = rOther * (1 - frozen);
   // virga: drops evaporate on the way down in hot dry air (Venus) and only reach high ground
   let reach = 1;
   if (regime && regime.virga > 0) reach = smoothstep(regime.virga * 0.6, regime.virga * 1.4, altitude);
@@ -347,7 +374,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   pr.hail01 = 0;
   if (rate > 0.02 && regime) {
     if (a.top === 'frost' || regime.liquid === 'frost') {
-      if (!(regime.frostBelow > 0) || T < regime.frostBelow) { type = 'frost'; species = 'frost'; }
+      if (rFrost > 0.02) { type = 'frost'; species = 'frost'; }
     } else if (a.top === 'ice') { type = 'ice'; species = bodyId === 'earth' ? 'iceCrystal' : regime.solid; }
     else if (a.top === 'acid') { type = 'acid'; species = 'acid'; }
     else if (frozen > 0.5) {
@@ -362,14 +389,15 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   pr.type = type;
   pr.species = species;
   pr.rate = type === 'none' ? 0 : rate;
-  pr.frozen01 = type === 'none' ? 0 : frozen;
+  pr.frozen01 = type === 'none' || !(rate > 0) ? 0 : clamp01((rSolid + rFrost) / rate);
   pr.reachesGround01 = reach;
   const sp = species ? SPECIES[species] : null;
   pr.dropSize = sp ? sp.d : 0;
   pr.fallSpeed = sp && atm.mu > 0 ? terminalVelocity(sp, BODIES[bodyId].gravity, rho, atm.mu, meanFreePath(bodyId, rho, T)) : 0;
   if (!(pr.fallSpeed < 1e4)) pr.fallSpeed = 0;
   // 0..1 for drawing and for particle counts: saturates around a downpour
-  pr.intensity01 = type === 'none' ? 0 : clamp01(1 - Math.exp(-rate / (type === 'snow' || type === 'ice' ? 1.2 : type === 'frost' ? 0.1 : 9)));
+  // (a millimetre of snow is far more flakes than a millimetre of rain is drops)
+  pr.intensity01 = type === 'none' ? 0 : clamp01(1 - Math.exp(-(rLiquid / 9 + rSolid / 1.2 + rFrost / 0.1)));
 
   // ---- fog and mist: a local condition (calm, damp, cool air) plus drifting fog banks --------
   const fogBiome = env && env.fog != null ? env.fog : 0.2;
@@ -388,17 +416,23 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // ---- visibility (Koschmieder): extinctions add; rain 0.2 R^0.6 per km, snow about 2 R^0.7 --
   let ext = 1 + fogExt + dustExt + a.haze * below;
   // (the rate / (rate + 0.5) factor only rounds off the infinite slope of a power law at zero)
-  const soft = rate / (rate + 0.5);
-  if (type === 'rain' || type === 'drizzle' || type === 'acid') ext += 0.2 * Math.pow(rate, 0.6) * soft * WEATHER.clearVisibility / 3912 * reach;
-  else if (type === 'snow' || type === 'ice') ext += 2.0 * Math.pow(rate, 0.7) * soft * WEATHER.clearVisibility / 3912;
-  else if (type === 'frost') ext += 0.5 * rate * WEATHER.clearVisibility / 3912;
+  // Each share of what falls adds its own, so the sum is continuous through sleet and where an
+  // ice-crystal veil overlaps a shower.
+  const kx = WEATHER.clearVisibility / 3912;
+  if (rLiquid > 0) ext += 0.2 * Math.pow(rLiquid, 0.6) * (rLiquid / (rLiquid + 0.5)) * kx * reach;
+  if (rSolid > 0) ext += 2.0 * Math.pow(rSolid, 0.7) * (rSolid / (rSolid + 0.5)) * kx;
+  if (rFrost > 0) ext += 0.5 * rFrost * kx;
   o.visibility = WEATHER.clearVisibility / ext;
   // For drawing: the game's distances are compressed, so the painted fog distance should shrink
   // with the square root of the real visual range (20 km -> 1, 5 km -> 0.5, 200 m -> 0.1).
   o.visibility01 = Math.sqrt(1 / ext);
-  o.fog01 = clamp01(1 - Math.exp(-fogExt / 60));
-  o.dust01 = clamp01(1 - Math.exp(-dustExt / 60));
-  o.haze01 = clamp01(1 - Math.exp(-a.haze * below / 30));
+  // How much of the view each veil takes away by itself (with only fog in the air,
+  // visibility01 = 1 - fog01). 0.5 is a visual range of 5 km, 0.78 is 1 km, 0.9 is 200 m.
+  o.fog01 = 1 - 1 / Math.sqrt(1 + fogExt);
+  o.dust01 = 1 - 1 / Math.sqrt(1 + dustExt);
+  o.haze01 = 1 - 1 / Math.sqrt(1 + a.haze * below);
+  // how much dust is in the air (its mass loading, saturating), for particle counts
+  o.dustLoad01 = clamp01(1 - Math.exp(-dustExt / 60));
   o.cloud01 = clamp01(a.cloud + 0.25 * o.fog01) * below;        // 0 once you are above the deck
   o.cloudBelow01 = clamp01(a.cloud) * (1 - below);              // cloud you are looking down on
   o.temperature = T;
@@ -415,6 +449,8 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   }
 
   // ---- kind: one word for what a person would call it --------------------------------------------
+  // `kind` is a label; `intensity01` is how much weather there is, and is continuous: the
+  // largest of the precipitation, the storm core, dust, fog, haze, half the cloud and the wind.
   let kind = 'clear', inten = 0;
   const airless = !(atm.rho0 > 0);
   if (airless) { kind = 'vacuum'; }
@@ -425,16 +461,18 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   else if (type === 'acid') { kind = reach > 0.3 ? 'acid drizzle' : 'virga'; inten = pr.intensity01; }
   else if (type === 'ice') { kind = 'ice fall'; inten = pr.intensity01; }
   else if (type === 'frost') { kind = 'frost fall'; inten = pr.intensity01; }
-  else if (o.dust01 > 0.35) { kind = 'dust storm'; inten = o.dust01; }
-  else if (o.fog01 > 0.45) { kind = 'fog'; inten = o.fog01; }
-  else if (o.haze01 > 0.4) { kind = 'haze'; inten = o.haze01; }
-  else if (o.fog01 > 0.12) { kind = 'mist'; inten = o.fog01 / 0.45; }
-  else if (o.dust01 > 0.1) { kind = 'dust haze'; inten = o.dust01 / 0.35; }
+  // (the meteorologist's lines: fog and dust storm under 1 km of visual range, mist and haze under 5 km)
+  else if (o.dust01 > 0.78) { kind = 'dust storm'; inten = o.dust01; }
+  else if (o.fog01 > 0.78) { kind = 'fog'; inten = o.fog01; }
+  else if (o.haze01 > 0.7) { kind = 'haze'; inten = o.haze01; }
+  else if (o.fog01 > 0.5) { kind = 'mist'; inten = o.fog01 / 0.78; }
+  else if (o.dust01 > 0.5) { kind = 'dust haze'; inten = o.dust01 / 0.78; }
   else if (o.cloud01 > 0.6) { kind = 'overcast'; inten = o.cloud01; }
   else if (wind * o.windFactor > 8) { kind = 'windy'; inten = clamp01((wind * o.windFactor - 8) / 12); }
   else if (wind * o.windFactor > 2.5) { kind = 'breeze'; inten = clamp01((wind * o.windFactor - 2.5) / 5.5); }
   o.kind = kind;
-  o.intensity01 = clamp01(inten);
+  o.kindIntensity01 = clamp01(inten);       // how strong within its kind (steps when the kind changes)
+  o.intensity01 = airless ? 0 : clamp01(Math.max(pr.intensity01, a.storm, o.dust01, o.fog01, o.haze01, 0.5 * o.cloud01, (wind * o.windFactor - 2.5) / 17.5));
   return o;
 }
 
