@@ -322,3 +322,17 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   mars, saturn), then the other five planets, then the remaining earth biomes; the frame budget
   holds on every planet. Real explorer and ship models: first item of M3 at the latest.
   Evidence shots for M2: up to 45 for PAINTER, 960x540 jpg.
+- 2026-11-11: **M1 is met.** Lead review 2 (`bc425a4`) closed PAINTER's three MUST FIX with its
+  own measurements in the integrated game: 564 k triangles and 334 draw calls standing at the
+  spawn at quality 1 (was 4.36 M and 887), 289 k at quality 0, 708 k at quality 2; brushed
+  crowns and wandering trunks and bank at 960x540. PILOT's half was met earlier; PHYSICS P1
+  accepted. Open SHOULD FIX carried into M2/M3: `world.update` worst frames 4 to 12 ms (budget
+  5), shade as dark green instead of a cool glaze, flat foreground meadow, far trunks in a line.
+- 2026-11-11: M2 so far: PILOT has pulse drive, markers, planet map, save, physics wiring,
+  canopy-aware cushion, pointer-lock fallback and a frame read-out (` key or `?stats=1`);
+  PAINTER has data-driven biomes, liquids and flora kits for every body; PHYSICS has loose
+  particles, dust devils, giants' storm tracks, ground marks and wind waves (151 tests).
+- 2026-11-11: **the container restarted once.** The working tree survived; the coordinator
+  snapshotted every role's uncommitted files (`61c8104`, `ee4c336`, `e292f19`) and resumed the
+  three agents. Background processes (servers, running tests) do not survive a restart: after
+  one, check `git status` and `git log`, re-run whatever was in flight, and keep committing often.
