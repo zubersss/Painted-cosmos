@@ -22,6 +22,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, FLORA_GLSL, WATER_GLSL, EXPLORER_BODY, SHIP_BODY } from './src/physics/index.js';
+import { createPhysicsKits, PARTICLE_GLSL, SHAPE_GLSL } from './src/physics/three/index.js';
 import { cellsAt, weatherAt } from './src/physics/weather.js';
 import { makeWorld } from './src/physics/testworld.mjs';
 import { BODIES } from './src/data/bodies.js';
@@ -435,7 +436,7 @@ for (const k of Object.keys(LOOSE_DRAW)) {
   const g = new THREE.BufferGeometry(); const a = new Float32Array(P[k].capacity * 3);
   g.setAttribute('position', new THREE.BufferAttribute(a, 3));
   const m = new THREE.Points(g, new THREE.PointsMaterial({ color: LOOSE_DRAW[k][0], size: LOOSE_DRAW[k][1], sizeAttenuation: false })); m.frustumCulled = false; scene3.add(m);
-  looseDraw[k] = { g, a };
+  looseDraw[k] = { g, a, m };
 }
 // dust devils: a ring at the foot and a line up the core
 const devilGeo = new THREE.BufferGeometry();
@@ -484,6 +485,52 @@ function updateParticles() {
   }
   evGeo.setDrawRange(0, m * 4); evGeo.attributes.position.needsUpdate = true;
 }
+
+// ---- the draw kits (src/physics/three), with plain stand-in materials -------------------------------
+// ?kits=cpu (default): quads built by the kit, any material (here MeshBasicMaterial).
+// ?kits=gpu: particles instanced straight from the physics buffers through PARTICLE_GLSL.
+// ?kits=0: the lab's old dots and lines instead.
+const KITS = scene === 'globe' ? '0' : (Q.get('kits') || 'cpu');
+const KIT_COLOR = { rain: C.blue, snow: 0xa79fd6, hail: C.ink, dust: 0x8a6a4c, sand: C.gold, ash: C.grey, spores: 0x7fae4e, leaves: C.red, spray: C.sky, ring: C.ink, mark: C.sepia, water: 0x5f7fc4 };
+function standIn(kind, info) {
+  const col = new THREE.Color(KIT_COLOR[kind]);
+  if (info.chunk && info.shape !== 'surface') {
+    // gpu particles: the chunk decides where each corner goes; a flat colour
+    return new THREE.ShaderMaterial({ uniforms: { ...info.uniforms, uCol: { value: col }, uVary: { value: info.draw.vary || 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      vertexShader: `${PARTICLE_GLSL}
+        varying float vShade; uniform float uVary;
+        void main() { vec3 p = ${info.shape === 'streak' ? 'pcPhysStreak' : 'pcPhysDab'}(position.xy); vShade = pcPhysShade(uVary); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+      fragmentShader: `uniform vec3 uCol; varying float vShade; void main() { gl_FragColor = vec4(uCol * vShade, 0.85); }` });
+  }
+  if (kind === 'ring' || kind === 'mark') {
+    // the shape helpers of SHAPE_GLSL: a boot, a disc, a widening circle
+    const isRing = kind === 'ring';
+    return new THREE.ShaderMaterial({ uniforms: { uCol: { value: col } }, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      vertexShader: `attribute vec4 ${isRing ? 'aPcRing' : 'aPcMark'}; varying vec2 vUv; varying vec4 vD;
+        void main() { vUv = uv; vD = ${isRing ? 'aPcRing' : 'aPcMark'}; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `${SHAPE_GLSL}
+        uniform vec3 uCol; varying vec2 vUv; varying vec4 vD;
+        void main() {
+          ${isRing ? 'float a = pcPhysRingCover(vUv, vD.z) * (0.4 + 0.6 * vD.y); vec3 c = uCol;'
+    : 'float cover = pcPhysMarkCover(vUv, vD.z), rim = pcPhysMarkRim(vUv, vD.z) * step(1e-4, vD.y); float a = (cover * min(0.85, 0.3 + vD.x * 8.0) + rim * 0.5) * min(1.0, vD.w * 3.0); vec3 c = mix(uCol, vec3(0.93, 0.9, 0.82), rim * (1.0 - cover));'}
+          if (a < 0.01) discard; gl_FragColor = vec4(c, a); }` });
+  }
+  if (kind === 'water') return new THREE.MeshBasicMaterial({ color: col, wireframe: true, transparent: true, opacity: 0.55 });
+  return new THREE.MeshBasicMaterial({ color: col, vertexColors: info.attributes.includes('color'), transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+}
+const kits = KITS === '0' ? null : createPhysicsKits(physics, { makeMaterial: standIn, weather: { expand: KITS === 'gpu' ? 'gpu' : 'cpu' } });
+// the lab's space is the field frame's: a root that carries body-local coordinates into it
+const labRoot = new THREE.Group(); labRoot.matrixAutoUpdate = false; scene3.add(labRoot);
+function placeLabRoot() {
+  labRoot.matrix.set(frame.ex, frame.ey, frame.ez, 0, frame.ax, frame.ay, frame.az, -frame.r0, -frame.nx, -frame.ny, -frame.nz, 0, 0, 0, 0, 1);
+  labRoot.matrixWorldNeedsUpdate = true;
+}
+const kitCost = { ms: 0, n: 0, worst: 0 };
+function updateKits() {
+  placeLabRoot(); kits.update(labRoot, camera, renderer.domElement.height);
+  kitCost.ms += (kits.stats.ms - kitCost.ms) * 0.05; kitCost.worst = Math.max(kitCost.worst * 0.999, kits.stats.ms);
+}
+if (kits) { for (const o of [rainLines, snowPts, evLines]) o.visible = false; for (const k in looseDraw) looseDraw[k].m.visible = false; }
 
 // ---- footprints -----------------------------------------------------------------------------------------
 const Mk = physics.fields.deform.marks;
@@ -702,9 +749,11 @@ function tick(now) {
     U.uPhysWindMap.value.fromArray(u.uPhysWindMap); U.uPhysNearMap.value.fromArray(u.uPhysNearMap);
     U.uPhysWave.value.fromArray(u.uPhysWave); U.uPhysWavePhase.value.fromArray(u.uPhysWavePhase); U.uPhysShape.value.fromArray(u.uPhysShape);
     upload(tBend); upload(tWind); upload(tPush);
-    updateArrows(); updateParticles(); updateMarks(); updateProbes(); placeActors(); updateWater(cam.fx, cam.fz);
+    updateArrows(); updateProbes(); placeActors();
+    if (!kits) { updateParticles(); updateMarks(); updateWater(cam.fx, cam.fz); } else updateDevils();
   } else updateGlobe();
   placeCamera();
+  if (kits) updateKits();
   renderer.render(scene3, camera);
   frames++;
   if (now - hudT > 200) { hudT = now; writeHud(); }
@@ -724,12 +773,17 @@ function writeHud() {
   L.push(`air- ${kinds}   devils ${physics.features.devils.count}`);
   { const W = physics.fields.water.field; if (W.present) L.push(`sea  Hs ${W.height.toFixed(2)} m  period ${W.period.toFixed(1)} s  length ${W.length.toFixed(1)} m  speed ${W.speed.toFixed(1)} m/s  steepness ${W.steepness.toFixed(3)}  whitecaps ${W.whitecap01.toFixed(2)}`); }
   L.push(`sim  ${st.ms.toFixed(2)} ms (avg ${st.msAvg.toFixed(2)})  ${st.samples} surface samples  ${st.pushCells} push cells  ${Mk.total} marks  ${P.events.total} events`);
+  if (kits) {
+    const K = kits, per = (k) => `${k.stats.drawCalls} calls ${k.stats.vertices} verts ${k.stats.ms.toFixed(2)} ms`;
+    L.push(`kits (${KITS})  weather ${per(K.weather)}  |  marks ${per(K.marks)}  |  water ${per(K.water)}  |  all ${K.stats.ms.toFixed(2)} ms (avg ${kitCost.ms.toFixed(2)}, worst ${kitCost.worst.toFixed(2)})`);
+  }
   if (frames % 20 === 0) agree = shaderAgreement();
   if (agree) L.push(`glsl vs js: ${agree.plants} tips, max ${(agree.maxError * 1000).toFixed(2)} mm, rms ${(agree.rmsError * 1000).toFixed(2)} mm (largest tip displacement ${(agree.largestTipDisplacement * 100).toFixed(0)} cm)`);
   hud.textContent = L.join('\n');
 }
 // debug handle for scripted checks: node tools/shot.mjs ... --eval "window.__lab.info()"
 window.__lab = {
+  kits, labRoot, camera, THREE,
   physics, ex, sh, frame,
   info() { return { time, here: JSON.parse(JSON.stringify(physics.here)), stats: { ...physics.stats }, explorer: useExplorer ? { speed: ex.phys && ex.phys.speedGround, grounded: ex.grounded, material: ex.phys && ex.phys.material } : null, ship: useShip ? { phase: shPhase, alt: shEnv.altGround, contacts: sh.phys && sh.phys.contacts, asleep: sh.phys && sh.phys.asleep } : null, probes: probes.length, grass: grass ? grass.count : 0, rain: P.rain.count, snow: P.snow.count }; },
   uniforms() { return JSON.parse(JSON.stringify(F.uniforms)); },

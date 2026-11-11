@@ -415,6 +415,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     air, weather, ground, bindEnv,
     water: waterAt,
     here,                     // air, weather and cover at the focus, refreshed by update()
+    focus,                    // {x,y,z} body-local: the focus of the last update (read-only)
     features,                 // { devils: [...] with .count }: dust devils near the focus
     explorer: { step: stepExplorerBody, tuning: EXPLORER_BODY, disturbers: explorerDisturbers, jumpSpeed: jumpSpeedFor, terminal: explorerTerminal, sustainableSpeed },
     ship: {
