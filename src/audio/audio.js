@@ -90,6 +90,10 @@ export function createAudio({ enabled = true, context = null } = {}) {
       node.rain = noiseVoice(node.white, 'highpass', 1900, 0.3);
       node.rainLow = noiseVoice(node.soft, 'bandpass', 700, 0.4); node.rainLow.src.playbackRate.value = 1.31;
       node.rainHull = noiseVoice(node.white, 'bandpass', 330, 1.3); node.rainHull.src.playbackRate.value = 0.71;
+      // What the wind carries over the ground (PHYSICS' here.blown): a dry hiss of sand or
+      // snow, and the wash of surf and spume where the player stands by a breaking sea.
+      node.hiss = noiseVoice(node.white, 'bandpass', 5200, 0.8); node.hiss.src.playbackRate.value = 1.17;
+      node.surf = noiseVoice(node.soft, 'lowpass', 520, 0.5); node.surf.src.playbackRate.value = 0.83;
       node.jet = noiseVoice(node.white, 'bandpass', 900, 0.9);
       node.rush = noiseVoice(node.white, 'bandpass', 700, 0.5);           // air over the hull
       // The ship: two soft oscillators a fifth apart through a low-pass, and a whine for the pulse.
@@ -115,9 +119,11 @@ export function createAudio({ enabled = true, context = null } = {}) {
 
   // s: { state, onFoot, inShip, speed, grounded, jet01, throttle01, pulse01, inSpace01, altitude01,
   //      bodyId, wind (m/s), gust01, airless, submerged, material (ground underfoot, PHYSICS' name),
+  //      blown ({ sand, snow, spume, surf }, each 0..1: PHYSICS' here.blown, or null),
   //      rain01 (PHYSICS' sky.rain: liquid falling, 0..1), canopy01 (leaves overhead), dripping
   //      (0..1: the soaked wood dripping after rain), underHull (standing under the parked ship),
   //      thunderIn (s until the bang, negative after it, or null), thunder01 (its loudness) }
+  let surfT = 0;
   function update(dt, s) {
     if (!ready) return;
     const air = s.airless ? 0 : 1 - s.inSpace01;
@@ -135,6 +141,17 @@ export function createAudio({ enabled = true, context = null } = {}) {
     set(node.rain.gain.gain, rain * 0.1 * (0.7 + 0.35 * leaves) * (roof ? 0.3 : 1), 0.8);
     set(node.rainLow.gain.gain, rain * 0.2 * (1 - 0.5 * leaves) * (roof ? 0.45 : 1), 0.8);
     set(node.rainHull.gain.gain, rain * 0.16 * roof, 0.5);
+    // Blown sand and snow hiss (snow more softly); inside the ship it is the hull that hears it.
+    // The surf breathes: each wave washes in and draws back, about one in eight seconds.
+    const bl = s.blown || null;
+    const grit = bl ? Math.min(1, Math.max(bl.sand || 0, (bl.snow || 0) * 0.6)) : 0;
+    set(node.hiss.gain.gain, air * grit * 0.07 * (0.7 + 0.3 * (s.gust01 || 0)) * (s.inShip ? 0.3 : 1), 0.6);
+    set(node.hiss.filt.frequency, (bl && (bl.snow || 0) > (bl.sand || 0) ? 6400 : 4600) + 900 * (s.gust01 || 0), 0.8);
+    surfT += dt;
+    const wash = 0.62 + 0.38 * Math.sin(surfT * 0.79) * Math.sin(surfT * 0.79 * 0.31 + 1.3);
+    const sea = bl ? Math.min(1, (bl.surf || 0) + 0.4 * (bl.spume || 0)) : 0;
+    set(node.surf.gain.gain, air * sea * 0.17 * wash * (s.inShip ? 0.35 : 1), 0.9);
+    set(node.surf.filt.frequency, 380 + 420 * wash + 300 * (bl ? bl.spume || 0 : 0), 0.9);
     // Drips: the wood goes on dripping after the rain, and drips under leaves while it rains.
     const drops = air * (s.onFoot ? 1 : 0) * Math.max(s.dripping || 0, rain * leaves * 0.6);
     if (drops > 0.04) {
@@ -208,6 +225,6 @@ export function createAudio({ enabled = true, context = null } = {}) {
     start, update, event,
     get ready() { return ready; },
     get state() { return ctx ? ctx.state : 'off'; },
-    debug: () => (ready ? { wind: node.wind.gain.gain.value, ship: node.shipGain.gain.value, pad: node.padGain.gain.value, rain: node.rain.gain.gain.value, rainLow: node.rainLow.gain.gain.value, rainHull: node.rainHull.gain.gain.value, lastState } : null),
+    debug: () => (ready ? { wind: node.wind.gain.gain.value, ship: node.shipGain.gain.value, pad: node.padGain.gain.value, rain: node.rain.gain.gain.value, rainLow: node.rainLow.gain.gain.value, rainHull: node.rainHull.gain.gain.value, hiss: node.hiss.gain.gain.value, surf: node.surf.gain.gain.value, lastState } : null),
   };
 }

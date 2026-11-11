@@ -337,6 +337,7 @@ export class Game {
       // Rain: PHYSICS' sky.rain (liquid falling; snow is silent), what it falls on, and the shelter.
       rain01: here && here.sky ? here.sky.rain : w && w.precipitation && w.precipitation.type !== 'snow' ? w.precipitation.intensity01 : 0,
       canopy01: here && here.cover ? here.cover.canopy01 || 0 : 0,
+      blown: here && here.blown ? here.blown : null,
       dripping: here && sim.physics.particles && sim.physics.particles.system ? sim.physics.particles.system.dripping || 0 : 0,
       underHull: st === S.ON_FOOT && sim.shFrame.kind === 'body' && sim.shFrame.id === sim.bodyId
         && Math.hypot(sim.sh.p.x - sim.ex.p.x, sim.sh.p.y - sim.ex.p.y, sim.sh.p.z - sim.ex.p.z) < 3.6,

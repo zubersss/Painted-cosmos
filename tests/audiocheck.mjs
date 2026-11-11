@@ -29,6 +29,8 @@ const rows = await page.evaluate(async () => {
     { name: 'heavy rain, under the hull', sec: 14, tail: 8, at: () => ({ ...base, wind: 6, rain01: 1, underHull: true }), want: 'sound', steady: true },
     { name: 'the wood dripping after rain', sec: 14, tail: 8, at: () => ({ ...base, wind: 1, canopy01: 0.9, dripping: 0.8 }), want: 'sound' },
     { name: 'thunderstorm (rain, 18 m/s, thunder)', sec: 16, tail: 10, at: (t) => ({ ...base, wind: 18, gust01: 0.7, rain01: 1, thunderIn: 8 - t, thunder01: 1 }), want: 'sound' },
+    { name: 'blown sand in a gale', sec: 14, tail: 8, at: () => ({ ...base, wind: 16, gust01: 0.6, blown: { sand: 1, snow: 0, spume: 0, surf: 0 } }), want: 'sound' },
+    { name: 'a breaking sea in a gale (surf, spume)', sec: 16, tail: 8, at: () => ({ ...base, wind: 20, gust01: 0.5, blown: { sand: 0, snow: 0, spume: 0.8, surf: 1 } }), want: 'sound' },
     { name: 'walking', sec: 12, tail: 8, at: () => ({ ...base, speed: 4.2 }), want: 'sound' },
     { name: 'walking on rock', sec: 12, tail: 8, at: () => ({ ...base, speed: 4.2, material: 'rock' }), want: 'sound' },
     { name: 'walking on snow', sec: 12, tail: 8, at: () => ({ ...base, speed: 4.2, material: 'snow' }), want: 'sound' },
@@ -41,7 +43,7 @@ const rows = await page.evaluate(async () => {
     { name: 'on the Moon, standing (airless)', sec: 12, tail: 6, at: () => ({ ...base, bodyId: 'moon', airless: true, wind: 0 }), padOff: true, want: 'silence' },
     { name: 'the pad at its fullest (Earth)', sec: 20, tail: 8, first: 34, at: () => ({ ...base, wind: 0 }), want: 'sound' },
     { name: 'interface: paper, brush, found, land, bounce', sec: 12, tail: 10, at: () => ({ ...base, wind: 0 }), events: [[2.5, 'paper'], [4, 'brush'], [5.5, 'found'], [8, 'land'], [9.5, 'bounce']], want: 'sound' },
-    { name: 'everything at once', sec: 16, tail: 10, first: 40, at: (t) => ({ ...base, ...ship, speed: 160, throttle01: 1, pulse01: 1, wind: 22, gust01: 1, rain01: 1, thunderIn: 8 - t, thunder01: 1 }), events: [[8.05, 'land'], [8.1, 'found'], [8.2, 'bounce']], want: 'sound' },
+    { name: 'everything at once', sec: 16, tail: 10, first: 40, at: (t) => ({ ...base, ...ship, speed: 160, throttle01: 1, pulse01: 1, wind: 22, gust01: 1, rain01: 1, thunderIn: 8 - t, thunder01: 1, blown: { sand: 1, snow: 1, spume: 1, surf: 1 } }), events: [[8.05, 'land'], [8.1, 'found'], [8.2, 'bounce']], want: 'sound' },
     { name: 'cuts: on foot, ship at full throttle, on foot, jet', sec: 16, tail: 14, at: (t) => (t < 5 ? { ...base, wind: 10 } : t < 9 ? { ...base, ...ship, speed: 150, throttle01: 1 } : t < 12 ? { ...base, wind: 10 } : { ...base, jet01: 1, grounded: false }), want: 'sound' },
   ];
 
