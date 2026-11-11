@@ -36,6 +36,24 @@ The eighth agent's handover is kept below it ("Handover of block 6"); its rules 
   lead's `tests/motion.mjs` and `tests/weather.mjs` with `--root --out --sheets` (always pass
   the last two or they write into the lead's evidence). The machine is shared and slow: the
   game is ready after 5 to 15 minutes, a frame of a strip 15 to 70 s.
+- **Next, in this order** (the lead's hardening review, `docs/lead/HARDENING.md` "PAINTER (in
+  order)", relayed by the coordinator): **A3** `uPhysBranchClock` is in `PHYS` at the head
+  (`shared.js:135`, committed): confirmed in the file; the lens's own check (read it on
+  `pc-prop-tall-broadleaf0` twice 10 s apart) was not run. **A2** prewarm hooks for PILOT's P3:
+  `world.prewarm()` (await the kits import kept from `buildKits`, `makeDab` for every body,
+  `st.flora._init()` for every body with flora, or compile its prop materials against a tiny
+  InstancedMesh) and `painter.prewarm()` (draw `mAbs[4]`, `mAbs[8]`, `mSheet` and the prep and
+  keep materials once into a 2x2 target); PILOT 8 writes the caller. **A1** log depth in the
+  vertex shader when EXT_clip_control is missing (exact lines in HARDENING.md; `PC_FRAG_LOGDEPTH`
+  only for water and near ground if they poke through; check the explorer at the shore and the
+  ship on its pad). Optional: the reversed smoothstep edges (gap 17). **After the art pass**:
+  both coast biomes must face open water (Neptune `storm_seas` faces a lagoon dry 120 to 170 m
+  out with the storm wind from E/ENE; Earth `sea_coast` a pool under 50 m with the wind
+  offshore): 2 km of fetch at about 20 m deep toward the storm wind; tell the coordinator if
+  it needs the sites (look data) changed. Then the unfinished block 7 bits: torn white crests
+  on the near sea, the near headland's vertical end, the blizzard's ruled crest, the gallery
+  run re-filmed after the heel change, item 4 of the block (the brush, two walled vistas,
+  Mercury from orbit, Mars' dune crests, the explorer's face, PILOT's UI look review).
 - **Rules that bit me**: (1) the coordinator's WIP snapshots sweep your working files into the
   head within minutes; commit under your own message as soon as tests pass. (2) A head can be
   broken in the browser while every Node test passes (a module cycle: the game silently ran on
