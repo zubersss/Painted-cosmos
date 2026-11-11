@@ -86,7 +86,7 @@ for (const id in REGIMES) {
 
 // The default seed puts a fair morning over Earth's home forest for the first minutes of play
 // (weather.test.mjs checks it). Change it only together with that test.
-export const DEFAULT_SEED = 11;
+export const DEFAULT_SEED = 14;
 
 const seedCache = {};
 function seedFor(bodyId, seed) {
@@ -283,8 +283,12 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   const a = gather(bodyId, ux, uy, uz, t, seed);
   const pr = o.precipitation || (o.precipitation = {});
   const li = o.lightning || (o.lightning = { last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } });
+  // Weather lives in the lower half of the atmosphere (PAINTER's cloud deck sits at 55 % of its
+  // height). Climb through it and you are above the rain, the fog and the cloud.
+  const top = BODIES[bodyId].atmosphereHeight || 0;
+  const below = top > 0 ? 1 - smoothstep(top * 0.5, top * 0.62, altitude) : 0;
 
-  let rate = a.rate * moist;
+  let rate = a.rate * moist * below;
   const melt = regime && regime.melt != null ? regime.melt : 1e9;
   const frozen = melt < 1e8 ? 1 - smoothstep(melt - 1.0, melt + 1.5, T) : (melt > 0 ? 1 : 0);
   // virga: drops evaporate on the way down in hot dry air (Venus) and only reach high ground
@@ -315,6 +319,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   const sp = species ? SPECIES[species] : null;
   pr.dropSize = sp ? sp.d : 0;
   pr.fallSpeed = sp && atm.mu > 0 ? terminalVelocity(sp, BODIES[bodyId].gravity, rho, atm.mu, meanFreePath(bodyId, rho, T)) : 0;
+  if (!(pr.fallSpeed < 1e4)) pr.fallSpeed = 0;
   // 0..1 for drawing and for particle counts: saturates around a downpour
   pr.intensity01 = type === 'none' ? 0 : clamp01(1 - Math.exp(-rate / (type === 'snow' || type === 'ice' ? 1.2 : type === 'frost' ? 0.1 : 9)));
 
@@ -326,14 +331,14 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // are misty whatever the wind does
   // (only where the air is near the condensation point of something: not on Venus or Mars)
   const mistOK = regime && regime.cells && atm.rho0 > 0.3 && melt > 1 && melt < 1e8 && T < melt + 40;
-  const mist = mistOK ? Math.max(fogBiome * calm * (0.3 + 0.7 * dawn), 0.5 * smoothstep(0.75, 1, fogBiome)) : 0;
-  const fogExt = a.fog * (0.4 + 0.6 * fogBiome) + mist * mist * WEATHER.clearVisibility / 150;
+  const mist = mistOK ? Math.max(fogBiome * calm * (0.3 + 0.7 * dawn), 0.5 * smoothstep(0.92, 1, fogBiome)) : 0;
+  const fogExt = (a.fog * (0.4 + 0.6 * fogBiome) + mist * mist * WEATHER.clearVisibility / 150) * below;
   // ---- dust: storms, plus wind over a dust source above the saltation threshold ---------------
   const dustSrc = env && env.dustSource != null ? env.dustSource : 0;
   const lift = rho > 0 ? smoothstep(1.0, 2.2, wind / saltationThreshold(bodyId, rho)) : 0;
-  const dustExt = a.dust * (0.5 + 0.5 * dustSrc) + lift * dustSrc * WEATHER.clearVisibility / 400;
+  const dustExt = (a.dust * (0.5 + 0.5 * dustSrc) + lift * dustSrc * WEATHER.clearVisibility / 400) * below;
   // ---- visibility (Koschmieder): extinctions add; rain 0.2 R^0.6 per km, snow about 2 R^0.7 --
-  let ext = 1 + fogExt + dustExt + a.haze;
+  let ext = 1 + fogExt + dustExt + a.haze * below;
   if (type === 'rain' || type === 'drizzle' || type === 'acid') ext += 0.2 * Math.pow(rate, 0.6) * WEATHER.clearVisibility / 3912 * reach;
   else if (type === 'snow' || type === 'ice') ext += 2.0 * Math.pow(rate, 0.7) * WEATHER.clearVisibility / 3912;
   else if (type === 'frost') ext += 0.5 * rate * WEATHER.clearVisibility / 3912;
@@ -343,8 +348,9 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   o.visibility01 = Math.sqrt(1 / ext);
   o.fog01 = clamp01(1 - Math.exp(-fogExt / 60));
   o.dust01 = clamp01(1 - Math.exp(-dustExt / 60));
-  o.haze01 = clamp01(1 - Math.exp(-a.haze / 30));
-  o.cloud01 = clamp01(a.cloud + 0.25 * o.fog01);
+  o.haze01 = clamp01(1 - Math.exp(-a.haze * below / 30));
+  o.cloud01 = clamp01(a.cloud + 0.25 * o.fog01) * below;        // 0 once you are above the deck
+  o.cloudBelow01 = clamp01(a.cloud) * (1 - below);              // cloud you are looking down on
   o.temperature = T;
   o.storm01 = a.storm;
   o.front01 = a.front;

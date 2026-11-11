@@ -60,7 +60,8 @@ export const EXPLORER_BODY = Object.freeze({
 export const EXPLORER_BODY_STATE = () => ({
   jetThrottle: 0,         // smoothed 0..1
   jetUse: 0,              // thrust fraction actually used this step (for PILOT's fuel)
-  slip01: 0,              // 0 gripping .. 1 sliding freely
+  slip01: 0,              // 0 gripping .. 1 sliding freely (the ground cannot hold you)
+  scramble01: 0,          // 0 easy .. 1 the legs want far more traction than there is (ice, mud)
   sink: 0,                // m the feet are pressed into the ground (for drawing and footprints)
   submerged01: 0,         // fraction of the body under liquid
   windAccel: 0,           // m/s^2 the wind is pushing with
@@ -212,20 +213,37 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
       const pmax = T.legPower / T.mass / sp;
       if (al > pmax) { const cut = (al - pmax) / sp; fx -= sx * cut; fy -= sy * cut; fz -= sz * cut; fl = Math.hypot(fx, fy, fz); }
     }
-    // ... and by the friction circle
+    // ... and by the friction circle. A walker does not spin their feet: they push only as hard
+    // as the ground will hold (traction control), so the force is the holding force (-outside
+    // loads) plus as much of the wanted change as fits inside mu N. Only when the holding force
+    // alone exceeds mu N does the body really slide, on kinetic friction.
     const hold = G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, sp));
     const fmax = Math.max(0, hold * support);
-    if (fl > fmax) {
+    const hl = Math.hypot(ex, ey, ez);
+    if (hl > fmax) {
+      // cannot even hold: kinetic friction against the sliding (or against the pull, from rest)
       const fk = Math.max(0, G.kinetic * support);
-      const m = fl > 1e-9 ? fk / fl : 0;
-      fx *= m; fy *= m; fz *= m;
-      B.slip01 = clamp01(1 - fmax / fl);
-    } else B.slip01 = 0;
+      let kx, ky, kz;
+      if (sp > 0.05) { kx = -sx / sp; ky = -sy / sp; kz = -sz / sp; } else { kx = -ex / hl; ky = -ey / hl; kz = -ez / hl; }
+      // the legs still steer a little within the kinetic circle
+      fx = kx * fk; fy = ky * fk; fz = kz * fk;
+      B.slip01 = clamp01(1 - fmax / hl);
+      B.scramble01 = 1;
+    } else {
+      B.slip01 = 0;
+      if (fl > fmax) {
+        const dx = fx + ex, dy = fy + ey, dz = fz + ez;           // wanted change beyond holding
+        const a = dx * dx + dy * dy + dz * dz, b = -(ex * dx + ey * dy + ez * dz), c = hl * hl - fmax * fmax;
+        const lam = a > 1e-12 ? clamp01((-b + Math.sqrt(Math.max(0, b * b - a * c))) / a) : 0;
+        fx = -ex + dx * lam; fy = -ey + dy * lam; fz = -ez + dz * lam;
+        B.scramble01 = clamp01(1 - fmax / fl);
+      } else B.scramble01 = 0;
+    }
     // integrate along the surface
     sx += (ex + fx) * dt; sy += (ey + fy) * dt; sz += (ez + fz) * dt;
     if (liqK > 0) { const m = 1 / (1 + liqK * Math.hypot(sx, sy, sz) * dt); sx *= m; sy *= m; sz *= m; }
     // snap to rest: never creep
-    if (qlen < 1e-6 && B.slip01 === 0 && Math.hypot(sx, sy, sz) < 0.02 && Math.hypot(ex + fx, ey + fy, ez + fz) < 1e-6) { sx = sy = sz = 0; }
+    if (qlen < 1e-6 && B.slip01 === 0 && Math.hypot(sx, sy, sz) < 0.02) { sx = sy = sz = 0; }
 
     // move, then meet the ground again
     let p1x = px + sx * dt, p1y = py + sy * dt, p1z = pz + sz * dt;
@@ -346,6 +364,7 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
     }
     B.support = 0;
     B.slip01 = grounded ? 0 : B.slip01 * 0.9;
+    B.scramble01 = 0;
   }
 
   // ---- report ------------------------------------------------------------------------------------

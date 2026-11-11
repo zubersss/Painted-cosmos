@@ -34,11 +34,13 @@ export const ATMOSPHERES = {
   // Mars: 610 Pa of CO2 at 210 K -> 0.020 kg/m^3 (NASA Mars fact sheet); speed of sound 240 m/s.
   mars: { rho0: 0.020, T0: 213, mu: 1.08e-5, c: 240, M: 0.04334, p0: 610, dTpole: 60, dTday: 35, lapse: 0.012, gas: 'CO2' },
   // The giants have no ground. The game's imagined surfaces are placed at real pressure levels:
-  // Jupiter's sky-islands at the 5 bar water-cloud deck (270 K, Galileo probe), Saturn's at 10 bar
-  // (280 K), Uranus at 2 bar (90 K, methane-ice clouds), Neptune at 3 bar (95 K, where methane is
-  // liquid: its seas and its rain). rho = p M / (R T). Viscosity and sound speed are for H2/He.
-  jupiter: { rho0: 0.51, T0: 270, mu: 8.3e-6, c: 1170, M: 0.0023, p0: 5e5, dTpole: 4, dTday: 1, lapse: 0.006, gas: 'H2/He' },
-  saturn: { rho0: 0.95, T0: 280, mu: 8.5e-6, c: 1210, M: 0.0022, p0: 1e6, dTpole: 4, dTday: 1, lapse: 0.006, gas: 'H2/He' },
+  // Jupiter's sky-islands just under the water-cloud deck at 6 bar (290 K; the Galileo probe
+  // measured 273 K at 5 bar and 300 K at 7), Saturn's at 10 bar (290 K), Uranus at 2 bar (90 K,
+  // methane-ice clouds), Neptune at 3 bar (95 K, where methane is liquid: its seas and its
+  // rain). rho = p M / (R T). Viscosity and sound speed are for H2/He. Warm enough on Jupiter
+  // and Saturn for the storms to rain water.
+  jupiter: { rho0: 0.57, T0: 290, mu: 8.8e-6, c: 1210, M: 0.0023, p0: 6e5, dTpole: 4, dTday: 1, lapse: 0.006, gas: 'H2/He' },
+  saturn: { rho0: 0.91, T0: 290, mu: 8.8e-6, c: 1240, M: 0.0022, p0: 1e6, dTpole: 4, dTday: 1, lapse: 0.006, gas: 'H2/He' },
   uranus: { rho0: 0.70, T0: 90, mu: 3.9e-6, c: 660, M: 0.0026, p0: 2e5, dTpole: 3, dTday: 0.5, lapse: 0.004, gas: 'H2/He/CH4' },
   neptune: { rho0: 0.99, T0: 95, mu: 4.0e-6, c: 675, M: 0.0026, p0: 3e5, dTpole: 3, dTday: 0.5, lapse: 0.004, gas: 'H2/He/CH4' },
   // Pluto: about 1 Pa of N2 at 40 K (New Horizons) -> 8.4e-5 kg/m^3. Almost nothing, but a gas:
