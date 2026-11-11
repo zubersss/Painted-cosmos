@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { weatherAt, moistureAt, cellsAt, weatherWind, saltationThreshold, REGIMES, DEFAULT_SEED, WEATHER } from './weather.js';
 import { ATMOSPHERES } from './atmosphere.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
+import { epoch0 } from './testworld.mjs';
 
 const dir = (latDeg, lonDeg) => { const a = latDeg * Math.PI / 180, b = lonDeg * Math.PI / 180, c = Math.cos(a); return { x: c * Math.sin(b), y: Math.sin(a), z: c * Math.cos(b) }; };
 const env = { moist: 1, fog: 0.3, sun01: 0.6, wind: 4 };
@@ -29,22 +30,22 @@ test('deterministic: the same place and time always has the same weather', () =>
   assert.notEqual(JSON.stringify(cellsAt('earth', 500, 1).map((c) => c.x)), JSON.stringify(cellsAt('earth', 500, 2).map((c) => c.x)));
 });
 
-test('a fair morning over Earth\'s home forest for the first seven minutes (default seed)', () => {
-  // PAINTER's spawn is found near the first forest site (38 N, 10 E); PILOT's stub spawn is elsewhere
-  for (const d of [dir(38, 10), { x: 0.1736, y: 0.5817, z: 0.7946 }, { x: 0.3339, y: 0.1072, z: -0.9365 }]) {
-    for (let t = 0; t <= 420; t += 10) {
-      const w = wx('earth', d, t);
-      assert.ok(w.precipitation.rate < 0.03 && w.storm01 === 0 && w.fog01 < 0.25, `t=${t}: ${w.kind}`);
-      assert.ok(['clear', 'breeze', 'overcast', 'mist', 'windy'].includes(w.kind), w.kind);
-    }
-  }
-  // ... and then, at PAINTER's spawn, you see weather coming and it comes: cloud builds within
-  // five minutes, a storm passes between ten and fourteen, and the sky opens again
-  const d = { x: 0.1736, y: 0.5817, z: 0.7946 };
-  assert.ok(wx('earth', d, 30).cloud01 < 0.2 && wx('earth', d, 300).cloud01 > 0.5, 'cloud builds');
-  let wettest = 0, when = 0; for (let t = 420; t <= 900; t += 10) { const r = wx('earth', d, t).precipitation.rate; if (r > wettest) { wettest = r; when = t; } }
-  assert.ok(wettest > 3 && when > 600 && when < 840, `the storm: ${wettest.toFixed(1)} mm/h at ${when} s`);
-  assert.ok(wx('earth', d, 960).precipitation.rate < 0.03, 'and it passes');
+test('the first storm over Earth\'s home forest is seen: a fair late morning, a thunderstorm between 150 and 340 s of play, a clear afternoon (default seed, Earth\'s epoch)', () => {
+  // (lead review 5, P2: it used to cross at 640 to 800 s, which is half past six to nine in the evening)
+  const d = { x: 0.1736, y: 0.5817, z: 0.7946 };                // PAINTER's spawn
+  const fair = (t) => { const w = wx('earth', d, t); assert.ok(w.precipitation.rate < 0.03 && w.storm01 === 0 && w.fog01 < 0.25 && ['clear', 'breeze', 'overcast', 'mist', 'windy'].includes(w.kind), `t=${t}: ${w.kind}`); };
+  for (let t = 0; t <= 120; t += 10) fair(t);
+  // ... you see it come (the shield is over you before the first drop), it comes, and the sky opens again
+  assert.ok(wx('earth', d, 100).cloud01 < 0.45 && wx('earth', d, 150).cloud01 > 0.6, 'cloud builds');
+  let wettest = 0, when = 0, first = -1, last = -1;
+  for (let t = 0; t <= 600; t += 10) { const w = wx('earth', d, t); if (w.precipitation.rate > wettest) { wettest = w.precipitation.rate; when = t; } if (w.kind === 'thunderstorm') { if (first < 0) first = t; last = t; } }
+  assert.ok(wettest > 15 && when >= 190 && when <= 280, `the storm: ${wettest.toFixed(1)} mm/h at ${when} s`);
+  assert.ok(first >= 150 && first <= 200 && last >= 280 && last <= 340, `called a thunderstorm from ${first} to ${last} s`);
+  for (let t = 350; t <= 900; t += 10) fair(t);
+  // PILOT's stub spawn has a fair first ten minutes
+  for (let t = 0; t <= 600; t += 20) { const w = wx('earth', { x: 0.3339, y: 0.1072, z: -0.9365 }, t); assert.ok(w.precipitation.rate < 0.03 && w.storm01 === 0, `stub t=${t}: ${w.kind}`); }
+  // the epoch is Earth's alone: no other body's weather clock moved
+  for (const id in REGIMES) if (id !== 'earth') assert.ok(!REGIMES[id].epoch, id);
 });
 
 test('cells are born, drift with the wind, and die; nothing teleports while alive', () => {
@@ -156,7 +157,7 @@ test('wetness builds up under rain and dries afterwards; faster in sun and wind'
   for (let t = hit.t - 500; t < hit.t + 3000; t += 50) { const w = m(t).wetness01; assert.ok(w >= 0 && w <= 1); }
 });
 
-test('snow piles up in the cold, melts in the warm; standing snow is the biome\'s own and nothing else', () => {
+test('snow piles up in the cold, melts in the warm; standing snow is the biome\'s own and nothing else', () => epoch0(() => {
   const hit = find('earth', (w) => w.precipitation.rate > 4);
   const cold = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t + 200, DEFAULT_SEED, { moist: 1, T: 265, Tmean: 271, wind: 3 }, {});
   const warm = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t + 200, DEFAULT_SEED, { moist: 1, T: 290, Tmean: 288, wind: 3 }, {});
@@ -175,7 +176,7 @@ test('snow piles up in the cold, melts in the warm; standing snow is the biome\'
   assert.ok(worst < 0.012 && prevW > 0.5, `wetness across the melting point: ${worst} for 0.02 K, ${prevW} well above it`);
   const frozenWet = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t + 200, DEFAULT_SEED, { moist: 1, T: 265, wind: 3 }, {});
   assert.ok(frozenWet.wetness01 < 0.05, 'snow does not wet the ground until it melts');
-});
+}));
 
 test('each body has its own regime', () => {
   const kinds = (id, e = env) => { const s = new Set(); for (let t = 0; t < 5000; t += 83) for (const c of cellsAt(id, t)) { s.add(weatherAt(id, c.x, c.y, c.z, 30, t, DEFAULT_SEED, e, {}).kind); } return s; };

@@ -41,3 +41,12 @@ export function along(d0, m, R) {
   const a = m / R;
   return norm({ x: d0.x + a, y: d0.y, z: d0.z });
 }
+
+// Run a test with Earth's weather clock at its old start (REGIMES.earth.epoch = 0): for tests of a
+// mechanism that look for "the first snowfall" or "the first storm" and were tuned on the systems
+// found from there. The game's own opening weather is tested in weather.test.mjs with the epoch on.
+import { REGIMES as _REG } from './weather.js';
+export function epoch0(fn) {
+  const e = _REG.earth.epoch; _REG.earth.epoch = 0;
+  try { return fn(); } finally { _REG.earth.epoch = e; }
+}

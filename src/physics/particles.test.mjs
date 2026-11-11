@@ -7,6 +7,7 @@ import { cellsAt, weatherAt, DEFAULT_SEED } from './weather.js';
 import { MARK, MARK_STRIDE, DeformField, DEFORM } from './deform.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len, dot } from './testworld.mjs';
+import { epoch0 } from './testworld.mjs';
 
 // a physics instance centred where it is raining (or snowing) right now
 function rainy(bodyId = 'earth', { biome = 'alpine_meadow', pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 5, sea = 0 } = {}) {
@@ -198,7 +199,7 @@ test('prints on loose ground have a rim; on mud they do not; the depth field pil
   assert.ok(hi > 0.02 && lo < -0.002, `trough ${hi} and pile ${lo}`);
 });
 
-test('falling snow fills prints in; in clear weather they last over a minute', () => {
+test('falling snow fills prints in; in clear weather they last over a minute', () => epoch0(() => {
   const snowy = rainy('earth', { biome: 'stub-polar', pred: (x) => x.precipitation.type === 'snow' && x.precipitation.rate > 4 });
   const fr0 = () => snowy.physics.fields.frame;
   run(snowy, 2);
@@ -237,7 +238,7 @@ test('falling snow fills prints in; in clear weather they last over a minute', (
   for (let i = 0; i < 70 * 20; i++) physics.update(1 / 20, { bodyId: 'earth', time: 52 + i / 20, focus: q });
   assert.equal(physics.fields.deform.marks.data[8], depth);
   assert.ok(life > 60 && born + life > 52 + 70, 'life ' + life);
-});
+}));
 
 test('the ship leaves three pad prints where it comes down, and a jet scours a dish with a ring', () => {
   const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
@@ -353,7 +354,7 @@ test('over deep water the weather enters above the surface, not above the bed', 
   assert.ok(ripples > 20, `${ripples} ripples`);
 });
 
-test('every particle says how long it has left: a flake by its fall to the ground, dust by its life', () => {
+test('every particle says how long it has left: a flake by its fall to the ground, dust by its life', () => epoch0(() => {
   const w = rainy('earth', { pred: (x) => x.precipitation.type === 'snow' && x.precipitation.intensity01 > 0.6 });
   w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
   run(w, 8);
@@ -371,7 +372,7 @@ test('every particle says how long it has left: a flake by its fall to the groun
   run(w, 3, { each: () => { const now = new Map(); for (let i = 0; i < b.count; i++) now.set(b.size[i], b.left[i]); for (const [id, l] of seen) if (!now.has(id)) lastLeft.push(l); seen.clear(); for (const [id, l] of now) seen.set(id, l); } });
   lastLeft.sort((x, y) => x - y);
   assert.ok(lastLeft.length > 50 && lastLeft[Math.floor(lastLeft.length * 0.98)] < 0.08, `${lastLeft.length} landings; 98 % were announced to within ${lastLeft[Math.floor(lastLeft.length * 0.98)].toFixed(3)} s`);
-});
+}));
 
 test('far from the anchor of the frame the rain still ends on the ground (the grid is a plane, the ground is not)', () => {
   const w = rainy('earth');

@@ -21,7 +21,7 @@ test('every number is there, finite and between 0 and 1, on every world, in any 
   assert.equal(skyNumbers(null, {}).haze, 1);
 });
 
-test('it says what a painter would say: a storm is dark, wet and rainy; a dust storm is dust; snow covers', () => {
+test('it says what a painter would say: a storm is dark, wet and rainy; a dust storm is dust; snow covers', () => epoch0(() => {
   const find = (id, pred) => { for (let t = 0; t < 9000; t += 41) for (const c of cellsAt(id, t)) { const w = wx(id, c, t + 15); if (pred(w)) return { w, c, t: t + 15 }; } throw new Error('not found on ' + id); };
   const storm = skyNumbers(find('earth', (w) => w.storm01 > 0.7 && w.precipitation.rate > 10 && w.precipitation.type === 'rain').w, {});
   assert.ok(storm.cloud > 0.8 && storm.overcast > 0.7 && storm.rain > 0.6 && storm.haze < 0.6 && storm.snowfall < 0.1 && storm.dust < 0.05, JSON.stringify(storm));
@@ -36,7 +36,7 @@ test('it says what a painter would say: a storm is dark, wet and rainy; a dust s
   assert.ok(s.snowfall > 0.3 && s.rain < 0.05, JSON.stringify(s));
   const deep = { ...snow.w, snowDepth: 0.2 }, thin = { ...snow.w, snowDepth: 0.01 };
   assert.ok(skyNumbers(deep, {}).snow > 0.99 && Math.abs(skyNumbers(thin, {}).snow - (1 - Math.exp(-0.01 / SKY.snowCover))) < 1e-9);
-});
+}));
 
 test('continuous in time: nothing but the flash moves by more than a tenth in a second', () => {
   let worst = 0, what = '';
@@ -59,6 +59,7 @@ test('continuous in time: nothing but the flash moves by more than a tenth in a 
 import { createPhysics } from './index.js';
 import { windLarge } from './wind.js';
 import { makeWorld } from './testworld.mjs';
+import { epoch0 } from './testworld.mjs';
 
 test('fresh snow is a number of its own: it gathers while snow falls, is never more than the snow that lies, and a green meadow in fair weather has none', () => {
   const find = (id, pred) => { for (let t = 0; t < 9000; t += 41) for (const c of cellsAt(id, t)) { const w = weatherAt(id, c.x, c.y, c.z, 2, t + 15, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {}); if (pred(w)) return { c, t: t + 15 }; } throw new Error('not found'); };
@@ -139,7 +140,7 @@ test('R-WX-1: with the real temperature of each place, through physics.weather a
   }
 });
 
-test('at the focus fresh snow comes only from the sky: it gathers while snow falls and never rises under a clear one', () => {
+test('at the focus fresh snow comes only from the sky: it gathers while snow falls and never rises under a clear one', () => epoch0(() => {
   const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'alpine_meadow' });
   const physics = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
   let hit = null;
@@ -166,4 +167,4 @@ test('at the focus fresh snow comes only from the sky: it gathers while snow fal
   const meadow = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
   let fair = null; for (let k = 0; k < 400 && !fair; k++) { const a = k * 2.399963, y = 0.2 + 0.6 * ((k * 0.618) % 1), r = Math.sqrt(1 - y * y), d = { x: Math.cos(a) * r, y, z: Math.sin(a) * r }, pp = { x: d.x * (R + 1), y: d.y * (R + 1), z: d.z * (R + 1) }; meadow.warmUp({ bodyId: 'earth', time: 50, focus: pp }); meadow.update(0.1, { bodyId: 'earth', time: 50.1, focus: pp }); const s = meadow.here.sky; if (s.cloud < 0.2 && s.snow < 0.02 && s.fresh < 0.02) fair = s; }
   assert.ok(fair, 'a fair day on the meadow with bare grass');
-});
+}));

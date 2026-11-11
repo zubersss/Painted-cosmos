@@ -70,7 +70,10 @@ export const REGIMES = {
   moon: { cells: 0 },
   venus: { cells: 14, radius: [700, 1500], life: [1200, 2400], steer: 8, melt: 0, liquid: 'acid', solid: 'acid', virga: 160,
     kinds: [['haze', 5], ['acid', 3], ['cloud', 2]] },
-  earth: { cells: 22, radius: [500, 1300], life: [600, 1500], steer: 1.6, melt: 273.15, liquid: 'rain', solid: 'snow', virga: 0,
+  // `epoch` (s): where in the life of its weather systems a body's game clock starts (the initial
+  // condition of the weather). Earth's is chosen so that the first thunderstorm crosses the
+  // home forest in the first minutes of play, in daylight: see DEFAULT_SEED below.
+  earth: { cells: 22, radius: [500, 1300], life: [600, 1500], steer: 1.6, melt: 273.15, liquid: 'rain', solid: 'snow', virga: 0, epoch: 480,
     kinds: [['cloud', 3], ['drizzle', 1.2], ['rain', 2], ['shower', 2], ['storm', 1.1], ['fog', 1]] },
   mars: { cells: 9, radius: [600, 1400], life: [1200, 2600], steer: 1.3, melt: 1e9, liquid: 'frost', solid: 'frost', virga: 0, frostBelow: 200,
     kinds: [['dust', 3], ['cloud', 3], ['frost', 1]] },
@@ -103,8 +106,13 @@ for (const id in REGIMES) {
   r.total = s;
 }
 
-// The default seed puts a fair morning over Earth's home forest for the first minutes of play
-// (weather.test.mjs checks it). Change it only together with that test.
+// The default seed and Earth's epoch (REGIMES.earth.epoch) put this over Earth's home forest
+// (weather.test.mjs checks it; change them only together with that test): a fair late morning
+// for the first two minutes of play (the game begins at 9:30; an hour of Earth's day is 62.5 s),
+// cloud building from 100 s, the first drops at 140 s, a thunderstorm from 160 to 320 s (noon to
+// half past two; heaviest, 20 mm/h and more, from 200 to 260 s), and a clear afternoon after 340 s.
+// Every Earth weather time of before P8 is 480 s earlier now (the storm was at 640 to 800 s, after
+// dark); no other body's weather moved.
 export const DEFAULT_SEED = 18;
 
 // (the last lookup is remembered: building a string key on every call would allocate)
@@ -121,6 +129,7 @@ const _pv = new Float64Array(2);
 // One cell at one time. Fills c: x,y,z (unit centre), r (m), w (0..1 strength now), kind (object),
 // kindId, age, life, gen, i. Returns false when the cell is dormant.
 function cellAt(bodyId, R, regime, s, i, t, c) {
+  if (regime.epoch) t += regime.epoch;
   if (i >= regime.cells) return spotAt(R, regime.spots[i - regime.cells], i, t, c);
   const life0 = mix(regime.life[0], regime.life[1], hash3(i, 1, 0, s));
   const phase = hash3(i, 2, 0, s) * life0;
