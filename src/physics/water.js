@@ -15,7 +15,7 @@
 // wave breaks when it is about 0.55 of the depth high.
 //
 // What is delivered: the sea state at the focus, smoothed (a sea takes time to rise and fall),
-// as three wave trains that PAINTER can draw and the JS twin can evaluate, so that a floating
+// as four wave trains (in sets, with wakes) that PAINTER can draw and the JS twin can evaluate, so that a floating
 // explorer rides the same waves that are painted.
 import { clamp01, smoothstep, TAU } from './util.js';
 
@@ -24,9 +24,11 @@ export const WATER = Object.freeze({
   growTime: 25,                    // game s for the sea to follow a change of wind
   turnTime: 40,                    // game s for the wave direction to follow the wind
   // the four trains: length as a multiple of the peak wavelength, share of the amplitude,
-  // direction offset from the wind (rad). The fourth is swell: long, low, from somewhere else.
+  // direction offset from the wind (rad). The first two are the peak of the spectrum, split
+  // into two trains a little apart in length and heading: their beat makes crests of finite
+  // length (a short-crested sea), where one train alone would draw ruled lines to the horizon.
   trains: 4,
-  lengths: [1, 0.62, 1.55, 3.4], shares: [0.5, 0.3, 0.24, 0.16], spread: [0, 0.42, -0.35, 0.9],
+  lengths: [1, 0.87, 0.62, 1.55], shares: [0.4, 0.37, 0.29, 0.26], spread: [-0.11, 0.15, 0.46, -0.36],
   // Waves come in sets. Each train's height swells and fades in groups about `groupWaves`
   // wavelengths long that travel at the group velocity (half the phase speed in deep water),
   // along a line turned `groupTurn` from the train's own, so that sets are patches, not
