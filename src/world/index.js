@@ -17,7 +17,7 @@ import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
-import { defaultBodyUniforms, makeWashMaterial } from '../render/materials.js';
+import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(), _east = new THREE.Vector3(), _north = new THREE.Vector3();
@@ -121,7 +121,7 @@ export function createWorld(scene) {
   }
   // PHYSICS' draw kits (rain, snow, dust, rings, prints) with the painter's materials. They are
   // built when PHYSICS is handed over and brought up to date just before each frame is painted.
-  let kits = null, kitsWanted = true;
+  let kits = null, kitsWanted = true, kitsP = null;
   // Fresh snow. PHYSICS' `snow` also counts the standing cover of cold places (it is 1 on the
   // alpine meadow in fair weather); that cover is already in each biome's painting (snow
   // peaks, frost fields). What the weather adds is what has fallen lately: it gathers while
@@ -140,7 +140,7 @@ export function createWorld(scene) {
   function buildKits() {
     if (!physics || !kitsWanted || kits) return;
     const P = physics;
-    import('../physics/three/index.js').then((K) => {
+    kitsP = import('../physics/three/index.js').then((K) => {
       if (physics !== P || kits) return;
       // the painter's draw table: PHYSICS' set for this pipeline (marks no smaller than three
       // internal pixels survive the brush), rain a little broader and longer: a few strokes
@@ -224,6 +224,7 @@ export function createWorld(scene) {
   const skyEase = { on: false, body: null, v: {} };
   function update(dt, cameraPos, activeBodyId) {
     frameNo++;
+    if (warm && ++warmFrames > 30) dropWarm();      // (the prewarm's compile has long been made)
     const nowW = performance.now();
     const washStep = dt > 0 ? Math.min(dt, 0.1) : washWall ? Math.min(0.1, Math.max(0.02, (nowW - washWall) / 1000)) : 0;
     washNow += washStep;
@@ -566,6 +567,41 @@ export function createWorld(scene) {
     }
   }
 
+  // The prewarm (PILOT's P3, docs/lead/HARDENING.md A2): everything the game may draw later is made now
+  // and put where a compile of the scene finds it, so that no shader is built mid-game (on ANGLE-D3D11 each
+  // build stalls a frame for 0.1 to 1 s): every far world's dab, every world's flora washes (materials and
+  // kits only: no cell is built), PHYSICS' draw kits. What has no object in the scene yet is given a tiny
+  // one in an invisible group (never drawn, so never seen), which leaves the scene some frames later; the
+  // materials stay, and with them their programs. Call it, then compile the scene (see the painter's prewarm).
+  let warm = null, warmFrames = 0, warmNear = null;
+  function dropWarm() {
+    if (!warm) return;
+    scene.remove(warm);
+    for (const o of warm.children.slice()) { warm.remove(o); if (o.userData.pcWarm && o.dispose) o.dispose(); }
+    warm.userData.geo.dispose();
+    warm = null;
+  }
+  async function prewarm() {
+    if (kitsP) { try { await kitsP; } catch { /* the kits say why */ } }
+    for (const st of state.values()) if (!st.dab) st.dab = makeDab(st);
+    dropWarm();
+    warm = new THREE.Group(); warm.name = 'pc-warm'; warm.visible = false; warmFrames = 0;
+    // (a program follows the material's defines and sides, the kind of object, and which attributes the geometry
+    // has: each wash is put on a geometry it is drawn on. The terrain and the water of every world are in the
+    // scene from the start, and so are the sky, the glaze, the rings and the cloud decks)
+    const geo = warm.userData.geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+    const add = (m, g, inst) => { const o = inst ? new THREE.InstancedMesh(g, m, 1) : new THREE.Mesh(g, m); if (inst) o.count = 0; o.frustumCulled = false; o.userData.pcWarm = true; warm.add(o); };
+    for (const st of state.values()) if (st.flora) for (const [m, g] of st.flora.warmSet()) add(m, g, true);
+    // the near ground's strokes (one program for every world; their geometry has positions only): made here only
+    // if no world has drawn them yet
+    if (![...state.values()].some((st) => st.near)) add(warmNear || (warmNear = makeNearMaterial(state.get('earth').bu)), geo, false);
+    // the kits that have not been drawn yet are in no group (each joins the world it is drawn on)
+    if (kits) for (const o of kits.objects) if (!o.parent) warm.add(o);
+    scene.add(warm);
+    return true;
+  }
+
   function busy() {
     let n = 0;
     // (the ground easing into a finer look counts on the world one stands on: a frame taken at 0 shows nothing half arrived)
@@ -584,6 +620,9 @@ export function createWorld(scene) {
     setVistaFound(bodyId, vistaId, found) { const st = state.get(bodyId); if (st) { if (found) st.found.add(vistaId); else st.found.delete(vistaId); } },
     // additive
     get busy() { return busy(); },
+    // (PILOT's P3) make everything the game may draw later and put it where a compile of the scene finds it;
+    // then compile the scene (painter.prewarm(scene, camera) does it as the scene pass draws). Resolves true.
+    prewarm,
     // { fixed: true } pins the slice (no larger share of slow frames): for checking the 5 ms budget in software GL
     setBuildBudget(ms, opts) { budgetMs = Math.max(0.5, +ms || 5); fixedSlice = !!(opts && opts.fixed); },
     getLighting() { return lighting; },

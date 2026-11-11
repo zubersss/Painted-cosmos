@@ -93,6 +93,19 @@ export class Flora {
     };
   }
 
+  // Every wash this world's flora can be drawn with, each with a kit geometry it is drawn on (kits and
+  // materials made if they were not; no cell is built), for the prewarm (world.prewarm, PILOT's P3): a
+  // program follows the attributes a geometry has as well as the material (three r187 keys it on a normal,
+  // for one). A biome's own undergrowth washes differ from the body's only in their uniforms, so they share
+  // its programs and are not listed.
+  warmSet() {
+    if (!this.ready) this._init();
+    const K = this.kit, M = this.mats, out = this.species.map((s) => [s.mat, s.geo1]);
+    if (M.far) out.push([M.far, K.far]);
+    out.push([M.under, K.grass], [M.patch, K.patch], [M.bush, K.bush], [M.rock, K.rock], [M.shard, K.shard]);
+    return out;
+  }
+
   // The undergrowth washes: the body's, or a biome's own where it names them (looks: biome.under).
   _underMats(U, tag) {
     const bodyUniforms = this.bodyUniforms, sh = U.shard || U.rock;

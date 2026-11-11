@@ -120,7 +120,7 @@ void main() {
     vec3 dv = nrm - sd;
     float de = dot(dv, east) * 0.55, dn = dot(dv, north);
     float r = length(vec2(de, dn)) / uSpot.w;
-    spiral = sin(atan(dn, de) * 2.0 + r * 8.0 + (c2 - 0.5) * 3.5);
+    spiral = sin(atan(dn, abs(de) + abs(dn) > 0.0 ? de : 1.0) * 2.0 + r * 8.0 + (c2 - 0.5) * 3.5);
     storm = (1.0 - smoothstep(0.72, 1.0, r + (c2 - 0.5) * 0.22)) * step(0.0, dot(nrm, sd));
   }
   float th = 1.0 - uCloud.x;
@@ -128,7 +128,7 @@ void main() {
   // scattered cloud thins away toward the limb and is not drawn beyond the world's own edge: the globe keeps
   // one soft outline (cloud standing out past the limb was a ragged hard fringe against space)
   float ndv = clamp(dot(nV, normalize(-vView)), 0.0, 1.0);
-  float edge = (1.0 - uCloud.w) * smoothstep(uLimbCos + 0.30, uLimbCos + 0.04, ndv);
+  float edge = (1.0 - uCloud.w) * (1.0 - smoothstep(uLimbCos + 0.04, uLimbCos + 0.30, ndv));
   if (max(v, storm * uCloud.x) < th + edge * 0.6) discard;
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5 + (c2 - 0.5) * 0.25;

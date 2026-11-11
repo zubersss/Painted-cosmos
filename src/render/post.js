@@ -374,6 +374,15 @@ export class Post {
     }
   }
 
+  // The brush's passes that are not drawn every frame laid once into a 2 x 2 sheet (PILOT's P3), so that
+  // none is first built mid-game: the four-sector brush is otherwise first drawn at the lowest tier, when
+  // the machine is already struggling. (The prep, keep and backdrop passes run from the first frame.)
+  warm() {
+    const t = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.UnsignedByteType });
+    for (const m of [this.mAbs[4], this.mAbs[8], this.mSheet]) this._pass(m, t);
+    t.dispose();
+  }
+
   dispose() {
     this.rtScene.dispose(); this.rtHalf.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose();
   }

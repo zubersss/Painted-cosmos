@@ -406,7 +406,7 @@ void main() {
   vec4 r5 = texture(uNoise3D, vBody / 47.0 + drift * 0.2);
   own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));
   own = mix(own, own * uGlaze, vLiqP.y * (1.0 - smoothstep(0.30, 0.52, r5.g)) * 0.6);
-  own = mix(own, own * uGlaze, vLiqP.y * smoothstep(0.1, -0.9, hN) * 0.5);      // the hollows of a rolling cloud sea
+  own = mix(own, own * uGlaze, vLiqP.y * (1.0 - smoothstep(-0.9, 0.1, hN)) * 0.5);      // the hollows of a rolling cloud sea
   // rain stipples the surface: it mirrors less and takes the sky's value
   mirror *= (1.0 - 0.45 * uWx.w) * (1.0 - 0.6 * rough);
   c = mix(own, pcDensity(c * mix(vec3(1.0), vLiq.rgb, 0.35), 1.12 + (r3.g - 0.5) * 0.35 - hN * 0.40), mirror);
@@ -1289,7 +1289,7 @@ void main() {
     // (seen close it must not be a disc: the outline is lobed by the hairs of the brush, each touch its own way,
     // and toward the edge the brush has run dry and the paper shows in flecks)
     vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
-    float qa = atan(q.y, q.x), qs = vS.z * 6.283, qr = dot(q, q);
+    float qa = atan(q.y, abs(q.x) + abs(q.y) > 0.0 ? q.x : 1.0), qs = vS.z * 6.283, qr = dot(q, q);
     float lim = 0.64 + 0.17 * sin(qa * 3.0 + qs) + 0.11 * sin(qa * 5.0 - qs * 1.7) + 0.08 * sin(qa * 8.0 + qs * 2.3) + 0.24 * n2.g;
     if (qr > lim) discard;
     if (qr > lim * 0.40 && texture(uNoise3D, vec3(q * 2.1, vS.z * 7.0)).r > 0.86 - 0.34 * (qr / lim)) discard;

@@ -155,7 +155,7 @@ void main() {
       } else {
         // the heads and the bank under them: lit tops, the sides and hollows in a soft glaze
         float under = clamp(1.0 - above / max(head, 1e-4), 0.0, 1.0);
-        hollow = smoothstep(0.22, 0.85, under + (h2.r - 0.5) * 0.5) * (0.55 + 0.45 * h2.b) * (1.0 - 0.5 * smoothstep(0.0, -0.10, above));
+        hollow = smoothstep(0.22, 0.85, under + (h2.r - 0.5) * 0.5) * (0.55 + 0.45 * h2.b) * (1.0 - 0.5 * (1.0 - smoothstep(-0.10, 0.0, above)));
       }
       vec3 deckc = mix(vec3(1.0, 0.995, 0.97), mix(uCloudShade, vec3(0.80, 0.76, 0.88), 0.35), hollow * 0.62);
       sky = mix(sky, deckc, deck * uSeaC.y * (1.0 - oc * 0.6) * (1.0 - uAtmo.x));
@@ -333,7 +333,8 @@ void main() {
     float c = clamp(dot(d, f), -1.0, 1.0);
     float rho = sqrt(max(1.0 - c, 0.0) / max(1.0 + c, 1e-4));    // tan(theta / 2): 0 ahead, 1 abeam
     float lr = log(max(rho, 1e-4));
-    float phi = atan(dot(d, v), dot(d, u)) / 6.2831853 + 0.5;     // 0..1 round the way ahead
+    float dvv = dot(d, v), duu = dot(d, u);
+    float phi = atan(dvv, abs(duu) + abs(dvv) > 0.0 ? duu : 1.0) / 6.2831853 + 0.5;     // 0..1 round the way ahead
     // (the hand is not a ruler: each drag wanders a little as it runs out)
     vec4 wn = texture(uNoise3D, d * 2.3 + 0.21);
     phi += (wn.r - 0.5) * 0.005 + (wn.g - 0.5) * 0.002;

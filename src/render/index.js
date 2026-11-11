@@ -44,6 +44,11 @@ export function createPainter(renderer) {
 
   renderer.autoClear = false;
   renderer.setPixelRatio(1);
+  // One program for a material wherever it is drawn. The paint's shaders write the sheet as it is (none
+  // converts a colour space; the canvas still shows sRGB), so the canvas is told it takes linear values,
+  // as the painter's own targets do: a compile of the scene made outside the scene pass (PILOT's prewarm)
+  // then builds the programs the scene pass draws with, not a second set keyed to the canvas.
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
   function applySize() {
     const t = TIERS[quality];
@@ -143,6 +148,24 @@ export function createPainter(renderer) {
     setTime(seconds) { G.uTime.value = seconds; },
     getTime() { return G.uTime.value; },
     setDebugView(n) { post.debugView = n | 0; },
+    // PILOT's P3 (docs/lead/HARDENING.md A2), behind the loading card, after world.prewarm(): with a scene
+    // and camera it compiles the scene as the scene pass draws it (into the pass's own target; the glazes
+    // are laid into a target too, so one compile covers them); with or without, it lays each of the brush's
+    // passes once. Resolves when the programs are ready (at once where the browser cannot say).
+    prewarm(scene, camera) {
+      const prev = renderer.getRenderTarget();
+      let p = null;
+      if (scene && camera) {
+        // (without KHR_parallel_shader_compile three's compileAsync only warns and waits: the plain compile is the same work)
+        const par = renderer.extensions && renderer.extensions.has('KHR_parallel_shader_compile');
+        renderer.setRenderTarget(post.rtScene);
+        try { p = par && renderer.compileAsync ? renderer.compileAsync(scene, camera) : renderer.compile(scene, camera); } catch (e) { console.warn('prewarm: ' + e.message); }
+        renderer.setRenderTarget(prev);
+      }
+      post.warm();
+      renderer.setRenderTarget(prev);
+      return Promise.resolve(p).then(() => true, () => true);
+    },
     setLook(o) {
       if (!o) return;
       const u = post.sheetUniforms, a = post.absUniforms;

@@ -7,18 +7,36 @@
 //               (integer part = class: 0 sky, 1 ground, 2 water, 3 solid prop, 4 foliage,
 //                5 character / ship / foreign; fraction = a per-object hash)
 
+// Depth. Where the browser has EXT_clip_control three keeps a reversed float depth and none of this is
+// compiled. Where it has not (Firefox, docs/lead/HARDENING.md A1), three falls back to a logarithmic depth
+// written per fragment (gl_FragDepth), which turns off early and hierarchical Z for every scene shader
+// (about 2.9 times the fragments shaded at the Earth spawn). Here the same log depth is written per vertex
+// instead (gl_Position.z): exact at the vertices and linear across the screen in between, which on these
+// worlds' triangles (the terrain's LOD keeps a cell under 1/40 of its distance) is off by well under a
+// centimetre a metre. A material whose large triangles near the eye poke through others opts back into
+// the fragment write with the define PC_FRAG_LOGDEPTH (and a late renderOrder: one depth-writing shader
+// can turn hierarchical Z off for the rest of the pass on some GPUs).
 export const VERT_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_vertex>
+#ifdef USE_LOGARITHMIC_DEPTH_BUFFER
+  uniform float logDepthBufFC;
+#endif
 `;
 
 export const VERT_END = /* glsl */`
 #include <logdepthbuf_vertex>
+#if defined(USE_LOGARITHMIC_DEPTH_BUFFER) && !defined(PC_FRAG_LOGDEPTH)
+  if (isPerspectiveMatrix(projectionMatrix)) gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w)) * logDepthBufFC - 1.0) * gl_Position.w;
+#endif
 `;
 
 export const FRAG_PARS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_fragment>
+#if defined(USE_LOGARITHMIC_DEPTH_BUFFER) && !defined(PC_FRAG_LOGDEPTH)
+  #undef USE_LOGARITHMIC_DEPTH_BUFFER
+#endif
 uniform highp sampler3D uNoise3D;
 uniform sampler2D uStrokeTex;
 uniform vec3 uSunDirW;

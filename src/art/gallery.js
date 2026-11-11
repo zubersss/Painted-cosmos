@@ -307,8 +307,9 @@ const MP = {
   pose: P.get('pose') || 'idle', speed: P.has('speed') ? num('speed', 0) : null, phase: P.has('phase') ? num('phase', 0) : null,
   jet: num('jet', 1), lift: num('lift', 0), face: num('mface', 0), epitch: num('epitch', 0),
   smode: P.get('smode') || (num('hover', 0) > 0 ? 'hover' : 'landed'), gear: P.has('gear') ? num('gear', 1) : null, canopy: num('canopy', 0),
-  throttle: P.has('throttle') ? num('throttle', 0) : null, sface: num('sface', -70),
+  throttle: P.has('throttle') ? num('throttle', 0) : null, sface: num('sface', -70), dist: num('mdist', 5),
 };
+window.__pcModel = MP;     // (a tool may turn the explorer, .face, or move it, .dist, between frames: several views from one load)
 const _mx = new THREE.Matrix4(), _fx = new THREE.Vector3(), _zx = new THREE.Vector3(), _xx = new THREE.Vector3();
 function placeModel(m, east, north, lift, face) {
   const R = BODIES[bodyId].radius;
@@ -349,7 +350,7 @@ function gaitPose(dt) {
   return { mode: 'walk', speed: GAIT.v, feet, ride: bob, stride: GAIT.s, gait: o.gait, footDown: (feet[0].down ? 1 : 0) | (feet[1].down ? 2 : 0), surge: 0, crouch01: 0 };
 }
 function placeExplorer(side, dt) {
-  placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * side, Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * side, MP.lift, MP.face);
+  placeModel(explorer, Math.sin(state.yaw) * MP.dist + Math.cos(state.yaw) * side, Math.cos(state.yaw) * MP.dist - Math.sin(state.yaw) * side, MP.lift, MP.face);
   if (dt != null && GAIT) explorer.animate({ ...gaitPose(frozenT != null ? 0 : dt), lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
   else if (dt != null) explorer.animate({ mode: MP.pose, speed: MP.speed == null ? undefined : MP.speed, phase: MP.phase == null ? undefined : MP.phase, jet01: MP.pose === 'jet' ? MP.jet : 0, lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
 }
