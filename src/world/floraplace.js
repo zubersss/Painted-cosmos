@@ -76,7 +76,9 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       let kind = -1, scale = 1, sink = 0.03;
       if (bi.terrain !== 'forest') {
         // other biomes: a table of densities per kind
-        if (!bi.small || inWater || r3 >= s.under) continue;
+        if (!bi.small || inWater) continue;
+        const fq = R / 21;
+        if (r3 >= s.under * (0.10 + 0.90 * smoothstep(-0.22, 0.24, S.nC.n3(_d[0] * fq + 2.0, _d[1] * fq - 5.0, _d[2] * fq + 9.0)))) continue;
         let acc = 0;
         for (let q = 0; q < SMALL.length; q++) {
           const dn = bi.small[SMALL[q][0]];

@@ -111,7 +111,8 @@ function aimAlongStream() {
   let best = null, bestD = 1e9;
   for (let a = 0; a < 64; a++) {
     const ang = (a / 64) * Math.PI * 2;
-    for (let r = 2; r < 60; r += 1.5) {
+    for (let r = 2; r < 460; r += (r < 60 ? 1.5 : 4)) {
+      if (r > bestD) break;
       const p = base.clone().multiplyScalar(R).addScaledVector(_e, Math.sin(ang) * r).addScaledVector(_n, Math.cos(ang) * r).normalize();
       if (world.sampleSurface(bodyId, p).isLiquid) { if (r < bestD) { bestD = r; best = { ang, r }; } break; }
     }
@@ -136,29 +137,39 @@ function aimAlongStream() {
   state.yaw = byaw + 0.10; state.pitch = -0.07;
 }
 
-// Stand somewhere low, dry and gentle near the spot and look toward the highest ground in
-// sight: a painter's choice of where to set the easel.
+// Where a painter would set the easel: gentle, dry, open ground a little above most of what
+// is around, facing the direction with the most relief (and any liquid) in it.
 function aimVista(eye) {
   const R = BODIES[bodyId].radius;
   const base = state.pos.clone().normalize();
   frame(base);
   const e0 = _e.clone(), n0 = _n.clone();
-  const pt = (ang, r) => base.clone().multiplyScalar(R).addScaledVector(e0, Math.sin(ang) * r).addScaledVector(n0, Math.cos(ang) * r).normalize();
-  let best = null, bestC = 1e9, hi = null, hiH = -1e9;
-  for (let a = 0; a < 20; a++) for (let r = 0; r <= 320; r += 40) {
-    const p = pt(a / 20 * Math.PI * 2, r), s = world.sampleSurface(bodyId, p);
-    if (s.radius > hiH) { hiH = s.radius; hi = { a: a / 20 * Math.PI * 2, r }; }
-    if (s.isLiquid) continue;
-    const c = (s.radius - R) * 0.02 + s.slope * 30 + r * 0.004 + (s.canopyHeight > 0 ? 3 : 0);
-    if (c < bestC) { bestC = c; best = { p, s }; }
+  const pt = (o, ang, r) => o.clone().multiplyScalar(R).addScaledVector(e0, Math.sin(ang) * r).addScaledVector(n0, Math.cos(ang) * r).normalize();
+  const top = (q) => Math.max(q.radius, q.liquidRadius || 0);
+  const c = [];
+  for (let a = 0; a < 20; a++) for (let r = 0; r <= 360; r += 40) { const p = pt(base, a / 20 * 6.283, r); c.push({ p, s: world.sampleSurface(bodyId, p) }); }
+  const hs = c.map((x) => top(x.s)).sort((x, y) => x - y);
+  const want = (hs[Math.floor(hs.length * 0.6)] + hs[Math.floor(hs.length * 0.9)]) / 2;
+  let best = null, bc = 1e9;
+  for (const x of c) {
+    if (x.s.isLiquid || x.s.slope > 0.35) continue;
+    const cost = Math.abs(x.s.radius - want) * 0.05 + x.s.slope * 8 + (x.s.canopyHeight > 0 ? 4 : 0);
+    if (cost < bc) { bc = cost; best = x; }
   }
   if (!best) return;
   state.pos.copy(best.p).multiplyScalar(best.s.radius + eye);
-  frame(best.p);
-  // yaw toward the highest point (in the new local frame)
-  const target = pt(hi.a, Math.max(hi.r, 60)).multiplyScalar(hiH).sub(state.pos);
-  state.yaw = Math.atan2(target.dot(_e), target.dot(_n)) + 0.25;
-  state.pitch = 0.02;
+  let by = 0, bs = -1e9;
+  for (let a = 0; a < 24; a++) {
+    const ang = a / 24 * 6.283;
+    let lo = 1e9, hi = -1e9, liq = 0;
+    for (const r of [25, 50, 90, 150, 240, 360, 520]) {
+      const q = world.sampleSurface(bodyId, pt(best.p, ang, r)), el = (top(q) - (best.s.radius + eye)) / r;
+      if (el < lo) lo = el; if (el > hi) hi = el; if (q.isLiquid) liq++;
+    }
+    const sc = (hi - lo) + Math.min(liq, 3) * 0.06 - Math.max(0, hi - 0.45) * 0.9;   // relief, water, but not nose to a wall
+    if (sc > bs) { bs = sc; by = ang; }
+  }
+  state.yaw = by; state.pitch = 0.03;
 }
 
 function applyTime() { world.setTime(bodyId, state.time); $('time').value = state.time; $('timev').textContent = state.time; }

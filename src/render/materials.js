@@ -118,8 +118,8 @@ void main() {
   c = pcDensity(c, d);
 
   // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks
-  float crack = (1.0 - smoothstep(0.03, 0.11, st.a)) * near + (1.0 - smoothstep(0.02, 0.08, pcTri(vAnch, nL, 1.0 / 32.0).a)) * mid;
-  c = pcDensity(c, 1.0 + crack * vPar.w * 2.6);
+  float crack = (1.0 - smoothstep(0.02, 0.09, st.a + (n2.b - 0.5) * 0.05)) * near + (1.0 - smoothstep(0.015, 0.07, pcTri(vAnch, nL, 1.0 / 32.0).a)) * mid;
+  c = pcDensity(c, 1.0 + crack * vPar.w * 2.2);
 
   // light in soft value steps; shadows are glazes
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
@@ -543,12 +543,16 @@ void main() {
   } else {
     // ---- rock: pale granulating wash, paper on top, pooled dark at the base
     vec4 st = pcTri(vBody, normalize(vObj + 0.001), 1.0 / 3.0);
+    // the silhouette is nibbled and the tones wander: a wash, not a faceted solid
+    vec4 nr = texture(uNoise3D, vBody / 2.3 + 0.3);
+    float rimR = 1.0 - abs(dot(nV, V));
+    if (rimR > 0.90 - 0.36 * smoothstep(0.42, 0.74, nr.r)) discard;
     c = mix(barkA, barkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
-    c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9);
+    c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5);
     x = dot(nV, sunV) * 0.5 + 0.5;
     x *= mix(0.45, 1.0, pcDapple(vBody, canopy));
-    x += (n1.g - 0.5) * 0.18 + (st.b - 0.5) * 0.1;
-    float lvl = pcLevel(x, 0.04);
+    x += (n1.g - 0.5) * 0.22 + (nr.g - 0.5) * 0.26 + (st.b - 0.5) * 0.1;
+    float lvl = pcLevel(x, 0.12);
     c = pcTone(c, lvl);
     float dryM = smoothstep(0.50, 0.62, st.r * 0.8 + st.g * 0.3);
     c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));

@@ -22,8 +22,8 @@ export const RENDERER_OPTIONS = {
 // Internal resolution per quality tier (multiplied by setRenderScale), and Kuwahara sectors.
 const TIERS = [
   { scale: 0.62, sectors: 4, graphite: 0.0 },
-  { scale: 0.80, sectors: 8, graphite: 0.55 },
-  { scale: 1.00, sectors: 8, graphite: 0.55 },
+  { scale: 0.80, sectors: 8, graphite: 0.40 },
+  { scale: 1.00, sectors: 8, graphite: 0.40 },
 ];
 
 const GRADES = [   // hour, sheet grade (used only when no world has published one)

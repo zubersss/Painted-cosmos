@@ -201,6 +201,13 @@ export class PlanetTerrain {
     this.visible.length = 0;
     for (const r of this.roots) this._select(r);
     for (const n of this.visible) { n.mesh.visible = true; if (n.water) n.water.visible = true; }
+    if (!this.detail && (this.queue.length || this.job)) {
+      // not the body the camera is on: nothing is wanted beyond the six root patches
+      for (const n of this.queue) n.queued = false;
+      this.queue.length = 0;
+      if (this.jobNode) this.jobNode.queued = false;
+      this.job = null; this.jobNode = null;
+    }
     if ((this.queue.length || this.job) && budgetMs > 0) {
       // drop requests that are no longer wanted, then build coarse and near first
       const q = this.queue;

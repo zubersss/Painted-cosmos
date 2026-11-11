@@ -314,7 +314,7 @@ export function crystalGeometry(seed, lod, thin) {
     const off = i === 0 ? 0 : (thin ? 0.4 : 0.6) + rnd() * 0.5;
     const bx = Math.cos(a) * off, bz = Math.sin(a) * off, dx = Math.cos(a) * Math.sin(tilt), dz = Math.sin(a) * Math.sin(tilt), dy = Math.cos(tilt);
     const pts = [V(bx, -0.2, bz), V(bx + dx * H * 0.72, dy * H * 0.72, bz + dz * H * 0.72), V(bx + dx * H, dy * H, bz + dz * H)];
-    tube(B, pts, [r0, r0 * 0.82, 0.02], lod ? 4 : 5, { part: 4, shade: 0.25 + 0.5 * rnd(), sway0: 0, hash: rnd() });
+    tube(B, pts, [r0, r0 * 0.82, 0.02], lod ? 5 : 8, { part: 4, shade: 0.25 + 0.5 * rnd(), sway0: 0, hash: rnd() });
   }
   return B.build();
 }

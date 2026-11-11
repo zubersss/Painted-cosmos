@@ -333,7 +333,12 @@ export class Flora {
     const alt = camLocal.length() - this.R;
     const show = active && alt < 2500;
     this.group.visible = show && !this.hidden;
-    if (!show) return;
+    if (!show) {
+      // nothing to build for a body the camera is not on
+      if (this.queue.length) { for (const ch of this.queue) ch.queued = false; this.queue.length = 0; }
+      this.lastTreeEval.set(1e9, 0, 0); this.lastUnderEval.set(1e9, 0, 0);
+      return;
+    }
     if (!this.ready) this._init();
     const k = this.rangeScale;
     const t0 = performance.now();
