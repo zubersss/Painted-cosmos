@@ -158,9 +158,14 @@ async function boot() {
       const f = () => { n = worldSettled(world, game.frameCount) ? n + 1 : 0; if (n >= frames) resolve(true); else requestAnimationFrame(f); };
       f();
     }),
+    // A test drives the clock itself (tests/motion.mjs): hold() stops the frame loop, step(dt, n)
+    // then runs n frames of exactly dt seconds each, whatever the machine's pace.
+    hold: (on = true) => { held = !!on; },
+    step: (dt = 1 / 30, n = 1) => { for (let i = 0; i < n; i++) game.frame(dt); return game.frameCount; },
     fps: 0,
     errors: [],
   };
+  let held = false;
   window.__pc = debug;
   window.addEventListener('error', (e) => debug.errors.push(String(e.message)));
 
@@ -172,7 +177,7 @@ async function boot() {
     requestAnimationFrame(tick);
     const dtMs = now - last;
     last = now;
-    if (dtMs <= 0) return;
+    if (dtMs <= 0 || held) return;
     game.frame(dtMs / 1000);
     // The controller judges frames only once the first view is on the paper (loading and the
     // first settle are not the machine's pace), and not the first second after that.

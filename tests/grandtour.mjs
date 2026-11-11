@@ -17,6 +17,12 @@
 //                               this run uses) and fly on to the worlds after it in the list
 //          [--minutes 180]      wall-clock limit for the whole run
 //          [--w 400 --h 225] [--query "scale=0.5&quality=0"]
+//          [--beats 1]          the first ten minutes as a new player sees them: a frame with
+//                               the HUD at every beat (<out>/beat-NN-<name>.jpg), what the
+//                               screen said at each, and the camera through every change of
+//                               state (how far it turned and moved in one frame: a cut shows
+//                               as a jump), all in <out>/beats.json. Use with
+//                               --bodies mars --query "quality=2" --w 960 --h 540
 // Writes <out>/grandtour.json after every leg (a resumed run adds to it) and one frame per
 // world, <out>/grandtour-<body>.jpg (with --keep also docs/shots/pilot/grandtour-<body>.jpg).
 import fs from 'node:fs';
@@ -41,6 +47,23 @@ const saveRecord = () => fs.writeFileSync(recFile, JSON.stringify(record, null, 
 const run = await startRun(opt);
 const { page, check, info, shot, look, gameWait, until, holdPitch, aimShipAt, log } = run;
 const summary = { legs: [], timings: {}, said: [] };
+// --beats: frames and words at every beat, and the camera at every frame (see the header).
+const beats = [];
+async function beat(name) {
+  if (!opt.beats) return;
+  const w0 = Date.now();
+  const n = String(beats.length + 1).padStart(2, '0');
+  let file = null;
+  try { file = path.basename(await shot(`beat-${n}-${name}`)); } catch { /* a frame that would not come is a finding too */ }
+  const i = await info();
+  beats.push({ n: beats.length + 1, name, file, t: +i.t.toFixed(1), wall: Math.round((Date.now() - wall0) / 1000), shotSeconds: Math.round((Date.now() - w0) / 100) / 10, state: i.state, view: i.view, prompt: i.prompt, notice: i.notice, uiNotice: i.uiNotice || null, quality: i.quality, scale: i.scale, fps: i.fps });
+  log(`  beat ${n} ${name}: ${i.state}, prompt "${i.prompt || ''}", notice "${i.notice || ''}"`);
+}
+const saveBeats = async () => {
+  if (!opt.beats) return;
+  const cam = await page.evaluate(() => (window.__rec ? window.__rec.report() : null));
+  fs.writeFileSync(path.join(opt.out, 'beats.json'), JSON.stringify({ beats, camera: cam }, null, 1));
+};
 const alt = (x) => (x.ship.altitude == null ? 1e9 : x.ship.altitude);
 const wrap = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const dist3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -60,6 +83,7 @@ function heard(leg, i) { if (i && i.notice && !leg.said.includes(i.notice)) { le
 async function chooseOnMap(id) {
   await page.keyboard.press('KeyM');
   await gameWait(0.3);
+  await beat('map');
   const spot = await page.evaluate((b) => {
     const m = window.__pc.map, s = m.spots().find((x) => x.id === b), r = m.canvas.getBoundingClientRect();
     return { open: m.open, x: r.left + (s.x / 680) * r.width, y: r.top + (s.y / 400) * r.height };
@@ -113,11 +137,13 @@ async function pulseTo(to, from, leg) {
       const mark = (i.marks || []).find((m) => m.kind === 'target');
       check(!!mark && Math.abs(mark.x - run.cx) < run.W * 0.12 && Math.abs(mark.y - run.cy) < run.H * 0.2, 'the target marker is on screen near the nose: ' + JSON.stringify(mark));
       leg.prompt = i.prompt;
+      await beat('aimed');
     }
     await page.keyboard.press('KeyF');
     await gameWait(0.4);
     i = await info();
     heard(leg, i);
+    if (i.state === 'PULSE' && !leg.beatPulse) { leg.beatPulse = 1; await beat('pulse-begins'); }
     if (i.state !== 'PULSE') {
       // Refused, and the screen says why. "Too close to X: turn away from it first".
       leg.refused.push(i.notice || 'nothing said');
@@ -135,7 +161,10 @@ async function pulseTo(to, from, leg) {
       continue;
     }
     const t0 = i.t;
-    i = await until((x) => x.state === 'SPACE', 900, (x) => { leg.vMax = Math.max(leg.vMax, Math.round(x.ship.speed)); heard(leg, x); });
+    i = await until((x) => x.state === 'SPACE', 900, async (x) => {
+      leg.vMax = Math.max(leg.vMax, Math.round(x.ship.speed)); heard(leg, x);
+      if (leg.beatPulse === 1 && x.t - t0 > 4) { leg.beatPulse = 2; await beat('pulse'); }
+    });
     heard(leg, i);
     leg.pulseSeconds = +((leg.pulseSeconds || 0) + (i.t - t0)).toFixed(1);
     if (i.state !== 'SPACE') { leg.problem = 'the pulse never let go'; return null; }
@@ -165,7 +194,9 @@ async function board(leg) {
   });
   await page.keyboard.up('KeyW');
   if (!i.canBoard) { leg.problem = `could not walk back to the ship (${i.shipDistance.toFixed(1)} m away)`; return i; }
+  await beat('at-the-ship');
   await page.keyboard.press('KeyE');
+  if (opt.beats) { await gameWait(0.5); await beat('climbing-in'); }
   return until((x) => x.state === 'LANDED', 8);
 }
 
@@ -178,15 +209,23 @@ async function flyLeg(to, n) {
   // ---- to the ship, up, out -------------------------------------------------------------------
   i = await board(leg);
   if (!check(i.state === 'LANDED', 'in the ship on ' + from)) return fail('never got into the ship');
+  await beat('in-the-ship');
   await page.keyboard.press('Space');
+  if (opt.beats) { await gameWait(0.8); await beat('lifting-off'); }
   i = await until((x) => x.state === 'ATMOSPHERE' && !x.ship.liftoff, 12);
   if (!check(i.state === 'ATMOSPHERE', 'lifted off from ' + from)) return fail('the ship did not lift off: ' + (i.notice || i.state));
+  await beat('airborne');
   await page.keyboard.down('KeyW');
   await gameWait(1.9);
   await page.keyboard.up('KeyW');
-  i = await until((x) => x.state === 'SPACE', 400, async (x) => { heard(leg, x); await holdPitch(50)(x); });
+  i = await until((x) => x.state === 'SPACE', 400, async (x) => {
+    heard(leg, x); await holdPitch(50)(x);
+    if (opt.beats && !leg.beatClimb && alt(x) > 250) { leg.beatClimb = 1; await beat('climbing'); }
+    if (opt.beats && leg.beatClimb === 1 && alt(x) > x.ship.spaceAlt * 0.75) { leg.beatClimb = 2; await beat('edge-of-the-air'); }
+  });
   if (!check(i.state === 'SPACE', 'reached space above ' + from)) return fail('never reached space: ' + (i.notice || i.state));
   leg.spaceAt = +(i.t - leg.t0).toFixed(0);
+  await beat('space');
   i = await until((x) => alt(x) > x.ship.spaceAlt * 3, 200, holdPitch(50));
   // ---- choose, aim, pulse ---------------------------------------------------------------------
   const target = await chooseOnMap(to);
@@ -194,6 +233,7 @@ async function flyLeg(to, n) {
   leg.km = Math.round(target.distance / 1000);
   i = await pulseTo(to, from, leg);
   if (!check(!!i, `arrived at ${to}` + (i ? `: ${leg.arrivedKm} km away after ${leg.pulseSeconds} s of pulse, ${leg.vMax} m/s at most` + (leg.refused.length || leg.barred.length ? `; refused ${leg.refused.length}, barred ${leg.barred.length}` : '') : ''))) return fail('no arrival');
+  await beat('arrived');
   await gameWait(8);
   i = await info();
   // (A small world's ground frame reaches up to where the drive lets go: either frame is the world's own.)
@@ -205,7 +245,9 @@ async function flyLeg(to, n) {
   await page.keyboard.up('KeyW');
   i = await until((x) => x.state === 'ATMOSPHERE', 400, async (x) => { heard(leg, x); await holdPitch(-58)(x); });
   if (!check(i.state === 'ATMOSPHERE', 'entered the atmosphere of ' + to)) return fail('never entered the atmosphere: ' + i.state + ' at ' + Math.round(alt(i)) + ' m');
+  await beat('into-the-air');
   i = await until((x) => x.ship.altGround < 170, 400, async (x) => { heard(leg, x); await holdPitch(-32)(x); });
+  await beat('low-over-the-land');
   await page.keyboard.down('KeyS');
   i = await until((x) => x.ship.throttle < 0.3, 8, holdPitch(-10));
   await page.keyboard.up('KeyS');
@@ -217,12 +259,14 @@ async function flyLeg(to, n) {
   };
   i = await until((x) => x.ship.canLand, 300, approach);
   if (!check(i.ship.canLand, 'landing prompt over ' + to)) return fail(`no landing prompt: ${Math.round(i.ship.altGround)} m up at ${Math.round(i.ship.speed)} m/s` + (i.notice ? `, "${i.notice}"` : ''));
+  await beat('landing-prompt');
   // Press E on the prompt, as a player does. If the ground says no ("Too steep to land here"),
   // fly on a little and ask again.
   for (leg.landTries = 1; leg.landTries <= 14; leg.landTries++) {
     await page.keyboard.press('KeyE');
     i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED', 2.5);
     heard(leg, i);
+    if (i.state === 'LANDING') await beat('landing');
     if (i.state === 'LANDING' || i.state === 'LANDED') break;
     log('  (E did not start a landing: ' + (i.notice || 'no prompt at that moment') + '; flying on)');
     await page.keyboard.down('KeyW'); await run.sleep(260); await page.keyboard.up('KeyW');
@@ -233,10 +277,12 @@ async function flyLeg(to, n) {
   if (!check(i.state === 'LANDED', `landed on ${to}` + (leg.landTries > 1 ? ` (asked ${leg.landTries} times)` : ''))) return fail('the landing never completed: ' + i.state + (i.ship.landing ? ' in phase ' + i.ship.landing : '') + (i.notice ? `, "${i.notice}"` : ''));
   leg.bounces = i.ship.bounces;
   await gameWait(1);
+  await beat('landed');
   // ---- out, and a few metres on foot ---------------------------------------------------------------
   await page.keyboard.press('KeyE');
   i = await until((x) => x.state === 'ON_FOOT', 8);
   if (!check(i.state === 'ON_FOOT', 'stepped out on ' + to)) return fail('could not step out: ' + i.state);
+  await beat('stepped-out');
   const p0 = i.explorer.p;
   await page.keyboard.down('KeyW');
   await gameWait(3);
@@ -254,6 +300,8 @@ async function flyLeg(to, n) {
   if (i.shipBearingDeg != null) await look((i.shipBearingDeg * RAD) / MOUSE_FOOT, 0);
   await gameWait(0.5);
   await shot('grandtour-' + to, 'grandtour-' + to);
+  await beat('on-' + to);
+  await saveBeats();
   leg.gameSeconds = +(i.t - leg.t0).toFixed(0);
   leg.wallSeconds = Math.round((Date.now() - leg.wall0) / 1000);
   delete leg.wall0;
@@ -262,6 +310,47 @@ async function flyLeg(to, n) {
   return leg;
 }
 
+// The camera at every frame (only with --beats): how far it turned, how far it moved against
+// what it follows, and the field of view, so that a cut at a change of state shows as a jump.
+if (opt.beats) await page.evaluate(() => {
+  const pc = window.__pc, g = pc.game, sim = pc.sim, rows = [];
+  const orig = g.frame.bind(g);
+  let last = null;
+  g.frame = (dt) => {
+    orig(dt);
+    const q = pc.camera.quaternion, st = sim.sm.state, onFoot = st === 'ON_FOOT';
+    const sub = onFoot ? sim.ex.p : sim.sh.p, cp = sim.camPose && sim.camPose.p, fr = sim.camFrame ? `${sim.camFrame.kind}:${sim.camFrame.id || ''}:${sim.camFrame.rotating ? 1 : 0}` : '';
+    const sameFrame = onFoot || !sim.camFrame || (sim.camFrame.kind === sim.shFrame.kind && sim.camFrame.id === sim.shFrame.id && sim.camFrame.rotating === sim.shFrame.rotating);
+    const boom = cp && sameFrame ? Math.hypot(cp.x - sub.x, cp.y - sub.y, cp.z - sub.z) : null;
+    const now = { t: sim.t, dt, st, view: sim.viewKind, fr, q: [q.x, q.y, q.z, q.w], boom, fov: pc.camera.fov };
+    if (last) {
+      const d = Math.abs(last.q[0] * q.x + last.q[1] * q.y + last.q[2] * q.z + last.q[3] * q.w);
+      now.turn = (2 * Math.acos(Math.min(1, d)) * 180) / Math.PI;
+      now.dBoom = boom != null && last.boom != null && last.fr === fr ? boom - last.boom : null;
+      now.dFov = pc.camera.fov - last.fov;
+      now.change = last.st !== st ? `${last.st} -> ${st}` : last.view !== now.view ? `${last.view} -> ${now.view}` : null;
+    }
+    rows.push(now); last = now;
+    if (rows.length > 40000) rows.splice(0, 10000);
+  };
+  window.__rec = {
+    rows,
+    // Every change of state or view, with the largest turn and move of the camera in one
+    // frame within three frames either side, and the usual turn in the ten frames before.
+    report() {
+      const out = [];
+      for (let i = 1; i < rows.length; i++) {
+        if (!rows[i].change) continue;
+        const a = Math.max(1, i - 3), b = Math.min(rows.length - 1, i + 3);
+        let turn = 0, boom = 0, fov = 0, dt = 0;
+        for (let k = a; k <= b; k++) { if (rows[k].turn > turn) { turn = rows[k].turn; dt = rows[k].dt; } if (rows[k].dBoom != null) boom = Math.max(boom, Math.abs(rows[k].dBoom)); fov = Math.max(fov, Math.abs(rows[k].dFov || 0)); }
+        const before = rows.slice(Math.max(1, i - 13), a).map((r) => r.turn || 0).sort((x, y) => x - y);
+        out.push({ t: +rows[i].t.toFixed(2), change: rows[i].change, turnDeg: +turn.toFixed(1), frameSeconds: +dt.toFixed(3), boomMetres: +boom.toFixed(2), fovDeg: +fov.toFixed(1), usualTurnDeg: before.length ? +before[Math.floor(before.length / 2)].toFixed(1) : 0 });
+      }
+      return out;
+    },
+  };
+});
 let reloads = 0;
 page.on('framenavigated', (f) => { if (f === page.mainFrame()) reloads++; });
 try {
@@ -279,14 +368,18 @@ try {
     const card = await page.evaluate(() => window.__pc.game.hud.startShown);
     check(card, 'the title card is up');
     await page.waitForFunction(() => window.__pc.game.canStart !== false, null, { timeout: 600000, polling: 300 });
+    await beat('title');
     await page.mouse.click(run.cx, run.cy);
+    if (opt.beats) { await gameWait(0.15); await beat('the-card-lifts'); }
     await gameWait(0.6);
+    await beat('first-view');
     check(!(await page.evaluate(() => window.__pc.game.hud.startShown)), 'a click on the title starts the game');
     i = await info();
     check(i.state === 'ON_FOOT' && i.body === 'earth', `on foot on Earth (${i.mood.biomeId})`);
     const p0 = i.explorer.p;
     await page.keyboard.down('KeyW');
     await gameWait(3);
+    await beat('walking');
     await page.keyboard.up('KeyW');
     i = await info();
     check(dist3(i.explorer.p, p0) >= 4, `W walks: ${dist3(i.explorer.p, p0).toFixed(1)} m in 3 s`);
@@ -294,6 +387,7 @@ try {
     let top = 0;
     await page.keyboard.down('Space');
     await until(() => false, 1.6, (x) => { top = Math.max(top, x.explorer.altitude); });
+    await beat('jetpack');
     await page.keyboard.up('Space');
     i = await until((x) => { top = Math.max(top, x.explorer.altitude); return x.explorer.grounded; }, 20);
     check(top > 1.5 && i.explorer.fuel < fuel0 + 1e-6, `Space is the jetpack: ${top.toFixed(1)} m up, back on the ground`);
@@ -319,6 +413,7 @@ try {
   run.fails.push('exception: ' + (e && e.stack ? e.stack : e));
   try { await shot('zz-failure'); } catch { /* ignore */ }
 }
+try { await saveBeats(); } catch { /* the page may be gone */ }
 clearTimeout(watchdog);
 record.runs.push({ at: new Date().toISOString(), from: opt.from || 'title', done: summary.legs.filter((l) => l.landed).map((l) => l.to), stoppedAt: (summary.legs.find((l) => !l.landed) || {}).to || null, problem: (summary.legs.find((l) => !l.landed) || {}).problem || null });
 saveRecord();
