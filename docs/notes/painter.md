@@ -6,32 +6,208 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
-- **Where things stand**: M2's third pass is committed; every biome has its landform, an
-  easel (the gallery view) and a stand (where the game arrives). What is weak is listed under
-  "Weakest" below. M3 has not been started.
-- **How to work here**: the machine is shared and slow (a 960x540 gallery frame takes 45 s
-  to several minutes). Do not design landforms in the browser. Use a software preview: scan
-  the surface function from Node (`getSurface(body).sample(x, y, z, o, true)` costs under a
-  microsecond) and draw a small heightfield picture; `findVantage(body, biome, { search: true,
-  top: 6 })` returns several candidate views to choose from by eye. My scratch tools did this
-  (`/home/user/.pc-scratch/painter/pv.mjs` one preview, `pvs.mjs` a planet, `ez.mjs` candidate
-  sheet, `mp.mjs` top-down map, `cost.mjs` frame cost, `arrive.mjs` build timing, `cmp.mjs`
-  image difference, `ev3.sh` all evidence frames, `dump.mjs` rewrites `easels.js`); they are
-  outside the repository and may be gone: each is under 100 lines to rewrite.
-- **Rules that bit me**: scratch output must use absolute paths (a relative path lands in
-  the repository); never change the easel search once frames are approved without re-rendering
-  (that is why the easels are stored); run PILOT's tour from a clean export
-  (`tools/export-head.sh dir`, then `cd dir && node tests/tour.mjs --bodies mars --root dir
-  --out /home/user/.pc-scratch/painter/tour`) so its sheets do not land in PILOT's folder.
-- **Next (M3, in the coordinator's order)**: 1. weather in the picture: sky, haze and sheet
-  read `setMood.sky` (`painter.setMood` stores it; nothing reads it yet), then ground washes
-  take `wet` and `snow`, then PHYSICS' wave chunk in the liquid material, then its kits with my
-  materials (`makeKitMaterial` in its notes uses `makePaintUniforms` and the chunks); 2. real
-  explorer and ship models; 3. motion and water, day-night pass, space washes; 4. repaint of
-  the weakest biome of each planet (my list is under "Weakest"). The painted UI theme is
-  PILOT's now (coordinator's ruling); I review its frames.
+Written by the third PAINTER agent at the end of M3 block 1 (weather in the picture), commit
+`9d9caf1`. The second agent's M2 record follows under "M2 status".
 
-## Status
+- **Where things stand**: M2 is done (table below). **M3 block 1 is in**: the sky, the haze,
+  the light, the sheet, the ground and the flora read PHYSICS' sky numbers; the liquid takes
+  PHYSICS' wave chunk; PHYSICS' kits are drawn with my materials; near grass is visible and
+  takes the push field. What each looks like, the numbers and what is weak: "M3 block 1" below.
+- **How the weather reaches the picture** (all in my files):
+  `src/render/shared.js` holds `WX` (the sky in force: `world.setWeather` forced, else
+  `physics.here.sky`, else `setMood.sky`), the body uniform `uWx` (overcast, wet, snow, veil),
+  `PHYSW` (PHYSICS' sea uniforms) and `FRAME_HOOKS` (run at the start of `painter.render`).
+  `src/world/index.js` `update` turns the numbers into light keys, haze, fog distance, storm
+  pigment, cloud cover, fresh snow and the kits' inks. `src/world/sky.js` paints the heavy
+  wash, cloud masses and veils. `src/render/chunks.js` has `pcLevel` and `pcDapple` under an
+  overcast, `pcWetWash`, `pcSnowCover`. `src/render/materials.js`: terrain, props, water.
+  `src/render/kitmat.js`: materials, shapes and inks for the kits. `src/render/post.js`: the
+  storm key, lightning, region 6 (crisp) and 7 (air).
+- **How to work here**: the machine is shared and slow (a 960x540 gallery frame takes 45 s to
+  two minutes; run two at a time, never four). My scratch tools are in
+  `/home/user/.pc-scratch/painter/m3/` (outside the repository, may be gone; each is under 40
+  lines): `s.sh "<query>" out.jpg [w h]` (a gallery frame into that folder), `join.py` (contact
+  sheet), `diff.py a b [box]` (mean difference and share of changed pixels), `ev.mjs "<query>"
+  "<js>"` (evaluate in the gallery; `ROOT=<export>` for a clean export), `sky.mjs` and
+  `skye.mjs` (PHYSICS' sky numbers over time at a stand or at an easel, in Node: use them to
+  find when it storms where), `sea.mjs`, `game.mjs <export> out.jpg <simT>` (the integrated
+  game with its clock set into the storm), `final.sh` (the evidence and crawl batch).
+  The second agent's tools (`pv.mjs`, `cost.mjs`, `cmp.mjs` ...) are one folder up.
+- **Rules that bit me**: (1) the tree is shared: a dynamic import of `src/physics` fails when
+  PHYSICS is mid-save and the frame then shows no physics at all without an error (two of my
+  frames were judged wrong because of it). The gallery now reloads and waits for physics and
+  the kits before `__pcReady`. (2) `renderer.info` must be read with `autoReset = false` over
+  a whole frame, or it reports the last full-screen pass (1 triangle). (3) Measure cost before
+  and after every flora change: my first grass patch put the home forest at 623 k. (4) A mark
+  lighter than what is round it gets a dark pooled rim from the sheet pass: airborne marks
+  must sit close to the value behind them. (5) Scratch output with absolute paths; the tour
+  only from a clean export with `--out` (second agent's rule, still true).
+- **Next, in the coordinator's order**: finish what is weak in this block (list under "M3
+  block 1": rain in the game's view, a real sward, lightning never seen, branches, drifts,
+  PHYSICS' debug flag), then the real explorer and ship models, motion and day-night, space
+  washes, a repaint of the weakest biome of each planet ("Weakest" in the M2 record).
+
+## M3 block 1: weather in the picture (third PAINTER agent)
+
+INTEGRATION: ready (`9d9caf1`; render, world and art usable on all ten bodies; the game on a
+clean export of that commit loads and plays into the storm with no console error).
+
+### What is in, the frame that shows it, my verdict
+Frames in `docs/shots/painter/`, 960x540, quality 1, gallery. "physics" = PHYSICS' own
+weather at that place and time (`physics=1&wtime=..&pre=6`); "forced" = sky numbers set by
+hand (`wx=`). I opened every frame named here at full size unless I say otherwise.
+
+| what | frame | how made | verdict |
+| --- | --- | --- | --- |
+| Earth spawn before the storm | `wx-earth-before.jpg` | physics, t 540 | fair day, sun and cast shade, a few dark grass strokes in the foreground (opened on a contact sheet at two thirds size) |
+| Earth spawn in the thunderstorm | `wx-earth-storm.jpg` | physics, t 720 | passes: indigo sky with a torn pale gap, far trees lost in a pale band, no cast shadows, darker richer ground with two small puddles, slanted rain strokes. The committed frame has the longer, thinner strokes and was opened at 640x360 only; the one before it at full size |
+| after the storm | `wx-earth-after.jpg` | physics, t 870 | sun back, ground a little richer (wet 0.4); quiet, as it should be (contact sheet) |
+| blizzard on a snowy biome | `wx-earth-blizzard.jpg` | physics, alpine meadow easel, t 400, `fresh=1` | passes: closed grey sky, the massif going into the white, fresh snow as bare paper with rocks capped, pines as dark dabs, paper flecks in the air. Weak: the foreground is empty paper; the grass tufts left standing are too green |
+| dust storm on Mars | `wx-mars-dust.jpg` | physics, dust dunes easel, t 840 | passes as a picture of dust: the whole sheet in the dunes' own ochre, far dunes dissolved, dust masses in the sky, a glow at the horizon. Weak: the near billows (kits) are soft blotches, more sponge than drift |
+| storm on a giant | `wx-jupiter-storm.jpg` | physics, storm wall easel, t 120 | passes: a sepia storm sky (not grey), the wall ghostly, wet red plain, rain. The strokes are many and all alike |
+| Neptune's sea in a gale | `wx-neptune-gale.jpg` | PHYSICS' waves (wind 34 m/s, Hs 1.0 m, 10.6 m waves) under a forced storm sky | partly: heavy indigo sky with veils, the sea in broken dark strokes, a pale foam patch, swash at the shore. Few white horses: at this distance the 10 m waves are smaller than the brush and are dropped; the far sea carries only anchored dabs. Under PHYSICS' own sky there (fair, "windy") it is a choppy blue sea |
+| grass parting round the explorer | `wx-grass-part.jpg` (left push off, right on) | physics, alpine meadow, explorer walked in | partly: the clump at the explorer's feet leans away (0.93 % of the frame's pixels change by more than 12 of 255); nothing reads as a sward parting |
+| grass under the ship's wash | `wx-grass-wash.jpg` (left no wash, right 90 kN at 3 m) | physics | yes: the near clumps lie over, away from the hull (2.3 % of the pixels of the grass band change by more than 12) |
+| the game itself | not committed (scratch `game-storm.jpg`, opened) | clean export of `02486d3`, `index.html`, clock set to t 700, third person | storm sky, wet ground, rain, kits 5 draw calls and 3.3 k triangles, state ON_FOOT, no console error. In that view from above the rain strokes read as short pale petals; made longer and thinner since (`9d9caf1`), **not re-checked in the game** |
+
+How each part works, briefly:
+- **Sky**: under an overcast the zenith and horizon keys become one heavy wash of that
+  world's storm pigment (its cloud shadow laid dense and glazed with indigo: Payne's grey on
+  the cool worlds, sepia on the warm ones, because orange mixed with indigo is mud), dense
+  overhead, paler toward the horizon. Clouds stop being bare paper and become masses of the
+  same wash with dark bellies and pale torn edges. Rain or snow in the air drags soft slanted
+  veils through the low sky (anchored to the planet). Where rain or snow falls the sky is
+  closed whatever `cloud` says. Dust tints zenith, horizon, haze and light with the mid ground
+  wash of the biomes under the camera and raises dust masses.
+- **Haze**: the fog distance is multiplied by `haze / 0.8` (PHYSICS' fair weather is 0.7 to
+  0.95: I treat 0.8 and up as my clear day); the haze colour goes to the pale band under the
+  cloud, to grey water (`fog`) or to the ground's dust.
+- **Light**: overcast flattens the light to two soft steps (local colour and one glaze),
+  switches off cast dapple, cools the light; a storm deepens the glaze.
+- **Sheet**: a storm adds pigment to every wash (the density model: paper stays the brightest
+  value); granulation is damped under that key; `flash` lifts the sky and the lights to bare
+  paper and leaves the darks as silhouettes (same frame).
+- **Ground and flora**: `wet` darkens and enriches (`pcWetWash`), softens edges, and leaves a
+  few small pale puddles on level ground near the eye; snow lies as bare paper on up-facing
+  forms with a ragged edge, thinner under trees, on crown tops and rocks; four fifths of
+  the grass and flowers are buried.
+- **Liquid**: the mesh is lifted by PHYSICS' wave trains and wakes within about 2 to 6
+  wavelengths of the eye (where the mesh is fine enough), dying at the waterline. In the
+  fragment: PHYSICS' height and slope give the normal; crest lines (high water where the
+  slope along the waves' way turns over) are torn bare-paper dashes; whitecaps torn dabs on
+  the crest fronts; surf on breaking crests in the shallows and a swash line at the shore;
+  detail smaller than a pixel is dropped (so far water cannot shimmer) and replaced by the
+  same share of white as anchored dabs; a running sea mirrors less and is laid in broken
+  strokes of unequal weight.
+- **Kits** (`src/render/kitmat.js`): rain a broad wet stroke in the sky's own wash, nothing
+  nearer than 3.2 m; snow a ragged paper fleck; dust a soft patch close to the haze's value;
+  prints the ground's wash laid darker; rings broken circles on region 6. Sixteen inks a
+  biome by PHYSICS' material names, blended by biome weight under the camera.
+- **Grass**: each near grass tuft (the seed-below-0.55 half, within 15 m) is now a patch of
+  12 broad blades about 1.6 m across; each blade carries its root in `aMass.xz` and is bent
+  about it by `pcPhysBend` at that root.
+
+### Numbers
+- **Cost with weather on** (gallery, whole frame, `renderer.info` over one frame):
+  Earth spawn in the thunderstorm (`cam=trees`) quality 1: 551 k triangles, 301 draw calls
+  (the same view before this block: 539 k, 296); quality 0: 246 k, 179 (before: 241 k, 174).
+  The densest view known (temperate forest easel, quality 1): 580 k, 317 (was 571 k, 315).
+  Kits in the storm: 5 draw calls, 3.3 to 3.4 k triangles, 0.2 to 0.3 ms a frame for
+  `kits.update` in the browser (one reading of 8.9 ms with four browsers running at once).
+  Budgets 600 k / 350 at quality 1 and 300 k at quality 0: inside. Quality 2 not re-measured.
+  The sky, haze, light and sheet changes add no draw call and no pass; the water fragment
+  adds PHYSICS' four wave trains (16 sin or cos) and three noise lookups; the water vertex
+  the same plus the 16-step wake loop. **Not measured on a real GPU.**
+- **Crawl** (frame pairs at 960x540, mean difference on 0 to 255 and share of pixels changing
+  by more than 12): storm sky, veils and wet ground one frame (1/30 s) apart, kits off: 0.32
+  and 0.04 %. The gale sea one frame apart: 1.81 and 2.3 % inside the sea band (0.02 % by
+  more than 30): it moves, nothing pops. The sea with the camera turned 0.15 degrees: 1.39 and
+  0.87 %. The snow-covered meadow under the same turn: 1.25 and 1.32 %, less than the same
+  meadow in fair weather (1.59 and 1.79 %): the snow edge adds no crawl. Two renders of the
+  same frame with physics on are identical outside what was pushed (0.02). **Not measured**:
+  crawl of rain, flakes, dust and rings in motion (PHYSICS measured its marks; I did not
+  measure them through my post pass), and nothing was judged in motion by eye.
+
+### Not done, not verified, weak (blunt)
+- **Lightning** is implemented (`flash`) and has never been seen: no frame caught a flash.
+- **Rain in the game's view** was re-shaped after the only game frame I took; not re-checked.
+  Rain strokes are opaque (the scene pass cannot glaze): they are pale sticks against dark
+  trees. The glaze target promised to PHYSICS (its gap 3) is still not built.
+- **Grass is not a sward**: tufts stand 1.5 to 3 m apart, so there are a few clumps of broad
+  strokes near the eye. The patch stands on the planet's up, not on the slope (blades hover
+  or sink on steep ground). On the alpine meadow the blades are pale. A meadow of grass
+  needs its own dense near layer (a camera-centred grid of strokes, about 3 a square metre
+  within 12 m: about 20 k triangles, one draw call).
+- **Snow**: I draw only fresh snow (see contract changes). The edge is ragged, the cover has
+  no drifts (PHYSICS' section F, `physics.fields.drift`, is not read).
+- **Not wired from PHYSICS' P6**: branches (`pcPhysBranch`, one line and two uniforms),
+  drifts, the instanced kit variant (`expand: 'gpu'`), half-float linear flora fields, and the
+  debug flag that writes the displaced position (asked for; not built).
+- **Puddles** are two or three pale shapes; they do not mirror anything.
+- The tour was not run in this block; landings and the trip were not re-run (terrain did not
+  change; spawns and stands did not move).
+- Venus, Saturn, Uranus, Mercury, the Moon and Pluto were not looked at under weather.
+- The ragged border goes dark and dotted under the storm key.
+
+### Contract changes in this block (all additive)
+- `world.setPhysics(physics, opts?)` now also builds PHYSICS' draw kits (dynamic import of
+  `src/physics/three/index.js`) and draws them under the active body's root; `{ kits: false }`
+  turns that off. **PILOT: do not create kits yourself.** `world.kits` is the kit object
+  (`stats.drawCalls`, `stats.triangles`) or null.
+- `world.setWeather(sky | null)`: force the eleven sky numbers (gallery, tests).
+  `world.freshSnow`, `world.setFreshSnow(x)`.
+- `painter.setMood({ sky })` is read: `flash` in the same frame; the rest only if PHYSICS was
+  not handed to the world. With `world.setPhysics` the world reads `physics.here.sky` itself.
+- **Snow, my reading of the contract (look is my call)**: PHYSICS' `snow` is 1.0 on the
+  alpine meadow in fair weather, 0.74 on Mars' polar frost, 0.96 on Neptune's tundra, 0.54 on
+  Uranus' shelves: the standing cover of a cold place. Drawn as given, the alpine meadow the
+  brief names would be white for ever. The standing cover is already in each biome's painting;
+  the picture adds **fresh** snow only: it gathers while `snowfall` is above 0.02 (full after
+  about 25 s of a blizzard), is gone five minutes after, and never exceeds `snow`.
+- Regions: 6 = small crisp marks (the abstraction pass keeps 92 % of the drawing), 7 = in the
+  air (no graphite line). `FRAG_PARS` declares `uniform vec4 uWx` and gains `pcWetWash`,
+  `pcSnowCover`; `makePaintUniforms` supplies `uWx`. Kits built on the old factory still work.
+- `src/render/index.js` consumers: nothing removed. New file `src/render/kitmat.js`
+  (`makeKitMaterial(kind, info, { shapeGlsl })`, `biomeInks`, `KIT_INK`, `KIT_PALETTE`).
+- Gallery: `wx=`, `sky=`, `physics=1&wtime=&pre=`, `fresh=1`, `kits=0`, `models=1&walk=&mdist=
+  &sdist=&hover=&wash=`, `push=0` (see "Gallery URL parameters").
+
+### For PHYSICS: what looks wrong in the physics as painted (frame by frame)
+- `wx-earth-storm.jpg`, `wx-jupiter-storm.jpg` (rain): near drops are drawn in perspective,
+  so strokes left and right of the view axis lean opposite ways and cross; a painter lays rain
+  in parallel strokes. Ask: one screen direction for all strokes of a frame (the mean), or
+  nothing nearer than 4 m (I discard nearer than 3.2 m myself). On Jupiter drops fall so fast
+  that at any exposure worth a stroke they are several metres long: an upper bound on stroke
+  length in metres would help (I use 120 ms on every world). With the 4 px floor about 40
+  strokes are in the frame: a third of that would be "a few".
+- `wx-earth-blizzard.jpg` (snow): the first try (size 0.1 m, ceiling 10 px) gave round discs
+  the size of popcorn; I use 0.07 m, floor 3.5 px, ceiling 6.5 px and a ragged cut. Flakes
+  are fine in number. **At the easel the blizzard has `cloud` 0.46 and `overcast` 0.43 with
+  `snowfall` 0.81**: a blizzard under a half-blue sky; I close the sky wherever rain or snow
+  falls, but the numbers should agree.
+- `wx-mars-dust.jpg` (dust): the billows come as about twenty separate round patches of 40 to
+  80 px; drawn in the ground's ink they are blotches. Fewer and larger (two or three low
+  walls of dust, wider than high, hugging the ground) would be a drift.
+- Rings: on region 6 they survive and are few (two or three in a storm frame at 960x540);
+  more would not hurt. Not checked on water.
+- `wx-neptune-gale.jpg` (sea): `crest01` covers the whole top of a wave, which paints as a
+  white sheet from near by; I use the crest line instead (height high and the slope along the
+  wave direction near zero). `foam01` patches are several metres across; I tear them with
+  noise. The waves are 10 m long and 1 m high in a 34 m/s wind (fetch-limited): from the shore
+  they are smaller than the brush beyond 60 m, so the storm sea is mostly my far strokes. A
+  longer, higher swell train on the open side of `storm_seas` would be seen.
+- `snow`: see the contract note; a number for fresh cover alone would let me drop my own.
+- Grass (`wx-grass-part.jpg`): the push round a walking explorer is one clump wide; the
+  flattening under the wash is strong and reads. Bend in a breeze is not judged.
+- The standing `wet` 0.55 on Neptune's tundra darkens that biome permanently: fine by me.
+
+### For PILOT
+- `world.setPhysics(physics)` now draws the weather kits: nothing to wire. Pass `eye` to
+  `physics.update` as PHYSICS asks. `setMood.sky` stays useful for `flash`.
+- The read-out will show 5 more draw calls and about 3.4 k more triangles in a storm.
+- Lightning: I would like to see one. A debug way to force `flash` for a frame would do.
+
+## M2 status (second PAINTER agent; kept as written)
 
 INTEGRATION: ready (latest `[painter]` commit; render, world and art usable on all ten bodies).
 
@@ -333,7 +509,14 @@ import { createExplorer, createShip } from './src/art/models.js';
 - `view=1..5`: scene colour, wetness, normal + depth, regions, abstraction
 - `dx, dy, dz` (metres), `yaw`, `pitch` (degrees) nudge the camera; `scale`, `fov`, `models=1`,
   `physics=1`, `look=pooling:1,granulation:1,wobble:2.6,graphite:0.4,border:1,abstraction:1,bleed:0.8`
-- `window.__pcReady` once terrain and flora have settled and three frames are painted;
+- weather: `wx=fair|overcast|rain|storm|after|blizzard|snow|dust|fog` or `sky=cloud:0.9,..`
+  force the sky numbers; `physics=1&wtime=<s>&pre=<s>` runs PHYSICS at that time on its clock
+  after a pre-roll (the Earth spawn's thunderstorm is 640 to 800 s; `skye.mjs` finds others);
+  `fresh=1` fresh snow already lying; `kits=0` no rain, snow, dust or marks; `models=1` with
+  `walk=<m/s>` (the explorer walks in during the pre-roll), `mdist=`, `sdist=`, `hover=<m>`,
+  `wash=<newtons>` (the ship's downwash), `push=0` (nothing pushes the grass)
+- `window.__pcReady` once terrain and flora have settled and three frames are painted (and,
+  with `physics=1`, once PHYSICS and its kits are loaded);
   `window.__pcVantage` the easel in use.
 
 ## Decisions
