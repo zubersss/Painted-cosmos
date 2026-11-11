@@ -6,7 +6,8 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 
 INTEGRATION: ready (latest `[painter]` commit; render, world and art are all usable on all ten bodies)
 
-M1 is closed (lead review 2). **M2 (Painter's half) first pass is in**: every planet has 4+
+M1 is closed (lead review 2). **M2 (Painter's half): second pass done, see the table below; five
+biomes still do not show their named feature.** First pass summary: every planet has 4+
 distinct biomes with its own palette, sky, liquids and flora or rock kits, and an orbit view.
 It is a first pass: forms and palettes differ clearly from planet to planet, but most biomes
 have had one look each, not the critique-and-repaint rounds the forest had.
@@ -62,6 +63,80 @@ sinkholes and venus lava and acid frames do not show the liquid (the camera did 
 earth's alpine meadow is grey; desert bushes are forest green (undergrowth colours are per
 body, not per biome); moon and pluto are untouched placeholders; night and space granulation
 are softer but not finished; explorer and ship are still toys; no weather, no painted UI.
+
+## M2 second pass (after the coordinator's review of the first 41 frames)
+
+Code: landform recipes in `src/world/surface.js` (cell-based impact craters with rims, sharp
+dune crests, sea cliffs, table-topped islands with cliffs into the sea, a pool on every
+terrace, wider lava rivers, buttressed walls, smaller wetland pools, lower snow line), cracks
+drawn at cell borders (they were dots at cell centres), rock-like kits (crystals, spires,
+waves, boulders) shaded as washes with nibbled silhouettes and soft tone steps, graphite
+fainter and more broken (0.55 -> 0.40, solid-edge weight 0.7 -> 0.38), undergrowth scattered in
+clusters with bare stretches, Neptune kelp thinned and slimmed, build queues drain when a body
+stops being the active one (`world.busy` returns to 0: lead review 3), gallery vantage rules
+(`cam=vista`: low for walls and peaks, sea-facing for islands and coasts, never inside a
+thicket; `cam=stream` searches 460 m for liquid).
+
+All 41 frames were regenerated in place. Per biome: is the named feature in the frame?
+(yes / partly / no, judged by me at 960x540, two frames side by side per view)
+
+| frame | named feature | visible? |
+| --- | --- | --- |
+| mars-dry_riverbeds | sparse red-leaf groves | yes (no channel in frame) |
+| mars-rust_canyons | canyon walls | yes: walls both sides, spires |
+| mars-dust_dunes | dunes | partly: one dune flank and crest, no field of crests |
+| mars-polar_frost | frost fields | yes: frost polygons, ice shards |
+| saturn-gold_islands | sky-islands | **no**: a flat plateau top, the cloud sea is out of frame |
+| saturn-crystal_reeds | crystal reed fields | yes |
+| saturn-ring_shadow | twilight zone | partly: violet spires on grey ground; sky is not dimmed |
+| saturn-honey_mist | honey mist valley | yes |
+| mercury-ochre_basins | cracked ochre basins | yes: cracks read as polygons now |
+| mercury-obsidian_fields | obsidian glass | yes (frame before the last edge tweak was opened; the re-shot was not) |
+| mercury-crystal_gardens | crystal gardens | yes (same caveat) |
+| mercury-shadow_craters | craters | **no**: reads as a frosty slope with boulders |
+| venus-fungal_towers | fungal towers | yes |
+| venus-lava_rivers | lava river through basalt | yes: the strongest new frame |
+| venus-acid_terraces | acid lake, terraces | yes for the lake, terraces only as a far step |
+| venus-pale_mesas | mesas | partly: buttes in the distance |
+| jupiter-sky_islands | islands in a cloud sea | partly: island slope with the cloud sea below at one side |
+| jupiter-storm_wall | storm-wall cliffs | partly: a red wall and spires; no storm |
+| jupiter-hanging_gardens | hanging gardens | **no**: trees on a terrace; nothing hangs |
+| jupiter-lightning_plains | lightning plains | partly: spires and scorched shards on cracked ground; no lightning (weather is M3) |
+| uranus-ice_shelves | ice shelves | partly: cracked ice plain, one low shelf step |
+| uranus-frozen_waves | frozen waves | partly: crests read as ice boulders, not curling waves |
+| uranus-pearl_fog | pearl fog flats | yes |
+| uranus-teal_sinkholes | glowing teal sinkhole | yes: pool inside steep ice walls |
+| neptune-storm_seas | sea with basalt stacks | yes |
+| neptune-kelp_forests | kelp forest | yes: ribbons as strokes |
+| neptune-ice_spires | ice spires | **no**: the frame is almost all mist |
+| neptune-aurora_tundra | tundra | yes for tundra; no aurora (day frame) |
+| earth-autumn_woodland | autumn woodland | yes |
+| earth-misty_wetland | wetland pools | yes |
+| earth-sea_coast | sea cliffs | partly: headland and sea, one pale cliff in haze |
+| earth-alpine_meadow | meadow and snow peaks | partly: snow slope from below, no peak silhouette |
+| earth-desert_canyon | canyon | **no**: the camera faces a slope; broken frame |
+
+Not opened at full size after their last regeneration: the eight `*-orbit.jpg` frames except
+mars, saturn and earth; `mercury-obsidian_fields`, `mercury-crystal_gardens`.
+Numbers after the second pass: not re-probed (the table above is from the first pass; kelp
+and gardens are thinner now, craters and cliffs add no triangles). `world.update` 8.5 to 9.4 ms
+while building on mercury, mars and neptune (lead review 3): not addressed.
+
+## For PHYSICS: what a draw kit's material must do to fit my scene pass
+
+- One opaque pass into two targets, no blending (holes by `discard`). Fragment output 0:
+  `vec4(wash, wetness)`, wash = transmittance over paper (1 = bare paper), wetness 0..1 (how
+  much it bleeds). Output 1: `vec4(viewNormal.xy, log2(1.0 + viewDepth), regionId)`; region
+  classes: 0 sky, 1 ground, 2 liquid, 3 solid prop, 4 foliage, 5 characters; use 2.x for spray
+  and rain, 1.x for ground marks. Call `pcWrite(col, wet, nV, -viewPos.z, id)`.
+- Use my chunks from `src/render/chunks.js`: `VERT_PARS` / `VERT_END` (log depth) and
+  `FRAG_PARS` (uniforms, `pcDensity`, `pcLevel`, `pcTone`, `pcFogAmount`, `pcAtmos`, `pcWrite`).
+  `material.userData.pcPainted = true` or the painter swaps it for a stand-in.
+- Easiest contract: your kit gives me geometry, attribute names and a **vertex chunk** that
+  defines `vec3 pcKitPosition()` (body-local metres) and any varyings; my factory
+  `(kit) => ShaderMaterial` wraps it. I will write that factory when your first kit lands.
+- `makeWashMaterial({ color, wet, dry, scale, id, flat, vertexColors, side, map, unlit, points })`
+  already works for plain meshes, lines, points and sprites.
 
 ## Answers to lead review 1 (at `19f72ce`)
 
