@@ -4,6 +4,34 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
+**Seventh agent, 2026-11-11 (read this paragraph first; the fifth agent's handover below still
+holds for the code, the commands and the timings).** Review 6 is half done and paused for the
+owner's **art pass** (four agents by planet group, every world's look changing): run nothing
+of the look until the coordinator says the pass has landed. What stands: review 6's first
+half (the mechanics, the sixth agent's runs) and a partial top-tier tour (six bodies on
+PAINTER `b022507`, Venus and Saturn on `ad17d2c`) with findings for PAINTER, in
+`docs/lead/REVIEW.md`, "Review 6, the tour" (top). Mine this run (record in "Seventh agent"
+below): the explorer steps with PHYSICS' gait (`src/player/figure.js`), footsteps on its
+footfalls, the hull's yaw, a stroll on C, the jump's fold by gait; the sketch slip waits at an
+arrival and is smaller; **the stub guard** (every browser check fails when the real game
+falls back to a stub it did not ask for: `window.__pc.info().fallback`, `tests/browser.mjs`
+`fallbackProblem`), never yet run in a browser. **What is left, in order, once the coordinator
+says go**: (1) build a clean tree from each role's last own commit (`tests/cleantree.sh`), run
+`node tests/all.mjs` inside it (the first browser run of the guard: every step should print
+"every module the run asked for is the real one"); (2) the tour at the top tier, `--first 1`,
+body by body, all ten (my runner: `/home/user/.pc-scratch/pilot/run7/tours.sh`, which waits
+while `run7/pause` exists so a check can take the browser between bodies; about 20 minutes a
+body at a load of 13; the tour now waits 30 minutes for the game to load); then `--quality 1`
+for coverage of every biome and vista; judge against the art bible and compare with the
+partial table in REVIEW; (3) review 6's second half: `node tests/motion.mjs` (all eight
+scenes), `node tests/weather.mjs` (top tier), `node tests/boulderrun.mjs` on the Moon against
+the ruled measure (no boulder lifts the feet more than 0.3 m, never thrown up more than
+0.3 m without a jump), settle times from the tour's json; (4) PAINTER's stepping figure
+(reads `feet`, `ride`, `stride`) seen in the game once it is committed: my scratch
+`run7/gaitcheck.mjs <root> <out-prefix> [quality]` films stand, pace, stroll, run, jump.
+Open items of mine are unchanged from the fifth agent's list below (10 to 14 in REVIEW's
+"Before review 6"), plus: the slip's place at 1080p not yet seen in the painted game.
+
 Kept current by the fifth PILOT agent (2026-11-11, part 1 of its order: what nobody had
 checked, the motion instrument, the first ten minutes; three relays from the coordinator
 folded in). Everything below is true at the commit that contains this section.
@@ -171,6 +199,21 @@ top tier; mechanics runs may pin a low tier (say which).
    footstep hook took 1 to 2 footfalls in each third of a second of moving and none standing;
    no console error. In the air after a running jump PAINTER's snapshot figure lifts its arms
    straight out into a T (for PAINTER, REVIEW).
+4. **The tour at the top tier, partial** (REVIEW, "Review 6, the tour"): Mercury, Earth, the
+   Moon, Mars, Jupiter, Uranus on a clean tree of PAINTER `b022507`, PHYSICS `2e6ce74`, PILOT
+   `5a5b691`, about 20 minutes a body; stopped at the coordinator's word for the art pass.
+   Neptune's run timed out waiting for the game to load (10 minutes, under the art agents'
+   load): the tour now waits 30. I stopped the sixth agent's orphaned runner (`run6/tours.sh`,
+   pid 10058, still touring on `ad17d2c`) by pid when I started.
+5. **The stub guard** (the coordinator's request after the import cycle of `6d5c02a` made
+   every real module fall back while every Node test passed): `providers.js` lists each module
+   it tried and could not load, `main.js` adds PHYSICS if it fails to start, `info().fallback`
+   carries the list; `tests/browser.mjs` `fallbackProblem(page, query)` names it (a module
+   forced with `?stub=` is not a fall-back; an older game is judged by `using` and the query).
+   `startRun` checks it (m3check, trip, grandtour, lockcheck, boulderrun), so do playthrough,
+   tour, motion, weather and cost (the instruments stop at once). `tests/fallback.test.mjs` (a
+   stand-in page). Not run in a browser yet. `tools/shot.mjs` (the coordinator's) has no such
+   check.
 
 ## Fifth agent, part 1 (record, newest last)
 

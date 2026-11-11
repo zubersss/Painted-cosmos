@@ -23,7 +23,7 @@ is judged at the top tier from now on.
 
 ---
 
-## Review 6, the tour: the first view of every world at the top tier (2026-11-11, seventh PILOT agent; IN PROGRESS)
+## Review 6, the tour: the first view of the worlds at the top tier (2026-11-11, seventh PILOT agent; PARTIAL, stopped for the owner's art pass)
 
 Run by me on one clean tree: PAINTER `b022507` (block 7 part 1), PHYSICS `2e6ce74` (P13),
 PILOT `5a5b691` (built with `tests/cleantree.sh`; no "WIP snapshot"). `node tests/tour.mjs
@@ -34,7 +34,35 @@ to `docs/lead/evidence/tour-top-<body>.jpg`); every sheet named below was opened
 `world.busy` at 0 for ten frames in a row, in game frames and in seconds of this machine
 (software rendering at a load of 13 to 15: a frame takes 3 to 8 s).
 
-Body by body, as I open them:
+**Stopped part-way on the coordinator's word** (21:20): the owner has started an art pass
+over every planet and biome (four agents by planet group), so every body's look changes in
+the next hours and the tour and review 6's second half will be run again on the new
+pictures. Done at the top tier on the tree above: **Mercury, Earth, the Moon, Mars, Jupiter,
+Uranus** (each exit 0, every frame settled, no console error). Venus and Saturn are judged
+from the **sixth PILOT agent's** sheets (its run, PAINTER `ad17d2c`, before block 7; opened by
+me; `docs/lead/evidence/tour-top-<body>-ad17d2c.jpg`). **Not judged: Neptune** (its run timed
+out waiting for the game to load, 10 minutes, at a load of the art agents' renders; the wait
+is 30 minutes now) **and Pluto** (not started). The tier-1 coverage tour (every biome and
+vista of every body) was not run. None of these sheets is affected by the import cycle of
+`6d5c02a`..`1d036eb`: the tree is older, and every run printed `render, world, art,
+physics: real`.
+
+| body | spawn settled (frames / s) | first vista (frames / s) | orbit (frames / s) | triangles at the spawn (information) |
+| --- | --- | --- | --- | --- |
+| Mercury | 46 / 358 | 43 / 162 | 9 / 22 | 985 k, 499 calls |
+| Earth | 9 / 52 (built behind the title card) | 43 / 432 | 9 / 38 | 1445 k, 463 calls |
+| Moon | 38 / 185 | 28 / 103 | 24 / 63 | 666 k, 211 calls |
+| Mars | 41 / 309 | 46 / 162 | 9 / 13 | 847 k, 349 calls |
+| Jupiter | 52 / 406 | 51 / 219 | 9 / 14 | 593 k, 298 calls |
+| Uranus | 46 / 220 | 32 / 189 | 9 / 34 | 777 k, 235 calls |
+| Venus (`ad17d2c`, sixth agent) | 33 / 150 | 28 / 162 | 9 / 28 | 769 k, 302 calls |
+| Saturn (`ad17d2c`, sixth agent) | 34 / 227 | 22 / 67 | 9 / 15 | 780 k, 276 calls |
+
+Frames are game frames until `world.busy` stayed 0 for ten (the ten included); at 60 frames a
+second every arrival here would be whole within a second, and block 7 holds it as bare paper
+until then. Seconds are this machine's and say nothing about a real one.
+
+Body by body:
 
 - **Mercury.** Spawn (obsidian fields; settled in 46 frames, 358 s): a peach sky with a pale
   sun is a real wash, and the ship stands clear to the right of the figure. The ground does
@@ -93,6 +121,60 @@ Body by body, as I open them:
   and flat faces, and blue cones before it that read as snowy firs; the brief's "frozen-wave
   forests" do not show as waves. From orbit (9 frames): a pale mint disc with white blots;
   quiet, right in colour.
+- **Venus** (the sixth agent's run, PAINTER `ad17d2c`, before block 7). Spawn (33 frames):
+  says Venus at once, an amber haze, fungal towers on the skyline, a basalt spire and the
+  lava river beyond the ship; the towers and sky pass. The foreground does not: a flat dark
+  brown ground with pale lozenge boulders, muddy where the art bible wants a rich dark; the
+  river is a flat orange band with no light in it. Vista, Fungal Tower Forest (28 frames):
+  **among the best frames of the game**: striped trunks and caps receding in rows into the
+  amber haze (the rows are a little regular). From orbit: a mottled amber globe, Venus.
+- **Saturn** (the sixth agent's run, `ad17d2c`). Spawn (34 frames): the ring arc across the
+  sky over a gold meadow says Saturn in one look; the wash under the arc is muddy (the
+  coordinator saw it too) and the crowns' edges break into pixel specks as on Mars. Vista,
+  Pale Gold Sky-Islands (22 frames): a dark trunk fills the left edge of the frame, a wall in
+  front of the easel; beyond it mist and islands are good. From orbit: a gold banded disc
+  with the ring as two broad vertical bands at the left edge only.
+
+**The three weakest first views** (the spawn, where a player arrives): **1. Mercury** (it
+neither passes nor says Mercury), **2. the Moon** (it passes, but is a grey plain at night
+with nothing of Earth in it, the brief's one image for it), **3. Mars** (it says Mars, but
+its shrubs end in pixel specks and its boulders are plastic). Uranus is the dullest of the
+ones that pass. The strongest: Earth's spawn, Jupiter's sky, Venus's fungal forest, Mars's
+canyons, Mercury's ochre basins: four of the five strongest frames are vistas, not arrivals.
+
+**Findings for PAINTER** (for the art pass; in the order a player would notice them; each
+seen in the sheets named above; none is a MUST FIX while the pass is running)
+1. **Mercury's arrival** (AB 2, 4, 10): a uniform scatter of pale smooth lozenges and white
+   cones to the horizon, no rest for the eye, nothing dark or glassy. The brief's obsidian
+   glass fields want dense indigo-sepia glass with bare-paper glints; the first view of a
+   world should be its best picture, and the ochre basins vista already is one.
+2. **Boulders are smooth pale lozenges with crisp outlines** on four first views (Mercury,
+   Mars, Venus, the Moon's slabs with violet rims). They are the commonest non-painted shape
+   in the game: rock wants broken dry-brush edges and a darker, varied value (AB 3, dry brush).
+3. **The Moon's first view faces away from Earth** (brief: "Earth in the sky"). Turn the
+   arrival towards it, or put it where the first view looks. The horizon is a ruler line of
+   identical pale blobs (AB 4).
+4. **Earth's far birches stand as a picket fence**: one height, one spacing, white verticals
+   across the frame, on the spawn and as the subject of the stream vista. This is the game's
+   first view and its reference painting (AB 4, 10: no repetition, far things fewer, larger,
+   softer).
+5. **Foliage edges break into pixel specks** (Mars' shrubs, Saturn's crowns): an alpha cut
+   with noise reads as dithering, not as a brush (AB 3: dry brush leaves paper, not pixels).
+6. **Near flowers by Earth's stream are flat orange-red ellipses with hard rims** (block 6's
+   lobed edge does not reach them).
+7. **From orbit**: Mars does not read as Mars (pale peach, no rust, no markings, no cap);
+   Mercury is anonymous; no body shows a dark side; Saturn's ring shows only as two bands at
+   the frame's edge.
+8. Uranus: one value range from sky to ground (add a dark: AB 2's 3 to 4 value steps); the
+   "frozen-wave forests" read as snowy firs; the shelf's top edge is ruler-straight. Jupiter's
+   island cliffs are flat planes with square tops. Saturn's vista has a trunk at the lens.
+9. The explorer reads as a smooth shaded doll among painted things (Earth), and PAINTER's
+   snapshot figure (`6b900e6`) lifts its arms straight out into a T in the air after a jump
+   (`docs/shots/pilot/gait-p13.jpg`, last row; it is not committed work).
+
+**GOOD (keep)**: every frame settled with no console error; Earth's spawn still passes as the
+reference painting; the vistas named above are watercolours; Jupiter's belts, Saturn's arc
+and Venus's towers each say their world in one look.
 
 ---
 

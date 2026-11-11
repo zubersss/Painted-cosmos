@@ -90,7 +90,7 @@ function planPlaces(b) {
 }
 
 try {
-  await page.waitForFunction('window.__pcReady === true', null, { timeout: 600000, polling: 300 });
+  await page.waitForFunction('window.__pcReady === true', null, { timeout: 1800000, polling: 300 });   // 30 min: a loaded machine took over 10 (neptune, review 6)
   { const fb = await fallbackProblem(page, query); if (fb) throw new Error('FALLBACK: ' + fb + ' (this would be a picture of the mock-up, not the game)'); }
   const using = await page.evaluate(() => window.__pc.info().using);
   log('ready', JSON.stringify(using), label);
