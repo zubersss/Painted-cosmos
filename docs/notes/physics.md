@@ -1125,6 +1125,14 @@ lines there (`draw.rain = ...`, `draw.snow = ...`) are now exactly my defaults a
   Venus. The lead's R-WX-1 allows 8 % (15 % on the ice giants): Earth and Jupiter are half a
   point over it at their worst moment; both are the edge of a weather cell passing, older than
   this stage, and not fixed. Ease what you show over 2 s as the lead asks.
+- *Storms are windy now* (the lead's review 5, P1; last commit of P7). A thunderstorm brings
+  16 m/s of its own at 10 m, a dust storm 20, under the cloud shield, so before the rain: at
+  the Earth spawn 4 to 11 m/s at 10 m and over 20 above the crowns where there was 2 to 4. You
+  will see it in everything that follows the wind with nothing to wire: crowns and grass bend
+  further and in gusts, rain falls at up to sixty degrees (the parallel strokes lean with it),
+  snow drives, dust streams, the sea gets up. If a storm frame now reads as too violent for a
+  calm game, say so: the numbers are `KINDS[...].blow` in `src/physics/weather.js`.
+  **Not seen by me in the picture** (I ran out of working context before a painted frame).
 - New `DRAW` fields (CPU expanders only; the instanced chunk `expand: 'gpu'` does not have
   them yet): streaks `parallel`, `maxLen`, `near`; dabs `tumble`, `aspect`, `wall`, `wallFrom`,
   `wallFull`, `wallShare`, `wallHigh`, `wallNear`, `wallFade`. All documented at the top of
