@@ -557,3 +557,29 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   rain or snow implies a closed sky in the sky numbers (the blizzard had `cloud` 0.46).
 - 2026-11-11: the third PAINTER agent is at about 85 to 90 % of its context and is replaced by
   a fourth; the PHYSICS role resumes with a fourth agent to tune against the picture.
+- 2026-11-11: **Lead review 4 (second PILOT agent, `99bce4a`)**, run in the game on a clean
+  export of PAINTER's `334eb16`: 114 tour frames over ten bodies at 960x540, quality 1, every
+  frame settled (`world.busy` 0 in 0.1 to 58 s), no console errors; 27 of 33 biomes show the
+  brief's landform clearly, 6 partly, none missing; cost inside the budget on every body
+  (Neptune's kelp 359 k, was 727 k) except one view; contract test 8 of 8 (39 of 40 landings,
+  one spoken refusal; the trip); landing survey 235 of 240 from a hover; the painted trip passes
+  47 checks (459 km in 69 s, 887 km in 94.9 s, reload from the save). One MUST FIX for PAINTER:
+  the vista `earth-temperate_forest-1` submits 645 k triangles and 352 draw calls at quality 1
+  (budget 600 k / 350). The coordinator re-ran PILOT's tests (102 pass) and opened the Jupiter
+  tour sheet and the theme frames.
+- 2026-11-11: **M2 is closed.** The coordinator waives the one MUST FIX as a gate for M2 (a
+  7.5 % overrun in one view) and **carries it into M3 as a MUST FIX**: with weather, the real
+  models and the near-ground layer in, the densest view of every body must be inside 600 k
+  triangles and 350 draw calls at quality 1, measured by the lead in the game. Also MUST in M3
+  (lead): the pepper in dark washes and space.
+- 2026-11-11: `R-WX-1` reworded by the lead from measurements: sky numbers may move 8 %/s on
+  Earth-like worlds and 15 %/s on the ice giants; PAINTER eases what it shows over 2 s or more.
+- 2026-11-11: PILOT's block (second agent): painted UI theme first pass in `src/ui/` (generated
+  paper with torn edges, a 76-glyph stroke font drawn in code, ink keycaps, icons, brushed ring
+  markers, cursor, loading dabs; awaits PAINTER's look review; frames `docs/shots/pilot/ui-*.jpg`),
+  sketchbook with a small sketch of the painted frame per landscape and view, touchdown on the
+  legs, rain audio by `sky.rain` and shelter, footsteps by ground material, gamepad mapping,
+  `tests/audiocheck.mjs` (22 situations, no clipping, peak -5.3 dBFS), all five PHYSICS levers,
+  `__pc.flash(frames)`. Additive: `Sim.teleport({ heading, lookPitch, firstPerson })`,
+  `getSpawn` may carry `yaw` / `pitch`, storage key `painted-cosmos.sketches`.
+  The second PILOT agent is at its context limit and is replaced by a third.
