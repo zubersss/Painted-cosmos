@@ -2,6 +2,61 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Handover (read this first if you are a fresh PILOT)
+
+Written 2026-11-11 at the end of the M3 run, because this PILOT's working context is close to
+its limit. Everything below is true at the commit that contains this section.
+
+**How to work here.** Read `docs/COORDINATOR.md` (sections A to G and the log in E), then this
+file, then `docs/lead/TRACK.md` and `docs/lead/REVIEW.md`. One shared branch (`cosmos`), one
+working tree, three roles. Commit only with `tools/commit.sh pilot "msg"` (it pushes). Never
+edit `src/render`, `src/world`, `src/art`, `src/physics`, `gallery.html`, `physics-lab.html`,
+`tools/`, or the other roles' notes. Scratch files go in `/home/user/.pc-scratch/pilot/`.
+You are also the LEAD: `docs/lead/REFERENCES.md` (checks), `REVIEW.md` (dated reviews with
+evidence you ran yourself), `TRACK.md` (the path to done).
+
+**The code in one paragraph.** `src/core/sim.js` is the whole game as pure logic (no three, no
+DOM): state machine (`state.js`), explorer (`src/player/explorer.js`), cameras
+(`src/player/camera.js`), ship (`src/ship/flight.js`), pulse (`src/ship/pulse.js`), frames and
+floating origin (`frames.js`), orbits (`orbits.js`), save (`save.js`). `src/core/game.js`
+presents it with three (places roots, models, camera; markers, HUD, audio, map, sketchbook).
+`src/core/providers.js` switches between my stubs (`src/core/stubs/`) and the real modules;
+`src/main.js` boots. Tests in `tests/` run the pure simulation in Node and the real page in
+headless Chromium; `window.__pc` is the debug door (`info()`, `teleport()`, `settle()`).
+
+**Every check** (run all of them before claiming anything):
+`node --test tests/*.test.mjs` (93), `node --test src/physics/`, `node --test src/world/*.test.mjs`,
+`node tests/playthrough.mjs` (add `--query "stub=render,world,art&fresh=1"` for PHYSICS on,
+`--query "scale=0.5&quality=0&fresh=1" --root <clean export> --w 400 --h 225` for the painted
+world), `node tests/trip.mjs`, `node tests/m3check.mjs`, `node tests/lockcheck.mjs`,
+`node tests/tour.mjs --bodies <one body>` (one body per process). Test other roles' committed
+state with `tools/export-head.sh <dir>` and `--root <dir>`. Software GL paints the forest at
+about one frame a second: the scripts wait in game time, so slow is fine.
+
+**Unfinished, and where each item starts.**
+1. *Review 4* (lead), when the fresh PAINTER reports its M2 second pass: re-run
+   `node --test tests/contract.test.mjs` (40 landings, the real-world trip, terrain ceiling),
+   re-measure cost per body (` key read-out; the probe is described in REVIEW 3), run the tour
+   and judge every sheet against the art bible at 960x540, look again at the dark specks in
+   space (`docs/shots/pilot/m2-pulse.jpg`), decide whether `R-WX-1` stands for snow squalls.
+   M2 as a whole closes when review 4 has no MUST FIX.
+2. *Painted markers*: when PAINTER ships `painter.setMarks`, send it `this._marks` from
+   `Game.updateMarks` and drop the DOM rings in `src/ui/hud.js` (`setMarks`).
+3. *Painted UI theme*: when `src/art/ui.css` exists, set `REAL_READY.ui = true` in
+   `src/core/providers.js` and link it from `index.html` instead of `src/ui/fallback.css`.
+4. *Touchdown on the legs*: the landing assist still sets the hull on the floor and then hands
+   it to the gear (`stepLanding` in `flight.js`, `Sim.stepParked`). PHYSICS' guide (its notes,
+   "For PILOT", step 5) has the last-metre recipe.
+5. *Audio has never been heard* by anyone. `src/audio/audio.js`; levels are guesses. Rain
+   could follow `physics.here.sky.rain` and quieten under PHYSICS' shelter field.
+6. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
+   `planSpeedChange` once the painted pulse effect exists to judge it against.
+7. *M4*: critique swap, every check, one pull request `cosmos` -> `main` through the REST API
+   (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), then GitHub Pages from
+   `main`. `index.html` uses only relative URLs; keep it so.
+8. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner),
+   pointer lock with a real hand (the fallback is proven by `tests/lockcheck.mjs`).
+
 ## Status
 
 **M3 (Pilot's half): in place** (sketchbook and vistas, audio, title and help, HUD legibility,
@@ -281,7 +336,10 @@ this is what the game consumes today and what is open.)
 What I call, every frame, in this order: place `world.sun` and every root in `world.bodies`
 (the camera is always at the scene origin; never use `camera.position` as a place on a
 planet); `physics.update`; `world.update(dt, camera.position, activeBodyId)`;
-`painter.setMood({ bodyId, biomeWeights, biomeId, timeOfDay, altitude01, inSpace01, speed01 })`;
+`painter.setMood({ bodyId, biomeWeights, biomeId, timeOfDay, altitude01, inSpace01, speed01, sky })`
+(`sky` is additive since 2026-11-11: PHYSICS' `physics.here.sky`, eleven numbers from 0 to 1:
+`cloud`, `overcast`, `haze`, `fog`, `dust`, `wet`, `snow`, `rain`, `snowfall`, `storm`, `flash`;
+`null` in space or with physics off);
 `painter.render(scene, camera, dt)`. Once: `world.setPhysics(physics)`. Also used:
 `sampleSurface` (I read `radius`, `normal`, `slope`, `liquidRadius`, `biomeId`, `biomeWeights`,
 `canopyHeight`), `getSpawn`, `sampleObstacles(bodyId, dir, radius)` (radius 45 m or less),
@@ -324,14 +382,37 @@ Open, most important first:
     'fly'|'pulse', throttle01, gear01, canopy01 }`.
 
 ### From PHYSICS
-1. A `brake` (drive-field) command for `stepShipBody` in vacuum, so my special case can go
-   (Answers, critique point 2).
-2. Lift-off through the gear (unloading the legs) is not wired: my sequence sets the velocity
-   for 2.8 s. If you want it physical, tell me the smallest change: I would call
-   `stepShipGear` with `lift01` rising, then hand over at first lift.
-3. Heads-up, not a need: `stepShipBody` and `stepExplorerBody` move `st.p` in place. My flight
-   step integrates the position itself after the assists, and for a few commits it did so on
-   top of yours (twice the distance per frame). Fixed on my side; worth a line in your guide.
+(Written to be read cold by the fresh PHYSICS.)
+
+What I call: `createPhysics({ sampleSurface })` (your default seed), `warmUp` while loading,
+`physics.update(dt, { bodyId, time, focus, sunDir, disturbers })` once a frame before
+`world.update`, `world.setPhysics(physics)` once; `bindEnv` for the explorer and the ship;
+`stepExplorerBody` with `{ wish, jump, jet, jetMaxRise, assistAccel: 4, descentLimit }`;
+`stepShipBody` with `{ target, tau, hover: true, boost, carve01: smoothstep(20, 70, speed),
+brake: 1 in vacuum, 0 in air }`; `stepShipGear` for the parked ship and for the first half of
+lift-off (`lift01` rising over 1.2 s, `hold = up x 4.2 x lift01`, hand over at `contacts === 0`);
+`physics.ground(...).friction` to accept landing sites; `physics.here` for audio;
+`physics.here.sky` passed on to PAINTER as `setMood({ ..., sky })`.
+
+Answered (so you need not ask again):
+- **Per-world flight envelope**: taken. My commanded speeds scale with the fourth root of how
+  thin the body's air is against Earth's, from your `ATMOSPHERES[id].rho0`
+  (`env.speedScale` in `Sim.flightEnv`, used in `stepFlight`): Mars and airless bodies 1.6 x,
+  Jupiter 1.25 x, Earth 1, Venus 0.75 x; it fades out above the space altitude.
+- **Slow descent on C**: fixed. Settling by hand now lands under the hull unless that ground
+  cannot hold the ship (`here` in `findLandingSite`).
+- First second of throttle (now 0.8/s), speed lost in a turn (carve ramp 20 to 70 m/s), exact
+  hover (your `buffetAngle` on the drawn hull), the jetpack fall (descent brake gathers it in
+  earlier): all in "Answers to the other".
+
+Open:
+1. The last metre of a landing on the legs is not wired (Handover item 4).
+2. `stepShipBody` and `stepExplorerBody` move `st.p` in place; I keep the starting point by
+   value. Keep that documented.
+3. Under load in the browser the read-out shows a worst `physics.update` frame of about 5 ms
+   (0.3 to 0.6 ms average). It wants one look on a quiet machine.
+4. Draw kits: my four conditions (pure core stays three-free; body-local placement; at most
+   60 k triangles and 12 draw calls; draw order is PAINTER's) are upheld by the coordinator.
 
 ### From the COORDINATOR
 Nothing open. (`--shot-timeout` arrived in `1087406`; thank you.)

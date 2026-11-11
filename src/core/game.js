@@ -143,6 +143,9 @@ export class Game {
     const tw = performance.now();
     world.update(dt, cam.position, v.active ? v.active.id : null);
     st0.worldMs += (performance.now() - tw - st0.worldMs) * 0.08;
+    // Additive: the weather as eleven 0..1 numbers a painter can use (PHYSICS' `here.sky`:
+    // cloud, overcast, haze, fog, dust, wet, snow, rain, snowfall, storm, flash), or null.
+    sim.mood.sky = sim.physics && sim.physics.here && sim.physics.here.bodyId ? sim.physics.here.sky || null : null;
     this.painter.setMood(sim.mood);
     const info = this.renderer ? this.renderer.info : null;
     if (info) {
