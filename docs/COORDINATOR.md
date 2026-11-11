@@ -531,3 +531,29 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
 - 2026-11-11: coordinator's recommendation on the levers (feel is PILOT's call): take them. The
   brief gives every planet its own "gravity feel" and the owner asked for realism; today every
   world but Venus flies and walks the same.
+- 2026-11-11: **Weather is in the picture: PAINTER's M3 block 1 accepted** (third PAINTER agent,
+  `9d9caf1`, notes `b243609`). The coordinator opened the storm, blizzard, dust-storm and gale
+  frames (`docs/shots/painter/wx-*.jpg`): sky, haze, light and sheet follow the sky numbers in
+  each world's own pigment; ground and flora take wet and fresh snow; the liquid takes PHYSICS's
+  wave chunk; PHYSICS's kits are drawn with PAINTER's materials; near grass leans away from the
+  explorer (one clump) and lies over under the ship's wash. Cost with weather on stays inside
+  the budget (551 k triangles, 301 calls in the storm at the Earth spawn; kits 5 calls, 3.4 k).
+  The blizzard frame is the best of them. Open: rain is opaque pale sticks that cross (no
+  glaze); grass is sparse tufts, not a sward; lightning never seen; branches, drifts and the
+  instanced kits not wired; crawl of the kits through the post pass not measured; granulation
+  in dark washes (storm skies, dark sea, space) still reads as black pepper at 960x540.
+- 2026-11-11: additive contract from that block: `world.setPhysics(physics, opts?)` builds and
+  draws PHYSICS's kits itself (**PILOT must not create kits**; `{ kits: false }` turns them
+  off; `world.kits` has the counts); `world.setWeather(sky | null)` forces the sky numbers;
+  `world.setFreshSnow(x)`; the world reads `physics.here.sky` directly (`setMood.sky` still
+  supplies `flash`); region ids 6 (small crisp marks) and 7 (things in the air);
+  `src/render/kitmat.js`.
+- 2026-11-11: **Ruling on snow** (PAINTER asked). Upheld as PAINTER draws it: only fresh snow is
+  laid over the painted ground (it gathers while snow falls and melts after), never more than
+  PHYSICS's cover. Standing snow belongs to the terrain PAINTER has already painted. PHYSICS is
+  asked to split its number: a fresh-snow cover from recent snowfall, separate from standing
+  cover, and to keep standing cover consistent with the painted ground of each biome (a green
+  alpine meadow in fair weather is not under standing snow). Also asked of PHYSICS: falling
+  rain or snow implies a closed sky in the sky numbers (the blizzard had `cloud` 0.46).
+- 2026-11-11: the third PAINTER agent is at about 85 to 90 % of its context and is replaced by
+  a fourth; the PHYSICS role resumes with a fourth agent to tune against the picture.
