@@ -271,7 +271,7 @@ export class Flora {
     const make = (list, geo, mat, lod, near, skipLow) => {
       if (!list.length) return;
       // in an order that has nothing to do with place, so that drawing the first share of
-      // a mesh thins it evenly (the low tier draws 55 %)
+      // a mesh thins it evenly (the low tier draws half)
       for (let a = list.length - 1; a > 0; a--) { const b = Math.floor(d[list[a] * INST_STRIDE + 7] * 9973.1 % 1 * (a + 1)); const t = list[a]; list[a] = list[b]; list[b] = t; }
       const mesh = this._instanced(chunk, geo, mat, list.length, lod, false);
       const im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array;
@@ -288,7 +288,7 @@ export class Flora {
         ia[a * 4] = d[o + 8]; ia[a * 4 + 1] = d[o + 9]; ia[a * 4 + 2] = d[o + 7]; ia[a * 4 + 3] = d[o + 10];
       }
       mesh.userData.full = list.length;
-      mesh.count = QUALITY.level === 0 ? Math.ceil(list.length * 0.55) : list.length;
+      mesh.count = QUALITY.level === 0 ? Math.ceil(list.length * 0.5) : list.length;
       mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
       mesh.userData.near = near; mesh.userData.skipLow = !!skipLow;
       mesh.userData.plantH = geo === this.kit.reed ? FLORA_PHYS.reed.height : geo === this.kit.fern ? FLORA_PHYS.fern.height : geo === this.kit.flower ? FLORA_PHYS.flower.height : FLORA_PHYS.grass.height;
@@ -399,8 +399,8 @@ export class Flora {
     // the low tier leaves out the bushes
     if (QUALITY.level !== this.lastQ) {
       this.lastQ = QUALITY.level;
-      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) { if (m.userData.skipLow) m.visible = QUALITY.level > 0; if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.55) : m.userData.full; }
-      for (const ch of this.underChunks.values()) for (const m of ch.meshes) if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.55) : m.userData.full;
+      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) { if (m.userData.skipLow) m.visible = QUALITY.level > 0; if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.5) : m.userData.full; }
+      for (const ch of this.underChunks.values()) for (const m of ch.meshes) if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.5) : m.userData.full;
     }
     // build queue: nearest first; always allowed one item when nothing was built for a while
     let spent = false;

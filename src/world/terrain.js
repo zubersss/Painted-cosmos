@@ -10,7 +10,7 @@ import { faceToDir, nodeSize, FACES } from './cubesphere.js';
 import { makeTerrainMaterial, makeWaterMaterial } from '../render/materials.js';
 import { QUALITY } from '../render/shared.js';
 
-const SPLIT_BY_QUALITY = [0.75, 1.12, 1.25];   // a node splits when the camera is nearer than this * its size
+const SPLIT_BY_QUALITY = [0.68, 1.12, 1.25];   // a node splits when the camera is nearer than this * its size
 const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at which it merges
 const MORPH_B = 0.98;
 const ANCHOR = 64;          // stroke textures repeat with periods that divide this (metres)
@@ -205,7 +205,7 @@ export class PlanetTerrain {
   update(camLocal, budgetMs) {
     this.frame++;
     this.splitK = SPLIT_BY_QUALITY[QUALITY.level] || 1.12;
-    this.boostK = QUALITY.level === 0 ? 0.3 : 1;      // the low tier spends little on cliffs
+    this.boostK = QUALITY.level === 0 ? 0.15 : 1;     // the low tier spends little on cliffs
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();
     for (const n of this.visible) { n.mesh.visible = false; if (n.water) n.water.visible = false; }
