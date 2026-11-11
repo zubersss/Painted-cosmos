@@ -778,3 +778,38 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
      and reported; a role that needs more for a better result says so and takes it.
   5. The cost to us: software rendering here is slower with fuller scenes. Mechanics may be
      checked at a lower tier; the look is judged at the top tier.
+- 2026-11-11: **PAINTER M3 block 3 accepted (fifth agent; `e56d65e`, `139be13`, notes
+  `1c567a9`, last code inside the snapshot `626b086`)**. The coordinator re-ran the 19 world
+  tests on a clean export of the head (pass) and opened `night-earth`, `space-pulse`,
+  `flash`, `space-deep` (sheet) and `flicks-lawn` (full size). In: a far world that cannot
+  be seen is not drawn and one a few pixels across is a single washed ball (the lead's forest
+  vista 614 k / 341 to 537 k / 305 without touching the picture; kept, it costs nothing);
+  dark and saturated washes settle soft, the border of a dark wash is ragged in broad pieces
+  (no dotted rim); **night as its own painting** (deep indigo masses, reserved paper lights);
+  **space in layered washes with spattered stars; pulse streaks** as soft drags laid as a
+  glaze (switched by the ship model's `mode: 'pulse'`); lightning lifts the open sky to paper
+  with no fringe in the crowns; **near strokes as tufts of curved flicks** close to the
+  ground's value, none under fresh snow (`sky.fresh`); puddles soft and pale (faint);
+  Neptune's sea darkens under a closed sky. After the owner's instruction `TRIM` was restored
+  to `[1, 1]`. Additive: reads `speed01`, `inSpace01`, `sky.fresh`; a boulder's `height` in
+  `sampleObstacles` is 0.58 of its scale (its drawn top; the largest is about 1.2 m); gallery
+  `odist=`, `chase=1`, `speed01=`. Coordinator's verdict: night, space, the pulse and the
+  lightning frame pass the freeze-frame test; the lawn no longer has teeth but is now quiet
+  to the point of flat at the boom's distance.
+  Not done: the owner's quality push; PHYSICS's five picture critiques; white horses on
+  Neptune; dust in the air near the explorer; two vistas in a thicket; Mercury and Neptune
+  from orbit; Mars' dune crests; branch sway and drifts; PILOT's UI second look. Known
+  flaws: a far world between 8 and 10 px swaps from ball to terrain in one frame and one
+  behind a closing sky vanishes at overcast 0.6 without a fade; the stored frames of dawn,
+  dusk, blizzard and storm were opened one commit early. Nothing judged in motion.
+  The fifth PAINTER agent is out of context and is replaced by a sixth.
+- 2026-11-11: **M3 has no MUST FIX open** (cost withdrawn by the owner; pepper and the storm
+  wind closed by the lead). M3 closes on lead review 6: the tour and every check on the
+  head, judged at the top tier, after PAINTER's quality push and PHYSICS's legs.
+- 2026-11-11: **PAINTER's order for block 4, "the quality push"** (the owner's instruction
+  made concrete by the coordinator): at the top tier, (1) a sward that is a sward, full trees
+  as far as they still read, denser flora and props where a biome is sparse, finer near
+  terrain, a finer brush at full resolution; before and after frames, keep what is the
+  better painting; (2) PHYSICS's picture critiques (the storm's ground loses its sun, the
+  blizzard needs figure and ground, dust as a soft glaze, a swell line and white horses on
+  Neptune); (3) the far-world pop and fade; (4) the lead's remaining SHOULD FIX list.
