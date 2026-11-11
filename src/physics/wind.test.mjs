@@ -1,7 +1,8 @@
 // Tests: the wind field. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WINDS, WIND, prevailing, windLarge, gustLevel, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
+import { WINDS, WIND, prevailing, windLarge, gustLevel, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, seaRoughness } from './wind.js';
+import { BIOMES, coverAt, liquidRoughness } from './ground.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 
 const o = new Float64Array(4), o2 = new Float64Array(4), pv = new Float64Array(2);
@@ -128,4 +129,24 @@ test('turbulence intensity: about 0.17 over grass, less over water, more over fo
 test('terrain: lee slopes shelter, windward slopes and crests speed the wind up', () => {
   assert.ok(slopeFactor(0.5) < 0.3 && slopeFactor(0) === 1 && slopeFactor(-0.4) > 1.2);
   assert.ok(shelterFactor(0.35) < 0.2 && shelterFactor(0) === 1 && shelterFactor(-0.2) > 1.2);
+});
+
+test('boundary layer: under the same wind aloft, a third is left at head height over a boulder shore, more over ice and sea, a sixth under a canopy', () => {
+  // (lead review 5, P6: 40 m/s at the blending height, what is left at 2 m)
+  const aloft = 40, at2 = (z0, hc, c) => aloft * heightFactor(2, z0, hc, c) / heightFactor(WIND.blendHeight, z0, hc, c);
+  const shore = at2(BIOMES.storm_seas.z0), grass = at2(0.03), sand = at2(BIOMES.dust_dunes.z0), ice = at2(BIOMES.ice_shelves.z0), wood = at2(BIOMES.temperate_forest.z0, 14, 0.75);
+  assert.ok(shore > 10 && shore < 16, 'boulder shore: ' + shore);
+  assert.ok(grass > 20 && grass < 24, 'grass: ' + grass);
+  assert.ok(sand > grass && ice > sand && ice < 30, 'smoother ground leaves more: ' + [grass, sand, ice]);
+  assert.ok(wood < 8 && wood < shore * 0.6, 'under a canopy: ' + wood);
+  // the open sea is as rough as its wind makes it (Charnock): glassy in Earth's breeze, rougher under Neptune's gale, never as rough as land
+  assert.equal(seaRoughness(5.5, 9.8), 0.0002);
+  const zn = seaRoughness(WINDS.neptune.U, BODIES.neptune.gravity), z40 = seaRoughness(40, BODIES.neptune.gravity);
+  assert.ok(zn > 0.001 && zn < 0.004 && z40 > zn && z40 < 0.02, 'Neptune sea: ' + [zn, z40]);
+  assert.equal(liquidRoughness('earth'), 0.0002);
+  const sea = coverAt('neptune', { biomeId: 'storm_seas', radius: 4000, liquidRadius: 4002 }, {}), land = coverAt('neptune', { biomeId: 'storm_seas', radius: 4000, liquidRadius: 0 }, {});
+  assert.ok(Math.abs(sea.z0 - zn) < 1e-9 && land.z0 === BIOMES.storm_seas.z0);
+  const overSea = at2(sea.z0);
+  assert.ok(overSea > 24 && overSea < 29 && overSea > shore * 1.7, 'over the storm sea: ' + overSea);
+  for (const u of [0, 1, 10, 30, 60, 200]) for (const g of [0, 0.6, 3.7, 9.8, 25]) { const z = seaRoughness(u, g); assert.ok(z >= 0.0002 && z <= 0.05, `sea roughness stays bounded: ${u} ${g} ${z}`); }
 });

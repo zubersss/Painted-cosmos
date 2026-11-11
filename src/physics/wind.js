@@ -169,6 +169,23 @@ export function heightFactor(z, z0, hc = 0, c01 = 0) {
   return top * (closed * c + open * (1 - c));
 }
 
+// Roughness length of open liquid under the wind (Charnock 1955): the waves the wind raises are
+// the roughness it feels, z0 = a u*^2 / g, with a = 0.018 for young, fetch-limited seas; never
+// smoother than the viscous limit of a glassy surface (0.0002 m). u* is the friction velocity of
+// the log profile through the 10 m wind, u* = k U10 / ln(10 / z0): solved by iteration (it
+// converges in three rounds). Earth's sea in its 5 m/s breeze: 0.0002 m; in a 22 m/s gale under
+// Neptune's gravity 0.002 m, in 40 m/s 0.008 m. So a storm sea leaves about two thirds of the
+// wind aloft at head height where a boulder beach (z0 0.3 m) leaves a third.
+export function seaRoughness(U10, g) {
+  const u = U10 > 0 ? U10 : 0, gg = g > 0.1 ? g : 0.1;
+  let z0 = 0.0002;
+  for (let i = 0; i < 4; i++) {
+    const us = 0.4 * u / Math.log(WIND.refHeight / z0);
+    z0 = Math.min(0.05, Math.max(0.0002, 0.018 * us * us / gg));
+  }
+  return z0;
+}
+
 // Speed-up or shelter from the ground itself, from the surface normal alone (no extra samples).
 // `lee` = dot(horizontal part of the normal, wind direction): positive on a lee slope (the ground
 // falls away downwind), negative on a windward slope. Flow separates on lee slopes steeper than

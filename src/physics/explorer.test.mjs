@@ -245,3 +245,21 @@ test('extreme inputs never produce NaN or an explosion', () => {
   // a NaN state heals itself
   const sim = make(); sim.st.v = V(NaN, 0, 0); run(sim, 1, { wish: V(1, 0, 0) }); assert.ok(finite(sim.st));
 });
+
+test('a wind never makes downwind the slow way: on level ground the speed made good downwind is at least the speed upwind (review 5, P6)', () => {
+  // (the lead measured 0.6 m/s downwind against 3.5 upwind on Neptune's storm coast: there is a 4.5 m
+  // cliff 14 m downwind of that stand; with the wind switched off the same heading makes the same)
+  const ROCK = { material: 'rock', friction: 0.85, kinetic: 0.65, foothold: 0.4, restitution: 0.2, sink: 0, drag: 0.01, dust: 0 };
+  const WET = { ...ROCK, friction: 0.47, kinetic: 0.36 };
+  const made = (wind, sign, ground, assist, wish) => {
+    const s = make({ wind: V(wind, 0, 0), ground, g: 10.2, rho: 0.99 });
+    run(s, 3, { wish: V(sign * wish, 0, 0), assistAccel: assist }); const x0 = s.st.p.x;
+    run(s, 6, { wish: V(sign * wish, 0, 0), assistAccel: assist });
+    return sign * (s.st.p.x - x0) / 6;
+  };
+  for (const ground of [ROCK, WET, GRASS, SAND, ICE]) for (const assist of [0, 4]) for (const wind of [5, 15, 25, 33, 45, 60]) for (const wish of [4.2, 7.4]) {
+    const down = made(wind, 1, ground, assist, wish), up = made(wind, -1, ground, assist, wish);
+    assert.ok(down >= up - 0.01, `${ground.material} assist ${assist} wind ${wind} wish ${wish}: downwind ${down.toFixed(2)} upwind ${up.toFixed(2)}`);
+    if (wind <= 15 && wish < 5 && ground !== ICE && ground !== SAND) assert.ok(Math.abs(down - wish) < 0.05 && up > wish - 0.3, `a fresh wind does not slow a walker: ${ground.material} ${wind} ${down} ${up}`);
+  }
+});

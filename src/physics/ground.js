@@ -8,6 +8,8 @@
 import { clamp, clamp01, mix, smoothstep } from './util.js';
 import { fetchOf } from './water.js';
 import { LIQUIDS, liquidOf } from './atmosphere.js';
+import { WINDS, seaRoughness } from './wind.js';
+import { BODIES } from '../data/bodies.js';
 
 // muS / muK: static and kinetic friction of a lugged rubber boot sole, dry.
 // wet: multiplier on both at wetness 1.   foothold: extra holding traction on a slope from
@@ -74,7 +76,13 @@ export function iceFriction(T) {
 
 // ---- biomes ---------------------------------------------------------------------------------
 // ground: material of level ground.  steep: material where the slope is steep.  shore: material
-// just above a liquid.  z0: roughness (m).  canopy / canopyH: closed-canopy fraction and height.
+// just above a liquid.  z0: roughness length (m) of the LAND as the wind feels it over tens of
+// metres: the skin of the ground cover AND the form drag of what stands on it (z0 is about a
+// tenth of the height of close-set boulders, shards or tussocks: 0.3 m for a boulder shore,
+// 0.03 m for grassland or tundra, 0.003 m for a sand sheet, 0.001 m for flat ice). The log
+// profile through it (wind.js heightFactor) is the boundary layer: under the same wind at 60 m,
+// 36 % is left at head height over the boulder shore, 55 % over grass, 69 % over flat ice.
+// canopy / canopyH: closed-canopy fraction and height.
 // moist: rain and snow multiplier.  fog: 0..1 tendency to fog.  dT: K warmer than the latitude
 // mean.  dustSrc: 0..1 how much dust the wind can lift here.  snowBase: permanent snow (m).
 const B = (ground, steep, shore, z0, canopy, canopyH, moist, fog, dT, dustSrc, snowBase = 0) =>
@@ -84,7 +92,7 @@ export const BIOMES = {
   temperate_forest: B('litter', 'rock', 'mud', 0.05, 0.75, 14, 1.0, 0.30, 0, 0.02),
   autumn_woodland: B('litter', 'rock', 'mud', 0.05, 0.65, 13, 0.9, 0.40, -4, 0.02),
   alpine_meadow: B('grass', 'rock', 'gravel', 0.03, 0.0, 0, 1.0, 0.15, -4, 0.02),
-  sea_coast: B('grass', 'rock', 'sand', 0.01, 0.0, 0, 1.1, 0.30, 1, 0.05),
+  sea_coast: B('grass', 'rock', 'sand', 0.03, 0.0, 0, 1.1, 0.30, 1, 0.05),
   desert_canyon: B('sand', 'rock', 'sand', 0.01, 0.0, 0, 0.08, 0.0, 10, 0.7),
   misty_wetland: B('mud', 'soil', 'mud', 0.10, 0.25, 2.2, 1.2, 0.90, 0, 0),
   // mercury
@@ -123,10 +131,10 @@ export const BIOMES = {
   pearl_fog: B('ice', 'ice', 'ice', 0.002, 0, 0, 0.8, 1.0, 0, 0, 0.08),
   teal_sinkholes: B('ice', 'ice', 'ice', 0.01, 0, 0, 0.6, 0.5, 2, 0, 0.02),
   // neptune
-  storm_seas: B('rock', 'rock', 'gravel', 0.0005, 0, 0, 1.6, 0.4, 0, 0),
+  storm_seas: B('rock', 'rock', 'gravel', 0.3, 0, 0, 1.6, 0.4, 0, 0),             // the LAND of the storm coast: ledges, boulders, stacks (the sea is liquidRoughness)
   kelp_forests: B('moss', 'rock', 'mud', 0.3, 0.6, 10, 1.2, 0.5, 0, 0),
   ice_spires: B('ice', 'ice', 'ice', 0.2, 0, 0, 0.8, 0.2, -3, 0, 0.03),
-  aurora_tundra: B('snow', 'rock', 'gravel', 0.01, 0, 0, 0.7, 0.3, -2, 0, 0.10),
+  aurora_tundra: B('snow', 'rock', 'gravel', 0.03, 0, 0, 0.7, 0.3, -2, 0, 0.10),     // tussocks, low shrubs, frost hummocks
   // pluto
   heart_glacier: B('ice', 'ice', 'ice', 0.001, 0, 0, 0.5, 0.1, 0, 0, 0.02),
   lilac_mountains: B('ice', 'ice', 'gravel', 0.05, 0, 0, 0.3, 0.05, 0, 0.1, 0.01),     // water-ice bedrock: at 40 K as hard and as grippy as rock
@@ -370,6 +378,16 @@ export function liquidAt(bodyId, surface) {
   return special ? LIQUIDS[special] : liquidOf(bodyId);
 }
 
+// Roughness length of the body's open liquid in its prevailing wind (wind.js seaRoughness). A sea
+// grows with the wind of hours, not with the gust, so the body's mean wind is the right measure.
+let _lrBody = null, _lrU = NaN, _lrZ = 0.0002;
+export function liquidRoughness(bodyId) {
+  const W = WINDS[bodyId], U = W ? W.U : 0;
+  if (bodyId === _lrBody && U === _lrU) return _lrZ;
+  _lrBody = bodyId; _lrU = U;
+  return (_lrZ = seaRoughness(U, BODIES[bodyId] ? BODIES[bodyId].gravity : 9.8));
+}
+
 // Climate fields of the ground alone (no wetness or snow applied): what air.js and weather.js
 // need to know about a place. Cheaper than groundAt.
 export function coverAt(bodyId, surface, out = {}) {
@@ -403,8 +421,8 @@ export function coverAt(bodyId, surface, out = {}) {
   out.moist = moist * inv; out.fog = fog * inv; out.dustSource = dustSrc * inv;
   out.z0 = Math.max(z0 * inv, 1e-5); out.snowBase = snowBase * inv; out.dT = dT * inv;
   out.leaves = lv * inv; out.spores = spo * inv; out.ash = ash * inv; out.fetch = fetch * inv; out.liquidDensity = lrho * inv;
-  // open liquid is far smoother than any land
-  if (surface && (surface.liquidRadius || 0) > surface.radius) { out.z0 = 0.0002; out.canopy01 = 0; out.dustSource = 0; out.leaves = 0; }
+  // open liquid is smoother than any land, and as rough as the body's own wind makes it (Charnock)
+  if (surface && (surface.liquidRadius || 0) > surface.radius) { out.z0 = liquidRoughness(bodyId); out.canopy01 = 0; out.dustSource = 0; out.leaves = 0; }
   return out;
 }
 
