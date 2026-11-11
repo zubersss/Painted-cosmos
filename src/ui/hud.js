@@ -24,6 +24,12 @@ export function createHud(root) {
   const notice = el('div', 'pc-notice', root);
   const marks = el('div', 'pc-marks', root);
   const stats = el('div', 'pc-stats', root);
+  // A new page in the sketchbook: the sketch itself, shown for a few seconds as it is made.
+  const fresh = el('div', 'pc-newsketch', root);
+  const freshImg = el('img', '', fresh); freshImg.alt = ''; freshImg.draggable = false;
+  const freshTitle = el('b', '', fresh);
+  const freshSub = el('span', 'pc-label', fresh);
+  let freshTimer = 0;
   const readout = el('div', 'pc-readout pc-label', root);
   const dot = el('div', 'pc-reticle', root);
   const card = el('div', 'pc-panel pc-start', root);
@@ -108,6 +114,17 @@ export function createHud(root) {
         if (m._text !== text) { m._text = text; m._label.textContent = text; }
       }
     },
+    // "A new page": the sketch that was just kept, its name, and where it went.
+    showSketch(url, title, sub, seconds = 6) {
+      freshImg.src = url;
+      freshTitle.textContent = title || '';
+      freshSub.textContent = sub || '';
+      fresh.classList.add('pc-on');
+      clearTimeout(freshTimer);
+      freshTimer = setTimeout(() => fresh.classList.remove('pc-on'), seconds * 1000);
+    },
+    hideSketch() { clearTimeout(freshTimer); fresh.classList.remove('pc-on'); },
+    get sketchShown() { return fresh.classList.contains('pc-on'); },
     // The frame-time read-out (behind ?stats=1 or the ` key).
     setStats(text) {
       stats.classList.toggle('pc-on', !!text);

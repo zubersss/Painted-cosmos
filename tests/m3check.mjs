@@ -25,6 +25,24 @@ try {
   check(!/pc-on/.test(ui), 'and goes away once you have looked around');
   i = await info();
   check(i.audio && i.audio.ready && i.audio.state === 'running', 'audio runs after the first gesture: ' + JSON.stringify(i.audio && i.audio.state));
+  // The sketchbook's reward: the first landscape is sketched a few seconds after the game begins.
+  i = await until((x) => x.sketches && x.sketches.count >= 1, 25);
+  check(i.sketches && i.sketches.count === 1 && /^b:earth:/.test(i.sketches.keys[0]), 'the first landscape walked gets a sketch: ' + JSON.stringify(i.sketches && i.sketches.keys));
+  ui = await page.evaluate(() => ({ on: window.__pc.game.hud.sketchShown, title: document.querySelector('.pc-newsketch b').textContent, sub: document.querySelector('.pc-newsketch span').textContent }));
+  check(ui.on && ui.title && /page 1 of \d+/.test(ui.sub), `and the new page is shown as it is made: "${ui.title}" (${ui.sub.replace(/\s+/g, ' ')})`);
+  await run.sleep(900);                                        // the slip fades in
+  await shot('m3-newsketch', 'm3-newsketch');
+  const px = await page.evaluate(async () => {
+    const sk = window.__pc.sketches, url = sk.get(Object.keys(sk.items)[0]);
+    const img = new Image(); img.src = url; await img.decode();
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let lo = 255, hi = 0;
+    for (let k = 0; k < d.length; k += 4) { const l = (d[k] + d[k + 1] + d[k + 2]) / 3; if (l < lo) lo = l; if (l > hi) hi = l; }
+    return { w: img.width, h: img.height, lo: Math.round(lo), hi: Math.round(hi), chars: url.length };
+  });
+  check(px.w === 192 && px.h === 108 && px.hi - px.lo > 25 && px.chars < 16000, `the sketch is a real picture of the frame: ${px.w}x${px.h}, luminance ${px.lo} to ${px.hi}, ${px.chars} characters`);
   // Walk: wind bed and footsteps are mixed from the world; values are finite and in range.
   await page.keyboard.down('KeyW');
   await gameWait(2.5);
@@ -37,9 +55,15 @@ try {
   await gameWait(0.3);
   i = await info();
   check(i.bookOpen, 'B opens the sketchbook');
-  const text = await page.evaluate(() => document.querySelector('.pc-book').textContent);
-  check(/Earth/.test(text) && /not yet visited/.test(text) && /view/.test(text), 'it lists the worlds, the landscapes and the views');
+  let text = await page.evaluate(() => document.querySelector('.pc-book').textContent);
+  check(/Earth/.test(text) && /Neptune/.test(text) && /landscape/.test(text) && /views/.test(text) && /pages drawn/.test(text), 'it has a page per world, with its landscapes and views');
+  const pics = await page.evaluate(() => ({ imgs: document.querySelectorAll('.pc-book img').length, empty: document.querySelectorAll('.pc-book .pc-sketch:not(.pc-on)').length, page: window.__pc.book.page }));
+  check(pics.page === 'earth' && pics.imgs === 1 && pics.empty >= 1, `it opens at the world you are on, with the sketch on its page and empty frames for what is left: ${pics.imgs} sketch, ${pics.empty} empty`);
   await shot('m3-sketchbook', 'm3-sketchbook');
+  await page.keyboard.press('ArrowRight');
+  await gameWait(0.3);
+  text = await page.evaluate(() => window.__pc.book.page + ': ' + document.querySelector('.pc-book-sub').textContent);
+  check(/^moon: not yet visited/.test(text), 'the arrow keys turn the page: ' + text);
   await page.keyboard.press('KeyB');
   await gameWait(0.2);
   check(!(await info()).bookOpen, 'B closes it');
@@ -73,6 +97,17 @@ try {
     await gameWait(1.5);
     const saved = await page.evaluate(() => { try { return JSON.parse(window.__pc.storage.getItem('painted-cosmos.save')); } catch { return null; } });
     check(saved && saved.vistas && (saved.vistas.earth || []).length === 1, 'the found view is in the save');
+    // The view gets its sketch too, and both pictures are kept beside the save.
+    i = await until((x) => x.sketches && x.sketches.keys.some((k) => k.startsWith('v:earth:')), 15);
+    check(i.sketches.keys.some((k) => k.startsWith('v:earth:')), 'the view found is sketched: ' + JSON.stringify(i.sketches.keys));
+    await shot('m3-vista-sketch');
+    const kept = await page.evaluate(() => { try { return Object.keys(JSON.parse(window.__pc.storage.getItem('painted-cosmos.sketches')).items); } catch { return []; } });
+    check(kept.length === i.sketches.count && i.sketches.saved, `the sketches are stored beside the save: ${kept.length} pictures, ${i.sketches.chars} characters`);
+    // A reload keeps the pictures.
+    await page.goto(run.baseUrl + '/index.html?' + opt.query.replace(/&?fresh=1/g, '') + '&card=0', { timeout: 600000, waitUntil: 'commit' });
+    await page.waitForFunction('window.__pcReady === true', null, { timeout: 600000, polling: 300 });
+    i = await info();
+    check(i.sketches && i.sketches.count === kept.length, 'after a reload the sketchbook still has its pictures: ' + (i.sketches && i.sketches.count));
   } else check(false, 'the world has vistas');
 } catch (e) { run.fails.push('exception: ' + (e && e.stack ? e.stack : e)); }
 await finish(run, opt, {});

@@ -132,6 +132,10 @@ export function createAudio({ enabled = true } = {}) {
     if (!ready) return;
     if (type === 'paper') burst(3200, 0.5, 0.08, 0.28, 'highpass');
     else if (type === 'brush') burst(1500, 1.2, 0.05, 0.18);
+    else if (type === 'sketch') {
+      // A pencil on paper: three short strokes.
+      [0, 0.13, 0.3].forEach((dly, i) => setTimeout(() => burst(2300 + i * 350, 1.6, 0.045, 0.11 + i * 0.03), dly * 1000));
+    }
     else if (type === 'land') burst(120, 0.7, 0.25, 0.5, 'lowpass');
     else if (type === 'bounce') burst(160, 1.2, 0.2, 0.35, 'lowpass');
     else if (type === 'found') {

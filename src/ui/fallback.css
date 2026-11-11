@@ -91,15 +91,50 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
   background: rgba(244, 239, 228, 0.85); border-radius: 4px 9px 5px 8px / 8px 4px 9px 5px; font-size: 13px; font-style: italic;
   color: var(--pc-ink); opacity: 0; transition: opacity 0.6s ease; box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.28); }
 .pc-hint.pc-on { opacity: 0.95; }
-.pc-book { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 620px;
-  padding: 16px 24px 14px; display: none; pointer-events: auto; text-align: left; }
+.pc-book { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 860px;
+  padding: 16px 22px 12px; display: none; pointer-events: auto; text-align: left; background: rgba(244, 239, 228, 0.965);
+  box-shadow: 0 0 0 1.5px rgba(44, 51, 80, 0.4), 0 8px 30px rgba(44, 51, 80, 0.22); }
 .pc-book.pc-on { display: block; }
-.pc-book .pc-title { font-size: 22px; text-align: center; margin-bottom: 8px; }
-.pc-book-row { display: grid; grid-template-columns: 86px 1fr; gap: 0 12px; padding: 4px 0; opacity: 0.45; font-size: 13px;
-  border-top: 1px solid rgba(107, 90, 72, 0.16); }
-.pc-book-row.pc-on { opacity: 1; }
-.pc-book-row b { grid-row: span 2; color: var(--pc-ink); font-size: 15px; }
-.pc-book-foot { margin-top: 8px; text-align: center; font-size: 13px; color: var(--pc-ink); }
+.pc-book-head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid rgba(107, 90, 72, 0.35);
+  padding-bottom: 6px; margin-bottom: 10px; }
+.pc-book .pc-title { font-size: 24px; margin: 0; }
+.pc-book-tally { font-size: 14px; color: var(--pc-ink); }
+.pc-book-body { display: grid; grid-template-columns: 124px 1fr; gap: 0 18px; }
+.pc-book-tabs { display: flex; flex-direction: column; gap: 3px; }
+.pc-book-tab { all: unset; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; padding: 4px 8px 5px;
+  font: 14px Georgia, serif; color: var(--pc-ink); border-radius: 3px 8px 4px 9px / 8px 3px 9px 4px; }
+.pc-book-tab b { font-weight: normal; letter-spacing: 0.04em; }
+.pc-book-tab span { font-size: 11.5px; color: var(--pc-sepia); font-style: italic; }
+.pc-book-tab.pc-dim b { opacity: 0.5; }
+.pc-book-tab.pc-on { background: var(--pc-ink); color: var(--pc-paper); }
+.pc-book-tab.pc-on b { opacity: 1; }
+.pc-book-tab.pc-on span { color: var(--pc-paper); }
+.pc-book-page { min-height: 430px; }
+.pc-book-world { font-size: 21px; letter-spacing: 0.1em; color: #232a45; }
+.pc-book-sub { font-size: 13.5px; margin-bottom: 4px; color: var(--pc-ink); }
+.pc-book-kind { font-size: 12px; letter-spacing: 0.12em; margin: 9px 0 5px; }
+.pc-book-grid { display: grid; grid-template-columns: repeat(5, 130px); gap: 8px 13px; }
+.pc-sketch { margin: 0; }
+.pc-sketch-frame { width: 130px; height: 73px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: 1px dashed rgba(107, 90, 72, 0.5); border-radius: 2px 5px 3px 6px / 5px 2px 6px 3px; background: rgba(107, 90, 72, 0.05); }
+.pc-sketch-frame span { font-size: 11px; font-style: italic; color: var(--pc-sepia); opacity: 0.8; }
+.pc-sketch.pc-on .pc-sketch-frame { border: none; background: #fbf8f1; padding: 3px;
+  box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.45), 1px 2px 5px rgba(44, 51, 80, 0.22); }
+.pc-sketch:nth-child(3n+1).pc-on .pc-sketch-frame { transform: rotate(-0.8deg); }
+.pc-sketch:nth-child(3n+2).pc-on .pc-sketch-frame { transform: rotate(0.6deg); }
+.pc-sketch-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pc-sketch figcaption { margin-top: 3px; font-size: 11.5px; line-height: 1.2; color: var(--pc-sepia); font-style: italic; min-height: 28px; }
+.pc-sketch.pc-on figcaption { color: #232a45; font-style: normal; }
+.pc-book-foot { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(107, 90, 72, 0.25); text-align: center; font-size: 13px;
+  color: var(--pc-ink); }
+/* A new page in the sketchbook, shown as it is made: the sketch on a slip of paper. */
+.pc-newsketch { position: absolute; right: 6.5%; top: 9.5%; width: min(204px, 23vw); padding: 6px 6px 7px; background: #fbf8f1;
+  border-radius: 2px 6px 3px 7px / 6px 2px 7px 3px; box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.5), 2px 4px 12px rgba(44, 51, 80, 0.3);
+  opacity: 0; transform: translateY(-14px) rotate(4deg) scale(0.92); transition: opacity 0.7s ease, transform 0.7s ease; }
+.pc-newsketch.pc-on { opacity: 1; transform: rotate(1.6deg); }
+.pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.pc-newsketch b { display: block; margin-top: 5px; font-weight: normal; font-size: 15px; letter-spacing: 0.05em; color: #232a45; }
+.pc-newsketch span { display: block; font-size: 11.5px; letter-spacing: 0.02em; }
 .pc-start .pc-sub { margin-top: 2px; font-size: 16px; }
 /* The title and help card: ink on nearly opaque paper, so it reads over any painting. */
 .pc-start { background: rgba(244, 239, 228, 0.955); width: 540px; padding: 24px 34px 22px; top: 50%;

@@ -20,6 +20,7 @@ import { createMap } from './ui/map.js';
 import { createBook } from './ui/book.js';
 import { createAudio } from './audio/audio.js';
 import { readSave, restore, clearSave, AutoSave } from './core/save.js';
+import { SketchStore } from './core/sketches.js';
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('pc-canvas');
@@ -80,8 +81,11 @@ async function boot() {
   const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id) });
   const book = createBook(hudRoot);
   const audio = createAudio({ enabled: params.get('audio') !== '0' });
+  // The sketchbook's pictures live beside the save (their own key); ?save=0 keeps them in memory.
+  const sketches = new SketchStore(storage && params.get('save') !== '0' ? storage : null);
+  if (params.get('fresh') === '1') sketches.clear();
   const game = new Game({
-    renderer, scene, camera, world, painter, explorer, ship, input, hud, map, book, audio, params, physics, dyn,
+    renderer, scene, camera, world, painter, explorer, ship, input, hud, map, book, audio, params, physics, dyn, sketches,
     autosave: storage && params.get('save') !== '0' ? new AutoSave(storage) : null,
   });
   game.showStats = params.get('stats') === '1';
@@ -126,7 +130,7 @@ async function boot() {
 
   const sim = game.sim;
   const debug = {
-    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, using: prov.using, note: debugNote,
+    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, using: prov.using, note: debugNote,
     info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),

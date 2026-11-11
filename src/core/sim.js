@@ -348,6 +348,7 @@ export class Sim {
         id, name: BODIES[id].name, visited: !!this.visited[id],
         biomes: this.visited[id] ? Object.keys(this.visited[id].biomes) : [],
         vistasFound: list.filter((v) => found[v.id]).map((v) => v.name), vistasTotal: list.length,
+        vistas: list.map((v) => ({ id: v.id, name: v.name, found: !!found[v.id] })),
       });
     }
     return out;

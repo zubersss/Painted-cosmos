@@ -11,13 +11,17 @@ import { S, isInShip } from './state.js';
 import { cameraPlanes, farthestExtent } from './depth.js';
 import { V } from './vec.js';
 import { pulseEta, arrivalRadius } from '../ship/pulse.js';
+import { SKETCH, biomeKey, vistaKey } from './sketches.js';
 
 const NO_KEYS = { down: () => false, axis: () => 0 };
 const NO_EVENTS = { edges: new Set(), dx: 0, dy: 0, wheel: 0 };
 
 export class Game {
-  constructor({ renderer, scene, camera, world, painter, explorer, ship, input, hud, map, book, audio, params, physics, autosave, dyn }) {
+  constructor({ renderer, scene, camera, world, painter, explorer, ship, input, hud, map, book, audio, params, physics, autosave, dyn, sketches }) {
     this.book = book || null; this.audio = audio || null; this._eventSeq = 0; this._promptKey = '';
+    this.sketches = sketches || null;      // SketchStore: the sketchbook's pictures
+    this._sketchWant = {};                 // key -> { due (game time), kind, bodyId, id }
+    this._names = {};
     this.renderer = renderer; this.scene = scene; this.camera = camera; this.world = world; this.painter = painter;
     this.explorerModel = explorer; this.shipModel = ship; this.input = input; this.hud = hud;
     this.map = map || null; this.autosave = autosave || null; this.dyn = dyn || null;
@@ -70,7 +74,11 @@ export class Game {
       if (raw.edges.has('ArrowRight') || raw.edges.has('ArrowDown')) this.map.step(1);
       if (raw.edges.has('ArrowLeft') || raw.edges.has('ArrowUp')) this.map.step(-1);
       if (raw.edges.has('Enter') || raw.edges.has('Escape')) this.toggleMap();
-    } else if (this.book && this.book.open && (raw.edges.has('Enter') || raw.edges.has('Escape'))) this.toggleBook();
+    } else if (this.book && this.book.open) {
+      if (raw.edges.has('ArrowRight') || raw.edges.has('ArrowDown')) { this.book.step(1); if (this.audio) this.audio.event('paper'); }
+      if (raw.edges.has('ArrowLeft') || raw.edges.has('ArrowUp')) { this.book.step(-1); if (this.audio) this.audio.event('paper'); }
+      if (raw.edges.has('Enter') || raw.edges.has('Escape')) this.toggleBook();
+    }
     if (panel) { keys = NO_KEYS; events = NO_EVENTS; }          // the world goes on; the hands are on the page
     if (this.input.message) {
       this.uiNotice = this.input.message; this.uiNoticeUntil = performance.now() + 9000;
@@ -165,6 +173,7 @@ export class Game {
     }
     this.painter.render(this.scene, cam, dt);
     if (info && this.showStats) { st0.tris = info.render.triangles; st0.calls = info.render.calls; }
+    this.updateSketches();                 // right after the frame is painted: it is still in the canvas
     this.updateMarks(v);
     this.updateHud();
     this.updateAudio(dt, v);
@@ -194,12 +203,113 @@ export class Game {
   toggleBook() {
     if (!this.book) return;
     if (this.book.open) this.book.hide();
-    else {
-      const sim = this.sim, totals = {};
-      if (this.world.getBiomes) for (const id of sim.eph.ids) { try { totals[id] = this.world.getBiomes(id).length; } catch { /* optional */ } }
-      this.book.show(sim.sketchbook(), sim.sm.state === S.ON_FOOT ? sim.nearestVista() : null, totals);
-    }
+    else this.book.show(this.bookPages(), this.sim.sm.state === S.ON_FOOT ? this.sim.nearestVista() : null, this.sim.mood.bodyId || this.sim.bodyId);
     if (this.audio) this.audio.event('paper');
+  }
+
+  // ---- the sketchbook ---------------------------------------------------------------------------
+  // The landscapes a world has (id and name), from the world when it can say, else from what
+  // has been walked.
+  biomesOf(bodyId) {
+    const c = this._names[bodyId];
+    if (c) return c;
+    let list = null;
+    if (this.world.getBiomes) { try { list = this.world.getBiomes(bodyId).map((b) => ({ id: b.id, name: b.name || pretty(b.id) })); } catch { list = null; } }
+    if (list) this._names[bodyId] = list;
+    return list;
+  }
+
+  // Every page of the book: per world, each landscape (walked or not) and each view (found or
+  // not), with its sketch when one was drawn.
+  bookPages() {
+    const sk = this.sketches;
+    return this.sim.sketchbook().map((p) => {
+      const walked = new Set(p.biomes);
+      const known = this.biomesOf(p.id) || p.biomes.map((id) => ({ id, name: pretty(id) }));
+      const biomes = known.map((b) => ({ id: b.id, name: b.name, done: walked.has(b.id), sketch: sk && walked.has(b.id) ? sk.get(biomeKey(p.id, b.id)) : null }));
+      for (const id of p.biomes) if (!known.some((b) => b.id === id)) biomes.push({ id, name: pretty(id), done: true, sketch: sk ? sk.get(biomeKey(p.id, id)) : null });
+      const vistas = (p.vistas || []).map((v) => ({ id: v.id, name: v.name, done: v.found, sketch: sk && v.found ? sk.get(vistaKey(p.id, v.id)) : null }));
+      return { id: p.id, name: p.name, visited: p.visited, biomes, vistas };
+    });
+  }
+
+  // How many pages the book has, and how many are filled (a landscape walked, a view found).
+  bookProgress() {
+    let done = 0, total = 0;
+    for (const p of this.bookPages()) for (const x of p.biomes.concat(p.vistas)) { total++; if (x.done) done++; }
+    return { done, total };
+  }
+
+  // Sketches: when a landscape is first walked or a view found, a small picture of that moment
+  // is kept for the book. A page that has no picture yet (an older save, a full storage) gets
+  // one the next time the explorer stands there.
+  updateSketches() {
+    const sk = this.sketches, sim = this.sim;
+    if (!sk || !this.started || sim.sm.state !== S.ON_FOOT) return;
+    const want = this._sketchWant, t = sim.t, body = sim.bodyId;
+    const biome = sim.ex.surface ? sim.ex.surface.biomeId : null;
+    if (this.frameCount % 20 === 0) {
+      const walked = sim.visited[body];
+      if (biome && walked && walked.biomes[biome]) {
+        const k = biomeKey(body, biome);
+        // A little way in, so the picture is of the place and not of its border.
+        if (!sk.has(k) && !want[k]) want[k] = { due: t + 2.5, kind: 'biome', bodyId: body, id: biome };
+      }
+      const found = sim.vistas[body];
+      if (found) {
+        const r = Math.hypot(sim.ex.p.x, sim.ex.p.y, sim.ex.p.z);
+        for (const v of sim.vistasOf(body)) {
+          if (!found[v.id]) continue;
+          const k = vistaKey(body, v.id);
+          if (sk.has(k) || want[k]) continue;
+          const d = Math.acos(Math.min(1, (sim.ex.p.x * v.dir.x + sim.ex.p.y * v.dir.y + sim.ex.p.z * v.dir.z) / r)) * r;
+          if (d < 25) want[k] = { due: t + 0.5, kind: 'vista', bodyId: body, id: v.id, name: v.name };
+        }
+      }
+    }
+    const panel = (this.map && this.map.open) || (this.book && this.book.open) || (this.hud && this.hud.startShown);
+    for (const k in want) {
+      const w = want[k];
+      if (w.bodyId !== body || (w.kind === 'biome' && w.id !== biome) || t > w.due + 40) { delete want[k]; continue; }   // moved on: next time
+      if (t < w.due || panel) continue;
+      // Wait for the world to finish what it is building here (a few seconds at most).
+      const busy = typeof this.world.busy === 'number' && this.world.busy > 0;
+      if (busy && t < w.due + 8) continue;
+      delete want[k];
+      const url = this.captureSketch();
+      if (url && sk.put(k, url)) {
+        const names = this.biomesOf(body);
+        const hit = w.kind === 'biome' && names ? names.find((b) => b.id === w.id) : null;
+        const title = w.kind === 'vista' ? w.name : hit ? hit.name : pretty(w.id);
+        const pr = this.bookProgress();
+        this.lastSketch = { key: k, title, t };
+        if (this.hud && this.hud.showSketch) this.hud.showSketch(url, title, `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}  \u00b7  B opens the sketchbook`);
+        if (this.audio) this.audio.event('sketch');
+      }
+      break;                                // one picture a frame is plenty
+    }
+  }
+
+  // A thumbnail of the frame that has just been painted (a data URL), or null. The frame is
+  // read straight after painter.render, while it is still in the canvas; nothing here can
+  // throw into the frame loop.
+  captureSketch() {
+    try {
+      const src = this.renderer ? this.renderer.domElement : null;
+      if (!src || !src.width || !src.height || typeof document === 'undefined') return null;
+      const c = this._sketchCanvas || (this._sketchCanvas = document.createElement('canvas'));
+      c.width = SKETCH.width; c.height = SKETCH.height;
+      const g = c.getContext('2d');
+      // Crop the frame to the sketch's proportions (centre), then scale it down.
+      const ar = SKETCH.width / SKETCH.height;
+      let sw = src.width, sh = src.height;
+      if (sw / sh > ar) sw = sh * ar; else sh = sw / ar;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, c.width, c.height);
+      let url = c.toDataURL('image/jpeg', SKETCH.quality);
+      if (url.length > SKETCH.maxEach) url = c.toDataURL('image/jpeg', SKETCH.qualityLow);
+      return url.length > SKETCH.maxEach ? null : url;
+    } catch { return null; }
   }
 
   // Sound: the state of the world for the mixer, and one-shots for what just happened.
@@ -281,6 +391,7 @@ export class Game {
     const st = sim.sm.state;
     const panelOpen = (this.map && this.map.open) || (this.book && this.book.open);
     hud.setPrompt(panelOpen ? null : sim.promptNow);
+    if (panelOpen && hud.sketchShown) hud.hideSketch();
     if (hud.setHint) {
       // Until the player has looked around once (and again whenever the capture is lost), say how.
       const need = this.started && !this.input.looked && !panelOpen && this.hintOn !== false;
@@ -334,9 +445,12 @@ export class Game {
       },
       mapOpen: !!(this.map && this.map.open), bookOpen: !!(this.book && this.book.open), uiNotice: this.uiNotice,
       audio: this.audio ? { state: this.audio.state, ready: this.audio.ready, mix: this.audio.debug() } : null,
+      sketches: this.sketches ? { count: this.sketches.count, chars: this.sketches.total, saved: this.sketches.saved, keys: Object.keys(this.sketches.items), last: this.lastSketch || null } : null,
     };
   }
 }
+
+const pretty = (id) => String(id).replace(/[_-]+/g, ' ');
 
 function fmt(m) {
   return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m';
