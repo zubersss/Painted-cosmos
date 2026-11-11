@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, QUALITY, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, ensureGlobals } from './shared.js';
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
@@ -62,7 +62,7 @@ export function createPainter(renderer) {
 
   function setQuality(q) { quality = Math.max(0, Math.min(2, q | 0)); QUALITY.level = quality; applySize(); }
   function setRenderScale(s) { renderScale = Math.max(0.3, Math.min(1, +s || 1)); applySize(); }
-  function setMood(m) { if (m) Object.assign(mood, m); }
+  function setMood(m) { if (m) { Object.assign(mood, m); if ('sky' in m) WX.mood = m.sky || null; } }
 
   function gradeFromHour(h, out) {
     h = ((h % 24) + 24) % 24;
@@ -103,6 +103,9 @@ export function createPainter(renderer) {
     if (dt > 0) G.uTime.value += Math.min(dt, 0.1);
     if (SHEET.valid) post.sheetUniforms.uGrade.value.copy(SHEET.grade);
     else gradeFromHour(mood.timeOfDay == null ? 12 : mood.timeOfDay, post.sheetUniforms.uGrade.value);
+    // weather on the sheet: a storm shifts the whole value key (more pigment, the paper stays
+    // the brightest value); lightning is bare paper showing through for a frame or two
+    post.sheetUniforms.uWxSheet.value.set(WX.key, Math.max(WX.flash, mood.sky && !WX.forced ? mood.sky.flash || 0 : 0), 0, 0);
     const prevTarget = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;

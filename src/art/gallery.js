@@ -4,6 +4,10 @@
 //   &ui=0 (hide panel) &t=0 (freeze wind/drift at this many seconds) &view=0..5 (debug buffers)
 //   &scale=1 (render scale) &fov=55 &look=pooling:1,granulation:1,... (painter.setLook)
 //   &dx=&dy=&dz= (nudge the camera, metres: right, up, forward) &yaw=&pitch= (degrees, added)
+//   weather: &wx=fair|overcast|rain|storm|after|blizzard|snow|dust|fog (forced sky numbers) or
+//   &sky=cloud:0.9,overcast:0.8,... (any of PHYSICS' eleven); with &physics=1 the weather is
+//   PHYSICS' own: &wtime= (seconds on its clock; the Earth spawn's thunderstorm is 640..800)
+//   &pre= (seconds simulated before the first frame, so rain is already falling) &kits=0
 import * as THREE from 'three';
 import { createPainter, RENDERER_OPTIONS } from '../render/index.js';
 import { createWorld } from '../world/index.js';
@@ -234,7 +238,25 @@ function fly(dt) {
   if (state.pos.length() < g) state.pos.copy(d).multiplyScalar(g);
 }
 
+// forced weather (no physics needed): named skies, or the numbers themselves
+const WXP = {
+  fair: { cloud: 0.15, haze: 0.95 },
+  overcast: { cloud: 0.8, overcast: 0.4, haze: 0.8 },
+  rain: { cloud: 0.9, overcast: 0.8, haze: 0.5, fog: 0.3, wet: 0.9, rain: 0.6, storm: 0.3 },
+  storm: { cloud: 0.92, overcast: 0.94, haze: 0.36, fog: 0.64, wet: 0.96, rain: 0.92, storm: 0.84 },
+  after: { cloud: 0.13, haze: 0.47, fog: 0.5, wet: 0.93 },
+  blizzard: { cloud: 0.95, overcast: 0.7, haze: 0.2, fog: 0.3, snow: 1, snowfall: 0.9, storm: 0.4 },
+  snow: { cloud: 0.3, haze: 0.9, snow: 1 },
+  dust: { cloud: 0.2, overcast: 0.2, haze: 0.12, dust: 0.88, storm: 0.3 },
+  fog: { cloud: 0.5, overcast: 0.3, haze: 0.15, fog: 0.9 },
+};
+let forcedSky = null;
+if (P.has('wx') && WXP[P.get('wx')]) forcedSky = Object.assign({}, WXP[P.get('wx')]);
+if (P.has('sky')) { forcedSky = forcedSky || {}; for (const kv of P.get('sky').split(',')) { const [k, v] = kv.split(':'); forcedSky[k] = +v; } }
+if (forcedSky) world.setWeather(forcedSky);
+
 // PHYSICS in the gallery (?physics=1): wind, gusts and bending plants from src/physics
+let wtime = num('wtime', 0), preroll = num('pre', 0);
 let physics = null;
 if (P.get('physics') === '1') {
   import('../physics/index.js').then((m) => {
@@ -293,7 +315,12 @@ function tick(now) {
   if (physics) {
     const up = state.pos.clone().normalize();
     const L0 = world.getLighting();
-    physics.update(frozenT != null ? 1 / 30 : dt, { bodyId, focus: up.multiplyScalar(groundRadius(up)), sunDir: world.bodyUniforms(bodyId).uSunDirL.value });
+    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), sunDir: world.bodyUniforms(bodyId).uSunDirL.value };
+    // pre-roll: let the weather fall for a while before the first frame, ending at wtime
+    for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; physics.update(1 / 30, fr); }
+    fr.time = wtime;
+    physics.update(frozenT != null ? 0 : dt, fr);
+    if (frozenT == null) wtime += dt;
   }
   world.update(dt, camera.position, bodyId);
   if (!settled) {
@@ -306,7 +333,7 @@ function tick(now) {
   }
   if (frozenT != null) painter.setTime(frozenT);
   const L = world.getLighting();
-  painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0 });
+  painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0, sky: forcedSky || (physics && physics.here ? physics.here.sky : null) });
   painter.render(scene, camera, frozenT != null ? 0 : dt);
   frames++;
   if (settled && frames >= 3 && world.busy === 0) window.__pcReady = true;

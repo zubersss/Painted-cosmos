@@ -107,6 +107,7 @@ uniform vec3 uGrade;
 uniform vec4 uPig;        // edge pooling, granulation, wobble px (at 1080p), graphite
 uniform vec4 uBorder;     // width, raggedness, pooling, enabled
 uniform vec2 uBoil;
+uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm), y lightning flash
 varying vec2 vUv;
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
@@ -139,6 +140,8 @@ void main() {
   // fine pits show in light washes; dark passages keep only the broad settling
   float gran = ((0.52 - ph) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmid.r) * 0.85 + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet);
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
+  // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
+  d += uWxSheet.x * (0.75 + 0.5 * plo.r);
 
   // ragged unpainted border: the wash simply stops, and pools where it stops
   vec2 bd = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);
@@ -168,6 +171,13 @@ void main() {
   line *= smoothstep(0.50, 0.70, plo.r + (pmid.r - 0.5) * 0.7) * (0.30 + 0.70 * smoothstep(0.35, 0.6, ph)) * (1.0 - smoothstep(6.5, 9.5, a0.z));
   col *= mix(vec3(1.0), vec3(0.46, 0.46, 0.50), line * uPig.w);
 
+  // lightning: for a frame or two the paper shows through. The sky and the lights go bare,
+  // the darks stay as silhouettes against them
+  if (uWxSheet.y > 0.003) {
+    float isSky = 1.0 - step(0.5, texture(tAux, uv).w);
+    float lift = uWxSheet.y * (isSky * (0.55 + 0.45 * plo.r) + (1.0 - isSky) * smoothstep(0.25, 0.75, dot(col, W)) * 0.55);
+    col = mix(col, vec3(1.0), clamp(lift, 0.0, 0.92));
+  }
   // nothing is pure black: the darkest darks are dense indigo and sepia
   col = max(col, vec3(0.085, 0.09, 0.145) + 0.035 * (ph - 0.5));
   col = mix(vec3(1.0), col, painted * (1.0 - skip * 0.8));
@@ -242,6 +252,7 @@ export class Post {
       uPig: { value: new THREE.Vector4(1.0, 1.0, 2.6, 0.55) },
       uBorder: { value: new THREE.Vector4(0.030, 0.034, 0.9, 1) },
       uBoil: { value: new THREE.Vector2(0, 0) },
+      uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
     };
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms);
     this.debugView = 0;

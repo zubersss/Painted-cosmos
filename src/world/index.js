@@ -14,7 +14,7 @@ import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
-import { makeBodyUniforms, SHEET, syncPhysFlora } from '../render/shared.js';
+import { makeBodyUniforms, SHEET, WX, skyNow, syncPhysFlora } from '../render/shared.js';
 import { defaultBodyUniforms } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -71,6 +71,15 @@ export function createWorld(scene) {
   let physics = null;
   let lastActive = null;
   const lighting = { bodyId: null, sunElevation: 1, hours: 12, dayness: 1, altitude: 0, space01: 0 };
+  const _storm = new THREE.Vector3(), _dust = new THREE.Vector3(), _pale = new THREE.Vector3(), _white = new THREE.Vector3(1, 1, 1);
+  const dustOf = new Map();   // body -> { biomeId: the pigment its dust carries (the mid ground wash) }
+  function dustColour(st, weights, out) {
+    let m = dustOf.get(st.id);
+    if (!m) { m = {}; const S = getSurface(st.id); S.biomes.forEach((b, i) => { m[b.id] = S.pal[i].mid; }); dustOf.set(st.id, m); }
+    let r = 0, g = 0, b = 0, w = 0;
+    for (const id in weights) { const c = m[id], k = weights[id]; if (c && k) { r += c[0] * k; g += c[1] * k; b += c[2] * k; w += k; } }
+    return w > 0 ? out.set(r / w, g / w, b / w) : out.set(0.9, 0.8, 0.66);
+  }
   const tmpKey = { zenith: new THREE.Vector3(), horizon: new THREE.Vector3(), haze: new THREE.Vector3(), glaze: new THREE.Vector3(), light: new THREE.Vector3(), grade: new THREE.Vector3(), cloudShade: new THREE.Vector3() };
 
   function blendKeys(look, wDay, wDawn, wDusk, wNight) {
@@ -152,7 +161,7 @@ export function createWorld(scene) {
       if (!isActive) {
         // far bodies: plain daylight, no haze
         bu.uFog.value.set(1e-7, 6, 0, 1);
-        bu.uDayness.value = 1;
+        bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0);
       }
     }
     if (active) {
@@ -185,13 +194,45 @@ export function createWorld(scene) {
       const lost = wDay * twi;
       wDay -= lost; wNight += lost * 0.22;
       blendKeys(look, wDay, am ? wTwi : 0, (am ? 0 : wTwi) + lost * 0.78, wNight);
+      const dayness = 1 - wNight;
+      // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
+      const sk = skyNow(physics, st.id), air = 1 - space01;
+      const oc = sk ? sk.overcast * air : 0, storm = sk ? sk.storm * air : 0;
+      const hazeK = sk ? Math.min(1, Math.max(0.04, sk.haze / 0.8)) : 1;          // fair weather (0.8 and up) is my clear day
+      const lostV = sk ? 1 - hazeK : 0;                                           // how much of the view the weather has taken
+      const dustW = sk ? Math.min(1, sk.dust * (0.25 + 1.5 * lostV)) * air : 0, fogW = sk ? Math.min(1, sk.fog * (0.2 + 1.2 * lostV)) * air : 0;
+      const veilR = sk ? sk.rain * air : 0, veilS = sk ? sk.snowfall * air : 0;
+      // this world's storm pigment: its cloud shadow laid dense and glazed with indigo
+      const cs = tmpKey.cloudShade, dn = (c) => c - (c - c * c) * 1.25;
+      // (Payne's grey on the cool worlds; on the warm ones it stays sepia: orange mixed with indigo is mud)
+      const warm = Math.min(1, Math.max(0, (cs.x - cs.z) * 3));
+      _storm.set(dn(cs.x) * 0.80, dn(cs.y) * 0.84, dn(cs.z) * 0.93).lerp(_pale.set(0.38, 0.45, 0.53).multiplyScalar(0.45 + 0.55 * dayness), 0.68 - 0.46 * warm);
+      // overcast: a cool even light; a storm deepens the glaze (indigo, not grey)
+      tmpKey.light.lerp(_pale.set(0.94, 0.955, 0.99), oc * 0.85);
+      tmpKey.glaze.multiply(_pale.set(1 - 0.10 * storm, 1 - 0.08 * storm, 1 - 0.02 * storm));
+      // the far washes: lost into the pale band under the cloud, into grey water, into the ground's own dust
+      tmpKey.zenith.lerp(_pale.copy(_storm).lerp(_white, 0.16), oc * 0.92);
+      tmpKey.horizon.lerp(_pale.copy(_storm).lerp(_white, 0.66), oc * 0.9);
+      tmpKey.haze.lerp(_pale.copy(_storm).lerp(_white, 0.74), oc * 0.9);
+      tmpKey.haze.lerp(_pale.set(0.955, 0.96, 0.965), fogW * 0.7);
+      if (dustW > 0.003) {
+        dustColour(st, here.biomeWeights, _dust);
+        tmpKey.haze.lerp(_pale.copy(_dust).lerp(_white, 0.30), dustW * 0.92);
+        tmpKey.horizon.lerp(_pale.copy(_dust).lerp(_white, 0.22), dustW * 0.9);
+        tmpKey.zenith.lerp(_pale.copy(_dust).multiplyScalar(0.94), dustW * 0.8);
+        tmpKey.light.lerp(_pale.copy(_dust).lerp(_white, 0.55), dustW * 0.6);
+        _storm.lerp(_pale.copy(_dust).multiplyScalar(0.74), dustW * 0.9);
+      }
       bu.uGlaze.value.copy(tmpKey.glaze);
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
-      const dayness = 1 - wNight;
       bu.uDayness.value = dayness;
+      bu.uWx.value.set(Math.min(1, oc + dustW * 0.6), sk ? sk.wet * air : 0, sk ? sk.snow * air : 0, Math.max(veilR, veilS));
+      skyU.uWxSky.value.set(Math.min(1, oc + dustW * 0.5), storm, veilR, veilS);
+      skyU.uStormWash.value.copy(_storm);
+      WX.key = (storm * 0.34 + oc * 0.14 + dustW * 0.10) * dayness; WX.flash = sk ? sk.flash * air : 0;
       const v0 = look.visibility[0], v1 = look.visibility[1];
-      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) + 40000 * space01;
+      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * space01) + 40000 * space01;
       bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, space01);
       // sky
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
@@ -200,7 +241,9 @@ export function createWorld(scene) {
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
-      skyU.uCloud.value.set(body.radius + atmH * 0.55, look.cloud, Math.max(900, atmH * 3.2), 0.0006);
+      // cloud cover: the world's own share in fair weather, closing in as the weather says
+      const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8), 0.12, 0.9) : look.cloud;
+      skyU.uCloud.value.set(body.radius + atmH * 0.55, cover, Math.max(900, atmH * 3.2), 0.0006);
       skyU.uAtmo.value.set(space01, dayness, 0.042, body.radius);
       st.root.getWorldQuaternion(_q);
       skyU.uBodyInv.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(_q.invert()));
@@ -214,7 +257,7 @@ export function createWorld(scene) {
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
-      skyU.uCloud.value.y = 0;
+      skyU.uCloud.value.y = 0; skyU.uWxSky.value.set(0, 0, 0, 0); WX.key = 0; WX.flash = 0;
       sun.getWorldPosition(_v2);
       skyU.uSunDirL.value.copy(_v2.sub(cameraPos)).normalize();
       skyU.uBodyInv.value.identity();
@@ -259,6 +302,9 @@ export function createWorld(scene) {
     // PHYSICS hook (COORDINATOR C14): the motion source for flora and weather. Stored now, read
     // by the flora and weather drawing as those fields arrive.
     setPhysics(p) { physics = p || null; },
+    // Force the weather in the picture (gallery, tests): PHYSICS' eleven sky numbers, or null
+    // to go back to what PHYSICS (or PILOT's setMood.sky) says.
+    setWeather(sky) { WX.forced = sky ? Object.assign({ cloud: 0, overcast: 0, haze: 1, fog: 0, dust: 0, wet: 0, snow: 0, rain: 0, snowfall: 0, storm: 0, flash: 0 }, sky) : null; },
     getStats() { const st = state.get(lastActive); return st ? { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy } : null; },
     sky,
   };

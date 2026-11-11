@@ -60,7 +60,20 @@ export function makeBodyUniforms() {
     uHueA: { value: new THREE.Vector3(0.84, 0.99, 0.80) },               // the two drifts of neighbouring pigment in ground washes
     uHueB: { value: new THREE.Vector3(1.0, 0.90, 0.80) },
     uBodyR: { value: 4000 },                                             // base radius of the body (strata follow the height)
+    uWx: { value: new THREE.Vector4(0, 0, 0, 0) },                       // weather: x overcast (flat cool light), y wet ground, z snow cover, w veil (rain or snow in the air)
   };
+}
+
+// Weather for the picture: PHYSICS' sky numbers (docs/notes/physics.md, "For PAINTER" B), each
+// 0..1 and continuous: cloud, overcast, haze, fog, dust, wet, snow, rain, snowfall, storm, flash.
+// Three sources, in this order: a forced sky (gallery, tests: world.setWeather), PHYSICS' own
+// numbers for this frame (world.setPhysics), what PILOT handed the painter (setMood.sky).
+export const WX = { forced: null, mood: null, flash: 0, key: 0 };
+export function skyNow(physics, bodyId) {
+  if (WX.forced) return WX.forced;
+  const h = physics && physics.here;
+  if (h && h.sky && (!h.bodyId || h.bodyId === bodyId)) return h.sky;
+  return WX.mood;
 }
 
 // The painter reads this to grade the sheet; the world writes it for the body the camera is on.

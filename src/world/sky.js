@@ -33,6 +33,8 @@ uniform vec3 uHaze;
 uniform vec3 uCloudShade;
 uniform vec4 uCloud;        // shell radius, coverage, feature size (m), drift
 uniform vec4 uAtmo;         // space01 (0 on the ground .. 1 in space), dayness, sun angular radius, body radius
+uniform vec4 uWxSky;        // weather: x overcast, y storm, z rain veil, w snow veil
+uniform vec3 uStormWash;    // this world's heavy-weather pigment (its cloud shadow laid dense, glazed with indigo)
 uniform float uTime;
 varying vec3 vDirL;
 varying vec3 vDirW;
@@ -53,13 +55,16 @@ void main() {
   // the horizon glows toward the sun at dawn and dusk
   float toward = pow(max(sd, 0.0), 3.0) * (1.0 - smoothstep(0.0, 0.5, sunE));
   sky = mix(sky, uSkyHorizon, toward * 0.65);
+  // (overcast: the world has already turned the zenith and horizon keys into one heavy wash of
+  // its storm pigment, dense overhead and running thinner toward a paler band above the horizon)
+  float oc = uWxSky.x;
   // turbulence and the odd backrun: no flat colour anywhere in a wet wash
   vec4 n1 = texture(uNoise3D, d * 1.3 + 0.17);
   vec4 n2 = texture(uNoise3D, d * 4.1);
   float turb = (n1.r - 0.5) * 0.9 + (n2.g - 0.5) * 0.35;
   float bf = n1.a + (n2.b - 0.5) * 0.10;
   float back = smoothstep(0.84, 0.90, bf) * (1.0 - smoothstep(0.90, 0.95, bf));
-  sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) + back * 0.38 * (1.0 - t));
+  sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * (1.0 + oc * 0.7) + back * 0.38 * (1.0 - t));
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
   // below the horizon (seen from high up): haze
   sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
@@ -68,7 +73,7 @@ void main() {
   float rc = length(uCamL);
   float b = dot(uCamL, d);
   float disc = b * b - (rc * rc - uCloud.x * uCloud.x);
-  float cloud = 0.0, shade = 0.0;
+  float cloud = 0.0, shade = 0.0, body = 0.0, belly = 0.5;
   if (uCloud.y > 0.001 && disc > 0.0) {
     float tt = rc < uCloud.x ? (-b + sqrt(disc)) : (-b - sqrt(disc));
     if (tt > 0.0) {
@@ -85,18 +90,38 @@ void main() {
       shade = smoothstep(0.0, 0.10, toSun - v + 0.02) * smoothstep(th + 0.02, th + 0.16, v);
       float fade = rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0;
       cloud *= fade;
+      body = smoothstep(th + 0.02, th + 0.30, v);
+      belly = smoothstep(th + 0.06, th + 0.50, v + (c2 - 0.5) * 0.25);
     }
   }
   vec3 cl = mix(vec3(1.0), uCloudShade, shade * 0.9);
   cl = dens(cl, 1.0 + (n2.r - 0.5) * 0.8);
+  // under an overcast the cloud is no longer bare paper: it is the wash itself, in heavy masses
+  // with dark bellies; their torn edges stay pale, where the light still comes through
+  vec3 mass = dens(uStormWash, 0.10 + 1.25 * belly + 0.3 * uWxSky.y + (n2.r - 0.5) * 0.4);
+  cl = mix(cl, mass, oc * (0.30 + 0.70 * body));
   vec3 col = mix(sky, cl, cloud);
+
+  // rain or snow falling from the cloud base, far off: soft slanted drags of the wet wash,
+  // strongest low in the sky (anchored to the planet: they do not turn with the camera)
+  float veil = max(uWxSky.z, uWxSky.w);
+  if (veil > 0.01) {
+    vec3 hz = normalize(d - up * e + up * 1e-4);
+    vec3 side = cross(up, hz);
+    vec3 vq = hz * 1.7 + side * (e * 1.1) + up * (e * 0.30) + vec3(uTime * 0.004, 0.0, 0.0);
+    float drag = texture(uNoise3D, vq).r * 0.75 + texture(uNoise3D, vq * 2.3 + 0.3).g * 0.25;
+    float low = (1.0 - smoothstep(0.03, 0.62, e)) * smoothstep(-0.10, 0.03, e);
+    col = dens(col, 1.0 + (smoothstep(0.30, 0.78, drag) - 0.35) * low * uWxSky.z * 1.05);
+    // falling snow whitens the low sky instead: the far world goes to paper
+    col = mix(col, vec3(0.985, 0.985, 0.99), uWxSky.w * low * (0.35 + 0.45 * smoothstep(0.35, 0.65, drag)));
+  }
 
   // ---- the sun: bare paper with a warm halo
   float ang = acos(clamp(sd, -1.0, 1.0));
   float halo = exp(-ang * 7.0) * 0.75 + exp(-ang * 28.0) * 0.6;
-  col = mix(col, vec3(1.0, 0.985, 0.93), clamp(halo, 0.0, 1.0) * (1.0 - cloud * 0.6));
+  col = mix(col, vec3(1.0, 0.985, 0.93), clamp(halo, 0.0, 1.0) * (1.0 - cloud * 0.6) * (1.0 - oc * 0.9));
   float sun = 1.0 - smoothstep(uAtmo.z * 0.82, uAtmo.z, ang + (n2.b - 0.5) * 0.012);
-  col = mix(col, vec3(1.0), sun * (1.0 - cloud * 0.5));
+  col = mix(col, vec3(1.0), sun * (1.0 - cloud * 0.5) * (1.0 - oc));
 
   // ---- space: deep indigo and Payne's grey washes with spattered stars (first pass)
   if (uAtmo.x > 0.001 || uAtmo.y < 0.999) {
@@ -140,6 +165,8 @@ export function makeSkyUniforms() {
     uCloudShade: { value: new THREE.Vector3(0.80, 0.80, 0.90) },
     uCloud: { value: new THREE.Vector4(4600, 0.45, 2600, 0.0006) },
     uAtmo: { value: new THREE.Vector4(0, 1, 0.045, 4000) },
+    uWxSky: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uStormWash: { value: new THREE.Vector3(0.48, 0.50, 0.68) },
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },
     uBodyInv: { value: new THREE.Matrix3() },

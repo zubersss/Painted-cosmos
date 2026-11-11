@@ -30,7 +30,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
-    uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR,
+    uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
 }
 
@@ -146,6 +146,14 @@ void main() {
   }
   c = pcDensity(c, d);
 
+  // weather on the ground. Rain: the wash goes darker and richer. Snow: up-facing forms are
+  // left as bare paper, ragged at the edge of the cover and thinner under trees; steep faces
+  // stay dark, so the land is drawn by what the snow could not lie on.
+  float upf = dot(nL, normalize(vBody));
+  float snowC = pcSnowCover(upf, mix(ma.g, mb.g, lf) * 0.45 + n2.b * 0.30 + n1.a * 0.25, vPar.z);
+  c = pcWetWash(c, 1.0 - snowC);
+  c = mix(c, mix(vec3(1.0), vec3(0.90, 0.93, 1.0), smoothstep(0.42, 0.70, n1.g) * 0.55), snowC);
+
   // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks.
   // The lines wander, swell, thin and break off: drawn by hand, not tiled.
   if (vPar.w > 0.01) {
@@ -159,7 +167,7 @@ void main() {
     float big = 1.0 - smoothstep(0.012, 0.045 + 0.05 * n2.r, a2);
     big *= smoothstep(0.30, 0.46, n1.g + (n2.b - 0.5) * 0.5);
     float crack = max(fine * near * 0.75, big * mix(0.55, 1.0, near) * mid);
-    c = pcDensity(c, 1.0 + crack * vPar.w * 2.2);
+    c = pcDensity(c, 1.0 + crack * vPar.w * 2.2 * (1.0 - snowC * 0.8));
   }
 
   // light in soft value steps; shadows are glazes
@@ -175,6 +183,12 @@ void main() {
   // dry brush on rough ground: the brush skips, paper sparkles through in small broken flecks
   float dryM = mix(smoothstep(0.60, 0.69, fa.b * 0.62 + fa.r * 0.38), smoothstep(0.60, 0.69, fb.b * 0.62 + fb.r * 0.38), lf);
   c = mix(c, vec3(1.0), dryM * vPar.x * markFade * (0.24 + 0.16 * lvl));
+  // standing water after rain: small pale shapes of sky lying in the flats near the eye
+  float pud = uWx.y * (1.0 - snowC) * smoothstep(0.990, 0.999, upf) * near * (1.0 - vPar.z * 0.6);
+  if (pud > 0.01) {
+    pud *= smoothstep(0.70, 0.76, texture(uNoise3D, vBody / 3.1 + 0.43).r * 0.7 + n2.a * 0.3) * smoothstep(0.50, 0.62, n1.a);
+    c = mix(c, mix(uHaze, vec3(1.0), 0.25), pud * 0.6);
+  }
 
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
@@ -183,6 +197,8 @@ void main() {
   float limb = pow(1.0 - clamp(dot(upV, normalize(-vView)), 0.0, 1.0), 2.5) * uFog.w;
   c = mix(c, mix(uHaze, vec3(1.0), 0.4), limb);
   float wet = max(max(vPar.y, f * 0.9), limb);
+  // wet ground and falling rain or snow: edges soften, far layers run into each other
+  wet = max(wet, max(uWx.y * 0.45 * (1.0 - snowC), uWx.w * smoothstep(10.0, 90.0, dist) * 0.9));
   pcWrite(c, wet, nV, -vView.z, 1.0);
 }
 `;
@@ -460,6 +476,7 @@ uniform vec3 uLeafC;
 uniform vec4 uLeafP;   // raggedness, sky holes, dab scale, wetness
 uniform vec3 uAccent;
 uniform float uCanopy;
+uniform mat3 normalMatrix;
 #ifdef PC_FAR
   uniform vec3 uFarA[8];
   uniform vec3 uFarB[8];
@@ -497,6 +514,7 @@ void main() {
     leafA = uFarA[si]; leafB = uFarB[si]; leafC = uFarC[si]; barkA = uFarBarkA[si]; barkB = uFarBarkB[si];
   #endif
   vec3 c; float wet = 0.05; float id = 3.0; float x;
+  vec3 upV = normalize(normalMatrix * normalize(vBody));   // the planet's up, for snow lying on things
 
   if (part < 0.5) {
     // ---- bark: a pale or warm wash with dry-brushed marks
@@ -522,7 +540,7 @@ void main() {
       float dryM = smoothstep(0.56, 0.68, st.g * 0.5 + st.r * 0.6);
       c = mix(c, vec3(1.0), dryM * uBarkP.w * near * 0.5);
     #endif
-    c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7);
+    c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7), 0.9);     // wet bark goes dark
     x = dot(nV, sunV) * 0.5 + 0.5;
     x *= mix(0.55, 1.0, pcDapple(vBody, canopy * 0.8));
     x += (n1.g - 0.5) * 0.12;
@@ -550,9 +568,12 @@ void main() {
     float hue = vInst.x + (n1.b - 0.5) * 0.9 + (vData.w - 0.5) * 0.7;
     c = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
     c = mix(c, leafC, clamp(vData.z * 0.75 + (n2.b - 0.5) * 0.3, 0.0, 1.0));
-    c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.9 + vInst.y * 0.5);
+    c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.9 + vInst.y * 0.5), 0.7);
+    // snow lies on the tops of the masses: bare paper with a ragged lower edge
+    float snowF = pcSnowCover(dot(mV, upV) * 0.5 + 0.5, st.g * 0.6 + n2.g * 0.4, vData.z * 0.8);
+    c = mix(c, vec3(0.97, 0.98, 1.0), snowF);
     x = dot(mV, sunV) * 0.5 + 0.5;
-    x = x * (1.0 - vData.z * 0.42);
+    x = x * (1.0 - vData.z * 0.42 * (1.0 - snowF));
     float through = pow(max(dot(-V, sunV), 0.0), 1.5);
     x = max(x, through * (0.50 + 0.45 * st.g + (n2.r - 0.5) * 0.5));
     x *= mix(0.62, 1.0, pcDapple(vBody, canopy * 0.6));
@@ -560,16 +581,17 @@ void main() {
     x += (vData.w - 0.5) * 0.26 + (n2.g - 0.5) * 0.14 - smoothstep(0.55, 0.8, st.g) * 0.16;
     float lvl = min(pcLevel(x, 0.07), 2.6);
     c = pcTone(c, lvl);
-    wet = uLeafP.w;
+    wet = max(uLeafP.w, uWx.y * 0.5);
     id = 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
   } else if (part < 2.5) {
     // ---- blades and fronds: single crisp strokes, lit like the ground under them
+    // (under snow most of them are buried; the few left stand dark against the paper)
+    if (seed < uWx.z * 0.8) discard;
     float hue = vInst.x + (n1.b - 0.5) * 0.8;
     c = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
     c = mix(c, leafC, clamp(0.55 - vUv.y * 0.7, 0.0, 1.0));
-    c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5);
-    vec3 upV = normalize(vMassV);
-    x = dot(upV, sunV) * 0.5 + 0.5;
+    c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5), 0.6);
+    x = dot(normalize(vMassV), sunV) * 0.5 + 0.5;
     x *= mix(0.42, 1.0, pcDapple(vBody, canopy));
     x += (n1.g - 0.5) * 0.14 + vUv.y * 0.10;
     float lvl = pcLevel(x, 0.06);
@@ -578,6 +600,7 @@ void main() {
     id = 4.0 + seed * 0.9;
   } else if (part < 3.5) {
     // ---- accent: one soft touch of pure pigment
+    if (seed < uWx.z * 0.8) discard;
     c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.9);
     x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, canopy));
     c = pcTone(c, pcLevel(x + 0.2, 0.08));
@@ -590,7 +613,9 @@ void main() {
     float rimR = 1.0 - abs(dot(nV, V));
     if (rimR > 0.92 - 0.20 * smoothstep(0.42, 0.74, nr.r)) discard;
     c = mix(barkA, barkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
-    c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5);
+    c = pcWetWash(pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5), 0.8);
+    float snowR = pcSnowCover(dot(nV, upV) * 0.5 + 0.5, nr.g * 0.6 + n1.r * 0.4, 0.0);
+    c = mix(c, vec3(0.97, 0.98, 1.0), snowR);
     x = dot(nV, sunV) * 0.5 + 0.5;
     x *= mix(0.45, 1.0, pcDapple(vBody, canopy));
     vec4 nf = texture(uNoise3D, vBody / 0.55 + 0.61);
@@ -602,7 +627,7 @@ void main() {
     id = 3.0 + seed * 0.9;
   }
   c = pcAtmos(c, vFog);
-  wet = max(wet, vFog * 0.85);
+  wet = max(max(wet, vFog * 0.85), uWx.w * smoothstep(10.0, 90.0, vd) * 0.9);
   pcWrite(c, wet, nV, -vView.z, id);
 }
 `;
