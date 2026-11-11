@@ -279,7 +279,11 @@ export function createExplorer() {
     // as positive here, so the figure never folded its knees after a landing.)
     w.hip = (w.hip || 0) + (Math.max(0, Math.min(0.5, -ride)) - (w.hip || 0)) * (first || s.snap || feet ? 1 : 1 - Math.exp(-22 * dt));
     const crouch = Math.acos(Math.max(0.3, 1 - w.hip / 0.86)) * (1 - sit);
-    const lean = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit - 0.30 * crouch;
+    // (PHYSICS' jump crouch, `crouch01` 0..1 over the 0.12 s before the push: the back leans in and the arms go back,
+    // the anticipation that makes the jump read; the hips' fall itself is in `ride`)
+    const cr01 = Number.isFinite(s.crouch01) ? Math.max(0, Math.min(1, s.crouch01)) : 0;
+    w.cr = (w.cr || 0) + (cr01 - (w.cr || 0)) * (first || s.snap ? 1 : 1 - Math.exp(-30 * dt));
+    const lean = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit - 0.30 * crouch - 0.22 * w.cr;
     const L1 = 0.41, L2 = 0.48, hipY = L1 + L2 + Math.max(-0.5, Math.min(0.06, ride));
     const leg = (thigh, shin, phi, side, F) => {
       const sw = Math.max(0, Math.cos(phi));
@@ -298,7 +302,9 @@ export function createExplorer() {
       }
       th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45;
       kn += w.jet * (-0.42 - 0.1 * side) + w.fall * (side < 0 ? -0.55 : -0.85) - sit * 1.45;
-      const ease = F ? 0 : (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25);          // at rest the weight is on one leg
+      // at rest the weight is on one leg (with PHYSICS' feet too: standing, both boots are under the hips and the
+      // figure may settle on one; it straightens out of it as the stride begins)
+      const ease = (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25) * (F ? 1 - w.cr : 1);
       thigh.rotation.x = th + 0.09 * ease + (F ? 0 : crouch); shin.rotation.x = kn - 0.17 * ease - (F ? 0 : 2 * crouch);
       thigh.rotation.z = side * (0.02 + 0.10 * w.fall + 0.04 * w.jet);
     };
@@ -315,7 +321,7 @@ export function createExplorer() {
     b.head.rotation.x = pitch * 0.55 - b.torso.rotation.x * 0.7 - 0.18 * w.fall;
     b.head.rotation.y = -b.torso.rotation.y * 0.8 + Math.sin(t * 0.31) * 0.10 * (1 - w.walk) * (1 - air);
     const arm = (bone, side, phi) => {
-      bone.rotation.x = -Math.sin(phi) * (0.30 + 0.45 * w.run) * w.walk * grounded * (1 - 0.5 * w.wade) + 0.22 * w.run * w.walk + 0.25 * w.jet - 0.25 * w.fall + 0.55 * sit;
+      bone.rotation.x = -Math.sin(phi) * (0.30 + 0.45 * w.run) * w.walk * grounded * (1 - 0.5 * w.wade) + 0.22 * w.run * w.walk + 0.25 * w.jet - 0.25 * w.fall + 0.55 * sit - 0.65 * w.cr;
       bone.rotation.z = side * (0.03 + 0.012 * breathe + 0.50 * crouch + 0.45 * w.jet + 1.95 * w.fall + 0.42 * w.wade * w.walk + 0.08 * Math.sin(t * 6.1 + side) * w.fall);
     };
     arm(b.armL, -1, ph); arm(b.armR, 1, ph + Math.PI);

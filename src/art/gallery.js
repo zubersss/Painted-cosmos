@@ -16,6 +16,7 @@ import { createExplorer, createShip } from './models.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { LOOKS } from '../data/looks.js';
 import { findVantage } from './vantage.js';
+import { gaitOf, EXPLORER_BODY } from '../physics/explorer.js';
 
 const P = new URLSearchParams(location.search);
 const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.get(k) : d);
@@ -322,9 +323,34 @@ function placeModel(m, east, north, lift, face) {
   _zx.copy(_fx).negate(); _xx.crossVectors(up, _zx).normalize(); _zx.crossVectors(_xx, up);
   m.object3D.quaternion.setFromRotationMatrix(_mx.makeBasis(_xx, up, _zx));
 }
+// PHYSICS' gait in the gallery (`gait=<m/s>`, `stride=<0..1>` held, else it runs; `grav=` m/s^2, default the
+// body's): the feet and the hips by PHYSICS' own stride (gaitOf; the feet and the bob as its stepGait lays them, a
+// steady pace on level ground), so that the figure can be checked pose by pose as the game will pass it.
+const GAIT = P.has('gait') ? { v: num('gait', 4.2), g: P.has('grav') ? num('grav', 9) : BODIES[bodyId].gravity, s: P.has('stride') ? num('stride', 0) : 0, hold: P.has('stride') } : null;
+function gaitPose(dt) {
+  const T = EXPLORER_BODY, o = gaitOf(Math.max(0.12, GAIT.v), GAIT.g, T, {});
+  if (!GAIT.hold && o.step > 0) GAIT.s = (GAIT.s + GAIT.v * dt / (2 * o.step)) % 1;
+  const ph = (GAIT.s * 2) % 1, L = T.legLength, k = (1 - T.gaitRocker) * L, gE = Math.max(0.3, GAIT.g);
+  let bob = 0;
+  if (o.gait === 2) {
+    const tc = o.contact, t = ph * o.period, a = Math.PI / tc;
+    bob = t < tc ? -o.drop - 0.5 * gE * o.flight * t + o.A * (t - Math.sin(a * t) / a) / a - 0.5 * gE * t * t : -o.drop + 0.5 * gE * (o.flight - (t - tc)) * (t - tc);
+  } else if (o.gait === 1) {
+    const ds = 2 * o.duty - 1, s = o.step, yl = -k * (1 - Math.cos((ph - 0.5 * (1 + ds)) * s / L));
+    if (ph >= ds) bob = yl; else { const yt = -k * (1 - Math.cos((ph + 0.5 * (1 - ds)) * s / L)), w = ph / ds; bob = yt + (yl - yt) * w * w * (3 - 2 * w); }
+  }
+  const X = o.duty * o.step, lift = o.gait === 2 ? 0.12 + 0.1 * Math.min(1, GAIT.v / 7) : 0.07, feet = [];
+  for (let i = 0; i < 2; i++) {
+    let p = GAIT.s - 0.5 * i; if (p < 0) p += 1;
+    if (p < o.duty) feet.push({ fwd: X * (1 - 2 * Math.min(1, p / o.duty)), up: 0, side: (i ? 0.5 : -0.5) * T.stepWidth, down: 1 });
+    else { const u = (p - o.duty) / (1 - o.duty); feet.push({ fwd: X * (2 * (u - Math.sin(2 * Math.PI * u) / (2 * Math.PI)) - 1), up: lift * Math.sin(Math.PI * Math.sqrt(u)), side: (i ? 0.5 : -0.5) * T.stepWidth, down: 0 }); }
+  }
+  return { mode: 'walk', speed: GAIT.v, feet, ride: bob, stride: GAIT.s, gait: o.gait, footDown: (feet[0].down ? 1 : 0) | (feet[1].down ? 2 : 0), surge: 0, crouch01: 0 };
+}
 function placeExplorer(side, dt) {
   placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * side, Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * side, MP.lift, MP.face);
-  if (dt != null) explorer.animate({ mode: MP.pose, speed: MP.speed == null ? undefined : MP.speed, phase: MP.phase == null ? undefined : MP.phase, jet01: MP.pose === 'jet' ? MP.jet : 0, lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
+  if (dt != null && GAIT) explorer.animate({ ...gaitPose(frozenT != null ? 0 : dt), lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
+  else if (dt != null) explorer.animate({ mode: MP.pose, speed: MP.speed == null ? undefined : MP.speed, phase: MP.phase == null ? undefined : MP.phase, jet01: MP.pose === 'jet' ? MP.jet : 0, lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
 }
 let cockpit = null;
 function placeShip(dt) {
