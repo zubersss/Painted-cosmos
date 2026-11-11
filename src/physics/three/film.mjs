@@ -92,6 +92,30 @@ export const SUBJECTS = {
   'tree-storm': { note: 'Earth spawn, 176 s: birches in the storm, 10 frames a second (the crown against the trunk, the return swing)',
     q: SPAWN + '&t=176&pre=4&explorer=0&dist=20&pitch=3&up=5.5&yaw=30', w: 640, h: 360, crop: [0.2, 0.05, 0.6, 0.6], tile: [320, 180], frames: 12, dt: 0.1, sub: 6,
     probe: `(L) => { const b = L.physics.fields.flora.plantBend(L.at(-6, 10), 1, {}), br = L.physics.fields.flora.plantBranch(2.5, 0, 9, 12, L.at(-6, 10), b, {}); return { w10: P.wind(-6, 10, 10), trunk: P.bend(-6, 10, 1).deg, trunk2: P.bend(5, 14, 1).deg, tipE: P.r3(br.e), tipN: P.r3(br.n), tipU: P.r3(br.up) }; }` },
+  // ---- the explorer (PILOT's speeds: walk 4.2 m/s, run 7.4 m/s, jump 4.8 m/s) ----
+  // (numbers: east and north of the start (m), feet over the ground (m), speed over the ground and upward (m/s), the legs:
+  //  hip = leg length less standing (m), clamber01, on the ground 1 / 0)
+  'explorer-run': { note: 'Earth spawn: a walk (4.2 m/s) for 0.6 s, a run (7.4 m/s) for 1.2 s, then stop; the camera follows; 7 frames a second',
+    q: SPAWN + '&t=60&pre=1&follow=1&dist=7&pitch=6&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [213, 144], cols: 6, frames: 18, dt: 0.15, sub: 9,
+    each: `(i, t, ctl) => { ctl.wish = t < 0.6 ? [4.2, 0] : t < 1.8 ? [7.4, 0] : [0, 0]; }`, probe: `(L) => P.ex()` },
+  'explorer-jump': { note: 'Earth spawn: a jump from a walk (4.2 m/s) and its landing; the camera follows; 12 frames a second',
+    q: SPAWN + '&t=60&pre=1&follow=1&dist=7&pitch=6&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.1, 0.5, 0.7], tile: [213, 168], cols: 6, frames: 18, dt: 1 / 12, sub: 5,
+    before: `(L) => { L.run(1, 1 / 60, (i, t, ctl) => { ctl.wish = [4.2, 0]; }); }`,
+    each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; if (i === 1) ctl.jump = true; }`, probe: `(L) => P.ex()` },
+  'explorer-jump-moon': { note: 'the Moon, at the spawn: the same jump (4.8 m/s off the ground) and its landing; 3 frames a second',
+    q: 'body=moon&hour=10&t=60&pre=1&follow=1&dist=9&pitch=6&up=1.6&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.05, 0.5, 0.8], tile: [213, 192], cols: 6, frames: 18, dt: 0.4, sub: 24,
+    before: `(L) => { L.run(1, 1 / 60, (i, t, ctl) => { ctl.wish = [4.2, 0]; }); }`,
+    each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; if (i === 1) ctl.jump = true; }`, probe: `(L) => P.ex()` },
+  'explorer-jet': { note: 'Earth spawn: a 2.5 s jetpack burn from standing, the coast, the fall and the landing; the camera follows from 30 m; 2 frames a second',
+    q: SPAWN + '&t=60&pre=1&follow=1&dist=30&pitch=4&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.3, 0.2, 0.4, 0.6], tile: [213, 180], cols: 6, frames: 18, dt: 0.5, sub: 30,
+    each: `(i, t, ctl) => { ctl.wish = [0, 0]; ctl.jet = t < 2.5 ? 1 : 0; }`, probe: `(L) => P.ex()` },
+  // the walker goes east from the spawn until its legs first reach the end of their stroke (clamber01 > 0.6: a boulder,
+  // a ledge), is put back 5 m before that place, and the strip is the walk over it
+  'explorer-clamber': { note: 'the Moon: a walk (4.2 m/s) over the first boulder east of the spawn that makes the legs clamber; the camera follows; 6 frames a second',
+    q: 'body=moon&hour=10&t=60&pre=1&follow=1&dist=7&pitch=8&up=0.9&yaw=0&circle=0.01', w: 640, h: 360, crop: [0.25, 0.2, 0.5, 0.6], tile: [213, 144], cols: 6, frames: 18, dt: 1 / 6, sub: 10,
+    before: `(L) => { let found = null; for (let i = 0; i < 60 * 240 && !found; i++) { L.ctl.wish = [4.2, 0]; L.run(1 / 60, 1 / 60); if (L.ex.phys && L.ex.phys.clamber01 > 0.6) found = L.enu(L.ex.p); }
+      window.__found = found; if (!found) return; const p = L.at(found.e - 5, found.n); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0; L.run(0.2, 1 / 60, (i, t, ctl) => { ctl.wish = [0, 0]; }); }`,
+    each: `(i, t, ctl) => { ctl.wish = [4.2, 0]; }`, probe: `(L) => { const x = P.ex(); x.found = window.__found ? P.r2(window.__found.e) : -1; return x; }` },
 };
 
 function arg(name, d) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : d; }
