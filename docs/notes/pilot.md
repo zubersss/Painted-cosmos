@@ -142,6 +142,36 @@ runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdra
    compared against that. The pulse now remembers where it was bound (`pulse.dest`);
    `tests/pulse.test.mjs` flies to the Moon and to Mars and wants "<World> ahead" (it fails
    with the fix taken out: checked). 115 unit tests.
+3. **The Moon boulder run, in the game.** `node tests/boulderrun.mjs --body moon --biome
+   crater_fields` (new; real Shift+W and mouse, the clock driven at 30 steps a second through
+   `window.__pc.hold/step`; clean tree PAINTER `23dea80`, PHYSICS `9b708e2`, mine `3858d3f`;
+   quality 0, scale 0.5, 400x225: mechanics, not the picture). The start is the densest place
+   within 320 m of the stand: 63 low boulders within 28 m, the tallest 1.09 m. Four headings,
+   12 s each:
+   | heading | metres | pace m/s | feet over the ground | thrown up | in the air |
+   | --- | --- | --- | --- | --- | --- |
+   | 0 | 70.9 | 5.90 | 0 | 0 | 0 frames |
+   | 90 | 71.8 | 5.98 | 0.162 m | 0.047 m | 29 frames (0.77 s at most) |
+   | 180 | 68.3 | 5.69 | 0.077 m | 0.007 m | 1 frame |
+   | 270 | 78.6 | 6.55 | **3.722 m** | 0.049 m | 86 frames (2.43 s) |
+   Top speed 7.4 m/s, mean pace 6.0 m/s, never stopped. **No boulder lifts the feet more than
+   0.16 m and nothing throws the body up (0.05 m at most above where the feet left the
+   ground).** The 3.7 m is not a boulder: at 7.4 s the run goes over a crater rim onto a 36
+   degree wall, the ground falls 6.7 m away under a 6.8 m/s run in the Moon's gravity and the
+   body sails for 2.4 s without rising (nearest boulder 3.9 m off). The measure as written
+   ("never more than 0.3 m off the ground without a jump") is not met there; whether a run
+   should hold a crater rim is PHYSICS' call (REVIEW). The same site replayed in the pure
+   simulation (scratch `run5/trace.mjs`, headings a few degrees off the browser's): at 90 a
+   step off the far side of a 0.72 m boulder (the ground under the feet drops 0.67 m in one
+   frame) is followed by +1.06 m/s upward: 0.29 m of rise, feet 0.53 m over the falling
+   ground, 1.4 s in the air; at 180 a run off a 50 degree wall, 1.5 m over ground that fell
+   3.4 m. Frame `docs/shots/pilot/boulderrun-moon.jpg` (opened: the explorer at a run on the
+   pale ground at night, the "Crater Fields" slip up; the slip runs off the right edge at
+   400 px, known); record `docs/lead/evidence/boulderrun-moon.json`.
+   The same run found a console error that the unit tests cannot: `pc-cloudshell` failed to
+   compile on `23dea80` ("'uStorm': redefinition": the shared chunk's `uniform float uStorm`
+   of the quality push against the cloud shell's `uniform vec4 uStorm`). PAINTER found it too
+   and fixed it in `cf2058a`.
 
 ## Status
 
