@@ -842,3 +842,44 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   the painted lab and opened: dust as many soft walls, leaves as thin tumbling marks, spray
   off a gale sea, a blizzard that drives; (3) the cost of the legs; (4) the instanced kit
   path.
+- 2026-11-11: **PILOT part 1 accepted (fourth agent, `1235328`)**. The coordinator re-ran
+  PILOT's unit tests on a clean export of the head (114 pass) and opened the grand tour sheet
+  and the new weather sheet. In:
+  **All eight planets in one browser sitting** (`tests/grandtour.mjs`; clean export of
+  `5e62268`, painted world at quality 0, scale 0.5, 400x225): from the title card with real
+  keys and mouse the run walked, used the jetpack, boarded, lifted off, reached space and
+  landed and walked on Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune and Earth
+  again: 8 of 8 in 31.6 minutes (1659 s of play), no reload, no console error; record
+  `docs/lead/evidence/grandtour.json`, frames `docs/shots/pilot/grandtour.jpg`. Found and
+  fixed on the way: the pulse from Venus to Mars let go after three seconds because Mars lay
+  through Venus; the screen now says "Venus is in the way: steer round it and pulse again".
+  The Moon and Pluto were not flown.
+  **The weather set on the new storm times** (clean export of `8d2905b`, quality 1): a
+  player at the spawn sees a sunny wood until about 11:18, a slate cloud bank and first
+  slanted rain at 11:54, the storm at 13:00, a clear warm afternoon over wet ground at 15:12.
+  **The owner's instruction on PILOT's side**: the game starts at tier 2 and full
+  resolution; `src/core/dynres.js` rewritten (under 30 fps it sheds load at once, a tier with
+  it when the smallest picture could not reach 30; it climbs in single steps that back off;
+  it is not fed frames while the first view loads); `?quality=N` now PINS the tier (not
+  additive); `tests/cost.mjs` only reports; README, REVIEW, TRACK, REFERENCES carry
+  "withdrawn" marks.
+  Also: tests for the two guards (`tests/guards.test.mjs`); the suit holds off wind beyond
+  12 m/s when off the ground (`cmd.shelter01`; a 2.5 s hop on Neptune's coast is carried
+  8.6 m, was 298 m at a full burn; on the ground nothing is cancelled and a little wind shows
+  in the pace: 4.50 / 4.20 / 3.59 m/s downwind / across / upwind); calm notice slips when
+  thin air limits the ship; "Setting down on level ground 12 m away"; a trunk or boulder met
+  dead on is stepped round after 0.12 s (a 25 s walk through the home forest stops 0.1 s at
+  most in eight headings); `mood.pulse01`; `all.mjs` re-runs a failed unit file alone once;
+  eight UI frames over the real painted world at the top tier (`docs/shots/pilot/ui-*.jpg`;
+  the Earth spawn settled in 29 s at the top tier before PAINTER's push). With PHYSICS's
+  legs the feet lift 0.18 m at most on the Moon in the pure simulation; PILOT's own clamber
+  limit and walk-over switch are out again.
+  **Not verified**: the full `tests/all.mjs` has not run since the legs, the new controller
+  and PAINTER's block 3; the grand tour was not re-flown after later changes; the weather
+  set is at quality 1, not the top tier; the Moon boulder run not seen in a browser; real
+  hardware as always. The fourth PILOT agent has about a fifth of its context left and is
+  replaced by a fifth.
+- 2026-11-11: coordinator's look at the weather sheet: the storm's arrival, height, flash,
+  clearing, and the night storm and night flash all read as watercolours; the blizzard now
+  has figure and ground. Flaws for PAINTER: in `earth-arrives` a far world shows as an orange
+  dot in front of the storm cloud; Neptune's sea stays flat blue beyond the shore.
