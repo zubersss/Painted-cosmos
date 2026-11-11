@@ -4,6 +4,25 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
+**Eighth agent, 2026-11-11 (read this paragraph first; the seventh's below still holds for
+review 6).** I did the hardening review's PILOT list (`docs/lead/HARDENING.md` section 2,
+P1 to P15) and its gaps 12 and 16: record in "Eighth agent" below, asks in "For PAINTER (eighth
+PILOT agent)" and "For PHYSICS (eighth PILOT agent)" under "Needs from the other". Commits
+`932cd9d`, `b990e8b`, `085d5e1`. Unit suite now **140** (new: `tests/input.test.mjs` 8,
+`tests/dynres-sweep.test.mjs` 5, one each in gamepad and save). What changed for the next
+PILOT: the game waits behind the card for `prewarm()` (`window.__pc.warm` says what it did);
+`__pcReady` comes a little later; sound starts only inside a gesture (the browser checks run
+with autoplay allowed, so they do not notice); `Input` reads action keys by printed letter
+(`bindingOf`), only standard pads, and its pointer-lock fallback re-arms once (lockcheck
+expects that); the controller can learn a frame-rate cap (`dyn.capMs`); `info()`'s debug has
+`gl` (`probeGL()`); main.js stops with a sentence when WebGL 2 or float targets are missing
+(`window.__pcNoGL`). My browser instrument for all of it: `/home/user/.pc-scratch/pilot/run8/
+probe.mjs <root> audio,pad,hotas,dpr,quality,nogl2,modfail,lost,prewarm,nofloat`. **Waiting
+on the coordinator's word after the art pass** for the rest of review 6 (the seventh agent's
+list below, unchanged). PAINTER's A2 hooks were in their working files, not committed, when I
+tested my side against them: once committed, rerun `probe.mjs ... prewarm` on a clean tree
+and land on another world after ready (no link expected).
+
 **Seventh agent, 2026-11-11 (read this paragraph first; the fifth agent's handover below still
 holds for the code, the commands and the timings).** Review 6 is half done and paused for the
 owner's **art pass** (four agents by planet group, every world's look changing): run nothing
@@ -259,7 +278,12 @@ time; `before/` = an export of `a671ca7`, the head before my first commit).
    ground radius under 6 m of water: 0.00 m above the bed in the new test on the old file).
    Now, in liquid deeper than `EXPLORER.swimDepth`, the explorer comes back afloat, feet 1.25 m
    under the surface, not grounded (`tests/save.test.mjs`, 1 new).
-10. **README**: layouts, the touchpad, Esc and "click again", the map releasing the mouse, the
+10. **The play still plays** (stubs, a clean export of `085d5e1` with my notes over it, `node
+    tests/all.mjs --only static,play-stub,trip-stub`): static rules hold, play-stub 38 checks,
+    trip-stub 50 checks (Earth, Mars, Saturn, the reload from the save), ALL 3 PASSED; also
+    lockcheck and m3check (stubs) PASSED and audiocheck PASSED after the changes. The painted
+    steps of `all.mjs` were not run (the art pass has the machine; review 6 runs them).
+11. **README**: layouts, the touchpad, Esc and "click again", the map releasing the mouse, the
     pad (standard layout only, sound needs a click), sound starting on the first click and
     going quiet in a hidden tab, the loading card compiling shaders, hitches, frame-rate caps
     and `capped at N fps`, the 3.7 MP picture, physics following the tier, Safari and Firefox

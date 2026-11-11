@@ -5,7 +5,8 @@ and how), PART (works, with the stated gap), TODO, RISK.
 A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it (the
 coordinator can waive an item).
 
-Last update: 2026-11-11, by the seventh PILOT agent, during review 6: the first half (the
+Last update: 2026-11-11, by the eighth PILOT agent: the hardening review's PILOT fixes are in
+(risk 9). Before that, the seventh PILOT agent, during review 6: the first half (the
 mechanics on the changed worlds, the sixth agent's runs) is on record; the top-tier tour was
 stopped part-way (six bodies of ten, Venus and Saturn from the sixth agent's sheets) because
 the owner started an art pass over every planet (four agents); the tour and the second half
@@ -135,3 +136,14 @@ been able to check are still the frame rate on a real GPU and how the game sound
    `node tests/all.mjs` in a clean tree (now loud on any stub fall-back) and the tour.
 8. **Agents run out of context.** Notes and lead files are kept able to stand alone; every
    role's notes open with a handover.
+9. **The hardening review (2026-11-11, `docs/lead/HARDENING.md`)**: PILOT's fifteen fixes are
+   in (eighth PILOT agent, `932cd9d`, `b990e8b`, `085d5e1`; record in `docs/notes/pilot.md`,
+   "Eighth agent"): sound now starts inside a gesture (Safari and pad-only players were silent),
+   non-standard pads are ignored (they could spin the camera), shaders compile behind the card
+   (0 compiles after ready in the real game, was 2 in a short run), the controller no longer
+   pins tier 0 under a refresh cap or reacts to single hitches, pointer lock survives Esc and
+   30 fps flicks, keys follow the keyboard's layout, the output is capped at 3.7 MP, plain
+   sentences for no WebGL 2, no float targets, a failed load and a lost context. Open: PAINTER's
+   A1 (no early-Z without EXT_clip_control) and the A2 hooks (in their working files, tested
+   with mine), a float-target fallback (PAINTER, low); still never run on Safari, Firefox or real
+   hardware.
