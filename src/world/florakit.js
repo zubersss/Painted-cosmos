@@ -1,0 +1,251 @@
+// Painted Cosmos: flora built from stroke clusters, all generated in code. OWNER: PAINTER.
+// Every plant is a few soft forms: wobbly tapered tubes for trunks, noisy blobs with a ragged
+// dabbed edge for foliage masses, single tapered strokes for blades and fronds.
+//
+// Vertex layout (see PROP shader in src/render/materials.js):
+//   position, normal, uv, aMass (soft normal of the whole mass),
+//   aData = (sway, part, inner shade, blob hash); part: 0 bark, 1 foliage, 2 blade, 3 accent, 4 rock
+import * as THREE from 'three';
+import { mulberry32 } from './noise.js';
+
+class Builder {
+  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; }
+  get count() { return this.p.length / 3; }
+  vert(px, py, pz, nx, ny, nz, mx, my, mz, u, v, sway, part, shade, hash) {
+    this.p.push(px, py, pz); this.n.push(nx, ny, nz); this.m.push(mx, my, mz); this.uv.push(u, v); this.d.push(sway, part, shade, hash);
+    return this.p.length / 3 - 1;
+  }
+  tri(a, b, c) { this.idx.push(a, b, c); }
+  build() {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.p), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(this.n), 3));
+    g.setAttribute('aMass', new THREE.BufferAttribute(new Float32Array(this.m), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(this.uv), 2));
+    g.setAttribute('aData', new THREE.BufferAttribute(new Float32Array(this.d), 4));
+    g.setIndex(this.count > 65535 ? new THREE.BufferAttribute(new Uint32Array(this.idx), 1) : new THREE.BufferAttribute(new Uint16Array(this.idx), 1));
+    g.computeBoundingSphere();
+    return g;
+  }
+}
+
+// A tube along a path of points with radii. Normals are radial (smooth).
+function tube(B, pts, radii, sides, opts) {
+  const o = Object.assign({ part: 0, shade: 0, hash: 0.5, sway0: 0, swayK: 0, swayH: 1, vScale: 1, v0: 0, cap: true }, opts || {});
+  const rings = [];
+  let vv = o.v0;
+  const up = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), t = new THREE.Vector3();
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    t.copy(pts[Math.min(i + 1, pts.length - 1)]).sub(pts[Math.max(i - 1, 0)]).normalize();
+    a.set(1, 0, 0); if (Math.abs(t.x) > 0.9) a.set(0, 0, 1);
+    b.crossVectors(t, a).normalize(); a.crossVectors(b, t).normalize();
+    if (i > 0) vv += p.distanceTo(pts[i - 1]) * o.vScale;
+    const ring = [];
+    const sway = o.sway0 + o.swayK * Math.pow(Math.max(0, p.y / o.swayH), 2);
+    for (let s = 0; s <= sides; s++) {
+      const ang = (s / sides) * Math.PI * 2, ca = Math.cos(ang), sa = Math.sin(ang);
+      const nx = a.x * ca + b.x * sa, ny = a.y * ca + b.y * sa, nz = a.z * ca + b.z * sa;
+      ring.push(B.vert(p.x + nx * radii[i], p.y + ny * radii[i], p.z + nz * radii[i], nx, ny, nz, nx, ny, nz, s / sides, vv, sway, o.part, o.shade, o.hash));
+    }
+    rings.push(ring);
+  }
+  for (let i = 0; i < rings.length - 1; i++) for (let s = 0; s < sides; s++) {
+    const p0 = rings[i][s], p1 = rings[i][s + 1], q0 = rings[i + 1][s], q1 = rings[i + 1][s + 1];
+    B.tri(p0, q0, p1); B.tri(p1, q0, q1);
+  }
+}
+
+// A noisy ellipsoid blob (foliage mass or rock). detail 1 = 80 triangles.
+const _ico = {};
+function ico(detail) {
+  if (!_ico[detail]) {
+    const g = new THREE.IcosahedronGeometry(1, detail);
+    _ico[detail] = { p: g.attributes.position.array, uv: g.attributes.uv.array, n: g.attributes.position.count };
+  }
+  return _ico[detail];
+}
+function blob(B, c, rx, ry, rz, rnd, opts) {
+  const o = Object.assign({ detail: 1, part: 1, noise: 0.22, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0 }, opts || {});
+  const I = ico(o.detail);
+  const mc = o.massC || c;
+  const ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28;
+  const base = B.count;
+  for (let i = 0; i < I.n; i++) {
+    let x = I.p[i * 3], y = I.p[i * 3 + 1], z = I.p[i * 3 + 2];
+    // smooth lumpy displacement: a few low sine lobes so shared vertices stay welded
+    const k = 1 + o.noise * (Math.sin(x * 3.1 + ph1) * Math.sin(y * 2.7 + ph2) + 0.6 * Math.sin(z * 4.3 + ph3 + x * 1.9));
+    let px = x * rx * k, py = y * ry * k, pz = z * rz * k;
+    const rad = Math.sqrt(x * x + z * z);
+    py -= o.droop * rad * rad * ry;
+    if (o.flatBottom && y < 0) py *= 1 - o.flatBottom;
+    // ellipsoid normal
+    let nx = x / rx, ny = y / ry, nz = z / rz; let l = 1 / Math.hypot(nx, ny, nz); nx *= l; ny *= l; nz *= l;
+    // mass normal: blend toward the direction from the crown centre
+    let mx = c.x + px - mc.x, my = c.y + py - mc.y, mz = c.z + pz - mc.z; l = 1 / Math.max(1e-6, Math.hypot(mx, my, mz)); mx *= l; my *= l; mz *= l;
+    mx = nx + (mx - nx) * o.massK; my = ny + (my - ny) * o.massK; mz = nz + (mz - nz) * o.massK; l = 1 / Math.max(1e-6, Math.hypot(mx, my, mz));
+    const shade = Math.min(1, Math.max(0, o.shade0 + o.shadeK * (0.5 - y * 0.5)));
+    B.vert(c.x + px, c.y + py, c.z + pz, nx, ny, nz, mx * l, my * l, mz * l, I.uv[i * 2] * o.uvScale, I.uv[i * 2 + 1] * o.uvScale * 0.5, o.sway, o.part, shade, o.hash);
+  }
+  for (let i = 0; i < I.n; i += 3) B.tri(base + i, base + i + 1, base + i + 2);
+}
+
+// A single tapered stroke (grass blade, fern frond): a ribbon that arches outward.
+function stroke(B, root, dir, len, width, arch, rnd, opts) {
+  const o = Object.assign({ segs: 3, part: 2, hash: rnd(), sway: 0.25, leaf: 0, twist: 0 }, opts || {});
+  const side = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+  let prevL = -1, prevR = -1;
+  for (let i = 0; i <= o.segs; i++) {
+    const t = i / o.segs;
+    // arc: rises then bends over
+    const out = len * (t * arch + 0.15 * t * t), upv = len * (t - arch * 0.55 * t * t);
+    const p = new THREE.Vector3(root.x + dir.x * out, root.y + upv, root.z + dir.z * out);
+    const w = width * (o.leaf ? Math.sin(Math.PI * Math.min(1, t * 0.9 + 0.08)) : (1 - t * 0.92));
+    const nUp = new THREE.Vector3(-dir.x * (1 - t) * 0.6, 1, -dir.z * (1 - t) * 0.6).normalize();
+    const L = B.vert(p.x - side.x * w, p.y, p.z - side.z * w, nUp.x, nUp.y, nUp.z, 0, 1, 0, 0, t, o.sway * t * t, o.part, 0, o.hash);
+    const Rr = B.vert(p.x + side.x * w, p.y, p.z + side.z * w, nUp.x, nUp.y, nUp.z, 0, 1, 0, 1, t, o.sway * t * t, o.part, 0, o.hash);
+    if (i > 0) { B.tri(prevL, prevR, L); B.tri(prevR, Rr, L); }
+    prevL = L; prevR = Rr;
+  }
+}
+
+function V(x, y, z) { return new THREE.Vector3(x, y, z); }
+
+// ---------------------------------------------------------------------------------------------
+export function birchGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 10.5 + rnd() * 2.5;
+  const lean = (rnd() - 0.5) * 0.9, bend = (rnd() - 0.5) * 1.2, lz = (rnd() - 0.5) * 0.7;
+  const segs = lod ? 4 : 10, sides = lod ? 5 : 8;
+  const pts = [], rad = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs, y = t * H;
+    pts.push(V(lean * t + bend * Math.sin(t * 2.6) * 0.35 + (lod ? 0 : (rnd() - 0.5) * 0.05), y, lz * t * t + (lod ? 0 : (rnd() - 0.5) * 0.05)));
+    rad.push((0.185 - 0.13 * Math.pow(t, 0.8)) * (i === 0 ? 1.35 : 1));
+  }
+  tube(B, pts, rad, sides, { part: 0, swayK: 0.5, swayH: H, hash: rnd() });
+  const top = pts[segs];
+  const crownC = V(top.x * 0.85, H * 0.72, top.z * 0.85);
+  const at = (t) => { const f = t * segs, i = Math.min(segs - 1, Math.floor(f)), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
+  if (!lod) {
+    // a few thin dark branches reaching into the crown
+    const nb = 4 + ((rnd() * 2) | 0);
+    for (let k = 0; k < nb; k++) {
+      const t0 = 0.42 + 0.5 * (k / nb) + rnd() * 0.05, p0 = at(t0);
+      const ang = rnd() * 6.283, len = 1.6 + rnd() * 1.6;
+      const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * 0.55, p0.z + Math.sin(ang) * len * 0.55);
+      const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * 0.8, p0.z + Math.sin(ang) * len);
+      tube(B, [p0, p1, p2], [0.05, 0.032, 0.012], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd() });
+    }
+    // crown: airy, hanging clusters
+    const nBlobs = 8 + ((rnd() * 3) | 0);
+    for (let k = 0; k < nBlobs; k++) {
+      const t0 = 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(Math.min(1, t0));
+      const spread = (1.0 - Math.abs(t0 - 0.72) * 1.5) * 2.1 + 0.3;
+      const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd());
+      const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? 0.5 : 0), p0.z + Math.sin(ang) * rr);
+      const r = 0.95 + rnd() * 0.75;
+      blob(B, c, r, r * (0.62 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3 });
+    }
+  } else {
+    const r = 2.5;
+    blob(B, V(top.x * 0.8, H * 0.74, top.z * 0.8), r, r * 1.25, r, rnd, { massK: 0.2, sway: 0.8, shade0: 0.0, shadeK: 0.75, noise: 0.3, uvScale: 5 });
+  }
+  return B.build();
+}
+
+export function pineGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 14 + rnd() * 4;
+  const lean = (rnd() - 0.5) * 0.4;
+  const segs = lod ? 3 : 8, sides = lod ? 5 : 8;
+  const pts = [], rad = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    pts.push(V(lean * t * t + (lod ? 0 : (rnd() - 0.5) * 0.04), t * H, (lod ? 0 : (rnd() - 0.5) * 0.04)));
+    rad.push((0.30 - 0.25 * Math.pow(t, 0.9)) * (i === 0 ? 1.3 : 1));
+  }
+  tube(B, pts, rad, sides, { part: 0, swayK: 0.35, swayH: H, hash: rnd() });
+  const crownC = V(lean * 0.5, H * 0.62, 0);
+  if (!lod) {
+    // dead branch stubs below the crown
+    for (let k = 0; k < 3; k++) {
+      const y = H * (0.18 + 0.07 * k + rnd() * 0.04), ang = rnd() * 6.283, len = 0.6 + rnd() * 0.9;
+      tube(B, [V(0, y, 0), V(Math.cos(ang) * len, y + 0.1, Math.sin(ang) * len)], [0.045, 0.012], 4, { part: 0, shade: 0.7, hash: rnd() });
+    }
+    const tiers = 7 + ((rnd() * 2) | 0);
+    for (let k = 0; k < tiers; k++) {
+      const t = k / (tiers - 1);
+      const y = H * (0.36 + 0.60 * t);
+      const r = (3.1 - 2.5 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3);
+      const off = (1 - t) * 0.5;
+      const c = V(lean * (y / H) * (y / H) + (rnd() - 0.5) * off, y, (rnd() - 0.5) * off);
+      blob(B, c, r, r * 0.42 + 0.25, r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: 4 });
+    }
+    blob(B, V(lean, H * 1.0, 0), 0.45, 0.9, 0.45, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2 });
+  } else {
+    for (let k = 0; k < 2; k++) {
+      const t = k, y = H * (0.50 + 0.30 * t), r = 2.6 - 1.2 * t;
+      blob(B, V(lean * 0.5, y, 0), r, r * 1.15, r, rnd, { detail: 1, massC: crownC, massK: 0.3, sway: 0.4 + 0.4 * t, shade0: 0.15 - 0.1 * t, shadeK: 0.8, droop: 0.5, noise: 0.3, uvScale: 5 });
+    }
+  }
+  return B.build();
+}
+
+export function grassGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * 6.283 + rnd() * 0.8;
+    const dir = V(Math.cos(ang), 0, Math.sin(ang));
+    const r0 = rnd() * 0.12;
+    stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, 0.42 + rnd() * 0.42, 0.045 + rnd() * 0.03, 0.25 + rnd() * 0.55, rnd, { segs: 3, sway: 0.5 });
+  }
+  return B.build();
+}
+
+export function fernGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * 6.283 + rnd() * 0.5;
+    const dir = V(Math.cos(ang), 0, Math.sin(ang));
+    stroke(B, V(0, 0, 0), dir, 0.75 + rnd() * 0.4, 0.14 + rnd() * 0.06, 0.85 + rnd() * 0.3, rnd, { segs: 5, leaf: 1, sway: 0.35 });
+  }
+  return B.build();
+}
+
+export function bushGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const cc = V(0, 0.5, 0);
+  for (let i = 0; i < 3; i++) {
+    const ang = i * 2.1 + rnd(), rr = 0.35 + rnd() * 0.3, r = 0.55 + rnd() * 0.3;
+    blob(B, V(Math.cos(ang) * rr, 0.45 + rnd() * 0.3, Math.sin(ang) * rr), r, r * 0.8, r, rnd, { massC: cc, massK: 0.5, sway: 0.25, shade0: 0.1, uvScale: 2 });
+  }
+  return B.build();
+}
+
+export function rockGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  blob(B, V(0, 0.28, 0), 0.75, 0.5, 0.6, rnd, { detail: 2, part: 4, noise: 0.32, massK: 0, sway: 0, shade0: 0, shadeK: 1.0, flatBottom: 0.4, uvScale: 1 });
+  return B.build();
+}
+
+export function flowerGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = 5;
+  for (let i = 0; i < n; i++) {
+    const ang = rnd() * 6.283, rr = rnd() * 0.28, h = 0.28 + rnd() * 0.3;
+    const x = Math.cos(ang) * rr, z = Math.sin(ang) * rr;
+    const dir = V(Math.cos(ang), 0, Math.sin(ang));
+    stroke(B, V(x * 0.6, 0, z * 0.6), dir, h, 0.012, 0.25, rnd, { segs: 2, sway: 0.5 });
+    // the head: a small soft dab
+    const c = V(x * 0.6 + dir.x * h * 0.3, h * 0.96, z * 0.6 + dir.z * h * 0.3), s = 0.05 + rnd() * 0.035;
+    const base = B.count, hh = rnd();
+    const ring = 6;
+    B.vert(c.x, c.y + s * 0.5, c.z, 0, 1, 0, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh);
+    for (let k = 0; k < ring; k++) { const a = (k / ring) * 6.283; B.vert(c.x + Math.cos(a) * s, c.y, c.z + Math.sin(a) * s, Math.cos(a) * 0.5, 0.8, Math.sin(a) * 0.5, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh); }
+    for (let k = 0; k < ring; k++) B.tri(base, base + 1 + ((k + 1) % ring), base + 1 + k);
+  }
+  return B.build();
+}
