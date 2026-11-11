@@ -1,0 +1,64 @@
+// Painted Cosmos: uniforms and textures shared by every painted material. OWNER: PAINTER.
+import * as THREE from 'three';
+import { genNoise3D, genStrokes, genPaper } from './texgen.js';
+import { PAPER, hexToRgb } from '../data/looks.js';
+
+let _tex = null;
+export function getTextures() {
+  if (_tex) return _tex;
+  const n3 = new THREE.Data3DTexture(genNoise3D(64), 64, 64, 64);
+  n3.format = THREE.RGBAFormat; n3.type = THREE.UnsignedByteType;
+  n3.wrapS = n3.wrapT = n3.wrapR = THREE.RepeatWrapping;
+  n3.minFilter = THREE.LinearFilter; n3.magFilter = THREE.LinearFilter;
+  n3.unpackAlignment = 1; n3.needsUpdate = true;
+
+  const st = new THREE.DataTexture(genStrokes(256), 256, 256, THREE.RGBAFormat, THREE.UnsignedByteType);
+  st.wrapS = st.wrapT = THREE.RepeatWrapping;
+  st.minFilter = THREE.LinearMipmapLinearFilter; st.magFilter = THREE.LinearFilter;
+  st.generateMipmaps = true; st.anisotropy = 4; st.needsUpdate = true;
+
+  const pp = new THREE.DataTexture(genPaper(512), 512, 512, THREE.RGBAFormat, THREE.UnsignedByteType);
+  pp.wrapS = pp.wrapT = THREE.RepeatWrapping;
+  pp.minFilter = THREE.LinearMipmapLinearFilter; pp.magFilter = THREE.LinearFilter;
+  pp.generateMipmaps = true; pp.needsUpdate = true;
+
+  _tex = { noise3D: n3, strokes: st, paper: pp };
+  return _tex;
+}
+
+const paper = hexToRgb(PAPER);
+
+// One object per uniform, shared by reference between all materials.
+export const G = {
+  uTime: { value: 0 },          // seconds, drives wind and drift (frozen for deterministic frames)
+  uNoise3D: { value: null },
+  uStrokeTex: { value: null },
+  uPaperColor: { value: new THREE.Vector3(paper[0], paper[1], paper[2]) },
+};
+
+export function ensureGlobals() {
+  const t = getTextures();
+  G.uNoise3D.value = t.noise3D;
+  G.uStrokeTex.value = t.strokes;
+  return G;
+}
+
+// Per-body light and atmosphere uniforms. The world owns one of these per body and updates the
+// active body's every frame; all of that body's materials share the same objects.
+export function makeBodyUniforms() {
+  return {
+    uSunDirW: { value: new THREE.Vector3(0.4, 0.8, 0.4).normalize() },   // toward the sun, scene space
+    uSunDirL: { value: new THREE.Vector3(0.4, 0.8, 0.4).normalize() },   // toward the sun, body-local
+    uGlaze: { value: new THREE.Vector3(0.66, 0.69, 0.90) },              // cool shadow glaze
+    uLight: { value: new THREE.Vector3(1.0, 0.985, 0.93) },              // sunlit wash tint
+    uHaze: { value: new THREE.Vector3(0.93, 0.955, 0.975) },             // distance fades to this (near paper)
+    uFog: { value: new THREE.Vector4(1 / 4000, 5, 1, 0) },               // 1/visibility, bands, max, altitude01
+    uDayness: { value: 1 },                                              // 1 day .. 0 night
+  };
+}
+
+// The painter reads this to grade the sheet; the world writes it for the body the camera is on.
+export const SHEET = {
+  grade: new THREE.Vector3(1, 1, 1),
+  valid: false,
+};

@@ -1,0 +1,575 @@
+// Painted Cosmos: painted scene materials. OWNER: PAINTER.
+// The watercolor look starts here, in the materials: washes with pigment-density turbulence,
+// value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
+// post passes (post.js) then treat the result as wet paint on paper.
+import * as THREE from 'three';
+import { G, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+
+const FOG_VERT = /* glsl */`
+uniform vec4 uFog;
+float pcFogAmountV(float dist) {
+  float f = 1.0 - exp(-dist * uFog.x);
+  float q = f * uFog.y;
+  float fl = floor(q);
+  f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
+  return clamp(f * uFog.z, 0.0, 1.0);
+}
+`;
+
+let _defaultBody = null;
+export function defaultBodyUniforms() {
+  if (!_defaultBody) _defaultBody = makeBodyUniforms();
+  return _defaultBody;
+}
+
+function baseUniforms(bodyU, own) {
+  ensureGlobals();
+  const b = bodyU || defaultBodyUniforms();
+  return Object.assign({
+    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex,
+    uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
+    uFog: b.uFog, uDayness: b.uDayness,
+  }, own || {});
+}
+
+// ------------------------------------------------------------------------------------------
+// Terrain
+// ------------------------------------------------------------------------------------------
+const TERRAIN_VERT = /* glsl */`
+${VERT_PARS}
+attribute vec3 aMorph;
+attribute vec4 aColor;
+attribute vec4 aColor2;
+attribute vec4 aParams;
+uniform vec3 uOrigin;     // patch origin, body-local metres
+uniform vec3 uAnchor;     // patch origin modulo the stroke tile period
+uniform vec3 uCamLocal;   // camera relative to the patch origin, body-local axes
+uniform vec2 uMorph;      // distance range over which this level morphs to its parent
+varying vec3 vBody;
+varying vec3 vAnch;
+varying vec3 vNV;
+varying vec3 vNL;
+varying vec3 vView;
+varying vec4 vCol;
+varying vec3 vCol2;
+varying vec4 vPar;
+void main() {
+  float d = distance(position, uCamLocal);
+  float m = clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0);
+  vec3 p = position + aMorph * m;
+  vBody = p + uOrigin;
+  vAnch = p + uAnchor;
+  vNL = normal;
+  vNV = normalMatrix * normal;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vView = mv.xyz;
+  vCol = aColor; vCol2 = aColor2.rgb; vPar = aParams;
+  gl_Position = projectionMatrix * mv;
+  ${VERT_END}
+}
+`;
+
+const TERRAIN_FRAG = /* glsl */`
+${FRAG_PARS}
+varying vec3 vBody;
+varying vec3 vAnch;
+varying vec3 vNV;
+varying vec3 vNL;
+varying vec3 vView;
+varying vec4 vCol;
+varying vec3 vCol2;
+varying vec4 vPar;
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 nV = normalize(vNV);
+  vec3 nL = normalize(vNL);
+  float dist = length(vView);
+  float near = 1.0 - smoothstep(18.0, 80.0, dist);
+  float mid = 1.0 - smoothstep(120.0, 420.0, dist);
+
+  vec4 n1 = texture(uNoise3D, vBody / 31.0);
+  vec4 n2 = texture(uNoise3D, vBody / 6.3 + 0.21);
+  vec4 st = pcTri(vAnch, nL, 1.0 / 8.0);
+  vec4 st2 = pcTri(vAnch, nL, 1.0 / 2.0);
+
+  // far away the forest floor reads as its canopy: one broad soft wash
+  vec3 c = mix(vCol2, vCol.rgb, mid);
+
+  // wash turbulence: the pigment load drifts, so no area is flat colour
+  float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.40 * near;
+  // broken colour: darker brush touches inside the wash
+  float dab = smoothstep(0.30, 0.62, st.g + (n2.b - 0.5) * 0.3) * near;
+  d += dab * 0.42 * (1.0 - vPar.x * 0.6);
+  c = pcDensity(c, d);
+
+  // light in soft value steps; shadows are glazes
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float x = dot(nV, sunV) * 0.5 + 0.5;
+  float sunny = pcDapple(vBody, vPar.z * mix(0.82, 1.0, mid));
+  x *= mix(0.40, 1.0, sunny);
+  x += (n1.g - 0.5) * 0.16 + (st.b - 0.5) * 0.06 * near;
+  float lvl = pcLevel(x, 0.045);
+  c = pcTone(c, lvl);
+
+  // dry brush on rough ground: broken strokes, paper sparkling through
+  float dryM = smoothstep(0.50, 0.64, st2.r * 0.75 + st.r * 0.35 + (n2.r - 0.5) * 0.25);
+  c = mix(c, vec3(1.0), dryM * vPar.x * near * (0.22 + 0.16 * lvl));
+
+  float f = pcFogAmount(dist);
+  c = pcAtmos(c, f);
+  float wet = max(vPar.y, max(f * 0.9, (1.0 - mid) * 0.7));
+  pcWrite(c, wet, nV, -vView.z, 1.0);
+}
+`;
+
+export function makeTerrainMaterial(bodyU) {
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-terrain',
+    uniforms: baseUniforms(bodyU, {
+      uOrigin: { value: new THREE.Vector3() }, uAnchor: { value: new THREE.Vector3() },
+      uCamLocal: { value: new THREE.Vector3() }, uMorph: { value: new THREE.Vector2(1e8, 2e8) },
+    }),
+    vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
+  });
+  m.userData.pcPainted = true;
+  return m;
+}
+
+// ------------------------------------------------------------------------------------------
+// Water
+// ------------------------------------------------------------------------------------------
+const WATER_VERT = /* glsl */`
+${VERT_PARS}
+attribute float aDepth;
+uniform vec3 uOrigin;
+uniform vec3 uCamLocal;
+varying vec3 vBody;
+varying vec3 vToCam;
+varying vec3 vView;
+varying float vDepth;
+void main() {
+  vBody = position + uOrigin;
+  vToCam = uCamLocal - position;
+  vDepth = aDepth;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vView = mv.xyz;
+  gl_Position = projectionMatrix * mv;
+  ${VERT_END}
+}
+`;
+
+const WATER_FRAG = /* glsl */`
+${FRAG_PARS}
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyHorizon;
+uniform vec3 uReflDark;
+uniform vec3 uBed;
+uniform float uTreeLine;
+varying vec3 vBody;
+varying vec3 vToCam;
+varying vec3 vView;
+varying float vDepth;
+void main() {
+  #include <logdepthbuf_fragment>
+  if (vDepth < 0.0) discard;
+  vec3 up = normalize(vBody);
+  vec3 Vd = normalize(vToCam);
+  float dist = length(vView);
+  vec3 drift = uSunDirL * 0.0 + vec3(uTime * 0.012, uTime * 0.007, -uTime * 0.009);
+  vec4 r1 = texture(uNoise3D, vBody / 4.6 + drift);
+  vec4 r2 = texture(uNoise3D, vBody / 1.35 - drift * 1.7);
+  vec4 r3 = texture(uNoise3D, vBody / 17.0);
+  vec3 n = normalize(up + (r1.xyz - 0.5) * 0.16 + (r2.xyz - 0.5) * 0.07);
+  vec3 r = reflect(-Vd, n);
+  float re = dot(r, up);
+  // what the water mirrors: sky above a ragged tree line, dark banks below it
+  float line = uTreeLine + (r3.r - 0.5) * 0.30;
+  float skyAmt = smoothstep(line - 0.05, line + 0.05, re + (r1.g - 0.5) * 0.18);
+  vec3 skyc = mix(uSkyHorizon, uSkyZenith, clamp(re * 1.2, 0.0, 1.0));
+  skyc = mix(skyc, vec3(1.0), 0.25);
+  vec3 dark = pcDensity(uReflDark, 1.0 + (r3.g - 0.5) * 0.9);
+  vec3 c = mix(dark, skyc, skyAmt);
+  // the bed shows through where the water is shallow or seen from above
+  float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
+  float shallow = smoothstep(0.42, 0.02, vDepth);
+  c = mix(c, uBed * mix(vec3(1.0), dark, 0.35), clamp((1.0 - fres) * 0.5 + shallow * 0.75, 0.0, 0.92));
+  // pigment pools at the water's edge
+  c = pcDensity(c, 1.0 + smoothstep(0.10, 0.0, vDepth) * 0.6);
+  // bare-paper glints: broken horizontal dashes where ripples catch the light
+  float glint = smoothstep(0.71, 0.76, r2.r * 0.62 + r1.b * 0.38) * (0.35 + 0.65 * skyAmt) * smoothstep(0.05, 0.25, vDepth) * uDayness;
+  c = mix(c, vec3(1.0), glint);
+  float f = pcFogAmount(dist);
+  c = pcAtmos(c, f);
+  vec3 nV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+  pcWrite(c, 0.75, nV, -vView.z, 2.0);
+}
+`;
+
+export function makeWaterMaterial(bodyU, skyU) {
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-water',
+    uniforms: baseUniforms(bodyU, {
+      uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
+      uSkyZenith: skyU.uSkyZenith, uSkyHorizon: skyU.uSkyHorizon,
+      uReflDark: { value: new THREE.Vector3(0.36, 0.47, 0.36) },
+      uBed: { value: new THREE.Vector3(0.80, 0.70, 0.52) },
+      uTreeLine: { value: 0.42 },
+    }),
+    vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
+  });
+  m.userData.pcPainted = true;
+  return m;
+}
+
+// ------------------------------------------------------------------------------------------
+// Props: trees, undergrowth, rocks. One shader, instanced, parts selected per vertex.
+//   aData.y part: 0 bark, 1 foliage mass, 2 blade / frond, 3 accent dab, 4 rock
+// ------------------------------------------------------------------------------------------
+const PROP_VERT = /* glsl */`
+${VERT_PARS}
+${FOG_VERT}
+attribute vec4 aData;     // x sway, y part, z inner shade, w blob hash
+attribute vec3 aMass;     // soft "mass" normal of the whole crown
+attribute vec4 aInst;     // per instance: x hue, y value, z seed, w spare
+uniform vec3 uOrigin;
+uniform vec3 uCamLocal;
+uniform vec4 uLod;        // min distance, max distance, jitter, fade start fraction
+uniform float uWind;
+uniform float uTime;
+varying vec3 vBody;
+varying vec3 vObj;
+varying vec3 vNV;
+varying vec3 vMassV;
+varying vec3 vView;
+varying vec2 vUv;
+varying vec4 vData;
+varying vec4 vInst;
+varying float vFog;
+void main() {
+  #ifdef USE_INSTANCING
+    mat4 im = instanceMatrix;
+    vec4 inst = aInst;
+  #else
+    mat4 im = mat4(1.0);
+    vec4 inst = vec4(0.0, 0.0, 0.5, 0.0);
+  #endif
+  vec3 io = im[3].xyz;
+  float di = distance(io, uCamLocal);
+  float j = 1.0 + (inst.z - 0.5) * uLod.z;
+  float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di));
+  vec3 lp = position;
+  float ph = inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13));
+  float sway = sin(uTime * 1.1 + ph) * 0.6 + sin(uTime * 2.7 + ph * 1.9) * 0.3;
+  lp.x += aData.x * sway * uWind;
+  lp.z += aData.x * cos(uTime * 0.8 + ph * 1.3) * uWind * 0.6;
+  vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
+  vBody = wp + uOrigin;
+  vObj = position;
+  mat3 ir = mat3(im);
+  vNV = normalMatrix * (ir * normal);
+  vMassV = normalMatrix * (ir * aMass);
+  vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+  vView = mv.xyz;
+  vUv = uv; vData = aData; vInst = inst;
+  vFog = pcFogAmountV(di);
+  gl_Position = projectionMatrix * mv;
+  ${VERT_END}
+}
+`;
+
+const PROP_FRAG = /* glsl */`
+${FRAG_PARS}
+uniform vec3 uBarkA;
+uniform vec3 uBarkB;
+uniform vec4 uBarkP;   // mark threshold, 0 marks run around / 1 along, dark base height (m), dry brush
+uniform vec3 uLeafA;
+uniform vec3 uLeafB;
+uniform vec3 uLeafC;
+uniform vec4 uLeafP;   // raggedness, sky holes, dab scale, wetness
+uniform vec3 uAccent;
+uniform float uCanopy;
+varying vec3 vBody;
+varying vec3 vObj;
+varying vec3 vNV;
+varying vec3 vMassV;
+varying vec3 vView;
+varying vec2 vUv;
+varying vec4 vData;
+varying vec4 vInst;
+varying float vFog;
+void main() {
+  #include <logdepthbuf_fragment>
+  float part = vData.y;
+  vec3 nV = normalize(vNV);
+  if (!gl_FrontFacing) nV = -nV;
+  vec3 V = normalize(-vView);
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  vec4 n1 = texture(uNoise3D, vBody / 9.0);
+  float seed = vInst.z;
+  float near = 1.0 - smoothstep(30.0, 110.0, length(vView));
+  vec3 c; float wet = 0.05; float id = 3.0; float x; float soft = 0.05;
+
+  if (part < 0.5) {
+    // ---- bark: a pale or warm wash with dry-brushed marks
+    vec2 tuv = mix(vec2(vUv.x * 2.0 + seed * 3.0, vUv.y * 0.55 + seed * 5.0), vec2(vUv.y * 0.30 + seed * 3.0, vUv.x * 3.0 + seed * 5.0), uBarkP.y);
+    vec4 st = texture(uStrokeTex, tuv);
+    float marks = smoothstep(uBarkP.x, uBarkP.x + 0.07, st.r * 0.78 + st.b * 0.30 + (n1.b - 0.5) * 0.25);
+    float base = smoothstep(uBarkP.z, 0.0, vUv.y + (st.b - 0.5) * 1.3);
+    float twig = smoothstep(0.0, 1.0, vData.z);   // thin branches read dark
+    c = mix(uBarkA, uBarkB, clamp(max(max(marks, base * 0.9), twig), 0.0, 1.0));
+    c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7);
+    x = dot(nV, sunV) * 0.5 + 0.5;
+    x *= mix(0.42, 1.0, pcDapple(vBody, uCanopy));
+    x += (n1.g - 0.5) * 0.12;
+    float lvl = pcLevel(x, 0.06);
+    c = pcTone(c, lvl);
+    float dryM = smoothstep(0.56, 0.68, st.g * 0.5 + st.r * 0.6);
+    c = mix(c, vec3(1.0), dryM * uBarkP.w * near * 0.5);
+    id = 3.0 + seed * 0.9;
+  } else if (part < 1.5) {
+    // ---- foliage mass: a wash with a ragged, dabbed edge and three tones
+    vec4 st = texture(uStrokeTex, vUv * uLeafP.z + seed * 3.7);
+    vec4 n2 = texture(uNoise3D, vBody / 2.6 + 0.4);
+    float rim = 1.0 - abs(dot(nV, V));
+    float cut = smoothstep(0.30, 0.92, rim) * uLeafP.x + uLeafP.y * smoothstep(0.52, 0.72, n2.r);
+    if (st.g + (n2.g - 0.5) * 0.5 < cut) discard;
+    vec3 mV = normalize(vMassV);
+    float hue = vInst.x + (n1.b - 0.5) * 0.9 + (vData.w - 0.5) * 0.5;
+    c = mix(uLeafA, uLeafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
+    c = mix(c, uLeafC, clamp(vData.z * 0.75 + (n2.b - 0.5) * 0.3, 0.0, 1.0));
+    c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.9 + vInst.y * 0.5);
+    x = dot(mV, sunV) * 0.5 + 0.5;
+    x = x * (1.0 - vData.z * 0.55);
+    x *= mix(0.62, 1.0, pcDapple(vBody, uCanopy * 0.6));
+    x += (st.g - 0.35) * 0.22 + (n2.g - 0.5) * 0.16;
+    float lvl = pcLevel(x, 0.07);
+    c = pcTone(c, lvl);
+    wet = uLeafP.w;
+    id = 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
+  } else if (part < 2.5) {
+    // ---- blades and fronds: single crisp strokes, lit like the ground under them
+    float hue = vInst.x + (n1.b - 0.5) * 0.8;
+    c = mix(uLeafA, uLeafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
+    c = mix(c, uLeafC, clamp(0.55 - vUv.y * 0.7, 0.0, 1.0));
+    c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5);
+    vec3 upV = normalize(vMassV);
+    x = dot(upV, sunV) * 0.5 + 0.5;
+    x *= mix(0.42, 1.0, pcDapple(vBody, uCanopy));
+    x += (n1.g - 0.5) * 0.14 + vUv.y * 0.10;
+    float lvl = pcLevel(x, 0.06);
+    c = pcTone(c, lvl);
+    wet = 0.1;
+    id = 4.0 + seed * 0.9;
+  } else if (part < 3.5) {
+    // ---- accent: one touch of pure pigment
+    c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.6);
+    x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, uCanopy));
+    c = pcTone(c, pcLevel(x + 0.2, 0.08));
+    id = 3.0 + seed * 0.9;
+  } else {
+    // ---- rock: pale granulating wash, paper on top, pooled dark at the base
+    vec4 st = pcTri(vBody, normalize(vObj + 0.001), 1.0 / 3.0);
+    c = mix(uBarkA, uBarkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
+    c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9);
+    x = dot(nV, sunV) * 0.5 + 0.5;
+    x *= mix(0.45, 1.0, pcDapple(vBody, uCanopy));
+    x += (n1.g - 0.5) * 0.18 + (st.b - 0.5) * 0.1;
+    float lvl = pcLevel(x, 0.04);
+    c = pcTone(c, lvl);
+    float dryM = smoothstep(0.50, 0.62, st.r * 0.8 + st.g * 0.3);
+    c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));
+    id = 3.0 + seed * 0.9;
+  }
+  c = pcAtmos(c, vFog);
+  wet = max(wet, vFog * 0.85);
+  pcWrite(c, wet, nV, -vView.z, id);
+}
+`;
+
+export function makePropMaterial(bodyU, opts = {}) {
+  const v3 = (a, d) => ({ value: new THREE.Vector3().fromArray(a || d) });
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-prop-' + (opts.name || ''),
+    uniforms: baseUniforms(bodyU, {
+      uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
+      uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
+      uWind: { value: opts.wind == null ? 0.06 : opts.wind },
+      uBarkA: v3(opts.barkA, [0.95, 0.94, 0.92]), uBarkB: v3(opts.barkB, [0.30, 0.27, 0.27]),
+      uBarkP: { value: new THREE.Vector4().fromArray(opts.barkP || [0.62, 0, 1.0, 0.5]) },
+      uLeafA: v3(opts.leafA, [0.72, 0.80, 0.36]), uLeafB: v3(opts.leafB, [0.50, 0.68, 0.34]),
+      uLeafC: v3(opts.leafC, [0.30, 0.48, 0.40]),
+      uLeafP: { value: new THREE.Vector4().fromArray(opts.leafP || [0.8, 0.25, 1.0, 0.45]) },
+      uAccent: v3(opts.accent, [0.85, 0.29, 0.17]),
+      uCanopy: { value: opts.canopy == null ? 0.7 : opts.canopy },
+    }),
+    vertexShader: PROP_VERT, fragmentShader: PROP_FRAG,
+    side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+  });
+  m.userData.pcPainted = true;
+  return m;
+}
+
+// ------------------------------------------------------------------------------------------
+// Wash: the general painted material (explorer, ship, Pilot's incidental objects, and the
+// stand-in for any foreign Three material found in the scene).
+// ------------------------------------------------------------------------------------------
+const WASH_VERT = /* glsl */`
+${VERT_PARS}
+varying vec3 vObj;
+varying vec3 vNO;
+varying vec3 vNV;
+varying vec3 vView;
+#ifdef USE_VCOLOR
+  attribute vec3 color;
+  varying vec3 vVCol;
+#endif
+#ifdef USE_UVMAP
+  varying vec2 vUv;
+#endif
+#ifdef PC_POINTS
+  uniform float uPointSize;
+#endif
+void main() {
+  vec3 p = position;
+  vec3 n = vec3(0.0, 1.0, 0.0);
+  #ifndef PC_UNLIT
+    n = normal;
+  #endif
+  #ifdef PC_SPRITE
+    vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+    vec2 sc = vec2(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz));
+    mv.xy += position.xy * sc;
+    vNV = vec3(0.0, 0.0, 1.0);
+  #else
+    #ifdef USE_INSTANCING
+      p = (instanceMatrix * vec4(p, 1.0)).xyz;
+      n = mat3(instanceMatrix) * n;
+    #endif
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    vNV = normalMatrix * n;
+  #endif
+  vObj = position; vNO = n;
+  vView = mv.xyz;
+  #ifdef USE_VCOLOR
+    vVCol = color;
+  #endif
+  #ifdef USE_UVMAP
+    vUv = uv;
+  #endif
+  gl_Position = projectionMatrix * mv;
+  #ifdef PC_POINTS
+    gl_PointSize = uPointSize;
+  #endif
+  ${VERT_END}
+}
+`;
+
+const WASH_FRAG = /* glsl */`
+${FRAG_PARS}
+uniform vec3 uColor;
+uniform vec4 uWash;   // noise scale (1/m), dry brush, wetness, region id
+uniform float uFlat;  // 1 = no light steps (pure wash)
+varying vec3 vObj;
+varying vec3 vNO;
+varying vec3 vNV;
+varying vec3 vView;
+#ifdef USE_VCOLOR
+  varying vec3 vVCol;
+#endif
+#ifdef USE_UVMAP
+  uniform sampler2D uMap;
+  varying vec2 vUv;
+#endif
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 c = uColor;
+  #ifdef USE_VCOLOR
+    c *= vVCol;
+  #endif
+  #ifdef USE_UVMAP
+    vec4 tx = texture(uMap, vUv);
+    if (tx.a < 0.5) discard;
+    c *= tx.rgb;
+  #endif
+  vec4 n1 = texture(uNoise3D, vObj * uWash.x);
+  vec4 n2 = texture(uNoise3D, vObj * uWash.x * 3.7 + 0.31);
+  c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7 + (n2.g - 0.5) * 0.3);
+  vec3 nV = vec3(0.0, 0.0, 1.0);
+  float lvl = 2.0;
+  #ifndef PC_UNLIT
+    nV = normalize(vNV);
+    if (!gl_FrontFacing) nV = -nV;
+    vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+    float x = dot(nV, sunV) * 0.5 + 0.5 + (n1.g - 0.5) * 0.14;
+    lvl = mix(pcLevel(x, 0.05), 2.0, uFlat);
+    vec4 st = pcTri(vObj * 2.0, normalize(vNO), 0.5);
+    float dryM = smoothstep(0.52, 0.66, st.r * 0.8 + st.b * 0.3);
+    c = mix(c, vec3(1.0), dryM * uWash.y * (0.25 + 0.15 * lvl));
+  #endif
+  c = pcTone(c, lvl);
+  float f = pcFogAmount(length(vView));
+  c = pcAtmos(c, f);
+  pcWrite(c, max(uWash.z, f * 0.8), nV, -vView.z, uWash.w);
+}
+`;
+
+// makeWashMaterial({ color, wet, dry, scale, id, flat, vertexColors, side, map })
+//   color: THREE.Color | hex | css string: the wash as it should look on paper
+//   wet 0..1: how much it bleeds into neighbours; dry 0..1: dry-brush sparkle
+//   scale: size in metres of the wash turbulence; flat: skip the light steps
+export function makeWashMaterial(opts = {}) {
+  const col = new THREE.Color(opts.color == null ? 0xb9b3a8 : opts.color);
+  const rgb = { r: 0, g: 0, b: 0 };
+  col.getRGB(rgb, THREE.SRGBColorSpace);
+  const defines = {};
+  if (opts.vertexColors) defines.USE_VCOLOR = 1;
+  if (opts.map) defines.USE_UVMAP = 1;
+  if (opts.unlit) defines.PC_UNLIT = 1;
+  if (opts.points) { defines.PC_POINTS = 1; defines.PC_UNLIT = 1; }
+  if (opts.sprite) { defines.PC_SPRITE = 1; defines.PC_UNLIT = 1; }
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-wash',
+    defines,
+    uniforms: baseUniforms(opts.bodyUniforms, {
+      uColor: { value: new THREE.Vector3(rgb.r, rgb.g, rgb.b) },
+      uWash: { value: new THREE.Vector4(1 / (opts.scale || 1.6), opts.dry == null ? 0.25 : opts.dry, opts.wet == null ? 0.15 : opts.wet, opts.id == null ? 5.0 : opts.id) },
+      uFlat: { value: opts.flat ? 1 : 0 },
+      uMap: { value: opts.map || null },
+      uPointSize: { value: opts.pointSize || 3 },
+    }),
+    vertexShader: WASH_VERT, fragmentShader: WASH_FRAG,
+    side: opts.side == null ? THREE.FrontSide : opts.side,
+  });
+  m.userData.pcPainted = true;
+  return m;
+}
+
+// Re-point a material's light uniforms at a body's (so an object standing on a planet is lit
+// and hazed like the planet around it).
+export function bindBodyUniforms(material, bodyU) {
+  if (!material || !material.uniforms || !bodyU) return;
+  for (const k of Object.keys(bodyU)) if (material.uniforms[k]) material.uniforms[k] = bodyU[k];
+  material.uniformsNeedUpdate = true;
+}
+
+// ------------------------------------------------------------------------------------------
+// Stand-ins for foreign materials (COORDINATOR C9)
+// ------------------------------------------------------------------------------------------
+const standIns = new WeakMap();
+export function standInFor(object, material) {
+  let s = standIns.get(material);
+  if (s) return s;
+  const color = material.color ? material.color : new THREE.Color(0xb9b3a8);
+  const c = color.clone();
+  if (material.transparent && material.opacity < 1) c.lerp(new THREE.Color(1, 1, 1), 1 - material.opacity);
+  const o = { color: c, side: material.side, vertexColors: !!material.vertexColors && !!(object.geometry && object.geometry.attributes.color) };
+  if (object.isPoints) { o.points = true; o.pointSize = Math.max(2, (material.size || 1) * 2); }
+  else if (object.isLine) o.unlit = true;
+  else if (object.isSprite) { o.sprite = true; o.side = THREE.DoubleSide; if (material.map) o.map = material.map; }
+  else if (!object.geometry || !object.geometry.attributes.normal) o.unlit = true;
+  if (material.isMeshBasicMaterial) o.flat = true;
+  s = makeWashMaterial(o);
+  standIns.set(material, s);
+  return s;
+}
