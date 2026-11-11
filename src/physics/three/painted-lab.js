@@ -697,6 +697,7 @@ const lab = { info, stability, film, run, ctl, ex, sh, enu, enuV, at, focus0, ea
   get yaw() { return yaw; }, set yaw(v) { yaw = v; },
   physics, world, painter, renderer, scene, camera, root, THREE, get kits() { return kits; },
   crownTip, crownTips, crownList,
+  get eye() { return camLocal; },        // (P15) where the lens is, body-local
   setRain(mode) { if (RAIN[mode]) { rainMode = mode; bound = false; buildKits(); } return rainMode; },
   hideKits(h) { if (kits) for (const o of kits.objects) o.userData.hide = !!h; } };
 window.__lab = lab;

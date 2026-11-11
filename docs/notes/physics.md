@@ -3,6 +3,46 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P15 (thirteenth PHYSICS agent; read this block first; P14 and older below hold for everything not named here)
+
+**Where things stand.** P15 item 1 (leaves that can be seen) done. Items 2 (the shore), 3 (are the crowns sheltered
+twice?), 4 (three strips to re-film) follow in that order. Scratch: `/home/user/.pc-scratch/physics/p15/` (`ex.sh`: a
+clean export of HEAD with the working physics over it into `p15/root`; `forest.mjs <biome> <k> <secs>`: leaves in the
+Node test world, wind scaled down k times; `timing.mjs <q> <k>`: physics.update in a closed wood gale; `diag.mjs`: where
+the leaves are in the painted lab).
+
+**1. Leaves (`loose.js`, `particles.js`, `three/expand.js`).** At the gust front the box held 200 leaves (cap 260), shed
+uniformly over the box whatever stood there, and 190 showed as specks. Now:
+- *How many is what the wood sheds, not the buffer*: `BLOWN.leafFlux` 0.04 leaves a second off each m2 of closed canopy at
+  torn 1, torn up to `leafTornMax` 6 (0.24 a m2 a second: a summer gale strips 1 to 2 in 100 of a wood's 2000 leaves a m2 in
+  its first minutes), each candidate kept by the canopy closure and leafiness at its place (`air.coverNear`) and the wind
+  there to the fourth power (the 4 x 4 patch, gusts in it): bursts and streams. A stock (`leafStock` 40 a m2, 9 x in an
+  autumn wood) that a long gale drains and a calm restores over 1200 s (`here.blown.leafStock01`).
+- *Inflow*: a leaf torn off a 14 m crown falls for ten seconds and goes 100 m downwind, so most leaves crossing the box
+  near the ground were shed upwind of it; they now come in through the box's upwind side at the height they have come
+  down to (`leafFetch` 300 m). Until now the box held only what its own crowns let go, high up, and it left downwind before
+  it came down. Under the crowns the air now holds flux / vs leaves a m3 (0.09 a m3 below 3 m in a closed wood gale).
+- *Litter* off the floor in the streamers where the wind at 1 m (with the sweeps, +-1.7 sigma) is over 3 m/s (full at 9),
+  dry ground only (`leafLitter` 0.04 a m2 a second at full). Under a closed canopy it hardly ever lifts (the floor is calm).
+- *Tumble*: `buf.turn` (new, every buffer; radians about the leaf's long side; 0 for kinds that do not tumble): three
+  quarters tumble at 2 Ro |v - w| / c (Ro 0.2 to 0.4, c 0.6 of the leaf's length: about 5 turns a second), a quarter
+  rock through +-0.9 to 1.35 rad and never turn over. The kit (`expandDabs`) uses it: the quad's short side is reversed
+  while cos(turn) < 0, so its winding turns over and PAINTER's two-toned leaf (gl_FrontFacing) flickers. No PAINTER change.
+- `LOOSE.leaves.turb` 0.5 -> 0.9 (a leaf answers the air within 0.15 s). Capacities 80 / 260 / 600 -> 800 / 3000 / 6000.
+- Numbers. Painted spawn (a clearing by an open wood), gust front 146 to 150 s, quality 1: 200 -> 990 to 1050 leaves in the
+  box; within 8 m of the lens 25 to 30 -> 9 to 18 (the old uniform shedding put leaves where no tree stood), within 3 m 0
+  to 1 (the clearing is open: 0.01 a m3 at head height). Node closed wood (canopy 0.75, 14 m) in 15.6 m/s: 2230 leaves,
+  635 below 3 m (0.09 a m3); a leaf shows its other side 11 times a second. Autumn wood in a breeze: 16 (was 6).
+- Cost, Node, this machine: physics.update mean 0.80 -> 1.27 ms at quality 1 in a closed wood gale (2257 leaves against
+  255); worst frames are spikes of the machine (7 to 35 ms either way).
+- Strips (`docs/shots/physics/motion-leaves-front*.jpg`, from `p15/root`, `kits=painter`, the game's camera: 5.2 m boom,
+  pivot 2.05 m, 58 degrees, looking across the wind): `-before` OPENED (a handful of specks); `leaves-front` OPENED (half
+  size tiles: 15 to 25 thin marks a frame against the crowns and the sky, few low); `leaves-front-detail` (960 x 540, the
+  upper right at its own pixels, 30 frames a second) OPENED: 30 to 40 dark red and pale ochre lenses in a quarter of the
+  picture, a leaf changing tone from one frame to the next: a flock that flickers.
+- **For PAINTER** (top of "For PAINTER"): leaves read at full size; at half size they are specks because the floor keeps
+  their ink (a 3 px leaf drawn at 10 px is drawn 1 in 11). See there.
+
 ## Hand-over P14 (twelfth PHYSICS agent; read this block first; P13 and older below hold for everything not named here)
 
 **Where things stand.** Item 1 of P14 (trees alive in a storm) is done and committed; items 2 (leaves), 3 (the
@@ -912,6 +952,8 @@ physics.ship.stepPulse(ps = { a, v }, vWant, dt);  pulseBrakeDistance(v)
 ```js
 physics.here.blown            // { sand, snow, spume, surf }, each 0..1, refreshed by update(): what the wind raises near the focus
 physics.particles.<kind>.hag  // Float32Array: m above the ground (or the liquid, for spray) under each LOOSE particle; 0 for rain and snow
+physics.particles.<kind>.turn // (P15) Float32Array: radians a leaf has turned about its long side (cos < 0: its other side shows); 0 for every other kind
+physics.here.blown.leaves, .litter, .leafStock01   // (P15) leaves a second torn off the crowns (inflow included) and lifted off the floor in the box; the loose leaves left on the trees (0..1)
 physics.fields.air.gustShift  // Float64Array(6): how far the wind has carried each copy of the gust pattern (m, body-local)
 // wind.js
 gustLevelAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed)   // the gust pattern with the displacement of each copy given
@@ -1823,6 +1865,21 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P15, first (thirteenth PHYSICS agent): leaves
+
+Nothing to wire: the leaves you draw through the kits now come in their real number (a gust front: about 1000 in the box
+at the spawn, 2000 in a closed wood) and each carries `turn`; the kit lays the quad mirrored while the leaf shows its
+other side, so your `gl_FrontFacing` tone flips as it tumbles (about ten times a second). Seen at 960 x 540 they read as a
+flock. What your glaze may still want:
+1. **Far leaves are thinned by the floor** (`minPx` 10: a 3 px leaf is drawn at 10 px one time in eleven, the ink kept).
+   If the flock should read at small sizes too, lower `minPx` to 6 or 7 for leaves (twice the marks, each smaller), or
+   give leaves a `room` above 1 (more ink than real leaves have: a look decision, yours).
+2. **Colour**: a summer gale tears off GREEN leaves (a dark upper side, a pale grey-green or silvery underside: birch,
+   poplar, willow); dark red and ochre is autumn. If you keep the autumn tones for legibility, keep the dark / pale pair.
+3. **Size**: you draw them 0.27 m (a real leaf is 0.05 to 0.07 m); near the lens my `near` 3 m fade keeps that from
+   blotting. With a real size the near ones could stay (a 6 cm leaf at 1.5 m is 4 % of the picture).
+
 
 ### P14, first (twelfth PHYSICS agent): switch branch motion on, exactly so
 

@@ -495,3 +495,42 @@ test('leaves: a few at a time in a breeze, a flock in a gale, more while a gust 
   assert.ok(breeze.mean > 0.5 && breeze.mean < 30, 'a few in a breeze: ' + breeze.mean.toFixed(1));
   assert.ok(gale.mean > 4 * breeze.mean && gale.mean > 60, 'a flock in a gale: ' + gale.mean.toFixed(1));
 });
+
+// ---- P15: leaves that can be seen -----------------------------------------------------------------------------------
+test('a gale in a wood in leaf fills the air with leaves to the ground (flux / fall speed under the crowns), and they tumble at a few turns a second', () => {
+  const s0 = WINDS.earth.scale; setWindScale('earth', s0 / 4);
+  let w, turns = 0, sideChanges = 0, frames = 0, lowMean = 0, nMean = 0, samples = 0;
+  try {
+    w = setup('earth', 'temperate_forest');
+    const L = w.physics.particles.leaves, prev = new Float32Array(L.capacity), side = new Uint8Array(L.capacity);
+    run(w, 30, { each: () => {
+      if (w.t < 320) return;
+      // the same leaf keeps its slot between two frames unless one before it died: count only slots whose size is unchanged
+      for (let i = 0; i < L.count; i++) { const s = Math.cos(L.turn[i]) < 0 ? 1 : 0; if (prev[i] === L.size[i]) { frames++; if (s !== side[i]) sideChanges++; } side[i] = s; prev[i] = L.size[i]; }
+      let low = 0; const up = w.up;
+      for (let i = 0; i < L.count; i++) { const x = L.pos[i * 3] + L.origin.x, y = L.pos[i * 3 + 1] + L.origin.y, z = L.pos[i * 3 + 2] + L.origin.z; if (Math.hypot(x, y, z) - w.R < 3) low++; }
+      lowMean += low; nMean += L.count; samples++;
+    } });
+  } finally { setWindScale('earth', s0); }
+  const H = w.physics.here, n = nMean / samples, low = lowMean / samples, A = w.physics.fields.air;
+  const rate = sideChanges / (frames / 60);               // side changes a second per leaf
+  console.log(`# a closed wood (canopy ${H.cover ? H.cover.canopy01 : '?'}) in ${Math.hypot(A.cwe, A.cwn).toFixed(1)} m/s: ${n.toFixed(0)} leaves in the box, ${low.toFixed(0)} below 3 m (${(low / (48 * 48 * 3)).toFixed(3)} a m3), torn ${H.blown.leaves.toFixed(0)} a second, stock ${H.blown.leafStock01.toFixed(2)}; a leaf shows its other side ${rate.toFixed(1)} times a second`);
+  assert.ok(n > 1000, 'a flock: ' + n.toFixed(0));
+  // under the crowns flux / vs: 0.04 x torn (up to 6) x canopy 0.75 x stock / 1.5 m/s: some 0.05 to 0.15 a m3 (the box's sides thin it)
+  assert.ok(low / (48 * 48 * 3) > 0.03, 'leaves down to the ground: ' + (low / (48 * 48 * 3)).toFixed(3) + ' a m3 below 3 m');
+  // three quarters tumble at 2 Ro |v - w| / c (3 to 4 turns a second for a 5 cm leaf at 1.5 m/s: two side changes a turn), a quarter never turn over
+  assert.ok(rate > 2 && rate < 12, 'side changes a second: ' + rate.toFixed(1));
+});
+
+test('the loose leaves on the trees are a stock: a long gale drains it, a calm restores it; no wood, no leaves', () => {
+  const s0 = WINDS.earth.scale; setWindScale('earth', s0 / 4);
+  try {
+    const w = setup('earth', 'temperate_forest'); run(w, 60);
+    const s60 = w.physics.here.blown.leafStock01, r60 = w.physics.here.blown.leaves;
+    assert.ok(s60 < 0.9 && s60 > 0.3, 'drained a little in a minute: ' + s60.toFixed(2));
+    const m = setup('earth', 'alpine_meadow'); run(m, 20);
+    assert.equal(m.physics.particles.leaves.count, 0, 'no trees: no leaves');
+    assert.ok(m.physics.here.blown.leafStock01 > 0.99, 'and nothing drained');
+    console.log(`# stock after a minute of gale ${s60.toFixed(2)} (torn ${r60.toFixed(0)} a second)`);
+  } finally { setWindScale('earth', s0); }
+});

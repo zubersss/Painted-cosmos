@@ -86,6 +86,9 @@
 //           long, at most) when seen broadside and `edge` when seen edge-on, and goes between the two
 //           as it tumbles about its long side, `flip` rad/s (each at its own rate and phase) while it
 //           turns in the picture at `spin` rad/s, some one way, some the other.
+//           (P15) When the buffer carries `turn` (the physics' leaves: radians about the long side), that is the
+//           tumble instead of `flip`'s own clock, and while cos(turn) < 0 the quad's short side is reversed: its
+//           winding turns over with the leaf, so gl_FrontFacing tells which side of the leaf is seen.
 //   level (streak): 1 = the stroke lies along the ground: the grain's motion with its vertical part taken
 //           out (blowing sand is a skim over the surface; its grains' own hops are steep at both ends)
 //   veil (dab): the kind is a translucent thing (dust): the kit adds a per-vertex attribute
@@ -299,6 +302,10 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   const fout = L ? (D.fadeOut || 0) + (D.wallFade || 0) * wT : 0, fin = (D.fadeIn || 0) + (D.wallFade || 0) * wT;
   const band = D.bands > 0 && eye.band01 > 0 ? D.bands * eye.band01 : 0, bandLong = D.bandLong || 9, bandWide = D.bandWide || 2;
   const flip = spin !== 0 && aspect < 1 ? D.flip || 0 : 0, edgeOn = D.edge > 0 ? D.edge : 0.08;
+  // (P15) the physics' own turn of each leaf about its long side (buf.turn, loose.js), when it hands one over: the quad is
+  // laid with its short side reversed while the leaf shows its other side (cos(turn) < 0), so its winding turns over
+  // with it and a material that colours by gl_FrontFacing (PAINTER's two-toned leaf) flickers as the leaf tumbles
+  const TU = flip > 0 && buf.turn && buf.turn.length >= n ? buf.turn : null;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
     const age = A[i];
@@ -344,7 +351,8 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
         // its long side, so that it is seen broadside (aspect), then edge-on (a line), then broadside
         const r1 = S[i] * 27183.31, f1 = r1 - Math.floor(r1), r2 = S[i] * 65537.17, f2 = r2 - Math.floor(r2);
         a = age * spin * (f2 < 0.5 ? -(0.4 + 0.9 * f1) : 0.4 + 0.9 * f1) + f2 * 6.2831853;
-        lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(Math.cos(age * flip * (0.6 + 0.8 * f2) + f1 * 6.2831853)));
+        if (TU) { const ct = Math.cos(TU[i]); lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(ct)) * (ct < 0 ? -1 : 1); }
+        else lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(Math.cos(age * flip * (0.6 + 0.8 * f2) + f1 * 6.2831853)));
       }
       const c = Math.cos(a), s = Math.sin(a);
       ax = eye.rx * c + eye.ux * s; ay = eye.ry * c + eye.uy * s; az = eye.rz * c + eye.uz * s;

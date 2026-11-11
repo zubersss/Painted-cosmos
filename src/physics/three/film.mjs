@@ -64,6 +64,10 @@ const PAGE_HELPERS = `(() => {
       let e = 0, nn = 0, h = 0, near = 0; const q = { x: 0, y: 0, z: 0 };
       for (let i = 0; i < n; i++) { q.x = b.origin.x + b.pos[i * 3]; q.y = b.origin.y + b.pos[i * 3 + 1]; q.z = b.origin.z + b.pos[i * 3 + 2]; const p = L.enu(q); e += p.e; nn += p.n; h += p.h; if (Math.hypot(p.e, p.n) < r) near++; }
       return { n, e: r2(e / n), nn: r2(nn / n), h: r2(h / n), near }; },
+    // (P15) particles of a kind round the lens: how many within r metres of the eye, within 3 m, and their mean height over the ground
+    nearEye(kind, r = 8) { const b = ph.particles[kind], n = b.count, E = L.eye; if (!n || !E) return { n: 0, eye: 0, eye3: 0 };
+      let k = 0, k3 = 0; for (let i = 0; i < n; i++) { const d = Math.hypot(b.origin.x + b.pos[i * 3] - E.x, b.origin.y + b.pos[i * 3 + 1] - E.y, b.origin.z + b.pos[i * 3 + 2] - E.z); if (d < r) k++; if (d < 3) k3++; }
+      return { n, eye: k, eye3: k3 }; },
     here() { const h = ph.here; return { wx: h.weather.kind, wind: r2(h.air.speed), gust: r2(h.air.gust01 || 0), rate: r2(h.weather.precipitation.rate) }; },
   };
 })()`;
@@ -208,6 +212,17 @@ export const SUBJECTS = {
   'leaves-gust': { note: 'Earth spawn, 176 s: leaves torn off in the storm; 10 frames a second',
     q: SPAWN + '&t=172&pre=4&explorer=0&dist=12&pitch=4&up=3&yaw=210', w: 640, h: 360, crop: [0.2, 0.15, 0.6, 0.7], tile: [320, 210], frames: 12, dt: 0.1, sub: 6,
     probe: `(L) => { const r = P.parts('leaves'), w = P.windEN(0, 0, 2), x = P.where('leaves', 15); return { leaves: r.n, near: x.near, ve: r.e, vn: r.nn, vu: r.u, sp: r.sp, windE: w.e, windN: w.n, h: x.h }; }` },
+  // ---- (P15) the gust front at the game's own camera: the boom 5.2 m behind a standing explorer, pivot 2.05 m over the
+  // feet, 58 degrees, looking across the wind (the leaves stream across the picture). (numbers: leaves in the box, within
+  // 8 and 3 m of the lens, how many show their other side this frame (turned over since the last), the wind) ----
+  'leaves-front': { note: "Earth spawn (a temperate wood), 149 s: the first thunderstorm's gust front, at the game's camera (5.2 m boom, 58 degrees), looking across the wind; 10 frames a second",
+    q: SPAWN + '&t=146&pre=3&dist=5.2&pitch=3&up=2.05&fov=58&yaw=0', w: 640, h: 360, crop: [0, 0, 1, 1], tile: [320, 180], frames: 12, dt: 0.1, sub: 6,
+    before: `(L) => { const w = P.windEN(0, 0, 10); L.yaw = Math.atan2(-w.n, -w.e); window.__w = w; }`,
+    probe: `(L) => { const r = P.nearEye('leaves', 8), w = P.windEN(0, 0, 2), b = L.physics.particles.leaves, T = b.turn, B = L.physics.here.blown; let back = 0, flip = 0; const o = window.__side || (window.__side = new Uint8Array(8192)); if (T) for (let i = 0; i < b.count; i++) { const f = Math.cos(T[i]) < 0 ? 1 : 0; back += f; if (f !== o[i]) flip++; o[i] = f; } return { leaves: r.n, eye8: r.eye, eye3: r.eye3, back, turned: flip, torn: Math.round(B.leaves || 0), litter: Math.round(B.litter || 0), stock: P.r2(B.leafStock01 == null ? 1 : B.leafStock01), w2: P.r2(Math.hypot(w.e, w.n)), u10: P.r2(L.info().u10 || 0) }; }` },
+  'leaves-front-detail': { note: "the same at 960 x 540, the upper right of the picture at its own pixels (the crowns and the sky the leaves cross), 30 frames a second: does a leaf turn over?",
+    q: SPAWN + '&t=146&pre=3.8&dist=5.2&pitch=3&up=2.05&fov=58&yaw=0', w: 960, h: 540, crop: [0.45, 0, 0.55, 0.62], cols: 3, frames: 6, dt: 1 / 30, sub: 2,
+    before: `(L) => { const w = P.windEN(0, 0, 10); L.yaw = Math.atan2(-w.n, -w.e); }`,
+    probe: `(L) => { const r = P.nearEye('leaves', 8); return { leaves: r.n, eye8: r.eye, eye3: r.eye3 }; }` },
   // ---- (P12) a clamber: a 1 m boulder (radius 0.6 m, PILOT's ground profile) 6 m east of the focus; the camera
   // stands south of it and does not move. (numbers: P.ex() and the height of the ground under the feet over the plain) ----
   'clamber-walk': { note: 'Earth spawn: a walk (4.2 m/s) over a 1 m boulder; 8 frames a second',

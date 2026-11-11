@@ -40,7 +40,11 @@ export const LOOSE = Object.freeze({
   sand: { species: 'sand', life: [1.5, 4], flutter: 0, turb: 0.25, ground: 1, rest: 0.5 },
   ash: { species: 'ash', life: [8, 16], flutter: 0.3, turb: 0.7, ground: 0, rest: 0, puff: 0.3, lands: true },
   spores: { species: 'spore', life: [8, 16], flutter: 0.5, turb: 0.9, ground: 0, rest: 0, puff: 0.3, lands: true },
-  leaves: { species: 'leaf', life: [6, 14], flutter: 0.6, turb: 0.5, ground: 0, rest: 0, lands: true },
+  // (P15) leaves: turb 0.5 -> 0.9 (a leaf answers the air within vt / g, 0.15 s: it rides every eddy longer than a
+  // second, the gusts' updraughts included, which is what keeps a flock aloft); tumble: the share that tumble end over
+  // end (the rest flutter to and fro without turning over: Field, Klaus, Moore and Nori 1997, Andersen, Pesavento and
+  // Wang 2005), see BLOWN.leafRo
+  leaves: { species: 'leaf', life: [6, 14], flutter: 0.6, turb: 0.9, ground: 0, rest: 0, lands: true, tumble: 0.75 },
   spray: { species: 'spray', life: [0.5, 1.4], flutter: 0, turb: 0.1, ground: 0, rest: 0 },
   hail: { species: 'hail', life: [3, 6], flutter: 0, turb: 0, ground: 2, rest: 0.45 },
 });
@@ -76,9 +80,47 @@ export const BLOWN = Object.freeze({
   // square of the wind and the share of stalks that fail rises as steeply again with the load, so
   // what is torn off goes with the fourth power of the wind; a gust front (the wind rising) strips
   // what the lull left: a flock.
-  leafCalm: 0.002,        // of the capacity per second in still air
-  leafWind: 11,           // m/s (10 m, in the open): the wind at which the trees shed a full flock
+  // (P15) In units of `torn` (below), which multiplies leafFlux; until P15 they were shares of the capacity a second, so a
+  // capacity that was raised to show more leaves tore more off: the count is now what the wood sheds, not the buffer.
+  leafCalm: 0.03,         // torn in still air where the biome's leaves (ground.js AIRBORNE) are 1: an autumn wood lets go of
+                          // its leaves by itself (2000 a m2 over a month: 2 to 3 a second in the box); a summer wood (0.25) a
+                          // quarter of that. (Until P15: 0.002 of the capacity a second, any wood.)
+  leafWind: 11,           // m/s (10 m, in the open): the wind at which torn is 1
   leafGust: 2.5,          // x more while a gust is arriving (the wind rising at 1 m/s2)
+  // (P15) How many: a wood in leaf holds some 2000 leaves over each m2 of its floor (leaf area index 5, a leaf 25 cm2). A
+  // summer gale strips one or two in a hundred of them in its first minutes (green litterfall in storms: 0.1 to 0.3 a m2 a
+  // second) and a gust front the weak ones first: leafFlux leaves a second off each m2 of closed canopy at torn 1, at most
+  // leafTornMax times that (0.24), out of a stock of leafStock a m2 held loosely enough to go (2 in 100), which the gale
+  // drains (in about 170 s at full) and a calm restores over leafRecover s. Under the crowns a torn leaf comes down at its
+  // fall speed vs, so the air there holds flux / vs leaves a m3: at the gust front in a closed wood 0.24 / 1.5 = 0.16, in
+  // an open one (canopy 0.3) a third of that. Each comes off where the crowns are (cover canopy01 and leaves there) and
+  // where the gust is (the wind at that place, to the fourth power): they come in bursts and streams, not evenly.
+  // A canopy in leaf sheds in a gale whatever its season: the biome's leaves count in full from 0.25 (a summer wood) up;
+  // an autumn wood (1) holds leafAutumn times the stock loosely.
+  leafFlux: 0.04,
+  leafTornMax: 6,
+  leafStock: 40,
+  leafAutumn: 9,
+  // (P15) A leaf torn off a crown 20 m up falls for ten seconds or more and goes a hundred metres downwind meanwhile: most
+  // of the leaves crossing the box near the ground were shed upwind of it. Those come in through its upwind side (inflow:
+  // each shed over the fetch upwind where it is still in the air when it gets there, at the height it has come down to),
+  // so the box holds what a wood that goes on upwind would put in it, low leaves included; until P15 it held only what
+  // its own crowns let go, high up, and they left it downwind before they came down: none passed the walker's eye.
+  leafFetch: 300,         // m: the farthest upwind a shed leaf is followed from
+  leafRecover: 1200,
+  // (P15) Litter: what lies on the floor of a wood (last year's leaves, twigs, bits of bark) is lifted where the gust
+  // sweeps reach it: a dry leaf on the ground slides at 3 to 4 m/s of wind at a metre and is thrown up at a few more;
+  // the gusts' sweeps carry it head high in the streamers along the wind. leafLitter leaves a second off each m2 of
+  // littered floor when the wind at 1 m is litterFull, none below litterFrom; wet litter lies (wet01).
+  leafLitter: 0.04,
+  litterFrom: 3,          // m/s at 1 m (the gusts' sweeps in it)
+  litterFull: 9,
+  // (P15) A tumbling plate turns at Omega = 2 Ro |v - w| / c (Ro, its rotation number, 0.2 to 0.4 for a thin plate
+  // tumbling free: Lugt 1983, Iversen 1979, Mahadevan, Ryu and Samuel 1999), c its chord (0.6 of the leaf's length): a 5 cm
+  // leaf, 3 cm across, slipping through the air at 1.5 m/s turns some 5 times a second, so a two-toned leaf shows its other
+  // side about ten times a second. A flutterer rocks through +-leafRock radians at half that rate and never turns over.
+  leafRo: [0.2, 0.4],
+  leafRock: [0.9, 1.35],
   // Spume and surf (the sea's own spray; before P10 only bodies raised spray).
   // Spume: where a crest is breaking and the wind is over spumeFrom the wind tears the top off it:
   // drops leave at the crest's speed plus a share of the wind, a little upward, and stream downwind
@@ -94,7 +136,7 @@ export const BLOWN = Object.freeze({
 });
 
 const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
-const _sf = {}, _sp = new Float64Array(2);
+const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
 
 export class Loose {
@@ -110,11 +152,15 @@ export class Loose {
       b.species = LOOSE[k].species;
       this.vt[k] = 1;
     }
-    this._carry = new Float64Array(12);  // fractional emissions carried between frames
+    this._carry = new Float64Array(13);  // fractional emissions carried between frames
     this.blowingSnow01 = 0;              // 0..1: how hard the wind is moving snow along the ground at the focus (a ground blizzard)
     this.spume01 = 0;                    // 0..1: how much spume the wind is tearing off the sea near the focus
     this.surf01 = 0;                     // 0..1: how hard the sea is breaking on a shore near the focus
     this._gustPrev = 0; this._gustRise = 0;
+    this.leafStock01 = 1;                // (P15) 0..1: the share of the loosely held leaves still on the trees round the focus
+    this.leafRate = 0;                   // (P15) leaves a second torn off the crowns in the box, and lifted off the floor, last frame
+    this.litterRate = 0;
+    this._cov = {}; this._crownTop = 0;
     this._shore = new Float32Array(96).fill(1e9); this._shoreN = 0; this._shoreI = 0;   // places found shallow (surf)
     this._seaLevel = -1e9;               // the still level of the liquid near the focus (from sea()), for the spray
     this.saltation01 = 0;                // 0..1: how hard sand is blowing at the focus right now
@@ -152,6 +198,7 @@ export class Loose {
     // a bigger grain falls faster: vt ~ d in the drag-dominated regime, d^2 in Stokes'; use d^1.2
     b._vt[i] = this.vt[kind] * Math.pow(s, 1.2);
     b._ph[i] = r() * 6.2831853;
+    b.turn[i] = 0; b._tp[i] = r() * 6.2831853;
     b._life[i] = (K.life[0] + r() * (K.life[1] - K.life[0])) * lifeMul;
     b.age[i] = 0; b.mat[i] = mat; b.left[i] = b._life[i]; b._alt[i] = 1e9;
     return true;
@@ -280,13 +327,86 @@ export class Loose {
         const rise = Math.max(0, (u10 - this._gustPrev) / h); this._gustPrev = u10;
         this._gustRise += (rise - this._gustRise) * Math.min(1, h / 0.4);
         const wl = u10 / BLOWN.leafWind;
-        const torn = Math.min(1.6, BLOWN.leafCalm + wl * wl * wl * wl * (1 + BLOWN.leafGust * Math.min(1.5, this._gustRise)));
-        const lv = (cover.leaves || 0) * (cover.canopy01 > 0.05 ? 1 : 0.3);
-        if (lv > 0.01) {
-          carry[4] += PARTICLES.capacity.leaves[P.quality] * lv * torn * h;
-          if (carry[4] > 12) carry[4] = 12;
-          const top = Math.max(3, cover.canopyHeight || 6);
-          while (carry[4] >= 1) { carry[4] -= 1; if (!this.emit('leaves', fx + (rng() * 2 - 1) * Rr, groundY + top * (0.4 + 0.6 * rng()), fz + (rng() * 2 - 1) * Rr, cwe * 0.3, 0, cwn * 0.3)) break; }
+        const tornF = Math.min(BLOWN.leafTornMax, BLOWN.leafCalm * (cover.leaves || 0) + wl * wl * wl * wl * (1 + BLOWN.leafGust * Math.min(1.5, this._gustRise)));
+        // (P15) the stock of loose leaves: drained by what the wind tears off, restored in a calm
+        const stock = BLOWN.leafStock * (1 + (BLOWN.leafAutumn - 1) * clamp01(((cover.leaves || 0) - 0.25) / 0.75));
+        this.leafStock01 += (-BLOWN.leafFlux * tornF * Math.min(1, 4 * (cover.leaves || 0)) * this.leafStock01 / stock + (1 - this.leafStock01) / BLOWN.leafRecover) * h;
+        if (this.leafStock01 < 0) this.leafStock01 = 0;
+        this.leafRate = 0; this.litterRate = 0;
+        {
+          // (P15) candidates at the most the box could shed, each kept by what is there: the crowns' closure and leafiness
+          // at that place and the wind there (the 4 x 4 patch, gusts and all) against the most it could be
+          const A = 4 * Rr * Rr, cov = this._cov;
+          carry[4] += BLOWN.leafFlux * BLOWN.leafTornMax * this.leafStock01 * A * h;
+          if (carry[4] > 400) carry[4] = 400;
+          let kept = 0;
+          while (carry[4] >= 1) {
+            carry[4] -= 1;
+            const x = fx + (rng() * 2 - 1) * Rr, z = fz + (rng() * 2 - 1) * Rr;
+            if (!air.coverNear(x, z, cov)) continue;
+            const lv = cov.leaves || 0, lf = Math.min(1, 4 * lv) * cov.canopy01;
+            if (!(lf > 0.005)) continue;
+            const ul = this._patchSpeed(wp, x - fx, z - fz) / BLOWN.leafWind, ul4 = ul * ul * ul * ul;
+            const torn = Math.min(BLOWN.leafTornMax, BLOWN.leafCalm * lv + ul4 * (1 + BLOWN.leafGust * Math.min(1.5, this._gustRise)));
+            if (rng() * BLOWN.leafTornMax >= torn * lf) continue;
+            const top = Math.max(3, cov.canopyHeight || 6), gy = near ? near.heightAt(x, z, groundY) : groundY;
+            this._crownTop = top;
+            kept++;
+            if (!this.emit('leaves', x, gy + top * (0.45 + 0.55 * rng()), z, cwe * 0.3, 0, cwn * 0.3)) { carry[4] = 0; break; }
+          }
+          // (P15) inflow: leaves shed upwind of the box arrive through its upwind side
+          const keptBox = kept;
+          if (u10 > 0.5) {
+            const vs = this.vt.leaves, topR = Math.max(3, cover.canopyHeight || 0, this._crownTop || 0);
+            const Uc = Math.max(0.5, this._airAt(fx - ue * Rr, fz - un * Rr, topR * 0.7, _aw));
+            const Dmax = Math.min(BLOWN.leafFetch, topR * Uc / Math.max(0.05, vs)), wid = 2 * Rr * (Math.abs(ue) + Math.abs(un));
+            carry[12] += BLOWN.leafFlux * BLOWN.leafTornMax * this.leafStock01 * wid * Dmax * h;
+            if (carry[12] > 400) carry[12] = 400;
+            while (carry[12] >= 1) {
+              carry[12] -= 1;
+              // a point of the box carried back upwind to its side: the side's points as the wind crosses them
+              let x = fx + (rng() * 2 - 1) * Rr, z = fz + (rng() * 2 - 1) * Rr;
+              const se = ue > 1e-6 ? (x - fx + Rr) / ue : ue < -1e-6 ? (x - fx - Rr) / ue : 1e9, sn = un > 1e-6 ? (z - fz + Rr) / un : un < -1e-6 ? (z - fz - Rr) / un : 1e9;
+              const sb = Math.min(se, sn) - 0.01; x -= ue * sb; z -= un * sb;
+              const D = rng() * Dmax;
+              // what the ground upwind is like, as far as the grid knows it (else at the side)
+              if (!air.coverNear(x - ue * D, z - un * D, cov) && !air.coverNear(x, z, cov)) continue;
+              const lv = cov.leaves || 0, lf = Math.min(1, 4 * lv) * cov.canopy01;
+              if (!(lf > 0.005)) continue;
+              const ul = this._patchSpeed(wp, x - fx, z - fz) / BLOWN.leafWind, ul4 = ul * ul * ul * ul;
+              const torn = Math.min(BLOWN.leafTornMax, BLOWN.leafCalm * lv + ul4 * (1 + BLOWN.leafGust * Math.min(1.5, this._gustRise)));
+              if (rng() * BLOWN.leafTornMax >= torn * lf) continue;
+              // shed at h0 over there; it comes down at its fall speed while the wind at the height it is passing carries it
+              const top = Math.max(3, cov.canopyHeight || 6), h0 = top * (0.45 + 0.55 * rng());
+              const U0 = Math.max(0.3, this._airAt(x, z, h0 * 0.6, _aw)), hz = h0 - vs * D / U0;
+              if (hz < 0.15) continue;
+              const gy = near ? near.heightAt(x, z, groundY) : groundY;
+              this._airAt(x, z, hz, _aw);
+              kept++;
+              if (!this.emit('leaves', x, gy + hz, z, _aw[0], 0, _aw[1])) { carry[12] = 0; break; }
+            }
+          }
+          this.leafRate = h > 0 ? kept / h : 0; this._inRate = h > 0 ? (kept - keptBox) / h : 0;
+          // (P15) litter off the floor, in the streamers, where the wind at a metre is over litterFrom
+          const dry = 1 - smoothstep(0.1, 0.5, wet01);
+          if (dry > 0.02 && snowDepth < 0.01) {
+            carry[11] += BLOWN.leafLitter * A * dry * h;
+            if (carry[11] > 200) carry[11] = 200;
+            let lk = 0;
+            while (carry[11] >= 1) {
+              carry[11] -= 1; this._streamPoint(fx, fz, Rr, time, ue, un, u10);
+              const x = _sp[0], z = _sp[1];
+              if (!air.coverNear(x, z, cov)) continue;
+              const lf = Math.min(1, 4 * (cov.leaves || 0)) * (0.3 + 0.7 * cov.canopy01);
+              const u1 = this._airAt(x, z, 1, _aw) + sigma * (rng() * 2 - 1) * 1.7;   // (the sweeps: sigma is the turbulence at the focus, near the ground)
+              const ex = (u1 - BLOWN.litterFrom) / (BLOWN.litterFull - BLOWN.litterFrom);
+              if (!(ex > 0) || rng() >= lf * (ex > 1 ? 1 : ex)) continue;
+              const gy = near ? near.heightAt(x, z, groundY) : groundY, up = 0.6 + rng() * (1.2 + 1.5 * Math.min(1, ex));
+              lk++;
+              if (!this.emit('leaves', x, gy + 0.05, z, _aw[0] * 0.5, up, _aw[1] * 0.5, 0.9)) { carry[11] = 0; break; }
+            }
+            this.litterRate = h > 0 ? lk / h : 0;
+          }
         }
         if ((cover.spores || 0) > 0.01) {
           carry[5] += PARTICLES.capacity.spores[P.quality] * cover.spores * h / 12;
@@ -395,6 +515,7 @@ export class Loose {
       if (alive === 0) { b.count = 0; continue; }
       const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left, HG = b.hag;
       const turb = K.turb * sigma, puff = K.puff || 0;
+      const TU = K.tumble > 0 ? b.turn : null, TP = b._tp, ro0 = BLOWN.leafRo[0], roD = BLOWN.leafRo[1] - ro0, rk0 = BLOWN.leafRock[0], rkD = BLOWN.leafRock[1] - rk0;
       const seaLevel = this._seaLevel, overSea = name === 'spray' && seaLevel > -1e8;
       for (let i = 0; i < alive; i++) {
         const o = i * 3;
@@ -440,6 +561,12 @@ export class Loose {
           rx *= m; ry *= m; rz *= m;
           vx = we + rx; vy = wu + ry; vz = wn + rz;
           x += vx * h; y += vy * h; z += vz * h;
+          // (P15) a leaf turns about its long side at its slip through the air (BLOWN.leafRo): end over end, or rocking
+          if (TU) {
+            const own = ph * 0.15915494, w = 2 * (ro0 + roD * (own * 7.31 % 1)) * Math.sqrt(rx * rx + ry * ry + rz * rz) / (0.6 * SZ[i]);
+            if (own * 3.7 % 1 < K.tumble) { let t = TP[i] + (own * 13.1 % 1 < 0.5 ? -w : w) * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = t; }
+            else { let t = TP[i] + 0.5 * w * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = (rk0 + rkD * (own * 5.3 % 1)) * Math.sin(t); }
+          }
           // the ground
           HG[i] = y - groundY;
           if (y < groundY + 4) {
@@ -470,7 +597,7 @@ export class Loose {
           if (i < alive) {
             const s = alive * 3;
             Pp[o] = Pp[s]; Pp[o + 1] = Pp[s + 1]; Pp[o + 2] = Pp[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; HG[i] = HG[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive];
+            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; HG[i] = HG[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive]; b.turn[i] = b.turn[alive]; TP[i] = TP[alive];
             if (EJ) { EJ[o] = EJ[s]; EJ[o + 1] = EJ[s + 1]; EJ[o + 2] = EJ[s + 2]; }
             i--;
           }
@@ -481,6 +608,32 @@ export class Loose {
       b._n = alive; b.count = alive;
       publish(b, frame, alive);                       // (on the curved ground: particles.js)
     }
+  }
+
+  // (P15) The reference wind's speed (m/s, gusts and the lee of trees in it) at (dx, dz) from the focus, bilinear on the
+  // 4 x 4 patch round it (nodes 16 m apart at -24, -8, 8, 24 m: particles.js).
+  _patchSpeed(wp, dx, dz) {
+    let u = (dx + 24) / 16, v = (dz + 24) / 16;
+    u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
+    const i = u | 0, j = v | 0, fu = u - i, fv = v - j, a = (j * 4 + i) * 3, b = a + 12;
+    const s00 = Math.hypot(wp[a], wp[a + 1]), s10 = Math.hypot(wp[a + 3], wp[a + 4]), s01 = Math.hypot(wp[b], wp[b + 1]), s11 = Math.hypot(wp[b + 3], wp[b + 4]);
+    return (s00 * (1 - fu) + s10 * fu) * (1 - fv) + (s01 * (1 - fu) + s11 * fu) * fv;
+  }
+
+  // (P15) The mean wind a particle rides at grid position (x, z), hz m over the ground: the same lookup as the motion's
+  // (the 5 x 5 nodes, each with its own profile). Writes we, wn into o; returns the speed.
+  _airAt(x, z, hz, o) {
+    const P = this.P, wv = P._wv, ht = P._ht;
+    let u = (x - P._wtx) * 0.0625, v = (z - P._wtz) * 0.0625;
+    u = u < 0 ? 0 : u > 3.999 ? 3.999 : u; v = v < 0 ? 0 : v > 3.999 ? 3.999 : v;
+    const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu;
+    hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
+    const ih = hz | 0, fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
+    const h00 = (ht[t0] + (ht[t0 + 1] - ht[t0]) * fh) * (1 - fu) * (1 - fv), h10 = (ht[t0 + 25] + (ht[t0 + 26] - ht[t0 + 25]) * fh) * fu * (1 - fv);
+    const h01 = (ht[t0 + 125] + (ht[t0 + 126] - ht[t0 + 125]) * fh) * (1 - fu) * fv, h11 = (ht[t0 + 150] + (ht[t0 + 151] - ht[t0 + 150]) * fh) * fu * fv;
+    o[0] = wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11;
+    o[1] = wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11;
+    return Math.hypot(o[0], o[1]);
   }
 
   // How much grid position (x, z) is in a streamer now: 0 between the bands .. 1 in the middle of one.
