@@ -42,6 +42,9 @@ export const G = {
   uCast: { value: [new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1), new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1)] },
   uCastK: { value: new THREE.Vector2(0, 0) },
   uNoHazeUp: { value: new THREE.Vector4(0, 0, 0, 0) }, uUpW0: { value: new THREE.Vector3(0, 1, 0) },   // (for body uniforms made before these existed)
+  // the near air (x how much of what stands at distance y metres it veils, rising as 1 - exp(-d / y)): a dust storm
+  // veils the explorer at the eye's own distance, which the far washes' stacked bands cannot (the world sets it)
+  uAirNear: { value: new THREE.Vector2(0, 9) },
   // the scene pass's second target (normal, log depth, region) and its size: glazes test their
   // depth against it by hand (set by the post passes)
   uSceneAux: { value: null }, uSceneRes: { value: new THREE.Vector2(2, 2) },

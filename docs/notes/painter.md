@@ -98,6 +98,74 @@ Earth spawn storm, clock 160 to 170 s, gust front 149 s.)
   touch ahead of the ground; **0 pops** (498 pop blocks in 29 of 29 pairs before); mean change
   1.0 % a frame, spread evenly over the sheet (no tile, no stipple). The instrument's second is
   shorter than the arrival; the whole of it is filmed below.
+- **The whole arrival** (scratch `arr.mjs`: 14 frames 0.2 s apart; `motion-arrival-after.jpg`,
+  opened): bare paper for 1.0 s while the land is laid (`busy` 8435 to 4), then the picture
+  comes up out of the paper as one between 1.0 and 2.2 s, the canopy and sky a little before the
+  ground; from 2.2 to 2.8 s the four frames are the same picture (busy 0): nothing arrives late,
+  nothing pops. It reads as a wash laid over the whole sheet, soft, never a stipple. Verdict:
+  **works as designed**. Weak: a second of blank paper is long if anything in real play ever
+  leaps (nothing does: the game's start is under the loading sheet).
+- **Weather set** (`node tests/weather.mjs --only earth-arrives,earth-storm,earth-blizzard,
+  mars-dust,neptune-gale`, clean export of `20b6bb5`; frames in scratch `m10/wx0/out`, all
+  opened): *earth-arrives*: the gust front's leaves read, forty or so lens-shaped marks in two
+  tones (ochre-red and dark) tumbling over the meadow and against the sky: **pass**.
+  *earth-storm*: rain as pale slanted strokes, leaves, splash rings as soft pale smudges on the
+  grass (no wire): **pass**; no spray there (it is an inland spawn) and the walker's track
+  cannot show in a frame of a figure standing still. *earth-blizzard*: flakes soft white
+  specks, a few blown streaks; the near slope's crest is one ruled diagonal against the sky
+  (terrain silhouette, smooth under fresh snow): **weak, not fixed**. *mars-dust*: the far is
+  lost in dust and the sand skims run low on the left, **but the explorer at 5 m stood crisp**,
+  not veiled at all: the far washes' fog comes in six stacked bands and gives nothing inside
+  20 m (3 % at 5 m in visibility 85 m): **fixed**, see below. *neptune-gale* (clock 154, mist):
+  the headland is a grey mass in the mist, the stacks dark; the pale flat-topped forms stand at
+  the right horizon; white horses are scattered white specks rather than torn crests.
+- **Neptune's coast in motion** (scratch `strip.mjs`: the game at the `storm_seas` stand, clock
+  150 to 156 s, 12 frames 0.5 s apart; scratch `m10/ns0`, sheet and a crop of the shore
+  opened): the swell's dark hollows move through the bay and out past 100 m (the long train
+  carried far: **the sea heaves**); the waterline's lace swells up the shingle and draws back
+  over the 5.5 s, torn anew in every frame (**the run-up works, the foam is alive**). But
+  **there were no white horses**: what read as white horses were PHYSICS' spray drops drawn as
+  4 px flecks, clusters of glitter over the bay; on the waves themselves nothing breaks between
+  30 and 150 m (the near crests are dropped there as finer than the brush, the far strokes have
+  not begun, and the far dabs waited on a whitecap cover of 2 % or more).
+- **The pale forms in Neptune's sky, found** (scratch `nep.mjs` at the stand, yaw 236, clock
+  40: a thunderstorm, rain 0.92, fog 0.76, storm 1; skyline traced from the stand with the
+  terrain sampler, scratch `js/prof.mjs`): they are **the coast's headlands**: the near one
+  55 m off (a 43 m cliff with a vertical end, which gives the ruled vertical edge) and a far
+  one at 228 m, 50 m high, standing 10 degrees up. The far one's lower part is lost in the mist,
+  and the mist was painted **near-white** (`uHaze` 0.90, 0.91, 0.94: fog lerps the haze 55 % to
+  white) while above 2 degrees `pcHazeAt` takes it into the storm's dark mass: so a pale band
+  with a hard top stood under the dark cloud, cut off by the near cliff's straight edge. The
+  sky's own low band was never given the mist at all (the haze went white, the horizon did not),
+  so far land stood paler than the sky behind it.
+
+**What the tenth agent changed for item 1** (all in my files):
+- *Mist in a storm* (`src/world/index.js`): the mist the far land is lost into is white only
+  under a light sky; under a closed storm sky it is the storm's own grey (`_fogC`: the paper
+  white lerped toward the storm wash lightened 48 %, by storm x overcast), and **the low sky
+  takes the same mist** (`tmpKey.horizon` lerps with the haze), so the far land runs into the
+  sky behind it. At the PHYSICS view (yaw 236, clock 40) `uHaze` went from 0.90 to 0.76: the
+  pale slab is now a grey-blue misty distance under the cloud (before | after crop in
+  `docs/shots/painter/weather-after.jpg`, top row Mars, bottom row Neptune, opened); from yaw 195 the far headland is a soft
+  grey mass in the rain with the storm drags above it (opened). What stays: the near headland's
+  end is a vertical cliff, so its silhouette is still a straight edge 40 m tall (terrain shape,
+  not touched: it would move the coast under PHYSICS and PILOT).
+- *The near air in a dust storm* (`G.uAirNear` in `shared.js`, both fog functions in
+  `chunks.js` and `materials.js`, set in `index.js` from the dust weight: 0.85 x dustW at 7 m):
+  the fog's six stacked bands left everything inside 20 m clear, so the explorer stood crisp in
+  a storm that had swallowed the far dunes. Now the figure at 5 m is about half veiled, the
+  ground at the feet a third (scratch `m10/md0`, opened). Six consecutive frames at 1/30 s:
+  mean change 0.9 to 1.2 levels a frame, all of it the sand streamers travelling; **no dust
+  near the lens flickers** (amplified difference opened).
+- *The sea in a gale* (water shader in `materials.js`): the torn pattern of the foam, the
+  crests and the surf is sized to the distance beyond 20 m in octaves that give way to one
+  another and drawn out three to one along the crest, and it changes as it goes (`tornW`); the
+  sun's glints go under a closed sky (`1 - 0.9 uWx.x`); in a sea running high (Hs 0.5 to 2 m)
+  white horses are laid beyond 10 m whether or not the waves under them are drawn.
+- *Spray* (`kitmat.js` `spume`, `index.js` draw table): a soft pale blot broken where the
+  brush lifted, 0.34 m wide and never under 9 px (was a 4 px fleck): the drops off a crest run
+  together into a wisp, told from the rain's long grey strokes (seen in the strip: one soft
+  pale blot over the bay where there had been a cluster of specks).
 
 ## M3 block 6: each world's idea in its first view, motion faults, orbit (eighth PAINTER agent)
 

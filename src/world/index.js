@@ -110,6 +110,7 @@ export function createWorld(scene) {
   let lastActive = null;
   const lighting = { bodyId: null, sunElevation: 1, hours: 12, dayness: 1, altitude: 0, space01: 0 };
   const _storm = new THREE.Vector3(), _dust = new THREE.Vector3(), _pale = new THREE.Vector3(), _white = new THREE.Vector3(1, 1, 1);
+  const _fogC = new THREE.Vector3();
   const dustOf = new Map();   // body -> { biomeId: the pigment its dust carries (the mid ground wash) }
   function dustColour(st, weights, out) {
     let m = dustOf.get(st.id);
@@ -150,7 +151,9 @@ export function createWorld(scene) {
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)
       draw.leaves = { ...D.leaves, size: 0.27, minPx: 10 };
-      draw.spray = { ...D.spray, width: 0.10, exposure: 0.05, maxLen: 0.6, minPx: 4 };
+      // (spray as flecks of 4 px was a glitter over the surf: a soft pale blot a third of a metre wide, never under 9 px,
+      // so that the drops off a crest run together into a wisp, and a storm's spray is told from its rain)
+      draw.spray = { ...D.spray, width: 0.34, exposure: 0.05, maxLen: 0.9, minPx: 9 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
       for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
     }).catch((e) => console.warn('weather kits not available: ' + e.message));
@@ -420,7 +423,12 @@ export function createWorld(scene) {
       tmpKey.zenith.lerp(_pale.copy(_storm).lerp(_white, 0.16), oc * 0.92);
       tmpKey.horizon.lerp(_pale.copy(_storm).lerp(_white, 0.66), oc * 0.9);
       tmpKey.haze.lerp(_pale.copy(_storm).lerp(_white, 0.74), oc * 0.9);
-      tmpKey.haze.lerp(_pale.set(0.955, 0.96, 0.965), fogW * 0.7);
+      // (a mist is white only under a light sky: in the rain of a thunderstorm the air the far land is lost into is the
+      // storm's own grey, and a headland gone to white there stood against the dark sky as a pale slab with ruled edges.
+      // The low sky takes the same mist, so that the far land runs into the sky behind it)
+      _fogC.set(0.955, 0.96, 0.965).lerp(_pale.copy(_storm).lerp(_white, 0.48), Math.min(1, storm * oc) * 0.85);
+      tmpKey.haze.lerp(_fogC, fogW * 0.7);
+      tmpKey.horizon.lerp(_fogC, fogW * 0.7);
       // (falling snow: the air is a blue-grey veil, so that the flakes, bare paper, have a ground to be seen against)
       tmpKey.haze.lerp(_pale.set(0.76, 0.81, 0.89), veilS * 0.62);
       if (dustW > 0.003) {
@@ -455,6 +463,9 @@ export function createWorld(scene) {
       const snowC = sk ? (skRaw.fresh != null ? sk.fresh : WX.forced ? sk.snow : Math.min(sk.snow, freshSnow)) * air : 0;
       bu.uWx.value.set(Math.min(1, sunless + dustW * 0.6), sk ? sk.wet * air : 0, snowC, Math.max(veilR, veilS));
       skyU.uWxSky.value.set(Math.min(1, oc + dustW * 0.5), storm, veilR, veilS);
+      // (a dust storm thickens the near air itself: the explorer at the eye's distance is a third lost in it, the ground at
+      // the feet a sixth, half at 10 m; the stacked bands of the far washes left everything inside 20 m clear)
+      G.uAirNear.value.set(0.70 * dustW * (1 - space01), 8);
       skyU.uStormWash.value.copy(_storm);
       WX.key = (storm * 0.34 + oc * 0.14 + dustW * 0.10) * dayness; WX.flash = sk ? sk.flash * air : 0;
       // inks for the kits: each ground material in this place's own washes; rain is the sky's wet wash
@@ -499,6 +510,7 @@ export function createWorld(scene) {
       skyU.uBodyInv.value.identity();
       skyU.uCamL.value.set(0, 1, 0);
       SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0; SHEET.laid = 1; veil.on = false;
+      G.uAirNear.value.x = 0;
       const du = defaultBodyUniforms();
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0);
       lighting.bodyId = null; lighting.space01 = 1;

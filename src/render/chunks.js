@@ -29,6 +29,7 @@ uniform vec3 uHaze;
 uniform vec4 uHazeUp;  // under a closed sky: rgb the sky's own wash overhead, a how far the far air takes it high in the view (0: one haze at every height)
 uniform vec3 uUpW;     // up at the eye, scene space
 uniform vec4 uFog;
+uniform vec2 uAirNear;  // the near air: x its share at distance y (m), see shared.js
 uniform float uTime;
 uniform float uDayness;
 uniform float uStorm;
@@ -74,13 +75,13 @@ float pcFogAmount(float dist) {
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
-  return clamp(f * uFog.z, 0.0, 1.0);
+  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
 }
 
 // Each distance band is lighter, cooler, lower in contrast; the far end is bare paper.
 vec3 pcAtmos(vec3 c, float f) {
   float l = dot(c, vec3(0.3, 0.5, 0.2));
-  vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62);
+  vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62 * (1.0 - uAirNear.x));   // (dust is warm: it does not cool)
   return mix(cool, uHaze, f);
 }
 // The far end of anything is the sky behind it. Under a closed sky that is the pale band only low down:
@@ -93,7 +94,7 @@ vec3 pcHazeAt(vec3 viewPos) {
 }
 vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   float l = dot(c, vec3(0.3, 0.5, 0.2));
-  vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62);
+  vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62 * (1.0 - uAirNear.x));   // (dust is warm: it does not cool)
   return mix(cool, pcHazeAt(viewPos), f);
 }
 

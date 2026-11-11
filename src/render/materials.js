@@ -10,12 +10,13 @@ import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
 const FOG_VERT = /* glsl */`
 uniform vec4 uFog;
+uniform vec2 uAirNear;
 float pcFogAmountV(float dist) {
   float f = 1.0 - exp(-dist * uFog.x);
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
-  return clamp(f * uFog.z, 0.0, 1.0);
+  return clamp(max(f * uFog.z, uAirNear.x * (1.0 - exp(-dist / max(uAirNear.y, 0.1)))), 0.0, 1.0);
 }
 `;
 
@@ -29,7 +30,7 @@ function baseUniforms(bodyU, own) {
   ensureGlobals();
   const b = bodyU || defaultBodyUniforms();
   return Object.assign({
-    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK,
+    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
     uFog: b.uFog, uDayness: b.uDayness, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
@@ -434,12 +435,29 @@ void main() {
   // bare-paper glints: broken dashes where ripples catch the light
   float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDep) * uDayness;
   glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y) * (1.0 - 0.7 * wavy);
+  // (glints are the sun's: under a closed sky there are none; in a gale they were a glitter of white pixels)
+  glint *= 1.0 - 0.9 * uWx.x;
   // the sea running: bare paper along the tops of the higher waves, in broken dashes that lie
   // the way the crests lie; whitecaps where it breaks, ragged; surf where it shoals at a shore
   float liq = (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
   float deep = smoothstep(0.04, 0.3, vDep);
   vec4 r6 = texture(uNoise3D, vBody / 0.62 + drift * 3.0);
   float torn = r6.r * 0.55 + r2.g * 0.45;
+  // (beyond the first twenty metres the torn foam is sized to the distance, in octaves that give way to one
+  // another, and drawn out three to one along the crest: a 0.6 m pattern seen at 60 m was a white pixel, and the
+  // gale's white horses were a glitter of specks; now each is a short torn dash lying along its wave)
+  float tornW = 0.5;
+  {
+    vec3 Dw = normalize(pcPhysWaterDir(uPhysWaterDir)), Aw = normalize(cross(up, Dw));
+    float lw = log2(max(dist, 20.0) / 20.0), kw = floor(lw), fw = lw - kw;
+    // (and it is torn anew as it goes: a white horse forms and is gone in two or three seconds)
+    vec3 qw = vec3(dot(vBody, Aw) / 1.9, dot(vBody, Dw) / 0.62, dot(vBody, up) / 0.62 + uTime * 0.3) + drift * 3.0;
+    float t0 = texture(uNoise3D, qw / exp2(kw) + 0.13).r, t1 = texture(uNoise3D, qw / exp2(kw + 1.0) + 0.57).r;
+    float tw = mix(t0, t1, fw);
+    tw = 0.5 + (tw - 0.5) * (1.0 + 0.45 * fw * (1.0 - fw) * 4.0);      // (the blend of two octaves is flatter: restored)
+    torn = mix(torn, tw * 0.75 + r2.g * 0.25, smoothstep(14.0, 28.0, dist));
+    tornW = tw;
+  }
   // (the crest line itself: high water where the slope along the waves' way turns over)
   float sAlong = abs(dot(wv.yz, uPhysWaterDir));
   float crest = smoothstep(0.25, 0.70, hN) * (1.0 - smoothstep(0.07, 0.24, sAlong)) * smoothstep(0.36, 0.50, torn) * (0.35 + 0.65 * uDayness);
@@ -450,10 +468,19 @@ void main() {
   float capFar = uPhysWaterSea.y < 1.0e8 ? smoothstep(0.02, 0.12, uPhysWaterSea.w) : 0.0;
   float capTh = 0.70 - 0.55 * uPhysWaterSea.w;
   foam = max(foam, capFar * (1.0 - keep) * smoothstep(capTh, capTh + 0.05, r3.r * 0.6 + r1.g * 0.4) * (1.0 - smoothstep(500.0, 1500.0, dist)));
+  // (a sea running high breaks all over: white horses beyond the first ten metres whether or not the waves under
+  // them are drawn, each a torn dash lying along its wave, sized to the distance, grouped by the sets, more on the
+  // crests, forming and going. Between 30 and 150 m nothing broke at all: the near crests are dropped there as finer
+  // than the brush, and the far strokes have not begun)
+  float galeW = smoothstep(0.5, 2.0, uPhysWaterSea.x) * (uPhysWaterSea.y < 1.0e8 ? 1.0 : 0.6);
+  float horseTh = 0.68 - 0.08 * galeW;
+  foam = max(foam, galeW * smoothstep(horseTh, horseTh + 0.06, tornW * 0.62 + r3.r * 0.38) * (0.55 + 0.45 * smoothstep(-0.3, 0.5, hN)) * smoothstep(10.0, 30.0, dist) * (1.0 - smoothstep(600.0, 1500.0, dist)));
   // (in the shallows the breaking crests are white, ragged lines; at the waterline a thin
   // broken edge of swash that can still be seen from far off)
   float sz = pcPhysWaterSurf(vDep);
-  float surf = sz * sz * smoothstep(0.50, 0.85, hN + (r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5);
+  // (beyond twenty metres the surf is torn by the pattern sized to the distance: a 0.6 m pattern there was a
+  // glitter of white pixels over the shoaling bay)
+  float surf = sz * sz * smoothstep(0.50, 0.85, hN + mix((r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5, (tornW - 0.5) * 1.3, smoothstep(14.0, 28.0, dist)));
   // (the swash runs up the shore with each wave and draws back: the depth here is the still depth plus
   // PHYSICS' run-up; and its lace is carried in with the waves, torn anew as it goes. A rim drawn from the
   // still depth and a still pattern was frozen from frame to frame)
