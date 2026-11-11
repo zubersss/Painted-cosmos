@@ -3,6 +3,100 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P12 (ninth PHYSICS agent; read this block first; P11 and older below hold for everything not named here)
+
+**Where things stand.** `node --test src/physics/` 253 tests pass; PILOT's 117 pass on a clean export of `6130796`
+with my files. Nothing half-edited, no job running. Scratch: `/home/user/.pc-scratch/physics/p12/` (`ex.sh`: a clean
+export of HEAD with the working `src/physics` and `physics-lab.html` over it, into `p12/root`; `descend.mjs`: the
+ship's last metre; `seam.mjs <speed>`: the wind at the focus across a re-anchoring, part by part; `kick.mjs`: a step
+off a boulder; `oneair.mjs`: the particles' wind against `physics.air` at a wood's edge; `cross.mjs`: the lateral
+turbulence against Kaimal; `nept.mjs`: what the wave chunk gives and what PAINTER's vertex shader keeps of it on
+Neptune's storm coast; `after/`: the strips; `motion-before/`, `motion-after/`: PILOT's landing scene with the old
+and the new ship model).
+
+**The four faults (all fixed, each held by a test).**
+1. *The ship's descent hung above the gear* (`ship.js`). Cause: the ventral thrusters gain a third more lift near the
+   ground and the flight computer, a proportional hold, let that lift balance its whole velocity error (0.05 m/s at
+   1.1 m where 0.6 was asked; 2.12 s for the 0.6 m from 1.6 to 1.0 m). Now the computer allows for the cushion
+   (`SHIP_BODY.groundComp`, 0 = as before): 0.78 s, slowest 0.45 m/s (the engine's lag: a real, small cushion). The
+   cushion is of air (`groundAir`: none in a vacuum). The gear model's wash is of the thrust the cushion leaves.
+   **The game's own landing does not go through this**: PILOT's `tests/motion.mjs --only landing` gives the same
+   heights with the old and the new `ship.js` (1.99 m to the ground in 44 frames at 30 Hz, no plateau, within 8 mm
+   of each other frame by frame); the hang was in the lab's `ship=fly` sequence and in any hover that sinks on a
+   velocity target.
+2. *The re-anchoring* (`air.js`, `near.js`, `flora.glsl.js`, `water.js`). 0.38 and 0.61 m/s in the frame of the
+   re-anchoring against 0.030 in any other, at a walk. Four causes: the wind lay in the tangent plane of the ANCHOR
+   (5.5 degrees off the ground 384 m away); the gust pattern was read on that plane (18 m above the sphere there); a
+   point's place in the grid (`lx`, `lz`, the shader's `pcPhysGrid`) was not the place whose ground the grid had
+   sampled (1.8 m apart at 384 m, more with relief); the planet's wind was projected onto the plane, not turned into
+   it. Now 0.007 and 0.009 against 0.030. `LocalFrame.lx / lz` and `pcPhysGrid` are the exact inverse of `dir()`.
+3. *One air* (`particles.js`, `loose.js`, `air.js`). Every particle had the wind profile of the ground the FOCUS
+   stood on and the whole lee of the trees at every height: up to 3.5 m/s off `physics.air` at a wood's edge. Now
+   each node of the wind grid has its own profile (`AirGrid.profileAt`, and the same blend tabulated every metre on
+   the 5 x 5 nodes round the focus: `_wv`, `_ht` in the particle system). Largest difference 0.39 m/s.
+4. *Across the wind* (`wind.js`, `air.js`). `gustCrossAt` (two large octaves, in the grid's fields), `gustCrossFineAt`
+   (two fine ones, at a point), `gustCross`, `gustCrossFull`; `WIND.crossWeights`, `crossNorm`, `crossRatio`.
+   sigma_v / sigma_u 0.77 to 0.79, shares by period within 0.06 of Kaimal's lateral spectrum, direction 8 degrees rms
+   over grass at 10 m. `physics.air().veer` is the lateral speed over the mean wind.
+Also, from the lead's relay: *no upward kick off a boulder* (`explorer.js`: the hold lets go a body that rises no
+faster than the ground it ran on: +0.2 to +0.35 m/s where it was +0.9 to +1.5; `explorer.test.mjs`), and *rings are
+born soft* (`pcPhysRingCover`).
+
+**The strips (all in `docs/shots/physics/motion-*.jpg` with `.json`; 640 x 360, quality 1, a clean export with my
+working files).** Opened in P12 and what was seen:
+- `ship-land` (before and after): before, five frames at one height from 4.3 to 5.7 s; after, an even descent,
+  first foot at 6.0 s, down by 6.3 s.
+- `clamber-walk` (Earth): the figure walks up to the mound, shortens on the face (legs folded 0.44 m), crosses the
+  top at 2.3 to 2.7 m/s, comes down still folded 0.28 m and is straight 0.6 s later. In contact all the way.
+- `clamber-run-moon`: 5.3 m/s to 1.97 m/s within one frame at the face (a hard check), three frames near the
+  top, down in contact, no flight. `clamber-run`, `clamber-walk-moon`: numbers only (no frame in the air; feet top
+  out at the boulder's 0.96 to 1.0 m).
+- `shore-neptune`: from 4 m up the beach, looking along the shore: the foam-rimmed pool at the water's edge is the
+  same in all 24 frames (6 s); nothing runs up or drains back; the sea beyond does not heave; a dark slab with a
+  straight vertical edge stands against a pale sky. `shore-earth`: not opened (Hs 0.37 m, water 8 m out moving
+  +-0.09 m).
+- `spray-neptune` (every kit but the spray hidden): **spray is seen**: level pale dashes over the surf and against
+  the sky, 160 growing to 580 in 2 s, 15 to 17 m/s, 1 to 2.5 m up. With the rain shown they cannot be told from the
+  rain (both are pale level dashes). In this view the surf lines DO move (white ragged patches spread over the
+  mid-ground from 1 s on); two pale forms with hard curved edges stand in the sky left and right (not kits).
+- `grass-gust`: the strokes' slant changes from frame to frame (18 to 60 degrees, the direction swinging 50 degrees
+  either way); no stroke appears or vanishes; the meadow is too sparse for the front to read as a wave.
+- `tree-storm` (after the trunk fix): rain and sky carry the storm; the trees are nearly the same in every frame
+  (trunks 3.6 to 4.0 and 10.1 to 10.3 degrees in 1.2 s, branch tips +-7 cm at 1.7 Hz): **in a 1.2 s window the
+  birches read as still**. `tree-gust` (not opened): 1.4 to 3.0 and 3.8 to 8.2 degrees over 6 s.
+- `explorer-run`: the figure does not bob at all (hip +-0.01 m): **a run that glides**; the ground slides evenly.
+- `explorer-jet`: an even climb to 49 m and an even 9 m/s descent (5 s at one speed reads as floating); the lab's
+  camera goes through the crowns.
+- `ship-liftoff`: smooth; the wash falls to 0 for 0.75 s at the top of the climb (the lab's height hold cutting the
+  thrusters) and comes back. `ship-hover`: the hull hangs dead level in gusts of 6.5 to 10 m/s (4 cm, 15 cm of
+  bob): **reads as pinned**; `st.phys.buffetAngle` is not drawn by the lab.
+- `mars-dust`: sand streaks steady; the pale puffs near the eye are in one frame and gone in the next at 6 frames
+  a second (a puff crossing the view in under 0.2 s): reads as flicker.
+- `leaves-gust`: 190 leaves in the air and a handful of one-pixel specks in the picture: **leaves do not read**.
+  They now ride the calm under the crowns (4.5 to 5.2 m/s where the meadow's wind at 2 m is 8.5).
+
+**Neptune's coast (item 3; `nept.mjs`).** The wave chunk gives what it should and it moves: +-0.8 to +-1.5 m,
+changing 1.3 to 2.3 m/s. PAINTER's vertex shader keeps none of it where the picture looks: see For PAINTER.
+
+**API added in P12 (all additive).** `ship.js`: `SHIP_BODY.groundComp`, `groundAir`. `wind.js`: `gustCrossAt`,
+`gustCrossFineAt`, `gustCross`, `gustCrossFull`, `WIND.crossWeights`, `crossNorm`, `crossRatio`. `air.js`:
+`AirGrid.cross`, `AirGrid.profileAt`, `sample()` fills `o.cross`; `physics.air()` and `here.air` carry `veer`.
+`water.js`: `WaterField.runupAt(x, z, slope)`, `fields.water.runup(p, slope)`, GLSL `pcPhysWaterRunup(p, slope)`,
+`pcPhysWaterLong(p)`, `WATER.swashSetup`, `swashSwing`. Lab: `rock=`, `rockAt=`, `rockR=`, `lookE=`, `lookN=`.
+Film: seven new subjects.
+
+**Cost.** `physics.update` medians at quality 1, load 10 (`p11/prof.mjs`): Mars dust 0.75 ms (0.70 before P12),
+blizzard 1.42 (1.50), storm in the forest 0.78 (0.68), Neptune's sea 1.33 (1.10); worst frames 5.5 to 130 ms, the
+machine's. The frame-budget test of `loose.test.mjs` failed once in a full run at load 12 (Neptune 1.59 ms against
+1.5) and passed alone three times of three.
+
+**Not done, in order.** 1. A gait: the run has no bob (a hip rise of 4 to 5 cm at the stride's frequency, 2 cm at a
+walk, handed over in `st.phys`). 2. Trees in a storm read as still in a short window: the branch sway is
+centimetres. 3. Leaves do not read (count, or PAINTER's mark). 4. A crouch before a jump. 5. The storm frame was not
+re-shot. 6. `shore-earth`, `tree-gust`, `clamber-run`, `clamber-walk-moon` not opened. 7. The sea state is one
+state round the focus: a focus standing in shallow water makes the whole sea low. 8. Nothing under one second in
+the gust pattern (Kaimal has 10 % of the longitudinal and 22 % of the lateral variance there at 11 m/s).
+
 ## Hand-over P11 (eighth PHYSICS agent; read this block first; P10 and older below hold for everything not named here)
 
 **Where things stand.** `node --test src/physics/` 246 tests pass; PILOT's 115 pass on a clean export with my
@@ -988,6 +1082,27 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+### P12, first (ninth PHYSICS agent)
+
+1. **The ship's last metre** (`stepShipBody`): a sink near the ground now follows its velocity target (it hung at
+   0.05 m/s at 1.1 m with tau 0.5). Your LANDING sequence is unchanged (your `motion.mjs --only landing`: the same
+   heights with the old and the new `ship.js`, within 8 mm); the "stalled" clause in `sim.js` (a sink that has not
+   come down 0.3 m in 1.5 s lands) should fire less often now. `st.phys.groundEffect` is 1 in a vacuum;
+   `downwash.thrust` on the gear is a quarter less. Lever: `SHIP_BODY.groundComp` (0 = the old hang).
+2. **The kick off a boulder** is gone: +0.2 to +0.35 m/s and 0.02 m of rise where your trace had +1.06 m/s and
+   0.29 m (`explorer.test.mjs`, "P12 legs"). The feet can still be 0.1 to 0.4 s in the air after a step the legs
+   cannot reach (hips higher than 0.28 m over the far ground): a fall, as ruled.
+3. **`physics.air().veer`** (and `here.air.veer`): the lateral speed over the mean wind, for a vane, a flag or
+   the sound's panning. The wind's direction now wobbles 8 degrees rms at 10 m.
+4. **Seen in the strips, yours to judge**: the run has no bob (hip +-0.01 m; the figure glides: I owe a gait in
+   `st.phys`, not done); the hull in a storm hover is dead level (apply `st.phys.buffetAngle` to the model if you do
+   not); the lab's lift-off cuts the wash to zero for 0.75 s at the top of the climb (my lab script's height hold,
+   not your sequence); the jetpack descent is 5 s at one speed.
+5. A clamber over a 1 m boulder at a run on the Moon is checked from 5.3 to 2.0 m/s within one frame at the face
+   (`clamber-run-moon`). In the game you measured 5.7 to 6.6 m/s over low boulders; over one a metre high this is
+   what the legs do.
+
+
 **P11, at the top (behaviour that changed without a call changing, and what the strips showed).**
 1. *A landing no longer brakes the walker.* The feet stop, the hips go on down and the legs fold (up to
    5.2 m/s over 0.45 m); `st.phys.hip` runs negative for half a second after a landing; the forward speed
@@ -1459,6 +1574,47 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P12, first (ninth PHYSICS agent): Neptune's coast, and what else the strips showed
+
+**Why the sea does not heave (yaw 236 from the `storm_seas` stand, 34 to 42 s; `p12/nept.mjs`).** The sea there is
+Hs 2.77 m: a 52.1 m train of amplitude 0.87 m (`uPhysWaterK.w`, `uPhysWaterAmp.w`: the swell) under three short
+trains of 10.7, 9.3 and 6.6 m and 0.20, 0.19, 0.15 m. `pcPhysWaterD` gives -1.04 to +0.94 m at 60 m out and
+-1.33 to +1.50 m at 250 m, changing at up to 2 m/s. Your vertex shader (`src/render/materials.js`, the liquid
+vertex) multiplies it by `carry * shoal`:
+1. `lam = 6.2831853 / uPhysWaterK.x` is the wavelength of the FIRST train, 10.7 m here, a short one that holds a
+   twentieth of the energy. So `carry` is 1 to 23.5 m, 0.81 at 35 m, 0.03 at 60 m and 0 beyond 64 m: **the sea is
+   flat from 64 m out**, where it stands +-1 to +-1.5 m. Change: take the carry of the long train from ITS
+   wavelength, `6.2831853 / uPhysWaterK.w` (52 m: full to 115 m, gone at 313 m), and displace far vertices by the
+   long train alone: `vec3 L = pcPhysWaterLong(vBody);` (new in the chunk), then
+   `height = (w.x - L.x) * carryShort + L.x * carryLong` with `carryShort` as now and `carryLong` the same
+   smoothstep with the long wavelength. A mesh that cannot carry a 10 m wave can carry a 52 m one.
+2. `shoal = smoothstep(0, 1, aDepth / (1.3 Hs))`: on this coast the water is 0.53 m deep 6 m out, 0.85 m at 12 m,
+   1.44 m at 20 m, 3.05 m at 35 m, so shoal is 0.06, 0.14, 0.35, 0.94: the first 20 m, all of the foreground, is
+   drawn at +-0.05 to +-0.26 m. A wave in the surf is as high as 0.78 of the depth (+-0.2, 0.33, 0.56 m at those
+   places): use the linear `clamp(aDepth / (1.28 * uPhysWaterSea.x), 0.0, 1.0)`, not the smoothstep, which is
+   2.5 times too low near the edge.
+   Together: only a band 25 to 50 m from the eye heaves (drawn +-0.65 m at 35 m), seen at a grazing angle.
+3. **The foam rim is frozen** because `swash` is a function of the still depth alone (`vDepth < 0.05 + 0.22 Hs`)
+   and the surface is not displaced at the edge. New in the chunk: `float pcPhysWaterRunup(vec3 p, float slope)`:
+   the level (m over the still level) of the water's edge on a beach of that slope (0.07 if you have none; this
+   beach is 0.07): on this coast set-up 0.29 m and a swing of 0.63 m, up in a third of the 5.4 s period and back in
+   two thirds, 9 m up and down the beach. Use `vDepth + pcPhysWaterRunup(vBody, 0.07)` where the swash term uses
+   `vDepth` (below zero the bed is bare for the moment: wet sand, no water), and lift the surface by it at the edge:
+   `p += up * mix(runup, waves, shoal)`.
+4. **The straight edges in the sky are yours**: with every kit of mine hidden but the spray (`spray-neptune`
+   strip) two pale forms with hard edges still stand in the sky left and right of the stacks, and in
+   `shore-neptune` a dark slab ends in a straight vertical edge against the pale sky a third of the way across.
+   They are not particles, veils or the water kit.
+**Also seen.** Spray and rain are the same pale level dash: on this coast nothing tells them apart (spray should be
+whiter, shorter and only low over the surf). Leaves in the storm are one-pixel specks (190 in the air, a handful
+seen). Mars dust puffs near the eye flash for one frame (fade a puff by its distance to the eye inside 3 m). Splash
+rings: `pcPhysRingCover` now comes up over the first eighth of a ring's life on a broader band; your
+`smoothstep(0.05, 0.50, cov)` after it still makes a line of it.
+**Changed under you without a call changing.** `pcPhysGrid` (same name, same result near the anchor) is exact far
+from it; the wind's direction now wobbles (8 degrees rms at 10 m, more at blade height), so grass, rain and flags
+no longer point one way; rain and leaves cross a wood's edge at the wind of the place.
+
 
 **P11, at the top (what the filmstrips ask of PAINTER; nothing here is urgent to the build).**
 1. *Nothing to change for the new motion.* Flutter rides in `pcPhysBend` and in uniform slots you already
@@ -2132,6 +2288,12 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     over it at the focus.
 
 ## Needs from the others
+
+**P12 (ninth agent), current needs.** From PAINTER, on Neptune's coast and any sea (all in "For PAINTER", P12):
+(1) the carry distance from the long train's wavelength (`uPhysWaterK.w`) and far vertices displaced by
+`pcPhysWaterLong`; (2) a linear shoal factor; (3) the swash from `pcPhysWaterRunup` in the foam mask and at the
+water's edge; (4) the hard-edged forms in the storm sky; (5) spray told apart from rain; leaves that can be seen; a
+near fade for dust puffs. From PILOT: nothing blocking; see "For PILOT", P12, items 1 and 4.
 
 ### From PAINTER
 
