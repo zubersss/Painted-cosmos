@@ -8,6 +8,7 @@
 //   &sky=cloud:0.9,overcast:0.8,... (any of PHYSICS' eleven); with &physics=1 the weather is
 //   PHYSICS' own: &wtime= (seconds on its clock; the Earth spawn's thunderstorm is 640..800)
 //   &pre= (seconds simulated before the first frame, so rain is already falling) &kits=0
+//   &fresh=1 (fresh snow already lying, as after some minutes of a blizzard)
 import * as THREE from 'three';
 import { createPainter, RENDERER_OPTIONS } from '../render/index.js';
 import { createWorld } from '../world/index.js';
@@ -254,6 +255,7 @@ let forcedSky = null;
 if (P.has('wx') && WXP[P.get('wx')]) forcedSky = Object.assign({}, WXP[P.get('wx')]);
 if (P.has('sky')) { forcedSky = forcedSky || {}; for (const kv of P.get('sky').split(',')) { const [k, v] = kv.split(':'); forcedSky[k] = +v; } }
 if (forcedSky) world.setWeather(forcedSky);
+if (P.has('fresh')) world.setFreshSnow(num('fresh', 1));   // snow already fallen (with physics=1)
 
 // PHYSICS in the gallery (?physics=1): wind, gusts and bending plants from src/physics
 let wtime = num('wtime', 0), preroll = num('pre', 0);
@@ -262,15 +264,14 @@ const physicsWanted = P.get('physics') === '1';
 if (physicsWanted) {
   import('../physics/index.js').then((m) => {
     physics = m.createPhysics({ sampleSurface: (id, d) => world.sampleSurface(id, d) });
-    world.setPhysics(physics);
-    if (P.get('kits') !== '0') startKits();
+    world.setPhysics(physics, { kits: P.get('kits') !== '0' });
   }).catch((e) => {
     // (the tree is shared: a module may be half-saved at the moment of loading. Try again.)
     let n = 0; try { n = +sessionStorage.getItem('pcPhysTry') || 0; sessionStorage.setItem('pcPhysTry', n + 1); } catch (_) { n = 9; }
     if (n < 4) setTimeout(() => location.reload(), 1500); else console.error('physics not available: ' + e.message);
   });
 }
-function startKits() {}
+
 
 // --- start ----------------------------------------------------------------------------------
 function resize() {

@@ -82,6 +82,8 @@ void main() {
   vec3 kuw = acc / wsum;
   // solid props (trunks, rocks, characters) keep more of their drawing
   float keep = (1.0 - far) * (cls == 3.0 || cls == 5.0 ? 0.72 : 0.30);
+  // region 6: small crisp marks (splash rings) the brush leaves as they were drawn
+  if (cls == 6.0) keep = 0.92;
   keep = mix(1.0, keep, uAbstraction);
   vec3 col = mix(kuw, c0.rgb, keep);
   // wet-in-wet: wet areas take up the (wetness-weighted) colour around them, feathered
@@ -165,7 +167,8 @@ void main() {
   float dz = max(abs(a1.z - a0.z), abs(a2.z - a0.z));
   float c0 = floor(a0.w), c1 = floor(a1.w), c2 = floor(a2.w);
   // region changes count only where a solid thing (prop, character) meets something else
-  float solid = max(step(2.5, c0) * step(c0, 3.5) + step(4.5, c0), max(step(2.5, c1) * step(c1, 3.5) + step(4.5, c1), step(2.5, c2) * step(c2, 3.5) + step(4.5, c2)));
+  float solid = max(step(2.5, c0) * step(c0, 3.5) + step(4.5, c0) * step(c0, 5.5), max(step(2.5, c1) * step(c1, 3.5) + step(4.5, c1) * step(c1, 5.5), step(2.5, c2) * step(c2, 3.5) + step(4.5, c2) * step(c2, 5.5)));
+  c0 = min(c0, 5.0); c1 = min(c1, 5.0); c2 = min(c2, 5.0);
   float idc = max(abs(c1 - c0), abs(c2 - c0)) * min(solid, 1.0);
   float fol = max(step(3.5, a0.w) * step(a0.w, 4.99), max(step(3.5, a1.w) * step(a1.w, 4.99), step(3.5, a2.w) * step(a2.w, 4.99)));
   float line = max(smoothstep(0.14, 0.38, dz) * 0.6, min(idc, 1.0) * 0.38) * (1.0 - fol * 0.85);

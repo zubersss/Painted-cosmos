@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, ensureGlobals } from './shared.js';
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
@@ -101,6 +101,7 @@ export function createPainter(renderer) {
 
   function render(scene, camera, dt) {
     if (dt > 0) G.uTime.value += Math.min(dt, 0.1);
+    for (const hook of FRAME_HOOKS) hook(camera, info);
     if (SHEET.valid) post.sheetUniforms.uGrade.value.copy(SHEET.grade);
     else gradeFromHour(mood.timeOfDay == null ? 12 : mood.timeOfDay, post.sheetUniforms.uGrade.value);
     // weather on the sheet: a storm shifts the whole value key (more pigment, the paper stays

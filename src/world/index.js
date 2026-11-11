@@ -14,7 +14,8 @@ import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
-import { makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -80,6 +81,43 @@ export function createWorld(scene) {
     for (const id in weights) { const c = m[id], k = weights[id]; if (c && k) { r += c[0] * k; g += c[1] * k; b += c[2] * k; w += k; } }
     return w > 0 ? out.set(r / w, g / w, b / w) : out.set(0.9, 0.8, 0.66);
   }
+  // PHYSICS' draw kits (rain, snow, dust, rings, prints) with the painter's materials. They are
+  // built when PHYSICS is handed over and brought up to date just before each frame is painted.
+  let kits = null, kitsWanted = true;
+  // Fresh snow. PHYSICS' `snow` also counts the standing cover of cold places (it is 1 on the
+  // alpine meadow in fair weather); that cover is already in each biome's painting (snow
+  // peaks, frost fields). What the weather adds is what has fallen lately: it gathers while
+  // snow falls and is gone a few minutes after, never more than PHYSICS says lies there.
+  let freshSnow = 0;
+  const inksOf = new Map();   // body -> { biomeId: 16 inks }
+  function kitInks(st, weights) {
+    let m = inksOf.get(st.id);
+    if (!m) { m = {}; const S = getSurface(st.id); S.biomes.forEach((b, i) => { m[b.id] = biomeInks(S.pal[i], b.liquid && b.liquid.color); }); inksOf.set(st.id, m); }
+    for (let i = 0; i < 16; i++) {
+      let r = 0, g = 0, b = 0, w = 0;
+      for (const id in weights) { const c = m[id] && m[id][i], k = weights[id]; if (c && k) { r += c[0] * k; g += c[1] * k; b += c[2] * k; w += k; } }
+      if (w > 0) KIT_PALETTE[i].set(r / w, g / w, b / w);
+    }
+  }
+  function buildKits() {
+    if (!physics || !kitsWanted || kits) return;
+    const P = physics;
+    import('../physics/three/index.js').then((K) => {
+      if (physics !== P || kits) return;
+      // the painter's draw table: PHYSICS' set for this pipeline (marks no smaller than three
+      // internal pixels survive the brush), rain a little broader and longer: a few strokes
+      const D = K.DRAW_PAINTED, draw = {};
+      for (const k in D) draw[k] = { ...D[k] };
+      draw.rain = { ...D.rain, width: 0.085, exposure: 0.16, minPx: 3.5 };
+      kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
+    }).catch((e) => console.warn('weather kits not available: ' + e.message));
+  }
+  FRAME_HOOKS.push((camera, info) => {
+    if (!kits) return;
+    const id = physics && physics.here && physics.here.bodyId, root = id && bodies.get(id);
+    if (root && id === lastActive) kits.update(root, camera, info.internalHeight);
+    else for (const o of kits.objects) o.visible = false;
+  });
   const tmpKey = { zenith: new THREE.Vector3(), horizon: new THREE.Vector3(), haze: new THREE.Vector3(), glaze: new THREE.Vector3(), light: new THREE.Vector3(), grade: new THREE.Vector3(), cloudShade: new THREE.Vector3() };
 
   function blendKeys(look, wDay, wDawn, wDusk, wNight) {
@@ -230,10 +268,19 @@ export function createWorld(scene) {
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
       bu.uDayness.value = dayness;
-      bu.uWx.value.set(Math.min(1, oc + dustW * 0.6), sk ? sk.wet * air : 0, sk ? sk.snow * air : 0, Math.max(veilR, veilS));
+      if (st.id !== lastActive) freshSnow = 0;
+      freshSnow = Math.min(1, Math.max(0, freshSnow + dt * (veilS > 0.02 ? veilS / 22 : -1 / 300)));
+      const snowC = sk ? (WX.forced ? sk.snow : Math.min(sk.snow, freshSnow)) * air : 0;
+      bu.uWx.value.set(Math.min(1, oc + dustW * 0.6), sk ? sk.wet * air : 0, snowC, Math.max(veilR, veilS));
       skyU.uWxSky.value.set(Math.min(1, oc + dustW * 0.5), storm, veilR, veilS);
       skyU.uStormWash.value.copy(_storm);
       WX.key = (storm * 0.34 + oc * 0.14 + dustW * 0.10) * dayness; WX.flash = sk ? sk.flash * air : 0;
+      // inks for the kits: each ground material in this place's own washes; rain is the sky's wet wash
+      if (kits) {
+        kitInks(st, here.biomeWeights);
+        KIT_INK.rain.copy(tmpKey.haze).lerp(_storm, 0.55);
+        KIT_INK.dust.copy(KIT_PALETTE[5]); KIT_INK.sand.copy(KIT_PALETTE[4]);
+      }
       const v0 = look.visibility[0], v1 = look.visibility[1];
       const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * space01) + 40000 * space01;
       bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, space01);
@@ -304,7 +351,12 @@ export function createWorld(scene) {
     sampleObstacles(bodyId, unitDir, radius) { return sampleObstaclesPure(bodyId, unitDir.x, unitDir.y, unitDir.z, radius); },
     // PHYSICS hook (COORDINATOR C14): the motion source for flora and weather. Stored now, read
     // by the flora and weather drawing as those fields arrive.
-    setPhysics(p) { physics = p || null; },
+    // (opts.kits === false: no rain, snow, dust or prints are drawn)
+    setPhysics(p, opts) { physics = p || null; if (opts && opts.kits === false) kitsWanted = false; if (kits && !physics) { kits.dispose(); kits = null; } buildKits(); },
+    get kits() { return kits; },
+    // how much freshly fallen snow lies in the picture, 0..1 (set it for a still frame)
+    get freshSnow() { return freshSnow; },
+    setFreshSnow(x) { freshSnow = Math.min(1, Math.max(0, +x || 0)); },
     // Force the weather in the picture (gallery, tests): PHYSICS' eleven sky numbers, or null
     // to go back to what PHYSICS (or PILOT's setMood.sky) says.
     setWeather(sky) { WX.forced = sky ? Object.assign({ cloud: 0, overcast: 0, haze: 1, fog: 0, dust: 0, wet: 0, snow: 0, rain: 0, snowfall: 0, storm: 0, flash: 0 }, sky) : null; },

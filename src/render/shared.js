@@ -138,3 +138,8 @@ export function syncPhysWater(W) {
   PHYSW.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); PHYSW.uPhysWaterSea.value.fromArray(u.uPhysWaterSea);
   PHYSW.uPhysWake.value = u.uPhysWake; PHYSW.uPhysWakeG.value = u.uPhysWakeG;
 }
+
+// Things that must be brought up to date with the camera just before a frame is painted
+// (PHYSICS' draw kits face the picture plane and size themselves in internal pixels):
+// each hook is called as hook(camera, painter.info) at the start of painter.render.
+export const FRAME_HOOKS = [];
