@@ -66,6 +66,24 @@ Body by body, as I open them:
   spawn); the near boulders are smooth pale slabs with hard violet outlines, like ice floes or
   soap, not rock. From orbit (24 frames): a pale cratered disc on indigo, painted; no dark
   side.
+- **Mars.** Spawn (dry riverbed with red-leaf groves; 41 frames, 309 s): the palette says
+  Mars (peach sky, ochre ground, maroon groves) and the ship sits well beyond the figure. The
+  shrubs do not pass: their masses end in a **speckled, pixel-ragged edge** (dots of maroon
+  breaking off like dithering, worst round the shrub between the figure and the ship), where
+  a brush would leave a soft or dry edge; the boulders are again smooth pale lozenges with
+  crisp outlines. Vista, Rust Canyons (46 frames, 162 s): **a good painting**: banded canyon
+  walls stepping back into a warm haze, a dark spire against them, a raking ochre slope.
+  From orbit (9 frames): a pale peach disc with cream worm-like swirls; no rust red, no dark
+  markings, no polar cap: from space it does not read as Mars.
+- **Jupiter.** Spawn (52 frames, 406 s): the sky says Jupiter in one look, cream and orange
+  belts running to a vanishing point over the island, laid as broad soft washes. The ground
+  is a green meadow with red flecks between grey-green cliff walls, and the walls are the
+  weak part: flat vertical planes with level stripes and square tops, like extruded blocks.
+  Passes as a painting; the coordinator's "its ground says valley" still holds. Vista, Cream
+  Sky-Islands (51 frames, 219 s): the cloud sea as a pale mist floor between the islands,
+  far islands as grey blocks in the haze: atmospheric and good, the same boxy cliffs. From
+  orbit (9 frames): bold orange and cream bands with soft edges: Jupiter at once (no Great
+  Red Spot, which the brief names among its biomes).
 
 ---
 
