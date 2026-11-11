@@ -67,6 +67,12 @@ export class Particles {
 
   setQuality(q) { this.quality = q; }
 
+  // The frame has re-anchored at old grid position (X, Z); the anchor radius changed by -dr.
+  rebase(frame, X, Z, dr) {
+    this.frameVersion = frame.version;
+    for (const k in this.buffers) { const b = this.buffers[k], P = b._p; for (let i = 0; i < b._n; i++) { P[i * 3] -= X; P[i * 3 + 1] += dr; P[i * 3 + 2] -= Z; } }
+  }
+
   _event(frame, x, y, z, kind, strength, size) {
     const E = this.events, o = E.head * 8;
     E.data[o] = frame.ex * x + frame.ax * y + frame.nx * z;

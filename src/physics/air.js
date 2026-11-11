@@ -61,10 +61,10 @@ export class AirGrid {
 
   // Rebuild the grid for this frame. sample(dir) is sampleSurface bound to the body.
   // Returns the number of sampleSurface calls made.
-  update(frame, bodyId, t, fx, fz, sample, budget) {
+  update(frame, bodyId, t, fx, fz, sample, budget, clock, budgetMs) {
     const N = this.N, cell = this.cell, T = this.terrain;
     _coverBody = bodyId;
-    const used = T.update(frame, fx, fz, sample, budget, coverInto);
+    const used = T.update(frame, fx, fz, sample, budget, coverInto, clock, budgetMs);
     this.bodyId = bodyId; this.time = t; this.ready = true;
     const W = WINDS[bodyId];
     const half = T.half;

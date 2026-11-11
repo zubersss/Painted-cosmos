@@ -100,10 +100,21 @@ export class TerrainGrid {
 
   invalidate() { this.valid.fill(0); this.invalid = this.N * this.N; this.changed++; }
 
+  // The frame has just re-anchored at old grid position (X, Z) (multiples of this grid's cell)
+  // and its anchor radius changed by -dr: keep every node, renumber the grid, re-base heights.
+  rebase(frame, X, Z, dr) {
+    this.frameVersion = frame.version;
+    this.ci -= Math.round(X / this.cell); this.cj -= Math.round(Z / this.cell);
+    const h = this.h, lq = this.lq;
+    for (let n = 0; n < h.length; n++) { h[n] += dr; if (lq[n] > -1e8) lq[n] += dr; }
+    this.changed++;
+  }
+
   // Follow the focus (grid coordinates fx, fz) and sample up to `budget` missing nodes.
   //   sample(dir {x,y,z}) -> contract surface;  coverOf(surface, out8, offset) fills cover.
+  // `clock` (optional, ms) and `budgetMs` stop the sampling early when the surface is slow.
   // Returns the number of sampleSurface calls made.
-  update(frame, fx, fz, sample, budget, coverOf) {
+  update(frame, fx, fz, sample, budget, coverOf, clock, budgetMs) {
     const N = this.N;
     if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.ci = Math.round(fx / this.cell); this.cj = Math.round(fz / this.cell); this.invalidate(); }
     const ni = Math.round(fx / this.cell), nj = Math.round(fz / this.cell);
@@ -111,9 +122,11 @@ export class TerrainGrid {
     if (this.invalid === 0 || budget <= 0) return 0;
     let used = 0;
     const order = this.order, half = this.half, cell = this.cell;
+    const t0 = clock ? clock() : 0;
     for (let k = 0; k < order.length && used < budget; k++) {
       const n = order[k];
       if (this.valid[n]) continue;
+      if (clock && used >= 2 && clock() - t0 > budgetMs) break;
       const i = n % N, j = (n - i) / N;
       const x = (this.ci + i - half) * cell, z = (this.cj + j - half) * cell;
       frame.dir(x, z, _d);

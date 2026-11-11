@@ -108,8 +108,16 @@ export class FloraField {
     this.active = 0; this._hfVersion = -1;
   }
 
-  // The frame is about to re-anchor: (dx, dz) is the new anchor in the OLD frame's coordinates.
-  // Keeps the travelling waves continuous. (Grid contents are dropped by update.)
+  // The frame has re-anchored at old grid position (X, Z) (multiples of 16 m): keep every cell
+  // and renumber the grids, so parted grass and swaying trees carry straight on.
+  rebase(frame, X, Z) {
+    this.frameVersion = frame.version;
+    this.ci -= Math.round(X / this.cell); this.cj -= Math.round(Z / this.cell);
+    this.mi -= Math.round(X / this.nearCell); this.mj -= Math.round(Z / this.nearCell);
+    this.onReanchor(X, Z);
+  }
+
+  // (dx, dz) is the new anchor in the OLD frame's coordinates: keeps the travelling waves continuous.
   onReanchor(dx, dz) {
     const k = FLORA.waveK, d0 = this.waveDir[0], d1 = this.waveDir[1];
     for (let i = 0; i < 3; i++) {
@@ -150,8 +158,10 @@ export class FloraField {
     const h = dt > 0.1 ? 0.1 : dt;
 
     // ---- height factors per cell (only when the ground under the grid changed) ----------------
+    // (while the ground cache is still filling this is refreshed every eighth frame, not every one)
     const T = air.terrain;
-    if (this._hfVersion !== T.changed) {
+    this._tick = (this._tick | 0) + 1;
+    if (this._hfVersion !== T.changed && (this._hfVersion < 0 || T.invalid === 0 || this._tick % 8 === 0)) {
       this._hfVersion = T.changed;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const x = (this.ci + i - N / 2 + 0.5) * cell, z = (this.cj + j - N / 2 + 0.5) * cell;

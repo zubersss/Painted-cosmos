@@ -42,6 +42,17 @@ export class DeformField {
 
   reset() { this.depth.fill(0); this._any = false; }
 
+  // The frame has re-anchored at old grid position (X, Z): keep the trail, renumber the grid,
+  // and move the marks to the new origin.
+  rebase(frame, X, Z) {
+    const M = this.marks, dx = M.origin.x - frame.ox, dy = M.origin.y - frame.oy, dz = M.origin.z - frame.oz;
+    for (let k = 0; k < M.capacity; k++) { const o = k * MARK_STRIDE; M.data[o] += dx; M.data[o + 1] += dy; M.data[o + 2] += dz; }
+    M.origin.x = frame.ox; M.origin.y = frame.oy; M.origin.z = frame.oz;
+    this.frameVersion = frame.version;
+    this.ci -= Math.round(X / this.cell); this.cj -= Math.round(Z / this.cell);
+    this.version++;
+  }
+
   // disturbers: as in physics.update. ground(x, z, out) -> { sink, imprint } for grid position.
   update(dt, frame, fx, fz, disturbers, groundOf, g, time) {
     const N = this.N, cell = this.cell;

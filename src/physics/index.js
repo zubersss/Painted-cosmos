@@ -30,6 +30,7 @@ export const PHYSICS_VERSION = 1;
 export const QUALITY = Object.freeze({
   samples: [4, 8, 12],        // sampleSurface calls per frame in steady state, per quality tier
   burst: 3,                   // x that while a grid is mostly empty (after a teleport or landing)
+  sampleMs: 0.35,             // ms of sampleSurface per grid per frame at most (after the first two calls)
   reanchor: 384,              // m the focus may wander from the anchor before the frame moves
   moistureEvery: 0.25,        // s between refreshes of the wetness / snow integrals at the focus
 });
@@ -62,6 +63,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
   };
   const stats = { ms: 0, msAvg: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
   const _dirv = { x: 0, y: 0, z: 0 };
+  const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {};
   let sampleBody = 'earth';
   const sampleActive = (dir) => sampleSurface(sampleBody, dir);
@@ -108,21 +110,35 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
     const body = BODIES[bodyId];
     // (re)anchor the near field
     let fx = frame.lx(fp.x, fp.y, fp.z), fz = frame.lz(fp.x, fp.y, fp.z);
-    if (active !== bodyId || frame.bodyId !== bodyId || Math.hypot(fx, fz) > QUALITY.reanchor) {
-      if (active === bodyId && frame.bodyId === bodyId) flora.onReanchor(fx, fz);
+    const rf = Math.hypot(fp.x, fp.y, fp.z);
+    if (active !== bodyId || frame.bodyId !== bodyId || Math.hypot(fx, fz) > QUALITY.reanchor * 3) {
+      // a new body, or a jump: start afresh under the focus
       frame.anchor(bodyId, fp.x, fp.y, fp.z);
       fx = 0; fz = 0; lastMoist = -1e9; stats.reanchors++;
+    } else if (Math.hypot(fx, fz) > QUALITY.reanchor) {
+      // wandered far from the anchor: move the anchor to the nearest point of the 16 m lattice
+      // that every grid shares, and carry all the fields over (nothing is dropped or re-sampled)
+      const X = Math.round(fx / 16) * 16, Z = Math.round(fz / 16) * 16;
+      frame.dir(X, Z, _d3);
+      const r0 = frame.r0;
+      frame.anchor(bodyId, _d3[0] * rf, _d3[1] * rf, _d3[2] * rf);
+      const dr = r0 - frame.r0;
+      near.rebase(frame, X, Z, dr); airGrid.terrain.rebase(frame, X, Z, dr);
+      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z);
+      fx = frame.lx(fp.x, fp.y, fp.z); fz = frame.lz(fp.x, fp.y, fp.z);
+      moistX -= X; moistZ -= Z; stats.reanchors++;
     }
     active = bodyId; here.bodyId = bodyId;
-    const r = Math.hypot(fp.x, fp.y, fp.z);
+    const r = rf;
     const ux = fp.x / r, uy = fp.y / r, uz = fp.z / r;
 
     // the ground: a few samples per frame, nearest the focus first
     let budget = QUALITY.samples[quality];
     const bn = near.invalid > near.N * near.N * 0.5 || near.frameVersion !== frame.version ? QUALITY.burst : 1;
     const ba = airGrid.terrain.invalid > airGrid.N * airGrid.N * 0.5 || airGrid.terrain.frameVersion !== frame.version ? QUALITY.burst : 1;
-    let used = near.update(frame, fx, fz, sampleActive, Math.ceil(budget * 0.5) * bn, groundInto);
-    used += airGrid.update(frame, bodyId, time, fx, fz, sampleActive, Math.ceil(budget * 0.5) * ba);
+    // (a slow surface is rationed by time as well: at most QUALITY.sampleMs per grid per frame)
+    let used = near.update(frame, fx, fz, sampleActive, Math.ceil(budget * 0.5) * bn, groundInto, now, QUALITY.sampleMs);
+    used += airGrid.update(frame, bodyId, time, fx, fz, sampleActive, Math.ceil(budget * 0.5) * ba, now, QUALITY.sampleMs);
     stats.samples = used;
 
     // where we are
