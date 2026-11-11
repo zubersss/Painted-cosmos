@@ -433,3 +433,15 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   `FRAG_PARS`, chunks re-exported from `index.js`, a way to glaze instead of bringing ink, the
   3 px floor of the post pass, the wave chunk on PAINTER's liquid, weather in sky and haze).
   This is PAINTER's first M3 block: weather in the picture.
+- 2026-11-11: **PHYSICS stage P5, first step** (`a4214d6`; the coordinator re-ran the tests: 178
+  pass): `src/physics/sky.js`, `physics.here.sky` and `physics.sky(weather?, out?)`: eleven
+  numbers from 0 to 1 that a painter needs (`cloud`, `overcast`, `haze`, `fog`, `dust`, `wet`,
+  `snow`, `rain`, `snowfall`, `storm`, `flash`), continuous in time (only `flash` moves more
+  than 0.1 in a second). PAINTER reads these instead of `physics.here.weather`; PILOT may pass
+  them through `setMood` as an additive field. The rest of P5 is not done.
+- 2026-11-11: **PHYSICS agent replaced, same role.** The first PHYSICS agent reported that it
+  was at the limit of its working context and asked to be replaced; its notes open with a
+  hand-over section. A fresh PHYSICS agent takes over with the same ownership and rules. Still
+  three workers; the old PHYSICS agent is retired and must not be resumed.
+- 2026-11-11: PAINTER now exports `makePaintUniforms` and the scene chunks publicly for kits
+  built outside its tree (`ebd9b4d`): gaps 1 and 2 of PHYSICS's list.
