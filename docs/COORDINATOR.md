@@ -401,3 +401,19 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   workers; the old PAINTER agent is retired and must not be resumed.
 - 2026-11-11: PAINTER's material contract for PHYSICS's draw kits is in `docs/notes/painter.md`
   (two opaque targets, `pcWrite`, PAINTER's chunks, a vertex chunk giving `pcKitPosition()`).
+- 2026-11-11: **PHYSICS stage P3 accepted** (`ea6efdc`; the coordinator re-ran the tests: 175
+  pass). Draw kits under `src/physics/three/` fit PAINTER's material contract (a vertex chunk
+  with `pcKitPosition()` and two varyings per kind, opaque with `discard`; at most 12 draw
+  calls and 31 k triangles with every buffer full; `kits.update(bodyRoot, camera, heightPx)`).
+  Rain shelter and drips, a sea that no longer tiles from the air, a wake field. Worst
+  reproducible `physics.update` frame 0.38 to 0.92 ms. The integrated game was played in the
+  browser on Earth, Mars and Neptune (seven findings in its notes). Not done: a branch rate in
+  trees; shader agreement inside PAINTER's `PROP_VERT`; kits with PAINTER's real chunks.
+  Water uniforms changed type to vec4 (groups and wakes added); nothing had wired them.
+- 2026-11-11: **P4 plan (coordinator):** so that PHYSICS does not wait for PAINTER, it proves
+  the kits, the flora chunk and the water chunk inside the real painted pipeline in its own
+  lab, using only PAINTER's public exports (`createPainter`, `createWorld`, `makeWashMaterial`,
+  `RENDERER_OPTIONS`), and hands PAINTER a material factory that is known to work, with frames.
+  How rain is drawn (a thin streak in an opaque pass will alias and crawl) is PAINTER's
+  decision; PHYSICS prototypes the options there and shows them. PAINTER's first M3 item is
+  wiring the kits (weather in the picture), then the real explorer and ship.
