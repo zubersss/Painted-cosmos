@@ -62,8 +62,13 @@ What M2 added:
   --root <clean export of the fix commit>`; PAINTER's render, world and art, PHYSICS on):
   PASSED, no console errors. Landed in `dry_riverbeds` on Mars and `crystal_reeds` on Saturn;
   the reload continued on Saturn. `docs/shots/pilot/real-03-mars.jpg` is from this run.
-- The M1 loop inside the painted forest with PHYSICS and the canopy cushion: see the last
-  lines of this section.
+- The M1 loop inside the painted forest with PHYSICS and the canopy cushion (clean export of
+  `ee4c336`, `scale=0.5&quality=0`, 400x225): PASSED, 37 checks. After lift-off the read-out
+  says 3.7 m, not 9: height is now measured from the floor the ship rides on, and in the
+  clearing that is PAINTER's canopy field.
+- The M1 loop on stubs with PHYSICS and its field brake (`cmd.brake`): PASSED, 37 checks.
+- The painted trip at 960x540 and quality 1 (the coordinator's evidence request): see
+  "Painted trip at 960x540" at the end of this section.
 - `node tests/lockcheck.mjs`: PASSED. Headless Chromium grants pointer lock and then reports
   nonsense; the game fell back to drag-look, said so, and the view moved 0.14 rad at most.
 - Evidence: `docs/shots/pilot/01-on-foot`, `02-jetpack`, `10-land-prompt` (M1 loop on stubs),
