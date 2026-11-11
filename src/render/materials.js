@@ -889,6 +889,91 @@ export function makeWashMaterial(opts = {}) {
   return m;
 }
 
+// ------------------------------------------------------------------------------------------
+// Figure: the explorer and the ship. One mesh each; its parts (limbs, coat, gear, canopy) are
+// moved by a small palette of matrices (attribute aPart), so a whole figure is one draw call.
+// The local washes are vertex colours; aMat = (dry brush, wetness, glow: 1 = bare light,
+// not modelled by the sun). The wash turbulence is anchored to each part's rest shape, so it
+// travels with the limb and never swims.
+// ------------------------------------------------------------------------------------------
+const FIG_VERT = /* glsl */`
+${VERT_PARS}
+uniform mat4 uPart[PC_PARTS];
+attribute vec3 color;
+attribute vec3 aMat;
+attribute float aPart;
+varying vec3 vObj;
+varying vec3 vNO;
+varying vec3 vNV;
+varying vec3 vView;
+varying vec3 vCol;
+varying vec3 vMat;
+void main() {
+  mat4 pm = uPart[int(aPart + 0.5)];
+  vec4 mv = modelViewMatrix * (pm * vec4(position, 1.0));
+  vNV = normalMatrix * normalize(mat3(pm) * normal);
+  vObj = position; vNO = normal; vCol = color; vMat = aMat;
+  vView = mv.xyz;
+  gl_Position = projectionMatrix * mv;
+  ${VERT_END}
+}
+`;
+
+const FIG_FRAG = /* glsl */`
+${FRAG_PARS}
+uniform vec4 uFig;    // wash turbulence scale (1/m), pooling inside the silhouette, dry-stroke scale, region id
+varying vec3 vObj;
+varying vec3 vNO;
+varying vec3 vNV;
+varying vec3 vView;
+varying vec3 vCol;
+varying vec3 vMat;
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 nV = normalize(vNV);
+  if (!gl_FrontFacing) nV = -nV;
+  vec4 n1 = texture(uNoise3D, vObj * uFig.x);
+  vec4 n2 = texture(uNoise3D, vObj * uFig.x * 3.3 + 0.31);
+  // the wash: its pigment load drifts, and pools just inside the edge of the form
+  float rim = 1.0 - clamp(dot(nV, normalize(-vView)), 0.0, 1.0);
+  float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.35 + uFig.y * smoothstep(0.35, 0.95, rim + (n2.b - 0.5) * 0.25);
+  vec3 c = pcWetWash(pcDensity(vCol, d), 0.7);
+  // light in soft steps that run into each other inside the form; the shadow side is a glaze
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float x = dot(nV, sunV) * 0.5 + 0.5 + (n1.g - 0.5) * 0.20 + (n2.a - 0.5) * 0.08;
+  float lvl = pcLevel(x, 0.085);
+  vec3 lit = pcTone(c, lvl);
+  // dry brush: the loaded brush skips on the lit side and paper sparkles through
+  vec4 st = pcTri(vObj * uFig.z, normalize(vNO), 0.5);
+  float dryM = smoothstep(0.50, 0.66, st.r * 0.8 + st.b * 0.3);
+  lit = mix(lit, vec3(1.0), dryM * vMat.x * (0.10 + 0.14 * lvl));
+  c = mix(lit, vCol, vMat.z);
+  float f = pcFogAmount(length(vView));
+  c = pcAtmos(c, f);
+  pcWrite(c, max(vMat.y, f * 0.8), nV, -vView.z, uFig.w);
+}
+`;
+
+// makeFigureMaterial({ parts, scale, pooling, stroke, id }) -> ShaderMaterial; its
+// uniforms.uPart.value is an array of `parts` Matrix4 (identity until the model's rig fills it).
+export function makeFigureMaterial(opts = {}) {
+  const n = Math.max(1, opts.parts | 0 || 1);
+  const mats = [];
+  for (let i = 0; i < n; i++) mats.push(new THREE.Matrix4());
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-figure',
+    defines: { PC_PARTS: n },
+    uniforms: baseUniforms(opts.bodyUniforms, {
+      uPart: { value: mats },
+      uFig: { value: new THREE.Vector4(1 / (opts.scale || 0.6), opts.pooling == null ? 0.5 : opts.pooling, opts.stroke || 2.0, opts.id == null ? 5.0 : opts.id) },
+    }),
+    vertexShader: FIG_VERT, fragmentShader: FIG_FRAG,
+    side: opts.side == null ? THREE.FrontSide : opts.side,
+  });
+  m.userData.pcPainted = true;
+  return m;
+}
+
 // Re-point a material's light uniforms at a body's (so an object standing on a planet is lit
 // and hazed like the planet around it).
 export function bindBodyUniforms(material, bodyU) {

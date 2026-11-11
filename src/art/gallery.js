@@ -292,13 +292,24 @@ orient();
 state.pos.addScaledVector(_r, num('dx', 0)).addScaledVector(_up, num('dy', 0)).addScaledVector(_f, num('dz', 0));
 resize();
 
-// models on show near the camera (placeholder until M3): ?models=1
+// models on show near the camera: ?models=1 (explorer 5 m ahead, ship 14 m ahead to the left)
+//   explorer: pose=idle|walk|jet|fall|wade|sit, speed=, phase= (radians of the stride), jet=, lift= (m),
+//             mface= (degrees to the right of the view direction; 0 shows its back), epitch=
+//   ship: smode=landed|hover|fly|pulse, gear=, canopy=, throttle=, sface=, hover= (m)
+//   cockpit=1: the view from the ship's seat, as PILOT's first person (fov 62, near 0.12 m)
 let explorer = null, ship = null;
-if (P.get('models') === '1') {
+if (P.get('models') === '1' || P.get('cockpit') === '1') {
   explorer = createExplorer(); ship = createShip();
   scene.add(explorer.object3D); scene.add(ship.object3D);
 }
-function placeModel(m, east, north, lift) {
+const MP = {
+  pose: P.get('pose') || 'idle', speed: P.has('speed') ? num('speed', 0) : null, phase: P.has('phase') ? num('phase', 0) : null,
+  jet: num('jet', 1), lift: num('lift', 0), face: num('mface', 0), epitch: num('epitch', 0),
+  smode: P.get('smode') || (num('hover', 0) > 0 ? 'hover' : 'landed'), gear: P.has('gear') ? num('gear', 1) : null, canopy: num('canopy', 0),
+  throttle: P.has('throttle') ? num('throttle', 0) : null, sface: num('sface', -70),
+};
+const _mx = new THREE.Matrix4(), _fx = new THREE.Vector3(), _zx = new THREE.Vector3(), _xx = new THREE.Vector3();
+function placeModel(m, east, north, lift, face) {
   const R = BODIES[bodyId].radius;
   frame(state.pos);
   const p = state.pos.clone().normalize().multiplyScalar(R).addScaledVector(_e, east).addScaledVector(_n, north).normalize();
@@ -306,7 +317,30 @@ function placeModel(m, east, north, lift) {
   p.multiplyScalar(groundRadius(p) + (lift || 0));
   const root = world.bodies.get(bodyId);
   m.object3D.position.copy(p).add(root.position);
-  m.object3D.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
+  // heading: the view direction laid on the ground, turned `face` degrees to the right
+  _fx.copy(_f).addScaledVector(up, -_f.dot(up)).normalize().applyAxisAngle(up, -(face || 0) * Math.PI / 180);
+  _zx.copy(_fx).negate(); _xx.crossVectors(up, _zx).normalize(); _zx.crossVectors(_xx, up);
+  m.object3D.quaternion.setFromRotationMatrix(_mx.makeBasis(_xx, up, _zx));
+}
+function placeExplorer(side, dt) {
+  placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * side, Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * side, MP.lift, MP.face);
+  if (dt != null) explorer.animate({ mode: MP.pose, speed: MP.speed == null ? undefined : MP.speed, phase: MP.phase == null ? undefined : MP.phase, jet01: MP.pose === 'jet' ? MP.jet : 0, lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
+}
+let cockpit = null;
+function placeShip(dt) {
+  if (cockpit) { ship.object3D.position.copy(cockpit.p).sub(state.pos); ship.object3D.quaternion.copy(cockpit.q); }
+  else placeModel(ship, Math.sin(state.yaw) * num('sdist', 14) - Math.cos(state.yaw) * 6, Math.cos(state.yaw) * num('sdist', 14) + Math.sin(state.yaw) * 6, num('hover', 0), MP.sface);
+  ship.animate({ mode: MP.smode, gear01: MP.gear == null ? undefined : MP.gear, canopy01: MP.canopy, throttle01: MP.throttle == null ? undefined : MP.throttle, snap: frozenT != null }, frozenT != null ? 0 : dt);
+  if (P.get('cockpit') === '1') {
+    if (!cockpit) {
+      // sit down: the camera goes to the seat and looks along the ship's nose
+      cockpit = { p: ship.object3D.position.clone().add(state.pos), q: ship.object3D.quaternion.clone() };
+      state.pos.copy(ship.object3D.userData.seat).applyQuaternion(cockpit.q).add(cockpit.p);
+      camera.fov = 62; camera.near = 0.12; camera.updateProjectionMatrix();
+      placeBodies(); ship.object3D.position.copy(cockpit.p).sub(state.pos);
+    }
+    camera.quaternion.copy(cockpit.q);
+  }
 }
 
 // Warm-up: build terrain and flora with a generous budget before the first painted frame, so
@@ -318,8 +352,8 @@ function tick(now) {
   fly(dt);
   orient();
   placeBodies();
-  if (explorer) { placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * 1.5, Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * 1.5); explorer.animate({ mode: 'idle' }, dt); }
-  if (ship) { placeModel(ship, Math.sin(state.yaw) * num('sdist', 14) - Math.cos(state.yaw) * 6, Math.cos(state.yaw) * num('sdist', 14) + Math.sin(state.yaw) * 6, num('hover', 0)); ship.animate({ mode: num('hover', 0) > 0 ? 'hover' : 'landed' }, dt); }
+  if (ship) placeShip(dt);
+  if (explorer) placeExplorer(1.5, dt);
   if (physics) {
     const up = state.pos.clone().normalize();
     // what pushes the grass about: the explorer on show, and the ship's downwash (?wash=<newtons>)
@@ -328,7 +362,7 @@ function tick(now) {
     const setDisturbers = (back) => {
       disturbers.length = 0;
       if (explorer) {
-        placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * (1.5 - walk * back), Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * (1.5 - walk * back));
+        placeExplorer(1.5 - walk * back, null);
         const p = root.worldToLocal(explorer.object3D.position.clone());
         frame(state.pos);
         disturbers.push({ kind: 'explorer', p, v: { x: _r.x * walk, y: _r.y * walk, z: _r.z * walk }, radius: 0.45, strength: 1, grounded: true });
