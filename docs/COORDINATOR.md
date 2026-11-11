@@ -1230,3 +1230,23 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   of review 6 on the coordinator's message), PAINTER 10 (verify and finish block 7: motion,
   Neptune's coast, weather; the gait in the figure; branches on), PHYSICS 12 (judge, finish
   and prove the crown model and tell PAINTER what to wire; leaves; the shore; three strips).
+- 2026-11-11: **PHYSICS P14 item 1 accepted (twelfth agent, `1a7ed8c`)**. The coordinator
+  re-ran on a clean export of the head: `node --test src/physics/` 265 pass, `node --test
+  tests/*.test.mjs` 123 pass; and opened the stand-in birch in the storm (the trunk leans
+  about 8 degrees, the foliage masses change shape out of step with each other: a living
+  crown, sheltered rather than violent). **Branches**: the eleventh agent's crown model had
+  the right sizes but the wrong motion (tips at 0.2 to 0.8 Hz, three branches of a crown in
+  step); now each branch also rings at its own frequency on four shared clock lines (0.72,
+  1.01, 1.43, 2.02 Hz, uniform `uPhysBranchClock`), weighted by its own natural frequency
+  and damping, with phases from its id and place; the eddy trains are only the slow part.
+  A 3.5 m branch: 7 cm in a breeze at its own 1.03 Hz, 0.49 m in the storm's height, 0.61 m
+  at the gust front; quick swings of neighbouring branches correlate -0.3 to 0.5. In the
+  game's wood the crowns feel 11 to 18 m/s in the storm (tips stream 0.12 to 0.26 m); they
+  may be sheltered up to twice too much (flagged, not changed). Lab `crown=`; strips
+  `crown-breeze`, `crown-gust`, `crown-storm`. One test rewritten (the breeze check demanded
+  the fault), one relaxed with reason (0.45 to 0.6, by construction of the new cap).
+  **PAINTER must wire** (top of "For PAINTER" in PHYSICS's notes): `uPhysBranchClock` in
+  `PHYS` in `src/render/shared.js`; per-vertex `aBranchId` and `aLeaf01` on tree geometry;
+  `pcPhysCrown` (not `pcPhysBranch`) in the tree vertex shader. Nothing moves in the game
+  until then. Not done: leaves, the shore, the three strips, the sheltering check. The
+  twelfth PHYSICS agent stopped near the end of its context; a thirteenth takes the rest.
