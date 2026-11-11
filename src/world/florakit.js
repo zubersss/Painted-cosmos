@@ -17,10 +17,13 @@ export const FLORA_PHYS = {
 };
 
 class Builder {
-  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; }
+  // (PHYSICS' crown, P14: `aBranchId` one number for every vertex of a branch and the foliage it carries, -1 on the
+  // trunk; `aLeaf01` 1 on foliage. `branch` is the number the next tube or blob is laid with)
+  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; this.br = []; this.lf = []; this.branch = -1; }
   get count() { return this.p.length / 3; }
   vert(px, py, pz, nx, ny, nz, mx, my, mz, u, v, sway, part, shade, hash) {
     this.p.push(px, py, pz); this.n.push(nx, ny, nz); this.m.push(mx, my, mz); this.uv.push(u, v); this.d.push(sway, part, shade, hash);
+    this.br.push(this.branch); this.lf.push(part === 1 || part === 3 ? 1 : 0);
     return this.p.length / 3 - 1;
   }
   tri(a, b, c) { this.idx.push(a, b, c); }
@@ -31,6 +34,8 @@ class Builder {
     g.setAttribute('aMass', new THREE.BufferAttribute(new Float32Array(this.m), 3));
     g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(this.uv), 2));
     g.setAttribute('aData', new THREE.BufferAttribute(new Float32Array(this.d), 4));
+    g.setAttribute('aBranchId', new THREE.BufferAttribute(new Float32Array(this.br), 1));
+    g.setAttribute('aLeaf01', new THREE.BufferAttribute(new Float32Array(this.lf), 1));
     g.setIndex(this.count > 65535 ? new THREE.BufferAttribute(new Uint32Array(this.idx), 1) : new THREE.BufferAttribute(new Uint16Array(this.idx), 1));
     g.computeBoundingSphere();
     return g;
@@ -40,6 +45,7 @@ class Builder {
 // A tube along a path of points with radii. Normals are radial (smooth).
 function tube(B, pts, radii, sides, opts) {
   const o = Object.assign({ part: 0, shade: 0, hash: 0.5, sway0: 0, swayK: 0, swayH: 1, vScale: 1, v0: 0, cap: true }, opts || {});
+  B.branch = o.branch != null ? o.branch : o.swayH > 1.5 ? -1 : (o.hash * 7.13) % 1;     // (a trunk carries -1; any other tube is its own branch)
   const rings = [];
   let vv = o.v0;
   const up = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), t = new THREE.Vector3();
@@ -75,6 +81,7 @@ function ico(detail) {
 }
 function blob(B, c, rx, ry, rz, rnd, opts) {
   const o = Object.assign({ detail: 1, part: 1, noise: 0.22, rough: 0, ledge: 0, ledgeF: 9, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0, taper: 0, uvT: false }, opts || {});
+  B.branch = o.branch != null ? o.branch : (o.hash * 7.13) % 1;     // (a mass of foliage is its own branch unless given one)
   const I = ico(o.detail);
   const mc = o.massC || c;
   const ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28;
@@ -104,6 +111,7 @@ function blob(B, c, rx, ry, rz, rnd, opts) {
 // A single tapered stroke (grass blade, fern frond): a ribbon that arches outward.
 function stroke(B, root, dir, len, width, arch, rnd, opts) {
   const o = Object.assign({ segs: 3, part: 2, hash: rnd(), sway: 0.25, leaf: 0, twist: 0 }, opts || {});
+  B.branch = o.branch != null ? o.branch : -1;
   const side = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
   let prevL = -1, prevR = -1;
   for (let i = 0; i <= o.segs; i++) {
@@ -142,13 +150,17 @@ export function birchGeometry(seed, lod) {
   const crownC = V(top.x * 0.85, H * 0.72, top.z * 0.85);
   const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
   if (lod === 0) {
-    // a few thin dark branches reaching into the crown
+    // a few thin dark branches reaching into the crown (each its own number; a mass of foliage within 2.2 m of a
+    // branch's tip is carried by it and swings with it, the others are branches of their own hidden in the wash)
+    const tips = [];
     for (let k = 0; k < 3; k++) {
       const t0 = 0.40 + 0.16 * k + rnd() * 0.06, p0 = at(t0);
       const ang = rnd() * 6.283, len = 1.9 + rnd() * 1.8;
       const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * 0.5, p0.z + Math.sin(ang) * len * 0.55);
       const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * 0.78, p0.z + Math.sin(ang) * len);
-      tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd() });
+      const bid = (k * 0.618034 + 0.13) % 1;
+      tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd(), branch: bid });
+      tips.push([p2, bid]);
     }
     // crown: a handful of large overlapping washes
     const nBlobs = 6 + ((rnd() * 2) | 0);
@@ -158,7 +170,9 @@ export function birchGeometry(seed, lod) {
       const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd());
       const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? (t0 - 1) * H : 0), p0.z + Math.sin(ang) * rr);
       const r = 1.9 + rnd() * 1.0;
-      blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
+      let bid = ((k + 3) * 0.618034 + 0.13) % 1, bd = 2.2;
+      for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
+      blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
   } else {
     blob(B, V(top.x * 0.7 + 0.5, H * 0.60, top.z * 0.7), 3.2, 2.5, 3.0, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });

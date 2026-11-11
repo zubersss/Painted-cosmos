@@ -564,6 +564,8 @@ const PROP_VERT = /* glsl */`
 ${VERT_PARS}
 ${FOG_VERT}
 attribute vec4 aData;     // x sway, y part, z inner shade, w blob hash
+attribute float aBranchId; // (trees) PHYSICS' crown: one number per branch and its foliage, -1 the trunk
+attribute float aLeaf01;   // (trees) 1 on foliage
 attribute vec3 aMass;     // soft "mass" normal of the whole crown
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
 attribute float aBorn;    // per instance: when it came into this mesh (the wash clock, s); negative: when it left (it is being lifted out)
@@ -646,16 +648,20 @@ void main() {
         vec2 bendB = pcPhysBend(rootB, uStiff).xy;
         wp = io + bro + pcPhysDisplace(wp - io - bro, normalize(rootB), uPlantHeight * length(im[1].xyz), bendB);
       #else
-      #ifdef PC_PHYS_FULL
-        vec2 bend = pcPhysBend(rootB, uStiff).xy;
+      #if defined(PC_PHYS_FULL) || defined(PC_PHYS_BRANCH)
+        vec4 pbP = pcPhysBend(rootB, uStiff);
+        vec2 bend = pbP.xy;
       #else
         vec2 bend = pcPhysBendLite(rootB, uStiff);
       #endif
       vec3 relP = wp - io, upP = normalize(rootB);
       float Hp = uPlantHeight * length(im[1].xyz);
       #ifdef PC_PHYS_BRANCH
-        // (a crown does not sway as one piece: PHYSICS' branch lobes, nothing moving at the trunk)
-        relP += pcPhysBranch(relP, upP, Hp, rootB, vec4(bend, 0.0, 0.0));
+        // (a crown does not sway as one piece: PHYSICS' crown, each branch loaded by its own wind and ringing at its
+        // own frequency out of step with its neighbours, the foliage trembling on top, nothing moving at the trunk.
+        // aBranchId: one number for a branch and the masses of foliage it carries (-1 the trunk); each tree its own)
+        float bidP = aBranchId < 0.0 ? -1.0 : fract(aBranchId + inst.z * 7.31);
+        relP += pcPhysCrown(relP, upP, Hp, rootB, pbP, bidP, aLeaf01);
       #endif
       wp = io + pcPhysDisplace(relP, upP, Hp, bend);
       #endif

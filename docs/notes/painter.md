@@ -6,6 +6,46 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
+Written by the tenth PAINTER agent (M3 block 7, after the ninth was stopped by a usage limit).
+The eighth agent's handover is kept below it ("Handover of block 6"); its rules still hold.
+
+- **Where things stand**: block 7 (the picture in motion, the weather) is verified and
+  finished: see "M3 block 7" below for every piece, the evidence and a blunt verdict each. In
+  short: arrival, fill and walk pass (no pops, no tier flicker); Neptune's sea heaves and runs
+  up; the pale forms in Neptune's storm sky were headlands in a near-white mist (fixed in shared
+  code: storm mist is grey, the low sky takes it); the dust storm veils the explorer (near-air
+  veil `G.uAirNear`); spray is a soft blot. Weak: no torn white crests on the near sea; the near
+  headland's vertical end; the blizzard's ruled crest.
+- **The explorer steps** by PHYSICS' gait (`models.js`, item 2): boots by `feet`, hips by
+  `ride`, no clock of its own; PILOT's `figureArgs` passes the fields. Gallery `gait=` poses it.
+- **Branches move** (item 3): PHYSICS' `pcPhysCrown` in the tree shader (`PC_PHYS_BRANCH`,
+  materials.js), per-vertex `aBranchId` / `aLeaf01` from the kit builder (`florakit.js`:
+  a trunk -1, every other tube or blob its own number, a birch's foliage masses take the number
+  of the branch whose tip is within 2.2 m), `uPhysBranchClock` in `PHYS` (shared.js). See item
+  3 below for what was seen.
+- **The art pass** (owner's order, 2026-11-11): `src/data/looks.js` and `src/data/looks/` belong
+  to the 'art' role until the coordinator ends the pass. Do not edit them; keep to shared code.
+- **How to work here**: render only from a clean export of the head with only the files you
+  changed laid over it. Scratch tools in `/home/user/.pc-scratch/painter/m10/` (may be gone):
+  `mkexp.sh <name> [base]` (export plus your changed files), `strip.mjs <export> <prefix> <body>
+  <biome|spawn> <t> <yaw|''> <frames> <dt> <k>` (the game at a stand, the clock driven, a frame
+  every k steps), `arr.mjs` (an arrival filmed 2.8 s), `nep.mjs` (Neptune's stand at several
+  yaws, with the haze numbers), `gait.mjs` (the figure posed by PHYSICS' stride in the gallery),
+  `why.mjs <export>` (prints the console line if any module fell back to a stub), `sheet.py`,
+  `js/prof.mjs` (the skyline from a stand: elevation, distance and height per azimuth). The
+  lead's `tests/motion.mjs` and `tests/weather.mjs` with `--root --out --sheets` (always pass
+  the last two or they write into the lead's evidence). The machine is shared and slow: the
+  game is ready after 5 to 15 minutes, a frame of a strip 15 to 70 s.
+- **Rules that bit me**: (1) the coordinator's WIP snapshots sweep your working files into the
+  head within minutes; commit under your own message as soon as tests pass. (2) A head can be
+  broken in the browser while every Node test passes (a module cycle: the game silently ran on
+  PILOT's stubs); `why.mjs` or `__pc.info().using` tells. (3) Before you fix a "glitter", find
+  which term draws it: I changed three water terms before a zoomed crop showed the specks were
+  the spray kit. (4) The gallery `cam=vista` stands on the easel 9 m up: use `cam=trees` for
+  the figure.
+
+## Handover of block 6 (eighth PAINTER agent; kept)
+
 Written by the eighth PAINTER agent at the end of M3 block 6 (the last art block before the
 lead's review 6). My commits: `5edf80c` (the worlds' ideas, the motion fixes, orbit, the timed
 test) and the one after it (flowers, splash rings, rain, veils, orbit frames, these notes).
@@ -187,6 +227,26 @@ Earth spawn storm, clock 160 to 170 s, gust front 149 s.)
 - Weather marks: leaves, rain, rings **pass**; dust storm now veils the figure **(fixed)**, no
   flicker near the lens **(pass)**; spray softened **(partly seen)**; the walker's track not
   seen (no walk was filmed in the weather); blizzard's ruled crest **weak, not touched**.
+
+### Item 2: the explorer steps (PHYSICS' gait)
+
+`src/art/models.js` `animate`: when `feet` (PHYSICS' `[left, right] { fwd, up, side, down }`) is
+passed, each leg is a two-bone chain (thigh 0.41 m, shin and boot 0.48 m) reaching for its
+boot: `fwd - surge` ahead of the hips, the hips at `L1 + L2 + ride` (`ride` = hip plus the
+stride's bob), the thigh angle taken against the back's lean; the swinging leg's heel is drawn up
+by PHYSICS' clearance times 1.4 to 2.7 (to about the other knee at a run, 0.30 m at most), so a
+run's flight reads in the knee; the torso rides at `ride` and moves by `surge`; the arms and
+the torso's twist follow `stride` (no cycle on the figure's own clock). Standing (both boots
+under the hips) the weight still settles on one leg. `crouch01` (the 0.12 s before a jump):
+the back leans in and the arms go back. Without `feet` the old cycle runs as before. PILOT's
+`figureArgs` (src/player/figure.js) passes exactly these.
+- *Gallery* (`gait=<m/s>`, `stride=`, `grav=`; `window.__pcGait` for a tool): the figure posed
+  by PHYSICS' own stride (gaitOf; the feet and the bob as stepGait lays them). Strip of six
+  poses of a run at 4.2 m/s and six of a walk at 1.5 m/s, side on
+  (`docs/shots/painter/gait-gallery-before-heel.jpg`, opened): **the walk reads** (legs
+  scissor, the trailing heel lifts, knees soft); **the run read as running but knelt in the
+  air** (the heel drawn up to hip height): heel lift reduced (0.42 m and x4.4 to 0.30 m and
+  x2.7) and not re-filmed in the gallery.
 
 ## M3 block 6: each world's idea in its first view, motion faults, orbit (eighth PAINTER agent)
 

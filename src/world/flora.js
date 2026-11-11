@@ -27,7 +27,7 @@ const WASH_T = 0.55;                   // seconds a new thing takes to wash in, 
 const HOLD_MAX = 6;                    // seconds a built cell waits at most for its ground to be on the paper
 const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
 const JIT = 0.3;                       // each tree switches tier at its own distance
-const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
+const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01'];     // (the last two: trees only, PHYSICS' crown)
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
 const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [8, 7.5, 0.5], vine: [7.5, 9, 0.25] };
 
@@ -117,7 +117,7 @@ export class Flora {
   // An InstancedMesh with room for `cap` instances that shares the kit geometry's buffers.
   _instanced(chunk, geo, mat, cap, lod, far) {
     const g = new THREE.BufferGeometry();
-    for (const k of SHARED) g.setAttribute(k, geo.attributes[k]);
+    for (const k of SHARED) if (geo.attributes[k]) g.setAttribute(k, geo.attributes[k]);
     g.setIndex(geo.index);
     const inst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     g.setAttribute('aInst', inst);
