@@ -186,12 +186,14 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
       const vUpNow = dot(st.v, up);
       if (vUpNow < -st.sinkLimit || dot(target, up) > vUpNow + 4) tauBody = Math.min(tau, 0.22);
     }
-    const p0 = st.p;
+    // (The body model moves st.p in place; this function integrates the position once, below,
+    // after the assists have had their say, so the starting point is kept by value.)
+    const p0 = { x: st.p.x, y: st.p.y, z: st.p.z };
     // carve01: PHYSICS' named assist that turns the velocity onto the nose without changing
     // the speed, so steering stays arcade while every change of speed keeps its mass.
     body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: 1 }, dt, env);
-    v = st.v;
-    st.p = p0;                                   // position is integrated once, below
+    v = { x: st.v.x, y: st.v.y, z: st.v.z };
+    st.p = p0;
   } else {
     v = add(st.v, scale(sub(target, st.v), damp(1 / tau, dt)));
   }

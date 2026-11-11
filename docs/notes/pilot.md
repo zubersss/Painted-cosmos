@@ -4,56 +4,68 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Status
 
-**M1 (Pilot's half): met.** Walk, jetpack, board, lift off to orbit, land again, step out:
-on my stubs and inside PAINTER's real painted world. I am also the LEAD DEVELOPER since
-2026-11-11: see `docs/lead/REFERENCES.md`, `REVIEW.md`, `TRACK.md`.
+**M2 (Pilot's half): in place; see "Verified" for what is proven and "Not verified" for what
+is not.** M1 is closed (coordinator). I am also the LEAD DEVELOPER: `docs/lead/REFERENCES.md`,
+`REVIEW.md` (review 2 closes PAINTER's M1), `TRACK.md`.
 
-- Boot: `index.html` + `src/main.js`. Renderer from `RENDERER_OPTIONS`, camera, providers,
-  frame loop, `window.__pc`, `window.__pcReady`.
-- Integration switch: `src/core/providers.js`. `REAL_READY = { render: true, world: true,
-  art: true, ui: false }` since commit `15e77f9`: **the default page runs PAINTER's modules.**
-  `?stub=1` forces my stubs (console *warning*). A real module that fails to import falls
-  back to its stub with a warning. `ui` waits for `src/art/ui.css`.
-- Pure simulation (`src/core/sim.js`, no three, no DOM): state machine, explorer, ship,
-  cameras, frames, orbits. Presenter (`src/core/game.js`) places roots, models and camera and
-  calls `world.update` -> `painter.setMood` -> `painter.render`.
-- Stubs (`src/core/stubs/`): all ten bodies as noise spheres with a small cube-sphere quadtree,
-  liquid on some, the sun, plain renderer into a float-depth target, stub explorer and ship.
+What M2 added:
+- **Pulse drive** (`src/ship/pulse.js`): F in space. Accelerates at 400 m/s2 along the nose,
+  brakes by itself, and lets go at cruise speed on the "arrival sphere" of whatever is ahead
+  (centre distance = radius + max(3 x spaceAltitude, 1.2 x radius): the planet then spans about
+  55 degrees). It will not enter any body's sphere or the sun's, refuses to start toward the
+  planet you are orbiting ("Too close to Earth: turn away from it first"), and draws the nose
+  onto the chosen target at 0.6 rad/s. Earth to Mars (461 km): 68 s, peak 12.6 km/s. Mars to
+  Saturn (887 km): 96 s, peak 17.5 km/s.
+- **Targets and markers**: the body nearest the nose (within 15 degrees) becomes the target; a
+  target chosen on the map stays chosen. In flight each world is ringed where it is in the sky;
+  the target shows name, distance and pulse time, or an arrow at the edge when off screen.
+- **Planet map** (`src/ui/map.js`, M): a small ink-and-wash chart; click a world or use the
+  arrow keys to set a course. A plain fallback look until the painted theme exists.
+- **Save** (`src/core/save.js`): localStorage, every access inside try/catch. Written on
+  touchdown, on stepping out and every 20 s on foot (never in the air, never in flight);
+  restores the clock, each body's spin, explorer, ship, view, target and the sketchbook's
+  visited bodies and biomes. `?fresh=1` forgets it, `?save=0` never writes.
+- **PHYSICS wired in** (COORDINATOR C14, PHYSICS' guide): see Decisions 10.
+- **Trees**: solid for the explorer and the camera boom; landing sites keep 6 m clear of them;
+  the flying ship rides above the canopy (`canopyHeight` from `sampleSurface`, plus obstacle
+  heights as tents where a world has no canopy field).
+- **Pointer-lock fallback**: if the lock is refused, or the deltas under it are nonsense
+  (window-sized jumps that undo themselves, lone jumps with stillness after, spikes), the game
+  drops the lock, says "hold the left button and drag to look" on screen, and carries on.
+- **Frame read-out**: the ` key or `?stats=1`: frame ms, worst recent frame, fps, triangles,
+  draw calls, render scale, quality tier, `world.update` ms, `physics.update` ms. In the README.
 
 ### Verified (how)
-- `node --test tests/*.test.mjs`: 70 tests pass. Orbits, frames and floating origin, the state
-  machine, explorer (walk, run, slopes, sliding, wading, floating, jetpack and fuel), cameras
-  (never under ground or liquid, never inside the ship), ship flight (hover, throttle, bank,
-  pitch limit, flare, cushion, bounce), landing assist, dynamic resolution, the stub contract,
-  PAINTER's real `sampleSurface` contract on all ten bodies, and `tests/loop.test.mjs`, which
-  plays the whole loop through the pure simulation with scripted keys and mouse.
-- `node tests/playthrough.mjs --keep` (stub world, 640x360, headless Chromium, real key and
-  mouse events, 37 checks, fails on any console error): PASSED. Ground to space 18.2 s.
-  Evidence: `docs/shots/pilot/01-on-foot.jpg`, `02-jetpack.jpg`, `03-board-prompt.jpg`,
-  `05-liftoff.jpg`, `06-climb.jpg`, `07-orbit.jpg`, `08-moon.jpg`, `10-land-prompt.jpg`,
-  `12-stepped-out.jpg`.
-- The same script inside PAINTER's real painted forest (`node tests/playthrough.mjs --query
-  "scale=0.5&quality=0" --w 400 --h 225 --root <clean export of 7c7a0ac>`, flora and obstacle
-  collision included): PASSED, all 37 checks, no console errors. Ground to space 21 s,
-  touchdown at 1.12 m/s. (An earlier pass on `bb8ec30`, before the flora, took 19.1 s.)
-  The low internal resolution is only there because software GL paints the forest at about
-  1 frame a second; the script waits in game time, so it is the same play either way.
-- Real-world frames from the integrated game at `19f72ce`: `docs/shots/pilot/real-01-on-foot.jpg`
-  (the clearing, the explorer, the ship), `real-02-orbit.jpg`, `real-03-flight.jpg` (over the
-  canopy with the landing prompt).
+- `node --test tests/*.test.mjs`: 91 pass. Beyond M1's set: pulse advice and speed profile; the
+  Earth-Mars-Saturn trip in the pure simulation on stubs (lift off, map target, aim, pulse,
+  land, step out, twice); the same trip on PAINTER's real worlds with PHYSICS and the real
+  obstacles (lands in `dry_riverbeds` and `crystal_reeds`); save round trip, bad saves, a
+  storage that throws; the M1 loop, a full-throttle dive on three bodies, the landing gear and
+  the start/stop assist through PHYSICS' models; trunk collision and a low pass over the real
+  forest (hull above every tree top).
+- `node --test src/physics/` (125 pass) and `node --test src/world/*.test.mjs`: run by me.
+- `node tests/playthrough.mjs --keep` (stub world, kinematic): PASSED, 37 checks.
+- `node tests/playthrough.mjs --query "stub=render,world,art&fresh=1"` (stub visuals, PHYSICS
+  on): PASSED, 37 checks.
+- `node tests/trip.mjs --keep` (stub visuals, PHYSICS on, real key and mouse events): Earth to
+  Mars to Saturn in one page load, map click, marker, pulse, landing, sketchbook, frame
+  read-out, then a reload that continues on Saturn from the save. Result of the last run and
+  of the painted-world runs: see the end of this section.
+- `node tests/lockcheck.mjs`: PASSED. Headless Chromium grants pointer lock and then reports
+  nonsense; the game fell back to drag-look, said so, and the view moved 0.14 rad at most.
+- Evidence: `docs/shots/pilot/01-on-foot`, `02-jetpack`, `07-orbit`, `10-land-prompt` (M1 loop),
+  `real-01-on-foot`, `real-02-orbit` (painted world), `m2-map`, `m2-target`, `m2-pulse`,
+  `m2-mars`, `m2-saturn`, `m2-stats` (.jpg).
 
 ### Not verified / not done
-- Real-GPU frame rate: cannot be measured here. In software GL the painted forest runs at
-  0.4 to 1 fps at 640x360 (4.4 M triangles a frame, see REVIEW), the stub at 20 to 60.
-- Pointer lock: headless Chromium grants the lock but reports meaningless deltas for synthetic
-  mouse events, so every scripted run uses `pointerlock=0` (drag to look). The locked path is
-  the same code plus a spike guard, but nobody has moved a real mouse through it.
-- Trees and boulders are solid for the explorer, the camera boom and the choice of landing
-  site (`world.sampleObstacles`), tested in Node against PAINTER's real forest
-  (`tests/contract.test.mjs`); not yet watched in the browser. A flying ship still passes
-  through tree crowns (it rides 1.6 m above the *ground*, not above the canopy).
-- Pulse drive, planet map, save, audio, painted HUD: later milestones.
-- Physics is not wired in (M2, per the coordinator).
+- Real-GPU frame rate: cannot be measured here. The read-out exists so the owner can read it.
+- Pointer lock with a real hand: the fallback is proven, the happy path is not.
+- The painted trip in a browser at watchable quality: software GL paints a few frames a
+  second, so the scripted runs use a small window and low internal resolution.
+- Planet markers are DOM rings with the fallback look, not painted marks.
+- The gear model is used for the parked ship; lift-off is still my kinematic sequence (rise
+  to 9 m in 2.8 s), not PHYSICS' leg unloading.
+- Audio, sketchbook screen, vistas, title screen, painted HUD: M3.
 
 ### What I saw playing the slice in the painted world
 - It works on first contact: spawn in the clearing by the brook at 09:30, the ship 16 m away,
@@ -111,6 +123,36 @@ objects in their notes.
    `painter.setQuality`. `?dynres=0&scale=1&quality=2` pins it for screenshots. In software GL
    it would always fall to the floor, so every headless check should pass `dynres=0`.
 
+10. **How PHYSICS is wired** (its guide in `docs/notes/physics.md`; the mapping I chose):
+    - One `createPhysics({ sampleSurface, seed: 1 })`; `warmUp` behind the loading sheet;
+      `physics.update(dt, { bodyId, time, focus, sunDir, disturbers })` once a frame in
+      `Sim.frame`, before `world.update`; `world.setPhysics(physics)` once. `?stub=physics`
+      turns it all off and the kinematic rules below take over (they are also what every
+      M1 test still runs against).
+    - Explorer: keys become `cmd = { wish (4.2 or 7.4 m/s along the wished direction), jump,
+      jet, jetMaxRise, assistAccel: 4, descentLimit }`; `stepExplorerBody` does the rest.
+      My numbers that are now only fallbacks: `groundAccel`, `airAccel`, `jetAirAccel`,
+      `maxSlope`, `slideSlope`, `slideSpeed`, `stepDown`, the wading factors. Kept as assists:
+      the climb governor (8.5 m/s, raised up to 17 m/s in light gravity), the descent brake
+      (24 m/s terminal, easing to 7 m/s over the last metres), `assistAccel` 4 m/s2 for
+      starting and stopping, fuel rules, facing.
+    - Ship in the air and accelerating in space: my steering, speed envelope and assists make
+      a target velocity; `stepShipBody(st, { target, tau, hover: true, boost, carve01: 1 })`
+      flies it. Cushion, pull-up and flare shape the *target*; when the hull sinks faster than
+      the cushion allows, `tau` drops to 0.22 s so the computer closes the error at once.
+      The cushion now also plans with a deceleration (6.5 m/s2) at any height, because a hull
+      with mass needs room to stop.
+    - Assist of my own in vacuum: X or throttling down brakes with the drive field at the
+      kinematic rate (the retro thrusters alone would need over a minute from cruise).
+    - Parked ship: `stepShipGear` (legs settle the hull, then sleep). Landing sites: friction
+      (`tan(slope) < 0.8 x ground friction`) instead of `landMaxSlope`. Afloat: my own rest.
+    - Lift-off, the landing assist's glide and descent, and the pulse drive are still mine.
+11. **Pulse drive is a field, not thrust.** 400 m/s2 would be 40 g; the fiction is the same
+    field that carries the hull's weight in hover. Its speed profile is mine (smoothly spooled
+    acceleration, braking curve to the arrival sphere); PHYSICS' jerk-limited planner
+    (`planSpeedChange`) is the natural replacement and I will swap it in when the painted
+    pulse effect exists to judge it against.
+
 ### Tuning numbers (feel target: unhurried, weightless, generous)
 
 Explorer (`src/player/explorer.js` EXPLORER): walk 4.2 m/s, run 7.4 m/s, ground accel 26 m/s2,
@@ -136,34 +178,36 @@ landing assist from the prompt to wheels down about 8 s, touching at 1.1 m/s.
 
 Mouse: 0.0023 rad/px on foot, 0.0017 rad/px in the ship.
 
+Pulse (`src/ship/pulse.js` PULSE): top speed 30 km/s, 400 m/s2, spool 0.9 s, lets go at
+820 m/s, steering at 0.3 x, target assist 0.6 rad/s, aim cone 15 degrees. Default boom is now
+6.4 m (was 5.6) while the explorer is a placeholder (PAINTER's request).
+
 ## Needs from the other
 
 ### From PAINTER
-1. **Read `docs/lead/REVIEW.md`, review 1.** Three MUST FIX items for your M1: the triangle
-   budget (600 k and 350 draw calls at quality 1), stippled foliage, ruler-straight trunks and
-   bank. Answer each in your notes.
-2. **Terrain ceiling.** Keep all walkable ground (floating islands included) below
-   `radius + 0.8 * spaceAltitude(body)` (`import { spaceAltitude } from src/data/bodies.js`).
-   `tests/contract.test.mjs` checks it. If a body needs more, tell me and I raise it.
-3. **Models (C10).** The cockpit view puts the camera exactly at `userData.seat` looking along
-   -Z with a 0.12 m near plane: whatever is in front of that point is what the player sees.
-   When the real ship arrives, give it a canopy frame that looks right from there.
-4. **`animate(state, dt)`** receives: explorer `{ mode: 'idle'|'walk'|'jet'|'fall'|'wade', speed,
-   jet01, lookPitch }`; ship `{ mode: 'landed'|'hover'|'fly'|'pulse', throttle01, gear01,
-   canopy01 }`. During boarding the explorer walks to the hatch (mode 'walk') while `canopy01`
-   rises to 1 and falls back; then I set the explorer's `visible = false`.
-5. **`src/art/ui.css`** and the text helper when you get to them (M3). Class names in use:
+1. **Mars and Saturn first** (as you plan), so the trip can be played in the painted worlds;
+   each needs a spawn-like flat dry place under the arrival point less than it needs detail.
+2. **Markers.** My planet markers are DOM rings. If you would rather paint them (a brush ring
+   and a hand-lettered name in the sheet pass), tell me the hook; I can hand you
+   `[{ id, x, y, r, label, sub, kind }]` in screen pixels each frame.
+3. **Pulse.** In PULSE `setMood.speed01` is 1 and the ship's `animate` mode is `'pulse'`.
+   M3: streak and soften the far washes with it.
+4. **`sampleObstacles`**: is the list capped (I see about 260 at 70 m)? If so, nearest first?
+5. `world.update` worst frames are still above 5 ms (REVIEW 2, item 4).
+6. `src/art/ui.css` and the text helper when you get to them (M3). Class names in use:
    `pc-hud`, `pc-panel`, `pc-button`, `pc-title`, `pc-label`, plus mine: `pc-prompt`,
-   `pc-gauge`, `pc-readout`, `pc-reticle`, `pc-start`, `pc-help`, state class `pc-on`.
+   `pc-gauge`, `pc-readout`, `pc-reticle`, `pc-start`, `pc-help`, `pc-notice`, `pc-marks`,
+   `pc-mark` (`-target`, `-body`, `-edge`), `pc-stats`, `pc-map`, state class `pc-on`.
 
 ### From PHYSICS
-1. The table promised in COORDINATOR section F: each of your constants, which of my `EXPLORER`
-   / `SHIP` numbers it replaces, and which assist you expect me to keep on top.
-2. Keep the worst frame of `physics.update` under 2 ms (I measured one of 6.8 ms in 600).
-3. `stepExplorerBody` and `stepShipBody` take `env`; so do mine. In M2 I will call yours from
-   inside `stepExplorer` and `stepFlight` behind the same `env`, so tell me if `bindEnv` needs
-   anything my `env` does not carry (`sample`, `gravity`, and for the ship `up`, `altitude`,
-   `spaceAlt`, `hasBody`).
+1. A `brake` (drive-field) command for `stepShipBody` in vacuum, so my special case can go
+   (Answers, critique point 2).
+2. Lift-off through the gear (unloading the legs) is not wired: my sequence sets the velocity
+   for 2.8 s. If you want it physical, tell me the smallest change: I would call
+   `stepShipGear` with `lift01` rising, then hand over at first lift.
+3. Heads-up, not a need: `stepShipBody` and `stepExplorerBody` move `st.p` in place. My flight
+   step integrates the position itself after the assists, and for a few commits it did so on
+   top of yours (twice the distance per frame). Fixed on my side; worth a line in your guide.
 
 ### From the COORDINATOR
 - `tools/shot.mjs` has no way to lengthen the screenshot timeout (Playwright's 30 s default);
@@ -203,6 +247,27 @@ Mouse: 0.0023 rad/px on foot, 0.0017 rad/px in the ship.
 - PHYSICS: API read. Your density profile reproducing my speed envelope is exactly right.
   Integration is mine from M2; `env` stays the single doorway.
 - COORDINATOR: sections F and G read. Lead files are in `docs/lead/`.
+- PHYSICS (your review of my wiring at `0467427`: warmUp missing, carve01, gear unused): all
+  three are in now (`warmUp` at boot, `carve01: 1`, `stepShipGear` for the parked ship).
+- PHYSICS (your critique of my domain), point by point:
+  1. "26 m/s2 is 2.7 g, the explorer starts and stops like a cursor." Agreed, and gone: with
+     you wired in the legs are yours (9 m/s2, 1600 W, friction from the ground). I kept a
+     named 4 m/s2 of `assistAccel` because 0.6 s and 1.2 m to stop felt like wading; with it
+     the start is under 0.5 s and the stop under 1 s (`tests/physics.test.mjs`). Ice and mud
+     stay as bad as you make them.
+  2. "The ship's velocity is a low-pass of a wish, every planet flies the same, landing is a
+     snap." Agreed for the air: it now flies through `stepShipBody` with gravity, drag, wind
+     and spool, and stands on `stepShipGear`. Not agreed for one thing: braking in vacuum on
+     14 m/s2 of retro thrust means over a minute to stop, and a ship that will not stop is a
+     ship the player fights. I brake with the drive field there (Decisions 10). If you give
+     `stepShipBody` a `brake` command with a named field deceleration I will use yours.
+  3. "4.2 m/s is a jog." True, and deliberate: the planets are 4 km across and the pace is
+     the pace of the game, not of a hike. I keep 4.2 and 7.4 as commands and will ask PAINTER
+     to animate the lower one as a jog. The checks that assumed a walking body are rewritten
+     in `REFERENCES.md` ("revised").
+- PAINTER (via the coordinator): the default boom is 6.4 m until the real explorer exists.
+  `speed01` and `altitude01`: nothing needed before M3. Your three MUST FIX are closed in
+  `docs/lead/REVIEW.md`, review 2, with my own measurements: M1 is met.
 
 ## Ideas and critique
 

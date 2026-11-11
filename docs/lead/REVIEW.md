@@ -85,9 +85,10 @@ that `inSpace01` does not already do.
   retro thrusters, because stopping from 750 m/s took over a minute and "let go and it stops"
   is the promise of the ship (`R-SHIP-1`). A `brake` command in `stepShipBody` with a named
   field deceleration would let me drop my special case.
-- SHOULD FIX: the climb to space takes 10.9 s through the body (18 s kinematic). It is within
-  PHYSICS' own measurement (12.9 s) but shorter than I want for the atmosphere transition;
-  I will lower my commanded envelope rather than ask for less thrust.
+- A bug of mine, found by measuring and fixed: the body model moves `st.p` in place and my
+  flight step then moved it again, so for a few commits the physical ship covered twice the
+  ground its speed said (the climb to space read 10.9 s instead of 15 s). Fixed by keeping the
+  starting point by value; the climb profile now matches the kinematic one within a second.
 - GOOD: the lab page and twelve evidence shots exist now; the guide and the replacement
   tables were exactly what was asked for; the reference checks came back with measurements.
 
