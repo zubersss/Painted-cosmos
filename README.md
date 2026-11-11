@@ -25,7 +25,10 @@ the first view is painted. Click. You stand in a clearing in Earth's forest, the
 steps away. Walk to it with `W A S D`, press `E` to board, hold `Space` to lift off, push the
 throttle with `W` and point the nose at the sky. Above the air, press `M`, choose a world,
 point at its marker and press `F`. Near a world the drive lets go by itself; fly down, and
-press `E` when the prompt says you can land. `H` shows the controls again at any time.
+press `E` when the prompt says you can land. A world you have not walked on yet shows "a place
+to land" (a small ring on the ground, or an arrow at the edge of the picture when it lies round
+the curve): the spot its first view was painted from. You may land anywhere else.
+`H` shows the controls again at any time.
 
 ## Controls
 

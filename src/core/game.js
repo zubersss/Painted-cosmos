@@ -405,8 +405,51 @@ export class Game {
           list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * 0.36, r: 0, angle: a, label: body.name, sub: fmt(dist) });
         }
       }
+      // The world's own landing place (where its first view was painted from), until the player
+      // has walked on that world: one small ring on the ground, so that a first landing can be
+      // the one the painter composed. Not behind the horizon, not once the ship is nearly there.
+      const site = here && st !== S.PULSE && st !== S.LANDING && !sim.visited[here] && BODIES[here] ? this.landingSite(here) : null;
+      const root = site ? this.world.bodies.get(here) : null;
+      if (root) {
+        p.set(site.x, site.y, site.z).applyQuaternion(root.quaternion);
+        const ox = p.x, oy = p.y, oz = p.z, R = p.length();
+        p.add(root.position);
+        const dist = p.length();
+        const over = -(ox * p.x + oy * p.y + oz * p.z) / R;       // the camera's height over the site's own horizon
+        if (dist > 60) {
+          // In sight: a ring on the place. Round the curve of the world or out of the picture: an
+          // arrow at the picture's edge, the way to fly.
+          p.applyMatrix4(cam.matrixWorldInverse);
+          const nx = p.z < 0 ? p.x / -p.z / (tanHalf * cam.aspect) : 9;
+          const ny = p.z < 0 ? p.y / -p.z / tanHalf : 9;
+          if (over > 2 && Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) {
+            list.push({ kind: 'body', x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a place to land', sub: fmt(dist) });
+          } else {
+            const a = Math.atan2(-p.y, p.x);
+            list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * 0.36, r: 0, angle: a, label: 'a place to land', sub: fmt(dist) });
+          }
+        }
+      }
     }
     hud.setMarks(list);
+  }
+
+  // Where the world itself would set a newcomer down (world.getSpawn), as a point in the body's
+  // own frame, on the ground. Looked up once per body.
+  landingSite(bodyId) {
+    const cache = this._sites || (this._sites = {});
+    if (bodyId in cache) return cache[bodyId];
+    let out = null;
+    const sp = this.world.getSpawn ? this.world.getSpawn(bodyId) : null;
+    if (sp && sp.unitDir) {
+      const l = Math.hypot(sp.unitDir.x, sp.unitDir.y, sp.unitDir.z) || 1;
+      const d = V(sp.unitDir.x / l, sp.unitDir.y / l, sp.unitDir.z / l);
+      const g = this.sim.sampler(bodyId)(d);
+      const r = Math.max(g && g.radius > 0 ? g.radius : BODIES[bodyId].radius, g && g.liquidRadius > 0 ? g.liquidRadius : 0);
+      out = V(d.x * r, d.y * r, d.z * r);
+    }
+    cache[bodyId] = out;
+    return out;
   }
 
   updateHud() {

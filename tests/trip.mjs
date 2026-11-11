@@ -89,6 +89,10 @@ async function leg(to, n) {
   await page.keyboard.up('KeyW');
   i = await until((x) => x.state === 'ATMOSPHERE', 300, holdPitch(-58));
   check(i.state === 'ATMOSPHERE', 'entered the atmosphere of ' + to);
+  // A world not yet walked on shows where it would set a newcomer down (a ring, or an arrow at
+  // the picture's edge when the place is round the curve or out of the picture).
+  const site = (i.marks || []).find((m) => m.label === 'a place to land');
+  check(!!site, 'a mark shows a place to land on ' + to + ': ' + JSON.stringify(site || null));
   i = await until((x) => x.ship.altGround < 170, 300, holdPitch(-32));
   await page.keyboard.down('KeyS');
   i = await until((x) => x.ship.throttle < 0.3, 8, holdPitch(-10));
