@@ -46,6 +46,7 @@ export class Sim {
     this.sampleSurface = sampleSurface;
     this.sampleObstacles = sampleObstacles || null;
     this.physics = physics || null;
+    this.useGear = !!(physics && physics.ship && physics.ship.gear);
     this.physicsMs = 0;
     this.physicsWorstMs = 0;
     this.nearObstacles = [];
@@ -182,14 +183,16 @@ export class Sim {
         const d = norm(this.ex.p);
         this.ex.p = scale(d, Math.max(len(this.ex.p), this.sampler(this.bodyId)(d).radius));
       }
+      if (this.shFrame.kind === 'body' && this.shFrame.rotating) this.stepParked(h);     // the ship waits on its gear
       if (pressed('KeyE') && this.boardable()) this.beginBoarding();
     } else if (st === S.BOARDING) {
       this.stepBoarding(h);
     } else if (st === S.LANDED) {
       if (first && inp.edges.has('KeyV')) this.shipCam.cockpit = !this.shipCam.cockpit;
-      stepLanded(this.sh, h);
+      this.stepParked(h);
       this.sh.canopy01 = mix(this.sh.canopy01, 0, 1 - Math.exp(-4 * h));
       if (pressed('Space')) {
+        this.sh.gearOn = false;
         beginLiftoff(this.sh);
         this.sm.dispatch(EV.liftoff);
         this.emit('liftoff');
@@ -202,6 +205,7 @@ export class Sim {
       const r = stepLanding(this.sh, h, this.sampler(this.shFrame.id));
       if (r === 'touchdown') {
         this.bodyId = this.shFrame.id;
+        this.sh.gearOn = false; this.sh.lift01 = 1;       // hand the hull to its landing gear
         this.sm.dispatch(EV.touchdown);
         this.emit('touchdown');
       } else if (pressed('Space') || pressed('KeyW')) {
@@ -209,6 +213,24 @@ export class Sim {
         this.sm.dispatch(EV.abortLanding);
       }
     }
+  }
+
+  // The parked ship. With PHYSICS it stands on its landing gear: three sprung legs settle the
+  // hull onto the ground it met and then go to sleep. Afloat, or without PHYSICS, it rests
+  // where the landing assist put it.
+  stepParked(h) {
+    const sh = this.sh;
+    if (this.physics && this.useGear && !sh.onLiquid && this.shFrame.kind === 'body' && this.shFrame.rotating) {
+      if (!sh.gearOn) { sh.gearOn = true; sh.lift01 = sh.lift01 == null ? 0 : sh.lift01; this.physics.ship.wake(sh); }
+      sh.lift01 = Math.max(0, sh.lift01 - h / 1.5);             // the anti-gravity lets the weight down
+      const cmd = this._gearCmd || (this._gearCmd = { lift01: 0 });
+      cmd.lift01 = sh.lift01;
+      this.physics.ship.gear(sh, cmd, h, this.explorerEnv(this.shFrame.id));
+      sh.speed = len(sh.v);
+      sh.throttle = 0; sh.turnRate = 0; sh.altGround = 0;
+      sh.gear01 = mix(sh.gear01, 1, 1 - Math.exp(-4 * h));
+      sh.throttle01 = mix(sh.throttle01, 0, 1 - Math.exp(-2.5 * h));
+    } else stepLanded(sh, h);
   }
 
   // Obstacles around a body-local point, as plain objects (copied: the world may reuse its own).
@@ -306,7 +328,7 @@ export class Sim {
     if (!T) { this.sm.force(this.sm.ctx.boardingDir === 'out' ? S.ON_FOOT : S.LANDED); return; }
     T.t = Math.min(T.dur, T.t + h);
     const k = T.t / T.dur;
-    stepLanded(this.sh, h);
+    this.stepParked(h);
     if (T.dir === 'in') {
       // The explorer walks to the hatch, the canopy lifts, then closes behind them.
       const e = smoothstep(0, 0.7, k);
@@ -537,7 +559,13 @@ export class Sim {
       const settle = sh.altGround < SHIP.minClearance + 1.2 && sh.speed < 5 && I.down('KeyC');
       if ((pressed('KeyE') && this.landable()) || settle) {
         const trees = this.obstaclesNear(this.shFrame.id, sh.p, 80);
-        if (beginLanding(sh, this.sampler(this.shFrame.id), undefined, trees)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
+        // With PHYSICS, a site is good when the ground's friction will hold the parked ship.
+        const id = this.shFrame.id;
+        const holds = this.physics ? (dir, g) => {
+          const G = this.physics.ground(id, dir, this._ground || (this._ground = {}));
+          return Math.tan(g.slope) < 0.8 * (G.friction || 0.6);
+        } : null;
+        if (beginLanding(sh, this.sampler(id), undefined, trees, holds)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
       }
     }

@@ -1,26 +1,15 @@
 // Pulse drive and travel between worlds, in the pure simulation.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Sim, FEEL } from '../src/core/sim.js';
+import { Sim } from '../src/core/sim.js';
 import { S } from '../src/core/state.js';
 import { BODIES, spaceAltitude, soiRadius } from '../src/data/bodies.js';
 import { PULSE, arrivalRadius, pulseAdvice, createPulse, stepPulseSpeed, pulseEta } from '../src/ship/pulse.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
-import { Pad, play, V, len, sub, norm } from './helpers.mjs';
+import { Pad, play, V, sub, norm, flyTo } from './helpers.mjs';
 import { qLook } from '../src/core/vec.js';
 
-const RAD = Math.PI / 180;
 const newSim = (opts = {}) => new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, ...opts });
-const holdPitch = (sim, pad, deg) => {
-  const err = deg - sim.info().ship.pitchDeg;
-  pad.dy -= Math.max(-40, Math.min(40, (err * RAD / FEEL.mouseShip) * 0.12));
-};
-// Turn the nose toward a body with the mouse (as a player would, watching the marker).
-const aimAt = (sim, pad, id) => {
-  const a = sim.aimAt(id);
-  pad.dx += Math.max(-60, Math.min(60, a.yawDeg * RAD / FEEL.mouseShip * 0.12));
-  pad.dy -= Math.max(-60, Math.min(60, a.pitchDeg * RAD / FEEL.mouseShip * 0.12));
-};
 
 test('arrival spheres sit inside each sphere of influence and above the atmosphere', () => {
   for (const b of Object.values(BODIES)) {
@@ -71,70 +60,6 @@ test('a pulse hop accelerates smoothly and is back at cruise speed exactly at th
   assert.ok(jerkMax < PULSE.accel * 9, 'no snap: jerk ' + jerkMax.toFixed(0));
   assert.ok(Math.abs(pulseEta(300e3 - 6600) - t) < t * 0.5, 'the estimate is in the right range');
 });
-
-// Fly one leg: from parked or landed on `from`, to standing on `to`.
-function flyTo(sim, pad, to, log) {
-  if (sim.sm.state === S.ON_FOOT) {
-    pad.dx += (sim.info().shipBearingDeg * RAD) / FEEL.mouseFoot;
-    pad.press('KeyW');
-    play(sim, pad, 30, { until: () => sim.info().canBoard });
-    pad.release('KeyW');
-    pad.tap('KeyE');
-    play(sim, pad, 4, { until: () => sim.sm.state === S.LANDED });
-  }
-  assert.equal(sim.sm.state, S.LANDED);
-  pad.tap('Space');
-  play(sim, pad, 4);
-  pad.press('KeyW');
-  play(sim, pad, 120, { each: () => holdPitch(sim, pad, 55), until: () => sim.sm.state === S.SPACE });
-  assert.equal(sim.sm.state, S.SPACE, 'reached space');
-  // Climb clear of the planet, pick the target on the map, point at it, pulse.
-  play(sim, pad, 60, { each: () => holdPitch(sim, pad, 55), until: () => sim.info().ship.altitude > 3 * spaceAltitude(BODIES[sim.shFrame.id]) });
-  pad.release('KeyW');
-  sim.setTarget(to);
-  play(sim, pad, 12, { each: () => aimAt(sim, pad, to), until: () => Math.abs(sim.aimAt(to).yawDeg) < 4 && Math.abs(sim.aimAt(to).pitchDeg) < 4 });
-  assert.equal(sim.promptNow.text, 'Pulse to ' + BODIES[to].name);
-  const d0 = sim.targetInfo().distance;
-  pad.tap('KeyF');
-  play(sim, pad, 0.2);
-  assert.equal(sim.sm.state, S.PULSE, 'pulse engaged: ' + (sim.notice && sim.notice.text));
-  let vMax = 0;
-  const tPulse = play(sim, pad, 300, { each: () => { vMax = Math.max(vMax, sim.sh.speed); }, until: () => sim.sm.state === S.SPACE });
-  assert.equal(sim.sm.state, S.SPACE, 'dropped out of pulse');
-  const d1 = sim.targetInfo() ? sim.targetInfo().distance : len(sub(sim.bodyInShipFrame(to), sim.sh.p));
-  assert.ok(d1 < arrivalRadius(BODIES[to]) * 1.25, `arrived at ${to}: ${(d1 / 1000).toFixed(1)} km from its centre`);
-  assert.ok(d1 > BODIES[to].radius + spaceAltitude(BODIES[to]), 'still in space');
-  log.push({ to, km: Math.round(d0 / 1000), pulseSeconds: +tPulse.toFixed(1), vMax: Math.round(vMax) });
-  // Coast in, descend, land.
-  play(sim, pad, 12);
-  assert.equal(sim.info().frame, to + ':orbit', 'flying in the frame of ' + to);
-  assert.ok(sim.sh.speed < 60, 'coasted to a near stop: ' + sim.sh.speed.toFixed(0));
-  pad.press('KeyW');
-  play(sim, pad, 1.5);
-  pad.release('KeyW');
-  play(sim, pad, 240, { each: () => holdPitch(sim, pad, -60), until: () => sim.sm.state === S.ATMOSPHERE });
-  assert.equal(sim.sm.state, S.ATMOSPHERE, 'entered the atmosphere of ' + to);
-  play(sim, pad, 240, { each: () => holdPitch(sim, pad, -35), until: () => sim.sh.altGround < 170 });
-  pad.press('KeyS');
-  play(sim, pad, 240, {
-    each: () => { holdPitch(sim, pad, sim.sh.altGround > 110 ? -18 : -7); if (sim.sh.throttle < 0.25) pad.release('KeyS'); },
-    until: () => sim.info().ship.canLand,
-  });
-  pad.release('KeyS');
-  assert.ok(sim.info().ship.canLand, 'landing prompt over ' + to);
-  pad.tap('KeyE');
-  play(sim, pad, 90, { until: () => sim.sm.state === S.LANDED });
-  assert.equal(sim.sm.state, S.LANDED, 'landed on ' + to);
-  assert.equal(sim.sh.bounces, 0);
-  pad.tap('KeyE');
-  play(sim, pad, 4, { until: () => sim.sm.state === S.ON_FOOT });
-  assert.equal(sim.sm.state, S.ON_FOOT);
-  assert.equal(sim.bodyId, to);
-  pad.press('KeyW');
-  play(sim, pad, 2);
-  pad.release('KeyW');
-  assert.ok(sim.visited[to] && Object.keys(sim.visited[to].biomes).length >= 1, 'the sketchbook has ' + to);
-}
 
 test('earth to mars to saturn in one sitting: lift off, pulse, land, step out, twice', () => {
   const sim = newSim();

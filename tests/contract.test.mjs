@@ -136,3 +136,27 @@ test('flying low over the real forest: the ship rides above the tree tops, never
   assert.equal(sim.sh.bounces, 0, 'no bumps');
   assert.ok(FEEL);
 });
+
+test('earth to mars to saturn on the real worlds, with PHYSICS and the real obstacles', { skip: skipObs }, async () => {
+  const { Sim } = await import('../src/core/sim.js');
+  const { Pad, play, flyTo } = await import('./helpers.mjs');
+  let physics = null;
+  try {
+    const P = await import('../src/physics/index.js');
+    physics = P.createPhysics({ sampleSurface: (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z), seed: 1 });
+  } catch { /* the trip is still worth flying without it */ }
+  const sim = new Sim({
+    sampleSurface: (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z),
+    getSpawn: (id) => surface.getSurface(id).getSpawn(),
+    sampleObstacles: (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r),
+    physics,
+  });
+  const pad = new Pad();
+  const log = [];
+  play(sim, pad, 0.5);
+  flyTo(sim, pad, 'mars', log);
+  flyTo(sim, pad, 'saturn', log);
+  assert.deepEqual(Object.keys(sim.visited).sort(), ['earth', 'mars', 'saturn']);
+  console.log('      real-world trip:', JSON.stringify(log), 'physics', physics ? 'on, avg ' + sim.physicsMs.toFixed(2) + ' ms' : 'off',
+    'biomes', JSON.stringify(Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)]))));
+});

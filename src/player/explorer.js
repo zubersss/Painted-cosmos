@@ -18,7 +18,8 @@ export const EXPLORER = Object.freeze({
   jetAirAccel: 11,           // m/s^2 of air control while the jetpack burns
   jumpSpeed: 4.8,            // m/s (about 1.3 m high on Earth: a light hop)
   jetThrust: 17,             // m/s^2 upward while burning (gravity is subtracted from this)
-  jetMaxRise: 8.5,           // m/s cap on climb speed
+  jetMaxRise: 8.5,           // m/s cap on climb speed (rises in light gravity, see jetRiseCap)
+  assistAccel: 4,            // m/s^2 of suit-thruster help for starting and stopping (with PHYSICS)
   jetFuelSeconds: 4.2,       // seconds of continuous burn on a full tank
   rechargeGroundSeconds: 2.2,  // seconds to refill standing on the ground
   rechargeAirDelay: 0.9,     // seconds after burning before it starts refilling in the air
@@ -139,8 +140,9 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
   const jetArmed = !grounded && st.jumpHeld >= T.jetStartDelay;
   if (input.jet && jetArmed && st.fuel > 0) {
     jetting = true;
+    const cap = jetRiseCap(env.gravity, T);
     vv += T.jetThrust * dt;
-    if (vv > T.jetMaxRise) vv = Math.max(T.jetMaxRise, vv - T.jetThrust * dt);
+    if (vv > cap) vv = Math.max(cap, vv - T.jetThrust * dt);
     st.fuel = Math.max(0, st.fuel - dt / T.jetFuelSeconds);
     st.sinceJet = 0;
   } else st.sinceJet += dt;
@@ -252,9 +254,12 @@ function stepExplorerBodied(st, input, dt, env, T) {
   cmd.wish.x = wish.x * maxSpeed; cmd.wish.y = wish.y * maxSpeed; cmd.wish.z = wish.z * maxSpeed;
   cmd.jump = jump;
   cmd.jet = jetOn ? 1 : 0;
-  cmd.jetMaxRise = T.jetMaxRise;
-  // Falls are free until the ground is near, then eased down to a soft touchdown.
-  cmd.descentLimit = T.softFallSpeed + Math.max(0, st.altitude - 1.5) * 0.9;
+  cmd.jetMaxRise = jetRiseCap(env.gravity, T);
+  // Suit thrusters help the boots start and stop (PHYSICS' named assist force): without them a
+  // 100 kg explorer at this pace takes 0.6 s and 1.2 m to stop on grass.
+  cmd.assistAccel = T.assistAccel;
+  // Falls are held to a gentle terminal speed, then eased down to a soft touchdown.
+  cmd.descentLimit = Math.min(T.terminalFall, T.softFallSpeed + Math.max(0, st.altitude - 1.5) * 0.9);
   env.bodyStep(st, cmd, dt, env);
 
   const up2 = norm(st.p);
@@ -297,6 +302,12 @@ function stepExplorerBodied(st, input, dt, env, T) {
 // Turn a view direction (unit tangent) by a mouse yaw, keeping it on the tangent plane.
 export function yawView(viewFwd, up, angle) {
   return tangent(rotateAround(viewFwd, up, angle), up, viewFwd);
+}
+
+// The climb governor: 8.5 m/s on Earth-like worlds, up to twice that where gravity is light, so
+// the same tank carries you much higher on the Moon (the pack is a force, not a speed).
+export function jetRiseCap(gravity, T = EXPLORER) {
+  return T.jetMaxRise * Math.min(2, Math.max(1, Math.sqrt(9 / Math.max(0.5, gravity || 9))));
 }
 
 // Solid things that are not in the heightfield: tree trunks, boulders (world.sampleObstacles).

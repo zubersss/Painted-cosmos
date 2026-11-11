@@ -18,6 +18,11 @@ Ground rules.
   pair of screenshots.
 - Where realism would make the player fight the controls, the realistic model stays and an
   assist goes on top (coordinator ruling, section F). Checks marked **(assist)** are Pilot's.
+- Coordinator ruling of 2026-11-11: where a check here contradicted real physics, the model
+  stays. Those checks are marked "(revised)" and now state either the real behaviour, with
+  PHYSICS' measured numbers, or a named assist target. Three limits hold whatever the physics
+  says: the player is never trapped, never floored for good, and the ship is never
+  uncontrollable.
 
 Game scale to keep in mind: planets are 1.4 to 5 km in radius, a day lasts 15 to 60 minutes,
 the atmosphere is 0.1 to 1.4 km deep. Real magnitudes for wind, rain and falling bodies still
@@ -39,17 +44,27 @@ downhill gives it back; loose or wet ground lowers traction, so starts are softe
 longer there; steep ground is slid down, not stuck to; nothing ever hurts you.
 
 Checks
-- `R-FOOT-1` From rest to 90% of walking speed in 0.15 to 0.4 s on firm dry ground; from walking
-  to rest in under 0.4 s and under 0.8 m. (Unit test on the explorer model.)
+- `R-FOOT-1` (revised 2026-11-11: real body plus a named assist) The explorer is a 100 kg body
+  on boots: at the game's pace of 4.2 m/s (a jog, not a walk) grass gives 0.58 s to 90% of
+  speed and a 1.2 m stop. The assist target, met with PHYSICS' `assistAccel` (suit thrusters,
+  4 m/s2): **90% of pace within 0.5 s and a stop within 1 s and 1.3 m on firm ground**
+  (`tests/physics.test.mjs`). On ice or mud it is allowed, and expected, to be worse.
 - `R-FOOT-2` No skating: the animation's stride length times its step rate equals ground speed
   within 10% at walk and at run (Painter's `animate` reads `speed`).
-- `R-FOOT-3` Grade: on a 20 degree uphill, running speed is 15 to 35% lower than on the flat; on
-  a 20 degree downhill it is no more than 15% higher. Above the walkable limit (about 45 deg)
-  uphill progress stops; above about 55 deg the body slides at 3 to 6 m/s.
-- `R-FOOT-4` Ground matters: braking distance from a run is at least 1.5 x longer on wet rock,
-  ice or loose sand than on dry soil; deep snow or soft sand lowers top speed by 20 to 40%.
-- `R-FOOT-5` Wind is felt but never wins: a 15 m/s wind changes walking speed by 5 to 15%
-  depending on heading; no wind in the game can knock the explorer over or stop them. **(assist)**
+- `R-FOOT-3` (revised: the real numbers) Leg power sets the cost of a hill: a run is about 3%
+  slower up 10 degrees, 37% up 20, 55% up 30. The ground holds you while tan(slope) is below
+  its friction plus foothold (grass about 43 degrees, rock 51, sand 33, warm ice 5); beyond
+  that you slide, starting at 3 to 6 m/s and gathering speed on a long slope. Hard limit that
+  stays: the player is never trapped (the jetpack always works).
+- `R-FOOT-4` (revised: the real behaviour) Ground changes the walk, each material in its own
+  way: wet rock lengthens braking by about 1.4 x and ice many times over; loose sand
+  *shortens* braking (about half) but costs a quarter of the top speed and a slow start; deep
+  snow halves the top speed. All of it comes from `physics.ground()`, none from multipliers.
+- `R-FOOT-5` (revised: real body, assist named) Up to about 25 m/s of wind a fit body leans
+  into it and walks on (the lean is visible: `st.phys.lean`); above that leg power runs out.
+  Hard limit that stays, as Pilot's assist: no wind in the game stops the explorer for good or
+  knocks them down; where a planet's storms exceed what legs can do, `assistAccel` and
+  `physics.setWindScale` are tuned until walking into the wind is slow but possible. **(assist)**
 - `R-FOOT-6` Frame-rate independence: distance covered in 4 s of walking differs by less than
   3% between 20 fps and 144 fps (exists: `tests/loop.test.mjs`).
 
@@ -65,8 +80,9 @@ long float on a light one); horizontal speed gained in the air is kept until the
 drag takes it; the tank is short enough to matter and refills fast enough to never annoy.
 
 Checks
-- `R-JET-1` A full tank lifts the explorer 20 to 35 m on Earth gravity and at least 2.5 x that
-  on the Moon (thrust is constant, gravity is the body's).
+- `R-JET-1` (revised) A full tank lifts the explorer 20 to 40 m on Earth gravity and at least
+  2.5 x that on the Moon. The thrust is the same force everywhere; the climb governor is an
+  assist that is raised in light gravity (`jetRiseCap`: 8.5 m/s on Earth, up to 17 m/s).
 - `R-JET-2` Fuel: 3.5 to 5 s of burn; full refill in under 3 s standing; no meaningful refill
   while burning. The gauge is visible only when the tank is not full.
 - `R-JET-3` Releasing the keys in mid-air does not brake: horizontal speed after 1 s of free
@@ -99,8 +115,12 @@ that property replaces the envelope table without changing the feel.
 Checks
 - `R-SHIP-1` Hands off, the ship comes to rest relative to the ground within 4 s in the
   atmosphere, and within 10 s in space near a body, and then does not drift or sink. **(assist)**
-- `R-SHIP-2` Velocity follows the nose with a time constant of 0.8 to 1.5 s in air and 1.5 to
-  2.5 s in space; a 90 degree turn at cruise never takes more than 3 s to straighten out.
+- `R-SHIP-2` (revised: assist named) Steering is the one place the ship is deliberately not a
+  plain rigid body: turning 90 degrees at 160 m/s with thrusters alone would take 9 s. The
+  velocity is turned onto the nose by the drive field (PHYSICS' `carve01: 1`) with a time
+  constant of 0.8 to 1.5 s in air and 1.5 to 2.5 s in space, without changing the speed; every
+  change of *speed* keeps its mass (22 m/s2 forward, 14 in reverse, 60 in vacuum cruise).
+  In vacuum the same field is the brake: X or throttling down stops the ship within 10 s.
 - `R-SHIP-3` Top speed rises smoothly with altitude (no step larger than 10% between adjacent
   50 m bands) and is set by thrust against drag, not by a clamp.
 - `R-SHIP-4` Vertical acceleration available: at least 0.5 g net upward at the ground on every
@@ -162,8 +182,9 @@ the direction; calm really is calm.
 Checks
 - `R-WIND-1` One wind field (PHYSICS `air().wind`) drives flora, falling particles, cloud drift,
   rain slant and audio; in any frame their directions agree within 20 degrees.
-- `R-WIND-2` Gust fronts travel: measured between two frames, a gust band moves across grass at
-  the wind speed, within 30%, and is coherent over 10 to 40 m.
+- `R-WIND-2` (revised) Gust fronts travel: a gust band crosses grass at the wind speed at 10 m
+  height (about twice the wind at blade height, because gusts are carried by the faster air
+  above), coherent over 30 to 90 m.
 - `R-WIND-3` Amplitude follows strength: below 1 m/s tips move less than 2 cm; at 8 m/s grass
   leans 15 to 35 degrees with flutter; at 20 m/s (storm) tree crowns bend at least 8 degrees
   and stay bent while it blows.
@@ -193,8 +214,10 @@ Checks
 - `R-PART-2` Recovery: after the explorer leaves, plants return within 0.6 to 1.5 s with one
   small overshoot (a damped spring, damping ratio roughly 0.4 to 0.7), never a snap.
 - `R-PART-3` A running explorer leaves a visible wake in tall grass at least 1 s long.
-- `R-PART-4` Ship downwash: hovering at 9 m flattens grass radially out to 8 to 14 m; the effect
-  fades with height and is gone above about 40 m; it appears and disappears over about 0.5 s.
+- `R-PART-4` (revised: the real reach) Ship downwash: hovering at 9 m flattens grass radially
+  out to 8 to 14 m; the effect fades with height but a jet keeps its momentum as it spreads,
+  so it is still a stiff breeze in the grass at 40 m and gone by about 100 m; it appears and
+  disappears over about 0.5 s.
 - `R-PART-5` The jetpack plume pushes a patch about 2 m across directly below, down to bare
   strokes on sand, dust and snow.
 - `R-PART-6` Cost: the whole disturbance system stays inside PHYSICS' 2 ms budget at quality 1
@@ -286,8 +309,8 @@ Physics that should be true: flakes fall at 0.5 to 1.5 m/s, so even a light wind
 nearly sideways; they wander as they fall; snow gathers in the lee of obstacles.
 
 Checks
-- `R-SNOW-1` Fall speed 0.5 to 1.5 m/s; in a 5 m/s wind flakes travel at 70 degrees or more
-  from the vertical; each flake wanders sideways by about its fall speed.
+- `R-SNOW-1` (revised) Fall speed 0.5 to 1.5 m/s; in a 5 m/s wind flakes travel at 70 degrees
+  or more from the vertical; each flake side-slips at 10 to 30% of its fall speed.
 - `R-SNOW-2` `weather().snowDepth` grows during snowfall at a rate visible within two minutes
   and feeds `R-DEF-1`; it does not grow under the parked ship.
 - `R-SNOW-3` A blizzard takes `visibility01` down to 0.3 or less, and the far layers fade to
@@ -304,8 +327,10 @@ stays wet after the sky clears. Nothing about weather is random per visit: it is
 place and time.
 
 Checks
-- `R-WX-1` Every weather output is continuous: no field changes by more than 5% of its range
-  per second (lightning excepted).
+- `R-WX-1` (revised) Weather outputs are continuous: intensity, cloud and wind change by a few
+  percent of their range per second at most. Visibility at the edge of a fog bank or dust
+  storm may change faster (a bank drifting at 6 m/s really does arrive that fast); Painter
+  low-passes it in the sky if it reads as a pop. Lightning excepted.
 - `R-WX-2` Deterministic: the same seed, body, place and time give the same weather (a unit
   test in `src/physics`), in keeping with "the same planet on every visit".
 - `R-WX-3` A full change (clear to rain, rain to clear) takes 1 to 4 minutes.
@@ -325,8 +350,11 @@ giants have bands of very fast wind and lightning; the ice giants are cold, with
 winds of all; Pluto has a trace of air and frost that comes and goes.
 
 Checks
-- `R-PLANET-1` `air().density` differs by body and the differences are felt: the same 20 m/s
-  wind pushes the explorer about 50 times harder on Venus than on Mars (clamped by `R-FOOT-5`).
+- `R-PLANET-1` (revised: the real ratios) `air().density` differs by body and the differences
+  are felt: drag goes with density, so the same wind pushes about 53 times harder on Venus than
+  on Earth and about 61 times harder on Earth than on Mars (clamped for the explorer by
+  `R-FOOT-5`). The ship's top speed at the ground is where thrust meets drag: about 250 m/s on
+  Earth, about 34 m/s on Venus.
 - `R-PLANET-2` Airless bodies: no wind, no falling-leaf drift, no thunder; kicked dust and
   jet plumes fly ballistically and land within a second or two.
 - `R-PLANET-3` Each of the eight planets has at least one weather behaviour no other planet
@@ -341,8 +369,9 @@ References: *Sea of Thieves* (water with real waves and real buoyancy); *Red Dea
 Breath of the Wild* (shallow water that simply slows you, deep water you float in).
 
 Checks
-- `R-WATER-1` Wading speed falls with depth: about 0.75 x at knee depth (0.5 m), about 0.5 x at
-  waist depth (1 m); deeper than about 1.25 m the explorer floats and cannot sink.
+- `R-WATER-1` (revised: drag grows with speed squared) Wading at the game's pace: about 0.75 x
+  at 0.3 m, 0.62 x at knee depth (0.5 m), 0.36 x at waist depth (1 m); deeper than about
+  1.25 m the explorer floats and cannot sink.
 - `R-WATER-2` The explorer makes rings and a wake that spread at 0.3 to 1 m/s and die within
   about 3 s; rain makes rings (`R-RAIN-4`); the ship's downwash makes a spray ring.
 - `R-WATER-3` Flowing water carries a floating explorer downstream at the flow speed.

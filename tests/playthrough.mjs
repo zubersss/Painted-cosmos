@@ -146,7 +146,7 @@ try {
   await gameWait(0.35);
   i = await info();
   check(i.canBoard && i.prompt === 'Board ship', 'board prompt shows next to the ship');
-  await shot('03-board-prompt', '03-board-prompt');
+  await shot('03-board-prompt');
   await page.keyboard.press('KeyE');
   i = await until((x) => x.state === 'LANDED', 6);
   check(i.state === 'LANDED', 'boarded with E');
@@ -160,7 +160,7 @@ try {
   await gameWait(1.4);
   i = await info();
   check(i.state === 'ATMOSPHERE' && i.ship.liftoff, 'lift-off sequence running');
-  await shot('05-liftoff', '05-liftoff');
+  await shot('05-liftoff');
   i = await until((x) => !x.ship.liftoff, 8);
   await gameWait(1.2);
   i = await info();
@@ -175,7 +175,7 @@ try {
   let shotClimb = false;
   i = await until((x) => x.state === 'SPACE', 120, async (x) => {
     await holdPitch(48)(x);
-    if (!shotClimb && (x.ship.altitude || 0) > 330) { shotClimb = true; await shot('06-climb', '06-climb'); }
+    if (!shotClimb && (x.ship.altitude || 0) > 330) { shotClimb = true; await shot('06-climb'); }
   });
   check(i.state === 'SPACE', 'reached space');
   check(i.frame === 'earth:orbit', 'flying in the orbit frame: ' + i.frame);
@@ -210,7 +210,7 @@ try {
   const moonHigh = Math.abs(i.ship.pitchDeg) > 72;       // beyond the pitch limit: cannot be centred
   check(Math.abs(a.yawDeg) < 6 && (moonHigh || Math.abs(a.pitchDeg) < 6), `the moon is ahead (off by ${a.yawDeg.toFixed(1)}, ${a.pitchDeg.toFixed(1)} deg), ${(a.distance / 1000).toFixed(1)} km away`);
   await gameWait(0.7);
-  await shot('08-moon', '08-moon');
+  await shot('08-moon');
   i = await info();
   check(i.frame === 'earth:orbit' && Math.abs(alt(i) - alt0) < 60, 'a parked ship stays with its planet');
   stage('orbit', i);
@@ -250,7 +250,7 @@ try {
   check(touch < 3, `soft touchdown (${touch.toFixed(2)} m/s just before)`);
   await gameWait(1.5);
   i = await info();
-  check(i.ship.speed === 0 && i.ship.gear01 > 0.9, 'at rest, gear down');
+  check(i.ship.speed < 0.3 && i.ship.gear01 > 0.9, 'at rest on the gear: ' + i.ship.speed.toFixed(3) + ' m/s');
   await shot('11-landed');
   stage('landed', i);
 
@@ -268,7 +268,7 @@ try {
   await page.keyboard.up('KeyS');
   i = await info();
   check(Math.hypot(i.explorer.p.x - p1.x, i.explorer.p.y - p1.y, i.explorer.p.z - p1.z) > 3, 'walking again');
-  await shot('12-stepped-out', '12-stepped-out');
+  await shot('12-stepped-out');
   stage('stepped-out', i);
 
   const want = ['ON_FOOT', 'BOARDING', 'LANDED', 'ATMOSPHERE', 'SPACE', 'ATMOSPHERE', 'LANDING', 'LANDED', 'BOARDING', 'ON_FOOT'];

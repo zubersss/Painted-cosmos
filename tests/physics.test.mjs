@@ -143,3 +143,64 @@ test('with physics: a full-throttle dive at the ground still ends in a skim, wit
     assert.ok(BODIES[body]);
   }
 });
+
+test('with physics: the parked ship stands on its landing gear, settles and sleeps', { skip }, () => {
+  for (const body of ['earth', 'moon', 'jupiter']) {
+    const sim = newSim({ body });
+    const pad = new Pad();
+    const p0 = { ...sim.sh.p };
+    play(sim, pad, 6);
+    assert.ok(sim.sh.gearOn, body + ': on its gear');
+    assert.ok(sim.sh.phys && sim.sh.phys.asleep, body + ': asleep after six seconds');
+    assert.ok(len(sub(sim.sh.p, p0)) < 0.6, `${body}: settled within ${len(sub(sim.sh.p, p0)).toFixed(2)} m of where it was parked`);
+    const up = norm(sim.sh.p);
+    const shipUp = sim.shipPoseU ? null : null;
+    assert.equal(shipUp, null);
+    // Upright: the hull's up is within 25 degrees of the planet's up.
+    const q = sim.sh.q, uy = { x: 2 * (q.x * q.y - q.w * q.z), y: 1 - 2 * (q.x * q.x + q.z * q.z), z: 2 * (q.y * q.z + q.w * q.x) };
+    assert.ok(dot(uy, up) > 0.9, body + ': upright ' + dot(uy, up).toFixed(3));
+    const p1 = { ...sim.sh.p };
+    play(sim, pad, 20);
+    assert.ok(len(sub(sim.sh.p, p1)) < 1e-6, body + ': asleep means it does not creep');
+    // It still boards and lifts off.
+    sim.sm.force(S.LANDED);
+    pad.tap('Space');
+    play(sim, pad, SHIP.liftoffSeconds + 0.8);
+    assert.equal(sim.sm.state, S.ATMOSPHERE);
+    assert.ok(sim.sh.altGround > SHIP.hoverHeight - 2.5, `${body}: lifted to ${sim.sh.altGround.toFixed(1)} m`);
+  }
+});
+
+test('with physics: after a landing the hull is handed to the gear and stays where it touched down', { skip }, () => {
+  const sim = newSim();
+  const pad = new Pad();
+  sim.teleport({ body: 'earth', ship: true, altitude: 40 });
+  play(sim, pad, 1);
+  pad.tap('KeyE');
+  play(sim, pad, 60, { until: () => sim.sm.state === S.LANDED });
+  assert.equal(sim.sm.state, S.LANDED);
+  const p0 = { ...sim.sh.p };
+  play(sim, pad, 6);
+  assert.ok(sim.sh.phys.asleep, 'asleep');
+  assert.ok(len(sub(sim.sh.p, p0)) < 0.6, 'moved ' + len(sub(sim.sh.p, p0)).toFixed(2) + ' m while settling');
+  pad.tap('KeyE');
+  play(sim, pad, 4, { until: () => sim.sm.state === S.ON_FOOT });
+  assert.equal(sim.sm.state, S.ON_FOOT);
+  assert.ok(len(sub(sim.ex.p, sim.sh.p)) < 8);
+});
+
+test('with physics: suit thrusters make the start and the stop crisp (the named assist)', { skip }, () => {
+  const sim = newSim();
+  const pad = new Pad();
+  play(sim, pad, 0.5);
+  pad.press('KeyW');
+  let t90 = null;
+  play(sim, pad, 2, { each: (t) => { if (t90 == null && sim.ex.speed > EXPLORER.walkSpeed * 0.9) t90 = t; } });
+  assert.ok(t90 != null && t90 <= 0.5, 'to 90 % of pace in ' + t90 + ' s');
+  pad.release('KeyW');
+  const p0 = { ...sim.ex.p };
+  let tStop = null;
+  play(sim, pad, 3, { each: (t) => { if (tStop == null && sim.ex.speed < 0.2) tStop = t; } });
+  assert.ok(tStop != null && tStop < 1.0, 'stopped in ' + tStop + ' s');
+  assert.ok(len(sub(sim.ex.p, p0)) < 1.3, 'within ' + len(sub(sim.ex.p, p0)).toFixed(2) + ' m');
+});

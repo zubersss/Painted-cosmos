@@ -82,6 +82,10 @@ async function boot() {
     const saved = readSave(storage);
     if (saved && restore(game.sim, saved)) debugNote = 'continued from a save';
   }
+  // Fill the near field (wind grid, terrain cache) behind the loading sheet, not in frame one.
+  if (physics && physics.warmUp) {
+    try { physics.warmUp({ bodyId: game.sim.bodyId, time: game.sim.t, focus: game.sim.ex.p }); } catch { /* optional */ }
+  }
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);

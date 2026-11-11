@@ -187,7 +187,9 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
       if (vUpNow < -st.sinkLimit || dot(target, up) > vUpNow + 4) tauBody = Math.min(tau, 0.22);
     }
     const p0 = st.p;
-    body(st, { target, tau: tauBody, hover: true, boost: !inAir }, dt, env);
+    // carve01: PHYSICS' named assist that turns the velocity onto the nose without changing
+    // the speed, so steering stays arcade while every change of speed keeps its mass.
+    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: 1 }, dt, env);
     v = st.v;
     st.p = p0;                                   // position is integrated once, below
   } else {
@@ -292,7 +294,9 @@ export function beginLiftoff(st) {
 // Choose where to set down: the flattest dry spot under or near the ship. Returns a site
 // { dir, floor, normal, liquid, slope } or null when everything nearby is too steep.
 // `obstacles` (optional): [{ unitDir, radius }] trees and boulders to keep clear of.
-export function findLandingSite(p, sample, T = SHIP, obstacles = null) {
+// `holds` (optional): (dir, ground) -> bool, whether the ground there will hold a parked ship
+// (PHYSICS: friction against the slope). Without it, slopes up to landMaxSlope are accepted.
+export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = null) {
   const up = norm(p);
   const r = len(p);
   const a = tangent(V(0.31, 0.77, 0.55), up);
@@ -310,7 +314,8 @@ export function findLandingSite(p, sample, T = SHIP, obstacles = null) {
   const consider = (dir, distance) => {
     const g = floorAt(sample, scale(dir, r));
     const score = g.slope * 60 + (g.liquid ? 14 : 0) + distance * 0.35 + crowd(dir) * 25;
-    if (g.slope <= T.landMaxSlope && (!best || score < best.score)) {
+    const ok = g.liquid || (holds ? holds(dir, g) : g.slope <= T.landMaxSlope);
+    if (ok && (!best || score < best.score)) {
       best = { dir, floor: g.floor, normal: g.normal, liquid: g.liquid, slope: g.slope, score, distance };
     }
   };
@@ -325,8 +330,8 @@ export function findLandingSite(p, sample, T = SHIP, obstacles = null) {
   return best;
 }
 
-export function beginLanding(st, sample, T = SHIP, obstacles = null) {
-  const site = findLandingSite(st.p, sample, T, obstacles);
+export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = null) {
+  const site = findLandingSite(st.p, sample, T, obstacles, holds);
   if (!site) return false;
   st.landing = { ...site, phase: 'glide', t: 0 };
   st.liftoff = null;
@@ -375,6 +380,7 @@ export function stepLanding(st, dt, sample, T = SHIP) {
     st.speed = 0;
     st.altGround = 0;
     st.gear01 = 1;
+    st.onLiquid = !!g.liquid;
     st.landing = null;
     // Rest squarely on the ground we actually touched.
     const restUp = norm(lerp(norm(p), g.normal, 0.75), norm(p));

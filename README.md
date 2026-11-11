@@ -4,7 +4,8 @@ A calm exploration game for desktop browsers: walk, use the jetpack, board your 
 through the atmosphere into space with no loading screen, and land again. Every frame is meant
 to look like a watercolour landscape on cold-press paper.
 
-Status: milestone 1 (vertical slice). See `docs/notes/` for what is done and what is not.
+Status: milestone 2 (the system: fly between worlds). See `docs/notes/` and `docs/lead/TRACK.md`
+for what is done and what is not.
 
 ## Play
 
@@ -37,10 +38,33 @@ In the ship
 | A / D | turn |
 | Mouse | point the nose |
 | X | brake |
+| F | pulse drive (in space): point at a world's marker and press F; F again drops out |
+| M | the map: click a world, or use the arrow keys, to set a course; M or Enter closes it |
 | E | land when the prompt shows; step out when landed |
 | V | cockpit / chase view |
 
-The ship hovers when you let go, levels itself, and will not let you crash.
+The ship hovers when you let go, levels itself, rides above the tree tops, and will not let
+you crash. The pulse drive brakes by itself and lets go in front of the world ahead.
+
+Anywhere
+
+| Key | Action |
+| --- | --- |
+| ` (backquote) | frame read-out: frame time, triangles, draw calls, render scale, quality tier |
+
+The game saves itself when you land, when you step out, and every 20 seconds on foot, and
+continues from there on the next visit. Add `?fresh=1` to the address to start again on Earth.
+
+If the browser will not capture the mouse (or reports nonsense while it does), the game says so
+and you look around by holding the left button and dragging.
+
+## Is it fast enough on my machine?
+
+Press the backquote key (or open the page with `?stats=1`). The read-out shows the frame time in
+milliseconds (16.7 is 60 frames a second), the worst recent frame, how many triangles and draw
+calls the scene needs, the render scale the game has settled on (1.00 is full resolution) and
+the quality tier (2 high, 0 low). If the frame time sits above 17 ms with the scale at 0.50 and
+the tier at 0, the machine cannot hold 60 frames a second in that view.
 
 ## URL parameters
 
@@ -51,13 +75,22 @@ The ship hovers when you let go, levels itself, and will not let you crash.
 | `body=mars` `time=18` | start on another body, at another local hour |
 | `dynres=0` `scale=0.75` `quality=1` | pin the dynamic resolution controller |
 | `pointerlock=0` | never capture the pointer; drag to look |
+| `stats=1` | show the frame read-out from the start |
+| `fresh=1` / `save=0` | forget the saved game / never save |
+| `stub=physics` | turn the physical models off (the explorer and ship then move by simple rules) |
 
 ## Checks
 
     node --test tests/*.test.mjs     # pure logic: orbits, frames, state machine, explorer,
-                                     # cameras, flight, landing, dynamic resolution, the loop
-    node tests/playthrough.mjs       # the whole loop in headless Chromium with real key and
+                                     # cameras, flight, landing, pulse drive, save, the loop,
+                                     # the Earth-Mars-Saturn trip, and the same through PHYSICS
+    node --test src/physics/         # the physical models (PHYSICS)
+    node --test src/world/*.test.mjs # terrain and biomes (Painter)
+    node tests/playthrough.mjs       # the M1 loop in headless Chromium with real key and
                                      # mouse events; fails on any console error
+    node tests/trip.mjs              # Earth to Mars to Saturn in one sitting, then a reload
+                                     # that continues from the save
+    node tests/lockcheck.mjs         # the pointer-lock fallback
 
 ## Layout
 
