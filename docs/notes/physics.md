@@ -3,6 +3,90 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over (written at the end of P5's first step, for a fresh PHYSICS agent)
+
+I am at the limit of my working context and have asked the coordinator to replace me. This
+file is meant to be enough on its own. Read it top to bottom once; the code comments carry
+the physics (every module starts with what it models and from which source).
+
+**Where things stand.** P1 to P4 are done and accepted. Of P5 (the coordinator's order,
+`docs/COORDINATOR.md` section E) only item 4 is done: `src/physics/sky.js`, `physics.here.sky`.
+The tree is green: `node --test src/physics/` 178 pass. Nothing is half-edited.
+
+**How to work here** (all of it learned the hard way):
+- Commit only with `tools/commit.sh physics "message"`; own only `src/physics/**`,
+  `physics-lab.html`, this file, `docs/shots/physics/**` (at most 12 jpg). Scratch goes in
+  `/home/user/.pc-scratch/physics/` (my measuring scripts are still there: `costs.mjs`,
+  `worst3.mjs`, `play.mjs`, `fly.mjs`, `lift.mjs`, `browserplay.mjs`, `rainmodes.mjs`, `vis.mjs`, `pi.mjs`).
+- Tests: `node --test src/physics/` runs everything through `all.test.mjs` (Node 22 treats a
+  directory argument as one module; `package.json` here exists only for that). Under memory
+  pressure run file by file: `node --test src/physics/<name>.test.mjs`. Commit green.
+- The pure core must not import three. Only `src/physics/three/` may (`kits.js`,
+  `painted-lab.js`); `three/expand.js` and `three/chunks.glsl.js` are pure and tested in Node
+  (`kits.test.mjs`). Three does not resolve in Node here.
+- Headless pictures: `node tools/shot.mjs "<page>?<query>" out.png --w 960 --h 540 --wait ms
+  [--eval js] [--timeout ms --shot-timeout ms]`. The debug lab: `physics-lab.html?scene=...`
+  (parameters below). The painted lab: `physics-lab.html?painted=1&...` (PAINTER's real
+  pipeline; give it `--timeout 400000 --shot-timeout 240000` and `pre=<s>`; one frame takes
+  about a second, a page load one to two minutes).
+- This machine is shared and slow: single timings lie. Cost is measured as the same
+  deterministic run five times, each frame's best, then the worst frame (`worst3.mjs`;
+  `createPhysics({ timeBudget: false })` makes runs repeatable). Browser read-outs of
+  `physics.update` are 2-4 times the Node numbers and spike to 30 ms; that is the machine.
+- Things that bit me: `flat` is a reserved word in GLSL ES 3; string keys and object-field
+  doubles in hot loops allocate (see the caches in `wind.js`, `weather.js`); the default
+  weather seed is pinned by a test to PAINTER's spawn (change both together or not at all);
+  `physics.air()` reads the clock of the last `update`; a screenshot takes seconds during
+  which the game keeps running (measure first, shoot after); PAINTER's post pass erases any
+  mark under about 3 of its internal pixels; its scene pass is opaque (no blending).
+- Read at every sync: `docs/COORDINATOR.md` section E, `docs/lead/REVIEW.md`,
+  `docs/notes/pilot.md`, `docs/notes/painter.md`. Answer MUST FIX items here.
+
+**Unfinished, in the coordinator's P5 order, each with where to start:**
+1. *Every kit kind must survive PAINTER's post pass.* Not started. The floor exists
+   (`DRAW[kind].minPx`, `eye.pix` in `three/expand.js`; the painted lab's `DRAW_PAINTED`
+   raises it to 3+ px) but counts are not reduced to keep coverage and far marks are not
+   merged. Start: in `expandStreaks` / `expandDabs`, when the floor enlarges a particle by a
+   factor f, keep only one in f^2 (dabs) or f (streaks) by a hash of its size (stable per
+   particle; see `expandShades`), so coverage stays what the physics says. Then re-shoot
+   `painted=1&body=earth&biome=alpine_meadow&find=snow&pre=25` and
+   `painted=1&body=mars&biome=dust_dunes&find=dust&pre=25` until the kit part reads; say what
+   still needs PAINTER (snow on the ground from `sky.snow`, haze from `sky.haze` / `sky.dust`).
+2. *The sea for PAINTER's own liquid.* The chunk exists and is the delivery
+   (`physics.glsl.water`: `pcPhysWater(p)` gives height and slope, wakes included; uniforms in
+   `physics.fields.water.uniforms`; JS twin `fields.water.heightAt`, tested). Missing: a crest
+   and foam measure for bare-paper glints. Start: add `uPhysWaterSea` (vec4: significant
+   height, the largest possible elevation `sum(amp) * (1 + WATER.group)`, `whitecap01`,
+   steepness) and `float pcPhysWaterCrest(vec3 w)` = how near the top of the highest waves
+   this point is, times `whitecap01`; give `WaterField` the same as `crestAt(x, z)` and test
+   the two formulas against each other as text and numbers (see how `water.test.mjs` checks
+   the chunk). Stop offering the patch as the way to draw the sea (`createWaterKit` can stay
+   for the debug lab). The 1.1-1.5 ms was the CPU patch at 65 x 65 with wakes (three
+   `wakeAt` calls a vertex for the slope): with the chunk in PAINTER's material the CPU cost
+   is the uniform update, under 0.01 ms. If the patch is kept, give `wakeAt` an analytic slope.
+3. *Ink on unknown ground.* Not started. Design: a material index per loose particle and per
+   mark. (a) `ground.js`: export `MATERIAL_IDS = Object.keys(MATERIALS)`. (b) `index.js`: the
+   near `TerrainGrid(17, 2, 8)` has 8 cover slots, all used (`fill` writes sink, imprint, ...,
+   friction, kinetic, z0, liquidDepth): make it 9 and store the index of `_g2.material`.
+   (c) `particles.js` `makeBuffer`: add `mat: new Uint8Array(cap)` and copy it wherever a
+   particle is moved (the two retire blocks in `particles.js`, the compaction in
+   `loose.js`). (d) `loose.js` `emit(...)`: take the index from the ground lookup at the
+   emission point (`_ground`). (e) `deform.js`: the mark's 14th float (`spare`) becomes the
+   material index; `_mark` gets it from `groundOf`. (f) kits: pass it on (`aPcMat` in gpu
+   mode; in cpu mode put it in `vPcData.y` for particles and document it; marks: a fifth
+   value needs a second attribute). PAINTER then tints from its own palette per material.
+4. *Weather for the sky*: **done** (`sky.js`, below in the API, tests in `sky.test.mjs`).
+5. *Left from before*: a silhouette agreement test for `PROP_VERT` (method under "The lab
+   inside the painted pipeline"); a meadow with real grass to judge parting (look for a biome
+   whose `small.grass` is high in `src/data/looks.js`: `misty_wetland` reeds 0.5 and grass
+   0.3, `sea_coast` grass 0.45); a third (branch) rate in trees (needs a third oscillator and
+   a fourth field texture: wait until PAINTER is on half-float fields); drifts of snow and
+   sand in the lee (`AirGrid.wake` already knows where the lee is; `DeformField.depth` is
+   where a drift would be stored, negative values are piled-up material).
+
+**What I would do first as a fresh agent:** item 3 (pure, testable, no pictures needed),
+then item 2's crest measure (same), then item 1 with the painted lab.
+
 ## API (current, exact; kept up to date with every commit)
 
 Everything is pure logic: no three, no DOM, plain `{x,y,z}` objects, **body-local** coordinates
@@ -68,7 +152,13 @@ physics.water(bodyId, p, out?) ->                         // the liquid surface 
 
 physics.features.devils // dust devils near the focus: array with .count; each { p (body-local foot), x, z (grid),
                         //   radius (m), height (m), speed (swirl, m/s), up (m/s), spin (+1/-1), strength 0..1, age, life, id }
-physics.here            // { bodyId, air, weather, cover, groundHeight } at the focus, refreshed by update(): free to read
+physics.here            // { bodyId, air, weather, cover, groundHeight, sky } at the focus, refreshed by update(): free to read
+physics.here.sky        // the weather as a painter needs it: eleven numbers 0..1, continuous (all but flash):
+                        //   cloud (cover), overcast (dim and cool the light), haze (MULTIPLY the clear-day fog
+                        //   distance by it), fog and dust (what the lost view is lost to: grey water, or dust to
+                        //   tint), wet (ground darkening), snow (ground cover), rain (liquid falling), snowfall
+                        //   (frozen falling), storm (in a storm core), flash (lightning now)
+physics.sky(weather?, out?)   // the same numbers for any physics.weather() result (default: at the focus)
 physics.focus           // {x,y,z} body-local: the focus of the last update (read-only)
 physics.particles.system.dripping   // 0..1: how hard the soaked canopy over the focus is dripping (after rain)
 physics.setWindScale(bodyId, scale)   // how far a body's real wind is scaled down (data.WINDS[body].scale)
@@ -170,9 +260,12 @@ MARK, MARK_STRIDE, EVENT, WATER, QUALITY, DEFAULT_SEED`, and `windSea(U, fetch, 
 
 INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is stable; P2 and P3 only added to it,
 with one change of type: the water uniforms are vec4 now (four trains; nobody had wired them).
-The tree is committed green: `node --test src/physics/` **175 pass** at the commit that carries this note.
+The tree is committed green: `node --test src/physics/` **178 pass** at the commit that carries this note.
 
-Stage P1 to P3: done, accepted. **Stage P4** so far: the lab runs inside the real painted
+**Stage P5**: item 4 done (`sky.js`: the weather as eleven numbers for a painter, 3 tests);
+items 1, 2, 3 and 5 not started: see the Hand-over at the top for where each begins.
+
+Stage P1 to P3: done, accepted. **Stage P4**: the lab runs inside the real painted
 pipeline (`?painted=1`), the reference material factory is proven with PAINTER's chunks and both
 render targets, six painted frames are judged, rain is prototyped four ways and measured for
 crawl; all under Answers, "The lab inside the painted pipeline". Not done in P4: shader
@@ -448,7 +541,17 @@ stands alone, in the order I would wire them.
 - Still unseen by anyone in the game: grass parting round the explorer and under the ship's
   wash. The push field is live (370 cells pushed on a short walk in the browser).
 
-### B. Weather for the sky and the sheet: `physics.here.weather`, every frame, free
+### B. Weather for the sky and the sheet: `physics.here.sky` (numbers) and `physics.here.weather` (detail), every frame, free
+- **Start here: `physics.here.sky`**, eleven numbers 0..1, continuous in time, no meteorology
+  in them: `cloud` (paint cloud over the blue), `overcast` (dim and cool the light, soften
+  shadows), `haze` (multiply your clear-day fog distance by it), `fog` and `dust` (what the
+  lost view is lost to: grey water, or dust to tint with the ground's colour), `wet` (darker
+  ground washes), `snow` (leave the paper white), `rain` and `snowfall` (how much is falling,
+  liquid and frozen), `storm`, `flash` (lightning now: bare paper). PILOT may hand the same
+  object to `setMood`. At the spawn with the default seed they run: fair `cloud 0.15`,
+  minute five `cloud 0.83, overcast 0.38`, the storm `overcast 0.95, rain 0.92, haze 0.36,
+  wet 1.0`, after it `cloud 0.13, haze 0.47 (mist), wet 0.93`. The rest of this section is
+  the detail behind them.
 - `cloud01` (cover; 0 once the camera is above the deck), `cloudBelow01`, `storm01`,
   `front01` (a gust front passing).
 - `visibility01`: multiply your clear-day fog distance by it. May fall by up to 5 %/s at a
@@ -1042,11 +1145,6 @@ Blunt, as asked. All of it is about motion and behaviour; none of it is about lo
 - (idea) `st.phys.lean` for the explorer model, `legCompress` for the ship's legs, `fieldBrake`
   for a glow: animation data that cost nothing.
 
-## Next stage (P4), in order
-1. Whatever PAINTER's first drawn rain, marks and waves show to be wrong (sizes, counts,
-   exposure, lifetimes): tune against the picture, not the lab. Sit with the new PAINTER on
-   the kit factory until one kind is in the game.
-2. Shader agreement measured inside `PROP_VERT`; real-GPU cost of the fields and kits.
-3. A third (branch) rate in the trees, once the fields are on half-float (it costs a texture).
-4. Drifts: snow and sand piling in the lee (the wake field already knows where the lee is).
-5. Let the ship's cruise near the ground be what the engines and the air give, with PILOT.
+## Next stage
+See the Hand-over at the top: the unfinished items of P5, in the coordinator's order, each
+with its starting point.
