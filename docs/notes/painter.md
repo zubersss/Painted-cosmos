@@ -6,58 +6,205 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
-Written by the fourth PAINTER agent at the end of M3 block 2 (the explorer and the ship, the
-near ground, rain as a glaze, dark washes), commit `6bb6c91`. The third agent's block
-(weather in the picture) and the second agent's M2 record follow.
+Written by the fifth PAINTER agent at the end of M3 block 3 (the two MUST items, day-night
+and space, pulse streaks, flicks, lightning, puddles). My commits: `e56d65e`, `139be13`; the
+last code is in `626b086` (the coordinator's snapshot of my files, taken as I finished). The fourth agent's
+block 2 (explorer and ship, near ground, glazes), the third's (weather) and the second's M2
+record follow.
 
-- **Where things stand**: M2 is done. M3 block 1 (weather) is in. **M3 block 2 is in**: the real
-  explorer and ship (`src/art/models.js`), a cast shade under both, the near ground layer
-  (`src/world/nearground.js`), a glaze pass (rain), soft settling instead of pepper in dark
-  washes, the sky numbers eased over two seconds. What each looks like, the numbers and what
-  is weak: "M3 block 2" below.
-- **Where things are** (all in my files):
-  `src/art/models.js`: a small geometry kit (`loft`, `path`, `capsule`, `blob`: every form is
-  a lofted shape with a hand-wobbled surface), a rig (`makeRig`: pivots; the mesh follows them
-  through a matrix palette), `createExplorer`, `createShip`.
-  `src/render/materials.js`: `makeFigureMaterial` (figures: one mesh, `aPart`, vertex colours,
-  `aMat` = dry, wet, glow), `makeNearMaterial` (the near strokes), plus the third agent's
-  terrain, water, props, wash. `src/render/chunks.js`: `pcCast` (the shade the explorer and
-  the ship lay on the ground; the world fills `G.uCast` from `userData.pcCaster`).
-  `src/world/nearground.js`: the strokes (clumps on cube-sphere cells, laid in a time slice).
-  `src/render/shared.js`: `GLAZES` (objects laid over the brushed picture), `G.uSceneAux`.
-  `src/render/post.js`: `finish(glazes, camera)` draws them after the abstraction pass; the
-  sheet's granulation (`dark`, `settle`). `src/render/kitmat.js`: `GLAZE = { rain: 1 }`.
-  `src/world/index.js`: `castShade`, the eased sky (`skyEase`), `setBuildBudget(ms, { fixed })`.
-  How the weather reaches the picture: the third agent's list under "M3 block 1".
-- **How to work here**: the machine is shared and slow (a 960x540 gallery frame takes one to
-  three minutes; run two at a time, never four). **Render from a clean export, not from the
-  working tree**: PHYSICS saves files while you render and a frame then has no physics or
-  dies on a half-written file (it happened again this run: `windLarge is not defined`).
-  Commit, `tools/export-head.sh <dir>`, then `ROOT=<dir> ./s.sh ...`. My scratch tools are in
-  `/home/user/.pc-scratch/painter/m4/` (outside the repository, may be gone; each is short):
-  `s.sh "<query>" out.jpg [w h]` (a gallery frame; honours `ROOT`), `join.py` (contact sheet),
-  `diff.py a b` (mean difference, share of changed pixels), `ev.mjs "<query>" "<js>"`
-  (evaluate in the gallery), `game2.mjs <export> <prefix> foot,cockpit,chase` (the integrated
-  game: third person at the Earth spawn, the cockpit, the chase view; prints the game's own
-  triangle and draw-call read-out), `cost.mjs earth spawn,temperate_forest` (cost at quality
-  1, 0, 2 in the gallery; `QX="&models=1"`), `final.sh`, `final2.sh` (the evidence batches).
-- **Rules that bit me** (and my predecessors): (1) render from an export (above). (2) In the
-  game, triangles are read from `__pc.info().stats` with `__pc.game.showStats = true`
-  (the game resets `renderer.info` itself); in the gallery with `autoReset = false` over a
-  frame. (3) Measure cost before and after every flora or near-ground change. (4) Anything
-  thin and transparent drawn in the scene pass is erased by the abstraction pass (over the
-  sky it keeps nothing): that is what the glaze pass is for. (5) An opaque mark lighter than
-  what is round it gets a dark pooled rim from the sheet. (6) A mesh under a body root is in
-  body-local metres: give it its own origin (`uOrigin`, `mesh.position`) or float precision
-  and my first hour are lost. (7) Scratch output with absolute paths; the tour only from a
-  clean export with `--out`.
-- **Next, in the coordinator's order**: what is weak in block 2 (the list under "M3 block 2":
-  the sward is still tufts, each blade a flat triangle; the explorer's face; the border under
-  a storm), then PHYSICS' branch sway and drifts, lightning (PILOT's `__pc.flash(frames)`
-  exists now; nobody has looked), day-night and space art pass, pulse streaks from `speed01`,
-  a repaint of the weakest biome of each planet, the lead's SHOULD FIX list (review 4:
-  three vistas in thickets, Mercury and Neptune from orbit, Earth's hard cloud edge, Mars'
-  ruler-straight dune crests, optional `yaw` on `getSpawn`).
+- **Where things stand**: M2 done; M3 blocks 1, 2 and 3 are in. Both MUST items are closed at
+  the lead's own instrument (numbers under "M3 block 3"). Night is its own painting now, space
+  has stars, the pulse drive has streaks. What is weak: the list at the end of "M3 block 3".
+- **Where the new things are** (all in my files):
+  `src/world/index.js`: the far-world tiers (`farTier`: 2 the world itself, 1 a dab made by
+  `makeDab`, 0 nothing: under the horizon, behind a closed sky, under 1.3 px), the sky veil
+  over far worlds by day, the night key (`SHEET.night`, `undens`), the sky glaze's frame hook
+  (pulse streaks, `MOTION`), `sky.fresh`.
+  `src/world/sky.js`: the sky pass (night clouds, layered space, `starOK` written to the aux
+  target's x) and `makeSkyGlaze` (stars and pulse streaks, laid after the abstraction pass).
+  `src/render/post.js`: the sheet's night key (`uNight`), the reserve (paper lights keep out
+  of the last glaze), dark and middle washes settling soft, the border of a dark wash, the
+  lightning lift by the share of open sky.
+  `src/render/shared.js`: `SHEET.night`, `MOTION` (speed01, space01, pulse, pulse01).
+  `src/art/models.js`: the ship's `animate` sets `MOTION.pulse` (that is how the streaks know).
+  `src/world/nearground.js` and `NEAR_VERT/FRAG` in `src/render/materials.js`: flicks (tufts,
+  lancet shape, `iPar.y` 2 = flick, 3 = a flick left crisp), splinters in clusters.
+  `src/render/materials.js`: puddles and the wet wash in shade (terrain), `stormy` (water).
+  Older pieces: the fourth agent's list is kept under "M3 block 2", the third's under block 1.
+- **How to work here**: the machine is shared and slow (a 960x540 gallery frame takes two to
+  four minutes, a game run six to ten; two at a time). **Render from a clean export**: PHYSICS
+  and PILOT save files while you render. To try uncommitted work: export HEAD and lay your own
+  files over it (`mkexp.sh` below). Scratch tools in `/home/user/.pc-scratch/painter/m5/`
+  (outside the repository, may be gone; each is short):
+  `mkexp.sh <name>` (clean export of HEAD plus my working files), `s.sh "<query>" out.jpg`
+  (a gallery frame; honours `ROOT`), `bd.mjs <export> <body:kind:id> 1,0 [prefix]` (the lead's
+  cost measure at one place with a per-object breakdown: this is what found the far worlds),
+  `storm.mjs <export> <prefix>` (the game at the Earth spawn in the first thunderstorm, clock
+  230 to 244 s, then the same at 21 h; counts, breakdown, `world.update` times),
+  `pulse.mjs <export> <prefix>` (the game: orbit, deep space, the pulse drive toward Mars),
+  `crop.py`, `pair.py`, `join.py`. The lead's own: `node tests/cost.mjs --root <export>
+  --places "earth:vista:earth-temperate_forest-1" --qualities 1,0 --sheets <scratch dir>`
+  (give `--sheets`, or it overwrites the lead's evidence) and `tests/weather.mjs` (its storm
+  times are the old ones: the first storm is at 160 to 320 s since PHYSICS' P8.3).
+- **Rules that bit me** (and my predecessors): (1) render from an export. (2) When a frame
+  costs more than it should, list what is drawn before trimming anything (`bd.mjs`): the
+  vista's overrun was four far planets, not trees. (3) The sheet's night key squares every
+  value, so anything the sky pass paints at night must be laid lighter (`undens`) or it goes
+  black; bare paper stays paper, so whatever must not glow at night needs a wash (clouds).
+  (4) Anything small and bright in the scene pass is eaten by the brush: lay it as a glaze
+  (stars). (5) A crisp mark darker than its ground is pooled darker still by the sheet: keep
+  accents close to the ground's value. (6) to (8): the fourth agent's rules 4 to 6 under
+  "M3 block 2" still hold (thin transparent things, light marks get a dark rim, body-local
+  meshes need their own origin).
+- **Next, first: the quality push the owner asked for** (no budget any more; the top tier is
+  where the look is judged). Not started by me. Raise what was set with 600 k in mind: fuller
+  trees out to where they still read (`T0`, `T1`, `T_THIN`, `T_FAR`, `RANGE_SCALE` in
+  `src/world/flora.js`), a sward that is a sward (`CELL` 0.66 m, `PER` 8, `MAXS` 6400,
+  `RANGE` 11 m in `src/world/nearground.js`: more and nearer tufts, a longer range; with the
+  flicks close to the ground's value a denser sward will not turn to teeth), denser flora and
+  props where a biome looks sparse. Render the Earth spawn and the forest vista before and
+  after at quality 2, open both, keep the better painting; report `world.update`'s worst
+  frame (the near layer's build is the part that grows).
+- **Then PHYSICS' critique of the picture** (frames `docs/shots/physics/painted-*.jpg`, not
+  opened by me): the storm's ground is still sunlit green under a black sky at the gust front
+  (the ground wants to lose its sun as the storm sky comes over, before `overcast` closes);
+  the blizzard is white flakes on white (flakes want a darker wash behind them, or to be laid
+  as shadowed marks); dust walls are hard pale blots and Mars' sand streaks darker than the
+  dune (they want to be a soft glaze, like rain); Neptune's far sea has no swell line
+  (`pcPhysWaterCrestLine`); a tree leaning in a gale reads as a calm tree in a still (the
+  crown does not shear against the trunk).
+- **Then, in the coordinator's order** (item 4 of block 3, mostly not done): white horses on
+  Neptune's sea (`pcPhysWaterCrestLine`, PHYSICS' notes P7), something in the air in the dust
+  storm, the two vistas in a thicket (`mercury-crystal_gardens-2`, `uranus-frozen_waves-2`:
+  `Surface.clearings` in `src/world/surface.js` is the mechanism, it must be fixed before
+  anything samples flora), Mercury and Neptune from orbit, Mars' dune crests, PHYSICS' branch
+  sway (`pcPhysBranch`) and drifts; then what is weak below; M4 is the critique swap and a
+  repaint of the weakest biome per planet.
+
+## M3 block 3: the MUST items, day-night, space, pulse, flicks (fifth PAINTER agent)
+
+INTEGRATION: ready (`626b086`; the game on a clean export loads and plays on foot, in orbit,
+in deep space and in the pulse drive with no console error; 19 world tests and the project's 109 tests pass on a clean export of `895a178`).
+
+### The two MUST items
+- **Cost, at the lead's instrument** (`tests/cost.mjs`, clean export, the game, fair weather):
+  vista `earth-temperate_forest-1` **537 k / 305 at quality 1** (was 614 k / 341; budget 600 k /
+  350) and **240 k / 180 at quality 0** (was 315 k in my run, 304 to 306 k in the lead's; budget
+  300 k). The thunderstorm at the Earth spawn: **524 k / 286** (the lead's 606 k / 315; the same
+  storm with the sun put at 21 h: 523 k / 287).
+  What it was: not trees. Every far world in the view frustum was submitted in full (14 k
+  triangles of terrain and 6 draw calls each, plus water and a cloud shell: up to 25 k and
+  13 calls a world), seen or not. At the vista four of them stood in the view (Mercury, Venus,
+  Uranus, Pluto: 72 k triangles, 36 calls, for one dot of ten pixels and three of under one
+  pixel); "the storm after dark" was Neptune behind the cloud. Now a far world that cannot be
+  seen is not drawn (wholly under the horizon, behind a closed sky, or under 1.3 px of radius),
+  one under about 9 px is a dab (a washed ball, 320 triangles, one call; hysteresis 8 to 10 px)
+  and by day it is veiled by the sky it is seen through. Nothing was trimmed from the flora:
+  `TRIM` and `MAXS` are as they were.
+  `world.update` in the storm frame, software rendering under load: mean 1.2 to 1.7, ninetieth percentile 3.1 to 4.8, worst 7.6 to 8.9 (50 frames at 13 h and 50 at 21 h; the same script on `62d061a` gave 1.1 to 1.7, 4.3 to 6.1 and 8.7 to 9.2: no change from this block; the worst frame is over 5 ms here as it was, on a machine at a load of 15) ms.
+- **Pepper**: (a) saturated middle washes (Neptune's sky) and everything under the night's
+  glaze now settle soft instead of in pits (`pepper-neptune.jpg`, before | after: opened both
+  at full size; the after's sky enlarged three times before, not after); (b) the border of a
+  dark wash is ragged in broad pieces with a pooled rim and a few flecks of paper, no pale rim
+  with dark dots in it (`night-storm.jpg`; `space-deep.jpg`). The lead closed the washes
+  himself on `0de3fb4`; the border he saw there is the old one.
+
+### What is in, the frame that shows it, my verdict
+Frames in `docs/shots/painter/`, 960x540 each, quality 1. Pairs are before | after.
+Opened at full size, each half as its own frame: `pepper-neptune`, `night-earth` (the after
+one commit earlier, and the last render on a two-frame sheet at full width), `space-orbit`,
+`flash`, `flicks-lawn`, `night-storm`; `space-deep`, `space-pulse`; `daynight-mars` and
+`daynight-uranus` as stored (two frames stacked); `night-mars`, `night-uranus` on two-frame
+sheets at full width; `wx-neptune-gale` and the lower half of `near-saturn`'s after on one
+sheet. **Not opened in the stored render**: `daynight-earth` (the same two frames one commit
+earlier were opened, with the old strokes in them), `wx-earth-blizzard` (opened one tweak
+earlier: a few more stems came through), `wx-earth-storm` (the same view one commit earlier
+was opened), the before half of `near-saturn` beyond its first render.
+
+| what | frame | verdict |
+| --- | --- | --- |
+| night on Earth | `night-earth.jpg` (gallery, forest easel, 23 h) | yes. Before: the day multiplied by blue. After: a nocturne: tree masses run together into deep indigo-green, the sky is a middle indigo paling to a band over the wood with a pale lifted cloud, and the lights are reserved paper: birch trunks, the stream's reflections, the canopy glass, the coat, five stars. Weak: the foreground ground is one flat dark; edges are all crisp (a nocturne wants more lost edges); the coat is the brightest thing in the picture |
+| dawn and dusk on Earth | `daynight-earth.jpg` (dawn over dusk) | yes: a rose-lilac dawn sky with long cool shade; a warm grey-gold dusk on toned paper. Dusk's sky wants more gold at the horizon |
+| Mars | `daynight-mars.jpg` (dawn over dusk), `night-mars.jpg` | yes, the best of the set: a salmon dawn with mesas stepping back in mauve layers; the blue dusk; at night dark sepia terraces with pale strata under a deep sky with stars. Weak: the night sky is nearly one value |
+| Uranus | `daynight-uranus.jpg` (dawn over dusk; rendered before the splinters were clustered), `night-uranus.jpg` | yes: mint sky to rose at dawn, teal to gold at dusk with the spire lit cream; at night the spire and the shelf are the reserved lights |
+| space, in orbit | `space-orbit.jpg` | yes. Before: one soft wash, no stars. After: two layers of indigo with lost and found edges, a violet drift, spattered stars of unequal size |
+| deep space, the game | `space-deep.jpg` | yes: layered washes, about seventy stars, the sun as bare paper with a halo, the ship's two warm lights |
+| pulse drive, the game at 5.3 km/s | `space-pulse.jpg` | yes: pale drags lifted out of the wash run out from the point the ship flies toward, soft-edged, wandering a little, dry at their tails; stars fade under them. Not seen in motion. Weak: a little like combed hair where many lie side by side |
+| lightning | `flash.jpg` (before: the game on `e56d65e`; after: gallery, storm at 21 h, flash forced) | yes: the open sky goes to bare paper, trees and trunks stand as silhouettes, no fringe of specks in the crowns. Weak: the crown edge against the paper is stepped in places (the sky mask is at the scene's resolution) |
+| near strokes as flicks | `flicks-lawn.jpg` (the lead's vista in the game), `wx-earth-storm.jpg`, `near-saturn.jpg` | yes for the lawn: tufts of soft touches close to the ground's value, a few olive accents, uneven; no teeth. On Saturn the splinters stand in loose clusters of unequal size. Weak: at the boom's distance most flicks merge into the wash, so the lawn is quieter than a painter would leave it; not judged in first person or in motion |
+| none on snow | `wx-earth-blizzard.jpg` (gallery, fresh snow forced) | yes: the snowfield is bare paper; two or three tall stems come through. PHYSICS' `sky.fresh` drives it in the game (not rendered in the game by me) |
+| puddles, wet shade | `wx-earth-storm.jpg` (the game, the thunderstorm at 13 h) | partly: the shade under the trees is no longer a row of dark holes; puddles are faint pale soft shapes on the lawn, hard to find. At a stronger setting they covered a third of the lawn like snow patches: there is no hollow to put them in, only flat ground and a noise |
+| Neptune's sea takes the storm | `wx-neptune-gale.jpg` (gallery, forced storm) | partly: sea and beach go dark indigo under the closed sky. No white horses (not done) |
+| the storm after dark | `night-storm.jpg` (before: the game on `62d061a`; after: the game, sun put at 21 h) | see the file: yes as a picture: a low-key wet night, the storm sky the darkest wash with a pale band under it, trunks, the ship and the coat as the lights, the border a clean ragged edge. Dark for play: the explorer reads by the coat. One dark round blot in the air is a flying leaf (PHYSICS' kit in my ink): it wants to be a flick |
+
+### How each part works
+- **Night key** (sheet pass). Three things, by `SHEET.night` (1 at night on the ground, 0 by
+  day and in space): the hue narrows toward indigo; every wash is given 0.68 to 0.94 more
+  pigment by the density model, so darks and middles run together and bare paper stays bare;
+  the last glaze over the sheet is light ([0.64, 0.70, 0.90], was [0.42, 0.48, 0.70]) and
+  what is near paper is kept out of it (the reserve). The world lays the sky's keys lighter
+  by the inverse of the density (`undens`), so the sky lands on the look's night values.
+  The brush is a little broader and wetter at night and the pencil nearly gone.
+- **Stars and streaks** are one glaze object (`pc-sky-glaze`, one triangle, drawn after the
+  abstraction pass only at night, in space or under the drive). Stars: one dot at most per
+  cell of two cube-map grids, radius 1.3 to 4.4 px, where the sky pass allows (no cloud, no
+  overcast, above the horizon haze, out of the sun's glare). Streaks: in polar coordinates
+  round the ship's heading (`userData.pcCaster === 'ship'`, else the camera's), sectors with a
+  drag each, flowing outward in log radius; strength is `pulse01` (eased 0.45 s from the
+  ship model's `mode: 'pulse'`) or, at a full cruise in space, 0.16 of it from `speed01`.
+- **Flicks**. A cell has no tuft (one in five), one or two; blades start within 8 cm of the
+  tuft's root, fan out, most short, the leader long; the shape is narrow at the root, full
+  at a third, a point at the tip. Washes: two thirds of the way to the ground's own, a third
+  of them paler, one in seven an accent (denser, left crisp). Under fresh snow all but the
+  tallest are gone by half cover.
+- **Lightning**: the lift to paper is by the share of open sky in five taps, so the gaps
+  inside a crown stay with the crown; during a flash light things are reserved from the
+  night's glaze.
+
+### Not done, not verified, weak (blunt)
+- **Not done from item 4**: white horses, the dust storm near the explorer, the two vistas in
+  a thicket, Mercury and Neptune from orbit, Mars' dune crests, branch sway, drifts.
+- **Not verified**: anything in motion (streak flow, star stability under a turn, flicks
+  under the storm wind: the stills show no torn or stretched strokes, which is all I can
+  say); quality 0 and 2 looks; the tour; other bodies' densest views (the far-world change
+  can only lower them); a real GPU. `tests/weather.mjs` was run on `e56d65e` only (five
+  frames; its "neptune-gale-forced" frame stayed on the meadow because of `--only`).
+- **Storm wind on trees and strokes** (PHYSICS asked): in three storm stills nothing is torn,
+  stretched or laid flat; I cannot say more without motion.
+- **Rain**: with PHYSICS' own share I count about twenty strokes in the frame in the
+  thunderstorm (it says 37 are in view): enough to read as rain, soft, paler than the wood.
+- Puddles are weak (above). The walker's track and the ship's wash were not re-rendered with
+  the flicks (`wx-grass-part.jpg`, `wx-grass-wash.jpg` removed as stale; trodden blades are
+  now only a little paler and broader, so the track will read less).
+- `models-*.jpg` and M2's biome frames predate this block (old strokes, old night).
+- A far world between 8 and 10 px of radius swaps from dab to terrain in one frame (no
+  cross-fade); a dab has no clouds, bands or rings' shadow; a far world behind a closed sky
+  vanishes at overcast 0.6 without a fade.
+
+### Contract changes in this block (all additive; nothing removed)
+- `setMood.speed01` and `inSpace01` are now read (streaks at a full cruise in space).
+- The ship's `animate({ mode: 'pulse' })` switches the streaks on (no new call for PILOT).
+- `sky.fresh` (PHYSICS) is the fresh-snow cover when present; my own model is the fallback.
+- `sampleObstacles`: a boulder's `height` is 0.58 of its scale (was 0.5): the top of the
+  drawn boulder over the ground beside it. The largest boulder is about 1.2 m.
+- Render: `SHEET.night`, `MOTION`; the sky writes where stars may lie into the aux target's
+  x for region 0. World: `world._glaze` (a debug string). Gallery: `odist=`, `chase=1`
+  (`cdist=`, `cdown=`, `cside=`), `speed01=`.
+- I no longer close the sky under rain or snow myself (PHYSICS does), and the rain share
+  is PHYSICS' own.
+
+### For PHYSICS
+- Snow: `sky.fresh` is used. Rain: your share is used as it is; about twenty strokes show in
+  the thunderstorm. Storm wind: no damage seen in stills; nobody has watched it.
+- Still open from my side: `pcPhysWaterCrestLine` (white horses), `pcPhysBranch`, drifts.
+
+### For PILOT (and the lead)
+- `tests/weather.mjs` still looks for the storm at 720 s; it is at 160 to 320 s now.
+- A cleaner signal for the streaks would be `mood.pulse01` (0 to 1); today I read the ship
+  model's mode. If you want no drags at a plain cruise, say so (one constant, 0.16).
+- Boulders: all are under 1.3 m by their true height, so all are walked over; if some should
+  block, tell me the size and I will grow a few.
+- **UI second look (PILOT asked): not done.** No interface frame was opened in this block.
 
 ## M3 block 2: explorer and ship, near ground, glazes, dark washes (fourth PAINTER agent)
 
@@ -726,6 +873,9 @@ import { createExplorer, createShip } from './src/art/models.js';
   its back), `epitch=`; ship `smode=landed|hover|fly|pulse`, `gear=`, `canopy=`, `throttle=`,
   `sface=<deg>`; `cockpit=1` the view from the ship's seat (fov 62, near 0.12 m);
   `near=0` hides the near ground strokes
+- space: `cam=orbit&odist=<radii>` (how far out, default 2.6), `chase=1` (the ship ahead of
+  the camera, flying where it looks; `cdist=`, `cdown=`, `cside=`), `smode=pulse` (streaks),
+  `speed01=<0..1>` (the mood's speed); lightning: `wx=storm&sky=flash:1`
 - `window.__pcReady` once terrain and flora have settled and three frames are painted (and,
   with `physics=1`, once PHYSICS and its kits are loaded);
   `window.__pcVantage` the easel in use.
