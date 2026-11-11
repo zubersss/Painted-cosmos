@@ -1,0 +1,191 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "mare",
+   "name": "Silver Mare",
+   "alsoVista": "Silver Mare",
+   "settledSeconds": 7.3,
+   "tris": 232122,
+   "calls": 139,
+   "worldWorstMs": 48.5,
+   "physicsWorstMs": 6.6,
+   "stoodIn": "mare",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.1,
+    "biome": "mare",
+    "radius": 1417.7722730669068
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "highlands",
+   "name": "Bright Highlands",
+   "alsoVista": "Bright Highlands",
+   "settledSeconds": 9.1,
+   "tris": 316218,
+   "calls": 153,
+   "worldWorstMs": 40.2,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "highlands",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.7,
+    "biome": "highlands",
+    "radius": 1432.9449607545225
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "crater_fields",
+   "name": "Crater Fields",
+   "alsoVista": "Crater Fields",
+   "settledSeconds": 12.7,
+   "tris": 409850,
+   "calls": 180,
+   "worldWorstMs": 46.2,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "crater_fields",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 8,
+    "biome": "crater_fields",
+    "radius": 1443.624685416011
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "rilles",
+   "name": "Winding Rilles",
+   "alsoVista": "Winding Rilles",
+   "settledSeconds": 9.1,
+   "tris": 267146,
+   "calls": 140,
+   "worldWorstMs": 79.7,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "rilles",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.8,
+    "biome": "rilles",
+    "radius": 1437.284526037242
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "moon-mare-2",
+   "name": "Silver Mare II",
+   "alsoVista": null,
+   "settledSeconds": 0.5,
+   "tris": 309940,
+   "calls": 185,
+   "worldWorstMs": 79.7,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "mare",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.4,
+    "biome": "mare",
+    "radius": 1417.6667813340518
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "moon-crater_fields-2",
+   "name": "Crater Fields II",
+   "alsoVista": null,
+   "settledSeconds": 12,
+   "tris": 354810,
+   "calls": 177,
+   "worldWorstMs": 45.9,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "crater_fields",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.1,
+    "biome": "crater_fields",
+    "radius": 1453.2650220610924
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "moon-rilles-2",
+   "name": "Winding Rilles II",
+   "alsoVista": null,
+   "settledSeconds": 7.3,
+   "tris": 313172,
+   "calls": 169,
+   "worldWorstMs": 77.7,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "rilles",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.2,
+    "biome": "rilles",
+    "radius": 1447.7393066911968
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "moon-highlands-2",
+   "name": "Bright Highlands II",
+   "alsoVista": null,
+   "settledSeconds": 7,
+   "tris": 324842,
+   "calls": 176,
+   "worldWorstMs": 72.2,
+   "physicsWorstMs": 12.1,
+   "stoodIn": "highlands",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13,
+    "biome": "highlands",
+    "radius": 1425.5800403536518
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 2.1,
+   "tris": 271822,
+   "calls": 138,
+   "worldWorstMs": 72.2,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

@@ -220,7 +220,7 @@ async function writeSheet(body, frames) {
     // A browser that has painted a dozen frames in software GL sometimes refuses one more
     // capture: lay the sheet out in a fresh browser instead.
     log('  (the sheet could not be captured in the game\'s browser: ' + String(e && e.message).split('\n')[0] + '; using a fresh one)');
-    const alt = await openPage({ pagePath: '/.nojekyll', w: 1640, h: 200, root: opt.root });
+    const alt = await openPage({ pagePath: '/src/ui/theme.css', w: 1640, h: 200, root: opt.root });
     await alt.page.setContent(html);
     await alt.page.screenshot({ path: out, type: 'jpeg', quality: 80, fullPage: true });
     await alt.close();

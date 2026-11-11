@@ -1,0 +1,212 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "heart_glacier",
+   "name": "Pale Heart Glacier",
+   "alsoVista": "Pale Heart Glacier",
+   "settledSeconds": 47.6,
+   "tris": 243254,
+   "calls": 133,
+   "worldWorstMs": 156.9,
+   "physicsWorstMs": 7,
+   "stoodIn": "heart_glacier",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.6,
+    "biome": "heart_glacier",
+    "radius": 1615.2666342988168
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "lilac_mountains",
+   "name": "Lilac Mountains",
+   "alsoVista": null,
+   "settledSeconds": 9.4,
+   "tris": 275430,
+   "calls": 151,
+   "worldWorstMs": 156.9,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 18.5,
+    "biome": "lilac_mountains",
+    "radius": 1699.0793443310981
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "long_shadow_plain",
+   "name": "Long-Shadow Plain",
+   "alsoVista": "Long-Shadow Plain",
+   "settledSeconds": 22.1,
+   "tris": 271622,
+   "calls": 136,
+   "worldWorstMs": 85.4,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "long_shadow_plain",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 5.9,
+    "biome": "long_shadow_plain",
+    "radius": 1631.0883924618804
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "nitrogen_dunes",
+   "name": "Nitrogen Dunes",
+   "alsoVista": "Nitrogen Dunes",
+   "settledSeconds": 19.7,
+   "tris": 198582,
+   "calls": 113,
+   "worldWorstMs": 121.9,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "nitrogen_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.3,
+    "biome": "nitrogen_dunes",
+    "radius": 1642.2838329394567
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-lilac_mountains-1",
+   "name": "Lilac Mountains",
+   "alsoVista": null,
+   "settledSeconds": 0.2,
+   "tris": 317802,
+   "calls": 189,
+   "worldWorstMs": 121.9,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 9.4,
+    "biome": "lilac_mountains",
+    "radius": 1697.21208658061
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-lilac_mountains-2",
+   "name": "Lilac Mountains II",
+   "alsoVista": null,
+   "settledSeconds": 10.6,
+   "tris": 254762,
+   "calls": 185,
+   "worldWorstMs": 203.9,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13,
+    "biome": "lilac_mountains",
+    "radius": 1748.3857585102353
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-nitrogen_dunes-2",
+   "name": "Nitrogen Dunes II",
+   "alsoVista": null,
+   "settledSeconds": 15.2,
+   "tris": 187946,
+   "calls": 134,
+   "worldWorstMs": 203.9,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "nitrogen_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.9,
+    "biome": "nitrogen_dunes",
+    "radius": 1611.775143325188
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-long_shadow_plain-2",
+   "name": "Long-Shadow Plain II",
+   "alsoVista": null,
+   "settledSeconds": 13.6,
+   "tris": 279050,
+   "calls": 156,
+   "worldWorstMs": 144.8,
+   "physicsWorstMs": 30.8,
+   "stoodIn": "long_shadow_plain",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.8,
+    "biome": "long_shadow_plain",
+    "radius": 1642.5928849687548
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-heart_glacier-2",
+   "name": "Pale Heart Glacier II",
+   "alsoVista": null,
+   "settledSeconds": 16.4,
+   "tris": 223514,
+   "calls": 141,
+   "worldWorstMs": 151.4,
+   "physicsWorstMs": 37.2,
+   "stoodIn": "heart_glacier",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.2,
+    "biome": "heart_glacier",
+    "radius": 1613.4436454403638
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 2.9,
+   "tris": 143342,
+   "calls": 107,
+   "worldWorstMs": 151.4,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

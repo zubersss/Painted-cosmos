@@ -1,0 +1,254 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "storm_seas",
+   "name": "Ultramarine Storm Seas",
+   "alsoVista": null,
+   "settledSeconds": 15.6,
+   "tris": 352916,
+   "calls": 206,
+   "worldWorstMs": 104,
+   "physicsWorstMs": 12.8,
+   "stoodIn": "storm_seas",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 15.7,
+    "biome": "storm_seas",
+    "radius": 4200.40855522032
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "kelp_forests",
+   "name": "Blue-Violet Kelp Forests",
+   "alsoVista": null,
+   "settledSeconds": 26.3,
+   "tris": 359392,
+   "calls": 221,
+   "worldWorstMs": 298.1,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "kelp_forests",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 5.2,
+    "biome": "kelp_forests",
+    "radius": 4203.892077926712
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "ice_spires",
+   "name": "Wind-Carved Ice Spires",
+   "alsoVista": null,
+   "settledSeconds": 15.8,
+   "tris": 216964,
+   "calls": 130,
+   "worldWorstMs": 137,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "ice_spires",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.1,
+    "biome": "ice_spires",
+    "radius": 4213.171220009212
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "aurora_tundra",
+   "name": "Aurora Tundra",
+   "alsoVista": null,
+   "settledSeconds": 8.3,
+   "tris": 349084,
+   "calls": 254,
+   "worldWorstMs": 79.5,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "aurora_tundra",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.1,
+    "biome": "aurora_tundra",
+    "radius": 4214.920200662161
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-storm_seas-1",
+   "name": "Ultramarine Storm Seas",
+   "alsoVista": null,
+   "settledSeconds": 3,
+   "tris": 418260,
+   "calls": 260,
+   "worldWorstMs": 79.5,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "storm_seas",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13.8,
+    "biome": "storm_seas",
+    "radius": 4200.439990811611
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-kelp_forests-1",
+   "name": "Blue-Violet Kelp Forests",
+   "alsoVista": null,
+   "settledSeconds": 28.7,
+   "tris": 344948,
+   "calls": 195,
+   "worldWorstMs": 96.4,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "kelp_forests",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.5,
+    "biome": "kelp_forests",
+    "radius": 4220.291420739235
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-ice_spires-1",
+   "name": "Wind-Carved Ice Spires",
+   "alsoVista": null,
+   "settledSeconds": 2.5,
+   "tris": 219302,
+   "calls": 144,
+   "worldWorstMs": 126.5,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "ice_spires",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.9,
+    "biome": "ice_spires",
+    "radius": 4225.811505030568
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-aurora_tundra-1",
+   "name": "Aurora Tundra",
+   "alsoVista": null,
+   "settledSeconds": 11.9,
+   "tris": 381386,
+   "calls": 261,
+   "worldWorstMs": 126.5,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "aurora_tundra",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.6,
+    "biome": "aurora_tundra",
+    "radius": 4212.259402081517
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-aurora_tundra-2",
+   "name": "Aurora Tundra II",
+   "alsoVista": null,
+   "settledSeconds": 13.4,
+   "tris": 374110,
+   "calls": 260,
+   "worldWorstMs": 128.1,
+   "physicsWorstMs": 19.8,
+   "stoodIn": "aurora_tundra",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.1,
+    "biome": "aurora_tundra",
+    "radius": 4210.988503785712
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-ice_spires-2",
+   "name": "Wind-Carved Ice Spires II",
+   "alsoVista": null,
+   "settledSeconds": 13.3,
+   "tris": 247202,
+   "calls": 169,
+   "worldWorstMs": 98.2,
+   "physicsWorstMs": 39.8,
+   "stoodIn": "ice_spires",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.7,
+    "biome": "ice_spires",
+    "radius": 4221.8418091386075
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-storm_seas-2",
+   "name": "Ultramarine Storm Seas II",
+   "alsoVista": null,
+   "settledSeconds": 14.5,
+   "tris": 359260,
+   "calls": 233,
+   "worldWorstMs": 125.7,
+   "physicsWorstMs": 39.8,
+   "stoodIn": "storm_seas",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.6,
+    "biome": "storm_seas",
+    "radius": 4251.209865165657
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 2,
+   "tris": 71164,
+   "calls": 57,
+   "worldWorstMs": 125.7,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

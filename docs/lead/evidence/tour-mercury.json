@@ -1,0 +1,254 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "ochre_basins",
+   "name": "Cracked Ochre Basins",
+   "alsoVista": null,
+   "settledSeconds": 40.9,
+   "tris": 189782,
+   "calls": 100,
+   "worldWorstMs": 189.8,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "ochre_basins",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.1,
+    "biome": "ochre_basins",
+    "radius": 2248.825706910215
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "obsidian_fields",
+   "name": "Obsidian Glass Fields",
+   "alsoVista": null,
+   "settledSeconds": 22.1,
+   "tris": 339776,
+   "calls": 273,
+   "worldWorstMs": 189.8,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "obsidian_fields",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.7,
+    "biome": "obsidian_fields",
+    "radius": 2209.110524567415
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "crystal_gardens",
+   "name": "Twilight Crystal Gardens",
+   "alsoVista": null,
+   "settledSeconds": 5.8,
+   "tris": 344286,
+   "calls": 296,
+   "worldWorstMs": 184.3,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "crystal_gardens",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.4,
+    "biome": "crystal_gardens",
+    "radius": 2225.210312031389
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "shadow_craters",
+   "name": "Frozen Shadow Craters",
+   "alsoVista": null,
+   "settledSeconds": 1.1,
+   "tris": 244854,
+   "calls": 122,
+   "worldWorstMs": 152.5,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "shadow_craters",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 14.3,
+    "biome": "shadow_craters",
+    "radius": 2258.2886424463986
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-ochre_basins-1",
+   "name": "Cracked Ochre Basins",
+   "alsoVista": null,
+   "settledSeconds": 0.8,
+   "tris": 183062,
+   "calls": 103,
+   "worldWorstMs": 92.9,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "ochre_basins",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.1,
+    "biome": "ochre_basins",
+    "radius": 2254.216288818666
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-obsidian_fields-1",
+   "name": "Obsidian Glass Fields",
+   "alsoVista": null,
+   "settledSeconds": 10.3,
+   "tris": 336316,
+   "calls": 286,
+   "worldWorstMs": 41.9,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "obsidian_fields",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2,
+    "biome": "obsidian_fields",
+    "radius": 2211.9960475690136
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-crystal_gardens-1",
+   "name": "Twilight Crystal Gardens",
+   "alsoVista": null,
+   "settledSeconds": 10.6,
+   "tris": 376618,
+   "calls": 336,
+   "worldWorstMs": 89.8,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "crystal_gardens",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 10.1,
+    "biome": "crystal_gardens",
+    "radius": 2226.2081061382796
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-shadow_craters-1",
+   "name": "Frozen Shadow Craters",
+   "alsoVista": null,
+   "settledSeconds": 14.5,
+   "tris": 249268,
+   "calls": 150,
+   "worldWorstMs": 144,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "shadow_craters",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 34,
+    "biome": "shadow_craters",
+    "radius": 2251.8955785238163
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-shadow_craters-2",
+   "name": "Frozen Shadow Craters II",
+   "alsoVista": null,
+   "settledSeconds": 9.2,
+   "tris": 245970,
+   "calls": 156,
+   "worldWorstMs": 90.8,
+   "physicsWorstMs": 11.9,
+   "stoodIn": "shadow_craters",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 11.5,
+    "biome": "shadow_craters",
+    "radius": 2243.987006954601
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-crystal_gardens-2",
+   "name": "Twilight Crystal Gardens II",
+   "alsoVista": null,
+   "settledSeconds": 24.7,
+   "tris": 408532,
+   "calls": 365,
+   "worldWorstMs": 156.7,
+   "physicsWorstMs": 55.7,
+   "stoodIn": "crystal_gardens",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.4,
+    "biome": "crystal_gardens",
+    "radius": 2240.489163764111
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-ochre_basins-2",
+   "name": "Cracked Ochre Basins II",
+   "alsoVista": null,
+   "settledSeconds": 12.8,
+   "tris": 205098,
+   "calls": 133,
+   "worldWorstMs": 225,
+   "physicsWorstMs": 7.8,
+   "stoodIn": "ochre_basins",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 5,
+    "biome": "ochre_basins",
+    "radius": 2247.478067619079
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 4.4,
+   "tris": 51182,
+   "calls": 38,
+   "worldWorstMs": 225,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

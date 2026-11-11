@@ -1,0 +1,254 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "ice_shelves",
+   "name": "Mint Ice Shelves",
+   "alsoVista": null,
+   "settledSeconds": 25.2,
+   "tris": 252260,
+   "calls": 145,
+   "worldWorstMs": 103.6,
+   "physicsWorstMs": 7.5,
+   "stoodIn": "ice_shelves",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.7,
+    "biome": "ice_shelves",
+    "radius": 4260.12847711491
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "frozen_waves",
+   "name": "Frozen-Wave Forest",
+   "alsoVista": null,
+   "settledSeconds": 6.2,
+   "tris": 252778,
+   "calls": 165,
+   "worldWorstMs": 345.6,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "frozen_waves",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.2,
+    "biome": "frozen_waves",
+    "radius": 4226.660878567809
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "pearl_fog",
+   "name": "Pearl Fog Flats",
+   "alsoVista": null,
+   "settledSeconds": 1,
+   "tris": 281256,
+   "calls": 145,
+   "worldWorstMs": 345.6,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "pearl_fog",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.1,
+    "biome": "pearl_fog",
+    "radius": 4215.460719633618
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "teal_sinkholes",
+   "name": "Glowing Teal Sinkholes",
+   "alsoVista": null,
+   "settledSeconds": 0.9,
+   "tris": 375230,
+   "calls": 209,
+   "worldWorstMs": 93.1,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "teal_sinkholes",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 14.3,
+    "biome": "teal_sinkholes",
+    "radius": 4205.26652244651
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-ice_shelves-1",
+   "name": "Mint Ice Shelves",
+   "alsoVista": null,
+   "settledSeconds": 5.4,
+   "tris": 270502,
+   "calls": 171,
+   "worldWorstMs": 50.4,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "ice_shelves",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.8,
+    "biome": "ice_shelves",
+    "radius": 4289.525706631927
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-frozen_waves-1",
+   "name": "Frozen-Wave Forest",
+   "alsoVista": null,
+   "settledSeconds": 10.5,
+   "tris": 260970,
+   "calls": 156,
+   "worldWorstMs": 67.7,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "frozen_waves",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 7.4,
+    "biome": "frozen_waves",
+    "radius": 4234.874590544278
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-pearl_fog-1",
+   "name": "Pearl Fog Flats",
+   "alsoVista": null,
+   "settledSeconds": 8,
+   "tris": 262130,
+   "calls": 150,
+   "worldWorstMs": 86.7,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "pearl_fog",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.8,
+    "biome": "pearl_fog",
+    "radius": 4217.444147365454
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-teal_sinkholes-1",
+   "name": "Glowing Teal Sinkholes",
+   "alsoVista": null,
+   "settledSeconds": 6.4,
+   "tris": 375302,
+   "calls": 215,
+   "worldWorstMs": 53.2,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "teal_sinkholes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 26.5,
+    "biome": "teal_sinkholes",
+    "radius": 4201.854568677125
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-pearl_fog-2",
+   "name": "Pearl Fog Flats II",
+   "alsoVista": null,
+   "settledSeconds": 7.9,
+   "tris": 283722,
+   "calls": 156,
+   "worldWorstMs": 80.1,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "pearl_fog",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.9,
+    "biome": "pearl_fog",
+    "radius": 4218.2183609450485
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-frozen_waves-2",
+   "name": "Frozen-Wave Forest II",
+   "alsoVista": null,
+   "settledSeconds": 22.1,
+   "tris": 276230,
+   "calls": 181,
+   "worldWorstMs": 60.9,
+   "physicsWorstMs": 13.5,
+   "stoodIn": "frozen_waves",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 5,
+    "biome": "frozen_waves",
+    "radius": 4226.151945674935
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-teal_sinkholes-2",
+   "name": "Glowing Teal Sinkholes II",
+   "alsoVista": null,
+   "settledSeconds": 16.2,
+   "tris": 279056,
+   "calls": 174,
+   "worldWorstMs": 235.4,
+   "physicsWorstMs": 3.8,
+   "stoodIn": "teal_sinkholes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.4,
+    "biome": "teal_sinkholes",
+    "radius": 4224.404791604843
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 1.6,
+   "tris": 58464,
+   "calls": 46,
+   "worldWorstMs": 235.4,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}
