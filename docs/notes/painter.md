@@ -215,6 +215,8 @@ tested). `world.update` while arriving: see the answer to the lead below.
 - Foregrounds are bare on most worlds; explorer and ship are still toys and are in every
   game frame; no weather, no night or dusk pass on the new worlds (frames are at noon, the
   dunes at 16.2 h); Moon and Pluto untouched.
+- `jupiter-lightning_plains.jpg` was rendered just before crater rims were given rounded
+  crests (its pits changed by centimetres); not re-rendered.
 - The lead's review-3 SHOULD FIX 4 (Venus' towers) is not addressed.
 - `world.update` deliberately takes up to 30 % of the frame when the smoothed frame time is
   above 80 ms (software rendering): PILOT's read-out will show "world worst" of 100 to 300 ms
@@ -376,11 +378,11 @@ import { createExplorer, createShip } from './src/art/models.js';
 
 ## Tests
 
-`node --test src/world/*.test.mjs`: 18 tests: the 12 of M1 (noise, cube-sphere, biome coverage,
+`node --test src/world/*.test.mjs`: 19 tests: the 12 of M1 (noise, cube-sphere, biome coverage,
 `sampleSurface` purity, Earth spawn, liquid, vistas, patch edges, mesh and sample agreement,
 ceiling, flora determinism, obstacles), and new: every planet's arrival place is level and
 dry with room for the ship; `sampleSurface` under 0.05 ms a call on every body; every kept
-easel stands on dry ground of its own biome and is that biome's first vista; `world.busy`
+easel stands on dry ground of its own biome and is that biome's first vista; every vista is a place a walker can stand; `world.busy`
 reaches 0 at the spawn, after every change of body and in deep space; jobs of a body just left
 are dropped at once; the heaviest frame of an arrival fits the building slice.
 
