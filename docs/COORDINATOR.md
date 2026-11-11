@@ -669,3 +669,47 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   P3 and P4: Neptune's `storm_seas` storms most of the time, no dust in the forest air; (5)
   as capacity allows, the instanced kit path, flake crawl, the silhouette request; (6) a
   blunt critique of the other two domains for M4's swap.
+- 2026-11-11: **Lead review 5 addendum and PILOT's block (third agent, `e583f67`)**, measured
+  in the game on a clean export of `0de3fb4`. The coordinator re-ran PILOT's unit tests on a
+  clean export of the head (105 pass) and opened `weather-recheck.jpg`, `space-recheck.jpg`
+  and the four `ui-*.jpg` frames.
+  **One MUST FIX is open for M3 (PAINTER)**: the vista `earth-temperate_forest-1` is at 611 k
+  triangles / 339 draw calls at quality 1 (600 k / 350) and 304 k at quality 0 (300 k).
+  **Closed by the lead**: pepper in dark washes and space (storm sky, Neptune's sky, night,
+  space and pulse, looked at 1:1); the storm at the Earth spawn after dark (550 k / 300, was
+  606 k); PHYSICS P1 (storms bring wind: walked and flown in the browser with real keys:
+  3.5 to 4.0 m/s in every heading, a 2.5 s hop carried 4 m, the ship lands in 9 s).
+  `node tests/all.mjs --export` on `d149255`: all 13 steps pass in 33 minutes, no console
+  errors (unit 105, PHYSICS 222, PAINTER 19, the play-through 37 checks, the trip 47 checks).
+  In from PILOT: `tests/weather.mjs`, `tests/cost.mjs`, `tests/all.mjs`; the read-out's
+  `weather` line; a camera that slides into the explorer's eyes when the boom is squeezed
+  under 2.3 m; obstacles up to 1.3 m are walked over (`scrambleSample`; a boulder's `height`
+  in `sampleObstacles` decides), a suit wedged between two tall ones walks round one (Mars'
+  spawn 170 to 179 m in every heading, was 5 m in one); the UI theme's second pass with
+  PAINTER's six points (keys as wash dabs in pencil rings, brush-stroke buttons, dry-brush
+  orbits on the map, the picture stepping back to paper behind an open map or sketchbook);
+  the cockpit HUD moved so the dials show; boom 5.2 m; a stalled sink lands or says "Slow
+  down to land"; thin-air worlds fly at about 78 m/s under 60 m; wall-clock assertions only
+  with `PC_TIMING=1`; `R-WX-1` and `R-STORM-5` reworded; README complete; TRACK's "Done
+  means" line by line; a critique of both other domains in PILOT's notes.
+  Coordinator's look verdict: the menus are accepted (torn paper, hand lettering, nothing
+  reads as a web page). The lightning frame's white specks and the green flicks on the
+  snowfield are confirmed in the lead's sheet. Space reads as a wash but has no stars and a
+  border of hard dark dots.
+  **Not verified**: the tour has not been re-run since `ded1435` (before weather, models and
+  the near layer); nobody has flown to all eight planets in one browser sitting; nothing has
+  been judged in motion; the new UI frames are on stubs.
+  Additive: URL parameters `kits=0`, `weather=fair`; `__pc.setClock(t)`,
+  `__pc.info().weather`; `collideObstacles(st, list, r, { moving, dt })`;
+  `Sim.cameraSolids`, `boomRoom`, `footCam.tight01`; HUD root class `pc-cockpit`.
+- 2026-11-11: PHYSICS P8 so far (fifth agent, commits `d149255` to `de6ee88`, not yet
+  reported): boundary layer over rough ground (14 m/s at 2 m under 40 m/s at 60 m on the
+  boulder shore); the first storm crosses the Earth spawn at **160 to 320 s of play** (noon
+  to half past two; every Earth weather time is 480 s earlier than before); Neptune's storm
+  coast under a thunderstorm about 70 % of the time; no dust from wet ground; aerodynamic
+  damping so trees do not whip in a gust front.
+- 2026-11-11: the third PILOT agent is at its context limit and is replaced by a fourth.
+  **PILOT's order** (coordinator): (1) own items: the weather set on PHYSICS's new storm
+  times, all eight planets in one browser sitting, tests for the two new guards, the suit's
+  share of the wind, a word on screen when thin air limits the ship; (2) lead review 6 when
+  PAINTER and PHYSICS report (the MUST FIX, the tour, every check), which gates M3; (3) M4.
