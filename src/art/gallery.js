@@ -327,6 +327,7 @@ function placeModel(m, east, north, lift, face) {
 // body's): the feet and the hips by PHYSICS' own stride (gaitOf; the feet and the bob as its stepGait lays them, a
 // steady pace on level ground), so that the figure can be checked pose by pose as the game will pass it.
 const GAIT = P.has('gait') ? { v: num('gait', 4.2), g: P.has('grav') ? num('grav', 9) : BODIES[bodyId].gravity, s: P.has('stride') ? num('stride', 0) : 0, hold: P.has('stride') } : null;
+if (GAIT) window.__pcGait = GAIT;     // (a tool may set .s, .v, .g between frames: a strip from one load)
 function gaitPose(dt) {
   const T = EXPLORER_BODY, o = gaitOf(Math.max(0.12, GAIT.v), GAIT.g, T, {});
   if (!GAIT.hold && o.step > 0) GAIT.s = (GAIT.s + GAIT.v * dt / (2 * o.step)) % 1;

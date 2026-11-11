@@ -69,6 +69,29 @@ Block 5 and the earlier records follow; "Rules that bit me" of the earlier agent
   brush at full resolution. (5) The short list (two vistas in a thicket, Mars' dune crests,
   branch sway and drifts, the explorer's face, the UI look review).
 
+## M3 block 7: the picture holding in motion, and the weather (ninth and tenth PAINTER agents)
+
+The ninth agent was stopped by a usage limit mid-block; its record is the message of `b022507`
+("Block 7, part 1") and its unfinished files in the coordinator's backup `6b900e6`. The tenth
+agent verified it on clean exports and finished it. Everything below was rendered from a clean
+export (`tools/export-head.sh`) at the top tier (quality 2), 960 x 540, and **opened** unless
+it says otherwise.
+
+### Item 1: verifying block 7 part 1 (tenth agent)
+
+- **Walk** (`node tests/motion.mjs --only walk`, clean export of `20b6bb5`; sheet
+  `docs/shots/painter/motion-walk-after.jpg`, opened): mean change 3.10 % (3.60 before, lead's
+  `motion-walk.jpg`), 19 pop blocks in 12 of 47 pairs (13 in 9 before), **every one with
+  triangles +0**: no tree changed tier, appeared or doubled in the 48 frames. What the
+  instrument calls pops are the near birch trunk sliding past the eye (its bark marks do not
+  follow the block match) and a step puff at the boot. Verdict: **passes**; the near strokes
+  did not re-lay over the 6.65 m walked.
+- **Fill** (arrival 600 m east, 30 frames, `motion-fill-after.jpg`, opened): frame 0 is bare
+  paper, frame 29 (1 s) the picture half up out of the paper, pale, everything at once, sky a
+  touch ahead of the ground; **0 pops** (498 pop blocks in 29 of 29 pairs before); mean change
+  1.0 % a frame, spread evenly over the sheet (no tile, no stipple). The instrument's second is
+  shorter than the arrival; the whole of it is filmed below.
+
 ## M3 block 6: each world's idea in its first view, motion faults, orbit (eighth PAINTER agent)
 
 INTEGRATION: see the last lines of this section for what was run on a clean export.
