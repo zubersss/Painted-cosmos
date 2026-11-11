@@ -133,7 +133,39 @@ PAINTER, SHOULD FIX): in `earth-arrives` a far world shows as an orange-red dot 
 the storm cloud (top left: the dab for a world a few pixels across is not veiled by a
 closing sky); two green flecks lie on the blizzard's snow.
 
-**2. All eight planets in one browser sitting**: see "The grand tour" below.
+**2. All eight planets in one browser sitting** (`node tests/grandtour.mjs` on a clean export
+of `5e62268` (my commit with the wind share and the thin-air words); painted world, quality 0, render scale 0.5, 400x225,
+tier pinned; frames `docs/shots/pilot/grandtour.jpg`, opened; record
+`docs/lead/evidence/grandtour.json`). From the title card with real key and mouse events:
+click, walk (W), jetpack (Space, 1.6 s), walk to the ship, E, Space, climb to space, M and a
+click on the map, nose on the marker, F, ride the drive, come down, E on the prompt, E to step
+out, walk three seconds, a frame. **8 of 8 landed in one sitting: 31.6 minutes, 1659 s of
+play, no reload, no console error, no bump, every landing began on the first E.**
+
+| Leg | km | pulse s | top m/s | pulses | E presses | bumps | stood on | walked m | game s / wall s | barred |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| earth to mercury | 152 | 35.8 | 6946 | 1 | 1 | 0 | ochre_basins (walk), 17.7 h | 12.4 | 125 / 182 | - |
+| mercury to venus | 180 | 38.5 | 7492 | 1 | 1 | 0 | fungal_towers (idle), 17.2 h | 12.6 | 194 / 255 | - |
+| venus to mars | 350 | 59.5 | 10612 | 2 | 1 | 0 | dry_riverbeds (walk), 15.6 h | 12 | 204 / 245 | Venus ahead (345 km still to go) |
+| mars to jupiter | 395 | 60.8 | 11425 | 1 | 1 | 0 | storm_wall (idle), 15.4 h | 13 | 145 / 160 | - |
+| jupiter to saturn | 1078 | 104.6 | 19254 | 1 | 1 | 0 | honey_mist (idle), 12.8 h | 12.7 | 231 / 253 | - |
+| saturn to uranus | 1089 | 105.4 | 19377 | 1 | 1 | 0 | pearl_fog (idle), 16.8 h | 12.3 | 223 / 247 | - |
+| uranus to neptune | 1732 | 134.4 | 24580 | 1 | 1 | 0 | storm_seas (wade), 11.3 h | 8.1 | 245 / 278 | - |
+| neptune to earth | 790 | 88.4 | 16430 | 1 | 1 | 0 | desert_canyon (idle), 23.8 h | 13.3 | 187 / 234 | - |
+
+What stopped or could stop a player: (a) Venus to Mars: the pulse let go after three seconds
+saying "Venus ahead" (Mars lay through the arrival sphere of the world just left; the script
+then pulsed off to one side and aimed again, as a player would have to work out). The word
+is now "Venus is in the way: steer round it and pulse again" (the Sun too, which said
+nothing). No leg was refused at F ("Too close to X: turn away from it first" was never met
+in this run; it will be when the course lies more than about 105 degrees from straight up).
+(b) On Neptune the ship set down at the shore and the three seconds of walking went into the
+sea (wading, 8.1 m): fine, noted. (c) At 400 px wide the sketch slip runs off the right edge
+of the screen ("B opens the sketchbo"): to be looked at at real sizes with the UI frames.
+(d) The run's one failed check was the script's own (it wanted Mercury's orbit frame eight
+seconds after arrival; a small world's ground frame reaches that high): relaxed to accept
+either frame of the world, because both are the world's own. Not flown: the Moon and Pluto
+(`--bodies moon,pluto --from earth` flies them).
 
 **3. The two guards have tests** (`tests/guards.test.mjs`): sink held while flying on says
 "Slow down to land" within 6 s and lands once X has slowed the ship (kinematic and with
