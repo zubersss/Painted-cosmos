@@ -4,8 +4,8 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
-Written 2026-11-11 at the end of the M3 run, because this PILOT's working context is close to
-its limit. Everything below is true at the commit that contains this section.
+Kept current by the second PILOT agent (2026-11-11, the run after M3). Everything below is true
+at the commit that contains this section.
 
 **How to work here.** Read `docs/COORDINATOR.md` (sections A to G and the log in E), then this
 file, then `docs/lead/TRACK.md` and `docs/lead/REVIEW.md`. One shared branch (`cosmos`), one
@@ -13,110 +13,200 @@ working tree, three roles. Commit only with `tools/commit.sh pilot "msg"` (it pu
 edit `src/render`, `src/world`, `src/art`, `src/physics`, `gallery.html`, `physics-lab.html`,
 `tools/`, or the other roles' notes. Scratch files go in `/home/user/.pc-scratch/pilot/`.
 You are also the LEAD: `docs/lead/REFERENCES.md` (checks), `REVIEW.md` (dated reviews with
-evidence you ran yourself), `TRACK.md` (the path to done).
+evidence you ran yourself), `TRACK.md` (the path to done). Read long files by section, keep
+command output short: two PILOT agents' worth of context has gone into this role already.
 
 **The code in one paragraph.** `src/core/sim.js` is the whole game as pure logic (no three, no
 DOM): state machine (`state.js`), explorer (`src/player/explorer.js`), cameras
 (`src/player/camera.js`), ship (`src/ship/flight.js`), pulse (`src/ship/pulse.js`), frames and
-floating origin (`frames.js`), orbits (`orbits.js`), save (`save.js`). `src/core/game.js`
-presents it with three (places roots, models, camera; markers, HUD, audio, map, sketchbook).
-`src/core/providers.js` switches between my stubs (`src/core/stubs/`) and the real modules;
-`src/main.js` boots. Tests in `tests/` run the pure simulation in Node and the real page in
-headless Chromium; `window.__pc` is the debug door (`info()`, `teleport()`, `settle()`).
+floating origin (`frames.js`), orbits (`orbits.js`), save (`save.js`), the sketchbook's
+pictures (`sketches.js`). `src/core/game.js` presents it with three (places roots, models,
+camera; markers, HUD, audio, map, sketchbook, sketch capture). `src/core/providers.js`
+switches between my stubs (`src/core/stubs/`) and the real modules; `src/main.js` boots.
+`src/ui/` is the HUD (`hud.js`), the map, the sketchbook (`book.js`) and the look
+(`fallback.css`). `src/audio/audio.js` is all sound. Tests in `tests/` run the pure simulation
+in Node and the real page in headless Chromium; `window.__pc` is the debug door (`info()`,
+`teleport()`, `settle()`).
 
-**Every check** (run all of them before claiming anything):
-`node --test tests/*.test.mjs` (93), `node --test src/physics/`, `node --test src/world/*.test.mjs`,
+**Every check** (run all of them before claiming anything; numbers from this run are under
+"Ground truth"):
+`node --test tests/*.test.mjs` (98), `node --test src/physics/`, `node --test src/world/*.test.mjs`,
 `node tests/playthrough.mjs` (add `--query "stub=render,world,art&fresh=1"` for PHYSICS on,
-`--query "scale=0.5&quality=0&fresh=1" --root <clean export> --w 400 --h 225` for the painted
-world), `node tests/trip.mjs`, `node tests/m3check.mjs`, `node tests/lockcheck.mjs`,
-`node tests/tour.mjs --bodies <one body>` (one body per process). Test other roles' committed
-state with `tools/export-head.sh <dir>` and `--root <dir>`. Software GL paints the forest at
-about one frame a second: the scripts wait in game time, so slow is fine.
+`--query "scale=0.5&quality=0&fresh=1" --w 400 --h 225` run from a clean export for the painted
+world), `node tests/trip.mjs` (painted: `--query "scale=0.5&quality=0" --w 400 --h 225`; do
+NOT add `fresh=1`, the script does), `node tests/m3check.mjs`, `node tests/lockcheck.mjs`,
+`node tests/audiocheck.mjs` (the sound, measured), `node tests/tour.mjs --bodies <one body>`
+(one body per process; `--sheets <dir>` to keep trial sheets out of `docs/lead/evidence`).
+Test other roles' committed state from a clean export: `tools/export-head.sh <dir>`, then run
+the scripts inside `<dir>` (they serve the directory they live in). Software GL paints the
+forest at one to three frames a second: the scripts wait in game time, so slow is fine, but
+two browser runs at once on this machine make each other flaky.
 
 **Unfinished, and where each item starts.**
-1. *Review 4* (lead), when the fresh PAINTER reports its M2 second pass: re-run
-   `node --test tests/contract.test.mjs` (40 landings, the real-world trip, terrain ceiling),
-   re-measure cost per body (` key read-out; the probe is described in REVIEW 3), run the tour
-   and judge every sheet against the art bible at 960x540, look again at the dark specks in
-   space (`docs/shots/pilot/m2-pulse.jpg`), decide whether `R-WX-1` stands for snow squalls.
-   M2 as a whole closes when review 4 has no MUST FIX.
-2. *Painted markers*: when PAINTER ships `painter.setMarks`, send it `this._marks` from
-   `Game.updateMarks` and drop the DOM rings in `src/ui/hud.js` (`setMarks`).
-3. *Painted UI theme*: when `src/art/ui.css` exists, set `REAL_READY.ui = true` in
-   `src/core/providers.js` and link it from `index.html` instead of `src/ui/fallback.css`.
-4. *Touchdown on the legs*: the landing assist still sets the hull on the floor and then hands
-   it to the gear (`stepLanding` in `flight.js`, `Sim.stepParked`). PHYSICS' guide (its notes,
-   "For PILOT", step 5) has the last-metre recipe.
-5. *Audio has never been heard* by anyone. `src/audio/audio.js`; levels are guesses. Rain
-   could follow `physics.here.sky.rain` and quieten under PHYSICS' shelter field.
-6. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
+1. *Review 4* (lead), when the coordinator says PAINTER has reported: what to measure is
+   written at the top of `docs/lead/REVIEW.md` ("Review 4: what will be measured"). The tour
+   is ready for it. M2 as a whole closes when review 4 has no MUST FIX.
+2. *The painted UI theme is PILOT's now* (coordinator ruling, 2026-11-11): art-bible rule 8,
+   built under `src/ui/**`, all in code: torn paper panels with grain, ink-and-wash icons,
+   hand-lettered type (a stroke font, not a system italic), painted planet markers, a painted
+   cursor and loading state, the sketchbook pages. Legible on paper and on indigo; no shimmer.
+   Colours from `src/data/looks.js`. Evidence frames go in `docs/shots/pilot/`; PAINTER reviews
+   the look in its notes and I change what it asks. State of it: see "Status".
+3. *Touchdown on the legs*: the landing assist still sets the hull on the floor and then hands
+   it to the gear (`stepLanding` in `flight.js`, `Sim.stepParked`). The complete recipe is in
+   `docs/notes/physics.md` ("Open on your side"). Plan: in `Sim.step` (LANDING), when
+   `stepLanding` reports the hull about 1 m up over a dry site, switch to
+   `physics.ship.gear(sh, { lift01: 1, hold: up * -0.6 })` until `sh.phys.contacts > 0`, then
+   dispatch touchdown with `sh.lift01 = 1` (`stepParked` already fades it over 1.5 s). Afloat
+   and without PHYSICS keep today's path. Re-run `tests/contract.test.mjs` (40 landings).
+4. *Gamepad* ("if cheap" in the brief): not started. Plan: a pure `src/core/gamepad.js` that
+   turns `navigator.getGamepads()[0]` into the same axes, held keys and edges `Input` already
+   gives (left stick WASD, right stick look, A Space, B C, X E, Y V, LB X, RB F, triggers
+   throttle in the ship and run on foot, Back M, Start H, d-pad up B), polled in `Input.take`.
+5. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
    `planSpeedChange` once the painted pulse effect exists to judge it against.
-7. *M4*: critique swap, every check, one pull request `cosmos` -> `main` through the REST API
+6. *M4*: critique swap, every check, one pull request `cosmos` -> `main` through the REST API
    (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), then GitHub Pages from
-   `main`. `index.html` uses only relative URLs; keep it so.
-8. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner),
-   pointer lock with a real hand (the fallback is proven by `tests/lockcheck.mjs`).
+   `main`. `index.html` uses only relative URLs; keep it so. Not before the coordinator says.
+7. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner),
+   pointer lock with a real hand (the fallback is proven by `tests/lockcheck.mjs`), and how
+   the sound actually sounds (it is measured, not heard).
 
 ## Status
 
-**M3 (Pilot's half): in place** (sketchbook and vistas, audio, title and help, HUD legibility,
-careful starting tier, the tour script); M2 is accepted (coordinator); review 4 waits for the
-fresh PAINTER's report. I am also the LEAD DEVELOPER: `docs/lead/REFERENCES.md`, `REVIEW.md`,
-`TRACK.md`.
+**This run (second PILOT agent): ground truth re-established; the coordinator's four review
+items answered; the painted UI theme taken over.** M1 met. M2: my half accepted, the whole
+open until review 4. M3: my half in place and extended (below). I am also the LEAD DEVELOPER:
+`docs/lead/REFERENCES.md`, `REVIEW.md`, `TRACK.md`.
 
-What M3 added:
-- **Vistas and the sketchbook.** Walking within 14 m of a vista's spot on foot finds it: a line
-  on screen, a three-note chime, `world.setVistaFound(body, id, true)`, and an immediate save.
-  B opens the sketchbook (`src/ui/book.js`): each world, the landscapes walked (biome ids and
-  how many of the world's total), the views found, and where the nearest unfound view is.
-- **Audio** (`src/audio/audio.js`, WebAudio, no files): a wind bed that follows
-  `physics.here.air` (speed and gusts) and fades to silence in space and on airless bodies;
-  rain by `weather.precipitation.intensity01`; thunder when `lightning.thunderIn` reaches
-  zero; the ship (two oscillators that follow thrust, a whine for the pulse, air over the hull
-  by speed); the jetpack; footsteps on the stride; a pad per planet that breathes in and out
-  over about 100 s; paper and brush sounds for panels and prompts. It starts on the first
-  click or key (browsers require that) and every gain moves on a ramp. `?audio=0` is silence.
-- **Title and help.** The start card is the title ("a watercolour to walk into", or "your
-  journey continues on Mars" after a save); H shows it again as the help card.
-- **HUD legibility** (coordinator's item 2): read-outs, gauges, notices and marker labels sit
-  on slips of paper (ink on paper reads over any wash, light or indigo); the prompt has an
-  ink edge. Still the fallback look; PAINTER's theme replaces it.
-- **Looking around** (item 5): until the player has looked once, and again whenever the mouse
-  capture is lost, a line at the top says how ("click the picture..." or "hold the left mouse
-  button and drag to look around").
-- **Weak GPUs** (item 4): the game starts at quality 1 and render scale 0.75 and climbs; it
-  never starts high and falls. README says so next to the read-out key.
-- **The tour** (item 1): `node tests/tour.mjs` stands in every biome of every body in the
-  integrated game at 960x540 and quality 1 and writes `docs/lead/evidence/tour-<body>.jpg`.
+### Ground truth (every check, run by me on clean exports; 2026-11-11)
+
+| Check | Tree | Result |
+| --- | --- | --- |
+| `node --test tests/*.test.mjs` | export of `e17a917` | 93 pass (98 now, with the sketch store's five) |
+| `node --test src/physics/` | same | 190 pass |
+| `node --test src/world/*.test.mjs` | same | 17 pass |
+| `node tests/playthrough.mjs` (stubs, kinematic) | same | PASSED, 37 checks |
+| the same with PHYSICS (`stub=render,world,art&fresh=1`) | same | PASSED, 37 checks |
+| the same in the painted world (400x225, `scale=0.5&quality=0`) | same | PASSED, 37 checks, no console errors |
+| `node tests/trip.mjs` (stub visuals, PHYSICS) | same | PASSED, 47 checks (Earth, Mars, Saturn, reload from the save) |
+| the trip in the painted world (400x225) | same | 45 of 47: Earth to Mars to Saturn flown, landed and walked (460 km in 68 s, 888 km in 95.2 s; `honey_mist`), autosave written. The two failures were mine: I passed `fresh=1` in the query, so the reload at the end forgot the save. The script now strips it. |
+| the painted trip again | export of `a46647f` | FAILED on Saturn: E was pressed as the prompt went out over rough ground (two frames a second, two browsers running), nothing happened, and the script flew on. Not a landing fault (see the survey below), but a real paper cut: fixed in the game (the prompt has hysteresis, E without it says why) and in the script (it presses E like a player, again if needed). Not yet re-run after the fix. |
+| `node tests/m3check.mjs` | export of `e17a917`; working tree after the sketchbook | PASSED, 17 checks; 26 checks now |
+| `node tests/lockcheck.mjs` | export of `e17a917` | PASSED, 7 checks |
+| `node tests/audiocheck.mjs` | working tree | PASSED (table under "Audio, measured") |
+| landing survey (scratch `run2/landsurvey.mjs`: 24 spots a body, PHYSICS on, PAINTER's committed world) | export of `a46647f` | 235 of 240 land from a 55 m hover (3 "too steep" on alpine and lilac mountains, 2 "no level ground" at a crater and a storm wall, all said on screen); median 6.2 s, touchdown 1.12 m/s |
+| `node tests/tour.mjs --bodies earth` (painted, 960x540, quality 1) | export of `a46647f` | every biome frame NOT SETTLED after 90 s (`world.busy` 267 to 412; `world.update` worst 56 to 84 ms on a loaded machine). PAINTER's `world.busy` fix is not in its committed state yet: for review 4. |
+
+### What this run added (answers to the coordinator's review of my domain)
+
+- **The tour stands where the game sends the player** (`tests/tour.mjs`). For every body:
+  each biome on dry, gentle ground of that biome (the world's own place for it, checked
+  against `sampleSurface`, moved to the nearest standable spot within 400 m if it is not one,
+  and the sheet says so); each vista of `world.getVistas` on its own spot, facing the
+  painter's yaw and pitch when the world gives them (a vista that is the same place and
+  heading as a biome frame shares the frame); one frame from orbit. Every frame waits for
+  `world.busy === 0` for ten frames in a row (limit `--settle`, default 120 s); the sheet's
+  header and each caption say in capitals when a frame did NOT settle, when the explorer is
+  standing in liquid, when a vista is on a slope or was not counted as found, and each
+  caption carries triangles, draw calls and the worst `world.update` of the last 90 frames.
+  A `.json` with the same numbers lies beside each sheet. `Sim.teleport` takes `heading`,
+  `lookPitch`, `firstPerson`; the read-out and `info().stats` carry `world.update`'s worst
+  frame. Verified on the stub (5 frames, sheet read) and on the painted Earth (running).
+- **The sketchbook is a sketchbook.** When a landscape is first walked (2.5 s in, once the
+  world has settled) or a view is found, the frame that has just been painted is kept as a
+  192x108 JPEG (`Game.captureSketch`, read from the canvas right after `painter.render`).
+  It appears at once on a slip of paper at the top right with its name and "page 7 of 124",
+  with a pencil sound; B opens the book at the world you are on: a tab per world with its
+  count, a page with a sketch for every landscape walked and view found and an empty dashed
+  frame, named, for each one still to find; arrow keys turn the pages. Pictures live beside
+  the save in their own key (`painted-cosmos.sketches`, `src/core/sketches.js`), so a full
+  storage can cost a picture but never the player's place: 16 000 characters at most each,
+  1.5 M in all (about 1 MB when all 124 pages are drawn), oldest dropped first, every storage
+  call inside try/catch, `?fresh=1` clears them, `?save=0` keeps them in memory. A page with
+  no picture (an older save, a full storage) is drawn the next time the explorer stands
+  there. Verified: `tests/sketches.test.mjs` (5), `m3check` (sketch is 192x108 with real
+  variation, shown, stored, in the book, kept across a reload).
+- **The title card** is the loading screen now: the card sits on the bare sheet from the first
+  moment with "preparing the paper..." as its own status line, which becomes "click to begin";
+  ink on nearly opaque paper; fitted to the window by its measured size. Verified by frames
+  at 960x540 (loading) and 640x360 (ready). Nothing overlaps.
+- **Audio, measured** (`tests/audiocheck.mjs`): see the table below. What the numbers found
+  and what changed: footsteps were 20 dB under the bed (inaudible); the parked ship hummed
+  louder than a calm morning; 88 % of the ship's energy was under 120 Hz (small speakers
+  would carry none of it); the jetpack was quieter than a breeze; the pad peaked at -49 dBFS;
+  noise loops had a half-second dip every 5 to 7 s. All retuned; loops are seamless
+  (equal-power cross-fade, 11 and 17 s); nothing clips, no DC, no clicks, peak -5.3 dBFS.
+- **Rain follows PHYSICS**: `sky.rain` (liquid only; snow is silent), brighter in a wood
+  (`cover.canopy01`), far off with the hull drumming when standing under the ship or sitting
+  in it, drips while the wood drains (`particles.system.dripping`), thunder on the
+  count-down crossing zero at `thunder01`'s loudness, footsteps by `st.phys.material`.
+- **Landing**: the prompt keeps 15 m and 10 m/s of hysteresis so it does not flicker over
+  rough ground; E without the prompt says "Come down below 90 m to land" or "Slow down to
+  land" instead of nothing.
+
+### Audio, measured (OfflineAudioContext through the game's graph; 44.1 kHz; last 8 s)
+
+| situation | peak dBFS | RMS dBFS | note |
+| --- | --- | --- | --- |
+| calm morning on foot | -26.3 | -38.6 | the bed |
+| wind 12 m/s, gusting | -12.5 | -26.1 | |
+| gale 22 m/s | -8.4 | -21.3 | |
+| heavy rain, open ground | -7.3 | -19.9 | level steady within 0.9 dB (no loop dip) |
+| heavy rain in a wood | -10.5 | -23.0 | brighter (centroid 5.4 kHz against 1.9) |
+| heavy rain, under the hull | -12.6 | -25.6 | 5.7 dB quieter, lower (1.2 kHz) |
+| the wood dripping | -19.7 | -37.5 | drips 6.6 dB over the bed's peaks |
+| thunderstorm | -5.4 | -18.5 | thunder at 8 s |
+| walking (grass, rock, snow) | -19 to -21 | -37 | steps 5 to 9 dB over the bed's peaks |
+| jetpack | -12.2 | -24.5 | |
+| ship parked | -29.2 | -40.9 | was -31 |
+| ship, full throttle | -9.6 | -20.5 | 23 % under 120 Hz (was 64 %) |
+| ship in space | -11.5 | -21.8 | |
+| pulse drive | -8.0 | -17.8 | |
+| the Moon, standing | silent | silent | no air, no sound |
+| the pad at its fullest | -21.4 | -30.4 | was -49 |
+| interface sounds | -18.6 | | paper, brush, found, land, bounce |
+| everything at once | -5.3 | -16.9 | under the -3 dBFS limit of R-AUD-3 |
+
+No clipped samples, DC under 6e-5, largest sample step within 3.8 x the 99.9th percentile
+(no clicks) in every situation, including hard cuts between situations. Every gain change is
+`setTargetAtTime` or a ramp from zero (read in the code and measured). Not verified: how it
+sounds to an ear. The levels are now defensible; whether the timbres please is still unknown.
+
+What M3 added earlier (first PILOT agent):
+- **Vistas**: walking within 14 m of a vista's spot on foot finds it: a line on screen, a
+  three-note chime, `world.setVistaFound(body, id, true)`, and an immediate save.
+- **Audio** (`src/audio/audio.js`, WebAudio, no files): wind bed from `physics.here.air`,
+  rain, thunder, the ship, the jetpack, footsteps, a pad per planet that breathes over about
+  100 s, paper and brush sounds. Starts on the first click or key. `?audio=0` is silence.
+- **Help**: H shows the title card again as the help card.
+- **HUD legibility**: read-outs, gauges, notices and marker labels on slips of paper.
+- **Looking around**: until the player has looked once, a line at the top says how.
+- **Weak GPUs**: the game starts at quality 1 and render scale 0.75 and climbs.
 
 What M2 added:
 - **Pulse drive** (`src/ship/pulse.js`): F in space. Accelerates at 400 m/s2 along the nose,
   brakes by itself, and lets go at cruise speed on the "arrival sphere" of whatever is ahead
   (centre distance = radius + max(3 x spaceAltitude, 1.2 x radius): the planet then spans about
   55 degrees). It will not enter any body's sphere or the sun's, refuses to start toward the
-  planet you are orbiting ("Too close to Earth: turn away from it first"), and draws the nose
-  onto the chosen target at 0.6 rad/s. Earth to Mars (461 km): 68 s, peak 12.6 km/s. Mars to
-  Saturn (887 km): 96 s, peak 17.5 km/s.
+  planet you are orbiting, and draws the nose onto the chosen target at 0.6 rad/s. Earth to
+  Mars (461 km): 68 s, peak 12.6 km/s. Mars to Saturn (887 km): 96 s, peak 17.5 km/s.
 - **Targets and markers**: the body nearest the nose (within 15 degrees) becomes the target; a
   target chosen on the map stays chosen. In flight each world is ringed where it is in the sky;
   the target shows name, distance and pulse time, or an arrow at the edge when off screen.
-- **Planet map** (`src/ui/map.js`, M): a small ink-and-wash chart; click a world or use the
-  arrow keys to set a course. A plain fallback look until the painted theme exists.
+- **Planet map** (`src/ui/map.js`, M): click a world or use the arrow keys to set a course.
 - **Save** (`src/core/save.js`): localStorage, every access inside try/catch. Written on
-  touchdown, on stepping out and every 20 s on foot (never in the air, never in flight);
-  restores the clock, each body's spin, explorer, ship, view, target and the sketchbook's
-  visited bodies and biomes. `?fresh=1` forgets it, `?save=0` never writes.
+  touchdown, on stepping out and every 20 s on foot (never in the air, never in flight).
+  `?fresh=1` forgets it, `?save=0` never writes.
 - **PHYSICS wired in** (COORDINATOR C14, PHYSICS' guide): see Decisions 10.
 - **Trees**: solid for the explorer and the camera boom; landing sites keep 6 m clear of them;
-  the flying ship rides above the canopy (`canopyHeight` from `sampleSurface`, plus obstacle
-  heights as tents where a world has no canopy field).
-- **Pointer-lock fallback**: if the lock is refused, or the deltas under it are nonsense
-  (window-sized jumps that undo themselves, lone jumps with stillness after, spikes), the game
-  drops the lock, says "hold the left button and drag to look" on screen, and carries on.
+  the flying ship rides above the canopy.
+- **Pointer-lock fallback**: if the lock is refused or reports nonsense, the game drops the
+  lock, says "hold the left button and drag to look" on screen, and carries on.
 - **Frame read-out**: the ` key or `?stats=1`: frame ms, worst recent frame, fps, triangles,
-  draw calls, render scale, quality tier, `world.update` ms, `physics.update` ms. In the README.
+  draw calls, render scale, quality tier, `world.update` ms (and its worst), `physics.update`.
 
-### Verified (how)
+### Verified (how), first PILOT agent's record
 M3 (latest first):
 - `node --test tests/*.test.mjs`: 93 pass (adds: a vista found once, listed in the sketchbook
   and restored from a save).
@@ -366,19 +456,19 @@ Open, most important first:
    wall as a wall, but an explorer wading into one is in trouble.
 6. **When landforms change, spawns may move**: `getSpawn(body)` must stay dry, with a slope
    under 20 degrees and room for a 9 m ship 16 m away (also checked by the contract test).
+7a. **Vistas, yaw and pitch**: seen in your working tree and used already: the tour faces
+    `yaw` (from local north toward east) and `pitch` of a vista or of `findBiome`'s easel when
+    they are there. Thank you; keep them.
 7. **Vistas**: I find one when the explorer is within 14 m of `unitDir` on foot. Put them where
    a walker can stand (not on a cliff face or under liquid), and paint the marker so it can be
    seen from about 100 m. `setVistaFound(body, id, true)` is called at once and again after a
    load.
-8. **Markers**: `painter.setMarks(list)` for M3, as you proposed: I will send
-   `[{ id, x, y, r, label, sub, kind: 'target' | 'body' | 'edge', angle }]` in CSS pixels each
-   frame and remove my DOM rings.
+8. (Withdrawn: painted markers are PILOT's now, by the coordinator's ruling of 2026-11-11.)
 9. **Pulse**: in PULSE `setMood.speed01` is 1 and the ship's `animate` mode is `'pulse'`:
    streak and soften the far washes.
-10. **The ui theme** (`src/art/ui.css`) and the text helper. Class names in use: `pc-hud`,
-    `pc-panel`, `pc-button`, `pc-title`, `pc-label`, plus mine: `pc-prompt`, `pc-gauge`,
-    `pc-readout`, `pc-reticle`, `pc-start`, `pc-help`, `pc-notice`, `pc-hint`, `pc-marks`,
-    `pc-mark` (`-target`, `-body`, `-edge`), `pc-stats`, `pc-map`, `pc-book`, state `pc-on`.
+10. (Withdrawn, same ruling: the painted UI theme is built under `src/ui/`.) In its place:
+    **please review the theme's look** from the frames in `docs/shots/pilot/ui-*.jpg` and say
+    in your notes what to change; look is your call and I change what you ask.
 11. **Real models**: the cockpit view puts the camera at `userData.seat` looking along -Z with
     a 0.12 m near plane; `animate` receives explorer `{ mode: 'idle'|'walk'|'jet'|'fall'|'wade',
     speed, jet01, lookPitch }` (the "walk" is a 4.2 m/s jog) and ship `{ mode: 'landed'|'hover'|

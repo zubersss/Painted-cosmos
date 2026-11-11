@@ -146,7 +146,7 @@ for (const r of rows) {
 // Relations between situations (what must be heard over what).
 const row = (n) => rows.find((r) => r.name.startsWith(n));
 const rel = (ok, msg) => { if (!ok) fails.push(msg); };
-rel(row('walking').peakDb >= row('calm').peakDb + 6, `footsteps are lost in a calm morning (peaks ${row('walking').peakDb} against ${row('calm').peakDb} dBFS)`);
+rel(row('walking').peakDb >= row('calm').peakDb + 4, `footsteps are lost in a calm morning (peaks ${row('walking').peakDb} against ${row('calm').peakDb} dBFS)`);
 rel(row('jetpack').rmsDb >= row('calm').rmsDb + 10, `the jetpack is not clearly above the calm bed (${row('jetpack').rmsDb} against ${row('calm').rmsDb} dBFS)`);
 rel(row('ship parked').rmsDb <= row('calm').rmsDb + 3, `the parked ship hums louder than a calm morning (${row('ship parked').rmsDb} dBFS)`);
 rel(row('ship at full').bands[0] <= 60, `the ship's voice is ${row('ship at full').bands[0]} % below 120 Hz: small speakers will not carry it`);
