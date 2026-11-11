@@ -1006,3 +1006,45 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   top tier for the spawn and first vista of each body; the motion set), M3 closes, M4's
   critique swap fixes the worst of what review 6 finds, and PILOT opens and merges the one
   pull request.
+- 2026-11-11: **PHYSICS P11 accepted (eighth agent, head `6d588d6`; `2c6b25b`, `05856b9`)**.
+  The coordinator re-ran on a clean export of the head: `node --test src/physics/` 245 of
+  246 in the full run at a load of 13 (the known frame-budget timing test in
+  `loose.test.mjs`; its file alone passes 20 of 20, twice); `node --test tests/*.test.mjs`
+  115 pass; and opened the strips of grass in the storm and of the jump.
+  **A filmstrip tool**: `node src/physics/three/film.mjs <subject>|all|list [--root <export>]
+  [--out dir] [--quality 2]`: the painted lab with the game's kits, the clock stepped at a
+  fixed rate, one sheet and one JSON of numbers per subject; 21 subjects defined, 15 strips
+  stored in `docs/shots/physics/motion-*.jpg`.
+  **Seen and fixed**: grass in a breeze was frozen (0.01 degrees in 0.8 s) and in a storm the
+  whole meadow leaned as one sheet: blades now flutter on three trains of small eddies
+  carried by the wind (2 to 7 degrees in a breeze; neighbours a metre apart at 58, 50 and
+  30 to 45 degrees in the storm); trunks stood pinned at their limit in the storm: now as
+  stiff as measured trees (3 degrees at 8 m/s, 12 at 20); a jump landed on straight legs and
+  lost half its forward speed: the legs now fold 0.31 m and straighten in half a second and
+  the speed is kept. Rain stays in the world when the camera turns; the blizzard's bands and
+  skim are right.
+  **The gust pattern against masts**: the earlier suspicion (twice too sharp) is refuted; at
+  equal intensity the model was 0.6 of Kaimal's spectrum at one second, with a quarter too
+  much variance at 15 to 60 s and clipped gust tops. Now four octaves: turbulence intensity
+  0.173 to 0.179 (target 0.172), gust factor 1.37 to 1.44 (masts 1.4 to 1.6), shares by
+  period within 0.07 of Kaimal from ten minutes to one second.
+  `physics.update` medians at quality 2: 1.02 to 2.21 ms on the loaded machine.
+  Behaviour changed without a call changing: `physics.air()` at a point changes up to three
+  times as fast; trunks lean a third as far; grass near the eye flutters; a landing no
+  longer brakes the walker and `st.phys.hip` runs negative for half a second after one;
+  `uPhysWave.z`, `.w`, `uPhysWavePhase.w` are flutter phases.
+  **Not seen or not done**: spray in a picture; a clamber; waves on a shore; seven of the
+  fifteen strips judged from numbers only (tree after the fix, run, jetpack, the three ship
+  strips, dust, leaves); the gust front not re-filmed. **Faults found, open**: the ship's
+  descent stalls for a second between 1.3 and 1.0 m; the wind at the focus steps 0.4 m/s
+  when the near field re-anchors; particles near a wood ride a wind 2 to 3 m/s faster than
+  `physics.air` at their height; the wind's direction never wobbles; on Neptune's storm
+  coast (yaw 236 from the `storm_seas` stand, 34 to 42 s) a pale rectangle with straight
+  edges stands in the sky, the sea does not visibly heave at 2.77 m, the foam rim is frozen
+  (PAINTER's); the run reaches 6.1 m/s where 7.4 is asked (PILOT's to judge).
+  The eighth PHYSICS agent is out of context and is replaced by a ninth.
+- 2026-11-11: **PHYSICS's order for P12, the last stage before review 6** (coordinator):
+  (1) the four open faults (descent stall, re-anchor step, particles' wind near a wood,
+  cross-wind turbulence); (2) the strips not yet opened, opened and judged, and the three
+  subjects never seen (a clamber, waves on a shore, spray); (3) why Neptune's sea does not
+  heave in the picture, with PAINTER told exactly what to change.
