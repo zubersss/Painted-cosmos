@@ -126,6 +126,8 @@ export const PHYS = {
   uPhysWindMap: { value: new THREE.Vector4(0, 0, 1, 2) }, uPhysNearMap: { value: new THREE.Vector4(0, 0, 1, 2) },
   uPhysWave: { value: new THREE.Vector4(1, 0, 0.1, 0) }, uPhysWavePhase: { value: new THREE.Vector4() },
   uPhysShape: { value: new THREE.Vector4(1, 1, 1, 1) }, uPhysOn: { value: 0 },
+  // (branches: PHYSICS' four oscillators and their gains; they were never copied, so no branch moved)
+  uPhysBranchPhase: { value: new THREE.Vector4() }, uPhysBranch: { value: new THREE.Vector4(0, 0, 0, 0.3) },
 };
 let _physV = -1, _physP = -1, _physF = null;
 export function syncPhysFlora(F) {

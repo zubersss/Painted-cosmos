@@ -81,8 +81,9 @@ const SHAPES = {
   spume: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || vPcUv.y > 0.5 || length(vView) < 1.6) discard; vec3 c = mix(ink, vec3(0.995, 0.995, 0.985), 0.88); float w = 0.05; float ga = (1.0 - tpr * tpr) * (1.0 - smoothstep(0.22, 0.5, vPcUv.y)) * smoothstep(0.0, 0.06, vPcUv.y) * 0.94;',
   // a leaf in the wind: a lens with pointed ends on the thin quad the kit lays (a line when it is
   // edge-on); laid as a glaze after the brush pass, so a mark two pixels wide is not brushed away
-  // (two tones: half the leaves dark, to be seen against the sky and the meadow, half pale ochre, against the wood)
-  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; float ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; float lt = step(0.5, fract(vPcData.x * 7.31)); vec3 c = mix(pcDensity(ink, 1.5 + 0.4 * vPcData.x), mix(ink, vec3(0.97, 0.86, 0.52), 0.6), lt); float w = 0.4;',
+  // (two tones: half the leaves dark, to be seen against the sky and the meadow, half pale ochre, against the
+  // wood; a leaf that turns over shows the other: it flickers as it tumbles)
+  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; float ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; float lt = abs(step(0.5, fract(vPcData.x * 7.31)) - (gl_FrontFacing ? 0.0 : 1.0)); vec3 c = mix(pcDensity(ink, 1.5 + 0.4 * vPcData.x), mix(ink, vec3(0.97, 0.86, 0.52), 0.6), lt); float w = 0.4;',
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
   // (a glaze: a soft pale arc of paper colour, broken where the brush lifted, never a white wire)

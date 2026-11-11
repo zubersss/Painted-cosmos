@@ -621,7 +621,13 @@ void main() {
       #else
         vec2 bend = pcPhysBendLite(rootB, uStiff);
       #endif
-      wp = io + pcPhysDisplace(wp - io, normalize(rootB), uPlantHeight * length(im[1].xyz), bend);
+      vec3 relP = wp - io, upP = normalize(rootB);
+      float Hp = uPlantHeight * length(im[1].xyz);
+      #ifdef PC_PHYS_BRANCH
+        // (a crown does not sway as one piece: PHYSICS' branch lobes, nothing moving at the trunk)
+        relP += pcPhysBranch(relP, upP, Hp, rootB, vec4(bend, 0.0, 0.0));
+      #endif
+      wp = io + pcPhysDisplace(relP, upP, Hp, bend);
       #endif
     }
     wp = io + (wp - io) * vis;
@@ -860,6 +866,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     defines.PC_PHYS = 1;
     if (opts.phys === 'full') defines.PC_PHYS_FULL = 1;
     if (opts.bladeRoot) defines.PC_BLADE_ROOT = 1;
+    if (opts.branch) defines.PC_PHYS_BRANCH = 1;
     Object.assign(own, PHYS, { uStiff: { value: opts.stiff || 0 }, uPlantHeight: { value: opts.plantHeight || 1 } });
   }
   if (opts.far) {

@@ -263,27 +263,52 @@ export function createExplorer() {
     jetS += ((s.jet01 == null ? (mode === 'jet' ? 1 : 0) : s.jet01) - jetS) * k;
     // the stride matches the ground covered: one step is 0.45 m + 0.22 s of travel
     const step = Math.max(0.5, Math.min(1.5, 0.45 + 0.22 * speed));
-    if (s.phase != null) ph = s.phase; else if (moving) ph += dt * Math.PI * speed / step;
+    // PHYSICS' gait (P13), when the game passes it: `feet` [left, right] { fwd, up, side, down } (m ahead of the
+    // body, off the ground), `ride` (m the hips are off their standing height, below negative: `hip` plus the
+    // stride's bob), `stride` (0 .. 1, the left foot lands at 0), `surge` (m the body is ahead within the
+    // stride). The boots are put where the feet are and the hips hung by `ride`: no walk cycle on a clock of
+    // this figure's own (two clocks drift and the feet slide). Without them: the old cycle.
+    const feet = Array.isArray(s.feet) && s.feet.length === 2 && s.feet[0] && s.feet[1] ? s.feet : null;
+    const ride = Number.isFinite(s.ride) ? s.ride : Number.isFinite(s.hip) ? s.hip : 0, surge = Number.isFinite(s.surge) ? Math.max(-0.3, Math.min(0.3, s.surge)) : 0;
+    if (s.phase != null) ph = s.phase; else if (feet && Number.isFinite(s.stride)) ph = 2 * Math.PI * s.stride + Math.PI / 2; else if (moving) ph += dt * Math.PI * speed / step;
     const A = Math.min(0.82, Math.asin(Math.min(0.95, step / 1.76))) * w.walk * (1 - 0.35 * w.wade);
     const air = Math.max(w.jet, w.fall), sit = w.sit, grounded = 1 - Math.max(air, sit);
     // PHYSICS' hips (`hip`: metres below standing height; about 0.3 for half a second after a landing): the knees
     // fold by the angle that lowers the hips that far, the back leans into it, and the figure straightens as it eases
-    w.hip = (w.hip || 0) + (Math.max(0, Math.min(0.5, s.hip || 0)) - (w.hip || 0)) * (first || s.snap ? 1 : 1 - Math.exp(-22 * dt));
+    // (PHYSICS' `hip` is the leg's length less its standing length: NEGATIVE while the legs are folded. It was read
+    // as positive here, so the figure never folded its knees after a landing.)
+    w.hip = (w.hip || 0) + (Math.max(0, Math.min(0.5, -ride)) - (w.hip || 0)) * (first || s.snap || feet ? 1 : 1 - Math.exp(-22 * dt));
     const crouch = Math.acos(Math.max(0.3, 1 - w.hip / 0.86)) * (1 - sit);
-    const leg = (thigh, shin, phi, side) => {
+    const lean = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit - 0.30 * crouch;
+    const L1 = 0.41, L2 = 0.48, hipY = L1 + L2 + Math.max(-0.5, Math.min(0.06, ride));
+    const leg = (thigh, shin, phi, side, F) => {
       const sw = Math.max(0, Math.cos(phi));
-      let th = A * Math.sin(phi) * grounded, kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(sw, 0.8)) * w.walk * grounded;
+      let th, kn;
+      if (F) {
+        // two bones to the boot: the swinging leg folds (the heel comes up toward the hip, most at a run), so
+        // that a run's flight reads in the knee
+        const up = F.down ? 0 : Math.min(0.42, Math.max(0, F.up || 0) * (2.2 + 2.2 * w.run));
+        const dz = (F.fwd || 0) - surge, dy = Math.max(0.1, hipY - up);
+        const D = Math.max(0.14, Math.min(L1 + L2 - 0.003, Math.hypot(dz, dy)));
+        const knee = Math.PI - Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - D * D) / (2 * L1 * L2))));
+        th = (Math.atan2(dz, dy) + Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + D * D - L2 * L2) / (2 * L1 * D)))) - lean) * grounded;
+        kn = -knee * grounded;
+      } else {
+        th = A * Math.sin(phi) * grounded; kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(sw, 0.8)) * w.walk * grounded;
+      }
       th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45;
       kn += w.jet * (-0.42 - 0.1 * side) + w.fall * (side < 0 ? -0.55 : -0.85) - sit * 1.45;
-      const ease = (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25);          // at rest the weight is on one leg
-      thigh.rotation.x = th + 0.09 * ease + crouch; shin.rotation.x = kn - 0.17 * ease - 2 * crouch;
+      const ease = F ? 0 : (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25);          // at rest the weight is on one leg
+      thigh.rotation.x = th + 0.09 * ease + (F ? 0 : crouch); shin.rotation.x = kn - 0.17 * ease - (F ? 0 : 2 * crouch);
       thigh.rotation.z = side * (0.02 + 0.10 * w.fall + 0.04 * w.jet);
     };
-    leg(b.thighL, b.shinL, ph, -1); leg(b.thighR, b.shinR, ph + Math.PI, 1);
+    leg(b.thighL, b.shinL, ph, -1, feet && feet[0]); leg(b.thighR, b.shinR, ph + Math.PI, 1, feet && feet[1]);
     const breathe = Math.sin(t * 1.5);
     // hips: bob twice a stride (highest as the legs pass), lean into the walk, sink to sit
-    b.torso.position.y = b.torso.userData.rest.y + (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded + breathe * 0.003 - sit * 0.40 - w.hip * (1 - sit);
-    b.torso.rotation.x = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit - 0.30 * crouch;
+    // (with PHYSICS' gait the hips ride where it says: its bob, and the body a little ahead or behind within the stride)
+    b.torso.position.y = b.torso.userData.rest.y + (feet ? Math.max(-0.5, Math.min(0.06, ride)) * (1 - sit) * (1 - air) : (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded - w.hip * (1 - sit)) + breathe * 0.003 - sit * 0.40;
+    b.torso.position.z = b.torso.userData.rest.z - (feet ? surge * grounded : 0);
+    b.torso.rotation.x = lean;
     b.torso.rotation.y = 0.07 * Math.sin(ph) * w.walk * grounded;
     b.torso.rotation.z = (0.022 + Math.sin(t * 0.47) * 0.012) * (1 - w.walk) * grounded + 0.03 * Math.sin(ph) * w.walk * w.wade;
     const pitch = Math.max(-0.7, Math.min(0.7, s.lookPitch || 0));
