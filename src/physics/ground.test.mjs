@@ -100,6 +100,9 @@ test('cover: forest has a canopy and is rough, water is smooth', () => {
   const f = coverAt('earth', surf('temperate_forest'), {}), c = coverAt('earth', surf('sea_coast', 0, 4001), {});
   assert.ok(f.canopy01 > 0.6 && f.canopyHeight > 10); assert.ok(c.z0 < 0.001 && c.canopy01 === 0);
   assert.ok(coverAt('earth', surf('desert_canyon'), {}).moist < 0.2);
+  // a surface sample that carries its own canopy overrides the biome's (a glade in the forest)
+  const glade = coverAt('earth', { ...surf('temperate_forest'), canopy01: 0.1, canopyHeight: 15 }, {});
+  assert.ok(Math.abs(glade.canopy01 - 0.1) < 1e-9 && glade.canopyHeight === 15);
 });
 
 test('no NaN for odd inputs', () => {

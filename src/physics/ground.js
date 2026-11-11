@@ -229,6 +229,8 @@ export function groundAt(bodyId, surface, state, out = {}) {
   for (let i = 0; i < NUM.length; i++) _acc[NUM[i]] *= inv;
   canopyH = canopy > 1e-6 ? canopyH / canopy : 0;
   canopy *= inv; moist *= inv; fog *= inv; dustSrc *= inv; z0b *= inv; snowBase *= inv; dT *= inv;
+  // PAINTER's own canopy at this very spot, when the surface sample carries it (additive fields)
+  if (surface.canopy01 != null) { canopy = surface.canopy01; if (surface.canopyHeight != null) canopyH = surface.canopyHeight; }
 
   // dominant base material
   let top = 0;
@@ -338,6 +340,9 @@ export function coverAt(bodyId, surface, out = {}) {
   const inv = 1 / wsum;
   out.canopyHeight = canopy > 1e-6 ? canopyH / canopy : 0;
   out.canopy01 = clamp01(canopy * inv);
+  // PAINTER's own canopy at this very spot, when the surface sample carries it (additive fields:
+  // canopy01 = closed-canopy fraction 0..1, canopyHeight = metres). Glades then get their wind.
+  if (surface && surface.canopy01 != null) { out.canopy01 = clamp01(surface.canopy01); if (surface.canopyHeight != null) out.canopyHeight = surface.canopyHeight; }
   out.moist = moist * inv; out.fog = fog * inv; out.dustSource = dustSrc * inv;
   out.z0 = Math.max(z0 * inv, 1e-5); out.snowBase = snowBase * inv; out.dT = dT * inv;
   // open liquid is far smoother than any land

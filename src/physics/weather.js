@@ -19,7 +19,7 @@ import { hash3, hashString, clamp, clamp01, mix, smoothstep, TAU } from './util.
 export const WEATHER = Object.freeze({
   timeScale: 60,           // game seconds of weather per real second (see above)
   dryTime: 3.0 * 3600,     // real s for a soaked surface to dry in still air at 288 K
-  wetDepth: 0.4,           // mm of rain that wets a surface through
+  wetDepth: 3.0,           // mm of rain that wets the ground through (a heavy shower: about 20 game seconds)
   snowRatio: 10,           // m of fresh snow per m of water (100 kg/m^3)
   meltRate: 4.0,           // mm of water per kelvin above freezing per real day (degree-day factor)
   snowLife: 30 * 3600,     // real s before fresh snow settles into the base layer
@@ -178,7 +178,9 @@ function gather(bodyId, ux, uy, uz, t, seed) {
       a.rate += K.rate * core * core;
       a.flash += K.flash * core;
       if (K.vis > 0) {
-        const ext = core * WEATHER.clearVisibility / K.vis;         // extinction in clear-air units
+        // extinction in clear-air units; it thickens as the square of the way in, so the edge
+        // of a fog bank or a dust storm is a gradual veil and never a wall
+        const ext = core * core * WEATHER.clearVisibility / K.vis;
         if (K === KINDS.fog) a.fog += ext; else if (K === KINDS.dust) a.dust += ext; else a.haze += ext;
       }
       if (K === KINDS.storm) a.storm = Math.max(a.storm, core);
@@ -339,8 +341,10 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   const dustExt = (a.dust * (0.5 + 0.5 * dustSrc) + lift * dustSrc * WEATHER.clearVisibility / 400) * below;
   // ---- visibility (Koschmieder): extinctions add; rain 0.2 R^0.6 per km, snow about 2 R^0.7 --
   let ext = 1 + fogExt + dustExt + a.haze * below;
-  if (type === 'rain' || type === 'drizzle' || type === 'acid') ext += 0.2 * Math.pow(rate, 0.6) * WEATHER.clearVisibility / 3912 * reach;
-  else if (type === 'snow' || type === 'ice') ext += 2.0 * Math.pow(rate, 0.7) * WEATHER.clearVisibility / 3912;
+  // (the rate / (rate + 0.5) factor only rounds off the infinite slope of a power law at zero)
+  const soft = rate / (rate + 0.5);
+  if (type === 'rain' || type === 'drizzle' || type === 'acid') ext += 0.2 * Math.pow(rate, 0.6) * soft * WEATHER.clearVisibility / 3912 * reach;
+  else if (type === 'snow' || type === 'ice') ext += 2.0 * Math.pow(rate, 0.7) * soft * WEATHER.clearVisibility / 3912;
   else if (type === 'frost') ext += 0.5 * rate * WEATHER.clearVisibility / 3912;
   o.visibility = WEATHER.clearVisibility / ext;
   // For drawing: the game's distances are compressed, so the painted fog distance should shrink

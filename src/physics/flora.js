@@ -44,7 +44,7 @@ export const FLORA = Object.freeze({
   // contact pushes
   pushLoad: 2.6,                // load a body puts on plants it touches
   pushReach: 0.45,              // m beyond the body radius that plants are still pushed
-  pushHz: 1.6, pushDamp: 0.45,  // spring-back of a released plant
+  pushHz: 1.6, pushDamp: 0.55,  // spring-back of a released plant: one small overshoot
   contactHz: 7,                 // how fast a plant gives way to a body
   flatRecover: 1.2,             // s: elastic recovery of flattened plants
   flatSet: 60,                  // s: recovery of the trampled (plastic) part
