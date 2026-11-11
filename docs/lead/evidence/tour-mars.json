@@ -1,0 +1,212 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "rust_canyons",
+   "name": "Rust Canyons",
+   "alsoVista": null,
+   "settledSeconds": 12.5,
+   "tris": 346948,
+   "calls": 210,
+   "worldWorstMs": 68.2,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.4,
+    "biome": "rust_canyons",
+    "radius": 3023.8483866039596
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "dust_dunes",
+   "name": "Dust-Storm Dunes",
+   "alsoVista": "Dust-Storm Dunes",
+   "settledSeconds": 9.1,
+   "tris": 185462,
+   "calls": 101,
+   "worldWorstMs": 93.5,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "dust_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4,
+    "biome": "dust_dunes",
+    "radius": 3018.2154190471183
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "polar_frost",
+   "name": "Polar Frost Fields",
+   "alsoVista": null,
+   "settledSeconds": 9.5,
+   "tris": 185626,
+   "calls": 129,
+   "worldWorstMs": 43.7,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "polar_frost",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.9,
+    "biome": "polar_frost",
+    "radius": 3043.003253219557
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "dry_riverbeds",
+   "name": "Dry Riverbeds",
+   "alsoVista": "Dry Riverbeds",
+   "settledSeconds": 11.3,
+   "tris": 339330,
+   "calls": 240,
+   "worldWorstMs": 58.9,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "dry_riverbeds",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.6,
+    "biome": "dry_riverbeds",
+    "radius": 3020.348794956606
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-rust_canyons-1",
+   "name": "Rust Canyons",
+   "alsoVista": null,
+   "settledSeconds": 8.9,
+   "tris": 279078,
+   "calls": 185,
+   "worldWorstMs": 89.1,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13.4,
+    "biome": "rust_canyons",
+    "radius": 3068.864790382551
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-polar_frost-1",
+   "name": "Polar Frost Fields",
+   "alsoVista": null,
+   "settledSeconds": 7.9,
+   "tris": 305024,
+   "calls": 174,
+   "worldWorstMs": 72,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "polar_frost",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.9,
+    "biome": "polar_frost",
+    "radius": 3049.2979035246576
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-polar_frost-2",
+   "name": "Polar Frost Fields II",
+   "alsoVista": null,
+   "settledSeconds": 6.7,
+   "tris": 228348,
+   "calls": 150,
+   "worldWorstMs": 79.5,
+   "physicsWorstMs": 10.6,
+   "stoodIn": "polar_frost",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.3,
+    "biome": "polar_frost",
+    "radius": 3050.1351980288905
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-rust_canyons-2",
+   "name": "Rust Canyons II",
+   "alsoVista": null,
+   "settledSeconds": 25.4,
+   "tris": 295612,
+   "calls": 198,
+   "worldWorstMs": 432.9,
+   "physicsWorstMs": 50.5,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 10.4,
+    "biome": "rust_canyons",
+    "radius": 3182.3827277903965
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-dust_dunes-2",
+   "name": "Dust-Storm Dunes II",
+   "alsoVista": null,
+   "settledSeconds": 9.3,
+   "tris": 203530,
+   "calls": 134,
+   "worldWorstMs": 288.1,
+   "physicsWorstMs": 3.6,
+   "stoodIn": "dust_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.2,
+    "biome": "dust_dunes",
+    "radius": 3035.6262200388865
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 4,
+   "tris": 75888,
+   "calls": 50,
+   "worldWorstMs": 104.5,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

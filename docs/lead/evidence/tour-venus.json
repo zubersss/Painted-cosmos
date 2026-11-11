@@ -1,0 +1,254 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "fungal_towers",
+   "name": "Fungal Tower Forest",
+   "alsoVista": null,
+   "settledSeconds": 3.4,
+   "tris": 521114,
+   "calls": 247,
+   "worldWorstMs": 73.2,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "fungal_towers",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.4,
+    "biome": "fungal_towers",
+    "radius": 3642.118797804338
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "lava_rivers",
+   "name": "Lava Rivers",
+   "alsoVista": null,
+   "settledSeconds": 12.2,
+   "tris": 308934,
+   "calls": 193,
+   "worldWorstMs": 63.8,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "lava_rivers",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 15.5,
+    "biome": "lava_rivers",
+    "radius": 3621.899869927601
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "acid_terraces",
+   "name": "Acid Lake Terraces",
+   "alsoVista": null,
+   "settledSeconds": 11.8,
+   "tris": 344170,
+   "calls": 199,
+   "worldWorstMs": 93.9,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "acid_terraces",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6,
+    "biome": "acid_terraces",
+    "radius": 3705.633528955508
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "pale_mesas",
+   "name": "Pale Mesas",
+   "alsoVista": null,
+   "settledSeconds": 5.6,
+   "tris": 331836,
+   "calls": 161,
+   "worldWorstMs": 93.9,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "pale_mesas",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.1,
+    "biome": "pale_mesas",
+    "radius": 3630.595692546193
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-fungal_towers-1",
+   "name": "Fungal Tower Forest",
+   "alsoVista": null,
+   "settledSeconds": 0.6,
+   "tris": 480684,
+   "calls": 253,
+   "worldWorstMs": 75.5,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "fungal_towers",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 8.2,
+    "biome": "fungal_towers",
+    "radius": 3645.5514523980405
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-lava_rivers-1",
+   "name": "Lava Rivers",
+   "alsoVista": null,
+   "settledSeconds": 10.1,
+   "tris": 297864,
+   "calls": 190,
+   "worldWorstMs": 67.7,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "lava_rivers",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 12.3,
+    "biome": "lava_rivers",
+    "radius": 3621.4827470016035
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-acid_terraces-1",
+   "name": "Acid Lake Terraces",
+   "alsoVista": null,
+   "settledSeconds": 1,
+   "tris": 409710,
+   "calls": 243,
+   "worldWorstMs": 96.4,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "acid_terraces",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 17.7,
+    "biome": "acid_terraces",
+    "radius": 3675.1775714551436
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-pale_mesas-1",
+   "name": "Pale Mesas",
+   "alsoVista": null,
+   "settledSeconds": 22.9,
+   "tris": 282428,
+   "calls": 162,
+   "worldWorstMs": 115.8,
+   "physicsWorstMs": 16.5,
+   "stoodIn": "pale_mesas",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 14.7,
+    "biome": "pale_mesas",
+    "radius": 3844.1813983965526
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-pale_mesas-2",
+   "name": "Pale Mesas II",
+   "alsoVista": null,
+   "settledSeconds": 16.3,
+   "tris": 327368,
+   "calls": 194,
+   "worldWorstMs": 115.8,
+   "physicsWorstMs": 46.9,
+   "stoodIn": "pale_mesas",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.8,
+    "biome": "pale_mesas",
+    "radius": 3859.924927311866
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-acid_terraces-2",
+   "name": "Acid Lake Terraces II",
+   "alsoVista": null,
+   "settledSeconds": 4.1,
+   "tris": 430516,
+   "calls": 272,
+   "worldWorstMs": 126.1,
+   "physicsWorstMs": 46.9,
+   "stoodIn": "acid_terraces",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 11.8,
+    "biome": "acid_terraces",
+    "radius": 3695.169758681687
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-fungal_towers-2",
+   "name": "Fungal Tower Forest II",
+   "alsoVista": null,
+   "settledSeconds": 4.5,
+   "tris": 544886,
+   "calls": 293,
+   "worldWorstMs": 126.1,
+   "physicsWorstMs": 46.9,
+   "stoodIn": "fungal_towers",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 9.7,
+    "biome": "fungal_towers",
+    "radius": 3644.3111683421075
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 0.1,
+   "tris": 74106,
+   "calls": 59,
+   "worldWorstMs": 126.1,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

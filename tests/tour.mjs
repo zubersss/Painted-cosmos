@@ -204,14 +204,26 @@ async function writeSheet(body, frames) {
   const cells = frames.map((f) => `<figure>${f.file ? `<img src="data:image/jpeg;base64,${fs.readFileSync(f.file).toString('base64')}">` : '<div class="none"></div>'}<figcaption>${caption(f)}</figcaption></figure>`).join('');
   const head = `<header><b>${body}</b>: the freeze-frame tour, ${esc(label)}, ${W}x${H}, quality ${opt.quality}, local time ${opt.hour}:00. `
     + `${shot.length} frames; <span class="${unsettled ? 'bad' : ''}">${unsettled ? unsettled + ' of them DID NOT SETTLE within ' + SETTLE + ' s (world.busy never reached 0): those frames may show unfinished terrain or flora' : 'every frame settled (world.busy reached 0) before it was captured'}</span>.</header>`;
-  const sheet = await browser.newPage({ viewport: { width: 1640, height: 200 }, deviceScaleFactor: 1 });
-  await sheet.setContent(`<body style="margin:0;background:#f4efe4;font:italic 15px Georgia,serif;color:#2c3350">${head}<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;width:1620px">${cells}</div><style>header{padding:12px 12px 2px;font-size:17px}figure{margin:0}img,.none{width:800px;display:block}.none{height:120px;background:#e6dfd0}figcaption{padding:3px 2px 6px;font-size:13.5px;line-height:1.3}.bad{color:#a02c1c;font-style:normal;font-weight:bold}</style></body>`);
-  const out = path.join(sheets, `tour-${body}.jpg`);
-  await sheet.screenshot({ path: out, type: 'jpeg', quality: 80, fullPage: true });
-  await sheet.close();
+  // The numbers first: they must survive whatever happens to the picture of the sheet.
   const rows = frames.map((f) => ({ kind: f.kind, id: f.id, name: f.name, alsoVista: f.alsoVista || null, settledSeconds: f.settled, tris: f.tris, calls: f.calls, worldWorstMs: f.worldWorstMs, physicsWorstMs: f.physicsWorstMs, stoodIn: f.stoodIn, moved: f.moved || 0, found: f.found, at: f.at, flags: f.flags || [] }));
   summary.bodies[body] = { frames: rows, unsettled };
   fs.writeFileSync(path.join(sheets, `tour-${body}.json`), JSON.stringify({ label, size: `${W}x${H}`, quality: Number(opt.quality), hour: Number(opt.hour), settleLimit: SETTLE, unsettled, frames: rows }, null, 1));
   fs.writeFileSync(path.join(opt.out, 'summary.json'), JSON.stringify(summary, null, 2));
+  const html = `<body style="margin:0;background:#f4efe4;font:italic 15px Georgia,serif;color:#2c3350">${head}<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;width:1620px">${cells}</div><style>header{padding:12px 12px 2px;font-size:17px}figure{margin:0}img,.none{width:800px;display:block}.none{height:120px;background:#e6dfd0}figcaption{padding:3px 2px 6px;font-size:13.5px;line-height:1.3}.bad{color:#a02c1c;font-style:normal;font-weight:bold}</style></body>`;
+  const out = path.join(sheets, `tour-${body}.jpg`);
+  try {
+    const sheet = await browser.newPage({ viewport: { width: 1640, height: 200 }, deviceScaleFactor: 1 });
+    await sheet.setContent(html);
+    await sheet.screenshot({ path: out, type: 'jpeg', quality: 80, fullPage: true });
+    await sheet.close();
+  } catch (e) {
+    // A browser that has painted a dozen frames in software GL sometimes refuses one more
+    // capture: lay the sheet out in a fresh browser instead.
+    log('  (the sheet could not be captured in the game\'s browser: ' + String(e && e.message).split('\n')[0] + '; using a fresh one)');
+    const alt = await openPage({ pagePath: '/.nojekyll', w: 1640, h: 200, root: opt.root });
+    await alt.page.setContent(html);
+    await alt.page.screenshot({ path: out, type: 'jpeg', quality: 80, fullPage: true });
+    await alt.close();
+  }
   log('wrote', out, `(${shot.length} frames, ${unsettled} unsettled)`);
 }

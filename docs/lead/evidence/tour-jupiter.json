@@ -1,0 +1,254 @@
+{
+ "label": "commit ded1435, clean export (PAINTER's 334eb16)",
+ "size": "960x540",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 120,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "sky_islands",
+   "name": "Cream Sky-Islands",
+   "alsoVista": null,
+   "settledSeconds": 16.2,
+   "tris": 416184,
+   "calls": 249,
+   "worldWorstMs": 86.9,
+   "physicsWorstMs": 9,
+   "stoodIn": "sky_islands",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 15.4,
+    "biome": "sky_islands",
+    "radius": 5124.865115753466
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "storm_wall",
+   "name": "Storm-Wall Cliffs",
+   "alsoVista": null,
+   "settledSeconds": 16.6,
+   "tris": 382566,
+   "calls": 199,
+   "worldWorstMs": 159.5,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "storm_wall",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.4,
+    "biome": "storm_wall",
+    "radius": 5036.394795946021
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "hanging_gardens",
+   "name": "Hanging Gardens",
+   "alsoVista": null,
+   "settledSeconds": 1.8,
+   "tris": 515748,
+   "calls": 246,
+   "worldWorstMs": 195.1,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "hanging_gardens",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.5,
+    "biome": "hanging_gardens",
+    "radius": 5086.672966738047
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "lightning_plains",
+   "name": "Lightning Plains",
+   "alsoVista": null,
+   "settledSeconds": 1.5,
+   "tris": 319792,
+   "calls": 201,
+   "worldWorstMs": 195.1,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "lightning_plains",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.5,
+    "biome": "lightning_plains",
+    "radius": 5016.323645750721
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-sky_islands-1",
+   "name": "Cream Sky-Islands",
+   "alsoVista": null,
+   "settledSeconds": 24.9,
+   "tris": 460974,
+   "calls": 292,
+   "worldWorstMs": 64.4,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "sky_islands",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 15.9,
+    "biome": "sky_islands",
+    "radius": 5118.132426039149
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-storm_wall-1",
+   "name": "Storm-Wall Cliffs",
+   "alsoVista": null,
+   "settledSeconds": 11.2,
+   "tris": 360918,
+   "calls": 184,
+   "worldWorstMs": 121.5,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "storm_wall",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.1,
+    "biome": "storm_wall",
+    "radius": 5026.795983844744
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-hanging_gardens-1",
+   "name": "Hanging Gardens",
+   "alsoVista": null,
+   "settledSeconds": 10,
+   "tris": 502778,
+   "calls": 250,
+   "worldWorstMs": 85.5,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "hanging_gardens",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.3,
+    "biome": "hanging_gardens",
+    "radius": 5086.320793386649
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-lightning_plains-1",
+   "name": "Lightning Plains",
+   "alsoVista": null,
+   "settledSeconds": 25.8,
+   "tris": 346596,
+   "calls": 214,
+   "worldWorstMs": 170.4,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "lightning_plains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 19.7,
+    "biome": "lightning_plains",
+    "radius": 5021.754060415406
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-hanging_gardens-2",
+   "name": "Hanging Gardens II",
+   "alsoVista": null,
+   "settledSeconds": 3.6,
+   "tris": 534580,
+   "calls": 281,
+   "worldWorstMs": 170.4,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "hanging_gardens",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.6,
+    "biome": "hanging_gardens",
+    "radius": 5087.1447773449445
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-lightning_plains-2",
+   "name": "Lightning Plains II",
+   "alsoVista": null,
+   "settledSeconds": 33.2,
+   "tris": 301410,
+   "calls": 210,
+   "worldWorstMs": 262.7,
+   "physicsWorstMs": 104.3,
+   "stoodIn": "lightning_plains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.6,
+    "biome": "lightning_plains",
+    "radius": 5012.103393787237
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-storm_wall-2",
+   "name": "Storm-Wall Cliffs II",
+   "alsoVista": null,
+   "settledSeconds": 9.4,
+   "tris": 289040,
+   "calls": 174,
+   "worldWorstMs": 116.3,
+   "physicsWorstMs": 0.9,
+   "stoodIn": "storm_wall",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.3,
+    "biome": "storm_wall",
+    "radius": 5474.6294209451735
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 2.2,
+   "tris": 67324,
+   "calls": 55,
+   "worldWorstMs": 116.3,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}
