@@ -658,6 +658,10 @@ export class Sim {
       return false;
     }
     this.pulse = createPulse(Math.max(0, dot(this.sh.v, f)));
+    // Where this pulse is bound: the course of the moment. (The target itself is dropped as
+    // soon as the ship is inside that world's own frame, which a small world's reaches out to
+    // where the drive lets go: the words at arrival must not depend on it.)
+    this.pulse.dest = this.target;
     this.sm.dispatch(EV.pulseOn);
     this.emit('pulse');
     return true;
@@ -725,10 +729,11 @@ export class Sim {
         this.sm.dispatch(EV.pulseOff);
         if (arrived) {
           // Arrived where we were going (or, with no course set, at whatever lay ahead)...
-          if (!this.target || adv.block === this.target) this.say(`${BODIES[adv.block].name} ahead`, 5);
+          const dest = ps.dest || this.target;
+          if (!dest || adv.block === dest) this.say(`${BODIES[adv.block].name} ahead`, 5);
           // ...or stopped short by a world that lies between (often the one just left).
           else this.say(`${BODIES[adv.block].name} is in the way: steer round it and pulse again`, 6);
-          if (adv.block === this.target) this.targetLocked = false;
+          if (adv.block === this.target || adv.block === dest) this.targetLocked = false;
           this.emit('arrived');
         } else {
           if (!ps.cancel && adv.block === 'sun') this.say('The Sun is in the way: steer round it and pulse again', 6);

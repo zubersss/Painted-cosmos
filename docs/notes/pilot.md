@@ -127,6 +127,21 @@ runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdra
    steps at quality 0, scale 0.5, 400x225). First full run since the legs, the new frame-rate
    controller and PAINTER's block 3 and first push. Nothing relaxed. Log:
    `/home/user/.pc-scratch/pilot/run5/all.log`.
+2. **The Moon and Pluto flown: ten bodies landed on is the full set.** `node
+   tests/grandtour.mjs --bodies moon,pluto --from earth` inside a clean tree (`da6d42d` with
+   my files of `b36435a`; quality 0, scale 0.5, 400x225): PASSED, 7 minutes, 316 s of play.
+   Earth to the Moon 30 km, 9.2 s of pulse, landed on the first E in `rilles`, walked 11.4 m;
+   the Moon to Pluto 1382 km, 120 s of pulse, 21969 m/s at most, landed on the first E in
+   `nitrogen_dunes`, walked 12 m; no bounce, no refusal, no console error. Frames
+   `docs/shots/pilot/grandtour-moon.jpg`, `-pluto.jpg` (both opened: the explorer on grey
+   regolith under a starred sky, and on pale dunes under a violet sky, the ship behind);
+   the two legs are added to `docs/lead/evidence/grandtour.json`.
+   **Found and fixed (mine):** arriving at the Moon the screen said "Moon is in the way: steer
+   round it and pulse again". The Moon's own frame reaches out to where the drive lets go;
+   inside it the course is dropped and the nose picks a new one, and the words at arrival
+   compared against that. The pulse now remembers where it was bound (`pulse.dest`);
+   `tests/pulse.test.mjs` flies to the Moon and to Mars and wants "<World> ahead" (it fails
+   with the fix taken out: checked). 115 unit tests.
 
 ## Status
 

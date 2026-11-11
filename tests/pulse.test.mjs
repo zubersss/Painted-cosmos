@@ -6,7 +6,7 @@ import { S } from '../src/core/state.js';
 import { BODIES, spaceAltitude, soiRadius } from '../src/data/bodies.js';
 import { PULSE, arrivalRadius, pulseAdvice, createPulse, stepPulseSpeed, pulseEta } from '../src/ship/pulse.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
-import { Pad, play, V, sub, norm, flyTo } from './helpers.mjs';
+import { Pad, play, V, sub, norm, flyTo, holdPitch, aimAt } from './helpers.mjs';
 import { qLook } from '../src/core/vec.js';
 
 const newSim = (opts = {}) => new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, ...opts });
@@ -114,4 +114,39 @@ test('aiming picks the target; a target chosen on the map stays chosen', () => {
   play(sim, pad, 1);
   assert.equal(sim.target, 'jupiter', 'the map choice holds while the nose is on the moon');
   assert.equal(sim.aimed, 'moon');
+});
+
+// The Moon's own frame reaches out to where the drive lets go, and the course is dropped once
+// the ship is inside the frame of the world it leads to. The words at arrival once turned on
+// the course of that moment: flying to the Moon the screen said "Moon is in the way: steer
+// round it and pulse again" (grand tour, Moon leg, 2026-11-11).
+test('arriving by pulse at the world the course was set for says "<World> ahead", the Moon included', () => {
+  for (const to of ['moon', 'mars']) {
+    const sim = newSim();
+    const pad = new Pad();
+    play(sim, pad, 0.5);
+    pad.dx += (sim.info().shipBearingDeg * Math.PI / 180) / 0.0023;
+    pad.press('KeyW');
+    play(sim, pad, 30, { until: () => sim.info().canBoard });
+    pad.release('KeyW');
+    pad.tap('KeyE');
+    play(sim, pad, 4, { until: () => sim.sm.state === S.LANDED });
+    pad.tap('Space');
+    play(sim, pad, 4);
+    pad.press('KeyW');
+    play(sim, pad, 120, { each: () => holdPitch(sim, pad, 55), until: () => sim.sm.state === S.SPACE });
+    play(sim, pad, 60, { each: () => holdPitch(sim, pad, 55), until: () => sim.info().ship.altitude > 3 * spaceAltitude(BODIES[sim.shFrame.id]) });
+    pad.release('KeyW');
+    sim.setTarget(to);
+    play(sim, pad, 12, { each: () => aimAt(sim, pad, to), until: () => Math.abs(sim.aimAt(to).yawDeg) < 4 && Math.abs(sim.aimAt(to).pitchDeg) < 4 });
+    pad.tap('KeyF');
+    play(sim, pad, 0.2);
+    assert.equal(sim.sm.state, S.PULSE, 'pulse engaged towards ' + to + ': ' + (sim.notice && sim.notice.text));
+    const said = [];
+    play(sim, pad, 300, { each: () => { if (sim.notice && !said.includes(sim.notice.text)) said.push(sim.notice.text); }, until: () => sim.sm.state === S.SPACE });
+    if (sim.notice && !said.includes(sim.notice.text)) said.push(sim.notice.text);
+    assert.equal(sim.sm.state, S.SPACE, 'the drive let go');
+    assert.ok(said.includes(BODIES[to].name + ' ahead'), `to ${to} the screen said: ${JSON.stringify(said)}`);
+    assert.ok(!said.some((x) => /in the way/.test(x)), `to ${to} nothing was "in the way": ${JSON.stringify(said)}`);
+  }
 });
