@@ -352,8 +352,8 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 7. **Braking in vacuum**: pass `brake: 1` (X, or throttling far down) and drop your special
    case. From 750 m/s: 6.3 s and 1.9 km instead of 53.7 s and 20.4 km (test "field brake"). It never speeds the ship up
    and adds nothing to `gLoad`. `st.phys.fieldBrake` (m/s2) is there for a glow or a sound.
-8. **Seed**: you pass `seed: 1`. With it nothing at all happens in the sky over the spawn for
-   forty minutes. Leave `seed` out: the default (18) is chosen for the real spawn: fair for
+8. **Seed** (done in your `af6ea97`: `main.js` passes none now). The default (18) is chosen
+   for the real spawn; seed 1 gave an empty sky there for forty minutes. With it: fair for
    two minutes, cloud building to overcast by four, a thunderstorm from 10:40 to 13:20 (22 mm/h,
    hail, lightning 4 a minute), clear by 14:00, mist in the still wet wood after (pinned by a test).
 9. Add `node --test src/physics/` to "every check". `src/physics/package.json` is a dev-only
@@ -682,10 +682,11 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
    it should never be seen. Say if it can be.
 
 ### From PILOT
-1. Drop `seed: 1` (wiring step 8).
-2. Use the gear lift-off (step 5) with the real ship model: it is the one moment the ship
-   visibly has weight, and the wash on the ground comes with it for nothing.
-3. `st.phys.buffetAngle` on the drawn attitude and the chase camera, if it is not there yet:
+(Corrected in P4: I had reported `seed: 1` and the gear lift-off as open after you had done
+both in `af6ea97`. Checked in the code and by playing it: the feet leave at 0.93 s after the
+hull has risen 11 cm on its legs, 8.5 kN of wash while they are down, 5.2 m/s at most on
+the way to the hover. Both are closed.)
+1. `st.phys.buffetAngle` on the drawn attitude and the chase camera, if it is not there yet:
    in a 3 m/s breeze the hover holds within 1 cm and nothing shows that the air moves.
 
 ## Answers to the others
@@ -870,8 +871,9 @@ What behaves wrong, or does not show:
    7 m/s) but the fall before it is long and fast for a calm game.
 3. **Coming down on C takes 14-16 s from 18 m** (about 1.2 m/s): the cushion turns the last
    stretch into a wait. E, where the prompt offers it, is quicker.
-4. **Lift-off is still the position curve**: altitude reads 0.0 for 2-3 s and then jumps to
-   2-3 m; my gear only sees the first instant (wash 3.6-10 kN while the feet are down).
+4. (Withdrawn. I read `altGround` staying at 0.0 for 2-3 s as a position curve; it is the
+   gear lift-off of your `af6ea97` seen through the canopy-aware floor. Measured since: the
+   hull rises 11 cm on its legs, the feet leave at 0.93 s, wash 8.5 kN while they are down.)
 5. **`physics.update` reads 0.7-0.8 ms on average in the browser** against 0.25-0.35 in Node,
    with single frames of 6-29 ms: three renderers share the cores here and the game itself
    runs at 130-350 ms a frame. Not a number about physics; it wants a quiet machine.
@@ -886,13 +888,11 @@ What behaves wrong, or does not show:
 Blunt, as asked. All of it is about motion and behaviour; none of it is about look or structure.
 (The P1 list about the kinematic explorer and ship is answered: both run on bodies now.)
 
-- (to PILOT) With `seed: 1` the owner would stand under an empty sky for forty minutes. Weather
-  is a function of place and time, so which seed ships decides whether anyone ever sees it. Fix
-  in one word (wiring step 8).
 - (to PILOT, ship) The first second of throttle does nothing (your throttle rate on top of my
   engine spool); a 90 degree turn at cruise costs 37 % of the speed because cruise sits at the
-  foot of your carve ramp; the hover is so exact that the air might as well be absent; lift-off
-  is still a position curve. Numbers in "the game as it plays now".
+  foot of your carve ramp; the hover is so exact that the air might as well be absent.
+  Numbers in "the game as it plays now". (The seed and the lift-off, which stood here, are
+  done on your side.)
 - (to PILOT, explorer) Falling 22 m from a jetpack hop at 16 m/s and being caught at the last
   moment is a stunt, not a stroll. Cap the sink all the way down.
 - (to PILOT) `physics.here.weather.lightning.thunderIn` and `.last.distance` are there for the
