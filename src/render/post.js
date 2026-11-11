@@ -144,10 +144,10 @@ void main() {
   // a dark wash the pits are full: what shows there is the broad soft settling of the pigment
   // (the same paper, out of focus), never a hard speck at the size of a pixel.
   float dark = 1.0 - smoothstep(0.24, 0.58, lum);
-  vec4 psoft = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 2.6);
+  vec4 psoft = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 3.6);
   float pits = (0.52 - ph) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmid.r) * 0.85;
-  float settle = (0.5 - psoft.r) * 1.25 + (0.5 - plo.r) * 0.45;
-  float gran = (mix(pits, settle, dark) + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet) * mix(1.0, 0.5, dark);
+  float settle = (0.5 - psoft.r) * 0.7 + (0.5 - plo.r) * 0.8;
+  float gran = (mix(pits, settle, dark) + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet) * mix(1.0, 0.4, dark);
   gran *= 1.0 - 0.5 * uWxSheet.x;
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)

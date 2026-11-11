@@ -109,7 +109,7 @@ export function createWorld(scene) {
       // internal pixels survive the brush), rain a little broader and longer: a few strokes
       const D = K.DRAW_PAINTED, draw = {};
       for (const k in D) draw[k] = { ...D[k] };
-      draw.rain = { ...D.rain, width: 0.05, exposure: 0.12, minPx: 4 };
+      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5 };
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
       for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
