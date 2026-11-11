@@ -129,7 +129,8 @@ export function createHud(root) {
           m._ring.innerHTML = `<svg width="${2 * half}" height="${2 * half}" viewBox="${-half} ${-half} ${2 * half} ${2 * half}" style="left:${-half}px;top:${-half}px"><path class="pc-ring-ink" d="${path}"/><path class="pc-ring-paper" d="${path}"/></svg>`;
         }
         m._ring.style.transform = d.kind === 'edge' ? `rotate(${(d.angle || 0).toFixed(2)}rad)` : '';
-        m._label.style.top = (d.kind === 'edge' ? 14 : size / 2 + 7).toFixed(0) + 'px';
+        if (d.above) { m._label.style.top = 'auto'; m._label.style.bottom = (size / 2 + 7).toFixed(0) + 'px'; }
+        else { m._label.style.bottom = 'auto'; m._label.style.top = (d.kind === 'edge' ? 14 : size / 2 + 7).toFixed(0) + 'px'; }
         const text = d.sub ? d.label + '\n' + d.sub : d.label;
         if (m._text !== text) { m._text = text; ink(m._label, text, d.kind === 'target' ? SIZE.small : SIZE.tiny, { align: 'center' }); }
       }

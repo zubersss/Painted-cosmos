@@ -87,21 +87,26 @@ runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdra
    (it runs at quality 1 by default: pass `--quality 2`), the grand tour, judge the frames
    against the art bible, say how long the Earth spawn takes to settle, write review 6,
    update TRACK. No MUST FIX is open against anyone.
-2. *The stale UI frames* (`docs/shots/pilot/ui-*.jpg` are on stubs): not replaced in part 1.
-   Wanted over the real painted world: title, help card, HUD on foot, cockpit with dials, map,
-   sketchbook. The third agent's script is scratch `run3/ui-shots.mjs`.
-3. *Boulders on the Moon and Pluto* (coordinator's ruling "boulders, legs and launches"): a
-   run across the densest boulder field lifts the feet 0.00 m on Earth and Mars and 0.97 m on
-   the Moon (0.6 s in the air: the body floats down the far side of a boulder; a slower
-   clamber does not change it). The ruling's fallback (boulders block on light worlds:
-   `EXPLORER.scrambleMinGravity: 3`) gives 0.00 m lift but traps a run in five of eight
-   headings on the Moon's highlands (3 to 26 m in 25 s), so it is left off (0). Needs
-   PHYSICS' legs (P9); then re-measure with scratch `run4/boulders.mjs <body>` (measure of
-   done: 0.3 m).
-4. *Walking into a trunk*: a 25 s straight walk through the home forest now has no stop over
-   0.3 s in eight headings (scratch `run4/straight.mjs`); the pace still dips to 0 for about
-   0.12 s before the suit steps round. Sliding round without any dip needs steering before
-   contact (not done).
+2. *The UI frames* are new (`docs/shots/pilot/ui-title`, `-help`, `-foot`, `-book`,
+   `-flight`, `-cockpit`, `-space`, `-map`: 960x540, top tier, over the real painted world;
+   scratch `run4/ui-shots.mjs <export> <outdir> 2`). PAINTER has still not reviewed the look.
+   Left: at 400 px wide the sketch slip runs off the right edge; the HUD on foot shows
+   nothing at rest (by design: no prompt, no notice), so `ui-foot` is the bare picture.
+3. *Boulders* (coordinator's ruling "boulders, legs and launches"): settled by PHYSICS' legs
+   (P9). My clamber limit and the switch that made boulders block on light worlds are out
+   again (they are in the history between `32c5c86` and `b67c410`, a WIP snapshot that holds
+   their removal); `scrambleSample` is exactly as PHYSICS tested it. Measured by me on the
+   export of `b67c410`, pure simulation, real ground, a run (Shift+W, 14 s, eight headings)
+   from the stand with the most boulders (scratch `run4/boulders.mjs <body>`): Moon
+   `highlands` 0.18 m at most (0.97 before the legs), 82 to 98 m made; Mars `rust_canyons`
+   and Earth `desert_canyon` 0.00 m. Review 6 wants the Moon looked at once in the browser.
+   Without the legs, for the record: boulders that block trapped a run on the Moon's
+   highlands in five of eight headings (3 to 26 m in 25 s).
+4. *Walking into a trunk*: one trunk or boulder met dead on is stepped round after 0.12 s
+   (`collideObstacles`: `hits >= 1`). A 25 s straight walk through the home forest makes 96
+   to 102 m in each of eight headings and stops for 0.1 s at most (it was 1.5 s in one
+   heading; scratch `run4/straight.mjs`). The pace still touches 0 for that tenth of a
+   second; sliding round with no dip at all needs steering before contact (not done).
 5. *Flight pace per world* and *pulse profile* (PHYSICS' `planSpeedChange`): as before.
 6. *M4*, when the coordinator says so and not before: `node tests/all.mjs --export` must print
    ALL PASSED on the final head; then one pull request `cosmos` -> `main` through the REST API
@@ -194,7 +199,17 @@ the nose has led the flight path by more than 29 degrees for 1.5 s (at most once
 speed says "Slow down to land: the air is thin here, hold X". Earth, Venus and the giants
 say nothing new. Seen in the browser on Mercury during the grand tour.
 
-**6. The UI frames**: not done (see the handover).
+**6. The UI frames** replaced (export of `f6d0a29`, top tier, full resolution, 960x540, no
+console errors; the eight frames opened as one sheet): the title card and the help card on
+torn paper over the home forest; the wood on foot; the sketchbook with the first sketch on
+Earth's page; the ship over the forest with "Earth 32 m up 44 m/s", "E Land here" and the
+throttle; the cockpit with its three dials under the cowl and the slips moved to the top; the
+cockpit in space with the stars and a marker on Mars; the map with every world named. The
+Earth spawn loaded and settled in 29 s at the top tier at that commit (before PAINTER's
+quality push). Found there and fixed: with the nose on the target the marker's label lay on
+the prompt "Pulse to Mars" in the cockpit; the label is now written above the ring there
+(checked in the browser: label at 130 to 169 px, prompt at 182 to 220 px of 360; the
+`ui-space.jpg` in the repository is from before the fix and shows the overlap).
 
 **The owner's instruction** (no triangle budget): controller, tests, README, lead files, as
 the handover says. On model machines (`tests/dynres.test.mjs`): 13 fps at the top tier is

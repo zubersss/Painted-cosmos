@@ -387,7 +387,10 @@ export class Game {
           const x = (nx * 0.5 + 0.5) * w, y = (-ny * 0.5 + 0.5) * h;
           if (isTarget) {
             const eta = pulseEta(Math.max(0, dist - arrivalRadius(body)));
-            list.push({ kind: 'target', x, y, r, label: body.name, sub: `${fmt(dist)}  ${Math.max(1, Math.round(eta))} s` });
+            // In the cockpit the prompt sits just under the middle of the picture: with the nose on
+            // the target ("Pulse to Mars") the label would lie on it, so there it is written above the ring.
+            const above = !!sim.shipCam.cockpit && Math.abs(x - w / 2) < w * 0.22 && y > h * 0.36 && y < h * 0.64;
+            list.push({ kind: 'target', x, y, r, above, label: body.name, sub: `${fmt(dist)}  ${Math.max(1, Math.round(eta))} s` });
           } else if (r < 30) list.push({ kind: 'body', x, y, r, label: body.name, sub: null });
         } else if (isTarget) {
           // Off screen: a small arrow at the edge of the picture, pointing the way to turn.
