@@ -336,3 +336,18 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   snapshotted every role's uncommitted files (`61c8104`, `ee4c336`, `e292f19`) and resumed the
   three agents. Background processes (servers, running tests) do not survive a restart: after
   one, check `git status` and `git log`, re-run whatever was in flight, and keep committing often.
+- 2026-11-11: **PAINTER reports M2, first pass** (`a7d553b`): all eight planets with 4+ biomes
+  driven from `looks.js`, liquids per biome, tall kits (fungus, crystal, reeds, spire, kelp,
+  frozen wave), Saturn's rings as geometry, cloud decks and limb haze from orbit, PHYSICS's
+  flora field wired (`?physics=1` in the gallery), violet shade glaze. Its own probe puts every
+  body inside the budget at quality 1 (355 k to 567 k triangles). `sampleObstacles` returns
+  everything within a radius clamped to 60 m, unsorted. Proposed for M3: `painter.setMarks(...)`.
+- 2026-11-11: **Coordinator finding on that pass (the coordinator looked at all 41 frames):**
+  the palettes differ, the landscapes mostly do not. Many biomes are the same rolling plain
+  with scattered rocks and do not show the feature the brief names (no canyon, dunes, craters,
+  terraces, mesas, sea cliffs, snow peaks, sinkholes; lava and acid not visible). Tall kits
+  (crystals, spires, frozen waves, kelp) show facets and continuous ink outlines and read as
+  low-poly, against the art bible ("not low-poly", "no visible facets", silhouettes never
+  ruler-straight). **PAINTER's M2 is not accepted yet: a second pass on landforms and on
+  faceted kits comes before M3.** How is PAINTER's call; that each biome shows its named
+  feature is the brief's requirement and the coordinator holds it.
