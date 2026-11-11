@@ -45,6 +45,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-hud.pc-cockpit .pc-readout { bottom: auto; top: 8.5%; }
 .pc-hud.pc-cockpit .pc-prompt { bottom: 39%; }
 .pc-hud.pc-cockpit .pc-notice { bottom: 47%; }
+/* On foot in third person the figure fills the lower middle (its feet about 14% up): the
+   prompt lies under the feet, the gauge and any notice just above it, not across the legs. */
+.pc-hud.pc-foot3 .pc-prompt { bottom: 4.4%; }
+.pc-hud.pc-foot3 .pc-gauges { bottom: 11.4%; }
+.pc-hud.pc-foot3 .pc-notice { bottom: 17%; }
+.pc-hud .pc-prompt { transition: opacity 0.25s ease, bottom 0.4s ease; }
+.pc-hud .pc-notice { transition: opacity 0.5s ease, bottom 0.4s ease; }
+.pc-hud .pc-gauges { transition: bottom 0.4s ease; }
 .pc-hud.pc-cockpit .pc-stats { top: 21%; }
 
 /* ---- prompt: a key in ink, an action in the hand ---- */

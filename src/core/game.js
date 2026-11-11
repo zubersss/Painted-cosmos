@@ -414,6 +414,9 @@ export class Game {
       hud.root.classList.toggle('pc-paneled', !!panelOpen);      // an open panel has the page to itself
       // From the seat the lower third of the frame is the cowl and its dials: the slips move up.
       hud.root.classList.toggle('pc-cockpit', !!sim.shipCam.cockpit && (st === S.LANDED || st === S.ATMOSPHERE || st === S.SPACE || st === S.PULSE));
+      // On foot in third person the explorer stands in the lower middle of the frame, where the
+      // slips used to lie across the legs: they go under the feet instead.
+      hud.root.classList.toggle('pc-foot3', st === S.ON_FOOT && !sim.footCam.firstPerson);
     }
     if (hud.setHint) {
       // Until the player has looked around once (and again whenever the capture is lost), say how.

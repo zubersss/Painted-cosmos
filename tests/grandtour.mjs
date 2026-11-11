@@ -62,6 +62,7 @@ async function beat(name) {
   await page.evaluate(() => window.__pc.hold(false));
   beats.push({ n: beats.length + 1, name, file, t: +i.t.toFixed(1), wall: Math.round((Date.now() - wall0) / 1000), shotSeconds: Math.round((Date.now() - w0) / 100) / 10, state: i.state, view: i.view, busy: await page.evaluate(() => (window.__pc.world.busy == null ? null : window.__pc.world.busy)), tris: i.stats ? i.stats.tris : null, prompt: i.prompt, notice: i.notice, uiNotice: i.uiNotice || null, quality: i.quality, scale: i.scale, fps: i.fps });
   log(`  beat ${n} ${name}: ${i.state}, prompt "${i.prompt || ''}", notice "${i.notice || ''}"`);
+  try { fs.writeFileSync(path.join(opt.out, 'beats.json'), JSON.stringify({ beats, camera: null }, null, 1)); } catch { /* keep playing */ }
 }
 const saveBeats = async () => {
   if (!opt.beats) return;
