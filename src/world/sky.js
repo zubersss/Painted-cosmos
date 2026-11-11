@@ -3,6 +3,7 @@
 // the active body's local frame, so clouds and wash variation are anchored to the planet.
 import * as THREE from 'three';
 import { G, ensureGlobals } from '../render/shared.js';
+import { RING_PROFILE } from './orbit.js';
 
 const SKY_VERT = /* glsl */`
 uniform vec2 uProjScale;
@@ -37,12 +38,15 @@ uniform vec4 uWxSky;        // weather: x overcast, y storm, z rain veil, w snow
 uniform vec3 uStormWash;    // this world's heavy-weather pigment (its cloud shadow laid dense, glazed with indigo)
 uniform vec4 uRingS;        // a ringed world seen from under its rings: inner, outer radius (m), strength (0: none)
 uniform vec3 uRingC;        // the rings' wash
+uniform vec4 uBelt;         // a banded world from inside: belts pole to pole, how far their edges wander (rad), strength
+uniform vec4 uSeaC;         // a sea of cloud: its top above the body's radius (m), strength, how high its heads stand
 uniform float uTime;
 varying vec3 vDirL;
 varying vec3 vDirW;
 layout(location = 1) out highp vec4 pcAux;
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
+${RING_PROFILE}
 
 void main() {
   vec3 d = normalize(vDirL);
@@ -84,26 +88,77 @@ void main() {
     if (tr > 0.0 && r01 > 0.0 && r01 < 1.0 && !hid) {
       vec4 ra = texture(uNoise3D, vec3(r01 * 2.3, 0.37, 0.11));
       vec4 rb = texture(uNoise3D, vec3(r01 * 9.1, 0.71, 0.53));
-      float band = ra.r * 0.65 + rb.g * 0.35;
-      float on = smoothstep(0.40, 0.46, band) * smoothstep(0.0, 0.05, r01) * (1.0 - smoothstep(0.93, 1.0, r01));
-      float pool = on * (1.0 - smoothstep(0.46, 0.55, band));                      // pigment pools along each band's edge
+      vec2 pr = pcRingProfile(r01, ra, rb);
       float al = dot(rp, uSunDirL);
       float lit = al > 0.0 ? 1.0 : smoothstep(uAtmo.w * 0.95, uAtmo.w * 1.05, length(rp - uSunDirL * al));
       // the brush runs dry along the arc here and there (anchored to the ring, not to the eye)
       float dryb = texture(uNoise3D, vec3(rp.xz / uRingS.y * 2.6, r01 * 1.7)).g;
-      float k = on * uRingS.z * smoothstep(0.015, 0.16, e) * (1.0 - oc * 0.85) * (0.70 + 0.30 * smoothstep(0.32, 0.56, dryb));
-      // by day: some bands lifted to paper out of the sky's wash, some a thin glaze of the rings' own gold over it
-      float kind = smoothstep(0.42, 0.58, rb.b + (ra.g - 0.5) * 0.4);
-      vec3 lifted = mix(vec3(1.0, 0.99, 0.95), uRingC, 0.12);
-      vec3 glazed = dens(sky * mix(vec3(1.0), uRingC, 0.75), 1.25 + pool * 0.8);
-      vec3 ringD = mix(glazed, lifted, kind);
+      float k = pr.x * uRingS.z * smoothstep(0.012, 0.13, e) * (1.0 - oc * 0.85) * (0.74 + 0.26 * smoothstep(0.30, 0.56, dryb));
+      // by day: the pale rings are lifted out of the sky's wash to paper; the thin ones are a glaze of their own gold over it
+      vec3 lifted = mix(vec3(1.0, 0.99, 0.95), uRingC, 0.10);
+      vec3 glazed = dens(sky * mix(vec3(1.0), uRingC, 0.55), 1.15);
+      vec3 ringD = mix(glazed, lifted, smoothstep(0.10, 0.62, pr.y));
       // by night the lit ring is the palest thing in the sky
-      vec3 ringN = mix(uRingC, vec3(1.0, 0.985, 0.93), 0.35 + 0.4 * kind);
+      vec3 ringN = mix(uRingC, vec3(1.0, 0.985, 0.93), 0.25 + 0.6 * pr.y);
       vec3 ringc = mix(ringN, ringD, uAtmo.y);
       // in the planet's shadow: only a cool breath darker than the sky
       ringc = mix(dens(sky * vec3(0.86, 0.85, 0.93), 1.35), ringc, lit);
-      sky = mix(sky, ringc, k * mix(0.9, 0.82, uAtmo.y));
-      sky = dens(sky, 1.0 + pool * k * 0.55 * lit);
+      sky = mix(sky, ringc, k * mix(0.94, 0.92, uAtmo.y));
+      // pigment pools where the sky's wash stops against each lifted band: the arc's fine drawn edges
+      sky = dens(sky, 1.0 + pr.x * (1.0 - pr.x) * 4.0 * 0.9 * uRingS.z * smoothstep(0.012, 0.13, e) * uAtmo.y * (1.0 - oc));
+    }
+  }
+
+  // ---- the belts of a banded world, seen from inside it: the high cloud lies in broad bands
+  // along the parallels, pale zone beside darker belt, their edges run wet into each other
+  float rc0 = length(uCamL);
+  if (uBelt.z > 0.001) {
+    float bb = dot(uCamL, d), bd = bb * bb - (rc0 * rc0 - uCloud.x * uCloud.x);
+    if (bd > 0.0 && rc0 < uCloud.x) {
+      vec3 bp = normalize(uCamL + d * (-bb + sqrt(bd)));
+      vec4 b1 = texture(uNoise3D, bp * 5.3 + vec3(uTime * 0.0003, 0.0, 0.0));
+      vec4 b2 = texture(uNoise3D, bp * 19.0 + 0.4);
+      float lat = asin(clamp(bp.y, -1.0, 1.0)) + ((b1.r - 0.5) + (b2.g - 0.5) * 0.4) * uBelt.y;
+      float sv = sin(lat * uBelt.x * 3.14159 + 0.6), sv2 = sin(lat * uBelt.x * 3.14159 * 2.7 + 2.1);
+      float belt = smoothstep(-0.22, 0.30, sv + 0.28 * sv2 + (b2.r - 0.5) * 0.35);
+      vec3 zone = mix(sky, vec3(1.0, 0.985, 0.94), 0.50);
+      vec3 beltc = dens(mix(sky, uCloudShade, 0.62), 1.30 + (b1.g - 0.5) * 0.9 + (b2.b - 0.5) * 0.4);
+      sky = mix(sky, mix(zone, beltc, belt), uBelt.z * smoothstep(-0.02, 0.07, e) * (1.0 - oc) * (1.0 - uAtmo.x));
+    }
+  }
+
+  // ---- a sea of cloud seen from one of its islands: beyond the island's rim the cloud tops
+  // lie in rows out to their own horizon, and heads of cumulus stand up along it. (The sea
+  // itself is the liquid's surface near by; this is its far reach, which no island's rim hides.)
+  if (uSeaC.y > 0.001) {
+    float rs = uAtmo.w + uSeaC.x;
+    // where the top of the far cloud lies for this eye: below eye level (its own horizon) from above it,
+    // above eye level from a bench lower than the cloud tops (the islands then stand in a bank of it)
+    float et = rc0 > rs ? -sqrt(max(0.0, 1.0 - (rs * rs) / (rc0 * rc0))) : sin(atan((rs - rc0) / 450.0));
+    vec3 hz2 = normalize(d - up * e + up * 1e-4);
+    vec4 h1 = texture(uNoise3D, hz2 * 2.2 + 0.31);
+    vec4 h2 = texture(uNoise3D, hz2 * 7.0);
+    float head = (0.016 + 0.085 * smoothstep(0.30, 0.78, h1.r) + 0.020 * h2.g) * uSeaC.z;       // heads of cumulus stand up along it
+    float above = e - et;
+    float deck = 0.0, hollow = 0.0;
+    if (above < head) {
+      deck = 1.0 - smoothstep(head * 0.80, head, above);                              // a crisp upper edge
+      float sb = dot(uCamL, d), sdisc = sb * sb - (rc0 * rc0 - rs * rs);
+      if (rc0 > rs && sdisc > 0.0 && sb < 0.0) {
+        // the deck itself, seen from above: rows of billows out to its horizon; the sea near by is the liquid's own surface
+        float ts = -sb - sqrt(sdisc);
+        vec3 sp = uCamL + d * ts;
+        vec4 q1 = texture(uNoise3D, sp / 190.0 + vec3(uTime * 0.0006, 0.0, 0.0));
+        vec4 q2 = texture(uNoise3D, sp / 53.0);
+        deck *= smoothstep(160.0, 420.0, ts);
+        hollow = 1.0 - smoothstep(0.30, 0.56, q1.r * 0.65 + q2.g * 0.35);
+      } else {
+        // the heads and the bank under them: lit tops, the sides and hollows in a soft glaze
+        float under = clamp(1.0 - above / max(head, 1e-4), 0.0, 1.0);
+        hollow = smoothstep(0.22, 0.85, under + (h2.r - 0.5) * 0.5) * (0.55 + 0.45 * h2.b) * (1.0 - 0.5 * smoothstep(0.0, -0.10, above));
+      }
+      vec3 deckc = mix(vec3(1.0, 0.995, 0.97), mix(uCloudShade, vec3(0.80, 0.76, 0.88), 0.35), hollow * 0.62);
+      sky = mix(sky, deckc, deck * uSeaC.y * (1.0 - oc * 0.6) * (1.0 - uAtmo.x));
     }
   }
 
@@ -215,6 +270,8 @@ export function makeSkyUniforms() {
     uStormWash: { value: new THREE.Vector3(0.48, 0.50, 0.68) },
     uRingS: { value: new THREE.Vector4(1, 2, 0, 0) },
     uRingC: { value: new THREE.Vector3(0.93, 0.86, 0.66) },
+    uBelt: { value: new THREE.Vector4(9, 0.02, 0, 0) },
+    uSeaC: { value: new THREE.Vector4(80, 0, 1, 0) },
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },
     uBodyInv: { value: new THREE.Matrix3() },

@@ -16,26 +16,46 @@ void main() {
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }`;
+// The rings' own drawing from the inner edge to the outer (r: 0..1), shared by the ring's geometry
+// (seen from space) and the arc laid into the sky (seen from the ground), so the two agree:
+// a thin inner ring, the broad pale ring, the dark division, the outer ring with a hair-line gap.
+// -> x: how much wash lies there (0: a gap, the sky shows through), y: how pale it is (1: bare paper)
+export const RING_PROFILE = /* glsl */`
+vec2 pcRingProfile(float r, vec4 n, vec4 n2) {
+  float w = (n.r - 0.5) * 0.012;                                                            // the hand's wobble
+  float c = smoothstep(0.02, 0.06, r) * (1.0 - smoothstep(0.215 + w, 0.245 + w, r));
+  float b = smoothstep(0.245 + w, 0.30 + w, r) * (1.0 - smoothstep(0.615 - w, 0.645 - w, r));
+  float a = smoothstep(0.715 + w, 0.745 + w, r) * (1.0 - smoothstep(0.94, 0.99, r));
+  float hair = 1.0 - 0.85 * smoothstep(0.868, 0.876, r) * (1.0 - smoothstep(0.888, 0.896, r));
+  float on = max(max(c * 0.5, b), a * hair);
+  float ringlets = 0.5 + 0.5 * smoothstep(0.30, 0.70, n2.g);                                // band beside band: denser, thinner
+  float pale = b * (0.62 + 0.38 * ringlets) + a * (0.34 + 0.26 * ringlets) + c * 0.12;
+  return vec2(on, clamp(pale, 0.0, 1.0));
+}`;
 const RING_FRAG = /* glsl */`
 ${FRAG_PARS}
 uniform vec3 uColor;
 uniform vec2 uRadii;
 varying vec3 vPos;
 varying vec3 vView;
+${RING_PROFILE}
 void main() {
   #include <logdepthbuf_fragment>
   float r = (length(vPos.xy) - uRadii.x) / (uRadii.y - uRadii.x);
   // bands of wash laid side by side, with gaps of bare paper between them
   vec4 n = texture(uNoise3D, vec3(r * 2.3, 0.37, 0.11));
   vec4 n2 = texture(uNoise3D, vec3(r * 9.1, 0.71, 0.53));
-  float band = n.r * 0.65 + n2.g * 0.35;
-  float gap = smoothstep(0.40, 0.46, band) * smoothstep(0.0, 0.05, r) * (1.0 - smoothstep(0.93, 1.0, r));
-  if (gap < 0.5) discard;
+  vec2 pr = pcRingProfile(r, n, n2);
+  if (pr.x < 0.42) discard;
   vec4 t = texture(uNoise3D, vPos * 0.00021);
-  vec3 c = pcDensity(mix(uColor, vec3(1.0), 0.25 + 0.5 * n2.b), 0.75 + band * 0.9 + (t.r - 0.5) * 0.6);
-  // the far side of the ring falls in the planet's shadow
+  // (the plane's own coordinates are x, y: the ring's mesh lies in its local xy and is turned into the equator)
+  vec3 c = pcDensity(mix(uColor, vec3(1.0), 0.10 + 0.62 * pr.y), 0.80 + (1.0 - pr.y) * 1.05 + (t.r - 0.5) * 0.6 + (n2.b - 0.5) * 0.3);
+  // the far side of the ring lies in the planet's shadow: a cool glaze over the wash
+  vec3 pl = vec3(vPos.x, 0.0, vPos.y);
   vec3 sunL = normalize(uSunDirL);
-  vec3 p = vPos.xzy * vec3(1.0, 1.0, 1.0);
+  float al = dot(pl, sunL);
+  float shadow = al > 0.0 ? 0.0 : 1.0 - smoothstep(uRadii.x * 0.70, uRadii.x * 0.78, length(pl - sunL * al));
+  c = mix(c, pcDensity(c * vec3(0.52, 0.54, 0.74), 1.5), shadow * 0.85);
   pcWrite(c, 1.0, vec3(0.0, 0.0, 1.0), -vView.z, 0.5);
 }`;
 

@@ -178,7 +178,11 @@ export const LOOKS = {
     rings: { inner: 1.35, outer: 2.25, color: [0.93, 0.86, 0.66] },
     bands: 0.5,
     deck: { height: 340, belts: 7, wobble: 0.05, a: [0.99, 0.95, 0.78], b: [0.93, 0.80, 0.52], streaks: 0.15, wet: 0.6 },
-    sky: mkSky([0.90, 0.84, 0.60], [0.99, 0.95, 0.80], { glaze: [0.74, 0.70, 0.86], light: [1.0, 0.97, 0.86] }),
+    // (a sky with body: honey at the horizon rising to a dusty violet-gold, so that the rings are a PALE arc in it)
+    sky: mkSky([0.76, 0.70, 0.78], [0.99, 0.93, 0.74], { glaze: [0.74, 0.70, 0.86], light: [1.0, 0.97, 0.86], cloudShade: [0.86, 0.74, 0.66] }),
+    skyBelts: [14, 0.012, 0.10], seaDeck: [84, 0.92, 1.0],
+    // the first landing: far enough south that the rings stand as a great arc over the northern sky, by the rim of an island
+    spawn: [-0.847849, -0.520723, 0.099999, 15, 1, 15, 343.6],
     flora: {
       tall: [
         { kit: 'crystal', thin: 1, scale: 0.9, bark: [[0.90, 0.98, 0.90], [0.50, 0.78, 0.72]], leaf: [[0.90, 0.98, 0.90], [0.74, 0.90, 0.80], [0.50, 0.78, 0.72]], far: [3.2, 7.5, 0.9], obs: [0.4, 6] },
@@ -229,6 +233,8 @@ export const LOOKS = {
 
   venus: {
     seed: 'venus-3', seaLevel: null, cloud: 0.85, visibility: [230, 1000], bands: 0.6,
+    // the first landing: on the bank of a lava river where it runs away into the haze, a grove of the old towers beside it
+    spawn: [0.441599, 0.870687, 0.216551, 352, -4, 15, 19.6],
     deck: { height: 450, belts: 3.2, wobble: 0.42, a: [0.99, 0.94, 0.66], b: [0.93, 0.70, 0.36], streaks: 0.35, wet: 0.7 },
     sky: mkSky([0.90, 0.76, 0.40], [0.99, 0.91, 0.62], { glaze: [0.74, 0.62, 0.66], light: [1.0, 0.94, 0.72], cloudShade: [0.86, 0.66, 0.44] }),
     flora: {
@@ -248,7 +254,7 @@ export const LOOKS = {
         { t: { amp: 55, wl: 480, patch: [{ c: [0.58, 0.60, 0.30], wl: 17, thr: -0.05, soft: 0.35, amt: 0.55 }, { c: [0.86, 0.60, 0.50], wl: 7, thr: 0.28, soft: 0.25, amt: 0.4 }] }, mist: 0.8, tall: [0, 1], tallD: 0.62, tallMix: 0.55,
           near: { blade: 2, dab: 1, flower: 7, flowerSize: 2.3, fern: 6, litter: 6, crust: 4 }, small: { bush: 0.09, fern: 0.20, flower: 0.10, rock: 0.02 } }),
       B('lava_rivers', 'Lava Rivers', 'riverbed', ['sepia', 'burntUmber', 'paynesGrey', 'cadOrange', 'indigo'], 'cadScarlet', ['burntUmber', 'sepia', 'paynesGrey'],
-        { t: { amp: 34, wet: 1, dil: 0.14, bedW: 12, bedD: 2.3, flow: 1.3, ember: 1, emberR: 26, patch: [{ c: [0.17, 0.15, 0.19], wl: 31, thr: -0.02, soft: 0.3, amt: 0.6 }, { c: [0.84, 0.72, 0.36], wl: 9, thr: 0.24, soft: 0.22, amt: 0.5 }, { c: [0.74, 0.40, 0.24], wl: 4.5, thr: 0.38, soft: 0.2, amt: 0.45 }] }, liquid: { color: [0.96, 0.46, 0.16], refl: 0, glow: 1 }, tall: [3, 2], tallD: 0.30, tallMix: 0.62,
+        { t: { amp: 34, wet: 1, dil: 0.14, bedW: 12, bedD: 2.3, lqD: 1.5, flow: 1.3, ember: 1, emberR: 26, patch: [{ c: [0.17, 0.15, 0.19], wl: 31, thr: -0.02, soft: 0.3, amt: 0.6 }, { c: [0.84, 0.72, 0.36], wl: 9, thr: 0.24, soft: 0.22, amt: 0.5 }, { c: [0.74, 0.40, 0.24], wl: 4.5, thr: 0.38, soft: 0.2, amt: 0.45 }] }, liquid: { color: [0.96, 0.46, 0.16], refl: 0, glow: 1 }, tall: [3, 2], tallD: 0.30, tallMix: 0.62,
           // cooled flows: ropes of dark glass, sulphur crust round the vents, an ember crack here and there
           under: { crust: [[0.13, 0.12, 0.16], [0.90, 0.78, 0.36], [0.30, 0.26, 0.30], [0.93, 0.52, 0.22]] }, near: { dab: 3, crust: 8, needle: 0 }, small: { rock: 0.11 }, phys: { ground: 'rock' } }),
       B('acid_terraces', 'Acid Lake Terraces', 'terraced', ['lemonYellow', 'oliveGreen', 'yellowOchre', 'viridian', 'rawUmber'], 'turquoise', ['lemonYellow', 'yellowOchre', 'oliveGreen'],
@@ -262,6 +268,9 @@ export const LOOKS = {
     seed: 'jupiter-3', seaLevel: 0, cloud: 0.6, visibility: [600, 3200], bands: 1.0, fine: 1,
     deck: { height: 720, belts: 9, wobble: 0.07, a: [0.99, 0.94, 0.80], b: [0.92, 0.62, 0.38], streaks: 0.25, wet: 0.45, storm: { over: 'storm_wall', size: 0.20, color: [0.80, 0.34, 0.28] } },
     sky: mkSky([0.90, 0.78, 0.62], [0.99, 0.93, 0.80], { glaze: [0.72, 0.66, 0.84], light: [1.0, 0.95, 0.84], cloudShade: [0.90, 0.68, 0.50] }),
+    skyBelts: [20, 0.016, 0.85], seaDeck: [106, 0.92, 1.15],
+    // the first landing: a bench of the first island, where the belts of the sky run down between the islands that stand round it
+    spawn: [0.124426, 0.328288, 0.936347, 60, 0, 15, 91.6],
     flora: {
       tall: [
         { kit: 'broadleaf', scale: 1.0, vary: 1, bark: [[0.70, 0.58, 0.46], [0.36, 0.28, 0.28]], leaf: [[0.70, 0.84, 0.42], [0.46, 0.70, 0.44], [0.24, 0.46, 0.42]], barkP: [0.55, 1, 0.8, 0.5], leafP: [0.85, 0.30, 1.0, 0.3], wind: 0.10, far: [13, 10.5, 0], obs: [0.3, 10] },

@@ -75,6 +75,7 @@ class Surface {
     this._buildSites();
     this._prepPalettes();
     this.clearings = [];   // [{x,y,z, r}] flora-free glades (spawn)
+    this.pads = [];        // [{x,y,z, r, r2, h}] levelled places (a first landing chosen by eye)
     this._b = makeB();
     this._ctx = { x: 0, y: 0, z: 0, baseReady: false, L: 0, s: 1e9 };
     this._wtmp = new Float32Array(this.sites.length);
@@ -545,7 +546,8 @@ class Surface {
       const rise = smoothstep(w0 + 2, 110, s);
       const hill = Math.max(0, 0.5 + 0.55 * A.n3(x * R / 380 + 7.7, y * R / 380 + 1.1, z * R / 380 - 3.3));
       h = c.L + hb + hill * amp * rise + A.n3(x * R / 90, y * R / 90, z * R / 90) * 3 * rise + C.n3(x * R / 11, y * R / 11, z * R / 11) * 0.35 + C.n3(x * R / 3.1, y * R / 3.1, z * R / 3.1) * 0.06;
-      if (T.wet) lq = c.L - 1.9;
+      const lqD = T.lqD == null ? 1.9 : T.lqD;      // how far below the plain the liquid stands (a lava river runs brim-full)
+      if (T.wet) lq = c.L - lqD;
       bed = 1 - smoothstep(w0 - 0.5, w0 + 2.5, s);
       t = clamp(0.25 + rise * 0.8 - bed * 0.4, 0, 1); dry = 0.5; wet = 0.15;
       // things grow along the banks, where the water once ran
@@ -553,7 +555,7 @@ class Surface {
       shade = smoothstep(w0 - 0.5, w0 + 1.5, s) * (1 - smoothstep(w0 + 1.5, w0 + 4 + dp, s)) * 0.3 * (T.wet ? 0 : 1);
       // the light of what flows: a warm glaze on the banks that dies away in a few strides, and
       // beside it the cooled levee, the darkest ground of the plain
-      if (T.ember) { const se = w0 * Math.sqrt(Math.max(0, 1 - 0.7 / dp)); ember = T.ember * (1 - smoothstep(se - 1, se + (T.emberR || 16), s)); char = smoothstep(se - 2, se + 1, s) * (1 - smoothstep(se + 6, se + 44, s)); crk = -char * smoothstep(-0.25, 0.35, C.n3(X / 23 + 7.0, Y / 23, Z / 23 - 3.0)); }
+      if (T.ember) { const se = w0 * Math.sqrt(Math.max(0, 1 - (lqD - 1.2) / dp)); ember = T.ember * (1 - smoothstep(se - 1, se + (T.emberR || 16), s)); char = smoothstep(se - 2, se + 1, s) * (1 - smoothstep(se + 6, se + 44, s)); crk = -char * smoothstep(-0.25, 0.35, C.n3(X / 23 + 7.0, Y / 23, Z / 23 - 3.0)); }
     } else if (k === 'sinkholes') {
       const amp = T.amp || 40;
       const cl = A.n3(x * R / 190 + 9.0, y * R / 190 - 4.0, z * R / 190 + 2.0);
@@ -593,7 +595,8 @@ class Surface {
       for (let q = 0; q < T.patch.length; q++) {
         const pt = T.patch[q], w = pt.wl, o = 3.7 + q * 11.3;
         const n = C.n3(X / w + o, Y / w - o, Z / w + 2.0 * o) + 0.45 * C.n3(X / (w * 0.29) - o, Y / (w * 0.29), Z / (w * 0.29) + o);
-        const kp = smoothstep(pt.thr, pt.thr + pt.soft, n) * pt.amt;
+        // (on a table of land the patches are what grows on its top: the cliffs keep their rock)
+        const kp = smoothstep(pt.thr, pt.thr + pt.soft, n) * pt.amt * (k === 'islands' ? grow : 1);
         if (kp > 0) mix3(b, pt.c, kp);
       }
     }
@@ -662,6 +665,15 @@ class Surface {
       if (k < 1) { const t = lv + 1.2, d = h - t; h += (1 - k) * (0.5 * (h + t + Math.sqrt(d * d + 0.36)) - h); }
       if (gw[g] >= 0.55 && lv > lq) lq = lv;
     }
+    // a first landing chosen by eye stands on a levelled place: the ground within its radius is drawn to the
+    // spot's own height and eased back into the land round it (room for the ship wherever the view is best)
+    if (this.pads.length) {
+      for (const pd of this.pads) {
+        const dx = x - pd.x, dy = y - pd.y, dz = z - pd.z;
+        const d2 = (dx * dx + dy * dy + dz * dz) * this.R * this.R;
+        if (d2 < pd.r2) { const k = 1 - smoothstep(pd.r, pd.r * 1.7, Math.sqrt(d2)); h += (pd.h - h) * k; }
+      }
+    }
     o.h = h;
     o.lq = lq;
     if (full && this.clearings.length) {
@@ -722,17 +734,29 @@ class Surface {
       const bx = y * az - z * ay, by = z * ax - x * az, bz = x * ay - y * ax;
       this.sample(x, y, z, o, true);
       const h0 = o.h, top = o.top;
-      let ok = !(o.lq !== NOLQ && o.lq > o.h - 0.5);
+      let ok = !(o.lq !== NOLQ && o.lq > o.h - 0.5), drift = 0;
       for (let a = 0; a < 8 && ok; a++) {
         const ca = Math.cos(a * Math.PI / 4), sa = Math.sin(a * Math.PI / 4);
         for (const r of [6.5, 13]) {
           const e = r / this.R;
           this.sample(x + (ax * ca + bx * sa) * e, y + (ay * ca + by * sa) * e, z + (az * ca + bz * sa) * e, o, false);
-          if ((o.lq !== NOLQ && o.lq > o.h - 0.3) || Math.abs(o.h - h0) / r > 0.2) { ok = false; break; }
+          if (o.lq !== NOLQ && o.lq > o.h - 0.3) { ok = false; break; }
+          drift = Math.max(drift, Math.abs(o.h - h0));
         }
       }
-      if (ok) {
+      // (the place is levelled, but only a place that is nearly level already: no shelf is cut into a hillside)
+      if (ok && drift < 4.5) {
         this._spawn = { x, y, z, yaw: fx[3] * D2R, pitch: (fx[4] || 0) * D2R };
+        this.pads.push({ x, y, z, r: 14, r2: (14 * 1.7) * (14 * 1.7), h: h0 });
+        // (and a berth for the ship, 16 m off on a compass bearing, where PILOT looks for the flattest ground
+        // beside the arrival: dead level, so the ship stands in the first view and not behind the easel)
+        if (fx[6] != null) {
+          let ex = z, ez = -x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;                   // east
+          const nx = y * ez, ny = z * ex - x * ez, nz = -y * ex;                                         // north = d x east
+          const cb = Math.cos(fx[6] * D2R) * 16 / this.R, sb = Math.sin(fx[6] * D2R) * 16 / this.R;
+          let qx = x + nx * cb + ex * sb, qy = y + ny * cb, qz = z + nz * cb + ez * sb; const ql = 1 / Math.hypot(qx, qy, qz);
+          this.pads.push({ x: qx * ql, y: qy * ql, z: qz * ql, r: 5, r2: (5 * 1.7) * (5 * 1.7), h: h0 });
+        }
         if (this.biomes[top].tall) this.clearings.push({ x, y, z, r: fx[5] || 15 });
         return this._spawn;
       }

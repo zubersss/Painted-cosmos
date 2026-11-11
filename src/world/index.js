@@ -427,6 +427,8 @@ export function createWorld(scene) {
       skyU.uAtmo.value.set(space01, dayness, 0.042, body.radius);
       // a ringed world's rings are laid into the sky's wash while one stands under them; the ring's geometry takes over in space
       { const rg = st.look.rings; if (rg) { skyU.uRingS.value.set(body.radius * rg.inner, body.radius * rg.outer, 1 - THREE.MathUtils.smoothstep(space01, 0.55, 0.9), 0); skyU.uRingC.value.fromArray(rg.color); } else skyU.uRingS.value.z = 0; }
+      // (and a banded world's belts, a cloud sea's far reach: looks.js `skyBelts` [belts, wander, strength], `seaDeck` [top (m), strength, heads])
+      { const sb = st.look.skyBelts, sd = st.look.seaDeck; if (sb) skyU.uBelt.value.set(sb[0], sb[1], sb[2], 0); else skyU.uBelt.value.z = 0; if (sd) skyU.uSeaC.value.set(sd[0], sd[1], sd[2] == null ? 1 : sd[2], 0); else skyU.uSeaC.value.y = 0; }
       st.root.getWorldQuaternion(_q);
       skyU.uBodyInv.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(_q.invert()));
       SHEET.grade.copy(tmpKey.grade).lerp(new THREE.Vector3(1, 1, 1), space01);
