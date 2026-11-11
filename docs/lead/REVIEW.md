@@ -23,6 +23,137 @@ is judged at the top tier from now on.
 
 ---
 
+## Before review 6: the picture in motion, the Moon run, the head in a browser (2026-11-11, fifth PILOT agent)
+
+Not a milestone review: evidence gathered for review 6, with findings a role can act on now.
+Nothing here is a MUST FIX yet; review 6 will sort them. All of it was run by me in a clean
+tree (each role's own last commit, never a "WIP snapshot"), software rendering.
+
+### The picture in motion (`tests/motion.mjs`, new)
+
+The first look at this game moving. The test drives the game's clock itself (30 steps a
+second through `window.__pc.hold/step`), takes consecutive frames at the top tier, 960x540,
+and measures what changes between them (what each number means is in the file's header; the
+in-page part is `tests/motionlib.mjs`, usable on any page with a canvas). Sheets:
+`docs/lead/evidence/motion-<scene>.jpg`, numbers `motion.json`. Shot on PAINTER `c0e6d03`,
+PHYSICS `bf73de5` (still, turn, walk, storm) and on PAINTER `cf2058a`, PHYSICS `9b708e2`
+(still-frozen, flight, fill, pulse; the first four were shot there too and the numbers moved
+by less than a tenth). I opened every sheet (the four re-shot ones: the storm on the new
+head, still, turn and walk on the older one).
+
+| scene | change per frame | pixels changing over 3 % | never changes | residual after following the motion (mean, 99th) | block mean over 3 % | pops |
+| --- | --- | --- | --- | --- | --- | --- |
+| still-frozen (same instant, 6 frames) | 0 % | 0 % | 100 % | 0, 0.006 % | 0 of 2400 | 0 |
+| still, clock running | 0.298 % (worst pair 0.327) | 2.25 % | 58 % | 0.31, 2.26 % | 5 of 13920 | 1 block in 1 of 29 pairs |
+| turn, 11.6 degrees a second | 2.69 % | 25 % | 11 % | 1.42, 4.22 % | 62 of 18720 | 2 in 2 of 39 |
+| walk, 4.24 m/s, 6.65 m | 3.60 % | 33 % | 10 % | 2.15, 6.00 % | 206 of 22560 | 13 in 9 of 47 |
+| storm at the spawn, standing | 0.177 % | 1.13 % | 62 % | 0.18, 1.56 % | 0 of 13920 | 1 in 1 of 29 |
+| flight, 40 m up, 28.9 m/s | 1.21 % | 11.7 % | 48 % | 0.68, 3.74 % | 45 of 22560 | 2 in 2 of 47 |
+| fill (arriving 600 m away) | 1.35 % (first pair 7.73) | 9.5 % | 13 % | 1.16, 10.0 % | 493 of 13920 | 498 in 29 of 29 |
+| pulse, 674 m/s | 0.168 % | 0.35 % | 55 % | 0.17, 0.79 % | 0 of 13920 | 0 |
+
+**GOOD (keep), with the check each passes**
+- `R-PAINT-3` (flicker). The same instant painted six times is the same picture to the last
+  bit (change 0): nothing in the paint is driven by the wall clock or by chance. With the
+  clock running and the wind blowing the mean change is 0.30 % a frame, under the 0.5 % the
+  check allows with the wind frozen; the series is level (0.27 to 0.33 %), no stepped boil.
+  The sky, the paper border and the ground wash do not change at all (bottom third 0.05 %);
+  what moves is the crowns and the grass by the explorer. This is what "only what the wind
+  moves should move" looks like.
+- `R-PAINT-2` (shower door). In the slow turn, detail five frames apart (the world has moved
+  14 px) matches where the world went (broad 0.68, fine 0.30) better than where it was on the
+  screen (0.42, 0.24; a frame against itself shifted that far gives 0.27, 0.13). Block by
+  block (scratch `run5/stuckmap.mjs`, frames 10 and 15 at full size): fine detail stays on
+  the screen only in the open sky top left (0.7 to 0.8: the paper, as the brief wants) and on
+  the explorer (0.5 to 0.8: the figure stands still in a turn); over trees and ground it is
+  0 on the screen and 0.3 to 0.7 with the world. No wash, granulation or stroke texture
+  sticks to the screen.
+- `R-PAINT-4` (slow pan). 99.7 % of 32 px blocks keep their mean luminance within 3 % from
+  frame to frame at 11.6 degrees a second (99th block 2.2 %); the 62 that do not are birch
+  trunks crossing a block edge and the two pops below.
+- The storm standing still is the calmest picture of all (0.18 %): the ground holds, the rain
+  strokes travel along their slant. On PHYSICS `9b708e2` the same strip had 3 pops and one
+  block over 3 %; on `bf73de5` (the wake, gust and outflow fixes) 1 and 0.
+- Flight over the wood: the sky does not move at all, the canopy flows; 2 small tier swaps
+  in 45 m. The pulse: the washes of space hold, the stars travel outward, nothing pops.
+
+**SHOULD FIX, PAINTER**
+1. **Arrival is a pop, then a second of pops** (`R-PAINT-6`; sheet `motion-fill.jpg`). The
+   first frame at a place nobody has painted shows the wood as trunks under thin simple
+   crowns (691 k triangles); the next frame has 575 k triangles more and the whole canopy:
+   7.7 % of the picture's luminance in one frame, residual up to 50 % in 150 blocks. Then
+   the ground: the sward and its light arrive in pieces for all of the 29 pairs measured
+   (498 blocks flagged, 493 block means over 3 %). In software rendering each frame gives
+   the builder seconds, so on a real machine this is slower and longer, not better. A player
+   meets it after a landing, after a pulse into a new sky, and at any teleport of the debug
+   door. What the art bible asks is the painting repainting itself calmly: a wash that comes
+   up over a third of a second, or nothing shown until the near field is whole (how is
+   yours). The title card already hides the very first one (see the first ten minutes).
+2. **Things change tier in one frame.** Walking 6.65 m the triangle count jumps by more than
+   2000 in 10 of 47 frames (the largest -50 k, +20 k, -18.5 k, +10.6 k); in flight in 31 of
+   47 (two visible: crowns under the ship re-drawn between frames 13/14 and 16/17, residual
+   6 % against a usual 1.4 %, `motion-flight.jpg`). In the walk none of the big jumps shows
+   as a flagged block, so most are out of sight or small; in the turn one does: between
+   frames 29 and 30 a dark dab of ground mark appears in the middle of the meadow (block at
+   192, 320; +746 triangles; on the older head's sheet, kept in scratch). Nothing fades.
+3. **A near flower is a flat hard-edged disc.** In the walk a poppy passes the camera at the
+   left edge as a perfectly round, flat orange-red disc about 30 px across with a hard rim
+   (frames 32 to 36, the four pop crops of the older walk sheet; the detector flags it
+   because it moves 30 px a frame, not because it appears). At that size it is a sticker, not
+   a touch of the brush (AB: no hard digital shapes).
+4. One crown re-deals its dark dabs in a single frame at the same clock time on both heads
+   (still: frame 20 to 21, block 288, 128, residual 4.3 % against 0.37 %; turn: frame 8 to
+   9, block 448, 64): small, and regular enough to be a scheduled update rather than wind.
+5. Where to look next (PAINTER's own note that the handwriting changes at about 17 m): in
+   the walk's ground band (scratch `run5/walk-ground.jpg`, frames 0, 12, 24, 36, 47, opened)
+   the edge between the bladed sward and the flat far wash with its dots keeps its place on
+   the screen, level with the ship's shadow 16 m ahead; what crosses it gains blades. I found
+   no single-frame pop there in 47 pairs and could not see a line in stills; whether the
+   growth reads as swimming needs eyes at full frame rate. The instrument cannot say.
+
+**SHOULD FIX, PHYSICS (the picture of the marks is PAINTER's glaze; say whose in your notes)**
+6. **Splash rings are thin white line ellipses that appear whole in one frame** (storm sheet,
+   the one pop: frames 13 to 14 at 416, 448 by the explorer's feet; three to four crisp white
+   outlines, one dashed). REFERENCES, rain, what makes it good: "never white lines". Everything else in that picture is
+   soft.
+
+**Limits of the instrument, so nobody reads more into it than it holds.** Pops from late
+building are understated (above). A near thing that moves more than 16 px a frame is
+flagged as a pop (every flagged block must be looked at; the sheet shows the six largest
+before and after). The measures are on luminance at half size. No frame rate, no judder, no
+tearing can be seen this way; nothing replaces looking at the game at 60 frames a second.
+
+### The Moon boulder run in the game (`tests/boulderrun.mjs`, new), for PHYSICS
+
+Crater fields, the densest place within 320 m of the stand (63 low boulders within 28 m,
+tallest 1.09 m), Shift+W in four headings for 12 s each, 30 steps a second, quality 0
+(mechanics). No boulder lifts the feet more than **0.16 m**; nothing throws the body up
+(0.05 m at most above where the feet left the ground); pace 5.7 to 6.6 m/s, never stopped.
+**GOOD: the legs do what P9 said.** Two things for PHYSICS to rule on:
+7. **A run over a crater rim sails.** Heading 270, 7.4 s in: over a rim onto a 36 degree wall
+   at 6.8 m/s; the ground falls 6.7 m away and the body is in the air for 2.4 s with the
+   feet up to 3.7 m over the wall, without rising. Review 6's measure as written ("never
+   more than 0.3 m off the ground without a jump") is not met there. It may be right for the
+   Moon (a runner would leave that rim); it is 2.4 s without control in a calm game. Your
+   call; I will word the measure as "never thrown up more than 0.3 m, and no boulder lifts
+   the feet more than 0.3 m" unless you say the rim should be held.
+8. In the pure simulation at the same site (scratch `run5/trace.mjs`): stepping off the far
+   side of a 0.72 m boulder at a run (the ground under the feet drops 0.67 m in one frame),
+   the next frame gives the body +1.06 m/s upward: 0.29 m of rise, feet 0.53 m over the
+   falling ground, 1.4 s in the air. Under the limit as a throw, over it as feet over
+   ground; it looks like a rebound of the hips after a step down.
+
+### What the unit tests could not see
+
+9. **A shader that did not compile was accepted** (closed). On PAINTER `23dea80` the
+   browser run on the Moon logged `pc-cloudshell: 'uStorm' : redefinition` (the shared
+   chunk's `uniform float uStorm` of quality push 2, `aeff8a6`, against the cloud shell's
+   `uniform vec4 uStorm`): no cloud deck on any banded world from outside. The 19 world
+   tests and my 115 pass on that commit; only a browser run fails. PAINTER found it too and
+   fixed it in `cf2058a`; my runs on `cf2058a` and `c0e6d03` have no console error. For the
+   coordinator: acceptance of a PAINTER block should include one browser run that looks at a
+   banded world from space (`node tests/all.mjs --only m3,painted-trip` does).
+
 ## Review 5, addendum: the three MUST FIX re-measured, 2026-11-11, at commit `0de3fb4`
 
 Asked for by the coordinator after PAINTER's M3 block 2 (`6bb6c91`) and PHYSICS' P7
