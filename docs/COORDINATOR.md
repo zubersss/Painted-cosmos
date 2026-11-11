@@ -388,3 +388,16 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   open the pull request with `gh api repos/zubersss/painted-cosmos/pulls -f title=... -f
   head=cosmos -f base=main -f body=...` and merge it with `gh api -X PUT
   repos/zubersss/painted-cosmos/pulls/<n>/merge -f merge_method=merge`. Only at M4, only once.
+- 2026-11-11: **PAINTER's M2 second pass came back incomplete** (`0291097`): by its own count 17
+  of 33 biome frames show their named feature, 11 partly, 5 not at all (`saturn-gold_islands`,
+  `mercury-shadow_craters`, `jupiter-hanging_gardens`, `neptune-ice_spires`,
+  `earth-desert_canyon`). Not re-probed for cost; `world.busy` fix untested; orbit frames not
+  opened. The coordinator's own look agrees and adds: ground strokes smear into long radial
+  streaks near the camera on several bodies, and Mars' frost cracks read as hexagonal tiles.
+- 2026-11-11: **PAINTER agent replaced, same role.** The first PAINTER agent reported that it
+  was at the limit of its working context and asked for a fresh run. A fresh PAINTER agent takes
+  over the role with the same ownership and rules, starting from `docs/BRIEF.md` (sections 6 and
+  7 are now stored there too), this file, `docs/notes/painter.md` and the code. Still three
+  workers; the old PAINTER agent is retired and must not be resumed.
+- 2026-11-11: PAINTER's material contract for PHYSICS's draw kits is in `docs/notes/painter.md`
+  (two opaque targets, `pcWrite`, PAINTER's chunks, a vertex chunk giving `pcKitPosition()`).

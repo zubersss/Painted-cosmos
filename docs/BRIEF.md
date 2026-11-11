@@ -211,3 +211,56 @@ target holds; the README lists the controls.
 Final message to me: how to play it (GitHub Pages from main), the
 controls, what is in, what is still weak, and what you would do next.
 ```
+
+## Role sections (the owner's brief, verbatim)
+
+Stored here by the coordinator so that a restarted or replaced agent can read its role from the
+repository. The PHYSICS role and the lead-developer duty were added later by the owner: see
+`docs/COORDINATOR.md` sections F and G.
+
+```
+=== 6. ROLE: PAINTER (art and worlds) ===
+You own how everything looks. Depth before breadth: make one forest
+frame pass the freeze-frame test before building anything else, because
+the pipeline is the product.
+1. Watercolor pipeline. A suggested shape: scene passes (colour, depth,
+   normals, region ids) -> abstraction -> edge detection for pooling,
+   wobble, and graphite -> pigment density (turbulence, granulation,
+   paper height) -> masked wet-in-wet bleed -> paper composite and
+   ragged border. Improve on this freely.
+2. Materials: world-space triplanar stroke and wash textures,
+   value-stepped lighting, glaze shadows.
+3. Terrain and biomes for every body, with smooth biome blending and
+   painterly LOD.
+4. Flora and prop kits per biome, instanced, built from stroke
+   clusters.
+5. Skies, clouds, weather, atmosphere seen from the ground and from
+   orbit, and space itself.
+6. Explorer and ship models with simple animation hooks.
+7. The painted UI theme.
+Study your own screenshots the way a painting teacher would, and
+repaint whatever looks digital.
+
+=== 7. ROLE: PILOT (systems and play) ===
+You own how everything feels and that it all runs. You are also the
+integrator.
+1. Core loop and state machine: ON_FOOT, BOARDING, LANDED, ATMOSPHERE,
+   SPACE, PULSE, LANDING.
+2. Scale: floating origin, body positions, slow orbits and rotation,
+   sun direction handed to Painter.
+3. Explorer: capsule against sampleSurface, slope limits, jetpack with
+   recharging fuel, wading in liquid, third and first person cameras
+   that never clip.
+4. Ship: forgiving arcade flight. Auto-level, landing assist with a
+   clear prompt, soft bounces instead of crashes, a lift-off sequence,
+   atmosphere entry and pulse-drive moments expressed through setMood,
+   target markers for planets.
+5. UI built on Painter's theme: minimal HUD, planet map, sketchbook,
+   title screen, help card.
+6. Audio, all procedural WebAudio: wind and ambience per biome, soft
+   pads per planet, brush and paper sounds for the UI.
+7. Performance budget, dynamic resolution, save, tests, README, deploy
+   readiness.
+Feel target: unhurried, weightless, generous. The player should never
+fight the controls.
+```
