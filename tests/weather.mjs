@@ -1,8 +1,10 @@
 // The weather set: the lead's instrument for "weather in the game" (review 5).
 // In the integrated game, third person as the player sees it, 960x540, quality 1, HUD hidden:
-//   - the Earth spawn before, in and after the default seed's first thunderstorm (the game
-//     clock is set a few seconds ahead of each moment and left to run up to it);
-//   - one forced lightning flash in that storm (window.__pc.flash);
+//   - the Earth spawn as a new player meets it: the first minute, before, as the front arrives,
+//     in and after the default seed's first thunderstorm (160 to 320 s of play, noon to half
+//     past two; the game clock is set a few seconds ahead of each moment and left to run up to
+//     it), and the same storm with the sun held at ten in the evening;
+//   - one forced lightning flash in that storm (window.__pc.flash), by day and after dark;
 //   - a blizzard on Earth's alpine meadow (fresh snow left to gather by itself);
 //   - a dust storm on Mars' dunes;
 //   - Neptune's storm sea under PHYSICS' own sky, and under a forced storm sky.
@@ -33,18 +35,22 @@ if (!label) {
 // the marks fill the air, fresh snow gathers). place: the spawn, or a biome's stand.
 const STORM = { cloud: 1, overcast: 0.95, haze: 0.35, fog: 0.5, wet: 0.9, rain: 0.85, storm: 0.85 };
 const SHOTS = [
-  { id: 'earth-before', what: 'Earth spawn, before the thunderstorm', body: 'earth', place: 'spawn', t: 540, pre: 10 },
-  { id: 'earth-storm', what: 'Earth spawn, in the thunderstorm', body: 'earth', place: 'spawn', t: 720, pre: 14 },
-  { id: 'earth-flash', what: 'the same storm, one forced lightning flash (__pc.flash)', body: 'earth', place: 'spawn', t: 724, pre: 0, flash: true, stay: true },
-  { id: 'earth-after', what: 'Earth spawn, after the storm', body: 'earth', place: 'spawn', t: 870, pre: 10, stay: true },
-  // The same three moments with the sun held at eleven in the morning, to judge the storm as a
-  // daylight picture (the frames above are what a new player gets: Earth's day is 25 minutes,
-  // the game begins at 9:30, so this storm arrives at nine in the evening).
-  { id: 'earth-before-day', what: 'before the storm, sun held at 11:00', body: 'earth', place: 'spawn', t: 540, pre: 10, hour: 11 },
-  { id: 'earth-storm-day', what: 'in the storm, sun held at 11:00', body: 'earth', place: 'spawn', t: 720, pre: 14, hour: 11 },
-  { id: 'earth-flash-day', what: 'the same, one forced lightning flash', body: 'earth', place: 'spawn', t: 724, pre: 0, flash: true, stay: true },
-  { id: 'earth-after-day', what: 'after the storm, sun held at 11:00 (the clock was jumped, so the ground had no time to dry)', body: 'earth', place: 'spawn', t: 870, pre: 10, hour: 11 },
-  { id: 'earth-blizzard', what: 'blizzard on Earth\'s alpine meadow (fresh snow gathered by itself)', body: 'earth', place: 'alpine_meadow', t: 470, pre: 32, hour: 11 },
+  // What a new player gets, standing at the spawn from the first second (the game begins at
+  // 9:30; Earth's day is 25 minutes): fair, the front arriving at noon, the storm, fair again.
+  // PHYSICS' clock since 1cbbcc6: first drops at 140 s, thunderstorm from 160 to 320 s (20 mm/h
+  // and more from 200 to 260 s), a clear afternoon from 340 s.
+  { id: 'earth-start', what: 'Earth spawn, the first minute of a new game', body: 'earth', place: 'spawn', t: 30, pre: 10 },
+  { id: 'earth-before', what: 'Earth spawn, two minutes in, before the thunderstorm', body: 'earth', place: 'spawn', t: 120, pre: 10, stay: true },
+  { id: 'earth-arrives', what: 'the front arrives (first drops fell at 140 s)', body: 'earth', place: 'spawn', t: 166, pre: 16, stay: true },
+  { id: 'earth-storm', what: 'in the thunderstorm, at its heaviest', body: 'earth', place: 'spawn', t: 240, pre: 14, stay: true },
+  { id: 'earth-flash', what: 'the same storm, one forced lightning flash (__pc.flash)', body: 'earth', place: 'spawn', t: 244, pre: 0, flash: true, stay: true },
+  { id: 'earth-after', what: 'the clear afternoon after the storm (the clock was jumped, so the ground had less time to dry than PHYSICS gives it)', body: 'earth', place: 'spawn', t: 400, pre: 10, stay: true },
+  // The same storm with the sun held at ten in the evening: the storm as a night picture, and
+  // the dearest the spawn gets (review 5's cost finding was this view).
+  { id: 'earth-storm-night', what: 'in the storm, sun held at 22:00', body: 'earth', place: 'spawn', t: 240, pre: 14, hour: 22 },
+  { id: 'earth-flash-night', what: 'the same, one forced lightning flash', body: 'earth', place: 'spawn', t: 244, pre: 0, hour: 22, flash: true, stay: true },
+  // A blizzard on land: lat 62.41, lon 49.46 (alpine meadow) is under one from 120 to 220 s.
+  { id: 'earth-blizzard', what: 'blizzard on Earth\'s alpine meadow, lat 62.41 lon 49.46 (fresh snow gathered by itself)', body: 'earth', at: { lat: 62.41, lon: 49.46 }, t: 190, pre: 32, hour: 11 },
   { id: 'mars-dust', what: 'dust storm on Mars\' dunes', body: 'mars', place: 'dust_dunes', t: 840, pre: 12, hour: 11 },
   { id: 'neptune-gale', what: 'Neptune\'s storm sea under PHYSICS\' own sky', body: 'neptune', place: 'storm_seas', t: 150, pre: 12, hour: 11 },
   { id: 'neptune-gale-forced', what: 'the same sea under a forced storm sky (world.setWeather)', body: 'neptune', place: 'storm_seas', t: 156, pre: 4, hour: 11, stay: true, force: STORM },
@@ -70,7 +76,11 @@ try {
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 600000, polling: 300 });
   log('ready', JSON.stringify(await page.evaluate(() => window.__pc.info().using)), label);
   await page.evaluate(() => { document.getElementById('pc-hud').style.visibility = 'hidden'; });
-  for (const s of WANT) {
+  for (let i = 0; i < WANT.length; i++) {
+    const s = { ...WANT[i] };
+    // "stay" keeps the stand of the frame before it in the list. With --only that frame may
+    // not have been shot: then go there (a fresh game already stands at the spawn by day).
+    if (s.stay && !(i > 0 ? SHOTS.indexOf(WANT[i - 1]) === SHOTS.indexOf(WANT[i]) - 1 : s.place === 'spawn' && s.hour == null)) s.stay = false;
     const t0 = Date.now();
     await page.evaluate((s) => {
       const pc = window.__pc, w = pc.world;
@@ -78,6 +88,12 @@ try {
       pc.setClock(s.t - s.pre);
       if (s.stay) return;
       if (s.place === 'spawn') { const d = w.getSpawn(s.body).unitDir; pc.teleport({ body: s.body, dir: [d.x, d.y, d.z], hour: s.hour }); return; }
+      if (s.at) {
+        // PHYSICS' convention: y is the pole, longitude turns from +z towards +x.
+        const la = (s.at.lat * Math.PI) / 180, lo = (s.at.lon * Math.PI) / 180;
+        pc.teleport({ body: s.body, dir: [Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)], hour: s.hour, firstPerson: false });
+        return;
+      }
       const at = w.findBiome(s.body, s.place), d = at.unitDir, deg = (r) => (r == null ? undefined : (r * 180) / Math.PI);
       pc.teleport({ body: s.body, dir: [d.x, d.y, d.z], hour: s.hour, heading: deg(at.yaw), lookPitch: deg(at.pitch), firstPerson: false });
     }, s);
