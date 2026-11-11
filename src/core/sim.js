@@ -82,7 +82,7 @@ export class Sim {
     this.camFrame = HELIO;
     this.viewKind = 'foot';
     this._samplers = {};
-    this.mood = { bodyId: 'earth', biomeWeights: {}, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0 };
+    this.mood = { bodyId: 'earth', biomeWeights: {}, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0, pulse01: 0 };
     this.seat = seat ? V(seat.x, seat.y, seat.z) : V(0, 2.2, -1.2);
     this.hatch = hatch ? V(hatch.x, hatch.y, hatch.z) : V(-2.7, 0, -0.9);
     this.input = { down: () => false, axis: () => 0 };
@@ -577,6 +577,7 @@ export class Sim {
       // has a little of the field brake (stops from 138 m/s in about 4 s).
       env.carveAccel = 40;
       env.airBrake = rho0 < 0.3 ? 0.15 : 0;
+      env.airless = rho0 < 0.01;
       // Air (density, wind, gusts) exists only in the ground frame; above it the ship is in vacuum.
       if (f.rotating) this.physics.bindEnv(f.id, env); else env.air = VACUUM_AIR;
       env.shipBody = this.physics.ship.step;
@@ -747,7 +748,7 @@ export class Sim {
     if (sh.bounce === 0) this.emit('bounce');
 
     if (this.sm.state === S.SPACE) this._thin = null;
-    else if (this.sm.state === S.ATMOSPHERE && !sh.liftoff && env.airBrake > 0 && this._firstStep) this.thinAirWord(h);
+    else if (this.sm.state === S.ATMOSPHERE && !sh.liftoff && env.airBrake > 0 && this._firstStep) this.thinAirWord(h, env);
 
     if (this.sm.state === S.ATMOSPHERE && !sh.liftoff) {
       // E lands. So does simply sinking onto the ground: nobody should have to hunt for a key.
@@ -786,25 +787,29 @@ export class Sim {
 
   // What the screen says when the ship is too fast to set down. Where the air is too thin to
   // slow it (Mars, Mercury, the Moon, Pluto) it also says what will: X.
-  slowWord(env) { return env && env.airBrake > 0 ? 'Slow down to land: the air is thin here, hold X' : 'Slow down to land'; }
+  slowWord(env) {
+    if (!env || !(env.airBrake > 0)) return 'Slow down to land';
+    return env.airless ? 'Slow down to land: no air to slow the ship here, hold X' : 'Slow down to land: the air is thin here, hold X';
+  }
 
   // A word on the screen when thin air limits the ship (PHYSICS' critique: "nothing telling the
   // player why the ship will not turn or land"). A calm slip of paper, no tone, each at its
   // moment: once per visit, coming down fast to where there is something to hit; and when the
   // nose has turned and the ship has not followed for a second and a half (at most once a minute).
-  thinAirWord(h) {
+  thinAirWord(h, env) {
     const sh = this.sh, id = this.shFrame.id;
+    const name = BODIES[id].name === 'Moon' ? 'the Moon' : BODIES[id].name;
     const T = this._thin && this._thin.id === id ? this._thin : (this._thin = { id, told: false, slip: 0, wideAt: -1e9 });
     if (!T.told && sh.altGround < 250 && sh.speed > SHIP.speedGround * 1.25 && !this.notice) {
       T.told = true;
-      this.say(`Thin air on ${BODIES[id].name}: the ship runs fast and turns wide. Hold X to slow it`, 6);
+      this.say(`${env.airless ? 'No air' : 'Thin air'} on ${name}: the ship runs fast and turns wide. Hold X to slow it`, 6);
     }
     const f = qRotate(sh.q, V(0, 0, -1));
     const off = sh.speed > 40 ? Math.acos(clamp(dot(f, sh.v) / sh.speed, -1, 1)) : 0;
     T.slip = off > 0.5 ? T.slip + h : 0;
     if (T.slip > 1.5 && this.t - T.wideAt > 60 && !this.notice) {
       T.wideAt = this.t;
-      this.say('Thin air: the ship turns wide at this speed. Ease off (S) and it turns tighter', 5);
+      this.say(`${env.airless ? 'No air to bank on' : 'Thin air'}: the ship turns wide at this speed. Ease off (S) and it turns tighter`, 5);
     }
   }
 
@@ -923,6 +928,9 @@ export class Sim {
   updateMood(active) {
     const m = this.mood;
     m.speed01 = isInShip(this.sm.state) ? clamp01(this.sh.speed / SHIP.speedSpace) : clamp01(this.ex.speed / 40);
+    // The pulse drive as one number for the painter's streaks: 0 at cruise, rising as the drive
+    // spools up (1 from about 6 km/s), falling as it brakes for arrival and after it lets go.
+    m.pulse01 = this.pulse ? smoothstep(PULSE.exitSpeed, 6000, this.pulse.v) : Math.max(0, (m.pulse01 || 0) - 0.05);
     if (!active) {
       m.bodyId = null; m.biomeWeights = {}; m.altitude01 = 1; m.inSpace01 = 1;
       return;

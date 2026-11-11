@@ -133,3 +133,60 @@ test('with physics: thin-air worlds keep a gentler pace low over the ground, and
   assert.ok(earth.top < SHIP.speedGround * 1.15, `earth: ${earth.top.toFixed(0)} m/s at 30 m`);
   assert.ok(venus.speedScale < 0.8, `venus: pace ${venus.speedScale.toFixed(2)}`);
 });
+
+// ---- 3. a word on the screen when the air limits the ship ----------------------------------
+
+test('with physics: thin-air worlds say why the ship runs fast, turns wide and will not land', { skip }, () => {
+  const fly = (body) => {
+    const sim = withPhysics({ body });
+    const pad = new Pad();
+    play(sim, pad, 0.3);
+    sim.teleport({ body, ship: true, altitude: 40, pitchDeg: 0, throttle: 1 });
+    pad.press('KeyW');
+    const said = [];
+    let last = null;
+    const each = () => {
+      const err = (40 - sim.sh.altGround) * 0.4 - sim.info().ship.pitchDeg;
+      pad.dy -= Math.max(-40, Math.min(40, (err * RAD / FEEL.mouseShip) * 0.12));
+      const n = sim.notice ? sim.notice.text : null;
+      if (n && n !== last) said.push(n);
+      last = n;
+    };
+    play(sim, pad, 12, { each });               // up to speed, low
+    pad.press('KeyD');
+    play(sim, pad, 4, { each });                // a hard turn held
+    pad.release('KeyD');
+    play(sim, pad, 6, { each });
+    pad.tap('KeyE');                            // ask to land at that pace
+    play(sim, pad, 0.5, { each });
+    return said;
+  };
+  const mars = fly('mars'), moon = fly('moon'), earth = fly('earth');
+  assert.match(mars[0], /^Thin air on Mars: the ship runs fast and turns wide/, 'first word on Mars: ' + mars[0]);
+  assert.ok(mars.some((s) => /turns wide at this speed/.test(s)), 'a held hard turn says why it is wide: ' + mars.join(' | '));
+  assert.match(mars[mars.length - 1], /^Slow down to land: the air is thin here, hold X/, 'E at speed: ' + mars[mars.length - 1]);
+  assert.equal(mars.filter((s) => /runs fast/.test(s)).length, 1, 'said once per visit');
+  assert.match(moon[0], /^No air on the Moon:/, 'the Moon has none: ' + moon[0]);
+  assert.match(moon[moon.length - 1], /no air to slow the ship here, hold X/);
+  // Where the air does the slowing, nothing about the air is said (at Earth's pace E simply lands).
+  assert.equal(earth.filter((s) => /air/i.test(s)).length, 0, 'Earth: ' + earth.join(' | '));
+});
+
+test('mood.pulse01 is 0 at cruise, rises as the pulse spools up, and falls when it lets go', () => {
+  const sim = stubSim();
+  const pad = new Pad();
+  play(sim, pad, 0.3);
+  sim.teleport({ body: 'earth', ship: true, altitude: 3000, pitchDeg: 30 });
+  play(sim, pad, 0.5);
+  assert.equal(sim.mood.pulse01, 0, 'cruise');
+  pad.tap('KeyF');
+  let before = 0, rising = true;
+  play(sim, pad, 12, { each: () => { if (sim.mood.pulse01 < before - 1e-9) rising = false; before = sim.mood.pulse01; } });
+  assert.equal(sim.sm.state, S.PULSE);
+  assert.ok(rising, 'never falls while the drive spools up');
+  assert.ok(sim.mood.pulse01 > 0.5, `after 12 s at ${Math.round(sim.sh.speed)} m/s: ${sim.mood.pulse01.toFixed(2)}`);
+  pad.tap('KeyF');
+  play(sim, pad, 40, { until: () => sim.sm.state === S.SPACE });
+  play(sim, pad, 1);
+  assert.ok(sim.mood.pulse01 < 0.05, `back at cruise: ${sim.mood.pulse01.toFixed(2)}`);
+});
