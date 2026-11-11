@@ -18,6 +18,8 @@ import { AirGrid, airAt, AIR } from './air.js';
 import { FloraField, FLORA, PlantSim, plantDisplace, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
+import { Loose, LOOSE, KICK } from './loose.js';
+import { devilsNear, DEVILS } from './features.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed } from './explorer.js';
 import {
@@ -46,6 +48,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const near = new TerrainGrid(17, 2, 8);       // 32 m of ground at 2 m, for particles, pushes and prints
   const flora = new FloraField();
   const particles = new Particles(seed, 1);
+  const loose = new Loose(particles);
+  const devils = []; devils.count = 0;
+  const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField();
 
   let quality = 1;
@@ -56,7 +61,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   let lastMoist = -1e9, moistX = 1e9, moistZ = 1e9;
   const focus = { x: 0, y: 1, z: 0 };
   const moist = { wetness01: 0, snowDepth: 0, freshSnow: 0 };
-  const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0 };
+  const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0 };
   const here = {
     bodyId: null,
     air: { density: 0, wind: { x: 0, y: 0, z: 0 }, speed: 0, gust01: 0, turbulence: 0, temperature: 0, pressure: 0, soundSpeed: 0, viscosity: 0, altitude: 0, height: 0, near: false },
@@ -64,6 +69,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     cover,
     groundHeight: 0,          // m above the body's base radius, under the focus
   };
+  // Small weather near the focus, refreshed by update(): dust devils (features.js).
+  const features = { devils };
   const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWeather: 0, msFlora: 0, msParticles: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
@@ -104,7 +111,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const fp = f && f.focus;
     if (!bodyId || !fp || !(fp.x === fp.x && fp.y === fp.y && fp.z === fp.z) || Math.hypot(fp.x, fp.y, fp.z) < 1) {
       // deep space, or nothing to centre on: the near field sleeps
-      if (active) { particles.clear(); active = null; here.bodyId = null; }
+      if (active) { particles.clear(); devils.count = 0; active = null; here.bodyId = null; }
       stats.ms = now() - t0; return;
     }
     focus.x = fp.x; focus.y = fp.y; focus.z = fp.z;
@@ -155,8 +162,14 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (gh !== gh) gh = r - frame.r0;
     here.groundHeight = frame.r0 + gh - body.radius;
     const fy = r - frame.r0;
-    airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air);
     const sun01 = sun01At(bodyId, ux, uy, uz);
+    // dust devils near the focus (a few hashes; nothing on bodies that have none)
+    _denv.dustSource = cover.dustSource * (1 - Math.min(1, moist.wetness01 * 3)) * (moist.snowDepth > 0.02 ? 0 : 1);
+    _denv.sun01 = sun01; _denv.wind = Math.hypot(airGrid.cwe, airGrid.cwn); _denv.storm01 = here.weather.storm01 || 0;
+    _denv.we = airGrid.cwe; _denv.wn = airGrid.cwn; _denv.rho = airDensity(bodyId, r - body.radius);
+    devilsNear(bodyId, fp.x, fp.y, fp.z, time, seed, _denv, frame, devils);
+    features.devils = devils;
+    airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils);
     _wenv.moist = cover.moist; _wenv.fog = cover.fog; _wenv.snowBase = cover.snowBase; _wenv.dT = cover.dT; _wenv.dustSource = cover.dustSource;
     _wenv.sun01 = sun01; _wenv.wind = Math.hypot(airGrid.cwe, airGrid.cwn);
     weatherAt(bodyId, ux, uy, uz, r - body.radius, time, seed, _wenv, here.weather);
@@ -172,13 +185,16 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // fields and particles
     const t3 = now();
     const dist = f.disturbers || null;
-    flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality);
+    flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality, devils);
     const t4 = now();
     particles.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time);
+    loose.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
     deform.update(dt, frame, fx, fz, dist, groundOfGrid, body.gravity, time);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
-    stats.particles = particles.buffers.rain.count + particles.buffers.snow.count;
+    let pc = 0;
+    for (let k = 0; k < PARTICLES.kinds.length; k++) pc += particles.buffers[PARTICLES.kinds[k]].count;
+    stats.particles = pc;
     stats.pushCells = flora.active;
     stats.frames++;
     stats.ms = now() - t0;
@@ -206,7 +222,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // The air at body-local point p. `height` (m above the ground) is optional: pass it when you
   // know it (the explorer and the ship do).
   function air(bodyId, p, out, height) {
-    return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {});
+    return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {}, bodyId === active ? devils : null);
   }
 
   function nearFocus(bodyId, ux, uy, uz, metres) {
@@ -284,13 +300,14 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // Disturbers for physics.update from PILOT's states. Appends to `out` (clear it each frame with
   // out.length = 0); the entries are four objects owned by physics and reused, so nothing is
   // allocated per frame.
-  const _dEx = { kind: 'explorer', p: null, v: null, radius: EXPLORER_BODY.radius, strength: 1, grounded: true };
+  const _dEx = { kind: 'explorer', p: null, v: null, radius: EXPLORER_BODY.radius, strength: 1, grounded: true, kick: undefined, impact: 0 };
   const _dJet = { kind: 'jet', p: null, v: null, radius: 0.15, strength: 0 };
   const _dShip = { kind: 'ship', p: null, v: null, radius: 4.2, strength: 1 };
   const _dWash = { kind: 'downwash', p: null, v: null, radius: 2.2, strength: 0 };
   function explorerDisturbers(st, out = []) {
     const B = st.phys;
     _dEx.p = st.p; _dEx.v = st.v; _dEx.grounded = !!st.grounded;
+    _dEx.kick = B ? B.dust : undefined; _dEx.impact = B ? B.puff : 0;
     out.push(_dEx);
     if (B && B.jetThrottle > 0.02) { _dJet.p = st.p; _dJet.v = st.v; _dJet.strength = EXPLORER_BODY.jetThrust * B.jetThrottle; out.push(_dJet); }
     return out;
@@ -339,6 +356,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     get time() { return time; },
     air, weather, ground, bindEnv,
     here,                     // air, weather and cover at the focus, refreshed by update()
+    features,                 // { devils: [...] with .count }: dust devils near the focus
     explorer: { step: stepExplorerBody, tuning: EXPLORER_BODY, disturbers: explorerDisturbers, jumpSpeed: jumpSpeedFor, terminal: explorerTerminal, sustainableSpeed },
     ship: {
       step: stepShipBody, gear: stepShipGear, wake: wakeShip, tuning: SHIP_BODY, disturbers: shipDisturbers,
@@ -363,5 +381,5 @@ export {
   stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed,
   stepShipBody, stepShipGear, wakeShip, SHIP_BODY, shipTopSpeed, shipTerminal, downwashSpeed, groundEffect, gearSag,
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
-  FLORA_GLSL, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED,
+  FLORA_GLSL, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
 };

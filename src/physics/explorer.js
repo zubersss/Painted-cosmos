@@ -75,6 +75,7 @@ export const EXPLORER_BODY_STATE = () => ({
   vvPrev: 0,
   support: 0,             // m/s^2 of normal support from the ground (0 when floating or airborne)
   impact: 0,              // m/s of the last landing (normal speed), set on the landing step
+  puff: 0,                // the same, held and decaying over 0.1 s (for dust and sound, read once a frame)
   material: 'soil',
   friction: 0.7,
   dust: 0,                // 0..1 fines raised by the feet right now
@@ -394,6 +395,8 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
   const vvF = (vx * px + vy * py + vz * pz) / rF;
   B.speedGround = Math.sqrt(Math.max(0, vx * vx + vy * vy + vz * vz - vvF * vvF));
   B.material = G.material; B.friction = G.friction;
+  B.puff = B.impact > B.puff ? B.impact : B.puff * Math.exp(-dt / 0.1);
+  if (B.puff < 0.05) B.puff = 0;
   const sinkT = grounded ? G.sink * (0.7 + 0.3 * Math.min(1, B.speedGround / 3)) + Math.min(0.1, B.impact * 0.01) : 0;
   B.sink += (sinkT - B.sink) * (1 - Math.exp(-dt / 0.08));
   B.dust = grounded ? clamp01((G.dust || 0) * (0.15 + B.speedGround / 6 + B.slip01 + B.impact * 0.15)) : 0;

@@ -14,6 +14,7 @@ import { weatherWind } from './weather.js';
 import { TerrainGrid } from './near.js';
 import { coverAt } from './ground.js';
 import { FLORA } from './flora.js';
+import { devilWind } from './features.js';
 import { clamp, clamp01, smoothstep } from './util.js';
 
 export const AIR = Object.freeze({
@@ -34,7 +35,7 @@ const _cs = { biomeWeights: null, biomeId: null, liquidRadius: 0, radius: 0 };
 // Per node of the wind grid: z0, canopy01, canopyH, moist, fog, dustSrc, dT, snowBase, and the
 // wind height factors at blade height, crown height and 2 m (computed once, when the node's
 // ground is sampled, so the flora field never has to redo them).
-const CW = 11;
+const CW = 14;
 function coverInto(surface, arr, o) {
   coverAt(_coverBody, surface, _cov);
   arr[o] = _cov.z0; arr[o + 1] = _cov.canopy01; arr[o + 2] = _cov.canopyHeight; arr[o + 3] = _cov.moist;
@@ -42,6 +43,7 @@ function coverInto(surface, arr, o) {
   arr[o + 8] = heightFactor(FLORA.softHeight, _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 9] = heightFactor(Math.max(FLORA.stiffHeight, _cov.canopyHeight), _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 10] = heightFactor(2, _cov.z0, _cov.canopyHeight, _cov.canopy01);
+  arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash;
 }
 const HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)];
 let _coverBody = 'earth';
@@ -227,6 +229,7 @@ export class AirGrid {
     const c = this.terrain.cover, a = n * CW;
     o.z0 = c[a]; o.canopy01 = c[a + 1]; o.canopyHeight = c[a + 2]; o.moist = c[a + 3];
     o.fog = c[a + 4]; o.dustSource = c[a + 5]; o.dT = c[a + 6]; o.snowBase = c[a + 7];
+    o.leaves = c[a + 11]; o.spores = c[a + 12]; o.ash = c[a + 13];
     return true;
   }
 }
@@ -240,6 +243,7 @@ export function aloftFactor(bodyId, z) {
 }
 
 const _s = {};
+const _dw = new Float64Array(3);
 
 // The air at body-local point (px,py,pz).
 //   grid: the AirGrid (or null), frame: its LocalFrame, used when the point is near the focus.
@@ -248,7 +252,7 @@ const _s = {};
 // Fills o: density (kg/m^3), wind {x,y,z} (m/s, body-local), speed, gust01 (0 lull .. 1 gust),
 // turbulence (sigma of the wind speed, m/s), temperature (K), pressure (Pa), soundSpeed (m/s),
 // viscosity (Pa s), altitude (m above the base radius), height (m above ground used), near (bool).
-export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, o = {}) {
+export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, o = {}, devils = null) {
   const body = BODIES[bodyId], atm = ATMOSPHERES[bodyId];
   const r = Math.hypot(px, py, pz) || 1;
   const ux = px / r, uy = py / r, uz = pz / r;
@@ -270,9 +274,12 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     if (zh == null) zh = _s.h === _s.h ? r - (frame.r0 + _s.h) : 10;
     if (zh < 0) zh = 0;
     const f = heightFactor(zh, _s.z0, _s.canopyH, _s.canopy01) * aloftFactor(bodyId, zh);
-    const we = _s.we * f, wn = _s.wn * f;
+    const we0 = _s.we * f, wn0 = _s.wn * f;
     // the flow follows the ground: vertical component from the slope, fading with height
-    const wu = (we * _s.gx + wn * _s.gz) * Math.exp(-zh / 25);
+    let wu = (we0 * _s.gx + wn0 * _s.gz) * Math.exp(-zh / 25);
+    let we = we0, wn = wn0;
+    // a dust devil close by: its swirl, inflow and updraught are added exactly, not from the grid
+    if (devils && devils.count > 0 && devilWind(devils, x, z, zh, _dw)) { we += _dw[0]; wn += _dw[1]; wu += _dw[2]; }
     wind.x = frame.ex * we + frame.nx * wn + ux * wu;
     wind.y = frame.ey * we + frame.ny * wn + uy * wu;
     wind.z = frame.ez * we + frame.nz * wn + uz * wu;

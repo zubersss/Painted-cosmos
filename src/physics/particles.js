@@ -152,6 +152,7 @@ export class Particles {
       const P = b._p, V = b._v, VT = b._vt, PH = b._ph;
       const snowy = name === 'snow';
       const top = ground + H, bottom = Math.min(ground, fy) - PARTICLES.below;
+      const virga = b === target && pr.reachesGround01 < 0.999 ? H * (1 - pr.reachesGround01) : 0;
       let alive = n;
       for (let i = 0; i < alive; i++) {
         const o = i * 3;
@@ -193,6 +194,8 @@ export class Particles {
           if (lq > gy) { gy = lq; wet = true; }
           hit = y <= gy;
         }
+        // virga: in hot dry air a drop evaporates on the way down and never lands
+        if (virga > 0 && !snowy && y - ground < virga * (0.3 + 0.7 * PH[i] / 6.2831853)) { hit = false; y = bottom - 1; }
         if (hit || y < bottom) {
           if (hit) {
             const sp = Math.hypot(vx, vy, vz);

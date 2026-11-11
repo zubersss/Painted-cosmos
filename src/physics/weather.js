@@ -65,14 +65,24 @@ export const REGIMES = {
     kinds: [['cloud', 3], ['drizzle', 1.2], ['rain', 2], ['shower', 2], ['storm', 1.1], ['fog', 1]] },
   mars: { cells: 9, radius: [600, 1400], life: [1200, 2600], steer: 1.3, melt: 1e9, liquid: 'frost', solid: 'frost', virga: 0, frostBelow: 200,
     kinds: [['dust', 3], ['cloud', 3], ['frost', 1]] },
-  jupiter: { cells: 26, radius: [500, 1400], life: [500, 1200], steer: 1.2, melt: 273.15, liquid: 'rain', solid: 'snow', virga: 0,
-    kinds: [['storm', 3], ['shower', 2], ['rain', 2], ['cloud', 3]] },
-  saturn: { cells: 20, radius: [600, 1500], life: [700, 1600], steer: 1.1, melt: 273.15, liquid: 'drizzle', solid: 'snow', virga: 0,
+  // Jupiter: storms ride the jets. `tracks` = the number of jets between equator and pole (the
+  // wind bands); a cell is born on one of them and runs along it, eastward on one jet, westward
+  // on the next. `spots`: storms that never die. The Great Red Spot: an anticyclone at 22 S that
+  // has lasted centuries, drifting slowly west, its winds circling at about 120 m/s (scaled).
+  jupiter: { cells: 26, radius: [500, 1400], life: [500, 1200], steer: 1.2, melt: 273.15, liquid: 'rain', solid: 'snow', virga: 0, tracks: 11,
+    kinds: [['storm', 3], ['shower', 2], ['rain', 2], ['cloud', 3]],
+    spots: [{ name: 'Great Red Spot', lat: -22, lon: 40, drift: -1.2, radius: 1500, kind: 'storm', strength: 0.95, swirl: 11, spin: 1 }] },
+  // Saturn: mist and fine drizzle, calm between rare great storms, all of it carried round on
+  // the broad equatorial jet.
+  saturn: { cells: 20, radius: [600, 1500], life: [700, 1600], steer: 1.1, melt: 273.15, liquid: 'drizzle', solid: 'snow', virga: 0, tracks: 7,
     kinds: [['fog', 4], ['drizzle', 2], ['rain', 1.5], ['storm', 0.8], ['cloud', 3]] },
   uranus: { cells: 18, radius: [600, 1500], life: [800, 1800], steer: 0.9, melt: 90.7, liquid: 'methaneRain', solid: 'methaneSnow', virga: 0,
     kinds: [['ice', 4], ['fog', 3], ['cloud', 3], ['storm', 0.6]] },
+  // Neptune: the fastest weather in the solar system. Its Great Dark Spot (Voyager 2, 1989) was
+  // an anticyclone racing west at 300 m/s; here it is a storm that laps the planet in half an hour.
   neptune: { cells: 24, radius: [600, 1500], life: [500, 1300], steer: 0.9, melt: 90.7, liquid: 'methaneRain', solid: 'methaneSnow', virga: 0,
-    kinds: [['storm', 3], ['rain', 3], ['shower', 2], ['ice', 1.5], ['cloud', 2]] },
+    kinds: [['storm', 3], ['rain', 3], ['shower', 2], ['ice', 1.5], ['cloud', 2]],
+    spots: [{ name: 'Great Dark Spot', lat: -20, lon: 200, drift: -13, radius: 1300, kind: 'storm', strength: 0.9, swirl: 14, spin: 1 }] },
   pluto: { cells: 8, radius: [500, 1100], life: [1500, 3000], steer: 2, melt: 1e9, liquid: 'frost', solid: 'frost', virga: 0,
     kinds: [['frost', 4], ['veil', 2]] },
 };
@@ -102,6 +112,7 @@ const _pv = new Float64Array(2);
 // One cell at one time. Fills c: x,y,z (unit centre), r (m), w (0..1 strength now), kind (object),
 // kindId, age, life, gen, i. Returns false when the cell is dormant.
 function cellAt(bodyId, R, regime, s, i, t, c) {
+  if (i >= regime.cells) return spotAt(R, regime.spots[i - regime.cells], i, t, c);
   const life0 = mix(regime.life[0], regime.life[1], hash3(i, 1, 0, s));
   const phase = hash3(i, 2, 0, s) * life0;
   const kid = pickKind(regime, hash3(i, 3, Math.floor((t + phase) / life0), s));
@@ -116,24 +127,43 @@ function cellAt(bodyId, R, regime, s, i, t, c) {
   const env = smoothstep(0, 0.22, u) * (1 - smoothstep(0.72, 1, u));
   if (env <= 0) return false;
   const strength = mix(0.45, 1, hash3(i, 5, gen, s));
-  const sy0 = hash3(i, 6, gen, s) * 1.9 - 0.95;
+  let sy0 = hash3(i, 6, gen, s) * 1.9 - 0.95;
+  if (regime.tracks) {
+    // born on a jet: latitude m * 90 / tracks degrees, a degree or two either side
+    const m = Math.round((hash3(i, 6, gen, s) * 2 - 1) * (regime.tracks - 1) * 0.5);
+    sy0 = Math.sin(m * Math.PI / regime.tracks + (hash3(i, 10, gen, s) - 0.5) * 0.05);
+  }
   const lon0 = hash3(i, 7, gen, s) * TAU;
   const lat0 = Math.asin(sy0);
   prevailing(bodyId, sy0, _pv);
   const cl = Math.max(0.3, Math.cos(lat0));
   // never quite still: systems have their own drift of a metre or two per second
   const own = (hash3(i, 8, gen, s) - 0.5) * 3;
-  const ownN = (hash3(i, 9, gen, s) - 0.5) * 1.6;
+  const ownN = regime.tracks ? 0 : (hash3(i, 9, gen, s) - 0.5) * 1.6;      // a storm on a jet stays on it
+  const vn = regime.tracks ? 0 : regime.steer * _pv[1] * 0.5 + ownN;
   const ts = age - life * 0.5;
   const lon = lon0 + (regime.steer * _pv[0] + own) / (R * cl) * ts;
-  const lat = clamp(lat0 + (regime.steer * _pv[1] * 0.5 + ownN) / R * ts, -1.45, 1.45);
+  const lat = clamp(lat0 + vn / R * ts, -1.45, 1.45);
   const cla = Math.cos(lat);
   c.x = cla * Math.sin(lon); c.y = Math.sin(lat); c.z = cla * Math.cos(lon);
   c.r = mix(regime.radius[0], regime.radius[1], hash3(i, 4, gen, s)) * K.size * (0.75 + 0.25 * env);
   c.w = env * strength;
   c.kind = K; c.kindId = kid; c.age = age; c.life = life; c.gen = gen; c.i = i;
+  c.swirl = 0; c.spin = 0;
   // velocity of the centre (east, north), for the lab and for gust-front direction
-  c.ve = regime.steer * _pv[0] + own; c.vn = regime.steer * _pv[1] * 0.5 + ownN;
+  c.ve = regime.steer * _pv[0] + own; c.vn = vn;
+  return true;
+}
+// A storm that never dies: fixed latitude, steady drift in longitude, a slow breathing strength.
+function spotAt(R, sp, i, t, c) {
+  const lat = sp.lat * Math.PI / 180, cla = Math.cos(lat);
+  const lon = sp.lon * Math.PI / 180 + sp.drift / (R * cla) * t;
+  c.x = cla * Math.sin(lon); c.y = Math.sin(lat); c.z = cla * Math.cos(lon);
+  c.r = sp.radius;
+  c.w = sp.strength * (0.9 + 0.1 * Math.sin(t / 97 + i));
+  c.kind = KINDS[sp.kind]; c.kindId = sp.kind; c.age = t; c.life = Infinity; c.gen = 0; c.i = i;
+  c.swirl = sp.swirl; c.spin = sp.spin;
+  c.ve = sp.drift; c.vn = 0;
   return true;
 }
 function pickKind(regime, h) {
@@ -149,7 +179,8 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
   const out = [];
   if (!regime || !regime.cells) return out;
   const R = BODIES[bodyId].radius, s = seedFor(bodyId, seed);
-  for (let i = 0; i < regime.cells; i++) {
+  const n = regime.cells + (regime.spots ? regime.spots.length : 0);
+  for (let i = 0; i < n; i++) {
     const c = {};
     if (cellAt(bodyId, R, regime, s, i, t, c)) out.push(c);
   }
@@ -168,7 +199,8 @@ function gather(bodyId, ux, uy, uz, t, seed) {
   if (!regime || !regime.cells) return a;
   const R = BODIES[bodyId].radius, s = seedFor(bodyId, seed);
   let clear = 1;
-  for (let i = 0; i < regime.cells; i++) {
+  const nCells = regime.cells + (regime.spots ? regime.spots.length : 0);
+  for (let i = 0; i < nCells; i++) {
     if (!cellAt(bodyId, R, regime, s, i, t, _c)) continue;
     const dot = ux * _c.x + uy * _c.y + uz * _c.z;
     const reach = _c.r * WEATHER.frontReach;
@@ -205,6 +237,16 @@ function gather(bodyId, ux, uy, uz, t, seed) {
         const l = Math.hypot(dx, dy, dz);
         if (l > 1e-9) { a.ox += dx / l * v; a.oy += dy / l * v; a.oz += dz / l * v; a.front = Math.max(a.front, ring * _c.w); }
       }
+    }
+    // a great spot turns: wind circling the centre, fastest at 70 % of its radius
+    if (_c.swirl > 0 && d > 1) {
+      const v = _c.swirl * _c.w * smoothstep(0, 0.7, x) * (1 - smoothstep(0.75, WEATHER.frontReach, x)) * _c.spin;
+      let dx = ux - _c.x, dy = uy - _c.y, dz = uz - _c.z;
+      const dn = dx * ux + dy * uy + dz * uz;
+      dx -= dn * ux; dy -= dn * uy; dz -= dn * uz;
+      const l = Math.hypot(dx, dy, dz);
+      // tangent = up x radial
+      if (l > 1e-9) { a.ox += (uy * dz - uz * dy) / l * v; a.oy += (uz * dx - ux * dz) / l * v; a.oz += (ux * dy - uy * dx) / l * v; }
     }
   }
   a.cloud = 1 - clear;

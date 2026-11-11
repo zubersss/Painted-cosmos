@@ -131,6 +131,18 @@ export const BIOMES = {
   'stub-polar': B('snow', 'ice', 'ice', 0.002, 0, 0, 0.8, 0.2, -25, 0, 0.3),
 };
 const DEFAULT_BIOME = B('soil', 'rock', 'mud', 0.03, 0, 0, 1.0, 0.2, 0, 0.1);
+// What drifts in the air of a biome, each 0..1: [falling leaves, spores (or seed fluff, pollen,
+// glitter off the crystal reeds), ash]. Leaves need a canopy to fall from.
+export const AIRBORNE = {
+  temperate_forest: [0.25, 0.06, 0], autumn_woodland: [1.0, 0.05, 0], misty_wetland: [0.05, 0.3, 0], alpine_meadow: [0, 0.08, 0],
+  fungal_towers: [0, 1.0, 0.05], lava_rivers: [0, 0, 1.0], acid_terraces: [0, 0.1, 0.2],
+  dry_riverbeds: [0.25, 0, 0],
+  sky_islands: [0.15, 0.15, 0], hanging_gardens: [0.3, 0.5, 0],
+  gold_islands: [0.1, 0.2, 0], crystal_reeds: [0, 0.35, 0], honey_mist: [0, 0.5, 0],
+  kelp_forests: [0.1, 0.8, 0],
+  'stub-lowland': [0.2, 0.05, 0],
+};
+const NO_AIRBORNE = [0, 0, 0];
 // Airless and dry bodies: an unknown biome there is regolith, not garden soil.
 const DEFAULT_BY_BODY = {
   venus: B('rock', 'rock', 'gravel', 0.02, 0, 0, 0.5, 0.3, 0, 0.2),
@@ -321,21 +333,24 @@ export function groundAt(bodyId, surface, state, out = {}) {
 // Climate fields of the ground alone (no wetness or snow applied): what air.js and weather.js
 // need to know about a place. Cheaper than groundAt.
 export function coverAt(bodyId, surface, out = {}) {
-  let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0 = 0, snowBase = 0, dT = 0, wsum = 0;
+  let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0 = 0, snowBase = 0, dT = 0, wsum = 0, lv = 0, spo = 0, ash = 0;
   const bw = surface && surface.biomeWeights;
   if (bw) {
     for (const id in bw) {
       const w = bw[id];
       if (!(w > 0.02)) continue;
-      const b = biomePhysics(bodyId, id);
+      const b = biomePhysics(bodyId, id), ab = AIRBORNE[id] || NO_AIRBORNE;
       wsum += w;
       canopy += b.canopy * w; canopyH += b.canopyH * b.canopy * w; moist += b.moist * w; fog += b.fog * w;
       dustSrc += b.dustSrc * w; z0 += b.z0 * w; snowBase += b.snowBase * w; dT += b.dT * w;
+      lv += ab[0] * w; spo += ab[1] * w; ash += ab[2] * w;
     }
   }
   if (!(wsum > 0)) {
-    const b = biomePhysics(bodyId, surface && surface.biomeId);
+    const id = surface && surface.biomeId;
+    const b = biomePhysics(bodyId, id), ab = AIRBORNE[id] || NO_AIRBORNE;
     wsum = 1; canopy = b.canopy; canopyH = b.canopyH * b.canopy; moist = b.moist; fog = b.fog; dustSrc = b.dustSrc; z0 = b.z0; snowBase = b.snowBase; dT = b.dT;
+    lv = ab[0]; spo = ab[1]; ash = ab[2];
   }
   const inv = 1 / wsum;
   out.canopyHeight = canopy > 1e-6 ? canopyH / canopy : 0;
@@ -345,8 +360,9 @@ export function coverAt(bodyId, surface, out = {}) {
   if (surface && surface.canopy01 != null) { out.canopy01 = clamp01(surface.canopy01); if (surface.canopyHeight != null) out.canopyHeight = surface.canopyHeight; }
   out.moist = moist * inv; out.fog = fog * inv; out.dustSource = dustSrc * inv;
   out.z0 = Math.max(z0 * inv, 1e-5); out.snowBase = snowBase * inv; out.dT = dT * inv;
+  out.leaves = lv * inv; out.spores = spo * inv; out.ash = ash * inv;
   // open liquid is far smoother than any land
-  if (surface && (surface.liquidRadius || 0) > surface.radius) { out.z0 = 0.0002; out.canopy01 = 0; out.dustSource = 0; }
+  if (surface && (surface.liquidRadius || 0) > surface.radius) { out.z0 = 0.0002; out.canopy01 = 0; out.dustSource = 0; out.leaves = 0; }
   return out;
 }
 

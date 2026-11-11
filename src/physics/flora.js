@@ -23,6 +23,7 @@
 //   Plus PlantSim: a single plant integrated with its own frequency, for hero plants.
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
+import { devilWind } from './features.js';
 
 export const FLORA = Object.freeze({
   N: 32, cell: 8,               // bend / wind field
@@ -55,6 +56,7 @@ export const FLORA = Object.freeze({
 const _s = new Float64Array(7);
 const _coef = new Float64Array(8);
 const _tmp2 = new Float64Array(2);
+const _dwf = new Float64Array(3);
 
 // Coefficients of the exact oscillator step for (w, z, dt): [a11, a12, a21, a22].
 function oscCoef(w, z, dt, o, i) {
@@ -128,7 +130,7 @@ export class FloraField {
   //   frame: LocalFrame.  air: AirGrid (already updated this frame).  near: TerrainGrid of the
   //   near field (2 m nodes) or null.  rho: air density at the focus.  (fx, fz): focus in grid
   //   coordinates.  disturbers: frame.disturbers (see index.js).  quality: 0 | 1 | 2.
-  update(dt, frame, air, near, rho, fx, fz, disturbers, quality) {
+  update(dt, frame, air, near, rho, fx, fz, disturbers, quality, devils) {
     const N = this.N, cell = this.cell, M = this.M, nc = this.nearCell;
     if (this.frameVersion !== frame.version) {
       this.frameVersion = frame.version; this.reset();
@@ -162,13 +164,18 @@ export class FloraField {
     const kq = 0.5 * rho / FLORA.qRef;
     const bend = this.bend, vel = this._vel, wind = this.wind;
     let gsum = 0, se = 0, sn = 0;
+    const swirl = !!devils && devils.count > 0;
     for (let j = 0; j < N; j++) {
       const z = (this.cj + j - N / 2 + 0.5) * cell;
       for (let i = 0; i < N; i++) {
         const x = (this.ci + i - N / 2 + 0.5) * cell;
         air.sampleWind(x, z, _s);
         const n = j * N + i, o = n * 4;
-        const we = _s[0], wn = _s[1], hs = _s[4], ht = _s[5], h2 = _s[6];
+        let we = _s[0], wn = _s[1];
+        const hs = _s[4], ht = _s[5], h2 = _s[6];
+        // a dust devil in the field: its swirl bends the plants round it (divided by the height
+        // factor because the vortex is given at plant height already)
+        if (swirl && devilWind(devils, x, z, 0.5, _dwf)) { we += _dwf[0] / (hs > 0.05 ? hs : 0.05); wn += _dwf[1] / (hs > 0.05 ? hs : 0.05); }
         const sp = Math.sqrt(we * we + wn * wn);
         // load = q / qRef along the wind, at the height each class lives at
         const ls = kq * sp * hs * hs, lt = kq * sp * ht * ht;
