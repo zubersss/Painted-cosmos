@@ -13,7 +13,8 @@ import * as stubModels from './stubs/models.js';
 import { planProviders } from './providers.plan.js';
 
 // Flip a flag to true when that module of Painter's is committed and usable.
-export const REAL_READY = { render: false, world: false, art: false, ui: false };
+// 2026-11-11: render, world and art are in (Painter's "INTEGRATION: ready", commit d238c50).
+export const REAL_READY = { render: true, world: true, art: true, ui: false };
 
 const REAL_PATH = {
   render: '../render/index.js',

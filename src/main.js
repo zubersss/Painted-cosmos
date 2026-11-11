@@ -20,13 +20,22 @@ const loading = document.getElementById('pc-loading');
 async function boot() {
   const prov = await loadProviders(location.search);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, ...prov.RENDERER_OPTIONS });
+  // Depth (COORDINATOR.md C7): reversed-Z where EXT_clip_control exists, logarithmic depth
+  // otherwise. Asking three for both makes it warn, so ask for exactly the one that will work.
+  const options = { ...prov.RENDERER_OPTIONS };
+  if (options.reversedDepthBuffer && options.logarithmicDepthBuffer) {
+    if (hasClipControl()) delete options.logarithmicDepthBuffer;
+    else delete options.reversedDepthBuffer;
+  }
+  const renderer = new THREE.WebGLRenderer({ canvas, ...options });
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 3e6);
 
   const world = prov.createWorld(scene);
   const painter = prov.createPainter(renderer);
   if (painter._attachWorld && world.isStub) painter._attachWorld(world);
+  // Build the first view quickly while the loading sheet is up, then go back to a frame budget.
+  if (world.setBuildBudget) world.setBuildBudget(40);
   const explorer = prov.createExplorer();
   const ship = prov.createShip();
 
@@ -92,6 +101,7 @@ async function boot() {
       if (settledFrames >= 2 || game.frameCount > 900) {
         window.__pcReady = true;
         loading.classList.add('pc-done');
+        if (world.setBuildBudget) world.setBuildBudget(5);
       }
     }
   }
@@ -104,6 +114,16 @@ function worldSettled(world, frames) {
   if (typeof world.isSettled === 'function') return world.isSettled();
   if (typeof world.busy === 'number') return world.busy === 0 && frames > 3;
   return frames > 90;
+}
+
+function hasClipControl() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ok = !!(gl && gl.getExtension('EXT_clip_control'));
+    const lose = gl && gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+    return ok;
+  } catch { return false; }
 }
 
 function norm3(p) {

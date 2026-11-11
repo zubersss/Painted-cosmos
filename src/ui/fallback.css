@@ -27,8 +27,8 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
 .pc-reticle { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -3px 0 0 -3px; border-radius: 50%;
   background: var(--pc-ink); opacity: 0; }
 .pc-reticle.pc-on { opacity: 0.35; }
-.pc-start { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center;
-  opacity: 0; transition: opacity 0.5s ease; max-width: 520px; }
+.pc-start { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1));
+  text-align: center; opacity: 0; transition: opacity 0.5s ease; width: 500px; }
 .pc-start.pc-on { opacity: 1; }
 .pc-help { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; text-align: left; font-size: 13px; }
 .pc-help em { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; opacity: 0.7; }

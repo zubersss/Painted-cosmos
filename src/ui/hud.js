@@ -33,6 +33,11 @@ export function createHud(root) {
     ['mouse', 'point the nose'], ['X', 'stop'],
   ].map(([k, t]) => (t ? `<span><kbd>${k}</kbd> ${t}</span>` : `<em>${k}</em>`)).join('');
 
+  // Keep the start card inside small windows.
+  const fit = () => card.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / 620, window.innerHeight / 470)));
+  window.addEventListener('resize', fit);
+  fit();
+
   let lastPrompt = '';
   let lastReadout = '';
   return {
