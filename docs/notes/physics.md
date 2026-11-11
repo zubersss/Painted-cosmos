@@ -13,6 +13,7 @@ Everything is pure logic: no three, no DOM, plain `{x,y,z}` objects, **body-loca
 import { createPhysics } from './src/physics/index.js';
 
 const physics = createPhysics({ sampleSurface, seed? });  // sampleSurface(bodyId, unitDir): the contract's
+                                                          // seed: leave it out (DEFAULT_SEED 18) unless you want other weather
 physics.setQuality(0 | 1 | 2);
 physics.warmUp({ bodyId, time, focus });   // once while loading: fills ground caches, compiles hot loops (about 20-60 ms)
 
@@ -22,9 +23,11 @@ physics.update(dt, {
   time,          // seconds on the simulation clock (sim.t). Weather and wind are functions of it.
   focus,         // {x,y,z} body-local point the near field centres on (explorer feet, or the ship)
   sunDir,        // {x,y,z} body-local unit vector toward the sun (optional: day/night temperature, dawn mist)
-  disturbers,    // [{ kind:'explorer'|'ship'|'jet'|'downwash', p, v, radius, strength, grounded? }]
+  disturbers,    // [{ kind:'explorer'|'ship'|'jet'|'downwash', p, v, radius, strength, grounded?,
+                 //    kick?, impact? (explorer: dust raised by the feet), q?, legContact? (ship: pad prints) }]
 });              //   explorer/ship: strength 1; jet/downwash: strength = thrust in newtons
-                 //   build them with physics.explorer.disturbers(st, out) / physics.ship.disturbers(st, out)
+                 //   build them with physics.explorer.disturbers(st, out) / physics.ship.disturbers(st, out):
+                 //   those fill every optional field from st.phys
 ```
 
 ### Environment queries (cheap; pass an `out` object to avoid allocation)
@@ -38,13 +41,15 @@ physics.air(bodyId, p, out?, heightAboveGround?) ->
 physics.weather(bodyId, p, out?, { time?, surface? }) ->
   { kind: 'clear'|'breeze'|'windy'|'overcast'|'mist'|'fog'|'drizzle'|'rain'|'thunderstorm'|'snow'|
           'blizzard'|'dust haze'|'dust storm'|'haze'|'virga'|'acid drizzle'|'ice fall'|'frost fall'|'vacuum',
-    intensity01,
+    intensity01 (how much weather there is; continuous), kindIntensity01 (strength within the kind; steps),
     precipitation: { type: 'none'|'drizzle'|'rain'|'snow'|'ice'|'acid'|'frost', species (key of data.SPECIES),
                      rate (mm/h water equivalent), intensity01, fallSpeed (m/s, this body's gravity and air),
                      dropSize (m), frozen01, hail01, reachesGround01 (Venus virga) },
     wetness01, snowDepth (m),
     visibility (m, real scale), visibility01 (multiply your clear-day fog distance by this),
-    cloud01 (0 once you are above the deck), cloudBelow01, fog01, dust01, haze01, storm01,
+    cloud01 (0 once you are above the deck), cloudBelow01, storm01,
+    fog01, dust01, haze01 (the share of the view each veil takes by itself: with only fog in the air
+      visibility01 = 1 - fog01; 0.5 = 5 km of visual range, 0.78 = 1 km, 0.9 = 200 m), dustLoad01,
     front01 (gust front), windFactor, temperature (K),
     lightning: { rate (flashes/min), flash01 (brightness now, 3-4 strokes in 0.25 s), nextIn (s),
                  thunderIn (s; negative = already passed), thunder01,
@@ -57,6 +62,12 @@ physics.ground(bodyId, unitDir, out?, surface?) ->        // pass `surface` if y
     z0 (m), imprint (0..1), density, grain, liquidDepth (m), wetness01, snowDepth, temperature,
     canopy01, canopyHeight, moist, fog, dustSource }
 
+physics.water(bodyId, p, out?) ->                         // the liquid surface and its wind waves
+  { present, height (elevation at p now, m), significant (Hs, m), period (s), length (m), speed (m/s),
+    steepness, whitecap01, dir:{x,y,z} (body-local, the way the waves run) }
+
+physics.features.devils // dust devils near the focus: array with .count; each { p (body-local foot), x, z (grid),
+                        //   radius (m), height (m), speed (swirl, m/s), up (m/s), spin (+1/-1), strength 0..1, age, life, id }
 physics.here            // { bodyId, air, weather, cover, groundHeight } at the focus, refreshed by update(): free to read
 physics.setWindScale(bodyId, scale)   // how far a body's real wind is scaled down (data.WINDS[body].scale)
 physics.stats           // { ms, msAvg, msMax (worst frame after warm-up), msGround, msAir, msWeather, msFlora,
@@ -67,25 +78,31 @@ physics.stats           // { ms, msAvg, msMax (worst frame after warm-up), msGro
 
 ```js
 import { stepExplorerBody, EXPLORER_BODY, stepShipBody, stepShipGear, wakeShip, SHIP_BODY } from './src/physics/index.js';
-const env = physics.bindEnv(bodyId, env);   // adds env.air, env.ground, env.liquid, env.gravity and env.radius if missing
+const env = physics.bindEnv(bodyId, env);   // adds env.air, env.ground, env.liquid, env.liquidOf (the liquid at a place:
+                                            // lava, cloud froth), env.gravity and env.radius if missing
+// BOTH flight step functions and the explorer step move st.p (and st.v) IN PLACE. Do not integrate the
+// position again afterwards; if you want to post-process, keep the old position by value first.
 
 stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY)       // == physics.explorer.step
 //  st:  { p, v, grounded }  (PILOT's explorer state; st.phys is added on first use)
 //  cmd: { wish:{x,y,z} m/s horizontal, jump:bool, jet:0..1, jetMaxRise?: m/s, descentLimit?: m/s,
 //         airControl?: 0..1, assistAccel?: m/s2 }
 //  env: { sample(unitDir), gravity, air?(p,out,height), ground?(surface,out), liquid? }
-//  st.phys: { slip01, scramble01, sink, submerged01, windAccel, lean, support, impact, material, friction,
+//  st.phys: { slip01, scramble01, sink, submerged01, windAccel, lean, support, impact, puff, material, friction,
 //             dust, jetThrottle, jetUse, speedGround }
 
 stepShipBody(st, cmd, dt, env, T = SHIP_BODY)               // == physics.ship.step   (flight: translation only)
-//  st:  { p, v, q }   cmd: { target:{x,y,z} m/s | null, tau: s, hover?: bool, boost?: bool, carve01?: 0..1 }
+//  st:  { p, v, q }   cmd: { target:{x,y,z} m/s | null, tau: s, hover?: bool, boost?: bool, carve01?: 0..1,
+//                             brake?: 0..1 (ASSIST: the drive field sheds what the retro thrusters cannot,
+//                             up to SHIP_BODY.fieldBrake = 160 m/s2, only ever slowing, not felt by the crew) }
 //  env: { up | null, gravity, radius, altGround?, air?, time? }
 //  st.phys: { thrust, lift01, buffet, buffetAngle:{pitch,roll}, q, airspeed, gLoad, heat01,
-//             downwash:{thrust,speed,q,radius}, groundEffect }
+//             downwash:{thrust,speed,q,radius}, groundEffect, brake01, fieldBrake (m/s2 being shed now) }
 
 stepShipGear(st, { lift01, hold? }, dt, env, T = SHIP_BODY) // == physics.ship.gear   (rigid body on 3 legs; moves p, v AND q)
-//  env: { sample(unitDir), gravity, ground? }
-//  st.phys: { contacts, asleep, legLoad[3] (N), legCompress[3] (m), legContact[3], w (rad/s) }
+//  env: { sample(unitDir), gravity, ground?, air? (for the thruster wash) }
+//  st.phys: { contacts, asleep, legLoad[3] (N), legCompress[3] (m), legContact[3], w (rad/s),
+//             downwash (lit whenever lift01 > 0: dust and grass blow before the feet leave) }
 
 physics.ship.planSpeedChange(v0, v1, aMax, jMax) -> plan;  sampleSpeedChange(plan, t) -> { a, v, s }
 physics.ship.stepPulse(ps = { a, v }, vWant, dt);  pulseBrakeDistance(v)
@@ -104,90 +121,134 @@ physics.fields.flora
               //   uPhysWave[4], uPhysWavePhase[4], uPhysShape[4] }  plain arrays, refreshed every update
   .version / .pushVersion          // bump when the arrays changed (re-upload)
   .plantBend(p, stiff01, out) -> { e, n (radians), angle, flatten01, shake01, load }   // CPU twin of the shader
+  .plantBendLite(p, stiff01, out)                                                       // twin of pcPhysBendLite
   .plantDisplace(h, H, be, bn, out) -> { e, n, up }
-physics.glsl.flora              // GLSL (ES 3.00): pcPhysBend(root, stiff01) -> vec4, pcPhysDisplace(rel, up, H, bend) -> vec3,
-                                //   pcPhysWind(p) -> vec4, pcPhysGrid(p) -> vec2
+physics.glsl.flora              // GLSL (ES 3.00): pcPhysBend(root, stiff01) -> vec4 (3 lookups: wind, waves, push, flatten),
+                                //   pcPhysBendLite(root, stiff01) -> vec2 (1 lookup: wind response only),
+                                //   pcPhysDisplace(rel, up, H, bend) -> vec3, pcPhysWind(p) -> vec4, pcPhysGrid(p) -> vec2
+                                //   `#define PC_PHYS_LINEAR` before it = hardware filtering, 1 fetch a lookup (see PAINTER wiring)
+
+physics.fields.water
+  .uniforms   // { uPhysWaterDir[2], uPhysWaterK[3], uPhysWaterAmp[3], uPhysWaterPhase[3] }, refreshed every update
+  .heightAt(p) -> m               // CPU twin of pcPhysWaterHeight: a floating thing rides the painted waves
+  .field      // WaterField: height (Hs), period, length, speed, steepness, whitecap01, dir, level, present
+physics.glsl.water              // pcPhysWater(p) -> vec3(height, dh/deast, dh/dnorth); pcPhysWaterHeight(p).
+                                //   Shares the frame uniforms with the flora chunk (guarded: include both freely)
 
 physics.fields.deform
   .depth  Float32Array(64*64)     // m pressed into the ground, 0.5 m cells (trail trough); .uniforms.uPhysDeformMap
-  .marks  { data: Float32Array(256*12), capacity, head, total, origin, stride: 12 }
-          // per mark: x,y,z (rel. origin), dirx,diry,dirz, length, width, depth, kind (0 left foot, 1 right foot), born, life
+  .marks  { data: Float32Array(256*14), capacity, head, total, origin, stride: 14 (MARK_STRIDE) }
+          // per mark: x,y,z (rel. origin), dirx,diry,dirz, length, width, depth, kind, born, life, rim (m, raised edge), spare
+          // kind (MARK): 0 left foot, 1 right foot, 2 gear pad, 3 hull, 4 scour (the dish a jet or the thrusters blow)
+  .depthAt(x, z)                  // m, at a grid position
 
 physics.particles.rain / .snow / .hail / .dust / .sand / .ash / .spores / .leaves / .spray
   // { count, capacity, pos Float32Array(3n) (relative to .origin, body-local axes), vel (3n), size (n), age (n), origin, species }
-physics.particles.events        // ring: { data Float32Array(256*8), head, total, origin }: x,y,z, kind (0 splash, 1 ripple, 2 settle), strength, time, size, 0
+  // rain, snow: the weather. hail: storm cores (bounces). dust: kicked up, storms, devils, ambient haze. sand: saltation,
+  // kicks, scour. leaves / spores / ash: the biome's own, on the wind. spray: wading, thruster wash over liquid.
+  // In vacuum the same kinds fly as clean parabolas (no drag, no drift).
+physics.particles.events        // ring: { data Float32Array(256*8), head, total, origin }: x,y,z, kind (0 splash, 1 ripple, 2 settle, 3 bounce), strength, time, size, 0
 ```
 
-Reference data and helpers: `physics.data.{ATMOSPHERES, WINDS, REGIMES, MATERIALS, BIOMES, SPECIES}`,
+Reference data and helpers: `physics.data.{ATMOSPHERES, LIQUIDS, WINDS, REGIMES, MATERIALS, BIOMES, SPECIES}`,
 `physics.util.{airDensity, airTemperature, gravityAt, fallSpeed, terminalVelocity, cellsAt, saltationThreshold,
-holdAngle, iceFriction, treeFrequency, stemFrequency, PlantSim}`.
+holdAngle, iceFriction, treeFrequency, stemFrequency, PlantSim, liquidOf, liquidAt(bodyId, surface), BIOME_LIQUID}`;
+tuning tables exported from `index.js`: `WEATHER, WIND, AIR, GROUND, FLORA, PARTICLES, LOOSE, KICK, DEVILS, DEFORM,
+MARK, MARK_STRIDE, EVENT, WATER, QUALITY, DEFAULT_SEED`, and `windSea(U, fetch, g, rhoAir, rhoLiquid, depth)`.
 
 ## Status
 
-INTEGRATION: ready (commit `af0783c` or later). The API above is stable; changes from here are additive.
+INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is stable; P2 only added to it.
+The tree is committed green: `node --test src/physics/` 158 pass at the commit that carries this note.
 
-Stage P1 (foundations) is done:
+Stage P1 (foundations): done, accepted. **Stage P2: done** (this section). What exists now:
 
 | Part | State | File |
 |---|---|---|
-| Atmosphere per body, fall speeds | real, tested | `atmosphere.js` |
-| Wind: bands, eddies, travelling gusts, height profile, canopy, terrain shelter | real, tested | `wind.js`, `air.js` |
-| Weather cells, kinds, lightning, gust fronts, wetness, snow depth, visibility | Earth full; other bodies' regimes sketched with their own air, gravity and species | `weather.js` |
-| Ground materials and contact | real, tested, all 46 biome ids mapped | `ground.js` |
-| Explorer body | real, tested | `explorer.js` |
-| Ship body: flight, gear, pulse profile | real, tested | `ship.js` |
-| Flora wind-and-disturbance field + GLSL chunk + CPU twin | first version, tested, compiles and matches in the lab | `flora.js`, `flora.glsl.js` |
-| Rain and snow particles, splash events | first version, tested | `particles.js` |
-| Footprints (marks + trail depth) | first version, tested | `deform.js` |
-| Dust, sand, ash, spores, leaves, spray, hail | buffers exist, **empty** (next stage) | `particles.js` |
-| Water (waves, wakes) | **not started** | |
+| Atmosphere per body, fall speeds, liquids (incl. lava, cloud froth) | real, tested | `atmosphere.js` |
+| Wind: bands, eddies, gusts, height profile, terrain shelter, **canopy wakes** | real, tested | `wind.js`, `air.js` |
+| Weather: cells, kinds, lightning, gust fronts, wetness, snow, visibility; **every world its own** | real, tested | `weather.js` |
+| **Dust devils** (Mars, Earth deserts) | real, tested | `features.js` |
+| Ground materials and contact; every biome id of `looks.js` mapped and checked by test | real, tested | `ground.js` |
+| Explorer body (**viscous liquids**) | real, tested | `explorer.js` |
+| Ship body: flight, gear, pulse profile, **field brake, lift-off on the gear** | real, tested | `ship.js` |
+| Flora field + GLSL chunk + CPU twin; **crown coupling, lite lookup** | tested; shader agreement measured | `flora.js`, `flora.glsl.js` |
+| Rain, snow, **hail, dust, sand, ash, spores, leaves, spray**; ballistic in vacuum | tested | `particles.js`, `loose.js` |
+| Marks: footprints **with rims, snow and sand filling them, gear pads, scour dishes** | tested | `deform.js` |
+| **Water: wind waves** (sea state, 3 trains, GLSL + twin), ripples and spray as events | tested | `water.js` |
+
+### Each world's own weather (lab preset `?planet=<name>`, shots `planets-inner.jpg`, `planets-outer.jpg`, `globes.jpg`)
+
+| World | What happens there | Preset |
+|---|---|---|
+| Mercury, Moon | no air: kicked dust and sand fly in clean parabolas and are down in 1-2 s; nothing drifts, nothing hangs | `mercury`, `moon` |
+| Venus | dense slow air (62 kg/m3, under 1 m/s at the ground); sulphuric drizzle that evaporates on the way down (virga) below 160 m and reaches the high mesas; haze | `venus`, `venus-mesa` |
+| Mars | dust devils (Rankine vortex, 11-44 m across, 80-570 m tall, drifting with the wind they were born in); dust storms in which sand keeps hopping far below the fluid threshold (impact threshold); CO2 frost only below 200 K | `mars`, `mars-storm` |
+| Jupiter | storms born on 11 jets and carried along them, east on one, west on the next; water rain falling fast (2.5 g, thin H2 air), hail, lightning; the Great Red Spot, a permanent anticyclone with circling winds | `jupiter`, `jupiter-globe` |
+| Saturn | mist and fine drizzle on 7 broad jets, calm between rare storms; gritty wind over the gravel | `saturn`, `saturn-globe` |
+| Uranus | slow methane snow and ice crystals at 91 K, fog banks, ice that grips like rock | `uranus` |
+| Neptune | the fastest winds; methane rain (falls at 5.6 m/s), a dark spot racing west, methane seas rougher than water (density ratio) | `neptune`, `neptune-globe` |
+| Pluto | nitrogen frost falling at 0.2 m/s out of 84 mg/m3 of air | `pluto` |
+| Earth | the full set: cloud, drizzle, rain, showers, thunderstorms with hail and gust fronts, fog banks, radiation mist after rain in still damp air, snow where it is cold | `scene=rain|snow|storm` |
+
+Every fast system is a big one (never smaller than the distance it drifts in 40 s) and its edge
+takes about 30 s to pass, so even Neptune's weather arrives rather than switches.
 
 ### Verified, and how
-- `node --test src/physics/`: **125 tests, 0 failures** (also `node --test "src/physics/*.test.mjs"`).
-  They pin: raindrop terminal speeds against Gunn and Kinzer (within 6 %) and against their own
-  force balance; Stokes law; per-planet fall speeds; density profile; wind continuity in space
-  (under 0.12 m/s per metre), across the poles, in time and across gust-cycle boundaries; gusts
-  travelling with the wind; determinism; weather continuity; lightning schedule and thunder
-  delay; wetness build-up and drying; snow; each body's regime; ground materials; the explorer
-  (rest stays at rest, traction-limited start and stop, slope hold angle, power-limited climb,
-  terminal fall on Earth and Venus, vacuum energy conservation, jump height by gravity, landing
-  impulse, jetpack, wading and floating, 60 Hz against 20 Hz, extreme inputs); the ship (top
-  speed formula, spool, hover, wind hold, turbulence, implicit drag at any step, gear settle and
-  sleep at 60 and 20 Hz on level and sloping ground, rebounds that only shrink, pulse S-curve);
-  the oscillator (exact at any step, never gains energy); the flora field; particles; footprints;
-  the facade (shape, all ten bodies, determinism, budget, re-anchoring, deep space, NaN).
-- Timing (Node 22, this sandbox, 4 cores shared with the other two workers): `physics.update`
-  at quality 1 **0.20 ms mean / 0.24 ms p95 walking; 0.31 / 0.80 ms at 46 m/s; 0.38 / 0.70 ms
-  at 160 m/s** on PILOT's stub; **0.17 ms mean on PAINTER's real Earth**.
-  Worst frame: the test repeats a 300-frame run four times after `warmUp()` and gives each
-  frame its best time; the worst of those is **0.22 ms**. Single measurements of 20-35 ms do
-  occur on this loaded machine about once in 1200 frames; they never recur at the same frame,
-  and a `--trace-gc` run shows only minor collections (0.2-0.4 ms, about one every 14 frames),
-  so they are the scheduler, not physics. Without `warmUp()` the first frames cost 5-10 ms
-  (engine compile plus a burst of surface samples): that is the 6.8 ms frame the lead measured.
-- Allocation: no objects or arrays are created per frame. About 100 kB of short-lived boxed
-  numbers per frame remain (doubles returned from calls the engine does not inline); the three
-  worst sources (string seed keys, object-field outputs in the 1024-cell loop, hash calls
-  inside the noise) were removed in this stage.
-- `physics-lab.html` in headless Chromium, no console errors in any scene. Evidence in
-  `docs/shots/physics/`: `meadow-gale-walk.jpg` (grass bent by wind, parted by the explorer,
-  footprints in snow), `meadow-jetpack.jpg` (plume blowing grass radially), `rain-earth.jpg`,
-  `thunderstorm-earth.jpg`, `snow-earth.jpg`, `explorer-sand-prints.jpg`, `wind-terrain.jpg`,
-  `ship-liftoff-hover-land.jpg` (four frames: lift-off, hover with downwash, descent, asleep on
-  its gear), `storm-neptune-methane.jpg`, `meadow-mars-gale.jpg`, `globe-earth.jpg`,
-  `globe-jupiter.jpg`. In every flora shot the red dots are plant tips computed by the JS model
-  and the green plants are drawn by the GLSL chunk from the same textures: they coincide.
+- `node --test src/physics/`: **158 tests, 0 failures** (also file by file). New in P2: loose
+  particles per kind and per world, saltation thresholds, devils (determinism, drift, wind
+  field), virga, jet tracks and spots, marks (rims, fill, pads, scour), canopy wake, crown
+  coupling, gust travel lag, wind waves (growth curves, shallow limit, other worlds, continuity
+  over a re-anchor against the analytic bound), weather edges (below), biome table against
+  `looks.js`, lava and froth, field brake, lift-off hand-over.
+- PILOT's suite on my P2 code: `node --test tests/*.test.mjs` **92 pass** (Earth-Mars-Saturn on
+  the real worlds with physics on).
+- **Cost** (Node 22, PAINTER's real worlds, quality 1; per-frame best of five identical runs,
+  then the worst frame of the run): running at the spawn **0.35 ms**, Earth thunderstorm with
+  1340 drops **0.48**, Jupiter thunderstorm with 1760 drops and hail **0.50**, Mars dust storm
+  **0.29**, ship at 160 m/s **0.49**, standing through the spawn's first storm (200 s) **0.51**.
+  Means 0.22-0.37 ms. By section (mean): ground cache 0.01 (0.06-0.13 flying), wind grid 0.11-
+  0.19, weather 0.02-0.04, flora 0.10-0.16, particles + loose + marks + water 0.02-0.09 in fair
+  weather and 0.19-0.28 in a downpour. What each new system adds: loose kinds 0.01-0.07
+  (700 grains), devils under 0.01, marks under 0.01, water under 0.005, canopy wake and crown
+  coupling about 0.02 inside the wind and flora numbers.
+  Single frames of 5-25 ms do show up in one-off runs here (three busy processes on shared
+  cores); they never recur at the same frame, which is how I know they are the machine.
+- **Shader against JS, measured** (lab, float readback of 66 displaced tips in a gale, largest
+  tip displacement 2.05 m): float32 textures with the chunk's own bilinear **max 2.47 mm, rms
+  0.87 mm** (grass max 0.04 mm); half-float textures with the hardware's linear filter and
+  `PC_PHYS_LINEAR` **max 2.48 mm, rms 0.87 mm** (grass max 0.10 mm). The 2.5 mm is on 13 m
+  trees. Not yet repeated inside PAINTER's `PROP_VERT` (it compiles and moves there; PAINTER
+  checked that much).
+- **Weather continuity** (a watcher standing still while every live system on every world
+  passes, 1 s steps): fog, dust and haze banks change `visibility01` by **at most 5.0 % a
+  second** (was 6.2; test); with precipitation the steepest is a methane snow squall on Uranus,
+  7.8 %/s, and an Earth snow squall 4.7 %/s; rain on the giants 5-6 %/s. `intensity01` and
+  `precipitation.intensity01` at most 6.5 %/s. Found and fixed on the way: where an ice-crystal
+  veil overlapped a shower the precipitation type flipped and visibility jumped 0.32 to 0.62 in
+  one second; what falls is now three continuous shares (liquid, solid, frost).
+- The integrated game, played through PILOT's `Sim` in Node with PAINTER's world and obstacles
+  (scripted keys; numbers in "To PILOT: the game as it plays now" below), and looked at once
+  in the browser (title sheet up, no console errors, `physics 0.7 ms`).
+- Evidence, `docs/shots/physics/` (12 files): `planets-inner.jpg`, `planets-outer.jpg`,
+  `globes.jpg`, `water-coast-gale.jpg` (Hs 0.60 m, 2.5 s, 9 m under a 25 m/s gale; the blue
+  mesh is the GLSL surface, the red dots the JS twin), and from P1 `meadow-gale-walk.jpg`,
+  `meadow-jetpack.jpg`, `rain-earth.jpg`, `thunderstorm-earth.jpg`, `snow-earth.jpg`,
+  `explorer-sand-prints.jpg`, `wind-terrain.jpg`, `ship-liftoff-hover-land.jpg`.
 
 ### Not done or not verified
-- Not wired into the game: nothing in `src/player`, `src/ship`, `src/world` calls physics yet.
-- The GLSL chunk has only been compiled and run in the lab's own shader, not inside PAINTER's
-  `PROP_VERT`. Shader-against-JS agreement is judged by eye (dots on tips), not measured.
-- Other bodies' weather is a sketch: the right air, gravity, species and cell kinds, but no
-  Mars dust devils, no hail particles, no Jupiter band-following storm tracks.
-- Real-GPU cost of the three float textures and the 12 texel fetches per plant vertex is
-  unmeasured (software GL only). `PC_PHYS_LINEAR` halves the fetches where float filtering exists.
-- The ship gear model samples the ground under each foot once per call; it has not been run
-  on PAINTER's bumpiest terrain, only on planes, cones and PILOT's stub.
+- Nobody draws my particles, marks, waves or weather yet (PAINTER's M3): I have only seen them
+  in my own lab, as dots and lines. How they read as paint is unknown.
+- The flora chunk inside `PROP_VERT`: agreement not measured there; parting around the
+  explorer and thruster wash not seen in the game by anyone.
+- Rain does not know about roofs: it falls through a closed canopy and through the ship
+  (`R-RAIN-5`). A tree has two response rates, not three (`R-WIND-4`: no separate branch rate).
+- Wakes behind a swimmer or a low-flying ship are events (rings, spray), not a displacement of
+  the wave field.
+- Real-GPU cost of the textures is unmeasured (software GL only).
+- The cloud seas: I made them a light froth that carries a trimmed suit (see Decisions 16);
+  nobody has walked into one in the game.
+- `explorer-sand-prints.jpg` and `ship-liftoff-hover-land.jpg` predate rims, pads and scour.
 
 ## For PILOT: wiring, in order
 
@@ -232,9 +293,22 @@ Stage P1 (foundations) is done:
    Apply your cushion, pull-up and flare to `target` (raise its vertical part) instead of
    clamping `v`: a clamp on velocity is an infinite force, and it shows as a kink. Add
    `st.phys.buffetAngle.pitch / roll` to the drawn attitude and to the chase camera.
-5. **Lift-off and landing.** Lift-off: `wakeShip(st)`, then `stepShipGear(st, { lift01 }, dt, env)`
-   with `lift01` rising 0 to 1 over a second (the legs unload and extend), then `stepShipBody`
-   with a vertical target. Landing: your assist flies `target` down to about 1 m at 1-1.5 m/s,
+5. **Lift-off and landing.** Lift-off, exactly (tested in `ship.test.mjs`, "lift-off on the
+   gear", on Earth, the Moon and Jupiter):
+   ```js
+   wakeShip(st); let lift01 = 0;
+   // every frame while st.phys.contacts > 0 (or until the first frame it reads 0):
+   lift01 = Math.min(1, lift01 + dt / 1.2);
+   stepShipGear(st, { lift01, hold: scale(up, climb * lift01) }, dt, env);   // climb: your rise speed, e.g. 2.5-4.8 m/s
+   // the first frame st.phys.contacts === 0: hand over, same target, nothing else to do
+   stepShipBody(st, { target: scale(up, climb), tau, hover: true }, dt, env);
+   ```
+   The legs stretch as the weight comes off (the hull rises 2 cm on the Moon, 10 on Earth, 26
+   on Jupiter before anything leaves the ground), the thruster wash is lit from the first frame
+   (`st.phys.downwash`: 10.6 kN and 27 m/s on Earth, so `physics.ship.disturbers` blows dust and
+   grass before the feet leave), the feet leave after 0.7 s (Moon) to 1.2 s (Jupiter), and
+   `st.phys.lift01` carries over to the hand-over so nothing sags (worst drop in any frame
+   under 4 mm). Landing: your assist flies `target` down to about 1 m at 1-1.5 m/s,
    then `stepShipGear(st, { lift01: 1, hold: up * -0.6 }, ...)` until `st.phys.contacts > 0`,
    then fade `lift01` to 0 over 1.5 s; touchdown is `contacts === 3 && lift01 === 0`; in LANDED
    keep calling `stepShipGear` (it returns at once when `st.phys.asleep`). The lab's ship scene
@@ -242,7 +316,14 @@ Stage P1 (foundations) is done:
 6. **Landing sites.** Replace `landMaxSlope` with friction: a site holds the ship when
    `Math.tan(slope) < 0.8 * physics.ground(bodyId, dir, out, surface).friction`. On warm ice
    that is 3 degrees; on rock 34.
-7. Add `node --test src/physics/` to "every check". `src/physics/package.json` is a dev-only
+7. **Braking in vacuum**: pass `brake: 1` (X, or throttling far down) and drop your special
+   case. From 750 m/s: 6.3 s and 1.9 km instead of 53.7 s and 20.4 km (test "field brake"). It never speeds the ship up
+   and adds nothing to `gLoad`. `st.phys.fieldBrake` (m/s2) is there for a glow or a sound.
+8. **Seed**: you pass `seed: 1`. With it nothing at all happens in the sky over the spawn for
+   forty minutes. Leave `seed` out: the default (18) is chosen for the real spawn: fair for
+   two minutes, cloud building to overcast by four, a thunderstorm from 10:40 to 13:20 (22 mm/h,
+   hail, lightning 4 a minute), clear by 14:00, mist in the still wet wood after (pinned by a test).
+9. Add `node --test src/physics/` to "every check". `src/physics/package.json` is a dev-only
    file that makes that exact command run every test file (Node 22 runs a directory argument as
    one module); the game never loads it.
 
@@ -315,9 +396,20 @@ Earth at 55 degrees (peak 3.2 g felt), 21.7 s on Venus (drag-limited to 78 m/s),
    if (F.pushVersion !== lastP) { tPush.needsUpdate = true; lastP = F.pushVersion; }               // only while plants are being pushed
    for (const k in F.uniforms) uniforms[k].value.fromArray(F.uniforms[k]);                          // Vector3 / Vector4
    ```
-   Row j is north, column i is east, texel centres at cell centres. Where
-   `OES_texture_float_linear` exists you may `#define PC_PHYS_LINEAR` and use `LinearFilter` +
-   `ClampToEdgeWrapping` (one fetch instead of four). Half-float works too.
+   Row j is north, column i is east, texel centres at cell centres.
+   **Cheaper, and my answer to "a per-instance variant"**: the chunk already evaluates the
+   field once per plant in the sense that matters (at the root, the same for every vertex of
+   the plant); what costs is that the vertex stage repeats it per vertex. Two ways down:
+   (a) `#define PC_PHYS_LINEAR` in front of the chunk and upload the three fields as
+   `THREE.HalfFloatType` with `LinearFilter` + `ClampToEdgeWrapping` (16-bit float filters in
+   every WebGL2, no extension): **1 fetch a lookup, so 3 a vertex for `pcPhysBend` and 1 for
+   `pcPhysBendLite`** instead of 12 and 4. Convert with `THREE.DataUtils.toHalfFloat` on upload
+   (12 k values a frame for bend and wind, the push map only when `pushVersion` changes). The
+   lab does exactly this with `?linear=1` (`tex` / `upload` in `physics-lab.html`); measured
+   agreement with the JS model is the same as with float32 (2.5 mm on a 2 m tip displacement).
+   (b) A true once-per-plant evaluation needs the bend as a per-instance attribute, written
+   on the CPU from `fields.flora.plantBend(...)`: about 0.3 us a plant, fine for the few
+   hundred plants inside the 32 m near field, not for every tuft. Take (a).
 3. **The shader.** Put `${physics.glsl.flora}` (or `import { FLORA_GLSL } from '../physics/index.js'`)
    above `main()` in `PROP_VERT`, delete `pcSway` and the `lp += pcSway(...)` line, and after
    `vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;` add:
@@ -343,7 +435,22 @@ Earth at 55 degrees (peak 3.2 g felt), 21.7 s on Venus (drag-limited to 78 m/s),
    (put the object at `origin` under the body root); `vel` gives the streak (a 40 ms exposure
    is `vel * 0.04`); `size` is the diameter in metres. `physics.particles.events` holds the
    last 256 splashes, ripples and settles with their time.
-6. **Footprints**: `physics.fields.deform.marks` (crisp, one per step) and `.depth` (the trough).
+6. **Marks**: `physics.fields.deform.marks` (crisp; kinds foot, gear pad, scour dish; `rim` is the
+   raised edge on loose ground; snow and blowing sand fill them, `life` says when) and `.depth`
+   (the trough).
+7. **Water**: put `${physics.glsl.water}` in the liquid's vertex shader and displace along the
+   local up by `pcPhysWater(bodyLocalPosition).x`; `.yz` is the slope along east and north for
+   the normal. Uniforms from `physics.fields.water.uniforms` every frame. `physics.water(bodyId,
+   p).whitecap01` for foam, `.significant` for how rough it reads from afar. No waves on lava
+   to speak of (they are there but tiny: it is 2.6 times as dense as water); cloud seas billow
+   high and slow (an eighth of water's density).
+8. **Loose particles**: `physics.particles.dust / sand / ash / spores / leaves / spray / hail`,
+   same layout as rain. Dust devils: `physics.features.devils` (a column to paint: foot `p`,
+   `radius`, `height`, `strength`); the dust and sand in them are in the particle buffers.
+9. **Weather numbers changed meaning in P2** (nobody read them yet): `fog01`, `dust01`,
+   `haze01` are now the share of the view each takes (`visibility01 = 1 - fog01` in pure fog);
+   `intensity01` is continuous. If `visibility01` still reads as a pop at a snow squall's
+   edge (up to 8 %/s), low-pass it in the sky as the lead's check allows.
 
 ## Lab: `physics-lab.html` URL parameters
 
@@ -354,7 +461,13 @@ Earth at 55 degrees (peak 3.2 g felt), 21.7 s on Venus (drag-limited to 78 m/s),
 `seed=`; `quality=`; `fixed=1` (advance 1/30 s per rendered frame) with `fast=N` (N of those
 per frame); `jet=0`, `walk=0` or `walk=<m/s>`, `explorer=0`, `flora=0|1`, `trees=<density>`,
 `arrows=0`, `grass=<height m>`, `sea=<depth m>`, `wind=<m/s>` (steady wind on the bodies only);
-camera `yaw=`, `pitch=`, `dist=`. `window.__lab.info()` returns the state for `--eval`.
+`alt=<m>` raises the synthetic ground (Venus mesas); `find=devil`; `linear=1` (half-float
+textures + hardware filter + `PC_PHYS_LINEAR`); **`planet=`** `mercury` | `moon` | `venus` |
+`venus-mesa` | `mars` | `mars-storm` | `jupiter` | `jupiter-globe` | `saturn` | `saturn-globe` |
+`uranus` | `neptune` | `neptune-globe` | `pluto` (a preset per world; any other parameter in
+the URL wins over it); camera `yaw=`, `pitch=` (degrees), `dist=`. `window.__lab.info()` and
+`window.__lab.shaderAgreement()` return state for `--eval`. With `sea=` the liquid surface is
+drawn by the wave chunk (blue) with the JS twin as red dots.
 Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.png --w 960 --h 540 --shots 7 --every 2600`.
 
 ## Decisions
@@ -389,27 +502,48 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     a point of the shared 16 m lattice and all grids are renumbered in place.
 12. **sampleSurface is rationed**: 8 calls a frame at quality 1 (4 / 12 at 0 / 2), three times
     that while a cache is mostly empty, and never more than 0.35 ms per grid.
-13. **Default seed 14** gives a fair first seven minutes at Earth's home forest and at the stub
-    spawn, cloud at about twelve minutes and the first shower just after (a test pins this).
+13. **Default seed 18**, chosen at PAINTER's real spawn: fair for the first minutes, then
+    weather you can see coming and that comes (wiring step 8 for PILOT; a test pins it). The
+    old 14 gave drizzle at twelve minutes at best.
+14. **What falls is three continuous shares** (liquid, solid, frost), never a type switch, and
+    a cold system snows 35 % of the water it would rain (cold air holds less vapour).
+15. **A bank of fog or dust thickens so that the visual range closes in steadily** on the way
+    in, and a system's edge is as wide as the distance it drifts in 30 s (turbulent mixing
+    smears a travelling edge). Both are choices about the shape of a bank; the extinction law
+    (Koschmieder) is untouched.
+16. **Liquids belong to places**: lava in `lava_rivers` (2600 kg/m3, 100 Pa s: you float high
+    and wade at under 1 m/s, the jetpack lifts you out), and the cloud seas of `gold_islands`
+    and `sky_islands` are a froth of 120 kg/m3 that carries the trimmed suit and barely drags.
+    A real cloud carries nobody; PAINTER declared them liquids, PILOT's ship treats the deck as
+    a floor, and an explorer who fell through to a bed a hundred metres under their ship would
+    be trapped in all but name. So: froth, by name, in one table (`BIOME_LIQUID`).
+17. **The sea is already running when you arrive** (it follows the wind within 1.5 s for the
+    first moments at a new place, then with a 25 s time constant), and when the waves lengthen
+    or turn the pattern pivots about the watcher, not about the field's origin.
+18. **PAINTER's `phys: { ground }` is a family, my table keeps the finer word**: rock may stay
+    glass or crystal. A test compares every override; two disagreements are on record (below).
 
 ## Needs from the others
 
 ### From PAINTER
-1. **Canopy at a point.** Today I only know the biome, so the whole temperate forest is
-   "75 % closed canopy, 14 m": the spawn clearing and the glades are as still as the deep wood
-   (0.7 m/s at 2 m in a 5 m/s breeze). Two additive fields on the `sampleSurface` result fix
-   it and are already read if present: `canopy01` (closed-canopy fraction, 0 in a glade) and
-   `canopyHeight` (m). PILOT asked for the same height for the ship's cushion.
-2. If a biome's ground is not what my table guesses (`physics.data.BIOMES[id].ground`, e.g.
-   `temperate_forest: 'litter'`, `sea_coast: 'grass'` with a sand shore), say so; or add
-   `phys: { ground }` to the biome in `looks.js` and I will read it.
-3. Plant heights and stiffness per kit (grass 0.3-0.6 m, fern, bush, birch, pine) so
-   `uPlantHeight` and `uStiff` are the plant's own.
+1. Draw them: rain, snow, hail, the loose kinds, marks, the waves, lightning, `visibility01`,
+   `cloud01`, `wetness01`, `snowDepth`. Until then two thirds of this role cannot be judged.
+2. Two ground words where I keep mine and say why (test `ground.test.mjs`): `ochre_basins`
+   you call rock, I keep **dust** (every airless world wears fine regolith, and ballistic
+   dust is Mercury's one piece of weather; if you paint bare slabs there, paint them dusty);
+   `nitrogen_dunes` you call ice, I keep **snow** (dunes are loose grains by definition and
+   take prints). The other five I changed to yours (`rust_canyons` rock, `frozen_waves`,
+   `pearl_fog`, `lilac_mountains`, `long_shadow_plain` ice).
+3. The cloud seas: tell me if you would rather they did not carry the explorer (Decisions 16).
+4. Under the cloud deck and under lava your terrain goes on; the explorer floats above it, so
+   it should never be seen. Say if it can be.
+
 ### From PILOT
-1. The wiring above. Until then nothing of this is in the game.
-2. `disturbers` every frame, `sunDir`, and `warmUp` during loading.
-3. Decide `carve01` and `assistAccel` (feel is yours). My advice: `carve01: 1` in flight, and
-   try the explorer with `assistAccel: 0` first.
+1. Drop `seed: 1` (wiring step 8).
+2. Use the gear lift-off (step 5) with the real ship model: it is the one moment the ship
+   visibly has weight, and the wash on the ground comes with it for nothing.
+3. `st.phys.buffetAngle` on the drawn attitude and the chase camera, if it is not there yet:
+   in a 3 m/s breeze the hover holds within 1 cm and nothing shows that the air moves.
 
 ## Answers to the others
 
@@ -512,49 +646,94 @@ with and without physics; the weather at PAINTER's spawn for your seed.
    dependent `descentLimit`. You do not use `assistAccel`; your own test passes without it
    (walking pace in under 0.8 s), so leave it at 0 unless it feels heavy in the hand.
 
+### To the lead's review 3 (no MUST FIX)
+- *Tree red during the restart recovery.* Understood: I commit green, and the Status line
+  says which count is green at which commit. The seven failures were the mid-edit state the
+  coordinator's snapshot caught (new default seed and the fog measure, half applied).
+- *Worst frame about 5 ms in the browser under load.* Measured where it can be repeated: the
+  same deterministic run five times, each frame's best, then the worst frame: 0.29-0.51 ms on
+  the real worlds, storms included (Status, Cost). The browser number is the machine.
+- `brake`, the lift-off and the `st.p` line: in the API and in wiring steps 5 and 7.
+
+### To PILOT: the game as it plays now (your `Sim`, PAINTER's world and obstacles, my physics, scripted keys)
+Measured at `dc5a4d9`, default seed:
+- On foot at the spawn (dry litter, mu 0.60): walk reaches 90 % of 4.2 m/s in 0.40 s and
+  stops in 0.52 s over 0.80 m; run reaches 7.4 m/s in 0.85 s; running jump 0.95 m, 0.93 s.
+  Right. In the storm at 12 minutes (wet litter, mu 0.36) the run still reaches 7.4 m/s and
+  stops in 0.95 s over 3.1 m: that is the weather being felt, and about as far as it should go.
+- Jetpack held 3 s: top 22 m, climb 8.4 m/s, then a fall at up to **16.2 m/s** before the
+  brake catches it near the ground. 16 m/s is a five-storey fall; for a calm game I would cap
+  the sink at 9-10 with `descentLimit` all the way down, not only near the ground.
+- Lift-off: yours, kinematic: 4.8 m/s peak, to hover in 2.8 s, no leg, no wash. Step 5.
+- Throttle: 0.6 m/s after the first second, 25 after the second, 46 after five. The first
+  second is the spool (0.45 s) plus your throttle rate stacked: it reads as a dead stick.
+  Either ramp the throttle faster or accept the spool as the only lag, not both.
+- Letting go of W does nothing (46.1 to 46.3 m/s in 4 s): fine if the throttle is a lever, but
+  then the screen has to show a lever.
+- A 90 degree turn at 46 m/s takes 3.2 s and ends at 29 m/s. That is the thrusters killing
+  the old velocity (`carve01` is 0.02 at that speed by your smoothstep 40-120): honest, but the
+  turn eats 37 % of the speed and cruise sits right at the bottom of your carve range. Start
+  the carve at 25, not 40.
+- X from 29 m/s: 2.6 s, 40 m. Good. Hover in a 3 m/s breeze: 1 cm of drift in 5 s, 1 cm/s of
+  vertical motion: too good; nothing tells you there is air (Needs 3).
+- Landing from 70 m: 13 m/s down, flare from 10 m, touch at about 1 m/s, 9.7 cm of leg
+  stroke, asleep 1.5 s later. Good, and it is the gear model doing the last metre.
+- A wart of mine found here and fixed: after lift-off `st.phys.contacts` kept its parked
+  value, so pad prints could be stamped under a flying ship. Cleared in flight now, and a
+  foot more than 25 cm up never prints.
+- `physics.update` in this loop: 0.25-0.32 ms mean on foot, 0.60 flying.
+
 ## Ideas and critique
 
-Blunt, as asked. All of it is about motion; none of it is about look or structure.
+Blunt, as asked. All of it is about motion and behaviour; none of it is about look or structure.
+(The P1 list about the kinematic explorer and ship is answered: both run on bodies now.)
 
-- (to PILOT, explorer) It accelerates like a cursor: 26 m/s2 is 2.7 g, walking speed in 0.16 s,
-  a dead stop from a 27 km/h run in 0.28 s on any surface, wet rock and ice included. There
-  is no momentum to feel, so there is nothing for sand, snow or rain to change.
-- (to PILOT, explorer) Falling hits an invisible ceiling at 24 m/s and the jetpack hits one at
-  8.5 m/s by overwriting the velocity; both show as a kink the instant they engage. The slide
-  on steep ground is a constant 5 m/s: it reads as a conveyor belt.
-- (to PILOT, explorer) `stepDown` 0.5 m glues the feet to the ground on every world. On Pluto
-  (g 1.4) a run over rolling ground should bound; today it tracks the terrain like a train.
-- (to PILOT, ship) The velocity is a low-pass filter of a wish, so the craft has no mass:
-  46 m/s2 off the mark at the ground, 441 m/s2 (45 g) in space, a full stop in half that with
-  X. Lift-off is a position curve and landing ends in `p = floor` and a slerp to the rest
-  attitude: no weight comes onto the legs, nothing compresses, nothing settles.
-- (to PILOT, ship) There is no gravity, drag or wind on the ship at all, so Venus, Mars and
-  the Moon fly identically. That is the cheapest place to get "each planet feels different".
-- (to PAINTER, flora) `pcSway` is two sines of global time with a hashed phase: every plant
-  on the planet sways at exactly 0.18 Hz and 0.43 Hz with the same amplitude, grass and pine
-  alike, along its own instance axes (so the sway direction is the plant's yaw, not the
-  wind's), and neighbours are uncorrelated. That is metronomes and noise at once, the two
-  things art bible point 7 rules out. The field gives direction, gusts that cross the meadow,
-  and frequency by size.
-- (to PAINTER, sky) Clouds drift with `uTime * const` on fixed axes. `physics.here.air.wind`
-  (or `physics.air` at cloud height: it is faster aloft, and on Venus twelve times faster) would
-  make the clouds, the rain slant and the grass agree, which is R-WIND-1.
-- (to both) The game "walks" at 4.2 m/s, three times a walking pace. Most references about
-  feet (stride, wading, wind, stopping) are true at 1.4 m/s and false at 4.2. Either the walk
-  is slower and Shift is the jog, or the checks should be read as being about a jog.
-- (self) The forest floor is physically calm (0.7 m/s at 2 m under a closed canopy), which is
-  right and may be dull to look at. Glades and the crowns carry the motion once PAINTER's
-  canopy field is in.
-- (idea) Thunder: `lightning.thunderIn` counts down to the bang at the speed of sound of that
-  air (340 m/s on Earth, 1210 on Jupiter, none on the Moon). Cheap, and it makes distance audible.
-- (idea) `st.phys.lean` for the explorer model and `legCompress` for the ship's legs are
-  animation data that cost nothing.
+- (to PILOT) With `seed: 1` the owner would stand under an empty sky for forty minutes. Weather
+  is a function of place and time, so which seed ships decides whether anyone ever sees it. Fix
+  in one word (wiring step 8).
+- (to PILOT, ship) The first second of throttle does nothing (your throttle rate on top of my
+  engine spool); a 90 degree turn at cruise costs 37 % of the speed because cruise sits at the
+  foot of your carve ramp; the hover is so exact that the air might as well be absent; lift-off
+  is still a position curve. Numbers in "the game as it plays now".
+- (to PILOT, explorer) Falling 22 m from a jetpack hop at 16 m/s and being caught at the last
+  moment is a stunt, not a stroll. Cap the sink all the way down.
+- (to PILOT) `physics.here.weather.lightning.thunderIn` and `.last.distance` are there for the
+  thunder; a storm without sound is half a storm, and the delay is the cheapest sense of scale
+  in the game (340 m/s on Earth, 1210 on Jupiter, never on the Moon).
+- (to PAINTER) Nothing of the weather is painted. The sky does not darken with `cloud01`, the
+  far washes do not close in with `visibility01`, the ground does not darken with `wetness01`,
+  no drop falls. The thunderstorm that crosses the spawn at eleven minutes, 22 mm/h with hail
+  and four flashes a minute, is at the moment a number in a read-out. This is now the largest
+  gap between what the game computes and what it shows.
+- (to PAINTER) Under the home forest the wind at 2 m is 1-3 m/s even in that storm, because a
+  closed canopy really does that. So on the ground the storm is rain and noise, and the drama
+  is in the crowns (the stiff response reads the wind at canopy height) and in the glades. If
+  the crowns do not visibly heave, the storm will look tame however hard it rains.
+- (to PAINTER) Clouds still drift on fixed axes with `uTime`. `physics.air(bodyId, p, out,
+  cloudHeight)` gives the wind up there (faster aloft; twelve times faster on Venus), and
+  `physics.util.cellsAt` gives where the systems are: paint the dark ones where it rains.
+- (to PAINTER) Grass leans 47 degrees in a 5 m/s breeze and 65 in 8 m/s. A single blade is that
+  limp, but if a whole meadow reads as flattened at the spawn, the knob is `FLORA.softFlex`
+  (3); tell me what you see at 960x540 before I touch it.
+- (to both) Cloud seas and lava are liquids only because the look table says so. I gave them
+  densities and a viscosity; someone should walk into each on purpose before M3 is called done.
+- (self) The lab draws dots and lines. I can prove a drop falls at the right speed and cannot
+  tell whether rain reads as rain. Every particle system here is unjudged as a picture.
+- (self) The three-wave sea is honest about height, period and direction and has no groups, no
+  breaking, no wake field. From a ship at 100 m it will tile. It needs a fourth, long train
+  and a per-train phase noise before anyone flies low over Neptune.
+- (self) Snow squalls still close the view at up to 8 % a second; I softened banks and left
+  squalls, because that is what a squall is.
+- (idea) Rain shelter: `canopy01` at the focus could thin the drops under a closed wood and
+  under the hull for almost nothing; drips after the rain (the canopy empties over a minute)
+  would sell the wet forest better than the rain itself.
+- (idea) `st.phys.lean` for the explorer model, `legCompress` for the ship's legs, `fieldBrake`
+  for a glow: animation data that cost nothing.
 
-## Next stage (P2), in order
-1. Kicked dust, blown sand (saltation above the threshold), ash, spores, leaves, spray, hail:
-   the empty particle kinds, with ballistic arcs on airless bodies.
-2. Ground: displaced rims, snow filling prints, ship pad prints and scour ring, angle-of-repose
-   relaxation, drifts.
-3. A third (branch) response in the flora field; rain shelter under canopy and under the ship.
-4. Water: wind-driven wave parameters, wakes and ripples as events.
-5. Other-planet weather in depth (Mars dust devils, Jupiter storm tracks along the bands).
+## Next stage (P3), in order
+1. Whatever PAINTER's first drawn rain, marks and waves show to be wrong (sizes, counts,
+   exposure, lifetimes): tune against the picture, not the lab.
+2. Rain shelter under canopy and hull, drips after rain; a third (branch) rate in the trees.
+3. The sea from above: wave groups, a long swell, a wake field behind the ship and the swimmer.
+4. Shader agreement measured inside `PROP_VERT`; real-GPU cost of the fields.
+5. Drifts: snow and sand piling in the lee (the wake field already knows where the lee is).
