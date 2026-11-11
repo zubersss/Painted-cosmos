@@ -90,6 +90,18 @@ at 2 m 8.5 to 10.4 m/s before, 8.6 to 10.8 after (the frames differ by the grid'
 under half the height of anything that casts a lee there). A crown taller than the wood upwind now feels up to the whole
 wind above 1.5 x that wood's height. PILOT's suite passes.
 
+**4. Three strips re-filmed** (from `p15/root`, `kits=painter`, `docs/shots/physics/motion-*.jpg`, all OPENED):
+- `explorer-jet`: up to 49 m over the wood and down; the brake eases in: -16.6, -13.1, -10.1, -7.8, -6.0, -4.6 m/s at
+  0.55 s steps (6.3 easing to 2.5 m/s2), touchdown at 4.6 m/s taken by a 4.5 cm fold. The camera (30 m, following) goes
+  through two crowns on the way (the lab's camera, not the game's).
+- `ship-hover` (176 s, 6.5 to 10.5 m/s at 6 m): the lab's hull now draws `buffetAngle` (rotateX pitch, rotateZ roll,
+  rotateY yaw): roll -0.35 to -0.52, pitch -0.2 to +0.1, yaw +0.33 to +0.47 degrees; at 17 m the hull still reads level
+  (half a degree is 2 cm at its edge). The storm's leaves stream across the whole picture, some large near the lens.
+- `clamber-run-moon`: legs fold at the face, cross the top, run on: a clamber that reads. But the run is still CHECKED at
+  the face: 5.4 -> 2.1 m/s between two frames 0.125 s apart (26 m/s2: lunar friction gives 1.6, so it is the face), then
+  back to 4.6 m/s over 2.4 s. P13's "0.5 m/s a step" holds per 1/64 s step, but the loss is over a tenth of a second, not a
+  stride (0.5 s on the Moon at 5 m/s). The explorer's body is PILOT's to review now: not changed (For PILOT).
+
 ## Hand-over P14 (twelfth PHYSICS agent; read this block first; P13 and older below hold for everything not named here)
 
 **Where things stand.** Item 1 of P14 (trees alive in a storm) is done and committed; items 2 (leaves), 3 (the
@@ -1383,6 +1395,15 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+### P15, first (thirteenth PHYSICS agent)
+- Nothing to wire for the leaves (the kits carry them; `here.blown.leaves`, `.litter`, `.leafStock01` are new numbers if
+  audio wants the rustle of a flock).
+- `clamber-run-moon`: a run into a 1 m boulder on the Moon still loses 3.3 m/s in 0.125 s at the face (see the P15
+  hand-over, item 4). It is the explorer's body, which you are reviewing; I left it alone as told. If it should be taken
+  up over a stride, the place is the clamber's face contact in `src/physics/explorer.js` (mine to change on your word).
+- The walker's 2 m wind is unchanged by P15's wake change (2 m is under half the height of anything that casts a lee).
+
 
 ### P13, first (tenth PHYSICS agent): the gait, the jump, the hull, the descent
 
