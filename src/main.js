@@ -67,6 +67,7 @@ async function boot() {
     } catch (e) {
       physics = null;
       console.warn('[painted-cosmos] physics could not start (' + (e && e.message) + '); using the built-in movement.');
+      prov.fallback.push('physics: ' + ((e && e.message) || e));
     }
   }
   prov.using.physics = physics ? 'real' : 'stub';
@@ -142,7 +143,7 @@ async function boot() {
   const sim = game.sim;
   const debug = {
     game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, using: prov.using, note: debugNote,
-    info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
+    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
     setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },

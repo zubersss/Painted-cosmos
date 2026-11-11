@@ -36,6 +36,9 @@ export async function loadProviders(search) {
   const plan = planProviders(search, REAL_READY);
   const mods = {};
   const using = {};
+  // Modules the plan wanted real that fell back to the stub (a load error, a missing export):
+  // the browser checks fail on any (tests/browser.mjs, fallbackProblem), unless asked for stubs.
+  const fallback = [];
   for (const key of ['render', 'world', 'art', 'physics']) {
     mods[key] = STUB[key];
     using[key] = 'stub';
@@ -48,6 +51,7 @@ export async function loadProviders(search) {
       using[key] = 'real';
     } catch (e) {
       console.warn(`[painted-cosmos] Painter's ${key} module is not usable yet (${e && e.message}); using the stub.`);
+      fallback.push(`${key}: ${(e && e.message) || e}`);
     }
   }
   if (['render', 'world', 'art'].some((k) => using[k] === 'stub')) {
@@ -57,6 +61,8 @@ export async function loadProviders(search) {
   using.ui = plan.ui;
   return {
     using,
+    plan,
+    fallback,
     createPainter: mods.render.createPainter,
     RENDERER_OPTIONS: mods.render.RENDERER_OPTIONS || stubPainter.RENDERER_OPTIONS,
     makeWashMaterial: mods.render.makeWashMaterial || null,

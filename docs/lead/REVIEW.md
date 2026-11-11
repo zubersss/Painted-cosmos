@@ -84,6 +84,15 @@ Body by body, as I open them:
   far islands as grey blocks in the haze: atmospheric and good, the same boxy cliffs. From
   orbit (9 frames): bold orange and cream bands with soft edges: Jupiter at once (no Great
   Red Spot, which the brief names among its biomes).
+- **Uranus.** Spawn (46 frames, 220 s): a mint sky over a pale aqua ice plain with blue
+  shard grass and rows of frosted cones on the horizon: the palette says Uranus, the sky is
+  a good granulated wash, and it passes as a pale study. It is also the emptiest first view
+  after the Moon's: one value range (pale to pale), no dark anywhere but the figure and the
+  ship, nothing for the eye to go to; the ice slab at right is a flat white shape with a hard
+  rim. Vista, Mint Ice Shelves (32 frames, 189 s): a shelf wall with a ruler-straight top edge
+  and flat faces, and blue cones before it that read as snowy firs; the brief's "frozen-wave
+  forests" do not show as waves. From orbit (9 frames): a pale mint disc with white blots;
+  quiet, right in colour.
 
 ---
 
