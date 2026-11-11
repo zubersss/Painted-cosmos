@@ -169,6 +169,8 @@ export class Game {
     // Additive: the weather as eleven 0..1 numbers a painter can use (PHYSICS' `here.sky`:
     // cloud, overcast, haze, fog, dust, wet, snow, rain, snowfall, storm, flash), or null.
     sim.mood.sky = sim.physics && sim.physics.here && sim.physics.here.bodyId ? sim.physics.here.sky || null : null;
+    // Debug (window.__pc.flash()): lightning for a frame or a few, so that it can be seen and shot.
+    if (this.forceFlash > 0 && sim.mood.sky) { sim.mood.sky = { ...sim.mood.sky, flash: 1 }; this.forceFlash--; }
     this.painter.setMood(sim.mood);
     const info = this.renderer ? this.renderer.info : null;
     if (info) {

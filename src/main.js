@@ -135,6 +135,8 @@ async function boot() {
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
     setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },
+    // Force lightning (setMood.sky.flash = 1) for `frames` frames: nobody has seen it yet.
+    flash: (frames = 1) => { game.forceFlash = Math.max(1, frames | 0); },
     setHour: (h) => { sim.eph.setLocalSolarTime(sim.bodyId, sim.t, norm3(sim.ex.p), h); },
     // Resolves when the world has had nothing left to build for `frames` frames in a row.
     settle: (frames = 12) => new Promise((resolve) => {
