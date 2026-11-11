@@ -63,7 +63,7 @@ refresh), and is not fed while the first view loads (`main.js`: `judged`, `dyn.r
 only reports. The look is judged at the top tier (tour, weather set, review 6); mechanics
 runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdrawn" marks.
 
-**What part 1 did** (commits `895a178` to the one that holds this text; details under
+**What part 1 did** (commits `895a178` to `fd677b5` and the one that holds this text; details under
 "Fourth agent, part 1" below):
 1. Weather set on PHYSICS' new storm times: `tests/weather.mjs` re-shot (twelve frames,
    sheet opened). New ids: `earth-start`, `earth-before`, `earth-arrives`, `earth-storm`,
@@ -217,6 +217,15 @@ above 30 fps after 0.14 s and settles on tier 1; a machine that cannot hold anyt
 the floor after 1.8 s (2.8 s when every frame is over 250 ms, as in software rendering); a
 machine a little over budget settles on scale 0.815 at tier 2 with one failed try upward
 every 4, 8, 16, 32 ... seconds. Never run on a real GPU.
+
+**Checked at the end of part 1**: `node tests/all.mjs --export --only unit,static,m3,painted-m3`
+on `fd677b5`: ALL 4 PASSED (unit 114, the static rules, m3 29 checks on stubs and 29 in the
+painted world with the controller free: "starts at the best: tier 2, render scale 1", then
+by itself "tier 1, render scale 0.5" within seconds in software rendering). **Not run since
+my changes to `sim.js`, `explorer.js`, `game.js`, `hud.js` and since PHYSICS' legs**: the
+play-through, the trip, pointer lock, sound, and their painted versions (part 2 runs every
+check). The grand tour ran on `5e62268`, before the step round a trunk, the landing word,
+the pulse word, the label above the ring and the legs.
 
 **From the coordinator's relays**: `mood.pulse01` (0 at cruise, 1 from 6 km/s of pulse,
 falling as the drive brakes; additive); PAINTER's faint drags at a plain full cruise: keep

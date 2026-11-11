@@ -20,7 +20,8 @@ is no triangle budget; the game starts at the top tier and full resolution and t
 dynamic resolution alone carry the frame-rate line. Closed at that re-measure: the pepper in the
 dark washes and in space, the storm after dark (550 k), and Physics' storms without wind
 (now 16 to 25 m/s; walked and flown in the browser).
-M4 is prepared: one command runs every
+All eight planets have been landed on in one browser sitting with real keys
+(`tests/grandtour.mjs`, 2026-11-11). M4 is prepared: one command runs every
 check and prints a table (`node tests/all.mjs --export`), the README is complete for a new
 player, the critique of the other two domains is in Pilot's notes. The two things nobody has
 been able to check are still the frame rate on a real GPU and how the game sounds.
@@ -101,18 +102,21 @@ been able to check are still the frame rate on a real GPU and how the game sound
 
 ## Risks and what is off track
 
-1. **Frame rate is unmeasured.** Every claim about 60 fps is reasoning from triangle counts
-   and pass counts. Someone must open the game on a real integrated GPU and read the `
+1. **Frame rate is unmeasured.** Every claim about 60 fps is reasoning; and since the owner's
+   instruction of 2026-11-11 the game starts at the top tier and full resolution and relies on
+   a controller that has only met model machines and software rendering. Someone must open the game on a real integrated GPU and read the `
    read-out before the pull request; until then this is the largest risk in the project.
-2. **Painter is still the critical path**: one MUST FIX (1.8 % in one view), then stars and
-   the pulse in space, the art pass on the weakest biome of every planet, and the SHOULD FIX
-   list of review 5, with one role on its fifth agent.
+2. **Painter is still the critical path**: no MUST FIX is open (the budget one is withdrawn),
+   but the owner's quality push (fuller ground, trees and distance at the top tier) lands on
+   one role on its sixth agent, and every look judgement must be made again at the top tier
+   after it. Software frames here get slower as the scenes get fuller.
 3. **Nothing has been judged in motion.** Every look judgement is a still; every feel
    judgement is a number from a 60 Hz simulation or a browser at one to three frames a
    second. The tour was last run on `ded1435` (review 4), before weather, models and the
    near-ground layer.
-4. **The first storm a new player meets arrives after dark** (day length against the default
-   seed). Cheap to move (Physics' seed, or the hour the game begins).
+4. ~~The first storm a new player meets arrives after dark.~~ Closed: Physics moved Earth's
+   weather clock (`1cbbcc6`); the storm crosses the spawn from 160 to 320 s of play, noon to
+   half past two, and the weather set shows it arriving in daylight (`weather.jpg`).
 5. **Nobody has heard the sound, held a real mouse or a real pad to it.** Measured levels and
    a proven pointer-lock fallback are substitutes, not the thing itself.
 6. **Build hitches are unmeasured**: the worst `world.update` frame cannot be read in software
