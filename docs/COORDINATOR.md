@@ -56,7 +56,7 @@ here, write the request in your notes file and report it; the coordinator record
 ## B. Tools (verified working in this sandbox)
 
 - `node tools/shot.mjs <page?query> <out.png|out.jpg> [--w 960 --h 540] [--ready "expr"]
-  [--wait ms] [--eval "js"] [--shots N --every ms] [--root dir]`: headless Chromium (Playwright,
+  [--wait ms] [--eval "js"] [--shots N --every ms] [--root dir] [--shot-timeout ms]`: headless Chromium (Playwright,
   pre-installed; do not install another) with software WebGL2, own static server on a free port,
   prints console errors, page errors, failed and external requests, exits 1 if any.
   It waits for `window.__pcReady === true` by default: **both pages set `window.__pcReady = true`
@@ -267,3 +267,26 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   realism is kept and made forgiving with assists, not faked. Same branch, same tree, same rules.
 - 2026-11-11: the owner made PILOT the lead developer as well (section G): reference benchmarks
   from existing games, verified reviews of the other roles, a track sheet, milestone sign-off.
+- 2026-11-11: **M1, PILOT's half: met** (walk, jetpack, board, lift off to space, land, step out;
+  70 unit tests; scripted play-through passes on the stubs and inside PAINTER's forest with no
+  console errors). **PAINTER's half: open**, three MUST FIX in `docs/lead/REVIEW.md` review 1.
+  The coordinator looked at the frames itself and upholds all three (see next lines).
+- 2026-11-11: **Frame budget (PILOT's call, performance; upheld):** in the densest view at most
+  600 k triangles and 350 draw calls at quality 1, 300 k at quality 0, 1.2 M at quality 2;
+  `world.update` at most 5 ms a frame, `physics.update` at most 2 ms a frame, both as a worst
+  frame, not an average. Measured by PILOT's frame-cost probe.
+- 2026-11-11: **Look findings upheld by the coordinator** (PAINTER decides how): crowns must be
+  a few washes, not specks; trunks and the brook bank must not be ruler-straight; trees must not
+  stand in rows; distance bands inside the wood must fade lighter and cooler; space grain must
+  not read as black pepper.
+- 2026-11-11: additive contract changes, all in use: `spaceAltitude(body)` and `soiRadius(body)`
+  exported from `src/data/bodies.js` (Moon and Pluto: 420 m); terrain stays below
+  `radius + 0.8 * spaceAltitude(body)`; `setMood.biomeId` (the heaviest biome); `world.busy`
+  (pending build jobs; readiness), `world.setBuildBudget(ms)`, `world.getLighting()`,
+  `world.sampleObstacles` (trunks and boulders as cylinders).
+  Requested, not yet delivered: canopy height under a point (PAINTER -> PILOT, for the ship's
+  cushion); the table of which PILOT constants each PHYSICS constant replaces (PHYSICS -> PILOT).
+- 2026-11-11: `tools/shot.mjs` has `--shot-timeout ms` (default 180000) and reports a failed
+  screenshot as a problem instead of dying.
+- 2026-11-11: debug query parameters in the game (PILOT): `stub=1`, `dynres=0`, `scale=`,
+  `quality=`, `pointerlock=0` (drag to look; use it in every headless run).
