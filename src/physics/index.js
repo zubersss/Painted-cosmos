@@ -15,7 +15,7 @@ import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltati
 import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
-import { FloraField, FLORA, PlantSim, plantDisplace, plantBranch, treeFrequency, stemFrequency } from './flora.js';
+import { FloraField, FLORA, PlantSim, plantDisplace, plantBranch, plantCrown, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK } from './loose.js';
@@ -454,6 +454,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _dJet = { kind: 'jet', p: null, v: null, radius: 0.15, strength: 0 };
   const _dShip = { kind: 'ship', p: null, v: null, radius: 4.2, strength: 1, q: null, legContact: null };
   const _dWash = { kind: 'downwash', p: null, v: null, radius: 2.2, strength: 0 };
+  const _cw = new Float64Array(5);
   function explorerDisturbers(st, out = []) {
     const B = st.phys;
     _dEx.p = st.p; _dEx.v = st.v; _dEx.grounded = !!st.grounded;
@@ -486,7 +487,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       // how far a point of a crown is moved by its branch (m: { e, n, up }); add it before plantDisplace.
       // rel: the point's offset from the trunk { e, n } (m) and height h; H: the plant's height;
       // root: body-local; bend: what plantBend returned for the plant (stiff01 as for the plant)
-      plantBranch(re, rn, h, H, root, bend, out) { return plantBranch(re, rn, h, H, frame.lx(root.x, root.y, root.z), frame.lz(root.x, root.y, root.z), bend.e, bend.n, bend.shake01 || 0, flora.uniforms, out); },
+      // (P14: the branch's wind is its own, looked up at the root; of `bend` only shake01 is read)
+      plantBranch(re, rn, h, H, root, bend, out) { const gx = frame.lx(root.x, root.y, root.z), gz = frame.lz(root.x, root.y, root.z); return plantBranch(re, rn, h, H, gx, gz, 0, 0, (bend && bend.shake01) || 0, flora.uniforms, out, flora.crownAt(gx, gz, H, _cw)); },
+      // (P14) the twin of pcPhysCrown: the same for a point of the branch or foliage mass numbered id (0..1; negative:
+      // none), leaf01 1 on foliage; shake01 from plantBend. out also carries set (m), load, I, hz, gain (see flora.js)
+      plantCrown(re, rn, h, H, root, shake01, id, leaf01, out) { const gx = frame.lx(root.x, root.y, root.z), gz = frame.lz(root.x, root.y, root.z); return plantCrown(re, rn, h, H, gx, gz, flora.crownAt(gx, gz, H, _cw), shake01 || 0, flora.uniforms, id, leaf01, out); },
       field: flora,
     },
     deform: {

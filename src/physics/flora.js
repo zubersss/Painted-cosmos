@@ -102,25 +102,63 @@ export const FLORA = Object.freeze({
   // Branches. A tree is not one cantilever: its first-order branches are cantilevers on the
   // trunk with natural frequencies two to four times the trunk's (measured on open-grown trees:
   // trunk 0.2 to 0.5 Hz, branches 0.8 to 2 Hz; James, Haritos and Ades 2006; Rodriguez, de
-  // Langre and Moulia 2008), each with its own phase. They are driven by the turbulence, not
-  // the mean wind, and being out of step with the trunk they take energy out of its sway (the
-  // crown is the tree's damper). So a crown does not sway as one piece: lobes of it bob and
-  // swing in turn, faster than the trunk leans.
-  branchHz: 1.3,                // Hz: the first of four branch rates (x BRANCH_F)
-  branchGain: 1.3,              // rad of branch swing per rad of trunk lean, in fully gusty air (tips of 3.5 m branches
-                                // move 10 to 20 cm in a fresh breeze, half a metre in a storm; 0.5 before P11, when
-                                // the trunk itself leaned three times as far)
-  branchCalm: 0.35,             // share of that left in smooth air (the trunk's own sway shakes them)
+  // Langre and Moulia 2008), each with its own phase, and being out of step with the trunk they
+  // take energy out of its sway (the crown is the tree's damper).
+  // (P14) A BRANCH CARRIES ITS OWN WIND. Until P14 a branch swung by branchGain x the TRUNK's lean; P11 made
+  // trunks as stiff as measured trees (right) and the branches went quiet with them (wrong: 7 cm at the tip
+  // in the thunderstorm, the birches read as still). A branch in leaf is loaded by the wind on its own
+  // foliage:
+  //   the set: the tip streams downwind by branchSet x (q / qRef)^branchSetExp of the branch's length. The
+  //     drag of a leafy branch grows as U^1.3, not U^2 (leaves and twigs fold into the wind: Vogel 1989,
+  //     exponent -0.7), so as load^0.65. By a 3.5 m birch branch (5 cm at the base tapering to a twig, about
+  //     50 N/m at the tip; 0.16 m^2 of drag area left at 20 m/s, 38 N of which some 60 % acts at the tip):
+  //     0.38 m in a 20 m/s gale, 0.16 m in 10 m/s, 0.06 m in 5 m/s, never more than branchSetMax of its length.
+  //   the thrash: the gusts smaller than the wind grid load it as they pass. Three frozen eddy trains 6, 11 and
+  //     19 m long (the lengths that pass a crown at about a hertz in a strong wind), fixed in the ground and
+  //     carried by the wind at crown height (Taylor), each felt by a branch as the oscillator it is (its own
+  //     frequency, branchHz +- branchSpread / 2 by the branch's own number; damped by its wood and, more, by
+  //     its leaves in the moving air): full below its frequency, amplified at it, little above, and late by
+  //     its own lag. The swing of the load is branchThrash x the turbulence intensity (d ln F / d ln U = 1.3).
+  //     So the rms swing about the set is 0.4 to 0.5 of the set in a storm and its peaks about the set itself:
+  //     a tip in 20 m/s streams 0.4 m downwind and thrashes between 0 and 0.8 m; in a 3 m/s breeze it moves
+  //     2 to 3 cm. Branches differ in frequency, lag and place in the eddies, so a crown changes shape.
+  //   the foliage: twigs in leaf tremble at twigHz and above on top (twigMax in a gale, a centimetre in a breeze).
+  branchHz: 1.3,                // Hz: a first-order branch in leaf (a 3.5 m birch branch; 0.85 to 1.75 by branchSpread)
+  branchSpread: 0.7,            // the branches of one crown differ in frequency by this much (share of branchHz, end to end)
+  branchSet: 0.0334,            // tip set / branch length at load 1 (8 m/s at the crown in Earth air)
+  branchSetExp: 0.65,           // the set grows as load to this power (drag as U^1.3)
+  branchSetMax: 0.30,           // of its length: a branch streams no further (a chord of 17 degrees)
+  branchThrash: 1.3,            // swing of the load / mean load = this x the turbulence intensity
+  branchDamp: 0.08,             // damping ratio of a branch in still air (wood and leaves)
+  branchAero: 0.012,            // ... plus this per m/s of wind at the crown (leaf drag), up to branchDampMax
+  branchDampMax: 0.6,
+  crownK: Object.freeze([1.047, 0.571, 0.331]),     // rad/m: eddies 6, 11 and 19 m long
+  crownAng: Object.freeze([1.92, 0.87, 2.97]),      // rad: their directions in the field frame (60 degrees apart)
+  crownA: Object.freeze([0.656, 0.802, 0.962]),     // amplitudes: variance as length^(2/3), unit rms together
+  crownTilt: 0.25,              // rad per metre of height: the eddies lean with the shear, a crown's top leads its skirt
+  crownImax: 0.6,               // the turbulence intensity counted, at most
+  twigHz: 3.6,                  // Hz: the first of the two rates foliage trembles at (the other 23/16 of it)
+  twigMax: 0.07,                // m: swing of twigs in leaf in a gale
+  twigGain: 1.2,                // ... reached as 1 - exp(-twigGain x load)
+  branchGain: 1,                // a lever on all of it (1 = the model; 1.3 rad per rad of trunk lean before P14)
   branchShake: 0.08,            // rad: swing of a crown that has just been brushed or blown on (shake01 = 1)
-  crown: 0.35,                  // a branch is this long, as a share of the plant's height
+  crown: 0.27,                  // a branch is this long, as a share of the plant's height (3.5 m on a 13 m birch; 0.35 before P14)
 });
-// Four branch oscillators: relative rates (incommensurate, so the pattern never repeats), how
-// many lobes each puts round the trunk (whole numbers: the motion is continuous all the way
-// round), and how its phase runs with height and from tree to tree.
-export const BRANCH_F = [1, 1.37, 0.71, 1.93];
+// Without a number per branch (pcPhysBranch, plantBranch) the crown moves in whole lobes round the trunk
+// (whole numbers: the motion is continuous all the way round), each eddy train with its own count and its own
+// run of phase with height. (Trees differ by where they stand in the eddies; the number per tree of P6, taken
+// from the grid cell, jumped when the frame re-anchored and is gone: BRANCH_T is no longer used.)
+export const BRANCH_F = [1, 1.37, 0.71, 1.93];   // (the four clock oscillators of P6 to P13: no longer used by the model)
 export const BRANCH_M = [2, 3, 1, 4];
 export const BRANCH_S = [2.6, -1.9, 4.1, 0];
 export const BRANCH_T = [1, 1.7, 2.3, 0.6];
+// (P14) the crown's eddy trains: unit directions; the phase of the vertical and of the cross-wind part of a
+// branch's swing against its along-wind part; how far a branch's own number puts it out of step (turns: the
+// long eddies take a crown as one, the short ones branch by branch)
+export const CROWN_D = FLORA.crownAng.map((a) => [Math.cos(a), Math.sin(a)]);
+export const CROWN_UP = [1.9, 4.4, 0.8];
+export const CROWN_X = [3.6, 1.1, 5.2];
+export const CROWN_ID = [1, 0.5, 0.25];
 
 const _s = new Float64Array(9);
 const _coef = new Float64Array(8);
@@ -172,12 +210,14 @@ export class FloraField {
       uPhysWave: [1, 0, 0, 0],                    // xy: wave direction; z, w: flutter phases 0 and 1 (P11)
       uPhysWavePhase: [0, 0, 0, 0],
       uPhysShape: [FLORA.softFlex, FLORA.softMax, FLORA.stiffFlex, FLORA.stiffMax],
-      // branches (P6): phases of the four branch oscillators (rad, wrapped), and
-      // x: gustiness 0..1 near the focus, y: gain, z: shake swing (rad), w: branch length / height
+      // branches (P14): xyz: phases of the crown's three eddy trains (rad, wrapped), w: the twig clock (rad,
+      // wrapped at 16 turns), and x: wind speed at load 1 (m/s: sqrt(2 qRef / rho)), y: gain, z: shake swing
+      // (rad), w: branch length / height.  (P6 to P13: four clock oscillators, and x was the gustiness.)
       uPhysBranchPhase: [0, 0, 0, 0],
-      uPhysBranch: [0, FLORA.branchGain, FLORA.branchShake, FLORA.crown],
+      uPhysBranch: [Math.sqrt(2 * FLORA.qRef / 1.225), FLORA.branchGain, FLORA.branchShake, FLORA.crown],
     };
-    this.branchPhase = new Float64Array(4);
+    this.branchPhase = new Float64Array(4);      // [0..2] the crown's eddy trains (unwrapped), [3] the twig clock
+    this.crownWind = new Float64Array(2);        // mean wind at crown height over the field (m/s east, north)
     this.gustiness = 0;
   }
 
@@ -204,6 +244,7 @@ export class FloraField {
       this.wavePhase[i] -= ki * (ex * dx + ez * dz);
     }
     for (let i = 0; i < 3; i++) this.flutPhase[i] -= FLORA.flutterK[i] * (FLUT_D[i][0] * dx + FLUT_D[i][1] * dz);
+    for (let i = 0; i < 3; i++) this.branchPhase[i] -= FLORA.crownK[i] * (CROWN_D[i][0] * dx + CROWN_D[i][1] * dz);
   }
 
   // Advance the fields by dt.
@@ -245,7 +286,7 @@ export class FloraField {
     const b11 = _coef[4], b12 = _coef[5], b21 = _coef[6], b22 = _coef[7];
     const kq = 0.5 * rho / FLORA.qRef;
     const bend = this.bend, vel = this._vel, wind = this.wind;
-    let gsum = 0, se = 0, sn = 0, tsum = 0;
+    let gsum = 0, se = 0, sn = 0, tsum = 0, sce = 0, scn = 0;
     const swirl = !!devils && devils.count > 0;
     for (let j = 0; j < N; j++) {
       const z = (this.cj + j - N / 2 + 0.5) * cell;
@@ -276,7 +317,7 @@ export class FloraField {
         wind[o + 2] = g01 < 0 ? 0 : g01 > 1 ? 1 : g01;
         wind[o + 3] = _s[3] * sp * h2;
         this._can[n] = _s[7];
-        gsum += wind[o + 2]; se += we * hs; sn += wn * hs; tsum += wind[o + 3];
+        gsum += wind[o + 2]; se += we * hs; sn += wn * hs; tsum += wind[o + 3]; sce += we * ht; scn += wn * ht;
       }
     }
     // ---- crowns loading their neighbours --------------------------------------------------------
@@ -312,8 +353,11 @@ export class FloraField {
     // (P11) the flutter trains are carried by the wind at blade height (se, sn: its mean over the field)
     for (let i = 0; i < 3; i++) this.flutPhase[i] = (this.flutPhase[i] + FLORA.flutterK[i] * (FLUT_D[i][0] * se + FLUT_D[i][1] * sn) * h) % (TAU * 1024);
     this.gustMean = gsum * inv;
-    // branches: four oscillators on the clock, and how gusty the air is (turbulence over mean wind), eased over 2 s
-    for (let i = 0; i < 4; i++) this.branchPhase[i] = (this.branchPhase[i] + TAU * FLORA.branchHz * BRANCH_F[i] * h) % TAU;
+    // (P14) branches: the crown's eddy trains are carried by the mean wind at crown height; the twig clock runs
+    sce *= inv; scn *= inv; this.crownWind[0] = sce; this.crownWind[1] = scn;
+    for (let i = 0; i < 3; i++) this.branchPhase[i] = (this.branchPhase[i] + FLORA.crownK[i] * (CROWN_D[i][0] * sce + CROWN_D[i][1] * scn) * h) % (TAU * 1024);
+    this.branchPhase[3] = (this.branchPhase[3] + TAU * FLORA.twigHz * h) % (TAU * 16);
+    // how gusty the air is (turbulence over mean wind), eased over 2 s (physics.here; no longer a uniform)
     { const g = clamp01(tsum * inv / (ms + 0.5) * 2.5); this.gustiness += (g - this.gustiness) * (1 - Math.exp(-h / 2)); }
 
     // ---- push field ----------------------------------------------------------------------------------
@@ -330,8 +374,9 @@ export class FloraField {
     U.uPhysWave[0] = this.waveDir[0]; U.uPhysWave[1] = this.waveDir[1];
     U.uPhysWavePhase[0] = this.wavePhase[0] % TAU; U.uPhysWavePhase[1] = this.wavePhase[1] % TAU; U.uPhysWavePhase[2] = this.wavePhase[2] % TAU;
     U.uPhysWave[2] = this.flutPhase[0] % TAU; U.uPhysWave[3] = this.flutPhase[1] % TAU; U.uPhysWavePhase[3] = this.flutPhase[2] % TAU;
-    for (let i = 0; i < 4; i++) U.uPhysBranchPhase[i] = this.branchPhase[i];
-    U.uPhysBranch[0] = this.gustiness;
+    for (let i = 0; i < 3; i++) { const p = this.branchPhase[i] % TAU; U.uPhysBranchPhase[i] = p < 0 ? p + TAU : p; }
+    U.uPhysBranchPhase[3] = this.branchPhase[3];
+    U.uPhysBranch[0] = Math.sqrt(2 * FLORA.qRef / Math.max(rho, 1e-6));
     this.version++;
   }
 
@@ -497,6 +542,17 @@ export class FloraField {
     return o;
   }
 
+  // (P14) What a crown feels at grid position (x, z): o[0], o[1] the wind load (q / qRef, east / north) at the
+  // height of a plant H metres tall (the stiff class's at 10 m and above, the soft class's at blade height,
+  // between by height), o[2], o[3] the wind at 2 m (m/s), o[4] its turbulence (m/s). For plantCrown.
+  crownAt(x, z, H, o = new Float64Array(5)) {
+    const N = this.N, u = (x - this.ci * this.cell) / this.cell + N / 2, v = (z - this.cj * this.cell) / this.cell + N / 2;
+    const b = this._tex(this.bend, N, u, v), k = clamp01((H - 0.5) / 9.5);
+    o[0] = b[0] + (b[2] - b[0]) * k; o[1] = b[1] + (b[3] - b[1]) * k;
+    const wt = this._tex(this.wind, N, u, v);
+    o[2] = wt[0]; o[3] = wt[1]; o[4] = wt[3];
+    return o;
+  }
   // The cheap twin (pcPhysBendLite): wind response only. Fills o: e, n, angle, load.
   plantBendLite(x, z, stiff01, o = {}) {
     const N = this.N;
@@ -538,36 +594,67 @@ export function flutterAt(x, z, w2e, w2n, turb, P, o) {
 }
 const _fl2 = new Float64Array(2), _fl3 = new Float64Array(3);
 
-// How far a point of a crown is moved by its branch (m; add it to the point before plantDisplace).
-// The JS twin of pcPhysBranch in FLORA_GLSL.
-//   (re, rn): the point's horizontal offset from the trunk (m east, north); h: its height above
-//   the root; H: the plant's height; (gx, gz): the root in grid coordinates; (be, bn): the bend
-//   from plantBend (rad); shake01 from plantBend; U: the field's uniforms. Fills o: e, n, up.
-// A branch is a cantilever on the trunk: nothing moves at the trunk, the tip most (x^2 (3 - x) / 2
-// along it). Its swing follows the trunk's lean (the wind on this tree, shelter and all) times
-// how gusty the air is, plus whatever shook the crown; its phase turns round the trunk in whole
-// lobes, so neighbouring parts of a crown move together and opposite sides do not.
-export function plantBranch(re, rn, h, H, gx, gz, be, bn, shake01, U, o = {}) {
-  const r = Math.hypot(re, rn), Hs = Math.max(H, 1e-3), L = U.uPhysBranch[3] * Hs;
-  o.e = 0; o.n = 0; o.up = 0;
-  if (r < 1e-4) return o;
+// (P14) How far a point of a crown is moved by its branch and its twigs (m; add it to the point before
+// plantDisplace). The JS twin of pcPhysCrown in FLORA_GLSL.
+//   (re, rn): the point's horizontal offset from the trunk's axis (m east, north); h: its height above the
+//   root; H: the plant's height; (gx, gz): the root in grid coordinates; cw: what FloraField.crownAt(gx, gz,
+//   H) filled (the wind load at the plant's height, the wind at 2 m and its turbulence, at the root);
+//   shake01 from plantBend; U: the field's uniforms; id: one number in 0..1 for all points of one branch or
+//   one mass of foliage (negative: none; the crown then moves in whole lobes round the trunk); leaf01: 1 on
+//   foliage, 0 on wood.  Fills o: e, n, up (m), and for probes set (m: how far this point streams downwind),
+//   load (q / qRef), I (turbulence intensity), hz (the branch's own frequency), gain (its largest amplification).
+// A branch is a cantilever on the trunk: nothing moves at the axis, the tip most (x^2 (3 - x) / 2 along it,
+// x = distance from the axis / branch length). See FLORA (branches) for the model.
+export function plantCrown(re, rn, h, H, gx, gz, cw, shake01, U, id, leaf01, o = {}) {
+  const r = Math.hypot(re, rn), Hs = Math.max(H, 1e-3), B = U.uPhysBranch, P = U.uPhysBranchPhase, L = B[3] * Hs;
   const x = Math.min(1, r / L), shape = x * x * (3 - x) * 0.5;
-  const ang = Math.hypot(be, bn);
-  const A = U.uPhysBranch[1] * ang * (FLORA.branchCalm + (1 - FLORA.branchCalm) * U.uPhysBranch[0]) + U.uPhysBranch[2] * shake01;
-  if (A < 1e-6) return o;
-  const s = clamp01(h / Hs), az = Math.atan2(rn, re), P = U.uPhysBranchPhase;
-  const tp = TAU * fract01(Math.floor(gx * 2) * 0.3183 + Math.floor(gz * 2) * 0.7071);       // this tree's own number
-  const a0 = Math.sin(P[0] + BRANCH_M[0] * az + BRANCH_T[0] * tp + BRANCH_S[0] * s);
-  const a1 = Math.sin(P[1] + BRANCH_M[1] * az + BRANCH_T[1] * tp + BRANCH_S[1] * s);
-  const a2 = Math.sin(P[2] + BRANCH_M[2] * az + BRANCH_T[2] * tp + BRANCH_S[2] * s);
-  const a3 = Math.sin(P[3] + BRANCH_M[3] * az + BRANCH_T[3] * tp + BRANCH_S[3] * s);
-  const k = A * L * shape;
-  // it bobs (up), swings along the load (or along itself in still air), and flutters across itself
-  const de = ang > 1e-6 ? be / ang : re / r, dn = ang > 1e-6 ? bn / ang : rn / r;
-  const al = 0.7 * a1 * k, tg = 0.3 * a3 * k;
-  o.e = de * al - rn / r * tg; o.n = dn * al + re / r * tg; o.up = (0.6 * a0 + 0.4 * a2) * k;
+  const load = Math.hypot(cw[0], cw[1]);
+  const de = load > 1e-6 ? cw[0] / load : r > 1e-4 ? re / r : 1, dn = load > 1e-6 ? cw[1] / load : r > 1e-4 ? rn / r : 0;
+  const Uc = B[0] * Math.sqrt(load);
+  const fb = FLORA.branchHz * (1 + FLORA.branchSpread * ((id >= 0 ? fract01(id * 5.37 + 0.31) : 0.5) - 0.5));
+  const z2 = 2 * Math.min(FLORA.branchDampMax, FLORA.branchDamp + FLORA.branchAero * Uc);
+  const s = clamp01(h / Hs), px = gx + re, pz = gz + rn;
+  let az = 0, qs;
+  if (id >= 0) qs = TAU * fract01(id * 9.7);
+  else { az = r > 1e-4 ? Math.atan2(rn, re) : 0; qs = 2 * az; }
+  let da = 0, du = 0, dc = 0, gmax = 0;
+  for (let i = 0; i < 3; i++) {
+    const k = FLORA.crownK[i], d = CROWN_D[i], cd = d[0] * de + d[1] * dn;
+    const rr = k * Math.abs(cd) * Uc / (TAU * fb), r2 = rr * rr;
+    const g = FLORA.crownA[i] / Math.sqrt((1 - r2) * (1 - r2) + z2 * z2 * r2);
+    let ph = k * (d[0] * px + d[1] * pz) + FLORA.crownTilt * h - P[i] + Math.atan2(z2 * rr, 1 - r2) * Math.sign(cd);
+    ph += id >= 0 ? TAU * CROWN_ID[i] * fract01(id * (7 + 4 * i) + 0.17 * i) : BRANCH_M[i] * az + BRANCH_S[i] * s;
+    da += g * Math.sin(ph); du += g * Math.sin(ph + CROWN_UP[i]); dc += g * Math.sin(ph + CROWN_X[i]);
+    gmax += g;
+  }
+  const I = Math.min(FLORA.crownImax, cw[4] / (Math.hypot(cw[2], cw[3]) + 0.25));
+  const set = FLORA.branchSetMax * (1 - Math.exp(-FLORA.branchSet * Math.pow(load, FLORA.branchSetExp) / FLORA.branchSetMax));
+  const A = FLORA.branchThrash * I * set, sk = B[2] * shake01;
+  qs += P[3] * 0.375;
+  const k0 = B[1] * L * shape;
+  // it streams downwind and swings about that set, bobs, and sways across the wind; a shaken crown shivers
+  let al = k0 * (set + A * da + sk * Math.sin(qs));
+  let vu = k0 * (0.6 * A * du + 0.7 * sk * Math.sin(qs + 1.9));
+  let cr = k0 * 0.5 * A * dc;
+  if (leaf01 > 0) {
+    // twigs in leaf: two ripples through the foliage at twigHz and 23/16 of it
+    const tw = leaf01 * B[1] * FLORA.twigMax * (1 - Math.exp(-FLORA.twigGain * load)) * (0.5 + I), idp = id > 0 ? id : 0;
+    const q1 = P[3] + 3.1 * re + 2.3 * rn + 2.7 * h + 40 * idp, q2 = P[3] * 1.4375 - 2.2 * re + 3.4 * rn - 1.9 * h + 71 * idp;
+    al += tw * (0.6 * Math.sin(q1) + 0.4 * Math.sin(q2));
+    vu += tw * 0.7 * (0.6 * Math.sin(q1 + 1.9) + 0.4 * Math.sin(q2 + 4.0));
+    cr += tw * 0.5 * Math.sin(q2 + 2.6);
+  }
+  o.e = de * al - dn * cr; o.n = dn * al + de * cr; o.up = vu;
+  o.set = k0 * set; o.load = load; o.I = I; o.hz = fb; o.gain = gmax;
   return o;
 }
+// The same without a number per branch (the JS twin of pcPhysBranch): whole lobes round the trunk, wood only.
+// (Until P14 this took the trunk's bend (be, bn) and swung by it; the signature is kept: be, bn are no longer
+// read, the branch's wind comes from cw = FloraField.crownAt(gx, gz, H).)
+export function plantBranch(re, rn, h, H, gx, gz, be, bn, shake01, U, o = {}, cw = _cw0) {
+  return plantCrown(re, rn, h, H, gx, gz, cw, shake01, U, -1, 0, o);
+}
+const _cw0 = new Float64Array(5);
 const fract01 = (v) => v - Math.floor(v);
 
 // Where a point of a plant ends up when the plant bends: the cantilever curls over, keeping its

@@ -5,10 +5,12 @@
 //
 // The constants below are interpolated from flora.js, so the shader and the CPU model cannot
 // drift apart. physics-lab.html?scene=flora draws both on top of each other as a check.
-import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, BRANCH_T, FLUT_D, FLUT_PH } from './flora.js';
+import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, FLUT_D, FLUT_PH, CROWN_D, CROWN_UP, CROWN_X, CROWN_ID } from './flora.js';
 
 const f = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
 const fd = (i) => `vec2(${f(FLUT_D[i][0])}, ${f(FLUT_D[i][1])})`;
+const cdv = (i) => `vec2(${f(CROWN_D[i][0])}, ${f(CROWN_D[i][1])})`;
+const v3 = (a) => `vec3(${a.slice(0, 3).map(f).join(', ')})`;
 const rot = (i) => `vec2(d.x * ${f(Math.cos(WAVE_ROT[i]))} - d.y * ${f(Math.sin(WAVE_ROT[i]))}, d.x * ${f(Math.sin(WAVE_ROT[i]))} + d.y * ${f(Math.cos(WAVE_ROT[i]))})`;
 
 export const FLORA_GLSL = /* glsl */`
@@ -35,8 +37,8 @@ uniform vec4 uPhysNearMap;     // the same for the push field
 uniform vec4 uPhysWave;        // xy: wave direction; z, w: phases of flutter trains 0 and 1 (P11)
 uniform vec4 uPhysWavePhase;   // xyz: phases of the three wave trains; w: phase of flutter train 2 (P11)
 uniform vec4 uPhysShape;       // soft flex, soft max angle, stiff flex, stiff max angle
-uniform vec4 uPhysBranchPhase; // phases (rad) of the four branch oscillators
-uniform vec4 uPhysBranch;      // x: gustiness 0..1, y: gain, z: swing of a shaken crown (rad), w: branch length / plant height
+uniform vec4 uPhysBranchPhase; // (P14) xyz: phases (rad) of the crown's three eddy trains, w: the twig clock (rad, wraps at 16 turns)
+uniform vec4 uPhysBranch;      // x: wind speed at load 1 (m/s), y: gain, z: swing of a shaken crown (rad), w: branch length / plant height
 
 // Bilinear lookup that does not need float-texture filtering (define PC_PHYS_LINEAR to use the
 // hardware filter instead: textures must then be LinearFilter + ClampToEdge).
@@ -121,32 +123,74 @@ vec3 pcPhysDisplace(vec3 rel, vec3 up, float H, vec2 bend) {
   return (rel - up * h) + uPhysEast * sh.x + uPhysNorth * sh.y + up * (h * cos(am));
 }
 
-// Branches: a crown does not sway as one piece (the JS twin is plantBranch in flora.js).
-// rel: the point relative to the root (body-local axes, m); up: the plant's up; H: its height;
-// root: the plant's root (body-local); pb: what pcPhysBend returned for this plant.
+// (P14) Branches and foliage: a crown does not sway as one piece, and a branch carries its own wind (the JS
+// twin is plantCrown in flora.js; the model is written out at FLORA.branchHz there).
+//   rel: the point relative to the root (body-local axes, m); up: the plant's up; H: its height (m);
+//   root: the plant's root (body-local); pb: what pcPhysBend returned for this plant (only its shake, pb.w,
+//   is read: the branch's wind is looked up here, at the root);
+//   id: ONE NUMBER IN 0..1 FOR ALL VERTICES OF ONE BRANCH OR ONE MASS OF FOLIAGE (its own frequency and lag;
+//   negative: none, the crown then moves in whole lobes round the trunk);
+//   leaf01: 1 on foliage, 0 on wood (foliage trembles on top).
 // Returns the offset (m) to ADD to rel BEFORE pcPhysDisplace:
-//   vec3 rel = wp - io;  rel += pcPhysBranch(rel, up, H, rootB, pb);  wp = io + pcPhysDisplace(rel, up, H, pb.xy);
-// Nothing moves at the trunk; the motion is continuous all the way round it (whole lobes), so a
-// crown mesh is never torn. For trees and tall shrubs near the eye; costs four sines and an atan.
-vec3 pcPhysBranch(vec3 rel, vec3 up, float H, vec3 root, vec4 pb) {
+//   vec3 rel = wp - io;  rel += pcPhysCrown(rel, up, H, rootB, pb, id, leaf01);  wp = io + pcPhysDisplace(rel, up, H, pb.xy);
+// Nothing of the wood moves at the trunk's axis; a point streams downwind and swings about that set by
+// x^2 (3 - x) / 2 of the tip's motion, x = its distance from the axis / (uPhysBranch.w * H).
+// Costs two field lookups, twelve sines and three arctangents a vertex.
+vec3 pcPhysCrown(vec3 rel, vec3 up, float H, vec3 root, vec4 pb, float id, float leaf01) {
   float h = dot(rel, up);
   vec3 q = rel - up * h;
   vec2 rd = vec2(dot(q, uPhysEast), dot(q, uPhysNorth));
   float r = length(rd);
-  if (r < 1e-4) return vec3(0.0);
   float Hs = max(H, 1e-3), L = uPhysBranch.w * Hs;
   float x = min(1.0, r / L), shape = x * x * (3.0 - x) * 0.5;
-  float ang = length(pb.xy);
-  float A = uPhysBranch.y * ang * (${f(FLORA.branchCalm)} + ${f(1 - FLORA.branchCalm)} * uPhysBranch.x) + uPhysBranch.z * pb.w;
-  if (A < 1e-6) return vec3(0.0);
-  float s = clamp(h / Hs, 0.0, 1.0), az = atan(rd.y, rd.x);
-  vec2 g = floor(pcPhysGrid(root) * 2.0);
-  float tp = 6.2831853 * fract(g.x * 0.3183 + g.y * 0.7071);
-  vec4 a = sin(uPhysBranchPhase + vec4(${BRANCH_M.map(f).join(', ')}) * az + vec4(${BRANCH_T.map(f).join(', ')}) * tp + vec4(${BRANCH_S.map(f).join(', ')}) * s);
-  float k = A * L * shape;
-  vec2 d = ang > 1e-6 ? pb.xy / ang : rd / r;
-  vec2 sh = d * (0.7 * a.y * k) + vec2(-rd.y, rd.x) / r * (0.3 * a.w * k);
-  return uPhysEast * sh.x + uPhysNorth * sh.y + up * ((0.6 * a.x + 0.4 * a.z) * k);
+  vec2 g = pcPhysGrid(root);
+  vec2 uv = (g - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
+  vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w), wt = pcPhysTex(uPhysWind, uv, uPhysWindMap.w);
+  vec2 Lw = mix(b.xy, b.zw, clamp((Hs - 0.5) / 9.5, 0.0, 1.0));       // the wind load at the plant's own height
+  float load = length(Lw);
+  vec2 d = load > 1e-6 ? Lw / load : (r > 1e-4 ? rd / r : vec2(1.0, 0.0));
+  float Uc = uPhysBranch.x * sqrt(load);
+  float fb = ${f(FLORA.branchHz)} * (1.0 + ${f(FLORA.branchSpread)} * ((id >= 0.0 ? fract(id * 5.37 + 0.31) : 0.5) - 0.5));
+  float z2 = 2.0 * min(${f(FLORA.branchDampMax)}, ${f(FLORA.branchDamp)} + ${f(FLORA.branchAero)} * Uc);
+  vec3 ck = ${v3(FLORA.crownK)};
+  vec3 cd = vec3(dot(${cdv(0)}, d), dot(${cdv(1)}, d), dot(${cdv(2)}, d));
+  vec3 rr = ck * abs(cd) * (Uc / (6.2831853 * fb)), r2 = rr * rr;
+  vec3 hh = ${v3(FLORA.crownA)} * inversesqrt((1.0 - r2) * (1.0 - r2) + z2 * z2 * r2);
+  vec2 pt = g + rd;
+  vec3 ph = ck * vec3(dot(${cdv(0)}, pt), dot(${cdv(1)}, pt), dot(${cdv(2)}, pt)) + ${f(FLORA.crownTilt)} * h - uPhysBranchPhase.xyz + atan(z2 * rr, 1.0 - r2) * sign(cd);
+  float s = clamp(h / Hs, 0.0, 1.0), qs;
+  if (id >= 0.0) {
+    ph += 6.2831853 * ${v3(CROWN_ID)} * fract(id * vec3(7.0, 11.0, 15.0) + vec3(0.0, 0.17, 0.34));
+    qs = 6.2831853 * fract(id * 9.7);
+  } else {
+    float az = r > 1e-4 ? atan(rd.y, rd.x) : 0.0;
+    ph += ${v3(BRANCH_M)} * az + ${v3(BRANCH_S)} * s;
+    qs = 2.0 * az;
+  }
+  float da = dot(hh, sin(ph)), du = dot(hh, sin(ph + ${v3(CROWN_UP)})), dc = dot(hh, sin(ph + ${v3(CROWN_X)}));
+  float I = min(${f(FLORA.crownImax)}, wt.w / (length(wt.xy) + 0.25));
+  float set = ${f(FLORA.branchSetMax)} * (1.0 - exp(-${f(FLORA.branchSet / FLORA.branchSetMax)} * pow(load, ${f(FLORA.branchSetExp)})));
+  float A = ${f(FLORA.branchThrash)} * I * set, sk = uPhysBranch.z * pb.w;
+  qs += uPhysBranchPhase.w * 0.375;
+  float k0 = uPhysBranch.y * L * shape;
+  float al = k0 * (set + A * da + sk * sin(qs));
+  float vu = k0 * (0.6 * A * du + 0.7 * sk * sin(qs + 1.9));
+  float cr = k0 * 0.5 * A * dc;
+  if (leaf01 > 0.0) {
+    float tw = leaf01 * uPhysBranch.y * ${f(FLORA.twigMax)} * (1.0 - exp(-${f(FLORA.twigGain)} * load)) * (0.5 + I), idp = max(id, 0.0);
+    float q1 = uPhysBranchPhase.w + 3.1 * rd.x + 2.3 * rd.y + 2.7 * h + 40.0 * idp;
+    float q2 = uPhysBranchPhase.w * 1.4375 - 2.2 * rd.x + 3.4 * rd.y - 1.9 * h + 71.0 * idp;
+    al += tw * (0.6 * sin(q1) + 0.4 * sin(q2));
+    vu += tw * 0.7 * (0.6 * sin(q1 + 1.9) + 0.4 * sin(q2 + 4.0));
+    cr += tw * 0.5 * sin(q2 + 2.6);
+  }
+  vec2 sh = d * al + vec2(-d.y, d.x) * cr;
+  return uPhysEast * sh.x + uPhysNorth * sh.y + up * vu;
+}
+// The same without a number per branch (P6's call, kept): whole lobes round the trunk, wood only.
+//   vec3 rel = wp - io;  rel += pcPhysBranch(rel, up, H, rootB, pb);  wp = io + pcPhysDisplace(rel, up, H, pb.xy);
+vec3 pcPhysBranch(vec3 rel, vec3 up, float H, vec3 root, vec4 pb) {
+  return pcPhysCrown(rel, up, H, root, pb, -1.0, 0.0);
 }
 
 // Wind at 2 m above the ground at a body-local point: xy m/s (east, north), z gust01, w turbulence.
