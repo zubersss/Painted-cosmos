@@ -85,6 +85,15 @@ export function createShip() {
   for (const [x, z] of [[0, -2.6], [-1.3, 1.9], [1.3, 1.9]]) {
     part(legGeo, dark, x, 0.52, z, gear); part(padGeo, dark, x, 0.06, z, gear);
   }
+  // what the pilot sees from the seat: a windscreen hoop, two rails and the cowl below it
+  const frameMat = makeWashMaterial({ color: '#6c4b37', scale: 0.6, dry: 0.3, side: THREE.DoubleSide });
+  const cowlMat = makeWashMaterial({ color: '#c9914e', scale: 0.8, dry: 0.4, side: THREE.DoubleSide });
+  const hoop = part(new THREE.TorusGeometry(0.80, 0.035, 6, 22, Math.PI), frameMat, 0, 0.30, -2.25, body);
+  hoop.scale.set(1, 0.92, 1);
+  const railGeo = new THREE.CapsuleGeometry(0.03, 1.0, 3, 6); railGeo.rotateX(Math.PI / 2);
+  part(railGeo, frameMat, -0.79, 0.32, -1.72, body); part(railGeo, frameMat, 0.79, 0.32, -1.72, body);
+  const cowlGeo = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); cowlGeo.scale(0.80, 0.26, 0.85);
+  part(cowlGeo, cowlMat, 0, 0.12, -2.35, body);
   g.userData.seat = new THREE.Vector3(0, 1.75, -1.3);
   g.userData.hatch = new THREE.Vector3(-2.3, 0, -0.6);
   let t = 0;

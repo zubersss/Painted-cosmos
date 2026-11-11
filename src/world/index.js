@@ -54,6 +54,7 @@ export function createWorld(scene) {
   }
 
   let budgetMs = 5;
+  const prof = { terrain: 0 };
   let physics = null;
   let lastActive = null;
   const lighting = { bodyId: null, sunElevation: 1, hours: 12, dayness: 1, altitude: 0, space01: 0 };
@@ -107,8 +108,11 @@ export function createWorld(scene) {
       }
       const isActive = st === active;
       st.terrain.detail = isActive;
-      st.terrain.update(st.camLocal, isActive ? budgetMs : 1);
-      if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? budgetMs * 0.6 : 0);
+      // one shared time budget per frame: terrain first, flora with what is left
+      const tb = performance.now();
+      st.terrain.update(st.camLocal, isActive ? budgetMs : 0);
+      if (isActive) { const tt = performance.now() - tb; if (tt > prof.terrain) prof.terrain = tt; }
+      if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, budgetMs - (performance.now() - tb)) : 0);
       if (!isActive) {
         // far bodies: plain daylight, no haze
         bu.uFog.value.set(1e-7, 6, 0, 0);
@@ -196,6 +200,9 @@ export function createWorld(scene) {
       const s = S.sites.find((x) => x.b === bi);
       return s ? { unitDir: { x: s.x, y: s.y, z: s.z } } : null;
     },
+    get _flora() { return state.get('earth').flora; },
+    get _prof() { return Object.assign({}, prof, state.get('earth').flora.prof); },
+    _profReset() { prof.terrain = 0; const p = state.get('earth').flora.prof; p.wanted = p.build = p.retier = 0; },
     bodyUniforms(bodyId) { const st = state.get(bodyId); return st ? st.bu : null; },
     // Trunks and boulders within `radius` metres of a point (not part of sampleSurface):
     // -> [{ unitDir, radius, height, kind }]

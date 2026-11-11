@@ -1,23 +1,32 @@
 // Painted Cosmos: instanced flora in streamed chunks. OWNER: PAINTER.
-// Trees live in ~100 m chunks out to about 470 m (full trees near, simplified ones beyond,
-// switched per tree at its own distance so nothing pops in step); undergrowth lives in ~25 m
-// chunks and grows in stroke by stroke as you approach. Chunks are built in time slices.
+//
+// Cost is the design constraint here (lead review 1): every tree is submitted exactly once,
+// in the tier its own distance puts it in.
+//   tier 0  near: the full tree (about 650 triangles)
+//   tier 1  mid: a trunk and two washes (about 180 triangles)
+//   far     one shared 26-triangle form for every species; beyond the thinning distance only
+//           one tree in three is kept and drawn larger ("fewer, larger, softer strokes")
+// Tiers are assigned per tree on the CPU whenever the camera has moved a few metres, into
+// dynamic instance buffers, so nothing is drawn collapsed. Undergrowth lives in 25 m cells,
+// one mesh per kind, and grows in stroke by stroke as you approach.
 import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
-import { placeTrees, placeUnder, INST_STRIDE, K_BIRCH, K_PINE, K_BIRCH_AUTUMN, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED } from './floraplace.js';
-import { birchGeometry, pineGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry } from './florakit.js';
+import { INST_STRIDE, K_BIRCH, K_PINE, K_BIRCH_AUTUMN, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED } from './floraplace.js';
+import { birchGeometry, pineGeometry, farTreeGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
-import { treeCell, underCell } from './obstacles.js';
+import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY } from '../render/shared.js';
 
-const TREE_LEVEL = 6, UNDER_LEVEL = 8;
-const TREE_T0 = 65, TREE_T1 = 175, TREE_FAR = 470, TREE_THIN = 300;
-const RANGE_SCALE = [0.62, 0.82, 1.0];   // by quality tier
-const UNDER_FAR = 62;
+// tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
+const T0 = 52, T1 = 128, T_THIN = 300, T_FAR = 470;
+const UNDER_FAR = 60, GRASS_NEAR = 15;
+const RANGE_SCALE = [0.42, 0.82, 1.0];
+const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
 
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
+const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
 const _Y = new THREE.Vector3(0, 1, 0);
 const _ff = {}, _dd = [0, 0, 0];
 
@@ -29,136 +38,255 @@ export class Flora {
     this.group.name = 'flora-' + bodyId;
     root.add(this.group);
     this.camLocal = new THREE.Vector3();
-    this.treeChunks = new Map(); this.underChunks = new Map();
+    this.treeChunks = new Map(); this.farChunks = new Map(); this.underChunks = new Map(); this.under2Chunks = new Map();
+    this.treeList = [];
     this.queue = [];
     this.lastTreeEval = new THREE.Vector3(1e9, 0, 0); this.lastUnderEval = new THREE.Vector3(1e9, 0, 0);
     this.treeSize = nodeSize(this.R, TREE_LEVEL); this.underSize = nodeSize(this.R, UNDER_LEVEL);
-    this.instances = 0;
-    this.rangeScale = 1;
+    this.farSize = this.treeSize * 2;       // far trees are batched in cells twice as large
+    this.rangeScale = 1; this.lastScale = -1;
+    this.retierCursor = 0;
+    this.starved = 0;
+    this.hidden = false;
+    this.prof = { wanted: 0, build: 0, retier: 0 };
 
-    const birch = { barkA: [0.975, 0.965, 0.945], barkB: [0.27, 0.24, 0.26], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.40, 1.0, 0.28], wind: 0.10 };
+    const birchBark = { barkA: [0.975, 0.965, 0.945], barkB: [0.27, 0.24, 0.26] };
+    const birchLeaf = { leafA: [0.76, 0.85, 0.42], leafB: [0.58, 0.75, 0.36], leafC: [0.31, 0.51, 0.37] };
+    const autumnLeaf = { leafA: [0.96, 0.82, 0.32], leafB: [0.93, 0.64, 0.28], leafC: [0.72, 0.42, 0.26] };
+    const pineBark = { barkA: [0.74, 0.54, 0.42], barkB: [0.40, 0.28, 0.25] };
+    const pineLeaf = { leafA: [0.44, 0.62, 0.43], leafB: [0.31, 0.51, 0.44], leafC: [0.17, 0.28, 0.35] };
+    const birchP = { barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10 };
     this.mats = {
-      birch: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch', leafA: [0.76, 0.85, 0.42], leafB: [0.58, 0.75, 0.36], leafC: [0.31, 0.51, 0.37] }, birch)),
-      birchAutumn: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch-autumn', leafA: [0.96, 0.82, 0.32], leafB: [0.93, 0.64, 0.28], leafC: [0.72, 0.42, 0.26] }, birch)),
-      pine: makePropMaterial(bodyUniforms, { name: 'pine', barkA: [0.74, 0.54, 0.42], barkB: [0.40, 0.28, 0.25], barkP: [0.50, 1, 0.9, 0.6], leafA: [0.44, 0.62, 0.43], leafB: [0.31, 0.51, 0.44], leafC: [0.17, 0.28, 0.35], leafP: [0.9, 0.20, 1.0, 0.25], wind: 0.05 }),
+      birch: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch' }, birchBark, birchLeaf, birchP)),
+      birchAutumn: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch-autumn' }, birchBark, autumnLeaf, birchP)),
+      pine: makePropMaterial(bodyUniforms, Object.assign({ name: 'pine', barkP: [0.50, 1, 0.9, 0.6], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.05 }, pineBark, pineLeaf)),
+      far: makePropMaterial(bodyUniforms, {
+        name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
+        far: [Object.assign({}, birchBark, birchLeaf), Object.assign({}, pineBark, pineLeaf), Object.assign({}, birchBark, autumnLeaf)],
+      }),
       under: makePropMaterial(bodyUniforms, { name: 'under', leafA: [0.80, 0.85, 0.38], leafB: [0.54, 0.71, 0.31], leafC: [0.35, 0.51, 0.31], accent: [0.86, 0.29, 0.17], wind: 0.07, doubleSide: true }),
       bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: [0.64, 0.77, 0.37], leafB: [0.45, 0.63, 0.36], leafC: [0.24, 0.41, 0.36], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04 }),
       rock: makePropMaterial(bodyUniforms, { name: 'rock', barkA: [0.80, 0.79, 0.83], barkB: [0.47, 0.45, 0.55], wind: 0 }),
     };
-    // geometry kits (a few variants of each, generated once)
+    // geometry kits, generated once
     this.kit = {
-      birch: [[birchGeometry(11, 0), birchGeometry(12, 0), birchGeometry(13, 0)], [birchGeometry(11, 1), birchGeometry(12, 1), birchGeometry(13, 1)], [birchGeometry(11, 2)]],
-      pine: [[pineGeometry(21, 0), pineGeometry(22, 0), pineGeometry(23, 0)], [pineGeometry(21, 1), pineGeometry(22, 1), pineGeometry(23, 1)], [pineGeometry(21, 2)]],
-      grass: [grassGeometry(31), grassGeometry(32), grassGeometry(33)],
-      fern: [fernGeometry(41), fernGeometry(42), fernGeometry(43)],
-      reed: [reedGeometry(81), reedGeometry(82), reedGeometry(83)],
-      bush: [bushGeometry(51), bushGeometry(52), bushGeometry(53)],
-      rock: [rockGeometry(61), rockGeometry(62), rockGeometry(63)],
-      flower: [flowerGeometry(71), flowerGeometry(72), flowerGeometry(73)],
+      birch0: [birchGeometry(11, 0), birchGeometry(12, 0)], birch1: birchGeometry(13, 1),
+      pine0: [pineGeometry(21, 0), pineGeometry(22, 0)], pine1: pineGeometry(23, 1),
+      far: farTreeGeometry(5),
+      grass: grassGeometry(31), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51),
+      rock: rockGeometry(61), flower: flowerGeometry(71),
     };
   }
 
   get busy() { return this.queue.length; }
 
-  _mesh(chunk, geo, mat, list, data, lod, yScale, thin) {
-    const n = list.length;
+  // An InstancedMesh with room for `cap` instances that shares the kit geometry's buffers.
+  _instanced(chunk, geo, mat, cap, lod, far) {
     const g = new THREE.BufferGeometry();
     for (const k of SHARED) g.setAttribute(k, geo.attributes[k]);
     g.setIndex(geo.index);
-    const inst = new Float32Array(n * 4);
-    const mesh = new THREE.InstancedMesh(g, mat, n);
-    for (let i = 0; i < n; i++) {
-      const o = list[i] * INST_STRIDE;
-      _p.set(data[o], data[o + 1], data[o + 2]);
-      _up.copy(_p).normalize();
-      _q.setFromUnitVectors(_Y, _up);
-      // lean and turn about the local up
-      _q2.setFromEuler(new THREE.Euler(data[o + 11] * Math.cos(data[o + 4] * 3.0), data[o + 4], data[o + 11] * Math.sin(data[o + 4] * 3.0), 'YXZ'));
-      _q.multiply(_q2);
-      const sc = data[o + 3];
-      _s.set(sc, sc * (yScale || 1), sc);
-      _m.compose(_p.sub(chunk.origin), _q, _s);
-      mesh.setMatrixAt(i, _m);
-      inst[i * 4] = data[o + 8]; inst[i * 4 + 1] = data[o + 9]; inst[i * 4 + 2] = data[o + 7]; inst[i * 4 + 3] = data[o + 10];
-    }
-    g.setAttribute('aInst', new THREE.InstancedBufferAttribute(inst, 4));
-    mesh.instanceMatrix.needsUpdate = true;
+    const inst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
+    g.setAttribute('aInst', inst);
+    let inst2 = null;
+    if (far) { inst2 = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2); g.setAttribute('aInst2', inst2); }
+    const mesh = new THREE.InstancedMesh(g, mat, cap);
+    mesh.count = 0;
     mesh.position.copy(chunk.origin);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
-    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + 22);
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + 24);
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
-    const thinD = thin ? thin[0] : 1e9, thinG = thin ? thin[1] : 0;
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       const u = material.uniforms, k = flora.rangeScale;
       u.uOrigin.value.copy(origin);
       u.uCamLocal.value.copy(camRel.subVectors(flora.camLocal, origin));
       u.uLod.value.set(lodv.x * k, lodv.y * k, lodv.z, lodv.w);
-      u.uThin.value.set(thinD * k, thinG);
       material.uniformsNeedUpdate = true;
     };
-    mesh.userData.lod = lod;
+    mesh.userData.inst = inst; mesh.userData.inst2 = inst2;
     this.group.add(mesh);
     chunk.meshes.push(mesh);
-    this.instances += n;
     return mesh;
   }
 
+  // ---- trees ----------------------------------------------------------------------------------
   _buildTrees(chunk) {
-    const t = treeCell(this.S, chunk.face, chunk.ix, chunk.iy);
-    // tiers 0 and 1 keep the three variants; the far tier uses one mesh per species
-    const groups = [{}, {}, {}];
-    for (let i = 0; i < t.count; i++) {
-      const o = i * INST_STRIDE, kind = t.data[o + 5], variant = t.data[o + 6];
-      const k01 = kind * 10 + variant, k2 = kind * 10;
-      (groups[0][k01] || (groups[0][k01] = [])).push(i);
-      (groups[1][k01] || (groups[1][k01] = [])).push(i);
-      (groups[2][k2] || (groups[2][k2] = [])).push(i);
+    let n = 0, d;
+    if (chunk.kind === 'far') {
+      // the four tree cells under this far cell, concatenated
+      const parts = [];
+      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) { const t = treeCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count; }
+      d = new Float32Array(n * INST_STRIDE);
+      let o = 0;
+      for (const t of parts) { d.set(t.data.subarray(0, t.count * INST_STRIDE), o); o += t.count * INST_STRIDE; }
+    } else {
+      const t = treeCell(this.S, chunk.face, chunk.ix, chunk.iy);
+      n = t.count; d = t.data;
     }
-    const lods = [[0, TREE_T0, 0.3, 0.999], [TREE_T0, TREE_T1, 0.3, 0.999], [TREE_T1, TREE_FAR, 0.3, 0.9]];
-    for (let tier = 0; tier < 3; tier++) {
-      for (const key of Object.keys(groups[tier])) {
-        const kind = Math.floor(key / 10), variant = key % 10, list = groups[tier][key];
-        const mat = kind === K_PINE ? this.mats.pine : kind === K_BIRCH_AUTUMN ? this.mats.birchAutumn : this.mats.birch;
-        const geo = (kind === K_PINE ? this.kit.pine : this.kit.birch)[tier][variant];
-        const m = this._mesh(chunk, geo, mat, list, t.data, lods[tier], 1, tier === 2 ? [TREE_THIN, 0.3] : null);
-        m.userData.tier = tier;
+    chunk.n = n; chunk.data = d;
+    chunk.mat = new Float32Array(n * 16);
+    chunk.rel = new Float32Array(n * 3);
+    chunk.tier = new Int8Array(n).fill(-2);
+    // groups: which trees can appear in which mesh
+    const groups = {};
+    const add = (key, i, geo, mat, far) => {
+      const g = groups[key] || (groups[key] = { list: [], geo, mat, far: !!far, mesh: null, tierKey: key[0] });
+      g.list.push(i);
+    };
+    for (let i = 0; i < n; i++) {
+      const o = i * INST_STRIDE;
+      _p.set(d[o], d[o + 1], d[o + 2]);
+      _up.copy(_p).normalize();
+      _q.setFromUnitVectors(_Y, _up);
+      const lean = d[o + 11], yaw = d[o + 4];
+      _q2.setFromEuler(_e.set(lean * Math.cos(yaw * 3.0), yaw, lean * Math.sin(yaw * 3.0), 'YXZ'));
+      _q.multiply(_q2);
+      const sc = d[o + 3];
+      // trunks and crowns vary in girth as well as height
+      const girth = sc * (0.82 + 0.4 * ((d[o + 7] * 7.31) % 1));
+      _m.compose(_p.sub(chunk.origin), _q, _s.set(girth, sc, girth));
+      _m.toArray(chunk.mat, i * 16);
+      chunk.rel[i * 3] = _p.x; chunk.rel[i * 3 + 1] = _p.y; chunk.rel[i * 3 + 2] = _p.z;
+      if (chunk.kind === 'far') add('2', i, this.kit.far, this.mats.far, true);
+      else {
+        const kind = d[o + 5], v = d[o + 6] % 2;
+        const pine = kind === K_PINE;
+        const mat = pine ? this.mats.pine : kind === K_BIRCH_AUTUMN ? this.mats.birchAutumn : this.mats.birch;
+        add('0:' + kind + ':' + v, i, (pine ? this.kit.pine0 : this.kit.birch0)[v], mat);
+        add('1:' + kind, i, pine ? this.kit.pine1 : this.kit.birch1, mat);
       }
+    }
+    chunk.groups = Object.values(groups);
+    chunk.tierPos = new THREE.Vector3(1e9, 0, 0);
+  }
+
+  // Put every tree of a chunk into the tier its distance asks for and refill the buffers.
+  _retier(chunk) {
+    const n = chunk.n;
+    if (!n) return;
+    const k = this.rangeScale;
+    const cx = this.camLocal.x - chunk.origin.x, cy = this.camLocal.y - chunk.origin.y, cz = this.camLocal.z - chunk.origin.z;
+    const d = chunk.data, rel = chunk.rel, tier = chunk.tier;
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const seed = d[i * INST_STRIDE + 7];
+      const j = (1 + (seed - 0.5) * JIT) * k;
+      let t;
+      if (dist < T0 * j) t = 0;
+      else if (dist < T1 * j) t = 1;
+      else if (dist < T_THIN * j) t = 2;
+      else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
+      else t = -1;
+      if (t !== tier[i]) { tier[i] = t; changed = true; }
+    }
+    chunk.tierPos.copy(this.camLocal);
+    if (!changed) return;
+    const mat = chunk.mat;
+    for (const g of chunk.groups) {
+      const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : 2;
+      let c = 0;
+      const list = g.list;
+      for (let a = 0; a < list.length; a++) { const t = tier[list[a]]; if (t === want || (want === 2 && t === 3)) c++; }
+      if (c === 0) { if (g.mesh) { g.mesh.count = 0; g.mesh.visible = false; } continue; }
+      if (!g.mesh) g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
+      const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null;
+      let w = 0;
+      for (let a = 0; a < list.length; a++) {
+        const i = list[a], t = tier[i];
+        if (!(t === want || (want === 2 && t === 3))) continue;
+        const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
+        if (g.far) {
+          // the unit far tree: size it to the species; thinned ones stand in for three
+          const pine = d[o + 5] === K_PINE;
+          const big = t === 3 ? 1.5 : 1;
+          const sxz = (pine ? 14.5 : 13.5) * big, sy = (pine ? 16.5 : 11.8) * (t === 3 ? 1.15 : 1);
+          for (let q = 0; q < 4; q++) { im[wo + q] = mat[mo + q] * sxz; im[wo + 4 + q] = mat[mo + 4 + q] * sy; im[wo + 8 + q] = mat[mo + 8 + q] * sxz; im[wo + 12 + q] = mat[mo + 12 + q]; }
+          ib[w * 2] = d[o + 5]; ib[w * 2 + 1] = 0;
+        } else {
+          for (let q = 0; q < 16; q++) im[wo + q] = mat[mo + q];
+        }
+        ia[w * 4] = d[o + 8]; ia[w * 4 + 1] = d[o + 9]; ia[w * 4 + 2] = d[o + 7]; ia[w * 4 + 3] = d[o + 10];
+        w++;
+      }
+      mesh.count = w; mesh.visible = true;
+      mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
+      if (ib) mesh.userData.inst2.needsUpdate = true;
     }
   }
 
+  // ---- undergrowth ----------------------------------------------------------------------------
+  // Grass lives in 25 m cells (two meshes: short-range and long-range tufts). The rarer kinds
+  // (ferns, reeds, flowers, bushes, stones) are batched in cells twice as large, one mesh a kind.
   _buildUnder(chunk) {
-    const t = underCell(this.S, chunk.face, chunk.ix, chunk.iy);
-    const groups = {};
-    for (let i = 0; i < t.count; i++) {
-      const o = i * INST_STRIDE, key = t.data[o + 5] * 10 + t.data[o + 6];
-      (groups[key] || (groups[key] = [])).push(i);
+    let n = 0, d;
+    if (chunk.kind === 'under2') {
+      const parts = [];
+      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) { const t = underCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count; }
+      d = new Float32Array(n * INST_STRIDE);
+      let o = 0;
+      for (const t of parts) { d.set(t.data.subarray(0, t.count * INST_STRIDE), o); o += t.count * INST_STRIDE; }
+    } else {
+      const t = underCell(this.S, chunk.face, chunk.ix, chunk.iy);
+      n = t.count; d = t.data;
     }
-    for (const key of Object.keys(groups)) {
-      const kind = Math.floor(key / 10), variant = key % 10, list = groups[key];
-      if (kind === U_GRASS) this._mesh(chunk, this.kit.grass[variant], this.mats.under, list, t.data, [0, 22, 1.5, 0.6]);
-      else if (kind === U_REED) this._mesh(chunk, this.kit.reed[variant], this.mats.under, list, t.data, [0, UNDER_FAR, 0.4, 0.8]);
-      else if (kind === U_FERN) this._mesh(chunk, this.kit.fern[variant], this.mats.under, list, t.data, [0, UNDER_FAR, 0.5, 0.75]);
-      else if (kind === U_FLOWER) this._mesh(chunk, this.kit.flower[variant], this.mats.under, list, t.data, [0, UNDER_FAR * 0.8, 0.5, 0.75]);
-      else if (kind === U_BUSH) this._mesh(chunk, this.kit.bush[variant], this.mats.bush, list, t.data, [0, UNDER_FAR, 0.3, 0.8]);
-      else if (kind === U_ROCK) this._mesh(chunk, this.kit.rock[variant], this.mats.rock, list, t.data, [0, UNDER_FAR, 0.3, 0.85]);
-      else if (kind === U_STONE) this._mesh(chunk, this.kit.rock[variant], this.mats.rock, list, t.data, [0, UNDER_FAR, 0.3, 0.85], 0.55);
+    const lists = { gn: [], gf: [], fern: [], reed: [], flower: [], bush: [], rock: [] };
+    const grass = chunk.kind === 'under';
+    for (let i = 0; i < n; i++) {
+      const o = i * INST_STRIDE, kind = d[o + 5];
+      if (kind === U_GRASS) { if (grass) (d[o + 7] < 0.55 ? lists.gn : lists.gf).push(i); }
+      else if (grass) continue;
+      else if (kind === U_FERN) lists.fern.push(i);
+      else if (kind === U_REED) lists.reed.push(i);
+      else if (kind === U_FLOWER) lists.flower.push(i);
+      else if (kind === U_BUSH) lists.bush.push(i);
+      else if (kind === U_ROCK || kind === U_STONE) lists.rock.push(i);
     }
+    const make = (list, geo, mat, lod, near, skipLow) => {
+      if (!list.length) return;
+      const mesh = this._instanced(chunk, geo, mat, list.length, lod, false);
+      const im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array;
+      for (let a = 0; a < list.length; a++) {
+        const o = list[a] * INST_STRIDE;
+        _p.set(d[o], d[o + 1], d[o + 2]);
+        _up.copy(_p).normalize();
+        _q.setFromUnitVectors(_Y, _up);
+        _q2.setFromEuler(_e.set(d[o + 11] * Math.cos(d[o + 4] * 3.0), d[o + 4], d[o + 11] * Math.sin(d[o + 4] * 3.0), 'YXZ'));
+        _q.multiply(_q2);
+        const sc = d[o + 3];
+        _m.compose(_p.sub(chunk.origin), _q, _s.set(sc, sc * (d[o + 5] === U_STONE ? 0.55 : 1), sc));
+        _m.toArray(im, a * 16);
+        ia[a * 4] = d[o + 8]; ia[a * 4 + 1] = d[o + 9]; ia[a * 4 + 2] = d[o + 7]; ia[a * 4 + 3] = d[o + 10];
+      }
+      mesh.count = list.length;
+      mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
+      mesh.userData.near = near; mesh.userData.skipLow = !!skipLow;
+      if (skipLow && QUALITY.level === 0) mesh.visible = false;
+    };
+    // grass: the seed (0..1) sets how far each tuft is drawn; short-range tufts get their own
+    // mesh so cells beyond that range do not submit them at all
+    make(lists.gn, this.kit.grass, this.mats.under, [0, GRASS_NEAR / 0.775, 1.0, 0.6], GRASS_NEAR);
+    make(lists.gf, this.kit.grass, this.mats.under, [0, 30, 0.9, 0.6], 0);
+    make(lists.fern, this.kit.fern, this.mats.under, [0, UNDER_FAR, 0.5, 0.75], 0);
+    make(lists.reed, this.kit.reed, this.mats.under, [0, UNDER_FAR, 0.4, 0.8], 0);
+    make(lists.flower, this.kit.flower, this.mats.under, [0, UNDER_FAR * 0.8, 0.5, 0.75], 0);
+    make(lists.bush, this.kit.bush, this.mats.bush, [0, UNDER_FAR, 0.3, 0.8], 0, true);
+    make(lists.rock, this.kit.rock, this.mats.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
   }
 
   _disposeChunk(chunk) {
     for (const m of chunk.meshes) {
       this.group.remove(m);
-      this.instances -= m.count;
       for (const k of SHARED) m.geometry.deleteAttribute(k);
       m.geometry.setIndex(null);
       m.geometry.dispose();
       m.dispose();
     }
-    chunk.meshes.length = 0; chunk.built = false; chunk.dead = true;
+    chunk.meshes.length = 0; chunk.groups = null; chunk.built = false; chunk.dead = true;
   }
 
   // Which chunks should exist around the camera: walk a tangent-plane grid and bucket by cell.
-  _wanted(level, size, radius, map, isTree) {
+  _wanted(level, size, radius, map, kind) {
     const R = this.R, cam = this.camLocal;
     const c = _up.copy(cam).normalize();
     const e = new THREE.Vector3().crossVectors(_Y, c); if (e.lengthSq() < 1e-6) e.set(1, 0, 0); e.normalize();
@@ -178,11 +306,9 @@ export class Flora {
         const span = 2 / cells;
         faceToDir(_ff.face, -1 + (ix + 0.5) * span, -1 + (iy + 0.5) * span, _dd);
         const h = this.S.heightAt(_dd[0], _dd[1], _dd[2]);
-        const chunk = { key, face: _ff.face, ix, iy, size, isTree, origin: new THREE.Vector3(_dd[0], _dd[1], _dd[2]).multiplyScalar(R + h), meshes: [], built: false, queued: false, dead: false };
-        map.set(key, chunk);
+        map.set(key, { key, face: _ff.face, ix, iy, size, kind, isTree: kind === 'near' || kind === 'far', origin: new THREE.Vector3(_dd[0], _dd[1], _dd[2]).multiplyScalar(R + h), meshes: [], built: false, queued: false, dead: false });
       }
     }
-    // drop chunks that are well out of range
     for (const [key, ch] of map) {
       if (seen.has(key)) continue;
       if (ch.origin.distanceTo(cam) > radius + size * 2.2) { this._disposeChunk(ch); map.delete(key); }
@@ -190,46 +316,96 @@ export class Flora {
     for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
   }
 
+  // budgetMs: time this call may spend building and re-tiering.
   update(camLocal, active, budgetMs) {
     this.camLocal.copy(camLocal);
     this.rangeScale = RANGE_SCALE[QUALITY.level] || 1;
-    this.group.visible = active;
-    if (!active) return;
     const alt = camLocal.length() - this.R;
-    if (alt > 2500) { this.group.visible = false; return; }
-    if (this.lastTreeEval.distanceTo(camLocal) > 28) {
+    const show = active && alt < 2500;
+    this.group.visible = show && !this.hidden;
+    if (!show) return;
+    const k = this.rangeScale;
+    const t0 = performance.now();
+    const prof = this.prof;
+    if (k !== this.lastScale) {
+      // quality changed: re-evaluate everything
+      this.lastScale = k; this.lastTreeEval.set(1e9, 0, 0); this.lastUnderEval.set(1e9, 0, 0);
+      for (const ch of this.treeChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
+      for (const ch of this.farChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
+    }
+    if (this.lastTreeEval.distanceTo(camLocal) > 20) {
       this.lastTreeEval.copy(camLocal);
-      this._wanted(TREE_LEVEL, this.treeSize, TREE_FAR * 1.12 + this.treeSize * 0.6, this.treeChunks, true);
+      this._wanted(TREE_LEVEL, this.treeSize, T1 * k * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
+      this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * k * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
+      this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
     }
     if (this.lastUnderEval.distanceTo(camLocal) > 8) {
       this.lastUnderEval.copy(camLocal);
-      if (alt < 400) this._wanted(UNDER_LEVEL, this.underSize, UNDER_FAR * 1.2 + this.underSize * 0.6, this.underChunks, false);
-    }
-    // near meshes only matter close by; far meshes only beyond the switch distance
-    const k = this.rangeScale;
-    for (const ch of this.treeChunks.values()) {
-      if (!ch.built) continue;
-      const d = ch.origin.distanceTo(camLocal), half = ch.size * 0.75;
-      for (const m of ch.meshes) {
-        const tier = m.userData.tier;
-        m.visible = tier === 0 ? d - half < TREE_T0 * k * 1.2
-          : tier === 1 ? (d + half > TREE_T0 * k * 0.8 && d - half < TREE_T1 * k * 1.2)
-            : (d + half > TREE_T1 * k * 0.8 && d - half < TREE_FAR * k * 1.2);
+      if (alt < 400) {
+        this._wanted(UNDER_LEVEL, this.underSize, 44 * k + this.underSize * 0.6, this.underChunks, 'under');
+        this._wanted(UNDER_LEVEL - 1, this.underSize * 2, UNDER_FAR * k * 1.25 + this.underSize * 1.2, this.under2Chunks, 'under2');
       }
     }
+    let t1 = performance.now(); if (t1 - t0 > prof.wanted) prof.wanted = t1 - t0;
+    // short-range grass is only submitted from cells close enough to show it
+    for (const ch of this.underChunks.values()) {
+      if (!ch.built) continue;
+      const d = ch.origin.distanceTo(camLocal) - ch.size * 0.75;
+      for (const m of ch.meshes) if (m.userData.near) m.visible = d < m.userData.near * k * 1.5;
+    }
+    // the low tier leaves out the bushes
+    if (QUALITY.level !== this.lastQ) {
+      this.lastQ = QUALITY.level;
+      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) if (m.userData.skipLow) m.visible = QUALITY.level > 0;
+    }
+    // build queue: nearest first; always allowed one item when nothing was built for a while
+    let spent = false;
     if (this.queue.length) {
       const q = this.queue, cam = this.camLocal;
-      for (const ch of q) ch.dist = ch.origin.distanceTo(cam) - (ch.isTree ? 0 : 40);
+      for (const ch of q) ch.dist = ch.origin.distanceTo(cam) - (ch.isTree ? 0 : 60);
       q.sort((a, b) => b.dist - a.dist);
-      const t0 = performance.now();
       let built = 0;
-      while (q.length && (built === 0 || performance.now() - t0 < budgetMs)) {
-        const ch = q.pop();
+      while (q.length && (performance.now() - t0 < budgetMs || (built === 0 && this.starved > 3))) {
+        const ch = q[q.length - 1];
+        if (ch.dead || ch.built) { q.pop(); ch.queued = false; continue; }
+        // big cells are assembled from four placement cells: prepare one missing cell per
+        // step, so no single step is long
+        if (ch.kind === 'far' || ch.kind === 'under2') {
+          const ck = ch.kind === 'far' ? 't' : 'u';
+          let missing = false;
+          for (let b = 0; b < 2 && !missing; b++) for (let a = 0; a < 2 && !missing; a++) {
+            if (!hasCell(ck, this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b)) {
+              if (ck === 't') treeCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b); else underCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b);
+              missing = true;
+            }
+          }
+          if (missing) { built++; continue; }
+        }
+        q.pop();
         ch.queued = false;
-        if (ch.dead || ch.built) continue;
-        if (ch.isTree) this._buildTrees(ch); else this._buildUnder(ch);
+        if (ch.isTree) { this._buildTrees(ch); this._retier(ch); } else this._buildUnder(ch);
         ch.built = true; built++;
       }
+      this.starved = built ? 0 : this.starved + 1;
+      spent = performance.now() - t0 >= budgetMs;
     }
+    let t2 = performance.now(); if (t2 - t1 > prof.build) prof.build = t2 - t1;
+    // re-tier: chunks near a tier boundary react to a few metres of travel, far ones to more
+    if (!spent) {
+      const list = this.treeList, n = list.length;
+      const nearR = T1 * k * (1 + JIT * 0.5) + this.treeSize;
+      for (let c = 0; c < n; c++) {
+        const ch = list[(this.retierCursor + c) % n];
+        if (!ch.built || !ch.n) continue;
+        const moved = ch.tierPos.distanceTo(camLocal);
+        if (moved < 3) continue;
+        const d = ch.origin.distanceTo(camLocal);
+        if (moved > (ch.kind === 'near' || d < nearR + ch.size ? 3 : 18)) {
+          this._retier(ch);
+          if (performance.now() - t0 > budgetMs) { this.retierCursor = (this.retierCursor + c + 1) % n; break; }
+        }
+      }
+    }
+    const t3 = performance.now(); if (t3 - t2 > prof.retier) prof.retier = t3 - t2;
   }
 }

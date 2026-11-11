@@ -54,6 +54,7 @@ class Surface {
     this._buildSites();
     this._prepPalettes();
     this.clearings = [];   // [{x,y,z, r}] flora-free glades (spawn)
+    this.hasFlora = this.biomes.some((b) => b.terrain === 'forest');
     this._b = makeB();
     this._ctx = { x: 0, y: 0, z: 0, baseReady: false, L: 0, s: 1e9 };
     this._wtmp = new Float32Array(this.sites.length);
@@ -196,7 +197,13 @@ class Surface {
   _forest(c, b, bi, pal, full) {
     this._base(c);
     const R = this.R, x = c.x, y = c.y, z = c.z, nA = this.nA.n3, nC = this.nC.n3;
-    const s = c.s, L = c.L;
+    const L = c.L;
+    let s = c.s;
+    if (s < 26) {
+      const fb1 = R / 8.5, fb2 = R / 2.7;
+      const wob = nC(x * fb1 + 14.0, y * fb1 - 3.0, z * fb1 + 6.0) * 1.25 + nC(x * fb2 - 7.0, y * fb2 + 11.0, z * fb2) * 0.5;
+      s = Math.max(0, s + wob * smoothstep(0.4, 3.0, s) * (1 - smoothstep(14, 26, s)));
+    }
     const fs = R / 160;
     const w0 = 2.5 + 0.9 * nC(x * fs + 2.2, y * fs, z * fs - 7.7);
     let hb;
@@ -227,7 +234,7 @@ class Surface {
     mix3(b, pal.bed, smoothstep(w0 + 0.35, w0 - 0.5, s));
     mix3(b, pal.rock, rk * 0.92);
     const bedm = smoothstep(w0 + 0.6, w0 - 0.3, s);
-    b.dry = clamp(0.22 + 0.55 * rk + 0.22 * glade - bedm * 0.3, 0, 1);
+    b.dry = clamp(0.34 + 0.5 * rk + 0.3 * glade - bedm * 0.4, 0, 1);
     b.wet = clamp(0.18 + 0.5 * bedm, 0, 1);
     const open = smoothstep(w0 + 0.6, w0 + 3.6, s);
     b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open, 0, 1);
@@ -481,8 +488,10 @@ export function sampleSurfacePure(bodyId, dx, dy, dz) {
   if (!o) { o = makeSample(S.nB); _o.set(bodyId, o); }
   const il = 1 / Math.hypot(dx, dy, dz);
   const x = dx * il, y = dy * il, z = dz * il;
-  S.sample(x, y, z, o, false);
+  S.sample(x, y, z, o, S.hasFlora);
   const R = S.R, h = o.h, lq = o.lq;
+  // tallest thing likely to stand here (0 on open ground): tree tops, for flying over them
+  const canopyHeight = S.hasFlora ? 24 * smoothstep(0.03, 0.30, o.trees) : 0;
   const weights = {};
   for (let i = 0; i < S.nB; i++) if (o.w[i] > 0.0005) weights[S.biomes[i].id] = o.w[i];
   const biomeId = S.biomes[o.top].id;
@@ -502,7 +511,7 @@ export function sampleSurfacePure(bodyId, dx, dy, dz) {
   const liquidRadius = (lq !== NOLQ && lq > h) ? R + lq : 0;
   return {
     radius, normal: { x: nx, y: ny, z: nz }, biomeId, biomeWeights: weights,
-    isLiquid: liquidRadius > radius, slope: Math.acos(cosS), liquidRadius,
+    isLiquid: liquidRadius > radius, slope: Math.acos(cosS), liquidRadius, canopyHeight,
   };
 }
 

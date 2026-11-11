@@ -59,8 +59,8 @@ export function glazec(a, b) { return [a[0] * b[0], a[1] * b[1], a[2] * b[2]]; }
 //   grade: a last overall glaze on the whole sheet (night indigo, dusk gold)
 const EARTH_SKY = {
   day: { zenith: [0.50, 0.69, 0.90], horizon: [0.90, 0.94, 0.97], haze: [0.93, 0.955, 0.975], glaze: [0.71, 0.72, 0.875], light: [1.0, 0.985, 0.93], grade: [1, 1, 1], cloudShade: [0.80, 0.80, 0.90] },
-  dawn: { zenith: [0.66, 0.72, 0.90], horizon: [1.0, 0.80, 0.76], haze: [1.0, 0.90, 0.87], glaze: [0.66, 0.66, 0.88], light: [1.0, 0.90, 0.84], grade: [1.0, 0.965, 0.955], cloudShade: [0.86, 0.72, 0.80] },
-  dusk: { zenith: [0.58, 0.63, 0.86], horizon: [1.0, 0.80, 0.50], haze: [1.0, 0.89, 0.70], glaze: [0.60, 0.58, 0.84], light: [1.0, 0.87, 0.62], grade: [1.0, 0.96, 0.90], cloudShade: [0.84, 0.66, 0.66] },
+  dawn: { zenith: [0.66, 0.72, 0.90], horizon: [1.0, 0.80, 0.76], haze: [1.0, 0.90, 0.87], glaze: [0.66, 0.66, 0.88], light: [1.0, 0.88, 0.82], grade: [1.0, 0.94, 0.93], cloudShade: [0.86, 0.72, 0.80] },
+  dusk: { zenith: [0.58, 0.63, 0.86], horizon: [1.0, 0.80, 0.50], haze: [1.0, 0.89, 0.70], glaze: [0.60, 0.58, 0.84], light: [1.0, 0.84, 0.58], grade: [1.0, 0.92, 0.80], cloudShade: [0.84, 0.66, 0.66] },
   night: { zenith: [0.17, 0.21, 0.38], horizon: [0.34, 0.39, 0.56], haze: [0.36, 0.41, 0.58], glaze: [0.55, 0.58, 0.80], light: [0.80, 0.86, 1.0], grade: [0.42, 0.48, 0.70], cloudShade: [0.55, 0.58, 0.75] },
 };
 
@@ -88,7 +88,7 @@ export const LOOKS = {
     seed: 'earth-7',
     seaLevel: 0,
     cloud: 0.45,
-    visibility: [250, 2600],   // metres at ground level, and from high up
+    visibility: [185, 2600],   // metres at ground level, and from high up
     sky: EARTH_SKY,
     biomes: [
       B('temperate_forest', 'Temperate Forest', 'forest',

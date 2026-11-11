@@ -110,10 +110,10 @@ uniform vec2 uBoil;
 varying vec2 vUv;
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
-  float sc = uOutRes.y / 1080.0;
+  float sc = max(uOutRes.y / 1080.0, 0.62);
   vec2 px = gl_FragCoord.xy;
   vec2 puv = px / (512.0 * sc);
-  vec4 paper = texture(tPaper, puv);
+  vec4 paper = texture(tPaper, puv, 0.55);
   vec4 plo = texture(tPaper, puv * 0.19 + 0.37);
   vec4 pmid = texture(tPaper, puv * 0.47 + 0.11 + uBoil);
 

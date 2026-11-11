@@ -6,7 +6,7 @@ import { placeTrees, placeUnder, INST_STRIDE, K_PINE, U_ROCK } from './floraplac
 import { getSurface } from './surface.js';
 import { dirToFace } from './cubesphere.js';
 
-export const TREE_LEVEL = 6, UNDER_LEVEL = 8, TREE_GRID = 18, UNDER_GRID = 17;
+export const TREE_LEVEL = 7, UNDER_LEVEL = 8, TREE_GRID = 9, UNDER_GRID = 17;
 
 const caches = { t: new Map(), u: new Map() };
 function cell(kind, S, face, ix, iy) {
@@ -15,10 +15,11 @@ function cell(kind, S, face, ix, iy) {
   if (v) { c.delete(key); c.set(key, v); return v; }     // refresh LRU order
   v = kind === 't' ? placeTrees(S, face, TREE_LEVEL, ix, iy, TREE_GRID) : placeUnder(S, face, UNDER_LEVEL, ix, iy, UNDER_GRID);
   c.set(key, v);
-  if (c.size > (kind === 't' ? 160 : 220)) c.delete(c.keys().next().value);
+  if (c.size > (kind === 't' ? 700 : 260)) c.delete(c.keys().next().value);
   return v;
 }
 export function treeCell(S, face, ix, iy) { return cell('t', S, face, ix, iy); }
+export function hasCell(kind, S, face, ix, iy) { return caches[kind].has(S.id + ':' + face + ':' + ix + ':' + iy); }
 export function underCell(S, face, ix, iy) { return cell('u', S, face, ix, iy); }
 
 const _f = {};

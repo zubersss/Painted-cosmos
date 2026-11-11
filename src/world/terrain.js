@@ -5,11 +5,12 @@
 // without popping.
 import * as THREE from 'three';
 import { getSurface } from './surface.js';
-import { buildPatchData, patchIndices, PATCH_N } from './patchgen.js';
+import { buildPatchData, beginPatch, stepPatch, patchIndices, PATCH_N } from './patchgen.js';
 import { faceToDir, nodeSize, FACES } from './cubesphere.js';
 import { makeTerrainMaterial, makeWaterMaterial } from '../render/materials.js';
+import { QUALITY } from '../render/shared.js';
 
-const SPLIT_K = 1.3;        // a node splits when the camera is nearer than SPLIT_K * its size
+const SPLIT_BY_QUALITY = [0.75, 1.12, 1.25];   // a node splits when the camera is nearer than this * its size
 const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at which it merges
 const MORPH_B = 0.98;
 const ANCHOR = 64;          // stroke textures repeat with periods that divide this (metres)
@@ -58,19 +59,21 @@ export class PlanetTerrain {
     this.roots = [];
     for (let f = 0; f < 6; f++) this.roots.push(new Node(f, 0, 0, 0, this.R));
     this.queue = [];
+    this.job = null; this.jobNode = null;
     this.frame = 0;
     this.camLocal = new THREE.Vector3(0, this.R * 3, 0);
     this.camDir = new THREE.Vector3(0, 1, 0);
     this.visible = [];
     this.patchCount = 0;
     this.detail = true;        // false: only the six root patches (far bodies)
+    this.splitK = 1.12;
     for (const n of this.roots) this._build(n);
   }
 
-  get busy() { return this.queue.length; }
+  get busy() { return this.queue.length + (this.job ? 1 : 0); }
 
-  _build(node) {
-    const d = buildPatchData(this.S, node.face, node.level, node.ix, node.iy);
+  _build(node, data) {
+    const d = data || buildPatchData(this.S, node.face, node.level, node.ix, node.iy);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(d.positions, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(d.normals, 3));
@@ -88,14 +91,13 @@ export class PlanetTerrain {
     const anchor = new THREE.Vector3(((d.origin[0] % ANCHOR) + ANCHOR) % ANCHOR, ((d.origin[1] % ANCHOR) + ANCHOR) % ANCHOR, ((d.origin[2] % ANCHOR) + ANCHOR) % ANCHOR);
     const camRel = new THREE.Vector3();
     // level L merges into its parent at the parent's split distance
-    const mergeD = node.level === 0 ? 1e12 : SPLIT_K * node.size * 2;
-    const morph = new THREE.Vector2(mergeD * MORPH_A, mergeD * MORPH_B);
+    const mergeUnit = node.level === 0 ? 1e12 : node.size * 2;
     const terrain = this;
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       const u = material.uniforms;
       u.uOrigin.value.copy(origin); u.uAnchor.value.copy(anchor);
       u.uCamLocal.value.copy(camRel.subVectors(terrain.camLocal, origin));
-      u.uMorph.value.copy(morph);
+      u.uMorph.value.set(mergeUnit * terrain.splitK * MORPH_A, mergeUnit * terrain.splitK * MORPH_B);
       material.uniformsNeedUpdate = true;
     };
     this.group.add(mesh);
@@ -168,7 +170,7 @@ export class PlanetTerrain {
     node.lastUsed = this.frame;
     const d = this._nodeDist(node);
     node.dist = d;
-    const split = this.detail && node.level < this.maxLevel && d < SPLIT_K * node.size;
+    const split = this.detail && node.level < this.maxLevel && d < this.splitK * node.size;
     if (split) {
       if (!node.children) {
         const l = node.level + 1, x = node.ix * 2, y = node.iy * 2;
@@ -190,24 +192,36 @@ export class PlanetTerrain {
   // camLocal: camera position in this body's local frame. budgetMs: time allowed for building.
   update(camLocal, budgetMs) {
     this.frame++;
+    this.splitK = SPLIT_BY_QUALITY[QUALITY.level] || 1.12;
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();
     for (const n of this.visible) { n.mesh.visible = false; if (n.water) n.water.visible = false; }
     this.visible.length = 0;
     for (const r of this.roots) this._select(r);
     for (const n of this.visible) { n.mesh.visible = true; if (n.water) n.water.visible = true; }
-    if (this.queue.length) {
+    if ((this.queue.length || this.job) && budgetMs > 0) {
       // drop requests that are no longer wanted, then build coarse and near first
       const q = this.queue;
       for (let i = q.length - 1; i >= 0; i--) {
         if (this.frame - q[i].lastUsed > 2) { q[i].queued = false; q.splice(i, 1); }
       }
       q.sort((a, b) => (b.level - a.level) || (b.dist - a.dist));   // pop() takes coarse, near
-      const t0 = performance.now();
-      let built = 0;
-      while (q.length && (built === 0 || performance.now() - t0 < budgetMs)) {
-        const n = q.pop();
-        if (!n.ready) { this._build(n); built++; }
+      // patches are resumable jobs: stop the moment the slice is used up
+      const deadline = performance.now() + budgetMs;
+      for (;;) {
+        if (!this.job) {
+          let n = null;
+          while (q.length && !n) { n = q.pop(); if (n.ready) n = null; }
+          if (!n) break;
+          this.job = beginPatch(this.S, n.face, n.level, n.ix, n.iy);
+          this.jobNode = n;
+        }
+        const data = stepPatch(this.job, deadline);
+        if (!data) break;
+        const n = this.jobNode;
+        this.job = null; this.jobNode = null;
+        if (this.frame - n.lastUsed <= 4) this._build(n, data); else n.queued = false;
+        if (performance.now() >= deadline) break;
       }
     }
   }

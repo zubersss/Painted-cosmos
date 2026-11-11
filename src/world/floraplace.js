@@ -3,7 +3,7 @@
 // yields the same plants, independent of LOD or of the order in which cells are built.
 import { faceToDir } from './cubesphere.js';
 import { makeSample, NOLQ } from './surface.js';
-import { hash3i } from './noise.js';
+import { hash3i, smoothstep, clamp } from './noise.js';
 
 // kinds
 export const K_BIRCH = 0, K_PINE = 1, K_BIRCH_AUTUMN = 2;
@@ -20,28 +20,38 @@ function cellSeed(face, level, ix, iy, salt) {
 }
 
 // Trees of one chunk. Returns { count, data } with STRIDE floats per tree.
+// Two candidates per grid cell, thinned by a clump field, so trunks gather in groups with
+// irregular gaps between them instead of standing in rows.
 export function placeTrees(S, face, level, ix, iy, grid) {
   if (!_s || _s.w.length < S.nB) _s = makeSample(S.nB);
   const s = _s, R = S.R;
   const span = 2 / (1 << level), u0 = -1 + ix * span, v0 = -1 + iy * span;
   const seed = cellSeed(face, level, ix, iy, 911);
+  const n3 = S.nC.n3, fc = R / 17, fd = R / 52;
   const out = [];
   for (let b = 0; b < grid; b++) {
     for (let a = 0; a < grid; a++) {
-      const r1 = hash3i(a, b, 1, seed), r2 = hash3i(a, b, 2, seed), r3 = hash3i(a, b, 3, seed), r4 = hash3i(a, b, 4, seed), r5 = hash3i(a, b, 5, seed);
-      faceToDir(face, u0 + span * (a + 0.12 + 0.76 * r1) / grid, v0 + span * (b + 0.12 + 0.76 * r2) / grid, _d);
-      S.sample(_d[0], _d[1], _d[2], s, true);
-      if (r3 >= s.trees) continue;
-      if (s.lq !== NOLQ && s.lq > s.h - 0.15) continue;
-      const bi = S.biomes[s.top];
-      if (bi.terrain !== 'forest') continue;
-      const birch = r4 < s.birch;
-      const kind = birch ? (bi.autumn ? K_BIRCH_AUTUMN : K_BIRCH) : K_PINE;
-      const rr = R + s.h - 0.12;
-      // trees at the edge of a glade or the stream grow a little larger and lean toward the light
-      const scale = (birch ? 0.78 : 0.82) + 0.5 * r5 * r5 + 0.12 * s.glade;
-      out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r1 * 6.2831853, kind, (r2 * 3) | 0, r3 / Math.max(1e-3, s.trees),
-        (r5 - 0.5) * 2, (r4 - 0.5) * 2 * 0.6, s.canopy, birch ? 0.03 + 0.07 * r2 : 0.015 * r2);
+      for (let c = 0; c < 2; c++) {
+        const k = c * 7;
+        const r1 = hash3i(a, b, 1 + k, seed), r2 = hash3i(a, b, 2 + k, seed), r3 = hash3i(a, b, 3 + k, seed), r4 = hash3i(a, b, 4 + k, seed), r5 = hash3i(a, b, 5 + k, seed);
+        faceToDir(face, u0 + span * (a + r1) / grid, v0 + span * (b + r2) / grid, _d);
+        const x = _d[0], y = _d[1], z = _d[2];
+        const clump = smoothstep(-0.30, 0.22, n3(x * fc + 3.3, y * fc - 8.1, z * fc + 1.7) + 0.45 * n3(x * fd - 5.0, y * fd, z * fd + 9.0));
+        if (r3 >= 0.62 * (0.14 + 0.86 * clump)) continue;
+        S.sample(x, y, z, s, true);
+        if (r3 >= 0.62 * (0.14 + 0.86 * clump) * s.trees) continue;
+        if (s.lq !== NOLQ && s.lq > s.h - 0.15) continue;
+        const bi = S.biomes[s.top];
+        if (bi.terrain !== 'forest') continue;
+        // birches keep to their own groups: the species choice follows the clump field too
+        const grove = n3(x * fd + 21.0, y * fd + 4.0, z * fd - 13.0);
+        const birch = r4 < clamp(s.birch + grove * 0.55, 0.04, 0.97);
+        const kind = birch ? (bi.autumn ? K_BIRCH_AUTUMN : K_BIRCH) : K_PINE;
+        const rr = R + s.h - 0.12;
+        const scale = (birch ? 0.74 : 0.80) + 0.56 * r5 * r5 + 0.12 * s.glade;
+        out.push(x * rr, y * rr, z * rr, scale, r1 * 6.2831853, kind, (r2 * 3) | 0, hash3i(a, b, 6 + k, seed),
+          (r5 - 0.5) * 2, (r4 - 0.5) * 2 * 0.6, s.canopy, birch ? 0.02 + 0.15 * r2 * r2 : 0.02 * r2);
+      }
     }
   }
   return { count: out.length / STRIDE, data: new Float32Array(out) };

@@ -38,6 +38,7 @@ vec3 pcDensity(vec3 c, float d) {
 
 // Light in four soft value steps. x in 0..1 -> level in 0..3.
 float pcLevel(float x, float soft) {
+  x = mix(0.37 + x * 0.30, x, uDayness);   // night: a dim, even moonlight, nothing near black
   return smoothstep(0.26 - soft, 0.26 + soft, x)
        + smoothstep(0.50 - soft, 0.50 + soft, x)
        + smoothstep(0.76 - soft, 0.76 + soft, x);
@@ -51,7 +52,7 @@ vec3 pcTone(vec3 c, float level) {
   vec3 g1 = c * uGlaze;
   vec3 g2 = pcDensity(g1 * pow(uGlaze, vec3(0.75)), 1.3);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
-  r = mix(r, c, clamp(level - 1.0, 0.0, 1.0));
+  r = mix(r, c * mix(vec3(1.0), uLight, 0.55), clamp(level - 1.0, 0.0, 1.0));
   r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
   return r;
 }

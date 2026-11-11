@@ -285,11 +285,14 @@ ${VERT_PARS}
 ${FOG_VERT}
 attribute vec4 aData;     // x sway, y part, z inner shade, w blob hash
 attribute vec3 aMass;     // soft "mass" normal of the whole crown
-attribute vec4 aInst;     // per instance: x hue, y value, z seed, w spare
+attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
+#ifdef PC_FAR
+  attribute vec2 aInst2;  // species (0 birch, 1 pine, 2 autumn birch)
+  varying float vSpecies;
+#endif
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uLod;        // min distance, max distance, jitter, fade start fraction
-uniform vec2 uThin;       // beyond this distance half the instances drop out; the rest grow by y
 uniform float uWind;
 uniform float uTime;
 varying vec3 vBody;
@@ -301,6 +304,15 @@ varying vec2 vUv;
 varying vec4 vData;
 varying vec4 vInst;
 varying float vFog;
+
+// MOTION: the one place flora moves. Returns the local offset of a vertex for a given sway
+// weight. PHYSICS' wind / disturbance field replaces the body of this function (C14).
+vec3 pcSway(float w, float phase) {
+  float a = sin(uTime * 1.1 + phase) * 0.6 + sin(uTime * 2.7 + phase * 1.9) * 0.3;
+  float b = cos(uTime * 0.8 + phase * 1.3) * 0.6;
+  return vec3(a, 0.0, b) * w * uWind;
+}
+
 void main() {
   #ifdef USE_INSTANCING
     mat4 im = instanceMatrix;
@@ -312,16 +324,15 @@ void main() {
   vec3 io = im[3].xyz;
   float di = distance(io, uCamLocal);
   float j = 1.0 + (inst.z - 0.5) * uLod.z;
+  // strokes at the edge of their range shrink away instead of popping
   float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di));
-  // far away: fewer, larger strokes
-  float dv = uThin.x * (0.75 + inst.z);
-  vis *= 1.0 - step(inst.z, 0.5) * smoothstep(dv * 0.9, dv, di);
-  vis *= 1.0 + uThin.y * smoothstep(uThin.x * 0.8, uThin.x * 1.2, di);
   vec3 lp = position;
-  float ph = inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13));
-  float sway = sin(uTime * 1.1 + ph) * 0.6 + sin(uTime * 2.7 + ph * 1.9) * 0.3;
-  lp.x += aData.x * sway * uWind;
-  lp.z += aData.x * cos(uTime * 0.8 + ph * 1.3) * uWind * 0.6;
+  #ifdef PC_FAR
+    vSpecies = aInst2.x;
+    float pine = 1.0 - step(0.5, abs(aInst2.x - 1.0));
+    lp.xz *= 1.0 - pine * 0.80 * uv.y * step(0.5, aData.y);   // pines taper to a point
+  #endif
+  lp += pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);
   vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
   vBody = wp + uOrigin;
   vObj = position;
@@ -348,6 +359,14 @@ uniform vec3 uLeafC;
 uniform vec4 uLeafP;   // raggedness, sky holes, dab scale, wetness
 uniform vec3 uAccent;
 uniform float uCanopy;
+#ifdef PC_FAR
+  uniform vec3 uFarA[3];
+  uniform vec3 uFarB[3];
+  uniform vec3 uFarC[3];
+  uniform vec3 uFarBarkA[3];
+  uniform vec3 uFarBarkB[3];
+  varying float vSpecies;
+#endif
 varying vec3 vBody;
 varying vec3 vObj;
 varying vec3 vNV;
@@ -369,49 +388,75 @@ void main() {
   float canopy = vInst.w * uCanopy;
   float vd = length(vView);
   float near = 1.0 - smoothstep(30.0, 110.0, vd);
+  // strokes part when they are right in front of the eye (the explorer can walk through trunks)
   if (vd < 1.6 && texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1 > smoothstep(0.35, 1.6, vd)) discard;
-  vec3 c; float wet = 0.05; float id = 3.0; float x; float soft = 0.05;
+  vec3 leafA = uLeafA, leafB = uLeafB, leafC = uLeafC, barkA = uBarkA, barkB = uBarkB;
+  #ifdef PC_FAR
+    int si = int(vSpecies + 0.5);
+    leafA = uFarA[si]; leafB = uFarB[si]; leafC = uFarC[si]; barkA = uFarBarkA[si]; barkB = uFarBarkB[si];
+  #endif
+  vec3 c; float wet = 0.05; float id = 3.0; float x;
 
   if (part < 0.5) {
     // ---- bark: a pale or warm wash with dry-brushed marks
-    vec2 tuv = mix(vec2(vUv.x * 1.5 + seed * 3.0, vUv.y * 1.15 + seed * 5.0), vec2(vUv.y * 0.30 + seed * 3.0, vUv.x * 3.0 + seed * 5.0), uBarkP.y);
-    vec4 st = texture(uStrokeTex, tuv);
-    vec4 stb = texture(uStrokeTex, vec2(vUv.x * 1.0 + seed * 9.0, vUv.y * 0.21 + seed * 2.0));
-    // dashes (lenticels), plus a few larger dark scars
-    float marks = smoothstep(uBarkP.x, uBarkP.x + 0.05, st.r * 0.92 + st.b * 0.14 + (n1.b - 0.5) * 0.10);
-    marks = max(marks, smoothstep(0.80, 0.86, stb.g + (st.r - 0.5) * 0.25) * (1.0 - uBarkP.y));
-    float base = 1.0 - smoothstep(0.0, uBarkP.z, vUv.y + (st.b - 0.5) * 1.3);
-    float twig = smoothstep(0.0, 1.0, vData.z);   // thin branches read dark
-    c = mix(uBarkA, uBarkB, clamp(max(max(marks, base * 0.9), twig), 0.0, 1.0));
+    float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
+    #ifdef PC_FAR
+      c = mix(barkA, barkB, 0.22 + 0.3 * n1.b);
+    #else
+      vec2 tuv = mix(vec2(vUv.x * 1.5 + seed * 3.0, vUv.y * 1.15 + seed * 5.0), vec2(vUv.y * 0.30 + seed * 3.0, vUv.x * 3.0 + seed * 5.0), uBarkP.y);
+      vec4 st = texture(uStrokeTex, tuv);
+      vec4 stb = texture(uStrokeTex, vec2(vUv.x * 1.0 + seed * 9.0, vUv.y * 0.21 + seed * 2.0));
+      // the edge of the stroke is broken: the trunk thins and swells along its length
+      vec4 nb = texture(uNoise3D, vec3(vUv.y * 0.55 + seed * 7.0, seed * 3.0, vUv.x * 0.15));
+      float rimB = 1.0 - abs(dot(nV, V));
+      if (rimB > 0.86 - 0.42 * smoothstep(0.42, 0.72, nb.r) && vData.z < 0.5) discard;
+      // dashes (lenticels), plus a few larger dark scars
+      float marks = smoothstep(uBarkP.x, uBarkP.x + 0.05, st.r * 0.92 + st.b * 0.14 + (n1.b - 0.5) * 0.10);
+      marks = max(marks, smoothstep(0.80, 0.86, stb.g + (st.r - 0.5) * 0.25) * (1.0 - uBarkP.y));
+      float base = 1.0 - smoothstep(0.0, uBarkP.z, vUv.y + (st.b - 0.5) * 1.3);
+      float twig = smoothstep(0.0, 1.0, vData.z);   // thin branches read dark
+      c = mix(barkA, barkB, clamp(max(max(marks, base * 0.9), twig), 0.0, 1.0));
+      // soft grey washes drift up the trunk: never one even white
+      c *= mix(vec3(1.0), vec3(0.80, 0.80, 0.87), smoothstep(0.48, 0.70, nb.g) * 0.7 * pale);
+      float dryM = smoothstep(0.56, 0.68, st.g * 0.5 + st.r * 0.6);
+      c = mix(c, vec3(1.0), dryM * uBarkP.w * near * 0.5);
+    #endif
     c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7);
     x = dot(nV, sunV) * 0.5 + 0.5;
     x *= mix(0.55, 1.0, pcDapple(vBody, canopy * 0.8));
     x += (n1.g - 0.5) * 0.12;
     float lvl = pcLevel(x, 0.06);
-    // pale bark takes a thinner shadow wash: the trunks stay the lights of the picture
-    float pale = smoothstep(0.55, 0.9, dot(uBarkA, vec3(0.333)));
-    c = mix(pcTone(c, lvl), pcTone(c, max(lvl, 1.0) * 0.5 + 1.0), pale * 0.75);
-    float dryM = smoothstep(0.56, 0.68, st.g * 0.5 + st.r * 0.6);
-    c = mix(c, vec3(1.0), dryM * uBarkP.w * near * 0.5);
+    // pale bark takes a thinner shadow wash: by day the trunks stay the lights of the picture
+    c = mix(pcTone(c, lvl), pcTone(c, max(lvl, 1.0) * 0.5 + 1.0), pale * 0.75 * uDayness);
     id = 3.0 + seed * 0.9;
   } else if (part < 1.5) {
-    // ---- foliage mass: a wash with a ragged, dabbed edge and three tones
-    vec4 st = texture(uStrokeTex, vUv * uLeafP.z + seed * 3.7);
-    vec4 n2 = texture(uNoise3D, vBody / 2.6 + 0.4);
+    // ---- foliage mass: a few overlapping washes with a ragged, dabbed edge.
+    // The dabs keep about the same size on the sheet at any distance: far crowns are fewer,
+    // larger strokes (two octaves cross-faded, anchored to the tree).
+    float lodf = log2(max(vd / 7.0, 1.0));
+    float l0 = floor(lodf);
+    float fr = smoothstep(0.25, 0.75, lodf - l0);
+    float s0 = exp2(-l0);
+    vec2 suv = vUv * uLeafP.z;
+    vec4 st = mix(texture(uStrokeTex, suv * s0 + seed * 3.7), texture(uStrokeTex, suv * s0 * 0.5 + seed * 3.7), fr);
+    vec4 n2 = mix(texture(uNoise3D, vBody * (s0 / 2.6) + 0.4), texture(uNoise3D, vBody * (s0 / 5.2) + 0.4), fr);
     float rim = 1.0 - abs(dot(nV, V));
     float cut = smoothstep(0.30, 0.92, rim) * uLeafP.x + uLeafP.y * smoothstep(0.52, 0.72, n2.r);
-    if (st.g + (n2.g - 0.5) * 0.5 < cut) discard;
+    // the edge of a wash is a little more broken than its inside
+    float stE = texture(uStrokeTex, suv * s0 * 2.0 + seed * 1.3).g;
+    if (mix(st.g, stE, 0.45) + (n2.g - 0.5) * 0.5 < cut) discard;
     vec3 mV = normalize(vMassV);
-    float hue = vInst.x + (n1.b - 0.5) * 0.9 + (vData.w - 0.5) * 0.5;
-    c = mix(uLeafA, uLeafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
-    c = mix(c, uLeafC, clamp(vData.z * 0.75 + (n2.b - 0.5) * 0.3, 0.0, 1.0));
+    float hue = vInst.x + (n1.b - 0.5) * 0.9 + (vData.w - 0.5) * 0.7;
+    c = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
+    c = mix(c, leafC, clamp(vData.z * 0.75 + (n2.b - 0.5) * 0.3, 0.0, 1.0));
     c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.9 + vInst.y * 0.5);
     x = dot(mV, sunV) * 0.5 + 0.5;
-    x = x * (1.0 - vData.z * 0.55);
+    x = x * (1.0 - vData.z * 0.42);
     float through = pow(max(dot(-V, sunV), 0.0), 1.5);
     x = max(x, through * (0.50 + 0.45 * st.g + (n2.r - 0.5) * 0.5));
     x *= mix(0.62, 1.0, pcDapple(vBody, canopy * 0.6));
-    x += (st.g - 0.35) * 0.22 + (n2.g - 0.5) * 0.16;
+    // each wash of the crown sits at its own value; a few dark touches inside
+    x += (vData.w - 0.5) * 0.26 + (n2.g - 0.5) * 0.14 - smoothstep(0.55, 0.8, st.g) * 0.16;
     float lvl = min(pcLevel(x, 0.07), 2.6);
     c = pcTone(c, lvl);
     wet = uLeafP.w;
@@ -419,8 +464,8 @@ void main() {
   } else if (part < 2.5) {
     // ---- blades and fronds: single crisp strokes, lit like the ground under them
     float hue = vInst.x + (n1.b - 0.5) * 0.8;
-    c = mix(uLeafA, uLeafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
-    c = mix(c, uLeafC, clamp(0.55 - vUv.y * 0.7, 0.0, 1.0));
+    c = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
+    c = mix(c, leafC, clamp(0.55 - vUv.y * 0.7, 0.0, 1.0));
     c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5);
     vec3 upV = normalize(vMassV);
     x = dot(upV, sunV) * 0.5 + 0.5;
@@ -431,15 +476,16 @@ void main() {
     wet = 0.1;
     id = 4.0 + seed * 0.9;
   } else if (part < 3.5) {
-    // ---- accent: one touch of pure pigment
-    c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.6);
+    // ---- accent: one soft touch of pure pigment
+    c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.9);
     x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, canopy));
     c = pcTone(c, pcLevel(x + 0.2, 0.08));
-    id = 3.0 + seed * 0.9;
+    wet = 0.35;
+    id = 4.0 + seed * 0.9;
   } else {
     // ---- rock: pale granulating wash, paper on top, pooled dark at the base
     vec4 st = pcTri(vBody, normalize(vObj + 0.001), 1.0 / 3.0);
-    c = mix(uBarkA, uBarkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
+    c = mix(barkA, barkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
     c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9);
     x = dot(nV, sunV) * 0.5 + 0.5;
     x *= mix(0.45, 1.0, pcDapple(vBody, canopy));
@@ -458,21 +504,30 @@ void main() {
 
 export function makePropMaterial(bodyU, opts = {}) {
   const v3 = (a, d) => ({ value: new THREE.Vector3().fromArray(a || d) });
+  const own = {
+    uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
+    uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
+    uWind: { value: opts.wind == null ? 0.06 : opts.wind },
+    uBarkA: v3(opts.barkA, [0.95, 0.94, 0.92]), uBarkB: v3(opts.barkB, [0.30, 0.27, 0.27]),
+    uBarkP: { value: new THREE.Vector4().fromArray(opts.barkP || [0.62, 0, 1.0, 0.5]) },
+    uLeafA: v3(opts.leafA, [0.72, 0.80, 0.36]), uLeafB: v3(opts.leafB, [0.50, 0.68, 0.34]),
+    uLeafC: v3(opts.leafC, [0.30, 0.48, 0.40]),
+    uLeafP: { value: new THREE.Vector4().fromArray(opts.leafP || [0.8, 0.25, 1.0, 0.45]) },
+    uAccent: v3(opts.accent, [0.85, 0.29, 0.17]),
+    uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
+  };
+  const defines = {};
+  if (opts.far) {
+    // far trees of every species share one mesh: per-instance species picks the washes
+    defines.PC_FAR = 1;
+    const arr = (k) => ({ value: opts.far.map((f) => new THREE.Vector3().fromArray(f[k])) });
+    own.uFarA = arr('leafA'); own.uFarB = arr('leafB'); own.uFarC = arr('leafC');
+    own.uFarBarkA = arr('barkA'); own.uFarBarkB = arr('barkB');
+  }
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
-    uniforms: baseUniforms(bodyU, {
-      uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
-      uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
-      uThin: { value: new THREE.Vector2(1e9, 0) },
-      uWind: { value: opts.wind == null ? 0.06 : opts.wind },
-      uBarkA: v3(opts.barkA, [0.95, 0.94, 0.92]), uBarkB: v3(opts.barkB, [0.30, 0.27, 0.27]),
-      uBarkP: { value: new THREE.Vector4().fromArray(opts.barkP || [0.62, 0, 1.0, 0.5]) },
-      uLeafA: v3(opts.leafA, [0.72, 0.80, 0.36]), uLeafB: v3(opts.leafB, [0.50, 0.68, 0.34]),
-      uLeafC: v3(opts.leafC, [0.30, 0.48, 0.40]),
-      uLeafP: { value: new THREE.Vector4().fromArray(opts.leafP || [0.8, 0.25, 1.0, 0.45]) },
-      uAccent: v3(opts.accent, [0.85, 0.29, 0.17]),
-      uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
-    }),
+    defines,
+    uniforms: baseUniforms(bodyU, own),
     vertexShader: PROP_VERT, fragmentShader: PROP_FRAG,
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });

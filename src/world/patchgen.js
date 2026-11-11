@@ -42,14 +42,23 @@ let _s = null;
 
 function b8(v) { v = v * 255 + 0.5; return v < 0 ? 0 : v > 255 ? 255 : v | 0; }
 
-export function buildPatchData(S, face, level, ix, iy) {
+// A patch is built as a resumable job so that terrain generation never takes more than its
+// time slice: beginPatch() -> stepPatch(job, deadline) until it returns the data.
+// (Only one job may be in progress at a time: the sample grid is shared scratch memory.)
+export function beginPatch(S, face, level, ix, iy) {
+  return { S, face, level, ix, iy, row: 0, minH: 1e9, maxH: -1e9, anyWater: false };
+}
+
+export function stepPatch(job, deadline) {
+  const { S, face, level, ix, iy } = job;
   if (!_s || _s.w.length < S.nB) _s = makeSample(S.nB);
   const s = _s, R = S.R;
   const span = 2 / (1 << level);
   const u0 = -1 + ix * span, v0 = -1 + iy * span, du = span / N;
-  let minH = 1e9, maxH = -1e9, anyWater = false;
-  // 1. sample the surface on the apron grid
-  for (let j = 0; j < E; j++) {
+  let minH = job.minH, maxH = job.maxH, anyWater = job.anyWater;
+  // 1. sample the surface on the apron grid, a row at a time
+  for (let j = job.row; j < E; j++) {
+    if (j > job.row && performance.now() >= deadline) { job.row = j; job.minH = minH; job.maxH = maxH; job.anyWater = anyWater; return null; }
     for (let i = 0; i < E; i++) {
       const k = j * E + i;
       faceToDir(face, u0 + (i - 1) * du, v0 + (j - 1) * du, _d);
@@ -68,6 +77,7 @@ export function buildPatchData(S, face, level, ix, iy) {
       }
     }
   }
+  job.row = E;
   // 2. origin: the patch centre, so vertex coordinates stay small
   const kc = (1 + N / 2) * E + (1 + N / 2);
   const ox = _px[kc], oy = _py[kc], oz = _pz[kc];
@@ -139,10 +149,16 @@ export function buildPatchData(S, face, level, ix, iy) {
       const a = j * V + i, b = a + 1, c = a + V, d = c + 1;
       if (wdep[a] > -0.45 || wdep[b] > -0.45 || wdep[c] > -0.45 || wdep[d] > -0.45) widx.push(a, b, d, a, d, c);
     }
-    if (widx.length) water = { positions: wpos, depth: wdep, indices: new Uint16Array(widx) };
+    // thin water (a brook) is left to the terrain's far colour on coarse patches
+    if (widx.length && (level >= 5 || widx.length > N * N * 6 * 0.08)) water = { positions: wpos, depth: wdep, indices: new Uint16Array(widx) };
   }
   return {
     origin: [ox, oy, oz], positions: pos, normals: nor, morph: mor, colors: col, colors2: col2, params: par,
     water, boundR: Math.sqrt(boundR2) + drop, minH, maxH, size,
   };
+}
+
+// Build a whole patch in one go (tests, the six root patches).
+export function buildPatchData(S, face, level, ix, iy) {
+  return stepPatch(beginPatch(S, face, level, ix, iy), Infinity);
 }
