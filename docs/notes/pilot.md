@@ -117,6 +117,17 @@ runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdra
    new controller has only met model machines and software rendering), a real mouse under
    pointer lock, a real gamepad, how the sound sounds.
 
+## Fifth agent, part 1 (record, newest last)
+
+1. **Every check on the head, 2026-11-11.** `node tests/all.mjs` inside a clean export of
+   `da6d42d` (the last commit before the coordinator's two "WIP snapshot" commits; it holds
+   PAINTER's `573c10d`, PHYSICS' `9b708e2`, my `1235328`): **ALL 13 PASSED** in 42 minutes
+   (unit 114, physics 230, world 19, static, play-stub 37 checks, play-physics 37, trip-stub
+   47, m3 29, lock 7, audio, painted-play 37, painted-trip 47, painted-m3 29; the painted
+   steps at quality 0, scale 0.5, 400x225). First full run since the legs, the new frame-rate
+   controller and PAINTER's block 3 and first push. Nothing relaxed. Log:
+   `/home/user/.pc-scratch/pilot/run5/all.log`.
+
 ## Status
 
 ### Fourth agent, part 1 (2026-11-11; everything run by me; software GL; frames opened where said)
