@@ -14,7 +14,7 @@
 //                            [--sheets dir (default docs/lead/evidence)] [--label text]
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseArgs, repo, settleWorld } from './browser.mjs';
+import { parseArgs, repo, settleWorld, fallbackProblem } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 
 const opt = parseArgs({ w: 960, h: 540, qualities: '0,1,2', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto', places: '', shoot: '', shots: '/home/user/.pc-scratch/pilot/cost', label: '' });
@@ -44,6 +44,7 @@ const rows = [];
 let failed = false;
 try {
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 600000, polling: 300 });
+  { const fb = await fallbackProblem(page, query); if (fb) throw new Error('FALLBACK: ' + fb + ' (this would be a picture of the mock-up, not the game)'); }
   await page.evaluate(() => { document.getElementById('pc-hud').style.visibility = 'hidden'; });
   for (const q of String(opt.qualities).split(',').map(Number)) {
     await page.evaluate((q) => { const pc = window.__pc; pc.dyn.quality = q; pc.painter.setQuality(q); }, q);

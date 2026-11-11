@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openPage } from '../tools/shot.mjs';
+import { fallbackProblem } from './browser.mjs';
 
 const args = process.argv.slice(2);
 const opt = { out: '/home/user/.pc-scratch/pilot/play', w: 640, h: 360, query: 'stub=1' };
@@ -88,6 +89,8 @@ try {
   let i = await info();
   log('ready. providers:', JSON.stringify(i.using), 'fps', i.fps);
   summary.using = i.using;
+  const fb = await fallbackProblem(page, query);
+  check(!fb, fb || 'every module the run asked for is the real one');
   check(i.state === 'ON_FOOT' && i.body === 'earth', 'starts on foot on Earth');
   check(Math.abs(i.mood.timeOfDay - 9.5) < 0.2, 'local time is a clear morning: ' + i.mood.timeOfDay.toFixed(2));
   await shot('00-start');

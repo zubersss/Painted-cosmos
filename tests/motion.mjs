@@ -48,7 +48,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { parseArgs, repo, settleWorld } from './browser.mjs';
+import { parseArgs, repo, settleWorld, fallbackProblem } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 import { BODIES } from '../src/data/bodies.js';
 import { installInPage } from './motionlib.mjs';
@@ -99,6 +99,7 @@ const info = () => page.evaluate(() => window.__pc.info());
 
 try {
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 900000, polling: 300 });
+  { const fb = await fallbackProblem(page, query); if (fb) throw new Error('FALLBACK: ' + fb + ' (this would be a picture of the mock-up, not the game)'); }
   log('ready', JSON.stringify(await page.evaluate(() => window.__pc.info().using)), label);
   await page.evaluate(() => { document.getElementById('pc-hud').style.visibility = 'hidden'; });
   await page.evaluate(installInPage, [W, H]);

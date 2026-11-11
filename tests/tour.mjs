@@ -23,7 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { parseArgs, repo, settleWorld } from './browser.mjs';
+import { parseArgs, repo, settleWorld, fallbackProblem } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 
 const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/tour', w: 960, h: 540, quality: 2, hour: 10, settle: 3600, 'settle-frames': 300, first: 0, vistas: 1, orbit: 1, label: '', query: '', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto' });
@@ -91,6 +91,7 @@ function planPlaces(b) {
 
 try {
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 600000, polling: 300 });
+  { const fb = await fallbackProblem(page, query); if (fb) throw new Error('FALLBACK: ' + fb + ' (this would be a picture of the mock-up, not the game)'); }
   const using = await page.evaluate(() => window.__pc.info().using);
   log('ready', JSON.stringify(using), label);
   // The painting, not the interface: hide the HUD; count the whole frame's triangles and calls.

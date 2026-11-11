@@ -18,6 +18,23 @@ export function parseArgs(defaults) {
   return opt;
 }
 
+// The real game must never fall back to PILOT's stubs without saying so (a broken import made
+// every real module fall back once, and every Node test still passed). Returns a sentence
+// naming what fell back, or null. A module the run forced to its stub (?stub=...) is not a
+// fall-back; the game lists the ones it tried and could not load (info().fallback).
+export async function fallbackProblem(page, query = '') {
+  const r = await page.evaluate(() => {
+    const pc = window.__pc, i = pc && pc.info ? pc.info() : null;
+    return i ? { using: i.using || {}, fallback: i.fallback } : null;
+  });
+  if (!r) return 'the game did not start (no window.__pc.info)';
+  if (Array.isArray(r.fallback)) return r.fallback.length ? 'the real game fell back to the stub for ' + r.fallback.join('; ') : null;
+  // An older game without info().fallback: any stub among the real modules, unless asked for.
+  if (/(^|&)stub=/.test(query)) return null;
+  const stubs = ['render', 'world', 'art', 'physics'].filter((k) => r.using[k] === 'stub');
+  return stubs.length ? 'the real game is running PILOT\'s stub for ' + stubs.join(', ') : null;
+}
+
 export async function startRun(opt) {
   const W = Number(opt.w), H = Number(opt.h);
   fs.mkdirSync(opt.out, { recursive: true });
@@ -78,6 +95,8 @@ export async function startRun(opt) {
     return a;
   }
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 300000, polling: 200 });
+  const fb = await fallbackProblem(page, opt.query);
+  check(!fb, fb || 'every module the run asked for is the real one: ' + JSON.stringify((await info()).using));
   return { page, problems, close, baseUrl, fails, log, check, info, sleep, shot, look, gameWait, until, holdPitch, aimShipAt, cx, cy, W, H };
 }
 
