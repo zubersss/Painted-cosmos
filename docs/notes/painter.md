@@ -294,6 +294,10 @@ before `pcPhysDisplace`, `id = fract(aBranchId + 7.31 seed)` so no two trees mov
   error. Not seen side by side with the crown as it was (the lobes of `pcPhysBranch`), and not
   in the gust front (149 s) or in a breeze; the far form does not move (by PHYSICS' leave).
 
+**Last check** (clean export of `59bfb1b`, which holds all of this code): the game at the top
+tier stands at the Earth spawn on foot, every module real (`render`, `world`, `art`, `physics`),
+`world.busy` 0, **no console error** (scratch `spawn.mjs`, frame opened).
+
 ### Needs (block 7, tenth agent)
 
 - *PHYSICS*: (1) at Neptune's `storm_seas` stand in the gale (clock 150), what are Hs and the
