@@ -93,6 +93,27 @@ float pcDapple(vec3 bodyPos, float canopy) {
   return mix(smoothstep(th - w, th + w, v), 1.0 - 0.42 * canopy, uWx.x);
 }
 
+// The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
+// them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any
+// anchored noise around 0 (a ragged edge).
+uniform vec4 uCast[4];
+uniform vec2 uCastK;
+float pcCast(vec3 bodyPos, float rag) {
+  float s = 0.0;
+  vec3 up = normalize(bodyPos);
+  for (int i = 0; i < 2; i++) {
+    float k = i == 0 ? uCastK.x : uCastK.y;
+    if (k < 0.004) continue;
+    vec4 A = uCast[i * 2], B = uCast[i * 2 + 1];
+    vec3 dd = bodyPos - A.xyz;
+    dd -= up * dot(dd, up);
+    float al = dot(dd, B.xyz);
+    float q = length(vec2(al / A.w, length(dd - B.xyz * al) / B.w));
+    s = max(s, (1.0 - smoothstep(0.55 + rag, 1.0 + rag, q)) * k);
+  }
+  return s;
+}
+
 // Rain-wet: the wash goes darker and richer (more pigment, not grey).
 vec3 pcWetWash(vec3 c, float amt) {
   return pcDensity(c * mix(vec3(1.0), vec3(0.95, 0.96, 0.99), uWx.y * amt), 1.0 + 0.62 * uWx.y * amt);

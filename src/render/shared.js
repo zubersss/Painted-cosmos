@@ -37,6 +37,10 @@ export const G = {
   uPaperColor: { value: new THREE.Vector3(paper[0], paper[1], paper[2]) },
   uPrevTex: { value: null },    // last frame's painting (rgb) and log depth (a), half resolution
   uPrevOn: { value: 0 },
+  // cast shade of the explorer and the ship on the ground (the world fills these): per caster
+  // [centre body-local, half length], [axis body-local, half width]; uCastK the two strengths
+  uCast: { value: [new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1), new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1)] },
+  uCastK: { value: new THREE.Vector2(0, 0) },
 };
 
 export function ensureGlobals() {

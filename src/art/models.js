@@ -47,9 +47,9 @@ function spline(keys, sub_) {
 }
 
 // ---- the palette (washes as they should look on paper) -----------------------------------------
-const CREAM = hex('#e4d4ae'), HEM = hex('#b79a70'), INK = hex('#3d4056'), TROUSER = hex('#57525f');
-const PACK = hex('#6c7b8d'), ROLL = hex('#efe6cf'), COPPER = hex('#b56b3d'), RED = hex('#c8452e');
-const FLESH = hex('#e9c9a6'), HAIR = hex('#5b4634'), GLASS = hex('#b7ced6'), OCHRE = hex('#c9914e');
+const CREAM = hex('#e4d4ae'), HEM = hex('#b79a70'), INK = hex('#3d4056'), TROUSER = hex('#6a6170');
+const PACK = hex('#6c7b8d'), ROLL = hex('#efe6cf'), COPPER = hex('#a9683f'), RED = hex('#c8452e');
+const FLESH = hex('#e9c9a6'), HAIR = hex('#5b4634'), GLASS = hex('#8eaab6'), OCHRE = hex('#c9914e');
 const SEPIA = hex('#6f4e3a'), KEEL = hex('#86674b'), FLAME0 = [1, 0.99, 0.94], FLAME1 = hex('#f6c871'), FLAME2 = hex('#e79a52');
 
 // ---- geometry kit: lofted soft forms into one buffer ------------------------------------------
@@ -171,7 +171,7 @@ export function createExplorer() {
   const B = makeBuilder();
   const X = [1, 0, 0], Z = [0, 0, 1];
   const ringsY = (rows) => rows.map((r) => ({ c: [r[3] || 0, r[0], r[4] || 0], u: X, v: Z, ru: r[1], rv: r[2], e: r[5] || 2.2 }));
-  const coat = (p) => mixc(CREAM, HEM, sstep(1.05, 0.55, p[1]) * 0.85);
+  const coat = (p) => (p[1] > 0.985 && p[1] < 1.045 ? SEPIA : mixc(CREAM, HEM, sstep(1.05, 0.55, p[1]) * 0.85));
 
   // 0 torso: upper coat, collar, scarf round the neck, pack, rolled sheet, jet bottles
   B.part = 0;
@@ -183,7 +183,7 @@ export function createExplorer() {
   B.blob([0, 1.19, 0.215], 0.158, 0.215, 0.088, { seg: 12, e: 3.0, ey: 2.6, col: (p) => mixc(PACK, hex('#8a98a6'), sstep(1.22, 1.38, p[1])), lump: 0.010 });
   B.capsule([-0.205, 1.44, 0.21], [0.205, 1.44, 0.21], 0.064, 0.060, { seg: 9, col: (p) => mixc(ROLL, HEM, sstep(0.17, 0.23, Math.abs(p[0])) * 0.7), lump: 0.006, dry: 0.7 });
   for (const s of [-1, 1]) {
-    B.capsule([s * 0.19, 1.22, 0.235], [s * 0.19, 1.00, 0.235], 0.054, 0.050, { seg: 8, col: COPPER, lump: 0.005 });
+    B.capsule([s * 0.19, 1.22, 0.235], [s * 0.19, 1.00, 0.235], 0.054, 0.050, { seg: 8, col: (p) => mixc(COPPER, SEPIA, 0.15 + 0.4 * sstep(1.12, 1.0, p[1])), lump: 0.005 });
     B.capsule([s * 0.19, 0.975, 0.235], [s * 0.19, 0.935, 0.235], 0.028, 0.044, { seg: 7, col: INK, lump: 0, mid: 0 });
   }
   // 1 head: face, hair, the hat with its band
@@ -209,11 +209,11 @@ export function createExplorer() {
   B.loft(ringsY([[1.03, 0.160, 0.126], [0.96, 0.186, 0.150], [0.84, 0.220, 0.190], [0.70, 0.250, 0.222], [0.585, 0.272, 0.244], [0.555, 0.262, 0.236], [0.60, 0.14, 0.12]]), {
     seg: 16, lump: 0.012, cap: 0.0,
     col: (p, t) => (t > 0.9 ? mixc(INK, SEPIA, 0.5) : coat(p)),
-    warp: (p, a, t) => { const k = sstep(0.95, 0.56, p[1]); return [p[0] * (1 + k * 0.07 * Math.sin(3 * a + 0.4)), p[1] + k * (0.022 * Math.sin(4 * a + 1.3) + 0.014 * Math.sin(7 * a)), p[2] * (1 + k * 0.07 * Math.sin(3 * a + 0.4))]; },
+    warp: (p, a, t) => { const k = sstep(0.95, 0.56, p[1]); return [p[0] * (1 + k * 0.09 * Math.sin(3 * a + 0.4)), p[1] + k * (0.032 * Math.sin(4 * a + 1.3) + 0.018 * Math.sin(7 * a)), p[2] * (1 + k * 0.09 * Math.sin(3 * a + 0.4))]; },
   });
   // 5 the scarf's tail, over the pack
   B.part = 5;
-  B.path([[-0.055, 1.45, 0.10], [-0.07, 1.435, 0.20], [-0.08, 1.36, 0.305], [-0.09, 1.20, 0.318], [-0.085, 1.05, 0.312], [-0.095, 0.96, 0.305]], (i) => [[0.030, 0.016], [0.042, 0.014], [0.048, 0.012], [0.052, 0.011], [0.056, 0.011], [0.040, 0.010]][i], { seg: 8, col: RED, lump: 0.004, ref: X, dry: 0.3 });
+  B.path([[-0.05, 1.45, 0.10], [-0.06, 1.445, 0.22], [-0.07, 1.38, 0.325], [-0.085, 1.22, 0.338], [-0.075, 1.06, 0.334], [-0.09, 0.95, 0.326]], (i) => [[0.030, 0.018], [0.046, 0.016], [0.054, 0.015], [0.060, 0.014], [0.064, 0.014], [0.046, 0.012]][i], { seg: 8, col: RED, lump: 0.004, ref: X, dry: 0.3 });
   // 6..9 legs: thigh, shin and boot
   for (const s of [-1, 1]) {
     B.part = s < 0 ? 6 : 7;
@@ -270,7 +270,8 @@ export function createExplorer() {
       let th = A * Math.sin(phi) * grounded, kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(sw, 0.8)) * w.walk * grounded;
       th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45;
       kn += w.jet * (-0.42 - 0.1 * side) + w.fall * (side < 0 ? -0.55 : -0.85) - sit * 1.45;
-      thigh.rotation.x = th; shin.rotation.x = kn;
+      const ease = (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25);          // at rest the weight is on one leg
+      thigh.rotation.x = th + 0.09 * ease; shin.rotation.x = kn - 0.17 * ease;
       thigh.rotation.z = side * (0.02 + 0.10 * w.fall + 0.04 * w.jet);
     };
     leg(b.thighL, b.shinL, ph, -1); leg(b.thighR, b.shinR, ph + Math.PI, 1);
@@ -279,7 +280,7 @@ export function createExplorer() {
     b.torso.position.y = b.torso.userData.rest.y + (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded + breathe * 0.003 - sit * 0.40;
     b.torso.rotation.x = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit;
     b.torso.rotation.y = 0.07 * Math.sin(ph) * w.walk * grounded;
-    b.torso.rotation.z = Math.sin(t * 0.47) * 0.012 * (1 - w.walk) + 0.03 * Math.sin(ph) * w.walk * w.wade;
+    b.torso.rotation.z = (0.022 + Math.sin(t * 0.47) * 0.012) * (1 - w.walk) * grounded + 0.03 * Math.sin(ph) * w.walk * w.wade;
     const pitch = Math.max(-0.7, Math.min(0.7, s.lookPitch || 0));
     b.head.rotation.x = pitch * 0.55 - b.torso.rotation.x * 0.7 - 0.18 * w.fall;
     b.head.rotation.y = -b.torso.rotation.y * 0.8 + Math.sin(t * 0.31) * 0.10 * (1 - w.walk) * (1 - air);
@@ -373,15 +374,15 @@ export function createShip() {
 
   // 1 the canopy: glass bubble on two hoops and a spine, hinged at the back
   B.part = 1;
-  const CAN = { c: [0, 1.44, -1.25], rx: 0.74, ry: 0.86, rz: 1.25 };
+  const CAN = { c: [0, 1.44, -1.25], rx: 0.70, ry: 0.80, rz: 1.18 };
   {
     const rings = [];
     for (let i = 0; i < 10; i++) { const th = Math.PI * (0.07 + 0.86 * (i / 9)), sn = Math.sin(th); rings.push({ c: [0, CAN.c[1], CAN.c[2] - CAN.rz * Math.cos(th)], u: X, v: Y, ru: CAN.rx * sn, rv: CAN.ry * sn, e: 2.1 }); }
     B.loft(rings, { seg: 20, lump: 0.010, freq: 1.8, wet: 0.45, dry: 0.0, cap: 0.2,
-      col: (p, t, a) => { const up = sstep(1.5, 2.3, p[1]); const glint = sstep(0.55, 0.9, Math.cos(a - 2.2)) * sstep(0.25, 0.45, t) * sstep(0.75, 0.5, t); return mixc(mixc(GLASS, hex('#dbe7ea'), up * 0.7), [1, 1, 1], glint * 0.9); } });
+      col: (p, t, a) => { const up = sstep(1.45, 2.2, p[1]); const glint = sstep(0.55, 0.9, Math.cos(a - 2.2)) * sstep(0.25, 0.45, t) * sstep(0.75, 0.5, t); return mixc(mixc(GLASS, hex('#d9e6e9'), up), [1, 1, 1], glint); } });
     const hoop = (z, r) => { const k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)), pts = []; for (let i = 0; i <= 12; i++) { const a = Math.PI * (i / 12); pts.push([Math.cos(a) * (CAN.rx * k + 0.012), CAN.c[1] - 0.06 + Math.sin(a) * (CAN.ry * k + 0.072), z]); } B.path(pts, r, { seg: 7, col: SEPIA, lump: 0.006, ref: Z, dry: 0.3 }); };
-    hoop(-2.05, 0.030); hoop(-0.62, 0.030);
-    const sp = []; for (let i = 0; i <= 8; i++) { const z = -2.05 + (1.43 * i) / 8, k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)); sp.push([0, CAN.c[1] + CAN.ry * k + 0.012, z]); }
+    hoop(-1.95, 0.030); hoop(-1.25, 0.026); hoop(-0.55, 0.030);
+    const sp = []; for (let i = 0; i <= 8; i++) { const z = -1.95 + (1.40 * i) / 8, k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)); sp.push([0, CAN.c[1] + CAN.ry * k + 0.012, z]); }
     B.path(sp, 0.024, { seg: 6, col: SEPIA, lump: 0.005, ref: X, dry: 0.3 });
   }
   // 2, 3, 4 the legs: strut, brace and a round pad each

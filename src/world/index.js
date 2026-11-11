@@ -14,7 +14,7 @@ import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
-import { makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { G, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms } from '../render/materials.js';
 
@@ -320,7 +320,55 @@ export function createWorld(scene) {
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0);
       lighting.bodyId = null; lighting.space01 = 1;
     }
+    castShade(active);
     lastActive = active ? active.id : null;
+  }
+
+  // The explorer and the ship stand on the land: each lays a soft shade on the ground, thrown
+  // away from the sun (a pool right under them when the sky is closed), fading as they rise.
+  // They are found in the scene by userData.pcCaster (src/art/models.js); nothing to wire.
+  const _cp = new THREE.Vector3(), _cu = new THREE.Vector3(), _ct = new THREE.Vector3(), _ca = new THREE.Vector3(), _cq = new THREE.Quaternion();
+  function castShade(active) {
+    const K = G.uCastK.value, U = G.uCast.value;
+    K.set(0, 0);
+    if (!active) return;
+    const sunL = active.bu.uSunDirL.value, ov = active.bu.uWx.value.x, day = active.bu.uDayness.value;
+    for (const o of scene.children) {
+      const kind = o.userData && o.userData.pcCaster;
+      if (!kind || !o.visible) continue;
+      const i = kind === 'ship' ? 1 : 0;
+      _cp.copy(o.position); active.root.worldToLocal(_cp);
+      const r = _cp.length();
+      if (!(r > 1)) continue;
+      _cu.copy(_cp).divideScalar(r);
+      const ground = sampleSurfacePure(active.id, _cu.x, _cu.y, _cu.z).radius, h = Math.max(0, r - ground);
+      if (h > 60) continue;
+      // where the sun throws the shade, and how far (nothing is thrown under a closed sky or at night)
+      const e = sunL.dot(_cu), thrown = (1 - ov) * THREE.MathUtils.smoothstep(e, 0.03, 0.2) * day;
+      _ct.copy(sunL).addScaledVector(_cu, -e).multiplyScalar(-1);
+      if (_ct.lengthSq() < 1e-6) _ct.set(1, 0, 0).addScaledVector(_cu, -_cu.x);
+      _ct.normalize();
+      const cot = Math.min(2.2, Math.sqrt(Math.max(0, 1 - e * e)) / Math.max(0.12, e));
+      if (i === 0) {
+        const len = 1.7 * cot * thrown;
+        U[0].set(0, 0, 0, 0.34 + len * 0.5 + h * 0.05);
+        _ca.copy(_cu).multiplyScalar(ground).addScaledVector(_ct, len * 0.5 + h * cot * thrown);
+        U[0].x = _ca.x; U[0].y = _ca.y; U[0].z = _ca.z;
+        U[1].set(_ct.x, _ct.y, _ct.z, 0.33 + h * 0.05);
+        K.x = (0.62 + 0.3 * thrown) * (1 - THREE.MathUtils.smoothstep(h, 0.5, 9));
+      } else {
+        // the ship: a broad oval along its keel
+        active.root.getWorldQuaternion(_cq).invert();
+        _ca.set(0, 0, -1).applyQuaternion(o.quaternion).applyQuaternion(_cq);
+        _ca.addScaledVector(_cu, -_ca.dot(_cu));
+        if (_ca.lengthSq() < 1e-6) _ca.copy(_ct);
+        _ca.normalize();
+        U[3].set(_ca.x, _ca.y, _ca.z, 2.5 + h * 0.08);
+        _ca.copy(_cu).multiplyScalar(ground).addScaledVector(_ct, (1.2 + h) * cot * thrown);
+        U[2].set(_ca.x, _ca.y, _ca.z, 4.7 + h * 0.08);
+        K.y = (0.75 + 0.25 * thrown) * (1 - THREE.MathUtils.smoothstep(h, 3, 40));
+      }
+    }
   }
 
   function busy() {

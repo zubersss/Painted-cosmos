@@ -29,7 +29,7 @@ function baseUniforms(bodyU, own) {
   ensureGlobals();
   const b = bodyU || defaultBodyUniforms();
   return Object.assign({
-    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex,
+    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
     uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
@@ -175,6 +175,7 @@ void main() {
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
   float sunny = pcDapple(vBody, vPar.z * mix(0.82, 1.0, mid));
+  if (near > 0.0) sunny = min(sunny, 1.0 - pcCast(vBody, (ma.g - 0.5) * 0.34 + (n2.b - 0.5) * 0.16));
   x = mix(min(x, 0.44) - (1.0 - smoothstep(0.30, 0.50, n1.g)) * 0.22 * vPar.z, x, sunny);
   x += (n1.g - 0.5) * 0.10 + (mix(fa.b, fb.b, lf) - 0.5) * 0.06 * near;
   float lvl = pcLevel(x, 0.045);
@@ -937,6 +938,9 @@ void main() {
   // the wash: its pigment load drifts, and pools just inside the edge of the form
   float rim = 1.0 - clamp(dot(nV, normalize(-vView)), 0.0, 1.0);
   float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.35 + uFig.y * smoothstep(0.35, 0.95, rim + (n2.b - 0.5) * 0.25);
+  // a few long soft strokes down the form: folds in cloth, runs of weather on a hull
+  float fold = texture(uNoise3D, vObj * vec3(2.6, 0.22, 2.6) * uFig.x + 0.17).b;
+  d += (smoothstep(0.42, 0.62, fold) - 0.45) * 0.55 * (1.0 - vMat.z);
   vec3 c = pcWetWash(pcDensity(vCol, d), 0.7);
   // light in soft steps that run into each other inside the form; the shadow side is a glaze
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
@@ -945,8 +949,8 @@ void main() {
   vec3 lit = pcTone(c, lvl);
   // dry brush: the loaded brush skips on the lit side and paper sparkles through
   vec4 st = pcTri(vObj * uFig.z, normalize(vNO), 0.5);
-  float dryM = smoothstep(0.50, 0.66, st.r * 0.8 + st.b * 0.3);
-  lit = mix(lit, vec3(1.0), dryM * vMat.x * (0.10 + 0.14 * lvl));
+  float dryM = smoothstep(0.56, 0.70, st.r * 0.8 + st.b * 0.3) * smoothstep(0.45, 0.60, n2.r);
+  lit = mix(lit, vec3(1.0), dryM * vMat.x * 0.16 * clamp(lvl - 1.0, 0.0, 1.5));
   c = mix(lit, vCol, vMat.z);
   float f = pcFogAmount(length(vView));
   c = pcAtmos(c, f);
