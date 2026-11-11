@@ -363,3 +363,29 @@ test('lift-off on the gear: the legs unload, the wash comes on, the feet leave, 
     assert.ok(gMax < g / 9.81 + 0.6, `${bodyId}: a gentle hand-over, ${gMax.toFixed(2)} g felt`);
   }
 });
+
+test('P12 the last metre: a commanded 0.6 m/s descent does not hang on the ground cushion', () => {
+  // Before: the extra lift of the thrusters near the ground (a third more at 1 m) balanced the flight
+  // computer's whole velocity error: 0.05 m/s at 1.1 m, 2.1 s for the 0.6 m above the gear. Now the
+  // computer allows for the cushion; what is left is the engine's lag behind it, a real, small slowing.
+  const descend = (rho, g, tau, T2) => {
+    const sim = flight({ rho, g, alt: 6 }); const dt = 1 / 60; let tIn = 0, slow = 9, n = 0, wash16 = 0;
+    for (; n < 60 * 30; n++) {
+      const alt = sim.st.p.y - R; if (alt <= 1.0) break;
+      sim.env.altGround = alt; sim.env.time += dt;
+      stepShipBody(sim.st, { target: V(0, -Math.min(1.5, Math.max(0.6, (alt - 1.0) * 0.9)), 0), tau, hover: true }, dt, sim.env, T2);
+      if (alt >= 1.6) { tIn = n; wash16 = sim.st.phys.downwash.speed; } else slow = Math.min(slow, -sim.st.v.y);
+    }
+    return { time: (n - tIn) * dt, slow, wash16, wash10: sim.st.phys.downwash.speed, ge: sim.st.phys.groundEffect };
+  };
+  const earth = descend(1.225, 9.81, 0.5);
+  assert.ok(earth.time < 1.0 && earth.slow > 0.4 && earth.slow < 0.6, `Earth: 1.6 to 1.0 m in ${earth.time} s, slowest ${earth.slow} m/s`);
+  assert.ok(earth.ge > 1.3 && earth.wash10 < earth.wash16 * 0.97, `the cushion is still there: less thrust for the same lift (wash ${earth.wash16} -> ${earth.wash10})`);
+  const old = descend(1.225, 9.81, 0.5, { ...T, groundComp: 0 });
+  assert.ok(old.time > 1.8 && old.slow < 0.1, `without the compensation it hangs: ${old.time} s, ${old.slow} m/s`);
+  for (const [rho, g, tau] of [[1.225, 9.81, 1.0], [0.02, 3.71, 0.5], [65, 8.87, 0.5]]) {
+    const r = descend(rho, g, tau); assert.ok(r.time < 1.0 && r.slow > 0.4, `rho ${rho} tau ${tau}: ${r.time} s, slowest ${r.slow}`);
+  }
+  // no air, no cushion: in a vacuum a thruster is a rocket
+  const moon = descend(0, 1.62, 0.5); assert.equal(moon.ge, 1);
+});

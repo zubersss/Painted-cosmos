@@ -39,6 +39,8 @@ export const SHIP_BODY = Object.freeze({
   liftSpool: 0.35,         // s
   thrusterArea: 6,         // m^2: total exit area of the ventral thrusters (the other 30 % of hover)
   thrusterRadius: 2.2,     // m: radius of the thruster footprint, for ground effect
+  groundAir: 0.01,         // kg/m^3: air density at which the ground cushion is half what it is in thick air
+  groundComp: 1,           // 0..1: how much of the cushion the flight computer allows for (P12; 0 = the old hang)
   // buffeting
   gustArea: 60,            // m^2: lift-curve slope x planform area, for the response to gusts
   buffetRate: 1.3,         // Hz: main frequency of the chop
@@ -193,6 +195,11 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   const tg = cmd.target;
   let ax = 0, ay = 0, az = 0;
   const carried = g * B.lift01;
+  // thrust gain of the ventral thrusters near the ground. It is a cushion of AIR (the ground blocks the
+  // induced flow): in a vacuum a thruster is a rocket and gains nothing, so it fades with the density
+  // (half at 0.01 kg/m^3: Mars 0.67 of the full gain, Earth 0.99, the Moon none).
+  const h = env.altGround;
+  const ge = h != null && h < T.thrusterRadius * 6 && rho > 0 ? 1 + (groundEffect(Math.max(h, 0.3), T) - 1) * rho / (rho + T.groundAir) : 1;
   if (tg) {
     ax = (tg.x - vx) / tau; ay = (tg.y - vy) / tau; az = (tg.z - vz) / tau;
     // feed-forward: cancel the drag it can feel, and (while hovering) whatever weight the lift
@@ -200,6 +207,17 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
     const dF = kf * Math.abs(rf) * rf, dS = ks * Math.abs(rs) * rs, dU = kv * Math.abs(ru) * ru;
     ax += _f[0] * dF + _r[0] * dS + _u[0] * dU; ay += _f[1] * dF + _r[1] * dS + _u[1] * dU; az += _f[2] * dF + _r[2] * dS + _u[2] * dU;
     if (hover) { const rest = g - carried; ax += ux * rest; ay += uy * rest; az += uz * rest; }
+    // (P12) and the cushion: near the ground the ventral thrusters give `ge` times their thrust, and a
+    // computer that asks them for the open-air figure gets more lift than it wanted. Left alone, a
+    // commanded 0.6 m/s descent hung at 0.05 m/s between 1.3 and 1.0 m (the extra lift balanced the
+    // whole velocity error: 2.1 s for the last 0.6 m above the gear). It knows its height and its
+    // thrusters, so it asks for less: the thrust that, multiplied by ge, is what it wanted. The cushion
+    // is still there, in the thrust and the downwash (both fall as the ground comes up), and in the
+    // engine's lag behind it. T.groundComp 0 switches the compensation off.
+    if (ge > 1 && T.groundComp !== 0) {
+      const cv = carried * (1 - T.antigravShare), aUp = ax * ux + ay * uy + az * uz;
+      if (cv + aUp > 0) { const d = (cv + aUp) * (1 / ge - 1) * (T.groundComp == null ? 1 : T.groundComp); ax += ux * d; ay += uy * d; az += uz * d; }
+    }
   }
   // in body axes, limited by what each set of engines can give
   let cf = ax * _f[0] + ay * _f[1] + az * _f[2], cs = ax * _r[0] + ay * _r[1] + az * _r[2], cu = ax * _u[0] + ay * _u[1] + az * _u[2];
@@ -216,8 +234,6 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   // ---- ventral thrusters, downwash, ground effect ----------------------------------------------
   const thrUp = B.thrust.x * ux + B.thrust.y * uy + B.thrust.z * uz;
   const ventral = Math.max(0, carried * (1 - T.antigravShare) + thrUp) * T.mass;      // N
-  const h = env.altGround;
-  const ge = h != null && h < T.thrusterRadius * 6 ? groundEffect(Math.max(h, 0.3), T) : 1;
   B.groundEffect = ge;
   B.downwash.thrust = ventral;
   B.downwash.speed = downwashSpeed(ventral, rho, T);
@@ -439,12 +455,15 @@ export function stepShipGear(st, cmd, dt, env, T = SHIP_BODY) {
   // The ventral thrusters are lit whenever the lift is: their wash blows dust and grass about
   // before the feet leave the ground and until the lift is shut down after landing.
   {
-    const ventral = lift01 * g * m * (1 - T.antigravShare);
+    const lifted = lift01 * g * m * (1 - T.antigravShare);
     let rho = 0;
-    if (env.air && ventral > 0) rho = env.air(st.p, _air, 0).density;
+    if (env.air && lifted > 0) rho = env.air(st.p, _air, 0).density;
+    // (P12) on the gear the thrusters are deep in the cushion: the same lift for less thrust, as in the
+    // last metre of the flight model (so the wash does not step up 6 % when the gear takes the hull)
+    const ge = rho > 0 ? 1 + (groundEffect(0.5, T) - 1) * rho / (rho + T.groundAir) : 1, ventral = lifted / ge;
     B.downwash.thrust = ventral; B.downwash.speed = downwashSpeed(ventral, rho, T);
     B.downwash.q = ventral / (2 * T.thrusterArea); B.downwash.radius = T.thrusterRadius;
-    B.groundEffect = groundEffect(0.5, T);
+    B.groundEffect = ge;
     B.thrust.x = B.thrust.y = B.thrust.z = 0; B.brake01 = 0; B.fieldBrake = 0;
     B.airspeed = Math.hypot(vx, vy, vz); B.q = 0; B.gLoad = contacts ? g / 9.81 : g * lift01 / 9.81; B.heat01 = 0;
   }
