@@ -13,7 +13,7 @@
 // takes one game minute. Rates below are quoted in real units and converted with that factor.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, SPECIES, terminalVelocity, meanFreePath, airDensity, airTemperature } from './atmosphere.js';
-import { prevailing, WINDS } from './wind.js';
+import { prevailing, windLarge, WINDS } from './wind.js';
 import { hash3, hashString, clamp, clamp01, mix, smoothstep, TAU } from './util.js';
 
 export const WEATHER = Object.freeze({
@@ -22,13 +22,17 @@ export const WEATHER = Object.freeze({
   wetDepth: 3.0,           // mm of rain that wets the ground through (a heavy shower: about 20 game seconds)
   snowRatio: 10,           // m of fresh snow per m of water (100 kg/m^3)
   meltRate: 4.0,           // mm of water per kelvin above freezing per real day (degree-day factor)
-  snowLife: 30 * 3600,     // real s before fresh snow settles into the base layer
+  snowLife: 8 * 3600,      // real s before fresh snow settles (crusts, is trodden, blows off): 8 game minutes (30 h before P7)
   slot: 9,                 // s: lightning scheduling slot
   frontReach: 1.3,         // gust front runs this many cell radii ahead of the core
   coldShare: 0.35,         // water a system gives as snow, as a fraction of what it would rain
   passTime: 40,            // s: no system is smaller than the distance it drifts in this time
   edgeTime: 30,            // s: how long the edge of a drifting system takes to pass
   clearVisibility: 20000,  // m: visual range of clean air (Koschmieder, real scale)
+  // (P7) a gale's own sky: from galeFrom to galeFull m/s of large-scale wind (Beaufort 8 to 12) scud covers up to
+  // galeCloud of the sky, and over an open sea spray takes the view (sprayExt: extinction in units of clear air:
+  // 12 = a visual range of 1.5 km in a hurricane-force wind over a breaking sea)
+  galeFrom: 18, galeFull: 34, galeCloud: 0.9, sprayExt: 12,
 });
 
 // Cell kinds. rate: peak precipitation (mm/h water equivalent). cloud: cloud cover. wind: mean
@@ -288,12 +292,20 @@ function precipAt(bodyId, ux, uy, uz, t, seed, moist, T, o) {
   const a = gather(bodyId, ux, uy, uz, t, seed);
   const regime = REGIMES[bodyId];
   o.rate = a.rate * moist;
-  o.frozen = regime && regime.melt < 1e8 ? 1 - smoothstep(regime.melt - 1.0, regime.melt + 1.5, T) : 1;
+  // (snow falls up to two or three kelvin above melting; the band is 4 K wide since P7, it was 2.5: as the day
+  // warms through it the fresh snow goes inside the 8 % a second a sky number may move, R-WX-1)
+  o.frozen = regime && regime.melt < 1e8 ? 1 - smoothstep(regime.melt - 1.5, regime.melt + 2.5, T) : 1;
   return o;
 }
 
 // Lags (game seconds into the past) for the wetness and snow integrals, geometric spacing.
-const LAGS = [0, 12, 20, 33, 54, 88, 144, 236, 386, 632, 1035, 1700, 2800];
+// (P7: 21 slices, none wider than 100 s within the last 9 game minutes, where there were 12 reaching back 47
+// minutes. A spell of rain or snow at one place lasts 100 to 200 game seconds; a slice 665 s wide counted one
+// that its midpoint fell in six times over and missed the others, so fresh snow came and went with nothing
+// falling (cover from 0.5 to 0.99 and back under a clear sky, 0.55 to nothing in three minutes as a spell left
+// the last slice). With that, fresh snow is fresh for 8 real hours (snowLife; it was 30), so what is older than
+// the fine slices weighs little. Still a quadrature: see sky.test.mjs for how steady it is.)
+const LAGS = [0, 10, 20, 32, 46, 64, 86, 114, 150, 196, 250, 310, 380, 460, 550, 650, 770, 910, 1080, 1290, 1550, 1870];
 const _p = { rate: 0, frozen: 0 };
 
 // Ground moisture at a place and time: o.wetness01, o.snowDepth (m, fresh + base), o.freshSnow.
@@ -304,9 +316,13 @@ export function moistureAt(bodyId, ux, uy, uz, t, seed, env, o = {}) {
   const T = env.T != null ? env.T : 288;
   o.wetness01 = 0; o.freshSnow = 0;
   const melt = regime ? regime.melt : 1e9;
-  // permanent snow: where the daily mean stays below freezing, the pack never goes (up to 0.4 m)
-  const Tm = env.Tmean != null ? env.Tmean : T;
-  const base = (env.snowBase || 0) + (regime && regime.cells && melt < 1e8 ? 0.4 * Math.min(1, moist) * clamp01((melt - 2 - Tm) / 10) : 0);
+  // Standing snow: the biome's own (ground.js `snowBase`), which is what PAINTER has painted into
+  // its ground. (Until P7 a pack of up to 0.4 m was added wherever the daily mean stays below
+  // freezing: the green alpine meadow of the brief stood under 40 cm of snow in fair weather.
+  // The coordinator's ruling: standing snow belongs to the painted terrain; what the weather adds
+  // is FRESH snow, from recent snowfall, and that is what a painter lays over the ground.)
+  const base = env.snowBase || 0;
+  o.standing = base;
   if (!regime || !regime.cells) { o.snowDepth = base; return o; }
   const ts = WEATHER.timeScale;
   // drying: faster when warm, windy and sunny (evaporation ~ (1 + 0.25 U) and vapour deficit)
@@ -326,14 +342,16 @@ export function moistureAt(bodyId, ux, uy, uz, t, seed, env, o = {}) {
     snow += Math.max(0, depth * Math.exp(-lag / settleTau) - meltPerS * lag * 0.5);
   }
   // melting snow keeps the ground wet
-  if (meltPerS > 0 && snow + base > 0.005) water += WEATHER.wetDepth * 0.8;
+  // (it comes in over the first 1.5 K above melting and the first centimetre of snow: until P7 it was a
+  // step, and the wetness jumped by 55 % in a second where the afternoon crossed the melting point)
+  if (meltPerS > 0) water += WEATHER.wetDepth * 0.8 * clamp01((T - melt) / 1.5) * clamp01((snow + base - 0.002) / 0.01);
   o.wetness01 = 1 - Math.exp(-water / WEATHER.wetDepth);
   o.freshSnow = snow;
   o.snowDepth = base + snow;
   return o;
 }
 
-const _a2 = new Float64Array(5);
+const _a2 = new Float64Array(5), _wl = new Float64Array(4);
 
 // The weather at a place and time.
 //   up: unit direction {x,y,z}.  altitude: m above the base radius.
@@ -357,7 +375,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
 
   let rate = a.rate * moist * below;
   const melt = regime && regime.melt != null ? regime.melt : 1e9;
-  const frozen = melt < 1e8 ? 1 - smoothstep(melt - 1.0, melt + 1.5, T) : (melt > 0 ? 1 : 0);
+  const frozen = melt < 1e8 ? 1 - smoothstep(melt - 1.5, melt + 2.5, T) : (melt > 0 ? 1 : 0);
   // What falls, in three continuous shares (so that nothing steps where two systems overlap or
   // the air crosses freezing): frost, solid (snow and ice crystals) and liquid.
   let rFrost = regime && regime.liquid === 'frost' ? rate : a.rateFrost * moist * below;
@@ -414,7 +432,17 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // (only where the air is near the condensation point of something: not on Venus or Mars)
   const mistOK = regime && regime.cells && atm.rho0 > 0.3 && melt > 1 && melt < 1e8 && T < melt + 40;
   const mist = mistOK ? Math.max(fogBiome * calm * (0.3 + 0.7 * dawn), 0.5 * smoothstep(0.92, 1, fogBiome)) : 0;
-  const fogExt = (a.fog * (0.4 + 0.6 * fogBiome) + mist * mist * WEATHER.clearVisibility / 150) * below;
+  // ---- a gale has a sky of its own (P7) -----------------------------------------------------------
+  // The large-scale wind here (no gusts: it changes over minutes), with what the weather cells make
+  // of it. From a strong gale to hurricane force (Beaufort 8 to 12) scud closes the sky, and over an
+  // open sea the air fills with spray torn from the crests ("visibility seriously affected"): until
+  // P7 Neptune's 34 m/s blew over a white sea under a fair sky.
+  windLarge(bodyId, ux, uy, uz, t, seed, _wl);
+  const galeU = _wl[3] * a.windMul * (1 - a.calm);
+  const gale01 = rho > 0.05 ? smoothstep(WEATHER.galeFrom, WEATHER.galeFull, galeU) : 0;
+  const open = env && env.fetch > 0 ? smoothstep(600, 2000, env.fetch) : 0;
+  const sprayExt = WEATHER.sprayExt * gale01 * open;
+  const fogExt = (a.fog * (0.4 + 0.6 * fogBiome) + mist * mist * WEATHER.clearVisibility / 150 + sprayExt) * below;
   // ---- dust: storms, plus wind over a dust source above the saltation threshold ---------------
   const dustSrc = env && env.dustSource != null ? env.dustSource : 0;
   const lift = rho > 0 ? smoothstep(1.0, 2.2, wind / saltationThreshold(bodyId, rho)) : 0;
@@ -446,7 +474,11 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   o.haze01 = 1 - 1 / Math.sqrt(1 + a.haze * below);
   // how much dust is in the air (its mass loading, saturating), for particle counts
   o.dustLoad01 = clamp01(1 - Math.exp(-dustExt / 60));
-  o.cloud01 = clamp01(a.cloud + 0.25 * o.fog01) * below;        // 0 once you are above the deck
+  // (P7) what falls, falls from cloud: rain or snow means a closed sky (a blizzard stood under a sky
+  // 0.46 covered); and a gale drives scud across it
+  const closed = 1 - (1 - clamp01(pr.intensity01 || 0)) * (1 - clamp01(pr.intensity01 || 0));   // (no steeper than twice what is falling: R-WX-1)
+  o.cloud01 = clamp01(Math.max(a.cloud + 0.25 * o.fog01, 0.97 * closed, WEATHER.galeCloud * gale01 * (0.5 + 0.5 * Math.min(1, moist)))) * below;        // 0 once you are above the deck
+  o.gale01 = gale01 * below;
   o.cloudBelow01 = clamp01(a.cloud) * (1 - below);              // cloud you are looking down on
   o.temperature = T;
   o.storm01 = a.storm;

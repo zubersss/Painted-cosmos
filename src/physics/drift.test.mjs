@@ -106,7 +106,8 @@ test('a landed hull is an obstacle: a drift grows behind it; a flying one casts 
 });
 
 function snowy(opts) {
-  const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'alpine_meadow', ...opts });
+  // (a biome with standing snow of its own: since P7 a cold meadow has only what fell lately)
+  const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'stub-polar', ...opts });
   const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
   for (let t = 0; t < 12000; t += 53) for (const c of cellsAt('earth', t)) {
     const w = weatherAt('earth', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {});

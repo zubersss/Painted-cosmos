@@ -156,14 +156,23 @@ test('wetness builds up under rain and dries afterwards; faster in sun and wind'
   for (let t = hit.t - 500; t < hit.t + 3000; t += 50) { const w = m(t).wetness01; assert.ok(w >= 0 && w <= 1); }
 });
 
-test('snow piles up in the cold, melts in the warm, and stays where the mean is below freezing', () => {
+test('snow piles up in the cold, melts in the warm; standing snow is the biome\'s own and nothing else', () => {
   const hit = find('earth', (w) => w.precipitation.rate > 4);
   const cold = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t + 200, DEFAULT_SEED, { moist: 1, T: 265, Tmean: 271, wind: 3 }, {});
   const warm = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t + 200, DEFAULT_SEED, { moist: 1, T: 290, Tmean: 288, wind: 3 }, {});
   assert.ok(cold.freshSnow > 0.01, 'fresh snow: ' + cold.freshSnow);
   assert.equal(warm.freshSnow, 0);
+  // (P7, the ruling on snow) a cold place with no standing snow of its own (the green alpine meadow) has only
+  // what has fallen lately; a biome painted under snow keeps its own, in fair weather too
   const alpine = moistureAt('earth', 0.2, 0.9, 0.38, 100, DEFAULT_SEED, { moist: 1, T: 255, Tmean: 255, wind: 3 }, {});
-  assert.ok(alpine.snowDepth >= 0.39, 'permanent snow where it never thaws: ' + alpine.snowDepth);
+  assert.ok(Math.abs(alpine.snowDepth - alpine.freshSnow) < 1e-12 && alpine.standing === 0 && alpine.snowDepth < 0.01, 'no pack of its own: ' + alpine.snowDepth);
+  const tundra = moistureAt('earth', 0.2, 0.9, 0.38, 100, DEFAULT_SEED, { moist: 1, T: 255, Tmean: 255, wind: 3, snowBase: 0.1 }, {});
+  assert.ok(Math.abs(tundra.snowDepth - 0.1 - tundra.freshSnow) < 1e-12 && tundra.standing === 0.1);
+  // and the wetness of melting snow comes in steadily as the afternoon crosses the melting point (it was a step of 55 %)
+  let prevW = null, worst = 0;
+  // (on standing snow, where nothing has fallen lately: the melt water alone)
+  for (let T = 271; T <= 276; T += 0.02) { const m = moistureAt('earth', 0.2, 0.9, 0.38, 100, DEFAULT_SEED, { moist: 1, T, wind: 3, snowBase: 0.05 }, {}); if (prevW != null) worst = Math.max(worst, Math.abs(m.wetness01 - prevW)); prevW = m.wetness01; }
+  assert.ok(worst < 0.012 && prevW > 0.5, `wetness across the melting point: ${worst} for 0.02 K, ${prevW} well above it`);
   const frozenWet = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t + 200, DEFAULT_SEED, { moist: 1, T: 265, wind: 3 }, {});
   assert.ok(frozenWet.wetness01 < 0.05, 'snow does not wet the ground until it melts');
 });

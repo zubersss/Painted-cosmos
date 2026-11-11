@@ -10,7 +10,7 @@
 //   physics.fields.flora / physics.fields.deform / physics.particles.rain ... / physics.glsl.flora
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
-import { WINDS, WIND, setWindScale } from './wind.js';
+import { WINDS, WIND, setWindScale, windLarge } from './wind.js';
 import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
 import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
@@ -71,7 +71,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   let time = 0;
   let sunDir = null;
   let lastMoist = -1e9, moistX = 1e9, moistZ = 1e9;
+  let fresh = 0, freshT = -1e9, freshBody = null; const freshP = { x: 0, y: 0, z: 0 };   // fresh snow at the focus, integrated as it falls
   const focus = { x: 0, y: 1, z: 0 };
+  const _wl4 = new Float64Array(4);
   const moist = { wetness01: 0, snowDepth: 0, freshSnow: 0 };
   const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0, fetch: 80, liquidDensity: 0 };
   const here = {
@@ -195,16 +197,37 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     features.devils = devils;
     airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils);
     _wenv.moist = cover.moist; _wenv.fog = cover.fog; _wenv.snowBase = cover.snowBase; _wenv.dT = cover.dT; _wenv.dustSource = cover.dustSource;
-    _wenv.sun01 = sun01; _wenv.wind = Math.hypot(airGrid.cwe, airGrid.cwn);
+    // (the weather answers the large-scale wind here, not the gusty wind at the focus: fog does not come and go
+    // with a three-second gust, and physics.weather() anywhere, any time, then says what physics.here says: P7)
+    _wenv.sun01 = sun01; _wenv.wind = windLarge(bodyId, ux, uy, uz, time, seed, _wl4)[3]; _wenv.fetch = cover.fetch || 0;
     weatherAt(bodyId, ux, uy, uz, r - body.radius, time, seed, _wenv, here.weather);
     if (time - lastMoist > QUALITY.moistureEvery || time < lastMoist || Math.hypot(fx - moistX, fz - moistZ) > 15) {
       lastMoist = time; moistX = fx; moistZ = fz;
       _menv.moist = cover.moist; _menv.snowBase = cover.snowBase; _menv.T = here.weather.temperature;
       _menv.Tmean = airTemperature(bodyId, r - body.radius, uy, null) + cover.dT;
-      _menv.wind = _wenv.wind; _menv.sun01 = sun01;
+      _menv.wind = windLarge(bodyId, ux, uy, uz, time, seed, _wl4)[3]; _menv.sun01 = sun01;   // (the large-scale wind: what physics.weather() uses anywhere, so the two agree)
       moistureAt(bodyId, ux, uy, uz, time, seed, _menv, moist);
     }
-    here.weather.wetness01 = moist.wetness01; here.weather.snowDepth = moist.snowDepth;
+    // Fresh snow at the focus is integrated as it falls (P7): dF/dt = what is falling - F / (the time fresh
+    // snow stays fresh) - melt. The stateless estimate (moistureAt: a quadrature over the past) counts a
+    // snow shower shorter than its slices too often or not at all, so by itself it rises under a clear sky;
+    // here it only starts the integration (on arrival, after a jump in place or time) and from then on
+    // the cover grows only while snow falls and goes steadily after. physics.here is the authority at
+    // the focus; physics.weather(p, { time }) elsewhere is the estimate.
+    {
+      const ts = WEATHER.timeScale, pr = here.weather.precipitation, melt = REGIMES[bodyId] ? REGIMES[bodyId].melt : 1e9, T = here.weather.temperature;
+      const jumped = !(freshT <= time && time - freshT < 5) || freshBody !== bodyId || Math.hypot(fp.x - freshP.x, fp.y - freshP.y, fp.z - freshP.z) > 200;
+      if (jumped) fresh = moist.freshSnow;
+      else {
+        const hh = time - freshT;
+        const fall = pr && pr.rate > 0 ? pr.rate * (pr.frozen01 || 0) * (pr.reachesGround01 == null ? 1 : pr.reachesGround01) * ts / 3600 * WEATHER.snowRatio / 1000 : 0;   // m of fresh snow a game second
+        const meltPerS = T > melt ? WEATHER.meltRate * (T - melt) / 86400 * ts * WEATHER.snowRatio / 1000 : 0;
+        fresh = Math.max(0, (fresh + (fall - meltPerS) * hh) * Math.exp(-hh / (WEATHER.snowLife / ts)));
+      }
+      freshT = time; freshBody = bodyId; freshP.x = fp.x; freshP.y = fp.y; freshP.z = fp.z;
+      moist.freshSnow = fresh; moist.snowDepth = (moist.standing || 0) + fresh;
+    }
+    here.weather.wetness01 = moist.wetness01; here.weather.snowDepth = moist.snowDepth; here.weather.freshSnow = moist.freshSnow;
 
     // fields and particles
     const t3 = now();
@@ -335,15 +358,16 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     else if (opts && opts.surface) cv = coverAt(bodyId, opts.surface, _cov);
     const sun01 = sun01At(bodyId, ux, uy, uz);
     const env = {};
-    if (cv) { env.moist = cv.moist; env.fog = cv.fog; env.snowBase = cv.snowBase; env.dT = cv.dT; env.dustSource = cv.dustSource; }
+    if (cv) { env.moist = cv.moist; env.fog = cv.fog; env.snowBase = cv.snowBase; env.dT = cv.dT; env.dustSource = cv.dustSource; env.fetch = cv.fetch || 0; }
     env.sun01 = sun01;
-    env.wind = local ? Math.hypot(airGrid.cwe, airGrid.cwn) : (WINDS[bodyId] ? WINDS[bodyId].U : 0);
+    const wl = windLarge(bodyId, ux, uy, uz, t, seed, _wl4)[3];
+    env.wind = wl;
     weatherAt(bodyId, ux, uy, uz, r - body.radius, t, seed, env, o);
-    if (local && nearFocus(bodyId, ux, uy, uz, 40)) { o.wetness01 = moist.wetness01; o.snowDepth = moist.snowDepth; }
+    if (local && nearFocus(bodyId, ux, uy, uz, 40)) { o.wetness01 = moist.wetness01; o.snowDepth = moist.snowDepth; o.freshSnow = moist.freshSnow; }
     else {
-      env.T = o.temperature; env.Tmean = airTemperature(bodyId, r - body.radius, uy, null) + (cv ? cv.dT : 0);
+      env.T = o.temperature; env.Tmean = airTemperature(bodyId, r - body.radius, uy, null) + (cv ? cv.dT : 0); env.wind = wl;
       moistureAt(bodyId, ux, uy, uz, t, seed, env, _m2);
-      o.wetness01 = _m2.wetness01; o.snowDepth = _m2.snowDepth;
+      o.wetness01 = _m2.wetness01; o.snowDepth = _m2.snowDepth; o.freshSnow = _m2.freshSnow;
     }
     return o;
   }

@@ -174,11 +174,13 @@ physics.water(bodyId, p, out?) ->                         // the liquid surface 
 physics.features.devils // dust devils near the focus: array with .count; each { p (body-local foot), x, z (grid),
                         //   radius (m), height (m), speed (swirl, m/s), up (m/s), spin (+1/-1), strength 0..1, age, life, id }
 physics.here            // { bodyId, air, weather, cover, groundHeight, sky } at the focus, refreshed by update(): free to read
-physics.here.sky        // the weather as a painter needs it: eleven numbers 0..1, continuous (all but flash):
+physics.here.sky        // the weather as a painter needs it: twelve numbers 0..1 (P7: `fresh` added), continuous (all but flash):
                         //   cloud (cover), overcast (dim and cool the light), haze (MULTIPLY the clear-day fog
                         //   distance by it), fog and dust (what the lost view is lost to: grey water, or dust to
-                        //   tint), wet (ground darkening), snow (ground cover), rain (liquid falling), snowfall
-                        //   (frozen falling), storm (in a storm core), flash (lightning now)
+                        //   tint), wet (ground darkening), snow (ALL snow lying: standing and fresh), fresh (cover of
+                        //   FRESH snow alone: what recent snowfall laid; lay this over the painted ground), rain
+                        //   (liquid falling), snowfall (frozen falling), storm (a storm core, or a hurricane-force gale),
+                        //   flash (lightning now). Rain or snow falling means cloud over 0.85 and overcast over 0.5.
 physics.sky(weather?, out?)   // the same numbers for any physics.weather() result (default: at the focus)
 physics.focus           // {x,y,z} body-local: the focus of the last update (read-only)
 physics.particles.system.dripping   // 0..1: how hard the soaked canopy over the focus is dripping (after rain)
@@ -296,6 +298,27 @@ physics.particles.rain / .snow / .hail / .dust / .sand / .ash / .spores / .leave
   // In vacuum the same kinds fly as clean parabolas (no drag, no drift).
 physics.particles.events        // ring: { data Float32Array(256*8), head, total, origin }: x,y,z, kind (0 splash, 1 ripple, 2 settle, 3 bounce), strength, time, size, 0
 ```
+
+**Added in P7** (all additive; nothing renamed):
+```js
+physics.here.sky.fresh                    // 0..1: ground covered by FRESH snow (recent snowfall only); never more than .snow
+physics.weather(...).freshSnow            // m of fresh snow (snowDepth = the biome's standing snow + this); .gale01 (0..1: the
+                                          //   large-scale wind between 18 and 34 m/s: scud, spray over an open sea)
+physics.water(...).swell, .swellLength    // m: the swell on an open sea (0 on lakes); .significant is wind sea and swell together
+physics.fields.water.sample(p).line01     // the crest as a line (GLSL: pcPhysWaterCrestLine(w, along))
+physics.fields.water.field.swellHeight, .swellLength, .open (0 lake .. 1 open sea), .significant, .slope (rms)
+WATER.swellFetch, .swellDecay, .swellTime, .swellCalm, .swellOpen, .lineIn, .lineOut;  new WaterField({ swell: false })
+PARTICLES.events 512 (was 256), .ringRate, .ringRadius, .ringFar      // rings laid near the focus in rain
+FLORA.pushReach 0.7 (was 0.45), .wakeShare, .wakeSet, .wakeTime, .trampleTime   // the parted wake behind a walker
+WEATHER.galeFrom, .galeFull, .galeCloud, .sprayExt;  SKY.overcastGale, .stormGale
+// three/: DRAW fields parallel, maxLen, near (streaks); tumble, aspect, wall, wallFrom, wallFull, wallShare, wallHigh,
+//   wallNear, wallFade (dabs); makeEye().wall01 (the kit sets it from weather.dustLoad01). CPU expanders only.
+```
+**Changed behaviour in P7** (same names): standing snow is the biome's own `snowBase` and nothing else (the climate
+pack of up to 0.4 m wherever the daily mean is below freezing is gone: the alpine meadow is grass, not snow, to the
+feet as well); `physics.sky(physics.weather(p, { time }))` and `physics.here.sky` use the same large-scale wind for
+drying and agree within 1 % (they were up to 29 % apart in `wet`); the wetness of melting snow comes in over 1.5 K
+(it was a step of 55 %); snow falls up to 2.5 K above melting (was 1.5).
 
 **Added in P6** (all additive):
 ```js
@@ -933,6 +956,40 @@ lines there (`draw.rain = ...`, `draw.snow = ...`) are now exactly my defaults a
   nothing half a minute later; `flatten01` on the path 0.3 behind the walker. Nothing to wire:
   it is in the `push` texture you already read (RG lean, B flatten). The wash under the ship is
   as it was.
+- *Snow, per the coordinator's ruling.* `physics.here.sky` has a twelfth number, **`fresh`**:
+  the ground covered by fresh snow, from recent snowfall alone. At the focus it is integrated
+  as it falls: it rises only while snow falls (measured through a snow shower: 0.39 to 0.60 of
+  cover in the 100 s it snowed, then down steadily: 0.53, 0.46, 0.39 at 200, 300, 400 s after),
+  stays fresh for 8 game minutes (e-folding), melts above freezing, and is never more than
+  `snow`. Lay `fresh` over your painted ground and drop your own gathering model (`freshSnow`,
+  the 25 s / five minutes). **`physics.here.sky` is the authority for `fresh` and `snow`**:
+  `physics.sky(physics.weather(p, { time }))` for another place or time estimates them from a
+  21-point quadrature over the past and can be 15 % of cover off (every other number is the
+  same through both, within 1 %). **`snow` is now standing
+  snow of the biome plus fresh, and standing snow is only what my biome table says** (m:
+  `polar_frost` 0.04, `ice_shelves` 0.02, `frozen_waves` 0.15, `pearl_fog` 0.08,
+  `teal_sinkholes` 0.02, `ice_spires` 0.03, `aurora_tundra` 0.1, Pluto's four 0.01 to 0.1;
+  every other biome 0): the alpine meadow reads `snow` 0 in fair weather (it read 1.0: a pack
+  I added wherever the daily mean is below freezing; gone). If a biome you have painted under
+  snow is not in that list, or one in it is painted bare, tell me the biome and I change the
+  table (`snowBase` in `src/physics/ground.js`).
+- *A closed sky under what falls.* `cloud` is at least `0.97 (1 - (1 - falling)^2)` where
+  `falling` is the larger of `rain` and `snowfall`: over 0.85 from 0.65 on; a blizzard of
+  0.81 as at your alpine easel reads cloud 0.93 or more and overcast 0.64 or more (they were
+  0.46 and 0.43). You can drop your own closing of the sky under rain and snow.
+- *A gale's own sky.* Where the large-scale wind is between 18 and 34 m/s (only the ice giants
+  get there outside storm cores) scud covers up to 0.9 of the sky, `overcast` gains up to 0.25,
+  `storm` reads up to 0.8, and over an open sea (fetch over 2 km) spray takes the view (`haze`
+  down to 0.28, counted in `fog`). Neptune's `storm_seas` in the 34 m/s of your frame: cloud
+  over 0.6, overcast over 0.4, storm over 0.5, haze under 0.45, with a swell of 1.7 m; in its
+  ordinary 22 m/s a little of each. No forcing needed for a gale frame any more.
+- *Rates.* Measured over 150 places, 12 moments and 11 s each per biome, through the stateless
+  path with each place's real temperature, at ground level: the fastest any number but `flash`
+  moves in a second is 8.5 % on Earth (`haze` and `fog` as a snow front arrives), 8.5 % on
+  Jupiter (`rain`), 6.2 % on Uranus, 7.3 % on Neptune, 4.1 % on Saturn, 2.0 % on Mars and
+  Venus. The lead's R-WX-1 allows 8 % (15 % on the ice giants): Earth and Jupiter are half a
+  point over it at their worst moment; both are the edge of a weather cell passing, older than
+  this stage, and not fixed. Ease what you show over 2 s as the lead asks.
 - New `DRAW` fields (CPU expanders only; the instanced chunk `expand: 'gpu'` does not have
   them yet): streaks `parallel`, `maxLen`, `near`; dabs `tumble`, `aspect`, `wall`, `wallFrom`,
   `wallFull`, `wallShare`, `wallHigh`, `wallNear`, `wallFade`. All documented at the top of
