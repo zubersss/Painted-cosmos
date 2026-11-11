@@ -12,7 +12,7 @@ import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
 import { WINDS, WIND, setWindScale } from './wind.js';
 import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
-import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
+import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
 import { FloraField, FLORA, PlantSim, plantDisplace, treeFrequency, stemFrequency } from './flora.js';
@@ -48,7 +48,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   if (typeof sampleSurface !== 'function') throw new Error('createPhysics: sampleSurface(bodyId, unitDir) is required');
   const frame = new LocalFrame();
   const airGrid = new AirGrid(seed);
-  const near = new TerrainGrid(17, 2, 8);       // 32 m of ground at 2 m, for particles, pushes and prints
+  const near = new TerrainGrid(17, 2, 10);      // 32 m of ground at 2 m, for particles, pushes and prints
   const flora = new FloraField();
   const particles = new Particles(seed, 1);
   const loose = new Loose(particles);
@@ -91,12 +91,12 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     groundAt(sampleBody, surface, null, _g2);
     arr[o] = _g2.sink; arr[o + 1] = _g2.imprint; arr[o + 2] = _g2.dust; arr[o + 3] = _g2.repose;
     arr[o + 4] = _g2.friction; arr[o + 5] = _g2.kinetic; arr[o + 6] = _g2.z0; arr[o + 7] = _g2.liquidDepth;
+    arr[o + 8] = _g2.materialId; arr[o + 9] = _g2.mudding;       // which material, and how far rain turns it to mud
   }
-  const _gn = { sink: 0.015, imprint: 0.5, h: 0 };
   function groundOfGrid(x, z, o) {
     const n = near.nearest(x, z);
-    if (n < 0) { o.sink = 0.015; o.imprint = 0.5; o.loose = 0; o.dust = 0; o.h = here.groundHeight + BODIES[active].radius - frame.r0; return o; }
-    const c = near.cover, a = n * 8;
+    if (n < 0) { o.sink = 0.015; o.imprint = 0.5; o.loose = 0; o.dust = 0; o.mat = MATERIAL_NONE; o.h = here.groundHeight + BODIES[active].radius - frame.r0; return o; }
+    const c = near.cover, a = n * near.CW;
     // snow on the ground deepens the print and keeps it
     const snow = moist.snowDepth;
     o.sink = Math.max(c[a], Math.min(snow * 0.8, GROUND.snowSinkMax)) * (c[a + 7] > 0.05 ? 0 : 1);
@@ -104,6 +104,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // loose: granular ground that piles into rims and can be scoured (sand, dust, gravel, snow)
     o.loose = snow > GROUND.snowCover ? 1 : (c[a + 3] > 0 ? 1 : 0) * (1 - Math.min(1, moist.wetness01 * 1.5));
     o.dust = c[a + 2];
+    // what the mark is made in (its ink): snow once snow covers the ground, else the ground as it is now
+    o.mat = snow > GROUND.snowCover ? MATERIAL_INDEX.snow : materialNow(c[a + 8], c[a + 9], Math.atan(Math.hypot(near.gx[n], near.gz[n])), moist.wetness01, snow, here.weather.temperature);
     o.h = near.heightAt(x, z, near.h[n]);
     return o;
   }
@@ -463,7 +465,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     particles: Object.assign({ events: particles.events, system: particles }, particles.buffers),
     glsl: { flora: FLORA_GLSL, water: WATER_GLSL },
     // reference data
-    data: { ATMOSPHERES, WINDS, REGIMES, MATERIALS, BIOMES, SPECIES },
+    data: { ATMOSPHERES, WINDS, REGIMES, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, BIOMES, SPECIES },
     util: {
       airDensity, airTemperature, gravityAt, fallSpeed, terminalVelocity, bluntTerminal, liquidOf, liquidAt, BIOME_LIQUID, cellsAt: (bodyId, t) => cellsAt(bodyId, t == null ? time : t, seed),
       saltationThreshold, holdAngle, iceFriction, treeFrequency, stemFrequency, PlantSim,
@@ -478,4 +480,5 @@ export {
   stepShipBody, stepShipGear, wakeShip, SHIP_BODY, shipTopSpeed, shipTerminal, downwashSpeed, groundEffect, gearSag,
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
   FLORA_GLSL, WATER_GLSL, WATER, windSea, fetchOf, skyNumbers, SKY, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
+  MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow,
 };

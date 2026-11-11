@@ -7,7 +7,9 @@ import { cellsAt, weatherAt, weatherWind, saltationThreshold, DEFAULT_SEED, REGI
 import { setWindScale, WINDS } from './wind.js';
 import { devilsNear, devilWind, makeDevil, DEVILS } from './features.js';
 import { LocalFrame } from './near.js';
-import { EVENT } from './particles.js';
+import { EVENT, PARTICLES } from './particles.js';
+import { MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE } from './ground.js';
+import { MARK_STRIDE } from './deform.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len, dot } from './testworld.mjs';
 
@@ -342,4 +344,71 @@ test('every body, every kind: nothing is NaN and the frame stays inside the budg
     ms.sort((a, b) => a - b);
     assert.ok(ms[Math.floor(ms.length / 2)] < 1.5, `${bodyId}: median frame ${ms[Math.floor(ms.length / 2)].toFixed(2)} ms with ${w.physics.stats.particles} particles`);
   }
+});
+
+// ---- ink: every loose particle and every mark carries the ground it came from ----------------------
+const matsOf = (b) => { const o = {}; for (let i = 0; i < b.count; i++) { const k = b.mat[i] === MATERIAL_NONE ? 'none' : MATERIAL_IDS[b.mat[i]]; o[k] = (o[k] || 0) + 1; } return o; };
+test('ink: kicked dust carries the material it was kicked from, on every kind of ground; what falls from the sky carries none', () => {
+  for (const [bodyId, biome, want] of [['earth', 'desert_canyon', 'sand'], ['moon', 'mare', 'dust'], ['mars', 'dry_riverbeds', 'gravel'], ['earth', 'temperate_forest', 'litter'], ['venus', 'lava_rivers', 'rock']]) {
+    const w = setup(bodyId, biome);
+    run(w, 1); walk(w, 3, 5);
+    const P = w.physics.particles, m = matsOf(P.dust);
+    if (want === 'rock') { for (const k of Object.keys(m)) assert.ok(k === 'rock' || k === 'dust', 'only what the rock sheds, and the haze: ' + k); continue; }
+    assert.ok(P.dust.count > 2, `${biome}: dust raised: ${P.dust.count}`);
+    assert.deepEqual(Object.keys(m), [want], `${biome}: every grain says ${want}: ${JSON.stringify(m)}`);
+    if (P.sand.count) assert.deepEqual(Object.keys(matsOf(P.sand)), [want]);
+    // the prints say the same
+    const M = w.physics.fields.deform.marks; assert.ok(M.total > 3);
+    for (let k = 0; k < Math.min(M.total, M.capacity); k++) assert.equal(MATERIAL_IDS[M.data[k * MARK_STRIDE + 13]], want, biome + ' print ' + k);
+  }
+  // leaves and spores are the biome's own, not the ground's
+  const f = setup('earth', 'autumn_woodland'); run(f, 20);
+  assert.ok(f.physics.particles.leaves.count > 3);
+  assert.deepEqual(Object.keys(matsOf(f.physics.particles.leaves)), ['none']);
+});
+
+test('ink: the material stays with its grain while the buffer is reshuffled, and changes when the ground does', () => {
+  // sand, then (12 m on) fine dust: walk across the border
+  const R = BODIES.earth.radius;
+  const sandy = makeWorld({ R, biome: 'desert_canyon' }), woody = makeWorld({ R, biome: 'ochre_basins' });     // sand, then fine dust
+  const d0 = norm(HERE);
+  const physics = createPhysics({ sampleSurface: (id, d) => { const fr = physics.fields.frame; const e = (d.x * fr.ex + d.y * fr.ey + d.z * fr.ez) * R; return e > 12 ? woody(d) : sandy(d); }, seed: 14, timeBudget: false });
+  const w = { physics, bodyId: 'earth', R, focus: V(d0.x * R, d0.y * R, d0.z * R), t: 300, up: d0 };
+  run(w, 1);
+  const seen = { sand: 0, dust: 0, other: 0 }, P = physics.particles;
+  // every grain keeps the word it was born with: track (size, mat) pairs across frames (a grain's size is its own)
+  const born = new Map(); let moved = 0;
+  walk(w, 6, 4, { each: () => {
+    for (let i = 0; i < P.dust.count; i++) {
+      const key = P.dust.size[i], m = P.dust.mat[i];
+      if (born.has(key)) { assert.equal(m, born.get(key).m, 'a grain changed its material'); if (born.get(key).i !== i) moved++; born.get(key).i = i; }
+      else { born.set(key, { m, i }); const k = MATERIAL_IDS[m]; if (k === 'sand') seen.sand++; else if (k === 'dust') seen.dust++; else seen.other++; }
+    }
+  } });
+  assert.ok(seen.sand > 10 && seen.dust > 10 && seen.other === 0, JSON.stringify(seen));
+  assert.ok(moved > 5, 'grains were moved to other slots as their neighbours died: ' + moved);
+});
+
+test('ink: powder kicked from snow says snow, prints in snow say snow, storm dust says dust, spray says what is under the liquid', () => {
+  // snow on the ground (Neptune's tundra keeps 10 cm): powder from the feet, prints in snow
+  const s = setup('neptune', 'aurora_tundra'); run(s, 1); walk(s, 3, 4);
+  assert.ok(s.physics.here.weather.snowDepth > 0.03, 'snow lies: ' + s.physics.here.weather.snowDepth);
+  const sn = matsOf(s.physics.particles.snow);
+  assert.ok(sn.snow > 3, 'powder: ' + JSON.stringify(sn));
+  const M = s.physics.fields.deform.marks; assert.ok(M.total > 3);
+  assert.equal(M.data[13], MATERIAL_INDEX.snow);
+  // a Mars dust storm: the dust in the air is the world's dust, whatever is underfoot
+  const R = BODIES.mars.radius; let storm = null;
+  for (let t = 0; t < 9000 && !storm; t += 97) for (const c of cellsAt('mars', t)) { const wx = weatherAt('mars', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 0, sun01: 0.5, wind: 12, dustSource: 1 }, {}); if (wx.dustLoad01 > 0.6) { storm = { c, t }; break; } }
+  assert.ok(storm, 'a dust storm somewhere on Mars');
+  const sample = makeWorld({ R, biome: 'rust_canyons' });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+  const m = { physics, bodyId: 'mars', R, focus: V(storm.c.x * R, storm.c.y * R, storm.c.z * R), t: storm.t, up: storm.c };
+  run(m, 6);
+  const dm = matsOf(physics.particles.dust);
+  assert.ok(dm.dust > 20 && Object.keys(dm).length === 1, 'storm dust over rock: ' + JSON.stringify(dm));
+  // wading: spray is raised from the liquid; it carries the bed
+  const sea = setup('earth', 'sea_coast', { sea: 0.4 }); run(sea, 1); walk(sea, 2, 3);
+  const sp = matsOf(sea.physics.particles.spray);
+  assert.ok(sp.bed > 3 && Object.keys(sp).length === 1, 'spray: ' + JSON.stringify(sp));
 });

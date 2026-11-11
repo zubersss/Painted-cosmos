@@ -52,7 +52,13 @@ export const MATERIALS = {
   // models from the depth, not here.
   bed: { muS: 0.50, muK: 0.38, wet: 1.0, foothold: 0.15, rest: 0.05, sink: 0.03, resist: 0.08, repose: 0, density: 1900, grain: 0.002, dust: 0, z0: 0.0002, imprint: 0.3, mudding: 0 },
 };
-export const MATERIAL_IDS = Object.keys(MATERIALS);
+// Every material has a number: its place in this list. Loose particles and ground marks carry
+// the number of the ground they came from (particles.js `mat`, deform.js mark slot 13), so that
+// PAINTER can give each its own ink: kicked dust is the colour of what it was kicked from.
+// MATERIAL_NONE marks what did not come from the ground (rain, falling snow, leaves).
+export const MATERIAL_IDS = Object.freeze(Object.keys(MATERIALS));
+export const MATERIAL_INDEX = Object.freeze(Object.fromEntries(MATERIAL_IDS.map((k, i) => [k, i])));
+export const MATERIAL_NONE = 255;
 
 // Friction of ice against temperature. Ice is slippery because of a melt-water film; far below
 // freezing there is none. Measured sliding friction rises from about 0.03-0.05 at 0 C to 0.1 at
@@ -306,6 +312,8 @@ export function groundAt(bodyId, surface, state, out = {}) {
   }
 
   out.material = material;
+  out.materialId = MATERIAL_INDEX[material] != null ? MATERIAL_INDEX[material] : MATERIAL_INDEX.soil;
+  out.mudding = _acc.mudding;
   out.friction = clamp(muS, 0.02, 1.5);
   out.kinetic = clamp(Math.min(muK, muS), 0.015, 1.5);
   out.foothold = clamp01(foothold);
@@ -330,6 +338,24 @@ export function groundAt(bodyId, surface, state, out = {}) {
   out.snowBase = snowBase;
   out.dT = dT;
   return out;
+}
+
+// The material a place shows NOW, from what the near field keeps about it: the number of its
+// dry material (groundAt with no state: `materialId`), how far it turns to mud (`mudding`),
+// its slope (rad), and the weather's state. The same rules, in the same order, as groundAt
+// applies them (a test holds the two together); the bed of a liquid stays the bed.
+const I_MUD = MATERIAL_INDEX.mud, I_ICE = MATERIAL_INDEX.ice, I_SNOW = MATERIAL_INDEX.snow, I_BED = MATERIAL_INDEX.bed;
+export function materialNow(dryId, mudding, slope, wet, snow, T) {
+  if (dryId === I_BED) return dryId;
+  let m = dryId;
+  const steep = smoothstep(GROUND.steepStart, GROUND.steepFull, slope);
+  if (wet > 0 && T > 272) {
+    if (smoothstep(GROUND.mudStart, 1, wet) * mudding * (1 - steep) > 0.5) m = I_MUD;
+  } else if (wet > GROUND.frostStart && T <= 272 && snow < GROUND.snowCover) {
+    if (smoothstep(GROUND.frostStart, 0.8, wet) * (1 - 0.6 * steep) > 0.5) m = I_ICE;
+  }
+  if (snow > GROUND.snowCover * 0.2 && smoothstep(GROUND.snowCover * 0.2, GROUND.snowFull, snow) * (1 - 0.7 * smoothstep(0.7, 1.0, slope)) > 0.5) m = I_SNOW;
+  return m;
 }
 
 // Liquids that are not the world's usual one, by biome (PAINTER's look table marks them

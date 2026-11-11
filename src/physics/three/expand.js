@@ -124,6 +124,15 @@ export function expandShades(buf, vary, out) {
   return n;
 }
 
+// The ground each particle was raised from, once per vertex: buf.mat (an index into the physics'
+// MATERIAL_IDS, 255 = not from the ground) copied to its quad's four vertices.
+// out: Uint8Array of at least count * 4.
+export function expandMats(buf, out) {
+  const n = Math.min(buf.count, out.length >> 2), M = buf.mat;
+  for (let i = 0, q = 0; i < n; i++, q += 4) { const m = M ? M[i] : 255; out[q] = m; out[q + 1] = m; out[q + 2] = m; out[q + 3] = m; }
+  return n;
+}
+
 // Ground marks (physics.fields.deform.marks): one quad per live mark, laid on the ground.
 //   frame: physics.fields.frame.  heightAt(x, z) -> m above the frame's datum, or NaN where
 //   the near field does not know the ground (the quad then lies in the mark's own tangent plane).
@@ -133,9 +142,11 @@ export function expandShades(buf, vary, out) {
 //   data: Float32Array(capacity * 16) or null: per vertex (depth m, rim m, kind, fade 0..1).
 //   shade: Float32Array(capacity * 12) or null: grey per vertex, darker where deeper and
 //          fresher (so a stand-in material with vertex colours shows the print at all).
+//   mat: Uint8Array(capacity * 4) or null: per vertex, the material the mark was pressed into
+//        (an index into the physics' MATERIAL_IDS, 255 = unknown).
 // Returns the number of quads.
 const _d = new Float64Array(3);
-export function expandMarks(marks, frame, heightAt, time, lift, pos, data, shade) {
+export function expandMarks(marks, frame, heightAt, time, lift, pos, data, shade, mat) {
   const M = marks.data, st = marks.stride, cap = marks.capacity, O = marks.origin;
   let n = 0;
   for (let m = 0; m < cap; m++) {
@@ -165,6 +176,7 @@ export function expandMarks(marks, frame, heightAt, time, lift, pos, data, shade
       pos[q + c * 3] = px - O.x; pos[q + c * 3 + 1] = py - O.y; pos[q + c * 3 + 2] = pz - O.z;
       if (data) { const k = n * 16 + c * 4; data[k] = M[o + 8]; data[k + 1] = M[o + 12]; data[k + 2] = M[o + 9]; data[k + 3] = fade; }
       if (shade) { const g = 1 - Math.min(0.75, 0.25 + M[o + 8] * 9) * Math.min(1, fade * 3); const k = q + c * 3; shade[k] = g; shade[k + 1] = g; shade[k + 2] = g; }
+      if (mat) mat[n * 4 + c] = st > 13 ? M[o + 13] : 255;
     }
     n++;
   }

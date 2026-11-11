@@ -20,6 +20,7 @@
 //   dust devils a rising helix of dust (features.js)
 import { SPECIES, terminalVelocity, meanFreePath, ATMOSPHERES } from './atmosphere.js';
 import { saltationThreshold } from './weather.js';
+import { MATERIAL_INDEX, MATERIAL_NONE, materialNow } from './ground.js';
 import { BODIES } from '../data/bodies.js';
 import { PARTICLES, EVENT } from './particles.js';
 import { clamp01, smoothstep } from './util.js';
@@ -54,7 +55,8 @@ export const KICK = Object.freeze({
   impactRatio: { earth: 0.8, mars: 0.12, venus: 0.8, default: 0.8 },
 });
 
-const _gp = { dust: 0, repose: 0, liquid: 0, h: 0 };
+const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
+const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
 
 export class Loose {
   constructor(particles) {
@@ -72,6 +74,7 @@ export class Loose {
     this._carry = new Float64Array(8);   // fractional emissions carried between frames
     this.saltation01 = 0;                // 0..1: how hard sand is blowing at the focus right now
     this._wade = 0;
+    this._T = 288;                       // K: air temperature at the focus (frozen ground glazes, warm ground muds)
   }
 
   _terminal(bodyId, rho, T) {
@@ -89,7 +92,8 @@ export class Loose {
   }
 
   // Add one particle (frame coordinates: east, up, north). Returns false when the kind is full.
-  emit(kind, x, y, z, vx, vy, vz, sizeMul = 1, lifeMul = 1) {
+  // mat: the ground it is raised from (index into MATERIAL_IDS), MATERIAL_NONE when it is not.
+  emit(kind, x, y, z, vx, vy, vz, sizeMul = 1, lifeMul = 1, mat = MATERIAL_NONE) {
     const b = this.P.buffers[kind], K = LOOSE[kind];
     const cap = PARTICLES.capacity[kind][this.P.quality];
     if (b._n >= cap) return false;
@@ -103,18 +107,20 @@ export class Loose {
     b._vt[i] = this.vt[kind] * Math.pow(s, 1.2);
     b._ph[i] = r() * 6.2831853;
     b._life[i] = (K.life[0] + r() * (K.life[1] - K.life[0])) * lifeMul;
-    b.age[i] = 0;
+    b.age[i] = 0; b.mat[i] = mat;
     return true;
   }
 
-  // Ground under grid position (x, z) from the near cache: fills _gp { dust, repose, liquid, h }.
+  // Ground under grid position (x, z) from the near cache: fills _gp { dust, repose, liquid, h,
+  // mat (what the ground there is now: an index into MATERIAL_IDS, snow and mud included) }.
   _ground(near, x, z, groundY, wet01, snowDepth) {
     const n = near ? near.nearest(x, z) : -1;
-    if (n < 0) { _gp.dust = 0; _gp.repose = 0; _gp.liquid = 0; _gp.h = groundY; return _gp; }
+    if (n < 0) { _gp.dust = 0; _gp.repose = 0; _gp.liquid = 0; _gp.h = groundY; _gp.mat = MATERIAL_NONE; return _gp; }
     const c = near.cover, a = n * near.CW;
     _gp.dust = c[a + 2] * (1 - smoothstep(0.05, 0.4, wet01));
     _gp.repose = c[a + 3]; _gp.liquid = c[a + 7];
     _gp.h = near.heightAt(x, z, near.h[n]);
+    _gp.mat = near.CW > 9 ? (snowDepth > 0.03 ? I_SNOW : materialNow(c[a + 8], c[a + 9], Math.atan(Math.hypot(near.gx[n], near.gz[n])), wet01, snowDepth, this._T)) : MATERIAL_NONE;
     if (snowDepth > 0.03) { _gp.dust = 0; }
     return _gp;
   }
@@ -126,7 +132,8 @@ export class Loose {
   update(dt, frame, air, near, fx, fy, fz, groundY, wx, rho, cover, bodyId, g, time, disturbers, sigma, wet01, snowDepth, devils) {
     const P = this.P, rng = this.rng, h = dt > 0.1 ? 0.1 : dt;
     const Rr = PARTICLES.radius;
-    this._terminal(bodyId, rho, wx ? wx.temperature : 288);
+    this._T = wx ? wx.temperature : 288;
+    this._terminal(bodyId, rho, this._T);
     const wp = P._wp, hfl = P._hfl;
     // reference wind at the focus (10 m) and at knee height
     const cwe = (wp[15] + wp[18] + wp[27] + wp[30]) * 0.25, cwn = (wp[16] + wp[19] + wp[28] + wp[31]) * 0.25;
@@ -143,13 +150,13 @@ export class Loose {
         while (carry[0] >= 1 && bd._n < capD * (0.25 + 0.6 * dust01)) {
           carry[0] -= 1;
           const y = groundY + rng() * rng() * 14;
-          this.emit('dust', fx + (rng() * 2 - 1) * Rr, y, fz + (rng() * 2 - 1) * Rr, cwe * 0.6, 0, cwn * 0.6, 1.4, 1.2);
+          this.emit('dust', fx + (rng() * 2 - 1) * Rr, y, fz + (rng() * 2 - 1) * Rr, cwe * 0.6, 0, cwn * 0.6, 1.4, 1.2, I_DUST);   // carried in from afar: the world's dust
         }
         if (carry[0] > 4) carry[0] = 4;
       }
       // saltation: sand hops where the wind is over the threshold and the ground is loose sand
       const gp = this._ground(near, fx, fz, groundY, wet01, snowDepth);
-      const loose = gp.repose > 0 ? gp.dust : 0;
+      const loose = gp.repose > 0 ? gp.dust : 0, matHere = gp.mat;
       this.saltation01 = 0;
       if (loose > 0.2 && rho > 0) {
         const ratio = KICK.impactRatio[bodyId] || KICK.impactRatio.default;
@@ -166,12 +173,12 @@ export class Loose {
             const gy = near ? near.heightAt(x, z, groundY) : groundY;
             // launched at 50 degrees or so with a speed of a few threshold friction velocities
             const vu = (0.5 + rng() * 1.1) * Math.sqrt(9 / g) * (0.7 + 0.5 * Math.min(2, excess));
-            if (!this.emit('sand', x, gy + 0.01, z, ue * vu * 0.6, vu, un * vu * 0.6)) break;
+            if (!this.emit('sand', x, gy + 0.01, z, ue * vu * 0.6, vu, un * vu * 0.6, 1, 1, matHere)) break;
           }
           if (carry[1] > 4) carry[1] = 4;
           // and the fines the hopping sand knocks loose are lifted as dust
           carry[2] += capD * 0.25 * clamp01(excess) * loose * h / 4;
-          while (carry[2] >= 1) { carry[2] -= 1; this.emit('dust', fx + (rng() * 2 - 1) * Rr, groundY + rng() * 0.6, fz + (rng() * 2 - 1) * Rr, cwe * 0.3, 0.4 + rng(), cwn * 0.3); }
+          while (carry[2] >= 1) { carry[2] -= 1; this.emit('dust', fx + (rng() * 2 - 1) * Rr, groundY + rng() * 0.6, fz + (rng() * 2 - 1) * Rr, cwe * 0.3, 0.4 + rng(), cwn * 0.3, 1, 1, matHere); }
         }
       }
       // hail in the core of a strong storm
@@ -204,12 +211,13 @@ export class Loose {
           const D = devils[k];
           if (!(D.strength > 0.05) || Math.abs(D.x - fx) > Rr + 30 || Math.abs(D.z - fz) > Rr + 30) continue;
           let n = 110 * D.strength * h + rng();
+          const dm = this._ground(near, D.x, D.z, groundY, wet01, snowDepth).mat;       // what its foot stands on
           while (n >= 1) {
             n -= 1;
             const a = rng() * 6.2831853, r = D.radius * (0.3 + 0.9 * rng());
             const x = D.x + Math.cos(a) * r, z = D.z + Math.sin(a) * r;
             const gy = near ? near.heightAt(x, z, groundY) : groundY;
-            if (!this.emit('dust', x, gy + rng() * 1.5, z, -Math.sin(a) * D.speed * D.spin, D.up * 0.5, Math.cos(a) * D.speed * D.spin, 1.6, 1.5)) break;
+            if (!this.emit('dust', x, gy + rng() * 1.5, z, -Math.sin(a) * D.speed * D.spin, D.up * 0.5, Math.cos(a) * D.speed * D.spin, 1.6, 1.5, dm)) break;
           }
         }
       }
@@ -233,7 +241,7 @@ export class Loose {
             // wading: droplets thrown up by the legs, and a ring on the water now and then
             if (grounded && sp > 0.6) {
               let n = sp * 6 * h + rng();
-              while (n >= 1) { n -= 1; const a = rng() * 6.2831853; this.emit('spray', x + Math.cos(a) * 0.3, gp.h + gp.liquid + 0.02, z + Math.sin(a) * 0.3, vx * 0.5 + Math.cos(a) * 0.8, 1.2 + rng() * 1.5, vz * 0.5 + Math.sin(a) * 0.8); }
+              while (n >= 1) { n -= 1; const a = rng() * 6.2831853; this.emit('spray', x + Math.cos(a) * 0.3, gp.h + gp.liquid + 0.02, z + Math.sin(a) * 0.3, vx * 0.5 + Math.cos(a) * 0.8, 1.2 + rng() * 1.5, vz * 0.5 + Math.sin(a) * 0.8, 1, 1, gp.mat); }
               this._wade += h * sp;
               if (this._wade > 0.5) { this._wade = 0; P._event(frame, x, gp.h + gp.liquid, z, EVENT.ripple, clamp01(sp / 3), 0.3); }
             }
@@ -253,9 +261,9 @@ export class Loose {
             const eu = KICK.up * (0.4 + rng()) * Math.pow(9 / g, 0.25);
             if (powder) { this._emitSnow(x + Math.cos(a) * 0.2, gp.h + 0.05, z + Math.sin(a) * 0.2, ex * 1.5, eu * 2.4, ez * 1.5); this._emitSnow(x - Math.cos(a) * 0.2, gp.h + 0.05, z - Math.sin(a) * 0.2, -ex, eu * 1.8, -ez); }
             else {
-              this.emit(kind, x + Math.cos(a) * 0.2, gp.h + 0.03, z + Math.sin(a) * 0.2, ex, eu, ez);
+              this.emit(kind, x + Math.cos(a) * 0.2, gp.h + 0.03, z + Math.sin(a) * 0.2, ex, eu, ez, 1, 1, gp.mat);
               // coarse grains too where the ground is granular: they fall straight back
-              if (gp.repose > 0 && rng() < 0.5) this.emit('sand', x + Math.cos(a) * 0.15, gp.h + 0.03, z + Math.sin(a) * 0.15, ex * 1.4, eu * 1.3, ez * 1.4, 1, 0.5);
+              if (gp.repose > 0 && rng() < 0.5) this.emit('sand', x + Math.cos(a) * 0.15, gp.h + 0.03, z + Math.sin(a) * 0.15, ex * 1.4, eu * 1.3, ez * 1.4, 1, 0.5, gp.mat);
             }
           }
         } else if (D.kind === 'jet' || D.kind === 'downwash') {
@@ -276,10 +284,10 @@ export class Loose {
             const px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr;
             const gy = near ? near.heightAt(px, pz, gp.h) : gp.h;
             const s = vj * (0.5 + 0.6 * rng()), el = rho > 0.01 ? 0.25 + 0.5 * rng() : 0.08 + 0.2 * rng();
-            if (wetGround) this.emit('spray', px, gy + gp.liquid + 0.02, pz, Math.cos(a) * s, s * (0.5 + el), Math.sin(a) * s);
+            if (wetGround) this.emit('spray', px, gy + gp.liquid + 0.02, pz, Math.cos(a) * s, s * (0.5 + el), Math.sin(a) * s, 1, 1, gp.mat);
             else if (snowDepth > 0.03) this._emitSnow(px, gy + 0.05, pz, Math.cos(a) * s, s * el, Math.sin(a) * s);
-            else if (gp.repose > 0 && rng() < 0.35) this.emit('sand', px, gy + 0.02, pz, Math.cos(a) * s, s * el, Math.sin(a) * s, 1, 0.6);
-            else this.emit('dust', px, gy + 0.03, pz, Math.cos(a) * s, s * el, Math.sin(a) * s);
+            else if (gp.repose > 0 && rng() < 0.35) this.emit('sand', px, gy + 0.02, pz, Math.cos(a) * s, s * el, Math.sin(a) * s, 1, 0.6, gp.mat);
+            else this.emit('dust', px, gy + 0.03, pz, Math.cos(a) * s, s * el, Math.sin(a) * s, 1, 1, gp.mat);
           }
           if (wetGround) { this._wade += h * 3; if (this._wade > 0.5) { this._wade = 0; P._event(frame, x, gp.h + gp.liquid, z, EVENT.ripple, 1, R); } }
         }
@@ -293,7 +301,7 @@ export class Loose {
       b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
       let alive = b._n;
       if (alive === 0) { b.count = 0; continue; }
-      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e;
+      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat;
       const turb = K.turb * sigma, puff = K.puff || 0;
       for (let i = 0; i < alive; i++) {
         const o = i * 3;
@@ -354,7 +362,7 @@ export class Loose {
           if (i < alive) {
             const s = alive * 3;
             Pp[o] = Pp[s]; Pp[o + 1] = Pp[s + 1]; Pp[o + 2] = Pp[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive];
+            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive];
             if (EJ) { EJ[o] = EJ[s]; EJ[o + 1] = EJ[s + 1]; EJ[o + 2] = EJ[s + 2]; }
             i--;
           }
@@ -379,7 +387,7 @@ export class Loose {
     const i = b._n++, o = i * 3;
     b._p[o] = x; b._p[o + 1] = y; b._p[o + 2] = z; b._v[o] = vx; b._v[o + 1] = vy; b._v[o + 2] = vz;
     // a clod of powder is heavier than a flake: it flies a short arc and bursts into flakes on the way
-    b._vt[i] = 2.2 + this.rng() * 2.5; b._ph[i] = this.rng() * 6.2831853; b.size[i] = 0.004 + this.rng() * 0.006; b.age[i] = 0;
+    b._vt[i] = 2.2 + this.rng() * 2.5; b._ph[i] = this.rng() * 6.2831853; b.size[i] = 0.004 + this.rng() * 0.006; b.age[i] = 0; b.mat[i] = I_SNOW;
     return true;
   }
 }

@@ -64,17 +64,13 @@ The tree is green: `node --test src/physics/` 178 pass. Nothing is half-edited.
    for the debug lab). The 1.1-1.5 ms was the CPU patch at 65 x 65 with wakes (three
    `wakeAt` calls a vertex for the slope): with the chunk in PAINTER's material the CPU cost
    is the uniform update, under 0.01 ms. If the patch is kept, give `wakeAt` an analytic slope.
-3. *Ink on unknown ground.* Not started. Design: a material index per loose particle and per
-   mark. (a) `ground.js`: export `MATERIAL_IDS = Object.keys(MATERIALS)`. (b) `index.js`: the
-   near `TerrainGrid(17, 2, 8)` has 8 cover slots, all used (`fill` writes sink, imprint, ...,
-   friction, kinetic, z0, liquidDepth): make it 9 and store the index of `_g2.material`.
-   (c) `particles.js` `makeBuffer`: add `mat: new Uint8Array(cap)` and copy it wherever a
-   particle is moved (the two retire blocks in `particles.js`, the compaction in
-   `loose.js`). (d) `loose.js` `emit(...)`: take the index from the ground lookup at the
-   emission point (`_ground`). (e) `deform.js`: the mark's 14th float (`spare`) becomes the
-   material index; `_mark` gets it from `groundOf`. (f) kits: pass it on (`aPcMat` in gpu
-   mode; in cpu mode put it in `vPcData.y` for particles and document it; marks: a fifth
-   value needs a second attribute). PAINTER then tints from its own palette per material.
+3. *Ink on unknown ground.* **Done in the pure core and in the kits** (second PHYSICS agent):
+   `physics.data.MATERIAL_IDS` (15 names; a material's number is its place), every particle
+   buffer has `mat` (bytes; 255 = `MATERIAL_NONE`, not from the ground), every mark's 14th
+   float is the material it was pressed into; `ground.js` `materialNow()` is the twin of
+   `groundAt`'s naming (snow, mud, glaze) for the near field; the kits hand it on as a third
+   varying `vPcMat`. Tests: `ground.test.mjs` (last), `loose.test.mjs` (last three),
+   `kits.test.mjs` (last). Open: show it in the painted lab's factory (a palette per material).
 4. *Weather for the sky*: **done** (`sky.js`, below in the API, tests in `sky.test.mjs`).
 5. *Left from before*: a silhouette agreement test for `PROP_VERT` (method under "The lab
    inside the painted pipeline"); a meadow with real grass to judge parting (look for a biome

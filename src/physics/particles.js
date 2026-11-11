@@ -6,6 +6,9 @@
 //   buf.vel   (3 n)      velocity, body-local axes, m/s (draw streaks along it)
 //   buf.size  (n)        diameter, metres
 //   buf.age   (n)        seconds since it was (re)born
+//   buf.mat   (n, bytes) the ground it was raised from: an index into ground.js MATERIAL_IDS, or
+//                        255 (MATERIAL_NONE) for what did not come from the ground (rain, falling
+//                        snow, hail, leaves). Kicked dust is the colour of what it was kicked from.
 //   buf.origin {x,y,z}   body-local point the positions are relative to (keeps float32 precise)
 // A particle is a point mass with weight and drag. Drag is quadratic in the velocity relative to
 // the moving air and is scaled so that the particle's terminal speed is the one computed for
@@ -47,6 +50,7 @@ function makeBuffer(cap) {
   return {
     count: 0, capacity: cap,
     pos: new Float32Array(cap * 3), vel: new Float32Array(cap * 3), size: new Float32Array(cap), age: new Float32Array(cap),
+    mat: new Uint8Array(cap).fill(255),
     origin: { x: 0, y: 0, z: 0 },
     species: null, fallSpeed: 0,
     // internal: frame coordinates (east, up, north), terminal speed, phase
@@ -252,7 +256,7 @@ export class Particles {
             if (i < alive) {
               const s = alive * 3;
               P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-              VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive];
+              VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; b.mat[i] = b.mat[alive];
               i--;
             }
             continue;
@@ -261,7 +265,7 @@ export class Particles {
             // the next drop from a leaf tip (or, where there is no leaf over the spot, one fewer)
             if (!this._drip(b, i, fx, fz, ground, canopyH, cp, g)) {
               alive--;
-              if (i < alive) { const s = alive * 3; P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2]; VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; i--; }
+              if (i < alive) { const s = alive * 3; P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2]; VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; b.mat[i] = b.mat[alive]; i--; }
             }
             continue;
           }
@@ -300,7 +304,7 @@ export class Particles {
     b._vt[i] = vt > 0.005 ? vt : 0.005;
     b.size[i] = (b.species ? SPECIES[b.species].d : 0.002) * (0.4 + 0.3 * t);
     b._ph[i] = rng() * 6.2831853;
-    b.age[i] = 0;
+    b.age[i] = 0; b.mat[i] = 255;                 // from the sky, not from the ground
     b._v[o] = 0; b._v[o + 1] = -b._vt[i]; b._v[o + 2] = 0;
   }
 
@@ -320,7 +324,7 @@ export class Particles {
     // terminal speed of a drop this big: the top of the size table (large drops flatten: about 9 m/s on Earth)
     b._vt[i] = Math.max(this._lut[7], 0.5);
     b._ph[i] = rng() * 6.2831853;
-    b.age[i] = 0;
+    b.age[i] = 0; b.mat[i] = 255;
     void g;
     return true;
   }

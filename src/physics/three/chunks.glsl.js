@@ -6,6 +6,8 @@
 // the CPU. Per instance, the physics arrays as they are:
 //   aPcPos  vec3  m, relative to the object's origin, body-local axes
 //   aPcVel  vec3  m/s          aPcSize  float  m (the grain itself)          aPcAge  float  s
+//   aPcMat  float the ground it was raised from: an index into the physics' MATERIAL_IDS
+//                 (bytes, not normalised: 0..14), 255 = not from the ground
 // In main(), instead of `position`:
 //   vec3 p = pcPhysStreak(position.xy);      // rain, hail, sand, spray
 //   vec3 p = pcPhysDab(position.xy);         // snow, dust, ash, spores, leaves
@@ -27,6 +29,7 @@ attribute vec3 aPcPos;
 attribute vec3 aPcVel;
 attribute float aPcSize;
 attribute float aPcAge;
+attribute float aPcMat;
 
 // 1 inside the volume, falling to 0 over its outer fifth: the edge is never a wall.
 float pcPhysEdge(vec3 p) {

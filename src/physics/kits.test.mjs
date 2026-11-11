@@ -2,7 +2,7 @@
 // the three.js wrappers are exercised in physics-lab.html). Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DRAW, RING, makeEye, expandStreaks, expandDabs, expandShades, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './three/expand.js';
+import { DRAW, RING, makeEye, expandStreaks, expandDabs, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './three/expand.js';
 import { PARTICLE_GLSL, SHAPE_GLSL } from './three/chunks.glsl.js';
 import { LocalFrame } from './near.js';
 import { WaterField } from './water.js';
@@ -195,4 +195,20 @@ test('the kits stay inside the budget PILOT set: 12 draw calls and far fewer tha
   tris += PARTICLES.events * 2 + 256 * 2 + 40 * 40 * 2; calls += 3;      // rings, marks, the water patch
   assert.ok(calls <= 12, 'draw calls: ' + calls);
   assert.ok(tris <= 32000, 'triangles, everything full at the highest quality: ' + tris);
+});
+
+test('ink for the kits: a particle\'s material on its four vertices, a mark\'s on its quad', () => {
+  const b = buf([{ p: [0, 0, 0] }, { p: [1, 0, 0] }, { p: [2, 0, 0] }]);
+  b.mat = Uint8Array.from([4, 255, 9]);
+  const out = new Uint8Array(12);
+  assert.equal(expandMats(b, out), 3);
+  assert.deepEqual(Array.from(out), [4, 4, 4, 4, 255, 255, 255, 255, 9, 9, 9, 9]);
+  delete b.mat; expandMats(b, out); assert.ok(out.every((x) => x === 255), 'a buffer without materials says none');
+  const frame = new LocalFrame(); frame.anchor('earth', 0, 4000, 0);
+  const M = markRing([{ x: 1, z: 1, d: [1, 0, 0], length: 0.3, width: 0.12, depth: 0.04 }, { x: 2, z: 1, d: [1, 0, 0], length: 0.3, width: 0.12, depth: 0.04 }]);
+  M.data[13] = 8; M.data[MARK_STRIDE + 13] = 3;
+  const pos = new Float32Array(8 * 12), mat = new Uint8Array(8 * 4);
+  assert.equal(expandMarks(M, frame, null, 1, 0.015, pos, null, null, mat), 2);
+  assert.deepEqual(Array.from(mat.slice(0, 8)), [8, 8, 8, 8, 3, 3, 3, 3]);
+  assert.ok(PARTICLE_GLSL.includes('attribute float aPcMat;'));
 });

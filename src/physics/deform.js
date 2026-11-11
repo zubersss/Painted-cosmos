@@ -34,10 +34,11 @@ export const DEFORM = Object.freeze({
   scourLoad: 60,           // Pa of jet pressure on the ground that starts to scour loose ground
 });
 export const MARK = Object.freeze({ footLeft: 0, footRight: 1, gear: 2, hull: 3, scour: 4 });
-// x, y, z (relative to marks.origin), dirx, diry, dirz, length, width, depth, kind, born, life, rim, spare
+// x, y, z (relative to marks.origin), dirx, diry, dirz, length, width, depth, kind, born, life, rim,
+// material (what it was pressed into: an index into ground.js MATERIAL_IDS, 255 = unknown)
 export const MARK_STRIDE = 14;
 
-const _g = { sink: 0, imprint: 0, h: 0, loose: 0, dust: 0 };
+const _g = { sink: 0, imprint: 0, h: 0, loose: 0, dust: 0, mat: 255 };
 const _a = new Float64Array(3);
 function qRot(q, x, y, z, o) {
   const tx = 2 * (q.y * z - q.z * y), ty = 2 * (q.z * x - q.x * z), tz = 2 * (q.x * y - q.y * x);
@@ -80,7 +81,7 @@ export class DeformField {
   }
 
   // disturbers: as in physics.update (ship disturbers may carry q and legContact).
-  // groundOf(x, z, out) -> { sink, imprint, h, loose (0..1 granular), dust } for a grid position.
+  // groundOf(x, z, out) -> { sink, imprint, h, loose (0..1 granular), dust, mat (material index) } for a grid position.
   // fill: { snow: m/s of snow depth falling now, sand: 0..1 how hard sand is blowing }.
   update(dt, frame, fx, fz, disturbers, groundOf, g, time, fill) {
     const N = this.N, cell = this.cell;
@@ -147,7 +148,7 @@ export class DeformField {
         const G = groundOf(mx, mz, _g);
         const depth = G.sink * (0.8 + 0.4 * clamp01(speed / 6));
         if (depth < 0.002) continue;
-        this._mark(frame, mx, G.h, mz, hx, hz, DEFORM.footLength, DEFORM.footWidth, depth, W.side < 0 ? MARK.footLeft : MARK.footRight, time, DEFORM.fade * (0.15 + 0.85 * G.imprint), depth * DEFORM.rim * G.loose);
+        this._mark(frame, mx, G.h, mz, hx, hz, DEFORM.footLength, DEFORM.footWidth, depth, W.side < 0 ? MARK.footLeft : MARK.footRight, time, DEFORM.fade * (0.15 + 0.85 * G.imprint), depth * DEFORM.rim * G.loose, G.mat);
         this._splat(mx, mz, depth * 0.6);
         // the rim: what was pressed out, piled a little ahead of and beside the print
         if (G.loose > 0.3) this._splat(mx + hx * 0.4, mz + hz * 0.4, -depth * DEFORM.rim * G.loose * 0.6);
@@ -174,7 +175,7 @@ export class DeformField {
               // forward of the ship, for the mark's direction
               qRot(D.q, 0, 0, -1, _a);
               const fx2 = _a[0] * frame.ex + _a[1] * frame.ey + _a[2] * frame.ez, fz2 = _a[0] * frame.nx + _a[1] * frame.ny + _a[2] * frame.nz, fl = Math.hypot(fx2, fz2) || 1;
-              this._mark(frame, lx, G.h, lz, fx2 / fl, fz2 / fl, DEFORM.padRadius * 2, DEFORM.padRadius * 2, depth, MARK.gear, time, DEFORM.fade * 2 * (0.15 + 0.85 * G.imprint), depth * DEFORM.rim * G.loose);
+              this._mark(frame, lx, G.h, lz, fx2 / fl, fz2 / fl, DEFORM.padRadius * 2, DEFORM.padRadius * 2, depth, MARK.gear, time, DEFORM.fade * 2 * (0.15 + 0.85 * G.imprint), depth * DEFORM.rim * G.loose, G.mat);
               this._splat(lx, lz, depth);
             }
           }
@@ -196,20 +197,20 @@ export class DeformField {
         this._dish(x, z, R, rate * dt);
         if (J.t >= DEFORM.scourEvery) {
           J.t = 0;
-          this._mark(frame, x, G.h, z, 1, 0, R * 2, R * 2, Math.min(0.08, rate * 6), MARK.scour, time, DEFORM.fade * 0.5 * (0.15 + 0.85 * G.imprint), Math.min(0.03, rate * 2));
+          this._mark(frame, x, G.h, z, 1, 0, R * 2, R * 2, Math.min(0.08, rate * 6), MARK.scour, time, DEFORM.fade * 0.5 * (0.15 + 0.85 * G.imprint), Math.min(0.03, rate * 2), G.mat);
         }
       }
     }
   }
 
-  _mark(frame, x, y, z, hx, hz, length, width, depth, kind, time, life, rim) {
+  _mark(frame, x, y, z, hx, hz, length, width, depth, kind, time, life, rim, mat) {
     const M = this.marks, o = M.head * MARK_STRIDE, d = M.data;
     d[o] = frame.ex * x + frame.ax * y + frame.nx * z;
     d[o + 1] = frame.ey * x + frame.ay * y + frame.ny * z;
     d[o + 2] = frame.ez * x + frame.az * y + frame.nz * z;
     d[o + 3] = frame.ex * hx + frame.nx * hz; d[o + 4] = frame.ey * hx + frame.ny * hz; d[o + 5] = frame.ez * hx + frame.nz * hz;
     d[o + 6] = length; d[o + 7] = width; d[o + 8] = depth; d[o + 9] = kind; d[o + 10] = time; d[o + 11] = life;
-    d[o + 12] = rim || 0; d[o + 13] = 0;
+    d[o + 12] = rim || 0; d[o + 13] = mat != null ? mat : 255;
     M.head = (M.head + 1) % M.capacity; M.total++;
   }
 

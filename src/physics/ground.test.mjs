@@ -1,7 +1,7 @@
 // Tests: ground materials and contact. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MATERIALS, BIOMES, groundAt, coverAt, iceFriction, biomePhysics, holdAngle, liquidAt } from './ground.js';
+import { MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, groundAt, coverAt, iceFriction, biomePhysics, holdAngle, liquidAt } from './ground.js';
 import { LOOKS } from '../data/looks.js';
 
 const surf = (biomeId, slope = 0, liquid = 0, radius = 4000) => ({ radius, slope, liquidRadius: liquid, biomeId, biomeWeights: { [biomeId]: 1 }, normal: { x: 0, y: 1, z: 0 } });
@@ -156,4 +156,28 @@ test('no NaN for odd inputs', () => {
     for (const k of ['friction', 'kinetic', 'restitution', 'sink', 'drag', 'dust', 'z0']) assert.ok(Number.isFinite(g[k]) && g[k] >= 0, `${k} = ${g[k]}`);
     assert.ok(biomePhysics('earth', s.biomeId));
   }
+});
+
+test('every material has a number, and materialNow names the ground exactly as groundAt does in every weather', () => {
+  assert.equal(MATERIAL_IDS.length, Object.keys(MATERIALS).length);
+  assert.ok(MATERIAL_IDS.length < MATERIAL_NONE && MATERIAL_IDS.length <= 16, 'fits a byte and a 16-entry palette: ' + MATERIAL_IDS.length);
+  MATERIAL_IDS.forEach((k, i) => { assert.equal(MATERIAL_INDEX[k], i); assert.ok(MATERIALS[k]); });
+  // the near field keeps (dry material number, mudding) per node; the state comes from the weather
+  let checked = 0, changed = 0;
+  for (const [bodyId, biome] of [['earth', 'temperate_forest'], ['earth', 'desert_canyon'], ['earth', 'alpine_meadow'], ['earth', 'misty_wetland'], ['mars', 'dust_dunes'], ['venus', 'lava_rivers'], ['uranus', 'ice_shelves'], ['saturn', 'ring_shadow'], ['moon', 'mare']]) {
+    for (const slope of [0, 0.3, 0.6, 0.75, 0.9]) for (const liquid of [0, 4000.1, 4000.5]) {
+      const s = surf(biome, slope, liquid);
+      const dry = groundAt(bodyId, s, null, {});
+      assert.equal(MATERIAL_IDS[dry.materialId], dry.material);
+      const id = dry.materialId, mudding = dry.mudding;
+      for (const wet of [0, 0.2, 0.5, 0.7, 0.9, 1]) for (const snow of [0, 0.004, 0.02, 0.05, 0.08, 0.3]) for (const T of [150, 260, 271, 273, 300]) {
+        const g = groundAt(bodyId, s, { wetness01: wet, snowDepth: snow, temperature: T }, {});
+        const m = materialNow(id, mudding, slope, wet, snow, T);
+        assert.equal(MATERIAL_IDS[m], g.material, `${biome} slope ${slope} liquid ${liquid} wet ${wet} snow ${snow} T ${T}`);
+        assert.equal(g.materialId, m);
+        checked++; if (m !== id) changed++;
+      }
+    }
+  }
+  assert.ok(checked > 5000 && changed > 500, `${checked} states, ${changed} of them not the dry material`);
 });
