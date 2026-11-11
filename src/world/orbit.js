@@ -73,8 +73,8 @@ uniform vec4 uCloud;      // coverage, feature size, drift, bands (0 = scattered
 uniform vec4 uDeck;       // number of belts pole to pole, how far the weather pushes their edges, white streaks, wetness
 uniform vec3 uBandA;
 uniform vec3 uBandB;
-uniform vec4 uStorm;      // a great storm: unit direction, and its angular radius (0 = none)
-uniform vec3 uStormCol;
+uniform vec4 uSpot;      // a great storm: unit direction, and its angular radius (0 = none)
+uniform vec3 uSpotCol;
 varying vec3 vPos;
 varying vec3 vNV;
 varying vec3 vView;
@@ -92,13 +92,13 @@ void main() {
   v += (stripe - 0.5) * 0.30 * uCloud.w;
   // the great storm: an oval twice as long as it is tall, turning on itself
   float storm = 0.0, spiral = 0.0;
-  if (uStorm.w > 0.0) {
-    vec3 sd = normalize(uStorm.xyz);
+  if (uSpot.w > 0.0) {
+    vec3 sd = normalize(uSpot.xyz);
     vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), sd));
     vec3 north = cross(sd, east);
     vec3 dv = nrm - sd;
     float de = dot(dv, east) * 0.55, dn = dot(dv, north);
-    float r = length(vec2(de, dn)) / uStorm.w;
+    float r = length(vec2(de, dn)) / uSpot.w;
     spiral = sin(atan(dn, de) * 2.0 + r * 8.0 + (c2 - 0.5) * 3.5);
     storm = (1.0 - smoothstep(0.72, 1.0, r + (c2 - 0.5) * 0.22)) * step(0.0, dot(nrm, sd));
   }
@@ -113,7 +113,7 @@ void main() {
   // white streaks of high cloud drawn out along the wind: bare paper
   float streak = smoothstep(0.64, 0.72, texture(uNoise3D, vec3(q.x * 0.45, q.y * 3.6, q.z * 0.45) + 0.4).r + (c3 - 0.5) * 0.15);
   c = mix(c, vec3(1.0), streak * uDeck.z);
-  c = mix(c, pcDensity(uStormCol, 1.0 + spiral * 0.5), storm);
+  c = mix(c, pcDensity(uSpotCol, 1.0 + spiral * 0.5), storm);
   c = pcTone(c, pcLevel(x, 0.08));
   float limb = pow(1.0 - clamp(dot(nV, normalize(-vView)), 0.0, 1.0), 2.5);
   c = mix(c, mix(uHaze, vec3(1.0), 0.4), limb);
@@ -130,8 +130,8 @@ export function makeCloudShell(bodyU, radius, look, stormDir) {
       uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands ? 1 : 0) },
       uDeck: { value: new THREE.Vector4(D.belts || 7, D.wobble == null ? 0.10 : D.wobble, D.streaks || 0, D.wet == null ? 0.55 : D.wet) },
       uBandA: { value: new THREE.Vector3().fromArray(D.a || sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(D.b || sky.cloudShade) },
-      uStorm: { value: stormDir ? new THREE.Vector4(stormDir.x, stormDir.y, stormDir.z, D.storm ? D.storm.size : 0.22) : new THREE.Vector4(0, 1, 0, 0) },
-      uStormCol: { value: new THREE.Vector3().fromArray((D.storm && D.storm.color) || [0.80, 0.36, 0.30]) },
+      uSpot: { value: stormDir ? new THREE.Vector4(stormDir.x, stormDir.y, stormDir.z, D.storm ? D.storm.size : 0.22) : new THREE.Vector4(0, 1, 0, 0) },
+      uSpotCol: { value: new THREE.Vector3().fromArray((D.storm && D.storm.color) || [0.80, 0.36, 0.30]) },
     }, bodyU),
     vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG,
   });
