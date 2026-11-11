@@ -13,7 +13,7 @@
 //   walk=<m/s> (an explorer circling the focus; 0 = stands)   circle=<m>
 //   ship=hover|land (a hull 9 m away: hovering low, or landing and leaving again)
 //   yaw= pitch= dist=  (camera, degrees and metres, round the focus)   up=<m> (look-at height)
-//   rain=thin|broad|cover|blend (four ways to draw rain; see RAIN below)   kits=0 (no kits)
+//   rain=thin|broad|cover|blend (P4's four ways to draw rain; see RAIN below; default: the game's own table)   kits=0 (no kits)
 //   water=1 (my wave patch over PAINTER's liquid)   expand=gpu (instanced particles)
 //   hud=1   freeze=1 (stop the clock once ready: for frame pairs)
 //   pre=<s> (simulate this long, unseen, before the page says it is ready)
@@ -189,7 +189,9 @@ const FRAG = {
 //   cover  thin strokes, each pixel kept or dropped by a stipple fixed in the stroke
 //   blend  the thin strokes drawn in a pass of their own after the painting, alpha-blended
 const RAIN = { thin: { width: 0.012, exposure: 0.04, minPx: 1.2 }, broad: { width: 0.07, exposure: 0.14, minPx: 3 }, cover: { width: 0.02, exposure: 0.05, minPx: 1.6 }, blend: { width: 0.014, exposure: 0.05, minPx: 1.4 } };
-let rainMode = RAIN[Q.get('rain')] ? Q.get('rain') : 'broad';
+// (P8) the default is the GAME's table (DRAW_PAINTED.rain: parallel, at most 1.2 m, none nearer than 2.4 m, a share of
+// the strokes): until P8 this page drew P4's 'broad' strokes by default, and its storm frames showed planks the game never draws
+let rainMode = RAIN[Q.get('rain')] ? Q.get('rain') : 'game';
 // The draw table for this pipeline is DRAW_PAINTED (expand.js: what the painted frames taught);
 // the URL may override single numbers of it.
 const DRAW_LAB = {}; for (const k in DRAW_PAINTED) DRAW_LAB[k] = { ...DRAW_PAINTED[k] };
@@ -198,7 +200,7 @@ const kitMaterials = [];
 let palette = null;
 function makeKitMaterial(kind, info) {
   let body = FRAG[kind === 'dust' || kind === 'ash' ? 'puff' : kind === 'snow' ? 'flake' : info.shape];
-  if (kind === 'rain' && rainMode === 'broad') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * 0.93; float w = 0.95;';
+  if (kind === 'rain' && (rainMode === 'broad' || rainMode === 'game')) body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * 0.93; float w = 0.95;';
   if (kind === 'rain' && rainMode === 'cover') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec2 cell = floor(vec2(vPcUv.x * 3.0, vPcUv.y * 14.0)); if (fract(sin(dot(cell + vPcData.x * 31.0, vec2(12.9898, 78.233))) * 43758.5453) > 0.6 - 0.45 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;';
   palette = palette || inkPalette(world.sampleSurface(bodyId, up0).biomeId);
   const m = new THREE.ShaderMaterial({
@@ -248,7 +250,7 @@ function buildKits() {
   if (Q.get('kits') === '0') { kits = null; return; }
   kits = createPhysicsKits(physics, {
     makeMaterial: (kind, info) => (kind === 'rain' && rainMode === 'blend' ? makeBlendRain(info) : makeKitMaterial(kind, info)),
-    weather: { draw: { ...DRAW_LAB, rain: RAIN[rainMode] }, expand: Q.get('expand') === 'gpu' ? 'gpu' : 'cpu' },
+    weather: { draw: { ...DRAW_LAB, rain: RAIN[rainMode] || DRAW_LAB.rain }, expand: Q.get('expand') === 'gpu' ? 'gpu' : 'cpu' },
     water: Q.get('water') === '1' ? { N: num('waterN', 64), step: num('waterStep', 1.25) } : false,      // PAINTER draws the liquid; the patch only on request
   });
   rainMesh = kits.weather.objects.find((o) => o.name === 'pc-physics-rain');
