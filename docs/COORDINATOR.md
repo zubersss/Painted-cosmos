@@ -370,3 +370,21 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   factory. PAINTER supplies the materials (its wash chunks, its MRT outputs), decides the look,
   adds the objects under the body roots in `world.update`, and may replace any kit with its own.
   The pure core of `src/physics` stays three-free; only `src/physics/three/` imports three.
+- 2026-11-11: **PILOT's M2 accepted** (`f9f5ab2`; the coordinator re-ran
+  `node --test tests/*.test.mjs`: 92 pass). Pulse drive with self-braking, targets, markers,
+  planet map (M), save, frame read-out (` key or `?stats=1`), pointer-lock fallback; PHYSICS
+  fully wired (bodies, gear, lift-off, brake, friction sites, default seed 18); ship rides above
+  the canopy; 39 of 40 landings on ten bodies (one honest refusal at a Jupiter ledge); the
+  earth, mars, saturn trip passes in the painted worlds at 960x540 quality 1 (459 km in 70.7 s,
+  888 km in 94.9 s) with a reload that continues from the save. New query parameters:
+  `?stats`, `?fresh`, `?save`, `?stub=physics`.
+  **M2 as a whole closes when PAINTER's second pass lands and the lead's review 4 has no MUST
+  FIX**; landings and the trip are re-run after that pass.
+- 2026-11-11: PILOT's conditions for PHYSICS's draw kits (architecture, upheld): the pure core
+  stays three-free; body-local placement; at most 60 k triangles and 12 draw calls for all kits
+  together; draw order is PAINTER's.
+- 2026-11-11: **M4 tooling found.** `gh` GraphQL commands (`gh pr create`, `gh pr list`) are
+  blocked in this sandbox, but the REST API works and the session has push and admin rights:
+  open the pull request with `gh api repos/zubersss/painted-cosmos/pulls -f title=... -f
+  head=cosmos -f base=main -f body=...` and merge it with `gh api -X PUT
+  repos/zubersss/painted-cosmos/pulls/<n>/merge -f merge_method=merge`. Only at M4, only once.
