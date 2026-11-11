@@ -133,6 +133,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       // a new body, or a jump: start afresh under the focus
       frame.anchor(bodyId, fp.x, fp.y, fp.z);
       fx = 0; fz = 0; lastMoist = -1e9; stats.reanchors++;
+      liqScan = 0; liqLevel = -1e9; liqDepth = 0;
     } else if (Math.hypot(fx, fz) > QUALITY.reanchor) {
       // wandered far from the anchor: move the anchor to the nearest point of the 16 m lattice
       // that every grid shares, and carry all the fields over (nothing is dropped or re-sampled)
@@ -165,7 +166,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     stats.samples = used; stats.msGround = t1 - t0; stats.msAir = t2 - t1;
 
     // where we are
-    airGrid.coverNear(fx, fz, cover);
+    const coverKnown = airGrid.coverNear(fx, fz, cover);
     let gh = near.heightAt(fx, fz, NaN);
     if (gh !== gh) gh = airGrid.terrain.heightAt(fx, fz, NaN);
     if (gh !== gh) gh = r - frame.r0;
@@ -207,11 +208,14 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (--liqScan <= 0) {
       liqScan = 20; liqLevel = -1e9; liqDepth = 0;
       const T = airGrid.terrain, lq = T.lq, hh = T.h, va = T.valid;
-      for (let n = 0; n < lq.length; n++) if (va[n] && lq[n] > liqLevel) { liqLevel = lq[n]; liqDepth = lq[n] - hh[n]; }
+      // (the level of the highest liquid about, and the deepest water under it: the waves are
+      // raised over the open water, not over the shallows the focus may be standing in)
+      for (let n = 0; n < lq.length; n++) if (va[n] && lq[n] > -1e8) { if (lq[n] > liqLevel) liqLevel = lq[n]; if (lq[n] - hh[n] > liqDepth) liqDepth = lq[n] - hh[n]; }
       const l2 = near.liquidAt(fx, fz);
       if (l2 === l2 && l2 > -1e8) { liqLevel = l2; liqDepth = Math.max(liqDepth, l2 - gh); }
     }
-    water.update(dt, frame, airGrid.cwe, airGrid.cwn, liqLevel, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz);
+    // (until the ground under the focus has been sampled, nothing is known about the liquid here)
+    water.update(dt, frame, airGrid.cwe, airGrid.cwn, coverKnown ? liqLevel : -1e9, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;

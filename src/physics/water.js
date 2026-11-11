@@ -20,6 +20,7 @@
 import { clamp01, smoothstep, TAU } from './util.js';
 
 export const WATER = Object.freeze({
+  arriveTime: 1.5,                 // s of quick settling when the focus arrives somewhere new
   growTime: 25,                    // game s for the sea to follow a change of wind
   turnTime: 40,                    // game s for the wave direction to follow the wind
   // the three trains: length as a multiple of the peak wavelength, share of the amplitude,
@@ -78,7 +79,7 @@ export class WaterField {
     this.level = -1e9;             // liquid surface near the focus (radius - frame.r0), -1e9 when dry
     this.present = false;
     this.frameVersion = -1;
-    this.settled = false;          // false until the sea state has been set for this place
+    this.arrive = 0;               // s left of the quick settling after arriving somewhere
     this.uniforms = { uPhysWaterDir: [1, 0], uPhysWaterK: [0, 0, 0], uPhysWaterAmp: [0, 0, 0], uPhysWaterPhase: [0, 0, 0] };
   }
 
@@ -94,16 +95,16 @@ export class WaterField {
   // about the watcher, not about the frame's origin (which would sweep the crests past them).
   update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0) {
     // arriving somewhere new (another world, a jump): the sea there is already running
-    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.height = 0; this.settled = false; }
+    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; }
     this.level = level; this.present = level > -1e8;
     const U = Math.hypot(we, wn);
-    // (the first frame that knows both the liquid and the wind sets the sea; from then on it follows slowly)
-    const fresh = !this.settled && this.present && U > 0.3;
-    if (fresh) this.settled = true;
+    // (for the first moments that both the liquid and the wind are known the sea follows them
+    // quickly, since the wind estimate itself is still settling; from then on, slowly)
+    const fresh = this.arrive > 0 && this.present && U > 0.3;
     windSea(this.present ? U : 0, fetch, g, rhoAir, rhoLiq, depth > 0 ? depth : 1e9, _t);
     const h = dt > 0.25 ? 0.25 : dt;
-    const kh = fresh ? 1 : 1 - Math.exp(-h / WATER.growTime);
-    if (fresh) { this.period = _t.period; this.length = _t.length; if (U > 0.3) { this.dir[0] = we / U; this.dir[1] = wn / U; } }
+    const kh = 1 - Math.exp(-h / (fresh ? 0.2 : WATER.growTime));
+    if (fresh) { this.arrive -= h; this.dir[0] = we / U; this.dir[1] = wn / U; }
     this.height += (_t.height - this.height) * kh;
     if (this.height < 1e-5) this.height = 0;
     // period and length follow the same sea; do not let them collapse when the wind drops

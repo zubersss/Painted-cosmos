@@ -45,8 +45,8 @@ test('the sea state at the focus rises and falls slowly, and the JS twin is boun
   const F = new WaterField();
   const frame = { version: 1 };
   // arriving somewhere, the sea is already running under the wind that blows there
-  F.update(1 / 60, frame, 3, 0, 0, 50, 2500, 9, 1.2, 999);
-  assert.ok(Math.abs(F.height - windSea(3, 2500, 9, 1.2, 999, 50).height) < 1e-9 && F.height > 0.05, 'set on arrival: ' + F.height);
+  for (let i = 0; i < 100; i++) F.update(1 / 60, frame, 3, 0, 0, 50, 2500, 9, 1.2, 999);
+  assert.ok(Math.abs(F.height - windSea(3, 2500, 9, 1.2, 999, 50).height) < 2e-3 && F.height > 0.05, 'set within two seconds of arriving: ' + F.height);
   let prev = F.height, worst = 0;
   for (let i = 0; i < 60 * 120; i++) {
     const U = i < 60 * 60 ? 18 : 2;          // a gale for a minute, then it drops

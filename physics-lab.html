@@ -29,6 +29,25 @@ import { hash3 } from './src/physics/util.js';
 
 // ---- parameters -----------------------------------------------------------------------------
 const Q = new URLSearchParams(location.search);
+// ?planet=<name>: one preset per world, showing the weather that is its own. Any parameter given
+// in the URL as well wins over the preset.
+const PLANETS = {
+  mercury: { scene: 'explorer', body: 'mercury', ground: 'ochre_basins', walk: '4', jet: '0' },                        // vacuum: kicked dust flies in parabolas
+  moon: { scene: 'explorer', body: 'moon', ground: 'mare', walk: '4', jet: '0' },                                         // the same, in a sixth of a g
+  venus: { scene: 'rain', body: 'venus', ground: 'acid_terraces', find: 'virga', alt: '20' },                   // acid rain that never reaches the low ground
+  'venus-mesa': { scene: 'rain', body: 'venus', ground: 'pale_mesas', find: 'virga', alt: '280' },              // ... and does reach a high mesa
+  mars: { scene: 'explorer', body: 'mars', ground: 'dust_dunes', find: 'devil', walk: '0', dist: '120', pitch: '16' },   // a dust devil crossing the dunes
+  'mars-storm': { scene: 'explorer', body: 'mars', ground: 'dust_dunes', find: 'dust', walk: '3' },             // a dust storm with hopping sand
+  jupiter: { scene: 'storm', body: 'jupiter', ground: 'lightning_plains', find: 'thunderstorm' },                // a storm on a jet, with lightning
+  'jupiter-globe': { scene: 'globe', body: 'jupiter' },                                                         // the jets, the storm tracks, the Great Red Spot
+  saturn: { scene: 'rain', body: 'saturn', ground: 'crystal_reeds', find: 'drizzle' },                            // fine drizzle and mist on the broad jet
+  'saturn-globe': { scene: 'globe', body: 'saturn' },
+  uranus: { scene: 'snow', body: 'uranus', ground: 'frozen_waves', find: 'ice fall' },                           // slow methane snow
+  neptune: { scene: 'storm', body: 'neptune', ground: 'storm_seas', sea: '0.6', world: 'hills', find: 'thunderstorm' },   // methane rain in the fastest winds there are
+  'neptune-globe': { scene: 'globe', body: 'neptune' },
+  pluto: { scene: 'snow', body: 'pluto', ground: 'nitrogen_dunes', find: 'frost fall' },                         // nitrogen frost falling out of almost nothing
+};
+{ const pz = PLANETS[Q.get('planet')]; if (pz) for (const k in pz) if (!Q.has(k)) Q.set(k, pz[k]); }
 const scene = Q.get('scene') || 'flora';             // flora | wind | rain | snow | storm | explorer | ship | globe
 const bodyId = Q.get('body') && BODIES[Q.get('body')] ? Q.get('body') : 'earth';
 const worldKind = Q.get('world') || (scene === 'wind' ? 'stub' : 'flat');     // flat | hills | slope | stub | real
