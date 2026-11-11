@@ -281,7 +281,7 @@ class Surface {
       const n = A.fbm(x * f - 9.0, y * f + 2.0, z * f + 14.0, 4, 2.0, 0.5);
       let hh = n * 70 - 9;
       if (hh > 1.5) hh += smoothstep(1.5, 8, hh) * 24 + C.n3(x * R / 40, y * R / 40, z * R / 40) * 2.2 * smoothstep(8, 20, hh);
-      h = hh + C.n3(x * R / 9, y * R / 9 + 2.0, z * R / 9) * 0.25;
+      h = hh + C.n3(x * R / 9, y * R / 9 + 2.0, z * R / 9) * 0.25 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 2.6 + C.n3(x * R / 11 - 2.0, y * R / 11, z * R / 11 + 6.0) * 0.9) * (1 - smoothstep(3, 16, Math.abs(hh)));
       t = clamp((h + 2) / 34, 0, 1); dry = 0.25 + 0.5 * t; wet = h < 1 ? 0.6 : 0.2;
       lq = this.sea == null ? 0 : this.sea;
       grow = bi.tallWet ? (1 - smoothstep(-14, -3, h)) * smoothstep(-34, -20, h) * 1.0 + smoothstep(-3, 0, h) * 0 : smoothstep(3, 9, h);
@@ -328,7 +328,7 @@ class Surface {
       const f = R / 520, amp = T.amp || 150;
       const n = A.fbm(x * f + 5.0, y * f - 7.0, z * f + 2.0, 3, 2.0, 0.5);
       const isl = smoothstep(-0.02, 0.26, n);
-      h = -46 + isl * amp + n * 36 + C.n3(x * R / 18, y * R / 18, z * R / 18) * 0.6;
+      h = -46 + isl * amp + n * 36 + C.n3(x * R / 18, y * R / 18, z * R / 18) * 0.6 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 3.2 + C.n3(x * R / 9 - 2.0, y * R / 9, z * R / 9 + 6.0) * 1.1) * (1 - smoothstep(4, 22, Math.abs(-46 + isl * amp + n * 36)));
       t = isl; dry = 0.3; wet = 0.35;
       lq = this.sea == null ? 0 : this.sea;
       grow = smoothstep(6, 16, h);

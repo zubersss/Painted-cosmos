@@ -71,3 +71,33 @@ export const SHEET = {
 // Quality tier (0 low, 1 medium, 2 high): set by the painter, read by the world to scale how
 // far flora is drawn.
 export const QUALITY = { level: 1 };
+
+// PHYSICS' flora field (COORDINATOR C14): three float textures and their uniforms, shared by
+// every plant material. The world fills them from physics.fields.flora each frame; until then
+// uPhysOn is 0 and plants use the painter's own gentle sway.
+function blank() {
+  const t = new THREE.DataTexture(new Float32Array(16), 2, 2, THREE.RGBAFormat, THREE.FloatType);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t;
+}
+export const PHYS = {
+  uPhysBend: { value: blank() }, uPhysWind: { value: blank() }, uPhysPush: { value: blank() },
+  uPhysAnchor: { value: new THREE.Vector3() }, uPhysEast: { value: new THREE.Vector3(1, 0, 0) },
+  uPhysNorth: { value: new THREE.Vector3(0, 0, -1) }, uPhysUp: { value: new THREE.Vector3(0, 1, 0) },
+  uPhysWindMap: { value: new THREE.Vector4(0, 0, 1, 2) }, uPhysNearMap: { value: new THREE.Vector4(0, 0, 1, 2) },
+  uPhysWave: { value: new THREE.Vector4(1, 0, 0.1, 0) }, uPhysWavePhase: { value: new THREE.Vector4() },
+  uPhysShape: { value: new THREE.Vector4(1, 1, 1, 1) }, uPhysOn: { value: 0 },
+};
+let _physV = -1, _physP = -1, _physF = null;
+export function syncPhysFlora(F) {
+  if (!F || !F.bend) { PHYS.uPhysOn.value = 0; return; }
+  if (F !== _physF) {
+    _physF = F;
+    const mk = (arr, n) => { const t = new THREE.DataTexture(arr, n, n, THREE.RGBAFormat, THREE.FloatType); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };
+    PHYS.uPhysBend.value = mk(F.bend, F.size); PHYS.uPhysWind.value = mk(F.wind, F.size); PHYS.uPhysPush.value = mk(F.push, F.nearSize);
+    _physV = _physP = -1;
+  }
+  if (F.version !== _physV) { PHYS.uPhysBend.value.needsUpdate = true; PHYS.uPhysWind.value.needsUpdate = true; _physV = F.version; }
+  if (F.pushVersion !== _physP) { PHYS.uPhysPush.value.needsUpdate = true; _physP = F.pushVersion; }
+  for (const k in F.uniforms) if (PHYS[k]) PHYS[k].value.fromArray(F.uniforms[k]);
+  PHYS.uPhysOn.value = 1;
+}

@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
-import { TALL_KITS, farTreeGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
+import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY } from '../render/shared.js';
@@ -62,7 +62,7 @@ export class Flora {
     this.ready = true;
     const bodyUniforms = this.bodyUniforms, L = this.look;
     this.species = L.tall.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double });
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: 'lite', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1] });
       const gen = TALL_KITS[sp.kit];
       const fd = sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit];
       return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
@@ -74,8 +74,8 @@ export class Flora {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
         far: L.tall.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' })),
       }) : null,
-      under: makePropMaterial(bodyUniforms, { name: 'under', leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true }),
-      bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04 }),
+      under: makePropMaterial(bodyUniforms, { name: 'under', leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
+      bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
       rock: makePropMaterial(bodyUniforms, { name: 'rock', barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
       shard: makePropMaterial(bodyUniforms, { name: 'shard', barkA: sh[0], barkB: sh[1], wind: 0 }),
     };
@@ -108,6 +108,7 @@ export class Flora {
       u.uOrigin.value.copy(origin);
       u.uCamLocal.value.copy(camRel.subVectors(flora.camLocal, origin));
       u.uLod.value.set(lodv.x * k, lodv.y * k, lodv.z, lodv.w);
+      if (u.uPlantHeight && mesh.userData.plantH) u.uPlantHeight.value = mesh.userData.plantH;
       material.uniformsNeedUpdate = true;
     };
     mesh.userData.inst = inst; mesh.userData.inst2 = inst2;
@@ -268,6 +269,7 @@ export class Flora {
       mesh.count = list.length;
       mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
       mesh.userData.near = near; mesh.userData.skipLow = !!skipLow;
+      mesh.userData.plantH = geo === this.kit.reed ? FLORA_PHYS.reed.height : geo === this.kit.fern ? FLORA_PHYS.fern.height : geo === this.kit.flower ? FLORA_PHYS.flower.height : FLORA_PHYS.grass.height;
       if (skipLow && QUALITY.level === 0) mesh.visible = false;
     };
     // grass: the seed (0..1) sets how far each tuft is drawn; short-range tufts get their own

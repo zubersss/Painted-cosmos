@@ -173,6 +173,15 @@ function fly(dt) {
   if (state.pos.length() < g) state.pos.copy(d).multiplyScalar(g);
 }
 
+// PHYSICS in the gallery (?physics=1): wind, gusts and bending plants from src/physics
+let physics = null;
+if (P.get('physics') === '1') {
+  import('../physics/index.js').then((m) => {
+    physics = m.createPhysics({ sampleSurface: (id, d) => world.sampleSurface(id, d) });
+    world.setPhysics(physics);
+  }).catch((e) => console.warn('physics not available: ' + e.message));
+}
+
 // --- start ----------------------------------------------------------------------------------
 function resize() {
   const w = Math.max(2, Math.floor(canvas.clientWidth * Math.min(devicePixelRatio || 1, 2)));
@@ -220,6 +229,11 @@ function tick(now) {
   placeBodies();
   if (explorer) { placeModel(explorer, Math.sin(state.yaw) * 5 + 1.5, Math.cos(state.yaw) * 5); explorer.animate({ mode: 'idle' }, dt); }
   if (ship) { placeModel(ship, Math.sin(state.yaw) * 14 - 6, Math.cos(state.yaw) * 14); ship.animate({ mode: 'landed' }, dt); }
+  if (physics) {
+    const up = state.pos.clone().normalize();
+    const L0 = world.getLighting();
+    physics.update(frozenT != null ? 1 / 30 : dt, { bodyId, focus: up.multiplyScalar(groundRadius(up)), sunDir: world.bodyUniforms(bodyId).uSunDirL.value });
+  }
   world.update(dt, camera.position, bodyId);
   if (!settled) {
     // keep building until two updates in a row find nothing left to do (each finished level
@@ -238,5 +252,5 @@ function tick(now) {
   if (frames % 20 === 0) $('stat').textContent = `${painter.info.internalWidth}x${painter.info.internalHeight} internal, ${renderer.info.render.calls} draws, ${(renderer.info.render.triangles / 1000) | 0}k tris, alt ${L.altitude.toFixed(0)} m`;
   requestAnimationFrame(tick);
 }
-window.__pcGallery = { state, world, painter, camera, renderer, scene };
+window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; } };
 requestAnimationFrame(tick);

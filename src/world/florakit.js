@@ -287,9 +287,9 @@ export function flowerGeometry(seed) {
 // A fungal tower: a pale leaning stalk under a broad drooping cap, with a smaller cap or two.
 export function fungusGeometry(seed, lod) {
   const rnd = mulberry32(seed), B = new Builder();
-  const H = 12 + rnd() * 5, lean = (rnd() - 0.5) * 2.5, lz = (rnd() - 0.5) * 1.6;
-  const segs = lod ? 2 : 6, sides = lod ? 4 : 7, pts = [], rad = [];
-  for (let i = 0; i <= segs; i++) { const t = i / segs; pts.push(V(lean * t * t + (lod ? 0 : (rnd() - 0.5) * 0.12), t * H, lz * t * t)); rad.push((0.62 - 0.26 * t) * (i === 0 ? 1.4 : 1) * (0.9 + rnd() * 0.2)); }
+  const H = 12 + rnd() * 5, lean = (rnd() - 0.5) * 4.5, lz = (rnd() - 0.5) * 3.0, bend = (rnd() - 0.5) * 3.0, ph = rnd() * 3;
+  const segs = lod ? 3 : 8, sides = lod ? 4 : 7, pts = [], rad = [];
+  for (let i = 0; i <= segs; i++) { const t = i / segs; pts.push(V(lean * t * t + bend * Math.sin(t * 3.0 + ph) * 0.35 * t + (lod ? 0 : (rnd() - 0.5) * 0.18), t * H, lz * t * t + bend * Math.cos(t * 2.2 + ph) * 0.25 * t)); rad.push((0.66 - 0.30 * Math.pow(t, 0.7)) * (i === 0 ? 1.5 : 1) * (0.8 + rnd() * 0.4)); }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.15, swayH: H, hash: rnd() });
   const top = pts[segs], cc = V(top.x, H * 0.9, top.z);
   const r = 4.2 + rnd() * 1.6;

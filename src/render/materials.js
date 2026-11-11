@@ -3,7 +3,8 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
-import { G, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { G, PHYS, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
 const FOG_VERT = /* glsl */`
@@ -128,6 +129,7 @@ void main() {
   x += (n1.g - 0.5) * 0.10 + (st.b - 0.5) * 0.06 * near;
   float lvl = pcLevel(x, 0.045);
   c = pcTone(c, lvl);
+  c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
 
   // dry brush on rough ground: broken strokes, paper sparkling through
   float dryM = smoothstep(0.50, 0.64, st2.r * 0.75 + st.r * 0.35 + (n2.r - 0.5) * 0.25);
@@ -338,8 +340,14 @@ varying vec4 vData;
 varying vec4 vInst;
 varying float vFog;
 
-// MOTION: the one place flora moves. Returns the local offset of a vertex for a given sway
-// weight. PHYSICS' wind / disturbance field replaces the body of this function (C14).
+// MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
+// pushing through them (C14). Without it, this gentle sway stands in.
+#ifdef PC_PHYS
+${FLORA_GLSL}
+uniform float uPhysOn;
+uniform float uStiff;
+uniform float uPlantHeight;
+#endif
 vec3 pcSway(float w, float phase) {
   float a = sin(uTime * 1.1 + phase) * 0.6 + sin(uTime * 2.7 + phase * 1.9) * 0.3;
   float b = cos(uTime * 0.8 + phase * 1.3) * 0.6;
@@ -368,8 +376,22 @@ void main() {
     // rock-like kinds have no trunk: the form stands on the ground
     lp = mix(lp * mix(uFarTrunk[fsi], 1.0, crown), vec3(lp.x * 1.5, (lp.y - 0.30) * 1.45, lp.z * 1.5), crown * (1.0 - uFarTrunk[fsi]));
   #endif
-  lp += pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);
-  vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;
+  vec3 sw = pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);
+  #ifdef PC_PHYS
+    vec3 wp = (im * vec4(lp + sw * (1.0 - uPhysOn), 1.0)).xyz;
+    if (uPhysOn > 0.5) {
+      vec3 rootB = io + uOrigin;
+      #ifdef PC_PHYS_FULL
+        vec2 bend = pcPhysBend(rootB, uStiff).xy;
+      #else
+        vec2 bend = pcPhysBendLite(rootB, uStiff);
+      #endif
+      wp = io + pcPhysDisplace(wp - io, normalize(rootB), uPlantHeight * length(im[1].xyz), bend);
+    }
+    wp = io + (wp - io) * vis;
+  #else
+    vec3 wp = (im * vec4((lp + sw) * vis, 1.0)).xyz;
+  #endif
   vBody = wp + uOrigin;
   vObj = position;
   mat3 ir = mat3(im);
@@ -553,6 +575,11 @@ export function makePropMaterial(bodyU, opts = {}) {
     uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
   };
   const defines = {};
+  if (opts.phys) {
+    defines.PC_PHYS = 1;
+    if (opts.phys === 'full') defines.PC_PHYS_FULL = 1;
+    Object.assign(own, PHYS, { uStiff: { value: opts.stiff || 0 }, uPlantHeight: { value: opts.plantHeight || 1 } });
+  }
   if (opts.far) {
     // far trees of every species share one mesh: per-instance species picks the washes
     defines.PC_FAR = 1;

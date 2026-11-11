@@ -89,7 +89,7 @@ void main() {
   vec3 nV = normalize(vNV);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5 + (c2 - 0.5) * 0.25;
-  vec3 c = mix(vec3(1.0), mix(uBandA, uBandB, stripe), uCloud.w * 0.85);
+  vec3 c = mix(vec3(1.0), mix(uBandA, uBandB, stripe), 0.30 + uCloud.w * 0.60);
   c = pcDensity(c, 0.8 + smoothstep(th, th + 0.25, v) * 0.7);
   c = pcTone(c, pcLevel(x, 0.08));
   float limb = pow(1.0 - clamp(dot(nV, normalize(-vView)), 0.0, 1.0), 2.5);
@@ -105,7 +105,7 @@ export function makeCloudShell(bodyU, radius, look) {
     uniforms: Object.assign({
       uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime,
       uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands || 0) },
-      uBandA: { value: new THREE.Vector3().fromArray(sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(sky.cloudShade) },
+      uBandA: { value: new THREE.Vector3().fromArray(sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(look.deck || sky.cloudShade) },
     }, bodyU),
     vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG,
   });
