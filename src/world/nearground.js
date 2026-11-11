@@ -16,7 +16,7 @@ import { makeNearMaterial } from '../render/materials.js';
 import { QUALITY } from '../render/shared.js';
 import { getLook } from '../data/looks.js';
 
-const CELL = 0.66, RANGE = 11, PER = 8, MAXC = 1024;
+const CELL = 0.66, RANGE = 11, PER = 8, MAXS = 6400;   // at most 6400 strokes: 19.2 k triangles
 const lerp = (a, b, t) => a + (b - a) * t;
 const dens = (c, d) => Math.max(0, Math.min(1, c - (c - c * c) * (d - 1)));   // the pigment density model
 
@@ -45,31 +45,32 @@ export class NearGround {
     const look = getLook(bodyId);
     this.styles = this.S.biomes.map((b) => styleOf(look, b));
     this.n = Math.max(8, Math.round((Math.PI * 0.5 * this.S.R) / CELL));
-    const N = MAXC * PER;
+    const N = MAXS;
     const g = new THREE.InstancedBufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, -1, 0.5, 0, 1, 0.5, 0, 0, 1, 0], 3));
     g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]);
     const attr = (name, size) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(N * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); return a; };
     this.aRoot = attr('iRoot', 3); this.aAxis = attr('iAxis', 4); this.aPar = attr('iPar', 4); this.aCol = attr('iCol', 4); this.aExt = attr('iExt', 2);
-    g.instanceCount = N;
+    g.instanceCount = 0;
     this.material = makeNearMaterial(bu);
     this.mesh = new THREE.Mesh(g, this.material);
     this.mesh.name = 'near-' + bodyId; this.mesh.frustumCulled = false; this.mesh.visible = false;
     root.add(this.mesh);
     this.origin = new THREE.Vector3(); this.hasOrigin = false;
-    this.map = new Map();            // cell key -> clump slot (-1: nothing grows there)
-    this.free = []; for (let i = MAXC - 1; i >= 0; i--) this.free.push(i);
+    this.map = new Map();            // cell key -> the stroke slots of its clump (null: nothing grows there)
+    this.free = []; for (let i = MAXS - 1; i >= 0; i--) this.free.push(i);
+    this.high = 0; this.lastQ = QUALITY.level;
     this.pending = []; this.lastKey = -1; this.dirty = false; this.now = 0; this.filled = false;
     this.s = makeSample(this.S.nB); this.d = [0, 0, 0]; this.fo = { face: 0, u: 0, v: 0 };
     this.cam = new THREE.Vector3();
   }
 
   get busy() { return this.mesh.visible ? this.pending.length : 0; }
-  get triangles() { return this.mesh.visible ? (QUALITY.level === 0 ? MAXC * 4 : MAXC * PER) * 3 : 0; }
+  get triangles() { return this.mesh.visible ? this.high * 3 : 0; }
 
   clear() {
-    this.map.clear(); this.free.length = 0; for (let i = MAXC - 1; i >= 0; i--) this.free.push(i);
-    this.pending.length = 0; this.lastKey = -1; this.filled = false;
+    this.map.clear(); this.free.length = 0; for (let i = MAXS - 1; i >= 0; i--) this.free.push(i);
+    this.pending.length = 0; this.lastKey = -1; this.filled = false; this.high = 0;
     this.aAxis.array.fill(0); this.dirty = true;
   }
 
@@ -87,8 +88,8 @@ export class NearGround {
     }
     const u = this.material.uniforms;
     u.uCamLocal.value.copy(camLocal).sub(this.origin);
-    u.uNear.value.set(RANGE * 0.5, RANGE, this.now, pixel || 0.002);
-    this.mesh.geometry.instanceCount = QUALITY.level === 0 ? MAXC * 4 : MAXC * PER;
+    u.uNear.value.set(RANGE * 0.66, RANGE, this.now, pixel || 0.002);
+    if (QUALITY.level !== this.lastQ) { this.lastQ = QUALITY.level; this.clear(); }      // the low tier lays every other stroke
     // the cell under the eye; when it changes, see which cells have come into range or left it
     const il = 1 / camLocal.length(), cx = camLocal.x * il, cy = camLocal.y * il, cz = camLocal.z * il;
     const fo = dirToFace(cx, cy, cz, this.fo), d = this.d;
@@ -122,7 +123,7 @@ export class NearGround {
         faceToDir(f, ((i + 0.5) / n) * 2 - 1, ((j + 0.5) / n) * 2 - 1, d);
         if (Math.hypot(d[0] - cx, d[1] - cy, d[2] - cz) < gone) continue;
         this.map.delete(key);
-        if (slot >= 0) { this.free.push(slot); for (let k = 0; k < PER; k++) this.aAxis.array[(k * MAXC + slot) * 4 + 3] = 0; this.dirty = true; }
+        if (slot) { for (const o of slot) { this.free.push(o); this.aAxis.array[o * 4 + 3] = 0; } this.dirty = true; }
       }
       this.pending.sort((p, q) => q[0] - p[0]);          // nearest last: popped first
     }
@@ -138,6 +139,7 @@ export class NearGround {
     }
     if (this.dirty) {
       this.dirty = false;
+      this.mesh.geometry.instanceCount = this.high;
       this.aRoot.needsUpdate = this.aAxis.needsUpdate = this.aPar.needsUpdate = this.aCol.needsUpdate = this.aExt.needsUpdate = true;
     }
   }
@@ -150,7 +152,7 @@ export class NearGround {
     const x = d[0], y = d[1], z = d[2];
     S.sample(x, y, z, s, true);
     const h = s.h;
-    if ((s.lq !== NOLQ && s.lq > h - 0.04) || !this.free.length) { this.map.set(key, -1); return; }
+    if ((s.lq !== NOLQ && s.lq > h - 0.04) || !this.free.length) { this.map.set(key, null); return; }
     // the ground's own plane here (two more heights): strokes stand on the slope, not on the sphere
     let ux, uy, uz;
     if (Math.abs(y) < 0.9) { ux = -z; uy = 0; uz = x; } else { ux = 0; uy = z; uz = -y; }
@@ -158,17 +160,19 @@ export class NearGround {
     const vx = y * uz - z * uy, vy = z * ux - x * uz, vz = x * uy - y * ux;
     const e = 0.45, gu = (S.heightAt(x + ux * e / R, y + uy * e / R, z + uz * e / R) - h) / e, gv = (S.heightAt(x + vx * e / R, y + vy * e / R, z + vz * e / R) - h) / e;
     const steep = Math.hypot(gu, gv);
-    if (steep > 1.3) { this.map.set(key, -1); return; }
+    if (steep > 1.3) { this.map.set(key, null); return; }
     let nx = x - ux * gu - vx * gv, ny = y - uy * gu - vy * gv, nz = z - uz * gu - vz * gv;
     l = 1 / Math.hypot(nx, ny, nz); nx *= l; ny *= l; nz *= l;
-    const slot = this.free.pop();
-    this.map.set(key, slot);
+    const slots = [], lowQ = QUALITY.level === 0;
+    this.map.set(key, slots);
     const px = x * (R + h) - this.origin.x, py = y * (R + h) - this.origin.y, pz = z * (R + h) - this.origin.z;
     // which biome's ground this is (borders intermix clump by clump)
     let bi = s.top, acc = 0; const pick = hash3i(i, j, 3, seed);
     for (let q = 0; q < S.nB; q++) { acc += s.w[q]; if (pick < acc) { bi = q; break; } }
     const st = this.styles[bi];
-    const meadow = Math.min(1, 0.25 + 0.75 * (s.under || 0)) * (1 - 0.45 * Math.min(1, s.canopy || 0)) * (1 - Math.min(1, s.rock || 0) * 0.7);
+    // (a biome without undergrowth of its own, the forests, grows grass wherever the canopy lets it)
+    const und = S.biomes[bi].small ? (s.under || 0) : 1;
+    const meadow = Math.min(1, 0.3 + 0.7 * und) * (1 - 0.4 * Math.min(1, s.canopy || 0)) * (1 - Math.min(1, s.rock || 0) * 0.7);
     const nBlade = Math.round(st.blade * meadow * (steep > 0.8 ? 0.4 : 1));
     const gr = s.r, gg = s.g, gb = s.b;
     const A = this.aAxis.array, P = this.aPar.array, C = this.aCol.array, Ro = this.aRoot.array, E = this.aExt.array;
@@ -179,19 +183,19 @@ export class NearGround {
     for (let q = 0; q < st.ripple; q++) kinds.push(4);
     for (let q = 0; q < st.dab + (st.blade - nBlade > 3 ? 1 : 0); q++) kinds.push(3);
     for (let k = 0; k < PER; k++) {
-      const o = k * MAXC + slot;
-      // the strokes are dealt in a shuffled order so that the half drawn at the low tier is a fair sample
+      // (dealt in a shuffled order, so that the half laid at the low tier is a fair sample)
       const kind = kinds.length ? kinds[(k * 5 + ((pick * 8) | 0)) % PER] : undefined;
-      if (kind === undefined) { A[o * 4 + 3] = 0; continue; }
+      if (kind === undefined || (lowQ && (k & 1)) || !this.free.length) continue;
+      const o = this.free.pop(); slots.push(o); if (o >= this.high) this.high = o + 1;
       const q1 = hash3i(i, j, 10 + k, seed), q2 = hash3i(i, j, 20 + k, seed), q3 = hash3i(i, j, 30 + k, seed), q4 = hash3i(i, j, 40 + k, seed), q5 = hash3i(i, j, 50 + k, seed);
       // where in the clump: on the ground's plane, up to half a metre from its centre
       const ang = q1 * 6.2832, rad = (kind === 0 || kind === 1 ? (q2 < 0.75 ? 0.04 + 0.30 * q2 : 0.2 + 0.4 * q2) : 0.06 + 0.45 * Math.sqrt(q2)), ou = Math.cos(ang) * rad, ov = Math.sin(ang) * rad, dh = ou * gu + ov * gv - 0.02;
       Ro[o * 3] = px + ux * ou + vx * ov + x * dh; Ro[o * 3 + 1] = py + uy * ou + vy * ov + y * dh; Ro[o * 3 + 2] = pz + uz * ou + vz * ov + z * dh;
       let len, wid, mid, curl, tilt, flex, cr, cg, cb;
       if (kind === 0) {            // a grass blade: one flick of the brush
-        len = 0.17 + 0.27 * q3; wid = 0.022 + 0.016 * q4; mid = 0.62; curl = (q5 - 0.5) * 0.7; tilt = 0.10 + 0.50 * q4; flex = 1;
-        const L = st.leaf, c = L ? L[q5 < 0.14 ? 0 : q5 < 0.62 ? 1 : 2] : null;
-        if (c) { cr = lerp(c[0], gr, 0.45); cg = lerp(c[1], gg, 0.45); cb = lerp(c[2], gb, 0.45); } else { cr = dens(gr, 1.5); cg = dens(gg, 1.5); cb = dens(gb, 1.5); }
+        len = 0.20 + 0.26 * q3; wid = 0.026 + 0.018 * q4; mid = 0.62; curl = (q5 - 0.5) * 0.7; tilt = 0.18 + 0.60 * q4; flex = 1;
+        const L = st.leaf, c = L ? L[q5 < 0.10 ? 0 : q5 < 0.42 ? 1 : 2] : null, gm = q5 < 0.42 ? 0.45 : 0.25;
+        if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); } else { cr = dens(gr, 1.5); cg = dens(gg, 1.5); cb = dens(gb, 1.5); }
       } else if (kind === 1) {     // reed stubble
         len = 0.45 + 0.55 * q3; wid = 0.024 + 0.012 * q4; mid = 0.86; curl = (q5 - 0.5) * 0.25; tilt = 0.04 + 0.16 * q4; flex = 0.7;
         const c = st.leaf ? st.leaf[1] : [gr, gg, gb];

@@ -140,8 +140,15 @@ void main() {
   // granulation: pigment settles into the valleys of the paper, strongest in darks and wets
   float ph = paper.r;
   // fine pits show in light washes; dark passages keep only the broad settling
-  float gran = ((0.52 - ph) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmid.r) * 0.85 + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet);
-  gran *= 1.0 - 0.9 * uWxSheet.x;     // (heavy storm washes would turn the settling into pepper)
+  // In light and middle washes the pigment sits in the pits of the paper: a fine speckle. In
+  // a dark wash the pits are full: what shows there is the broad soft settling of the pigment
+  // (the same paper, out of focus), never a hard speck at the size of a pixel.
+  float dark = 1.0 - smoothstep(0.24, 0.58, lum);
+  vec4 psoft = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 2.6);
+  float pits = (0.52 - ph) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmid.r) * 0.85;
+  float settle = (0.5 - psoft.r) * 1.25 + (0.5 - plo.r) * 0.45;
+  float gran = (mix(pits, settle, dark) + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet) * mix(1.0, 0.5, dark);
+  gran *= 1.0 - 0.5 * uWxSheet.x;
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
   d += uWxSheet.x * (0.75 + 0.5 * plo.r);
@@ -155,7 +162,7 @@ void main() {
   float lip = (1.0 - smoothstep(uBorder.x, uBorder.x * 2.2, bn)) * painted * uBorder.w;
   d += lip * uBorder.z * (0.4 + 0.6 * plo.r);
   // dry edge: near the border the brush skips the paper's peaks
-  float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * smoothstep(0.50, 0.62, ph) * uBorder.w;
+  float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * smoothstep(0.46, 0.62, mix(ph, pmid.r, 0.65)) * uBorder.w;
 
   col = clamp(col - (col - col * col) * (d - 1.0), 0.0, 1.0);
 
@@ -184,11 +191,11 @@ void main() {
     col = mix(col, vec3(1.0), clamp(lift, 0.0, 0.92));
   }
   // nothing is pure black: the darkest darks are dense indigo and sepia
-  col = max(col, vec3(0.085, 0.09, 0.145) + 0.035 * (ph - 0.5));
+  col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoft.r - 0.5));
   col = mix(vec3(1.0), col, painted * (1.0 - skip * 0.8));
 
   // paper: warm off-white, lit so its tooth shows faintly even where it is bare
-  float relief = (ph - 0.5) * 0.055 + (plo.g - 0.5) * 0.02;
+  float relief = (ph - 0.5) * 0.055 * mix(1.0, 0.35, dark) + (plo.g - 0.5) * 0.02;
   vec3 outc = uPaperColor * col * (1.0 + relief) * mix(vec3(1.0), uGrade, painted);
   gl_FragColor = vec4(outc, 1.0);
 }

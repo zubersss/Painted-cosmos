@@ -22,6 +22,7 @@ import { QUALITY } from '../render/shared.js';
 const T0 = 52, T1 = 128, T_THIN = 300, T_FAR = 470;
 const UNDER_FAR = 60, GRASS_NEAR = 15;
 const RANGE_SCALE = [0.42, 0.82, 1.0];
+const TRIM = [0.82, 0.88];
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
@@ -189,6 +190,9 @@ export class Flora {
     const k = this.rangeScale;
     const cx = this.camLocal.x - chunk.origin.x, cy = this.camLocal.y - chunk.origin.y, cz = this.camLocal.z - chunk.origin.z;
     const d = chunk.data, rel = chunk.rel, tier = chunk.tier, lowQ = QUALITY.level === 0;
+    // the middle tier pays for the near ground, the explorer and the ship (the frame budget of
+    // 600 k triangles): full trees and middle trees hand over a little sooner
+    const trim0 = QUALITY.level === 1 ? TRIM[0] : 1, trim1 = QUALITY.level === 1 ? TRIM[1] : 1;
     let changed = false;
     for (let i = 0; i < n; i++) {
       const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
@@ -196,8 +200,8 @@ export class Flora {
       const seed = d[i * INST_STRIDE + 7];
       const j = (1 + (seed - 0.5) * JIT) * k;
       let t;
-      if (dist < T0 * j) t = lowQ ? 1 : 0;              // the low tier draws no full trees
-      else if (dist < T1 * j) t = 1;
+      if (dist < T0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
+      else if (dist < T1 * j * trim1) t = 1;
       else if (dist < T_THIN * j) t = 2;
       else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;

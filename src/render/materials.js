@@ -1006,6 +1006,7 @@ varying vec3 vView;
 varying vec3 vCol;
 varying vec4 vS;        // x along the stroke 0..1, y across -1..1, z hash, w canopy
 varying float vFog;
+varying float vFlat;
 void main() {
   float t = position.y, side = position.x, h = iPar.z;
   vec3 root = iRoot;
@@ -1017,16 +1018,25 @@ void main() {
   float flex = iExt.y;
   float len = iAxis.w * vis * mix(1.0, 0.45, uWx.z * flex);      // fresh snow buries most of a blade
   vec3 ax = iAxis.xyz;
+  vec3 up = normalize(root + uOrigin);
+  // what has pushed through here: a blade leans with the load, and where it was trodden or
+  // blown flat it lies over the way it already leaned, and stays down for a while
+  vec4 pb = vec4(0.0);
+  if (flex > 0.01 && uPhysOn > 0.5) {
+    pb = pcPhysBend(root + uOrigin, 0.0);
+    float fl = clamp(pb.z, 0.0, 1.0) * flex;
+    vec3 axh = ax - up * dot(ax, up);
+    ax = normalize(mix(ax, axh / max(length(axh), 0.05) + up * 0.16, fl * 0.92));
+    vFlat = fl;
+  } else vFlat = 0.0;
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
   float wid = max(iPar.x, wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0));
   vec3 rel = ax * (len * t) + sd * (side * wid * min(1.0, vis * 3.0) + iCol.a * len * t * t);
-  vec3 up = normalize(root + uOrigin);
   if (flex > 0.01 && len > 0.0) {
     if (uPhysOn > 0.5) {
-      vec4 pb = pcPhysBend(root + uOrigin, 0.0);
-      rel = mix(rel, pcPhysDisplace(rel, up, max(iAxis.w, 0.05), pb.xy), flex);
+      rel = mix(rel, pcPhysDisplace(rel, up, max(iAxis.w, 0.05), pb.xy * (1.0 - vFlat)), flex);
     } else {
       rel += sd * (sin(uTime * 1.3 + h * 40.0) * 0.05 * len * t * t * flex);
     }
@@ -1051,6 +1061,7 @@ varying vec3 vView;
 varying vec3 vCol;
 varying vec4 vS;
 varying float vFog;
+varying float vFlat;
 void main() {
   #include <logdepthbuf_fragment>
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
@@ -1059,7 +1070,7 @@ void main() {
   if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
   float d = 1.0 + (0.55 - vS.x) * 0.7 + (vS.z - 0.5) * 0.5 + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), 1.0);
-  c = mix(c, vec3(1.0), uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8);
+  c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.3));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
@@ -1070,7 +1081,7 @@ void main() {
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
   c = pcAtmos(c, vFog);
   // a third of the strokes are the crisp accents the brush leaves as drawn; the rest belong to the wash
-  pcWrite(c, max(0.2, vFog * 0.9), nV, -vView.z, (fract(vS.z * 13.7) < 0.34 ? 6.0 : 4.0) + vS.z * 0.9);
+  pcWrite(c, max(0.2, vFog * 0.9), nV, -vView.z, (fract(vS.z * 13.7) < 0.5 ? 6.0 : 4.0) + vS.z * 0.9);
 }
 `;
 

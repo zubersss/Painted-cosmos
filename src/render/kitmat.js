@@ -47,7 +47,8 @@ export function biomeInks(pal, liquid) {
 const SHAPES = {
   // rain: a broad stroke, full at the head and thinning to its tail, laid wet
   // (nothing right in front of the lens: a drop a metre away would be a stick across the sheet)
-  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y || length(vView) < 3.2) discard; vec3 c = ink * (0.93 + 0.07 * vPcData.x); float w = 0.95;',
+  // (a glaze: see GLAZE below; `ga` is how much of the stroke's wash is laid over what is behind it)
+  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 3.2) discard; vec3 c = ink * (0.93 + 0.07 * vPcData.x); float w = 0.95; float ga = (1.0 - tpr * tpr) * (1.0 - 0.75 * vPcUv.y * vPcUv.y) * smoothstep(0.0, 0.12, vPcUv.y) * 0.46;',
   streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
@@ -69,6 +70,11 @@ function shapeOf(kind, info) {
 }
 // region ids: prints belong to the ground (1); splash rings are 6 (kept crisp by the post
 // pass); everything in the air is 7 (no graphite line is drawn round a raindrop or a puff)
+// Kinds that are laid as a GLAZE: a transparent stroke over whatever is behind it (darker than
+// a light sky, lighter than a dark wood), instead of an opaque mark. They are drawn after the
+// opaque scene with ordinary blending; the second target (normal, depth, region) is left as it
+// was by writing zero with zero alpha, so the post passes still see the thing behind the stroke.
+const GLAZE = { rain: 1 };
 function regionOf(kind, info) {
   if (kind === 'ring' || info.shape === 'ring') return 6.0;
   if (kind === 'mark' || info.shape === 'mark') return 1.0;
@@ -101,9 +107,9 @@ void main() {
   vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${shapeOf(kind, info)}
   c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
-  pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});
+  ${GLAZE[kind] ? 'gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga); pcAux = vec4(0.0);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,
-    side: THREE.DoubleSide,
+    side: THREE.DoubleSide, transparent: !!GLAZE[kind], depthWrite: !GLAZE[kind],
     polygonOffset: info.shape === 'mark' || info.shape === 'ring', polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   m.userData.pcPainted = true;
