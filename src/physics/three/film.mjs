@@ -89,6 +89,9 @@ const SHORE_BEFORE = (up, turn, more = '') => `(L) => {
 const SHORE_PROBE = `(L) => { const W = L.physics.fields.water, F = W.field, s = L.info().seaState || {}, S = window.__shore || {}, b = L.physics.here.blown, o = {};
   const lvl = (d) => { const me = L.enu(L.ex.p), p = L.at(me.e + S.oe * d, me.n + S.on * d); const w = W.heightAt ? W.heightAt(p, o) : null; return w == null ? null : P.r2(typeof w === 'number' ? w : (w.height != null ? w.height : NaN)); };
   return { Hs: s.Hs, length: s.length, breaking: s.breaking ? 1 : 0, cover: s.cover, surf: P.r2(b.surf || 0), spume: P.r2(b.spume || 0), spray: L.physics.particles.spray.count, w6: lvl(8), w20: lvl(22), runup: F.runup != null ? P.r2(F.runup) : null, swash: F.swash != null ? P.r2(F.swash) : null }; }`;
+// (P14) the stand-in crowns: look across the wind at the crowns; the numbers of three tips of the middle tree
+const CROWN_BEFORE = `(L) => { const w = P.windEN(0, 0, 10); L.yaw = Math.atan2(w.n, w.e); }`;
+const CROWN_PROBE = `(L) => { const o = {}, r = {}; for (const i of [0, 3, 5]) { L.crownTip(0, i, o); r['b' + i] = [P.r3(o.e), P.r3(o.n), P.r3(o.up)]; r['hz' + i] = P.r2(o.hz); } r.set = P.r3(o.set); return { w10: P.wind(0, 0, 10), trunk: P.bend(0, 0, 1).deg, ...r }; }`;
 export const SUBJECTS = {
   // ---- where things are: four views round the Earth spawn, 90 degrees apart (not a motion strip) ----
   'look-around': { note: 'four views round the spawn (yaw 30, 120, 210, 300), to choose a framing',
@@ -121,6 +124,19 @@ export const SUBJECTS = {
   'tree-storm': { note: 'Earth spawn, 176 s: birches in the storm, 10 frames a second (the crown against the trunk, the return swing)',
     q: SPAWN + '&t=176&pre=4&explorer=0&dist=20&pitch=3&up=5.5&yaw=30', w: 640, h: 360, crop: [0.2, 0.05, 0.6, 0.6], tile: [320, 180], frames: 12, dt: 0.1, sub: 6,
     probe: `(L) => { const b = L.physics.fields.flora.plantBend(L.at(-6, 10), 1, {}), br = L.physics.fields.flora.plantBranch(2.5, 0, 9, 12, L.at(-6, 10), b, {}); return { w10: P.wind(-6, 10, 10), trunk: P.bend(-6, 10, 1).deg, trunk2: P.bend(5, 14, 1).deg, tipE: P.r3(br.e), tipN: P.r3(br.n), tipU: P.r3(br.up) }; }` },
+  // (P14) the lab's own stand-in birches (crown=: a trunk, seven 3.5 m branches, foliage dabs), moved by FLORA_GLSL as PAINTER's
+  // trees should be (pcPhysBend, pcPhysCrown per branch, pcPhysDisplace); the camera looks across the wind at 8 m.
+  // numbers: the wind 10 m up, the trunk's lean (deg), three branch tips of the middle tree from the JS twin (m east, north,
+  // up), the set they stream at (m) and each branch's own frequency (Hz)
+  'crown-breeze': { note: 'Earth spawn (a temperate wood), 100 s: the stand-in birches in a breeze (4 m/s at 10 m among the trees, 9.5 m/s regional), 10 frames a second',
+    q: SPAWN + '&t=100&pre=4&explorer=0&crown=0,0&dist=13&pitch=4&up=8.5&fov=60', w: 900, h: 540, crop: [0.28, 0.0, 0.44, 0.92], tile: [264, 298], cols: 6, frames: 12, dt: 0.1, sub: 6,
+    before: CROWN_BEFORE, probe: CROWN_PROBE },
+  'crown-gust': { note: 'Earth spawn, 149 s: the gust front of the first thunderstorm reaches the stand-in birches (10 m wind among the trees 9 to 14 m/s, 28 m/s regional), 10 frames a second',
+    q: SPAWN + '&t=149&pre=4&explorer=0&crown=0,0&dist=13&pitch=4&up=8.5&fov=60', w: 900, h: 540, crop: [0.28, 0.0, 0.44, 0.92], tile: [264, 298], cols: 6, frames: 12, dt: 0.1, sub: 6,
+    before: CROWN_BEFORE, probe: CROWN_PROBE },
+  'crown-storm': { note: 'Earth spawn, 167 s: the stand-in birches at the storm\'s height (30 m/s regional, 12 to 18 m/s at 10 m among the trees), 10 frames a second',
+    q: SPAWN + '&t=167&pre=4&explorer=0&crown=0,0&dist=13&pitch=4&up=8.5&fov=60', w: 900, h: 540, crop: [0.28, 0.0, 0.44, 0.92], tile: [264, 298], cols: 6, frames: 12, dt: 0.1, sub: 6,
+    before: CROWN_BEFORE, probe: CROWN_PROBE },
   // ---- the explorer (PILOT's speeds: walk 4.2 m/s, run 7.4 m/s, jump 4.8 m/s) ----
   // (numbers: east and north of the start (m), feet over the ground (m), speed over the ground and upward (m/s), the legs:
   //  hip = leg length less standing (m), clamber01, on the ground 1 / 0)

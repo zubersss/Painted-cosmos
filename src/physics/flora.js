@@ -136,10 +136,35 @@ export const FLORA = Object.freeze({
   crownAng: Object.freeze([1.92, 0.87, 2.97]),      // rad: their directions in the field frame (60 degrees apart)
   crownA: Object.freeze([0.656, 0.802, 0.962]),     // amplitudes: variance as length^(2/3), unit rms together
   crownTilt: 0.25,              // rad per metre of height: the eddies lean with the shear, a crown's top leads its skirt
-  crownImax: 0.6,               // the turbulence intensity counted, at most
+  crownImax: 0.6,               // the turbulence intensity counted at the crown, at most
+  crownI: 3,                    // (twelfth agent) turbulence intensity at the crown / in the open air at 2 m: the roughness sublayer and
+                                // the crown's own wake (sigma_u / U 0.4 to 0.6 at canopy top: Raupach, Finnigan and Brunet 1996)
+  crownBand: 0.33,              // the share of sigma_u in eddies 5 to 25 m long (von Karman, Lu 25 m): what the three trains carry.
+                                // (The eleventh agent put all of sigma_u in them at the open air's I: 1.3 x I, the same number
+                                // uncapped; and gave them a resonant peak, which is now the clock lines' alone.)
   twigHz: 3.6,                  // Hz: the first of the two rates foliage trembles at (the other 23/16 of it)
   twigMax: 0.07,                // m: swing of twigs in leaf in a gale
   twigGain: 1.2,                // ... reached as 1 - exp(-twigGain x load)
+  // (P14, twelfth agent) THE BRANCH RINGS AT ITS OWN FREQUENCY. The three eddy trains are lines in the spectrum
+  // whose frequencies are set by the wind (k U / 2 pi): in a breeze they pass a crown at 0.1 to 0.5 Hz and a
+  // branch only follows them, slower than the trunk; measured at the Earth spawn the tips moved at 0.2 to 0.8 Hz
+  // in every wind, and three branches of one crown correlated 0.7 to 0.9 in the gust front. Real turbulence is
+  // a continuous spectrum: there is always forcing at the branch's own frequency, and a lightly damped
+  // cantilever answers it most (the resonant part of the buffeting response; Davenport). Its variance about the
+  // set: sigma^2 / set^2 = integral |H(f)|^2 x 1.69 I^2 x phi(f Lu / Uc) dln f, phi(n) = 4 n / (1 + 70.8 n^2)^(5/6)
+  // (von Karman, the share of the along-wind variance per unit ln f), H the branch's own oscillator. It is built
+  // here as the spectral representation (Shinozuka): four clock lines at clockR x branchHz, each weighted by
+  // |H| and the turbulence at it, with phases of the branch's own (from id) and of the place (clockK: a crown's
+  // two sides and two trees a few metres apart are out of step). A branch at 0.94 Hz rings at 0.9 to 1.1 Hz,
+  // one at 1.69 Hz at 1.4 to 2; their swings at those frequencies do not correlate. In a gale (I 0.17 in the
+  // open, more in a wood) it adds about 0.1 of the set at the branch's own period; across the wind and up
+  // it is driven by the cross and vertical turbulence (sigma_v / sigma_u 0.75, sigma_w 0.5) through the drag.
+  crownLu: 25,                  // m: integral length of the along-wind turbulence at crown height (1 to 2 x the canopy's height)
+  clockR: Object.freeze([0.55, 0.78, 1.1, 1.55]),   // the clock lines (x branchHz: 0.72, 1.01, 1.43, 2.02 Hz), 0.34 apart in ln f
+  clockK: Object.freeze([[0.29, 0.17], [-0.12, 0.31], [-0.26, -0.21], [0.33, -0.08]]),  // rad/m: their phase over the ground
+  branchRes: 1,                 // a lever on the resonant part (1 = the model)
+  branchResX: 0.6,              // its swing across the wind, of the along-wind swing
+  branchResUp: 0.45,            // and up and down
   branchGain: 1,                // a lever on all of it (1 = the model; 1.3 rad per rad of trunk lean before P14)
   branchShake: 0.08,            // rad: swing of a crown that has just been brushed or blown on (shake01 = 1)
   crown: 0.27,                  // a branch is this long, as a share of the plant's height (3.5 m on a 13 m birch; 0.35 before P14)
@@ -159,6 +184,12 @@ export const CROWN_D = FLORA.crownAng.map((a) => [Math.cos(a), Math.sin(a)]);
 export const CROWN_UP = [1.9, 4.4, 0.8];
 export const CROWN_X = [3.6, 1.1, 5.2];
 export const CROWN_ID = [1, 0.5, 0.25];
+// (P14, twelfth agent) the clock lines: frequency (Hz), the weight of one line (sqrt(2 x 1.69 x dln f)), and
+// the multipliers that give a branch's three phases per line from its number
+export const CLOCK_F = FLORA.clockR.map((r) => r * FLORA.branchHz);
+export const CLOCK_W = Math.sqrt(2 * 1.69 * Math.log(FLORA.clockR[1] / FLORA.clockR[0]));
+export const CLOCK_ID = [[13.1, 17.3, 23.9, 29.3], [31.7, 37.1, 41.3, 43.7], [47.9, 53.3, 59.1, 61.7]];
+export const CLOCK_M = [1, 2, 3, 2];          // without a number per branch: whole lobes round the trunk
 
 const _s = new Float64Array(9);
 const _coef = new Float64Array(8);
@@ -215,7 +246,10 @@ export class FloraField {
       // (rad), w: branch length / height.  (P6 to P13: four clock oscillators, and x was the gustiness.)
       uPhysBranchPhase: [0, 0, 0, 0],
       uPhysBranch: [Math.sqrt(2 * FLORA.qRef / 1.225), FLORA.branchGain, FLORA.branchShake, FLORA.crown],
+      // (P14, twelfth agent) phases of the four clock lines a branch rings on (rad, wrapped; see FLORA.clockR)
+      uPhysBranchClock: [0, 0, 0, 0],
     };
+    this.clockPhase = new Float64Array(4);
     this.branchPhase = new Float64Array(4);      // [0..2] the crown's eddy trains (unwrapped), [3] the twig clock
     this.crownWind = new Float64Array(2);        // mean wind at crown height over the field (m/s east, north)
     this.gustiness = 0;
@@ -245,6 +279,7 @@ export class FloraField {
     }
     for (let i = 0; i < 3; i++) this.flutPhase[i] -= FLORA.flutterK[i] * (FLUT_D[i][0] * dx + FLUT_D[i][1] * dz);
     for (let i = 0; i < 3; i++) this.branchPhase[i] -= FLORA.crownK[i] * (CROWN_D[i][0] * dx + CROWN_D[i][1] * dz);
+    for (let i = 0; i < 4; i++) this.clockPhase[i] -= FLORA.clockK[i][0] * dx + FLORA.clockK[i][1] * dz;
   }
 
   // Advance the fields by dt.
@@ -357,6 +392,7 @@ export class FloraField {
     sce *= inv; scn *= inv; this.crownWind[0] = sce; this.crownWind[1] = scn;
     for (let i = 0; i < 3; i++) this.branchPhase[i] = (this.branchPhase[i] + FLORA.crownK[i] * (CROWN_D[i][0] * sce + CROWN_D[i][1] * scn) * h) % (TAU * 1024);
     this.branchPhase[3] = (this.branchPhase[3] + TAU * FLORA.twigHz * h) % (TAU * 16);
+    for (let i = 0; i < 4; i++) this.clockPhase[i] = (this.clockPhase[i] + TAU * CLOCK_F[i] * h) % TAU;
     // how gusty the air is (turbulence over mean wind), eased over 2 s (physics.here; no longer a uniform)
     { const g = clamp01(tsum * inv / (ms + 0.5) * 2.5); this.gustiness += (g - this.gustiness) * (1 - Math.exp(-h / 2)); }
 
@@ -377,6 +413,7 @@ export class FloraField {
     for (let i = 0; i < 3; i++) { const p = this.branchPhase[i] % TAU; U.uPhysBranchPhase[i] = p < 0 ? p + TAU : p; }
     U.uPhysBranchPhase[3] = this.branchPhase[3];
     U.uPhysBranch[0] = Math.sqrt(2 * FLORA.qRef / Math.max(rho, 1e-6));
+    for (let i = 0; i < 4; i++) { const p = this.clockPhase[i] % TAU; U.uPhysBranchClock[i] = p < 0 ? p + TAU : p; }
     this.version++;
   }
 
@@ -621,31 +658,47 @@ export function plantCrown(re, rn, h, H, gx, gz, cw, shake01, U, id, leaf01, o =
   for (let i = 0; i < 3; i++) {
     const k = FLORA.crownK[i], d = CROWN_D[i], cd = d[0] * de + d[1] * dn;
     const rr = k * Math.abs(cd) * Uc / (TAU * fb), r2 = rr * rr;
-    const g = FLORA.crownA[i] / Math.sqrt((1 - r2) * (1 - r2) + z2 * z2 * r2);
+    const g = FLORA.crownA[i] / Math.sqrt(1 + r2 * r2);      // (twelfth agent) the background: followed below fb, shed above; the peak is the clock lines'
     let ph = k * (d[0] * px + d[1] * pz) + FLORA.crownTilt * h - P[i] + Math.atan2(z2 * rr, 1 - r2) * Math.sign(cd);
     ph += id >= 0 ? TAU * CROWN_ID[i] * fract01(id * (7 + 4 * i) + 0.17 * i) : BRANCH_M[i] * az + BRANCH_S[i] * s;
     da += g * Math.sin(ph); du += g * Math.sin(ph + CROWN_UP[i]); dc += g * Math.sin(ph + CROWN_X[i]);
     gmax += g;
   }
-  const I = Math.min(FLORA.crownImax, cw[4] / (Math.hypot(cw[2], cw[3]) + 0.25));
+  const Io = cw[4] / (Math.hypot(cw[2], cw[3]) + 0.25), I = Math.min(FLORA.crownImax, FLORA.crownI * Io);
   const set = FLORA.branchSetMax * (1 - Math.exp(-FLORA.branchSet * Math.pow(load, FLORA.branchSetExp) / FLORA.branchSetMax));
-  const A = FLORA.branchThrash * I * set, sk = B[2] * shake01;
+  const A = FLORA.branchThrash * FLORA.crownBand * I * set, sk = B[2] * shake01;
   qs += P[3] * 0.375;
   const k0 = B[1] * L * shape;
   // it streams downwind and swings about that set, bobs, and sways across the wind; a shaken crown shivers
-  let al = k0 * (set + A * da + sk * Math.sin(qs));
-  let vu = k0 * (0.6 * A * du + 0.7 * sk * Math.sin(qs + 1.9));
-  let cr = k0 * 0.5 * A * dc;
+  // (P14, twelfth agent) the resonant part: the branch rings on the clock lines near its own frequency
+  let ra = 0, ru = 0, rc = 0, rv = 0;
+  const C = U.uPhysBranchClock;
+  if (C && set > 0 && FLORA.branchRes > 0) {
+    const Ul = Math.max(Uc, 0.5);
+    for (let j = 0; j < 4; j++) {
+      const rj = CLOCK_F[j] / fb, n = CLOCK_F[j] * FLORA.crownLu / Ul;
+      const c = CLOCK_W * I * Math.sqrt(4 * n / Math.pow(1 + 70.8 * n * n, 5 / 6)) / Math.sqrt((1 - rj * rj) * (1 - rj * rj) + z2 * z2 * rj * rj);
+      const base = FLORA.clockK[j][0] * px + FLORA.clockK[j][1] * pz - C[j];
+      let oa, ou, oc;
+      if (id >= 0) { oa = TAU * fract01(id * CLOCK_ID[0][j]); ou = TAU * fract01(id * CLOCK_ID[1][j]); oc = TAU * fract01(id * CLOCK_ID[2][j]); }
+      else { oa = CLOCK_M[j] * az + 0.9 * j; ou = CLOCK_M[(j + 1) & 3] * az + 2.3 + j; oc = CLOCK_M[(j + 2) & 3] * az + 4.1 + 1.7 * j; }
+      ra += c * Math.sin(base + oa); ru += c * Math.sin(base + ou); rc += c * Math.sin(base + oc); rv += 0.5 * c * c;
+    }
+  }
+  const kr = FLORA.branchRes * set;
+  let al = k0 * (set + A * da + sk * Math.sin(qs) + kr * ra);
+  let vu = k0 * (0.6 * A * du + 0.7 * sk * Math.sin(qs + 1.9) + FLORA.branchResUp * kr * ru);
+  let cr = k0 * (0.5 * A * dc + FLORA.branchResX * kr * rc);
   if (leaf01 > 0) {
     // twigs in leaf: two ripples through the foliage at twigHz and 23/16 of it
-    const tw = leaf01 * B[1] * FLORA.twigMax * (1 - Math.exp(-FLORA.twigGain * load)) * (0.5 + I), idp = id > 0 ? id : 0;
+    const tw = leaf01 * B[1] * FLORA.twigMax * (1 - Math.exp(-FLORA.twigGain * load)) * (0.5 + Io), idp = id > 0 ? id : 0;
     const q1 = P[3] + 3.1 * re + 2.3 * rn + 2.7 * h + 40 * idp, q2 = P[3] * 1.4375 - 2.2 * re + 3.4 * rn - 1.9 * h + 71 * idp;
     al += tw * (0.6 * Math.sin(q1) + 0.4 * Math.sin(q2));
     vu += tw * 0.7 * (0.6 * Math.sin(q1 + 1.9) + 0.4 * Math.sin(q2 + 4.0));
     cr += tw * 0.5 * Math.sin(q2 + 2.6);
   }
   o.e = de * al - dn * cr; o.n = dn * al + de * cr; o.up = vu;
-  o.set = k0 * set; o.load = load; o.I = I; o.hz = fb; o.gain = gmax;
+  o.set = k0 * set; o.load = load; o.I = I; o.hz = fb; o.gain = gmax; o.res = k0 * kr * Math.sqrt(rv);
   return o;
 }
 // The same without a number per branch (the JS twin of pcPhysBranch): whole lobes round the trunk, wood only.

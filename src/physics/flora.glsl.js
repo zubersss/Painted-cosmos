@@ -5,12 +5,15 @@
 //
 // The constants below are interpolated from flora.js, so the shader and the CPU model cannot
 // drift apart. physics-lab.html?scene=flora draws both on top of each other as a check.
-import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, FLUT_D, FLUT_PH, CROWN_D, CROWN_UP, CROWN_X, CROWN_ID } from './flora.js';
+import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, FLUT_D, FLUT_PH, CROWN_D, CROWN_UP, CROWN_X, CROWN_ID, CLOCK_F, CLOCK_W, CLOCK_ID, CLOCK_M } from './flora.js';
 
 const f = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
 const fd = (i) => `vec2(${f(FLUT_D[i][0])}, ${f(FLUT_D[i][1])})`;
 const cdv = (i) => `vec2(${f(CROWN_D[i][0])}, ${f(CROWN_D[i][1])})`;
 const v3 = (a) => `vec3(${a.slice(0, 3).map(f).join(', ')})`;
+const v4 = (a) => `vec4(${a.slice(0, 4).map(f).join(', ')})`;
+const ckv = (j) => `vec2(${f(FLORA.clockK[j][0])}, ${f(FLORA.clockK[j][1])})`;
+const cm = (k) => v4([0, 1, 2, 3].map((j) => CLOCK_M[(j + k) & 3]));
 const rot = (i) => `vec2(d.x * ${f(Math.cos(WAVE_ROT[i]))} - d.y * ${f(Math.sin(WAVE_ROT[i]))}, d.x * ${f(Math.sin(WAVE_ROT[i]))} + d.y * ${f(Math.cos(WAVE_ROT[i]))})`;
 
 export const FLORA_GLSL = /* glsl */`
@@ -39,6 +42,7 @@ uniform vec4 uPhysWavePhase;   // xyz: phases of the three wave trains; w: phase
 uniform vec4 uPhysShape;       // soft flex, soft max angle, stiff flex, stiff max angle
 uniform vec4 uPhysBranchPhase; // (P14) xyz: phases (rad) of the crown's three eddy trains, w: the twig clock (rad, wraps at 16 turns)
 uniform vec4 uPhysBranch;      // x: wind speed at load 1 (m/s), y: gain, z: swing of a shaken crown (rad), w: branch length / plant height
+uniform vec4 uPhysBranchClock; // (P14) phases (rad) of the four clock lines a branch rings on (FLORA.clockR x branchHz)
 
 // Bilinear lookup that does not need float-texture filtering (define PC_PHYS_LINEAR to use the
 // hardware filter instead: textures must then be LinearFilter + ClampToEdge).
@@ -135,7 +139,7 @@ vec3 pcPhysDisplace(vec3 rel, vec3 up, float H, vec2 bend) {
 //   vec3 rel = wp - io;  rel += pcPhysCrown(rel, up, H, rootB, pb, id, leaf01);  wp = io + pcPhysDisplace(rel, up, H, pb.xy);
 // Nothing of the wood moves at the trunk's axis; a point streams downwind and swings about that set by
 // x^2 (3 - x) / 2 of the tip's motion, x = its distance from the axis / (uPhysBranch.w * H).
-// Costs two field lookups, twelve sines and three arctangents a vertex.
+// Costs two field lookups, twenty-four sines, four powers and three arctangents a vertex.
 vec3 pcPhysCrown(vec3 rel, vec3 up, float H, vec3 root, vec4 pb, float id, float leaf01) {
   float h = dot(rel, up);
   vec3 q = rel - up * h;
@@ -155,29 +159,40 @@ vec3 pcPhysCrown(vec3 rel, vec3 up, float H, vec3 root, vec4 pb, float id, float
   vec3 ck = ${v3(FLORA.crownK)};
   vec3 cd = vec3(dot(${cdv(0)}, d), dot(${cdv(1)}, d), dot(${cdv(2)}, d));
   vec3 rr = ck * abs(cd) * (Uc / (6.2831853 * fb)), r2 = rr * rr;
-  vec3 hh = ${v3(FLORA.crownA)} * inversesqrt((1.0 - r2) * (1.0 - r2) + z2 * z2 * r2);
+  vec3 hh = ${v3(FLORA.crownA)} * inversesqrt(1.0 + r2 * r2);      // the background (the resonant peak is the clock lines')
   vec2 pt = g + rd;
   vec3 ph = ck * vec3(dot(${cdv(0)}, pt), dot(${cdv(1)}, pt), dot(${cdv(2)}, pt)) + ${f(FLORA.crownTilt)} * h - uPhysBranchPhase.xyz + atan(z2 * rr, 1.0 - r2) * sign(cd);
-  float s = clamp(h / Hs, 0.0, 1.0), qs;
+  float s = clamp(h / Hs, 0.0, 1.0), qs, az = 0.0;
   if (id >= 0.0) {
     ph += 6.2831853 * ${v3(CROWN_ID)} * fract(id * vec3(7.0, 11.0, 15.0) + vec3(0.0, 0.17, 0.34));
     qs = 6.2831853 * fract(id * 9.7);
   } else {
-    float az = r > 1e-4 ? atan(rd.y, rd.x) : 0.0;
+    az = r > 1e-4 ? atan(rd.y, rd.x) : 0.0;
     ph += ${v3(BRANCH_M)} * az + ${v3(BRANCH_S)} * s;
     qs = 2.0 * az;
   }
   float da = dot(hh, sin(ph)), du = dot(hh, sin(ph + ${v3(CROWN_UP)})), dc = dot(hh, sin(ph + ${v3(CROWN_X)}));
-  float I = min(${f(FLORA.crownImax)}, wt.w / (length(wt.xy) + 0.25));
+  float Io = wt.w / (length(wt.xy) + 0.25), I = min(${f(FLORA.crownImax)}, ${f(FLORA.crownI)} * Io);
   float set = ${f(FLORA.branchSetMax)} * (1.0 - exp(-${f(FLORA.branchSet / FLORA.branchSetMax)} * pow(load, ${f(FLORA.branchSetExp)})));
-  float A = ${f(FLORA.branchThrash)} * I * set, sk = uPhysBranch.z * pb.w;
+  float A = ${f(FLORA.branchThrash * FLORA.crownBand)} * I * set, sk = uPhysBranch.z * pb.w;
   qs += uPhysBranchPhase.w * 0.375;
   float k0 = uPhysBranch.y * L * shape;
-  float al = k0 * (set + A * da + sk * sin(qs));
-  float vu = k0 * (0.6 * A * du + 0.7 * sk * sin(qs + 1.9));
-  float cr = k0 * 0.5 * A * dc;
+  // the branch rings at its own frequency: four clock lines weighted by its oscillator and the turbulence at them
+  vec4 fr = ${v4(CLOCK_F)} / fb, fr2 = fr * fr, nn = ${v4(CLOCK_F)} * ${f(FLORA.crownLu)} / max(Uc, 0.5);
+  vec4 cc = ${f(CLOCK_W)} * I * sqrt(4.0 * nn / pow(1.0 + 70.8 * nn * nn, vec4(${f(5 / 6)}))) * inversesqrt((1.0 - fr2) * (1.0 - fr2) + z2 * z2 * fr2);
+  vec4 cb = vec4(dot(${ckv(0)}, pt), dot(${ckv(1)}, pt), dot(${ckv(2)}, pt), dot(${ckv(3)}, pt)) - uPhysBranchClock;
+  vec4 oa, ou, oc;
+  if (id >= 0.0) {
+    oa = 6.2831853 * fract(id * ${v4(CLOCK_ID[0])}); ou = 6.2831853 * fract(id * ${v4(CLOCK_ID[1])}); oc = 6.2831853 * fract(id * ${v4(CLOCK_ID[2])});
+  } else {
+    oa = ${cm(0)} * az + vec4(0.0, 0.9, 1.8, 2.7); ou = ${cm(1)} * az + vec4(2.3, 3.3, 4.3, 5.3); oc = ${cm(2)} * az + vec4(4.1, 5.8, 7.5, 9.2);
+  }
+  float kr = ${f(FLORA.branchRes)} * set;
+  float al = k0 * (set + A * da + sk * sin(qs) + kr * dot(cc, sin(cb + oa)));
+  float vu = k0 * (0.6 * A * du + 0.7 * sk * sin(qs + 1.9) + ${f(FLORA.branchResUp)} * kr * dot(cc, sin(cb + ou)));
+  float cr = k0 * (0.5 * A * dc + ${f(FLORA.branchResX)} * kr * dot(cc, sin(cb + oc)));
   if (leaf01 > 0.0) {
-    float tw = leaf01 * uPhysBranch.y * ${f(FLORA.twigMax)} * (1.0 - exp(-${f(FLORA.twigGain)} * load)) * (0.5 + I), idp = max(id, 0.0);
+    float tw = leaf01 * uPhysBranch.y * ${f(FLORA.twigMax)} * (1.0 - exp(-${f(FLORA.twigGain)} * load)) * (0.5 + Io), idp = max(id, 0.0);
     float q1 = uPhysBranchPhase.w + 3.1 * rd.x + 2.3 * rd.y + 2.7 * h + 40.0 * idp;
     float q2 = uPhysBranchPhase.w * 1.4375 - 2.2 * rd.x + 3.4 * rd.y - 1.9 * h + 71.0 * idp;
     al += tw * (0.6 * sin(q1) + 0.4 * sin(q2));

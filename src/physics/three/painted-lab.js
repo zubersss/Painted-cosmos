@@ -23,6 +23,9 @@
 //   ship=fly (P11: the real flight model and the real gear: at rest on its legs until told; see ctl.ship)
 //   legs=0 (the explorer as the old one-piece capsule; default: a torso riding on legs that fold and reach
 //   with st.phys.hip, so a landing, a crouch and a clamber show)
+//   crown=e,n[;e,n...] (P14) stand-in birches drawn by this page (a trunk, seven branches, foliage dabs) at those
+//   places (m east, north of the focus), moved by FLORA_GLSL exactly as PAINTER's trees should be: pcPhysBend, then
+//   pcPhysCrown with one id per branch (its foliage the same id, leaf01 1), then pcPhysDisplace. crownH=<m> (13)
 // FILMSTRIPS (P11): __lab.film({...}) drives the clock itself at a fixed step and returns one sheet of
 // consecutive frames with the simulation's own numbers for each; see film() below and
 // src/physics/three/film.mjs (the Node driver and the table of subjects).
@@ -32,7 +35,8 @@ import { createPainter, RENDERER_OPTIONS, makeWashMaterial, makePaintUniforms, b
 import { createWorld } from '../../world/index.js';
 import { BODIES } from '../../data/bodies.js';
 import { LOOKS, pig, dilute } from '../../data/looks.js';
-import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, MATERIAL_IDS } from '../index.js';
+import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, MATERIAL_IDS, FLORA_GLSL } from '../index.js';
+import { PHYS } from '../../render/shared.js';
 import { weatherAt, cellsAt } from '../weather.js';
 import { scrambleSample, EXPLORER as PILOT_EXPLORER } from '../../player/explorer.js';
 import { createPhysicsKits } from './kits.js';
@@ -120,6 +124,101 @@ if (rockH > 0) {
   for (let j = 0; j < rings; j++) for (let i = 0; i < seg; i++) { const a = j * seg + i, b = j * seg + (i + 1) % seg, c2 = a + seg, d2 = b + seg; idx.push(a, c2, b, b, c2, d2); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, makeWashMaterial({ color: 0x77706a, id: 7.0 })); mesh.name = 'lab-rock'; root.add(mesh);
+}
+// (P14) stand-in birches (crown=): the reference for what PAINTER's tree shader must do with FLORA_GLSL. One geometry
+// in a tree's own frame (x, z across, y up; built for crownH), instanced at each place. Per vertex: aId, one number
+// for a branch and all its foliage (-1 on the trunk), aLeaf 1 on foliage; per tree: aRoot (body-local), aTree (height,
+// yaw, the tree's own number added to every branch id). The JS twin (crownTips) gives the probes the tips' motion.
+const crownList = Q.get('crown') ? Q.get('crown').split(';').map((s) => s.split(',').map(Number)).filter((v) => v.length === 2 && v.every(isFinite)) : [];
+const crownH = num('crownH', 13), crownTips = [];
+let crownMesh = null, crownU = null;
+function crownGeometry(H) {
+  const P = [], I = [], L = [], UV = [];
+  const tube = (a, b, r0, r1, id, sides = 6) => {        // a tapered prism from a to b
+    const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l = Math.hypot(...d), t = d.map((v) => v / l);
+    const u0 = Math.abs(t[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+    let u = [t[1] * u0[2] - t[2] * u0[1], t[2] * u0[0] - t[0] * u0[2], t[0] * u0[1] - t[1] * u0[0]]; const ul = Math.hypot(...u); u = u.map((v) => v / ul);
+    const w = [t[1] * u[2] - t[2] * u[1], t[2] * u[0] - t[0] * u[2], t[0] * u[1] - t[1] * u[0]];
+    for (let k = 0; k < sides; k++) {
+      const a0 = k / sides * 2 * Math.PI, a1 = (k + 1) / sides * 2 * Math.PI;
+      const ring = (c, r, an) => [c[0] + r * (Math.cos(an) * u[0] + Math.sin(an) * w[0]), c[1] + r * (Math.cos(an) * u[1] + Math.sin(an) * w[1]), c[2] + r * (Math.cos(an) * u[2] + Math.sin(an) * w[2])];
+      for (const v of [ring(a, r0, a0), ring(b, r1, a0), ring(a, r0, a1), ring(a, r0, a1), ring(b, r1, a0), ring(b, r1, a1)]) { P.push(...v); I.push(id); L.push(0); UV.push(0.5, 0.5); }
+    }
+  };
+  const dab = (c, s, id) => {                               // three crossed squares; the fragment cuts a ragged disc
+    const ax = [[[s, 0, 0], [0, s, 0]], [[0, 0, s], [0, s, 0]], [[s, 0, 0], [0, 0, s]]];
+    for (const [e1, e2] of ax) for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
+      P.push(c[0] + (x * e1[0] + y * e2[0]) / 2, c[1] + (x * e1[1] + y * e2[1]) / 2, c[2] + (x * e1[2] + y * e2[2]) / 2); I.push(id); L.push(1); UV.push((x + 1) / 2, (y + 1) / 2);
+    }
+  };
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  tube([0, 0, 0], [0, H, 0], 0.2, 0.05, -1, 8);
+  const nB = 7, Lb = 0.27 * H;                              // a first-order branch as long as FLORA.crown x H (3.5 m on 13 m)
+  for (let i = 0; i < nB; i++) {
+    const id = (i * 0.618034) % 1, az = i * 2.4 + 0.3 * rnd(), y0 = H * (0.45 + 0.4 * i / (nB - 1)), rise = 0.35 + 0.25 * rnd();
+    const dir = [Math.cos(az) * Math.cos(rise), Math.sin(rise), Math.sin(az) * Math.cos(rise)];
+    const a = [0, y0, 0], b = [dir[0] * Lb, y0 + dir[1] * Lb, dir[2] * Lb];
+    tube(a, b, 0.07, 0.015, id, 5);
+    crownTips.push({ id, x: b[0], y: b[1], z: b[2] });
+    for (let k = 0; k < 16; k++) {                            // foliage on the outer two thirds, drooping a little
+      const f = 0.33 + 0.67 * rnd(), sp = 0.35 + 0.5 * f;
+      dab([a[0] + (b[0] - a[0]) * f + (rnd() - 0.5) * sp, a[1] + (b[1] - a[1]) * f + (rnd() - 0.7) * sp, a[2] + (b[2] - a[2]) * f + (rnd() - 0.5) * sp], 0.55 + 0.35 * rnd(), id);
+    }
+  }
+  for (let k = 0; k < 10; k++) dab([(rnd() - 0.5) * 1.2, H * (0.9 + 0.12 * rnd()), (rnd() - 0.5) * 1.2], 0.5, 0.5);   // the leader's top
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
+  g.setAttribute('aId', new THREE.Float32BufferAttribute(I, 1)); g.setAttribute('aLeaf', new THREE.Float32BufferAttribute(L, 1));
+  return g;
+}
+function buildCrowns() {
+  const bu = world.bodyUniforms(bodyId); if (!bu || !crownList.length) return;
+  crownU = { ...PHYS, uPhysBranchClock: { value: new THREE.Vector4() } };
+  const g = crownGeometry(crownH), roots = new Float32Array(crownList.length * 3), tr = new Float32Array(crownList.length * 4);
+  crownList.forEach(([e, n], k) => { const p = at(e, n); roots.set([p.x, p.y, p.z], k * 3); tr.set([crownH, 0.7 + 2.1 * k, (k * 0.37 + 0.11) % 1, 0], k * 4); });
+  g.setAttribute('aRoot', new THREE.InstancedBufferAttribute(roots, 3)); g.setAttribute('aTree', new THREE.InstancedBufferAttribute(tr, 4));
+  g.instanceCount = crownList.length;
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-lab-crown',
+    uniforms: makePaintUniforms(bu, crownU),
+    vertexShader: `${VERT_PARS}
+${FLORA_GLSL}
+attribute vec3 aRoot; attribute vec4 aTree; attribute float aId; attribute float aLeaf;
+varying vec3 vView; varying float vLeaf; varying vec2 vCu;
+void main() {
+  vec3 up = normalize(aRoot), ea = normalize(cross(vec3(0.0, 1.0, 0.0), up)), no = cross(up, ea);
+  float c = cos(aTree.y), s = sin(aTree.y);
+  vec3 rel = ea * (position.x * c - position.z * s) + no * (position.x * s + position.z * c) + up * position.y;
+  vec4 pb = pcPhysBend(aRoot, 1.0);                                   // the trunk's lean (and a brushed crown's shake)
+  float id = aId < 0.0 ? -1.0 : fract(aId + aTree.z);                 // one number per branch, different in every tree
+  rel += pcPhysCrown(rel, up, aTree.x, aRoot, pb, id, aLeaf);          // the branch (and its foliage) on its own wind
+  vec3 p = aRoot + pcPhysDisplace(rel, up, aTree.x, pb.xy);            // then the trunk carries it all
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vView = mv.xyz; vLeaf = aLeaf; vCu = uv;
+  gl_Position = projectionMatrix * mv;
+  ${VERT_END}
+}`,
+    fragmentShader: `${FRAG_PARS}
+varying vec3 vView; varying float vLeaf; varying vec2 vCu;
+void main() {
+  #include <logdepthbuf_fragment>
+  vec2 q = vCu - 0.5;
+  if (vLeaf > 0.5 && length(q) > 0.5 - 0.12 * texture(uNoise3D, vec3(vCu * 2.0, 0.37)).r) discard;
+  vec3 c = vLeaf > 0.5 ? vec3(0.36, 0.5, 0.2) : vec3(0.88, 0.86, 0.8);
+  c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
+  pcWrite(c, 0.25, vec3(0.0, 0.0, 1.0), -vView.z, vLeaf > 0.5 ? 6.0 : 5.0);
+}`,
+    side: THREE.DoubleSide,
+  });
+  m.userData.pcPainted = true;
+  bindBodyUniforms(m, bu);
+  crownMesh = new THREE.Mesh(g, m); crownMesh.frustumCulled = false; crownMesh.name = 'lab-crowns'; root.add(crownMesh);
+}
+// the JS twin of a stand-in tip: its motion (m east, north, up) from plantCrown, for tree k and branch i
+function crownTip(k, i, out = {}) {
+  const t = crownTips[i], [e, n] = crownList[k], yawK = 0.7 + 2.1 * k, c = Math.cos(yawK), s = Math.sin(yawK);
+  const F = physics.fields.flora, root0 = at(e, n), b = F.plantBend(root0, 1, {});
+  return F.plantCrown(t.x * c - t.z * s, t.x * s + t.z * c, t.y, crownH, root0, b.shake01 || 0, (t.id + (k * 0.37 + 0.11) % 1) % 1, 0, out);
 }
 const groundEx = rocks.length ? scrambleSample((d) => world.sampleSurface(bodyId, d), () => rocks) : (d) => world.sampleSurface(bodyId, d);
 const envEx = physics.bindEnv(bodyId, { sample: groundEx, gravity: body.gravity });
@@ -467,6 +566,8 @@ function step(dt) {
 }
 function draw(dt) {
   placeCamera();
+  if (crownList.length && !crownMesh) buildCrowns();
+  if (crownU) crownU.uPhysBranchClock.value.fromArray(physics.fields.flora.uniforms.uPhysBranchClock);
   let t0 = performance.now();
   world.update(dt, camera.position, bodyId);
   cost.world += (performance.now() - t0 - cost.world) * 0.1;
@@ -595,6 +696,7 @@ function run(seconds, dt = 1 / 60, each = null) { const f = each ? _fn(each) : n
 const lab = { info, stability, film, run, ctl, ex, sh, enu, enuV, at, focus0, east0, north0, up0, bodyId, body, get time() { return time; },
   get yaw() { return yaw; }, set yaw(v) { yaw = v; },
   physics, world, painter, renderer, scene, camera, root, THREE, get kits() { return kits; },
+  crownTip, crownTips, crownList,
   setRain(mode) { if (RAIN[mode]) { rainMode = mode; bound = false; buildKits(); } return rainMode; },
   hideKits(h) { if (kits) for (const o of kits.objects) o.userData.hide = !!h; } };
 window.__lab = lab;

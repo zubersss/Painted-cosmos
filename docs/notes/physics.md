@@ -3,6 +3,76 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P14 (twelfth PHYSICS agent; read this block first; P13 and older below hold for everything not named here)
+
+**Where things stand.** Item 1 of P14 (trees alive in a storm) is done and committed; items 2 (leaves), 3 (the
+shore) and 4 (three strips to re-film) are NOT done: I stopped near the end of my working context. `node --test
+src/physics/` 265 pass (2 new); PILOT's 123 pass on a clean export of `6a9e44e` with my files. Scratch:
+`/home/user/.pc-scratch/physics/p14/` (`ex.sh`: export of HEAD with the working physics over it into `p14/root`;
+`crown.mjs <t0:secs,...> [biome]`: branch tips in the Node spawn world; `synth.mjs`: tips in a uniform wind,
+spectral peak, correlation; `scan.mjs <root>`: the painted lab's spawn scanned over its clock, wind and crown load;
+`after/`: the strips).
+
+**1. Branches (`flora.js` `plantCrown`, `flora.glsl.js` `pcPhysCrown`).** The eleventh agent's crown model (a branch
+loaded by the wind on its own foliage: a set downwind as U^1.3, thrash from three frozen eddy trains 6, 11 and 19 m
+long carried at crown height, twigs trembling at 3.6 Hz) was judged in Node at the Earth spawn (P8's world): the
+amplitudes were right (set 0.44 m, 0.4 to 0.55 m in 2 s in the gust front) but **the tips moved at 0.2 to 0.8 Hz in
+every wind and three branches correlated 0.7 to 0.9**: the eddy trains are lines whose frequencies the wind sets
+(k U / 2 pi), so a branch only followed them and its own period never showed. Corrected:
+- *The resonant part* (Davenport's buffeting response): four clock lines at 0.72, 1.01, 1.43, 2.02 Hz (new uniform
+  `uPhysBranchClock`), each weighted by the branch's own oscillator |H(f)| and the turbulence at f (von Karman,
+  `crownLu` 25 m), with phases from the branch's id and from the place (`clockK`). Variance about the set =
+  1.69 Ic^2 phi(fb Lu / U) pi / (4 zeta), tested within 35 %. Across the wind 0.6 and up 0.45 of it.
+- *The eddy trains are now the background* (followed below the branch's frequency, shed above: no resonant peak of
+  their own, which was double counting) and carry the share of sigma_u that 5 to 25 m eddies hold (`crownBand` 0.33)
+  of the turbulence AT THE CROWN (`crownI` 3 x the open air's, capped at 0.6: the roughness sublayer and the crown's
+  own wake, Raupach, Finnigan and Brunet 1996). Numerically the old 1.3 x I, now capped.
+- Numbers, Node spawn world (open alpine meadow), a 3.5 m branch of 0.94 Hz: a breeze (4 m/s at 10 m) 7 cm in 2 s,
+  most at 1.03 Hz; the storm's height (240 s, 20 m/s) set 0.34 m, 0.49 m in 2 s; the gust front (184 s, 28 to 31
+  m/s, gusts to 51) 0.61 m. Branches of 0.85, 0.94, 1.69 Hz swing most at 0.72, 1.03, 1.42 Hz in 3 and in 20 m/s;
+  their quick swings correlate -0.3 to 0.5. In a uniform 20 m/s: tip from 0.0 to 0.6 m downwind, up +-0.16, across
+  +-0.18. Foliage 1 cm in a breeze, 6 cm in a gale at 3.6 Hz (unchanged).
+- **The game's spawn is a temperate wood, not the Node world's meadow, and its storm comes earlier**: the regional
+  wind peaks at 30 m/s at 161 to 169 s (gust front at about 149 s; at 240 s it is 21 m/s and easing). Among the
+  trees the 10 m wind is 12 to 18 m/s at the height and the crowns feel loads of 2 to 5 (11 to 18 m/s); a set of
+  0.12 to 0.26 m. That shelter is the air model's (`AirGrid.sampleWind`: the wake of upwind trees multiplies the
+  reference wind for crowns too, and the crown height factor). By the log law over a forest a 20.5 m/s open-ground
+  storm gives 8 to 9 m/s at a 13 m canopy top; the painted spawn gave 5 m/s at 240 s, so the crowns there may be
+  sheltered up to twice too much in speed. **Next: check whether the wake factor should apply at crown height**
+  (the canopy's top is above the lee of its neighbours), with a test; not changed here.
+
+**The strips** (from `p14/root`: a clean export of `f86bd1b` with my working files; `docs/shots/physics/motion-crown-*`;
+the lab's own stand-in birch, `crown=0,0`, 13 m, seven 3.5 m branches with foliage dabs, drawn through PAINTER's
+painter, camera 13 m off looking across the wind at 8.5 m, 10 frames a second):
+- `crown-storm` (167 s), OPENED: the trunk leans 7.9 to 8.9 degrees downwind; the foliage lobes change shape frame to
+  frame (the lower right mass reaches further out at 0.4 to 0.5 s than at 0.1 s while the upper left lobes rise and
+  fall out of step); tips 0.13, 0.42, 0.15 m in 1.2 s. A living crown, not a still one; a big gale it is not,
+  because the wood shelters it (above).
+- `crown-gust` (149 s), OPENED: the same, smaller (trunk 4.6 to 5.6 degrees, tips 0.10 to 0.16 m in 1.2 s).
+- `crown-breeze` (100 s, 4 m/s at 10 m), NOT opened: numbers only, tips 2 to 6 cm in 1.2 s, trunk 1.0 to 1.1 degrees.
+
+**API added (all additive).** `flora.js`: `FLORA.crownLu`, `clockR`, `clockK`, `branchRes`, `branchResX`,
+`branchResUp`, `crownI`, `crownBand`; exports `CLOCK_F`, `CLOCK_W`, `CLOCK_ID`, `CLOCK_M`; `FloraField.clockPhase`;
+uniform `uPhysBranchClock` (in `fields.flora.uniforms` and declared in `FLORA_GLSL`); `plantCrown`'s out also
+carries `res` (rms of the resonant swing, m). The eleventh agent's, now judged and kept: `plantCrown`,
+`FloraField.crownAt`, `crownWind`, `pcPhysCrown`, `physics.fields.flora.plantCrown(re, rn, h, H, root, shake01, id,
+leaf01, out)`, uniforms `uPhysBranch` (x is now the wind at load 1, m/s), `uPhysBranchPhase` (xyz eddy trains, w the
+twig clock). Lab: `crown=e,n[;...]`, `crownH=`, `__lab.crownTip(k, i)`. Film: `crown-breeze`, `crown-gust`, `crown-storm`.
+
+**Behaviour that changed without a call changing.** `pcPhysBranch` / `plantBranch` no longer read the trunk's bend:
+the branch's wind is looked up at the root (the eleventh agent's change), and now also rings at its own frequency.
+Nothing draws branches in the game yet (PAINTER's define is off), so nothing in the game's picture changes until
+PAINTER switches it on.
+
+**Cost.** `physics.update`: four more phase advances a frame (nothing measurable); not re-measured. The shader:
+24 sines, 4 powers, 2 field lookups a crown vertex.
+
+**Not done, in order.** (1) P14 item 2, leaves that can be seen (nothing changed: five to ten times the count in a
+gale, some carried near the camera's path, a tumble phase for PAINTER's two-toned leaf). (2) Item 3, the shore (the
+probe's run-up columns still print null; Earth beach calm and breeze, Neptune's storm coast at 40 to 55 s, with
+`kits=painter`). (3) Item 4, re-film `explorer-jet`, `ship-hover` (make the lab's hull draw `buffetAngle`, roll and
+yaw), `clamber-run-moon`. (4) The crown shelter in a wood (above). (5) From P13 and P12: see those blocks.
+
 ## Hand-over P13 (tenth PHYSICS agent; read this block first; P12 and older below hold for everything not named here)
 
 **Where things stand.** `node --test src/physics/` 262 tests pass (9 new); PILOT's 117 pass on a clean export of
@@ -1754,6 +1824,36 @@ What follows is what a physicist would object to, and it is all in the assists.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
 
+### P14, first (twelfth PHYSICS agent): switch branch motion on, exactly so
+
+The lab's stand-in birch (`physics-lab.html?painted=1&crown=0,0`, code in `src/physics/three/painted-lab.js`,
+`crownGeometry` and `buildCrowns`) is the reference: do in your tree shader what its vertex shader does.
+1. **Add one uniform to `PHYS` in `src/render/shared.js`**: `uPhysBranchClock: { value: new THREE.Vector4() }`.
+   `syncPhysFlora` copies only the keys `PHYS` already has, so without it the four clock lines stand still and the
+   resonant part of every branch freezes as a fixed offset. (`uPhysBranch` and `uPhysBranchPhase` you have.)
+2. **Per vertex, two attributes** (built once into the geometry):
+   - `aBranchId` (float): ONE number for every vertex of one first-order branch AND all the foliage it carries;
+     -1 on the trunk (and the leader's wood). Use `fract(i * 0.618034)` for branch i of the model.
+   - `aLeaf01` (float): 1 on foliage (leaf cards, dabs), 0 on wood.
+   Per instance (you have a per-tree number already): add it to the id so no two trees move alike:
+   `float id = aBranchId < 0.0 ? -1.0 : fract(aBranchId + treeHash);`
+3. **The calls, in this order** (body-local, `up` the plant's own up, `H` its height in m, `root` its body-local root):
+   ```glsl
+   vec4 pb = pcPhysBend(root, 1.0);                                  // the trunk (and pb.w, a brushed crown's shake)
+   vec3 rel = wp - root;                                             // the vertex relative to the root, body-local
+   rel += pcPhysCrown(rel, up, H, root, pb, id, aLeaf01);            // the branch on its own wind, its foliage on top
+   wp = root + pcPhysDisplace(rel, up, H, pb.xy);                    // then the trunk carries it all
+   ```
+   The branch length is `uPhysBranch.w x H` (0.27: 3.5 m on a 13 m birch). Nothing at the trunk's axis moves; a
+   point x of the way out moves x^2 (3 - x) / 2 of its branch tip, so the model's branches should reach about that
+   far from the axis. `pcPhysBranch(rel, up, H, root, pb)` (no id: whole lobes round the trunk) still works but
+   makes the crown move in smooth lobes, not branch by branch: use `pcPhysCrown`.
+4. **What it should look like** (strips `docs/shots/physics/motion-crown-*.jpg`): in a breeze the crown is all but
+   still (tips 2 to 6 cm in 1.2 s, at each branch's own 0.7 to 2 Hz); at the storm's height at the spawn (167 s)
+   the trunk leans 8 to 9 degrees and the foliage lobes change shape frame to frame, tips 0.12 to 0.42 m in 1.2 s,
+   each branch out of step with its neighbours. Mid and far tiers can skip it (cost: two field lookups, 24 sines,
+   4 powers a vertex).
+
 ### P13, first (tenth PHYSICS agent): legs that step, prints, branches, leaves
 
 1. **Swing the legs in time with the body** (the figure; PILOT passes these to `explorerModel.animate` once it has
@@ -2499,6 +2599,11 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     over it at the focus.
 
 ## Needs from the others
+
+**P14 (twelfth agent), current needs.** From PAINTER: switch branch motion on as "For PAINTER", P14 says: add
+`uPhysBranchClock` to `PHYS` in `src/render/shared.js`; give the tree geometry `aBranchId` (one number per branch and its
+foliage, -1 on the trunk) and `aLeaf01`; call `pcPhysCrown(rel, up, H, root, pcPhysBend(root, 1.0), fract(aBranchId +
+treeHash), aLeaf01)` before `pcPhysDisplace`. From PILOT: nothing new.
 
 **P13 (tenth agent), current needs.** From PILOT (all in "For PILOT", P13): (1) pass `phys.ride` as `hip` and
 `stride`, `footDown`, `feet`, `surge`, `crouch01`, `gait` to the figure; (2) footsteps from `phys.steps` /
