@@ -491,6 +491,10 @@ export class Sim {
       gravity: body.gravity, radius: body.radius, altGround: this.sh.altGround, time: this.t,
     };
     if (this.physics) {
+      // The pace of each world: commanded speeds scale with the fourth root of how thin its air
+      // is against Earth's (Mars and the airless bodies 1.6 x, Jupiter 1.25 x, Venus 0.75 x).
+      const A = this.physics.data && this.physics.data.ATMOSPHERES ? this.physics.data.ATMOSPHERES[f.id] : null;
+      env.speedScale = A ? clamp(Math.pow(1.225 / Math.max(A.rho0 || 0, 0.02), 0.25), 0.75, 1.6) : 1;
       // Air (density, wind, gusts) exists only in the ground frame; above it the ship is in vacuum.
       if (f.rotating) this.physics.bindEnv(f.id, env); else env.air = VACUUM_AIR;
       env.shipBody = this.physics.ship.step;
@@ -671,7 +675,7 @@ export class Sim {
           const G = this.physics.ground(id, dir, this._ground || (this._ground = {}));
           return Math.tan(g.slope) < 0.8 * (G.friction || 0.6);
         } : null;
-        if (beginLanding(sh, this.sampler(id), undefined, trees, holds)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
+        if (beginLanding(sh, this.sampler(id), undefined, trees, holds, settle)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
       }
     }

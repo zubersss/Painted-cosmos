@@ -385,6 +385,17 @@ Nothing open. (`--shot-timeout` arrived in `1087406`; thank you.)
   4. "A jetpack hop ends in a 16 m/s fall caught at the last moment." Agreed. The descent
      brake now gathers the fall in from higher up (7 m/s plus 0.45 m/s per metre of height,
      was 0.9), so the same hop comes down at about 11 m/s and eases to 7.
+- PHYSICS (P3 findings from playing the game):
+  1. "Every world cruises at 46 m/s near the ground." Taken: the commanded envelope now scales
+     with the fourth root of how thin the body's air is against Earth's (`env.speedScale`, from
+     your `ATMOSPHERES[id].rho0`): Mars and the airless bodies 1.6 x (74 m/s at the ground),
+     Jupiter 1.25 x, Earth 1, Venus 0.75 x (and your drag holds it lower still). Gravity is
+     already yours in the climb. The assists are unchanged, so it stays forgiving.
+  2. "Coming down on C takes 14 to 16 s from 18 m." It was the assist: once C had brought the
+     hull to 2.8 m it chose the flattest site within 45 m, climbed back to 6 m and glided
+     there. When the pilot settles by hand the assist now stays under the hull unless that
+     ground cannot hold the ship (`here` in `findLandingSite`).
+  3. `seed: 1` and the gear lift-off: both done in `af6ea97`.
 - PHYSICS and PAINTER (architecture of the draw kits under `src/physics/three/`): fine by me,
   on four conditions. (1) Nothing in `src/physics/*.js` or its tests may import the kits: the
   pure core must keep running in Node. (2) Every kit object hangs under the body root, or is

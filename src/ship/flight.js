@@ -158,7 +158,10 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   }
   // Near the ground the ship is slow (you are looking at a painting, not racing over it).
   const altForSpeed = ground ? Math.max(0, ground.r - ground.floor) : env.altitude;
-  const vmax = maxSpeedAt(altForSpeed, env.spaceAlt, env.hasBody, T);
+  // Each world flies at its own pace near the ground: fast and loose in thin air, slow and
+  // heavy in thick (env.speedScale, from the body's air; 1 on Earth and without PHYSICS).
+  const paceBlend = env.hasBody ? 1 - smoothstep(env.spaceAlt, env.spaceAlt * 4, env.altitude) : 0;
+  const vmax = maxSpeedAt(altForSpeed, env.spaceAlt, env.hasBody, T) * mix(1, env.speedScale || 1, paceBlend);
   const liftDir = w > 0.3 ? upRef : qRotate(st.q, V(0, 1, 0));
   const liftSpeed = clamp(vmax * 0.42, T.liftSpeed, T.liftSpeedSpace);
   let target = add(scale(f, st.throttle * vmax), scale(liftDir, (input.lift || 0) * liftSpeed));
@@ -312,7 +315,8 @@ export function beginLiftoff(st) {
 // `obstacles` (optional): [{ unitDir, radius }] trees and boulders to keep clear of.
 // `holds` (optional): (dir, ground) -> bool, whether the ground there will hold a parked ship
 // (PHYSICS: friction against the slope). Without it, slopes up to landMaxSlope are accepted.
-export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = null) {
+// `here` (optional): the pilot is settling by hand, so stay under the hull unless that cannot hold.
+export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = null, here = false) {
   const up = norm(p);
   const r = len(p);
   const a = tangent(V(0.31, 0.77, 0.55), up);
@@ -329,7 +333,7 @@ export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = n
   };
   const consider = (dir, distance) => {
     const g = floorAt(sample, scale(dir, r));
-    const score = g.slope * 60 + (g.liquid ? 14 : 0) + distance * 0.35 + crowd(dir) * 25;
+    const score = g.slope * (here ? 20 : 60) + (g.liquid ? 14 : 0) + distance * (here ? 3 : 0.35) + crowd(dir) * 25;
     const ok = g.liquid || (holds ? holds(dir, g) : g.slope <= T.landMaxSlope);
     if (ok && (!best || score < best.score)) {
       best = { dir, floor: g.floor, normal: g.normal, liquid: g.liquid, slope: g.slope, score, distance };
@@ -346,8 +350,8 @@ export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = n
   return best;
 }
 
-export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = null) {
-  const site = findLandingSite(st.p, sample, T, obstacles, holds);
+export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = null, here = false) {
+  const site = findLandingSite(st.p, sample, T, obstacles, holds, here);
   if (!site) return false;
   st.landing = { ...site, phase: 'glide', t: 0 };
   st.liftoff = null;
