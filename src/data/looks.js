@@ -206,14 +206,14 @@ export const LOOKS = {
       B('obsidian_fields', 'Obsidian Glass Fields', 'flat', ['indigo', 'paynesGrey', 'neutralTint', 'cobaltViolet', 'sepia'], 'turquoise', ['paynesGrey', 'indigo', 'neutralTint'],
         { t: { amp: 14, crack: 0.5, gloss: 1, dil: 0.12 }, tall: [2, 2], tallD: 0.22, tallMix: 1, small: { rock: 0.03, shard: 0.05 }, phys: { ground: 'rock' } }),
       B('crystal_gardens', 'Twilight Crystal Gardens', 'rolling', ['cobaltViolet', 'roseMadder', 'cerulean', 'neutralTint', 'indigo'], 'lemonYellow', ['cobaltViolet', 'roseMadder', 'neutralTint'],
-        { t: { amp: 45, wl: 380, dusk: 0.3 }, tall: [0, 1], tallD: 0.5, tallMix: 0.55, small: { shard: 0.25, rock: 0.02 } }),
+        { t: { amp: 45, wl: 380, dusk: 0.3 }, tall: [0, 1], tallD: 0.26, tallMix: 0.55, small: { shard: 0.12, rock: 0.02 } }),
       B('shadow_craters', 'Frozen Shadow Craters', 'crater', ['davysGrey', 'cobaltBlue', 'neutralTint', 'indigo', 'paynesGrey'], 'mint', ['davysGrey', 'cobaltBlue', 'neutralTint'],
         { t: { frost: 0.8, dusk: 0.4 }, small: { shard: 0.08, rock: 0.04 }, phys: { ground: 'ice' } }),
     ],
   },
 
   venus: {
-    seed: 'venus-3', seaLevel: null, cloud: 0.85, visibility: [230, 1000],
+    seed: 'venus-3', seaLevel: null, cloud: 0.85, visibility: [230, 1000], bands: 0.6,
     sky: mkSky([0.90, 0.76, 0.40], [0.99, 0.91, 0.62], { glaze: [0.74, 0.62, 0.66], light: [1.0, 0.94, 0.72], cloudShade: [0.86, 0.66, 0.44] }),
     flora: {
       tall: [
