@@ -19,6 +19,7 @@
 //                            [--hour 10] [--settle 120] [--out dir] [--vistas 0] [--orbit 0]
 //                            [--label "text for the sheet's header"] [--query "stub=1"]
 //                            [--sheets dir (default docs/lead/evidence)]
+//                            [--weather 1 (leave PHYSICS' weather on; default: a clear sky, no marks)]
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -35,7 +36,11 @@ if (!label) {
   try { label = 'commit ' + execSync('git rev-parse --short HEAD', { cwd: repo }).toString().trim() + (opt.root ? ' (clean export)' : ' (working tree)'); }
   catch { label = opt.root ? 'a clean export' : 'the working tree'; }
 }
-const query = `dynres=0&pointerlock=0&card=0&fresh=1&save=0&audio=0&quality=${opt.quality}` + (opt.query ? '&' + opt.query : '');
+// Fair weather and no weather marks unless asked otherwise (--weather 1): the sheets are compared
+// from review to review, and a storm that happens to cross a stand would make that impossible.
+// The weather itself is judged on its own sheet: node tests/weather.mjs.
+const fair = String(opt.weather || '0') === '0' ? '&weather=fair&kits=0' : '';
+const query = `dynres=0&pointerlock=0&card=0&fresh=1&save=0&audio=0&quality=${opt.quality}${fair}` + (opt.query ? '&' + opt.query : '');
 const { page, browser, problems, close } = await openPage({ pagePath: '/index.html?' + query, w: W, h: H, root: opt.root });
 const summary = { label, quality: Number(opt.quality), size: `${W}x${H}`, settleLimit: SETTLE, bodies: {} };
 let failed = false;
@@ -202,7 +207,7 @@ async function writeSheet(body, frames) {
     return `${body} / ${what}${bits.filter(Boolean).length ? ': ' + bits.filter(Boolean).join('; ') : ''} ${flags}`;
   };
   const cells = frames.map((f) => `<figure>${f.file ? `<img src="data:image/jpeg;base64,${fs.readFileSync(f.file).toString('base64')}">` : '<div class="none"></div>'}<figcaption>${caption(f)}</figcaption></figure>`).join('');
-  const head = `<header><b>${body}</b>: the freeze-frame tour, ${esc(label)}, ${W}x${H}, quality ${opt.quality}, local time ${opt.hour}:00. `
+  const head = `<header><b>${body}</b>: the freeze-frame tour, ${esc(label)}, ${W}x${H}, quality ${opt.quality}, local time ${opt.hour}:00, ${fair ? 'fair weather held (no weather marks)' : 'the weather as it comes'}. `
     + `${shot.length} frames; <span class="${unsettled ? 'bad' : ''}">${unsettled ? unsettled + ' of them DID NOT SETTLE within ' + SETTLE + ' s (world.busy never reached 0): those frames may show unfinished terrain or flora' : 'every frame settled (world.busy reached 0) before it was captured'}</span>.</header>`;
   // The numbers first: they must survive whatever happens to the picture of the sheet.
   const rows = frames.map((f) => ({ kind: f.kind, id: f.id, name: f.name, alsoVista: f.alsoVista || null, settledSeconds: f.settled, tris: f.tris, calls: f.calls, worldWorstMs: f.worldWorstMs, physicsWorstMs: f.physicsWorstMs, stoodIn: f.stoodIn, moved: f.moved || 0, found: f.found, at: f.at, flags: f.flags || [] }));

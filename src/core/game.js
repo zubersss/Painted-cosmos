@@ -446,7 +446,29 @@ export class Game {
       `scene  ${k(s.tris)} triangles   ${s.calls} draw calls`,
       `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}`,
       `world ${s.worldMs.toFixed(1)} ms (worst ${Math.max(0, ...s.worldWindow).toFixed(1)})   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
+      this.weatherText(k),
     ].join('\n');
+  }
+
+  // What the weather is doing and what its marks cost (the world draws PHYSICS' kits itself:
+  // rain, snow, dust, rings, prints; their share is already inside the scene line above).
+  weatherStats() {
+    const kits = this.world.kits, st = kits && kits.stats;
+    const sky = this.sim.mood.sky;
+    const r = (x) => +(+x || 0).toFixed(2);
+    return {
+      kits: st ? { calls: st.drawCalls | 0, tris: st.triangles | 0 } : null,
+      sky: sky ? { cloud: r(sky.cloud), overcast: r(sky.overcast), haze: r(sky.haze), fog: r(sky.fog), dust: r(sky.dust), wet: r(sky.wet), snow: r(sky.snow), rain: r(sky.rain), snowfall: r(sky.snowfall), storm: r(sky.storm), flash: r(sky.flash) } : null,
+    };
+  }
+
+  weatherText(k) {
+    const w = this.weatherStats();
+    const kits = w.kits ? `kits ${w.kits.calls} draw calls, ${k(w.kits.tris)} triangles` : 'kits none';
+    if (!w.sky) return `weather  ${kits}   (no sky numbers)`;
+    const s = w.sky, bits = [];
+    for (const [name, v] of [['overcast', s.overcast], ['rain', s.rain], ['snowfall', s.snowfall], ['dust', s.dust], ['fog', s.fog], ['storm', s.storm], ['wet', s.wet]]) if (v >= 0.05) bits.push(`${name} ${v.toFixed(2)}`);
+    return `weather  ${kits}   ${bits.length ? bits.join('  ') : 'fair'}`;
   }
 
   info() {
@@ -458,6 +480,7 @@ export class Game {
         frameMs: +s.frameMs.toFixed(1), worldMs: +s.worldMs.toFixed(2), worldWorstMs: +Math.max(0, ...s.worldWindow).toFixed(2),
         worldPeakMs: +s.worldPeakMs.toFixed(2), tris: s.tris, calls: s.calls, shown: this.showStats,
       },
+      weather: this.weatherStats(),
       mapOpen: !!(this.map && this.map.open), bookOpen: !!(this.book && this.book.open), uiNotice: this.uiNotice,
       audio: this.audio ? { state: this.audio.state, ready: this.audio.ready, mix: this.audio.debug() } : null,
       sketches: this.sketches ? { count: this.sketches.count, chars: this.sketches.total, saved: this.sketches.saved, keys: Object.keys(this.sketches.items), last: this.lastSketch || null } : null,

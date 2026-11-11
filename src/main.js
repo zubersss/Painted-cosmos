@@ -10,6 +10,7 @@
 //   stats=1                          show the frame read-out (also the ` key)
 //   fresh=1                          forget the saved game       save=0   do not save
 //   audio=0                          silence
+//   kits=0                           no weather marks (rain, snow, dust)   weather=fair   a clear sky, always
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
@@ -58,13 +59,16 @@ async function boot() {
       // PHYSICS' default seed: chosen so that weather happens at the real Earth spawn
       // (a thunderstorm crosses late in the first morning).
       physics = prov.createPhysics({ sampleSurface: (bodyId, d) => world.sampleSurface(bodyId, d) });
-      if (world.setPhysics) world.setPhysics(physics);
+      // The world draws PHYSICS' weather marks itself (rain, snow, dust, rings, prints);
+      // ?kits=0 leaves them out, ?weather=fair holds a clear sky (comparable captures).
+      if (world.setPhysics) world.setPhysics(physics, params.get('kits') === '0' ? { kits: false } : undefined);
     } catch (e) {
       physics = null;
       console.warn('[painted-cosmos] physics could not start (' + (e && e.message) + '); using the built-in movement.');
     }
   }
   prov.using.physics = physics ? 'real' : 'stub';
+  if (params.get('weather') === 'fair' && world.setWeather) world.setWeather({});
 
   const hudRoot = document.getElementById('pc-hud');
   const hud = createHud(hudRoot);
@@ -137,6 +141,9 @@ async function boot() {
     setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },
     // Force lightning (setMood.sky.flash = 1) for `frames` frames: nobody has seen it yet.
     flash: (frames = 1) => { game.forceFlash = Math.max(1, frames | 0); },
+    // Set the game clock (seconds): the weather is a function of it. The sun moves with it
+    // (use setHour or teleport({ hour }) afterwards to choose the light).
+    setClock: (t) => { sim.t = Math.max(0, +t || 0); },
     setHour: (h) => { sim.eph.setLocalSolarTime(sim.bodyId, sim.t, norm3(sim.ex.p), h); },
     // Resolves when the world has had nothing left to build for `frames` frames in a row.
     settle: (frames = 12) => new Promise((resolve) => {
