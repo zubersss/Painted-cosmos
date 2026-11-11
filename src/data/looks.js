@@ -236,6 +236,8 @@ export const LOOKS = {
         { kit: 'fungus', scale: 1.0, vary: 1, bark: [[0.96, 0.90, 0.72], [0.62, 0.46, 0.34]], leaf: [[0.96, 0.74, 0.34], [0.88, 0.56, 0.30], [0.60, 0.34, 0.28]], barkP: [0.74, 0, 1.6, 0.4], leafP: [0.35, 0.0, 1.0, 0.4], wind: 0.03, far: [10, 14, 0.0], obs: [0.7, 14] },
         { kit: 'fungus', scale: 0.6, vary: 1, bark: [[0.94, 0.86, 0.76], [0.58, 0.42, 0.40]], leaf: [[0.92, 0.60, 0.62], [0.80, 0.44, 0.50], [0.52, 0.30, 0.40]], barkP: [0.74, 0, 1.6, 0.4], leafP: [0.35, 0.0, 1.0, 0.4], wind: 0.03, far: [7, 9, 0.0], obs: [0.5, 8] },
         { kit: 'spire', scale: 0.8, vary: 1, bark: [[0.50, 0.44, 0.46], [0.22, 0.20, 0.26]], leaf: [[0.50, 0.44, 0.46], [0.36, 0.32, 0.36], [0.22, 0.20, 0.26]], far: [7, 12, 0.85], obs: [1.6, 9] },
+        // the old towers that line a lava river, full grown, their caps warmed from below
+        { kit: 'fungus', scale: 1.45, bark: [[0.97, 0.90, 0.70], [0.66, 0.44, 0.30]], leaf: [[0.97, 0.70, 0.30], [0.90, 0.48, 0.24], [0.58, 0.28, 0.24]], barkP: [0.74, 0, 1.6, 0.4], leafP: [0.35, 0.0, 1.0, 0.4], wind: 0.03, far: [14, 20, 0.0], obs: [1.0, 20] },
       ],
       under: { leaf: [[0.92, 0.80, 0.40], [0.80, 0.62, 0.34], [0.56, 0.40, 0.30]], accent: [0.86, 0.36, 0.46], bush: [[0.90, 0.66, 0.36], [0.74, 0.48, 0.32], [0.48, 0.30, 0.30]], rock: [[0.62, 0.56, 0.56], [0.30, 0.27, 0.32]], shard: [[0.96, 0.94, 0.60], [0.70, 0.74, 0.40]],
         // the sward: young fungi (caps on pale stalks), what has fallen from the towers, crusts of mould
@@ -246,7 +248,7 @@ export const LOOKS = {
         { t: { amp: 55, wl: 480, patch: [{ c: [0.58, 0.60, 0.30], wl: 17, thr: -0.05, soft: 0.35, amt: 0.55 }, { c: [0.86, 0.60, 0.50], wl: 7, thr: 0.28, soft: 0.25, amt: 0.4 }] }, mist: 0.8, tall: [0, 1], tallD: 0.62, tallMix: 0.55,
           near: { blade: 2, dab: 1, flower: 7, flowerSize: 2.3, fern: 6, litter: 6, crust: 4 }, small: { bush: 0.09, fern: 0.20, flower: 0.10, rock: 0.02 } }),
       B('lava_rivers', 'Lava Rivers', 'riverbed', ['sepia', 'burntUmber', 'paynesGrey', 'cadOrange', 'indigo'], 'cadScarlet', ['burntUmber', 'sepia', 'paynesGrey'],
-        { t: { amp: 34, wet: 1, dil: 0.14, patch: [{ c: [0.17, 0.15, 0.19], wl: 31, thr: -0.02, soft: 0.3, amt: 0.6 }, { c: [0.84, 0.72, 0.36], wl: 9, thr: 0.24, soft: 0.22, amt: 0.5 }, { c: [0.74, 0.40, 0.24], wl: 4.5, thr: 0.38, soft: 0.2, amt: 0.45 }] }, liquid: { color: [0.97, 0.56, 0.22], refl: 0, glow: 1 }, tall: [2, 2], tallD: 0.17, tallMix: 1,
+        { t: { amp: 34, wet: 1, dil: 0.14, bedW: 12, bedD: 2.3, flow: 1.3, ember: 1, emberR: 26, patch: [{ c: [0.17, 0.15, 0.19], wl: 31, thr: -0.02, soft: 0.3, amt: 0.6 }, { c: [0.84, 0.72, 0.36], wl: 9, thr: 0.24, soft: 0.22, amt: 0.5 }, { c: [0.74, 0.40, 0.24], wl: 4.5, thr: 0.38, soft: 0.2, amt: 0.45 }] }, liquid: { color: [0.96, 0.46, 0.16], refl: 0, glow: 1 }, tall: [3, 2], tallD: 0.30, tallMix: 0.62,
           // cooled flows: ropes of dark glass, sulphur crust round the vents, an ember crack here and there
           under: { crust: [[0.13, 0.12, 0.16], [0.90, 0.78, 0.36], [0.30, 0.26, 0.30], [0.93, 0.52, 0.22]] }, near: { dab: 3, crust: 8, needle: 0 }, small: { rock: 0.11 }, phys: { ground: 'rock' } }),
       B('acid_terraces', 'Acid Lake Terraces', 'terraced', ['lemonYellow', 'oliveGreen', 'yellowOchre', 'viridian', 'rawUmber'], 'turquoise', ['lemonYellow', 'yellowOchre', 'oliveGreen'],

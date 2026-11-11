@@ -19,6 +19,8 @@ const _cf = {};
 
 const NOT = {};
 const SNOW = [0.97, 0.98, 1.0];
+const CHAR = [0.16, 0.14, 0.19];     // cooled lava: indigo and sepia, the darkest wash of a lava plain
+const EMBER = [0.98, 0.55, 0.24];    // the glow of lava on its banks: cadmium orange run thin
 
 export const NOLQ = -1e9;
 const D2R = Math.PI / 180;
@@ -328,7 +330,7 @@ class Surface {
     const X = x * R, Y = y * R, Z = z * R;
     const T = bi.t || NOT, k = bi.terrain;
     let h = 0, t = 0.5, dry = 0.4, wet = 0.2, lq = NOLQ, grow = 1, bed = 0;
-    let shade = 0, snow = 0, veil = 0, lip = 0, meadow = 1;
+    let shade = 0, snow = 0, veil = 0, lip = 0, meadow = 1, ember = 0, char = 0, crk = 0;
     if (k === 'alpine') {
       // meadows fill the valley floors; the peaks stand up sharply behind them
       const wl = T.wl || 1000, amp = T.amp || 480;
@@ -536,7 +538,9 @@ class Surface {
       if (T.veil) veil = (1 - smoothstep(3, T.veil, h - lq + C.n3(X / 31, Y / 31 + 2.0, Z / 31) * T.veil * 0.35)) * smoothstep(-3, 2, h - lq);
     } else if (k === 'riverbed') {
       this._base(c);
-      const s = c.s, amp = T.amp || 26, w0 = T.bedW || (T.wet ? 9 : 6.5), dp = T.bedD || 1.6;
+      // (`flow`: the bed swells and narrows along its course: pools of lava between narrows)
+      const s = c.s, amp = T.amp || 26, dp = T.bedD || 1.6;
+      const w0 = (T.bedW || (T.wet ? 9 : 6.5)) * (T.flow ? 0.7 + T.flow * smoothstep(-0.3, 0.5, A.n3(x * R / 210 + 4.4, y * R / 210 - 2.2, z * R / 210 + 9.1)) : 1);
       const hb = s < w0 ? -1.2 - dp * (1 - (s / w0) * (s / w0)) : -1.2 + (dp * 0.6 + 1.0) * smoothstep(w0, w0 + 4 + dp * 1.5, s);
       const rise = smoothstep(w0 + 2, 110, s);
       const hill = Math.max(0, 0.5 + 0.55 * A.n3(x * R / 380 + 7.7, y * R / 380 + 1.1, z * R / 380 - 3.3));
@@ -547,6 +551,9 @@ class Surface {
       // things grow along the banks, where the water once ran
       grow = smoothstep(w0 + 0.5, w0 + 4, s) * (1 - smoothstep(22, 60, s) * 0.85);
       shade = smoothstep(w0 - 0.5, w0 + 1.5, s) * (1 - smoothstep(w0 + 1.5, w0 + 4 + dp, s)) * 0.3 * (T.wet ? 0 : 1);
+      // the light of what flows: a warm glaze on the banks that dies away in a few strides, and
+      // beside it the cooled levee, the darkest ground of the plain
+      if (T.ember) { const se = w0 * Math.sqrt(Math.max(0, 1 - 0.7 / dp)); ember = T.ember * (1 - smoothstep(se - 1, se + (T.emberR || 16), s)); char = smoothstep(se - 2, se + 1, s) * (1 - smoothstep(se + 6, se + 44, s)); crk = -char * smoothstep(-0.25, 0.35, C.n3(X / 23 + 7.0, Y / 23, Z / 23 - 3.0)); }
     } else if (k === 'sinkholes') {
       const amp = T.amp || 40;
       const cl = A.n3(x * R / 190 + 9.0, y * R / 190 - 4.0, z * R / 190 + 2.0);
@@ -595,6 +602,8 @@ class Surface {
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
     if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
     if (bed > 0) { mix3(b, pal.low, bed * 0.6); if (T.bedPale) { const kb = bed * T.bedPale; b.r += (0.97 - b.r) * kb; b.g += (0.95 - b.g) * kb; b.b += (0.93 - b.b) * kb; } }
+    if (char > 0) { const kc = char * (0.5 + v * 1.6) * (T.char == null ? 0.55 : T.char); mix3(b, CHAR, clamp(kc, 0, 0.85)); }
+    if (ember > 0) { const ke = clamp(ember * (0.8 + v * 0.8), 0, 0.9); mix3(b, EMBER, ke * 0.62); }
     if (T.dusk) { const d = T.dusk; b.r *= 1 - 0.30 * d; b.g *= 1 - 0.30 * d; b.b *= 1 - 0.12 * d; }
     // fog lying in the low ground: the wash thins toward paper below its level
     if (T.fog) { const fk = (1 - smoothstep(T.fog[0] - T.fog[1], T.fog[0] + T.fog[1], h + v * T.fog[1] * 2.5)) * 0.82; b.r += (0.99 - b.r) * fk; b.g += (0.975 - b.g) * fk; b.b += (0.93 - b.b) * fk; wet = wet + (1 - wet) * fk; }
@@ -606,7 +615,7 @@ class Surface {
     b.trees = dens; b.birch = bi.tallMix == null ? 0.5 : bi.tallMix;
     b.canopy = dens * 0.8 * this.shade[bidx];
     b.under = bi.small ? (lq !== NOLQ && h < lq ? 0 : meadow) : 0;
-    b.rock = k === 'alpine' ? t : 0; b.s = c.baseReady ? c.s : 1e9; b.glade = 1; b.aux = T.crack || 0;
+    b.rock = k === 'alpine' ? t : 0; b.s = c.baseReady ? c.s : 1e9; b.glade = 1; b.aux = crk || T.crack || 0;
     b.strata = T.strata || 0; b.lip = lip;
   }
 
@@ -703,6 +712,31 @@ class Surface {
     if (this._spawn) return this._spawn;
     const s0 = this.sites[0];
     const o = makeSample(this.nB);
+    // A first landing chosen by eye (looks.js `spawn`: [x, y, z, yaw, pitch in degrees]): the spot and the way to
+    // face where the world's idea stands in the first view (a lava river with towers on its banks, the rim of a
+    // sky island under the ring arc). Kept only while it still stands on dry, level ground with room for the ship.
+    const fx = this.look.spawn;
+    if (fx) {
+      const k = 1 / Math.hypot(fx[0], fx[1], fx[2]), x = fx[0] * k, y = fx[1] * k, z = fx[2] * k;
+      let ax = -z, ay = 0, az = x; const al = Math.hypot(ax, ay, az) || 1; ax /= al; az /= al;
+      const bx = y * az - z * ay, by = z * ax - x * az, bz = x * ay - y * ax;
+      this.sample(x, y, z, o, true);
+      const h0 = o.h, top = o.top;
+      let ok = !(o.lq !== NOLQ && o.lq > o.h - 0.5);
+      for (let a = 0; a < 8 && ok; a++) {
+        const ca = Math.cos(a * Math.PI / 4), sa = Math.sin(a * Math.PI / 4);
+        for (const r of [6.5, 13]) {
+          const e = r / this.R;
+          this.sample(x + (ax * ca + bx * sa) * e, y + (ay * ca + by * sa) * e, z + (az * ca + bz * sa) * e, o, false);
+          if ((o.lq !== NOLQ && o.lq > o.h - 0.3) || Math.abs(o.h - h0) / r > 0.2) { ok = false; break; }
+        }
+      }
+      if (ok) {
+        this._spawn = { x, y, z, yaw: fx[3] * D2R, pitch: (fx[4] || 0) * D2R };
+        if (this.biomes[top].tall) this.clearings.push({ x, y, z, r: fx[5] || 15 });
+        return this._spawn;
+      }
+    }
     // tangent frame at the site
     let ux = -s0.z, uy = 0, uz = s0.x; let l = Math.hypot(ux, uy, uz) || 1; ux /= l; uy /= l; uz /= l;
     const vx = s0.y * uz - s0.z * uy, vy = s0.z * ux - s0.x * uz, vz = s0.x * uy - s0.y * ux;

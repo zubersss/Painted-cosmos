@@ -35,6 +35,8 @@ uniform vec4 uCloud;        // shell radius, coverage, feature size (m), drift
 uniform vec4 uAtmo;         // space01 (0 on the ground .. 1 in space), dayness, sun angular radius, body radius
 uniform vec4 uWxSky;        // weather: x overcast, y storm, z rain veil, w snow veil
 uniform vec3 uStormWash;    // this world's heavy-weather pigment (its cloud shadow laid dense, glazed with indigo)
+uniform vec4 uRingS;        // a ringed world seen from under its rings: inner, outer radius (m), strength (0: none)
+uniform vec3 uRingC;        // the rings' wash
 uniform float uTime;
 varying vec3 vDirL;
 varying vec3 vDirW;
@@ -68,6 +70,42 @@ void main() {
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
   // below the horizon (seen from high up): haze
   sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
+
+  // ---- the rings, seen from the ground: a great pale arc across the sky, laid into the wash
+  // before the clouds (so clouds drift in front of it), band beside band with the sky between,
+  // lost in the haze toward the horizon; the planet's own shadow lies across its far side.
+  // (The same plane, radii and bands as the ring's geometry in orbit.js, which takes over in space.)
+  if (uRingS.z > 0.001 && abs(d.y) > 1e-5) {
+    float tr = -uCamL.y / d.y;
+    vec3 rp = uCamL + d * tr;
+    float r01 = (length(rp.xz) - uRingS.x) / (uRingS.y - uRingS.x);
+    float pb = dot(uCamL, d), pd = pb * pb - (dot(uCamL, uCamL) - uAtmo.w * uAtmo.w);
+    bool hid = pd > 0.0 && (-pb - sqrt(pd)) > 0.0 && (-pb - sqrt(pd)) < tr;      // the planet in the way (from high up)
+    if (tr > 0.0 && r01 > 0.0 && r01 < 1.0 && !hid) {
+      vec4 ra = texture(uNoise3D, vec3(r01 * 2.3, 0.37, 0.11));
+      vec4 rb = texture(uNoise3D, vec3(r01 * 9.1, 0.71, 0.53));
+      float band = ra.r * 0.65 + rb.g * 0.35;
+      float on = smoothstep(0.40, 0.46, band) * smoothstep(0.0, 0.05, r01) * (1.0 - smoothstep(0.93, 1.0, r01));
+      float pool = on * (1.0 - smoothstep(0.46, 0.55, band));                      // pigment pools along each band's edge
+      float al = dot(rp, uSunDirL);
+      float lit = al > 0.0 ? 1.0 : smoothstep(uAtmo.w * 0.95, uAtmo.w * 1.05, length(rp - uSunDirL * al));
+      // the brush runs dry along the arc here and there (anchored to the ring, not to the eye)
+      float dryb = texture(uNoise3D, vec3(rp.xz / uRingS.y * 2.6, r01 * 1.7)).g;
+      float k = on * uRingS.z * smoothstep(0.015, 0.16, e) * (1.0 - oc * 0.85) * (0.70 + 0.30 * smoothstep(0.32, 0.56, dryb));
+      // by day: some bands lifted to paper out of the sky's wash, some a thin glaze of the rings' own gold over it
+      float kind = smoothstep(0.42, 0.58, rb.b + (ra.g - 0.5) * 0.4);
+      vec3 lifted = mix(vec3(1.0, 0.99, 0.95), uRingC, 0.12);
+      vec3 glazed = dens(sky * mix(vec3(1.0), uRingC, 0.75), 1.25 + pool * 0.8);
+      vec3 ringD = mix(glazed, lifted, kind);
+      // by night the lit ring is the palest thing in the sky
+      vec3 ringN = mix(uRingC, vec3(1.0, 0.985, 0.93), 0.35 + 0.4 * kind);
+      vec3 ringc = mix(ringN, ringD, uAtmo.y);
+      // in the planet's shadow: only a cool breath darker than the sky
+      ringc = mix(dens(sky * vec3(0.86, 0.85, 0.93), 1.35), ringc, lit);
+      sky = mix(sky, ringc, k * mix(0.9, 0.82, uAtmo.y));
+      sky = dens(sky, 1.0 + pool * k * 0.55 * lit);
+    }
+  }
 
   // ---- clouds: bare paper with soft violet undersides, on a shell around the planet
   float rc = length(uCamL);
@@ -175,6 +213,8 @@ export function makeSkyUniforms() {
     uAtmo: { value: new THREE.Vector4(0, 1, 0.045, 4000) },
     uWxSky: { value: new THREE.Vector4(0, 0, 0, 0) },
     uStormWash: { value: new THREE.Vector3(0.48, 0.50, 0.68) },
+    uRingS: { value: new THREE.Vector4(1, 2, 0, 0) },
+    uRingC: { value: new THREE.Vector3(0.93, 0.86, 0.66) },
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },
     uBodyInv: { value: new THREE.Matrix3() },

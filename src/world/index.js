@@ -250,7 +250,7 @@ export function createWorld(scene) {
       st.farTier = tier;
       const seen = tier === 2;
       st.terrain.group.visible = seen;
-      if (st.ring) st.ring.visible = tier > 0;
+      if (st.ring) st.ring.visible = tier > 0 && !(st === active && lighting.bodyId === st.id && lighting.space01 < 0.55);
       const dabOn = st !== active && tier > 0 && st.dabFade > 0.004;
       if (dabOn && !st.dab) st.dab = makeDab(st);
       if (st.dab) { st.dab.visible = dabOn; if (dabOn) st.dab.material.uniforms.uFade.value = st.dabFade; }
@@ -425,6 +425,8 @@ export function createWorld(scene) {
       const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8), 0.12, 0.9) : look.cloud;
       skyU.uCloud.value.set(body.radius + atmH * 0.55, cover, Math.max(900, atmH * 3.2), 0.0006);
       skyU.uAtmo.value.set(space01, dayness, 0.042, body.radius);
+      // a ringed world's rings are laid into the sky's wash while one stands under them; the ring's geometry takes over in space
+      { const rg = st.look.rings; if (rg) { skyU.uRingS.value.set(body.radius * rg.inner, body.radius * rg.outer, 1 - THREE.MathUtils.smoothstep(space01, 0.55, 0.9), 0); skyU.uRingC.value.fromArray(rg.color); } else skyU.uRingS.value.z = 0; }
       st.root.getWorldQuaternion(_q);
       skyU.uBodyInv.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(_q.invert()));
       SHEET.grade.copy(tmpKey.grade).lerp(new THREE.Vector3(1, 1, 1), space01);
@@ -509,7 +511,8 @@ export function createWorld(scene) {
     sampleSurface(bodyId, unitDir) { return sampleSurfacePure(bodyId, unitDir.x, unitDir.y, unitDir.z); },
     getVistas(bodyId) { return getVistasPure(bodyId); },
     setTime(bodyId, hours) { const st = state.get(bodyId); if (st) st.forcedTime = (hours == null ? null : +hours); },
-    getSpawn(bodyId) { const s = getSurface(bodyId).getSpawn(); return { unitDir: { x: s.x, y: s.y, z: s.z } }; },
+    // (additive: yaw and pitch, radians, yaw from local north toward east: the way to face on arrival, where the world has a view to show)
+    getSpawn(bodyId) { const s = getSurface(bodyId).getSpawn(); const r = { unitDir: { x: s.x, y: s.y, z: s.z } }; if (s.yaw != null) { r.yaw = s.yaw; r.pitch = s.pitch || 0; } return r; },
     setVistaFound(bodyId, vistaId, found) { const st = state.get(bodyId); if (st) { if (found) st.found.add(vistaId); else st.found.delete(vistaId); } },
     // additive
     get busy() { return busy(); },

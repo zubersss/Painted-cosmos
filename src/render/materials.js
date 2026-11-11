@@ -160,7 +160,8 @@ void main() {
 
   // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks.
   // The lines wander, swell, thin and break off: drawn by hand, not tiled.
-  if (vPar.w > 0.01) {
+  // (a negative amount: cooled lava, whose cracks open on the glow beneath: lines of fire, not of pigment)
+  if (abs(vPar.w) > 0.01) {
     vec3 wp = vAnch + (n2.rgb - 0.5) * 2.2 + (ma.rgb - 0.5) * 0.5;
     float a1 = pcTri8(wp, nL, 1.0 / 16.0).a;
     float w1 = 0.035 + 0.075 * n1.b;
@@ -171,7 +172,8 @@ void main() {
     float big = 1.0 - smoothstep(0.012, 0.045 + 0.05 * n2.r, a2);
     big *= smoothstep(0.30, 0.46, n1.g + (n2.b - 0.5) * 0.5);
     float crack = max(fine * near * 0.75, big * mix(0.55, 1.0, near) * mid);
-    c = pcDensity(c, 1.0 + crack * vPar.w * 2.2 * (1.0 - snowC * 0.8));
+    if (vPar.w > 0.0) c = pcDensity(c, 1.0 + crack * vPar.w * 2.2 * (1.0 - snowC * 0.8));
+    else c = mix(c, mix(vec3(0.98, 0.52, 0.20), vec3(1.0, 0.86, 0.50), fine * near), clamp(crack * -vPar.w * 1.5, 0.0, 0.92));
   }
 
   // light in soft value steps; shadows are glazes
@@ -360,8 +362,12 @@ void main() {
   vec3 own = pcDensity(vLiq.rgb, 1.0 + (r3.g - 0.5) * 1.3 + (r1.r - 0.5) * 0.6 - hN * 0.55);   // pigment gathers in the troughs
   // lava: paper-bright where it runs hot, dark crust drifting on it
   vec4 r4 = texture(uNoise3D, vBody / 9.0 + drift * 0.4);
-  own = mix(own, vec3(1.0, 0.975, 0.86), vLiqP.x * smoothstep(0.50, 0.72, r4.r));
-  own = mix(own, vec3(0.30, 0.22, 0.24), smoothstep(0.75, 1.0, vLiqP.x) * smoothstep(0.56, 0.70, r4.g + (r2.b - 0.5) * 0.3));   // (a crust forms on lava, not on a glowing pool)
+  // (scarlet by the banks where it cools, cadmium orange in the stream, paper-yellow only where it
+  // runs deep and hot; the plates of crust gather by the banks: a crust forms on lava, not on a glowing pool)
+  float hotD = smoothstep(0.30, 1.20, vDepth + (r2.g - 0.5) * 0.5);
+  own = mix(own, vec3(0.88, 0.25, 0.13), vLiqP.x * (1.0 - hotD) * 0.7);
+  own = mix(own, vec3(1.0, 0.94, 0.64), vLiqP.x * hotD * smoothstep(0.40, 0.70, r4.r) * 0.92);
+  own = mix(own, vec3(0.21, 0.16, 0.20), smoothstep(0.75, 1.0, vLiqP.x) * smoothstep(0.58 - 0.20 * (1.0 - hotD), 0.70 - 0.18 * (1.0 - hotD), r4.g + (r2.b - 0.5) * 0.3));
   // cloud sea: bare-paper billows with soft shaded hollows
   vec4 r5 = texture(uNoise3D, vBody / 47.0 + drift * 0.2);
   own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));
@@ -453,7 +459,8 @@ void main() {
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
   // swallow the far water whole, strokes and all, and a storm sea painted as a pale blank is
   // no sea; the painter keeps it darker than the sky to the horizon and lets the stacks go pale)
-  float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea);
+  // (and what glows is seen through the haze: lava keeps its fire into the distance)
+  float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
   c = pcAtmos(c, f);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
