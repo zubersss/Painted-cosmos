@@ -1032,7 +1032,8 @@ void main() {
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
-  float wid = max(iPar.x, wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0)) * (1.0 + 0.7 * vFlat);
+  // (close to the eye a blade is as slender as a blade is; farther off it is as broad as the brush must be)
+  float wid = max(iPar.x * mix(0.42, 1.0, smoothstep(2.0, 7.5, di)), wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0)) * (1.0 + 0.7 * vFlat);
   vec3 rel = ax * (len * t) + sd * (side * wid * min(1.0, vis * 3.0) + iCol.a * len * t * t);
   if (flex > 0.01 && len > 0.0) {
     if (uPhysOn > 0.5) {

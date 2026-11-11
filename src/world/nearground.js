@@ -193,7 +193,7 @@ export class NearGround {
       Ro[o * 3] = px + ux * ou + vx * ov + x * dh; Ro[o * 3 + 1] = py + uy * ou + vy * ov + y * dh; Ro[o * 3 + 2] = pz + uz * ou + vz * ov + z * dh;
       let len, wid, mid, curl, tilt, flex, cr, cg, cb;
       if (kind === 0) {            // a grass blade: one flick of the brush
-        len = 0.20 + 0.26 * q3; wid = 0.026 + 0.018 * q4; mid = 0.62; curl = (q5 - 0.5) * 0.7; tilt = 0.18 + 0.60 * q4; flex = 1;
+        len = 0.15 + 0.40 * q3 * q3; wid = 0.026 + 0.018 * q4; mid = 0.62; curl = (q5 - 0.5) * 0.7; tilt = 0.18 + 0.60 * q4; flex = 1;
         const L = st.leaf, c = L ? L[q5 < 0.10 ? 0 : q5 < 0.42 ? 1 : 2] : null, gm = q5 < 0.42 ? 0.45 : 0.25;
         if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); } else { cr = dens(gr, 1.5); cg = dens(gg, 1.5); cb = dens(gb, 1.5); }
       } else if (kind === 1) {     // reed stubble

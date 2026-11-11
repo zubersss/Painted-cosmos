@@ -109,7 +109,7 @@ export function createWorld(scene) {
       // internal pixels survive the brush), rain a little broader and longer: a few strokes
       const D = K.DRAW_PAINTED, draw = {};
       for (const k in D) draw[k] = { ...D[k] };
-      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5 };
+      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5, share: Math.min(1, (D.rain.share || 0.25) * 1.6) };
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
       for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
@@ -152,7 +152,9 @@ export function createWorld(scene) {
     return out.normalize();
   }
 
-  let frameNo = 0, lastWall = 0, wallDt = 16;
+  let frameNo = 0, lastWall = 0, wallDt = 16, fixedSlice = false;
+  const SKY_KEYS = ['cloud', 'overcast', 'haze', 'fog', 'dust', 'wet', 'snow', 'rain', 'snowfall', 'storm'];
+  const skyEase = { on: false, body: null, v: {} };
   function update(dt, cameraPos, activeBodyId) {
     frameNo++;
     const nowW = performance.now();
@@ -196,7 +198,7 @@ export function createWorld(scene) {
       // turns at going first, so no frame pays for a full slice of each.
       // (when frames are already very slow, as in software rendering, building is given a
       // share of the frame instead of a fixed few milliseconds, or nothing would ever settle)
-      const tb = performance.now(), slice = (wallDt > 80 ? Math.max(budgetMs, Math.min(220, wallDt * 0.3)) : budgetMs) * 0.8;
+      const tb = performance.now(), slice = (wallDt > 80 && !fixedSlice ? Math.max(budgetMs, Math.min(220, wallDt * 0.3)) : budgetMs) * 0.8;
       if (isActive && st.flora && (frameNo & 1) && st.flora.busy > 0 && st.terrain.busy > 0) {
         st.flora.update(st.camLocal, true, slice);
         st.terrain.update(st.camLocal, Math.max(0, slice - (performance.now() - tb)));
@@ -247,7 +249,17 @@ export function createWorld(scene) {
       blendKeys(look, wDay, am ? wTwi : 0, (am ? 0 : wTwi) + lost * 0.78, wNight);
       const dayness = 1 - wNight;
       // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
-      const sk = skyNow(physics, st.id), air = 1 - space01;
+      // the sky numbers are eased over about two seconds before anything is painted from them
+      // (PHYSICS' may move by 8 to 15 % a second: a wash must not jump). A forced sky, a first
+      // frame, a frozen clock and a change of body are taken as they are; lightning is never eased.
+      const skRaw = skyNow(physics, st.id), air = 1 - space01;
+      let sk = skRaw;
+      if (skRaw && !WX.forced) {
+        const snap = !skyEase.on || skyEase.body !== st.id || !(dt > 0), k = snap ? 1 : 1 - Math.exp(-Math.min(dt, 0.25) / 0.9);
+        for (const key of SKY_KEYS) { const v = +skRaw[key] || 0; skyEase.v[key] = snap ? v : skyEase.v[key] + (v - skyEase.v[key]) * k; }
+        skyEase.v.flash = skRaw.flash || 0; skyEase.on = true; skyEase.body = st.id;
+        sk = skyEase.v;
+      } else skyEase.on = false;
       // (where rain or snow is falling the sky is closed, whatever the cover says)
       const fall = sk ? Math.max(sk.rain, sk.snowfall) * air : 0;
       const oc = sk ? Math.max(sk.overcast, 0.75 * fall) * air : 0, storm = sk ? sk.storm * air : 0;
@@ -395,13 +407,15 @@ export function createWorld(scene) {
     setVistaFound(bodyId, vistaId, found) { const st = state.get(bodyId); if (st) { if (found) st.found.add(vistaId); else st.found.delete(vistaId); } },
     // additive
     get busy() { return busy(); },
-    setBuildBudget(ms) { budgetMs = Math.max(0.5, +ms || 5); },
+    // { fixed: true } pins the slice (no larger share of slow frames): for checking the 5 ms budget in software GL
+    setBuildBudget(ms, opts) { budgetMs = Math.max(0.5, +ms || 5); fixedSlice = !!(opts && opts.fixed); },
     getLighting() { return lighting; },
     getBiomes(bodyId) { return getLook(bodyId).biomes.map((b) => ({ id: b.id, name: b.name })); },
     // a place to arrive at in a biome: level, dry, and showing what the biome is whichever
     // way one faces (src/art/easels.js, STANDS), with the best way to face (yaw from local
     // north toward east, radians); else the painter's easel; else the biome's first site
     findBiome(bodyId, biomeId) { return getStandPure(bodyId, biomeId); },
+    get _near() { const st = state.get(lastActive || 'earth'); return st && st.near; },
     get _flora() { const st = state.get(lastActive || 'earth'); return st && st.flora; },
     get _prof() { return Object.assign({}, prof, this._flora ? this._flora.prof : {}); },
     _profReset() { prof.terrain = 0; const fl = this._flora; if (fl) { const p = fl.prof; p.wanted = p.build = p.retier = 0; } },

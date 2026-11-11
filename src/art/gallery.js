@@ -390,6 +390,7 @@ function tick(now) {
     while (idle < 2 && guard++ < 2000 && performance.now() - t0 < 4000) { world.update(0, camera.position, bodyId); idle = world.busy === 0 ? idle + 1 : 0; }
     if (idle >= 2) { settled = true; world.setBuildBudget(5); }
   }
+  if (P.get('near') === '0' && world._near) world._near.mesh.visible = false;     // (the picture without the near ground strokes)
   if (frozenT != null) painter.setTime(frozenT);
   const L = world.getLighting();
   painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0, sky: forcedSky || (physics && physics.here ? physics.here.sky : null) });
