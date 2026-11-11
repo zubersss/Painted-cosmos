@@ -66,6 +66,7 @@ export function createExplorerState(p, fwd) {
 //          of the camera, body-local), faceView (first person: body faces the view) }
 // env:   { sample(unitDir) -> contract surface, gravity (m/s^2) }
 export function stepExplorer(st, input, dt, env, T = EXPLORER) {
+  if (env.bodyStep) return stepExplorerBodied(st, input, dt, env, T);
   const up = norm(st.p);
   const r = len(st.p);
   const s0 = env.sample(up);
@@ -220,6 +221,75 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
   if (jetting) st.mode = 'jet';
   else if (st.swimming || (grounded && st.liquidDepth > 0.3)) st.mode = 'wade';
   else if (!grounded) st.mode = st.airTime > 0.12 ? 'fall' : st.mode;
+  else st.mode = st.speed > 0.4 ? 'walk' : 'idle';
+  return st;
+}
+
+// The same explorer driven through PHYSICS' body model (src/physics/explorer.js): this function
+// turns keys into a command and keeps Pilot's assists; the body model decides what a 100 kg
+// explorer then does on that ground, in that air, under that gravity.
+//   env.bodyStep(st, cmd, dt, env)   PHYSICS' stepExplorerBody
+//   cmd.wish            walk or run speed along the wished direction (traction, slopes, wading
+//                       and wind are the model's business now, not multipliers here)
+//   cmd.jetMaxRise      assist: the climb governor (EXPLORER.jetMaxRise)
+//   cmd.descentLimit    assist: the soft-landing brake, tighter the nearer the ground
+// Fuel, facing and the animation mode stay here.
+function stepExplorerBodied(st, input, dt, env, T) {
+  const up = norm(st.p);
+  const wasGrounded = st.grounded;
+  const floating = !wasGrounded && !!st.phys && st.phys.submerged01 > 0.35;
+  const f = tangent(input.viewFwd || st.fwd, up, st.fwd);
+  const right = cross(f, up);
+  const wish = clampLen(add(scale(f, input.moveZ || 0), scale(right, input.moveX || 0)), 1);
+  const maxSpeed = input.run ? T.runSpeed : T.walkSpeed;
+
+  let jump = false;
+  if (input.jump && (wasGrounded || floating)) { jump = true; st.jumpHeld = 0; }
+  if (input.jet) st.jumpHeld += dt; else st.jumpHeld = 0;
+  const jetOn = !!input.jet && (!wasGrounded || jump) && st.jumpHeld >= T.jetStartDelay && st.fuel > 0;
+
+  const cmd = st.cmd || (st.cmd = { wish: V(), jump: false, jet: 0, jetMaxRise: T.jetMaxRise, descentLimit: 0, airControl: 1 });
+  cmd.wish.x = wish.x * maxSpeed; cmd.wish.y = wish.y * maxSpeed; cmd.wish.z = wish.z * maxSpeed;
+  cmd.jump = jump;
+  cmd.jet = jetOn ? 1 : 0;
+  cmd.jetMaxRise = T.jetMaxRise;
+  // Falls are free until the ground is near, then eased down to a soft touchdown.
+  cmd.descentLimit = T.softFallSpeed + Math.max(0, st.altitude - 1.5) * 0.9;
+  env.bodyStep(st, cmd, dt, env);
+
+  const up2 = norm(st.p);
+  const r2 = len(st.p);
+  const s2 = env.sample(up2);
+  const liq2 = s2.liquidRadius > s2.radius ? s2.liquidRadius : 0;
+  const B = st.phys || {};
+  const use = B.jetUse == null ? (jetOn ? 1 : 0) : B.jetUse;
+  st.jetting = use > 0.05;
+  if (st.jetting) { st.fuel = Math.max(0, st.fuel - (use * dt) / T.jetFuelSeconds); st.sinceJet = 0; } else st.sinceJet += dt;
+  st.jet01 = mix(st.jet01, st.jetting ? 1 : 0, damp(12, dt));
+  st.airTime = st.grounded ? 0 : st.airTime + dt;
+  st.slope = s2.slope;
+  st.surface = s2;
+  st.altitude = Math.max(0, r2 - s2.radius);
+  st.liquidDepth = liq2 ? Math.max(0, liq2 - r2) : 0;
+  st.swimming = !st.grounded && (B.submerged01 || 0) > 0.35;
+  st.speed = len(reject(st.v, up2));
+  if (B.impact > 0.5 && st.grounded && !wasGrounded) st.landedHard = B.impact;
+  if (!st.jetting) {
+    if (st.grounded || st.swimming) st.fuel = Math.min(1, st.fuel + dt / T.rechargeGroundSeconds);
+    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / T.rechargeAirSeconds);
+  }
+
+  let fwd = tangent(st.fwd, up2, f);
+  if (input.faceView) fwd = tangent(f, up2, fwd);
+  else if (len(wish) > 0.1) {
+    const want = tangent(wish, up2, fwd);
+    fwd = tangent(add(scale(fwd, 1 - damp(T.turnRate, dt)), scale(want, damp(T.turnRate, dt))), up2, want);
+  }
+  st.fwd = fwd;
+
+  if (st.jetting) st.mode = 'jet';
+  else if (st.swimming || (st.grounded && st.liquidDepth > 0.3)) st.mode = 'wade';
+  else if (!st.grounded) st.mode = st.airTime > 0.12 ? 'fall' : st.mode;
   else st.mode = st.speed > 0.4 ? 'walk' : 'idle';
   return st;
 }

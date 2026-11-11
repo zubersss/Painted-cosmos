@@ -98,6 +98,8 @@ test('prompts and rules', () => {
   assert.match(promptFor(S.ATMOSPHERE, { canLand: true }).text, /Land/);
   assert.equal(promptFor(S.ATMOSPHERE, { canLand: true, liftingOff: true }), null);
   assert.equal(promptFor(S.SPACE, {}), null);
+  assert.match(promptFor(S.SPACE, { target: 'Mars' }).text, /Pulse to Mars/);
+  assert.equal(promptFor(S.PULSE, {}).key, 'F');
   assert.ok(isPiloting(S.SPACE) && isPiloting(S.LANDING) && !isPiloting(S.LANDED));
   assert.ok(isInShip(S.LANDED) && !isInShip(S.ON_FOOT) && !isInShip(S.BOARDING));
 });

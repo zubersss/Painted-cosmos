@@ -1,7 +1,7 @@
 // The simulation: the state machine, the explorer, the ship, the cameras and the solar system,
 // with no three and no DOM. src/core/game.js presents it; tests/loop.test.mjs plays the whole
 // loop through it in Node.
-import { BODIES } from '../data/bodies.js';
+import { BODIES, SUN } from '../data/bodies.js';
 import { Ephemeris, spaceAltitude } from './orbits.js';
 import {
   HELIO, bodyFrame, sameFrame, frameState, posToUniverse, quatToUniverse, quatFromUniverse,
@@ -19,6 +19,7 @@ import {
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
 } from '../ship/flight.js';
+import { PULSE, arrivalRadius, createPulse, pulseAdvice, stepPulseSpeed, pulseEta } from '../ship/pulse.js';
 
 export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
@@ -30,16 +31,33 @@ export const FEEL = Object.freeze({
   startHour: 9.5,            // local solar time at the first spawn: a clear morning
 });
 
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const Y = V(0, 1, 0);
+const VACUUM = { density: 0, wind: V(), speed: 0, gust01: 0, turbulence: 0, temperature: 3, pressure: 0, soundSpeed: 0, viscosity: 0 };
+const VACUUM_AIR = (p, out) => (out ? Object.assign(out, VACUUM) : VACUUM);
 
 export class Sim {
   // sampleSurface(bodyId, {x,y,z}) -> contract surface;  getSpawn(bodyId) -> {x,y,z} or null;
   // seat / hatch: ship-local points from the ship model (COORDINATOR.md C10).
   // sampleObstacles(bodyId, {x,y,z}, radius) -> [{ unitDir, radius, height }] (optional).
-  constructor({ sampleSurface, getSpawn, sampleObstacles, seat, hatch, body, hour }) {
+  // physics (optional): the object from createPhysics (src/physics). Without it the explorer
+  // and the ship move by Pilot's own kinematic rules.
+  constructor({ sampleSurface, getSpawn, sampleObstacles, physics, seat, hatch, body, hour }) {
     this.sampleSurface = sampleSurface;
     this.sampleObstacles = sampleObstacles || null;
+    this.physics = physics || null;
+    this.physicsMs = 0;
+    this.physicsWorstMs = 0;
     this.nearObstacles = [];
+    this.canopy = [];
+    this.target = null;            // body id the pulse drive and the markers point at
+    this.targetLocked = false;     // chosen on the map: aiming elsewhere does not change it
+    this.aimed = null;
+    this.pulse = null;
+    this.notice = null;            // { text, until } one line of feedback for the HUD
+    this.visited = {};             // bodyId -> { biomes: { id: true } }  (the sketchbook's data)
+    this._envs = {};
+    this._disturbers = [];
     this.getSpawn = getSpawn || (() => null);
 
     this.eph = new Ephemeris(BODIES);
@@ -128,12 +146,15 @@ export class Sim {
     const steps = Math.max(1, Math.ceil(simDt / FEEL.simStep - 1e-6));
     const h = simDt / steps;
     for (let i = 0; i < steps; i++) this.step(h, inp, i === 0);
+    this.updatePhysics(simDt);
+    this.noteVisit();
     this.frameCount++;
     return simDt;
   }
 
   // ---- simulation step -----------------------------------------------------------------------
   step(h, inp, first) {
+    this._firstStep = first;
     this.t += h;
     this.sm.update(h);
     const I = this.input;
@@ -153,7 +174,7 @@ export class Sim {
         jet: I.down('Space'),
         viewFwd: this.footCam.viewFwd,
         faceView: this.footCam.firstPerson,
-      }, h, { sample: this.sampler(this.bodyId), gravity: BODIES[this.bodyId].gravity });
+      }, h, this.explorerEnv(this.bodyId));
       // Trunks and boulders: looked up once a frame around the explorer, hit every step.
       if (first) this.nearObstacles = this.obstaclesNear(this.bodyId, this.ex.p, 9);
       if (collideObstacles(this.ex, this.nearObstacles) && this.ex.grounded) {
@@ -201,6 +222,43 @@ export class Sim {
       out.push({ unitDir: norm(V(o.unitDir.x, o.unitDir.y, o.unitDir.z)), radius: o.radius || 0.3, height: o.height == null ? 3 : o.height });
     }
     return out;
+  }
+
+  // PHYSICS, once per frame, before the world is updated (C14): where the near field is centred
+  // and what is disturbing it.
+  updatePhysics(dt) {
+    const physics = this.physics;
+    if (!physics) return;
+    const st = this.sm.state;
+    const out = this._disturbers;
+    out.length = 0;
+    let bodyId = null, focus = null;
+    const shipOnGroundFrame = this.shFrame.kind === 'body' && this.shFrame.rotating;
+    if (st === S.ON_FOOT || st === S.BOARDING) {
+      bodyId = this.bodyId; focus = this.ex.p;
+      physics.explorer.disturbers(this.ex, out);
+      if (shipOnGroundFrame && this.shFrame.id === bodyId && len(sub(this.sh.p, this.ex.p)) < 80) physics.ship.disturbers(this.sh, out);
+    } else if (shipOnGroundFrame) {
+      bodyId = this.shFrame.id; focus = this.sh.p;
+      physics.ship.disturbers(this.sh, out);
+    }
+    const t0 = now();
+    physics.update(dt, {
+      bodyId, time: this.t, focus,
+      sunDir: bodyId ? this.eph.sunDirLocal(bodyId, this.t) : null,
+      disturbers: out,
+    });
+    const ms = now() - t0;
+    this.physicsMs += (ms - this.physicsMs) * 0.1;
+    if (ms > this.physicsWorstMs || this.frameCount % 600 === 0) this.physicsWorstMs = ms;
+  }
+
+  // The sketchbook's raw data: every body and biome the explorer has stood on.
+  noteVisit() {
+    if (this.sm.state !== S.ON_FOOT || !this.ex.surface) return;
+    const v = this.visited[this.bodyId] || (this.visited[this.bodyId] = { biomes: {} });
+    const b = this.ex.surface.biomeId;
+    if (b && !v.biomes[b]) { v.biomes[b] = true; this.emit('biome'); }
   }
 
   emit(type) { this.events.push({ type, t: this.t }); if (this.events.length > 40) this.events.shift(); }
@@ -266,17 +324,53 @@ export class Sim {
   }
 
   // ---- flight ------------------------------------------------------------------------------------
+  // Everything the explorer's step needs to know about the world, per body. With PHYSICS wired
+  // in this is where air, ground materials and the liquid come through (COORDINATOR.md C14).
+  explorerEnv(bodyId) {
+    let env = this._envs[bodyId];
+    if (!env) {
+      env = { sample: this.sampler(bodyId), gravity: BODIES[bodyId].gravity };
+      if (this.physics) {
+        this.physics.bindEnv(bodyId, env);
+        env.bodyStep = this.physics.explorer.step;
+      }
+      this._envs[bodyId] = env;
+    } else if (this.physics) env.time = this.t;
+    return env;
+  }
+
+  // The floor under the flying ship: ground or liquid, raised to the tree tops where trees
+  // stand (obstacle heights from world.sampleObstacles, refreshed once a frame near the ship).
+  shipFloor(bodyId) {
+    const sample = this.sampler(bodyId);
+    return (p) => {
+      const g = floorAt(sample, p);
+      const list = this.canopy;
+      if (list.length) {
+        let top = 0;
+        const r = g.r;
+        for (let i = 0; i < list.length; i++) {
+          const o = list[i];
+          const gap = Math.acos(Math.min(1, (p.x * o.unitDir.x + p.y * o.unitDir.y + p.z * o.unitDir.z) / r)) * r;
+          if (gap < o.radius + Math.max(2.5, o.height * 0.22) && o.height > top) top = o.height;
+        }
+        if (top > 0) { g.floor += top; g.canopy = top; g.slope = 0; g.normal = scale(p, 1 / r); }
+      }
+      return g;
+    };
+  }
+
   flightEnv() {
     const f = this.shFrame;
     if (f.kind !== 'body') {
-      return { up: null, universeUp: Y, upWeight: 0, altitude: 1e9, spaceAlt: 1, hasBody: false, sample: null };
+      return { up: null, universeUp: Y, upWeight: 0, altitude: 1e9, spaceAlt: 1, hasBody: false, sample: null, gravity: 0, air: VACUUM_AIR, time: this.t };
     }
     const body = BODIES[f.id];
     const r = len(this.sh.p);
     const spaceAlt = spaceAltitude(body);
     const altitude = r - body.radius;
     const soiAlt = this.eph.soiRadius(f.id) - body.radius;
-    return {
+    const env = {
       up: scale(this.sh.p, 1 / r),
       universeUp: f.rotating ? qRotate(qConj(this.eph.orientation(f.id, this.t)), Y) : Y,
       // Inside a body's sphere of influence "up" is simply away from the body; it eases to
@@ -284,37 +378,152 @@ export class Sim {
       upWeight: 1 - smoothstep(soiAlt * 0.68, soiAlt, altitude),
       altitude, spaceAlt, hasBody: true,
       sample: f.rotating ? this.sampler(f.id) : null,
+      floor: f.rotating ? this.shipFloor(f.id) : null,
+      gravity: body.gravity, radius: body.radius, altGround: this.sh.altGround, time: this.t,
     };
+    if (this.physics) {
+      // Air (density, wind, gusts) exists only in the ground frame; above it the ship is in vacuum.
+      if (f.rotating) this.physics.bindEnv(f.id, env); else env.air = VACUUM_AIR;
+      env.shipBody = this.physics.ship.step;
+    }
+    return env;
+  }
+
+  // Move the ship's state into the right frame for where it is (ground frame in the atmosphere,
+  // body-centred in orbit, the sun's frame between worlds). State changes follow the frame.
+  reframe() {
+    const sh = this.sh;
+    const fsOld = frameState(this.eph, this.shFrame, this.t);
+    const P = posToUniverse(fsOld, sh.p);
+    const next = chooseFrame(this.eph, this.t, P, this.shFrame);
+    if (!sameFrame(next, this.shFrame)) {
+      const c = convertState(this.eph, this.t, this.shFrame, next, sh);
+      sh.p = c.p; sh.v = c.v; sh.q = c.q;
+      if (this.shipCam.q) {
+        this.shipCam.q = quatFromUniverse(frameState(this.eph, next, this.t), quatToUniverse(fsOld, this.shipCam.q));
+      }
+      this.shFrame = next;
+    }
+    const inAtmo = this.shFrame.kind === 'body' && this.shFrame.rotating;
+    if (this.sm.state === S.ATMOSPHERE && !inAtmo) { this.sm.dispatch(EV.leftAtmosphere); this.emit('space'); }
+    else if (this.sm.state === S.SPACE && inAtmo) { this.sm.dispatch(EV.enteredAtmosphere); this.emit('entry'); }
+  }
+
+  // Centre of a body (or the sun) in the ship's current frame coordinates.
+  bodyInShipFrame(id) {
+    const fs = frameState(this.eph, this.shFrame, this.t);
+    return posFromUniverse(fs, id === 'sun' ? V() : this.eph.position(id, this.t));
+  }
+
+  // The body nearest the nose becomes the target, unless one was chosen on the map.
+  updateTarget() {
+    const f = qRotate(this.sh.q, V(0, 0, -1));
+    const here = this.shFrame.kind === 'body' ? this.shFrame.id : null;
+    let best = null, bestAng = PULSE.aimCone;
+    for (const id of this.eph.ids) {
+      if (id === here) continue;
+      const d = sub(this.bodyInShipFrame(id), this.sh.p);
+      const ang = Math.acos(clamp(dot(norm(d), f), -1, 1));
+      if (ang < bestAng) { bestAng = ang; best = id; }
+    }
+    this.aimed = best;
+    if (best && !this.targetLocked) this.target = best;
+    if (this.target === here) { this.target = null; this.targetLocked = false; }
+  }
+
+  setTarget(id, locked = true) {
+    this.target = id && BODIES[id] ? id : null;
+    this.targetLocked = !!this.target && locked;
+  }
+
+  targetInfo() {
+    if (!this.target) return null;
+    const d = len(sub(this.bodyInShipFrame(this.target), this.sh.p));
+    const hop = Math.max(0, d - arrivalRadius(BODIES[this.target]));
+    return { id: this.target, name: BODIES[this.target].name, distance: d, eta: pulseEta(hop) };
+  }
+
+  pulseSpheres() {
+    const out = [{ id: 'sun', c: this.bodyInShipFrame('sun'), radius: SUN.radius * 2.5 }];
+    for (const id of this.eph.ids) out.push({ id, c: this.bodyInShipFrame(id), radius: arrivalRadius(BODIES[id]) });
+    return out;
+  }
+
+  say(text, seconds = 3.5) { this.notice = { text, until: this.t + seconds }; }
+
+  tryPulse() {
+    if (this.sm.state !== S.SPACE) return false;
+    const f = qRotate(this.sh.q, V(0, 0, -1));
+    const adv = pulseAdvice(this.sh.p, f, this.pulseSpheres());
+    if (adv.inside || adv.vWant < PULSE.exitSpeed * 1.5) {
+      const name = adv.block === 'sun' ? 'the Sun' : adv.block ? BODIES[adv.block].name : 'something';
+      this.say(adv.inside ? `Too close to ${name}: turn away from it first` : `${name} is right ahead`);
+      this.emit('pulse-blocked');
+      return false;
+    }
+    this.pulse = createPulse(Math.max(0, dot(this.sh.v, f)));
+    this.sm.dispatch(EV.pulseOn);
+    this.emit('pulse');
+    return true;
   }
 
   stepFlying(h, I, mdx, mdy, pressed) {
     const sh = this.sh;
-    // Which frame are we flying in? (ground frame in the atmosphere, body-centred in orbit,
-    // the sun's frame between worlds). State changes follow the frame.
-    if (!sh.liftoff) {
-      const fsOld = frameState(this.eph, this.shFrame, this.t);
-      const P = posToUniverse(fsOld, sh.p);
-      const next = chooseFrame(this.eph, this.t, P, this.shFrame);
-      if (!sameFrame(next, this.shFrame)) {
-        const c = convertState(this.eph, this.t, this.shFrame, next, sh);
-        sh.p = c.p; sh.v = c.v; sh.q = c.q;
-        if (this.shipCam.q) {
-          this.shipCam.q = quatFromUniverse(frameState(this.eph, next, this.t), quatToUniverse(fsOld, this.shipCam.q));
-        }
-        this.shFrame = next;
-      }
-      const inAtmo = this.shFrame.kind === 'body' && this.shFrame.rotating;
-      if (this.sm.state === S.ATMOSPHERE && !inAtmo) { this.sm.dispatch(EV.leftAtmosphere); this.emit('space'); }
-      else if (this.sm.state === S.SPACE && inAtmo) { this.sm.dispatch(EV.enteredAtmosphere); this.emit('entry'); }
-    }
+    if (!sh.liftoff) this.reframe();
     const env = this.flightEnv();
+    this.updateTarget();
+
+    // ---- pulse drive ---------------------------------------------------------------------------
+    if (this.sm.state === S.SPACE && pressed('KeyF')) this.tryPulse();
+    else if (this.sm.state === S.PULSE && this.pulse) {
+      const ps = this.pulse;
+      if (pressed('KeyF') || pressed('KeyX') || pressed('KeyS') || pressed('Space')) ps.cancel = true;
+      let f = qRotate(sh.q, V(0, 0, -1));
+      // Draw the nose onto the target, so "point roughly and go" arrives.
+      if (this.target && !ps.cancel) {
+        const want = norm(sub(this.bodyInShipFrame(this.target), sh.p));
+        const axis = cross(f, want);
+        const sinA = len(axis);
+        const ang = Math.atan2(sinA, dot(f, want));
+        if (sinA > 1e-6 && ang < 1.2) {
+          sh.q = qMul(qFromAxisAngle(scale(axis, 1 / sinA), Math.min(ang, PULSE.assistRate * h)), sh.q);
+          f = qRotate(sh.q, V(0, 0, -1));
+        }
+      }
+      const adv = pulseAdvice(sh.p, f, this.pulseSpheres());
+      stepPulseSpeed(ps, ps.cancel ? PULSE.exitSpeed * 0.9 : adv.vWant, h);
+      ps.block = adv.block;
+      env.pulseSpeed = ps.v;
+      env.turnScale = PULSE.turnScale;
+      // Let go when asked, or when what lies ahead is so close that cruise speed is all it allows.
+      const atEdge = !!adv.block && adv.vWant <= PULSE.exitSpeed * 1.02;
+      if (ps.t > 0.6 && ps.v <= PULSE.exitSpeed * 1.05 && (ps.cancel || atEdge)) {
+        const arrived = !ps.cancel && adv.block !== 'sun';
+        this.pulse = null;
+        env.pulseSpeed = null;
+        sh.throttle = arrived ? 0 : 0.5;          // arrive and coast to a stop in front of the planet
+        this.sm.dispatch(EV.pulseOff);
+        if (arrived) {
+          this.say(`${BODIES[adv.block].name} ahead`, 5);
+          if (adv.block === this.target) this.targetLocked = false;
+          this.emit('arrived');
+        } else this.emit('pulse-off');
+      }
+    }
+
+    // Tree tops under and ahead of a low-flying ship (looked up once a frame).
+    if (env.floor) {
+      if (this._firstStep && sh.altGround < 90) this.canopy = this.obstaclesNear(this.shFrame.id, sh.p, Math.min(48, 16 + sh.speed * 0.85));
+      else if (sh.altGround >= 90) this.canopy = [];
+    } else this.canopy = [];
+
     stepFlight(sh, {
       aimX: mdx * FEEL.mouseShip,
       aimY: mdy * FEEL.mouseShip,
       yawKey: I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight'),
       throttle: I.axis('KeyS', 'KeyW') + I.axis('ArrowDown', 'ArrowUp'),
       cut: I.down('KeyX'),
-      lift: (I.down('Space') ? 1 : 0) - (I.down('KeyC') ? 1 : 0),
+      lift: this.sm.state === S.PULSE ? 0 : (I.down('Space') ? 1 : 0) - (I.down('KeyC') ? 1 : 0),
     }, h, env);
     if (sh.bounce === 0) this.emit('bounce');
 
@@ -323,8 +532,8 @@ export class Sim {
       const settle = sh.altGround < SHIP.minClearance + 1.2 && sh.speed < 5 && I.down('KeyC');
       if ((pressed('KeyE') && this.landable()) || settle) {
         const trees = this.obstaclesNear(this.shFrame.id, sh.p, 80);
-        if (beginLanding(sh, this.sampler(this.shFrame.id), undefined, trees)) this.sm.dispatch(EV.beginLanding);
-        else this.emit('too-steep');
+        if (beginLanding(sh, this.sampler(this.shFrame.id), undefined, trees)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
+        else { this.say('Too steep to land here'); this.emit('too-steep'); }
       }
     }
   }
@@ -392,8 +601,13 @@ export class Sim {
         : active ? Math.max(0, active.altitude) : 1e6;
     }
     this.updateMood(active);
-    const q = { canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable(), liftingOff: !!this.sh.liftoff };
+    const ti = this.targetInfo();
+    const q = {
+      canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable(), liftingOff: !!this.sh.liftoff,
+      target: ti ? ti.name : null,
+    };
     this.promptNow = promptFor(st, q);
+    if (this.notice && this.t > this.notice.until) this.notice = null;
     return { camU, camQ, fov: pose.fov, view, clearance, active, flying };
   }
 
@@ -471,6 +685,12 @@ export class Sim {
       ? Math.atan2(dot(cross(this.footCam.viewFwd, toShip), scale(up, -1)), dot(this.footCam.viewFwd, toShip)) * 180 / Math.PI : null;
     out.shipDistance = len(sub(sh.p, ex.p));
     out.canBoard = st === S.ON_FOOT && this.boardable();
+    out.target = this.targetInfo();
+    out.aimed = this.aimed;
+    out.pulse = this.pulse ? { v: this.pulse.v, block: this.pulse.block, cancel: this.pulse.cancel } : null;
+    out.notice = this.notice ? this.notice.text : null;
+    out.visited = Object.fromEntries(Object.entries(this.visited).map(([k, v]) => [k, Object.keys(v.biomes)]));
+    out.physics = this.physics ? { ms: this.physicsMs, worstMs: this.physicsWorstMs } : null;
     const env = this.flightEnv();
     const f = qRotate(sh.q, V(0, 0, -1));
     out.ship = {

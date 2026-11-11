@@ -96,11 +96,12 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   st.pending.yaw = clamp(st.pending.yaw + (input.aimX || 0), -T.pendingMax, T.pendingMax);
   st.pending.pitch = clamp(st.pending.pitch + (input.aimY || 0), -T.pendingMax, T.pendingMax);
   const k = damp(T.steerRate, dt);
-  let yawStep = clamp(st.pending.yaw * k, -T.maxTurn * dt, T.maxTurn * dt);       // + = right
-  let pitchStep = clamp(st.pending.pitch * k, -T.maxTurn * dt, T.maxTurn * dt);   // + = nose down
-  st.pending.yaw -= yawStep;
-  st.pending.pitch -= pitchStep;
-  yawStep += (input.yawKey || 0) * T.keyYawRate * dt;
+  const turn = env.pulseSpeed != null ? (env.turnScale == null ? 0.3 : env.turnScale) : 1;
+  let yawStep = clamp(st.pending.yaw * k, -T.maxTurn * dt, T.maxTurn * dt) * turn;       // + = right
+  let pitchStep = clamp(st.pending.pitch * k, -T.maxTurn * dt, T.maxTurn * dt) * turn;   // + = nose down
+  st.pending.yaw -= yawStep / turn;
+  st.pending.pitch -= pitchStep / turn;
+  yawStep += (input.yawKey || 0) * T.keyYawRate * dt * turn;
   if (st.liftoff) { pitchStep = 0; st.pending.pitch = 0; }
 
   let q = st.q;
@@ -131,8 +132,10 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   }
   // ---- flare: the lower the ship, the less steeply it may point at the ground -----------------
   const up = env.up || null;
+  // The floor under the ship: ground or liquid, plus the tree canopy when the caller knows it.
+  const floorOf = env.floor || (env.sample ? (q) => floorAt(env.sample, q) : null);
   let ground = null;
-  if (env.sample && up) ground = floorAt(env.sample, st.p);
+  if (floorOf && up) ground = floorOf(st.p);
   if (ground && !st.liftoff) {
     const alt = ground.r - ground.floor;
     const minElev = -mix(T.flareAngle, T.pitchLimit, smoothstep(T.cushionHeight, T.flareHeight, alt));
@@ -156,10 +159,26 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   const vmax = maxSpeedAt(altForSpeed, env.spaceAlt, env.hasBody, T);
   const liftDir = w > 0.3 ? upRef : qRotate(st.q, V(0, 1, 0));
   const liftSpeed = clamp(vmax * 0.42, T.liftSpeed, T.liftSpeedSpace);
-  const target = add(scale(f, st.throttle * vmax), scale(liftDir, (input.lift || 0) * liftSpeed));
+  let target = add(scale(f, st.throttle * vmax), scale(liftDir, (input.lift || 0) * liftSpeed));
   // X is a real brake: the ship stops in about half the usual time.
-  const tau = mix(T.tauSpace, T.tauAtmo, env.hasBody && env.altitude < env.spaceAlt ? 1 : 0) * (input.cut ? T.brakeFactor : 1);
-  let v = add(st.v, scale(sub(target, st.v), damp(1 / tau, dt)));
+  const inAir = env.hasBody && env.altitude < env.spaceAlt;
+  const tau = mix(T.tauSpace, T.tauAtmo, inAir ? 1 : 0) * (input.cut ? T.brakeFactor : 1);
+  let v;
+  const body = env.shipBody && !st.liftoff && env.pulseSpeed == null ? env.shipBody : null;
+  if (env.pulseSpeed != null) {
+    // Pulse drive: the speed is the drive's, the direction is the nose.
+    v = add(st.v, scale(sub(scale(f, env.pulseSpeed), st.v), damp(5, dt)));
+  } else if (body) {
+    // PHYSICS' ship: the flight computer asks for `target`; thrust, drag, gravity, lift and
+    // gusts decide what the hull actually does. The assists below shape the request first.
+    if (ground && up) target = shapeTarget(st, target, ground, up, floorOf, T);
+    const p0 = st.p;
+    body(st, { target, tau, hover: true, boost: !inAir }, dt, env);
+    v = st.v;
+    st.p = p0;                                   // position is integrated once, below
+  } else {
+    v = add(st.v, scale(sub(target, st.v), damp(1 / tau, dt)));
+  }
 
   // ---- lift-off sequence overrides the vertical motion ---------------------------------------
   if (st.liftoff && up) {
@@ -174,20 +193,7 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     if (L.t >= T.liftoffSeconds) { st.liftoff = null; v = V(); }
   } else if (ground && up) {
     // ---- the ground is never a wall --------------------------------------------------------
-    let vUp = dot(v, up);
-    const vh = reject(v, up);
-    const alt = ground.r - ground.floor;
-    // Pull up over terrain that rises ahead of us.
-    // (Only the rise of the terrain counts, so hovering low over flat ground is left alone.)
-    const ahead = floorAt(env.sample, addScaled(st.p, vh, T.lookAhead));
-    const need = ahead.floor + clamp(alt, T.minClearance + 0.4, T.cushionHeight) - ground.r;
-    if (need > 0) vUp = Math.max(vUp, need / T.lookAhead);
-    // Ride a cushion: the closer to the ground, the slower the ship may sink.
-    if (alt < T.cushionHeight) {
-      const maxDown = Math.max(0.25, (alt - T.minClearance) * 1.8);
-      if (vUp < -maxDown) vUp = -maxDown;
-    }
-    v = add(vh, scale(up, vUp));
+    v = shapeTarget(st, v, ground, up, floorOf, T);
     st.gear01 = mix(st.gear01, 0, damp(3, dt));
   } else if (!st.liftoff) {
     st.gear01 = mix(st.gear01, 0, damp(3, dt));
@@ -196,8 +202,8 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   // ---- integrate, then the soft bounce if we still touched something -------------------------
   let p = add(st.p, scale(v, dt));
   st.bounce += dt;
-  if (env.sample && up && !st.liftoff) {
-    const g2 = floorAt(env.sample, p);
+  if (floorOf && up && !st.liftoff) {
+    const g2 = floorOf(p);
     const alt2 = g2.r - g2.floor;
     if (alt2 < T.minClearance) {
       const up2 = scale(p, 1 / g2.r);
@@ -234,6 +240,24 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   st.speed = len(v);
   st.throttle01 = mix(st.throttle01, clamp01(Math.abs(st.throttle) * 0.85 + (st.liftoff ? 0.5 : 0.15)), damp(4, dt));
   return st;
+}
+
+// The ground assists, applied to a velocity (the request to the flight computer, or the
+// velocity itself): pull up over terrain that rises ahead, and ride a cushion near the floor.
+function shapeTarget(st, v, ground, up, floorOf, T) {
+  let vUp = dot(v, up);
+  const vh = reject(v, up);
+  const alt = ground.r - ground.floor;
+  // Only the rise of the terrain counts, so hovering low over flat ground is left alone.
+  const ahead = floorOf(addScaled(st.p, reject(st.v, up), T.lookAhead));
+  const need = ahead.floor + clamp(alt, T.minClearance + 0.4, T.cushionHeight) - ground.r;
+  if (need > 0) vUp = Math.max(vUp, need / T.lookAhead);
+  // The closer to the floor, the slower the ship may sink.
+  if (alt < T.cushionHeight) {
+    const maxDown = Math.max(0.25, (alt - T.minClearance) * 1.8);
+    if (vUp < -maxDown) vUp = -maxDown;
+  }
+  return add(vh, scale(up, vUp));
 }
 
 export function beginLiftoff(st) {

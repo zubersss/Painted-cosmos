@@ -132,6 +132,8 @@ export function promptFor(state, q) {
       if (q.canLand) return { key: 'E', text: 'Land here' };
       return null;
     case S.LANDING: return { key: 'SPACE', text: 'Cancel landing' };
+    case S.SPACE: return q.target ? { key: 'F', text: 'Pulse to ' + q.target } : null;
+    case S.PULSE: return { key: 'F', text: 'Drop out of pulse' };
     default: return null;
   }
 }
