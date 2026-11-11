@@ -19,9 +19,9 @@ import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacl
 import { QUALITY } from '../render/shared.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
-const T0 = 95, T1 = 230, T_THIN = 480, T_FAR = 760;      // (were 52, 128, 300, 470 while there was a triangle budget)
+const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
 const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget)
-const RANGE_SCALE = [0.24, 0.5, 1.0];                    // (the lower tiers keep the ranges they had)
+const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];

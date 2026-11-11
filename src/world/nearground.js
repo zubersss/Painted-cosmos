@@ -263,7 +263,7 @@ class Ring {
       left -= ns;
       if (st.leaf && left > 0) {       // moss: a dark, saturated touch lying on the bank
         const q1 = H(70), q2 = H(71), c = st.leaf[2];
-        this.put((q1 - 0.5) * 0.4, (q2 - 0.5) * 0.4, 0.02, 0, 0, 0.10 + 0.14 * q1, 0.07 + 0.09 * q2, LYING, q1, born, dens(lerp(c[0], gr, 0.3), 1.35), dens(lerp(c[1], gg, 0.3), 1.2), dens(lerp(c[2], gb, 0.3), 1.35), q2 * 6.28, 0);
+        this.put((q1 - 0.5) * 0.4, (q2 - 0.5) * 0.4, 0.02, 0, 0, 0.05 + 0.20 * q1 * q1, 0.04 + 0.11 * q2 * q2, LYING, q1, born, dens(lerp(c[0], gr, 0.45), 1.2), dens(lerp(c[1], gg, 0.45), 1.1), dens(lerp(c[2], gb, 0.45), 1.2), q2 * 6.28, 0);
         left--;
       }
     }
