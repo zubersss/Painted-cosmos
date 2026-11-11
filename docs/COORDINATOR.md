@@ -713,3 +713,43 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   times, all eight planets in one browser sitting, tests for the two new guards, the suit's
   share of the wind, a word on screen when thin air limits the ship; (2) lead review 6 when
   PAINTER and PHYSICS report (the MUST FIX, the tour, every check), which gates M3; (3) M4.
+- 2026-11-11: **PHYSICS P8 accepted (fifth agent, `7944d45`)**. The coordinator re-ran on a
+  clean export of the head: `node --test src/physics/` 226 pass, `node --test
+  tests/*.test.mjs` 105 pass; and opened the four painted-lab frames on a sheet (the storm
+  forest reads as driving rain; the blizzard is a white-out; Mars reads as a dust storm by
+  haze alone, the dust walls as a few pale blots; the Neptune frame predates the lab's rain
+  fix). In: aerodynamic damping so trees do not whip upwind in a gust front (`FLORA.aeroDamp`,
+  was up to 104 deg/s, now 10); a boundary layer by ground roughness (under 40 m/s at 60 m:
+  14 m/s at 2 m over a boulder shore, 22 over grass, 28 over flat ice, 6.6 under a canopy);
+  "downwind slower than upwind" on Neptune's coast was a 4.5 m cliff, not the wind (a test
+  holds downwind >= upwind on level ground); **Earth's weather clock starts 480 s in**
+  (`REGIMES.earth.epoch`): at the spawn fair to 120 s, first drops 140 s, thunderstorm 160
+  to 320 s (noon to half past two), clear from 340 s (for `tests/weather.mjs`: before 60,
+  storm 240, flash 244, after 390); storms of a place's own making where a biome's moisture
+  is over 1.2 (Neptune's storm coast under a thunderstorm about 70 % of the time); only dry
+  ground gives dust; `cmd.shelter01` (0 to 1, default 0: the share of the wind force on the
+  explorer that the suit cancels; PILOT's lever). Additive API; behaviour changed without a
+  call changing: Earth weather times, wind near rough ground, tree damping.
+  **Open, found by PHYSICS and not fixed**: (1) with PILOT's "obstacles up to 1.3 m are
+  ground", the point body is launched off a boulder (pure body over a 1.3 m bump: Earth run
+  1.4 m up, Mars run 2.3 m, Moon run 5.9 m and 5.1 s in the air); (2) five mechanism tests
+  still run at Earth's old weather start and fail at the new one, not looked into; (3) the
+  gust pattern races when the mean wind changes fast (up to 52 m/s2 in one frame at 30 m);
+  (4) a 2.5 s hop is carried 25 m on Neptune's coast (the lead's aim is 15 m; `shelter01`
+  is the lever). The fifth PHYSICS agent is out of context and is replaced by a sixth.
+- 2026-11-11: **Ruling: boulders, legs and launches** (physical behaviour is PHYSICS's,
+  feel is PILOT's; both asked for a decision). The explorer has legs: over any ground
+  feature shorter than a leg and a half (about 1.3 m) a walking or running body stays in
+  contact, its legs taking up the rise and fall, as a person's do; it leaves the ground only
+  by a jump, the jetpack, or a drop it cannot step down. PHYSICS builds that into the body
+  (a named part of the model, not a fudge). PILOT keeps "low boulders are ground", makes the
+  explorer clamber over them at no more than a walking pace, and until the legs are in
+  measures a run across the Moon's and Mars' boulder fields in the game and turns the
+  walk-over off there if it launches the explorer. Measure of done, for the lead: a run
+  across a boulder field on Earth, Mars and the Moon never lifts the feet more than 0.3 m
+  off the ground without a jump.
+- 2026-11-11: **PHYSICS's order for P9** (coordinator): (1) legs (the ruling above), tested
+  on Earth, Mars and the Moon over PILOT's real ground profile; (2) the five tests at the
+  old weather start: stale probe or real fault, each one; (3) the racing gust pattern; (4)
+  as capacity allows: spray off the sea in a gale, softer dust walls for PAINTER, the
+  instanced kit path, flake crawl; the Neptune lab frame re-shot and opened.
