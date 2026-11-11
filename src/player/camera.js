@@ -73,6 +73,15 @@ function boomThroughSpheres(o, d, boom, spheres, minBoom) {
   return out;
 }
 
+// How long a third-person boom could be at this spot, looking along `viewFwd` at `pitch`,
+// before something solid (obstacle spheres) cuts it. Used to choose where the view faces
+// when the explorer steps out of the ship: never into the hull at its back.
+export function boomRoom(feet, viewFwd, pitch, obstacles, C = CAMERA) {
+  const up = norm(feet), f = tangent(viewFwd, up, viewFwd);
+  const look = norm(add(scale(f, Math.cos(pitch)), scale(up, Math.sin(pitch))));
+  return boomThroughSpheres(addScaled(feet, up, C.pivotHeight), scale(look, -1), C.boom, obstacles || [], 0);
+}
+
 // feet: explorer position (body-local). obstacles: [{ p, radius }] spheres the camera must not
 // enter (the ship's hull). Returns { p, q, fov, look } and updates the smoothing.
 export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = null) {

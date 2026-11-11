@@ -14,7 +14,7 @@ import {
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer, collideObstacles } from '../player/explorer.js';
 import {
-  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose,
+  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom,
 } from '../player/camera.js';
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
@@ -453,7 +453,17 @@ export class Sim {
     this.ex = createExplorerState(hp, away);
     this.ex.fuel = 1;
     this.bodyId = this.shFrame.id;
-    this.footCam = createFootCamera(rotateAround(away, up, 0.5), up);
+    // The view: as near to "half over the shoulder, away from the ship" as leaves the boom
+    // room. Straight away from the hull puts the camera inside it (a boom of 0.8 m: the back
+    // of a helmet); so turn the view along the hull, either way, until the boom is free.
+    const solid = this.cameraSolids(hp);
+    let best = 0.5, room = -1;
+    for (const a of [0.5, -0.5, 0.95, -0.95, 1.4, -1.4, 1.85, -1.85, 2.4, -2.4, Math.PI]) {
+      const r = boomRoom(hp, rotateAround(away, up, a), -0.12, solid);
+      if (r > room + 0.05) { room = r; best = a; }
+      if (r >= CAMERA.boom - 0.05) break;
+    }
+    this.footCam = createFootCamera(rotateAround(away, up, best), up);
     this.footCam.firstPerson = false;
     this.transition = { t: 0, dur: FEEL.exitSeconds, dir: 'out', from: this.camPose };
   }
@@ -758,20 +768,24 @@ export class Sim {
   }
 
   // ---- camera ------------------------------------------------------------------------------------
+  // What the third-person boom must not pass through near body-local point `p`: the parked
+  // ship (the one solid thing besides the ground) and trunks, crystals and the like that stand
+  // taller than the boom's pivot. Spheres { p, radius }.
+  cameraSolids(p, obstacles) {
+    let out = [];
+    if (this.shFrame.kind === 'body' && this.shFrame.rotating && this.shFrame.id === this.bodyId && len(sub(this.sh.p, p)) < 40) {
+      out = [-2.9, 0, 2.9].map((z) => ({ p: add(this.sh.p, qRotate(this.sh.q, V(0, 1.7, z))), radius: 2.2 }));
+    }
+    const list = obstacles || this.obstaclesNear(this.bodyId, p, 12);
+    if (list.length) {
+      const r = len(p) + CAMERA.pivotHeight;
+      for (const o of list) if (o.height > CAMERA.pivotHeight) out.push({ p: scale(o.unitDir, r), radius: o.radius + 0.3 });
+    }
+    return out;
+  }
+
   footPose(dt) {
-    // The parked ship is the one solid thing besides the ground: keep the camera out of it.
-    let hull = null;
-    if (this.shFrame.kind === 'body' && this.shFrame.rotating && this.shFrame.id === this.bodyId
-        && len(sub(this.sh.p, this.ex.p)) < 40) {
-      hull = [-2.9, 0, 2.9].map((z) => ({ p: add(this.sh.p, qRotate(this.sh.q, V(0, 1.7, z))), radius: 2.2 }));
-    }
-    // Trunks between the camera and the explorer pull the boom in as well.
-    if (this.nearObstacles.length) {
-      const r = len(this.ex.p) + CAMERA.pivotHeight;
-      const trunks = this.nearObstacles.filter((o) => o.height > CAMERA.pivotHeight).map((o) => ({ p: scale(o.unitDir, r), radius: o.radius + 0.3 }));
-      hull = hull ? hull.concat(trunks) : trunks;
-    }
-    return updateFootCamera(this.footCam, this.ex.p, dt, this.sampler(this.bodyId), undefined, hull);
+    return updateFootCamera(this.footCam, this.ex.p, dt, this.sampler(this.bodyId), undefined, this.cameraSolids(this.ex.p, this.nearObstacles));
   }
 
   shipPose(dt) {
