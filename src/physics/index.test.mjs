@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createPhysics, stepExplorerBody, stepShipBody, FLORA_GLSL, QUALITY } from './index.js';
 import { stubSurface, stubSpawn } from '../core/stubs/surface.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
-import { makeWorld, V, norm, len } from './testworld.mjs';
+import { makeWorld, V, norm, len, timing } from './testworld.mjs';
 
 const spawnPoint = (bodyId) => { const d = stubSpawn(bodyId).unitDir, s = stubSurface(bodyId, d); return V(d.x * s.radius, d.y * s.radius, d.z * s.radius); };
 function walker(bodyId, speed = 4) {
@@ -107,7 +107,7 @@ test('budget: well under 2 ms per frame at quality 1 (walking, flying, raining)'
   console.log(`# physics.update ms per frame (Node, stub surface): walk mean ${walk.mean.toFixed(3)} p95 ${walk.p95.toFixed(3)} | ship 46 m/s mean ${fly.mean.toFixed(3)} p95 ${fly.p95.toFixed(3)} | 160 m/s mean ${fast.mean.toFixed(3)} p95 ${fast.p95.toFixed(3)}`);
   // (this sandbox is shared with two other workers and their headless browsers: the median is
   // the honest number here; the p95 is printed, and the worst frame has its own test below)
-  for (const m of [walk, fly, fast]) { assert.ok(m.median < 1.0, 'median ' + m.median); assert.ok(m.mean < 1.6, 'mean ' + m.mean); }
+  for (const m of [walk, fly, fast]) { timing(m.median < 1.0, 'median ' + m.median); timing(m.mean < 1.6, 'mean ' + m.mean); }
   assert.ok(walk.samples <= QUALITY.samples[1], 'sampleSurface calls per frame when walking: ' + walk.samples);
 });
 
@@ -136,8 +136,8 @@ test('warmUp fills the ground caches and leaves every played frame inside the 2 
   let worst = 0, at = 0;
   for (let i = 0; i < frames; i++) if (best[i] > worst) { worst = best[i]; at = i; }
   console.log(`# first 5 s after warmUp (${warm.toFixed(0)} ms): worst frame ${worst.toFixed(2)} ms at frame ${at} (best of ${runs} runs per frame; worst single measurement ${rawWorst.toFixed(2)} ms)`);
-  assert.ok(warm < 400, 'warm-up took ' + warm + ' ms');
-  assert.ok(worst < 2.0, `frame ${at} costs ${worst} ms in every run`);
+  timing(warm < 400, 'warm-up took ' + warm + ' ms');
+  timing(worst < 2.0, `frame ${at} costs ${worst} ms in every run`);
 });
 
 test('sampleSurface is called sparingly: a bounded number per frame, bursts only after a jump', () => {
@@ -259,7 +259,7 @@ test('against PAINTER\'s real Earth, if it loads in Node: runs clean and inside 
   }
   allFinite(physics.here);
   console.log(`# physics.update on PAINTER's Earth: mean ${mean.toFixed(3)} ms; home forest: ${physics.here.weather.kind}, wind ${physics.here.air.speed.toFixed(2)} m/s at 2 m, canopy ${physics.here.cover.canopy01.toFixed(2)}, ground ${physics.ground('earth', norm(p)).material}`);
-  assert.ok(mean < 2.0, 'mean ' + mean);
+  timing(mean < 2.0, 'mean ' + mean);
   assert.ok(physics.here.cover.canopy01 > 0.3, 'the home forest has a canopy');
   assert.ok(['litter', 'mud', 'rock', 'bed'].includes(physics.ground('earth', norm(p)).material));
 });

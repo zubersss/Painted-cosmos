@@ -9,7 +9,7 @@
 // Away from the focus the same layers are evaluated directly, without terrain.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature } from './atmosphere.js';
-import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
+import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, wakeAt, WAKE } from './wind.js';
 import { weatherWind } from './weather.js';
 import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
@@ -19,10 +19,9 @@ import { clamp, clamp01, smoothstep } from './util.js';
 
 // (P15) The wind left at height z (m) in the lee of trees of height wkH that leave wk of it near the ground: whole up
 // to AIR.wakeFull of their height, gone at AIR.wakeTop. One shape for the particles' air, profileAt and the crowns.
-export function wakeAt(wk, wkH, z) {
-  if (!(wk < 1) || !(wkH > 0)) return 1;
-  return 1 - (1 - wk) * (1 - smoothstep(wkH * AIR.wakeFull, wkH * AIR.wakeTop, z));
-}
+// (P16) It lives in wind.js now and is re-exported here (the same function): flora.js takes it from wind.js, so no
+// module of the physics imports air.js back (src/physics/load.test.mjs loads every module alone to keep it so).
+export { wakeAt };
 
 export const AIR = Object.freeze({
   gridN: 17,              // nodes per side of the wind grid
@@ -32,13 +31,13 @@ export const AIR = Object.freeze({
   wakeDrop: 0.75,         // a dense stand of trees takes this much off the wind just behind it ...
   wakeLength: 5,          // ... recovering over this many tree heights downwind (a shelter belt
                           // protects out to 10-15 heights; Wang and Takle 1996)
-  wakeTop: 1.5,           // the wake reaches this many canopy heights up
+  wakeTop: WAKE.top,      // the wake reaches this many canopy heights up (1.5; the number is wind.js WAKE.top)
   // (P15) ... and is whole only below this share of their height: behind a forest edge or a dense belt the quiet zone
   // lies under half to two thirds of its height, and at its top the speed is lost by a third to a quarter of what is lost
   // near the ground (Heisler and DeWalle 1988; Wang and Takle 1996). Until P15 the wake was whole up to the full height
   // (particles, profileAt) and, for the crowns (sampleWind), at every height: a crown in a clearing behind a wood felt
   // the wood's ground-level lee at its own height and above.
-  wakeFull: 0.5,
+  wakeFull: WAKE.full,    // 0.5 (wind.js WAKE.full, which wakeAt reads)
   shelterAdjust: 48,      // m: shelter and wakes follow a veering wind as the air crosses this much fetch
                           // (the time it takes is this over the wind speed, kept between 1 and 6 s)
   shelterLearn: 0.4,      // s: a node whose upwind search reaches newly sampled ground takes it in over this
@@ -65,8 +64,9 @@ function coverInto(surface, arr, o) {
   arr[o + 10] = heightFactor(2, _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash; arr[o + 14] = _cov.fetch; arr[o + 15] = _cov.liquidDensity;
 }
-// Computed on first use, not at load: flora.js imports air.js (wakeAt), so FLORA is not yet initialised while air.js loads
-// when the browser enters through flora.glsl.js -> flora.js -> air.js.
+// Computed on first use, not at load (the coordinator's guard after 6d5c02a, kept): when flora.js imported air.js, FLORA was
+// not yet initialised while air.js loaded from flora.glsl.js -> flora.js -> air.js. P16 removed that cycle (flora.js takes
+// wakeAt from wind.js); lazy costs nothing and keeps air.js safe whatever imports it first.
 let HF0 = null;
 const hf0 = () => HF0 || (HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)]);
 let _coverBody = 'earth';

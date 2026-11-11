@@ -626,7 +626,7 @@ function info() {
   return { body: bodyId, t: +time.toFixed(1), wx: w.kind, rate: +w.precipitation.rate.toFixed(1), wind: +a.speed.toFixed(1), wet: +w.wetness01.toFixed(2), vis: +w.visibility01.toFixed(2), particles: counts,
     marks: physics.fields.deform.marks.total, sea: physics.fields.water.field.present ? +physics.fields.water.field.height.toFixed(2) : null,
     // (P10) the sea PAINTER's far-sea gate reads (uPhysWaterSea: Hs, breaking level, edge, whitecap cover), the 10 m wind, what the wind raises
-    seaState: physics.fields.water.field.present ? { Hs: +physics.fields.water.field.significant.toFixed(2), cover: +physics.fields.water.field.cover.toFixed(3), breaking: physics.fields.water.field.foamAt < 1e8, length: +physics.fields.water.field.length.toFixed(1) } : null,
+    seaState: physics.fields.water.field.present ? { Hs: +physics.fields.water.field.significant.toFixed(2), cover: +physics.fields.water.field.cover.toFixed(3), breaking: physics.fields.water.field.foamAt < 1e8, length: +physics.fields.water.field.length.toFixed(1), fetch: Math.round(physics.fields.water.field.fetch), depth: +physics.fields.water.field.depth.toFixed(1) } : null,
     u10: +Math.hypot(physics.fields.air.cwe, physics.fields.air.cwn).toFixed(1), blown: r3(physics.here.blown), kitMode,
     kits: kits ? { calls: kits.stats.drawCalls, tris: kits.stats.triangles, verts: kits.stats.vertices, ms: +cost.kits.toFixed(3), cover: r3(kits.weather.stats.cover), size: r3(kits.weather.stats.size) } : null,
     sky: r3(physics.here.sky), hides: { falling: +(w.precipitation.extinction * 24).toFixed(3), dust: +(w.dustExtinction * 24).toFixed(3) },

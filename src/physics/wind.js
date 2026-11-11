@@ -353,6 +353,19 @@ export function shelterFactor(sx) {
   return 1 - 0.85 * smoothstep(0.04, 0.32, sx) + 0.3 * smoothstep(0.02, 0.2, -sx);
 }
 
+// (P15, moved here in P16) The lee of trees with height: behind a forest edge or a dense belt the quiet zone lies under
+// half to two thirds of its height, and at its top the speed is lost by a third to a quarter of what is lost near the
+// ground (Heisler and DeWalle 1988; Wang and Takle 1996). wakeAt(wk, wkH, z): the wind left at height z (m) in the lee of
+// trees of height wkH that leave wk of it near the ground: whole up to WAKE.full of their height, gone at WAKE.top.
+// One shape for the particles' air, profileAt and the crowns. It lives here (not in air.js, which re-exports it and
+// carries the same numbers as AIR.wakeFull, AIR.wakeTop) so that flora.js can take it without importing air.js, which
+// imports flora.js: that cycle put FLORA in its temporal dead zone when the browser entered through flora.glsl.js (6d5c02a).
+export const WAKE = Object.freeze({ full: 0.5, top: 1.5 });
+export function wakeAt(wk, wkH, z) {
+  if (!(wk < 1) || !(wkH > 0)) return 1;
+  return 1 - (1 - wk) * (1 - smoothstep(wkH * WAKE.full, wkH * WAKE.top, z));
+}
+
 export function hasAir(bodyId) {
   const W = WINDS[bodyId];
   return !!W && W.U > 0 && (BODIES[bodyId].atmosphereHeight || 0) > 0;

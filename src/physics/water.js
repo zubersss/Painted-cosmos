@@ -74,6 +74,7 @@ export const WATER = Object.freeze({
   // the crest LINE: within this slope (in units of the sea's rms slope, along the way the waves run) of the very top
   // (on one train: 0 at the top, 1 a twenty-fifth of a wavelength either side of it)
   lineIn: 0.12, lineOut: 0.36,
+  whiteSpeed: [0.9, 1.5],          // (P16) m/s of phase speed: no whitecaps on shorter waves (0.5 m long on Earth), all on longer (1.4 m)
 });
 // 4 sigma of the surface for unit Hs of the four standard trains (the sets add 1 + group^2 / 2 to each train's variance)
 const VARG = 1 + 0.45 * 0.45 / 2;
@@ -86,6 +87,105 @@ export const FETCH = {
   default: 80,
 };
 export function fetchOf(biomeId) { return FETCH[biomeId] != null ? FETCH[biomeId] : FETCH.default; }
+
+// (P16) THE FETCH, MEASURED. Until P16 the sea at the focus was raised over the biome's fetch (2500 m on a sea coast)
+// whatever water was there: Neptune's storm coast faces a lagoon dry 160 m out and carried 2.8 m of surf. Now the
+// fetch is measured upwind over the liquid the world has, from a water point near the focus, and the biome's fetch
+// is only its cap (how far the open water runs beyond what is measured). Shore Protection Manual 1984 (3-VI): over
+// an irregular shore the fetch is the arithmetic mean of radials over 24 degrees about the wind; each radial runs
+// upwind until it meets dry ground (or the cap). The mean depth over the wet length of the radials is the depth the
+// waves grew over (windSea limits them by it). Sparse and cached: steps of 16 m growing by a tenth of the distance gone
+// (39 samples out to 2500 m, the shore placed to within 5 % of its distance: 2.5 % in the height), a few samples a
+// frame, and a measurement holds for a water point within max(cell, a tenth of its fetch) and the same sector of the wind.
+export const FETCH_GAUGE = Object.freeze({
+  radials: [-12, -6, 0, 6, 12],   // degrees about the upwind direction (SPM 1984: 3-degree radials over +-12; five here)
+  step0: 16,                      // m: the first and smallest step
+  stepGrow: 0.1,                  // each step at least this share of the distance gone
+  sectors: 16,                    // the wind's direction is taken to the nearest of this many (22.5 degrees)
+  cell: 48,                       // m: a measurement holds for a water point within this (or a tenth of its fetch) ...
+  keep: 24,                       // ... and this many measurements are kept (places and directions)
+  minDepth: 1,                    // m: the water point is the nearest liquid at least this deep (else the deepest about)
+});
+const DEG = Math.PI / 180;
+
+// The measurement itself. sample(unitDir) -> the world's surface ({ radius, liquidRadius }). Pure but for that call.
+export class FetchGauge {
+  constructor() {
+    this.fetch = -1;          // the mean of the radials (m) the sea uses now; -1 while nothing is known here
+    this.depth = 0;           // the mean depth over their wet length (m)
+    this.radial = [];         // the last finished measurement's radials (m), for the lab
+    this.ready = false;       // fetch is a finished measurement for this place and wind (not a lower bound)
+    this.samples = 0;         // sampleSurface calls made in the last update
+    this.measured = 0;        // measurements finished so far
+    this.kept = [];           // { body, x, y, z (unit), sector, fetch, depth, radial }
+    this.job = null;
+    this._q = { x: 0, y: 0, z: 1 };
+  }
+  // One frame. body: id; (px, py, pz): the water point (unit, body-local); (tx, ty, tz): a tangent there pointing
+  // upwind (unit); R: the body's radius (m); cap: the biome's fetch (m); pointDepth: the liquid's depth at the point (m);
+  // budget: sampleSurface calls allowed now; clock, ms: optional time ration (clock() in ms).
+  update(body, px, py, pz, tx, ty, tz, R, cap, pointDepth, sample, budget, clock = null, ms = 0) {
+    this.samples = 0;
+    // the sector of the wind, in the local geographic frame (east = Y x up), so that it means the same after re-anchors
+    let ex = pz, ez = -px; const el = Math.hypot(ex, ez);
+    if (el < 1e-6) { ex = 1; ez = 0; } else { ex /= el; ez /= el; }
+    const ey = 0, nx = py * ez - pz * ey, ny = pz * ex - px * ez, nz = px * ey - py * ex;
+    const NS = FETCH_GAUGE.sectors, sector = ((Math.round(Math.atan2(tx * nx + ty * ny + tz * nz, tx * ex + tz * ez) / (2 * Math.PI) * NS) % NS) + NS) % NS;
+    const capM = cap > 0 ? cap : 0;
+    // a measurement already made here?
+    for (let i = 0; i < this.kept.length; i++) {
+      const m = this.kept[i];
+      if (m.body !== body || m.sector !== sector || m.cap !== capM) continue;
+      const d = R * Math.acos(Math.min(1, m.x * px + m.y * py + m.z * pz));
+      if (d <= Math.max(FETCH_GAUGE.cell, 0.1 * m.fetch)) {
+        if (i > 0) { this.kept.splice(i, 1); this.kept.unshift(m); }
+        this.fetch = m.fetch; this.depth = m.depth; this.radial = m.radial; this.ready = true; this.job = null;
+        return this;
+      }
+    }
+    // measure: a job for this place and sector (a new one if the place or the wind has moved on)
+    let J = this.job;
+    if (!J || J.body !== body || J.sector !== sector || J.cap !== capM || R * Math.acos(Math.min(1, J.x * px + J.y * py + J.z * pz)) > FETCH_GAUGE.cell) {
+      // the upwind direction of the sector, and the radials about it
+      const a = sector / NS * 2 * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+      const ux = ex * ca + nx * sa, uy = ny * sa, uz = ez * ca + nz * sa;
+      const vx = py * uz - pz * uy, vy = pz * ux - px * uz, vz = px * uy - py * ux;   // up x upwind: 90 degrees to the left
+      const n = FETCH_GAUGE.radials.length;
+      J = this.job = { body, sector, cap: capM, x: px, y: py, z: pz, R, k: 0, r: new Float64Array(n), done: new Uint8Array(n), wet: new Float64Array(n), dsum: new Float64Array(n),
+        b: FETCH_GAUGE.radials.map((deg) => { const c = Math.cos(deg * DEG), s = Math.sin(deg * DEG); return [ux * c + vx * s, uy * c + vy * s, uz * c + vz * s]; }), pointDepth: pointDepth > 0 ? pointDepth : 0 };
+      if (!(capM > 0)) J.done.fill(1);
+    }
+    const n = J.b.length, q = this._q, t0 = clock ? clock() : 0;
+    while (this.samples < budget && J.k < n) {
+      if (clock && this.samples >= 2 && clock() - t0 > ms) break;
+      const k = J.k;
+      if (J.done[k]) { J.k++; continue; }
+      const r0 = J.r[k], r1 = Math.min(J.cap, r0 + Math.max(FETCH_GAUGE.step0, FETCH_GAUGE.stepGrow * r0));
+      const th = r1 / R, c = Math.cos(th), s = Math.sin(th), b = J.b[k];
+      q.x = J.x * c + b[0] * s; q.y = J.y * c + b[1] * s; q.z = J.z * c + b[2] * s;
+      const S = sample(q); this.samples++;
+      const d = S ? (S.liquidRadius || 0) - S.radius : -1;
+      if (d > 0) { J.dsum[k] += d * (r1 - r0); J.wet[k] += r1 - r0; J.r[k] = r1; if (r1 >= J.cap) J.done[k] = 1; }
+      else { J.r[k] = 0.5 * (r0 + r1); J.done[k] = 1; }            // dry: the shore is taken half way (the depth is the wet steps')
+    }
+    // the mean of the radials (a lower bound while they are still running) and the mean depth over their wet length
+    let f = 0, w = 0, ds = 0;
+    for (let k = 0; k < n; k++) { f += J.r[k]; w += J.wet[k]; ds += J.dsum[k]; }
+    const fetch = f / n, depth = w > 0 ? ds / w : J.pointDepth;
+    if (J.k >= n) {
+      const m = { body, sector, cap: capM, x: J.x, y: J.y, z: J.z, fetch, depth, radial: Array.from(J.r) };
+      this.kept.unshift(m); if (this.kept.length > FETCH_GAUGE.keep) this.kept.pop();
+      this.job = null; this.measured++;
+      this.fetch = fetch; this.depth = depth; this.radial = m.radial; this.ready = true;
+    } else if (!this.ready || this.fetch < 0) {
+      // nothing finished for this place yet: what has been measured so far (it only grows)
+      this.fetch = fetch; this.depth = depth; this.ready = false;
+    }
+    return this;
+  }
+  // forget everything (a new body, or a jump)
+  reset() { this.fetch = -1; this.depth = 0; this.radial = []; this.ready = false; this.job = null; }
+}
 
 // The wind sea raised by a wind U (m/s at 10 m) over a fetch F (m) under gravity g, with the
 // densities of the air and the liquid, in liquid `depth` metres deep (Infinity = deep).
@@ -100,6 +200,20 @@ export function windSea(U, F, g, rhoAir, rhoLiq, depth, o = {}) {
   let T = 0.2857 * Math.cbrt(U * F) / Math.pow(g, 2 / 3);
   const Tfd = 8.134 * U / g;
   if (T > Tfd) T = Tfd;
+  // (P16) Depth-limited growth (Shore Protection Manual 1984, eqs 3-39 and 3-40, Bretschneider's shallow-water curves):
+  // over a bottom d metres down the waves grow more slowly and stop lower,
+  //   g H / U^2 = 0.283 tanh(0.530 (g d / U^2)^(3/4)) tanh( 0.00565 (g F / U^2)^(1/2) / tanh(0.530 (g d / U^2)^(3/4)) )
+  //   g T / U   = 7.54  tanh(0.833 (g d / U^2)^(3/8)) tanh( 0.0379  (g F / U^2)^(1/3) / tanh(0.833 (g d / U^2)^(3/8)) )
+  // which in deep water are the laws above (0.283 x 0.00565 = 0.0016, 7.54 x 0.0379 = 0.2857). Applied as the ratio of
+  // each to its own deep-water form, so deep water is exactly as before. Until P16 only the breaking cap (0.55 of the
+  // depth) knew the bottom: 3.4 m of depth held 1.9 m of sea in any wind.
+  if (depth > 0 && depth < 1e8) {
+    const U2 = U * U, D = g * depth / U2, X = g * F / U2;
+    const tH = Math.tanh(0.530 * Math.pow(D, 0.75)), aH = 0.00565 * Math.sqrt(X);
+    const tT = Math.tanh(0.833 * Math.pow(D, 0.375)), aT = 0.0379 * Math.cbrt(X);
+    if (tH < 1 && aH > 0) H *= tH * Math.tanh(aH / tH) / Math.tanh(aH);
+    if (tT < 1 && aT > 0) T *= tT * Math.tanh(aT / tT) / Math.tanh(aT);
+  }
   // wavelength: deep water g T^2 / 2 pi, shortened over a shallow bottom (Fenton and McKee 1990)
   const L0 = g * T * T / TAU;
   let L = L0;
@@ -109,10 +223,16 @@ export function windSea(U, F, g, rhoAir, rhoLiq, depth, o = {}) {
   if (L > 0 && H > L / 7) H = L / 7;
   o.height = H; o.period = T; o.length = L; o.speed = T > 0 ? L / T : 0;
   o.steepness = L > 0 ? H / L : 0;
-  o.whitecap01 = smoothstep(0.035, 0.075, o.steepness);
+  o.whitecap01 = smoothstep(0.035, 0.075, o.steepness) * whiteScale(o.speed);
   return o;
 }
 
+// (P16) Whitecaps need waves big enough to trap air as they break. Waves under about a metre long (on Earth) break
+// without entraining air: microscale breaking, a glint and a ruffle but no white (Banner and Phillips 1974; Jessup,
+// Zappa and Yeh 1997). Taken by the phase speed (gravity-aware): none under WATER.whiteSpeed[0], all above [1]. Until
+// the fetch was measured no sea at a coast was that short; a 20 m channel in a fresh breeze raises 2 cm ripples 0.2 m
+// long whose steepness alone said 15 % white.
+export function whiteScale(c) { return smoothstep(WATER.whiteSpeed[0], WATER.whiteSpeed[1], c); }
 const _t = {}, _s = {};
 const NT = 4;
 // 4 sigma of the standard four trains for Hs = 1 (0.992: they were chosen to make it 1)
@@ -186,6 +306,7 @@ export class WaterField {
     this.amp = new Float64Array(NT);                        // amplitudes (m)
     this.omega = new Float64Array(NT);
     this.level = -1e9;             // liquid surface near the focus (radius - frame.r0), -1e9 when dry
+    this.fetch = 0; this.depth = 0;  // (P16) the fetch (m) and the depth (m) the sea is raised over now (as update() was given them)
     this.present = false;
     this.frameVersion = -1;
     this.arrive = 0;               // s left of the quick settling after arriving somewhere
@@ -229,6 +350,7 @@ export class WaterField {
   update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0, prevailing = 0) {
     if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.gphase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; this.wake.fill(0); }
     this.level = level; this.present = level > -1e8; this.g = g;
+    this.fetch = fetch; this.depth = depth;     // (P16) what the sea was raised over (m), for the probe and the lab
     const U = Math.hypot(we, wn);
     // (for the first moments that both the liquid and the wind are known the sea follows them
     // quickly, since the wind estimate itself is still settling; from then on, slowly)
@@ -243,7 +365,7 @@ export class WaterField {
     if (_t.length > 0) { this.period += (_t.period - this.period) * kh; this.length += (_t.length - this.length) * kh; }
     this.speed = this.period > 0 ? this.length / this.period : 0;
     this.steepness = this.length > 0 ? this.height / this.length : 0;
-    this.whitecap01 = smoothstep(0.035, 0.075, this.steepness);
+    this.whitecap01 = smoothstep(0.035, 0.075, this.steepness) * whiteScale(this.speed);
     if (U > 0.3) {
       const kd = 1 - Math.exp(-h / WATER.turnTime);
       const d0 = this.dir[0] + (we / U - this.dir[0]) * kd, d1 = this.dir[1] + (wn / U - this.dir[1]) * kd, l = Math.hypot(d0, d1) || 1;

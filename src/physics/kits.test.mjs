@@ -8,6 +8,7 @@ import { LocalFrame } from './near.js';
 import { WaterField } from './water.js';
 import { MARK, MARK_STRIDE } from './deform.js';
 import { PARTICLES } from './particles.js';
+import { timing } from './testworld.mjs';
 
 const buf = (list) => { const n = list.length, b = { count: n, capacity: n, pos: new Float32Array(n * 3), vel: new Float32Array(n * 3), size: new Float32Array(n), age: new Float32Array(n), origin: { x: 0, y: 0, z: 0 } }; list.forEach((p, i) => { b.pos.set(p.p, i * 3); b.vel.set(p.v || [0, 0, 0], i * 3); b.size[i] = p.size ?? 0.002; b.age[i] = p.age ?? 1; }); return b; };
 const V = (a, i) => [a[i * 3], a[i * 3 + 1], a[i * 3 + 2]];
@@ -255,7 +256,7 @@ test('cost of the arithmetic: a downpour, a full ring of marks and the water gri
   const N = 40, wp = new Float32Array((N + 1) * (N + 1) * 3), wn = new Float32Array((N + 1) * (N + 1) * 3);
   const tW = time(() => expandWater(W, frame, 0, 0, N, 1.5, wp, wn), 20);
   console.log(`      kit arithmetic: 1600 streaks ${(tS * 1000).toFixed(0)} us, 1600 dabs ${(tD * 1000).toFixed(0)} us, shades ${(tC * 1000).toFixed(0)} us, 256 marks ${(tM * 1000).toFixed(0)} us, water 41x41 ${(tW * 1000).toFixed(0)} us`);
-  assert.ok(tS < 0.4 && tD < 0.4 && tC < 0.2 && tM < 0.5 && tW < 0.4, 'each well under half a millisecond');
+  timing(tS < 0.4 && tD < 0.4 && tC < 0.2 && tM < 0.5 && tW < 0.4, 'each well under half a millisecond');
 });
 
 test('what the kits can draw with every buffer full at the highest quality (reported; the owner removed the budget of 12 draw calls and 60 k triangles)', () => {

@@ -6,7 +6,7 @@ import { LocalFrame, TerrainGrid } from './near.js';
 import { createPhysics } from './index.js';
 import { cellsAt, weatherAt, DEFAULT_SEED } from './weather.js';
 import { BODIES } from '../data/bodies.js';
-import { makeWorld, V, norm, len } from './testworld.mjs';
+import { makeWorld, V, norm, len, timing } from './testworld.mjs';
 
 // A stand-in for the near TerrainGrid: any height function of the grid position.
 const ground = (fn) => ({ heightAt: (x, z, fb) => { const h = fn(x, z); return h === h ? h : fb; } });
@@ -151,5 +151,5 @@ test('cost: a full refresh of the field on arrival, then a few rows a frame', ()
   const D = new DriftField(), F = frame(), sh = new Float32Array(16);
   const t0 = performance.now(); D.update(1 / 60, F, 0, 0, bank, 9, 0, 0.2, 1, sh, 0); const first = performance.now() - t0;
   let best = 1e9; for (let k = 0; k < 40; k++) { const t1 = performance.now(); for (let i = 0; i < 20; i++) D.update(1 / 60, F, 0, 0, bank, 9, 0, 0.2, 1, sh, 0); best = Math.min(best, (performance.now() - t1) / 20); }
-  assert.ok(first < 30 && best < 0.25, `arrival ${first.toFixed(2)} ms, then ${best.toFixed(3)} ms a frame`);
+  timing(first < 30 && best < 0.25, `arrival ${first.toFixed(2)} ms, then ${best.toFixed(3)} ms a frame`);
 });

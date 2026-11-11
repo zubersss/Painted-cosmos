@@ -11,7 +11,7 @@ import { EVENT, PARTICLES } from './particles.js';
 import { MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE } from './ground.js';
 import { MARK_STRIDE } from './deform.js';
 import { BODIES } from '../data/bodies.js';
-import { makeWorld, V, norm, len, dot } from './testworld.mjs';
+import { makeWorld, V, norm, len, dot, timing } from './testworld.mjs';
 
 // (the fixed test place is used with a fixed weather seed, under which it is fair there; tests
 // that go looking for weather use the default seed)
@@ -354,7 +354,7 @@ test('every body, every kind: nothing is NaN and the frame stays inside the budg
     ms.sort((x, y) => x - y); best = Math.min(best, ms[Math.floor(ms.length / 2)]);
     }
     for (const k of ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray']) assert.ok(finiteBuf(w.physics.particles[k]), bodyId + ' ' + k);
-    assert.ok(best < 1.5, `${bodyId}: median frame ${best.toFixed(2)} ms with ${w.physics.stats.particles} particles`);
+    timing(best < 1.5, `${bodyId}: median frame ${best.toFixed(2)} ms with ${w.physics.stats.particles} particles`);
   }
 });
 

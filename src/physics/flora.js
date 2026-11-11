@@ -24,7 +24,7 @@
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
 import { devilWind } from './features.js';
-import { wakeAt } from './air.js';     // (P15; a cycle with air.js, safe: called at run time only)
+import { wakeAt } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
   N: 32, cell: 8,               // bend / wind field
