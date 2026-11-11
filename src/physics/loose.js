@@ -70,6 +70,7 @@ export class Loose {
       this.vt[k] = 1;
     }
     this._carry = new Float64Array(8);   // fractional emissions carried between frames
+    this.saltation01 = 0;                // 0..1: how hard sand is blowing at the focus right now
     this._wade = 0;
   }
 
@@ -149,11 +150,13 @@ export class Loose {
       // saltation: sand hops where the wind is over the threshold and the ground is loose sand
       const gp = this._ground(near, fx, fz, groundY, wet01, snowDepth);
       const loose = gp.repose > 0 ? gp.dust : 0;
+      this.saltation01 = 0;
       if (loose > 0.2 && rho > 0) {
         const ratio = KICK.impactRatio[bodyId] || KICK.impactRatio.default;
         const thr = saltationThreshold(bodyId, rho) * (1 + (ratio - 1) * clamp01(dust01 * 2));
         const excess = u10 / thr - 0.85;
         if (excess > 0) {
+          this.saltation01 = clamp01(excess / 0.7) * loose;
           const capS = PARTICLES.capacity.sand[P.quality];
           carry[1] += capS * clamp01(excess / 0.7) * loose * h / 1.6;
           const ue = u10 > 1e-6 ? cwe / u10 : 1, un = u10 > 1e-6 ? cwn / u10 : 0;

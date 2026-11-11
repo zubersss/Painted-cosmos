@@ -51,7 +51,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
-  const deform = new DeformField();
+  const deform = new DeformField(SHIP_BODY.legs);
+  const _fill = { snow: 0, sand: 0 };
 
   let quality = 1;
   let warming = false;
@@ -87,12 +88,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _gn = { sink: 0.015, imprint: 0.5, h: 0 };
   function groundOfGrid(x, z, o) {
     const n = near.nearest(x, z);
-    if (n < 0) { o.sink = 0.015; o.imprint = 0.5; o.h = here.groundHeight + BODIES[active].radius - frame.r0; return o; }
+    if (n < 0) { o.sink = 0.015; o.imprint = 0.5; o.loose = 0; o.dust = 0; o.h = here.groundHeight + BODIES[active].radius - frame.r0; return o; }
     const c = near.cover, a = n * 8;
     // snow on the ground deepens the print and keeps it
     const snow = moist.snowDepth;
     o.sink = Math.max(c[a], Math.min(snow * 0.8, GROUND.snowSinkMax)) * (c[a + 7] > 0.05 ? 0 : 1);
     o.imprint = snow > GROUND.snowCover ? 1 : c[a + 1];
+    // loose: granular ground that piles into rims and can be scoured (sand, dust, gravel, snow)
+    o.loose = snow > GROUND.snowCover ? 1 : (c[a + 3] > 0 ? 1 : 0) * (1 - Math.min(1, moist.wetness01 * 1.5));
+    o.dust = c[a + 2];
     o.h = near.heightAt(x, z, near.h[n]);
     return o;
   }
@@ -189,7 +193,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const t4 = now();
     particles.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
-    deform.update(dt, frame, fx, fz, dist, groundOfGrid, body.gravity, time);
+    // what is filling the marks in: falling snow (m of depth per second) and blowing sand
+    const pr = here.weather.precipitation;
+    _fill.snow = pr.type === 'snow' || pr.type === 'ice' || pr.type === 'frost' ? pr.rate * pr.frozen01 * WEATHER.snowRatio * WEATHER.timeScale / 3.6e6 : 0;
+    _fill.sand = loose.saltation01;
+    deform.update(dt, frame, fx, fz, dist, groundOfGrid, body.gravity, time, _fill);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;
@@ -302,7 +310,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // allocated per frame.
   const _dEx = { kind: 'explorer', p: null, v: null, radius: EXPLORER_BODY.radius, strength: 1, grounded: true, kick: undefined, impact: 0 };
   const _dJet = { kind: 'jet', p: null, v: null, radius: 0.15, strength: 0 };
-  const _dShip = { kind: 'ship', p: null, v: null, radius: 4.2, strength: 1 };
+  const _dShip = { kind: 'ship', p: null, v: null, radius: 4.2, strength: 1, q: null, legContact: null };
   const _dWash = { kind: 'downwash', p: null, v: null, radius: 2.2, strength: 0 };
   function explorerDisturbers(st, out = []) {
     const B = st.phys;
@@ -314,7 +322,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   }
   function shipDisturbers(st, out = []) {
     const B = st.phys;
-    _dShip.p = st.p; _dShip.v = st.v;
+    _dShip.p = st.p; _dShip.v = st.v; _dShip.q = st.q || null;
+    _dShip.legContact = B && B.contacts != null && (B.contacts > 0 || B.asleep || B.lift01 < 1) ? B.legContact : null;
     out.push(_dShip);
     if (B && B.downwash && B.downwash.thrust > 50) { _dWash.p = st.p; _dWash.v = st.v; _dWash.radius = B.downwash.radius; _dWash.strength = B.downwash.thrust; out.push(_dWash); }
     return out;

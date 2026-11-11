@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
 import { PARTICLES, EVENT } from './particles.js';
 import { cellsAt, weatherAt, DEFAULT_SEED } from './weather.js';
-import { MARK, MARK_STRIDE } from './deform.js';
+import { MARK, MARK_STRIDE, DeformField, DEFORM } from './deform.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len, dot } from './testworld.mjs';
 
@@ -175,4 +175,94 @@ test('footprints: one per stride, alternating feet, deeper in snow than on rock,
   let any = 0; for (const x of sand.depth) if (x > 0) any++;
   assert.ok(any > 4, 'a trail in the depth field');
   assert.ok(sand.depthAt(V(sand.marks.origin.x + d[(sand.marks.head - 1) * MARK_STRIDE], sand.marks.origin.y + d[(sand.marks.head - 1) * MARK_STRIDE + 1], sand.marks.origin.z + d[(sand.marks.head - 1) * MARK_STRIDE + 2])) > 0.005);
+});
+
+test('prints on loose ground have a rim; on mud they do not; the depth field piles up beside the trail', () => {
+  const walk = (biome) => {
+    const R = BODIES.earth.radius, sample = makeWorld({ R, biome });
+    const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+    let p = V(0, 0, R); const v = V(4, 0, 0);
+    for (let i = 0; i < 300; i++) { p = V(p.x + 4 / 60, 0, p.z); const r = len(p); p = V(p.x * R / r, 0, p.z * R / r); physics.update(1 / 60, { bodyId: 'earth', time: 50 + i / 60, focus: p, disturbers: [{ kind: 'explorer', p, v, radius: 0.35, strength: 1, grounded: true }] }); }
+    return physics.fields.deform;
+  };
+  const sand = walk('desert_canyon'), mud = walk('misty_wetland');
+  const ds = sand.marks.data, dm = mud.marks.data;
+  assert.equal(sand.marks.stride, MARK_STRIDE);
+  assert.ok(Math.abs(ds[12] / ds[8] - 0.2) < 1e-6, 'sand rim is a fifth of the depth: ' + ds[12] / ds[8]);
+  assert.ok(dm[8] > 0.05 && dm[12] === 0, 'mud squeezes, it does not pile: depth ' + dm[8] + ' rim ' + dm[12]);
+  let lo = 0, hi = 0; for (const x of sand.depth) { if (x < lo) lo = x; if (x > hi) hi = x; }
+  assert.ok(hi > 0.02 && lo < -0.002, `trough ${hi} and pile ${lo}`);
+});
+
+test('falling snow fills prints in; in clear weather they last over a minute', () => {
+  const snowy = rainy('earth', { biome: 'stub-polar', pred: (x) => x.precipitation.type === 'snow' && x.precipitation.rate > 4 });
+  const fr0 = () => snowy.physics.fields.frame;
+  run(snowy, 2);
+  const v = V(fr0().ex * 4, fr0().ey * 4, fr0().ez * 4);
+  let p = snowy.focus;
+  run(snowy, 3, { disturbers: () => { p = V(p.x + v.x / 60, p.y + v.y / 60, p.z + v.z / 60); const l = len(p); p = V(p.x * snowy.R / l, p.y * snowy.R / l, p.z * snowy.R / l); snowy.focus = p; return [{ kind: 'explorer', p, v, radius: 0.35, strength: 1, grounded: true }]; } });
+  const M = snowy.physics.fields.deform.marks;
+  assert.ok(M.total > 5);
+  const d0 = M.data[8];
+  assert.ok(d0 > 0.1, 'a deep print in snow: ' + d0);
+  run(snowy, 12);
+  assert.ok(M.data[8] < d0 * 0.9, `the first print is filling: ${d0} -> ${M.data[8]}`);
+  // the mechanism itself, with a steady snowfall of 1 mm of depth a second: hollows fill six times
+  // as fast as level ground gains snow, the rim shrinks with the print, and a filled print is over
+  const F = new DeformField(), fr = snowy.physics.fields.frame;
+  F.update(0, fr, 0, 0, null, null, 9, 0, null);
+  F._mark(fr, 1, 0, 1, 1, 0, 0.3, 0.12, 0.12, MARK.footLeft, 0, 100, 0.024); F._splat(1, 1, 0.12);
+  for (let i = 0; i < 10 * 60; i++) F.update(1 / 60, fr, 0, 0, null, null, 9, i / 60, { snow: 0.001, sand: 0 });
+  assert.ok(Math.abs(F.marks.data[8] - (0.12 - 10 * 0.001 * DEFORM.snowFill)) < 1e-4, 'after 10 s: ' + F.marks.data[8]);
+  assert.ok(Math.abs(F.marks.data[12] / F.marks.data[8] - 0.2) < 1e-4, 'the rim shrinks with it');
+  for (let i = 0; i < 15 * 60; i++) F.update(1 / 60, fr, 0, 0, null, null, 9, 10 + i / 60, { snow: 0.001, sand: 0 });
+  assert.equal(F.marks.data[8], 0); assert.equal(F.marks.data[11], 0, 'life over');
+  assert.equal(F.depthAt(1, 1), 0, 'and the trough is level again');
+  // blowing sand does the same
+  const G = new DeformField(); G.update(0, fr, 0, 0, null, null, 9, 0, null);
+  G._mark(fr, 1, 0, 1, 1, 0, 0.3, 0.12, 0.06, MARK.footLeft, 0, 100, 0.012);
+  for (let i = 0; i < 8 * 60; i++) G.update(1 / 60, fr, 0, 0, null, null, 9, i / 60, { snow: 0, sand: 1 });
+  assert.equal(G.marks.data[8], 0, 'a sandstorm erases a print in seconds');
+  // no weather: the same print is still there after a minute
+  const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+  // (at 30 degrees north, in the calm of the horse latitudes: no sand is blowing)
+  let q = V(0, R * 0.5, R * Math.sqrt(0.75));
+  for (let i = 0; i < 120; i++) { q = V(q.x + 4 / 60, q.y, q.z); const r = len(q); q = V(q.x * R / r, q.y * R / r, q.z * R / r); physics.update(1 / 60, { bodyId: 'earth', time: 50 + i / 60, focus: q, disturbers: [{ kind: 'explorer', p: q, v: V(4, 0, 0), radius: 0.35, strength: 1, grounded: true }] }); }
+  const depth = physics.fields.deform.marks.data[8], born = physics.fields.deform.marks.data[10], life = physics.fields.deform.marks.data[11];
+  for (let i = 0; i < 70 * 20; i++) physics.update(1 / 20, { bodyId: 'earth', time: 52 + i / 20, focus: q });
+  assert.equal(physics.fields.deform.marks.data[8], depth);
+  assert.ok(life > 60 && born + life > 52 + 70, 'life ' + life);
+});
+
+test('the ship leaves three pad prints where it comes down, and a jet scours a dish with a ring', () => {
+  const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+  const p = V(0, R, 0), q = { x: 0, y: 0, z: 0, w: 1 };
+  const frame = (hgt, extra = []) => ({ bodyId: 'earth', time: (t += 1 / 60), focus: p, disturbers: [{ kind: 'ship', p: V(0, R + hgt, 0), v: V(), radius: 4.2, strength: 1, q }, ...extra] });
+  let t = 10;
+  for (let i = 0; i < 60; i++) physics.update(1 / 60, frame(6));
+  const M = physics.fields.deform.marks;
+  assert.equal(M.total, 0, 'hovering leaves no pad prints');
+  for (let i = 0; i < 30; i++) physics.update(1 / 60, frame(0));
+  assert.equal(M.total, 3, 'three pads');
+  const kinds = [0, 1, 2].map((k) => M.data[k * MARK_STRIDE + 9]);
+  assert.deepEqual(kinds, [MARK.gear, MARK.gear, MARK.gear]);
+  assert.ok(M.data[8] > 0.08 && M.data[8] <= 0.3, 'pad depth in sand ' + M.data[8]);
+  // the three pads are where the legs are: 3.2 m ahead and 2.2 m to each side, 1.8 m behind
+  const d = (a, b) => Math.hypot(M.data[a * MARK_STRIDE] - M.data[b * MARK_STRIDE], M.data[a * MARK_STRIDE + 1] - M.data[b * MARK_STRIDE + 1], M.data[a * MARK_STRIDE + 2] - M.data[b * MARK_STRIDE + 2]);
+  assert.ok(Math.abs(d(1, 2) - 4.4) < 0.05 && Math.abs(d(0, 1) - Math.hypot(5, 2.2)) < 0.05);
+  for (let i = 0; i < 120; i++) physics.update(1 / 60, frame(0));
+  assert.equal(M.total, 3, 'standing still adds none');
+  // lift off on thrusters: the downwash scours the sand
+  for (let i = 0; i < 180; i++) physics.update(1 / 60, frame(1.5, [{ kind: 'downwash', p: V(0, R + 1.5, 0), v: V(), radius: 2.2, strength: 12000 }]));
+  let scour = 0; for (let k = 0; k < M.total; k++) if (M.data[k * MARK_STRIDE + 9] === MARK.scour) scour++;
+  assert.ok(scour >= 3, 'scour marks: ' + scour);
+  const D = physics.fields.deform;
+  assert.ok(D.depthAt(V(0.3, R, 0.3)) > 0.004, 'a dish under the jet: ' + D.depthAt(V(0.3, R, 0.3)));
+  assert.ok(D.depthAt(V(3.3, R, 0)) < 0, 'a raised ring round it: ' + D.depthAt(V(3.3, R, 0)));
+  // on rock a jet scours nothing
+  const rock = createPhysics({ sampleSurface: (id, dd) => makeWorld({ R, biome: 'pale_mesas' })(dd), timeBudget: false });
+  for (let i = 0; i < 120; i++) rock.update(1 / 60, { bodyId: 'venus', time: 5 + i / 60, focus: V(0, 3600, 0), disturbers: [{ kind: 'jet', p: V(0, 3601.5, 0), v: V(), radius: 0.15, strength: 1700 }] });
+  assert.equal(rock.fields.deform.marks.total, 0);
 });
