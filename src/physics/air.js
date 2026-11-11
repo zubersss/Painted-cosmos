@@ -65,7 +65,10 @@ function coverInto(surface, arr, o) {
   arr[o + 10] = heightFactor(2, _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash; arr[o + 14] = _cov.fetch; arr[o + 15] = _cov.liquidDensity;
 }
-const HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)];
+// Computed on first use, not at load: flora.js imports air.js (wakeAt), so FLORA is not yet initialised while air.js loads
+// when the browser enters through flora.glsl.js -> flora.js -> air.js.
+let HF0 = null;
+const hf0 = () => HF0 || (HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)]);
 let _coverBody = 'earth';
 
 export class AirGrid {
@@ -358,7 +361,7 @@ export class AirGrid {
       o[6] = (c[a + 2] * v00 + c[b + 2] * v10 + c[d + 2] * v01 + c[e + 2] * v11) * k;
       o[7] = (c[a - 7] * v00 + c[b - 7] * v10 + c[d - 7] * v01 + c[e - 7] * v11) * k;     // canopy01
       if (o.length > 11) o[11] = (c[a - 6] * v00 + c[b - 6] * v10 + c[d - 6] * v01 + c[e - 6] * v11) * k;   // (P15) canopy height (m)
-    } else { o[4] = HF0[0]; o[5] = HF0[1]; o[6] = HF0[2]; o[7] = 0; }
+    } else { const h = hf0(); o[4] = h[0]; o[5] = h[1]; o[6] = h[2]; o[7] = 0; }
     return o;
   }
 
