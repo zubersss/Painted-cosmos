@@ -824,7 +824,9 @@ What behaves wrong, or does not show:
    on landing (4.9 against 10.9 cm), and the hover: rock steady on Mars, pushed 1.8 m and
    bobbing at 1.3 m/s in Neptune's 19 m/s wind. If the ship should feel each world at low
    speed too, the lever is the envelope (let cruise near the ground be what the engines and
-   the air give: 131 m/s on Earth, 78 on Venus, unlimited on Mars), not the body model.
+   the air give at sea level: 251 m/s on Earth, 35 on Venus, 279 on Neptune, 1960 on Mars),
+   not the body model. Venus is the telling one: its air would hold this ship to 35 m/s, and
+   today it cruises there at 46 like everywhere else.
 2. **The jetpack hop on Mars** climbs at 11.9 m/s (8.4 elsewhere) to 50 m and comes down at
    16 m/s; on Earth 13.4 m/s. The catch near the ground works on all three (touchdown about
    7 m/s) but the fall before it is long and fast for a calm game.
