@@ -398,7 +398,12 @@ uniform vec3 uPhysAnchor;      // body-local anchor of the field frame (m)
 uniform vec3 uPhysEast;        // unit axes of the frame, body-local
 uniform vec3 uPhysNorth;
 uniform vec3 uPhysUp;
-vec2 pcPhysGrid(vec3 p) { vec3 d = p - uPhysAnchor; return vec2(dot(d, uPhysEast), dot(d, uPhysNorth)); }
+// (P12: along the ray from the body's centre, the exact inverse of how the fields sample the ground; it was
+// the foot of the perpendicular on the tangent plane, 1.8 m out of register 384 m from the anchor.)
+vec2 pcPhysGrid(vec3 p) {
+  vec3 d = p - uPhysAnchor; float r0 = dot(uPhysAnchor, uPhysUp);
+  return vec2(dot(d, uPhysEast), dot(d, uPhysNorth)) * (r0 > 1.0 ? r0 / max(r0 + dot(d, uPhysUp), 0.05 * r0) : 1.0);
+}
 #endif
 uniform vec2 uPhysWaterDir;    // wave direction (frame axes)
 uniform vec4 uPhysWaterK;      // wavenumbers of the four trains (rad/m)

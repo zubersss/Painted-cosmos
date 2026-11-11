@@ -51,8 +51,20 @@ export class LocalFrame {
   }
 
   // Grid coordinates (metres along the east and north axes) of a body-local point.
-  lx(px, py, pz) { return (px - this.ox) * this.ex + (py - this.oy) * this.ey + (pz - this.oz) * this.ez; }
-  lz(px, py, pz) { return (px - this.ox) * this.nx + (py - this.oy) * this.ny + (pz - this.oz) * this.nz; }
+  // (P12) The exact inverse of dir() below: the grid position whose ray from the body's centre passes
+  // through the point, whatever the point's height. (Until P12 this was the foot of the perpendicular on
+  // the tangent plane, which is not where dir() puts the same ground: 1.8 m apart 384 m from the anchor
+  // of a 4 km sphere, and 0.7 % of the distance more for every 30 m of relief. Every field was that far
+  // out of register with the world at the edge of the frame's reach and came back into register in one
+  // frame when the frame re-anchored. The shader's pcPhysGrid is the same formula.)
+  lx(px, py, pz) {
+    const d = px * this.ax + py * this.ay + pz * this.az, m = this.r0 * 0.05;
+    return ((px - this.ox) * this.ex + (py - this.oy) * this.ey + (pz - this.oz) * this.ez) * this.r0 / (d > m ? d : m);
+  }
+  lz(px, py, pz) {
+    const d = px * this.ax + py * this.ay + pz * this.az, m = this.r0 * 0.05;
+    return ((px - this.ox) * this.nx + (py - this.oy) * this.ny + (pz - this.oz) * this.nz) * this.r0 / (d > m ? d : m);
+  }
 
   // Unit direction of the surface point above/below grid position (x, z). Writes o[0..2].
   dir(x, z, o) {

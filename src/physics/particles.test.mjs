@@ -335,8 +335,11 @@ test('the hull keeps the rain off what is under it', () => {
   const b = w.physics.particles.rain, fr = w.physics.fields.frame;
   // (P11: counted at eight instants a quarter of a second apart, not at one. A single instant held one or
   // two drops in the ring by luck of where they stood; the gust pattern changed and the count went from 2 to 1.)
+  // (P12: 48 instants, twelve seconds, not eight: with the gust pattern read on the sphere the same two seconds
+  // held a slant that reached further under the edge, 24 against 37; over twelve seconds it is 94 against 267,
+  // and with the pattern as it was 88 against 294. The limit is unchanged.)
   let under = 0, ring = 0;
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 48; k++) {
     for (let i = 0; i < b.count; i++) {
       const p = V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2]);
       const x = fr.lx(p.x, p.y, p.z), z = fr.lz(p.x, p.y, p.z), h = len(p) - w.R, r = Math.hypot(x, z);

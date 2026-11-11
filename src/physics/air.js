@@ -148,12 +148,19 @@ export class AirGrid {
       windLarge(bodyId, _d[0], _d[1], _d[2], t, this.seed, _w);
       weatherWind(bodyId, _d[0], _d[1], _d[2], t, this.seed, _ww);
       const mul = _ww[0], blow = _ww[5];
-      const oe = _ww[1] * frame.ex + _ww[2] * frame.ey + _ww[3] * frame.ez;
-      const on = _ww[1] * frame.nx + _ww[2] * frame.ny + _ww[3] * frame.nz;
+      // (P12) both winds lie in the tangent plane at their own node, up to 640 m from the anchor. They
+      // are TURNED into the frame's plane (the smallest rotation that takes the node's up to the
+      // anchor's), not projected onto it: the projection lost 1 - cos of the tilt, half a percent of
+      // the wind at the edge of the frame's reach, and gave it back in one frame at a re-anchoring.
+      const tde = (_d[0] * frame.ex + _d[1] * frame.ey + _d[2] * frame.ez), tdn = (_d[0] * frame.nx + _d[1] * frame.ny + _d[2] * frame.nz);
+      const tc = 1 + _d[0] * frame.ax + _d[1] * frame.ay + _d[2] * frame.az;
+      const tw = (_w[0] * frame.ax + _w[1] * frame.ay + _w[2] * frame.az) / tc, to = (_ww[1] * frame.ax + _ww[2] * frame.ay + _ww[3] * frame.az) / tc;
+      const oe = _ww[1] * frame.ex + _ww[2] * frame.ey + _ww[3] * frame.ez - tde * to;
+      const on = _ww[1] * frame.nx + _ww[2] * frame.ny + _ww[3] * frame.nz - tdn * to;
       const k = (b * 3 + a) * 4;
       // (the system's own wind, added along what is blowing: a storm blows 16 m/s whatever the breeze
       // was; where the mean wind and the outflow cancel, on the rear side, it shifts through a lull)
-      const be = (_w[0] * frame.ex + _w[1] * frame.ey + _w[2] * frame.ez) * mul + oe, bn = (_w[0] * frame.nx + _w[1] * frame.ny + _w[2] * frame.nz) * mul + on;
+      const be = (_w[0] * frame.ex + _w[1] * frame.ey + _w[2] * frame.ez - tde * tw) * mul + oe, bn = (_w[0] * frame.nx + _w[1] * frame.ny + _w[2] * frame.nz - tdn * tw) * mul + on;
       const bs = Math.hypot(be, bn), bl = bs > 1e-6 ? blow * Math.min(1, bs / 2) / bs : 0;
       sup[k] = be * (1 + bl);
       sup[k + 1] = bn * (1 + bl);
@@ -261,6 +268,7 @@ export class AirGrid {
     // nodes: interpolate the large-scale wind, add the travelling gusts and the shelter
     const gain = WIND.gustGain;
     const gs = this.gustShift;
+    const Rref = BODIES[bodyId].radius;
     for (let j = 0; j < N; j++) {
       const v = (gj0 + j - this._sj) / L - lb, b0 = v >= 1 ? 1 : 0, fv = v - b0;
       for (let i = 0; i < N; i++) {
@@ -271,7 +279,14 @@ export class AirGrid {
         const bn = sup[k + 1] * w00 + sup[k + 5] * w10 + sup[k + 13] * w01 + sup[k + 17] * w11;
         const gi = (sup[k + 2] * w00 + sup[k + 6] * w10 + sup[k + 14] * w01 + sup[k + 18] * w11) * 0.15;
         const x = (T.ci + i - half) * cell, z = (T.cj + j - half) * cell;
-        const px = frame.ox + frame.ex * x + frame.nx * z, py = frame.oy + frame.ey * x + frame.ny * z, pz = frame.oz + frame.ez * x + frame.nz * z;
+        // (P12) the pattern is read ON THE SPHERE, at the node's own direction and the body's base radius:
+        // one function of place whatever the frame is anchored to. (It was read on the frame's tangent
+        // plane, which 384 m from the anchor stands 18 m above a 4 km sphere: when the frame re-anchored
+        // every node's place in the pattern moved by that much at once, and the gust level at the focus
+        // stepped by up to 0.1.) airAt reads its fine eddies the same way, at the point's height above
+        // the ground.
+        let px = frame.ox + frame.ex * x + frame.nx * z, py = frame.oy + frame.ey * x + frame.ny * z, pz = frame.oz + frame.ez * x + frame.nz * z;
+        { const kr = Rref / Math.sqrt(px * px + py * py + pz * pz); px *= kr; py *= kr; pz *= kr; }
         const n = j * N + i;
         const g = gustLevelAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
         const A = (this.I[n] + gi) * gain, fc = Math.max(WIND.minFactor, 1 + A * g);
@@ -419,7 +434,8 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     {
       const gs = grid.gustShift, A = (_s.I + grid.gustiness * 0.15) * WIND.gustGain;
       const fc = Math.max(WIND.minFactor, 1 + A * gust);
-      gust += gustFineAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
+      const kr = (body.radius + zh) / r;      // (P12) on the sphere, zh above it: see AirGrid.update
+      gust += gustFineAt(bodyId, px * kr, py * kr, pz * kr, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
       gust = gust > WIND.gustMax ? WIND.gustMax : gust < -WIND.gustMax ? -WIND.gustMax : gust;
       f *= Math.max(WIND.minFactor, 1 + A * gust) / fc;
     }
@@ -429,9 +445,16 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     let we = we0, wn = wn0;
     // a dust devil close by: its swirl, inflow and updraught are added exactly, not from the grid
     if (devils && devils.count > 0 && devilWind(devils, x, z, zh, _dw)) { we += _dw[0]; wn += _dw[1]; wu += _dw[2]; }
-    wind.x = frame.ex * we + frame.nx * wn + ux * wu;
-    wind.y = frame.ey * we + frame.ny * wn + uy * wu;
-    wind.z = frame.ez * we + frame.nz * wn + uz * wu;
+    // (P12) the grid's wind is in the frame's axes, the tangent plane at the ANCHOR. Here, up to 384 m
+    // away on a 4 km sphere, that plane is tilted 5.5 degrees to the ground: a 7 m/s wind blew 0.7 m/s
+    // into or out of the hill, and stopped doing so in one frame when the frame re-anchored. Turn it
+    // into this point's own tangent plane (the smallest rotation that takes the anchor's up to this up).
+    {
+      let hx = frame.ex * we + frame.nx * wn, hy = frame.ey * we + frame.ny * wn, hz = frame.ez * we + frame.nz * wn;
+      const c = frame.ax * ux + frame.ay * uy + frame.az * uz;
+      if (c > -0.9) { const k = (hx * ux + hy * uy + hz * uz) / (1 + c); hx -= (frame.ax + ux) * k; hy -= (frame.ay + uy) * k; hz -= (frame.az + uz) * k; }
+      wind.x = hx + ux * wu; wind.y = hy + uy * wu; wind.z = hz + uz * wu;
+    }
     o.speed = Math.hypot(we, wn, wu);
     o.gust01 = clamp01(0.5 + 0.5 * gust);
     o.turbulence = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn) * fMean / (1 + zh / 300);

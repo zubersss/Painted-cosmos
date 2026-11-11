@@ -165,11 +165,44 @@ test('re-anchoring the near field is seamless: the wind at the focus does not ju
     prev = { ...a };
   }
   assert.ok(anchors >= 3, 'the frame re-anchored ' + anchors + ' times in 1000 m');
-  // (P11: reported apart: the frames in which the field re-anchors, and all the others. The seam is there and is not
-  // new: 0.42 m/s at a re-anchoring against 0.06 between before P11, 0.40 against 0.20 now that the wind at a point
-  // carries eddies of 10 m, through which this walker moves at 40 m/s. Not fixed in P11; the limit is unchanged.)
+  // (P11 reported the seam apart: 0.40 m/s at a re-anchoring against 0.20 between. P12 found its four parts and
+  // removed them: the wind lay in the tangent plane of the anchor, tilted 5.5 degrees to the ground 384 m away; the
+  // gust pattern was read on that plane, 18 m above the sphere there; a point's place in the grid was not the place
+  // whose ground the grid had sampled (1.8 m apart); and the planet's wind was projected onto the plane, not turned
+  // into it. Now 0.10 against 0.22 at this walker's 40 m/s, and at a walk, below, 0.009 against 0.030 where it was
+  // 0.61 against 0.030.)
   console.log(`# wind at the focus, largest change in one frame: ${worst.toFixed(2)} m/s when re-anchoring, ${between.toFixed(2)} m/s between`);
-  assert.ok(worst < 0.5 && between < 0.5, 'largest change of wind at the focus in one frame: ' + worst + ' m/s when re-anchoring, ' + between + ' between');
+  assert.ok(worst < between && between < 0.5, 'largest change of wind at the focus in one frame: ' + worst + ' m/s when re-anchoring, ' + between + ' between');
+});
+
+test('P12 at a walk the re-anchoring cannot be told from any other frame, and the wind lies along the ground', () => {
+  const physics = createPhysics({ sampleSurface: stubSurface });
+  // start 372 m short of where the frame will re-anchor: walk 10 s at 4 m/s after standing for the field to fill
+  const w = walker('earth', 4), fr = physics.fields.frame;
+  let p = w.p; for (let i = 0; i < 120; i++) physics.update(1 / 60, { bodyId: 'earth', time: 500 + i / 60, focus: p });
+  const v0 = fr.version; let prev = null, hopStep = 0, between = 0, hops = 0, tilt = 0, t = 502;
+  const far = walker('earth', 370); for (let i = 0; i < 60; i++) { p = far.step(1 / 60); t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus: p }); }
+  assert.equal(fr.version, v0, 'still on the first anchor, ' + Math.hypot(fr.lx(p.x, p.y, p.z), fr.lz(p.x, p.y, p.z)).toFixed(0) + ' m from it');
+  const e = norm(V(-p.z, 0, p.x)); let lastV = fr.version;
+  for (let i = 0; i < 900; i++) {
+    p = V(p.x + e.x * 4 / 60, p.y, p.z + e.z * 4 / 60); const r = stubSurface('earth', p).radius, l = len(p); p = V(p.x * r / l, p.y * r / l, p.z * r / l);
+    t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus: p });
+    const a = physics.here.air.wind, hop = fr.version !== lastV; lastV = fr.version; if (hop) hops++;
+    if (prev && i > 60) { const d = Math.hypot(a.x - prev.x, a.y - prev.y, a.z - prev.z); if (hop) hopStep = Math.max(hopStep, d); else between = Math.max(between, d); }
+    // the wind's vertical part is the slope's and nothing else: against the ground's own slope here
+    if (i === 60) { const s = physics.fields.air.sample(fr.lx(p.x, p.y, p.z), fr.lz(p.x, p.y, p.z), {}), up = (a.x * p.x + a.y * p.y + a.z * p.z) / len(p); tilt = Math.abs(up - (s.we * s.gx + s.wn * s.gz) * Math.exp(-2 / 25) * physics.here.air.speed / Math.max(1e-6, Math.hypot(s.we, s.wn, 0))); }
+    prev = { ...a };
+  }
+  console.log(`# at a walk: ${hopStep.toFixed(3)} m/s in the frame of the re-anchoring, ${between.toFixed(3)} m/s in the worst other frame; ${hops} re-anchoring`);
+  assert.ok(hops >= 1, 'the frame re-anchored');
+  assert.ok(hopStep <= between * 1.5 + 0.005, `re-anchoring ${hopStep} m/s against ${between} between`);
+  assert.ok(tilt < 0.25, 'the wind does not blow into the ground far from the anchor: ' + tilt + ' m/s off the slope');
+  // a point's place in the grid is the place whose ground the grid sampled, at any height
+  const o = [0, 0, 0];
+  for (const [x, z, h] of [[380, 0, 0], [-250, 300, 40], [100, -380, -25]]) {
+    fr.dir(x, z, o); const R = fr.r0 + h;
+    assert.ok(Math.abs(fr.lx(o[0] * R, o[1] * R, o[2] * R) - x) < 1e-6 && Math.abs(fr.lz(o[0] * R, o[1] * R, o[2] * R) - z) < 1e-6);
+  }
 });
 
 test('deep space, NaN focus, missing frame: the near field sleeps and nothing throws', () => {
