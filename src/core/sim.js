@@ -565,7 +565,13 @@ export class Sim {
       // Jupiter 62 m/s near the ground, Mars and the airless worlds 138, Venus 35 (its air decides).
       const A = this.physics.data && this.physics.data.ATMOSPHERES ? this.physics.data.ATMOSPHERES[f.id] : null;
       const rho0 = A ? A.rho0 || 0 : 1.225;
-      env.speedScale = clamp(Math.pow(1.225 / Math.max(rho0, 0.02), 0.4), 0.75, 3);
+      const full = clamp(Math.pow(1.225 / Math.max(rho0, 0.02), 0.4), 0.75, 3);
+      // ...but low over the ground the thin-air worlds keep to a gentler pace (about 78 m/s
+      // under 60 m, the full 138 above 400 m): at 143 m/s Mars and the Moon turned on a radius
+      // of 208 to 260 m and took 131 to 248 m to stop, the least forgiving flight in the game
+      // exactly where there is something to hit (PHYSICS' re-fly). Height buys speed.
+      const low = Math.min(full, 1.7), k = clamp((this.sh.altGround - 60) / 340, 0, 1);
+      env.speedScale = low + (full - low) * k * k * (3 - 2 * k);
       // The drive field turns the velocity onto the nose with at most this sideways acceleration,
       // so thin-air worlds turn wide at their speed; and where the air cannot stop the ship, X
       // has a little of the field brake (stops from 138 m/s in about 4 s).
@@ -742,7 +748,22 @@ export class Sim {
 
     if (this.sm.state === S.ATMOSPHERE && !sh.liftoff) {
       // E lands. So does simply sinking onto the ground: nobody should have to hunt for a key.
-      const settle = sh.altGround < SHIP.minClearance + 1.2 && sh.speed < 5 && I.down('KeyC');
+      // "Onto the ground" is wherever the ship can sink no further: over a boulder, on a slope
+      // or under PHYSICS' field the hover can settle higher than the free-flight clearance
+      // (PHYSICS saw 4.1 m on the Moon, sink held for 90 s, nothing said). So besides the
+      // height, a sink that has stalled for a second and a half near the ground also lands;
+      // and if the ship is still moving too fast by then, the screen says so.
+      const sinking = I.down('KeyC') && sh.altGround < 14;
+      if (!sinking) this._sink = null;
+      else if (!this._sink) this._sink = { t: 0, alt: sh.altGround };
+      else {
+        this._sink.t += h;
+        if (this._sink.alt - sh.altGround > 0.3) this._sink = { t: 0, alt: sh.altGround };       // still coming down
+      }
+      const stalled = !!this._sink && this._sink.t > 1.5;
+      if (stalled && sh.speed >= 5 && this._firstStep && !this.notice) this.say('Slow down to land');
+      const settle = I.down('KeyC') && sh.speed < 5 && (sh.altGround < SHIP.minClearance + 1.2 || stalled);
+      if (settle) this._sink = null;
       if ((pressed('KeyE') && this.landable()) || settle) {
         const trees = this.obstaclesNear(this.shFrame.id, sh.p, 80);
         // With PHYSICS, a site is good when the ground's friction will hold the parked ship.
