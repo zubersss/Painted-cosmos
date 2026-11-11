@@ -7,6 +7,7 @@
 // loses nearly half its grip, soil turns to mud, ice is slippery only near its melting point.
 import { clamp, clamp01, mix, smoothstep } from './util.js';
 import { fetchOf } from './water.js';
+import { LIQUIDS, liquidOf } from './atmosphere.js';
 
 // muS / muK: static and kinetic friction of a lugged rubber boot sole, dry.
 // wet: multiplier on both at wetness 1.   foothold: extra holding traction on a slope from
@@ -96,7 +97,7 @@ export const BIOMES = {
   crater_fields: B('dust', 'rock', 'dust', 0.01, 0, 0, 0, 0, 0, 0.7),
   rilles: B('dust', 'rock', 'dust', 0.01, 0, 0, 0, 0, 0, 0.6),
   // mars
-  rust_canyons: B('gravel', 'rock', 'sand', 0.02, 0, 0, 0, 0.05, 0, 0.5),
+  rust_canyons: B('rock', 'rock', 'sand', 0.02, 0, 0, 0, 0.05, 0, 0.5),
   dust_dunes: B('sand', 'sand', 'sand', 0.003, 0, 0, 0, 0, 2, 1.0),
   polar_frost: B('ice', 'rock', 'ice', 0.001, 0, 0, 0.3, 0.2, -50, 0.1, 0.04),
   dry_riverbeds: B('gravel', 'rock', 'sand', 0.02, 0.1, 3, 0, 0.1, 0, 0.5),
@@ -112,8 +113,8 @@ export const BIOMES = {
   honey_mist: B('moss', 'rock', 'mud', 0.05, 0.1, 3, 1.0, 1.0, 0, 0),
   // uranus
   ice_shelves: B('ice', 'ice', 'ice', 0.001, 0, 0, 0.6, 0.3, 0, 0, 0.02),
-  frozen_waves: B('snow', 'ice', 'ice', 0.4, 0.3, 6, 0.8, 0.3, 0, 0, 0.15),
-  pearl_fog: B('snow', 'ice', 'ice', 0.002, 0, 0, 0.8, 1.0, 0, 0, 0.08),
+  frozen_waves: B('ice', 'ice', 'ice', 0.4, 0.3, 6, 0.8, 0.3, 0, 0, 0.15),
+  pearl_fog: B('ice', 'ice', 'ice', 0.002, 0, 0, 0.8, 1.0, 0, 0, 0.08),
   teal_sinkholes: B('ice', 'ice', 'ice', 0.01, 0, 0, 0.6, 0.5, 2, 0, 0.02),
   // neptune
   storm_seas: B('rock', 'rock', 'gravel', 0.0005, 0, 0, 1.6, 0.4, 0, 0),
@@ -122,8 +123,8 @@ export const BIOMES = {
   aurora_tundra: B('snow', 'rock', 'gravel', 0.01, 0, 0, 0.7, 0.3, -2, 0, 0.10),
   // pluto
   heart_glacier: B('ice', 'ice', 'ice', 0.001, 0, 0, 0.5, 0.1, 0, 0, 0.02),
-  lilac_mountains: B('rock', 'rock', 'gravel', 0.05, 0, 0, 0.3, 0.05, 0, 0.1, 0.01),
-  long_shadow_plain: B('dust', 'rock', 'dust', 0.005, 0, 0, 0.3, 0.1, 0, 0.3, 0.01),
+  lilac_mountains: B('ice', 'ice', 'gravel', 0.05, 0, 0, 0.3, 0.05, 0, 0.1, 0.01),     // water-ice bedrock: at 40 K as hard and as grippy as rock
+  long_shadow_plain: B('ice', 'ice', 'dust', 0.005, 0, 0, 0.3, 0.1, 0, 0.1, 0.01),
   nitrogen_dunes: B('snow', 'ice', 'snow', 0.003, 0, 0, 0.4, 0.1, 0, 0.2, 0.10),
   // PILOT's stub world and test worlds
   'stub-lowland': B('grass', 'rock', 'mud', 0.03, 0.15, 8, 1.0, 0.3, 0, 0.05),
@@ -331,11 +332,24 @@ export function groundAt(bodyId, surface, state, out = {}) {
   return out;
 }
 
+// Liquids that are not the world's usual one, by biome (PAINTER's look table marks them
+// `glow` for lava and `cloud` for a cloud sea).
+export const BIOME_LIQUID = { lava_rivers: 'lava', gold_islands: 'cloud', sky_islands: 'cloud' };
+// The liquid at a sampleSurface result: { name, density, viscosity, tension }.
+export function liquidAt(bodyId, surface) {
+  let id = surface ? surface.biomeId || surface.biome : null;
+  const bw = surface && surface.biomeWeights;
+  if (bw) { let best = 0; for (const k in bw) if (bw[k] > best) { best = bw[k]; id = k; } }
+  const special = id != null ? BIOME_LIQUID[id] : null;
+  return special ? LIQUIDS[special] : liquidOf(bodyId);
+}
+
 // Climate fields of the ground alone (no wetness or snow applied): what air.js and weather.js
 // need to know about a place. Cheaper than groundAt.
 export function coverAt(bodyId, surface, out = {}) {
-  let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0 = 0, snowBase = 0, dT = 0, wsum = 0, lv = 0, spo = 0, ash = 0, fetch = 0;
+  let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0 = 0, snowBase = 0, dT = 0, wsum = 0, lv = 0, spo = 0, ash = 0, fetch = 0, lrho = 0;
   const bw = surface && surface.biomeWeights;
+  const rhoBody = liquidOf(bodyId).density;
   if (bw) {
     for (const id in bw) {
       const w = bw[id];
@@ -345,13 +359,14 @@ export function coverAt(bodyId, surface, out = {}) {
       canopy += b.canopy * w; canopyH += b.canopyH * b.canopy * w; moist += b.moist * w; fog += b.fog * w;
       dustSrc += b.dustSrc * w; z0 += b.z0 * w; snowBase += b.snowBase * w; dT += b.dT * w;
       lv += ab[0] * w; spo += ab[1] * w; ash += ab[2] * w; fetch += fetchOf(id) * w;
+      lrho += (BIOME_LIQUID[id] ? LIQUIDS[BIOME_LIQUID[id]].density : rhoBody) * w;
     }
   }
   if (!(wsum > 0)) {
     const id = surface && surface.biomeId;
     const b = biomePhysics(bodyId, id), ab = AIRBORNE[id] || NO_AIRBORNE;
     wsum = 1; canopy = b.canopy; canopyH = b.canopyH * b.canopy; moist = b.moist; fog = b.fog; dustSrc = b.dustSrc; z0 = b.z0; snowBase = b.snowBase; dT = b.dT;
-    lv = ab[0]; spo = ab[1]; ash = ab[2]; fetch = fetchOf(id);
+    lv = ab[0]; spo = ab[1]; ash = ab[2]; fetch = fetchOf(id); lrho = BIOME_LIQUID[id] ? LIQUIDS[BIOME_LIQUID[id]].density : rhoBody;
   }
   const inv = 1 / wsum;
   out.canopyHeight = canopy > 1e-6 ? canopyH / canopy : 0;
@@ -361,7 +376,7 @@ export function coverAt(bodyId, surface, out = {}) {
   if (surface && surface.canopy01 != null) { out.canopy01 = clamp01(surface.canopy01); if (surface.canopyHeight != null) out.canopyHeight = surface.canopyHeight; }
   out.moist = moist * inv; out.fog = fog * inv; out.dustSource = dustSrc * inv;
   out.z0 = Math.max(z0 * inv, 1e-5); out.snowBase = snowBase * inv; out.dT = dT * inv;
-  out.leaves = lv * inv; out.spores = spo * inv; out.ash = ash * inv; out.fetch = fetch * inv;
+  out.leaves = lv * inv; out.spores = spo * inv; out.ash = ash * inv; out.fetch = fetch * inv; out.liquidDensity = lrho * inv;
   // open liquid is far smoother than any land
   if (surface && (surface.liquidRadius || 0) > surface.radius) { out.z0 = 0.0002; out.canopy01 = 0; out.dustSource = 0; out.leaves = 0; }
   return out;

@@ -113,7 +113,8 @@ export function explorerTerminal(g, rho, T = EXPLORER_BODY) {
 //   env: { sample(unitDir) -> contract surface,  gravity (m/s^2),
 //          air(p, out) -> { density, wind }          optional (default: still Earth air)
 //          ground(surface, out) -> contact props     optional (default: firm soil)
-//          liquid: { density }                       optional (default: water) }
+//          liquid: { density, viscosity }            optional (default: water)
+//          liquidOf(surface) -> { density, viscosity }   optional: the liquid at a place (lava, cloud froth) }
 // Returns st. Sets st.grounded, st.p, st.v and st.phys.*; never allocates after the first call.
 export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
   const B = st.phys || (st.phys = EXPLORER_BODY_STATE());
@@ -138,7 +139,9 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
   let rho = 1.225, wx = 0, wy = 0, wz = 0;
   if (env.air) { const a = env.air(st.p, _air, Math.max(0, r - groundR) + 1.0); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
   const G = env.ground ? env.ground(s0, _gnd) : DEFAULT_GROUND;
-  const liq = env.liquid || DEFAULT_LIQUID;
+  const liq = env.liquidOf ? env.liquidOf(s0) : env.liquid || DEFAULT_LIQUID;
+  // viscous (Stokes) drag: nothing in water, everything in lava. 3 pi mu L v on a body of length L.
+  const visc = 3 * Math.PI * (liq.viscosity || 0) / T.mass;
   const depth = liquidR ? Math.max(0, liquidR - r) : 0;
   const sub = clamp01(depth / T.height);
   let rhoBody = T.bodyDensity;
@@ -264,7 +267,7 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
     }
     // integrate along the surface
     sx += (ex + fx + zx) * dt; sy += (ey + fy + zy) * dt; sz += (ez + fz + zz) * dt;
-    if (liqK > 0) { const m = 1 / (1 + liqK * Math.hypot(sx, sy, sz) * dt); sx *= m; sy *= m; sz *= m; }
+    if (liqK > 0) { const m = 1 / (1 + (liqK * Math.hypot(sx, sy, sz) + visc * Math.min(depth, T.height)) * dt); sx *= m; sy *= m; sz *= m; }
     // snap to rest: never creep
     if (qlen < 1e-6 && B.slip01 === 0 && Math.hypot(sx, sy, sz) < 0.02) { sx = sy = sz = 0; }
 
@@ -355,8 +358,9 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
       const kh = 0.5 * liq.density * (T.swimCda + T.wadeWidth * 0.25 * sub) / T.mass;
       vv = vx * ux + vy * uy + vz * uz;
       hx = vx - vv * ux; hy = vy - vv * uy; hz = vz - vv * uz;
-      vv /= 1 + kv * Math.abs(vv) * dt;
-      const hm = 1 / (1 + kh * Math.hypot(hx, hy, hz) * dt);
+      const kvis = visc * sub * T.height;
+      vv /= 1 + (kv * Math.abs(vv) + kvis) * dt;
+      const hm = 1 / (1 + (kh * Math.hypot(hx, hy, hz) + kvis) * dt);
       // bobbing is damped by wave-making as well as by drag
       vv *= Math.exp(-2.2 * dt * Math.min(1, sub * 3));
       vx = hx * hm + vv * ux; vy = hy * hm + vv * uy; vz = hz * hm + vv * uz;

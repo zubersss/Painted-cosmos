@@ -1,7 +1,7 @@
 // Tests: ground materials and contact. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MATERIALS, BIOMES, groundAt, coverAt, iceFriction, biomePhysics, holdAngle } from './ground.js';
+import { MATERIALS, BIOMES, groundAt, coverAt, iceFriction, biomePhysics, holdAngle, liquidAt } from './ground.js';
 import { LOOKS } from '../data/looks.js';
 
 const surf = (biomeId, slope = 0, liquid = 0, radius = 4000) => ({ radius, slope, liquidRadius: liquid, biomeId, biomeWeights: { [biomeId]: 1 }, normal: { x: 0, y: 1, z: 0 } });
@@ -11,6 +11,51 @@ test('every biome PAINTER defines has a physics row with known materials', () =>
     const p = BIOMES[b.id];
     assert.ok(p, `no physics for biome ${bodyId}/${b.id}`);
     for (const k of ['ground', 'steep', 'shore']) assert.ok(MATERIALS[p[k]], `${b.id}.${k} = ${p[k]}`);
+  }
+});
+
+// PAINTER's look table may say what the ground is (`phys: { ground }`, a coarse word: rock,
+// sand, ice, gravel, dust). The physics row must be that, or a finer material of the same
+// family, or a disagreement that is written down here and answered in docs/notes/physics.md.
+// A new override that is none of these fails this test: look at it and decide.
+const FAMILY = { rock: ['rock', 'glass', 'crystal'], ice: ['ice'], sand: ['sand'], gravel: ['gravel'], dust: ['dust', 'ash'], snow: ['snow'], grass: ['grass'], soil: ['soil', 'litter'], mud: ['mud'], moss: ['moss'] };
+const DISAGREE = {
+  // every airless world is covered in fine regolith, and Mercury's ballistic dust is its signature
+  ochre_basins: { painter: 'rock', physics: 'dust' },
+  // dunes are loose grains by definition (Pluto's are methane-ice sand): they take prints
+  nitrogen_dunes: { painter: 'ice', physics: 'snow' },
+};
+test('PAINTER\'s ground overrides agree with the physics table (or the disagreement is on record)', () => {
+  let seen = 0;
+  for (const bodyId of Object.keys(LOOKS)) for (const b of LOOKS[bodyId].biomes) {
+    const want = b.phys && b.phys.ground;
+    if (!want) continue;
+    seen++;
+    const mine = BIOMES[b.id].ground;
+    assert.ok(FAMILY[want], `${b.id}: PAINTER says ground '${want}', a word physics has no family for`);
+    if (FAMILY[want].includes(mine)) continue;
+    const d = DISAGREE[b.id];
+    assert.ok(d && d.painter === want && d.physics === mine, `${bodyId}/${b.id}: PAINTER says '${want}', physics has '${mine}'`);
+  }
+  assert.ok(seen > 10, 'overrides read: ' + seen);
+});
+
+test('liquids by place: lava in the lava rivers, cloud froth in the cloud seas, the world\'s own elsewhere', () => {
+  assert.equal(liquidAt('venus', { biomeId: 'lava_rivers' }).name, 'lava');
+  assert.equal(liquidAt('venus', { biomeWeights: { lava_rivers: 0.6, acid_terraces: 0.4 } }).name, 'lava');
+  assert.equal(liquidAt('venus', { biomeWeights: { lava_rivers: 0.3, acid_terraces: 0.7 } }).name, 'sulphuric acid');
+  assert.equal(liquidAt('jupiter', { biomeId: 'sky_islands' }).name, 'cloud froth');
+  assert.equal(liquidAt('saturn', { biomeId: 'gold_islands' }).name, 'cloud froth');
+  assert.equal(liquidAt('neptune', { biomeId: 'storm_seas' }).name, 'liquid methane');
+  assert.equal(liquidAt('earth', null).name, 'water');
+  // every biome PAINTER gives a liquid look to: glow means lava, cloud means froth
+  for (const bodyId of Object.keys(LOOKS)) for (const b of LOOKS[bodyId].biomes) {
+    if (!b.liquid) continue;
+    const name = liquidAt(bodyId, { biomeId: b.id }).name;
+    if (b.liquid.cloud) assert.equal(name, 'cloud froth', b.id);
+    else if (b.liquid.glow >= 1) assert.equal(name, 'lava', b.id);
+    else assert.ok(name !== 'lava' && name !== 'cloud froth', `${b.id}: ${name}`);
+    assert.ok(coverAt(bodyId, { biomeId: b.id, radius: 1, liquidRadius: 2 }).liquidDensity > 0);
   }
 });
 

@@ -296,3 +296,42 @@ test('field brake (assist): in vacuum the ship stops from cruise in seconds, nev
   assert.equal(st.phys.fieldBrake, 0);
   assert.ok(st.v.z < -180 && st.v.z > -100 - 60 * 2 - 1, 'accelerating on the main drive only: ' + st.v.z);
 });
+
+test('lift-off on the gear: the legs unload, the wash comes on, the feet leave, and the hand-over to flight has no sag', () => {
+  for (const [bodyId, g, rho] of [['earth', 9.81, 1.225], ['moon', 1.62, 0], ['jupiter', 24.8, 0.57]]) {
+    const R = 4000, sample = makeWorld({ R, biome: 'alpine_meadow' });
+    const up = norm(V(0.3, 0.5, 0.81));
+    const st = { p: V(up.x * (R + 0.4), up.y * (R + 0.4), up.z * (R + 0.4)), v: V(0, 0, 0), q: { x: 0, y: 0, z: 0, w: 1 } };
+    // stand the ship upright on the ground: rotate +Y onto `up`
+    { const ax = norm(V(up.z, 0, -up.x)), a = Math.acos(up.y), s = Math.sin(a / 2); st.q = { x: ax.x * s, y: 0, z: ax.z * s, w: Math.cos(a / 2) }; }
+    const air = (p, o) => { o.density = rho; o.wind = o.wind || V(0, 0, 0); o.turbulence = 0; return o; };
+    const envG = { sample, gravity: g, air }, envB = { up, gravity: g, radius: R, air, altGround: 1 };
+    for (let i = 0; i < 600 && !(st.phys && st.phys.asleep); i++) stepShipGear(st, { lift01: 0 }, 1 / 60, envG);
+    assert.ok(st.phys.asleep, bodyId + ': parked and asleep');
+    const h0 = len(st.p) - R;
+    wakeShip(st);
+    let lift01 = 0, t = 0, tOff = -1, hMin = Infinity, hPrev = h0, washOnGround = 0, worstDrop = 0, gMax = 0;
+    const climb = 2.5;
+    while (t < 6) {
+      t += 1 / 60;
+      if (st.phys.contacts > 0 || tOff < 0) {
+        lift01 = Math.min(1, lift01 + (1 / 60) / 1.2);
+        stepShipGear(st, { lift01, hold: V(up.x * climb * lift01, up.y * climb * lift01, up.z * climb * lift01) }, 1 / 60, envG);
+        if (st.phys.contacts > 0) washOnGround = Math.max(washOnGround, st.phys.downwash.thrust);
+        if (st.phys.contacts === 0 && tOff < 0) tOff = t;
+      } else {
+        envB.altGround = len(st.p) - R;
+        stepShipBody(st, { target: V(up.x * climb, up.y * climb, up.z * climb), tau: 1, hover: true }, 1 / 60, envB);
+        gMax = Math.max(gMax, st.phys.gLoad);
+      }
+      const h = len(st.p) - R;
+      worstDrop = Math.max(worstDrop, hPrev - h); hPrev = h;
+      if (tOff > 0) hMin = Math.min(hMin, h);
+    }
+    assert.ok(tOff > 0.4 && tOff < 1.6, `${bodyId}: feet off at ${tOff.toFixed(2)} s`);
+    assert.ok(washOnGround > 0.12 * 4200 * g, `${bodyId}: thruster wash before the feet leave: ${washOnGround.toFixed(0)} N`);
+    assert.ok(worstDrop < 0.004, `${bodyId}: never sinks on the way up (worst ${worstDrop.toFixed(4)} m in a frame)`);
+    assert.ok(hMin >= h0 - 1e-3 && hPrev > h0 + 5, `${bodyId}: ${hPrev.toFixed(1)} m up after 6 s`);
+    assert.ok(gMax < g / 9.81 + 0.6, `${bodyId}: a gentle hand-over, ${gMax.toFixed(2)} g felt`);
+  }
+});

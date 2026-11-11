@@ -59,6 +59,13 @@ export const LIQUIDS = {
   uranus: { name: 'methane slush', density: 480, viscosity: 3.0e-4, tension: 0.017 },
   neptune: { name: 'liquid methane', density: 450, viscosity: 1.9e-4, tension: 0.017 },
   default: { name: 'water', density: 999, viscosity: 1.14e-3, tension: 0.073 },
+  // liquids that belong to a biome, not to a whole world (see ground.js BIOME_LIQUID)
+  // lava: basalt near its vent. Two and a half times as dense as water and a hundred thousand
+  // times as viscous: a body floats high in it and wades as through cold honey.
+  lava: { name: 'lava', density: 2600, viscosity: 100, tension: 0.35 },
+  // the cloud seas of the giants: a froth of droplets dense enough to carry a trimmed suit.
+  // An eighth of water's density, so it barely drags and its billows run high and slow.
+  cloud: { name: 'cloud froth', density: 120, viscosity: 1e-4, tension: 0.01 },
 };
 export const liquidOf = (bodyId) => LIQUIDS[bodyId] || LIQUIDS.default;
 

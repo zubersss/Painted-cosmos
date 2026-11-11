@@ -295,6 +295,12 @@ const _gnd = {};
 //   cmd: { lift01    0..1 share of the weight the anti-gravity still carries (PILOT ramps it
 //                    from 1 to 0 over a second or two once the feet touch; default 0)
 //          hold      optional {x,y,z} velocity target for hover thrusters while lift01 > 0 }
+// LIFT-OFF with it: wakeShip(st); then every frame raise lift01 from 0 to 1 over a second or
+// two and pass hold = up * (climb speed * lift01). The legs unload and stretch (the hull rises
+// a few centimetres), the thruster wash comes on (st.phys.downwash), and when the lift passes
+// the weight the feet leave the ground: st.phys.contacts === 0. From that frame on call
+// stepShipBody with hover: true and the same climb target; st.phys.lift01 is already 1, so
+// nothing sags at the hand-over. Retract the gear when you like.
 //   env: { sample(unitDir) -> contract surface, gravity, ground(surface, out) optional,
 //          air(p, out) optional }
 // Returns st. st.phys.contacts = number of feet on the ground; st.phys.asleep = settled.
@@ -406,6 +412,18 @@ export function stepShipGear(st, cmd, dt, env, T = SHIP_BODY) {
   B.w.x = wx; B.w.y = wy; B.w.z = wz;
   B.contacts = contacts;
   // sleep: three feet down, lift off, nothing moving for a while
+  // The ventral thrusters are lit whenever the lift is: their wash blows dust and grass about
+  // before the feet leave the ground and until the lift is shut down after landing.
+  {
+    const ventral = lift01 * g * m * (1 - T.antigravShare);
+    let rho = 0;
+    if (env.air && ventral > 0) rho = env.air(st.p, _air, 0).density;
+    B.downwash.thrust = ventral; B.downwash.speed = downwashSpeed(ventral, rho, T);
+    B.downwash.q = ventral / (2 * T.thrusterArea); B.downwash.radius = T.thrusterRadius;
+    B.groundEffect = groundEffect(0.5, T);
+    B.thrust.x = B.thrust.y = B.thrust.z = 0; B.brake01 = 0; B.fieldBrake = 0;
+    B.airspeed = Math.hypot(vx, vy, vz); B.q = 0; B.gLoad = contacts ? g / 9.81 : g * lift01 / 9.81; B.heat01 = 0;
+  }
   const moving = Math.hypot(vx, vy, vz) > T.sleepSpeed || Math.hypot(wx, wy, wz) > T.sleepSpeed;
   if (contacts === 3 && lift01 <= 0 && !moving) {
     B.still += dt;

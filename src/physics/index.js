@@ -12,7 +12,7 @@ import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
 import { WINDS, WIND, setWindScale } from './wind.js';
 import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
-import { groundAt, coverAt, MATERIALS, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
+import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
 import { FloraField, FLORA, PlantSim, plantDisplace, treeFrequency, stemFrequency } from './flora.js';
@@ -66,7 +66,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   let lastMoist = -1e9, moistX = 1e9, moistZ = 1e9;
   const focus = { x: 0, y: 1, z: 0 };
   const moist = { wetness01: 0, snowDepth: 0, freshSnow: 0 };
-  const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0, fetch: 80 };
+  const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0, fetch: 80, liquidDensity: 0 };
   const here = {
     bodyId: null,
     air: { density: 0, wind: { x: 0, y: 0, z: 0 }, speed: 0, gust01: 0, turbulence: 0, temperature: 0, pressure: 0, soundSpeed: 0, viscosity: 0, altitude: 0, height: 0, near: false },
@@ -211,7 +211,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       const l2 = near.liquidAt(fx, fz);
       if (l2 === l2 && l2 > -1e8) { liqLevel = l2; liqDepth = Math.max(liqDepth, l2 - gh); }
     }
-    water.update(dt, frame, airGrid.cwe, airGrid.cwn, liqLevel, liqDepth, cover.fetch || 80, body.gravity, here.air.density, liquidOf(bodyId).density);
+    water.update(dt, frame, airGrid.cwe, airGrid.cwn, liqLevel, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;
@@ -338,6 +338,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     env.air = (p, out, height) => air(bodyId, p, out, height);
     env.ground = (surface, out) => ground(bodyId, null, out, surface);
     env.liquid = liquidOf(bodyId);
+    env.liquidOf = (surface) => liquidAt(bodyId, surface);
     if (env.gravity == null) env.gravity = body.gravity;
     if (env.radius == null) env.radius = body.radius;
     return env;
@@ -423,7 +424,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // reference data
     data: { ATMOSPHERES, WINDS, REGIMES, MATERIALS, BIOMES, SPECIES },
     util: {
-      airDensity, airTemperature, gravityAt, fallSpeed, terminalVelocity, bluntTerminal, liquidOf, cellsAt: (bodyId, t) => cellsAt(bodyId, t == null ? time : t, seed),
+      airDensity, airTemperature, gravityAt, fallSpeed, terminalVelocity, bluntTerminal, liquidOf, liquidAt, BIOME_LIQUID, cellsAt: (bodyId, t) => cellsAt(bodyId, t == null ? time : t, seed),
       saltationThreshold, holdAngle, iceFriction, treeFrequency, stemFrequency, PlantSim,
     },
     stats,

@@ -199,6 +199,25 @@ test('water: wading is slow, deep water floats you at the float depth, bobbing d
   // dense liquid: the suit floats you higher out of sulphuric acid only if the assist is off
 });
 
+test('other liquids: lava is honey (slow, never stuck), the cloud froth of the giants barely drags', () => {
+  const LAVA = { density: 2600, viscosity: 100 }, FROTH = { density: 120, viscosity: 1e-4 }, WATER = { density: 999, viscosity: 1.14e-3 };
+  const wade = (liquid) => { const s = make({ world: { sea: R + 0.5 }, dir: V(0, 0, 1), liquid }); s.st.p = V(0, 0, R); run(s, 6, { wish: V(4.2, 0, 0) }); return speed(s.st); };
+  const swim = (liquid) => { const s = make({ world: { sea: R + 6 }, alt: 8, liquid }); run(s, 25, {}); const depth = R + 6 - len(s.st.p); run(s, 8, { wish: V(2.6, 0, 0) }); return { v: speed(s.st), depth, st: s.st }; };
+  const wl = wade(LAVA), ww = wade(WATER), wf = wade(FROTH);
+  assert.ok(wl > 0.25 && wl < 1.2 && wl < ww * 0.6, `wading knee-deep in lava: ${wl} m/s (water ${ww})`);
+  assert.ok(wf > ww * 1.25 && wf < 4.3, `in cloud froth: ${wf} m/s`);
+  const sl = swim(LAVA), sw = swim(WATER), sf = swim(FROTH);
+  assert.ok(sl.v > 0.1 && sl.v < 0.8, `swimming in lava: ${sl.v} m/s`);
+  assert.ok(sf.v >= sw.v, `swimming in froth ${sf.v} vs water ${sw.v}`);
+  for (const x of [sl, sf]) assert.ok(Math.abs(x.depth - T.floatDepth) < 0.08 && finite(x.st), 'the suit trims to the float depth in any liquid: ' + x.depth);
+  // the liquid at a place wins over the world's usual one
+  const s = make({ world: { sea: R + 0.5 }, dir: V(0, 0, 1), liquid: WATER }); s.env.liquidOf = () => LAVA; s.st.p = V(0, 0, R); run(s, 6, { wish: V(4.2, 0, 0) });
+  assert.ok(Math.abs(speed(s.st) - wl) < 1e-9);
+  // and you can always get out: the jetpack lifts you clear of lava
+  const j = make({ world: { sea: R + 6 }, alt: 8, liquid: LAVA }); run(j, 20, {}); run(j, 2.5, { jet: 1 });
+  assert.ok(len(j.st.p) > R + 6 + 1, 'out of the lava on the pack: ' + (len(j.st.p) - R - 6));
+});
+
 test('60 Hz and 20 Hz agree on a run-jump-land sequence', () => {
   const go = (hz) => { const sim = make({ world: { bumps: { amp: 0.4, length: 40 } } }); run(sim, 6, (t) => ({ wish: V(6, 0, 1), jump: Math.abs(t - 3) < 0.5 / hz }), { hz }); return sim.st; };
   const a = go(60), b = go(20);

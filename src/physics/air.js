@@ -39,7 +39,7 @@ const _cs = { biomeWeights: null, biomeId: null, liquidRadius: 0, radius: 0 };
 // Per node of the wind grid: z0, canopy01, canopyH, moist, fog, dustSrc, dT, snowBase, and the
 // wind height factors at blade height, crown height and 2 m (computed once, when the node's
 // ground is sampled, so the flora field never has to redo them).
-const CW = 15;
+const CW = 16;
 function coverInto(surface, arr, o) {
   coverAt(_coverBody, surface, _cov);
   arr[o] = _cov.z0; arr[o + 1] = _cov.canopy01; arr[o + 2] = _cov.canopyHeight; arr[o + 3] = _cov.moist;
@@ -47,7 +47,7 @@ function coverInto(surface, arr, o) {
   arr[o + 8] = heightFactor(FLORA.softHeight, _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 9] = heightFactor(Math.max(FLORA.stiffHeight, _cov.canopyHeight), _cov.z0, _cov.canopyHeight, _cov.canopy01);
   arr[o + 10] = heightFactor(2, _cov.z0, _cov.canopyHeight, _cov.canopy01);
-  arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash; arr[o + 14] = _cov.fetch;
+  arr[o + 11] = _cov.leaves; arr[o + 12] = _cov.spores; arr[o + 13] = _cov.ash; arr[o + 14] = _cov.fetch; arr[o + 15] = _cov.liquidDensity;
 }
 const HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)];
 let _coverBody = 'earth';
@@ -256,7 +256,7 @@ export class AirGrid {
     const c = this.terrain.cover, a = n * CW;
     o.z0 = c[a]; o.canopy01 = c[a + 1]; o.canopyHeight = c[a + 2]; o.moist = c[a + 3];
     o.fog = c[a + 4]; o.dustSource = c[a + 5]; o.dT = c[a + 6]; o.snowBase = c[a + 7];
-    o.leaves = c[a + 11]; o.spores = c[a + 12]; o.ash = c[a + 13]; o.fetch = c[a + 14];
+    o.leaves = c[a + 11]; o.spores = c[a + 12]; o.ash = c[a + 13]; o.fetch = c[a + 14]; o.liquidDensity = c[a + 15];
     return true;
   }
 }
