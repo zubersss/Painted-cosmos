@@ -1211,3 +1211,22 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   report; their committed work stands. Every agent started from here runs on the new model
   at extra-high effort (the coordinator's reading of the owner's "extra"). Coordinator
   commits carry the new attribution line.
+- 2026-11-11: **All three agents were stopped by the old model's usage limit** within a
+  minute of each other, before any wrote a handover: PILOT 6 (review 6, first half),
+  PAINTER 9 (block 7), PHYSICS 11 (P14). Their uncommitted files were already in the
+  coordinator's backups (`6b900e6` PAINTER, `df35355` PHYSICS, `1186819` PILOT). The
+  coordinator stopped their orphaned browser runs by process id and checked the head on a
+  clean export: PHYSICS 263, world 19, PILOT 117 pass. Left behind and carried forward, not
+  redone: PILOT 6's draft of review 6's first half (`/home/user/.pc-scratch/pilot/run6/
+  review-mech.md`: survey 235/240, every spawn 10/10, painted trip PASS, grand tour 8/8 and
+  Moon and Pluto 2/2, on the commits it names) and its top-tier tour sheets of Venus and
+  Saturn; PAINTER 9's `b022507` (block 7 part 1: wash-in of ground, growth and near strokes,
+  arrival held as paper then up over 1.3 s, water by PHYSICS's recipe with run-up, spray,
+  leaves, rings, dust fade, walker's track; unverified) and its unfinished gait and branch
+  wiring (the branch define is not switched on); PHYSICS 11's unfinished crown model
+  (`pcPhysCrown`, `plantCrown`; tests pass; unjudged).
+  Successors started on the new model at extra-high effort: PILOT 7 (record the first half,
+  wire the gait, footfalls and hull yaw, the rest of the tour and the look; the second half
+  of review 6 on the coordinator's message), PAINTER 10 (verify and finish block 7: motion,
+  Neptune's coast, weather; the gait in the figure; branches on), PHYSICS 12 (judge, finish
+  and prove the crown model and tell PAINTER what to wire; leaves; the shore; three strips).
