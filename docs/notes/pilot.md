@@ -75,8 +75,31 @@ What M2 added:
   `real-01-on-foot`, `real-02-orbit`, `real-03-mars` (painted worlds), `m2-map`, `m2-target`,
   `m2-pulse`, `m2-mars`, `m2-saturn`, `m2-stats` (the trip on stubs) (.jpg).
 
+**Painted trip at 960x540, quality 1** (the coordinator's evidence request; clean export of
+`e2b0a5e`, PAINTER's render, world and art, PHYSICS on): Earth to Mars to Saturn in one page
+load, every check passed through both legs (map click, marker, pulse 459 km in 70.7 s and
+888 km in 94.9 s, landed and stepped out in `dry_riverbeds` and `honey_mist`, sketchbook,
+frame read-out: 404 k triangles and 212 draw calls on Saturn, autosave). The last step, the
+reload that continues from the save, hit Playwright's 30 s navigation limit (the painted page
+takes longer than that to load at two seconds a frame in software GL); the script now allows
+for it, and the same reload-and-continue check passed in the painted world at 400x225.
+A first attempt at 960x540 failed on Saturn's approach with the older script (the throttle
+overshoot at 2 fps described above). The six `m2-*.jpg` frames in `docs/shots/pilot/` are from
+the passing run.
+
+After PHYSICS' P2 requests and the feel changes (gear lift-off, default seed, throttle, carve,
+gentler fall, landing assist and walls): `node --test tests/*.test.mjs` 92 pass;
+`node tests/playthrough.mjs --query "stub=render,world,art&fresh=1"` PASSED (hover 9.8 m after
+the gear lift-off); `node tests/trip.mjs` on stubs with PHYSICS PASSED (354 s of game time).
+Not re-run after those last changes: the painted-world browser runs (they take 15 to 40
+minutes each); the Node tests fly the same trip and the 40 landings on the real worlds.
+
 ### Not verified / not done
 - Real-GPU frame rate: cannot be measured here. The read-out exists so the owner can read it.
+- PAINTER is doing a second pass on every planet's landforms: the landings, arrival points and
+  the trip must be re-run when it lands (`node --test tests/contract.test.mjs` does the first
+  two in seconds). On its current working tree: 39 of 40 landings, and one honest refusal at a
+  ledge on Jupiter ("No level ground here").
 - Pointer lock with a real hand: the fallback is proven, the happy path is not.
 - The painted trip in a browser at watchable quality: software GL paints a few frames a
   second, so the scripted runs use a small window and low internal resolution.

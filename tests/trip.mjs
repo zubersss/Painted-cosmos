@@ -141,7 +141,8 @@ try {
   const saved = await page.evaluate(() => { try { return JSON.parse(window.__pc.storage.getItem('painted-cosmos.save')); } catch { return null; } });
   check(saved && saved.bodyId === 'saturn' && saved.state === 'ON_FOOT', 'autosave wrote the visit to Saturn');
   check(i.frames > frames0 - 1, 'one sitting: the page was never reloaded during the trip');
-  await page.goto(run.baseUrl + '/index.html?' + opt.query.replace('&fresh=1', ''));
+  // (The painted pipeline in software GL can take over 30 s to load: no default time limit.)
+  await page.goto(run.baseUrl + '/index.html?' + opt.query.replace('&fresh=1', ''), { timeout: 600000, waitUntil: 'commit' });
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 300000, polling: 200 });
   i = await info();
   check(i.body === 'saturn' && i.state === 'ON_FOOT', 'after a reload the game continues on Saturn: ' + i.body + ' ' + i.state);
