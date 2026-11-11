@@ -23,8 +23,10 @@ import { getLook } from '../data/looks.js';
 // fades in between `inner` distances (so a broad touch is never held up to the eye); how soft
 // its marks are left; how far above the ground the eye may be; cells moved before re-listing.
 const RINGS = [
-  { name: 'fine', cell: 0.6, range: [11, 12, 17], per: 12, inner: [0.8, 2.6], soft: 0, alt: 45, step: 2 },
-  { name: 'mid', cell: 1.9, range: [0, 40, 66], per: 7, inner: [8, 15], soft: 0.6, alt: 90, step: 1 },
+  // (the single strokes run on to 23 m at the top tier and the fan touches begin at 6 m: the two
+  // hands overlap over a long band instead of changing over at 17 m)
+  { name: 'fine', cell: 0.6, range: [11, 12, 23], per: 12, inner: [0.8, 2.6], soft: 0, alt: 45, step: 2 },
+  { name: 'mid', cell: 1.9, range: [0, 40, 66], per: 7, inner: [6, 13], soft: 0.6, alt: 90, step: 1 },
   { name: 'far', cell: 6.5, range: [0, 0, 240], per: 5, inner: [38, 66], soft: 0.8, alt: 200, step: 1 },
 ];
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -48,7 +50,8 @@ const SEED_HEAD = [0.88, 0.76, 0.46], LITTER = [[0.80, 0.62, 0.34], [0.66, 0.42,
 function styleOf(look, b) {
   const sm = b.small || {}, forest = b.terrain === 'forest';
   const under = Object.assign({}, look.flora && look.flora.under, b.under);
-  const st = { blade: 0, reed: 0, needle: 0, dab: 0, ripple: 0, flower: 0, fern: 0, litter: 0,
+  const st = { blade: 0, reed: 0, needle: 0, dab: 0, ripple: 0, flower: 0, fern: 0, litter: 0, crust: 0, gm: 0.60, flowerSize: 1,
+    crustC: under.crust || null, stalk: under.stalk || null,
     leaf: under.leaf || null, rock: under.rock || null, shard: under.shard || null, bush: under.bush || null,
     flowers: under.flowers || (under.accent ? [under.accent] : null), litterC: under.litter || (forest ? LITTER : null) };
   const grass = (sm.grass == null ? (forest ? 0.4 : 0) : sm.grass) + (sm.fern || 0) * 0.6;
@@ -60,10 +63,14 @@ function styleOf(look, b) {
   st.flower = 8 * Math.min(1, (sm.flower == null ? (forest ? 0.07 : 0) : sm.flower) * 7);
   st.fern = 8 * Math.min(1, (sm.fern == null ? (forest ? 0.12 : 0) : sm.fern) * 5);
   st.litter = st.litterC ? (forest ? 8 : (b.tall ? 4 : 0)) : 0;
+  // (`crust`: what lies flat on bare ground in patches: lichen, sulphur crust, frost flowers, plates of ice or glass;
+  // `gm`: how far a blade's wash is pulled to the ground's; `flowerSize`: fungi are flowers with broad heads)
+  st.crust = st.crustC ? 4 : 0;
   if (b.near) Object.assign(st, b.near);
+  if (!st.crustC) st.crust = 0;
   let left = 8;
   for (const k of ['blade', 'reed', 'needle', 'ripple', 'dab']) { st[k] = Math.max(0, Math.min(left, st[k])); left -= st[k]; }
-  for (const k of ['blade', 'reed', 'needle', 'ripple', 'dab', 'flower', 'fern', 'litter']) st[k] /= 8;
+  for (const k of ['blade', 'reed', 'needle', 'ripple', 'dab', 'flower', 'fern', 'litter', 'crust']) st[k] /= 8;
   return st;
 }
 
@@ -218,6 +225,10 @@ class Ring {
     this.rough = vnoise(U / 7.3, V / 7.3, seed + 5);
     this.drift = vnoise(U / 9.7 + 31.7, V / 9.7 + 3.3, seed + 9);
     this.which = vnoise(U / 27 + 7.1, V / 27 + 1.9, seed + 11);
+    // stones lie in drifts with bare ground between, crust in patches of its own (and one more, larger, slower field: which crust)
+    this.stony = 2.1 * sstep(0.44, 0.76, vnoise(U / 5.9 + 13.1, V / 5.9 + 7.7, seed + 15) * 0.75 + 0.25 * this.rough);
+    this.needly = 1.9 * sstep(0.42, 0.72, vnoise(U / 6.7 + 23.1, V / 6.7 + 1.7, seed + 19));       // splinters stand in companies
+    this.crusty = sstep(0.40, 0.66, vnoise(U / 4.3 + 3.9, V / 4.3 + 17.3, seed + 17) * 0.7 + 0.3 * this.drift);
     this.slots = []; this.map.set(key, this.slots);
     return true;
   }
@@ -289,10 +300,10 @@ class Ring {
       for (let k = 0; k < nf; k++) {
         const q1 = H(102 + k), q2 = H(106 + k), q3 = H(110 + k), q4 = H(114 + k);
         const ou = (q1 - 0.5) * 0.56, ov = (q2 - 0.5) * 0.56, L = (0.16 + 0.26 * q3) * (1 + 0.5 * tall), la = q4 * 6.2832, tilt = 0.05 + 0.22 * q1;
-        const lc = st.leaf ? st.leaf[1] : [gr, gg, gb];
-        this.put(ou, ov, 0, tilt, la, L, 0.012, FLICK, q3, born, lerp(lc[0], gr, 0.5), lerp(lc[1], gg, 0.5), lerp(lc[2], gb, 0.5), 0, 1);
-        const hr = 0.020 + 0.045 * q2 * q2;
-        this.put(ou, ov, 0, tilt, la, hr * 1.5, hr, DAB + CRISP, q2, born, fc[0], fc[1], fc[2], L * 0.96, 1);
+        const lc = st.stalk || (st.leaf ? st.leaf[1] : [gr, gg, gb]), fs = st.flowerSize;
+        this.put(ou, ov, 0, tilt, la, L, fs > 1.3 ? 0.030 : 0.012, FLICK, q3, born, lerp(lc[0], gr, fs > 1.3 ? 0.25 : 0.5), lerp(lc[1], gg, fs > 1.3 ? 0.25 : 0.5), lerp(lc[2], gb, fs > 1.3 ? 0.25 : 0.5), 0, 1);
+        const hr = (0.020 + 0.045 * q2 * q2) * fs;
+        this.put(ou, ov, 0, tilt, la, hr * (fs > 1.3 ? 0.8 : 1.5), hr, DAB + CRISP, q2, born, fc[0], fc[1], fc[2], L * 0.96, 1);
       }
       left -= nf * 2;
     }
@@ -300,9 +311,10 @@ class Ring {
     const others = [];
     const cnt = (share, k) => { const v = share * 8 * (per / 12); const nI = Math.floor(v); return nI + (H(k) < v - nI ? 1 : 0); };
     for (let q = cnt(st.reed, 120); q > 0; q--) others.push(1);
-    for (let q = cnt(st.needle * 1.6, 121); q > 0; q--) others.push(2);
+    for (let q = cnt(st.needle * 1.6 * this.needly, 121); q > 0; q--) others.push(2);
     for (let q = cnt(st.ripple * 1.3, 122); q > 0; q--) others.push(4);
-    for (let q = cnt(st.dab * 1.2, 123) + (st.blade > 0 && this.meadow < 0.55 ? 1 : 0); q > 0; q--) others.push(3);
+    for (let q = cnt(st.dab * 1.2 * this.stony, 123) + (st.blade > 0 && this.meadow < 0.55 ? 1 : 0); q > 0; q--) others.push(3);
+    for (let q = cnt(st.crust * 2.2 * this.crusty, 124); q > 0; q--) others.push(5);
     // Grass grows in tufts, not in rows: a cell has one tuft, or two, or (one in six) none; a
     // tuft is a handful of flicks from nearly one root, fanned, one or two of them long. Tufts
     // differ in size, so the sward is uneven in spacing and in height; where the grass is left
@@ -322,12 +334,12 @@ class Ring {
       const len = (0.09 + 0.34 * q3 * q3) * tsz[tf] * (lead ? 1.5 : 1) * (acc ? 1.2 : 1), wid = 0.020 + 0.018 * q4;
       // most are close to the ground's own value (a little richer, or a little paler: the
       // sunlit and the dry); one in seven is a darker accent, and only those are left crisp
-      const L = st.leaf, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? 0.44 : 0.60;
+      const L = st.leaf, c = L ? L[acc ? 2 : pv < 0.55 ? 1 : 0] : null, gm = acc ? st.gm * 0.73 : st.gm;
       let cr = gr, cg = gg, cb = gb;
       if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
       if (lead && tall > 0.3 && !acc) { const m = 0.5 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }
       const dk = acc ? 1.12 : pv < 0.36 ? 0.84 : 1.2;
-      this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, q2 * 6.2832 + 1.7, len, wid, acc ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
+      this.put(Math.cos(ang) * rad + tu[tf], Math.sin(ang) * rad + tv[tf], 0, 0.08 + 0.85 * q4 * q4, (tf ? t3 : t4) * 6.2832 + (q2 - 0.5) * 1.5, len, wid, acc && (k < 2 || q2 < 0.3) ? 3 : 2, q3 * 0.61 + q1 * 0.39, born,
         dens(cr, dk), dens(cg, dk), dens(cb, dk), (q5 - 0.5) * 1.5 + (q1 - 0.5) * 0.5, 1);
     }
     left -= nBlade;
@@ -350,6 +362,10 @@ class Ring {
         if (c && c.length === 3) { cr = c[0]; cg = c[1]; cb = c[2]; }
         else if (q5 < 0.5) { cr = lerp(gr, 0.95, 0.6); cg = lerp(gg, 0.97, 0.6); cb = lerp(gb, 1.0, 0.6); }
         else { cr = dens(gr, 1.7) * 0.93; cg = dens(gg, 1.7) * 0.95; cb = dens(gb, 1.7); }
+      } else if (kind === 5) {     // crust: a flat touch lying on the ground, one of the patch's own kind, ragged, unequal
+        const cc = st.crustC, c = cc[Math.min(cc.length - 1, Math.floor((this.which * 0.75 + q5 * 0.25) * cc.length * 0.999))], m = 0.18 + 0.30 * q1;
+        this.put(ou * 0.8, ov * 0.8, 0.012, 0, 0, 0.04 + 0.24 * q3 * q3, 0.02 + 0.10 * q4 * q4 + 0.02, LYING + (q5 > 0.8 ? CRISP : 0), q3, born, lerp(c[0], gr, m), lerp(c[1], gg, m), lerp(c[2], gb, m), q2 * 6.2832, 0);
+        continue;
       } else if (kind === 4) {     // a drift ripple: a low dark comma on the sand
         len = 0.022 + 0.02 * q3; wid = 0.20 + 0.26 * q4; mid = 0.9;
         cr = dens(gr, 1.45); cg = dens(gg, 1.45); cb = dens(gb, 1.5);
@@ -379,7 +395,7 @@ class Ring {
       const fc = st.flowers[Math.min(st.flowers.length - 1, Math.floor(this.which * st.flowers.length * 0.999))];
       for (let q = 0; q < nf; q++, k++) {
         const q1 = H(102 + q), q2 = H(106 + q), q3 = H(110 + q), p = at(q1, q2), m = far ? 0.25 : 0.1;
-        this.put(p[0], p[1], (0.12 + 0.16 * q3) * (1 + 0.5 * tall) * kh, 0, 0, (0.035 + 0.035 * q3) * kh, (0.10 + 0.22 * q1) * kw, DAB, q3, born, lerp(fc[0], gr, m), lerp(fc[1], gg, m), lerp(fc[2], gb, m), 0, flex);
+        this.put(p[0], p[1], (0.12 + 0.16 * q3) * (1 + 0.5 * tall) * kh, 0, 0, (0.035 + 0.035 * q3) * kh * Math.min(1.6, st.flowerSize), (0.10 + 0.22 * q1) * kw * Math.min(1.6, st.flowerSize), DAB, q3, born, lerp(fc[0], gr, m), lerp(fc[1], gg, m), lerp(fc[2], gb, m), 0, flex);
       }
       left -= nf;
     }
@@ -401,7 +417,7 @@ class Ring {
       left -= nl;
     }
     // stones: by the water, and wherever the ground is stony
-    const nst = Math.min(left, (shore > 0.3 && st.rock ? 1 : 0) + Math.floor(st.dab * (far ? 2.2 : 3.0) + H(140) * 0.9));
+    const nst = Math.min(left, (shore > 0.3 && st.rock ? 1 : 0) + Math.floor(st.dab * (far ? 2.2 : 3.0) * this.stony + H(140) * 0.9));
     for (let q = 0; q < nst; q++, k++) {
       const q1 = H(141 + q), q2 = H(145 + q), q3 = H(149 + q), q4 = H(153 + q), p = at(q1, q2);
       // (unequal: most are small, one in a while is a boulder; most are the pale stone with its
@@ -413,6 +429,18 @@ class Ring {
       this.put(p[0], p[1], 0, 0, 0, w * (0.55 + 0.8 * q1), w, DAB + (q4 > 0.8 ? CRISP : 0), q3, born, cr, cg, cb, 0, 0);
     }
     left -= nst;
+    // crust: broken drags of a second wash lying flat on the ground, longer and softer the farther
+    // off (seen across a plain they are the horizontal strokes that give it its distance)
+    if (st.crust > 0 && left > 0) {
+      const ncr = Math.min(left, Math.round(st.crust * (far ? 3.2 : 4.2) * this.crusty + H(240) - 0.5));
+      const cc = st.crustC;
+      for (let q = 0; q < ncr; q++, k++) {
+        const q1 = H(241 + q), q2 = H(245 + q), q3 = H(249 + q), q4 = H(253 + q), p = at(q1, q2);
+        const c = cc[Math.min(cc.length - 1, Math.floor((this.which * 0.75 + q4 * 0.25) * cc.length * 0.999))], m = (far ? 0.42 : 0.30) + 0.25 * q3;
+        this.put(p[0], p[1], 0.015, 0, 0, (0.14 + 0.5 * q3 * q3) * kw, (0.07 + 0.22 * q4 * q4) * kw, LYING, q3, born, lerp(c[0], gr, m), lerp(c[1], gg, m), lerp(c[2], gb, m), q2 * 6.2832, 0);
+      }
+      left -= ncr;
+    }
     // drift ripples on dunes: long low dashes, darker than the sand
     // (short, unequal, soft: rows of long thin ones read as ruled dashes)
     const nrp = Math.min(left, Math.round(st.ripple * 3 + H(160) - 0.5));
@@ -422,7 +450,7 @@ class Ring {
     }
     left -= nrp;
     // splinters of frost and crystal: a cluster in one touch, lit or in its own shadow
-    const nnd = Math.min(left, Math.round(st.needle * 4 + H(170) - 0.5));
+    const nnd = Math.min(left, Math.round(st.needle * 4 * this.needly + H(170) - 0.5));
     for (let q = 0; q < nnd; q++, k++) {
       const q1 = H(171 + q), q2 = H(175 + q), q3 = H(179 + q), q5 = H(183 + q), p = at(q1, q2);
       const c = st.shard ? st.shard[q5 < 0.5 ? 0 : st.shard.length - 1] : null;
@@ -447,7 +475,7 @@ class Ring {
       for (let q = 0; q < ng; q++, k++) {
         const q1 = H(201 + q), q2 = H(208 + q), q3 = H(215 + q), q4 = H(222 + q), q5 = H(229 + q), p = at(q1, q2);
         // the shaded side of a tuft, the sunlit one, the dry one: all near the ground's own value
-        const v = q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? 0.58 : 0.60;
+        const v = q5 < 0.36 ? 2 : q5 < 0.72 ? 1 : 0, c = L ? L[v] : null, gm = v === 2 ? st.gm - 0.02 : st.gm;
         let cr = gr, cg = gg, cb = gb;
         if (c) { cr = lerp(c[0], gr, gm); cg = lerp(c[1], gg, gm); cb = lerp(c[2], gb, gm); }
         if (v === 0 && tall > 0.2) { const m = 0.55 * tall; cr = lerp(cr, SEED_HEAD[0], m); cg = lerp(cg, SEED_HEAD[1], m); cb = lerp(cb, SEED_HEAD[2], m); }

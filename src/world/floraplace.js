@@ -52,7 +52,8 @@ export function placeTrees(S, face, level, ix, iy, grid) {
         const kind = birch ? bi.tall[0] : bi.tall[1];
         const spec = S.look.flora.tall[kind];
         const rr = R + s.h - 0.12;
-        const scale = ((birch ? 0.74 : 0.80) + 0.56 * r5 * r5 + 0.12 * s.glade) * (spec.scale || 1);
+        // (`vary`: a stand of all ages: most are young, the middle storey; a few are full grown, one in a while a giant)
+        const scale = (spec.vary ? 0.30 + 1.15 * r5 * r5 * (0.75 + 0.5 * r1) : (birch ? 0.74 : 0.80) + 0.56 * r5 * r5 + 0.12 * s.glade) * (spec.scale || 1);
         out.push(x * rr, y * rr, z * rr, scale, (spec.slim || spec.kit === 'wave') ? 0.6 + (r1 - 0.5) * 0.9 : r1 * 6.2831853, kind, (r2 * 3) | 0, hash3i(a, b, 6 + k, seed),
           (r5 - 0.5) * 2, (r4 - 0.5) * 2 * 0.6, s.canopy, birch ? 0.02 + 0.15 * r2 * r2 : 0.02 * r2);
       }

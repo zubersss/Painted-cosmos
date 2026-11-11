@@ -74,7 +74,7 @@ function ico(detail) {
   return _ico[detail];
 }
 function blob(B, c, rx, ry, rz, rnd, opts) {
-  const o = Object.assign({ detail: 1, part: 1, noise: 0.22, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0, taper: 0, uvT: false }, opts || {});
+  const o = Object.assign({ detail: 1, part: 1, noise: 0.22, rough: 0, ledge: 0, ledgeF: 9, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0, taper: 0, uvT: false }, opts || {});
   const I = ico(o.detail);
   const mc = o.massC || c;
   const ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28;
@@ -82,8 +82,10 @@ function blob(B, c, rx, ry, rz, rnd, opts) {
   for (let i = 0; i < I.n; i++) {
     let x = I.p[i * 3], y = I.p[i * 3 + 1], z = I.p[i * 3 + 2];
     // smooth lumpy displacement: a few low sine lobes so shared vertices stay welded
-    const k = 1 + o.noise * (Math.sin(x * 3.1 + ph1) * Math.sin(y * 2.7 + ph2) + 0.6 * Math.sin(z * 4.3 + ph3 + x * 1.9));
-    const tp = 1 - o.taper * (y * 0.5 + 0.5);
+    // (`rough`: a second, finer set of lobes, so a big form's outline is broken; `ledge`: the girth steps in and out with height, wind-carved strata)
+    const k = 1 + o.noise * (Math.sin(x * 3.1 + ph1) * Math.sin(y * 2.7 + ph2) + 0.6 * Math.sin(z * 4.3 + ph3 + x * 1.9))
+      + (o.rough ? o.rough * (Math.sin(x * 8.3 + ph2) * Math.sin(z * 7.1 + ph1 + y * 5.0) + 0.5 * Math.sin(y * 13.0 + ph3 + x * 6.0 + z * 4.0)) : 0);
+    const tp = (1 - o.taper * (y * 0.5 + 0.5)) * (o.ledge ? 1 + o.ledge * Math.sin(y * o.ledgeF + ph1 + 0.8 * Math.sin(x * 2.3 + z * 1.7 + ph2)) : 1);
     let px = x * rx * k * tp, py = y * ry * k, pz = z * rz * k * tp;
     const rad = Math.sqrt(x * x + z * z);
     py -= o.droop * rad * rad * ry;
@@ -283,7 +285,7 @@ export function bushGeometry(seed) {
 
 export function rockGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
-  blob(B, V(0, 0.28, 0), 0.75, 0.5, 0.6, rnd, { detail: 1, part: 4, noise: 0.32, massK: 0, sway: 0, shade0: 0, shadeK: 1.0, flatBottom: 0.4, uvScale: 1 });
+  blob(B, V(0, 0.28, 0), 0.75, 0.5, 0.6, rnd, { detail: 2, part: 4, noise: 0.32, rough: 0.09, massK: 0, sway: 0, shade0: 0, shadeK: 1.0, flatBottom: 0.4, uvScale: 1 });
   return B.build();
 }
 
@@ -358,8 +360,14 @@ export function spireGeometry(seed, lod, spec) {
   const slim = spec && spec.slim;
   const H = slim ? 8 + rnd() * 5 : 9 + rnd() * 6, r = slim ? 1.05 + rnd() * 0.5 : 2.0 + rnd() * 1.0;
   const base = B.count;
-  blob(B, V((rnd() - 0.5) * 0.6, H * 0.46, (rnd() - 0.5) * 0.6), r, H * 0.56, r * (0.8 + rnd() * 0.4), rnd, { detail: lod ? 1 : 2, part: 4, noise: slim ? 0.30 : 0.24, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: slim ? 0.80 : 0.86, flatBottom: 0.2, uvScale: 2 });
-  if (!lod) blob(B, V(1.6 + rnd(), H * 0.16, (rnd() - 0.5) * 2), r * 0.6, H * (slim ? 0.32 : 0.2), r * 0.6, rnd, { detail: 1, part: 4, noise: 0.25, massK: 0, sway: 0, shade0: 0.2, shadeK: 0.8, taper: 0.8, uvScale: 1 });
+  // (no budget: the near form is finely cut, so its outline is a wobbling line and not a row of
+  // straight edges; ledges step its girth, a buttress and a few fallen blocks stand at its foot)
+  blob(B, V((rnd() - 0.5) * 0.6, H * 0.46, (rnd() - 0.5) * 0.6), r, H * 0.56, r * (0.8 + rnd() * 0.4), rnd, { detail: lod ? 1 : 3, part: 4, noise: slim ? 0.30 : 0.24, rough: lod ? 0 : 0.07, ledge: lod ? 0.05 : 0.11, ledgeF: 7 + rnd() * 5, massK: 0, sway: 0, shade0: 0.05, shadeK: 0.9, taper: slim ? 0.80 : 0.86, flatBottom: 0.2, uvScale: 2 });
+  if (!lod) {
+    blob(B, V(1.6 + rnd(), H * 0.16, (rnd() - 0.5) * 2), r * 0.6, H * (slim ? 0.32 : 0.2), r * 0.6, rnd, { detail: 2, part: 4, noise: 0.25, rough: 0.08, ledge: 0.10, massK: 0, sway: 0, shade0: 0.2, shadeK: 0.8, taper: 0.8, uvScale: 1 });
+    const nb = 2 + ((rnd() * 3) | 0);
+    for (let q = 0; q < nb; q++) { const a = rnd() * 6.283, d = r * (0.7 + rnd() * 0.45), s2 = 0.35 + rnd() * 0.6; blob(B, V(Math.cos(a) * d, s2 * 0.3, Math.sin(a) * d), s2 * (0.8 + rnd() * 0.5), s2 * 0.6, s2 * (0.7 + rnd() * 0.5), rnd, { detail: 1, part: 4, noise: 0.3, massK: 0, sway: 0, shade0: 0.25, shadeK: 0.8, flatBottom: 0.4, uvScale: 1 }); }
+  }
   if (slim) {
     // carved by one wind: the whole form leans along +Z, the more the higher, and the tip hooks
     const lean = 0.22 + rnd() * 0.16;

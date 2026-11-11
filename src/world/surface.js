@@ -579,6 +579,17 @@ class Surface {
     let tt = clamp(t + v, 0, 1);
     if (tt < 0.5) { set3(b, pal.low); mix3(b, pal.mid, tt * 2); }
     else { set3(b, pal.mid); mix3(b, pal.high, tt * 2 - 1); }
+    // a second and third wash laid in patches over the first (looks.js `t.patch`: lichen on
+    // basalt, moss on an island's top, frost drifts on ice): the ground's own handwriting,
+    // near (a few metres) and middle (tens of metres), before form and frost are laid in
+    if (T.patch) {
+      for (let q = 0; q < T.patch.length; q++) {
+        const pt = T.patch[q], w = pt.wl, o = 3.7 + q * 11.3;
+        const n = C.n3(X / w + o, Y / w - o, Z / w + 2.0 * o) + 0.45 * C.n3(X / (w * 0.29) - o, Y / (w * 0.29), Z / (w * 0.29) + o);
+        const kp = smoothstep(pt.thr, pt.thr + pt.soft, n) * pt.amt;
+        if (kp > 0) mix3(b, pt.c, kp);
+      }
+    }
     // form laid in with a second, denser wash (cliff faces, slip faces, cut banks)
     if (shade > 0) { const kd = shade * 0.9, kg = Math.min(1, shade * 1.7); b.r -= (b.r - b.r * b.r) * kd; b.g -= (b.g - b.g * b.g) * kd; b.b -= (b.b - b.b * b.b) * kd * 0.6; b.r *= 1 - 0.26 * kg; b.g *= 1 - 0.28 * kg; b.b *= 1 - 0.08 * kg; }
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
