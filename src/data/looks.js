@@ -159,7 +159,7 @@ export const LOOKS = {
       B('rust_canyons', 'Rust Canyons', 'canyon', ['burntSienna', 'rawSienna', 'burntUmber', 'cobaltViolet', 'yellowOchre'], 'turquoise', ['rawSienna', 'burntSienna', 'burntUmber'],
         { t: { strata: 1, amp: 200, steps: 3, dil: 0.16, wl: 620 }, tall: [1, 1], tallD: 0.05, tallMix: 1, small: { rock: 0.07, bush: 0.012 }, phys: { ground: 'rock' } }),
       B('dust_dunes', 'Dust-Storm Dunes', 'dunes', ['rawSienna', 'yellowOchre', 'burntSienna', 'roseMadder', 'sepia'], 'cerulean', ['yellowOchre', 'rawSienna', 'burntSienna'],
-        { t: { amp: 24, wl: 150, slip: 0.2, ride: 0.22, swell: 22, dil: 0.26, lee: 0.3 }, mist: 1.3, hour: 16.2, want: { perch: 1.0, steep: 0.8, high: 0.06, relief: 1.4, along: 2.5, layers: 1.2 }, small: { rock: 0.006 }, phys: { ground: 'sand' } }),
+        { t: { amp: 24, wl: 150, slip: 0.2, ride: 0.22, swell: 22, dil: 0.26, lee: 0.3 }, mist: 1.3, hour: 16.2, small: { rock: 0.006 }, phys: { ground: 'sand' } }),
       B('polar_frost', 'Polar Frost Fields', 'terraced', ['davysGrey', 'roseMadder', 'cobaltBlue', 'rawSienna', 'neutralTint'], 'cadOrange', ['mint', 'davysGrey', 'roseMadder'],
         { t: { amp: 40, steps: 6, wl: 760, crack: 0.8, frost: 0.85, strata: 0.7, riser: [0.84, 0.93] }, want: { high: 0.05, steep: 0.9, layers: 1.6, perch: 0.6 }, under: { rock: [[0.94, 0.92, 0.93], [0.68, 0.62, 0.70]], shard: [[0.97, 0.98, 0.99], [0.76, 0.84, 0.93]] }, small: { shard: 0.035, rock: 0.02 }, phys: { ground: 'ice' } }),
       B('dry_riverbeds', 'Dry Riverbeds', 'riverbed', ['rawSienna', 'burntUmber', 'alizarin', 'yellowOchre', 'sepia'], 'alizarin', ['yellowOchre', 'rawSienna', 'burntUmber'],
@@ -277,7 +277,7 @@ export const LOOKS = {
     sky: mkSky([0.60, 0.86, 0.84], [0.93, 0.985, 0.96], { glaze: [0.64, 0.74, 0.88], light: [0.97, 1.0, 0.96] }),
     flora: {
       tall: [
-        { kit: 'wave', scale: 1.0, bark: [[0.84, 0.96, 0.94], [0.26, 0.60, 0.68]], leaf: [[0.84, 0.96, 0.94], [0.58, 0.84, 0.84], [0.26, 0.60, 0.68]], far: [9, 9, 0.5], obs: [1.5, 9] },
+        { kit: 'wave', scale: 1.0, double: 1, bark: [[0.84, 0.96, 0.94], [0.26, 0.60, 0.68]], leaf: [[0.84, 0.96, 0.94], [0.58, 0.84, 0.84], [0.26, 0.60, 0.68]], far: [9, 9, 0.5], obs: [4.5, 9] },
         { kit: 'spire', scale: 0.8, bark: [[0.92, 0.98, 0.98], [0.52, 0.78, 0.84]], leaf: [[0.92, 0.98, 0.98], [0.74, 0.90, 0.92], [0.52, 0.78, 0.84]], far: [7, 12, 0.85], obs: [1.6, 9] },
       ],
       under: { leaf: [[0.80, 0.94, 0.86], [0.62, 0.84, 0.80], [0.42, 0.66, 0.70]], accent: [0.90, 0.60, 0.70], bush: [[0.74, 0.92, 0.86], [0.54, 0.78, 0.78], [0.36, 0.58, 0.66]], rock: [[0.92, 0.97, 0.96], [0.60, 0.78, 0.82]], shard: [[0.94, 0.99, 0.98], [0.56, 0.84, 0.86]] },
@@ -286,7 +286,7 @@ export const LOOKS = {
       B('ice_shelves', 'Mint Ice Shelves', 'terraced', ['mint', 'turquoise', 'cerulean', 'davysGrey', 'cobaltBlue'], 'roseMadder', ['mint', 'turquoise', 'cerulean'],
         { t: { amp: 150, steps: 5, wl: 800, crack: 0.9, frost: 0.5, riser: [0.86, 0.94], rag: 0.6, strata: 0.5 }, tall: [1, 1], tallD: 0.06, tallMix: 1, small: { shard: 0.12, rock: 0.03 }, phys: { ground: 'ice' } }),
       B('frozen_waves', 'Frozen-Wave Forest', 'dunes', ['turquoise', 'viridian', 'cobaltBlue', 'mint', 'indigo'], 'lemonYellow', ['turquoise', 'mint', 'cobaltBlue'],
-        { t: { amp: 16, wl: 90, slip: 0.2, lee: 0.6, swell: 14, ride: 0.3 }, tall: [0, 0], tallD: 0.50, tallMix: 1, small: { shard: 0.15 }, phys: { ground: 'ice' } }),
+        { t: { amp: 16, wl: 90, slip: 0.2, lee: 0.6, swell: 14, ride: 0.3 }, want: { onLip: 0, along: 0, flora: 1.6, perch: 0.5 }, tall: [0, 0], tallD: 0.34, tallMix: 1, small: { shard: 0.15 }, phys: { ground: 'ice' } }),
       B('pearl_fog', 'Pearl Fog Flats', 'flat', ['davysGrey', 'mint', 'roseMadder', 'cerulean', 'neutralTint'], 'cobaltViolet', ['davysGrey', 'mint', 'roseMadder'],
         { t: { amp: 6, dil: 0.55 }, mist: 0.10, small: { shard: 0.10, rock: 0.04 }, phys: { ground: 'ice' } }),
       B('teal_sinkholes', 'Glowing Teal Sinkholes', 'sinkholes', ['viridian', 'turquoise', 'indigo', 'mint', 'paynesGrey'], 'lemonYellow', ['viridian', 'turquoise', 'indigo'],

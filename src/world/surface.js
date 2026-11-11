@@ -281,6 +281,7 @@ class Surface {
     const sd = (this.seed ^ Math.imul(cell | 0, 7919)) | 0, f = _cf.face;
     const kp = keep == null ? 0.72 : keep;
     let out = 0, wob = 2;
+    this._rim = 0;                                                   // how nearly this point sits on a rim crest (read by the caller)
     for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
       const ix = bx + i, iy = by + j;
       if (ix < 0 || iy < 0 || ix >= n || iy >= n) continue;
@@ -298,6 +299,7 @@ class Surface {
       const bowl = d < 1 ? -(1 - Math.pow(d, 2.6)) : 0;
       const rim = d < 1 ? Math.exp(-(1 - d) * (1 - d) / 0.012) : Math.exp(-(d - 1) * 3.4) * (1 - smoothstep(1.45, 1.75, d));
       out += (bowl * depth + rim * rimH) * (rr / 0.29);
+      if (rr > 0.2 && d > 0.9 && d < 1.12 && rim > this._rim) this._rim = rim;
     }
     return out;
   }
@@ -488,6 +490,7 @@ class Surface {
       h = 24 + swell * (T.swell || 30) + amp * am * (0.75 + 0.5 * swell) * p + amp * km * pm + C.n3(X / 8, Y / 8, Z / 8) * 0.10;
       t = clamp(0.2 + 0.5 * p * am + 0.3 * pm * am2, 0, 1); dry = 0.16; wet = 0.25;
       shade = Math.max(lee * (0.35 + 0.65 * am), leem * am2 * 0.8) * (T.lee == null ? 0.5 : T.lee);
+      lip = am > 0.75 && fu > 1 - sp - 0.035 && fu < 1 - sp + 0.004 ? 1 : 0;      // on the crest of a full-grown dune
       meadow = 1 - Math.max(lee, leem);
     } else if (k === 'ridged') {
       const wl = T.wl || 900, amp = T.amp || 260, f = R / wl;
@@ -499,6 +502,7 @@ class Surface {
       meadow = grow;
     } else if (k === 'crater' || k === 'basin') {
       const big = this._craters(x, y, z, k === 'crater' ? (T.cell || 400) : 520, k === 'crater' ? 58 : 12, k === 'crater' ? 20 : 6, k === 'crater' ? 0.9 : 0.72);
+      lip = this._rim;                                               // the rim of a large crater: where the easel goes
       const sml = this._craters(x, y, z, k === 'crater' ? 150 : 190, k === 'crater' ? 13 : 5, k === 'crater' ? 4.5 : 2.5);
       const tiny = this._craters(x, y, z, 47, k === 'crater' ? 3.4 : 1.6, k === 'crater' ? 1.3 : 0.7, 0.5);
       const cr = big + sml + tiny;

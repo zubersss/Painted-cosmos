@@ -34,6 +34,11 @@ function baseUniforms(bodyU, own) {
   }, own || {});
 }
 
+// The uniforms every painted material needs (what FRAG_PARS declares), for materials built
+// outside this file: makePaintUniforms(bodyUniforms?, own?) -> uniforms object. Pass the
+// body's uniforms (world.bodyUniforms(id)) to be lit and hazed like that body.
+export function makePaintUniforms(bodyU, own) { return baseUniforms(bodyU, own); }
+
 // ------------------------------------------------------------------------------------------
 // Terrain
 // ------------------------------------------------------------------------------------------
@@ -300,7 +305,7 @@ void main() {
   // lava: paper-bright where it runs hot, dark crust drifting on it
   vec4 r4 = texture(uNoise3D, vBody / 9.0 + drift * 0.4);
   own = mix(own, vec3(1.0, 0.975, 0.86), vLiqP.x * smoothstep(0.50, 0.72, r4.r));
-  own = mix(own, vec3(0.30, 0.22, 0.24), vLiqP.x * smoothstep(0.56, 0.70, r4.g + (r2.b - 0.5) * 0.3));
+  own = mix(own, vec3(0.30, 0.22, 0.24), smoothstep(0.75, 1.0, vLiqP.x) * smoothstep(0.56, 0.70, r4.g + (r2.b - 0.5) * 0.3));   // (a crust forms on lava, not on a glowing pool)
   // cloud sea: bare-paper billows with soft shaded hollows
   vec4 r5 = texture(uNoise3D, vBody / 47.0 + drift * 0.2);
   own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));

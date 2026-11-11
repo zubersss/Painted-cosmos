@@ -31,8 +31,8 @@ const WANT = {
   wall: { relief: 0.8, layers: 0.5, liquid: 0, beyond: 0, steep: 2.4, below: 0, high: 0.30, flora: 0.2 },
   ridged: { relief: 1.6, layers: 1.0, liquid: 0, beyond: 0, steep: 0.8, below: 0.2, high: 0.22, flora: 0.5 },
   alpine: { relief: 2.0, layers: 1.0, liquid: 0, beyond: 0, steep: 0.6, below: 0, high: 0.24, flora: 0.3 },
-  dunes: { relief: 1.2, layers: 2.4, liquid: 0, beyond: 0, steep: 0.2, below: 0.3, high: 0.08, flora: 0 },
-  crater: { relief: 0.8, layers: 0.8, liquid: 0, beyond: 0, steep: 0.6, below: 0.8, high: 0.06, flora: 0, bowl: 3.5, perch: 0.6 },
+  dunes: { relief: 1.2, layers: 1.6, liquid: 0, beyond: 0, steep: 0.6, below: 0.3, high: 0.06, flora: 0, onLip: 1, along: 2.5 },
+  crater: { relief: 0.8, layers: 0.8, liquid: 0, beyond: 0, steep: 0.6, below: 1.6, high: 0.06, flora: 0, bowl: 3.5, onLip: 1 },
   basin: { relief: 0.6, layers: 0.8, liquid: 0, beyond: 0, steep: 0.2, below: 0.6, high: 0.06, flora: 0, bowl: 1.5 },
   sinkholes: { relief: 0.5, layers: 0.5, liquid: 2.0, beyond: 1.2, steep: 1.2, below: 1.6, high: 0.06, flora: 0, bowl: 1.5 },
   riverbed: { relief: 0.6, layers: 0.5, liquid: 1.6, beyond: 1.0, steep: 0.2, below: 0.2, high: 0.10, flora: 0.8 },
@@ -217,6 +217,22 @@ export function findVantage(bodyId, biomeId, opts = {}) {
       }
     }
   }
+  // where the place to stand is a crest (a dune's, a crater rim's), find crests near each spot
+  if (W.onLip) {
+    const base = cands.length, keep = [];
+    for (let ci = 0; ci < base; ci++) {
+      const c = cands[ci], fc = frameAt(c.d);
+      let got = false;
+      for (let a = 0; a < 8 && !got; a++) {
+        for (let r = 0; r < 190 && !got; r += 2.5) {
+          step(c.d, fc, a * Math.PI / 4 + ci * 0.7, r, R, p);
+          S.sample(p[0], p[1], p[2], o, true);
+          if (o.lip > 0.5 && o.w[bi] > 0.93) { keep.push({ d: [p[0], p[1], p[2]], h: o.h, rough: 0, dens: 0, perch: 0.5 }); got = true; }
+        }
+      }
+    }
+    if (keep.length) { cands.length = 0; for (const c of keep) cands.push(c); }
+  }
   // where water is the subject, also try the easel at the water's edge: from each spot walk
   // to the nearest shore and stand a few steps back from it
   if (W.liquid >= 1.5 && sc.fogL == null) {
@@ -281,10 +297,10 @@ export function findVantage(bodyId, biomeId, opts = {}) {
     for (const ob of sampleObstaclesPure(bodyId, d[0], d[1], d[2], 16)) {
       const u = ob.unitDir, vx = u.x - d[0], vy = u.y - d[1], vz = u.z - d[2];
       const dist = Math.hypot(vx, vy, vz) * R;
-      if (dist < 5.5) { blocked = true; break; }
+      if (dist < 5.5 + ob.radius * 2.2) { blocked = true; break; }
       let da = Math.atan2(vx * f.e[0] + vy * f.e[1] + vz * f.e[2], vx * f.n[0] + vy * f.n[1] + vz * f.n[2]) - yaw;
       while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
-      if (Math.abs(da) < 0.5 && dist < 13) { blocked = true; break; }       // nothing standing in the middle of the picture
+      if (Math.abs(da) < 0.5 && dist < 13 + ob.radius * 3) { blocked = true; break; }       // nothing standing in the middle of the picture
     }
     if (blocked) continue;
     best = t; break;

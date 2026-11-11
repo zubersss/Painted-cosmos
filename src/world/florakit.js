@@ -368,7 +368,7 @@ export function waveGeometry(seed, lod) {
   const rows = [];
   for (let i = 0; i <= st; i++) {
     const a = i / st, xx = (a - 0.5) * L;
-    const k = Math.pow(Math.sin(Math.PI * (0.06 + 0.88 * a)), 0.7) * (0.82 + 0.3 * rnd());     // taper to the ends
+    const k = (0.42 + 0.58 * Math.pow(Math.sin(Math.PI * (0.04 + 0.92 * a)), 0.45)) * (0.85 + 0.25 * rnd());     // lower toward the ends, where the curl shows in profile
     const fwd = (Math.abs(a - 0.5) * 2) ** 2 * 1.6 + (rnd() - 0.5) * 0.3;                         // the ends run ahead
     const row = [];
     for (let j = 0; j < np; j++) {

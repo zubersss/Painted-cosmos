@@ -6,9 +6,12 @@
 import * as THREE from 'three';
 import { Post } from './post.js';
 import { G, SHEET, QUALITY, ensureGlobals } from './shared.js';
-import { makeWashMaterial, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
+import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
+import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
-export { makeWashMaterial, bindBodyUniforms, defaultBodyUniforms };
+// additive exports for materials written outside the painter (PHYSICS' draw kits): the three
+// GLSL chunks of the scene pass and the uniforms they need
+export { makeWashMaterial, makePaintUniforms, bindBodyUniforms, defaultBodyUniforms, VERT_PARS, VERT_END, FRAG_PARS };
 
 // Pilot spreads this into the WebGLRenderer constructor (COORDINATOR C7).
 export const RENDERER_OPTIONS = {
