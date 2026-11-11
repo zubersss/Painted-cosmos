@@ -43,9 +43,20 @@ forest at one to three frames a second: the scripts wait in game time, so slow i
 two browser runs at once on this machine make each other flaky.
 
 **Unfinished, and where each item starts.**
-1. *Review 4* (lead), when the coordinator says PAINTER has reported: what to measure is
-   written at the top of `docs/lead/REVIEW.md` ("Review 4: what will be measured"). The tour
-   is ready for it. M2 as a whole closes when review 4 has no MUST FIX.
+1. *After review 4* (done 2026-11-11, `docs/lead/REVIEW.md`: one MUST FIX for PAINTER, the
+   Earth vista at 645 k triangles). When PAINTER answers it, re-measure exactly as the item
+   says and close M2 in `REVIEW.md` and `TRACK.md`. Re-run `node tests/trip.mjs` in the
+   painted world on that commit (it was last run in a browser on `5d411f2`).
+1a. *Weather in the game* (coordinator's relay after PAINTER's `9d9caf1`; nothing of it done
+   yet except `__pc.flash(frames)`): the world now builds PHYSICS' kits itself
+   (`world.setPhysics(physics, opts)`, `world.kits` has the counts: put them in the read-out),
+   `world.setWeather(sky | null)` forces the sky numbers, `world.setFreshSnow(x)` presets
+   snow. To do: (a) make the tour force fair weather (`world.setWeather` with a clear sky) so
+   sheets stay comparable, and add `--weather` frames in third person: the Earth spawn
+   before, in and after the storm (game clock about 640 to 800 s, default seed), a blizzard
+   on a snowy biome, a dust storm on Mars, a gale on Neptune's sea; (b) report the storm at
+   the Earth spawn with the game's own counters (PAINTER's gallery says 551 k triangles, 301
+   calls); (c) look at lightning with `__pc.flash()`; (d) judge those frames in a review.
 2. *The painted UI theme is PILOT's* (coordinator ruling, 2026-11-11; art-bible rule 8). A
    first pass is in and used everywhere: `src/ui/paint.js` (paper tile, torn-edge filters,
    `ink()` lettering into an element, `inkOnCanvas`, `ringPath`, `iconSvg`, cursor),
@@ -429,6 +440,17 @@ objects in their notes.
 14. **Touchdown belongs to the legs** (with PHYSICS, on dry ground): the assist stops a metre
     up; LANDED begins at the first foot's contact, so the player can step out while the hull
     is still settling.
+
+15. **PHYSICS' five levers of P6, all taken** (coordinator's recommendation; feel is my call
+    and I agree: the brief gives every planet its own gravity feel). `eye` in
+    `physics.update`; the carve assist bounded (`carveAccel` 40 m/s2: thin-air worlds turn
+    wide at their speed); pace `clamp((1.225 / rho0)^0.4, 0.75, 3)` (Neptune 50, Saturn 52,
+    Uranus 58, Jupiter 62, Earth 46, Venus 35, Mars and airless worlds 138 m/s near the
+    ground) with 15 % of the field brake on X where the air is too thin to stop the ship;
+    suit assist `4 * clamp(g / 9, 0.45, 1)`; falls end at 4 m/s. The hard limits stand: never
+    trapped, never uncontrollable. Verified so far: 102 unit tests (the 40 landings and the
+    trip on the real worlds among them) and the browser runs listed under "Ground truth".
+    PHYSICS will fly them again and send numbers; change them if a world fights the player.
 
 ### Tuning numbers (feel target: unhurried, weightless, generous)
 

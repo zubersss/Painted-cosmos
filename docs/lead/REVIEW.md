@@ -10,7 +10,156 @@ are relative, never a claim about a real GPU.
 
 ---
 
-## Review 4: what will be measured (written 2026-11-11, before PAINTER's third pass has reported)
+## Review 4: 2026-11-11, at commit `ded1435` (PAINTER's third pass `334eb16`; before its weather block)
+
+The gate for M2 as a whole. Everything below was run by me on a clean export of `ded1435`,
+one browser at a time, in software GL. The tour sheets and their numbers are in
+`docs/lead/evidence/tour-<body>.jpg` and `.json` (960x540, quality 1, 10:00 local time, HUD
+hidden; biome frames in first person from the world's stand, vistas in third person as the
+player arrives, one frame from orbit). The plan this review follows is the next section.
+
+**Verdict: M2 has one open MUST FIX for PAINTER, a small one (item 1). With it fixed or
+waived by the coordinator, M2 is closed.** PHYSICS: no MUST FIX. PILOT: none known.
+
+What I ran, and what came back:
+- `node --test tests/contract.test.mjs`: 8 of 8. The contract holds on all ten bodies, the
+  terrain stays under the ceiling, spawns are dry and gentle, 39 of 40 scripted landings set
+  down (one honest "too steep" on Earth at -20, -60), and the Earth, Mars, Saturn trip flies in
+  the pure simulation on the real worlds (lands in `rust_canyons` and `ring_shadow`).
+  `node --test src/world/*.test.mjs`: 19 pass. `node --test tests/*.test.mjs`: 102 pass.
+  `node --test src/physics/`: 196 of 197 on this export, which is a coordinator's snapshot of
+  PHYSICS' files in mid-edit; its accepted P6 commit is later (not re-run by me).
+- Landing survey, 24 spots a body: 235 of 240 from a hover (3 "too steep", 2 "no level
+  ground", all said on screen); 232 of 240 entered at speed. No body has a biome that cannot
+  be landed in.
+- The tour of all ten bodies: 114 frames, **every one settled** (`world.busy` at 0 for ten
+  frames) in 0.1 to 58 s, **no console errors**, every vista counted as found where the
+  explorer was put, no place had to be moved off wet or steep ground, nobody stands in liquid.
+- Cost in the game, the dearest frame of each body at quality 1 (budget 600 k triangles, 350
+  draw calls):
+
+  | body | triangles | draw calls | where |
+  | --- | --- | --- | --- |
+  | mercury | 409 k | 365 (344 without my placeholder models) | vista `crystal_gardens-2` |
+  | venus | 545 k | 293 | vista `fungal_towers-2` |
+  | **earth** | **652 k (645 k without the models)** | **368 (352)** | vista `temperate_forest-1` |
+  | mars | 347 k | 240 | `rust_canyons`, `dry_riverbeds` |
+  | jupiter | 535 k | 292 | vistas `hanging_gardens-2`, `sky_islands-1` |
+  | saturn | 438 k | 260 | vistas `crystal_reeds-2`, `gold_islands-1` |
+  | uranus | 375 k | 215 | vista `teal_sinkholes-1` |
+  | neptune | 418 k | 261 | vistas `storm_seas-1`, `aurora_tundra-1` |
+  | moon, pluto | 410 k, 318 k | 185, 189 | |
+
+  The two bold numbers were measured again, five frames each, settled, with and without the
+  explorer and ship (scratch `run2/remeasure.mjs`): identical every frame.
+  Neptune's `kelp_forests` is 359 k (review 3: 727 k). Quality 0 and 2 were not measured in
+  the game in this review (PAINTER's gallery: at most 299 k at quality 0).
+- `world.update` worst frame: 42 to 511 ms on the tour. That is not a measurement of the 5 ms
+  budget: in software GL a frame takes 300 to 1000 ms, and above 80 ms PAINTER's builder takes
+  30 % of the frame on purpose. At real frame rates the slice is said to be 4 ms; nobody here
+  can check that. See SHOULD FIX 9.
+- Space and the pulse drive at 960x540, quality 1: `docs/shots/pilot/m2-pulse.jpg` (new).
+- `R-WX-1`: measured, and reworded in `REFERENCES.md` (see PHYSICS below).
+
+### PAINTER
+
+MUST FIX (M2)
+
+1. **Earth's first vista is over the frame budget.** Standing at the vista
+   `earth-temperate_forest-1` (the easel of the home forest, the first view a new player will
+   find) at quality 1, the game submits **645 k triangles and 352 draw calls for the world
+   alone**, 652 k and 368 with the placeholder explorer and ship. The budget, upheld by the
+   coordinator, is 600 k and 350 in the densest view, measured in the integrated game. To see
+   it: `index.html?stats=1&quality=1&dynres=0`, then in the console
+   `v = __pc.world.getVistas('earth')[0]; __pc.teleport({ body: 'earth', dir: [v.unitDir.x, v.unitDir.y, v.unitDir.z], heading: v.yaw * 57.2958 })`,
+   wait for `world.busy === 0`, read the second line of the read-out. Wanted: 600 k or less
+   and 350 or less there, with room for the real explorer and ship (my placeholders cost 7 k
+   triangles and about 20 calls; Mercury's `crystal_gardens-2` is at 344 calls without them
+   and will go over with them). Honest note for the coordinator: the overrun is 7.5 %, in one
+   view, against a budget that is itself a stand-in for a frame rate nobody can measure here;
+   a waiver would be defensible. I hold it because the budget only means something if the
+   densest view of the showcase obeys it, and because the weather block has since added more.
+
+SHOULD FIX (none blocks M2; several are M3's art pass in all but name)
+
+2. **Three second-site vistas stand in a thicket**: `mercury-crystal_gardens-2` and
+   `uranus-frozen_waves-2` (the third-person camera is jammed against a crystal or a wave and
+   the frame is the back of a hat), `saturn-crystal_reeds-2` (reed stalks between the camera
+   and the explorer). The easels are tested to stand on open, dry ground of their biome; the
+   second sites need the same test plus a few metres clear of tall kits. (Mine as well: when
+   the boom is squeezed under two metres the camera should go to first person. Noted.)
+3. **From orbit, Mercury and Neptune read as glass balls**: a dark disc inside a bright rim
+   line. `R-SPACE-5` wants a rim that fades to paper. Earth's cloud is hard-edged white
+   patches with dashes round the limb. Venus, Mars, Jupiter, Saturn and Uranus read as painted
+   globes; Saturn with its rings across the frame is the best orbit view in the game.
+4. **Dark washes are peppered** (`m2-pulse.jpg`, Mercury's sky, Neptune's sea and sky): dense,
+   hard, dark specks two to four pixels across are the first thing the eye meets in space.
+   Art bible 3 wants granulation that settles into the paper's grain, 8 wants salt and
+   spattered stars. Space is M3 by the brief, so this does not gate M2; in M3 it is a MUST.
+   In the pulse frame nothing streaks or softens yet (`speed01` is 1 there).
+5. **Mars' dunes at mid-morning** are flat tan planes divided by ruler-straight crest lines
+   (art bible 4); they were painted for 16:12 and the player arrives at any hour.
+   `dry_riverbeds` shows the grove and no bed.
+6. **Uranus**: `ice_shelves` is a rounded scarp, `frozen_waves` are capped mounds (your own
+   "partly"). The glowing sinkhole is the frame to bring them up to.
+7. **Crystals and blades** (Mercury) keep straight edges and flat faces: they read as cut
+   paper more than as washes. Venus' fungal towers are still the busiest frame (review 3,
+   item 4), and Venus and Mars have dark, hard-edged blots lying on the foreground.
+8. **Earth**: `misty_wetland` is nearly empty; `sea_coast` is a cove under cliffs more than a
+   sea. Both show their feature; neither is yet a picture one would walk to.
+9. **A way to pin the build slice**: accepted that above 80 ms a frame the builder takes 30 %
+   of it (a machine that slow is unplayable anyway, and it catches up sooner). But it leaves
+   me unable to measure the 5 ms worst frame at all in software GL. Please let
+   `world.setBuildBudget(ms, { fixed: true })` (or a URL switch) hold the slice at its real
+   value, so the read-out's "world worst" means something in a headless run.
+
+GOOD
+- **Every biome the brief names is there**, in the game, where the player is put: canyon
+  walls and a butte on Earth, strata and spires on Mars, lava through basalt and a green acid
+  lake on Venus, sky-islands in a cloud sea and vines down a cliff on Jupiter, the ring arc
+  over Saturn's islands, the teal sinkhole, basalt stacks in an ultramarine sea, the crater
+  bowl on Mercury. By my reading of the eight sheets: 27 of 33 clearly, 6 partly
+  (`mars-dust_dunes` at this hour, `mars-dry_riverbeds`, `uranus-ice_shelves`,
+  `uranus-frozen_waves`, `neptune-aurora_tundra`, `jupiter-lightning_plains`), none missing.
+  The stretched ground streaks and the hexagon cracks of the second pass are gone.
+- `world.busy` drains everywhere (review 3, item 2: closed). Neptune's spawn is inside the
+  budget (review 3, MUST FIX 1: closed).
+- The stands and easels: arriving in a biome now shows the biome. `findBiome` with `yaw` and
+  `pitch` made the tour honest without any guessing on my side.
+- 40 landings, a 240-spot survey and the trip survive a pass that changed every landform.
+
+### PHYSICS
+
+No MUST FIX.
+- `R-WX-1`, the question left for this review: does 5 %/s stand for snow squalls? Measured
+  through `physics.here.sky` at 2 Hz for half an hour at twelve places a body (scratch
+  `run2/squall2.mjs`): on Earth a snow front moves haze 6.3 %/s and snowfall 5.1 %/s,
+  everything else under 2.2 %/s; on Uranus nothing over 4.3 %/s; on Neptune rain 8 %/s at a
+  storm front, a fog bank 14.6 %/s, overcast 6.2 %/s. So: no, not as a single number. The
+  fronts are physical and stay. The check now reads 8 %/s on Earth-like worlds and 15 %/s on
+  the ice giants, and PAINTER eases what it shows with a time constant of 2 s or more.
+- SHOULD FIX: the stateless query disagrees with the state. `physics.sky(physics.weather(body,
+  p, {}, { time }))` at a fixed place, stepping one second: `wet` jumps 55 % in a second on
+  Uranus under "windy" and `snow` 10.7 % (scratch `run2/squall.mjs`), while `here.sky` at the
+  same places moves 0.5 %. Anyone who reads weather away from the focus will see pops.
+- SHOULD FIX (carried from review 3): one test was red in the snapshot `ded1435`.
+- Taken from P6, all five levers (in my notes, Decisions 15); flown only by the unit tests
+  and one scripted trip so far.
+
+### PILOT (self-review)
+
+- Found by this review in my own domain: the third-person camera has no answer to a thicket
+  (item 2); the tour's sheet capture failed twice in a tired browser (fixed: the numbers are
+  written first, the sheet is laid out in a fresh browser if need be); the landing prompt
+  flickered over rough ground (fixed earlier in this run).
+- The painted trip and play-through passed in the browser on the export of `5d411f2`, which
+  had PAINTER's work in progress, not `334eb16`. On `ded1435` the browser has stood in every
+  biome and at every vista without an error, and the trip passes in the pure simulation; the
+  scripted browser trip on the reported commit itself was not re-run.
+
+---
+
+## Review 4: the plan it followed (written before PAINTER's third pass had reported)
 
 Review 4 is the gate for M2 as a whole. It starts when the coordinator relays PAINTER's report,
 and it is run on a clean export of that commit (`tools/export-head.sh`), one browser at a time.
