@@ -1125,6 +1125,16 @@ lines there (`draw.rain = ...`, `draw.snow = ...`) are now exactly my defaults a
   Venus. The lead's R-WX-1 allows 8 % (15 % on the ice giants): Earth and Jupiter are half a
   point over it at their worst moment; both are the edge of a weather cell passing, older than
   this stage, and not fixed. Ease what you show over 2 s as the lead asks.
+- *Your three asks of M3 block 2* (after `6bb6c91`). (1) **Rain share follows the rain**:
+  `DRAW_PAINTED.rain.shareGain: 1`: the kit draws `share x (0.6 + sky.rain)` of the drops, so
+  0.16 in a drizzle (rain 0.05), 0.375 in a thunderstorm (0.9), 0.4 in a downpour: your 1.6 at
+  the top end, fewer below; and the particles themselves are already as many as it rains.
+  Drop your multiplier (spread `D.rain` and leave `share` alone). Not run in a browser by me
+  (`node --check` only). (2) **Flatten radius**: pressed fully flat out to 0.6 m from the
+  explorer (body radius 0.35 + `FLORA.flatReach` 0.25), half at 0.85 m, none at 1.1 m; the
+  trodden set that lasts a minute forms out to about 0.7 m, so the track is 1.4 m wide with
+  soft edges. A boot is not that wide; the sweep of legs and coat through knee-high grass is.
+  (3) **The ship's legs have not moved** in P7 (`SHIP_BODY` gear is as in P6).
 - *Storms are windy now* (the lead's review 5, P1; last commit of P7). A thunderstorm brings
   16 m/s of its own at 10 m, a dust storm 20, under the cloud shield, so before the rain: at
   the Earth spawn 4 to 11 m/s at 10 m and over 20 above the crowns where there was 2 to 4. You

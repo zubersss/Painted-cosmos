@@ -104,7 +104,8 @@ export const DRAW = Object.freeze({
 export const DRAW_PAINTED = Object.freeze({
   // rain: a few broad strokes, all one way (P7: PAINTER's own numbers, a third of the strokes,
   // none longer than 1.2 m on any world, none nearer than 2.4 m)
-  rain: Object.freeze({ width: 0.05, exposure: 0.12, minPx: 4, share: 0.25, parallel: 1, maxLen: 1.2, near: 6 }),
+  // shareGain: the share drawn follows how hard it rains: share x (0.6 + shareGain x sky.rain): 0.16 in a drizzle, 0.4 in a downpour
+  rain: Object.freeze({ width: 0.05, exposure: 0.12, minPx: 4, share: 0.25, shareGain: 1, parallel: 1, maxLen: 1.2, near: 6 }),
   // snow: PAINTER's sizes (0.07 m, 3.5 to 6.5 px: 0.1 m and 10 px were popcorn), each flake its own shape and turn
   snow: Object.freeze({ size: 0.07, minPx: 3.5, maxPx: 6.5, exposure: 0.04, smear: 1.2, varySize: 0.5, cell: 9, tumble: 1.2, aspect: 0.5 }),
   hail: Object.freeze({ width: 0.05, minPx: 3, maxLen: 0.6 }),

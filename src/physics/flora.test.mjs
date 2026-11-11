@@ -99,7 +99,8 @@ test('the explorer pushes grass aside; it springs back, damped, and is still aga
   run(w, 6, { t0: 103, each: () => trace.push(F.plantBend(beside, 0).e - before.e) });
   let peak = 0; for (let i = 60; i < trace.length; i++) peak = Math.max(peak, Math.abs(trace[i]));
   // (P7: it comes back to the lean it keeps for a while, the wake, not all the way; that goes in some eight seconds)
-  assert.ok(Math.abs(trace[30]) < Math.abs(trace[0]) * 0.7 && trace[30] > trace[0] * 0.2, `half a second later it has sprung back to its wake lean: ${trace[30] / trace[0]}`);
+  assert.ok(Math.abs(trace[30]) < Math.abs(trace[0]) * 0.8 && trace[30] > trace[0] * 0.2,   // (the probe, half a metre off, is inside the pressed zone since flatReach)
+     `half a second later it has sprung back to its wake lean: ${trace[30] / trace[0]}`);
   assert.ok(peak < Math.abs(trace[0]) * 0.62, 'and the swing dies away');
   const end = trace[trace.length - 1] / trace[0];
   assert.ok(end > 0.05 && end < 0.45, `six seconds later some of the lean is left: ${end}`);

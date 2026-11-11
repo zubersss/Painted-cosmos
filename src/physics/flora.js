@@ -52,6 +52,8 @@ export const FLORA = Object.freeze({
   // some ten metres behind (measured: grass 0.6 m off the path leans 60 degrees as the walker passes, 25 degrees
   // 3 m behind, 17 degrees 7.5 m behind, nothing half a minute later). And where the body itself went the grass is pressed down sooner.
   wakeShare: 0.2, wakeSet: 0.25, wakeTime: 6,
+  flatReach: 0.25,              // m beyond the body radius pressed fully flat (P7, PAINTER's ask: not the boot but the sweep
+                                //   of legs and coat hem through knee-high grass: flat to 0.6 m, half at 0.85 m, none at 1.1 m)
   trampleTime: 0.7,             // s under a body for most of the trampled set to form (2.5 before P7: a walker left none)
   pushHz: 1.6, pushDamp: 0.55,  // spring-back of a released plant: one small overshoot
   contactHz: 7,                 // how fast a plant gives way to a body
@@ -347,7 +349,7 @@ export class FloraField {
             // plants ahead of a moving body are pushed forward as well as aside
             if (sp > 0.2) { const f = Math.min(0.6, sp / 6); ex = dx * (1 - f) + vx / sp * f; ez = dz * (1 - f) + vz / sp * f; }
             // under the body itself the plants are pressed flat (falling off over one cell)
-            if (hgt < 0.4) flat = 1 - smoothstep(R, R + nc, d);
+            if (hgt < 0.4) flat = 1 - smoothstep(R + FLORA.flatReach, R + FLORA.flatReach + nc, d);
             shake = clamp01(mag * (0.2 + sp / 3));
           }
           // strongest disturber wins per cell

@@ -142,7 +142,7 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       chunk: gpu ? PARTICLE_GLSL : null };
     const mesh = new THREE.Mesh(geo, makeMaterial(kind, info));
     mesh.name = 'pc-physics-' + kind; mesh.frustumCulled = false; mesh.visible = false; mesh.matrixAutoUpdate = true;
-    parts.push({ kind, buf, D, mesh, geo, posA, colA, matA, cap, uniforms, drawn: 0, size: 0 });
+    parts.push({ kind, buf, D, mesh, geo, posA, colA, matA, cap, uniforms, drawn: 0, size: 0, share0: D.share > 0 ? D.share : 1 });
   }
   // rings
   let ring = null;
@@ -203,6 +203,8 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.rx = track.rx; eye.ry = track.ry; eye.rz = track.rz; eye.ux = track.ux; eye.uy = track.uy; eye.uz = track.uz;
         eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.radius = PARTICLES.radius; eye.pix = pix;
         eye.wall01 = P.kind === 'dust' ? physics.here.weather.dustLoad01 || 0 : 0;
+        // (rain: more strokes the harder it rains; the share moves as slowly as the sky's number does)
+        if (P.D.shareGain > 0) P.D.share = Math.min(1, P.share0 * (0.6 + P.D.shareGain * (physics.here.sky.rain || 0)));
         // how large a dab is now: its own size, or what the dust (snow) in the air needs to hide what it hides
         let size = P.D.size, room = 1;
         const ext = AIR[P.kind] ? hiding(P.kind, physics.here.weather) : 0;
