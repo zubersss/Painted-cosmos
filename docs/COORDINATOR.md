@@ -1048,3 +1048,46 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   cross-wind turbulence); (2) the strips not yet opened, opened and judged, and the three
   subjects never seen (a clamber, waves on a shore, spray); (3) why Neptune's sea does not
   heave in the picture, with PAINTER told exactly what to change.
+- 2026-11-11: **PILOT part 1 accepted (fifth agent, `54ba154`)**. The coordinator re-ran
+  PILOT's unit tests on a clean export of the head (116 pass) and opened the motion sheets of
+  the arrival and the walk. In:
+  **Every check on the head**: `node tests/all.mjs` on a clean export of `da6d42d`: all 13
+  steps pass in 42 minutes (unit 114, PHYSICS 230, world 19, static, eight browser runs;
+  painted steps at quality 0). After PILOT's last fixes only five steps were re-run (pass).
+  **The Moon and Pluto landed on** in a browser (`grandtour --bodies moon,pluto`): ten of ten
+  bodies. Fixed on the way: arriving at the Moon said "Moon is in the way".
+  **The Moon boulder run in the game** (`tests/boulderrun.mjs`, real keys, 63 low boulders
+  within 28 m): no boulder lifts the feet more than 0.16 m; pace 5.7 to 6.6 m/s; a run over
+  a crater rim onto a 36 degree wall sails 2.4 s over ground that fell 6.7 m away.
+  **The motion instrument** (`tests/motion.mjs`, `tests/motionlib.mjs`; `__pc.hold(true)`,
+  `__pc.step(dt, n)`): eight scenes at the top tier, 960x540, sheets in
+  `docs/lead/evidence/motion-<scene>.jpg`, numbers in `motion.json`. What holds: standing
+  still, the sky, the paper border and the ground wash do not move (0.30 % of the picture
+  changes per frame, all of it crowns and grass); the same instant repainted is identical;
+  in a slow turn detail stays with the world (no shower door); the pulse is steady.
+  **Faults**: arriving at an unpainted place the whole canopy appears in one frame (+575 k
+  triangles) and the ground arrives in pieces for the next second; tiers change in one frame
+  (the triangle count jumps by more than 2000 in 10 of 47 walk frames, largest 50 k; two
+  swaps visible in flight); a near poppy is a flat hard-edged disc; splash rings are thin
+  white line ellipses. All strips predate PHYSICS P11 and must be re-shot for review 6.
+  **The first ten minutes**: at the top tier only the opening was played (a frame takes
+  about 15 s here); the whole leg to standing on Mars ran at quality 0 (26 beats, 202 s of
+  play, passed). The sward is whole at "click to begin"; no camera cut through 13 changes
+  of state. Fixed: the "Board ship" prompt lay across the explorer's legs; "Land here" was
+  offered three seconds after lift-off; a note on the map at first space. Open: crowns
+  between the lens and the figure hide the explorer when jetpacking among trees.
+  PILOT's answers on feel, from the game: the run reaches 7.48 m/s at 1.23 s (good as it
+  is); the jetpack is capped by PILOT's wrapper (2.5 s of Space is an apex of 22.7 m, the
+  whole tank 54 m, touchdown at 4.0 m/s); no stall in the ship's last metres in the game.
+  Also: settle counted in game frames; the tour and weather set default to the top tier;
+  `tour --first 1`; `tests/cleantree.sh` (a clean tree from each role's own last commit);
+  a hiss for blown sand and snow and a wash for surf from `physics.here.blown`. Additive:
+  `__pc.hold`, `__pc.step`, `sim.pulse.dest`; the explorer's `animate` receives `hip`,
+  `clamber01`, `grounded`; HUD class `pc-foot3`.
+  Not verified: the full `all.mjs` and the grand tour, trip and survey since PAINTER's
+  block 5 moved obstacles; the top tier beyond the opening; real hardware as always. The
+  fifth PILOT agent is at its context limit; a sixth takes review 6.
+- 2026-11-11: **Ruling (PILOT asked): the boulder measure.** A run that goes over a crater
+  rim or any drop it cannot step down is a fall, as the ruling on legs already says. The
+  measure for review 6 reads: no boulder lifts the feet more than 0.3 m, and the body is
+  never thrown upward more than 0.3 m, without a jump.
