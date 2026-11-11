@@ -38,7 +38,7 @@ export class Flora {
 
     const birch = { barkA: [0.975, 0.965, 0.945], barkB: [0.27, 0.24, 0.26], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.40, 1.0, 0.28], wind: 0.10 };
     this.mats = {
-      birch: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch', leafA: [0.82, 0.87, 0.40], leafB: [0.60, 0.76, 0.34], leafC: [0.33, 0.53, 0.37] }, birch)),
+      birch: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch', leafA: [0.76, 0.85, 0.42], leafB: [0.58, 0.75, 0.36], leafC: [0.31, 0.51, 0.37] }, birch)),
       birchAutumn: makePropMaterial(bodyUniforms, Object.assign({ name: 'birch-autumn', leafA: [0.96, 0.82, 0.32], leafB: [0.93, 0.64, 0.28], leafC: [0.72, 0.42, 0.26] }, birch)),
       pine: makePropMaterial(bodyUniforms, { name: 'pine', barkA: [0.74, 0.54, 0.42], barkB: [0.40, 0.28, 0.25], barkP: [0.50, 1, 0.9, 0.6], leafA: [0.44, 0.62, 0.43], leafB: [0.31, 0.51, 0.44], leafC: [0.17, 0.28, 0.35], leafP: [0.9, 0.20, 1.0, 0.25], wind: 0.05 }),
       under: makePropMaterial(bodyUniforms, { name: 'under', leafA: [0.80, 0.85, 0.38], leafB: [0.54, 0.71, 0.31], leafC: [0.35, 0.51, 0.31], accent: [0.86, 0.29, 0.17], wind: 0.07, doubleSide: true }),

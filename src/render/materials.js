@@ -102,8 +102,8 @@ void main() {
   float dab = smoothstep(0.30, 0.62, st.g + (n2.b - 0.5) * 0.3) * near;
   d += dab * 0.42 * (1.0 - vPar.x * 0.6);
   // short dark strokes: grass, twigs and litter suggested by the side of the brush
-  float flick = smoothstep(0.60, 0.70, st2.r * 0.8 + st.b * 0.25) * near;
-  d += flick * 0.55;
+  float flick = smoothstep(0.58, 0.68, st2.r * 0.8 + st.b * 0.25) * near;
+  d += flick * 0.75;
   // neighbouring pigments run into each other: drifts of green and of warm earth
   vec3 hueA = c * vec3(0.84, 0.99, 0.80);
   vec3 hueB = c * vec3(1.0, 0.90, 0.80);
@@ -126,7 +126,7 @@ void main() {
 
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
-  float wet = max(vPar.y, max(f * 0.9, (1.0 - mid) * 0.7));
+  float wet = max(vPar.y, f * 0.9);
   pcWrite(c, wet, nV, -vView.z, 1.0);
 }
 `;
@@ -412,7 +412,7 @@ void main() {
     x = max(x, through * (0.50 + 0.45 * st.g + (n2.r - 0.5) * 0.5));
     x *= mix(0.62, 1.0, pcDapple(vBody, canopy * 0.6));
     x += (st.g - 0.35) * 0.22 + (n2.g - 0.5) * 0.16;
-    float lvl = pcLevel(x, 0.07);
+    float lvl = min(pcLevel(x, 0.07), 2.6);
     c = pcTone(c, lvl);
     wet = uLeafP.w;
     id = 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;

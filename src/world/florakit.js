@@ -66,7 +66,7 @@ function ico(detail) {
   return _ico[detail];
 }
 function blob(B, c, rx, ry, rz, rnd, opts) {
-  const o = Object.assign({ detail: 1, part: 1, noise: 0.22, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0 }, opts || {});
+  const o = Object.assign({ detail: 1, part: 1, noise: 0.22, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0, taper: 0 }, opts || {});
   const I = ico(o.detail);
   const mc = o.massC || c;
   const ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28;
@@ -75,7 +75,8 @@ function blob(B, c, rx, ry, rz, rnd, opts) {
     let x = I.p[i * 3], y = I.p[i * 3 + 1], z = I.p[i * 3 + 2];
     // smooth lumpy displacement: a few low sine lobes so shared vertices stay welded
     const k = 1 + o.noise * (Math.sin(x * 3.1 + ph1) * Math.sin(y * 2.7 + ph2) + 0.6 * Math.sin(z * 4.3 + ph3 + x * 1.9));
-    let px = x * rx * k, py = y * ry * k, pz = z * rz * k;
+    const tp = 1 - o.taper * (y * 0.5 + 0.5);
+    let px = x * rx * k * tp, py = y * ry * k, pz = z * rz * k * tp;
     const rad = Math.sqrt(x * x + z * z);
     py -= o.droop * rad * rad * ry;
     if (o.flatBottom && y < 0) py *= 1 - o.flatBottom;
@@ -185,14 +186,13 @@ export function pineGeometry(seed, lod) {
       const r = (3.4 - 2.7 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3) * (lod ? 1.12 : 1);
       const off = (1 - t) * 0.5;
       const c = V(lean * (y / H) * (y / H) + (rnd() - 0.5) * off, y, (rnd() - 0.5) * off);
-      blob(B, c, r, r * (lod ? 0.6 : 0.42) + 0.25, r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: lod ? 5 : 4 });
+      const gap = (H * 0.60) / (tiers - 1);
+      blob(B, c, r, Math.max(r * (lod ? 0.6 : 0.42) + 0.25, gap * 0.66), r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: lod ? 5 : 4 });
     }
-    if (lod === 0) blob(B, V(lean, H * 1.0, 0), 0.45, 0.9, 0.45, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2 });
+    if (lod === 0) blob(B, V(lean, H * 0.99, 0), 0.5, 1.3, 0.5, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2, taper: 0.6 });
   } else {
-    for (let k = 0; k < 2; k++) {
-      const y = H * (0.50 + 0.30 * k), r = 2.9 - 1.3 * k;
-      blob(B, V(lean * 0.5, y, 0), r, r * 1.2, r, rnd, { detail: 0, massC: crownC, massK: 0.3, sway: 0.4 + 0.4 * k, shade0: 0.15 - 0.1 * k, shadeK: 0.8, droop: 0.5, noise: 0.3, uvScale: 6 });
-    }
+    // far away a pine is one tall, tapering stroke
+    blob(B, V(lean * 0.6, H * 0.66, 0), 3.0, H * 0.37, 3.0, rnd, { detail: 1, massC: crownC, massK: 0.25, sway: 0.5, shade0: 0.1, shadeK: 0.8, droop: 0.2, noise: 0.22, taper: 0.8, uvScale: 6 });
   }
   return B.build();
 }
