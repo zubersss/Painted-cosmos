@@ -1,8 +1,8 @@
 // Tests: wind waves. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { windSea, WaterField, WATER_GLSL, WATER, fetchOf, foamLevel, foamCover, surf01 } from './water.js';
-import { createPhysics } from './index.js';
+import { windSea, WaterField, WATER_GLSL, WATER, fetchOf, foamLevel, foamCover, surf01, FetchGauge } from './water.js';
+import { createPhysics, QUALITY } from './index.js';
 import { setWindScale, WINDS } from './wind.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len } from './testworld.mjs';
@@ -349,4 +349,92 @@ test('P12 the swash: the water runs up a beach in a third of the wave period and
   assert.ok(wall <= F.significant * (1 + WATER.group) * 1.01, `on a wall ${wall} m over the set-up, the sea ${F.significant}`);
   assert.equal(new WaterField().runupAt(0, 0, 0.07), 0);
   assert.ok(WATER_GLSL.includes('float pcPhysWaterRunup(vec3 p, float slope)') && WATER_GLSL.includes('vec3 pcPhysWaterLong(vec3 p)'));
+});
+
+// ---- (P16) the fetch, measured; the depth, felt ----------------------------------------------------------
+test('P16 depth-limited growth (SPM 1984): deep water as before; over a shallow bottom the sea grows slower and stops lower', () => {
+  // deep water: exactly the deep-water laws
+  for (const [U, F] of [[8, 300], [20, 2500], [30, 1e6]]) {
+    const a = windSea(U, F, 9.81, 1.225, 999, Infinity), b = windSea(U, F, 9.81, 1.225, 999, 5000);
+    // (the period law's tanh still takes 0.07 % off a fully developed 30 m/s sea in 5 km of water: within 0.2 %)
+    assert.ok(Math.abs(a.height - b.height) < 1e-4 * a.height && Math.abs(a.period - b.period) < 2e-3 * a.period, `U ${U} F ${F}: ${a.height} / ${b.height}, ${a.period} / ${b.period} s`);
+  }
+  // the shallow-water curves themselves, where the sea is fetch-limited (below the fully developed cap)
+  const spmH = (U, F, d, g) => { const t = Math.tanh(0.530 * Math.pow(g * d / U / U, 0.75)); return 0.283 * t * Math.tanh(0.00565 * Math.sqrt(g * F / U / U) / t) * U * U / g; };
+  for (const [U, F, d] of [[20, 10000, 5], [15, 2500, 2], [30, 500, 3.4], [10, 20000, 8]]) {
+    const s = windSea(U, F, 9.81, 1.225, 999, d), ref = spmH(U, F, d, 9.81);
+    assert.ok(Math.abs(s.height / Math.min(ref, WATER.breakRatio * d) - 1) < 0.03, `U ${U} F ${F} d ${d}: ${s.height.toFixed(3)} m against SPM ${ref.toFixed(3)}`);
+  }
+  // 3.4 m of water under 30 m/s: over 2500 m a little lower and shorter than in deep water (the sea is still young);
+  // over 30 km (the fetch of an open sea's swell) under half of it (1.1 m against 2.7)
+  const lag = windSea(30, 2500, 9.81, 1.225, 999, 3.4), open = windSea(30, 2500, 9.81, 1.225, 999, Infinity);
+  assert.ok(lag.height < 0.95 * open.height && lag.period < open.period, `lagoon ${lag.height.toFixed(2)} m ${lag.period.toFixed(1)} s, open ${open.height.toFixed(2)} m ${open.period.toFixed(1)} s`);
+  const lagL = windSea(30, 30000, 9.81, 1.225, 999, 3.4), openL = windSea(30, 30000, 9.81, 1.225, 999, Infinity);
+  assert.ok(lagL.height < 0.5 * openL.height && lagL.height < WATER.breakRatio * 3.4, `over 30 km: ${lagL.height.toFixed(2)} m against ${openL.height.toFixed(2)} m`);
+  let prev = 0; for (let d = 0.2; d < 400; d *= 1.3) { const h = windSea(25, 2500, 9.81, 1.225, 999, d).height; assert.ok(h >= prev - 1e-12, `depth ${d}`); prev = h; }
+});
+
+test('P16 whitecaps need waves long enough to trap air: ripples of a pond in a breeze are not white, a gale\'s chop is', () => {
+  const pond = windSea(8.8, 24, 9.81, 1.225, 999, 2);
+  assert.ok(pond.steepness > 0.075 && pond.length < 0.5 && pond.whitecap01 === 0, `ripples ${pond.length.toFixed(2)} m long, steepness ${pond.steepness.toFixed(3)}: white ${pond.whitecap01}`);
+  const chop = windSea(30, 133, 11, 1.2, 450, 3.3);
+  assert.ok(chop.length > 1.3 && chop.whitecap01 > 0.8, `a gale's chop ${chop.length.toFixed(2)} m: white ${chop.whitecap01}`);
+});
+
+// a round lake of radius a (m) and depth dep (m) on a 4 km sphere, centred on C; dry land 1 m up elsewhere
+const lakeWorld = (C, a, dep, R = 4000, biome = 'sea_coast') => (d) => {
+  const l = Math.hypot(d.x, d.y, d.z), x = d.x / l, y = d.y / l, z = d.z / l, s = Math.acos(Math.min(1, x * C.x + y * C.y + z * C.z)) * R;
+  const wet = s < a;
+  return { radius: wet ? R - dep : R + 1, liquidRadius: wet ? R : 0, isLiquid: wet, normal: { x, y, z }, slope: 0, biomeId: biome, biomeWeights: { [biome]: 1 } };
+};
+test('P16 the fetch gauge: the mean of five radials upwind to the shore, the mean depth over them, capped; sparse and cached', () => {
+  const R = 4000, C = norm(V(0.2, 0.9, 0.3)), lake = lakeWorld(C, 300, 3);
+  // an upwind tangent at C, and the point 150 m downwind of the centre
+  const t = norm(V(C.z, 0, -C.x)), at = (P, u, m) => { const th = m / R; return norm(V(P.x * Math.cos(th) + u.x * Math.sin(th), P.y * Math.cos(th) + u.y * Math.sin(th), P.z * Math.cos(th) + u.z * Math.sin(th))); };
+  let calls = 0; const sample = (q) => { calls++; return lake(q); };
+  const measure = (G, P, u, cap, budget = 8) => { let prev = -1, frames = 0;
+    for (; frames < 200; frames++) { const c0 = calls; G.update('earth', P.x, P.y, P.z, u.x, u.y, u.z, R, cap, 3, sample, budget); assert.ok(calls - c0 <= budget, 'within the budget'); if (G.ready) break; assert.ok(G.fetch >= prev - 1e-9, 'a lower bound that only grows'); prev = G.fetch; }
+    return frames; };
+  // from the centre: every radial meets the shore 300 m out
+  const G = new FetchGauge(); calls = 0;
+  const fr = measure(G, C, t, 2500);
+  assert.ok(Math.abs(G.fetch / 300 - 1) < 0.06 && Math.abs(G.depth - 3) < 1e-6, `from the centre: ${G.fetch.toFixed(0)} m (radials ${G.radial.map((r) => r.toFixed(0))}), depth ${G.depth}`);
+  assert.ok(calls <= 5 * 40 && fr >= 3, `${calls} samples over ${fr + 1} frames`);
+  // the same place and wind again, or 30 m away: nothing sampled
+  const c1 = calls; G.update('earth', C.x, C.y, C.z, t.x, t.y, t.z, R, 2500, 3, sample, 8); G.update('earth', ...Object.values(at(C, t, 30)), t.x, t.y, t.z, R, 2500, 3, sample, 8);
+  assert.equal(calls, c1, 'cached');
+  // 150 m downwind of the centre: the radials run 445 to 450 m (the chord of the circle), their mean 448
+  const P = at(C, V(-t.x, -t.y, -t.z), 150), G2 = new FetchGauge(); measure(G2, P, t, 2500);
+  assert.ok(Math.abs(G2.fetch / 447.6 - 1) < 0.06, `150 m downwind of the centre: ${G2.fetch.toFixed(0)} m (radials ${G2.radial.map((r) => r.toFixed(0))})`);
+  // the wind turned through 90 degrees there: a new measurement (the radials now cross the lake off its centre)
+  const tl = norm(V(P.y * t.z - P.z * t.y, P.z * t.x - P.x * t.z, P.x * t.y - P.y * t.x)); const c2 = calls; measure(G2, P, tl, 2500);
+  const want = Math.sqrt(300 * 300 - 150 * 150);
+  assert.ok(calls > c2 && Math.abs(G2.fetch / want - 1) < 0.08, `across the wind: ${G2.fetch.toFixed(0)} m against ${want.toFixed(0)}`);
+  // capped by the biome's fetch; an endless sea runs to the cap
+  const G3 = new FetchGauge(); measure(G3, C, t, 100); assert.equal(G3.fetch, 100);
+  const sea = (q) => ({ radius: R - 40, liquidRadius: R }), G4 = new FetchGauge(); let n4 = 0;
+  while (!G4.ready && n4 < 400) { G4.update('earth', C.x, C.y, C.z, t.x, t.y, t.z, R, 2500, 40, sea, 8); n4++; }
+  assert.ok(G4.fetch === 2500 && Math.abs(G4.depth - 40) < 1e-9, `open sea ${G4.fetch} m, ${G4.depth} m deep`);
+  // a clock ration stops it early (two samples at least a frame)
+  const G5 = new FetchGauge(); let c5 = calls, tick = 0; G5.update('earth', C.x, C.y, C.z, t.x, t.y, t.z, R, 2500, 3, sample, 50, () => (tick += 1), 0.5); assert.equal(calls - c5, 2);
+});
+
+test('P16 in the game loop: a gale over a small lake raises a chop; over an open sea, the sea; the fetch and depth are reported', () => {
+  const R = BODIES.earth.radius, d = norm(V(0.6, 0.04, 0.8)), s0 = WINDS.earth.scale;
+  const run = (sample, seconds = 40) => {
+    const physics = createPhysics({ sampleSurface: (id, q) => sample(q), timeBudget: false });
+    const p = V(d.x * (R + 1.5), d.y * (R + 1.5), d.z * (R + 1.5)); let worst = 0;
+    for (let i = 0; i < seconds * 30; i++) { physics.update(1 / 30, { bodyId: 'earth', time: 300 + i / 30, focus: p }); worst = Math.max(worst, physics.stats.fetchSamples); }
+    return { ws: physics.water('earth', p, {}), F: physics.fields.water.field, G: physics.fields.water.gauge, worst };
+  };
+  try {
+    setWindScale('earth', 0.12);
+    const lake = run(lakeWorld(d, 120, 3, R)), open = run(makeWorld({ R, biome: 'sea_coast', sea: R + 30 }));
+    console.log(`# a gale: lake 120 m: fetch ${lake.ws.fetch.toFixed(0)} m, Hs ${lake.ws.significant.toFixed(2)} m, swell ${lake.F.open}; open sea: fetch ${open.ws.fetch.toFixed(0)} m, depth ${open.ws.depth.toFixed(0)} m, Hs ${open.ws.significant.toFixed(2)} m, swell ${open.F.open}; gauge samples a frame at most ${lake.worst} / ${open.worst}`);
+    assert.ok(open.ws.fetch === 2500 && Math.abs(open.ws.depth - 30) < 1 && open.F.open === 1, `open sea: ${open.ws.fetch} m, ${open.ws.depth} m`);
+    assert.ok(lake.ws.fetch > 100 && lake.ws.fetch < 140 && lake.F.open === 0, `lake: fetch ${lake.ws.fetch}`);
+    assert.ok(open.ws.significant > 0.5 && lake.ws.significant < 0.3 * open.ws.significant, `lake ${lake.ws.significant} m against open sea ${open.ws.significant} m`);
+    const most = QUALITY.samples[1] * QUALITY.burst;
+    assert.ok(lake.worst <= most && open.worst <= most, 'the gauge keeps to its ration');
+  } finally { setWindScale('earth', s0); }
 });

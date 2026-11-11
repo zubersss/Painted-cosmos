@@ -114,7 +114,9 @@ export class FetchGauge {
     this.fetch = -1;          // the mean of the radials (m) the sea uses now; -1 while nothing is known here
     this.depth = 0;           // the mean depth over their wet length (m)
     this.radial = [];         // the last finished measurement's radials (m), for the lab
-    this.ready = false;       // fetch is a finished measurement for this place and wind (not a lower bound)
+    this.ready = false;       // fetch is the finished measurement for the place and wind of the last update
+    this.final = false;       // fetch is a finished measurement (of this place, or held from the last one while this is measured);
+                              // false after reset() until one finishes: fetch is then what has been measured so far (a lower bound)
     this.samples = 0;         // sampleSurface calls made in the last update
     this.measured = 0;        // measurements finished so far
     this.kept = [];           // { body, x, y, z (unit), sector, fetch, depth, radial }
@@ -139,7 +141,7 @@ export class FetchGauge {
       const d = R * Math.acos(Math.min(1, m.x * px + m.y * py + m.z * pz));
       if (d <= Math.max(FETCH_GAUGE.cell, 0.1 * m.fetch)) {
         if (i > 0) { this.kept.splice(i, 1); this.kept.unshift(m); }
-        this.fetch = m.fetch; this.depth = m.depth; this.radial = m.radial; this.ready = true; this.job = null;
+        this.fetch = m.fetch; this.depth = m.depth; this.radial = m.radial; this.ready = true; this.final = true; this.job = null;
         return this;
       }
     }
@@ -176,15 +178,17 @@ export class FetchGauge {
       const m = { body, sector, cap: capM, x: J.x, y: J.y, z: J.z, fetch, depth, radial: Array.from(J.r) };
       this.kept.unshift(m); if (this.kept.length > FETCH_GAUGE.keep) this.kept.pop();
       this.job = null; this.measured++;
-      this.fetch = fetch; this.depth = depth; this.radial = m.radial; this.ready = true;
-    } else if (!this.ready || this.fetch < 0) {
-      // nothing finished for this place yet: what has been measured so far (it only grows)
-      this.fetch = fetch; this.depth = depth; this.ready = false;
+      this.fetch = fetch; this.depth = depth; this.radial = m.radial; this.ready = true; this.final = true;
+    } else {
+      // not finished: the last finished measurement is held (the sea follows a change over WATER.growTime anyway);
+      // with none since arriving, what has been measured so far (a lower bound that only grows)
+      this.ready = false;
+      if (!this.final) { this.fetch = fetch; this.depth = depth; }
     }
     return this;
   }
   // forget everything (a new body, or a jump)
-  reset() { this.fetch = -1; this.depth = 0; this.radial = []; this.ready = false; this.job = null; }
+  reset() { this.fetch = -1; this.depth = 0; this.radial = []; this.ready = false; this.final = false; this.job = null; }
 }
 
 // The wind sea raised by a wind U (m/s at 10 m) over a fetch F (m) under gravity g, with the

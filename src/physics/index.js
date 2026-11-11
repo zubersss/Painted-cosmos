@@ -318,9 +318,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       const dp = tx * wp.x + ty * wp.y + tz * wp.z; tx -= dp * wp.x; ty -= dp * wp.y; tz -= dp * wp.z;
       const tl = Math.hypot(tx, ty, tz);
       if (tl > 1e-6) {
-        const gb = warming ? 64 : gauge.ready ? Math.max(2, QUALITY.samples[quality] >> 1) : QUALITY.samples[quality] * QUALITY.burst;
+        const gb = warming ? 64 : gauge.final ? Math.max(2, QUALITY.samples[quality] >> 1) : QUALITY.samples[quality] * QUALITY.burst;
         const tg = now();
-        gauge.update(bodyId, wp.x, wp.y, wp.z, tx / tl, ty / tl, tz / tl, body.radius, wp.cap, wp.depth, sampleActive, gb, clock, gauge.ready ? QUALITY.sampleMs : 3 * QUALITY.sampleMs);
+        gauge.update(bodyId, wp.x, wp.y, wp.z, tx / tl, ty / tl, tz / tl, body.radius, wp.cap, wp.depth, sampleActive, gb, clock, gauge.final ? QUALITY.sampleMs : 3 * QUALITY.sampleMs);
         stats.samples += gauge.samples; stats.fetchSamples = gauge.samples; stats.msFetch = now() - tg;
         if (gauge.fetch >= 0) { seaFetch = gauge.fetch; seaDepth = gauge.depth > 0 ? gauge.depth : wp.depth; }
       }
@@ -570,7 +570,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       surf01(depth) { return water.present ? surf01(water.height, depth) : 0; },
       // (P12) the swash: level (m over the still level) of the water's edge on a beach of this slope at body-local p
       runup(p, slope = 0.07) { return water.runupAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), slope); },
-      // (P16) the fetch gauge: fetch (m, the mean of its radials), depth (m), radial (m each), ready, samples (this frame);
+      // (P16) the fetch gauge: fetch (m, the mean of its radials), depth (m), radial (m each), ready, final, samples (this frame);
       // and the water point it measures from (body-local unit direction, its depth and its biome's fetch, the cap)
       gauge, waterPoint: wp,
       field: water,

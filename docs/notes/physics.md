@@ -1019,6 +1019,24 @@ physics.ship.stepPulse(ps = { a, v }, vWant, dt);  pulseBrakeDistance(v)
 
 ### Fields and buffers (typed arrays; PAINTER wraps them in textures and attributes)
 
+**Added in P16 (all additive; nothing was renamed or removed):**
+```js
+physics.water(bodyId, p).fetch, .depth   // m: the fetch this sea was raised over (measured; FETCH_DEFAULT 800 away from the
+                                         //   focus) and the mean depth along it (Infinity away from the focus)
+physics.fields.water.gauge               // FetchGauge: fetch (m, the mean of its radials), depth (m), radial [5] (m), ready,
+                                         //   final, samples (this frame), measured (count), kept (cache), update(), reset()
+physics.fields.water.waterPoint          // { ok, x, y, z (unit, body-local), depth (m), cap (m: the point's biome fetch) }
+physics.fields.water.field.fetch, .depth // what WaterField.update was given this frame
+physics.stats.msFetch, .fetchSamples     // the gauge's cost this frame (ms) and its sampleSurface calls
+// water.js: FetchGauge, FETCH_GAUGE { radials [-12,-6,0,6,12] deg, step0 16, stepGrow 0.1, sectors 16, cell 48, keep 24,
+//   minDepth 1 }; whiteScale(c) (0..1 by phase speed); WATER.whiteSpeed [0.9, 1.5] m/s
+// windSea(U, F, g, rhoAir, rhoLiq, depth): depth now limits growth as well (SPM 1984 shallow-water curves, as a ratio)
+// wind.js: wakeAt(wk, wkH, z) and WAKE { full 0.5, top 1.5 } (moved from air.js; air.js re-exports wakeAt, AIR.wakeFull
+//   and AIR.wakeTop carry the same numbers)
+// testworld.mjs: timing(ok, msg): a wall-clock assert only under PC_TIMING=1 (printed otherwise)
+// lab: info().seaState.fetch, .depth; SHORE_PROBE columns fetch, fdepth
+```
+
 **Added in P10 (all additive; nothing was renamed or removed):**
 ```js
 physics.here.blown            // { sand, snow, spume, surf }, each 0..1, refreshed by update(): what the wind raises near the focus
