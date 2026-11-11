@@ -69,6 +69,8 @@ export class DriftField {
   equilibrium(x, z, near, level, shelters, n) {
     const z0 = near.heightAt(x, z, NaN);
     if (z0 !== z0) return NaN;
+    // under standing liquid nothing lies at all (a pool on a terrace, the sea, a cloud sea)
+    if (near.liquidAt) { const lq = near.liquidAt(x, z); if (lq > z0) return -1; }
     const R = DRIFT.reach, de = this.de, dn = this.dn;
     let sx = -1e9, step = 0;
     for (let k = 0; k < R.length; k++) {

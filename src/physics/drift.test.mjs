@@ -84,6 +84,16 @@ test('nothing moves in a calm; drifts melt with the snow and deepen with the nex
   assert.ok(snowTransport01(3, 0, 1) > 0.3 && snowTransport01(0.5, 0, 1) === 0);
 });
 
+test('nothing lies on standing liquid: over a pool the factor is -1 (no snow, no sand), and its banks drift as banks', () => {
+  // a pool 6 m across and 1 m deep, brim-full, on level ground
+  const bed = (x, z) => (Math.hypot(x, z) < 3 ? -1 : 0);
+  const near = { heightAt: (x, z) => bed(x, z), liquidAt: (x, z) => (Math.hypot(x, z) < 3 ? 0 : NaN) };
+  const D = settle(new DriftField(), near, 9, 0, 0.2);
+  const pool = stats(D, (x, z) => Math.hypot(x, z) < 2.2), shore = stats(D, (x, z) => Math.hypot(x, z) > 5 && Math.abs(z) > 5);
+  assert.ok(Math.abs(pool.mean + 0.2) < 1e-6 && Math.abs(pool.max + 0.2) < 1e-6, `over the pool ${pool.mean.toFixed(3)} m (all of the level 0.2 m gone)`);
+  assert.ok(Math.abs(shore.mean) < 1e-6, 'the shore to the side: level');
+});
+
 test('a landed hull is an obstacle: a drift grows behind it; a flying one casts none', () => {
   // flat ground, the hull's feet at the origin, its top 2.2 m up, radius 3.6 m
   const flat = ground(() => 0), sh = new Float32Array(16); sh.set([0, 0, DRIFT.hullHeight, 3.6]);

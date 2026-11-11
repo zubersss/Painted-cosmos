@@ -11,8 +11,9 @@ comments carry the physics (every module starts with what it models and from whi
 **Where things stand.** P1 to P5 are accepted. P6 (the coordinator's order, in
 `docs/COORDINATOR.md` section E and in "Stage P6" under Status below) has items 1, 2 and 3
 done and items 4 and 5 open (below). The tree is green at the commit that carries this note:
-`node --test src/physics/` **207 pass**; PILOT's `node --test tests/*.test.mjs` 102 pass with
-my changes. Nothing is half-edited. PAINTER (its third agent) is wiring weather into the
+`node --test src/physics/` **208 pass**; PILOT's `node --test tests/*.test.mjs` 102 pass with
+my changes; the game itself loads with this tree in headless Chromium with no console errors
+(on foot at the spawn, `uPhysBranch` live, drift level 0 in the wood). Nothing is half-edited. PAINTER (its third agent) is wiring weather into the
 picture right now and reads "For PAINTER" cold: **if you change a uniform, an export or a
 call named there, say so at the top of that section in the same commit.**
 
@@ -328,18 +329,18 @@ MARK, MARK_STRIDE, EVENT, WATER, QUALITY, DEFAULT_SEED`, and `windSea(U, fetch, 
 
 INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is stable; P2 and P3 only added to it,
 with one change of type: the water uniforms are vec4 now (four trains; nobody had wired them).
-The tree is committed green: `node --test src/physics/` **191 pass** at the commit that carries this note.
+The tree is committed green: `node --test src/physics/` **208 pass** at the commit that carries this note.
 
 **Stage P6** (the third agent; commits `ded1435` (the coordinator's snapshot of my tree), `16d5305`, and the two after):
 
 | P6 job | State | How it was verified |
 |---|---|---|
-| 1. Crawl of the kits | done: `buf.left` and `fadeOut`, snow in its own 8 m box round the eye and riding the air over slopes, the cell divides the box, dabs drawn out to their travel a frame, hairlines and marks at the lens gone, rain strokes taper | `p6/crawl.mjs` (table below): pops 11.7 to 0.0 a second, jumps 1.3 to 0, strobing 0.2 to 0; painted lab pairs 8 ms apart: 19 to 22 % less change than before, a camera orbiting at 6 deg/s adds no more than the scene's own; 9 new tests |
+| 1. Crawl of the kits | done: `buf.left` and `fadeOut`, snow in its own 8 m box round the eye and riding the air over slopes, the cell divides the box, dabs drawn out to their travel a frame, hairlines and marks at the lens gone, rain strokes taper | `p6/crawl.mjs` (table below): pops 11.7 to 0.0 a second, jumps 1.3 to 0, strobing 0.2 to 0; painted lab pairs 8 ms apart: 19 to 22 % less change than before, a camera orbiting at 6 deg/s adds no more than the scene's own; 6 new tests and one extended |
 | found on the way: curved ground | fixed: particles and splash rings are published at radius r0 + height on the line through the grid point, velocities turned to the local vertical | before: rain 16.4 to 38.1 m over the true ground 380 m from the anchor and splashes at 15 to 20 m; after: 0.00 to 18.00 m and splashes at 0.00 m, at 80, 161, 300 and 380 m (`p6/curv.mjs`); test at 300 m |
 | found on the way: rain over deep water | fixed: the weather enters over the surface it meets (ground or liquid), not 18 m over the bed | before: every flake of a blizzard over a 21 m deep sea was 3.6 to 15.6 m UNDER the surface; test over a 40 m sea: 0 drops under it, ripples on it |
 | 2. The game played | done: six worlds at 60 Hz in Node and four in the browser with real keys | tables and findings in "The integrated game, played in P6" |
 | 3a. Branch rate | done: `pcPhysBranch` in the flora chunk, `plantBranch` its twin, phases on the clock; no new texture, one line for PAINTER | 2 tests (nothing at the trunk, continuous all the way round, tips out of step, 1 to 2.5 Hz, bounded, scales with lean and gustiness); the chunk compiles inside PAINTER's plants (painted lab, no console errors). **Not seen as a picture: PAINTER has not called it.** |
-| 3b. Drifts | done: `drift.js`, `physics.fields.drift`, the ground under the explorer and under every print | 7 tests (level ground none, lee of a bank +0.2 to +0.5 m in 0.2 m of snow, windward face scoured to bare, a kerb's drift under 0.8 of the kerb, a hollow fills from any wind, nothing moves in a calm, melts and deepens with the snow, fixed in the world as the walker moves, behind a landed hull, in the game loop behind a hill); cost under 0.25 ms a frame. **Not seen as a picture.** |
+| 3b. Drifts | done: `drift.js`, `physics.fields.drift`, the ground under the explorer and under every print | 8 tests (nothing on standing liquid, level ground none, lee of a bank +0.2 to +0.5 m in 0.2 m of snow, windward face scoured to bare, a kerb's drift under 0.8 of the kerb, a hollow fills from any wind, nothing moves in a calm, melts and deepens with the snow, fixed in the world as the walker moves, behind a landed hull, in the game loop behind a hill); cost under 0.25 ms a frame. **Not seen as a picture.** |
 | carve assist bounded | done as an option: `cmd.carveAccel`, `st.phys.fieldCarve` | 1 test; PILOT's 102 tests pass unchanged (the default is as before) |
 | 4. Silhouette test in `PROP_VERT` | not done | Hand-over, 1 |
 | 5. Look-critique items | not done | Hand-over, 2 |
@@ -1169,7 +1170,8 @@ keeps this on the grid of the ground marks (64 x 64 cells of 0.5 m round the foc
   a paler, smoother wash where `factor > 0` (the tail), the darker bed where it is negative.
 - It is where it was when the walker comes back (it is a function of the ground and the wind
   that last moved material), it melts with the snow and deepens with the next fall, and the
-  explorer sinks deeper in it (his prints say so). On level ground it is zero.
+  explorer sinks deeper in it (his prints say so). On level ground it is zero; over standing
+  liquid (a pool on a terrace, the sea, a cloud sea) it is -1: nothing lies on water.
 
 ## For PILOT: what audio can read (all in `physics.here`, refreshed every frame, free)
 
