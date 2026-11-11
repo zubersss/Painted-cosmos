@@ -460,3 +460,29 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   handover and the lead files stand alone. A fresh PILOT takes over with the same ownership
   and rules. Still three workers; the old PILOT agent is retired and must not be resumed.
   All three roles are now on their second agent.
+- 2026-11-11: **PHYSICS stage P5, items 1 to 3 accepted** (`5acf86a`; the coordinator re-ran the
+  tests: 191 pass). (1) Every particle carries `mat` and every mark its material (index into
+  `physics.data.MATERIAL_IDS`, 15 names), passed to kits as `vPcMat`. (2) The sea for PAINTER's
+  liquid: `physics.glsl.water` gives height, slope, crest direction, `crest01`, `foam01`, surf
+  and the normal through `uPhysWaterSea`; JS twin `physics.fields.water.sample(p)`; chunk
+  against twin 0.06 mm in GL; the patch kit is off by default. (3) Kits survive the post pass:
+  size floor in PAINTER's internal pixels with thinning that keeps cover, snow shown in a 9 m
+  cell round the eye, dust sized from the dust in the air; `kits.update` takes
+  `painter.info.internalHeight`. Painted-lab verdicts by PHYSICS, shared by the coordinator:
+  snow reads as a flurry on a sunny meadow and dust as a dry-brush band under a clear sky;
+  **neither is a storm until PAINTER's sky, haze and ground read `setMood.sky`.** Not done:
+  silhouette agreement test in `PROP_VERT`, branch rate in trees, drifts, crawl of the snow cell.
+- 2026-11-11: PHYSICS's integration order for PAINTER (its notes, "For PAINTER"): section E
+  (sky, haze, ground wash read `setMood.sky`), section D (wave chunk in the liquid material),
+  section C (lift `makeKitMaterial`, a 16-colour palette per biome indexed by `vPcMat`), then
+  grass blades visible near the eye (the push field is live; the meadow shows no blades to
+  part). Also asked: a region id the post pass keeps crisp (splash rings are erased).
+- 2026-11-11: **The second PHYSICS agent also reached its context limit after one stage and is
+  replaced by a third in the same role.** Fresh agents are told to budget their reading.
+- 2026-11-11: **Ruling: the painted UI theme moves to PILOT** (the coordinator; PAINTER is the
+  critical path and carries M2, weather in the picture, the real models, space and the art
+  pass). PILOT builds the theme under `src/ui/**` to art-bible rule 8, all generated in code:
+  torn-paper panels, ink-and-wash icons, hand-lettered type, painted planet markers, cursor,
+  loading. Look stays PAINTER's call: PAINTER reviews the theme and PILOT changes what it asks.
+  `src/art/ui.css` and `painter.setMarks` are no longer owed by PAINTER (it may still offer
+  them). Palette and paper constants come from PAINTER's public data (`src/data/looks.js`).
