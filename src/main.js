@@ -5,6 +5,7 @@
 //   stub=1 | stub=render,world,art   force stubs        real=1 | real=...   try real modules
 //   body=<id>  time=<hours>          where and when to start
 //   dynres=0   scale=<0.25..1>  quality=<0|1|2>   pin the resolution controller (for screenshots)
+//   pointerlock=0                    drag to look instead of locking the pointer
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
@@ -30,7 +31,7 @@ async function boot() {
   const ship = prov.createShip();
 
   const hud = createHud(document.getElementById('pc-hud'));
-  const input = new Input(canvas);
+  const input = new Input(canvas, { pointerLock: params.get('pointerlock') !== '0' });
   const game = new Game({ scene, camera, world, painter, explorer, ship, input, hud, params });
 
   // Resolution: at most 1080p-class output; the controller scales the scene inside that.

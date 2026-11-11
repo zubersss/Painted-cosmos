@@ -256,7 +256,9 @@ export class Sim {
     return {
       up: scale(this.sh.p, 1 / r),
       universeUp: f.rotating ? qRotate(qConj(this.eph.orientation(f.id, this.t)), Y) : Y,
-      upWeight: 1 - smoothstep(spaceAlt * 1.6, soiAlt * 0.9, altitude),
+      // Inside a body's sphere of influence "up" is simply away from the body; it eases to
+      // the ecliptic's up only in the outer third, on the way out to open space.
+      upWeight: 1 - smoothstep(soiAlt * 0.68, soiAlt, altitude),
       altitude, spaceAlt, hasBody: true,
       sample: f.rotating ? this.sampler(f.id) : null,
     };
@@ -310,7 +312,13 @@ export class Sim {
 
   // ---- camera ------------------------------------------------------------------------------------
   footPose(dt) {
-    return updateFootCamera(this.footCam, this.ex.p, dt, this.sampler(this.bodyId));
+    // The parked ship is the one solid thing besides the ground: keep the camera out of it.
+    let hull = null;
+    if (this.shFrame.kind === 'body' && this.shFrame.rotating && this.shFrame.id === this.bodyId
+        && len(sub(this.sh.p, this.ex.p)) < 40) {
+      hull = [-2.9, 0, 2.9].map((z) => ({ p: add(this.sh.p, qRotate(this.sh.q, V(0, 1.7, z))), radius: 2.2 }));
+    }
+    return updateFootCamera(this.footCam, this.ex.p, dt, this.sampler(this.bodyId), undefined, hull);
   }
 
   shipPose(dt) {

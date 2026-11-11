@@ -54,8 +54,25 @@ export function lookFootCamera(cam, up, dx, dy, C = CAMERA) {
   cam.pitch = clamp(cam.pitch - dy, C.pitchMin, C.pitchMax);
 }
 
-// feet: explorer position (body-local). Returns { p, q, fov, look } and updates the smoothing.
-export function updateFootCamera(cam, feet, dt, sample, C = CAMERA) {
+// Shorten a boom (from `o` along unit `d`) so it stops in front of any obstacle sphere.
+function boomThroughSpheres(o, d, boom, spheres, minBoom) {
+  let out = boom;
+  for (const s of spheres) {
+    const ox = o.x - s.p.x, oy = o.y - s.p.y, oz = o.z - s.p.z;
+    const cc = ox * ox + oy * oy + oz * oz - s.radius * s.radius;
+    if (cc <= 0) continue;                           // the pivot is inside: nothing sensible to do
+    const b = ox * d.x + oy * d.y + oz * d.z;
+    const disc = b * b - cc;
+    if (disc <= 0 || b >= 0) continue;
+    const t = -b - Math.sqrt(disc);
+    if (t > 0 && t - 0.35 < out) out = Math.max(minBoom, t - 0.35);
+  }
+  return out;
+}
+
+// feet: explorer position (body-local). obstacles: [{ p, radius }] spheres the camera must not
+// enter (the ship's hull). Returns { p, q, fov, look } and updates the smoothing.
+export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = null) {
   const up = norm(feet);
   cam.viewFwd = tangent(cam.viewFwd, up, cam.viewFwd);        // carry the yaw along the sphere
   const f = cam.viewFwd;
@@ -73,6 +90,7 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA) {
   // Walk the boom outward; find the lift that keeps every point of it clear of the terrain.
   const N = 5;
   let lift = 0, boom = cam.boom;
+  if (obstacles) boom = boomThroughSpheres(pivot, back, boom, obstacles, 0.8);
   for (let i = 1; i <= N; i++) {
     const t = i / N;
     const q = addScaled(pivot, back, boom * t);
@@ -82,7 +100,7 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA) {
   // Lifting more than the boom is long looks wrong: pull in instead.
   const maxLift = cam.boom * 0.9 + 1;
   if (lift > maxLift) {
-    boom = Math.max(C.boomMin, cam.boom * (maxLift / lift));
+    boom = Math.min(boom, Math.max(C.boomMin, cam.boom * (maxLift / lift)));
     lift = maxLift;
   }
   // Move toward the obstacle-free pose quickly when blocked, slowly when the way clears.

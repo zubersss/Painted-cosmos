@@ -253,3 +253,20 @@ test('first-person camera sits at eye height and looks where the mouse points', 
   lookFootCamera(cam, start, 0, 10);
   assert.equal(cam.pitch, CAMERA.pitchMin);
 });
+
+test('third-person camera stops in front of the ship instead of going inside it', () => {
+  const sample = makeWorld({ R });
+  const feet = scale(start, R);
+  const cam = createFootCamera(fwd0, start);
+  cam.pitch = 0;
+  // A hull sphere 4 m behind the explorer, at pivot height.
+  const hull = [{ p: sub(scale(start, R + CAMERA.pivotHeight), scale(fwd0, 4)), radius: 1.5 }];
+  let pose;
+  for (let i = 0; i < 120; i++) pose = updateFootCamera(cam, feet, DT, sample, undefined, hull);
+  const d = len(sub(pose.p, hull[0].p));
+  assert.ok(d >= 1.5 + 0.2, 'camera is outside the hull: ' + d);
+  assert.ok(len(sub(pose.p, feet)) < 4, 'pulled in toward the explorer');
+  // With nothing in the way the boom is full length again.
+  for (let i = 0; i < 240; i++) pose = updateFootCamera(cam, feet, DT, sample, undefined, []);
+  assert.ok(Math.abs(cam.boomNow - CAMERA.boom) < 0.05);
+});

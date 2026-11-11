@@ -32,7 +32,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const fails = [];
 const check = (ok, msg) => { if (!ok) { fails.push(msg); log('  FAIL:', msg); } else log('  ok:', msg); };
 
-const query = opt.query + (opt.query.includes('dynres') ? '' : '&dynres=0');
+const query = opt.query + (opt.query.includes('dynres') ? '' : '&dynres=0') + '&pointerlock=0';
 const { page, problems, close } = await openPage({ pagePath: '/index.html?' + query, w: W, h: H, root: opt.root });
 const info = () => page.evaluate(() => window.__pc.info());
 const sleep = (ms) => page.waitForTimeout(ms);
@@ -166,7 +166,7 @@ try {
   let shotClimb = false;
   i = await until((x) => x.state === 'SPACE', 120000, async (x) => {
     await holdPitch(48)(x);
-    if (!shotClimb && x.ship.altitude > 330) { shotClimb = true; await shot('06-climb', '06-climb'); }
+    if (!shotClimb && (x.ship.altitude || 0) > 330) { shotClimb = true; await shot('06-climb', '06-climb'); }
   });
   check(i.state === 'SPACE', 'reached space');
   check(i.frame === 'earth:orbit', 'flying in the orbit frame: ' + i.frame);
@@ -175,7 +175,7 @@ try {
   log('  ground to space took', summary.timings.groundToSpace, 's of game time');
   stage('space', i);
   await timeScale(3);
-  i = await until((x) => x.ship.altitude > 5200, 90000, holdPitch(48));
+  i = await until((x) => (x.ship.altitude || 0) > 5200, 90000, holdPitch(48));
   await timeScale(1);
   await page.keyboard.down('KeyX');
   i = await until((x) => x.ship.speed < 4, 30000);
@@ -183,40 +183,41 @@ try {
   check(i.ship.speed < 4, 'X brings the ship to rest in space');
   check(i.mood.inSpace01 > 0.99, 'mood says space: inSpace01 ' + i.mood.inSpace01.toFixed(2));
 
-  // Turn to look back at the planet, then at the moon (another world).
-  const aimAt = async (id, tol = 3) => {
-    for (let n = 0; n < 60; n++) {
-      const a = await page.evaluate((b) => window.__pc.aimAt(b), id);
-      if (Math.abs(a.yawDeg) < tol && Math.abs(a.pitchDeg) < tol) return a;
-      await look(Math.max(-120, Math.min(120, (a.yawDeg * RAD / MOUSE_SHIP) * 0.5)), -Math.max(-80, Math.min(80, (a.pitchDeg * RAD / MOUSE_SHIP) * 0.5)));
-      await sleep(260);
-    }
-    return page.evaluate((b) => window.__pc.aimAt(b), id);
-  };
-  let a = await aimAt('earth', 12);
+  // Look down at the planet from orbit, then find the moon (another world).
+  const alt = (x) => (x.ship.altitude == null ? 1e9 : x.ship.altitude);
+  i = await until((x) => Math.abs(x.ship.pitchDeg + 62) < 3, 20000, holdPitch(-62));
   await sleep(900);
   await shot('07-orbit', '07-orbit');
-  const alt0 = (await info()).ship.altitude;
-  a = await aimAt('moon');
-  check(Math.abs(a.yawDeg) < 6 && Math.abs(a.pitchDeg) < 6, `the moon is dead ahead, ${(a.distance / 1000).toFixed(1)} km away`);
+  const alt0 = alt(await info());
+  i = await until((x) => Math.abs(x.ship.pitchDeg) < 3, 20000, holdPitch(0));
+  let a = null;
+  for (let n = 0; n < 80; n++) {
+    a = await page.evaluate(() => window.__pc.aimAt('moon'));
+    if (Math.abs(a.yawDeg) < 3 && Math.abs(a.pitchDeg) < 3) break;
+    await look(Math.max(-110, Math.min(110, (a.yawDeg * RAD / MOUSE_SHIP) * 0.4)), -Math.max(-70, Math.min(70, (a.pitchDeg * RAD / MOUSE_SHIP) * 0.4)));
+    await sleep(250);
+  }
+  i = await info();
+  const moonHigh = Math.abs(i.ship.pitchDeg) > 72;       // beyond the pitch limit: cannot be centred
+  check(Math.abs(a.yawDeg) < 6 && (moonHigh || Math.abs(a.pitchDeg) < 6), `the moon is ahead (off by ${a.yawDeg.toFixed(1)}, ${a.pitchDeg.toFixed(1)} deg), ${(a.distance / 1000).toFixed(1)} km away`);
   await sleep(700);
   await shot('08-moon', '08-moon');
   i = await info();
-  check(Math.abs(i.ship.altitude - alt0) < 60, 'a parked ship stays with its planet');
+  check(i.frame === 'earth:orbit' && Math.abs(alt(i) - alt0) < 60, 'a parked ship stays with its planet');
   stage('orbit', i);
 
   // ---- back down --------------------------------------------------------------------------------------------
-  await aimAt('earth', 14);
+  i = await until((x) => x.ship.pitchDeg < -50, 20000, holdPitch(-58));
   await page.keyboard.down('KeyW');
   await sleep(1100);
   await page.keyboard.up('KeyW');
   await timeScale(3);
-  i = await until((x) => x.ship.altitude < 1500, 120000, holdPitch(-55));
+  i = await until((x) => alt(x) < 1500, 120000, holdPitch(-58));
   await timeScale(1);
   let shotEntry = false;
   i = await until((x) => x.state === 'ATMOSPHERE', 120000, async (x) => {
     await holdPitch(-45)(x);
-    if (!shotEntry && x.ship.altitude < 1050) { shotEntry = true; await shot('09-entry', '09-entry'); }
+    if (!shotEntry && alt(x) < 1050) { shotEntry = true; await shot('09-entry', '09-entry'); }
   });
   check(i.state === 'ATMOSPHERE' && i.frame === 'earth:ground', 'entered the atmosphere');
   stage('entry', i);

@@ -6,8 +6,11 @@ const GAME_KEYS = new Set([
 ]);
 
 export class Input {
-  constructor(el, doc = document) {
+  // opts.pointerLock: false keeps to drag-look (for embeds and for headless tests, where
+  // synthetic mouse events under pointer lock report meaningless movement).
+  constructor(el, opts = {}, doc = document) {
     this.el = el;
+    this.usePointerLock = opts.pointerLock !== false;
     this.keys = new Set();
     this.edges = new Set();
     this.dx = 0; this.dy = 0; this.wheel = 0;
@@ -28,13 +31,17 @@ export class Input {
       this.used = true;
       if (e.button !== 0) return;
       this.dragging = true; this._lx = e.clientX; this._ly = e.clientY;
-      if (!this.locked && el.requestPointerLock) {
+      if (this.usePointerLock && !this.locked && el.requestPointerLock) {
         try { const p = el.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* drag-look instead */ }
       }
     });
     doc.addEventListener('mouseup', () => { this.dragging = false; });
     doc.addEventListener('mousemove', (e) => {
-      if (this.locked) { this.dx += e.movementX || 0; this.dy += e.movementY || 0; }
+      if (this.locked) {
+        // Some browsers report one enormous delta when the lock is taken or focus returns.
+        const mx = e.movementX || 0, my = e.movementY || 0;
+        if (Math.abs(mx) < 400 && Math.abs(my) < 400) { this.dx += mx; this.dy += my; }
+      }
       else if (this.dragging) {
         this.dx += e.clientX - this._lx; this.dy += e.clientY - this._ly;
         this._lx = e.clientX; this._ly = e.clientY;
