@@ -172,6 +172,7 @@ void main() {
   float idc = max(abs(c1 - c0), abs(c2 - c0)) * min(solid, 1.0);
   float fol = max(step(3.5, a0.w) * step(a0.w, 4.99), max(step(3.5, a1.w) * step(a1.w, 4.99), step(3.5, a2.w) * step(a2.w, 4.99)));
   float line = max(smoothstep(0.14, 0.38, dz) * 0.6, min(idc, 1.0) * 0.38) * (1.0 - fol * 0.85);
+  line *= 1.0 - max(step(5.5, a0.w), max(step(5.5, a1.w), step(5.5, a2.w)));   // nothing is outlined in the air
   line *= smoothstep(0.50, 0.70, plo.r + (pmid.r - 0.5) * 0.7) * (0.30 + 0.70 * smoothstep(0.35, 0.6, ph)) * (1.0 - smoothstep(6.5, 9.5, a0.z));
   col *= mix(vec3(1.0), vec3(0.46, 0.46, 0.50), line * uPig.w);
 

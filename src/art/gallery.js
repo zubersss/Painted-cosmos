@@ -322,8 +322,12 @@ function tick(now) {
   if (ship) { placeModel(ship, Math.sin(state.yaw) * 14 - 6, Math.cos(state.yaw) * 14); ship.animate({ mode: 'landed' }, dt); }
   if (physics) {
     const up = state.pos.clone().normalize();
+    // what pushes the grass about: the explorer on show, and the ship's downwash (?wash=<newtons>)
+    const disturbers = [];
+    if (explorer) { const p = world.bodies.get(bodyId).worldToLocal(explorer.object3D.position.clone()); disturbers.push({ kind: 'explorer', p, v: { x: 0, y: 0, z: 0 }, radius: 0.45, strength: 1, grounded: true }); }
+    if (ship && P.has('wash')) { const p = world.bodies.get(bodyId).worldToLocal(ship.object3D.position.clone()); disturbers.push({ kind: 'downwash', p, v: { x: 0, y: 0, z: 0 }, radius: 6, strength: num('wash', 60000) }); }
     const L0 = world.getLighting();
-    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), sunDir: world.bodyUniforms(bodyId).uSunDirL.value };
+    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers };
     // pre-roll: let the weather fall for a while before the first frame, ending at wtime
     for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; physics.update(1 / 30, fr); }
     fr.time = wtime;

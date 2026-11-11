@@ -46,13 +46,14 @@ export function biomeInks(pal, liquid) {
 // and float lv (light level for pcTone: 2 local colour)
 const SHAPES = {
   // rain: a broad stroke, full at the head and thinning to its tail, laid wet
-  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * (0.90 + 0.10 * vPcData.x); float w = 0.95;',
+  // (nothing right in front of the lens: a drop a metre away would be a stick across the sheet)
+  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y || length(vView) < 3.2) discard; vec3 c = ink * (0.93 + 0.07 * vPcData.x); float w = 0.95;',
   streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
-  flake: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 0.78 + 0.22 * texture(uNoise3D, vec3(vPcUv * 2.3, vPcData.x * 7.0)).r) discard; vec3 c = ink; float w = 0.05;',
+  flake: 'float rr = length((vPcUv - 0.5) * vec2(1.0, 1.25)) * 2.0; if (rr > 0.42 + 0.75 * texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.x * 7.0)).r) discard; vec3 c = ink; float w = 0.05;',
   // dust: a ragged dry-brush patch thinning toward its edge; the pattern travels with the puff
-  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; if (nz < 0.47 + 0.5 * rr * rr) discard; vec3 c = mix(vec3(1.0), ink, 0.8) * (0.9 + 0.1 * vPcData.x); float w = 0.75;',
+  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; if (nz < 0.40 + 0.6 * rr * rr) discard; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95;',
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
   ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.12) discard; if (texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r < 0.36) discard; vec3 c = ink; float w = 0.0;',
@@ -66,11 +67,12 @@ function shapeOf(kind, info) {
   if (kind === 'dust' || kind === 'ash' || kind === 'sand') return kind === 'sand' ? SHAPES.streak : SHAPES.puff;
   return SHAPES[info.shape] || SHAPES.dab;
 }
-// region ids: rain, snow and spray belong with the sky's wet washes (2.x), drifts with the
-// ground (1.x), leaves with foliage (4.x); rings are 6: kept crisp by the post pass
+// region ids: prints belong to the ground (1); splash rings are 6 (kept crisp by the post
+// pass); everything in the air is 7 (no graphite line is drawn round a raindrop or a puff)
 function regionOf(kind, info) {
   if (kind === 'ring' || info.shape === 'ring') return 6.0;
-  return info.region || 1.0;
+  if (kind === 'mark' || info.shape === 'mark') return 1.0;
+  return 7.0;
 }
 
 // makeKitMaterial(kind, info, { bodyUniforms, shapeGlsl }): PHYSICS' reference factory with the

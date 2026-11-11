@@ -108,7 +108,8 @@ export function createWorld(scene) {
       // internal pixels survive the brush), rain a little broader and longer: a few strokes
       const D = K.DRAW_PAINTED, draw = {};
       for (const k in D) draw[k] = { ...D[k] };
-      draw.rain = { ...D.rain, width: 0.085, exposure: 0.16, minPx: 3.5 };
+      draw.rain = { ...D.rain, width: 0.07, exposure: 0.08, minPx: 5 };
+      draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
     }).catch((e) => console.warn('weather kits not available: ' + e.message));
   }
@@ -238,7 +239,9 @@ export function createWorld(scene) {
       const dayness = 1 - wNight;
       // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
       const sk = skyNow(physics, st.id), air = 1 - space01;
-      const oc = sk ? sk.overcast * air : 0, storm = sk ? sk.storm * air : 0;
+      // (where rain or snow is falling the sky is closed, whatever the cover says)
+      const fall = sk ? Math.max(sk.rain, sk.snowfall) * air : 0;
+      const oc = sk ? Math.max(sk.overcast, 0.75 * fall) * air : 0, storm = sk ? sk.storm * air : 0;
       const hazeK = sk ? Math.min(1, Math.max(0.04, sk.haze / 0.8)) : 1;          // fair weather (0.8 and up) is my clear day
       const lostV = sk ? 1 - hazeK : 0;                                           // how much of the view the weather has taken
       const dustW = sk ? Math.min(1, sk.dust * (0.25 + 1.5 * lostV)) * air : 0, fogW = sk ? Math.min(1, sk.fog * (0.2 + 1.2 * lostV)) * air : 0;
@@ -268,7 +271,7 @@ export function createWorld(scene) {
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
       bu.uDayness.value = dayness;
-      if (st.id !== lastActive) freshSnow = 0;
+      if (lastActive && st.id !== lastActive) freshSnow = 0;
       freshSnow = Math.min(1, Math.max(0, freshSnow + dt * (veilS > 0.02 ? veilS / 22 : -1 / 300)));
       const snowC = sk ? (WX.forced ? sk.snow : Math.min(sk.snow, freshSnow)) * air : 0;
       bu.uWx.value.set(Math.min(1, oc + dustW * 0.6), sk ? sk.wet * air : 0, snowC, Math.max(veilR, veilS));
@@ -278,7 +281,7 @@ export function createWorld(scene) {
       // inks for the kits: each ground material in this place's own washes; rain is the sky's wet wash
       if (kits) {
         kitInks(st, here.biomeWeights);
-        KIT_INK.rain.copy(tmpKey.haze).lerp(_storm, 0.55);
+        KIT_INK.rain.copy(tmpKey.haze).lerp(_storm, 0.38);
         KIT_INK.dust.copy(KIT_PALETTE[5]); KIT_INK.sand.copy(KIT_PALETTE[4]);
       }
       const v0 = look.visibility[0], v1 = look.visibility[1];
@@ -292,7 +295,7 @@ export function createWorld(scene) {
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
       // cloud cover: the world's own share in fair weather, closing in as the weather says
-      const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8), 0.12, 0.9) : look.cloud;
+      const cover = sk ? look.cloud * 0.8 + (Math.max(look.cloud, 0.82) - look.cloud * 0.8) * THREE.MathUtils.smoothstep(Math.max(sk.cloud * air, dustW * 0.8, fall), 0.12, 0.9) : look.cloud;
       skyU.uCloud.value.set(body.radius + atmH * 0.55, cover, Math.max(900, atmH * 3.2), 0.0006);
       skyU.uAtmo.value.set(space01, dayness, 0.042, body.radius);
       st.root.getWorldQuaternion(_q);
