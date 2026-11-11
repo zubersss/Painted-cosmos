@@ -327,10 +327,17 @@ export class Game {
       throttle01: sim.sh.throttle01, pulse01: st === S.PULSE ? 1 : 0,
       inSpace01: sim.mood.inSpace01, altitude01: sim.mood.altitude01, bodyId: sim.mood.bodyId,
       wind: here ? here.air.speed : body && body.atmosphereHeight > 0 ? 4 : 0, gust01: here ? here.air.gust01 : 0,
-      rain01: w && w.precipitation ? w.precipitation.intensity01 : 0,
+      // Rain: PHYSICS' sky.rain (liquid falling; snow is silent), what it falls on, and the shelter.
+      rain01: here && here.sky ? here.sky.rain : w && w.precipitation && w.precipitation.type !== 'snow' ? w.precipitation.intensity01 : 0,
+      canopy01: here && here.cover ? here.cover.canopy01 || 0 : 0,
+      dripping: here && sim.physics.particles && sim.physics.particles.system ? sim.physics.particles.system.dripping || 0 : 0,
+      underHull: st === S.ON_FOOT && sim.shFrame.kind === 'body' && sim.shFrame.id === sim.bodyId
+        && Math.hypot(sim.sh.p.x - sim.ex.p.x, sim.sh.p.y - sim.ex.p.y, sim.sh.p.z - sim.ex.p.z) < 3.6,
       airless: !!body && !(body.atmosphereHeight > 0),
       thunderIn: w && w.lightning ? w.lightning.thunderIn : null,
+      thunder01: w && w.lightning ? w.lightning.thunder01 : null,
       submerged: sim.ex.liquidDepth > 0.2,
+      material: sim.ex.phys ? sim.ex.phys.material : null,
     });
     const seq = sim.eventSeq || 0;
     const fresh = Math.min(seq - this._eventSeq, sim.events.length);
