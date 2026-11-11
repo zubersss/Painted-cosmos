@@ -51,7 +51,9 @@ async function boot() {
   let physics = null;
   if (prov.createPhysics) {
     try {
-      physics = prov.createPhysics({ sampleSurface: (bodyId, d) => world.sampleSurface(bodyId, d), seed: 1 });
+      // PHYSICS' default seed: chosen so that weather happens at the real Earth spawn
+      // (a thunderstorm crosses late in the first morning).
+      physics = prov.createPhysics({ sampleSurface: (bodyId, d) => world.sampleSurface(bodyId, d) });
       if (world.setPhysics) world.setPhysics(physics);
     } catch (e) {
       physics = null;

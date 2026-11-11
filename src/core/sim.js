@@ -209,6 +209,10 @@ export class Sim {
         this.sh.gearOn = false; this.sh.lift01 = 1;       // hand the hull to its landing gear
         this.sm.dispatch(EV.touchdown);
         this.emit('touchdown');
+      } else if (r === 'blocked') {
+        this.sm.dispatch(EV.abortLanding);
+        this.say('No level ground here: try a little further on');
+        this.emit('too-steep');
       } else if (pressed('Space') || pressed('KeyW')) {
         this.sh.landing = null;
         this.sm.dispatch(EV.abortLanding);
@@ -499,8 +503,32 @@ export class Sim {
     return true;
   }
 
+  // Lift-off, first half, with PHYSICS: the anti-gravity takes the weight off the legs over
+  // 1.2 s, the thruster wash is lit from the first frame, the legs stretch, the feet leave.
+  // Returns true while the ship is still on its gear.
+  stepGearLiftoff(h) {
+    const sh = this.sh, L = sh.liftoff;
+    if (!L || L.air || !this.useGear || sh.onLiquid || this.shFrame.kind !== 'body' || !this.shFrame.rotating) {
+      if (L) L.air = true;
+      return false;
+    }
+    if (L.lift01 == null) { L.lift01 = 0; this.physics.ship.wake(sh); }
+    L.lift01 = Math.min(1, L.lift01 + h / 1.2);
+    L.t += h;
+    const cmd = this._liftCmd || (this._liftCmd = { lift01: 0, hold: V() });
+    const up = norm(sh.p);
+    cmd.lift01 = L.lift01;
+    cmd.hold.x = up.x * SHIP.liftoffClimb * L.lift01; cmd.hold.y = up.y * SHIP.liftoffClimb * L.lift01; cmd.hold.z = up.z * SHIP.liftoffClimb * L.lift01;
+    this.physics.ship.gear(sh, cmd, h, this.explorerEnv(this.shFrame.id));
+    sh.speed = len(sh.v);
+    sh.throttle01 = mix(sh.throttle01, 0.65, 1 - Math.exp(-4 * h));
+    if ((sh.phys && sh.phys.contacts === 0) || L.t > 3.5) { L.air = true; L.t = 0; }
+    return true;
+  }
+
   stepFlying(h, I, mdx, mdy, pressed) {
     const sh = this.sh;
+    if (sh.liftoff && this.physics && this.stepGearLiftoff(h)) return;
     if (!sh.liftoff) this.reframe();
     const env = this.flightEnv();
     this.updateTarget();

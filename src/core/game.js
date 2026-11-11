@@ -97,6 +97,12 @@ export class Game {
     const ss = origin.toScene(sp.p);
     shObj.position.set(ss.x, ss.y, ss.z);
     shObj.quaternion.set(sp.q.x, sp.q.y, sp.q.z, sp.q.w);
+    // The air is there: PHYSICS' buffet shows on the drawn hull (never on the flight itself).
+    const buf = sim.sh.phys && v.flying ? sim.sh.phys.buffetAngle : null;
+    if (buf && (buf.pitch || buf.roll)) {
+      shObj.rotateX(Math.max(-0.12, Math.min(0.12, buf.pitch || 0)));
+      shObj.rotateZ(Math.max(-0.12, Math.min(0.12, buf.roll || 0)));
+    }
     this.shipModel.animate({
       mode: st === S.PULSE ? 'pulse' : !v.flying ? 'landed' : sim.sh.speed > 12 ? 'fly' : 'hover',
       throttle01: sim.sh.throttle01, gear01: sim.sh.gear01, canopy01: sim.sh.canopy01,

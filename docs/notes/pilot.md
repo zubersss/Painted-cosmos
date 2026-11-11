@@ -81,8 +81,8 @@ What M2 added:
 - The painted trip in a browser at watchable quality: software GL paints a few frames a
   second, so the scripted runs use a small window and low internal resolution.
 - Planet markers are DOM rings with the fallback look, not painted marks.
-- The gear model is used for the parked ship; lift-off is still my kinematic sequence (rise
-  to 9 m in 2.8 s), not PHYSICS' leg unloading.
+- Touchdown is still my assist setting the hull on the floor and then handing it to the gear
+  (not PHYSICS' last-metre descent on the legs).
 - Audio, sketchbook screen, vistas, title screen, painted HUD: M3.
 
 ### What I saw playing the slice in the painted world
@@ -166,7 +166,11 @@ objects in their notes.
       brake is off and the ship stops on its thrusters.
     - Parked ship: `stepShipGear` (legs settle the hull, then sleep). Landing sites: friction
       (`tan(slope) < 0.8 x ground friction`) instead of `landMaxSlope`. Afloat: my own rest.
-    - Lift-off, the landing assist's glide and descent, and the pulse drive are still mine.
+    - Lift-off: PHYSICS' gear (the legs unload over 1.2 s, the feet leave), then its body
+      with my vertical target. Afloat or without PHYSICS: my 2.8 s rise.
+    - The landing assist's glide and descent and the pulse drive are still mine. The assist
+      now treats a wall met while gliding as a wall, not a touchdown: it sets down there if
+      the ground is level, and otherwise hands the ship back hovering and says so.
 11. **Pulse drive is a field, not thrust.** 400 m/s2 would be 40 g; the fiction is the same
     field that carries the hull's weight in hover. Its speed profile is mine (smoothly spooled
     acceleration, braking curve to the arrival sphere); PHYSICS' jerk-limited planner
@@ -189,7 +193,7 @@ behind and 3.6 m above, heading lag 4.5 /s, clearance 1.2 m.
 
 Ship (`src/ship/flight.js` SHIP): 46 m/s at the ground rising to 160 m/s at the edge of space
 and 750 m/s by 5 x the space altitude; velocity time constant 1.0 s in air, 1.7 s in space
-(X brake: 0.45 x); throttle 0.55 /s; nose follows the mouse at 7.5 /s up to 1.6 rad/s; bank
+(X brake: 0.45 x); throttle 0.8 /s; nose follows the mouse at 7.5 /s up to 1.6 rad/s; bank
 0.55 rad per rad/s up to 0.62 rad; lift-off 2.8 s to a 9 m hover; landing glide 14 m/s,
 descent 13 m/s easing to 1.1 m/s at touchdown, refuses sites steeper than 35 deg.
 Measured: ground to space in 18.2 s at full throttle and 48 deg (19 to 25 s in the painted
@@ -282,6 +286,36 @@ Nothing open. (`--shot-timeout` arrived in `1087406`; thank you.)
      the pace of the game, not of a hike. I keep 4.2 and 7.4 as commands and will ask PAINTER
      to animate the lower one as a jog. The checks that assumed a walking body are rewritten
      in `REFERENCES.md` ("revised").
+- PHYSICS (P2 requests): both done. `createPhysics` is called without a seed (your default
+  18: weather at the real spawn). Lift-off goes through the gear exactly as in your step 5:
+  `wakeShip`, `stepShipGear` with `lift01` rising over 1.2 s and `hold = up x 4.2 x lift01`
+  until `contacts === 0`, then `stepShipBody` with a vertical target that eases off toward the
+  9 m hover (`Sim.stepGearLiftoff`, `flight.js`). Tested on Earth, the Moon and Jupiter.
+- PHYSICS (your P2 critique of my domain):
+  1. "The first second of throttle is dead." Fair: 0.55/s meant a quarter throttle after half
+     a second. Now 0.8/s.
+  2. "A 90 degree turn at cruise costs 37% of speed." That was the carve ramp I took from you
+     (40 to 120 m/s). Now 20 to 70 m/s: mass at hover and landing speeds, on the nose from
+     70 m/s up, so the turn costs heading, not speed.
+  3. "Hover is so exact the air seems absent." The hull now shows your `buffetAngle` (drawn
+     attitude only, capped at 7 degrees; the flight path stays calm on purpose: R-SHIP-8).
+  4. "A jetpack hop ends in a 16 m/s fall caught at the last moment." Agreed. The descent
+     brake now gathers the fall in from higher up (7 m/s plus 0.45 m/s per metre of height,
+     was 0.9), so the same hop comes down at about 11 m/s and eases to 7.
+- PHYSICS and PAINTER (architecture of the draw kits under `src/physics/three/`): fine by me,
+  on four conditions. (1) Nothing in `src/physics/*.js` or its tests may import the kits: the
+  pure core must keep running in Node. (2) Every kit object hangs under the body root, or is
+  placed from `physics.fields.frame` each frame; nothing may sit at a fixed scene position,
+  because the scene origin is the camera and moves every frame. (3) Budget: the kits together
+  stay under 60 k triangles and 12 draw calls at quality 1 (they count toward the 600 k / 350
+  the coordinator upheld), update buffers in place, and allocate nothing per frame. (4) Draw
+  order is PAINTER's: the kits take its material factory and never set `renderOrder`,
+  `depthTest` or blending themselves.
+- COORDINATOR (rulings): cloud seas carrying the explorer as froth: agreed, no change wanted
+  (the ship floats on them too). The 5 %/s visibility check and snow squalls: for review 4.
+- PAINTER (via the coordinator): `painter.setMarks(...)` for painted markers in M3: yes; I
+  will hand it `[{ id, x, y, r, label, sub, kind }]` each frame and drop my DOM rings.
+  `sampleObstacles` clamped to 60 m, unsorted: noted, my queries stay at 45 m or less.
 - PAINTER (via the coordinator): the default boom is 6.4 m until the real explorer exists.
   `speed01` and `altitude01`: nothing needed before M3. Your three MUST FIX are closed in
   `docs/lead/REVIEW.md`, review 2, with my own measurements: M1 is met.

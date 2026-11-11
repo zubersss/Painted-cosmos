@@ -19,7 +19,7 @@ export const SHIP = Object.freeze({
   liftSpeedSpace: 90,
   tauAtmo: 1.0,              // s: time constant of velocity following the nose and throttle
   tauSpace: 1.7,             // s: more glide in space
-  throttleRate: 0.55,        // per second while W or S is held
+  throttleRate: 0.8,         // per second while W or S is held
   brakeFactor: 0.45,         // X shortens the velocity time constant by this much
   reverseMax: -0.2,
   // steering
@@ -43,6 +43,7 @@ export const SHIP = Object.freeze({
   bounceRestitution: 0.35,
   // sequences
   hoverHeight: 9,            // m: where the lift-off sequence leaves you
+  liftoffClimb: 4.2,         // m/s: rise speed off the landing gear (with PHYSICS)
   liftoffSeconds: 2.8,
   landGlideSpeed: 14,        // m/s sideways toward the chosen spot
   landMaxDescent: 13,        // m/s
@@ -189,8 +190,8 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     // carve01: PHYSICS' named assist that turns the velocity onto the nose without changing
     // the speed, so steering stays arcade while every change of speed keeps its mass.
     // (PHYSICS' suggestion, taken: no carve at low speed, where a little slide reads as weight;
-    // full carve at speed, where thrusters alone would feel like ice.)
-    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: smoothstep(40, 120, st.speed), brake: inAir ? 0 : 1 }, dt, env);
+    // full carve from 70 m/s, so a turn at cruise does not cost a third of the speed.)
+    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: smoothstep(20, 70, st.speed), brake: inAir ? 0 : 1 }, dt, env);
     v = { x: st.v.x, y: st.v.y, z: st.v.z };
     st.p = p0;
   } else {
@@ -198,7 +199,21 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   }
 
   // ---- lift-off sequence overrides the vertical motion ---------------------------------------
-  if (st.liftoff && up) {
+  if (st.liftoff && up && env.shipBody && st.liftoff.air) {
+    // Lift-off, second half, through PHYSICS' body: the feet have left the ground (the first
+    // half is the landing gear's, see Sim.stepGearLiftoff); rise to the hover height and hold.
+    const L = st.liftoff;
+    L.t += dt;
+    const g0 = env.sample ? floorAt(env.sample, st.p) : ground;
+    const alt = g0 ? g0.r - g0.floor : T.hoverHeight;
+    const p0 = { x: st.p.x, y: st.p.y, z: st.p.z };
+    env.shipBody(st, { target: scale(up, clamp((T.hoverHeight - alt) * 0.9, 0.3, T.liftoffClimb)), tau: 0.5, hover: true }, dt, env);
+    v = { x: st.v.x, y: st.v.y, z: st.v.z };
+    st.p = p0;
+    st.gear01 = 1 - smoothstep(0.25, 0.9, alt / T.hoverHeight);
+    st.canopy01 = 0;
+    if (alt >= T.hoverHeight - 0.5 || L.t > 9) st.liftoff = null;
+  } else if (st.liftoff && up) {
     const L = st.liftoff;
     const t0 = L.t;
     L.t = Math.min(T.liftoffSeconds, L.t + dt);
@@ -341,17 +356,22 @@ export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = nul
   return true;
 }
 
-// Returns 'landing' while descending and 'touchdown' on the frame the gear meets the ground.
+// Returns 'landing' while descending, 'touchdown' on the frame the gear meets the ground, and
+// 'blocked' if the way to the site turned out to be barred and there is no level ground here.
 export function stepLanding(st, dt, sample, T = SHIP) {
   const L = st.landing;
   L.t += dt;
   const up = norm(st.p);
   const r = len(st.p);
   const here = floorAt(sample, st.p);
-  const alt = r - here.floor;
   // Sideways toward the site.
   const err = reject(sub(scale(L.dir, r), st.p), up);
   const errLen = len(err);
+  // Height above the highest ground that matters: under the hull, a little way along the
+  // glide, and the site itself once it is close (so a ledge or a cliff edge on the way is
+  // seen before it is met).
+  const ahead = floorAt(sample, addScaled(st.p, reject(st.v, up), 0.7));
+  const alt = r - Math.max(here.floor, ahead.floor, errLen < 15 ? L.floor : here.floor);
   const vhWant = clampLen(scale(err, 1.3), T.landGlideSpeed);
   // Down: fast when high, feather-soft at the end. Hold at 10 m until we are over the site.
   let vDown = clamp(alt * 0.85, T.landMinDescent, T.landMaxDescent);
@@ -374,6 +394,23 @@ export function stepLanding(st, dt, sample, T = SHIP) {
   const g = floorAt(sample, p);
   st.altGround = Math.max(0, g.r - g.floor);
   st.speed = len(st.v);
+  if (g.r - g.floor <= 0.04 && len(reject(st.v, up)) > 3) {
+    // Met a wall on the way to the site (a ledge, the edge of a liquid): that is not a landing.
+    // Stop and rise clear of it. If what is under the hull now is level (or liquid), set down
+    // right here; if it is a slope, give the ship back to the pilot rather than park on a ledge.
+    st.v = V();
+    st.speed = 0;
+    if (!g.liquid && g.slope > 0.3) {
+      st.p = scale(norm(p), g.floor + 4);
+      st.altGround = 4;
+      st.landing = null;
+      return 'blocked';
+    }
+    st.p = scale(norm(p), g.floor + 1.5);
+    L.dir = norm(st.p); L.floor = g.floor; L.normal = g.normal; L.liquid = g.liquid;
+    st.altGround = 1.5;
+    return 'landing';
+  }
   if (g.r - g.floor <= 0.04) {
     p = scale(norm(p), g.floor);
     st.p = p;

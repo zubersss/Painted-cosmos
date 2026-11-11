@@ -259,7 +259,9 @@ function stepExplorerBodied(st, input, dt, env, T) {
   // 100 kg explorer at this pace takes 0.6 s and 1.2 m to stop on grass.
   cmd.assistAccel = T.assistAccel;
   // Falls are held to a gentle terminal speed, then eased down to a soft touchdown.
-  cmd.descentLimit = Math.min(T.terminalFall, T.softFallSpeed + Math.max(0, st.altitude - 1.5) * 0.9);
+  // (0.45 m/s per metre: from the top of a jetpack hop the fall is gathered in early, not
+  // caught at the last moment.)
+  cmd.descentLimit = Math.min(T.terminalFall, T.softFallSpeed + Math.max(0, st.altitude - 1.5) * 0.45);
   env.bodyStep(st, cmd, dt, env);
 
   const up2 = norm(st.p);

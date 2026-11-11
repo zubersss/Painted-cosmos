@@ -54,7 +54,7 @@ test('throttle is persistent, speed follows it, X stops', () => {
   const sample = makeWorld({ R });
   const st = hovering(sample, 300);
   fly(st, sample, 1, { throttle: 1 });
-  assert.ok(st.throttle > 0.5 && st.throttle < 0.6, 'half a second of W is about half throttle');
+  assert.ok(st.throttle > 0.75 && st.throttle < 0.85, 'a second of W is most of the throttle: ' + st.throttle);
   fly(st, sample, 2, { throttle: 1 });
   assert.equal(st.throttle, 1);
   fly(st, sample, 6);

@@ -196,7 +196,14 @@ test('landing anywhere: on every body the assist sets the ship down, it settles,
         continue;
       }
       let touch = 0;
-      play(sim, pad, 90, { each: () => { touch = sim.sh.speed; }, until: () => sim.sm.state === S.LANDED });
+      play(sim, pad, 90, { each: () => { touch = sim.sh.speed; }, until: () => sim.sm.state !== S.LANDING });
+      if (sim.sm.state === S.ATMOSPHERE) {
+        // The assist found its way barred (a ledge) and handed the ship back, hovering, with a word.
+        assert.ok(sim.notice && /level ground/i.test(sim.notice.text), tag + ': gave up without a word');
+        assert.ok(sim.sh.altGround > 1 && sim.sh.speed < 3, tag + ': hovering after giving up');
+        report.push(tag + ': refused (no level ground on the way)');
+        continue;
+      }
       assert.equal(sim.sm.state, S.LANDED, tag + ': landed');
       assert.ok(touch < 3, `${tag}: touchdown at ${touch.toFixed(2)} m/s`);
       const p0 = { ...sim.sh.p };
