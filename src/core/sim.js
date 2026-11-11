@@ -724,10 +724,16 @@ export class Sim {
         sh.throttle = arrived ? 0 : 0.5;          // arrive and coast to a stop in front of the planet
         this.sm.dispatch(EV.pulseOff);
         if (arrived) {
-          this.say(`${BODIES[adv.block].name} ahead`, 5);
+          // Arrived where we were going (or, with no course set, at whatever lay ahead)...
+          if (!this.target || adv.block === this.target) this.say(`${BODIES[adv.block].name} ahead`, 5);
+          // ...or stopped short by a world that lies between (often the one just left).
+          else this.say(`${BODIES[adv.block].name} is in the way: steer round it and pulse again`, 6);
           if (adv.block === this.target) this.targetLocked = false;
           this.emit('arrived');
-        } else this.emit('pulse-off');
+        } else {
+          if (!ps.cancel && adv.block === 'sun') this.say('The Sun is in the way: steer round it and pulse again', 6);
+          this.emit('pulse-off');
+        }
       }
     }
 

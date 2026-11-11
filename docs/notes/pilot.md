@@ -4,8 +4,9 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
-Kept current by the third PILOT agent (2026-11-11, the run that did review 5 and prepared
-M4). Everything below is true at the commit that contains this section.
+Kept current by the fourth PILOT agent (2026-11-11, part 1 of its order: own items, the
+owner's instruction on quality, three relays from the coordinator). Everything below is true
+at the commit that contains this section.
 
 **How to work here.** Read `docs/COORDINATOR.md` (section A, section G, the end of the log in
 E), then this section, then `docs/lead/TRACK.md` and the newest review in
@@ -19,7 +20,8 @@ command output short: three PILOT agents' worth of context has gone into this ro
 Things that cost me time: the other two commit every few minutes, so say in every finding
 which commit it was measured on, and export again before each browser run; their working tree
 is often mid-save (a Node probe that imports `src/physics` from the working tree can fail for a
-minute: run probes against an export, `ROOT=<export> node probe.mjs`); wall-clock time is the
+minute: run probes against an export, `ROOT=<export> node probe.mjs`); `sampleObstaclesPure`
+lists boulders (`kind: 'rock'`) only for a radius of 30 m or less; wall-clock time is the
 scarce thing in a browser run (a painted frame takes one to three seconds), so queue the next
 run behind the last with `until grep -q EXIT log; do sleep 5; done; ...` in the background.
 
@@ -50,45 +52,130 @@ frames in the game, `--only id,id` re-shoots some and keeps the rest), `node tes
 `--places "earth:vista:earth-temperate_forest-1"`, `--shoot` for frames). Run them inside a
 clean export (`tools/export-head.sh <dir>`, then `cd <dir>`), one browser at a time.
 
+**The rule that changed everything (the owner, 2026-11-11): there is no triangle budget.**
+`docs/COORDINATOR.md`, end of section E. No count of triangles or draw calls is a gate. The
+game starts at tier 2 and full resolution; `src/core/dynres.js` (rewritten) steps down when
+the measured frame time asks (under 30 fps at once, a tier with it when the smallest picture
+could not reach 30; a run of three frames over 250 ms is load, one is a hitch), climbs by
+single careful steps that back off when they do not hold (so it also climbs behind a display
+refresh), and is not fed while the first view loads (`main.js`: `judged`, `dyn.rest()`).
+`?quality=N` pins the tier (resolution still adapts); `?dynres=0` pins both. `tests/cost.mjs`
+only reports. The look is judged at the top tier (tour, weather set, review 6); mechanics
+runs may pin a low tier (say which). REVIEW, TRACK and REFERENCES carry "withdrawn" marks.
+
+**What part 1 did** (commits `895a178` to the one that holds this text; details under
+"Fourth agent, part 1" below):
+1. Weather set on PHYSICS' new storm times: `tests/weather.mjs` re-shot (twelve frames,
+   sheet opened). New ids: `earth-start`, `earth-before`, `earth-arrives`, `earth-storm`,
+   `earth-flash`, `earth-after`, `earth-storm-night`, `earth-flash-night`, `earth-blizzard`
+   (lat 62.41 lon 49.46 at 190 s), `mars-dust`, `neptune-gale`, `neptune-gale-forced`.
+2. `tests/grandtour.mjs`: all eight planets in one browser sitting (see its header; results
+   below; `--from <body>` resumes; records in `<out>/grandtour.json`).
+3. `tests/guards.test.mjs`: the stalled sink, the thin-air pace, the thin-air words,
+   `mood.pulse01`; each guard test fails with its guard taken out.
+4. The suit's share of the wind (`EXPLORER.windAirCap` 12 m/s through PHYSICS'
+   `cmd.shelter01`; `windPace`), a word when thin air limits the ship (`Sim.thinAirWord`,
+   `slowWord`), `mood.pulse01`, the landing word ("Setting down on level ground 12 m away"),
+   boulders clambered at a walk, one trunk met dead on stepped round, `all.mjs` re-runs a
+   failed unit file alone once.
+
 **Unfinished, and where each item starts.**
-1. *The one open MUST FIX* (addendum to review 5 in `docs/lead/REVIEW.md`): PAINTER's vista
-   `earth-temperate_forest-1` is at 611 k / 339 at quality 1 and 304 k at quality 0 on
-   `0de3fb4`. When PAINTER reports: `tools/export-head.sh <dir>; cd <dir>; node tests/cost.mjs
-   --places "earth:vista:earth-temperate_forest-1,earth:spawn:spawn" --qualities 0,1` (wanted
-   600 k and 350, 300 k), and `node tests/weather.mjs --only earth-storm,earth-storm-day` for
-   the storm (550 k after dark today). Then record review 6 and say whether M3 is closed.
-   Never test a commit whose message begins "WIP snapshot" (the coordinator's backups, may be
-   mid-edit): test the last commit the role made itself. Also wanted when the machine is
-   quiet: the tour on the current head (`node tests/tour.mjs --bodies <one body>`, ten
-   bodies, about two hours; last run on `ded1435`), and PAINTER's space pass (stars, pulse
-   streaks) and near-ground strokes on snow looked at when it reports.
-2. *M4*, when the coordinator says so and not before: `node tests/all.mjs --export` must print
+1. *Part 2, lead review 6* (only on the coordinator's message): on a clean export of the head
+   (never a "WIP snapshot" commit): the tour body by body at the top tier (`node
+   tests/tour.mjs --bodies <one body>`, about two hours and more now that scenes are fuller;
+   check its query pins `quality=2`), `node tests/all.mjs --export`, `node tests/weather.mjs`
+   (it runs at quality 1 by default: pass `--quality 2`), the grand tour, judge the frames
+   against the art bible, say how long the Earth spawn takes to settle, write review 6,
+   update TRACK. No MUST FIX is open against anyone.
+2. *The stale UI frames* (`docs/shots/pilot/ui-*.jpg` are on stubs): not replaced in part 1.
+   Wanted over the real painted world: title, help card, HUD on foot, cockpit with dials, map,
+   sketchbook. The third agent's script is scratch `run3/ui-shots.mjs`.
+3. *Boulders on the Moon and Pluto* (coordinator's ruling "boulders, legs and launches"): a
+   run across the densest boulder field lifts the feet 0.00 m on Earth and Mars and 0.97 m on
+   the Moon (0.6 s in the air: the body floats down the far side of a boulder; a slower
+   clamber does not change it). The ruling's fallback (boulders block on light worlds:
+   `EXPLORER.scrambleMinGravity: 3`) gives 0.00 m lift but traps a run in five of eight
+   headings on the Moon's highlands (3 to 26 m in 25 s), so it is left off (0). Needs
+   PHYSICS' legs (P9); then re-measure with scratch `run4/boulders.mjs <body>` (measure of
+   done: 0.3 m).
+4. *Walking into a trunk*: a 25 s straight walk through the home forest now has no stop over
+   0.3 s in eight headings (scratch `run4/straight.mjs`); the pace still dips to 0 for about
+   0.12 s before the suit steps round. Sliding round without any dip needs steering before
+   contact (not done).
+5. *Flight pace per world* and *pulse profile* (PHYSICS' `planSpeedChange`): as before.
+6. *M4*, when the coordinator says so and not before: `node tests/all.mjs --export` must print
    ALL PASSED on the final head; then one pull request `cosmos` -> `main` through the REST API
    (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), merge, GitHub Pages from
-   `main` (`https://zubersss.github.io/Painted-cosmos/`). `index.html` uses only relative
-   URLs (the static step checks it). The final message to the owner is described at the end of
-   section 5 of the brief; the README already says how to play.
-3. *The painted UI theme*: second pass in (keys, button, tabs, pencil frames, rules, map,
-   gauges). Left: PAINTER's review of the look (frames `docs/shots/pilot/ui-*.jpg`; change
-   what it asks), more icons, lettering with thick and thin. To letter new text:
-   `ink(el, text, SIZE.body)`; never set `textContent` on HUD elements.
-4. *The first storm falls after dark* (the default seed's storm crosses the spawn at 640 to
-   800 s, which is 18:30 to 21:00). Asked of PHYSICS (review 5, P2). If it does not move, the
-   lever on this side is `FEEL.startHour` in `src/core/sim.js` (9.5 today; 6.5 would put the
-   storm at 15:30 to 18:00 and open the game on a rose dawn).
-5. *Wind on the explorer*: on Neptune's storm coast (33 m/s) a walk downwind makes 0.6 m/s
-   and a 2.5 s jetpack hop is carried 85 m. Asked of PHYSICS (review 5, P6); if the answer is
-   "that is the physics", the lever wanted is a shelter factor in the command (see "Needs").
-6. *Flight pace per world*: PHYSICS is re-flying the levers; `env.speedScale` in
-   `Sim.flightEnv`.
-7. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
-   `planSpeedChange` once the painted pulse effect exists to judge it against.
-8. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner), a
-   real mouse under pointer lock (the fallback is proven by `tests/lockcheck.mjs`), a real
-   gamepad (`src/core/gamepad.js` has only met a simulated one), and how the sound actually
-   sounds (it is measured, not heard).
+   `main` (`https://zubersss.github.io/Painted-cosmos/`). The final message to the owner is
+   described at the end of section 5 of the brief; the README already says how to play.
+7. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner; the
+   new controller has only met model machines and software rendering), a real mouse under
+   pointer lock, a real gamepad, how the sound sounds.
 
 ## Status
+
+### Fourth agent, part 1 (2026-11-11; everything run by me; software GL; frames opened where said)
+
+**1. The weather set on the new storm times** (export of `8d2905b`: PAINTER at `139be13`,
+PHYSICS at `de6ee88`; quality 1, 960x540; sheet `docs/lead/evidence/weather.jpg`, opened).
+Twelve frames, no console errors. PHYSICS' sky numbers at the spawn, stateless, every 20 s
+(scratch `run4/sky.mjs`): fair to 120 s (cloud 0.2 to 0.55, overcast under 0.16), drizzle at
+140 s, thunderstorm 160 to 300 s (rain 0.9 and overcast 0.99 from 200 to 260 s), drizzle at
+320 s, clear from 340 s with the ground drying (wet 0.63 at 340 s, 0.05 at 480 s).
+*What a player who stands at the spawn for six minutes sees*: a sunny wood at ten in the
+morning, blue sky with a little cloud, the explorer's shadow on the lawn, the ship 16 m off;
+the same and clearer two minutes in (11:18); at 11:54 a slate-dark cloud bank has come over
+the tree tops while the lawn is still lit, and the first slanted strokes of rain are in the
+air; by 13:00 the sky is indigo, the rain is a soft slanted glaze, the wood has gone dark
+and wet, with lightning lifting the open sky to paper; at 15:12 it is a clear warm
+afternoon over wet ground. The whole storm is in daylight. Found in the frames (for
+PAINTER, SHOULD FIX): in `earth-arrives` a far world shows as an orange-red dot *in front of*
+the storm cloud (top left: the dab for a world a few pixels across is not veiled by a
+closing sky); two green flecks lie on the blizzard's snow.
+
+**2. All eight planets in one browser sitting**: see "The grand tour" below.
+
+**3. The two guards have tests** (`tests/guards.test.mjs`): sink held while flying on says
+"Slow down to land" within 6 s and lands once X has slowed the ship (kinematic and with
+PHYSICS); on a 16 and a 37 degree slope, creeping uphill, the sink stalls at 6.6 to 7 m and
+a landing begins within 1.7 s; Mars and the Moon make 80 and 85 m/s at 30 m (pace 1.7) and
+stop in under 150 m, Mars makes over 200 m/s at 250 m, Earth's pace is 1, Venus' 0.75. With
+the guards taken out (a scratch copy) all four fail.
+
+**4. The suit's share of the wind** (Neptune's storm coast at 150 s, 13.8 m/s at the walker;
+scratch `run4/windshare.mjs`, pure simulation on the real ground). Before: every heading
+4.20 m/s on level ground; a 2.5 s jetpack hop rises 17 m into 35 to 40 m/s air and was
+carried **298 m** from level ground (over a cliff into the sea, 42 m/s at most) and 46 to
+86 m elsewhere. PHYSICS' 25 m was not a full burn. Now: off the ground the suit holds off
+whatever wind is beyond 12 m/s (`cmd.shelter01 = 1 - (12 / wind)^2`, 0 in a breeze): the
+hop is carried 8.6 m on level ground and 9.1 m at the stand; in Earth's thunderstorm 5 m as
+before. On the ground nothing is cancelled and a little of the wind shows in the pace
+(`windPace` 1.2 % per m/s along the walk, between 0.75 and 1.1): 4.50 m/s downwind, 4.20
+across, 3.59 upwind on Neptune; never under 3.15 m/s in any gale. Unit test in
+`tests/explorer.test.mjs`.
+
+**5. A word when the air limits the ship** (`Sim.thinAirWord`, `slowWord`; no tone, the
+ordinary notice slip): once per visit, coming in under 250 m faster than 57 m/s: "Thin air on
+Mars: the ship runs fast and turns wide. Hold X to slow it" ("No air on the Moon: ..."); when
+the nose has led the flight path by more than 29 degrees for 1.5 s (at most once a minute):
+"Thin air: the ship turns wide at this speed. Ease off (S) and it turns tighter"; and E at
+speed says "Slow down to land: the air is thin here, hold X". Earth, Venus and the giants
+say nothing new. Seen in the browser on Mercury during the grand tour.
+
+**6. The UI frames**: not done (see the handover).
+
+**The owner's instruction** (no triangle budget): controller, tests, README, lead files, as
+the handover says. On model machines (`tests/dynres.test.mjs`): 13 fps at the top tier is
+above 30 fps after 0.14 s and settles on tier 1; a machine that cannot hold anything is at
+the floor after 1.8 s (2.8 s when every frame is over 250 ms, as in software rendering); a
+machine a little over budget settles on scale 0.815 at tier 2 with one failed try upward
+every 4, 8, 16, 32 ... seconds. Never run on a real GPU.
+
+**From the coordinator's relays**: `mood.pulse01` (0 at cruise, 1 from 6 km/s of pulse,
+falling as the drive brakes; additive); PAINTER's faint drags at a plain full cruise: keep
+them; boulders (above); trunks (above); the landing word; `all.mjs` re-runs a failed unit
+file alone once and says so in the table.
+
 
 **This run (third PILOT agent): weather in the game reviewed (review 5), my review-4 items
 answered, the painted theme's second pass, milestone 4 prepared.** M1 and M2 closed. M3: my
