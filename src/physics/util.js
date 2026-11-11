@@ -50,11 +50,22 @@ export function noise3(x, y, z, seed) {
   fx = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
   fy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
   fz = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
-  const a = hash3(ix, iy, iz, seed), b = hash3(ix + 1, iy, iz, seed);
-  const c = hash3(ix, iy + 1, iz, seed), d = hash3(ix + 1, iy + 1, iz, seed);
-  const e = hash3(ix, iy, iz + 1, seed), f = hash3(ix + 1, iy, iz + 1, seed);
-  const g = hash3(ix, iy + 1, iz + 1, seed), h = hash3(ix + 1, iy + 1, iz + 1, seed);
-  const x0 = a + (b - a) * fx, x1 = c + (d - c) * fx, x2 = e + (f - e) * fx, x3 = g + (h - g) * fx;
+  // The eight lattice hashes are written out in place (the same arithmetic as hash3): a call
+  // that returns a double can allocate, and this function runs thousands of times a frame.
+  const xa = Math.imul(ix | 0, 374761393), xb = Math.imul((ix + 1) | 0, 374761393);
+  const ya = Math.imul(iy | 0, 668265263), yb = Math.imul((iy + 1) | 0, 668265263);
+  const za = Math.imul(iz | 0, 2147483647) ^ Math.imul(seed | 0, 1274126177), zb = Math.imul((iz + 1) | 0, 2147483647) ^ Math.imul(seed | 0, 1274126177);
+  const K = 2.3283064365386963e-10;          // 1 / 2^32
+  let h;
+  h = xa ^ ya ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const a = (h >>> 0) * K;
+  h = xb ^ ya ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const b = (h >>> 0) * K;
+  h = xa ^ yb ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const c = (h >>> 0) * K;
+  h = xb ^ yb ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const d = (h >>> 0) * K;
+  h = xa ^ ya ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const e = (h >>> 0) * K;
+  h = xb ^ ya ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const f = (h >>> 0) * K;
+  h = xa ^ yb ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const g = (h >>> 0) * K;
+  h = xb ^ yb ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const hh = (h >>> 0) * K;
+  const x0 = a + (b - a) * fx, x1 = c + (d - c) * fx, x2 = e + (f - e) * fx, x3 = g + (hh - g) * fx;
   const y0 = x0 + (x1 - x0) * fy, y1 = x2 + (x3 - x2) * fy;
   return (y0 + (y1 - y0) * fz) * 2 - 1;
 }

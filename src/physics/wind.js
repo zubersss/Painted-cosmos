@@ -61,10 +61,14 @@ export const WIND = Object.freeze({
   minFactor: 0.25,        // a lull never drops below this fraction of the mean
 });
 
+// (the last lookup is remembered: building a string key on every call would allocate)
 const seeds = {};
+let _sb = null, _ss = NaN, _sv = 0;
 function seedOf(bodyId, seed) {
+  if (bodyId === _sb && seed === _ss) return _sv;
   const k = bodyId + ':' + seed;
-  return seeds[k] || (seeds[k] = hashString('wind-' + k) | 0);
+  _sb = bodyId; _ss = seed;
+  return (_sv = seeds[k] || (seeds[k] = hashString('wind-' + k) | 0));
 }
 
 // Zonal (east) and meridional (north) prevailing wind at sin(latitude) = sy. o[0] = east, o[1] = north.

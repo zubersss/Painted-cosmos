@@ -183,13 +183,14 @@ export class TerrainGrid {
     return (this.h[n] * w00 + this.h[n + 1] * w10 + this.h[n + N] * w01 + this.h[n + N + 1] * w11) / ws;
   }
 
-  // Liquid surface (radius - r0) at (x, z), or -1e9 where the nearest node is dry.
+  // Liquid surface (radius - r0) at (x, z): -1e9 where the nearest node is dry, NaN where it is
+  // outside the grid or not sampled yet (unknown is not the same as dry).
   liquidAt(x, z) {
     const N = this.N;
     const i = Math.round(this.u(x)), j = Math.round(this.v(z));
-    if (i < 0 || j < 0 || i > N - 1 || j > N - 1) return -1e9;
+    if (i < 0 || j < 0 || i > N - 1 || j > N - 1) return NaN;
     const n = j * N + i;
-    return this.valid[n] ? this.lq[n] : -1e9;
+    return this.valid[n] ? this.lq[n] : NaN;
   }
 
   // Nearest valid node index to (x, z), or -1.

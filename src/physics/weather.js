@@ -88,10 +88,14 @@ for (const id in REGIMES) {
 // (weather.test.mjs checks it). Change it only together with that test.
 export const DEFAULT_SEED = 14;
 
+// (the last lookup is remembered: building a string key on every call would allocate)
 const seedCache = {};
+let _sb = null, _ss = NaN, _sv = 0;
 function seedFor(bodyId, seed) {
+  if (bodyId === _sb && seed === _ss) return _sv;
   const k = bodyId + ':' + seed;
-  return seedCache[k] || (seedCache[k] = hashString('weather-' + k) | 0);
+  _sb = bodyId; _ss = seed;
+  return (_sv = seedCache[k] || (seedCache[k] = hashString('weather-' + k) | 0));
 }
 
 const _pv = new Float64Array(2);

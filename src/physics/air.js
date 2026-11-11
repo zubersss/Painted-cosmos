@@ -158,7 +158,10 @@ export class AirGrid {
     return u >= 0 && v >= 0 && u <= this.N - 1 && v <= this.N - 1;
   }
 
-  // Wind only (the per-frame hot path): fills o.we, o.wn, o.gust, o.I.
+  // Wind only (the per-frame hot path). Writes seven numbers into the typed array `o`:
+  //   [0] we, [1] wn (reference wind, frame axes), [2] gust (-1..1), [3] turbulence intensity,
+  //   [4..6] wind height factors at blade height, crown height and 2 m.
+  // (A typed array, not an object: storing a double in an object field can allocate.)
   sampleWind(x, z, o) {
     const N = this.N, T = this.terrain;
     let u = T.u(x), v = T.v(z);
@@ -167,20 +170,20 @@ export class AirGrid {
     if (i > N - 2) i = N - 2; if (j > N - 2) j = N - 2;
     const fu = u - i, fv = v - j, n = j * N + i;
     const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
-    o.we = this.we[n] * w00 + this.we[n + 1] * w10 + this.we[n + N] * w01 + this.we[n + N + 1] * w11;
-    o.wn = this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11;
-    o.gust = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
-    o.I = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
-    // height factors (blade height, crown height, 2 m) from the nodes whose ground is known
+    o[0] = this.we[n] * w00 + this.we[n + 1] * w10 + this.we[n + N] * w01 + this.we[n + N + 1] * w11;
+    o[1] = this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11;
+    o[2] = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
+    o[3] = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
+    // height factors from the nodes whose ground is known
     const va = T.valid, c = T.cover;
     const v00 = w00 * va[n], v10 = w10 * va[n + 1], v01 = w01 * va[n + N], v11 = w11 * va[n + N + 1];
     const vs = v00 + v10 + v01 + v11;
     if (vs > 0.2) {
       const k = 1 / vs, a = n * CW + 8, b = a + CW, d = (n + N) * CW + 8, e = d + CW;
-      o.hfSoft = (c[a] * v00 + c[b] * v10 + c[d] * v01 + c[e] * v11) * k;
-      o.hfStiff = (c[a + 1] * v00 + c[b + 1] * v10 + c[d + 1] * v01 + c[e + 1] * v11) * k;
-      o.hf2 = (c[a + 2] * v00 + c[b + 2] * v10 + c[d + 2] * v01 + c[e + 2] * v11) * k;
-    } else { o.hfSoft = HF0[0]; o.hfStiff = HF0[1]; o.hf2 = HF0[2]; }
+      o[4] = (c[a] * v00 + c[b] * v10 + c[d] * v01 + c[e] * v11) * k;
+      o[5] = (c[a + 1] * v00 + c[b + 1] * v10 + c[d + 1] * v01 + c[e + 1] * v11) * k;
+      o[6] = (c[a + 2] * v00 + c[b + 2] * v10 + c[d + 2] * v01 + c[e + 2] * v11) * k;
+    } else { o[4] = HF0[0]; o[5] = HF0[1]; o[6] = HF0[2]; }
     return o;
   }
 

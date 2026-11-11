@@ -12,7 +12,7 @@ import { makeWorld, V, norm, len, dot } from './testworld.mjs';
 function rainy(bodyId = 'earth', { biome = 'alpine_meadow', pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 5, sea = 0 } = {}) {
   const R = BODIES[bodyId].radius;
   const sample = makeWorld({ R, biome, sea });
-  const physics = createPhysics({ sampleSurface: (id, d) => sample(d) });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
   for (let t = 0; t < 8000; t += 53) for (const c of cellsAt(bodyId, t)) {
     const w = weatherAt(bodyId, c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {});
     if (pred(w)) return { physics, bodyId, focus: V(c.x * R, c.y * R, c.z * R), t0: t, R };
@@ -153,7 +153,7 @@ test('deterministic: two runs give identical buffers', () => {
 test('footprints: one per stride, alternating feet, deeper in snow than on rock, none in the air', () => {
   const walk = (bodyId, biome, speed, grounded = true) => {
     const R = BODIES[bodyId].radius, sample = makeWorld({ R, biome });
-    const physics = createPhysics({ sampleSurface: (id, d) => sample(d) });
+    const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
     let p = V(0, 0, R); const v = V(speed, 0, 0);
     for (let i = 0; i < 600; i++) {
       p = V(p.x + speed / 60, 0, p.z); const r = len(p); p = V(p.x * R / r, 0, p.z * R / r);

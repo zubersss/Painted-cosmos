@@ -106,16 +106,33 @@ test('budget: well under 2 ms per frame at quality 1 (walking, flying, raining)'
   assert.ok(walk.samples <= QUALITY.samples[1], 'sampleSurface calls per frame when walking: ' + walk.samples);
 });
 
-test('warmUp fills the ground caches and leaves the first played frame inside the budget', () => {
-  const physics = createPhysics({ sampleSurface: stubSurface });
-  const p = spawnPoint('earth');
-  const ms = physics.warmUp({ bodyId: 'earth', time: 0, focus: p });
-  assert.ok(ms < 400, 'warm-up took ' + ms + ' ms');
-  assert.equal(physics.fields.near.invalid, 0); assert.equal(physics.fields.air.terrain.invalid, 0);
-  const w = walker('earth'); let worst = 0;
-  for (let i = 0; i < 300; i++) { const q = w.step(1 / 60); const t = performance.now(); physics.update(1 / 60, { bodyId: 'earth', time: i / 60, focus: q, disturbers: [{ kind: 'explorer', p: q, v: w.v, radius: 0.35, strength: 1, grounded: true }] }); worst = Math.max(worst, performance.now() - t); }
-  console.log(`# worst frame in the first 5 s after warmUp: ${worst.toFixed(2)} ms`);
-  assert.ok(worst < 6, 'worst frame after warm-up ' + worst);       // loose: other processes share this machine
+test('warmUp fills the ground caches and leaves every played frame inside the 2 ms budget', () => {
+  // A wall-clock maximum on a shared machine is mostly the scheduler and the garbage collector.
+  // A real cost recurs at the same frame of a deterministic run; noise does not. So the run is
+  // repeated and each frame is given its best time: the worst of those is the true worst frame.
+  const runs = 4, frames = 300;
+  const best = new Float64Array(frames).fill(Infinity);
+  let rawWorst = 0, warm = 0;
+  for (let r = 0; r < runs; r++) {
+    const physics = createPhysics({ sampleSurface: stubSurface, timeBudget: false });
+    const p = spawnPoint('earth');
+    warm = physics.warmUp({ bodyId: 'earth', time: 0, focus: p });
+    assert.equal(physics.fields.near.invalid, 0); assert.equal(physics.fields.air.terrain.invalid, 0);
+    const w = walker('earth'); const dist = [{ kind: 'explorer', p: null, v: w.v, radius: 0.35, strength: 1, grounded: true }];
+    for (let i = 0; i < frames; i++) {
+      const q = w.step(1 / 60); dist[0].p = q;
+      const t = performance.now();
+      physics.update(1 / 60, { bodyId: 'earth', time: i / 60, focus: q, disturbers: dist });
+      const ms = performance.now() - t;
+      if (ms < best[i]) best[i] = ms;
+      if (ms > rawWorst) rawWorst = ms;
+    }
+  }
+  let worst = 0, at = 0;
+  for (let i = 0; i < frames; i++) if (best[i] > worst) { worst = best[i]; at = i; }
+  console.log(`# first 5 s after warmUp (${warm.toFixed(0)} ms): worst frame ${worst.toFixed(2)} ms at frame ${at} (best of ${runs} runs per frame; worst single measurement ${rawWorst.toFixed(2)} ms)`);
+  assert.ok(warm < 400, 'warm-up took ' + warm + ' ms');
+  assert.ok(worst < 2.0, `frame ${at} costs ${worst} ms in every run`);
 });
 
 test('sampleSurface is called sparingly: a bounded number per frame, bursts only after a jump', () => {

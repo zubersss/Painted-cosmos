@@ -52,7 +52,7 @@ export const FLORA = Object.freeze({
   jetSpread: 0.25,              // jet footprint radius grows by this x height above the ground
 });
 
-const _s = {};
+const _s = new Float64Array(7);
 const _coef = new Float64Array(8);
 const _tmp2 = new Float64Array(2);
 
@@ -168,10 +168,10 @@ export class FloraField {
         const x = (this.ci + i - N / 2 + 0.5) * cell;
         air.sampleWind(x, z, _s);
         const n = j * N + i, o = n * 4;
-        const we = _s.we, wn = _s.wn;
-        const sp = Math.hypot(we, wn);
+        const we = _s[0], wn = _s[1], hs = _s[4], ht = _s[5], h2 = _s[6];
+        const sp = Math.sqrt(we * we + wn * wn);
         // load = q / qRef along the wind, at the height each class lives at
-        const ls = kq * sp * _s.hfSoft * _s.hfSoft, lt = kq * sp * _s.hfStiff * _s.hfStiff;
+        const ls = kq * sp * hs * hs, lt = kq * sp * ht * ht;
         const tse = we * ls, tsn = wn * ls, tte = we * lt, ttn = wn * lt;
         let d = bend[o] - tse, v = vel[o];
         bend[o] = tse + a11 * d + a12 * v; vel[o] = a21 * d + a22 * v;
@@ -181,10 +181,11 @@ export class FloraField {
         bend[o + 2] = tte + b11 * d + b12 * v; vel[o + 2] = b21 * d + b22 * v;
         d = bend[o + 3] - ttn; v = vel[o + 3];
         bend[o + 3] = ttn + b11 * d + b12 * v; vel[o + 3] = b21 * d + b22 * v;
-        wind[o] = we * _s.hf2; wind[o + 1] = wn * _s.hf2;
-        wind[o + 2] = clamp01(0.5 + 0.5 * _s.gust);
-        wind[o + 3] = _s.I * sp * _s.hf2;
-        gsum += wind[o + 2]; se += we * _s.hfSoft; sn += wn * _s.hfSoft;
+        wind[o] = we * h2; wind[o + 1] = wn * h2;
+        const g01 = 0.5 + 0.5 * _s[2];
+        wind[o + 2] = g01 < 0 ? 0 : g01 > 1 ? 1 : g01;
+        wind[o + 3] = _s[3] * sp * h2;
+        gsum += wind[o + 2]; se += we * hs; sn += wn * hs;
       }
     }
     // ---- travelling waves ------------------------------------------------------------------------

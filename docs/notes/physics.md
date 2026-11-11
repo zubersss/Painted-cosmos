@@ -124,7 +124,7 @@ holdAngle, iceFriction, treeFrequency, stemFrequency, PlantSim}`.
 
 ## Status
 
-INTEGRATION: ready (commit `af0783c`). The API above is stable; changes from here are additive.
+INTEGRATION: ready (commit `af0783c` or later). The API above is stable; changes from here are additive.
 
 Stage P1 (foundations) is done:
 
@@ -156,11 +156,19 @@ Stage P1 (foundations) is done:
   sleep at 60 and 20 Hz on level and sloping ground, rebounds that only shrink, pulse S-curve);
   the oscillator (exact at any step, never gains energy); the flora field; particles; footprints;
   the facade (shape, all ten bodies, determinism, budget, re-anchoring, deep space, NaN).
-- Timing (Node 22, this sandbox, 4 shared cores): `physics.update` at quality 1
-  **0.21 ms mean / 0.30 ms p95 walking; 0.34 / 0.52 ms at 46 m/s; 0.37 / 0.70 ms at 160 m/s**
-  on PILOT's stub; **0.20 ms mean on PAINTER's real Earth**. Worst frame in the first 5 s
-  after `warmUp()`: 0.45 ms. Without `warmUp()` the very first frames cost 5-10 ms (engine
-  compile); that is the 6.8 ms frame the lead measured.
+- Timing (Node 22, this sandbox, 4 cores shared with the other two workers): `physics.update`
+  at quality 1 **0.20 ms mean / 0.24 ms p95 walking; 0.31 / 0.80 ms at 46 m/s; 0.38 / 0.70 ms
+  at 160 m/s** on PILOT's stub; **0.17 ms mean on PAINTER's real Earth**.
+  Worst frame: the test repeats a 300-frame run four times after `warmUp()` and gives each
+  frame its best time; the worst of those is **0.22 ms**. Single measurements of 20-35 ms do
+  occur on this loaded machine about once in 1200 frames; they never recur at the same frame,
+  and a `--trace-gc` run shows only minor collections (0.2-0.4 ms, about one every 14 frames),
+  so they are the scheduler, not physics. Without `warmUp()` the first frames cost 5-10 ms
+  (engine compile plus a burst of surface samples): that is the 6.8 ms frame the lead measured.
+- Allocation: no objects or arrays are created per frame. About 100 kB of short-lived boxed
+  numbers per frame remain (doubles returned from calls the engine does not inline); the three
+  worst sources (string seed keys, object-field outputs in the 1024-cell loop, hash calls
+  inside the noise) were removed in this stage.
 - `physics-lab.html` in headless Chromium, no console errors in any scene. Evidence in
   `docs/shots/physics/`: `meadow-gale-walk.jpg` (grass bent by wind, parted by the explorer,
   footprints in snow), `meadow-jetpack.jpg` (plume blowing grass radially), `rain-earth.jpg`,

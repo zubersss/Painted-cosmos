@@ -47,7 +47,7 @@ function makeBuffer(cap) {
   };
 }
 
-const _w = {};
+const _w = new Float64Array(7);
 
 export class Particles {
   constructor(seed, quality = 1) {
@@ -121,11 +121,16 @@ export class Particles {
     const wp = this._wp;
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
       air.sampleWind(fx + (i - 1.5) * 16, fz + (j - 1.5) * 16, _w);
-      const o = (j * 4 + i) * 3; wp[o] = _w.we; wp[o + 1] = _w.wn; wp[o + 2] = _w.gust;
+      const o = (j * 4 + i) * 3; wp[o] = _w[0]; wp[o + 1] = _w[1]; wp[o + 2] = _w[2];
     }
     for (let k = 0; k < 25; k++) this._hfl[k] = heightFactor(k, cover.z0 || 0.03, cover.canopyHeight || 0, cover.canopy01 || 0);
+    // liquid level at the focus: what an unsampled spot is assumed to be until its node arrives
+    let liquid0 = near ? near.liquidAt(fx, fz) : NaN;
+    if (liquid0 !== liquid0) liquid0 = air.terrain.liquidAt(fx, fz);
+    if (liquid0 !== liquid0) liquid0 = -1e9;
 
-    for (const name of ['rain', 'snow']) {
+    for (let kk = 0; kk < 2; kk++) {
+      const name = kk === 0 ? 'rain' : 'snow';
       const b = this.buffers[name];
       b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
       const cap = PARTICLES.capacity[name][this.quality];
@@ -182,7 +187,9 @@ export class Particles {
         if (y < ground + 6) {
           gy = near ? near.heightAt(x, z, NaN) : NaN;
           if (gy !== gy) gy = air.terrain.heightAt(x, z, ground);
-          const lq = near ? near.liquidAt(x, z) : -1e9;
+          let lq = near ? near.liquidAt(x, z) : NaN;
+          if (lq !== lq) lq = air.terrain.liquidAt(x, z);
+          if (lq !== lq) lq = liquid0;
           if (lq > gy) { gy = lq; wet = true; }
           hit = y <= gy;
         }

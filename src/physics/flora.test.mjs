@@ -10,7 +10,7 @@ import { makeWorld, V, norm, len } from './testworld.mjs';
 const R = 4000;
 function world(bodyId = 'earth', biome = 'alpine_meadow') {
   const sample = makeWorld({ R, biome });
-  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), seed: 7 });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), seed: 7, timeBudget: false });
   const d = norm(V(0.3, 0.55, 0.78));
   const focus = V(d.x * R, d.y * R, d.z * R);
   return { physics, focus, bodyId, d };
@@ -174,8 +174,8 @@ test('a single PlantSim agrees with the field for a plant of the reference frequ
     const x = fr.lx(w.focus.x, w.focus.y, w.focus.z), z = fr.lz(w.focus.x, w.focus.y, w.focus.z);
     // (sampled at the centre of the field cell the plant is compared with)
     const cx = (F.ci + 0.5) * F.cell, cz = (F.cj + 0.5) * F.cell;
-    const s = {}; w.physics.fields.air.sampleWind(cx, cz, s);
-    plant.step(1 / 60, s.we * s.hfSoft, s.wn * s.hfSoft, w.physics.here.air.density);
+    const s = new Float64Array(7); w.physics.fields.air.sampleWind(cx, cz, s);
+    plant.step(1 / 60, s[0] * s[4], s[1] * s[4], w.physics.here.air.density);
     const i = (F.N / 2) * F.N + F.N / 2;
     const fe = F.bend[i * 4], fn = F.bend[i * 4 + 1];
     if (w.physics.time > 110) { err += Math.hypot(plant.s[0] - fe, plant.s[2] - fn); mag += Math.hypot(fe, fn); n++; }

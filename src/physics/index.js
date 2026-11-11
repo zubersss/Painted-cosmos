@@ -281,17 +281,25 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     return env;
   }
 
-  // Disturbers for physics.update from PILOT's states (reuses the objects in `out`).
+  // Disturbers for physics.update from PILOT's states. Appends to `out` (clear it each frame with
+  // out.length = 0); the entries are four objects owned by physics and reused, so nothing is
+  // allocated per frame.
+  const _dEx = { kind: 'explorer', p: null, v: null, radius: EXPLORER_BODY.radius, strength: 1, grounded: true };
+  const _dJet = { kind: 'jet', p: null, v: null, radius: 0.15, strength: 0 };
+  const _dShip = { kind: 'ship', p: null, v: null, radius: 4.2, strength: 1 };
+  const _dWash = { kind: 'downwash', p: null, v: null, radius: 2.2, strength: 0 };
   function explorerDisturbers(st, out = []) {
     const B = st.phys;
-    out.push({ kind: 'explorer', p: st.p, v: st.v, radius: EXPLORER_BODY.radius, strength: 1, grounded: !!st.grounded });
-    if (B && B.jetThrottle > 0.02) out.push({ kind: 'jet', p: st.p, v: st.v, radius: 0.15, strength: EXPLORER_BODY.jetThrust * B.jetThrottle });
+    _dEx.p = st.p; _dEx.v = st.v; _dEx.grounded = !!st.grounded;
+    out.push(_dEx);
+    if (B && B.jetThrottle > 0.02) { _dJet.p = st.p; _dJet.v = st.v; _dJet.strength = EXPLORER_BODY.jetThrust * B.jetThrottle; out.push(_dJet); }
     return out;
   }
   function shipDisturbers(st, out = []) {
     const B = st.phys;
-    out.push({ kind: 'ship', p: st.p, v: st.v, radius: 4.2, strength: 1 });
-    if (B && B.downwash.thrust > 50) out.push({ kind: 'downwash', p: st.p, v: st.v, radius: B.downwash.radius, strength: B.downwash.thrust });
+    _dShip.p = st.p; _dShip.v = st.v;
+    out.push(_dShip);
+    if (B && B.downwash && B.downwash.thrust > 50) { _dWash.p = st.p; _dWash.v = st.v; _dWash.radius = B.downwash.radius; _dWash.strength = B.downwash.thrust; out.push(_dWash); }
     return out;
   }
 
