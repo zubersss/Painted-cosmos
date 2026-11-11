@@ -46,7 +46,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { parseArgs, repo } from './browser.mjs';
+import { parseArgs, repo, settleWorld } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 import { BODIES } from '../src/data/bodies.js';
 
@@ -62,14 +62,19 @@ if (!label) {
   catch { label = opt.root ? 'a clean export' : 'the working tree'; }
 }
 
+// Where to look (PAINTER, quality push, top tier): the sward is drawn in three rings, to 17,
+// 66 and 240 m; trees change tier at 90, 190, 420 and 600 m. A walk sweeps the ring edges over
+// the ground ahead; the low flight crosses the tree tiers; `fill` is an arrival, before the
+// land is painted.
 const SCENES = [
-  { id: 'still-frozen', what: 'Earth spawn, standing, the clock stopped (time scale 0): the same instant painted again', place: 'spawn', t: 30, frames: 8, freeze: true },
-  { id: 'still', what: 'Earth spawn, standing still, the clock running', place: 'spawn', t: 30, frames: 36 },
-  { id: 'turn', what: 'Earth spawn, a slow turn of the camera (mouse held, 3 px a frame)', place: 'spawn', t: 30, frames: 48, mouse: 3, stuck: true },
-  { id: 'walk', what: 'walking through the home forest (W held)', place: 'spawn', t: 30, frames: 60, keys: ['KeyW'], lead: 12 },
-  { id: 'flight', what: 'the ship low over the wood', place: 'spawn', t: 30, frames: 60, ship: { altitude: 40, speed: 35, throttle: 0.5 }, lead: 6 },
-  { id: 'pulse', what: 'the pulse drive, from high above Earth', frames: 36, pulse: ['mars', 'venus', 'jupiter', 'saturn', 'mercury'] },
-  { id: 'storm', what: 'the first thunderstorm at the Earth spawn (clock 240 s), standing still', place: 'spawn', t: 240, pre: 8, frames: 36 },
+  { id: 'still-frozen', what: 'Earth spawn, standing, the clock stopped (time scale 0): the same instant painted again', place: 'spawn', t: 30, frames: 6, freeze: true },
+  { id: 'still', what: 'Earth spawn, standing still, the clock running', place: 'spawn', stay: true, t: 30, frames: 30 },
+  { id: 'turn', what: 'Earth spawn, a slow turn of the camera (mouse held, 3 px a frame)', place: 'spawn', stay: true, t: 30, frames: 40, mouse: 3, stuck: true },
+  { id: 'walk', what: 'walking through the home forest (W held)', place: 'spawn', stay: true, t: 30, frames: 48, keys: ['KeyW'], lead: 12 },
+  { id: 'storm', what: 'the first thunderstorm at the Earth spawn (clock 240 s), standing still', place: 'spawn', stay: true, t: 240, pre: 4, frames: 30 },
+  { id: 'flight', what: 'the ship low over the wood', place: 'spawn', t: 30, frames: 48, ship: { altitude: 40, speed: 35, throttle: 0.5 }, lead: 6 },
+  { id: 'fill', what: 'arriving on foot 600 m east of the spawn: the first frames, while the land is still being painted', place: 'east', t: 30, frames: 30, noSettle: true },
+  { id: 'pulse', what: 'the pulse drive, from high above Earth', frames: 30, pulse: ['mars', 'venus', 'jupiter', 'saturn', 'mercury'] },
 ];
 const WANT = SCENES.filter((s) => !opt.only || String(opt.only).split(',').includes(s.id));
 
@@ -80,15 +85,11 @@ try { rows = JSON.parse(fs.readFileSync(path.join(sheets, 'motion.json'), 'utf8'
 const order = (r) => SCENES.findIndex((s) => s.id === r.id);
 const save = () => { rows.sort((a, b) => order(a) - order(b)); fs.writeFileSync(path.join(sheets, 'motion.json'), JSON.stringify({ label, size: `${W}x${H}`, quality: Number(opt.quality), stepHz: Number(opt.hz), scenes: rows }, null, 1)); };
 let failed = false;
+let here = 'spawn';                 // a fresh game stands at the Earth spawn
 
 const step = (n = 1) => page.evaluate(([dt, k]) => window.__pc.step(dt, k), [DT, n]);
 const grab = () => page.evaluate(() => window.__motion.grab());
 const info = () => page.evaluate(() => window.__pc.info());
-async function settle(sec = 400) {
-  const t0 = Date.now();
-  const ok = await page.evaluate((s) => Promise.race([window.__pc.settle(10), new Promise((r) => setTimeout(() => r(false), s * 1000))]), sec);
-  return ok === true ? Math.round((Date.now() - t0) / 100) / 10 : null;
-}
 
 try {
   await page.waitForFunction('window.__pcReady === true', null, { timeout: 900000, polling: 300 });
@@ -102,24 +103,36 @@ try {
     // here, nothing moves and nothing is measured).
     await page.evaluate(() => { const pc = window.__pc; pc.hold(false); pc.setTimeScale(0); window.__motion.reset(); });
     const note = [];
-    if (s.place === 'spawn') {
+    if (s.place === 'spawn' && s.stay && here === 'spawn') {
+      // The scene before left the explorer standing at (or a few steps from) the spawn.
+      await page.evaluate((s) => window.__pc.setClock(s.t - (s.pre || 0)), s);
+    } else if (s.place === 'spawn' || s.place === 'east') {
+      if (s.noSettle) await page.evaluate(() => window.__pc.hold(true));   // not one frame before the measured ones
       await page.evaluate((s) => {
-        const pc = window.__pc, d = pc.world.getSpawn('earth').unitDir;
+        const pc = window.__pc, d0 = pc.world.getSpawn('earth').unitDir;
+        let d = [d0.x, d0.y, d0.z];
+        if (s.place === 'east') {
+          // 600 m along the surface, eastwards (about the pole): land nobody has painted yet.
+          const a = 600 / s.R, c = Math.cos(a), n = Math.sin(a);
+          d = [d0.x * c + d0.z * n, d0.y, d0.z * c - d0.x * n];
+        }
         pc.setClock(s.t - (s.pre || 0));
-        pc.teleport(s.ship ? { body: 'earth', dir: [d.x, d.y, d.z], ship: true, altitude: s.ship.altitude, throttle: s.ship.throttle } : { body: 'earth', dir: [d.x, d.y, d.z], firstPerson: false });
-      }, s);
+        pc.teleport(s.ship ? { body: 'earth', dir: d, ship: true, altitude: s.ship.altitude, throttle: s.ship.throttle } : { body: 'earth', dir: d, firstPerson: false });
+      }, { ...s, R: BODIES.earth.radius });
     } else if (s.pulse) {
       await page.evaluate((alt) => {
         const pc = window.__pc, d = pc.world.getSpawn('earth').unitDir;
         pc.teleport({ body: 'earth', dir: [d.x, d.y, d.z], ship: true, altitude: alt });
       }, BODIES.earth.radius * 3);
     }
-    const settled = await settle();
-    if (settled == null) note.push('the world did not settle in 400 s');
+    here = s.ship || s.pulse || s.place !== 'spawn' ? 'elsewhere' : 'spawn';
+    const st = s.noSettle ? { ok: true, frames: 0, seconds: 0 } : await settleWorld(page);
+    const settled = st.ok ? st.seconds : null;
+    if (!st.ok) note.push(`the world did not settle in ${st.frames} frames`);
     await page.evaluate((fr) => { const pc = window.__pc; pc.hold(true); pc.setTimeScale(fr ? 0 : 1); }, !!s.freeze);
     await page.waitForTimeout(300);
     // Run up to the moment in coarse steps (the sky eases, the marks fill the air): not measured.
-    if (s.pre) await page.evaluate(([dt, k]) => window.__pc.step(dt, k), [0.1, Math.round(s.pre / 0.1)]);
+    if (s.pre) await page.evaluate(([dt, k]) => window.__pc.step(dt, k), [0.2, Math.round(s.pre / 0.2)]);
 
     // The action, with real keys and a real mouse; then the frames, one fixed step each.
     if (s.ship) {
@@ -173,7 +186,7 @@ try {
     const dir = path.join(opt.out, s.id);
     fs.mkdirSync(dir, { recursive: true });
     urls.forEach((u, i) => fs.writeFileSync(path.join(dir, `f${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')));
-    const row = { id: s.id, what: s.what, frames: s.frames, settledSeconds: settled, seconds: 0, note, ...res.summary, pairs: res.pairs, pops: res.pops, meta: res.meta };
+    const row = { id: s.id, what: s.what, frames: s.frames, settledSeconds: settled, settledFrames: st.frames, seconds: 0, note, ...res.summary, pairs: res.pairs, pops: res.pops, meta: res.meta };
     await writeSheet(s, row, urls, res);
     row.seconds = Math.round((Date.now() - t0) / 1000);
     rows.push(row);

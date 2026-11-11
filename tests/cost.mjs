@@ -14,7 +14,7 @@
 //                            [--sheets dir (default docs/lead/evidence)] [--label text]
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseArgs, repo } from './browser.mjs';
+import { parseArgs, repo, settleWorld } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 
 const opt = parseArgs({ w: 960, h: 540, qualities: '0,1,2', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto', places: '', shoot: '', shots: '/home/user/.pc-scratch/pilot/cost', label: '' });
@@ -61,7 +61,7 @@ try {
       }, pl);
       if (!where) { log(`${pl.body} ${pl.kind} ${pl.id}: the world names no such place`); continue; }
       const t0 = Date.now();
-      const settled = await page.evaluate((s) => Promise.race([window.__pc.settle(10), new Promise((r) => setTimeout(() => r(false), s * 1000))]), 150);
+      const settled = (await settleWorld(page)).ok;
       await page.waitForTimeout(900);
       const m = await page.evaluate(() => { const pc = window.__pc, x = pc.info(); return { tris: x.stats.tris, calls: x.stats.calls, quality: pc.dyn.quality, busy: pc.world.busy, tight: +(pc.sim.footCam.tight01 || 0).toFixed(2), boom: +pc.sim.footCam.boomNow.toFixed(2), shown: pc.sim.explorerVisible() }; });
       const tag = `${pl.body}:${pl.kind}:${pl.id}`;

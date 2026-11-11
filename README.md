@@ -106,13 +106,14 @@ meant to be seen, and the lower tiers exist so that a weaker machine still plays
 
 | Tier | What it draws |
 | --- | --- |
-| 2, high (the start) | everything at full distance, the finest terrain |
-| 1, medium | plants and rocks out to a shorter distance |
-| 0, low | plants and rocks nearer still, coarser far terrain, fewer full trees in the distance and less undergrowth |
+| 2, high (the start) | full resolution; full-detail trees to 90 m and simpler trees to 600 m; undergrowth to 110 m; the sward in three rings (to 17, 66 and 240 m); the finest terrain; the pencil underdrawing |
+| 1, medium | 0.8 of the resolution; full trees to about 54 m, simpler ones to 360 m; undergrowth to 66 m; two rings of sward (12 and 40 m); coarser terrain |
+| 0, low | 0.62 of the resolution; no full-detail trees, simpler ones to about 170 m; half the undergrowth; one ring of strokes to 11 m at half density; a four-sector brush; no pencil line |
 
-The painting itself (paper, washes, edges, granulation) is the same in every tier; a lower
-tier has fewer things in it, not a different look. Render scale is separate: at 0.50 the
-picture is painted at half size and enlarged, which softens it a little.
+The paper and the washes are the same in every tier; a lower tier has fewer things in it, is
+painted on a smaller sheet (the share of the resolution in the table) and, at tier 0, with a
+simpler brush and no pencil line. The controller's render scale is separate and multiplies
+with it: at 0.50 the picture is painted at half size and enlarged, which softens it a little.
 
 **To pin a tier yourself**, add `?quality=2` (or `1`, or `0`) to the address: the tier then
 stays and only the resolution adapts. `?quality=0&scale=0.5&dynres=0` pins both.

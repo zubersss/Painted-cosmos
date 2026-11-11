@@ -6,8 +6,10 @@
 //
 // The run starts at the place with the most low boulders within reach of the biome's stand
 // (searched on a grid round it with the world's own sampleObstacles), and is made in several
-// headings. After every frame: the feet's height over the ground (sim.ex.altitude), the time
-// in the air, the pace. Space is never pressed.
+// headings. After every frame: the feet's height over the ground (sim.ex.altitude) and the
+// pace; for every stretch off the ground, how high the feet were over the ground, how far the
+// body rose above where the feet left it (thrown up, or did the ground fall away under the
+// run?), the slope and the nearest boulder at that moment. Space is never pressed.
 //
 // Usage: node tests/boulderrun.mjs [--root dir] [--body moon] [--biome crater_fields]
 //          [--headings 4] [--seconds 12] [--hz 30] [--limit 0.3]
@@ -59,25 +61,47 @@ try {
     if (k) { await look(Math.round((k * 2 * Math.PI / HEADINGS) / MOUSE_FOOT), 0); await page.evaluate(([dt]) => window.__pc.step(dt, 6), [DT]); }
     await page.keyboard.down('ShiftLeft');
     await page.keyboard.down('KeyW');
-    const acc = { maxUp: 0, maxAir: 0, vmax: 0, dist: 0, airFrames: 0, frames: 0, t: 0, stalled: 0, biomes: {} };
+    const acc = { vmax: 0, dist: 0, airFrames: 0, frames: 0, stalled: 0, biomes: {} };
+    await page.evaluate(() => { window.__br = { cur: null, list: [], last: null }; });
     for (let done = 0; done < FRAMES;) {
       const nStep = Math.min(30, FRAMES - done);
-      const r = await page.evaluate(([dt, nn, skip]) => {
-        const pc = window.__pc, sim = pc.sim, o = { maxUp: 0, maxAir: 0, vmax: 0, dist: 0, airFrames: 0, stalled: 0, biome: null, state: null };
+      const r = await page.evaluate(([dt, nn, skip, body]) => {
+        const pc = window.__pc, sim = pc.sim, B = window.__br, o = { vmax: 0, dist: 0, airFrames: 0, stalled: 0, biome: null, state: null };
         let p = { ...sim.ex.p };
         for (let i = 0; i < nn; i++) {
           pc.step(dt, 1);
-          const ex = sim.ex, q = ex.p;
+          const ex = sim.ex, q = ex.p, r = Math.hypot(q.x, q.y, q.z), alt = ex.altitude || 0;
           o.dist += Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z); p = { ...q };
-          if (i >= skip) { o.maxUp = Math.max(o.maxUp, ex.altitude || 0); o.maxAir = Math.max(o.maxAir, ex.airTime || 0); if (!ex.grounded) o.airFrames++; }
           o.vmax = Math.max(o.vmax, ex.speed || 0);
           if ((ex.speed || 0) < 0.3) o.stalled++;
+          if (i < skip) continue;
+          if (ex.grounded) {
+            if (B.cur) { B.cur.seconds = +(sim.t - B.cur.t0).toFixed(2); B.cur.groundAtLanding = +((r - alt) - B.cur.ground0).toFixed(2); delete B.cur.r0; delete B.cur.ground0; B.list.push(B.cur); B.cur = null; }
+            B.last = { r, ground: r - alt, speed: ex.speed || 0, slope: ex.slope || 0 };
+          } else {
+            o.airFrames++;
+            if (!B.cur) {
+              const L = B.last || { r, ground: r - alt, speed: ex.speed || 0, slope: 0 };
+              let near = null;
+              try {
+                for (const ob of pc.sim.sampleObstacles(body, { x: q.x / r, y: q.y / r, z: q.z / r }, 6) || []) {
+                  if (ob.kind !== 'rock') continue;
+                  const d = Math.hypot(ob.unitDir.x * r - q.x, ob.unitDir.y * r - q.y, ob.unitDir.z * r - q.z) - (ob.radius || 0);
+                  if (!near || d < near.gap) near = { gap: +d.toFixed(2), height: +ob.height.toFixed(2) };
+                }
+              } catch { /* no obstacles */ }
+              B.cur = { t0: +sim.t.toFixed(2), r0: L.r, ground0: L.ground, speed: +L.speed.toFixed(1), slopeDeg: Math.round(L.slope * 57.3), boulder: near, feetUp: 0, rise: -9, groundLowest: 0 };
+            }
+            B.cur.feetUp = +Math.max(B.cur.feetUp, alt).toFixed(3);
+            B.cur.rise = +Math.max(B.cur.rise, r - B.cur.r0).toFixed(3);
+            B.cur.groundLowest = +Math.min(B.cur.groundLowest, (r - alt) - B.cur.ground0).toFixed(2);
+          }
         }
         const bw = Object.entries((sim.mood && sim.mood.biomeWeights) || {}).sort((x, y) => y[1] - x[1])[0];
         o.biome = bw ? bw[0] : null; o.state = sim.sm.state;
         return o;
-      }, [DT, nStep, done === 0 ? Math.round(0.5 / DT) : 0]);
-      acc.maxUp = Math.max(acc.maxUp, r.maxUp); acc.maxAir = Math.max(acc.maxAir, r.maxAir); acc.vmax = Math.max(acc.vmax, r.vmax);
+      }, [DT, nStep, done === 0 ? Math.round(0.5 / DT) : 0, opt.body]);
+      acc.vmax = Math.max(acc.vmax, r.vmax);
       acc.dist += r.dist; acc.airFrames += r.airFrames; acc.stalled += r.stalled; acc.frames += nStep; if (r.biome) acc.biomes[r.biome] = 1;
       done += nStep;
       if (done === Math.min(FRAMES, 150)) await shot(`boulderrun-${opt.body}-${k}`, k === 0 ? `boulderrun-${opt.body}` : null);
@@ -85,14 +109,27 @@ try {
     }
     await page.keyboard.up('KeyW');
     await page.keyboard.up('ShiftLeft');
+    const air = (await page.evaluate(() => { const B = window.__br; return B.cur ? B.list.concat([{ ...B.cur, seconds: null, unfinished: true }]) : B.list; })).filter((a) => a.feetUp > 0.05);
     const secs = acc.frames * DT;
-    const row = { heading: Math.round((k * 360) / HEADINGS), metres: +acc.dist.toFixed(1), pace: +(acc.dist / secs).toFixed(2), topSpeed: +acc.vmax.toFixed(2), feetUp: +acc.maxUp.toFixed(3), airSeconds: +acc.maxAir.toFixed(2), framesOffGround: acc.airFrames, framesStalled: acc.stalled, biomes: Object.keys(acc.biomes) };
+    const row = { heading: Math.round((k * 360) / HEADINGS), metres: +acc.dist.toFixed(1), pace: +(acc.dist / secs).toFixed(2), topSpeed: +acc.vmax.toFixed(2), feetUp: Math.max(0, ...air.map((a) => a.feetUp)), thrownUp: Math.max(0, ...air.map((a) => a.rise)), framesOffGround: acc.airFrames, framesStalled: acc.stalled, biomes: Object.keys(acc.biomes), offTheGround: air };
     summary.headings.push(row);
-    log(`heading ${row.heading}: ${row.metres} m in ${secs.toFixed(0)} s (${row.pace} m/s, top ${row.topSpeed}), feet ${row.feetUp} m up at most, ${row.airSeconds} s in the air at most, ${row.framesOffGround} frames off the ground, ${row.framesStalled} stalled`);
+    log(`heading ${row.heading}: ${row.metres} m in ${secs.toFixed(0)} s (${row.pace} m/s, top ${row.topSpeed}), feet ${row.feetUp} m over the ground at most, thrown up ${row.thrownUp} m at most, ${row.framesOffGround} frames off the ground, ${row.framesStalled} stalled`);
+    for (const a of air) log(`    off the ground at ${a.t0} s for ${a.seconds} s: feet ${a.feetUp} m over the ground, ${a.rise} m above where they left it; the ground fell ${-a.groundLowest} m away; left at ${a.speed} m/s on a ${a.slopeDeg} degree slope, ${a.boulder ? 'a boulder ' + a.boulder.height + ' m tall ' + a.boulder.gap + ' m from the feet' : 'no boulder within 6 m'}`);
   }
-  summary.worstLift = Math.max(...summary.headings.map((h) => h.feetUp));
+  // Two different things lift the feet: being thrown up (the body rises above where the feet
+  // left the ground: a launch, the fault the measure is after) and the ground falling away
+  // under a run (a crater rim, the far side of a boulder: the body does not rise).
+  const all = summary.headings.flatMap((h) => h.offTheGround.map((a) => ({ ...a, heading: h.heading })));
+  summary.worstLift = Math.max(0, ...summary.headings.map((h) => h.feetUp));
+  summary.worstThrow = Math.max(0, ...summary.headings.map((h) => h.thrownUp));
   summary.pace = +(summary.headings.reduce((s, h) => s + h.pace, 0) / summary.headings.length).toFixed(2);
-  check(summary.worstLift <= Number(opt.limit), `the feet never leave the ground by more than ${opt.limit} m without a jump (largest lift ${summary.worstLift} m)`);
+  const lim = Number(opt.limit);
+  const byBoulder = all.filter((a) => a.feetUp > lim && a.boulder && a.boulder.gap < 1.5);
+  const offEdge = all.filter((a) => a.feetUp > lim && a.rise <= lim && !(a.boulder && a.boulder.gap < 1.5));
+  check(summary.worstThrow <= lim, `a run never throws the body more than ${lim} m above where the feet left the ground (largest ${summary.worstThrow} m)`);
+  check(byBoulder.length === 0, `no boulder lifts the feet more than ${lim} m off the ground` + (byBoulder.length ? ': ' + byBoulder.map((a) => `heading ${a.heading} at ${a.t0} s, ${a.feetUp} m, boulder ${a.boulder.height} m tall`).join('; ') : ''));
+  summary.offAnEdge = offEdge.map((a) => ({ heading: a.heading, t0: a.t0, seconds: a.seconds, feetUp: a.feetUp, groundFell: -a.groundLowest, speed: a.speed, slopeDeg: a.slopeDeg }));
+  log(`the measure as written (feet never more than ${lim} m over the ground without a jump): largest ${summary.worstLift} m` + (offEdge.length ? `; ${offEdge.length} time(s) the ground fell away under the run (not thrown up): ` + offEdge.map((a) => `heading ${a.heading}: ${a.feetUp} m over ground that fell ${-a.groundLowest} m, ${a.seconds} s in the air`).join('; ') : ''));
   check(summary.headings.every((h) => h.metres > 0.25 * Number(opt.seconds)), 'no heading is stopped dead: ' + summary.headings.map((h) => h.metres + ' m').join(', '));
 } catch (e) { run.fails.push('exception: ' + (e && e.message ? e.message : e)); log(e && e.stack ? e.stack : e); }
 summary.timings.wallSeconds = Math.round((Date.now() - t0) / 1000);

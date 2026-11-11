@@ -81,6 +81,26 @@ export async function startRun(opt) {
   return { page, problems, close, baseUrl, fails, log, check, info, sleep, shot, look, gameWait, until, holdPitch, aimShipAt, cx, cy, W, H };
 }
 
+// Wait until the world has had nothing left to build for `calm` frames in a row. Counted in
+// game frames as well as in seconds: in software rendering a top-tier frame takes five to nine
+// seconds, and a slow machine must not read as a slow game. Gives up after maxFrames frames
+// (or maxSeconds, the safety net). Returns { ok, frames, seconds }.
+export async function settleWorld(page, { calm = 10, maxFrames = 300, maxSeconds = 3600 } = {}) {
+  const t0 = Date.now();
+  const r = await page.evaluate(([calmN, maxF, maxS]) => new Promise((resolve) => {
+    const pc = window.__pc, f0 = pc.game.frameCount, w0 = performance.now();
+    let done = false;
+    pc.settle(calmN).then(() => { if (!done) { done = true; resolve({ ok: true, frames: pc.game.frameCount - f0 }); } });
+    const watch = () => {
+      if (done) return;
+      const fr = pc.game.frameCount - f0;
+      if (fr > maxF || performance.now() - w0 > maxS * 1000) { done = true; resolve({ ok: false, frames: fr }); } else setTimeout(watch, 500);
+    };
+    watch();
+  }), [calm, maxFrames, maxSeconds]);
+  return { ...r, seconds: Math.round((Date.now() - t0) / 100) / 10 };
+}
+
 export async function finish(run, opt, summary) {
   await run.close();
   run.check(run.problems.length === 0, 'no console errors, page errors, failed or external requests' + (run.problems.length ? ': ' + [...new Set(run.problems)].slice(0, 6).join(' | ') : ''));

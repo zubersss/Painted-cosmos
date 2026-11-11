@@ -7,7 +7,7 @@
 //     the way the painter faced when the world says so (yaw, pitch);
 //   - look at the body from orbit, from the ship.
 // Each frame waits until the world has nothing left to build (world.busy === 0 for ten frames
-// in a row), is captured on foot at 960x540 and quality 1 with the HUD hidden, and goes into
+// in a row), is captured on foot at 960x540 and the top tier (quality 2 unless --quality says otherwise) with the HUD hidden, and goes into
 // one contact sheet per body: docs/lead/evidence/tour-<body>.jpg (+ .json with the numbers).
 // The sheet says in so many words when a frame did NOT settle, when the explorer is standing
 // in liquid, when a vista cannot be stood on, and what each frame cost.
@@ -15,7 +15,7 @@
 //
 // For a long tour in software GL run one body per process (the browser tires):
 //   for b in mercury venus earth; do node tests/tour.mjs --bodies $b; done
-// Usage: node tests/tour.mjs [--bodies earth,mars] [--root dir] [--quality 1] [--w 960 --h 540]
+// Usage: node tests/tour.mjs [--bodies earth,mars] [--root dir] [--quality 2] [--settle-frames 300 --settle 3600] [--w 960 --h 540]
 //                            [--hour 10] [--settle 120] [--out dir] [--vistas 0] [--orbit 0]
 //                            [--label "text for the sheet's header"] [--query "stub=1"]
 //                            [--sheets dir (default docs/lead/evidence)]
@@ -23,10 +23,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { parseArgs, repo } from './browser.mjs';
+import { parseArgs, repo, settleWorld } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 
-const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/tour', w: 960, h: 540, quality: 1, hour: 10, settle: 120, vistas: 1, orbit: 1, label: '', query: '', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto' });
+const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/tour', w: 960, h: 540, quality: 2, hour: 10, settle: 3600, 'settle-frames': 300, vistas: 1, orbit: 1, label: '', query: '', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto' });
 const W = Number(opt.w), H = Number(opt.h), SETTLE = Number(opt.settle);
 const sheets = opt.sheets || path.join(repo, 'docs/lead/evidence');
 fs.mkdirSync(opt.out, { recursive: true });
@@ -126,10 +126,12 @@ process.exit(failed ? 1 : 0);
 
 // Wait for the world: nothing left to build for ten frames in a row, or the limit. Returns the
 // seconds it took, or null when the limit ran out first.
+// Settled is judged in game frames (--settle-frames), with --settle seconds as the safety net:
+// a top-tier frame takes seconds in software rendering, and that is the machine, not the game.
+let lastSettle = { frames: 0 };
 async function settle() {
-  const t0 = Date.now();
-  const ok = await page.evaluate((sec) => Promise.race([window.__pc.settle(10), new Promise((r) => setTimeout(() => r(false), sec * 1000))]), SETTLE);
-  return ok === true ? Math.round((Date.now() - t0) / 100) / 10 : null;
+  lastSettle = await settleWorld(page, { maxFrames: Number(opt['settle-frames']), maxSeconds: SETTLE });
+  return lastSettle.ok ? lastSettle.seconds : null;
 }
 
 async function shoot(file) {
@@ -161,12 +163,12 @@ async function capture(body, pl) {
   const file = path.join(opt.out, `${body}-${pl.kind}-${pl.id}.jpg`);
   await shoot(file);
   const flags = [];
-  if (settled == null) flags.push(`NOT SETTLED after ${SETTLE} s (world.busy ${m.busy})`);
+  if (settled == null) flags.push(`NOT SETTLED after ${lastSettle.frames} frames (world.busy ${m.busy})`);
   if (pl.problem) flags.push(pl.problem.toUpperCase());
   if (m.liquidDepth > 0.3 || pl.at.liquid > 0.3) flags.push(`STANDING IN LIQUID (${Math.max(m.liquidDepth, pl.at.liquid)} m)`);
   if (pl.kind === 'vista' && pl.at.slopeDeg >= 35) flags.push(`ON A ${pl.at.slopeDeg} DEGREE SLOPE`);
   if (pl.kind === 'biome' && pl.id !== 'spawn' && m.biome && m.biome !== pl.id) flags.push('STOOD IN ' + m.biome);
-  const f = { ...pl, file, settled, flags, found: null, tris: m.tris, calls: m.calls, worldWorstMs: m.worldWorstMs, physicsWorstMs: m.physicsWorstMs, stoodIn: m.biome, seconds: Math.round((Date.now() - t0) / 1000) };
+  const f = { ...pl, file, settled, settledFrames: lastSettle.frames, flags, found: null, tris: m.tris, calls: m.calls, worldWorstMs: m.worldWorstMs, physicsWorstMs: m.physicsWorstMs, stoodIn: m.biome, seconds: Math.round((Date.now() - t0) / 1000) };
   log(`${body} ${pl.kind} ${pl.id}: ${settled == null ? 'NOT SETTLED (busy ' + m.busy + ')' : 'settled in ' + settled + ' s'}, ${Math.round(m.tris / 1000)} k tris, ${m.calls} calls, world worst ${m.worldWorstMs} ms${pl.moved ? ', moved ' + pl.moved + ' m' : ''}${flags.length ? ' | ' + flags.join('; ') : ''} (${f.seconds} s)`);
   return f;
 }
@@ -184,9 +186,9 @@ async function captureOrbit(body) {
   const m = await measure();
   const file = path.join(opt.out, `${body}-orbit.jpg`);
   await shoot(file);
-  const flags = settled == null ? [`NOT SETTLED after ${SETTLE} s (world.busy ${m.busy})`] : [];
+  const flags = settled == null ? [`NOT SETTLED after ${lastSettle.frames} frames (world.busy ${m.busy})`] : [];
   log(`${body} orbit: ${settled == null ? 'NOT SETTLED' : 'settled in ' + settled + ' s'}, ${Math.round(m.tris / 1000)} k tris, ${m.calls} calls (${Math.round((Date.now() - t0) / 1000)} s)`);
-  return { kind: 'orbit', id: 'orbit', name: 'from orbit', file, settled, flags, tris: m.tris, calls: m.calls, worldWorstMs: m.worldWorstMs, stoodIn: null, moved: 0 };
+  return { kind: 'orbit', id: 'orbit', name: 'from orbit', file, settled, settledFrames: lastSettle.frames, flags, tris: m.tris, calls: m.calls, worldWorstMs: m.worldWorstMs, stoodIn: null, moved: 0 };
 }
 
 // Contact sheet: a header that says what this is and how it went, two frames across, a caption
@@ -202,7 +204,7 @@ async function writeSheet(body, frames) {
     if (f.alsoVista) bits.push(`also the vista "${esc(f.alsoVista)}"`);
     if (f.kind === 'biome' && f.heading != null) bits.push('from the easel, first person');
     if (f.moved) bits.push(`moved ${f.moved} m from the world's place to stand on dry, gentle ground${f.otherBiome ? ' (of ' + esc(f.otherBiome) + ')' : ''}`);
-    if (f.file) bits.push(f.settled == null ? '' : `settled in ${f.settled} s`, `${k(f.tris)} triangles, ${f.calls} draw calls`, `world.update worst ${f.worldWorstMs} ms`);
+    if (f.file) bits.push(f.settled == null ? '' : `settled in ${f.settled} s (${f.settledFrames} frames)`, `${k(f.tris)} triangles, ${f.calls} draw calls`, `world.update worst ${f.worldWorstMs} ms`);
     const flags = (f.flags || []).map((x) => `<span class="bad">${esc(x)}</span>`).join(' ');
     return `${body} / ${what}${bits.filter(Boolean).length ? ': ' + bits.filter(Boolean).join('; ') : ''} ${flags}`;
   };
@@ -210,7 +212,7 @@ async function writeSheet(body, frames) {
   const head = `<header><b>${body}</b>: the freeze-frame tour, ${esc(label)}, ${W}x${H}, quality ${opt.quality}, local time ${opt.hour}:00, ${fair ? 'fair weather held (no weather marks)' : 'the weather as it comes'}. `
     + `${shot.length} frames; <span class="${unsettled ? 'bad' : ''}">${unsettled ? unsettled + ' of them DID NOT SETTLE within ' + SETTLE + ' s (world.busy never reached 0): those frames may show unfinished terrain or flora' : 'every frame settled (world.busy reached 0) before it was captured'}</span>.</header>`;
   // The numbers first: they must survive whatever happens to the picture of the sheet.
-  const rows = frames.map((f) => ({ kind: f.kind, id: f.id, name: f.name, alsoVista: f.alsoVista || null, settledSeconds: f.settled, tris: f.tris, calls: f.calls, worldWorstMs: f.worldWorstMs, physicsWorstMs: f.physicsWorstMs, stoodIn: f.stoodIn, moved: f.moved || 0, found: f.found, at: f.at, flags: f.flags || [] }));
+  const rows = frames.map((f) => ({ kind: f.kind, id: f.id, name: f.name, alsoVista: f.alsoVista || null, settledSeconds: f.settled, settledFrames: f.settledFrames, tris: f.tris, calls: f.calls, worldWorstMs: f.worldWorstMs, physicsWorstMs: f.physicsWorstMs, stoodIn: f.stoodIn, moved: f.moved || 0, found: f.found, at: f.at, flags: f.flags || [] }));
   summary.bodies[body] = { frames: rows, unsettled };
   fs.writeFileSync(path.join(sheets, `tour-${body}.json`), JSON.stringify({ label, size: `${W}x${H}`, quality: Number(opt.quality), hour: Number(opt.hour), settleLimit: SETTLE, unsettled, frames: rows }, null, 1));
   fs.writeFileSync(path.join(opt.out, 'summary.json'), JSON.stringify(summary, null, 2));

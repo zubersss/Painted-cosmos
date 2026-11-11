@@ -1,5 +1,6 @@
 // The weather set: the lead's instrument for "weather in the game" (review 5).
-// In the integrated game, third person as the player sees it, 960x540, quality 1, HUD hidden:
+// In the integrated game, third person as the player sees it, 960x540, the top tier (quality 2
+// unless --quality says otherwise), HUD hidden:
 //   - the Earth spawn as a new player meets it: the first minute, before, as the front arrives,
 //     in and after the default seed's first thunderstorm (160 to 320 s of play, noon to half
 //     past two; the game clock is set a few seconds ahead of each moment and left to run up to
@@ -12,15 +13,15 @@
 // counters: triangles and draw calls of the whole frame, the kits' share, the sky numbers.
 // Writes docs/lead/evidence/weather.jpg (contact sheet) and weather.json. Console errors fail it.
 //
-// Usage: node tests/weather.mjs [--root dir] [--only earth-storm,mars-dust] [--quality 1]
+// Usage: node tests/weather.mjs [--root dir] [--only earth-storm,mars-dust] [--quality 2]
 //                               [--out dir] [--sheets dir] [--w 960 --h 540] [--label text]
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { parseArgs, repo } from './browser.mjs';
+import { parseArgs, repo, settleWorld } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
 
-const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/weather', w: 960, h: 540, quality: 1, only: '', label: '' });
+const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/weather', w: 960, h: 540, quality: 2, only: '', label: '' });
 const W = Number(opt.w), H = Number(opt.h);
 const sheets = opt.sheets || path.join(repo, 'docs/lead/evidence');
 fs.mkdirSync(opt.out, { recursive: true });
@@ -66,10 +67,11 @@ const order = (r) => SHOTS.findIndex((s) => s.id === r.id);
 const save = () => { rows.sort((a, b) => order(a) - order(b)); fs.writeFileSync(path.join(sheets, 'weather.json'), JSON.stringify({ label, size: `${W}x${H}`, quality: Number(opt.quality), frames: rows }, null, 1)); };
 let failed = false;
 
-async function settle(sec = 150) {
-  const t0 = Date.now();
-  const ok = await page.evaluate((s) => Promise.race([window.__pc.settle(10), new Promise((r) => setTimeout(() => r(false), s * 1000))]), sec);
-  return ok === true ? Math.round((Date.now() - t0) / 100) / 10 : null;
+// Settled is judged in game frames (300 at most), not seconds: a slow machine is not a slow game.
+let lastSettle = { frames: 0 };
+async function settle() {
+  lastSettle = await settleWorld(page);
+  return lastSettle.ok ? lastSettle.seconds : null;
 }
 
 try {
@@ -117,7 +119,7 @@ try {
         physicsWorstMs: x.physics ? +x.physics.worstMs.toFixed(2) : null,
       };
     });
-    const row = { id: s.id, what: s.what, file: path.basename(file), wanted: s.t, forced: s.force || null, settledSeconds: settled, seconds: Math.round((Date.now() - t0) / 1000), ...m };
+    const row = { id: s.id, what: s.what, file: path.basename(file), wanted: s.t, forced: s.force || null, settledSeconds: settled, settledFrames: lastSettle.frames, seconds: Math.round((Date.now() - t0) / 1000), ...m };
     rows.push(row);
     const sk = m.sky || {};
     log(`${s.id}: t ${m.t}, ${m.kind}, ${Math.round(m.tris / 1000)} k tris, ${m.calls} calls, kits ${m.kits ? m.kits.calls + ' calls ' + m.kits.tris + ' tris' : 'none'}, overcast ${sk.overcast} rain ${sk.rain} snowfall ${sk.snowfall} dust ${sk.dust} wet ${sk.wet} storm ${sk.storm}, fresh snow ${m.freshSnow}, ${settled == null ? 'NOT SETTLED' : 'settled'} (${row.seconds} s)`);
