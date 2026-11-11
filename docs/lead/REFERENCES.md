@@ -267,7 +267,8 @@ water make expanding rings.
 Checks
 - `R-RAIN-1` Fall speed 5 to 9 m/s for rain, 1.5 to 3 m/s for drizzle; slant equals
   atan(wind / fall speed) within 20%.
-- `R-RAIN-2` Rain never switches on or off: intensity changes by no more than 0.05 per second.
+- `R-RAIN-2` Rain never switches on or off: intensity changes by no more than 0.05 per second
+  on Earth (measured 0.9 %/s), 0.08 at a storm front on Neptune (`R-WX-1`).
 - `R-RAIN-3` Wetness: `weather().wetness01` reaches 1 within 30 to 90 s of heavy rain and decays
   to 0 over 3 to 10 minutes after it stops; traction follows it (`R-FOOT-4`).
 - `R-RAIN-4` Open water shows rain rings while it rains; puddles appear in hollows after a
@@ -327,10 +328,14 @@ stays wet after the sky clears. Nothing about weather is random per visit: it is
 place and time.
 
 Checks
-- `R-WX-1` (revised) Weather outputs are continuous: intensity, cloud and wind change by a few
-  percent of their range per second at most. Visibility at the edge of a fog bank or dust
-  storm may change faster (a bank drifting at 6 m/s really does arrive that fast); Painter
-  low-passes it in the sky if it reads as a pop. Lightning excepted.
+- `R-WX-1` (revised again in review 4, from measurements) Weather is continuous, and a moving
+  front is allowed to be a front. Measured through `physics.here.sky` at 2 Hz for half an hour
+  at twelve places a body: cloud, overcast, storm and wetness change by at most 2 to 6 % of
+  their range in a second everywhere; a snow squall front on Earth moves haze by 6.3 %/s and
+  snowfall by 5.1 %/s; on Neptune, where the fronts ride the fastest winds in the system, rain
+  moves 8 %/s and a fog bank 14.6 %/s. Limits: 8 %/s for anything on Earth-like worlds,
+  15 %/s on the ice giants, lightning excepted. The picture must not pop for it: PAINTER
+  eases what it shows of `sky` with a time constant of 2 s or more (`flash` excepted).
 - `R-WX-2` Deterministic: the same seed, body, place and time give the same weather (a unit
   test in `src/physics`), in keeping with "the same planet on every visit".
 - `R-WX-3` A full change (clear to rain, rain to clear) takes 1 to 4 minutes.

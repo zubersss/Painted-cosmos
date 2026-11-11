@@ -40,7 +40,11 @@ export class Game {
       sampleSurface: (bodyId, d) => world.sampleSurface(bodyId, scratch.set(d.x, d.y, d.z)),
       getSpawn: (bodyId) => {
         const sp = world.getSpawn ? world.getSpawn(bodyId) : null;
-        return sp && sp.unitDir ? V(sp.unitDir.x, sp.unitDir.y, sp.unitDir.z) : null;
+        if (!sp || !sp.unitDir) return null;
+        const d = V(sp.unitDir.x, sp.unitDir.y, sp.unitDir.z);
+        // Additive: where to look on arrival (radians from local north toward east), if the world says.
+        if (typeof sp.yaw === 'number') { d.yaw = sp.yaw; d.pitch = typeof sp.pitch === 'number' ? sp.pitch : null; }
+        return d;
       },
       sampleObstacles: world.sampleObstacles ? (bodyId, d, radius) => world.sampleObstacles(bodyId, scratch.set(d.x, d.y, d.z), radius) : null,
       physics: physics || null,

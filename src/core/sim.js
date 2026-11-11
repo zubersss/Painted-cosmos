@@ -119,6 +119,7 @@ export class Sim {
     const sample = this.sampler(bodyId);
     let d = dir;
     if (!d) d = this.getSpawn(bodyId) || V(0.3, 0.4, 0.86);
+    const face = typeof d.yaw === 'number' ? { yaw: d.yaw, pitch: d.pitch } : null;      // the world's own view of this place
     d = norm(d);
     if (opts.hour != null) this.eph.setLocalSolarTime(bodyId, this.t, d, opts.hour);
     const s = sample(d);
@@ -141,6 +142,12 @@ export class Sim {
     this.ex.grounded = !(opts.altitude > 0);
     // Look a little to the side of the ship so both it and the landscape are in frame.
     this.footCam = createFootCamera(rotateAround(toShip, d, 0.45), d);
+    if (face) {
+      // PAINTER's request: arrive facing the way the picture was painted (yaw from north toward east).
+      const fwd = add(scale(north, Math.cos(face.yaw)), scale(east, Math.sin(face.yaw)));
+      this.footCam = createFootCamera(fwd, d);
+      if (face.pitch != null) this.footCam.pitch = clamp(face.pitch, CAMERA.pitchMin, CAMERA.pitchMax);
+    }
     this.sh = restOnSurface(sample, best.dir, rotateAround(toShip, d, -1.9));
     this.shFrame = bodyFrame(bodyId, true);
     this.shipCam = createShipCamera();
