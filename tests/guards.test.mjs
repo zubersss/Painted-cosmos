@@ -66,14 +66,14 @@ test('a sink that stalls above the usual touch-down height (creeping up a slope)
     pad.press('KeyC');
     let lowest = Infinity;
     const t = play(sim, pad, 8, {
-      each: () => {
+      each: (t) => {
         // Keep the nose on the hill top with the yaw keys.
         const up = norm(sim.sh.p), fwd = qRotate(sim.sh.q, V(0, 0, -1));
         const to = norm(reject(sub(scale(hillDir, len(sim.sh.p)), sim.sh.p), up));
         const side = dot(cross(fwd, to), up);
         pad.release('KeyA'); pad.release('KeyD');
         if (side > 0.03) pad.press('KeyA'); else if (side < -0.03) pad.press('KeyD');
-        lowest = Math.min(lowest, sim.sh.altGround);
+        if (t > 0.1) lowest = Math.min(lowest, sim.sh.altGround);       // (the first frame after a teleport has no height yet)
       },
       until: () => sim.sm.state !== S.ATMOSPHERE,
     });
