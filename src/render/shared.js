@@ -72,6 +72,7 @@ export function makeBodyUniforms() {
     uLight: { value: new THREE.Vector3(1.0, 0.985, 0.93) },              // sunlit wash tint
     uHaze: { value: new THREE.Vector3(0.93, 0.955, 0.975) },             // distance fades to this (near paper)
     uFog: { value: new THREE.Vector4(1 / 4000, 5, 1, 0) },               // 1/visibility, bands, max, altitude01
+    uStorm: { value: 0 },                                                // 0 .. 1: under a storm cloud nothing is lit
     uDayness: { value: 1 },                                              // 1 day .. 0 night
     uHueA: { value: new THREE.Vector3(0.84, 0.99, 0.80) },               // the two drifts of neighbouring pigment in ground washes
     uHueB: { value: new THREE.Vector3(1.0, 0.90, 0.80) },
@@ -101,7 +102,7 @@ export const SHEET = {
 
 // How the picture is moving: the painter writes speed01 from the mood, the ship's model says
 // when the pulse drive is on (its animate state), the world eases pulse01 and lays the streaks.
-export const MOTION = { speed01: 0, space01: 0, pulse: false, pulseAt: -1, pulse01: 0 };
+export const MOTION = { speed01: 0, space01: 0, pulse: false, pulseAt: -1, pulse01: 0, given: null };
 
 // Quality tier (0 low, 1 medium, 2 high): set by the painter, read by the world to scale how
 // far flora is drawn.

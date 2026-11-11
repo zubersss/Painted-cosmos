@@ -401,14 +401,16 @@ class Ring {
       left -= nl;
     }
     // stones: by the water, and wherever the ground is stony
-    const nst = Math.min(left, (shore > 0.3 && st.rock ? 1 : 0) + Math.floor(st.dab * 4.5 + H(140)));
+    const nst = Math.min(left, (shore > 0.3 && st.rock ? 1 : 0) + Math.floor(st.dab * (far ? 2.2 : 3.0) + H(140) * 0.9));
     for (let q = 0; q < nst; q++, k++) {
       const q1 = H(141 + q), q2 = H(145 + q), q3 = H(149 + q), q4 = H(153 + q), p = at(q1, q2);
-      const w = (0.07 + 0.30 * q3 * q3) * (far ? 2.2 : 1);
-      const c = st.rock ? st.rock[q4 < 0.45 ? 0 : 1] : null;
+      // (unequal: most are small, one in a while is a boulder; most are the pale stone with its
+      // own shadow under it, one in four the dark one; all near the ground's value)
+      const w = (0.05 + 0.42 * q3 * q3 * q3) * (far ? 2.2 : 1);
+      const c = st.rock ? st.rock[q4 < 0.74 ? 0 : 1] : null, m = q4 < 0.74 ? 0.35 : 0.6;
       let cr, cg, cb;
-      if (c) { cr = lerp(c[0], gr, 0.4); cg = lerp(c[1], gg, 0.4); cb = lerp(c[2], gb, 0.4); } else { const k2 = 1.25 + 0.7 * q4; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
-      this.put(p[0], p[1], 0, 0, 0, w * (0.75 + 0.7 * q1), w, DAB + (q4 > 0.7 ? CRISP : 0), q3, born, cr, cg, cb, 0, 0);
+      if (c) { cr = lerp(c[0], gr, m); cg = lerp(c[1], gg, m); cb = lerp(c[2], gb, m); } else { const k2 = 1.15 + 0.5 * q4; cr = dens(gr, k2); cg = dens(gg, k2); cb = dens(gb, k2 + 0.1); }
+      this.put(p[0], p[1], 0, 0, 0, w * (0.55 + 0.8 * q1), w, DAB + (q4 > 0.8 ? CRISP : 0), q3, born, cr, cg, cb, 0, 0);
     }
     left -= nst;
     // drift ripples on dunes: long low dashes, darker than the sand

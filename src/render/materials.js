@@ -31,7 +31,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
-    uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
+    uFog: b.uFog, uDayness: b.uDayness, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
 }
 
@@ -417,7 +417,31 @@ void main() {
   float surf = sz * sz * smoothstep(0.50, 0.85, hN + (r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5);
   float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDepth)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
   surf = max(surf, swash * smoothstep(0.40, 0.60, r2.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
-  float white = max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq;
+  // far off, where the waves are finer than the brush can hold: the swell as a painter lays it,
+  // long broken strokes lying the way the crests lie (anchored to the planet), the hollow before
+  // each one darker, and on a sea that is breaking a white horse here and there along them
+  float farSea = (1.0 - keep) * smoothstep(0.04, 0.35, uPhysWaterSea.x) * liq * deep;
+  float farWhite = 0.0;
+  if (farSea > 0.01) {
+    vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
+    vec3 A3 = normalize(cross(up, D3));
+    float wB = smoothstep(110.0, 300.0, dist), capTh2 = 0.80 - 0.5 * uPhysWaterSea.w;
+    float sw = 0.0, wh = 0.0, hol = 0.0;
+    for (int i = 0; i < 2; i++) {
+      float L = i == 0 ? 8.5 : 21.0, wgt = i == 0 ? 1.0 - wB : wB;
+      float q = dot(vBody, D3) / L + (texture(uNoise3D, vBody / (L * 6.0) + 0.3).r - 0.5) * 1.6;
+      float id = floor(q), s = fract(q);
+      float br = texture(uNoise3D, vec3(dot(vBody, A3) / (L * 4.0), id * 0.371, id * 0.117)).r;
+      float ln = smoothstep(0.74, 0.86, s) * (1.0 - smoothstep(0.92, 1.0, s));
+      sw += wgt * ln * smoothstep(0.42, 0.56, br);
+      wh += wgt * ln * smoothstep(capTh2, capTh2 + 0.06, br);
+      hol += wgt * smoothstep(0.30, 0.55, s) * (1.0 - smoothstep(0.70, 0.80, s)) * smoothstep(0.35, 0.60, br);
+    }
+    c = pcDensity(c, 1.0 + farSea * (hol * 0.45 - sw * 0.25));
+    c = mix(c, skyc, farSea * sw * 0.35);
+    farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(700.0, 1800.0, dist));
+  }
+  float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq, farWhite);
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   float f = pcFogAmount(dist);
@@ -677,10 +701,11 @@ void main() {
   } else if (part < 2.5) {
     // ---- blades and fronds: single crisp strokes, lit like the ground under them
     // (under snow most of them are buried; the few left stand dark against the paper)
-    if (seed < uWx.z * 0.8) discard;
+    if (seed < uWx.z * 0.9) discard;
     float hue = vInst.x + (n1.b - 0.5) * 0.8;
     c = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
     c = mix(c, leafC, clamp(0.55 - vUv.y * 0.7, 0.0, 1.0));
+    c = mix(c, vec3(0.50, 0.43, 0.40), uWx.z * 0.85);      // (what still stands out of the snow is dead stalk, not a green fleck)
     c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5), 0.6);
     x = dot(normalize(vMassV), sunV) * 0.5 + 0.5;
     x *= mix(0.42, 1.0, pcDapple(vBody, canopy));
@@ -690,8 +715,8 @@ void main() {
     wet = 0.1;
     id = 4.0 + seed * 0.9;
   } else if (part < 3.5) {
-    // ---- accent: one soft touch of pure pigment
-    if (seed < uWx.z * 0.8) discard;
+    // ---- accent: one soft touch of pure pigment (none on a snowfield)
+    if (seed < uWx.z * 1.2) discard;
     c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.9);
     x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, canopy));
     c = pcTone(c, pcLevel(x + 0.2, 0.08));
@@ -826,6 +851,7 @@ ${FRAG_PARS}
 uniform vec3 uColor;
 uniform vec4 uWash;   // noise scale (1/m), dry brush, wetness, region id
 uniform float uFlat;  // 1 = no light steps (pure wash)
+uniform float uFade;  // 1 = all of it; less: thinned through a fixed stipple (a far world's ball giving way to the world itself)
 varying vec3 vObj;
 varying vec3 vNO;
 varying vec3 vNV;
@@ -838,6 +864,7 @@ varying vec3 vView;
   varying vec2 vUv;
 #endif
 void main() {
+  if (uFade < 0.999 && fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715)))) >= uFade) discard;
   #include <logdepthbuf_fragment>
   vec3 c = uColor;
   #ifdef USE_VCOLOR
@@ -890,7 +917,7 @@ export function makeWashMaterial(opts = {}) {
     uniforms: baseUniforms(opts.bodyUniforms, {
       uColor: { value: new THREE.Vector3(rgb.r, rgb.g, rgb.b) },
       uWash: { value: new THREE.Vector4(1 / (opts.scale || 1.6), opts.dry == null ? 0.25 : opts.dry, opts.wet == null ? 0.15 : opts.wet, opts.id == null ? 5.0 : opts.id) },
-      uFlat: { value: opts.flat ? 1 : 0 },
+      uFlat: { value: opts.flat ? 1 : 0 }, uFade: { value: 1 },
       uMap: { value: opts.map || null },
       uPointSize: { value: opts.pointSize || 3 },
     }),
@@ -1040,7 +1067,9 @@ void main() {
   float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
-  float len = iAxis.w * vis * (1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w)));
+  float snowK = 1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w));
+  if (broad) vis *= kind > 4.5 ? step(0.5, snowK) * snowK : snowK;        // (what lies on the ground is under the snow altogether)
+  float len = iAxis.w * vis * (broad ? 1.0 : snowK);
   vec3 ax = iAxis.xyz;
   vec3 up = normalize(root + uOrigin);
   // what has pushed through here: a blade leans with the load, and where it was trodden or
@@ -1141,7 +1170,7 @@ void main() {
   }
   // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
   // mark pooled by the sheet as well was a black comma)
-  float d = 1.0 + (0.55 - vS.x) * 0.7 * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
+  float d = 1.0 + (0.55 - vS.x) * (vKind > 4.5 && vKind < 5.5 ? 1.5 : 0.7) * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), mix(1.0, 0.4, 1.0 - vLoad));
   c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.16));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);

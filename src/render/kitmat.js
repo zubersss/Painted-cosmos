@@ -55,7 +55,11 @@ const SHAPES = {
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
   flake: 'float rr = length((vPcUv - 0.5) * vec2(1.0, 1.25)) * 2.0; if (rr > 0.42 + 0.75 * texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.x * 7.0)).r) discard; vec3 c = ink; float w = 0.05;',
   // dust: a ragged dry-brush patch thinning toward its edge; the pattern travels with the puff
-  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; if (nz < 0.40 + 0.6 * rr * rr) discard; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95;',
+  // (a glaze, like the rain: a soft veil of the ground's own dust, densest at its middle, running
+  // out to nothing, broken softly where the brush was dry; never a hard pale blot)
+  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0 || length(vView) < 1.6) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.22, 0.70, nz + 0.30 * (1.0 - rr)) * 0.52;',
+  // blown sand: a drag of the dune's own wash, a little paler than the dune, thinning to its tail
+  sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(uHaze, ink, 0.55); float w = 0.9; float ga = (1.0 - tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.46;',
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
   ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.12) discard; if (texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r < 0.36) discard; vec3 c = ink; float w = 0.0;',
@@ -66,7 +70,7 @@ const SHAPES = {
 function shapeOf(kind, info) {
   if (kind === 'rain') return SHAPES.rain;
   if (kind === 'snow') return SHAPES.flake;
-  if (kind === 'dust' || kind === 'ash' || kind === 'sand') return kind === 'sand' ? SHAPES.streak : SHAPES.puff;
+  if (kind === 'dust' || kind === 'ash' || kind === 'sand') return kind === 'sand' ? SHAPES.sandStreak : SHAPES.puff;
   return SHAPES[info.shape] || SHAPES.dab;
 }
 // region ids: prints belong to the ground (1); splash rings are 6 (kept crisp by the post
@@ -75,7 +79,7 @@ function shapeOf(kind, info) {
 // a light sky, lighter than a dark wood), instead of an opaque mark. They are drawn after the
 // abstraction pass, onto the brushed picture (shared.js GLAZES; the painter does it), testing
 // their depth by hand against the scene's, so the post passes still see the thing behind them.
-const GLAZE = { rain: 1 };
+const GLAZE = { rain: 1, dust: 1, ash: 1, sand: 1 };
 function regionOf(kind, info) {
   if (kind === 'ring' || info.shape === 'ring') return 6.0;
   if (kind === 'mark' || info.shape === 'mark') return 1.0;

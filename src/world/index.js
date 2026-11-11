@@ -59,7 +59,7 @@ export function createWorld(scene) {
       flora: null,
       forcedTime: null,
       camLocal: new THREE.Vector3(0, BODIES[id].radius * 4, 0),
-      found: new Set(), ring: null, dab: null, farTier: 2,
+      found: new Set(), ring: null, dab: null, farTier: 2, dabFade: 0,
     };
     if (look.flora) st.flora = new Flora(id, root, bu);
     if (look.rings) { st.ring = makeRing(bu, BODIES[id].radius, look.rings); root.add(st.ring); }
@@ -83,7 +83,7 @@ export function createWorld(scene) {
     else { const S = getSurface(st.id); for (const p of S.pal) for (let k = 0; k < 3; k++) c[k] += p.mid[k] / S.pal.length; }
     const m = makeWashMaterial({ bodyUniforms: st.bu, wet: 0.55, dry: 0, scale: st.body.radius * 0.9, id: 1 });
     m.uniforms.uColor.value.set(c[0], c[1], c[2]);
-    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(st.body.radius, 3), m);
+    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(st.body.radius * 1.03, 3), m);      // (a little over the world: it covers it while both are drawn)
     mesh.name = 'dab-' + st.id; mesh.visible = false;
     st.root.add(mesh);
     return mesh;
@@ -147,8 +147,11 @@ export function createWorld(scene) {
     const u = skyGlaze.material.uniforms, now = G.uTime.value, dt = glazeT < 0 ? 0 : Math.min(0.1, Math.max(0, now - glazeT));
     glazeT = now;
     const on = MOTION.pulse && performance.now() - MOTION.pulseAt < 600 ? 1 : 0;
-    MOTION.pulse01 += (on - MOTION.pulse01) * (dt > 0 ? 1 - Math.exp(-dt / 0.45) : 1);
-    if (MOTION.pulse01 < 0.002 && !on) MOTION.pulse01 = 0;
+    if (MOTION.given != null) MOTION.pulse01 = MOTION.given;      // (the game says how far the drive has spooled)
+    else {
+      MOTION.pulse01 += (on - MOTION.pulse01) * (dt > 0 ? 1 - Math.exp(-dt / 0.45) : 1);
+      if (MOTION.pulse01 < 0.002 && !on) MOTION.pulse01 = 0;
+    }
     const cruise = THREE.MathUtils.smoothstep(MOTION.speed01, 0.85, 1.0) * MOTION.space01 * 0.16;
     const S = Math.max(MOTION.pulse01, cruise);
     u.uStreak.value.set(S, now * 0.9, nearPixel, 0);
@@ -211,7 +214,7 @@ export function createWorld(scene) {
     // A far world that cannot be seen is not drawn: one wholly under the horizon of the world we
     // stand on, or behind its closed sky (it used to be submitted all the same: Neptune behind
     // the thunderstorm at the Earth spawn was 24 k triangles and 13 draw calls of nothing).
-    let hzn = -1, closedSky = false;
+    let hzn = -1, closedSky = false, farVeil = 0;
     if (active) {
       active.root.updateMatrixWorld(true);
       active.root.getWorldPosition(_hup);
@@ -220,7 +223,10 @@ export function createWorld(scene) {
       if (cr > 1) {
         _hup.divideScalar(cr);
         hzn = Math.PI / 2 + Math.acos(Math.min(1, (active.body.radius * 0.92) / cr));    // (the lowest ground there could be)
-        closedSky = skyU.uWxSky.value.x > 0.6 && skyU.uAtmo.value.x < 0.3 && lastActive === active.id;
+        // (a far world is veiled by the cloud in front of it: `farVeil` runs to 1 as the sky closes
+        // or the storm cloud comes over, and only then is the world left out)
+        farVeil = lastActive === active.id ? THREE.MathUtils.smoothstep(Math.max(skyU.uWxSky.value.x, skyU.uWxSky.value.y) * (1 - skyU.uAtmo.value.x), 0.06, 0.6) : 0;
+        closedSky = farVeil > 0.985;
       }
     }
     for (const st of state.values()) {
@@ -232,7 +238,9 @@ export function createWorld(scene) {
       if (st !== active) {
         root.getWorldPosition(_v).sub(cameraPos);
         const dist = Math.max(1, _v.length()), rpx = st.body.radius / dist / nearPixel;
-        tier = rpx < 1.3 ? 0 : rpx < (st.farTier === 2 ? 8 : 10) ? 1 : 2;
+        // (between 8 and 12 px across the ball thins away over the world itself: no swap in one frame)
+        tier = rpx < 1.3 ? 0 : rpx < 8 ? 1 : 2;
+        st.dabFade = rpx < 12 ? 1 - THREE.MathUtils.smoothstep(rpx, 8, 12) : 0;
         if (hzn > 0 && tier) {
           const reach = st.body.radius * (st.ring ? 2.6 : 1.12) + (st.body.atmosphereHeight || 0);
           const fromUp = Math.acos(Math.max(-1, Math.min(1, _v.dot(_hup) / dist)));
@@ -243,8 +251,9 @@ export function createWorld(scene) {
       const seen = tier === 2;
       st.terrain.group.visible = seen;
       if (st.ring) st.ring.visible = tier > 0;
-      if (tier === 1 && !st.dab) st.dab = makeDab(st);
-      if (st.dab) st.dab.visible = tier === 1;
+      const dabOn = st !== active && tier > 0 && st.dabFade > 0.004;
+      if (dabOn && !st.dab) st.dab = makeDab(st);
+      if (st.dab) { st.dab.visible = dabOn; if (dabOn) st.dab.material.uniforms.uFade.value = st.dabFade; }
       root.getWorldQuaternion(_q);
       // camera in body-local coordinates
       st.camLocal.copy(cameraPos);
@@ -288,9 +297,14 @@ export function createWorld(scene) {
         // far bodies: plain daylight; seen through the air of the world we stand on they are
         // veiled by its sky (a pale disc by day, as the moon is), clear at night and from space
         const veil = active && lastActive === active.id ? (1 - skyU.uAtmo.value.x) * skyU.uAtmo.value.y * 0.72 : 0;
-        if (veil > 0.01) { bu.uFog.value.set(1, 6, veil, 1); bu.uHaze.value.copy(skyU.uSkyZenith.value).lerp(skyU.uSkyHorizon.value, 0.45); }
+        if (veil > 0.01 || farVeil > 0.01) {
+          bu.uFog.value.set(1, 6, Math.max(veil, farVeil), 1);
+          bu.uHaze.value.copy(skyU.uSkyZenith.value).lerp(skyU.uSkyHorizon.value, 0.45);
+          // (behind a storm cloud it is lost into the cloud's own wash, not into the pale sky)
+          if (farVeil > 0.01) bu.uHaze.value.lerp(skyU.uStormWash.value, Math.min(1, skyU.uWxSky.value.y * 1.25) * farVeil * 0.85);
+        }
         else bu.uFog.value.set(1e-7, 6, 0, 1);
-        bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0);
+        bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0); bu.uStorm.value = 0;
       }
     }
     if (active) {
@@ -351,13 +365,18 @@ export function createWorld(scene) {
       const warm = Math.min(1, Math.max(0, (cs.x - cs.z) * 3));
       _storm.set(dn(cs.x) * 0.80, dn(cs.y) * 0.84, dn(cs.z) * 0.93).lerp(_pale.set(0.38, 0.45, 0.53).multiplyScalar(0.45 + 0.55 * dayness), 0.68 - 0.46 * warm);
       // overcast: a cool even light; a storm deepens the glaze (indigo, not grey)
-      tmpKey.light.lerp(_pale.set(0.94, 0.955, 0.99), oc * 0.85);
+      // (the ground loses its sun as the storm cloud comes over, before PHYSICS' overcast has closed)
+      const sunless = Math.min(1, Math.max(oc, storm * 1.5));
+      tmpKey.light.lerp(_pale.set(0.94, 0.955, 0.99), sunless * 0.85);
+      bu.uStorm.value = Math.min(1, Math.max(storm * 1.3, (sk ? sk.snowfall * air : 0) * 0.8)) * 0.9 * dayness;      // (and a snowfield under falling snow is in shadow: blue-grey, the flakes white on it)
       tmpKey.glaze.multiply(_pale.set(1 - 0.10 * storm, 1 - 0.08 * storm, 1 - 0.02 * storm));
       // the far washes: lost into the pale band under the cloud, into grey water, into the ground's own dust
       tmpKey.zenith.lerp(_pale.copy(_storm).lerp(_white, 0.16), oc * 0.92);
       tmpKey.horizon.lerp(_pale.copy(_storm).lerp(_white, 0.66), oc * 0.9);
       tmpKey.haze.lerp(_pale.copy(_storm).lerp(_white, 0.74), oc * 0.9);
       tmpKey.haze.lerp(_pale.set(0.955, 0.96, 0.965), fogW * 0.7);
+      // (falling snow: the air is a blue-grey veil, so that the flakes, bare paper, have a ground to be seen against)
+      tmpKey.haze.lerp(_pale.set(0.76, 0.81, 0.89), veilS * 0.62);
       if (dustW > 0.003) {
         dustColour(st, here.biomeWeights, _dust);
         tmpKey.haze.lerp(_pale.copy(_dust).lerp(_white, 0.30), dustW * 0.92);
@@ -382,7 +401,7 @@ export function createWorld(scene) {
       // (PHYSICS' twelfth number, `fresh`, is the cover of fresh snow alone: that is what is
       // laid over the painted ground; the older model above stands in where it is not given)
       const snowC = sk ? (skRaw.fresh != null ? sk.fresh : WX.forced ? sk.snow : Math.min(sk.snow, freshSnow)) * air : 0;
-      bu.uWx.value.set(Math.min(1, oc + dustW * 0.6), sk ? sk.wet * air : 0, snowC, Math.max(veilR, veilS));
+      bu.uWx.value.set(Math.min(1, sunless + dustW * 0.6), sk ? sk.wet * air : 0, snowC, Math.max(veilR, veilS));
       skyU.uWxSky.value.set(Math.min(1, oc + dustW * 0.5), storm, veilR, veilS);
       skyU.uStormWash.value.copy(_storm);
       WX.key = (storm * 0.34 + oc * 0.14 + dustW * 0.10) * dayness; WX.flash = sk ? sk.flash * air : 0;

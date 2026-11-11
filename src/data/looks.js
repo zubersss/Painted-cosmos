@@ -119,7 +119,7 @@ export const LOOKS = {
     biomes: [
       B('temperate_forest', 'Temperate Forest', 'forest',
         ['sapGreen', 'hookersGreen', 'quinGold', 'burntSienna', 'rawUmber', 'ultramarine', 'cobaltViolet'], 'cadScarlet',
-        ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1] }),
+        ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1], mist: 1.25 }),      // (a little more air than the planet's 185 m: one more band of wood shows before the paper)
       B('autumn_woodland', 'Autumn Woodland', 'forest',
         ['quinGold', 'burntSienna', 'cadOrange', 'rawUmber', 'oliveGreen', 'ultramarine', 'cobaltViolet'], 'alizarin',
         ['quinGold', 'burntSienna', 'rawUmber'], { autumn: 1, tall: [2, 1],

@@ -29,6 +29,7 @@ uniform vec3 uHaze;
 uniform vec4 uFog;
 uniform float uTime;
 uniform float uDayness;
+uniform float uStorm;
 uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
 layout(location = 1) out highp vec4 pcAux;
 
@@ -44,6 +45,9 @@ float pcLevel(float x, float soft) {
   // soft steps (local colour and one glaze) that run into each other
   x = mix(x, 0.37 + x * 0.25, uWx.x);
   soft += 0.08 * uWx.x;
+  // under a storm cloud nothing is lit at all: every form stands in the cloud's shadow, in the
+  // cool glaze and the deep one (the ground loses its sun before the rain comes)
+  x = mix(x, 0.17 + x * 0.26, uStorm);
   return smoothstep(0.26 - soft, 0.26 + soft, x)
        + smoothstep(0.50 - soft, 0.50 + soft, x)
        + smoothstep(0.76 - soft, 0.76 + soft, x);

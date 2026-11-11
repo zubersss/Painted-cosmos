@@ -15,7 +15,7 @@ function cell(kind, S, face, ix, iy) {
   if (v) { c.delete(key); c.set(key, v); return v; }     // refresh LRU order
   v = kind === 't' ? placeTrees(S, face, TREE_LEVEL, ix, iy, TREE_GRID) : placeUnder(S, face, UNDER_LEVEL, ix, iy, UNDER_GRID);
   c.set(key, v);
-  if (c.size > (kind === 't' ? 700 : 260)) c.delete(c.keys().next().value);
+  if (c.size > (kind === 't' ? 1400 : 700)) c.delete(c.keys().next().value);      // (the tiers reach farther now: more cells are alive at once)
   return v;
 }
 export function treeCell(S, face, ix, iy) { return cell('t', S, face, ix, iy); }
