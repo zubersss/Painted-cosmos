@@ -619,3 +619,41 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   as brush flicks and none on snow, the white fringe in the lightning frame, puddles as soft
   pale sky; (4) as capacity allows, the rest of review 5's SHOULD FIX list, then branch sway
   and drifts. A repaint of the weakest biome per planet moves to M4's critique swap.
+- 2026-11-11: **PHYSICS P7 accepted (fourth agent, `62d061a`; code `7a3df85`, `6b047dc`,
+  `e2e2d75`)**. The coordinator re-ran on a clean export of the head: `node --test
+  src/physics/` 220 pass; `node --test tests/*.test.mjs` 105 pass on the second run (the first
+  run had 2 failures with two other agents rendering: load-flaky, see below). In: rain in one
+  direction per frame, short, sparse (37 strokes in view in a thunderstorm, was 106); snow
+  flakes with their own aspect and slow turn; dust as low walls in a storm; a swell on open
+  seas and `pcPhysWaterCrestLine` / `line01` for the bare-paper crest stroke; denser splash
+  rings; grass parted about 2 m wide with a wake that closes in 30 s; a twelfth sky number
+  `sky.fresh` (fresh snow at the focus, integrated as it falls; `physics.here` is the
+  authority for `fresh` and `snow`); standing snow is the biome's `snowBase` only; rain or
+  snow closes the sky; a gale has its own sky; stateless and stateful sky agree within 1 %
+  except snow; **storms bring their own wind** (lead review 5, P1: storm 16 m/s at 10 m, dust
+  storm 20, shower 6, rain 3, ice fall 4). The game re-flown in Node with PILOT's levers on
+  six worlds (table in PHYSICS's notes, "For PILOT").
+  **Not verified by anyone**: P7.3 and P7.4 (sky, snow, storm wind) have never run in a
+  browser; nobody has walked or hovered through the windy storm in the game. PHYSICS itself
+  calls the storm wind the riskiest change of its run (two tests relaxed: hull shelter 0.25 to
+  0.5, powder count 3 to 2).
+  Open from review 5: P2 (first storm falls in the dark), P3 (Neptune's `storm_seas` never
+  storms by regime), P4 (dust in the forest air), P6 (33 m/s at two metres on Neptune's
+  coast; walking downwind slower than upwind).
+- 2026-11-11: **Rulings (PHYSICS asked).** (1) `R-WX-1`: Jupiter and Saturn count with the
+  giants (15 %/s). On the rocky worlds 8 %/s stands with one point of tolerance, because
+  PAINTER now eases what it shows with a 0.9 s time constant; Earth's 8.5 % passes. (2)
+  Process: a commit whose message begins "WIP snapshot" is a backup made by the coordinator
+  for the stop hook, possibly mid-edit. **The lead never reviews or tests a WIP snapshot**;
+  it reviews the last commit a role made itself. (3) Review 5, P6 (a wind the player cannot
+  walk in): PHYSICS owns the model, so PHYSICS gives the wind a boundary layer over rough
+  ground (10 to 15 m/s at two metres under 40 m/s aloft is what a log profile over a boulder
+  beach gives) and fixes downwind being slower than upwind, which is a fault in any model;
+  PILOT then sets how much the suit cancels (feel). Inside a wood the canopy's shelter is
+  real: the lead's 15 to 30 m/s gust check for thunderstorms (`R-STORM-5`) is measured in the
+  open at 10 m, not under trees.
+- 2026-11-11: findings relayed to PILOT from PHYSICS's re-fly: over the Moon's
+  `crater_fields` the ship hovered at 4.1 m with sink held for 90 s and never landed; cruise
+  on Mars and the Moon is 143 m/s with a 208 to 260 m turn radius and 131 to 248 m to stop;
+  two of PILOT's unit tests fail now and then under load (`tests/physics.test.mjs:27` once in
+  four for PHYSICS, two of 105 once in two for the coordinator).
