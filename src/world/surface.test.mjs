@@ -1,0 +1,140 @@
+// Unit tests for the pure world logic. Run: node --test src/world/
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { makeNoise, hashString, hash2i } from './noise.js';
+import { faceToDir, dirToFace } from './cubesphere.js';
+import { getSurface, sampleSurfacePure, getVistasPure, makeSample, NOLQ } from './surface.js';
+import { buildPatchData, patchIndices, PATCH_VERTS, PATCH_N } from './patchgen.js';
+import { BODY_IDS, BODIES } from '../data/bodies.js';
+import { LOOKS } from '../data/looks.js';
+
+test('noise is deterministic, bounded and seed-dependent', () => {
+  const a = makeNoise(hashString('x')), b = makeNoise(hashString('x')), c = makeNoise(hashString('y'));
+  let differs = false;
+  for (let i = 0; i < 2000; i++) {
+    const x = i * 0.137, y = i * 0.071 - 3, z = i * 0.013 + 9;
+    const v = a.n3(x, y, z);
+    assert.equal(v, b.n3(x, y, z));
+    assert.ok(v >= -1.2 && v <= 1.2);
+    if (Math.abs(v - c.n3(x, y, z)) > 1e-6) differs = true;
+  }
+  assert.ok(differs);
+  assert.equal(hash2i(3, 4, 5), hash2i(3, 4, 5));
+});
+
+test('cube-sphere mapping round-trips on every face', () => {
+  const d = [0, 0, 0], o = {};
+  for (let f = 0; f < 6; f++) for (let u = -0.95; u <= 0.95; u += 0.19) for (let v = -0.95; v <= 0.95; v += 0.19) {
+    faceToDir(f, u, v, d);
+    assert.ok(Math.abs(Math.hypot(d[0], d[1], d[2]) - 1) < 1e-12);
+    dirToFace(d[0], d[1], d[2], o);
+    assert.equal(o.face, f);
+    assert.ok(Math.abs(o.u - u) < 1e-9 && Math.abs(o.v - v) < 1e-9);
+  }
+});
+
+test('every body has a look with at least 4 biomes and a working surface', () => {
+  for (const id of BODY_IDS) {
+    assert.ok(LOOKS[id], id);
+    assert.ok(LOOKS[id].biomes.length >= 4, id);
+    const S = getSurface(id);
+    const seen = new Set();
+    for (let i = 0; i < 4000; i++) {
+      const y = 1 - 2 * (i + 0.5) / 4000, r = Math.sqrt(1 - y * y), a = i * 2.399963;
+      const s = sampleSurfacePure(id, Math.cos(a) * r, y, Math.sin(a) * r);
+      assert.ok(Number.isFinite(s.radius) && s.radius > BODIES[id].radius - 400 && s.radius < BODIES[id].radius + 900, id + ' radius ' + s.radius);
+      assert.ok(s.slope >= 0 && s.slope < Math.PI / 2);
+      let sum = 0; for (const k in s.biomeWeights) sum += s.biomeWeights[k];
+      assert.ok(Math.abs(sum - 1) < 0.01);
+      assert.ok(s.biomeWeights[s.biomeId] > 0);
+      assert.equal(s.isLiquid, s.liquidRadius > s.radius);
+      seen.add(s.biomeId);
+    }
+    assert.ok(seen.size >= 4, id + ' shows ' + seen.size + ' biomes');
+    assert.ok(S.sites.length >= 8);
+  }
+});
+
+test('sampleSurface is pure: same input, same output, in any order', () => {
+  const a = sampleSurfacePure('earth', 0.3, 0.5, 0.8);
+  sampleSurfacePure('mars', -0.2, 0.9, 0.1);
+  sampleSurfacePure('earth', -0.7, 0.1, 0.3);
+  const b = sampleSurfacePure('earth', 0.3, 0.5, 0.8);
+  assert.deepEqual(a, b);
+  const c = sampleSurfacePure('earth', 0.6, 1.0, 1.6);   // not normalised: same direction
+  assert.ok(Math.abs(a.radius - c.radius) < 1e-6);
+});
+
+test('earth spawn is dry, flat, in the temperate forest, near the stream', () => {
+  const S = getSurface('earth');
+  const sp = S.getSpawn();
+  const s = sampleSurfacePure('earth', sp.x, sp.y, sp.z);
+  assert.equal(s.biomeId, 'temperate_forest');
+  assert.ok(!s.isLiquid);
+  assert.ok(s.slope < 0.2, 'slope ' + s.slope);
+  const o = makeSample(S.nB);
+  S.sample(sp.x, sp.y, sp.z, o, true);
+  assert.ok(o.s < 25, 'stream distance ' + o.s);
+  assert.ok(o.trees < 0.05, 'the landing clearing has no trees');
+  // water really is within 30 m
+  let ux = -sp.z, uz = sp.x; const l = Math.hypot(ux, uz); ux /= l; uz /= l;
+  const vx = sp.y * uz, vy = sp.z * ux - sp.x * uz, vz = -sp.y * ux;
+  let wet = false;
+  for (let a = 0; a < 64 && !wet; a++) for (let r = 2; r < 30; r += 1) {
+    const c = Math.cos(a / 64 * 6.283) * r / S.R, d = Math.sin(a / 64 * 6.283) * r / S.R;
+    if (sampleSurfacePure('earth', sp.x + ux * c + vx * d, sp.y + vy * d, sp.z + uz * c + vz * d).isLiquid) { wet = true; break; }
+  }
+  assert.ok(wet);
+});
+
+test('liquid never floats: where there is liquid its level is a sane height', () => {
+  const S = getSurface('earth'), o = makeSample(S.nB);
+  for (let i = 0; i < 20000; i++) {
+    const y = 1 - 2 * (i + 0.5) / 20000, r = Math.sqrt(1 - y * y), a = i * 2.399963;
+    S.sample(Math.cos(a) * r, y, Math.sin(a) * r, o, false);
+    if (o.lq !== NOLQ && o.lq > o.h) assert.ok(o.lq - o.h < 90, 'depth ' + (o.lq - o.h));
+  }
+});
+
+test('vistas exist for every body and point at unit directions', () => {
+  for (const id of BODY_IDS) {
+    const v = getVistasPure(id);
+    assert.ok(v.length >= 4);
+    for (const x of v) assert.ok(Math.abs(Math.hypot(x.unitDir.x, x.unitDir.y, x.unitDir.z) - 1) < 1e-6);
+    assert.equal(new Set(v.map((x) => x.id)).size, v.length);
+  }
+});
+
+test('patches: sizes, determinism, and edges shared with the neighbour', () => {
+  const S = getSurface('earth');
+  const a = buildPatchData(S, 4, 5, 10, 12), b = buildPatchData(S, 4, 5, 10, 12);
+  assert.equal(a.positions.length, PATCH_VERTS * 3);
+  assert.deepEqual(a.positions, b.positions);
+  assert.ok(patchIndices().every((i) => i < PATCH_VERTS));
+  // right edge of (10,12) equals left edge of (11,12) in absolute coordinates
+  const c = buildPatchData(S, 4, 5, 11, 12), V = PATCH_N + 1;
+  for (let j = 0; j < V; j++) {
+    const p = (j * V + PATCH_N) * 3, q = (j * V) * 3;
+    for (let k = 0; k < 3; k++) assert.ok(Math.abs((a.positions[p + k] + a.origin[k]) - (c.positions[q + k] + c.origin[k])) < 0.02);
+  }
+  // morph targets of even vertices are zero (they exist on the parent mesh)
+  for (let j = 0; j < V; j += 2) for (let i = 0; i < V; i += 2) {
+    const p = (j * V + i) * 3;
+    assert.equal(a.morph[p], 0); assert.equal(a.morph[p + 1], 0); assert.equal(a.morph[p + 2], 0);
+  }
+});
+
+test('mesh at the finest level agrees with sampleSurface', () => {
+  const S = getSurface('earth');
+  const sp = S.getSpawn(), f = dirToFace(sp.x, sp.y, sp.z, {});
+  const level = 8, n = 1 << level;
+  const ix = Math.min(n - 1, Math.floor((f.u + 1) / 2 * n)), iy = Math.min(n - 1, Math.floor((f.v + 1) / 2 * n));
+  const d = buildPatchData(S, f.face, level, ix, iy), V = PATCH_N + 1;
+  for (let j = 0; j < V; j += 4) for (let i = 0; i < V; i += 4) {
+    const p = (j * V + i) * 3;
+    const x = d.positions[p] + d.origin[0], y = d.positions[p + 1] + d.origin[1], z = d.positions[p + 2] + d.origin[2];
+    const r = Math.hypot(x, y, z);
+    const s = sampleSurfacePure('earth', x / r, y / r, z / r);
+    assert.ok(Math.abs(s.radius - r) < 0.01, 'radius differs by ' + Math.abs(s.radius - r));
+  }
+});

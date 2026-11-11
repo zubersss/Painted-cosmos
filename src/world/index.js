@@ -53,6 +53,7 @@ export function createWorld(scene) {
   }
 
   let budgetMs = 5;
+  let physics = null;
   let lastActive = null;
   const lighting = { bodyId: null, sunElevation: 1, hours: 12, dayness: 1, altitude: 0, space01: 0 };
   const tmpKey = { zenith: new THREE.Vector3(), horizon: new THREE.Vector3(), haze: new THREE.Vector3(), glaze: new THREE.Vector3(), light: new THREE.Vector3(), grade: new THREE.Vector3(), cloudShade: new THREE.Vector3() };
@@ -195,6 +196,10 @@ export function createWorld(scene) {
       return s ? { unitDir: { x: s.x, y: s.y, z: s.z } } : null;
     },
     bodyUniforms(bodyId) { const st = state.get(bodyId); return st ? st.bu : null; },
+    // PHYSICS hook (COORDINATOR C14): the motion source for flora and weather. Stored now, read
+    // by the flora and weather drawing as those fields arrive.
+    setPhysics(p) { physics = p || null; },
+    getStats() { const st = state.get(lastActive); return st ? { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy } : null; },
     sky,
   };
 }

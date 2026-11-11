@@ -6,11 +6,11 @@
 import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { buildPatchData, patchIndices, PATCH_N } from './patchgen.js';
-import { faceToDir, nodeSize } from './cubesphere.js';
+import { faceToDir, nodeSize, FACES } from './cubesphere.js';
 import { makeTerrainMaterial, makeWaterMaterial } from '../render/materials.js';
 
-const SPLIT_K = 2.5;        // a node splits when the camera is nearer than SPLIT_K * its size
-const MORPH_A = 0.84;       // morph band: [MORPH_A, MORPH_B] * the distance at which it merges
+const SPLIT_K = 1.3;        // a node splits when the camera is nearer than SPLIT_K * its size
+const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at which it merges
 const MORPH_B = 0.98;
 const ANCHOR = 64;          // stroke textures repeat with periods that divide this (metres)
 const KEEP_FRAMES = 240;    // unused children are disposed after this many updates
@@ -36,6 +36,8 @@ class Node {
     faceToDir(face, -1 + (ix + 0.5) * span, -1 + (iy + 0.5) * span, _dir);
     this.center = new THREE.Vector3(_dir[0] * R, _dir[1] * R, _dir[2] * R);
     this.boundR = this.size * 0.9 + 60;
+    this.u0 = -1 + ix * span; this.u1 = this.u0 + span; this.v0 = -1 + iy * span; this.v1 = this.v0 + span;
+    this.avgR = R;
     this.lastUsed = 0;
     this.dist = 0;
   }
@@ -58,6 +60,7 @@ export class PlanetTerrain {
     this.queue = [];
     this.frame = 0;
     this.camLocal = new THREE.Vector3(0, this.R * 3, 0);
+    this.camDir = new THREE.Vector3(0, 1, 0);
     this.visible = [];
     this.patchCount = 0;
     this.detail = true;        // false: only the six root patches (far bodies)
@@ -118,6 +121,7 @@ export class PlanetTerrain {
     }
     node.center.copy(origin);
     node.boundR = d.boundR;
+    node.avgR = this.R + (d.minH + d.maxH) * 0.5;
     node.ready = true; node.queued = false;
     this.patchCount++;
   }
@@ -141,15 +145,35 @@ export class PlanetTerrain {
     this.queue.push(node);
   }
 
+  // Distance from the camera to the nearest point of a node: clamp the camera's position in
+  // the face's (u, v) to the node's rectangle. Far tighter than a bounding sphere, which is
+  // what keeps the patch count low.
+  _nodeDist(node) {
+    const f = FACES[node.face], c = this.camDir;
+    const dn = c.x * f.n[0] + c.y * f.n[1] + c.z * f.n[2];
+    if (dn > 0.2) {
+      let u = Math.atan((c.x * f.u[0] + c.y * f.u[1] + c.z * f.u[2]) / dn) * (4 / Math.PI);
+      let v = Math.atan((c.x * f.v[0] + c.y * f.v[1] + c.z * f.v[2]) / dn) * (4 / Math.PI);
+      u = u < node.u0 ? node.u0 : u > node.u1 ? node.u1 : u;
+      v = v < node.v0 ? node.v0 : v > node.v1 ? node.v1 : v;
+      faceToDir(node.face, u, v, _dir);
+      const r = node.avgR;
+      const dx = this.camLocal.x - _dir[0] * r, dy = this.camLocal.y - _dir[1] * r, dz = this.camLocal.z - _dir[2] * r;
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    return Math.max(0, _v.copy(this.camLocal).sub(node.center).length() - node.boundR);
+  }
+
   _select(node) {
     node.lastUsed = this.frame;
-    const d = Math.max(0, _v.copy(this.camLocal).sub(node.center).length() - node.boundR);
+    const d = this._nodeDist(node);
     node.dist = d;
     const split = this.detail && node.level < this.maxLevel && d < SPLIT_K * node.size;
     if (split) {
       if (!node.children) {
         const l = node.level + 1, x = node.ix * 2, y = node.iy * 2;
         node.children = [new Node(node.face, l, x, y, this.R), new Node(node.face, l, x + 1, y, this.R), new Node(node.face, l, x, y + 1, this.R), new Node(node.face, l, x + 1, y + 1, this.R)];
+        for (const c of node.children) c.avgR = node.avgR;
       }
       let all = true;
       for (const c of node.children) { if (!c.ready) { all = false; c.dist = d; c.lastUsed = this.frame; this._request(c); } }
@@ -167,6 +191,7 @@ export class PlanetTerrain {
   update(camLocal, budgetMs) {
     this.frame++;
     this.camLocal.copy(camLocal);
+    this.camDir.copy(camLocal).normalize();
     for (const n of this.visible) { n.mesh.visible = false; if (n.water) n.water.visible = false; }
     this.visible.length = 0;
     for (const r of this.roots) this._select(r);

@@ -221,9 +221,12 @@ function tick(now) {
   if (ship) { placeModel(ship, Math.sin(state.yaw) * 14 - 6, Math.cos(state.yaw) * 14); ship.animate({ mode: 'landed' }, dt); }
   world.update(dt, camera.position, bodyId);
   if (!settled) {
-    let guard = 0;
-    while (world.busy > 0 && guard++ < 400) world.update(0, camera.position, bodyId);
-    if (world.busy === 0) { settled = true; world.setBuildBudget(5); }
+    // keep building until two updates in a row find nothing left to do (each finished level
+    // of the quadtree asks for the next one on the following update)
+    let guard = 0, idle = world.busy === 0 ? 1 : 0;
+    const t0 = performance.now();
+    while (idle < 2 && guard++ < 2000 && performance.now() - t0 < 4000) { world.update(0, camera.position, bodyId); idle = world.busy === 0 ? idle + 1 : 0; }
+    if (idle >= 2) { settled = true; world.setBuildBudget(5); }
   }
   if (frozenT != null) painter.setTime(frozenT);
   const L = world.getLighting();
