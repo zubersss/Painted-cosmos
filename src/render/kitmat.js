@@ -68,8 +68,11 @@ const SHAPES = {
     + ' float ends = 1.0 - smoothstep(1.0 - max(soft, 0.8), 1.0, abs(p.x)); float up = (p.y + 1.0) * 0.5 / (0.3 + 0.7 * (1.0 - p.x * p.x));'
     + ' float prof = smoothstep(0.0, 0.12 + 0.2 * soft, up) * exp(-2.6 * up) * (1.0 - smoothstep(0.75, 1.0, up));'
     + ' float nz = 0.6 * texture(uNoise3D, vec3(vPcUv.x * 1.1 + vPcData.x * 3.7, vPcUv.y * 2.6, vPcData.x * 5.0)).r + 0.4 * texture(uNoise3D, vec3(vPcUv.x * 3.1, vPcUv.y * 8.0, vPcData.x * 9.0)).g;'
-    + ' float ga = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.7, ends * prof * 1.7, strm) * (0.30 + 0.70 * smoothstep(0.22, 0.72, nz)) * clamp(vPcData.y, 0.0, 1.0); ga = min(ga, 0.86);'
-    + ' vec3 c = mix(mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * fract(vPcData.x * 7.0)), vec3(0.985, 0.975, 0.955), 0.34 * strm); float w = 0.95;',
+    + ' float ga = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.7, ends * prof * 1.7, strm) * (0.42 + 0.58 * smoothstep(0.22, 0.72, nz)) * clamp(vPcData.y * 1.5, 0.0, 1.0); ga = min(ga, 0.9);'
+    // (seen in the game: a veil in the dust's own middle tone is lost against the hazy dune behind it. A veil
+    // is the paper coming through: it is lifted toward the paper AFTER the air has been laid over it, so that
+    // veils stand pale at every depth; less so after dark)
+    + ' vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * fract(vPcData.x * 7.0)); float w = 0.95; float lift = (0.42 + 0.26 * strm) * (0.35 + 0.65 * uDayness);',
   // blown sand: a drag of the dune's own wash lifted toward the paper (a pale skim, heavier than
   // it was: scattered specks did not read), thinning to its tail
   sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66;',
@@ -131,6 +134,7 @@ void main() {
   vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${shapeOf(kind, info)}
   c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
+  ${info.veil && (kind === 'dust' || kind === 'ash' || kind === 'sand') ? 'c = mix(c, vec3(0.985, 0.975, 0.955), lift);' : ''}
   ${GLAZE[kind] ? 'if (log2(1.0 + max(-vView.z, 0.0)) > texture(uSceneAux, gl_FragCoord.xy / uSceneRes).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,
     side: THREE.DoubleSide, transparent: !!GLAZE[kind], depthWrite: !GLAZE[kind], depthTest: !GLAZE[kind],
