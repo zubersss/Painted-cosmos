@@ -746,6 +746,9 @@ export class Sim {
     }, h, env);
     if (sh.bounce === 0) this.emit('bounce');
 
+    if (this.sm.state === S.SPACE) this._thin = null;
+    else if (this.sm.state === S.ATMOSPHERE && !sh.liftoff && env.airBrake > 0 && this._firstStep) this.thinAirWord(h);
+
     if (this.sm.state === S.ATMOSPHERE && !sh.liftoff) {
       // E lands. So does simply sinking onto the ground: nobody should have to hunt for a key.
       // "Onto the ground" is wherever the ship can sink no further: over a boulder, on a slope
@@ -761,7 +764,7 @@ export class Sim {
         if (this._sink.alt - sh.altGround > 0.3) this._sink = { t: 0, alt: sh.altGround };       // still coming down
       }
       const stalled = !!this._sink && this._sink.t > 1.5;
-      if (stalled && sh.speed >= 5 && this._firstStep && !this.notice) this.say('Slow down to land');
+      if (stalled && sh.speed >= 5 && this._firstStep && !this.notice) this.say(this.slowWord(env));
       const settle = I.down('KeyC') && sh.speed < 5 && (sh.altGround < SHIP.minClearance + 1.2 || stalled);
       if (settle) this._sink = null;
       if ((pressed('KeyE') && this.landable()) || settle) {
@@ -776,8 +779,32 @@ export class Sim {
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
       } else if (pressed('KeyE')) {
         // E without the prompt: never silence. Say what the landing is waiting for.
-        this.say(sh.altGround > LAND_PROMPT_ALTITUDE ? `Come down below ${LAND_PROMPT_ALTITUDE} m to land` : 'Slow down to land');
+        this.say(sh.altGround > LAND_PROMPT_ALTITUDE ? `Come down below ${LAND_PROMPT_ALTITUDE} m to land` : this.slowWord(env));
       }
+    }
+  }
+
+  // What the screen says when the ship is too fast to set down. Where the air is too thin to
+  // slow it (Mars, Mercury, the Moon, Pluto) it also says what will: X.
+  slowWord(env) { return env && env.airBrake > 0 ? 'Slow down to land: the air is thin here, hold X' : 'Slow down to land'; }
+
+  // A word on the screen when thin air limits the ship (PHYSICS' critique: "nothing telling the
+  // player why the ship will not turn or land"). A calm slip of paper, no tone, each at its
+  // moment: once per visit, coming down fast to where there is something to hit; and when the
+  // nose has turned and the ship has not followed for a second and a half (at most once a minute).
+  thinAirWord(h) {
+    const sh = this.sh, id = this.shFrame.id;
+    const T = this._thin && this._thin.id === id ? this._thin : (this._thin = { id, told: false, slip: 0, wideAt: -1e9 });
+    if (!T.told && sh.altGround < 250 && sh.speed > SHIP.speedGround * 1.25 && !this.notice) {
+      T.told = true;
+      this.say(`Thin air on ${BODIES[id].name}: the ship runs fast and turns wide. Hold X to slow it`, 6);
+    }
+    const f = qRotate(sh.q, V(0, 0, -1));
+    const off = sh.speed > 40 ? Math.acos(clamp(dot(f, sh.v) / sh.speed, -1, 1)) : 0;
+    T.slip = off > 0.5 ? T.slip + h : 0;
+    if (T.slip > 1.5 && this.t - T.wideAt > 60 && !this.notice) {
+      T.wideAt = this.t;
+      this.say('Thin air: the ship turns wide at this speed. Ease off (S) and it turns tighter', 5);
     }
   }
 
