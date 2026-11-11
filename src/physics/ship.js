@@ -26,9 +26,10 @@ export const SHIP_BODY = Object.freeze({
   // drag areas Cd x A (m^2): a 9 m lifting body nose-on, side-on, and flat belly-on
   cdaForward: 2.4, cdaSide: 14, cdaVertical: 30,
   // engines (accelerations = force / mass, m/s^2)
-  accelMain: 22,           // forward: 2.4 g
-  accelReverse: 10,        // retro thrusters
-  accelSide: 9,            // lateral thrusters (the flight computer kills sideslip with them)
+  accelMain: 22,           // forward: 2.2 g
+  accelReverse: 14,        // retro thrusters
+  accelSide: 18,           // sideways: thrusters (9) plus the lift of the hull in a banked turn (about 9
+                           // at the speeds the flight computer allows; see docs/notes/physics.md)
   accelLift: 14,           // ventral / dorsal thrusters beyond the weight they already carry
   accelSpace: 60,          // main drive in vacuum cruise mode (above the atmosphere): 6 g
   spoolUp: 0.45,           // s: engine thrust rise time
@@ -116,7 +117,12 @@ export function groundEffect(h, T = SHIP_BODY) {
 //   cmd: { target:{x,y,z}  velocity the flight computer should hold (m/s, frame coordinates)
 //          tau             s: how quickly it tries to close the error (PILOT's tauAtmo / tauSpace)
 //          hover           true: lift carries the weight (default true)
-//          boost           true: vacuum cruise mode (accelSpace instead of accelMain) }
+//          boost           true: vacuum cruise mode (accelSpace instead of accelMain)
+//          carve01         0..1, an ASSIST (default 0): the anti-gravity field turns the velocity
+//                          vector toward the target direction with time constant tau, without
+//                          changing the speed (a force at right angles to the motion does no
+//                          work). 1 = the nose-following feel of an arcade ship; 0 = pure
+//                          thrusters, and the ship slides wide in turns like a hovercraft. }
 //   env: { up:{x,y,z} | null   unit vector away from the body (null in deep space)
 //          gravity          m/s^2 at the body's surface (0 or missing in deep space)
 //          radius           m: base radius of the body, for inverse-square gravity (optional)
@@ -151,7 +157,7 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   const kf = 0.5 * rho * T.cdaForward / T.mass, ks = 0.5 * rho * T.cdaSide / T.mass, kv = 0.5 * rho * T.cdaVertical / T.mass;
   const rf = rx * _f[0] + ry * _f[1] + rz * _f[2], rs = rx * _r[0] + ry * _r[1] + rz * _r[2], ru = rx * _u[0] + ry * _u[1] + rz * _u[2];
   // ---- turbulence: a band-limited, deterministic chop ------------------------------------------
-  const time = env.time || 0;
+  const time = env.time != null ? env.time : B.time + dt;
   const amp = 0.5 * rho * airspeed * sigma * T.gustArea / T.mass;
   const ph = time * T.buffetRate;
   const b1 = noise3(ph, 3.7, 1.1, 911), b2 = noise3(ph * 1.7 + 40, 9.2, 5.5, 912), b3 = noise3(ph * 0.8 - 17, 2.2, 8.8, 913);
@@ -211,14 +217,30 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   const dragF = nf - nf / (1 + kf * Math.abs(nf) * dt), dragS = ns - ns / (1 + ks * Math.abs(ns) * dt), dragU = nu - nu / (1 + kv * Math.abs(nu) * dt);
   nf -= dragF; ns -= dragS; nu -= dragU;
   vx = wx + _f[0] * nf + _r[0] * ns + _u[0] * nu; vy = wy + _f[1] * nf + _r[1] * ns + _u[1] * nu; vz = wz + _f[2] * nf + _r[2] * ns + _u[2] * nu;
+  // ---- assist: the field turns the velocity toward the commanded direction ----------------------
+  if (cmd.carve01 > 0 && tg) {
+    const sp = Math.hypot(vx, vy, vz), ts = Math.hypot(tg.x, tg.y, tg.z);
+    if (sp > 0.5 && ts > 0.5) {
+      const k = (1 - Math.exp(-dt / tau)) * (cmd.carve01 > 1 ? 1 : cmd.carve01);
+      const ax0 = vx / sp, ay0 = vy / sp, az0 = vz / sp, bx = tg.x / ts, by = tg.y / ts, bz = tg.z / ts;
+      if (ax0 * bx + ay0 * by + az0 * bz > -0.98) {
+        let dx = ax0 + (bx - ax0) * k, dy = ay0 + (by - ay0) * k, dz = az0 + (bz - az0) * k;
+        const dl = Math.hypot(dx, dy, dz);
+        if (dl > 1e-9) { vx = dx / dl * sp; vy = dy / dl * sp; vz = dz / dl * sp; }
+      }
+    }
+  }
   st.p.x += vx * dt; st.p.y += vy * dt; st.p.z += vz * dt;
   st.v.x = vx; st.v.y = vy; st.v.z = vz;
 
   // ---- report ------------------------------------------------------------------------------------
   B.airspeed = Math.hypot(rx, ry, rz);
   B.q = 0.5 * rho * B.airspeed * B.airspeed;
-  const dragAcc = Math.hypot(dragF, dragS, dragU) / dt;
-  B.gLoad = Math.hypot(feltX, feltY, feltZ) / 9.81 + dragAcc / 9.81;
+  // what the crew would feel: every force except gravity (thrust, lift, buffet, drag), as a vector
+  const gx = feltX - (_f[0] * dragF + _r[0] * dragS + _u[0] * dragU) / dt;
+  const gy = feltY - (_f[1] * dragF + _r[1] * dragS + _u[1] * dragU) / dt;
+  const gz = feltZ - (_f[2] * dragF + _r[2] * dragS + _u[2] * dragU) / dt;
+  B.gLoad = Math.hypot(gx, gy, gz) / 9.81;
   // convective heating ~ sqrt(rho) v^3 (Sutton-Graves), normalised to a brisk Earth entry at 600 m/s
   B.heat01 = clamp01(Math.sqrt(rho) * B.airspeed * B.airspeed * B.airspeed / (Math.sqrt(0.3) * 600 * 600 * 600));
   B.time = time;

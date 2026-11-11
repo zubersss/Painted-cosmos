@@ -52,6 +52,21 @@ test('a small speed change behaves like PILOT\'s first-order follow (time consta
   assert.ok(Math.abs(-sim.st.v.z - 10) < 0.2);
 });
 
+test('turning: thrusters alone slide wide; the carve assist turns the velocity without changing the speed', () => {
+  const turn = (carve01) => {
+    const sim = flight({ rho: 0 }); sim.st.v = V(0, 0, -100);
+    // the nose (and so the target) swings 90 degrees to the right at once
+    sim.st.q = { x: 0, y: -Math.SQRT1_2, z: 0, w: Math.SQRT1_2 };
+    let t10 = null, smin = 1e9, smax = 0;
+    fly(sim, 12, { target: V(100, 0, 0), tau: 1, carve01 }, { each: (t, st) => { const sp = len(st.v); smin = Math.min(smin, sp); smax = Math.max(smax, sp); const ang = Math.acos(Math.min(1, st.v.x / sp)); if (t10 == null && ang < 10 * Math.PI / 180) t10 = t; } });
+    return { t10, smin, smax };
+  };
+  const pure = turn(0), carved = turn(1);
+  assert.ok(pure.t10 > 5, 'with thrusters alone a 90 degree turn at 100 m/s takes ' + pure.t10 + ' s');
+  assert.ok(carved.t10 < 3, 'with the carve assist: ' + carved.t10 + ' s');
+  assert.ok(carved.smin > 85 && carved.smax < 106, `speed through the carved turn: ${carved.smin}..${carved.smax}`);
+});
+
 test('hover: holds position exactly; no drift, no bobbing (60 and 20 Hz)', () => {
   for (const hz of [60, 20]) {
     const sim = flight();
@@ -81,7 +96,7 @@ test('wind: the flight computer holds station against it with side thrust', () =
   const sim = flight({ wind: V(15, 0, 0) });
   fly(sim, 15, { target: V(), tau: 1 });
   assert.ok(len(sim.st.v) < 0.01);
-  const need = 0.5 * 1.225 * T.cdaSide * 225 / T.mass;
+  const need = 0.5 * 1.225 * T.cdaSide * 225 / T.mass;      // well inside accelSide
   assert.ok(Math.abs(-sim.st.phys.thrust.x - need) < 0.02 * need, `side thrust ${-sim.st.phys.thrust.x} vs drag ${need}`);
   // engines off: the ship drifts downwind toward the wind speed
   const s2 = flight({ wind: V(15, 0, 0) }); fly(s2, 60, { target: null, hover: true });

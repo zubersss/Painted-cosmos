@@ -269,14 +269,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
 
   // Add physics to an env object for the explorer or ship step functions:
   //   env.air(p, out, height), env.ground(surface, out), env.liquid, and gravity / radius if missing.
+  // With no body (deep space) the env is returned as it is: no air, no gravity.
   function bindEnv(bodyId, env = {}) {
     const body = BODIES[bodyId];
+    if (!body) { env.air = undefined; env.ground = undefined; return env; }
     env.air = (p, out, height) => air(bodyId, p, out, height);
     env.ground = (surface, out) => ground(bodyId, null, out, surface);
     env.liquid = liquidOf(bodyId);
     if (env.gravity == null) env.gravity = body.gravity;
     if (env.radius == null) env.radius = body.radius;
-    env.time = time;
     return env;
   }
 
