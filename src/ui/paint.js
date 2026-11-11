@@ -70,11 +70,13 @@ export function installTheme(doc = typeof document !== 'undefined' ? document : 
   const tile = paperTile();
   if (tile) st.setProperty('--pc-paper-img', `url(${tile})`);
   st.setProperty('--pc-cursor', cursorUrl());
+  // Four pencil rings for the keys: none quite alike, none quite closed.
+  for (let i = 0; i < 4; i++) st.setProperty('--pc-key-' + 'abcd'[i], pencilRing(i + 1));
   // Pencil: three loose frames for the sketches not yet made, and a rule drawn along a page.
   st.setProperty('--pc-frame-a', pencilFrame(130, 73, 1)); st.setProperty('--pc-frame-b', pencilFrame(130, 73, 2));
   st.setProperty('--pc-frame-c', pencilFrame(130, 73, 3)); st.setProperty('--pc-rule', pencilRule(1)); st.setProperty('--pc-rule-b', pencilRule(2));
-  // Filters. pc-torn: the ragged edge of a torn sheet (panels). pc-rag: the same, finer, for
-  // small slips. pc-rough: the broken edge of ink or a wash on rough paper. pc-wash: a small
+  // Filters. pc-torn (-b, -c): the ragged edge of a torn sheet, a different tear for each
+  // panel. pc-rag (-b, -c): the same, finer, for small slips (-c for the long thin ones). pc-rough: the broken edge of ink or a wash on rough paper. pc-wash: a small
   // wash (a key, a tab): an uneven edge, and pigment settled into the grain so that the paper
   // shows through in specks. pc-stroke: the body of one broad stroke of a loaded brush (a
   // wandering edge, dense pigment). pc-brush: where that stroke runs dry: long streaks along
@@ -85,6 +87,10 @@ export function installTheme(doc = typeof document !== 'undefined' ? document : 
   holder.innerHTML = `<svg xmlns="${SVG}" width="0" height="0"><defs>
     <filter id="pc-torn" x="-4%" y="-6%" width="108%" height="112%"><feTurbulence type="fractalNoise" baseFrequency="0.028 0.034" numOctaves="3" seed="11" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="11" xChannelSelector="R" yChannelSelector="G"/></filter>
     <filter id="pc-rag" x="-6%" y="-20%" width="112%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.06 0.075" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="pc-torn-b" x="-4%" y="-6%" width="108%" height="112%"><feTurbulence type="fractalNoise" baseFrequency="0.022 0.04" numOctaves="3" seed="37" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="12" xChannelSelector="G" yChannelSelector="R"/></filter>
+    <filter id="pc-torn-c" x="-4%" y="-6%" width="108%" height="112%"><feTurbulence type="fractalNoise" baseFrequency="0.034 0.026" numOctaves="3" seed="73" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="10" xChannelSelector="R" yChannelSelector="B"/></filter>
+    <filter id="pc-rag-b" x="-6%" y="-24%" width="112%" height="148%"><feTurbulence type="fractalNoise" baseFrequency="0.045 0.09" numOctaves="2" seed="19" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="6" xChannelSelector="G" yChannelSelector="R"/></filter>
+    <filter id="pc-rag-c" x="-4%" y="-34%" width="108%" height="168%"><feTurbulence type="fractalNoise" baseFrequency="0.03 0.11" numOctaves="2" seed="52" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="8.5" xChannelSelector="R" yChannelSelector="B"/></filter>
     <filter id="pc-rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" seed="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.7" xChannelSelector="R" yChannelSelector="G"/></filter>
     <filter id="pc-wash" x="-18%" y="-30%" width="136%" height="160%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.1 0.13" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="4.2" xChannelSelector="R" yChannelSelector="G" result="d"/><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.5 0 0 0 1.6" result="ga"/><feComposite in="d" in2="ga" operator="in"/></filter>
     <filter id="pc-stroke" x="-7%" y="-34%" width="114%" height="168%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.03 0.075" numOctaves="2" seed="9" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G" result="d"/><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="5" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.7 0 0 0 1.32" result="ga"/><feComposite in="d" in2="ga" operator="in"/></filter>
@@ -153,6 +159,26 @@ export function pencilFrame(w = 130, h = 73, seed = 1) {
     hatch += `M${a.toFixed(1)} ${b.toFixed(1)}l${(l * 0.62).toFixed(1)} ${(-l * 0.78).toFixed(1)}`;
   }
   return svgUrl(`<svg xmlns="${SVG}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><filter id="g" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="${seed}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.3" xChannelSelector="R" yChannelSelector="G"/></filter><g fill="none" stroke="${GRAPHITE}" stroke-linecap="round" filter="url(#g)"><path d="${d1}" stroke-width="1.15" opacity="0.62"/><path d="${d2}" stroke-width="0.8" opacity="0.36"/><path d="${hatch}" stroke-width="0.8" opacity="0.3"/></g></svg>`);
+}
+
+// A key's outline: a soft pencil pulled once round a rounded box, not quite closed, the end
+// running past the start; stretched to the key by the browser (the line keeps its weight).
+export function pencilRing(seed = 1) {
+  const r = (i) => hash(seed * 53 + i, 11) - 0.5;
+  const W = 40, H = 24, m = 2.2, n = 22, start = hash(seed, 5) * Math.PI * 2, sweep = Math.PI * 2 * (0.9 + 0.13 * hash(seed, 6));
+  const pt = (k) => {
+    const a = start + (sweep * k) / n, c = Math.cos(a), sn = Math.sin(a);
+    // a superellipse: a box with soft corners
+    const q = 3.4, x = Math.sign(c) * Math.pow(Math.abs(c), 2 / q), y = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / q);
+    const grow = 1 + 0.05 * (k / n - 0.5);                      // the hand drifts outward as it goes round
+    return [W / 2 + x * (W / 2 - m) * grow + r(20 + k) * 1.3, H / 2 + y * (H / 2 - m) * grow + r(60 + k) * 1.3];
+  };
+  let d = '';
+  for (let k = 0; k <= n; k++) { const p0 = pt(k); d += (k ? 'L' : 'M') + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1); }
+  // a second, lighter touch over a third of the way where the pencil went back
+  const k0 = Math.floor(hash(seed, 9) * n * 0.6); let d2 = '';
+  for (let k = k0; k <= k0 + n / 3; k++) { const p0 = pt(k); d2 += (k > k0 ? 'L' : 'M') + (p0[0] + 0.8).toFixed(1) + ' ' + (p0[1] - 0.7).toFixed(1); }
+  return svgUrl(`<svg xmlns="${SVG}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g fill="none" stroke="${GRAPHITE}" stroke-linecap="round" stroke-linejoin="round"><path d="${d}" stroke-width="1.15" opacity="0.72" vector-effect="non-scaling-stroke"/><path d="${d2}" stroke-width="0.8" opacity="0.4" vector-effect="non-scaling-stroke"/></g></svg>`);
 }
 
 // A rule drawn freehand along the page: it wanders a pixel, and the pencil was lifted once.

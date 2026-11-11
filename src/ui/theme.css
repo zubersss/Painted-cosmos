@@ -29,19 +29,43 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-panel::before { inset: -4px; box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.14), inset 0 0 34px rgba(88, 68, 53, 0.14);
   filter: url(#pc-torn) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
 .pc-panel { padding: 22px 30px; }
+/* No two sheets are torn alike. */
+.pc-map::before { filter: url(#pc-torn-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
+.pc-book::before { filter: url(#pc-torn-c) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
+.pc-readout::before, .pc-gauge::before, .pc-newsketch::before {
+  filter: url(#pc-rag-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* The long thin slips (the hint, a notice, a marker's name) need a deeper tear to show one. */
+.pc-hint::before, .pc-notice::before, .pc-mark span::before { inset: -2px -3px;
+  filter: url(#pc-rag-c) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* With the map or the sketchbook open the picture behind steps back toward paper, as under a
+   sheet of tracing paper: the open sheet is the thing to read, on any sky. */
+.pc-hud.pc-paneled::before { content: ''; position: fixed; inset: 0; background: rgba(244, 239, 228, 0.6); }
+/* From the cockpit the lower third of the frame is the cowl and its three dials. */
+.pc-hud.pc-cockpit .pc-gauges { bottom: auto; top: 8.5%; left: auto; right: 7%; transform: none; }
+.pc-hud.pc-cockpit .pc-readout { bottom: auto; top: 8.5%; }
+.pc-hud.pc-cockpit .pc-prompt { bottom: 39%; }
+.pc-hud.pc-cockpit .pc-notice { bottom: 47%; }
+.pc-hud.pc-cockpit .pc-stats { top: 21%; }
 
 /* ---- prompt: a key in ink, an action in the hand ---- */
-/* A key is an ink-and-wash mark: a pale wash laid first (uneven edge, pigment pooled inside
-   it, a little off register), a pen outline drawn over it by hand, the letter in dark ink. */
+/* A key is a loose dab of wash with a broken pencil ring round it (PAINTER's look review):
+   the dab is laid first, off register, pooled along its edge; the ring is drawn by hand and
+   does not close; four of each, so that no two neighbours are alike. The letter is ink. */
 kbd { position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
   min-width: 25px; height: 24px; padding: 0 7px; color: var(--pc-dark); background: none; }
-kbd::before { content: ''; position: absolute; z-index: -1; inset: 1px -2px -2px 1.5px; border-radius: 7px 10px 6px 11px / 10px 6px 11px 7px;
-  background: radial-gradient(ellipse at 46% 44%, rgba(77, 96, 178, 0.2) 0%, rgba(77, 96, 178, 0.3) 62%, rgba(47, 58, 93, 0.5) 100%);
+kbd::before { content: ''; position: absolute; z-index: -1; inset: 2px -3px -2px 2px; border-radius: 46% 54% 42% 58% / 58% 44% 62% 40%;
+  background: radial-gradient(ellipse at 44% 42%, rgba(77, 96, 178, 0.14) 0%, rgba(77, 96, 178, 0.27) 58%, rgba(47, 58, 93, 0.46) 100%);
   filter: url(#pc-wash); }
-kbd::after { content: ''; position: absolute; z-index: -1; inset: 0 0.5px 0.5px 0; border: 1.25px solid var(--pc-dark);
-  border-radius: 5px 8px 4px 9px / 8px 4px 9px 5px; transform: rotate(-1.1deg); opacity: 0.82; filter: url(#pc-rough); }
-:nth-child(even) > kbd::after { transform: rotate(0.9deg); border-radius: 8px 4px 9px 5px / 4px 9px 5px 8px; }
-:nth-child(even) > kbd::before { inset: 1.5px -1px -2.5px -1px; background: radial-gradient(ellipse at 58% 50%, rgba(77, 96, 178, 0.18) 0%, rgba(77, 96, 178, 0.3) 60%, rgba(47, 58, 93, 0.48) 100%); }
+kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px -3px; background: var(--pc-key-a) center / 100% 100% no-repeat; }
+:nth-child(4n+2) > kbd::before { inset: 0 1px -3px -3px; border-radius: 58% 42% 55% 45% / 42% 60% 40% 58%;
+  background: radial-gradient(ellipse at 60% 52%, rgba(86, 110, 170, 0.14) 0%, rgba(77, 96, 178, 0.25) 60%, rgba(47, 58, 93, 0.44) 100%); }
+:nth-child(4n+2) > kbd::after { background-image: var(--pc-key-b); inset: -3px -2px -1px -4px; }
+:nth-child(4n+3) > kbd::before { inset: 3px -1px -1px -2px; border-radius: 40% 60% 60% 40% / 50% 50% 46% 54%;
+  background: radial-gradient(ellipse at 40% 58%, rgba(110, 104, 168, 0.15) 0%, rgba(92, 100, 176, 0.27) 62%, rgba(47, 58, 93, 0.42) 100%); }
+:nth-child(4n+3) > kbd::after { background-image: var(--pc-key-c); inset: -1px -4px -3px -2px; }
+:nth-child(4n) > kbd::before { inset: 1px -4px -3px 0; border-radius: 52% 48% 38% 62% / 62% 38% 56% 44%;
+  background: radial-gradient(ellipse at 52% 40%, rgba(70, 104, 170, 0.13) 0%, rgba(70, 96, 170, 0.26) 56%, rgba(47, 58, 93, 0.45) 100%); }
+:nth-child(4n) > kbd::after { background-image: var(--pc-key-d); inset: -2px -2px -3px -4px; }
 .pc-prompt { position: absolute; left: 0; right: 0; bottom: 16%; display: flex; justify-content: center; gap: 18px; opacity: 0;
   transition: opacity 0.25s ease; }
 .pc-prompt.pc-on { opacity: 1; }

@@ -406,7 +406,11 @@ export class Game {
     const panelOpen = (this.map && this.map.open) || (this.book && this.book.open);
     hud.setPrompt(panelOpen ? null : sim.promptNow);
     if (panelOpen && hud.sketchShown) hud.hideSketch();
-    if (hud.root) hud.root.classList.toggle('pc-paneled', !!panelOpen);      // an open panel has the page to itself
+    if (hud.root) {
+      hud.root.classList.toggle('pc-paneled', !!panelOpen);      // an open panel has the page to itself
+      // From the seat the lower third of the frame is the cowl and its dials: the slips move up.
+      hud.root.classList.toggle('pc-cockpit', !!sim.shipCam.cockpit && (st === S.LANDED || st === S.ATMOSPHERE || st === S.SPACE || st === S.PULSE));
+    }
     if (hud.setHint) {
       // Until the player has looked around once (and again whenever the capture is lost), say how.
       const need = this.started && !this.input.looked && !panelOpen && this.hintOn !== false;

@@ -47,21 +47,27 @@ export function createMap(root, { onSelect } = {}) {
       if (b.parent) return;
       const r = R(b.orbitRadius);
       const ox = (wob(n, 3) - 0.5) * 2.4, oy = (wob(n, 4) - 0.5) * 2;
-      const rad = (a) => 1 + 0.011 * Math.sin(2 * a + n * 1.7) + 0.007 * Math.sin(5 * a + n * 4.1) + 0.004 * Math.sin(11 * a + n);
+      const rad = (a) => 1 + 0.017 * Math.sin(2 * a + n * 1.7) + 0.01 * Math.sin(5 * a + n * 4.1) + 0.005 * Math.sin(11 * a + n);
       const strokes = 3 + (n % 2), turn = wob(n, 5) * Math.PI * 2;
       for (let k = 0; k < strokes; k++) {
         const a0 = turn + (k / strokes) * Math.PI * 2 + (wob(n, 20 + k) - 0.5) * 0.12;
         const a1 = turn + ((k + 1) / strokes) * Math.PI * 2 + (wob(n, 30 + k) - 0.2) * 0.16;      // some overlap, some gap
         const lift = 1 + (wob(n, 40 + k) - 0.5) * 0.012;                                           // each stroke sits a hair in or out
-        g.strokeStyle = `rgba(90, 80, 72, ${(0.3 + 0.16 * wob(n, 50 + k)).toFixed(2)})`; g.lineWidth = 0.75 + 0.35 * wob(n, 60 + k);
-        g.beginPath();
-        const steps = Math.max(8, Math.round((a1 - a0) * 14));
+        // Dry brush: the line swells where the hand pressed and thins to nothing where it
+        // lifted; here and there the paper's tooth breaks it.
+        const alpha = 0.32 + 0.2 * wob(n, 50 + k), heavy = 0.9 + 0.9 * wob(n, 60 + k);
+        const steps = Math.max(10, Math.round((a1 - a0) * 16));
+        let px = 0, py = 0;
         for (let i = 0; i <= steps; i++) {
-          const a = a0 + ((a1 - a0) * i) / steps, q = r * rad(a) * lift;
+          const u = i / steps, a = a0 + (a1 - a0) * u, q = r * rad(a) * lift;
           const x = cx + ox + Math.cos(a) * q * 1.55, y = cy + oy + Math.sin(a) * q;
-          if (i) g.lineTo(x, y); else g.moveTo(x, y);
+          if (i && wob(n * 7 + k, 90 + i) > 0.1) {
+            const press = Math.sin(Math.PI * Math.min(1, u * 1.15)) ** 0.7 * (0.75 + 0.5 * wob(n * 3 + k, 130 + (i >> 2)));
+            g.strokeStyle = `rgba(90, 80, 72, ${(alpha * (0.55 + 0.45 * press)).toFixed(2)})`; g.lineWidth = 0.35 + heavy * press;
+            g.beginPath(); g.moveTo(px, py); g.lineTo(x, y); g.stroke();
+          }
+          px = x; py = y;
         }
-        g.stroke();
       }
     });
     // The sun: bare paper with a warm halo.
