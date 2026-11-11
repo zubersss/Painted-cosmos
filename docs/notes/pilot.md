@@ -76,7 +76,7 @@ What M2 added:
   `m2-pulse`, `m2-mars`, `m2-saturn`, `m2-stats` (the trip on stubs) (.jpg).
 
 **Painted trip at 960x540, quality 1** (the coordinator's evidence request; clean export of
-`e2b0a5e`, PAINTER's render, world and art, PHYSICS on): Earth to Mars to Saturn in one page
+`b716e22`, PAINTER's render, world and art, PHYSICS on): Earth to Mars to Saturn in one page
 load, every check passed through both legs (map click, marker, pulse 459 km in 70.7 s and
 888 km in 94.9 s, landed and stepped out in `dry_riverbeds` and `honey_mist`, sketchbook,
 frame read-out: 404 k triangles and 212 draw calls on Saturn, autosave). The last step, the
