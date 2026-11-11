@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, ensureGlobals } from './shared.js';
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
@@ -39,7 +39,7 @@ export function createPainter(renderer) {
   const post = new Post(renderer);
   let quality = 1, renderScale = 1, outW = 2, outH = 2;
   const mood = { bodyId: null, biomeWeights: null, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0 };
-  const swapped = [];
+  const swapped = [], glazed = [];
   const info = { internalWidth: 2, internalHeight: 2, quality: 1 };
 
   renderer.autoClear = false;
@@ -112,12 +112,15 @@ export function createPainter(renderer) {
     renderer.autoClear = false;
     post.beginScene();
     swapForeign(scene);
+    // glazes sit out the scene pass and are laid over the brushed picture afterwards
+    glazed.length = 0;
+    for (const o of GLAZES) if (o.visible && o.parent) { o.visible = false; glazed.push(o); }
     try {
       renderer.render(scene, camera);
     } finally {
       restoreForeign();
     }
-    post.finish();
+    post.finish(glazed, camera);
     renderer.setRenderTarget(prevTarget);
     renderer.autoClear = prevAuto;
   }

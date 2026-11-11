@@ -41,7 +41,16 @@ export const G = {
   // [centre body-local, half length], [axis body-local, half width]; uCastK the two strengths
   uCast: { value: [new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1), new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1)] },
   uCastK: { value: new THREE.Vector2(0, 0) },
+  // the scene pass's second target (normal, log depth, region) and its size: glazes test their
+  // depth against it by hand (set by the post passes)
+  uSceneAux: { value: null }, uSceneRes: { value: new THREE.Vector2(2, 2) },
 };
+
+// Things laid as a GLAZE over the painted scene (rain): objects whose material blends. They are
+// left out of the scene pass and drawn after the abstraction pass, straight onto the brushed
+// picture, so a stroke stays a stroke: transparent, darker than a light sky, lighter than a
+// dark wood. Whoever makes such an object pushes it here (the world does for PHYSICS' kits).
+export const GLAZES = [];
 
 export function ensureGlobals() {
   const t = getTextures();

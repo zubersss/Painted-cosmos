@@ -9,6 +9,7 @@
 //   rings   crisp broken circles (region 6: the post pass keeps its hands off them)
 import * as THREE from 'three';
 import { makePaintUniforms } from './materials.js';
+import { G } from './shared.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
 // what a kind is drawn with when it did not come from the ground (updated by the world: rain
@@ -72,8 +73,8 @@ function shapeOf(kind, info) {
 // pass); everything in the air is 7 (no graphite line is drawn round a raindrop or a puff)
 // Kinds that are laid as a GLAZE: a transparent stroke over whatever is behind it (darker than
 // a light sky, lighter than a dark wood), instead of an opaque mark. They are drawn after the
-// opaque scene with ordinary blending; the second target (normal, depth, region) is left as it
-// was by writing zero with zero alpha, so the post passes still see the thing behind the stroke.
+// abstraction pass, onto the brushed picture (shared.js GLAZES; the painter does it), testing
+// their depth by hand against the scene's, so the post passes still see the thing behind them.
 const GLAZE = { rain: 1 };
 function regionOf(kind, info) {
   if (kind === 'ring' || info.shape === 'ring') return 6.0;
@@ -86,7 +87,7 @@ function regionOf(kind, info) {
 export function makeKitMaterial(kind, info, opts) {
   const m = new THREE.ShaderMaterial({
     name: 'pc-kit-' + kind,
-    uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, ...info.uniforms }),
+    uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, ...info.uniforms }),
     vertexShader: `${VERT_PARS}
 ${info.vertexChunk}
 varying vec3 vView;
@@ -100,6 +101,8 @@ void main() {
 ${opts.shapeGlsl || ''}
 uniform vec3 uColor;
 uniform vec3 uPcInk[16];
+uniform highp sampler2D uSceneAux;
+uniform vec2 uSceneRes;
 varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView; varying float vPcMat;
 void main() {
   #include <logdepthbuf_fragment>
@@ -107,11 +110,12 @@ void main() {
   vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${shapeOf(kind, info)}
   c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
-  ${GLAZE[kind] ? 'gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga); pcAux = vec4(0.0);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
+  ${GLAZE[kind] ? 'if (log2(1.0 + max(-vView.z, 0.0)) > texture(uSceneAux, gl_FragCoord.xy / uSceneRes).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,
-    side: THREE.DoubleSide, transparent: !!GLAZE[kind], depthWrite: !GLAZE[kind],
+    side: THREE.DoubleSide, transparent: !!GLAZE[kind], depthWrite: !GLAZE[kind], depthTest: !GLAZE[kind],
     polygonOffset: info.shape === 'mark' || info.shape === 'ring', polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   m.userData.pcPainted = true;
+  m.userData.pcGlaze = !!GLAZE[kind];
   return m;
 }

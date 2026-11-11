@@ -291,6 +291,7 @@ export class Post {
     this.mPrep.uniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uRes.value.set(inW, inH);
+    G.uSceneAux.value = this.rtScene.textures[1]; G.uSceneRes.value.set(inW, inH);
     this.sheetUniforms.uOutRes.value.set(outW, outH);
     this.sheetUniforms.uInTexel.value.set(1 / inW, 1 / inH);
   }
@@ -311,9 +312,15 @@ export class Post {
     r.render(this.tri, this.cam);
   }
 
-  finish() {
+  // glazes: objects drawn over the brushed picture (see shared.js GLAZES), with the scene's camera
+  finish(glazes, camera) {
     this._pass(this.mPrep, this.rtHalf);
     this._pass(this.mAbs[this.sectors], this.rtAbs);
+    if (glazes && glazes.length) {
+      const r = this.renderer;
+      r.setRenderTarget(this.rtAbs);
+      for (const o of glazes) { o.visible = true; r.render(o, camera); }
+    }
     this._pass(this.mKeep, this.rtPrev);
     this.prevFrames++;
     G.uPrevOn.value = this.prevFrames >= 1 ? 1 : 0;

@@ -15,7 +15,7 @@ import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
-import { G, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { G, GLAZES, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms } from '../render/materials.js';
 
@@ -112,6 +112,7 @@ export function createWorld(scene) {
       draw.rain = { ...D.rain, width: 0.05, exposure: 0.12, minPx: 4 };
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
+      for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
     }).catch((e) => console.warn('weather kits not available: ' + e.message));
   }
   // one pixel of the scene pass at one metre (the near strokes are never thinner than the brush)
@@ -289,7 +290,7 @@ export function createWorld(scene) {
       // inks for the kits: each ground material in this place's own washes; rain is the sky's wet wash
       if (kits) {
         kitInks(st, here.biomeWeights);
-        KIT_INK.rain.copy(tmpKey.haze).lerp(_storm, 0.38);
+        KIT_INK.rain.copy(tmpKey.haze).lerp(_storm, 0.6);     // a middle value: darker than the light sky, lighter than the wood
         KIT_INK.dust.copy(KIT_PALETTE[5]); KIT_INK.sand.copy(KIT_PALETTE[4]);
       }
       const v0 = look.visibility[0], v1 = look.visibility[1];
