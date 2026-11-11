@@ -98,7 +98,19 @@ async function leg(to, n) {
     if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
   });
   check(i.ship.canLand, 'landing prompt over ' + to);
-  await page.keyboard.press('KeyE');
+  // Press E on the prompt, as a player does: if the prompt had gone by the time the key
+  // arrived (rough ground at two frames a second), wait for it and press again.
+  for (let tries = 0; tries < 8; tries++) {
+    await page.keyboard.press('KeyE');
+    i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED', 2.5);
+    if (i.state === 'LANDING' || i.state === 'LANDED') break;
+    run.log('  (E did not start a landing: ' + (i.notice || 'no prompt at that moment') + '; trying again)');
+    i = await until((x) => x.ship.canLand, 120, async (x) => {
+      await holdPitch(x.ship.altGround > 110 ? -18 : -7)(x);
+      if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
+      if (x.ship.speed > 60) { await page.keyboard.down('KeyS'); await run.sleep(150); await page.keyboard.up('KeyS'); }
+    });
+  }
   i = await until((x) => x.state === 'LANDED', 90);
   check(i.state === 'LANDED', 'landed on ' + to);
   check(i.ship.bounces === 0, 'no bumps');

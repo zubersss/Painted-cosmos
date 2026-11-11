@@ -7,7 +7,7 @@ import {
   HELIO, bodyFrame, sameFrame, frameState, posToUniverse, quatToUniverse, quatFromUniverse,
   convertState, chooseFrame, FloatingOrigin, posFromUniverse,
 } from './frames.js';
-import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip } from './state.js';
+import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip, LAND_PROMPT_ALTITUDE } from './state.js';
 import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
   qLook, qRotate, qConj, qMul, qFromAxisAngle, rotateAround,
@@ -678,13 +678,20 @@ export class Sim {
         } : null;
         if (beginLanding(sh, this.sampler(id), undefined, trees, holds, settle)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
+      } else if (pressed('KeyE')) {
+        // E without the prompt: never silence. Say what the landing is waiting for.
+        this.say(sh.altGround > LAND_PROMPT_ALTITUDE ? `Come down below ${LAND_PROMPT_ALTITUDE} m to land` : 'Slow down to land');
       }
     }
   }
 
   landable() {
-    return this.shFrame.kind === 'body' && this.shFrame.rotating && !this.sh.liftoff
-      && canBeginLanding(this.sm.state, this.sh.altGround, this.sh.speed);
+    // Once the prompt is up it stays up through a little more height and speed (15 m, 10 m/s),
+    // so it does not flicker over rough ground and E pressed on the prompt lands.
+    const k = this._landOk ? 1 : 0;
+    this._landOk = this.shFrame.kind === 'body' && this.shFrame.rotating && !this.sh.liftoff
+      && canBeginLanding(this.sm.state, this.sh.altGround - 15 * k, this.sh.speed - 10 * k);
+    return this._landOk;
   }
 
   // ---- camera ------------------------------------------------------------------------------------
