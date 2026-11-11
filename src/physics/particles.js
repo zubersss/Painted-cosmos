@@ -9,7 +9,11 @@
 //   buf.mat   (n, bytes) the ground it was raised from: an index into ground.js MATERIAL_IDS, or
 //                        255 (MATERIAL_NONE) for what did not come from the ground (rain, falling
 //                        snow, hail, leaves). Kicked dust is the colour of what it was kicked from.
+//   buf.left  (n)        seconds until it will be gone, where the physics can tell (its life is
+//                        ending; the ground is coming up at its fall speed); 1e9 while it cannot.
+//                        For the kits: a mark that shrinks over its last moments never pops out.
 //   buf.origin {x,y,z}   body-local point the positions are relative to (keeps float32 precise)
+//   buf.radius           m: half-width of the box the kind is simulated in (it wraps from wall to wall)
 // A particle is a point mass with weight and drag. Drag is quadratic in the velocity relative to
 // the moving air and is scaled so that the particle's terminal speed is the one computed for
 // its size, that planet's gravity and that air (atmosphere.js):
@@ -30,6 +34,12 @@ export const PARTICLES = Object.freeze({
   kinds: ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'],
   capacity: { rain: [700, 1600, 3200], snow: [800, 2000, 2800], hail: [0, 200, 400], dust: [300, 800, 1600], sand: [300, 800, 1600], ash: [200, 600, 1200], spores: [200, 500, 1000], leaves: [60, 160, 320], spray: [200, 500, 1000] },
   radius: 24,          // m: half-width of the simulated volume around the focus
+  // Snow is simulated in a smaller box, and round the EYE (frame.eye; the focus when none is
+  // given). A snowfall is the same everywhere near by, single flakes only read near the lens
+  // (beyond a few metres snow is haze: sky.snowfall), and a real one is thousands of flakes a
+  // cubic metre: so the flakes there are go where they can be seen, and each of them lands on
+  // the ground it is over, is caught by the leaves it is under and stopped by the hull.
+  snowRadius: 8,       // m: half-width of the box snow is simulated in
   height: 18,          // m above the ground at the focus where precipitation enters
   below: 8,            // m below the focus ground that still belongs to the volume
   // shelter: a closed canopy catches rain on its leaves. A dry canopy lets a quarter through,
@@ -50,11 +60,13 @@ function makeBuffer(cap) {
   return {
     count: 0, capacity: cap,
     pos: new Float32Array(cap * 3), vel: new Float32Array(cap * 3), size: new Float32Array(cap), age: new Float32Array(cap),
-    mat: new Uint8Array(cap).fill(255),
-    origin: { x: 0, y: 0, z: 0 },
+    mat: new Uint8Array(cap).fill(255), left: new Float32Array(cap).fill(1e9),
+    origin: { x: 0, y: 0, z: 0 }, radius: PARTICLES.radius,
     species: null, fallSpeed: 0,
     // internal: frame coordinates (east, up, north), terminal speed, phase
     _p: new Float32Array(cap * 3), _v: new Float32Array(cap * 3), _vt: new Float32Array(cap), _ph: new Float32Array(cap), _n: 0,
+    // for `left`: the height over the ground under it when last looked up, and when that was
+    _alt: new Float32Array(cap).fill(1e9), _lt: new Float64Array(cap).fill(-1e9), _rate: new Float32Array(cap), _g: new Float32Array(cap), _wu: new Float32Array(cap),
   };
 }
 
@@ -91,9 +103,10 @@ export class Particles {
 
   _event(frame, x, y, z, kind, strength, size) {
     const E = this.events, o = E.head * 8;
-    E.data[o] = frame.ex * x + frame.ax * y + frame.nx * z;
-    E.data[o + 1] = frame.ey * x + frame.ay * y + frame.ny * z;
-    E.data[o + 2] = frame.ez * x + frame.az * y + frame.nz * z;
+    // (heights are radial, the grid is the tangent plane at the anchor: see publish())
+    const qx = frame.ox + frame.ex * x + frame.nx * z, qy = frame.oy + frame.ey * x + frame.ny * z, qz = frame.oz + frame.ez * x + frame.nz * z;
+    const k = (frame.r0 + y) / Math.sqrt(qx * qx + qy * qy + qz * qz);
+    E.data[o] = qx * k - frame.ox; E.data[o + 1] = qy * k - frame.oy; E.data[o + 2] = qz * k - frame.oz;
     E.data[o + 3] = kind; E.data[o + 4] = strength; E.data[o + 5] = this.time; E.data[o + 6] = size; E.data[o + 7] = 0;
     E.head = (E.head + 1) % E.capacity; E.total++;
   }
@@ -119,8 +132,9 @@ export class Particles {
   //   frame: LocalFrame.  air: AirGrid.  near: near TerrainGrid.  (fx, fz): focus in grid
   //   coordinates, fy: focus height above frame.r0.  ground: ground height above frame.r0 at the
   //   focus.  wx: weather at the focus (weatherAt result).  rho: air density there.  cover: { z0,
-  //   canopy01, canopyHeight }.  g: gravity (m/s^2).
-  update(dt, frame, air, near, fx, fy, fz, ground, wx, rho, cover, bodyId, g, time) {
+  //   canopy01, canopyHeight }.  g: gravity (m/s^2).  (ecx, ecz): the eye in grid coordinates
+  //   (the centre of the snow's box; the focus when not given).
+  update(dt, frame, air, near, fx, fy, fz, ground, wx, rho, cover, bodyId, g, time, ecx = fx, ecz = fz) {
     this.time = time;
     const Rr = PARTICLES.radius, H = PARTICLES.height;
     const reborn = this.frameVersion !== frame.version;
@@ -151,10 +165,20 @@ export class Particles {
     if (liquid0 !== liquid0) liquid0 = air.terrain.liquidAt(fx, fz);
     if (liquid0 !== liquid0) liquid0 = -1e9;
 
+    const groundF = ground;
     for (let kk = 0; kk < 2; kk++) {
       const name = kk === 0 ? 'rain' : 'snow';
       const b = this.buffers[name];
       b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
+      // the box of this kind: its half-width, its centre, and the surface under its centre
+      const Rb = kk === 1 ? PARTICLES.snowRadius : Rr, bx = kk === 1 ? ecx : fx, bz = kk === 1 ? ecz : fz;
+      b.radius = Rb;
+      let ground = groundF;
+      if (bx !== fx || bz !== fz) {
+        let gB = near ? near.heightAt(bx, bz, NaN) : NaN; if (gB !== gB) gB = air.terrain.heightAt(bx, bz, groundF);
+        let lB = near ? near.liquidAt(bx, bz) : NaN; if (lB !== lB) lB = air.terrain.liquidAt(bx, bz);
+        ground = lB > gB ? lB : gB;
+      }
       const cap = PARTICLES.capacity[name][this.quality];
       let want = 0;
       if (b === target) {
@@ -180,7 +204,7 @@ export class Particles {
       if (!draining && b._n < want) {
         // new arrivals enter at random heights so a shower builds up rather than switching on
         const add = Math.min(want - b._n, Math.ceil(cap * h * 0.6) + 1);
-        for (let k = 0; k < add; k++) this._spawn(b, b._n++, fx, fz, ground + this.rng() * H, isSnow);
+        for (let k = 0; k < add; k++) this._spawn(b, b._n++, bx, bz, ground + this.rng() * H, isSnow, Rb);
       }
       const n = b._n;
       if (n === 0) { b.count = 0; continue; }
@@ -193,14 +217,19 @@ export class Particles {
         const o = i * 3;
         let x = P[o], y = P[o + 1], z = P[o + 2];
         // wrap into the box around the focus, so the density stays even as the focus moves
-        if (x - fx > Rr) x -= 2 * Rr; else if (x - fx < -Rr) x += 2 * Rr;
-        if (z - fz > Rr) z -= 2 * Rr; else if (z - fz < -Rr) z += 2 * Rr;
+        // (powder kicked up from lying snow is where the foot is, wherever the box is)
+        let wrapped = false;
+        if (b.mat[i] === 255) {
+          if (x - bx > Rb) { x -= 2 * Rb * Math.ceil((x - bx - Rb) / (2 * Rb)); wrapped = true; } else if (x - bx < -Rb) { x += 2 * Rb * Math.ceil((bx - x - Rb) / (2 * Rb)); wrapped = true; }
+          if (z - bz > Rb) { z -= 2 * Rb * Math.ceil((z - bz - Rb) / (2 * Rb)); wrapped = true; } else if (z - bz < -Rb) { z += 2 * Rb * Math.ceil((bz - z - Rb) / (2 * Rb)); wrapped = true; }
+        }
         // wind at the particle: bilinear in the 4 x 4 patch, scaled by the height profile
         let u = (x - fx) / 16 + 1.5, v = (z - fz) / 16 + 1.5;
         u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
         const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, q = (iv * 4 + iu) * 3;
         const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
-        let hz = y - ground; hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
+        // (height over the ground: for a flake, over the ground under it as last looked up)
+        let hz = y - (snowy && b._lt[i] > -1e8 ? b._g[i] : ground); hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
         const ih = hz | 0, hf = this._hfl[ih] + (this._hfl[ih + 1] - this._hfl[ih]) * (hz - ih);
         let we = (wp[q] * w00 + wp[q + 3] * w10 + wp[q + 12] * w01 + wp[q + 15] * w11) * hf;
         let wn = (wp[q + 1] * w00 + wp[q + 4] * w10 + wp[q + 13] * w01 + wp[q + 16] * w11) * hf;
@@ -211,41 +240,77 @@ export class Particles {
           const fl = PARTICLES.flutter * Math.min(1, vt);
           we += Math.cos(a) * fl; wn += Math.sin(a * 1.3) * fl;
         }
-        // weight, then drag relative to the air (implicit)
-        let rx = V[o] - we, ry = V[o + 1] - g * h, rz = V[o + 2] - wn;
+        // weight, then drag relative to the air (implicit). wu: the air's own rise or fall where
+        // it flows over sloping ground (snow only; below)
+        const wu = snowy ? b._wu[i] : 0;
+        let rx = V[o] - we, ry = V[o + 1] - g * h - wu, rz = V[o + 2] - wn;
         const m = 1 / (1 + g / (vt * vt) * Math.hypot(rx, ry, rz) * h);
         rx *= m; ry *= m; rz *= m;
-        const vx = we + rx, vy = ry, vz = wn + rz;
+        const vx = we + rx, vy = wu + ry, vz = wn + rz;
         x += vx * h; y += vy * h; z += vz * h;
         b.age[i] += h;
         // the ground (only looked up when the particle is low)
-        let hit = false, gy = ground, wet = false;
-        if (y < ground + 6) {
+        // (a flake is looked up all the way down: it rides the air over the ground, below)
+        let hit = false, gy = ground, wet = false, left = b.left[i] - h;
+        if (snowy || y < ground + 6) {
+          left = 1e9;
           gy = near ? near.heightAt(x, z, NaN) : NaN;
           if (gy !== gy) gy = air.terrain.heightAt(x, z, ground);
           let lq = near ? near.liquidAt(x, z) : NaN;
           if (lq !== lq) lq = air.terrain.liquidAt(x, z);
           if (lq !== lq) lq = liquid0;
           if (lq > gy) { gy = lq; wet = true; }
+          if (snowy && b.mat[i] === 255) {
+            // The air near the ground flows over it, and a flake, which falls at a metre a second
+            // in a wind of ten, goes where the air goes: up the windward slope and down the lee.
+            // Carried straight and level instead it would strike every rise it met and leave
+            // everything lower than the highest ground about bare of snow (measured on an alpine
+            // slope: half the flakes in view gone). So the air it is in rises and falls with the
+            // ground under it, at the rate the ground changes along its path, and the flake
+            // follows through its drag, a tenth of a second late. (At every height of the 18 m
+            // it falls through: over a single hummock the streamlines flatten with height, but
+            // the box wraps, so a slope across it is a slope without end, and over that the air
+            // runs parallel to the ground all the way up. With the following fading out aloft,
+            // flakes blown downhill hung where the lag equalled their fall and never landed.)
+            // Across a wrap of the box it keeps its height over the ground instead.
+            const g0 = b._g[i]; b._g[i] = gy;
+            if (time - b._lt[i] < 0.5) {
+              if (wrapped || h < 1e-4) { y += gy - g0; b._wu[i] = 0; } else b._wu[i] = (gy - g0) / h;
+            } else { b._wu[i] = 0; y += gy - ground; }      // (the first look: it entered over the ground it is over, not the box centre's)
+          }
           hit = y <= gy;
+          // How long until it lands: its height over the ground under it, at the rate that height
+          // has been closing. (Not at its fall speed: in a wind a flake comes down a windward
+          // slope many times faster than it falls, and its landing must be foretold in time.)
+          // The rate is eased over 0.15 s: the ground is rough, and a flake skimming it would
+          // otherwise be told it lands now, never, now.
+          const alt = y - gy, dl = time - b._lt[i];
+          let rate = -vy;                                                       // (the first look: its fall speed)
+          if (dl > 0 && dl < 0.5) { const r0 = b._rate[i]; rate = r0 + ((b._alt[i] - alt) / dl - r0) * (dl < 0.15 ? dl / 0.15 : 1); }
+          // (never slower than it is falling: a clod of kicked powder is down again in a third of a second)
+          const closing = rate > -vy ? rate : -vy;
+          if (closing > 0.05) left = alt / closing;
+          b._alt[i] = alt; b._lt[i] = time; b._rate[i] = rate;
         }
         // virga: in hot dry air a drop evaporates on the way down and never lands
-        if (virga > 0 && !snowy && y - ground < virga * (0.3 + 0.7 * PH[i] / 6.2831853)) { hit = false; y = bottom - 1; }
+        let gone = false;                      // caught or evaporated on the way: it never lands
+        if (virga > 0 && !snowy && y - ground < virga * (0.3 + 0.7 * PH[i] / 6.2831853)) { hit = false; gone = true; }
         // shelter. Canopy: a share of what falls is caught where it meets the leaves (each
         // particle's fate is its own for its whole fall). Drips are born under the leaves.
         if (canopyH > 1 && hz < canopyH && drip === 0) {
           const c01 = cp[iv * 4 + iu] * w00 + cp[iv * 4 + iu + 1] * w10 + cp[iv * 4 + iu + 4] * w01 + cp[iv * 4 + iu + 5] * w11;
-          if (c01 > 0.05 && PH[i] < 6.2831853 * c01 * (1 - through) && hz > canopyH * 0.5) { hit = false; y = bottom - 1; }
+          if (c01 > 0.05 && PH[i] < 6.2831853 * c01 * (1 - through) && hz > canopyH * 0.5) { hit = false; gone = true; }
         }
         // the hull: a drop that reaches it stops there (a splash on the hull, none under it)
         for (let s = 0; s < nSH; s++) {
           const so = s * 4, dx = x - SH[so], dz = z - SH[so + 1];
           if (y < SH[so + 2] && y - vy * h >= SH[so + 2] - 0.5 && dx * dx + dz * dz < SH[so + 3] * SH[so + 3]) {
             this._event(frame, x, SH[so + 2], z, snowy ? EVENT.settle : EVENT.splash, clamp01(Math.hypot(vx, vy, vz) * b.size[i] * 60), b.size[i]);
-            hit = false; y = bottom - 1; break;
+            hit = false; gone = true; break;
           }
         }
-        if (hit || y < bottom) {
+        // (snow is bounded by the ground under each flake, not by a floor and a lid at the centre's height)
+        if (hit || gone || (y < bottom && !snowy)) {
           if (hit) {
             const sp = Math.hypot(vx, vy, vz);
             this._event(frame, x, gy, z, snowy ? EVENT.settle : wet ? EVENT.ripple : EVENT.splash, clamp01(sp * b.size[i] * 60), b.size[i]);
@@ -256,7 +321,7 @@ export class Particles {
             if (i < alive) {
               const s = alive * 3;
               P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-              VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; b.mat[i] = b.mat[alive];
+              VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; b.mat[i] = b.mat[alive]; b.left[i] = b.left[alive]; b._alt[i] = b._alt[alive]; b._lt[i] = b._lt[alive]; b._rate[i] = b._rate[alive]; b._g[i] = b._g[alive]; b._wu[i] = b._wu[alive];
               i--;
             }
             continue;
@@ -265,37 +330,28 @@ export class Particles {
             // the next drop from a leaf tip (or, where there is no leaf over the spot, one fewer)
             if (!this._drip(b, i, fx, fz, ground, canopyH, cp, g)) {
               alive--;
-              if (i < alive) { const s = alive * 3; P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2]; VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; b.mat[i] = b.mat[alive]; i--; }
+              if (i < alive) { const s = alive * 3; P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2]; VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; b.mat[i] = b.mat[alive]; b.left[i] = b.left[alive]; b._alt[i] = b._alt[alive]; b._lt[i] = b._lt[alive]; b._rate[i] = b._rate[alive]; b._g[i] = b._g[alive]; b._wu[i] = b._wu[alive]; i--; }
             }
             continue;
           }
-          this._spawn(b, i, fx, fz, top, isSnow);
+          this._spawn(b, i, bx, bz, top, isSnow, Rb);
           // enter upwind, so that slanting rain still fills the box
           const tf = H / Math.max(VT[i], 0.3) * 0.5;
-          P[o] -= clampAbs(we * tf, Rr * 0.8); P[o + 2] -= clampAbs(wn * tf, Rr * 0.8);
+          P[o] -= clampAbs(we * tf, Rb * 0.8); P[o + 2] -= clampAbs(wn * tf, Rb * 0.8);
           continue;
         }
-        if (y > top + 4) y = top;
-        P[o] = x; P[o + 1] = y; P[o + 2] = z; V[o] = vx; V[o + 1] = vy; V[o + 2] = vz;
+        if (snowy) { if (y - gy > H + 4) y = gy + H; } else if (y > top + 4) y = top;
+        P[o] = x; P[o + 1] = y; P[o + 2] = z; V[o] = vx; V[o + 1] = vy; V[o + 2] = vz; b.left[i] = left;
       }
       b._n = alive;
       b.count = alive;
-      // publish in body-local axes
-      const ex = frame.ex, ey = frame.ey, ez = frame.ez, ax = frame.ax, ay = frame.ay, az = frame.az, nx = frame.nx, ny = frame.ny, nz = frame.nz;
-      const pos = b.pos, vel = b.vel;
-      for (let i = 0; i < alive; i++) {
-        const o = i * 3;
-        const x = P[o], y = P[o + 1], z = P[o + 2];
-        pos[o] = ex * x + ax * y + nx * z; pos[o + 1] = ey * x + ay * y + ny * z; pos[o + 2] = ez * x + az * y + nz * z;
-        const a = V[o], c = V[o + 1], d = V[o + 2];
-        vel[o] = ex * a + ax * c + nx * d; vel[o + 1] = ey * a + ay * c + ny * d; vel[o + 2] = ez * a + az * c + nz * d;
-      }
+      publish(b, frame, alive);
     }
     void other;
   }
 
-  _spawn(b, i, fx, fz, y, snow) {
-    const R = PARTICLES.radius, rng = this.rng, o = i * 3;
+  _spawn(b, i, fx, fz, y, snow, R = PARTICLES.radius) {
+    const rng = this.rng, o = i * 3;
     b._p[o] = fx + (rng() * 2 - 1) * R; b._p[o + 1] = y; b._p[o + 2] = fz + (rng() * 2 - 1) * R;
     // size: exponential tail of large drops (Marshall and Palmer 1948), index into the 8-step LUT
     const t = snow ? rng() * 5 : Math.min(7, -Math.log(1 - rng() * 0.98) * 1.6);
@@ -304,7 +360,7 @@ export class Particles {
     b._vt[i] = vt > 0.005 ? vt : 0.005;
     b.size[i] = (b.species ? SPECIES[b.species].d : 0.002) * (0.4 + 0.3 * t);
     b._ph[i] = rng() * 6.2831853;
-    b.age[i] = 0; b.mat[i] = 255;                 // from the sky, not from the ground
+    b.age[i] = 0; b.mat[i] = 255; b.left[i] = 1e9; b._lt[i] = -1e9; b._wu[i] = 0;  // from the sky, not from the ground
     b._v[o] = 0; b._v[o + 1] = -b._vt[i]; b._v[o + 2] = 0;
   }
 
@@ -324,13 +380,34 @@ export class Particles {
     // terminal speed of a drop this big: the top of the size table (large drops flatten: about 9 m/s on Earth)
     b._vt[i] = Math.max(this._lut[7], 0.5);
     b._ph[i] = rng() * 6.2831853;
-    b.age[i] = 0; b.mat[i] = 255;
+    b.age[i] = 0; b.mat[i] = 255; b.left[i] = 1e9; b._lt[i] = -1e9;
     void g;
     return true;
   }
 
   clear() {
     for (const k in this.buffers) { this.buffers[k]._n = 0; this.buffers[k].count = 0; }
+  }
+}
+// Publish a buffer's particles in body-local axes, relative to the frame's anchor.
+// The simulation runs in grid coordinates: (x, z) on the tangent plane at the anchor, y the
+// height above the sphere of radius r0, measured along the local vertical (as the ground
+// heights of the terrain grids are). So the particle is at radius r0 + y on the line through
+// the grid point, NOT at anchor + east x + up y + north z: on a 4 km world that plane leaves
+// the ground by d^2 / 2R, 4.5 m at 190 m from the anchor and 18 m at 380 m (measured: the rain
+// ended that far above the ground before a walker had gone far enough for the frame to move).
+// Velocities are turned to the local vertical to first order in d / R.
+export function publish(b, frame, n) {
+  const ex = frame.ex, ey = frame.ey, ez = frame.ez, nx = frame.nx, ny = frame.ny, nz = frame.nz, ox = frame.ox, oy = frame.oy, oz = frame.oz, r0 = frame.r0;
+  const P = b._p, V = b._v, pos = b.pos, vel = b.vel;
+  for (let i = 0; i < n; i++) {
+    const o = i * 3, x = P[o], y = P[o + 1], z = P[o + 2];
+    const qx = ox + ex * x + nx * z, qy = oy + ey * x + ny * z, qz = oz + ez * x + nz * z;
+    const il = 1 / Math.sqrt(qx * qx + qy * qy + qz * qz), k = (r0 + y) * il;
+    pos[o] = qx * k - ox; pos[o + 1] = qy * k - oy; pos[o + 2] = qz * k - oz;
+    // east' = east - up (east . up), north' likewise; up' = the unit vector through the grid point
+    const a = V[o], d = V[o + 2], c = V[o + 1] - (a * x + d * z) * il;
+    vel[o] = ex * a + nx * d + qx * il * c; vel[o + 1] = ey * a + ny * d + qy * il * c; vel[o + 2] = ez * a + nz * d + qz * il * c;
   }
 }
 function clampAbs(x, m) { return x > m ? m : x < -m ? -m : x; }

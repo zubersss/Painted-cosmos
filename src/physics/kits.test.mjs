@@ -2,7 +2,7 @@
 // the three.js wrappers are exercised in physics-lab.html). Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DRAW, RING, makeEye, expandStreaks, expandDabs, dabSize, thinned, own01, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './three/expand.js';
+import { DRAW, DRAW_PAINTED, cellFor, RING, makeEye, expandStreaks, expandDabs, dabSize, thinned, own01, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './three/expand.js';
 import { PARTICLE_GLSL, SHAPE_GLSL } from './three/chunks.glsl.js';
 import { LocalFrame } from './near.js';
 import { WaterField } from './water.js';
@@ -157,7 +157,7 @@ test('indices, uvs and the GLSL chunks', () => {
   }
   // the constants the shader and the JS share
   assert.ok(PARTICLE_GLSL.includes('51413.7') && PARTICLE_GLSL.includes('73856.093'));
-  assert.ok(PARTICLE_GLSL.includes('91573.37') && PARTICLE_GLSL.includes('(keep * 1.18 - h) / (0.3 * h + 1e-4)') && PARTICLE_GLSL.includes('min(sl, uPcSmear * h)'), 'thinning and smear as in expand.js');
+  assert.ok(PARTICLE_GLSL.includes('91573.37') && PARTICLE_GLSL.includes('(keep * 1.18 - h) / (0.3 * h + 1e-4)') && PARTICLE_GLSL.includes('min(sl, max(uPcSmear * h, travel))') && PARTICLE_GLSL.includes('aPcLeft / uPcDraw3.x'), 'thinning, smear and fade-out as in expand.js');
 });
 
 test('the floor: far marks are never smaller than the least size, there are fewer of them, and they cover what they covered', () => {
@@ -204,7 +204,7 @@ test('the floor: far marks are never smaller than the least size, there are fewe
 
 test('a mark near the lens is never larger than the most asked for; a dab is drawn out along its motion', () => {
   const eye = makeEye(); eye.pix = 0.002;
-  const D = { ...DRAW.snow, size: 0.1, minPx: 3.5, maxPx: 9, exposure: 0 };
+  const D = { ...DRAW.snow, size: 0.1, minPx: 3.5, maxPx: 9, exposure: 0, strobe: 0, near: 0 };
   const b = buf([{ p: [0, 0, -1] }, { p: [0, 0, -8] }]); const out = new Float32Array(24);
   expandDabs(b, D, eye, out);
   assert.ok(Math.abs(len(sub(V(out, 1), V(out, 0))) - 9 * 0.002 * 1) < 1e-6, 'at 1 m: 9 px');
@@ -285,7 +285,7 @@ test('ink for the kits: a particle\'s material on its four vertices, a mark\'s o
 test('snow shown modulo a cell round the eye: the same flakes, whole cells away, none under the hull; room from the physics spares the far ones', () => {
   const eye = makeEye(); eye.pix = 0.002; eye.x = 3; eye.y = 1.6; eye.z = -4; eye.shelters = new Float32Array(16);
   // local axes of a flat patch: east = +x, north = -z, up = +y (east x north = up)
-  const D = { ...DRAW.snow, size: 0.1, minPx: 0, exposure: 0, cell: 9 };
+  const D = { ...DRAW.snow, size: 0.1, minPx: 0, exposure: 0, cell: 9, near: 0 };
   const N = 600, b = buf(Array.from({ length: N }, (_, i) => ({ p: [Math.sin(i * 1.7) * 24, 1 + (i % 17), Math.cos(i * 2.9) * 24], size: 0.003 + i * 1e-6 })));
   const out = new Float32Array(N * 12);
   expandDabs(b, D, eye, out);
@@ -316,4 +316,70 @@ test('snow shown modulo a cell round the eye: the same flakes, whole cells away,
   const tight = count(1), roomy = count(30);
   assert.ok(tight < 400 * 0.08 && roomy === 400, `at 20 m a 5 cm flake is drawn 24 cm: one in 23 if it must keep its cover (${tight} of 400), all of them where the physics says the snow hides far more than the flakes paint (${roomy})`);
   assert.ok(PARTICLE_GLSL.includes('uPcDraw2.z * f * f') && PARTICLE_GLSL.includes('uniform vec4 uPcShelter'));
+});
+
+test('nothing strobes: a dab is drawn out as far as it travels in a frame, and shrinks away where that would make it a hairline', () => {
+  const eye = makeEye(); eye.pix = 0.002;
+  const D = { ...DRAW.snow, size: 0.1, minPx: 0, maxPx: 0, exposure: 0.04, smear: 1.2, strobe: 0.02 };
+  // at 8 m, blown across the picture at 5, 10, 20, 30 and 45 m/s
+  const w = buf([5, 10, 20, 30, 45].map((v) => ({ p: [0, 0, -8], v: [v, 0, 0] }))), o = new Float32Array(60);
+  expandDabs(w, D, eye, o);
+  const along = (q) => len(sub(V(o, q * 4 + 1), V(o, q * 4))), across = (q) => len(sub(V(o, q * 4 + 3), V(o, q * 4)));
+  // 5 m/s: 10 cm a frame; the smear cap (1.2 sizes) already covers it
+  assert.ok(Math.abs(along(0) - 0.22) < 1e-6 && Math.abs(across(0) - 0.1) < 1e-6, `5 m/s: ${along(0)}`);
+  // 10 m/s: the cap would leave gaps between one frame's mark and the next; drawn out to its travel
+  assert.ok(Math.abs(along(1) - 0.3) < 1e-6 && Math.abs(across(1) - 0.1) < 1e-6, `10 m/s: ${along(1)} by ${across(1)}`);
+  for (let q = 0; q < 2; q++) assert.ok(along(q) >= w.vel[q * 3] * 0.02 - 1e-6, 'never shorter than its travel in a frame');
+  // 20 m/s: four of its sizes a frame, more than the three a dab may be drawn out to: it is thinning
+  // (still as long as its travel); 30 m/s and more: a camera would smear it to nothing
+  assert.ok(across(2) > 0.02 && across(2) < 0.08 && along(2) >= 0.4, `20 m/s: ${along(2)} by ${across(2)}`);
+  assert.ok(across(3) < 1e-9 && across(4) < 1e-9, '30 and 45 m/s: gone');
+  // a hand from the lens the same 5 m/s flake is a flash (it is capped at 9 px = 0.36 cm at 20 cm, and crosses 10 cm a frame)
+  const near = buf([{ p: [0, 0, -0.2], v: [5, 0, 0] }, { p: [0, 0, -3], v: [5, 0, 0] }]);
+  expandDabs(near, { ...D, maxPx: 9 }, eye, o);
+  assert.ok(across(0) < 1e-9, 'at the lens: gone'); assert.ok(Math.abs(across(1) - 0.054) < 1e-6, 'at 3 m: there, 9 px');
+  // and in still air too nothing is painted at arm's length: full size from `near` on, nothing inside 0.4 of it
+  const still = buf([0.5, 0.8, 1.4, 2, 6].map((d) => ({ p: [0, 0, -d] })));
+  expandDabs(still, { ...D, near: 2 }, eye, o); assert.equal(DRAW.snow.near, 3);
+  assert.ok(across(0) < 1e-9 && across(1) < 1e-9 && across(2) > 0.02 && across(2) < 0.09 && Math.abs(across(3) - 0.1) < 1e-6 && Math.abs(across(4) - 0.1) < 1e-6, `${[0, 1, 2, 3, 4].map((q) => across(q).toFixed(3))}`);
+});
+
+test('nothing pops out: a mark shrinks to nothing over the last moments the physics gives it', () => {
+  const eye = makeEye(); eye.pix = 0;
+  const b = buf([{ p: [0, 0, -5] }, { p: [1, 0, -5] }, { p: [2, 0, -5] }, { p: [3, 0, -5] }]); b.age.fill(5);
+  b.left = new Float32Array([1e9, 0.35, 0.175, 0]);
+  const o = new Float32Array(48), D = { ...DRAW.dust, size: 1, grow: 0, minPx: 0, vary: 0, fadeOut: 0.7 };
+  expandDabs(b, D, eye, o);
+  const w = (q) => len(sub(V(o, q * 4 + 1), V(o, q * 4)));
+  assert.ok(Math.abs(w(0) - 1) < 1e-6 && Math.abs(w(1) - 0.5) < 1e-6 && Math.abs(w(2) - 0.25) < 1e-6 && w(3) === 0, `${[0, 1, 2, 3].map(w)}`);
+  // streaks too (sand, spray); rain is where it is to the end
+  const st = buf([{ p: [0, 0, -5], v: [0, -5, 0] }, { p: [1, 0, -5], v: [0, -5, 0] }]); st.age.fill(5); st.left = new Float32Array([1e9, 0.05]);
+  expandStreaks(st, { ...DRAW.sand, width: 0.1, minPx: 0, fadeOut: 0.1 }, eye, o);
+  assert.ok(Math.abs(w(0) - 0.1) < 1e-6 && Math.abs(w(1) - 0.05) < 1e-6);
+  expandStreaks(st, { ...DRAW.hail, width: 0.1, minPx: 0 }, eye, o); assert.ok(Math.abs(w(1) - 0.1) < 1e-6, 'a hailstone is there until it strikes');
+  // every kind that grows, tumbles or hangs has a fade-out; a buffer without `left` draws as before
+  for (const k of ['rain', 'snow', 'dust', 'ash', 'spores', 'leaves', 'sand', 'spray']) assert.ok(DRAW[k].fadeOut > 0, k);
+  delete b.left; expandDabs(b, D, eye, o); assert.ok(Math.abs(w(3) - 1) < 1e-6);
+});
+
+test('the cell divides the simulated box: a particle the simulation wraps from wall to wall is shown where it was', () => {
+  const eye = makeEye(); eye.pix = 0; eye.x = 2; eye.y = 1.6; eye.z = -3; eye.radius = PARTICLES.radius; eye.fx = 0; eye.fy = 0; eye.fz = 0;
+  const D = { ...DRAW.snow, ...DRAW_PAINTED.snow, minPx: 0, maxPx: 0, exposure: 0 };
+  assert.equal(cellFor(D, eye), 8, 'asked for 9 m in a 24 m box: 8 m (three cells across the box)');
+  assert.equal(cellFor({ cell: 12 }, eye), 12); assert.equal(cellFor({ cell: 30 }, eye), 24); assert.equal(cellFor({ cell: 0 }, eye), 0);
+  assert.equal(cellFor({ cell: 9 }, makeEye()), 9, 'no box known: as asked');
+  for (let c = 2; c < 30; c += 0.7) { const k = 2 * PARTICLES.radius / (2 * cellFor({ cell: c }, eye)); assert.ok(Math.abs(k - Math.round(k)) < 1e-9, `${c}`); }
+  // flakes just inside the east wall of the box, and the same flakes after the wrap (48 m west)
+  const N = 40, a = buf(Array.from({ length: N }, (_, i) => ({ p: [23.9, 1 + i * 0.3, -20 + i], size: 0.003 + i * 1e-5 })));
+  const b2 = buf(Array.from({ length: N }, (_, i) => ({ p: [23.9 - 48, 1 + i * 0.3, -20 + i], size: 0.003 + i * 1e-5 })));
+  const oa = new Float32Array(N * 12), ob = new Float32Array(N * 12);
+  expandDabs(a, D, eye, oa); expandDabs(b2, D, eye, ob);
+  let worst = 0, seen = 0; for (let i = 0; i < N * 12; i++) { worst = Math.max(worst, Math.abs(oa[i] - ob[i])); }
+  for (let i = 0; i < N; i++) if (len(sub(V(oa, i * 4 + 1), V(oa, i * 4))) > 0.05) seen++;
+  assert.ok(worst < 1e-4, `moved by ${worst} m`); assert.ok(seen > N * 0.5, `${seen} of them in sight`);
+  // with the cell as it was asked for (9 m: 48 m is not a whole number of 18 m cells) they would have jumped 6 m
+  const far = makeEye(); Object.assign(far, eye, { radius: 0 });
+  expandDabs(a, D, far, oa); expandDabs(b2, D, far, ob);
+  let jump = 0; for (let i = 0; i < N; i++) jump = Math.max(jump, Math.abs(oa[i * 12] - ob[i * 12]));
+  assert.ok(jump > 5.9, `${jump}`);
 });

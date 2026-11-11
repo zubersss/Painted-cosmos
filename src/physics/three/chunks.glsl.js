@@ -6,6 +6,7 @@
 // the CPU. Per instance, the physics arrays as they are:
 //   aPcPos  vec3  m, relative to the object's origin, body-local axes
 //   aPcVel  vec3  m/s          aPcSize  float  m (the grain itself)          aPcAge  float  s
+//   aPcLeft float s until it is gone, where the physics can tell (1e9 otherwise)
 //   aPcMat  float the ground it was raised from: an index into the physics' MATERIAL_IDS
 //                 (bytes, not normalised: 0..14), 255 = not from the ground
 // In main(), instead of `position`:
@@ -33,6 +34,10 @@ uniform vec4 uPcShelter;  // the hull: east, north (m from the eye), top (m abov
 uniform vec4 uPcPixel;    // x: metres one pixel covers at one metre from the eye; y: least size in pixels; z: most (0 = none);
                           // w: dab: how much sizes differ from particle to particle (0..1)
 uniform float uPcSmear;   // dab: the most it is drawn out along its motion, in half-sizes (4 = two dab sizes)
+uniform vec4 uPcDraw3;    // x: fade-out (s): a mark shrinks to nothing over its last moments (aPcLeft).  y: dab strobe (s): the
+                          // frame time (0 = off); z: the longest a dab is drawn out to keep up with its travel a frame, in dab sizes
+                          // w: dab: nothing nearer the eye than 0.4 of this (m), full size from it on (0 = off)
+attribute float aPcLeft;
 attribute vec3 aPcPos;
 attribute vec3 aPcVel;
 attribute float aPcSize;
@@ -45,7 +50,7 @@ float pcPhysEdge(vec3 p) {
   float t = clamp((length(p - uPcFocus.xyz) / uPcFocus.w - 0.8) / 0.2, 0.0, 1.0);
   return 1.0 - t * t * (3.0 - 2.0 * t);
 }
-float pcPhysFadeIn() { return uPcDraw.w > 0.0 ? min(1.0, aPcAge / uPcDraw.w) : 1.0; }
+float pcPhysFadeIn() { return (uPcDraw.w > 0.0 ? min(1.0, aPcAge / uPcDraw.w) : 1.0) * (uPcDraw3.x > 0.0 ? clamp(aPcLeft / uPcDraw3.x, 0.0, 1.0) : 1.0); }
 // Where the least size makes a mark f times larger than it is, it stands for f (streak) or
 // f^2 (dab) of its kind and only that share is drawn: a number each particle keeps for life
 // decides which, and a mark shrinks smoothly to nothing as its turn passes (expand.js: thinned).
@@ -74,7 +79,7 @@ vec3 pcPhysStreak(vec2 corner) {
 vec3 pcPhysDab(vec2 corner) {
   vec3 c0 = aPcPos;
   float edge = -1.0;
-  if (uPcDraw2.w > 0.0) {
+  if (uPcDraw2.w > 0.0 && aPcMat > 200.0) {
     vec3 t = c0 - uPcEye;
     vec2 d = vec2(dot(t, uPcEast), dot(t, uPcNorth)), w = d - 2.0 * uPcDraw2.w * floor(d / (2.0 * uPcDraw2.w) + 0.5);
     c0 += uPcEast * (w.x - d.x) + uPcNorth * (w.y - d.y);
@@ -86,6 +91,8 @@ vec3 pcPhysDab(vec2 corner) {
   h *= 1.0 - uPcPixel.w + 2.0 * uPcPixel.w * fract(aPcSize * 51413.7);
   if (far > h) { float f = h / far; h = far * pcPhysThin(uPcDraw2.y * min(1.0, uPcDraw2.z * f * f)); } else h *= pcPhysThin(uPcDraw2.y);
   if (uPcPixel.z > 0.0) h = min(h, 0.5 * uPcPixel.x * uPcPixel.z * dist);
+  float full = h;
+  if (uPcDraw3.w > 0.0) h *= smoothstep(0.4, 1.0, dist / uPcDraw3.w);
   h *= (edge >= 0.0 ? edge : pcPhysEdge(aPcPos)) * pcPhysFadeIn();
   vec3 r = uPcRight, u = uPcUp;
   float la = h;
@@ -97,7 +104,9 @@ vec3 pcPhysDab(vec2 corner) {
     vec2 sp = vec2(dot(v, uPcRight), dot(v, uPcUp));
     float sl = length(sp);
     if (sl > 1e-5) {
-      vec2 c = sp / sl; sl = min(sl, uPcSmear * h);
+      vec2 c = sp / sl; float travel = sl * uPcDraw3.y / uPcDraw2.x, streak = uPcDraw3.z;
+      if (travel > streak * 2.0 * full) h *= 1.0 - smoothstep(0.0, 0.6, travel / (streak * 2.0 * full) - 1.0);
+      sl = min(sl, max(uPcSmear * h, travel));
       r = uPcRight * c.x + uPcUp * c.y; u = uPcUp * c.x - uPcRight * c.y;
       la = h + 0.5 * sl; c0 -= r * (0.5 * sl);
     }

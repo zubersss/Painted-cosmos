@@ -39,20 +39,74 @@
 //           shown under the hull. 0 = each where it is. For snow, which is sparse to simulate
 //           (a real snowfall is thousands of flakes a cubic metre) and has no ground to respect
 //           but the hull and the terrain, which hides what is behind it.
+//           The cell in use is the nearest one that divides the simulated box (cellFor): the box
+//           wraps its particles from one wall to the other, and only then is a wrapped particle
+//           shown where it was.
+//   fadeOut: seconds over which a mark shrinks to nothing before it is gone (its life ends, or
+//           it lands: buf.left). Nothing pops out: a puff that has grown to two metres does not
+//           vanish between two frames, a flake shown a cell away from where it is melts just
+//           above the ground it is really over, and a stroke of rain (a metre of it, in the
+//           painted table) thins to a point over its last 40 cm instead of going out whole
+//   strobe (dab with an exposure): seconds, the frame time the picture is made for. A mark that
+//           crosses more than its own drawn length in that time cannot be followed by the eye:
+//           it is a flash somewhere new every frame. So a dab is drawn out at least as far as
+//           it travels in a frame, whatever `smear` says (driving snow is slanted strokes), up
+//           to `streak` dab sizes (default 3); beyond that a camera would smear it to nothing
+//           and so does this: it shrinks away, gone at 1.6 times that (a hairline is not a
+//           flake: one near the lens in a gale). 0 = off
+//   near (dab): m. Nothing is drawn nearer the eye than 0.4 of this, and marks grow to their
+//           full size between there and it: a flake at arm's length crosses the whole picture
+//           in a frame or two, a blot the painter would not have put there. 0 = off
 //   share:  0..1 (default 1): draw only this share of the kind (a painter's rain is a few
 //           strokes, not every drop); which ones is decided as for the floor
 //   vary:   0..1 how much the shade differs from particle to particle (the `color` attribute)
 export const DRAW = Object.freeze({
-  rain: Object.freeze({ shape: 'streak', width: 0.012, exposure: 0.04, min: 0.05, fadeIn: 0, vary: 0, minPx: 1.2 }),
-  hail: Object.freeze({ shape: 'streak', width: 0.024, exposure: 0.018, min: 0.03, fadeIn: 0, vary: 0, minPx: 1.2 }),
-  sand: Object.freeze({ shape: 'streak', width: 0.014, exposure: 0.03, min: 0.02, fadeIn: 0.05, vary: 0.3, minPx: 1.2 }),
-  spray: Object.freeze({ shape: 'streak', width: 0.018, exposure: 0.03, min: 0.03, fadeIn: 0, vary: 0, minPx: 1.2 }),
-  snow: Object.freeze({ shape: 'dab', size: 0.035, grow: 0, spin: 0, fadeIn: 0.25, vary: 0, minPx: 1.6, exposure: 0.03 }),
-  dust: Object.freeze({ shape: 'dab', size: 0.16, grow: 0.3, spin: 0, fadeIn: 0.15, vary: 0.35, minPx: 1.6, sizeMax: 2.6, fill: 0.785 }),
-  ash: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 1.5, fadeIn: 0.3, vary: 0.4, minPx: 1.6 }),
-  spores: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 0, fadeIn: 0.4, vary: 0.3, minPx: 1.6 }),
-  leaves: Object.freeze({ shape: 'dab', size: 0.075, grow: 0, spin: 3.2, fadeIn: 0.3, vary: 0.5, minPx: 1.6 }),
+  rain: Object.freeze({ shape: 'streak', width: 0.012, exposure: 0.04, min: 0.05, fadeIn: 0.1, fadeOut: 0.08, vary: 0, minPx: 1.2 }),
+  hail: Object.freeze({ shape: 'streak', width: 0.024, exposure: 0.018, min: 0.03, fadeIn: 0.1, fadeOut: 0, vary: 0, minPx: 1.2 }),
+  sand: Object.freeze({ shape: 'streak', width: 0.014, exposure: 0.03, min: 0.02, fadeIn: 0.05, fadeOut: 0.15, vary: 0.3, minPx: 1.2 }),
+  spray: Object.freeze({ shape: 'streak', width: 0.018, exposure: 0.03, min: 0.03, fadeIn: 0, fadeOut: 0.15, vary: 0, minPx: 1.2 }),
+  snow: Object.freeze({ shape: 'dab', size: 0.035, grow: 0, spin: 0, fadeIn: 0.25, fadeOut: 0.3, vary: 0, minPx: 1.6, exposure: 0.03, strobe: 0.02, near: 3 }),
+  dust: Object.freeze({ shape: 'dab', size: 0.16, grow: 0.3, spin: 0, fadeIn: 0.15, fadeOut: 0.7, vary: 0.35, minPx: 1.6, sizeMax: 2.6, fill: 0.785, near: 2.5 }),
+  ash: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 1.5, fadeIn: 0.3, fadeOut: 0.4, vary: 0.4, minPx: 1.6 }),
+  spores: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 0, fadeIn: 0.4, fadeOut: 0.4, vary: 0.3, minPx: 1.6 }),
+  leaves: Object.freeze({ shape: 'dab', size: 0.075, grow: 0, spin: 3.2, fadeIn: 0.3, fadeOut: 0.3, vary: 0.5, minPx: 1.6 }),
 });
+
+// The same table for PAINTER's pipeline, as overrides of DRAW (pass it as `draw` to the weather
+// kit). Its post pass erases any mark under about three of its internal pixels, so every kind
+// has a least size of 3 px or more and sizes that read as brush marks at 10 m:
+//   snow   a flake is a speck of bare paper 4 to 10 px across, drawn out along its motion in
+//          wind, shown modulo a cell round the eye
+//   dust   ragged dry-brush patches (the lab's puff inks 0.3 of its quad); in a storm the kit
+//          sizes them from the dust in the air, up to 2.6 m: billows, not blots
+//   rain   one broad wet stroke stands for several drops (thin strokes do not survive)
+export const DRAW_PAINTED = Object.freeze({
+  rain: Object.freeze({ width: 0.07, exposure: 0.14, minPx: 3 }),
+  snow: Object.freeze({ size: 0.1, minPx: 4, maxPx: 10, exposure: 0.04, smear: 1.2, varySize: 0.4, cell: 9 }),
+  hail: Object.freeze({ width: 0.05, minPx: 3 }),
+  sand: Object.freeze({ width: 0.035, minPx: 3, exposure: 0.05, vary: 0.12 }),
+  spray: Object.freeze({ width: 0.04, minPx: 3 }),
+  dust: Object.freeze({ size: 0.5, grow: 0.35, minPx: 8, maxPx: 80, sizeMax: 2.6, fill: 0.3, exposure: 0.12 }),
+  ash: Object.freeze({ size: 0.09, minPx: 4, exposure: 0.03 }),
+  spores: Object.freeze({ size: 0.05, minPx: 3 }),
+  leaves: Object.freeze({ size: 0.1, minPx: 4 }),
+});
+
+// The cell (m, half-width) a kind is shown modulo: the one nearest D.cell of which the
+// simulated box (half-width eye.radius) holds a whole number. The simulation wraps a particle
+// from one wall of its box to the other; unless the box is whole cells wide the wrapped
+// particle would be shown somewhere else in the same frame (measured: 4 marks a second jumping
+// across the picture and 12 vanishing, in a blizzard, with a 9 m cell in a 24 m box).
+// buf (optional): the buffer; a kind simulated in a box of its own (buf.radius: snow, 8 m round
+// the eye the physics was given) is always shown modulo that box round the eye that is drawing:
+// where the two eyes are the same every flake is exactly where it is simulated.
+export function cellFor(D, eye, buf) {
+  const own = buf && buf.radius > 0 && eye && eye.radius > 0 && buf.radius < eye.radius ? buf.radius : 0;
+  const c = D.cell > 0 ? D.cell : own, R = own > 0 ? own : eye && eye.radius > 0 ? eye.radius : 0;
+  if (!(c > 0) || !(R > 0)) return c;
+  return R / Math.max(1, Math.round(R / c));
+}
+const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 // What the eye is doing, for the particle expanders. All in buffer coordinates.
 //   x, y, z        camera position
@@ -95,7 +149,8 @@ function edgeScale(px, py, pz, eye) {
 // room (>= 1, default 1): how much larger the kind's marks may grow in all before they would
 // hide more than the physics says the kind hides; the floor thins only beyond that.
 export function expandStreaks(buf, D, eye, out, room = 1) {
-  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size;
+  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size, L = buf.left;
+  const fout = L ? D.fadeOut || 0 : 0;
   const ex = D.exposure, hw = D.width * 0.5, min = D.min || 0, fin = D.fadeIn || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
   const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
@@ -120,6 +175,7 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
     if (most > 0 && half > most * dist) half = most * dist;
     let k = half / wl * edgeScale(px, py, pz, eye) * thin;
     if (fin > 0 && A[i] < fin) k *= A[i] / fin;
+    if (fout > 0 && L[i] < fout) k *= L[i] > 0 ? L[i] / fout : 0;
     wx *= k; wy *= k; wz *= k;
     const hx = px - sx, hy = py - sy, hz = pz - sz;                      // where it was
     out[q] = px - wx; out[q + 1] = py - wy; out[q + 2] = pz - wz;
@@ -134,12 +190,14 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
 // size: the size now (m) when the kit has worked one out from the physics (see dabSize);
 // D.size otherwise.
 export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
-  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size;
+  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size, L = buf.left;
+  const fout = L ? D.fadeOut || 0 : 0;
   const fin = D.fadeIn || 0, grow = D.grow || 0, spin = D.spin || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
   const ex = spin === 0 ? D.exposure || 0 : 0, smear = 2 * (D.smear != null ? D.smear : 2);
   const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
   const vs = D.varySize || 0;
-  const cell = D.cell || 0, c2 = cell * 2, SH = eye.shelters, nSH = cell > 0 && SH ? eye.shelterCount : 0;
+  const strobe = ex > 0 ? D.strobe || 0 : 0, streak = D.streak > 0 ? D.streak : 3, nearD = D.near || 0;
+  const cell = cellFor(D, eye, buf), c2 = cell * 2, M = buf.mat, SH = eye.shelters, nSH = cell > 0 && SH ? eye.shelterCount : 0;
   const Ex = eye.ex, Ey = eye.ey, Ez = eye.ez, Nx = eye.nx, Ny = eye.ny, Nz = eye.nz;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
@@ -147,8 +205,9 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
     let h = 0.5 * (size + grow * age);
     if (vs > 0) { const r = S[i] * 51413.7; h *= 1 - vs + 2 * vs * (r - Math.floor(r)); }       // no two flakes the same size
     let tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z, edge = -1;
-    if (cell > 0) {
+    if (cell > 0 && !(M && M[i] !== 255)) {
       // shown at its place modulo the cell round the eye; it shrinks to nothing toward the cell's wall
+      // (what was raised from the ground, kicked powder, is shown where it is)
       const de = tx * Ex + ty * Ey + tz * Ez, dn = tx * Nx + ty * Ny + tz * Nz;
       const we = de - c2 * Math.round(de / c2), wn = dn - c2 * Math.round(dn / c2);
       const se = we - de, sn = wn - dn;
@@ -164,8 +223,11 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
     if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), share * Math.min(1, roomy * f * f)); }
     else if (share < 1) h *= thinned(own01(S[i]), share);
     if (most > 0 && h > most * dist) h = most * dist;
+    const full = h;                                               // its size before the edge and the fades take from it
+    if (dist < nearD) h *= smooth01((dist / nearD - 0.4) / 0.6);
     h *= edge >= 0 ? edge : edgeScale(px, py, pz, eye);
     if (fin > 0 && age < fin) h *= age / fin;
+    if (fout > 0 && L[i] < fout) h *= L[i] > 0 ? L[i] / fout : 0;
     let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h;
     if (spin !== 0) {
       // each particle keeps its own phase (its size is its own and travels with it)
@@ -178,8 +240,12 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
       const sr = vx * eye.rx + vy * eye.ry + vz * eye.rz, su = vx * eye.ux + vy * eye.uy + vz * eye.uz;
       let sl = Math.sqrt(sr * sr + su * su);
       if (sl > 1e-5) {
-        const c = sr / sl, s2 = su / sl;
-        if (sl > smear * h) sl = smear * h;
+        const c = sr / sl, s2 = su / sl, travel = sl * strobe / ex;
+        // drawn out by its motion during the exposure, capped; but never less than it travels in
+        // a frame (else it strobes), and shrinking away where that would make it a hairline
+        if (travel > streak * 2 * full) h *= 1 - smooth01((travel / (streak * 2 * full) - 1) / 0.6);
+        const cap = Math.max(smear * h, travel);
+        if (sl > cap) sl = cap;
         ax = eye.rx * c + eye.ux * s2; ay = eye.ry * c + eye.uy * s2; az = eye.rz * c + eye.uz * s2;
         bx = eye.ux * c - eye.rx * s2; by = eye.uy * c - eye.ry * s2; bz = eye.uz * c - eye.rz * s2;
         la = h + 0.5 * sl;

@@ -22,7 +22,7 @@ import { SPECIES, terminalVelocity, meanFreePath, ATMOSPHERES } from './atmosphe
 import { saltationThreshold } from './weather.js';
 import { MATERIAL_INDEX, MATERIAL_NONE, materialNow } from './ground.js';
 import { BODIES } from '../data/bodies.js';
-import { PARTICLES, EVENT } from './particles.js';
+import { PARTICLES, EVENT, publish } from './particles.js';
 import { clamp01, smoothstep } from './util.js';
 
 // species: row of atmosphere.SPECIES for the fall speed.  life: [min, max] seconds.
@@ -32,12 +32,14 @@ import { clamp01, smoothstep } from './util.js';
 // flutter: sideways tumbling speed as a fraction of the fall speed (capped at 1 m/s).
 // turb: how much of the air's turbulence the particle follows.
 // ground: what happens on touching the ground: 0 dies, 1 hops on (saltation), 2 bounces (hail).
+// lands: it falls steadily enough for its landing to be foretold (buf.left: the time to the
+// ground at its fall speed). Dust is not: it hangs, and its vertical speed is the turbulence's.
 export const LOOSE = Object.freeze({
   dust: { species: 'dust', life: [3, 8], flutter: 0, turb: 1.0, ground: 0, rest: 0, puff: 0.45 },
   sand: { species: 'sand', life: [1.5, 4], flutter: 0, turb: 0.25, ground: 1, rest: 0.5 },
-  ash: { species: 'ash', life: [8, 16], flutter: 0.3, turb: 0.7, ground: 0, rest: 0, puff: 0.3 },
-  spores: { species: 'spore', life: [8, 16], flutter: 0.5, turb: 0.9, ground: 0, rest: 0, puff: 0.3 },
-  leaves: { species: 'leaf', life: [6, 14], flutter: 0.6, turb: 0.5, ground: 0, rest: 0 },
+  ash: { species: 'ash', life: [8, 16], flutter: 0.3, turb: 0.7, ground: 0, rest: 0, puff: 0.3, lands: true },
+  spores: { species: 'spore', life: [8, 16], flutter: 0.5, turb: 0.9, ground: 0, rest: 0, puff: 0.3, lands: true },
+  leaves: { species: 'leaf', life: [6, 14], flutter: 0.6, turb: 0.5, ground: 0, rest: 0, lands: true },
   spray: { species: 'spray', life: [0.5, 1.4], flutter: 0, turb: 0.1, ground: 0, rest: 0 },
   hail: { species: 'hail', life: [3, 6], flutter: 0, turb: 0, ground: 2, rest: 0.45 },
 });
@@ -107,7 +109,7 @@ export class Loose {
     b._vt[i] = this.vt[kind] * Math.pow(s, 1.2);
     b._ph[i] = r() * 6.2831853;
     b._life[i] = (K.life[0] + r() * (K.life[1] - K.life[0])) * lifeMul;
-    b.age[i] = 0; b.mat[i] = mat;
+    b.age[i] = 0; b.mat[i] = mat; b.left[i] = b._life[i]; b._alt[i] = 1e9;
     return true;
   }
 
@@ -301,7 +303,7 @@ export class Loose {
       b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
       let alive = b._n;
       if (alive === 0) { b.count = 0; continue; }
-      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat;
+      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left;
       const turb = K.turb * sigma, puff = K.puff || 0;
       for (let i = 0; i < alive; i++) {
         const o = i * 3;
@@ -309,6 +311,7 @@ export class Loose {
         const age = AG[i] + h;
         let dead = age > LF[i] || Math.abs(x - fx) > Rr + 6 || Math.abs(z - fz) > Rr + 6;
         let vx = V[o], vy = V[o + 1], vz = V[o + 2];
+        let left = LF[i] - age;                                   // what is left of its life
         if (!dead) {
           // wind at the particle
           let u = (x - fx) / 16 + 1.5, v = (z - fz) / 16 + 1.5;
@@ -354,6 +357,11 @@ export class Loose {
               } else if (K.ground === 2 && vy < 0) {
                 if (-vy > 2 && PH[i] < 100) { y = gy + 0.01; vy = -vy * K.rest; vx *= 0.6; vz *= 0.6; PH[i] += 100; P._event(frame, x, gy, z, EVENT.bounce, clamp01(-vy / 8), SZ[i]); } else dead = true;
               } else dead = true;
+            } else if (K.lands) {
+              // it will land first: its height over the ground, at the rate that has been closing (particles.js)
+              const alt = y - gy, a0 = b._alt[i]; b._alt[i] = alt;
+              const rate = a0 < 1e8 ? b._rate[i] + ((a0 - alt) / h - b._rate[i]) * (h < 0.15 ? h / 0.15 : 1) : -vy; b._rate[i] = rate;
+              if (rate > 0.05) { const tl = alt / rate; if (tl < left) left = tl; }
             }
           }
         }
@@ -362,21 +370,16 @@ export class Loose {
           if (i < alive) {
             const s = alive * 3;
             Pp[o] = Pp[s]; Pp[o + 1] = Pp[s + 1]; Pp[o + 2] = Pp[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive];
+            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive];
             if (EJ) { EJ[o] = EJ[s]; EJ[o + 1] = EJ[s + 1]; EJ[o + 2] = EJ[s + 2]; }
             i--;
           }
           continue;
         }
-        Pp[o] = x; Pp[o + 1] = y; Pp[o + 2] = z; V[o] = vx; V[o + 1] = vy; V[o + 2] = vz; AG[i] = age;
+        Pp[o] = x; Pp[o + 1] = y; Pp[o + 2] = z; V[o] = vx; V[o + 1] = vy; V[o + 2] = vz; AG[i] = age; LT[i] = left;
       }
       b._n = alive; b.count = alive;
-      const pos = b.pos, vel = b.vel;
-      for (let i = 0; i < alive; i++) {
-        const o = i * 3, x = Pp[o], y = Pp[o + 1], z = Pp[o + 2], a = V[o], c = V[o + 1], d = V[o + 2];
-        pos[o] = ex * x + ax * y + nx * z; pos[o + 1] = ey * x + ay * y + ny * z; pos[o + 2] = ez * x + az * y + nz * z;
-        vel[o] = ex * a + ax * c + nx * d; vel[o + 1] = ey * a + ay * c + ny * d; vel[o + 2] = ez * a + az * c + nz * d;
-      }
+      publish(b, frame, alive);                       // (on the curved ground: particles.js)
     }
   }
 
@@ -387,7 +390,7 @@ export class Loose {
     const i = b._n++, o = i * 3;
     b._p[o] = x; b._p[o + 1] = y; b._p[o + 2] = z; b._v[o] = vx; b._v[o + 1] = vy; b._v[o + 2] = vz;
     // a clod of powder is heavier than a flake: it flies a short arc and bursts into flakes on the way
-    b._vt[i] = 2.2 + this.rng() * 2.5; b._ph[i] = this.rng() * 6.2831853; b.size[i] = 0.004 + this.rng() * 0.006; b.age[i] = 0; b.mat[i] = I_SNOW;
+    b._vt[i] = 2.2 + this.rng() * 2.5; b._ph[i] = this.rng() * 6.2831853; b.size[i] = 0.004 + this.rng() * 0.006; b.age[i] = 0; b.mat[i] = I_SNOW; b.left[i] = 1e9; b._lt[i] = -1e9; b._wu[i] = 0;
     return true;
   }
 }

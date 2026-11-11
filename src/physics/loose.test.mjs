@@ -74,7 +74,14 @@ test('air: kicked dust hangs and drifts with the wind; wet ground and rock raise
   run(w, 1); walk(w, 3, 4);
   const P = w.physics.particles;
   assert.ok(P.dust.count > 5 && P.sand.count > 0, `dust ${P.dust.count}, sand ${P.sand.count}`);
-  run(w, 2.5);
+  // every grain says how long it has left (its life, 3 to 8 s for dust), and the number runs down with the clock
+  const left0 = new Map(); for (let i = 0; i < P.dust.count; i++) { assert.ok(P.dust.left[i] > 0 && P.dust.left[i] <= 8, `${P.dust.left[i]}`); left0.set(P.dust.size[i], P.dust.left[i]); }
+  run(w, 0.5);
+  let ran = 0; for (let i = 0; i < P.dust.count; i++) { const l0 = left0.get(P.dust.size[i]); if (l0 !== undefined && Math.abs(l0 - P.dust.left[i] - 0.5) < 0.02) ran++; }
+  assert.ok(ran > 3, `${ran} grains half a second nearer their end`);
+  // and none is retired with time left: the last a kit saw of each was under a frame
+  { const seen = new Map(), last = []; run(w, 2, { each: () => { const now = new Map(); for (let i = 0; i < P.dust.count; i++) now.set(P.dust.size[i], P.dust.left[i]); for (const [id, l] of seen) if (!now.has(id)) last.push(l); seen.clear(); for (const [id, l] of now) seen.set(id, l); } });
+    assert.ok(last.length > 0 && Math.max(...last) < 0.05, `${last.length} grains ended, the latest warning ${Math.max(...last).toFixed(3)} s`); }
   assert.ok(P.dust.count > 3, 'still hanging after 2.5 s: ' + P.dust.count);
   assert.ok(P.sand.count < 3, 'the coarse grains have fallen back');
   let fall = 0; for (let i = 0; i < P.dust.count; i++) fall += -dot(V(P.dust.vel[i * 3], P.dust.vel[i * 3 + 1], P.dust.vel[i * 3 + 2]), w.up);

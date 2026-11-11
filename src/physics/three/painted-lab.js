@@ -17,9 +17,10 @@
 //   water=1 (my wave patch over PAINTER's liquid)   expand=gpu (instanced particles)
 //   hud=1   freeze=1 (stop the clock once ready: for frame pairs)
 //   pre=<s> (simulate this long, unseen, before the page says it is ready)
+//   eye=0 (the physics is not told where the camera is)
 //   push=0 (the explorer and the ship disturb nothing: with freeze=1 and the same pre, the frame
 //   differs from the pushed one only by what the push field does)
-// window.__lab: { info(), stability(dtMs, pairs), plantCheck(), setRain(mode), physics, kits, world, painter }
+// window.__lab: { info(), stability(dtMs, pairs, hideKits, orbitDegPerSec), plantCheck(), setRain(mode), physics, kits, world, painter }
 import * as THREE from 'three';
 import { createPainter, RENDERER_OPTIONS, makeWashMaterial, makePaintUniforms, bindBodyUniforms, VERT_PARS, VERT_END, FRAG_PARS } from '../../render/index.js';
 import { createWorld } from '../../world/index.js';
@@ -29,6 +30,7 @@ import { createPhysics, stepExplorerBody, stepShipGear, wakeShip, MATERIAL_IDS }
 import { weatherAt, cellsAt } from '../weather.js';
 import { createPhysicsKits } from './kits.js';
 import { SHAPE_GLSL } from './chunks.glsl.js';
+import { DRAW_PAINTED } from './expand.js';
 
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => (Q.has(k) && Q.get(k) !== '' && isFinite(+Q.get(k)) ? +Q.get(k) : d);
@@ -188,17 +190,10 @@ const FRAG = {
 //   blend  the thin strokes drawn in a pass of their own after the painting, alpha-blended
 const RAIN = { thin: { width: 0.012, exposure: 0.04, minPx: 1.2 }, broad: { width: 0.07, exposure: 0.14, minPx: 3 }, cover: { width: 0.02, exposure: 0.05, minPx: 1.6 }, blend: { width: 0.014, exposure: 0.05, minPx: 1.4 } };
 let rainMode = RAIN[Q.get('rain')] ? Q.get('rain') : 'broad';
-// What the painted frames taught: PAINTER's post pass erases anything under about three of its
-// internal pixels (a 1.2 px streak or a 1.6 px flake is simply gone). So in this pipeline every
-// kind gets a least size of 3 px or more, and sizes that read as brush marks at 10 m.
-// The kits then keep the cover: a mark the floor enlarges stands for several of its kind and
-// only that share is drawn (fewer, larger marks far away). Sizes per kind, and why:
-//   snow   a flake is a speck of bare paper 4 to 9 px across, drawn out along its motion in wind
-//   dust   ragged dry-brush patches (the puff inks 0.4 of its quad); in a storm the kit sizes
-//          them from the dust in the air, up to 2.6 m: billows, not blots
-const DRAW_PAINTED = { snow: { size: 0.1, minPx: 4, maxPx: 10, exposure: 0.04, smear: 1.2, varySize: 0.4, cell: 9 }, hail: { width: 0.05, minPx: 3 }, sand: { width: 0.035, minPx: 3, exposure: 0.05, vary: 0.12 }, spray: { width: 0.04, minPx: 3 },
-  dust: { size: 0.5, grow: 0.35, minPx: 8, maxPx: 80, sizeMax: 2.6, fill: 0.3, exposure: 0.12 }, ash: { size: 0.09, minPx: 4, exposure: 0.03 }, spores: { size: 0.05, minPx: 3 }, leaves: { size: 0.1, minPx: 4 } };
-for (const k of ['snowSize', 'snowMin', 'snowMax', 'snowCell', 'dustMax', 'dustSize']) if (Q.has(k)) { const kind = k.slice(0, 4), f = { Size: 'size', Min: 'minPx', Cell: 'cell', Max: k === 'dustMax' ? 'sizeMax' : 'maxPx' }[k.slice(4)]; DRAW_PAINTED[kind][f] = num(k, DRAW_PAINTED[kind][f]); }
+// The draw table for this pipeline is DRAW_PAINTED (expand.js: what the painted frames taught);
+// the URL may override single numbers of it.
+const DRAW_LAB = {}; for (const k in DRAW_PAINTED) DRAW_LAB[k] = { ...DRAW_PAINTED[k] };
+for (const k of ['snowSize', 'snowMin', 'snowMax', 'snowCell', 'dustMax', 'dustSize']) if (Q.has(k)) { const kind = k.slice(0, 4), f = { Size: 'size', Min: 'minPx', Cell: 'cell', Max: k === 'dustMax' ? 'sizeMax' : 'maxPx' }[k.slice(4)]; DRAW_LAB[kind][f] = num(k, DRAW_LAB[kind][f]); }
 const kitMaterials = [];
 let palette = null;
 function makeKitMaterial(kind, info) {
@@ -253,7 +248,7 @@ function buildKits() {
   if (Q.get('kits') === '0') { kits = null; return; }
   kits = createPhysicsKits(physics, {
     makeMaterial: (kind, info) => (kind === 'rain' && rainMode === 'blend' ? makeBlendRain(info) : makeKitMaterial(kind, info)),
-    weather: { draw: { ...DRAW_PAINTED, rain: RAIN[rainMode] }, expand: Q.get('expand') === 'gpu' ? 'gpu' : 'cpu' },
+    weather: { draw: { ...DRAW_LAB, rain: RAIN[rainMode] }, expand: Q.get('expand') === 'gpu' ? 'gpu' : 'cpu' },
     water: Q.get('water') === '1' ? { N: num('waterN', 64), step: num('waterStep', 1.25) } : false,      // PAINTER draws the liquid; the patch only on request
   });
   rainMesh = kits.weather.objects.find((o) => o.name === 'pc-physics-rain');
@@ -262,7 +257,8 @@ function buildKits() {
 buildKits();
 
 // ---- camera and the loop ------------------------------------------------------------------------------
-const yaw = num('yaw', 30) * Math.PI / 180, pitch = num('pitch', 12) * Math.PI / 180, dist = num('dist', 9), lookUp = num('up', 1.0);
+let yaw = num('yaw', 30) * Math.PI / 180;
+const pitch = num('pitch', 12) * Math.PI / 180, dist = num('dist', 9), lookUp = num('up', 1.0);
 const camLocal = new THREE.Vector3(), target = new THREE.Vector3();
 function placeCamera() {
   const f = Q.get('follow') === '1' ? _t.set(ex.p.x, ex.p.y, ex.p.z) : _t.copy(focus0);
@@ -292,7 +288,8 @@ function step(dt) {
   dist2.length = 0; if (pushOn) physics.explorer.disturbers(ex, dist2);
   if (shipMode && pushOn) physics.ship.disturbers(sh, dist2);
   const bu = world.bodyUniforms(bodyId);
-  physics.update(dt, { bodyId, time, focus: ex.p, sunDir: bu ? bu.uSunDirL.value : null, disturbers: dist2 });
+  // (the eye: what falls as single flakes is simulated round it; eye=0 leaves it out, as a caller that does not know it would)
+  physics.update(dt, { bodyId, time, focus: ex.p, sunDir: bu ? bu.uSunDirL.value : null, disturbers: dist2, eye: Q.get('eye') === '0' || camLocal.lengthSq() === 0 ? undefined : camLocal });
 }
 function draw(dt) {
   placeCamera();
@@ -354,19 +351,22 @@ function info() {
 // averaged over `pairs` pairs. Compare with the kits hidden to see what the kits add.
 const grab = document.createElement('canvas'); const g2 = grab.getContext('2d', { willReadFrequently: true });
 function pixels() { grab.width = canvas.width; grab.height = canvas.height; g2.drawImage(canvas, 0, 0); return g2.getImageData(0, 0, grab.width, grab.height).data; }
-function stability(dtMs = 8, pairs = 6, hideKits = false) {
+// orbit (degrees a second): the camera goes round the focus at that rate between the two frames of a pair
+// (a slow camera move: every mark shifts by a part of a pixel; what crawls shows as change beyond the scene's own).
+function stability(dtMs = 8, pairs = 6, hideKits = false, orbit = 0) {
   const was = frozen; frozen = true;
   if (kits) for (const o of kits.objects) o.userData.hide = hideKits;
   let mean = 0, share = 0;
   for (let k = 0; k < pairs; k++) {
     step(0.25 * speedK); draw(0.25); const a = pixels().slice();
+    yaw += orbit * Math.PI / 180 * dtMs / 1000;
     step(dtMs / 1000); draw(dtMs / 1000); const b = pixels();
     let s = 0, c = 0; const n = a.length / 4;
     for (let i = 0; i < a.length; i += 4) { const d = (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 765; s += d; if (d > 0.08) c++; }
     mean += s / n / pairs; share += c / n / pairs;
   }
   frozen = was;
-  return { dtMs, pairs, meanDiff: +mean.toFixed(5), changedShare: +share.toFixed(5) };
+  return { dtMs, pairs, orbit, hideKits, meanDiff: +mean.toFixed(5), changedShare: +share.toFixed(5) };
 }
 window.__lab = { info, stability, physics, world, painter, renderer, scene, camera, root, THREE, get kits() { return kits; },
   setRain(mode) { if (RAIN[mode]) { rainMode = mode; bound = false; buildKits(); } return rainMode; },

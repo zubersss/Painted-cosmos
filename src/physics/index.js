@@ -208,8 +208,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     { let ns = 0; const SH = particles.shelters;
       if (dist) for (let k = 0; k < dist.length && ns < 4; k++) { const D = dist[k]; if (D.kind !== 'ship' || !D.p) continue; const o = ns * 4; SH[o] = frame.lx(D.p.x, D.p.y, D.p.z); SH[o + 1] = frame.lz(D.p.x, D.p.y, D.p.z); SH[o + 2] = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0 + 2.2; SH[o + 3] = (D.radius || 4.2) * 0.85; ns++; }
       particles.shelterCount = ns; }
-    particles.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time);
-    loose.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
+    // the surface the weather meets under the focus: the ground, or the liquid standing over it
+    // (over a deep sea the bed is far below: rain that entered 18 m over the bed fell under water)
+    let wh = gh; { let l0 = near.liquidAt(fx, fz); if (l0 !== l0) l0 = airGrid.terrain.liquidAt(fx, fz); if (l0 === l0 && l0 > wh) wh = l0; }
+    // the eye (f.eye: the camera, body-local; optional): what falls as single flakes is simulated round it.
+    // (An eye far from the focus is a map or a free camera: the focus then.)
+    let ecx = fx, ecz = fz;
+    if (f.eye) { const x = frame.lx(f.eye.x, f.eye.y, f.eye.z), z = frame.lz(f.eye.x, f.eye.y, f.eye.z); if (Math.abs(x - fx) < 60 && Math.abs(z - fz) < 60) { ecx = x; ecz = z; } }
+    particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
+    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
     // what is filling the marks in: falling snow (m of depth per second) and blowing sand
     const pr = here.weather.precipitation;
     _fill.snow = pr.type === 'snow' || pr.type === 'ice' || pr.type === 'frost' ? pr.rate * pr.frozen01 * WEATHER.snowRatio * WEATHER.timeScale / 3.6e6 : 0;

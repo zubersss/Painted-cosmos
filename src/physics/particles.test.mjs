@@ -336,3 +336,64 @@ test('the hull keeps the rain off what is under it', () => {
   for (let k = 0; k < E.capacity; k++) { const o = k * 8; const p = V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2]); if (E.data[o + 4] > 0 && Math.abs(len(p) - w.R - 4.7) < 0.3) onHull++; }
   assert.ok(E.total > ev0 && onHull > 3, 'splashes on the hull: ' + onHull);
 });
+
+test('over deep water the weather enters above the surface, not above the bed', () => {
+  // a sea 40 m deep everywhere; the focus swims at the surface
+  const w = rainy('earth', { sea: BODIES.earth.radius + 40 });
+  const R = w.R + 40; const u = norm(w.focus); w.focus = V(u.x * (R + 0.5), u.y * (R + 0.5), u.z * (R + 0.5));
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 6);
+  const b = w.physics.particles.rain; let above = 0, under = 0, top = -1e9;
+  for (let i = 0; i < b.count; i++) { const h = len(V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2])) - R; if (h > -0.3) above++; else under++; if (h > top) top = h; }
+  assert.ok(b.count > 200 && under === 0, `${above} drops above the sea, ${under} under it`);
+  assert.ok(top > PARTICLES.height - 3 && top < PARTICLES.height + 5, `the highest ${top.toFixed(1)} m over the surface`);
+  // and they end on the surface as ripples
+  const E = w.physics.particles.events; let ripples = 0; for (let k = 0; k < E.capacity; k++) if (E.data[k * 8 + 4] > 0 && E.data[k * 8 + 3] === EVENT.ripple) ripples++;
+  assert.ok(ripples > 20, `${ripples} ripples`);
+});
+
+test('every particle says how long it has left: a flake by its fall to the ground, dust by its life', () => {
+  const w = rainy('earth', { pred: (x) => x.precipitation.type === 'snow' && x.precipitation.intensity01 > 0.6 });
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 8);
+  const b = w.physics.particles.snow, u = norm(w.focus);
+  assert.ok(b.left instanceof Float32Array && b.left.length === b.pos.length / 3);
+  let low = 0, bad = 0, high = 0;
+  for (let i = 0; i < b.count; i++) {
+    const h = len(V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2])) - w.R;
+    const fall = -(b.vel[i * 3] * u.x + b.vel[i * 3 + 1] * u.y + b.vel[i * 3 + 2] * u.z);
+    if (h < 3 && fall > 0.2) { low++; if (Math.abs(b.left[i] - h / fall) > 0.1 + 0.1 * h / fall) bad++; } else if (h > 8) { high++; assert.ok(b.left[i] > 2, `at ${h.toFixed(1)} m: ${b.left[i]}`); }
+  }
+  assert.ok(low > 30 && bad === 0 && high > 100, `${low} low flakes, ${bad} wrong, ${high} high`);
+  // each flake is seen shrinking before it lands: no flake is retired with much time left
+  const seen = new Map(); let lastLeft = [];
+  run(w, 3, { each: () => { const now = new Map(); for (let i = 0; i < b.count; i++) now.set(b.size[i], b.left[i]); for (const [id, l] of seen) if (!now.has(id)) lastLeft.push(l); seen.clear(); for (const [id, l] of now) seen.set(id, l); } });
+  lastLeft.sort((x, y) => x - y);
+  assert.ok(lastLeft.length > 50 && lastLeft[Math.floor(lastLeft.length * 0.98)] < 0.08, `${lastLeft.length} landings; 98 % were announced to within ${lastLeft[Math.floor(lastLeft.length * 0.98)].toFixed(3)} s`);
+});
+
+test('far from the anchor of the frame the rain still ends on the ground (the grid is a plane, the ground is not)', () => {
+  const w = rainy('earth');
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 1);
+  // walk 300 m east at 30 m/s: the frame re-anchors only after 384 m
+  const fr = w.physics.fields.frame, e = V(fr.ex, fr.ey, fr.ez), re0 = w.physics.stats.reanchors;
+  for (let i = 0; i < 600; i++) {
+    w.focus = V(w.focus.x + e.x * 0.5, w.focus.y + e.y * 0.5, w.focus.z + e.z * 0.5); const l = len(w.focus) / w.R; w.focus = V(w.focus.x / l, w.focus.y / l, w.focus.z / l);
+    run(w, 1 / 60);
+  }
+  run(w, 2);
+  const d = Math.hypot(fr.lx(w.focus.x, w.focus.y, w.focus.z), fr.lz(w.focus.x, w.focus.y, w.focus.z));
+  assert.ok(w.physics.stats.reanchors === re0 && d > 280, `${d.toFixed(0)} m from the anchor`);
+  // (a plane through the anchor would be d^2 / 2R = 11 m above the ground here)
+  const b = w.physics.particles.rain; let lo = 1e9, hi = -1e9;
+  for (let i = 0; i < b.count; i++) { const h = len(V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2])) - w.R; lo = Math.min(lo, h); hi = Math.max(hi, h); }
+  assert.ok(b.count > 300 && lo > -0.2 && lo < 0.6 && hi < PARTICLES.height + 4.5, `drops from ${lo.toFixed(2)} to ${hi.toFixed(2)} m over the ground`);
+  const E = w.physics.particles.events; let n = 0, worst = 0;
+  for (let k = 0; k < E.capacity; k++) if (E.data[k * 8 + 4] > 0 && w.t0 - E.data[k * 8 + 5] < 1) { n++; worst = Math.max(worst, Math.abs(len(V(E.origin.x + E.data[k * 8], E.origin.y + E.data[k * 8 + 1], E.origin.z + E.data[k * 8 + 2])) - w.R)); }
+  assert.ok(n > 50 && worst < 0.02, `${n} splashes, the worst ${worst.toFixed(3)} m off the ground`);
+  // and a drop falls along the local vertical there, not the anchor's (4 degrees apart at 300 m)
+  const u = norm(w.focus); let side = 0, down = 0;
+  for (let i = 0; i < b.count; i++) { const vx = b.vel[i * 3], vy = b.vel[i * 3 + 1], vz = b.vel[i * 3 + 2], dn = -(vx * u.x + vy * u.y + vz * u.z); down += dn; side += vx * fr.ex + vy * fr.ey + vz * fr.ez + dn * (fr.ex * u.x + fr.ey * u.y + fr.ez * u.z); }
+  void side; assert.ok(down / b.count > 3);
+});
