@@ -62,6 +62,23 @@ What M2 added:
   draw calls, render scale, quality tier, `world.update` ms, `physics.update` ms. In the README.
 
 ### Verified (how)
+M3 (latest first):
+- `node --test tests/*.test.mjs`: 93 pass (adds: a vista found once, listed in the sketchbook
+  and restored from a save).
+- `node tests/m3check.mjs` (real browser, stub visuals, PHYSICS on): PASSED, 17 checks: starts
+  at tier 1 and reduced scale, title card, no sound before the first gesture, the look hint
+  appears and goes after the first look, audio context running with a sane mix, B and H
+  panels, a vista found by walking to it, announced and saved.
+- With all M3 code and the last flight changes (per-world pace, settling on C):
+  `node tests/playthrough.mjs` (kinematic) PASSED; the same with PHYSICS PASSED;
+  `node tests/trip.mjs` (Earth, Mars, Saturn, reload from save) PASSED.
+- `node tests/tour.mjs` on a clean export of `0f40f68`'s successor: contact sheets in
+  `docs/lead/evidence/tour-<body>.jpg` (see the report for which bodies finished). Most frames
+  are marked "(unsettled)": `world.busy` did not return to 0 within 75 s after a teleport.
+- Not verified: nobody has *heard* the audio; the tour sheets have not been judged yet (that
+  is review 4, after the fresh PAINTER reports).
+
+M2 and before:
 - `node --test tests/*.test.mjs`: 92 pass. Beyond M1's set: pulse advice and speed profile; the
   Earth-Mars-Saturn trip in the pure simulation on stubs (lift off, map target, aim, pulse,
   land, step out, twice); the same trip on PAINTER's real worlds with PHYSICS and the real
