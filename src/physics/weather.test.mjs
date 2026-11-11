@@ -1,7 +1,7 @@
 // Tests: weather systems. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weatherAt, moistureAt, cellsAt, weatherWind, saltationThreshold, REGIMES, DEFAULT_SEED, WEATHER } from './weather.js';
+import { weatherAt, moistureAt, cellsAt, weatherWind, saltationThreshold, ownStorm01, REGIMES, DEFAULT_SEED, WEATHER } from './weather.js';
 import { ATMOSPHERES } from './atmosphere.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { epoch0 } from './testworld.mjs';
@@ -275,4 +275,35 @@ test('a fast system is a big one: the quickest weather on any world still takes 
     const v = Math.hypot(c.ve, c.vn);
     if (c.life < 1e8) assert.ok(c.r >= v * WEATHER.passTime * 0.75 - 1e-6, `${id}: r ${c.r.toFixed(0)} m at ${v.toFixed(1)} m/s`);
   }
+});
+
+test('a sea named for its storms storms most of the time: home-grown storms where the surface feeds the air (review 5, P3)', () => {
+  const places = [dir(-4, -159), dir(20, 40), dir(-35, 100)];
+  const share = (id, moist, fog = 0.4) => { let on = 0, n = 0, named = 0, flash = 0; for (const d of places) for (let t = 0; t < 14400; t += 30) { const w = wx(id, d, t, { moist, fog, sun01: 0.5, fetch: 2500 }, 2); n++; if (w.storm01 > 0.25) on++; if (w.kind === 'thunderstorm') named++; if (w.lightning.rate > 0.5) flash++; } return { on: on / n, named: named / n, flash: flash / n }; };
+  const seas = share('neptune', 1.6), wall = share('jupiter', 1.4), plain = share('neptune', 1.0);
+  assert.ok(seas.on > 0.6 && seas.on < 0.95 && seas.named > 0.5 && seas.flash > 0.4, 'Neptune\'s storm seas: ' + JSON.stringify(seas));
+  assert.ok(wall.on > plain.on && seas.on > wall.on, 'more moisture, more storms: ' + JSON.stringify([plain, wall, seas]));
+  // nothing of the kind where the ground is no wetter than the body's mean, or on a body without weather
+  for (const m of [0, 0.5, 1, 1.2]) assert.equal(ownStorm01('neptune', 0.3, 0.2, 0.93, 500, DEFAULT_SEED, m), 0);
+  // it comes and goes over minutes, and neighbours agree (R-WX-1: 15 % a second on the giants)
+  let worst = 0, worstX = 0; const d = places[0], R = BODIES.neptune.radius;
+  for (let t = 0; t < 7200; t += 1) { const a = ownStorm01('neptune', d.x, d.y, d.z, t, DEFAULT_SEED, 1.6), b = ownStorm01('neptune', d.x, d.y, d.z, t + 1, DEFAULT_SEED, 1.6); worst = Math.max(worst, Math.abs(b - a));
+    const c = ownStorm01('neptune', d.x + 10 / R, d.y, d.z, t, DEFAULT_SEED, 1.6); worstX = Math.max(worstX, Math.abs(c - a)); }
+  assert.ok(worst < 0.05, 'in a second: ' + worst);
+  assert.ok(worstX < 0.05, 'over ten metres: ' + worstX);
+  // its lightning is a real strike with a place and a distance
+  let struck = 0; for (let t = 0; t < 3600; t += 7) { const w = wx('neptune', d, t, { moist: 1.6, sun01: 0.5 }, 2); if (w.lightning.last.t > -1e8) { struck++; assert.ok(Number.isFinite(w.lightning.last.distance) && w.lightning.last.distance < 20000); } }
+  assert.ok(struck > 20, 'strikes seen: ' + struck);
+});
+
+test('only dry ground gives dust to the wind: none over a wet wood in any gale, plenty over a desert (review 5, P4)', () => {
+  const d = { x: 0.1736, y: 0.5817, z: 0.7946 };
+  for (const wind of [5, 15, 30, 60]) for (let t = 0; t <= 900; t += 30) {
+    const wood = wx('earth', d, t, { moist: 1, dustSource: 0.02, wind, sun01: 0.5 }, 2), meadow = wx('earth', d, t, { moist: 1.1, dustSource: 0.05, wind, sun01: 0.5 }, 2);
+    assert.equal(wood.dust01, 0, `wood, wind ${wind}, t ${t}`); assert.equal(meadow.dust01, 0);
+  }
+  const desert = wx('earth', d, 60, { moist: 0.08, dustSource: 0.7, wind: 20, sun01: 0.5 }, 2), calm = wx('earth', d, 60, { moist: 0.08, dustSource: 0.7, wind: 3, sun01: 0.5 }, 2);
+  assert.ok(desert.dust01 > 0.5 && calm.dust01 === 0, 'desert in a gale ' + desert.dust01 + ', in a breeze ' + calm.dust01);
+  const mars = wx('mars', d, 60, { moist: 0, dustSource: 1, wind: 3 * saltationThreshold('mars', ATMOSPHERES.mars.rho0), sun01: 0.5 }, 2);
+  assert.ok(mars.dust01 > 0.3, 'Mars: ' + mars.dust01);
 });

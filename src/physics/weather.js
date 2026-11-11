@@ -14,7 +14,7 @@
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, SPECIES, terminalVelocity, meanFreePath, airDensity, airTemperature } from './atmosphere.js';
 import { prevailing, windLarge, WINDS } from './wind.js';
-import { hash3, hashString, clamp, clamp01, mix, smoothstep, TAU } from './util.js';
+import { hash3, hashString, noise3, clamp, clamp01, mix, smoothstep, TAU } from './util.js';
 
 export const WEATHER = Object.freeze({
   timeScale: 60,           // game seconds of weather per real second (see above)
@@ -33,6 +33,13 @@ export const WEATHER = Object.freeze({
   // galeCloud of the sky, and over an open sea spray takes the view (sprayExt: extinction in units of clear air:
   // 12 = a visual range of 1.5 km in a hurricane-force wind over a breaking sea)
   galeFrom: 18, galeFull: 34, galeCloud: 0.9, sprayExt: 12,
+  // (P8) home-grown storms: where the surface feeds the air far more moisture than the body's mean
+  // (a biome's `moist` over ownFrom: Neptune's storm seas 1.6, Jupiter's storm wall 1.4 and
+  // lightning plains 1.3) convection builds over the place itself, the way thunderstorms stand
+  // over a warm sea: for a share of the time that rises to ownMax at ownFrom + ownSpan, in spells
+  // of minutes (ownTime) over kilometres (ownLength). They bring cloud, rain and lightning but no
+  // wind of their own: over such a place the standing gale is the storm's wind.
+  ownFrom: 1.2, ownSpan: 0.4, ownMax: 0.8, ownLength: 2500, ownTime: 420, ownRate: 0.45,
 });
 
 // Cell kinds. rate: peak precipitation (mm/h water equivalent). cloud: cloud cover. wind: mean
@@ -371,6 +378,20 @@ const _a2 = new Float64Array(5), _wl = new Float64Array(4);
 //   up: unit direction {x,y,z}.  altitude: m above the base radius.
 //   env: { moist, fog, snowBase, dT, dustSource (from ground.coverAt), sun01 (cos zenith or null),
 //          wind (local mean wind speed, m/s) }, all optional.
+// Strength now (0..1) of the storm a place grows for itself (WEATHER.own*), for a biome moisture
+// `moist`. A smooth pattern in space and time: neighbours agree, and it comes and goes over minutes.
+const OWN_CELL = 9001;
+const _own = { x: 0, y: 1, z: 0, r: 1 };
+export function ownStorm01(bodyId, ux, uy, uz, t, seed, moist) {
+  const duty = WEATHER.ownMax * clamp01((moist - WEATHER.ownFrom) / WEATHER.ownSpan);
+  if (!(duty > 0)) return 0;
+  const k = BODIES[bodyId].radius / WEATHER.ownLength, tt = t / WEATHER.ownTime;
+  const n = 0.5 + 0.5 * noise3(ux * k + tt * 0.37, uy * k - tt * 0.21, uz * k + tt, seedFor(bodyId, seed) + 4001);
+  // (the noise spends about as long over 0.5 as under it: the threshold follows the share of time wanted)
+  const thr = 0.5 - (duty - 0.5) * 0.62;
+  return smoothstep(thr - 0.11, thr + 0.11, n);
+}
+
 // Fills and returns `o` (shape documented in docs/notes/physics.md, API section).
 export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   const regime = REGIMES[bodyId];
@@ -380,6 +401,22 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   const T = airTemperature(bodyId, altitude, uy, sun01) + (env && env.dT ? env.dT : 0);
   const wind = env && env.wind != null ? env.wind : (WINDS[bodyId] ? WINDS[bodyId].U : 0);
   const a = gather(bodyId, ux, uy, uz, t, seed);
+  // a storm of the place's own making (WEATHER.own*): cloud first, then rain and lightning
+  const own = regime && regime.cells && moist > WEATHER.ownFrom ? ownStorm01(bodyId, ux, uy, uz, t, seed, moist) : 0;
+  if (own > 0) {
+    const core = smoothstep(0.3, 1, own);
+    a.cloud = 1 - (1 - a.cloud) * (1 - Math.min(1, own * 1.6));
+    a.rate += KINDS.storm.rate * WEATHER.ownRate * core * core;
+    a.flash += KINDS.storm.flash * core;
+    if (core > a.storm) a.storm = core;
+    if (core > a.topW) {
+      // its lightning falls round a centre the whole neighbourhood agrees on
+      const q = BODIES[bodyId].radius / (WEATHER.ownLength * 0.5);
+      const cx = Math.round(ux * q), cy = Math.round(uy * q), cz = Math.round(uz * q), cl = Math.hypot(cx, cy, cz) || 1;
+      _own.x = cx / cl; _own.y = cy / cl; _own.z = cz / cl; _own.r = WEATHER.ownLength * 0.6;
+      a.topW = core; a.top = 'storm'; a.topCell = OWN_CELL; a.topGen = Math.round(cx * 7 + cy * 13 + cz * 17);
+    }
+  }
   const pr = o.precipitation || (o.precipitation = {});
   const li = o.lightning || (o.lightning = { last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } });
   // Weather lives in the lower half of the atmosphere (PAINTER's cloud deck sits at 55 % of its
@@ -460,7 +497,12 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // ---- dust: storms, plus wind over a dust source above the saltation threshold ---------------
   const dustSrc = env && env.dustSource != null ? env.dustSource : 0;
   const lift = rho > 0 ? smoothstep(1.0, 2.2, wind / saltationThreshold(bodyId, rho)) : 0;
-  const dustExt = (a.dust * (0.5 + 0.5 * dustSrc) + lift * dustSrc * WEATHER.clearVisibility / 400) * below;
+  // (P8, lead review 5 P4) ... and only dry ground gives dust up: soil moisture binds the grains
+  // (the threshold of wind erosion rises steeply with it; Fecan et al. 1999), so where it rains
+  // as much as the body's mean (a biome's moist of 1: a temperate wood, a meadow, a wet coast)
+  // the wind lifts none, however hard it blows. A dust STORM's dust is carried in from elsewhere.
+  const dry = clamp01(1 - moist);
+  const dustExt = (a.dust * (0.5 + 0.5 * dustSrc) + lift * dustSrc * dry * WEATHER.clearVisibility / 400) * below;
   // ---- visibility (Koschmieder): extinctions add; rain 0.2 R^0.6 per km, snow about 2 R^0.7 --
   let ext = 1 + fogExt + dustExt + a.haze * below;
   // (the rate / (rate + 0.5) factor only rounds off the infinite slope of a power law at zero)
@@ -504,7 +546,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   li.flash01 = 0; li.nextIn = Infinity; li.thunderIn = Infinity; li.thunder01 = 0;
   li.last.t = -1e9; li.last.distance = 1e9;
   if (regime && regime.cells && a.topCell >= 0 && a.flash > 0.05) {
-    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li);
+    lightningFor(bodyId, regime, seed, a.topCell, a.topGen, a.flash, ux, uy, uz, t, atm.c, li, a.topCell === OWN_CELL ? _own : null);
   }
 
   // ---- kind: one word for what a person would call it --------------------------------------------
@@ -549,13 +591,14 @@ export function saltationThreshold(bodyId, rho) {
 
 // Deterministic lightning of one storm cell: at most one flash per time slot, at a hashed moment
 // and place inside the core. Finds the most recent flash and the next one.
-function lightningFor(bodyId, regime, seed, cell, gen, perMin, ux, uy, uz, t, cSound, li) {
+function lightningFor(bodyId, regime, seed, cell, gen, perMin, ux, uy, uz, t, cSound, li, own = null) {
   const s = seedFor(bodyId, seed) + 7919;
   const R = BODIES[bodyId].radius;
   const slot = WEATHER.slot;
   const p = clamp01(perMin * slot / 60);
   const n0 = Math.floor(t / slot);
-  if (!cellAt(bodyId, R, regime, seedFor(bodyId, seed), cell, t, _c)) return;
+  if (own) { _c.x = own.x; _c.y = own.y; _c.z = own.z; _c.r = own.r; }
+  else if (!cellAt(bodyId, R, regime, seedFor(bodyId, seed), cell, t, _c)) return;
   const cx = _c.x, cy = _c.y, cz = _c.z, cr = _c.r;
   let ex = cz, ez = -cx; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
   const nx = cy * ez, ny = cz * ex - cx * ez, nz = -cy * ex;
