@@ -25,7 +25,14 @@ uniform vec3 uPcUp;
 uniform vec4 uPcFocus;    // xyz centre of the particle volume, w its radius (0 = no edge fade)
 uniform vec4 uPcDraw;     // streak: width, exposure, least length, fade-in.  dab: size (now), grow, spin, fade-in
 uniform vec4 uPcDraw2;    // x: dab exposure (s): drawn out along its motion across the picture.  y: share of the kind drawn (1 = all)
-uniform vec3 uPcPixel;    // x: metres one pixel covers at one metre from the eye; y: least size in pixels; z: most (0 = none)
+                          // z: room (>= 1): how much the marks may grow before they hide more than the physics says
+                          // w: dab cell (m; 0 = none): shown modulo a cell of this half-width round the eye
+uniform vec3 uPcEast;     // local horizontal axes (unit), for the cell
+uniform vec3 uPcNorth;
+uniform vec4 uPcShelter;  // the hull: east, north (m from the eye), top (m above the eye), radius (0 = none)
+uniform vec4 uPcPixel;    // x: metres one pixel covers at one metre from the eye; y: least size in pixels; z: most (0 = none);
+                          // w: dab: how much sizes differ from particle to particle (0..1)
+uniform float uPcSmear;   // dab: the most it is drawn out along its motion, in half-sizes (4 = two dab sizes)
 attribute vec3 aPcPos;
 attribute vec3 aPcVel;
 attribute float aPcSize;
@@ -57,7 +64,7 @@ vec3 pcPhysStreak(vec2 corner) {
   float wl = length(w);
   w = wl > 1e-9 ? w / wl : uPcRight;
   float dist = length(aPcPos - uPcEye), hw = 0.5 * uPcDraw.x, far = 0.5 * uPcPixel.x * uPcPixel.y * dist, thin = 1.0;
-  if (far > hw) { thin = pcPhysThin(uPcDraw2.y * hw / far); hw = far; } else thin = pcPhysThin(uPcDraw2.y);
+  if (far > hw) { thin = pcPhysThin(uPcDraw2.y * min(1.0, uPcDraw2.z * hw / far)); hw = far; } else thin = pcPhysThin(uPcDraw2.y);
   if (uPcPixel.z > 0.0) hw = min(hw, 0.5 * uPcPixel.x * uPcPixel.z * dist);
   return aPcPos + w * (corner.x * 2.0 * hw * pcPhysEdge(aPcPos) * pcPhysFadeIn() * thin) - s * (corner.y + 0.5);
 }
@@ -65,11 +72,22 @@ vec3 pcPhysStreak(vec2 corner) {
 // A dab: a quad in the picture plane, growing with age, turning if the kind tumbles, drawn out
 // along its motion if the kind has an exposure.
 vec3 pcPhysDab(vec2 corner) {
-  float dist = length(aPcPos - uPcEye), h = 0.5 * (uPcDraw.x + uPcDraw.y * aPcAge), far = 0.5 * uPcPixel.x * uPcPixel.y * dist;
-  if (far > h) { float f = h / far; h = far * pcPhysThin(uPcDraw2.y * f * f); } else h *= pcPhysThin(uPcDraw2.y);
+  vec3 c0 = aPcPos;
+  float edge = -1.0;
+  if (uPcDraw2.w > 0.0) {
+    vec3 t = c0 - uPcEye;
+    vec2 d = vec2(dot(t, uPcEast), dot(t, uPcNorth)), w = d - 2.0 * uPcDraw2.w * floor(d / (2.0 * uPcDraw2.w) + 0.5);
+    c0 += uPcEast * (w.x - d.x) + uPcNorth * (w.y - d.y);
+    float m = clamp((max(abs(w.x), abs(w.y)) / uPcDraw2.w - 0.8) / 0.2, 0.0, 1.0);
+    edge = 1.0 - m * m * (3.0 - 2.0 * m);
+    if (uPcShelter.w > 0.0 && length(w - uPcShelter.xy) < uPcShelter.w && dot(c0 - uPcEye, cross(uPcEast, uPcNorth)) < uPcShelter.z) edge = 0.0;
+  }
+  float dist = length(c0 - uPcEye), h = 0.5 * (uPcDraw.x + uPcDraw.y * aPcAge), far = 0.5 * uPcPixel.x * uPcPixel.y * dist;
+  h *= 1.0 - uPcPixel.w + 2.0 * uPcPixel.w * fract(aPcSize * 51413.7);
+  if (far > h) { float f = h / far; h = far * pcPhysThin(uPcDraw2.y * min(1.0, uPcDraw2.z * f * f)); } else h *= pcPhysThin(uPcDraw2.y);
   if (uPcPixel.z > 0.0) h = min(h, 0.5 * uPcPixel.x * uPcPixel.z * dist);
-  h *= pcPhysEdge(aPcPos) * pcPhysFadeIn();
-  vec3 r = uPcRight, u = uPcUp, c0 = aPcPos;
+  h *= (edge >= 0.0 ? edge : pcPhysEdge(aPcPos)) * pcPhysFadeIn();
+  vec3 r = uPcRight, u = uPcUp;
   float la = h;
   if (uPcDraw.z != 0.0) {
     float a = aPcAge * uPcDraw.z + aPcSize * 51413.7, c = cos(a), sn = sin(a);
@@ -79,7 +97,7 @@ vec3 pcPhysDab(vec2 corner) {
     vec2 sp = vec2(dot(v, uPcRight), dot(v, uPcUp));
     float sl = length(sp);
     if (sl > 1e-5) {
-      vec2 c = sp / sl; sl = min(sl, 4.0 * h);
+      vec2 c = sp / sl; sl = min(sl, uPcSmear * h);
       r = uPcRight * c.x + uPcUp * c.y; u = uPcUp * c.x - uPcRight * c.y;
       la = h + 0.5 * sl; c0 -= r * (0.5 * sl);
     }

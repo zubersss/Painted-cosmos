@@ -26,10 +26,19 @@
 //           the far air holds fewer, larger marks and the cover stays what it was (art bible 4)
 //   maxPx:  the most (0 = no limit): a flake a hand's breadth from the lens is not a snowball
 //   exposure (dab): a dab is drawn out along its motion relative to the eye over this many
-//           seconds (driving snow is streaks; still air leaves it round); not with `spin`
+//           seconds (driving snow is streaks; still air leaves it round); not with `spin`.
+//           smear: the most it is drawn out, in dab sizes (default 2)
+//   varySize (dab): 0..1: sizes differ from particle to particle by this much either way
 //   sizeMax, fill (dab): where the physics says how much of the view the kind hides (dust in
 //           a storm), the kit sizes the marks to cover that, up to sizeMax; fill is the share
 //           of a quad the material inks (a disc 0.785; say so if yours is ragged)
+//   cell (dab): m. What falls is the same everywhere near by, so each particle may be shown at
+//           its place modulo a square cell of this half-width round the EYE (as the simulation
+//           itself wraps its box round the focus): the same flakes, each still on its own
+//           simulated path, but all of them near the lens, where single marks read; none is
+//           shown under the hull. 0 = each where it is. For snow, which is sparse to simulate
+//           (a real snowfall is thousands of flakes a cubic metre) and has no ground to respect
+//           but the hull and the terrain, which hides what is behind it.
 //   share:  0..1 (default 1): draw only this share of the kind (a painter's rain is a few
 //           strokes, not every drop); which ones is decided as for the floor
 //   vary:   0..1 how much the shade differs from particle to particle (the `color` attribute)
@@ -56,7 +65,10 @@ export const DRAW = Object.freeze({
 //   pix            metres that one pixel covers at one metre from the eye:
 //                  2 tan(fov / 2) / (viewport height in pixels). 0 = no least size.
 export function makeEye() {
-  return { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, rx: 1, ry: 0, rz: 0, ux: 0, uy: 1, uz: 0, fx: 0, fy: 0, fz: 0, radius: 0, pix: 0 };
+  return { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, rx: 1, ry: 0, rz: 0, ux: 0, uy: 1, uz: 0, fx: 0, fy: 0, fz: 0, radius: 0, pix: 0,
+    // for kinds drawn modulo a cell round the eye: the local horizontal axes (unit; east x north = up),
+    // and what keeps the weather off: shelters = [east, north (m from the eye), top (m above the eye), radius] x shelterCount
+    ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: -1, shelters: null, shelterCount: 0 };
 }
 
 // A number in 0..1 that stays with a particle for life (its size is its own).
@@ -80,10 +92,12 @@ function edgeScale(px, py, pz, eye) {
 
 // Streaks. buf: a particle buffer of physics.particles; D: its DRAW entry; out: Float32Array of
 // at least count * 12. Returns the number of quads written (= the particles drawn).
-export function expandStreaks(buf, D, eye, out) {
+// room (>= 1, default 1): how much larger the kind's marks may grow in all before they would
+// hide more than the physics says the kind hides; the floor thins only beyond that.
+export function expandStreaks(buf, D, eye, out, room = 1) {
   const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size;
   const ex = D.exposure, hw = D.width * 0.5, min = D.min || 0, fin = D.fadeIn || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
-  const share = D.share > 0 && D.share < 1 ? D.share : 1;
+  const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     const px = P[o], py = P[o + 1], pz = P[o + 2];
     // motion relative to the eye over the exposure
@@ -101,7 +115,7 @@ export function expandStreaks(buf, D, eye, out) {
     let half = hw, thin = 1;
     const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
     // the floor: f times wider than it is, so one in f is drawn
-    if (least > 0) { const far = least * dist; if (far > half) { thin = thinned(own01(S[i]), share * half / far); half = far; } else if (share < 1) thin = thinned(own01(S[i]), share); }
+    if (least > 0) { const far = least * dist; if (far > half) { thin = thinned(own01(S[i]), share * Math.min(1, roomy * half / far)); half = far; } else if (share < 1) thin = thinned(own01(S[i]), share); }
     else if (share < 1) thin = thinned(own01(S[i]), share);
     if (most > 0 && half > most * dist) half = most * dist;
     let k = half / wl * edgeScale(px, py, pz, eye) * thin;
@@ -119,21 +133,38 @@ export function expandStreaks(buf, D, eye, out) {
 // Dabs: quads facing the camera. Same arguments as expandStreaks.
 // size: the size now (m) when the kit has worked one out from the physics (see dabSize);
 // D.size otherwise.
-export function expandDabs(buf, D, eye, out, size = D.size) {
+export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size;
   const fin = D.fadeIn || 0, grow = D.grow || 0, spin = D.spin || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
-  const ex = spin === 0 ? D.exposure || 0 : 0;
-  const share = D.share > 0 && D.share < 1 ? D.share : 1;
+  const ex = spin === 0 ? D.exposure || 0 : 0, smear = 2 * (D.smear != null ? D.smear : 2);
+  const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
+  const vs = D.varySize || 0;
+  const cell = D.cell || 0, c2 = cell * 2, SH = eye.shelters, nSH = cell > 0 && SH ? eye.shelterCount : 0;
+  const Ex = eye.ex, Ey = eye.ey, Ez = eye.ez, Nx = eye.nx, Ny = eye.ny, Nz = eye.nz;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
     const age = A[i];
     let h = 0.5 * (size + grow * age);
-    const tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z, dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
-    // the floor: f times larger than it is, so one in f^2 is drawn
-    if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), share * f * f); }
+    if (vs > 0) { const r = S[i] * 51413.7; h *= 1 - vs + 2 * vs * (r - Math.floor(r)); }       // no two flakes the same size
+    let tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z, edge = -1;
+    if (cell > 0) {
+      // shown at its place modulo the cell round the eye; it shrinks to nothing toward the cell's wall
+      const de = tx * Ex + ty * Ey + tz * Ez, dn = tx * Nx + ty * Ny + tz * Nz;
+      const we = de - c2 * Math.round(de / c2), wn = dn - c2 * Math.round(dn / c2);
+      const se = we - de, sn = wn - dn;
+      px += Ex * se + Nx * sn; py += Ey * se + Ny * sn; pz += Ez * se + Nz * sn;
+      tx = px - eye.x; ty = py - eye.y; tz = pz - eye.z;
+      const m = Math.max(Math.abs(we), Math.abs(wn)) / cell, t = (m - 0.8) / 0.2;
+      edge = t <= 0 ? 1 : t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
+      // not under the hull
+      for (let k = 0; k < nSH; k++) { const a = k * 4, dx = we - SH[a], dz = wn - SH[a + 1]; if (dx * dx + dz * dz < SH[a + 3] * SH[a + 3] && (tx * (Ey * Nz - Ez * Ny) + ty * (Ez * Nx - Ex * Nz) + tz * (Ex * Ny - Ey * Nx)) < SH[a + 2]) { edge = 0; break; } }
+    }
+    const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    // the floor: f times larger than it is, so one in f^2 is drawn (unless the physics leaves room)
+    if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), share * Math.min(1, roomy * f * f)); }
     else if (share < 1) h *= thinned(own01(S[i]), share);
     if (most > 0 && h > most * dist) h = most * dist;
-    h *= edgeScale(px, py, pz, eye);
+    h *= edge >= 0 ? edge : edgeScale(px, py, pz, eye);
     if (fin > 0 && age < fin) h *= age / fin;
     let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h;
     if (spin !== 0) {
@@ -142,13 +173,13 @@ export function expandDabs(buf, D, eye, out, size = D.size) {
       ax = eye.rx * c + eye.ux * s; ay = eye.ry * c + eye.uy * s; az = eye.rz * c + eye.uz * s;
       bx = eye.ux * c - eye.rx * s; by = eye.uy * c - eye.ry * s; bz = eye.uz * c - eye.rz * s;
     } else if (ex > 0 && h > 0) {
-      // drawn out along its motion across the picture during the exposure (never more than 3 dabs long)
+      // drawn out along its motion across the picture during the exposure (never by more than D.smear dab sizes: 2 by default)
       const vx = (V[o] - eye.vx) * ex, vy = (V[o + 1] - eye.vy) * ex, vz = (V[o + 2] - eye.vz) * ex;
       const sr = vx * eye.rx + vy * eye.ry + vz * eye.rz, su = vx * eye.ux + vy * eye.uy + vz * eye.uz;
       let sl = Math.sqrt(sr * sr + su * su);
       if (sl > 1e-5) {
         const c = sr / sl, s2 = su / sl;
-        if (sl > 4 * h) sl = 4 * h;
+        if (sl > smear * h) sl = smear * h;
         ax = eye.rx * c + eye.ux * s2; ay = eye.ry * c + eye.uy * s2; az = eye.rz * c + eye.uz * s2;
         bx = eye.ux * c - eye.rx * s2; by = eye.uy * c - eye.ry * s2; bz = eye.uz * c - eye.rz * s2;
         la = h + 0.5 * sl;

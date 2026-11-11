@@ -43,15 +43,16 @@ The tree is green: `node --test src/physics/` 178 pass. Nothing is half-edited.
   `docs/notes/pilot.md`, `docs/notes/painter.md`. Answer MUST FIX items here.
 
 **Unfinished, in the coordinator's P5 order, each with where to start:**
-1. *Every kit kind must survive PAINTER's post pass.* Not started. The floor exists
-   (`DRAW[kind].minPx`, `eye.pix` in `three/expand.js`; the painted lab's `DRAW_PAINTED`
-   raises it to 3+ px) but counts are not reduced to keep coverage and far marks are not
-   merged. Start: in `expandStreaks` / `expandDabs`, when the floor enlarges a particle by a
-   factor f, keep only one in f^2 (dabs) or f (streaks) by a hash of its size (stable per
-   particle; see `expandShades`), so coverage stays what the physics says. Then re-shoot
-   `painted=1&body=earth&biome=alpine_meadow&find=snow&pre=25` and
-   `painted=1&body=mars&biome=dust_dunes&find=dust&pre=25` until the kit part reads; say what
-   still needs PAINTER (snow on the ground from `sky.snow`, haze from `sky.haze` / `sky.dust`).
+1. *Every kit kind must survive PAINTER's post pass.* **Done as far as a kit can** (second
+   PHYSICS agent): the least size in internal pixels now thins the kind (a mark the floor makes
+   f times larger stands for f or f^2 of its kind; which ones is a number each particle keeps
+   for life; marks shrink smoothly, never pop), but only as far as the physics does not say
+   the kind hides more than its marks paint (`weather.precipitation.extinction`,
+   `weather.dustExtinction`, both 1/m); dabs are drawn out along their motion; dust in a
+   storm is sized from the dust in the air; snow is shown modulo a 9 m cell round the eye
+   (the same flakes, all near the lens), never under the hull. `kits.weather.stats.cover`
+   says what share of the kind's hiding the marks paint. Frames re-shot and judged:
+   `painted-snow.jpg`, `painted-mars-dust.jpg` ("The lab inside the painted pipeline").
 2. *The sea for PAINTER's own liquid.* **Done** (second PHYSICS agent): the chunk now gives
    height, slope, the way the crests lie (`pcPhysWaterD(p, out along)`), crests and foam
    (`pcPhysWaterCrest(w)`), surf at a shore (`pcPhysWaterSurf(depth)`), the normal; one new

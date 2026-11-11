@@ -100,7 +100,9 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
   if (typeof makeMaterial !== 'function') throw new Error('createWeatherKit: makeMaterial(kind, info) is required');
   const gpu = expand === 'gpu';
   const eye = makeEye(), track = makeTrack();
-  const U = gpu ? { uPcEye: { value: new THREE.Vector3() }, uPcEyeVel: { value: new THREE.Vector3() }, uPcRight: { value: new THREE.Vector3(1, 0, 0) }, uPcUp: { value: new THREE.Vector3(0, 1, 0) }, uPcFocus: { value: new THREE.Vector4() } } : null;
+  const U = gpu ? { uPcEye: { value: new THREE.Vector3() }, uPcEyeVel: { value: new THREE.Vector3() }, uPcRight: { value: new THREE.Vector3(1, 0, 0) }, uPcUp: { value: new THREE.Vector3(0, 1, 0) }, uPcFocus: { value: new THREE.Vector4() },
+    uPcEast: { value: new THREE.Vector3(1, 0, 0) }, uPcNorth: { value: new THREE.Vector3(0, 0, -1) }, uPcShelter: { value: new THREE.Vector4() } } : null;
+  eye.shelters = new Float32Array(16);
   const parts = [];
   for (const kind of kinds) {
     const buf = physics.particles[kind];
@@ -118,8 +120,8 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       for (const [name, arr, size] of [['aPcPos', buf.pos, 3], ['aPcVel', buf.vel, 3], ['aPcSize', buf.size, 1], ['aPcAge', buf.age, 1], ['aPcMat', buf.mat || new Uint8Array(cap).fill(255), 1]]) {
         const a = new THREE.InstancedBufferAttribute(arr, size); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a);
       }
-      uniforms = { ...U, uPcPixel: { value: new THREE.Vector3(0, D.minPx || 0, D.maxPx || 0) }, uPcDraw: { value: new THREE.Vector4(D.shape === 'streak' ? D.width : D.size, D.shape === 'streak' ? D.exposure : D.grow, D.shape === 'streak' ? D.min : D.spin, D.fadeIn) },
-        uPcDraw2: { value: new THREE.Vector4(D.shape === 'dab' && !D.spin ? D.exposure || 0 : 0, D.share > 0 && D.share < 1 ? D.share : 1, 0, 0) } };
+      uniforms = { ...U, uPcPixel: { value: new THREE.Vector4(0, D.minPx || 0, D.maxPx || 0, D.shape === 'dab' ? D.varySize || 0 : 0) }, uPcSmear: { value: 2 * (D.smear != null ? D.smear : 2) }, uPcDraw: { value: new THREE.Vector4(D.shape === 'streak' ? D.width : D.size, D.shape === 'streak' ? D.exposure : D.grow, D.shape === 'streak' ? D.min : D.spin, D.fadeIn) },
+        uPcDraw2: { value: new THREE.Vector4(D.shape === 'dab' && !D.spin ? D.exposure || 0 : 0, D.share > 0 && D.share < 1 ? D.share : 1, 1, D.shape === 'dab' ? D.cell || 0 : 0) } };
     } else {
       geo = new THREE.BufferGeometry();
       posA = dyn(new Float32Array(cap * 12), 3);
@@ -180,7 +182,13 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       trackEye(track, physics, bodyRoot, camera);
       // metres per pixel at one metre: 2 tan(fov / 2) / height = 2 / (P[1][1] height)
       const pix = 2 / (Math.abs(camera.projectionMatrix.elements[5]) * viewportHeight || 1e9);
-      const F = physics.focus;
+      const F = physics.focus, fr = physics.fields.frame;
+      // the local horizontal axes, and the hull (for kinds shown modulo a cell round the eye)
+      eye.ex = fr.ex; eye.ey = fr.ey; eye.ez = fr.ez; eye.nx = fr.nx; eye.ny = fr.ny; eye.nz = fr.nz;
+      { const S = physics.particles.system, ns = S.shelterCount || 0, ge = fr.lx(track.x, track.y, track.z), gn = fr.lz(track.x, track.y, track.z), gu = Math.hypot(track.x, track.y, track.z) - fr.r0;
+        for (let k = 0; k < ns; k++) { const a = k * 4; eye.shelters[a] = S.shelters[a] - ge; eye.shelters[a + 1] = S.shelters[a + 1] - gn; eye.shelters[a + 2] = S.shelters[a + 2] - gu; eye.shelters[a + 3] = S.shelters[a + 3]; }
+        eye.shelterCount = ns;
+        if (gpu) { U.uPcEast.value.set(fr.ex, fr.ey, fr.ez); U.uPcNorth.value.set(fr.nx, fr.ny, fr.nz); if (ns) U.uPcShelter.value.set(eye.shelters[0], eye.shelters[1], eye.shelters[2], eye.shelters[3]); else U.uPcShelter.value.set(0, 0, 0, 0); } }
       for (const P of parts) {
         const b = P.buf, n = Math.min(b.count, P.cap);
         P.mesh.visible = n > 0; P.drawn = n;
@@ -193,26 +201,30 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.rx = track.rx; eye.ry = track.ry; eye.rz = track.rz; eye.ux = track.ux; eye.uy = track.uy; eye.uz = track.uz;
         eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.radius = PARTICLES.radius; eye.pix = pix;
         // how large a dab is now: its own size, or what the dust (snow) in the air needs to hide what it hides
-        let size = P.D.size;
+        let size = P.D.size, room = 1;
         const ext = AIR[P.kind] ? hiding(P.kind, physics.here.weather) : 0;
+        // (a kind shown modulo a cell is spread through the cell's air, not the whole box's)
+        const air = (AIR[P.kind] || 1) * (P.D.cell > 0 ? Math.min(1, (P.D.cell * P.D.cell) / (PARTICLES.radius * PARTICLES.radius)) : 1);
         if (P.D.shape === 'dab') {
-          size = dabSize(P.D, ext, n, AIR[P.kind] || 1, _c);
+          size = dabSize(P.D, ext, n, air, _c);
           P.size += (size - P.size) * (P.size > 0 ? 0.05 : 1); size = P.size;                 // (eased: the count jitters)
-          if (ext > 0) stats.cover[P.kind] = _c.cover; else delete stats.cover[P.kind];
+          if (ext > 0) { stats.cover[P.kind] = _c.cover; room = 1 / Math.max(_c.cover, 1e-3); } else delete stats.cover[P.kind];
           stats.size[P.kind] = size;
         } else if (ext > 0) {
           // a streak inks about half its quad (it tapers); its length is its fall during the exposure
-          stats.cover[P.kind] = Math.min(1, n * P.D.width * Math.max(P.D.min || 0, (b.fallSpeed || 6) * P.D.exposure) * 0.5 * (P.D.share || 1) / (ext * AIR[P.kind]));
+          const c = Math.min(1, n * P.D.width * Math.max(P.D.min || 0, (b.fallSpeed || 6) * P.D.exposure) * 0.5 * (P.D.share || 1) / (ext * air));
+          stats.cover[P.kind] = c; room = 1 / Math.max(c, 1e-3);
         } else delete stats.cover[P.kind];
         if (gpu) {
           if (P.D.shape === 'dab') P.uniforms.uPcDraw.value.x = size;
+          P.uniforms.uPcDraw2.value.z = room;
           U.uPcEye.value.set(eye.x, eye.y, eye.z); U.uPcEyeVel.value.set(eye.vx, eye.vy, eye.vz);
           U.uPcRight.value.set(eye.rx, eye.ry, eye.rz); U.uPcUp.value.set(eye.ux, eye.uy, eye.uz);
           U.uPcFocus.value.set(eye.fx, eye.fy, eye.fz, eye.radius); P.uniforms.uPcPixel.value.x = pix;
           P.geo.instanceCount = n;
           send(P.geo.attributes.aPcPos, n * 3); send(P.geo.attributes.aPcVel, n * 3); send(P.geo.attributes.aPcSize, n); send(P.geo.attributes.aPcAge, n); send(P.geo.attributes.aPcMat, n);
         } else {
-          if (P.D.shape === 'streak') expandStreaks(b, P.D, eye, P.posA.array); else expandDabs(b, P.D, eye, P.posA.array, size);
+          if (P.D.shape === 'streak') expandStreaks(b, P.D, eye, P.posA.array, room); else expandDabs(b, P.D, eye, P.posA.array, size, room);
           send(P.posA, n * 12);
           if (P.colA) { expandShades(b, P.D.vary, P.colA.array); send(P.colA, n * 12); }
           if (P.matA) { expandMats(b, P.matA.array); send(P.matA, n * 4); }

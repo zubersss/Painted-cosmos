@@ -170,7 +170,7 @@ const FRAG = {
   flake: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 0.78 + 0.22 * texture(uNoise3D, vec3(vPcUv * 2.3, vPcData.x * 7.0)).r) discard; vec3 c = ink; float w = 0.05;',
   // a puff of dust: not a disc but a ragged dry-brush patch cut from PAINTER's own noise, thinning
   // toward its edge; the pattern is fixed in the puff (it travels with it; nothing is re-rolled)
-  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r; if (nz < 0.46 + 0.5 * rr * rr) discard; vec3 c = mix(vec3(1.0), ink, 0.8) * (0.9 + 0.1 * vPcData.x); float w = 0.75;',
+  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; if (nz < 0.47 + 0.5 * rr * rr) discard; vec3 c = mix(vec3(1.0), ink, 0.8) * (0.9 + 0.1 * vPcData.x); float w = 0.75;',
   ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.22) discard; vec3 c = ink; float w = 0.8;',
   // a print: darker ground inside, a paler rim on loose ground. Shallow prints are faint, deep
   // ones full; a scour dish is only its pale ring. Fading thins the mark through PAINTER's noise
@@ -194,9 +194,9 @@ let rainMode = RAIN[Q.get('rain')] ? Q.get('rain') : 'broad';
 //   snow   a flake is a speck of bare paper 4 to 9 px across, drawn out along its motion in wind
 //   dust   ragged dry-brush patches (the puff inks 0.4 of its quad); in a storm the kit sizes
 //          them from the dust in the air, up to 2.6 m: billows, not blots
-const DRAW_PAINTED = { snow: { size: 0.1, minPx: 4, maxPx: 9, exposure: 0.035 }, hail: { width: 0.05, minPx: 3 }, sand: { width: 0.035, minPx: 3, exposure: 0.05 }, spray: { width: 0.04, minPx: 3 },
-  dust: { size: 0.5, grow: 0.35, minPx: 8, sizeMax: 2.6, fill: 0.4 }, ash: { size: 0.09, minPx: 4, exposure: 0.03 }, spores: { size: 0.05, minPx: 3 }, leaves: { size: 0.1, minPx: 4 } };
-for (const k of ['snowSize', 'snowMin', 'snowMax', 'dustMax', 'dustSize']) if (Q.has(k)) { const kind = k.slice(0, 4), f = { Size: 'size', Min: 'minPx', Max: k === 'dustMax' ? 'sizeMax' : 'maxPx' }[k.slice(4)]; DRAW_PAINTED[kind][f] = num(k, DRAW_PAINTED[kind][f]); }
+const DRAW_PAINTED = { snow: { size: 0.1, minPx: 4, maxPx: 10, exposure: 0.04, smear: 1.2, varySize: 0.4, cell: 9 }, hail: { width: 0.05, minPx: 3 }, sand: { width: 0.035, minPx: 3, exposure: 0.05, vary: 0.12 }, spray: { width: 0.04, minPx: 3 },
+  dust: { size: 0.5, grow: 0.35, minPx: 8, maxPx: 80, sizeMax: 2.6, fill: 0.3, exposure: 0.12 }, ash: { size: 0.09, minPx: 4, exposure: 0.03 }, spores: { size: 0.05, minPx: 3 }, leaves: { size: 0.1, minPx: 4 } };
+for (const k of ['snowSize', 'snowMin', 'snowMax', 'snowCell', 'dustMax', 'dustSize']) if (Q.has(k)) { const kind = k.slice(0, 4), f = { Size: 'size', Min: 'minPx', Cell: 'cell', Max: k === 'dustMax' ? 'sizeMax' : 'maxPx' }[k.slice(4)]; DRAW_PAINTED[kind][f] = num(k, DRAW_PAINTED[kind][f]); }
 const kitMaterials = [];
 let palette = null;
 function makeKitMaterial(kind, info) {

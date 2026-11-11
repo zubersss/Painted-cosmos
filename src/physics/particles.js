@@ -28,7 +28,7 @@ import { makeRng, clamp01 } from './util.js';
 
 export const PARTICLES = Object.freeze({
   kinds: ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'],
-  capacity: { rain: [700, 1600, 3200], snow: [600, 1400, 2800], hail: [0, 200, 400], dust: [300, 800, 1600], sand: [300, 800, 1600], ash: [200, 600, 1200], spores: [200, 500, 1000], leaves: [60, 160, 320], spray: [200, 500, 1000] },
+  capacity: { rain: [700, 1600, 3200], snow: [800, 2000, 2800], hail: [0, 200, 400], dust: [300, 800, 1600], sand: [300, 800, 1600], ash: [200, 600, 1200], spores: [200, 500, 1000], leaves: [60, 160, 320], spray: [200, 500, 1000] },
   radius: 24,          // m: half-width of the simulated volume around the focus
   height: 18,          // m above the ground at the focus where precipitation enters
   below: 8,            // m below the focus ground that still belongs to the volume

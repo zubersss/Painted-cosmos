@@ -157,7 +157,7 @@ test('indices, uvs and the GLSL chunks', () => {
   }
   // the constants the shader and the JS share
   assert.ok(PARTICLE_GLSL.includes('51413.7') && PARTICLE_GLSL.includes('73856.093'));
-  assert.ok(PARTICLE_GLSL.includes('91573.37') && PARTICLE_GLSL.includes('(keep * 1.18 - h) / (0.3 * h + 1e-4)') && PARTICLE_GLSL.includes('min(sl, 4.0 * h)'), 'thinning and smear as in expand.js');
+  assert.ok(PARTICLE_GLSL.includes('91573.37') && PARTICLE_GLSL.includes('(keep * 1.18 - h) / (0.3 * h + 1e-4)') && PARTICLE_GLSL.includes('min(sl, uPcSmear * h)'), 'thinning and smear as in expand.js');
 });
 
 test('the floor: far marks are never smaller than the least size, there are fewer of them, and they cover what they covered', () => {
@@ -214,7 +214,13 @@ test('a mark near the lens is never larger than the most asked for; a dab is dra
   expandDabs(w, { ...D, exposure: 0.03 }, eye, o);
   const along = (q) => len(sub(V(o, q * 4 + 1), V(o, q * 4))), across = (q) => len(sub(V(o, q * 4 + 3), V(o, q * 4)));
   assert.ok(Math.abs(along(0) - 0.25) < 1e-6 && Math.abs(across(0) - 0.1) < 1e-6, `blown: ${along(0)} by ${across(0)} m`);
-  assert.ok(Math.abs(along(3) - 0.3) < 1e-6, 'in a gale: never more than three dabs long');
+  assert.ok(Math.abs(along(3) - 0.3) < 1e-6, 'in a gale: never drawn out by more than two dab sizes');
+  expandDabs(w, { ...D, exposure: 0.03, smear: 1 }, eye, o); assert.ok(Math.abs(along(3) - 0.2) < 1e-6, 'or by as much as the kind allows');
+  // no two flakes the same size, the mean unchanged
+  const many = buf(Array.from({ length: 500 }, (_, i) => ({ p: [0, 0, -8], size: 0.002 + i * 3.1e-6 }))), om = new Float32Array(500 * 12);
+  expandDabs(many, { ...D, varySize: 0.4 }, eye, om);
+  let lo = 9, hi = 0, mean = 0; for (let i = 0; i < 500; i++) { const s2 = len(sub(V(om, i * 4 + 1), V(om, i * 4))); lo = Math.min(lo, s2); hi = Math.max(hi, s2); mean += s2 / 500; }
+  assert.ok(lo > 0.059 && lo < 0.07 && hi > 0.13 && hi < 0.141 && Math.abs(mean - 0.1) < 0.006, `sizes ${lo.toFixed(3)} .. ${hi.toFixed(3)}, mean ${mean.toFixed(3)}`);
   assert.ok(Math.abs(Math.max(o[3], o[6]) - 0.05) < 1e-6, 'its head is where the flake is, the smear behind it');
   assert.ok(Math.abs(along(1) - 0.13) < 1e-6, 'falling at 1 m/s: nearly round');
   assert.ok(Math.abs(along(2) - 0.1) < 1e-6, 'moving along the line of sight: round');
@@ -274,4 +280,40 @@ test('ink for the kits: a particle\'s material on its four vertices, a mark\'s o
   assert.equal(expandMarks(M, frame, null, 1, 0.015, pos, null, null, mat), 2);
   assert.deepEqual(Array.from(mat.slice(0, 8)), [8, 8, 8, 8, 3, 3, 3, 3]);
   assert.ok(PARTICLE_GLSL.includes('attribute float aPcMat;'));
+});
+
+test('snow shown modulo a cell round the eye: the same flakes, whole cells away, none under the hull; room from the physics spares the far ones', () => {
+  const eye = makeEye(); eye.pix = 0.002; eye.x = 3; eye.y = 1.6; eye.z = -4; eye.shelters = new Float32Array(16);
+  // local axes of a flat patch: east = +x, north = -z, up = +y (east x north = up)
+  const D = { ...DRAW.snow, size: 0.1, minPx: 0, exposure: 0, cell: 9 };
+  const N = 600, b = buf(Array.from({ length: N }, (_, i) => ({ p: [Math.sin(i * 1.7) * 24, 1 + (i % 17), Math.cos(i * 2.9) * 24], size: 0.003 + i * 1e-6 })));
+  const out = new Float32Array(N * 12);
+  expandDabs(b, D, eye, out);
+  let whole = 0, small = 0;
+  for (let i = 0; i < N; i++) {
+    const c = [0, 1, 2].map((k) => (out[i * 12 + k] + out[i * 12 + 6 + k]) / 2), w = len(sub(V(out, i * 4 + 1), V(out, i * 4)));
+    const de = c[0] - eye.x, dn = -(c[2] - eye.z);
+    assert.ok(Math.abs(de) <= 9 + 1e-4 && Math.abs(dn) <= 9 + 1e-4, 'inside the cell round the eye');
+    const se = (c[0] - b.pos[i * 3]) / 18, sn = (c[2] - b.pos[i * 3 + 2]) / 18;
+    assert.ok(Math.abs(se - Math.round(se)) < 1e-4 && Math.abs(sn - Math.round(sn)) < 1e-4 && Math.abs(c[1] - b.pos[i * 3 + 1]) < 1e-5, 'moved by whole cells, at its own height');
+    const m = Math.max(Math.abs(de), Math.abs(dn)) / 9;
+    if (m < 0.8) { assert.ok(Math.abs(w - 0.1) < 1e-5); whole++; } else if (w < 0.099) small++;
+  }
+  assert.ok(whole > N * 0.5 && small > N * 0.2, `${whole} whole, ${small} shrinking toward the cell's wall`);
+  // a hull 4 m east of the eye, its top 1 m above the eye: nothing is drawn under it
+  eye.shelters.set([4, 0, 1, 3.5]); eye.shelterCount = 1;
+  expandDabs(b, D, eye, out);
+  let under = 0, gone = 0;
+  for (let i = 0; i < N; i++) {
+    const de0 = b.pos[i * 3] - eye.x, dn0 = -(b.pos[i * 3 + 2] - eye.z), we = de0 - 18 * Math.round(de0 / 18), wn = dn0 - 18 * Math.round(dn0 / 18);
+    if (Math.hypot(we - 4, wn) < 3.5 && b.pos[i * 3 + 1] - eye.y < 1) { under++; if (len(sub(V(out, i * 4 + 1), V(out, i * 4))) === 0) gone++; }
+  }
+  assert.ok(under > 3 && gone === under, `${gone} of ${under} under the hull are not drawn`);
+  // the floor thins a kind only as far as the physics does not leave room
+  eye.shelterCount = 0;
+  const F = { ...DRAW.snow, size: 0.05, minPx: 6, exposure: 0 }, far = buf(Array.from({ length: 400 }, (_, i) => ({ p: [3 + Math.sin(i) * 3, 1.6, -4 - 20], size: 0.002 + i * 2e-6 })));
+  const o2 = new Float32Array(400 * 12), count = (room) => { expandDabs(far, F, eye, o2, F.size, room); let n = 0; for (let i = 0; i < 400; i++) if (len(sub(V(o2, i * 4 + 1), V(o2, i * 4))) > 0.2) n++; return n; };
+  const tight = count(1), roomy = count(30);
+  assert.ok(tight < 400 * 0.08 && roomy === 400, `at 20 m a 5 cm flake is drawn 24 cm: one in 23 if it must keep its cover (${tight} of 400), all of them where the physics says the snow hides far more than the flakes paint (${roomy})`);
+  assert.ok(PARTICLE_GLSL.includes('uPcDraw2.z * f * f') && PARTICLE_GLSL.includes('uniform vec4 uPcShelter'));
 });
