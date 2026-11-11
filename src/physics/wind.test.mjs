@@ -62,7 +62,7 @@ test('continuity in time, including across gust-cycle boundaries', () => {
   let worst = 0, prev = gustLevel('earth', p[0], p[1], p[2], w[0], w[1], w[2], 0, 4);
   for (let t = 1 / 60; t < 3 * WIND.gustCycle; t += 1 / 60) {
     const g = gustLevel('earth', p[0], p[1], p[2], w[0], w[1], w[2], t, 4);
-    assert.ok(g >= -1 && g <= 1);
+    assert.ok(g >= -WIND.gustMax && g <= WIND.gustMax);      // (P11: the clamp sits at 3.3 sigma, not at level 1)
     worst = Math.max(worst, Math.abs(g - prev)); prev = g;
   }
   assert.ok(worst < 0.03, 'largest jump per frame ' + worst);
@@ -149,4 +149,41 @@ test('boundary layer: under the same wind aloft, a third is left at head height 
   const overSea = at2(sea.z0);
   assert.ok(overSea > 24 && overSea < 29 && overSea > shore * 1.7, 'over the storm sea: ' + overSea);
   for (const u of [0, 1, 10, 30, 60, 200]) for (const g of [0, 0.6, 3.7, 9.8, 25]) { const z = seaRoughness(u, g); assert.ok(z >= 0.0002 && z <= 0.05, `sea roughness stays bounded: ${u} ${g} ${z}`); }
+});
+
+// ---- P11: the gust pattern against what masts measure -------------------------------------------------
+// A mast at 10 m over open grass in a steady wind (gustLevelFull: the large gusts and the fine eddies).
+// Kaimal et al. 1972: f S(f) / u*^2 = 105 n / (1 + 33 n)^(5/3), n = f z / U; the share of the variance at
+// frequencies below f is 1 - (1 + 33 f z / U)^(-2/3). Gust factor: the largest 3 s mean over the 10 minute
+// mean, 1.4 to 1.6 over open country (WMO; Harper, Kepert and Ginger 2010).
+test('P11 a mast at 10 m: turbulence intensity, gust factor and the shares of the variance by period follow Kaimal\'s spectrum', async () => {
+  const { gustLevelFull } = await import('./wind.js');
+  const z = 10, I = turbulenceIntensity(z, 0.03), hz = 10, N = 3600 * hz;
+  const below = (f, U) => 1 - Math.pow(1 + 33 * f * z / U, -2 / 3);
+  const edges = [600, 60, 15, 4, 1];              // s: bands 600-60, 60-15, 15-4, 4-1
+  for (const U of [5, 11, 20]) {
+    const u = new Float64Array(N);
+    for (let i = 0; i < N; i++) u[i] = U * Math.max(WIND.minFactor, 1 + I * WIND.gustGain * gustLevelFull('earth', 0, 6371010, 0, U, 0, 0, 1000 + i / hz, 18));
+    let m = 0; for (const v of u) m += v; m /= N; let s2 = 0; for (const v of u) s2 += (v - m) ** 2; s2 /= N;
+    const TI = Math.sqrt(s2) / m;
+    // gust factor over six 10 minute blocks
+    let G = 0; const w = 3 * hz, B = 600 * hz;
+    for (let b = 0; b < N; b += B) { let bm = 0, run = 0, mx = 0; for (let i = b; i < b + B; i++) { bm += u[i]; run += u[i]; if (i >= b + w) run -= u[i - w]; if (i >= b + w - 1) mx = Math.max(mx, run / w); } G += mx / (bm / B) / 6; }
+    // variance of the means over p seconds keeps what is slower than about 2 p
+    const vm = (p) => { const k = Math.max(1, Math.round(p * hz)); let n = 0, s = 0, q = 0; for (let i = 0; i + k <= N; i += k) { let a = 0; for (let j = i; j < i + k; j++) a += u[j]; a /= k; s += a; q += a * a; n++; } return q / n - (s / n) ** 2; };
+    const got = [], want = [];
+    for (let k = 0; k + 1 < edges.length; k++) { got.push((vm(edges[k + 1] / 2) - vm(edges[k] / 2)) / s2); want.push(below(1 / edges[k + 1], U) - below(1 / edges[k], U)); }
+    // rate of change of the 1 s means against the same integral of Kaimal's spectrum to 0.5 Hz (Gaussian p99)
+    const m1 = []; for (let i = 0; i + hz <= N; i += hz) { let a = 0; for (let j = i; j < i + hz; j++) a += u[j]; m1.push(a / hz); }
+    const d = []; for (let i = 1; i < m1.length; i++) d.push(Math.abs(m1[i] - m1[i - 1])); d.sort((a, b) => a - b);
+    const us = 0.4 * U / Math.log(z / 0.03); let va = 0; for (let f = 0.001; f < 0.5; f += 0.001) va += (2 * Math.PI * f) ** 2 * us * us * 105 * (z / U) / Math.pow(1 + 33 * f * z / U, 5 / 3) * 0.001;
+    const p99 = d[Math.floor(d.length * 0.99)], real = 2.58 * Math.sqrt(va);
+    console.log(`# mast at 10 m, U ${U}: TI ${TI.toFixed(3)} (I ${I.toFixed(3)}), G(3 s, 600 s) ${G.toFixed(2)}; shares 600-60 / 60-15 / 15-4 / 4-1 s: ${got.map((v) => v.toFixed(2)).join(' ')} (Kaimal ${want.map((v) => v.toFixed(2)).join(' ')}); p99 of the 1 s rate ${p99.toFixed(2)} m/s2 (Kaimal ${real.toFixed(2)})`);
+    assert.ok(Math.abs(TI - I) < 0.015, `U ${U}: TI ${TI}`);
+    assert.ok(G > 1.33 && G < 1.6, `U ${U}: gust factor ${G}`);
+    for (let k = 0; k < got.length; k++) assert.ok(Math.abs(got[k] - want[k]) < 0.09, `U ${U}: band ${edges[k]}-${edges[k + 1]} s holds ${got[k].toFixed(3)}, Kaimal ${want[k].toFixed(3)}`);
+    // what was wrong before P11: nothing under 4 s (0.01 to 0.05 where Kaimal has 0.09 to 0.24)
+    assert.ok(got[3] > 0.5 * want[3], `U ${U}: the inertial range is there`);
+    assert.ok(p99 > 0.6 * real && p99 < 1.3 * real, `U ${U}: 1 s rate ${p99} against ${real}`);
+  }
 });

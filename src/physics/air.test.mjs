@@ -43,7 +43,18 @@ function scan(sampleSurface, dir, t0, t1, hz, heights) {
 // smallest gust past it: swing x (speed of the air that carries the gusts) / (the smallest gust,
 // WIND.gustLength2), with 1.5 for the steepest edge the pattern has. Anything faster is the model
 // moving the air by other means: a pattern that slides through the air, a field that steps.
-const bound = (o, uref) => 1.5 * (o.hi - o.lo) * uref / WIND.gustLength2;
+// (P11) The pattern has four octaves now (the inertial range: wind.js), and the bound is re-derived from them:
+// each octave can swing the level by 2 x weight x gustNorm of the 2 x gustMax the clamp allows, across its
+// own lattice length, and the steepest the interpolant between two lattice values gets is 1.875 x the mean
+// slope (the quintic fade of noise3; "1.5" stood here for the same thing). So "swing / the smallest gust"
+// becomes swing x 1.875 x the sum of (weight x gustNorm / gustMax) / length: 0.16 per metre where
+// 1.5 / gustLength2 was 0.044. That is what a mast sees too: the 1 s rate of change of the model now equals
+// Kaimal's (wind.test.mjs); before P11 it was 0.6 of it. The bound still catches what it was written for:
+// the wake that switched in one frame gave 86 and 123 m/s2 at 2 and 10 m on the real ground (bounds 61 and 84),
+// and that fault has its own test below.
+const GUST_LENGTHS = [WIND.gustLength, WIND.gustLength2, WIND.gustLength3, WIND.gustLength4];
+const EDGE = 1.875 * WIND.gustWeights.reduce((a, w, i) => a + w * WIND.gustNorm / WIND.gustMax / GUST_LENGTHS[i], 0);
+const bound = (o, uref) => (o.hi - o.lo) * uref * EDGE;
 
 test('the first storm at the Earth spawn: at 2, 10 and 30 m the air accelerates no faster than the storm\'s own wind carries a gust past (open ground)', () => {
   const sample = makeWorld({ R: BODIES.earth.radius, biome: 'alpine_meadow' });

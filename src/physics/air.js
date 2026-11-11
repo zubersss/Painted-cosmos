@@ -9,7 +9,7 @@
 // Away from the focus the same layers are evaluated directly, without terrain.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature } from './atmosphere.js';
-import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
+import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
 import { weatherWind } from './weather.js';
 import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
@@ -63,7 +63,11 @@ export class AirGrid {
     this.terrain = new TerrainGrid(N, AIR.gridCell, CW);
     this.we = new Float32Array(N * N);        // reference wind along the frame's east axis (m/s)
     this.wn = new Float32Array(N * N);        // ... north axis
-    this.gust = new Float32Array(N * N);      // travelling gust level -1..1
+    this.gust = new Float32Array(N * N);      // travelling gust level -1..1 (the two large octaves)
+    // (P11) what the fine eddies (wind.js gustFineAt) do to the wind at each node, as a factor on we / wn.
+    // NOT in we / wn: a 16 m grid cannot carry eddies of 10 to 30 m, and what samples it sparsely (the
+    // falling and blown particles) would move in step over a whole cell. sampleWind hands it to the plants.
+    this.fine = new Float32Array(N * N).fill(1);
     this.shel = new Float32Array(N * N).fill(1);   // terrain shelter / speed-up factor
     this.I = new Float32Array(N * N).fill(0.17);   // turbulence intensity at 10 m
     this.wake = new Float32Array(N * N).fill(1);   // wind left near the ground in the lee of trees upwind (0..1)
@@ -270,8 +274,11 @@ export class AirGrid {
         const px = frame.ox + frame.ex * x + frame.nx * z, py = frame.oy + frame.ey * x + frame.ny * z, pz = frame.oz + frame.ez * x + frame.nz * z;
         const n = j * N + i;
         const g = gustLevelAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
-        const f = Math.max(WIND.minFactor, 1 + (this.I[n] + gi) * gain * g) * this.shel[n];
+        const A = (this.I[n] + gi) * gain, fc = Math.max(WIND.minFactor, 1 + A * g);
+        const f = fc * this.shel[n];
         this.we[n] = be * f; this.wn[n] = bn * f; this.gust[n] = g;
+        const gt = g + gustFineAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
+        this.fine[n] = Math.max(WIND.minFactor, 1 + A * (gt > WIND.gustMax ? WIND.gustMax : gt < -WIND.gustMax ? -WIND.gustMax : gt)) / fc;
       }
     }
     return used;
@@ -282,9 +289,11 @@ export class AirGrid {
     return u >= 0 && v >= 0 && u <= this.N - 1 && v <= this.N - 1;
   }
 
-  // Wind only (the per-frame hot path). Writes seven numbers into the typed array `o`:
+  // Wind only (the per-frame hot path). Writes these numbers into the typed array `o`:
   //   [0] we, [1] wn (reference wind, frame axes), [2] gust (-1..1), [3] turbulence intensity,
-  //   [4..6] wind height factors at blade height, crown height and 2 m, [7] canopy01.
+  //   [4..6] wind height factors at blade height, crown height and 2 m, [7] canopy01,
+  //   [8] (P11; only if o has room) the factor of the fine eddies on we / wn: multiply by it for what a
+  //   thing standing at one place feels (plants); leave it out for what is carried along (particles).
   // (A typed array, not an object: storing a double in an object field can allocate.)
   sampleWind(x, z, o) {
     const N = this.N, T = this.terrain;
@@ -300,6 +309,7 @@ export class AirGrid {
     o[1] = (this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11) * wk;
     o[2] = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
     o[3] = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
+    if (o.length > 8) o[8] = this.fine[n] * w00 + this.fine[n + 1] * w10 + this.fine[n + N] * w01 + this.fine[n + N + 1] * w11;
     // height factors from the nodes whose ground is known
     const va = T.valid, c = T.cover;
     const v00 = w00 * va[n], v10 = w10 * va[n + 1], v01 = w01 * va[n + N], v11 = w11 * va[n + N + 1];
@@ -403,6 +413,16 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     let f = heightFactor(zh, _s.z0, _s.canopyH, _s.canopy01) * aloftFactor(bodyId, zh);
     // in the lee of trees upwind the air near the ground is slower; above their tops it is not
     if (_s.wake < 1 && _s.wakeH > 0) f *= 1 - (1 - _s.wake) * (1 - smoothstep(_s.wakeH, _s.wakeH * AIR.wakeTop, zh));
+    // (P11) the fine eddies, exactly at this point (the grid holds the large gusts only: see wind.js)
+    const fMean = f;
+    let gust = _s.gust;
+    {
+      const gs = grid.gustShift, A = (_s.I + grid.gustiness * 0.15) * WIND.gustGain;
+      const fc = Math.max(WIND.minFactor, 1 + A * gust);
+      gust += gustFineAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
+      gust = gust > WIND.gustMax ? WIND.gustMax : gust < -WIND.gustMax ? -WIND.gustMax : gust;
+      f *= Math.max(WIND.minFactor, 1 + A * gust) / fc;
+    }
     const we0 = _s.we * f, wn0 = _s.wn * f;
     // the flow follows the ground: vertical component from the slope, fading with height
     let wu = (we0 * _s.gx + wn0 * _s.gz) * Math.exp(-zh / 25);
@@ -413,8 +433,8 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     wind.y = frame.ey * we + frame.ny * wn + uy * wu;
     wind.z = frame.ez * we + frame.nz * wn + uz * wu;
     o.speed = Math.hypot(we, wn, wu);
-    o.gust01 = clamp01(0.5 + 0.5 * _s.gust);
-    o.turbulence = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn) * f / (1 + zh / 300);
+    o.gust01 = clamp01(0.5 + 0.5 * gust);
+    o.turbulence = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn) * fMean / (1 + zh / 300);
     o.height = zh; o.near = true; dT = _s.dT;
   } else {
     windLarge(bodyId, ux, uy, uz, t, seed, _w);

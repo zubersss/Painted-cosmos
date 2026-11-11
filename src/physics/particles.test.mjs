@@ -330,15 +330,21 @@ test('the hull keeps the rain off what is under it', () => {
   const w = rainyWood(0);
   const up = norm(w.focus), ship = V(up.x * (w.R + 2.5), up.y * (w.R + 2.5), up.z * (w.R + 2.5));
   const ev0 = w.physics.particles.events.total;
-  run(w, 8, { disturbers: () => [{ kind: 'ship', p: ship, v: V(0, 0, 0), radius: 4.2, strength: 1 }] });
+  const hull = () => [{ kind: 'ship', p: ship, v: V(0, 0, 0), radius: 4.2, strength: 1 }];
+  run(w, 8, { disturbers: hull });
   const b = w.physics.particles.rain, fr = w.physics.fields.frame;
+  // (P11: counted at eight instants a quarter of a second apart, not at one. A single instant held one or
+  // two drops in the ring by luck of where they stood; the gust pattern changed and the count went from 2 to 1.)
   let under = 0, ring = 0;
-  for (let i = 0; i < b.count; i++) {
-    const p = V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2]);
-    const x = fr.lx(p.x, p.y, p.z), z = fr.lz(p.x, p.y, p.z), h = len(p) - w.R, r = Math.hypot(x, z);
-    if (h < 3.5) { if (r < 2.8) under++; else if (r > 5 && r < 5 + 2.8 * 0.6) ring++; }      // (the ring has about the same area)
+  for (let k = 0; k < 8; k++) {
+    for (let i = 0; i < b.count; i++) {
+      const p = V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2]);
+      const x = fr.lx(p.x, p.y, p.z), z = fr.lz(p.x, p.y, p.z), h = len(p) - w.R, r = Math.hypot(x, z);
+      if (h < 3.5) { if (r < 2.8) under++; else if (r > 5 && r < 5 + 2.8 * 0.6) ring++; }      // (the ring has about the same area)
+    }
+    run(w, 0.25, { t0: 108 + k * 0.25, disturbers: hull });
   }
-  assert.ok(ring >= 2, 'rain all around: ' + ring);
+  assert.ok(ring >= 8, 'rain all around: ' + ring);
   // (P7: a storm brings its own wind now, 16 m/s: rain driven at sixty degrees reaches a little way under the edge)
   assert.ok(under <= ring * 0.5, `under the hull ${under} against ${ring} beside it`);
   // and it lands on the hull instead: splashes up there

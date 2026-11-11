@@ -191,9 +191,14 @@ test('waves travel through a meadow: neighbouring plants are coherent, distant o
   const at = (e) => V(w.focus.x + fr.ex * e, w.focus.y + fr.ey * e, w.focus.z + fr.ez * e);
   const series = (e) => { const s = []; run(w, 0, {}); return s; };
   const a = [], b = [], c = [];
-  run(w, 30, { t0: 110, each: () => { a.push(F.plantBend(at(0), 0).angle); b.push(F.plantBend(at(0.6), 0).angle); c.push(F.plantBend(at(45), 0).angle); } });
+  const b2 = [];
+  run(w, 30, { t0: 110, each: () => { a.push(F.plantBend(at(0), 0).angle); b.push(F.plantBend(at(0.1), 0).angle); b2.push(F.plantBend(at(0.6), 0).angle); c.push(F.plantBend(at(45), 0).angle); } });
   const corr = (x, y) => { const mx = x.reduce((p, q) => p + q) / x.length, my = y.reduce((p, q) => p + q) / y.length; let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < x.length; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; } return sxy / Math.sqrt(sxx * syy + 1e-30); };
-  assert.ok(corr(a, b) > 0.95, 'plants 0.6 m apart move together: ' + corr(a, b));
+  // (P11: the blades of one tuft, a hand apart, move together; tufts a step apart are related but no longer in
+  // step: the flutter is eddies 0.9 to 3.2 m long. Until P11 plants 0.6 m apart were asked to correlate above 0.95,
+  // and did, which is why a meadow moved as one sheet.)
+  assert.ok(corr(a, b) > 0.95, 'blades 0.1 m apart move together: ' + corr(a, b));
+  assert.ok(corr(a, b2) > 0.3 && corr(a, b2) < 0.95, 'tufts 0.6 m apart are related, not in step: ' + corr(a, b2));
   assert.ok(corr(a, c) < 0.9, 'plants 45 m apart do not: ' + corr(a, c));
   // no shimmer: frame-to-frame change of the bend is small
   let worst = 0; for (let i = 1; i < a.length; i++) worst = Math.max(worst, Math.abs(a[i] - a[i - 1]));
@@ -328,7 +333,7 @@ test('branches: a crown does not sway as one piece; nothing moves at the trunk, 
   const F = w.physics.fields.flora, H = 12, L = FLORA.crown * H;
   run(w, 20);
   const bend = F.plantBend(w.focus, 1);
-  assert.ok(bend.angle > 0.002, `the tree leans ${bend.angle.toFixed(4)} rad`);
+  assert.ok(bend.angle > 0.0003, `the tree leans ${bend.angle.toFixed(4)} rad`);      // (P11: 0.002 before the trunks were made as stiff as measured trees)
   const o = {}, at = (az, x, s) => { F.plantBranch(Math.cos(az) * x * L, Math.sin(az) * x * L, s * H, H, w.focus, bend, o); return [o.e, o.n, o.up]; };
   // at the trunk: nothing. Along a branch: more toward the tip, as a cantilever (x^2 (3 - x) / 2)
   assert.deepEqual(at(0.7, 0, 0.6), [0, 0, 0]);
@@ -351,7 +356,7 @@ test('branches: a crown does not sway as one piece; nothing moves at the trunk, 
   assert.ok(crossings(east) > 2 * FLORA.stiffHz && crossings(east) < FLORA.branchHz * Math.max(...BRANCH_F) * 1.2, `a tip bobs at about ${crossings(east).toFixed(2)} Hz; the trunk sways at ${FLORA.stiffHz}`);
   const bound = (FLORA.branchGain * Math.max(...lean) + 0) * L;
   assert.ok(Math.max(...east.map(Math.abs)) <= bound + 1e-9, `largest bob ${Math.max(...east.map(Math.abs)).toFixed(3)} m of ${bound.toFixed(3)} m`);
-  assert.ok(Math.max(...east.map(Math.abs)) > 0.002, 'and it does move');
+  assert.ok(Math.max(...east.map(Math.abs)) > 0.0003, 'and it does move');      // (P11: 0.002 before the trunks were made as stiff as measured trees; this wind is light)
   // two trees side by side are not in step either (each has its own number)
   const U = F.uniforms, a1 = {}, a2 = {};
   plantBranch(L, 0, 8, H, 10.2, 3.1, 0.1, 0, 0, U, a1); plantBranch(L, 0, 8, H, 14.9, 3.1, 0.1, 0, 0, U, a2);
@@ -367,7 +372,8 @@ test('branches follow the wind on the tree and how gusty it is; a brushed crown 
   assert.ok(gusty > 2 * calm && calm > 0, `the same lean: ${calm.toFixed(3)} m in smooth air, ${gusty.toFixed(3)} m in gusty air`);
   assert.ok(Math.abs(storm / gusty - 2) < 0.05, 'twice the lean, twice the swing');
   // a 3.5 m branch on a tree leaning 0.1 rad in gusty air: tips move a few decimetres at most
-  assert.ok(gusty > 0.15 && gusty < 0.5, `${gusty}`);
+  // (P11: a lean of 0.1 rad is a storm now, 12 m/s and more at the crown, and the gain is 1.3: half a metre. "0.15 to 0.5" before.)
+  assert.ok(gusty > 0.3 && gusty < 0.7, `${gusty}`);
   const shiver = amp(0, 1, 0);
   assert.ok(shiver > 0.15 && shiver < 1.3 * FLORA.branchShake * L, `a shaken crown in still air: ${shiver.toFixed(3)} m`);
   // the phases the field hands out advance at the four rates and stay wrapped
@@ -404,8 +410,53 @@ test('in a storm a tree leans and tosses but does not whip back upwind (aerodyna
   };
   const storm = run(170, 40);
   assert.ok(storm.wmax > 12, 'this is the gust front: ' + storm.wmax);
-  assert.ok(storm.largest > 6, 'the tree leans: ' + storm.largest);
+  // (P11: "> 6" before the trunks were made as stiff as measured trees. This open ground has 46 m/s at 10 m in the gust
+  // front: the trunk goes to its limit, as a real one would break.)
+  assert.ok(storm.largest > 3 && storm.largest <= FLORA.stiffMax * 57.3 + 0.01, 'the tree leans: ' + storm.largest);
   assert.ok(storm.fastest < 30, 'no whip: fastest ' + storm.fastest + ' deg/s');
   assert.ok(storm.upwind > -2, 'never far upwind: ' + storm.upwind + ' deg');
   assert.ok(FLORA.stiffDamp < 0.2 && FLORA.aeroDamp * 3 < 0.1, 'in a breeze the sway is still free');
+});
+
+// ---- P11: flutter ------------------------------------------------------------------------------------
+test('P11 flutter: blades a metre apart are out of step, each swings near its own frequency, none bends upwind, and a re-anchoring does not move the eddies', async () => {
+  const { flutterAt, FLUT_D, FloraField } = await import('./flora.js');
+  // the three trains together have unit rms where the blade follows fully (slow eddies)
+  const o = new Float64Array(2), P = [0, 0, 0];
+  let s2 = 0, n = 0;
+  for (let x = 0; x < 200; x += 0.37) for (let z = 0; z < 40; z += 3.1) { flutterAt(x, z, 0.3, 0.1, 0.17 * 0.32, P, o); s2 += o[0] * o[0]; n++; }
+  const m = Math.min(FLORA.flutterMax, FLORA.flutterGain * 0.17 * 0.32 / (0.32 + 0.25));
+  assert.ok(Math.abs(Math.sqrt(s2 / n) / m - 1) < 0.15, `rms ${Math.sqrt(s2 / n) / m} of the depth`);
+  // a blade does not follow eddies that pass faster than it can swing: a train lying along a 12 m/s wind (the 0.9 m
+  // one passes at 8 Hz) is nearly gone, one lying across it passes slowly and stays
+  const amp = (w, i) => { const d = FLUT_D[i]; let mx = 0; for (let x = 0; x < 30; x += 0.02) { flutterAt(x * d[0], x * d[1], w * d[0], w * d[1], 1e9, P, o); mx = Math.max(mx, Math.abs(o[0])); } return mx / FLORA.flutterMax; };
+  assert.ok(amp(12, 0) < 0.9 * amp(1.5, 0), `largest swing with the wind along the 0.9 m train: ${amp(12, 0).toFixed(2)} in 12 m/s, ${amp(1.5, 0).toFixed(2)} in 1.5 m/s (of the depth)`);
+  // in the field: a storm wind over grass
+  const w = world();
+  run(w, 12);
+  const F = w.physics.fields.flora, fr = w.physics.fields.frame;
+  const at = (e, nn) => V(w.focus.x + fr.ex * e + fr.nx * nn, w.focus.y + fr.ey * e + fr.ny * nn, w.focus.z + fr.ez * e + fr.nz * nn);
+  const a = [], b = [], lite = [], dots = [];
+  run(w, 20, { t0: 112, each: () => { const A = F.plantBend(at(0, 0), 0, {}), B = F.plantBend(at(1.1, 0.4), 0, {}), L = F.plantBendLite(at(0, 0), 0, {}); a.push(A.angle); b.push(B.angle); lite.push(L.angle); dots.push((A.e * L.e + A.n * L.n) / (Math.hypot(L.e, L.n) || 1)); } });
+  const mean = (x) => x.reduce((p, q) => p + q, 0) / x.length;
+  const corr = (x, y) => { const mx = mean(x), my = mean(y); let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < x.length; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; } return sxy / Math.sqrt(sxx * syy); };
+  // what the eddies add to each blade (its lean less the smooth field's)
+  const da = a.map((v, i) => v - lite[i]), db = b.map((v, i) => v - lite[i]);
+  const c = corr(da, db);
+  const sd = Math.sqrt(mean(da.map((v) => (v - mean(da)) ** 2)));
+  console.log(`# flutter: lean ${(mean(a) * 57.3).toFixed(1)} deg, the eddies add ${(sd * 57.3).toFixed(1)} deg rms; blades 1.2 m apart correlate ${c.toFixed(2)}; least lean along the wind ${(Math.min(...dots) * 57.3).toFixed(1)} deg`);
+  assert.ok(mean(a) > 0.01, 'there is a wind: lean ' + mean(a));
+  assert.ok(sd > 0.04 * mean(a), `the eddies move the blade: ${sd} rad on a lean of ${mean(a)}`);
+  assert.ok(Math.abs(c) < 0.8, `blades 1.2 m apart are not in step: ${c}`);
+  assert.ok(Math.min(...dots) > 0, 'a blade never bends upwind');
+  // re-anchoring: the phases are moved with the anchor, so the eddy at a place stays the eddy at that place
+  const ff = new FloraField(); ff.flutPhase[0] = 1; ff.flutPhase[1] = 2; ff.flutPhase[2] = 3;
+  const q0 = new Float64Array(2), q1 = new Float64Array(2);
+  flutterAt(40, 9, 3, 1, 0.5, ff.flutPhase, q0);
+  ff.onReanchor(32, -16);                       // the new anchor, in the old frame's coordinates
+  flutterAt(40 - 32, 9 + 16, 3, 1, 0.5, ff.flutPhase, q1);
+  assert.ok(Math.abs(q0[0] - q1[0]) < 1e-9 && Math.abs(q0[1] - q1[1]) < 1e-9, `the same swing at the same place after re-anchoring: ${q0[0]} and ${q1[0]}`);
+  // the chunk carries it, and the two constants it took the uniform slots of
+  assert.ok(FLORA_GLSL.includes('uPhysWavePhase.w') && FLORA_GLSL.includes('uPhysWave.z') && FLORA_GLSL.includes(String(FLORA.flutterGain)));
+  assert.ok(!/uPhysWave\.[zw] \*/.test(FLORA_GLSL), 'the honami wavenumber and depth are constants of the chunk now');
 });

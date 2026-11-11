@@ -56,8 +56,27 @@ export const WIND = Object.freeze({
   eddyPeriod: 420,        // s: time for an eddy to change
   gustLength: 90,         // m: lattice of the large gusts (the integral scale of turbulence)
   gustLength2: 34,        // m: second octave
+  // (P11) the inertial range. Until P11 the pattern stopped at the second octave: in an 11 m/s wind 5 % of
+  // its variance lay at periods under 4 s where a mast at 10 m has 22 % (Kaimal et al. 1972: f S / u*^2 =
+  // 105 n / (1 + 33 n)^(5/3), n = f z / U, which falls as f^(-5/3)), and it had a quarter too much at 15 to
+  // 60 s. Two more octaves carry it down to eddies of about 10 m; the weights follow the variance Kaimal's
+  // spectrum holds in each octave's band of wavelengths at 10 m and were then fitted to its shares by
+  // period (wind.test.mjs holds them: within 0.07 of Kaimal's in every band from 10 minutes to 1 s at
+  // 5, 11 and 20 m/s). What is smaller is the plants' own (flora.js: honami waves and flutter).
+  // The two fine octaves are a SEPARATE level (gustFineAt): eddies of 10 to 30 m cannot be carried by the
+  // 16 m wind grid, so the grid's fields (what rain, snow and dust ride in) hold the two large octaves
+  // only, and the fine level is added where the place is known exactly: at a point query (airAt: a mast,
+  // the explorer, the ship) and, node by node, for the plants (a tree is an oscillator: it is the eddies
+  // arriving at its own frequency that make it sway rather than lean).
+  gustLength3: 13,        // m: third octave
+  gustLength4: 5,         // m: fourth octave
+  gustWeights: Object.freeze([0.6, 0.42, 0.36, 0.3]),
+  gustNorm: 1.16,         // scales the sum so that sigma(u) / U = I (measured: spectrum check in wind.test.mjs)
+  gustMax: 1.45,          // the level is clamped at this (3.3 sigma; it was 1 = 2.1 sigma until P11, which cut the
+                          // tops off the gusts: the 3 s gust over the 10 minute mean came out at 1.36 where open
+                          // country gives 1.4 to 1.6)
   gustCycle: 96,          // s: re-seeding period of the travelling pattern (two phases blended)
-  gustGain: 2.3,          // peak gust = mean * (1 + I * gustGain): about 1.4 over grass
+  gustGain: 2.3,          // gust = mean * (1 + I * gustGain * level): level 1 is about 1.4 x the mean over grass
   minFactor: 0.25,        // a lull never drops below this fraction of the mean
 });
 
@@ -111,7 +130,7 @@ export function windLarge(bodyId, ux, uy, uz, t, seed, o) {
 }
 
 // Travelling gust level at body-local point (px,py,pz) in metres, carried by wind (wx,wy,wz).
-// Returns -1..1 (0 = the mean wind, +1 a strong gust, -1 a deep lull).
+// Returns -gustMax..gustMax (0 = the mean wind, +1 a strong gust, -1 a deep lull; beyond 1 the rare extremes).
 // Two copies of the pattern, half a cycle apart, are advected for at most one cycle each and
 // cross-faded, so the pattern travels for ever without shearing itself to noise.
 // This form is exact only while the wind is steady: each copy sits at p - w * tau with tau up to
@@ -138,20 +157,53 @@ export function gustLevelAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed)
   const b = a + 0.5, c2 = Math.floor(b);
   const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1;
   const k1 = 1 / WIND.gustLength, k2 = 1 / WIND.gustLength2;
+  const W = WIND.gustWeights;
   let g = 0;
   if (w1 > 0.001) {
     const o = hash1(c1, s) * 977;
     const x = px - ax, y = py - ay, z = pz - az;
-    g += w1 * (noise3(x * k1 + o, y * k1, z * k1 - o, s) * 0.7 + noise3(x * k2 - o, y * k2 + o, z * k2, s + 7) * 0.42);
+    g += w1 * (noise3(x * k1 + o, y * k1, z * k1 - o, s) * W[0] + noise3(x * k2 - o, y * k2 + o, z * k2, s + 7) * W[1]);
   }
   if (w2 > 0.001) {
     const o = hash1(c2, s + 55) * 977;
     const x = px - bx, y = py - by, z = pz - bz;
-    g += w2 * (noise3(x * k1 + o, y * k1, z * k1 - o, s + 3) * 0.7 + noise3(x * k2 - o, y * k2 + o, z * k2, s + 11) * 0.42);
+    g += w2 * (noise3(x * k1 + o, y * k1, z * k1 - o, s + 3) * W[0] + noise3(x * k2 - o, y * k2 + o, z * k2, s + 11) * W[1]);
   }
   // blending two independent patterns lowers the variance; put it back
   g /= Math.sqrt(w1 * w1 + w2 * w2);
-  return clamp(g * 1.35, -1, 1);
+  return clamp(g * WIND.gustNorm, -WIND.gustMax, WIND.gustMax);
+}
+
+// (P11) The fine level: the third and fourth octaves (eddies of roughly 10 to 30 m), carried exactly as
+// gustLevelAt carries the large ones (same arguments). ADD it to gustLevelAt's level and clamp the sum to
+// +-WIND.gustMax: that sum is what a mast measures. Unclamped here (about +-0.6).
+export function gustFineAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed) {
+  const s = seedOf(bodyId, seed) + 101;
+  const T = WIND.gustCycle;
+  const a = t / T, c1 = Math.floor(a), f1 = a - c1;
+  const c2 = Math.floor(a + 0.5);
+  const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1;
+  const k3 = 1 / WIND.gustLength3, k4 = 1 / WIND.gustLength4;
+  const W = WIND.gustWeights;
+  let g = 0;
+  if (w1 > 0.001) {
+    const o = hash1(c1, s) * 977;
+    const x = px - ax, y = py - ay, z = pz - az;
+    g += w1 * (noise3(x * k3 + o, y * k3 - o, z * k3, s + 17) * W[2] + noise3(x * k4, y * k4 + o, z * k4 - o, s + 23) * W[3]);
+  }
+  if (w2 > 0.001) {
+    const o = hash1(c2, s + 55) * 977;
+    const x = px - bx, y = py - by, z = pz - bz;
+    g += w2 * (noise3(x * k3 + o, y * k3 - o, z * k3, s + 19) * W[2] + noise3(x * k4, y * k4 + o, z * k4 - o, s + 29) * W[3]);
+  }
+  return g / Math.sqrt(w1 * w1 + w2 * w2) * WIND.gustNorm;
+}
+// The whole level a mast would measure in a steady wind (wx,wy,wz): large gusts and fine eddies, clamped.
+export function gustLevelFull(bodyId, px, py, pz, wx, wy, wz, t, seed) {
+  const T = WIND.gustCycle, a = t / T;
+  const t1 = (a - Math.floor(a) - 0.5) * T, t2 = (a + 0.5 - Math.floor(a + 0.5) - 0.5) * T;
+  return clamp(gustLevelAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed)
+    + gustFineAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed), -WIND.gustMax, WIND.gustMax);
 }
 
 // Cycle bookkeeping of the two copies at time t: o[0], o[1] = the cycle number of copy 1 and 2

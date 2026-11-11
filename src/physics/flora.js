@@ -41,13 +41,40 @@ export const FLORA = Object.freeze({
   aeroDamp: 0.025, aeroDampMax: 0.85,
   // shape of the response (shared with the shader through uniforms)
   softFlex: 3.0, softMax: 1.2,        // bend angle = max * (1 - exp(-flex * load)), radians
-  stiffFlex: 1.2, stiffMax: 0.25,
+  // (P11) trunks. Until P11 a trunk leaned 0.25 (1 - exp(-1.2 load)) rad: 10 degrees in 8 m/s, 12.8 in 11 m/s and
+  // pinned at its limit (14.3) through any storm: in the first filmstrip of the birches in the thunderstorm
+  // nothing moved in 1.2 s but the branch tips. Measured trees are far stiffer: the top of a 12 to 20 m tree
+  // moves 0.3 to 0.5 m in a fresh breeze and about a metre in a gale (Mayer 1987; Peltola 1996; Gardiner 1995;
+  // James, Haritos and Ades 2006), a lean of the chord of 1.5 to 2.5 degrees at 8 m/s, growing as the load to
+  // the power 0.7 (the crown streamlines) until the stem fails near 15 to 20 degrees. Now 3 degrees at the tip
+  // in 8 m/s (chord 2: 0.42 m at the top of a 12 m birch), 5.2 in 11 m/s, 12 in 20 m/s, limit 17.
+  stiffFlex: 0.19, stiffMax: 0.30,
   flatAngle: 1.45,              // rad: a flattened plant lies this far over
   // travelling waves in soft plants (honami): wavelengths about 14, 11 and 19 m, moving a bit
   // faster than the wind at blade height
   waveK: 0.45,                  // rad/m of the first train
   waveSpeed: 1.4,               // x wind speed at blade height
   waveAmp: 0.45,                // modulation depth of the soft load at full gust
+  // (P11) FLUTTER: the eddies smaller than the wind grid can carry. Until P11 three blades a metre apart
+  // leaned within half a degree of each other at every instant and a meadow moved as one sheet (in the
+  // fair-weather breeze by a hundredth of a degree in a second: the filmstrip was twelve identical frames).
+  // At blade height the air is the most turbulent there is (sigma / U about 0.4), and a third of that
+  // variance lies in eddies 0.5 to 5 m long (Kaimal's spectrum at z = 0.5 m), which arrive at a blade at
+  // U / length: a hertz or two, its own frequency. Three frozen eddy trains of those lengths, fixed in the
+  // ground frame at 60 degrees to each other and carried by the wind at blade height (Taylor), load each
+  // soft plant along the wind and across it; a blade answers each as the oscillator it is (softHz,
+  // flutterDamp: full below its frequency, 1.2 x at it, little above). No uniform is added: the three
+  // phases ride in uPhysWave.z, uPhysWave.w and uPhysWavePhase.w (the wavenumber and depth of the honami
+  // waves they used to hold never changed and are now constants of the chunk).
+  flutterK: Object.freeze([6.98, 3.70, 1.96]),      // rad/m: eddies 0.9, 1.7 and 3.2 m long
+  flutterAng: Object.freeze([0.35, 1.40, 2.44]),    // rad: their directions in the field frame (60 degrees apart)
+  flutterA: Object.freeze([0.64, 0.79, 0.98]),      // amplitudes: variance as length^(2/3), unit rms together
+  flutterGain: 2.4,             // rms load swing / mean load = this x the turbulence intensity of the cell
+                                // (2 x 0.53 sigma_u at blade height, where U is 0.43 of the 10 m wind)
+  flutterMax: 0.6,              // ... and never more than this (the storm's own gustiness is larger eddies)
+  flutterBlade: 0.62,           // wind at blade height over the wind at 2 m (open grass)
+  flutterDamp: 0.45,            // damping ratio of a blade in moving air
+  flutterCross: 0.6,            // across the wind as a share of along it
   // contact pushes
   pushLoad: 2.6,                // load a body puts on plants it touches
   pushReach: 0.7,               // m beyond the body radius that plants are still pushed (0.45 before P7: stems
@@ -80,8 +107,9 @@ export const FLORA = Object.freeze({
   // crown is the tree's damper). So a crown does not sway as one piece: lobes of it bob and
   // swing in turn, faster than the trunk leans.
   branchHz: 1.3,                // Hz: the first of four branch rates (x BRANCH_F)
-  branchGain: 0.5,              // rad of branch swing per rad of trunk lean, in fully gusty air (tips of 3.5 m branches
-                                // move about 10 cm in a fresh breeze, half a metre in a storm)
+  branchGain: 1.3,              // rad of branch swing per rad of trunk lean, in fully gusty air (tips of 3.5 m branches
+                                // move 10 to 20 cm in a fresh breeze, half a metre in a storm; 0.5 before P11, when
+                                // the trunk itself leaned three times as far)
   branchCalm: 0.35,             // share of that left in smooth air (the trunk's own sway shakes them)
   branchShake: 0.08,            // rad: swing of a crown that has just been brushed or blown on (shake01 = 1)
   crown: 0.35,                  // a branch is this long, as a share of the plant's height
@@ -94,7 +122,7 @@ export const BRANCH_M = [2, 3, 1, 4];
 export const BRANCH_S = [2.6, -1.9, 4.1, 0];
 export const BRANCH_T = [1, 1.7, 2.3, 0.6];
 
-const _s = new Float64Array(8);
+const _s = new Float64Array(9);
 const _coef = new Float64Array(8);
 const _tmp2 = new Float64Array(2);
 const _dwf = new Float64Array(3);
@@ -133,6 +161,7 @@ export class FloraField {
     this.active = 0;                             // cells of the push field that are moving
     this.rho = 1.225;
     this.wavePhase = new Float64Array(3);
+    this.flutPhase = new Float64Array(3);        // (P11) phases of the three flutter trains
     this.waveDir = new Float64Array(2); this.waveDir[0] = 1;
     this.gustMean = 0;
     // uniforms for FLORA_GLSL, refreshed every update (plain arrays; PAINTER copies them)
@@ -140,7 +169,7 @@ export class FloraField {
       uPhysAnchor: [0, 0, 0], uPhysEast: [1, 0, 0], uPhysNorth: [0, 0, -1], uPhysUp: [0, 1, 0],
       uPhysWindMap: [0, 0, 1 / (N * FLORA.cell), N],
       uPhysNearMap: [0, 0, 1 / (M * FLORA.nearCell), M],
-      uPhysWave: [1, 0, FLORA.waveK, FLORA.waveAmp],
+      uPhysWave: [1, 0, 0, 0],                    // xy: wave direction; z, w: flutter phases 0 and 1 (P11)
       uPhysWavePhase: [0, 0, 0, 0],
       uPhysShape: [FLORA.softFlex, FLORA.softMax, FLORA.stiffFlex, FLORA.stiffMax],
       // branches (P6): phases of the four branch oscillators (rad, wrapped), and
@@ -174,6 +203,7 @@ export class FloraField {
       const ex = d0 * Math.cos(a) - d1 * Math.sin(a), ez = d0 * Math.sin(a) + d1 * Math.cos(a);
       this.wavePhase[i] -= ki * (ex * dx + ez * dz);
     }
+    for (let i = 0; i < 3; i++) this.flutPhase[i] -= FLORA.flutterK[i] * (FLUT_D[i][0] * dx + FLUT_D[i][1] * dz);
   }
 
   // Advance the fields by dt.
@@ -223,7 +253,8 @@ export class FloraField {
         const x = (this.ci + i - N / 2 + 0.5) * cell;
         air.sampleWind(x, z, _s);
         const n = j * N + i, o = n * 4;
-        let we = _s[0], wn = _s[1];
+        // (P11) with the fine eddies (10 to 30 m) the wind grid keeps apart: a plant stands in one place
+        let we = _s[0] * _s[8], wn = _s[1] * _s[8];
         const hs = _s[4], ht = _s[5], h2 = _s[6];
         // a dust devil in the field: its swirl bends the plants round it (divided by the height
         // factor because the vortex is given at plant height already)
@@ -278,6 +309,8 @@ export class FloraField {
     for (let i = 0; i < 3; i++) {
       this.wavePhase[i] = (this.wavePhase[i] + FLORA.waveK * WAVE_K[i] * FLORA.waveSpeed * WAVE_C[i] * ms * h) % (TAU * 1024);
     }
+    // (P11) the flutter trains are carried by the wind at blade height (se, sn: its mean over the field)
+    for (let i = 0; i < 3; i++) this.flutPhase[i] = (this.flutPhase[i] + FLORA.flutterK[i] * (FLUT_D[i][0] * se + FLUT_D[i][1] * sn) * h) % (TAU * 1024);
     this.gustMean = gsum * inv;
     // branches: four oscillators on the clock, and how gusty the air is (turbulence over mean wind), eased over 2 s
     for (let i = 0; i < 4; i++) this.branchPhase[i] = (this.branchPhase[i] + TAU * FLORA.branchHz * BRANCH_F[i] * h) % TAU;
@@ -296,6 +329,7 @@ export class FloraField {
     U.uPhysNearMap[0] = this.mi * nc; U.uPhysNearMap[1] = this.mj * nc;
     U.uPhysWave[0] = this.waveDir[0]; U.uPhysWave[1] = this.waveDir[1];
     U.uPhysWavePhase[0] = this.wavePhase[0] % TAU; U.uPhysWavePhase[1] = this.wavePhase[1] % TAU; U.uPhysWavePhase[2] = this.wavePhase[2] % TAU;
+    U.uPhysWave[2] = this.flutPhase[0] % TAU; U.uPhysWave[3] = this.flutPhase[1] % TAU; U.uPhysWavePhase[3] = this.flutPhase[2] % TAU;
     for (let i = 0; i < 4; i++) U.uPhysBranchPhase[i] = this.branchPhase[i];
     U.uPhysBranch[0] = this.gustiness;
     this.version++;
@@ -426,7 +460,8 @@ export class FloraField {
     const N = this.N, M = this.M;
     const b = this._tex(this.bend, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2);
     let le = b[0] + (b[2] - b[0]) * stiff01, ln = b[1] + (b[3] - b[1]) * stiff01;
-    const g = this._tex(this.wind, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2)[2];
+    const wt = this._tex(this.wind, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2);
+    const g = wt[2], w2e = wt[0], w2n = wt[1], turb = wt[3];
     // travelling waves modulate the load on soft plants
     let wsum = 0;
     for (let i = 0; i < 3; i++) {
@@ -436,6 +471,14 @@ export class FloraField {
     }
     const wave = 1 + FLORA.waveAmp * (1 - stiff01) * (0.35 + 0.65 * g) * wsum;
     le *= wave; ln *= wave;
+    // (P11) flutter: the small eddies, along the load and across it
+    if (stiff01 < 1) {
+      const U = this.uniforms; _fl3[0] = U.uPhysWave[2]; _fl3[1] = U.uPhysWave[3]; _fl3[2] = U.uPhysWavePhase[3];
+      flutterAt(x, z, w2e, w2n, turb, _fl3, _fl2);
+      const fa = _fl2[0] * (1 - stiff01), fc = _fl2[1] * (1 - stiff01), e0 = le, n0 = ln;
+      const fl = 1 + fa > 0.15 ? 1 + fa : 0.15;        // (a lull between eddies, never a wind from behind)
+      le = e0 * fl - n0 * fc; ln = n0 * fl + e0 * fc;
+    }
     // near-field push (only inside the push grid; soft plants take it fully, trunks hardly)
     const pu = (x - this.mi * this.nearCell) / this.nearCell + M / 2, pvv = (z - this.mj * this.nearCell) / this.nearCell + M / 2;
     let flat = 0, shake = 0;
@@ -474,6 +517,26 @@ export const WAVE_K = [1, 1.31, 0.74];
 export const WAVE_ROT = [0, 0.38, -0.31];
 export const WAVE_C = [1, 0.92, 1.12];
 export const WAVE_A = [0.5, 0.3, 0.2];
+// (P11) the flutter: unit directions of the three eddy trains, and the JS twin of pcPhysFlutter in FLORA_GLSL.
+export const FLUT_D = FLORA.flutterAng.map((a) => [Math.cos(a), Math.sin(a)]);
+export const FLUT_PH = [1.7, 4.1, 2.9];      // the cross-wind part runs this far (rad) out of step with the along-wind part
+// (x, z): grid position; (w2e, w2n): wind at 2 m there (m/s); turb: sigma there (m/s); P: the three phases.
+// Fills o[0] = swing along the load, o[1] = across it (both as shares of the load; multiply by 1 - stiff01).
+export function flutterAt(x, z, w2e, w2n, turb, P, o) {
+  const sp = Math.hypot(w2e, w2n), m = Math.min(FLORA.flutterMax, FLORA.flutterGain * turb / (sp + 0.25));
+  const ue = w2e * FLORA.flutterBlade, un = w2n * FLORA.flutterBlade, wn = TAU * FLORA.softHz, z4 = 4 * FLORA.flutterDamp * FLORA.flutterDamp;
+  let a = 0, c = 0;
+  for (let i = 0; i < 3; i++) {
+    const k = FLORA.flutterK[i], d = FLUT_D[i];
+    const r = k * (d[0] * ue + d[1] * un) / wn, r2 = r * r;
+    const H = FLORA.flutterA[i] / Math.sqrt((1 - r2) * (1 - r2) + z4 * r2);
+    const ph = k * (d[0] * x + d[1] * z) - P[i];
+    a += H * Math.sin(ph); c += H * Math.sin(ph + FLUT_PH[i]);
+  }
+  o[0] = m * a; o[1] = m * FLORA.flutterCross * c;
+  return o;
+}
+const _fl2 = new Float64Array(2), _fl3 = new Float64Array(3);
 
 // How far a point of a crown is moved by its branch (m; add it to the point before plantDisplace).
 // The JS twin of pcPhysBranch in FLORA_GLSL.

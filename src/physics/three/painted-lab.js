@@ -20,13 +20,19 @@
 //   eye=0 (the physics is not told where the camera is)
 //   push=0 (the explorer and the ship disturb nothing: with freeze=1 and the same pre, the frame
 //   differs from the pushed one only by what the push field does)
+//   ship=fly (P11: the real flight model and the real gear: at rest on its legs until told; see ctl.ship)
+//   legs=0 (the explorer as the old one-piece capsule; default: a torso riding on legs that fold and reach
+//   with st.phys.hip, so a landing, a crouch and a clamber show)
+// FILMSTRIPS (P11): __lab.film({...}) drives the clock itself at a fixed step and returns one sheet of
+// consecutive frames with the simulation's own numbers for each; see film() below and
+// src/physics/three/film.mjs (the Node driver and the table of subjects).
 // window.__lab: { info(), stability(dtMs, pairs, hideKits, orbitDegPerSec), plantCheck(), setRain(mode), physics, kits, world, painter }
 import * as THREE from 'three';
 import { createPainter, RENDERER_OPTIONS, makeWashMaterial, makePaintUniforms, bindBodyUniforms, VERT_PARS, VERT_END, FRAG_PARS } from '../../render/index.js';
 import { createWorld } from '../../world/index.js';
 import { BODIES } from '../../data/bodies.js';
 import { LOOKS, pig, dilute } from '../../data/looks.js';
-import { createPhysics, stepExplorerBody, stepShipGear, wakeShip, MATERIAL_IDS } from '../index.js';
+import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, MATERIAL_IDS } from '../index.js';
 import { weatherAt, cellsAt } from '../weather.js';
 import { createPhysicsKits } from './kits.js';
 import { SHAPE_GLSL } from './chunks.glsl.js';
@@ -97,8 +103,20 @@ const ex = { p: { x: 0, y: 0, z: 0 }, v: { x: 0, y: 0, z: 0 }, grounded: true };
 { const p = at(circle, 0); ex.p.x = p.x; ex.p.y = p.y; ex.p.z = p.z; }
 const envEx = physics.bindEnv(bodyId, { sample: (d) => world.sampleSurface(bodyId, d), gravity: body.gravity });
 const actorMat = makeWashMaterial({ color: 0x8a4a3a, wet: 0.1, id: 5.0 });
-const exMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 1.2, 4, 10), actorMat); exMesh.visible = Q.get('explorer') !== '0';
+// (P11) the figure: a torso that rides at the hips on legs whose length is the model's (0.9 m + st.phys.hip),
+// so what the legs do (fold on a landing, reach down a step, clamber) is in the picture. legs=0: one capsule.
+const legsOn = Q.get('legs') !== '0';
+const exMesh = new THREE.Group(); exMesh.visible = Q.get('explorer') !== '0';
+const exTorso = new THREE.Mesh(legsOn ? new THREE.CapsuleGeometry(0.27, 0.36, 4, 10) : new THREE.CapsuleGeometry(0.28, 1.2, 4, 10), actorMat);
+const exLegs = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 1, 8), actorMat); exLegs.visible = legsOn;
+exMesh.add(exTorso, exLegs);
 root.add(exMesh);
+// (P11) scripted control, for the filmstrips. All optional; null/0 = the page's own behaviour.
+//   wish: [east, north] m/s the explorer wishes to move at (null: the circle of walk= / circle=)
+//   jump: true for one step (taken and cleared)   jet: 0..1 jetpack throttle
+//   yawRate: degrees a second the camera turns round the focus   follow: true = the camera's target is the explorer
+//   ship (ship=fly): 'rest' on the gear | 'up' lift off and hold shipAlt | 'down' descend and stand
+const ctl = { wish: null, jump: false, jet: 0, yawRate: 0, follow: Q.get('follow') === '1', ship: 'rest' };
 const _t = new THREE.Vector3(), _u = new THREE.Vector3();
 function driveExplorer(dt) {
   _u.set(ex.p.x, ex.p.y, ex.p.z); const r = _u.length(); _u.divideScalar(r);
@@ -106,9 +124,15 @@ function driveExplorer(dt) {
   _t.copy(_u).multiplyScalar(r).sub(focus0); const e = _t.dot(east0), n = _t.dot(north0), rad = Math.hypot(e, n) || 1;
   const pull = (circle - rad) * 0.6;
   _t.copy(east0).multiplyScalar(-n / rad + e / rad * pull).addScaledVector(north0, e / rad + n / rad * pull).normalize().multiplyScalar(walk);
-  stepExplorerBody(ex, { wish: walk > 0 ? { x: _t.x, y: _t.y, z: _t.z } : { x: 0, y: 0, z: 0 }, jump: false, jet: 0, descentLimit: 9 }, dt, envEx);
-  exMesh.position.set(ex.p.x + _u.x * 0.88, ex.p.y + _u.y * 0.88, ex.p.z + _u.z * 0.88);
+  if (ctl.wish) _t.copy(east0).multiplyScalar(ctl.wish[0]).addScaledVector(north0, ctl.wish[1]).addScaledVector(_u, -(east0.dot(_u) * ctl.wish[0] + north0.dot(_u) * ctl.wish[1]));
+  const moving = ctl.wish ? true : walk > 0;
+  stepExplorerBody(ex, { wish: moving ? { x: _t.x, y: _t.y, z: _t.z } : { x: 0, y: 0, z: 0 }, jump: !!ctl.jump, jet: ctl.jet || 0, descentLimit: 9 }, dt, envEx);
+  ctl.jump = false;
+  _u.set(ex.p.x, ex.p.y, ex.p.z).normalize();
+  exMesh.position.set(ex.p.x, ex.p.y, ex.p.z);
   exMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _u);
+  if (legsOn) { const leg = 0.9 + (ex.phys ? ex.phys.hip : 0); exLegs.scale.y = leg; exLegs.position.y = leg * 0.5; exTorso.position.y = leg + 0.36; }
+  else exTorso.position.y = 0.88;
 }
 
 // ---- the ship: the real gear model for standing, a scripted hover otherwise; a painted slab on legs ----
@@ -117,7 +141,7 @@ const sh = { p: { x: 0, y: 0, z: 0 }, v: { x: 0, y: 0, z: 0 }, q: { x: 0, y: 0, 
 let shipObj = null, shT = 0, shLift = 1, shPhase = 'down';
 const shipAlt = num('shipAlt', 3.5);
 if (shipMode) {
-  const p = at(-num('shipAway', 9), 2, shipMode === 'land' ? 1.2 : shipAlt); sh.p.x = p.x; sh.p.y = p.y; sh.p.z = p.z;
+  const p = at(-num('shipAway', 9), 2, shipMode === 'land' || shipMode === 'fly' ? 1.2 : shipAlt); sh.p.x = p.x; sh.p.y = p.y; sh.p.z = p.z;
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), p.clone().normalize()); sh.q = { x: q.x, y: q.y, z: q.z, w: q.w };
   shipObj = new THREE.Group();
   const hull = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.1, 7.4), makeWashMaterial({ color: 0xc9a23a, wet: 0.1, id: 3.0 })); hull.position.y = 1.5; shipObj.add(hull);
@@ -125,11 +149,44 @@ if (shipMode) {
   root.add(shipObj);
 }
 const envSh = physics.bindEnv(bodyId, { sample: (d) => world.sampleSurface(bodyId, d), gravity: body.gravity });
+// (P11) ship=fly: the game's own sequence with the real models (PILOT's numbers: the gear takes the hull at
+// 1.0 m and lets it down at 0.6 m/s, the anti-gravity hands the weight over in 1.5 s, lift-off ramps in 1.2 s
+// with a 4.2 m/s climb target, the hover is held with tau 0.5 s). ctl.ship: 'rest' | 'up' | 'down'.
+const envFly = physics.bindEnv(bodyId, { sample: (d) => world.sampleSurface(bodyId, d), gravity: body.gravity, up: { x: 0, y: 1, z: 0 }, altGround: 0, time: 0 });
+const flyCmd = { target: { x: 0, y: 0, z: 0 }, tau: 0.5, hover: true }, gearCmd = { lift01: 0, hold: { x: 0, y: 0, z: 0 } };
+let flyOn = false, flyLift = 1;
+function driveFly(dt) {
+  const alt = Math.hypot(sh.p.x, sh.p.y, sh.p.z) - surfR(_u);
+  const want = ctl.ship;
+  if (flyOn) {
+    // in the air, on the flight model: climb to and hold shipAlt, or come down to where the gear takes over
+    const vz = want === 'down' ? -Math.min(1.5, Math.max(0.6, (alt - 1.0) * 0.9)) : Math.max(-1.5, Math.min(4.2, (shipAlt - alt) * 0.9));
+    flyCmd.target.x = _u.x * vz; flyCmd.target.y = _u.y * vz; flyCmd.target.z = _u.z * vz;
+    envFly.up.x = _u.x; envFly.up.y = _u.y; envFly.up.z = _u.z; envFly.altGround = alt; envFly.time = time;
+    stepShipBody(sh, flyCmd, dt, envFly);
+    if (want === 'down' && alt <= 1.0) { flyOn = false; flyLift = 1; wakeShip(sh); }
+    return;
+  }
+  // on or over the gear
+  const touching = sh.phys && sh.phys.contacts > 0;
+  if (want === 'up') {
+    if (sh.phys && sh.phys.asleep) wakeShip(sh);
+    flyLift = Math.min(1, flyLift + dt / 1.2);
+    gearCmd.lift01 = flyLift; gearCmd.hold.x = _u.x * 4.2 * flyLift; gearCmd.hold.y = _u.y * 4.2 * flyLift; gearCmd.hold.z = _u.z * 4.2 * flyLift;
+    stepShipGear(sh, gearCmd, dt, envSh);
+    if (sh.phys.contacts === 0 && flyLift >= 1) flyOn = true;
+  } else {
+    if (touching) flyLift = Math.max(0, flyLift - dt / 1.5);
+    gearCmd.lift01 = flyLift; gearCmd.hold.x = -_u.x * 0.6; gearCmd.hold.y = -_u.y * 0.6; gearCmd.hold.z = -_u.z * 0.6;
+    stepShipGear(sh, gearCmd, dt, envSh);
+  }
+}
 function driveShip(dt) {
   if (!shipMode) return;
   shT += dt;
   _u.set(sh.p.x, sh.p.y, sh.p.z).normalize();
-  if (shipMode === 'land') {
+  if (shipMode === 'fly') driveFly(dt);
+  else if (shipMode === 'land') {
     // set down on the gear, stand 5 s, lift off again and slide 9 m aside (so the pad marks show)
     if (shPhase === 'down') { shLift = Math.max(0, shLift - dt / 1.5); if (sh.phys && sh.phys.asleep && shT > 6) { shPhase = 'up'; wakeShip(sh); } }
     else if (shPhase === 'up') { shLift = Math.min(1, shLift + dt / 1.2); if (sh.phys.contacts === 0 && shLift >= 1) shPhase = 'away'; }
@@ -334,7 +391,7 @@ let yaw = num('yaw', 30) * Math.PI / 180;
 const pitch = num('pitch', 12) * Math.PI / 180, dist = num('dist', 9), lookUp = num('up', 1.0);
 const camLocal = new THREE.Vector3(), target = new THREE.Vector3();
 function placeCamera() {
-  const f = Q.get('follow') === '1' ? _t.set(ex.p.x, ex.p.y, ex.p.z) : _t.copy(focus0);
+  const f = ctl.follow ? _t.set(ex.p.x, ex.p.y, ex.p.z) : _t.copy(focus0);
   target.copy(f).addScaledVector(up0, lookUp);
   camLocal.copy(target).addScaledVector(east0, Math.sin(yaw) * Math.cos(pitch) * dist).addScaledVector(north0, -Math.cos(yaw) * Math.cos(pitch) * dist).addScaledVector(up0, Math.sin(pitch) * dist);
   // keep the eye above the ground
@@ -356,6 +413,7 @@ world.setBuildBudget(60);
 physics.warmUp({ bodyId, time, focus: ex.p });
 function step(dt) {
   time += dt;
+  yaw += ctl.yawRate * Math.PI / 180 * dt;
   driveExplorer(dt); driveShip(dt);
   // push=0: the bodies are there but press on nothing (for A/B frames: what the push field does to the picture)
   dist2.length = 0; if (pushOn) physics.explorer.disturbers(ex, dist2);
@@ -395,7 +453,9 @@ function draw(dt) {
     renderer.setScissorTest(false); renderer.autoClear = ac;
   }
 }
+let filming = false;
 function tick(now) {
+  if (filming) { last = now; requestAnimationFrame(tick); return; }
   resize();
   const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)) * speedK; last = now;
   if (!frozen) { const t0 = performance.now(); step(dt); cost.phys += (performance.now() - t0 - cost.phys) * 0.1; }
@@ -449,9 +509,52 @@ function stability(dtMs = 8, pairs = 6, hideKits = false, orbit = 0) {
   frozen = was;
   return { dtMs, pairs, orbit, hideKits, meanDiff: +mean.toFixed(5), changedShare: +share.toFixed(5) };
 }
-window.__lab = { info, stability, physics, world, painter, renderer, scene, camera, root, THREE, get kits() { return kits; },
+// ---- filmstrips (P11) ---------------------------------------------------------------------------------
+// film(o): the page's clock is stopped and driven here at a fixed step, so the result does not depend on how
+// fast this machine draws. For each of o.frames frames: o.each(i, t, ctl, lab) may script the controls, the
+// simulation is advanced o.dt seconds in o.sub equal steps, the frame is drawn and its crop is copied into
+// one sheet (in the same task as the draw: a WebGL canvas is cleared once the browser has presented it), and
+// o.probe(lab) returns that frame's numbers.
+//   frames 12, dt 1/15 s, sub 2 (steps a frame: the simulation runs at sub / dt Hz)
+//   crop [x, y, w, h] in fractions of the canvas (default the whole frame), tile [w, h] px (default: the crop's
+//   own pixels), cols 4, quality 0.85 (jpeg), label true (frame number and time in the corner of each tile)
+//   each, probe: functions, or strings of functions (so a Node driver can pass them)
+// Returns { sheet (a data URL), numbers: [per frame], dt, hz, w, h }.
+const _fn = (f) => (typeof f === 'string' ? (0, eval)('(' + f + ')') : f);
+const enu = (p) => { _t.set(p.x, p.y, p.z); const r = _t.length(); const u = _t.clone().divideScalar(r); _t.sub(focus0); return { e: _t.dot(east0), n: _t.dot(north0), h: r - groundR(u) }; };
+const enuV = (v) => ({ e: v.x * east0.x + v.y * east0.y + v.z * east0.z, n: v.x * north0.x + v.y * north0.y + v.z * north0.z, u: v.x * up0.x + v.y * up0.y + v.z * up0.z });
+const sheet = document.createElement('canvas');
+function film(o = {}) {
+  const frames = o.frames || 12, dt = o.dt || 1 / 15, sub = o.sub || 2, cols = o.cols || 4;
+  const each = o.each ? _fn(o.each) : null, probe = o.probe ? _fn(o.probe) : null;
+  const was = frozen; frozen = true; filming = true;
+  resize();
+  const c = o.crop || [0, 0, 1, 1], sx = Math.round(c[0] * canvas.width), sy = Math.round(c[1] * canvas.height), sw = Math.round(c[2] * canvas.width), sh2 = Math.round(c[3] * canvas.height);
+  const tw = o.tile ? o.tile[0] : sw, th = o.tile ? o.tile[1] : sh2, rows = Math.ceil(frames / cols);
+  sheet.width = tw * cols; sheet.height = th * rows;
+  const g = sheet.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, sheet.width, sheet.height);
+  g.font = '10px monospace'; g.textBaseline = 'top';
+  const numbers = [], t0 = time;
+  for (let i = 0; i < frames; i++) {
+    if (each) each(i, time - t0, ctl, lab);
+    for (let k = 0; k < sub; k++) step(dt / sub);
+    draw(dt);
+    const x = (i % cols) * tw, y = Math.floor(i / cols) * th;
+    g.drawImage(canvas, sx, sy, sw, sh2, x, y, tw, th);
+    if (o.label !== false) { const s = i + ' ' + (time - t0).toFixed(2) + 's'; g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(x, y, s.length * 6 + 4, 12); g.fillStyle = '#000'; g.fillText(s, x + 2, y + 1); }
+    if (probe) { const r = probe(lab); r.t = +(time - t0).toFixed(4); numbers.push(r); }
+  }
+  frozen = was; filming = false; last = performance.now();
+  return { sheet: sheet.toDataURL('image/jpeg', o.quality || 0.85), numbers, dt, hz: sub / dt, w: sheet.width, h: sheet.height };
+}
+// advance unseen (no drawing): n steps of dt, each(i, t, ctl, lab) before every step
+function run(seconds, dt = 1 / 60, each = null) { const f = each ? _fn(each) : null; const n = Math.round(seconds / dt), t0 = time; for (let i = 0; i < n; i++) { if (f) f(i, time - t0, ctl, lab); step(dt); } return time; }
+const lab = { info, stability, film, run, ctl, ex, sh, enu, enuV, at, focus0, east0, north0, up0, bodyId, body, get time() { return time; },
+  get yaw() { return yaw; }, set yaw(v) { yaw = v; },
+  physics, world, painter, renderer, scene, camera, root, THREE, get kits() { return kits; },
   setRain(mode) { if (RAIN[mode]) { rainMode = mode; bound = false; buildKits(); } return rainMode; },
   hideKits(h) { if (kits) for (const o of kits.objects) o.userData.hide = !!h; } };
+window.__lab = lab;
 // (a hidden kit object stays hidden whatever the kit says)
 const _vis = () => { if (kits) for (const o of kits.objects) if (o.userData.hide) o.visible = false; };
 scene.onBeforeRender = _vis;

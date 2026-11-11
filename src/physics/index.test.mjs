@@ -154,17 +154,22 @@ test('sampleSurface is called sparingly: a bounded number per frame, bursts only
 test('re-anchoring the near field is seamless: the wind at the focus does not jump', () => {
   const physics = createPhysics({ sampleSurface: stubSurface });
   const w = walker('earth', 40);
-  let prev = null, worst = 0, anchors = 0, lastVersion = -1, prevBend = null, worstBend = 0;
+  let prev = null, worst = 0, between = 0, anchors = 0, lastVersion = -1, prevBend = null, worstBend = 0;
   for (let i = 0; i < 1500; i++) {
     const p = w.step(1 / 60);
     physics.update(1 / 60, { bodyId: 'earth', time: 500 + i / 60, focus: p });
-    const v = physics.fields.frame.version; if (v !== lastVersion) { anchors++; lastVersion = v; }
+    const v = physics.fields.frame.version, hop = v !== lastVersion; if (hop) { anchors++; lastVersion = v; }
     const a = physics.here.air.wind;
-    if (prev && i > 200) worst = Math.max(worst, Math.hypot(a.x - prev.x, a.y - prev.y, a.z - prev.z));
+    // (P11) the frames in which the field re-anchored, against all the others
+    if (prev && i > 200) { const d = Math.hypot(a.x - prev.x, a.y - prev.y, a.z - prev.z); if (hop) worst = Math.max(worst, d); else between = Math.max(between, d); }
     prev = { ...a };
   }
   assert.ok(anchors >= 3, 'the frame re-anchored ' + anchors + ' times in 1000 m');
-  assert.ok(worst < 0.5, 'largest change of wind at the focus in one frame: ' + worst + ' m/s');
+  // (P11: reported apart: the frames in which the field re-anchors, and all the others. The seam is there and is not
+  // new: 0.42 m/s at a re-anchoring against 0.06 between before P11, 0.40 against 0.20 now that the wind at a point
+  // carries eddies of 10 m, through which this walker moves at 40 m/s. Not fixed in P11; the limit is unchanged.)
+  console.log(`# wind at the focus, largest change in one frame: ${worst.toFixed(2)} m/s when re-anchoring, ${between.toFixed(2)} m/s between`);
+  assert.ok(worst < 0.5 && between < 0.5, 'largest change of wind at the focus in one frame: ' + worst + ' m/s when re-anchoring, ' + between + ' between');
 });
 
 test('deep space, NaN focus, missing frame: the near field sleeps and nothing throws', () => {

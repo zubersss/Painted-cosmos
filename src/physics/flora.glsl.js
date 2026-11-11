@@ -5,9 +5,10 @@
 //
 // The constants below are interpolated from flora.js, so the shader and the CPU model cannot
 // drift apart. physics-lab.html?scene=flora draws both on top of each other as a check.
-import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, BRANCH_T } from './flora.js';
+import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, BRANCH_T, FLUT_D, FLUT_PH } from './flora.js';
 
 const f = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
+const fd = (i) => `vec2(${f(FLUT_D[i][0])}, ${f(FLUT_D[i][1])})`;
 const rot = (i) => `vec2(d.x * ${f(Math.cos(WAVE_ROT[i]))} - d.y * ${f(Math.sin(WAVE_ROT[i]))}, d.x * ${f(Math.sin(WAVE_ROT[i]))} + d.y * ${f(Math.cos(WAVE_ROT[i]))})`;
 
 export const FLORA_GLSL = /* glsl */`
@@ -26,8 +27,8 @@ vec2 pcPhysGrid(vec3 p) { vec3 d = p - uPhysAnchor; return vec2(dot(d, uPhysEast
 #endif
 uniform vec4 uPhysWindMap;     // xy: centre of the bend/wind field (m along east/north), z: 1/size, w: texels per side
 uniform vec4 uPhysNearMap;     // the same for the push field
-uniform vec4 uPhysWave;        // xy: wave direction, z: wavenumber (rad/m), w: amplitude
-uniform vec4 uPhysWavePhase;   // xyz: phases of the three wave trains
+uniform vec4 uPhysWave;        // xy: wave direction; z, w: phases of flutter trains 0 and 1 (P11)
+uniform vec4 uPhysWavePhase;   // xyz: phases of the three wave trains; w: phase of flutter train 2 (P11)
 uniform vec4 uPhysShape;       // soft flex, soft max angle, stiff flex, stiff max angle
 uniform vec4 uPhysBranchPhase; // phases (rad) of the four branch oscillators
 uniform vec4 uPhysBranch;      // x: gustiness 0..1, y: gain, z: swing of a shaken crown (rad), w: branch length / plant height
@@ -55,12 +56,25 @@ vec4 pcPhysBend(vec3 root, float stiff01) {
   vec2 uv = (g - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
   vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w);
   vec2 L = mix(b.xy, b.zw, stiff01);
-  float gust = pcPhysTex(uPhysWind, uv, uPhysWindMap.w).z;
+  vec4 wt = pcPhysTex(uPhysWind, uv, uPhysWindMap.w);
+  float gust = wt.z;
   vec2 d = uPhysWave.xy;
-  float ws = ${f(WAVE_A[0])} * sin(uPhysWave.z * ${f(WAVE_K[0])} * dot(${rot(0)}, g) - uPhysWavePhase.x)
-           + ${f(WAVE_A[1])} * sin(uPhysWave.z * ${f(WAVE_K[1])} * dot(${rot(1)}, g) - uPhysWavePhase.y)
-           + ${f(WAVE_A[2])} * sin(uPhysWave.z * ${f(WAVE_K[2])} * dot(${rot(2)}, g) - uPhysWavePhase.z);
-  L *= 1.0 + uPhysWave.w * (1.0 - stiff01) * (0.35 + 0.65 * gust) * ws;
+  float ws = ${f(WAVE_A[0])} * sin(${f(FLORA.waveK * WAVE_K[0])} * dot(${rot(0)}, g) - uPhysWavePhase.x)
+           + ${f(WAVE_A[1])} * sin(${f(FLORA.waveK * WAVE_K[1])} * dot(${rot(1)}, g) - uPhysWavePhase.y)
+           + ${f(WAVE_A[2])} * sin(${f(FLORA.waveK * WAVE_K[2])} * dot(${rot(2)}, g) - uPhysWavePhase.z);
+  L *= 1.0 + ${f(FLORA.waveAmp)} * (1.0 - stiff01) * (0.35 + 0.65 * gust) * ws;
+  // (P11) flutter: three frozen eddy trains smaller than the field can carry (flutterAt in flora.js is the twin)
+  if (stiff01 < 1.0) {
+    float fm = min(${f(FLORA.flutterMax)}, ${f(FLORA.flutterGain)} * wt.w / (length(wt.xy) + 0.25)) * (1.0 - stiff01);
+    vec2 ub = wt.xy * ${f(FLORA.flutterBlade)};
+    vec3 fk = vec3(${FLORA.flutterK.map(f).join(', ')});
+    vec3 fr = fk * vec3(dot(${fd(0)}, ub), dot(${fd(1)}, ub), dot(${fd(2)}, ub)) * ${f(1 / (2 * Math.PI * FLORA.softHz))};
+    vec3 fr2 = fr * fr;
+    vec3 fh = vec3(${FLORA.flutterA.map(f).join(', ')}) * inversesqrt((1.0 - fr2) * (1.0 - fr2) + ${f(4 * FLORA.flutterDamp * FLORA.flutterDamp)} * fr2);
+    vec3 fp = fk * vec3(dot(${fd(0)}, g), dot(${fd(1)}, g), dot(${fd(2)}, g)) - vec3(uPhysWave.z, uPhysWave.w, uPhysWavePhase.w);
+    float fa = fm * dot(fh, sin(fp)), fc = fm * ${f(FLORA.flutterCross)} * dot(fh, sin(fp + vec3(${FLUT_PH.map(f).join(', ')})));
+    L = L * max(0.15, 1.0 + fa) + vec2(-L.y, L.x) * fc;      // (a lull between eddies, never a wind from behind)
+  }
   vec2 nuv = (g - uPhysNearMap.xy) * uPhysNearMap.z + 0.5;
   float flatten = 0.0, shake = 0.0;
   if (nuv.x > 0.0 && nuv.y > 0.0 && nuv.x < 1.0 && nuv.y < 1.0) {
