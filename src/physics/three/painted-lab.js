@@ -17,6 +17,8 @@
 //   water=1 (my wave patch over PAINTER's liquid)   expand=gpu (instanced particles)
 //   hud=1   freeze=1 (stop the clock once ready: for frame pairs)
 //   pre=<s> (simulate this long, unseen, before the page says it is ready)
+//   push=0 (the explorer and the ship disturb nothing: with freeze=1 and the same pre, the frame
+//   differs from the pushed one only by what the push field does)
 // window.__lab: { info(), stability(dtMs, pairs), plantCheck(), setRain(mode), physics, kits, world, painter }
 import * as THREE from 'three';
 import { createPainter, RENDERER_OPTIONS, makeWashMaterial, makePaintUniforms, bindBodyUniforms, VERT_PARS, VERT_END, FRAG_PARS } from '../../render/index.js';
@@ -278,7 +280,7 @@ function resize() {
   const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
   if (canvas.width !== w || canvas.height !== h) { renderer.setSize(w, h, false); painter.resize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 }
-const dist2 = [];
+const dist2 = [], pushOn = Q.get('push') !== '0';
 let last = performance.now(), frames = 0, settled = false, frozen = false, bound = false;
 const cost = { phys: 0, kits: 0, world: 0 };
 world.setBuildBudget(60);
@@ -286,8 +288,9 @@ physics.warmUp({ bodyId, time, focus: ex.p });
 function step(dt) {
   time += dt;
   driveExplorer(dt); driveShip(dt);
-  dist2.length = 0; physics.explorer.disturbers(ex, dist2);
-  if (shipMode) physics.ship.disturbers(sh, dist2);
+  // push=0: the bodies are there but press on nothing (for A/B frames: what the push field does to the picture)
+  dist2.length = 0; if (pushOn) physics.explorer.disturbers(ex, dist2);
+  if (shipMode && pushOn) physics.ship.disturbers(sh, dist2);
   const bu = world.bodyUniforms(bodyId);
   physics.update(dt, { bodyId, time, focus: ex.p, sunDir: bu ? bu.uSunDirL.value : null, disturbers: dist2 });
 }
