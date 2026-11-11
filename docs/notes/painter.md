@@ -6,65 +6,191 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
-Written by the seventh PAINTER agent at the end of M3 block 5 ("the push on the other worlds",
-the owner's instruction: no triangle budget, the best picture). My commits: `cf2058a` (a shader
-that had not compiled since block 4), `84a6d93` (the push, part 1), `59e3731` (the weather ruling),
-`3af362b` (veils lifted, frames) and the notes commit. Block 4 and the earlier records follow.
+Written by the eighth PAINTER agent at the end of M3 block 6 (the last art block before the
+lead's review 6). My commits: `5edf80c` (the worlds' ideas, the motion fixes, orbit, the timed
+test) and the one after it (flowers, splash rings, rain, veils, orbit frames, these notes).
+Block 5 and the earlier records follow; "Rules that bit me" of the earlier agents still hold.
 
-- **Where things stand**: all ten bodies have been opened at their spawn at the top tier. The
-  seven that nobody had opened (Venus, Mercury, Jupiter, Saturn, Uranus, Neptune, Pluto) are
-  pushed once: one round of code, one round of corrections, frames in
-  `docs/shots/painter/push-<world>.jpg` (before left, after right). They are better paintings
-  than they were and none of them is yet at the standard of the Earth forest vista. The
-  weather ruling of the coordinator (dust veils, leaves, sand skim, Neptune's far sea) is in
-  code; see "M3 block 5" for what was seen in a frame and what was not.
+- **Where things stand**: Venus, Saturn and Jupiter now say which world they are in the first
+  view (frames `docs/shots/painter/idea-<world>.jpg`, before | after, all opened at full size).
+  The lead's motion faults 1 (pop-in), 2 (flower disc), 3 (splash rings), 4 (crowns hiding the
+  figure) and 5 (crouch) are in code; **none of them has been seen in motion** (no filmstrip
+  was run: one frame costs minutes here). The ten bodies were opened from orbit before and
+  after (`orbit-before.jpg`, `orbit-after.jpg`). The brush (item 4) and the short list (item
+  5) were not started. See "M3 block 6" for every verdict and what is weak.
 - **Where the new things are** (all in my files):
-  `src/world/surface.js` `_generic`: `t.patch` (looks.js: a list of `{ c, wl, thr, soft, amt }`),
-  second and third washes laid in patches over a generic biome's ground. `getSpawn` opens a
-  clearing (r 15) round a non-forest spawn whose biome has tall growth.
-  `src/world/nearground.js`: `crust` (flat touches lying on the ground, kind LYING, in all
-  three rings; colours `under.crust`; gathered by the field `crusty`), `stony` and `needly`
-  (stones and splinters stand in drifts and companies with bare ground between), `gm` (how far
-  a blade's wash is pulled to the ground's), `flowerSize` and `under.stalk` (fungi are flowers
-  with broad heads), a tuft's flicks lean one way (the "V" pairs), `RINGS` fine to 23 m and mid
-  from 6 m (the change of hand at 17 m).
-  `src/world/floraplace.js`: a tall spec with `vary: 1` is a stand of all ages (scale 0.30 to
-  1.45: the young ones are the middle storey). `src/world/florakit.js`: `blob` takes `rough`
-  and `ledge`; spires are cut at detail 3 with ledges, a buttress and fallen blocks, boulders
-  at detail 2. `src/data/looks.js`: every one of the seven worlds has `patch`, `near`,
-  `under.crust` (and `flowers`, `litter` where things grow); Pluto has a tall kit (penitent
-  spires). `src/render/kitmat.js`: `SHAPES.veil` (PHYSICS' dust veils by `vPcData.y/z/w`,
-  used when `info.veil`), `SHAPES.leaf` (leaves are a glaze now), a heavier `sandStreak`.
-  `src/render/materials.js` water: the far sea's gate opens nearer and the fog on it is cut by
-  up to 0.45 where the far-sea strokes are laid. `src/world/orbit.js`: the cloud shell's storm
-  uniform is `uSpot` (it collided with the body's `uStorm`).
-- **How to work here**: as before: render from a clean export, two renders at a time, kill
-  only your own processes by PID. Scratch tools in `/home/user/.pc-scratch/painter/m7/` (may
-  be gone): `mkexp.sh <name>` (export of HEAD plus my working files), `q.sh <export> <prefix>
-  body...` (the spawn of each body at the top tier, 960x540, with a draw breakdown; one frame
-  took 2.5 to 5 minutes under a load of 13 to 17), `g.mjs`, `pair.py`, `join.py`, `crop.py`,
-  `where.mjs` (each body's spawn biome), `kc.mjs` (forces every PHYSICS kit object to draw one
-  quad and reports shader errors: but kits are made lazily, so dust is only compiled in a dust
-  storm). `node tests/weather.mjs --root <export> --only mars-dust,neptune-gale --out <dir>
-  --sheets <dir>` is the lead's weather set; it needs 7 minutes to be ready and then many
-  minutes a shot here (game clock at software speed).
-- **Rules that bit me**: (1) a shader uniform name is global to a material: the body's
-  uniforms are spread into every painted material, so a new body uniform must not share a name
-  with any material's own (block 4's `uStorm` broke `pc-cloudshell` for a whole block and no
-  test saw it: a shader compiles only when its object is first drawn; look at the console of a
-  frame from Mercury or from orbit, not only of the Earth spawn). (2) Bright marks sown evenly
-  are confetti whatever they are meant to be: gather them with a field and leave bare ground.
-  (3) A mark pulled 60 % to its ground's wash is invisible on ochre: `gm`. (4) The debug spawn
-  of a world is the first site's biome, not its signature (Venus spawns on the lava plain, not
-  in the fungal forest; Mercury in the obsidian field; Pluto on the lilac mountains).
-  (5) to (13): the earlier agents' rules below still hold.
-- **Next**: (1) open each pushed world once more and correct it (list of weak points per
-  world in "M3 block 5"); open each world's signature biome that is not its spawn (Venus'
-  fungal towers above all: it has the new looks and nobody has seen them). (2) The weather
-  frames not seen. (3) The brush at full resolution (not touched in two blocks). (4) The
-  lead's SHOULD FIX list, unchanged: the two vistas in a thicket (the new clearing does not
-  apply to vistas), Mercury and Neptune from orbit, Mars' dune crests, branch sway and drifts,
-  the explorer's face; the look review of PILOT's interface frames.
+  `src/data/looks.js`: `spawn: [x, y, z, yaw, pitch, clearing r, berth bearing]` (a first
+  landing chosen by eye; degrees; the berth is the compass bearing, 16 m off, of the level
+  spot where PILOT's `spawnOn` will find the flattest ground for the ship: it is one of
+  PILOT's ten directions, 55.6 - 36 i degrees); `skyBelts: [belts, wander, strength]`,
+  `seaDeck: [top m, strength, heads]`, `limb` (how far the limb thins into haze from space;
+  default by the depth of the air); on a riverbed `t.flow`, `t.lqD`, `t.ember`, `t.emberR`.
+  `src/world/surface.js`: `getSpawn` takes `look.spawn` while it is dry and nearly level
+  (else the old search), pushes a levelled place (`pads`, applied in `sample`) and a
+  clearing; riverbed: swelling bed, ember and char washes, negative `aux` = cracks of fire
+  (drawn in `materials.js` where `vPar.w < 0`); island patches only on the tops.
+  `src/world/sky.js`: three blocks before the clouds: the ring arc (plane y = 0 of the body,
+  `uRingS`, `uRingC`, profile shared with `orbit.js` `RING_PROFILE`), the belts (`uBelt`),
+  the far cloud sea and its cumulus heads (`uSeaC`). `src/world/index.js` sets them per
+  body, hides the ring's geometry below space01 0.55, carries the limb strength in
+  `uFog.w`, returns yaw and pitch from `getSpawn`. `src/world/orbit.js`: ring profile and
+  the planet's shadow on the ring, `uLimbCos` (cloud not drawn past the limb).
+  `src/world/flora.js`: the wash clock (`washNow`, real time in steps of 0.02 to 0.1 s),
+  `aBorn` per instance (when it came into its mesh; negative: when it left), a second fill
+  of the chunk when the wash has dried (`washUntil`), `busy` counts a wash in progress,
+  `_focus` (the explorer's figure in view space: `G.figure` is set by `models.js`).
+  `src/render/materials.js` (flora shader): `vWash` and the two interlocking discards,
+  `uFocus` window; lava; the near flower's lobed edge. `src/render/kitmat.js`: the splash
+  ring is a glaze; rain 0.64 to 0.78; veil gain 1.5 to 2.6.
+- **How to work here**: render from a clean export, two renders at a time, kill only your own
+  processes by PID. Scratch tools in `/home/user/.pc-scratch/painter/m8/` (may be gone):
+  `mkexp.sh <name>` (export of HEAD plus my working files), `v.mjs <export> <prefix> <body>
+  spawn | "x,y,z,yaw,pitch,hour" ...` (the game at the top tier in third person at the true
+  spawn or at places; prints PROBLEMS if the console had any), `orb.sh <export> <prefix>
+  body...` (each body from orbit through the gallery), `lib.mjs` with `sv.mjs` (lava banks),
+  `si2.mjs` (island rims: what the easel sees over the rim), `near.mjs`, `lv.mjs`.
+  A frame took 3 to 6 minutes; the game was ready after 90 to 310 s.
+- **Rules that bit me**: (1) these planets are tiny (R 3.6 to 5 km): from the top of a
+  100 m island the cloud sea's horizon lies 12 degrees below eye level and the island's own
+  rim hides everything below 6: **the sea cannot be seen from a level landing**, whatever
+  the spot. That is why the far sea and its heads are painted into the sky. (2) Saturn's
+  rings stand 49 to 69 degrees up at latitude 12 and 14 to 40 at latitude 30: the arc is in
+  a third-person frame only between about 28 and 42 degrees of latitude, facing the equator.
+  (3) A `python` edit that slices a function by two anchors removes what lies between: I cut
+  the tangent frame out of `getSpawn` that way; the tests caught it. (4) The coordinator's
+  WIP snapshot commits sweep working files: commit under your own message as soon as the
+  tests pass. (5) to (13): the earlier agents' rules below still hold.
+- **Next**: (1) see the motion fixes in the lead's `tests/motion.mjs` (fill, walk, low
+  flight, jetpack among trees) and correct them: the wash-in pattern may be too coarse or
+  too fine, the window round the figure too wide. (2) The build order after a landing (far
+  and tall first) and the ground arriving in pieces: not touched. (3) Item 3's frames:
+  leaves, sand skim and blown snow blowing; Neptune's far sea; PHYSICS' pale rectangle in
+  Neptune's sky (yaw 236 from the `storm_seas` stand, 34 to 42 s): not looked for. (4) The
+  brush at full resolution. (5) The short list (two vistas in a thicket, Mars' dune crests,
+  branch sway and drifts, the explorer's face, the UI look review).
+
+## M3 block 6: each world's idea in its first view, motion faults, orbit (eighth PAINTER agent)
+
+INTEGRATION: see the last lines of this section for what was run on a clean export.
+Every frame named here was rendered from a clean export of the head with my working files laid
+over it, at the top tier, 960x540 unless said, in the game in third person. "Opened" means with
+my own eyes; I say for each how.
+
+### 1. The worlds' ideas (the coordinator's brief: Venus, Saturn, Jupiter)
+
+| world | what the brief promises | frame (before, after) | what is in the first view now | blunt verdict |
+|---|---|---|---|---|
+| Venus | lava rivers through basalt, fungal tower forests in amber cloud | `idea-venus.jpg` (both halves opened at full size; the after is the stored render of the true spawn) | a grove of the old fungal towers left (pale ringed stalks, amber caps), a basalt spire, the lava river behind the ship running into the haze, towers ghosting in the sulphur haze right, dark basalt underfoot warmed toward the bank | It says Venus in one look, which it did not. Weak: the lava is a band, not a river filling the middle distance (the ship stands in front of part of it); the foreground is one brown mass with a bland pale boulder; the cracks of fire in the cooled levee cannot be told apart from the ember wash at this size |
+| Saturn | ring arcs across the sky, pale gold islands, honey mist | `idea-saturn.jpg` (both opened at full size; the after is the stored render, sky colour of the commit; the last small change to the inner ring's glaze was not rendered again) | the rings as a great pale arc from the left horizon to the upper right, white cloud in front of it, gold meadow with teal crystal reeds, gold trees, the ship left, a far island and white cloud heads on the horizon | From the palest and emptiest to a place with its sign in the sky. Weak: the wash under the arc is a brownish band (the dusky inner ring over a violet sky: muddy); the arc is soft, its division a faint line; no sea of cloud below (it cannot be seen from a level landing, see the handover) |
+| Jupiter | sky-islands in banded cream and orange cloud seas | `idea-jupiter.jpg` (both opened at full size; the after is the stored render) | the belts of the sky, cream and orange, running down to a vanishing point between islands that stand on three sides with strata cliffs; a bank of white cloud in the gap; the ship right; poppies | The sky alone now says Jupiter. Weak: the islands read as the walls of a valley, not as tables standing in cloud (the cliffs' feet meet the meadow's edge: no sea below them in view); the cliffs are olive grey (the biome's middle pigment is sap green); the belts are flat slabs with little inner life |
+
+How: (a) a first landing chosen by eye is data (`looks.js` `spawn`), found with scratch searches
+(`sv.mjs`: a dry level bank with lava running away along the view; `si2.mjs`: an island spot
+whose easel sees other islands over its rim), then looked at. The ground within 14 m is drawn
+to the spot's height and eased back by 23.8 m (`pads`), with a second level spot 16 m off where
+PILOT's ship search looks, so the ship stands 28 to 32 degrees to the side of the view.
+(b) Venus: the lava bed swells and narrows (`flow`), stands brim-full (`lqD` 1.5), is scarlet
+by the banks and paper-yellow only where deep, keeps its fire through the haze (fog on lava
+cut by 0.6); banks get an ember wash to 26 m and a charred levee; a fourth tall kit (full-grown
+towers, scale 1.45, obstacle radius 1.0 m, height 20 m) lines the lava with the spires.
+(c) Saturn: sky zenith [0.76, 0.70, 0.78] (was [0.90, 0.84, 0.60]); the arc is cut per view
+ray in the sky's wash, under the clouds, with the ring's own profile (thin inner ring, broad
+pale ring, division, outer ring with a hair-line gap) and the planet's shadow across its far
+side; it hands over to the ring's geometry between space01 0.55 and 0.9. (d) Jupiter:
+`skyBelts` [20, 0.016, 0.85]: the cloud shell's parallels seen from inside; `seaDeck`: beyond
+the island's rim a deck of cloud at 106 m (Saturn 84 m) out to its own horizon with heads of
+cumulus standing 1 to 6 degrees above it; from a bench below the deck the heads stand as a
+bank between the islands.
+
+**Spawns moved** (PILOT's landing and tour tests stand there): Venus from the first site's
+plain to the lava bank at [0.441599, 0.870687, 0.216551] (same biome, lava 18 to 34 m off to
+the north and east, towers and spires beyond the 15 m clearing); Saturn from latitude 12 to
+latitude -31 on another gold island at [-0.847849, -0.520723, 0.099999]; Jupiter stays on the
+first island, on a bench at [0.124426, 0.328288, 0.936347] (61 m above the cloud, 290 m from
+the nearest other island). All three pass "every planet has a level, dry arrival place with
+room for the ship". `world.getSpawn` now returns `yaw` and `pitch` for them (additive; PILOT's
+`spawnOn` already reads them).
+
+Numbers (the game at the spawn, 960x540, this machine): Venus 769 k triangles, 303 draw
+calls; Saturn 781 k, 279; Jupiter 594 k, 302; Earth 1.44 M, 465. No console error in any.
+
+### 2. The lead's motion faults (relayed during the block; none seen in motion)
+
+1. **Things appear in one frame**: every tree carries the time it came into its mesh; for
+   0.55 s its strokes are kept only where a noise fixed in the tree is below the wash's
+   progress, so it fills in as broken strokes. A tree that changes tier stays in its old
+   mesh for the same 0.55 s with the complementary rule, so the two interlock and the sum is
+   one tree. A cell of undergrowth washes in as a whole when it is built. `world.busy` stays
+   above 0 while a wash is being laid (a frame taken at busy 0 shows nothing half arrived).
+   **Not done**: the build order (far and tall first after a landing), the ground arriving
+   in pieces, the near ground's strokes growing in. **Not seen**: any of it moving; the Earth
+   spawn's still (`h-earth-1.jpg` in scratch, opened at full size) shows whole trees.
+2. Near flowers: the round touch has a lobed outline (three sines of the angle, seeded per
+   touch) and dry flecks toward the edge. Not seen close to the lens.
+3. Splash rings: a glaze of paper colour at up to 0.58, soft across the ring, broken by a
+   noise fixed in the ring; no longer an opaque white region-6 mark. Not seen.
+4. Crowns hiding the figure: **the fade** (not obstacles). Strokes of trees and undergrowth
+   nearer than the figure part within 0.8 to 2.0 m of the line of sight to it (ragged, by a
+   noise fixed in the plant). The figure is found by itself (`models.js` registers it), so
+   PILOT changes nothing; it is off while the figure is hidden. Not seen.
+5. The explorer reads `hip`: the knees fold by acos(1 - hip/0.86), the back leans in, the
+   arms spread a little; eased at 22/s. **Not done**: knees bending before a jump (there is
+   no signal before take-off; if PHYSICS sends `hip` then, it shows by itself). `clamber01`
+   and `grounded` are not read. Not seen.
+
+### 3. The worlds from orbit
+
+`orbit-before.jpg` (all ten, 480x360 each on one sheet, opened on the sheet) and
+`orbit-after.jpg` (Mercury, Earth, Saturn, Neptune, Mars after the changes, opened on the
+sheet). Found: Mercury a grey ball with a pale rim (glass); Earth's scattered cloud stood out
+past the limb as a ragged hard fringe; Saturn's broad ring was paper white; Neptune had a
+bright rim. Changed: the limb thins into haze in proportion to the depth of the air (Mercury
+0.26, Moon 0, Pluto 0.17, Neptune 0.3 by its look); scattered cloud thins toward the limb and
+is not drawn beyond it; the ring is gold with its division and lies in the planet's shadow on
+the far side. After: Earth has one outline, Neptune is a banded blue ball without the rim,
+Saturn reads as Saturn. **Still weak**: Mercury is still grey and dull (its grounds average to
+grey from afar; it wants ochre and obsidian in broad shapes); no body shows a dark side in
+these views (the gallery's orbit camera has the sun behind it); the discs have a crisp edge.
+The eight stale `<world>-orbit.jpg` frames are removed.
+
+### 4. Weather leftovers and PHYSICS' findings
+
+Changed without a frame: dust veil gain 1.5 to 2.6 (cap 0.86); rain stroke 0.64 to 0.78.
+Seen: `wx-mars-dust.jpg` (the lead's `tests/weather.mjs --only mars-dust` on a clean export, 960x540,
+opened at two thirds size beside another frame; it replaces the stale frame of that name): dust 0.87,
+the veils are pale level drags across the dunes of the middle distance and the horizon is lost in
+them, no blots; **the explorer is still not half veiled** (no veil stands between the lens and the
+figure in that frame). I did not open the stored frame of the same moment before the change, so
+"more than before" rests on the gain alone. A gallery frame of the thunderstorm at the stream
+(scratch, 640x360, opened) compiled the rain and the ring glaze with no console error; the rain
+in it is still faint and no ring could be told at that size.
+Not done: leaves, sand skim and blown snow were not seen blowing; Neptune's far sea, the pale
+rectangle in its sky, the sea's heave and the frozen foam rim were not looked at; the track
+through grass round a walker (denser, shorter strokes at the feet) was not started.
+
+### 5. Small and required
+
+"sampleSurface stays cheap on every body" takes the best of ten batches of 1500 calls, reports
+the number for every body as a test diagnostic on every run, and asserts the 50 us limit only
+when `PC_TIMING=1`. Alone here: 8 to 26 us.
+
+### Not started
+
+The brush at full resolution (item 4); the short list (item 5).
+
+INTEGRATION: ready. On a clean export of the head with these files: `node --test
+src/world/*.test.mjs` 19 pass, `node --test tests/*.test.mjs` 116 pass; the game loads and
+stands at the Earth spawn, on foot, with no console error (640x360, the top tier, opened), and at
+the Venus, Saturn and Jupiter spawns likewise (960x540).
+
+Needs from PILOT: (1) run the landing, tour and motion sets once on the three moved spawns
+(Venus, Saturn, Jupiter); the ship's berth is 16 m off on one of `spawnOn`'s ten bearings: if
+those constants change, the ship simply stands elsewhere on the level place. (2) If `settle`
+or the title's readiness must not wait for a wash-in, say so: `world.busy` now stays above 0
+for about 0.65 s of the wash clock after the last tree or cell arrived. (3) `G.figure` is the
+explorer made by `createExplorer`: if a second explorer is ever made, the last one made is the
+one foliage parts for.
+Needs from PHYSICS: a `hip` dip before take-off if the knees are to bend before a jump.
 
 ## M3 block 5: the push on the other worlds, the weather ruling (seventh PAINTER agent)
 

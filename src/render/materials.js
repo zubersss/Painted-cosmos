@@ -1192,8 +1192,13 @@ void main() {
   vec4 n2 = texture(uNoise3D, vBody * vec3(7.0, 2.0, 7.0) + vS.z * 3.0);
   if (vKind > 4.5) {
     // a round touch: the brush pressed down once, its edge a little ragged
+    // (seen close it must not be a disc: the outline is lobed by the hairs of the brush, each touch its own way,
+    // and toward the edge the brush has run dry and the paper shows in flecks)
     vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
-    if (dot(q, q) > 0.78 + 0.44 * n2.g) discard;
+    float qa = atan(q.y, q.x), qs = vS.z * 6.283, qr = dot(q, q);
+    float lim = 0.64 + 0.17 * sin(qa * 3.0 + qs) + 0.11 * sin(qa * 5.0 - qs * 1.7) + 0.08 * sin(qa * 8.0 + qs * 2.3) + 0.24 * n2.g;
+    if (qr > lim) discard;
+    if (qr > lim * 0.40 && texture(uNoise3D, vec3(q * 2.1, vS.z * 7.0)).r > 0.86 - 0.34 * (qr / lim)) discard;
   } else {
     if (vKind > 3.5) {
       // a fan brush: a handful of blades of unequal height from one foot, lower at the sides

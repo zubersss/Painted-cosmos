@@ -49,7 +49,7 @@ const SHAPES = {
   // rain: a broad stroke, full at the head and thinning to its tail, laid wet
   // (nothing right in front of the lens: a drop a metre away would be a stick across the sheet)
   // (a glaze: see GLAZE below; `ga` is how much of the stroke's wash is laid over what is behind it)
-  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 3.2) discard; vec3 c = ink * (0.93 + 0.07 * vPcData.x); float w = 0.95; float ga = smoothstep(1.0, 0.45, tpr) * (1.0 - 0.7 * vPcUv.y * vPcUv.y) * smoothstep(0.0, 0.1, vPcUv.y) * 0.64;',
+  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 3.2) discard; vec3 c = ink * (0.93 + 0.07 * vPcData.x); float w = 0.95; float ga = smoothstep(1.0, 0.45, tpr) * (1.0 - 0.7 * vPcUv.y * vPcUv.y) * smoothstep(0.0, 0.1, vPcUv.y) * 0.78;',
   streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
@@ -68,7 +68,7 @@ const SHAPES = {
     + ' float ends = 1.0 - smoothstep(1.0 - max(soft, 0.8), 1.0, abs(p.x)); float up = (p.y + 1.0) * 0.5 / (0.3 + 0.7 * (1.0 - p.x * p.x));'
     + ' float prof = smoothstep(0.0, 0.12 + 0.2 * soft, up) * exp(-2.6 * up) * (1.0 - smoothstep(0.75, 1.0, up));'
     + ' float nz = 0.6 * texture(uNoise3D, vec3(vPcUv.x * 1.1 + vPcData.x * 3.7, vPcUv.y * 2.6, vPcData.x * 5.0)).r + 0.4 * texture(uNoise3D, vec3(vPcUv.x * 3.1, vPcUv.y * 8.0, vPcData.x * 9.0)).g;'
-    + ' float ga = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.7, ends * prof * 1.7, strm) * (0.42 + 0.58 * smoothstep(0.22, 0.72, nz)) * clamp(vPcData.y * 1.5, 0.0, 1.0); ga = min(ga, 0.9);'
+    + ' float ga = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.85, ends * prof * 2.0, strm) * (0.50 + 0.50 * smoothstep(0.22, 0.72, nz)) * clamp(vPcData.y * 2.6, 0.0, 1.0); ga = min(ga, 0.86);'
     // (seen in the game: a veil in the dust's own middle tone is lost against the hazy dune behind it. A veil
     // is the paper coming through: it is lifted toward the paper AFTER the air has been laid over it, so that
     // veils stand pale at every depth; less so after dark)
@@ -81,7 +81,8 @@ const SHAPES = {
   leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; float ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; vec3 c = pcDensity(ink, 0.9 + 0.5 * vPcData.x); float w = 0.4;',
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
-  ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.12) discard; if (texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r < 0.36) discard; vec3 c = ink; float w = 0.0;',
+  // (a glaze: a soft pale arc of paper colour, broken where the brush lifted, never a white wire)
+  ring: 'float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.05, 0.50, cov) * smoothstep(0.30, 0.54, brk) * 0.58; if (ga < 0.02) discard; vec3 c = vec3(0.985, 0.975, 0.945); float w = 0.0;',
   // a print: this ground, darker; a paler rim on loose ground; fading thins it through the
   // noise (fixed in the mark, so it never boils)
   mark: 'float scour = step(3.5, vPcData.z); float cover = pcPhysMarkCover(vPcUv, vPcData.z) * (1.0 - scour), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * clamp(vPcData.x * 12.0, 0.15, 0.9), rim * mix(0.6, 0.22, scour)) * min(1.0, vPcData.w * 3.0); a = min(a, 0.62); if (a < texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.z * 0.37 + vPcData.x)).g) discard; vec3 c = mix(pcWetWash(ink, 1.0) * 0.66, mix(ink, vec3(1.0), 0.45), rim * (1.0 - cover)); float w = 0.2;',
@@ -109,6 +110,7 @@ function regionOf(kind, info) {
 // makeKitMaterial(kind, info, { bodyUniforms, shapeGlsl }): PHYSICS' reference factory with the
 // painter's shapes, inks and regions. `shapeGlsl` is PHYSICS' SHAPE_GLSL (ring and mark covers).
 export function makeKitMaterial(kind, info, opts) {
+  const glaze = !!GLAZE[kind] || kind === 'ring' || info.shape === 'ring';      // (a splash ring is a glaze too)
   const m = new THREE.ShaderMaterial({
     name: 'pc-kit-' + kind,
     uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, ...info.uniforms }),
@@ -135,12 +137,12 @@ void main() {
   ${shapeOf(kind, info)}
   c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
   ${info.veil && (kind === 'dust' || kind === 'ash' || kind === 'sand') ? 'c = mix(c, vec3(0.985, 0.975, 0.955), lift);' : ''}
-  ${GLAZE[kind] ? 'if (log2(1.0 + max(-vView.z, 0.0)) > texture(uSceneAux, gl_FragCoord.xy / uSceneRes).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
+  ${glaze ? 'if (log2(1.0 + max(-vView.z, 0.0)) > texture(uSceneAux, gl_FragCoord.xy / uSceneRes).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,
-    side: THREE.DoubleSide, transparent: !!GLAZE[kind], depthWrite: !GLAZE[kind], depthTest: !GLAZE[kind],
+    side: THREE.DoubleSide, transparent: glaze, depthWrite: !glaze, depthTest: !glaze,
     polygonOffset: info.shape === 'mark' || info.shape === 'ring', polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   m.userData.pcPainted = true;
-  m.userData.pcGlaze = !!GLAZE[kind];
+  m.userData.pcGlaze = glaze;
   return m;
 }
