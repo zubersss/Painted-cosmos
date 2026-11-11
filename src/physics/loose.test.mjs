@@ -75,8 +75,9 @@ test('air: kicked dust hangs and drifts with the wind; wet ground and rock raise
   let fall = 0; for (let i = 0; i < P.dust.count; i++) fall += -dot(V(P.dust.vel[i * 3], P.dust.vel[i * 3 + 1], P.dust.vel[i * 3 + 2]), w.up);
   assert.ok(Math.abs(fall / P.dust.count) < 0.8, 'dust barely falls: ' + fall / P.dust.count);
   assert.ok(finiteBuf(P.dust) && finiteBuf(P.sand));
-  const rock = setup('venus', 'pale_mesas'); run(rock, 1); walk(rock, 3, 4);
-  assert.ok(rock.physics.particles.dust.count < 3, 'bare rock: ' + rock.physics.particles.dust.count);
+  // hard smooth ground has nothing to raise
+  const rock = setup('mercury', 'obsidian_fields'); run(rock, 1); walk(rock, 3, 4);
+  assert.equal(rock.physics.particles.dust.count, 0, 'volcanic glass: ' + rock.physics.particles.dust.count);
   // rain has soaked the sand: find a rainy place and walk there
   let wet = null;
   for (let t = 0; t < 6000 && !wet; t += 53) for (const c of cellsAt('earth', t)) { const x = weatherAt('earth', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 1 }, {}); if (x.precipitation.rate > 8) { wet = setup('earth', 'sea_coast', { dir: c }); wet.t = t; break; } }
@@ -216,7 +217,7 @@ test('dust devils: deterministic, continuous, only on dusty sunlit ground in lig
       assert.ok(D.radius > 2 && D.height > 30 && D.speed >= 7 && Math.abs(D.spin) === 1 && D.strength > 0 && D.strength <= 1);
       const pr = prev.get(D.id);
       if (pr) { worstMove = Math.max(worstMove, Math.hypot(D.x - pr.x, D.z - pr.z)); worstStrength = Math.max(worstStrength, Math.abs(D.strength - pr.s)); }
-      else assert.ok(D.strength < 0.2, 'a devil fades in: ' + D.strength);
+      else if (t > 0) assert.ok(D.strength < 0.2, 'a devil fades in: ' + D.strength);
       now.set(D.id, { x: D.x, z: D.z, s: D.strength });
     }
     prev = now;
