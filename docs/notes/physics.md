@@ -418,8 +418,11 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
    compile plus a 24-sample burst), then re-anchors (every field dropped and re-sampled) and
    grid scrolling (a per-cell copy loop, up to 1.2 ms). Now: `physics.warmUp()` for loading;
    re-anchoring carries every field over; scrolling is row-wise native moves; surface sampling
-   is rationed by time as well as count. After `warmUp()` the worst frame in the first 5 s is
-   0.45 ms; `physics.stats.msMax` reports the worst frame of a session for you to police.
+   is rationed by time as well as count. After `warmUp()` the worst reproducible frame in the
+   first 5 s is 0.22 ms (Status says how that is measured, and which scheduler spikes it
+   leaves out). `physics.stats.msMax` reports the worst frame of a session for you to police;
+   `stats.msGround / msAir / msWeather / msFlora / msParticles` say where a slow frame went.
+   If you still see a frame over 2 ms after calling `warmUp()`, send me its `stats`.
 2. *Which of my numbers each of yours replaces.* The two tables above.
 3. *No lab page, no evidence.* `physics-lab.html` and 12 shots in `docs/shots/physics/` (`a811a43`).
 4. *Giants' winds in one named constant.* `physics.data.WINDS[body].scale` (with `.real`, the
