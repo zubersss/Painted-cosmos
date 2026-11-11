@@ -54,6 +54,12 @@ Anywhere
 | H | the help card (these controls) |
 | ` (backquote) | frame read-out: frame time, triangles, draw calls, render scale, quality tier |
 
+Gamepad (standard layout): left stick walks (in the ship: turn and throttle), right stick looks
+(points the nose), A is Space, B is C, X is E, Y is V, LB brakes, RB is the pulse drive, the
+triggers are the throttle in the ship (the right one runs on foot), Back opens the map, Start
+the help card, d-pad up the sketchbook (left and right turn its pages, down closes it).
+Not tried with a real pad: the mapping is tested with a simulated one.
+
 The game saves itself when you land, when you step out, and every 20 seconds on foot, and
 continues from there on the next visit. Add `?fresh=1` to the address to start again on Earth.
 

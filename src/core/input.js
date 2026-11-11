@@ -1,5 +1,7 @@
 // Keyboard and mouse. Pointer lock when the browser grants it; when it does not (an embedded
 // frame, a headless test), holding the left button and dragging looks around instead.
+// A gamepad, when one is connected, feeds the same axes, keys and look (src/core/gamepad.js).
+import { readPad } from './gamepad.js';
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyV', 'KeyC', 'KeyX', 'Space', 'ShiftLeft', 'ShiftRight',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'KeyF', 'KeyM', 'KeyB', 'KeyH', 'Backquote',
@@ -21,6 +23,9 @@ export class Input {
     this.looked = false;                  // has the player looked around yet (lock or drag)
     this._lx = 0; this._ly = 0;
     this._pm = null; this._odd = []; this._doc = doc;
+    this.inShip = false;                  // set by the game: the triggers are the throttle in the ship
+    this.pad = null;                      // the gamepad's last reading (null without one)
+    this._padButtons = null;
 
     doc.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;       // leave browser shortcuts alone
@@ -106,11 +111,43 @@ export class Input {
     if (this._odd.length >= 3) this.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
   }
 
-  down(code) { return this.keys.has(code); }
-  axis(neg, pos) { return (this.keys.has(pos) ? 1 : 0) - (this.keys.has(neg) ? 1 : 0); }
+  down(code) {
+    if (this.keys.has(code)) return true;
+    const p = this.pad;
+    return !!p && (p.held.includes(code) || (code === 'ShiftLeft' && p.run && !this.inShip));
+  }
 
-  // Everything that happened since the last frame, consumed once.
-  take() {
+  // -1..1: keys give the ends, the gamepad's sticks (and, in the ship, its triggers) the range between.
+  axis(neg, pos) {
+    let v = (this.keys.has(pos) ? 1 : 0) - (this.keys.has(neg) ? 1 : 0);
+    const p = this.pad;
+    if (p) {
+      if (neg === 'KeyA' && pos === 'KeyD') v += p.moveX;
+      else if (neg === 'KeyS' && pos === 'KeyW') v += p.moveY + (this.inShip ? p.throttle : 0);
+    }
+    return v > 1 ? 1 : v < -1 ? -1 : v;
+  }
+
+  // The first connected gamepad, read once a frame. Never throws (the API may be missing or blocked).
+  pollPad(dt) {
+    let pad = null;
+    try {
+      const list = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
+      if (list) for (const g of list) if (g && g.connected !== false && g.buttons && g.axes) { pad = g; break; }
+    } catch { pad = null; }
+    if (!pad) { this.pad = null; this._padButtons = null; return; }
+    const r = readPad(pad, this._padButtons, dt);
+    this._padButtons = r.buttons;
+    this.pad = r;
+    for (const code of r.edges) this.edges.add(code);
+    this.dx += r.lookX; this.dy += r.lookY;
+    if (r.active) this.used = true;
+    if (Math.abs(r.lookX) + Math.abs(r.lookY) > 0.5) this.looked = true;
+  }
+
+  // Everything that happened since the last frame, consumed once. dt: seconds since the last call.
+  take(dt = 1 / 60) {
+    this.pollPad(Math.min(0.1, dt));
     const out = { edges: this.edges, dx: this.dx, dy: this.dy, wheel: this.wheel };
     this.edges = new Set(); this.dx = 0; this.dy = 0; this.wheel = 0;
     return out;

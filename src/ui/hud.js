@@ -50,7 +50,7 @@ export function createHud(root) {
     ['E', 'board, land, step out'], ['V', 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], ['C', 'sink'], ['W S', 'throttle'], ['A D', 'turn'],
     ['mouse', 'point the nose'], ['X', 'brake'], ['F', 'pulse drive (in space)'], ['M', 'map'],
-    ['anywhere', ''], ['B', 'sketchbook'], ['H', 'this card'], ['`', 'frame read-out'],
+    ['anywhere', ''], ['B', 'sketchbook'], ['H', 'this card'], ['`', 'frame read-out'], ['pad', 'a gamepad works too'],
   ];
   for (const [k, t] of rows) {
     if (!t) { el('em', '', help, k, SIZE.small); continue; }

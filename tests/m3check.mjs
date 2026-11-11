@@ -67,6 +67,25 @@ try {
   await page.keyboard.press('KeyB');
   await gameWait(0.2);
   check(!(await info()).bookOpen, 'B closes it');
+  // A gamepad (simulated: the browser's API answered by a fake standard pad).
+  await page.evaluate(() => {
+    const b = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+    window.__pad = { connected: true, mapping: 'standard', axes: [0, -1, 0.6, 0], buttons: b() };
+    navigator.getGamepads = () => [window.__pad];
+  });
+  const before = await info();
+  await gameWait(1.6);
+  i = await info();
+  const walked = Math.hypot(i.explorer.p.x - before.explorer.p.x, i.explorer.p.y - before.explorer.p.y, i.explorer.p.z - before.explorer.p.z);
+  check(i.explorer.speed > 2.5 && walked > 3, `gamepad: the left stick walks (${i.explorer.speed.toFixed(1)} m/s, ${walked.toFixed(1)} m), the right stick looks`);
+  await page.evaluate(() => { window.__pad.axes = [0, 0, 0, 0]; window.__pad.buttons[12] = { pressed: true, value: 1 }; });
+  await gameWait(0.3);
+  check((await info()).bookOpen, 'gamepad: d-pad up opens the sketchbook');
+  await page.evaluate(() => { window.__pad.buttons[12] = { pressed: false, value: 0 }; window.__pad.buttons[13] = { pressed: true, value: 1 }; });
+  await gameWait(0.3);
+  check(!(await info()).bookOpen, 'gamepad: d-pad down closes it');
+  await page.evaluate(() => { navigator.getGamepads = () => []; });
+  await gameWait(0.3);
   await page.keyboard.press('KeyH');
   await gameWait(0.3);
   check(await page.evaluate(() => window.__pc.game.hud.startShown), 'H shows the help card');

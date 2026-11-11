@@ -57,7 +57,8 @@ export class Game {
 
   frame(realDt) {
     const sim = this.sim;
-    const raw = this.input.take();
+    this.input.inShip = isInShip(sim.sm.state);
+    const raw = this.input.take(realDt);
     // Keys that belong to the interface, not to the explorer or the ship.
     if (this.audio && this.input.used) this.audio.start();
     if (raw.edges.has('KeyM')) { if (this.book && this.book.open) this.book.hide(); this.toggleMap(); }
