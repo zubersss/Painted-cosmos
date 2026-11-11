@@ -1250,3 +1250,7 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   `pcPhysCrown` (not `pcPhysBranch`) in the tree vertex shader. Nothing moves in the game
   until then. Not done: leaves, the shore, the three strips, the sheltering check. The
   twelfth PHYSICS agent stopped near the end of its context; a thirteenth takes the rest.
+
+### 2026-11-11 OWNER'S INSTRUCTION: multi-agent workflows for the tough parts
+The owner: "Use ultra code on extra high on opus when your working on tough parts that need it." Read as: the coordinator may run multi-agent workflows (finders, adversarial verifiers, synthesis) on Opus at extra-high effort for the hard problems. The three roles stay the only workers that change the game; a workflow's agents are read-only instruments (clean export, scratch under /home/user/.pc-scratch/sweep, one browser at a time on this 4-CPU box), and what they confirm goes to the owning role as a fix list.
+First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader cannot show: GLSL portability on real drivers (ANGLE/D3D11, Mesa, Metal, Firefox), the integrated-GPU frame time at 1080p from the top tier and whether dynres and tier stepping catch it, first-run robustness (no WebGL2, context loss, storage blocked, long tab hide, keyboard layouts, README vs bindings). Each finding is attacked by a verifier before it reaches a role. Planned second use: the M4 critique swap.
