@@ -32,9 +32,12 @@ on my stubs and inside PAINTER's real painted world. I am also the LEAD DEVELOPE
   Evidence: `docs/shots/pilot/01-on-foot.jpg`, `02-jetpack.jpg`, `03-board-prompt.jpg`,
   `05-liftoff.jpg`, `06-climb.jpg`, `07-orbit.jpg`, `08-moon.jpg`, `10-land-prompt.jpg`,
   `12-stepped-out.jpg`.
-- The same script inside PAINTER's real world (`--query "scale=0.5&quality=0" --w 480 --h 270`,
-  clean export of `bb8ec30`, before the forest's flora was committed): PASSED, no console
-  errors. A run on the current HEAD with the forest is recorded below if it finished.
+- The same script inside PAINTER's real painted forest (`node tests/playthrough.mjs --query
+  "scale=0.5&quality=0" --w 400 --h 225 --root <clean export of 7c7a0ac>`, flora and obstacle
+  collision included): PASSED, all 37 checks, no console errors. Ground to space 21 s,
+  touchdown at 1.12 m/s. (An earlier pass on `bb8ec30`, before the flora, took 19.1 s.)
+  The low internal resolution is only there because software GL paints the forest at about
+  1 frame a second; the script waits in game time, so it is the same play either way.
 - Real-world frames from the integrated game at `19f72ce`: `docs/shots/pilot/real-01-on-foot.jpg`
   (the clearing, the explorer, the ship), `real-02-orbit.jpg`, `real-03-flight.jpg` (over the
   canopy with the landing prompt).

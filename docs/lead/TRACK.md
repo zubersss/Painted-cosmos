@@ -19,7 +19,7 @@ Last update: 2026-11-11, after review 1 (commit `19f72ce`).
 | Floating origin, orbits, spin, sun, depth | Pilot | DONE | Pilot: `tests/orbits.test.mjs`; screenshots from 0.08 m near plane to orbit |
 | Watercolour pipeline | Painter | PART: the sheet is convincing; the cost is not (REVIEW 1, Painter MUST FIX 1) | Lead: gallery captures, frame-cost probe |
 | Earth temperate forest passes the freeze-frame test | Painter | PART: birch and pine forest, brook and canopy are in; three MUST FIX open (triangle budget, stippled foliage, ruler-straight trunks and bank) | Lead: `docs/lead/evidence/painter-19f72ce-*.jpg` |
-| Merge both ways: the slice plays inside the painted forest | Pilot | DONE: Painter's render, world and art are the default since `15e77f9`; the scripted loop passes inside the real world | Lead: `node tests/playthrough.mjs --query "scale=0.5&quality=0"` on a clean export; `docs/shots/pilot/real-0*.jpg` |
+| Merge both ways: the slice plays inside the painted forest | Pilot | DONE: Painter's render, world and art are the default since `15e77f9`; the scripted loop passes inside the real world | Lead: `node tests/playthrough.mjs --query "scale=0.5&quality=0"` on a clean export of `7c7a0ac` (forest and collision in): 37 checks pass; `docs/shots/pilot/real-0*.jpg` |
 | Physics models (added by the owner on 2026-11-11) | Physics | Ahead of plan: API facade, atmosphere, wind, weather, ground, explorer and ship bodies, fields, 72 tests; no lab page or shots yet; wiring is M2 | Lead: `node --test src/physics/`, 600-frame timing run |
 
 **M1 verdict.** Pilot's half: met. Painter's half: not yet (three MUST FIX). Physics: no M1 gate.
