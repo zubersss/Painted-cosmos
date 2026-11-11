@@ -128,6 +128,50 @@ top tier; mechanics runs may pin a low tier (say which).
    voices pass the sound check, nobody has heard them), and the picture at 60 frames a
    second (the motion set measures frames, it does not watch them).
 
+## Seventh agent (review 6, the tour; record, newest last)
+
+1. **Review 6's first half put on record** from the sixth agent's draft (its runs, its
+   commits; REVIEW, "Review 6, first half"), `c8745f0`.
+2. **The sketch slip no longer covers the ship in the first view** (the coordinator saw it
+   from a clean export of `20b6bb5`: "Temperate Forest / Earth / page 1 of 115" over the top
+   right, where the ship stands 16 m off). At an arrival (the game's start, every step out of
+   the ship) the page is still kept at once, but its slip waits until the explorer has walked
+   4 m from where they stood or 25 s have passed (`SKETCH_SLIP` in `src/core/sketches.js`;
+   `game.updateSketches`); the pencil sound comes with the slip. The slip is smaller and
+   tucked into the corner (`right 4.5 %, top 5.5 %, width clamp(152px, 19vw, 172px)`; it
+   was 23vw up to 204 px at 9.5 % / 6.5 %); 5 s on screen (was 6). `m3check` now checks that
+   the slip waits and then shows once the explorer sets off: on stubs 30 checks PASSED
+   (frame `docs/shots/pilot/slip-held.jpg`, opened: the slip in the corner, clear of the ship; its
+   last line ran 10 px past the paper at 640 px, hence the minimum width).
+3. **The explorer steps in the game** (PHYSICS P13 wired; code in the coordinator's backup
+   `f86bd1b` of my files, tested before it was taken). `src/player/figure.js` (pure):
+   `figureArgs` hands `explorerModel.animate` `hip: phys.ride` (so a figure that reads only
+   `hip` folds its knees with the stride) and by name `ride`, `stride`, `footDown`, `feet`,
+   `surge`, `crouch01`, `gait`, with the old fields; the camera stays on `st.p` (the view does
+   not bob). `hullTrim` adds `buffetAngle.yaw` (rotateY, clamped 0.12 rad like pitch and roll)
+   to the drawn hull. Footsteps come from `phys.footfall` each time `phys.steps` changes
+   (`game.takeFootfall`), loud by force over weight (`footLoudness`: 0.69 strolling, 1.0 at the
+   pace, 1.29 running, at most 1.25 in the mixer; a landing on both feet a little heavier);
+   without PHYSICS' gait (stubs) the mixer keeps its own cadence. **Feel decisions**: (a) the
+   fold before a jump stays 0.12 s from a stand or a walk (the anticipation reads) and is
+   0.06 s from a run's stride (`EXPLORER.jumpCrouchRun`: a runner springs from the stride; a
+   jump on the move should answer at once); (b) **a stroll**: C on foot toggles 1.7 m/s, a true
+   walking gait on Earth (PHYSICS: walk under 2.0 m/s), Shift still runs; the 4.2 m/s pace
+   stays the default (it is an easy lope by its gait, and the worlds are kilometres round); a
+   gamepad stick tilted a little strolls by itself (the speed is proportional). Help card and
+   README name C. Unit: `tests/figure.test.mjs` (6 tests: the hips ride 6 to 7 cm with the
+   stride and `st.p` does not; cadence 3.0 a second at the pace; one footfall at a time; the
+   stroll is gait 1 at 1.7 m/s; the feet leave 0.12 s after Space from a stand and 0.06 s
+   from a run; the hull's trim); PILOT's suite 123 pass in a clean tree (PAINTER `b022507`,
+   PHYSICS `2e6ce74`, my working files). **Seen once in a browser** (scratch
+   `run7/gaitcheck.mjs`, quality 1, 640x360, the same tree with PAINTER's figure from the
+   snapshot `6b900e6`, the one that reads `feet`; strip `docs/shots/pilot/gait-p13.jpg`, opened): standing
+   still; at the pace the legs scissor, ride -0.126 to -0.057 m, gait 2, 4.23 m/s; strolling
+   gait 1 at 1.71 m/s, ride -0.043 to 0; running 7.42 m/s, ride -0.096 to -0.042; the game's
+   footstep hook took 1 to 2 footfalls in each third of a second of moving and none standing;
+   no console error. In the air after a running jump PAINTER's snapshot figure lifts its arms
+   straight out into a T (for PAINTER, REVIEW).
+
 ## Fifth agent, part 1 (record, newest last)
 
 1. **Every check on the head, 2026-11-11.** `node tests/all.mjs` inside a clean export of

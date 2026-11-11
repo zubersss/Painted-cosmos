@@ -212,7 +212,7 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 /* A new page in the sketchbook, shown as it is made: the sketch on a slip of paper, tucked into
    the top right corner of the painting, small, above where the ship stands in a first view
    (and held back at an arrival until the explorer sets off: game.js, SKETCH_SLIP). */
-.pc-newsketch { position: absolute; right: 4.5%; top: 5.5%; width: min(172px, 19vw); padding: 6px 6px 7px; color: var(--pc-dark);
+.pc-newsketch { position: absolute; right: 4.5%; top: 5.5%; width: clamp(152px, 19vw, 172px); padding: 6px 6px 7px; color: var(--pc-dark);
   opacity: 0; transform: translateY(-14px) rotate(4deg) scale(0.92); transition: opacity 0.7s ease, transform 0.7s ease; }
 .pc-newsketch.pc-on { opacity: 1; transform: rotate(1.6deg); }
 .pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; box-shadow: 0 0 0 1px rgba(88, 68, 53, 0.4); }
