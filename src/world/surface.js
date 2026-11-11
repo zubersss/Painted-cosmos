@@ -657,6 +657,29 @@ class Surface {
     return o;
   }
 
+  // The nearest dry, gentle ground of the same biome to a site (a vista must be a place a
+  // walker can stand): rings outward to 240 m; the site itself if nothing better is found.
+  standNear(site) {
+    const o = this._so || (this._so = makeSample(this.nB)), R = this.R;
+    let ux = -site.z, uy = 0, uz = site.x; let l = Math.hypot(ux, uy, uz) || 1; ux /= l; uz /= l;
+    const vx = site.y * uz - site.z * uy, vy = site.z * ux - site.x * uz, vz = site.x * uy - site.y * ux;
+    for (let r = 0; r <= 240; r += 12) {
+      const na = r === 0 ? 1 : Math.round(r / 6);
+      for (let a = 0; a < na; a++) {
+        const an = a / na * Math.PI * 2 + r * 0.31, e = r / R;
+        let x = site.x + (ux * Math.cos(an) + vx * Math.sin(an)) * e, y = site.y + (uy * Math.cos(an) + vy * Math.sin(an)) * e, z = site.z + (uz * Math.cos(an) + vz * Math.sin(an)) * e;
+        l = 1 / Math.hypot(x, y, z); x *= l; y *= l; z *= l;
+        this.sample(x, y, z, o, false);
+        if (o.top !== site.b || o.w[site.b] < 0.85 || (o.lq !== NOLQ && o.lq > o.h - 0.4)) continue;
+        const h0 = o.h, d = 4 / R;
+        let rough = 0;
+        for (let t = 0; t < 4 && rough < 1; t++) { const c = Math.cos(t * Math.PI / 2), sn = Math.sin(t * Math.PI / 2); rough = Math.max(rough, Math.abs(this.heightAt(x + (ux * c + vx * sn) * d, y + (uy * c + vy * sn) * d, z + (uz * c + vz * sn) * d) - h0)); }
+        if (rough < 1.0) return [x, y, z];
+      }
+    }
+    return [site.x, site.y, site.z];
+  }
+
   heightAt(x, y, z) {
     const o = this._ho || (this._ho = makeSample(this.nB));
     this.sample(x, y, z, o, false);
@@ -832,7 +855,8 @@ export function getVistasPure(bodyId) {
     if (seen[bi.id] === 1 || !(EASELS[bodyId] && EASELS[bodyId][bi.id]) || i > 0) {
       // a site of a biome whose easel is already listed counts as its second view
       if (EASELS[bodyId] && EASELS[bodyId][bi.id] && S.sites.findIndex((x) => x.b === s.b) === i) { seen[bi.id]--; continue; }
-      out.push({ id: bodyId + '-' + bi.id + '-' + seen[bi.id], name: bi.name + (seen[bi.id] > 1 ? ' II' : ''), unitDir: { x: s.x, y: s.y, z: s.z } });
+      const st = S.standNear(s);
+      out.push({ id: bodyId + '-' + bi.id + '-' + seen[bi.id], name: bi.name + (seen[bi.id] > 1 ? ' II' : ''), unitDir: { x: st[0], y: st[1], z: st[2] } });
     }
   }
   return out;

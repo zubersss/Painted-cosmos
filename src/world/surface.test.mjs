@@ -227,3 +227,13 @@ test('every kept easel stands on dry ground of its own biome, and is the first v
     }
   }
 });
+
+test('every vista is a place a walker can stand: dry, and no steeper than 25 degrees', () => {
+  for (const id of BODY_IDS) {
+    for (const v of getVistasPure(id)) {
+      const s = sampleSurfacePure(id, v.unitDir.x, v.unitDir.y, v.unitDir.z);
+      assert.ok(!s.isLiquid, v.id + ' is dry');
+      assert.ok(s.slope < 0.44 || (EASELS[id] && v.yaw != null && s.slope < 0.75), v.id + ' slope ' + (s.slope * 57.3).toFixed(0) + ' degrees');
+    }
+  }
+});
