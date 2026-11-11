@@ -1196,6 +1196,12 @@ Example: `node tools/shot.mjs "/physics-lab.html?painted=1&body=earth&find=thund
 | `painted-neptune-sea.jpg` | Neptune's sea, Hs 0.75 m, my patch lifted 0.8 m over your liquid, a hull hovering | **Fails as a sea.** A flat wash; the waves show only as the wavy far edge of the patch; spray under the hull reads. My patch fights your flat liquid surface (where it dips below yours you see yours), and my three-tone shading did not survive. This needs the wave chunk in your water material, not a second surface. |
 | `painted-meadow-wash-ab.jpg` (P5) | alpine meadow, the ship hovering 5 m up just out of frame; top: its downwash on (2957 push cells live), bottom: the same frame to the pixel with `push=0` | **The push field reaches your plants**: the poppies under the wash are flattened outward by 10 to 20 px (0.66 % of the pixels differ, all of them plants). **Grass parting cannot be judged**: the meadow is a wash with no blades to be seen at 4 or at 11 m, so there is nothing to part. Round the walking explorer in the wetland (three ferns in view, none within a metre of the path) the two frames are identical to the pixel. |
 
+**Rain after P5** (checked, frame not kept): the same wood in a thunderstorm of 8.6 mm/h, 981
+drops, the kits as they are now: about 15 pale slanted strokes in view, as thin as the 25 of
+the kept frame at twice the rate; `cover.rain` 0.755. That thinness is the physics: rain of
+that rate hides 1.6 % of a 24 m sight line. Rain reads in a painting through the dark sky, the
+wet ground and the softened distance (`overcast`, `wet`, `rain`, `haze`), not through more strokes.
+
 **Rain, measured for crawl** (pairs of frames 8 ms apart, five pairs, same storm, 1270-1390
 drops; mean absolute difference of the picture, and the share of pixels changing by more
 than 8 %): no kits 0.00035, 0.03 %; thin 0.00050, 0.06 %; cover 0.00038, 0.05 %; blend
