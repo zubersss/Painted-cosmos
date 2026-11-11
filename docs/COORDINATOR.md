@@ -657,3 +657,15 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   on Mars and the Moon is 143 m/s with a 208 to 260 m turn radius and 131 to 248 m to stop;
   two of PILOT's unit tests fail now and then under load (`tests/physics.test.mjs:27` once in
   four for PHYSICS, two of 105 once in two for the coordinator).
+- 2026-11-11: PHYSICS P7 addendum (`c11ca37`, answering PAINTER's block 2 asks): the rain
+  share follows the rain rate (`share x (0.6 + sky.rain)`, 0.16 in a drizzle to 0.40 in a
+  downpour; PAINTER drops its 1.6 multiplier); grass pressed flat to 0.6 m from the explorer
+  and half at 0.85 m (`FLORA.flatReach` 0.25 m; one test threshold loosened for it); the
+  ship's legs have not moved. Not run in a browser. The fourth PHYSICS agent is out of
+  context and is replaced by a fifth. **PHYSICS's order for P8** (coordinator): (1) run P7.3,
+  P7.4 and the addendum in the painted lab and in PILOT's `Sim`, open the frames, fix what
+  is wrong; (2) review 5 P6: downwind slower than upwind, and a boundary layer over rough
+  ground; (3) P2: the first storm crosses the spawn in daylight at about 150 to 400 s; (4)
+  P3 and P4: Neptune's `storm_seas` storms most of the time, no dust in the forest air; (5)
+  as capacity allows, the instanced kit path, flake crawl, the silhouette request; (6) a
+  blunt critique of the other two domains for M4's swap.
