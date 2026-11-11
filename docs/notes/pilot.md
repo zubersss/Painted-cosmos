@@ -47,15 +47,21 @@ What M2 added:
 - `node tests/playthrough.mjs --keep` (stub world, kinematic): PASSED, 37 checks.
 - `node tests/playthrough.mjs --query "stub=render,world,art&fresh=1"` (stub visuals, PHYSICS
   on): PASSED, 37 checks.
-- `node tests/trip.mjs --keep` (stub visuals, PHYSICS on, real key and mouse events): Earth to
-  Mars to Saturn in one page load, map click, marker, pulse, landing, sketchbook, frame
-  read-out, then a reload that continues on Saturn from the save. Result of the last run and
-  of the painted-world runs: see the end of this section.
+- `node tests/trip.mjs --keep` (stub visuals, PHYSICS on, real key and mouse events): PASSED.
+  Earth to Mars to Saturn in one page load: map click, marker, pulse (461 km in 67.6 s, 888 km
+  in 95.4 s), landing, sketchbook, frame read-out, then a reload that continues on Saturn from
+  the save. 400 s of game time.
+- The same trip **inside the painted worlds** (`--query "scale=0.5&quality=0" --w 400 --h 225
+  --root <clean export of the fix commit>`; PAINTER's render, world and art, PHYSICS on):
+  PASSED, no console errors. Landed in `dry_riverbeds` on Mars and `crystal_reeds` on Saturn;
+  the reload continued on Saturn. `docs/shots/pilot/real-03-mars.jpg` is from this run.
+- The M1 loop inside the painted forest with PHYSICS and the canopy cushion: see the last
+  lines of this section.
 - `node tests/lockcheck.mjs`: PASSED. Headless Chromium grants pointer lock and then reports
   nonsense; the game fell back to drag-look, said so, and the view moved 0.14 rad at most.
-- Evidence: `docs/shots/pilot/01-on-foot`, `02-jetpack`, `07-orbit`, `10-land-prompt` (M1 loop),
-  `real-01-on-foot`, `real-02-orbit` (painted world), `m2-map`, `m2-target`, `m2-pulse`,
-  `m2-mars`, `m2-saturn`, `m2-stats` (.jpg).
+- Evidence: `docs/shots/pilot/01-on-foot`, `02-jetpack`, `10-land-prompt` (M1 loop on stubs),
+  `real-01-on-foot`, `real-02-orbit`, `real-03-mars` (painted worlds), `m2-map`, `m2-target`,
+  `m2-pulse`, `m2-mars`, `m2-saturn`, `m2-stats` (the trip on stubs) (.jpg).
 
 ### Not verified / not done
 - Real-GPU frame rate: cannot be measured here. The read-out exists so the owner can read it.

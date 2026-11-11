@@ -164,7 +164,9 @@ try {
   i = await until((x) => !x.ship.liftoff, 8);
   await gameWait(1.2);
   i = await info();
-  check(Math.abs(i.ship.altGround - 9) < 2 && i.ship.speed < 1, `hovering at ${i.ship.altGround.toFixed(1)} m, ${i.ship.speed.toFixed(2)} m/s`);
+  // (Height is measured from the floor the ship rides on: the ground, or the tree tops where a
+  // world has a canopy, so in a forest clearing it reads less than the 9 m it rose.)
+  check(i.ship.altGround > 1.5 && i.ship.altGround < 11 && i.ship.speed < 1, `hovering ${i.ship.altGround.toFixed(1)} m above the floor at ${i.ship.speed.toFixed(2)} m/s`);
   stage('liftoff', i);
 
   // ---- climb to space, no loading screen ---------------------------------------------------------------
@@ -196,7 +198,7 @@ try {
   const alt = (x) => (x.ship.altitude == null ? 1e9 : x.ship.altitude);
   i = await until((x) => Math.abs(x.ship.pitchDeg + 62) < 3, 20, holdPitch(-62));
   await gameWait(0.9);
-  await shot('07-orbit', '07-orbit');
+  await shot('07-orbit');
   const alt0 = alt(await info());
   i = await until((x) => Math.abs(x.ship.pitchDeg) < 3, 20, holdPitch(0));
   let a = null;
@@ -262,12 +264,16 @@ try {
   i = await info();
   check(i.explorer.grounded || i.explorer.mode === 'wade', 'standing beside the ship');
   check(i.shipDistance < 9, 'next to the ship: ' + i.shipDistance.toFixed(1) + ' m');
+  // Walk away from the ship (straight ahead is away from the hull; a trunk may be in the way,
+  // so what counts is that the legs carry the explorer somewhere).
   const p1 = i.explorer.p;
-  await page.keyboard.down('KeyS');
-  await gameWait(1.5);
-  await page.keyboard.up('KeyS');
+  let pace2 = 0;
+  await page.keyboard.down('KeyW');
+  await until(() => false, 2.5, async (x) => { pace2 = Math.max(pace2, x.explorer.speed); });
+  await page.keyboard.up('KeyW');
   i = await info();
-  check(Math.hypot(i.explorer.p.x - p1.x, i.explorer.p.y - p1.y, i.explorer.p.z - p1.z) > 3, 'walking again');
+  const stepped = Math.hypot(i.explorer.p.x - p1.x, i.explorer.p.y - p1.y, i.explorer.p.z - p1.z);
+  check(stepped > 1.5 && pace2 > 2, `walking again: ${stepped.toFixed(1)} m, up to ${pace2.toFixed(1)} m/s`);
   await shot('12-stepped-out');
   stage('stepped-out', i);
 
