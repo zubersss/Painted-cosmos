@@ -375,7 +375,7 @@ class Surface {
       const tw = clamp((cut - fw) / (T.wall || 0.19) + rag, 0, 1.3);
       const ns = T.steps || 3;
       const q = Math.min(tw, 0.9999) * ns, fl = Math.floor(q), fr = q - fl;
-      const riser = smoothstep(0.10, 0.50, fr);
+      const riser = smoothstep(0.10, 0.50, fr) * 0.88 + smoothstep(0.42, 0.80, fr) * 0.12;
       const prof = (fl + riser) / ns;
       const D = amp * (0.78 + 0.22 * A.n3(X / 900 + 1.0, Y / 900, Z / 900));
       const top = smoothstep(1.0, 1.25, tw);
@@ -394,7 +394,7 @@ class Surface {
       const n = A.fbm(X / wl + 21.0, Y / wl - 5.0, Z / wl, 3, 2.0, 0.5);
       const rag = C.n3(X / 52, Y / 52, Z / 52 + 3.0) * 0.035 + C.n3(X / 15, Y / 15 + 7.0, Z / 15) * 0.010;
       const thr = T.thr == null ? 0.06 : T.thr;
-      const m1 = smoothstep(thr, thr + 0.035, n + rag);
+      const m1 = smoothstep(thr, thr + 0.035, n + rag) * 0.88 + smoothstep(thr + 0.025, thr + 0.11, n + rag) * 0.12;
       const m2 = smoothstep(thr + 0.20, thr + 0.23, n + rag * 0.8);
       const apron = smoothstep(thr - 0.16, thr, n + rag);
       h = 26 + apron * apron * amp * 0.10 + m1 * amp * 0.62 + m2 * amp * 0.28
@@ -411,7 +411,7 @@ class Surface {
       const rag = (C.n3(X / 44, Y / 44 + 1.0, Z / 44) * 0.11 + C.n3(X / 12, Y / 12, Z / 12 - 3.0) * 0.03) * (T.rag == null ? 1 : T.rag);
       const q = clamp(n, 0, 0.9999) * steps + rag, fl = Math.floor(q), fr = q - fl;
       const r0 = T.riser ? T.riser[0] : 0.76, r1 = T.riser ? T.riser[1] : 0.92;
-      const riser = smoothstep(r0, r1, fr);
+      const riser = smoothstep(r0, r1, fr) * 0.90 + smoothstep(r1 - 0.02, Math.min(0.995, r1 + 0.06), fr) * 0.10;
       h = 30 + (fl + riser) / steps * amp + C.n3(X / 30, Y / 30, Z / 30) * 1.0 + C.n3(X / 5, Y / 5, Z / 5) * 0.10;
       const face = riser * (1 - riser) * 4;
       t = clamp((fl + riser) / steps * 0.85 + face * 0.15, 0, 1); dry = 0.6; wet = 0.1;
@@ -517,7 +517,8 @@ class Surface {
       const wl = T.wl || 520, amp = T.amp || 150, cl = T.cliff || 80;
       const n = A.fbm(X / wl + 5.0, Y / wl - 7.0, Z / wl + 2.0, 3, 2.0, 0.5);
       const rag = C.n3(X / 55 - 6.0, Y / 55, Z / 55 + 2.0) * 0.03 + C.n3(X / 14, Y / 14 + 3.0, Z / 14) * 0.008;
-      const isl = smoothstep(0.0, 0.05, n + rag);
+      // (the last of the height is gained over a wider band: a rounded shoulder, not a knife edge)
+      const isl = smoothstep(0.0, 0.05, n + rag) * 0.93 + smoothstep(0.035, 0.11, n + rag) * 0.07;
       let land = isl, tall = 1;
       if (isl < 1 && n > -0.42) { const st = this._stacks(X, Y, Z, T.stackCell || 170, T.stacks == null ? 0.6 : T.stacks); if (st > land) { land = Math.min(1, st * 2.2); tall = Math.max(isl, st * 0.9 + 0.1); } }
       const dome = Math.max(0, n) * amp * 0.5 * isl;

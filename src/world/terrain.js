@@ -53,7 +53,9 @@ export class PlanetTerrain {
     this.root = root;
     this.S = getSurface(bodyId);
     this.R = this.S.R;
-    this.maxLevel = opts.maxLevel != null ? opts.maxLevel : Math.max(4, Math.round(Math.log2((Math.PI * 0.5 * this.R) / (PATCH_N * 0.75))));
+    // finest cells about 0.5 to 0.75 m: one more level on the big bodies, whose cliffs would
+    // otherwise show a metre-wide sawtooth at the lip under one's feet
+    this.maxLevel = opts.maxLevel != null ? opts.maxLevel : Math.max(4, Math.round(Math.log2((Math.PI * 0.5 * this.R) / (PATCH_N * 0.75))) + (this.S.look.fine ? 1 : 0));
     this.material = makeTerrainMaterial(bodyUniforms);
     this.waterMaterial = makeWaterMaterial(bodyUniforms, skyUniforms);
     this.group = new THREE.Group();
@@ -70,6 +72,7 @@ export class PlanetTerrain {
     this.patchCount = 0;
     this.detail = true;        // false: only the six root patches (far bodies)
     this.splitK = 1.12;
+    this.boostK = 1;
     for (const n of this.roots) this._build(n);
   }
 
@@ -94,12 +97,13 @@ export class PlanetTerrain {
     const anchor = new THREE.Vector3(((d.origin[0] % ANCHOR) + ANCHOR) % ANCHOR, ((d.origin[1] % ANCHOR) + ANCHOR) % ANCHOR, ((d.origin[2] % ANCHOR) + ANCHOR) % ANCHOR);
     const camRel = new THREE.Vector3();
     // level L merges into its parent at the parent's split distance
-    const mergeUnit = node.level === 0 ? 1e12 : node.size * 2 * node.pBoost;
+    const mergeUnit0 = node.level === 0 ? 1e12 : node.size * 2;
     const terrain = this;
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
       const u = material.uniforms;
       u.uOrigin.value.copy(origin); u.uAnchor.value.copy(anchor);
       u.uCamLocal.value.copy(camRel.subVectors(terrain.camLocal, origin));
+      const mergeUnit = mergeUnit0 * (1 + (node.pBoost - 1) * terrain.boostK);
       u.uMorph.value.set(mergeUnit * terrain.splitK * MORPH_A, mergeUnit * terrain.splitK * MORPH_B);
       material.uniformsNeedUpdate = true;
     };
@@ -178,7 +182,7 @@ export class PlanetTerrain {
     node.lastUsed = this.frame;
     const d = this._nodeDist(node);
     node.dist = d;
-    const split = this.detail && node.level < this.maxLevel && d < this.splitK * node.boost * node.size;
+    const split = this.detail && node.level < this.maxLevel && d < this.splitK * (1 + (node.boost - 1) * this.boostK) * node.size;
     if (split) {
       if (!node.children) {
         const l = node.level + 1, x = node.ix * 2, y = node.iy * 2;
@@ -201,6 +205,7 @@ export class PlanetTerrain {
   update(camLocal, budgetMs) {
     this.frame++;
     this.splitK = SPLIT_BY_QUALITY[QUALITY.level] || 1.12;
+    this.boostK = QUALITY.level === 0 ? 0.3 : 1;      // the low tier spends little on cliffs
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();
     for (const n of this.visible) { n.mesh.visible = false; if (n.water) n.water.visible = false; }

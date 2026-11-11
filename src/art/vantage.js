@@ -9,6 +9,7 @@
 // Used by the gallery's `cam=vista` and by the evidence frames; deterministic.
 import { getSurface, makeSample, NOLQ } from '../world/surface.js';
 import { sampleObstaclesPure } from '../world/obstacles.js';
+import { EASELS } from './easels.js';
 
 const NAZ = 36, HALF = 4;             // bearings around the spot; the frame spans +-HALF of them
 const VFOV = 0.48;                    // half the vertical field of view (55 degrees), radians
@@ -104,10 +105,10 @@ function scoreView(sc, a0, W) {
   let pitch = Math.max(hi - 0.34, Math.min(lo + 0.40, (hi + lo) * 0.5 + 0.08));
   pitch = Math.max(-0.30, Math.min(0.26, pitch));
   const top = pitch + VFOV, bot = pitch - VFOV;
-  let area = 0, liquid = 0, steep = 0, below = 0, flora = 0, own = 0, layers = 0, beyond = 0, skyA = 0, m1 = 0, m2 = 0, near = 0, hiWall = 0, wallA = 0, fore = 0, bowl = 0;
+  let area = 0, liquid = 0, steep = 0, below = 0, flora = 0, own = 0, layers = 0, beyond = 0, skyA = 0, m1 = 0, m2 = 0, near = 0, hiWall = 0, wallA = 0, fore = 0, bowl = 0, stand = 0;
   for (let c = -HALF; c <= HALF; c++) {
     const a = (a0 + c + NAZ) % NAZ;
-    let hmax = -9, lastVisR = 0, sawLiq = false, got = false, pit = 9, hollow = false;
+    let hmax = -9, lastVisR = 0, sawLiq = false, got = false, pit = 9, hollow = false, colF = 0;
     for (let i = 0; i < NR; i++) {
       const k = a * NR + i;
       if (!sc.vis[k]) continue;
@@ -120,6 +121,9 @@ function scoreView(sc, a0, W) {
         if (sc.steep[k] > 0.55 && !sc.liq[k]) steep += g * Math.min(1, sc.steep[k] / 1.4);
         if (sc.el[k] < -0.10 && RS[i] > 20) below += g;
         flora += g * Math.min(1, sc.trees[k] * 2.5) * (RS[i] > 14 && RS[i] < 180 ? 1 : 0);
+        // tall things standing far off on flat ground or water fill no ground in the frame:
+        // there, count how high the nearest stand of them rises in this column (W.stand)
+        if (RS[i] > 14 && RS[i] < 260) { const fh = Math.min(1, sc.trees[k] * 2.5) * Math.min(0.32, sc.tallH / RS[i]); if (fh > colF) colF = fh; }
         if (RS[i] > 18 && RS[i] < 420) { if (sc.el[k] < pit) pit = sc.el[k]; else if (pit < -0.09 && sc.el[k] > pit + 0.07) hollow = true; }
         if (RS[i] < 12) near += g;
         if (RS[i] < 28 && !sc.liq[k]) fore += g;
@@ -131,6 +135,7 @@ function scoreView(sc, a0, W) {
       hmax = sc.el[k];
     }
     if (hollow) bowl++;
+    stand += colF / 0.32;
     const s = Math.min(top, Math.max(bot, sc.sky[a]));
     skyA += (top - s);
     m1 += sc.sky[a]; m2 += sc.sky[a] * sc.sky[a];
@@ -148,7 +153,7 @@ function scoreView(sc, a0, W) {
   s += W.steep * Math.min(1, (steep / area) / 0.30);
   s += W.below * Math.min(1, (below / area) / 0.35);
   s += (W.bowl || 0) * (bowl / n);                           // a hollow with its far wall in view
-  s += W.flora * Math.min(1, (flora / area) / 0.25);
+  s += W.flora * Math.min(1, (flora / area) / 0.25) + (W.stand || 0) * Math.min(1, (stand / n) / 0.45);
   s -= Math.abs(hi - W.high - 0.06) * 2.2;                   // the skyline about where this kind of place wants it
   s -= Math.max(0, 0.14 - skyFrac) * 6 + Math.max(0, skyFrac - 0.55) * 3;   // some sky, not mostly sky
   s -= Math.max(0, hiWall - 1) * 0.5 + Math.max(0, wallA / area - (W.close || 0.06)) * 5;   // not nose to a wall
@@ -185,14 +190,19 @@ function ringIn(rs, a0, pitch) {
 // -> { unitDir: {x,y,z}, eye (m above the ground), yaw, pitch (radians), score, terms } | null
 // yaw is measured from local north toward east (north = up x (Y x up)), as in the gallery.
 export function findVantage(bodyId, biomeId, opts = {}) {
+  // a spot already chosen and kept (src/art/easels.js) is used as it stands
+  const kept = !opts.search && EASELS[bodyId] && EASELS[bodyId][biomeId];
+  if (kept) return { unitDir: { x: kept[0], y: kept[1], z: kept[2] }, eye: 1.7, yaw: kept[3] * Math.PI / 180, pitch: kept[4] * Math.PI / 180, score: 0, kept: true };
   const S = getSurface(bodyId), R = S.R;
   const bi = S.biomes.findIndex((b) => b.id === biomeId);
   if (bi < 0) return null;
   const B = S.biomes[bi];
   const W = Object.assign({}, WANT[B.terrain] || WANT.default, B.want || {});
   const eye = opts.eye || 1.7;
+  const tk = B.tall && S.look.flora && S.look.flora.tall[B.tall[0]];
+  const turned = tk && tk.kit === 'wave' ? 'wave' : tk && tk.slim ? 'slim' : null;
   const o = makeSample(S.nB);
-  const sc = { o, bi, fogL: B.t && B.t.fog ? B.t.fog[0] : null, els: new Float32Array(NAZ * NR), bedW: B.terrain === 'riverbed' && !(B.t && B.t.wet) ? ((B.t && B.t.bedW) || 6.5) : 0, el: new Float32Array(NAZ * NR), gap: new Float32Array(NAZ * NR), steep: new Float32Array(NAZ * NR), trees: new Float32Array(NAZ * NR), own: new Float32Array(NAZ * NR), liq: new Uint8Array(NAZ * NR), vis: new Uint8Array(NAZ * NR), sky: new Float32Array(NAZ) };
+  const sc = { o, bi, tallH: S.tallH[bi] || 8, fogL: B.t && B.t.fog ? B.t.fog[0] : null, els: new Float32Array(NAZ * NR), bedW: B.terrain === 'riverbed' && !(B.t && B.t.wet) ? ((B.t && B.t.bedW) || 6.5) : 0, el: new Float32Array(NAZ * NR), gap: new Float32Array(NAZ * NR), steep: new Float32Array(NAZ * NR), trees: new Float32Array(NAZ * NR), own: new Float32Array(NAZ * NR), liq: new Uint8Array(NAZ * NR), vis: new Uint8Array(NAZ * NR), sky: new Float32Array(NAZ) };
   const sites = S.sites.filter((s) => s.b === bi).slice(0, opts.sites || 2);
   const p = [0, 0, 0], q = [0, 0, 0];
   const cands = [];
@@ -267,6 +277,13 @@ export function findVantage(bodyId, biomeId, opts = {}) {
   for (const c of cands) {
     scan(S, c.d, R + c.h + eye, sc);
     const ringAt = S.look.rings ? ringSky(S, c.d, R + c.h + eye) : null;
+    // the bearing toward which this biome's wind-turned kits face (their local +Z), at this spot
+    let windB = 0;
+    if (turned) {
+      const x = c.d[0], y = c.d[1], z = c.d[2], k1 = 1 / (1 + y), f = frameAt(c.d), sn = Math.sin(0.6), cs = Math.cos(0.6);
+      const wx = sn * (y + z * z * k1) + cs * (-x * z * k1), wy = sn * -x + cs * -z, wz = sn * (-x * z * k1) + cs * (y + x * x * k1);
+      windB = Math.atan2(wx * f.e[0] + wy * f.e[1] + wz * f.e[2], wx * f.n[0] + wy * f.n[1] + wz * f.n[2]);
+    }
     // the bearing along which this biome's crests (dunes, fins) run at this spot
     let crest = null;
     if (W.along) {
@@ -280,6 +297,12 @@ export function findVantage(bodyId, biomeId, opts = {}) {
       v.s += -c.rough * 0.3 + (W.perch || 0) * c.perch - c.dens * 0.8;
       if (B.t && B.t.fog && c.h < B.t.fog[0] + B.t.fog[1]) v.s -= 2.5;      // paint the fog from above it
       if (ringAt) v.s += (W.rings || 0.3) * ringIn(ringAt, a, v.pitch);
+      if (turned) {
+        // things shaped by one wind: frozen waves are painted from in front and a little to
+        // one side, where the curl shows; leaning spires from the side, where the lean shows
+        let da = a / NAZ * Math.PI * 2 - windB; da = Math.atan2(Math.sin(da), Math.cos(da));
+        v.s += (W.facing == null ? 1.6 : W.facing) * (turned === 'wave' ? Math.max(0, 1 - Math.abs(Math.abs(Math.abs(da) - Math.PI) - 0.75) / 0.6) : Math.abs(Math.sin(da)));
+      }
       if (W.along && crest != null) {
         // crests are best drawn running away into the picture, a little off the line of sight
         let da = Math.abs(a / NAZ * Math.PI * 2 - crest) % Math.PI; if (da > Math.PI / 2) da = Math.PI - da;
@@ -294,7 +317,12 @@ export function findVantage(bodyId, biomeId, opts = {}) {
   for (const t of tops.slice(0, 40)) {
     const d = t.c.d, f = frameAt(d), yaw = t.v.a / NAZ * Math.PI * 2;
     let blocked = false;
-    for (const ob of sampleObstaclesPure(bodyId, d[0], d[1], d[2], 16)) {
+    for (const ob of sampleObstaclesPure(bodyId, d[0], d[1], d[2], 16, true)) {
+      if (ob.kind === 'bush') {      // a bush at the easel's feet fills the picture: keep 7 m clear of them
+        const bd = Math.hypot(ob.unitDir.x - d[0], ob.unitDir.y - d[1], ob.unitDir.z - d[2]) * R;
+        if (bd < 7) { blocked = true; break; }
+        continue;
+      }
       const u = ob.unitDir, vx = u.x - d[0], vy = u.y - d[1], vz = u.z - d[2];
       const dist = Math.hypot(vx, vy, vz) * R;
       if (dist < 5.5 + ob.radius * 2.2) { blocked = true; break; }
@@ -307,11 +335,20 @@ export function findVantage(bodyId, biomeId, opts = {}) {
   }
   if (!best && tops.length) best = tops[0];
   if (!best) return null;
-  const v = best.v;
-  return {
+  const pack = (best) => { const v = best.v; return {
     unitDir: { x: best.c.d[0], y: best.c.d[1], z: best.c.d[2] }, eye,
     yaw: v.a / NAZ * Math.PI * 2, pitch: v.pitch, score: v.s,
     terms: { sky: +v.skyFrac.toFixed(2), liquid: +v.lf.toFixed(2), hi: +v.hi.toFixed(2), lo: +v.lo.toFixed(2), layers: +v.layers.toFixed(2), steep: +v.steep.toFixed(2), below: +v.below.toFixed(2), beyond: +v.beyond.toFixed(2), flora: +v.flora.toFixed(2) },
     candidates: tops.length,
-  };
+  }; };
+  if (opts.top) {
+    // several different views, best first: for choosing by eye
+    const out = [];
+    for (const t of tops) {
+      if (out.length >= opts.top) break;
+      if (out.every((u) => Math.hypot(u.c.d[0] - t.c.d[0], u.c.d[1] - t.c.d[1], u.c.d[2] - t.c.d[2]) * R > 60 || Math.abs(u.v.a - t.v.a) % (NAZ - 8) > 8)) out.push(t);
+    }
+    return out.map(pack);
+  }
+  return pack(best);
 }

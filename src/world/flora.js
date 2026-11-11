@@ -186,7 +186,7 @@ export class Flora {
     if (!n) return;
     const k = this.rangeScale;
     const cx = this.camLocal.x - chunk.origin.x, cy = this.camLocal.y - chunk.origin.y, cz = this.camLocal.z - chunk.origin.z;
-    const d = chunk.data, rel = chunk.rel, tier = chunk.tier;
+    const d = chunk.data, rel = chunk.rel, tier = chunk.tier, lowQ = QUALITY.level === 0;
     let changed = false;
     for (let i = 0; i < n; i++) {
       const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
@@ -194,7 +194,7 @@ export class Flora {
       const seed = d[i * INST_STRIDE + 7];
       const j = (1 + (seed - 0.5) * JIT) * k;
       let t;
-      if (dist < T0 * j) t = 0;
+      if (dist < T0 * j) t = lowQ ? 1 : 0;              // the low tier draws no full trees
       else if (dist < T1 * j) t = 1;
       else if (dist < T_THIN * j) t = 2;
       else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
@@ -270,6 +270,9 @@ export class Flora {
     }
     const make = (list, geo, mat, lod, near, skipLow) => {
       if (!list.length) return;
+      // in an order that has nothing to do with place, so that drawing the first share of
+      // a mesh thins it evenly (the low tier draws 55 %)
+      for (let a = list.length - 1; a > 0; a--) { const b = Math.floor(d[list[a] * INST_STRIDE + 7] * 9973.1 % 1 * (a + 1)); const t = list[a]; list[a] = list[b]; list[b] = t; }
       const mesh = this._instanced(chunk, geo, mat, list.length, lod, false);
       const im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array;
       for (let a = 0; a < list.length; a++) {
@@ -284,7 +287,8 @@ export class Flora {
         _m.toArray(im, a * 16);
         ia[a * 4] = d[o + 8]; ia[a * 4 + 1] = d[o + 9]; ia[a * 4 + 2] = d[o + 7]; ia[a * 4 + 3] = d[o + 10];
       }
-      mesh.count = list.length;
+      mesh.userData.full = list.length;
+      mesh.count = QUALITY.level === 0 ? Math.ceil(list.length * 0.55) : list.length;
       mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
       mesh.userData.near = near; mesh.userData.skipLow = !!skipLow;
       mesh.userData.plantH = geo === this.kit.reed ? FLORA_PHYS.reed.height : geo === this.kit.fern ? FLORA_PHYS.fern.height : geo === this.kit.flower ? FLORA_PHYS.flower.height : FLORA_PHYS.grass.height;
@@ -395,7 +399,8 @@ export class Flora {
     // the low tier leaves out the bushes
     if (QUALITY.level !== this.lastQ) {
       this.lastQ = QUALITY.level;
-      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) if (m.userData.skipLow) m.visible = QUALITY.level > 0;
+      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) { if (m.userData.skipLow) m.visible = QUALITY.level > 0; if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.55) : m.userData.full; }
+      for (const ch of this.underChunks.values()) for (const m of ch.meshes) if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.55) : m.userData.full;
     }
     // build queue: nearest first; always allowed one item when nothing was built for a while
     let spent = false;

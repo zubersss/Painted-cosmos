@@ -84,7 +84,11 @@ function applyPreset(name, dir) {
     return p.multiplyScalar(surf(p) + h);
   };
   state.pitch = 0; state.yaw = 0;
-  if (name === 'orbit') { state.pos.copy(d).multiplyScalar(R * 2.6); state.pitch = -Math.PI / 2 + 0.001; }
+  if (name === 'orbit') {
+    // banded worlds are drawn from over the low latitudes, where the belts run across the disc
+    if (LOOKS[bodyId].bands && Math.abs(d.y) > 0.38) { const k = Math.sqrt((1 - 0.38 * 0.38) / Math.max(1e-6, d.x * d.x + d.z * d.z)); d.set(d.x * k, 0.38 * Math.sign(d.y), d.z * k); if (d.lengthSq() < 0.5) d.set(0.925, 0.38, 0); d.normalize(); }
+    state.pos.copy(d).multiplyScalar(R * 2.6); state.pitch = -Math.PI / 2 + 0.001;
+  }
   else if (name === 'high') { state.pos.copy(at(0, 0, 420)); state.pitch = -0.5; state.yaw = 0.6; }
   else if (name === 'jet') { state.pos.copy(at(0, -6, 30)); state.pitch = -0.30; state.yaw = num('jyaw', 0.9); }
   else if (name === 'vista') { state.pos.copy(at(0, 0, 9)); state.pitch = -0.10; state.yaw = num('jyaw', 0.9); }

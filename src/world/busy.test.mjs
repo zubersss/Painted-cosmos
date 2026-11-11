@@ -20,7 +20,7 @@ const THREE = await import('three');
 const { createWorld } = await import('./index.js');
 const { QUALITY } = await import('../render/shared.js');
 const { BODIES } = await import('../data/bodies.js');
-const { getSurface, makeSample } = await import('./surface.js');
+const { getSurface } = await import('./surface.js');
 
 QUALITY.level = 1;
 const scene = new THREE.Scene();
@@ -89,32 +89,29 @@ test('one frame of building stays inside its slice while arriving', () => {
   // this runs on is shared, so wall-clock spikes say little: count the work instead (surface
   // samples, the unit all building is made of), priced at this machine's own speed.
   const S = getSurface('uranus'), proto = Object.getPrototypeOf(S), orig = proto.sample;
-  const o = makeSample(S.nB);
-  let unit = 1e9;
-  for (let r = 0; r < 6; r++) {
-    const t = performance.now();
-    for (let i = 0; i < 4000; i++) { const a = i * 2.399963, y = 1 - 2 * (i + 0.5) / 4000, q = Math.sqrt(1 - y * y); orig.call(S, Math.cos(a) * q, y, Math.sin(a) * q, o, i % 3 === 0); }
-    unit = Math.min(unit, (performance.now() - t) / (4000 * (1 + 0.6 / 3)));
-  }
   let work = 0;
   proto.sample = function (x, y, z, out, full) { work += full ? 1.6 : 1; return orig.call(this, x, y, z, out, full); };
   world.setBuildBudget(5);
-  let worst = 0, total = 0, walls = [];
+  let worst = 0, total = 0, unit = 1e9;
+  const walls = [];
   try {
     for (let f = 0; f < 420; f++) {
       stand('uranus', Math.max(1.7, 900 - f * 3));
       work = 0;
       const t = performance.now();
       world.update(1 / 60, cam, 'uranus');
-      walls.push(performance.now() - t);
+      const w = performance.now() - t;
+      walls.push(w);
       if (work > worst) worst = work;
+      // the price of a sample on this machine: from the building frame that ran least disturbed
+      if (work > 1500 && w / work < unit) unit = w / work;
       total += work;
     }
   } finally { proto.sample = orig; }
   walls.sort((a, b) => a - b);
   assert.ok(total > 20000, 'the descent built something (' + total + ' samples)');
+  // the slice is 4 ms of the 5 ms budget: the heaviest frame, at the undisturbed price, must fit in the budget
   const ms = worst * unit;
-  // the slice is 4 ms of the 5 ms budget; the price of a sample is only known to about a third
-  assert.ok(ms < 7, 'heaviest frame: ' + worst.toFixed(0) + ' samples, about ' + ms.toFixed(2) + ' ms of building at ' + (unit * 1000).toFixed(2) + ' us a sample'
+  assert.ok(ms < 5.5, 'heaviest frame: ' + worst.toFixed(0) + ' samples, about ' + ms.toFixed(2) + ' ms of building at ' + (unit * 1000).toFixed(2) + ' us a sample'
     + ' (wall clock: median ' + walls[210].toFixed(2) + ', 95th ' + walls[399].toFixed(2) + ' ms)');
 });

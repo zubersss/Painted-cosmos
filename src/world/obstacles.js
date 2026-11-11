@@ -2,7 +2,7 @@
 // Trees and boulders are not part of sampleSurface; this gives the game their trunks and
 // stones near a point so it can collide with them. It shares the placement cells (and their
 // cache) with the flora renderer, so what you bump into is exactly what is painted.
-import { placeTrees, placeUnder, INST_STRIDE, U_ROCK } from './floraplace.js';
+import { placeTrees, placeUnder, INST_STRIDE, U_ROCK, U_BUSH } from './floraplace.js';
 import { getSurface } from './surface.js';
 import { dirToFace } from './cubesphere.js';
 
@@ -46,7 +46,8 @@ function cellsAround(S, x, y, z, radius, level, out) {
 
 const _cells = [];
 // -> [{ unitDir: {x,y,z}, radius (m), height (m), kind: 'tree' | 'rock' }] within `radius` metres
-export function sampleObstaclesPure(bodyId, dx, dy, dz, radius) {
+// soft === true also lists bushes (kind 'bush'): nothing to collide with, but in the way of a view
+export function sampleObstaclesPure(bodyId, dx, dy, dz, radius, soft) {
   const S = getSurface(bodyId);
   const res = [];
   if (!S.hasFlora && !S.biomes.some((b) => b.small)) return res;
@@ -75,6 +76,7 @@ export function sampleObstaclesPure(bodyId, dx, dy, dz, radius) {
       const t = underCell(S, _cells[i], _cells[i + 1], _cells[i + 2]);
       for (let k = 0; k < t.count; k++) {
         const o = k * INST_STRIDE;
+        if (soft && t.data[o + 5] === U_BUSH) { add(t.data, o, 0.9 * t.data[o + 3], 1.3 * t.data[o + 3], 'bush'); continue; }
         if (t.data[o + 5] !== U_ROCK) continue;
         const sc = t.data[o + 3];
         if (sc < 0.7) continue;                       // small stones are stepped over
