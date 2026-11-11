@@ -15,7 +15,7 @@ export const CAMERA = Object.freeze({
   fovShipFast: 72,           // at full speed
   pitchMin: -1.15,           // rad: looking down
   pitchMax: 1.25,            // rad: looking up
-  boom: 5.6,                 // metres behind the explorer
+  boom: 6.4,                 // metres behind the explorer (longer while the explorer is a placeholder)
   boomMin: 2.2,
   boomMax: 14,
   pivotHeight: 2.05,         // the boom pivots above the head so the landscape fills the frame

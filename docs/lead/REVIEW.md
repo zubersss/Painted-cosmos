@@ -10,6 +10,89 @@ are relative, never a claim about a real GPU.
 
 ---
 
+## Review 2: 2026-11-11, at commit `a9c02bc` (includes Painter's `b2bfcae` and `6a31de3`, Physics' `b0ad22b`)
+
+What I ran:
+- The same frame-cost probe as review 1, in the integrated game from a clean export
+  (480x270, counters from the game's own read-out, `?stats=1`), at quality 0, 1 and 2.
+- `gallery.html?...cam=trees&time=12&quality=1` at **960x540** (the coordinator's rule for
+  judging look), `cam=stream` at 12 h and 0 h at 640x360.
+- `node --test src/world/*.test.mjs`, `node --test src/physics/` (125 pass),
+  `node --test tests/*.test.mjs` (91 pass; they fly Earth to Mars to Saturn on Painter's real
+  worlds with Physics and the real obstacles, in the pure simulation).
+
+### PAINTER: M1 is met
+
+MUST FIX from review 1, all three **closed**:
+
+1. **Frame cost: closed.** Measured in the integrated game:
+
+   | view (quality 1) | triangles | draw calls | review 1 |
+   | --- | --- | --- | --- |
+   | standing at the spawn | 564 k | 334 | 4.36 M, 887 |
+   | running | 529 k | 307 | 4.57 M, 848 |
+   | flying at 120 m | 217 k | 143 | 1.47 M, 262 |
+   | orbit at 5 km | 46 k | 41 | 43 k, 41 |
+
+   Quality 0 at the spawn: 289 k, 206 calls. Quality 2: 708 k, 381 calls. All inside the budget
+   (600 k / 350, 300 k, 1.2 M). Software GL at the same viewport went from 0.7 to about 3 fps.
+2. **Stippled foliage: closed.** `docs/lead/evidence/painter-a9c02bc-gallery-trees-noon.jpg`
+   (960x540): crowns are a few overlapping washes with darker accents; no pepper.
+3. **Ruler-straight lines: closed.** Same frame: birches lean, taper and break into dry-brush
+   marks; the bank of the brook wanders (`...-stream-noon.jpg`).
+
+At 960x540 the home forest passes the freeze-frame test for me: I would take that frame for a
+scan of a plein-air study.
+
+SHOULD FIX (carried or new; none blocks)
+
+4. **Build hitches, still.** `world.update` worst frames: 4 to 8 ms at quality 1 (flying
+   8 ms), 12 ms running at quality 0. Budget 5 ms. Better than the 34 ms of review 1, not yet
+   inside. The frame read-out now shows `world` ms live (` key).
+5. **Shade is dark green, not a cool glaze.** The dappled patches on the clearing are the local
+   colour darkened, with fairly hard edges. AB 2: shadows are cool transparent violet-blue
+   glazes over the local colour.
+6. **The foreground meadow** is still one broad wash with sparse marks (review 1 item 5): a
+   few more grass-tip strokes near the eye, none far away.
+7. **The far trunks** still stand in an even line like a fence in the `trees` frame (item 6).
+8. Night (`...-stream-night.jpg`) is better: trunks take the glaze. Dusk and space unchanged
+   from review 1 items 7 and 8; M3 scope.
+9. `sampleObstacles` returns at most about 260 entries at large radii. Say in your notes
+   whether they are the nearest ones; I keep my queries under 45 m meanwhile.
+
+GOOD (new)
+
+- `canopyHeight` on `sampleSurface`: wired into the ship's cushion the same hour; a low pass
+  over the real forest keeps the hull above every tree top (`tests/contract.test.mjs`).
+- Mars and Saturn placeholders already have distinct biomes to land in: the scripted trip
+  ends in `dry_riverbeds` and `crystal_reeds`.
+
+Answers to PAINTER's questions: the default boom is now 6.4 m (was 5.6) until the real
+explorer exists. `speed01` and `altitude01`: nothing needed before M3; in M3 I would like
+`speed01` near 1 (pulse) to soften and streak the far washes, and nothing from `altitude01`
+that `inSpace01` does not already do.
+
+### PHYSICS: P1 accepted by the coordinator; wiring done
+
+- All of the wiring guide is in (commit after `a9c02bc`): `createPhysics`, `warmUp`,
+  `physics.update` once a frame before `world.update`, `world.setPhysics`, the explorer through
+  `stepExplorerBody` (with `assistAccel` 4, `jetMaxRise`, `descentLimit`), the ship through
+  `stepShipBody` (`carve01: 1`, assists applied to the target), landing sites by friction, the
+  parked ship on `stepShipGear`. Measured in my loop tests: `physics.update` averages 0.3 to
+  0.5 ms; the gear settles and sleeps on Earth, the Moon and Jupiter.
+- One assist I added that PHYSICS should know about and may want to model: in vacuum, X or
+  throttling down brakes with the drive field (the kinematic rate) instead of the 14 m/s2
+  retro thrusters, because stopping from 750 m/s took over a minute and "let go and it stops"
+  is the promise of the ship (`R-SHIP-1`). A `brake` command in `stepShipBody` with a named
+  field deceleration would let me drop my special case.
+- SHOULD FIX: the climb to space takes 10.9 s through the body (18 s kinematic). It is within
+  PHYSICS' own measurement (12.9 s) but shorter than I want for the atmosphere transition;
+  I will lower my commanded envelope rather than ask for less thrust.
+- GOOD: the lab page and twelve evidence shots exist now; the guide and the replacement
+  tables were exactly what was asked for; the reference checks came back with measurements.
+
+---
+
 ## Review 1: 2026-11-11, at commit `19f72ce`
 
 What I ran:
