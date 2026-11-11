@@ -337,7 +337,10 @@ test('legs: a feature lower than their stroke is taken in stride, and one the hi
   const low = cross(boulders([{ x: 12, y: 0, radius: 0.4, height: 0.4 }]), 9.81, 7.4, { until: 20 });
   assert.ok(low.slowest > 7.2 && low.airTime === 0, 'a 0.4 m rock at a run: slowest ' + low.slowest.toFixed(2));
   const pace = (g) => cross(boulders([{ x: 12, y: 0, radius: 0.6, height: 1.3 }]), g, 7.4, { until: 20, air: 0 }).slowest;
-  assert.ok(pace(9.81) < 4.5 && pace(1.62) < pace(9.81), `Earth ${pace(9.81).toFixed(2)}, Moon ${pace(1.62).toFixed(2)}`);
+  // (P16: the pace over a face the hips must climb is the pace it can be crossed at in contact, planned from where the
+  // walker sees it; measured, that pace is the same on every world within 10 % (the hold's pull, not gravity, sets it),
+  // so the old 'lower on the Moon than on Earth' (the face checked a lunar run harder) is now 'no faster on the Moon')
+  assert.ok(pace(9.81) < 4.5 && pace(1.62) < 4.5 && pace(1.62) < pace(9.81) * 1.1, `Earth ${pace(9.81).toFixed(2)}, Moon ${pace(1.62).toFixed(2)}`);
 });
 
 test('legs: what is not a low feature is as it was: a cliff is a fall, a wall stops the body, a jump is a jump, and a step up to a clamber high is climbed', () => {
@@ -513,4 +516,36 @@ test('P13 the descent brake lights before its limit and settles the fall onto it
   run(sim, 4, { wish: V(), descentLimit: 12 }, { each: (t, st) => { const v = vert(st), a = (v - vPrev) * 60; if (t > 0.05) worstJerk = Math.max(worstJerk, Math.abs(a - aPrev)); aPrev = a; vPrev = v; vMax = Math.max(vMax, -v); } });
   assert.ok(vMax > 11.5 && vMax < 12.05, `settles at the limit: ${vMax}`);
   assert.ok(worstJerk < 1.2, `largest change of acceleration in one step ${worstJerk} m/s^2 (the brake at full at the limit gave 9)`);
+});
+
+test('P16 the way ahead: a run at a 1 m boulder sheds its pace with its soles before the face, within the grip, and crosses with no brace at the face; a hill is not a face (Moon, Mars, Earth)', async () => {
+  const { scrambleSample } = await import('../player/explorer.js');
+  for (const [g, pace] of [[2.2, 7.4], [3.7, 7.4], [9, 7.4], [2.2, 4.2]]) {
+    const c = norm(V(Math.sin(12 / R), 0, Math.cos(12 / R)));
+    const sample = scrambleSample((d) => ({ radius: R, normal: d, liquidRadius: 0 }), () => [{ unitDir: c, radius: 0.6, height: 1 }]);
+    const st = { p: V(0, 0, R), v: V(), grounded: true }, env = { sample, gravity: g }, assist = 4 * Math.min(1, Math.max(0.45, g / 9));
+    let brace = 0, worst = 0, vPrev = 0, air = 0, top = 0, far = 0, seen = Infinity, atFace = 0;
+    for (let i = 0; i < 60 * 9; i++) {
+      stepExplorerBody(st, { wish: V(pace, 0, 0), assistAccel: assist }, 1 / 60, env);
+      const B = st.phys, v = B.speedGround, x = Math.atan2(st.p.x, st.p.z) * R; far = x;
+      if (B.ahead && seen === Infinity) seen = 12 - x;
+      if (x > 4 && x < 15) { brace = Math.max(brace, B.brace); if (!st.grounded) air++; top = Math.max(top, len(st.p) - sample(norm(st.p)).radius); }
+      if (x > 4 && x < 11.4) worst = Math.max(worst, vPrev - v);          // (the approach and the near flank: the soles' work)
+      if (x < 11.4) atFace = v;
+      vPrev = v;
+    }
+    // the grip on this ground (testworld-like: no material, the default friction) and the suit's assist bound the slowing
+    const grip = 1.0 * g + assist;
+    assert.ok(brace < 0.05, `g ${g} pace ${pace}: the face braced ${brace} m/s in a step`);
+    assert.ok(worst <= grip / 60 + 0.05, `g ${g} pace ${pace}: ${worst.toFixed(3)} m/s lost in one step of the approach (grip and assist give ${(grip / 60).toFixed(3)})`);
+    assert.ok(air === 0 && top < 0.05, `g ${g} pace ${pace}: in contact (${air} steps in the air, feet ${top.toFixed(3)} m up)`);
+    assert.ok(atFace < 3.3 && atFace > 2.2 && far > 20, `g ${g} pace ${pace}: ${atFace.toFixed(2)} m/s at the face (the law: 2.75), on to ${far.toFixed(0)} m; seen ${seen.toFixed(1)} m out`);
+  }
+  // a hill (a 20 % slope from 10 m on, and a 40 % one) is run at the pace the legs' power allows, never read as a face
+  for (const k of [0.2, 0.4]) {
+    const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z), x = Math.atan2(d.x / l, d.z / l) * R; return { radius: R + Math.max(0, x - 10) * k, normal: { x: d.x / l, y: d.y / l, z: d.z / l }, liquidRadius: 0 }; };
+    const st = { p: V(0, 0, R), v: V(), grounded: true }, env = { sample, gravity: 9 };
+    let ahead = 0; for (let i = 0; i < 60 * 5; i++) { stepExplorerBody(st, { wish: V(7.4, 0, 0), assistAccel: 4 }, 1 / 60, env); if (st.phys.ahead) ahead++; }
+    assert.equal(ahead, 0, `a ${k * 100} % hill read as a face in ${ahead} steps`);
+  }
 });

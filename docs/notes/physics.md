@@ -3,6 +3,116 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P16 (fourteenth PHYSICS agent; read this block first; P15 and older below hold for everything not named here)
+
+**Where things stand.** Items 1 (import cycles), 2 (the fetch) and 3 (the Moon run at the boulder) are done; no hardening
+finding reached me (item 4); item 5 not started. Commits: `dc4e3f5` (items 1 and 2; most of their files went up first in
+the coordinator's backup `fbd611f`), then item 3 and the strips (the next physics commit). Tests: `node --test
+src/physics/` 275 pass and PILOT's `node --test tests/*.test.mjs` 125 pass on a clean export of `194171b` with my files. Scratch:
+`/home/user/.pc-scratch/physics/p16/` (`ex.sh`: export of HEAD with the working physics over it into `p16/root`;
+`sea.mjs <root> <body> <biome> <t0> <t1> [up]`: the sea state at the lab's shore in Node on PAINTER's world;
+`rose.mjs <root> <body> <biome> <t>`: the fetch by direction at the water point and where the wind comes from;
+`rock.mjs <root> <body> <assist> <height> <pace>`: a run at a boulder on PILOT's profile, the speeds and braces;
+`cycles.mjs`: import cycles; `x6d/`: an export of 6d5c02a for the load test).
+**Next, in order:** (1) the hardening findings as the coordinator sends them; (2) P14 and P13's open items (P13 hand-over,
+"Not done": the stand-in's knee, the storm frame, `tree-gust`, `clamber-walk-moon` not opened; the sea is still one state
+round the focus); (3) the fetch by direction could also turn the waves (a lagoon's chop runs where its fetch is longest,
+not only down the wind); (4) the way ahead reads only along the path: a boulder met side-on at the edge of the path is
+still taken by the face brace (legCatch) as before.
+**API added (additive):** see "Added in P16" in the API section: `physics.water().fetch/.depth`, `fields.water.gauge`,
+`.waterPoint`, `stats.msFetch`, `.fetchSamples`, `FetchGauge`, `FETCH_GAUGE`, `whiteScale`, `WATER.whiteSpeed`,
+`wind.js wakeAt`/`WAKE`, `testworld timing()`; explorer: `st.phys.paceAhead`, `st.phys.ahead`, tuning `aheadFrom`,
+`aheadMax`, `aheadSpan`, `aheadMargin`, `aheadPace`, `aheadExp`; film `clamber-run-moon-long`; probe columns `fetch`, `fdepth`.
+**Behaviour changed without a call changing:** (1) the sea near the focus is raised over the measured fetch and limited
+by the depth along it: lagoons, pools and channels carry a chop or ripples, not the biome's open sea (Neptune's storm
+coast: Hs 2.75 -> 0.21 m; Earth's sea_coast stand in a breeze: 0.64 -> 0.02 m); no swell where the water upwind is under
+600 m; (2) short waves (phase speed under 0.9 m/s, under half a metre long) never show whitecaps; (3) running (over 2.5
+m/s) the explorer reads the ground ahead (two samples a step) and slows with its soles before a face it must clamber, to
+the pace it can cross it at; the face no longer checks it; (4) wall-clock asserts in the physics tests run only under
+PC_TIMING=1.
+
+**1. Import cycles (`wind.js`, `air.js`, `flora.js`, `load.test.mjs`).** `wakeAt` and its two numbers (`WAKE.full` 0.5,
+`WAKE.top` 1.5) live in `wind.js` now; `flora.js` imports it from there, so nothing in the physics imports `air.js` back.
+`air.js` re-exports `wakeAt` (the same function) and keeps `AIR.wakeFull`/`AIR.wakeTop` (the same numbers) and the
+coordinator's lazy `HF0` (it costs nothing and keeps `air.js` safe whatever enters first). `load.test.mjs` (2 tests):
+every `src/physics/**/*.js` is imported as the ENTRY of a fresh Node process (`three` resolved to `vendor/three` as the
+pages' import maps do; `painted-lab.js` reads `location` in its body, so it passes when the only error is a browser
+global missing in its own body, which means all it imports loaded); and no static import cycle among the 49 modules the
+physics reaches (`ALLOWED_CYCLES` is empty). On an export of `6d5c02a` the first fails three ways (`flora.glsl.js`,
+`flora.js`, `painted-lab.js`: "Cannot access 'FLORA' before initialization") and the second names
+`air.js -> flora.js -> air.js`; on the head with my files both pass (about 8 s).
+
+**2. The fetch, measured (`water.js` `FetchGauge`, `windSea`, `whiteScale`; `index.js`).** As ruled: the sea state comes
+from the water that is there.
+- *The gauge*: from a water point (the focus where it stands in liquid at least 1 m deep, else the nearest such node of
+  the 256 m wind grid, else the deepest liquid about) five radials (0, +-6, +-12 degrees about upwind: the Shore
+  Protection Manual 1984 takes the mean of radials over 24 degrees) run upwind over the world's liquid until dry ground
+  or the cap (the point's biome fetch, 2500 m on sea coasts); steps of 16 m growing by a tenth of the distance gone (39
+  samples to 2500 m; the shore placed within 5 % of its distance, 2.5 % in the height); fetch = the mean of the radials;
+  depth = the mean depth over their wet length. Cached: a measurement holds within max(48 m, a tenth of its fetch) and the
+  same sixteenth of the compass (24 kept); a few samples a frame (2/4/6 by tier, x9 while nothing is known on arrival,
+  time-rationed by `QUALITY.sampleMs`); while it runs the last finished value is held, and on arrival the radials so far
+  (a lower bound that only grows). Upwind is against the way the sea runs (it follows the wind over 40 s).
+- *Depth-limited growth* (`windSea`): the SPM 1984 shallow-water curves (Bretschneider) as the ratio of each to its own
+  deep-water form, so deep water is exactly as before: 3.4 m of water under 30 m/s over 30 km holds 1.1 m where deep water
+  raises 2.7 m. Until now only the breaking cap (0.55 of the depth) knew the bottom.
+- *No whitecaps on ripples* (`whiteScale`): waves under about a metre long break without trapping air (microscale
+  breaking; Banner and Phillips 1974, Jessup, Zappa and Yeh 1997): none under 0.9 m/s of phase speed, all above 1.5.
+- *Numbers* (Node, `p16/sea.mjs`, PAINTER's world at the lab's places; `p16/before-*.txt`, `after-*.txt`):
+
+  | place | wind | fetch | depth | Hs | length | swell | cover |
+  |---|---|---|---|---|---|---|---|
+  | Neptune storm_seas, 44-50 s, before | 30 m/s from the E | 2500 (biome) | grid's deepest | 2.75 m | 10.7 m | 1.73 m (open) | 15 % |
+  | the same, after | the same | 133 m (radials 168 136 136 120 104) | 3.3 m | 0.21 m | 1.5 m | none | 15 % (a steep, white chop) |
+  | Earth sea_coast, 1150 s, before | 8.8 m/s from the ESE (offshore) | 2500 | | 0.64 m | 4.8 m | 0.40 m | 1 % |
+  | the same, after | the same | 24 m (a pool 1.7 m deep) | 0.4 m | 0.02 m | 0.2 m | none | 0 |
+- *Strips* (from `p16/root`, `kits=painter`; before = P15's, kept as `-before`), all OPENED:
+  `motion-sea-out-neptune-before`: a tongue of leopard foam runs up and drains, reach 1.5 to 7.0 m, spray to 482 drops;
+  `motion-sea-out-neptune` (after): the lagoon's surface is a fine-grained chop with small white flecks; the waterline
+  barely moves (reach -0.03 to 0.44 m), a thin warm edge along it, no foam tongue, 1 to 2 spray drops.
+  `motion-shore-earth-breeze-before`: a white foam rim along the edge, reach 0.5 to 1.9 m; `motion-shore-earth-breeze`
+  (after): a still pool, no rim, reach -0.01 to 0.06 m (fetch 18 m at the lab's focus), no spray.
+- *Cost*: the gauge spends at most its ration (24 samples a frame on arrival in the tests, 2 to 6 after) once per place
+  and wind sector; then nothing. **For PAINTER**: what changed on Neptune's coast, and what would keep a storm's surf
+  there, is the first entry of "For PAINTER".
+
+**3. The Moon run at the boulder (`explorer.js`, mine).** The check was the clamber's face contact in my body model
+(P13's `legCatch` brace: the legs at the end of their fold, the face takes the speed the feet cannot carry up it, 0.5 m/s
+a step); PILOT's wrapper passes the command through unchanged. What the ruling meets, measured (`p16/rock.mjs`, PILOT's
+`scrambleSample` dome, 1.3 m across): **within the standing rule (feet never 0.3 m off, never thrown up 0.3 m) a face
+the hips must climb can be crossed in contact only at a pace the hips can be raised onto it and brought down beyond it**:
+constant-pace runs that need no brace at the face reach 4, 3 and 2.25 to 2.5 m/s for boulders of 0.8, 1.0 and 1.2 m, the
+same on the Moon, Mars and Earth (the hold's pull, not gravity, sets it). So a lunar run at 6 m/s cannot lose only m g h
+(2.2 J/kg for 1 m, which would leave 5.8 m/s) without a bound over the top, which the rule forbids; it must shed about
+14 J/kg. What changed is WHERE and HOW: the runner reads the way ahead (`wayAhead`: one point as far ahead as its soles
+need to slow from this pace, and one 1.2 m short of it; a rise of more than the legs' stroke within that 1.2 m is a face;
+a hill under 60 % is not), plans the crossing pace by the law above (8 % under the measured edge) and brakes to it with
+its soles and the suit's assist, within the grip there, from as far out as that takes; the face then costs the climb.
+Before and after (1 m boulder, run at 7.4 m/s, Node, no assist as in the lab):
+
+  | world | before: least speed over it, brace | after: speed at the face, least over it, brace, worst step of the approach |
+  |---|---|---|
+  | Moon (g 2.2) | 2.33 m/s, 0.5 m/s a step at the face | 2.90, 2.78, none, 0.03 m/s (1.8 m/s^2) |
+  | Mars | 2.61 | 3.10, 2.75, none, 0.05 |
+  | Earth | 3.17 | 3.32, 2.76, none, 0.10 |
+
+  Still in contact everywhere (feet 0.000 m off). The run from 6 m/s on the Moon now slows over about 2 s and 8 m before
+  the boulder instead of in 0.13 s at its face. Boulders of 0.8 and 1.3 m: no brace at the face either (crossing 3.0 to
+  3.9 and 2.0 m/s). Tests: one new (`P16 the way ahead`: no brace at the face on the Moon, Mars, Earth; the approach's
+  worst step within grip plus assist; in contact; 2.2 to 3.3 m/s at the face; a 20 % and a 40 % hill never read as a
+  face); one changed with its reason (`one the hips must climb costs pace: more in low gravity`: the crossing pace is now
+  the same on every world within 10 %, measured, so it reads "no faster on the Moon").
+- *Strips* (from `p16/root` = a clean export of `194171b` with my files, `kits=painter`), all OPENED:
+  `motion-clamber-run-moon-before` (P15's): at the face the runner is checked, 5.41 -> 2.11 m/s between 0.625 and 0.75 s,
+  then climbs, crosses and slowly runs on (4.6 m/s at 3 s). `motion-clamber-run-moon` (after, the same subject): it
+  arrives already easing, 3.55 -> 2.84 m/s over the first 0.75 s (about 1 m/s^2: the lab gives no assist), climbs from
+  0.88 to 1.25 s at 2.78 -> 2.76 m/s (no check), is over the top at 1.25 s and down by 1.6 s, 4.57 m/s at 3 s.
+  `motion-clamber-run-moon-long` (new: from 10 m out, wider): the face is seen 9.1 m out at 4.4 m/s; the pace falls
+  smoothly 4.67 -> 2.76 m/s over 1.9 s, the clamber at 2.71 m/s, over at 2.75 s, on at 4.06 m/s at 4 s. The figure is
+  small in that frame but the even approach reads. If the coordinator would rather the run kept its pace over clamberable
+  boulders in low gravity (the energy-only cost), that needs the 0.3 m rule relaxed for a clamber (a bound over the top):
+  a decision, not something I took.
+
 ## Hand-over P15 (thirteenth PHYSICS agent; read this block first; P14 and older below hold for everything not named here)
 
 **Where things stand.** All four P15 items done and committed (`6f9fdd8` leaves, then the shore, the crowns' shelter,
@@ -1426,6 +1536,26 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+### P16, first (fourteenth PHYSICS agent)
+- **Nothing to wire.** Three behaviours change under the same calls:
+  1. *The explorer reads the way ahead* (`src/physics/explorer.js` `wayAhead`; the coordinator's ruling on the Moon run
+     at the boulder): running over 2.5 m/s, two more `env.sample` calls a step (one point as far ahead as the soles need to
+     slow, one 1.2 m short of it); a face it must clamber (a rise of more than the legs' 0.73 m stroke within 1.2 m, up to
+     a clamber) is remembered (`st.phys.ahead`) and the pace is held (`st.phys.paceAhead`, used like `paceCap`) so that the
+     walker arrives at the pace it can cross it at in contact (2.75 m/s for 1 m), braking with its soles and your
+     `cmd.assistAccel` within the grip. The face no longer checks the run (Moon, 1 m boulder at 7.4 m/s: before, 5.4 ->
+     2.1 m/s in 0.125 s at the face; after, about 1.8 m/s^2 over 2 s before it, nothing at the face, 2.8 m/s over it). The
+     feet stay on the ground as before (0.000 m off in my runs). Hills under 60 % are never read as faces (tested). Your
+     `tests/boulderrun.mjs` on the Moon should now show a lower pace just before the taller boulders and no check at
+     them; the ruled measure (0.3 m) is unchanged. If you want the walker blind to faces (feel), `aheadFrom` in
+     `EXPLORER_BODY` set very high turns it off (then the P13 face brace takes the speed, as before).
+  2. *The sea near the focus* is raised over the fetch measured upwind and limited by the depth (`physics.water(...).fetch`,
+     `.depth` say what it was raised over); lagoons and pools are calm or choppy, not the biome's sea. Audio: the surf and
+     spume of `here.blown` follow (Neptune's storm beach: surf 1 -> 0, spume 1 -> 0, `p16` strips' numbers).
+  3. `physics.stats.msFetch` and `.fetchSamples` count the gauge (also inside `stats.samples`).
+- Your guard on stub fall-backs and my `src/physics/load.test.mjs` (every physics module loads as the entry of a fresh
+  process, no import cycle) together cover the incident of 6d5c02a.
+
 ### P15, first (thirteenth PHYSICS agent)
 - Nothing to wire for the leaves (the kits carry them; `here.blown.leaves`, `.litter`, `.leafStock01` are new numbers if
   audio wants the rustle of a flock).
@@ -1963,6 +2093,33 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P16, first (fourteenth PHYSICS agent): the sea now comes from the water that is there (a world decision for you)
+
+Nothing to wire: the same uniforms carry a different sea. The coordinator ruled that the sea state comes from the fetch
+measured upwind over real water, capped by the biome's fetch, and limited by the depth. **What changed on Neptune's
+storm_seas coast** (the stand `getStandPure('neptune','storm_seas')`, where the lab and PILOT's tour arrive):
+- The storm wind there blows from the east (in 0 to 9000 s, 137 of 150 samples over 3 m/s came from E or ENE, 13 from
+  ESE). Upwind of the beach lies a lagoon: 0.3 m deep 20 m out, 2.8 m at 40 m, 3.4 m at 80 m, dry from about 120 to 170 m
+  out. So the storm's sea there is a steep, white chop 0.2 m high and 1.5 m long, not 2.8 m of surf; the waterline moves
+  0.4 m up the beach at most (was 1.5 to 7 m); no swell; spray 1 or 2 drops (was hundreds). Strips:
+  `docs/shots/physics/motion-sea-out-neptune-before.jpg` and `motion-sea-out-neptune.jpg`.
+- The fetch by direction at the water point (14 m east, 16 m south of the stand), `p16/rose-neptune.txt`: from E 133 m,
+  ENE 101, NE 98, NNE 75, N to SW 11 to 40, SSW 75, S 166, **SSE 571, SE 628, ESE 928** (single radials to 1800 and 2000 m).
+  The open water lies to the south-east, but the storms come from the east.
+- **If that coast should carry a storm's surf** (your call: the brief's "ultramarine storm seas with basalt stacks"), it
+  must face open water upwind, that is to the east, at least 2 km of it (the swell comes in fully from 2000 m) and some
+  depth: at 30 m/s on Neptune the sea over 2500 m of water is 1.0 m of wind sea plus a swell of 0.8 m (3.4 m deep), 1.3 m
+  (10 m deep), 1.6 m (20 m deep), 1.7 m (deep): about 2.6 m together at 20 m depth. Ways: open the lagoon's eastern bar
+  (the land 120 to 170 m east of the beach) to the sea beyond; or move the stand to a beach of storm_seas whose open side
+  faces east; or deepen the lagoon (depth alone does not help much while the fetch is 133 m: Hs 0.21 m at any depth).
+- **Earth's sea_coast stand** has the same kind of answer: it stands by a pool or channel no more than 50 m across in any
+  direction (`p16/rose-earth.txt`: fetch 8 to 50 m all round, 0.4 to 1.7 m deep), the open sea begins 320 to 640 m to the
+  west (dry between), and the wind comes from the ESE (145 of 148 samples from ESE, E or SE): offshore. So the beach is a still pool in a
+  fresh breeze (Hs 0.02 m, no foam rim; strips `motion-shore-earth-breeze-before`/`motion-shore-earth-breeze`). A beach
+  facing east onto open water would have waves and run-up; on this one the open sea's waves run away from the land.
+- Small waves no longer whiten: whitecaps need waves over about a metre long (phase speed over 0.9 to 1.5 m/s), so a pond
+  in a breeze is ripples without foam (`uPhysWaterSea.w` is 0 there).
 
 ### P15, first (thirteenth PHYSICS agent): leaves
 
@@ -2752,6 +2909,16 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     unbounded: the feel of a turn is PILOT's.
 32. **(P6) The weather enters over the surface it meets**: the ground, or the liquid standing
     over it at the focus.
+33. **(P16) The sea is raised over the water that is there** (the coordinator's ruling): the fetch measured upwind
+    from a water point over the world's liquid (the mean of five radials over 24 degrees, SPM 1984), capped by the
+    biome's fetch, and the waves limited by the mean depth along it. The biome's fetch is only how far the open water
+    runs beyond what is measured.
+34. **(P16) No import cycles in the physics** (held by `load.test.mjs`): a module that reads another's export at load
+    time inside a cycle breaks for some entry orders, and the browser's order is not the tests'.
+35. **(P16) A face the explorer must clamber is seen coming.** Within the 0.3 m measure the pace over it is bounded by
+    the hips (about 2.75 m/s for 1 m on any world), so the run's speed above that is shed by the soles, within the grip,
+    before the face, not by the face. A bound that kept the run's pace (the energy of the climb only) would break the
+    measure: the coordinator's to allow, not mine.
 
 ## Needs from the others
 

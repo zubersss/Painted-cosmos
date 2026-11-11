@@ -74,8 +74,8 @@ const PAGE_HELPERS = `(() => {
 
 const SPAWN = 'body=earth&hour=12.3';
 // (P12) put the explorer `e0` metres east of the focus, at rest or at a run-up speed, before a clamber strip
-const CLAMBER_BEFORE = (e0, v = 0) => `(L) => { const p = L.at(${e0}, 0); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0; L.ex.grounded = true;
-  ${v ? `for (let i = 0; i < 600 && L.enu(L.ex.p).e < 2.2; i++) { L.ctl.wish = [${v}, 0]; L.run(1 / 60, 1 / 60); }` : ''} }`;
+const CLAMBER_BEFORE = (e0, v = 0, until = 2.2) => `(L) => { const p = L.at(${e0}, 0); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0; L.ex.grounded = true;
+  ${v ? `for (let i = 0; i < 600 && L.enu(L.ex.p).e < ${until}; i++) { L.ctl.wish = [${v}, 0]; L.run(1 / 60, 1 / 60); }` : ''} }`;
 // (P12) move the focus (the hidden explorer; follow=1) to the waterline nearest the place, `up` metres up the beach,
 // look along the shore turned `turn` radians toward the water, let the sea settle there for 6 s, then `more`
 const SHORE_BEFORE = (up, turn, more = '') => `(L) => {
@@ -245,6 +245,12 @@ export const SUBJECTS = {
   'clamber-run-moon': { note: 'the Moon: a run (7.4 m/s) over a 1 m boulder; 8 frames a second',
     q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 8, sub: 8,
     before: CLAMBER_BEFORE(-8, 7.4), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => P.ex()` },
+  // (P16) the same run seen from further back, from 10 m before the boulder: where the walker sees it and slows (its soles,
+  // within the Moon's grip), the clamber, the run on; probe: the pace it holds for the face it has seen (pA) and how far
+  // ahead that face is (ad)
+  'clamber-run-moon-long': { note: 'the Moon: a run (7.4 m/s) at a 1 m boulder from 10 m out; 8 frames a second',
+    q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=2&dist=12&pitch=6&up=0.8&yaw=0', w: 640, h: 360, crop: [0, 0.3, 1, 0.5], tile: [320, 90], cols: 4, frames: 32, dt: 1 / 8, sub: 8,
+    before: CLAMBER_BEFORE(-12, 7.4, -4), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => ({ ...P.ex(), pA: L.ex.phys && L.ex.phys.paceAhead < 1e8 ? P.r2(L.ex.phys.paceAhead) : -1, ad: L.ex.phys && L.ex.phys.ahead ? P.r2(L.ex.phys.ahead.d) : -1 })` },
   // ---- (P12) waves on a shore: the focus is moved to the waterline nearest the place, 2 m up the beach; the camera
   // looks along the shore, turned a little toward the water. (numbers: the sea state, the run-up line (m up the beach
   // from the still waterline), the surf and foam the model reports, the height of the water 6 and 20 m out) ----

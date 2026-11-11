@@ -62,6 +62,20 @@ export const EXPLORER_BODY = Object.freeze({
                           // more than that tears the grip off and the body flies
   crestFilter: 0.15,      // (retired in P9: the stroke of the legs does this now; kept, unused)
   crestLaunch: true,      // leave the ground when it falls away faster than gravity (low-g bounding)
+  // THE WAY AHEAD (P16). A face the hips must climb (its top more than the legs' stroke over the ground here, within a
+  // clamber) is crossed in contact only at the pace the hips can be raised onto it and brought down beyond it: within the
+  // 0.3 m measure (never thrown up, the feet never off the far side) about aheadPace / (rise - legFold)^aheadExp (m): on
+  // PILOT's profile (a 1.3 m dome) the fastest pace that needs no brace at the face is 4, 3 and 2.25 to 2.5 m/s for 0.8,
+  // 1.0 and 1.2 m, the same on the Moon, Mars and Earth (the hold's pull, not gravity, sets it): 1.9 / x^0.75 within 5 %,
+  // and the law is taken 8 % under that. A runner sees it coming and sheds the rest with its soles (and the
+  // suit's assist), within the grip it has, from as far as that takes. Until P16 the face itself took it: a run on the
+  // Moon was checked from 5.4 to 2.1 m/s in 0.125 s, by contact. Two samples a step while running (aheadFrom).
+  aheadFrom: 2.5,         // m/s over the ground from which the walker reads the way ahead
+  aheadMax: 12,           // m: the farthest it reads
+  aheadSpan: 1.2,         // m: a face is a rise of more than the stroke within this run (a hill under 60 % is not)
+  aheadMargin: 0.8,       // share of the grip (and the assist) the walker plans to brake with
+  aheadPace: 1.75,        // m/s at a rise of a metre over the fold, in that law (3.85, 2.75, 2.15 m/s for 0.8, 1.0, 1.2 m)
+  aheadExp: 0.75,
   // GAIT (P13). The stride-averaged body above (st.p, st.v: the path, the pace, the stops) is carried by
   // legs that step. Within the stride the hips ride the mechanics of a legged walker:
   //   a WALK is an inverted pendulum: the hips vault over the stance foot on a leg that rolls over the
@@ -136,6 +150,8 @@ export const EXPLORER_BODY_STATE = () => ({
   clamberT: 0,            // s left of looking ahead after the legs last worked
   grip: 0,                // 1 while the limbs hold a feature (taken at a convex edge, kept until standing again)
   paceCap: 1e9,           // m/s: the pace the walker holds so its feet can follow the ground ahead
+  paceAhead: 1e9,         // (P16) m/s: the pace it holds now to meet a face it has seen ahead at the pace it can climb it
+  ahead: null,            // (P16) that face: { x, y, z (unit), rise (m), vc (m/s) } or null
   brace: 0,               // m/s of forward speed lost this step against a face or to a hold
   support: 0,             // m/s^2 of normal support from the ground (0 when floating or airborne)
   impact: 0,              // m/s of the last landing (normal speed), set on the landing step
@@ -195,6 +211,38 @@ function groundAhead(env, px, py, pz, hx, hy, hz, dist) {
   _dir2.x = x / r; _dir2.y = y / r; _dir2.z = z / r;
   return env.sample(_dir2).radius;
 }
+// (P16) THE WAY AHEAD. Running, read the ground `d` ahead along the path (and aheadSpan short of it), d far enough for the
+// soles to brake from this pace; a face the hips must climb (a rise of more than the stroke within aheadSpan, and more
+// than the stroke over the line of the ground being run on, within a clamber) is remembered; the pace held is what still
+// meets it at the pace it can be crossed in contact. aB: the braking the grip and the assist can give (m/s^2).
+function wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T) {
+  const stroke = T.legFold + T.legReach, ab = Math.max(0.3, T.aheadMargin * aB);
+  const r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r;
+  let hx = sx, hy = sy, hz = sz; const hu = hx * ux + hy * uy + hz * uz; hx -= hu * ux; hy -= hu * uy; hz -= hu * uz;
+  const hl = Math.hypot(hx, hy, hz);
+  if (!(hl > 1e-9) || !(gE > 0)) { B.paceAhead = 1e9; B.ahead = null; return; }
+  hx /= hl; hy /= hl; hz /= hl;
+  // the face remembered: still ahead and on the path?
+  let A = B.ahead;
+  if (A) { const dx = A.x - ux, dy = A.y - uy, dz = A.z - uz, d = (dx * hx + dy * hy + dz * hz) * r, side = Math.hypot(dx * r - d * hx, dy * r - d * hy, dz * r - d * hz); A.d = d; if (d < -0.5 || side > 1.0) A = B.ahead = null; }
+  // read the way: the far point, and aheadSpan short of it
+  // (read only while running; a face already seen is kept, slow or not, until it is passed or off the path)
+  const d = Math.min(T.aheadMax, vh * vh / (2 * ab)) + T.look;
+  if (vh > T.aheadFrom && d > T.aheadSpan + 0.5) {
+    const hN = groundAhead(env, px, py, pz, hx, hy, hz, d - T.aheadSpan), hF = groundAhead(env, px, py, pz, hx, hy, hz, d);   // (_dir2: the far point)
+    const slope = B.trend > 0 ? B.trend / vh : 0, rise = hF - h1 - slope * d;
+    if (hF - hN > stroke && rise > stroke && hF - h1 <= T.clamber) {
+      const vc = Math.max(0.5, T.aheadPace / Math.pow(Math.max(0.05, rise - T.legFold), T.aheadExp));
+      const cost = (q) => Math.sqrt(q.vc * q.vc + 2 * ab * Math.max(0, q.d - T.look));
+      const N = { x: _dir2.x, y: _dir2.y, z: _dir2.z, rise, vc, d };
+      // (the same face read again a little further on: it is as high as its highest reading; another face: the dearer)
+      if (A && Math.abs(N.d - A.d) < T.aheadSpan) { if (N.vc < A.vc) { A.vc = N.vc; A.rise = N.rise; } }
+      else if (!A || cost(N) < cost(A)) A = B.ahead = N;
+    }
+  }
+  B.paceAhead = A ? Math.sqrt(A.vc * A.vc + 2 * ab * Math.max(0, A.d - T.look)) : 1e9;
+}
+
 // Is there something for the limbs to hold? Yes when the ground `look` ahead (radius hD) lies well below
 // the line the hips are moving on (c: hips less a leg, w: their vertical speed, vh: their speed over the
 // ground): a convex feature at the scale of a limb; and when that ground is within a clamber of the feet.
@@ -491,7 +539,7 @@ function stepOnce(st, cmd, dt, env, T) {
       tx = qx - ux * k; ty = qy - uy * k; tz = qz - uz * k;
       const tl = Math.hypot(tx, ty, tz);
       // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
-      if (tl > 1e-9) { const m = Math.min(qlen, B.paceCap) / tl; tx *= m; ty *= m; tz *= m; }
+      if (tl > 1e-9) { const m = Math.min(qlen, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;
@@ -672,7 +720,7 @@ function stepOnce(st, cmd, dt, env, T) {
       const rr = Math.max(h1, c1 - reach), vv1 = w1 - su;
       px = _dir.x * rr; py = _dir.y * rr; pz = _dir.z * rr;
       vx = sx + vv1 * ux; vy = sy + vv1 * uy; vz = sz + vv1 * uz;
-      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.clamberT = 0; B.grip = 0;
+      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamberT = 0; B.grip = 0;
     } else {
       px = _dir.x * h1; py = _dir.y * h1; pz = _dir.z * h1;
       B.hip = clamp(c1 - h1, -fold, reach); B.hipV = w1;
@@ -690,6 +738,8 @@ function stepOnce(st, cmd, dt, env, T) {
           if (B.paceCap < 0.5) B.paceCap = 0.5;
         }
       }
+      // (P16) the way ahead (see EXPLORER_BODY.aheadFrom)
+      wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0), T);
       // the velocity lies along the ground as the legs carry it (see LEGS, 1) at the new place
       { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
       const q1 = q === 0 || B.grip ? 0 : 1;
@@ -810,7 +860,7 @@ function stepOnce(st, cmd, dt, env, T) {
       const l1 = (s1.liquidRadius || 0) > s1.radius ? s1.liquidRadius - s1.radius : 0;
       if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * _dir.x + vy * _dir.y + vz * _dir.z + hipIn; }
     }
-    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.clamber01 = 0; B.clamberT = 0;
+    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;
     if (!grounded) { B.hip = 0; B.hipV = 0; B.trend = 0; B.grip = 0; }
     B.slip01 = grounded ? 0 : B.slip01 * 0.9;
     B.scramble01 = 0;
