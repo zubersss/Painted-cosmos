@@ -7,7 +7,7 @@ export default {
   sky: mkSky([0.34, 0.33, 0.50], [0.97, 0.88, 0.74], { glaze: [0.62, 0.62, 0.82], light: [1.0, 0.97, 0.88] }),
   flora: {
     tall: [
-      { kit: 'crystal', scale: 1.1, vary: 1, bark: [[0.90, 0.80, 0.96], [0.50, 0.42, 0.72]], leaf: [[0.90, 0.80, 0.96], [0.74, 0.62, 0.86], [0.50, 0.42, 0.72]], far: [5, 7, 0.85], obs: [0.9, 5] },
+      { kit: 'crystal', scale: 1.1, vary: 1, bark: [[0.92, 0.84, 0.94], [0.60, 0.47, 0.66]], leaf: [[0.92, 0.84, 0.94], [0.76, 0.64, 0.82], [0.60, 0.47, 0.66]], far: [5, 7, 0.85], obs: [0.9, 5] },
       { kit: 'crystal', scale: 0.9, vary: 1, bark: [[0.96, 0.78, 0.84], [0.62, 0.74, 0.90]], leaf: [[0.96, 0.78, 0.84], [0.80, 0.76, 0.88], [0.52, 0.66, 0.86]], far: [4, 6, 0.85], obs: [0.8, 4] },
       { kit: 'crystal', scale: 0.8, vary: 1, bark: [[0.32, 0.32, 0.44], [0.12, 0.12, 0.20]], leaf: [[0.32, 0.32, 0.44], [0.22, 0.22, 0.33], [0.12, 0.12, 0.20]], far: [4, 5, 0.85], obs: [0.8, 3.5] },
     ],
@@ -23,6 +23,6 @@ export default {
     B('crystal_gardens', 'Twilight Crystal Gardens', 'rolling', ['cobaltViolet', 'roseMadder', 'cerulean', 'neutralTint', 'indigo'], 'lemonYellow', ['cobaltViolet', 'roseMadder', 'neutralTint'],
       { t: { amp: 45, wl: 380, dusk: 0.2 }, twilight: 0.45, tall: [0, 1], tallD: 0.11, tallMix: 0.5, under: { crust: [[0.94, 0.84, 0.94], [0.62, 0.52, 0.80], [0.96, 0.90, 0.58]], shard: [[0.95, 0.86, 0.92], [0.66, 0.56, 0.80]], rock: [[0.86, 0.78, 0.80], [0.54, 0.46, 0.58]] }, near: { crust: 5, needle: 2, dab: 1 }, small: { shard: 0.045, rock: 0.015 } }),
     B('shadow_craters', 'Frozen Shadow Craters', 'crater', ['davysGrey', 'cobaltBlue', 'neutralTint', 'indigo', 'paynesGrey'], 'mint', ['davysGrey', 'cobaltBlue', 'neutralTint'],
-      { t: { frost: 0.9, dusk: 0.25 }, twilight: 0.5, under: { rock: [[0.88, 0.91, 0.96], [0.52, 0.58, 0.74]] }, small: { rock: 0.03 }, phys: { ground: 'ice' } }),
+      { t: { frost: 0.9, dusk: 0.25 }, twilight: 0.5, under: { rock: [[0.74, 0.76, 0.82], [0.40, 0.44, 0.58]], crust: [[0.97, 0.98, 1.0], [0.80, 0.86, 0.94], [0.72, 0.90, 0.84]] }, near: { crust: 4, dab: 1 }, small: { rock: 0.018 }, phys: { ground: 'ice' } }),
   ],
 };
