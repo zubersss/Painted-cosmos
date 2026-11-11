@@ -196,7 +196,8 @@ async function flyLeg(to, n) {
   if (!check(!!i, `arrived at ${to}` + (i ? `: ${leg.arrivedKm} km away after ${leg.pulseSeconds} s of pulse, ${leg.vMax} m/s at most` + (leg.refused.length || leg.barred.length ? `; refused ${leg.refused.length}, barred ${leg.barred.length}` : '') : ''))) return fail('no arrival');
   await gameWait(8);
   i = await info();
-  check(i.frame === to + ':orbit', 'flying in the frame of ' + to + ': ' + i.frame);
+  // (A small world's ground frame reaches up to where the drive lets go: either frame is the world's own.)
+  check(i.frame === to + ':orbit' || i.frame === to + ':ground', 'flying in the frame of ' + to + ': ' + i.frame);
   // ---- down ---------------------------------------------------------------------------------------
   await until((x) => x.ship.pitchDeg < -50, 30, holdPitch(-58));
   await page.keyboard.down('KeyW');
