@@ -9,6 +9,7 @@ import { BODY_IDS, BODIES, spaceAltitude } from '../data/bodies.js';
 import { sampleObstaclesPure } from './obstacles.js';
 import { placeTrees, INST_STRIDE } from './floraplace.js';
 import { LOOKS } from '../data/looks.js';
+import { EASELS } from '../art/easels.js';
 
 test('noise is deterministic, bounded and seed-dependent', () => {
   const a = makeNoise(hashString('x')), b = makeNoise(hashString('x')), c = makeNoise(hashString('y'));
@@ -208,5 +209,21 @@ test('sampleSurface stays cheap on every body', () => {
       best = Math.min(best, (performance.now() - t0) / 3000);
     }
     assert.ok(best < 0.05, id + ': ' + (best * 1000).toFixed(1) + ' us a call');
+  }
+});
+
+test('every kept easel stands on dry ground of its own biome, and is the first vista of it', () => {
+  for (const id of Object.keys(EASELS)) {
+    const vistas = getVistasPure(id);
+    for (const biome of Object.keys(EASELS[id])) {
+      const e = EASELS[id][biome];
+      assert.ok(Math.abs(Math.hypot(e[0], e[1], e[2]) - 1) < 1e-4, id + ' ' + biome + ' is a unit direction');
+      const s = sampleSurfacePure(id, e[0], e[1], e[2]);
+      assert.equal(s.biomeId, biome, id + ' ' + biome + ' easel stands in ' + s.biomeId);
+      assert.ok(!s.isLiquid, id + ' ' + biome + ' easel is dry');
+      assert.ok(s.slope < 0.75, id + ' ' + biome + ' easel slope ' + s.slope.toFixed(2));
+      const v = vistas.find((x) => x.id === id + '-' + biome + '-1');
+      assert.ok(v && Math.abs(v.unitDir.x - e[0]) < 1e-4 && Number.isFinite(v.yaw), id + ' ' + biome + ' is a vista with a facing');
+    }
   }
 });

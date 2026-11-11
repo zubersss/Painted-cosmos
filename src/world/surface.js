@@ -13,6 +13,7 @@ import { BODIES } from '../data/bodies.js';
 import { LOOKS, pig, dilute, mixc } from '../data/looks.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
 import { dirToFace } from './cubesphere.js';
+import { EASELS } from '../art/easels.js';
 
 const _cf = {};
 
@@ -297,7 +298,8 @@ class Surface {
       if (wob === 2) wob = this.nC.n3(x * this.R / (cell * 0.16) + 3.0, y * this.R / (cell * 0.16), z * this.R / (cell * 0.16) - 5.0) * 0.09;
       d *= 1 + wob;                                                  // a lumpy outline, never a circle
       const bowl = d < 1 ? -(1 - Math.pow(d, 2.6)) : 0;
-      const rim = d < 1 ? Math.exp(-(1 - d) * (1 - d) / 0.012) : Math.exp(-(d - 1) * 3.4) * (1 - smoothstep(1.45, 1.75, d));
+      // (the crest is rounded on both sides: a rim one can stand on)
+      const rim = d < 1 ? Math.exp(-(1 - d) * (1 - d) / 0.012) : Math.exp(-Math.pow((d - 1) * 3.0, 1.6)) * (1 - smoothstep(1.45, 1.75, d));
       out += (bowl * depth + rim * rimH) * (rr / 0.29);
       if (rr > 0.2 && d > 0.9 && d < 1.12 && rim > this._rim) this._rim = rim;
     }
@@ -791,15 +793,39 @@ export function sampleSurfacePure(bodyId, dx, dy, dz) {
   };
 }
 
+// The painter's spot for a biome: where its picture was painted from (src/art/easels.js), or
+// its first site. -> { unitDir, yaw, pitch } (yaw from local north toward east, radians) | null
+export function getEaselPure(bodyId, biomeId) {
+  const S = getSurface(bodyId);
+  const e = EASELS[bodyId] && EASELS[bodyId][biomeId];
+  if (e) { const l = 1 / Math.hypot(e[0], e[1], e[2]); return { unitDir: { x: e[0] * l, y: e[1] * l, z: e[2] * l }, yaw: e[3] * D2R, pitch: e[4] * D2R }; }
+  const bi = S.biomes.findIndex((b) => b.id === biomeId);
+  const s0 = S.sites.find((x) => x.b === bi);
+  return s0 ? { unitDir: { x: s0.x, y: s0.y, z: s0.z }, yaw: 0, pitch: 0 } : null;
+}
+
+// The marked views of a body: first each biome's easel (the view its picture was painted
+// from; yaw and pitch say which way the painter faced), then second sites.
 export function getVistasPure(bodyId) {
   const S = getSurface(bodyId);
   const out = [];
   const seen = {};
+  for (const bi of S.biomes) {
+    const e = EASELS[bodyId] && EASELS[bodyId][bi.id];
+    if (!e || out.length >= 8) continue;
+    const v = getEaselPure(bodyId, bi.id);
+    seen[bi.id] = 1;
+    out.push({ id: bodyId + '-' + bi.id + '-1', name: bi.name, unitDir: v.unitDir, yaw: v.yaw, pitch: v.pitch });
+  }
   for (let i = 0; i < S.sites.length && out.length < 8; i++) {
     const s = S.sites[i], bi = S.biomes[s.b];
     seen[bi.id] = (seen[bi.id] || 0) + 1;
     if (seen[bi.id] > 2) continue;
-    out.push({ id: bodyId + '-' + bi.id + '-' + seen[bi.id], name: bi.name + (seen[bi.id] > 1 ? ' II' : ''), unitDir: { x: s.x, y: s.y, z: s.z } });
+    if (seen[bi.id] === 1 || !(EASELS[bodyId] && EASELS[bodyId][bi.id]) || i > 0) {
+      // a site of a biome whose easel is already listed counts as its second view
+      if (EASELS[bodyId] && EASELS[bodyId][bi.id] && S.sites.findIndex((x) => x.b === s.b) === i) { seen[bi.id]--; continue; }
+      out.push({ id: bodyId + '-' + bi.id + '-' + seen[bi.id], name: bi.name + (seen[bi.id] > 1 ? ' II' : ''), unitDir: { x: s.x, y: s.y, z: s.z } });
+    }
   }
   return out;
 }

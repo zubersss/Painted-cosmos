@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { BODIES, BODY_IDS, SUN } from '../data/bodies.js';
 import { getLook } from '../data/looks.js';
-import { getSurface, sampleSurfacePure, getVistasPure } from './surface.js';
+import { getSurface, sampleSurfacePure, getVistasPure, getEaselPure } from './surface.js';
 import { PlanetTerrain } from './terrain.js';
 import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
@@ -240,12 +240,9 @@ export function createWorld(scene) {
     setBuildBudget(ms) { budgetMs = Math.max(0.5, +ms || 5); },
     getLighting() { return lighting; },
     getBiomes(bodyId) { return getLook(bodyId).biomes.map((b) => ({ id: b.id, name: b.name })); },
-    findBiome(bodyId, biomeId) {
-      const S = getSurface(bodyId);
-      const bi = S.biomes.findIndex((b) => b.id === biomeId);
-      const s = S.sites.find((x) => x.b === bi);
-      return s ? { unitDir: { x: s.x, y: s.y, z: s.z } } : null;
-    },
+    // a place to stand in a biome: the painter's easel for it (and which way the painter
+    // faced: yaw from local north toward east, pitch, radians), or the biome's first site
+    findBiome(bodyId, biomeId) { return getEaselPure(bodyId, biomeId); },
     get _flora() { const st = state.get(lastActive || 'earth'); return st && st.flora; },
     get _prof() { return Object.assign({}, prof, this._flora ? this._flora.prof : {}); },
     _profReset() { prof.terrain = 0; const fl = this._flora; if (fl) { const p = fl.prof; p.wanted = p.build = p.retier = 0; } },
