@@ -3,6 +3,66 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P8 (fifth PHYSICS agent; read this block first, then the P7 hand-over below, which still holds for everything not named here)
+
+**Where things stand.** `node --test src/physics/` 226 pass; PILOT's 105 pass on a clean export with my files
+(`tests/physics.test.mjs:27` failed once in three full runs under load and passed alone, 9 of 9; my own timing
+tests in `loose.test.mjs` and `kits.test.mjs` fail now and then under load and pass alone). Nothing half-edited.
+
+**Done in P8** (commits `d149255`, `1cbbcc6`, P8.4, P8.1, and the last one):
+1. *Run in a browser and looked at* (painted lab, clean export, no console error in any): thunderstorm in the
+   forest, blizzard, Mars dust storm, Neptune's storm coast. Frames in `docs/shots/physics/` under the old four
+   names (`painted-storm-forest.jpg`, `painted-snow.jpg`, `painted-mars-dust.jpg`, `painted-neptune-sea.jpg`).
+   Found and fixed: **trees whipped upwind in the gust front** (104 deg/s; aerodynamic damping added,
+   `FLORA.aeroDamp`: now 10 deg/s at most, test in `flora.test.mjs`); **the lab drew P4's `broad` rain table,
+   not the game's** (`painted-lab.js`: default is `DRAW_PAINTED.rain` now; the Neptune frame was shot before
+   that fix and shows the old fanning strokes; a re-shot `p8/p8-neptune-gale2.jpg` exists in scratch, NOT opened).
+   Walked in PILOT's `Sim` (`p8/stormwalk.mjs <root> <body> <t> [biome|lat,lon]`): numbers in "For PILOT".
+2. *The wind where the player stands*: boundary layer by roughness (`BIOMES.storm_seas` z0 0.3 m, sea by
+   Charnock: `wind.js seaRoughness`, `ground.js liquidRoughness`); downwind slower than upwind was a 4.5 m cliff
+   14 m downwind of the stand, not the model (test holds downwind >= upwind on level ground).
+   `cmd.shelter01` (0..1, default 0): the share of the wind FORCE the suit cancels (PILOT's lever; tested).
+3. *First storm in daylight*: `REGIMES.earth.epoch = 480` (Earth's weather clock starts 480 s in; nothing else moved).
+4. *Regimes*: home-grown storms where a biome's `moist` > 1.2 (`WEATHER.own*`, `ownStorm01`); dust only from dry
+   ground (`lift x (1 - moist)`).
+
+**Not done, in the order I would do it:**
+1. **Five tests run at Earth's old weather start** (`testworld.mjs epoch0`: snow filling prints and particle
+   life in `particles.test.mjs`; the painter's sky words and fresh snow under a clear sky in `sky.test.mjs`; the
+   snow pack in `weather.test.mjs`). With the epoch on they fail: "323 low flakes, 7 wrong"; the first system
+   found by `find` is no storm (cloud 0.49); "cover gained with nothing falling: 0.00011"; "no pack of its own:
+   0.027". The coordinator asked for each to be looked into (probe moved, or a real fault the old start hid):
+   NOT done, I ran out of context. Starting the searches at t = -480 instead breaks other tests (negative time).
+2. **A boulder as ground launches the body** (PILOT now folds obstacles up to 1.3 m into `env.sample`).
+   `p8/boulder.mjs` (pure body, a smooth bump 1.3 m high and 2.6 m across, flanks up to 57 deg): on Earth a
+   walker stalls on it and a runner flies 1.4 m high for 0.7 s; Mars walk 1.6 m, run 2.3 m; **Moon walk 3.2 m
+   up and 3.6 s in the air, Moon run 5.9 m and 5.1 s**. The body is a point that leaves the ground when the
+   ground curves away faster than gravity; legs that flex over anything lower than a leg are missing. Start in
+   `explorer.js` where the ground is met again after the move (a leg-length of reach before `grounded` is lost,
+   and the vertical speed a ramp gives absorbed over features shorter than a stride).
+3. *Spindrift*: a 30 m/s gale over Neptune's sea emits no spray particles (only bodies do: `loose.js`); the sea
+   shows foam but nothing flies. *Dust walls* read as pale blots (4 to 5 in view), not as blowing dust.
+   *Flakes near the ground* in a blizzard read as pale pebbles (drawn-out ovals); the frame is a white-out.
+4. Item 5 of the order (the `expand: 'gpu'` path, calm-air flake crawl, the silhouette request): not touched.
+   The gpu path is only reachable through my lab's `expand=gpu`; I did not check whether PAINTER uses it.
+5. The gust pattern is advected by `tau x wind` with tau up to 48 s: when the mean wind changes fast (a storm
+   arriving) the pattern races (wind at 30 m changed by up to 52 m/s2 in one frame at 241 s at the spawn).
+
+**Critique of the other two domains (for M4's swap), from where I stand.**
+PAINTER: (1) in the storm the ground stays sunlit green under a black sky: `wet` and `overcast` do not darken
+the grass enough to read as rain light. (2) Trees are rigid in a still frame at 14 degrees of lean: the crown
+does not shear against the trunk, so a gale and a calm look alike unless it moves. (3) The blizzard is a
+white-out with no horizon and no figure-ground: flakes are white on white; they need the dark of what is
+behind them. (4) Dust walls and kicked dust are pale blots with hard edges, like spilled wash, and Mars' sand
+streaks are darker than the dune. (5) Neptune's sea is foam at the shore and flat wash beyond: no swell line
+to the horizon, so a hurricane sea looks like a pond.
+PILOT: (1) a straight walk through the home forest makes 1.8 to 4.1 m/s depending on heading because the
+explorer stalls on trunks (speed falls to 0 in five of eight headings). (2) The ship set down 12 m from where
+it hovered at the spawn in calm and storm alike: the descent moves sideways by itself. (3) A hop is carried 25 m
+on Neptune and 28 m in a blizzard with nothing telling the player why. (4) Walking speed is 4.20 m/s in every
+heading in a 19 m/s wind: the assist erases the weather on foot; lean is the only trace. (5) Low boulders as
+ground launch the explorer (item 2 above), worst on the Moon.
+
 ## Hand-over (kept current; last written at the end of P7 by the fourth PHYSICS agent)
 
 This file is meant to be enough on its own. Read this section top to bottom once; the code
@@ -647,6 +707,32 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+**P8, for PILOT (read first).**
+- *New storm times (Earth only; every Earth weather time of before is 480 s earlier; no other body moved).* At
+  the spawn: fair 0 to 120 s, first drops 140 s, thunderstorm 160 to 320 s (12:04 to 14:37 of the first day;
+  20 mm/h and more from 200 to 260 s; gust front about 176 to 195 s), clear from 340 s. For `tests/weather.mjs`:
+  before 60, storm 240, flash 244, after 390. Blizzards on land: lat 62.20 lon 20.58 from 10 to 110 s; lat
+  62.41 lon 49.46 from 120 to 220 s (5.2 mm/h at 170 s). The alpine meadow stand has one only from 0 to 30 s.
+  Mars' dust at 840 s and Neptune's coast are where they were; Neptune's coast is now in a thunderstorm at 0 to
+  90, 780 to 2010, 2820 to 4590 and from 4980 s (a storm sky about 70 % of two hours).
+- *`cmd.shelter01`* (0..1, default 0, additive): the share of the wind's force on the explorer the suit
+  cancels (the body is given wind x sqrt(1 - shelter01); its drag in still air is untouched). Tested.
+- *The wind on Neptune's coast* (`p8/stormwalk.mjs`, your Sim, level ground at lat -4.277 lon -159.326, t 60):
+
+  | | wind at the walker | walk made good, 8 headings | lean | 2.5 s hop carried | ship: hover drift 10 s, landing |
+  | --- | --- | --- | --- | --- | --- |
+  | before P8 | 24 to 26 m/s (max 29) | 4.19 to 4.20 m/s | 9 to 19 deg | 37.9 m | 1.9 m; down at 0.97 m/s |
+  | P8 | 13 to 15 m/s (max 19) | 4.19 to 4.20 m/s | 1 to 6 deg | 25.1 m | 3.8 m; down at 0.99 m/s, 0.7 m off |
+
+  At the biome's stand itself the downwind heading still makes 1.1 m/s, with or without wind: a 4.5 m cliff
+  14 m away (`p8/profile.mjs`). Wind at 2 / 10 / 30 m there: 21.8 / 39.8 / 51.5 m/s (was 36.2 / 42.5 / 46.6):
+  the rough shore is gustier aloft, and the ship's hover sees up to 57 m/s (drift 5.9 m in 10 s, lands).
+- *The storm at the Earth spawn* (t 240, in the wood): wind at the walker 1 to 6 m/s; walk made good 1.8 to
+  4.1 m/s by heading (the low ones are trunks); stand 15 s: 0 m; hop carried 6.1 m; ship hover drift 0.7 m,
+  lands in 6 s at 1.08 m/s. Blizzard (old clock 414 s, alpine meadow, 19 m/s at 2 m): 4.20 m/s in every
+  heading, lean to 11 deg, hop carried 27.9 m, ship lands at 0.98 m/s.
+- *Boulders as ground*: the body minds. See the hand-over, "Not done" 2, for the numbers.
+
 **P7, for PILOT and the lead (read this block first; nothing below it changed).**
 
 *Nothing to wire.* Everything of P7 arrives through what you already call. What you will
@@ -1022,6 +1108,15 @@ through `world.setPhysics(physics)`; `physics.update` has already run when `worl
 called (in the gallery you call `physics.update(dt, { bodyId, time, focus, sunDir })` yourself).
 Everything of mine is in **body-local** coordinates (C3). Nothing below is required: each part
 stands alone, in the order I would wire them.
+
+**P8, for PAINTER (read first; nothing you call changed).** Earth's storms are 480 s earlier (the first
+thunderstorm crosses the spawn at 160 to 320 s, in daylight; times in "For PILOT"). Trees no longer whip
+upwind in a gust front (the bend texture is as before; it just moves at 10 deg/s at most where it did 104).
+Neptune's storm coast is under a thunderstorm of its own most of the time (`sky.storm`, `sky.rain`, lightning)
+and its land is sheltered by its roughness (about a third of the wind aloft at head height). `sky.dust` is 0
+over any ground as wet as a wood or a meadow, in any wind. My lab now draws rain with your table.
+What I saw in the four frames that is yours: the storm's ground is sunlit; flakes are white on white; dust
+walls are hard pale blots; the far sea is flat (the swell and `pcPhysWaterCrestLine` are there to use).
 
 **Changed in P7 (tuned against your `wx-*.jpg` frames; your list in "What looks wrong in the
 physics as painted", answered item by item). Nothing you call changed its name or arguments;

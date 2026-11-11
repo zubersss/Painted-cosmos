@@ -263,3 +263,14 @@ test('a wind never makes downwind the slow way: on level ground the speed made g
     if (wind <= 15 && wish < 5 && ground !== ICE && ground !== SAND) assert.ok(Math.abs(down - wish) < 0.05 && up > wish - 0.3, `a fresh wind does not slow a walker: ${ground.material} ${wind} ${down} ${up}`);
   }
 });
+
+test('cmd.shelter01 is the share of the wind force the suit cancels: none by default, all of it at 1 (PILOT\'s lever, P8)', () => {
+  const lean = (shelter01) => { const s = make({ wind: V(30, 0, 0) }); run(s, 2, { wish: V(), shelter01 }); return s.st.phys.windAccel; };
+  const full = lean(undefined), zero = lean(0), half = lean(0.5), none = lean(1);
+  assert.equal(full, zero); assert.ok(full > 3, 'a 30 m/s wind pushes: ' + full);
+  assert.ok(Math.abs(half / full - 0.5) < 0.01, 'half the force: ' + half / full);
+  assert.equal(none, 0);
+  const ice = (shelter01) => { const s = make({ wind: V(25, 0, 0), ground: ICE }); run(s, 6, { wish: V(), shelter01 }); return s.st.v.x; };
+  assert.ok(ice(0) > 1 && ice(1) === 0, 'blown across the ice without it, standing with it: ' + [ice(0), ice(1)]);
+  const still = make(); run(still, 5, { wish: V(4.2, 0, 0), shelter01: 1 }); assert.ok(Math.abs(speed(still.st) - 4.2) < 0.01, 'still air: nothing changes');
+});

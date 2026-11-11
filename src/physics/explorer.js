@@ -138,6 +138,10 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
   // ---- surroundings ------------------------------------------------------------------------
   let rho = 1.225, wx = 0, wy = 0, wz = 0;
   if (env.air) { const a = env.air(st.p, _air, Math.max(0, r - groundR) + 1.0); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
+  // A named assist (PILOT's lever; default 0 = the real wind): cmd.shelter01, 0..1, is the share of the
+  // wind's FORCE on the body that the suit cancels. The force goes with the square of the wind, so the
+  // body is given wind x sqrt(1 - shelter01); its own drag through still air is untouched.
+  if (cmd.shelter01 > 0) { const k = Math.sqrt(1 - clamp01(cmd.shelter01)); wx *= k; wy *= k; wz *= k; }
   const G = env.ground ? env.ground(s0, _gnd) : DEFAULT_GROUND;
   const liq = env.liquidOf ? env.liquidOf(s0) : env.liquid || DEFAULT_LIQUID;
   // viscous (Stokes) drag: nothing in water, everything in lava. 3 pi mu L v on a body of length L.
