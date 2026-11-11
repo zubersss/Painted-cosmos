@@ -1091,3 +1091,38 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   rim or any drop it cannot step down is a fall, as the ruling on legs already says. The
   measure for review 6 reads: no boulder lifts the feet more than 0.3 m, and the body is
   never thrown upward more than 0.3 m, without a jump.
+- 2026-11-11: **PAINTER block 6 accepted (eighth agent; `5edf80c`, `ad17d2c`, some files in
+  the snapshot `2f4a7b6`)**. The coordinator re-ran on a clean export of the head: 19 world
+  tests and PILOT's 116 pass; and opened the before and after pair of Venus, Saturn and
+  Jupiter. In: **each of the three says its world in one look**: Venus lands on the bank of
+  a lava river with a grove of old fungal towers on the skyline and a basalt spire; Saturn
+  has its rings as a great pale arc across the sky over a gold meadow; Jupiter stands on a
+  bench between island cliffs under cream and orange belts running to a vanishing point.
+  All three spawns moved (data in `src/data/looks.js`; Venus to a lava bank in the same
+  biome, Saturn from latitude 12 to -31 on another gold island, Jupiter to a bench on the
+  first island), each on levelled ground with a level berth for the ship 16 m off;
+  `world.getSpawn` returns `yaw` and `pitch` for them. The cloud sea cannot be seen from a
+  level landing on these small worlds (its horizon lies 12 degrees below eye level and the
+  island's rim hides it), so the far deck is painted into the sky.
+  The lead's motion faults, **in code and not seen in motion**: each tree washes in over
+  0.55 s and a tree changing tier cross-fades; undergrowth cells wash in; near flowers have
+  a lobed edge; splash rings are a soft broken glaze; strokes between the lens and the
+  figure part; the explorer folds its knees by `hip`. `world.busy` stays above 0 for 0.65 s
+  after the last arrival. Orbit: the limb thins in proportion to a world's air (Neptune's
+  bright rim gone), one outline for Earth's cloud, a gold ring with its division; Mercury is
+  still a dull grey ball and no body shows a dark side in the gallery's orbit view. Dust
+  veil gain 1.5 to 2.6; rain strokes heavier. The timed world test asserts only with
+  `PC_TIMING=1`.
+  Coordinator's verdict: Venus is the largest single gain of the push; Saturn's arc works
+  though the wash under it is muddy; Jupiter's sky says Jupiter and its ground says valley.
+  Not done: the build order after a landing, the ground arriving in pieces, near strokes
+  growing in; leaves, sand skim and blown snow seen blowing; Neptune's far sea, the pale
+  rectangle in its sky, the sea's heave and the frozen foam rim; the track through grass;
+  the brush; the two vistas in a thicket; Mars' dune crests; branch sway and drifts; the
+  explorer's face; the UI look review. The eighth PAINTER agent is out of context and is
+  replaced by a ninth.
+- 2026-11-11: **Review 6 starts now** (coordinator), in two halves so that nobody waits:
+  the sixth PILOT agent begins with what depends least on PHYSICS's last stage (the
+  mechanics on the moved spawns and changed obstacles; the tour), and does the motion set,
+  the weather set and every check when PHYSICS reports. PAINTER's ninth agent works on the
+  known motion and weather faults meanwhile and takes review 6's findings as they come.
