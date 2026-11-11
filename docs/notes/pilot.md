@@ -127,9 +127,12 @@ M3 (latest first):
 - With all M3 code and the last flight changes (per-world pace, settling on C):
   `node tests/playthrough.mjs` (kinematic) PASSED; the same with PHYSICS PASSED;
   `node tests/trip.mjs` (Earth, Mars, Saturn, reload from save) PASSED.
-- `node tests/tour.mjs` on a clean export of `0f40f68`'s successor: contact sheets in
-  `docs/lead/evidence/tour-<body>.jpg` (see the report for which bodies finished). Most frames
-  are marked "(unsettled)": `world.busy` did not return to 0 within 75 s after a teleport.
+- `node tests/tour.mjs` on a clean export (PAINTER's state at `19e9599`, before the fresh
+  PAINTER's pass): contact sheets for all ten bodies in `docs/lead/evidence/tour-<body>.jpg`,
+  42 frames, no console errors on any body. Most frames are marked "(unsettled)":
+  `world.busy` did not return to 0 within 60 to 75 s after a teleport. In one long process the
+  browser refused a capture after about 40 minutes (twice, on Mercury and on the Moon); run
+  alone, both bodies capture fine, so the tour is now run one body per process.
 - Not verified: nobody has *heard* the audio; the tour sheets have not been judged yet (that
   is review 4, after the fresh PAINTER reports).
 
