@@ -151,7 +151,9 @@ export class Loose {
         carry[0] += capD * 0.6 * dust01 * h / 5;
         while (carry[0] >= 1 && bd._n < capD * (0.25 + 0.6 * dust01)) {
           carry[0] -= 1;
-          const y = groundY + rng() * rng() * 14;
+          // (P7) low: what reads as marks in a dust storm is the dense streamers within a few metres of
+          // the ground; the dust above head height is haze (sky.dust), and a puff against the sky is a blot
+          const y = groundY + 0.4 + rng() * rng() * 3.2;
           this.emit('dust', fx + (rng() * 2 - 1) * Rr, y, fz + (rng() * 2 - 1) * Rr, cwe * 0.6, 0, cwn * 0.6, 1.4, 1.2, I_DUST);   // carried in from afar: the world's dust
         }
         if (carry[0] > 4) carry[0] = 4;

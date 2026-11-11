@@ -164,7 +164,7 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
   const _c = { cover: 1 };
   // the air a kind is spread through (m3): what falls fills the whole box, dust hugs the ground
   const BOX = 4 * PARTICLES.radius * PARTICLES.radius;
-  const AIR = { snow: BOX * (PARTICLES.height + PARTICLES.below), rain: BOX * (PARTICLES.height + PARTICLES.below), dust: BOX * 8 };
+  const AIR = { snow: BOX * (PARTICLES.height + PARTICLES.below), rain: BOX * (PARTICLES.height + PARTICLES.below), dust: BOX * 3.6 };   // (P7: storm dust is carried within 3.6 m of the ground: loose.js)
   function hiding(kind, wx) {
     const p = wx.precipitation;
     if (kind === 'dust') return wx.dustExtinction || 0;
@@ -202,6 +202,7 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.vx = track.vx; eye.vy = track.vy; eye.vz = track.vz;
         eye.rx = track.rx; eye.ry = track.ry; eye.rz = track.rz; eye.ux = track.ux; eye.uy = track.uy; eye.uz = track.uz;
         eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.radius = PARTICLES.radius; eye.pix = pix;
+        eye.wall01 = P.kind === 'dust' ? physics.here.weather.dustLoad01 || 0 : 0;
         // how large a dab is now: its own size, or what the dust (snow) in the air needs to hide what it hides
         let size = P.D.size, room = 1;
         const ext = AIR[P.kind] ? hiding(P.kind, physics.here.weather) : 0;
@@ -215,7 +216,7 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
           stats.size[P.kind] = size;
         } else if (ext > 0) {
           // a streak inks about half its quad (it tapers); its length is its fall during the exposure
-          const c = Math.min(1, n * P.D.width * Math.max(P.D.min || 0, (b.fallSpeed || 6) * P.D.exposure) * 0.5 * (P.D.share || 1) / (ext * air));
+          const c = Math.min(1, n * P.D.width * Math.min(P.D.maxLen > 0 ? P.D.maxLen : 1e9, Math.max(P.D.min || 0, (b.fallSpeed || 6) * P.D.exposure)) * 0.5 * (P.D.share || 1) / (ext * air));
           stats.cover[P.kind] = c; room = 1 / Math.max(c, 1e-3);
         } else delete stats.cover[P.kind];
         if (gpu) {

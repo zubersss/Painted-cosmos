@@ -204,7 +204,7 @@ test('the floor: far marks are never smaller than the least size, there are fewe
 
 test('a mark near the lens is never larger than the most asked for; a dab is drawn out along its motion', () => {
   const eye = makeEye(); eye.pix = 0.002;
-  const D = { ...DRAW.snow, size: 0.1, minPx: 3.5, maxPx: 9, exposure: 0, strobe: 0, near: 0 };
+  const D = { ...DRAW.snow, size: 0.1, minPx: 3.5, maxPx: 9, exposure: 0, strobe: 0, near: 0, tumble: 0 };   // (round flakes here: their shape has its own test)
   const b = buf([{ p: [0, 0, -1] }, { p: [0, 0, -8] }]); const out = new Float32Array(24);
   expandDabs(b, D, eye, out);
   assert.ok(Math.abs(len(sub(V(out, 1), V(out, 0))) - 9 * 0.002 * 1) < 1e-6, 'at 1 m: 9 px');
@@ -320,7 +320,7 @@ test('snow shown modulo a cell round the eye: the same flakes, whole cells away,
 
 test('nothing strobes: a dab is drawn out as far as it travels in a frame, and shrinks away where that would make it a hairline', () => {
   const eye = makeEye(); eye.pix = 0.002;
-  const D = { ...DRAW.snow, size: 0.1, minPx: 0, maxPx: 0, exposure: 0.04, smear: 1.2, strobe: 0.02 };
+  const D = { ...DRAW.snow, size: 0.1, minPx: 0, maxPx: 0, exposure: 0.04, smear: 1.2, strobe: 0.02, tumble: 0 };
   // at 8 m, blown across the picture at 5, 10, 20, 30 and 45 m/s
   const w = buf([5, 10, 20, 30, 45].map((v) => ({ p: [0, 0, -8], v: [v, 0, 0] }))), o = new Float32Array(60);
   expandDabs(w, D, eye, o);
@@ -382,4 +382,130 @@ test('the cell divides the simulated box: a particle the simulation wraps from w
   expandDabs(a, D, far, oa); expandDabs(b2, D, far, ob);
   let jump = 0; for (let i = 0; i < N; i++) jump = Math.max(jump, Math.abs(oa[i * 12] - ob[i * 12]));
   assert.ok(jump > 5.9, `${jump}`);
+});
+
+// ---- P7: tuned against the painted picture ------------------------------------------------------
+
+test('rain laid parallel: every stroke of a frame has one direction in the picture, however near, and none is longer than asked', () => {
+  const eye = makeEye(); eye.pix = 0.002;
+  // looking along -z, a little down: picture right = +x, picture up = (0, cos, sin) tilted
+  const pitch = 0.35; eye.ux = 0; eye.uy = Math.cos(pitch); eye.uz = -Math.sin(pitch);
+  const drops = [];
+  for (let i = 0; i < 60; i++) drops.push({ p: [(i % 10 - 4.5) * 1.3, 1 + (i % 7) * 0.8, -3 - (i % 6) * 2.5], v: [3 + 0.4 * Math.sin(i), -8 - (i % 5) * 0.5, 1], size: 0.002 + i * 1e-5 });
+  const b = buf(drops), out = new Float32Array(60 * 12);
+  const D = { ...DRAW.rain, ...DRAW_PAINTED.rain, minPx: 0, share: 1, near: 0, fadeIn: 0, fadeOut: 0 };
+  assert.equal(D.parallel, 1); assert.ok(D.maxLen > 0.5 && D.maxLen <= 1.5);
+  const fwd = cross([eye.rx, eye.ry, eye.rz], [eye.ux, eye.uy, eye.uz]);     // toward the eye (right x up)
+  const screen = (v) => { const d = -dot(v, fwd); return [dot(v, [eye.rx, eye.ry, eye.rz]) / d, dot(v, [eye.ux, eye.uy, eye.uz]) / d]; };
+  const dirs = (o) => { const a = []; for (let q = 0; q < 60; q++) { const h = V(o, q * 4), t = V(o, q * 4 + 3), sh = screen(h), st = screen(t); a.push(Math.atan2(st[1] - sh[1], st[0] - sh[0])); } return a; };
+  expandStreaks(b, D, eye, out);
+  const par = dirs(out), spread = Math.max(...par) - Math.min(...par);
+  assert.ok(spread < 1e-3, `parallel: the strokes differ by ${spread} rad`);
+  for (let q = 0; q < 60; q++) { const l = len(sub(V(out, q * 4 + 3), V(out, q * 4))); assert.ok(l <= D.maxLen + 1e-6 && l >= D.min - 1e-6, `stroke ${l} m`); }
+  // each along its own path in perspective: they fan out by a quarter of a radian and more (what PAINTER saw crossing)
+  expandStreaks(b, { ...D, parallel: 0 }, eye, out);
+  const per = dirs(out); assert.ok(Math.max(...per) - Math.min(...per) > 0.25, `in perspective they fan by ${Math.max(...per) - Math.min(...per)}`);
+  // the frame's direction is the mean motion as the picture sees it: down, and to the right with this wind
+  const mean = par[0]; assert.ok(Math.cos(mean) < 0 && Math.sin(mean) > 0.5, `tails up and to the left (heads lead down and right): ${mean}`);
+  // Jupiter: 30 m/s for 0.12 s would be 3.6 m; no stroke is longer than maxLen, parallel or not
+  const fast = buf([{ p: [0, 3, -9], v: [0, -30, 0] }, { p: [2, 3, -9], v: [0, -30, 0] }]), o2 = new Float32Array(24);
+  for (const parallel of [0, 1]) { expandStreaks(fast, { ...D, parallel }, eye, o2); assert.ok(Math.abs(len(sub(V(o2, 3), V(o2, 0))) - D.maxLen) < 1e-6, 'capped'); }
+  // looking straight down the rain there is no direction to see: dots of the least length
+  const down = makeEye(); down.pix = 0.002; down.rx = 1; down.ry = 0; down.rz = 0; down.ux = 0; down.uy = 0; down.uz = -1;
+  const fall = buf([{ p: [1, -6, 1], v: [0, -9, 0] }, { p: [-2, -8, 0], v: [0, -9, 0] }]);
+  expandStreaks(fall, D, down, o2); assert.ok(Math.abs(len(sub(V(o2, 3), V(o2, 0))) - D.min) < 1e-6, 'seen from above: a dot');
+  // nothing near the lens: gone inside 0.4 of `near`, whole from `near` on
+  const nearB = buf([1, 2.3, 4, 6.5, 12].map((d) => ({ p: [0, 0, -d], v: [0, -8, 0] }))), o3 = new Float32Array(60);
+  expandStreaks(nearB, { ...D, near: 6 }, eye, o3);
+  const wid = (q) => len(sub(V(o3, q * 4 + 1), V(o3, q * 4)));
+  assert.ok(wid(0) < 1e-9 && wid(1) < 1e-9 && wid(2) > 0.005 && wid(2) < 0.04 && Math.abs(wid(3) - D.width) < 1e-6 && Math.abs(wid(4) - D.width) < 1e-6, `${[0, 1, 2, 3, 4].map((q) => wid(q).toFixed(3))}`);
+  // a third of the strokes: the painted table draws about a third of what it drew
+  const many = buf(Array.from({ length: 900 }, (_, i) => ({ p: [(i % 30 - 15) * 0.7, (i % 9) * 0.6, -6 - (i % 17)], v: [0, -8, 0], size: 0.001 + i * 2.3e-6 }))), om = new Float32Array(900 * 12);
+  const count = (DD) => { expandStreaks(many, DD, eye, om); let c = 0; for (let q = 0; q < 900; q++) if (len(sub(V(om, q * 4 + 1), V(om, q * 4))) > 1e-4) c++; return c; };
+  const all = count({ ...D, minPx: 4 }), few = count({ ...D, minPx: 4, share: DRAW_PAINTED.rain.share });
+  assert.ok(few > 0.22 * all && few < 0.48 * all, `${few} of ${all} strokes`);
+});
+
+test('a flake has a shape of its own and turns slowly; driven by wind it lies along its motion; nothing flips', () => {
+  const eye = makeEye(); eye.pix = 0.002;
+  const D = { ...DRAW.snow, ...DRAW_PAINTED.snow, minPx: 0, maxPx: 0, varySize: 0, cell: 0, near: 0, fadeIn: 0, fadeOut: 0 };
+  assert.equal(DRAW_PAINTED.snow.size, 0.07); assert.equal(DRAW_PAINTED.snow.minPx, 3.5); assert.equal(DRAW_PAINTED.snow.maxPx, 6.5);
+  assert.ok(D.tumble > 0 && D.aspect < 0.8);
+  const n = 300, list = Array.from({ length: n }, (_, i) => ({ p: [0, 0, -6], size: 0.004 + i * 2.1e-5, age: 3 }));
+  const b = buf(list), o = new Float32Array(n * 12);
+  expandDabs(b, D, eye, o);
+  const long = (q) => len(sub(V(o, q * 4 + 1), V(o, q * 4))), short = (q) => len(sub(V(o, q * 4 + 3), V(o, q * 4)));
+  const ang = (q) => { const a = sub(V(o, q * 4 + 1), V(o, q * 4)); return Math.atan2(a[1], a[0]); };
+  let lo = 9, hi = 0; const seen = new Set();
+  for (let q = 0; q < n; q++) { const r = short(q) / long(q); lo = Math.min(lo, r); hi = Math.max(hi, r); assert.ok(Math.abs(long(q) - D.size) < 1e-6, 'its long side is its size'); seen.add(Math.floor(((ang(q) + Math.PI) % Math.PI) / (Math.PI / 6))); }
+  assert.ok(lo < D.aspect + 0.05 && lo >= D.aspect - 1e-6 && hi > 0.95, `shapes from ${lo.toFixed(2)} to ${hi.toFixed(2)}`);
+  assert.equal(seen.size, 6, 'they lie every way');
+  // a tenth of a second later each has turned a little (at most tumble rad/s), some one way, some the other
+  const a0 = Array.from({ length: n }, (_, q) => ang(q));
+  for (let i = 0; i < n; i++) b.age[i] += 0.1;
+  expandDabs(b, D, eye, o);
+  let cw = 0, ccw = 0, most = 0;
+  for (let q = 0; q < n; q++) { let d = ang(q) - a0[q]; d -= Math.PI * Math.round(d / Math.PI); most = Math.max(most, Math.abs(d)); if (d > 1e-4) ccw++; else if (d < -1e-4) cw++; }
+  assert.ok(most <= D.tumble * 0.1 + 1e-6 && most > 0.3 * D.tumble * 0.1, `the fastest turns ${most} rad in 0.1 s`);
+  assert.ok(cw > n * 0.3 && ccw > n * 0.3, `${cw} one way, ${ccw} the other`);
+  // in a 9 m/s wind across the picture every flake lies within a few degrees of its motion, and is drawn out
+  for (let i = 0; i < n; i++) { b.vel[i * 3] = 9; }
+  expandDabs(b, D, eye, o);
+  for (let q = 0; q < n; q++) { let d = ang(q); d -= Math.PI * Math.round(d / Math.PI); assert.ok(Math.abs(d) < 0.3, `along the wind: ${d}`); assert.ok(long(q) > D.size * 1.5); }
+  // as the wind rises from nothing the mark changes steadily: between two wind speeds 2 % apart no corner
+  // of any flake moves by more than a third of the flake (a flake lying across the wind turns into it
+  // while it is all but round, not by flipping)
+  const steadiness = (DD) => {
+    let worst = 0; const prev = new Float32Array(n * 2).fill(NaN);
+    for (let v = 0; v <= 9; v *= 1.02, v += 0.002) {
+      for (let i = 0; i < n; i++) b.vel[i * 3] = v;
+      expandDabs(b, DD, eye, o);
+      for (let q = 0; q < n; q++) {
+        // the quad as a shape: the second moments of its two sides (an oval has no head), in units of size^2
+        const a = sub(V(o, q * 4 + 1), V(o, q * 4)), bb = sub(V(o, q * 4 + 3), V(o, q * 4)), m0 = a[0] * a[0] - a[1] * a[1] + bb[0] * bb[0] - bb[1] * bb[1], m1 = 2 * a[0] * a[1] + 2 * bb[0] * bb[1];
+        if (prev[q * 2] === prev[q * 2]) worst = Math.max(worst, Math.hypot(m0 - prev[q * 2], m1 - prev[q * 2 + 1]) / (D.size * D.size));
+        prev[q * 2] = m0; prev[q * 2 + 1] = m1;
+      }
+    }
+    return worst;
+  };
+  // (what a round flake does as it is drawn out is the measure: a tumbling one changes no faster)
+  const round = steadiness({ ...D, tumble: 0 }), tumbling = steadiness(D);
+  assert.ok(tumbling <= round * 1.1 + 0.02, `the largest change of shape between two wind speeds: ${tumbling} of the flake (round: ${round})`);
+});
+
+test('dust in a storm: a few low level walls, wider than high, instead of many round puffs; kicked dust in clear air stays a puff', () => {
+  const eye = makeEye(); eye.pix = 0.002;
+  // the eye looks north-ish and a little down; local up is +y (east = +x, north = -z in makeEye)
+  const pitch = 0.3; eye.ux = 0; eye.uy = Math.cos(pitch); eye.uz = -Math.sin(pitch);
+  const D = { ...DRAW.dust, ...DRAW_PAINTED.dust, minPx: 0, maxPx: 0, near: 0, wallNear: 0, fadeIn: 0, fadeOut: 0, wallFade: 0, exposure: 0, grow: 0 };
+  const n = 2000, b = buf(Array.from({ length: n }, (_, i) => ({ p: [(i % 40 - 20) * 0.5, 1, -12 - (i % 9)], v: [14, 0, 0], size: 1e-5 + i * 3.7e-8, age: 4 }))), o = new Float32Array(n * 12);
+  const wide = (q) => sub(V(o, q * 4 + 1), V(o, q * 4)), high = (q) => sub(V(o, q * 4 + 3), V(o, q * 4));
+  // clear air (the size is the kind's own): every puff drawn, round, facing the picture
+  eye.wall01 = 0; expandDabs(b, D, eye, o, D.size);
+  let drawn = 0; for (let q = 0; q < n; q++) if (len(wide(q)) > 1e-4) { drawn++; assert.ok(Math.abs(len(wide(q)) - D.size) < 1e-6 && Math.abs(len(high(q)) - D.size) < 1e-6); }
+  assert.equal(drawn, n);
+  // the storm at its height (the weather's dust load is past wallFull; the size the physics asks for is the largest allowed)
+  eye.wall01 = 0.9; expandDabs(b, D, eye, o, D.sizeMax);
+  drawn = 0;
+  for (let q = 0; q < n; q++) {
+    const w = len(wide(q)), h = len(high(q)); if (w < 1e-3) continue; drawn++;
+    // (those the thinning is still shrinking are narrower: judge the whole ones)
+    if (h > D.wallHigh * 0.98) assert.ok(Math.abs(w / h - D.wall) < 1e-3 && h <= D.wallHigh + 1e-6, `${w} by ${h}`);
+    const a = wide(q), u = high(q);
+    assert.ok(Math.abs(a[1]) < 1e-6 * w, 'its long side is level'); assert.ok(Math.abs(u[0]) < 1e-6 && Math.abs(u[2]) < 1e-6, 'its short side is the local up');
+  }
+  assert.ok(drawn > n * D.wallShare * 0.5 && drawn < n * D.wallShare * 2.2, `${drawn} walls of ${n} puffs`);
+  // half way there are already few of them (thinned first, widened after)
+  eye.wall01 = 0.5 * (D.wallFrom + D.wallFull); expandDabs(b, D, eye, o, 0.5 * (D.size + D.sizeMax));
+  drawn = 0; for (let q = 0; q < n; q++) if (len(wide(q)) > 1e-3) drawn++;
+  assert.ok(drawn < n * 0.12, `half way: ${drawn} of ${n}`);
+  // between the two it goes over steadily: a storm builds over a minute or more, 3600 frames; over 2000 steps
+  // no mark changes its width by more than half a metre a step
+  let worst = 0; const prev = new Float32Array(n).fill(NaN);
+  for (let k = 0; k <= 2000; k++) {
+    eye.wall01 = k / 2000; expandDabs(b, D, eye, o, D.size + (D.sizeMax - D.size) * k / 2000);
+    for (let q = 0; q < n; q += 5) { const w = len(wide(q)); if (prev[q] === prev[q]) worst = Math.max(worst, Math.abs(w - prev[q])); prev[q] = w; }
+  }
+  assert.ok(worst < 0.5, `largest step in width: ${worst} m`);
 });

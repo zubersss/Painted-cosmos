@@ -60,12 +60,33 @@
 //   share:  0..1 (default 1): draw only this share of the kind (a painter's rain is a few
 //           strokes, not every drop); which ones is decided as for the floor
 //   vary:   0..1 how much the shade differs from particle to particle (the `color` attribute)
+// New in P7 (tuned against PAINTER's picture; CPU expanders only, the instanced chunk has not got them):
+//   parallel (streak): 1 = every stroke of the frame takes ONE direction in the picture, that of
+//           the kind's mean motion relative to the eye, and lies in the picture plane at its
+//           drop's depth, as long as that motion is seen from where the eye looks (looking down
+//           the rain, strokes are dots). Drops drawn each along its own path in perspective lean
+//           opposite ways left and right of the view axis and cross: a painter lays rain parallel.
+//   maxLen (streak): m, the longest stroke (0 = none). Jupiter's rain falls 30 m/s: at any
+//           exposure worth a stroke on Earth it would be metres long there.
+//   near (streak): as for dabs: nothing nearer the eye than 0.4 of it, full size from it.
+//   tumble, aspect (dab without spin): a flake is not a disc. Each mark has a shape of its own,
+//           between `aspect` (short side to long) and 1, and lies at an angle of its own that
+//           turns slowly (up to `tumble` rad/s, some one way, some the other) while it is not
+//           drawn out by its motion; the more it is drawn out, the more it lies along its motion.
+//   wall, wallFrom, wallFull, wallShare, wallHigh, wallNear, wallFade (dab): dust in a storm is
+//           not round puffs but low streamers hugging the ground. As the dust the weather carries
+//           (eye.wall01: the kit sets it to weather.dustLoad01) goes from wallFrom to wallFull the
+//           marks go from round puffs to walls: fewer first, then wider: level
+//           (their long side along the horizon of the picture, their short side the local up),
+//           `wall` times as wide as high, at most `wallHigh` m high, only a share `wallShare` of
+//           them drawn (two or three in view, not twenty), nothing nearer than 0.4 of `wallNear`,
+//           growing and going over `wallFade` s more than a puff does.
 export const DRAW = Object.freeze({
   rain: Object.freeze({ shape: 'streak', width: 0.012, exposure: 0.04, min: 0.05, fadeIn: 0.1, fadeOut: 0.08, vary: 0, minPx: 1.2 }),
   hail: Object.freeze({ shape: 'streak', width: 0.024, exposure: 0.018, min: 0.03, fadeIn: 0.1, fadeOut: 0, vary: 0, minPx: 1.2 }),
   sand: Object.freeze({ shape: 'streak', width: 0.014, exposure: 0.03, min: 0.02, fadeIn: 0.05, fadeOut: 0.15, vary: 0.3, minPx: 1.2 }),
   spray: Object.freeze({ shape: 'streak', width: 0.018, exposure: 0.03, min: 0.03, fadeIn: 0, fadeOut: 0.15, vary: 0, minPx: 1.2 }),
-  snow: Object.freeze({ shape: 'dab', size: 0.035, grow: 0, spin: 0, fadeIn: 0.25, fadeOut: 0.3, vary: 0, minPx: 1.6, exposure: 0.03, strobe: 0.02, near: 3 }),
+  snow: Object.freeze({ shape: 'dab', size: 0.035, grow: 0, spin: 0, fadeIn: 0.25, fadeOut: 0.3, vary: 0, minPx: 1.6, exposure: 0.03, strobe: 0.02, near: 3, tumble: 1.2, aspect: 0.5 }),
   dust: Object.freeze({ shape: 'dab', size: 0.16, grow: 0.3, spin: 0, fadeIn: 0.15, fadeOut: 0.7, vary: 0.35, minPx: 1.6, sizeMax: 2.6, fill: 0.785, near: 2.5 }),
   ash: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 1.5, fadeIn: 0.3, fadeOut: 0.4, vary: 0.4, minPx: 1.6 }),
   spores: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 0, fadeIn: 0.4, fadeOut: 0.4, vary: 0.3, minPx: 1.6 }),
@@ -81,12 +102,16 @@ export const DRAW = Object.freeze({
 //          sizes them from the dust in the air, up to 2.6 m: billows, not blots
 //   rain   one broad wet stroke stands for several drops (thin strokes do not survive)
 export const DRAW_PAINTED = Object.freeze({
-  rain: Object.freeze({ width: 0.07, exposure: 0.14, minPx: 3 }),
-  snow: Object.freeze({ size: 0.1, minPx: 4, maxPx: 10, exposure: 0.04, smear: 1.2, varySize: 0.4, cell: 9 }),
-  hail: Object.freeze({ width: 0.05, minPx: 3 }),
+  // rain: a few broad strokes, all one way (P7: PAINTER's own numbers, a third of the strokes,
+  // none longer than 1.2 m on any world, none nearer than 2.4 m)
+  rain: Object.freeze({ width: 0.05, exposure: 0.12, minPx: 4, share: 0.25, parallel: 1, maxLen: 1.2, near: 6 }),
+  // snow: PAINTER's sizes (0.07 m, 3.5 to 6.5 px: 0.1 m and 10 px were popcorn), each flake its own shape and turn
+  snow: Object.freeze({ size: 0.07, minPx: 3.5, maxPx: 6.5, exposure: 0.04, smear: 1.2, varySize: 0.5, cell: 9, tumble: 1.2, aspect: 0.5 }),
+  hail: Object.freeze({ width: 0.05, minPx: 3, maxLen: 0.6 }),
   sand: Object.freeze({ width: 0.035, minPx: 3, exposure: 0.05, vary: 0.12 }),
   spray: Object.freeze({ width: 0.04, minPx: 3 }),
-  dust: Object.freeze({ size: 0.5, grow: 0.35, minPx: 8, maxPx: 80, sizeMax: 2.6, fill: 0.3, exposure: 0.12 }),
+  // dust: round ragged puffs where it is kicked up; in a storm a few low walls, four times as wide as high
+  dust: Object.freeze({ size: 0.5, grow: 0.35, minPx: 8, maxPx: 80, sizeMax: 2.6, fill: 0.3, exposure: 0.12, wall: 4, wallFrom: 0.25, wallFull: 0.7, wallShare: 0.05, wallHigh: 2.2, wallNear: 9, wallFade: 1.2 }),
   ash: Object.freeze({ size: 0.09, minPx: 4, exposure: 0.03 }),
   spores: Object.freeze({ size: 0.05, minPx: 3 }),
   leaves: Object.freeze({ size: 0.1, minPx: 4 }),
@@ -122,7 +147,9 @@ export function makeEye() {
   return { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, rx: 1, ry: 0, rz: 0, ux: 0, uy: 1, uz: 0, fx: 0, fy: 0, fz: 0, radius: 0, pix: 0,
     // for kinds drawn modulo a cell round the eye: the local horizontal axes (unit; east x north = up),
     // and what keeps the weather off: shelters = [east, north (m from the eye), top (m above the eye), radius] x shelterCount
-    ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: -1, shelters: null, shelterCount: 0 };
+    ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: -1, shelters: null, shelterCount: 0,
+    // 0..1: how much dust the weather carries (weather.dustLoad01): dust dabs with a `wall` become low walls in a storm
+    wall01: 0 };
 }
 
 // A number in 0..1 that stays with a particle for life (its size is its own).
@@ -153,20 +180,40 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
   const fout = L ? D.fadeOut || 0 : 0;
   const ex = D.exposure, hw = D.width * 0.5, min = D.min || 0, fin = D.fadeIn || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
   const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
+  const maxLen = D.maxLen > 0 ? D.maxLen : 1e9, nearD = D.near || 0;
+  // one direction for the frame: the mean motion relative to the eye, as the picture plane sees it
+  // (dr, du: unit, along picture right and up; seen: the share of the motion that lies in the plane)
+  let par = D.parallel ? 1 : 0, dr = 0, du = -1, seen = 0;
+  if (par && n > 0) {
+    let mx = 0, my = 0, mz = 0;
+    for (let i = 0, o = 0; i < n; i++, o += 3) { mx += V[o]; my += V[o + 1]; mz += V[o + 2]; }
+    mx = mx / n - eye.vx; my = my / n - eye.vy; mz = mz / n - eye.vz;
+    const sr = mx * eye.rx + my * eye.ry + mz * eye.rz, su = mx * eye.ux + my * eye.uy + mz * eye.uz, pl = Math.sqrt(sr * sr + su * su), ml = Math.sqrt(mx * mx + my * my + mz * mz);
+    if (ml > 1e-6 && pl > 1e-3 * ml) { dr = sr / pl; du = su / pl; seen = pl / ml; }
+  }
+  const dx = eye.rx * dr + eye.ux * du, dy = eye.ry * dr + eye.uy * du, dz = eye.rz * dr + eye.uz * du;        // along the stroke
+  const cx = eye.ux * dr - eye.rx * du, cy = eye.uy * dr - eye.ry * du, cz = eye.uz * dr - eye.rz * du;        // across it, in the picture plane
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     const px = P[o], py = P[o + 1], pz = P[o + 2];
     // motion relative to the eye over the exposure
     let sx = (V[o] - eye.vx) * ex, sy = (V[o + 1] - eye.vy) * ex, sz = (V[o + 2] - eye.vz) * ex;
     let sl = Math.sqrt(sx * sx + sy * sy + sz * sz);
-    if (sl < min) {
-      if (sl > 1e-6) { const k = min / sl; sx *= k; sy *= k; sz *= k; } else { sx = eye.ux * min; sy = eye.uy * min; sz = eye.uz * min; }
-      sl = min;
-    }
-    // across the streak, facing the eye: (motion) x (line of sight)
     const tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z;
-    let wx = sy * tz - sz * ty, wy = sz * tx - sx * tz, wz = sx * ty - sy * tx;
-    let wl = Math.sqrt(wx * wx + wy * wy + wz * wz);
-    if (wl < 1e-9) { wx = eye.rx; wy = eye.ry; wz = eye.rz; wl = 1; }   // coming straight at the eye
+    let wx, wy, wz, wl = 1;
+    if (par) {
+      // its own length (a big drop falls faster), the frame's direction
+      sl *= seen; sl = sl < min ? min : sl > maxLen ? maxLen : sl;
+      sx = dx * sl; sy = dy * sl; sz = dz * sl; wx = cx; wy = cy; wz = cz;
+    } else {
+      if (sl < min) {
+        if (sl > 1e-6) { const k = min / sl; sx *= k; sy *= k; sz *= k; } else { sx = eye.ux * min; sy = eye.uy * min; sz = eye.uz * min; }
+        sl = min;
+      } else if (sl > maxLen) { const k = maxLen / sl; sx *= k; sy *= k; sz *= k; sl = maxLen; }
+      // across the streak, facing the eye: (motion) x (line of sight)
+      wx = sy * tz - sz * ty; wy = sz * tx - sx * tz; wz = sx * ty - sy * tx;
+      wl = Math.sqrt(wx * wx + wy * wy + wz * wz);
+      if (wl < 1e-9) { wx = eye.rx; wy = eye.ry; wz = eye.rz; wl = 1; }   // coming straight at the eye
+    }
     let half = hw, thin = 1;
     const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
     // the floor: f times wider than it is, so one in f is drawn
@@ -174,6 +221,7 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
     else if (share < 1) thin = thinned(own01(S[i]), share);
     if (most > 0 && half > most * dist) half = most * dist;
     let k = half / wl * edgeScale(px, py, pz, eye) * thin;
+    if (nearD > 0 && dist < nearD) k *= smooth01((dist / nearD - 0.4) / 0.6);
     if (fin > 0 && A[i] < fin) k *= A[i] / fin;
     if (fout > 0 && L[i] < fout) k *= L[i] > 0 ? L[i] / fout : 0;
     wx *= k; wy *= k; wz *= k;
@@ -191,18 +239,30 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
 // D.size otherwise.
 export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size, L = buf.left;
-  const fout = L ? D.fadeOut || 0 : 0;
-  const fin = D.fadeIn || 0, grow = D.grow || 0, spin = D.spin || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
+  const grow = D.grow || 0, spin = D.spin || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
   const ex = spin === 0 ? D.exposure || 0 : 0, smear = 2 * (D.smear != null ? D.smear : 2);
-  const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
   const vs = D.varySize || 0;
-  const strobe = ex > 0 ? D.strobe || 0 : 0, streak = D.streak > 0 ? D.streak : 3, nearD = D.near || 0;
+  const strobe = ex > 0 ? D.strobe || 0 : 0, streak = D.streak > 0 ? D.streak : 3;
+  const tumble = spin === 0 ? D.tumble || 0 : 0, aspect = D.aspect > 0 && D.aspect < 1 ? D.aspect : 1;
   const cell = cellFor(D, eye, buf), c2 = cell * 2, M = buf.mat, SH = eye.shelters, nSH = cell > 0 && SH ? eye.shelterCount : 0;
   const Ex = eye.ex, Ey = eye.ey, Ez = eye.ez, Nx = eye.nx, Ny = eye.ny, Nz = eye.nz;
+  // walls (dust in a storm): how far the marks have gone from puffs to walls, and the wall's axes:
+  // level along the picture's horizon (picture right with its share along the local up taken out), and the local up
+  const wT = D.wall > 1 && eye.wall01 > 0 ? smooth01((eye.wall01 - (D.wallFrom || 0)) / Math.max(1e-6, (D.wallFull || 1) - (D.wallFrom || 0))) : 0;
+  const Ux = Ey * Nz - Ez * Ny, Uy = Ez * Nx - Ex * Nz, Uz = Ex * Ny - Ey * Nx;
+  let Hx = eye.rx, Hy = eye.ry, Hz = eye.rz;
+  if (wT > 0) { const d = Hx * Ux + Hy * Uy + Hz * Uz; Hx -= Ux * d; Hy -= Uy * d; Hz -= Uz * d; const l = Math.sqrt(Hx * Hx + Hy * Hy + Hz * Hz); if (l > 1e-3) { Hx /= l; Hy /= l; Hz /= l; } else { Hx = Ex; Hy = Ey; Hz = Ez; } }
+  // (thinned first, widened after: half way to a storm there are already few of them, not hundreds of half-walls)
+  const wAsp = 1 + ((D.wall || 1) - 1) * smooth01((wT - 0.3) / 0.7), wKeep = wT > 0 && D.wallShare > 0 && D.wallShare < 1 ? Math.pow(D.wallShare, smooth01(wT / 0.6)) : 1;
+  // a wall's height: what hides the same as the marks it stands for, never over wallHigh (the rest is haze)
+  const wHigh = wT > 0 ? Math.min(size / Math.sqrt(wKeep * wAsp), size + ((D.wallHigh || size) - size) * wT) / size : 1;
+  const share = (D.share > 0 && D.share < 1 ? D.share : 1) * wKeep, roomy = room > 1 ? room : 1;
+  const nearD = (D.near || 0) + ((D.wallNear || D.near || 0) - (D.near || 0)) * wT;
+  const fout = L ? (D.fadeOut || 0) + (D.wallFade || 0) * wT : 0, fin = (D.fadeIn || 0) + (D.wallFade || 0) * wT;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
     const age = A[i];
-    let h = 0.5 * (size + grow * age);
+    let h = 0.5 * (size * wHigh + grow * age * (1 - wT));
     if (vs > 0) { const r = S[i] * 51413.7; h *= 1 - vs + 2 * vs * (r - Math.floor(r)); }       // no two flakes the same size
     let tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z, edge = -1;
     if (cell > 0 && !(M && M[i] !== 255)) {
@@ -216,7 +276,7 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
       const m = Math.max(Math.abs(we), Math.abs(wn)) / cell, t = (m - 0.8) / 0.2;
       edge = t <= 0 ? 1 : t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
       // not under the hull
-      for (let k = 0; k < nSH; k++) { const a = k * 4, dx = we - SH[a], dz = wn - SH[a + 1]; if (dx * dx + dz * dz < SH[a + 3] * SH[a + 3] && (tx * (Ey * Nz - Ez * Ny) + ty * (Ez * Nx - Ex * Nz) + tz * (Ex * Ny - Ey * Nx)) < SH[a + 2]) { edge = 0; break; } }
+      for (let k = 0; k < nSH; k++) { const a = k * 4, dx = we - SH[a], dz = wn - SH[a + 1]; if (dx * dx + dz * dz < SH[a + 3] * SH[a + 3] && (tx * Ux + ty * Uy + tz * Uz) < SH[a + 2]) { edge = 0; break; } }
     }
     const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
     // the floor: f times larger than it is, so one in f^2 is drawn (unless the physics leaves room)
@@ -228,31 +288,62 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
     h *= edge >= 0 ? edge : edgeScale(px, py, pz, eye);
     if (fin > 0 && age < fin) h *= age / fin;
     if (fout > 0 && L[i] < fout) h *= L[i] > 0 ? L[i] / fout : 0;
-    let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h;
+    let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h, lb = h;
     if (spin !== 0) {
       // each particle keeps its own phase (its size is its own and travels with it)
       const a = age * spin + S[i] * 51413.7, c = Math.cos(a), s = Math.sin(a);
       ax = eye.rx * c + eye.ux * s; ay = eye.ry * c + eye.uy * s; az = eye.rz * c + eye.uz * s;
       bx = eye.ux * c - eye.rx * s; by = eye.uy * c - eye.ry * s; bz = eye.uz * c - eye.rz * s;
-    } else if (ex > 0 && h > 0) {
-      // drawn out along its motion across the picture during the exposure (never by more than D.smear dab sizes: 2 by default)
-      const vx = (V[o] - eye.vx) * ex, vy = (V[o + 1] - eye.vy) * ex, vz = (V[o + 2] - eye.vz) * ex;
-      const sr = vx * eye.rx + vy * eye.ry + vz * eye.rz, su = vx * eye.ux + vy * eye.uy + vz * eye.uz;
-      let sl = Math.sqrt(sr * sr + su * su);
-      if (sl > 1e-5) {
-        const c = sr / sl, s2 = su / sl, travel = sl * strobe / ex;
-        // drawn out by its motion during the exposure, capped; but never less than it travels in
-        // a frame (else it strobes), and shrinking away where that would make it a hairline
-        if (travel > streak * 2 * full) h *= 1 - smooth01((travel / (streak * 2 * full) - 1) / 0.6);
-        const cap = Math.max(smear * h, travel);
-        if (sl > cap) sl = cap;
-        ax = eye.rx * c + eye.ux * s2; ay = eye.ry * c + eye.uy * s2; az = eye.rz * c + eye.uz * s2;
-        bx = eye.ux * c - eye.rx * s2; by = eye.uy * c - eye.ry * s2; bz = eye.uz * c - eye.rz * s2;
-        la = h + 0.5 * sl;
-        px -= ax * 0.5 * sl; py -= ay * 0.5 * sl; pz -= az * 0.5 * sl;      // the head stays where the particle is
+    } else if (h > 0 && (ex > 0 || tumble > 0)) {
+      // (c, s2): the way its long side lies in the picture; sl: how far it is drawn out along its motion
+      let c = 1, s2 = 0, sl = 0;
+      if (ex > 0) {
+        // drawn out along its motion across the picture during the exposure (never by more than D.smear dab sizes: 2 by default)
+        const vx = (V[o] - eye.vx) * ex, vy = (V[o + 1] - eye.vy) * ex, vz = (V[o + 2] - eye.vz) * ex;
+        const sr = vx * eye.rx + vy * eye.ry + vz * eye.rz, su = vx * eye.ux + vy * eye.uy + vz * eye.uz;
+        sl = Math.sqrt(sr * sr + su * su);
+        if (sl > 1e-5) {
+          c = sr / sl; s2 = su / sl;
+          const travel = sl * strobe / ex;
+          // drawn out by its motion during the exposure, capped; but never less than it travels in
+          // a frame (else it strobes), and shrinking away where that would make it a hairline
+          if (travel > streak * 2 * full) { const k = 1 - smooth01((travel / (streak * 2 * full) - 1) / 0.6); h *= k; }
+          const cap = Math.max(smear * h, travel);
+          if (sl > cap) sl = cap;
+          sl *= 1 - wT;                                              // a wall is not drawn out: it is one
+        } else sl = 0;
       }
+      lb = h; la = h + 0.5 * sl;
+      const mc = c, ms = s2;                                         // the way it moves in the picture
+      if (tumble > 0) {
+        // its own shape, lying its own way and turning slowly: an oval (long side h, short side its
+        // own share of h) at angle th. Drawn out along its motion, the mark is that oval spread along
+        // the motion: the two are added as ellipses (second moments), so the mark turns toward the
+        // motion steadily as the wind rises and only ever turns fast while it is all but round
+        const r1 = S[i] * 27183.31, f1 = r1 - Math.floor(r1), r2 = S[i] * 65537.17, f2 = r2 - Math.floor(r2);
+        const th = f2 * 6.2831853 + age * tumble * (f2 < 0.5 ? -(0.35 + 0.65 * f1) : 0.35 + 0.65 * f1), ct = Math.cos(th), st = Math.sin(th);
+        const sh = h * (aspect + (1 - aspect) * f1), A2 = h * h, B2 = sh * sh, Q = la * la - A2;
+        const xx = A2 * ct * ct + B2 * st * st + Q * mc * mc, yy = A2 * st * st + B2 * ct * ct + Q * ms * ms, xy = (A2 - B2) * ct * st + Q * mc * ms;
+        const df = xx - yy, rr = Math.sqrt(df * df + 4 * xy * xy), tr = xx + yy;
+        if (rr > 1e-12) { const k = df / rr; c = Math.sqrt(0.5 * (1 + k)); s2 = Math.sqrt(0.5 * (1 - k)); if (xy < 0) s2 = -s2; }
+        la = Math.sqrt(0.5 * (tr + rr)); lb = Math.sqrt(Math.max(0, 0.5 * (tr - rr)));
+      }
+      ax = eye.rx * c + eye.ux * s2; ay = eye.ry * c + eye.uy * s2; az = eye.rz * c + eye.uz * s2;
+      bx = eye.ux * c - eye.rx * s2; by = eye.uy * c - eye.ry * s2; bz = eye.uz * c - eye.rz * s2;
+      // the head stays where the particle is
+      { const k = 0.5 * sl, mx = eye.rx * mc + eye.ux * ms, my = eye.ry * mc + eye.uy * ms, mz = eye.rz * mc + eye.uz * ms; px -= mx * k; py -= my * k; pz -= mz * k; }
     }
-    ax *= la; ay *= la; az *= la; bx *= h; by *= h; bz *= h;
+    if (wT > 0) {
+      // toward a wall: its long side level, its short side the local up (each turned the short way round)
+      let k = ax * Hx + ay * Hy + az * Hz < 0 ? -(1 - wT) : 1 - wT;
+      ax = ax * k + Hx * wT; ay = ay * k + Hy * wT; az = az * k + Hz * wT;
+      let l = Math.sqrt(ax * ax + ay * ay + az * az); if (l > 1e-4) { ax /= l; ay /= l; az /= l; } else { ax = Hx; ay = Hy; az = Hz; }
+      k = bx * Ux + by * Uy + bz * Uz < 0 ? -(1 - wT) : 1 - wT;
+      bx = bx * k + Ux * wT; by = by * k + Uy * wT; bz = bz * k + Uz * wT;
+      l = Math.sqrt(bx * bx + by * by + bz * bz); if (l > 1e-4) { bx /= l; by /= l; bz /= l; } else { bx = Ux; by = Uy; bz = Uz; }
+      la *= wAsp;
+    }
+    ax *= la; ay *= la; az *= la; bx *= lb; by *= lb; bz *= lb;
     out[q] = px - ax - bx; out[q + 1] = py - ay - by; out[q + 2] = pz - az - bz;
     out[q + 3] = px + ax - bx; out[q + 4] = py + ay - by; out[q + 5] = pz + az - bz;
     out[q + 6] = px + ax + bx; out[q + 7] = py + ay + by; out[q + 8] = pz + az + bz;
