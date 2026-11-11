@@ -16,13 +16,14 @@ import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED
 import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
-import { QUALITY } from '../render/shared.js';
+import { QUALITY, G } from '../render/shared.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
 const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
 const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget)
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
+const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
@@ -48,6 +49,8 @@ export class Flora {
     this.treeSize = nodeSize(this.R, TREE_LEVEL); this.underSize = nodeSize(this.R, UNDER_LEVEL);
     this.farSize = this.treeSize * 2;       // far trees are batched in cells twice as large
     this.rangeScale = 1; this.lastScale = -1;
+    this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
+    this.focusV = new THREE.Vector4(); this._focusFrame = -1; this._focusCam = null;       // the wash clock (s): real time, in steps of at most 0.1 s (it runs when the wind's clock is frozen too)
     this.retierCursor = 0;
     this.starved = 0;
     this.hidden = false;
@@ -103,7 +106,8 @@ export class Flora {
     return m;
   }
 
-  get busy() { return this.queue.length; }
+  // (still busy while a wash is being laid: a frame taken when this reaches 0 shows nothing half arrived)
+  get busy() { return this.queue.length + (this.group.visible && this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0); }
 
   // An InstancedMesh with room for `cap` instances that shares the kit geometry's buffers.
   _instanced(chunk, geo, mat, cap, lod, far) {
@@ -112,6 +116,8 @@ export class Flora {
     g.setIndex(geo.index);
     const inst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     g.setAttribute('aInst', inst);
+    const born = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
+    g.setAttribute('aBorn', born);
     let inst2 = null;
     if (far) { inst2 = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2); g.setAttribute('aInst2', inst2); }
     const mesh = new THREE.InstancedMesh(g, mat, cap);
@@ -125,10 +131,14 @@ export class Flora {
       u.uOrigin.value.copy(origin);
       u.uCamLocal.value.copy(camRel.subVectors(flora.camLocal, origin));
       u.uLod.value.set(lodv.x * k, lodv.y * k, lodv.z, lodv.w);
+      if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
+      if (u.uFocus) u.uFocus.value.copy(flora._focus(renderer, camera));
       if (u.uPlantHeight && mesh.userData.plantH) u.uPlantHeight.value = mesh.userData.plantH;
       material.uniformsNeedUpdate = true;
     };
-    mesh.userData.inst = inst; mesh.userData.inst2 = inst2;
+    mesh.userData.inst = inst; mesh.userData.inst2 = inst2; mesh.userData.born = born;
+    if (!(far || chunk.isTree)) this.lastLaid = this.washNow;
+    mesh.userData.laid = far || chunk.isTree ? 0 : this.washNow;       // (trees wash in one by one, see _retier; a cell of undergrowth as one)
     this.group.add(mesh);
     chunk.meshes.push(mesh);
     return mesh;
@@ -152,6 +162,7 @@ export class Flora {
     chunk.mat = new Float32Array(n * 16);
     chunk.rel = new Float32Array(n * 3);
     chunk.tier = new Int8Array(n).fill(-2);
+    chunk.prev = new Int8Array(n).fill(-2); chunk.since = new Float32Array(n); chunk.washUntil = 0;
     // groups: which trees can appear in which mesh
     const groups = {};
     const add = (key, i, geo, mat, far) => {
@@ -184,9 +195,25 @@ export class Flora {
   }
 
   // Put every tree of a chunk into the tier its distance asks for and refill the buffers.
-  _retier(chunk) {
+  // Where the explorer's figure stands in view space (w 1 while it is shown): strokes between the lens and
+  // the figure part round the line of sight to it, so a crown never hides the figure. Once a frame.
+  _focus(renderer, camera) {
+    const fr = renderer.info.render.frame, v = this.focusV;
+    if (fr === this._focusFrame && camera === this._focusCam) return v;
+    this._focusFrame = fr; this._focusCam = camera;
+    let f = G.figure, on = !!f;
+    for (let o = f; o && on; o = o.parent) { if (!o.visible) on = false; if (!o.parent && !o.isScene) on = false; }
+    if (!on) { v.set(0, 0, 0, 0); return v; }
+    const e = f.matrixWorld.elements;
+    _p.set(e[12] + e[4] * 0.95, e[13] + e[5] * 0.95, e[14] + e[6] * 0.95).applyMatrix4(camera.matrixWorldInverse);
+    v.set(_p.x, _p.y, _p.z, 1);
+    return v;
+  }
+
+  _retier(chunk, force) {
     const n = chunk.n;
     if (!n) return;
+    const now = this.washNow, prev = chunk.prev, since = chunk.since;
     const k = this.rangeScale;
     const cx = this.camLocal.x - chunk.origin.x, cy = this.camLocal.y - chunk.origin.y, cz = this.camLocal.z - chunk.origin.z;
     const d = chunk.data, rel = chunk.rel, tier = chunk.tier, lowQ = QUALITY.level === 0;
@@ -205,23 +232,32 @@ export class Flora {
       else if (dist < T_THIN * j) t = 2;
       else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
-      if (t !== tier[i]) { tier[i] = t; changed = true; }
+      if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
     }
     chunk.tierPos.copy(this.camLocal);
-    if (!changed) return;
+    if (!changed && !force) return;
+    // (while a tree changes hands both meshes hold it; the chunk is refilled once more when the wash has dried)
+    chunk.washUntil = changed ? now + WASH_T + 0.05 : 0;
+    if (changed) this.lastLaid = now;
     const mat = chunk.mat;
     for (const g of chunk.groups) {
       const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : 2;
       let c = 0;
       const list = g.list;
-      for (let a = 0; a < list.length; a++) { const t = tier[list[a]]; if (t === want || (want === 2 && t === 3)) c++; }
+      const inTier = (t) => t === want || (want === 2 && t === 3);
+      // (a far tree that only changes between plain and thinned stays in its mesh; a tree that left this mesh a moment ago is still in it, being lifted out)
+      const leaving = (i) => now - since[i] < WASH_T && inTier(prev[i]) && !inTier(tier[i]);
+      for (let a = 0; a < list.length; a++) { const i = list[a]; if (inTier(tier[i]) || leaving(i)) c++; }
       if (c === 0) { if (g.mesh) { g.mesh.count = 0; g.mesh.visible = false; } continue; }
       if (!g.mesh) g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
-      const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null;
+      const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null, ab = mesh.userData.born.array;
       let w = 0;
       for (let a = 0; a < list.length; a++) {
-        const i = list[a], t = tier[i];
-        if (!(t === want || (want === 2 && t === 3))) continue;
+        const i = list[a], out = !inTier(tier[i]);
+        const t = out ? prev[i] : tier[i];
+        if (out && !leaving(i)) continue;
+        // when it came (it washes in), or when it left (it is lifted out); one that only changed within the mesh keeps its place
+        ab[w] = out ? -Math.max(since[i], 1e-3) : (inTier(prev[i]) ? 0 : since[i]);
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
         if (g.far) {
           // the unit far tree: size it to the species; thinned ones stand in for three
@@ -237,7 +273,7 @@ export class Flora {
         w++;
       }
       mesh.count = w; mesh.visible = true;
-      mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
+      mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true; mesh.userData.born.needsUpdate = true;
       if (ib) mesh.userData.inst2.needsUpdate = true;
     }
   }
@@ -362,6 +398,7 @@ export class Flora {
   update(camLocal, active, budgetMs) {
     this.camLocal.copy(camLocal);
     this.rangeScale = RANGE_SCALE[QUALITY.level] || 1;
+    { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
     const alt = camLocal.length() - this.R;
     const show = active && alt < 2500;
     this.group.visible = show && !this.hidden;
@@ -455,6 +492,7 @@ export class Flora {
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
         if (!ch.built || !ch.n) continue;
+        if (ch.washUntil && this.washNow > ch.washUntil) { this._retier(ch, true); continue; }
         const moved = ch.tierPos.distanceTo(camLocal);
         if (moved < 3) continue;
         const d = ch.origin.distanceTo(camLocal);

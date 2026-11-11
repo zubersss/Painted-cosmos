@@ -495,6 +495,7 @@ ${FOG_VERT}
 attribute vec4 aData;     // x sway, y part, z inner shade, w blob hash
 attribute vec3 aMass;     // soft "mass" normal of the whole crown
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
+attribute float aBorn;    // per instance: when it came into this mesh (the wash clock, s); negative: when it left (it is being lifted out)
 #ifdef PC_FAR
   attribute vec2 aInst2;  // species index into the far tables
   varying float vSpecies;
@@ -505,6 +506,7 @@ attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shad
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uLod;        // min distance, max distance, jitter, fade start fraction
+uniform vec3 uWashIn;     // x the wash clock now (s), y when this mesh was first laid, z how long a wash takes (s)
 uniform float uWind;
 uniform float uTime;
 varying vec3 vBody;
@@ -515,6 +517,7 @@ varying vec3 vView;
 varying vec2 vUv;
 varying vec4 vData;
 varying vec4 vInst;
+varying float vWash;      // 1: fully laid; below: the strokes are still arriving (negative: being lifted out)
 varying float vFog;
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -535,9 +538,14 @@ void main() {
   #ifdef USE_INSTANCING
     mat4 im = instanceMatrix;
     vec4 inst = aInst;
+    // nothing snaps into being: a thing new to this mesh washes in over half a second, and one that
+    // has changed tier is lifted out of its old mesh while it is laid in the new (the two patterns interlock)
+    float wsh = clamp((uWashIn.x - max(abs(aBorn), uWashIn.y)) / uWashIn.z, 0.0, 1.0);
+    vWash = aBorn < 0.0 ? -(1.0 - clamp((uWashIn.x + aBorn) / uWashIn.z, 0.0, 1.0)) - 1e-3 : wsh;
   #else
     mat4 im = mat4(1.0);
     vec4 inst = vec4(0.0, 0.0, 0.5, 0.7);
+    vWash = 1.0;
   #endif
   vec3 io = im[3].xyz;
   float di = distance(io, uCamLocal);
@@ -616,6 +624,7 @@ uniform mat3 normalMatrix;
   uniform vec3 uFarBarkB[8];
   varying float vSpecies;
 #endif
+uniform vec4 uFocus;      // the explorer's figure in view space (w 1 while it is shown)
 varying vec3 vBody;
 varying vec3 vObj;
 varying vec3 vNV;
@@ -624,6 +633,7 @@ varying vec3 vView;
 varying vec2 vUv;
 varying vec4 vData;
 varying vec4 vInst;
+varying float vWash;
 varying float vFog;
 void main() {
   #include <logdepthbuf_fragment>
@@ -639,6 +649,20 @@ void main() {
   float near = 1.0 - smoothstep(30.0, 110.0, vd);
   // strokes part when they are right in front of the eye (the explorer can walk through trunks)
   if (vd < 1.6 && texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1 > smoothstep(0.35, 1.6, vd)) discard;
+  // strokes that stand between the lens and the explorer's figure part round the line of sight to it:
+  // a window in the crown, ragged like everything else, so the figure is never lost behind foliage
+  if (uFocus.w > 0.5 && vView.z > uFocus.z + 0.4) {
+    vec3 rd = normalize(vView);
+    float off = length(uFocus.xyz - rd * dot(uFocus.xyz, rd));
+    float hole = 1.0 - smoothstep(0.8, 2.0, off);
+    if (hole > 0.0 && texture(uNoise3D, vBody / 0.9).r * 0.8 + 0.08 < hole) discard;
+  }
+  // a wash being laid (or lifted): broken strokes that fill in, anchored to the thing itself
+  if (vWash < 0.999) {
+    float wn = texture(uNoise3D, vBody / 2.3).g * 0.5 + texture(uNoise3D, vBody / 0.6).b * 0.5;
+    wn = clamp((wn - 0.5) * 1.5 + 0.5, 0.02, 0.98);
+    if (vWash >= 0.0 ? wn > vWash : wn < 1.0 + vWash) discard;
+  }
   vec3 leafA = uLeafA, leafB = uLeafB, leafC = uLeafC, barkA = uBarkA, barkB = uBarkB;
   #ifdef PC_FAR
     int si = int(vSpecies + 0.5);
@@ -769,6 +793,8 @@ export function makePropMaterial(bodyU, opts = {}) {
   const own = {
     uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
     uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
+    uWashIn: { value: new THREE.Vector3(1e6, 0, 0.55) },
+    uFocus: { value: new THREE.Vector4(0, 0, 0, 0) },
     uWind: { value: opts.wind == null ? 0.06 : opts.wind },
     uBarkA: v3(opts.barkA, [0.95, 0.94, 0.92]), uBarkB: v3(opts.barkB, [0.30, 0.27, 0.27]),
     uBarkP: { value: new THREE.Vector4().fromArray(opts.barkP || [0.62, 0, 1.0, 0.5]) },

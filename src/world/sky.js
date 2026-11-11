@@ -96,7 +96,7 @@ void main() {
       float k = pr.x * uRingS.z * smoothstep(0.012, 0.13, e) * (1.0 - oc * 0.85) * (0.74 + 0.26 * smoothstep(0.30, 0.56, dryb));
       // by day: the pale rings are lifted out of the sky's wash to paper; the thin ones are a glaze of their own gold over it
       vec3 lifted = mix(vec3(1.0, 0.99, 0.95), uRingC, 0.10);
-      vec3 glazed = dens(sky * mix(vec3(1.0), uRingC, 0.55), 1.15);
+      vec3 glazed = dens(sky * mix(vec3(1.0), uRingC, 0.35), 1.05);
       vec3 ringD = mix(glazed, lifted, smoothstep(0.10, 0.62, pr.y));
       // by night the lit ring is the palest thing in the sky
       vec3 ringN = mix(uRingC, vec3(1.0, 0.985, 0.93), 0.25 + 0.6 * pr.y);

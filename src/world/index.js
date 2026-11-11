@@ -60,6 +60,9 @@ export function createWorld(scene) {
       forcedTime: null,
       camLocal: new THREE.Vector3(0, BODIES[id].radius * 4, 0),
       found: new Set(), ring: null, dab: null, farTier: 2, dabFade: 0,
+      // how far the limb thins into the world's haze when seen from space: a world with little or no air keeps its
+      // own wash to the edge (a pale rim on a dark ball reads as glass), looks.js `limb` says otherwise
+      limbK: look.limb != null ? look.limb : Math.max(0, Math.min(1, (BODIES[id].atmosphereHeight || 0) / 700)),
     };
     if (look.flora) st.flora = new Flora(id, root, bu);
     if (look.rings) { st.ring = makeRing(bu, BODIES[id].radius, look.rings); root.add(st.ring); }
@@ -70,6 +73,7 @@ export function createWorld(scene) {
       let stormDir = null;
       if (look.deck && look.deck.storm) { const S = getSurface(id), bi = S.biomes.findIndex((b) => b.id === look.deck.storm.over), s0 = S.sites.find((x) => x.b === bi); if (s0) stormDir = s0; }
       st.clouds = makeCloudShell(bu, st.cloudR, look, stormDir);
+      st.clouds.material.uniforms.uLimbCos.value = Math.sqrt(Math.max(0, 1 - (BODIES[id].radius / st.cloudR) ** 2));
       root.add(st.clouds);
     }
     state.set(id, st);
@@ -298,12 +302,12 @@ export function createWorld(scene) {
         // veiled by its sky (a pale disc by day, as the moon is), clear at night and from space
         const veil = active && lastActive === active.id ? (1 - skyU.uAtmo.value.x) * skyU.uAtmo.value.y * 0.72 : 0;
         if (veil > 0.01 || farVeil > 0.01) {
-          bu.uFog.value.set(1, 6, Math.max(veil, farVeil), 1);
+          bu.uFog.value.set(1, 6, Math.max(veil, farVeil), st.limbK);
           bu.uHaze.value.copy(skyU.uSkyZenith.value).lerp(skyU.uSkyHorizon.value, 0.45);
           // (behind a storm cloud it is lost into the cloud's own wash, not into the pale sky)
           if (farVeil > 0.01) bu.uHaze.value.lerp(skyU.uStormWash.value, Math.min(1, skyU.uWxSky.value.y * 1.25) * farVeil * 0.85);
         }
-        else bu.uFog.value.set(1e-7, 6, 0, 1);
+        else bu.uFog.value.set(1e-7, 6, 0, st.limbK);
         bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0); bu.uStorm.value = 0;
       }
     }
@@ -413,7 +417,7 @@ export function createWorld(scene) {
       }
       const v0 = look.visibility[0], v1 = look.visibility[1];
       const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * space01) + 40000 * space01;
-      bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, space01);
+      bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, space01 * st.limbK);
       // sky
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
       skyU.uCamL.value.copy(st.camLocal);

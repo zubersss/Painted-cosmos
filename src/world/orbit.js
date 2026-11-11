@@ -49,7 +49,7 @@ void main() {
   if (pr.x < 0.42) discard;
   vec4 t = texture(uNoise3D, vPos * 0.00021);
   // (the plane's own coordinates are x, y: the ring's mesh lies in its local xy and is turned into the equator)
-  vec3 c = pcDensity(mix(uColor, vec3(1.0), 0.10 + 0.62 * pr.y), 0.80 + (1.0 - pr.y) * 1.05 + (t.r - 0.5) * 0.6 + (n2.b - 0.5) * 0.3);
+  vec3 c = pcDensity(mix(uColor, vec3(1.0), 0.06 + 0.36 * pr.y), 0.85 + (1.0 - pr.y) * 1.05 + (t.r - 0.5) * 0.6 + (n2.b - 0.5) * 0.3);
   // the far side of the ring lies in the planet's shadow: a cool glaze over the wash
   vec3 pl = vec3(vPos.x, 0.0, vPos.y);
   vec3 sunL = normalize(uSunDirL);
@@ -95,6 +95,7 @@ uniform vec3 uBandA;
 uniform vec3 uBandB;
 uniform vec4 uSpot;      // a great storm: unit direction, and its angular radius (0 = none)
 uniform vec3 uSpotCol;
+uniform float uLimbCos;   // the cosine, on the shell, at which the line of sight just clears the world's own limb
 varying vec3 vPos;
 varying vec3 vNV;
 varying vec3 vView;
@@ -123,8 +124,12 @@ void main() {
     storm = (1.0 - smoothstep(0.72, 1.0, r + (c2 - 0.5) * 0.22)) * step(0.0, dot(nrm, sd));
   }
   float th = 1.0 - uCloud.x;
-  if (max(v, storm * uCloud.x) < th) discard;
   vec3 nV = normalize(vNV);
+  // scattered cloud thins away toward the limb and is not drawn beyond the world's own edge: the globe keeps
+  // one soft outline (cloud standing out past the limb was a ragged hard fringe against space)
+  float ndv = clamp(dot(nV, normalize(-vView)), 0.0, 1.0);
+  float edge = (1.0 - uCloud.w) * smoothstep(uLimbCos + 0.30, uLimbCos + 0.04, ndv);
+  if (max(v, storm * uCloud.x) < th + edge * 0.6) discard;
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5 + (c2 - 0.5) * 0.25;
   vec3 belt = mix(uBandA, uBandB, stripe);
@@ -135,8 +140,9 @@ void main() {
   c = mix(c, vec3(1.0), streak * uDeck.z);
   c = mix(c, pcDensity(uSpotCol, 1.0 + spiral * 0.5), storm);
   c = pcTone(c, pcLevel(x, 0.08));
-  float limb = pow(1.0 - clamp(dot(nV, normalize(-vView)), 0.0, 1.0), 2.5);
+  float limb = pow(1.0 - ndv, 2.5) * uFog.w;
   c = mix(c, mix(uHaze, vec3(1.0), 0.4), limb);
+  // the edge of a cloud is wet: it runs into the wash beneath instead of standing as a cut shape
   pcWrite(c, mix(1.0, uDeck.w, uCloud.w), nV, -vView.z, 0.6);
 }`;
 
@@ -148,6 +154,7 @@ export function makeCloudShell(bodyU, radius, look, stormDir) {
     uniforms: Object.assign({
       uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime,
       uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands ? 1 : 0) },
+      uLimbCos: { value: 0.4 },
       uDeck: { value: new THREE.Vector4(D.belts || 7, D.wobble == null ? 0.10 : D.wobble, D.streaks || 0, D.wet == null ? 0.55 : D.wet) },
       uBandA: { value: new THREE.Vector3().fromArray(D.a || sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(D.b || sky.cloudShade) },
       uSpot: { value: stormDir ? new THREE.Vector4(stormDir.x, stormDir.y, stormDir.z, D.storm ? D.storm.size : 0.22) : new THREE.Vector4(0, 1, 0, 0) },

@@ -321,7 +321,7 @@ export const LOOKS = {
   },
 
   neptune: {
-    seed: 'neptune-3', seaLevel: 0, cloud: 0.42, visibility: [460, 2800], bands: 0.8,
+    seed: 'neptune-3', seaLevel: 0, cloud: 0.42, visibility: [460, 2800], bands: 0.8, limb: 0.3,
     deck: { height: 310, belts: 5, wobble: 0.16, a: [0.50, 0.62, 0.93], b: [0.27, 0.35, 0.74], streaks: 0.9, wet: 0.6 },
     sky: mkSky([0.34, 0.46, 0.84], [0.80, 0.88, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
     flora: {

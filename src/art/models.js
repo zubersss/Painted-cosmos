@@ -11,7 +11,7 @@
 // parts are moved by a matrix palette (render/materials.js, makeFigureMaterial).
 import * as THREE from 'three';
 import { makeFigureMaterial } from '../render/materials.js';
-import { MOTION } from '../render/shared.js';
+import { MOTION, G } from '../render/shared.js';
 
 // ---- small vector and noise helpers ---------------------------------------------------------
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -266,20 +266,24 @@ export function createExplorer() {
     if (s.phase != null) ph = s.phase; else if (moving) ph += dt * Math.PI * speed / step;
     const A = Math.min(0.82, Math.asin(Math.min(0.95, step / 1.76))) * w.walk * (1 - 0.35 * w.wade);
     const air = Math.max(w.jet, w.fall), sit = w.sit, grounded = 1 - Math.max(air, sit);
+    // PHYSICS' hips (`hip`: metres below standing height; about 0.3 for half a second after a landing): the knees
+    // fold by the angle that lowers the hips that far, the back leans into it, and the figure straightens as it eases
+    w.hip = (w.hip || 0) + (Math.max(0, Math.min(0.5, s.hip || 0)) - (w.hip || 0)) * (first || s.snap ? 1 : 1 - Math.exp(-22 * dt));
+    const crouch = Math.acos(Math.max(0.3, 1 - w.hip / 0.86)) * (1 - sit);
     const leg = (thigh, shin, phi, side) => {
       const sw = Math.max(0, Math.cos(phi));
       let th = A * Math.sin(phi) * grounded, kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(sw, 0.8)) * w.walk * grounded;
       th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45;
       kn += w.jet * (-0.42 - 0.1 * side) + w.fall * (side < 0 ? -0.55 : -0.85) - sit * 1.45;
       const ease = (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25);          // at rest the weight is on one leg
-      thigh.rotation.x = th + 0.09 * ease; shin.rotation.x = kn - 0.17 * ease;
+      thigh.rotation.x = th + 0.09 * ease + crouch; shin.rotation.x = kn - 0.17 * ease - 2 * crouch;
       thigh.rotation.z = side * (0.02 + 0.10 * w.fall + 0.04 * w.jet);
     };
     leg(b.thighL, b.shinL, ph, -1); leg(b.thighR, b.shinR, ph + Math.PI, 1);
     const breathe = Math.sin(t * 1.5);
     // hips: bob twice a stride (highest as the legs pass), lean into the walk, sink to sit
-    b.torso.position.y = b.torso.userData.rest.y + (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded + breathe * 0.003 - sit * 0.40;
-    b.torso.rotation.x = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit;
+    b.torso.position.y = b.torso.userData.rest.y + (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded + breathe * 0.003 - sit * 0.40 - w.hip * (1 - sit);
+    b.torso.rotation.x = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit - 0.30 * crouch;
     b.torso.rotation.y = 0.07 * Math.sin(ph) * w.walk * grounded;
     b.torso.rotation.z = (0.022 + Math.sin(t * 0.47) * 0.012) * (1 - w.walk) * grounded + 0.03 * Math.sin(ph) * w.walk * w.wade;
     const pitch = Math.max(-0.7, Math.min(0.7, s.lookPitch || 0));
@@ -287,7 +291,7 @@ export function createExplorer() {
     b.head.rotation.y = -b.torso.rotation.y * 0.8 + Math.sin(t * 0.31) * 0.10 * (1 - w.walk) * (1 - air);
     const arm = (bone, side, phi) => {
       bone.rotation.x = -Math.sin(phi) * (0.30 + 0.45 * w.run) * w.walk * grounded * (1 - 0.5 * w.wade) + 0.22 * w.run * w.walk + 0.25 * w.jet - 0.25 * w.fall + 0.55 * sit;
-      bone.rotation.z = side * (0.03 + 0.012 * breathe + 0.45 * w.jet + 1.95 * w.fall + 0.42 * w.wade * w.walk + 0.08 * Math.sin(t * 6.1 + side) * w.fall);
+      bone.rotation.z = side * (0.03 + 0.012 * breathe + 0.50 * crouch + 0.45 * w.jet + 1.95 * w.fall + 0.42 * w.wade * w.walk + 0.08 * Math.sin(t * 6.1 + side) * w.fall);
     };
     arm(b.armL, -1, ph); arm(b.armR, 1, ph + Math.PI);
     // the coat: streams back when moving, flares in the air
@@ -305,6 +309,7 @@ export function createExplorer() {
     rig.update();
   }
   animate({ mode: 'idle' }, 0);
+  G.figure = g;      // (the flora parts where it stands between the lens and the figure: see flora.js `_focus`)
   return { object3D: g, animate };
 }
 
