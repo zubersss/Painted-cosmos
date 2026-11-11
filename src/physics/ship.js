@@ -44,6 +44,16 @@ export const SHIP_BODY = Object.freeze({
   // buffeting
   gustArea: 60,            // m^2: lift-curve slope x planform area, for the response to gusts
   buffetRate: 1.3,         // Hz: main frequency of the chop
+  // (P13) the hull's attitude in a wind. The wind's force on the hull does not act through the centre of mass:
+  // the side area's centre lies above it and aft of it (the fins), the planform's aft of it. So a side wind
+  // rolls the hull away from the wind and swings its nose into it (a weathercock), an updraft tips the nose
+  // down, and the attitude hold (a spring and a damper: holdRate, holdDamp) brings it back: in gusts the
+  // hull rocks and yaws and corrects. Reported in st.phys.buffetAngle (pitch, roll, yaw), for the drawn hull.
+  cpHeight: 0.5,           // m the side area's centre is above the centre of mass
+  cpAft: 1.2,              // m it is aft of it
+  cpPlan: 0.6,             // m the planform's centre is aft of it
+  holdRate: 1.6,           // rad/s: natural frequency of the attitude hold
+  holdDamp: 0.45,          // its damping ratio (under 1: it overshoots a little, as a craft in gusts does)
   // landing gear: three legs, origin at the centre of the contact plane (COORDINATOR C10)
   legs: Object.freeze([Object.freeze([0, 0, -3.2]), Object.freeze([-2.2, 0, 1.8]), Object.freeze([2.2, 0, 1.8])]),
   gearFrequency: 1.6,      // Hz: bounce frequency of the craft on its legs
@@ -66,7 +76,8 @@ export const SHIP_BODY_STATE = () => ({
   thrust: { x: 0, y: 0, z: 0 },     // spooled engine acceleration, frame coordinates (m/s^2)
   lift01: 0,                        // spooled anti-gravity + hover thruster share of the weight
   buffet: { x: 0, y: 0, z: 0 },     // turbulence acceleration this step (m/s^2)
-  buffetAngle: { pitch: 0, roll: 0 },   // small attitude wobble for the camera and the model (rad)
+  buffetAngle: { pitch: 0, roll: 0, yaw: 0 },   // attitude off the commanded one, for the camera and the model (rad; three's rotateX, rotateZ, rotateY of a hull whose nose is -z): the chop, and (P13) the hull rocking and weathercocking in the wind
+  gustAtt: { pitch: 0, roll: 0, yaw: 0, pitchV: 0, rollV: 0, yawV: 0 },   // (P13) the attitude hold's state
   q: 0,                             // dynamic pressure (Pa)
   airspeed: 0,                      // m/s relative to the air
   gLoad: 0,                         // felt acceleration in units of 9.81 m/s^2
@@ -187,8 +198,18 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   B.buffet.y = _u[1] * bu + _r[1] * bs + _f[1] * bf;
   B.buffet.z = _u[2] * bu + _r[2] * bs + _f[2] * bf;
   const wob = clamp(amp * 0.012, 0, 0.05);
-  B.buffetAngle.pitch = wob * noise3(ph * 1.3 + 7, 4.4, 2.2, 914);
-  B.buffetAngle.roll = wob * 1.6 * noise3(ph * 1.1 - 9, 6.6, 3.3, 915);
+  // (P13) the wind's moments on the hull against the attitude hold (see cpHeight)
+  const A = B.gustAtt || (B.gustAtt = { pitch: 0, roll: 0, yaw: 0, pitchV: 0, rollV: 0, yawV: 0 });
+  {
+    const Fs = -0.5 * rho * T.cdaSide * airspeed * rs, Fu = -0.5 * rho * T.cdaVertical * airspeed * ru, I = T.inertia;
+    const w2 = T.holdRate * T.holdRate, c = 2 * T.holdDamp * T.holdRate, h = Math.min(dt, 0.05);
+    A.rollV += (-Fs * T.cpHeight / I[2] - c * A.rollV - w2 * A.roll) * h; A.roll = clamp(A.roll + A.rollV * h, -0.3, 0.3);
+    A.yawV += (Fs * T.cpAft / I[1] - c * A.yawV - w2 * A.yaw) * h; A.yaw = clamp(A.yaw + A.yawV * h, -0.3, 0.3);
+    A.pitchV += (-Fu * T.cpPlan / I[0] - c * A.pitchV - w2 * A.pitch) * h; A.pitch = clamp(A.pitch + A.pitchV * h, -0.3, 0.3);
+  }
+  B.buffetAngle.pitch = wob * noise3(ph * 1.3 + 7, 4.4, 2.2, 914) + A.pitch;
+  B.buffetAngle.roll = wob * 1.6 * noise3(ph * 1.1 - 9, 6.6, 3.3, 915) + A.roll;
+  B.buffetAngle.yaw = A.yaw;
 
   // ---- flight computer: the acceleration that closes the velocity error -------------------------
   const tau = Math.max(cmd.tau || 1, 0.05);

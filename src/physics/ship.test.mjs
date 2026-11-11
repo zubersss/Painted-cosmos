@@ -389,3 +389,23 @@ test('P12 the last metre: a commanded 0.6 m/s descent does not hang on the groun
   // no air, no cushion: in a vacuum a thruster is a rocket
   const moon = descend(0, 1.62, 0.5); assert.equal(moon.ge, 1);
 });
+
+test('P13 the hovering hull in a wind: it rolls away from a side wind and swings its nose into it, by its own mass and areas (half a degree in a breeze, degrees in a storm), overshoots and corrects; level in still air and in a vacuum', () => {
+  const D = 180 / Math.PI, hover = { target: V(), hover: true };
+  // a steady wind from the left (blowing toward +x; the nose is -z): the top of the hull goes downwind, the nose upwind
+  const a = flight({ wind: V(8, 0, 0), alt: 10 }); fly(a, 20, hover);
+  const s = a.st.phys.buffetAngle;
+  assert.ok(s.roll < 0 && s.roll * D > -0.8 && s.roll * D < -0.2, `8 m/s: roll ${s.roll * D} deg`);
+  assert.ok(s.yaw > 0 && s.yaw * D < 0.8 && s.yaw * D > 0.2, `8 m/s: yaw ${s.yaw * D} deg (rotateY +: the nose toward -x, into the wind)`);
+  // the force goes with the square of the wind
+  const b = flight({ wind: V(20, 0, 0), alt: 10 }); fly(b, 20, hover);
+  assert.ok(Math.abs(b.st.phys.buffetAngle.roll / s.roll - 6.25) < 0.5, `20 m/s over 8 m/s: ${b.st.phys.buffetAngle.roll / s.roll}`);
+  // a gust arriving: the hull swings past its new trim and comes back (the hold is underdamped)
+  const c = flight({ wind: V(8, 0, 0), alt: 10 }); fly(c, 20, hover);
+  c.env.air = (p, o) => { o.density = 1.225; o.wind.x = 14; o.wind.y = 0; o.wind.z = 0; o.turbulence = 0; return o; };
+  let far = 0; fly(c, 12, hover, { each: (t, st) => { far = Math.min(far, st.phys.buffetAngle.roll); } });
+  const end = c.st.phys.buffetAngle.roll;
+  assert.ok(far < end * 1.1 && far > end * 1.35, `overshoot: furthest ${far * D} deg, settles at ${end * D} deg`);
+  // nothing to rock it in still air or with no air
+  for (const cfg of [{ alt: 10 }, { rho: 0, wind: V(30, 0, 0), alt: 10 }]) { const z = flight(cfg); fly(z, 5, hover); const k = z.st.phys.buffetAngle; assert.ok(Math.abs(k.roll) < 1e-6 && Math.abs(k.yaw) < 1e-6 && Math.abs(k.pitch) < 1e-6); }
+});

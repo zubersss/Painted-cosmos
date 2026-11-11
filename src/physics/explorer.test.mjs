@@ -488,3 +488,29 @@ test('P13 jump: the legs fold before they push: the feet leave the ground jumpCr
     assert.ok(Math.abs(top - top2) < 0.01 && top > 1, `the same height either way: ${top} m and ${top2} m`);
   }
 });
+
+test('P13 legs: a run into the face of a 1 m boulder is taken up by the legs (legCatch at most), not stopped in one step; still in contact (Moon, Mars, Earth)', async () => {
+  const { scrambleSample } = await import('../player/explorer.js');
+  for (const [g, pace] of [[2.2, 7.4], [2.2, 4.2], [4.6, 7.4], [9, 7.4]]) {
+    const c = norm(V(Math.sin(12 / R), 0, Math.cos(12 / R)));
+    const sample = scrambleSample((d) => ({ radius: R, normal: d, liquidRadius: 0 }), () => [{ unitDir: c, radius: 0.6, height: 1 }]);
+    const st = { p: V(0, 0, R), v: V(), grounded: true }, env = { sample, gravity: g };
+    let worst = 0, vPrev = 0, air = 0, slow = 99, far = 0, surge = 0;
+    for (let i = 0; i < 60 * 9; i++) {
+      stepExplorerBody(st, { wish: V(pace, 0, 0), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / 60, env);
+      const v = st.phys.speedGround, x = Math.atan2(st.p.x, st.p.z) * R; far = x;
+      if (x > 9 && x < 15) { worst = Math.max(worst, vPrev - v); if (!st.grounded) air++; slow = Math.min(slow, v); surge = Math.max(surge, Math.abs(st.phys.surge)); }
+      vPrev = v;
+    }
+    assert.ok(worst <= T.legCatch / 60 + 0.36, `g ${g} pace ${pace}: ${worst} m/s lost in one step`);       // (+ braceAccel / 60 from a hold)
+    assert.equal(air, 0, `g ${g} pace ${pace}: in contact`); assert.ok(slow > 1.5 && slow < pace - 1, `slowest ${slow}`);
+    assert.ok(surge < 0.45, `the body is never further over its feet than half a stance: ${surge} m`); assert.ok(far > 20, 'and it goes on');
+  }
+});
+
+test('P13 the descent brake lights before its limit and settles the fall onto it: no step in the acceleration, the limit never passed by more than before', () => {
+  const sim = make({ alt: 60 }); let worstJerk = 0, aPrev = -9, vMax = 0, vPrev = 0;
+  run(sim, 4, { wish: V(), descentLimit: 12 }, { each: (t, st) => { const v = vert(st), a = (v - vPrev) * 60; if (t > 0.05) worstJerk = Math.max(worstJerk, Math.abs(a - aPrev)); aPrev = a; vPrev = v; vMax = Math.max(vMax, -v); } });
+  assert.ok(vMax > 11.5 && vMax < 12.05, `settles at the limit: ${vMax}`);
+  assert.ok(worstJerk < 1.2, `largest change of acceleration in one step ${worstJerk} m/s^2 (the brake at full at the limit gave 9)`);
+});

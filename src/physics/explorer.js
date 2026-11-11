@@ -104,6 +104,7 @@ export const EXPLORER_BODY = Object.freeze({
   rcsAccel: 4.0,          // m/s^2: steering from the suit's small thrusters while falling without the jet
   rcsTime: 0.5,           // s
   retroAccel: 45,         // m/s^2: strongest push of the automatic descent brake (an assist PILOT commands)
+  retroBand: 0.25,        // the brake lights this share of the limit before the limit (0 = at the limit, at full: before P13)
   // liquid
   floatAssist: true,      // the suit trims its buoyancy so it floats floatDepth deep in ANY liquid
   floatDepth: 1.25,       // m of the body under the surface when floating (PILOT's swimDepth)
@@ -611,14 +612,14 @@ function stepOnce(st, cmd, dt, env, T) {
       if (a > 0 && gE > 0) { const cap = trend + Math.sqrt(Math.max(0, 2 * (gE + pull) * (B.base + reach - c0))); if (wn > cap) { wn = Math.max(w, cap); cut = true; } }
       if (cut) { w1 = wn; c1 = c0 + 0.5 * (w + w1) * dt; }
     }
-    let lam = 1, held = true;
+    let lam = 1, held = true, face = false;
     if (c1 < h1 - fold) {
       // folded out
       const capB = Math.max(w, Math.sqrt(Math.max(0, 0.5 * (gE + pull) * (fold + reach))));   // (a quarter of the stroke: the rest is kept for the far side)
       const cUp = Math.min(c0 + capB * dt, Math.max(c0, r + reach));
       if (h1 - fold <= cUp) { c1 = h1 - fold; w1 = Math.max(w1, Math.min(capB, (c1 - c0) / dt)); }
       else if (dh > T.clamber && vh * dt > 1e-6) { c1 = Math.max(c0, r - fold); w1 = 0; lam = 0; }   // a wall, not a step: it stops the body
-      else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; }
+      else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; face = true; }
     } else if (c1 > h1 + reach) {
       // reached out
       if (!looked) { hD = groundAhead(env, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber); if (feat) B.grip = 1; }
@@ -635,15 +636,25 @@ function stepOnce(st, cmd, dt, env, T) {
     B.brace = 0;
     if (held && lam < 1) {
       // braced: the feet take only part of the step, and the rest of the forward speed is lost
-      B.brace = (1 - lam) * vh;
-      sx *= lam; sy *= lam; sz *= lam;
-      p1x = px + sx * dt; p1y = py + sy * dt; p1z = pz + sz * dt;
+      p1x = px + sx * lam * dt; p1y = py + sy * lam * dt; p1z = pz + sz * lam * dt;
       r1 = Math.hypot(p1x, p1y, p1z) || 1;
       _dir.x = p1x / r1; _dir.y = p1y / r1; _dir.z = p1z / r1;
       s1 = env.sample(_dir);
       h1 = s1.radius; n1x = s1.normal.x; n1y = s1.normal.y; n1z = s1.normal.z;
       if (c1 < h1 - fold) c1 = h1 - fold;                // (a face the legs cannot fold onto: the hips are heaved up it)
       else if (c1 > h1 + reach) c1 = h1 + reach;
+      // (P13) The FEET go no further up a face than the hips can follow (lam). The BODY is not stopped in
+      // that sixtieth of a second: it comes on over its planted feet and the legs take its speed up as they
+      // take a landing, legCatch at most (a run on the Moon met a 1 m boulder at 5.3 m/s and was at 2.0 m/s
+      // one frame later: 200 m/s^2; now 0.11 s, the body 0.15 m over its feet meanwhile: B.surge). A wall
+      // (lam 0) and a hold on the way down (its own limit, braceDv) are as they were.
+      let m = lam;
+      if (lam > 0 && face) {
+        const sn = Math.hypot(sx, sy, sz);
+        if (sn > 1e-6) { m = Math.max(lam, 1 - T.legCatch * dt / sn); B.surge = (B.surge || 0) + (m - lam) * sn * dt; }
+      }
+      B.brace = (1 - m) * vh;
+      sx *= m; sy *= m; sz *= m;
     }
     if (!held) {
       // the feet leave the ground at full stretch, with the hips' velocity
@@ -733,8 +744,12 @@ function stepOnce(st, cmd, dt, env, T) {
     B.jetUse = aJet > 0 ? clamp01(B.jetThrottle * (0.25 + 0.75 * jetUp / aJet)) : 0;
     // automatic descent brake
     let retro = 0;
-    if (cmd.descentLimit != null && cmd.descentLimit < 1e8 && vv < -cmd.descentLimit && sub < 0.3) {
-      retro = clamp((-vv - cmd.descentLimit) / 0.12 + gEff, 0, T.retroAccel);
+    if (cmd.descentLimit != null && cmd.descentLimit < 1e8 && sub < 0.3) {
+      const lim = cmd.descentLimit, lo = lim * (1 - T.retroBand);
+      if (-vv > lim) retro = clamp((-vv - lim) / 0.12 + gEff, 0, T.retroAccel);
+      // (P13) the brake is a throttled jet: it lights before the limit and grows as the fall nears it, so a
+      // fall settles toward its descent speed (the weight is carried exactly at the limit) and does not snap to it
+      else if (-vv > lo && lim > lo) { const x = (-vv - lo) / (lim - lo); retro = gEff * x * x; }
     }
     vv += (-gEff + jetUp + retro) * dt;
     hx += lx * dt; hy += ly * dt; hz += lz * dt;

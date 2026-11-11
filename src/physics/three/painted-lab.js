@@ -143,6 +143,9 @@ root.add(exMesh);
 //   yawRate: degrees a second the camera turns round the focus   follow: true = the camera's target is the explorer
 //   ship (ship=fly): 'rest' on the gear | 'up' lift off and hold shipAlt | 'down' descend and stand
 const ctl = { wish: null, jump: false, jet: 0, yawRate: 0, follow: Q.get('follow') === '1', ship: 'rest' };
+// (P13) the descent limit is PILOT's (src/player/explorer.js: terminalFall, then softFallSpeed + 0.45 m/s per metre over
+// 1.5 m), as the game commands it; descent=<m/s> holds one speed instead (the lab's 9 m/s before P13)
+const descentQ = num('descent', -1);
 const _t = new THREE.Vector3(), _u = new THREE.Vector3();
 function driveExplorer(dt) {
   _u.set(ex.p.x, ex.p.y, ex.p.z); const r = _u.length(); _u.divideScalar(r);
@@ -152,7 +155,7 @@ function driveExplorer(dt) {
   _t.copy(east0).multiplyScalar(-n / rad + e / rad * pull).addScaledVector(north0, e / rad + n / rad * pull).normalize().multiplyScalar(walk);
   if (ctl.wish) _t.copy(east0).multiplyScalar(ctl.wish[0]).addScaledVector(north0, ctl.wish[1]).addScaledVector(_u, -(east0.dot(_u) * ctl.wish[0] + north0.dot(_u) * ctl.wish[1]));
   const moving = ctl.wish ? true : walk > 0;
-  stepExplorerBody(ex, { wish: moving ? { x: _t.x, y: _t.y, z: _t.z } : { x: 0, y: 0, z: 0 }, jump: !!ctl.jump, jet: ctl.jet || 0, descentLimit: 9 }, dt, envEx);
+  stepExplorerBody(ex, { wish: moving ? { x: _t.x, y: _t.y, z: _t.z } : { x: 0, y: 0, z: 0 }, jump: !!ctl.jump, jet: ctl.jet || 0, descentLimit: descentQ >= 0 ? descentQ : Math.min(PILOT_EXPLORER.terminalFall, PILOT_EXPLORER.softFallSpeed + Math.max(0, r - groundEx(_u).radius - 1.5) * 0.45) }, dt, envEx);
   ctl.jump = false;
   _u.set(ex.p.x, ex.p.y, ex.p.z).normalize();
   exMesh.position.set(ex.p.x, ex.p.y, ex.p.z);
