@@ -23,8 +23,9 @@ uniform vec3 uPcEyeVel;   // camera velocity, m/s
 uniform vec3 uPcRight;    // picture-plane axes
 uniform vec3 uPcUp;
 uniform vec4 uPcFocus;    // xyz centre of the particle volume, w its radius (0 = no edge fade)
-uniform vec4 uPcDraw;     // streak: width, exposure, least length, fade-in.  dab: size, grow, spin, fade-in
-uniform vec2 uPcPixel;    // x: metres one pixel covers at one metre from the eye; y: least size in pixels
+uniform vec4 uPcDraw;     // streak: width, exposure, least length, fade-in.  dab: size (now), grow, spin, fade-in
+uniform vec4 uPcDraw2;    // x: dab exposure (s): drawn out along its motion across the picture.  y: share of the kind drawn (1 = all)
+uniform vec3 uPcPixel;    // x: metres one pixel covers at one metre from the eye; y: least size in pixels; z: most (0 = none)
 attribute vec3 aPcPos;
 attribute vec3 aPcVel;
 attribute float aPcSize;
@@ -38,6 +39,14 @@ float pcPhysEdge(vec3 p) {
   return 1.0 - t * t * (3.0 - 2.0 * t);
 }
 float pcPhysFadeIn() { return uPcDraw.w > 0.0 ? min(1.0, aPcAge / uPcDraw.w) : 1.0; }
+// Where the least size makes a mark f times larger than it is, it stands for f (streak) or
+// f^2 (dab) of its kind and only that share is drawn: a number each particle keeps for life
+// decides which, and a mark shrinks smoothly to nothing as its turn passes (expand.js: thinned).
+float pcPhysThin(float keep) {
+  if (keep >= 1.0) return 1.0;
+  float h = fract(aPcSize * 91573.37);
+  return smoothstep(0.0, 1.0, (keep * 1.18 - h) / (0.3 * h + 1e-4));
+}
 
 // A streak: from where the particle is back along its motion relative to the eye.
 vec3 pcPhysStreak(vec2 corner) {
@@ -47,19 +56,35 @@ vec3 pcPhysStreak(vec2 corner) {
   vec3 w = cross(s, aPcPos - uPcEye);
   float wl = length(w);
   w = wl > 1e-9 ? w / wl : uPcRight;
-  float width = max(uPcDraw.x, uPcPixel.x * uPcPixel.y * length(aPcPos - uPcEye));
-  return aPcPos + w * (corner.x * width * pcPhysEdge(aPcPos) * pcPhysFadeIn()) - s * (corner.y + 0.5);
+  float dist = length(aPcPos - uPcEye), hw = 0.5 * uPcDraw.x, far = 0.5 * uPcPixel.x * uPcPixel.y * dist, thin = 1.0;
+  if (far > hw) { thin = pcPhysThin(uPcDraw2.y * hw / far); hw = far; } else thin = pcPhysThin(uPcDraw2.y);
+  if (uPcPixel.z > 0.0) hw = min(hw, 0.5 * uPcPixel.x * uPcPixel.z * dist);
+  return aPcPos + w * (corner.x * 2.0 * hw * pcPhysEdge(aPcPos) * pcPhysFadeIn() * thin) - s * (corner.y + 0.5);
 }
 
-// A dab: a quad in the picture plane, growing with age, turning if the kind tumbles.
+// A dab: a quad in the picture plane, growing with age, turning if the kind tumbles, drawn out
+// along its motion if the kind has an exposure.
 vec3 pcPhysDab(vec2 corner) {
-  float h = max(uPcDraw.x + uPcDraw.y * aPcAge, uPcPixel.x * uPcPixel.y * length(aPcPos - uPcEye)) * pcPhysEdge(aPcPos) * pcPhysFadeIn();
-  vec3 r = uPcRight, u = uPcUp;
+  float dist = length(aPcPos - uPcEye), h = 0.5 * (uPcDraw.x + uPcDraw.y * aPcAge), far = 0.5 * uPcPixel.x * uPcPixel.y * dist;
+  if (far > h) { float f = h / far; h = far * pcPhysThin(uPcDraw2.y * f * f); } else h *= pcPhysThin(uPcDraw2.y);
+  if (uPcPixel.z > 0.0) h = min(h, 0.5 * uPcPixel.x * uPcPixel.z * dist);
+  h *= pcPhysEdge(aPcPos) * pcPhysFadeIn();
+  vec3 r = uPcRight, u = uPcUp, c0 = aPcPos;
+  float la = h;
   if (uPcDraw.z != 0.0) {
     float a = aPcAge * uPcDraw.z + aPcSize * 51413.7, c = cos(a), sn = sin(a);
     r = uPcRight * c + uPcUp * sn; u = uPcUp * c - uPcRight * sn;
+  } else if (uPcDraw2.x > 0.0 && h > 0.0) {
+    vec3 v = (aPcVel - uPcEyeVel) * uPcDraw2.x;
+    vec2 sp = vec2(dot(v, uPcRight), dot(v, uPcUp));
+    float sl = length(sp);
+    if (sl > 1e-5) {
+      vec2 c = sp / sl; sl = min(sl, 4.0 * h);
+      r = uPcRight * c.x + uPcUp * c.y; u = uPcUp * c.x - uPcRight * c.y;
+      la = h + 0.5 * sl; c0 -= r * (0.5 * sl);
+    }
   }
-  return aPcPos + (r * corner.x + u * corner.y) * h;
+  return c0 + r * (corner.x * 2.0 * la) + u * (corner.y * 2.0 * h);
 }
 
 // A shade in 1 - vary .. 1 that stays with the particle.

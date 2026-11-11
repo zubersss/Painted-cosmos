@@ -44,7 +44,7 @@
 // logdepthbuf chunks in a ShaderMaterial, as everywhere else).
 import * as THREE from 'three';
 import { PARTICLES } from '../particles.js';
-import { DRAW, makeEye, expandStreaks, expandDabs, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './expand.js';
+import { DRAW, makeEye, expandStreaks, expandDabs, dabSize, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './expand.js';
 import { PARTICLE_GLSL } from './chunks.glsl.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -118,7 +118,8 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       for (const [name, arr, size] of [['aPcPos', buf.pos, 3], ['aPcVel', buf.vel, 3], ['aPcSize', buf.size, 1], ['aPcAge', buf.age, 1], ['aPcMat', buf.mat || new Uint8Array(cap).fill(255), 1]]) {
         const a = new THREE.InstancedBufferAttribute(arr, size); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a);
       }
-      uniforms = { ...U, uPcPixel: { value: new THREE.Vector2(0, D.minPx || 0) }, uPcDraw: { value: new THREE.Vector4(D.shape === 'streak' ? D.width : D.size, D.shape === 'streak' ? D.exposure : D.grow, D.shape === 'streak' ? D.min : D.spin, D.fadeIn) } };
+      uniforms = { ...U, uPcPixel: { value: new THREE.Vector3(0, D.minPx || 0, D.maxPx || 0) }, uPcDraw: { value: new THREE.Vector4(D.shape === 'streak' ? D.width : D.size, D.shape === 'streak' ? D.exposure : D.grow, D.shape === 'streak' ? D.min : D.spin, D.fadeIn) },
+        uPcDraw2: { value: new THREE.Vector4(D.shape === 'dab' && !D.spin ? D.exposure || 0 : 0, D.share > 0 && D.share < 1 ? D.share : 1, 0, 0) } };
     } else {
       geo = new THREE.BufferGeometry();
       posA = dyn(new Float32Array(cap * 12), 3);
@@ -137,7 +138,7 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       chunk: gpu ? PARTICLE_GLSL : null };
     const mesh = new THREE.Mesh(geo, makeMaterial(kind, info));
     mesh.name = 'pc-physics-' + kind; mesh.frustumCulled = false; mesh.visible = false; mesh.matrixAutoUpdate = true;
-    parts.push({ kind, buf, D, mesh, geo, posA, colA, matA, cap, uniforms, drawn: 0 });
+    parts.push({ kind, buf, D, mesh, geo, posA, colA, matA, cap, uniforms, drawn: 0, size: 0 });
   }
   // rings
   let ring = null;
@@ -153,7 +154,20 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
     ring = { E, mesh, geo, posA, dataA, cap, drawn: 0 };
   }
   const objects = parts.map((p) => p.mesh); if (ring) objects.push(ring.mesh);
-  const stats = { ms: 0, drawCalls: 0, vertices: 0, triangles: 0, particles: 0 };
+  // cover: per kind, the share of what the physics says the kind hides of the view that its marks
+  // paint (1 = all of it). What is missing is haze, and haze is the sky's to paint.
+  const stats = { ms: 0, drawCalls: 0, vertices: 0, triangles: 0, particles: 0, cover: {}, size: {} };
+  const _c = { cover: 1 };
+  // the air a kind is spread through (m3): what falls fills the whole box, dust hugs the ground
+  const BOX = 4 * PARTICLES.radius * PARTICLES.radius;
+  const AIR = { snow: BOX * (PARTICLES.height + PARTICLES.below), rain: BOX * (PARTICLES.height + PARTICLES.below), dust: BOX * 8 };
+  function hiding(kind, wx) {
+    const p = wx.precipitation;
+    if (kind === 'dust') return wx.dustExtinction || 0;
+    if (kind === 'snow') return p && p.frozen01 > 0.5 ? p.extinction || 0 : 0;
+    if (kind === 'rain') return p && !(p.frozen01 > 0.5) ? p.extinction || 0 : 0;
+    return 0;
+  }
   return {
     objects, stats, eye,
     // bodyRoot: root Object3D of the body the physics is active on; camera: the scene camera;
@@ -178,14 +192,27 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.vx = track.vx; eye.vy = track.vy; eye.vz = track.vz;
         eye.rx = track.rx; eye.ry = track.ry; eye.rz = track.rz; eye.ux = track.ux; eye.uy = track.uy; eye.uz = track.uz;
         eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.radius = PARTICLES.radius; eye.pix = pix;
+        // how large a dab is now: its own size, or what the dust (snow) in the air needs to hide what it hides
+        let size = P.D.size;
+        const ext = AIR[P.kind] ? hiding(P.kind, physics.here.weather) : 0;
+        if (P.D.shape === 'dab') {
+          size = dabSize(P.D, ext, n, AIR[P.kind] || 1, _c);
+          P.size += (size - P.size) * (P.size > 0 ? 0.05 : 1); size = P.size;                 // (eased: the count jitters)
+          if (ext > 0) stats.cover[P.kind] = _c.cover; else delete stats.cover[P.kind];
+          stats.size[P.kind] = size;
+        } else if (ext > 0) {
+          // a streak inks about half its quad (it tapers); its length is its fall during the exposure
+          stats.cover[P.kind] = Math.min(1, n * P.D.width * Math.max(P.D.min || 0, (b.fallSpeed || 6) * P.D.exposure) * 0.5 * (P.D.share || 1) / (ext * AIR[P.kind]));
+        } else delete stats.cover[P.kind];
         if (gpu) {
+          if (P.D.shape === 'dab') P.uniforms.uPcDraw.value.x = size;
           U.uPcEye.value.set(eye.x, eye.y, eye.z); U.uPcEyeVel.value.set(eye.vx, eye.vy, eye.vz);
           U.uPcRight.value.set(eye.rx, eye.ry, eye.rz); U.uPcUp.value.set(eye.ux, eye.uy, eye.uz);
           U.uPcFocus.value.set(eye.fx, eye.fy, eye.fz, eye.radius); P.uniforms.uPcPixel.value.x = pix;
           P.geo.instanceCount = n;
           send(P.geo.attributes.aPcPos, n * 3); send(P.geo.attributes.aPcVel, n * 3); send(P.geo.attributes.aPcSize, n); send(P.geo.attributes.aPcAge, n); send(P.geo.attributes.aPcMat, n);
         } else {
-          if (P.D.shape === 'streak') expandStreaks(b, P.D, eye, P.posA.array); else expandDabs(b, P.D, eye, P.posA.array);
+          if (P.D.shape === 'streak') expandStreaks(b, P.D, eye, P.posA.array); else expandDabs(b, P.D, eye, P.posA.array, size);
           send(P.posA, n * 12);
           if (P.colA) { expandShades(b, P.D.vary, P.colA.array); send(P.colA, n * 12); }
           if (P.matA) { expandMats(b, P.matA.array); send(P.matA, n * 4); }

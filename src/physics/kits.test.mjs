@@ -2,7 +2,7 @@
 // the three.js wrappers are exercised in physics-lab.html). Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DRAW, RING, makeEye, expandStreaks, expandDabs, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './three/expand.js';
+import { DRAW, RING, makeEye, expandStreaks, expandDabs, dabSize, thinned, own01, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './three/expand.js';
 import { PARTICLE_GLSL, SHAPE_GLSL } from './three/chunks.glsl.js';
 import { LocalFrame } from './near.js';
 import { WaterField } from './water.js';
@@ -157,18 +157,81 @@ test('indices, uvs and the GLSL chunks', () => {
   }
   // the constants the shader and the JS share
   assert.ok(PARTICLE_GLSL.includes('51413.7') && PARTICLE_GLSL.includes('73856.093'));
+  assert.ok(PARTICLE_GLSL.includes('91573.37') && PARTICLE_GLSL.includes('(keep * 1.18 - h) / (0.3 * h + 1e-4)') && PARTICLE_GLSL.includes('min(sl, 4.0 * h)'), 'thinning and smear as in expand.js');
 });
 
-test('far particles keep a least size on screen; near ones keep their own', () => {
+test('the floor: far marks are never smaller than the least size, there are fewer of them, and they cover what they covered', () => {
   const eye = makeEye(); eye.pix = 2 * Math.tan(24 * Math.PI / 180) / 540;      // a 48 degree lens, 540 pixels high
-  const b = buf([{ p: [0, 0, -2], v: [0, -6.5, 0] }, { p: [0, 0, -100], v: [0, -6.5, 0] }]);
-  const out = new Float32Array(24);
-  expandStreaks(b, DRAW.rain, eye, out);
-  assert.ok(Math.abs(len(sub(V(out, 1), V(out, 0))) - DRAW.rain.width) < 1e-6, 'at 2 m: its own width');
-  assert.ok(Math.abs(len(sub(V(out, 5), V(out, 4))) - DRAW.rain.minPx * eye.pix * 100) < 1e-4, 'at 100 m: 1.2 pixels wide');
-  expandDabs(b, DRAW.snow, eye, out);
-  assert.ok(Math.abs(len(sub(V(out, 1), V(out, 0))) - DRAW.snow.size) < 1e-6);
-  assert.ok(Math.abs(len(sub(V(out, 5), V(out, 4))) - DRAW.snow.minPx * eye.pix * 100) < 1e-4);
+  const near = buf([{ p: [0, 0, -2], v: [0, -6.5, 0] }]);
+  const out1 = new Float32Array(12);
+  expandStreaks(near, DRAW.rain, eye, out1);
+  assert.ok(Math.abs(len(sub(V(out1, 1), V(out1, 0))) - DRAW.rain.width) < 1e-6, 'at 2 m: its own width');
+  expandDabs(near, { ...DRAW.snow, exposure: 0 }, eye, out1);
+  assert.ok(Math.abs(len(sub(V(out1, 1), V(out1, 0))) - DRAW.snow.size) < 1e-6);
+  // 4000 of a kind at one distance, each with its own size (as the simulation gives them)
+  const N = 4000, many = (d) => buf(Array.from({ length: N }, (_, i) => ({ p: [Math.sin(i) * 0.3 * d, Math.cos(i * 1.3) * 0.2 * d, -d], v: [0, -6.5, 0], size: 0.0008 + 0.0000031 * i + 0.0007 * Math.abs(Math.sin(i * 12.9898)) })));
+  const out = new Float32Array(N * 12);
+  const widths = (o) => { const w = []; for (let i = 0; i < N; i++) w.push(len(sub(V(o, i * 4 + 1), V(o, i * 4)))); return w; };
+  for (const [D, pow, name] of [[{ ...DRAW.rain, minPx: 3 }, 1, 'streak'], [{ ...DRAW.snow, minPx: 3.5, exposure: 0 }, 2, 'dab']]) {
+    const own = D.shape === 'streak' ? D.width : D.size;
+    let prevShown = N + 1;
+    for (const d of [6, 20, 45, 90]) {
+      const b = many(d);
+      if (D.shape === 'streak') expandStreaks(b, D, eye, out); else expandDabs(b, D, eye, out);
+      const w = widths(out), dl = (i) => Math.hypot(b.pos[i * 3], b.pos[i * 3 + 1], b.pos[i * 3 + 2]);
+      let shown = 0, cover = 0, smallest = 1e9;
+      for (let i = 0; i < N; i++) {
+        const floor = D.minPx * eye.pix * dl(i), f = Math.max(1, floor / own);
+        assert.ok(w[i] <= Math.max(own, floor) + 2e-5, 'never larger than the floor asks');
+        if (w[i] > 0.97 * Math.max(own, floor)) { shown++; smallest = Math.min(smallest, w[i] / (eye.pix * dl(i))); }
+        cover += Math.pow(w[i] / own, pow) / Math.pow(f, 0);            // width (streak) or area (dab), in units of its own
+      }
+      const f = Math.max(1, D.minPx * eye.pix * d * 1.03 / own);
+      assert.ok(shown <= prevShown && shown >= 1, `${name} at ${d} m: ${shown} shown`); prevShown = shown;
+      if (f > 1.2) assert.ok(smallest > D.minPx * 0.97, `${name} at ${d} m: the smallest mark drawn whole is ${smallest.toFixed(2)} px`);
+      const expect = N / Math.pow(f, pow), tol = expect > 150 ? 0.25 : 0.6;      // (few are left far away: counting noise)
+      assert.ok(Math.abs(shown / expect - 1) < tol || f < 1.2, `${name} at ${d} m (${f.toFixed(1)} x its size): one in ${(N / shown).toFixed(1)} drawn whole, the floor asks for one in ${Math.pow(f, pow).toFixed(1)}`);
+      assert.ok(Math.abs(cover / N - 1) < 0.2, `${name} at ${d} m: the marks cover ${(cover / N).toFixed(2)} of what they covered`);
+    }
+  }
+  // which ones are drawn does not change when the buffer is reshuffled, and nothing pops as a mark recedes
+  const D = { ...DRAW.snow, minPx: 3.5, exposure: 0 }, one = buf([{ p: [0, 0, -5], size: 0.00233 }]); let prev = null, worst = 0;
+  for (let d = 5; d < 120; d += 0.05) { one.pos[2] = -d; expandDabs(one, D, eye, out1); const px = len(sub(V(out1, 1), V(out1, 0))) / (eye.pix * d); if (prev != null) worst = Math.max(worst, Math.abs(px - prev)); prev = px; }
+  assert.ok(worst < 0.25 && prev === 0, `receding 5 cm at a time, its size on screen changes by at most ${worst.toFixed(2)} px a step, and it is gone in the end`);
+  assert.ok(thinned(0.3, 1) === 1 && thinned(0.3, 0.2) === 0 && thinned(0.3, 0.3) > 0 && thinned(0.3, 0.3) < 1);
+  assert.equal(own01(0.00233), own01(0.00233));
+});
+
+test('a mark near the lens is never larger than the most asked for; a dab is drawn out along its motion', () => {
+  const eye = makeEye(); eye.pix = 0.002;
+  const D = { ...DRAW.snow, size: 0.1, minPx: 3.5, maxPx: 9, exposure: 0 };
+  const b = buf([{ p: [0, 0, -1] }, { p: [0, 0, -8] }]); const out = new Float32Array(24);
+  expandDabs(b, D, eye, out);
+  assert.ok(Math.abs(len(sub(V(out, 1), V(out, 0))) - 9 * 0.002 * 1) < 1e-6, 'at 1 m: 9 px');
+  assert.ok(Math.abs(len(sub(V(out, 5), V(out, 4))) - 0.1) < 1e-6, 'at 8 m: its own 10 cm (6 px)');
+  // a flake blown across the picture at 5 m/s, 30 ms exposure: 15 cm of travel on a 10 cm dab
+  const w = buf([{ p: [0, 0, -8], v: [5, 0, 0] }, { p: [0, 0, -8], v: [0, -1, 0] }, { p: [0, 0, -8], v: [0, 0, 10] }, { p: [0, 0, -8], v: [40, 0, 0] }]); const o = new Float32Array(48);
+  expandDabs(w, { ...D, exposure: 0.03 }, eye, o);
+  const along = (q) => len(sub(V(o, q * 4 + 1), V(o, q * 4))), across = (q) => len(sub(V(o, q * 4 + 3), V(o, q * 4)));
+  assert.ok(Math.abs(along(0) - 0.25) < 1e-6 && Math.abs(across(0) - 0.1) < 1e-6, `blown: ${along(0)} by ${across(0)} m`);
+  assert.ok(Math.abs(along(3) - 0.3) < 1e-6, 'in a gale: never more than three dabs long');
+  assert.ok(Math.abs(Math.max(o[3], o[6]) - 0.05) < 1e-6, 'its head is where the flake is, the smear behind it');
+  assert.ok(Math.abs(along(1) - 0.13) < 1e-6, 'falling at 1 m/s: nearly round');
+  assert.ok(Math.abs(along(2) - 0.1) < 1e-6, 'moving along the line of sight: round');
+  // leaves turn instead
+  expandDabs(w, { ...DRAW.leaves, exposure: 0.03 }, eye, o); assert.ok(Math.abs(along(0) - DRAW.leaves.size) < 1e-6);
+});
+
+test('dabs sized by the physics: the marks hide what the dust in the air hides, up to the largest mark allowed', () => {
+  const D = { ...DRAW.dust, size: 0.5, sizeMax: 3, fill: 0.4 }, o = {};
+  assert.equal(dabSize(D, 0, 200, 18000, o), 0.5); assert.equal(o.cover, 1);
+  // a dust storm with 200 m of visual range: 3.912 / 200 per metre, 206 puffs in 18 000 m3
+  const s = dabSize(D, 3.912 / 200, 206, 18432, o);
+  assert.ok(Math.abs(206 * 0.4 * s * s - 3.912 / 200 * 18432) < 1e-6 && s > 1.5 && s < 3 && o.cover === 1, 'size ' + s);
+  // a thicker storm needs more than the largest mark gives: the rest is the sky's haze
+  const s2 = dabSize(D, 3.912 / 40, 206, 18432, o);
+  assert.equal(s2, 3); assert.ok(o.cover > 0.2 && o.cover < 0.6, 'cover ' + o.cover);
+  assert.equal(dabSize(D, 1e-5, 500, 18432, o), 0.5, 'thin haze: the puffs keep their own size');
 });
 
 test('cost of the arithmetic: a downpour, a full ring of marks and the water grid', () => {

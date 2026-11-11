@@ -425,9 +425,16 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // Each share of what falls adds its own, so the sum is continuous through sleet and where an
   // ice-crystal veil overlaps a shower.
   const kx = WEATHER.clearVisibility / 3912;
-  if (rLiquid > 0) ext += 0.2 * Math.pow(rLiquid, 0.6) * (rLiquid / (rLiquid + 0.5)) * kx * reach;
-  if (rSolid > 0) ext += 2.0 * Math.pow(rSolid, 0.7) * (rSolid / (rSolid + 0.5)) * kx;
-  if (rFrost > 0) ext += 0.5 * rFrost * kx;
+  let extP = 0;
+  if (rLiquid > 0) extP += 0.2 * Math.pow(rLiquid, 0.6) * (rLiquid / (rLiquid + 0.5)) * kx * reach;
+  if (rSolid > 0) extP += 2.0 * Math.pow(rSolid, 0.7) * (rSolid / (rSolid + 0.5)) * kx;
+  if (rFrost > 0) extP += 0.5 * rFrost * kx;
+  ext += extP;
+  // The same as a length: what is falling, and the dust in the air, each hide this share of a
+  // sight line per metre (1/m; over a short path s the share hidden is s times this). The
+  // draw kits size their marks from it: the marks in view cover what the physics says.
+  if (o.precipitation) o.precipitation.extinction = extP * 3.912 / WEATHER.clearVisibility;
+  o.dustExtinction = dustExt * 3.912 / WEATHER.clearVisibility;
   o.visibility = WEATHER.clearVisibility / ext;
   // For drawing: the game's distances are compressed, so the painted fog distance should shrink
   // with the square root of the real visual range (20 km -> 1, 5 km -> 0.5, 200 m -> 0.1).

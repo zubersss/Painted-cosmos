@@ -1,9 +1,10 @@
 // Painted Cosmos physics: the lab inside the real painted pipeline. OWNER: PHYSICS.
 // physics-lab.html?painted=1 loads this instead of the debug lab. It builds PAINTER's world and
 // painter from their public exports only (createPainter, RENDERER_OPTIONS, makeWashMaterial,
-// bindBodyUniforms from src/render/index.js; createWorld from src/world/index.js; the chunks
-// that PAINTER's material contract names, from src/render/chunks.js), runs the physics on it
-// and adds the draw kits with a material factory written to PAINTER's contract.
+// makePaintUniforms, bindBodyUniforms and the three scene chunks VERT_PARS, VERT_END, FRAG_PARS,
+// all from src/render/index.js; createWorld from src/world/index.js; the palette data of
+// src/data/looks.js), runs the physics on it and adds the draw kits with a material factory
+// written to PAINTER's contract.
 // It touches no PAINTER file and reaches into none of its internals.
 //
 // URL (all optional):  body=earth  biome=<id> | lat= lon=   hour=12 (local solar time)
@@ -18,11 +19,11 @@
 //   pre=<s> (simulate this long, unseen, before the page says it is ready)
 // window.__lab: { info(), stability(dtMs, pairs), plantCheck(), setRain(mode), physics, kits, world, painter }
 import * as THREE from 'three';
-import { createPainter, RENDERER_OPTIONS, makeWashMaterial, bindBodyUniforms } from '../../render/index.js';
-import { VERT_PARS, VERT_END, FRAG_PARS } from '../../render/chunks.js';
+import { createPainter, RENDERER_OPTIONS, makeWashMaterial, makePaintUniforms, bindBodyUniforms, VERT_PARS, VERT_END, FRAG_PARS } from '../../render/index.js';
 import { createWorld } from '../../world/index.js';
 import { BODIES } from '../../data/bodies.js';
-import { createPhysics, stepExplorerBody, stepShipGear, wakeShip } from '../index.js';
+import { LOOKS, pig, dilute } from '../../data/looks.js';
+import { createPhysics, stepExplorerBody, stepShipGear, wakeShip, MATERIAL_IDS } from '../index.js';
 import { weatherAt, cellsAt } from '../weather.js';
 import { createPhysicsKits } from './kits.js';
 import { SHAPE_GLSL } from './chunks.glsl.js';
@@ -144,44 +145,69 @@ function driveShip(dt) {
 // One opaque pass into two targets, holes by discard, pcWrite(col, wet, nV, viewZ, region).
 // The uniform set that FRAG_PARS needs comes from a makeWashMaterial (a public export); the
 // light and haze of the body are bound with bindBodyUniforms, as for any object on a planet.
+// Ink by material: every loose particle and every mark says what ground it came from
+// (vPcMat, an index into MATERIAL_IDS), and its ink is that ground's. Here: the biome's own
+// ground washes from PAINTER's look table, snow and ice left near paper, wet ground deeper.
+// (The lab's stand-in: the palette is PAINTER's to make.)
+const _hex = (h) => new THREE.Vector3(((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255);
+function inkPalette(biomeId) {
+  const b = LOOKS[bodyId] && LOOKS[bodyId].biomes.find((x) => x.id === biomeId);
+  const g = b ? b.ground.map((n) => dilute(pig(n), 0.3)) : [[0.74, 0.66, 0.52], [0.66, 0.56, 0.44], [0.56, 0.5, 0.46]];
+  const mx = (a, c, t) => [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, a[2] + (c[2] - a[2]) * t];
+  const base = mx(g[0], g[1], 0.5), stone = mx(g[2], [0.78, 0.78, 0.8], 0.3);
+  const of = (m) => (m === 'snow' || m === 'ice' ? [0.965, 0.97, 0.98] : m === 'mud' || m === 'bed' ? mx(base, [0.3, 0.26, 0.24], 0.35)
+    : m === 'rock' || m === 'glass' || m === 'crystal' || m === 'gravel' ? stone : m === 'ash' ? mx(base, [0.45, 0.44, 0.44], 0.6) : base);
+  const pal = []; for (let i = 0; i < 16; i++) { const c = of(MATERIAL_IDS[i] || 'soil'); pal.push(new THREE.Vector3(c[0], c[1], c[2])); }
+  return pal;
+}
 const INK = { rain: 0xb9c6d6, hail: 0xe9edf0, spray: 0xdfe8ee, snow: 0xf7f8f6, dust: 0xb08b62, sand: 0xc8a469, ash: 0x77736c, spores: 0xb7c66a, leaves: 0xb5542f, ring: 0xcfd9e2, mark: 0x7a6250, water: 0x4f77a8 };
 // how the fragment of each shape cuts its hole and picks its wash; c: colour, w: wetness
 const FRAG = {
   // a stroke: full at the head, tapering to nothing at the tail
-  streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = uColor * vPcData.x; float w = 0.55;',
-  dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = uColor * vPcData.x; float w = 0.35;',
+  streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
+  dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
+  // a flake: a speck of bare paper with a ragged edge (it is drawn out along its motion by the kit)
+  flake: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 0.78 + 0.22 * texture(uNoise3D, vec3(vPcUv * 2.3, vPcData.x * 7.0)).r) discard; vec3 c = ink; float w = 0.05;',
   // a puff of dust: not a disc but a ragged dry-brush patch cut from PAINTER's own noise, thinning
   // toward its edge; the pattern is fixed in the puff (it travels with it; nothing is re-rolled)
-  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r; if (nz < 0.46 + 0.5 * rr * rr) discard; vec3 c = uColor * (0.9 + 0.1 * vPcData.x); float w = 0.75;',
-  ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.22) discard; vec3 c = uColor; float w = 0.8;',
+  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r; if (nz < 0.46 + 0.5 * rr * rr) discard; vec3 c = mix(vec3(1.0), ink, 0.8) * (0.9 + 0.1 * vPcData.x); float w = 0.75;',
+  ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.22) discard; vec3 c = ink; float w = 0.8;',
   // a print: darker ground inside, a paler rim on loose ground. Shallow prints are faint, deep
   // ones full; a scour dish is only its pale ring. Fading thins the mark through PAINTER's noise
   // (fixed in the mark, so it never boils).
-  mark: 'float scour = step(3.5, vPcData.z); float cover = pcPhysMarkCover(vPcUv, vPcData.z) * (1.0 - scour), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * clamp(vPcData.x * 12.0, 0.15, 0.9), rim * mix(0.6, 0.22, scour)) * min(1.0, vPcData.w * 3.0); a = min(a, 0.62); if (a < texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.z * 0.37 + vPcData.x)).g) discard; vec3 c = mix(uColor, vec3(0.9, 0.86, 0.78), rim * (1.0 - cover)); float w = 0.2;',
+  mark: 'float scour = step(3.5, vPcData.z); float cover = pcPhysMarkCover(vPcUv, vPcData.z) * (1.0 - scour), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * clamp(vPcData.x * 12.0, 0.15, 0.9), rim * mix(0.6, 0.22, scour)) * min(1.0, vPcData.w * 3.0); a = min(a, 0.62); if (a < texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.z * 0.37 + vPcData.x)).g) discard; vec3 c = mix(ink * 0.66, mix(ink, vec3(1.0), 0.45), rim * (1.0 - cover)); float w = 0.2;',
   // the sea: three flat tones by how the wave faces the sun and the sky (hard-edged washes, no gradient)
-  surface: 'vec3 nB = normalize(vPcData.xyz); float tilt = 1.0 - nB.y * 0.0 - dot(nB, normalize(uSunDirL)); float lv = pcLevel(clamp(1.3 - tilt * 0.9 + (texture(uNoise3D, vec3(vPcUv * 6.0, 0.3)).r - 0.5) * 0.25, 0.0, 1.0), 0.06) / 3.0; vec3 c = mix(uColor * 0.55, mix(uColor, vec3(0.86, 0.9, 0.95), 0.55), lv); float w = 0.12;',
+  surface: 'vec3 nB = normalize(vPcData.xyz); float tilt = 1.0 - nB.y * 0.0 - dot(nB, normalize(uSunDirL)); float lv = pcLevel(clamp(1.3 - tilt * 0.9 + (texture(uNoise3D, vec3(vPcUv * 6.0, 0.3)).r - 0.5) * 0.25, 0.0, 1.0), 0.06) / 3.0; vec3 c = mix(ink * 0.55, mix(ink, vec3(0.86, 0.9, 0.95), 0.55), lv); float w = 0.12;',
 };
 // Four ways to draw rain (the choice is PAINTER's; `rain=` picks one):
 //   thin   every drop a thin tapering stroke, opaque (the contract as it stands)
 //   broad  one drop in six as a broad slanted stroke, long exposure, wet (bleeds in the post pass)
 //   cover  thin strokes, each pixel kept or dropped by a stipple fixed in the stroke
 //   blend  the thin strokes drawn in a pass of their own after the painting, alpha-blended
-const RAIN = { thin: { width: 0.012, exposure: 0.04 }, broad: { width: 0.07, exposure: 0.14, minPx: 3 }, cover: { width: 0.02, exposure: 0.05, minPx: 1.6 }, blend: { width: 0.014, exposure: 0.05, minPx: 1.4 } };
+const RAIN = { thin: { width: 0.012, exposure: 0.04, minPx: 1.2 }, broad: { width: 0.07, exposure: 0.14, minPx: 3 }, cover: { width: 0.02, exposure: 0.05, minPx: 1.6 }, blend: { width: 0.014, exposure: 0.05, minPx: 1.4 } };
 let rainMode = RAIN[Q.get('rain')] ? Q.get('rain') : 'broad';
 // What the painted frames taught: PAINTER's post pass erases anything under about three of its
 // internal pixels (a 1.2 px streak or a 1.6 px flake is simply gone). So in this pipeline every
 // kind gets a least size of 3 px or more, and sizes that read as brush marks at 10 m.
-const DRAW_PAINTED = { snow: { size: 0.06, minPx: 3.5 }, hail: { width: 0.05, minPx: 3 }, sand: { width: 0.035, minPx: 2.6, exposure: 0.05 }, spray: { width: 0.04, minPx: 3 },
-  dust: { size: 0.5, grow: 0.35, minPx: 8 }, ash: { size: 0.09, minPx: 4 }, spores: { size: 0.05, minPx: 3 }, leaves: { size: 0.1, minPx: 4 } };
+// The kits then keep the cover: a mark the floor enlarges stands for several of its kind and
+// only that share is drawn (fewer, larger marks far away). Sizes per kind, and why:
+//   snow   a flake is a speck of bare paper 4 to 9 px across, drawn out along its motion in wind
+//   dust   ragged dry-brush patches (the puff inks 0.4 of its quad); in a storm the kit sizes
+//          them from the dust in the air, up to 2.6 m: billows, not blots
+const DRAW_PAINTED = { snow: { size: 0.1, minPx: 4, maxPx: 9, exposure: 0.035 }, hail: { width: 0.05, minPx: 3 }, sand: { width: 0.035, minPx: 3, exposure: 0.05 }, spray: { width: 0.04, minPx: 3 },
+  dust: { size: 0.5, grow: 0.35, minPx: 8, sizeMax: 2.6, fill: 0.4 }, ash: { size: 0.09, minPx: 4, exposure: 0.03 }, spores: { size: 0.05, minPx: 3 }, leaves: { size: 0.1, minPx: 4 } };
+for (const k of ['snowSize', 'snowMin', 'snowMax', 'dustMax', 'dustSize']) if (Q.has(k)) { const kind = k.slice(0, 4), f = { Size: 'size', Min: 'minPx', Max: k === 'dustMax' ? 'sizeMax' : 'maxPx' }[k.slice(4)]; DRAW_PAINTED[kind][f] = num(k, DRAW_PAINTED[kind][f]); }
 const kitMaterials = [];
+let palette = null;
 function makeKitMaterial(kind, info) {
-  const base = makeWashMaterial({ color: INK[kind], unlit: true });
-  let body = FRAG[kind === 'dust' || kind === 'ash' ? 'puff' : info.shape];
-  if (kind === 'rain' && rainMode === 'broad') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y || fract(vPcData.x * 97.0) > 0.17) discard; vec3 c = uColor * 0.93; float w = 0.95;';
-  if (kind === 'rain' && rainMode === 'cover') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec2 cell = floor(vec2(vPcUv.x * 3.0, vPcUv.y * 14.0)); if (fract(sin(dot(cell + vPcData.x * 31.0, vec2(12.9898, 78.233))) * 43758.5453) > 0.6 - 0.45 * vPcUv.y) discard; vec3 c = uColor * vPcData.x; float w = 0.55;';
+  let body = FRAG[kind === 'dust' || kind === 'ash' ? 'puff' : kind === 'snow' ? 'flake' : info.shape];
+  if (kind === 'rain' && rainMode === 'broad') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * 0.93; float w = 0.95;';
+  if (kind === 'rain' && rainMode === 'cover') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec2 cell = floor(vec2(vPcUv.x * 3.0, vPcUv.y * 14.0)); if (fract(sin(dot(cell + vPcData.x * 31.0, vec2(12.9898, 78.233))) * 43758.5453) > 0.6 - 0.45 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;';
+  palette = palette || inkPalette(world.sampleSurface(bodyId, up0).biomeId);
   const m = new THREE.ShaderMaterial({
     name: 'pc-kit-' + kind,
-    uniforms: { ...base.uniforms, ...info.uniforms },
+    // everything FRAG_PARS declares (lit and hazed like the body once its uniforms are bound), plus the kit's own
+    uniforms: makePaintUniforms(world.bodyUniforms(bodyId) || undefined, { uColor: { value: _hex(INK[kind]) }, uPcInk: { value: palette }, ...info.uniforms }),
     vertexShader: `${VERT_PARS}
 ${info.vertexChunk}
 varying vec3 vView;
@@ -194,9 +220,12 @@ void main() {
     fragmentShader: `${FRAG_PARS}
 ${SHAPE_GLSL}
 uniform vec3 uColor;
-varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView;
+uniform vec3 uPcInk[16];
+varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView; varying float vPcMat;
 void main() {
   #include <logdepthbuf_fragment>
+  // the ink: that of the ground the thing came from, where it came from the ground
+  vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${body}
   c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
   pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${info.region.toFixed(1)});
@@ -304,12 +333,14 @@ function tick(now) {
   if (hud.style.display !== 'none' && frames % 10 === 0) hud.textContent = JSON.stringify(info(), null, 0).replace(/,"/g, ', "');
   requestAnimationFrame(tick);
 }
+const r3 = (o) => { const q = {}; for (const k in o) if (o[k]) q[k] = +(+o[k]).toFixed(3); return q; };
 function info() {
   const w = physics.here.weather, a = physics.here.air, P = physics.particles;
   const counts = {}; for (const k of ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray']) if (P[k].count) counts[k] = P[k].count;
   return { body: bodyId, t: +time.toFixed(1), wx: w.kind, rate: +w.precipitation.rate.toFixed(1), wind: +a.speed.toFixed(1), wet: +w.wetness01.toFixed(2), vis: +w.visibility01.toFixed(2), particles: counts,
     marks: physics.fields.deform.marks.total, sea: physics.fields.water.field.present ? +physics.fields.water.field.height.toFixed(2) : null,
-    kits: kits ? { calls: kits.stats.drawCalls, tris: kits.stats.triangles, verts: kits.stats.vertices, ms: +cost.kits.toFixed(3) } : null,
+    kits: kits ? { calls: kits.stats.drawCalls, tris: kits.stats.triangles, verts: kits.stats.vertices, ms: +cost.kits.toFixed(3), cover: r3(kits.weather.stats.cover), size: r3(kits.weather.stats.size) } : null,
+    sky: r3(physics.here.sky), hides: { falling: +(w.precipitation.extinction * 24).toFixed(3), dust: +(w.dustExtinction * 24).toFixed(3) },
     frame: { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, internal: painter.info.internalWidth + 'x' + painter.info.internalHeight },
     ms: { physics: +cost.phys.toFixed(2), world: +cost.world.toFixed(2) }, rain: rainMode, biome: world.sampleSurface(bodyId, up0).biomeId };
 }

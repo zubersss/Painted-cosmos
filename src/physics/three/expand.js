@@ -19,15 +19,27 @@
 //           spreads), turning at `spin` rad/s in the picture plane (a leaf tumbles)
 //   fadeIn: seconds over which a new particle grows to full size (nothing pops in)
 //   minPx:  the least width (streak) or size (dab) on screen, in pixels: a 1 cm streak is
-//           under a pixel beyond 15 m and would flicker in and out of the raster
+//           under a pixel beyond 15 m and would flicker in and out of the raster (and PAINTER's
+//           post pass erases any mark under about 3 of its internal pixels). A mark that the
+//           floor makes f times larger than it is stands for f (streak) or f^2 (dab) of its
+//           kind: only that share is drawn, chosen by a number each particle keeps for life, so
+//           the far air holds fewer, larger marks and the cover stays what it was (art bible 4)
+//   maxPx:  the most (0 = no limit): a flake a hand's breadth from the lens is not a snowball
+//   exposure (dab): a dab is drawn out along its motion relative to the eye over this many
+//           seconds (driving snow is streaks; still air leaves it round); not with `spin`
+//   sizeMax, fill (dab): where the physics says how much of the view the kind hides (dust in
+//           a storm), the kit sizes the marks to cover that, up to sizeMax; fill is the share
+//           of a quad the material inks (a disc 0.785; say so if yours is ragged)
+//   share:  0..1 (default 1): draw only this share of the kind (a painter's rain is a few
+//           strokes, not every drop); which ones is decided as for the floor
 //   vary:   0..1 how much the shade differs from particle to particle (the `color` attribute)
 export const DRAW = Object.freeze({
   rain: Object.freeze({ shape: 'streak', width: 0.012, exposure: 0.04, min: 0.05, fadeIn: 0, vary: 0, minPx: 1.2 }),
   hail: Object.freeze({ shape: 'streak', width: 0.024, exposure: 0.018, min: 0.03, fadeIn: 0, vary: 0, minPx: 1.2 }),
   sand: Object.freeze({ shape: 'streak', width: 0.014, exposure: 0.03, min: 0.02, fadeIn: 0.05, vary: 0.3, minPx: 1.2 }),
   spray: Object.freeze({ shape: 'streak', width: 0.018, exposure: 0.03, min: 0.03, fadeIn: 0, vary: 0, minPx: 1.2 }),
-  snow: Object.freeze({ shape: 'dab', size: 0.035, grow: 0, spin: 0, fadeIn: 0.25, vary: 0, minPx: 1.6 }),
-  dust: Object.freeze({ shape: 'dab', size: 0.16, grow: 0.3, spin: 0, fadeIn: 0.15, vary: 0.35, minPx: 1.6 }),
+  snow: Object.freeze({ shape: 'dab', size: 0.035, grow: 0, spin: 0, fadeIn: 0.25, vary: 0, minPx: 1.6, exposure: 0.03 }),
+  dust: Object.freeze({ shape: 'dab', size: 0.16, grow: 0.3, spin: 0, fadeIn: 0.15, vary: 0.35, minPx: 1.6, sizeMax: 2.6, fill: 0.785 }),
   ash: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 1.5, fadeIn: 0.3, vary: 0.4, minPx: 1.6 }),
   spores: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 0, fadeIn: 0.4, vary: 0.3, minPx: 1.6 }),
   leaves: Object.freeze({ shape: 'dab', size: 0.075, grow: 0, spin: 3.2, fadeIn: 0.3, vary: 0.5, minPx: 1.6 }),
@@ -47,6 +59,18 @@ export function makeEye() {
   return { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, rx: 1, ry: 0, rz: 0, ux: 0, uy: 1, uz: 0, fx: 0, fy: 0, fz: 0, radius: 0, pix: 0 };
 }
 
+// A number in 0..1 that stays with a particle for life (its size is its own).
+export const own01 = (size) => { const h = size * 91573.37; return h - Math.floor(h); };
+// How much is left of a particle whose own number is h when only a share `keep` of its kind is
+// drawn where it is: all of it while keep is well above h, nothing once keep is below h, and
+// a smooth shrinking between (so a mark never pops as it drifts away from the eye). Averaged
+// over the kind the area drawn is the share asked for, within a few percent.
+export function thinned(h, keep) {
+  if (keep >= 1) return 1;
+  const t = (keep * 1.18 - h) / (0.3 * h + 1e-4);
+  return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+}
+
 function edgeScale(px, py, pz, eye) {
   if (!(eye.radius > 0)) return 1;
   const dx = px - eye.fx, dy = py - eye.fy, dz = pz - eye.fz;
@@ -57,8 +81,9 @@ function edgeScale(px, py, pz, eye) {
 // Streaks. buf: a particle buffer of physics.particles; D: its DRAW entry; out: Float32Array of
 // at least count * 12. Returns the number of quads written (= the particles drawn).
 export function expandStreaks(buf, D, eye, out) {
-  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age;
-  const ex = D.exposure, hw = D.width * 0.5, min = D.min || 0, fin = D.fadeIn || 0, least = 0.5 * (D.minPx || 0) * eye.pix;
+  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size;
+  const ex = D.exposure, hw = D.width * 0.5, min = D.min || 0, fin = D.fadeIn || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
+  const share = D.share > 0 && D.share < 1 ? D.share : 1;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     const px = P[o], py = P[o + 1], pz = P[o + 2];
     // motion relative to the eye over the exposure
@@ -73,9 +98,13 @@ export function expandStreaks(buf, D, eye, out) {
     let wx = sy * tz - sz * ty, wy = sz * tx - sx * tz, wz = sx * ty - sy * tx;
     let wl = Math.sqrt(wx * wx + wy * wy + wz * wz);
     if (wl < 1e-9) { wx = eye.rx; wy = eye.ry; wz = eye.rz; wl = 1; }   // coming straight at the eye
-    let half = hw;
-    if (least > 0) { const far = least * Math.sqrt(tx * tx + ty * ty + tz * tz); if (far > half) half = far; }
-    let k = half / wl * edgeScale(px, py, pz, eye);
+    let half = hw, thin = 1;
+    const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    // the floor: f times wider than it is, so one in f is drawn
+    if (least > 0) { const far = least * dist; if (far > half) { thin = thinned(own01(S[i]), share * half / far); half = far; } else if (share < 1) thin = thinned(own01(S[i]), share); }
+    else if (share < 1) thin = thinned(own01(S[i]), share);
+    if (most > 0 && half > most * dist) half = most * dist;
+    let k = half / wl * edgeScale(px, py, pz, eye) * thin;
     if (fin > 0 && A[i] < fin) k *= A[i] / fin;
     wx *= k; wy *= k; wz *= k;
     const hx = px - sx, hy = py - sy, hz = pz - sz;                      // where it was
@@ -88,29 +117,66 @@ export function expandStreaks(buf, D, eye, out) {
 }
 
 // Dabs: quads facing the camera. Same arguments as expandStreaks.
-export function expandDabs(buf, D, eye, out) {
-  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, A = buf.age, S = buf.size;
-  const fin = D.fadeIn || 0, grow = D.grow || 0, spin = D.spin || 0, least = 0.5 * (D.minPx || 0) * eye.pix;
+// size: the size now (m) when the kit has worked one out from the physics (see dabSize);
+// D.size otherwise.
+export function expandDabs(buf, D, eye, out, size = D.size) {
+  const n = Math.min(buf.count, Math.floor(out.length / 12)), P = buf.pos, V = buf.vel, A = buf.age, S = buf.size;
+  const fin = D.fadeIn || 0, grow = D.grow || 0, spin = D.spin || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
+  const ex = spin === 0 ? D.exposure || 0 : 0;
+  const share = D.share > 0 && D.share < 1 ? D.share : 1;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
-    const px = P[o], py = P[o + 1], pz = P[o + 2], age = A[i];
-    let h = 0.5 * (D.size + grow * age);
-    if (least > 0) { const tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z, far = least * Math.sqrt(tx * tx + ty * ty + tz * tz); if (far > h) h = far; }
+    let px = P[o], py = P[o + 1], pz = P[o + 2];
+    const age = A[i];
+    let h = 0.5 * (size + grow * age);
+    const tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z, dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    // the floor: f times larger than it is, so one in f^2 is drawn
+    if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), share * f * f); }
+    else if (share < 1) h *= thinned(own01(S[i]), share);
+    if (most > 0 && h > most * dist) h = most * dist;
     h *= edgeScale(px, py, pz, eye);
     if (fin > 0 && age < fin) h *= age / fin;
-    let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz;
+    let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h;
     if (spin !== 0) {
       // each particle keeps its own phase (its size is its own and travels with it)
       const a = age * spin + S[i] * 51413.7, c = Math.cos(a), s = Math.sin(a);
       ax = eye.rx * c + eye.ux * s; ay = eye.ry * c + eye.uy * s; az = eye.rz * c + eye.uz * s;
       bx = eye.ux * c - eye.rx * s; by = eye.uy * c - eye.ry * s; bz = eye.uz * c - eye.rz * s;
+    } else if (ex > 0 && h > 0) {
+      // drawn out along its motion across the picture during the exposure (never more than 3 dabs long)
+      const vx = (V[o] - eye.vx) * ex, vy = (V[o + 1] - eye.vy) * ex, vz = (V[o + 2] - eye.vz) * ex;
+      const sr = vx * eye.rx + vy * eye.ry + vz * eye.rz, su = vx * eye.ux + vy * eye.uy + vz * eye.uz;
+      let sl = Math.sqrt(sr * sr + su * su);
+      if (sl > 1e-5) {
+        const c = sr / sl, s2 = su / sl;
+        if (sl > 4 * h) sl = 4 * h;
+        ax = eye.rx * c + eye.ux * s2; ay = eye.ry * c + eye.uy * s2; az = eye.rz * c + eye.uz * s2;
+        bx = eye.ux * c - eye.rx * s2; by = eye.uy * c - eye.ry * s2; bz = eye.uz * c - eye.rz * s2;
+        la = h + 0.5 * sl;
+        px -= ax * 0.5 * sl; py -= ay * 0.5 * sl; pz -= az * 0.5 * sl;      // the head stays where the particle is
+      }
     }
-    ax *= h; ay *= h; az *= h; bx *= h; by *= h; bz *= h;
+    ax *= la; ay *= la; az *= la; bx *= h; by *= h; bz *= h;
     out[q] = px - ax - bx; out[q + 1] = py - ay - by; out[q + 2] = pz - az - bz;
     out[q + 3] = px + ax - bx; out[q + 4] = py + ay - by; out[q + 5] = pz + az - bz;
     out[q + 6] = px + ax + bx; out[q + 7] = py + ay + by; out[q + 8] = pz + az + bz;
     out[q + 9] = px - ax + bx; out[q + 10] = py - ay + by; out[q + 11] = pz - az + bz;
   }
   return n;
+}
+
+// The size (m) a dab of this kind should have now for the marks to hide what the physics says
+// the kind hides: `extinction` (1/m: the share of a sight line hidden per metre; from
+// physics.here.weather: precipitation.extinction, dustExtinction) spread over the `count`
+// marks alive in `volume` m3 of air, each inking `D.fill` of its quad:
+//   count x fill x size^2 = extinction x volume          (fill: the share of the quad that is inked)
+// never under D.size, never over D.sizeMax. o (optional): o.cover = the share of that hiding
+// the marks then paint (1 = all of it; the rest is haze, which is the sky's to paint).
+export function dabSize(D, extinction, count, volume, o) {
+  const max = D.sizeMax || D.size, fill = D.fill || 0.785;
+  let s = D.size, want = 0;
+  if (extinction > 0 && count > 0) { want = Math.sqrt(extinction * volume / (count * fill)); s = want < D.size ? D.size : want > max ? max : want; }
+  if (o) o.cover = want > 0 ? Math.min(1, (s * s) / (want * want)) : 1;
+  return s;
 }
 
 // A shade per particle (the same on its four vertices) in 1 - vary .. 1, stable for the life
