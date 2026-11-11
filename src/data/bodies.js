@@ -38,6 +38,20 @@ export const BODIES = {
     parent: null, orbitRadius: 1180e3, orbitPeriod: 160000, orbitPhase: 2.8, dayLength: 3000, axialTilt: 0.3 },
 };
 
+// Height above `radius` where flight stops being "in the atmosphere" and becomes space: the
+// ATMOSPHERE/SPACE boundary of the state machine and the top of the ground (co-rotating) flight
+// frame. Airless bodies still get a near-surface zone so landing has room to work.
+// Terrain (including floating islands) should stay below radius + 0.8 * spaceAltitude(body).
+export function spaceAltitude(body) {
+  return body.spaceAltitude || Math.max(body.atmosphereHeight || 0, body.radius * 0.2);
+}
+
+// Radius of the sphere inside which a ship flies in this body's own frame (it follows the body
+// along its orbit). No two spheres overlap at any time (tests/orbits.test.mjs).
+export function soiRadius(body) {
+  return body.soiRadius || body.radius * 4;
+}
+
 export function getBody(id) {
   const b = BODIES[id];
   if (!b) throw new Error('unknown body id: ' + id);

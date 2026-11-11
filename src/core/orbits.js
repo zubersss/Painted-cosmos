@@ -2,6 +2,7 @@
 // Pure (no three). "Universe" frame: the sun sits at the origin, the planets orbit in the XZ
 // plane, +Y is ecliptic north, metres, seconds. All values are JS doubles.
 import { V, add, sub, len, norm, dot, scale, qFromAxisAngle, qMul, qConj, qRotate, wrapAngle } from './vec.js';
+import { spaceAltitude, soiRadius } from '../data/bodies.js';
 
 const TAU = Math.PI * 2;
 
@@ -87,10 +88,7 @@ export class Ephemeris {
   }
 
   // Radius of the sphere of influence used for choosing the flight frame (see frames.js).
-  soiRadius(id) {
-    const b = this.body(id);
-    return b.soiRadius || b.radius * 4;
-  }
+  soiRadius(id) { return soiRadius(this.body(id)); }
 
   // Nearest body by distance to its surface. Returns { id, distance (to centre), altitude }.
   nearest(P, t) {
@@ -104,8 +102,4 @@ export class Ephemeris {
   }
 }
 
-// Height above the base radius where flight stops being "in the atmosphere" and becomes space.
-// Airless bodies still get a thin near-surface zone so that landing logic has room to work.
-export function spaceAltitude(body) {
-  return body.spaceAltitude || Math.max(body.atmosphereHeight || 0, body.radius * 0.2);
-}
+export { spaceAltitude };

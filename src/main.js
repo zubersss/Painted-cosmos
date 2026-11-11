@@ -56,7 +56,7 @@ async function boot() {
   const sim = game.sim;
   const debug = {
     game, sim, world, painter, renderer, scene, camera, dyn, using: prov.using,
-    info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: world.isSettled ? world.isSettled() : null }),
+    info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
     setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },
@@ -86,7 +86,7 @@ async function boot() {
     // "Ready" = a complete frame is on screen: the terrain around the camera has settled
     // (or, for a world that cannot say, a generous number of frames has passed).
     if (!window.__pcReady) {
-      const settled = world.isSettled ? world.isSettled() : game.frameCount > 90;
+      const settled = worldSettled(world, game.frameCount);
       settledFrames = settled ? settledFrames + 1 : 0;
       if (settledFrames >= 2 || game.frameCount > 900) {
         window.__pcReady = true;
@@ -95,6 +95,14 @@ async function boot() {
     }
   }
   requestAnimationFrame(tick);
+}
+
+// Has the world finished building what the camera can see? The stub says so through
+// isSettled(); Painter's world exposes `busy` (pending build jobs); anything else gets time.
+function worldSettled(world, frames) {
+  if (typeof world.isSettled === 'function') return world.isSettled();
+  if (typeof world.busy === 'number') return world.busy === 0 && frames > 3;
+  return frames > 90;
 }
 
 function norm3(p) {
