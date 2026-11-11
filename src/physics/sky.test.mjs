@@ -21,11 +21,14 @@ test('every number is there, finite and between 0 and 1, on every world, in any 
   assert.equal(skyNumbers(null, {}).haze, 1);
 });
 
-test('it says what a painter would say: a storm is dark, wet and rainy; a dust storm is dust; snow covers', () => epoch0(() => {
+test('it says what a painter would say: a storm is dark, wet and rainy; a dust storm is dust; snow covers', () => {
   const find = (id, pred) => { for (let t = 0; t < 9000; t += 41) for (const c of cellsAt(id, t)) { const w = wx(id, c, t + 15); if (pred(w)) return { w, c, t: t + 15 }; } throw new Error('not found on ' + id); };
   const storm = skyNumbers(find('earth', (w) => w.storm01 > 0.7 && w.precipitation.rate > 10 && w.precipitation.type === 'rain').w, {});
   assert.ok(storm.cloud > 0.8 && storm.overcast > 0.7 && storm.rain > 0.6 && storm.haze < 0.6 && storm.snowfall < 0.1 && storm.dust < 0.05, JSON.stringify(storm));
-  const fair = skyNumbers(wx('earth', { x: 0.1736, y: 0.5817, z: 0.7946 }, 20), {});
+  // (P9: the fair day was one fixed place at t = 20, which under Earth's clock as the game has it is half
+  // cloudy; the probe is now the first place found at t = 20 with an open sky, nothing falling and no fog)
+  const fairW = (() => { for (let k = 0; k < 800; k++) { const a = k * 2.399963, y = -0.9 + 1.8 * ((k * 0.618034) % 1), r = Math.sqrt(1 - y * y), w = wx('earth', { x: Math.cos(a) * r, y, z: Math.sin(a) * r }, 20); if (w.cloud01 < 0.18 && w.precipitation.rate === 0 && w.fog01 < 0.1) return w; } throw new Error('no fair place on earth at t = 20'); })();
+  const fair = skyNumbers(fairW, {});
   assert.ok(fair.cloud < 0.2 && fair.overcast < 0.05 && fair.haze > 0.9 && fair.rain === 0, JSON.stringify(fair));
   const dust = skyNumbers(find('mars', (w) => w.dust01 > 0.85).w, {});
   assert.ok(dust.dust > 0.6 && dust.dust > dust.fog * 4 && dust.haze < 0.3, JSON.stringify(dust));
@@ -36,7 +39,7 @@ test('it says what a painter would say: a storm is dark, wet and rainy; a dust s
   assert.ok(s.snowfall > 0.3 && s.rain < 0.05, JSON.stringify(s));
   const deep = { ...snow.w, snowDepth: 0.2 }, thin = { ...snow.w, snowDepth: 0.01 };
   assert.ok(skyNumbers(deep, {}).snow > 0.99 && Math.abs(skyNumbers(thin, {}).snow - (1 - Math.exp(-0.01 / SKY.snowCover))) < 1e-9);
-}));
+});
 
 test('continuous in time: nothing but the flash moves by more than a tenth in a second', () => {
   let worst = 0, what = '';
@@ -140,7 +143,7 @@ test('R-WX-1: with the real temperature of each place, through physics.weather a
   }
 });
 
-test('at the focus fresh snow comes only from the sky: it gathers while snow falls and never rises under a clear one', () => epoch0(() => {
+test('at the focus fresh snow comes only from the sky: it gathers while snow falls and never rises under a clear one', () => {
   const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'alpine_meadow' });
   const physics = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
   let hit = null;
@@ -152,7 +155,9 @@ test('at the focus fresh snow comes only from the sky: it gathers while snow fal
     physics.update(0.25, { bodyId: 'earth', time: t, focus: p });
     const s = physics.here.sky;
     assert.ok(s.fresh <= s.snow + 1e-9);
-    if (s.snowfall > 0.005) { dry = 0; falling += 0.25; } else dry += 0.25;
+    // (falling is any snow at all: the first flakes of a front lay cover before the sky number reaches 0.005;
+    // P9: with Earth's clock as the game has it, the first heavy fall found begins that gently)
+    if (s.snowfall > 0) { dry = 0; if (s.snowfall > 0.005) falling += 0.25; } else dry += 0.25;
     if (prev != null) { const d = s.fresh - prev; if (d > 0) { if (dry > 2) { gainedDry += d; worstDry = Math.max(worstDry, d); } else gainedFalling += d; } }
     prev = s.fresh; top = Math.max(top, s.fresh);
   }
@@ -167,4 +172,4 @@ test('at the focus fresh snow comes only from the sky: it gathers while snow fal
   const meadow = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
   let fair = null; for (let k = 0; k < 400 && !fair; k++) { const a = k * 2.399963, y = 0.2 + 0.6 * ((k * 0.618) % 1), r = Math.sqrt(1 - y * y), d = { x: Math.cos(a) * r, y, z: Math.sin(a) * r }, pp = { x: d.x * (R + 1), y: d.y * (R + 1), z: d.z * (R + 1) }; meadow.warmUp({ bodyId: 'earth', time: 50, focus: pp }); meadow.update(0.1, { bodyId: 'earth', time: 50.1, focus: pp }); const s = meadow.here.sky; if (s.cloud < 0.2 && s.snow < 0.02 && s.fresh < 0.02) fair = s; }
   assert.ok(fair, 'a fair day on the meadow with bare grass');
-}));
+});
