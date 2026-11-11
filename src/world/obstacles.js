@@ -65,6 +65,7 @@ export function sampleObstaclesPure(bodyId, dx, dy, dz, radius) {
     const t = treeCell(S, _cells[i], _cells[i + 1], _cells[i + 2]);
     for (let k = 0; k < t.count; k++) {
       const o = k * INST_STRIDE, sc = t.data[o + 3], sp = specs[t.data[o + 5]], ob = (sp && sp.obs) || [0.3, 10], ks = (sp && sp.scale) || 1;
+      if (sp && sp.noObs) continue;                  // trailing plants: nothing to bump into
       add(t.data, o, ob[0] * sc / ks, ob[1] * sc / ks, 'tree');
     }
   }

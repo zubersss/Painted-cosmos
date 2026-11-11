@@ -67,8 +67,9 @@ function scan(S, d, eyeR, sc) {
       const r = RS[i], k = a * NR + i;
       step(d, f, ang, r, R, p);
       S.sample(p[0], p[1], p[2], o, r > 8 && r < 260);
-      const liq = o.lq !== NOLQ && o.lq > o.h;
-      const top = R + (liq ? o.lq : o.h);
+      const wetL = o.lq !== NOLQ && o.lq > o.h;
+      const liq = wetL || (sc.bedW > 0 && r > 8 && r < 260 && o.s < sc.bedW);     // a dry river bed counts as the water it once held
+      const top = R + (wetL ? o.lq : o.h);
       const th = r / R;
       const el = Math.atan2(top * Math.cos(th) - eyeR, top * Math.sin(th));
       sc.el[k] = el; sc.liq[k] = liq ? 1 : 0;
@@ -96,11 +97,11 @@ function scoreView(sc, a0, W) {
   lo = Math.max(lo, hi - 0.80);
   // set the frame so the tallest thing stands a little under the top edge, and what lies below
   // the eye is still in it
-  let pitch = Math.min(hi - 0.30, (hi + lo) * 0.5 + 0.03);
-  pitch = Math.max(-0.30, Math.min(0.24, Math.max(pitch, hi - 0.40)));
-  if (hi < 0.12 && lo > -0.2) pitch = Math.max(pitch, -0.05);
+  let pitch = hi - Math.max(0.16, Math.min(0.34, 0.16 + (hi - 0.10) * 0.6));
+  if (W.below > 1) pitch = Math.min(pitch, Math.max(hi - 0.40, (hi + lo) * 0.5 + 0.03));   // a hollow to look down into
+  pitch = Math.max(-0.30, Math.min(0.24, pitch));
   const top = pitch + VFOV, bot = pitch - VFOV;
-  let area = 0, liquid = 0, steep = 0, below = 0, flora = 0, own = 0, layers = 0, beyond = 0, skyA = 0, m1 = 0, m2 = 0, near = 0, hiWall = 0;
+  let area = 0, liquid = 0, steep = 0, below = 0, flora = 0, own = 0, layers = 0, beyond = 0, skyA = 0, m1 = 0, m2 = 0, near = 0, hiWall = 0, wallA = 0, fore = 0;
   for (let c = -HALF; c <= HALF; c++) {
     const a = (a0 + c + NAZ) % NAZ;
     let hmax = -9, lastVisR = 0, sawLiq = false, got = false;
@@ -117,8 +118,10 @@ function scoreView(sc, a0, W) {
         if (sc.el[k] < -0.10 && RS[i] > 20) below += g;
         flora += g * Math.min(1, sc.trees[k] * 2.5) * (RS[i] > 14 && RS[i] < 180 ? 1 : 0);
         if (RS[i] < 12) near += g;
+        if (RS[i] < 28 && !sc.liq[k]) fore += g;
         if (lastVisR > 0 && RS[i] > lastVisR * 1.6 && i < NR - 1) layers++;
         if (RS[i] < 30 && sc.el[k] > 0.42) hiWall++;
+        if (RS[i] < 45 && sc.el[k] > 0.08) wallA += g;
       }
       lastVisR = RS[i];
       hmax = sc.el[k];
@@ -142,10 +145,35 @@ function scoreView(sc, a0, W) {
   s += W.flora * Math.min(1, (flora / area) / 0.25);
   s -= Math.abs(hi - W.high - 0.06) * 2.2;                   // the skyline about where this kind of place wants it
   s -= Math.max(0, 0.14 - skyFrac) * 6 + Math.max(0, skyFrac - 0.55) * 3;   // some sky, not mostly sky
-  s -= Math.max(0, hiWall - 1) * 0.5;                         // not nose to a wall
+  s -= Math.max(0, hiWall - 1) * 0.5 + Math.max(0, wallA / area - (W.close || 0.06)) * 5;   // not nose to a wall
   s -= Math.max(0, 0.02 - near / full) * 12;                  // a foreground to stand on
+  s -= Math.max(0, fore / full - 0.30) * 4;                   // but not a picture of the ground at one's feet
   s -= (1 - own / area) * 2.5;                                // paint this biome, not its neighbour
   return { s, pitch, skyFrac, lf, hi, lo, layers: layers / n, steep: steep / area, below: below / area, beyond: beyond / n, flora: flora / area };
+}
+
+// Where a body's rings stand in the sky of a spot: [bearing index, elevation] of points along them.
+function ringSky(S, d, eyeR) {
+  const f = frameAt(d), rr = S.R * (S.look.rings.inner + S.look.rings.outer) * 0.5, out = [];
+  for (let i = 0; i < 90; i++) {
+    const l = i / 90 * Math.PI * 2;
+    const vx = rr * Math.cos(l) - d[0] * eyeR, vy = -d[1] * eyeR, vz = rr * Math.sin(l) - d[2] * eyeR;
+    const il = 1 / Math.hypot(vx, vy, vz);
+    const up = (vx * d[0] + vy * d[1] + vz * d[2]) * il;
+    if (up < 0.03) continue;
+    const az = Math.atan2((vx * f.e[0] + vy * f.e[1] + vz * f.e[2]) * il, (vx * f.n[0] + vy * f.n[1] + vz * f.n[2]) * il);
+    out.push((az / (Math.PI * 2) * NAZ + NAZ) % NAZ, Math.asin(up));
+  }
+  return out;
+}
+// share of the frame's width in which a ring arc crosses the sky
+function ringIn(rs, a0, pitch) {
+  let n = 0;
+  for (let i = 0; i < rs.length; i += 2) {
+    let da = rs[i] - a0; if (da > NAZ / 2) da -= NAZ; if (da < -NAZ / 2) da += NAZ;
+    if (Math.abs(da) <= HALF && rs[i + 1] > pitch + 0.05 && rs[i + 1] < pitch + VFOV - 0.04) n++;
+  }
+  return Math.min(1, n / 8);
 }
 
 // -> { unitDir: {x,y,z}, eye (m above the ground), yaw, pitch (radians), score, terms } | null
@@ -158,7 +186,7 @@ export function findVantage(bodyId, biomeId, opts = {}) {
   const W = Object.assign({}, WANT[B.terrain] || WANT.default, B.want || {});
   const eye = opts.eye || 1.7;
   const o = makeSample(S.nB);
-  const sc = { o, bi, el: new Float32Array(NAZ * NR), gap: new Float32Array(NAZ * NR), steep: new Float32Array(NAZ * NR), trees: new Float32Array(NAZ * NR), own: new Float32Array(NAZ * NR), liq: new Uint8Array(NAZ * NR), vis: new Uint8Array(NAZ * NR), sky: new Float32Array(NAZ) };
+  const sc = { o, bi, bedW: B.terrain === 'riverbed' && !(B.t && B.t.wet) ? ((B.t && B.t.bedW) || 6.5) : 0, el: new Float32Array(NAZ * NR), gap: new Float32Array(NAZ * NR), steep: new Float32Array(NAZ * NR), trees: new Float32Array(NAZ * NR), own: new Float32Array(NAZ * NR), liq: new Uint8Array(NAZ * NR), vis: new Uint8Array(NAZ * NR), sky: new Float32Array(NAZ) };
   const sites = S.sites.filter((s) => s.b === bi).slice(0, opts.sites || 2);
   const p = [0, 0, 0], q = [0, 0, 0];
   const cands = [];
@@ -171,12 +199,15 @@ export function findVantage(bodyId, biomeId, opts = {}) {
         S.sample(p[0], p[1], p[2], o, true);
         if (o.w[bi] < 0.93) continue;
         if (o.lq !== NOLQ && o.lq > o.h - 0.3) continue;
-        if (o.trees > 0.35 && !opts.inside) continue;
+        const dens = o.trees;
         const h0 = o.h, fp = frameAt(p);
         let rough = 0;
         for (let t = 0; t < 4; t++) { step(p, fp, t * Math.PI / 2, 3.5, R, q); rough = Math.max(rough, Math.abs(S.heightAt(q[0], q[1], q[2]) - h0)); }
         if (rough > 1.3) continue;
-        cands.push({ d: [p[0], p[1], p[2]], h: h0, rough });
+        // how far this spot stands above the ground around it
+        let around = 0;
+        for (let t = 0; t < 6; t++) { step(p, fp, t * Math.PI / 3 + 0.3, 70, R, q); around += S.heightAt(q[0], q[1], q[2]); }
+        cands.push({ d: [p[0], p[1], p[2]], h: h0, rough, dens, perch: Math.max(-1, Math.min(1, (h0 - around / 6) / 12)) });
       }
     }
   }
@@ -184,20 +215,31 @@ export function findVantage(bodyId, biomeId, opts = {}) {
   const tops = [];
   for (const c of cands) {
     scan(S, c.d, R + c.h + eye, sc);
+    const ringAt = S.look.rings ? ringSky(S, c.d, R + c.h + eye) : null;
     let cb = null;
     for (let a = 0; a < NAZ; a++) {
       const v = scoreView(sc, a, W);
       if (!v) continue;
-      v.s -= c.rough * 0.3;
+      v.s += -c.rough * 0.3 + (W.perch || 0) * c.perch - c.dens * 0.8;
+      if (ringAt) v.s += (W.rings || 0.3) * ringIn(ringAt, a, v.pitch);
       if (!cb || v.s > cb.s) { cb = v; cb.a = a; }
     }
     if (cb) tops.push({ c, v: cb });
   }
   tops.sort((x, y) => y.v.s - x.v.s);
   // the best view whose easel does not stand against a trunk or a boulder
-  for (const t of tops.slice(0, 12)) {
-    const ob = sampleObstaclesPure(bodyId, t.c.d[0], t.c.d[1], t.c.d[2], 7);
-    if (ob.length && !opts.inside) continue;
+  for (const t of tops.slice(0, 40)) {
+    const d = t.c.d, f = frameAt(d), yaw = t.v.a / NAZ * Math.PI * 2;
+    let blocked = false;
+    for (const ob of sampleObstaclesPure(bodyId, d[0], d[1], d[2], 16)) {
+      const u = ob.unitDir, vx = u.x - d[0], vy = u.y - d[1], vz = u.z - d[2];
+      const dist = Math.hypot(vx, vy, vz) * R;
+      if (dist < 5.5) { blocked = true; break; }
+      let da = Math.atan2(vx * f.e[0] + vy * f.e[1] + vz * f.e[2], vx * f.n[0] + vy * f.n[1] + vz * f.n[2]) - yaw;
+      while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+      if (Math.abs(da) < 0.5 && dist < 13) { blocked = true; break; }       // nothing standing in the middle of the picture
+    }
+    if (blocked) continue;
     best = t; break;
   }
   if (!best && tops.length) best = tops[0];

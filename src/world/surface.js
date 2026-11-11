@@ -26,13 +26,13 @@ export function makeSample(nBiomes) {
     r2: 1, g2: 1, b2: 1,         // what this ground reads as from far away (canopy, water)
     dry: 0, wet: 0, canopy: 0, aux: 0,
     qr: 0.6, qg: 0.74, qb: 0.8, qk: 0.85, qglow: 0, qcloud: 0,   // liquid look: colour, mirror, glow, cloud
-    trees: 0, birch: 0, under: 0, rock: 0, s: 1e9, glade: 0,
+    trees: 0, birch: 0, under: 0, rock: 0, s: 1e9, glade: 0, strata: 0, lip: 0,
   };
 }
 
 // scratch result of one biome recipe
 function makeB() {
-  return { h: 0, lq: NOLQ, r: 1, g: 1, b: 1, r2: 1, g2: 1, b2: 1, dry: 0.2, wet: 0.2, canopy: 0, aux: 0, trees: 0, birch: 0, under: 0, rock: 0, s: 1e9, glade: 0 };
+  return { h: 0, lq: NOLQ, r: 1, g: 1, b: 1, r2: 1, g2: 1, b2: 1, dry: 0.2, wet: 0.2, canopy: 0, aux: 0, trees: 0, birch: 0, under: 0, rock: 0, s: 1e9, glade: 0, strata: 0, lip: 0 };
 }
 
 function mix3(o, c, t) { o.r += (c[0] - o.r) * t; o.g += (c[1] - o.g) * t; o.b += (c[2] - o.b) * t; }
@@ -56,13 +56,15 @@ class Surface {
     this.sea = look.seaLevel;
     // liquid groups: 0 stream network, 1 sea (water or cloud), 2 pools, 3 flowing lava and the like
     this.lqGroup = this.biomes.map((b) => (b.terrain === 'forest' ? 0 : (b.terrain === 'coast' || b.terrain === 'islands') ? 1
-      : (b.terrain === 'wetland' || b.terrain === 'sinkholes' || (b.t && b.t.pools)) ? 2 : (b.terrain === 'riverbed' && b.t && b.t.wet) ? 3 : -1));
+      : (b.terrain === 'wetland' || b.terrain === 'sinkholes' || (b.t && (b.t.pools || b.t.ponds))) ? 2 : (b.terrain === 'riverbed' && b.t && b.t.wet) ? 3 : -1));
     const leafy = { broadleaf: 1, conifer: 1, fungus: 1, kelp: 1 };
     const tallKits = (look.flora && look.flora.tall) || [];
     this.shade = this.biomes.map((b) => (b.tall && tallKits[b.tall[0]] && leafy[tallKits[b.tall[0]].kit] ? 1 : 0));
     this.liq = this.biomes.map((b) => Object.assign({ color: [0.62, 0.74, 0.80], refl: 0.85, glow: 0, cloud: 0 }, b.liquid || {}));
     this._gw = new Float64Array(4); this._gl = new Float64Array(4);
-    this.hasFlora = this.biomes.some((b) => b.tall && b.tall.length);
+    this.hasFlora = this.biomes.some((b) => (b.tall && b.tall.length) || b.hang);
+    this.hangs = this.biomes.some((b) => b.hang);
+    this.smallSum = this.biomes.map((b) => (b.small ? Object.values(b.small).reduce((x, y) => x + y, 0) : 0));
     this.tallH = this.biomes.map((b) => (b.tall ? 1.45 * Math.max(...b.tall.map((i) => (tallKits[i] && tallKits[i].obs ? tallKits[i].obs[1] : 10))) : 0));
     this._buildSites();
     this._prepPalettes();
@@ -254,7 +256,7 @@ class Surface {
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s), 0, 1);
-    b.rock = rk; b.s = s; b.glade = glade; b.aux = 0;
+    b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines
     const cz = clamp(b.trees * 1.15, 0, 1);
     const ca = pal.canopyA, cb = pal.canopyB, k = clamp(pz * 1.1, 0, 1), dv = 1 + v1 * 0.25;
@@ -282,47 +284,161 @@ class Surface {
     return (bowl * depth + Math.exp(-e * e / 0.035) * rimH) * (rr / 0.29);
   }
 
+  // Small tables of rock standing alone (sea stacks, islets of a sky-archipelago): one per
+  // cell of a 3D grid. Returns 0..1: a flat top with a cliff all round, scaled per stack.
+  _stacks(X, Y, Z, cell, keep) {
+    const px = X / cell, py = Y / cell, pz = Z / cell;
+    const ix = Math.floor(px), iy = Math.floor(py), iz = Math.floor(pz), sd = this.seed | 0;
+    const h4 = hash3i(ix, iy, iz, sd ^ 911);
+    if (h4 > keep) return 0;
+    const cx = ix + 0.28 + 0.44 * hash3i(ix, iy, iz, sd ^ 5), cy = iy + 0.28 + 0.44 * hash3i(ix, iy, iz, sd ^ 71), cz = iz + 0.28 + 0.44 * hash3i(ix, iy, iz, sd ^ 173);
+    const rr = 0.10 + 0.16 * hash3i(ix, iy, iz, sd ^ 37);
+    const dx = px - cx, dy = py - cy, dz = pz - cz;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) / rr;
+    if (d > 1.25) return 0;
+    // a lumpy outline, never a circle
+    const wob = this.nC.n3(X / (cell * 0.11) + 3.0, Y / (cell * 0.11), Z / (cell * 0.11) - 5.0) * 0.16;
+    return (1 - smoothstep(0.72, 0.96, d + wob)) * (0.45 + 0.55 * (h4 / keep));
+  }
+
   _generic(c, b, bi, pal, full, bidx) {
     const R = this.R, x = c.x, y = c.y, z = c.z, A = this.nA, C = this.nC;
+    const X = x * R, Y = y * R, Z = z * R;
     const T = bi.t || NOT, k = bi.terrain;
     let h = 0, t = 0.5, dry = 0.4, wet = 0.2, lq = NOLQ, grow = 1, bed = 0;
+    let shade = 0, snow = 0, veil = 0, lip = 0, meadow = 1;
     if (k === 'alpine') {
-      const f = R / 1150;
-      const rd = A.ridged(x * f + 4.0, y * f, z * f - 2.0, 5, 2.1, 0.55);
-      const m = A.n3(x * R / 260, y * R / 260 + 7.0, z * R / 260);
-      h = 45 + rd * rd * 520 + m * 9 + C.n3(x * R / 22, y * R / 22, z * R / 22) * 0.7;
-      t = clamp((h - 60) / 330, 0, 1); dry = 0.3 + 0.5 * t; wet = 0.15;
-      grow = 1 - smoothstep(110, 190, h);
+      // meadows fill the valley floors; the peaks stand up sharply behind them
+      const wl = T.wl || 1000, amp = T.amp || 480;
+      const rd = A.ridged(X / wl + 4.0, Y / wl, Z / wl - 2.0, 4, 2.1, 0.5);
+      const up = smoothstep(0.14, 0.60, rd);
+      const pk = 0.42 + 0.58 * smoothstep(-0.35, 0.45, A.n3(X / (wl * 1.6) + 9.0, Y / (wl * 1.6), Z / (wl * 1.6) + 3.0));
+      const crag = A.ridged(X / (wl * 0.19) + 2.0, Y / (wl * 0.19) - 6.0, Z / (wl * 0.19), 2, 2.0, 0.5);
+      const m = A.n3(X / 260, Y / 260 + 7.0, Z / 260);
+      const rise = Math.pow(up, 1.7) * (0.30 + 0.70 * rd) * pk;
+      h = 42 + m * 7 * (1 - up) + rise * amp + (crag - 0.4) * amp * 0.10 * up + C.n3(X / 22, Y / 22, Z / 22) * 0.7 * (0.4 + up) + C.n3(X / 5, Y / 5, Z / 5) * 0.08;
+      t = clamp(up * 0.55 + rise * 0.6, 0, 1); dry = 0.3 + 0.5 * t; wet = 0.15;
+      grow = (1 - smoothstep(95, 170, h)) * smoothstep(0.05, 0.3, up);
+      meadow = 1 - smoothstep(0.25, 0.6, up);
+      const sl = T.snow || 190;
+      snow = smoothstep(sl, sl + 60, h + (crag - 0.5) * 90 + C.n3(X / 60, Y / 60, Z / 60) * 30);
+      shade = up * (1 - snow) * 0.18;
     } else if (k === 'coast') {
       const f = R / 780;
       const n = A.fbm(x * f - 9.0, y * f + 2.0, z * f + 14.0, 4, 2.0, 0.5);
       let hh = n * 70 - 9;
-      if (hh > 0.9) hh += smoothstep(0.9, 5.5, hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5) * (T.cliff || 44) + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
+      const cl = T.cliff || 44;
+      let face = 0;
+      if (hh > 0.9) {
+        const cu = smoothstep(0.9, 4.2, hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.6);
+        face = cu * (1 - cu) * 4;
+        hh += cu * cl + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
+      } else if (hh > -30 && hh < -1.5) {
+        // stacks: stumps of the old cliff left standing in the shallows
+        const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks);
+        if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, st * (1 - st) * 4 * near); }
+      }
       h = hh + C.n3(x * R / 9, y * R / 9 + 2.0, z * R / 9) * 0.25 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 2.6 + C.n3(x * R / 11 - 2.0, y * R / 11, z * R / 11 + 6.0) * 0.9 + C.n3(x * R / 3.7 + 8.0, y * R / 3.7, z * R / 3.7) * 0.4) * (1 - smoothstep(3, 16, Math.abs(hh)));
       t = clamp((h + 2) / 34, 0, 1); dry = 0.25 + 0.5 * t; wet = h < 1 ? 0.6 : 0.2;
       lq = this.sea == null ? 0 : this.sea;
-      grow = bi.tallWet ? (1 - smoothstep(-14, -3, h)) * smoothstep(-34, -20, h) * 1.0 + smoothstep(-3, 0, h) * 0 : smoothstep(3, 9, h);
+      grow = bi.tallWet ? (1 - smoothstep(-14, -3, h)) * smoothstep(-34, -20, h) * 1.0 + smoothstep(-3, 0, h) * 0 : smoothstep(cl * 0.7, cl * 0.9, h);
+      meadow = smoothstep(cl * 0.5, cl * 0.8, h);
       bed = 1 - smoothstep(-0.5, 2.5, h);
-    } else if (k === 'canyon' || k === 'mesa' || k === 'terraced') {
-      const f = R / (T.wl || 820);
-      const n = A.fbm(x * f + 21.0, y * f - 5.0, z * f, 3, 2.0, 0.5) * 0.5 + 0.5;
-      const steps = T.steps || (k === 'terraced' ? 7 : 4);
-      const q = n * steps, fl = Math.floor(q), fr = q - fl;
-      const tr = (fl + smoothstep(0.62, 0.9, fr)) / steps;
-      const cut = Math.abs(A.n3(x * R / 560 - 3.0, y * R / 560, z * R / 560 + 9.0));
-      const cv = k === 'canyon' ? 1 - smoothstep(0.02, 0.11, cut) : 0;
-      const amp = T.amp || (k === 'terraced' ? 110 : 190);
-      h = 30 + tr * amp * (1 - cv * 0.85) + C.n3(x * R / 30, y * R / 30, z * R / 30) * 1.4 + C.n3(x * R / 5, y * R / 5, z * R / 5) * 0.12 + C.n3(x * R / 70 + 9.0, y * R / 70, z * R / 70) * amp * 0.035;
-      t = clamp(tr * (1 - cv), 0, 1); dry = 0.6; wet = 0.1;
-      grow = 1 - smoothstep(0.5, 0.75, fr) * (1 - smoothstep(0.9, 1.0, fr));   // not on the risers
+      shade = face * 0.12;
+    } else if (k === 'canyon') {
+      // a plateau cut by a wandering network of gorges: flat dry floor, walls in steps, benches
+      const wl = T.wl || 620, amp = T.amp || 190;
+      const wa = C.n3(X / 190 + 3.0, Y / 190, Z / 190) * 0.20, wb = C.n3(X / 190, Y / 190 + 9.0, Z / 190 - 4.0) * 0.20;
+      const cut = Math.abs(A.n3(X / wl - 3.0 + wa, Y / wl + wb, Z / wl + 9.0 - wa));
+      const fw = (T.floor || 0.05) * (1 + 0.5 * A.n3(X / 330 + 7.0, Y / 330, Z / 330));
+      const rag = C.n3(X / 47, Y / 47 + 2.0, Z / 47) * 0.05 + C.n3(X / 13, Y / 13, Z / 13 + 5.0) * 0.012;
+      const tw = clamp((cut - fw) / (T.wall || 0.19) + rag, 0, 1.3);
+      const ns = T.steps || 3;
+      const q = Math.min(tw, 0.9999) * ns, fl = Math.floor(q), fr = q - fl;
+      const riser = smoothstep(0.10, 0.50, fr);
+      const prof = (fl + riser) / ns;
+      const D = amp * (0.78 + 0.22 * A.n3(X / 900 + 1.0, Y / 900, Z / 900));
+      const top = smoothstep(1.0, 1.25, tw);
+      const pn = A.fbm(X / 420 + 11.0, Y / 420, Z / 420 - 6.0, 3, 2.0, 0.5);
+      const bu = smoothstep(0.30, 0.335, pn + rag * 0.4) * top;        // a butte left standing on the plateau
+      h = 24 + D * prof + (pn * 9 + bu * D * 0.30) * top + C.n3(X / 30, Y / 30, Z / 30) * 1.2 * (0.25 + 0.75 * prof) + C.n3(X / 5, Y / 5, Z / 5) * 0.10;
+      const face = Math.max(riser * (1 - riser), bu * (1 - bu)) * 4;
+      t = clamp(0.08 + smoothstep(0.0, 0.25, tw) * 0.42 + prof * 0.22 + top * 0.2 + bu * 0.1, 0, 1); dry = 0.6; wet = 0.1;
+      grow = 1 - clamp(face * 1.6, 0, 1);
+      shade = face * 0.14;
+      bed = (1 - smoothstep(0.0, 0.12, tw)) * 0.8;
+      meadow = 1 - clamp(face * 2, 0, 1);
+    } else if (k === 'mesa') {
+      // flat-topped tables with cliffs all round and a skirt of talus, standing on a plain
+      const wl = T.wl || 520, amp = T.amp || 300;
+      const n = A.fbm(X / wl + 21.0, Y / wl - 5.0, Z / wl, 3, 2.0, 0.5);
+      const rag = C.n3(X / 52, Y / 52, Z / 52 + 3.0) * 0.035 + C.n3(X / 15, Y / 15 + 7.0, Z / 15) * 0.010;
+      const thr = T.thr == null ? 0.06 : T.thr;
+      const m1 = smoothstep(thr, thr + 0.035, n + rag);
+      const m2 = smoothstep(thr + 0.20, thr + 0.23, n + rag * 0.8);
+      const apron = smoothstep(thr - 0.16, thr, n + rag);
+      h = 26 + apron * apron * amp * 0.10 + m1 * amp * 0.62 + m2 * amp * 0.28
+        + A.n3(X / 900, Y / 900 + 4.0, Z / 900) * 14 + C.n3(X / 34, Y / 34, Z / 34) * 1.3 * (0.4 + m1) + C.n3(X / 6, Y / 6, Z / 6) * 0.10;
+      const face = Math.max(m1 * (1 - m1), m2 * (1 - m2)) * 4;
+      t = clamp(0.12 + apron * 0.2 + m1 * 0.4 + m2 * 0.28, 0, 1); dry = 0.6; wet = 0.1;
+      grow = 1 - clamp(face * 1.6, 0, 1);
+      shade = face * 0.10;
+      meadow = 1 - clamp(face * 2, 0, 1);
+    } else if (k === 'terraced') {
+      // broad level treads, each ending in a cliff down to the next
+      const wl = T.wl || 820, amp = T.amp || 110, steps = T.steps || 7;
+      const n = A.fbm(X / wl + 21.0, Y / wl - 5.0, Z / wl, 3, 2.0, 0.5) * 0.5 + 0.5;
+      const rag = (C.n3(X / 44, Y / 44 + 1.0, Z / 44) * 0.11 + C.n3(X / 12, Y / 12, Z / 12 - 3.0) * 0.03) * (T.rag == null ? 1 : T.rag);
+      const q = clamp(n, 0, 0.9999) * steps + rag, fl = Math.floor(q), fr = q - fl;
+      const r0 = T.riser ? T.riser[0] : 0.76, r1 = T.riser ? T.riser[1] : 0.92;
+      const riser = smoothstep(r0, r1, fr);
+      h = 30 + (fl + riser) / steps * amp + C.n3(X / 30, Y / 30, Z / 30) * 1.0 + C.n3(X / 5, Y / 5, Z / 5) * 0.10;
+      const face = riser * (1 - riser) * 4;
+      t = clamp((fl + riser) / steps * 0.85 + face * 0.15, 0, 1); dry = 0.6; wet = 0.1;
+      grow = 1 - clamp(face * 1.8 + smoothstep(r0 - 0.04, r0, fr) * (1 - riser), 0, 1);
+      meadow = 1 - clamp(face * 2, 0, 1);
+      shade = face * 0.12 + (T.under || 0) * smoothstep(0.55, 0.80, riser) * (1 - smoothstep(0.93, 1.0, riser));   // a dark recess under the lip
+      lip = smoothstep(r1 - 0.035, r1 - 0.01, fr) * (1 - smoothstep(r1 + 0.01, r1 + 0.03, fr));
       if (T.pools) {
-        // a pool on every terrace: carved into the flat, filled to just below its lip
-        const pool = smoothstep(0.10, 0.34, C.n3(x * R / 58 + 3.0, y * R / 58 - 7.0, z * R / 58)) * (1 - smoothstep(0.30, 0.55, fr)) * smoothstep(0.02, 0.12, fr);
-        h -= pool * 3.2;
-        lq = 30 + (fl / steps) * amp - 1.5;
+        // a pool on every tread, held behind a raised rim at the tread's outer edge
+        const lev = fl + (fr >= r1 ? 1 : 0);
+        const rim = smoothstep(r1 - 0.06, r1, fr) * (1 - smoothstep(r1 + 0.02, r1 + 0.08, fr));
+        const pool = smoothstep(-0.20, 0.10, C.n3(X / 58 + 3.0, Y / 58 - 7.0, Z / 58)) * (fr >= r1 ? smoothstep(r1 + 0.05, r1 + 0.10, fr) : 1 - smoothstep(r0 - 0.03, r0 + 0.02, fr));
+        h += rim * 0.9 - pool * 1.9;
+        lq = 30 + (lev / steps) * amp + 0.30;
         bed = pool; wet = 0.2 + 0.4 * pool;
         grow *= 1 - pool;
       }
+    } else if (k === 'wall') {
+      // one great escarpment: lowland, a skirt of talus, the wall in two lifts, the upland
+      const wl = T.wl || 1500, amp = T.amp || 520;
+      const n = A.fbm(X / wl - 6.0, Y / wl + 1.0, Z / wl, 3, 2.0, 0.5);
+      const fold = A.ridged(X / 85 + 2.0, Y / 85, Z / 85 - 7.0, 2, 2.0, 0.5) * 0.05 + C.n3(X / 30, Y / 30, Z / 30) * 0.012;
+      const e = n + fold - (T.thr || 0);
+      const w1 = smoothstep(0.0, 0.07, e), w2 = smoothstep(0.19, 0.24, e), apron = smoothstep(-0.15, 0.0, e);
+      h = 30 + apron * apron * amp * 0.09 + w1 * amp * 0.64 + w2 * amp * 0.20
+        + A.n3(X / 700, Y / 700 + 3.0, Z / 700) * 12 + C.n3(X / 30, Y / 30, Z / 30) * 1.4 * (0.4 + w1) + C.n3(X / 5, Y / 5, Z / 5) * 0.10;
+      const face = Math.max(w1 * (1 - w1), w2 * (1 - w2)) * 4;
+      t = clamp(0.08 + apron * 0.22 + face * 0.30 + w1 * 0.25 + w2 * 0.25, 0, 1); dry = 0.6; wet = 0.12;
+      grow = (1 - clamp(face * 1.8, 0, 1)) * (1 - w1 * 0.6);
+      meadow = 1 - clamp(face * 2, 0, 1);
+      shade = face * 0.10;
+    } else if (k === 'spires') {
+      // wind-carved fins: rows of narrow blades standing along the wind, notched into spires
+      const wl = T.wl || 46, amp = T.amp || 34;
+      const ax = T.axis || [0.62, 0.30, -0.72];
+      const warp = A.n3(X / 170 + 2.0, Y / 170, Z / 170) * 0.9 + C.n3(X / 40, Y / 40, Z / 40) * 0.12;
+      const u = (X * ax[0] + Y * ax[1] + Z * ax[2]) / wl + warp;
+      const cu = Math.abs(u - Math.floor(u) - 0.5) * 2;
+      const env = smoothstep(-0.20, 0.30, A.n3(X / 150 + 7.0, Y / 150, Z / 150 - 3.0));
+      const fin = Math.pow(Math.max(0, 1 - cu / (T.fin || 0.34)), 1.3);
+      const sp = 0.5 + 0.5 * C.n3(X / 17 + 1.0, Y / 17, Z / 17);
+      const hgt = fin * env * (0.30 + 0.70 * sp * sp * 1.6);
+      h = 22 + A.n3(X / 800, Y / 800, Z / 800 + 5.0) * 16 + amp * Math.min(1.15, hgt) + C.n3(X / 9, Y / 9, Z / 9) * 0.25;
+      t = clamp(0.15 + hgt * 0.8, 0, 1); dry = 0.5; wet = 0.15;
+      grow = 1 - smoothstep(0.04, 0.2, hgt);
+      meadow = grow;
+      shade = smoothstep(0.1, 0.5, hgt) * 0.22;
     } else if (k === 'wetland') {
       this._base(c);
       const m = A.fbm(x * R / 46 + 3.0, y * R / 46, z * R / 46 - 6.0, 3, 2.1, 0.5);
@@ -331,11 +447,30 @@ class Surface {
       t = clamp(0.5 + m * 0.8, 0, 1); dry = 0.15; wet = 0.6;
       bed = 1 - smoothstep(lq - 0.2, lq + 0.5, h);
     } else if (k === 'dunes') {
-      const wl = T.wl || 240, amp = T.amp || 26, f = R / wl;
-      const rd = A.ridged(x * f + y * f * 0.6, y * f, z * f + 3.0, 2, 2.0, 0.5);
-      // sharp crests with long windward backs, ripples on top
-      h = 20 + Math.pow(rd, 1.7) * amp + A.n3(x * R / 900, y * R / 900, z * R / 900) * 18 + Math.sin((x * 0.8 + z * 0.6) * R / 1.9 + rd * 9) * 0.07 + C.n3(x * R / 8, y * R / 8, z * R / 8) * 0.10;
-      t = rd; dry = 0.35; wet = 0.25;
+      // transverse dunes: long sinuous crests across the wind, each a long back and a short
+      // steep slip face; smaller dunes ride the big ones
+      const wl = T.wl || 150, amp = T.amp || 13;
+      const ax = T.axis || [0.36, 0.48, 0.80];
+      const warp = A.n3(X / (wl * 2.6) + 4.0, Y / (wl * 2.6), Z / (wl * 2.6) - 1.0) * 0.55 + C.n3(X / (wl * 0.7), Y / (wl * 0.7) + 2.0, Z / (wl * 0.7)) * 0.10;
+      const u = (X * ax[0] + Y * ax[1] + Z * ax[2]) / wl + warp;
+      const sp = T.slip || 0.26;
+      // one dune across its wavelength: 0 at the toe, 1 at the crest; lee = on the slip face
+      let fu = u - Math.floor(u), p, lee = 0;
+      if (fu < 1 - sp) { const s1 = fu / (1 - sp); p = s1 * s1 * (3 - 2 * s1) * 0.4 + s1 * 0.6; }
+      else { const s2 = (fu - (1 - sp)) / sp; p = Math.pow(1 - s2, 1.6); lee = smoothstep(0.0, 0.05, s2) * (1 - smoothstep(0.7, 1.0, s2)); }
+      // the dunes that ride it: a third of the size, the same wind
+      const um = u * 2.9 + C.n3(X / (wl * 0.9) + 6.0, Y / (wl * 0.9), Z / (wl * 0.9)) * 0.9 + C.n3(X / (wl * 0.22), Y / (wl * 0.22) + 3.0, Z / (wl * 0.22)) * 0.16;
+      let fm = um - Math.floor(um), pm, leem = 0;
+      if (fm < 1 - sp) { const s1 = fm / (1 - sp); pm = s1 * s1 * (3 - 2 * s1) * 0.4 + s1 * 0.6; }
+      else { const s2 = (fm - (1 - sp)) / sp; pm = Math.pow(1 - s2, 1.6); leem = smoothstep(0.0, 0.07, s2) * (1 - smoothstep(0.65, 1.0, s2)); }
+      const am = 0.35 + 0.65 * smoothstep(-0.45, 0.35, A.n3(X / (wl * 3.1) + 9.0, Y / (wl * 3.1), Z / (wl * 3.1) + 2.0));
+      const am2 = smoothstep(-0.25, 0.35, C.n3(X / (wl * 0.8) + 2.0, Y / (wl * 0.8) + 5.0, Z / (wl * 0.8)) + 0.25);
+      const swell = A.n3(X / 700, Y / 700, Z / 700);
+      const km = (T.ride == null ? 0.42 : T.ride) * am2 * (1 - 0.75 * lee);
+      h = 24 + swell * (T.swell || 30) + amp * am * (0.75 + 0.5 * swell) * p + amp * km * pm + C.n3(X / 8, Y / 8, Z / 8) * 0.10;
+      t = clamp(0.2 + 0.5 * p * am + 0.3 * pm * am2, 0, 1); dry = 0.35; wet = 0.25;
+      shade = Math.max(lee * (0.35 + 0.65 * am), leem * am2 * 0.8) * (T.lee == null ? 0.5 : T.lee);
+      meadow = 1 - Math.max(lee, leem);
     } else if (k === 'ridged') {
       const wl = T.wl || 900, amp = T.amp || 260, f = R / wl;
       const rd = A.ridged(x * f - 6.0, y * f + 1.0, z * f, 4, 2.1, 0.5);
@@ -343,26 +478,41 @@ class Surface {
       h = 20 + rd * amp + A.ridged(x * f * 5.3 + 2.0, y * f * 5.3, z * f * 5.3 - 7.0, 2, 2.0, 0.5) * amp * 0.13 + C.n3(x * R / 25, y * R / 25, z * R / 25) * 1.6;
       t = rd; dry = 0.6; wet = 0.12;
       grow = 1 - smoothstep(0.35, 0.6, rd);
+      meadow = grow;
     } else if (k === 'crater' || k === 'basin') {
       const big = this._craters(x, y, z, k === 'crater' ? 430 : 520, k === 'crater' ? 62 : 12, k === 'crater' ? 24 : 6);
       const sml = this._craters(x + 0.37, y - 0.11, z + 0.23, k === 'crater' ? 150 : 190, k === 'crater' ? 13 : 5, k === 'crater' ? 4.5 : 2.5);
-      h = 44 + big + sml + A.n3(x * R / 1300, y * R / 1300, z * R / 1300) * 26 + C.n3(x * R / 14, y * R / 14, z * R / 14) * 0.4;
-      t = clamp(0.55 + (big + sml) * 0.035, 0, 1); dry = 0.55; wet = 0.12;
-      grow = big + sml < -2 ? 0.2 : 1;
+      const tiny = this._craters(x - 0.21, y + 0.43, z - 0.17, 47, k === 'crater' ? 3.4 : 1.6, k === 'crater' ? 1.3 : 0.7);
+      const cr = big + sml + tiny;
+      h = 44 + cr + A.n3(x * R / 1300, y * R / 1300, z * R / 1300) * 26 + C.n3(x * R / 14, y * R / 14, z * R / 14) * 0.4;
+      t = clamp(0.55 + cr * 0.035, 0, 1); dry = 0.55; wet = 0.12;
+      grow = cr < -2 ? 0.2 : 1;
+      // frost gathers where the sun never reaches: the floors of the bowls
+      if (T.frost) snow = T.frost * (0.10 + 0.90 * smoothstep(-1.5, -12, cr)) * (0.7 + 0.3 * C.n3(X / 40, Y / 40, Z / 40));
+      shade = smoothstep(1.0, 6.0, cr) * 0.25 + smoothstep(-3, -20, cr) * (T.frost ? 0 : 0.2);
     } else if (k === 'islands') {
-      const f = R / 520, amp = T.amp || 150;
-      const n = A.fbm(x * f + 5.0, y * f - 7.0, z * f + 2.0, 3, 2.0, 0.5);
-      // table-topped islands: cliffs straight out of the sea, a plateau on top
-      const isl = smoothstep(0.0, 0.085, n + C.n3(x * R / 55 - 6.0, y * R / 55, z * R / 55 + 2.0) * 0.02);
-      h = -46 + isl * (46 + amp * 0.5) + Math.max(0, n) * amp * 0.9 + C.n3(x * R / 18, y * R / 18, z * R / 18) * 0.6 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 3.2 + C.n3(x * R / 9 - 2.0, y * R / 9, z * R / 9 + 6.0) * 1.1 + C.n3(x * R / 3.7 + 8.0, y * R / 3.7, z * R / 3.7) * 0.45) * (1 - smoothstep(3, 14, Math.abs(-46 + isl * (46 + amp * 0.5))));
-      t = isl; dry = 0.3; wet = 0.35;
+      // tables of land standing in a sea (of water or of cloud): cliffs all round, a garden on top
+      const wl = T.wl || 520, amp = T.amp || 150, cl = T.cliff || 80;
+      const n = A.fbm(X / wl + 5.0, Y / wl - 7.0, Z / wl + 2.0, 3, 2.0, 0.5);
+      const rag = C.n3(X / 55 - 6.0, Y / 55, Z / 55 + 2.0) * 0.03 + C.n3(X / 14, Y / 14 + 3.0, Z / 14) * 0.008;
+      const isl = smoothstep(0.0, 0.05, n + rag);
+      let land = isl, tall = 1;
+      if (isl < 1 && n > -0.42) { const st = this._stacks(X, Y, Z, T.stackCell || 170, T.stacks == null ? 0.6 : T.stacks); if (st > land) { land = Math.min(1, st * 2.2); tall = Math.max(isl, st * 0.9 + 0.1); } }
+      const dome = Math.max(0, n) * amp * 0.5 * isl;
+      h = -40 + land * (40 + cl * tall) + dome + C.n3(X / 18, Y / 18, Z / 18) * 0.6 * land + (C.n3(X / 37 + 4.0, Y / 37, Z / 37) * 3.2 + C.n3(X / 9 - 2.0, Y / 9, Z / 9 + 6.0) * 1.1) * land * (1 - land) * 4 + C.n3(X / 4, Y / 4 + 8.0, Z / 4) * 0.12;
+      const face = land * (1 - land) * 4;
+      t = clamp(0.25 + land * 0.35 + dome / amp, 0, 1); dry = 0.3; wet = 0.35;
       lq = this.sea == null ? 0 : this.sea;
-      grow = smoothstep(6, 16, h);
+      grow = smoothstep(cl * 0.75, cl * 0.95, h);
+      meadow = grow;
       bed = 1 - smoothstep(-1, 4, h);
+      shade = face * 0.10;
+      // where the rock goes down into the cloud it is lost in it: the islands seem to float
+      if (T.veil) veil = (1 - smoothstep(3, T.veil, h - lq + C.n3(X / 31, Y / 31 + 2.0, Z / 31) * T.veil * 0.35)) * smoothstep(-3, 2, h - lq);
     } else if (k === 'riverbed') {
       this._base(c);
-      const s = c.s, amp = T.amp || 26, w0 = T.wet ? 9 : 6.5;
-      const hb = s < w0 ? -1.2 - 1.6 * (1 - (s / w0) * (s / w0)) : -1.2 + 2.0 * smoothstep(w0, w0 + 7, s);
+      const s = c.s, amp = T.amp || 26, w0 = T.bedW || (T.wet ? 9 : 6.5), dp = T.bedD || 1.6;
+      const hb = s < w0 ? -1.2 - dp * (1 - (s / w0) * (s / w0)) : -1.2 + (dp * 0.6 + 1.0) * smoothstep(w0, w0 + 4 + dp * 1.5, s);
       const rise = smoothstep(w0 + 2, 110, s);
       const hill = Math.max(0, 0.5 + 0.55 * A.n3(x * R / 380 + 7.7, y * R / 380 + 1.1, z * R / 380 - 3.3));
       h = c.L + hb + hill * amp * rise + A.n3(x * R / 90, y * R / 90, z * R / 90) * 3 * rise + C.n3(x * R / 11, y * R / 11, z * R / 11) * 0.35 + C.n3(x * R / 3.1, y * R / 3.1, z * R / 3.1) * 0.06;
@@ -371,6 +521,7 @@ class Surface {
       t = clamp(0.25 + rise * 0.8 - bed * 0.4, 0, 1); dry = 0.5; wet = 0.15;
       // things grow along the banks, where the water once ran
       grow = smoothstep(w0 + 0.5, w0 + 4, s) * (1 - smoothstep(22, 60, s) * 0.85);
+      shade = smoothstep(w0 - 0.5, w0 + 1.5, s) * (1 - smoothstep(w0 + 1.5, w0 + 4 + dp, s)) * 0.3 * (T.wet ? 0 : 1);
     } else if (k === 'sinkholes') {
       const amp = T.amp || 40;
       const cl = A.n3(x * R / 190 + 9.0, y * R / 190 - 4.0, z * R / 190 + 2.0);
@@ -380,10 +531,18 @@ class Surface {
       t = clamp(1 - pit, 0, 1); dry = 0.4; wet = 0.2 + 0.4 * pit;
       grow = 1 - smoothstep(0.02, 0.2, pit);
       bed = smoothstep(0.55, 0.9, pit);
+      shade = pit * (1 - pit) * 4 * 0.25;
     } else if (k === 'flat') {
       const amp = T.amp || 9;
       h = 18 + A.n3(x * R / 700, y * R / 700 + 3.0, z * R / 700) * amp + C.n3(x * R / 40, y * R / 40, z * R / 40) * 0.6 + C.n3(x * R / 6, y * R / 6, z * R / 6) * 0.06 + (T.pits ? this._craters(x, y, z, 130, 7 * T.pits, 3 * T.pits) : 0);
       t = clamp(0.5 + A.n3(x * R / 180, y * R / 180, z * R / 180) * 0.9, 0, 1); dry = 0.3; wet = 0.3;
+      if (T.ponds) {
+        // meltwater ponds: round, shallow, scattered in groups
+        const pd = smoothstep(0.34, 0.42, C.n3(X / 38 + 5.0, Y / 38, Z / 38 - 2.0) * 0.6 + A.n3(X / 210, Y / 210 + 4.0, Z / 210) * 0.5);
+        h -= pd * 1.3;
+        lq = 18 + A.n3(x * R / 700, y * R / 700 + 3.0, z * R / 700) * amp - 0.75;
+        bed = pd; wet = 0.3 + 0.3 * pd;
+      }
     } else { // rolling
       const wl = T.wl || 600, amp = T.amp || 70;
       h = 30 + A.fbm(x * R / wl + 1.0, y * R / wl, z * R / wl - 4.0, 4, 2.0, 0.5) * amp + C.n3(x * R / 12, y * R / 12, z * R / 12) * 0.3;
@@ -393,22 +552,26 @@ class Surface {
     if (!full) return;
     const v = C.n3(x * R / 33 + 12.0, y * R / 33, z * R / 33 - 5.0) * 0.25;
     let tt = clamp(t + v, 0, 1);
-    // strata: bands of colour that follow the height, as in layered rock
-    if (T.strata) tt = clamp(tt + (0.5 + 0.5 * Math.sin(h * 0.11 + v * 5)) * T.strata - T.strata * 0.5, 0, 1);
     if (tt < 0.5) { set3(b, pal.low); mix3(b, pal.mid, tt * 2); }
     else { set3(b, pal.mid); mix3(b, pal.high, tt * 2 - 1); }
-    if (k === 'alpine' && h > 170) mix3(b, SNOW, smoothstep(170, 235, h + v * 70));
-    if (T.frost) mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
+    // form laid in with a second, denser wash (cliff faces, slip faces, cut banks)
+    if (shade > 0) { const kd = shade * 0.9, kg = Math.min(1, shade * 1.7); b.r -= (b.r - b.r * b.r) * kd; b.g -= (b.g - b.g * b.g) * kd; b.b -= (b.b - b.b * b.b) * kd * 0.6; b.r *= 1 - 0.26 * kg; b.g *= 1 - 0.28 * kg; b.b *= 1 - 0.08 * kg; }
+    if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
+    if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
     if (bed > 0) mix3(b, pal.low, bed * 0.6);
     if (T.dusk) { const d = T.dusk; b.r *= 1 - 0.30 * d; b.g *= 1 - 0.30 * d; b.b *= 1 - 0.12 * d; }
+    // fog lying in the low ground: the wash thins toward paper below its level
+    if (T.fog) { const fk = (1 - smoothstep(T.fog[0] - T.fog[1], T.fog[0] + T.fog[1], h + v * T.fog[1] * 2.5)) * 0.82; b.r += (0.99 - b.r) * fk; b.g += (0.975 - b.g) * fk; b.b += (0.93 - b.b) * fk; wet = wet + (1 - wet) * fk; }
+    if (veil > 0) { b.r += (1 - b.r) * veil; b.g += (1 - b.g) * veil; b.b += (1 - b.b) * veil; wet = wet + (1 - wet) * veil; }
     b.r2 = b.r; b.g2 = b.g; b.b2 = b.b;
     if (lq !== NOLQ && h < lq) { const L = this.liq[bidx].color; b.r2 = L[0]; b.g2 = L[1]; b.b2 = L[2]; }
     b.dry = T.gloss ? 0.95 : dry; b.wet = wet;
     const dens = (bi.tallD || 0) * grow;
     b.trees = dens; b.birch = bi.tallMix == null ? 0.5 : bi.tallMix;
     b.canopy = dens * 0.8 * this.shade[bidx];
-    b.under = bi.small ? (lq !== NOLQ && h < lq ? 0 : 1) : 0;
+    b.under = bi.small ? (lq !== NOLQ && h < lq ? 0 : meadow) : 0;
     b.rock = k === 'alpine' ? t : 0; b.s = c.baseReady ? c.s : 1e9; b.glade = 1; b.aux = T.crack || 0;
+    b.strata = T.strata || 0; b.lip = lip;
   }
 
   // ---- the surface --------------------------------------------------------------------------
@@ -422,7 +585,7 @@ class Surface {
     const gw = this._gw, gl = this._gl;
     gw[0] = gw[1] = gw[2] = gw[3] = 0; gl[0] = gl[1] = gl[2] = gl[3] = 0;
     let qw = 0, qr = 0, qg = 0, qb = 0, qk = 0, qglow = 0, qcloud = 0;
-    if (full) { o.r = o.g = o.b = 0; o.r2 = o.g2 = o.b2 = 0; o.dry = o.wet = o.canopy = o.aux = 0; o.trees = o.birch = o.under = o.rock = 0; o.glade = 0; o.s = 1e9; }
+    if (full) { o.r = o.g = o.b = 0; o.r2 = o.g2 = o.b2 = 0; o.dry = o.wet = o.canopy = o.aux = 0; o.trees = o.birch = o.under = o.rock = 0; o.glade = 0; o.s = 1e9; o.strata = 0; o.lip = 0; }
     for (let i = 0; i < nb; i++) {
       const wi = w[i];
       if (wi < 0.0015) continue;
@@ -439,8 +602,8 @@ class Surface {
         o.r += wi * b.r; o.g += wi * b.g; o.b += wi * b.b;
         o.r2 += wi * b.r2; o.g2 += wi * b.g2; o.b2 += wi * b.b2;
         o.dry += wi * b.dry; o.wet += wi * b.wet; o.canopy += wi * b.canopy; o.aux += wi * b.aux;
-        o.rock += wi * b.rock; o.glade += wi * b.glade;
-        if (i === top) { o.trees = b.trees * smoothstep(0.5, 0.8, wi); o.birch = b.birch; o.under = b.under * smoothstep(0.5, 0.8, wi); o.s = b.s; }
+        o.rock += wi * b.rock; o.glade += wi * b.glade; o.strata += wi * b.strata;
+        if (i === top) { o.trees = b.trees * smoothstep(0.5, 0.8, wi); o.birch = b.birch; o.under = b.under * smoothstep(0.5, 0.8, wi); o.s = b.s; o.lip = b.lip * smoothstep(0.5, 0.8, wi); }
       }
     }
     if (full && qw > 0) { o.qr = qr / qw; o.qg = qg / qw; o.qb = qb / qw; o.qk = qk / qw; o.qglow = qglow / qw; o.qcloud = qcloud / qw; }

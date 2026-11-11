@@ -359,6 +359,7 @@ attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shad
   varying float vSpecies;
   uniform float uFarTaper[8];
   uniform float uFarTrunk[8];
+  uniform float uFarDrop[8];
 #endif
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
@@ -410,6 +411,7 @@ void main() {
     lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;                 // pines, spires: taper to a point
     // rock-like kinds have no trunk: the form stands on the ground
     lp = mix(lp * mix(uFarTrunk[fsi], 1.0, crown), vec3(lp.x * 1.5, (lp.y - 0.30) * 1.45, lp.z * 1.5), crown * (1.0 - uFarTrunk[fsi]));
+    lp.y -= uFarDrop[fsi] * 0.97;                                   // hanging kinds: the wash falls below its root
   #endif
   vec3 sw = pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);
   #ifdef PC_PHYS
@@ -628,6 +630,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     own.uFarBarkA = arr('barkA'); own.uFarBarkB = arr('barkB');
     own.uFarTaper = { value: pad(opts.far.map((f) => f.taper || 0)) };
     own.uFarTrunk = { value: pad(opts.far.map((f) => (f.trunk ? 1 : 0))) };
+    own.uFarDrop = { value: pad(opts.far.map((f) => (f.drop ? 1 : 0))) };
   }
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),

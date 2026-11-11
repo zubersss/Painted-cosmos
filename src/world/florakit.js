@@ -349,6 +349,39 @@ export function waveGeometry(seed, lod) {
   return B.build();
 }
 
+// A hanging garden: a mound of leaves on the lip of a cliff and a curtain of trailing strands
+// falling down its face. Local +Z points out over the edge; the strands hang below y = 0.
+export function vineGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const cc = V(0, 0.6, 0.6);
+  const mounds = lod ? 1 : 3;
+  for (let i = 0; i < mounds; i++) {
+    const r = 1.5 + rnd() * 0.9, x0 = lod ? 0 : (i - 1) * 2.6 + (rnd() - 0.5);
+    blob(B, V(x0, 0.35 + rnd() * 0.4, 1.0 + rnd() * 0.8), r * (lod ? 2.0 : 1.15), r * 0.62, r * 0.9, rnd, { massC: cc, massK: 0.5, sway: 0.15, shade0: 0.1, shadeK: 0.7, droop: 0.5, noise: 0.3, uvScale: 3 });
+  }
+  const n = lod ? 5 : 9;
+  for (let i = 0; i < n; i++) {
+    const x0 = ((i + 0.5) / n - 0.5) * 8.4 + (rnd() - 0.5) * 0.8, L = 6 + rnd() * 11, w0 = 0.40 + rnd() * 0.34;
+    const segs = lod ? 3 : 6, ph = rnd() * 6.283, out = 0.7 + rnd() * 0.7, hh = rnd();
+    let pl = -1, pr = -1;
+    for (let k = 0; k <= segs; k++) {
+      const t = k / segs;
+      const px = x0 + Math.sin(ph + t * 3.3) * 0.38 * t, py = 0.5 - L * (t * t * 0.35 + t * 0.65) - (t === 0 ? 0 : 0.2), pz = out * Math.min(1, t * 4) * 1.6 + 0.9 + t * L * 0.30 + Math.cos(ph + t * 2.1) * 0.2;
+      const w = w0 * (1 - 0.6 * t) * (k === segs ? 0.25 : 1);
+      const a = B.vert(px - w, py, pz, 0, 0.25, 0.97, 0, 0.3, 0.95, 0, 1 - t, 0.25 + 1.6 * t * t, 2, 0, hh);
+      const b = B.vert(px + w, py, pz, 0, 0.25, 0.97, 0, 0.3, 0.95, 1, 1 - t, 0.25 + 1.6 * t * t, 2, 0, hh);
+      if (k > 0) { B.tri(pl, pr, a); B.tri(pr, b, a); }
+      pl = a; pr = b;
+      // garlands of leaves along the strand, a flower here and there
+      if (!lod && k > 0 && k < segs && rnd() < 0.55) {
+        const r = 0.45 + rnd() * 0.45, fl = rnd() < 0.3;
+        blob(B, V(px + (rnd() - 0.5) * 0.4, py, pz + 0.15), r * (fl ? 0.6 : 1), r * (fl ? 0.5 : 0.8), r * 0.6, rnd, { detail: 0, part: fl ? 3 : 1, massC: V(px, py, pz - 2), massK: 0.3, sway: 0.25 + 1.6 * t * t, shade0: 0.15 + 0.4 * t, shadeK: 0.6, noise: 0.3, uvScale: 2 });
+      }
+    }
+  }
+  return B.build();
+}
+
 // A small crystal shard cluster for the undergrowth.
 export function shardGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
@@ -362,5 +395,5 @@ export function shardGeometry(seed) {
 
 export const TALL_KITS = {
   broadleaf: birchGeometry, conifer: pineGeometry, fungus: fungusGeometry,
-  crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: spireGeometry, kelp: kelpGeometry, wave: waveGeometry,
+  crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: spireGeometry, kelp: kelpGeometry, wave: waveGeometry, vine: vineGeometry,
 };

@@ -25,7 +25,7 @@ const RANGE_SCALE = [0.42, 0.82, 1.0];
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
-const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [8, 7.5, 0.5] };
+const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [8, 7.5, 0.5], vine: [7.5, 9, 0.25] };
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
@@ -51,6 +51,7 @@ export class Flora {
     this.starved = 0;
     this.hidden = false;
     this.prof = { wanted: 0, build: 0, retier: 0 };
+    this.est = { near: 1.0, far: 1.0, under: 2.5, under2: 2.5 };   // what one build step of each kind has been costing, ms
 
     this.bodyUniforms = bodyUniforms;
     this.look = this.S.look.flora || { tall: [], under: null };
@@ -62,7 +63,7 @@ export class Flora {
     this.ready = true;
     const bodyUniforms = this.bodyUniforms, L = this.look;
     this.species = L.tall.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: 'lite', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1] });
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1] });
       const gen = TALL_KITS[sp.kit];
       const fd = sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit];
       return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
@@ -72,7 +73,7 @@ export class Flora {
     this.mats = {
       far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
-        far: L.tall.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' })),
+        far: L.tall.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine' })),
       }) : null,
       under: makePropMaterial(bodyUniforms, { name: 'under', leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
       bush: makePropMaterial(bodyUniforms, { name: 'bush', leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
@@ -383,9 +384,14 @@ export class Flora {
       for (const ch of q) ch.dist = ch.origin.distanceTo(cam) - (ch.isTree ? 0 : 60);
       q.sort((a, b) => b.dist - a.dist);
       let built = 0;
-      while (q.length && (performance.now() - t0 < budgetMs || (built === 0 && this.starved > 3))) {
+      while (q.length) {
         const ch = q[q.length - 1];
         if (ch.dead || ch.built) { q.pop(); ch.queued = false; continue; }
+        // start a step only if it is likely to fit in what is left of the slice (the first
+        // step of a full slice always goes ahead, so the queue cannot stall)
+        const el = performance.now() - t0, est = this.est[ch.kind];
+        if (el + est > budgetMs && (built > 0 || budgetMs < 2.5) && !(built === 0 && this.starved > 12 && budgetMs > 0)) break;
+        const ts = performance.now();
         // big cells are assembled from four placement cells: prepare one missing cell per
         // step, so no single step is long
         if (ch.kind === 'far' || ch.kind === 'under2') {
@@ -397,12 +403,13 @@ export class Flora {
               missing = true;
             }
           }
-          if (missing) { built++; continue; }
+          if (missing) { built++; this.est[ch.kind] += (Math.min(8, performance.now() - ts) - this.est[ch.kind]) * 0.2; continue; }
         }
         q.pop();
         ch.queued = false;
         if (ch.isTree) { this._buildTrees(ch); this._retier(ch); } else this._buildUnder(ch);
         ch.built = true; built++;
+        this.est[ch.kind] += (Math.min(8, performance.now() - ts) - this.est[ch.kind]) * 0.2;
       }
       this.starved = built ? 0 : this.starved + 1;
       spent = performance.now() - t0 >= budgetMs;

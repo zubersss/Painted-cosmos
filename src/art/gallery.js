@@ -10,6 +10,7 @@ import { createWorld } from '../world/index.js';
 import { createExplorer, createShip } from './models.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { LOOKS } from '../data/looks.js';
+import { findVantage } from './vantage.js';
 
 const P = new URLSearchParams(location.search);
 const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.get(k) : d);
@@ -100,9 +101,15 @@ function gotoBiome(biomeId, preset) {
   applyPreset(preset || 'stream', spot.unitDir);
   if (preset === 'stream' || !preset) aimAlongStream();
   if (preset === 'vista') {
+    // where a painter would set the easel for this biome (src/art/vantage.js)
     const here2 = world.sampleSurface(bodyId, state.pos.clone().normalize());
-    const bi = LOOKS[bodyId].biomes.find((b) => b.id === here2.biomeId);
-    aimVista(1.7, !!bi && ['canyon', 'mesa', 'terraced', 'ridged', 'alpine', 'crater', 'sinkholes'].includes(bi.terrain), !!bi && (bi.terrain === 'islands' || bi.terrain === 'coast'));
+    const v = findVantage(bodyId, biomeId || here2.biomeId);
+    if (v) {
+      const d = new THREE.Vector3(v.unitDir.x, v.unitDir.y, v.unitDir.z);
+      state.pos.copy(d).multiplyScalar(surf(d) + v.eye);
+      state.yaw = v.yaw; state.pitch = v.pitch;
+      window.__pcVantage = v;
+    } else aimVista(1.7, false, false);
   }
   if (preset === 'shore') { aimAlongStream(); state.yaw += 1.0; }
 }
@@ -192,7 +199,7 @@ function setBody(id) {
 }
 
 $('body').onchange = (e) => { P.delete('biome'); P.delete('cam'); setBody(e.target.value); };
-$('biome').onchange = (e) => { gotoBiome(e.target.value, 'stream'); };
+$('biome').onchange = (e) => { gotoBiome(e.target.value, 'vista'); };
 $('time').oninput = (e) => { state.time = +e.target.value; applyTime(); };
 $('quality').onchange = (e) => { painter.setQuality(+e.target.value); };
 $('view').onchange = (e) => { painter.setDebugView(+e.target.value); };

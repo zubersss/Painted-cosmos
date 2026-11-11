@@ -96,7 +96,9 @@ export function createWorld(scene) {
     return out.normalize();
   }
 
+  let frameNo = 0;
   function update(dt, cameraPos, activeBodyId) {
+    frameNo++;
     const active = activeBodyId && state.has(activeBodyId) ? state.get(activeBodyId) : null;
     // PHYSICS' flora field for the body it is running on (it has already updated this frame)
     syncPhysFlora(physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id) ? physics.fields.flora : null);
@@ -127,11 +129,17 @@ export function createWorld(scene) {
         cu.x = st.look.cloud * a01; cu.y = Math.max(900, st.body.atmosphereHeight * 3.2);
       }
       st.terrain.detail = isActive;
-      // one shared time budget per frame: terrain first, flora with what is left
-      const tb = performance.now();
-      st.terrain.update(st.camLocal, isActive ? budgetMs * 0.8 : 0);
-      if (isActive) { const tt = performance.now() - tb; if (tt > prof.terrain) prof.terrain = tt; }
-      if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, budgetMs - (performance.now() - tb)) : 0);
+      // One shared time slice per frame. When terrain and flora both have work they take
+      // turns at going first, so no frame pays for a full slice of each.
+      const tb = performance.now(), slice = budgetMs * 0.8;
+      if (isActive && st.flora && (frameNo & 1) && st.flora.busy > 0 && st.terrain.busy > 0) {
+        st.flora.update(st.camLocal, true, slice);
+        st.terrain.update(st.camLocal, Math.max(0, slice - (performance.now() - tb)));
+      } else {
+        st.terrain.update(st.camLocal, isActive ? slice : 0);
+        if (isActive) { const tt = performance.now() - tb; if (tt > prof.terrain) prof.terrain = tt; }
+        if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, slice - (performance.now() - tb)) : 0);
+      }
       if (!isActive) {
         // far bodies: plain daylight, no haze
         bu.uFog.value.set(1e-7, 6, 0, 1);
@@ -145,8 +153,16 @@ export function createWorld(scene) {
       const here = sampleSurfacePure(st.id, _up.x, _up.y, _up.z);
       const ground = here.radius;
       // some biomes are mistier than others: blend the visibility by what is under the camera
-      let mist = 0;
-      for (const b of look.biomes) { const w = here.biomeWeights[b.id]; if (w) mist += w * (b.mist || 1); }
+      // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
+      let mist = 0, twi = 0;
+      for (const b of look.biomes) {
+        const w = here.biomeWeights[b.id];
+        if (!w) continue;
+        let m = b.mist || 1;
+        // fog lying in the low ground: thick below its level, clear above it
+        if (b.t && b.t.fog) m *= 0.2 + 0.8 * THREE.MathUtils.smoothstep(camR - body.radius, b.t.fog[0] - b.t.fog[1] * 0.5, b.t.fog[0] + b.t.fog[1]);
+        mist += w * m; twi += w * (b.twilight || 0);
+      }
       mist = mist || 1;
       const alt = camR - ground;
       const atmH = Math.max(1, body.atmosphereHeight || 1);
@@ -154,10 +170,12 @@ export function createWorld(scene) {
       const e = bu.uSunDirL.value.dot(_up);
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
-      const wNight = 1 - THREE.MathUtils.smoothstep(e, -0.24, -0.03);
-      const wDay = THREE.MathUtils.smoothstep(e, 0.06, 0.42);
+      let wNight = 1 - THREE.MathUtils.smoothstep(e, -0.24, -0.03);
+      let wDay = THREE.MathUtils.smoothstep(e, 0.06, 0.42);
       const wTwi = Math.max(0, 1 - wNight - wDay);
-      blendKeys(look, wDay, am ? wTwi : 0, am ? 0 : wTwi, wNight);
+      const lost = wDay * twi;
+      wDay -= lost; wNight += lost * 0.22;
+      blendKeys(look, wDay, am ? wTwi : 0, (am ? 0 : wTwi) + lost * 0.78, wNight);
       bu.uGlaze.value.copy(tmpKey.glaze);
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);

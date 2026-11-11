@@ -56,6 +56,30 @@ export function placeTrees(S, face, level, ix, iy, grid) {
       }
     }
   }
+  // hanging gardens: a third candidate per cell, kept only on the lip of a cliff and turned to
+  // face out over the drop
+  if (S.hangs) {
+    const w = _s.w;
+    for (let b = 0; b < grid; b++) {
+      for (let a = 0; a < grid * 3; a++) {
+        const r1 = hash3i(a, b, 21, seed), r2 = hash3i(a, b, 22, seed), r3 = hash3i(a, b, 23, seed), r5 = hash3i(a, b, 25, seed);
+        faceToDir(face, u0 + span * (a + r1) / (grid * 3), v0 + span * (b + r2) / grid, _d);
+        const x = _d[0], y = _d[1], z = _d[2];
+        const bi = S.biomes[S.biomeWeights(x, y, z, w)];
+        if (!bi.hang || r3 >= bi.hang.d) continue;
+        S.sample(x, y, z, s, true);
+        if (s.lip < 0.5) continue;
+        // the kit's local axes on the ground (as THREE's setFromUnitVectors(Y, up) lays them)
+        const k1 = 1 / (1 + y), ax = y + z * z * k1, ay = -x, az = -x * z * k1, bx = -x * z * k1, by = -z, bz = y + x * x * k1;
+        const e = 3 / R;
+        const gx = S.heightAt(x + ax * e, y + ay * e, z + az * e) - S.heightAt(x - ax * e, y - ay * e, z - az * e);
+        const gz = S.heightAt(x + bx * e, y + by * e, z + bz * e) - S.heightAt(x - bx * e, y - by * e, z - bz * e);
+        const rr = R + s.h + 0.2;
+        out.push(x * rr, y * rr, z * rr, (0.8 + 0.6 * r5) * (S.look.flora.tall[bi.hang.kit].scale || 1), Math.atan2(-gx, -gz), bi.hang.kit, (r2 * 3) | 0, hash3i(a, b, 26, seed),
+          (r5 - 0.5) * 2, (r1 - 0.5) * 1.2, 0, 0);
+      }
+    }
+  }
   return { count: out.length / STRIDE, data: new Float32Array(out) };
 }
 
@@ -70,6 +94,15 @@ export function placeUnder(S, face, level, ix, iy, grid) {
     for (let a = 0; a < grid; a++) {
       const r1 = hash3i(a, b, 1, seed), r2 = hash3i(a, b, 2, seed), r3 = hash3i(a, b, 3, seed), r4 = hash3i(a, b, 4, seed), r5 = hash3i(a, b, 5, seed);
       faceToDir(face, u0 + span * (a + 0.05 + 0.9 * r1) / grid, v0 + span * (b + 0.05 + 0.9 * r2) / grid, _d);
+      // cheap rejections first (most candidates grow nothing): the biome alone often decides
+      const top0 = S.biomeWeights(_d[0], _d[1], _d[2], s.w), b0 = S.biomes[top0];
+      let clump = 1;
+      if (b0.terrain !== 'forest') {
+        if (!b0.small || r4 >= S.smallSum[top0]) continue;
+        const fq = R / 21;
+        clump = 0.10 + 0.90 * smoothstep(-0.22, 0.24, S.nC.n3(_d[0] * fq + 2.0, _d[1] * fq - 5.0, _d[2] * fq + 9.0));
+        if (r3 >= clump) continue;
+      }
       S.sample(_d[0], _d[1], _d[2], s, true);
       const bi = S.biomes[s.top];
       const inWater = s.lq !== NOLQ && s.lq > s.h;
@@ -77,8 +110,7 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       if (bi.terrain !== 'forest') {
         // other biomes: a table of densities per kind
         if (!bi.small || inWater) continue;
-        const fq = R / 21;
-        if (r3 >= s.under * (0.10 + 0.90 * smoothstep(-0.22, 0.24, S.nC.n3(_d[0] * fq + 2.0, _d[1] * fq - 5.0, _d[2] * fq + 9.0)))) continue;
+        if (r3 >= s.under * clump) continue;
         let acc = 0;
         for (let q = 0; q < SMALL.length; q++) {
           const dn = bi.small[SMALL[q][0]];
