@@ -2,6 +2,8 @@
 // PAINTER pastes these into its own materials next to its wash chunks, as with the flora chunk.
 
 // ---- particles straight from the physics buffers (createWeatherKit with expand: 'gpu') ------------
+// UNUSED BY THE GAME (checked in P10; see kits.js, `expand`): only the lab pages can switch it on, and it
+// has none of the draw options added since P7. Not kept level with expand.js.
 // Geometry: ONE quad (position.xy in -0.5 .. 0.5, uv 0 .. 1), instanced; nothing is built on
 // the CPU. Per instance, the physics arrays as they are:
 //   aPcPos  vec3  m, relative to the object's origin, body-local axes

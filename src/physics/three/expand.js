@@ -146,7 +146,7 @@ export const DRAW_PAINTED = Object.freeze({
   ash: Object.freeze({ size: 0.09, minPx: 4, exposure: 0.03 }),
   spores: Object.freeze({ size: 0.05, minPx: 3 }),
   // (P10) a leaf 17 cm long, never under 6 px long: thin, so its ink is a third of a disc's that size
-  leaves: Object.freeze({ size: 0.17, minPx: 6 }),
+  leaves: Object.freeze({ size: 0.17, minPx: 6, near: 3 }),      // (near: a leaf a metre from the lens was a blot across the sheet)
 });
 
 // The cell (m, half-width) a kind is shown modulo: the one nearest D.cell of which the

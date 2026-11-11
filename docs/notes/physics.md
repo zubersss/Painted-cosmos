@@ -3,6 +3,90 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P10 (seventh PHYSICS agent; read this block first; P9, P8 and P7 below hold for everything not named here)
+
+**Where things stand.** `node --test src/physics/` 244 tests; PILOT's 115 pass on a clean export with my files.
+Timing tests fail now and then on this machine (load average 13 to 18 all stage: `loose.test` "every body, every
+kind", `index.test` budget, `kits.test` cost): run the file alone before concluding anything. Nothing half-edited.
+Scratch: `/home/user/.pc-scratch/physics/p10/` (`verify.sh` both suites; `shoot.sh`, `final.sh`, `overlay.sh` the
+painted frames; `gust.mjs real.mjs walk.mjs walk2.mjs` item 1; `prof.mjs` cost of `physics.update` in four
+weathers; `legs.mjs` item 3; `spraydbg.js` an `--eval` that says where the spray is on the screen).
+
+**Item 1, the wind near the player (done; `air.js`, `wind.js`, `near.js`, `air.test.mjs`).** Three faults, not one:
+1. *The 52 m/s2 frame at 241 s was not the gust pattern.* It was the wake of the stand upwind changing stands in
+   one frame (the upwind search is a step function of the wind's direction): at the real spawn 86, 123 and 51 m/s2
+   at 2, 10 and 30 m. Shelter and wakes now ease toward what the search finds at the pace the air crosses the
+   fetch (`AIR.shelterAdjust` 48 m over the wind speed, 1 to 6 s), take newly sampled ground in over
+   `AIR.shelterLearn` 0.4 s, and are scrolled with the grid (they were one cell stale for up to four frames at
+   every 16 m hop: 452 m/s2 for a walker in the forest, 407 for a runner on open ground).
+2. *The gust pattern did race.* Each copy sat at p - wind x tau, tau up to 48 s: with the storm's wind changing
+   at 0.6 m/s2 it slid through the air at up to 30 m/s. The grid now carries each copy by the integral of the wind
+   (`AirGrid.gustShift`; `wind.js gustLevelAt`, `gustPhase`; exact in a steady wind). The far field (`airAt`
+   outside the grid: nothing in play) carries it by the synoptic wind alone, so it cannot race either, but its
+   gusts drift at the planet's wind, not the storm's.
+3. *The storm's outflow was taken at the grid's centre alone* and hopped with it (1 m/s every 16 m in the gust
+   front). Planet and weather wind now sit on a 3 x 3 lattice fixed to the ground (+8 `weatherWind` a frame, 0.04 ms).
+- *Numbers now* (60 Hz, first storm, 150 to 330 s): real spawn 7.2, 10.3, 20.2 m/s2 at 2, 10, 30 m (bounds 16,
+  23, 44); open test ground 23, 32, 38 (bounds 40, 55, 65; the wind there is 5 to 46 m/s at 10 m); a walker in
+  the forest 13; a runner on open ground 28. The bound: lull-to-gust swing x the wind that carries the gusts /
+  `WIND.gustLength2` x 1.5. Seen from the air the pattern changes at 0.052 /s (the cross-fade); the old form 0.63.
+- *What is still true and is not a fault of this stage:* a gust carried at the wind's own speed past a fixed
+  place still changes the wind fast when the wind is fast (p99 8 m/s2 at 10 m at the spawn, 22 on open ground in a
+  26 m/s mean wind): the pattern's small octave (34 m) at full weight. Real 10 m masts show 3 to 10 m/s2 in
+  severe gusts; the model is perhaps twice as sharp at its extremes. Softening it changes how gusts cross a
+  meadow; not done, not asked.
+
+**Item 2, the marks (done as physics and kits; the picture is half done, see the verdicts).**
+- *Found: the painted lab drew every mark twice.* `world.setPhysics` builds the kits itself since PAINTER wired
+  them, and the lab built its own on top: every painted frame from P5 to P9 shows both. Now `kits=painter`
+  (default): the world's kits, PAINTER's materials, the game's picture; `kits=lab`: the stand-in alone (what the
+  physics proposes; dust, sand and leaves as a glaze after the painting, no depth); `kits=0` none.
+- *Dust.* Fed as fast as the wind empties the box (190 marks became 470). Six in ten marks are low veils 11:1
+  (was one in twenty, 4:1), under 1.1 m high, none nearer than 1.4 m. Per vertex `aPcVeil` -> `vPcData.y`
+  opacity (0.75 at the ground to 0.15 from 3 m up, fading in and out with the mark), `.z` softness, `.w` veil01
+  (0 puff, 1 streamer). `buf.hag`: height over the ground under each loose particle.
+- *Blowing sand and snow.* Grains leave the ground in streamers (`loose.streamAt`: snaking bands, a third of the
+  ground, travelling downwind at 0.55 of the wind). Snow on the ground is blown now (it never was): a skim (the
+  sand kind, material snow) and powder over it (the dust kind, material snow), `here.blown.snow`. Sand strokes lie
+  level (`level: 1`).
+- *Leaves.* `aspect 0.33, flip, edge`: 1 in 3 broadside, a line edge-on, turning either way. Torn off with the
+  fourth power of the wind, more while it rises: 20 in the air in 4.5 m/s, the whole 260 in 15.6 m/s.
+- *Spray.* `loose.sea()`: spume off breaking crests from 9 m/s (full at 24), surf where the water is shallower
+  than 1.3 Hs. Spray rides the wind over the sea and is gone when it falls back in. `here.blown.spume`, `.surf`.
+- *Snow.* A flake in a wind is a level stroke up to 8 flake sizes long (was 3, beyond which it was taken away),
+  and comes in bands carried by the wind (`bands 0.8`).
+- *Capacities* (quality 1 / 2): dust 1000 / 2400, sand 1200 / 2800, leaves 260 / 600, spray 800 / 1800.
+- *Cost* (`prof.mjs`, median `physics.update`, this loaded machine, before -> after): Mars dust storm 0.81 -> 0.68
+  ms, blizzard 1.04 -> 1.30 (1100 skim grains), storm in the forest 0.53 -> 0.91 (257 leaves), Neptune's sea 0.50 ->
+  0.67. Worst frames here are the machine's (40 to 90 ms in both).
+- *Frames* (all from the clean export of `d66f2ec`, which holds PAINTER's `f1a395e`; 960 x 540, quality 1):
+  `painted-mars-dust.jpg`, `painted-snow.jpg`, `painted-storm-forest.jpg`, `painted-neptune-sea.jpg` are the
+  GAME's picture (`kits=painter`); `painted-proposal.jpg` is the same four with the stand-in (`kits=lab`).
+  `painted-rain-options.jpg` is gone (PAINTER glazes the rain now). Before frames: `p10/before-sheet.jpg`.
+  Verdicts under "For PAINTER", P10.
+
+**Item 3, the cost of the legs (measured; nothing changed).** `legs.mjs <root> <body> <hz>`: a run, 8 headings
+from the spawn, PILOT's `Sim` on the real ground, load average 14: Moon median 22 us a step, p99 101 us, mean 46
+us, 2.36 ground samples a step (most 4), legs working 14 % of steps; Mars median 37 us, p99 146 us, mean 59 us,
+2.61 samples, legs working 43 %. The body before the legs on the Moon: median 16 us, p99 62 us, 2.00 samples. The
+worst single steps (15 to 90 ms, a few in ten thousand) are there in the old body too and outside
+`sampleSurface` as well: the machine, not the legs. **The `Sim` steps the body at a fixed 1/60 s whatever the
+frame rate**, so a 20 Hz frame is three body steps (0.07 to 0.11 ms) and my split of long steps is never
+reached through it.
+
+**Item 4.** Nothing in the game uses `expand: 'gpu'` (the world builds the kits with the default); only the two
+lab pages can switch it on. Marked UNUSED in `kits.js` and `chunks.glsl.js`; not brought level.
+
+**Not done, not verified, in order.**
+1. *Spray is not seen in any painted frame.* At the stored Neptune shot 18 to 118 drops were alive and none
+   was in view (`spraydbg.js`): the camera looks at a cove from 11 m inland. Shoot over open water or along
+   the surf line (`lat= lon=` on the sea, or another `yaw`), and look at whether PAINTER's displaced sea hides
+   drops within 0.2 m of the surface.
+2. *Motion.* Every verdict is a still: streamers snaking, veils streaming, leaves tumbling, bands travelling are
+   tested in Node, not looked at.
+3. *The top tier.* Frames are at quality 1 (the lab's default); the look is to be judged at quality 2.
+4. The gust pattern's sharpness (item 1, last bullet). 5. The instanced path. 6. P9's left-overs (b) and (c).
+
 ## Hand-over P9 (sixth PHYSICS agent; read this block first, then P8 and P7 below, which hold for everything not named here)
 
 **Where things stand.** `node --test src/physics/` 230 pass; PILOT's 114 pass on a clean export with my files
@@ -416,6 +500,29 @@ physics.ship.stepPulse(ps = { a, v }, vWant, dt);  pulseBrakeDistance(v)
 
 ### Fields and buffers (typed arrays; PAINTER wraps them in textures and attributes)
 
+**Added in P10 (all additive; nothing was renamed or removed):**
+```js
+physics.here.blown            // { sand, snow, spume, surf }, each 0..1, refreshed by update(): what the wind raises near the focus
+physics.particles.<kind>.hag  // Float32Array: m above the ground (or the liquid, for spray) under each LOOSE particle; 0 for rain and snow
+physics.fields.air.gustShift  // Float64Array(6): how far the wind has carried each copy of the gust pattern (m, body-local)
+// wind.js
+gustLevelAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed)   // the gust pattern with the displacement of each copy given
+gustPhase(t, out4)                                                 // cycle numbers of the two copies, seconds since the middle of each
+// air.js: AIR.shelterAdjust (48 m), AIR.shelterLearn (0.4 s).   near.js: TerrainGrid.known(x, z)
+// loose.js
+BLOWN                         // constants of the streamers, blowing snow, leaves, spume and surf
+loose.streamAt(x, z, time, ue, un, u10) -> 0..1                    // how much a place is in a streamer now
+loose.sea(dt, water, near, fx, fz, cwe, cwn, g, airGrid)           // the sea's own spray; update() calls it after water.update
+// three/expand.js
+expandVeils(buf, D, eye, out)   // 3 floats a vertex: opacity01, soft01, veil01 (kinds whose DRAW entry has `veil`: dust)
+// DRAW options: flip, edge (leaves); veil, veilLow, veilHigh, veilTop, veilSoft (dust); bands, bandLong, bandWide (snow);
+// level (sand); eye.bandE, bandN, bandWe, bandWn, band01 (the kit sets them).  kits: info.veil, attribute aPcVeil (vec3)
+// PARTICLES.capacity: dust [300, 1000, 2400], sand [300, 1200, 2800], leaves [80, 260, 600], spray [200, 800, 1800]
+```
+Behaviour that changed with no call changing: see "For PILOT", P10 (wind), and the draw table `DRAW_PAINTED`
+(dust walls 6 in 10 and 11:1, snow strokes up to 8 sizes and in bands, leaves thin, sand level, spray larger),
+which the world passes to the kits as it is.
+
 ```js
 physics.fields.frame            // LocalFrame: ox,oy,oz (anchor, body-local m); ex.. (east axis); nx.. (north); ax.. (up); version
 physics.fields.flora
@@ -779,6 +886,22 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+**P10, for PILOT (read first). Nothing to wire; four things to know.**
+- *The wind near the player no longer steps.* Shelter behind trees, the storm's outflow and the per-node fields
+  used to jump when the wind veered or the wind grid hopped a cell (every 16 m of travel): up to 450 m/s2 in one
+  frame at the player. Now 13 m/s2 for a walker in the forest in the first storm. Behaviour that changes without
+  a call changing: the lee of a wood takes 1 to 6 s to follow a veering wind; gusts ride at the wind's own
+  speed (they slid through the air at up to 30 m/s more when the storm's wind was changing).
+- *The body step costs* 0.02 to 0.04 ms (median), 0.10 to 0.15 ms (p99) in your `Sim` on the Moon and Mars on
+  this loaded machine; 2.4 to 2.6 ground samples a step against 2.0 before the legs. Your `Sim` steps it at a
+  fixed 1/60 s, so a 20 Hz frame is three steps.
+- *`physics.update` costs more in three weathers* (medians on this machine, before -> after): blizzard 1.04 ->
+  1.30 ms, storm in a forest 0.53 -> 0.91, Neptune's sea 0.50 -> 0.67; a Mars dust storm 0.81 -> 0.68. The 2 ms
+  aim holds at quality 1 here; at quality 2 the loose kinds hold 2.3 times as many particles and I have not
+  measured a blizzard there.
+- *For sound*: `physics.here.blown = { sand, snow, spume, surf }`, each 0..1: sand hissing in streamers, a ground
+  blizzard, spume off the sea, surf on a shore within 24 m.
 
 **P9, for PILOT (read first): the explorer has legs.**
 - *Nothing to wire.* `physics.explorer.step` is the same call. Keep "low boulders are ground" exactly as
@@ -1219,6 +1342,41 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+**P10, for PAINTER (read first). Frames: `docs/shots/physics/painted-*.jpg` are your picture of my marks
+(clean export of `d66f2ec`, your `f1a395e` inside); `painted-proposal.jpg` is my stand-in for comparison.**
+- *Your three questions.* (a) Neptune's far sea: at the storm coast (`biome=storm_seas`, the lab's place) at 40
+  to 55 s of the game's clock `uPhysWaterSea` = (Hs 2.77 m, breaking level 0.77 m, edge, cover 0.15), 10 m wind
+  30 m/s: your gate (`smoothstep(0.02, 0.12, cover)`, `smoothstep(0.03, 0.22, Hs)`) is wide open on my numbers
+  and its thresholds are right. In the frame the far sea is a flat pale grey with no swell stroke and no white
+  horse; visibility there is 0.24 (fog 0.76), so look at your haze over the far sea, or at `uDayness` under the
+  storm, not at the gate. In the gallery the forced sky does not move my wind, so the sea stays slight there.
+  (b) Dust under your glaze (`painted-mars-dust.jpg`): no blot, soft, and **too faint to see**: the storm has
+  470 dust marks in the box and the picture shows a hazy dune. (c) The blizzard over the shadowed snowfield
+  (`painted-snow.jpg`): it works: white level strokes over the blue wash read as driving snow.
+- *What to change, mark by mark* (my numbers are not turned up to fight your glaze):
+  1. **Dust**: read `vPcData.y` (opacity at the mark's densest: 0.75 at the ground, 0.15 aloft, 0 as it is born
+     and as it dies), `.z` (the share of its half-size that is feathered) and `.w` (0 a round puff, 1 a level
+     streamer 11 times as wide as high). For a streamer: ends feathered, densest just above its foot, thinning to
+     nothing at its top, wisps along its length (`painted-lab.js makeGlaze`, the `veil` branch, is 8 lines).
+     Your `puff` gives every mark one faint alpha; with opacity from the field the low veils carry the picture
+     and the high ones are haze.
+  2. **Blowing sand and snow** (the sand kind): a pale skim, paler than the ground it left (lift its wash half
+     way to paper; of snow: bare paper). In your glaze it is a faint hairline. The strokes lie level now and
+     come in streamers; they need about 0.8 alpha at the head to read as a skim.
+  3. **Leaves**: lay them as a glaze too, or exempt them from the pass that erases marks under three pixels: a
+     leaf edge-on is a line one or two pixels wide. In your pipeline a flock of 150 leaves leaves a few specks;
+     in the stand-in the same flock is twenty thin slivers at all angles (`painted-proposal.jpg`, lower left).
+     A lens with pointed ends suits the 3:1 quad (`abs(y) < 1 - x*x`).
+  4. **Snow**: nothing to change. The table is yours through `DRAW_PAINTED.snow` (`streak: 8`, `bands`).
+  5. **Spray** is new (spume and surf): the spray kind is no longer only splashes; its strokes are 0.11 m wide and
+     as long as a drop flies in 0.1 s. Not judged in a picture (see the hand-over).
+- *New fields, free*: `physics.here.blown = { sand, snow, spume, surf }` (0..1 each); `buf.hag` on the loose
+  kinds; `info.veil` and the attribute `aPcVeil` (vec3) on the dust mesh; `DRAW` options `flip, edge, veil*,
+  bands*, level` (header of `three/expand.js`). Your world's `draw.snow` override keeps `streak` and `bands`
+  because it spreads `D.snow`: keep it that way.
+- *The lab drew every mark twice until now* (yours and mine): any frame of mine you judged before P10 shows
+  both. `kits=painter` is your picture alone.
 
 **P9, for PAINTER (read first).** Nothing of yours has to change. New and free to use: the explorer's
 `st.phys.hip` (m: the legs' length now less standing, -0.45 folded to +0.28 reaching down), `clamber01`, `grip`
@@ -1693,6 +1851,11 @@ keeps this on the grid of the ground marks (64 x 64 cells of 0.5 m round the foc
 
 ## Lab: `physics-lab.html` URL parameters
 
+**Painted lab, P10:** `kits=painter` (default: the world's own kits and PAINTER's materials, the game's picture)
+| `kits=lab` (this page's stand-in materials alone) | `kits=0`; with `kits=lab`: `glaze=0` (dust, sand and
+leaves back in the painting as cut marks), `figure=<0..1>` (flakes in a shadow tone over fresh snow).
+`info()` also returns `seaState { Hs, cover, breaking, length }`, `u10`, `blown`, `kitMode`.
+
 `scene=` `flora` (default) | `wind` | `rain` | `snow` | `storm` | `explorer` | `ship` | `globe`;
 `body=` any body id; `world=` `flat` | `hills` | `slope` (`&slope=14` degrees) | `stub` (PILOT's) |
 `real` (PAINTER's); `ground=` a biome id for the synthetic worlds; `find=` `gale` | `calm` |
@@ -1836,6 +1999,12 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
 ## Needs from the others
 
 ### From PAINTER
+
+**P10 (details under "For PAINTER", P10):** (1) the dust glaze reads `vPcData.y, .z, .w` (opacity, softness,
+veil01) instead of one faint alpha: it is too faint to see now; (2) leaves laid as a glaze or exempt from the
+pass that erases thin marks; (3) the skim of blowing sand and snow lifted toward paper and given weight; (4) a
+look at why Neptune's far sea shows no swell stroke or white horse at the storm coast when my numbers open the
+gate fully (haze, dayness); (5) nothing for snow.
 0. In this order ("For PAINTER", E): the sky, the haze and the ground wash reading
    `setMood.sky` (`overcast`, `haze`, `wet`, `snow`, `dust`); the wave chunk in your liquid
    material (D); the kits with the reference factory and a palette by material (C); blades
@@ -1853,6 +2022,8 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
    it should never be seen. Say if it can be.
 
 ### From PILOT
+
+**P10:** nothing has to be wired. Offered: `physics.here.blown` for sound (sand, snow, spume, surf).
 0. The three items the coordinator relays as open on your side have their recipes under "For
    PILOT: Open on your side": touchdown on the legs, rain audio, the pulse planner.
 (Corrected in P4: I had reported `seed: 1` and the gear lift-off as open after you had done

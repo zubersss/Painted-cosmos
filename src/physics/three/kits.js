@@ -100,6 +100,11 @@ function send(attr, count) { attr.clearUpdateRanges(); if (count > 0) attr.addUp
 //   expand: 'cpu' (default: quads built here; any material) | 'gpu' (instanced straight from
 //           the physics buffers, zero copies; your material must paste PARTICLE_GLSL and take
 //           info.uniforms; see chunks.glsl.js)
+//           UNUSED BY THE GAME (checked in P10): the world builds the kits with the default, 'cpu'; only
+//           the two lab pages can switch 'gpu' on by URL. The instanced chunk has none of the draw options
+//           added since P7 (parallel, maxLen, near for streaks; tumble, aspect, walls; P10's flip, veil,
+//           bands, level): a kind drawn with it is P6's picture. Bring it level before anyone uses it, or
+//           remove it; nothing depends on it.
 export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kinds, rings = true, draw = {}, expand = 'cpu' } = {}) {
   if (typeof makeMaterial !== 'function') throw new Error('createWeatherKit: makeMaterial(kind, info) is required');
   const gpu = expand === 'gpu';
