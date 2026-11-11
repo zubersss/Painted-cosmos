@@ -98,6 +98,7 @@ export class Sim {
         isLiquid: liquidRadius > s.radius,
         biomeId: s.biomeId,
         biomeWeights: s.biomeWeights,
+        canopyHeight: s.canopyHeight || 0,          // additive (Painter): tree-top height above the ground here
       };
     };
     this._samplers[bodyId] = fn;
@@ -368,6 +369,9 @@ export class Sim {
     return (p) => {
       const g = floorAt(sample, p);
       const list = this.canopy;
+      // Painter's canopy field where the world has one...
+      if (g.canopyHeight > 0 && !g.liquid) { g.floor += g.canopyHeight; g.canopy = g.canopyHeight; g.slope = 0; g.normal = scale(p, 1 / g.r); }
+      // ...and single trees and boulders from the obstacle list (the only source on worlds without the field).
       if (list.length) {
         // Each tree is a tent: full height over its crown, sloping away to nothing, so the
         // canopy is a surface the ship can follow rather than a field of posts.
@@ -381,7 +385,8 @@ export class Sim {
           const h = over <= 0 ? o.height : o.height * (1 - over / run);
           if (h > top) top = h;
         }
-        if (top > 0) { g.floor += top; g.canopy = top; g.slope = 0; g.normal = scale(p, 1 / r); }
+        const extra = top - (g.canopy || 0);
+        if (extra > 0) { g.floor += extra; g.canopy = top; g.slope = 0; g.normal = scale(p, 1 / r); }
       }
       return g;
     };

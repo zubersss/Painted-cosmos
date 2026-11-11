@@ -70,20 +70,34 @@ export class Input {
 
   // Under a pointer lock some environments report nonsense: jumps the size of the window that
   // are taken back by the very next event, or a stream of huge deltas. A real hand cannot do
-  // either. Three such events within a second and a half: stop trusting the lock.
+  // either. A large delta is therefore held back for one event: if the next one undoes it,
+  // both are dropped; if not, it was a real flick and is applied. Three undone jumps (or
+  // impossible spikes) within a second and a half: stop trusting the lock.
+  // Returns true when this event has been dealt with here.
   suspicious(mx, my, time) {
     const big = Math.abs(mx) >= 120 || Math.abs(my) >= 120;
-    const pm = this._pm;
-    const cancels = big && pm && Math.abs(mx + pm.x) <= 2 && Math.abs(my + pm.y) <= 2;
     const spike = Math.abs(mx) >= 400 || Math.abs(my) >= 400;
-    this._pm = { x: mx, y: my };
-    if (!cancels && !spike) return false;
+    const held = this._pm;
+    this._pm = null;
+    let odd = spike;
+    if (held) {
+      const undone = big && Math.abs(mx + held.x) <= 2 && Math.abs(my + held.y) <= 2;
+      // A real fast movement has neighbours going the same way; a lone window-sized jump with
+      // stillness after it does not.
+      const follows = mx * held.x + my * held.y > 0 && Math.hypot(mx, my) >= 0.15 * Math.hypot(held.x, held.y);
+      if (undone) { odd = true; this.finishOdd(time); return true; }
+      if (follows) { this.dx += held.x; this.dy += held.y; } else odd = true;
+    }
+    if (big && !spike) this._pm = { x: mx, y: my };
+    if (odd) this.finishOdd(time);
+    return big || spike;
+  }
+
+  finishOdd(time) {
     const t = time || 0;
     this._odd = this._odd.filter((x) => t - x < 1500);
     this._odd.push(t);
-    if (cancels && Math.abs(pm.x) < 400 && Math.abs(pm.y) < 400) { this.dx -= pm.x; this.dy -= pm.y; }   // take back the jump just undone
     if (this._odd.length >= 3) this.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
-    return true;
   }
 
   down(code) { return this.keys.has(code); }

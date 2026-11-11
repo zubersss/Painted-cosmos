@@ -72,7 +72,7 @@ export function floorAt(sample, p) {
   const r = len(p);
   const s = sample(scale(p, 1 / r));
   const liquid = (s.liquidRadius || 0) > s.radius;
-  return { floor: liquid ? s.liquidRadius : s.radius, normal: liquid ? scale(p, 1 / r) : norm(s.normal, p), slope: liquid ? 0 : s.slope, liquid, r };
+  return { floor: liquid ? s.liquidRadius : s.radius, normal: liquid ? scale(p, 1 / r) : norm(s.normal, p), slope: liquid ? 0 : s.slope, liquid, r, canopyHeight: s.canopyHeight || 0 };
 }
 
 export function maxSpeedAt(altitude, spaceAlt, hasBody, T = SHIP) {
