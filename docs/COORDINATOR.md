@@ -924,3 +924,49 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   "V" pairs and the change of handwriting at 17 m; the brush at full resolution; (4) the two
   vistas in a thicket, Mercury and Neptune from orbit, Mars' dune crests, branch sway and
   drifts, the explorer's face; the UI look review.
+- 2026-11-11: **PHYSICS P10 accepted (seventh agent, head `bf73de5`; code in `d66f2ec` and
+  inside the snapshots `f030411`, `c04262c`)**. The coordinator re-ran on a clean export of
+  the head: `node --test src/physics/` 244 pass, `node --test tests/*.test.mjs` 115 pass; and
+  opened the four stored painted frames and `painted-proposal.jpg` on sheets.
+  **The wind near the player**: the 52 m/s2 frame was three faults, none of them the gust
+  shape: the wake of the stand upwind switched stands in one frame when the wind veered
+  (86 / 123 / 51 m/s2 at 2 / 10 / 30 m at the real spawn; 452 m/s2 for a walker in the
+  forest), the gust pattern raced through the air by up to 30 m/s, and the storm's outflow
+  hopped with the grid. Now 7.2 / 10.3 / 20.2 m/s2 at the spawn through the first storm and
+  13 m/s2 for the walker; six tests in `air.test.mjs` hold it.
+  **The weather marks**: dust fed as fast as the wind empties the box (470 marks, six in ten
+  low veils 11:1, opacity and softness per vertex); blowing sand and snow leave the ground in
+  streamers (snow on the ground is now blown by the wind); leaves are thin tumbling marks
+  torn off with the fourth power of the wind; the sea makes its own spray (spume from 9 m/s,
+  surf where the water is shallower than 1.3 wave heights); snow in wind is a level stroke in
+  bands. The painted lab had drawn every mark twice since PAINTER wired the kits into the
+  world; it now shows the game's picture alone (`kits=painter`) or PHYSICS's stand-in
+  (`kits=lab`). Legs cost 22 to 37 us a step (median), p99 under 0.15 ms: nothing changed.
+  `expand: 'gpu'` is unused and marked so. `physics.update` medians 0.67 to 1.30 ms on the
+  loaded machine. Additive: `physics.here.blown { sand, snow, spume, surf }`, draw options
+  and kit attributes (`aPcVeil`, `vPcData.y/.z/.w`). Tests changed: one tolerance widened
+  with reason (a fluttering flake against a calm-air reference), the kit budget test only
+  reports, three probes rewritten; nine added.
+  **Coordinator's verdict on the frames, agreeing with PHYSICS's own**: in the game's
+  picture the Mars dust storm is a hazy dune with nothing in the air and the leaves are a
+  few specks; in PHYSICS's stand-in the dust is soft low veils at several depths with the
+  explorer half veiled, plainly the better picture. The blizzard works in the game's picture
+  (level white strokes over a blue snowfield). Spray has not been seen in any frame.
+  Neptune's far sea is flat pale grey although PAINTER's gate is fully open on PHYSICS's
+  numbers (Hs 2.77 m, whitecap cover 0.15 at 40 to 55 s at the `storm_seas` stand).
+- 2026-11-11: **Ruling (look, after one exchange between the roles): the dust glaze and the
+  leaves.** PAINTER's dust glaze reads PHYSICS's per-vertex opacity, softness and
+  puff-or-streamer (`vPcData.y`, `.z`, `.w`) so that veils read as veils (the stand-in's
+  eight-line shader in `src/physics/three/painted-lab.js` is the reference for the result,
+  PAINTER's hand decides the stroke); leaves are laid so the pass that erases thin marks
+  does not eat them; the skim of blowing sand and snow is given weight. This is item 2 of
+  PAINTER's block 5 and is wanted before review 6.
+- 2026-11-11: **PHYSICS's order for P11** (coordinator): everything PHYSICS moves has only
+  ever been judged in stills or in Node. (1) Spray seen in a picture. (2) Filmstrips at a
+  fixed step, in the painted lab with the game's kits, of each thing that moves (grass in a
+  breeze and a gust and parting round the walker; a tree in the gust front; rain; snow
+  bands and the ground skim; dust veils; leaves; waves and surf; the ship's downwash; the
+  explorer walking, clambering and landing from a jump; the ship settling on its legs),
+  opened, with a verdict each on jitter, popping, sliding, things frozen, pace; fix what is
+  wrong. (3) The gust pattern's sharpness against what masts measure. (4) `physics.update`
+  at the top tier.
