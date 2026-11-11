@@ -307,3 +307,18 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   fraction at that point, 0 in a glade) and `canopyHeight` (m). PAINTER provides them; PHYSICS
   (wind shelter) and PILOT (ship cushion) read them. Plants carry a height and a stiffness per
   kit for the flora chunk (`uPlantHeight`, `uStiff`).
+- 2026-11-11: **PAINTER reports M1 with the three MUST FIX answered** (`b2bfcae`, notes at
+  `6a31de3`): by its own probe 496 to 543 k triangles and 287 to 307 draw calls at quality 1
+  (was 4.23 M and 699); crowns as a few washes; leaning, broken trunks and a wandering bank;
+  trees in clumps; `canopy01` / `canopyHeight` on `sampleSurface`; `FLORA_PHYS` (plant height
+  and stiffness per kit) exported from `src/world/florakit.js`. The coordinator looked at the
+  new frames and agrees the three are fixed as far as still frames show. **M1 closes when the
+  lead's review 2 confirms the cost with its own probe in the integrated game.** PAINTER starts
+  M2 meanwhile (nobody waits).
+- 2026-11-11: look is judged at 960x540 or more with quality 1 or higher; cost is measured at
+  whatever size is fastest (PAINTER's request, upheld: at 150x84 internal pixels no painting
+  survives).
+- 2026-11-11: M2 order for PAINTER (coordinator): mars and saturn first (the M2 trip is earth,
+  mars, saturn), then the other five planets, then the remaining earth biomes; the frame budget
+  holds on every planet. Real explorer and ship models: first item of M3 at the latest.
+  Evidence shots for M2: up to 45 for PAINTER, 960x540 jpg.
