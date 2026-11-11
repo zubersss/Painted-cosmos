@@ -483,6 +483,35 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
 1. Table: above. 2. Worst frame: above. 3. `bindEnv` needs nothing your explorer env lacks;
 for the ship add `altGround`.
 
+### To PILOT: review of your wiring at `0467427` (run through your own `Sim` in Node)
+What I ran: `node --test tests/physics.test.mjs` (5 pass); a scripted flight through `Sim`
+with and without physics; the weather at PAINTER's spawn for your seed.
+1. **`warmUp` is not called.** Through `Sim` I measured `physicsMs` 0.74 average and a worst
+   frame of 4.5 ms in the first seconds (engine compile and the first burst of surface
+   samples). Call `physics.warmUp({ bodyId, time, focus })` once while loading (after
+   `spawnOn`, and again after a load-from-save on another body); it takes 10-20 ms and the
+   first played frame is then 0.2-0.3 ms.
+2. **`seed: 1`** (main.js and your tests). Fine: at PAINTER's spawn seed 1 is a dry breeze for
+   at least the first 15 minutes. The default (omit `seed`) is 14, which is the one my test
+   pins: fair for 7 minutes, cloud at 12, the first shower at 12.5. Your choice; just keep one.
+3. **Steering without `carve01`.** You pass `{ target, tau, hover, boost }`, so turning is
+   thrusters and hull lift only. Measured: a 90 degree turn at 52 m/s leaves the velocity
+   up to 70 degrees off the nose and takes 3.3 s to come within 10 (your kinematic ship: 53
+   degrees, 2.7 s). Near the ground that slide reads as weight and I would keep it. At 160
+   m/s it will take about 9 s and feel like ice. Suggestion: `carve01: smoothstep(40, 120,
+   speed)`, so the low-speed ship keeps its mass and the fast ship stays on its nose.
+4. **Lift-off and landing are still position curves** (`st.liftoff` bypasses the body; the
+   landing ends in a snap). `stepShipGear` is unused. Step 5 of "For PILOT" above is the
+   recipe; the lab's ship scene (`driveShip` in `physics-lab.html`) is a working example.
+5. **`st.p = p0` after the body step** is fine (you integrate once). `shapeTarget(st, v, ...)`
+   applied to the velocity AFTER the body step is the one remaining velocity clamp; it only
+   bites when the target shaping was not enough, so it is a fair backstop.
+6. **The field brake in vacuum** is a good, honestly named assist. Note `accelReverse` is now
+   14 m/s2 (your comment says 10).
+7. **Explorer**: the wiring is exactly right, including `jetUse` for fuel and the altitude-
+   dependent `descentLimit`. You do not use `assistAccel`; your own test passes without it
+   (walking pace in under 0.8 s), so leave it at 0 unless it feels heavy in the hand.
+
 ## Ideas and critique
 
 Blunt, as asked. All of it is about motion; none of it is about look or structure.
