@@ -10,6 +10,61 @@ are relative, never a claim about a real GPU.
 
 ---
 
+## Review 4: what will be measured (written 2026-11-11, before PAINTER's third pass has reported)
+
+Review 4 is the gate for M2 as a whole. It starts when the coordinator relays PAINTER's report,
+and it is run on a clean export of that commit (`tools/export-head.sh`), one browser at a time.
+
+1. **Contract and landings** (seconds): `node --test tests/contract.test.mjs` (the contract on
+   every body, terrain ceiling, dry spawns, 40 landings, the real-world trip in the pure
+   simulation), `node --test src/world/*.test.mjs`, `node --test src/physics/`. Then the
+   landing survey (scratch `run2/landsurvey.mjs <export> 24`): 24 spots on every body, from a
+   hover and at speed. Baseline before the pass: 235 of 240 land; every refusal says why.
+   MUST FIX if a body has a biome nobody can land in, or a refusal without a word.
+2. **Cost per body, in the integrated game**: the tour records triangles and draw calls for
+   every biome frame and every vista frame at quality 1 (budget 600 k triangles, 350 calls;
+   review 3 found Neptune's `kelp_forests` at 727 k). Quality 0 (300 k) and 2 (1.2 M) at each
+   body's densest frame with `?quality=0|2&dynres=0&stats=1`. MUST FIX over budget.
+3. **`world.busy`**: every tour frame must settle (ten frames in a row at 0) within 120 s in
+   software GL; the sheet says which did not. Baseline on PAINTER's committed state of
+   2026-11-11 (`a46647f` export): no Earth biome frame settled in 90 s (busy 267 to 412).
+   MUST FIX if frames still do not settle: it is the readiness signal for the title card,
+   for sketches and for every capture, and PAINTER's own test for it must pass.
+4. **`world.update` worst frame**: the tour's caption carries the worst of the last 90 frames
+   at each place (software GL on a shared machine: read as relative, and re-measured in Node
+   through PAINTER's own profile where a number looks bad). Budget 5 ms. SHOULD FIX unless it
+   is tens of milliseconds on arrival, which a player would feel as a hitch.
+5. **The freeze-frame test, frame by frame**: `node tests/tour.mjs --bodies <b>` for all ten
+   bodies at 960x540, quality 1: every biome (on dry ground of that biome), every vista
+   (where the game sends the player, facing the painter's way), one frame from orbit. Each
+   frame is judged against the art bible's ten points and against the brief's own words for
+   that biome ("rust canyons", "floating sky-islands in banded cloud seas", ...). One line a
+   frame in the review: does it show its named landform (yes / partly / no), what reads as
+   digital (facets, ruler-straight edges, stretched streaks, tiling, pepper grain, flat
+   washes, dark shade instead of a glaze), and whether the vista is a view worth walking to.
+   MUST FIX: a biome whose named feature is not in its frame, a vista under liquid or on a
+   cliff face, visible facets or streaks. The coordinator can waive single biomes.
+6. **From orbit and in space**: the orbit frame of every body (distinct biome colours, soft
+   terminator, rim that fades to paper, no seams: `R-SPACE-5`), and the dark specks in space
+   seen in `docs/shots/pilot/m2-pulse.jpg` (art bible 1: nothing is black; 8: salt and
+   spattered stars, not pepper). Re-shoot the pulse frame at 960x540 and look at it at full
+   size. SHOULD FIX unless it reads as noise at a glance, then MUST.
+7. **The trip and the loop in the painted worlds**: `node tests/playthrough.mjs` and
+   `node tests/trip.mjs` on the export (400x225 for the run, 960x540 for the evidence frames).
+   MUST FIX on any console error or a leg that cannot be flown.
+8. **`R-WX-1` and snow squalls** (PHYSICS): does the 5 %/s limit on visibility stand? Measure
+   `physics.here.sky` at 10 Hz through a squall front on Uranus or Neptune and through the
+   Earth thunderstorm (`find=` in the lab gives the place and time): the largest change per
+   second of `haze`, `fog`, `snowfall`. The check already allows fog banks and dust fronts to
+   arrive faster; if a squall front does too, the check is reworded for precipitation fronts
+   and PAINTER is asked to low-pass what it shows (a pop in the picture is the real fault).
+9. **Not in review 4** (M3, listed so nobody builds on sand): weather in the picture, the real
+   models, night and dusk as paintings, the interface theme (PILOT's; PAINTER reviews it).
+
+Interim finding for PAINTER, measured during this run (no need to wait for review 4):
+`world.busy` does not reach 0 on the committed state (item 3). If the fix is in your working
+tree, say in your notes which commit carries it.
+
 ## Review 3: 2026-11-11, at commit `22a10c3` (Painter's `ff51af7` and `1e1801e`, Physics' P2 work in progress)
 
 Short pass, during M2. What I ran:

@@ -2,93 +2,105 @@
 
 Owner: PILOT as lead developer. Updated at every sync. Status words: DONE (verified, by whom
 and how), PART (works, with the stated gap), TODO, RISK.
-A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it.
+A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it (the
+coordinator can waive an item).
 
-Last update: 2026-11-11, during M3 (Pilot's M2 accepted; Painter's M2 second pass with a fresh Painter; Physics P3 accepted).
+Last update: 2026-11-11, by the second PILOT agent, after re-running every check (results in
+`docs/notes/pilot.md`, "Ground truth"). All three roles are on their second or third agent.
 
-## Milestone 1: vertical slice
+## Where we are in one paragraph
 
-| Item | Owner | Status | Verified how, by whom |
-| --- | --- | --- | --- |
-| Walk, run, jump, jetpack with recharging fuel | Pilot | DONE on stubs and in the real world | Pilot: `tests/explorer.test.mjs`, `tests/loop.test.mjs`, `node tests/playthrough.mjs` |
-| Third person default, V first person, cameras never clip terrain | Pilot | DONE for ground, liquid, the ship's hull and tree trunks | Pilot: camera tests (clearance never below 0.45 m over 90 s on steep stub terrain); trunk test |
-| Board with E, lift-off sequence | Pilot | DONE | Pilot: loop test, play-through |
-| Climb to orbit with no loading screen | Pilot | DONE on stubs; in the real world see REVIEW | Pilot: play-through (17.8 s ground to space, no state reload) |
-| Descend, landing assist with prompt, soft bounce, step out | Pilot | DONE | Pilot: `tests/flight.test.mjs` (touchdown under 1.8 m/s; never inside terrain in 10 min of careless flying), play-through |
-| State machine with the seven states | Pilot | DONE | Pilot: `tests/state.test.mjs` |
-| Floating origin, orbits, spin, sun, depth | Pilot | DONE | Pilot: `tests/orbits.test.mjs`; screenshots from 0.08 m near plane to orbit |
-| Watercolour pipeline | Painter | PART: the sheet is convincing; the cost is not (REVIEW 1, Painter MUST FIX 1) | Lead: gallery captures, frame-cost probe |
-| Earth temperate forest passes the freeze-frame test | Painter | PART: birch and pine forest, brook and canopy are in; three MUST FIX open (triangle budget, stippled foliage, ruler-straight trunks and bank) | Lead: `docs/lead/evidence/painter-19f72ce-*.jpg` |
-| Merge both ways: the slice plays inside the painted forest | Pilot | DONE: Painter's render, world and art are the default since `15e77f9`; the scripted loop passes inside the real world | Lead: `node tests/playthrough.mjs --query "scale=0.5&quality=0"` on a clean export of `7c7a0ac` (forest and collision in): 37 checks pass; `docs/shots/pilot/real-0*.jpg` |
-| Physics models (added by the owner on 2026-11-11) | Physics | Ahead of plan: API facade, atmosphere, wind, weather, ground, explorer and ship bodies, fields, 72 tests; no lab page or shots yet; wiring is M2 | Lead: `node --test src/physics/`, 600-frame timing run |
+M1 is met. M2 is met on Pilot's and Physics' side and OPEN on Painter's: the planets exist and
+can be landed on everywhere, but many biomes did not show the landform the brief names and
+several things read as digital; a fresh Painter is on a third pass, and M2 closes when review 4
+(what it measures is at the top of `REVIEW.md`) has no MUST FIX. M3 is under way in parallel:
+Pilot's half is in place (and since 2026-11-11 Pilot also builds the painted UI theme);
+Painter's half (weather in the picture, real explorer and ship, space, art pass) has not
+started; Physics has delivered everything the picture needs to show weather. M4 has not
+started. The two things nobody has been able to check are the frame rate on a real GPU and how
+the game sounds.
 
-**M1 verdict (review 2).** Pilot's half: met. Painter's half: met (the three MUST FIX are closed
-with the lead's own measurements: 564 k triangles and 334 draw calls at the spawn at quality 1,
-brushed crowns, wandering trunks and bank at 960x540). Physics: P1 accepted by the coordinator.
-
-## Milestone 2: the system
+## Milestone 1: vertical slice: MET
 
 | Item | Owner | Status | Verified how, by whom |
 | --- | --- | --- | --- |
-| Full solar-system flight: frames, spheres of influence, moving bodies | Pilot | DONE | Pilot: `tests/orbits.test.mjs`, `tests/pulse.test.mjs` |
-| Pulse drive between planets, with markers | Pilot | DONE (markers are DOM rings, not painted) | Pilot: `tests/pulse.test.mjs`, `node tests/trip.mjs` |
-| Landing anywhere | Pilot | DONE: 40 landings on all ten bodies (28 biomes, three afloat), slopes by ground friction, clear of trees | Pilot: `tests/contract.test.mjs` on Painter's real worlds with Physics |
-| Planet map | Pilot | DONE (fallback look) | Pilot: `node tests/trip.mjs` (click sets the course) |
-| Save to localStorage in try/catch | Pilot | DONE | Pilot: `tests/save.test.mjs`; the trip reloads and continues |
-| Physics wired in (`createPhysics`, update, env, `world.setPhysics`, gear) | Pilot + Physics | DONE on Pilot's side; the world reading the fields is Painter's | Pilot: `tests/physics.test.mjs`; play-through and trip with physics on |
-| Ship never flies through tree crowns | Pilot | DONE | Pilot: `tests/contract.test.mjs` (low pass over the real forest) |
-| Pointer-lock fallback, said on screen | Pilot | DONE for refusal and nonsense deltas; the happy path needs a real hand | Pilot: `node tests/lockcheck.mjs` |
-| Frame read-out for the owner | Pilot | DONE (` key, `?stats=1`, README) | Pilot: the trip checks it shows numbers |
-| All eight planets with 4+ biomes each, and their look from orbit | Painter | PART: data-driven biomes, liquids and flora kits on every body (`ff51af7`); one MUST FIX open (Neptune's spawn is 727 k triangles, REVIEW 3) | Lead: per-body frame cost, 40 landings, Painter's shots |
-| Weather, particles, ground marks, plants reacting, in the picture | Physics + Painter | PART: fields are fed every frame; Painter wired the flora field in `1e1801e` (not yet reviewed in the game); weather, particles and marks are not drawn yet | Lead: `node --test src/physics/` (158), lab shots |
-| Earth to Mars to Saturn in one sitting with no reload | all | DONE on stubs and in the painted worlds as they are (see Pilot's notes for the runs) | Pilot: `node tests/trip.mjs`, `tests/contract.test.mjs` |
+| Walk, run, jump, jetpack with recharging fuel | Pilot | DONE | Lead: `tests/explorer.test.mjs`, `tests/loop.test.mjs`, `node tests/playthrough.mjs` (37 checks; re-run 2026-11-11 on stubs, with Physics, and in the painted world) |
+| Third person default, V first person, cameras never clip | Pilot | DONE for ground, liquid, hull and trunks | Lead: camera tests; the play-through checks the clearance every stage |
+| Board with E, lift-off, climb to orbit with no loading screen, land, step out | Pilot | DONE | Lead: play-through in the painted world, no console errors |
+| State machine with the seven states; floating origin, orbits, spin, sun, depth | Pilot | DONE | Lead: `tests/state.test.mjs`, `tests/orbits.test.mjs` |
+| Watercolour pipeline; Earth's temperate forest passes the freeze-frame test | Painter | DONE (review 2: 564 k triangles, 334 calls at the spawn; brushed crowns; wandering trunks and bank) | Lead: frame-cost probe in the integrated game, gallery frames at 960x540 |
+| The slice plays inside the painted forest | Pilot | DONE | Lead: play-through on a clean export |
+| Physics models, P1 | Physics | DONE (accepted by the coordinator) | Lead: `node --test src/physics/` |
 
-## Milestone 3: the painting comes alive
+## Milestone 2: the system: OPEN (Painter's planets; review 4)
 
 | Item | Owner | Status | Verified how, by whom |
 | --- | --- | --- | --- |
-| Sketchbook and vistas | Pilot | DONE (fallback look) | Pilot: `tests/save.test.mjs` (vista found once, listed, saved), `node tests/m3check.mjs` |
-| Audio, all procedural | Pilot | DONE: wind from the real wind, rain, thunder, ship, jetpack, footsteps, pads, UI sounds. Nobody has listened to it: headless checks only prove it runs and the mix is sane | Pilot: `node tests/m3check.mjs` |
-| Title screen, help card | Pilot | DONE (the start card; H) | Pilot: `node tests/m3check.mjs` |
-| HUD | Pilot | PART: prompt, gauges, read-out, notice, markers, look hint, all legible on paper slips; fallback look until `src/art/ui.css` and `painter.setMarks` | Pilot: evidence frames |
-| Performance tiers and dynamic resolution | Pilot | PART: controller unit-tested; starts at tier 1 and scale 0.75 and climbs; never run on a real GPU | Pilot: `tests/dynres.test.mjs`, `m3check` |
-| Freeze-frame tour of every biome on every body | Lead | DONE as an instrument: `node tests/tour.mjs` writes `docs/lead/evidence/tour-<body>.jpg` | Lead: sheets in the repo |
-| Motion: wind, water, weather, day-night; space washes; art pass on weakest biomes | Painter (+ Physics kits) | TODO: Physics' draw kits exist and are inside the budget (12 calls, 31 k triangles); Painter wires them first in M3 | |
-| Painted UI theme, painted markers, real explorer and ship | Painter | TODO | |
+| Full solar-system flight, pulse drive, markers | Pilot | DONE (markers are DOM rings until the painted theme) | Lead: `tests/pulse.test.mjs`, `node tests/trip.mjs` (47 checks) |
+| Landing anywhere | Pilot | DONE: 40 of 40 scripted landings on ten bodies in the contract test; a wider survey of 240 spots lands 235, and the 5 refusals say why on screen | Lead: `tests/contract.test.mjs`; survey in Pilot's notes |
+| Planet map, save | Pilot | DONE (fallback look) | Lead: the trip (click sets the course; a reload continues from the save) |
+| Physics wired in | Pilot + Physics | DONE on Pilot's side | Lead: `tests/physics.test.mjs`; play-through and trip with Physics on |
+| Frame read-out for the owner | Pilot | DONE (` key, `?stats=1`; now with the worst `world.update` frame) | Lead: the trip checks it shows numbers |
+| All eight planets with 4+ biomes each | Painter | PART: every body has 4+ biomes with their own palette, liquid and kits and can be walked; the named landform is missing or weak in many (the coordinator's and Painter's own tables); third pass in progress | Lead: review 4 will judge every tour sheet |
+| How each planet looks from orbit | Painter | PART: orbit frames exist; not reviewed since the first pass. The tour now takes one orbit frame per body | Lead: review 4 |
+| Frame budget on every planet (600 k triangles, 350 calls at quality 1) | Painter | PART: review 3 found Neptune's spawn at 727 k; not re-measured since | Lead: review 4 (the tour records cost per frame) |
+| `world.busy` drains; `world.update` inside 5 ms | Painter | OPEN: on the committed state of 2026-11-11 no Earth biome frame settled within 90 s (busy 267 to 412) | Lead: `node tests/tour.mjs --bodies earth` on a clean export |
+| Earth to Mars to Saturn in one sitting with no reload | all | DONE on stubs; in the painted worlds the flight, both landings and the autosave passed on 2026-11-11; the reload step must be re-run (script fault, fixed) | Lead: `node tests/trip.mjs` in the painted world |
 
-## Milestone 4: critique swap and ship
+## Milestone 3: the painting comes alive: UNDER WAY
 
-TODO. Pull request `cosmos` -> `main`; GitHub Pages serves `main`
-(`https://zubersss.github.io/Painted-cosmos/`), so every URL in `index.html` must stay relative.
+| Item | Owner | Status | Verified how, by whom |
+| --- | --- | --- | --- |
+| Sketchbook and vistas | Pilot | DONE: views found on foot; a sketch of the painted frame for every landscape walked and view found, shown as it is made, kept beside the save; a page per world with empty frames for what is left | Lead: `tests/sketches.test.mjs`, `node tests/m3check.mjs` (26 checks) |
+| Audio, all procedural | Pilot | DONE and measured: 22 situations rendered through the game's graph; no clipping, no DC, no clicks, peak -5.3 dBFS; rain follows what falls and what it falls on; footsteps by ground. Nobody has heard it | Lead: `node tests/audiocheck.mjs` |
+| Title screen, help card | Pilot | DONE: the title card is the loading screen; legible; H shows it again | Lead: frames at 960x540 and 640x360, `m3check` |
+| HUD | Pilot | PART: prompt, gauges, read-out, notice, markers, look hint, sketch slip, all legible on paper slips; the painted theme is being built | Lead: evidence frames |
+| Painted UI theme (art bible 8): torn paper, ink icons, hand lettering, painted markers, cursor, loading | Pilot (moved from Painter by the coordinator, 2026-11-11) | see Pilot's notes for its state; look to be reviewed by Painter | Lead: frames in `docs/shots/pilot/` |
+| Performance tiers and dynamic resolution | Pilot | PART: controller unit-tested; starts at tier 1 and scale 0.75 and climbs; never run on a real GPU | Lead: `tests/dynres.test.mjs`, `m3check` |
+| Touchdown on the landing legs | Pilot + Physics | TODO: recipe complete in Physics' notes; plan in Pilot's handover | |
+| Gamepad ("if cheap") | Pilot | TODO: plan in Pilot's handover | |
+| Freeze-frame tour of every biome and every vista on every body | Lead | DONE as an instrument: `node tests/tour.mjs` writes `docs/lead/evidence/tour-<body>.jpg` and `.json`; says on the sheet what did not settle, who stands in liquid, what each frame cost | Lead: sheets |
+| Weather in the picture: sky, haze, ground and water reading `setMood.sky`, then Physics' draw kits | Painter (+ Physics kits) | TODO: Painter's first M3 block. Physics side is ready: eleven sky numbers, kits inside the budget, ink per ground material, the sea as a chunk | Lead: Physics' tests (190) and lab frames |
+| Motion (wind, water, day-night), space washes, art pass on the weakest biome of every planet | Painter | TODO | |
+| Real explorer and ship models | Painter | TODO (placeholders in every frame today) | |
+
+## Milestone 4: critique swap and ship: NOT STARTED
+
+Each role plays the whole game and writes a blunt critique of the others' domains; the worst
+issues are fixed; every check is run; Pilot opens one pull request `cosmos` -> `main` through
+the REST API (`docs/COORDINATOR.md` section E has the commands) and merges it; GitHub Pages
+serves `main` (`https://zubersss.github.io/Painted-cosmos/`), so every URL in `index.html`
+stays relative. Only when the coordinator says so, and only once.
 
 ## "Done means" checklist (the brief)
 
 | Requirement | Status |
 | --- | --- |
-| A new player can open index.html and start on Earth in the forest | DONE: spawn in the clearing by the brook, the ship 16 m away (`docs/shots/pilot/real-01-on-foot.jpg`) |
-| Walk, jetpack, board, reach space | DONE (Pilot) |
-| Land on all eight planets, different biomes on each | TODO |
-| Every frame passes the freeze-frame test | TODO: see REVIEW |
-| No console errors | DONE for the M1 loop (play-through fails on any) |
-| Frame-rate target holds (60 fps at 1080p on an integrated GPU, never under 30) | RISK: unmeasurable here |
-| README lists the controls | DONE |
+| A new player can open index.html and start on Earth in the forest | DONE (title card, then the clearing by the brook, the ship 16 m away) |
+| Walk, jetpack, board, reach space | DONE: scripted in the painted world, no console errors |
+| Land on all eight planets | DONE as mechanics (landing survey, contract test); the trip lands on Mars and Saturn in the painted worlds |
+| Find different biomes on each | PART: the biomes exist and the sketchbook counts them; whether each shows what the brief names is review 4 |
+| Every frame along the way passes the freeze-frame test | TODO: the home forest passed (review 2); the other 40 biomes, the vistas, orbit, space, night, weather and the interface have not. The tour is the instrument; review 4 is the first full judgement |
+| No console errors | DONE for every scripted run so far (they fail on any) |
+| The frame-rate target holds (60 fps at 1080p on an integrated GPU, never under 30) | RISK: cannot be measured here. Triangle and draw-call budgets are set and policed; dynamic resolution and three tiers exist; the read-out is there for the owner |
+| The README lists the controls | DONE (to be extended when the gamepad and the theme land) |
 
 ## Risks and what is off track
 
-1. **Frame rate: the largest risk in the project.** It cannot be measured in this sandbox,
-   but the forest submits 4.4 M triangles and 887 draw calls a frame at quality 1, on top of a
-   multi-target scene pass and four full-screen passes. That will not hold 60 fps at 1080p on
-   an integrated GPU. A budget is set in REVIEW 1 (600 k triangles, 350 calls at quality 1).
-   Dynamic resolution and tiers exist but only cut pixels, not triangles. Someone must run the
-   game on real hardware before M4; until then every claim about 60 fps is reasoning.
-2. **Hitches while moving.** Terrain and flora are built on the main thread in time slices; in
-   software GL the frame time during a walk rises sharply. Needs a measurement of build time
-   per frame (`R-SPACE-1`).
-3. **Three roles, one working tree.** Mid-edit files from one role can break another role's
-   run. Mitigation in place: checks run against `tools/export-head.sh`.
-4. **Scope added mid-flight** (physics, weather, deformation). M2 now carries wiring work for
-   Pilot that the original plan did not have. The frame budget has to absorb about 2 ms of CPU.
-5. **The flying ship passes through tree crowns.** The explorer, the camera boom and landing
-   sites respect `world.sampleObstacles`; the ship's ground cushion does not know the canopy.
-6. **Pointer lock is untested** (headless reports nonsense deltas under lock). First thing to
-   try when a person opens the game.
+1. **Painter is the critical path.** M2's planets, then all of M3's picture work (weather,
+   models, space, art pass) sit with one role that has already used up one agent. The
+   coordinator has moved the UI theme to Pilot for that reason. If review 4 again finds
+   biomes without their landform, the honest options are a waiver per biome or fewer, better
+   biomes; that is the coordinator's call.
+2. **Frame rate is unmeasured.** Every claim about 60 fps is reasoning from triangle counts
+   and pass counts. Someone must open the game on a real integrated GPU before M4 and read
+   the ` read-out; until then this stays the largest risk in the project.
+3. **`world.busy` and build hitches.** The readiness signal does not drain in Painter's
+   committed state, so frames are captured unsettled and the title card may wait on a 900
+   frame fallback; `world.update` worst frames were 8.5 to 9.4 ms in review 3 (budget 5).
+4. **Nothing of the weather is in the picture.** Physics simulates a thunderstorm over the
+   spawn late in the first morning; the player hears it (rain, thunder) and sees a sunny day.
+5. **Nobody has heard the sound or held a real mouse to it.** Measured levels and a proven
+   pointer-lock fallback are substitutes, not the thing itself.
+6. **Agents run out of context.** Notes and lead files are kept able to stand alone; every
+   role's notes open with a handover.
