@@ -200,7 +200,7 @@ export class Loose {
         for (let k = 0; k < devils.count; k++) {
           const D = devils[k];
           if (!(D.strength > 0.05) || Math.abs(D.x - fx) > Rr + 30 || Math.abs(D.z - fz) > Rr + 30) continue;
-          let n = 40 * D.strength * h + rng();
+          let n = 110 * D.strength * h + rng();
           while (n >= 1) {
             n -= 1;
             const a = rng() * 6.2831853, r = D.radius * (0.3 + 0.9 * rng());

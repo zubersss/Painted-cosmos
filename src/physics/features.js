@@ -12,6 +12,7 @@
 // into 260 m cubes and 150 s slots, and a hash decides whether a cube hosts a devil in a slot,
 // where it starts, how big it is and which way it spins. No state, same devil on every visit.
 import { hash3, hashString, smoothstep, clamp01, mix } from './util.js';
+import { windLarge } from './wind.js';
 
 export const DEVILS = Object.freeze({
   cell: 260,              // m: one candidate per cube of this size
@@ -38,13 +39,15 @@ function seedFor(bodyId, seed) {
   return (_sv = seedCache[k] || (seedCache[k] = hashString('devils-' + k) | 0));
 }
 
+const _wl = new Float64Array(4);
+
 export function makeDevil() {
   return { x: 0, z: 0, p: { x: 0, y: 0, z: 0 }, radius: 0, height: 0, speed: 0, up: 0, spin: 1, strength: 0, age: 0, life: 0, id: 0 };
 }
 
 // The dust devils near body-local point (px,py,pz) at time t.
 //   env: { dustSource 0..1, sun01 (cos zenith) or null, wind (mean wind speed, m/s), storm01,
-//          we, wn (mean wind in frame axes, for the drift), rho (air density) }
+//          rho (air density) }
 //   frame: LocalFrame (for the grid coordinates x, z of each devil).
 //   out: array of objects from makeDevil(); out.count is set. Returns out.
 export function devilsNear(bodyId, px, py, pz, t, seed, env, frame, out) {
@@ -76,9 +79,15 @@ export function devilsNear(bodyId, px, py, pz, t, seed, env, frame, out) {
     const k = r / qr; qx *= k; qy *= k; qz *= k;
     const h1 = hash3(ix, iy, iz + n * 15485863, s + 6), h2 = hash3(ix, iy, iz + n * 15485863, s + 7);
     const x0 = frame.lx(qx, qy, qz), z0 = frame.lz(qx, qy, qz);
+    // It travels with the wind it was born in: the large-scale wind at its birthplace at its
+    // birth time, fixed for its whole life (a path that depended on the wind NOW would jump
+    // with every gust).
+    const tb = t - age;
+    windLarge(bodyId, qx / r, qy / r, qz / r, tb, seed, _wl);
+    const ve = _wl[0] * frame.ex + _wl[1] * frame.ey + _wl[2] * frame.ez, vn = _wl[0] * frame.nx + _wl[1] * frame.ny + _wl[2] * frame.nz;
     const ts = age - life * 0.5;
-    const x = x0 + (env.we || 0) * DEVILS.drift * ts + Math.sin(age * 0.11 + h1 * 6.28) * 14;
-    const z = z0 + (env.wn || 0) * DEVILS.drift * ts + Math.cos(age * 0.09 + h2 * 6.28) * 14;
+    const x = x0 + ve * DEVILS.drift * ts + Math.sin(age * 0.11 + h1 * 6.28) * 14;
+    const z = z0 + vn * DEVILS.drift * ts + Math.cos(age * 0.09 + h2 * 6.28) * 14;
     if (out.count >= DEVILS.max) continue;
     const D = out[out.count] || (out[out.count] = makeDevil());
     out.count++;

@@ -76,6 +76,18 @@ vec4 pcPhysBend(vec3 root, float stiff01) {
   return vec4(L * (load > 1e-6 ? ang / load : 0.0), flatten, shake);
 }
 
+// The cheap variant: the wind response only, one lookup (four texel fetches without
+// PC_PHYS_LINEAR). No travelling waves, no push field, no flatten. For the mid and far tree
+// tiers and for anything beyond the 32 m near field. Returns the bend (rad, east / north).
+vec2 pcPhysBendLite(vec3 root, float stiff01) {
+  vec2 uv = (pcPhysGrid(root) - uPhysWindMap.xy) * uPhysWindMap.z + 0.5;
+  vec4 b = pcPhysTex(uPhysBend, uv, uPhysWindMap.w);
+  vec2 L = mix(b.xy, b.zw, stiff01);
+  float load = length(L);
+  float ang = mix(uPhysShape.y, uPhysShape.w, stiff01) * (1.0 - exp(-mix(uPhysShape.x, uPhysShape.z, stiff01) * load));
+  return L * (load > 1e-6 ? ang / load : 0.0);
+}
+
 // Where a point of the plant goes. rel: the point relative to the root (body-local axes, m).
 // up: the plant's own up (unit). H: the plant's height (m). bend: pcPhysBend(...).xy.
 // The stem curls like a tip-loaded cantilever and keeps its length.

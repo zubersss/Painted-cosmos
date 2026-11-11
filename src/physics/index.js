@@ -166,7 +166,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // dust devils near the focus (a few hashes; nothing on bodies that have none)
     _denv.dustSource = cover.dustSource * (1 - Math.min(1, moist.wetness01 * 3)) * (moist.snowDepth > 0.02 ? 0 : 1);
     _denv.sun01 = sun01; _denv.wind = Math.hypot(airGrid.cwe, airGrid.cwn); _denv.storm01 = here.weather.storm01 || 0;
-    _denv.we = airGrid.cwe; _denv.wn = airGrid.cwn; _denv.rho = airDensity(bodyId, r - body.radius);
+    _denv.rho = airDensity(bodyId, r - body.radius);
     devilsNear(bodyId, fp.x, fp.y, fp.z, time, seed, _denv, frame, devils);
     features.devils = devils;
     airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils);
@@ -330,6 +330,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       get version() { return flora.version; }, get pushVersion() { return flora.pushVersion; },
       // CPU twin of the shader: bend of a plant rooted at body-local point p
       plantBend(p, stiff01, out) { return flora.plantBend(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), stiff01, out); },
+      plantBendLite(p, stiff01, out) { return flora.plantBendLite(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), stiff01, out); },
       plantDisplace,
       field: flora,
     },

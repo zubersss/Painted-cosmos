@@ -371,6 +371,20 @@ export class FloraField {
     o.e = le * k; o.n = ln * k; o.angle = ang; o.flatten01 = flat; o.shake01 = shake; o.load = load;
     return o;
   }
+
+  // The cheap twin (pcPhysBendLite): wind response only. Fills o: e, n, angle, load.
+  plantBendLite(x, z, stiff01, o = {}) {
+    const N = this.N;
+    const b = this._tex(this.bend, N, (x - this.ci * this.cell) / this.cell + N / 2, (z - this.cj * this.cell) / this.cell + N / 2);
+    const le = b[0] + (b[2] - b[0]) * stiff01, ln = b[1] + (b[3] - b[1]) * stiff01;
+    const load = Math.hypot(le, ln);
+    const flex = FLORA.softFlex + (FLORA.stiffFlex - FLORA.softFlex) * stiff01;
+    const amax = FLORA.softMax + (FLORA.stiffMax - FLORA.softMax) * stiff01;
+    const ang = amax * (1 - Math.exp(-flex * load));
+    const k = load > 1e-6 ? ang / load : 0;
+    o.e = le * k; o.n = ln * k; o.angle = ang; o.load = load;
+    return o;
+  }
 }
 const _q = new Float64Array(4);
 // the three wave trains: relative wavenumber, direction offset (rad), relative speed, amplitude

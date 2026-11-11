@@ -55,7 +55,7 @@ if (worldKind === 'stub') {
 } else {
   const up0 = { x: 0.31, y: 0.56, z: 0.77 }, l0 = Math.hypot(up0.x, up0.y, up0.z);
   const dir0 = { x: up0.x / l0, y: up0.y / l0, z: up0.z / l0 };
-  const opts = { R, biome };
+  const opts = { R: R + Number(Q.get('alt') || 0), biome };      // alt: raise the whole synthetic ground above the datum
   if (worldKind === 'hills') opts.bumps = { amp: 1.6, length: 46 };
   if (worldKind === 'slope') { const e = { x: dir0.z, y: 0, z: -dir0.x }, el = Math.hypot(e.x, e.z); const k = 260 / R; opts.cone = { dir: norm3({ x: dir0.x + e.x / el * k, y: dir0.y, z: dir0.z + e.z / el * k }), radius: 300, height: 300 * Math.tan(Number(Q.get('slope') || 14) * Math.PI / 180) }; }
   if (Q.get('sea')) opts.sea = R + Number(Q.get('sea'));
@@ -101,7 +101,18 @@ if (startDirOverride) {
   startDir = startDirOverride;
 }
 const s0 = sampleSurface(bodyId, startDir);
-const start = { x: startDir.x * s0.radius, y: startDir.y * s0.radius, z: startDir.z * s0.radius };
+let start = { x: startDir.x * s0.radius, y: startDir.y * s0.radius, z: startDir.z * s0.radius };
+if (findQ === 'devil') {
+  // run the clock forward until a dust devil in its prime stands near, then go and stand beside it
+  const sunUp = norm3(start);
+  for (let k = 0; k < 20000; k++) {
+    physics.update(0, { bodyId, time, focus: start, sunDir: sunUp });
+    const D = physics.features.devils; let hit = null;
+    for (let i = 0; i < D.count; i++) if (D[i].strength > 0.9 && D[i].life - D[i].age > 60 && D[i].age < 20) hit = D[i];
+    if (hit) { const fr = physics.fields.frame, q = { x: hit.p.x + fr.ex * 14 - fr.nx * 6, y: hit.p.y + fr.ey * 14 - fr.ny * 6, z: hit.p.z + fr.ez * 14 - fr.nz * 6 }, d = norm3(q), r = sampleSurface(bodyId, d).radius; start = { x: d.x * r, y: d.y * r, z: d.z * r }; break; }
+    time += 0.5;
+  }
+}
 
 // ---- three -------------------------------------------------------------------------------------
 const canvas = document.getElementById('c');
@@ -164,7 +175,7 @@ attribute vec3 aRoot;      // lab-space root (in the lab, "body-local" is lab sp
 attribute vec4 aPlant;     // height (m), stiff01, yaw, lean seed
 varying float vShake;
 void main() {
-  vec4 b = pcPhysBend(aRoot, aPlant.y);
+  vec4 b = aPlant.w > 0.5 ? vec4(pcPhysBendLite(aRoot, aPlant.y), 0.0, 0.0) : pcPhysBend(aRoot, aPlant.y);
   // the blade model is a unit stem along +Y with a little sideways shape in x
   float c = cos(aPlant.z), s = sin(aPlant.z);
   vec3 rel = vec3(position.x * c * aPlant.x, position.y * aPlant.x, position.x * s * aPlant.x);
@@ -227,7 +238,7 @@ function rebuildPlants(cx, cz) {
     if (Math.hypot(x, z) < 11) continue;
     const y = groundY(x, z), h = 8 + 7 * hash3(gi, gj, 3, 11);
     trees.roots[n * 3] = x; trees.roots[n * 3 + 1] = y; trees.roots[n * 3 + 2] = -z;
-    trees.params[n * 4] = h; trees.params[n * 4 + 1] = 1; trees.params[n * 4 + 2] = hash3(gi, gj, 4, 11) * 6.283; trees.params[n * 4 + 3] = 0;
+    trees.params[n * 4] = h; trees.params[n * 4 + 1] = 1; trees.params[n * 4 + 2] = hash3(gi, gj, 4, 11) * 6.283; trees.params[n * 4 + 3] = 1;      // w = 1: the one-lookup variant
     if (probes.length < 75 && Math.hypot(x - cx, z - cz) < 40) probes.push({ x, y, z, h, stiff: 1 });
     n++;
   }
@@ -243,7 +254,7 @@ const _b = {}, _dp = {};
 function updateProbes() {
   let n = 0;
   for (const p of probes) {
-    F.field.plantBend(p.x, p.z, p.stiff, _b);
+    if (p.stiff) F.field.plantBendLite(p.x, p.z, p.stiff, _b); else F.field.plantBend(p.x, p.z, p.stiff, _b);
     // the tip of a blade is the model point (0.04 sin(2.2), 1): its own sideways offset is ignored here (4 % of the height)
     const tipH = p.stiff ? p.h * 0.9 : p.h;
     F.plantDisplace(tipH, p.h, _b.e, _b.n, _dp);
@@ -251,6 +262,59 @@ function updateProbes() {
     n++;
   }
   probeGeo.setDrawRange(0, n); probeGeo.attributes.position.needsUpdate = true;
+}
+
+// ---- shader against JS, in numbers ----------------------------------------------------------------
+// The probe plants are drawn once more as single points into a float target, one texel each,
+// whose colour is the displaced tip the GLSL chunk computes. Read back and compared with the JS
+// twin, that is the agreement in metres.
+let agreeRT = null, agreeMesh = null, agreeScene = null, agreeCam = null;
+function shaderAgreement() {
+  const n = probes.length;
+  if (!n || !showFlora) return null;
+  if (!agreeRT) {
+    agreeRT = new THREE.WebGLRenderTarget(80, 1, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(80 * 3), 3));
+    g.setAttribute('aRoot', new THREE.BufferAttribute(new Float32Array(80 * 3), 3));
+    g.setAttribute('aPlant', new THREE.BufferAttribute(new Float32Array(80 * 4), 4));
+    const m = new THREE.ShaderMaterial({
+      uniforms: U,
+      vertexShader: `${FLORA_GLSL}
+        attribute vec3 aRoot; attribute vec4 aPlant; varying vec3 vTip;
+        void main() {
+          vec2 bend = aPlant.w > 0.5 ? pcPhysBendLite(aRoot, aPlant.y) : pcPhysBend(aRoot, aPlant.y).xy;
+          vTip = aRoot + pcPhysDisplace(vec3(0.0, aPlant.z, 0.0), vec3(0.0, 1.0, 0.0), aPlant.x, bend);
+          gl_Position = vec4((position.x + 0.5) / 80.0 * 2.0 - 1.0, 0.0, 0.0, 1.0);
+          gl_PointSize = 1.0;
+        }`,
+      fragmentShader: 'varying vec3 vTip; void main() { gl_FragColor = vec4(vTip, 1.0); }',
+    });
+    agreeMesh = new THREE.Points(g, m); agreeMesh.frustumCulled = false;
+    agreeScene = new THREE.Scene(); agreeScene.add(agreeMesh); agreeCam = new THREE.Camera();
+  }
+  const g = agreeMesh.geometry, ip = g.attributes.position.array, ar = g.attributes.aRoot.array, ap = g.attributes.aPlant.array;
+  for (let i = 0; i < n; i++) {
+    const p = probes[i];
+    ip[i * 3] = i; ar[i * 3] = p.x; ar[i * 3 + 1] = p.y; ar[i * 3 + 2] = -p.z;
+    ap[i * 4] = p.h; ap[i * 4 + 1] = p.stiff; ap[i * 4 + 2] = p.stiff ? p.h * 0.9 : p.h; ap[i * 4 + 3] = p.stiff ? 1 : 0;
+  }
+  g.attributes.position.needsUpdate = g.attributes.aRoot.needsUpdate = g.attributes.aPlant.needsUpdate = true;
+  g.setDrawRange(0, n);
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(agreeRT); renderer.clear(); renderer.render(agreeScene, agreeCam); renderer.setRenderTarget(prev);
+  const px = new Float32Array(80 * 4);
+  renderer.readRenderTargetPixels(agreeRT, 0, 0, 80, 1, px);
+  let max = 0, sum = 0, disp = 0, maxSoft = 0, maxStiff = 0;
+  for (let i = 0; i < n; i++) {
+    const p = probes[i];
+    const e = Math.hypot(px[i * 4] - probePos[i * 3], px[i * 4 + 1] - probePos[i * 3 + 1], px[i * 4 + 2] - probePos[i * 3 + 2]);
+    const tipH = p.stiff ? p.h * 0.9 : p.h;
+    disp = Math.max(disp, Math.hypot(probePos[i * 3] - p.x, probePos[i * 3 + 1] - (p.y + tipH), probePos[i * 3 + 2] + p.z));
+    max = Math.max(max, e); sum += e * e;
+    if (p.stiff) maxStiff = Math.max(maxStiff, e); else maxSoft = Math.max(maxSoft, e);
+  }
+  return { plants: n, maxError: max, rmsError: Math.sqrt(sum / n), maxErrorGrass: maxSoft, maxErrorTrees: maxStiff, largestTipDisplacement: disp };
 }
 
 // ---- wind arrows -----------------------------------------------------------------------------------
@@ -301,8 +365,37 @@ const evGeo = new THREE.BufferGeometry();
 const evPos = new Float32Array(P.events.capacity * 12);
 evGeo.setAttribute('position', new THREE.BufferAttribute(evPos, 3));
 const evLines = new THREE.LineSegments(evGeo, line(C.ink, 0.8)); evLines.frustumCulled = false; scene3.add(evLines);
+// the loose kinds, each a cloud of points in its own colour
+const LOOSE_DRAW = { dust: [C.sepia, 2.5], sand: [C.gold, 2.5], ash: [C.grey, 2.5], spores: [C.green, 3], leaves: [C.red, 4], spray: [C.sky, 2.5], hail: [C.ink, 4] };
+const looseDraw = {};
+for (const k of Object.keys(LOOSE_DRAW)) {
+  const g = new THREE.BufferGeometry(); const a = new Float32Array(P[k].capacity * 3);
+  g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: LOOSE_DRAW[k][0], size: LOOSE_DRAW[k][1], sizeAttenuation: false })); m.frustumCulled = false; scene3.add(m);
+  looseDraw[k] = { g, a };
+}
+// dust devils: a ring at the foot and a line up the core
+const devilGeo = new THREE.BufferGeometry();
+const devilPos = new Float32Array(6 * 34 * 6);
+devilGeo.setAttribute('position', new THREE.BufferAttribute(devilPos, 3));
+const devilLines = new THREE.LineSegments(devilGeo, line(C.sepia, 0.8)); devilLines.frustumCulled = false; scene3.add(devilLines);
+function updateDevils() {
+  const D = physics.features.devils; let m = 0;
+  for (let k = 0; k < D.count; k++) {
+    const d = D[k], y = groundY(d.x, d.z), r = d.radius;
+    for (let i = 0; i < 32; i++) { const a = i / 32 * 6.283, b = (i + 1) / 32 * 6.283; devilPos.set([d.x + Math.cos(a) * r, y + 0.1, -(d.z + Math.sin(a) * r), d.x + Math.cos(b) * r, y + 0.1, -(d.z + Math.sin(b) * r)], m * 6); m++; }
+    devilPos.set([d.x, y, -d.z, d.x, y + d.height * d.strength, -d.z], m * 6); m++;
+  }
+  devilGeo.setDrawRange(0, m * 2); devilGeo.attributes.position.needsUpdate = true;
+}
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _pp = { x: 0, y: 0, z: 0 };
 function updateParticles() {
+  for (const k of Object.keys(looseDraw)) {
+    const b = P[k], L = looseDraw[k];
+    for (let i = 0; i < b.count; i++) { _pp.x = b.origin.x + b.pos[i * 3]; _pp.y = b.origin.y + b.pos[i * 3 + 1]; _pp.z = b.origin.z + b.pos[i * 3 + 2]; toLab(_pp, _v); L.a[i * 3] = _v.x; L.a[i * 3 + 1] = _v.y; L.a[i * 3 + 2] = _v.z; }
+    L.g.setDrawRange(0, b.count); L.g.attributes.position.needsUpdate = true;
+  }
+  updateDevils();
   const b = P.rain; let n = b.count;
   for (let i = 0; i < n; i++) {
     _pp.x = b.origin.x + b.pos[i * 3]; _pp.y = b.origin.y + b.pos[i * 3 + 1]; _pp.z = b.origin.z + b.pos[i * 3 + 2];
@@ -511,7 +604,8 @@ function placeCamera() {
 
 // ---- loop ----------------------------------------------------------------------------------------------------------
 const hud = document.getElementById('hud'), key = document.getElementById('key');
-key.textContent = 'physics lab: ' + scene + '\ngreen: plants drawn by the GLSL chunk\nred dots: the same tips from the JS model\nblue/red arrows: wind at 2 m (lull/gust)\nblue streaks: rain   violet: snow\nbrown: footprints   gold: velocity';
+let agree = null;
+key.textContent = 'physics lab: ' + scene + '\ngreen: plants drawn by the GLSL chunk\nred dots: the same tips from the JS model\nblue/red arrows: wind at 2 m (lull/gust)\nblue streaks: rain   violet: snow   ink: hail\nbrown dots: dust   gold: sand   grey: ash\ngreen dots: spores   red: leaves   sky: spray\nbrown lines: footprints, dust devils';
 let last = performance.now(), frames = 0, hudT = 0, acc = 0;
 const dist = [];
 const fixed = Q.get('fixed') === '1';       // advance a fixed 1/30 s per rendered frame (for slow headless runs)
@@ -527,7 +621,7 @@ function simulate(dt) {
   if (useExplorer) physics.explorer.disturbers(ex, dist);
   if (useShip) physics.ship.disturbers(sh, dist);
   // the sun: mid-morning (only temperature and mist depend on it)
-  const sun = norm3({ x: startDir.x * 0.6 + 0.5, y: startDir.y * 0.6 + 0.2, z: startDir.z * 0.6 });
+  const sun = findQ === 'devil' ? norm3(start) : norm3({ x: startDir.x * 0.6 + 0.5, y: startDir.y * 0.6 + 0.2, z: startDir.z * 0.6 });
   physics.update(dt, { bodyId, time, focus, sunDir: sun, disturbers: dist });
   return focus;
 }
@@ -563,16 +657,20 @@ function writeHud() {
   L.push(`     wet ${w.wetness01.toFixed(2)}  snow ${(w.snowDepth * 100).toFixed(1)} cm  lightning ${w.lightning.rate.toFixed(1)}/min flash ${w.lightning.flash01.toFixed(2)} next ${Number.isFinite(w.lightning.nextIn) ? w.lightning.nextIn.toFixed(1) + ' s' : '-'} thunder in ${Number.isFinite(w.lightning.thunderIn) ? w.lightning.thunderIn.toFixed(1) + ' s' : '-'}`);
   if (useExplorer && ex.phys) { const B = ex.phys; L.push(`walk ${B.speedGround.toFixed(2)} m/s on ${B.material} (mu ${B.friction.toFixed(2)})  ${ex.grounded ? 'grounded' : 'airborne'}  slip ${B.slip01.toFixed(2)} scramble ${B.scramble01.toFixed(2)}  sink ${(B.sink * 100).toFixed(1)} cm  jet ${B.jetThrottle.toFixed(2)}  wind push ${B.windAccel.toFixed(2)} m/s2`); }
   if (useShip && sh.phys) { const B = sh.phys; L.push(`ship ${shPhase}  alt ${shEnv.altGround.toFixed(2)} m  v ${Math.hypot(sh.v.x, sh.v.y, sh.v.z).toFixed(2)} m/s  lift ${B.lift01.toFixed(2)}  feet ${B.contacts}  legs ${Array.from(B.legCompress).map((x) => (x * 100).toFixed(1)).join('/')} cm  ${B.asleep ? 'asleep' : ''}`); L.push(`     downwash ${(B.downwash.thrust / 1000).toFixed(1)} kN  ${B.downwash.speed.toFixed(1)} m/s  ground effect x${B.groundEffect.toFixed(2)}  buffet ${Math.hypot(B.buffet.x, B.buffet.y, B.buffet.z).toFixed(2)} m/s2`); }
-  L.push(`sim  ${st.ms.toFixed(2)} ms (avg ${st.msAvg.toFixed(2)})  ${st.samples} surface samples  ${st.particles} particles  ${st.pushCells} push cells  ${Mk.total} prints  ${P.events.total} splashes`);
+  const kinds = ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'].filter((k) => P[k].count > 0).map((k) => `${k} ${P[k].count}`).join('  ') || 'none';
+  L.push(`air- ${kinds}   devils ${physics.features.devils.count}`);
+  L.push(`sim  ${st.ms.toFixed(2)} ms (avg ${st.msAvg.toFixed(2)})  ${st.samples} surface samples  ${st.pushCells} push cells  ${Mk.total} marks  ${P.events.total} events`);
+  if (frames % 20 === 0) agree = shaderAgreement();
+  if (agree) L.push(`glsl vs js: ${agree.plants} tips, max ${(agree.maxError * 1000).toFixed(2)} mm, rms ${(agree.rmsError * 1000).toFixed(2)} mm (largest tip displacement ${(agree.largestTipDisplacement * 100).toFixed(0)} cm)`);
   hud.textContent = L.join('\n');
 }
 // debug handle for scripted checks: node tools/shot.mjs ... --eval "window.__lab.info()"
 window.__lab = {
   physics, ex, sh, frame,
   info() { return { time, here: JSON.parse(JSON.stringify(physics.here)), stats: { ...physics.stats }, explorer: useExplorer ? { speed: ex.phys && ex.phys.speedGround, grounded: ex.grounded, material: ex.phys && ex.phys.material } : null, ship: useShip ? { phase: shPhase, alt: shEnv.altGround, contacts: sh.phys && sh.phys.contacts, asleep: sh.phys && sh.phys.asleep } : null, probes: probes.length, grass: grass ? grass.count : 0, rain: P.rain.count, snow: P.snow.count }; },
-  // largest distance (m) between a shader-drawn tip and its CPU twin cannot be read back from the GPU;
-  // what can be checked here is that the uniforms the shader gets are the ones the CPU model uses
   uniforms() { return JSON.parse(JSON.stringify(F.uniforms)); },
+  // metres between the tips the GLSL chunk computes on the GPU and the tips the JS twin computes
+  shaderAgreement() { updateProbes(); return shaderAgreement(); },
 };
 requestAnimationFrame(tick);
 </script>

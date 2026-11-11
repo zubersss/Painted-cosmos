@@ -205,7 +205,7 @@ test('dust devils: deterministic, continuous, only on dusty sunlit ground in lig
   const frame = new LocalFrame();
   const p = V(0.31 * 3000, 0.56 * 3000, 0.77 * 3000), l = len(p), q = V(p.x * 3000 / l, p.y * 3000 / l, p.z * 3000 / l);
   frame.anchor('mars', q.x, q.y, q.z);
-  const env = { dustSource: 1, sun01: 0.8, wind: 4, storm01: 0, we: 3, wn: 1, rho: 0.02 };
+  const env = { dustSource: 1, sun01: 0.8, wind: 4, storm01: 0, rho: 0.02 };
   const at = (t, e = env, body = 'mars') => { const o = []; o.count = 0; devilsNear(body, q.x, q.y, q.z, t, 14, e, frame, o); return o; };
   let seen = 0, worstMove = 0, worstStrength = 0, prev = new Map();
   for (let t = 0; t < 1500; t += 0.25) {
