@@ -137,8 +137,9 @@ objects in their notes.
       (24 m/s terminal, easing to 7 m/s over the last metres), `assistAccel` 4 m/s2 for
       starting and stopping, fuel rules, facing.
     - Ship in the air and accelerating in space: my steering, speed envelope and assists make
-      a target velocity; `stepShipBody(st, { target, tau, hover: true, boost, carve01: 1 })`
-      flies it. Cushion, pull-up and flare shape the *target*; when the hull sinks faster than
+      a target velocity; `stepShipBody(st, { target, tau, hover: true, boost, carve01 })`
+      flies it, with `carve01 = smoothstep(40, 120, speed)` (PHYSICS' suggestion: mass at low
+      speed, on the nose at high speed). Cushion, pull-up and flare shape the *target*; when the hull sinks faster than
       the cushion allows, `tau` drops to 0.22 s so the computer closes the error at once.
       The cushion now also plans with a deceleration (6.5 m/s2) at any height, because a hull
       with mass needs room to stop.

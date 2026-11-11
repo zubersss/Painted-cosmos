@@ -191,7 +191,9 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     const p0 = { x: st.p.x, y: st.p.y, z: st.p.z };
     // carve01: PHYSICS' named assist that turns the velocity onto the nose without changing
     // the speed, so steering stays arcade while every change of speed keeps its mass.
-    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: 1 }, dt, env);
+    // (PHYSICS' suggestion, taken: no carve at low speed, where a little slide reads as weight;
+    // full carve at speed, where thrusters alone would feel like ice.)
+    body(st, { target, tau: tauBody, hover: true, boost: !inAir, carve01: smoothstep(40, 120, st.speed) }, dt, env);
     v = { x: st.v.x, y: st.v.y, z: st.v.z };
     st.p = p0;
   } else {

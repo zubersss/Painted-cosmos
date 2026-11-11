@@ -79,7 +79,8 @@ export function createMap(root, { onSelect } = {}) {
       g.fillStyle = id === selected ? INK : SEPIA;
       g.font = (id === selected ? 'italic 600 13px' : 'italic 12px') + ' Georgia, serif';
       g.textAlign = 'center';
-      g.fillText(b.name, x, y - size - 7);
+      // A moon's name goes under its dot so it does not sit on its planet's name.
+      g.fillText(b.name, x, pp ? y + size + 13 : y - size - 7);
       spots.push({ id, x, y, size });
     }
     const t = data.target;

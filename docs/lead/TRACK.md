@@ -4,7 +4,7 @@ Owner: PILOT as lead developer. Updated at every sync. Status words: DONE (verif
 and how), PART (works, with the stated gap), TODO, RISK.
 A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it.
 
-Last update: 2026-11-11, after review 1 (commit `19f72ce`).
+Last update: 2026-11-11, after review 2 (commit `a9c02bc`) and Pilot's M2 work.
 
 ## Milestone 1: vertical slice
 
@@ -22,19 +22,26 @@ Last update: 2026-11-11, after review 1 (commit `19f72ce`).
 | Merge both ways: the slice plays inside the painted forest | Pilot | DONE: Painter's render, world and art are the default since `15e77f9`; the scripted loop passes inside the real world | Lead: `node tests/playthrough.mjs --query "scale=0.5&quality=0"` on a clean export of `7c7a0ac` (forest and collision in): 37 checks pass; `docs/shots/pilot/real-0*.jpg` |
 | Physics models (added by the owner on 2026-11-11) | Physics | Ahead of plan: API facade, atmosphere, wind, weather, ground, explorer and ship bodies, fields, 72 tests; no lab page or shots yet; wiring is M2 | Lead: `node --test src/physics/`, 600-frame timing run |
 
-**M1 verdict.** Pilot's half: met. Painter's half: not yet (three MUST FIX). Physics: no M1 gate.
+**M1 verdict (review 2).** Pilot's half: met. Painter's half: met (the three MUST FIX are closed
+with the lead's own measurements: 564 k triangles and 334 draw calls at the spawn at quality 1,
+brushed crowns, wandering trunks and bank at 960x540). Physics: P1 accepted by the coordinator.
 
 ## Milestone 2: the system
 
-| Item | Owner | Status |
-| --- | --- | --- |
-| All eight planets with 4+ biomes each, and their look from orbit | Painter | TODO (placeholders exist for all ten bodies) |
-| Full solar-system flight, pulse drive | Pilot | TODO (frames and SOI logic exist and are tested; no pulse yet) |
-| Landing anywhere (including liquid) | Pilot | PART (assist lands on slopes up to 35 deg and floats on liquid; untested on Painter's other bodies) |
-| Planet map | Pilot | TODO |
-| Save to localStorage | Pilot | TODO |
-| Physics wired in: `createPhysics`, air, ground, weather into the controllers; `world.setPhysics` | Pilot + Physics + Painter | TODO |
-| Earth to Mars to Saturn in one sitting with no reload | all | TODO |
+| Item | Owner | Status | Verified how, by whom |
+| --- | --- | --- | --- |
+| Full solar-system flight: frames, spheres of influence, moving bodies | Pilot | DONE | Pilot: `tests/orbits.test.mjs`, `tests/pulse.test.mjs` |
+| Pulse drive between planets, with markers | Pilot | DONE (markers are DOM rings, not painted) | Pilot: `tests/pulse.test.mjs`, `node tests/trip.mjs` |
+| Landing anywhere | Pilot | PART: slopes by ground friction, liquid (floats), clear of trees; proven on Earth, Mars, Saturn, Moon, Jupiter, not on every body | Pilot: flight and physics tests, the trip |
+| Planet map | Pilot | DONE (fallback look) | Pilot: `node tests/trip.mjs` (click sets the course) |
+| Save to localStorage in try/catch | Pilot | DONE | Pilot: `tests/save.test.mjs`; the trip reloads and continues |
+| Physics wired in (`createPhysics`, update, env, `world.setPhysics`, gear) | Pilot + Physics | DONE on Pilot's side; the world reading the fields is Painter's | Pilot: `tests/physics.test.mjs`; play-through and trip with physics on |
+| Ship never flies through tree crowns | Pilot | DONE | Pilot: `tests/contract.test.mjs` (low pass over the real forest) |
+| Pointer-lock fallback, said on screen | Pilot | DONE for refusal and nonsense deltas; the happy path needs a real hand | Pilot: `node tests/lockcheck.mjs` |
+| Frame read-out for the owner | Pilot | DONE (` key, `?stats=1`, README) | Pilot: the trip checks it shows numbers |
+| All eight planets with 4+ biomes each, and their look from orbit | Painter | PART: placeholders with 4 biomes on every body; Mars and Saturn are next | Lead: the trip lands in `dry_riverbeds` and `crystal_reeds` |
+| Weather, particles, ground marks, plants reacting, in the picture | Physics + Painter | PART: fields exist and are fed every frame; nothing draws them in the game yet | Lead: `node --test src/physics/` (125), lab shots |
+| Earth to Mars to Saturn in one sitting with no reload | all | DONE on stubs and in the painted worlds as they are (see Pilot's notes for the runs) | Pilot: `node tests/trip.mjs`, `tests/contract.test.mjs` |
 
 ## Milestone 3: the painting comes alive
 
