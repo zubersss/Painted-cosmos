@@ -1,18 +1,31 @@
 # Painted Cosmos
 
-A calm exploration game for desktop browsers: walk, use the jetpack, board your ship, climb
-through the atmosphere into space with no loading screen, and land again. Every frame is meant
-to look like a watercolour landscape on cold-press paper.
-
-Status: milestone 3 (sketchbook with sketches, views to find, sound, the painted interface). See `docs/notes/` and `docs/lead/TRACK.md`
-for what is done and what is not.
+A calm exploration game for desktop browsers that looks like a watercolour landscape come to
+life. Walk through a forest, lift on a jetpack, board your ship, climb through the sky into
+space without a loading screen, fly to every planet of a small solar system, land anywhere and
+walk out. There are views to find and a sketchbook that fills as you go. There is no combat
+and nothing can go wrong: the ship will not let you crash and the explorer cannot be hurt.
 
 ## Play
 
-Open `index.html` from any static host (it is plain ES modules, no build step, no network
-requests). Locally:
+**In the browser:** <https://zubersss.github.io/Painted-cosmos/> (GitHub Pages, served from the
+`main` branch). A desktop browser with WebGL 2 is needed (a current Chrome, Edge, Firefox or
+Safari); a keyboard and mouse, or a gamepad.
+
+**From a copy of this repository:** the game is plain ES modules with no build step and makes
+no network requests once loaded. Serve the folder with any static server and open it:
 
     node tools/serve.mjs 8080      # then open http://127.0.0.1:8080/
+
+(Opening `index.html` straight from the disk does not work: browsers do not load modules from
+`file:` addresses.)
+
+**The first minute.** The title card is also the loading screen: it says "click to begin" when
+the first view is painted. Click. You stand in a clearing in Earth's forest, the ship a few
+steps away. Walk to it with `W A S D`, press `E` to board, hold `Space` to lift off, push the
+throttle with `W` and point the nose at the sky. Above the air, press `M`, choose a world,
+point at its marker and press `F`. Near a world the drive lets go by itself; fly down, and
+press `E` when the prompt says you can land. `H` shows the controls again at any time.
 
 ## Controls
 
@@ -23,8 +36,8 @@ On foot
 | W A S D | walk |
 | Shift | run |
 | Space | jump; hold to fire the jetpack (it refills on the ground) |
-| Mouse | look (click the picture to capture the pointer; or hold the left button and drag) |
-| Mouse wheel | camera closer / farther |
+| mouse | look (click the picture to capture the pointer; or hold the left button and drag) |
+| mouse wheel | camera closer / farther |
 | V | first person / third person |
 | E | board the ship when you are next to it |
 
@@ -36,7 +49,7 @@ In the ship
 | C | sink (settle onto the ground to land) |
 | W / S | throttle up / down (it stays where you leave it) |
 | A / D | turn |
-| Mouse | point the nose |
+| mouse | point the nose |
 | X | brake |
 | F | pulse drive (in space): point at a world's marker and press F; F again drops out |
 | M | the map: click a world, or use the arrow keys, to set a course; M or Enter closes it |
@@ -52,9 +65,10 @@ Anywhere
 | --- | --- |
 | B | the sketchbook: a page per world with a sketch of every landscape walked and every view found (arrow keys turn the pages) |
 | H | the help card (these controls) |
-| ` (backquote) | frame read-out: frame time, triangles, draw calls, render scale, quality tier |
+| ` (backquote) | the frame read-out (explained under "Is it fast enough on my machine?") |
+| Esc | releases the mouse; closes the map or the sketchbook |
 
-Gamepad (standard layout): left stick walks (in the ship: turn and throttle), right stick looks
+A gamepad works too (standard layout): left stick walks (in the ship: turn and throttle), right stick looks
 (points the nose), A is Space, B is C, X is E, Y is V, LB brakes, RB is the pulse drive, the
 triggers are the throttle in the ship (the right one runs on foot), Back opens the map, Start
 the help card, d-pad up the sketchbook (left and right turn its pages, down closes it).
@@ -73,16 +87,57 @@ footsteps, a quiet pad per planet); `?audio=0` turns it off.
 
 ## Is it fast enough on my machine?
 
-The game starts carefully (medium quality at three-quarter resolution) and climbs by itself
-when the machine has room: the resolution after a few seconds, the quality tier after about
-twelve. It never starts at the expensive setting and falls from there.
+The target is 60 frames a second at 1080p on a laptop's built-in graphics, and never under 30.
+**Nobody has measured that on a real machine yet** (see "Never verified on real hardware"
+below), so the game looks after itself and gives you the means to check.
 
+**It tunes itself.** It starts carefully, at the medium quality tier and three-quarter
+resolution, and climbs when the machine has room: the resolution after about two and a half
+seconds of headroom, the quality tier after about twelve seconds at full resolution. When
+frames run slow it sheds resolution first (down to half), and only if that is not enough,
+after three seconds, a quality tier. It never starts at the expensive setting and falls.
 
-Press the backquote key (or open the page with `?stats=1`). The read-out shows the frame time in
-milliseconds (16.7 is 60 frames a second), the worst recent frame, how many triangles and draw
-calls the scene needs, the render scale the game has settled on (1.00 is full resolution) and
-the quality tier (2 high, 0 low). If the frame time sits above 17 ms with the scale at 0.50 and
-the tier at 0, the machine cannot hold 60 frames a second in that view.
+**The quality tiers.**
+
+| Tier | What it draws | Budget in the densest view |
+| --- | --- | --- |
+| 0, low | plants and rocks out to 42 % of the full distance, coarser far terrain, no full trees in the distance and about half the undergrowth, five blades to a grass patch | 300 thousand triangles |
+| 1, medium (the start) | plants out to 82 % of the full distance | 600 thousand triangles, 350 draw calls |
+| 2, high | everything at full distance, the finest terrain | 1.2 million triangles |
+
+The painting itself (paper, washes, edges, granulation) is the same in every tier; a lower
+tier has fewer things in it, not a different look. Render scale is separate: at 0.50 the
+picture is painted at half size and enlarged, which softens it a little.
+
+**The read-out.** Press the backquote key `` ` `` (or add `?stats=1` to the address). It shows
+five lines:
+
+| Line | What it says | What to look for |
+| --- | --- | --- |
+| `frame` | the average frame time in milliseconds, the worst frame of the last ninety, frames a second | 16.7 ms is 60 frames a second; 33 ms is 30 |
+| `scene` | triangles and draw calls of the whole frame (every pass) | inside the tier's budget above |
+| `render scale`, `quality tier` | what the game has settled on; `(pinned)` if the address fixed them | 1.00 and tier 1 or 2 on a machine that copes |
+| `world`, `physics` | milliseconds a frame spent building the landscape and stepping the physical models, with their worst recent frame | a few milliseconds each; a long `world` worst is a hitch while new ground is built |
+| `weather` | what the weather's own marks cost (rain, snow, dust, ripples: "kits"), and what the sky is doing | `fair`, or for example `overcast 0.94  rain 0.92  storm 0.84  wet 0.96` |
+
+If `frame` sits above 17 ms with the scale at 0.50 and the tier at 0, the machine cannot hold
+60 frames a second in that view. To pin the settings yourself:
+`?quality=0&scale=0.5&dynres=0` (see the address parameters below).
+
+## Never verified on real hardware
+
+Everything in this game was built and tested in a sandbox with a software renderer and
+scripted input. These four things have never been checked on a real machine by anyone:
+
+- **Frame rate on a real GPU.** Triangle and draw-call budgets are set and measured, and the
+  dynamic resolution logic is unit-tested, but no frame time has been measured on any graphics
+  card. The read-out above is there so that you can.
+- **A real mouse under pointer lock.** Mouse look is tested with synthetic events. If the
+  browser will not capture the mouse (or reports nonsense while it does), the game says so
+  and falls back to holding the left button and dragging; that fallback is tested.
+- **A real gamepad.** The standard mapping is tested with a simulated pad only.
+- **How it sounds.** Every sound is made in code and its levels are measured (no clipping, no
+  clicks, peak about -5 dB), but nobody has listened to it. `?audio=0` turns it off.
 
 ## URL parameters
 
@@ -95,26 +150,38 @@ the tier at 0, the machine cannot hold 60 frames a second in that view.
 | `pointerlock=0` | never capture the pointer; drag to look |
 | `stats=1` | show the frame read-out from the start |
 | `audio=0` | silence |
+| `kits=0` / `weather=fair` | no weather marks (rain, snow, dust) / a clear sky, always |
+| `card=0` | no title card (for captures) |
 | `fresh=1` / `save=0` | forget the saved game / never save |
 | `stub=physics` | turn the physical models off (the explorer and ship then move by simple rules) |
 
 ## Checks
 
+    node tests/all.mjs --export      # every check below, in order, on a clean export of the
+                                     # last commit; prints one pass or fail table
+    node tests/all.mjs --list        # what the steps are (--only a,b and --skip a,b choose)
+
+The steps, which can also be run by hand:
+
     node --test tests/*.test.mjs     # pure logic: orbits, frames, state machine, explorer,
                                      # cameras, flight, landing, pulse drive, save, the loop,
-                                     # the Earth-Mars-Saturn trip, and the same through PHYSICS
-    node --test src/physics/         # the physical models (PHYSICS)
+                                     # the Earth-Mars-Saturn trip, the contract with the worlds
+    node --test src/physics/         # the physical models (Physics)
     node --test src/world/*.test.mjs # terrain and biomes (Painter)
-    node tests/playthrough.mjs       # the M1 loop in headless Chromium with real key and
-                                     # mouse events; fails on any console error
+    node tests/playthrough.mjs       # walk, jetpack, board, orbit, land, step out in headless
+                                     # Chromium with real key and mouse events
     node tests/trip.mjs              # Earth to Mars to Saturn in one sitting, then a reload
                                      # that continues from the save
-    node tests/lockcheck.mjs         # the pointer-lock fallback
-    node tests/m3check.mjs           # starting tier, look hint, sketchbook and its sketches, help, a view found, audio
+    node tests/m3check.mjs           # title card, look hint, sketchbook and its sketches, a view found
+    node tests/lockcheck.mjs         # pointer lock and the drag-to-look fallback
     node tests/audiocheck.mjs        # the sound, measured: every situation rendered through the game's
                                      # own audio graph and checked for level, clipping, DC, clicks
-    node tests/tour.mjs              # every biome of every body at 960x540: contact sheets in
-                                     # docs/lead/evidence/tour-<body>.jpg (slow in software GL)
+
+Every browser run fails on any console error, failed request, or request to another server.
+For looking, not passing: `node tests/tour.mjs --bodies earth` (every biome and view of a body
+at 960x540, fair weather held, contact sheet in `docs/lead/evidence/tour-<body>.jpg`) and
+`node tests/weather.mjs` (the storm, the blizzard, the dust storm and the storm sea, in
+`docs/lead/evidence/weather.jpg`). Both are slow in software rendering.
 
 ## Layout
 

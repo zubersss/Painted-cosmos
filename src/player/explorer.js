@@ -11,6 +11,8 @@ import {
 export const EXPLORER = Object.freeze({
   height: 1.8,
   eyeHeight: 1.62,
+  scramble: 1.3,             // m: anything this low (a boulder, a stump) is walked over, not round
+  scrambleSkirt: 0.7,        // m: the rise onto it begins this far outside its edge
   walkSpeed: 4.2,            // m/s, a relaxed walk
   runSpeed: 7.4,             // m/s with Shift
   groundAccel: 26,           // m/s^2 toward the wished velocity on the ground (snappy stop/start)
@@ -314,16 +316,41 @@ export function jetRiseCap(gravity, T = EXPLORER) {
 }
 
 // Solid things that are not in the heightfield: tree trunks, boulders (world.sampleObstacles).
+// Low obstacles are not walls. A knee-high rock that stops a run dead is the controls being
+// fought; a field of them is a trap. Anything up to EXPLORER.scramble tall is part of the
+// ground instead: a rounded rise the explorer walks up and over. This wraps a sampler so that
+// the ground it reports carries those rises (`list()` returns the obstacles near the explorer).
+// Both movement models (the built-in one and PHYSICS') see the ground only through env.sample.
+export function scrambleSample(sample, list, E = EXPLORER) {
+  return (d) => {
+    const s = sample(d);
+    const obs = list();
+    if (!obs || !obs.length) return s;
+    let rise = 0;
+    for (const o of obs) {
+      if (o.height > E.scramble) continue;
+      const R = s.radius, dx = (d.x - o.unitDir.x) * R, dy = (d.y - o.unitDir.y) * R, dz = (d.z - o.unitDir.z) * R;
+      const reach = o.radius + E.scrambleSkirt, d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= reach * reach) continue;
+      const q = 1 - Math.sqrt(d2) / reach;                  // 0 at the skirt, 1 over the middle
+      const h = o.height * q * q * (3 - 2 * q);
+      if (h > rise) rise = h;
+    }
+    if (rise <= 0 || (s.liquidRadius || 0) > s.radius + rise) return s;
+    return { ...s, radius: s.radius + rise };
+  };
+}
+
 // Each is an upright cylinder { unitDir, radius, height } standing on the ground. The explorer
 // is pushed out sideways and loses only the part of the velocity that points into it, so
 // walking into a trunk slides round it. Above the top (jetpack) there is nothing to hit.
-export function collideObstacles(st, obstacles, bodyRadius = 0.35) {
-  if (!obstacles || !obstacles.length) return 0;
-  let hits = 0;
+export function collideObstacles(st, obstacles, bodyRadius = 0.35, help = null) {
+  if (!obstacles || !obstacles.length) { st.stuck = 0; st.detour = null; return 0; }
+  let hits = 0, c1 = null, c2 = null;
+  const r = len(st.p), up = scale(st.p, 1 / r);
   for (const ob of obstacles) {
+    if (ob.height <= EXPLORER.scramble) continue;          // low things are ground (scrambleSample)
     if (st.altitude > ob.height) continue;
-    const r = len(st.p);
-    const up = scale(st.p, 1 / r);
     const d = reject(sub(st.p, scale(ob.unitDir, r)), up);
     const dist = len(d);
     const min = ob.radius + bodyRadius;
@@ -333,6 +360,27 @@ export function collideObstacles(st, obstacles, bodyRadius = 0.35) {
     const vn = dot(st.v, n);
     if (vn < 0) st.v = addScaled(st.v, n, -vn);
     hits++;
+    if (!c1 || ob.radius < c1.ob.radius) { c2 = c1; c1 = { ob, n }; } else if (!c2 || ob.radius < c2.ob.radius) c2 = { ob, n };
+  }
+  if (!help) return hits;
+  // Wedged between two trunks (or crystals) with the key held: each takes away the part of
+  // the velocity that points into it and nothing is left. Nobody should have to work out why
+  // the explorer stopped: after a quarter of a second the suit walks round the thinner of the
+  // two, on the side away from the other, until the way ahead is open again.
+  const vu = dot(st.v, up), hs = len(addScaled(st.v, up, -vu));
+  st.stuck = help.moving && st.grounded && hits >= 2 && hs < 0.8 ? (st.stuck || 0) + help.dt : 0;
+  if (st.stuck > 0.25 && !st.detour && c1 && c2) {
+    const t = cross(up, c1.n), away = reject(sub(st.p, scale(c2.ob.unitDir, r)), up);
+    st.detour = { ob: c1.ob, side: dot(t, away) >= 0 ? 1 : -1, left: 2.2 };
+    st.stuck = 0;
+  }
+  if (st.detour) {
+    const D = st.detour, d = reject(sub(st.p, scale(D.ob.unitDir, r)), up), dist = len(d);
+    D.left -= help.dt;
+    const n = dist > 1e-4 ? scale(d, 1 / dist) : up;
+    // Over when time is up, the key is let go, the trunk is left behind, or it is no longer in the way.
+    if (D.left <= 0 || !help.moving || dist > D.ob.radius + bodyRadius + 0.6 || (D.left < 1.9 && dot(st.fwd, n) > 0.1)) st.detour = null;
+    else st.v = addScaled(scale(cross(up, n), D.side * Math.max(2.6, hs)), up, vu);
   }
   return hits;
 }

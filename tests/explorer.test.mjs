@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EXPLORER, createExplorerState, stepExplorer, collideObstacles } from '../src/player/explorer.js';
+import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../src/player/explorer.js';
 import { createFootCamera, lookFootCamera, updateFootCamera, CAMERA } from '../src/player/camera.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { makeWorld, arc, V, norm, dot, sub, scale, len } from './helpers.mjs';
@@ -324,4 +324,46 @@ test('tree trunks are solid: walking into one slides round it; the jetpack goes 
   air.altitude = 13; air.grounded = false;
   assert.equal(collideObstacles(air, trunk), 0);
   assert.equal(collideObstacles(st, []), 0);
+});
+
+test('a low boulder dead ahead is walked over, not into: the run does not stall', () => {
+  const right = cross(fwd0, start);
+  const at = (ahead, side) => norm(add(start, add(scale(fwd0, ahead / R), scale(right, side / R))));
+  // The two rocks that stopped a run dead at Mars' spawn: knee-high and waist-high, side by side.
+  const rocks = [{ unitDir: at(6, -0.5), radius: 0.6, height: 0.48 }, { unitDir: at(6.8, 0.9), radius: 1.22, height: 0.99 }];
+  const env = { sample: scrambleSample(makeWorld({ R }), () => rocks), gravity: 3.7 };
+  const st = createExplorerState(scale(start, R), fwd0);
+  let top = 0, slowest = Infinity, steps = 0;
+  for (let i = 0; i < 4 / DT; i++) {
+    stepExplorer(st, { moveZ: 1, run: true, viewFwd: fwd0 }, DT, env);
+    collideObstacles(st, rocks, undefined, { moving: true, dt: DT });
+    top = Math.max(top, len(st.p) - R);
+    if (i * DT > 0.6) slowest = Math.min(slowest, st.speed);
+    steps++;
+  }
+  assert.ok(arc(st.p, start, R) > 22, 'kept running: ' + arc(st.p, start, R).toFixed(1) + ' m in 4 s');
+  assert.ok(top > 0.3 && top < 1.05, 'went up and over the rocks: ' + top.toFixed(2) + ' m');
+  assert.ok(slowest > 3, 'never slowed to a crawl: ' + slowest.toFixed(1) + ' m/s');
+  assert.ok(Math.abs(len(st.p) - R) < 1e-3 && st.grounded, 'back on the ground after them');
+});
+
+test('wedged between two trunks with the key held, the explorer walks round one of them', () => {
+  const right = cross(fwd0, start);
+  const at = (ahead, side) => norm(add(start, add(scale(fwd0, ahead / R), scale(right, side / R))));
+  // Two crystals a body's width apart, straight ahead: a pocket with no way through the middle.
+  const pair = [{ unitDir: at(6, -1.05), radius: 0.99, height: 4.4 }, { unitDir: at(6, 1.1), radius: 1.04, height: 4.6 }];
+  const env = { sample: makeWorld({ R }), gravity: 3.7 };
+  const st = createExplorerState(scale(start, R), fwd0);
+  let minGap = Infinity;
+  for (let i = 0; i < 8 / DT; i++) {
+    stepExplorer(st, { moveZ: 1, viewFwd: fwd0 }, DT, env);
+    collideObstacles(st, pair, undefined, { moving: true, dt: DT });
+    for (const o of pair) minGap = Math.min(minGap, arc(st.p, o.unitDir, R) - o.radius);
+  }
+  assert.ok(minGap >= 0.3, 'never inside a crystal (two pushes in turn may overlap by millimetres): ' + minGap.toFixed(3));
+  assert.ok(dot(sub(st.p, scale(start, R)), fwd0) > 14, 'got past them: ' + dot(sub(st.p, scale(start, R)), fwd0).toFixed(1) + ' m ahead after 8 s');
+  // With the key let go nothing moves the explorer.
+  const idle = createExplorerState(scale(at(4.9, 0), R), fwd0);
+  for (let i = 0; i < 2 / DT; i++) { stepExplorer(idle, { viewFwd: fwd0 }, DT, env); collideObstacles(idle, pair, undefined, { moving: false, dt: DT }); }
+  assert.ok(idle.speed < 0.05 && !idle.detour, 'standing in the pocket, the explorer stands');
 });
