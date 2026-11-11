@@ -776,7 +776,15 @@ export class Sim {
           const G = this.physics.ground(id, dir, this._ground || (this._ground = {}));
           return Math.tan(g.slope) < 0.8 * (G.friction || 0.6);
         } : null;
-        if (beginLanding(sh, this.sampler(id), undefined, trees, holds, settle)) { this.canopy = []; this.sm.dispatch(EV.beginLanding); }
+        if (beginLanding(sh, this.sampler(id), undefined, trees, holds, settle)) {
+          this.canopy = []; this.sm.dispatch(EV.beginLanding);
+          // The assist picks level, open ground and glides to it. When that is more than a few
+          // metres from where the ship hovered (trees, a slope), the screen says so: the
+          // ship is not wandering off, it is looking for a place to stand.
+          const L = sh.landing, r = len(sh.p);
+          const off = L && L.dir ? Math.acos(clamp(dot(norm(sh.p), L.dir), -1, 1)) * r : 0;
+          if (off > 6) this.say(`Setting down on level ground ${Math.round(off)} m away`, 4);
+        }
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
       } else if (pressed('KeyE')) {
         // E without the prompt: never silence. Say what the landing is waiting for.
