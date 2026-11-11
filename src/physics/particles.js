@@ -29,6 +29,13 @@ export const PARTICLES = Object.freeze({
   radius: 24,          // m: half-width of the simulated volume around the focus
   height: 18,          // m above the ground at the focus where precipitation enters
   below: 8,            // m below the focus ground that still belongs to the volume
+  // shelter: a closed canopy catches rain on its leaves. A dry canopy lets a quarter through,
+  // a soaked one three quarters (the rest runs down the stems or evaporates); when the rain
+  // stops the leaves go on dripping until they have drained.
+  throughDry: 0.25, throughWet: 0.75,
+  dripShare: 0.14,     // drips after rain, as a share of the rain capacity, under a closed soaked canopy
+  dripWet: 0.35,       // ground wetness below which the canopy has drained
+  dripSize: 0.0045,    // m: drops gather on a leaf tip until they are this big
   events: 256,         // capacity of the splash / settle event ring
   flutter: 0.28,       // m/s: sideways flutter of a falling snowflake
 });
@@ -57,6 +64,11 @@ export class Particles {
     for (const k of PARTICLES.kinds) this.buffers[k] = makeBuffer(PARTICLES.capacity[k][2]);
     // events: x, y, z (relative to events.origin, body-local axes), kind, strength 0..1, time, size, spare
     this.events = { data: new Float32Array(PARTICLES.events * 8), capacity: PARTICLES.events, head: 0, total: 0, origin: { x: 0, y: 0, z: 0 } };
+    // things that keep the rain off what is under them (the ship's hull): x, z (grid), y (top,
+    // above frame.r0), radius; set by the caller before update()
+    this.shelters = new Float32Array(4 * 4); this.shelterCount = 0;
+    this._cp = new Float32Array(16);          // canopy closure on the 4 x 4 patch
+    this.dripping = 0;                        // 0..1: how hard the canopy over the focus is dripping
     this.frameVersion = -1;
     this._lut = new Float32Array(8);
     this._lutKey = '';
@@ -122,7 +134,13 @@ export class Particles {
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
       air.sampleWind(fx + (i - 1.5) * 16, fz + (j - 1.5) * 16, _w);
       const o = (j * 4 + i) * 3; wp[o] = _w[0]; wp[o + 1] = _w[1]; wp[o + 2] = _w[2];
+      this._cp[j * 4 + i] = _w[7];
     }
+    const cp = this._cp, canopyH = cover.canopyHeight || 0;
+    const wet01 = wx && wx.wetness01 ? wx.wetness01 : 0;
+    // share of the drops that get through closed canopy
+    const through = PARTICLES.throughDry + (PARTICLES.throughWet - PARTICLES.throughDry) * wet01;
+    const SH = this.shelters, nSH = this.shelterCount;
     for (let k = 0; k < 25; k++) this._hfl[k] = heightFactor(k, cover.z0 || 0.03, cover.canopyHeight || 0, cover.canopy01 || 0);
     // liquid level at the focus: what an unsampled spot is assumed to be until its node arrives
     let liquid0 = near ? near.liquidAt(fx, fz) : NaN;
@@ -137,11 +155,24 @@ export class Particles {
       let want = 0;
       if (b === target) {
         want = Math.round(cap * clamp01(pr.intensity01) * (0.25 + 0.75 * pr.reachesGround01));
+        // under leaves there are fewer drops in the box (above the crowns as many as anywhere)
+        if (canopyH > 1) want = Math.round(want * (1 - clamp01(cover.canopy01 || 0) * (1 - through) * Math.min(1, canopyH / H)));
         b.species = pr.species; b.fallSpeed = pr.fallSpeed;
         this._buildLut(bodyId, pr.species, rho, wx.temperature);
       }
+      // after the rain the soaked canopy goes on dripping: big slow drops from the leaf tips
+      let drip = 0;
+      if (kk === 0 && b !== target && type === 'none' && b.species && canopyH > 1 && T0(wx) > 273.5) {
+        drip = clamp01((wet01 - PARTICLES.dripWet) / (1 - PARTICLES.dripWet)) * clamp01((cover.canopy01 || 0) * 1.3);
+        if (drip > 0.02) want = Math.round(cap * PARTICLES.dripShare * drip); else drip = 0;
+      }
+      if (kk === 0) this.dripping = drip;
       // precipitation of the other phase, or none: let the buffer drain as its particles land
-      const draining = b !== target;
+      const draining = b !== target && drip === 0;
+      if (drip > 0 && b._n < want) {
+        const add = Math.min(want - b._n, Math.ceil(cap * h * 0.2) + 1);
+        for (let k = 0; k < add; k++) { const i = b._n; if (this._drip(b, i, fx, fz, ground, canopyH, cp, g)) b._n++; }
+      }
       if (!draining && b._n < want) {
         // new arrivals enter at random heights so a shower builds up rather than switching on
         const add = Math.min(want - b._n, Math.ceil(cap * h * 0.6) + 1);
@@ -196,6 +227,20 @@ export class Particles {
         }
         // virga: in hot dry air a drop evaporates on the way down and never lands
         if (virga > 0 && !snowy && y - ground < virga * (0.3 + 0.7 * PH[i] / 6.2831853)) { hit = false; y = bottom - 1; }
+        // shelter. Canopy: a share of what falls is caught where it meets the leaves (each
+        // particle's fate is its own for its whole fall). Drips are born under the leaves.
+        if (canopyH > 1 && hz < canopyH && drip === 0) {
+          const c01 = cp[iv * 4 + iu] * w00 + cp[iv * 4 + iu + 1] * w10 + cp[iv * 4 + iu + 4] * w01 + cp[iv * 4 + iu + 5] * w11;
+          if (c01 > 0.05 && PH[i] < 6.2831853 * c01 * (1 - through) && hz > canopyH * 0.5) { hit = false; y = bottom - 1; }
+        }
+        // the hull: a drop that reaches it stops there (a splash on the hull, none under it)
+        for (let s = 0; s < nSH; s++) {
+          const so = s * 4, dx = x - SH[so], dz = z - SH[so + 1];
+          if (y < SH[so + 2] && y - vy * h >= SH[so + 2] - 0.5 && dx * dx + dz * dz < SH[so + 3] * SH[so + 3]) {
+            this._event(frame, x, SH[so + 2], z, snowy ? EVENT.settle : EVENT.splash, clamp01(Math.hypot(vx, vy, vz) * b.size[i] * 60), b.size[i]);
+            hit = false; y = bottom - 1; break;
+          }
+        }
         if (hit || y < bottom) {
           if (hit) {
             const sp = Math.hypot(vx, vy, vz);
@@ -209,6 +254,14 @@ export class Particles {
               P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
               VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive];
               i--;
+            }
+            continue;
+          }
+          if (drip > 0) {
+            // the next drop from a leaf tip (or, where there is no leaf over the spot, one fewer)
+            if (!this._drip(b, i, fx, fz, ground, canopyH, cp, g)) {
+              alive--;
+              if (i < alive) { const s = alive * 3; P[o] = P[s]; P[o + 1] = P[s + 1]; P[o + 2] = P[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2]; VT[i] = VT[alive]; PH[i] = PH[alive]; b.size[i] = b.size[alive]; b.age[i] = b.age[alive]; i--; }
             }
             continue;
           }
@@ -251,8 +304,30 @@ export class Particles {
     b._v[o] = 0; b._v[o + 1] = -b._vt[i]; b._v[o + 2] = 0;
   }
 
+  // A drip: a big drop let go by a leaf, at rest, somewhere under the canopy near the focus.
+  // Returns false when the spot it tried has no canopy over it.
+  _drip(b, i, fx, fz, ground, canopyH, cp, g) {
+    const R = PARTICLES.radius, rng = this.rng, o = i * 3;
+    const x = fx + (rng() * 2 - 1) * R, z = fz + (rng() * 2 - 1) * R;
+    let u = (x - fx) / 16 + 1.5, v = (z - fz) / 16 + 1.5;
+    u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
+    const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv;
+    const c01 = cp[iv * 4 + iu] * (1 - fu) * (1 - fv) + cp[iv * 4 + iu + 1] * fu * (1 - fv) + cp[iv * 4 + iu + 4] * (1 - fu) * fv + cp[iv * 4 + iu + 5] * fu * fv;
+    if (rng() > c01) return false;
+    b._p[o] = x; b._p[o + 1] = ground + canopyH * (0.45 + 0.5 * rng()); b._p[o + 2] = z;
+    b._v[o] = 0; b._v[o + 1] = 0; b._v[o + 2] = 0;
+    b.size[i] = PARTICLES.dripSize * (0.8 + 0.4 * rng());
+    // terminal speed of a drop this big: the top of the size table (large drops flatten: about 9 m/s on Earth)
+    b._vt[i] = Math.max(this._lut[7], 0.5);
+    b._ph[i] = rng() * 6.2831853;
+    b.age[i] = 0;
+    void g;
+    return true;
+  }
+
   clear() {
     for (const k in this.buffers) { this.buffers[k]._n = 0; this.buffers[k].count = 0; }
   }
 }
 function clampAbs(x, m) { return x > m ? m : x < -m ? -m : x; }
+const T0 = (wx) => (wx && wx.temperature ? wx.temperature : 288);

@@ -197,6 +197,10 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const dist = f.disturbers || null;
     flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality, devils);
     const t4 = now();
+    // the hull keeps the rain off what is under it
+    { let ns = 0; const SH = particles.shelters;
+      if (dist) for (let k = 0; k < dist.length && ns < 4; k++) { const D = dist[k]; if (D.kind !== 'ship' || !D.p) continue; const o = ns * 4; SH[o] = frame.lx(D.p.x, D.p.y, D.p.z); SH[o + 1] = frame.lz(D.p.x, D.p.y, D.p.z); SH[o + 2] = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0 + 2.2; SH[o + 3] = (D.radius || 4.2) * 0.85; ns++; }
+      particles.shelterCount = ns; }
     particles.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
     // what is filling the marks in: falling snow (m of depth per second) and blowing sand

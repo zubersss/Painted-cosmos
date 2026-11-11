@@ -270,3 +270,69 @@ test('the ship leaves three pad prints where it comes down, and a jet scours a d
   for (let i = 0; i < 120; i++) rock.update(1 / 60, { bodyId: 'venus', time: 5 + i / 60, focus: V(0, 3600, 0), disturbers: [{ kind: 'jet', p: V(0, 3601.5, 0), v: V(), radius: 0.15, strength: 1700 }] });
   assert.equal(rock.fields.deform.marks.total, 0);
 });
+
+// ---- shelter ------------------------------------------------------------------------------------
+function rainyWood(canopy01, pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 8) {
+  const R = BODIES.earth.radius;
+  for (let t = 0; t < 8000; t += 53) for (const c of cellsAt('earth', t)) {
+    const w = weatherAt('earth', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {});
+    if (!pred(w)) continue;
+    const sample = makeWorld({ R, biome: 'alpine_meadow', stand: { dir: norm(V(c.x, c.y, c.z)), radius: 400, canopy01, canopyHeight: 14 } });
+    return { physics: createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false }), bodyId: 'earth', focus: V(c.x * R, c.y * R, c.z * R), t0: t, R, cell: c };
+  }
+  throw new Error('no rain found');
+}
+const below = (w, buf, hMax) => { let n = 0; for (let i = 0; i < buf.count; i++) { const p = V(buf.origin.x + buf.pos[i * 3], buf.origin.y + buf.pos[i * 3 + 1], buf.origin.z + buf.pos[i * 3 + 2]); if (len(p) - w.R < hMax) n++; } return n; };
+
+test('a closed canopy keeps much of the rain off the ground under it, and less of it once it is soaked', () => {
+  const open = rainyWood(0), wood = rainyWood(1);
+  run(open, 8); run(wood, 8);
+  const no = below(open, open.physics.particles.rain, 6), nw = below(wood, wood.physics.particles.rain, 6);
+  const wet = wood.physics.here.weather.wetness01;
+  const through = PARTICLES.throughDry + (PARTICLES.throughWet - PARTICLES.throughDry) * wet;
+  assert.ok(no > 150, 'drops low in the open: ' + no);
+  assert.ok(nw < no * (through + 0.15) && nw > no * (through - 0.15), `under the leaves ${nw} of ${no} (expected about ${(through * 100).toFixed(0)} % at wetness ${wet.toFixed(2)})`);
+  // above the crowns it rains as hard as anywhere
+  const above = (w) => w.physics.particles.rain.count - below(w, w.physics.particles.rain, 14);
+  assert.ok(Math.abs(above(wood) - above(open)) < above(open) * 0.25, `above the canopy: ${above(wood)} against ${above(open)}`);
+});
+
+test('after the rain the wood goes on dripping: big slow drops from the leaves, none in the open', () => {
+  const wood = rainyWood(1), open = rainyWood(0);
+  // find when this shower ends at the cell centre, and go there
+  let tEnd = wood.t0; const c = wood.cell;
+  while (weatherAt('earth', c.x, c.y, c.z, 0, tEnd, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {}).precipitation.rate > 0.02 && tEnd < wood.t0 + 3000) tEnd += 5;
+  for (const w of [wood, open]) { w.t0 = tEnd - 20; run(w, 20 + 25, { hz: 30 }); }      // (the last drizzle takes a while to come down)
+  const P = wood.physics.particles, wx = wood.physics.here.weather;
+  assert.equal(wx.precipitation.type, 'none');
+  assert.ok(wx.wetness01 > 0.6, 'the wood is soaked: ' + wx.wetness01);
+  assert.ok(P.system.dripping > 0.3 && P.rain.count > 20, `dripping ${P.system.dripping.toFixed(2)}, drops ${P.rain.count}`);
+  let big = 0, high = 0; for (let i = 0; i < P.rain.count; i++) { if (P.rain.size[i] > 0.0035) big++; const p = V(P.rain.origin.x + P.rain.pos[i * 3], P.rain.origin.y + P.rain.pos[i * 3 + 1], P.rain.origin.z + P.rain.pos[i * 3 + 2]); if (len(p) - wood.R > 14.01) high++; }
+  assert.ok(big > P.rain.count * 0.7, 'big drops: ' + big + ' of ' + P.rain.count);
+  assert.equal(high, 0, 'none above the crowns');
+  assert.ok(open.physics.particles.rain.count < P.rain.count * 0.2, `the open meadow has all but stopped: ${open.physics.particles.rain.count} against ${P.rain.count} in the wood`);
+  assert.equal(open.physics.particles.system.dripping, 0);
+  // they fall from rest: none is faster than free fall from the crown allows
+  let fastest = 0; for (let i = 0; i < P.rain.count; i++) fastest = Math.max(fastest, Math.hypot(P.rain.vel[i * 3], P.rain.vel[i * 3 + 1], P.rain.vel[i * 3 + 2]));
+  assert.ok(fastest < Math.sqrt(2 * 9.81 * 14) + 0.5 && fastest > 3, 'fastest drip ' + fastest);
+});
+
+test('the hull keeps the rain off what is under it', () => {
+  const w = rainyWood(0);
+  const up = norm(w.focus), ship = V(up.x * (w.R + 2.5), up.y * (w.R + 2.5), up.z * (w.R + 2.5));
+  const ev0 = w.physics.particles.events.total;
+  run(w, 8, { disturbers: () => [{ kind: 'ship', p: ship, v: V(0, 0, 0), radius: 4.2, strength: 1 }] });
+  const b = w.physics.particles.rain, fr = w.physics.fields.frame;
+  let under = 0, ring = 0;
+  for (let i = 0; i < b.count; i++) {
+    const p = V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2]);
+    const x = fr.lx(p.x, p.y, p.z), z = fr.lz(p.x, p.y, p.z), h = len(p) - w.R, r = Math.hypot(x, z);
+    if (h < 3.5) { if (r < 2.8) under++; else if (r > 5 && r < 5 + 2.8 * 0.6) ring++; }      // (the ring has about the same area)
+  }
+  assert.ok(ring >= 2, 'rain all around: ' + ring);
+  assert.ok(under <= ring * 0.25, `under the hull ${under} against ${ring} beside it`);
+  // and it lands on the hull instead: splashes up there
+  const E = w.physics.particles.events; let onHull = 0;
+  for (let k = 0; k < E.capacity; k++) { const o = k * 8; const p = V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2]); if (E.data[o + 4] > 0 && Math.abs(len(p) - w.R - 4.7) < 0.3) onHull++; }
+  assert.ok(E.total > ev0 && onHull > 3, 'splashes on the hull: ' + onHull);
+});
