@@ -339,8 +339,8 @@ export function createShip() {
   // bow lantern
   B.blob([0, 1.19, -4.58], 0.10, 0.10, 0.10, { seg: 8, rings: 5, col: FLAME1, glow: 0.8, wet: 0.6, lump: 0 });
   // the cowl in front of the pilot, three dials, the seat back
-  B.blob([0, 1.43, -2.02], 0.50, 0.17, 0.30, { seg: 14, e: 2.6, col: (p) => mixc(SEPIA, COPPER, sstep(1.44, 1.6, p[1]) * 0.6), lump: 0.012, dry: 0.3 });
-  for (const x of [-0.23, 0, 0.23]) B.blob([x, 1.515 - Math.abs(x) * 0.08, -1.775 - Math.abs(x) * 0.05], 0.062, 0.062, 0.022, { seg: 8, rings: 5, col: ROLL, lump: 0, dry: 0.1 });
+  B.blob([0, 1.40, -2.02], 0.46, 0.155, 0.28, { seg: 18, rings: 9, e: 2.6, col: (p) => mixc(SEPIA, COPPER, sstep(1.44, 1.6, p[1]) * 0.6), lump: 0.012, dry: 0.3 });
+  for (const x of [-0.20, 0, 0.20]) B.blob([x, 1.475 - Math.abs(x) * 0.10, -1.795 - Math.abs(x) * 0.06], 0.044, 0.044, 0.016, { seg: 14, rings: 7, col: (p, t) => (t < 0.16 || t > 0.84 ? INK : ROLL), lump: 0, dry: 0.1 });
   B.blob([0, 1.60, -0.74], 0.27, 0.33, 0.10, { seg: 10, e: 2.8, col: mixc(COPPER, SEPIA, 0.45), lump: 0.008 });
   // wings: cloth over ribs, the tips in the accent
   for (const s of [-1, 1]) {
@@ -380,10 +380,10 @@ export function createShip() {
     for (let i = 0; i < 10; i++) { const th = Math.PI * (0.07 + 0.86 * (i / 9)), sn = Math.sin(th); rings.push({ c: [0, CAN.c[1], CAN.c[2] - CAN.rz * Math.cos(th)], u: X, v: Y, ru: CAN.rx * sn, rv: CAN.ry * sn, e: 2.1 }); }
     B.loft(rings, { seg: 20, lump: 0.010, freq: 1.8, wet: 0.45, dry: 0.0, cap: 0.2,
       col: (p, t, a) => { const up = sstep(1.45, 2.2, p[1]); const glint = sstep(0.55, 0.9, Math.cos(a - 2.2)) * sstep(0.25, 0.45, t) * sstep(0.75, 0.5, t); return mixc(mixc(GLASS, hex('#d9e6e9'), up), [1, 1, 1], glint); } });
-    const hoop = (z, r) => { const k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)), pts = []; for (let i = 0; i <= 12; i++) { const a = Math.PI * (i / 12); pts.push([Math.cos(a) * (CAN.rx * k + 0.012), CAN.c[1] - 0.06 + Math.sin(a) * (CAN.ry * k + 0.072), z]); } B.path(pts, r, { seg: 7, col: SEPIA, lump: 0.006, ref: Z, dry: 0.3 }); };
-    hoop(-1.95, 0.030); hoop(-1.25, 0.026); hoop(-0.55, 0.030);
+    const hoop = (z, r) => { const k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)), pts = []; for (let i = 0; i <= 22; i++) { const a = Math.PI * (i / 22); pts.push([Math.cos(a) * (CAN.rx * k + 0.012), CAN.c[1] - 0.06 + Math.sin(a) * (CAN.ry * k + 0.072), z]); } B.path(pts, r, { seg: 7, col: SEPIA, lump: 0.006, ref: Z, dry: 0.3 }); };
+    hoop(-1.95, 0.019); hoop(-1.25, 0.019); hoop(-0.55, 0.022);
     const sp = []; for (let i = 0; i <= 8; i++) { const z = -1.95 + (1.40 * i) / 8, k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)); sp.push([0, CAN.c[1] + CAN.ry * k + 0.012, z]); }
-    B.path(sp, 0.024, { seg: 6, col: SEPIA, lump: 0.005, ref: X, dry: 0.3 });
+    B.path(sp, 0.017, { seg: 6, col: SEPIA, lump: 0.005, ref: X, dry: 0.3 });
   }
   // 2, 3, 4 the legs: strut, brace and a round pad each
   const PADS = [[0, -3.2], [-2.2, 1.8], [2.2, 1.8]], HIPS = [[0, 0.74, -3.02], [-1.22, 1.02, 1.66], [1.22, 1.02, 1.66]];
