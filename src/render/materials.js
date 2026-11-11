@@ -1032,7 +1032,7 @@ void main() {
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
-  float wid = max(iPar.x, wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0));
+  float wid = max(iPar.x, wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0)) * (1.0 + 0.7 * vFlat);
   vec3 rel = ax * (len * t) + sd * (side * wid * min(1.0, vis * 3.0) + iCol.a * len * t * t);
   if (flex > 0.01 && len > 0.0) {
     if (uPhysOn > 0.5) {
@@ -1070,7 +1070,7 @@ void main() {
   if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
   float d = 1.0 + (0.55 - vS.x) * 0.7 + (vS.z - 0.5) * 0.5 + (n1.r - 0.5) * 0.5;
   vec3 c = pcWetWash(pcDensity(vCol, d), 1.0);
-  c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.3));     // snow on the tips; trodden grass shows its pale side
+  c = mix(c, vec3(1.0), max(uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8, vFlat * 0.42));     // snow on the tips; trodden grass shows its pale side
   vec3 nV = normalize(vNV);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
