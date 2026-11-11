@@ -69,6 +69,8 @@ physics.water(bodyId, p, out?) ->                         // the liquid surface 
 physics.features.devils // dust devils near the focus: array with .count; each { p (body-local foot), x, z (grid),
                         //   radius (m), height (m), speed (swirl, m/s), up (m/s), spin (+1/-1), strength 0..1, age, life, id }
 physics.here            // { bodyId, air, weather, cover, groundHeight } at the focus, refreshed by update(): free to read
+physics.focus           // {x,y,z} body-local: the focus of the last update (read-only)
+physics.particles.system.dripping   // 0..1: how hard the soaked canopy over the focus is dripping (after rain)
 physics.setWindScale(bodyId, scale)   // how far a body's real wind is scaled down (data.WINDS[body].scale)
 physics.stats           // { ms, msAvg, msMax (worst frame after warm-up), msGround, msAir, msWeather, msFlora,
                         //   msParticles, samples (sampleSurface calls this frame), particles, pushCells, reanchors }
@@ -129,11 +131,19 @@ physics.glsl.flora              // GLSL (ES 3.00): pcPhysBend(root, stiff01) -> 
                                 //   `#define PC_PHYS_LINEAR` before it = hardware filtering, 1 fetch a lookup (see PAINTER wiring)
 
 physics.fields.water
-  .uniforms   // { uPhysWaterDir[2], uPhysWaterK[3], uPhysWaterAmp[3], uPhysWaterPhase[3] }, refreshed every update
-  .heightAt(p) -> m               // CPU twin of pcPhysWaterHeight: a floating thing rides the painted waves
-  .field      // WaterField: height (Hs), period, length, speed, steepness, whitecap01, dir, level, present
-physics.glsl.water              // pcPhysWater(p) -> vec3(height, dh/deast, dh/dnorth); pcPhysWaterHeight(p).
+  .uniforms   // { uPhysWaterDir[2], uPhysWaterK[4], uPhysWaterAmp[4], uPhysWaterPhase[4], uPhysWaterGroup[4],
+              //   uPhysWake Float32Array(64) (16 x: x, z, age s, amplitude m), uPhysWakeG }, refreshed every update
+  .heightAt(p) -> m               // CPU twin of pcPhysWaterHeight (waves, sets and wakes): a floating thing rides the painted sea
+  .field      // WaterField: height (Hs), period, length, speed, steepness, whitecap01, dir, level, present,
+              //   addWake(x, z, amplitude), wakeAt(x, z)
+physics.glsl.water              // pcPhysWater(p) -> vec3(height, dh/deast, dh/dnorth); pcPhysWaterHeight(p); pcPhysWake(grid).
+                                //   `#define PC_PHYS_NO_WAKE` leaves the wakes out (far water).
                                 //   Shares the frame uniforms with the flora chunk (guarded: include both freely)
+
+// draw kits (the only folder that imports three; optional; see "For PAINTER", C)
+import { createPhysicsKits, createWeatherKit, createMarksKit, createWaterKit, DRAW, PARTICLE_GLSL, SHAPE_GLSL } from './src/physics/three/index.js';
+const kits = createPhysicsKits(physics, { makeMaterial(kind, info), weather?: { draw?, expand?: 'cpu' | 'gpu', kinds?, rings? } | false, marks?, water? });
+kits.update(bodyRoot, camera, viewportHeightPx);   kits.objects;   kits.stats { ms, drawCalls, vertices, triangles };   kits.dispose()
 
 physics.fields.deform
   .depth  Float32Array(64*64)     // m pressed into the ground, 0.5 m cells (trail trough); .uniforms.uPhysDeformMap
@@ -380,154 +390,158 @@ Ship (`src/ship/flight.js` SHIP -> `SHIP_BODY`):
 Measured through the body with your target law and `carve01: 1`: ground to space in 12.9 s on
 Earth at 55 degrees (peak 3.2 g felt), 21.7 s on Venus (drag-limited to 78 m/s), 11.0 s on Mars.
 
-## For PAINTER: wiring, in order
+## For PAINTER: everything you need, on its own (current at the commit that carries this note)
 
-1. **Read from `world.setPhysics(physics)`** in `world.update`. `physics.update` has already
-   run that frame (PILOT calls it first; in the gallery you call it yourself with
-   `{ bodyId, time, focus: camera ground point, sunDir }`).
-2. **Three textures**, created once, re-uploaded when the version changes:
-   ```js
-   const F = physics.fields.flora;
-   const mk = (arr, n) => { const t = new THREE.DataTexture(arr, n, n, THREE.RGBAFormat, THREE.FloatType);
-     t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };   // the chunk filters by hand
-   const tBend = mk(F.bend, F.size), tWind = mk(F.wind, F.size), tPush = mk(F.push, F.nearSize);
-   // per frame:
-   if (F.version !== lastV) { tBend.needsUpdate = tWind.needsUpdate = true; lastV = F.version; }   // every update
-   if (F.pushVersion !== lastP) { tPush.needsUpdate = true; lastP = F.pushVersion; }               // only while plants are being pushed
-   for (const k in F.uniforms) uniforms[k].value.fromArray(F.uniforms[k]);                          // Vector3 / Vector4
-   ```
-   Row j is north, column i is east, texel centres at cell centres.
-   **Cheaper, and my answer to "a per-instance variant"**: the chunk already evaluates the
-   field once per plant in the sense that matters (at the root, the same for every vertex of
-   the plant); what costs is that the vertex stage repeats it per vertex. Two ways down:
-   (a) `#define PC_PHYS_LINEAR` in front of the chunk and upload the three fields as
-   `THREE.HalfFloatType` with `LinearFilter` + `ClampToEdgeWrapping` (16-bit float filters in
-   every WebGL2, no extension): **1 fetch a lookup, so 3 a vertex for `pcPhysBend` and 1 for
-   `pcPhysBendLite`** instead of 12 and 4. Convert with `THREE.DataUtils.toHalfFloat` on upload
-   (12 k values a frame for bend and wind, the push map only when `pushVersion` changes). The
-   lab does exactly this with `?linear=1` (`tex` / `upload` in `physics-lab.html`); measured
-   agreement with the JS model is the same as with float32 (2.5 mm on a 2 m tip displacement).
-   (b) A true once-per-plant evaluation needs the bend as a per-instance attribute, written
-   on the CPU from `fields.flora.plantBend(...)`: about 0.3 us a plant, fine for the few
-   hundred plants inside the 32 m near field, not for every tuft. Take (a).
-3. **The shader.** Put `${physics.glsl.flora}` (or `import { FLORA_GLSL } from '../physics/index.js'`)
-   above `main()` in `PROP_VERT`, delete `pcSway` and the `lp += pcSway(...)` line, and after
-   `vec3 wp = (im * vec4(lp * vis, 1.0)).xyz;` add:
-   ```glsl
-   vec3 rootB = io + uOrigin;                         // body-local root of this plant
-   vec4 pb = pcPhysBend(rootB, uStiff);               // xy bend (rad, east/north), z flatten01, w shake01
-   wp = io + pcPhysDisplace(wp - io, normalize(rootB), uPlantHeight * length(im[1].xyz), pb.xy);
-   ```
-   `uStiff`: 0 for grass, ferns, flowers; about 0.35 for bushes; 1 for trees (per material).
-   `uPlantHeight`: the model's height in metres before the instance scale. The stem curls like
-   a tip-loaded cantilever and keeps its length; the root does not move; a crown rides on its
-   trunk. `pb.w` (shake) is there for a leaf flutter of your own; `pcPhysWind(rootB).w` is the
-   turbulence in m/s if you want flutter to follow gustiness. The chunk uses `texelFetch`, so
-   the material must compile as GLSL ES 3.00 (three's default on WebGL2). Note `flat` is a
-   reserved word there (it bit me).
-4. **Weather for the sky and the sheet**: `physics.here.weather` every frame: `cloud01` (cloud
-   cover), `visibility01` (multiply your clear-day fog distance), `wetness01` (darker, wetter
-   ground washes), `snowDepth` (m), `fog01` / `dust01` / `haze01` (tints), `storm01`,
-   `lightning.flash01` (bare paper showing through, 3-4 strokes in a quarter second),
-   `precipitation.intensity01`. For a storm seen from afar: `physics.util.cellsAt(bodyId)` ->
-   `[{ x, y, z (unit centre), r (m), w (strength), kindId }]`.
-5. **Particles**: for `rain` and `snow`, draw `count` marks; `pos` is relative to `origin`
-   (put the object at `origin` under the body root); `vel` gives the streak (a 40 ms exposure
-   is `vel * 0.04`); `size` is the diameter in metres. `physics.particles.events` holds the
-   last 256 splashes, ripples and settles with their time.
-6. **Marks**: `physics.fields.deform.marks` (crisp; kinds foot, gear pad, scour dish; `rim` is the
-   raised edge on loose ground; snow and blowing sand fill them, `life` says when) and `.depth`
-   (the trough).
-7. **Water**: put `${physics.glsl.water}` in the liquid's vertex shader and displace along the
-   local up by `pcPhysWater(bodyLocalPosition).x`; `.yz` is the slope along east and north for
-   the normal. Uniforms from `physics.fields.water.uniforms` every frame. `physics.water(bodyId,
-   p).whitecap01` for foam, `.significant` for how rough it reads from afar. No waves on lava
-   to speak of (they are there but tiny: it is 2.6 times as dense as water); cloud seas billow
-   high and slow (an eighth of water's density).
-8. **Loose particles**: `physics.particles.dust / sand / ash / spores / leaves / spray / hail`,
-   same layout as rain. Dust devils: `physics.features.devils` (a column to paint: foot `p`,
-   `radius`, `height`, `strength`); the dust and sand in them are in the particle buffers.
-9. **Weather numbers changed meaning in P2** (nobody read them yet): `fog01`, `dust01`,
-   `haze01` are now the share of the view each takes (`visibility01 = 1 - fog01` in pure fog);
-   `intensity01` is continuous. If `visibility01` still reads as a pop at a snow squall's
-   edge (up to 8 %/s), low-pass it in the sky as the lead's check allows.
+Written to be read cold. `physics` is the object PILOT made with `createPhysics` and hands you
+through `world.setPhysics(physics)`; `physics.update` has already run when `world.update` is
+called (in the gallery you call `physics.update(dt, { bodyId, time, focus, sunDir })` yourself).
+Everything of mine is in **body-local** coordinates (C3). Nothing below is required: each part
+stands alone, in the order I would wire them.
 
-## For PAINTER: the draw kits (`src/physics/three/`), ten lines each
+### A. Plants in the wind (wired by your predecessor in `1e1801e`; one cheap improvement open)
+- Three fields, `physics.fields.flora`: `.bend` (32x32 RGBA: RG soft-plant load east/north, BA
+  stiff-plant load; 8 m cells), `.wind` (32x32: RG wind at 2 m in m/s, B gust 0..1, A turbulence
+  m/s), `.push` (64x64, 0.5 m cells: RG push load, B flattened 0..1, A shaken 0..1). Re-upload
+  bend and wind when `.version` changes (every frame), push when `.pushVersion` changes.
+  `.uniforms` holds plain arrays for `uPhysAnchor, uPhysEast, uPhysNorth, uPhysUp, uPhysWindMap,
+  uPhysNearMap, uPhysWave, uPhysWavePhase, uPhysShape`: copy them each frame.
+- Shader: `physics.glsl.flora` above `main()`; per plant ROOT (body-local): `vec4 pb =
+  pcPhysBend(rootB, uStiff);` then `wp = io + pcPhysDisplace(wp - io, normalize(rootB),
+  heightInMetres, pb.xy);`. `uStiff` 0 grass, ferns, flowers; 0.35 bushes; 1 trees.
+  `pcPhysBendLite(rootB, uStiff)` (returns the vec2 bend) is the one-lookup version: wind
+  response only, for mid and far tiers. `pb.z` flattened, `pb.w` shaken (for leaf flutter).
+- **Open, cheap: fewer fetches.** Today the chunk blends four texels by hand: 12 fetches a
+  vertex (4 for Lite). Upload the three fields as `THREE.HalfFloatType` (convert with
+  `THREE.DataUtils.toHalfFloat` on upload: 12 k values a frame) with `LinearFilter` and
+  `ClampToEdgeWrapping`, and put `#define PC_PHYS_LINEAR` in front of the chunk: **3 fetches a
+  vertex, 1 for Lite**. 16-bit float textures filter in every WebGL2. `physics-lab.html?linear=1`
+  does exactly this (functions `tex` and `upload`); measured against the JS model it is as
+  exact as float32 (2.5 mm on a tip displaced 2 m).
+- Still unseen by anyone in the game: grass parting round the explorer and under the ship's
+  wash. The push field is live (370 cells pushed on a short walk in the browser).
 
-Optional, and yours to replace. They build the geometry and keep it current; **you** give the
-material and so the look. Shown running in the lab with flat stand-in materials
-(`docs/shots/physics/draw-kits.jpg`: rain and hail built on the CPU, the same instanced on the
-GPU, footprints and dust on sand, the sea).
+### B. Weather for the sky and the sheet: `physics.here.weather`, every frame, free
+- `cloud01` (cover; 0 once the camera is above the deck), `cloudBelow01`, `storm01`,
+  `front01` (a gust front passing).
+- `visibility01`: multiply your clear-day fog distance by it. May fall by up to 5 %/s at a
+  fog bank and 8 %/s at a snow squall; low-pass it in the sky if that reads as a pop.
+- `fog01`, `dust01`, `haze01`: **the share of the view each veil takes by itself** (with only
+  fog in the air, `visibility01 = 1 - fog01`; 0.5 is 5 km of visual range, 0.78 is 1 km, 0.9
+  is 200 m). Use them to tint, not to set distance (that is `visibility01`).
+- `wetness01` (darker, wetter ground washes; lingers after rain, dries faster in sun and
+  wind), `snowDepth` (m), `temperature` (K).
+- `precipitation`: `type` (`none | drizzle | rain | snow | ice | acid | frost`),
+  `intensity01` (continuous), `rate` (mm/h), `hail01`, `reachesGround01` (Venus: under 1
+  means the streaks evaporate overhead).
+- `lightning.flash01`: brightness now, 3-4 strokes inside a quarter second (bare paper
+  showing through); `lightning.last` is where it struck (unit direction, distance).
+- `kind` is a word for a read-out (`thunderstorm`, `mist`, `dust storm`, ...); `intensity01`
+  is how much weather there is, continuous. Do not drive paint from `kind`.
+- Far storms: `physics.util.cellsAt(bodyId)` -> `[{ x, y, z (unit centre), r (m), w
+  (strength), kindId }]`: paint the dark ones where it rains. Wind for cloud drift:
+  `physics.air(bodyId, p, out, heightAboveGround).wind` (faster aloft; `physics.here.air.wind`
+  at the focus).
+
+### C. Rain, snow, dust, marks, water: the draw kits (`src/physics/three/`)
+They follow your material contract (your notes, "For PHYSICS: what a draw kit's material must
+do"): one opaque pass, no blending, holes by `discard`. Each kit hands your factory a
+**vertex chunk that defines `vec3 pcKitPosition()`** plus two varyings.
 
 ```js
-import { createPhysicsKits } from '../physics/three/index.js';     // the only folder of mine that imports three
-const kits = createPhysicsKits(physics, { makeMaterial });          // once; makeMaterial(kind, info) -> your material
+import { createPhysicsKits, SHAPE_GLSL } from '../physics/three/index.js';   // the only folder of mine that imports three
+const kits = createPhysicsKits(physics, { makeMaterial });                   // once
 // every frame, after physics.update and after PILOT has placed the body roots:
 kits.update(bodyRootOf(physics.here.bodyId), camera, renderHeightInPixels);
 ```
-Rules that hold for every kit: each object is a `THREE.Mesh` of triangles with `position` and
-`uv`, parented by the kit under the body root you pass, sitting at its buffer's body-local
-origin (C3: nothing swims); `frustumCulled` is off; nothing is allocated per frame; the kit
-writes no depth of its own (C7 is your material's business, as everywhere). `kits.stats`
-(`ms`, `drawCalls`, `vertices`, `triangles`) and `kits.weather.stats` etc. for your read-out.
+`makeMaterial(kind, info)` is yours. With your chunks it is about ten lines (not run by me with
+your chunks: I ran this exact shape with a flat colour in place of your wash, in
+`physics-lab.html`, function `standIn`):
+```js
+const makeMaterial = (kind, info) => new THREE.ShaderMaterial({
+  uniforms: { ...yourBaseUniforms(), ...info.uniforms },         // info.uniforms: {} for the cpu kits
+  vertexShader: `${VERT_PARS}\n${info.vertexChunk}\nvarying vec3 vView;
+    void main() { vec4 mv = modelViewMatrix * vec4(pcKitPosition(), 1.0); vView = mv.xyz;
+      gl_Position = projectionMatrix * mv; ${VERT_END} }`,
+  fragmentShader: `${FRAG_PARS}\n${SHAPE_GLSL}\nvarying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView;
+    void main() { /* cut the shape with discard, pick the wash */ pcWrite(col, wet, nV, -vView.z, ${info.region.toFixed(1)}); }`,
+  side: THREE.DoubleSide,
+});  // then material.userData.pcPainted = true
+```
+- `pcKitPosition()` returns the vertex in the mesh's own coordinates: body-local axes, metres,
+  relative to the mesh, which the kit parents under the body root you pass and places at a
+  body-local point (C3). Multiply by `modelViewMatrix` as for any mesh.
+- `vPcUv`: 0..1 across the quad. `vPcData`: per kind, below (also in `info.data`).
+- `info.region`: my suggestion for your region id (2.x rain, hail, spray, snow, rings; 1.x
+  marks, dust, sand, ash; 4.x leaves, spores). Yours to change.
+- Nothing needs blending: particles are born small, grow in, and shrink to nothing at the
+  edge of the simulated volume (24 m); shapes inside a quad are cut with `discard`.
+- Budget (PILOT's conditions): at most 12 draw calls for all kits (one per kind that has
+  anything in the air, rings, marks, water) and, with every buffer full at the highest
+  quality, 31 k triangles; typical: a downpour 3 calls and 7 k vertices, fair weather 0-2
+  calls. The kits set no `renderOrder`: draw order is yours. Meshes are not frustum-culled.
+  CPU per frame: 0.10 ms for a downpour (1100 drops plus rings), 0.05 ms instanced, marks
+  0.07 ms only when one is added (else nothing), water 0.05 ms. `kits.stats`,
+  `kits.weather.stats` etc. give `ms`, `drawCalls`, `vertices`, `triangles`.
+- A material that ignores the chunk and uses `position` (your `makeWashMaterial({ color,
+  unlit: true, side: DoubleSide })`) also works with the default (cpu) kits: that is the
+  fastest way to see rain in the picture at all.
 
-**1. Rain, hail, sand, spray (streaks)**: `kind` `'rain' | 'hail' | 'sand' | 'spray'`, one mesh
-each, a quad per particle: `uv.x` across, `uv.y` 0 at the head (where the drop is) to 1 at the
-tail (where it was one exposure ago, *relative to the camera*: run and the rain slants at you).
-`makeWashMaterial({ color, unlit: true, side: DoubleSide })` works as it is; so does anything
-with `position` and `uv`. Size and exposure are yours: `createPhysicsKits(physics, { makeMaterial,
-weather: { draw: { rain: { width: 0.02, exposure: 0.06 } } } })` (defaults in `DRAW`,
-`three/expand.js`: rain 12 mm wide, 40 ms exposure, never thinner than 1.2 px on screen).
-Fade `uv.y` to nothing at the tail and it is a brush stroke. Cost: 1 draw call a kind in the
-air, 4 vertices a drop (1500 drops: 6000 vertices, 0.07 ms to build, 0.10 ms a frame in the
-browser with rings). `info.attributes` tells you what the mesh carries.
+The kinds, and what `vPcUv` / `vPcData` mean:
+1. **Streaks: `rain`, `hail`, `sand`, `spray`**. A quad per particle; `vPcUv.x` across,
+   `vPcUv.y` 0 at the head (where the drop is) to 1 at the tail (where it was one exposure
+   ago *relative to the camera*: run and the rain slants at you). `vPcData.x` a shade
+   1 - vary .. 1 that stays with the particle. A stroke: `if (abs(vPcUv.x - 0.5) * 2.0 >
+   1.0 - 0.75 * vPcUv.y) discard;`. Defaults (`DRAW` in `three/expand.js`): rain 12 mm wide,
+   40 ms exposure, never under 1.2 px. Yours to change: `createPhysicsKits(physics, {
+   makeMaterial, weather: { draw: { rain: { width: 0.02, exposure: 0.06 } } } })`.
+2. **Dabs: `snow`, `dust`, `ash`, `spores`, `leaves`**. Quads facing the picture plane; a
+   round dab is `if (length(vPcUv - 0.5) > 0.5) discard;`. Dust grows with age (a puff
+   spreads), leaves and ash turn. Sizes are brush marks, not grains (snow 3.5 cm, leaves
+   7.5 cm, dust 16 cm growing 30 cm/s, never under 1.6 px).
+3. **Instanced variant** (`weather: { expand: 'gpu' }`): one quad, instanced; the instance
+   attributes are my arrays themselves (no copy, nothing built on the CPU). Same
+   `pcKitPosition()`, same varyings, plus `vPcData` = (shade, age s, grain size m, speed m/s);
+   needs `info.uniforms` in the material (the kit keeps them current). Take this one for the
+   final rain; take the cpu one today.
+4. **`ring`**: the splash of a drop, the ripple it leaves on liquid, the puff where a flake
+   settles, a hailstone's bounce: flat on the ground, growing with age. `vPcData` = (kind 0
+   splash / 1 ripple / 2 settle / 3 bounce, strength 0..1, age 0..1, drop size m).
+   `SHAPE_GLSL`: `pcPhysRingCover(vPcUv, vPcData.z)` is a circle that widens and thins;
+   `discard` under about 0.2. Rain also lands on the ship's hull (splashes up there, none
+   under it) and is thinned under closed canopy; after rain the wood drips big slow drops.
+5. **`mark`** (`kits.marks`): footprints, the ship's three gear pads, scour dishes: a quad
+   laid on the ground (follows the slope near the focus), 15 mm above it: give the material
+   `polygonOffset`. `vPcUv.x` across, `.y` along the direction of travel; `vPcData` = (depth
+   m, rim height m, kind 0/1 feet, 2 pad, 4 scour dish, fade 1..0 over its life).
+   `SHAPE_GLSL`: `pcPhysMarkCover(vPcUv, vPcData.z)` (a boot's outline or a disc) and
+   `pcPhysMarkRim(...)` (the raised edge on sand, snow and dust: paint it lighter). Fade
+   without blending: `discard` against a hash of `gl_FragCoord` (the lab's stand-in does).
+   Snow and blowing sand fill prints; `fade` already says so.
+6. **`water`** (`kits.water`): a 60 m patch (41 x 41 vertices) that follows the focus and
+   rides my waves, with `normal`. You already draw liquid everywhere, so prefer D below and
+   pass `water: false`; the patch is the reference of what the chunk computes.
 
-**2. Snow, dust, ash, spores, leaves (dabs)**: quads facing the picture plane, `uv` 0..1
-across the dab, one mesh a kind. Dust grows as it ages (a puff spreads), leaves and ash turn.
-Kinds with `vary > 0` (dust, sand, ash, spores, leaves) also carry `color`: a grey 1 - vary .. 1
-per particle that stays with it; `makeWashMaterial({ vertexColors: true })` picks it up. New
-particles grow in from nothing and particles at the edge of the simulated volume (24 m)
-shrink to nothing: no alpha is needed for either, so any blending you choose works. Sizes are
-brush marks, not grains (snow 3.5 cm, leaves 7.5 cm, dust 16 cm growing 30 cm/s): change them
-in `draw`. Cost as streaks (1600 dabs: 0.09 ms).
+What the kits do not draw: lightning (B), dust devils as columns (`physics.features.devils`:
+foot `p`, `radius`, `height`, `strength`; their dust and sand are in the particle kits), the sky.
 
-**3. The same, instanced** (`weather: { expand: 'gpu' }`): one quad, instanced; the instance
-attributes ARE my arrays (`aPcPos`, `aPcVel`, `aPcSize`, `aPcAge`: nothing is copied or built).
-Your material must paste `info.chunk` (`PARTICLE_GLSL`) and spread `info.uniforms` into its
-uniforms; in `main()`: `vec3 p = pcPhysStreak(position.xy);` or `pcPhysDab(position.xy)`, then
-your usual `modelViewMatrix`. `pcPhysShade(vary)` is the per-particle grey. 0.05 ms a frame on
-the CPU for 1100 particles, 4 vertices a kind in the buffers. Take this one once you write a
-rain material of your own; take the CPU one to see rain in the picture today.
-
-**4. Rings** (`kind` `'ring'`): the splash of a drop, the ripple it leaves on liquid, the puff
-where a flake settles, a hailstone's bounce: one quad each, flat on the local horizontal,
-growing with age, from `physics.particles.events`. Attribute `aPcRing` = (kind 0 splash / 1
-ripple / 2 settle / 3 bounce, strength 0..1, age 0..1, drop size m). `SHAPE_GLSL` has
-`pcPhysRingCover(uv, age01)`: a circle that widens and thins; the lab's stand-in uses it. Up
-to 256 quads, 1 draw call.
-
-**5. Marks** (`kits.marks`, `kind` `'mark'`): footprints, the three gear pads, scour dishes:
-one quad per live mark, laid on the ground (it follows the slope within 16 m of the focus),
-lifted 15 mm: give the material `polygonOffset` or `depthWrite: false`. `uv.x` across, `uv.y`
-along the direction of travel. `aPcMark` = (depth m, rim height m, kind as in `MARK`, fade
-1..0 over its life); `color` is a grey, darker where deeper and fresher, so that
-`makeWashMaterial({ vertexColors: true })` shows prints at once. `SHAPE_GLSL`:
-`pcPhysMarkCover(uv, kind)` (a boot's outline, or a disc) and `pcPhysMarkRim(uv, kind)` (the
-raised edge on loose ground: paint it lighter). Rebuilt only when a mark is added, on a
-re-anchor and four times a second (fading, snow filling them): 0.07 ms for a full ring of 256,
-nothing otherwise. 1 draw call, at most 1024 vertices.
-
-**6. Water** (`kits.water`, `kind` `'water'`): a square patch (41 x 41 vertices, 1.5 m apart,
-60 m across) that follows the focus in whole steps and rides my three wave trains; `position`,
-`normal`, `uv`. 0.04 ms, 1 draw call, 1681 vertices, 3200 triangles. You already draw liquid
-everywhere, so the better wiring is still step 7 above (paste `physics.glsl.water` into
-`makeWaterMaterial`'s vertex stage: no CPU at all, and the far water moves too). Use the patch
-if you want the near water as its own wash, with a hole in yours; or leave it out:
-`createPhysicsKits(physics, { makeMaterial, water: false })`.
-
-What the kits do not draw: lightning (`weather.lightning.flash01` is the sky's), dust devils
-as columns (`physics.features.devils`; their dust and sand are in the particle kits), and
-anything about the sky. `kits.dispose()` removes everything.
+### D. Water: waves and wakes in your own liquid material
+- Paste `physics.glsl.water` into the vertex stage of `makeWaterMaterial` and lift each
+  vertex along the local up by `pcPhysWater(bodyLocalPosition).x`; `.yz` is the slope along
+  the frame's east and north, for the normal. Far water: `#define PC_PHYS_NO_WAKE` first.
+- Uniforms, from `physics.fields.water.uniforms` every frame (**changed in P3**: four trains,
+  groups, wakes): `uPhysWaterDir` vec2, `uPhysWaterK` vec4, `uPhysWaterAmp` vec4,
+  `uPhysWaterPhase` vec4, `uPhysWaterGroup` vec4, `uPhysWake` vec4[16] (a Float32Array(64):
+  give it to three as it is), `uPhysWakeG` float; plus the frame uniforms it shares with the
+  flora chunk (`uPhysAnchor, uPhysEast, uPhysNorth, uPhysUp`: guarded, include both chunks
+  freely).
+- What you get: a wind sea whose height, length and direction follow the wind, the fetch of
+  the biome and the world's gravity and air (Neptune's methane runs higher than water);
+  short crests and sets of bigger waves (no ruled lines from the air); rings behind a swimmer
+  and under the ship's thrusters. `physics.water(bodyId, p).whitecap01` for foam,
+  `.significant` (m) for how rough it reads from afar; `physics.fields.water.heightAt(p)` is
+  the same surface in JS (the explorer floats on it).
+- Liquids by place: lava in `lava_rivers` (barely any waves: 2.6 times water's density),
+  cloud froth in `gold_islands` and `sky_islands` (billows high and slow).
 
 ## For PILOT: what audio can read (all in `physics.here`, refreshed every frame, free)
 

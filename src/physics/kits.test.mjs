@@ -188,3 +188,11 @@ test('cost of the arithmetic: a downpour, a full ring of marks and the water gri
   console.log(`      kit arithmetic: 1600 streaks ${(tS * 1000).toFixed(0)} us, 1600 dabs ${(tD * 1000).toFixed(0)} us, shades ${(tC * 1000).toFixed(0)} us, 256 marks ${(tM * 1000).toFixed(0)} us, water 41x41 ${(tW * 1000).toFixed(0)} us`);
   assert.ok(tS < 0.4 && tD < 0.4 && tC < 0.2 && tM < 0.5 && tW < 0.4, 'each well under half a millisecond');
 });
+
+test('the kits stay inside the budget PILOT set: 12 draw calls and far fewer than 60 k triangles with every buffer full', () => {
+  let tris = 0, calls = 0;
+  for (const k of PARTICLES.kinds) { tris += PARTICLES.capacity[k][2] * 2; calls++; }
+  tris += PARTICLES.events * 2 + 256 * 2 + 40 * 40 * 2; calls += 3;      // rings, marks, the water patch
+  assert.ok(calls <= 12, 'draw calls: ' + calls);
+  assert.ok(tris <= 32000, 'triangles, everything full at the highest quality: ' + tris);
+});

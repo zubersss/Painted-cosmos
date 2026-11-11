@@ -11,11 +11,26 @@
 // makeMaterial(kind, info) -> THREE.Material
 //   kind: 'rain' | 'snow' | 'hail' | 'dust' | 'sand' | 'ash' | 'spores' | 'leaves' | 'spray' |
 //         'ring' | 'mark' | 'water'
-//   info: { shape: 'streak' | 'dab' | 'ring' | 'mark' | 'surface', attributes: [...names],
-//           draw (the DRAW entry in use), uniforms (gpu mode: uniform objects to put in your
-//           material), chunk (gpu mode: the GLSL to paste) }
+//   info: { shape: 'streak' | 'dab' | 'ring' | 'mark' | 'surface',
+//           vertexChunk   GLSL for the vertex stage (PAINTER's material contract): declares what
+//                         it needs and defines
+//                           vec3 pcKitPosition()   the vertex, in the mesh's own coordinates
+//                                                  (body-local axes, metres, relative to the mesh,
+//                                                  which sits at a body-local point): multiply by
+//                                                  modelViewMatrix as for any mesh
+//                         and sets two varyings:  vec2 vPcUv, vec4 vPcData (see `data` below)
+//           data          what vPcData holds for this kind (a sentence)
+//           uniforms      uniform objects the chunk needs ({} for the cpu kits): put them in
+//                         your material's `uniforms`; the kit keeps their values current
+//           attributes    the attribute names the mesh carries
+//           region        a suggestion for the region id class of PAINTER's second target
+//           draw          the DRAW entry in use (sizes, exposure) }
 // Every object is a THREE.Mesh of triangles with `position` and `uv` (and `color` or `normal`
-// where info.attributes says so): makeWashMaterial from src/render/index.js works as it is.
+// where info.attributes says so). Nothing needs blending: particles fade by shrinking, and
+// the shapes inside a quad are cut with `discard`. A material that ignores the chunk and just
+// uses `position` (makeWashMaterial from src/render/index.js) also works with the cpu kits.
+// Budget (PILOT): all kits together are at most 12 draw calls and, with every buffer full at
+// the highest quality, 31 k triangles; they set no render order (the draw order is PAINTER's).
 //
 // Coordinates (C3): each object sits at its buffer's origin, a body-local point, as a child of
 // the body root; vertices are relative to it in body-local axes. Nothing here knows about the
@@ -28,6 +43,16 @@ import { DRAW, makeEye, expandStreaks, expandDabs, expandShades, expandMarks, ex
 import { PARTICLE_GLSL } from './chunks.glsl.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+// ---- the vertex chunks of the material contract ----------------------------------------------------
+const VARYINGS = 'varying vec2 vPcUv;\nvarying vec4 vPcData;\n';
+// (three declares `color` itself when material.vertexColors is set)
+const COLOR_ATTR = '#if !defined(USE_COLOR) && !defined(USE_COLOR_ALPHA)\nattribute vec3 color;\n#endif\n';
+const chunkPlain = (data) => `${VARYINGS}vec3 pcKitPosition() { vPcUv = uv; vPcData = ${data}; return position; }\n`;
+const chunkShaded = () => `${VARYINGS}${COLOR_ATTR}vec3 pcKitPosition() { vPcUv = uv; vPcData = vec4(color.r, 0.0, 0.0, 0.0); return position; }\n`;
+const chunkData = (name) => `${VARYINGS}attribute vec4 ${name};\nvec3 pcKitPosition() { vPcUv = uv; vPcData = ${name}; return position; }\n`;
+const chunkGpu = (shape, vary) => `${PARTICLE_GLSL}${VARYINGS}vec3 pcKitPosition() { vPcUv = uv; vPcData = vec4(pcPhysShade(${vary.toFixed(3)}), aPcAge, aPcSize, length(aPcVel)); return ${shape === 'streak' ? 'pcPhysStreak' : 'pcPhysDab'}(position.xy); }\n`;
+const REGION = { rain: 2.6, hail: 2.6, spray: 2.7, snow: 2.5, dust: 1.6, sand: 1.6, ash: 1.7, spores: 4.6, leaves: 4.5, ring: 2.8, mark: 1.5, water: 2.0 };
 const _m = new THREE.Matrix4(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 
 // The eye in body-local coordinates: position, picture-plane axes, velocity (from its own
@@ -93,7 +118,12 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       geo.setIndex(new THREE.BufferAttribute(quadIndices(cap), 1));
       geo.setDrawRange(0, 0);
     }
-    const info = { shape: D.shape, draw: D, attributes: gpu ? ['position', 'uv', 'aPcPos', 'aPcVel', 'aPcSize', 'aPcAge'] : (colA ? ['position', 'uv', 'color'] : ['position', 'uv']), uniforms, chunk: gpu ? PARTICLE_GLSL : null };
+    const info = { shape: D.shape, draw: D, region: REGION[kind],
+      attributes: gpu ? ['position', 'uv', 'aPcPos', 'aPcVel', 'aPcSize', 'aPcAge'] : (colA ? ['position', 'uv', 'color'] : ['position', 'uv']),
+      uniforms: uniforms || {},
+      vertexChunk: gpu ? chunkGpu(D.shape, D.vary || 0) : (colA ? chunkShaded() : chunkPlain('vec4(1.0, 0.0, 0.0, 0.0)')),
+      data: gpu ? 'x: shade 1 - vary .. 1 (stays with the particle), y: age (s), z: grain size (m), w: speed (m/s)' : 'x: shade 1 - vary .. 1 (stays with the particle); y, z, w: 0',
+      chunk: gpu ? PARTICLE_GLSL : null };
     const mesh = new THREE.Mesh(geo, makeMaterial(kind, info));
     mesh.name = 'pc-physics-' + kind; mesh.frustumCulled = false; mesh.visible = false; mesh.matrixAutoUpdate = true;
     parts.push({ kind, buf, D, mesh, geo, posA, colA, cap, uniforms, drawn: 0 });
@@ -106,7 +136,8 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
     const posA = dyn(new Float32Array(cap * 12), 3), dataA = dyn(new Float32Array(cap * 16), 4);
     geo.setAttribute('position', posA); geo.setAttribute('uv', new THREE.BufferAttribute(quadUvs(cap), 2)); geo.setAttribute('aPcRing', dataA);
     geo.setIndex(new THREE.BufferAttribute(quadIndices(cap), 1)); geo.setDrawRange(0, 0);
-    const mesh = new THREE.Mesh(geo, makeMaterial('ring', { shape: 'ring', attributes: ['position', 'uv', 'aPcRing'], draw: null, uniforms: null, chunk: null }));
+    const mesh = new THREE.Mesh(geo, makeMaterial('ring', { shape: 'ring', attributes: ['position', 'uv', 'aPcRing'], draw: null, uniforms: {}, region: REGION.ring, chunk: null,
+      vertexChunk: chunkData('aPcRing'), data: 'x: kind (0 splash, 1 ripple, 2 settle, 3 bounce), y: strength 0..1, z: age 0..1, w: drop size (m)' }));
     mesh.name = 'pc-physics-ring'; mesh.frustumCulled = false; mesh.visible = false;
     ring = { E, mesh, geo, posA, dataA, cap, drawn: 0 };
   }
@@ -182,7 +213,8 @@ export function createMarksKit(physics, { makeMaterial, lift = 0.015, refresh = 
   geo.setAttribute('position', posA); geo.setAttribute('uv', new THREE.BufferAttribute(quadUvs(cap), 2));
   geo.setAttribute('color', colA); geo.setAttribute('aPcMark', dataA);
   geo.setIndex(new THREE.BufferAttribute(quadIndices(cap), 1)); geo.setDrawRange(0, 0);
-  const mesh = new THREE.Mesh(geo, makeMaterial('mark', { shape: 'mark', attributes: ['position', 'uv', 'color', 'aPcMark'], draw: null, uniforms: null, chunk: null }));
+  const mesh = new THREE.Mesh(geo, makeMaterial('mark', { shape: 'mark', attributes: ['position', 'uv', 'color', 'aPcMark'], draw: null, uniforms: {}, region: REGION.mark, chunk: null,
+    vertexChunk: chunkData('aPcMark'), data: 'x: depth (m), y: rim height (m), z: kind (0, 1 feet; 2 gear pad; 4 scour dish), w: fade 1..0 over its life' }));
   mesh.name = 'pc-physics-marks'; mesh.frustumCulled = false; mesh.visible = false;
   const near = physics.fields.near, heightAt = (x, z) => near.heightAt(x, z, NaN);
   const stats = { ms: 0, drawCalls: 0, vertices: 0, triangles: 0, marks: 0, rebuilt: false };
@@ -226,7 +258,8 @@ export function createWaterKit(physics, { makeMaterial, N = 40, step = 1.5 } = {
   for (let j = 0, k = 0; j <= N; j++) for (let i = 0; i <= N; i++, k += 2) { uv[k] = i / N; uv[k + 1] = j / N; }
   geo.setAttribute('position', posA); geo.setAttribute('normal', nrmA); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setIndex(new THREE.BufferAttribute(gridIndices(N), 1));
-  const mesh = new THREE.Mesh(geo, makeMaterial('water', { shape: 'surface', attributes: ['position', 'normal', 'uv'], draw: null, uniforms: null, chunk: physics.glsl.water }));
+  const mesh = new THREE.Mesh(geo, makeMaterial('water', { shape: 'surface', attributes: ['position', 'normal', 'uv'], draw: null, uniforms: {}, region: REGION.water, chunk: physics.glsl.water,
+    vertexChunk: chunkPlain('vec4(0.0)'), data: 'nothing (zeros); the mesh carries `normal`' }));
   mesh.name = 'pc-physics-water'; mesh.frustumCulled = false; mesh.visible = false;
   const stats = { ms: 0, drawCalls: 0, vertices: 0, triangles: 0 };
   return {

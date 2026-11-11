@@ -493,31 +493,23 @@ function updateParticles() {
 // ?kits=0: the lab's old dots and lines instead.
 const KITS = scene === 'globe' ? '0' : (Q.get('kits') || 'cpu');
 const KIT_COLOR = { rain: C.blue, snow: 0xa79fd6, hail: C.ink, dust: 0x8a6a4c, sand: C.gold, ash: C.grey, spores: 0x7fae4e, leaves: C.red, spray: C.sky, ring: C.ink, mark: C.sepia, water: 0x5f7fc4 };
+// The stand-in is built the way PAINTER's material contract asks: the kit's vertex chunk gives
+// pcKitPosition() and the varyings vPcUv / vPcData; the fragment is opaque and cuts its shapes
+// with discard (no blending anywhere), a flat colour standing in for PAINTER's wash.
 function standIn(kind, info) {
   const col = new THREE.Color(KIT_COLOR[kind]);
-  if (info.chunk && info.shape !== 'surface') {
-    // gpu particles: the chunk decides where each corner goes; a flat colour
-    return new THREE.ShaderMaterial({ uniforms: { ...info.uniforms, uCol: { value: col }, uVary: { value: info.draw.vary || 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      vertexShader: `${PARTICLE_GLSL}
-        varying float vShade; uniform float uVary;
-        void main() { vec3 p = ${info.shape === 'streak' ? 'pcPhysStreak' : 'pcPhysDab'}(position.xy); vShade = pcPhysShade(uVary); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-      fragmentShader: `uniform vec3 uCol; varying float vShade; void main() { gl_FragColor = vec4(uCol * vShade, 0.85); }` });
-  }
-  if (kind === 'ring' || kind === 'mark') {
-    // the shape helpers of SHAPE_GLSL: a boot, a disc, a widening circle
-    const isRing = kind === 'ring';
-    return new THREE.ShaderMaterial({ uniforms: { uCol: { value: col } }, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-      vertexShader: `attribute vec4 ${isRing ? 'aPcRing' : 'aPcMark'}; varying vec2 vUv; varying vec4 vD;
-        void main() { vUv = uv; vD = ${isRing ? 'aPcRing' : 'aPcMark'}; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `${SHAPE_GLSL}
-        uniform vec3 uCol; varying vec2 vUv; varying vec4 vD;
-        void main() {
-          ${isRing ? 'float a = pcPhysRingCover(vUv, vD.z) * (0.4 + 0.6 * vD.y); vec3 c = uCol;'
-    : 'float cover = pcPhysMarkCover(vUv, vD.z), rim = pcPhysMarkRim(vUv, vD.z) * step(1e-4, vD.y); float a = (cover * min(0.85, 0.3 + vD.x * 8.0) + rim * 0.5) * min(1.0, vD.w * 3.0); vec3 c = mix(uCol, vec3(0.93, 0.9, 0.82), rim * (1.0 - cover));'}
-          if (a < 0.01) discard; gl_FragColor = vec4(c, a); }` });
-  }
-  if (kind === 'water') return new THREE.MeshBasicMaterial({ color: col, wireframe: true, transparent: true, opacity: 0.55 });
-  return new THREE.MeshBasicMaterial({ color: col, vertexColors: info.attributes.includes('color'), transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+  if (kind === 'water') return new THREE.MeshBasicMaterial({ color: col, wireframe: true });
+  const shape = { streak: 'float t = abs(vPcUv.x - 0.5) * 2.0; if (t > 1.0 - 0.75 * vPcUv.y) discard; vec3 c = uCol * vPcData.x;',      // a stroke that tapers to its tail
+    dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = uCol * vPcData.x;',
+    ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.2) discard; vec3 c = uCol;',
+    mark: 'float cover = pcPhysMarkCover(vPcUv, vPcData.z), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * min(1.0, 0.45 + vPcData.x * 10.0), rim * 0.8) * min(1.0, vPcData.w * 3.0); if (a < fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453)) discard; vec3 c = mix(uCol, vec3(0.93, 0.9, 0.82), rim * (1.0 - cover));' }[info.shape];
+  return new THREE.ShaderMaterial({ uniforms: { ...info.uniforms, uCol: { value: col } }, side: THREE.DoubleSide,
+    polygonOffset: info.shape === 'mark' || info.shape === 'ring', polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    vertexShader: `${info.vertexChunk}
+      void main() { vec3 p = pcKitPosition(); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+    fragmentShader: `${SHAPE_GLSL}
+      uniform vec3 uCol; varying vec2 vPcUv; varying vec4 vPcData;
+      void main() { ${shape} gl_FragColor = vec4(c, 1.0); }` });
 }
 const kits = KITS === '0' ? null : createPhysicsKits(physics, { makeMaterial: standIn, weather: { expand: KITS === 'gpu' ? 'gpu' : 'cpu' } });
 // the lab's space is the field frame's: a root that carries body-local coordinates into it
