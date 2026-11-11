@@ -6,46 +6,250 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
-Written by the third PAINTER agent at the end of M3 block 1 (weather in the picture), commit
-`9d9caf1`. The second agent's M2 record follows under "M2 status".
+Written by the fourth PAINTER agent at the end of M3 block 2 (the explorer and the ship, the
+near ground, rain as a glaze, dark washes), commit `6bb6c91`. The third agent's block
+(weather in the picture) and the second agent's M2 record follow.
 
-- **Where things stand**: M2 is done (table below). **M3 block 1 is in**: the sky, the haze,
-  the light, the sheet, the ground and the flora read PHYSICS' sky numbers; the liquid takes
-  PHYSICS' wave chunk; PHYSICS' kits are drawn with my materials; near grass is visible and
-  takes the push field. What each looks like, the numbers and what is weak: "M3 block 1" below.
-- **How the weather reaches the picture** (all in my files):
-  `src/render/shared.js` holds `WX` (the sky in force: `world.setWeather` forced, else
-  `physics.here.sky`, else `setMood.sky`), the body uniform `uWx` (overcast, wet, snow, veil),
-  `PHYSW` (PHYSICS' sea uniforms) and `FRAME_HOOKS` (run at the start of `painter.render`).
-  `src/world/index.js` `update` turns the numbers into light keys, haze, fog distance, storm
-  pigment, cloud cover, fresh snow and the kits' inks. `src/world/sky.js` paints the heavy
-  wash, cloud masses and veils. `src/render/chunks.js` has `pcLevel` and `pcDapple` under an
-  overcast, `pcWetWash`, `pcSnowCover`. `src/render/materials.js`: terrain, props, water.
-  `src/render/kitmat.js`: materials, shapes and inks for the kits. `src/render/post.js`: the
-  storm key, lightning, region 6 (crisp) and 7 (air).
-- **How to work here**: the machine is shared and slow (a 960x540 gallery frame takes 45 s to
-  two minutes; run two at a time, never four). My scratch tools are in
-  `/home/user/.pc-scratch/painter/m3/` (outside the repository, may be gone; each is under 40
-  lines): `s.sh "<query>" out.jpg [w h]` (a gallery frame into that folder), `join.py` (contact
-  sheet), `diff.py a b [box]` (mean difference and share of changed pixels), `ev.mjs "<query>"
-  "<js>"` (evaluate in the gallery; `ROOT=<export>` for a clean export), `sky.mjs` and
-  `skye.mjs` (PHYSICS' sky numbers over time at a stand or at an easel, in Node: use them to
-  find when it storms where), `sea.mjs`, `game.mjs <export> out.jpg <simT>` (the integrated
-  game with its clock set into the storm), `final.sh` (the evidence and crawl batch).
-  The second agent's tools (`pv.mjs`, `cost.mjs`, `cmp.mjs` ...) are one folder up.
-- **Rules that bit me**: (1) the tree is shared: a dynamic import of `src/physics` fails when
-  PHYSICS is mid-save and the frame then shows no physics at all without an error (two of my
-  frames were judged wrong because of it). The gallery now reloads and waits for physics and
-  the kits before `__pcReady`. (2) `renderer.info` must be read with `autoReset = false` over
-  a whole frame, or it reports the last full-screen pass (1 triangle). (3) Measure cost before
-  and after every flora change: my first grass patch put the home forest at 623 k. (4) A mark
-  lighter than what is round it gets a dark pooled rim from the sheet pass: airborne marks
-  must sit close to the value behind them. (5) Scratch output with absolute paths; the tour
-  only from a clean export with `--out` (second agent's rule, still true).
-- **Next, in the coordinator's order**: finish what is weak in this block (list under "M3
-  block 1": rain in the game's view, a real sward, lightning never seen, branches, drifts,
-  PHYSICS' debug flag), then the real explorer and ship models, motion and day-night, space
-  washes, a repaint of the weakest biome of each planet ("Weakest" in the M2 record).
+- **Where things stand**: M2 is done. M3 block 1 (weather) is in. **M3 block 2 is in**: the real
+  explorer and ship (`src/art/models.js`), a cast shade under both, the near ground layer
+  (`src/world/nearground.js`), a glaze pass (rain), soft settling instead of pepper in dark
+  washes, the sky numbers eased over two seconds. What each looks like, the numbers and what
+  is weak: "M3 block 2" below.
+- **Where things are** (all in my files):
+  `src/art/models.js`: a small geometry kit (`loft`, `path`, `capsule`, `blob`: every form is
+  a lofted shape with a hand-wobbled surface), a rig (`makeRig`: pivots; the mesh follows them
+  through a matrix palette), `createExplorer`, `createShip`.
+  `src/render/materials.js`: `makeFigureMaterial` (figures: one mesh, `aPart`, vertex colours,
+  `aMat` = dry, wet, glow), `makeNearMaterial` (the near strokes), plus the third agent's
+  terrain, water, props, wash. `src/render/chunks.js`: `pcCast` (the shade the explorer and
+  the ship lay on the ground; the world fills `G.uCast` from `userData.pcCaster`).
+  `src/world/nearground.js`: the strokes (clumps on cube-sphere cells, laid in a time slice).
+  `src/render/shared.js`: `GLAZES` (objects laid over the brushed picture), `G.uSceneAux`.
+  `src/render/post.js`: `finish(glazes, camera)` draws them after the abstraction pass; the
+  sheet's granulation (`dark`, `settle`). `src/render/kitmat.js`: `GLAZE = { rain: 1 }`.
+  `src/world/index.js`: `castShade`, the eased sky (`skyEase`), `setBuildBudget(ms, { fixed })`.
+  How the weather reaches the picture: the third agent's list under "M3 block 1".
+- **How to work here**: the machine is shared and slow (a 960x540 gallery frame takes one to
+  three minutes; run two at a time, never four). **Render from a clean export, not from the
+  working tree**: PHYSICS saves files while you render and a frame then has no physics or
+  dies on a half-written file (it happened again this run: `windLarge is not defined`).
+  Commit, `tools/export-head.sh <dir>`, then `ROOT=<dir> ./s.sh ...`. My scratch tools are in
+  `/home/user/.pc-scratch/painter/m4/` (outside the repository, may be gone; each is short):
+  `s.sh "<query>" out.jpg [w h]` (a gallery frame; honours `ROOT`), `join.py` (contact sheet),
+  `diff.py a b` (mean difference, share of changed pixels), `ev.mjs "<query>" "<js>"`
+  (evaluate in the gallery), `game2.mjs <export> <prefix> foot,cockpit,chase` (the integrated
+  game: third person at the Earth spawn, the cockpit, the chase view; prints the game's own
+  triangle and draw-call read-out), `cost.mjs earth spawn,temperate_forest` (cost at quality
+  1, 0, 2 in the gallery; `QX="&models=1"`), `final.sh`, `final2.sh` (the evidence batches).
+- **Rules that bit me** (and my predecessors): (1) render from an export (above). (2) In the
+  game, triangles are read from `__pc.info().stats` with `__pc.game.showStats = true`
+  (the game resets `renderer.info` itself); in the gallery with `autoReset = false` over a
+  frame. (3) Measure cost before and after every flora or near-ground change. (4) Anything
+  thin and transparent drawn in the scene pass is erased by the abstraction pass (over the
+  sky it keeps nothing): that is what the glaze pass is for. (5) An opaque mark lighter than
+  what is round it gets a dark pooled rim from the sheet. (6) A mesh under a body root is in
+  body-local metres: give it its own origin (`uOrigin`, `mesh.position`) or float precision
+  and my first hour are lost. (7) Scratch output with absolute paths; the tour only from a
+  clean export with `--out`.
+- **Next, in the coordinator's order**: what is weak in block 2 (the list under "M3 block 2":
+  the sward is still tufts, each blade a flat triangle; the explorer's face; the border under
+  a storm), then PHYSICS' branch sway and drifts, lightning (PILOT's `__pc.flash(frames)`
+  exists now; nobody has looked), day-night and space art pass, pulse streaks from `speed01`,
+  a repaint of the weakest biome of each planet, the lead's SHOULD FIX list (review 4:
+  three vistas in thickets, Mercury and Neptune from orbit, Earth's hard cloud edge, Mars'
+  ruler-straight dune crests, optional `yaw` on `getSpawn`).
+
+## M3 block 2: explorer and ship, near ground, glazes, dark washes (fourth PAINTER agent)
+
+INTEGRATION: ready (`6bb6c91`; the game on a clean export loads, plays on foot, in the
+cockpit and in the chase view with no console error; 19 world tests pass).
+
+### What is in, the frame that shows it, my verdict
+Frames in `docs/shots/painter/`, 960x540 unless said, quality 1, gallery from a clean export.
+Rendered at `db22516`, except `models-forest`, `models-game`, `wx-earth-storm` and
+`wx-grass-wash` at `6bb6c91` (which made the near blades slender and uneven in length and
+raised the rain share: the others show slightly broader, more even blades and fewer strokes).
+Opened at full size: `models-forest`, `models-game`, `wx-earth-storm`, `wx-grass-part`,
+`wx-grass-wash`. Seen on a contact sheet at two thirds size only: `models-mars`, `-moon`,
+`-uranus`, `-cockpit`, `wx-jupiter-storm`, `wx-neptune-gale`, `wx-mars-dust`,
+`wx-earth-blizzard`. **Not opened in its final render**: `models-poses` (the same poses were
+opened in an earlier render). `wx-earth-before` and `wx-earth-after` were removed (stale).
+
+| what | frame | verdict |
+| --- | --- | --- |
+| explorer and ship in the Earth forest | `models-forest.jpg` | yes. A traveller in a canvas coat with a broad dark hat, a pack with a rolled sheet and two copper jet bottles, a red scarf down the back; a planked flying skiff with a canvas deck, a framed glass bubble, cloth wings on ribs, a red-tipped fin, two copper pots, three legs, a rope ladder. Both read as painted things, sit in the light of the place and lay a shade on the ground. Weak: the explorer is still a little of a doll from the front (a blank face under the hat, stiff sleeves); the canopy is a pale egg |
+| the game, third person at the Earth spawn | `models-game.jpg` (the game on a clean export, 960x540) | yes: at the 6.4 m boom the figure is about 110 px tall and reads by hat, pack, scarf and coat; its shade is on the grass; the ship beside the birches is a boat with a red fin |
+| on Mars, on the Moon, on Uranus | `models-mars.jpg`, `models-moon.jpg`, `models-uranus.jpg` | yes (contact sheet only): the pale coat and dark hat carry the figure on ochre, on pale grey and on teal ice; the red reads on all three. On the Moon the pebbles are dark commas on the regolith, on Uranus frost needles stand all over the ice (a little too many, all alike) |
+| the cockpit from `userData.seat` | `models-cockpit.jpg` | yes: a wooden hoop frames the view near its edges, the cowl with three dials lies along the bottom, the canvas foredeck runs to the bow lantern. (The HUD covers the dials in the game.) |
+| walk and jet poses | `models-poses.jpg` (two 640x360 frames side by side) | yes: the stride, the coat and the scarf streaming; the jet with the legs trailing, the flame under the bottles and the shade below on the ground. Run, fall were looked at once (scratch), sit and wade never |
+| near ground: a walker's track | `wx-grass-part.jpg` (top: PHYSICS' push on; bottom: `push=0`; the lower two thirds of each frame) | partly. Top, a pale band about a metre wide runs from the left to the explorer's feet: the trodden tufts lie over and show their pale side, and stay down (PHYSICS' flatten). It is a track, not a sward parting: the grass is tufts 0.66 m apart. 1.0 % of the frame's pixels differ by more than 12 of 255 |
+| near ground: the ship's wash | `wx-grass-wash.jpg` (top: 90 kN at 3 m; bottom: no wash) | yes for the motion: every blade in a wide disc lies over, away from the hull (8.2 % of the frame's pixels differ by more than 12). As a picture it is weak: seen from a low camera the nearest blades are flat triangles |
+| rain as a glaze | `wx-earth-storm.jpg`, `wx-jupiter-storm.jpg` | yes on Jupiter (contact sheet): parallel transparent strokes, darker than the pale gap, lighter than the dark cloud. Partly on Earth (opened): the strokes are right but few (PHYSICS draws a quarter of them now; I ask for 1.6 times that) |
+| dark washes without pepper | `models-moon.jpg` (space), `wx-earth-storm.jpg`, `wx-neptune-gale.jpg` | yes: the Moon's sky and the storm sky are soft, broadly mottled washes; enlarged three times there is no hard speck left. The dust sky on Mars keeps its fine grain (it is a light wash: that is where pits belong) |
+| drift ripples, blizzard | `wx-mars-dust.jpg`, `wx-earth-blizzard.jpg` | (contact sheet) the near dune carries short dark commas along its crest; the blizzard is as it was, a few green tufts standing in the snow at the bottom edge |
+
+How each part works, briefly:
+- **Models**. Every form is a loft (rings of a superellipse along a path) whose surface is
+  pushed about by a smooth noise, so no silhouette is ruler-true and nothing is a primitive.
+  The washes are vertex colours from one palette of ten (canvas cream and its dirty hem,
+  indigo-sepia, grey-blue, copper, sepia, flesh, glass, ochre planks, and ONE accent, a red
+  that the scarf, the hat band, the fin and the wing tips share). `makeFigureMaterial` lays
+  the wash with drifting pigment, pooling just inside the silhouette, a few long soft strokes
+  down the form (folds, weather runs), light in soft steps and a little dry brush on the lit
+  side; flames and the bow lantern are bare paper running into warm colour (`glow`). Each
+  figure is one mesh and ONE draw call (the placeholders were 8 and 17): parts are moved by
+  `uPart[]`. Explorer: 11 parts, about 3 k triangles; ship: 6 parts, about 7.5 k.
+- **Animation** (C10 unchanged). Explorer: the modes are blended (weights eased at 9 /s), so
+  walk runs into jet into fall. The stride phase advances by the ground covered (one step is
+  0.45 m + 0.22 s of travel, the leg swing is the arc that step needs), the hips bob twice a
+  stride, the coat streams back, the scarf lifts with speed and flies up in a fall, the head
+  follows `lookPitch`, at rest the weight is on one leg. Jet flames scale with `jet01` and
+  boil at 8 frames a second. Additive state fields: `phase` (radians, sets the stride),
+  `snap` (no easing), both for stills. Ship: the legs fold (`gear01`: nose leg back under the
+  belly, the outriggers up to the wings), the canopy hinges at the back (`canopy01`), the
+  flames lengthen with `throttle01` and are long and thin in `pulse`, a slow bob in `hover`.
+- **Shade**. `pcCast` in the terrain and near-ground fragments: an oval glaze thrown away
+  from the sun (as long as the figure is tall over the sun's height, a pool under a closed
+  sky), ragged at the edge, fading as the explorer or the ship rises. The world finds the two
+  in the scene by `userData.pcCaster`; PILOT wires nothing. Trees and props do not take it.
+- **Near ground**. One instanced mesh, one draw call, at most 6400 strokes (19.2 k
+  triangles), three triangles a stroke. The ground is divided into cells of the cube sphere
+  (0.66 m); each cell owns a clump of up to eight strokes whose places, shapes and washes are
+  a pure function of the cell (so they are anchored). Clumps are laid nearest first inside a
+  time slice (a quarter of the build budget; one surface sample and two heights a clump),
+  come and go at 11 m where a stroke's length is already nothing, and grow in over 0.7 s
+  when laid inside the range. Kinds by biome (`styleOf`: from `small`, `terrain`, `under`,
+  or a biome's own `near: { blade, reed, needle, dab, ripple }` in looks.js): grass blades
+  (fanned tufts in the biome's leaf washes run into the ground's), reed stubble, frost
+  needles and splinters, pebbles, drift ripples. Each stroke faces the picture plane about
+  its own axis, is lit like the ground under it (dapple and the cast shade included), is
+  never thinner than 2.3 pixels of the scene pass, thins with distance (full to 7 m, none at
+  11 m), is slender close to the eye, and half of them are region 6 (crisp accents).
+  PHYSICS: each blade bends with `pcPhysBend` at its own root, and where the field says
+  flattened it lies over the way it already leaned, broader and paler. `world.busy` counts
+  clumps still to lay. Fresh snow buries most of a blade.
+- **Glaze pass**. Objects in `GLAZES` sit out the scene pass and are drawn after the
+  abstraction pass straight onto the brushed picture with ordinary blending; they test their
+  depth by hand against the scene's second target. Rain is the first: a transparent stroke
+  of a middle value. Cost: one more draw call per glaze object, no new target.
+- **Dark washes**. In the sheet pass the granulation has two regimes: in light and middle
+  washes pigment sits in the pits of the paper (the fine speckle, as before); in a dark wash
+  (and in any wash under a storm key) the pits are full and only the broad soft settling of
+  the pigment shows (the same paper sampled out of focus, at 40 % of the strength). The
+  floor of the darkest value and the paper relief follow the same rule. The border's dry
+  edge skips in larger pieces.
+- **Eased sky**. The world eases PHYSICS' sky numbers with a time constant of 0.9 s (90 % in
+  two seconds) before painting from them; a forced sky, the first frame and a change of body
+  are taken as they are; `flash` is never eased.
+
+### Numbers
+- **Cost** (quality 1, with the explorer, the ship and the near ground in; budget 600 k / 350):
+  Gallery (whole frame, `models=1`): Earth spawn 516 k triangles / 280 draw calls (quality 0:
+  265 k / 189; quality 2: 700 k / 351); temperate forest easel, the densest view known:
+  546 k / 299 (quality 0: 255 k / 181; quality 2: 740 k / 365 draw calls). The game on a clean
+  export, its own read-out: third person at the Earth spawn 527 k / 285 (579 k / 300 two
+  commits earlier, before the tree trim and with every stroke slot submitted); the cockpit
+  9 m up 350 k / 202.
+  Before this block: Earth spawn 539 k / 296 (gallery, no models), forest easel 580 k / 317.
+  What changed the count: the models are 2 draw calls instead of 25; the near layer is 1 draw
+  call and at most 19.2 k triangles (only live strokes are submitted); the old near grass
+  patches are gone (about 12 k triangles and one draw call a near chunk); **full trees and
+  middle-tier trees hand over 18 % and 12 % sooner at quality 1** (`TRIM` in
+  `src/world/flora.js`: 43 m to 35 m, 105 m to 92 m), which pays for the rest. The lead's
+  vista `earth-temperate_forest-1` (645 k / 352 before, in the game) **was not re-measured
+  by me in the game**: by the same deltas it should be under the budget; the lead must check.
+  Other bodies were not re-measured (the trim applies to all, the near layer adds at most
+  19.2 k and one call to each). **Not measured on a real GPU.**
+- **Near ground build**: one clump costs a surface sample and two heights (about 0.1 ms here
+  under load); a first fill is about 900 clumps and is spread over frames by the slice.
+- **Crawl**: the Earth spawn seen from 1.6 m up and pitched 20 degrees down (the foreground
+  fills the frame), camera turned 0.15 degrees (about 1.6 px): mean difference 3.85 of 255,
+  7.6 % of pixels change by more than 12, 1.6 % by more than 30. The same pair with `near=0`:
+  3.18, 6.0 %, 1.4 %. The strokes add about a quarter to what this view already does under a
+  turn: crisp marks that travel with the ground they are anchored to. Two renders of one
+  frame are identical. That is not a measure of shimmer in motion, and nobody has watched it.
+  **Not measured**: the strokes in motion under wind (PHYSICS' field moving them), rain in
+  motion through the glaze pass, the walk cycle's foot slip, anything by eye in motion.
+
+### Not done, not verified, weak (blunt)
+- **The sward is still tufts**: one clump every 0.66 m. A walker leaves a pale track, not a
+  parted sward; seen from the game's boom the strokes are small dark flicks, rather even in
+  size. Each blade is a flat two-segment triangle: close to a low camera they are cut paper
+  (I made them slender within 7 m; not re-judged in first person in the game).
+- **Explorer**: no face, no hands to speak of; sleeves are one stiff piece (no elbow);
+  `sit` and `wade` poses never rendered; foot slip not measured; the hat brim hides the head
+  from the game camera (intended) but from the front the head is a brown ball.
+- **Ship**: the canopy glass is an opaque pale wash (an egg from some sides); no pilot is seen
+  inside; the pulse state (long flames) was never rendered; the hover bob and the gear
+  folding were seen only in the game's chase frame.
+- **Cast shade** falls on terrain and near strokes only: not on props, water or the ship's own
+  deck. Under a low sun it is capped at 2.2 heights.
+- **Rain on Earth is thin**: a handful of strokes in a frame. Snow, dust, hail, leaves are
+  still opaque marks in the scene pass (only rain is a glaze). Lightning still unseen.
+- **Not done from item 4**: PHYSICS' branch sway and drifts; the instanced kit variant;
+  half-float flora fields; the debug flag PHYSICS asked for.
+- **The ragged border** still pools dark and a little dotted under a storm key.
+- **M2's 42 biome frames in `docs/shots/painter/` predate this block** (no near ground, the old
+  granulation): they are true to the landforms, not to today's foregrounds and darks.
+- The tour was not run. Venus, Saturn, Mercury, Neptune, Pluto were not looked at with the
+  near layer (their kinds follow from `small` automatically: mostly pebbles and needles).
+- Quality 0 and 2 with the near layer: counted (cost line), never looked at.
+
+### Contract changes in this block (all additive; nothing removed)
+- `createExplorer()`, `createShip()`: C10 kept (sizes, origins, facing -Z, `userData.seat`
+  (0, 1.75, -1.3), `userData.hatch` (-2.3, 0, -0.6), the state shapes). New: the ship's pads
+  stand where PHYSICS' legs are ((0, 0, -3.2), (+-2.2, 0, 1.8)); `object3D.userData.pcCaster`
+  ('explorer' | 'ship': the world lays their shade; any object added to the scene with that
+  tag is treated the same); explorer `animate` also reads `phase`, `snap`; ship `snap`.
+  Each `object3D` is a Group holding ONE mesh (`makeFigureMaterial`); do not swap its material.
+- `world.setBuildBudget(ms, { fixed: true })`: pins the slice (the lead asked): no larger share
+  of slow frames. `world.busy` now includes near-ground clumps still to lay.
+- `world.update` eases the sky numbers itself; PILOT changes nothing.
+- Render: `GLAZES` (shared.js) and `makeFigureMaterial`, `makeNearMaterial` (materials.js);
+  `FRAG_PARS` declares `uCast[4]`, `uCastK` and gains `pcCast`; `makePaintUniforms` supplies
+  them (kits built on the old factory still work: the uniforms default to no shade).
+- Gallery: `pose=`, `speed=`, `phase=`, `jet=`, `lift=`, `mface=`, `epitch=`, `smode=`, `gear=`,
+  `canopy=`, `throttle=`, `sface=`, `cockpit=1`, `near=0` (see "Gallery URL parameters").
+
+### For PHYSICS
+- **Rain** is a glaze now and your `share: 0.25`, `parallel`, `maxLen`, `near: 6` are in use:
+  parallel strokes read as rain at last (`wx-jupiter-storm.jpg`). On Earth a quarter is too
+  few through the trees (`wx-earth-storm.jpg`): I multiply your share by 1.6. If you can, make
+  the share follow the rain rate so a downpour has three times the strokes of a shower.
+- **Grass**: I use `pcPhysBend(root, 0.0)` per blade and your `flatten` (z) to lay a blade
+  over along its own lean and keep it down: the plastic part (60 s) is what makes the
+  walker's track visible, since the push load itself is gone a second after the feet. A
+  track 1 m wide is about one clump of mine: a wider flatten radius for the explorer (0.8 m)
+  would read better. The downwash disc is strong and right.
+- **Sky numbers** are eased by me (0.9 s time constant): no need to slow yours for my sake.
+- Pads: the ship's drawn pads are at your `legs`; tell me if they move.
+
+### For PILOT (and the lead)
+- **Cost** (MUST FIX of review 4): numbers above; please re-measure `earth-temperate_forest-1`
+  and the densest view of each body in the game. If a body is still over, the knob is `TRIM`
+  in `src/world/flora.js` (quality 1 only) or `MAXS` in `src/world/nearground.js`.
+- **Dark specks** (MUST in M3): fixed in the sheet pass for every dark wash; please look at a
+  fresh `m2-pulse` frame.
+- `setBuildBudget(ms, { fixed: true })` is there. `world.busy` reaches 0 with the near layer
+  (the gallery's ready flag waits on it); the tour was not re-run by me.
+- The boom: the figure now reads at the default 6.4 m ("longer while the explorer is a
+  placeholder" in `camera.js`): try 5 m, your call.
+- The cockpit: the hoop and the cowl sit where the HUD's lower panels are; if the dials
+  should be seen, the panels want to move outward 80 px or so.
+- The ship has no pilot inside and the explorer's `sit` pose is unused: if you ever show the
+  explorer in the cockpit from outside, tell me and I will seat a figure under the glass.
+- **UI theme, look review** (from `ui-title`, `ui-map`, `ui-painted-book`, `ui-foot`, seen on a
+  half-size contact sheet). It belongs to the picture: torn paper in the sheet's own white,
+  a hand-lettered face, "click to begin" as a brush stroke, the sketch pinned like a small
+  painting. Change, in this order: (1) the key caps are the one digital thing on the title
+  card (even blue-grey rounded rectangles with a hard outline): make each a loose wash dab
+  with a broken pencil ring, none quite alike; (2) the map lies on a flat navy field with
+  pixel-dot stars: either the sheet's own indigo wash with spattered stars, or no dark field
+  at all (an ink chart on bare paper); (3) the orbits are perfect ellipses of one line
+  weight: let the line break and swell like dry brush; (4) the sketchbook's empty slots are
+  grey dashed boxes and the selected planet is a hard navy pill: faint pencil rectangles,
+  and a brush stroke for the selection; (5) the hint line sits on a clean rectangle: tear it
+  like the others; (6) every panel shares one tear profile: vary it per panel.
 
 ## M3 block 1: weather in the picture (third PAINTER agent)
 
@@ -515,6 +719,11 @@ import { createExplorer, createShip } from './src/art/models.js';
   `fresh=1` fresh snow already lying; `kits=0` no rain, snow, dust or marks; `models=1` with
   `walk=<m/s>` (the explorer walks in during the pre-roll), `mdist=`, `sdist=`, `hover=<m>`,
   `wash=<newtons>` (the ship's downwash), `push=0` (nothing pushes the grass)
+- models (`models=1`): explorer `pose=idle|walk|jet|fall|wade|sit`, `speed=`, `phase=` (radians
+  of the stride), `jet=`, `lift=<m>`, `mface=<deg>` (turned to the right of the view; 0 shows
+  its back), `epitch=`; ship `smode=landed|hover|fly|pulse`, `gear=`, `canopy=`, `throttle=`,
+  `sface=<deg>`; `cockpit=1` the view from the ship's seat (fov 62, near 0.12 m);
+  `near=0` hides the near ground strokes
 - `window.__pcReady` once terrain and flora have settled and three frames are painted (and,
   with `physics=1`, once PHYSICS and its kits are loaded);
   `window.__pcVantage` the easel in use.
