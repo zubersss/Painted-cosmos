@@ -420,26 +420,32 @@ void main() {
   // far off, where the waves are finer than the brush can hold: the swell as a painter lays it,
   // long broken strokes lying the way the crests lie (anchored to the planet), the hollow before
   // each one darker, and on a sea that is breaking a white horse here and there along them
-  float farSea = (1.0 - keep) * smoothstep(0.04, 0.35, uPhysWaterSea.x) * liq * deep;
   float farWhite = 0.0;
+  // (seen across the water a swell 20 m long is a hair's breadth on the sheet: the strokes are
+  // spaced by what the brush can hold there, a dozen pixels, in octaves that give way to one
+  // another with distance, each one fixed to the planet)
+  vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
+  vec3 A3 = normalize(cross(up, D3));
+  float qd = dot(vBody, D3);
+  float lk = max(0.0, log2(max(13.0 * fwidth(qd), 1.0e-3) / 8.5) / 1.3785);
+  // (far: where a pixel is wider than the brush can draw a wave in, a metre or two of sea)
+  float farSea = smoothstep(0.5, 2.2, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, uPhysWaterSea.x) * liq * deep;
   if (farSea > 0.01) {
-    vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
-    vec3 A3 = normalize(cross(up, D3));
-    float wB = smoothstep(110.0, 300.0, dist), capTh2 = 0.80 - 0.5 * uPhysWaterSea.w;
+    float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * uPhysWaterSea.w;
     float sw = 0.0, wh = 0.0, hol = 0.0;
     for (int i = 0; i < 2; i++) {
-      float L = i == 0 ? 8.5 : 21.0, wgt = i == 0 ? 1.0 - wB : wB;
-      float q = dot(vBody, D3) / L + (texture(uNoise3D, vBody / (L * 6.0) + 0.3).r - 0.5) * 1.6;
+      float L = 8.5 * pow(2.6, k0 + float(i)), wgt = i == 0 ? 1.0 - kf : kf;
+      float q = qd / L + (texture(uNoise3D, vBody / (L * 6.0) + 0.3).r - 0.5) * 1.6;
       float id = floor(q), s = fract(q);
       float br = texture(uNoise3D, vec3(dot(vBody, A3) / (L * 4.0), id * 0.371, id * 0.117)).r;
-      float ln = smoothstep(0.74, 0.86, s) * (1.0 - smoothstep(0.92, 1.0, s));
-      sw += wgt * ln * smoothstep(0.42, 0.56, br);
-      wh += wgt * ln * smoothstep(capTh2, capTh2 + 0.06, br);
-      hol += wgt * smoothstep(0.30, 0.55, s) * (1.0 - smoothstep(0.70, 0.80, s)) * smoothstep(0.35, 0.60, br);
+      float ln = smoothstep(0.70, 0.82, s) * (1.0 - smoothstep(0.92, 1.0, s));
+      sw += wgt * ln * smoothstep(0.40, 0.54, br);
+      wh += wgt * smoothstep(0.80, 0.88, s) * (1.0 - smoothstep(0.93, 1.0, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
+      hol += wgt * smoothstep(0.28, 0.52, s) * (1.0 - smoothstep(0.66, 0.76, s)) * smoothstep(0.35, 0.60, br);
     }
-    c = pcDensity(c, 1.0 + farSea * (hol * 0.45 - sw * 0.25));
-    c = mix(c, skyc, farSea * sw * 0.35);
-    farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(700.0, 1800.0, dist));
+    c = pcDensity(c, 1.0 + farSea * (hol * 0.55 - sw * 0.25));
+    c = mix(c, skyc, farSea * sw * 0.40);
+    farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq, farWhite);
   glint = max(glint, white);

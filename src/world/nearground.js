@@ -414,10 +414,11 @@ class Ring {
     }
     left -= nst;
     // drift ripples on dunes: long low dashes, darker than the sand
-    const nrp = Math.min(left, Math.round(st.ripple * 5 + H(160) - 0.5));
+    // (short, unequal, soft: rows of long thin ones read as ruled dashes)
+    const nrp = Math.min(left, Math.round(st.ripple * 3 + H(160) - 0.5));
     for (let q = 0; q < nrp; q++, k++) {
       const q1 = H(161 + q), q2 = H(165 + q), q3 = H(169 + q), p = at(q1, q2);
-      this.put(p[0], p[1], 0, 0, 0, (0.02 + 0.025 * q3) * kh, (0.35 + 0.7 * q1) * kw, DAB, q3, born, dens(gr, 1.35), dens(gg, 1.35), dens(gb, 1.4), 0, 0);
+      this.put(p[0], p[1], 0, 0, 0, (0.03 + 0.04 * q3) * kh, (0.14 + 0.5 * q1 * q1) * kw, DAB, q3, born, dens(gr, 1.2), dens(gg, 1.2), dens(gb, 1.25), 0, 0);
     }
     left -= nrp;
     // splinters of frost and crystal: a cluster in one touch, lit or in its own shadow
@@ -477,8 +478,8 @@ export class NearGround {
     this.mesh.visible = true;
     if (QUALITY.level !== this.lastQ) { this.lastQ = QUALITY.level; this.clear(); }
     // (walking, a few cells come due each frame and the slice is never filled; after a landing or
-    // a leap the whole sward is due: it is then given more of the frame, for a second or two)
-    let left = this.busy > 800 ? sliceMs * 2.5 : sliceMs;
+    // a leap the whole sward is due and arrives nearest first over a few seconds, inside the slice)
+    let left = sliceMs;
     for (const r of this.rings) left -= r.update(camLocal, alt, Math.max(0.15, left), dt, pixel);
   }
 }
