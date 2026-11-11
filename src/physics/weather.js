@@ -36,22 +36,24 @@ export const WEATHER = Object.freeze({
 });
 
 // Cell kinds. rate: peak precipitation (mm/h water equivalent). cloud: cloud cover. wind: mean
-// wind multiplier at full strength. outflow: gust-front speed (m/s). flash: lightning flashes
+// wind multiplier at full strength. blow (P7, lead review 5 P1: storms brought no wind): the wind the
+// system brings by itself under its cloud shield, m/s at 10 m, added along the mean wind (a storm is 16 m/s
+// whatever the breeze was; a multiple of a 2 m/s breeze is still a breeze). outflow: gust-front speed (m/s). flash: lightning flashes
 // per minute at full strength. vis: visual range at full strength (m). size / life: multipliers.
 const KINDS = {
   cloud: { rate: 0.0, cloud: 0.85, wind: 1.0, outflow: 0, flash: 0, vis: 0, size: 1.3, life: 1.2 },
   drizzle: { rate: 0.8, cloud: 1.0, wind: 1.0, outflow: 0, flash: 0, vis: 4000, size: 1.2, life: 1.2 },
-  rain: { rate: 6, cloud: 1.0, wind: 1.3, outflow: 2, flash: 0, vis: 0, size: 1.2, life: 1.2 },
-  shower: { rate: 10, cloud: 0.9, wind: 1.4, outflow: 6, flash: 0, vis: 0, size: 0.6, life: 0.6 },
-  storm: { rate: 32, cloud: 1.0, wind: 1.9, outflow: 14, flash: 5, vis: 0, size: 0.9, life: 0.8 },
+  rain: { rate: 6, cloud: 1.0, wind: 1.3, outflow: 2, blow: 3, flash: 0, vis: 0, size: 1.2, life: 1.2 },
+  shower: { rate: 10, cloud: 0.9, wind: 1.4, outflow: 6, blow: 6, flash: 0, vis: 0, size: 0.6, life: 0.6 },
+  storm: { rate: 32, cloud: 1.0, wind: 1.9, outflow: 14, blow: 16, flash: 5, vis: 0, size: 0.9, life: 0.8 },
   fog: { rate: 0.0, cloud: 0.6, wind: 0.35, outflow: 0, flash: 0, vis: 120, size: 0.8, life: 1.0 },
   // Mars: regional dust storm. Lifts dust once the wind passes the saltation threshold.
-  dust: { rate: 0.0, cloud: 0.5, wind: 3.0, outflow: 8, flash: 0, vis: 90, size: 1.8, life: 1.6, dust: 1 },
+  dust: { rate: 0.0, cloud: 0.5, wind: 3.0, outflow: 8, blow: 20, flash: 0, vis: 90, size: 1.8, life: 1.6, dust: 1 },
   // Venus: sulphur haze banks, and sulphuric-acid drizzle that mostly evaporates on the way down.
   haze: { rate: 0.0, cloud: 1.0, wind: 1.0, outflow: 0, flash: 0, vis: 350, size: 1.5, life: 1.5 },
   acid: { rate: 1.2, cloud: 1.0, wind: 1.2, outflow: 0, flash: 0.3, vis: 900, size: 1.0, life: 1.0 },
   // Ice giants: fall of ice crystals; Pluto: slow frost from the thin nitrogen air.
-  ice: { rate: 1.5, cloud: 0.8, wind: 1.3, outflow: 3, flash: 0, vis: 1500, size: 1.2, life: 1.2 },
+  ice: { rate: 1.5, cloud: 0.8, wind: 1.3, outflow: 3, blow: 4, flash: 0, vis: 1500, size: 1.2, life: 1.2 },
   frost: { rate: 0.15, cloud: 0.2, wind: 1.0, outflow: 0, flash: 0, vis: 6000, size: 1.6, life: 1.8 },
   // Pluto: thin layered haze.
   veil: { rate: 0.0, cloud: 0.3, wind: 1.0, outflow: 0, flash: 0, vis: 7000, size: 1.6, life: 1.8 },
@@ -197,12 +199,12 @@ export function cellsAt(bodyId, t, seed = DEFAULT_SEED) {
 }
 
 const _c = {};
-const _acc = { rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0 };
+const _acc = { blow: 0, rate: 0, rateIce: 0, rateFrost: 0, cloud: 0, windMul: 1, calm: 0, flash: 0, fog: 0, haze: 0, dust: 0, ox: 0, oy: 0, oz: 0, storm: 0, top: null, topW: 0, topCell: -1, topGen: 0, front: 0 };
 
 // Sum the influence of every cell on unit direction (ux,uy,uz) at time t into _acc.
 function gather(bodyId, ux, uy, uz, t, seed) {
   const a = _acc;
-  a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
+  a.blow = 0; a.rate = 0; a.rateIce = 0; a.rateFrost = 0; a.cloud = 0; a.windMul = 1; a.calm = 0; a.flash = 0; a.fog = 0; a.haze = 0; a.dust = 0;
   a.ox = a.oy = a.oz = 0; a.storm = 0; a.top = null; a.topW = 0; a.topCell = -1; a.topGen = 0; a.front = 0;
   const regime = REGIMES[bodyId];
   if (!regime || !regime.cells) return a;
@@ -248,6 +250,7 @@ function gather(bodyId, ux, uy, uz, t, seed) {
     if (cover > 0) clear *= 1 - K.cloud * cover;
     // mean wind: stronger under active systems, calmer inside fog
     if (K.wind >= 1) a.windMul += (K.wind - 1) * cover; else a.calm = Math.max(a.calm, (1 - K.wind) * cover);
+    if (K.blow > 0) a.blow = Math.max(a.blow, K.blow * cover);     // (the cloud shield is wider than the rain: the wind rises first)
     // gust front: cold outflow spreading from the core, strongest just ahead of the rain
     if (K.outflow > 0 && d > 1) {
       const ring = smoothstep(0.15, 0.8, x) * (1 - smoothstep(0.95, WEATHER.frontReach, x));
@@ -277,12 +280,14 @@ function gather(bodyId, ux, uy, uz, t, seed) {
 }
 
 // What the weather does to the wind at a place: o[0] = multiplier on the mean wind,
-// o[1..3] = outflow vector (m/s, body-local) to add, o[4] = extra gustiness 0..1.
+// o[1..3] = outflow vector (m/s, body-local) to add, o[4] = extra gustiness 0..1,
+// o[5] = the system's own wind (m/s at 10 m) to add along the mean wind (P7).
 export function weatherWind(bodyId, ux, uy, uz, t, seed, o) {
   const a = gather(bodyId, ux, uy, uz, t, seed);
   o[0] = a.windMul * (1 - a.calm);
   o[1] = a.ox; o[2] = a.oy; o[3] = a.oz;
   o[4] = clamp01(a.storm * 0.8 + a.front * 0.6 + (a.windMul - 1) * 0.3);
+  o[5] = a.blow;
   return o;
 }
 
@@ -438,7 +443,7 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // open sea the air fills with spray torn from the crests ("visibility seriously affected"): until
   // P7 Neptune's 34 m/s blew over a white sea under a fair sky.
   windLarge(bodyId, ux, uy, uz, t, seed, _wl);
-  const galeU = _wl[3] * a.windMul * (1 - a.calm);
+  const galeU = _wl[3] * a.windMul * (1 - a.calm);   // (not the storm's own wind: a storm has its own sky)
   const gale01 = rho > 0.05 ? smoothstep(WEATHER.galeFrom, WEATHER.galeFull, galeU) : 0;
   const open = env && env.fetch > 0 ? smoothstep(600, 2000, env.fetch) : 0;
   const sprayExt = WEATHER.sprayExt * gale01 * open;

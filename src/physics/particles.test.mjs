@@ -330,7 +330,8 @@ test('the hull keeps the rain off what is under it', () => {
     if (h < 3.5) { if (r < 2.8) under++; else if (r > 5 && r < 5 + 2.8 * 0.6) ring++; }      // (the ring has about the same area)
   }
   assert.ok(ring >= 2, 'rain all around: ' + ring);
-  assert.ok(under <= ring * 0.25, `under the hull ${under} against ${ring} beside it`);
+  // (P7: a storm brings its own wind now, 16 m/s: rain driven at sixty degrees reaches a little way under the edge)
+  assert.ok(under <= ring * 0.5, `under the hull ${under} against ${ring} beside it`);
   // and it lands on the hull instead: splashes up there
   const E = w.physics.particles.events; let onHull = 0;
   for (let k = 0; k < E.capacity; k++) { const o = k * 8; const p = V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2]); if (E.data[o + 4] > 0 && Math.abs(len(p) - w.R - 4.7) < 0.3) onHull++; }

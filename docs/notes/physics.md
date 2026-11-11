@@ -3,19 +3,21 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
-## Hand-over (kept current; last written during P6 by the third PHYSICS agent)
+## Hand-over (kept current; last written at the end of P7 by the fourth PHYSICS agent)
 
 This file is meant to be enough on its own. Read this section top to bottom once; the code
 comments carry the physics (every module starts with what it models and from which source).
 
-**Where things stand.** P1 to P5 are accepted. P6 (the coordinator's order, in
-`docs/COORDINATOR.md` section E and in "Stage P6" under Status below) has items 1, 2 and 3
-done and items 4 and 5 open (below). The tree is green at the commit that carries this note:
-`node --test src/physics/` **208 pass**; PILOT's `node --test tests/*.test.mjs` 102 pass with
-my changes; the game itself loads with this tree in headless Chromium with no console errors
-(on foot at the spawn, `uPhysBranch` live, drift level 0 in the wood). Nothing is half-edited. PAINTER (its third agent) is wiring weather into the
-picture right now and reads "For PAINTER" cold: **if you change a uniform, an export or a
-call named there, say so at the top of that section in the same commit.**
+**Where things stand.** P1 to P6 are accepted. P7 (tune against the picture; the coordinator's
+order of this run, plus the lead's review 4 and 5 items that arrived during it) is done as far
+as the list below says. The tree is green at the commit that carries this note:
+`node --test src/physics/` **220 pass**; PILOT's `node --test tests/*.test.mjs` 105 pass on a
+clean export of HEAD with my files (the shared working tree itself had PILOT's half-edited
+`src/core/sim.js` failing one of its own tests while I worked: check PILOT's suite on an
+export, see below). Worst `physics.update` frame 0.48 to 1.35 ms (`p5/cost.mjs`). Nothing is
+half-edited. PAINTER (its fourth agent) is working from "For PAINTER" right now: **if you
+change a uniform, an export or a call named there, say so at the top of that section in the
+same commit.**
 
 **How to work here** (all of it learned the hard way):
 - Commit only with `tools/commit.sh physics "message"`; own only `src/physics/**`,
@@ -24,7 +26,24 @@ call named there, say so at the top of that section in the same commit.**
   red for longer than one command, and run the whole suite after every multi-file edit (I
   left an undefined name in `index.js` for a minute; every page that loads the physics would
   have failed in that minute).
-- Scratch goes in `/home/user/.pc-scratch/physics/`. What is there and worth knowing:
+- **The coordinator snapshots the working tree while you work** (`[physics] WIP snapshot`): my
+  first P7 code went in under that name, mid-edit, and the lead ran my tests on it (196 of
+  197). Keep every state between two commands green.
+- **PILOT's suite on a clean tree with your files**: `tools/export-head.sh <dir>`, then
+  `cp -r src/physics/. <dir>/src/physics/`, then run `node --test tests/*.test.mjs` in `<dir>`.
+  The shared tree usually has someone's half-written file in it. One of PILOT's tests
+  (`tests/physics.test.mjs:27`, walking and running) failed once in four runs under heavy load
+  and passed alone: it is the load, not the code.
+- **A test world must be the body's own size**: `makeWorld({ R: BODIES[id].radius })`. With
+  any other radius the place is hundreds of metres above or below the weather and every sky
+  number is constant (I measured "rates" of zero for an hour before I saw it).
+- Scratch goes in `/home/user/.pc-scratch/physics/`. New in `p7/`: `crawl.mjs` (the P6 one with
+  this stage's kit arithmetic), `rates.mjs` (the fastest any sky number moves, 150 places a
+  biome), `paths.mjs` (`physics.here.sky` against `physics.sky(physics.weather())`),
+  `stormwind.mjs` (the lead's table: wind at 2, 10, 30 m through each storm), `sea.mjs`
+  (wind sea and swell at a liquid biome), `wake.mjs` (the walker's wake against a twin world),
+  `nodeplay.mjs` (the P6 one pointed at the export `p7/head`), `fresh2.mjs`. What was there
+  before and worth knowing:
   - `p6/crawl.mjs <repo root> <blizzard|dust|storm> <still|pan|walk|orbit>`: the kits'
     marks followed from frame to frame WITHOUT GL (pure `expand.js`), counting what a painting
     may not do: marks that vanish or appear at full size, marks that jump, marks that strobe.
@@ -61,19 +80,58 @@ call named there, say so at the top of that section in the same commit.**
 - Read at every sync: `docs/COORDINATOR.md` section E, `docs/lead/REVIEW.md`,
   `docs/notes/pilot.md`, `docs/notes/painter.md`. Answer MUST FIX items here.
 
-**Done in P6** (details under Status, "Stage P6", and in the sections each changed):
-1. *Crawl.* Nothing pops, jumps or strobes any more (numbers in "Crawl, measured"). On the
-   way two real bugs fell out: particles were published on the tangent plane of the frame's
-   anchor (rain ended up to 18 m above the ground 380 m from where the session began), and
-   the weather entered 18 m over the sea BED (no rain over deep water).
-2. *The game played* on Earth, Mars, the Moon, Venus, Jupiter and Neptune, in the browser
-   with real keys and at 60 Hz in Node: tables and what is physically off, with the assist
-   that keeps each forgiving ("The integrated game, played in P6"; "For PILOT", new items).
-3. *Branches and drifts.* `pcPhysBranch` / `plantBranch` (a crown no longer sways as one
-   piece; one line for PAINTER, no new texture) and `drift.js` / `physics.fields.drift`
-   (snow and sand in the lee and in hollows; the explorer's ground knows the depth).
+**Done in P7** (details in "For PAINTER" (top block), "For PILOT" (top block), API "Added in P7"):
+1. *PAINTER's list.* Rain laid parallel, no stroke over 1.2 m or nearer than 2.4 m, a quarter
+   of the strokes; snow at PAINTER's sizes, each flake its own shape and slow turn; dust in a
+   storm as a few low walls near the ground; a swell on open seas, the crest as a line, the
+   significant height of sea and swell together; five times the splash rings near the focus;
+   grass parted two metres wide with a wake that lasts six seconds and a pressed path.
+2. *Sky numbers and the ruling on snow.* `sky.fresh` (integrated at the focus as it falls);
+   standing snow is the biome's own only; rain or snow closes the sky; a gale has its own sky;
+   both paths (`here` and stateless) answer the same large-scale wind and agree within 1 % in
+   everything but snow; the melt-water step of 55 % is a ramp.
+3. *Storms bring wind* (lead review 5, P1, a MUST FIX): each system adds its own wind (`blow`
+   in `KINDS`: storm 16 m/s, dust 20, shower 6, rain 3, ice 4 at 10 m) under its cloud shield.
+4. *The game re-flown* with PILOT's five levers in, six worlds, numbers in "For PILOT".
 
 **Not done, each with where to start:**
+1. *The lead's review 5, SHOULD FIX P2 to P6* (`docs/lead/REVIEW.md`): P2 the first storm
+   crosses the spawn at 640 to 800 s, in the dark (a seed or a time offset: `DEFAULT_SEED` in
+   `weather.js`, or start the weather clock some 300 s on); P3 half done (the gale sky and the
+   swell are in; "never a storm" on `storm_seas` is the regime table: `REGIMES.neptune`); P4
+   dust in the air of Earth's forest (`sky.dust` 0.27 at the spawn before the storm: the gust
+   front lifts dust where `dustSource` says there is some; the forest's is not 0: `BIOMES`
+   in `ground.js`, or gate the lift by wetness and canopy); P5 answered (fresh snow is
+   stateful at the focus and says so; the clock-jump case re-reads the quadrature); **P6 not
+   touched: walking downwind in 33 m/s is slower than upwind** (0.6 against 3.5 m/s: start in
+   `explorer.js`, the wind load and the lean; and the boundary layer over a sea in `wind.js`
+   `heightFactor`: 33 m/s at two metres is too much of a 40 m/s wind).
+2. *Thunderstorm gusts are still under the lead's 15 to 30 m/s at 10 m in a wood*: measured
+   at the spawn 4 to 11 m/s at 10 m (21 to 25 at 30 m, above the crowns), where it was 1.6 to
+   3.7. In the open it is more. Tune `KINDS.storm.blow` and the gust gain against
+   `p7/stormwind.mjs`; watch the explorer (PILOT's `R-FOOT-5`).
+3. *The weather judged in the integrated game by me*: not done. The lead's weather sheet
+   (`docs/lead/evidence/weather.jpg`, at `62d3529`) has P7.1 and P7.2 in it, not the sky
+   numbers or the storm wind; I did not open it (out of working context). Re-run
+   `node tests/weather.mjs` (PILOT's) on a clean export and judge the twelve frames.
+4. *The instanced kit path* (`expand: 'gpu'`, `chunks.glsl.js`) has none of this stage's draw
+   options (`parallel`, `maxLen`, `near` for streaks; `tumble`, `aspect`, the walls). PAINTER
+   uses the CPU path. Port them before anyone switches.
+5. *Rates*: Earth's `haze` and Jupiter's `rain` reach 8.5 % a second at the edge of a passing
+   cell (the lead allows 8). The source is how sharp a cell's edge is against its drift speed
+   (`gather` in `weather.js`: `x0`, `edgeTime`).
+6. *Fresh snow away from the focus* is a 21-point quadrature over the past and wobbles (it can
+   rise a little under a clear sky): good enough for a tour's read-out, not for a picture.
+   A per-place ring of the rate, filled as time passes, would make it exact.
+7. *From P6, still open*: the silhouette agreement test for the flora chunk inside
+   `PROP_VERT` (method in the P6 list below, item 1); calm-air crawl of flakes; drifts and
+   branches judged as a picture (PAINTER has not wired them); on the Moon the explorer's feet
+   never leave the ground at a run.
+8. *Sand marks*: 2.3 strokes of saltating sand a second go out whole while walking in Mars'
+   storm (`p7/crawl.mjs dust walk`); never looked at.
+
+**The P6 list of what was not done then** (kept for its "where to start"):
+
 1. *A silhouette agreement test for the flora chunk inside `PROP_VERT`.* Not started. The
    painted lab is deterministic with `pre` and `freeze=1`, so: put the camera on a lone tree
    (`world.sampleObstacles` gives root and height), shoot once with `physics.setWindScale`
@@ -588,6 +646,83 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+**P7, for PILOT and the lead (read this block first; nothing below it changed).**
+
+*Nothing to wire.* Everything of P7 arrives through what you already call. What you will
+notice: `physics.here.sky` has a twelfth number `fresh`; the read-out's sky line and
+`__pc.info().weather` can show it. `physics.here.weather` has `freshSnow` and `gale01`.
+
+*Answers to review 5.*
+- **P1 (MUST FIX, storms bring no wind): done.** Each system adds a wind of its own under its
+  cloud shield (so it rises before the rain), along what is blowing: storm 16 m/s at 10 m,
+  dust storm 20, shower 6, rain 3, ice fall 4 (`KINDS[...].blow` in `weather.js`). Measured at
+  the game's own places with `physics.air` (`p7/stormwind.mjs`), wind at 2 / 10 / 30 m:
+  the thunderstorm at the Earth spawn, 600 to 780 s every 20 s: 4.3/6.2/12.1 (mist), 3.6/5.1/
+  10.0 (drizzle), **7.5/10.7/20.9** (first rain), 3.0/4.3/8.4, 6.2/9.0/21.4, 4.4/6.2/14.9,
+  7.2/10.4/24.5, 6.2/9.0/21.1, 1.5/2.2/5.2, 4.1/5.8/14.0 (it was 1.6 to 3.7 at 10 m: gusts and
+  lulls now, the wood shelters the two-metre level); a snow storm over the coast: 5.7 at 10 m
+  before it, 10.3 to 14.3 in it; Mars' dust storm: 7.5 to 14.2 at 10 m (it was 2.8 to 4.2).
+  Still under your `R-STORM-5` (15 to 30 m/s) at 10 m in a wood: see the hand-over, item 2.
+  **Not verified: the explorer and the ship in these winds in the game** (your unit tests pass
+  on an export with it; nobody has walked through the storm at the spawn since).
+- **P2** (the first storm falls in the dark): not done. **P3** (Neptune's `storm_seas`):
+  half: where the large-scale wind is 18 to 34 m/s the sky closes (cloud to 0.9, overcast
+  +0.25, `storm` to 0.8) and over the open sea spray takes the view (haze to 0.28); the sea
+  has a swell (0.8 m and 30 m long in its ordinary wind, 1.7 m and 59 m in 34 m/s). It still
+  never storms by its regime. **P4** (dust in the forest's air): not done. **P5** (the two
+  paths): `physics.sky(physics.weather(p, { time }))` and `physics.here.sky` now agree within
+  1 % in every number but `snow` and `fresh` (they were 29 % apart in `wet`, 38 % in `fog`,
+  because the stateful weather answered the gusty wind at the focus and the stateless one the
+  prevailing wind: both answer the large-scale wind now, and fog no longer comes and goes
+  with a gust); the 55 % step in `wet` (melt water switching on) is a ramp. Fresh snow at the
+  focus is integrated as it falls, so there `physics.here` is the authority and says so in the
+  API; a clock jump of over 5 s re-reads the quadrature. **P6** (downwind slower than upwind in
+  33 m/s): not done; it is the first thing I would do next.
+- `R-WX-1`: measured through the stateless path, 150 places and 12 moments a biome, 11 s each,
+  at ground level (`p7/rates.mjs`): the fastest any number but `flash` moves in a second is
+  8.5 % on Earth (`haze`, a snow front arriving), 8.5 % on Jupiter (`rain`), 6.2 % Uranus,
+  7.3 % Neptune, 4.1 % Saturn, 2.0 % Mars and Venus. Half a point over your 8 % on Earth and
+  Jupiter at the worst moment; not fixed.
+
+*The game re-flown with your five levers in* (`p7/nodeplay.mjs`: your `Sim`, PAINTER's ground
+and obstacles, my physics, scripted keys at 60 Hz, on a clean export of `6b047dc`):
+
+| World | walk: to 90 %, stop | run: to 90 %, stop | jump: apex, aloft | jetpack fall ends at | cruise, 90 % after | turn at cruise | brake (X) | C to the ground |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Earth | 0.40 s; 0.53 s, 0.82 m | 0.82 s; 0.83 s, 2.6 m | 1.23 m, 1.05 s | 4.0 m/s | 46.7 m/s, 3.0 s | 42.0 deg/s, 69 m (37 m/s2, field 21) | from 47: 3.8 s, 97 m | lands at 1.09 m/s |
+| Mars | 0.75 s; 0.82 s, 1.58 m | 1.35 s; 1.55 s, 5.7 m | 2.84 m, 2.25 s | 4.0 | 143.1, 6.3 s | 28.9 deg/s, 260 m (66, field 40) | from 110: 4.2 s, 248 m (field 24) | lands at 0.98 (sink up to 64 m/s) |
+| Moon | 1.25 s; 1.18 s, 2.41 m | 2.30 s; 2.07 s, 7.5 m | 6.43 m, 4.90 s | 4.0 | 143.5, 6.3 s | 25.6 deg/s, 208 m (42, field 40) | from 74: 3.2 s, 131 m (field 24) | **hovers at 4.1 m, never lands** |
+| Venus | 0.42 s; 0.47 s, 0.63 m | pace 5.3 m/s; 0.52 s, 0.92 m | 1.08 m, 1.00 s | 4.0 | 34.9, 3.2 s | 39.6 deg/s, 30 m (14, field 3) | from 34: 2.4 s, 43 m | lands at 0.99 |
+| Jupiter | (walk 1.4 m/s here, see below) | 0.85 s; 0.87 s, 2.8 m | 0.88 m, 0.77 s | 4.0 | 69.3, 4.9 s | 42.6 deg/s, 103 m (57, field 40) | from 70: 5.4 s, 201 m | lands at 1.16 |
+| Neptune | 0.42 s; 0.53 s, 0.82 m | 0.90 s; 0.82 s, 2.5 m | 1.04 m, 0.90 s | 4.1 | 50.3, 3.0 s | 42.8 deg/s, 70 m (39, field 23) | from 51: 4.1 s, 112 m | lands at 1.06 |
+
+What the numbers say:
+- **The worlds now differ, on foot and in flight, as intended.** Getting up to a walk takes
+  0.4 s on Earth, 0.75 s on Mars, 1.25 s on the Moon, and stopping from a run 2.6, 5.7 and
+  7.5 m: low gravity is felt in the feet. Cruise is 35 (Venus), 47, 50, 69 (Jupiter) and 143
+  m/s (Mars, the Moon); in P6 it was 34 to 84. Thin-air worlds turn wide (26 to 29 deg/s),
+  thick-air worlds at 40 to 43. Every jetpack fall ends at 4 m/s.
+- **Forgiving? Three things to look at.** (1) *Mars and the Moon at cruise*: 143 m/s with a
+  turn radius of 208 to 260 m and 131 to 248 m to stop, with the field brake already giving
+  24 m/s2. In a Martian canyon that is a wall met before the nose comes round. The physics is
+  right for thin air; the forgiveness would be a slower pace near the ground (a cap on
+  `speedScale` below some height, or the density power 0.4 made 0.3: 100 m/s, radius 130 m).
+  Your call. (2) *Jupiter's brake*: 201 m from cruise, no field share (the air is thick enough
+  for the rule that gives none), 25 % longer than in P6 because the pace is up. (3) *Sideways
+  load*: Mars 66 m/s2 in a held turn (6.7 g), Jupiter 57: the field's 40 is bounded as you
+  set it, the thrusters and the air add the rest. Nothing says so to the player.
+- **On the Moon the ship did not land**: after the cruise, the turn and the brake of this
+  script it came down over `crater_fields` (slope 0.21, one obstacle within 12 m), sank at up
+  to 35 m/s, and then hovered at 4.1 m with C held for 90 s, state `ATMOSPHERE`, lift 1, no
+  contacts. The same with the physics of P6 (`b146000`) under your levers, so it is not this
+  stage's doing; with the tree before the levers it landed (elsewhere: the flight was
+  different). It looks like the landing logic holding off over a boulder. The player is not
+  trapped (they can move aside), but nothing tells them why.
+- *Jupiter's walk at 1.4 m/s* in this run is the spot (it was odd in P6's table too: a slope
+  or a plant in the way of the scripted walk); the run reaches 7.4 m/s. Not looked into.
+- *Feet*: on every world the feet are down 100 % of the time, at a run on the Moon too. Still
+  open from P6 (the body model has no flight phase in a stride).
 
 1. **Create and update.** In `Sim` (pure, so tests keep working):
    ```js

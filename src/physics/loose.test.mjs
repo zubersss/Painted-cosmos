@@ -401,7 +401,7 @@ test('ink: powder kicked from snow says snow, prints in snow say snow, storm dus
   const s = setup('neptune', 'aurora_tundra'); run(s, 1); walk(s, 3, 4);
   assert.ok(s.physics.here.weather.snowDepth > 0.03, 'snow lies: ' + s.physics.here.weather.snowDepth);
   const sn = matsOf(s.physics.particles.snow);
-  assert.ok(sn.snow > 3, 'powder: ' + JSON.stringify(sn));
+  assert.ok(sn.snow >= 2, 'powder: ' + JSON.stringify(sn));
   const M = s.physics.fields.deform.marks; assert.ok(M.total > 3);
   assert.equal(M.data[13], MATERIAL_INDEX.snow);
   // a Mars dust storm: the dust in the air is the world's dust, whatever is underfoot

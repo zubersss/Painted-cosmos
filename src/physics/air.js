@@ -31,7 +31,7 @@ export const AIR = Object.freeze({
 });
 
 const _w = new Float64Array(4);
-const _ww = new Float64Array(5);
+const _ww = new Float64Array(6);
 const _d = new Float64Array(3);
 const _cov = {};
 const _cs = { biomeWeights: null, biomeId: null, liquidRadius: 0, radius: 0 };
@@ -97,15 +97,19 @@ export class AirGrid {
     const mul = _ww[0];
     const oe = _ww[1] * frame.ex + _ww[2] * frame.ey + _ww[3] * frame.ez;
     const on = _ww[1] * frame.nx + _ww[2] * frame.ny + _ww[3] * frame.nz;
-    this.mul = mul; this.gustiness = _ww[4];
+    this.mul = mul; this.gustiness = _ww[4]; const blow = _ww[5];
     // large-scale wind on 3 x 3 super-nodes (it varies over a fraction of the planet)
     const sup = this._sup, span = half * cell;
     for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
       frame.dir(cx + (a - 1) * span, cz + (b - 1) * span, _d);
       windLarge(bodyId, _d[0], _d[1], _d[2], t, this.seed, _w);
       const k = (b * 3 + a) * 2;
-      sup[k] = (_w[0] * frame.ex + _w[1] * frame.ey + _w[2] * frame.ez) * mul + oe;
-      sup[k + 1] = (_w[0] * frame.nx + _w[1] * frame.ny + _w[2] * frame.nz) * mul + on;
+      // (the system's own wind, added along what is blowing: a storm blows 16 m/s whatever the breeze
+      // was; where the mean wind and the outflow cancel, on the rear side, it shifts through a lull)
+      const be = (_w[0] * frame.ex + _w[1] * frame.ey + _w[2] * frame.ez) * mul + oe, bn = (_w[0] * frame.nx + _w[1] * frame.ny + _w[2] * frame.nz) * mul + on;
+      const bs = Math.hypot(be, bn), bl = bs > 1e-6 ? blow * Math.min(1, bs / 2) / bs : 0;
+      sup[k] = be * (1 + bl);
+      sup[k + 1] = bn * (1 + bl);
     }
     this.cwe = sup[8]; this.cwn = sup[9];
     this.cwx = frame.ex * this.cwe + frame.nx * this.cwn;
@@ -320,6 +324,7 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     windLarge(bodyId, ux, uy, uz, t, seed, _w);
     weatherWind(bodyId, ux, uy, uz, t, seed, _ww);
     let wx = _w[0] * _ww[0] + _ww[1], wy = _w[1] * _ww[0] + _ww[2], wz = _w[2] * _ww[0] + _ww[3];
+    { const bs = Math.hypot(wx, wy, wz), bl = bs > 1e-6 ? _ww[5] * Math.min(1, bs / 2) / bs : 0; wx *= 1 + bl; wy *= 1 + bl; wz *= 1 + bl; }   // the system's own wind
     const g = gustLevel(bodyId, px, py, pz, wx, wy, wz, t, seed);
     const zh = height != null ? Math.max(0, height) : 10;
     const I = turbulenceIntensity(WIND.refHeight, WIND.refRoughness) + _ww[4] * 0.15;
