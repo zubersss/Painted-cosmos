@@ -203,6 +203,7 @@ export class Sim {
         this.ex.p = scale(d, Math.max(len(this.ex.p), this.explorerEnv(this.bodyId).sample(d).radius));
       }
       if (this.shFrame.kind === 'body' && this.shFrame.rotating) this.stepParked(h);     // the ship waits on its gear
+      this.thickWord(h, moving);
       if (pressed('KeyE') && this.boardable()) this.beginBoarding();
     } else if (st === S.BOARDING) {
       this.stepBoarding(h);
@@ -812,6 +813,22 @@ export class Sim {
 
   // What the screen says when the ship is too fast to set down. Where the air is too thin to
   // slow it (Mars, Mercury, the Moon, Pluto) it also says what will: X.
+  // Bogged down in a thick liquid (the lava of Venus: PHYSICS' Stokes drag holds a wader to a
+  // third of a metre a second): after a few seconds of pushing say the way out, once per wade.
+  thickWord(dt, moving) {
+    const ex = this.ex;
+    if (!(ex.liquidDepth > 0)) { this._bogT = 0; this._bogSaid = false; return; }
+    const u = norm(ex.p), w = dot(ex.v, u);
+    const slow = moving && ex.liquidDepth > 0.3 && len(sub(ex.v, scale(u, w))) < 1;
+    this._bogT = slow ? (this._bogT || 0) + dt : 0;
+    if (this._bogT < 2.5 || this._bogSaid) return;
+    const env = this._envs[this.bodyId];
+    const liq = env && env.liquidOf && ex.surface ? env.liquidOf(ex.surface) : null;
+    if (!liq || !(liq.viscosity > 1)) return;                 // water and froth do not hold anyone
+    this._bogSaid = true;
+    this.say(`The ${liq.name || 'liquid'} is thick: hold Space and the jetpack lifts you out`, 7);
+  }
+
   slowWord(env) {
     if (!env || !(env.airBrake > 0)) return 'Slow down to land';
     return env.airless ? 'Slow down to land: no air to slow the ship here, hold X' : 'Slow down to land: the air is thin here, hold X';

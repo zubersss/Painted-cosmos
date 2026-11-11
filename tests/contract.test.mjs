@@ -234,3 +234,38 @@ test('landing anywhere: on every body the assist sets the ship down, it settles,
   for (const body of BODY_IDS) assert.ok(report.some((x) => x.startsWith(body + ' ') && !/refused/.test(x)), body + ': at least one landing');
   console.log('      landings:\n        ' + report.join('\n        '));
 });
+
+test('wading into the lava of Venus at the first landing, the screen says the way out (once)', { skip: skipObs }, async () => {
+  const { Sim } = await import('../src/core/sim.js');
+  const { Pad, play, len, sub, norm } = await import('./helpers.mjs');
+  const vec = await import('../src/core/vec.js');
+  const P = await import('../src/physics/index.js');
+  const ss = (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z);
+  const sim = new Sim({ sampleSurface: ss, getSpawn: (id) => surface.getSurface(id).getSpawn(),
+    sampleObstacles: (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r), physics: P.createPhysics({ sampleSurface: ss, seed: 1 }), body: 'venus' });
+  const pad = new Pad();
+  play(sim, pad, 1);
+  // Find the river from the spawn: the nearest liquid within 60 m, by looking round.
+  const up = norm(sim.ex.p);
+  let best = null;
+  for (let k = 0; k < 16 && !best; k++) {
+    const f = vec.tangent(vec.rotateAround(sim.footCam.viewFwd, up, (k / 16) * Math.PI * 2), up);
+    for (let d = 10; d <= 60; d += 5) {
+      const q = norm({ x: sim.ex.p.x + f.x * d, y: sim.ex.p.y + f.y * d, z: sim.ex.p.z + f.z * d });
+      const s = ss('venus', q);
+      if (s.liquidRadius - s.radius > 0.8) { best = f; break; }
+    }
+  }
+  assert.ok(best, 'there is lava deep enough to wade within 60 m of the first landing on Venus');
+  sim.footCam.viewFwd = best;
+  pad.press('KeyW'); pad.press('ShiftLeft');
+  let said = 0, last = null;
+  play(sim, pad, 30, { each: () => { const t = sim.notice && sim.notice.text; if (t && t !== last && /thick/.test(t)) said++; last = t; } });
+  assert.ok(sim.ex.liquidDepth > 0.3, 'the explorer is in the lava');
+  assert.equal(said, 1, 'said once: ' + (sim.notice && sim.notice.text));
+  // Space lifts out: dry within three seconds.
+  pad.press('Space');
+  const t = play(sim, pad, 3, { until: () => sim.ex.liquidDepth <= 0 });
+  assert.ok(sim.ex.liquidDepth <= 0, 'the jetpack lifts the explorer out of the lava');
+  assert.ok(t < 3);
+});
