@@ -44,7 +44,10 @@ test('other worlds: Neptune\'s methane sea is rougher than water under the same 
 test('the sea state at the focus rises and falls slowly, and the JS twin is bounded by its amplitudes', () => {
   const F = new WaterField();
   const frame = { version: 1 };
-  let prev = 0, worst = 0;
+  // arriving somewhere, the sea is already running under the wind that blows there
+  F.update(1 / 60, frame, 3, 0, 0, 50, 2500, 9, 1.2, 999);
+  assert.ok(Math.abs(F.height - windSea(3, 2500, 9, 1.2, 999, 50).height) < 1e-9 && F.height > 0.05, 'set on arrival: ' + F.height);
+  let prev = F.height, worst = 0;
   for (let i = 0; i < 60 * 120; i++) {
     const U = i < 60 * 60 ? 18 : 2;          // a gale for a minute, then it drops
     F.update(1 / 60, frame, U, 0, 0, 50, 2500, 9, 1.2, 999);
@@ -81,12 +84,18 @@ test('in the game loop: waves on a windy coast, none on dry land, none without a
     let prev = null, worst = 0;
     const before = sea.physics.stats.reanchors;
     let q = p; const e = norm(V(-q.z, 0, q.x));
-    for (let i = 0; i < 60 * 14; i++) { q = V(q.x + e.x * 40 / 60, q.y, q.z + e.z * 40 / 60); const l = len(q); q = V(q.x * sea.R / l, q.y * sea.R / l, q.z * sea.R / l); sea.t += 1 / 60; sea.physics.update(1 / 60, { bodyId: 'earth', time: sea.t, focus: q }); const h = sea.physics.fields.water.heightAt(q); if (prev != null) worst = Math.max(worst, Math.abs(h - prev)); prev = h; }
-    assert.ok(sea.physics.stats.reanchors > before, 're-anchored');
     // the most a frame can change it: every train at its steepest, crossed at 40 m/s plus its own speed
-    const Wf = sea.physics.fields.water.field; let bound = 0.004;
-    for (let i = 0; i < 3; i++) bound += Wf.amp[i] * (Wf.k[i] * 40 + Wf.omega[i]) / 60;
-    assert.ok(worst < bound * 1.25, `largest change of the surface under the walker in one frame: ${worst} (waves alone allow ${bound})`);
+    const Wf = sea.physics.fields.water.field; let excess = 0;
+    for (let i = 0; i < 60 * 14; i++) {
+      q = V(q.x + e.x * 40 / 60, q.y, q.z + e.z * 40 / 60); const l = len(q); q = V(q.x * sea.R / l, q.y * sea.R / l, q.z * sea.R / l); sea.t += 1 / 60;
+      sea.physics.update(1 / 60, { bodyId: 'earth', time: sea.t, focus: q });
+      const h = sea.physics.fields.water.heightAt(q);
+      let bound = 0.004; for (let k = 0; k < 3; k++) bound += Wf.amp[k] * (Wf.k[k] * 40 + Wf.omega[k]) / 60;
+      if (prev != null) { worst = Math.max(worst, Math.abs(h - prev)); excess = Math.max(excess, Math.abs(h - prev) - bound * 1.1); }
+      prev = h;
+    }
+    assert.ok(sea.physics.stats.reanchors > before, 're-anchored');
+    assert.ok(excess <= 0, `the surface under the walker jumped ${excess} m more than the waves themselves allow (largest change ${worst})`);
     const dry = mk('earth', 'desert_canyon', 0); const pd = run(dry, norm(V(0.6, 0.04, 0.8)), 20);
     assert.equal(dry.physics.water('earth', pd, {}).present, false);
     assert.equal(dry.physics.fields.water.heightAt(pd), 0);

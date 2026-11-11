@@ -21,7 +21,7 @@
 <div id="key"></div>
 <script type="module">
 import * as THREE from 'three';
-import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, FLORA_GLSL, EXPLORER_BODY, SHIP_BODY } from './src/physics/index.js';
+import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, FLORA_GLSL, WATER_GLSL, EXPLORER_BODY, SHIP_BODY } from './src/physics/index.js';
 import { cellsAt, weatherAt } from './src/physics/weather.js';
 import { makeWorld } from './src/physics/testworld.mjs';
 import { BODIES } from './src/data/bodies.js';
@@ -87,6 +87,7 @@ if (findQ) {
 var startDirOverride;
 if (findQ === 'gale' || findQ === 'calm') {
   // the windiest (or stillest) place on the globe right now
+  physics.update(1e-6, { bodyId, time, focus: { x: startDir.x * R, y: startDir.y * R, z: startDir.z * R } });     // (sets the clock that physics.air reads)
   let best = null, bs = findQ === 'gale' ? -1 : 1e9; const o = {};
   for (let k = 0; k < 4000; k++) {
     const y = 1 - 2 * (k + 0.5) / 4000, rr = Math.sqrt(1 - y * y), a = k * 2.399963;
@@ -157,9 +158,52 @@ function rebuildGround(cx, cz) {
   groundGeo.attributes.position.needsUpdate = true; groundGeo.computeBoundingSphere();
 }
 
+// ---- the liquid surface, drawn with the physics wave chunk; red dots are the JS twin ----------------
+const WN = 56, wHalf = 34;
+const waterU = { uPhysAnchor: { value: new THREE.Vector3(0, 0, 0) }, uPhysEast: { value: new THREE.Vector3(1, 0, 0) }, uPhysNorth: { value: new THREE.Vector3(0, 0, -1) }, uPhysUp: { value: new THREE.Vector3(0, 1, 0) },
+  uPhysWaterDir: { value: new THREE.Vector2(1, 0) }, uPhysWaterK: { value: new THREE.Vector3() }, uPhysWaterAmp: { value: new THREE.Vector3() }, uPhysWaterPhase: { value: new THREE.Vector3() }, uOffset: { value: new THREE.Vector3() } };
+const waterGeo = new THREE.BufferGeometry();
+{ const pos = new Float32Array((WN + 1) * (WN + 1) * 3), idx = []; const step = wHalf * 2 / WN;
+  for (let j = 0; j <= WN; j++) for (let i = 0; i <= WN; i++) { const o = (j * (WN + 1) + i) * 3, n = j * (WN + 1) + i; pos[o] = (i - WN / 2) * step; pos[o + 1] = 0; pos[o + 2] = -(j - WN / 2) * step; if (i < WN) idx.push(n, n + 1); if (j < WN && i % 4 === 0) idx.push(n, n + WN + 1); }
+  waterGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); waterGeo.setIndex(idx); }
+const waterMesh = new THREE.LineSegments(waterGeo, new THREE.ShaderMaterial({ uniforms: waterU, transparent: true,
+  vertexShader: `${WATER_GLSL}
+    uniform vec3 uOffset; varying float vH;
+    void main() { vec3 p = position + uOffset; vec3 w = pcPhysWater(p); vH = w.x; p.y += w.x; gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
+  fragmentShader: `varying float vH; void main() { gl_FragColor = vec4(mix(vec3(0.30, 0.38, 0.70), vec3(0.75, 0.86, 0.95), clamp(vH * 2.0 + 0.5, 0.0, 1.0)), 0.8); }` }));
+waterMesh.frustumCulled = false; waterMesh.visible = false; scene3.add(waterMesh);
+const waterDots = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: C.red, size: 4, sizeAttenuation: false }));
+waterDots.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(40 * 3), 3)); waterDots.frustumCulled = false; waterDots.visible = false; scene3.add(waterDots);
+function updateWater(cx, cz) {
+  const W = physics.fields.water.field;
+  const lv = liquidY(cx, cz) ?? (W.present ? W.level : null);
+  waterMesh.visible = waterDots.visible = W.present && lv != null;
+  if (!waterMesh.visible) return;
+  const u = physics.fields.water.uniforms, step = wHalf * 2 / WN;
+  waterU.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); waterU.uPhysWaterK.value.fromArray(u.uPhysWaterK); waterU.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); waterU.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase);
+  waterU.uOffset.value.set(Math.round(cx / step) * step, lv, -Math.round(cz / step) * step);
+  const a = waterDots.geometry.attributes.position.array;
+  for (let i = 0; i < 40; i++) { const x = cx + (i - 20) * 1.1, z = cz + ((i * 7) % 11 - 5) * 1.3; a[i * 3] = x; a[i * 3 + 1] = lv + W.heightAt(x, z); a[i * 3 + 2] = -z; }
+  waterDots.geometry.attributes.position.needsUpdate = true;
+}
+
 // ---- flora drawn with the physics GLSL chunk ------------------------------------------------------
 const F = physics.fields.flora;
-const tex = (arr, n) => { const t = new THREE.DataTexture(arr, n, n, THREE.RGBAFormat, THREE.FloatType); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };
+// Two ways to give the fields to the GPU. Default: 32-bit float textures, nearest filter, the
+// chunk does its own bilinear blend (4 texel fetches a lookup; works everywhere).
+// ?linear=1: 16-bit half-float textures with the hardware's linear filter and
+// `#define PC_PHYS_LINEAR` in front of the chunk (1 fetch a lookup; filterable in every WebGL2).
+const LINEAR = Q.get('linear') === '1';
+const PHYS_DEFINE = LINEAR ? '#define PC_PHYS_LINEAR\n' : '';
+const halfOf = (arr) => new Uint16Array(arr.length);
+const toHalf = (src, dst) => { for (let i = 0; i < src.length; i++) dst[i] = THREE.DataUtils.toHalfFloat(src[i]); };
+const tex = (arr, n) => {
+  const t = LINEAR ? new THREE.DataTexture(halfOf(arr), n, n, THREE.RGBAFormat, THREE.HalfFloatType) : new THREE.DataTexture(arr, n, n, THREE.RGBAFormat, THREE.FloatType);
+  t.minFilter = t.magFilter = LINEAR ? THREE.LinearFilter : THREE.NearestFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.userData.src = arr; if (LINEAR) toHalf(arr, t.image.data);
+  t.needsUpdate = true; return t;
+};
+const upload = (t) => { if (LINEAR) toHalf(t.userData.src, t.image.data); t.needsUpdate = true; };
 const tBend = tex(F.bend, F.size), tWind = tex(F.wind, F.size), tPush = tex(F.push, F.nearSize);
 const U = {
   uPhysBend: { value: tBend }, uPhysWind: { value: tWind }, uPhysPush: { value: tPush },
@@ -170,7 +214,7 @@ const U = {
   uColor: { value: new THREE.Color(C.green) },
 };
 const plantVert = `
-${FLORA_GLSL}
+${PHYS_DEFINE}${FLORA_GLSL}
 attribute vec3 aRoot;      // lab-space root (in the lab, "body-local" is lab space: anchor 0, east +X, north -Z, up +Y)
 attribute vec4 aPlant;     // height (m), stiff01, yaw, lean seed
 varying float vShake;
@@ -280,7 +324,7 @@ function shaderAgreement() {
     g.setAttribute('aPlant', new THREE.BufferAttribute(new Float32Array(80 * 4), 4));
     const m = new THREE.ShaderMaterial({
       uniforms: U,
-      vertexShader: `${FLORA_GLSL}
+      vertexShader: `${PHYS_DEFINE}${FLORA_GLSL}
         attribute vec3 aRoot; attribute vec4 aPlant; varying vec3 vTip;
         void main() {
           vec2 bend = aPlant.w > 0.5 ? pcPhysBendLite(aRoot, aPlant.y) : pcPhysBend(aRoot, aPlant.y).xy;
@@ -638,8 +682,8 @@ function tick(now) {
     const u = F.uniforms;
     U.uPhysWindMap.value.fromArray(u.uPhysWindMap); U.uPhysNearMap.value.fromArray(u.uPhysNearMap);
     U.uPhysWave.value.fromArray(u.uPhysWave); U.uPhysWavePhase.value.fromArray(u.uPhysWavePhase); U.uPhysShape.value.fromArray(u.uPhysShape);
-    tBend.needsUpdate = true; tWind.needsUpdate = true; tPush.needsUpdate = true;
-    updateArrows(); updateParticles(); updateMarks(); updateProbes(); placeActors();
+    upload(tBend); upload(tWind); upload(tPush);
+    updateArrows(); updateParticles(); updateMarks(); updateProbes(); placeActors(); updateWater(cam.fx, cam.fz);
   } else updateGlobe();
   placeCamera();
   renderer.render(scene3, camera);
@@ -659,6 +703,7 @@ function writeHud() {
   if (useShip && sh.phys) { const B = sh.phys; L.push(`ship ${shPhase}  alt ${shEnv.altGround.toFixed(2)} m  v ${Math.hypot(sh.v.x, sh.v.y, sh.v.z).toFixed(2)} m/s  lift ${B.lift01.toFixed(2)}  feet ${B.contacts}  legs ${Array.from(B.legCompress).map((x) => (x * 100).toFixed(1)).join('/')} cm  ${B.asleep ? 'asleep' : ''}`); L.push(`     downwash ${(B.downwash.thrust / 1000).toFixed(1)} kN  ${B.downwash.speed.toFixed(1)} m/s  ground effect x${B.groundEffect.toFixed(2)}  buffet ${Math.hypot(B.buffet.x, B.buffet.y, B.buffet.z).toFixed(2)} m/s2`); }
   const kinds = ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'].filter((k) => P[k].count > 0).map((k) => `${k} ${P[k].count}`).join('  ') || 'none';
   L.push(`air- ${kinds}   devils ${physics.features.devils.count}`);
+  { const W = physics.fields.water.field; if (W.present) L.push(`sea  Hs ${W.height.toFixed(2)} m  period ${W.period.toFixed(1)} s  length ${W.length.toFixed(1)} m  speed ${W.speed.toFixed(1)} m/s  steepness ${W.steepness.toFixed(3)}  whitecaps ${W.whitecap01.toFixed(2)}`); }
   L.push(`sim  ${st.ms.toFixed(2)} ms (avg ${st.msAvg.toFixed(2)})  ${st.samples} surface samples  ${st.pushCells} push cells  ${Mk.total} marks  ${P.events.total} events`);
   if (frames % 20 === 0) agree = shaderAgreement();
   if (agree) L.push(`glsl vs js: ${agree.plants} tips, max ${(agree.maxError * 1000).toFixed(2)} mm, rms ${(agree.rmsError * 1000).toFixed(2)} mm (largest tip displacement ${(agree.largestTipDisplacement * 100).toFixed(0)} cm)`);

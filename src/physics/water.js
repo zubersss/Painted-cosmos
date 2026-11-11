@@ -72,32 +72,38 @@ export class WaterField {
     this.dir = new Float64Array(2); this.dir[0] = 1;      // wave direction (frame axes), smoothed
     this.phase = new Float64Array(3);
     this.k = new Float64Array(3);                           // wavenumbers (rad/m)
+    this.kx = new Float64Array(3); this.kz = new Float64Array(3);   // wave vectors (frame axes)
     this.amp = new Float64Array(3);                         // amplitudes (m)
     this.omega = new Float64Array(3);
     this.level = -1e9;             // liquid surface near the focus (radius - frame.r0), -1e9 when dry
     this.present = false;
     this.frameVersion = -1;
+    this.settled = false;          // false until the sea state has been set for this place
     this.uniforms = { uPhysWaterDir: [1, 0], uPhysWaterK: [0, 0, 0], uPhysWaterAmp: [0, 0, 0], uPhysWaterPhase: [0, 0, 0] };
   }
 
   // The frame re-anchored at old grid position (X, Z): keep the waves where they are.
   rebase(frame, X, Z) {
     this.frameVersion = frame.version;
-    for (let i = 0; i < 3; i++) {
-      const a = WATER.spread[i], ex = this.dir[0] * Math.cos(a) - this.dir[1] * Math.sin(a), ez = this.dir[0] * Math.sin(a) + this.dir[1] * Math.cos(a);
-      this.phase[i] -= this.k[i] * (ex * X + ez * Z);
-    }
+    for (let i = 0; i < 3; i++) this.phase[i] -= this.kx[i] * X + this.kz[i] * Z;
   }
 
   // Advance. we, wn: reference wind at the focus (frame axes, m/s). level: liquid surface near
   // the focus or -1e9. depth: liquid depth there (m). fetch: m. g, rhoAir, rhoLiq as windSea.
-  update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq) {
-    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.height = 0; this.phase.fill(0); }
+  // fx, fz: the focus (grid position): when the waves lengthen or turn, the pattern pivots
+  // about the watcher, not about the frame's origin (which would sweep the crests past them).
+  update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0) {
+    // arriving somewhere new (another world, a jump): the sea there is already running
+    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.height = 0; this.settled = false; }
     this.level = level; this.present = level > -1e8;
     const U = Math.hypot(we, wn);
+    // (the first frame that knows both the liquid and the wind sets the sea; from then on it follows slowly)
+    const fresh = !this.settled && this.present && U > 0.3;
+    if (fresh) this.settled = true;
     windSea(this.present ? U : 0, fetch, g, rhoAir, rhoLiq, depth > 0 ? depth : 1e9, _t);
     const h = dt > 0.25 ? 0.25 : dt;
-    const kh = 1 - Math.exp(-h / WATER.growTime);
+    const kh = fresh ? 1 : 1 - Math.exp(-h / WATER.growTime);
+    if (fresh) { this.period = _t.period; this.length = _t.length; if (U > 0.3) { this.dir[0] = we / U; this.dir[1] = wn / U; } }
     this.height += (_t.height - this.height) * kh;
     if (this.height < 1e-5) this.height = 0;
     // period and length follow the same sea; do not let them collapse when the wind drops
@@ -115,10 +121,13 @@ export class WaterField {
       const k = L > 0.02 ? TAU / L : 0;
       // deep-water dispersion for each train: omega^2 = g k (longer waves travel faster)
       const om = Math.sqrt(g * k);
-      // keep the phase of each crest where it is when the wavenumber drifts: phase is integrated
+      const a = WATER.spread[i], ex = this.dir[0] * Math.cos(a) - this.dir[1] * Math.sin(a), ez = this.dir[0] * Math.sin(a) + this.dir[1] * Math.cos(a);
+      const nkx = k * ex, nkz = k * ez;
       this.k[i] = k; this.omega[i] = om;
       this.amp[i] = 0.5 * this.height * WATER.shares[i];
-      this.phase[i] = (this.phase[i] + om * h) % (TAU * 4096);
+      // at the focus the phase only ever advances by omega dt, whatever the wave vector does
+      this.phase[i] = (this.phase[i] + (nkx - this.kx[i]) * fx + (nkz - this.kz[i]) * fz + om * h) % (TAU * 4096);
+      this.kx[i] = nkx; this.kz[i] = nkz;
     }
     const u = this.uniforms;
     u.uPhysWaterDir[0] = this.dir[0]; u.uPhysWaterDir[1] = this.dir[1];
@@ -131,8 +140,7 @@ export class WaterField {
     let s = 0;
     for (let i = 0; i < 3; i++) {
       if (this.amp[i] === 0) continue;
-      const a = WATER.spread[i], ex = this.dir[0] * Math.cos(a) - this.dir[1] * Math.sin(a), ez = this.dir[0] * Math.sin(a) + this.dir[1] * Math.cos(a);
-      s += this.amp[i] * Math.sin(this.k[i] * (ex * x + ez * z) - this.phase[i]);
+      s += this.amp[i] * Math.sin(this.kx[i] * x + this.kz[i] * z - this.phase[i]);
     }
     return s;
   }

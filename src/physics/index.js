@@ -211,7 +211,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       const l2 = near.liquidAt(fx, fz);
       if (l2 === l2 && l2 > -1e8) { liqLevel = l2; liqDepth = Math.max(liqDepth, l2 - gh); }
     }
-    water.update(dt, frame, airGrid.cwe, airGrid.cwn, liqLevel, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density);
+    water.update(dt, frame, airGrid.cwe, airGrid.cwn, liqLevel, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz);
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;
