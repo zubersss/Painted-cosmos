@@ -112,3 +112,74 @@ test('the GLSL twin declares what the uniforms object carries, and shares the fr
   assert.equal((both.match(/#ifndef PC_PHYS_FRAME/g) || []).length, 2);
   assert.equal((both.match(/{/g) || []).length, (both.match(/}/g) || []).length);
 });
+
+test('waves come in sets: the height swells and fades along the sea, the sets travel at half the wave speed, and nothing repeats like wallpaper', () => {
+  const F = new WaterField(), frame = { version: 1 };
+  for (let i = 0; i < 600; i++) F.update(1 / 60, frame, 15, 0, 0, 200, 2500, 9.81, 1.2, 999, 0, 0);
+  // the local height of the sea (largest elevation within a wavelength) along the wind
+  const L = F.length, local = (x) => { let m = 0; for (let s = 0; s < 24; s++) m = Math.max(m, Math.abs(F.heightAt(x + s * L / 24, 0))); return m; };
+  let lo = 1e9, hi = 0; for (let k = 0; k < 60; k++) { const h = local(k * L * 1.3); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+  assert.ok(hi > lo * 1.7, `sets: the highest stretch is ${hi.toFixed(2)} m, the calmest ${lo.toFixed(2)} m`);
+  // no period: the surface 30 or 60 wavelengths on does not match the surface here
+  const corr = (lag) => { let a = 0, b = 0, c = 0; for (let k = 0; k < 400; k++) { const x = k * 0.37 * L, z = k * 0.11 * L, p = F.heightAt(x, z), q = F.heightAt(x + lag, z + lag * 0.2); a += p * q; b += p * p; c += q * q; } return a / Math.sqrt(b * c); };
+  for (const n of [9, 30, 61]) assert.ok(Math.abs(corr(n * L)) < 0.45, `correlation ${n} wavelengths away: ${corr(n * L).toFixed(2)}`);
+  // the envelope of the main train moves at half its phase speed
+  const g0 = F.gphase[0], p0 = F.phase[0];
+  for (let i = 0; i < 60; i++) F.update(1 / 60, frame, 15, 0, 0, 200, 2500, 9.81, 1.2, 999, 0, 0);
+  const cg = (F.gphase[0] - g0) / Math.hypot(F.gx[0], F.gz[0]), c = (F.phase[0] - p0) / F.k[0];
+  assert.ok(Math.abs(cg / c - 0.5) < 0.02, `group speed ${cg.toFixed(2)} m/s against phase speed ${c.toFixed(2)}`);
+  // the sea still measures what it says: 4 sigma of the surface is the significant height
+  let v = 0, n = 0; for (let k = 0; k < 4000; k++) { const h = F.heightAt(k * 1.37 * L, k * 0.73 * L); v += h * h; n++; }
+  assert.ok(Math.abs(4 * Math.sqrt(v / n) / F.height - 1) < 0.12, `4 sigma ${(4 * Math.sqrt(v / n)).toFixed(2)} m against Hs ${F.height.toFixed(2)} m`);
+});
+
+test('wakes: rings spread from where the liquid was disturbed at the group speed of their own waves, and die away', () => {
+  const F = new WaterField(), frame = { version: 1 };
+  F.update(1 / 60, frame, 0, 0, 0, 200, 2500, 9.81, 1.2, 999, 0, 0);       // a flat calm
+  assert.equal(F.heightAt(3, 4), 0);
+  F.addWake(0, 0, 0.05);
+  const L = 0.8 + 14 * 0.05, c = Math.sqrt(9.81 * L / (2 * Math.PI));
+  let peakR = 0, peak = 0;
+  for (let i = 0; i < 120; i++) F.update(1 / 60, frame, 0, 0, 0, 200, 2500, 9.81, 1.2, 999, 0, 0);     // 2 s
+  for (let r = 0; r < 12; r += 0.02) { const h = Math.abs(F.heightAt(r, 0)); if (h > peak) { peak = h; peakR = r; } }
+  assert.ok(Math.abs(peakR - 0.5 * c * 2) < 0.6 * L, `after 2 s the ring is ${peakR.toFixed(2)} m out (group speed ${(0.5 * c).toFixed(2)} m/s)`);
+  assert.ok(peak > 0.004 && peak < 0.05, 'and lower than it began: ' + peak);
+  assert.ok(Math.abs(F.heightAt(peakR * 0.6, peakR * 0.8) - F.heightAt(peakR, 0)) < 1e-9, 'a ring: the same all the way round');
+  assert.equal(F.heightAt(40, 0), 0, 'nothing far away yet');
+  // carried over a re-anchor, gone after its life
+  const h0 = F.heightAt(peakR, 0); F.rebase(frame, 100, -50);
+  assert.ok(Math.abs(F.heightAt(peakR - 100, 50) - h0) < 1e-6);
+  for (let i = 0; i < 60 * 12; i++) F.update(1 / 60, frame, 0, 0, 0, 200, 2500, 9.81, 1.2, 999, 0, 0);
+  let any = 0; for (let r = 0; r < 40; r += 0.1) any = Math.max(any, Math.abs(F.heightAt(r - 100, 50)));
+  assert.equal(any, 0, 'died away');
+});
+
+test('in the game loop: a swimmer trails a wake, a hovering ship presses rings out of the sea, dry land takes none', () => {
+  const R = BODIES.earth.radius, d = norm(V(0.6, 0.04, 0.8));
+  const mk = (sea) => { const sample = makeWorld({ R, biome: 'sea_coast', sea: sea ? R + sea : 0 }); return createPhysics({ sampleSurface: (id, dd) => sample(dd), timeBudget: false }); };
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 50);                                             // a flat calm, so that only the wakes move the surface
+    const sea = mk(3); let t = 100; let p = V(d.x * (R + 2.2), d.y * (R + 2.2), d.z * (R + 2.2)); const e = norm(V(-d.z, 0, d.x));
+    for (let i = 0; i < 60; i++) { t += 1 / 60; sea.update(1 / 60, { bodyId: 'earth', time: t, focus: p }); }
+    const start = p;
+    for (let i = 0; i < 60 * 6; i++) { t += 1 / 60; p = V(p.x + e.x * 2 / 60, p.y, p.z + e.z * 2 / 60); const l = len(p); p = V(p.x * (R + 2.2) / l, p.y * (R + 2.2) / l, p.z * (R + 2.2) / l);
+      sea.update(1 / 60, { bodyId: 'earth', time: t, focus: p, disturbers: [{ kind: 'explorer', p, v: V(e.x * 2, 0, e.z * 2), radius: 0.35, strength: 1, grounded: false }] }); }
+    const W = sea.fields.water.field; let live = 0; for (let w = 3; w < W.wake.length; w += 4) if (W.wake[w] > 0) live++;
+    assert.ok(live >= 4, 'sources along the path: ' + live);
+    const behind = V((start.x + p.x) / 2, (start.y + p.y) / 2, (start.z + p.z) / 2); let worstB = 0, worstA = 0;
+    for (let k = -8; k <= 8; k++) { const q = V(behind.x + d.y * k * 0.3, behind.y, behind.z + k * 0.1); worstB = Math.max(worstB, Math.abs(sea.fields.water.heightAt(q))); }
+    const ahead = V(p.x + e.x * 25, p.y, p.z + e.z * 25); worstA = Math.abs(sea.fields.water.heightAt(ahead));
+    assert.ok(worstB > 0.003 && worstA < 1e-6, `behind the swimmer ${worstB.toFixed(4)} m, 25 m ahead ${worstA}`);
+    // a ship hovering 4 m over the sea
+    const sea2 = mk(3); t = 100; const hov = V(d.x * (R + 7), d.y * (R + 7), d.z * (R + 7));
+    for (let i = 0; i < 60 * 5; i++) { t += 1 / 60; sea2.update(1 / 60, { bodyId: 'earth', time: t, focus: hov, disturbers: [{ kind: 'ship', p: hov, v: V(), radius: 4.2, strength: 1 }, { kind: 'downwash', p: hov, v: V(), radius: 2.2, strength: 4200 * 9.81 * 0.3 }] }); }
+    let ring = 0; for (let r = 1; r < 14; r += 0.25) { const q = V(hov.x + e.x * r, hov.y, hov.z + e.z * r); ring = Math.max(ring, Math.abs(sea2.fields.water.heightAt(q))); }
+    assert.ok(ring > 0.01 && ring < 0.3, 'rings under the hovering ship: ' + ring);
+    // dry land: nothing
+    const dry = mk(0); t = 100;
+    for (let i = 0; i < 120; i++) { t += 1 / 60; dry.update(1 / 60, { bodyId: 'earth', time: t, focus: hov, disturbers: [{ kind: 'downwash', p: hov, v: V(), radius: 2.2, strength: 12000 }] }); }
+    let any = 0; for (let w = 3; w < dry.fields.water.field.wake.length; w += 4) any += dry.fields.water.field.wake[w];
+    assert.equal(any, 0);
+  } finally { setWindScale('earth', s0); }
+});

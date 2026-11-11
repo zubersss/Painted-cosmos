@@ -20,7 +20,7 @@ import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
-import { WaterField, WATER_GLSL, WATER, windSea, fetchOf } from './water.js';
+import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength } from './water.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed } from './explorer.js';
 import {
@@ -56,6 +56,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const deform = new DeformField(SHIP_BODY.legs);
   const _fill = { snow: 0, sand: 0 };
   const water = new WaterField();
+  const _wk = [];            // per-disturber wake state: where and when it last left a ring
   let liqLevel = -1e9, liqDepth = 0, liqScan = 0;
 
   let quality = 1;
@@ -144,6 +145,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       const dr = r0 - frame.r0;
       near.rebase(frame, X, Z, dr); airGrid.terrain.rebase(frame, X, Z, dr);
       flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); water.rebase(frame, X, Z);
+      for (let k = 0; k < _wk.length; k++) if (_wk[k]) { _wk[k].x -= X; _wk[k].z -= Z; }
       if (liqLevel > -1e8) liqLevel += dr;
       fx = frame.lx(fp.x, fp.y, fp.z); fz = frame.lz(fp.x, fp.y, fp.z);
       moistX -= X; moistZ -= Z; stats.reanchors++;
@@ -217,6 +219,31 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       for (let n = 0; n < lq.length; n++) if (va[n] && lq[n] > -1e8) { if (lq[n] > liqLevel) liqLevel = lq[n]; if (lq[n] - hh[n] > liqDepth) liqDepth = lq[n] - hh[n]; }
       const l2 = near.liquidAt(fx, fz);
       if (l2 === l2 && l2 > -1e8) { liqLevel = l2; liqDepth = Math.max(liqDepth, l2 - gh); }
+    }
+    // wakes: a body moving in the liquid, and thrusters blowing on it, leave rings of waves
+    if (water.present && dist) {
+      const rhoL = cover.liquidDensity || liquidOf(bodyId).density;
+      for (let k = 0; k < dist.length; k++) {
+        const D = dist[k];
+        if (!D || !D.p || D.kind === 'ship') continue;
+        const S = _wk[k] || (_wk[k] = { x: 1e9, z: 1e9, t: -1e9 });
+        const x = frame.lx(D.p.x, D.p.y, D.p.z), z = frame.lz(D.p.x, D.p.y, D.p.z);
+        let lq = near.liquidAt(x, z); if (lq !== lq) lq = airGrid.terrain.liquidAt(x, z);
+        if (!(lq > -1e8)) continue;                                       // dry ground under it (or not known yet)
+        const hgt = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0 - lq;     // above the liquid surface
+        let amp = 0;
+        if (D.kind === 'explorer') {
+          // wading or swimming: the body's bow wave, a few centimetres, growing with speed
+          if (hgt < 0.2 && hgt > -2.5) { const sp = D.v ? Math.hypot(D.v.x, D.v.y, D.v.z) : 0; amp = Math.min(0.06, 0.012 * sp); }
+        } else if (hgt < 14 && hgt > -0.5 && D.strength > 0) {
+          // a jet presses a dish into the liquid as deep as its pressure can hold up: q / (rho g)
+          const Rj = (D.radius || 0.4) + 0.25 * Math.max(0, hgt);
+          amp = Math.min(0.25, 0.5 * D.strength / (Math.PI * Rj * Rj) / (rhoL * body.gravity));
+        }
+        if (amp < 0.004) continue;
+        const L = wakeLength(amp);
+        if (Math.hypot(x - S.x, z - S.z) >= WATER.wakeEvery * L || time - S.t >= WATER.wakeEvery || time < S.t) { water.addWake(x, z, amp); S.x = x; S.z = z; S.t = time; }
+      }
     }
     // (until the ground under the focus has been sampled, nothing is known about the liquid here)
     water.update(dt, frame, airGrid.cwe, airGrid.cwn, coverKnown ? liqLevel : -1e9, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz);
@@ -398,7 +425,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       field: deform,
     },
     water: {
-      uniforms: water.uniforms,   // uPhysWaterDir[2], uPhysWaterK[3], uPhysWaterAmp[3], uPhysWaterPhase[3]
+      uniforms: water.uniforms,   // uPhysWaterDir[2], uPhysWaterK[4], uPhysWaterAmp[4], uPhysWaterPhase[4], uPhysWaterGroup[4],
+                                  // uPhysWake (Float32Array(64): 16 x (x, z, age, amplitude)), uPhysWakeG
       heightAt(p) { return water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0; },
       field: water,
     },
