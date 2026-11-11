@@ -168,10 +168,33 @@ MARK, MARK_STRIDE, EVENT, WATER, QUALITY, DEFAULT_SEED`, and `windSea(U, fetch, 
 
 ## Status
 
-INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is stable; P2 only added to it.
-The tree is committed green: `node --test src/physics/` 158 pass at the commit that carries this note.
+INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is stable; P2 and P3 only added to it,
+with one change of type: the water uniforms are vec4 now (four trains; nobody had wired them).
+The tree is committed green: `node --test src/physics/` **175 pass** at the commit that carries this note.
 
-Stage P1 (foundations): done, accepted. **Stage P2: done** (this section). What exists now:
+Stage P1 (foundations) and P2: done, accepted. **Stage P3** (this block; the tables below are still current):
+
+| P3 job | State |
+|---|---|
+| 1. Draw kits under `src/physics/three/` | done: rain, hail, sand, spray (streaks); snow, dust, ash, spores, leaves (dabs); rings; marks; water patch. CPU quads for any material, or instanced straight from my buffers. They fit PAINTER's material contract (`pcKitPosition()`, two varyings, opaque with `discard`). Shown in the lab (`draw-kits.jpg`), cost measured. "For PAINTER", C. |
+| 2. The integrated game in the browser | done on Earth, Mars and Neptune with real key events; findings with numbers under Answers, "The integrated game in the browser". |
+| 3a. Rain shelter and drips | done: a closed canopy catches 25 % (soaked) to 75 % (dry) of the rain, the wood drips big slow drops after rain until it has drained, the hull keeps what is under it dry and takes the splashes. Tested. |
+| 3b. The sea from the air | done: the spectral peak is two trains (short crests), every train comes in sets that travel at half the phase speed; no correlation above 0.6 at any range, 0.35 on average (test). |
+| 3c. A wake field on water | done: rings spread from swimmers, waders and thruster wash at the group speed of their own waves; 16 sources; GLSL and JS twins. Tested. |
+| 3d. A third (branch) rate in trees | **not done.** It needs a third oscillator and so a fourth field texture; not worth asking a new PAINTER for before the three existing ones are on half-float. |
+| 3e. Shader agreement inside `PROP_VERT` | **not done.** Still only measured in my lab's shader (2.5 mm). |
+
+Verified in P3: 175 tests (17 new: kit arithmetic and budget, shelter, drips, hull, sets, wakes);
+PILOT's `node --test tests/*.test.mjs` 93 pass on this code; worst reproducible frame of
+`physics.update` on the real worlds 0.38 ms running at the spawn, 0.54 ms standing in the forest
+through its storm (shelter active), 0.45 ms in an open thunderstorm, 0.92 ms flying low over
+Neptune's sea in a storm (wash, spray, wakes); kit cost per frame in the lab's browser: weather
+0.10 ms for 1100 drops with rings (0.05 instanced), marks 0.07 ms when one is added, water patch
+0.05 ms; in Node 1600 streaks 0.07 ms, 1600 dabs 0.09 ms, 256 marks 0.07 ms, 41 x 41 water 0.04 ms.
+Not verified in P3: the kits with PAINTER's real chunks and two render targets (only the same
+shape with a flat colour); the new water chunk anywhere but my lab; anything as a picture.
+
+What exists now:
 
 | Part | State | File |
 |---|---|---|
@@ -892,6 +915,16 @@ Blunt, as asked. All of it is about motion and behaviour; none of it is about lo
   (3); tell me what you see at 960x540 before I touch it.
 - (to both) Cloud seas and lava are liquids only because the look table says so. I gave them
   densities and a viscosity; someone should walk into each on purpose before M3 is called done.
+- (to PAINTER, new) The contract asks for one opaque pass with holes by `discard`. That suits
+  marks and dabs; it will make rain hard: a streak 1.2 px wide with no blending is an
+  aliased hairline that crawls. Either rain gets a blended pass of its own after the scene
+  pass, or it wants supersampling; decide before tuning anything else about it.
+- (to PILOT) Every world cruises at the same 46 m/s near the ground because your envelope
+  says so; only Venus, where the air stops the ship at 38, is itself. The worlds would
+  differ more if the cap were the engines' and the air's (table in "The integrated game in
+  the browser").
+- (self) I wrote the first kits before PAINTER's contract existed and had to turn them round
+  in the same stage. Ask for the contract first next time.
 - (self) The lab draws dots and lines. I can prove a drop falls at the right speed and cannot
   tell whether rain reads as rain. Every particle system here is unjudged as a picture.
 - (self) The three-wave sea is honest about height, period and direction and has no groups, no
@@ -905,10 +938,11 @@ Blunt, as asked. All of it is about motion and behaviour; none of it is about lo
 - (idea) `st.phys.lean` for the explorer model, `legCompress` for the ship's legs, `fieldBrake`
   for a glow: animation data that cost nothing.
 
-## Next stage (P3), in order
+## Next stage (P4), in order
 1. Whatever PAINTER's first drawn rain, marks and waves show to be wrong (sizes, counts,
-   exposure, lifetimes): tune against the picture, not the lab.
-2. Rain shelter under canopy and hull, drips after rain; a third (branch) rate in the trees.
-3. The sea from above: wave groups, a long swell, a wake field behind the ship and the swimmer.
-4. Shader agreement measured inside `PROP_VERT`; real-GPU cost of the fields.
-5. Drifts: snow and sand piling in the lee (the wake field already knows where the lee is).
+   exposure, lifetimes): tune against the picture, not the lab. Sit with the new PAINTER on
+   the kit factory until one kind is in the game.
+2. Shader agreement measured inside `PROP_VERT`; real-GPU cost of the fields and kits.
+3. A third (branch) rate in the trees, once the fields are on half-float (it costs a texture).
+4. Drifts: snow and sand piling in the lee (the wake field already knows where the lee is).
+5. Let the ship's cruise near the ground be what the engines and the air give, with PILOT.
