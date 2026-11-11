@@ -180,7 +180,7 @@ export class Loose {
     const Rr = PARTICLES.radius;
     this._T = wx ? wx.temperature : 288;
     this._terminal(bodyId, rho, this._T);
-    const wp = P._wp, hfl = P._hfl;
+    const wp = P._wp, wv = P._wv, ht = P._ht, wtx = P._wtx, wtz = P._wtz;
     // reference wind at the focus (10 m) and at knee height
     const cwe = (wp[15] + wp[18] + wp[27] + wp[30]) * 0.25, cwn = (wp[16] + wp[19] + wp[28] + wp[31]) * 0.25;
     const u10 = Math.hypot(cwe, cwn);
@@ -405,17 +405,19 @@ export class Loose {
         let left = LF[i] - age;                                   // what is left of its life
         if (!dead) {
           // wind at the particle
-          let u = (x - fx) / 16 + 1.5, v = (z - fz) / 16 + 1.5;
-          u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
-          const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, q = (iv * 4 + iu) * 3;
-          const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
+          // (P12: between the four grid nodes round it, each with its own profile; see particles.js)
+          let u = (x - wtx) * 0.0625, v = (z - wtz) * 0.0625;
+          u = u < 0 ? 0 : u > 3.999 ? 3.999 : u; v = v < 0 ? 0 : v > 3.999 ? 3.999 : v;
+          const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu;
           let hz = y - groundY;
           // (spray rides the wind over the sea, which may lie below the ground the focus stands on)
           if (overSea && y - seaLevel > hz) hz = y - seaLevel;
           hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
-          const ih = hz | 0, hf = hfl[ih] + (hfl[ih + 1] - hfl[ih]) * (hz - ih);
-          let we = (wp[q] * w00 + wp[q + 3] * w10 + wp[q + 12] * w01 + wp[q + 15] * w11) * hf;
-          let wn = (wp[q + 1] * w00 + wp[q + 4] * w10 + wp[q + 13] * w01 + wp[q + 16] * w11) * hf;
+          const ih = hz | 0, fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
+          const h00 = (ht[t0] + (ht[t0 + 1] - ht[t0]) * fh) * (1 - fu) * (1 - fv), h10 = (ht[t0 + 25] + (ht[t0 + 26] - ht[t0 + 25]) * fh) * fu * (1 - fv);
+          const h01 = (ht[t0 + 125] + (ht[t0 + 126] - ht[t0 + 125]) * fh) * (1 - fu) * fv, h11 = (ht[t0 + 150] + (ht[t0 + 151] - ht[t0 + 150]) * fh) * fu * fv;
+          let we = wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11;
+          let wn = wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11;
           let wu = 0;
           const vt = VT[i], ph = PH[i];
           if (turb > 0) { const a = ph + age * (1.1 + ph * 0.2); we += Math.cos(a) * turb; wn += Math.sin(a * 1.27) * turb; wu += Math.sin(a * 0.71 + 1.3) * turb * 0.4 * Math.min(1, hz); }

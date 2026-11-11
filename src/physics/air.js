@@ -9,7 +9,7 @@
 // Away from the focus the same layers are evaluated directly, without terrain.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature } from './atmosphere.js';
-import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
+import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
 import { weatherWind } from './weather.js';
 import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
@@ -64,6 +64,7 @@ export class AirGrid {
     this.we = new Float32Array(N * N);        // reference wind along the frame's east axis (m/s)
     this.wn = new Float32Array(N * N);        // ... north axis
     this.gust = new Float32Array(N * N);      // travelling gust level -1..1 (the two large octaves)
+    this.cross = new Float32Array(N * N);     // (P12) the lateral level (its two large octaves; already in we / wn)
     // (P11) what the fine eddies (wind.js gustFineAt) do to the wind at each node, as a factor on we / wn.
     // NOT in we / wn: a 16 m grid cannot carry eddies of 10 to 30 m, and what samples it sparsely (the
     // falling and blown particles) would move in step over a whole cell. sampleWind hands it to the plants.
@@ -124,7 +125,7 @@ export class AirGrid {
     const W = WINDS[bodyId];
     const half = T.half;
     if (!W || W.U === 0 || !(ATMOSPHERES[bodyId].rho0 > 0)) {
-      this.we.fill(0); this.wn.fill(0); this.gust.fill(0);
+      this.we.fill(0); this.wn.fill(0); this.gust.fill(0); this.cross.fill(0);
       this.cwx = this.cwy = this.cwz = this.cwe = this.cwn = 0; this.mul = 1; this.gustiness = 0;
       return used;
     }
@@ -290,8 +291,10 @@ export class AirGrid {
         const n = j * N + i;
         const g = gustLevelAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
         const A = (this.I[n] + gi) * gain, fc = Math.max(WIND.minFactor, 1 + A * g);
-        const f = fc * this.shel[n];
-        this.we[n] = be * f; this.wn[n] = bn * f; this.gust[n] = g;
+        // (P12) the lateral part: the wind swings as well as gusts (wind.js, crossWeights)
+        const cl = gustCrossAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
+        const kc = A * WIND.crossRatio * cl, sh = this.shel[n];
+        this.we[n] = (be * fc - bn * kc) * sh; this.wn[n] = (bn * fc + be * kc) * sh; this.gust[n] = g; this.cross[n] = cl;
         const gt = g + gustFineAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
         this.fine[n] = Math.max(WIND.minFactor, 1 + A * (gt > WIND.gustMax ? WIND.gustMax : gt < -WIND.gustMax ? -WIND.gustMax : gt)) / fc;
       }
@@ -339,6 +342,31 @@ export class AirGrid {
     return o;
   }
 
+  // (P12) The mean wind at (x, z), zh above the ground, as a fraction of the reference wind there: each of
+  // the four nodes round the place has its own profile (the log law of its roughness, the calm under its
+  // canopy, the lee of the trees upwind of it, which fades out above their tops), and the place has the
+  // blend of the four. The particles' air (particles.js) is this same blend, tabulated every metre: one
+  // air for what stands in it and what is carried by it.
+  profileAt(x, z, zh) {
+    const N = this.N, T = this.terrain;
+    let u = T.u(x), v = T.v(z);
+    u = u < 0 ? 0 : u > N - 1 ? N - 1 : u; v = v < 0 ? 0 : v > N - 1 ? N - 1 : v;
+    let i = Math.floor(u), j = Math.floor(v);
+    if (i > N - 2) i = N - 2; if (j > N - 2) j = N - 2;
+    const fu = u - i, fv = v - j, n = j * N + i, va = T.valid, c = T.cover;
+    let f = 0;
+    for (let k = 0; k < 4; k++) {
+      const w = (k & 1 ? fu : 1 - fu) * (k & 2 ? fv : 1 - fv);
+      if (!(w > 0)) continue;
+      const m = n + (k & 1) + (k & 2 ? N : 0), a = m * CW, ok = va[m];
+      let fn = heightFactor(zh, ok ? c[a] : WIND.refRoughness, ok ? c[a + 2] : 0, ok ? c[a + 1] : 0);
+      const wk = this.wake[m], wkH = this.wakeH[m];
+      if (wk < 1 && wkH > 0) fn *= 1 - (1 - wk) * (1 - smoothstep(wkH, wkH * AIR.wakeTop, zh));
+      f += w * fn;
+    }
+    return f;
+  }
+
   // Bilinear sample at grid position (x, z) (clamped to the grid). Fills o:
   //   we, wn (reference wind, frame axes), gust (-1..1), I, z0, canopy01, canopyH, dT, h (ground
   //   height above frame.r0, NaN when unknown), gx, gz (ground slope).
@@ -353,6 +381,7 @@ export class AirGrid {
     o.we = this.we[n] * w00 + this.we[n + 1] * w10 + this.we[n + N] * w01 + this.we[n + N + 1] * w11;
     o.wn = this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11;
     o.gust = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
+    o.cross = this.cross[n] * w00 + this.cross[n + 1] * w10 + this.cross[n + N] * w01 + this.cross[n + N + 1] * w11;
     o.I = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
     o.wake = this.wake[n] * w00 + this.wake[n + 1] * w10 + this.wake[n + N] * w01 + this.wake[n + N + 1] * w11;
     o.wakeH = Math.max(this.wakeH[n], this.wakeH[n + 1], this.wakeH[n + N], this.wakeH[n + N + 1]);
@@ -418,19 +447,20 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
   o.near = false;
   let dT = 0;
   if (!(rho > 0) || !WINDS[bodyId] || WINDS[bodyId].U === 0) {
-    wind.x = wind.y = wind.z = 0; o.speed = 0; o.gust01 = 0; o.turbulence = 0; o.height = height != null ? height : 0;
+    wind.x = wind.y = wind.z = 0; o.speed = 0; o.gust01 = 0; o.veer = 0; o.turbulence = 0; o.height = height != null ? height : 0;
   } else if (grid && frame && grid.ready && frame.bodyId === bodyId && grid.bodyId === bodyId && grid.inside(frame.lx(px, py, pz), frame.lz(px, py, pz))) {
     const x = frame.lx(px, py, pz), z = frame.lz(px, py, pz);
     grid.sample(x, z, _s);
     let zh = height;
     if (zh == null) zh = _s.h === _s.h ? r - (frame.r0 + _s.h) : 10;
     if (zh < 0) zh = 0;
-    let f = heightFactor(zh, _s.z0, _s.canopyH, _s.canopy01) * aloftFactor(bodyId, zh);
-    // in the lee of trees upwind the air near the ground is slower; above their tops it is not
-    if (_s.wake < 1 && _s.wakeH > 0) f *= 1 - (1 - _s.wake) * (1 - smoothstep(_s.wakeH, _s.wakeH * AIR.wakeTop, zh));
+    // (P12: the four nodes' own profiles, blended; see profileAt. It was one profile of the blended
+    // ground: half-way between a meadow node and a wood node, a canopy of half the height and half
+    // the closure, which is no wood at all at 10 m up.)
+    let f = grid.profileAt(x, z, zh) * aloftFactor(bodyId, zh);
     // (P11) the fine eddies, exactly at this point (the grid holds the large gusts only: see wind.js)
     const fMean = f;
-    let gust = _s.gust;
+    let gust = _s.gust, kx = 0, veer = 0;
     {
       const gs = grid.gustShift, A = (_s.I + grid.gustiness * 0.15) * WIND.gustGain;
       const fc = Math.max(WIND.minFactor, 1 + A * gust);
@@ -438,8 +468,14 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
       gust += gustFineAt(bodyId, px * kr, py * kr, pz * kr, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
       gust = gust > WIND.gustMax ? WIND.gustMax : gust < -WIND.gustMax ? -WIND.gustMax : gust;
       f *= Math.max(WIND.minFactor, 1 + A * gust) / fc;
+      // (P12) the fine lateral eddies, exactly at this point: the grid's wind already swings with the two
+      // large octaves (_s.cross); what the whole level adds to that, as a fraction of the mean wind here
+      let ct = _s.cross + gustCrossFineAt(bodyId, px * kr, py * kr, pz * kr, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
+      ct = ct > WIND.gustMax ? WIND.gustMax : ct < -WIND.gustMax ? -WIND.gustMax : ct;
+      kx = A * WIND.crossRatio * (ct - _s.cross) / Math.max(WIND.minFactor, 1 + A * gust);
+      veer = A * WIND.crossRatio * ct;
     }
-    const we0 = _s.we * f, wn0 = _s.wn * f;
+    const we0 = (_s.we - _s.wn * kx) * f, wn0 = (_s.wn + _s.we * kx) * f;
     // the flow follows the ground: vertical component from the slope, fading with height
     let wu = (we0 * _s.gx + wn0 * _s.gz) * Math.exp(-zh / 25);
     let we = we0, wn = wn0;
@@ -457,6 +493,7 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     }
     o.speed = Math.hypot(we, wn, wu);
     o.gust01 = clamp01(0.5 + 0.5 * gust);
+    o.veer = veer;                 // (P12) the lateral speed over the mean wind: the tangent of how far the wind has swung
     o.turbulence = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn) * fMean / (1 + zh / 300);
     o.height = zh; o.near = true; dT = _s.dT;
   } else {
@@ -471,6 +508,12 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     const I = turbulenceIntensity(WIND.refHeight, WIND.refRoughness) + _ww[4] * 0.15;
     const f = Math.max(WIND.minFactor, 1 + I * WIND.gustGain * g) * heightFactor(zh, WIND.refRoughness) * aloftFactor(bodyId, zh);
     wx *= f; wy *= f; wz *= f;
+    // (P12) the lateral part, across the wind in the horizontal (the two large octaves, as the grid's fields)
+    {
+      const kc = I * WIND.gustGain * WIND.crossRatio * gustCross(bodyId, px, py, pz, _w[0], _w[1], _w[2], t, seed) / Math.max(WIND.minFactor, 1 + I * WIND.gustGain * g);
+      const cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+      wx += cx * kc; wy += cy * kc; wz += cz * kc; o.veer = kc;
+    }
     wind.x = wx; wind.y = wy; wind.z = wz;
     o.speed = Math.hypot(wx, wy, wz);
     o.gust01 = clamp01(0.5 + 0.5 * g);

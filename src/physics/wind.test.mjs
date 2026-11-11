@@ -187,3 +187,32 @@ test('P11 a mast at 10 m: turbulence intensity, gust factor and the shares of th
     assert.ok(p99 > 0.6 * real && p99 < 1.3 * real, `U ${U}: 1 s rate ${p99} against ${real}`);
   }
 });
+
+test('P12 across the wind: the lateral part is three quarters of the longitudinal one, made of smaller eddies, and the direction wanders', async () => {
+  const { gustLevelFull, gustCrossFull } = await import('./wind.js');
+  const z = 10, I = turbulenceIntensity(z, 0.03), hz = 10, N = 3600 * hz;
+  const below = (f, U) => 1 - Math.pow(1 + 9.5 * f * z / U, -2 / 3);      // Kaimal et al. 1972, lateral: f S_v / u*^2 = 17 n / (1 + 9.5 n)^(5/3)
+  const edges = [600, 60, 15, 4, 1];
+  for (const U of [5, 11, 20]) {
+    const u = new Float64Array(N), v = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const t = 1000 + i / hz;
+      u[i] = U * Math.max(WIND.minFactor, 1 + I * WIND.gustGain * gustLevelFull('earth', 0, 6371010, 0, U, 0, 0, t, 18));
+      v[i] = U * I * WIND.gustGain * WIND.crossRatio * gustCrossFull('earth', 0, 6371010, 0, U, 0, 0, t, 18);
+    }
+    const stat = (a) => { let m = 0; for (const x of a) m += x; m /= N; let s2 = 0; for (const x of a) s2 += (x - m) ** 2; return [m, s2 / N]; };
+    const [mu, su2] = stat(u), [mv, sv2] = stat(v), ratio = Math.sqrt(sv2 / su2);
+    const vm = (p) => { const k = Math.max(1, Math.round(p * hz)); let n = 0, s = 0, q = 0; for (let i = 0; i + k <= N; i += k) { let x = 0; for (let j = i; j < i + k; j++) x += v[j]; x /= k; s += x; q += x * x; n++; } return q / n - (s / n) ** 2; };
+    const got = [], want = [];
+    for (let k = 0; k + 1 < edges.length; k++) { got.push((vm(edges[k + 1] / 2) - vm(edges[k] / 2)) / sv2); want.push(below(1 / edges[k + 1], U) - below(1 / edges[k], U)); }
+    let cuv = 0, d2 = 0, dmax = 0;
+    for (let i = 0; i < N; i++) { cuv += (u[i] - mu) * (v[i] - mv); const a = Math.atan2(v[i], u[i]) * 180 / Math.PI; d2 += a * a; dmax = Math.max(dmax, Math.abs(a)); }
+    cuv /= N * Math.sqrt(su2 * sv2);
+    console.log(`# vane at 10 m, U ${U}: sigma_v / sigma_u ${ratio.toFixed(3)}; shares 600-60 / 60-15 / 15-4 / 4-1 s: ${got.map((x) => x.toFixed(2)).join(' ')} (Kaimal ${want.map((x) => x.toFixed(2)).join(' ')}); direction ${Math.sqrt(d2 / N).toFixed(1)} deg rms, ${dmax.toFixed(0)} at most`);
+    assert.ok(ratio > 0.72 && ratio < 0.84, `U ${U}: sigma_v / sigma_u ${ratio} (masts: 0.75 to 0.8)`);
+    assert.ok(Math.abs(mv) < 0.01 * U && Math.abs(cuv) < 0.1, `U ${U}: the lateral part has no mean (${mv}) and is not the gusts over again (correlation ${cuv})`);
+    for (let k = 0; k < got.length; k++) assert.ok(Math.abs(got[k] - want[k]) < 0.09, `U ${U}: band ${edges[k]}-${edges[k + 1]} s holds ${got[k].toFixed(3)}, Kaimal ${want[k].toFixed(3)}`);
+    // smaller eddies than the gusts: more of it under 4 s than the longitudinal part has
+    assert.ok(Math.sqrt(d2 / N) > 5 && Math.sqrt(d2 / N) < 12 && dmax > 18 && dmax < 50, `U ${U}: direction ${Math.sqrt(d2 / N)} deg rms, ${dmax} at most`);
+  }
+});

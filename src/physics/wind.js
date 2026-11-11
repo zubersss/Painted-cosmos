@@ -75,6 +75,19 @@ export const WIND = Object.freeze({
   gustMax: 1.45,          // the level is clamped at this (3.3 sigma; it was 1 = 2.1 sigma until P11, which cut the
                           // tops off the gusts: the 3 s gust over the 10 minute mean came out at 1.36 where open
                           // country gives 1.4 to 1.6)
+  // (P12) ACROSS the wind. Until P12 the turbulence was along the wind only: the speed gusted and the
+  // direction never moved, so flags, grass and rain all pointed one way like a ruler. A mast measures a
+  // lateral part about three quarters of the longitudinal one (sigma_v = 1.9 u*, sigma_u = 2.4 u*:
+  // Panofsky and Dutton 1984; Kaimal's spectra integrate to 0.75), and it is made of smaller eddies:
+  // f S_v / u*^2 = 17 n / (1 + 9.5 n)^(5/3) peaks at 3.5 times the frequency of the longitudinal one.
+  // The same four octaves, the same carrying, their own seeds, and weights fitted to the lateral
+  // spectrum's shares by period (wind.test.mjs): gustCrossAt (the two large octaves, in the grid's fields:
+  // what rain and leaves ride in swings with them) and gustCrossFineAt (the two fine ones, added at a
+  // point). The level times I * gustGain * crossRatio is the lateral speed as a fraction of the mean wind:
+  // over grass at 10 m the direction wanders 7 degrees rms, 20 degrees and more in the largest swings.
+  crossWeights: Object.freeze([0.36, 0.5, 0.56, 0.55]),
+  crossNorm: 1.10,         // scales the sum so that sigma(v) / sigma(u) is crossRatio (measured: wind.test.mjs)
+  crossRatio: 0.78,
   gustCycle: 96,          // s: re-seeding period of the travelling pattern (two phases blended)
   gustGain: 2.3,          // gust = mean * (1 + I * gustGain * level): level 1 is about 1.4 x the mean over grass
   minFactor: 0.25,        // a lull never drops below this fraction of the mean
@@ -198,6 +211,66 @@ export function gustFineAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed) 
   }
   return g / Math.sqrt(w1 * w1 + w2 * w2) * WIND.gustNorm;
 }
+// (P12) The lateral level: the two large octaves, carried exactly as gustLevelAt carries the longitudinal
+// ones (same arguments), from their own seeds. Unclamped; add gustCrossFineAt and clamp the sum to
+// +-WIND.gustMax for what a vane on a mast measures.
+export function gustCrossAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed) {
+  const s = seedOf(bodyId, seed) + 311;
+  const T = WIND.gustCycle;
+  const a = t / T, c1 = Math.floor(a), f1 = a - c1;
+  const c2 = Math.floor(a + 0.5);
+  const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1;
+  const k1 = 1 / WIND.gustLength, k2 = 1 / WIND.gustLength2;
+  const W = WIND.crossWeights;
+  let g = 0;
+  if (w1 > 0.001) {
+    const o = hash1(c1, s) * 977;
+    const x = px - ax, y = py - ay, z = pz - az;
+    g += w1 * (noise3(x * k1 - o, y * k1 + o, z * k1, s) * W[0] + noise3(x * k2, y * k2 - o, z * k2 + o, s + 7) * W[1]);
+  }
+  if (w2 > 0.001) {
+    const o = hash1(c2, s + 55) * 977;
+    const x = px - bx, y = py - by, z = pz - bz;
+    g += w2 * (noise3(x * k1 - o, y * k1 + o, z * k1, s + 3) * W[0] + noise3(x * k2, y * k2 - o, z * k2 + o, s + 11) * W[1]);
+  }
+  return g / Math.sqrt(w1 * w1 + w2 * w2) * WIND.crossNorm;
+}
+// ... and its two fine octaves.
+export function gustCrossFineAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed) {
+  const s = seedOf(bodyId, seed) + 311;
+  const T = WIND.gustCycle;
+  const a = t / T, c1 = Math.floor(a), f1 = a - c1;
+  const c2 = Math.floor(a + 0.5);
+  const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1;
+  const k3 = 1 / WIND.gustLength3, k4 = 1 / WIND.gustLength4;
+  const W = WIND.crossWeights;
+  let g = 0;
+  if (w1 > 0.001) {
+    const o = hash1(c1, s) * 977;
+    const x = px - ax, y = py - ay, z = pz - az;
+    g += w1 * (noise3(x * k3, y * k3 + o, z * k3 - o, s + 17) * W[2] + noise3(x * k4 + o, y * k4, z * k4 - o, s + 23) * W[3]);
+  }
+  if (w2 > 0.001) {
+    const o = hash1(c2, s + 55) * 977;
+    const x = px - bx, y = py - by, z = pz - bz;
+    g += w2 * (noise3(x * k3, y * k3 + o, z * k3 - o, s + 19) * W[2] + noise3(x * k4 + o, y * k4, z * k4 - o, s + 29) * W[3]);
+  }
+  return g / Math.sqrt(w1 * w1 + w2 * w2) * WIND.crossNorm;
+}
+// The large lateral octaves in a steady wind (wx,wy,wz), as gustLevel is to gustLevelAt.
+export function gustCross(bodyId, px, py, pz, wx, wy, wz, t, seed) {
+  const T = WIND.gustCycle, a = t / T;
+  const t1 = (a - Math.floor(a) - 0.5) * T, t2 = (a + 0.5 - Math.floor(a + 0.5) - 0.5) * T;
+  return gustCrossAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed);
+}
+// The whole lateral level a vane on a mast would measure in a steady wind (wx,wy,wz), clamped.
+export function gustCrossFull(bodyId, px, py, pz, wx, wy, wz, t, seed) {
+  const T = WIND.gustCycle, a = t / T;
+  const t1 = (a - Math.floor(a) - 0.5) * T, t2 = (a + 0.5 - Math.floor(a + 0.5) - 0.5) * T;
+  return clamp(gustCrossAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed)
+    + gustCrossFineAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed), -WIND.gustMax, WIND.gustMax);
+}
+
 // The whole level a mast would measure in a steady wind (wx,wy,wz): large gusts and fine eddies, clamped.
 export function gustLevelFull(bodyId, px, py, pz, wx, wy, wz, t, seed) {
   const T = WIND.gustCycle, a = t / T;

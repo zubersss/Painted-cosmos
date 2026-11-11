@@ -263,3 +263,30 @@ test('against PAINTER\'s real Earth, if it loads in Node: runs clean and inside 
   assert.ok(physics.here.cover.canopy01 > 0.3, 'the home forest has a canopy');
   assert.ok(['litter', 'mud', 'rock', 'bed'].includes(physics.ground('earth', norm(p)).material));
 });
+
+test('P12 the wind at a place swings as well as gusts: physics.air, the grid the particles ride in, and a blade of grass', () => {
+  const physics = createPhysics({ sampleSurface: stubSurface });
+  const p = spawnPoint('earth'), up = norm(p), mast = V(p.x + up.x * 10, p.y + up.y * 10, p.z + up.z * 10);
+  for (let i = 0; i < 120; i++) physics.update(1 / 60, { bodyId: 'earth', time: 900 + i / 60, focus: p });
+  const fr = physics.fields.frame, G = physics.fields.air, s = {}, bend = {};
+  const n = 3000, a = { air: [], grid: [], grass: [] }, sp = [];
+  for (let i = 0; i < n; i++) {
+    physics.update(0.1, { bodyId: 'earth', time: 902 + i * 0.1, focus: p });
+    const w = physics.air('earth', mast).wind, we = w.x * fr.ex + w.y * fr.ey + w.z * fr.ez, wn = w.x * fr.nx + w.y * fr.ny + w.z * fr.nz;
+    a.air.push(Math.atan2(wn, we)); sp.push(Math.hypot(we, wn));
+    G.sample(fr.lx(p.x, p.y, p.z), fr.lz(p.x, p.y, p.z), s); a.grid.push(Math.atan2(s.wn, s.we));
+    physics.fields.flora.plantBend(p, 0, bend); a.grass.push(Math.atan2(bend.n, bend.e));
+  }
+  // the spread of each direction about its own slow mean (a 60 s running mean takes out the weather's veering)
+  const spread = (arr) => {
+    let q = 0, m = 0; const W = 600;
+    for (let i = W; i < n - W; i += 5) { let cx = 0, cy = 0; for (let j = i - W; j < i + W; j += 5) { cx += Math.cos(arr[j]); cy += Math.sin(arr[j]); } let d = arr[i] - Math.atan2(cy, cx); d = Math.atan2(Math.sin(d), Math.cos(d)); q += d * d; m++; }
+    return Math.sqrt(q / m) * 180 / Math.PI;
+  };
+  const dAir = spread(a.air), dGrid = spread(a.grid), dGrass = spread(a.grass), U = sp.reduce((x, y) => x + y, 0) / n;
+  console.log(`# direction of the wind over five minutes, about its own slow mean: physics.air at 10 m ${dAir.toFixed(1)} deg rms, the grid's wind (rain, leaves) ${dGrid.toFixed(1)}, the lean of a blade of grass ${dGrass.toFixed(1)}; mean wind ${U.toFixed(1)} m/s`);
+  assert.ok(dAir > 4 && dAir < 14, 'physics.air: ' + dAir + ' deg rms (a vane over grass: 6 to 10)');
+  assert.ok(dGrid > 2 && dGrid < dAir * 1.05, 'the grid carries the large swings only: ' + dGrid);
+  assert.ok(dGrass > 2, 'the grass leans to and fro across the wind too: ' + dGrass);
+  assert.equal(typeof physics.here.air.veer, 'number');
+});

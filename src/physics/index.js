@@ -78,7 +78,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0, fetch: 80, liquidDensity: 0 };
   const here = {
     bodyId: null,
-    air: { density: 0, wind: { x: 0, y: 0, z: 0 }, speed: 0, gust01: 0, turbulence: 0, temperature: 0, pressure: 0, soundSpeed: 0, viscosity: 0, altitude: 0, height: 0, near: false },
+    air: { density: 0, wind: { x: 0, y: 0, z: 0 }, speed: 0, gust01: 0, veer: 0, turbulence: 0, temperature: 0, pressure: 0, soundSpeed: 0, viscosity: 0, altitude: 0, height: 0, near: false },
     weather: { kind: 'clear', intensity01: 0, precipitation: { type: 'none', rate: 0, intensity01: 0, fallSpeed: 0, dropSize: 0, species: null, reachesGround01: 1, frozen01: 0, hail01: 0, extinction: 0 }, dustExtinction: 0, wetness01: 0, snowDepth: 0, visibility01: 1, visibility: WEATHER.clearVisibility, cloud01: 0, fog01: 0, dust01: 0, haze01: 0, storm01: 0, front01: 0, windFactor: 1, temperature: 0, lightning: { rate: 0, flash01: 0, nextIn: Infinity, thunderIn: Infinity, thunder01: 0, last: { t: -1e9, x: 0, y: 1, z: 0, distance: 1e9 } } },
     cover,
     groundHeight: 0,          // m above the body's base radius, under the focus

@@ -27,8 +27,9 @@
 import { SPECIES, terminalVelocity, meanFreePath } from './atmosphere.js';
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES } from './atmosphere.js';
-import { heightFactor } from './wind.js';
-import { makeRng, clamp01 } from './util.js';
+import { heightFactor, WIND } from './wind.js';
+import { AIR } from './air.js';
+import { makeRng, clamp01, smoothstep } from './util.js';
 
 export const PARTICLES = Object.freeze({
   kinds: ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'],
@@ -97,7 +98,17 @@ export class Particles {
     this._lut = new Float32Array(8);
     this._lutKey = '';
     this._wp = new Float32Array(16 * 3);       // 4 x 4 wind patch: we, wn, gust
-    this._hfl = new Float32Array(25);          // height factor every metre, 0..24 m
+    this._hfl = new Float32Array(25);          // (until P12: the height factor at the focus; unused now)
+    // (P12) the air the particles ride in, the same air as airAt's: on the 5 x 5 nodes of the wind grid
+    // round the focus, each node's reference wind (_wv: we, wn) and ITS OWN profile every metre from 0
+    // to 24 m (_ht: the log law of its roughness, the calm under its canopy, the lee of the trees
+    // upwind fading out above them). Until P12 every particle had the profile of the ground the FOCUS
+    // stood on and the whole wake at every height: a walker in the meadow saw rain and leaves cross
+    // the wood's edge at the meadow's wind, 2 to 3 m/s faster than the branches beside them moved.
+    this._wv = new Float32Array(25 * 2);
+    this._ht = new Float32Array(25 * 25);
+    this._hsig = new Float64Array(25).fill(NaN);
+    this._wtx = 0; this._wtz = 0;              // grid position of the patch's first node (m)
     this.time = 0;
     this._ring = 0;                            // rings owed near the focus (P7)
   }
@@ -168,7 +179,33 @@ export class Particles {
     // share of the drops that get through closed canopy
     const through = PARTICLES.throughDry + (PARTICLES.throughWet - PARTICLES.throughDry) * wet01;
     const SH = this.shelters, nSH = this.shelterCount;
-    for (let k = 0; k < 25; k++) this._hfl[k] = heightFactor(k, cover.z0 || 0.03, cover.canopyHeight || 0, cover.canopy01 || 0);
+    // (P12) the wind and its profile on the 5 x 5 grid nodes round the focus (see the constructor)
+    const wv = this._wv, ht = this._ht;
+    {
+      const T = air.terrain, N = air.N, cell = air.cell, half = T.half, CWa = T.CW, cv = T.cover, sig = this._hsig;
+      const pi0 = Math.round(fx / cell) - 2, pj0 = Math.round(fz / cell) - 2;
+      const moved = pi0 * cell !== this._wtx || pj0 * cell !== this._wtz;
+      this._wtx = pi0 * cell; this._wtz = pj0 * cell;
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
+        let gi = pi0 + i - T.ci + half, gj = pj0 + j - T.cj + half;
+        gi = gi < 0 ? 0 : gi > N - 1 ? N - 1 : gi; gj = gj < 0 ? 0 : gj > N - 1 ? N - 1 : gj;
+        const n = gj * N + gi, c = n * CWa, pn = j * 5 + i, ok = T.valid[n];
+        wv[pn * 2] = air.we[n]; wv[pn * 2 + 1] = air.wn[n];
+        const z0 = ok ? cv[c] : WIND.refRoughness, c01 = ok ? cv[c + 1] : 0, hc = ok ? cv[c + 2] : 0;
+        const wk = Math.round(air.wake[n] * 128) / 128, wkH = air.wakeH[n];
+        // (a node's profile is worked out again only when its ground or its wake has changed)
+        const sg = z0 + 31 * c01 + 977 * hc + 7919 * wk + 104729 * wkH;
+        if (!moved && sg === sig[pn]) continue;
+        sig[pn] = sg;
+        const top = wkH * AIR.wakeTop;
+        for (let k = 0, o = pn * 25; k < 25; k++) {
+          let f = heightFactor(k, z0, hc, c01);
+          if (wk < 1 && wkH > 0) f *= 1 - (1 - wk) * (1 - smoothstep(wkH, top, k));
+          ht[o + k] = f;
+        }
+      }
+    }
+    const wtx = this._wtx, wtz = this._wtz;
     // liquid level at the focus: what an unsampled spot is assumed to be until its node arrives
     let liquid0 = near ? near.liquidAt(fx, fz) : NaN;
     if (liquid0 !== liquid0) liquid0 = air.terrain.liquidAt(fx, fz);
@@ -232,16 +269,17 @@ export class Particles {
           if (x - bx > Rb) { x -= 2 * Rb * Math.ceil((x - bx - Rb) / (2 * Rb)); wrapped = true; } else if (x - bx < -Rb) { x += 2 * Rb * Math.ceil((bx - x - Rb) / (2 * Rb)); wrapped = true; }
           if (z - bz > Rb) { z -= 2 * Rb * Math.ceil((z - bz - Rb) / (2 * Rb)); wrapped = true; } else if (z - bz < -Rb) { z += 2 * Rb * Math.ceil((bz - z - Rb) / (2 * Rb)); wrapped = true; }
         }
-        // wind at the particle: bilinear in the 4 x 4 patch, scaled by the height profile
-        let u = (x - fx) / 16 + 1.5, v = (z - fz) / 16 + 1.5;
-        u = u < 0 ? 0 : u > 2.999 ? 2.999 : u; v = v < 0 ? 0 : v > 2.999 ? 2.999 : v;
-        const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, q = (iv * 4 + iu) * 3;
-        const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
+        // wind at the particle: between the four grid nodes round it, each with its own profile (P12)
+        let u = (x - wtx) * 0.0625, v = (z - wtz) * 0.0625;
+        u = u < 0 ? 0 : u > 3.999 ? 3.999 : u; v = v < 0 ? 0 : v > 3.999 ? 3.999 : v;
+        const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu;
         // (height over the ground: for a flake, over the ground under it as last looked up)
         let hz = y - (snowy && b._lt[i] > -1e8 ? b._g[i] : ground); hz = hz < 0 ? 0 : hz > 23.99 ? 23.99 : hz;
-        const ih = hz | 0, hf = this._hfl[ih] + (this._hfl[ih + 1] - this._hfl[ih]) * (hz - ih);
-        let we = (wp[q] * w00 + wp[q + 3] * w10 + wp[q + 12] * w01 + wp[q + 15] * w11) * hf;
-        let wn = (wp[q + 1] * w00 + wp[q + 4] * w10 + wp[q + 13] * w01 + wp[q + 16] * w11) * hf;
+        const ih = hz | 0, fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
+        const h00 = (ht[t0] + (ht[t0 + 1] - ht[t0]) * fh) * (1 - fu) * (1 - fv), h10 = (ht[t0 + 25] + (ht[t0 + 26] - ht[t0 + 25]) * fh) * fu * (1 - fv);
+        const h01 = (ht[t0 + 125] + (ht[t0 + 126] - ht[t0 + 125]) * fh) * (1 - fu) * fv, h11 = (ht[t0 + 150] + (ht[t0 + 151] - ht[t0 + 150]) * fh) * fu * fv;
+        let we = wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11;
+        let wn = wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11;
         const vt = VT[i];
         if (snowy) {
           // a flake side-slips as it tumbles: a slow circular flutter, its own phase and rate
@@ -307,7 +345,10 @@ export class Particles {
         // shelter. Canopy: a share of what falls is caught where it meets the leaves (each
         // particle's fate is its own for its whole fall). Drips are born under the leaves.
         if (canopyH > 1 && hz < canopyH && drip === 0) {
-          const c01 = cp[iv * 4 + iu] * w00 + cp[iv * 4 + iu + 1] * w10 + cp[iv * 4 + iu + 4] * w01 + cp[iv * 4 + iu + 5] * w11;
+          let cu = (x - fx) / 16 + 1.5, cw = (z - fz) / 16 + 1.5;
+          cu = cu < 0 ? 0 : cu > 2.999 ? 2.999 : cu; cw = cw < 0 ? 0 : cw > 2.999 ? 2.999 : cw;
+          const ci = cu | 0, cj = cw | 0, cfu = cu - ci, cfv = cw - cj, cq = cj * 4 + ci;
+          const c01 = cp[cq] * (1 - cfu) * (1 - cfv) + cp[cq + 1] * cfu * (1 - cfv) + cp[cq + 4] * (1 - cfu) * cfv + cp[cq + 5] * cfu * cfv;
           if (c01 > 0.05 && PH[i] < 6.2831853 * c01 * (1 - through) && hz > canopyH * 0.5) { hit = false; gone = true; }
         }
         // the hull: a drop that reaches it stops there (a splash on the hull, none under it)

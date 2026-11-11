@@ -476,3 +476,40 @@ test('a ground blizzard (P10): in a blizzard the wind moves the snow along the g
   calm.physics.warmUp({ bodyId: calm.bodyId, time: calm.t0, focus: calm.focus }); run(calm, 3);
   assert.equal(calm.physics.here.blown.snow, 0);
 });
+
+test('P12 one air: what is carried rides the wind physics.air gives at its place and height, at the edge of a wood', () => {
+  // The focus stands in a meadow, the edge of a 14 m wood 20 m east of it. Twenty-second means at 36 places from
+  // 20 m out in the meadow to 24 m toward the wood, 1 to 22 m up. Before: every particle had the profile of the
+  // ground the focus stood on and the whole lee of the trees at every height: 1.4 to 2.5 m/s too fast under the
+  // first crowns, 2.4 to 3.5 m/s too slow at 22 m, above the lee (largest difference 3.5 m/s). Now each node of
+  // the wind grid has its own profile, for physics.air and for the particles alike.
+  const R = BODIES.earth.radius, up = norm(V(0.3, 0.8, 0.52)), e = norm(V(-up.z, 0, up.x));
+  const cdir = norm(V(up.x + e.x * 420 / R, up.y + e.y * 420 / R, up.z + e.z * 420 / R));
+  const sample = makeWorld({ R, biome: 'alpine_meadow', stand: { dir: cdir, radius: 400, canopy01: 0.9, canopyHeight: 14 } });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false }), focus = V(up.x * R, up.y * R, up.z * R);
+  let t = 300; for (let i = 0; i < 600; i++) { t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus }); }
+  const S = physics.fields.frame, sys = physics.particles.system, wv = sys._wv, ht = sys._ht;
+  const carried = (x, z, hz) => {      // the lookup of particles.js and loose.js
+    const u = Math.min(3.999, Math.max(0, (x - sys._wtx) / 16)), v = Math.min(3.999, Math.max(0, (z - sys._wtz) / 16));
+    const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu, ih = Math.min(23, hz | 0), fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
+    const H = (o) => ht[t0 + o] + (ht[t0 + o + 1] - ht[t0 + o]) * fh;
+    const h00 = H(0) * (1 - fu) * (1 - fv), h10 = H(25) * fu * (1 - fv), h01 = H(125) * (1 - fu) * fv, h11 = H(150) * fu * fv;
+    return Math.hypot(wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11, wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11);
+  };
+  const fx = S.lx(focus.x, focus.y, focus.z), fz = S.lz(focus.x, focus.y, focus.z), d = [0, 0, 0], pts = [];
+  for (const de of [-20, -8, 0, 8, 16, 24]) for (const hz of [1, 2, 5, 10, 16, 22]) {
+    const x = fx + de * (S.ex * e.x + S.ey * e.y + S.ez * e.z), z = fz + de * (S.nx * e.x + S.ny * e.y + S.nz * e.z);
+    S.dir(x, z, d); const g = sample({ x: d[0], y: d[1], z: d[2] }).radius;
+    pts.push({ de, hz, x, z, p: V(d[0] * (g + hz), d[1] * (g + hz), d[2] * (g + hz)), air: 0, part: 0 });
+  }
+  const M = 1200;
+  for (let i = 0; i < M; i++) {
+    t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus });
+    for (const q of pts) { q.air += physics.air('earth', q.p).speed / M; q.part += carried(q.x, q.z, q.hz) / M; }
+  }
+  let worst = 0, at = null, calm = 9, open = 0;
+  for (const q of pts) { const dq = Math.abs(q.part - q.air); if (dq > worst) { worst = dq; at = q; } if (q.de === 24 && q.hz === 2) calm = q.part; if (q.de === -20 && q.hz === 2) open = q.part; }
+  console.log(`# one air: largest difference between the particles' wind and physics.air ${worst.toFixed(2)} m/s (${at.de} m toward the wood, ${at.hz} m up); at 2 m ${open.toFixed(1)} m/s in the meadow, ${calm.toFixed(1)} under the first crowns`);
+  assert.ok(worst < 0.6, `the particles' air is ${worst.toFixed(2)} m/s off physics.air ${at.de} m toward the wood, ${at.hz} m up`);
+  assert.ok(calm < open * 0.75, `it is calmer under the crowns: ${calm} against ${open} m/s`);
+});
