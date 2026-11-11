@@ -103,7 +103,7 @@ export function createWorld(scene) {
   // while the land is laid under it at full speed, and then comes up out of the paper as one
   // (SHEET.laid, post.js). `busy` stays above 0 until it has.
   const veil = { on: false, lift: -1, wall: 0, frames: 0, calm: 0 };
-  const VEIL_LIFT = 1.2;      // seconds the picture takes to come up
+  const VEIL_LIFT = 1.3;      // seconds the picture takes to come up
   const _camL = new THREE.Vector3();
   const prof = { terrain: 0 };
   let physics = null;
@@ -147,6 +147,10 @@ export function createWorld(scene) {
       for (const k in D) draw[k] = { ...D[k] };
       draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5 };      // (the share drawn is PHYSICS': it follows how hard it rains)
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
+      // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
+      // spray a short fleck, half as long as the rain's stroke)
+      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10 };
+      draw.spray = { ...D.spray, width: 0.10, exposure: 0.05, maxLen: 0.6, minPx: 4 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
       for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
     }).catch((e) => console.warn('weather kits not available: ' + e.message));
@@ -438,7 +442,10 @@ export function createWorld(scene) {
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
       // (under a closed sky the far air takes the sky's own wash high in the view: see pcHazeAt)
-      bu.uHazeUp.value.set(tmpKey.zenith.x, tmpKey.zenith.y, tmpKey.zenith.z, oc * 0.9 * (1 - space01));
+      // (what stands behind a far cliff there is the cloud's heavy mass, not the thin wash between clouds:
+      // the storm pigment at about the density the sky lays it, sky.js `mass`)
+      { const dk = 0.7 + 0.9 * storm - 1, up = (c) => c - (c - c * c) * dk;
+        bu.uHazeUp.value.set(up(_storm.x), up(_storm.y), up(_storm.z), oc * 0.92 * (1 - space01)); }
       bu.uUpW.value.copy(_hup);
       bu.uDayness.value = dayness;
       if (lastActive && st.id !== lastActive) freshSnow = 0;

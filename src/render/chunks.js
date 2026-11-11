@@ -89,7 +89,7 @@ vec3 pcAtmos(vec3 c, float f) {
 vec3 pcHazeAt(vec3 viewPos) {
   if (uHazeUp.a < 0.004) return uHaze;
   float e = clamp(dot(normalize(viewPos), mat3(viewMatrix) * uUpW), 0.0, 1.0);
-  return mix(uHaze, uHazeUp.rgb, uHazeUp.a * (1.0 - pow(1.0 - e, 2.4)));
+  return mix(uHaze, uHazeUp.rgb, uHazeUp.a * smoothstep(0.03, 0.20, e));
 }
 vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   float l = dot(c, vec3(0.3, 0.5, 0.2));
@@ -100,8 +100,12 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
 // Dappled light: a leaf-shadow pattern projected along the sun direction, anchored to the
 // planet. Every point along one sun ray gets the same value, so ground, trunks and foliage
 // share one continuous pattern. Returns 1 in sun, 0 in shade.
-float pcDapple(vec3 bodyPos, float canopy) {
-  vec3 pp = bodyPos - uSunDirL * dot(bodyPos, uSunDirL);
+// lift: how far (m) below the leaves that cast it the point lies. The pattern is read where the sun ray
+// through the point meets that level: one pattern along a ray, and it drifts with the sun as real sun
+// flecks do, a few centimetres a second. (It used to be projected through the planet's centre: on a
+// world 4 km in radius with a day of 25 minutes the flecks ran over the forest floor at 17 m/s.)
+float pcDappleL(vec3 bodyPos, float canopy, float lift) {
+  vec3 pp = bodyPos + uSunDirL * (lift / max(dot(normalize(bodyPos), uSunDirL), 0.22));
   float a = texture(uNoise3D, pp / 13.0).r;
   float b = texture(uNoise3D, pp / 4.1 + 0.37).g;
   float v = a * 0.68 + b * 0.32;
@@ -111,6 +115,7 @@ float pcDapple(vec3 bodyPos, float canopy) {
   // under an overcast nothing casts a shadow: only the dimness under the canopy is left
   return mix(smoothstep(th - w, th + w, v), 1.0 - 0.42 * canopy, uWx.x);
 }
+float pcDapple(vec3 bodyPos, float canopy) { return pcDappleL(bodyPos, canopy, 8.0); }
 
 // The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
 // them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any

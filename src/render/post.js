@@ -133,8 +133,9 @@ void main() {
   // a piece at a time, never a stipple.
   float laid = 1.0;
   if (uLaid < 0.999) {
-    float when = 0.40 * (1.0 - vUv.y) + 0.28 * plo.r + 0.10 * pmid.r;
-    laid = smoothstep(0.0, 0.62, uLaid * 1.42 - when);
+    // (slowly: no part of the sheet changes by more than a thirtieth of its depth in a thirtieth of a second)
+    float when = 0.11 * (1.0 - vUv.y) + 0.07 * plo.r + 0.02 * pmid.r;
+    laid = smoothstep(0.0, 1.0, uLaid * 1.2 - when);
     col = mix(vec3(1.0), col, laid);
     wet *= laid;
   }

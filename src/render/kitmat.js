@@ -57,7 +57,7 @@ const SHAPES = {
   // dust: a ragged dry-brush patch thinning toward its edge; the pattern travels with the puff
   // (a glaze, like the rain: a soft veil of the ground's own dust, densest at its middle, running
   // out to nothing, broken softly where the brush was dry; never a hard pale blot)
-  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0 || length(vView) < 1.6) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.22, 0.70, nz + 0.30 * (1.0 - rr)) * 0.52;',
+  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0 || length(vView) < 1.6) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.22, 0.70, nz + 0.30 * (1.0 - rr)) * 0.52 * smoothstep(1.6, 3.6, length(vView));',
   // a veil of dust (or of blown snow, or sand) as PHYSICS hands it over: vPcData.y its opacity,
   // .z how soft its ends are, .w 1 a long level streamer, 0 a round puff. A streamer is laid in
   // one level drag of a soft brush: densest just above its foot, thinning to nothing at its top
@@ -68,21 +68,25 @@ const SHAPES = {
     + ' float ends = 1.0 - smoothstep(1.0 - max(soft, 0.8), 1.0, abs(p.x)); float up = (p.y + 1.0) * 0.5 / (0.3 + 0.7 * (1.0 - p.x * p.x));'
     + ' float prof = smoothstep(0.0, 0.12 + 0.2 * soft, up) * exp(-2.6 * up) * (1.0 - smoothstep(0.75, 1.0, up));'
     + ' float nz = 0.6 * texture(uNoise3D, vec3(vPcUv.x * 1.1 + vPcData.x * 3.7, vPcUv.y * 2.6, vPcData.x * 5.0)).r + 0.4 * texture(uNoise3D, vec3(vPcUv.x * 3.1, vPcUv.y * 8.0, vPcData.x * 9.0)).g;'
-    + ' float ga = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.85, ends * prof * 2.0, strm) * (0.50 + 0.50 * smoothstep(0.22, 0.72, nz)) * clamp(vPcData.y * 2.6, 0.0, 1.0); ga = min(ga, 0.86);'
+    + ' float ga = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.85, ends * prof * 2.0, strm) * (0.50 + 0.50 * smoothstep(0.22, 0.72, nz)) * clamp(vPcData.y * 2.6, 0.0, 1.0) * smoothstep(1.6, 3.6, length(vView)); ga = min(ga, 0.86);'
     // (seen in the game: a veil in the dust's own middle tone is lost against the hazy dune behind it. A veil
     // is the paper coming through: it is lifted toward the paper AFTER the air has been laid over it, so that
     // veils stand pale at every depth; less so after dark)
     + ' vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * fract(vPcData.x * 7.0)); float w = 0.95; float lift = (0.42 + 0.26 * strm) * (0.35 + 0.65 * uDayness);',
   // blown sand: a drag of the dune's own wash lifted toward the paper (a pale skim, heavier than
   // it was: scattered specks did not read), thinning to its tail
-  sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66;',
+  sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66 * smoothstep(1.6, 3.6, length(vView));',
+  // spume and surf spray: a short fleck of bare paper at the head of the drop's flight (the rain is a
+  // long grey stroke: the two were the same pale level dash), laid after the brush so it stays a fleck
+  spume: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || vPcUv.y > 0.5 || length(vView) < 1.6) discard; vec3 c = mix(ink, vec3(0.995, 0.995, 0.985), 0.88); float w = 0.05; float ga = (1.0 - tpr * tpr) * (1.0 - smoothstep(0.22, 0.5, vPcUv.y)) * smoothstep(0.0, 0.06, vPcUv.y) * 0.94;',
   // a leaf in the wind: a lens with pointed ends on the thin quad the kit lays (a line when it is
   // edge-on); laid as a glaze after the brush pass, so a mark two pixels wide is not brushed away
-  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; float ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; vec3 c = pcDensity(ink, 0.9 + 0.5 * vPcData.x); float w = 0.4;',
+  // (two tones: half the leaves dark, to be seen against the sky and the meadow, half pale ochre, against the wood)
+  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; float ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; float lt = step(0.5, fract(vPcData.x * 7.31)); vec3 c = mix(pcDensity(ink, 1.5 + 0.4 * vPcData.x), mix(ink, vec3(0.97, 0.86, 0.52), 0.6), lt); float w = 0.4;',
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
   // (a glaze: a soft pale arc of paper colour, broken where the brush lifted, never a white wire)
-  ring: 'float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.05, 0.50, cov) * smoothstep(0.30, 0.54, brk) * 0.58; if (ga < 0.02) discard; vec3 c = vec3(0.985, 0.975, 0.945); float w = 0.0;',
+  ring: 'float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.02, 0.24, cov) * smoothstep(0.30, 0.54, brk) * 0.58; if (ga < 0.02) discard; vec3 c = vec3(0.985, 0.975, 0.945); float w = 0.0;',
   // a print: this ground, darker; a paler rim on loose ground; fading thins it through the
   // noise (fixed in the mark, so it never boils)
   mark: 'float scour = step(3.5, vPcData.z); float cover = pcPhysMarkCover(vPcUv, vPcData.z) * (1.0 - scour), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * clamp(vPcData.x * 12.0, 0.15, 0.9), rim * mix(0.6, 0.22, scour)) * min(1.0, vPcData.w * 3.0); a = min(a, 0.62); if (a < texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.z * 0.37 + vPcData.x)).g) discard; vec3 c = mix(pcWetWash(ink, 1.0) * 0.66, mix(ink, vec3(1.0), 0.45), rim * (1.0 - cover)); float w = 0.2;',
@@ -92,6 +96,7 @@ function shapeOf(kind, info) {
   if (kind === 'snow') return SHAPES.flake;
   if (kind === 'dust' || kind === 'ash' || kind === 'sand') return info.veil ? SHAPES.veil : kind === 'sand' ? SHAPES.sandStreak : SHAPES.puff;
   if (kind === 'leaves') return SHAPES.leaf;
+  if (kind === 'spray') return SHAPES.spume;
   return SHAPES[info.shape] || SHAPES.dab;
 }
 // region ids: prints belong to the ground (1); splash rings are 6 (kept crisp by the post
@@ -100,7 +105,7 @@ function shapeOf(kind, info) {
 // a light sky, lighter than a dark wood), instead of an opaque mark. They are drawn after the
 // abstraction pass, onto the brushed picture (shared.js GLAZES; the painter does it), testing
 // their depth by hand against the scene's, so the post passes still see the thing behind them.
-const GLAZE = { rain: 1, dust: 1, ash: 1, sand: 1, leaves: 1 };
+const GLAZE = { rain: 1, dust: 1, ash: 1, sand: 1, leaves: 1, spray: 1 };
 function regionOf(kind, info) {
   if (kind === 'ring' || info.shape === 'ring') return 6.0;
   if (kind === 'mark' || info.shape === 'mark') return 1.0;

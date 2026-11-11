@@ -98,6 +98,9 @@ uniform vec3 uHueB;
 uniform float uBodyR;
 varying vec4 vPar;
 varying vec3 vUpV;
+// PHYSICS' push field (what has been trodden or blown flat): the ground shows the track
+${FLORA_GLSL}
+uniform float uPhysOn;
 void main() {
   #include <logdepthbuf_fragment>
   vec3 nV = normalize(vNV);
@@ -204,6 +207,19 @@ void main() {
     c = mix(c, mix(uHaze, vec3(1.0), 0.35), pud * 0.70);
   } else pud = 0.0;
 
+  // Wet rock under a storm: a steep face takes a deeper wash (the pale cliffs of a storm coast stood
+  // against the storm's sky as paper cut-outs with ruled edges).
+  c = pcDensity(c, 1.0 + (0.80 * uStorm + 0.35 * uWx.y) * (1.0 - smoothstep(0.50, 0.92, upf)) * (1.0 - snowC));
+  // A track: where a walker (or a hull's wash) has laid the growth flat the ground's wash is a tone
+  // duller and deeper, as trodden grass is. PHYSICS lays the stems; the strokes standing over the
+  // sward are too few to show the lane by themselves.
+  if (uPhysOn > 0.5 && dist < 70.0) {
+    vec2 tuv = (pcPhysGrid(vBody) - uPhysNearMap.xy) * uPhysNearMap.z + 0.5;
+    if (tuv.x > 0.0 && tuv.y > 0.0 && tuv.x < 1.0 && tuv.y < 1.0) {
+      float trod = clamp(pcPhysTex(uPhysPush, tuv, uPhysNearMap.w).z, 0.0, 1.0) * (1.0 - smoothstep(40.0, 70.0, dist)) * (1.0 - snowC);
+      c = pcDensity(c, 1.0 + 0.42 * trod) * mix(vec3(1.0), vec3(0.95, 0.97, 0.90), trod);
+    }
+  }
   float f = pcFogAmount(dist);
   c = pcAtmosV(c, f, vView);
   // from space the limb of the planet thins into its haze, toward bare paper
@@ -224,6 +240,7 @@ export function makeTerrainMaterial(bodyU) {
     uniforms: baseUniforms(bodyU, {
       uOrigin: { value: new THREE.Vector3() }, uAnchor: { value: new THREE.Vector3() },
       uCamLocal: { value: new THREE.Vector3() }, uMorph: { value: new THREE.Vector3(1e8, 2e8, 0) },
+      ...PHYS,
     }),
     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
   });
@@ -258,14 +275,19 @@ void main() {
   vec2 along;
   vec3 w = pcPhysWaterD(vBody, along);
   vWake = pcPhysWake(pcPhysGrid(vBody));
-  // the mesh carries the waves only where it is fine enough for them (the rest is painted),
-  // and they die away at the waterline, so the shore does not crawl
-  float lam = 6.2831853 / max(uPhysWaterK.x, 1e-3);
-  float carry = 1.0 - smoothstep(2.2 * lam * uWaveLod, 6.0 * lam * uWaveLod, distance(p, uCamLocal));
-  // (a wave keeps its height into the shallows and falls away only over the last of the depth: with the
-  // whole height asked for at 1.3 times the wave's own, a 2.8 m sea lay flat for the first 30 m off a shelving shore)
-  float shoal = smoothstep(0.0, 1.0, aDepth / max(uPhysWaterSea.x * 0.45, 0.05));
-  p += normalize(vBody) * ((w.x + vWake.x) * carry * shoal);
+  // The mesh carries each wave only where it is fine enough for it (the rest is painted): the short
+  // trains near the eye, the long one (the swell, PHYSICS' fourth train) five times as far. (The reach
+  // of all of them used to be measured by the first, short train: Neptune's 2.8 m sea lay flat from 64 m out.)
+  vec3 wl = pcPhysWaterLong(vBody);
+  float dcam = distance(p, uCamLocal);
+  float lam = 6.2831853 / max(uPhysWaterK.x, 1e-3), lamL = 6.2831853 / max(uPhysWaterK.w, 1e-3);
+  float carry = 1.0 - smoothstep(2.2 * lam * uWaveLod, 6.0 * lam * uWaveLod, dcam);
+  float carryL = 1.0 - smoothstep(2.2 * lamL * uWaveLod, 6.0 * lamL * uWaveLod, dcam);
+  // In the shallows a wave is as high as the depth lets it be (PHYSICS: 0.78 of it), and at the edge
+  // the water itself runs up the beach with each wave and drains back (pcPhysWaterRunup).
+  float shoal = clamp(aDepth / max(1.28 * uPhysWaterSea.x, 0.05), 0.0, 1.0);
+  float runup = pcPhysWaterRunup(vBody, 0.07);
+  p += normalize(vBody) * mix(runup, (w.x - wl.x + vWake.x) * carry + wl.x * carryL, shoal);
   vBody = p + uOrigin;
   vToCam = uCamLocal - p;
   vDepth = aDepth;
@@ -324,7 +346,11 @@ vec3 pcReflect(vec3 P, vec3 R) {
 
 void main() {
   #include <logdepthbuf_fragment>
-  if (vDepth < 0.0) discard;
+  // (the still depth plus the swash of the moment: under zero the bed is bare just now)
+  // (and the swash reaches 0.4 m above the still waterline at most, to a ragged line: the
+  // mesh ends in straight cell edges a little higher, and a sheet of foam ended there as a white slab)
+  float vDep = vDepth + pcPhysWaterRunup(vBody, 0.07);
+  if (vDep < 0.0 || vDepth < -0.38 + (texture(uNoise3D, vBody / 2.1).g - 0.5) * 0.14) discard;
   vec3 up = normalize(vBody);
   vec3 Vd = normalize(vToCam);
   float dist = length(vView);
@@ -371,7 +397,7 @@ void main() {
   vec4 r4 = texture(uNoise3D, vBody / 9.0 + drift * 0.4);
   // (scarlet by the banks where it cools, cadmium orange in the stream, paper-yellow only where it
   // runs deep and hot; the plates of crust gather by the banks: a crust forms on lava, not on a glowing pool)
-  float hotD = smoothstep(0.30, 1.20, vDepth + (r2.g - 0.5) * 0.5);
+  float hotD = smoothstep(0.30, 1.20, vDep + (r2.g - 0.5) * 0.5);
   own = mix(own, vec3(0.88, 0.25, 0.13), vLiqP.x * (1.0 - hotD) * 0.7);
   own = mix(own, vec3(1.0, 0.94, 0.64), vLiqP.x * hotD * smoothstep(0.40, 0.70, r4.r) * 0.92);
   own = mix(own, vec3(0.21, 0.16, 0.20), smoothstep(0.75, 1.0, vLiqP.x) * smoothstep(0.58 - 0.20 * (1.0 - hotD), 0.70 - 0.18 * (1.0 - hotD), r4.g + (r2.b - 0.5) * 0.3));
@@ -400,18 +426,18 @@ void main() {
 
   // the bed shows through where the water is shallow or seen from above
   float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
-  float shallow = 1.0 - smoothstep(0.02, 0.42, vDepth);
+  float shallow = 1.0 - smoothstep(0.02, 0.42, vDep);
   vec3 bed = pcDensity(uBed, 1.0 + (r3.b - 0.5) * 0.8);
   c = mix(c, bed * mix(vec3(1.0), c, 0.45), clamp((1.0 - fres) * 0.42 + shallow * 0.7, 0.0, 0.9) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x * 0.8));
   // pigment pools at the water's edge
-  c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDepth)) * 0.35);
+  c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDep)) * 0.35);
   // bare-paper glints: broken dashes where ripples catch the light
-  float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDepth) * uDayness;
+  float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDep) * uDayness;
   glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y) * (1.0 - 0.7 * wavy);
   // the sea running: bare paper along the tops of the higher waves, in broken dashes that lie
   // the way the crests lie; whitecaps where it breaks, ragged; surf where it shoals at a shore
   float liq = (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
-  float deep = smoothstep(0.04, 0.3, vDepth);
+  float deep = smoothstep(0.04, 0.3, vDep);
   vec4 r6 = texture(uNoise3D, vBody / 0.62 + drift * 3.0);
   float torn = r6.r * 0.55 + r2.g * 0.45;
   // (the crest line itself: high water where the slope along the waves' way turns over)
@@ -426,15 +452,17 @@ void main() {
   foam = max(foam, capFar * (1.0 - keep) * smoothstep(capTh, capTh + 0.05, r3.r * 0.6 + r1.g * 0.4) * (1.0 - smoothstep(500.0, 1500.0, dist)));
   // (in the shallows the breaking crests are white, ragged lines; at the waterline a thin
   // broken edge of swash that can still be seen from far off)
-  float sz = pcPhysWaterSurf(vDepth);
+  float sz = pcPhysWaterSurf(vDep);
   float surf = sz * sz * smoothstep(0.50, 0.85, hN + (r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5);
-  // (the swash runs up the shore with each wave and draws back, and its lace is carried in with the
-  // waves, torn anew as it goes: a rim drawn from a still pattern was frozen from frame to frame)
+  // (the swash runs up the shore with each wave and draws back: the depth here is the still depth plus
+  // PHYSICS' run-up; and its lace is carried in with the waves, torn anew as it goes. A rim drawn from the
+  // still depth and a still pattern was frozen from frame to frame)
   vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
-  float run = 0.5 + 0.5 * clamp(wv.x / hs, -1.0, 1.0) * smoothstep(0.04, 0.35, uPhysWaterSea.x);
   vec4 rsw = texture(uNoise3D, (vBody - D3 * (uTime * 0.55)) / 1.35);
-  float swash = (1.0 - smoothstep(0.03, (0.05 + 0.22 * hs) * (0.30 + 1.25 * run), vDepth)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
-  surf = max(surf, swash * smoothstep(0.40, 0.60, rsw.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
+  float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDep)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
+  // (lace, not a sheet: where the run-up is a film over the sand the foam is torn wide open)
+  float film = 1.0 - smoothstep(-0.25, 0.02, vDepth);
+  surf = max(surf, swash * smoothstep(0.40 + 0.05 * film, 0.60 + 0.05 * film, rsw.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
   // far off, where the waves are finer than the brush can hold: the swell as a painter lays it,
   // long broken strokes lying the way the crests lie (anchored to the planet), the hollow before
   // each one darker, and on a sea that is breaking a white horse here and there along them
@@ -466,7 +494,7 @@ void main() {
     c = mix(c, skyc, farSea * sw * (0.50 + 0.22 * gale));
     farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
-  float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq, farWhite);
+  float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
@@ -531,6 +559,7 @@ varying vec2 vUv;
 varying vec4 vData;
 varying vec4 vInst;
 varying float vWash;      // 1: fully laid; below: the strokes are still arriving (negative: being lifted out)
+varying float vAbove;     // metres above the plant's foot (the sun flecks on a trunk continue the ground's)
 varying float vFog;
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -600,6 +629,11 @@ void main() {
     vec3 wp = (im * vec4((lp + sw) * vis, 1.0)).xyz;
   #endif
   vBody = wp + uOrigin;
+  #ifdef USE_INSTANCING
+    vAbove = dot(wp - io, normalize(io + uOrigin));
+  #else
+    vAbove = 0.0;
+  #endif
   vObj = position;
   mat3 ir = mat3(im);
   vNV = normalMatrix * (ir * normal);
@@ -647,6 +681,7 @@ varying vec2 vUv;
 varying vec4 vData;
 varying vec4 vInst;
 varying float vWash;
+varying float vAbove;
 varying float vFog;
 void main() {
   #include <logdepthbuf_fragment>
@@ -713,7 +748,7 @@ void main() {
     #endif
     c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7), 0.9);     // wet bark goes dark
     x = dot(nV, sunV) * 0.5 + 0.5;
-    x *= mix(0.55, 1.0, pcDapple(vBody, canopy * 0.8));
+    x *= mix(0.55, 1.0, pcDappleL(vBody, canopy * 0.8, 8.0 - vAbove));
     x += (n1.g - 0.5) * 0.12;
     float lvl = pcLevel(x, 0.06);
     // pale bark takes a thinner shadow wash: by day the trunks stay the lights of the picture
@@ -747,7 +782,7 @@ void main() {
     x = x * (1.0 - vData.z * 0.42 * (1.0 - snowF));
     float through = pow(max(dot(-V, sunV), 0.0), 1.5);
     x = max(x, through * (0.50 + 0.45 * st.g + (n2.r - 0.5) * 0.5));
-    x *= mix(0.62, 1.0, pcDapple(vBody, canopy * 0.6));
+    x *= mix(0.62, 1.0, pcDappleL(vBody, canopy * 0.6, 8.0 - vAbove));
     // each wash of the crown sits at its own value; a few dark touches inside
     x += (vData.w - 0.5) * 0.26 + (n2.g - 0.5) * 0.14 - smoothstep(0.55, 0.8, st.g) * 0.16;
     float lvl = min(pcLevel(x, 0.07), 2.6);
@@ -764,7 +799,7 @@ void main() {
     c = mix(c, vec3(0.50, 0.43, 0.40), uWx.z * 0.85);      // (what still stands out of the snow is dead stalk, not a green fleck)
     c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.8 + vInst.y * 0.5), 0.6);
     x = dot(normalize(vMassV), sunV) * 0.5 + 0.5;
-    x *= mix(0.42, 1.0, pcDapple(vBody, canopy));
+    x *= mix(0.42, 1.0, pcDappleL(vBody, canopy, 8.0 - vAbove));
     x += (n1.g - 0.5) * 0.14 + vUv.y * 0.10;
     float lvl = pcLevel(x, 0.06);
     c = pcTone(c, lvl);
@@ -774,7 +809,7 @@ void main() {
     // ---- accent: one soft touch of pure pigment (none on a snowfield)
     if (seed < uWx.z * 1.2) discard;
     c = pcDensity(uAccent, 1.0 + (n1.r - 0.5) * 0.9);
-    x = 0.6 * mix(0.6, 1.0, pcDapple(vBody, canopy));
+    x = 0.6 * mix(0.6, 1.0, pcDappleL(vBody, canopy, 8.0 - vAbove));
     c = pcTone(c, pcLevel(x + 0.2, 0.08));
     wet = 0.35;
     id = 4.0 + seed * 0.9;
@@ -789,7 +824,7 @@ void main() {
     float snowR = pcSnowCover(dot(nV, upV) * 0.5 + 0.5, nr.g * 0.6 + n1.r * 0.4, 0.0);
     c = mix(c, vec3(0.97, 0.98, 1.0), snowR);
     x = dot(nV, sunV) * 0.5 + 0.5;
-    x *= mix(0.45, 1.0, pcDapple(vBody, canopy));
+    x *= mix(0.45, 1.0, pcDappleL(vBody, canopy, 8.0 - vAbove));
     vec4 nf = texture(uNoise3D, vBody / 0.55 + 0.61);
     x += (n1.g - 0.5) * 0.22 + (nr.g - 0.5) * 0.26 + (nf.b - 0.5) * 0.1;
     float lvl = pcLevel(x, 0.12);
