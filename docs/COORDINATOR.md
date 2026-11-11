@@ -1126,3 +1126,46 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   mechanics on the moved spawns and changed obstacles; the tour), and does the motion set,
   the weather set and every check when PHYSICS reports. PAINTER's ninth agent works on the
   known motion and weather faults meanwhile and takes review 6's findings as they come.
+- 2026-11-11: **PHYSICS P12 accepted (ninth agent, head `a0630e4`; `3406da1`, `f0b58ea`,
+  `40161ba`)**. The coordinator re-ran on a clean export of the head: `node --test
+  src/physics/` 253 pass, `node --test tests/*.test.mjs` 117 pass; and opened the strips of
+  the clamber and of the spray. Fixed, each held by a test:
+  (1) **the ship's descent hung** above the gear because the thrusters' ground cushion
+  cancelled the flight computer's whole velocity error; the computer now allows for the
+  cushion (`SHIP_BODY.groundComp`) and the cushion fades with air density (none in a vacuum):
+  1.6 to 1.0 m in 0.78 s (was 2.12 s). The game's own landing is unchanged (within 8 mm
+  frame by frame in PILOT's `motion.mjs --only landing`); the hang came through the lab.
+  (2) **the wind stepped when the near field re-anchored** (0.38 to 0.61 m/s in that frame):
+  four geometric causes removed; now 0.007 to 0.009 m/s against 0.030 in any other frame.
+  (3) **particles near a wood rode another wind** (up to 3.5 m/s off): every node of the
+  wind grid has its own profile, used by `physics.air` and the particles alike; the largest
+  difference is 0.39 m/s.
+  (4) **cross-wind turbulence** on the same four octaves: lateral over along-wind intensity
+  0.77 to 0.79, within 0.06 of Kaimal's lateral spectrum; the direction wanders 8 degrees
+  rms over grass at 10 m.
+  (5) **the kick after stepping off a boulder** (+0.9 to +1.5 m/s, over a second in the air
+  on the Moon): now +0.2 to +0.35 m/s and 0.02 m of rise.
+  Seen for the first time: a clamber (the figure shortens on the face, crosses the top at
+  2.3 to 2.7 m/s, in contact throughout); spray (level pale dashes over the surf, 160
+  growing to 580 drops; with rain shown it cannot be told from rain).
+  **Findings from the strips**: the run has no bob at all (the hips move 0.01 m: the
+  explorer glides); the jetpack descent is five seconds at one speed and reads as floating;
+  the hovering hull hangs dead level in gusts; birches read as still in a 1.2 s window in
+  the storm; 190 leaves in the air are a handful of one-pixel specks; dust puffs near the
+  eye flicker for single frames; the gust front does not read as a wave in the sparse
+  meadow; a run on the Moon is checked from 5.3 to 2.0 m/s in one frame at a 1 m boulder.
+  **Neptune's coast, the cause found**: PHYSICS's chunk gives the right moving height
+  (1.0 m at 60 m out, 1.3 to 1.5 m at 250 m); PAINTER's liquid vertex shader removes it:
+  the carry distance is taken from the first, short wave train (flat from 64 m out), the
+  shoal factor flattens the foreground, and the swash mask depends on still depth alone
+  (frozen foam). PHYSICS added `pcPhysWaterLong` and `pcPhysWaterRunup` (a run-up of about
+  9 m up and down a 0.07 beach over a 5.4 s period) for PAINTER to wire. The straight-edged
+  pale forms in the sky are PAINTER's. Additive API; behaviour changed without a call
+  changing is listed in PHYSICS's notes.
+  The ninth PHYSICS agent is out of context and is replaced by a tenth.
+- 2026-11-11: **PHYSICS's order for P13** (coordinator), while review 6 runs: (1) a gait:
+  the hips rise and fall with each stride and the cadence follows speed and gravity, with
+  footfall events, so the run no longer glides; a crouch before a jump; (2) the jetpack's
+  descent, the hull in gusts and the hard check at a boulder on the Moon, each judged with
+  PILOT's levers in mind; (3) trees and leaves that read in a storm; (4) the Earth shore
+  seen; then review 6's findings as they come.
