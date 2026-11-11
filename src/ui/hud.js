@@ -20,6 +20,7 @@ export function createHud(root) {
   const thr = el('div', 'pc-gauge pc-gauge-throttle', gauges);
   el('span', 'pc-label', thr, 'throttle');
   const thrBar = el('i', '', el('b', '', thr));
+  const hint = el('div', 'pc-hint', root);
   const notice = el('div', 'pc-notice', root);
   const marks = el('div', 'pc-marks', root);
   const stats = el('div', 'pc-stats', root);
@@ -27,6 +28,7 @@ export function createHud(root) {
   const dot = el('div', 'pc-reticle', root);
   const card = el('div', 'pc-panel pc-start', root);
   el('div', 'pc-title', card, 'Painted Cosmos');
+  const sub = el('div', 'pc-label pc-sub', card, 'a watercolour to walk into');
   el('div', 'pc-label', card, 'click to begin');
   const help = el('div', 'pc-help pc-label', card);
   help.innerHTML = [
@@ -34,6 +36,7 @@ export function createHud(root) {
     ['E', 'board, land, step out'], ['V', 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], ['C', 'sink'], ['W S', 'throttle'], ['A D', 'turn'],
     ['mouse', 'point the nose'], ['X', 'brake'], ['F', 'pulse drive (in space)'], ['M', 'map'],
+    ['anywhere', ''], ['B', 'sketchbook'], ['H', 'this card'], ['`', 'frame read-out'],
   ].map(([k, t]) => (t ? `<span><kbd>${k}</kbd> ${t}</span>` : `<em>${k}</em>`)).join('');
 
   // Keep the start card inside small windows.
@@ -108,6 +111,10 @@ export function createHud(root) {
       if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
     },
     showStart(on) { card.classList.toggle('pc-on', !!on); },
+    get startShown() { return card.classList.contains('pc-on'); },
+    setSubtitle(text) { sub.textContent = text; },
+    // A quiet line at the top: how to look around while the mouse is not captured.
+    setHint(text) { hint.classList.toggle('pc-on', !!text); if (text && hint.textContent !== text) hint.textContent = text; },
     startCard: card,
   };
 }

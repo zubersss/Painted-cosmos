@@ -16,7 +16,8 @@ const NO_KEYS = { down: () => false, axis: () => 0 };
 const NO_EVENTS = { edges: new Set(), dx: 0, dy: 0, wheel: 0 };
 
 export class Game {
-  constructor({ renderer, scene, camera, world, painter, explorer, ship, input, hud, map, params, physics, autosave, dyn }) {
+  constructor({ renderer, scene, camera, world, painter, explorer, ship, input, hud, map, book, audio, params, physics, autosave, dyn }) {
+    this.book = book || null; this.audio = audio || null; this._eventSeq = 0; this._promptKey = '';
     this.renderer = renderer; this.scene = scene; this.camera = camera; this.world = world; this.painter = painter;
     this.explorerModel = explorer; this.shipModel = ship; this.input = input; this.hud = hud;
     this.map = map || null; this.autosave = autosave || null; this.dyn = dyn || null;
@@ -39,9 +40,11 @@ export class Game {
       },
       sampleObstacles: world.sampleObstacles ? (bodyId, d, radius) => world.sampleObstacles(bodyId, scratch.set(d.x, d.y, d.z), radius) : null,
       physics: physics || null,
+      getVistas: world.getVistas ? (bodyId) => world.getVistas(bodyId) : null,
       seat: ud.seat, hatch: ud.hatch,
       body: q.get('body'), hour: q.has('time') ? Number(q.get('time')) : null,
     });
+    this.sim.onVistaFound = (bodyId, id) => { if (world.setVistaFound) world.setVistaFound(bodyId, id, true); };
     this._planes = { near: 0, far: 0, fov: 0, aspect: 0 };
     this.frameCount = 0;
     this.started = false;
@@ -51,15 +54,19 @@ export class Game {
     const sim = this.sim;
     const raw = this.input.take();
     // Keys that belong to the interface, not to the explorer or the ship.
-    if (raw.edges.has('KeyM')) this.toggleMap();
+    if (this.audio && this.input.used) this.audio.start();
+    if (raw.edges.has('KeyM')) { if (this.book && this.book.open) this.book.hide(); this.toggleMap(); }
+    if (raw.edges.has('KeyB')) { if (this.map && this.map.open) this.map.hide(); this.toggleBook(); }
+    if (raw.edges.has('KeyH') && this.started) { this.hud.showStart(!this.hud.startShown); if (this.audio) this.audio.event('paper'); }
     if (raw.edges.has('Backquote')) this.showStats = !this.showStats;
     let keys = this.input, events = raw;
+    const panel = (this.map && this.map.open) || (this.book && this.book.open);
     if (this.map && this.map.open) {
       if (raw.edges.has('ArrowRight') || raw.edges.has('ArrowDown')) this.map.step(1);
       if (raw.edges.has('ArrowLeft') || raw.edges.has('ArrowUp')) this.map.step(-1);
       if (raw.edges.has('Enter') || raw.edges.has('Escape')) this.toggleMap();
-      keys = NO_KEYS; events = NO_EVENTS;          // the world goes on; the hands are on the map
-    }
+    } else if (this.book && this.book.open && (raw.edges.has('Enter') || raw.edges.has('Escape'))) this.toggleBook();
+    if (panel) { keys = NO_KEYS; events = NO_EVENTS; }          // the world goes on; the hands are on the page
     if (this.input.message) {
       this.uiNotice = this.input.message; this.uiNoticeUntil = performance.now() + 9000;
       this.input.message = null;
@@ -147,6 +154,7 @@ export class Game {
     if (info && this.showStats) { st0.tris = info.render.triangles; st0.calls = info.render.calls; }
     this.updateMarks(v);
     this.updateHud();
+    this.updateAudio(dt, v);
     if (this.autosave) this.autosave.update(sim);
     if (this.map && this.map.open && this.frameCount % 30 === 0) this.map.refresh(this.mapData());
     this.frameCount++;
@@ -167,6 +175,51 @@ export class Game {
   toggleMap() {
     if (!this.map) return;
     if (this.map.open) this.map.hide(); else this.map.show(this.mapData());
+    if (this.audio) this.audio.event('paper');
+  }
+
+  toggleBook() {
+    if (!this.book) return;
+    if (this.book.open) this.book.hide();
+    else {
+      const sim = this.sim, totals = {};
+      if (this.world.getBiomes) for (const id of sim.eph.ids) { try { totals[id] = this.world.getBiomes(id).length; } catch { /* optional */ } }
+      this.book.show(sim.sketchbook(), sim.sm.state === S.ON_FOOT ? sim.nearestVista() : null, totals);
+    }
+    if (this.audio) this.audio.event('paper');
+  }
+
+  // Sound: the state of the world for the mixer, and one-shots for what just happened.
+  updateAudio(dt, v) {
+    const audio = this.audio, sim = this.sim;
+    if (!audio || !audio.ready) return;
+    const st = sim.sm.state;
+    const here = sim.physics && sim.physics.here && sim.physics.here.bodyId ? sim.physics.here : null;
+    const w = here ? here.weather : null;
+    const inShip = isInShip(st);
+    const body = sim.mood.bodyId ? BODIES[sim.mood.bodyId] : null;
+    audio.update(dt, {
+      state: st, onFoot: st === S.ON_FOOT, inShip,
+      speed: inShip ? sim.sh.speed : sim.ex.speed, grounded: sim.ex.grounded, jet01: sim.ex.jet01,
+      throttle01: sim.sh.throttle01, pulse01: st === S.PULSE ? 1 : 0,
+      inSpace01: sim.mood.inSpace01, altitude01: sim.mood.altitude01, bodyId: sim.mood.bodyId,
+      wind: here ? here.air.speed : body && body.atmosphereHeight > 0 ? 4 : 0, gust01: here ? here.air.gust01 : 0,
+      rain01: w && w.precipitation ? w.precipitation.intensity01 : 0,
+      airless: !!body && !(body.atmosphereHeight > 0),
+      thunderIn: w && w.lightning ? w.lightning.thunderIn : null,
+      submerged: sim.ex.liquidDepth > 0.2,
+    });
+    const seq = sim.eventSeq || 0;
+    const fresh = Math.min(seq - this._eventSeq, sim.events.length);
+    for (let i = sim.events.length - fresh; i < sim.events.length; i++) {
+      const t = sim.events[i].type;
+      if (t === 'touchdown') audio.event('land'); else if (t === 'bounce') audio.event('bounce');
+      else if (t === 'vista') audio.event('found'); else if (t === 'biome' || t === 'arrived') audio.event('brush');
+    }
+    this._eventSeq = seq;
+    const key = sim.promptNow ? sim.promptNow.text : '';
+    if (key && key !== this._promptKey) audio.event('brush');
+    this._promptKey = key;
   }
 
   // ---- markers: a ring on each world you can fly to, drawn where it is in the sky --------------
@@ -213,7 +266,13 @@ export class Game {
     const hud = this.hud, sim = this.sim;
     if (!hud) return;
     const st = sim.sm.state;
-    hud.setPrompt(this.map && this.map.open ? null : sim.promptNow);
+    const panelOpen = (this.map && this.map.open) || (this.book && this.book.open);
+    hud.setPrompt(panelOpen ? null : sim.promptNow);
+    if (hud.setHint) {
+      // Until the player has looked around once (and again whenever the capture is lost), say how.
+      const need = this.started && !this.input.looked && !panelOpen && this.hintOn !== false;
+      hud.setHint(need ? (this.input.usePointerLock ? 'click the picture to look around with the mouse' : 'hold the left mouse button and drag to look around') : null);
+    }
     if (hud.setNotice) {
       hud.setNotice(sim.notice ? sim.notice.text : this.uiNotice && performance.now() < this.uiNoticeUntil ? this.uiNotice : null);
     }
@@ -256,7 +315,8 @@ export class Game {
       ...this.sim.info(), near: this.camera.near, far: this.camera.far,
       marks: this._marks.map((m) => ({ kind: m.kind, label: m.label, x: Math.round(m.x), y: Math.round(m.y), r: Math.round(m.r) })),
       stats: { frameMs: +s.frameMs.toFixed(1), worldMs: +s.worldMs.toFixed(2), tris: s.tris, calls: s.calls, shown: this.showStats },
-      mapOpen: !!(this.map && this.map.open), uiNotice: this.uiNotice,
+      mapOpen: !!(this.map && this.map.open), bookOpen: !!(this.book && this.book.open), uiNotice: this.uiNotice,
+      audio: this.audio ? { state: this.audio.state, ready: this.audio.ready, mix: this.audio.debug() } : null,
     };
   }
 }

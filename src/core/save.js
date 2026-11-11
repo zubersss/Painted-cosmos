@@ -136,9 +136,15 @@ export class AutoSave {
     const changed = st !== this.lastState;
     this.lastState = st;
     if (st !== S.ON_FOOT && st !== S.LANDED) return false;
-    if (!changed && sim.t - this.last < this.every) return false;
+    // Something for the sketchbook (a view found, a new landscape) is written down at once.
+    let pages = 0;
+    for (const k in sim.vistas) pages += Object.keys(sim.vistas[k]).length;
+    for (const k in sim.visited) pages += Object.keys(sim.visited[k].biomes).length;
+    const news = pages !== this.pages;
+    if (!changed && !news && sim.t - this.last < this.every) return false;
     if (st === S.ON_FOOT && !sim.ex.grounded && !sim.ex.swimming) return false;      // not in mid-air
     this.last = sim.t;
+    this.pages = pages;
     this.ok = writeSave(this.storage, snapshot(sim));
     if (this.ok) this.writes++;
     return this.ok;

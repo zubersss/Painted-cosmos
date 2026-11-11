@@ -361,7 +361,7 @@ export class Sim {
     if (b && !v.biomes[b]) { v.biomes[b] = true; this.emit('biome'); }
   }
 
-  emit(type) { this.events.push({ type, t: this.t }); if (this.events.length > 40) this.events.shift(); }
+  emit(type) { this.eventSeq = (this.eventSeq || 0) + 1; this.events.push({ type, t: this.t }); if (this.events.length > 40) this.events.shift(); }
 
   // ---- boarding and stepping out ---------------------------------------------------------------
   hatchPoint() {

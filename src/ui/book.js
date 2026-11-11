@@ -27,7 +27,7 @@ export function createBook(root) {
         el('b', '', row, p.name);
         if (!p.visited) { el('span', 'pc-label', row, 'not yet visited'); continue; }
         const total = totals[p.id];
-        el('span', 'pc-label', row, `${p.biomes.length}${total ? ' of ' + total : ''} landscapes: ${p.biomes.map(pretty).join(', ')}`);
+        el('span', 'pc-label', row, `${p.biomes.length}${total ? ' of ' + total : ''} landscape${p.biomes.length === 1 && !total ? '' : 's'}: ${p.biomes.map(pretty).join(', ')}`);
         el('span', 'pc-label', row, p.vistasTotal ? `${p.vistasFound.length} of ${p.vistasTotal} views${p.vistasFound.length ? ': ' + p.vistasFound.join(', ') : ''}` : '');
       }
       const where = (deg) => (Math.abs(deg) < 25 ? 'ahead' : Math.abs(deg) > 155 ? 'behind you' : deg > 0 ? (deg < 90 ? 'ahead to the right' : 'behind to the right') : (deg > -90 ? 'ahead to the left' : 'behind to the left'));

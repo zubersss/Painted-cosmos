@@ -2,7 +2,7 @@
 // frame, a headless test), holding the left button and dragging looks around instead.
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyV', 'KeyC', 'KeyX', 'Space', 'ShiftLeft', 'ShiftRight',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'KeyF', 'KeyM', 'Backquote',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'KeyF', 'KeyM', 'KeyB', 'KeyH', 'Backquote',
 ]);
 
 export class Input {
@@ -18,6 +18,7 @@ export class Input {
     this.dragging = false;
     this.used = false;                    // any input at all yet (for the first-run hint)
     this.message = null;                  // one line for the HUD when the mouse mode changes
+    this.looked = false;                  // has the player looked around yet (lock or drag)
     this._lx = 0; this._ly = 0;
     this._pm = null; this._odd = []; this._doc = doc;
 
@@ -49,11 +50,16 @@ export class Input {
         if (Math.abs(mx) < 400 && Math.abs(my) < 400) { this.dx += mx; this.dy += my; }
       }
       else if (this.dragging) {
+        this.looked = true;
         this.dx += e.clientX - this._lx; this.dy += e.clientY - this._ly;
         this._lx = e.clientX; this._ly = e.clientY;
       }
     });
-    doc.addEventListener('pointerlockchange', () => { this.locked = doc.pointerLockElement === el; this._pm = null; });
+    doc.addEventListener('pointerlockchange', () => {
+      const was = this.locked;
+      this.locked = doc.pointerLockElement === el; this._pm = null;
+      if (this.locked) this.looked = true; else if (was) this.looked = false;      // lost the lock: show the hint again
+    });
     doc.addEventListener('pointerlockerror', () => this.fallBack('Mouse capture was refused here: hold the left button and drag to look'));
     el.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); e.preventDefault(); }, { passive: false });
     el.addEventListener('contextmenu', (e) => e.preventDefault());

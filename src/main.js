@@ -9,6 +9,7 @@
 //   card=0                           no start card (for captures)
 //   stats=1                          show the frame read-out (also the ` key)
 //   fresh=1                          forget the saved game       save=0   do not save
+//   audio=0                          silence
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
@@ -16,6 +17,8 @@ import { Input } from './core/input.js';
 import { DynamicResolution } from './core/dynres.js';
 import { createHud } from './ui/hud.js';
 import { createMap } from './ui/map.js';
+import { createBook } from './ui/book.js';
+import { createAudio } from './audio/audio.js';
 import { readSave, restore, clearSave, AutoSave } from './core/save.js';
 
 const params = new URLSearchParams(location.search);
@@ -68,13 +71,17 @@ async function boot() {
   // Resolution: at most 1080p-class output; the controller scales the scene inside that.
   const dyn = new DynamicResolution({
     enabled: params.get('dynres') !== '0',
-    scale: params.has('scale') ? Number(params.get('scale')) : 1,
-    quality: params.has('quality') ? Number(params.get('quality')) : 2,
+    // Start carefully and climb: a weak GPU never sees the expensive setting first. The
+    // controller raises the scale after 2.5 s of headroom and the tier after 12 s at full scale.
+    scale: params.has('scale') ? Number(params.get('scale')) : 0.75,
+    quality: params.has('quality') ? Number(params.get('quality')) : 1,
   });
   const storage = safeStorage();
   const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id) });
+  const book = createBook(hudRoot);
+  const audio = createAudio({ enabled: params.get('audio') !== '0' });
   const game = new Game({
-    renderer, scene, camera, world, painter, explorer, ship, input, hud, map, params, physics, dyn,
+    renderer, scene, camera, world, painter, explorer, ship, input, hud, map, book, audio, params, physics, dyn,
     autosave: storage && params.get('save') !== '0' ? new AutoSave(storage) : null,
   });
   game.showStats = params.get('stats') === '1';
@@ -82,7 +89,12 @@ async function boot() {
   if (storage && params.get('fresh') === '1') clearSave(storage);
   else if (storage && !params.has('body')) {
     const saved = readSave(storage);
-    if (saved && restore(game.sim, saved)) debugNote = 'continued from a save';
+    if (saved && restore(game.sim, saved)) {
+      debugNote = 'continued from a save';
+      hud.setSubtitle('your journey continues on ' + game.sim.bodyId.charAt(0).toUpperCase() + game.sim.bodyId.slice(1));
+      // Views already found look found again.
+      if (world.setVistaFound) for (const [b, ids] of Object.entries(saved.vistas || {})) for (const id of ids) world.setVistaFound(b, id, true);
+    }
   }
   // Fill the near field (wind grid, terrain cache) behind the loading sheet, not in frame one.
   if (physics && physics.warmUp) {
@@ -103,11 +115,11 @@ async function boot() {
   painter.setQuality(dyn.quality);
   const showCard = params.get('card') !== '0';
   hud.showStart(showCard);
-  if (!showCard) game.started = true;
+  if (!showCard) { game.started = true; game.hintOn = false; }
 
   const sim = game.sim;
   const debug = {
-    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, storage, using: prov.using, note: debugNote,
+    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, using: prov.using, note: debugNote,
     info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
