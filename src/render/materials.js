@@ -514,7 +514,10 @@ void main() {
       float br = texture(uNoise3D, vec3(dot(vBody, A3) / (L * 4.0), id * 0.371, id * 0.117)).r;
       float ln = smoothstep(0.70, 0.82, s) * (1.0 - smoothstep(0.92, 1.0, s));
       sw += wgt * ln * smoothstep(0.40, 0.54, br);
-      wh += wgt * smoothstep(0.80 - 0.05 * gale, 0.88 - 0.05 * gale, s) * (1.0 - smoothstep(0.93, 1.0, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
+      // (a white horse is a dash at least two pixels deep: seen across the water the band was a tenth of a pixel tall,
+      // and a long dash along its wave came out as a row of single white specks, a glitter)
+      float c0 = 0.78 - 0.05 * gale, bw = clamp(2.6 * fwidth(q), 0.07, 0.22);
+      wh += wgt * smoothstep(c0 - bw * 0.5, c0, s) * (1.0 - smoothstep(c0 + bw * 0.4, c0 + bw * 0.9, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
       hol += wgt * smoothstep(0.28, 0.52, s) * (1.0 - smoothstep(0.66, 0.76, s)) * smoothstep(0.35, 0.60, br);
     }
     c = pcDensity(c, 1.0 + farSea * (hol * (0.75 + 0.60 * gale) - sw * 0.25));
