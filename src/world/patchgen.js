@@ -37,7 +37,7 @@ export const PATCH_VERTS = V * V + 4 * V;
 const _d = [0, 0, 0];
 const _px = new Float64Array(E * E), _py = new Float64Array(E * E), _pz = new Float64Array(E * E);
 const _hh = new Float32Array(E * E), _lq = new Float32Array(E * E);
-const CS = 16;   // floats kept per sample: wash, far wash, parameters, liquid look
+const CS = 17;   // floats kept per sample: wash, far wash, parameters, liquid look, strata
 const _col = new Float32Array(E * E * CS);
 let _s = null;
 
@@ -75,7 +75,7 @@ export function stepPatch(job, deadline) {
         _col[c] = s.r; _col[c + 1] = s.g; _col[c + 2] = s.b;
         _col[c + 3] = s.r2; _col[c + 4] = s.g2; _col[c + 5] = s.b2;
         _col[c + 6] = s.dry; _col[c + 7] = s.wet; _col[c + 8] = s.canopy; _col[c + 9] = s.aux;
-        _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud;
+        _col[c + 10] = s.qr; _col[c + 11] = s.qg; _col[c + 12] = s.qb; _col[c + 13] = s.qk; _col[c + 14] = s.qglow; _col[c + 15] = s.qcloud; _col[c + 16] = s.strata;
       }
     }
   }
@@ -111,7 +111,7 @@ export function stepPatch(job, deadline) {
         mor[o + 2] = (_pz[k1] + _pz[k2]) * 0.5 - _pz[k];
       }
       const c = k * CS, q = (j * V + i) * 4;
-      col[q] = b8(_col[c]); col[q + 1] = b8(_col[c + 1]); col[q + 2] = b8(_col[c + 2]); col[q + 3] = 255;
+      col[q] = b8(_col[c]); col[q + 1] = b8(_col[c + 1]); col[q + 2] = b8(_col[c + 2]); col[q + 3] = b8(1 - _col[c + 16]);
       col2[q] = b8(_col[c + 3]); col2[q + 1] = b8(_col[c + 4]); col2[q + 2] = b8(_col[c + 5]); col2[q + 3] = 255;
       par[q] = b8(_col[c + 6]); par[q + 1] = b8(_col[c + 7]); par[q + 2] = b8(_col[c + 8]); par[q + 3] = b8(_col[c + 9]);
     }

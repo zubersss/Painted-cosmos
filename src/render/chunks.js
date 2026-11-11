@@ -95,6 +95,15 @@ vec4 pcTri(vec3 p, vec3 n, float scale) {
        + texture(uStrokeTex, p.xy * scale) * w.z;
 }
 
+// The same with a narrow blend band: for line work (cracks), where two half-strength copies
+// of a pattern would read as a double exposure.
+vec4 pcTri8(vec3 p, vec3 n, float scale) {
+  vec3 w = abs(n); w = w * w; w = w * w; w = w * w; w /= (w.x + w.y + w.z);
+  return texture(uStrokeTex, p.yz * scale) * w.x
+       + texture(uStrokeTex, p.zx * scale) * w.y
+       + texture(uStrokeTex, p.xy * scale) * w.z;
+}
+
 void pcWrite(vec3 col, float wet, vec3 nV, float viewZ, float id) {
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(wet, 0.0, 1.0));
   pcAux = vec4(nV.xy, log2(1.0 + max(viewZ, 0.0)), id);

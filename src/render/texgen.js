@@ -90,10 +90,11 @@ export function genStrokes(size = 256) {
       }
     }
   }
-  // cells
-  const cells = 9;
+  // cells: scattered points of uneven spacing (a jittered grid with a quarter of its points
+  // left out), so the polygons differ in size and never read as a honeycomb
+  const cells = 11;
   const cp = [];
-  for (let j = 0; j < cells; j++) for (let i = 0; i < cells; i++) cp.push([(i + 0.15 + rnd() * 0.7) / cells, (j + 0.15 + rnd() * 0.7) / cells]);
+  for (let j = 0; j < cells; j++) for (let i = 0; i < cells; i++) cp.push(rnd() < 0.26 ? null : [(i + 0.02 + rnd() * 0.96) / cells, (j + 0.02 + rnd() * 0.96) / cells]);
   let k = 0;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -102,18 +103,22 @@ export function genStrokes(size = 256) {
       let st = n(u * 3, v * 40, 0.5, 3, 40, 4) * 0.55 + n(u * 6 + 2.1, v * 90, 1.5, 6, 90, 4) * 0.30 + m(u * 12, v * 28, 2.5, 12, 28, 4) * 0.25;
       st = 0.5 + st * 0.95;
       const gr = 0.5 + (n(u * 16, v * 16, 3.5, 16, 16, 4) * 0.55 + m(u * 40, v * 40, 4.5, 40, 40, 4) * 0.45) * 0.8;
-      // nearest cell point (tiling)
-      const ci = Math.floor(u * cells), cj = Math.floor(v * cells);
+      // nearest cell points (tiling), on coordinates bent by a slow noise so no edge is straight
+      const uw = u + n(u * 5 + 0.5, v * 5, 7.5, 5, 5, 4) * 0.022 + m(u * 13, v * 13 + 0.5, 8.5, 13, 13, 4) * 0.008;
+      const vw = v + m(u * 5, v * 5 + 0.5, 9.5, 5, 5, 4) * 0.022 + n(u * 13 + 0.5, v * 13, 10.5, 13, 13, 4) * 0.008;
+      const ci = Math.floor(uw * cells), cj = Math.floor(vw * cells);
       let d1 = 9, d2 = 9;
-      for (let oj = -1; oj <= 1; oj++) for (let oi = -1; oi <= 1; oi++) {
-        const ii = (ci + oi + cells) % cells, jj = (cj + oj + cells) % cells;
+      for (let oj = -2; oj <= 2; oj++) for (let oi = -2; oi <= 2; oi++) {
+        const ii = (((ci + oi) % cells) + cells) % cells, jj = (((cj + oj) % cells) + cells) % cells;
         const c = cp[jj * cells + ii];
-        let dx = Math.abs(c[0] - u), dy = Math.abs(c[1] - v);
+        if (!c) continue;
+        let dx = Math.abs(c[0] - uw), dy = Math.abs(c[1] - vw);
+        dx -= Math.floor(dx); dy -= Math.floor(dy);
         if (dx > 0.5) dx = 1 - dx; if (dy > 0.5) dy = 1 - dy;
         const d = Math.sqrt(dx * dx + dy * dy) * cells;
         if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
       }
-      data[k++] = to8(st); data[k++] = to8(dabs[y * size + x]); data[k++] = to8(gr); data[k++] = to8((d2 - d1) * 1.6);
+      data[k++] = to8(st); data[k++] = to8(dabs[y * size + x]); data[k++] = to8(gr); data[k++] = to8((d2 - d1) * 1.2);
     }
   }
   return data;

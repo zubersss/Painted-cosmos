@@ -41,6 +41,7 @@ export function createWorld(scene) {
     scene.add(root);
     bodies.set(id, root);
     const bu = makeBodyUniforms();
+    bu.uBodyR.value = BODIES[id].radius;
     const look = getLook(id);
     if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }
     const st = {

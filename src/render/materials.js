@@ -30,7 +30,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze,
-    uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB,
+    uFog: b.uFog, uDayness: b.uDayness, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR,
   }, own || {});
 }
 
@@ -84,6 +84,7 @@ varying vec4 vCol;
 varying vec3 vCol2;
 uniform vec3 uHueA;
 uniform vec3 uHueB;
+uniform float uBodyR;
 varying vec4 vPar;
 varying vec3 vUpV;
 void main() {
@@ -96,44 +97,78 @@ void main() {
 
   vec4 n1 = texture(uNoise3D, vBody / 31.0);
   vec4 n2 = texture(uNoise3D, vBody / 6.3 + 0.21);
-  vec4 st = pcTri(vAnch, nL, 1.0 / 8.0);
-  vec4 st2 = pcTri(vAnch, nL, 1.0 / 2.0);
+  // Brush marks: short broken touches that keep about the same size on the sheet, so far
+  // ground gets fewer, larger marks. Two octaves of a field anchored to the planet in 3D (no
+  // projection axis, nothing to stretch), each thresholded on its own and cross-faded.
+  float lodf = log2(max(dist / 4.0, 1.0));
+  float l0 = floor(lodf);
+  float lf = smoothstep(0.2, 0.8, lodf - l0);
+  vec3 q = vBody * exp2(-l0);
+  vec4 ma = texture(uNoise3D, q / 2.3 + 0.13), mb = texture(uNoise3D, q / 4.6 + 0.13);
+  vec4 fa = texture(uNoise3D, q / 0.61 + 0.57), fb = texture(uNoise3D, q / 1.22 + 0.57);
+  float markFade = 1.0 - smoothstep(150.0, 520.0, dist);
 
   // far away the forest floor reads as its canopy: one broad soft wash
   vec3 c = mix(vCol2, vCol.rgb, mid);
 
   // wash turbulence: the pigment load drifts, so no area is flat colour
   float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.40 * near;
-  // broken colour: darker brush touches inside the wash
-  float dab = smoothstep(0.30, 0.62, st.g + (n2.b - 0.5) * 0.3) * near;
-  d += dab * 0.42 * (1.0 - vPar.x * 0.6);
-  // short dark strokes: grass, twigs and litter suggested by the side of the brush
-  float flick = smoothstep(0.58, 0.68, st2.r * 0.8 + st.b * 0.25) * near;
-  d += flick * 0.75;
+  // broken colour: darker touches of the brush inside the wash
+  float dab = mix(smoothstep(0.56, 0.63, ma.r), smoothstep(0.56, 0.63, mb.r), lf) * markFade;
+  d += dab * 0.36 * (1.0 - vPar.x * 0.5);
+  // small crisp marks: grass, twigs, grit, laid with the tip of the brush
+  float flick = mix(smoothstep(0.655, 0.685, fa.g * 0.72 + ma.b * 0.28), smoothstep(0.655, 0.685, fb.g * 0.72 + mb.b * 0.28), lf) * markFade;
+  d += flick * 0.62;
   // neighbouring pigments run into each other: drifts of green and of warm earth
   vec3 hueA = c * uHueA;
   vec3 hueB = c * uHueB;
   c = mix(c, hueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
   c = mix(c, hueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * mid);
+
+  // strata: beds of unequal thickness that follow the height, strongest on steep faces
+  float steep = smoothstep(0.05, 0.38, 1.0 - dot(nL, normalize(vBody)));
+  if (vCol.a < 0.995) {
+    float strata = 1.0 - vCol.a;
+    float hgt = length(vBody) - uBodyR;
+    float b1 = texture(uNoise3D, vec3(hgt / 41.0 + (n1.r - 0.5) * 0.10, 0.31, 0.77)).r;
+    float b2 = texture(uNoise3D, vec3(hgt / 11.0 + (n2.g - 0.5) * 0.12, 0.13, 0.41)).g;
+    float beds = (b1 - 0.5) * 1.7 + (b2 - 0.5) * 0.9;
+    float sk = strata * (0.30 + 0.70 * steep);
+    d += beds * 0.9 * sk;
+    c = mix(c, hueB * vec3(1.0, 0.93, 0.88), smoothstep(0.05, 0.40, beds) * sk * 0.7);
+    c = mix(c, mix(c, vec3(1.0), 0.45), smoothstep(0.10, 0.45, -beds) * sk * 0.8);
+  }
   c = pcDensity(c, d);
 
-  // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks
-  float crack = (1.0 - smoothstep(0.02, 0.09, st.a + (n2.b - 0.5) * 0.05)) * near + (1.0 - smoothstep(0.015, 0.07, pcTri(vAnch, nL, 1.0 / 32.0).a)) * mid;
-  c = pcDensity(c, 1.0 + crack * vPar.w * 2.2);
+  // cracked ground (dried basins, frost polygons, ice shelves): pigment pools in the cracks.
+  // The lines wander, swell, thin and break off: drawn by hand, not tiled.
+  if (vPar.w > 0.01) {
+    vec3 wp = vAnch + (n2.rgb - 0.5) * 2.2 + (ma.rgb - 0.5) * 0.5;
+    float a1 = pcTri8(wp, nL, 1.0 / 16.0).a;
+    float w1 = 0.035 + 0.075 * n1.b;
+    float fine = 1.0 - smoothstep(w1 * 0.35, w1, a1);
+    fine *= smoothstep(0.36, 0.50, n2.b + (n1.g - 0.5) * 0.7);
+    vec3 wp2 = vAnch + (n1.rgb - 0.5) * 11.0 + (n2.rgb - 0.5) * 2.0;
+    float a2 = pcTri8(wp2, nL, 1.0 / 64.0).a;
+    float big = 1.0 - smoothstep(0.012, 0.045 + 0.05 * n2.r, a2);
+    big *= smoothstep(0.30, 0.46, n1.g + (n2.b - 0.5) * 0.5);
+    float crack = max(fine * near * 0.75, big * mix(0.55, 1.0, near) * mid);
+    c = pcDensity(c, 1.0 + crack * vPar.w * 2.2);
+  }
 
   // light in soft value steps; shadows are glazes
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
   float sunny = pcDapple(vBody, vPar.z * mix(0.82, 1.0, mid));
   x = mix(min(x, 0.44) - (1.0 - smoothstep(0.30, 0.50, n1.g)) * 0.22 * vPar.z, x, sunny);
-  x += (n1.g - 0.5) * 0.10 + (st.b - 0.5) * 0.06 * near;
+  x += (n1.g - 0.5) * 0.10 + (mix(fa.b, fb.b, lf) - 0.5) * 0.06 * near;
   float lvl = pcLevel(x, 0.045);
   c = pcTone(c, lvl);
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
 
-  // dry brush on rough ground: broken strokes, paper sparkling through
-  float dryM = smoothstep(0.50, 0.64, st2.r * 0.75 + st.r * 0.35 + (n2.r - 0.5) * 0.25);
-  c = mix(c, vec3(1.0), dryM * vPar.x * near * (0.22 + 0.16 * lvl));
+  // dry brush on rough ground: the brush skips, paper sparkles through in small broken flecks
+  float dryM = mix(smoothstep(0.60, 0.69, fa.b * 0.62 + fa.r * 0.38), smoothstep(0.60, 0.69, fb.b * 0.62 + fb.r * 0.38), lf);
+  c = mix(c, vec3(1.0), dryM * vPar.x * markFade * (0.24 + 0.16 * lvl));
 
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
@@ -542,7 +577,6 @@ void main() {
     id = 4.0 + seed * 0.9;
   } else {
     // ---- rock: pale granulating wash, paper on top, pooled dark at the base
-    vec4 st = pcTri(vBody, normalize(vObj + 0.001), 1.0 / 3.0);
     // the silhouette is nibbled and the tones wander: a wash, not a faceted solid
     vec4 nr = texture(uNoise3D, vBody / 2.3 + 0.3);
     float rimR = 1.0 - abs(dot(nV, V));
@@ -551,10 +585,11 @@ void main() {
     c = pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5);
     x = dot(nV, sunV) * 0.5 + 0.5;
     x *= mix(0.45, 1.0, pcDapple(vBody, canopy));
-    x += (n1.g - 0.5) * 0.22 + (nr.g - 0.5) * 0.26 + (st.b - 0.5) * 0.1;
+    vec4 nf = texture(uNoise3D, vBody / 0.55 + 0.61);
+    x += (n1.g - 0.5) * 0.22 + (nr.g - 0.5) * 0.26 + (nf.b - 0.5) * 0.1;
     float lvl = pcLevel(x, 0.12);
     c = pcTone(c, lvl);
-    float dryM = smoothstep(0.50, 0.62, st.r * 0.8 + st.g * 0.3);
+    float dryM = smoothstep(0.60, 0.70, nf.b * 0.6 + nf.r * 0.4);
     c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));
     id = 3.0 + seed * 0.9;
   }

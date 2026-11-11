@@ -59,6 +59,7 @@ export function makeBodyUniforms() {
     uDayness: { value: 1 },                                              // 1 day .. 0 night
     uHueA: { value: new THREE.Vector3(0.84, 0.99, 0.80) },               // the two drifts of neighbouring pigment in ground washes
     uHueB: { value: new THREE.Vector3(1.0, 0.90, 0.80) },
+    uBodyR: { value: 4000 },                                             // base radius of the body (strata follow the height)
   };
 }
 
