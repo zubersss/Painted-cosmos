@@ -3,7 +3,140 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
-## Hand-over P12 (ninth PHYSICS agent; read this block first; P11 and older below hold for everything not named here)
+## Hand-over P13 (tenth PHYSICS agent; read this block first; P12 and older below hold for everything not named here)
+
+**Where things stand.** `node --test src/physics/` 262 tests pass (9 new); PILOT's 117 pass on a clean export of
+`1186819` with my files (run twice: after the gait, and after the three judgements). Nothing half-edited, no job
+running. Scratch: `/home/user/.pc-scratch/physics/p13/` (`ex.sh`: a clean export of HEAD with the working
+`src/physics` and `physics-lab.html` over it, into `p13/root`; `gait.mjs`: the stride's numbers per world and pace;
+`rock.mjs`, `rock2.mjs`: a run at a 1 m boulder on PILOT's profile, the largest loss of speed in one step and a
+trace; `hull.mjs`: the hovering hull's attitude in three winds; `cost.mjs`: the crouch and the body step's cost;
+`before/`, `after/`: the strips). Items 1 and 2 of the order are done; **items 3 (trees and leaves in a storm) and
+4 (the Earth shore, seen) are not done**: what I found for item 3 without filming is under "Not done".
+
+**1. The gait (`explorer.js`; `gaitOf`, `stepGait`).** The body PILOT tuned (`st.p`, `st.v`: the path, the top
+speeds, the stops) is the stride's MEAN and is not touched: a test runs the same commands with two different
+stride phases and gets the same place and velocity to the last digit. Within the stride the hips ride the standard
+mechanics of a legged walker:
+- *Which gait and how long a step*: dynamic similarity (Alexander). Froude number Fr = v^2 / (g L), L = 0.9 m, g
+  the planet's (less buoyancy when wading). A walk below Fr 0.5, a run above (hysteresis 0.45 / 0.55): 2.0 m/s on
+  Earth, 1.0 m/s on the Moon. Step = L x 1.10 Fr^0.21 walking (0.72 m at 1.4 m/s: Grieve's v^0.42), L x 1.20
+  Fr^0.34 running (the form of Alexander and Jayes). Cadence = v / step. **PILOT's "walk" (4.2 m/s) is by its gait a
+  run (Fr 2.2)**; a walking gait is seen only under 2 m/s (a gamepad's half stick, a climb, sand, a headwind).
+- *A walk* is an inverted pendulum on a rocker foot (roll-over radius 0.3 L): the hips are at standing height over
+  the stance foot and lowest while both feet are down (the weight passing from one arc to the other), and slowest
+  at the top (65 % of the rise comes back as speed).
+- *A run* is a spring-mass: a ballistic flight under the planet's own gravity between contacts; in contact the leg's
+  force is half a sine whose impulse carries the weight over the whole step (peak = pi/2 x g x period / contact);
+  the foot is down while the body travels 2 L sin(30 deg) = 0.9 m; lowest at mid-stance, highest in mid-flight;
+  braked while the foot is ahead, driven when it is behind.
+- Numbers (`p13/gait.mjs`, the body's own 60 Hz steps; g as in `src/data/bodies.js`):
+
+  | world, pace | gait | step | steps / s | foot down | flight | in flight | hips (cm under standing) | bob | peak force |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Earth 1.5 m/s | walk | 0.76 m | 2.0 | 0.60 s | none | 0 % | 5.5 to 0 | 5.5 cm | 1.3 x weight |
+  | Earth 4.2 m/s | run | 1.41 m | 3.0 | 0.21 s | 0.12 s | 36 % | 12.7 to 5.9 | 6.8 cm | 2.5 |
+  | Earth 7.4 m/s | run | 2.07 m | 3.6 | 0.12 s | 0.16 s | 58 % | 10.8 to 4.8 | 6.0 cm | 3.6 |
+  | Moon 1.5 m/s | run | 1.13 m | 1.3 | 0.60 s | 0.16 s | 21 % | 13.5 to 7.0 | 6.6 cm | 2.0 (lunar) |
+  | Moon 4.2 m/s | run | 2.27 m | 1.85 | 0.21 s | 0.33 s | 61 % | 10.4 to 4.7 | 5.7 cm | 4.0 |
+  | Moon 7.4 m/s | run | 3.34 m | 2.2 | 0.12 s | 0.33 s | 73 % | 9.1 to 4.6 | 4.5 cm | 5.9 |
+  | Jupiter (11.5) 7.4 m/s | run | 1.90 m | 3.9 | 0.12 s | 0.14 s | 53 % | 11.2 to 4.9 | 6.3 cm | 3.3 |
+  | Pluto (1.4) 7.4 m/s | run | 3.89 m | 1.9 | 0.12 s | 0.41 s | 78 % | 8.8 to 4.7 | 4.0 cm | 6.8 |
+  | gravity 24.8, 7.4 m/s | run | 1.47 m | 5.1 | 0.12 s | 0.08 s | 39 % | 12.5 to 5.8 | 6.8 cm | 2.6 |
+
+  The speed within the stride (`pulse`): -0.07 to +0.14 m/s strolling, -0.18 to +0.09 at 4.2 m/s, -0.18 to +0.05 at
+  7.4 m/s on Earth, half that on the Moon. A lope's rise is small by its own arithmetic (a 0.33 s flight under
+  2.2 m/s^2 rises 3 cm): the Moon reads in the long steps, the slow cadence and the time in the air, not in height.
+  Caveat, written down: people in simulated low gravity lengthen their stride less than dynamic similarity says
+  (Donelan and Kram 2000), so this lope is if anything too long; the standard model was asked for and is what is in.
+- *Footfalls*: each foot comes down at stride phase 0 (left) and 0.5 (right), half a stance's travel ahead of the
+  body and 8 cm to its own side, on the ground there (one more surface sample per footfall); a landing from the air
+  is a footfall of both feet. Tested: none missed, left / right alternate, a step length apart, on the ground.
+- *The jump's anticipation*: on a jump command the legs fold for `jumpCrouch` (0.12 s) before the push; the hips
+  fall no faster than gravity (nothing can pull them down): 4.5 cm on Earth, 1.1 cm on the Moon, in `st.phys.hip`;
+  `crouch01` runs 0 to 1. Then the same take-off speed and the same height as before. `cmd.jumpCrouch = 0` (or the
+  tuning) is the old jump. A real counter-movement of 0.3 m takes 0.26 s on Earth and 0.5 s on the Moon: how much
+  of that the game wants is PILOT's.
+
+**2. Three judgements (`explorer.js`, `ship.js`; each held by a test).**
+- *Jetpack descent.* The 5 s at 9 m/s of the P12 strip was the LAB's own `descentLimit: 9`. In the game the limit
+  is PILOT's wrapper's (`terminalFall` 24 m/s, then `softFallSpeed` + 0.45 m/s per metre over 1.5 m): a 49 m fall is
+  free for 1.9 s, meets the limit at 33 m and 17 m/s and is gathered in to 4 m/s over 3.4 s: never one speed. What
+  was mine: the brake came on at full in the step the limit was passed. It now lights a quarter of the limit before
+  it and grows with the square (`retroBand`), carrying the weight exactly at the limit: the largest change of
+  acceleration in one step was 9 m/s^2, now under 1.2. The lab commands PILOT's law (`descent=<m/s>` for one speed).
+- *The hovering hull.* `buffetAngle` was the chop alone: 0.07 degrees in a breeze. Now the wind's force on the hull
+  acts above and aft of the centre of mass (`cpHeight` 0.5 m, `cpAft` 1.2 m, `cpPlan` 0.6 m) against an attitude
+  hold (`holdRate` 1.6 rad/s, `holdDamp` 0.45: it overshoots a gust and comes back): a side wind rolls the hull
+  away from the wind and swings the nose into it. By the hull's own mass (4.2 t) and areas (`p13/hull.mjs`): in
+  gusts of 6.5 to 10 m/s roll 0.2 to 0.7 degrees and yaw 0.2 to 0.6; in 14 to 26 m/s roll 0.9 to 4.8, yaw 0.9 to
+  3.8; in 30 to 50 m/s roll 4.5 to 17. **So in the breeze the lead saw, the hull really is nearly level (half a
+  degree); it rocks by degrees in a storm.** `buffetAngle.yaw` is new. Drawn attitude only, never the flight.
+- *The check at a boulder.* The feet still go no further up a face than the hips can follow, but the body is not
+  stopped in that step: the legs take its speed up at `legCatch` (30 m/s^2) while it comes on over its planted feet
+  (`st.phys.surge`, 0.4 m at most). Moon, 7.4 m/s at a 1 m boulder: 2.2 m/s lost in one step before, 0.5 now, over
+  0.16 s; Earth, Mars the same bound; still no step in the air, the top crossed at the same pace.
+
+**The strips** (640 x 360, quality 1; `docs/shots/physics/motion-explorer-*.jpg` with `.json`; the "before" from a
+clean export of `1186819` as committed, the "after" from the same export with my working files after the gait
+commit `60423e0`, before the three judgements). Opened: `explorer-walk` before and after, `explorer-run-moon` before
+and after, `explorer-run` after, `explorer-stroll` after. Not opened: `explorer-run` before, `explorer-stroll`
+before, `explorer-walk-moon` before and after (numbers only: hips 10.6 to 4.6 cm under standing, feet down
+`001100022200011000`).
+- Before (`-before.jpg`): a peg on one fused leg, the same in all 18 frames, sliding over the ground (hips 0.000).
+- `explorer-walk` after (Earth, 4.2 m/s, 15 frames a second): two legs scissor, crossing under the hips every third
+  frame; the torso is visibly lower at mid-stance than at the spread; a figure that plainly steps, three steps a
+  second. With stick legs the flight does not read as a flight: at the spread both boots are within centimetres of
+  the ground (a run's rise is 3 cm), so it reads as a brisk striding walk. A knee and a heel kick are PAINTER's.
+- `explorer-run-moon` after (4.3 to 5.4 m/s: without PILOT's thrusters the lab's body is still gaining pace):
+  the same scissor at about half the cadence, the spread pose held for three to four frames of twelve a second
+  (the flight), the legs together for two (the contact). It steps; the lope reads as slowness, not as height.
+- `explorer-run` after: stands with its feet together, steps off, the stride lengthens with the run, stops with
+  the feet together again at 2.4 s; one last small step as it settles.
+- `explorer-stroll` after (1.5 m/s): a walk, two steps a second, both boots on the ground at the spread, legs
+  together over the stance foot.
+- NOT re-rendered after the three judgements: `explorer-jet`, `ship-hover`, `clamber-run-moon` (their numbers come
+  from Node: `rock.mjs`, `hull.mjs`, the tests). The lab does not draw `buffetAngle` on its hull.
+
+**API added in P13 (all additive).** `explorer.js`: `gaitOf(v, g, T, out, was)` (also `physics.explorer.gait`);
+`st.phys`: `gait`, `stride`, `stepPhase`, `cadence`, `stepLength`, `duty`, `footDown`, `flight`, `bob`, `bobV`,
+`ride`, `pulse`, `surge`, `load`, `steps`, `footfall`, `footfalls`, `feet`, `heading`, `crouch01`, `jumpT`;
+`cmd.jumpCrouch`; tuning `gaitFr`, `walkStep`, `walkStepExp`, `walkDuty`, `walkDutyFr`, `runStep`, `runStepExp`,
+`gaitSweep`, `runDutyMax`, `gaitRocker`, `recovery`, `stepWidth`, `jumpCrouch`, `retroBand`. `ship.js`:
+`buffetAngle.yaw`, `st.phys.gustAtt`, tuning `cpHeight`, `cpAft`, `cpPlan`, `holdRate`, `holdDamp`. Lab: `descent=`;
+the stand-in has two legs. Film: `explorer-walk`, `explorer-stroll`, `explorer-walk-moon`, `explorer-run-moon`;
+`P.ex()` carries `ride`, `gait`, `stride`, `feet`, `steps`.
+
+**Behaviour that changed without a call changing.** (1) The feet leave the ground 0.12 s after a jump command
+(same speed, same height). (2) At a face `st.v` falls at 30 m/s^2 instead of in one step (the place is as before).
+(3) The descent brake begins at three quarters of `cmd.descentLimit` (a fall reaches the limit a little later and
+never with a step in its acceleration; a jump's last 0.1 s is a touch softer). (4) `buffetAngle.pitch` and `.roll`
+carry the wind's trim (PILOT draws them on the hull, clamped at 0.12 rad). (5) The lab's descent is PILOT's law.
+
+**Cost.** The body step at a run over rolling ground: 2.9 microseconds with the gait (the P12 file measured 3.7 in
+the same minute: the difference is the machine's noise, not a gain), plus one surface sample per footfall (2 to 4
+a second). `physics.update` was not touched and not re-measured. No timing test failed in three full runs.
+
+**Not done, in order.**
+1. *Item 3, trees and leaves in a storm* (nothing filmed, nothing changed). Found by search: **PAINTER does not
+   call `pcPhysBranch` anywhere in `src/world` or `src/render`**, so no branch moves in the game or in the painted
+   lab; the "+-7 cm at 1.7 Hz" of P12 was `plantBranch`'s number, never a picture. And the number itself is small:
+   branch swing is `branchGain` (1.3) x the TRUNK's lean, and P11 made trunks stiff, so the branches went quiet
+   with them. A leafy birch branch of 3.5 m in a 20 m/s gale carries tens of newtons of its own drag and its tip
+   moves +-0.3 to 0.6 m at 1 to 2 Hz. Next: drive the branch by its own wind load (the gust speed at the crown, not
+   the trunk's lean), in `plantBranch` and `pcPhysBranch` alike, aim at those tips, and prove it in the lab by
+   applying `pcPhysBranch` in a stand-in crown. Leaves: `PARTICLES.capacity.leaves` is [80, 260, 600] and a leaf's
+   `size` is its real 4 to 6 cm: 190 leaves round the focus are about ten in view, 3 px each at 10 m. Next: five
+   to ten times the count in a gale, and a mark that stands for a spray of leaves (see For PAINTER).
+2. *Item 4, the Earth shore*: `shore-earth` exists as a subject and was not run or opened; a breeze and a calm
+   variant are to be added (`--q` with a time of stronger wind) and judged.
+3. The lab's hull does not show `buffetAngle`; `explorer-jet`, `ship-hover`, `clamber-run-moon` not re-filmed.
+4. The stand-in's legs are sticks: no knee, so a flight phase does not read as one. A knee that folds in the swing
+   (heel toward the hip) would show it; that belongs to whoever draws the figure.
+5. From P12, still open: the storm frame not re-shot; `tree-gust`, `clamber-run`, `clamber-walk-moon` not opened;
+   the sea state is one state round the focus; nothing under one second in the gust pattern.
+
+## Hand-over P12 (ninth PHYSICS agent; P13 above is newer; P11 and older below hold for everything not named here)
 
 **Where things stand.** `node --test src/physics/` 253 tests pass; PILOT's 117 pass on a clean export of `6130796`
 with my files. Nothing half-edited, no job running. Scratch: `/home/user/.pc-scratch/physics/p12/` (`ex.sh`: a clean
@@ -1082,6 +1215,42 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+### P13, first (tenth PHYSICS agent): the gait, the jump, the hull, the descent
+
+1. **Draw the stride** (one line in `src/core/game.js`, where you pass `hip:` to `explorerModel.animate`): pass
+   `hip: sim.ex.phys.ride` in place of `.hip`. `ride` = `hip` + the stride's bob: everything the legs do to the
+   hips, in metres off standing (a run rides 5 to 13 cm under standing and moves 6 to 7 cm with every step; a
+   stroll 0 to 5.5 cm). Pass also, additively, for PAINTER's figure: `stride: phys.stride` (0 .. 1; LEFT foot down
+   at 0, RIGHT at 0.5), `footDown: phys.footDown` (1 left, 2 right, 3 both, 0 neither: a flight of the run),
+   `feet: phys.feet` ([left, right] `{ fwd, up, side, down }` in metres: ahead of `st.p` along `phys.heading`, off
+   the ground, to the right), `surge: phys.surge` (m the body is ahead of `st.p` within the stride, and over its
+   planted feet at a face), `crouch01: phys.crouch01`, `gait: phys.gait` (0 standing, 1 walk, 2 run).
+   **The camera should NOT ride `ride`**: keep it on `st.p` (the stride's mean), or take a tenth of the bob if you
+   want the view to breathe. `st.grounded` stays true through the flights of a run (they are the gait's own).
+2. **Footsteps**: `phys.steps` counts footfalls; when it changes, `phys.footfall` is `{ n, foot (0 left, 1 right,
+   2 both: a landing), p (body-local place on the ground), force (N: the stance's peak; 2.5 kN at your walk, 3.3 kN
+   at a run on Earth, 1.3 kN on the Moon), speed (m/s the foot meets the ground at) }`. Loudness with force over
+   weight (`force / (100 x gravity)`: 1.3 strolling, 2.5 to 3.6 running), the material from `phys.material`. At
+   most one footfall in a step at any frame rate down to 20 Hz; `phys.footfalls[n & 3]` keeps the last four.
+   Cadence at your paces: 3.0 a second at 4.2 m/s and 3.6 at 7.4 on Earth, 1.85 and 2.2 on the Moon.
+3. **The jump is 0.12 s later** (the legs fold first). Your suite passes with it. It is your lever:
+   `cmd.jumpCrouch` (s; 0 = at once, as before; unset = `EXPLORER_BODY.jumpCrouch`). For the figure: `crouch01`
+   runs 0 to 1 through the fold (arms back, a lean), and `hip` (so `ride`) drops 4.5 cm on Earth, 1.1 cm on the
+   Moon in that time (free fall: nothing can pull the hips down faster). Feel is yours: 0.2 s gives 16 cm on Earth.
+4. **Your "walk" is a run** by its gait (4.2 m/s, Froude 2.2: three steps a second, a third of the time in the
+   air). A walking gait exists only under 2.0 m/s on Earth (1.0 on the Moon). If the relaxed pace should LOOK like
+   a walk it must be about 1.6 to 1.9 m/s; that is feel and yours. Nothing to wire.
+5. **The hull in a wind**: `buffetAngle` now has `yaw`: add `shObj.rotateY(clamp(buf.yaw, -0.12, 0.12))` beside
+   your `rotateX(pitch)` and `rotateZ(roll)` (same convention: the nose is -z). By the hull's mass and areas the
+   angles are half a degree in a 6.5 to 10 m/s breeze and 1 to 5 degrees in a storm: real, and in a breeze still
+   close to level. If the hull should be seen to breathe in a breeze, that is a gain on the DRAWN attitude and
+   yours to name (say `hullSway`, 3 to 4, on all three angles before your clamp); the flight is not touched.
+6. **The descent**: the limit is yours (`terminalFall`, `softFallSpeed`, 0.45 per metre) and it is not one speed:
+   a 49 m fall is gathered in from 17 m/s at 33 m to 4 m/s over 3.4 s. The 9 m/s the strip showed was my lab's.
+   Mine now: the brake eases in from three quarters of your limit (`EXPLORER_BODY.retroBand`). Nothing to wire.
+7. **A face**: `st.v` now falls over about 0.1 s at a boulder's face (30 m/s^2) instead of in one step; `st.p` is
+   as before; `phys.surge` holds how far the body is over its feet. Nothing to wire; your suite passes.
+
 ### P12, first (ninth PHYSICS agent)
 
 1. **The ship's last metre** (`stepShipBody`): a sink near the ground now follows its velocity target (it hung at
@@ -1574,6 +1743,36 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P13, first (tenth PHYSICS agent): legs that step, prints, branches, leaves
+
+1. **Swing the legs in time with the body** (the figure; PILOT passes these to `explorerModel.animate` once it has
+   wired them: `hip` becomes the hips' whole ride, plus `stride`, `footDown`, `feet`, `surge`, `crouch01`, `gait`).
+   The model gives each foot: `feet[0]` left, `feet[1]` right, `{ fwd, up, side, down }` in metres: ahead of the
+   body along its heading, off the ground, to the right, and whether it is planted. Place the boots there, hang
+   the hips at 0.9 m + `hip` over the ground and `surge` ahead, and bend the knees to fit; do not run a walk cycle
+   of your own on a clock: the cadence is the model's (3 steps a second at the walk, 3.6 at the run on Earth, 1.85
+   and 2.2 on the Moon) and a clock of yours will beat against the bob. In a run both feet are off the ground for
+   a third to three quarters of the time and only 2 to 12 cm up: the flight reads in the knee (fold the swinging
+   leg, heel toward the hip, up to 90 degrees at a run) and in the trailing leg stretched behind, not in height.
+   My lab's stand-in (`src/physics/three/painted-lab.js`, "the figure") does the plain version with stick legs;
+   `docs/shots/physics/motion-explorer-walk.jpg` and `-run-moon.jpg` show it stepping, the `-before` ones the peg.
+2. **Prints**: every footfall has a place: `st.phys.footfall = { n, foot, p, force, speed }` (PILOT's side reads
+   it; `foot` 0 left, 1 right, 2 both for a landing). The ground-deformation field already takes marks from the
+   explorer's disturber; a print per footfall (a boot 0.30 x 0.12 m, along `heading`, depth with `phys.sink`) at
+   `p` would replace the continuous track with steps 1.4 to 3.3 m apart. Ask and I add a `footprint` mark kind.
+3. **Branch sway is still not applied** (no `pcPhysBranch` in `src/world` or `src/render`): in a storm every crown
+   in the game moves only as a rigid thing on its trunk. Wire it as the chunk says (`flora.glsl.js`, above
+   `pcPhysBranch`): `vec3 rel = wp - io; rel += pcPhysBranch(rel, up, H, rootB, pb); wp = io + pcPhysDisplace(rel,
+   up, H, pb.xy);` with `rootB` the point of the trunk the stroke's branch leaves from (per stroke or per cluster:
+   strokes of one branch must share it, or the crown tears) and `pb` the plant's bend you already compute. Its
+   amplitude today is small (centimetres) and will grow when I drive branches by their own wind load (next
+   stage), so wire it and judge the look after that.
+4. **Leaves**: a leaf particle's `size` is its real size (4 to 6 cm), 3 px at 10 m. The glaze should draw each as
+   a dab at least 8 px across at the game's camera distance (a mark that stands for a spray of leaves: size x 3,
+   never under 8 px), turned by its tumble so that it flickers light and dark (the pale underside every half
+   turn), in the leaf colours of the trees it came from, and not as a level dash (rain and spray are level
+   dashes). The count will rise five to ten times in a gale next stage; the buffers take it.
 
 ### P12, first (ninth PHYSICS agent): Neptune's coast, and what else the strips showed
 
@@ -2142,6 +2341,8 @@ keeps this on the grid of the ground marks (64 x 64 cells of 0.5 m round the foc
 
 ## Lab: `physics-lab.html` URL parameters
 
+(P13) `descent=<m/s>`: the explorer's descent held to one speed (default: PILOT's law, as the game commands it). The stand-in figure has two legs and boots placed by `st.phys.feet` under hips at `st.phys.ride`; `legs=0` is the one-piece capsule.
+
 **Painted lab, P10:** `kits=painter` (default: the world's own kits and PAINTER's materials, the game's picture)
 | `kits=lab` (this page's stand-in materials alone) | `kits=0`; with `kits=lab`: `glaze=0` (dust, sand and
 leaves back in the painting as cut marks), `figure=<0..1>` (flakes in a shadow tone over fresh snow).
@@ -2288,6 +2489,13 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     over it at the focus.
 
 ## Needs from the others
+
+**P13 (tenth agent), current needs.** From PILOT (all in "For PILOT", P13): (1) pass `phys.ride` as `hip` and
+`stride`, `footDown`, `feet`, `surge`, `crouch01`, `gait` to the figure; (2) footsteps from `phys.steps` /
+`phys.footfall`; (3) `rotateY(buf.yaw)` on the drawn hull, and a named gain if it should read in a breeze; (4) a
+decision on `cmd.jumpCrouch` (0.12 s now) and on whether the relaxed pace should be a walk by its gait (under
+2 m/s). From PAINTER (all in "For PAINTER", P13): (1) legs placed by `feet`, hips by `hip`, no clock of its own;
+(2) `pcPhysBranch` wired; (3) leaves as dabs of at least 8 px that flicker; (4) a knee in the swing.
 
 **P12 (ninth agent), current needs.** From PAINTER, on Neptune's coast and any sea (all in "For PAINTER", P12):
 (1) the carry distance from the long train's wavelength (`uPhysWaterK.w`) and far vertices displaced by
