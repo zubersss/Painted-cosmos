@@ -46,7 +46,7 @@ export function createHud(root) {
   status.insertAdjacentHTML('beforeend', '<i class="pc-dabs"><b></b><b></b><b></b></i>');
   const help = el('div', 'pc-help pc-label', card);
   const rows = [
-    ['W A S D', 'walk'], ['Shift', 'run'], ['Space', 'jump, hold for the jetpack'],
+    ['W A S D', 'walk'], ['Shift', 'run'], ['C', 'stroll / pace'], ['Space', 'jump, hold for the jetpack'],
     ['E', 'board, land, step out'], ['V', 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], ['C', 'sink'], ['W S', 'throttle'], ['A D', 'turn'],
     ['mouse', 'point the nose'], ['X', 'brake'], ['F', 'pulse drive (in space)'], ['M', 'map'],

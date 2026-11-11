@@ -11,7 +11,8 @@ import { S, isInShip } from './state.js';
 import { cameraPlanes, farthestExtent } from './depth.js';
 import { V } from './vec.js';
 import { pulseEta, arrivalRadius } from '../ship/pulse.js';
-import { SKETCH, biomeKey, vistaKey } from './sketches.js';
+import { SKETCH, SKETCH_SLIP, biomeKey, vistaKey } from './sketches.js';
+import { figureArgs, hullTrim, hasFootfalls, footLoudness } from '../player/figure.js';
 
 const NO_KEYS = { down: () => false, axis: () => 0 };
 const NO_EVENTS = { edges: new Set(), dx: 0, dy: 0, wheel: 0 };
@@ -54,6 +55,7 @@ export class Game {
     });
     this.sim.onVistaFound = (bodyId, id) => { if (world.setVistaFound) world.setVistaFound(bodyId, id, true); };
     this._planes = { near: 0, far: 0, fov: 0, aspect: 0 };
+    this._figure = {}; this._hullTrim = { pitch: 0, roll: 0, yaw: 0 };   // reused each frame
     this.frameCount = 0;
     this.started = false;
     this.canStart = true;          // false while the title card is still waiting for the first view
@@ -123,10 +125,13 @@ export class Game {
     shObj.position.set(ss.x, ss.y, ss.z);
     shObj.quaternion.set(sp.q.x, sp.q.y, sp.q.z, sp.q.w);
     // The air is there: PHYSICS' buffet shows on the drawn hull (never on the flight itself).
+    // Pitch, roll and (P13) yaw: the wind rolls the hull away from it and weathercocks the nose.
     const buf = sim.sh.phys && v.flying ? sim.sh.phys.buffetAngle : null;
-    if (buf && (buf.pitch || buf.roll)) {
-      shObj.rotateX(Math.max(-0.12, Math.min(0.12, buf.pitch || 0)));
-      shObj.rotateZ(Math.max(-0.12, Math.min(0.12, buf.roll || 0)));
+    if (buf) {
+      const tr = hullTrim(buf, this._hullTrim);
+      if (tr.pitch) shObj.rotateX(tr.pitch);
+      if (tr.yaw) shObj.rotateY(tr.yaw);
+      if (tr.roll) shObj.rotateZ(tr.roll);
     }
     this.shipModel.animate({
       mode: st === S.PULSE ? 'pulse' : !v.flying ? 'landed' : sim.sh.speed > 12 ? 'fly' : 'hover',
@@ -138,15 +143,10 @@ export class Game {
       const es = origin.toScene(ep.p);
       exObj.position.set(es.x, es.y, es.z);
       exObj.quaternion.set(ep.q.x, ep.q.y, ep.q.z, ep.q.w);
-      this.explorerModel.animate({
-        mode: sim.ex.mode, speed: sim.ex.speed, jet01: sim.ex.jet01, lookPitch: sim.footCam.pitch,
-        // Additive, for a figure that can show them (PHYSICS' legs): how far the hips ride off
-        // their standing height (m; negative while the legs are folded: the half second after a
-        // landing, a clamber), how hard the body is clambering, and whether the feet are down.
-        hip: sim.ex.phys && Number.isFinite(sim.ex.phys.hip) ? sim.ex.phys.hip : 0,
-        clamber01: sim.ex.phys && Number.isFinite(sim.ex.phys.clamber01) ? sim.ex.phys.clamber01 : 0,
-        grounded: !!sim.ex.grounded,
-      }, dt);
+      // The figure steps with PHYSICS' gait: the hips ride the stride (`ride`, passed as `hip`
+      // too), the feet are placed, the legs fold before a jump (src/player/figure.js). The
+      // explorer's place and the camera stay on the stride's mean (st.p): the view does not bob.
+      this.explorerModel.animate(figureArgs(sim.ex, sim.footCam.pitch, this._figure), dt);
     }
 
     // Camera: always at the scene origin; near and far follow the situation.
@@ -253,13 +253,30 @@ export class Game {
     return { done, total };
   }
 
+  showSketchSlip(url, title, sub) {
+    if (this.hud && this.hud.showSketch) this.hud.showSketch(url, title, sub, SKETCH_SLIP.seconds);
+    if (this.audio) this.audio.event('sketch');
+  }
+
   // Sketches: when a landscape is first walked or a view found, a small picture of that moment
   // is kept for the book. A page that has no picture yet (an older save, a full storage) gets
   // one the next time the explorer stands there.
   updateSketches() {
     const sk = this.sketches, sim = this.sim;
-    if (!sk || !this.started || sim.sm.state !== S.ON_FOOT) return;
+    if (!sk || !this.started || sim.sm.state !== S.ON_FOOT) { this._footFrom = null; return; }
     const want = this._sketchWant, t = sim.t, body = sim.bodyId;
+    // The first view of an arrival (the game's start, every step out of the ship) is left
+    // quiet: the page is kept as it is made, but its slip waits until the explorer has set off
+    // (SKETCH_SLIP.moved metres from where they stood) or SKETCH_SLIP.wait seconds have passed,
+    // so it never lies over the ship the player is meant to walk to in the very first view.
+    const ep = sim.ex.p;
+    if (!this._footFrom || this._footFrom.body !== body) this._footFrom = { body, t, x: ep.x, y: ep.y, z: ep.z, off: false };
+    const ff = this._footFrom;
+    if (!ff.off && (Math.hypot(ep.x - ff.x, ep.y - ff.y, ep.z - ff.z) > SKETCH_SLIP.moved || t - ff.t > SKETCH_SLIP.wait)) ff.off = true;
+    if (this._slipHeld && (ff.off || this._slipHeld.body !== body)) {
+      const h = this._slipHeld; this._slipHeld = null;
+      if (h.body === body) this.showSketchSlip(h.url, h.title, h.sub);
+    }
     const biome = sim.ex.surface ? sim.ex.surface.biomeId : null;
     if (this.frameCount % 20 === 0) {
       const walked = sim.visited[body];
@@ -296,8 +313,9 @@ export class Game {
         const title = w.kind === 'vista' ? w.name : hit ? hit.name : pretty(w.id);
         const pr = this.bookProgress();
         this.lastSketch = { key: k, title, t };
-        if (this.hud && this.hud.showSketch) this.hud.showSketch(url, title, `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}\nB opens the sketchbook`);
-        if (this.audio) this.audio.event('sketch');
+        const sub = `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}\nB opens the sketchbook`;
+        if (!ff.off) this._slipHeld = { body, url, title, sub };          // shown once they set off
+        else this.showSketchSlip(url, title, sub);
       }
       break;                                // one picture a frame is plenty
     }
@@ -323,6 +341,19 @@ export class Game {
       if (url.length > SKETCH.maxEach) url = c.toDataURL('image/jpeg', SKETCH.qualityLow);
       return url.length > SKETCH.maxEach ? null : url;
     } catch { return null; }
+  }
+
+  // The footfall to sound this frame, if PHYSICS counted a new one: { foot, loud }, or null.
+  takeFootfall(st) {
+    const ph = this.sim.ex.phys;
+    if (!hasFootfalls(ph)) { this._stepsSeen = null; return null; }
+    const seen = this._stepsSeen;
+    this._stepsSeen = ph.steps;
+    if (seen == null || ph.steps === seen || st !== S.ON_FOOT || !ph.footfall) return null;
+    const body = BODIES[this.sim.bodyId];
+    const f = ph.footfall, out = this._footfall || (this._footfall = { foot: 0, loud: 1 });
+    out.foot = f.foot; out.loud = footLoudness(f.force, body ? body.gravity : 9);
+    return out;
   }
 
   // Sound: the state of the world for the mixer, and one-shots for what just happened.
@@ -352,6 +383,10 @@ export class Game {
       thunder01: w && w.lightning ? w.lightning.thunder01 : null,
       submerged: sim.ex.liquidDepth > 0.2,
       material: sim.ex.phys ? sim.ex.phys.material : null,
+      // Footsteps on PHYSICS' footfalls (P13), loud by their force; without them the mixer
+      // keeps its own cadence.
+      footfalls: hasFootfalls(sim.ex.phys),
+      footfall: this.takeFootfall(st),
     });
     const seq = sim.eventSeq || 0;
     const fresh = Math.min(seq - this._eventSeq, sim.events.length);

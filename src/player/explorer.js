@@ -13,8 +13,11 @@ export const EXPLORER = Object.freeze({
   eyeHeight: 1.62,
   scramble: 1.3,             // m: anything this low (a boulder, a stump) is walked over, not round
   scrambleSkirt: 0.7,        // m: the rise onto it begins this far outside its edge
-  walkSpeed: 4.2,            // m/s, a relaxed walk
+  walkSpeed: 4.2,            // m/s, the pace (by PHYSICS' gait an easy lope: a walking gait is under 2 m/s on Earth)
   runSpeed: 7.4,             // m/s with Shift
+  strollSpeed: 1.7,          // m/s with the stroll on (C on foot): a true walk on Earth and the worlds near its gravity
+  jumpCrouch: 0.12,          // s the legs fold before a jump from a stand or a walk (PHYSICS' cmd.jumpCrouch)...
+  jumpCrouchRun: 0.06,       // s ...and from a run's stride, which is already a spring: a runner does not stop to crouch
   groundAccel: 26,           // m/s^2 toward the wished velocity on the ground (snappy stop/start)
   airAccel: 6,               // m/s^2 of air control while falling
   jetAirAccel: 11,           // m/s^2 of air control while the jetpack burns
@@ -91,7 +94,7 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
   let wish = add(scale(f, input.moveZ || 0), scale(right, input.moveX || 0));
   wish = clampLen(wish, 1);
 
-  let maxSpeed = input.run ? T.runSpeed : T.walkSpeed;
+  let maxSpeed = input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
   const swimming = liquidR > 0 && liquidR - groundR > T.swimDepth && r <= liquidR - T.swimDepth + 0.25;
   if (swimming) maxSpeed = T.swimSpeed;
   else if (depth > 0.05 && wasGrounded) maxSpeed *= mix(1, T.wadeSlowFactor, clamp01(depth / T.wadeSlowDepth));
@@ -251,7 +254,7 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const f = tangent(input.viewFwd || st.fwd, up, st.fwd);
   const right = cross(f, up);
   const wish = clampLen(add(scale(f, input.moveZ || 0), scale(right, input.moveX || 0)), 1);
-  const maxSpeed = input.run ? T.runSpeed : T.walkSpeed;
+  const maxSpeed = input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
 
   let jump = false;
   if (input.jump && (wasGrounded || floating)) { jump = true; st.jumpHeld = 0; }
@@ -279,6 +282,8 @@ function stepExplorerBodied(st, input, dt, env, T) {
   }
   cmd.wish.x = wish.x * maxSpeed * pace; cmd.wish.y = wish.y * maxSpeed * pace; cmd.wish.z = wish.z * maxSpeed * pace;
   cmd.jump = jump;
+  // The fold before the push (PHYSICS P13): seen from a stand, short from a run's stride.
+  cmd.jumpCrouch = st.phys && st.phys.gait === 2 ? T.jumpCrouchRun : T.jumpCrouch;
   cmd.jet = jetOn ? 1 : 0;
   cmd.jetMaxRise = jetRiseCap(env.gravity, T);
   // Suit thrusters help the boots start and stop (PHYSICS' named assist force): without them a

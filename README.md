@@ -38,7 +38,8 @@ On foot
 | --- | --- |
 | W A S D | walk |
 | Shift | run |
-| Space | jump; hold to fire the jetpack (it refills on the ground) |
+| C | stroll: a true walk (1.7 m/s) in place of the usual easy lope (4.2 m/s); C again for the pace. A gamepad stick tilted a little strolls too |
+| Space | jump; hold to fire the jetpack (it refills on the ground). From a stand the legs fold for an eighth of a second first; from a run, half that |
 | mouse | look (click the picture to capture the pointer; or hold the left button and drag) |
 | mouse wheel | camera closer / farther |
 | V | first person / third person |

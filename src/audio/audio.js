@@ -54,13 +54,14 @@ export function createAudio({ enabled = true, context = null } = {}) {
   }
   // One footfall, by what is underfoot (PHYSICS' ground material): soft on grass and litter, a
   // crunch on loose grains and snow, a tap on rock, ice and glass, a squelch in mud, a splash.
-  function footstep(material) {
-    const m = material || 'grass', j = 0.85 + Math.random() * 0.3;
-    if (m === 'water') { burst(900 * j, 0.7, 0.3, 0.24); return; }
-    if (m === 'sand' || m === 'dust' || m === 'ash' || m === 'snow' || m === 'gravel') { burst(1700 * j, 0.6, 0.2, 0.17); burst(300 * j, 1, 0.16, 0.09); return; }
-    if (m === 'rock' || m === 'ice' || m === 'glass' || m === 'crystal') { burst(720 * j, 2.2, 0.4, 0.07); return; }
-    if (m === 'mud' || m === 'bed') { burst(230 * j, 1.4, 0.46, 0.16); return; }
-    burst(340 * j, 1.1, 0.4, 0.12);                           // grass, soil, litter, moss
+  // `loud` (about 0.5 to 1.25) is the footfall's force over the body's weight (PHYSICS' gait).
+  function footstep(material, loud = 1) {
+    const m = material || 'grass', j = 0.85 + Math.random() * 0.3, L = loud;
+    if (m === 'water') { burst(900 * j, 0.7, 0.3 * L, 0.24); return; }
+    if (m === 'sand' || m === 'dust' || m === 'ash' || m === 'snow' || m === 'gravel') { burst(1700 * j, 0.6, 0.2 * L, 0.17); burst(300 * j, 1, 0.16 * L, 0.09); return; }
+    if (m === 'rock' || m === 'ice' || m === 'glass' || m === 'crystal') { burst(720 * j, 2.2, 0.4 * L, 0.07); return; }
+    if (m === 'mud' || m === 'bed') { burst(230 * j, 1.4, 0.46 * L, 0.16); return; }
+    burst(340 * j, 1.1, 0.4 * L, 0.12);                       // grass, soil, litter, moss
   }
   // A drop falling from a leaf: a short, pitched tick.
   function drip() {
@@ -170,8 +171,13 @@ export function createAudio({ enabled = true, context = null } = {}) {
     set(node.shipA.frequency, 62 + 50 * thr + 150 * (s.pulse01 || 0), 0.3);
     set(node.shipB.frequency, (62 + 50 * thr) * 1.5 + 230 * (s.pulse01 || 0), 0.3);
     set(node.shipFilt.frequency, 320 + 900 * thr + 2400 * (s.pulse01 || 0), 0.3);
-    // Footsteps on the stride (about one step per 0.75 m walked).
-    if (s.onFoot && s.grounded && s.speed > 0.6) {
+    // Footsteps: on PHYSICS' footfalls when the body has a gait (each one as it lands, loud by
+    // its force; a landing on both feet a little heavier); else on a stride of our own (about
+    // one step per 0.75 m walked).
+    if (s.footfalls) {
+      if (s.onFoot && s.footfall) footstep(s.submerged ? 'water' : s.material, Math.min(1.25, s.footfall.loud * (s.footfall.foot === 2 ? 1.15 : 1)));
+      stepPhase = 0.6;
+    } else if (s.onFoot && s.grounded && s.speed > 0.6) {
       stepPhase += (s.speed * dt) / 0.75;
       if (stepPhase >= 1) { stepPhase -= 1; footstep(s.submerged ? 'water' : s.material); }
     } else stepPhase = 0.6;

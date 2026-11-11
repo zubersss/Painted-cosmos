@@ -34,8 +34,16 @@ try {
   // The sketchbook's reward: the first landscape is sketched a few seconds after the game begins.
   i = await until((x) => x.sketches && x.sketches.count >= 1, 25);
   check(i.sketches && i.sketches.count === 1 && /^b:earth:/.test(i.sketches.keys[0]), 'the first landscape walked gets a sketch: ' + JSON.stringify(i.sketches && i.sketches.keys));
+  // The first view stays quiet: the page is kept, but its slip waits until the explorer sets off
+  // (it used to lie over the ship, the thing the player is meant to walk to).
+  ui = await page.evaluate(() => window.__pc.game.hud.sketchShown);
+  check(!ui, 'the slip waits while the explorer stands where the game began');
+  await page.keyboard.down('KeyW');
+  const tw = (await info()).t, ww = Date.now();
+  while (!(await page.evaluate(() => window.__pc.game.hud.sketchShown)) && (await info()).t - tw < 8 && Date.now() - ww < 300000) await run.sleep(90);
+  await page.keyboard.up('KeyW');
   ui = await page.evaluate(() => ({ on: window.__pc.game.hud.sketchShown, title: document.querySelector('.pc-newsketch b').textContent, sub: document.querySelector('.pc-newsketch span').textContent }));
-  check(ui.on && ui.title && /page 1 of \d+/.test(ui.sub), `and the new page is shown as it is made: "${ui.title}" (${ui.sub.replace(/\s+/g, ' ')})`);
+  check(ui.on && ui.title && /page 1 of \d+/.test(ui.sub), `and is shown once they set off: "${ui.title}" (${ui.sub.replace(/\s+/g, ' ')})`);
   await run.sleep(900);                                        // the slip fades in
   await shot('m3-newsketch', 'm3-newsketch');
   const px = await page.evaluate(async () => {

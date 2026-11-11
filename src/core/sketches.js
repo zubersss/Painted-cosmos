@@ -17,6 +17,15 @@ export const SKETCH = Object.freeze({
   maxTotal: 1500000,           // characters for all of them
 });
 
+// The slip that shows a new page as it is made. At an arrival (the game's start, a step out of
+// the ship) it waits until the explorer has set off, so the first view stays quiet and the slip
+// never lies over the ship the player is meant to walk to.
+export const SKETCH_SLIP = Object.freeze({
+  moved: 4,                    // metres from where the explorer stood at the arrival...
+  wait: 25,                    // ...or this many seconds standing there
+  seconds: 5,                  // how long the slip stays
+});
+
 export const biomeKey = (bodyId, biomeId) => `b:${bodyId}:${biomeId}`;
 export const vistaKey = (bodyId, vistaId) => `v:${bodyId}:${vistaId}`;
 

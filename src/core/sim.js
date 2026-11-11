@@ -65,6 +65,7 @@ export class Sim {
     this.aimed = null;
     this.pulse = null;
     this.notice = null;            // { text, until } one line of feedback for the HUD
+    this.stroll = false;           // C on foot: walk at a stroll (EXPLORER.strollSpeed) instead of the usual pace
     this.visited = {};             // bodyId -> { biomes: { id: true } }  (the sketchbook's data)
     this._envs = {};
     this._disturbers = [];
@@ -183,12 +184,18 @@ export class Sim {
 
     if (st === S.ON_FOOT) {
       if (first && inp.edges.has('KeyV')) this.footCam.firstPerson = !this.footCam.firstPerson;
+      // C: a stroll (a true walking gait) in place of the usual easy lope; Shift still runs.
+      if (pressed('KeyC')) {
+        this.stroll = !this.stroll;
+        this.say(this.stroll ? 'Strolling: C for the usual pace' : 'The usual pace', 2.5);
+      }
       if (first && inp.wheel) this.footCam.boom = clamp(this.footCam.boom + inp.wheel * 0.8, CAMERA.boomMin, CAMERA.boomMax);
       lookFootCamera(this.footCam, norm(this.ex.p), mdx * FEEL.mouseFoot, mdy * FEEL.mouseFoot);
       stepExplorer(this.ex, {
         moveX: I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight'),
         moveZ: I.axis('KeyS', 'KeyW') + I.axis('ArrowDown', 'ArrowUp'),
         run: I.down('ShiftLeft') || I.down('ShiftRight'),
+        stroll: !!this.stroll,
         jump: pressed('Space'),
         jet: I.down('Space'),
         viewFwd: this.footCam.viewFwd,
