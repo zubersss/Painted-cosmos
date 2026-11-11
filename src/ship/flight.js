@@ -13,13 +13,14 @@ import {
 export const SHIP = Object.freeze({
   // speeds (m/s)
   speedGround: 46,           // top speed skimming the ground
-  speedAtmoTop: 210,         // top speed at the edge of space
+  speedAtmoTop: 160,         // top speed at the edge of space
   speedSpace: 750,           // cruise in space (the pulse drive is separate)
   liftSpeed: 18,             // vertical thrusters (Space / C) in the atmosphere
   liftSpeedSpace: 90,
   tauAtmo: 1.0,              // s: time constant of velocity following the nose and throttle
   tauSpace: 1.7,             // s: more glide in space
   throttleRate: 0.55,        // per second while W or S is held
+  brakeFactor: 0.45,         // X shortens the velocity time constant by this much
   reverseMax: -0.2,
   // steering
   steerRate: 7.5,            // 1/s: how fast the nose swings to where the mouse asked
@@ -35,6 +36,9 @@ export const SHIP = Object.freeze({
   cushionHeight: 7,          // m: below this the descent rate is limited
   minClearance: 1.6,         // m: the hull never goes lower in free flight
   lookAhead: 0.8,            // s of terrain look-ahead for the automatic pull-up
+  flareHeight: 75,           // m: below this a dive is progressively levelled out
+  flareAngle: 0.07,          // rad: the steepest dive allowed at cushion height
+  flareRate: 4.5,            // 1/s
   bounceRestitution: 0.35,
   // sequences
   hoverHeight: 9,            // m: where the lift-off sequence leaves you
@@ -73,7 +77,7 @@ export function maxSpeedAt(altitude, spaceAlt, hasBody, T = SHIP) {
   if (!hasBody) return T.speedSpace;
   const a = altitude / spaceAlt;
   if (a < 1) return mix(T.speedGround, T.speedAtmoTop, smoothstep(0.01, 1, a));
-  return mix(T.speedAtmoTop, T.speedSpace, clamp01((a - 1) / 1.5));
+  return mix(T.speedAtmoTop, T.speedSpace, smoothstep(1, 5, a));
 }
 
 // input: { aimX, aimY (radians of mouse aim this step: +X right, +Y nose down), yawKey (-1..1),
@@ -124,6 +128,20 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     const corr = (want - roll) * damp(T.rollLevelRate * level, dt) * clamp01(cosElev * 3);
     q = qMul(qFromAxisAngle(f, corr), q);
   }
+  // ---- flare: the lower the ship, the less steeply it may point at the ground -----------------
+  const up = env.up || null;
+  let ground = null;
+  if (env.sample && up) ground = floorAt(env.sample, st.p);
+  if (ground && !st.liftoff) {
+    const alt = ground.r - ground.floor;
+    const minElev = -mix(T.flareAngle, T.pitchLimit, smoothstep(T.cushionHeight, T.flareHeight, alt));
+    const elev = Math.asin(clamp(dot(f, up), -1, 1));
+    if (elev < minElev && cosElev > 0.06) {
+      const lift = Math.min((minElev - elev) * damp(T.flareRate, dt), T.maxTurn * dt);
+      q = qMul(qFromAxisAngle(norm(cross(f, up)), lift), q);
+      st.pending.pitch = Math.min(st.pending.pitch, 0);        // forget queued nose-down
+    }
+  }
   st.q = qNorm(q);
   f = qRotate(st.q, V(0, 0, -1));
 
@@ -132,16 +150,14 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     st.throttle = clamp(st.throttle + (input.throttle || 0) * T.throttleRate * dt, T.reverseMax, 1);
     if (input.cut) st.throttle = mix(st.throttle, 0, damp(6, dt));
   }
-  const up = env.up || null;
-  let ground = null;
-  if (env.sample && up) ground = floorAt(env.sample, st.p);
   // Near the ground the ship is slow (you are looking at a painting, not racing over it).
   const altForSpeed = ground ? Math.max(0, ground.r - ground.floor) : env.altitude;
   const vmax = maxSpeedAt(altForSpeed, env.spaceAlt, env.hasBody, T);
   const liftDir = w > 0.3 ? upRef : qRotate(st.q, V(0, 1, 0));
   const liftSpeed = clamp(vmax * 0.42, T.liftSpeed, T.liftSpeedSpace);
   const target = add(scale(f, st.throttle * vmax), scale(liftDir, (input.lift || 0) * liftSpeed));
-  const tau = mix(T.tauSpace, T.tauAtmo, env.hasBody && env.altitude < env.spaceAlt ? 1 : 0);
+  // X is a real brake: the ship stops in about half the usual time.
+  const tau = mix(T.tauSpace, T.tauAtmo, env.hasBody && env.altitude < env.spaceAlt ? 1 : 0) * (input.cut ? T.brakeFactor : 1);
   let v = add(st.v, scale(sub(target, st.v), damp(1 / tau, dt)));
 
   // ---- lift-off sequence overrides the vertical motion ---------------------------------------
@@ -161,8 +177,9 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     const vh = reject(v, up);
     const alt = ground.r - ground.floor;
     // Pull up over terrain that rises ahead of us.
+    // (Only the rise of the terrain counts, so hovering low over flat ground is left alone.)
     const ahead = floorAt(env.sample, addScaled(st.p, vh, T.lookAhead));
-    const need = ahead.floor + T.cushionHeight - ground.r;
+    const need = ahead.floor + clamp(alt, T.minClearance + 0.4, T.cushionHeight) - ground.r;
     if (need > 0) vUp = Math.max(vUp, need / T.lookAhead);
     // Ride a cushion: the closer to the ground, the slower the ship may sink.
     if (alt < T.cushionHeight) {
@@ -197,6 +214,19 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     st.altGround = Math.max(0, len(p) - g2.floor);
   } else if (ground) st.altGround = Math.max(0, len(p) - ground.floor);
   else st.altGround = 0;
+
+  // Follow the curve of the world: on a planet a few kilometres across, "level" has to bend
+  // with the horizon or every straight line would climb away into the sky.
+  if (up && w > 0) {
+    const upNew = norm(p);
+    const axis = cross(up, upNew);
+    const sinA = len(axis);
+    if (sinA > 1e-12) {
+      const rot = qFromAxisAngle(scale(axis, 1 / sinA), Math.asin(Math.min(1, sinA)) * w);
+      st.q = qNorm(qMul(rot, st.q));
+      v = add(v, scale(sub(qRotate(rot, v), v), 1));
+    }
+  }
 
   st.p = p;
   st.v = v;

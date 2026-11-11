@@ -53,13 +53,14 @@ async function boot() {
   painter.setQuality(dyn.quality);
   hud.showStart(true);
 
+  const sim = game.sim;
   const debug = {
-    game, world, painter, renderer, scene, camera, dyn, using: prov.using,
+    game, sim, world, painter, renderer, scene, camera, dyn, using: prov.using,
     info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: world.isSettled ? world.isSettled() : null }),
-    teleport: (o) => game.teleport(o),
-    aimAt: (id) => game.aimAt(id),
-    setTimeScale: (k) => { game.timeScale = Math.max(0, Math.min(20, k)); },
-    setHour: (h) => { game.eph.setLocalSolarTime(game.bodyId, game.t, norm3(game.ex.p), h); },
+    teleport: (o) => sim.teleport(o),
+    aimAt: (id) => sim.aimAt(id),
+    setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },
+    setHour: (h) => { sim.eph.setLocalSolarTime(sim.bodyId, sim.t, norm3(sim.ex.p), h); },
     fps: 0,
     errors: [],
   };

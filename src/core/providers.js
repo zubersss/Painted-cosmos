@@ -10,7 +10,9 @@
 import * as stubPainter from './stubs/painter.js';
 import * as stubWorld from './stubs/world.js';
 import * as stubModels from './stubs/models.js';
+import { planProviders } from './providers.plan.js';
 
+// Flip a flag to true when that module of Painter's is committed and usable.
 export const REAL_READY = { render: false, world: false, art: false, ui: false };
 
 const REAL_PATH = {
@@ -25,27 +27,8 @@ const NEEDS = {
   art: ['createExplorer', 'createShip'],
 };
 
-function listParam(v) {
-  if (v == null) return [];
-  if (v === '' || v === '1' || v === 'true' || v === 'all') return ['render', 'world', 'art', 'ui'];
-  return String(v).split(',').map((s) => s.trim()).filter(Boolean);
-}
-
-export function planProviders(search, ready = REAL_READY) {
-  const q = new URLSearchParams(search || '');
-  const forceStub = listParam(q.has('stub') ? q.get('stub') : null);
-  const forceReal = listParam(q.has('real') ? q.get('real') : null);
-  const plan = {};
-  for (const key of ['render', 'world', 'art', 'ui']) {
-    if (forceStub.includes(key)) plan[key] = 'stub';
-    else if (forceReal.includes(key)) plan[key] = 'real';
-    else plan[key] = ready[key] ? 'real' : 'stub';
-  }
-  return plan;
-}
-
 export async function loadProviders(search) {
-  const plan = planProviders(search);
+  const plan = planProviders(search, REAL_READY);
   const mods = {};
   const using = {};
   for (const key of ['render', 'world', 'art']) {

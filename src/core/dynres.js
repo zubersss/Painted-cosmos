@@ -39,6 +39,8 @@ export class DynamicResolution {
     this.over = 0; this.under = 0; this.atMin = 0; this.atMax = 0;
     this.cooldown = 0;
     this.changes = 0;
+    this.upPenalty = 1;        // grows when a tier-up had to be undone, so it is tried less often
+    this.sinceTierUp = Infinity;
   }
 
   // Feed one frame. dtMs is the real time the last frame took. Returns
@@ -79,13 +81,16 @@ export class DynamicResolution {
     const pinnedHigh = this.scale >= T.maxScale - 1e-6 && ms < T.tierUpMs;
     this.atMin = pinnedLow ? this.atMin + dt : 0;
     this.atMax = pinnedHigh ? this.atMax + dt : 0;
+    this.sinceTierUp += dt;
     if (this.cooldown === 0) {
       if (this.atMin >= T.tierDownAfter && this.quality > this.minQuality) {
+        // If the last tier-up did not hold, wait much longer before trying again.
+        if (this.sinceTierUp < 60) this.upPenalty = Math.min(16, this.upPenalty * 3);
         this.quality--; this.atMin = 0; this.cooldown = T.tierCooldown;
         this.scale = Math.min(T.maxScale, T.minScale + 0.2);   // a cheaper tier buys pixels back
         changed = true;
-      } else if (this.atMax >= T.tierUpAfter && this.quality < this.maxQuality) {
-        this.quality++; this.atMax = 0; this.cooldown = T.tierCooldown * 2;
+      } else if (this.atMax >= T.tierUpAfter * this.upPenalty && this.quality < this.maxQuality) {
+        this.quality++; this.atMax = 0; this.cooldown = T.tierCooldown * 2; this.sinceTierUp = 0;
         this.scale = Math.max(T.minScale, T.maxScale - 0.15);  // start the dearer tier carefully
         changed = true;
       }
