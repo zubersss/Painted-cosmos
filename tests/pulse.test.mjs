@@ -150,3 +150,40 @@ test('arriving by pulse at the world the course was set for says "<World> ahead"
     assert.ok(!said.some((x) => /in the way/.test(x)), `to ${to} nothing was "in the way": ${JSON.stringify(said)}`);
   }
 });
+
+// Seen in the first ten minutes (2026-11-11): three seconds after the first lift-off, a metre
+// over the ground it had just left, the screen offered "Land here".
+test('"Land here" is not offered in the first moments after a lift-off; it is once the ship has been clear, and E lands all the same', () => {
+  const sim = newSim();
+  const pad = new Pad();
+  play(sim, pad, 0.5);
+  pad.dx += (sim.info().shipBearingDeg * Math.PI / 180) / 0.0023;
+  pad.press('KeyW');
+  play(sim, pad, 30, { until: () => sim.info().canBoard });
+  pad.release('KeyW');
+  pad.tap('KeyE');
+  play(sim, pad, 4, { until: () => sim.sm.state === S.LANDED });
+  pad.tap('Space');
+  play(sim, pad, 12, { until: () => sim.sm.state === S.ATMOSPHERE && !sim.sh.liftoff });
+  assert.equal(sim.sm.state, S.ATMOSPHERE);
+  // Hovering where it lifted off: landable, but not suggested.
+  let offered = 0, landable = 0;
+  play(sim, pad, 4, { each: () => { if (sim.info().ship.canLand) landable++; if (sim.promptNow && sim.promptNow.text === 'Land here') offered++; } });
+  assert.ok(landable > 60, `the ship could land for most of those four seconds (${landable} frames)`);
+  assert.equal(offered, 0, 'no "Land here" in the first four seconds after lift-off');
+  // ...and after eight seconds in the air it is offered, a hover included.
+  play(sim, pad, 6);
+  assert.ok(sim.info().ship.canLand, 'still landable');
+  assert.equal(sim.promptNow && sim.promptNow.text, 'Land here');
+  // E lands whether or not the prompt was up: a second lift-off, E at once.
+  pad.tap('KeyE');
+  play(sim, pad, 40, { until: () => sim.sm.state === S.LANDED });
+  assert.equal(sim.sm.state, S.LANDED);
+  pad.tap('Space');
+  play(sim, pad, 12, { until: () => sim.sm.state === S.ATMOSPHERE && !sim.sh.liftoff });
+  play(sim, pad, 0.5);
+  assert.notEqual(sim.promptNow && sim.promptNow.text, 'Land here');
+  pad.tap('KeyE');
+  play(sim, pad, 1);
+  assert.ok(sim.sm.state === S.LANDING || sim.sm.state === S.LANDED, 'E started a landing with no prompt up: ' + sim.sm.state);
+});

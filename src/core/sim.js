@@ -601,7 +601,13 @@ export class Sim {
       this.shFrame = next;
     }
     const inAtmo = this.shFrame.kind === 'body' && this.shFrame.rotating;
-    if (this.sm.state === S.ATMOSPHERE && !inAtmo) { this.sm.dispatch(EV.leftAtmosphere); this.emit('space'); }
+    if (this.sm.state === S.ATMOSPHERE && !inAtmo) {
+      this.sm.dispatch(EV.leftAtmosphere); this.emit('space');
+      // The first time above the air on a journey that has seen one world only: say how to go
+      // on (the title card listed M among sixteen keys, minutes ago).
+      if (!this._saidMap && Object.keys(this.visited).length <= 1) this.say('M opens the map: choose a world, point the nose at its mark, press F', 9);
+      this._saidMap = true;
+    }
     else if (this.sm.state === S.SPACE && inAtmo) { this.sm.dispatch(EV.enteredAtmosphere); this.emit('entry'); }
   }
 
@@ -904,8 +910,14 @@ export class Sim {
     }
     this.updateMood(active);
     const ti = this.targetInfo();
+    // "Land here" is not offered in the first moments after a lift-off (the ship is a metre
+    // up and has nowhere else to be): only once it has been 12 m clear of the ground, or eight
+    // seconds have passed. E lands all the same; this is about what the screen suggests.
+    if (st === S.LANDED || st === S.ON_FOOT || st === S.BOARDING) { this._offT = 0; this._offClear = false; }
+    else { this._offT = (this._offT || 0) + dt; if (this.sh.altGround > 12 || st === S.SPACE || st === S.PULSE) this._offClear = true; }
+    const offerLanding = this._offClear || this._offT > 8;
     const q = {
-      canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable(), liftingOff: !!this.sh.liftoff,
+      canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable() && offerLanding, liftingOff: !!this.sh.liftoff,
       target: ti ? ti.name : null,
     };
     this.promptNow = promptFor(st, q);
