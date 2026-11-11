@@ -98,6 +98,8 @@ function gotoBiome(biomeId, preset) {
   if (!biomeId || here.biomeId === biomeId) spot = spawn; else spot = world.findBiome(bodyId, biomeId) || spawn;
   applyPreset(preset || 'stream', spot.unitDir);
   if (preset === 'stream' || !preset) aimAlongStream();
+  if (preset === 'vista') aimVista(1.7);
+  if (preset === 'shore') { aimAlongStream(); state.yaw += 1.0; }
 }
 
 // Stand on the bank and look along the water: scan for the direction with the most water.
@@ -132,6 +134,31 @@ function aimAlongStream() {
     if (score > bscore) { bscore = score; byaw = ang; }
   }
   state.yaw = byaw + 0.10; state.pitch = -0.07;
+}
+
+// Stand somewhere low, dry and gentle near the spot and look toward the highest ground in
+// sight: a painter's choice of where to set the easel.
+function aimVista(eye) {
+  const R = BODIES[bodyId].radius;
+  const base = state.pos.clone().normalize();
+  frame(base);
+  const e0 = _e.clone(), n0 = _n.clone();
+  const pt = (ang, r) => base.clone().multiplyScalar(R).addScaledVector(e0, Math.sin(ang) * r).addScaledVector(n0, Math.cos(ang) * r).normalize();
+  let best = null, bestC = 1e9, hi = null, hiH = -1e9;
+  for (let a = 0; a < 20; a++) for (let r = 0; r <= 320; r += 40) {
+    const p = pt(a / 20 * Math.PI * 2, r), s = world.sampleSurface(bodyId, p);
+    if (s.radius > hiH) { hiH = s.radius; hi = { a: a / 20 * Math.PI * 2, r }; }
+    if (s.isLiquid) continue;
+    const c = (s.radius - R) * 0.02 + s.slope * 30 + r * 0.004 + (s.canopyHeight > 0 ? 3 : 0);
+    if (c < bestC) { bestC = c; best = { p, s }; }
+  }
+  if (!best) return;
+  state.pos.copy(best.p).multiplyScalar(best.s.radius + eye);
+  frame(best.p);
+  // yaw toward the highest point (in the new local frame)
+  const target = pt(hi.a, Math.max(hi.r, 60)).multiplyScalar(hiH).sub(state.pos);
+  state.yaw = Math.atan2(target.dot(_e), target.dot(_n)) + 0.25;
+  state.pitch = 0.02;
 }
 
 function applyTime() { world.setTime(bodyId, state.time); $('time').value = state.time; $('timev').textContent = state.time; }

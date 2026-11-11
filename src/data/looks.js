@@ -252,7 +252,7 @@ export const LOOKS = {
       B('storm_wall', 'Storm-Wall Cliffs', 'ridged', ['burntSienna', 'alizarin', 'rawUmber', 'neutralTint', 'cadOrange'], 'lemonYellow', ['burntSienna', 'alizarin', 'rawUmber'],
         { t: { amp: 620, wl: 1300, strata: 0.7 }, mist: 0.7, tall: [1, 1], tallD: 0.14, tallMix: 1, small: { rock: 0.08 }, phys: { ground: 'rock' } }),
       B('hanging_gardens', 'Hanging Gardens', 'terraced', ['sapGreen', 'viridian', 'quinGold', 'rawSienna', 'cobaltViolet'], 'roseMadder', ['sapGreen', 'viridian', 'quinGold'],
-        { t: { amp: 150, steps: 6 }, tall: [0, 0], tallD: 0.6, tallMix: 1, small: { fern: 0.3, flower: 0.14, bush: 0.08, grass: 0.3 } }),
+        { t: { amp: 150, steps: 6 }, tall: [0, 0], tallD: 0.42, tallMix: 1, small: { fern: 0.2, flower: 0.12, bush: 0.05, grass: 0.3 } }),
       B('lightning_plains', 'Lightning Plains', 'flat', ['neutralTint', 'paynesGrey', 'yellowOchre', 'cobaltViolet', 'indigo'], 'lemonYellow', ['neutralTint', 'yellowOchre', 'paynesGrey'],
         { t: { amp: 12, crack: 0.5, dusk: 0.3 }, tall: [2, 2], tallD: 0.16, tallMix: 1, small: { rock: 0.04, shard: 0.05, grass: 0.1 } }),
     ],

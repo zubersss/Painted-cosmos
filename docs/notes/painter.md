@@ -4,27 +4,61 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 
 ## Status
 
-INTEGRATION: ready (commit `c9e19bd`; render, world and art are all usable)
+INTEGRATION: ready (latest `[painter]` commit; render, world and art are all usable on all ten bodies)
 
-M1 (Painter's half): the temperate forest is built and the three MUST FIX of lead review 1 are
-answered below with numbers and frames. Waiting on the lead's re-review.
+M1 is closed (lead review 2). **M2 (Painter's half) first pass is in**: every planet has 4+
+distinct biomes with its own palette, sky, liquids and flora or rock kits, and an orbit view.
+It is a first pass: forms and palettes differ clearly from planet to planet, but most biomes
+have had one look each, not the critique-and-repaint rounds the forest had.
 
-- `src/render/index.js`: `createPainter(renderer)`, `RENDERER_OPTIONS`, `makeWashMaterial`,
-  `setRenderScale`, `setQuality`, `setMood`. Works.
-- `src/world/index.js`: `createWorld(scene)`: ten bodies (earth detailed; the other nine are
-  placeholders with 4 biomes each), `world.sun`, `update`, `sampleSurface` (with `liquidRadius`,
-  `canopyHeight`, `canopy01`), `sampleObstacles`, `getSpawn`, `getVistas`, `setTime`,
-  `setVistaFound`, `busy`, `setBuildBudget`, `getLighting`, `setPhysics` (stores it; not read yet).
-- Earth's temperate forest: birch and pine in clumps, undergrowth (grass, ferns, reeds, bushes,
-  poppies, stones), a brook with mirrored reflections, dappled light, day / dawn / dusk / night.
-- `src/art/models.js`: explorer and ship are still **placeholder shapes** (contract-correct
-  sizes, `seat`, `hatch`, `animate`; a windscreen hoop and cowl are visible from the seat).
-- `gallery.html`: free-fly camera, pickers, URL parameters (below).
+What exists on every body (all data-driven from `src/data/looks.js`):
+- terrain recipes (`rolling`, `flat`, `dunes`, `ridged`, `canyon` / `mesa` / `terraced` with
+  strata, `crater` / `basin`, `islands`, `coast`, `riverbed`, `sinkholes`, `alpine`, `wetland`,
+  `forest`), cracked ground, frost, dusk tint;
+- liquids with their own look per biome, blended per vertex: water, a sea of cloud (jupiter,
+  saturn), lava (venus), acid pools (venus), glowing teal (uranus), ultramarine sea (neptune);
+- flora on the tiered system: tall kits `broadleaf`, `conifer`, `fungus`, `crystal` (and thin
+  crystal reeds), `spire`, `kelp`, `wave`; small kits grass, fern, reed, bush, rock, flower,
+  shard. `sampleObstacles`, `canopy01`, `canopyHeight`, `getSpawn`, `getVistas` work everywhere;
+- sky keys per body (`mkSky`), per-biome mist, Saturn's rings as real geometry (they cross the
+  sky from the ground), a cloud deck seen from above that thins as you descend, a limb that
+  fades to haze, and a softer space wash (indigo and violet with salt blooms and spattered stars);
+- PHYSICS' flora field is wired (below).
 
-Not done / rough: autumn woodland and the four other earth biomes are placeholders; the other
-nine bodies are noise spheres with palettes; space is a first-pass wash (the grain reads as
-pepper there, lead finding 8); painted UI theme not started; no weather; flora sway is still my
-two-sine placeholder (PHYSICS' field goes in during M2/M3).
+Frame cost, my probe (gallery 480x270, quality 1, the densest biome I could find per body;
+budget 600 k triangles / 350 draw calls):
+
+| body | view | triangles | draw calls |
+| --- | --- | --- | --- |
+| earth | temperate forest, `cam=trees` | 519 k | 287 |
+| earth | autumn woodland | 502 k | 251 |
+| mars | dry riverbeds (red-leaf grove) | 476 k | 228 |
+| mars | rust canyons, 30 m up | 327 k | 161 |
+| saturn | crystal reed fields | 387 k | 162 |
+| saturn | gold islands (spawn) | 359 k | 206 |
+| mercury | crystal gardens | 453 k | 312 |
+| venus | fungal tower forest | 536 k | 206 |
+| jupiter | hanging gardens | 510 k | 162 |
+| uranus | frozen-wave forest | 355 k | 145 |
+| neptune | kelp forests | 567 k | 169 |
+
+`sampleSurface`: 4.5 to 8.5 microseconds a call on every body (Node, 20 000 calls each).
+Not measured in M2: quality 0 and 2 on the new planets, `world.update` worst frame on the new
+planets, anything on a real GPU. Mercury's crystal gardens and Jupiter's gardens were measured
+before I thinned them further; the numbers above are after.
+
+Evidence (`docs/shots/painter/`, 960x540, quality 1, `ui=0&t=0`): `<body>-orbit.jpg`
+(`cam=orbit`) and `<body>-<biome>.jpg` for mars, saturn, mercury, venus, jupiter, uranus,
+neptune and earth's five other biomes (41 files). Camera per biome: `cam=vista` (a low, dry,
+gentle spot near the biome's first site, looking at the highest ground), `cam=stream` for
+biomes with pools or rivers, `cam=shore` for seas. I looked at every frame as a contact sheet,
+not each at full size.
+
+Known weak (blunt): jupiter and saturn sky-islands are bare lumps in a pale sea; uranus teal
+sinkholes and venus lava and acid frames do not show the liquid (the camera did not find it);
+earth's alpine meadow is grey; desert bushes are forest green (undergrowth colours are per
+body, not per biome); moon and pluto are untouched placeholders; night and space granulation
+are softer but not finished; explorer and ship are still toys; no weather, no painted UI.
 
 ## Answers to lead review 1 (at `19f72ce`)
 
@@ -86,6 +120,19 @@ SHOULD FIX, short answers:
 - 9 (build hitches): see MUST FIX 1.
 - 10 (`sampleSurface` cost): unchanged except one fuller sample for `canopy01`/`canopyHeight`
   on bodies that have flora; about 6 microseconds a call in Node here.
+
+## Answers to lead review 2 (SHOULD FIX, none blocking)
+
+- 4 (`world.update` worst frames): unchanged since review 2. Terrain is a resumable job and the
+  slice is 0.8 x the budget, so what remains is one flora cell assembly or one re-tier landing
+  on top of a patch step. Not fixed.
+- 5 (shade as darkened local colour): the ground's shade is now the glaze plus a violet-blue
+  shift, with feathered edges where the wash "was wet" (commit `1e1801e`). Trunks and crowns
+  unchanged.
+- 6 (foreground one wash), 7 (far trunks in a line): not addressed in M2.
+- 9 (`sampleObstacles` size): the radius is clamped to 60 m and everything inside it is
+  returned, unsorted (trees always; rocks only when the radius is 30 m or less and the rock is
+  larger than a step). It is not "the nearest N": sort by distance yourself if you need that.
 
 ## How to use my modules
 
@@ -186,10 +233,18 @@ quality 1 unless noted):
 - PHYSICS 3: your ground table matches what I paint for earth (`temperate_forest: 'litter'` is
   right: grass over leaf and needle litter, mud at the brook). No `phys` overrides needed yet;
   I will add `phys: { ground }` in `looks.js` when M2 biomes differ.
-- PHYSICS wiring: the sway is one function, `pcSway` in `PROP_VERT`
-  (`src/render/materials.js`), called on one line; that is where `pcPhysBend` /
-  `pcPhysDisplace` go. I will apply your chunk to grass, ferns, reeds, flowers, bushes and the
-  near tree tier only; mid and far trees take the low-resolution wind. Planned with M2.
+- PHYSICS wiring: **done** (`1e1801e`). `world.setPhysics(physics)`; each `world.update` copies
+  `physics.fields.flora` (three float textures, re-uploaded on `version` / `pushVersion`) and
+  its uniforms. Undergrowth (grass, ferns, reeds, flowers) uses the full `pcPhysBend` (wind,
+  waves, push, flatten); bushes and the near and mid tree tiers use `pcPhysBendLite`; far trees
+  keep my small sway. `uStiff`: 0 undergrowth, 0.35 bushes, 1 trees (0.1 kelp). `uPlantHeight`
+  per mesh. In the gallery: `?physics=1`. Checked: field live (wind 5 m/s, bend up to 1 rad at
+  the spawn), plants move between frames, no console errors. Not checked: parting around the
+  explorer, downwash (nothing pushes in the gallery). I import `../physics/flora.glsl.js`.
+- PILOT (markers): leave them as DOM rings for now; a painted version belongs with the UI
+  theme in M3 (hook would be `painter.setMarks([{ id, x, y, r, label, sub, kind }])`).
+- PILOT (flat dry arrival): `getSpawn(bodyId)` searches the first site for a dry, gentle spot
+  on every body (tested for liquid and slope on earth only; on others by one frame each).
 
 ## Ideas and critique
 
@@ -209,6 +264,7 @@ quality 1 unless noted):
 
 ## Tests
 
-- `node --test src/world/*.test.mjs`: 12 tests of pure logic (noise, cube-sphere, biome
+- `node --test src/world/*.test.mjs`: 12 tests of pure logic (all ten bodies for the ceiling, vistas and obstacles)
+- (was) 12 tests of pure logic (noise, cube-sphere, biome
   coverage, `sampleSurface` purity, spawn, liquid, vistas, patch edges, mesh / sample agreement,
   terrain ceiling, flora determinism, obstacles).
