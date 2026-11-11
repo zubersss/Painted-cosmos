@@ -300,7 +300,8 @@ export class Flora {
     // mesh so cells beyond that range do not submit them at all
     for (const [pk, lists] of sets) {
       const M = pk < 0 ? this.mats : this._palette(pk);
-      make(lists.gn, this.kit.patch, M.patch, [0, GRASS_NEAR / 0.775, 1.0, 0.6], GRASS_NEAR);
+      // (the near half of the tufts used to be drawn as patches of blades; the near ground layer,
+      // src/world/nearground.js, is the sward now)
       make(lists.gf, this.kit.grass, M.under, [0, 30, 0.9, 0.6], 0);
       make(lists.fern, this.kit.fern, M.under, [0, UNDER_FAR, 0.5, 0.75], 0);
       make(lists.reed, this.kit.reed, M.under, [0, UNDER_FAR, 0.4, 0.8], 0);

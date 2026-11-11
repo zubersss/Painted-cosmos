@@ -978,6 +978,116 @@ export function makeFigureMaterial(opts = {}) {
   return m;
 }
 
+// ------------------------------------------------------------------------------------------
+// The near ground: one instanced layer of brush strokes round the eye (src/world/nearground.js):
+// grass blades, reed stubble, frost needles, pebbles, drift ripples. Each stroke is a tapering
+// flick that faces the picture plane about its own axis, takes the light of the ground it
+// stands on, is bent blade by blade by PHYSICS' push field, shrinks away at the end of its
+// range (far strokes are fewer) and is never thinner than the brush can hold.
+// ------------------------------------------------------------------------------------------
+const NEAR_VERT = /* glsl */`
+${VERT_PARS}
+${FOG_VERT}
+${FLORA_GLSL}
+uniform float uPhysOn;
+attribute vec3 iRoot;   // root relative to uOrigin (body-local metres)
+attribute vec4 iAxis;   // xyz the way the stroke grows (unit), w its length (0 = an empty slot)
+attribute vec4 iPar;    // x width (m), y width at half length (share), z hash, w born (s)
+attribute vec4 iCol;    // wash; a: curl of the tip (share of the length)
+attribute vec2 iExt;    // x canopy shade at the root, y how much it gives to a push (0 rigid .. 1 grass)
+uniform vec3 uOrigin;
+uniform vec3 uCamLocal;
+uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here, z now (s), w one pixel at 1 m (tangent)
+uniform float uTime;
+uniform vec4 uWx;
+varying vec3 vBody;
+varying vec3 vNV;
+varying vec3 vView;
+varying vec3 vCol;
+varying vec4 vS;        // x along the stroke 0..1, y across -1..1, z hash, w canopy
+varying float vFog;
+void main() {
+  float t = position.y, side = position.x, h = iPar.z;
+  vec3 root = iRoot;
+  vec3 toCam = uCamLocal - root;
+  float di = length(toCam);
+  // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
+  float range = mix(uNear.x, uNear.y, fract(h * 7.31));
+  float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(0.8, 2.6, di);
+  float flex = iExt.y;
+  float len = iAxis.w * vis * mix(1.0, 0.45, uWx.z * flex);      // fresh snow buries most of a blade
+  vec3 ax = iAxis.xyz;
+  vec3 sd = cross(ax, toCam / max(di, 0.001));
+  sd /= max(length(sd), 0.05);
+  float wPx = uNear.w * di;                                       // metres across one pixel here
+  float wid = max(iPar.x, wPx * 2.3) * (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0));
+  vec3 rel = ax * (len * t) + sd * (side * wid * min(1.0, vis * 3.0) + iCol.a * len * t * t);
+  vec3 up = normalize(root + uOrigin);
+  if (flex > 0.01 && len > 0.0) {
+    if (uPhysOn > 0.5) {
+      vec4 pb = pcPhysBend(root + uOrigin, 0.0);
+      rel = mix(rel, pcPhysDisplace(rel, up, max(iAxis.w, 0.05), pb.xy), flex);
+    } else {
+      rel += sd * (sin(uTime * 1.3 + h * 40.0) * 0.05 * len * t * t * flex);
+    }
+  }
+  vec3 wp = root + rel;
+  vBody = wp + uOrigin;
+  vNV = normalMatrix * normalize(mix(up, ax, 0.35));
+  vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+  vView = mv.xyz;
+  vCol = iCol.rgb; vS = vec4(t, side, h, iExt.x);
+  vFog = pcFogAmountV(di);
+  gl_Position = projectionMatrix * mv;
+  ${VERT_END}
+}
+`;
+
+const NEAR_FRAG = /* glsl */`
+${FRAG_PARS}
+varying vec3 vBody;
+varying vec3 vNV;
+varying vec3 vView;
+varying vec3 vCol;
+varying vec4 vS;
+varying float vFog;
+void main() {
+  #include <logdepthbuf_fragment>
+  vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
+  // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks
+  vec4 n2 = texture(uNoise3D, vBody * vec3(7.0, 2.0, 7.0) + vS.z * 3.0);
+  if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
+  float d = 1.0 + (0.55 - vS.x) * 0.7 + (vS.z - 0.5) * 0.5 + (n1.r - 0.5) * 0.5;
+  vec3 c = pcWetWash(pcDensity(vCol, d), 1.0);
+  c = mix(c, vec3(1.0), uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8);
+  vec3 nV = normalize(vNV);
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float x = dot(nV, sunV) * 0.5 + 0.5;
+  float sunny = min(pcDapple(vBody, vS.w), 1.0 - pcCast(vBody, (n1.g - 0.5) * 0.3));
+  x = mix(min(x, 0.44), x, sunny) + (n1.g - 0.5) * 0.10;
+  float lvl = pcLevel(x, 0.05);
+  c = pcTone(c, lvl);
+  c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
+  c = pcAtmos(c, vFog);
+  // a third of the strokes are the crisp accents the brush leaves as drawn; the rest belong to the wash
+  pcWrite(c, max(0.2, vFog * 0.9), nV, -vView.z, (fract(vS.z * 13.7) < 0.34 ? 6.0 : 4.0) + vS.z * 0.9);
+}
+`;
+
+export function makeNearMaterial(bodyU) {
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-near',
+    uniforms: baseUniforms(bodyU, Object.assign({
+      uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
+      uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) },
+    }, PHYS)),
+    vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
+    side: THREE.DoubleSide,
+  });
+  m.userData.pcPainted = true;
+  return m;
+}
+
 // Re-point a material's light uniforms at a body's (so an object standing on a planet is lit
 // and hazed like the planet around it).
 export function bindBodyUniforms(material, bodyU) {

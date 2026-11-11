@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { BODIES, BODY_IDS, SUN } from '../data/bodies.js';
 import { getLook } from '../data/looks.js';
+import { NearGround } from './nearground.js';
 import { getSurface, sampleSurfacePure, getVistasPure, getStandPure } from './surface.js';
 import { PlanetTerrain } from './terrain.js';
 import { sampleObstaclesPure } from './obstacles.js';
@@ -113,6 +114,9 @@ export function createWorld(scene) {
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
     }).catch((e) => console.warn('weather kits not available: ' + e.message));
   }
+  // one pixel of the scene pass at one metre (the near strokes are never thinner than the brush)
+  let nearPixel = 0.002;
+  FRAME_HOOKS.push((camera, info) => { if (camera.isPerspectiveCamera && info.internalHeight) nearPixel = 2 * Math.tan(camera.fov * Math.PI / 360) / info.internalHeight; });
   FRAME_HOOKS.push((camera, info) => {
     if (!kits) return;
     const id = physics && physics.here && physics.here.bodyId, root = id && bodies.get(id);
@@ -201,6 +205,7 @@ export function createWorld(scene) {
         if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, slice - (performance.now() - tb)) : 0);
       }
       if (!isActive) {
+        if (st.near) st.near.update(st.camLocal, false);
         // far bodies: plain daylight, no haze
         bu.uFog.value.set(1e-7, 6, 0, 1);
         bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0);
@@ -212,6 +217,9 @@ export function createWorld(scene) {
       _up.copy(st.camLocal).normalize();
       const here = sampleSurfacePure(st.id, _up.x, _up.y, _up.z);
       const ground = here.radius;
+      // the near ground: one layer of strokes round the eye (built on first use, in what is left of the slice)
+      if (!st.near) st.near = new NearGround(st.id, st.root, bu);
+      st.near.update(st.camLocal, true, camR - ground, Math.max(0.6, budgetMs * 0.25), dt, nearPixel);
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
       let mist = 0, twi = 0;
@@ -373,7 +381,7 @@ export function createWorld(scene) {
 
   function busy() {
     let n = 0;
-    for (const st of state.values()) { n += st.terrain.busy; if (st.flora) n += st.flora.busy; }
+    for (const st of state.values()) { n += st.terrain.busy; if (st.flora) n += st.flora.busy; if (st.near) n += st.near.busy; }
     return n;
   }
 
