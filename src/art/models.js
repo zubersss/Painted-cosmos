@@ -291,7 +291,9 @@ export function createExplorer() {
       if (F) {
         // two bones to the boot: the swinging leg folds (the heel comes up toward the hip, most at a run), so
         // that a run's flight reads in the knee
-        const up = F.down ? 0 : Math.min(0.42, Math.max(0, F.up || 0) * (2.2 + 2.2 * w.run));
+        // (the heel is drawn up to about the other knee at a run: PHYSICS' lift is the foot's clearance, 0.18 m at 4.2 m/s;
+        // four times it, as first written, knelt in the air)
+        const up = F.down ? 0 : Math.min(0.30, Math.max(0, F.up || 0) * (1.4 + 1.3 * w.run));
         const dz = (F.fwd || 0) - surge, dy = Math.max(0.1, hipY - up);
         const D = Math.max(0.14, Math.min(L1 + L2 - 0.003, Math.hypot(dz, dy)));
         const knee = Math.PI - Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - D * D) / (2 * L1 * L2))));

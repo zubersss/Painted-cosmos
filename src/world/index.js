@@ -151,9 +151,9 @@ export function createWorld(scene) {
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)
       draw.leaves = { ...D.leaves, size: 0.27, minPx: 10 };
-      // (spray as flecks of 4 px was a glitter over the surf: a soft pale blot a third of a metre wide, never under 9 px,
+      // (spray as flecks of 4 px was a glitter over the surf: a soft pale blot half a metre wide, never under 14 px,
       // so that the drops off a crest run together into a wisp, and a storm's spray is told from its rain)
-      draw.spray = { ...D.spray, width: 0.34, exposure: 0.05, maxLen: 0.9, minPx: 9 };
+      draw.spray = { ...D.spray, width: 0.5, exposure: 0.05, maxLen: 1.0, minPx: 14 };
       kits = K.createPhysicsKits(P, { makeMaterial: (kind, info) => makeKitMaterial(kind, info, { shapeGlsl: K.SHAPE_GLSL }), weather: { draw } });
       for (const o of kits.objects) if (o.material && o.material.userData.pcGlaze && !GLAZES.includes(o)) GLAZES.push(o);
     }).catch((e) => console.warn('weather kits not available: ' + e.message));

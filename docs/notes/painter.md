@@ -163,9 +163,30 @@ Earth spawn storm, clock 160 to 170 s, gust front 149 s.)
   sun's glints go under a closed sky (`1 - 0.9 uWx.x`); in a sea running high (Hs 0.5 to 2 m)
   white horses are laid beyond 10 m whether or not the waves under them are drawn.
 - *Spray* (`kitmat.js` `spume`, `index.js` draw table): a soft pale blot broken where the
-  brush lifted, 0.34 m wide and never under 9 px (was a 4 px fleck): the drops off a crest run
-  together into a wisp, told from the rain's long grey strokes (seen in the strip: one soft
-  pale blot over the bay where there had been a cluster of specks).
+  brush lifted (was a 4 px fleck), told from the rain's long grey strokes. Seen at 0.34 m and
+  9 px (scratch `m10/ns5`, zoomed and opened): soft white touches of 4 to 6 output pixels in
+  clusters over the bay, no longer hard specks, but still small; then set to 0.5 m, 14 px and a
+  fainter wash so that a cluster runs together into a wisp: **that last step is not seen**.
+- *Far white horses* (the far-sea strokes): a white horse's band is at least two pixels deep
+  (`fwidth(q)`); seen across the water it was a tenth of a pixel tall.
+
+**Verdicts, item 1** (blunt):
+- Arrival and fill: **pass**. The land comes up as one over 1.2 s after a second of paper;
+  nothing pops, nothing arrives late; soft, never a stipple.
+- Walk: **pass**. No tier change, hole or doubling in 48 frames (every flagged block +0
+  triangles); near strokes stay put. Weak: a step on the meadow raises a pale round puff at
+  the boot (PHYSICS' dust puff in my `puff` mark) that appears in one frame.
+- Neptune's sea: **heaves and runs up: pass**; the swash lace is alive. **White horses: weak.**
+  The near and middle water still shows no torn white crests (the near crests need PHYSICS'
+  whitecap cover and the wave detail the brush keeps; the gale term I added is gated by Hs
+  and was not seen to fire at the stand, whose bay is sheltered); what reads as white on the
+  bay is the spray.
+- The pale forms in Neptune's sky: **found and fixed** (shared code, `index.js`): storm mist
+  is grey and the low sky takes it. The straight vertical end of the near headland stays (a
+  terrain form).
+- Weather marks: leaves, rain, rings **pass**; dust storm now veils the figure **(fixed)**, no
+  flicker near the lens **(pass)**; spray softened **(partly seen)**; the walker's track not
+  seen (no walk was filmed in the weather); blizzard's ruled crest **weak, not touched**.
 
 ## M3 block 6: each world's idea in its first view, motion faults, orbit (eighth PAINTER agent)
 
