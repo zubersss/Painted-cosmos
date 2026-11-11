@@ -86,7 +86,9 @@ top tier; mechanics runs may pin a low tier (say which).
 3. The Moon boulder run in the game: no boulder lifts the feet more than 0.16 m; one run off a
    crater rim sails 2.4 s (for PHYSICS).
 4. The motion set, first measurements (REVIEW has the table and nine findings).
-5. The first ten minutes: see the record below.
+5. The first ten minutes at the top tier (the opening) and at quality 0 (the whole leg):
+   three things fixed (the prompt across the legs, "Land here" at lift-off, a word about the
+   map), no camera cut anywhere; PHYSICS' questions on feel answered from the game.
 6. From the relays: settle counted in frames; README says what each tier draws; sound for
    `here.blown`; `tour --first`; two tries alone for a failed unit file.
 
@@ -106,7 +108,9 @@ top tier; mechanics runs may pin a low tier (say which).
    more boulders on Venus, Mercury, Pluto, Uranus, a 15 m clearing at every spawn that is not
    a forest): `node tests/grandtour.mjs` (all eight) and `--bodies moon,pluto --from earth`,
    `tests/trip.mjs`, the contract and walk tests (inside `all.mjs`); say what changed.
-2. *Open findings of mine* (REVIEW, "Before review 6"): none is a MUST FIX yet. The measure
+2. *Open findings of mine* (REVIEW, "Before review 6", items 10 to 14: crowns between the
+   lens and the figure, the quiet first view, the 66 s first pulse, the HUD at 400 px, the
+   unheard sound): none is a MUST FIX yet. The measure
    for boulders should read "never thrown up more than 0.3 m and no boulder lifts the feet
    more than 0.3 m" unless PHYSICS rules that a crater rim must be held.
 3. *The UI*: at 400 px wide the sketch slip runs off the right edge; PAINTER has still not
@@ -204,6 +208,24 @@ top tier; mechanics runs may pin a low tier (say which).
    sand in a gale" (peak -10.7 dBFS) and "a breaking sea in a gale" (-6.6 dBFS) and
    "everything at once" stays at -5.6 dBFS: PASSED (no clipping, no clicks, no DC). Nobody
    has heard them.
+6. **The first ten minutes** (`grandtour --bodies mars --beats 1`). Top tier, 960x540: only
+   the opening (title, the card lifting, first view, three seconds later, walking, jetpack),
+   stopped after 25 minutes: a top-tier frame takes about 15 s here. Quality 0: the whole
+   leg, 26 beats, 202 s of play, PASSED. Findings and fixes are in REVIEW ("The first ten
+   minutes"); fixed: the prompt lay across the explorer's legs (HUD class `pc-foot3`:
+   prompt, gauge and notice go under the feet on foot in third person), "Land here" three
+   seconds after lift-off (`_offClear`, `_offT` in `Sim.view`; test in `pulse.test.mjs`), no
+   word about the map on reaching space (one line, once: `_saidMap`). Camera: no cut through
+   thirteen changes of state (1.7 degrees a frame at most, 8 in the boarding blend). Frames
+   `docs/shots/pilot/first10-*.jpg`, record `docs/lead/evidence/first10.json`.
+7. **PHYSICS' P11 relay.** Measured in my `Sim` on the real ground (scratch `run5/feel.mjs`):
+   the run reaches 7.48 m/s at 1.23 s and stops in 0.77 s over 2.49 m; the jetpack climbs at
+   8.4 m/s at most (my cap), 2.5 s of Space is an apex of 22.7 m, the whole tank 54 m,
+   touch-down 4.0 m/s; the ship comes down the last 2.2 m in 1.5 s with no stall (and in the
+   browser: `motion.mjs --only landing`, heights in `motion.json`). The explorer model gets
+   `hip`, `clamber01`, `grounded` in `animate` (PAINTER's figure does not read them yet).
+   The wind's sound is eased over 0.4 s already. All eight motion rows were shot before P11:
+   re-shoot at review 6.
 
 ## Status
 
@@ -818,6 +840,26 @@ Second PILOT agent:
 - The stylesheet is `src/ui/theme.css`; `src/art/ui.css` and `painter.setMarks` are not needed.
 
 ## Needs from the other
+
+### Before review 6 (fifth PILOT agent, 2026-11-11; evidence in `docs/lead/REVIEW.md`, "Before review 6")
+
+From PAINTER:
+1. Arrival: the canopy appears in one frame and the ground in pieces for a second
+   (`motion-fill.jpg`): a wash-in, or nothing shown until the near field is whole.
+2. Tier changes in one frame (walk, flight, one dab in a turn); a near poppy is a flat
+   hard-edged disc; one crown re-deals its dabs in a single frame.
+3. Leaves between the lens and the figure when jetpacking among trees (`first10-jetpack.jpg`):
+   thin them near the lens, or give me a crown radius in `sampleObstacles` (additive).
+4. Read `hip` (m, negative while the legs are folded), `clamber01` and `grounded` in the
+   explorer's `animate` for the landing crouch (I pass them now), and a crouch before a jump.
+
+From PHYSICS:
+1. Splash rings are thin white line ellipses that appear whole in one frame (`motion-storm.jpg`).
+2. Rule on the crater rim: a run sails 2.4 s off a 36 degree wall on the Moon
+   (`boulderrun-moon.json`); and the +1.06 m/s after a step off a 0.72 m boulder (`run5/trace.mjs`).
+3. Your ship-descent stall is not in the game's landing (heights per frame in `motion.json`,
+   scene `landing`); if your lab still shows it, it is the lab's ship or ground effect.
+
 
 ### After review 5 (third PILOT agent; details and evidence in `docs/lead/REVIEW.md`)
 

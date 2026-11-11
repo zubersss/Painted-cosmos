@@ -143,6 +143,82 @@ tallest 1.09 m), Shift+W in four headings for 12 s each, 30 steps a second, qual
    falling ground, 1.4 s in the air. Under the limit as a throw, over it as feet over
    ground; it looks like a rebound of the hips after a step down.
 
+### The first ten minutes, as a new player (`node tests/grandtour.mjs --bodies mars --beats 1`)
+
+Played twice from the title card with real keys and mouse. **At the top tier** (960x540,
+PAINTER `4c2cf51`, PHYSICS `2c6b25b`) only the opening: a top-tier frame takes about 15 s
+here and the clock moves a quarter second a frame, so the run was stopped after the jetpack
+(six beats in 25 minutes; frames `docs/shots/pilot/first10-*.jpg`, all opened). **At quality
+0** (400x225, PHYSICS `6d588d6`) the whole first leg, title card to standing on Mars: 26
+beats, 202 s of play, PASSED; what the screen said at each beat and the camera at every
+frame are in `docs/lead/evidence/first10.json` (four of its frames opened: at the ship, airborne, space, the pulse).
+
+**GOOD**
+- At "click to begin" the picture is whole: the sward beside the card has its blades and
+  flowers, `world.busy` is 0, and the first view three seconds later is the same picture
+  (nothing fills in after the card lifts; the sketch slip fades in, it does not pop).
+- **No cut anywhere.** Through all thirteen changes of state and view (boarding, lift-off,
+  space, pulse on and off, the air of Mars, landing, stepping out) the camera never turns
+  more than 1.7 degrees in a frame, except the blend into the ship (8 degrees in a 0.37 s
+  frame, 22 degrees a second, as designed); the field of view never jumps more than 1.7.
+- The pulse says what it is doing ("Mars 442.8 km 74 s") and the drive lets go with "Mars
+  ahead"; the thin air of Mars is explained when it matters; landing took one E.
+
+**Fixed (mine), best first**
+1. "[E] Board ship" lay across the explorer's legs (`first10-walking-before.jpg`): on foot in
+   third person the prompt, the gauge and the notices sat where the figure stands. They now
+   lie under the feet (`first10-at-the-ship-after.jpg`, opened).
+2. Three seconds after the first lift-off, a metre over the ground it had just left, the
+   screen offered "Land here". It is now offered once the ship has been 12 m clear or eight
+   seconds have passed (E lands all the same; unit test).
+3. On reaching space for the first time the only words were "Pulse to Pluto" (the nose
+   happened to be on it). The screen now says once "M opens the map: choose a world, point
+   the nose at its mark, press F".
+4. (From the Moon leg) "Moon is in the way" at arrival at the Moon: fixed, with a test.
+
+**Open**
+10. **PAINTER and PILOT: leaves between the lens and the figure.** Jetpacking up 15 m among
+    the birches, crowns stand between the camera and the explorer as large flat light-green
+    shapes with hard edges and hide half the figure (`first10-jetpack.jpg`). The boom knows
+    trunks, not crowns. Either the foliage near the lens thins to a wash (PAINTER) or the
+    boom needs a crown radius from `sampleObstacles` (additive) to shorten against (mine).
+    Say which in your notes.
+11. PILOT: the hint at the top ("click the picture to look around with the mouse") stays
+    until the player has looked round once; nothing in the first view says that the ship is
+    theirs or that it is the way on ("Board ship" appears only beside it). Not changed: the
+    brief wants a quiet screen; to be looked at with the owner's eyes.
+12. PILOT: the first pulse, to the nearest planet, is 66 s of holding a course (Pluto from
+    the Moon 120 s). The countdown is on the screen; the pace is the fourth agent's open
+    item ("pulse profile").
+13. PILOT: at 400 px wide the read-out, the prompt and the throttle gauge overlap (the HUD
+    is sized in pixels): small windows only.
+14. Nobody heard any of it: whether a sound starts or stops abruptly at these changes is
+    not known (the sound check measures levels and clicks in isolation).
+
+### PHYSICS' questions on feel, answered from the game (PILOT's `Sim`, real ground, Earth spawn, PHYSICS `6d588d6`; scratch `run5/feel.mjs`)
+
+- *The run*: 4.74 m/s at 0.5 s, **7.48 m/s at 1.23 s**, then 7.4 to 7.5: the asked speed is
+  reached. Stop from 7.5 m/s in 0.77 s over 2.49 m; the walk is 4.2 m/s within a second.
+  Good as it is. (6.1 m/s in the lab is the lab's ground or command, not the game's.)
+- *The jetpack*: the game's wrapper holds the climb to 8.4 m/s: Space for 1 s is an apex of
+  9.7 m, **2.5 s is 22.7 m** (58 % of the fuel left), the whole tank 54 m, and every fall
+  touches down at 4.0 m/s. That is what I want on Earth: over the canopy in one hop, never
+  out of sight of where you stood. (49 m from 2.5 s is the body without my cap.)
+- *The ship's last metres*: no stall in the game. From 2.2 m to the ground in 1.5 s, slowing
+  evenly (2.5, 2.0, 1.6, 1.3, 1.0, 0.8 m/s through the bands; 0.18 s between 1.3 and 1.0 m).
+  The same in the browser at 30 steps a second: `node tests/motion.mjs --only landing`
+  keeps the height at every frame (`motion.json`, `meta[].alt`): 1.99 m to 0 in 44 frames,
+  no plateau. My landing logic does not hold the ship there.
+- *The landing crouch*: the explorer model is handed `hip`, `clamber01` and `grounded` in
+  `animate` (additive); PAINTER's figure does not read them yet. A crouch before a jump
+  needs the same from PAINTER.
+- *Wind sound*: the level follows the wind through a 0.4 s ease (the filter 0.5 s), so the
+  faster gusts do not flutter it.
+
+**Shot before PHYSICS' P11** (`05856b9`: grass near the eye flutters, trunks lean a third as
+far, gusts three times as fast): every motion row above. The still and storm rows and
+finding 4 are to be re-shot at review 6 before anyone acts on them.
+
 ### What the unit tests could not see
 
 9. **A shader that did not compile was accepted** (closed). On PAINTER `23dea80` the
