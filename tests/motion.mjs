@@ -15,6 +15,8 @@
 //                 than 3 % between consecutive frames) and the shower-door measure (R-PAINT-2).
 //   walk          W held through the home forest.
 //   flight        the ship low over the wood (about 40 m up, 35 m/s).
+//   landing       the last two metres of a landing (the ship's height at every frame is kept).
+//   fill          an arrival: the first frames at a place nobody has painted yet.
 //   pulse         the pulse drive from high above Earth towards another world.
 //   storm         the first thunderstorm at the Earth spawn (clock 240 s), standing.
 //
@@ -74,6 +76,7 @@ const SCENES = [
   { id: 'walk', what: 'walking through the home forest (W held)', place: 'spawn', stay: true, t: 30, frames: 48, keys: ['KeyW'], lead: 12 },
   { id: 'storm', what: 'the first thunderstorm at the Earth spawn (clock 240 s), standing still', place: 'spawn', stay: true, t: 240, pre: 4, frames: 30 },
   { id: 'flight', what: 'the ship low over the wood', place: 'spawn', t: 30, frames: 48, ship: { altitude: 40, speed: 35, throttle: 0.5 }, lead: 6 },
+  { id: 'landing', what: 'the last two metres of a landing at the Earth spawn (E pressed in a hover 8 m up)', place: 'spawn', t: 30, frames: 90, ship: { altitude: 8, speed: 0, throttle: 0 }, land: 2.2 },
   { id: 'fill', what: 'arriving on foot 600 m east of the spawn: the first frames, while the land is still being painted', place: 'east', t: 30, frames: 30, noSettle: true },
   { id: 'pulse', what: 'the pulse drive, from high above Earth', frames: 30, pulse: ['mars', 'venus', 'jupiter', 'saturn', 'mercury'] },
 ];
@@ -148,6 +151,15 @@ try {
         sim.sh.v = { x: f.x * sp.speed, y: f.y * sp.speed, z: f.z * sp.speed };
         sim.sh.throttle = sp.throttle;
       }, s.ship);
+    }
+    if (s.land) {
+      // E in a hover; the frames begin when the gear is `land` metres over the ground. Every
+      // frame's height is in motion.json (meta[].alt): a descent that stalls shows there.
+      await step(15);
+      await page.keyboard.press('KeyE');
+      let i = null;
+      for (let n = 0; n < 150; n++) { await step(6); i = await info(); if (i.state === 'LANDED' || (i.state === 'LANDING' && i.ship.altGround < s.land)) break; }
+      note.push(`the frames begin in ${i.state}${i.ship.landing ? ' (' + i.ship.landing + ')' : ''}, ${i.ship.altGround.toFixed(2)} m over the ground` + (i.notice ? `; the screen said "${i.notice}"` : ''));
     }
     if (s.pulse) {
       let on = null;

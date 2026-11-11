@@ -140,6 +140,12 @@ export class Game {
       exObj.quaternion.set(ep.q.x, ep.q.y, ep.q.z, ep.q.w);
       this.explorerModel.animate({
         mode: sim.ex.mode, speed: sim.ex.speed, jet01: sim.ex.jet01, lookPitch: sim.footCam.pitch,
+        // Additive, for a figure that can show them (PHYSICS' legs): how far the hips ride off
+        // their standing height (m; negative while the legs are folded: the half second after a
+        // landing, a clamber), how hard the body is clambering, and whether the feet are down.
+        hip: sim.ex.phys && Number.isFinite(sim.ex.phys.hip) ? sim.ex.phys.hip : 0,
+        clamber01: sim.ex.phys && Number.isFinite(sim.ex.phys.clamber01) ? sim.ex.phys.clamber01 : 0,
+        grounded: !!sim.ex.grounded,
       }, dt);
     }
 

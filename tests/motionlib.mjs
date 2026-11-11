@@ -37,7 +37,7 @@ export function installInPage([FW, FH, canvasSelector]) {
     if (pc && pc.sim && !given) {
       const sim = pc.sim, st = pc.game.stats, e = pc.camera.matrixWorld.elements;
       const onFoot = sim.sm.state === 'ON_FOOT', p = onFoot ? sim.ex.p : sim.sh.p;
-      meta = { t: +sim.t.toFixed(3), state: sim.sm.state, tris: st.tris, calls: st.calls, busy: pc.world.busy == null ? null : pc.world.busy, dir: [-e[8], -e[9], -e[10]], p: [p.x, p.y, p.z], speed: onFoot ? sim.ex.speed : sim.sh.speed };
+      meta = { t: +sim.t.toFixed(3), state: sim.sm.state, tris: st.tris, calls: st.calls, busy: pc.world.busy == null ? null : pc.world.busy, dir: [-e[8], -e[9], -e[10]], p: [p.x, p.y, p.z], speed: onFoot ? sim.ex.speed : sim.sh.speed, alt: onFoot ? sim.ex.altitude : sim.sh.altGround };
     }
     M.frames.push({ L, url: full.toDataURL('image/jpeg', 0.9), meta });
     return M.frames.length;
@@ -172,7 +172,7 @@ export function installInPage([FW, FH, canvasSelector]) {
     for (let i = 0; i < N; i++) meanChange[i] /= pairs.length || 1;
     const wd = new Float32Array(N), wa = F[worstPair].L, wb = F[Math.min(n - 1, worstPair + 1)].L;
     for (let i = 0; i < N; i++) wd[i] = Math.abs(wb[i] - wa[i]);
-    return { summary, pairs, pops, meta: F.map((f) => ({ t: f.meta.t, state: f.meta.state, tris: f.meta.tris, calls: f.meta.calls, busy: f.meta.busy, speed: r2(f.meta.speed || 0) })), changeMap: toUrl(meanChange, 10), worstDiff: toUrl(wd, 8) };
+    return { summary, pairs, pops, meta: F.map((f) => ({ t: f.meta.t, state: f.meta.state, tris: f.meta.tris, calls: f.meta.calls, busy: f.meta.busy, speed: r2(f.meta.speed || 0), alt: f.meta.alt == null ? null : r3(f.meta.alt) })), changeMap: toUrl(meanChange, 10), worstDiff: toUrl(wd, 8) };
   };
   window.__motion = M;
 }
