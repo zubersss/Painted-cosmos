@@ -128,8 +128,18 @@ a second). `physics.update` was not touched and not re-measured. No timing test 
    applying `pcPhysBranch` in a stand-in crown. Leaves: `PARTICLES.capacity.leaves` is [80, 260, 600] and a leaf's
    `size` is its real 4 to 6 cm: 190 leaves round the focus are about ten in view, 3 px each at 10 m. Next: five
    to ten times the count in a gale, and a mark that stands for a spray of leaves (see For PAINTER).
-2. *Item 4, the Earth shore*: `shore-earth` exists as a subject and was not run or opened; a breeze and a calm
-   variant are to be added (`--q` with a time of stronger wind) and judged.
+2. *Item 4, the Earth shore*: half done. `shore-earth` (a calm: Hs 0.37 m, 3.4 m waves, not breaking; the water
+   8 m out moving +-0.09 m, 22 m out +-0.12 m) was rendered from the export of `1186819` with my files and OPENED
+   (`motion-shore-earth.jpg`): from 4 m up a sand beach, looking along the shore, a white foam rim lies along the
+   water's edge and **the edge is in the same place in all 24 frames (6 s)**; the rim swells and thins a little
+   with a period near 3 s (brighter and broader at 0 to 1 s and 2.5 to 3.5 s) and the dark patches of the water
+   shift, but nothing runs up the sand and nothing drains back. In that export PAINTER's shaders do not use
+   `pcPhysWaterRunup` or `pcPhysWaterLong` (PAINTER's uncommitted `src/render/materials.js` in the working tree now
+   names them), so this is the shore BEFORE the run-up is drawn. What it should show there: on a 0.07 beach the
+   edge travelling about 0.8 m up and back (Stockdon: swing 0.75 x slope x sqrt(H L) = 6 cm of height) in the long
+   train's period. To do: re-film when PAINTER's wiring is committed; a breeze (the subject takes `--q "t=..."` for
+   a time of stronger wind); the probe's `runup` and `swash` columns print null (the probe does not reach
+   `fields.water.runup`): fix it so the strip carries the edge's travel in numbers.
 3. The lab's hull does not show `buffetAngle`; `explorer-jet`, `ship-hover`, `clamber-run-moon` not re-filmed.
 4. The stand-in's legs are sticks: no knee, so a flight phase does not read as one. A knee that folds in the swing
    (heel toward the hip) would show it; that belongs to whoever draws the figure.
