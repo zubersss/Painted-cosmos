@@ -134,7 +134,7 @@ process.exit(failed ? 1 : 0);
 // seconds it took, or null when the limit ran out first.
 // Settled is judged in game frames (--settle-frames), with --settle seconds as the safety net:
 // a top-tier frame takes seconds in software rendering, and that is the machine, not the game.
-let lastSettle = { frames: 0 };
+var lastSettle = { frames: 0 };      // var: the run above (top-level await) calls settle() before this line is reached
 async function settle() {
   lastSettle = await settleWorld(page, { maxFrames: Number(opt['settle-frames']), maxSeconds: SETTLE });
   return lastSettle.ok ? lastSettle.seconds : null;
