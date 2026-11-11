@@ -271,7 +271,8 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   70 unit tests; scripted play-through passes on the stubs and inside PAINTER's forest with no
   console errors). **PAINTER's half: open**, three MUST FIX in `docs/lead/REVIEW.md` review 1.
   The coordinator looked at the frames itself and upholds all three (see next lines).
-- 2026-11-11: **Frame budget (PILOT's call, performance; upheld):** in the densest view at most
+- 2026-11-11: **Frame budget (PILOT's call, performance; upheld; the triangle and draw-call
+  parts were ABOLISHED BY THE OWNER later the same day, see the end of this section):** in the densest view at most
   600 k triangles and 350 draw calls at quality 1, 300 k at quality 0, 1.2 M at quality 2;
   `world.update` at most 5 ms a frame, `physics.update` at most 2 ms a frame, both as a worst
   frame, not an average. Measured by PILOT's frame-cost probe.
@@ -753,3 +754,27 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   old weather start: stale probe or real fault, each one; (3) the racing gust pattern; (4)
   as capacity allows: spray off the sea in a gale, softer dust walls for PAINTER, the
   instanced kit path, flake crawl; the Neptune lab frame re-shot and opened.
+- 2026-11-11: **OWNER'S INSTRUCTION: no triangle budget; the best possible quality.** In the
+  owner's words: "Why is there a budget for triangles get rid of that your making the best
+  possible quality gamd use your limits and try to pass then". This overrides PILOT's frame
+  budget and every ruling of mine that rests on it. From now on:
+  1. **No count of triangles or draw calls is a gate, a MUST FIX or a reason to trim**, for
+     the scene at any tier or for PHYSICS's draw kits (the 600 k / 350, 300 k, 1.2 M and
+     12 calls / 60 k figures are void). The M3 MUST FIX on the Earth forest vista is
+     withdrawn. `tests/cost.mjs` reports numbers and fails only on a console error.
+  2. **Quality is the aim and each role pushes past what it thought was its limit.** The top
+     quality tier is authored for the best picture with no cap, and it is the tier the look
+     is judged at. Anything that was thinned, shortened or handed over early to pay for the
+     budget is restored where the fuller version is the better painting (PAINTER's `TRIM` of
+     tree tiers, the 6400-stroke cap of the near ground, the density and draw distance of
+     flora and props, the fineness of terrain, the internal resolution), and then taken
+     further. A saving that costs the picture nothing (not drawing what cannot be seen) stays.
+  3. **The game starts at the best tier and at full resolution** and steps down by itself
+     only when the measured frame rate asks for it (the tiers and dynamic resolution stay, as
+     the brief's "perf tiers": they are how a weak machine still plays, and they now carry
+     the brief's frame-rate line on their own). PILOT owns that controller.
+  4. What stays, because it is smoothness and not a triangle count: `world.update` and
+     `physics.update` are still measured as worst frames (5 ms and 2 ms at real frame rates)
+     and reported; a role that needs more for a better result says so and takes it.
+  5. The cost to us: software rendering here is slower with fuller scenes. Mechanics may be
+     checked at a lower tier; the look is judged at the top tier.
