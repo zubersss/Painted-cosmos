@@ -8,6 +8,14 @@
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
 
+// Physical hints per kit for PHYSICS (C14): model height in metres before the instance scale,
+// and stiffness (0 = bends like grass, 1 = a tree).
+export const FLORA_PHYS = {
+  grass: { height: 0.5, stiffness: 0 }, reed: { height: 1.4, stiffness: 0.05 }, fern: { height: 0.6, stiffness: 0.05 },
+  flower: { height: 0.58, stiffness: 0 }, bush: { height: 1.3, stiffness: 0.35 },
+  birch: { height: 13, stiffness: 1 }, pine: { height: 18, stiffness: 1 }, farTree: { height: 1, stiffness: 1 },
+};
+
 class Builder {
   constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; }
   get count() { return this.p.length / 3; }

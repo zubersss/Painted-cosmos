@@ -78,6 +78,8 @@ test('earth spawn is dry, flat, in the temperate forest, near the stream', () =>
   S.sample(sp.x, sp.y, sp.z, o, true);
   assert.ok(o.s < 25, 'stream distance ' + o.s);
   assert.ok(o.trees < 0.05, 'the landing clearing has no trees');
+  assert.equal(s.canopyHeight, 0);
+  assert.ok(s.canopy01 >= 0 && s.canopy01 < 0.5);
   // water really is within 30 m
   let ux = -sp.z, uz = sp.x; const l = Math.hypot(ux, uz); ux /= l; uz /= l;
   const vx = sp.y * uz, vy = sp.z * ux - sp.x * uz, vz = -sp.y * ux;

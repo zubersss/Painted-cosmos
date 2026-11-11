@@ -110,7 +110,7 @@ export function createWorld(scene) {
       st.terrain.detail = isActive;
       // one shared time budget per frame: terrain first, flora with what is left
       const tb = performance.now();
-      st.terrain.update(st.camLocal, isActive ? budgetMs : 0);
+      st.terrain.update(st.camLocal, isActive ? budgetMs * 0.8 : 0);
       if (isActive) { const tt = performance.now() - tb; if (tt > prof.terrain) prof.terrain = tt; }
       if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, budgetMs - (performance.now() - tb)) : 0);
       if (!isActive) {

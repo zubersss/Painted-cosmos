@@ -492,6 +492,7 @@ export function sampleSurfacePure(bodyId, dx, dy, dz) {
   const R = S.R, h = o.h, lq = o.lq;
   // tallest thing likely to stand here (0 on open ground): tree tops, for flying over them
   const canopyHeight = S.hasFlora ? 24 * smoothstep(0.03, 0.30, o.trees) : 0;
+  const canopy01 = S.hasFlora ? clamp(o.canopy, 0, 1) : 0;   // closed-canopy fraction (0 in a glade)
   const weights = {};
   for (let i = 0; i < S.nB; i++) if (o.w[i] > 0.0005) weights[S.biomes[i].id] = o.w[i];
   const biomeId = S.biomes[o.top].id;
@@ -511,7 +512,7 @@ export function sampleSurfacePure(bodyId, dx, dy, dz) {
   const liquidRadius = (lq !== NOLQ && lq > h) ? R + lq : 0;
   return {
     radius, normal: { x: nx, y: ny, z: nz }, biomeId, biomeWeights: weights,
-    isLiquid: liquidRadius > radius, slope: Math.acos(cosS), liquidRadius, canopyHeight,
+    isLiquid: liquidRadius > radius, slope: Math.acos(cosS), liquidRadius, canopyHeight, canopy01,
   };
 }
 
