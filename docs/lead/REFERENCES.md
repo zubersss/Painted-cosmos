@@ -444,7 +444,9 @@ Checks
 - `R-PAINT-7` Everything is painted: explorer, ship, HUD, cursor, loading (art bible 8).
 - `R-PAINT-8` Cost: the pipeline holds 60 fps at 1080p on an integrated GPU with render scale
   no lower than 0.6 at quality 1. Not measurable in this sandbox: reported as reasoning plus
-  software-GL timings until someone runs it on a real GPU.
+  software-GL timings until someone runs it on a real GPU. There is no triangle or draw-call
+  budget (the owner's instruction, 2026-11-11): the tiers and dynamic resolution carry the frame
+  rate, the game starts at the top tier, and the look is judged at the top tier.
 
 ## 16. Minimal HUD
 

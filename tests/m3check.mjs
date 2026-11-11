@@ -1,4 +1,4 @@
-// Scripted check of the M3 pieces in a real browser: careful starting tier, the look hint, the
+// Scripted check of the M3 pieces in a real browser: best tier first and shed by itself, the look hint, the
 // sketchbook, the help card, a vista found on foot (and saved), and the procedural audio.
 // Usage: node tests/m3check.mjs [--query "stub=render,world,art"] [--root dir] [--keep]
 import { RAD, MOUSE_FOOT, parseArgs, startRun, finish } from './browser.mjs';
@@ -9,7 +9,13 @@ const run = await startRun(opt);
 const { page, check, info, shot, look, gameWait, until } = run;
 try {
   let i = await info();
-  check(i.quality === 1 && i.scale <= 0.76, `starts carefully: tier ${i.quality}, render scale ${i.scale}`);
+  // The game starts at the best picture and comes down only when the frame time asks. Here
+  // (software rendering, seconds per frame at the top tier) it must have come down by itself.
+  const dyn = await page.evaluate(() => ({ ...window.__pc.dyn.start }));
+  check(dyn.quality === 2 && dyn.scale === 1, `starts at the best: tier ${dyn.quality}, render scale ${dyn.scale}`);
+  const down = await page.waitForFunction(() => { const d = window.__pc.dyn; return !d.enabled || d.quality < 2 || d.scale < 0.9 || window.__pc.fps >= 40; }, null, { timeout: 240000, polling: 500 }).then(() => true, () => false);
+  i = await info();
+  check(down, `a slow machine is not left at the top: tier ${i.quality}, render scale ${i.scale}, ${i.fps} frames a second after ${i.frames} frames`);
   let ui = await page.evaluate(() => ({ card: window.__pc.game.hud.startShown, sub: document.querySelector('.pc-sub').textContent, audio: window.__pc.audio.state }));
   check(ui.card, 'the title card is up: "' + ui.sub + '"');
   check(ui.audio === 'off', 'no sound before the first gesture');

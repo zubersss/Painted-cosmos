@@ -1,11 +1,12 @@
-// Frame cost in the game at every quality tier: the lead's instrument for the frame budget.
+// Frame cost in the game at every quality tier: what each view draws, as information.
 // For the dearest frame of each body in the last tour (docs/lead/evidence/tour-<body>.json),
 // plus the Earth spawn, the game is put there in third person as the player arrives (fair
 // weather held, real explorer and ship in the frame), left to settle, and its own counters are
 // read at quality 0, 1 and 2: triangles and draw calls of the whole frame.
-// Budgets (COORDINATOR.md): 300 k triangles at quality 0; 600 k and 350 draw calls at
-// quality 1; 1.2 M at quality 2. Writes docs/lead/evidence/cost.json and prints a table.
-// A frame over its budget makes the exit code 1 (so does any console error).
+// There is no triangle or draw-call budget (the owner's instruction, COORDINATOR.md section E,
+// 2026-11-11: the best possible quality; the frame rate is held by the tiers and dynamic
+// resolution, not by a count). This reports the numbers; only a console error fails it.
+// Writes docs/lead/evidence/cost.json and prints a table.
 //
 // Usage: node tests/cost.mjs [--root dir] [--qualities 0,1,2] [--bodies earth,mars]
 //                            [--places "earth:vista:temperate_forest-1,mars:biome:rust_canyons"]
@@ -18,7 +19,6 @@ import { openPage } from '../tools/shot.mjs';
 
 const opt = parseArgs({ w: 960, h: 540, qualities: '0,1,2', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto', places: '', shoot: '', shots: '/home/user/.pc-scratch/pilot/cost', label: '' });
 const sheets = opt.sheets || path.join(repo, 'docs/lead/evidence');
-const BUDGET = { 0: { tris: 300e3, calls: Infinity }, 1: { tris: 600e3, calls: 350 }, 2: { tris: 1.2e6, calls: Infinity } };
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 fs.mkdirSync(opt.shots, { recursive: true });
 
@@ -64,14 +64,11 @@ try {
       const settled = await page.evaluate((s) => Promise.race([window.__pc.settle(10), new Promise((r) => setTimeout(() => r(false), s * 1000))]), 150);
       await page.waitForTimeout(900);
       const m = await page.evaluate(() => { const pc = window.__pc, x = pc.info(); return { tris: x.stats.tris, calls: x.stats.calls, quality: pc.dyn.quality, busy: pc.world.busy, tight: +(pc.sim.footCam.tight01 || 0).toFixed(2), boom: +pc.sim.footCam.boomNow.toFixed(2), shown: pc.sim.explorerVisible() }; });
-      const b = BUDGET[q] || BUDGET[1];
-      const over = m.tris > b.tris || m.calls > b.calls;
       const tag = `${pl.body}:${pl.kind}:${pl.id}`;
       if (q === 1 && shoot.has(tag)) await page.screenshot({ path: path.join(opt.shots, tag.replace(/:/g, '-') + '.jpg'), type: 'jpeg', quality: 86, timeout: 600000 });
-      rows.push({ place: tag, quality: q, tris: m.tris, calls: m.calls, over, settled: settled === true, boom: m.boom, tight01: m.tight, explorerShown: m.shown });
-      if (over) failed = true;
-      log(`q${q} ${tag}: ${Math.round(m.tris / 1000)} k tris, ${m.calls} calls${over ? '  OVER BUDGET (' + Math.round(b.tris / 1000) + ' k' + (Number.isFinite(b.calls) ? ', ' + b.calls : '') + ')' : ''}${settled === true ? '' : '  NOT SETTLED'}, boom ${m.boom} m${m.tight ? ', view slid ' + Math.round(m.tight * 100) + ' % into the eyes' : ''} (${Math.round((Date.now() - t0) / 1000)} s)`);
-      fs.writeFileSync(path.join(sheets, 'cost.json'), JSON.stringify({ label: opt.label || (opt.root ? 'a clean export' : 'the working tree'), size: `${opt.w}x${opt.h}`, weather: 'fair, no kits', budgets: { 0: '300 k', 1: '600 k, 350 calls', 2: '1.2 M' }, rows }, null, 1));
+      rows.push({ place: tag, quality: q, tris: m.tris, calls: m.calls, settled: settled === true, boom: m.boom, tight01: m.tight, explorerShown: m.shown });
+      log(`q${q} ${tag}: ${Math.round(m.tris / 1000)} k tris, ${m.calls} calls${settled === true ? '' : '  NOT SETTLED'}, boom ${m.boom} m${m.tight ? ', view slid ' + Math.round(m.tight * 100) + ' % into the eyes' : ''} (${Math.round((Date.now() - t0) / 1000)} s)`);
+      fs.writeFileSync(path.join(sheets, 'cost.json'), JSON.stringify({ label: opt.label || (opt.root ? 'a clean export' : 'the working tree'), size: `${opt.w}x${opt.h}`, weather: 'fair, no kits', note: 'no budget: numbers are information (owner, 2026-11-11)', rows }, null, 1));
     }
   }
 } catch (e) { failed = true; log('exception:', e && e.stack ? e.stack : e); }
@@ -80,8 +77,8 @@ if (problems.length) { failed = true; log('PROBLEMS:', [...new Set(problems)].sl
 console.log('\nplace'.padEnd(40) + ['q0', 'q1', 'q2'].map((s) => s.padStart(22)).join(''));
 for (const pl of places) {
   const tag = `${pl.body}:${pl.kind}:${pl.id}`;
-  const cell = (q) => { const r = rows.find((x) => x.place === tag && x.quality === q); return (r ? `${Math.round(r.tris / 1000)} k / ${r.calls}${r.over ? ' OVER' : ''}` : '-').padStart(22); };
+  const cell = (q) => { const r = rows.find((x) => x.place === tag && x.quality === q); return (r ? `${Math.round(r.tris / 1000)} k / ${r.calls}` : '-').padStart(22); };
   console.log(tag.padEnd(39) + cell(0) + cell(1) + cell(2));
 }
-log(failed ? 'COST: OVER BUDGET OR FAILED' : 'COST: every frame inside its budget');
+log(failed ? 'COST: FAILED (console errors or an exception)' : 'COST: measured (numbers are information, not limits)');
 process.exit(failed ? 1 : 0);

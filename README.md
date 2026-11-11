@@ -91,23 +91,31 @@ The target is 60 frames a second at 1080p on a laptop's built-in graphics, and n
 **Nobody has measured that on a real machine yet** (see "Never verified on real hardware"
 below), so the game looks after itself and gives you the means to check.
 
-**It tunes itself.** It starts carefully, at the medium quality tier and three-quarter
-resolution, and climbs when the machine has room: the resolution after about two and a half
-seconds of headroom, the quality tier after about twelve seconds at full resolution. When
-frames run slow it sheds resolution first (down to half), and only if that is not enough,
-after three seconds, a quality tier. It never starts at the expensive setting and falls.
+**It picks the best your machine can hold.** The game starts at the best picture it has: the
+high quality tier at full resolution. It gives some of that up only when the measured frame
+time asks for it, and quickly: under 30 frames a second it sheds resolution at once (down to
+half) and, if even that could not reach 30, a quality tier in the same move, so a slow machine
+is not left at a crawl (within about two seconds it is on a setting it can hold). A little
+over budget, the resolution steps down after half a second. It climbs back carefully: one
+small step of resolution after a few steady seconds, a quality tier only after twelve seconds
+at full resolution; a step that does not hold is taken back and tried again less often. It
+does not judge frames while the first view is loading.
 
-**The quality tiers.**
+**The quality tiers.** There is no triangle budget: the high tier is the painting as it is
+meant to be seen, and the lower tiers exist so that a weaker machine still plays.
 
-| Tier | What it draws | Budget in the densest view |
-| --- | --- | --- |
-| 0, low | plants and rocks out to 42 % of the full distance, coarser far terrain, no full trees in the distance and about half the undergrowth, five blades to a grass patch | 300 thousand triangles |
-| 1, medium (the start) | plants out to 82 % of the full distance | 600 thousand triangles, 350 draw calls |
-| 2, high | everything at full distance, the finest terrain | 1.2 million triangles |
+| Tier | What it draws |
+| --- | --- |
+| 2, high (the start) | everything at full distance, the finest terrain |
+| 1, medium | plants and rocks out to a shorter distance |
+| 0, low | plants and rocks nearer still, coarser far terrain, fewer full trees in the distance and less undergrowth |
 
 The painting itself (paper, washes, edges, granulation) is the same in every tier; a lower
 tier has fewer things in it, not a different look. Render scale is separate: at 0.50 the
 picture is painted at half size and enlarged, which softens it a little.
+
+**To pin a tier yourself**, add `?quality=2` (or `1`, or `0`) to the address: the tier then
+stays and only the resolution adapts. `?quality=0&scale=0.5&dynres=0` pins both.
 
 **The read-out.** Press the backquote key `` ` `` (or add `?stats=1` to the address). It shows
 five lines:
@@ -115,22 +123,21 @@ five lines:
 | Line | What it says | What to look for |
 | --- | --- | --- |
 | `frame` | the average frame time in milliseconds, the worst frame of the last ninety, frames a second | 16.7 ms is 60 frames a second; 33 ms is 30 |
-| `scene` | triangles and draw calls of the whole frame (every pass) | inside the tier's budget above |
-| `render scale`, `quality tier` | what the game has settled on; `(pinned)` if the address fixed them | 1.00 and tier 1 or 2 on a machine that copes |
+| `scene` | triangles and draw calls of the whole frame (every pass) | information only: there is no budget |
+| `render scale`, `quality tier` | what the game has settled on; `(pinned)` if the address fixed them | 1.00 and tier 2 on a machine that copes |
 | `world`, `physics` | milliseconds a frame spent building the landscape and stepping the physical models, with their worst recent frame | a few milliseconds each; a long `world` worst is a hitch while new ground is built |
 | `weather` | what the weather's own marks cost (rain, snow, dust, ripples: "kits"), and what the sky is doing | `fair`, or for example `overcast 0.94  rain 0.92  storm 0.84  wet 0.96` |
 
 If `frame` sits above 17 ms with the scale at 0.50 and the tier at 0, the machine cannot hold
-60 frames a second in that view. To pin the settings yourself:
-`?quality=0&scale=0.5&dynres=0` (see the address parameters below).
+60 frames a second in that view.
 
 ## Never verified on real hardware
 
 Everything in this game was built and tested in a sandbox with a software renderer and
 scripted input. These four things have never been checked on a real machine by anyone:
 
-- **Frame rate on a real GPU.** Triangle and draw-call budgets are set and measured, and the
-  dynamic resolution logic is unit-tested, but no frame time has been measured on any graphics
+- **Frame rate on a real GPU.** The logic that steps the tier and the resolution down and up
+  is unit-tested against model machines, but no frame time has been measured on any graphics
   card. The read-out above is there so that you can.
 - **A real mouse under pointer lock.** Mouse look is tested with synthetic events. If the
   browser will not capture the mouse (or reports nonsense while it does), the game says so
@@ -146,7 +153,9 @@ scripted input. These four things have never been checked on a real machine by a
 | `stub=1` | run on Pilot's grey stub world and plain renderer (also `stub=render,world,art`) |
 | `real=1` | try Painter's modules even if they are not flagged ready (also `real=world`, ...) |
 | `body=mars` `time=18` | start on another body, at another local hour |
-| `dynres=0` `scale=0.75` `quality=1` | pin the dynamic resolution controller |
+| `quality=1` | pin the quality tier (0, 1 or 2); the resolution still adapts |
+| `scale=0.75` | the render scale the game starts at |
+| `dynres=0` | switch the controller off: tier and scale stay where the address put them |
 | `pointerlock=0` | never capture the pointer; drag to look |
 | `stats=1` | show the frame read-out from the start |
 | `audio=0` | silence |

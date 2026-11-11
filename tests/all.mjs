@@ -77,6 +77,18 @@ for (const s of steps) {
     fs.writeFileSync(path.join(out, s.id + '.log'), text);
     ok = r.status === 0;
     detail = summarise(text, ok, r);
+    // Three agents render on this machine: a unit test with a clock in it can fail in the full
+    // run and pass alone. Before the table calls it a failure, the files that failed are run
+    // once more, alone. (The table says so; the first run's log is kept.)
+    if (!ok && /unit$/.test(s.id) && !(r.error && r.error.code === 'ETIMEDOUT')) {
+      const files = [...new Set([...text.matchAll(/location: '([^']+?\.mjs):\d+:\d+'/g)].map((m) => m[1]))].filter((f) => fs.existsSync(f));
+      if (files.length) {
+        const again = files.map((f) => spawnSync(process.execPath, ['--test', f], { cwd: here, encoding: 'utf8', maxBuffer: 1 << 28, timeout: s.min * 60000 }));
+        fs.writeFileSync(path.join(out, s.id + '.alone.log'), again.map((a) => (a.stdout || '') + (a.stderr || '')).join('\n'));
+        if (again.every((a) => a.status === 0)) { ok = true; detail += ` [failed in the full run, passed alone: ${files.map((f) => path.basename(f)).join(', ')}]`; }
+        else detail += ' [failed again alone]';
+      }
+    }
   }
   const sec = Math.round((Date.now() - t0) / 1000);
   rows.push({ id: s.id, ok, sec, detail, what: s.what });

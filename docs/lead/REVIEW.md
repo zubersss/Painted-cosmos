@@ -8,6 +8,19 @@ MUST FIX blocks the milestone. Answer each MUST FIX in your own notes ("fixed in
 Everything here was run by me, not taken from anyone's notes. Software GL only: frame rates
 are relative, never a claim about a real GPU.
 
+
+**2026-11-11, the owner's instruction: there is no triangle budget; the best possible quality.**
+(`docs/COORDINATOR.md` section E.) Every finding below that rests on a count of triangles or
+draw calls is **withdrawn by the owner's instruction**: the 600 k / 350 at quality 1, 300 k at
+quality 0 and 1.2 M at quality 2 for the scene, and the 12 calls / 60 k for PHYSICS' kits, are
+no longer limits, gates or reasons to trim. The M3 MUST FIX on the vista
+`earth-temperate_forest-1` is withdrawn. The numbers stay in the reviews as a record of what
+each view drew (history is not rewritten). What is still measured, because it is smoothness
+and not a count: `world.update` and `physics.update` as worst frames. The frame-rate line of
+the brief is carried by the quality tiers and dynamic resolution alone (the game starts at the
+top tier and full resolution and steps down when the measured frame time asks), and the look
+is judged at the top tier from now on.
+
 ---
 
 ## Review 5, addendum: the three MUST FIX re-measured, 2026-11-11, at commit `0de3fb4`
@@ -19,12 +32,12 @@ weather-recheck.jpg` and `.json` (five weather frames), `cost-recheck.json`,
 `space-recheck.jpg` (cockpit above the air, orbit, space with a target, the pulse),
 `player-recheck.jpg` (night on foot, low flight, cockpit in flight, Saturn at dusk).
 
-**Verdict: two of the three are closed. One is left, for PAINTER, by 1.8 %.**
+**Verdict: two of the three are closed. One is left, for PAINTER, by 1.8 %.** *(Withdrawn by the owner's instruction, 2026-11-11: no count of triangles or draw calls is a limit any more; the numbers stay as a record.)*
 
 | MUST FIX | Before (review 5) | Now, on `0de3fb4` | Verdict |
 | --- | --- | --- | --- |
-| PAINTER 1, the budget: vista `earth-temperate_forest-1`, quality 1 | 614 k / 341 | **611 k / 339** (budget 600 k / 350) | **OPEN**: 11 k triangles over |
-| the same vista, quality 0 | 306 k | **304 k** (budget 300 k) | **OPEN**: 4 k over |
+| PAINTER 1, the budget: vista `earth-temperate_forest-1`, quality 1 | 614 k / 341 | **611 k / 339** (budget 600 k / 350) | withdrawn by the owner's instruction (was OPEN: 11 k triangles over) |
+| the same vista, quality 0 | 306 k | **304 k** (budget 300 k) | withdrawn by the owner's instruction (was OPEN: 4 k over) |
 | the storm at the Earth spawn after dark | 606 k / 315 | 550 k / 300 (by day 527 k / 287) | closed |
 | the Earth spawn in fair weather (not a MUST; for scale) | 549 k / 294 | 546 k / 294; quality 0: 272 k | inside |
 | PAINTER 2, pepper in dark washes and space | hard specks in every dark wash | none in the storm sky, Neptune's sky, the night at the spawn, space or the pulse frame, looked at 1:1 | **closed** for the washes (see below for what is left) |
@@ -160,6 +173,7 @@ What I ran, and what came back:
 
 MUST FIX (M3; both carried by the coordinator's ruling when M2 closed)
 
+*(Withdrawn by the owner's instruction, 2026-11-11: no triangle budget; kept as a record.)*
 1. **The frame budget with weather, the real models and the near-ground layer in** (600 k
    triangles and 350 draw calls in the densest view of every body at quality 1, measured in
    the game). **Still open, by a hair, in one view and in one situation**: the vista
@@ -375,6 +389,7 @@ What I ran, and what came back:
 
 MUST FIX (M2)
 
+*(Withdrawn by the owner's instruction, 2026-11-11: no triangle budget; kept as a record.)*
 1. **Earth's first vista is over the frame budget.** Standing at the vista
    `earth-temperate_forest-1` (the easel of the home forest, the first view a new player will
    find) at quality 1, the game submits **645 k triangles and 352 draw calls for the world
@@ -589,6 +604,7 @@ Short pass, during M2. What I ran:
 
 MUST FIX (M2)
 
+*(Withdrawn by the owner's instruction, 2026-11-11: no triangle budget; kept as a record.)*
 1. **Neptune's spawn is over budget: 727 k triangles at quality 1** (`kelp_forests`; budget
    600 k). Every other body is inside it:
 
@@ -752,6 +768,7 @@ What I ran:
 
 MUST FIX (M1: "Earth's temperate forest passes the freeze-frame test")
 
+*(Withdrawn by the owner's instruction, 2026-11-11: no triangle budget; kept as a record.)*
 1. **The forest is far over any frame budget: 4.36 million triangles and 887 draw calls per
    frame standing at the spawn** (quality 1, 480x270; 4.57 M while running; 1.47 M and 262
    calls flying at 120 m; 43 k and 41 calls in orbit). Evidence: frame-cost probe at `19f72ce`;

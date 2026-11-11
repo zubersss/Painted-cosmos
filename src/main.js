@@ -4,7 +4,9 @@
 // URL parameters (all optional):
 //   stub=1 | stub=render,world,art   force stubs        real=1 | real=...   try real modules
 //   body=<id>  time=<hours>          where and when to start
-//   dynres=0   scale=<0.25..1>  quality=<0|1|2>   pin the resolution controller (for screenshots)
+//   quality=<0|1|2>  pin the quality tier;  scale=<0.25..1>  where the resolution starts;
+//   dynres=0   pin both (for screenshots). Without any of them: best tier, full resolution,
+//   and the controller steps down only when the frame rate asks.
 //   pointerlock=0                    drag to look instead of locking the pointer
 //   card=0                           no start card (for captures)
 //   stats=1                          show the frame read-out (also the ` key)
@@ -76,10 +78,15 @@ async function boot() {
   // Resolution: at most 1080p-class output; the controller scales the scene inside that.
   const dyn = new DynamicResolution({
     enabled: params.get('dynres') !== '0',
-    // Start carefully and climb: a weak GPU never sees the expensive setting first. The
-    // controller raises the scale after 2.5 s of headroom and the tier after 12 s at full scale.
-    scale: params.has('scale') ? Number(params.get('scale')) : 0.75,
-    quality: params.has('quality') ? Number(params.get('quality')) : 1,
+    // Start at the best picture (top tier, full resolution) and give some of it up only when
+    // the measured frame time asks: under 30 fps the controller sheds load within a second or
+    // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the
+    // tier (the resolution still adapts); ?scale= chooses where the resolution starts;
+    // ?dynres=0 pins both.
+    scale: params.has('scale') ? Number(params.get('scale')) : 1,
+    quality: params.has('quality') ? Number(params.get('quality')) : 2,
+    minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
+    maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
   });
   const storage = safeStorage();
   const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id) });
@@ -159,6 +166,7 @@ async function boot() {
 
   let last = performance.now();
   let settledFrames = 0;
+  let judged = 0;
   let fpsAcc = 0, fpsN = 0;
   function tick(now) {
     requestAnimationFrame(tick);
@@ -166,7 +174,10 @@ async function boot() {
     last = now;
     if (dtMs <= 0) return;
     game.frame(dtMs / 1000);
-    const r = dyn.frame(dtMs);
+    // The controller judges frames only once the first view is on the paper (loading and the
+    // first settle are not the machine's pace), and not the first second after that.
+    if (window.__pcReady) judged += dtMs / 1000;
+    const r = judged > 1 ? dyn.frame(dtMs) : { changed: false };
     if (r.changed) {
       if (painter.setRenderScale) painter.setRenderScale(r.scale);
       painter.setQuality(r.quality);
@@ -180,6 +191,7 @@ async function boot() {
       settledFrames = settled ? settledFrames + 1 : 0;
       if (settledFrames >= 2 || game.frameCount > 900) {
         window.__pcReady = true;
+        dyn.rest();
         loading.classList.add('pc-done');
         hud.setWaiting(false);
         hud.setStartStatus('click to begin');
