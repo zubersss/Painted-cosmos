@@ -160,3 +160,67 @@ test('earth to mars to saturn on the real worlds, with PHYSICS and the real obst
   console.log('      real-world trip:', JSON.stringify(log), 'physics', physics ? 'on, avg ' + sim.physicsMs.toFixed(2) + ' ms' : 'off',
     'biomes', JSON.stringify(Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)]))));
 });
+
+test('landing anywhere: on every body the assist sets the ship down, it settles, and you can step out and walk', { skip: skipObs }, async () => {
+  const { Sim } = await import('../src/core/sim.js');
+  const { S } = await import('../src/core/state.js');
+  const { Pad, play, len, sub, norm, dot } = await import('./helpers.mjs');
+  let physics = null;
+  try {
+    const P = await import('../src/physics/index.js');
+    physics = P.createPhysics({ sampleSurface: (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z), seed: 1 });
+  } catch { /* still worth doing without it */ }
+  const sim = new Sim({
+    sampleSurface: (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z),
+    getSpawn: (id) => surface.getSurface(id).getSpawn(),
+    sampleObstacles: (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r),
+    physics,
+  });
+  const pad = new Pad();
+  const report = [];
+  // The spawn of every body, and three other places on each (other biomes, maybe liquid).
+  const places = [null, { lat: 35, lon: 120 }, { lat: -20, lon: -60 }, { lat: 62, lon: 10 }];
+  for (const body of BODY_IDS) {
+    for (const where of places) {
+      sim.teleport(where ? { body, ship: true, altitude: 55, ...where } : { body, ship: true, altitude: 55 });
+      play(sim, pad, 0.6);
+      pad.tap('KeyE');
+      play(sim, pad, 0.2);
+      const tag = `${body} ${where ? where.lat + ',' + where.lon : 'spawn'}`;
+      if (sim.sm.state !== S.LANDING) {
+        // Refusing is allowed (nothing nearby will hold the ship) as long as it says so and
+        // the ship is still flying and under control.
+        assert.ok(sim.notice && /steep/i.test(sim.notice.text), tag + ': refused without a word');
+        assert.equal(sim.sm.state, S.ATMOSPHERE);
+        report.push(tag + ': refused (too steep)');
+        continue;
+      }
+      let touch = 0;
+      play(sim, pad, 90, { each: () => { touch = sim.sh.speed; }, until: () => sim.sm.state === S.LANDED });
+      assert.equal(sim.sm.state, S.LANDED, tag + ': landed');
+      assert.ok(touch < 3, `${tag}: touchdown at ${touch.toFixed(2)} m/s`);
+      const p0 = { ...sim.sh.p };
+      play(sim, pad, 5);
+      const moved = len(sub(sim.sh.p, p0));
+      assert.ok(moved < 1.5, `${tag}: the parked ship stayed put (moved ${moved.toFixed(2)} m)`);
+      const q = sim.sh.q, uy = { x: 2 * (q.x * q.y - q.w * q.z), y: 1 - 2 * (q.x * q.x + q.z * q.z), z: 2 * (q.y * q.z + q.w * q.x) };
+      assert.ok(dot(uy, norm(sim.sh.p)) > 0.8, `${tag}: upright (${dot(uy, norm(sim.sh.p)).toFixed(2)})`);
+      pad.tap('KeyE');
+      play(sim, pad, 4, { until: () => sim.sm.state === S.ON_FOOT });
+      assert.equal(sim.sm.state, S.ON_FOOT, tag + ': stepped out');
+      assert.equal(sim.bodyId, body);
+      const e0 = { ...sim.ex.p };
+      pad.press('KeyW');
+      play(sim, pad, 3);
+      pad.release('KeyW');
+      const r = len(sim.ex.p), up = norm(sim.ex.p);
+      const s = surface.sampleSurfacePure(body, up.x, up.y, up.z);
+      assert.ok(r >= s.radius - 0.05 || sim.ex.swimming, `${tag}: on the ground, not under it`);
+      report.push(`${tag}: ${s.biomeId}${sim.sh.onLiquid ? ' (afloat)' : ''}, walked ${len(sub(sim.ex.p, e0)).toFixed(1)} m`);
+    }
+  }
+  const landed = report.filter((x) => !/refused/.test(x)).length;
+  assert.ok(landed >= BODY_IDS.length * 3, `landed at ${landed} of ${report.length} places`);
+  for (const body of BODY_IDS) assert.ok(report.some((x) => x.startsWith(body + ' ') && !/refused/.test(x)), body + ': at least one landing');
+  console.log('      landings:\n        ' + report.join('\n        '));
+});
