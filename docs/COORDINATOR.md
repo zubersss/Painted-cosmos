@@ -883,3 +883,44 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   clearing, and the night storm and night flash all read as watercolours; the blizzard now
   has figure and ground. Flaws for PAINTER: in `earth-arrives` a far world shows as an orange
   dot in front of the storm cloud; Neptune's sea stays flat blue beyond the shore.
+- 2026-11-11: **PAINTER block 4, "the quality push", accepted (sixth agent; `573c10d`,
+  `aeff8a6`, `f1a395e`, notes `23dea80`)**. The coordinator re-ran on a clean export of the
+  head: 19 world tests and PILOT's 115 pass; and opened `push-spawn-before`,
+  `push-spawn-after` and `push-vista-after` at full size. In, at the top tier on Earth: the
+  ground in three rings to 240 m (tufts of flicks, flowers on stalks in drifts, grass gone to
+  seed, fallen leaves, twigs, stones and moss to 17 m; fan-brush clumps, ferns and drifts of
+  colour to 66 m; broad touches to 240 m: about 77 k marks, was 6400); full-detail trees to
+  90 m (was 52), middle tier to 190 m, far tiers to 420 and 600 m, undergrowth to 110 m,
+  twice the bushes; clearer forest air. The spawn frame went from 733 k triangles / 360 draw
+  calls to 1.36 M / 465, the forest vista from 0.74 M to 1.40 M / 489 (information, not a
+  limit). Moon and Mars made richer (289 k to 429 k; 423 k to 715 k). Weather picture: under
+  a storm nothing is lit; the snowfield stands in a cool glaze under a blue-grey veil; dust,
+  ash and sand are soft glazes; swell strokes and white horses on the far sea; far worlds
+  thin away between 8 and 12 px and are veiled by cloud before they are left out. Additive:
+  reads `mood.pulse01`; body uniform `uStorm`; looks gain `under.flowers`, `under.litter`,
+  biome `near: { flower, fern, litter }`; `world._near.mesh` is a group of three meshes;
+  nothing added to `sampleObstacles`.
+  **Coordinator's verdict: the Earth spawn is a meadow now and the forest vista is the best
+  frame this project has made** (brook, stones, reeds, poppies, a wood with a middle
+  storey); both are plainly the better painting. Weak: near flicks pair into small "V"s; the
+  handwriting changes at about 17 m.
+  **Not verified in a frame**: the blizzard with flakes, PHYSICS's dust wall under the new
+  glaze, Neptune's sea in its own hurricane, the far-world fixes (the orange dot); Venus,
+  Mercury, the giants and Pluto carry the new code and nobody has opened them. Not started:
+  the brush at full resolution, the two vistas in a thicket, Mercury and Neptune from orbit,
+  Mars' dune crests, branch sway and drifts, the explorer's face, the UI look review.
+  **Cost to our tooling**: in software rendering the top-tier forest vista took about 416 s
+  to settle after a teleport (78 s before) and the title 153 s (87 s); building itself grew
+  about 10 %. PILOT's tools need longer settle time-outs at the top tier.
+  Tier lines for the README: tier 2 full resolution, full trees to 90 m, simpler to 600 m,
+  undergrowth to 110 m, three rings of sward; tier 1 0.8 of the resolution, full trees to
+  54 m, simpler to 360 m, two rings; tier 0 0.62 of the resolution, no full-detail trees,
+  simpler to 170 m, one ring at half density, a four-sector brush, no pencil line.
+  The sixth PAINTER agent is out of context and is replaced by a seventh.
+- 2026-11-11: **PAINTER's order for block 5** (coordinator): (1) the same push on Venus,
+  Mercury, Jupiter, Saturn, Uranus, Neptune and Pluto, each opened before and after at the
+  top tier; (2) the weather picture verified in the game under PHYSICS's own weather
+  (blizzard, dust storm, Neptune's hurricane, the far world behind the storm cloud); (3) the
+  "V" pairs and the change of handwriting at 17 m; the brush at full resolution; (4) the two
+  vistas in a thicket, Mercury and Neptune from orbit, Mars' dune crests, branch sway and
+  drifts, the explorer's face; the UI look review.
