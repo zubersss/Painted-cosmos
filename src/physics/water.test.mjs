@@ -1,7 +1,7 @@
 // Tests: wind waves. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { windSea, WaterField, WATER_GLSL, WATER, fetchOf } from './water.js';
+import { windSea, WaterField, WATER_GLSL, WATER, fetchOf, foamLevel, foamCover, surf01 } from './water.js';
 import { createPhysics } from './index.js';
 import { setWindScale, WINDS } from './wind.js';
 import { BODIES } from '../data/bodies.js';
@@ -184,4 +184,90 @@ test('in the game loop: a swimmer trails a wake, a hovering ship presses rings o
     let any = 0; for (let w = 3; w < dry.fields.water.field.wake.length; w += 4) any += dry.fields.water.field.wake[w];
     assert.equal(any, 0);
   } finally { setWindScale('earth', s0); }
+});
+
+// ---- the sea for a painter's own liquid: slope, crest direction, crests, foam ----------------------
+const gale = (U = 18, seconds = 20, F = new WaterField()) => { const frame = { version: 1 }; for (let i = 0; i < seconds * 60; i++) F.update(1 / 60, frame, U * 0.8, U * 0.6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0); return F; };
+
+test('surfaceAt: the slope is the slope of heightAt, wakes included, and the crest direction lies along the crests', () => {
+  const F = gale(18);
+  F.addWake(3, -2, 0.08); F.addWake(-6, 5, 0.03);
+  for (let i = 0; i < 90; i++) F.update(1 / 60, { version: 1 }, 14.4, 10.8, 0, 200, 2500, 9.81, 1.225, 999, 0, 0);
+  const o = {}, e = 1e-4; let worst = 0, steep = 0;
+  for (let k = 0; k < 400; k++) {
+    const x = Math.sin(k * 1.31) * 25, z = Math.cos(k * 0.77) * 25;
+    F.surfaceAt(x, z, o);
+    assert.ok(Math.abs(o.height - F.heightAt(x, z)) < 1e-12);
+    const de = (F.heightAt(x + e, z) - F.heightAt(x - e, z)) / (2 * e), dn = (F.heightAt(x, z + e) - F.heightAt(x, z - e)) / (2 * e);
+    worst = Math.max(worst, Math.abs(o.de - de), Math.abs(o.dn - dn)); steep = Math.max(steep, Math.hypot(o.de, o.dn));
+    assert.ok(Math.abs(Math.hypot(o.ax, o.az) - 1) < 1e-9, 'unit');
+    // the crests lie across the wind, within the spread of the trains
+    assert.ok(Math.abs(o.ax * 0.8 + o.az * 0.6) < Math.sin(0.5), 'along the crests, not along the wind: ' + (o.ax * 0.8 + o.az * 0.6));
+  }
+  assert.ok(worst < 1e-5 && steep > 0.1, `slope against finite differences: ${worst} (steepest ${steep.toFixed(2)})`);
+  // walking along the crest direction from a crest, the surface stays high; across it, it falls away
+  let alongDrop = 0, acrossDrop = 0, n = 0;
+  for (let k = 0; k < 4000 && n < 40; k++) {
+    const x = Math.sin(k * 2.1) * 200, z = Math.cos(k * 1.3) * 200;
+    F.surfaceAt(x, z, o);
+    if (o.crest01 < 0.95) continue;
+    const h = o.height, ax = o.ax, az = o.az, s = F.length * 0.2;
+    alongDrop += h - Math.min(F.heightAt(x + ax * s, z + az * s), F.heightAt(x - ax * s, z - az * s));
+    acrossDrop += h - Math.min(F.heightAt(x - az * s, z + ax * s), F.heightAt(x + az * s, z - ax * s)); n++;
+  }
+  assert.ok(n === 40 && acrossDrop > alongDrop * 2.5, `a fifth of a wavelength along a crest the sea drops ${(alongDrop / n).toFixed(3)} m, across it ${(acrossDrop / n).toFixed(3)} m`);
+});
+
+test('crests are the tops of the higher waves; a calm sea has none worth the name beyond its own ripples', () => {
+  const F = gale(18), o = {};
+  let top = 0, any = 0, N = 0, trough = 0;
+  for (let j = 0; j < 150; j++) for (let i = 0; i < 150; i++) {
+    F.surfaceAt(i * 1.9, j * 2.3, o); N++;
+    if (o.crest01 > 0.5) { top++; assert.ok(o.height > WATER.crestLow * F.height); }
+    if (o.crest01 > 0) any++;
+    if (o.height < 0 && o.crest01 > 0) trough++;
+  }
+  assert.equal(trough, 0, 'never in a trough');
+  assert.ok(top / N > 0.03 && top / N < 0.15 && any / N < 0.4, `crest01 over half on ${(100 * top / N).toFixed(1)} % of the sea, over nothing on ${(100 * (1 - any / N)).toFixed(0)} %`);
+});
+
+test('whitecaps: the breaking share of the sea follows the wind as measured at sea, and the foam covers exactly that share', () => {
+  // Monahan and O'Muircheartaigh 1980: W = 3.84e-6 U^3.41, over the game's longest fetch
+  for (const U of [10, 15, 20]) {
+    const s = windSea(U, 2500, 9.81, 1.225, 999, 1e9), W = foamCover(s.whitecap01), M = 3.84e-6 * Math.pow(U, 3.41);
+    assert.ok(W / M > 0.6 && W / M < 1.7, `${U} m/s: ${(W * 100).toFixed(1)} % against ${(M * 100).toFixed(1)} %`);
+  }
+  assert.ok(foamCover(windSea(4, 2500, 9.81, 1.225, 999, 1e9).whitecap01) < WATER.foamMin, 'a light breeze breaks nothing');
+  // the level is a quantile: higher for a smaller share, never above the highest possible crest
+  let prev = 9; for (const W of [0.0005, 0.002, 0.01, 0.04, 0.1, 0.15]) { const q = foamLevel(W); assert.ok(q < prev && q > 0.15 && q < 0.5 * WATER.shares.reduce((a, b) => a + b, 0) * (1 + WATER.group), `${W}: ${q}`); prev = q; }
+  // on the sea itself: count the foam
+  const o = {};
+  for (const U of [12, 16, 22]) {
+    const F = gale(U);
+    assert.ok(F.cover > 0.005 && F.foamAt < F.height, `U ${U}: cover ${F.cover}, breaking above ${F.foamAt} m of Hs ${F.height}`);
+    let foam = 0, N = 0;
+    for (let j = 0; j < 220; j++) for (let i = 0; i < 220; i++) { F.surfaceAt(i * 2.7 + j * 0.31, j * 3.1, o); N++; if (o.height > F.foamAt) foam++; if (o.foam01 > 0) assert.ok(o.crest01 > 0.3, 'foam only on crests'); }
+    assert.ok(Math.abs(foam / N / F.cover - 1) < 0.25, `U ${U}: ${(100 * foam / N).toFixed(2)} % of the surface breaks, the law says ${(100 * F.cover).toFixed(2)} %`);
+    assert.deepEqual(F.uniforms.uPhysWaterSea.map((x) => +x.toFixed(6)), [F.height, F.foamAt, F.height * WATER.foamEdge, F.cover].map((x) => +x.toFixed(6)));
+  }
+  // a breeze: no foam anywhere, and the uniform says so
+  const B = gale(4);
+  assert.equal(B.uniforms.uPhysWaterSea[3], 0); assert.ok(B.uniforms.uPhysWaterSea[1] > 1e8);
+  for (let k = 0; k < 500; k++) assert.equal(B.surfaceAt(k * 3.3, k * 1.7, o).foam01, 0);
+});
+
+test('surf: a wave breaks where the liquid is shallower than 1.28 wave heights', () => {
+  assert.equal(surf01(0.6, 5), 0, 'deep water');
+  assert.equal(surf01(0.6, 0.6 / WATER.surfBreak + 0.01), 0);
+  assert.ok(surf01(0.6, 0.6) > 0.2 && surf01(0.6, 0.6) < 0.8);
+  assert.equal(surf01(0.6, 0.25), 1, 'fully broken in the shallows');
+  assert.equal(surf01(0.01, 0.001), 0, 'ripples do not make surf');
+});
+
+test('the chunk carries the same formulas as the twin: constants, uniforms and functions', () => {
+  for (const n of ['uniform vec4 uPhysWaterSea', 'vec3 pcPhysWaterD(vec3 p, out vec2 along)', 'vec2 pcPhysWaterCrest(vec3 w)', 'float pcPhysWaterSurf(float depth)', 'vec3 pcPhysWaterNormal(vec3 w, vec3 up)', 'vec3 pcPhysWaterDir(vec2 a)', 'D += A * env * di;',
+    `smoothstep(${WATER.crestLow}, ${WATER.crestHigh}, w.x / hs)`, `smoothstep(0.5, ${1 / WATER.surfBreak}, depth / uPhysWaterSea.x)`, 'smoothstep(uPhysWaterSea.y, uPhysWaterSea.y + uPhysWaterSea.z, w.x)']) assert.ok(WATER_GLSL.includes(n), n);
+  assert.equal((WATER_GLSL.match(/{/g) || []).length, (WATER_GLSL.match(/}/g) || []).length);
+  assert.equal((WATER_GLSL.match(/\(/g) || []).length, (WATER_GLSL.match(/\)/g) || []).length);
+  // (the numbers of chunk and twin are compared in a real GL context: physics-lab.html, window.__lab.waterAgreement())
 });

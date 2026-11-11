@@ -52,18 +52,14 @@ The tree is green: `node --test src/physics/` 178 pass. Nothing is half-edited.
    `painted=1&body=earth&biome=alpine_meadow&find=snow&pre=25` and
    `painted=1&body=mars&biome=dust_dunes&find=dust&pre=25` until the kit part reads; say what
    still needs PAINTER (snow on the ground from `sky.snow`, haze from `sky.haze` / `sky.dust`).
-2. *The sea for PAINTER's own liquid.* The chunk exists and is the delivery
-   (`physics.glsl.water`: `pcPhysWater(p)` gives height and slope, wakes included; uniforms in
-   `physics.fields.water.uniforms`; JS twin `fields.water.heightAt`, tested). Missing: a crest
-   and foam measure for bare-paper glints. Start: add `uPhysWaterSea` (vec4: significant
-   height, the largest possible elevation `sum(amp) * (1 + WATER.group)`, `whitecap01`,
-   steepness) and `float pcPhysWaterCrest(vec3 w)` = how near the top of the highest waves
-   this point is, times `whitecap01`; give `WaterField` the same as `crestAt(x, z)` and test
-   the two formulas against each other as text and numbers (see how `water.test.mjs` checks
-   the chunk). Stop offering the patch as the way to draw the sea (`createWaterKit` can stay
-   for the debug lab). The 1.1-1.5 ms was the CPU patch at 65 x 65 with wakes (three
-   `wakeAt` calls a vertex for the slope): with the chunk in PAINTER's material the CPU cost
-   is the uniform update, under 0.01 ms. If the patch is kept, give `wakeAt` an analytic slope.
+2. *The sea for PAINTER's own liquid.* **Done** (second PHYSICS agent): the chunk now gives
+   height, slope, the way the crests lie (`pcPhysWaterD(p, out along)`), crests and foam
+   (`pcPhysWaterCrest(w)`), surf at a shore (`pcPhysWaterSurf(depth)`), the normal; one new
+   uniform `uPhysWaterSea`; JS twin `physics.fields.water.sample(p)` / `WaterField.surfaceAt`.
+   Chunk against twin in a real GL context (`window.__lab.waterAgreement()` in the debug lab):
+   height 0.06 mm, slope 4e-5, crest01 4e-4, foam01 1e-3, direction 2e-5. The patch kit is off
+   by default (`createPhysicsKits(..., { water: {} })` to ask for it). Tests: `water.test.mjs`
+   (last five).
 3. *Ink on unknown ground.* **Done in the pure core and in the kits** (second PHYSICS agent):
    `physics.data.MATERIAL_IDS` (15 names; a material's number is its place), every particle
    buffer has `mat` (bytes; 255 = `MATERIAL_NONE`, not from the ground), every mark's 14th

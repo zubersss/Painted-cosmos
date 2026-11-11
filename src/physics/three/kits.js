@@ -258,10 +258,10 @@ export function createMarksKit(physics, { makeMaterial, lift = 0.015, refresh = 
 // A square of (N+1)^2 vertices, `step` metres apart, that follows the focus in whole steps and
 // rides the physics' waves (the same three trains the explorer floats on). Attributes:
 // position, normal, uv (0..1 across the square).
-// PAINTER already draws liquid everywhere with its own patches; the better wiring there is to
-// paste physics.glsl.water into that material (see docs/notes/physics.md). This kit is for the
-// lab, for a near-field patch over a hole in the far water, and as the reference of what the
-// chunk computes.
+// NOT the way to draw the sea in the game: PAINTER draws liquid everywhere with its own
+// patches, and the delivery for those is the chunk (physics.glsl.water: height, slope, crest
+// direction, crests, foam, surf) with its uniforms. This kit is for the debug lab and as the
+// reference of what the chunk computes.
 export function createWaterKit(physics, { makeMaterial, N = 40, step = 1.5 } = {}) {
   if (typeof makeMaterial !== 'function') throw new Error('createWaterKit: makeMaterial(kind, info) is required');
   const nv = (N + 1) * (N + 1);
@@ -296,9 +296,11 @@ export function createWaterKit(physics, { makeMaterial, N = 40, step = 1.5 } = {
 }
 
 // ---- all of them ------------------------------------------------------------------------------------
-// options: makeMaterial (required), weather / marks / water: options for each kit, or false to
-// leave one out.
-export function createPhysicsKits(physics, { makeMaterial, weather = {}, marks = {}, water = {} } = {}) {
+// options: makeMaterial (required), weather / marks: options for each kit, or false to leave
+// one out. water: off unless asked for ({} or options): the sea belongs in PAINTER's own
+// liquid material through the wave chunk (physics.glsl.water); a second surface laid over
+// PAINTER's fights it (docs/notes/physics.md, "The sea").
+export function createPhysicsKits(physics, { makeMaterial, weather = {}, marks = {}, water = false } = {}) {
   const kits = {};
   if (weather) kits.weather = createWeatherKit(physics, { makeMaterial, ...weather });
   if (marks) kits.marks = createMarksKit(physics, { makeMaterial, ...marks });

@@ -226,6 +226,7 @@ export function expandRings(events, frame, time, lift, pos, data) {
 // Returns the number of vertices.
 const _ws = new Float64Array(4), _wc = new Float64Array(4), _gs = new Float64Array(4), _gc = new Float64Array(4);
 const _dws = new Float64Array(4), _dwc = new Float64Array(4), _dgs = new Float64Array(4), _dgc = new Float64Array(4);
+const _wk = new Float64Array(3);
 export function expandWater(water, frame, cx, cz, N, step, pos, nrm, group = 0.45) {
   const x0 = Math.round(cx / step) * step - N * step * 0.5, z0 = Math.round(cz / step) * step - N * step * 0.5;
   const kx = water.kx, kz = water.kz, gx = water.gx, gz = water.gz, amp = water.amp, ph = water.phase, gph = water.gphase, R = frame.r0 + water.level;
@@ -253,10 +254,7 @@ export function expandWater(water, frame, cx, cz, N, step, pos, nrm, group = 0.4
         let tt = _ws[t] * _dwc[t] + _wc[t] * _dws[t]; _wc[t] = _wc[t] * _dwc[t] - _ws[t] * _dws[t]; _ws[t] = tt;
         tt = _gs[t] * _dgc[t] + _gc[t] * _dgs[t]; _gc[t] = _gc[t] * _dgc[t] - _gs[t] * _dgs[t]; _gs[t] = tt;
       }
-      if (wakes) {
-        const x = x0 + i * step, hw = water.wakeAt(x, z);
-        if (hw !== 0) { h += hw; if (nrm) { he += (water.wakeAt(x + 0.05, z) - hw) * 20; hn += (water.wakeAt(x, z + 0.05) - hw) * 20; } }
-      }
+      if (wakes) { water.wakeInto(x0 + i * step, z, _wk); h += _wk[0]; he += _wk[1]; hn += _wk[2]; }
       const l = 1 / Math.sqrt(qx * qx + qy * qy + qz * qz), ux = qx * l, uy = qy * l, uz = qz * l, r = R + h;
       pos[v] = ux * r - frame.ox; pos[v + 1] = uy * r - frame.oy; pos[v + 2] = uz * r - frame.oz;
       if (nrm) {

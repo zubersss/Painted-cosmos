@@ -186,6 +186,7 @@ function rebuildGround(cx, cz) {
 const WN = 56, wHalf = 34;
 const waterU = { uPhysAnchor: { value: new THREE.Vector3(0, 0, 0) }, uPhysEast: { value: new THREE.Vector3(1, 0, 0) }, uPhysNorth: { value: new THREE.Vector3(0, 0, -1) }, uPhysUp: { value: new THREE.Vector3(0, 1, 0) },
   uPhysWaterDir: { value: new THREE.Vector2(1, 0) }, uPhysWaterK: { value: new THREE.Vector4() }, uPhysWaterAmp: { value: new THREE.Vector4() }, uPhysWaterPhase: { value: new THREE.Vector4() }, uPhysWaterGroup: { value: new THREE.Vector4() },
+  uPhysWaterSea: { value: new THREE.Vector4(0, 1e9, 1, 0) },
   uPhysWake: { value: physics.fields.water.uniforms.uPhysWake }, uPhysWakeG: { value: 9.81 }, uOffset: { value: new THREE.Vector3() } };
 const waterGeo = new THREE.BufferGeometry();
 { const pos = new Float32Array((WN + 1) * (WN + 1) * 3), idx = []; const step = wHalf * 2 / WN;
@@ -193,9 +194,10 @@ const waterGeo = new THREE.BufferGeometry();
   waterGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); waterGeo.setIndex(idx); }
 const waterMesh = new THREE.LineSegments(waterGeo, new THREE.ShaderMaterial({ uniforms: waterU, transparent: true,
   vertexShader: `${WATER_GLSL}
-    uniform vec3 uOffset; varying float vH;
-    void main() { vec3 p = position + uOffset; vec3 w = pcPhysWater(p); vH = w.x; p.y += w.x; gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
-  fragmentShader: `varying float vH; void main() { gl_FragColor = vec4(mix(vec3(0.30, 0.38, 0.70), vec3(0.75, 0.86, 0.95), clamp(vH * 2.0 + 0.5, 0.0, 1.0)), 0.8); }` }));
+    uniform vec3 uOffset; varying float vH; varying vec2 vCrest;
+    void main() { vec3 p = position + uOffset; vec3 w = pcPhysWater(p); vH = w.x; vCrest = pcPhysWaterCrest(w); p.y += w.x; gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
+  // blue: the surface; pale: its crests (crest01); red: where it is breaking (foam01)
+  fragmentShader: `varying float vH; varying vec2 vCrest; void main() { vec3 c = mix(vec3(0.30, 0.38, 0.70), vec3(0.80, 0.90, 0.97), vCrest.x); gl_FragColor = vec4(mix(c, vec3(0.85, 0.25, 0.2), vCrest.y), 0.8); }` }));
 waterMesh.frustumCulled = false; waterMesh.visible = false; scene3.add(waterMesh);
 const waterDots = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: C.red, size: 4, sizeAttenuation: false }));
 waterDots.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(40 * 3), 3)); waterDots.frustumCulled = false; waterDots.visible = false; scene3.add(waterDots);
@@ -205,7 +207,7 @@ function updateWater(cx, cz) {
   waterMesh.visible = waterDots.visible = W.present && lv != null;
   if (!waterMesh.visible) return;
   const u = physics.fields.water.uniforms, step = wHalf * 2 / WN;
-  waterU.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); waterU.uPhysWaterK.value.fromArray(u.uPhysWaterK); waterU.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); waterU.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase); waterU.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); waterU.uPhysWakeG.value = u.uPhysWakeG;
+  waterU.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); waterU.uPhysWaterK.value.fromArray(u.uPhysWaterK); waterU.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); waterU.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase); waterU.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); waterU.uPhysWaterSea.value.fromArray(u.uPhysWaterSea); waterU.uPhysWakeG.value = u.uPhysWakeG;
   waterU.uOffset.value.set(Math.round(cx / step) * step, lv, -Math.round(cz / step) * step);
   const a = waterDots.geometry.attributes.position.array;
   for (let i = 0; i < 40; i++) { const x = cx + (i - 20) * 1.1, z = cz + ((i * 7) % 11 - 5) * 1.3; a[i * 3] = x; a[i * 3 + 1] = lv + W.heightAt(x, z); a[i * 3 + 2] = -z; }
@@ -386,6 +388,55 @@ function shaderAgreement() {
   return { plants: n, maxError: max, rmsError: Math.sqrt(sum / n), maxErrorGrass: maxSoft, maxErrorTrees: maxStiff, largestTipDisplacement: disp };
 }
 
+// ---- the wave chunk against its JS twin, in numbers --------------------------------------------------
+// 120 points of the sea are drawn as single texels into a float target, two rows: the first holds
+// (height, dh/deast, dh/dnorth, crest01) as the GLSL chunk computes them, the second (foam01,
+// along.x, along.y, surf01 at 0.6 m). Read back and compared with WaterField.surfaceAt.
+let wagRT = null, wagMesh = null, wagScene = null;
+function waterAgreement() {
+  const W = physics.fields.water.field;
+  if (!W.present) return null;
+  const N = 120;
+  if (!wagRT) {
+    wagRT = new THREE.WebGLRenderTarget(N, 2, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
+    g.setAttribute('aAt', new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
+    const m = new THREE.ShaderMaterial({ uniforms: waterU,
+      vertexShader: `${WATER_GLSL}
+        attribute vec3 aAt; varying vec4 vOut;
+        void main() {
+          vec2 along; vec3 w = pcPhysWaterD(aAt, along); vec2 c = pcPhysWaterCrest(w);
+          vOut = position.y < 0.5 ? vec4(w, c.x) : vec4(c.y, along, pcPhysWaterSurf(0.6));
+          gl_Position = vec4((position.x + 0.5) / ${N}.0 * 2.0 - 1.0, position.y - 0.5, 0.0, 1.0); gl_PointSize = 1.0;
+        }`,
+      fragmentShader: 'varying vec4 vOut; void main() { gl_FragColor = vOut; }' });
+    wagMesh = new THREE.Points(g, m); wagMesh.frustumCulled = false; wagScene = new THREE.Scene(); wagScene.add(wagMesh);
+  }
+  const u = physics.fields.water.uniforms;
+  waterU.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); waterU.uPhysWaterK.value.fromArray(u.uPhysWaterK); waterU.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); waterU.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase); waterU.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); waterU.uPhysWaterSea.value.fromArray(u.uPhysWaterSea); waterU.uPhysWakeG.value = u.uPhysWakeG;
+  const g = wagMesh.geometry, ip = g.attributes.position.array, at = g.attributes.aAt.array, pts = [];
+  // points round the focus (the lab frame: x east, -z north), a few of them on the wakes if there are any
+  const F0 = physics.focus, fx = frame.lx(F0.x, F0.y, F0.z), fz = frame.lz(F0.x, F0.y, F0.z);
+  for (let i = 0; i < N; i++) { const x = fx + Math.sin(i * 1.7) * (2 + i * 0.4), z = fz + Math.cos(i * 2.3) * (2 + i * 0.4); pts.push([x, z]);
+    for (let r = 0; r < 2; r++) { const o = (r * N + i) * 3; ip[o] = i; ip[o + 1] = r; ip[o + 2] = 0; at[o] = x; at[o + 1] = 0; at[o + 2] = -z; } }
+  g.attributes.position.needsUpdate = g.attributes.aAt.needsUpdate = true;
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(wagRT); renderer.clear(); renderer.render(wagScene, new THREE.Camera()); renderer.setRenderTarget(prev);
+  const px = new Float32Array(N * 2 * 4); renderer.readRenderTargetPixels(wagRT, 0, 0, N, 2, px);
+  const o = {}, e = { height: 0, slope: 0, crest01: 0, foam01: 0, along: 0, surf01: 0 }; let hMax = 0, sMax = 0, crests = 0, foams = 0;
+  for (let i = 0; i < N; i++) {
+    W.surfaceAt(pts[i][0], pts[i][1], o);
+    const a = i * 4, b = (N + i) * 4;
+    e.height = Math.max(e.height, Math.abs(px[a] - o.height)); e.slope = Math.max(e.slope, Math.abs(px[a + 1] - o.de), Math.abs(px[a + 2] - o.dn));
+    e.crest01 = Math.max(e.crest01, Math.abs(px[a + 3] - o.crest01)); e.foam01 = Math.max(e.foam01, Math.abs(px[b] - o.foam01));
+    e.along = Math.max(e.along, Math.hypot(px[b + 1] - o.ax, px[b + 2] - o.az)); e.surf01 = Math.max(e.surf01, Math.abs(px[b + 3] - physics.fields.water.surf01(0.6)));
+    hMax = Math.max(hMax, Math.abs(o.height)); sMax = Math.max(sMax, Math.hypot(o.de, o.dn)); if (o.crest01 > 0.5) crests++; if (o.foam01 > 0.5) foams++;
+  }
+  let wakes = 0; for (let w = 3; w < W.wake.length; w += 4) if (W.wake[w] > 0) wakes++;
+  return { points: N, maxError: e, largestHeight: hMax, steepestSlope: sMax, onCrests: crests, inFoam: foams, wakes, Hs: W.height, cover: W.cover, breakingAbove: W.foamAt };
+}
+
 // ---- wind arrows -----------------------------------------------------------------------------------
 const A = physics.fields.air;
 const arrowN = A.N * A.N;
@@ -515,7 +566,7 @@ function standIn(kind, info) {
       uniform vec3 uCol; varying vec2 vPcUv; varying vec4 vPcData;
       void main() { ${shape} gl_FragColor = vec4(c, 1.0); }` });
 }
-const kits = KITS === '0' ? null : createPhysicsKits(physics, { makeMaterial: standIn, weather: { expand: KITS === 'gpu' ? 'gpu' : 'cpu' } });
+const kits = KITS === '0' ? null : createPhysicsKits(physics, { makeMaterial: standIn, weather: { expand: KITS === 'gpu' ? 'gpu' : 'cpu' }, water: Q.get('patch') === '1' ? {} : false });   // patch=1: the CPU water patch (reference only)
 // the lab's space is the field frame's: a root that carries body-local coordinates into it
 const labRoot = new THREE.Group(); labRoot.matrixAutoUpdate = false; scene3.add(labRoot);
 function placeLabRoot() {
@@ -768,11 +819,11 @@ function writeHud() {
   if (useShip && sh.phys) { const B = sh.phys; L.push(`ship ${shPhase}  alt ${shEnv.altGround.toFixed(2)} m  v ${Math.hypot(sh.v.x, sh.v.y, sh.v.z).toFixed(2)} m/s  lift ${B.lift01.toFixed(2)}  feet ${B.contacts}  legs ${Array.from(B.legCompress).map((x) => (x * 100).toFixed(1)).join('/')} cm  ${B.asleep ? 'asleep' : ''}`); L.push(`     downwash ${(B.downwash.thrust / 1000).toFixed(1)} kN  ${B.downwash.speed.toFixed(1)} m/s  ground effect x${B.groundEffect.toFixed(2)}  buffet ${Math.hypot(B.buffet.x, B.buffet.y, B.buffet.z).toFixed(2)} m/s2`); }
   const kinds = ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'].filter((k) => P[k].count > 0).map((k) => `${k} ${P[k].count}`).join('  ') || 'none';
   L.push(`air- ${kinds}   devils ${physics.features.devils.count}`);
-  { const W = physics.fields.water.field; if (W.present) L.push(`sea  Hs ${W.height.toFixed(2)} m  period ${W.period.toFixed(1)} s  length ${W.length.toFixed(1)} m  speed ${W.speed.toFixed(1)} m/s  steepness ${W.steepness.toFixed(3)}  whitecaps ${W.whitecap01.toFixed(2)}`); }
+  { const W = physics.fields.water.field; if (W.present) L.push(`sea  Hs ${W.height.toFixed(2)} m  period ${W.period.toFixed(1)} s  length ${W.length.toFixed(1)} m  speed ${W.speed.toFixed(1)} m/s  steepness ${W.steepness.toFixed(3)}  whitecaps ${W.whitecap01.toFixed(2)} (${(100 * (W.foamAt < 1e8 ? W.cover : 0)).toFixed(1)} % of the surface, above ${W.foamAt < 1e8 ? W.foamAt.toFixed(2) + ' m' : 'nothing'})`); }
   L.push(`sim  ${st.ms.toFixed(2)} ms (avg ${st.msAvg.toFixed(2)})  ${st.samples} surface samples  ${st.pushCells} push cells  ${Mk.total} marks  ${P.events.total} events`);
   if (kits) {
     const K = kits, per = (k) => `${k.stats.drawCalls} calls ${k.stats.vertices} verts ${k.stats.ms.toFixed(2)} ms`;
-    L.push(`kits (${KITS})  weather ${per(K.weather)}  |  marks ${per(K.marks)}  |  water ${per(K.water)}  |  all ${K.stats.ms.toFixed(2)} ms (avg ${kitCost.ms.toFixed(2)}, worst ${kitCost.worst.toFixed(2)})`);
+    L.push(`kits (${KITS})  weather ${per(K.weather)}  |  marks ${per(K.marks)}  |  water ${K.water ? per(K.water) : 'chunk only'}  |  all ${K.stats.ms.toFixed(2)} ms (avg ${kitCost.ms.toFixed(2)}, worst ${kitCost.worst.toFixed(2)})`);
   }
   if (frames % 20 === 0) agree = shaderAgreement();
   if (agree) L.push(`glsl vs js: ${agree.plants} tips, max ${(agree.maxError * 1000).toFixed(2)} mm, rms ${(agree.rmsError * 1000).toFixed(2)} mm (largest tip displacement ${(agree.largestTipDisplacement * 100).toFixed(0)} cm)`);
@@ -786,6 +837,7 @@ window.__lab = {
   uniforms() { return JSON.parse(JSON.stringify(F.uniforms)); },
   // metres between the tips the GLSL chunk computes on the GPU and the tips the JS twin computes
   shaderAgreement() { updateProbes(); return shaderAgreement(); },
+  waterAgreement,
 };
 requestAnimationFrame(tick);
 </script>

@@ -16,7 +16,19 @@
 //
 // What is delivered: the sea state at the focus, smoothed (a sea takes time to rise and fall),
 // as four wave trains (in sets, with wakes) that PAINTER can draw and the JS twin can evaluate, so that a floating
-// explorer rides the same waves that are painted.
+// explorer rides the same waves that are painted. For the painter's own liquid material the
+// chunk (WATER_GLSL) and its twin (WaterField.surfaceAt) give, at any point:
+//   height and slope        to lift the surface and tilt its normal
+//   along                   the way the crests lie there (the direction a stroke should run)
+//   crest01                 0 on the flanks and in the troughs, 1 on the tops of the higher waves
+//   foam01                  where the sea is breaking now (whitecaps)
+// Whitecaps: the share of the sea surface that is white grows steeply with the wind, about
+// 3.84e-6 U^3.41 (Monahan and O'Muircheartaigh 1980): 1 % at 10 m/s, 4 % at 15, 10 % at 20.
+// Here it follows the steepness of the sea (so it holds on other worlds too) through
+// cover = foamMax whitecap01^foamPower, which is within a factor 1.5 of that law from 10 to
+// 20 m/s over the game's fetches; and the sea breaks where it stands highest: the foam is
+// the part of the surface above the level that leaves exactly that share above it.
+// At a shore a wave breaks when it is 0.78 of the depth high (McCowan 1894): surf01.
 import { clamp01, smoothstep, TAU } from './util.js';
 
 export const WATER = Object.freeze({
@@ -42,6 +54,12 @@ export const WATER = Object.freeze({
   wakeEvery: 0.6,                  // a source for every this many wavelengths travelled (or seconds, hovering)
   wakeLife: 3.2,                   // s x sqrt(wavelength in m): how long a packet lasts
   wakeWidth: 1.6,                  // wavelengths: width of the packet
+  // crests and foam (see the header)
+  crestLow: 0.12, crestHigh: 0.42, // elevation / Hs where a crest begins and where it is fully one (the top third .. the top 5 % of the sea)
+  foamMax: 0.15, foamPower: 1.8,   // whitecap cover = foamMax whitecap01^foamPower (share of the surface)
+  foamMin: 5e-4,                   // below this share the sea does not break at all
+  foamEdge: 0.06,                  // x Hs: the width of the edge of a foam patch
+  surfBreak: 0.78,                 // a wave breaks when it is this fraction of the depth high
 });
 
 // Fetch (m) by biome: how far the wind can work on the liquid there. Game scale.
@@ -86,6 +104,43 @@ const GK = 1 / WATER.groupWaves;            // group wavenumber as a fraction of
 // wavelength of a wake from its amplitude: a swimmer's ripples are a metre long, a ship's a few
 export const wakeLength = (amp) => 0.8 + 14 * amp;
 
+// How high (in units of Hs) the surface must stand for only a share W of it to stand higher.
+// The elevation of four trains in sets is not Gaussian (its tails are shorter), so the
+// distribution is measured once, on first use: every phase of every train and of its groups
+// taken evenly (a Kronecker sequence), sorted, and the upper quantiles tabulated against log W.
+const QN = 25, QLO = -3.4, QHI = -0.4;         // log10 of the share: 0.04 % .. 40 %
+let _quant = null;
+function quantiles() {
+  if (_quant) return _quant;
+  const N = 30000, v = new Float32Array(N), sh = WATER.shares, g = WATER.group;
+  const al = [2, 3, 5, 7, 11, 13, 17, 19].map((p) => Math.sqrt(p) % 1);       // independent over the rationals
+  for (let n = 0; n < N; n++) {
+    let h = 0;
+    for (let i = 0; i < NT; i++) { const a = TAU * ((n + 1) * al[i] % 1), e = TAU * ((n + 1) * al[i + 4] % 1); h += 0.5 * sh[i] * (1 + g * Math.sin(e)) * Math.sin(a); }
+    v[n] = h;
+  }
+  v.sort();
+  _quant = new Float32Array(QN);
+  for (let k = 0; k < QN; k++) { const W = Math.pow(10, QLO + (QHI - QLO) * k / (QN - 1)); _quant[k] = v[Math.min(N - 1, Math.max(0, Math.round(N * (1 - W))))]; }
+  return _quant;
+}
+// elevation / Hs above which a share `cover` of the sea surface stands
+export function foamLevel(cover) {
+  const q = quantiles();
+  let t = (Math.log10(cover > 1e-9 ? cover : 1e-9) - QLO) / (QHI - QLO) * (QN - 1);
+  t = t < 0 ? 0 : t > QN - 1 ? QN - 1 : t;
+  const i = Math.min(QN - 2, t | 0);
+  return q[i] + (q[i + 1] - q[i]) * (t - i);
+}
+// share of the sea surface that is white, from how steep the sea is (0..1, as windSea's whitecap01)
+export const foamCover = (whitecap01) => WATER.foamMax * Math.pow(whitecap01 > 0 ? whitecap01 : 0, WATER.foamPower);
+// 0..1: how far a wave of this sea has broken in liquid `depth` metres deep (the surf at a shore)
+export function surf01(Hs, depth) {
+  if (!(Hs > 0.02)) return 0;
+  return 1 - smoothstep(0.5, 1 / WATER.surfBreak, depth / Hs);
+}
+
+const _wk3 = new Float64Array(3);
 export class WaterField {
   constructor() {
     this.height = 0;               // significant wave height at the focus now (m), smoothed
@@ -106,8 +161,12 @@ export class WaterField {
     // wakes: x, z (grid), age (s), amplitude (m). Unused slots have amplitude 0.
     this.wake = new Float32Array(WATER.wakes * 4);
     this.wakeHead = 0;
+    quantiles();                   // (measured here, while loading, not in the first played frame)
+    this.cover = 0;                // share of the surface that is breaking (whitecaps), 0 .. foamMax
+    this.foamAt = 1e9;             // elevation (m) above which the sea is breaking now (1e9: it is not)
+    // uPhysWaterSea: Hs (m), the elevation above which the sea breaks (m), the width of that edge (m), whitecap cover
     this.uniforms = { uPhysWaterDir: [1, 0], uPhysWaterK: [0, 0, 0, 0], uPhysWaterAmp: [0, 0, 0, 0], uPhysWaterPhase: [0, 0, 0, 0], uPhysWaterGroup: [0, 0, 0, 0],
-      uPhysWake: this.wake, uPhysWakeG: 9.81 };
+      uPhysWaterSea: [0, 1e9, 1, 0], uPhysWake: this.wake, uPhysWakeG: 9.81 };
   }
 
   // The frame re-anchored at old grid position (X, Z): keep the waves where they are.
@@ -171,6 +230,10 @@ export class WaterField {
       u.uPhysWaterK[i] = k; u.uPhysWaterAmp[i] = this.amp[i]; u.uPhysWaterPhase[i] = this.phase[i] % TAU; u.uPhysWaterGroup[i] = this.gphase[i] % TAU;
     }
     u.uPhysWaterDir[0] = d0; u.uPhysWaterDir[1] = d1; u.uPhysWakeG = g;
+    // whitecaps: how much of the surface is breaking, and so how high it has to stand to break
+    this.cover = foamCover(this.whitecap01);
+    this.foamAt = this.cover > WATER.foamMin && this.height > 0.02 ? this.height * foamLevel(this.cover) : 1e9;
+    const S = u.uPhysWaterSea; S[0] = this.height; S[1] = this.foamAt; S[2] = Math.max(1e-4, this.height * WATER.foamEdge); S[3] = this.foamAt < 1e8 ? this.cover : 0;
     // wakes age and die
     const W = this.wake;
     for (let w = 0; w < W.length; w += 4) {
@@ -196,6 +259,55 @@ export class WaterField {
     return s;
   }
 
+  // The wakes with their slope: o[0] = elevation (m), o[1] = d/deast, o[2] = d/dnorth. The twin of pcPhysWake.
+  wakeInto(x, z, o) {
+    const W = this.wake, g = this.g;
+    let s = 0, se = 0, sn = 0;
+    for (let w = 0; w < W.length; w += 4) {
+      const amp = W[w + 3];
+      if (amp === 0) continue;
+      const L = wakeLength(amp), k = TAU / L, c = Math.sqrt(g / k), age = W[w + 2];
+      const dx = x - W[w], dz = z - W[w + 1], r = Math.sqrt(dx * dx + dz * dz);
+      const q = (r - 0.5 * c * age) / (WATER.wakeWidth * L);
+      if (q > 3 || q < -3) continue;
+      const A = amp * Math.exp(-q * q - age / (WATER.wakeLife * Math.sqrt(L))) * Math.sqrt(L / (r + L)), ph = k * (r - c * age);
+      const cp = Math.cos(ph);
+      s += A * cp;
+      // d/dr of the carrier and of the packet's own shape (its Gaussian edge and its spreading)
+      if (r > 1e-4) { const m = (-A * k * Math.sin(ph) - A * cp * (2 * q / (WATER.wakeWidth * L) + 0.5 / (r + L))) / r; se += m * dx; sn += m * dz; }
+    }
+    o[0] = s; o[1] = se; o[2] = sn;
+    return o;
+  }
+
+  // Everything about the surface at grid position (x, z): the twin of pcPhysWaterD and
+  // pcPhysWaterCrest in WATER_GLSL. Fills o:
+  //   height (m above the still level), de, dn (slope along the frame's east and north),
+  //   ax, az (unit vector, frame axes: the way the crests lie here; a stroke runs along it),
+  //   crest01 (0 flanks and troughs .. 1 the tops of the higher waves), foam01 (breaking now)
+  surfaceAt(x, z, o = {}) {
+    let h = 0, he = 0, hn = 0, Dx = this.dir[0] * 1e-6, Dz = this.dir[1] * 1e-6;
+    const G = WATER.group;
+    for (let i = 0; i < NT; i++) {
+      const A = this.amp[i];
+      if (A === 0) continue;
+      const a = this.kx[i] * x + this.kz[i] * z - this.phase[i], e = this.gx[i] * x + this.gz[i] * z - this.gphase[i];
+      const env = 1 + G * Math.sin(e), sa = Math.sin(a), ca = Math.cos(a), ce = Math.cos(e);
+      h += A * env * sa;
+      he += A * (env * ca * this.kx[i] + G * ce * sa * this.gx[i]);
+      hn += A * (env * ca * this.kz[i] + G * ce * sa * this.gz[i]);
+      const w = A * env / (this.k[i] || 1); Dx += w * this.kx[i]; Dz += w * this.kz[i];
+    }
+    const wk = this.wakeInto(x, z, _wk3);
+    h += wk[0]; he += wk[1]; hn += wk[2];
+    const dl = Math.hypot(Dx, Dz) || 1;
+    o.height = h; o.de = he; o.dn = hn; o.ax = -Dz / dl; o.az = Dx / dl;
+    const hs = this.height > 1e-4 ? this.height : 1e-4;
+    o.crest01 = smoothstep(WATER.crestLow, WATER.crestHigh, h / hs);
+    o.foam01 = this.foamAt < 1e8 ? smoothstep(this.foamAt, this.foamAt + Math.max(1e-4, this.height * WATER.foamEdge), h) : 0;
+    return o;
+  }
+
   // Elevation of the surface above its still level at grid position (x, z), metres.
   // The JS twin of pcPhysWaterHeight in WATER_GLSL.
   heightAt(x, z) {
@@ -218,6 +330,7 @@ const train = (i) => `  {
     float env = 1.0 + ${f(WATER.group)} * sin(e), sa = sin(a);
     o.x += A * env * sa;
     o.yz += A * k * (env * cos(a) * di + ${f(WATER.group)} * cos(e) * sa * gi);
+    D += A * env * di;
   }`;
 
 // GLSL twin. Shares the frame uniforms with FLORA_GLSL (guarded, so both may be included).
@@ -236,6 +349,8 @@ uniform vec4 uPhysWaterK;      // wavenumbers of the four trains (rad/m)
 uniform vec4 uPhysWaterAmp;    // amplitudes (m)
 uniform vec4 uPhysWaterPhase;  // phases (rad)
 uniform vec4 uPhysWaterGroup;  // phases of each train's groups (rad)
+uniform vec4 uPhysWaterSea;    // x: significant height Hs (m); y: the elevation (m) above which the sea is breaking
+                               // now (1e9: it is not); z: the width of that edge (m); w: whitecap cover (share of the surface)
 uniform vec4 uPhysWake[${WATER.wakes}];     // wakes: x, z (frame axes, m), age (s), amplitude (m; 0 = unused)
 uniform float uPhysWakeG;      // gravity (m/s^2), for the speed of the wake waves
 
@@ -251,24 +366,48 @@ vec3 pcPhysWake(vec2 g) {
     if (abs(q) > 3.0) continue;
     float A = w.w * exp(-q * q - w.z / (${f(WATER.wakeLife)} * sqrt(L))) * sqrt(L / (r + L));
     float ph = k * (r - c * w.z);
-    o.x += A * cos(ph);
-    o.yz += (-A * k * sin(ph)) * (r > 1e-4 ? dl / r : vec2(0.0));
+    float cp = cos(ph);
+    o.x += A * cp;
+    o.yz += (-A * k * sin(ph) - A * cp * (2.0 * q / (${f(WATER.wakeWidth)} * L) + 0.5 / (r + L))) * (r > 1e-4 ? dl / r : vec2(0.0));
   }
   return o;
 }
 
 // Elevation (m) of the liquid surface above its still level at a body-local point, and its
 // slope along the frame's east and north axes: xyz = (height, dh/deast, dh/dnorth).
-vec3 pcPhysWater(vec3 p) {
+// along: the way the crests lie at this point (unit, frame axes): the direction a stroke runs.
+vec3 pcPhysWaterD(vec3 p, out vec2 along) {
   vec2 g = pcPhysGrid(p);
   vec2 d = uPhysWaterDir;
   vec3 o = vec3(0.0);
+  vec2 D = d * 1e-6;
 ${[0, 1, 2, 3].map(train).join('\n')}
   #ifndef PC_PHYS_NO_WAKE
     o += pcPhysWake(g);
   #endif
+  D = normalize(D);
+  along = vec2(-D.y, D.x);
   return o;
 }
+vec3 pcPhysWater(vec3 p) { vec2 along; return pcPhysWaterD(p, along); }
 float pcPhysWaterHeight(vec3 p) { return pcPhysWater(p).x; }
+
+// Crests and foam at a point, from what pcPhysWater returned there:
+//   x  crest01: 0 on the flanks and in the troughs, 1 on the tops of the higher waves
+//      (where a painter leaves the paper bare)
+//   y  foam01: the sea is breaking here (whitecaps); 0 everywhere in a light sea
+vec2 pcPhysWaterCrest(vec3 w) {
+  float hs = max(uPhysWaterSea.x, 1e-4);
+  float foam = uPhysWaterSea.y < 1e8 ? smoothstep(uPhysWaterSea.y, uPhysWaterSea.y + uPhysWaterSea.z, w.x) : 0.0;
+  return vec2(smoothstep(${f(WATER.crestLow)}, ${f(WATER.crestHigh)}, w.x / hs), foam);
+}
+// The surf at a shore: 0..1, how far a wave of this sea has broken in liquid depth metres deep.
+float pcPhysWaterSurf(float depth) {
+  return uPhysWaterSea.x > 0.02 ? 1.0 - smoothstep(0.5, ${f(1 / WATER.surfBreak)}, depth / uPhysWaterSea.x) : 0.0;
+}
+// The unit normal of the surface (body-local) from pcPhysWater's result and the local up.
+vec3 pcPhysWaterNormal(vec3 w, vec3 up) { return normalize(up - w.y * uPhysEast - w.z * uPhysNorth); }
+// A frame-axes direction (such as \`along\`) as a body-local vector.
+vec3 pcPhysWaterDir(vec2 a) { return a.x * uPhysEast + a.y * uPhysNorth; }
 `;
 export { clamp01 };

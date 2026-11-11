@@ -21,7 +21,7 @@ import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { skyNumbers, SKY } from './sky.js';
-import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength } from './water.js';
+import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01 } from './water.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed } from './explorer.js';
 import {
@@ -357,13 +357,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       o.present = water.present;
       o.height = water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0;
       o.significant = water.height; o.period = water.period; o.length = water.length; o.speed = water.speed;
-      o.steepness = water.steepness; o.whitecap01 = water.whitecap01;
+      o.steepness = water.steepness; o.whitecap01 = water.whitecap01; o.whitecapCover = water.foamAt < 1e8 ? water.cover : 0;
       dir.x = frame.ex * water.dir[0] + frame.nx * water.dir[1]; dir.y = frame.ey * water.dir[0] + frame.ny * water.dir[1]; dir.z = frame.ez * water.dir[0] + frame.nz * water.dir[1];
     } else {
       const a = air(bodyId, p, _wa, 10), body = BODIES[bodyId];
       windSea(a.speed, FETCH_DEFAULT, body.gravity, a.density, liquidOf(bodyId).density, 1e9, _ws);
       o.present = true; o.height = 0; o.significant = _ws.height; o.period = _ws.period; o.length = _ws.length; o.speed = _ws.speed;
-      o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01;
+      o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01; o.whitecapCover = foamCover(_ws.whitecap01);
       const s = a.speed > 1e-6 ? 1 / a.speed : 0; dir.x = a.wind.x * s; dir.y = a.wind.y * s; dir.z = a.wind.z * s;
     }
     return o;
@@ -431,8 +431,14 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     },
     water: {
       uniforms: water.uniforms,   // uPhysWaterDir[2], uPhysWaterK[4], uPhysWaterAmp[4], uPhysWaterPhase[4], uPhysWaterGroup[4],
+                                  // uPhysWaterSea[4] (Hs, breaking level, its edge, whitecap cover),
                                   // uPhysWake (Float32Array(64): 16 x (x, z, age, amplitude)), uPhysWakeG
       heightAt(p) { return water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0; },
+      // the whole surface at body-local p, the twin of the chunk: { height, de, dn (slope along the
+      // frame's east and north), ax, az (the way the crests lie, frame axes), crest01, foam01 }
+      sample(p, out) { return water.surfaceAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), out || {}); },
+      // 0..1: how far this sea's waves have broken where the liquid is `depth` m deep (the surf at a shore)
+      surf01(depth) { return water.present ? surf01(water.height, depth) : 0; },
       field: water,
     },
     air: airGrid,             // the wind grid itself (for the lab and for debugging)
