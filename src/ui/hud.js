@@ -29,7 +29,8 @@ export function createHud(root) {
   const card = el('div', 'pc-panel pc-start', root);
   el('div', 'pc-title', card, 'Painted Cosmos');
   const sub = el('div', 'pc-label pc-sub', card, 'a watercolour to walk into');
-  el('div', 'pc-label', card, 'click to begin');
+  // One line that says what the card is waiting for: the paper while loading, then a click.
+  const status = el('div', 'pc-status', card, 'click to begin');
   const help = el('div', 'pc-help pc-label', card);
   help.innerHTML = [
     ['W A S D', 'walk'], ['Shift', 'run'], ['Space', 'jump, hold for the jetpack'],
@@ -40,7 +41,9 @@ export function createHud(root) {
   ].map(([k, t]) => (t ? `<span><kbd>${k}</kbd> ${t}</span>` : `<em>${k}</em>`)).join('');
 
   // Keep the start card inside small windows.
-  const fit = () => card.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / 620, window.innerHeight / 470)));
+  // (measured, not assumed: the card's laid-out size is not changed by the scale itself)
+  const fit = () => card.style.setProperty('--pc-fit', String(Math.min(1,
+    window.innerWidth / ((card.offsetWidth || 608) + 36), window.innerHeight / ((card.offsetHeight || 500) + 44))));
   window.addEventListener('resize', fit);
   fit();
 
@@ -110,9 +113,16 @@ export function createHud(root) {
       stats.classList.toggle('pc-on', !!text);
       if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
     },
-    showStart(on) { card.classList.toggle('pc-on', !!on); },
+    showStart(on) { if (on) fit(); card.classList.toggle('pc-on', !!on); },
     get startShown() { return card.classList.contains('pc-on'); },
     setSubtitle(text) { sub.textContent = text; },
+    // The card's one line of status ("preparing the paper...", "click to begin", "H closes this card").
+    setStartStatus(text, waiting = false) {
+      if (status.textContent !== text) status.textContent = text;
+      status.classList.toggle('pc-wait', !!waiting);
+    },
+    // While the first view is being built only the title card shows, on the bare sheet.
+    setWaiting(on) { root.classList.toggle('pc-waiting', !!on); },
     // A quiet line at the top: how to look around while the mouse is not captured.
     setHint(text) { hint.classList.toggle('pc-on', !!text); if (text && hint.textContent !== text) hint.textContent = text; },
     startCard: card,

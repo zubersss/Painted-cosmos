@@ -39,10 +39,15 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
 .pc-help { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; text-align: left; font-size: 13px; }
 .pc-help em { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; opacity: 0.7; }
 .pc-help kbd { font-size: 11px; padding: 3px 6px; margin-right: 5px; }
-#pc-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+/* The loading sheet is bare paper UNDER the HUD: the title card is readable on it from the first
+   moment, and the painting fades in behind the card when the first view is ready. */
+#pc-loading { position: fixed; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 7vh; box-sizing: border-box;
   background: var(--pc-paper); color: var(--pc-sepia); font: italic 18px Georgia, serif; letter-spacing: 0.08em;
   transition: opacity 0.8s ease; pointer-events: none; }
 #pc-loading.pc-done { opacity: 0; }
+.pc-hud { z-index: 2; }
+.pc-hud.pc-waiting > :not(.pc-start) { visibility: hidden; }
 
 .pc-notice { position: absolute; left: 0; right: 0; bottom: 24%; text-align: center; font-size: 16px; font-style: italic;
   color: var(--pc-ink); opacity: 0; transition: opacity 0.5s ease;
@@ -95,4 +100,15 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
 .pc-book-row.pc-on { opacity: 1; }
 .pc-book-row b { grid-row: span 2; color: var(--pc-ink); font-size: 15px; }
 .pc-book-foot { margin-top: 8px; text-align: center; font-size: 13px; color: var(--pc-ink); }
-.pc-start .pc-sub { margin-top: 2px; }
+.pc-start .pc-sub { margin-top: 2px; font-size: 16px; }
+/* The title and help card: ink on nearly opaque paper, so it reads over any painting. */
+.pc-start { background: rgba(244, 239, 228, 0.955); width: 540px; padding: 24px 34px 22px; top: 50%;
+  box-shadow: 0 0 0 1.5px rgba(44, 51, 80, 0.4), 0 8px 30px rgba(44, 51, 80, 0.22); }
+.pc-start .pc-title { color: #232a45; }
+.pc-status { margin: 12px auto 2px; width: max-content; padding: 5px 16px 6px; font-size: 16px; letter-spacing: 0.08em;
+  color: var(--pc-paper); background: var(--pc-ink); border-radius: 4px 10px 5px 9px / 9px 4px 10px 5px; }
+.pc-status.pc-wait { color: var(--pc-ink); background: none; font-style: italic; box-shadow: 0 0 0 1px rgba(44, 51, 80, 0.35); }
+.pc-help { margin-top: 16px; gap: 7px 26px; font-size: 14px; font-style: normal; letter-spacing: 0.02em; color: #232a45; }
+.pc-help em { margin-top: 8px; padding-bottom: 2px; font-size: 12.5px; opacity: 1; color: var(--pc-sepia); letter-spacing: 0.1em;
+  border-bottom: 1px solid rgba(107, 90, 72, 0.35); }
+.pc-help kbd { font-size: 11.5px; padding: 3px 7px; margin-right: 7px; }

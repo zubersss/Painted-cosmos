@@ -48,6 +48,7 @@ export class Game {
     this._planes = { near: 0, far: 0, fov: 0, aspect: 0 };
     this.frameCount = 0;
     this.started = false;
+    this.canStart = true;          // false while the title card is still waiting for the first view
   }
 
   frame(realDt) {
@@ -57,7 +58,11 @@ export class Game {
     if (this.audio && this.input.used) this.audio.start();
     if (raw.edges.has('KeyM')) { if (this.book && this.book.open) this.book.hide(); this.toggleMap(); }
     if (raw.edges.has('KeyB')) { if (this.map && this.map.open) this.map.hide(); this.toggleBook(); }
-    if (raw.edges.has('KeyH') && this.started) { this.hud.showStart(!this.hud.startShown); if (this.audio) this.audio.event('paper'); }
+    if (raw.edges.has('KeyH') && this.started) {
+      this.hud.showStart(!this.hud.startShown);
+      if (this.hud.setStartStatus) this.hud.setStartStatus('H closes this card');
+      if (this.audio) this.audio.event('paper');
+    }
     if (raw.edges.has('Backquote')) this.showStats = !this.showStats;
     let keys = this.input, events = raw;
     const panel = (this.map && this.map.open) || (this.book && this.book.open);
@@ -295,7 +300,8 @@ export class Game {
         hud.setReadout(`${name}\n${alt == null ? '' : fmt(alt) + ' up   '}${Math.round(sim.sh.speed)} m/s`, true);
       } else hud.setReadout(name, this.started && sim.t - this._placeAt < 6);
     }
-    if (this.input.used && !this.started) { this.started = true; hud.showStart(false); }
+    // The first click or key begins (once the first view is ready: canStart).
+    if (this.input.used && !this.started && this.canStart !== false) { this.started = true; hud.showStart(false); }
   }
 
   // One glance at how the machine is coping (shown with ?stats=1 or the ` key).

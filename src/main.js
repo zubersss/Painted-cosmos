@@ -116,6 +116,13 @@ async function boot() {
   const showCard = params.get('card') !== '0';
   hud.showStart(showCard);
   if (!showCard) { game.started = true; game.hintOn = false; }
+  else {
+    // The title card is the loading screen: it says what it is waiting for, on the bare sheet.
+    loading.textContent = '';
+    hud.setWaiting(true);
+    hud.setStartStatus('preparing the paper\u2026', true);
+    game.canStart = false;
+  }
 
   const sim = game.sim;
   const debug = {
@@ -161,6 +168,9 @@ async function boot() {
       if (settledFrames >= 2 || game.frameCount > 900) {
         window.__pcReady = true;
         loading.classList.add('pc-done');
+        hud.setWaiting(false);
+        hud.setStartStatus('click to begin');
+        game.canStart = true;
         if (world.setBuildBudget) world.setBuildBudget(5);
       }
     }
