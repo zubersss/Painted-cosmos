@@ -146,6 +146,8 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   if (!(dt > 0)) return st;
   if (fresh) B.lift01 = cmd.hover === false ? 0 : 1;      // a ship that is already flying is already hovering
   B.asleep = false; B.still = 0;
+  // in flight no foot is on the ground (the gear step sets these while it has the ship)
+  if (B.contacts) { B.contacts = 0; B.legContact[0] = B.legContact[1] = B.legContact[2] = 0; B.legLoad[0] = B.legLoad[1] = B.legLoad[2] = 0; B.legCompress[0] = B.legCompress[1] = B.legCompress[2] = 0; }
   let vx = st.v.x, vy = st.v.y, vz = st.v.z;
   if (!(vx === vx && vy === vy && vz === vz)) { vx = vy = vz = 0; }
   axes(st.q);

@@ -165,7 +165,9 @@ export class DeformField {
           const G = groundOf(lx, lz, _g);
           const hgt = Math.hypot(px, py, pz) - (frame.r0 + G.h);
           // a foot is down when the gear model says so, or (without it) when the ship rests on the ground
-          const down = D.legContact ? D.legContact[i] > 0 : (hgt < 0.25 && speed < 0.3);
+          // a foot presses the ground only where it is: whatever the caller's flags say, a
+          // foot more than a hand's breadth up leaves no print
+          const down = hgt < 0.25 && (D.legContact ? D.legContact[i] > 0 : speed < 0.3);
           if (down && !S.c[i]) {
             const depth = Math.min(DEFORM.padMax, G.sink * DEFORM.padPressure);
             if (depth >= 0.002) {
