@@ -9,9 +9,9 @@
 // Away from the focus the same layers are evaluated directly, without terrain.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature } from './atmosphere.js';
-import { WINDS, WIND, windLarge, gustLevel, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
+import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor } from './wind.js';
 import { weatherWind } from './weather.js';
-import { TerrainGrid } from './near.js';
+import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
 import { FLORA } from './flora.js';
 import { devilWind } from './features.js';
@@ -26,6 +26,9 @@ export const AIR = Object.freeze({
   wakeLength: 5,          // ... recovering over this many tree heights downwind (a shelter belt
                           // protects out to 10-15 heights; Wang and Takle 1996)
   wakeTop: 1.5,           // the wake reaches this many canopy heights up
+  shelterAdjust: 48,      // m: shelter and wakes follow a veering wind as the air crosses this much fetch
+                          // (the time it takes is this over the wind speed, kept between 1 and 6 s)
+  shelterLearn: 0.4,      // s: a node whose upwind search reaches newly sampled ground takes it in over this
   aloftGain: 1.2,         // wind in the free air above the surface layer: 1 + this at 60 % of the atmosphere
   aloftGainVenus: 12,     // Venus: slow at the ground, fast aloft (super-rotation)
 });
@@ -65,6 +68,18 @@ export class AirGrid {
     this.I = new Float32Array(N * N).fill(0.17);   // turbulence intensity at 10 m
     this.wake = new Float32Array(N * N).fill(1);   // wind left near the ground in the lee of trees upwind (0..1)
     this.wakeH = new Float32Array(N * N);          // height of the canopy that casts it (m)
+    // what the upwind search last found for each node (NaN: not searched yet): shel, wake and wakeH
+    // move toward these at the pace the air crosses the fetch, and never step (P10)
+    this._shelT = new Float32Array(N * N).fill(NaN);
+    this._wakeT = new Float32Array(N * N).fill(NaN);
+    this._wakeHT = new Float32Array(N * N).fill(NaN);
+    this._known = new Uint8Array(N * N);           // how many of a node's upwind probes fell on known ground ...
+    this._seen = new Float64Array(N * N);          // ... and the terrain grid's change count when it was last searched
+    this._fast = new Uint8Array(N * N);            // 1 while a node is taking in ground that has just become known
+    // how far the wind has carried each copy of the gust pattern since the middle of its cycle (m,
+    // body-local), and the cycle each is in: the pattern moves with the air, at the wind's own speed
+    this.gustShift = new Float64Array(6);
+    this._gc1 = NaN; this._gc2 = NaN; this._gbody = null; this._gp = new Float64Array(4);
     this.bodyId = null;
     this.time = 0;
     this.ready = false;
@@ -73,7 +88,11 @@ export class AirGrid {
     this.cwe = 0; this.cwn = 0;                   // the same in frame axes
     this.mul = 1; this.gustiness = 0;
     this._row = 0;
-    this._sup = new Float32Array(9 * 2);
+    // the wind of the weather and of the planet on a 3 x 3 lattice 256 m wide that is fixed to the
+    // ground (not to the grid's centre, which hops a cell at a time as the focus moves)
+    this._sup = new Float32Array(9 * 4);      // per lattice node: east, north (m/s), gustiness, multiplier
+    this._si = 0; this._sj = 0;               // where the lattice lies, in cells (0 .. N - 2)
+    this._ci1 = 0; this._cj1 = 0;             // the terrain grid's centre when this was last updated
   }
 
   // Rebuild the grid for this frame. sample(dir) is sampleSurface bound to the body.
@@ -81,7 +100,22 @@ export class AirGrid {
   update(frame, bodyId, t, fx, fz, sample, budget, clock, budgetMs) {
     const N = this.N, cell = this.cell, T = this.terrain;
     _coverBody = bodyId;
+    // the step since the last call; a jump (a warm-up, a new body, a new frame, a pause) is not
+    // a step: fields are set, not eased, and the gust pattern is placed afresh
+    const dts = t - this.time;
+    const fresh = !this.ready || this.bodyId !== bodyId || T.frameVersion !== frame.version;
+    const jump = fresh || !(dts > 0) || dts > 1;
+    const ci0 = T.ci, cj0 = T.cj;
     const used = T.update(frame, fx, fz, sample, budget, coverInto, clock, budgetMs);
+    if (fresh) this._shelT.fill(NaN);
+    else if (T.ci !== ci0 || T.cj !== cj0) {
+      // the grid followed the focus: the per-node fields move with the ground they belong to
+      const di = T.ci - ci0, dj = T.cj - cj0;
+      scrollField(this.shel, null, N, 1, di, dj, 1); scrollField(this.wake, null, N, 1, di, dj, 1); scrollField(this.wakeH, null, N, 1, di, dj, 0);
+      scrollField(this.I, null, N, 1, di, dj, 0.17);
+      scrollField(this._shelT, null, N, 1, di, dj, NaN); scrollField(this._wakeT, null, N, 1, di, dj, NaN); scrollField(this._wakeHT, null, N, 1, di, dj, NaN);
+      scrollField(this._known, null, N, 1, di, dj, 0); scrollField(this._seen, null, N, 1, di, dj, -1); scrollField(this._fast, null, N, 1, di, dj, 0);
+    }
     this.bodyId = bodyId; this.time = t; this.ready = true;
     const W = WINDS[bodyId];
     const half = T.half;
@@ -90,33 +124,66 @@ export class AirGrid {
       this.cwx = this.cwy = this.cwz = this.cwe = this.cwn = 0; this.mul = 1; this.gustiness = 0;
       return used;
     }
-    // weather at the centre of the patch (cells are kilometres wide)
-    const cx = T.ci * cell, cz = T.cj * cell;
-    frame.dir(cx, cz, _d);
-    weatherWind(bodyId, _d[0], _d[1], _d[2], t, this.seed, _ww);
-    const mul = _ww[0];
-    const oe = _ww[1] * frame.ex + _ww[2] * frame.ey + _ww[3] * frame.ez;
-    const on = _ww[1] * frame.nx + _ww[2] * frame.ny + _ww[3] * frame.nz;
-    this.mul = mul; this.gustiness = _ww[4]; const blow = _ww[5];
-    // large-scale wind on 3 x 3 super-nodes (it varies over a fraction of the planet)
-    const sup = this._sup, span = half * cell;
+    // The wind of the planet and of the weather on a lattice of 3 x 3 nodes, one grid width (256 m)
+    // apart, interpolated to the nodes. (P10: the weather's part used to be taken at the grid's centre
+    // alone and the lattice hung from that centre. The centre hops 16 m at a time as the focus moves,
+    // and across a storm's gust front the outflow changes by 1 m/s in 16 m: a walker's wind stepped by
+    // that much every 16 m. The lattice is now fixed to the ground and carries the weather at every
+    // node, so the field is one function of place, whatever the grid does.)
+    const L = N - 1, sup = this._sup;
+    if (!fresh && (ci0 !== this._ci1 || cj0 !== this._cj1)) {
+      // the frame was re-anchored since the last update (cells were renumbered before this call; a
+      // scroll, inside T.update, renumbers nothing): the lattice stays where it is on the ground
+      this._si = (((this._si + ci0 - this._ci1) % L) + L) % L; this._sj = (((this._sj + cj0 - this._cj1) % L) + L) % L;
+    }
+    this._ci1 = T.ci; this._cj1 = T.cj;
+    const gi0 = T.ci - half, gj0 = T.cj - half;
+    const la = Math.floor((gi0 - this._si) / L), lb = Math.floor((gj0 - this._sj) / L);
     for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
-      frame.dir(cx + (a - 1) * span, cz + (b - 1) * span, _d);
+      frame.dir(((la + a) * L + this._si) * cell, ((lb + b) * L + this._sj) * cell, _d);
       windLarge(bodyId, _d[0], _d[1], _d[2], t, this.seed, _w);
-      const k = (b * 3 + a) * 2;
+      weatherWind(bodyId, _d[0], _d[1], _d[2], t, this.seed, _ww);
+      const mul = _ww[0], blow = _ww[5];
+      const oe = _ww[1] * frame.ex + _ww[2] * frame.ey + _ww[3] * frame.ez;
+      const on = _ww[1] * frame.nx + _ww[2] * frame.ny + _ww[3] * frame.nz;
+      const k = (b * 3 + a) * 4;
       // (the system's own wind, added along what is blowing: a storm blows 16 m/s whatever the breeze
       // was; where the mean wind and the outflow cancel, on the rear side, it shifts through a lull)
       const be = (_w[0] * frame.ex + _w[1] * frame.ey + _w[2] * frame.ez) * mul + oe, bn = (_w[0] * frame.nx + _w[1] * frame.ny + _w[2] * frame.nz) * mul + on;
       const bs = Math.hypot(be, bn), bl = bs > 1e-6 ? blow * Math.min(1, bs / 2) / bs : 0;
       sup[k] = be * (1 + bl);
       sup[k + 1] = bn * (1 + bl);
+      sup[k + 2] = _ww[4]; sup[k + 3] = mul;
     }
-    this.cwe = sup[8]; this.cwn = sup[9];
+    // the patch-wide values are those at the focus itself (they move smoothly with it)
+    {
+      let u = (fx / cell - this._si) / L - la, v = (fz / cell - this._sj) / L - lb;
+      u = u < 0 ? 0 : u > 1.999 ? 1.999 : u; v = v < 0 ? 0 : v > 1.999 ? 1.999 : v;
+      const a0 = u >= 1 ? 1 : 0, b0 = v >= 1 ? 1 : 0, fu = u - a0, fv = v - b0, k = (b0 * 3 + a0) * 4;
+      const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
+      this.cwe = sup[k] * w00 + sup[k + 4] * w10 + sup[k + 12] * w01 + sup[k + 16] * w11;
+      this.cwn = sup[k + 1] * w00 + sup[k + 5] * w10 + sup[k + 13] * w01 + sup[k + 17] * w11;
+      this.gustiness = sup[k + 2] * w00 + sup[k + 6] * w10 + sup[k + 14] * w01 + sup[k + 18] * w11;
+      this.mul = sup[k + 3] * w00 + sup[k + 7] * w10 + sup[k + 15] * w01 + sup[k + 19] * w11;
+    }
     this.cwx = frame.ex * this.cwe + frame.nx * this.cwn;
     this.cwy = frame.ey * this.cwe + frame.ny * this.cwn;
     this.cwz = frame.ez * this.cwe + frame.nz * this.cwn;
     const cs = Math.hypot(this.cwe, this.cwn);
     const dwe = cs > 1e-6 ? this.cwe / cs : 1, dwn = cs > 1e-6 ? this.cwn / cs : 0;
+    // the gust pattern rides in the air: each copy is carried by the wind of the moment (an
+    // integral, kept here), and starts again half a cycle upwind when its cycle begins. In a steady
+    // wind this is gustLevel() exactly; in a wind that changes the pattern still moves at the
+    // wind's speed and no faster (it used to move at wind + 48 s x the wind's rate of change).
+    {
+      const gs = this.gustShift, gp = gustPhase(t, this._gp);
+      const re = jump || this._gbody !== bodyId;
+      if (re || gp[0] !== this._gc1) { gs[0] = this.cwx * gp[2]; gs[1] = this.cwy * gp[2]; gs[2] = this.cwz * gp[2]; }
+      else { gs[0] += this.cwx * dts; gs[1] += this.cwy * dts; gs[2] += this.cwz * dts; }
+      if (re || gp[1] !== this._gc2) { gs[3] = this.cwx * gp[3]; gs[4] = this.cwy * gp[3]; gs[5] = this.cwz * gp[3]; }
+      else { gs[3] += this.cwx * dts; gs[4] += this.cwy * dts; gs[5] += this.cwz * dts; }
+      this._gc1 = gp[0]; this._gc2 = gp[1]; this._gbody = bodyId;
+    }
 
     // terrain shelter for a quarter of the rows per frame (it only changes as the wind veers)
     const rows = Math.ceil(N / 4);
@@ -124,14 +191,15 @@ export class AirGrid {
       const j = this._row; this._row = (this._row + 1) % N;
       for (let i = 0; i < N; i++) {
         const n = j * N + i;
-        if (!T.valid[n]) { this.shel[n] = 1; continue; }
+        if (!T.valid[n]) { this.shel[n] = 1; this._shelT[n] = NaN; continue; }
         const x = (T.ci + i - half) * cell, z = (T.cj + j - half) * cell;
         const h0 = T.h[n];
-        let sx = -1.5;
+        let sx = -1.5, known = 0;
         for (let k = 1; k <= AIR.shelterSteps; k++) {
           const dd = k * AIR.shelterStep;
           const hk = T.heightAt(x - dwe * dd, z - dwn * dd, NaN);
           if (hk !== hk) continue;
+          known++;
           const a = Math.atan2(hk - h0, dd);
           if (a > sx) sx = a;
         }
@@ -143,6 +211,7 @@ export class AirGrid {
         for (let k = 1; k <= AIR.shelterSteps; k++) {
           const dd = k * AIR.shelterStep;
           const m = T.nearest(x - dwe * dd, z - dwn * dd);
+          if (T.known(x - dwe * dd, z - dwn * dd)) known++;
           if (m < 0 || m === n) continue;
           const c = T.cover[m * CW + 1], hc = T.cover[m * CW + 2];
           if (!(c > 0.05) || !(hc > 0.5)) continue;
@@ -151,29 +220,56 @@ export class AirGrid {
           const r = AIR.wakeDrop * c * more * Math.exp(-dd / (AIR.wakeLength * hc));
           if (r > drop) { drop = r; dropH = hc; }
         }
-        this.wake[n] = 1 - drop; this.wakeH[n] = dropH;
         const sl = Math.sqrt(1 + T.gx[n] * T.gx[n] + T.gz[n] * T.gz[n]);
         const lee = -(T.gx[n] * dwe + T.gz[n] * dwn) / sl;
-        this.shel[n] = clamp(shelterFactor(sx) * (0.5 + 0.5 * slopeFactor(lee)), 0.08, 1.6);
+        const sh = clamp(shelterFactor(sx) * (0.5 + 0.5 * slopeFactor(lee)), 0.08, 1.6);
+        // a node searched for the first time takes what was found. One whose search reached ground
+        // that has been sampled since its last search is learning, not seeing the air change: it
+        // takes the new value in over shelterLearn (so a walker, whose grid gains a row of ground
+        // every 16 m, feels no step either). Otherwise the change comes from the wind veering and
+        // is eased at the pace of the air (below).
+        if (this._shelT[n] !== this._shelT[n]) { this.shel[n] = sh; this.wake[n] = 1 - drop; this.wakeH[n] = dropH; this._fast[n] = 0; }
+        else if (this._known[n] !== known && this._seen[n] !== T.changed) this._fast[n] = 1;   // (until it has arrived)
+        this._known[n] = known; this._seen[n] = T.changed;
+        this._shelT[n] = sh; this._wakeT[n] = 1 - drop; this._wakeHT[n] = dropH;
         const z0 = T.cover[n * CW];
         this.I[n] = turbulenceIntensity(WIND.refHeight, z0 > 0 ? z0 : WIND.refRoughness);
       }
     }
 
+    // shelter and wakes follow the wind as it veers: the search above is a step function of the
+    // wind's direction (the nearest stand upwind, five probes of the ground), and the air cannot
+    // re-arrange itself faster than it crosses the fetch (before P10 a wake that changed stands took
+    // a fifth off the wind in one frame: 120 m/s2 at 10 m in the first storm at the Earth spawn)
+    {
+      const k0 = jump ? 1 : 1 - Math.exp(-dts / clamp(AIR.shelterAdjust / Math.max(cs, 1e-3), 1, 6));
+      const k1 = jump ? 1 : 1 - Math.exp(-dts / AIR.shelterLearn);
+      const sT = this._shelT, wT = this._wakeT, hT = this._wakeHT, sh = this.shel, wk = this.wake, wh = this.wakeH, fast = this._fast;
+      for (let n = 0; n < N * N; n++) {
+        const a = sT[n];
+        if (a !== a) continue;
+        const k = fast[n] ? k1 : k0;
+        sh[n] += (a - sh[n]) * k; wk[n] += (wT[n] - wk[n]) * k; wh[n] += (hT[n] - wh[n]) * k;
+        if (fast[n] && Math.abs(a - sh[n]) < 0.01 && Math.abs(wT[n] - wk[n]) < 0.01) fast[n] = 0;
+      }
+    }
+
     // nodes: interpolate the large-scale wind, add the travelling gusts and the shelter
-    const gain = WIND.gustGain, gi = this.gustiness * 0.15;
+    const gain = WIND.gustGain;
+    const gs = this.gustShift;
     for (let j = 0; j < N; j++) {
-      const v = j / (N - 1) * 2, b0 = v >= 1 ? 1 : 0, fv = v - b0;
+      const v = (gj0 + j - this._sj) / L - lb, b0 = v >= 1 ? 1 : 0, fv = v - b0;
       for (let i = 0; i < N; i++) {
-        const u = i / (N - 1) * 2, a0 = u >= 1 ? 1 : 0, fu = u - a0;
-        const k = (b0 * 3 + a0) * 2;
-        const e0 = sup[k] + (sup[k + 2] - sup[k]) * fu, e1 = sup[k + 6] + (sup[k + 8] - sup[k + 6]) * fu;
-        const n0 = sup[k + 1] + (sup[k + 3] - sup[k + 1]) * fu, n1 = sup[k + 7] + (sup[k + 9] - sup[k + 7]) * fu;
-        const be = e0 + (e1 - e0) * fv, bn = n0 + (n1 - n0) * fv;
+        const u = (gi0 + i - this._si) / L - la, a0 = u >= 1 ? 1 : 0, fu = u - a0;
+        const k = (b0 * 3 + a0) * 4;
+        const w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
+        const be = sup[k] * w00 + sup[k + 4] * w10 + sup[k + 12] * w01 + sup[k + 16] * w11;
+        const bn = sup[k + 1] * w00 + sup[k + 5] * w10 + sup[k + 13] * w01 + sup[k + 17] * w11;
+        const gi = (sup[k + 2] * w00 + sup[k + 6] * w10 + sup[k + 14] * w01 + sup[k + 18] * w11) * 0.15;
         const x = (T.ci + i - half) * cell, z = (T.cj + j - half) * cell;
         const px = frame.ox + frame.ex * x + frame.nx * z, py = frame.oy + frame.ey * x + frame.ny * z, pz = frame.oz + frame.ez * x + frame.nz * z;
         const n = j * N + i;
-        const g = gustLevel(bodyId, px, py, pz, this.cwx, this.cwy, this.cwz, t, this.seed);
+        const g = gustLevelAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
         const f = Math.max(WIND.minFactor, 1 + (this.I[n] + gi) * gain * g) * this.shel[n];
         this.we[n] = be * f; this.wn[n] = bn * f; this.gust[n] = g;
       }
@@ -325,7 +421,9 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     weatherWind(bodyId, ux, uy, uz, t, seed, _ww);
     let wx = _w[0] * _ww[0] + _ww[1], wy = _w[1] * _ww[0] + _ww[2], wz = _w[2] * _ww[0] + _ww[3];
     { const bs = Math.hypot(wx, wy, wz), bl = bs > 1e-6 ? _ww[5] * Math.min(1, bs / 2) / bs : 0; wx *= 1 + bl; wy *= 1 + bl; wz *= 1 + bl; }   // the system's own wind
-    const g = gustLevel(bodyId, px, py, pz, wx, wy, wz, t, seed);
+    // (no state out here: the pattern is carried by the synoptic wind alone, which changes over
+    // hours; carried by the storm's own wind it would race whenever that wind changed, see gustLevel)
+    const g = gustLevel(bodyId, px, py, pz, _w[0], _w[1], _w[2], t, seed);
     const zh = height != null ? Math.max(0, height) : 10;
     const I = turbulenceIntensity(WIND.refHeight, WIND.refRoughness) + _ww[4] * 0.15;
     const f = Math.max(WIND.minFactor, 1 + I * WIND.gustGain * g) * heightFactor(zh, WIND.refRoughness) * aloftFactor(bodyId, zh);

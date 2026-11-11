@@ -114,27 +114,53 @@ export function windLarge(bodyId, ux, uy, uz, t, seed, o) {
 // Returns -1..1 (0 = the mean wind, +1 a strong gust, -1 a deep lull).
 // Two copies of the pattern, half a cycle apart, are advected for at most one cycle each and
 // cross-faded, so the pattern travels for ever without shearing itself to noise.
+// This form is exact only while the wind is steady: each copy sits at p - w * tau with tau up to
+// half a cycle (48 s), so a wind that changes at 1 m/s2 moves the pattern at up to 48 m/s through
+// the air it is supposed to ride in (P10: the gusts raced whenever a storm's front came through).
+// Callers whose wind changes keep the displacement of each copy as state and use gustLevelAt
+// (the wind grid does: AirGrid, air.js); a caller with no state passes a wind that changes
+// slowly (airAt's far field passes the synoptic wind without the storm's own).
 export function gustLevel(bodyId, px, py, pz, wx, wy, wz, t, seed) {
+  const T = WIND.gustCycle, a = t / T;
+  const t1 = (a - Math.floor(a) - 0.5) * T, t2 = (a + 0.5 - Math.floor(a + 0.5) - 0.5) * T;
+  return gustLevelAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed);
+}
+
+// The same pattern with the displacement of each copy given (m, body-local): copy 1 has been
+// carried (ax,ay,az) and copy 2 (bx,by,bz) since the middle of its cycle. A caller that adds
+// wind * dt to both every step, and starts a copy again at -wind * gustCycle / 2 when its cycle
+// begins (its weight is zero at that moment), has a pattern that moves at exactly the wind's
+// speed however the wind changes. gustPhase gives the cycle numbers.
+export function gustLevelAt(bodyId, px, py, pz, ax, ay, az, bx, by, bz, t, seed) {
   const s = seedOf(bodyId, seed) + 101;
   const T = WIND.gustCycle;
   const a = t / T, c1 = Math.floor(a), f1 = a - c1;
-  const b = a + 0.5, c2 = Math.floor(b), f2 = b - c2;
+  const b = a + 0.5, c2 = Math.floor(b);
   const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1;
   const k1 = 1 / WIND.gustLength, k2 = 1 / WIND.gustLength2;
   let g = 0;
   if (w1 > 0.001) {
-    const tau = (f1 - 0.5) * T, o = hash1(c1, s) * 977;
-    const x = px - wx * tau, y = py - wy * tau, z = pz - wz * tau;
+    const o = hash1(c1, s) * 977;
+    const x = px - ax, y = py - ay, z = pz - az;
     g += w1 * (noise3(x * k1 + o, y * k1, z * k1 - o, s) * 0.7 + noise3(x * k2 - o, y * k2 + o, z * k2, s + 7) * 0.42);
   }
   if (w2 > 0.001) {
-    const tau = (f2 - 0.5) * T, o = hash1(c2, s + 55) * 977;
-    const x = px - wx * tau, y = py - wy * tau, z = pz - wz * tau;
+    const o = hash1(c2, s + 55) * 977;
+    const x = px - bx, y = py - by, z = pz - bz;
     g += w2 * (noise3(x * k1 + o, y * k1, z * k1 - o, s + 3) * 0.7 + noise3(x * k2 - o, y * k2 + o, z * k2, s + 11) * 0.42);
   }
   // blending two independent patterns lowers the variance; put it back
   g /= Math.sqrt(w1 * w1 + w2 * w2);
   return clamp(g * 1.35, -1, 1);
+}
+
+// Cycle bookkeeping of the two copies at time t: o[0], o[1] = the cycle number of copy 1 and 2
+// (a copy starts again when its number changes), o[2], o[3] = seconds since the middle of its cycle
+// (-gustCycle / 2 .. +gustCycle / 2: what a steady wind is multiplied by).
+export function gustPhase(t, o) {
+  const T = WIND.gustCycle, a = t / T, c1 = Math.floor(a), c2 = Math.floor(a + 0.5);
+  o[0] = c1; o[1] = c2; o[2] = (a - c1 - 0.5) * T; o[3] = (a + 0.5 - c2 - 0.5) * T;
+  return o;
 }
 
 // Turbulence intensity at height z over roughness z0 with displacement d: I = 1 / ln((z - d) / z0)

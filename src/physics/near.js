@@ -194,6 +194,12 @@ export class TerrainGrid {
   }
 
   // Nearest valid node index to (x, z), or -1.
+  // Whether the node nearest (x, z) has been sampled (false outside the grid too).
+  known(x, z) {
+    const N = this.N, i = Math.round(this.u(x)), j = Math.round(this.v(z));
+    return i >= 0 && j >= 0 && i < N && j < N && this.valid[j * N + i] === 1;
+  }
+
   nearest(x, z) {
     const N = this.N;
     let i = Math.round(this.u(x)), j = Math.round(this.v(z));
