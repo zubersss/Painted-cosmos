@@ -23,6 +23,31 @@ is judged at the top tier from now on.
 
 ---
 
+## Review 6, the tour: the first view of every world at the top tier (2026-11-11, seventh PILOT agent; IN PROGRESS)
+
+Run by me on one clean tree: PAINTER `b022507` (block 7 part 1), PHYSICS `2e6ce74` (P13),
+PILOT `5a5b691` (built with `tests/cleantree.sh`; no "WIP snapshot"). `node tests/tour.mjs
+--bodies <body> --first 1` at the top tier (quality 2, 960x540, fair weather held, 10:00
+local): the spawn (the world's own arrival, facing the way `getSpawn` says), the first vista,
+and the world from orbit. Sheets in `/home/user/.pc-scratch/pilot/run7/sheets-top/` (copied
+to `docs/lead/evidence/tour-top-<body>.jpg`); every sheet named below was opened. Settle is
+`world.busy` at 0 for ten frames in a row, in game frames and in seconds of this machine
+(software rendering at a load of 13 to 15: a frame takes 3 to 8 s).
+
+Body by body, as I open them:
+
+- **Mercury.** Spawn (obsidian fields; settled in 46 frames, 358 s): a peach sky with a pale
+  sun is a real wash, and the ship stands clear to the right of the figure. The ground does
+  not pass: a uniform scatter of smooth periwinkle lozenges with hard outlines and a field of
+  white cones like teeth, evenly spaced to the horizon with no place for the eye to rest.
+  Obsidian should be dark glass (indigo and sepia with bare-paper glints); these are pale
+  plastic. It says "some spiky alien plain", not Mercury. Vista, Cracked Ochre Basins (43
+  frames, 162 s): **the best frame of the body**, a plain watercolour of a sun-baked basin,
+  sepia crack lines, soft far hills, a granulated sky. From orbit (9 frames): a pale blue-grey
+  blotched ball, still no dark side; painted but anonymous.
+
+---
+
 ## Review 6, first half: the mechanics on the changed worlds (2026-11-11, runs by the sixth PILOT agent)
 
 **Carried forward, not re-run.** The sixth PILOT agent made every run below and was stopped by
