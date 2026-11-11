@@ -378,3 +378,34 @@ test('branches follow the wind on the tree and how gusty it is; a brushed crown 
   const g = w.physics.fields.flora.uniforms.uPhysBranch[0]; assert.ok(g >= 0 && g <= 1);
   for (const name of ['pcPhysBranch', 'uPhysBranch', 'uPhysBranchPhase']) assert.ok(FLORA_GLSL.includes(name), name);
 });
+
+test('in a storm a tree leans and tosses but does not whip back upwind (aerodynamic damping; P8, the thunderstorm at the Earth spawn)', async () => {
+  // (before P8 a lull in the gust front swung a tree from 12 degrees downwind to 11 upwind in 0.4 s,
+  // at up to 104 degrees a second: the lightly damped sway of a calm day, driven by a gale)
+  const { BODIES } = await import('../data/bodies.js');
+  const sample = makeWorld({ R: BODIES.earth.radius, biome: 'alpine_meadow' });
+  const physics = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
+  const d = norm(V(0.1736, 0.5817, 0.7946)), R = sample(d).radius, p = V(d.x * (R + 1), d.y * (R + 1), d.z * (R + 1));
+  const run = (t0, secs) => {
+    physics.warmUp({ bodyId: 'earth', time: t0 - 10, focus: p });
+    for (let t = t0 - 10; t < t0; t += 1 / 30) physics.update(1 / 30, { bodyId: 'earth', time: t, focus: p });
+    const o = {}, a = {}; let fastest = 0, upwind = 0, largest = 0, pe = 0, pn = 0, wmax = 0;
+    for (let i = 0; i < secs * 60; i++) {
+      physics.update(1 / 60, { bodyId: 'earth', time: t0 + i / 60, focus: p });
+      physics.fields.flora.plantBend(p, 1, o); physics.air('earth', p, a, 10);
+      const w = Math.hypot(a.wind.x, a.wind.y, a.wind.z); wmax = Math.max(wmax, w);
+      if (i) fastest = Math.max(fastest, Math.hypot(o.e - pe, o.n - pn) * 60);
+      pe = o.e; pn = o.n; largest = Math.max(largest, o.angle);
+      // the bend against the wind: its part along the wind's own direction, when negative
+      const F = physics.fields.flora.plantBendLite(p, 1, {});
+      if (w > 4) { const wl = Math.hypot(physics.here.air.wind.x, physics.here.air.wind.y, physics.here.air.wind.z) || 1; const al = (F.e * o.e + F.n * o.n) / (Math.hypot(F.e, F.n) || 1); upwind = Math.min(upwind, al); }
+    }
+    return { fastest: fastest * 57.3, upwind: upwind * 57.3, largest: largest * 57.3, wmax };
+  };
+  const storm = run(170, 40);
+  assert.ok(storm.wmax > 12, 'this is the gust front: ' + storm.wmax);
+  assert.ok(storm.largest > 6, 'the tree leans: ' + storm.largest);
+  assert.ok(storm.fastest < 30, 'no whip: fastest ' + storm.fastest + ' deg/s');
+  assert.ok(storm.upwind > -2, 'never far upwind: ' + storm.upwind + ' deg');
+  assert.ok(FLORA.stiffDamp < 0.2 && FLORA.aeroDamp * 3 < 0.1, 'in a breeze the sway is still free');
+});

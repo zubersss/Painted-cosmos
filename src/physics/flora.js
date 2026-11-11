@@ -33,6 +33,12 @@ export const FLORA = Object.freeze({
   stiffHeight: 10,              // m: where crowns feel it (or the canopy top, if higher)
   softHz: 2.2, softDamp: 0.38,
   stiffHz: 0.45, stiffDamp: 0.12,
+  // (P8) aerodynamic damping: a crown moving through moving air is braked by its own drag, in
+  // proportion to the wind (damping ratio rho Cd A U / (2 m omega): 0.1 to 0.3 for a tree in
+  // leaf in 10 m/s; Moore and Maguire 2004, Sellier and Fourcaud 2009), so a tree that sways
+  // freely in a breeze follows the gusts of a gale without whipping back upwind. Per m/s of
+  // reference wind at Earth's air density; the ratio never exceeds aeroDampMax.
+  aeroDamp: 0.025, aeroDampMax: 0.85,
   // shape of the response (shared with the shader through uniforms)
   softFlex: 3.0, softMax: 1.2,        // bend angle = max * (1 - exp(-flex * load)), radians
   stiffFlex: 1.2, stiffMax: 0.25,
@@ -202,8 +208,9 @@ export class FloraField {
     const h = dt > 0.1 ? 0.1 : dt;
 
     // ---- bend field: drive the two reference oscillators with the wind load of each cell --------
-    oscCoef(TAU * FLORA.softHz, FLORA.softDamp, h, _coef, 0);
-    oscCoef(TAU * FLORA.stiffHz, FLORA.stiffDamp, h, _coef, 4);
+    const aero = FLORA.aeroDamp * Math.hypot(air.cwe || 0, air.cwn || 0) * rho / 1.225;
+    oscCoef(TAU * FLORA.softHz, Math.min(FLORA.aeroDampMax, FLORA.softDamp + aero), h, _coef, 0);
+    oscCoef(TAU * FLORA.stiffHz, Math.min(FLORA.aeroDampMax, FLORA.stiffDamp + aero), h, _coef, 4);
     const a11 = _coef[0], a12 = _coef[1], a21 = _coef[2], a22 = _coef[3];
     const b11 = _coef[4], b12 = _coef[5], b21 = _coef[6], b22 = _coef[7];
     const kq = 0.5 * rho / FLORA.qRef;
