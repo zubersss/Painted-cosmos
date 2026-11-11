@@ -149,7 +149,12 @@ async function boot() {
   // Sound may start only inside a click, a tap or a key press (Safari for the whole session;
   // Chrome, where a gamepad is not a gesture): start it there, in the capture phase so that no
   // handler can swallow the event first. Idempotent; a running context ignores it.
-  const wake = () => { if (audio.state !== 'running') audio.start(true); };
+  // (Esc and browser shortcuts are not gestures: where the browser can say, skip what is not one.)
+  const wake = () => {
+    if (audio.state === 'running') return;
+    if (navigator.userActivation && !navigator.userActivation.isActive) return;
+    audio.start(true);
+  };
   for (const t of ['pointerdown', 'mousedown', 'keydown', 'touchend', 'click']) document.addEventListener(t, wake, { capture: true });
   // A hidden tab stops the frame loop: silence the mix rather than freeze it (src/audio/audio.js).
   document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); else audio.resume(); });
