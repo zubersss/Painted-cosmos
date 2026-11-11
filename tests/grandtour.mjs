@@ -54,9 +54,13 @@ async function beat(name) {
   const w0 = Date.now();
   const n = String(beats.length + 1).padStart(2, '0');
   let file = null;
+  // The game stands still while the frame is taken (a top-tier frame takes seconds to reach
+  // the screen in software rendering; the moment must not run on meanwhile).
+  await page.evaluate(() => window.__pc.hold(true));
   try { file = path.basename(await shot(`beat-${n}-${name}`)); } catch { /* a frame that would not come is a finding too */ }
   const i = await info();
-  beats.push({ n: beats.length + 1, name, file, t: +i.t.toFixed(1), wall: Math.round((Date.now() - wall0) / 1000), shotSeconds: Math.round((Date.now() - w0) / 100) / 10, state: i.state, view: i.view, prompt: i.prompt, notice: i.notice, uiNotice: i.uiNotice || null, quality: i.quality, scale: i.scale, fps: i.fps });
+  await page.evaluate(() => window.__pc.hold(false));
+  beats.push({ n: beats.length + 1, name, file, t: +i.t.toFixed(1), wall: Math.round((Date.now() - wall0) / 1000), shotSeconds: Math.round((Date.now() - w0) / 100) / 10, state: i.state, view: i.view, busy: await page.evaluate(() => (window.__pc.world.busy == null ? null : window.__pc.world.busy)), tris: i.stats ? i.stats.tris : null, prompt: i.prompt, notice: i.notice, uiNotice: i.uiNotice || null, quality: i.quality, scale: i.scale, fps: i.fps });
   log(`  beat ${n} ${name}: ${i.state}, prompt "${i.prompt || ''}", notice "${i.notice || ''}"`);
 }
 const saveBeats = async () => {
@@ -373,6 +377,7 @@ try {
     if (opt.beats) { await gameWait(0.15); await beat('the-card-lifts'); }
     await gameWait(0.6);
     await beat('first-view');
+    if (opt.beats) { await gameWait(3); await beat('first-view-3s-later'); }
     check(!(await page.evaluate(() => window.__pc.game.hud.startShown)), 'a click on the title starts the game');
     i = await info();
     check(i.state === 'ON_FOOT' && i.body === 'earth', `on foot on Earth (${i.mood.biomeId})`);
