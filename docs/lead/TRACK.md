@@ -77,7 +77,7 @@ been able to check are still the frame rate on a real GPU and how the game sound
 
 | Item | Owner | Status |
 | --- | --- | --- |
-| Every check, one command, one table | Pilot | DONE: `node tests/all.mjs --export` (a clean export of the last commit; three unit suites, the brief's static rules, eight scripted browser runs). Last run: export of `db22516`, 12 of 13 pass (the thirteenth was a fault in the step itself, fixed). ALLCHECKS_FINAL |
+| Every check, one command, one table | Pilot | DONE: `node tests/all.mjs --export` (a clean export of the last commit; three unit suites, the brief's static rules, eight scripted browser runs). Last run: export of `db22516`, 12 of 13 pass (the thirteenth was a fault in the step itself, fixed). Run again on the export of `d149255` (PAINTER's block 2, PHYSICS' P7.5, the boom, the stalled-sink guard and the gentler low pace all in): **ALL 13 PASSED** (unit 105, PHYSICS 222, PAINTER 19, static, play-through 37 on stubs, with PHYSICS and in the painted world, the trip 47 on stubs and in the painted world, m3 28 on stubs and in the painted world, pointer lock 7, sound), 33 minutes. |
 | README for a new player | Pilot | DONE: where to play, the first minute, every control, the read-out line by line, what the tiers draw, what was never verified on real hardware; the static step of `all.mjs` fails if a control of the help card is missing from it |
 | Blunt critique of the other two domains, as a player | each role | Pilot's is in `docs/notes/pilot.md` ("Critique swap"); Painter's and Physics' of the others are theirs to write |
 | Fix the worst issues | all | TODO: the one MUST FIX above first, then each role's SHOULD FIX list (review 5 and its addendum) |

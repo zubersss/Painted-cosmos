@@ -71,6 +71,11 @@ wall-clock assertions in my unit tests no longer fail on a busy machine. **The s
 `tests/all.mjs` that failed on `db22516` was my fault** (it pinned the quality tier that the
 check then reads); fixed.
 
+**Every check on the head after all of this**: `node tests/all.mjs --export` on the export of
+`d149255`: ALL 13 PASSED (unit 105, PHYSICS 222, PAINTER 19, the static rules, play-through
+37 checks three times over, the trip 47 twice, m3 28 twice, pointer lock, sound; the painted
+play-through and the painted Earth, Mars, Saturn trip among them), no console errors.
+
 Not done in this addendum: the tour (114 frames, about two hours of a quiet machine) was not
 re-run on `0de3fb4`; nothing was judged in motion.
 
