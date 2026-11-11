@@ -4,7 +4,7 @@ Owner: PILOT as lead developer. Updated at every sync. Status words: DONE (verif
 and how), PART (works, with the stated gap), TODO, RISK.
 A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it.
 
-Last update: 2026-11-11, after review 3 (commit `22a10c3`).
+Last update: 2026-11-11, during M3 (Pilot's M2 accepted; Painter's M2 second pass with a fresh Painter; Physics P3 accepted).
 
 ## Milestone 1: vertical slice
 
@@ -45,13 +45,16 @@ brushed crowns, wandering trunks and bank at 960x540). Physics: P1 accepted by t
 
 ## Milestone 3: the painting comes alive
 
-| Item | Owner | Status |
-| --- | --- | --- |
-| Motion: wind, water, weather, day-night; space washes; art pass on weakest biomes | Painter (+ Physics fields) | TODO |
-| Painted UI theme (`src/art/ui.css`, hand lettering) | Painter | TODO (Pilot runs a plain paper fallback) |
-| HUD, sketchbook and vistas, title screen, help card | Pilot | PART (prompt line, two gauges, start card with the controls) |
-| Audio, all procedural | Pilot | TODO |
-| Performance tiers and dynamic resolution | Pilot | PART (controller built and unit-tested; never run on a real GPU) |
+| Item | Owner | Status | Verified how, by whom |
+| --- | --- | --- | --- |
+| Sketchbook and vistas | Pilot | DONE (fallback look) | Pilot: `tests/save.test.mjs` (vista found once, listed, saved), `node tests/m3check.mjs` |
+| Audio, all procedural | Pilot | DONE: wind from the real wind, rain, thunder, ship, jetpack, footsteps, pads, UI sounds. Nobody has listened to it: headless checks only prove it runs and the mix is sane | Pilot: `node tests/m3check.mjs` |
+| Title screen, help card | Pilot | DONE (the start card; H) | Pilot: `node tests/m3check.mjs` |
+| HUD | Pilot | PART: prompt, gauges, read-out, notice, markers, look hint, all legible on paper slips; fallback look until `src/art/ui.css` and `painter.setMarks` | Pilot: evidence frames |
+| Performance tiers and dynamic resolution | Pilot | PART: controller unit-tested; starts at tier 1 and scale 0.75 and climbs; never run on a real GPU | Pilot: `tests/dynres.test.mjs`, `m3check` |
+| Freeze-frame tour of every biome on every body | Lead | DONE as an instrument: `node tests/tour.mjs` writes `docs/lead/evidence/tour-<body>.jpg` | Lead: sheets in the repo |
+| Motion: wind, water, weather, day-night; space washes; art pass on weakest biomes | Painter (+ Physics kits) | TODO: Physics' draw kits exist and are inside the budget (12 calls, 31 k triangles); Painter wires them first in M3 | |
+| Painted UI theme, painted markers, real explorer and ship | Painter | TODO | |
 
 ## Milestone 4: critique swap and ship
 
