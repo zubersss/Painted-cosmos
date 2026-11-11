@@ -10,6 +10,241 @@ are relative, never a claim about a real GPU.
 
 ---
 
+## Review 5 (weather in the game; M3 in progress): 2026-11-11, at commit `62d3529`
+
+Not a milestone gate: PAINTER's M3 block 2 (real models, near-ground layer, rain glaze, pepper)
+and PHYSICS' P7 (marks, waves and sky tuned against the picture) are both in mid-flight, and
+this review looks at what they had committed at `62d3529` (PAINTER's `29686e8` "near ground
+1", PHYSICS' `44c0101` "P7.1"). Everything below was run by me, in the game itself, on a clean
+export, one browser at a time, software GL. Evidence: `docs/lead/evidence/weather.jpg` and
+`.json` (twelve frames, third person as the player sees it, 960x540, quality 1, HUD hidden;
+made by `node tests/weather.mjs`), `docs/lead/evidence/cost.json` (`node tests/cost.mjs`).
+
+**Open MUST FIX after this review.** PAINTER: two, both carried into M3 by the coordinator
+(items 1 and 2). PHYSICS: one, new (item P1: storms bring no wind). PILOT: none known.
+
+What I ran, and what came back:
+- The weather set, twelve frames, **no console errors**, every frame settled. The numbers are
+  the game's own counters (the read-out's `scene` and `weather` lines, now also in
+  `__pc.info().weather`):
+
+  | frame | game clock, local time | PHYSICS says | triangles | draw calls | kits (calls, triangles) |
+  | --- | --- | --- | --- | --- | --- |
+  | Earth spawn, before | 544 s, 17:12 | mist | 579 k | 299 | 2, 34 |
+  | **Earth spawn, in the storm, as the game gives it** | 724 s, 19:48 | thunderstorm | **606 k** | 315 | 5, 3.3 k |
+  | the same, forced flash | 730 s | thunderstorm | 606 k | 315 | 5, 3.1 k |
+  | Earth spawn, after | 874 s, 21:54 | mist | 579 k | 299 | 2, 50 |
+  | before, sun held at 11:00 | 544 s | clear | 579 k | 299 | 2, 60 |
+  | in the storm, 11:00 | 725 s | thunderstorm | 582 k | 302 | 5, 3.2 k |
+  | forced flash, 11:00 | 731 s | thunderstorm | 582 k | 302 | 5, 3.2 k |
+  | after, 11:00 | 874 s | clear | 579 k | 299 | 2, 42 |
+  | blizzard, Earth's alpine meadow | 474 s, 11:30 | blizzard | 470 k | 234 | 3, 3.5 k |
+  | dust storm, Mars' dunes | 845 s, 11:12 | dust storm | 219 k | 108 | 1, 702 |
+  | Neptune's storm sea, PHYSICS' own sky | 155 s, 11:18 | windy (30 m/s) | 379 k | 206 | none |
+  | the same sea, storm sky forced | 160 s | windy (40 m/s) | 379 k | 206 | none |
+
+  (PAINTER's gallery figure for the storm at the spawn was 551 k and 301. The game's is higher
+  because the game has the explorer and the ship in the frame and, since `29686e8`, the
+  near-ground layer.)
+- **The first storm of the default seed arrives in the dark.** Earth's day is 25 minutes and
+  the game begins at 9:30, so the thunderstorm that PHYSICS' default seed sends across the
+  spawn at 640 to 800 s falls between half past six in the evening and nine at night. A new
+  player who stays at the spawn sees the first four frames of the sheet: a rose dusk, then
+  indigo night with pale rain. To judge the storm as a daylight picture I shot it again with
+  the sun held at eleven (frames five to eight).
+- **Cost in the game at all three quality tiers** (new instrument, `node tests/cost.mjs`; on
+  the clean export of `83c604c`, PAINTER's "near ground 2"): the dearest tour frame of every
+  body and the Earth spawn, third person as the player arrives, fair weather held, the real
+  explorer and ship in the frame, settled. Triangles / draw calls:
+
+  | place | quality 0 (300 k) | quality 1 (600 k, 350) | quality 2 (1.2 M) |
+  | --- | --- | --- | --- |
+  | earth, spawn | 283 k / 195 | 549 k / 294 | 756 k / 368 |
+  | **earth, vista `temperate_forest-1`** | **306 k** / 191 | **614 k** / 341 | 818 k / 405 |
+  | mercury, vista `crystal_gardens-2` | 217 k / 167 | 420 k / 326 | 505 k / 419 |
+  | venus, vista `fungal_towers-2` | 211 k / 133 | 549 k / 264 | 627 k / 305 |
+  | moon, `crater_fields` | 178 k / 92 | 419 k / 160 | 494 k / 189 |
+  | mars, `rust_canyons` | 165 k / 99 | 375 k / 210 | 410 k / 252 |
+  | jupiter, vista `hanging_gardens-2` | 240 k / 139 | 534 k / 246 | 664 k / 297 |
+  | saturn, vista `crystal_reeds-2` | 245 k / 126 | 454 k / 211 | 511 k / 241 |
+  | uranus, vista `teal_sinkholes-1` | 201 k / 118 | 398 k / 210 | 445 k / 234 |
+  | neptune, vista `storm_seas-1` | 234 k / 135 | 427 k / 242 | 482 k / 281 |
+  | pluto, vista `lilac_mountains-1` | 145 k / 91 | 338 k / 167 | 414 k / 202 |
+
+  No console errors. This is the first time quality 0 and 2 have been measured in the game.
+  One view is over at quality 1 and at quality 0, the same one as in review 4; every draw-call
+  count is now inside (Mercury's crystal garden was 365 with my placeholder models, 326 with
+  the real ones, which are one draw call each).
+- PHYSICS' weather measured in Node on the same export (scratch `run3/sky.mjs`, `wind.mjs`):
+  see the PHYSICS section.
+- My own unit tests: 105 pass. `node --test src/physics/`: 215 pass. `node --test
+  src/world/*.test.mjs`: 19 pass.
+- BROWSER_CHECKS_PENDING
+
+### PAINTER (M3 in progress)
+
+MUST FIX (M3; both carried by the coordinator's ruling when M2 closed)
+
+1. **The frame budget with weather, the real models and the near-ground layer in** (600 k
+   triangles and 350 draw calls in the densest view of every body at quality 1, measured in
+   the game). **Still open, by a hair, in one view and in one situation**: the vista
+   `earth-temperate_forest-1` is at **614 k** triangles and 341 draw calls in fair weather at
+   quality 1 (review 4: 652 k and 368 with my placeholders; the draw calls are now inside)
+   and at **306 k** at quality 0 (budget 300 k); and the thunderstorm at the Earth spawn, at
+   the hour the game gives it, is at **606 k** and 315. Everything else measured is inside:
+   291 k to 549 k at quality 1, at most 818 k at quality 2. Wanted, as before: 600 k or less
+   and 350 or less at that vista at quality 1 in fair weather and in the storm, 300 k or less
+   at quality 0 (`node tests/cost.mjs --places "earth:vista:earth-temperate_forest-1"`).
+   One thing to look at on the way: the same storm at the same spot costs **606 k at night and
+   582 k at eleven in the morning**, while the night without the storm costs 579 k. Something
+   is submitted only when it storms after dark (24 k triangles, 13 draw calls; the kits are
+   3.3 k and 5 in both). To see it: fresh game, `__pc.setClock(710)`, wait until
+   `__pc.sim.t > 724`, read the `scene` line; then `__pc.teleport({ hour: 11 })` and read it
+   again.
+2. **Pepper in dark washes and in space.** Still there, and the weather makes more dark
+   washes: the storm sky, the wet ground at night, Neptune's sky and sea (the blue sky of the
+   Neptune frame is the worst: hard dark specks over the whole wash), and the ragged border,
+   which goes dark and dotted under the storm key (your own note). You have this on your list
+   for block 2; it is measured again when you report.
+
+SHOULD FIX (the weather as a picture; judged against the art bible, at 960x540)
+
+3. **Rain is still pale opaque sticks** (`R-RAIN-6`: "never white lines"). PHYSICS' P7.1 has
+   made the strokes parallel and fewer (about a dozen in the frame), which is right; but each
+   is a hard-edged chalk-white bar laid over dark trees, the most digital thing in an
+   otherwise convincing wet forest. The glaze you have planned is the fix. In the night
+   frames the strokes are the brightest marks in the picture.
+4. **The lightning frame has white dust round every crown.** With `flash` at 1 the sky lifts
+   to paper (good, and `R-STORM-4` holds: paper, not white), but along the silhouette of the
+   trees there is a fringe of pure-white specks, two or three pixels each, that reads as a
+   dropout. Both flash frames show it (day and night).
+5. **The near-ground layer ignores snow.** In the blizzard frame the fresh snow is bare paper
+   everywhere except where the new layer draws: a band of bright green flicks lies on top of
+   the snowfield across the whole foreground. (Before `29686e8` that foreground was empty
+   paper, which was honest.) On Earth's lawn in fair weather the same marks are small dark
+   green triangles a metre apart: they read as teeth, not as grass; on Mars and Neptune, as
+   pebbles and ripple marks, they are right.
+6. **After the storm, the puddles read as holes**: two or three dark, hard-edged patches on
+   the lawn (day frame), and on Neptune's beach one hard white kite. `R-RAIN-4` wants puddles
+   in hollows; a puddle is a pale, soft-edged piece of sky.
+7. **Neptune's sea does not take the storm.** Under the forced storm sky the land darkens and
+   the sky is heavy indigo, and the sea stays the same clear ultramarine as in fair weather.
+   Under PHYSICS' own sky (30 to 40 m/s of wind) the sea is nearly flat blue with one foam
+   line at the shore: no white horses at all (your note: the waves are smaller than the
+   brush; see PHYSICS item P3).
+8. **The dust storm is a hazy day.** The sky and the far dunes are right (the whole sheet in
+   the ground's ochre). Near the explorer nothing is in the air: the ground is crisp to the
+   first ridge with a pencil line on it. PHYSICS' new dust walls (1 draw call, 702 triangles)
+   cannot be found in the frame.
+9. **The blizzard is a quiet snowfall.** As a painting it is the best frame of the set
+   (closed sky, the massif going into the white, the explorer's violet shade). As a blizzard
+   it is about fifteen pale flecks in the sky and a massif that is plainly visible (PHYSICS
+   item P1).
+
+GOOD
+- Weather is in the game and costs almost nothing: the kits are 1 to 5 draw calls and 0.7 to
+  3.5 k triangles; sky, haze, light and wet ground add no call.
+- The real explorer and ship sit in the painting (hat, coat, red pack; a boat-like hull under
+  a canopy), with a cast shade under each. They are the first third-person frames in this
+  project that do not have a grey capsule in the middle.
+- The storm by day passes as a watercolour of a wet wood: dark heavy sky, the far trees lost
+  in a pale band, no cast shadows, richer ground.
+
+### PHYSICS (P7 in progress)
+
+MUST FIX (M3)
+
+P1. **Storms bring no wind.** Measured with `physics.air` on the export, at the place and
+   time of each frame, at 2, 10 and 30 m above the ground:
+
+   | weather (PHYSICS' own name) | wind at 2 m | at 10 m | at 30 m | visibility |
+   | --- | --- | --- | --- | --- |
+   | thunderstorm, Earth spawn, 660 to 720 s | 1.1 to 2.6 m/s | 1.6 to 3.7 | 3.8 to 8.7 | 2.6 to 3.1 km |
+   | the drizzle before it, 600 s | 1.7 to 4.2 | 2.5 to 6.0 | 4.9 to 11.7 | 7.6 km |
+   | blizzard, alpine meadow, 400 s | 4.7 to 9.2 | 6.5 to 12.7 | 7.7 to 15.1 | 1.2 km (`visibility01` 0.25) |
+   | the same blizzard, 470 s (snowfall 0.87) | 1.4 to 4.1 | 2.0 to 5.7 | 2.4 to 6.8 | 2.0 km (0.31) |
+   | dust storm, Mars' dunes, 840 s | 2.2 to 3.4 | 2.8 to 4.2 | 3.2 to 4.8 | 350 m |
+
+   `R-STORM-5` asks for gusts of 15 to 30 m/s in a thunderstorm; the storm at the spawn peaks
+   under 9 m/s above the canopy and under 3 m/s where the player stands. `R-STORM-2` asks for
+   the wind to rise before the rain; here the wind is highest in the drizzle before the storm
+   and **falls** as the storm arrives. A blizzard is by definition a wind (15 m/s and more,
+   visibility under 400 m); a dust storm on Mars needs a wind strong enough to lift dust. In
+   the game all three are the local breeze multiplied by a `windFactor` of 1.4 to 2.5, so what
+   the player gets is rain, snow or haze falling through still air: trees that do not toss,
+   flakes that drift down, dust that hangs. Wanted: each storm brings its own wind (a gust
+   front ahead of the rain; sustained 15 m/s and more in a blizzard with `visibility01` at
+   0.3 or less for as long as it is called one; 20 m/s and more in a Martian dust storm), in
+   `physics.air`, so that everything that already follows the wind (plants, marks, waves, the
+   sound) shows it. The assists keep the explorer on its feet (`R-FOOT-5`).
+
+SHOULD FIX
+
+P2. **The first storm falls in the dark** (see above): 640 to 800 s is 18:30 to 21:00 at the
+   spawn. Your note says "late in the first morning". A seed (or an offset) that sends the
+   first storm across the spawn before about 400 s (15:30) would let a new player see it.
+P3. **Neptune's `storm_seas` never storms.** At the biome's stand, scanned every 20 s for two
+   hours of game time: "windy" under a cloudless sky (`cloud` 0, `haze` 1) for most of it,
+   with short spells of drizzle, rain and ice fall; never a storm. The wind is 26 to 47 m/s
+   at 2 to 10 m (hurricane force) and the sea it raises is 1 m high and 10 m long, which at
+   the game's distances is smaller than PAINTER's brush. A sea named for its storms needs a
+   storm sky most of the time and a swell that can be seen from the shore (PAINTER asked for
+   the same).
+P4. **Dust in the air of Earth's forest**: `sky.dust` is 0.27 to 0.29 at the spawn at 600 to
+   630 s ("windy", then the first rain) and 0.18 to 0.23 as the storm leaves. A wet temperate
+   wood has no dust to raise; is this haze under another name?
+P5. Carried from review 4: the stateless `physics.sky(physics.weather(...))` and `here.sky`
+   disagree (one visible case today: jumping the clock from 730 to 860 s leaves `wet` at 0.99
+   where your state would have dried to 0.4; only tools jump the clock, so it is cosmetic).
+P6. **A wind the player cannot walk in.** On Neptune's storm coast the wind at the explorer is
+   33 m/s whenever one visits. In the pure simulation (my `Sim`, your body model, PAINTER's
+   ground; scratch `run3/windwalk.mjs`, export of `62d3529`): standing still for 15 s the
+   explorer does not move (good); walking **downwind makes 0.60 m/s**, upwind 3.54, across
+   2.87 (still air 4.2); a 2.5 s jetpack hop is carried 85 m. Downwind slower than upwind is
+   the wrong way round whatever one thinks of the rest. And a coast where one heading is
+   always a crawl and every hop is a throw fights the player (`R-FOOT-5`: "up to about 25 m/s
+   a fit body leans"). Two ways out: a boundary layer that leaves 10 to 15 m/s at two metres
+   under a 40 m/s wind aloft, or a lever in the command that says how much of the wind the
+   suit cancels (feel is PILOT's call; I would set it so that no heading is under 3 m/s and a
+   hop is carried at most 15 m).
+
+GOOD
+- P7.1's marks: the rain is parallel and sparse, as PAINTER asked; the snow flecks have their
+  own shapes.
+- 215 tests pass. The worst `physics.update` frame I saw in the browser was 66 ms under load
+  (software GL, three agents on four cores: not a measurement of your code).
+
+### PILOT (self-review)
+
+- **The thicket** (review 4, item 2, my half): a third-person boom squeezed under 2.3 m by
+  trunks, crystals or the hull now slides the view into the explorer's eyes (fully at 1.3 m),
+  eased over a third of a second, and back out when there is room; the explorer is not drawn
+  while it does. Unit-tested, and seen in the game (scratch
+  `run3/cost/thicket.jpg`, on `83c604c`): at `mercury-crystal_gardens-2` the boom is 0.8 m and
+  the view is fully the explorer's; at `uranus-frozen_waves-2` 1.56 m and 84 % of the way in.
+  No frame is the back of a hat any more. **What the camera cannot fix**: both frames are now
+  filled by the crystal face and the wave wall that stand a metre or two in front of the
+  easel. Review 4's item 2 stays with PAINTER for those two sites (a few metres clear in
+  front of the easel as well as behind it). `saturn-crystal_reeds-2` reads as a picture of
+  reeds and can stay.
+- **Stepping out of the ship** started with the boom at 0.8 m (the camera faced away from the
+  hull, so the hull was at its back): the view now turns along the hull until the boom has
+  room. Found by the new camera test; it had been so since M1.
+- **Mars' spawn** (PHYSICS' finding, confirmed): running from the spawn in eight directions for
+  25 s each in the pure simulation with the real ground, obstacles and physics, one heading
+  made 5 m (wedged between a rock 0.48 m high and one 0.99 m high) and the others 127 to 154 m
+  with up to 2.6 s lost. Fixed on my side, not by moving the spawn: obstacles up to 1.3 m are
+  ground the explorer walks up and over; and wedged between two tall ones with the key held,
+  the suit walks round the thinner. After: 170 to 179 m in every heading on Mars; Mercury's
+  one stall (two crystals) 5 m to 146 m; Neptune's 101 m to 167 m. Two tests.
+- **The painted theme, second pass**: keys, button, tabs, pencil frames, rules, map, gauges
+  (`docs/shots/pilot/ui-*.jpg`). Not yet looked at by PAINTER. The frame read-out stays plain
+  type on purpose.
+- Still open in my domain: nothing has met a real mouse, a real pad or a real GPU; the pulse
+  profile is still mine, not PHYSICS'.
+
+---
+
 ## Review 4: 2026-11-11, at commit `ded1435` (PAINTER's third pass `334eb16`; before its weather block)
 
 The gate for M2 as a whole. Everything below was run by me on a clean export of `ded1435`,

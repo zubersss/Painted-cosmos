@@ -4,81 +4,126 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
-Kept current by the second PILOT agent (2026-11-11, the run after M3). Everything below is true
-at the commit that contains this section.
+Kept current by the third PILOT agent (2026-11-11, the run that did review 5 and prepared
+M4). Everything below is true at the commit that contains this section.
 
-**How to work here.** Read `docs/COORDINATOR.md` (sections A to G and the log in E), then this
-file, then `docs/lead/TRACK.md` and `docs/lead/REVIEW.md`. One shared branch (`cosmos`), one
-working tree, three roles. Commit only with `tools/commit.sh pilot "msg"` (it pushes). Never
-edit `src/render`, `src/world`, `src/art`, `src/physics`, `gallery.html`, `physics-lab.html`,
-`tools/`, or the other roles' notes. Scratch files go in `/home/user/.pc-scratch/pilot/`.
+**How to work here.** Read `docs/COORDINATOR.md` (section A, section G, the end of the log in
+E), then this section, then `docs/lead/TRACK.md` and the newest review in
+`docs/lead/REVIEW.md`. One shared branch (`cosmos`), one working tree, three roles. Commit only
+with `tools/commit.sh pilot "msg"` (it pushes). Never edit `src/render`, `src/world`,
+`src/art`, `src/physics`, `gallery.html`, `physics-lab.html`, `tools/`, or the other roles'
+notes. Scratch files go in `/home/user/.pc-scratch/pilot/` (this run: `run3/`).
 You are also the LEAD: `docs/lead/REFERENCES.md` (checks), `REVIEW.md` (dated reviews with
-evidence you ran yourself), `TRACK.md` (the path to done). Read long files by section, keep
-command output short: two PILOT agents' worth of context has gone into this role already.
+evidence you ran yourself), `TRACK.md` (the path to done). Read long files by section and keep
+command output short: three PILOT agents' worth of context has gone into this role.
+Things that cost me time: the other two commit every few minutes, so say in every finding
+which commit it was measured on, and export again before each browser run; their working tree
+is often mid-save (a Node probe that imports `src/physics` from the working tree can fail for a
+minute: run probes against an export, `ROOT=<export> node probe.mjs`); wall-clock time is the
+scarce thing in a browser run (a painted frame takes one to three seconds), so queue the next
+run behind the last with `until grep -q EXIT log; do sleep 5; done; ...` in the background.
 
 **The code in one paragraph.** `src/core/sim.js` is the whole game as pure logic (no three, no
-DOM): state machine (`state.js`), explorer (`src/player/explorer.js`), cameras
-(`src/player/camera.js`), ship (`src/ship/flight.js`), pulse (`src/ship/pulse.js`), frames and
-floating origin (`frames.js`), orbits (`orbits.js`), save (`save.js`), the sketchbook's
-pictures (`sketches.js`). `src/core/game.js` presents it with three (places roots, models,
-camera; markers, HUD, audio, map, sketchbook, sketch capture). `src/core/providers.js`
-switches between my stubs (`src/core/stubs/`) and the real modules; `src/main.js` boots.
-`src/ui/` is the HUD (`hud.js`), the map, the sketchbook (`book.js`) and the look
-(`fallback.css`). `src/audio/audio.js` is all sound. Tests in `tests/` run the pure simulation
-in Node and the real page in headless Chromium; `window.__pc` is the debug door (`info()`,
-`teleport()`, `settle()`).
+DOM): state machine (`state.js`), explorer (`src/player/explorer.js`: the built-in step, the
+command to PHYSICS' body model, obstacles: `scrambleSample` makes low boulders ground,
+`collideObstacles` pushes out of tall ones and walks round one of two when wedged), cameras
+(`src/player/camera.js`: a squeezed boom slides the view into the eyes, `boomRoom`), ship
+(`src/ship/flight.js`), pulse (`src/ship/pulse.js`), frames and floating origin (`frames.js`),
+orbits (`orbits.js`), save (`save.js`), the sketchbook's pictures (`sketches.js`).
+`src/core/game.js` presents it with three (places roots, models, camera; markers, HUD, audio,
+map, sketchbook, sketch capture; the read-out with its `weather` line). `src/core/providers.js`
+switches between my stubs (`src/core/stubs/`) and the real modules; `src/main.js` boots (the
+world builds PHYSICS' weather kits itself in `world.setPhysics`: never build kits here).
+`src/ui/` is the HUD (`hud.js`), the map, the sketchbook (`book.js`) and the look (`paint.js`
+makes paper, filters, pencil frames and rules; `lettering.js` the stroke font; `theme.css`).
+`src/audio/audio.js` is all sound. `window.__pc` is the debug door (`info()`, `teleport()`,
+`settle()`, `setClock(t)`, `setHour(h)`, `flash(frames)`).
 
-**Every check** (run all of them before claiming anything; numbers from this run are under
-"Ground truth"):
-`node --test tests/*.test.mjs` (102), `node --test src/physics/`, `node --test src/world/*.test.mjs`,
-`node tests/playthrough.mjs` (add `--query "stub=render,world,art&fresh=1"` for PHYSICS on,
-`--query "scale=0.5&quality=0&fresh=1" --w 400 --h 225` run from a clean export for the painted
-world), `node tests/trip.mjs` (painted: `--query "scale=0.5&quality=0" --w 400 --h 225`; do
-NOT add `fresh=1`, the script does), `node tests/m3check.mjs`, `node tests/lockcheck.mjs`,
-`node tests/audiocheck.mjs` (the sound, measured), `node tests/tour.mjs --bodies <one body>`
-(one body per process; `--sheets <dir>` to keep trial sheets out of `docs/lead/evidence`).
-Test other roles' committed state from a clean export: `tools/export-head.sh <dir>`, then run
-the scripts inside `<dir>` (they serve the directory they live in). Software GL paints the
-forest at one to three frames a second: the scripts wait in game time, so slow is fine, but
-two browser runs at once on this machine make each other flaky.
+**Every check.** One command: `node tests/all.mjs --export` (a clean export of the last
+commit; three unit suites, the brief's static rules, eight scripted browser runs, one table;
+`--list`, `--only a,b`, `--skip a,b`; about ALLCHECKS_MINUTES in software GL). The lead's
+instruments, for looking and measuring rather than passing: `node tests/tour.mjs --bodies
+<one body>` (every biome and vista, fair weather held, sheets in `docs/lead/evidence`; one body
+per process, `--sheets <dir>` for trials), `node tests/weather.mjs` (the weather set: twelve
+frames in the game, `--only id,id` re-shoots some and keeps the rest), `node tests/cost.mjs`
+(triangles and draw calls at quality 0, 1, 2 at the dearest tour frame of each body;
+`--places "earth:vista:earth-temperate_forest-1"`, `--shoot` for frames). Run them inside a
+clean export (`tools/export-head.sh <dir>`, then `cd <dir>`), one browser at a time.
 
 **Unfinished, and where each item starts.**
-1. *After review 4* (done 2026-11-11, `docs/lead/REVIEW.md`: one MUST FIX for PAINTER, the
-   Earth vista at 645 k triangles). When PAINTER answers it, re-measure exactly as the item
-   says and close M2 in `REVIEW.md` and `TRACK.md`. Re-run `node tests/trip.mjs` in the
-   painted world on that commit (it was last run in a browser on `5d411f2`).
-1a. *Weather in the game* (coordinator's relay after PAINTER's `9d9caf1`; nothing of it done
-   yet except `__pc.flash(frames)`): the world now builds PHYSICS' kits itself
-   (`world.setPhysics(physics, opts)`, `world.kits` has the counts: put them in the read-out),
-   `world.setWeather(sky | null)` forces the sky numbers, `world.setFreshSnow(x)` presets
-   snow. To do: (a) make the tour force fair weather (`world.setWeather` with a clear sky) so
-   sheets stay comparable, and add `--weather` frames in third person: the Earth spawn
-   before, in and after the storm (game clock about 640 to 800 s, default seed), a blizzard
-   on a snowy biome, a dust storm on Mars, a gale on Neptune's sea; (b) report the storm at
-   the Earth spawn with the game's own counters (PAINTER's gallery says 551 k triangles, 301
-   calls); (c) look at lightning with `__pc.flash()`; (d) judge those frames in a review.
-2. *The painted UI theme is PILOT's* (coordinator ruling, 2026-11-11; art-bible rule 8). A
-   first pass is in and used everywhere: `src/ui/paint.js` (paper tile, torn-edge filters,
-   `ink()` lettering into an element, `inkOnCanvas`, `ringPath`, `iconSvg`, cursor),
-   `src/ui/lettering.js` (the stroke font: glyph table `G`, `letterPath`), `src/ui/theme.css`
-   (layout and the paper look). What is left: PAINTER's review of the look (frames
-   `docs/shots/pilot/ui-*.jpg`; change what it asks), more icons, lettering with thick and
-   thin, the frame read-out (plain type on purpose), and anything the painted frames show.
-   To letter new text: `ink(el, text, SIZE.body)`; never set `textContent` on HUD elements.
-3. *Flight pace per world*: PHYSICS will fly it and may propose a wider spread for the giants;
-   the lever is `env.speedScale` in `Sim.flightEnv`.
-4. *A real gamepad and a real mouse*: the mapping (`src/core/gamepad.js`) and pointer lock
-   have only met simulated devices.
-5. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
+1. *Review 5's open MUST FIX* (`docs/lead/REVIEW.md`). PAINTER: the budget (re-measure with
+   `node tests/cost.mjs --places "earth:vista:earth-temperate_forest-1,earth:spawn:spawn"
+   --qualities 0,1` and `node tests/weather.mjs --only earth-storm,earth-storm-day`: wanted 600 k
+   and 350 at quality 1, 300 k at quality 0, in fair weather and in the storm) and the pepper
+   (open `weather.jpg` after `node tests/weather.mjs`: storm sky, night, Neptune's sky; and a
+   frame in space: `docs/shots/pilot/m2-pulse.jpg` shows how to make one). PHYSICS: storms
+   bring wind (scratch `run3/wind.mjs` prints `physics.air` at 2, 10 and 30 m at the place and
+   time of each weather frame; `R-STORM-5`, `R-STORM-2`, `R-SNOW-3`). When both report, record
+   review 6 and say whether M3 is closed.
+2. *M4*, when the coordinator says so and not before: `node tests/all.mjs --export` must print
+   ALL PASSED on the final head; then one pull request `cosmos` -> `main` through the REST API
+   (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), merge, GitHub Pages from
+   `main` (`https://zubersss.github.io/Painted-cosmos/`). `index.html` uses only relative
+   URLs (the static step checks it). The final message to the owner is described at the end of
+   section 5 of the brief; the README already says how to play.
+3. *The painted UI theme*: second pass in (keys, button, tabs, pencil frames, rules, map,
+   gauges). Left: PAINTER's review of the look (frames `docs/shots/pilot/ui-*.jpg`; change
+   what it asks), more icons, lettering with thick and thin. To letter new text:
+   `ink(el, text, SIZE.body)`; never set `textContent` on HUD elements.
+4. *The first storm falls after dark* (the default seed's storm crosses the spawn at 640 to
+   800 s, which is 18:30 to 21:00). Asked of PHYSICS (review 5, P2). If it does not move, the
+   lever on this side is `FEEL.startHour` in `src/core/sim.js` (9.5 today; 6.5 would put the
+   storm at 15:30 to 18:00 and open the game on a rose dawn).
+5. *Wind on the explorer*: on Neptune's storm coast (33 m/s) a walk downwind makes 0.6 m/s
+   and a 2.5 s jetpack hop is carried 85 m. Asked of PHYSICS (review 5, P6); if the answer is
+   "that is the physics", the lever wanted is a shelter factor in the command (see "Needs").
+6. *Flight pace per world*: PHYSICS is re-flying the levers; `env.speedScale` in
+   `Sim.flightEnv`.
+7. *Pulse profile*: swap my spooled acceleration (`src/ship/pulse.js`) for PHYSICS'
    `planSpeedChange` once the painted pulse effect exists to judge it against.
-6. *M4*: critique swap, every check, one pull request `cosmos` -> `main` through the REST API
-   (the exact `gh api` calls are in `docs/COORDINATOR.md` section E), then GitHub Pages from
-   `main`. `index.html` uses only relative URLs; keep it so. Not before the coordinator says.
-7. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner),
-   pointer lock with a real hand (the fallback is proven by `tests/lockcheck.mjs`), and how
-   the sound actually sounds (it is measured, not heard).
+8. *Never verified here*: frame rate on a real GPU (the ` read-out exists for the owner), a
+   real mouse under pointer lock (the fallback is proven by `tests/lockcheck.mjs`), a real
+   gamepad (`src/core/gamepad.js` has only met a simulated one), and how the sound actually
+   sounds (it is measured, not heard).
 
 ## Status
+
+**This run (third PILOT agent): weather in the game reviewed (review 5), my review-4 items
+answered, the painted theme's second pass, milestone 4 prepared.** M1 and M2 closed. M3: my
+half done; three MUST FIX open for the others (two PAINTER, one PHYSICS; `REVIEW.md`).
+
+### This run in numbers (everything run by me; browser runs on clean exports, software GL)
+
+| What | On | Result |
+| --- | --- | --- |
+| `node tests/all.mjs --export` (every check) | export of `db22516` | ALLCHECKS_TABLE |
+| The weather set, `node tests/weather.mjs` | export of `62d3529` | 12 frames, no console errors; storm at the Earth spawn as the game gives it (19:48) 606 k triangles, 315 draw calls; the same at 11:00 582 k, 302; before and after 579 k, 299; kits 5 calls, 3.3 k triangles; blizzard 470 k, 234; Mars dust storm 219 k, 108; Neptune's sea 379 k, 206 |
+| Cost at three tiers, `node tests/cost.mjs` | export of `83c604c` | 36 measurements, no console errors; one view over: `earth-temperate_forest-1` 306 k (quality 0), 614 k / 341 (quality 1), 818 k (quality 2); the rest 145 k to 283 k, 291 k to 549 k, 324 k to 756 k |
+| A run from the spawn, eight headings, 25 s each (pure simulation, real ground, obstacles, physics) | export of `62d3529` with my `sim.js` and `src/player` | before: Mars 5 m in one heading, Mercury 5 m in one; after: Mars 170 to 179 m, Mercury 144 to 163 m, Earth 106 (a 41 degree slope) to 174 m, Venus 123 to 130 m (thick air), the giants 130 to 195 m |
+| Unit tests | working tree | 105 pass (two more camera and two more obstacle tests) |
+
+### What this run added
+
+- **Weather in the game** (handover item 1a): the read-out has a `weather` line (the kits' draw
+  calls and triangles from `world.kits.stats`, and what the sky is doing); `__pc.info().weather`;
+  `?kits=0`, `?weather=fair`, `__pc.setClock(t)`. The tour holds fair weather and no marks
+  (`--weather 1` leaves the weather on). `tests/weather.mjs` is the weather set; lightning is
+  seen with `__pc.flash()`. Findings: review 5.
+- **The camera's answer to a thicket**: `CAMERA.boomTight` 2.3 m, `boomEye` 1.3 m; between
+  them the view slides from the squeezed third-person pose into the explorer's eyes (eased:
+  9 /s in, 5 /s out), and `explorerVisible()` hides the explorer past 30 %. Stepping out of the
+  ship, the view turns along the hull until the boom is free (`boomRoom`, `Sim.cameraSolids`).
+- **Nothing stalls a run**: `EXPLORER.scramble` 1.3 m (lower obstacles are a smooth rise in the
+  explorer's ground, through `env.sample`, so both movement models see them);
+  `collideObstacles(st, list, r, { moving, dt })` starts a detour round the thinner of two
+  obstacles after a quarter of a second wedged with the key held.
+- **Painted theme, second pass** (`src/ui/paint.js`, `theme.css`, `map.js`): filters
+  `pc-wash` (a small wash: uneven edge, granulation), `pc-stroke` and `pc-brush` (the body and
+  the dry tail of one broad stroke); `pencilFrame(w, h, seed)` and `pencilRule(seed)` as CSS
+  images; keys are a pale wash under a pen outline; the map's orbits are three or four pencil
+  strokes each and its worlds dabs with pooled edges; the gauge fill is a wash.
+- **Milestone 4 prepared**: `tests/all.mjs`, `tests/cost.mjs`, the README, TRACK's "Done means"
+  line by line, the critique below ("Critique swap").
 
 **This run (second PILOT agent): ground truth re-established; the coordinator's four review
 items answered; the painted UI theme taken over.** M1 met. M2: my half accepted, the whole
@@ -500,6 +545,19 @@ Pulse (`src/ship/pulse.js` PULSE): top speed 30 km/s, 400 m/s2, spool 0.9 s, let
 
 ## Contract additions made in this run (all additive)
 
+Third PILOT agent:
+- URL: `kits=0` (the world is handed PHYSICS with `{ kits: false }`), `weather=fair`
+  (`world.setWeather({})` at boot).
+- `window.__pc.setClock(seconds)`; `__pc.info().weather = { kits: { calls, tris } | null, sky }`;
+  `__pc.info()` is otherwise unchanged. The read-out has a fifth line.
+- `collideObstacles(st, obstacles, bodyRadius, help)`: obstacles no taller than
+  `EXPLORER.scramble` (1.3 m) are no longer pushed out of: they are ground (`scrambleSample`).
+  PAINTER: a boulder's `height` in `sampleObstacles` therefore decides whether it is walked
+  over or round. PHYSICS: `env.sample` now returns ground that includes those rises.
+- `Sim.cameraSolids(p, obstacles?)`, `boomRoom(...)`, `footCam.tight01`.
+
+Second PILOT agent:
+
 - `physics.update(dt, { ..., eye })`: the camera, body-local (PHYSICS' lever 1).
 - `Sim.teleport({ heading, lookPitch, firstPerson })` (degrees) and `window.__pc.flash(frames)`.
 - `world.getSpawn(body)` may carry `yaw` (and `pitch`), radians from north toward east: the
@@ -510,6 +568,34 @@ Pulse (`src/ship/pulse.js` PULSE): top speed 30 km/s, 400 m/s2, spool 0.9 s, let
 - The stylesheet is `src/ui/theme.css`; `src/art/ui.css` and `painter.setMarks` are not needed.
 
 ## Needs from the other
+
+### After review 5 (third PILOT agent; details and evidence in `docs/lead/REVIEW.md`)
+
+From PAINTER:
+1. The two MUST FIX of M3: the budget at `earth-temperate_forest-1` (614 k at quality 1,
+   306 k at quality 0) and in the storm after dark (606 k), and the pepper.
+2. What storms after dark submit that storms by day do not (24 k triangles, 13 draw calls).
+3. The near-ground layer under fresh snow (green flicks on the snowfield) and on lawns (dark
+   teeth); the white specks round the crowns in the lightning frame; puddles that read as
+   holes; Neptune's sea under a storm sky.
+4. Two second-site vistas with a wall in front of the easel: `mercury-crystal_gardens-2`,
+   `uranus-frozen_waves-2` (the camera no longer shows the back of a hat there; it shows the
+   wall).
+5. A look at the interface: `docs/shots/pilot/ui-title.jpg`, `ui-book.jpg`, `ui-map.jpg`,
+   `ui-flight.jpg`, `ui-space.jpg`, `ui-foot.jpg`. Say what is wrong; I change it.
+6. Still wanted from review 4: `world.setBuildBudget(ms, { fixed: true })`.
+
+From PHYSICS:
+1. The MUST FIX: storms bring their own wind (P1).
+2. The first storm of the default seed before about 400 s, so that it falls in daylight (P2).
+3. Neptune's `storm_seas`: a storm sky and a swell that can be seen (P3).
+4. Wind on the explorer (P6): at 33 m/s a walk downwind makes 0.6 m/s, upwind 3.5, across 2.9,
+   and a 2.5 s jetpack hop is carried 85 m. If the model is right as it is, give me a lever in
+   the command (`cmd.shelter01`, 0 to 1: how much of the wind the suit cancels) and I will set
+   it; feel is my call, the physics is yours.
+5. Note: low obstacles are now part of `env.sample`'s ground (a rise of up to 1.3 m over
+   `radius + 0.7` m). Say if your contact model minds.
+
 
 ### From PAINTER
 (Written to be read cold by the fresh PAINTER. The contract is `docs/COORDINATOR.md` C1 to C14;
