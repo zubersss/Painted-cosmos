@@ -135,7 +135,7 @@ the 40 at full size.** Verdicts are mine, as a painting teacher would give them.
 | neptune-ice_spires | wind-carved ice spires | yes: leaning needles in a row |
 | neptune-aurora_tundra | aurora tundra | partly: tundra with ponds; no aurora (sky work, M3) |
 
-Earth's home forest: `earth-forest-*.jpg` (the M1 set) {{FORESTLINE}}
+Earth's home forest: `earth-forest-*.jpg` (the M1 set) regenerated with the new ground marks. Opened at full size: `earth-forest-trees-noon.jpg` (still passes: leaning birches, crowns as washes, the brook, a softer meadow). **Not opened after regeneration**: stream-noon, canopy, jet, dusk, dawn, night, high, models-in-forest, stability-a and -b.
 
 By my count: 28 biomes yes, 5 partly (`lightning_plains`, `ice_shelves`, `frozen_waves`,
 `aurora_tundra`, and the channel of `dry_riverbeds`), none missing; eight orbit views
@@ -146,7 +146,31 @@ recognisable.
 `node tests/tour.mjs --bodies <body> --root <export>` at 960x540, quality 1, third person. The
 tour stands where `world.findBiome` says (now the biome's **stand**: level ground that shows
 the biome whichever way one faces) and at every vista.
-(tour results are being added)
+Run by me for all eight planets on exports of `0d8ce45` to `6d0a92e` (the stands and easels
+did not change between them except Uranus' sinkhole stand, re-run on `ddb5758`). I opened the
+biome frames of every planet (my own contact sheets of the tour's frames) and two vista frames
+each of Jupiter and Saturn; **I did not open the other vista frames**.
+
+- Every frame settled (5 to 62 s; before this pass they never did) and no run reported a
+  console error. Jupiter's and Uranus' first runs ended "TOUR FAILED" only because the browser
+  refused the final contact-sheet screenshot under load; their frames were captured.
+- The game's own counters at the stands, quality 1 (budget 600 k, 350): Earth 302 to 573 k and
+  181 to 336 calls (autumn woodland the heaviest), Venus 316 to 512 k, Jupiter 321 to 532 k,
+  Saturn 294 to 402 k, Neptune 224 to 375 k, Mars 178 to 361 k, Mercury 196 to 358 k (309
+  calls in the crystal gardens), Uranus 252 to 375 k. All inside.
+- What the game frames show: Earth: forest by the brook, autumn birches (with long dark cast
+  shadows across the ground: hard-edged, to soften), meadow under snow peaks, a sea inlet under
+  cliffs, banded canyon walls and a butte, a misty pool. Mars: canyon floor between strata
+  walls; dune swells (soft at 10 h); frost polygons (the ice shards read too violet in the
+  game's light); red groves over a pale bed. Jupiter: island top with the cloud sea and other
+  islands behind; the storm wall above the red plain; a vine-hung cliff over the garden;
+  cracked plain with shards. Saturn: an island top facing another island's cliff, the ring in
+  the sky; reeds; twilight spires; misty valley. Mercury: cracks; glass blades; crystals in
+  dusk; a crater's far wall and rim. Venus: towers; lava; the acid lake; pale mesas in fog.
+  Uranus: spires before a shelf; frozen swell (weak); fog; the glowing pool inside its pit (after the stand was moved down to it). Neptune: cliff, sea and a
+  stack; kelp; leaning spires behind a ridge; tundra and a pond.
+- Second-site vistas stood on cliffs in two Jupiter cases (44 and 68 degrees); they are now
+  moved to standable ground (tested for every vista on all ten bodies).
 
 ### Frame cost
 
@@ -169,7 +193,7 @@ Every planet is inside the budget at quality 1 (worst: Earth's home forest, 571 
 calls) and at quality 2 (worst 728 k). At quality 0 the first probe found two Earth views
 over (wetland 394 k, alpine 312 k); the low tier was then trimmed (no full trees, half the
 undergrowth, little extra refinement on cliffs, a coarser split) and re-measured: alpine
-168 k, home forest 242 k, Jupiter's gardens 209 k, wetland {{WETQ0}}. The other planets' low
+168 k, home forest 242 k, Jupiter's gardens 209 k, wetland 299 k (at the edge of the budget). The other planets' low
 tier figures in the table are from before the trim (so they are upper bounds).
 `sampleSurface`: 10 to 34 microseconds a call on the ten bodies in Node under load (budget 50;
 tested). `world.update` while arriving: see the answer to the lead below.
