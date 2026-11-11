@@ -5,7 +5,7 @@
 //
 // The constants below are interpolated from flora.js, so the shader and the CPU model cannot
 // drift apart. physics-lab.html?scene=flora draws both on top of each other as a check.
-import { FLORA, WAVE_K, WAVE_ROT, WAVE_A } from './flora.js';
+import { FLORA, WAVE_K, WAVE_ROT, WAVE_A, BRANCH_M, BRANCH_S, BRANCH_T } from './flora.js';
 
 const f = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
 const rot = (i) => `vec2(d.x * ${f(Math.cos(WAVE_ROT[i]))} - d.y * ${f(Math.sin(WAVE_ROT[i]))}, d.x * ${f(Math.sin(WAVE_ROT[i]))} + d.y * ${f(Math.cos(WAVE_ROT[i]))})`;
@@ -29,6 +29,8 @@ uniform vec4 uPhysNearMap;     // the same for the push field
 uniform vec4 uPhysWave;        // xy: wave direction, z: wavenumber (rad/m), w: amplitude
 uniform vec4 uPhysWavePhase;   // xyz: phases of the three wave trains
 uniform vec4 uPhysShape;       // soft flex, soft max angle, stiff flex, stiff max angle
+uniform vec4 uPhysBranchPhase; // phases (rad) of the four branch oscillators
+uniform vec4 uPhysBranch;      // x: gustiness 0..1, y: gain, z: swing of a shaken crown (rad), w: branch length / plant height
 
 // Bilinear lookup that does not need float-texture filtering (define PC_PHYS_LINEAR to use the
 // hardware filter instead: textures must then be LinearFilter + ClampToEdge).
@@ -98,6 +100,34 @@ vec3 pcPhysDisplace(vec3 rel, vec3 up, float H, vec2 bend) {
   float hor = h * sin(am);
   vec2 sh = ang > 1e-6 ? bend * (hor / ang) : vec2(0.0);
   return (rel - up * h) + uPhysEast * sh.x + uPhysNorth * sh.y + up * (h * cos(am));
+}
+
+// Branches: a crown does not sway as one piece (the JS twin is plantBranch in flora.js).
+// rel: the point relative to the root (body-local axes, m); up: the plant's up; H: its height;
+// root: the plant's root (body-local); pb: what pcPhysBend returned for this plant.
+// Returns the offset (m) to ADD to rel BEFORE pcPhysDisplace:
+//   vec3 rel = wp - io;  rel += pcPhysBranch(rel, up, H, rootB, pb);  wp = io + pcPhysDisplace(rel, up, H, pb.xy);
+// Nothing moves at the trunk; the motion is continuous all the way round it (whole lobes), so a
+// crown mesh is never torn. For trees and tall shrubs near the eye; costs four sines and an atan.
+vec3 pcPhysBranch(vec3 rel, vec3 up, float H, vec3 root, vec4 pb) {
+  float h = dot(rel, up);
+  vec3 q = rel - up * h;
+  vec2 rd = vec2(dot(q, uPhysEast), dot(q, uPhysNorth));
+  float r = length(rd);
+  if (r < 1e-4) return vec3(0.0);
+  float Hs = max(H, 1e-3), L = uPhysBranch.w * Hs;
+  float x = min(1.0, r / L), shape = x * x * (3.0 - x) * 0.5;
+  float ang = length(pb.xy);
+  float A = uPhysBranch.y * ang * (${f(FLORA.branchCalm)} + ${f(1 - FLORA.branchCalm)} * uPhysBranch.x) + uPhysBranch.z * pb.w;
+  if (A < 1e-6) return vec3(0.0);
+  float s = clamp(h / Hs, 0.0, 1.0), az = atan(rd.y, rd.x);
+  vec2 g = floor(pcPhysGrid(root) * 2.0);
+  float tp = 6.2831853 * fract(g.x * 0.3183 + g.y * 0.7071);
+  vec4 a = sin(uPhysBranchPhase + vec4(${BRANCH_M.map(f).join(', ')}) * az + vec4(${BRANCH_T.map(f).join(', ')}) * tp + vec4(${BRANCH_S.map(f).join(', ')}) * s);
+  float k = A * L * shape;
+  vec2 d = ang > 1e-6 ? pb.xy / ang : rd / r;
+  vec2 sh = d * (0.7 * a.y * k) + vec2(-rd.y, rd.x) / r * (0.3 * a.w * k);
+  return uPhysEast * sh.x + uPhysNorth * sh.y + up * ((0.6 * a.x + 0.4 * a.z) * k);
 }
 
 // Wind at 2 m above the ground at a body-local point: xy m/s (east, north), z gust01, w turbulence.

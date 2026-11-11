@@ -73,6 +73,7 @@ export const SHIP_BODY_STATE = () => ({
   groundEffect: 1,
   brake01: 0,                       // spooled field brake command
   fieldBrake: 0,                    // m/s^2 the drive field is shedding right now (for a glow or a sound)
+  fieldCarve: 0,                    // m/s^2 the field is pushing sideways right now to turn the path onto the nose
   // touchdown
   w: { x: 0, y: 0, z: 0 },          // angular velocity (rad/s, frame coordinates)
   legLoad: new Float32Array(3),     // N on each leg
@@ -128,6 +129,10 @@ export function groundEffect(h, T = SHIP_BODY) {
 //                          changing the speed (a force at right angles to the motion does no
 //                          work). 1 = the nose-following feel of an arcade ship; 0 = pure
 //                          thrusters, and the ship slides wide in turns like a hovercraft.
+//          carveAccel      m/s^2, optional: the most sideways acceleration the carve may give
+//                          (absent: unbounded, as before). With it a fast ship runs wide of its
+//                          nose and each world turns at its own radius; st.phys.fieldCarve says
+//                          what the field is giving now.
 //          brake           0..1, an ASSIST (default 0): the drive field (the one behind the pulse)
 //                          sheds the speed the thrusters cannot: whatever part of "close the
 //                          error in tau" the retro thrusters fall short of, up to
@@ -231,6 +236,7 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   nf -= dragF; ns -= dragS; nu -= dragU;
   vx = wx + _f[0] * nf + _r[0] * ns + _u[0] * nu; vy = wy + _f[1] * nf + _r[1] * ns + _u[1] * nu; vz = wz + _f[2] * nf + _r[2] * ns + _u[2] * nu;
   // ---- assist: the field turns the velocity toward the commanded direction ----------------------
+  let carve = 0;
   if (cmd.carve01 > 0 && tg) {
     const sp = Math.hypot(vx, vy, vz), ts = Math.hypot(tg.x, tg.y, tg.z);
     if (sp > 0.5 && ts > 0.5) {
@@ -238,11 +244,27 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
       const ax0 = vx / sp, ay0 = vy / sp, az0 = vz / sp, bx = tg.x / ts, by = tg.y / ts, bz = tg.z / ts;
       if (ax0 * bx + ay0 * by + az0 * bz > -0.98) {
         let dx = ax0 + (bx - ax0) * k, dy = ay0 + (by - ay0) * k, dz = az0 + (bz - az0) * k;
-        const dl = Math.hypot(dx, dy, dz);
-        if (dl > 1e-9) { vx = dx / dl * sp; vy = dy / dl * sp; vz = dz / dl * sp; }
+        let dl = Math.hypot(dx, dy, dz);
+        if (dl > 1e-9) {
+          // What that costs: turning a velocity v through an angle a in dt is a sideways
+          // acceleration v a / dt, and the field is not infinite. cmd.carveAccel (m/s^2, optional)
+          // is the most it gives: beyond it the path runs wide of the nose, more the faster the
+          // ship flies (at 77 m/s a 45 deg/s turn asks for 60 m/s^2, six g).
+          dx /= dl; dy /= dl; dz /= dl;
+          let c = ax0 * dx + ay0 * dy + az0 * dz; c = c > 1 ? 1 : c < -1 ? -1 : c;
+          let a = Math.acos(c);
+          const lim = cmd.carveAccel > 0 ? cmd.carveAccel * dt / sp : Infinity;
+          if (a > lim && a > 1e-9) {
+            const f = lim / a; dx = ax0 + (dx - ax0) * f; dy = ay0 + (dy - ay0) * f; dz = az0 + (dz - az0) * f;
+            dl = Math.hypot(dx, dy, dz); dx /= dl; dy /= dl; dz /= dl; a = lim;
+          }
+          carve = dt > 0 ? sp * a / dt : 0;
+          vx = dx * sp; vy = dy * sp; vz = dz * sp;
+        }
       }
     }
   }
+  B.fieldCarve += (carve - B.fieldCarve) * (dt < 0.1 ? dt / 0.1 : 1);     // (eased over a tenth of a second, for a read-out or a glow)
   // ---- assist: the drive field as a brake ---------------------------------------------------------
   B.brake01 += (clamp01(cmd.brake || 0) - B.brake01) * (1 - Math.exp(-dt / T.fieldBrakeSpool));
   B.fieldBrake = 0;

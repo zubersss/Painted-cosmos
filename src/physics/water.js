@@ -65,7 +65,8 @@ export const WATER = Object.freeze({
 // Fetch (m) by biome: how far the wind can work on the liquid there. Game scale.
 export const FETCH = {
   sea_coast: 2500, storm_seas: 2500, misty_wetland: 40, temperate_forest: 14, autumn_woodland: 14,
-  acid_terraces: 250, lava_rivers: 20, teal_sinkholes: 60, kelp_forests: 400, gold_islands: 2500, sky_islands: 2500, 'stub-shore': 1200, 'stub-lowland': 300,
+  // (acid_terraces: since PAINTER's third pass the acid stands in pools on the treads, 30 to 40 m across, not in lakes)
+  acid_terraces: 35, aurora_tundra: 30, lava_rivers: 20, teal_sinkholes: 60, kelp_forests: 400, gold_islands: 2500, sky_islands: 2500, 'stub-shore': 1200, 'stub-lowland': 300,
   default: 80,
 };
 export function fetchOf(biomeId) { return FETCH[biomeId] != null ? FETCH[biomeId] : FETCH.default; }

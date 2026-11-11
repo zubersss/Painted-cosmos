@@ -56,7 +56,27 @@ export const FLORA = Object.freeze({
   // its four neighbours, times the canopy closure there.
   crownCoupling: 0.9,
   jetSpread: 0.25,              // jet footprint radius grows by this x height above the ground
+  // Branches. A tree is not one cantilever: its first-order branches are cantilevers on the
+  // trunk with natural frequencies two to four times the trunk's (measured on open-grown trees:
+  // trunk 0.2 to 0.5 Hz, branches 0.8 to 2 Hz; James, Haritos and Ades 2006; Rodriguez, de
+  // Langre and Moulia 2008), each with its own phase. They are driven by the turbulence, not
+  // the mean wind, and being out of step with the trunk they take energy out of its sway (the
+  // crown is the tree's damper). So a crown does not sway as one piece: lobes of it bob and
+  // swing in turn, faster than the trunk leans.
+  branchHz: 1.3,                // Hz: the first of four branch rates (x BRANCH_F)
+  branchGain: 0.5,              // rad of branch swing per rad of trunk lean, in fully gusty air (tips of 3.5 m branches
+                                // move about 10 cm in a fresh breeze, half a metre in a storm)
+  branchCalm: 0.35,             // share of that left in smooth air (the trunk's own sway shakes them)
+  branchShake: 0.08,            // rad: swing of a crown that has just been brushed or blown on (shake01 = 1)
+  crown: 0.35,                  // a branch is this long, as a share of the plant's height
 });
+// Four branch oscillators: relative rates (incommensurate, so the pattern never repeats), how
+// many lobes each puts round the trunk (whole numbers: the motion is continuous all the way
+// round), and how its phase runs with height and from tree to tree.
+export const BRANCH_F = [1, 1.37, 0.71, 1.93];
+export const BRANCH_M = [2, 3, 1, 4];
+export const BRANCH_S = [2.6, -1.9, 4.1, 0];
+export const BRANCH_T = [1, 1.7, 2.3, 0.6];
 
 const _s = new Float64Array(8);
 const _coef = new Float64Array(8);
@@ -106,7 +126,13 @@ export class FloraField {
       uPhysWave: [1, 0, FLORA.waveK, FLORA.waveAmp],
       uPhysWavePhase: [0, 0, 0, 0],
       uPhysShape: [FLORA.softFlex, FLORA.softMax, FLORA.stiffFlex, FLORA.stiffMax],
+      // branches (P6): phases of the four branch oscillators (rad, wrapped), and
+      // x: gustiness 0..1 near the focus, y: gain, z: shake swing (rad), w: branch length / height
+      uPhysBranchPhase: [0, 0, 0, 0],
+      uPhysBranch: [0, FLORA.branchGain, FLORA.branchShake, FLORA.crown],
     };
+    this.branchPhase = new Float64Array(4);
+    this.gustiness = 0;
   }
 
   reset() {
@@ -170,7 +196,7 @@ export class FloraField {
     const b11 = _coef[4], b12 = _coef[5], b21 = _coef[6], b22 = _coef[7];
     const kq = 0.5 * rho / FLORA.qRef;
     const bend = this.bend, vel = this._vel, wind = this.wind;
-    let gsum = 0, se = 0, sn = 0;
+    let gsum = 0, se = 0, sn = 0, tsum = 0;
     const swirl = !!devils && devils.count > 0;
     for (let j = 0; j < N; j++) {
       const z = (this.cj + j - N / 2 + 0.5) * cell;
@@ -200,7 +226,7 @@ export class FloraField {
         wind[o + 2] = g01 < 0 ? 0 : g01 > 1 ? 1 : g01;
         wind[o + 3] = _s[3] * sp * h2;
         this._can[n] = _s[7];
-        gsum += wind[o + 2]; se += we * hs; sn += wn * hs;
+        gsum += wind[o + 2]; se += we * hs; sn += wn * hs; tsum += wind[o + 3];
       }
     }
     // ---- crowns loading their neighbours --------------------------------------------------------
@@ -234,6 +260,9 @@ export class FloraField {
       this.wavePhase[i] = (this.wavePhase[i] + FLORA.waveK * WAVE_K[i] * FLORA.waveSpeed * WAVE_C[i] * ms * h) % (TAU * 1024);
     }
     this.gustMean = gsum * inv;
+    // branches: four oscillators on the clock, and how gusty the air is (turbulence over mean wind), eased over 2 s
+    for (let i = 0; i < 4; i++) this.branchPhase[i] = (this.branchPhase[i] + TAU * FLORA.branchHz * BRANCH_F[i] * h) % TAU;
+    { const g = clamp01(tsum * inv / (ms + 0.5) * 2.5); this.gustiness += (g - this.gustiness) * (1 - Math.exp(-h / 2)); }
 
     // ---- push field ----------------------------------------------------------------------------------
     this._pushStep(h, frame, near, fx, fz, disturbers);
@@ -248,6 +277,8 @@ export class FloraField {
     U.uPhysNearMap[0] = this.mi * nc; U.uPhysNearMap[1] = this.mj * nc;
     U.uPhysWave[0] = this.waveDir[0]; U.uPhysWave[1] = this.waveDir[1];
     U.uPhysWavePhase[0] = this.wavePhase[0] % TAU; U.uPhysWavePhase[1] = this.wavePhase[1] % TAU; U.uPhysWavePhase[2] = this.wavePhase[2] % TAU;
+    for (let i = 0; i < 4; i++) U.uPhysBranchPhase[i] = this.branchPhase[i];
+    U.uPhysBranch[0] = this.gustiness;
     this.version++;
   }
 
@@ -416,6 +447,38 @@ export const WAVE_K = [1, 1.31, 0.74];
 export const WAVE_ROT = [0, 0.38, -0.31];
 export const WAVE_C = [1, 0.92, 1.12];
 export const WAVE_A = [0.5, 0.3, 0.2];
+
+// How far a point of a crown is moved by its branch (m; add it to the point before plantDisplace).
+// The JS twin of pcPhysBranch in FLORA_GLSL.
+//   (re, rn): the point's horizontal offset from the trunk (m east, north); h: its height above
+//   the root; H: the plant's height; (gx, gz): the root in grid coordinates; (be, bn): the bend
+//   from plantBend (rad); shake01 from plantBend; U: the field's uniforms. Fills o: e, n, up.
+// A branch is a cantilever on the trunk: nothing moves at the trunk, the tip most (x^2 (3 - x) / 2
+// along it). Its swing follows the trunk's lean (the wind on this tree, shelter and all) times
+// how gusty the air is, plus whatever shook the crown; its phase turns round the trunk in whole
+// lobes, so neighbouring parts of a crown move together and opposite sides do not.
+export function plantBranch(re, rn, h, H, gx, gz, be, bn, shake01, U, o = {}) {
+  const r = Math.hypot(re, rn), Hs = Math.max(H, 1e-3), L = U.uPhysBranch[3] * Hs;
+  o.e = 0; o.n = 0; o.up = 0;
+  if (r < 1e-4) return o;
+  const x = Math.min(1, r / L), shape = x * x * (3 - x) * 0.5;
+  const ang = Math.hypot(be, bn);
+  const A = U.uPhysBranch[1] * ang * (FLORA.branchCalm + (1 - FLORA.branchCalm) * U.uPhysBranch[0]) + U.uPhysBranch[2] * shake01;
+  if (A < 1e-6) return o;
+  const s = clamp01(h / Hs), az = Math.atan2(rn, re), P = U.uPhysBranchPhase;
+  const tp = TAU * fract01(Math.floor(gx * 2) * 0.3183 + Math.floor(gz * 2) * 0.7071);       // this tree's own number
+  const a0 = Math.sin(P[0] + BRANCH_M[0] * az + BRANCH_T[0] * tp + BRANCH_S[0] * s);
+  const a1 = Math.sin(P[1] + BRANCH_M[1] * az + BRANCH_T[1] * tp + BRANCH_S[1] * s);
+  const a2 = Math.sin(P[2] + BRANCH_M[2] * az + BRANCH_T[2] * tp + BRANCH_S[2] * s);
+  const a3 = Math.sin(P[3] + BRANCH_M[3] * az + BRANCH_T[3] * tp + BRANCH_S[3] * s);
+  const k = A * L * shape;
+  // it bobs (up), swings along the load (or along itself in still air), and flutters across itself
+  const de = ang > 1e-6 ? be / ang : re / r, dn = ang > 1e-6 ? bn / ang : rn / r;
+  const al = 0.7 * a1 * k, tg = 0.3 * a3 * k;
+  o.e = de * al - rn / r * tg; o.n = dn * al + re / r * tg; o.up = (0.6 * a0 + 0.4 * a2) * k;
+  return o;
+}
+const fract01 = (v) => v - Math.floor(v);
 
 // Where a point of a plant ends up when the plant bends: the cantilever curls over, keeping its
 // length. `h` is the point's height above the root (m), `H` the plant's height, (be, bn) the

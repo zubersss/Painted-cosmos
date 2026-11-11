@@ -67,6 +67,34 @@ test('turning: thrusters alone slide wide; the carve assist turns the velocity w
   assert.ok(carved.smin > 85 && carved.smax < 106, `speed through the carved turn: ${carved.smin}..${carved.smax}`);
 });
 
+test('the carve is a force and says so; bounded, the path runs wide of the nose, wider the faster the ship flies', () => {
+  // the nose swings 90 degrees at once; how long until the path has come round to within 10 degrees, and the hardest the field pushed
+  const turn = (speed, carveAccel) => {
+    const sim = flight({ rho: 0 }); sim.st.v = V(0, 0, -speed);
+    sim.st.q = { x: 0, y: -Math.SQRT1_2, z: 0, w: Math.SQRT1_2 };
+    let t10 = null, peak = 0, smin = 1e9, smax = 0;
+    fly(sim, 30, { target: V(speed, 0, 0), tau: 0.5, carve01: 1, carveAccel }, { each: (t, st) => { const sp = len(st.v); smin = Math.min(smin, sp); smax = Math.max(smax, sp); peak = Math.max(peak, st.phys.fieldCarve); if (t10 == null && Math.acos(Math.min(1, st.v.x / sp)) < 10 * Math.PI / 180) t10 = t; } });
+    return { t10, peak, smin, smax, end: sim.st.phys.fieldCarve };
+  };
+  // unbounded (as PILOT flies it today): the field gives whatever it takes, and now it is reported
+  const free = turn(77);
+  assert.ok(free.peak > 100, `unbounded at 77 m/s the field pushes ${free.peak.toFixed(0)} m/s2 sideways`);
+  assert.ok(free.end < 0.5, 'and nothing once the path is on the nose');
+  // bounded to 30 m/s2: never more than that, the speed is still not changed, and the turn takes v (pi / 2) / a
+  for (const v of [46, 77, 137]) {
+    const b = turn(v, 30);
+    assert.ok(b.peak <= 30.001, `${v} m/s: peak ${b.peak}`);
+    assert.ok(b.smin > v * 0.85 && b.smax < v * 1.08, `${v} m/s: speed ${b.smin.toFixed(1)}..${b.smax.toFixed(1)}`);    // (the thrusters work too: a few percent)
+    // 80 degrees of turning: no faster than the field and every thruster together could (30 + 22 m/s2), no slower than the field alone
+    const fast = v * (80 * Math.PI / 180) / 52, slowest = v * (80 * Math.PI / 180) / 30;
+    assert.ok(b.t10 > fast * 0.8 && b.t10 < slowest * 1.2 + 1, `${v} m/s: within 10 degrees after ${b.t10.toFixed(2)} s (between ${fast.toFixed(2)} and ${slowest.toFixed(2)} s)`);
+  }
+  assert.ok(turn(137, 30).t10 > 2 * turn(46, 30).t10, 'three times the speed: the turn takes more than twice as long');
+  // a gentle turn the field can afford is not changed by the bound
+  const slow = turn(20, 30), slowFree = turn(20);
+  assert.ok(Math.abs(slow.t10 - slowFree.t10) < 0.35, `${slow.t10} against ${slowFree.t10}`);
+});
+
 test('hover: holds position exactly; no drift, no bobbing (60 and 20 Hz)', () => {
   for (const hz of [60, 20]) {
     const sim = flight();

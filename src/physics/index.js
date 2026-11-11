@@ -15,12 +15,14 @@ import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltati
 import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
-import { FloraField, FLORA, PlantSim, plantDisplace, treeFrequency, stemFrequency } from './flora.js';
+import { FloraField, FLORA, PlantSim, plantDisplace, plantBranch, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { skyNumbers, SKY } from './sky.js';
+import { DriftField, DRIFT, snowTransport01 } from './drift.js';
+import { clamp01 } from './util.js';
 import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01 } from './water.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed } from './explorer.js';
@@ -55,6 +57,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const devils = []; devils.count = 0;
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField(SHIP_BODY.legs);
+  const drift = new DriftField();
+  const _dsh = new Float32Array(16);     // landed hulls, as obstacles the wind drifts round
+  let driftSnow = false;                 // what drifts here is snow (else the loose layer of sand or dust)
   const _fill = { snow: 0, sand: 0 };
   const water = new WaterField();
   const _wk = [];            // per-disturber wake state: where and when it last left a ring
@@ -98,8 +103,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (n < 0) { o.sink = 0.015; o.imprint = 0.5; o.loose = 0; o.dust = 0; o.mat = MATERIAL_NONE; o.h = here.groundHeight + BODIES[active].radius - frame.r0; return o; }
     const c = near.cover, a = n * near.CW;
     // snow on the ground deepens the print and keeps it
-    const snow = moist.snowDepth;
+    // (as deep as it lies HERE: more in a drift, none where the wind has scoured the ground bare)
+    const dd = drift.depthAt(x, z);
+    const snow = driftSnow ? Math.max(0, moist.snowDepth + dd) : moist.snowDepth;
     o.sink = Math.max(c[a], Math.min(snow * 0.8, GROUND.snowSinkMax)) * (c[a + 7] > 0.05 ? 0 : 1);
+    if (!driftSnow && dd > 0) o.sink += Math.min(dd, 0.1) * 0.4;      // a tail of blown sand is softer than the bed it lies on
     o.imprint = snow > GROUND.snowCover ? 1 : c[a + 1];
     // loose: granular ground that piles into rims and can be scoured (sand, dust, gravel, snow)
     o.loose = snow > GROUND.snowCover ? 1 : (c[a + 3] > 0 ? 1 : 0) * (1 - Math.min(1, moist.wetness01 * 1.5));
@@ -148,7 +156,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       frame.anchor(bodyId, _d3[0] * rf, _d3[1] * rf, _d3[2] * rf);
       const dr = r0 - frame.r0;
       near.rebase(frame, X, Z, dr); airGrid.terrain.rebase(frame, X, Z, dr);
-      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); water.rebase(frame, X, Z);
+      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); drift.rebase(frame, X, Z); water.rebase(frame, X, Z);
       for (let k = 0; k < _wk.length; k++) if (_wk[k]) { _wk[k].x -= X; _wk[k].z -= Z; }
       if (liqLevel > -1e8) liqLevel += dr;
       fx = frame.lx(fp.x, fp.y, fp.z); fz = frame.lz(fp.x, fp.y, fp.z);
@@ -217,6 +225,19 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (f.eye) { const x = frame.lx(f.eye.x, f.eye.y, f.eye.z), z = frame.lz(f.eye.x, f.eye.y, f.eye.z); if (Math.abs(x - fx) < 60 && Math.abs(z - fz) < 60) { ecx = x; ecz = z; } }
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
+    // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
+    { const U = Math.hypot(airGrid.cwe, airGrid.cwn), snow = moist.snowDepth;
+      driftSnow = snow > 0.01;
+      const level = driftSnow ? snow : DRIFT.sandLayer * clamp01(cover.dustSource) * (1 - Math.min(1, moist.wetness01 * 2));
+      const tr = driftSnow ? snowTransport01(U, moist.wetness01, here.sky.snowfall) : loose.saltation01;
+      let ns = 0;
+      if (dist) for (let k = 0; k < dist.length && ns < 4; k++) {
+        const D = dist[k]; if (D.kind !== 'ship' || !D.p) continue;
+        const x = frame.lx(D.p.x, D.p.y, D.p.z), z = frame.lz(D.p.x, D.p.y, D.p.z), feet = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0;
+        if (feet - near.heightAt(x, z, gh) > 1.2) continue;                   // flying: the wind goes under it
+        const o = ns * 4; _dsh[o] = x; _dsh[o + 1] = z; _dsh[o + 2] = feet + DRIFT.hullHeight; _dsh[o + 3] = (D.radius || 4.2) * 0.85; ns++;
+      }
+      drift.update(dt, frame, fx, fz, near, airGrid.cwe, airGrid.cwn, level > 0.004 ? level : 0, tr, _dsh, ns); }
     // what is filling the marks in: falling snow (m of depth per second) and blowing sand
     const pr = here.weather.precipitation;
     _fill.snow = pr.type === 'snow' || pr.type === 'ice' || pr.type === 'frost' ? pr.rate * pr.frozen01 * WEATHER.snowRatio * WEATHER.timeScale / 3.6e6 : 0;
@@ -337,6 +358,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const body = BODIES[bodyId];
     if (bodyId === active && (!unitDir || nearFocus(bodyId, unitDir.x, unitDir.y, unitDir.z, 60))) {
       st.wetness01 = moist.wetness01; st.snowDepth = moist.snowDepth;
+      // the snow as deep as the wind has left it at this very spot (drift.js)
+      if (driftSnow && unitDir && s.radius > 0) { const px = unitDir.x * s.radius, py = unitDir.y * s.radius, pz = unitDir.z * s.radius; st.snowDepth = Math.max(0, moist.snowDepth + drift.depthAt(frame.lx(px, py, pz), frame.lz(px, py, pz))); }
       // temperature at this ground: the focus air temperature, corrected for the height difference
       st.temperature = here.weather.temperature - ATMOSPHERES[bodyId].lapse * ((s.radius - body.radius) - here.groundHeight);
     } else if (unitDir) {
@@ -427,6 +450,10 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       plantBend(p, stiff01, out) { return flora.plantBend(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), stiff01, out); },
       plantBendLite(p, stiff01, out) { return flora.plantBendLite(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), stiff01, out); },
       plantDisplace,
+      // how far a point of a crown is moved by its branch (m: { e, n, up }); add it before plantDisplace.
+      // rel: the point's offset from the trunk { e, n } (m) and height h; H: the plant's height;
+      // root: body-local; bend: what plantBend returned for the plant (stiff01 as for the plant)
+      plantBranch(re, rn, h, H, root, bend, out) { return plantBranch(re, rn, h, H, frame.lx(root.x, root.y, root.z), frame.lz(root.x, root.y, root.z), bend.e, bend.n, bend.shake01 || 0, flora.uniforms, out); },
       field: flora,
     },
     deform: {
@@ -435,6 +462,16 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       get version() { return deform.version; },
       depthAt(p) { return deform.depthAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)); },
       field: deform,
+    },
+    // drifts (drift.js): a 64 x 64 grid of 0.5 m cells round the focus, the grid of the marks.
+    //   factor: Float32Array(64*64): loose material at the cell in units of what lies on level ground
+    //           (0 level, +1 twice as deep, -1 blown bare); level: that depth now (m); snow: it is snow
+    //           (else the loose layer of sand or dust); depthAt(p): m above (below) the level deposit
+    drift: {
+      get factor() { return drift.f; }, size: DRIFT.N, cell: DRIFT.cell, uniforms: drift.uniforms,
+      get version() { return drift.version; }, get level() { return drift.level; }, get snow() { return driftSnow; },
+      depthAt(p) { return drift.depthAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)); },
+      field: drift,
     },
     water: {
       uniforms: water.uniforms,   // uPhysWaterDir[2], uPhysWaterK[4], uPhysWaterAmp[4], uPhysWaterPhase[4], uPhysWaterGroup[4],

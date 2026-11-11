@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
-import { FLORA, PlantSim, plantDisplace, treeFrequency, stemFrequency } from './flora.js';
+import { FLORA, PlantSim, plantDisplace, plantBranch, BRANCH_F, BRANCH_M, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { oscStep, TAU } from './util.js';
 import { setWindScale, WINDS } from './wind.js';
@@ -285,4 +285,60 @@ test('gusts travel through the grass: a plant downwind bends like its upwind nei
     assert.ok(lagS > expect * 0.5 && lagS < expect * 2, `after ${lagS.toFixed(1)} s; the wind (${u.toFixed(1)} m/s) covers ${gap} m in ${expect.toFixed(1)} s`);
     assert.ok(corr(0) < best - 0.03, 'and not at the same moment');
   } finally { setWindScale('earth', s0); }
+});
+
+test('branches: a crown does not sway as one piece; nothing moves at the trunk, nothing tears, and it is bounded', () => {
+  const w = world('earth', 'temperate_forest');
+  const F = w.physics.fields.flora, H = 12, L = FLORA.crown * H;
+  run(w, 20);
+  const bend = F.plantBend(w.focus, 1);
+  assert.ok(bend.angle > 0.002, `the tree leans ${bend.angle.toFixed(4)} rad`);
+  const o = {}, at = (az, x, s) => { F.plantBranch(Math.cos(az) * x * L, Math.sin(az) * x * L, s * H, H, w.focus, bend, o); return [o.e, o.n, o.up]; };
+  // at the trunk: nothing. Along a branch: more toward the tip, as a cantilever (x^2 (3 - x) / 2)
+  assert.deepEqual(at(0.7, 0, 0.6), [0, 0, 0]);
+  const m = (v) => Math.hypot(v[0], v[1], v[2]);
+  const half = m(at(0.7, 0.5, 0.6)), tip = m(at(0.7, 1, 0.6));
+  assert.ok(Math.abs(half / tip - 0.3125) < 1e-9, `half way out moves ${half / tip} of the tip`);
+  // all the way round the trunk the motion is continuous (whole lobes): no seam where atan2 wraps
+  let jump = 0, prev = at(-Math.PI, 1, 0.6);
+  for (let k = 1; k <= 720; k++) { const v = at(-Math.PI + k * Math.PI / 360, 1, 0.6); jump = Math.max(jump, m([v[0] - prev[0], v[1] - prev[1], v[2] - prev[2]])); prev = v; }
+  const seam = m(at(Math.PI - 1e-7, 1, 0.6).map((v, i) => v - at(-Math.PI + 1e-7, 1, 0.6)[i]));
+  assert.ok(seam < 1e-6 * L && jump < 0.05 * tip + 1e-9 + 0.03 * FLORA.branchGain * bend.angle * L, `seam ${seam}, largest step round the crown ${jump}`);
+  for (const mm of BRANCH_M) assert.equal(mm, Math.round(mm));
+  // over time: opposite sides of the crown are out of step, each moves at branch rates (faster
+  // than the trunk), and no tip ever swings further than its bound
+  const east = [], west = [], lean = [];
+  run(w, 30, { t0: 120, each: () => { const b = F.plantBend(w.focus, 1); lean.push(b.angle); F.plantBranch(L, 0, 0.7 * H, H, w.focus, b, o); east.push(o.up); F.plantBranch(-L, 0, 0.7 * H, H, w.focus, b, o); west.push(o.up); } });
+  const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length, c = (a, b) => { const ma = mean(a), mb = mean(b); let sab = 0, saa = 0, sbb = 0; for (let i = 0; i < a.length; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; } return sab / Math.sqrt(saa * sbb); };
+  assert.ok(Math.abs(c(east, west)) < 0.6, `east and west tips correlate ${c(east, west).toFixed(2)}`);
+  const crossings = (a) => { const ma = mean(a); let n = 0; for (let i = 1; i < a.length; i++) if ((a[i] - ma) * (a[i - 1] - ma) < 0) n++; return n / 2 / 30; };   // Hz
+  assert.ok(crossings(east) > 2 * FLORA.stiffHz && crossings(east) < FLORA.branchHz * Math.max(...BRANCH_F) * 1.2, `a tip bobs at about ${crossings(east).toFixed(2)} Hz; the trunk sways at ${FLORA.stiffHz}`);
+  const bound = (FLORA.branchGain * Math.max(...lean) + 0) * L;
+  assert.ok(Math.max(...east.map(Math.abs)) <= bound + 1e-9, `largest bob ${Math.max(...east.map(Math.abs)).toFixed(3)} m of ${bound.toFixed(3)} m`);
+  assert.ok(Math.max(...east.map(Math.abs)) > 0.002, 'and it does move');
+  // two trees side by side are not in step either (each has its own number)
+  const U = F.uniforms, a1 = {}, a2 = {};
+  plantBranch(L, 0, 8, H, 10.2, 3.1, 0.1, 0, 0, U, a1); plantBranch(L, 0, 8, H, 14.9, 3.1, 0.1, 0, 0, U, a2);
+  assert.ok(Math.abs(a1.up - a2.up) > 1e-4);
+});
+
+test('branches follow the wind on the tree and how gusty it is; a brushed crown shivers; calm air leaves them still', () => {
+  const U = { uPhysBranch: [0, FLORA.branchGain, FLORA.branchShake, FLORA.crown], uPhysBranchPhase: [0.3, 1.1, 2.0, 4.4] };
+  const H = 10, L = FLORA.crown * H, o = {};
+  const amp = (be, shake, gust) => { U.uPhysBranch[0] = gust; let mx = 0; for (let k = 0; k < 400; k++) { for (let i = 0; i < 4; i++) U.uPhysBranchPhase[i] = k * 0.37 * BRANCH_F[i]; plantBranch(L, 0, 7, H, 3, 4, be, 0, shake, U, o); mx = Math.max(mx, Math.hypot(o.e, o.n, o.up)); } return mx; };
+  assert.equal(amp(0, 0, 1), 0, 'no lean, nothing shaken: still');
+  const calm = amp(0.1, 0, 0), gusty = amp(0.1, 0, 1), storm = amp(0.2, 0, 1);
+  assert.ok(gusty > 2 * calm && calm > 0, `the same lean: ${calm.toFixed(3)} m in smooth air, ${gusty.toFixed(3)} m in gusty air`);
+  assert.ok(Math.abs(storm / gusty - 2) < 0.05, 'twice the lean, twice the swing');
+  // a 3.5 m branch on a tree leaning 0.1 rad in gusty air: tips move a few decimetres at most
+  assert.ok(gusty > 0.15 && gusty < 0.5, `${gusty}`);
+  const shiver = amp(0, 1, 0);
+  assert.ok(shiver > 0.15 && shiver < 1.3 * FLORA.branchShake * L, `a shaken crown in still air: ${shiver.toFixed(3)} m`);
+  // the phases the field hands out advance at the four rates and stay wrapped
+  const w = world('earth', 'temperate_forest'); run(w, 1);
+  const P0 = w.physics.fields.flora.uniforms.uPhysBranchPhase.slice(); run(w, 0.1, { t0: 101 });
+  const P1 = w.physics.fields.flora.uniforms.uPhysBranchPhase;
+  for (let i = 0; i < 4; i++) { const d = ((P1[i] - P0[i]) % TAU + TAU) % TAU; assert.ok(Math.abs(d - TAU * FLORA.branchHz * BRANCH_F[i] * 0.1) < 1e-6, `oscillator ${i}`); assert.ok(P1[i] >= 0 && P1[i] < TAU); }
+  const g = w.physics.fields.flora.uniforms.uPhysBranch[0]; assert.ok(g >= 0 && g <= 1);
+  for (const name of ['pcPhysBranch', 'uPhysBranch', 'uPhysBranchPhase']) assert.ok(FLORA_GLSL.includes(name), name);
 });
