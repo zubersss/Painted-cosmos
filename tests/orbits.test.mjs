@@ -152,6 +152,7 @@ test('space edge: every body has room between the ground and space', () => {
   for (const id of BODY_IDS) {
     const b = BODIES[id];
     assert.ok(spaceAltitude(b) >= b.radius * 0.2 - 1e-9 && spaceAltitude(b) >= b.atmosphereHeight);
+    assert.ok(spaceAltitude(b) < b.radius * 0.5, 'space starts well inside the sphere of influence');
     assert.ok(eph.soiRadius(id) > b.radius + spaceAltitude(b) * 2);
   }
 });

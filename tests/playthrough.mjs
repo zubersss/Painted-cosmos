@@ -151,7 +151,7 @@ try {
   check(i.state === 'LANDED', 'boarded with E');
   check(/Lift off/.test(i.prompt || ''), 'lift-off prompt shows');
   await gameWait(0.6);
-  await shot('04-in-ship', '04-in-ship');
+  await shot('04-in-ship');
   stage('board', i);
 
   // ---- lift off ----------------------------------------------------------------------------------------
@@ -225,7 +225,7 @@ try {
   let shotEntry = false;
   i = await until((x) => x.state === 'ATMOSPHERE', 120, async (x) => {
     await holdPitch(-45)(x);
-    if (!shotEntry && alt(x) < 1050) { shotEntry = true; await shot('09-entry', '09-entry'); }
+    if (!shotEntry && alt(x) < 1050) { shotEntry = true; await shot('09-entry'); }
   });
   check(i.state === 'ATMOSPHERE' && i.frame === 'earth:ground', 'entered the atmosphere');
   stage('entry', i);
@@ -250,7 +250,7 @@ try {
   await gameWait(1.5);
   i = await info();
   check(i.ship.speed === 0 && i.ship.gear01 > 0.9, 'at rest, gear down');
-  await shot('11-landed', '11-landed');
+  await shot('11-landed');
   stage('landed', i);
 
   // ---- step out ------------------------------------------------------------------------------------------------

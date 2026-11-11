@@ -6,6 +6,7 @@
 //   body=<id>  time=<hours>          where and when to start
 //   dynres=0   scale=<0.25..1>  quality=<0|1|2>   pin the resolution controller (for screenshots)
 //   pointerlock=0                    drag to look instead of locking the pointer
+//   card=0                           no start card (for captures)
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
@@ -61,7 +62,9 @@ async function boot() {
   resize();
   if (painter.setRenderScale) painter.setRenderScale(dyn.scale);
   painter.setQuality(dyn.quality);
-  hud.showStart(true);
+  const showCard = params.get('card') !== '0';
+  hud.showStart(showCard);
+  if (!showCard) game.started = true;
 
   const sim = game.sim;
   const debug = {
@@ -71,6 +74,12 @@ async function boot() {
     aimAt: (id) => sim.aimAt(id),
     setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },
     setHour: (h) => { sim.eph.setLocalSolarTime(sim.bodyId, sim.t, norm3(sim.ex.p), h); },
+    // Resolves when the world has had nothing left to build for `frames` frames in a row.
+    settle: (frames = 12) => new Promise((resolve) => {
+      let n = 0;
+      const f = () => { n = worldSettled(world, game.frameCount) ? n + 1 : 0; if (n >= frames) resolve(true); else requestAnimationFrame(f); };
+      f();
+    }),
     fps: 0,
     errors: [],
   };

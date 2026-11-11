@@ -10,7 +10,7 @@ import {
 import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip } from './state.js';
 import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
-  qLook, qRotate, qConj, rotateAround,
+  qLook, qRotate, qConj, qMul, qFromAxisAngle, rotateAround,
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer } from '../player/explorer.js';
 import {
@@ -472,7 +472,8 @@ export class Sim {
     };
   }
 
-  // Teleport: { body, dir:[x,y,z] | lat, lon (degrees), altitude, hour, ship: bool }.
+  // Teleport: { body, dir:[x,y,z] | lat, lon (degrees), altitude, hour, ship: bool,
+  //             pitchDeg (ship nose above the horizon), throttle }.
   teleport(o = {}) {
     const body = o.body && BODIES[o.body] ? o.body : this.bodyId;
     let dir = null;
@@ -495,6 +496,11 @@ export class Sim {
         const c = convertState(this.eph, this.t, bodyFrame(body, true), bodyFrame(body, false), this.sh);
         this.sh.p = c.p; this.sh.v = V(); this.sh.q = c.q;
       }
+      if (o.pitchDeg) {
+        const right = qRotate(this.sh.q, V(1, 0, 0));
+        this.sh.q = qMul(qFromAxisAngle(right, (o.pitchDeg * Math.PI) / 180), this.sh.q);
+      }
+      if (o.throttle != null) this.sh.throttle = o.throttle;
       this.shFrame = bodyFrame(body, rotating);
       this.sm.force(rotating ? S.ATMOSPHERE : S.SPACE);
     }

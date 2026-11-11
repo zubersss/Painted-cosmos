@@ -6,6 +6,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-hud { position: fixed; inset: 0; pointer-events: none; color: var(--pc-ink);
   font: 15px/1.35 Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; user-select: none; }
 .pc-label { letter-spacing: 0.06em; font-style: italic; color: var(--pc-sepia); }
+/* A halo of paper keeps ink readable over the indigo of space as well as over bare paper. */
+.pc-readout, .pc-gauge { text-shadow: 0 0 2px var(--pc-paper), 0 0 5px var(--pc-paper), 0 0 9px var(--pc-paper); }
+.pc-readout { color: var(--pc-ink); }
 .pc-title { font-size: 34px; letter-spacing: 0.12em; color: var(--pc-ink); margin-bottom: 6px; }
 .pc-panel { background: var(--pc-wash); border-radius: 3px 9px 4px 11px / 10px 4px 9px 3px;
   box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.25), 0 6px 24px rgba(44, 51, 80, 0.12); padding: 22px 30px; }
@@ -20,7 +23,8 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
 .pc-gauges { position: absolute; left: 50%; bottom: 9.5%; transform: translateX(-50%); display: flex; gap: 22px; }
 .pc-gauge { opacity: 0; transition: opacity 0.4s ease; display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .pc-gauge.pc-on { opacity: 0.9; }
-.pc-gauge b { display: block; width: 120px; height: 5px; border-radius: 3px; background: rgba(107, 90, 72, 0.22); overflow: hidden; }
+.pc-gauge b { display: block; width: 120px; height: 5px; border-radius: 3px; background: rgba(244, 239, 228, 0.7);
+  box-shadow: 0 0 0 1px rgba(107, 90, 72, 0.35); overflow: hidden; }
 .pc-gauge i { display: block; height: 100%; width: 100%; background: var(--pc-ink); border-radius: 3px; }
 .pc-gauge-fuel i { background: #b5553c; }
 .pc-readout { position: absolute; left: 7%; bottom: 9.5%; font-size: 12px; opacity: 0; white-space: pre;
