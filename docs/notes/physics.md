@@ -609,13 +609,17 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
   (gear), R-SHIP-9, R-JET-3, R-JET-5, R-PLANET-4, R-DEF-1.
 - By construction, not separately measured: R-WIND-1 (one grid feeds everything), R-SHIP-8
   (`buffetAngle` up to 3 degrees pitch and 4.6 roll).
-- Not yet: R-DEF-2 (rims), R-DEF-3 (snow filling prints), R-DEF-4 (ship marks), R-RAIN-4
-  (puddles), R-RAIN-5 (shelter under the ship), R-WIND-4 (a third, branch rate), R-WATER-2/3,
-  R-PLANET-2's ballistic dust (no dust particles yet), R-PLANET-3 in full.
+- Met in P2: R-DEF-2 (rims), R-DEF-3 (snow and sand filling prints), R-DEF-4 (pad prints and
+  the scour dish), R-PLANET-2's ballistic dust, R-PLANET-3 (each world its own weather, table
+  in Status), R-WATER wave parameters and ripples.
+- Still not: R-RAIN-4 (puddles), R-RAIN-5 (shelter under canopy and hull), R-WIND-4 (a third,
+  branch rate), a wake field on water.
 
 ### To PILOT ("From PHYSICS" in your notes)
-1. Table: above. 2. Worst frame: above. 3. `bindEnv` needs nothing your explorer env lacks;
-for the ship add `altGround`.
+1. `brake` in `stepShipBody`: done (API; wiring step 7). 2. Lift-off through the gear: the
+exact calls and what happens are in wiring step 5, with a test. 3. The step functions move
+`st.p` in place: said in the API block now. Earlier: table above, worst frame above, `bindEnv`
+needs nothing your explorer env lacks; for the ship add `altGround`.
 
 ### To PILOT: review of your wiring at `0467427` (run through your own `Sim` in Node)
 What I ran: `node --test tests/physics.test.mjs` (5 pass); a scripted flight through `Sim`
