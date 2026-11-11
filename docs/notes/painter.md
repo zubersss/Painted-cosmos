@@ -247,6 +247,47 @@ the back leans in and the arms go back. Without `feet` the old cycle runs as bef
   scissor, the trailing heel lifts, knees soft); **the run read as running but knelt in the
   air** (the heel drawn up to hip height): heel lift reduced (0.42 m and x4.4 to 0.30 m and
   x2.7) and not re-filmed in the gallery.
+- *In the game* (PILOT's wiring in the head; `node tests/motion.mjs --only walk` on a clean
+  export of `194171b`, W held, 4.2 m/s, a run by its gait; the lower body cropped from twelve
+  consecutive frames: `docs/shots/painter/gait-game-run.jpg`, opened): seen from behind, the
+  boots alternate, a heel kicks up behind at each step, the legs cross under the coat about
+  every ten frames (three steps a second at 30 frames a second), the arms swing against the
+  legs: **the explorer steps, on the game's clock**. Whether a planted boot slides against the
+  ground could not be judged from behind at this size. The walk's pops: 17 blocks (19 before),
+  none from the figure. Not filmed: a walk under 2 m/s in the game, a jump's crouch, the Moon's
+  bound.
+
+### Item 3: branches that move (PHYSICS' crown)
+
+Wired as PHYSICS asked (relayed with `1a7ed8c`): `uPhysBranchClock` in `PHYS`; the kit builder
+lays `aBranchId` and `aLeaf01` on every vertex (`florakit.js`: a trunk, a tube with `swayH` >
+1.5, is -1; any other tube or blob takes its own number from its hash; a birch's three branches
+take 0.13 + 0.618 k and every foliage mass within 2.2 m of a branch's tip takes that branch's
+number, the others are branches of their own hidden in the wash; a pine's six tiers each their
+own); `flora.js` shares the two attributes with the instanced meshes; the tree shader
+(`PC_PHYS_BRANCH`, broadleaf, conifer, fungus, kelp; near and mid tiers, not the far form)
+takes `pb = pcPhysBend(root, stiff)` and adds `pcPhysCrown(rel, up, H, root, pb, id, aLeaf01)`
+before `pcPhysDisplace`, `id = fract(aBranchId + 7.31 seed)` so no two trees move alike.
+- *Seen* (scratch `strip.mjs` at the Earth spawn, clock 165 s, the storm, 10 frames 1/15 s
+  apart; one crown against the sky zoomed over 0.6 s: `docs/shots/painter/crown-storm-after.jpg`,
+  opened; an amplified difference over 0.27 s, opened): the holes of sky between the masses of
+  foliage open, close and change shape from frame to frame, the masses shift against one
+  another while the white trunks stand: **the crowns move in pieces, not as one**. No console
+  error. Not seen side by side with the crown as it was (the lobes of `pcPhysBranch`), and not
+  in the gust front (149 s) or in a breeze; the far form does not move (by PHYSICS' leave).
+
+### Needs (block 7, tenth agent)
+
+- *PHYSICS*: (1) at Neptune's `storm_seas` stand in the gale (clock 150), what are Hs and the
+  whitecap cover (`uPhysWaterSea.x`, `.w`) over the bay? My white horses wait on Hs 0.5 to 2 m
+  and did not show there. (2) Should a step on a meadow raise a dust puff? It shows as a pale
+  round puff at the boot that appears in one frame. (3) Export `bobAt` (or a pose helper
+  `gaitPose(v, g, stride)`): the gallery copies its formula to pose the figure.
+- *PILOT*: none.
+- *For the art pass* (look data, not mine to change during the pass): none of my findings came
+  from a body's look data; Neptune's `storm_seas` `t.cliff` (46 m) sets the height of the
+  vertical cliff ends that make the ruled edges (the form itself is shared code in
+  `surface.js`).
 
 ## M3 block 6: each world's idea in its first view, motion faults, orbit (eighth PAINTER agent)
 
