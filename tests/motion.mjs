@@ -29,7 +29,7 @@
 //                 own median over the run plus 2 % (and over 4 %): something appeared, vanished
 //                 or changed at once there. Listed with the frame, the place and the change in
 //                 the triangle count, and shown before and after on the sheet.
-//   stuck         (turn only) fine and broad detail of frame n against frame n+3: how well it
+//   stuck         (turn only) fine and broad detail of frame n against frame n+5: how well it
 //                 matches where the world has moved to ("with the world"), where it was on the
 //                 screen ("on the screen"), and how well the frame matches ITSELF shifted by
 //                 that much ("by chance"). Detail that belongs to the screen scores high "on
@@ -88,7 +88,9 @@ let failed = false;
 let here = 'spawn';                 // a fresh game stands at the Earth spawn
 
 const step = (n = 1) => page.evaluate(([dt, k]) => window.__pc.step(dt, k), [DT, n]);
-const grab = () => page.evaluate(() => window.__motion.grab());
+// One frame of exactly DT and its picture, in one task: between two tasks the browser may
+// present the canvas and clear it (the first trial's first frames came back black).
+const stepGrab = () => page.evaluate((dt) => { window.__pc.step(dt, 1); return window.__motion.grab(); }, DT);
 const info = () => page.evaluate(() => window.__pc.info());
 
 try {
@@ -174,8 +176,7 @@ try {
     let mx = W / 2 - 90;
     for (let f = 0; f < s.frames; f++) {
       if (s.mouse) { mx += s.mouse; await page.mouse.move(mx, H / 2); }
-      await step(1);
-      await grab();
+      await stepGrab();
     }
     if (s.mouse) await page.mouse.up();
     for (const k of s.keys || []) await page.keyboard.up(k);
@@ -186,7 +187,7 @@ try {
     const dir = path.join(opt.out, s.id);
     fs.mkdirSync(dir, { recursive: true });
     urls.forEach((u, i) => fs.writeFileSync(path.join(dir, `f${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')));
-    const row = { id: s.id, what: s.what, frames: s.frames, settledSeconds: settled, settledFrames: st.frames, seconds: 0, note, ...res.summary, pairs: res.pairs, pops: res.pops, meta: res.meta };
+    const row = { id: s.id, what: s.what, frames: s.frames, settledSeconds: settled, settledFrames: st.frames, seconds: 0, note, ...res.summary, pairs: res.pairs, popList: res.pops, meta: res.meta };
     await writeSheet(s, row, urls, res);
     row.seconds = Math.round((Date.now() - t0) / 1000);
     rows.push(row);
@@ -219,11 +220,11 @@ async function writeSheet(s, row, urls, res) {
   const line2 = `Change between consecutive frames: mean ${m.change.mean} %, worst pair ${m.change.max} % (frames ${m.change.worstPair} to ${m.change.worstPair + 1}); pixels changing by more than 3 %: ${m.change.pixels3} % on average; picture that never changes by 0.5 %: ${m.change.stillShare} %.`
     + ` After following the motion: residual ${m.residual.mean} % mean, ${m.residual.p99} % at the 99th block in a hundred; block mean luminance changes ${m.blockMean.p99} % (99th), ${m.blockMean.max} % at most, ${m.blockMean.over3} of ${m.blockMean.of} over 3 %.`
     + ` Pops: ${m.pops.blocks} blocks in ${m.pops.pairs} of ${s.frames - 1} pairs.`
-    + (m.stuck ? ` Detail three frames apart (shift ${m.stuck.shiftPx} px on screen): broad detail matches ${m.stuck.broad.world} with the world, ${m.stuck.broad.screen} on the screen, ${m.stuck.broad.chance} by chance; fine detail ${m.stuck.fine.world}, ${m.stuck.fine.screen}, ${m.stuck.fine.chance}.` : '');
+    + (m.stuck ? ` Detail ${m.stuck.lagFrames} frames apart (shift ${m.stuck.shiftPx} px on screen): broad detail matches ${m.stuck.broad.world} with the world, ${m.stuck.broad.screen} on the screen, ${m.stuck.broad.chance} by chance; fine detail ${m.stuck.fine.world}, ${m.stuck.fine.screen}, ${m.stuck.fine.chance}.` : '');
   const big = (u, cap) => `<figure><img src="${u}" style="width:632px"><figcaption>${cap}</figcaption></figure>`;
   const Z = 2, C = 128;
   const crop = (u, x, y) => `<div style="width:${C * Z}px;height:${C * Z}px;background:url(${u}) ${-x * Z}px ${-y * Z}px / ${W * Z}px ${H * Z}px no-repeat;display:inline-block"></div>`;
-  const pops = row.pops.slice(0, 6).map((p) => {
+  const pops = row.popList.slice(0, 6).map((p) => {
     const x = Math.max(0, Math.min(W - C, p.x + 16 - C / 2)), y = Math.max(0, Math.min(H - C, p.y + 16 - C / 2));
     return `<figure style="display:inline-block;margin:0 6px 6px 0">${crop(urls[p.pair], x, y)}${crop(urls[p.pair + 1], x, y)}<figcaption>frames ${p.pair} and ${p.pair + 1} at (${p.x}, ${p.y}): ${p.blocks} blocks, residual ${p.residual} % (its median ${p.median} %), triangles ${p.dTris >= 0 ? '+' : ''}${p.dTris}</figcaption></figure>`;
   }).join('');
@@ -375,7 +376,7 @@ function installInPage([FW, FH]) {
     };
     if (o.stuck && n > 6) {
       // Fine detail: what a 3 px blur takes away. Broad detail: between a 3 px and an 11 px blur.
-      const lag = 3, picks = [];
+      const lag = 5, picks = [];
       for (let k = 1; k + lag < n; k += Math.max(1, Math.floor((n - lag) / 6))) picks.push(k);
       const acc = { shift: [], fw: [], fs: [], fc: [], bw: [], bs: [], bc: [] };
       for (const k of picks) {
