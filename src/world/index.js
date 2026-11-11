@@ -301,7 +301,7 @@ export function createWorld(scene) {
       const ground = here.radius;
       // the near ground: one layer of strokes round the eye (built on first use, in what is left of the slice)
       if (!st.near) st.near = new NearGround(st.id, st.root, bu);
-      st.near.update(st.camLocal, true, camR - ground, Math.max(0.6, budgetMs * 0.25), dt, nearPixel);
+      st.near.update(st.camLocal, true, camR - ground, Math.max(0.6, wallDt > 80 && !fixedSlice ? Math.min(110, wallDt * 0.15) : budgetMs * 0.25), dt, nearPixel);     // (in slow frames a share of the frame, like the terrain)
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
       let mist = 0, twi = 0;

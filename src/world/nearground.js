@@ -24,7 +24,7 @@ import { getLook } from '../data/looks.js';
 // its marks are left; how far above the ground the eye may be; cells moved before re-listing.
 const RINGS = [
   { name: 'fine', cell: 0.6, range: [11, 12, 17], per: 12, inner: [0.8, 2.6], soft: 0, alt: 45, step: 2 },
-  { name: 'mid', cell: 1.9, range: [0, 40, 66], per: 7, inner: [5, 12], soft: 0.6, alt: 90, step: 1 },
+  { name: 'mid', cell: 1.9, range: [0, 40, 66], per: 7, inner: [8, 15], soft: 0.6, alt: 90, step: 1 },
   { name: 'far', cell: 6.5, range: [0, 0, 240], per: 5, inner: [38, 66], soft: 0.8, alt: 200, step: 1 },
 ];
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -474,7 +474,9 @@ export class NearGround {
     if (!active) { for (const r of this.rings) r.hide(); return; }
     this.mesh.visible = true;
     if (QUALITY.level !== this.lastQ) { this.lastQ = QUALITY.level; this.clear(); }
-    let left = sliceMs;
+    // (walking, a few cells come due each frame and the slice is never filled; after a landing or
+    // a leap the whole sward is due: it is then given more of the frame, for a second or two)
+    let left = this.busy > 800 ? sliceMs * 2.5 : sliceMs;
     for (const r of this.rings) left -= r.update(camLocal, alt, Math.max(0.15, left), dt, pixel);
   }
 }

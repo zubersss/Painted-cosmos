@@ -1132,8 +1132,10 @@ void main() {
       float b1 = u * nb + hz * 7.0 + 0.4 * sin(u * 9.0 + hz * 30.0), b2 = u * nb * 0.37 + hz * 3.0;
       float h1 = 0.30 + 0.70 * fract(sin(floor(b1) * 12.9898 + hz * 78.233) * 43758.5453);
       float h2 = 0.55 + 0.45 * fract(sin(floor(b2) * 39.3468 + hz * 11.135) * 24634.6345);
-      float top = h1 * h2 * (1.0 - 0.66 * vS.y * vS.y) * pow(max(1.0 - abs(fract(b1) - 0.5) * 2.0, 0.0), 0.45) + (n2.g - 0.5) * 0.25;
-      if (vS.x > max(top, 0.08)) discard;
+      // (the lower part is one body of wash; only its top is broken into blades)
+      float blades = h1 * h2 * pow(max(1.0 - abs(fract(b1 + (n2.b - 0.5) * 0.8) - 0.5) * 2.0, 0.0), 0.45);
+      float top = mix(0.40, 1.0, blades) * (1.0 - 0.66 * vS.y * vS.y) + (n2.g - 0.5) * 0.22;
+      if (vS.x > top) discard;
     }
     if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
   }
