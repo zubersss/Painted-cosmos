@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { BODIES, BODY_IDS } from '../src/data/bodies.js';
 import { Ephemeris, spaceAltitude } from '../src/core/orbits.js';
 import {
-  HELIO, bodyFrame, frameState, posToUniverse, posFromUniverse, velToUniverse, velFromUniverse,
+  HELIO, bodyFrame, frameState, posToUniverse, velToUniverse, velFromUniverse,
   convertState, chooseFrame, sameFrame, FloatingOrigin, quatToUniverse,
 } from '../src/core/frames.js';
-import { V, add, sub, scale, len, norm, dot, qRotate, qLook } from '../src/core/vec.js';
+import { V, add, sub, scale, len, norm, qRotate, qLook } from '../src/core/vec.js';
 
 const eph = new Ephemeris(BODIES);
 const near = (a, b, eps, msg) => assert.ok(Math.abs(a - b) <= eps, `${msg || ''} ${a} vs ${b} (eps ${eps})`);

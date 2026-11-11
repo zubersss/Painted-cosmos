@@ -4,7 +4,7 @@
 // the contract's sampleSurface bound to the current body.
 import {
   V, add, sub, scale, addScaled, dot, len, norm, reject, tangent, clampLen, cross,
-  clamp, clamp01, mix, damp, rotateAround,
+  clamp01, mix, damp, rotateAround,
 } from '../core/vec.js';
 
 // Feel target: unhurried, weightless, generous. All distances in metres, times in seconds.

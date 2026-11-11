@@ -11,7 +11,7 @@ Last update: 2026-11-11, after review 1 (commit `19f72ce`).
 | Item | Owner | Status | Verified how, by whom |
 | --- | --- | --- | --- |
 | Walk, run, jump, jetpack with recharging fuel | Pilot | DONE on stubs and in the real world | Pilot: `tests/explorer.test.mjs`, `tests/loop.test.mjs`, `node tests/playthrough.mjs` |
-| Third person default, V first person, cameras never clip terrain | Pilot | DONE for ground, liquid and the ship's hull; trees are not collided with | Pilot: camera tests (clearance never below 0.45 m over 90 s on steep stub terrain) |
+| Third person default, V first person, cameras never clip terrain | Pilot | DONE for ground, liquid, the ship's hull and tree trunks | Pilot: camera tests (clearance never below 0.45 m over 90 s on steep stub terrain); trunk test |
 | Board with E, lift-off sequence | Pilot | DONE | Pilot: loop test, play-through |
 | Climb to orbit with no loading screen | Pilot | DONE on stubs; in the real world see REVIEW | Pilot: play-through (17.8 s ground to space, no state reload) |
 | Descend, landing assist with prompt, soft bounce, step out | Pilot | DONE | Pilot: `tests/flight.test.mjs` (touchdown under 1.8 m/s; never inside terrain in 10 min of careless flying), play-through |
@@ -78,7 +78,7 @@ TODO. Pull request `cosmos` -> `main`; GitHub Pages serves `main`
    run. Mitigation in place: checks run against `tools/export-head.sh`.
 4. **Scope added mid-flight** (physics, weather, deformation). M2 now carries wiring work for
    Pilot that the original plan did not have. The frame budget has to absorb about 2 ms of CPU.
-5. **Trees and rocks have no collision yet.** Painter delivered `world.sampleObstacles`; Pilot
-   wires it first thing in M2 (explorer, cameras, landing sites).
+5. **The flying ship passes through tree crowns.** The explorer, the camera boom and landing
+   sites respect `world.sampleObstacles`; the ship's ground cushion does not know the canopy.
 6. **Pointer lock is untested** (headless reports nonsense deltas under lock). First thing to
    try when a person opens the game.

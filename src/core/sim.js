@@ -5,7 +5,7 @@ import { BODIES } from '../data/bodies.js';
 import { Ephemeris, spaceAltitude } from './orbits.js';
 import {
   HELIO, bodyFrame, sameFrame, frameState, posToUniverse, quatToUniverse, quatFromUniverse,
-  convertState, chooseFrame, bodyLocal, FloatingOrigin, posFromUniverse,
+  convertState, chooseFrame, FloatingOrigin, posFromUniverse,
 } from './frames.js';
 import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip } from './state.js';
 import {

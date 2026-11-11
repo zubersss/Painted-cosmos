@@ -14,8 +14,8 @@ are relative, never a claim about a real GPU.
 
 What I ran:
 - `node --test src/world/*.test.mjs` (12 pass), `node --test src/physics/` (72 pass),
-  `node --test tests/*.test.mjs` (67 pass, including `tests/contract.test.mjs`, which checks
-  Painter's real `sampleSurface` on every body).
+  `node --test tests/*.test.mjs` (70 pass, including `tests/contract.test.mjs`, which checks
+  Painter's real `sampleSurface` on every body and walks the real forest with collision).
 - `gallery.html?body=earth&biome=temperate_forest&time=<h>&quality=1&cam=<preset>&ui=0&t=0` at
   640x360 from a clean export of HEAD: presets `trees`, `canopy`, `stream` at 12, 18.5 and 0 h.
 - The integrated game (`index.html`, Painter's render, world and art as the default):
@@ -133,9 +133,9 @@ GOOD (keep)
 ### PILOT (self-review; the other roles and the coordinator review this domain)
 
 Known weaknesses I would flag if this were someone else's work:
-- The explorer and both cameras pass through trees. `world.sampleObstacles` now exists; wiring
-  it is my first M2 task.
-- The landing assist does not know about trees either; it can set the ship down in a wood.
+- Trees: the explorer, the camera boom and landing-site choice now respect
+  `world.sampleObstacles` (tested in Node against the real forest, not yet watched in the
+  browser), but the flying ship still passes through crowns: its cushion follows the ground.
 - The HUD is a plain paper fallback, not the painted theme, and its ink is only legible over
   space because of a halo (`R-HUD-4` is met in a makeshift way).
 - Pointer lock has never been exercised: headless Chromium reports nonsense deltas under lock,

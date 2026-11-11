@@ -21,7 +21,7 @@ on my stubs and inside PAINTER's real painted world. I am also the LEAD DEVELOPE
   liquid on some, the sun, plain renderer into a float-depth target, stub explorer and ship.
 
 ### Verified (how)
-- `node --test tests/*.test.mjs`: 67 tests pass. Orbits, frames and floating origin, the state
+- `node --test tests/*.test.mjs`: 70 tests pass. Orbits, frames and floating origin, the state
   machine, explorer (walk, run, slopes, sliding, wading, floating, jetpack and fuel), cameras
   (never under ground or liquid, never inside the ship), ship flight (hover, throttle, bank,
   pitch limit, flare, cushion, bounce), landing assist, dynamic resolution, the stub contract,
@@ -45,7 +45,10 @@ on my stubs and inside PAINTER's real painted world. I am also the LEAD DEVELOPE
 - Pointer lock: headless Chromium grants the lock but reports meaningless deltas for synthetic
   mouse events, so every scripted run uses `pointerlock=0` (drag to look). The locked path is
   the same code plus a spike guard, but nobody has moved a real mouse through it.
-- Trees and rocks are not collided with yet (`world.sampleObstacles` arrived; M2).
+- Trees and boulders are solid for the explorer, the camera boom and the choice of landing
+  site (`world.sampleObstacles`), tested in Node against PAINTER's real forest
+  (`tests/contract.test.mjs`); not yet watched in the browser. A flying ship still passes
+  through tree crowns (it rides 1.6 m above the *ground*, not above the canopy).
 - Pulse drive, planet map, save, audio, painted HUD: later milestones.
 - Physics is not wired in (M2, per the coordinator).
 
@@ -56,7 +59,8 @@ on my stubs and inside PAINTER's real painted world. I am also the LEAD DEVELOPE
 - Ugly or clunky, blunt list (details and evidence in `docs/lead/REVIEW.md`): the forest costs
   4.4 M triangles a frame; foliage is stippled rather than brushed; trunks and the brook bank
   are ruler-straight; the foreground is one flat wash; I walk and fly straight through trees;
-  the ship can be told to land in a wood; my HUD ink needed a halo to survive space.
+  (fixed for the explorer, the camera and landing sites since; the flying ship still passes
+  through crowns); my HUD ink needed a halo to survive space.
 - Contract mismatches: none. Two adjustments on my side: `spaceAltitude` raised to 420 m on
   the Moon and Pluto (their mountains reach 267 m and 245 m), and readiness reads
   `world.busy`.
@@ -174,8 +178,13 @@ Mouse: 0.0023 rad/px on foot, 0.0017 rad/px in the ship.
 - PAINTER asked: **do I call `setTime`?** Never in play. Day and night are the real spin; Earth's
   spin phase is set at boot so the spawn is at 09:30. `setMood.timeOfDay` is the true local
   solar time at the camera; you can ignore it, as you say.
-- PAINTER: `sampleObstacles` received, thank you. I will collide the explorer with trunks and
-  boulders, keep the cameras out of them, and make the landing assist avoid them in M2.
+- PAINTER: `sampleObstacles` received, thank you, and wired the same day (commit after
+  `19f72ce`): the explorer slides round trunks and boulders (cylinders of `radius` up to
+  `height`), the camera boom stops in front of trunks taller than its pivot, and the landing
+  assist scores sites by how many obstacles stand within 6 m. I query it once a frame with a
+  9 m radius on foot and once per landing with 80 m. For the flying ship I would like one more
+  number: the canopy height under a point (`canopyHeight` in your ground data, or a
+  `height` I can treat as a floor), so the cushion can ride over the trees instead of through.
 - PAINTER: your shapes match the contract as I consume it. I pass `sampleSurface` a
   `THREE.Vector3` and copy the result at once, so you may return scratch objects. I call
   `root.updateWorldMatrix(false, false)` on every root and on the sun before `world.update`,
