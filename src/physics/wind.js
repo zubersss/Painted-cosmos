@@ -17,25 +17,36 @@
 import { BODIES } from '../data/bodies.js';
 import { noise3, hash1, clamp, smoothstep, hashString } from './util.js';
 
-// U: prevailing speed scale (m/s).  bands: half-waves of the zonal jet between equator and pole.
-// eq: +1 when the equatorial jet blows the way the planet spins (toward local east), -1 against.
-// merid: meridional flow as a fraction of U.  eddy: synoptic eddy speed as a fraction of U.
-// GAME SCALE: the giants' real jets are 100-580 m/s; nobody could stand in that. Their speeds
-// are divided by about 10-25 and keep their real ORDER (Neptune windiest, then Uranus, Saturn,
-// Jupiter) and their real band structure and direction. Earth, Mars, Venus and Pluto are real
-// near-surface values (Earth 5-6 m/s mean at 10 m; Viking landers 2-7 m/s; Venera 0.3-1 m/s).
+// real: the real prevailing wind speed (m/s).  scale: the game divides it by this.  U = real / scale
+// is the prevailing speed used (filled in below).  bands: half-waves of the zonal jet between
+// equator and pole.  eq: +1 when the equatorial jet blows the way the planet spins (toward local
+// east), -1 against.  merid: meridional flow as a fraction of U.  eddy: synoptic eddy speed as a
+// fraction of U.
+// GAME SCALE: `scale` is the ONE place where the giants' winds are tamed. Their real jets are
+// 150-580 m/s; nobody could stand in that, so they are divided by 11-26 and keep their real
+// ORDER (Neptune windiest, then Uranus, Saturn, Jupiter), band structure and direction. Earth,
+// Mars, Venus and Pluto are real near-surface values, scale 1 (Earth 5-6 m/s mean at 10 m;
+// Viking landers 2-7 m/s; Venera 0.3-1 m/s). PILOT may retune a body with setWindScale().
 export const WINDS = {
-  mercury: { U: 0, bands: 1, eq: 1, merid: 0, eddy: 0 },
-  moon: { U: 0, bands: 1, eq: 1, merid: 0, eddy: 0 },
-  venus: { U: 0.8, bands: 1, eq: 1, merid: 0.15, eddy: 0.3 },      // slow super-rotation
-  earth: { U: 5.5, bands: 3, eq: -1, merid: 0.3, eddy: 0.45 },
-  mars: { U: 6, bands: 2, eq: -1, merid: 0.35, eddy: 0.5 },
-  jupiter: { U: 14, bands: 11, eq: 1, merid: 0.05, eddy: 0.25 },   // many sharp jets
-  saturn: { U: 16, bands: 7, eq: 1, merid: 0.05, eddy: 0.22 },     // broad fast equatorial jet
-  uranus: { U: 18, bands: 2, eq: -1, merid: 0.08, eddy: 0.25 },    // retrograde at the equator
-  neptune: { U: 22, bands: 2, eq: -1, merid: 0.1, eddy: 0.35 },
-  pluto: { U: 1.5, bands: 1, eq: -1, merid: 0.3, eddy: 0.4 },
+  mercury: { real: 0, scale: 1, bands: 1, eq: 1, merid: 0, eddy: 0 },
+  moon: { real: 0, scale: 1, bands: 1, eq: 1, merid: 0, eddy: 0 },
+  venus: { real: 0.8, scale: 1, bands: 1, eq: 1, merid: 0.15, eddy: 0.3 },      // slow super-rotation at the ground
+  earth: { real: 5.5, scale: 1, bands: 3, eq: -1, merid: 0.3, eddy: 0.45 },
+  mars: { real: 6, scale: 1, bands: 2, eq: -1, merid: 0.35, eddy: 0.5 },
+  jupiter: { real: 150, scale: 10.7, bands: 11, eq: 1, merid: 0.05, eddy: 0.25 },   // many sharp jets
+  saturn: { real: 400, scale: 25, bands: 7, eq: 1, merid: 0.05, eddy: 0.22 },       // broad fast equatorial jet
+  uranus: { real: 250, scale: 13.9, bands: 2, eq: -1, merid: 0.08, eddy: 0.25 },    // retrograde at the equator
+  neptune: { real: 580, scale: 26.4, bands: 2, eq: -1, merid: 0.1, eddy: 0.35 },
+  pluto: { real: 1.5, scale: 1, bands: 1, eq: -1, merid: 0.3, eddy: 0.4 },
 };
+for (const id in WINDS) WINDS[id].U = WINDS[id].real / WINDS[id].scale;
+// Change how far a body's real wind is scaled down (1 = the real thing). Affects the prevailing
+// wind, gusts and the drift of weather cells from the next query on.
+export function setWindScale(bodyId, scale) {
+  const W = WINDS[bodyId];
+  if (!W || !(scale > 0)) return;
+  W.scale = scale; W.U = W.real / scale;
+}
 
 export const WIND = Object.freeze({
   refHeight: 10,          // m: height the reference wind is defined at

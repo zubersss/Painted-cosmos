@@ -76,7 +76,7 @@ test('a session on every body: nothing is NaN, fields fill in, here() tracks the
 });
 
 test('deterministic: two instances fed the same frames agree exactly', () => {
-  const mk = () => { const physics = createPhysics({ sampleSurface: stubSurface, seed: 5 }); const w = walker('earth'); for (let i = 0; i < 200; i++) physics.update(1 / 60, { bodyId: 'earth', time: 1000 + i / 60, focus: w.step(1 / 60), disturbers: [{ kind: 'explorer', p: w.p, v: w.v, radius: 0.35, strength: 1, grounded: true }] }); return physics; };
+  const mk = () => { const physics = createPhysics({ sampleSurface: stubSurface, seed: 5, timeBudget: false }); const w = walker('earth'); for (let i = 0; i < 200; i++) physics.update(1 / 60, { bodyId: 'earth', time: 1000 + i / 60, focus: w.step(1 / 60), disturbers: [{ kind: 'explorer', p: w.p, v: w.v, radius: 0.35, strength: 1, grounded: true }] }); return physics; };
   const a = mk(), b = mk();
   assert.deepEqual(Array.from(a.fields.flora.bend), Array.from(b.fields.flora.bend));
   assert.deepEqual(Array.from(a.fields.flora.push), Array.from(b.fields.flora.push));
@@ -106,9 +106,21 @@ test('budget: well under 2 ms per frame at quality 1 (walking, flying, raining)'
   assert.ok(walk.samples <= QUALITY.samples[1], 'sampleSurface calls per frame when walking: ' + walk.samples);
 });
 
+test('warmUp fills the ground caches and leaves the first played frame inside the budget', () => {
+  const physics = createPhysics({ sampleSurface: stubSurface });
+  const p = spawnPoint('earth');
+  const ms = physics.warmUp({ bodyId: 'earth', time: 0, focus: p });
+  assert.ok(ms < 400, 'warm-up took ' + ms + ' ms');
+  assert.equal(physics.fields.near.invalid, 0); assert.equal(physics.fields.air.terrain.invalid, 0);
+  const w = walker('earth'); let worst = 0;
+  for (let i = 0; i < 300; i++) { const q = w.step(1 / 60); const t = performance.now(); physics.update(1 / 60, { bodyId: 'earth', time: i / 60, focus: q, disturbers: [{ kind: 'explorer', p: q, v: w.v, radius: 0.35, strength: 1, grounded: true }] }); worst = Math.max(worst, performance.now() - t); }
+  console.log(`# worst frame in the first 5 s after warmUp: ${worst.toFixed(2)} ms`);
+  assert.ok(worst < 6, 'worst frame after warm-up ' + worst);       // loose: other processes share this machine
+});
+
 test('sampleSurface is called sparingly: a bounded number per frame, bursts only after a jump', () => {
   let calls = 0;
-  const physics = createPhysics({ sampleSurface: (id, d) => { calls++; return stubSurface(id, d); } });
+  const physics = createPhysics({ sampleSurface: (id, d) => { calls++; return stubSurface(id, d); }, timeBudget: false });
   const w = walker('earth');
   let worst = 0, first = 0;
   for (let i = 0; i < 600; i++) { calls = 0; physics.update(1 / 60, { bodyId: 'earth', time: i / 60, focus: w.step(1 / 60) }); if (i === 0) first = calls; if (i > 150) worst = Math.max(worst, calls); }

@@ -121,11 +121,13 @@ test('a jet from above blows plants radially outward and flattens the centre', (
   assert.ok(F.plantBend(at(-1.5, 0), 0).e < c0 - 0.3, 'blown west on the west side');
   assert.ok(F.plantBend(at(0, 1.5), 0).n > 0.3, 'blown north on the north side');
   assert.ok(F.plantBend(at(8, 0), 0).shake01 < F.plantBend(at(1.5, 0), 0).shake01, 'weaker further out');
-  // from 60 m up the plume has spread and decayed: nothing happens
-  const w2 = world(); run(w2, 2);
-  const high = [{ kind: 'jet', p: V(w2.focus.x + up.x * 60, w2.focus.y + up.y * 60, w2.focus.z + up.z * 60), v: V(), radius: 0.15, strength: 1700 }];
-  run(w2, 1, { t0: 102, disturbers: () => high });
-  assert.equal(w2.physics.stats.pushCells, 0);
+  // from 60 m up the plume has spread over 700 m2 (momentum is conserved, pressure is not):
+  // 1700 N / 720 m2 = 2.4 Pa, a breath. From 300 m: nothing.
+  const far = (h) => { const w2 = world(); run(w2, 2); const b0 = F2(w2).plantBend(w2.focus, 0).angle; const j = [{ kind: 'jet', p: V(w2.focus.x + up.x * h, w2.focus.y + up.y * h, w2.focus.z + up.z * h), v: V(), radius: 0.15, strength: 1700 }]; run(w2, 1.5, { t0: 102, disturbers: () => j }); return { w2, d: Math.abs(F2(w2).plantBend(V(w2.focus.x + fr.ex * 6, w2.focus.y + fr.ey * 6, w2.focus.z + fr.ez * 6), 0).load) }; };
+  const F2 = (x) => x.physics.fields.flora;
+  const h60 = far(60), h300 = far(300);
+  assert.ok(h60.d < 0.25, 'load 6 m off-axis under a jet 60 m up: ' + h60.d);
+  assert.equal(h300.w2.physics.stats.pushCells, 0);
 });
 
 test('a body flying overhead does not touch the grass', () => {
@@ -170,9 +172,10 @@ test('a single PlantSim agrees with the field for a plant of the reference frequ
   run(w, 30, { each: () => {
     // the same wind the field cell sees: 2 m wind scaled back to blade height through the field's own factors
     const x = fr.lx(w.focus.x, w.focus.y, w.focus.z), z = fr.lz(w.focus.x, w.focus.y, w.focus.z);
-    const s = {}; w.physics.fields.air.sampleWind(x, z, s);
-    const hf = F._hf[((F.N / 2) * F.N + F.N / 2) * 3];
-    plant.step(1 / 60, s.we * hf, s.wn * hf, w.physics.here.air.density);
+    // (sampled at the centre of the field cell the plant is compared with)
+    const cx = (F.ci + 0.5) * F.cell, cz = (F.cj + 0.5) * F.cell;
+    const s = {}; w.physics.fields.air.sampleWind(cx, cz, s);
+    plant.step(1 / 60, s.we * s.hfSoft, s.wn * s.hfSoft, w.physics.here.air.density);
     const i = (F.N / 2) * F.N + F.N / 2;
     const fe = F.bend[i * 4], fn = F.bend[i * 4 + 1];
     if (w.physics.time > 110) { err += Math.hypot(plant.s[0] - fe, plant.s[2] - fn); mag += Math.hypot(fe, fn); n++; }

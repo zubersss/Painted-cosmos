@@ -28,9 +28,12 @@ export const EXPLORER_BODY = Object.freeze({
   cdaFall: 0.60,          // m^2: falling with the pack (a skydiver belly-down is 0.45-0.5 without one)
   // legs
   legAccel: 9.0,          // m/s^2: the hardest the legs push off firm ground (a sprint start is 8-10)
-  legPower: 1300,         // W of external work the legs sustain (sprint peak 1500-2000, steady 300)
+  legPower: 1600,         // W of external work the legs sustain: an athlete's sprint peak (1500-2000 W),
+                          // held by the suit. It sets the speed uphill, in sand, snow, water and dense air.
   response: 0.11,         // s: time constant with which the legs cancel a velocity error
   runFoothold: 4.5,       // m/s: above this speed footholds no longer help
+  arrest: 0.85,           // sliding out of control, the body digs in heels and hands: friction is this
+                          // fraction of the holding traction (never less than the kinetic coefficient)
   stickGap: 0.28,         // m: how far the feet reach down to keep contact over an edge
   crestFilter: 0.15,      // s: the legs absorb bumps shorter than this before the body goes ballistic
   crestLaunch: true,      // leave the ground when it falls away faster than gravity (low-g bounding)
@@ -50,6 +53,8 @@ export const EXPLORER_BODY = Object.freeze({
   // liquid
   floatAssist: true,      // the suit trims its buoyancy so it floats floatDepth deep in ANY liquid
   floatDepth: 1.25,       // m of the body under the surface when floating (PILOT's swimDepth)
+  floatTrimStart: 0.8,    // the trim only comes on as the liquid nears float depth (this fraction of
+                          // it): wading in the shallows the suit is as heavy as a person, and grips
   wadeWidth: 0.32,        // m: width of the legs and trunk pushing through liquid (drag area = width x depth)
   swimCda: 0.12,          // m^2: drag area swimming (a good swimmer is 0.05-0.1)
   swimForce: 400,         // N: stroke plus suit thrusters (a strong swimmer makes 100-150 N)
@@ -65,6 +70,7 @@ export const EXPLORER_BODY_STATE = () => ({
   sink: 0,                // m the feet are pressed into the ground (for drawing and footprints)
   submerged01: 0,         // fraction of the body under liquid
   windAccel: 0,           // m/s^2 the wind is pushing with
+  lean: 0,                // rad the body must lean into the wind to balance it: atan(windAccel / g)
   unload: 0,              // filtered vertical acceleration of the ground being followed
   vvPrev: 0,
   support: 0,             // m/s^2 of normal support from the ground (0 when floating or airborne)
@@ -99,7 +105,10 @@ export function explorerTerminal(g, rho, T = EXPLORER_BODY) {
 //          jet: 0..1      jetpack throttle
 //          jetMaxRise:    m/s, optional governor on the climb speed
 //          descentLimit:  m/s, optional automatic descent brake (the soft-landing assist)
-//          airControl:    0..1, default 1 }
+//          airControl:    0..1, default 1
+//          assistAccel:   m/s^2, optional: extra authority from the suit's thrusters for starting
+//                         and stopping on the ground, NOT limited by traction (an assist: 0 is
+//                         pure legs; 3 makes a 4 m/s stop take 0.35 s instead of 0.5) }
 //   env: { sample(unitDir) -> contract surface,  gravity (m/s^2),
 //          air(p, out) -> { density, wind }          optional (default: still Earth air)
 //          ground(surface, out) -> contact props     optional (default: firm soil)
@@ -131,7 +140,12 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
   const liq = env.liquid || DEFAULT_LIQUID;
   const depth = liquidR ? Math.max(0, liquidR - r) : 0;
   const sub = clamp01(depth / T.height);
-  const rhoBody = T.floatAssist ? liq.density * T.floatDepth / T.height : T.bodyDensity;
+  let rhoBody = T.bodyDensity;
+  if (T.floatAssist) {
+    const trim = smoothstep(T.floatDepth * T.floatTrimStart, T.floatDepth, depth);
+    const floatRho = liq.density * T.floatDepth / T.height;
+    rhoBody = floatRho < rhoBody ? rhoBody + (floatRho - rhoBody) * trim : (depth > 0 ? floatRho : rhoBody);
+  }
   const buoy = sub * liq.density / rhoBody;            // buoyant force as a fraction of weight
   B.submerged01 = sub;
 
@@ -183,7 +197,8 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
     const rl = Math.hypot(rx, ry, rz);
     let ax = -airK * rl * rx, ay = -airK * rl * ry, az = -airK * rl * rz;
     d = ax * nx + ay * ny + az * nz; ax -= d * nx; ay -= d * ny; az -= d * nz;
-    B.windAccel = airK * Math.hypot(wx, wy, wz) * Math.hypot(wx, wy, wz);
+    B.windAccel = Math.hypot(ax, ay, az);
+    B.lean = Math.atan2(B.windAccel, g > 1e-6 ? g : 1e-6);
     ex += ax; ey += ay; ez += az;
     // soft ground: the work of pressing a footprint at every step opposes the motion
     if (sp > 1e-6) {
@@ -221,8 +236,8 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
     const fmax = Math.max(0, hold * support);
     const hl = Math.hypot(ex, ey, ez);
     if (hl > fmax) {
-      // cannot even hold: kinetic friction against the sliding (or against the pull, from rest)
-      const fk = Math.max(0, G.kinetic * support);
+      // cannot even hold: sliding. Friction is kinetic, or better when the body digs in
+      const fk = Math.max(0, Math.max(G.kinetic, T.arrest * hold) * support);
       let kx, ky, kz;
       if (sp > 0.05) { kx = -sx / sp; ky = -sy / sp; kz = -sz / sp; } else { kx = -ex / hl; ky = -ey / hl; kz = -ez / hl; }
       // the legs still steer a little within the kinetic circle
@@ -239,8 +254,15 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
         B.scramble01 = clamp01(1 - fmax / fl);
       } else B.scramble01 = 0;
     }
+    // the suit's thrusters, if PILOT asks for them: close what is left of the velocity error
+    let zx = 0, zy = 0, zz = 0;
+    if (cmd.assistAccel > 0) {
+      zx = (tx - sx) / T.response - (ex + fx); zy = (ty - sy) / T.response - (ey + fy); zz = (tz - sz) / T.response - (ez + fz);
+      const zl = Math.hypot(zx, zy, zz);
+      if (zl > cmd.assistAccel) { const m = cmd.assistAccel / zl; zx *= m; zy *= m; zz *= m; }
+    }
     // integrate along the surface
-    sx += (ex + fx) * dt; sy += (ey + fy) * dt; sz += (ez + fz) * dt;
+    sx += (ex + fx + zx) * dt; sy += (ey + fy + zy) * dt; sz += (ez + fz + zz) * dt;
     if (liqK > 0) { const m = 1 / (1 + liqK * Math.hypot(sx, sy, sz) * dt); sx *= m; sy *= m; sz *= m; }
     // snap to rest: never creep
     if (qlen < 1e-6 && B.slip01 === 0 && Math.hypot(sx, sy, sz) < 0.02) { sx = sy = sz = 0; }
@@ -387,6 +409,7 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
 export function sustainableSpeed(wish, g, rho, G = DEFAULT_GROUND, T = EXPLORER_BODY) {
   const k = 0.5 * rho * T.cdaUpright / T.mass;
   let lo = 0, hi = wish;
+  if (!(g > 0)) return 0;
   const ok = (v) => {
     const need = G.drag * g * Math.tanh(v / 0.5) + k * v * v;      // m/s^2 of propulsion needed
     return need <= Math.min(T.legAccel, (G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, v))) * g) && need * v <= T.legPower / T.mass;

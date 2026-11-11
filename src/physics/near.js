@@ -80,14 +80,17 @@ const _dir = { x: 0, y: 0, z: 0 };
 // A cache of the ground on an N x N grid of nodes `cell` metres apart that follows the focus.
 // Node (i, j) sits at grid position ((ci + i - half) * cell, (cj + j - half) * cell).
 export class TerrainGrid {
-  constructor(N, cell, withCover) {
+  // coverWidth: floats of caller-defined data kept per node (0 = none).
+  constructor(N, cell, coverWidth = 0) {
+    const withCover = coverWidth > 0;
+    this.CW = coverWidth;
     this.N = N; this.cell = cell; this.half = (N - 1) / 2;
     this.h = new Float32Array(N * N);          // ground radius - frame.r0 (m)
     this.lq = new Float32Array(N * N);         // liquid radius - frame.r0, or -1e9 where dry
     this.gx = new Float32Array(N * N);         // ground slope d h / d east
     this.gz = new Float32Array(N * N);         // ground slope d h / d north
     this.valid = new Uint8Array(N * N);
-    this.cover = withCover ? new Float32Array(N * N * 8) : null;   // z0, canopy01, canopyH, moist, fog, dustSrc, dT, snowBase
+    this.cover = withCover ? new Float32Array(N * N * coverWidth) : null;
     this.ci = 0; this.cj = 0;                  // grid centre, in cells from the anchor
     this.order = spiralOrder(N);
     this.invalid = N * N;
@@ -95,7 +98,7 @@ export class TerrainGrid {
     this.changed = 0;                          // bumps whenever any node changes
     this._tmpF = new Float32Array(N * N);
     this._tmpU = new Uint8Array(N * N);
-    this._tmpC = withCover ? new Float32Array(N * N * 8) : null;
+    this._tmpC = withCover ? new Float32Array(N * N * coverWidth) : null;
   }
 
   invalidate() { this.valid.fill(0); this.invalid = this.N * this.N; this.changed++; }
@@ -140,7 +143,7 @@ export class TerrainGrid {
       const k1 = nu > 0.05 ? 1 / nu : 20;
       this.gx[n] = -(nn.x * frame.ex + nn.y * frame.ey + nn.z * frame.ez) * k1;
       this.gz[n] = -(nn.x * frame.nx + nn.y * frame.ny + nn.z * frame.nz) * k1;
-      if (this.cover && coverOf) coverOf(s, this.cover, n * 8);
+      if (this.cover && coverOf) coverOf(s, this.cover, n * this.CW);
       this.valid[n] = 1; this.invalid--; used++;
     }
     if (used) this.changed++;
@@ -151,20 +154,10 @@ export class TerrainGrid {
     const N = this.N;
     this.ci += di; this.cj += dj;
     if (Math.abs(di) >= N || Math.abs(dj) >= N) { this.invalidate(); return; }
-    const move = (arr, tmp, comps, fill) => {
-      tmp.set(arr);
-      for (let j = 0; j < N; j++) {
-        const sj = j + dj;
-        for (let i = 0; i < N; i++) {
-          const si = i + di, o = (j * N + i) * comps;
-          if (si >= 0 && si < N && sj >= 0 && sj < N) { const s = (sj * N + si) * comps; for (let c = 0; c < comps; c++) arr[o + c] = tmp[s + c]; }
-          else for (let c = 0; c < comps; c++) arr[o + c] = fill;
-        }
-      }
-    };
-    move(this.h, this._tmpF, 1, 0); move(this.lq, this._tmpF, 1, -1e9); move(this.gx, this._tmpF, 1, 0); move(this.gz, this._tmpF, 1, 0);
-    move(this.valid, this._tmpU, 1, 0);
-    if (this.cover) move(this.cover, this._tmpC, 8, 0);
+    scrollField(this.h, null, N, 1, di, dj, 0); scrollField(this.lq, null, N, 1, di, dj, -1e9);
+    scrollField(this.gx, null, N, 1, di, dj, 0); scrollField(this.gz, null, N, 1, di, dj, 0);
+    scrollField(this.valid, null, N, 1, di, dj, 0);
+    if (this.cover) scrollField(this.cover, null, N, this.CW, di, dj, 0);
     let inv = 0;
     for (let n = 0; n < N * N; n++) if (!this.valid[n]) inv++;
     this.invalid = inv; this.changed++;
@@ -213,17 +206,24 @@ export class TerrainGrid {
   }
 }
 
-// Move an N x N field of `comps` floats by (di, dj) cells, filling new cells with `fill`.
+// Move an N x N field of `comps` values by (di, dj) cells in place, filling new cells with
+// `fill`: new(i, j) = old(i + di, j + dj). Row-wise native moves (no temporary, no per-cell loop).
+// `tmp` is unused and kept for the callers' signatures.
 export function scrollField(arr, tmp, N, comps, di, dj, fill = 0) {
   if (di === 0 && dj === 0) return;
   if (Math.abs(di) >= N || Math.abs(dj) >= N) { arr.fill(fill); return; }
-  tmp.set(arr);
-  for (let j = 0; j < N; j++) {
-    const sj = j + dj;
-    for (let i = 0; i < N; i++) {
-      const si = i + di, o = (j * N + i) * comps;
-      if (si >= 0 && si < N && sj >= 0 && sj < N) { const s = (sj * N + si) * comps; for (let c = 0; c < comps; c++) arr[o + c] = tmp[s + c]; }
-      else for (let c = 0; c < comps; c++) arr[o + c] = fill;
+  const row = N * comps;
+  const j0 = dj > 0 ? 0 : N - 1, j1 = dj > 0 ? N : -1, js = dj > 0 ? 1 : -1;
+  for (let j = j0; j !== j1; j += js) {
+    const sj = j + dj, o = j * row;
+    if (sj < 0 || sj >= N) { arr.fill(fill, o, o + row); continue; }
+    const so = sj * row;
+    if (di >= 0) {
+      arr.copyWithin(o, so + di * comps, so + row);
+      if (di > 0) arr.fill(fill, o + row - di * comps, o + row);
+    } else {
+      arr.copyWithin(o - di * comps, so, so + row + di * comps);
+      arr.fill(fill, o, o - di * comps);
     }
   }
 }

@@ -69,15 +69,16 @@ test('ice: you can barely start and barely stop', () => {
   assert.equal(speed(sim.st), 0);
 });
 
-test('slopes: holds up to atan(mu + foothold), slides beyond with a = g (sin - mu_k cos)', () => {
+test('slopes: holds up to atan(mu + foothold); beyond it slides, digging in (self-arrest)', () => {
   const hold = Math.atan(GRASS.friction + GRASS.foothold);
   for (const [ang, slides] of [[hold - 0.06, false], [hold + 0.08, true], [1.05, true]]) {
     const sim = make({ world: { cone: { dir: norm(V(0, 0, 1)), radius: 400, height: 400 * Math.tan(ang) } }, dir: V(0.02, 0, 1) });
     run(sim, 2, { wish: V() });
     if (!slides) { assert.equal(speed(sim.st), 0, 'holds at ' + ang); continue; }
-    const a = 9 * (Math.sin(ang) - GRASS.kinetic * Math.cos(ang));
-    assert.ok(Math.abs(speed(sim.st) - a * 2) < 0.08 * a * 2 + 0.1, `slide speed at ${ang.toFixed(2)} rad: ${speed(sim.st)} vs ${a * 2}`);
-    assert.ok(sim.st.phys.slip01 > 0);
+    // friction while sliding is between the kinetic coefficient and 85 % of the holding traction
+    const lo = 9 * (Math.sin(ang) - T.arrest * (GRASS.friction + GRASS.foothold) * Math.cos(ang)), hi = 9 * (Math.sin(ang) - GRASS.kinetic * Math.cos(ang));
+    assert.ok(speed(sim.st) >= lo * 2 - 0.05 && speed(sim.st) <= hi * 2 + 0.05, `slide speed at ${ang.toFixed(2)} rad after 2 s: ${speed(sim.st)} not in ${lo * 2}..${hi * 2}`);
+    assert.ok(speed(sim.st) > 0.3 && sim.st.phys.slip01 > 0);
   }
 });
 
@@ -95,7 +96,7 @@ test('soft ground and dense air cost speed', () => {
   const lvl = (cfg) => { const sim = make(cfg); run(sim, 6, { wish: V(7.4, 0, 0) }); return speed(sim.st); };
   const firm = lvl({}), sand = lvl({ ground: SAND }), venus = lvl({ rho: 65, g: 8.6 });
   assert.ok(Math.abs(firm - 7.4) < 0.02);
-  assert.ok(sand < 5.5 && sand > 3.5, 'running on sand ' + sand);
+  assert.ok(sand < 6.3 && sand > 4.4, 'running on sand ' + sand + ' (a fifth to two fifths slower)');
   assert.ok(venus < 4.2 && venus > 2.5, 'running through Venus air ' + venus);
   assert.ok(Math.abs(sand - sustainableSpeed(7.4, 9, 1.225, SAND)) < 0.15);
   assert.ok(Math.abs(venus - sustainableSpeed(7.4, 8.6, 65, GRASS)) < 0.15);

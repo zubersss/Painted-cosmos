@@ -22,7 +22,6 @@
 //   2. plantBend(): the same arithmetic in JS for a handful of near plants (and for the tests).
 //   Plus PlantSim: a single plant integrated with its own frequency, for hero plants.
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
-import { heightFactor } from './wind.js';
 import { scrollField } from './near.js';
 
 export const FLORA = Object.freeze({
@@ -73,8 +72,6 @@ export class FloraField {
     this.push = new Float32Array(M * M * 4);     // push east, north (load units), flatten01, shake01
     // internal state
     this._vel = new Float32Array(N * N * 4);     // rates of the four bend components
-    this._hf = new Float32Array(N * N * 3);      // height factors: soft, stiff, 2 m
-    this._hfVersion = -1;
     this._pv = new Float32Array(M * M * 2);      // push rates
     this._fl = new Float32Array(M * M * 2);      // flatten: elastic, plastic
     this._act = new Uint8Array(M * M);
@@ -105,7 +102,7 @@ export class FloraField {
 
   reset() {
     this.bend.fill(0); this.wind.fill(0); this.push.fill(0); this._vel.fill(0); this._pv.fill(0); this._fl.fill(0); this._act.fill(0); this._tg.fill(0);
-    this.active = 0; this._hfVersion = -1;
+    this.active = 0;
   }
 
   // The frame has re-anchored at old grid position (X, Z) (multiples of 16 m): keep every cell
@@ -143,7 +140,7 @@ export class FloraField {
     if (ni !== this.ci || nj !== this.cj) {
       scrollField(this.bend, this._tmpN, N, 4, ni - this.ci, nj - this.cj, 0);
       scrollField(this._vel, this._tmpN, N, 4, ni - this.ci, nj - this.cj, 0);
-      this.ci = ni; this.cj = nj; this._hfVersion = -1;
+      this.ci = ni; this.cj = nj;
     }
     const pi = Math.round(fx / nc), pj = Math.round(fz / nc);
     if (pi !== this.mi || pj !== this.mj) {
@@ -157,40 +154,24 @@ export class FloraField {
     this.rho = rho;
     const h = dt > 0.1 ? 0.1 : dt;
 
-    // ---- height factors per cell (only when the ground under the grid changed) ----------------
-    // (while the ground cache is still filling this is refreshed every eighth frame, not every one)
-    const T = air.terrain;
-    this._tick = (this._tick | 0) + 1;
-    if (this._hfVersion !== T.changed && (this._hfVersion < 0 || T.invalid === 0 || this._tick % 8 === 0)) {
-      this._hfVersion = T.changed;
-      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-        const x = (this.ci + i - N / 2 + 0.5) * cell, z = (this.cj + j - N / 2 + 0.5) * cell;
-        air.sample(x, z, _s);
-        const n = (j * N + i) * 3;
-        this._hf[n] = heightFactor(FLORA.softHeight, _s.z0, _s.canopyH, _s.canopy01);
-        this._hf[n + 1] = heightFactor(Math.max(FLORA.stiffHeight, _s.canopyH), _s.z0, _s.canopyH, _s.canopy01);
-        this._hf[n + 2] = heightFactor(2, _s.z0, _s.canopyH, _s.canopy01);
-      }
-    }
-
     // ---- bend field: drive the two reference oscillators with the wind load of each cell --------
     oscCoef(TAU * FLORA.softHz, FLORA.softDamp, h, _coef, 0);
     oscCoef(TAU * FLORA.stiffHz, FLORA.stiffDamp, h, _coef, 4);
     const a11 = _coef[0], a12 = _coef[1], a21 = _coef[2], a22 = _coef[3];
     const b11 = _coef[4], b12 = _coef[5], b21 = _coef[6], b22 = _coef[7];
     const kq = 0.5 * rho / FLORA.qRef;
-    const bend = this.bend, vel = this._vel, wind = this.wind, hf = this._hf;
+    const bend = this.bend, vel = this._vel, wind = this.wind;
     let gsum = 0, se = 0, sn = 0;
     for (let j = 0; j < N; j++) {
       const z = (this.cj + j - N / 2 + 0.5) * cell;
       for (let i = 0; i < N; i++) {
         const x = (this.ci + i - N / 2 + 0.5) * cell;
         air.sampleWind(x, z, _s);
-        const n = j * N + i, o = n * 4, q = n * 3;
+        const n = j * N + i, o = n * 4;
         const we = _s.we, wn = _s.wn;
         const sp = Math.hypot(we, wn);
         // load = q / qRef along the wind, at the height each class lives at
-        const ls = kq * sp * hf[q] * hf[q], lt = kq * sp * hf[q + 1] * hf[q + 1];
+        const ls = kq * sp * _s.hfSoft * _s.hfSoft, lt = kq * sp * _s.hfStiff * _s.hfStiff;
         const tse = we * ls, tsn = wn * ls, tte = we * lt, ttn = wn * lt;
         let d = bend[o] - tse, v = vel[o];
         bend[o] = tse + a11 * d + a12 * v; vel[o] = a21 * d + a22 * v;
@@ -200,10 +181,10 @@ export class FloraField {
         bend[o + 2] = tte + b11 * d + b12 * v; vel[o + 2] = b21 * d + b22 * v;
         d = bend[o + 3] - ttn; v = vel[o + 3];
         bend[o + 3] = ttn + b11 * d + b12 * v; vel[o + 3] = b21 * d + b22 * v;
-        wind[o] = we * hf[q + 2]; wind[o + 1] = wn * hf[q + 2];
+        wind[o] = we * _s.hf2; wind[o + 1] = wn * _s.hf2;
         wind[o + 2] = clamp01(0.5 + 0.5 * _s.gust);
-        wind[o + 3] = _s.I * sp * hf[q + 2];
-        gsum += wind[o + 2]; se += we * hf[q]; sn += wn * hf[q];
+        wind[o + 3] = _s.I * sp * _s.hf2;
+        gsum += wind[o + 2]; se += we * _s.hfSoft; sn += wn * _s.hfSoft;
       }
     }
     // ---- travelling waves ------------------------------------------------------------------------
@@ -257,12 +238,13 @@ export class FloraField {
         let reach, R = D.radius || 0.4;
         let qg = 0;
         if (air) {
-          // a jet striking the ground spreads into a radial wall jet: footprint radius grows with
-          // height, the dynamic pressure is the thrust over the footprint
+          // a jet striking the ground spreads into a radial wall jet. A free jet keeps its
+          // momentum while it widens (about 14 degrees half-angle), so the dynamic pressure on
+          // the ground is the thrust over the footprint: it falls as 1 / height^2 and nothing else
           R = R + FLORA.jetSpread * Math.max(0, hgt);
-          qg = (D.strength || 0) / (Math.PI * R * R) / FLORA.qRef * Math.exp(-Math.max(0, hgt) / (40 * (D.radius || 0.4)));
-          if (qg < 0.05) continue;
-          reach = R * Math.min(6, Math.sqrt(qg / 0.05));
+          qg = (D.strength || 0) / (Math.PI * R * R) / FLORA.qRef;
+          if (qg < 0.03) continue;                 // under 1.2 Pa: less than a breath of wind
+          reach = R * Math.min(6, Math.sqrt(qg / 0.03));
         } else {
           // a body only touches plants when it is down among them
           if (hgt > (D.kind === 'ship' ? 2.5 : 1.2)) continue;

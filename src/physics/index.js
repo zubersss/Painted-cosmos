@@ -10,7 +10,7 @@
 //   physics.fields.flora / physics.fields.deform / physics.particles.rain ... / physics.glsl.flora
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
-import { WINDS, WIND } from './wind.js';
+import { WINDS, WIND, setWindScale } from './wind.js';
 import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
 import { groundAt, coverAt, MATERIALS, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
@@ -37,16 +37,19 @@ export const QUALITY = Object.freeze({
 
 const now = typeof performance !== 'undefined' && performance.now ? () => performance.now() : () => 0;
 
-export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
+// options: sampleSurface (required), seed, timeBudget (default true: ration slow sampleSurface
+// calls by time as well as by count; pass false for bit-exact repeatability, as the tests do).
+export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget = true } = {}) {
   if (typeof sampleSurface !== 'function') throw new Error('createPhysics: sampleSurface(bodyId, unitDir) is required');
   const frame = new LocalFrame();
   const airGrid = new AirGrid(seed);
-  const near = new TerrainGrid(17, 2, true);       // 32 m of ground at 2 m, for particles, pushes and prints
+  const near = new TerrainGrid(17, 2, 8);       // 32 m of ground at 2 m, for particles, pushes and prints
   const flora = new FloraField();
   const particles = new Particles(seed, 1);
   const deform = new DeformField();
 
   let quality = 1;
+  let warming = false;
   let active = null;            // body the near field is on, or null
   let time = 0;
   let sunDir = null;
@@ -61,7 +64,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
     cover,
     groundHeight: 0,          // m above the body's base radius, under the focus
   };
-  const stats = { ms: 0, msAvg: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
+  const stats = { ms: 0, msAvg: 0, msMax: 0, msGround: 0, msAir: 0, msWeather: 0, msFlora: 0, msParticles: 0, samples: 0, particles: 0, pushCells: 0, frames: 0, reanchors: 0 };
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {};
@@ -137,9 +140,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
     const bn = near.invalid > near.N * near.N * 0.5 || near.frameVersion !== frame.version ? QUALITY.burst : 1;
     const ba = airGrid.terrain.invalid > airGrid.N * airGrid.N * 0.5 || airGrid.terrain.frameVersion !== frame.version ? QUALITY.burst : 1;
     // (a slow surface is rationed by time as well: at most QUALITY.sampleMs per grid per frame)
-    let used = near.update(frame, fx, fz, sampleActive, Math.ceil(budget * 0.5) * bn, groundInto, now, QUALITY.sampleMs);
-    used += airGrid.update(frame, bodyId, time, fx, fz, sampleActive, Math.ceil(budget * 0.5) * ba, now, QUALITY.sampleMs);
-    stats.samples = used;
+    const clock = timeBudget && !warming ? now : null;
+    if (warming) budget = 64;
+    let used = near.update(frame, fx, fz, sampleActive, Math.ceil(budget * 0.5) * bn, groundInto, clock, QUALITY.sampleMs);
+    const t1 = now();
+    used += airGrid.update(frame, bodyId, time, fx, fz, sampleActive, Math.ceil(budget * 0.5) * ba, clock, QUALITY.sampleMs);
+    const t2 = now();
+    stats.samples = used; stats.msGround = t1 - t0; stats.msAir = t2 - t1;
 
     // where we are
     airGrid.coverNear(fx, fz, cover);
@@ -163,16 +170,36 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
     here.weather.wetness01 = moist.wetness01; here.weather.snowDepth = moist.snowDepth;
 
     // fields and particles
+    const t3 = now();
     const dist = f.disturbers || null;
     flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality);
+    const t4 = now();
     particles.update(dt, frame, airGrid, near, fx, fy, fz, gh, here.weather, here.air.density, cover, bodyId, body.gravity, time);
     deform.update(dt, frame, fx, fz, dist, groundOfGrid, body.gravity, time);
+    stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     stats.particles = particles.buffers.rain.count + particles.buffers.snow.count;
     stats.pushCells = flora.active;
     stats.frames++;
     stats.ms = now() - t0;
     stats.msAvg += (stats.ms - stats.msAvg) * 0.05;
+    if (stats.frames > 120 && stats.ms > stats.msMax) stats.msMax = stats.ms;      // worst frame after warm-up
+  }
+
+  // Call once while loading (after the world can be sampled): fills the ground caches under the
+  // focus and lets the JavaScript engine compile the hot loops, so the first played frame is
+  // already inside the budget. Takes a frame like update(); returns the milliseconds it took.
+  function warmUp(f, maxMs = 60) {
+    const t0 = now();
+    warming = true;
+    for (let i = 0; i < 400; i++) {
+      update(0, f);
+      if (i >= 40 && near.invalid === 0 && airGrid.terrain.invalid === 0) break;
+      if (now() - t0 > maxMs && i >= 8) break;
+    }
+    warming = false;
+    stats.frames = 0; stats.msMax = 0;
+    return now() - t0;
   }
 
   // ---- environment queries ----------------------------------------------------------------------
@@ -295,8 +322,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED } = {}) {
     version: PHYSICS_VERSION,
     seed,
     update,
+    warmUp,
     setQuality(q) { quality = q <= 0 ? 0 : q >= 2 ? 2 : 1; particles.setQuality(quality); },
     get quality() { return quality; },
+    // How far a body's real prevailing wind is scaled down for play (data.WINDS[body].scale).
+    setWindScale,
     get time() { return time; },
     air, weather, ground, bindEnv,
     here,                     // air, weather and cover at the focus, refreshed by update()

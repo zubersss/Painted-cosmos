@@ -13,6 +13,7 @@ import { WINDS, WIND, windLarge, gustLevel, turbulenceIntensity, heightFactor, s
 import { weatherWind } from './weather.js';
 import { TerrainGrid } from './near.js';
 import { coverAt } from './ground.js';
+import { FLORA } from './flora.js';
 import { clamp, clamp01, smoothstep } from './util.js';
 
 export const AIR = Object.freeze({
@@ -30,11 +31,19 @@ const _d = new Float64Array(3);
 const _cov = {};
 const _cs = { biomeWeights: null, biomeId: null, liquidRadius: 0, radius: 0 };
 
+// Per node of the wind grid: z0, canopy01, canopyH, moist, fog, dustSrc, dT, snowBase, and the
+// wind height factors at blade height, crown height and 2 m (computed once, when the node's
+// ground is sampled, so the flora field never has to redo them).
+const CW = 11;
 function coverInto(surface, arr, o) {
   coverAt(_coverBody, surface, _cov);
   arr[o] = _cov.z0; arr[o + 1] = _cov.canopy01; arr[o + 2] = _cov.canopyHeight; arr[o + 3] = _cov.moist;
   arr[o + 4] = _cov.fog; arr[o + 5] = _cov.dustSource; arr[o + 6] = _cov.dT; arr[o + 7] = _cov.snowBase;
+  arr[o + 8] = heightFactor(FLORA.softHeight, _cov.z0, _cov.canopyHeight, _cov.canopy01);
+  arr[o + 9] = heightFactor(Math.max(FLORA.stiffHeight, _cov.canopyHeight), _cov.z0, _cov.canopyHeight, _cov.canopy01);
+  arr[o + 10] = heightFactor(2, _cov.z0, _cov.canopyHeight, _cov.canopy01);
 }
+const HF0 = [heightFactor(FLORA.softHeight, WIND.refRoughness), heightFactor(FLORA.stiffHeight, WIND.refRoughness), heightFactor(2, WIND.refRoughness)];
 let _coverBody = 'earth';
 
 export class AirGrid {
@@ -42,7 +51,7 @@ export class AirGrid {
     const N = AIR.gridN;
     this.N = N; this.cell = AIR.gridCell;
     this.seed = seed;
-    this.terrain = new TerrainGrid(N, AIR.gridCell, true);
+    this.terrain = new TerrainGrid(N, AIR.gridCell, CW);
     this.we = new Float32Array(N * N);        // reference wind along the frame's east axis (m/s)
     this.wn = new Float32Array(N * N);        // ... north axis
     this.gust = new Float32Array(N * N);      // travelling gust level -1..1
@@ -118,7 +127,7 @@ export class AirGrid {
         const sl = Math.sqrt(1 + T.gx[n] * T.gx[n] + T.gz[n] * T.gz[n]);
         const lee = -(T.gx[n] * dwe + T.gz[n] * dwn) / sl;
         this.shel[n] = clamp(shelterFactor(sx) * (0.5 + 0.5 * slopeFactor(lee)), 0.08, 1.6);
-        const z0 = T.cover[n * 8];
+        const z0 = T.cover[n * CW];
         this.I[n] = turbulenceIntensity(WIND.refHeight, z0 > 0 ? z0 : WIND.refRoughness);
       }
     }
@@ -162,6 +171,16 @@ export class AirGrid {
     o.wn = this.wn[n] * w00 + this.wn[n + 1] * w10 + this.wn[n + N] * w01 + this.wn[n + N + 1] * w11;
     o.gust = this.gust[n] * w00 + this.gust[n + 1] * w10 + this.gust[n + N] * w01 + this.gust[n + N + 1] * w11;
     o.I = this.I[n] * w00 + this.I[n + 1] * w10 + this.I[n + N] * w01 + this.I[n + N + 1] * w11;
+    // height factors (blade height, crown height, 2 m) from the nodes whose ground is known
+    const va = T.valid, c = T.cover;
+    const v00 = w00 * va[n], v10 = w10 * va[n + 1], v01 = w01 * va[n + N], v11 = w11 * va[n + N + 1];
+    const vs = v00 + v10 + v01 + v11;
+    if (vs > 0.2) {
+      const k = 1 / vs, a = n * CW + 8, b = a + CW, d = (n + N) * CW + 8, e = d + CW;
+      o.hfSoft = (c[a] * v00 + c[b] * v10 + c[d] * v01 + c[e] * v11) * k;
+      o.hfStiff = (c[a + 1] * v00 + c[b + 1] * v10 + c[d + 1] * v01 + c[e + 1] * v11) * k;
+      o.hf2 = (c[a + 2] * v00 + c[b + 2] * v10 + c[d + 2] * v01 + c[e + 2] * v11) * k;
+    } else { o.hfSoft = HF0[0]; o.hfStiff = HF0[1]; o.hf2 = HF0[2]; }
     return o;
   }
 
@@ -185,7 +204,7 @@ export class AirGrid {
     const v00 = w00 * va[n], v10 = w10 * va[n + 1], v01 = w01 * va[n + N], v11 = w11 * va[n + N + 1];
     const vs = v00 + v10 + v01 + v11;
     if (vs > 0.2) {
-      const k = 1 / vs, a = n * 8, b = a + 8, d = (n + N) * 8, e = d + 8;
+      const k = 1 / vs, a = n * CW, b = a + CW, d = (n + N) * CW, e = d + CW;
       o.h = (T.h[n] * v00 + T.h[n + 1] * v10 + T.h[n + N] * v01 + T.h[n + N + 1] * v11) * k;
       o.gx = (T.gx[n] * v00 + T.gx[n + 1] * v10 + T.gx[n + N] * v01 + T.gx[n + N + 1] * v11) * k;
       o.gz = (T.gz[n] * v00 + T.gz[n + 1] * v10 + T.gz[n + N] * v01 + T.gz[n + N + 1] * v11) * k;
@@ -202,7 +221,7 @@ export class AirGrid {
   coverNear(x, z, o) {
     const n = this.terrain.nearest(x, z);
     if (n < 0) return false;
-    const c = this.terrain.cover, a = n * 8;
+    const c = this.terrain.cover, a = n * CW;
     o.z0 = c[a]; o.canopy01 = c[a + 1]; o.canopyHeight = c[a + 2]; o.moist = c[a + 3];
     o.fog = c[a + 4]; o.dustSource = c[a + 5]; o.dT = c[a + 6]; o.snowBase = c[a + 7];
     return true;

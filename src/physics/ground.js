@@ -251,6 +251,7 @@ export function groundAt(bodyId, surface, state, out = {}) {
   if (wet > 0 && T > 272) {
     const k = mix(1, _acc.wet, wet);
     muS *= k; muK *= k;
+    foothold *= 1 - 0.5 * wet;                  // a wet ledge is half the foothold
     const mud = smoothstep(GROUND.mudStart, 1, wet) * _acc.mudding * (1 - steep);
     if (mud > 0) {
       const M = MATERIALS.mud;
