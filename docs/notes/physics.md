@@ -452,6 +452,99 @@ Earth at 55 degrees (peak 3.2 g felt), 21.7 s on Venus (drag-limited to 78 m/s),
    `intensity01` is continuous. If `visibility01` still reads as a pop at a snow squall's
    edge (up to 8 %/s), low-pass it in the sky as the lead's check allows.
 
+## For PAINTER: the draw kits (`src/physics/three/`), ten lines each
+
+Optional, and yours to replace. They build the geometry and keep it current; **you** give the
+material and so the look. Shown running in the lab with flat stand-in materials
+(`docs/shots/physics/draw-kits.jpg`: rain and hail built on the CPU, the same instanced on the
+GPU, footprints and dust on sand, the sea).
+
+```js
+import { createPhysicsKits } from '../physics/three/index.js';     // the only folder of mine that imports three
+const kits = createPhysicsKits(physics, { makeMaterial });          // once; makeMaterial(kind, info) -> your material
+// every frame, after physics.update and after PILOT has placed the body roots:
+kits.update(bodyRootOf(physics.here.bodyId), camera, renderHeightInPixels);
+```
+Rules that hold for every kit: each object is a `THREE.Mesh` of triangles with `position` and
+`uv`, parented by the kit under the body root you pass, sitting at its buffer's body-local
+origin (C3: nothing swims); `frustumCulled` is off; nothing is allocated per frame; the kit
+writes no depth of its own (C7 is your material's business, as everywhere). `kits.stats`
+(`ms`, `drawCalls`, `vertices`, `triangles`) and `kits.weather.stats` etc. for your read-out.
+
+**1. Rain, hail, sand, spray (streaks)**: `kind` `'rain' | 'hail' | 'sand' | 'spray'`, one mesh
+each, a quad per particle: `uv.x` across, `uv.y` 0 at the head (where the drop is) to 1 at the
+tail (where it was one exposure ago, *relative to the camera*: run and the rain slants at you).
+`makeWashMaterial({ color, unlit: true, side: DoubleSide })` works as it is; so does anything
+with `position` and `uv`. Size and exposure are yours: `createPhysicsKits(physics, { makeMaterial,
+weather: { draw: { rain: { width: 0.02, exposure: 0.06 } } } })` (defaults in `DRAW`,
+`three/expand.js`: rain 12 mm wide, 40 ms exposure, never thinner than 1.2 px on screen).
+Fade `uv.y` to nothing at the tail and it is a brush stroke. Cost: 1 draw call a kind in the
+air, 4 vertices a drop (1500 drops: 6000 vertices, 0.07 ms to build, 0.10 ms a frame in the
+browser with rings). `info.attributes` tells you what the mesh carries.
+
+**2. Snow, dust, ash, spores, leaves (dabs)**: quads facing the picture plane, `uv` 0..1
+across the dab, one mesh a kind. Dust grows as it ages (a puff spreads), leaves and ash turn.
+Kinds with `vary > 0` (dust, sand, ash, spores, leaves) also carry `color`: a grey 1 - vary .. 1
+per particle that stays with it; `makeWashMaterial({ vertexColors: true })` picks it up. New
+particles grow in from nothing and particles at the edge of the simulated volume (24 m)
+shrink to nothing: no alpha is needed for either, so any blending you choose works. Sizes are
+brush marks, not grains (snow 3.5 cm, leaves 7.5 cm, dust 16 cm growing 30 cm/s): change them
+in `draw`. Cost as streaks (1600 dabs: 0.09 ms).
+
+**3. The same, instanced** (`weather: { expand: 'gpu' }`): one quad, instanced; the instance
+attributes ARE my arrays (`aPcPos`, `aPcVel`, `aPcSize`, `aPcAge`: nothing is copied or built).
+Your material must paste `info.chunk` (`PARTICLE_GLSL`) and spread `info.uniforms` into its
+uniforms; in `main()`: `vec3 p = pcPhysStreak(position.xy);` or `pcPhysDab(position.xy)`, then
+your usual `modelViewMatrix`. `pcPhysShade(vary)` is the per-particle grey. 0.05 ms a frame on
+the CPU for 1100 particles, 4 vertices a kind in the buffers. Take this one once you write a
+rain material of your own; take the CPU one to see rain in the picture today.
+
+**4. Rings** (`kind` `'ring'`): the splash of a drop, the ripple it leaves on liquid, the puff
+where a flake settles, a hailstone's bounce: one quad each, flat on the local horizontal,
+growing with age, from `physics.particles.events`. Attribute `aPcRing` = (kind 0 splash / 1
+ripple / 2 settle / 3 bounce, strength 0..1, age 0..1, drop size m). `SHAPE_GLSL` has
+`pcPhysRingCover(uv, age01)`: a circle that widens and thins; the lab's stand-in uses it. Up
+to 256 quads, 1 draw call.
+
+**5. Marks** (`kits.marks`, `kind` `'mark'`): footprints, the three gear pads, scour dishes:
+one quad per live mark, laid on the ground (it follows the slope within 16 m of the focus),
+lifted 15 mm: give the material `polygonOffset` or `depthWrite: false`. `uv.x` across, `uv.y`
+along the direction of travel. `aPcMark` = (depth m, rim height m, kind as in `MARK`, fade
+1..0 over its life); `color` is a grey, darker where deeper and fresher, so that
+`makeWashMaterial({ vertexColors: true })` shows prints at once. `SHAPE_GLSL`:
+`pcPhysMarkCover(uv, kind)` (a boot's outline, or a disc) and `pcPhysMarkRim(uv, kind)` (the
+raised edge on loose ground: paint it lighter). Rebuilt only when a mark is added, on a
+re-anchor and four times a second (fading, snow filling them): 0.07 ms for a full ring of 256,
+nothing otherwise. 1 draw call, at most 1024 vertices.
+
+**6. Water** (`kits.water`, `kind` `'water'`): a square patch (41 x 41 vertices, 1.5 m apart,
+60 m across) that follows the focus in whole steps and rides my three wave trains; `position`,
+`normal`, `uv`. 0.04 ms, 1 draw call, 1681 vertices, 3200 triangles. You already draw liquid
+everywhere, so the better wiring is still step 7 above (paste `physics.glsl.water` into
+`makeWaterMaterial`'s vertex stage: no CPU at all, and the far water moves too). Use the patch
+if you want the near water as its own wash, with a hole in yours; or leave it out:
+`createPhysicsKits(physics, { makeMaterial, water: false })`.
+
+What the kits do not draw: lightning (`weather.lightning.flash01` is the sky's), dust devils
+as columns (`physics.features.devils`; their dust and sand are in the particle kits), and
+anything about the sky. `kits.dispose()` removes everything.
+
+## For PILOT: what audio can read (all in `physics.here`, refreshed every frame, free)
+
+- Rain: `weather.precipitation.intensity01` (continuous), `.type`, `.rate` (mm/h), `.hail01`;
+  what it falls on: `cover.canopy01` (leaves overhead) and `physics.water(...).present`.
+- Wind: `air.speed`, `air.gust01` (0 lull .. 1 gust, travelling), `air.turbulence`; in the
+  crowns: `physics.air(bodyId, p, out, canopyHeight).speed`.
+- Thunder: `weather.lightning.thunderIn` counts down in seconds and goes negative at the bang
+  (the delay is distance over that air's speed of sound); `thunder01` is its loudness from
+  then on (decays over 6 s, quieter with distance); `last.distance` (m), `last.t`; `flash01`.
+- The ground underfoot: `st.phys.material`, `speedGround`, `slip01`, `sink`, `impact`
+  (landing speed), `submerged01`; the ship: `st.phys.downwash.thrust`, `gLoad`, `fieldBrake`,
+  `legLoad`, `buffet`.
+- The sea: `physics.fields.water.field.height` (significant wave height), `period`, `whitecap01`.
+- No air, no sound: `air.density` is 0 on Mercury and the Moon, and `air.soundSpeed` is there
+  for pitch (1210 m/s in Jupiter's hydrogen).
+
 ## Lab: `physics-lab.html` URL parameters
 
 `scene=` `flora` (default) | `wind` | `rain` | `snow` | `storm` | `explorer` | `ship` | `globe`;
@@ -520,6 +613,19 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
 17. **The sea is already running when you arrive** (it follows the wind within 1.5 s for the
     first moments at a new place, then with a 25 s time constant), and when the waves lengthen
     or turn the pattern pivots about the watcher, not about the field's origin.
+19. **What a snow squall front really does, and why I leave it at up to 8 % a second.** A
+    squall is a narrow band of heavy snow on a sharp wind shift. What defines it for a
+    forecaster (the US snow squall warning) is visibility dropping to a quarter of a mile or
+    less, and what makes it dangerous is how fast: from kilometres to a few hundred metres
+    in about a minute or two as the band crosses at 10-15 m/s. In `visibility01` (the square
+    root of range) that is a fall of 0.5 or more in 60-120 s, about 0.5-1 % a second on
+    average and several times that at the leading edge. Mine on Earth peaks at 4.7 %/s: the
+    hard end of real, not beyond it. Uranus' 7.8 % is the same band carried at 14.5 m/s
+    instead of 9; the giants' weather is quicker than Earth's because their winds are, and
+    that is their character. If the lead's 5 % is to hold on every world, the knobs are
+    `WEATHER.passTime` and `WEATHER.edgeTime` together (40 and 30 s): 64 and 48 make every
+    fast system 1.6 times larger and its edge 1.6 times slower, which by the scaling of the
+    edge puts Uranus at about 4.9 % (computed from the scaling, not yet run).
 18. **PAINTER's `phys: { ground }` is a family, my table keeps the finer word**: rock may stay
     glass or crystal. A test compares every override; two disagreements are on record (below).
 
