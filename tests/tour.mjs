@@ -4,6 +4,8 @@
 // one contact sheet per body in docs/lead/evidence/tour-<body>.jpg. Console errors on any
 // body fail the run. A frame that never settles is captured anyway and marked "(unsettled)".
 //
+// For a long tour in software GL run one body per process (the browser tires):
+//   for b in mercury venus earth; do node tests/tour.mjs --bodies $b; done
 // Usage: node tests/tour.mjs [--bodies earth,mars] [--root dir] [--quality 1] [--w 960 --h 540]
 //                            [--hour 10] [--settle 120] [--out dir]
 import fs from 'node:fs';
@@ -45,7 +47,9 @@ try {
       await page.waitForTimeout(600);
       const i = await page.evaluate(() => { const x = window.__pc.info(); return { biome: x.mood.biomeId, tris: x.stats.tris, state: x.state, busy: window.__pc.world.busy }; });
       const file = path.join(opt.out, `${body}-${pl.id}.jpg`);
-      await page.screenshot({ path: file, type: 'jpeg', quality: 84, timeout: 600000 });
+      // Software GL sometimes refuses a capture after a long run: wait and try once more.
+      try { await page.screenshot({ path: file, type: 'jpeg', quality: 84, timeout: 600000 }); }
+      catch { await page.waitForTimeout(4000); await page.screenshot({ path: file, type: 'jpeg', quality: 84, timeout: 600000 }); }
       frames.push({ ...pl, file, settled: settled === true, stoodIn: i.biome, seconds: Math.round((Date.now() - t0) / 1000) });
       log(`${body} ${pl.id}: stood in ${i.biome}${settled === true ? '' : ' (unsettled, busy ' + i.busy + ')'} ${Math.round((Date.now() - t0) / 1000)} s`);
     }
