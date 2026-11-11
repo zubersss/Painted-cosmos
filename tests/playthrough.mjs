@@ -57,12 +57,18 @@ async function look(dx, dy) {
     rx -= sx; ry -= sy;
   }
 }
-// Poll until pred(info) is true. `steer(info)` may act every tick. Returns the last info.
-async function until(pred, timeoutMs, steer, tickMs = 90) {
-  const t0 = Date.now();
+// All waiting is in GAME time (info().t), so the script behaves the same at 60 fps and at the
+// 3 to 8 fps that software GL gives the painted pipeline.
+async function gameWait(seconds) {
+  const t0 = (await info()).t, w0 = Date.now();
+  while ((await info()).t - t0 < seconds && Date.now() - w0 < seconds * 40000 + 20000) await sleep(30);
+}
+// Poll until pred(info) is true or `seconds` of game time pass. `steer(info)` may act every tick.
+async function until(pred, seconds, steer, tickMs = 90) {
   let i = await info();
+  const t0 = i.t, w0 = Date.now();
   while (!pred(i)) {
-    if (Date.now() - t0 > timeoutMs) return { ...i, timedOut: true };
+    if (i.t - t0 > seconds || Date.now() - w0 > seconds * 40000 + 20000) return { ...i, timedOut: true };
     if (steer) await steer(i);
     await sleep(tickMs);
     i = await info();
@@ -87,73 +93,75 @@ try {
 
   // ---- walk ------------------------------------------------------------------------------------
   await page.mouse.click(cx, cy);                 // "click to begin"
-  const p0 = i.explorer.p;
+  let j = await info();
+  const p0 = j.explorer.p, tw0 = j.t;
   await page.keyboard.down('KeyW');
-  await sleep(2500);
+  await gameWait(2.5);
   await shot('01-on-foot', '01-on-foot');
-  await page.keyboard.up('KeyW');
   i = await info();
+  await page.keyboard.up('KeyW');
   const walked = Math.hypot(i.explorer.p.x - p0.x, i.explorer.p.y - p0.y, i.explorer.p.z - p0.z);
-  check(walked > 6 && walked < 14, `walked ${walked.toFixed(1)} m in 2.5 s`);
+  const pace = walked / (i.t - tw0);
+  check(walked > 6 && pace > 2.5 && pace < 4.4, `walked ${walked.toFixed(1)} m at ${pace.toFixed(2)} m/s`);
   check(i.explorer.grounded, 'feet on the ground');
   stage('walk', i);
 
   // ---- look around, first person and back ---------------------------------------------------------
   await page.keyboard.press('KeyV');
-  await sleep(300);
+  await gameWait(0.3);
   i = await info();
   check(i.explorer.firstPerson === true, 'V switches to first person');
   await look(160, -30);
   await shot('01b-first-person');
   await page.keyboard.press('KeyV');
-  await sleep(300);
+  await gameWait(0.3);
   check((await info()).explorer.firstPerson === false, 'V switches back to third person');
 
   // ---- jetpack ---------------------------------------------------------------------------------------
   await page.keyboard.down('Space');
-  await sleep(2300);
+  await gameWait(2.3);
   i = await info();
   await shot('02-jetpack', '02-jetpack');
   check(i.explorer.mode === 'jet' && i.explorer.altitude > 7, `jetpack lifted the explorer ${i.explorer.altitude.toFixed(1)} m`);
   check(i.explorer.fuel < 0.65, 'fuel is draining: ' + i.explorer.fuel.toFixed(2));
   await page.keyboard.up('Space');
-  i = await until((x) => x.explorer.grounded, 15000);
+  i = await until((x) => x.explorer.grounded, 15);
   check(i.explorer.grounded, 'landed softly after the jetpack');
-  i = await until((x) => x.explorer.fuel >= 0.999, 8000);
+  i = await until((x) => x.explorer.fuel >= 0.999, 8);
   check(i.explorer.fuel >= 0.999, 'fuel recharged on the ground');
   stage('jetpack', i);
 
   // ---- walk to the ship and board ----------------------------------------------------------------------
   i = await info();
   await look((i.shipBearingDeg * RAD) / MOUSE_FOOT, 0);
-  await sleep(200);
+  await gameWait(0.2);
   i = await info();
   check(Math.abs(i.shipBearingDeg) < 6, 'turned to face the ship: ' + i.shipBearingDeg.toFixed(1) + ' deg');
   await page.keyboard.down('KeyW');
-  i = await until((x) => x.canBoard, 25000, async (x) => {
+  i = await until((x) => x.canBoard, 25, async (x) => {
     if (Math.abs(x.shipBearingDeg) > 4) await look((x.shipBearingDeg * RAD) / MOUSE_FOOT * 0.6, 0);
   });
   await page.keyboard.up('KeyW');
-  await sleep(350);
+  await gameWait(0.35);
   i = await info();
   check(i.canBoard && i.prompt === 'Board ship', 'board prompt shows next to the ship');
   await shot('03-board-prompt', '03-board-prompt');
   await page.keyboard.press('KeyE');
-  i = await until((x) => x.state === 'LANDED', 6000);
+  i = await until((x) => x.state === 'LANDED', 6);
   check(i.state === 'LANDED', 'boarded with E');
   check(/Lift off/.test(i.prompt || ''), 'lift-off prompt shows');
-  await sleep(600);
+  await gameWait(0.6);
   await shot('04-in-ship', '04-in-ship');
   stage('board', i);
 
   // ---- lift off ----------------------------------------------------------------------------------------
   await page.keyboard.press('Space');
-  await sleep(1400);
+  await gameWait(1.4);
   i = await info();
   check(i.state === 'ATMOSPHERE' && i.ship.liftoff, 'lift-off sequence running');
   await shot('05-liftoff', '05-liftoff');
-  i = await until((x) => !x.ship.liftoff, 8000);
-  await sleep(1200);
+  i = await until((x) => !x.ship.liftoff, 8);
+  await gameWait(1.2);
   i = await info();
   check(Math.abs(i.ship.altGround - 9) < 2 && i.ship.speed < 1, `hovering at ${i.ship.altGround.toFixed(1)} m, ${i.ship.speed.toFixed(2)} m/s`);
   stage('liftoff', i);
@@ -161,10 +169,10 @@ try {
   // ---- climb to space, no loading screen ---------------------------------------------------------------
   const tClimb0 = (await info()).t;
   await page.keyboard.down('KeyW');
-  await sleep(1900);
+  await gameWait(1.9);
   await page.keyboard.up('KeyW');                 // throttle is persistent
   let shotClimb = false;
-  i = await until((x) => x.state === 'SPACE', 120000, async (x) => {
+  i = await until((x) => x.state === 'SPACE', 120, async (x) => {
     await holdPitch(48)(x);
     if (!shotClimb && (x.ship.altitude || 0) > 330) { shotClimb = true; await shot('06-climb', '06-climb'); }
   });
@@ -175,71 +183,71 @@ try {
   log('  ground to space took', summary.timings.groundToSpace, 's of game time');
   stage('space', i);
   await timeScale(3);
-  i = await until((x) => (x.ship.altitude || 0) > 5200, 90000, holdPitch(48));
+  i = await until((x) => (x.ship.altitude || 0) > 5200, 90, holdPitch(48));
   await timeScale(1);
   await page.keyboard.down('KeyX');
-  i = await until((x) => x.ship.speed < 4, 30000);
+  i = await until((x) => x.ship.speed < 4, 30);
   await page.keyboard.up('KeyX');
   check(i.ship.speed < 4, 'X brings the ship to rest in space');
   check(i.mood.inSpace01 > 0.99, 'mood says space: inSpace01 ' + i.mood.inSpace01.toFixed(2));
 
   // Look down at the planet from orbit, then find the moon (another world).
   const alt = (x) => (x.ship.altitude == null ? 1e9 : x.ship.altitude);
-  i = await until((x) => Math.abs(x.ship.pitchDeg + 62) < 3, 20000, holdPitch(-62));
-  await sleep(900);
+  i = await until((x) => Math.abs(x.ship.pitchDeg + 62) < 3, 20, holdPitch(-62));
+  await gameWait(0.9);
   await shot('07-orbit', '07-orbit');
   const alt0 = alt(await info());
-  i = await until((x) => Math.abs(x.ship.pitchDeg) < 3, 20000, holdPitch(0));
+  i = await until((x) => Math.abs(x.ship.pitchDeg) < 3, 20, holdPitch(0));
   let a = null;
   for (let n = 0; n < 80; n++) {
     a = await page.evaluate(() => window.__pc.aimAt('moon'));
     if (Math.abs(a.yawDeg) < 3 && Math.abs(a.pitchDeg) < 3) break;
     await look(Math.max(-110, Math.min(110, (a.yawDeg * RAD / MOUSE_SHIP) * 0.4)), -Math.max(-70, Math.min(70, (a.pitchDeg * RAD / MOUSE_SHIP) * 0.4)));
-    await sleep(250);
+    await gameWait(0.25);
   }
   i = await info();
   const moonHigh = Math.abs(i.ship.pitchDeg) > 72;       // beyond the pitch limit: cannot be centred
   check(Math.abs(a.yawDeg) < 6 && (moonHigh || Math.abs(a.pitchDeg) < 6), `the moon is ahead (off by ${a.yawDeg.toFixed(1)}, ${a.pitchDeg.toFixed(1)} deg), ${(a.distance / 1000).toFixed(1)} km away`);
-  await sleep(700);
+  await gameWait(0.7);
   await shot('08-moon', '08-moon');
   i = await info();
   check(i.frame === 'earth:orbit' && Math.abs(alt(i) - alt0) < 60, 'a parked ship stays with its planet');
   stage('orbit', i);
 
   // ---- back down --------------------------------------------------------------------------------------------
-  i = await until((x) => x.ship.pitchDeg < -50, 20000, holdPitch(-58));
+  i = await until((x) => x.ship.pitchDeg < -50, 20, holdPitch(-58));
   await page.keyboard.down('KeyW');
-  await sleep(1100);
+  await gameWait(1.1);
   await page.keyboard.up('KeyW');
   await timeScale(3);
-  i = await until((x) => alt(x) < 1500, 120000, holdPitch(-58));
+  i = await until((x) => alt(x) < 1500, 120, holdPitch(-58));
   await timeScale(1);
   let shotEntry = false;
-  i = await until((x) => x.state === 'ATMOSPHERE', 120000, async (x) => {
+  i = await until((x) => x.state === 'ATMOSPHERE', 120, async (x) => {
     await holdPitch(-45)(x);
     if (!shotEntry && alt(x) < 1050) { shotEntry = true; await shot('09-entry', '09-entry'); }
   });
   check(i.state === 'ATMOSPHERE' && i.frame === 'earth:ground', 'entered the atmosphere');
   stage('entry', i);
-  i = await until((x) => x.ship.altGround < 170, 120000, holdPitch(-32));
+  i = await until((x) => x.ship.altGround < 170, 120, holdPitch(-32));
   await page.keyboard.down('KeyS');
-  i = await until((x) => x.ship.throttle < 0.3, 8000, holdPitch(-10));
+  i = await until((x) => x.ship.throttle < 0.3, 8, holdPitch(-10));
   await page.keyboard.up('KeyS');
-  i = await until((x) => x.ship.canLand, 60000, holdPitch(-8));
+  i = await until((x) => x.ship.canLand, 150, async (x) => holdPitch(x.ship.altGround > 110 ? -18 : -7)(x));
   check(i.ship.canLand && i.prompt === 'Land here', 'landing prompt shows');
   check(i.ship.bounces === 0, 'never touched the ground on the way down');
   await shot('10-land-prompt', '10-land-prompt');
 
   // ---- landing assist -----------------------------------------------------------------------------------------
   await page.keyboard.press('KeyE');
-  await sleep(300);
+  await gameWait(0.3);
   i = await info();
   check(i.state === 'LANDING', 'E starts the landing assist');
   let touch = 99;
-  i = await until((x) => x.state === 'LANDED', 60000, async (x) => { touch = x.ship.speed; });
+  i = await until((x) => x.state === 'LANDED', 60, async (x) => { touch = x.ship.speed; });
   check(i.state === 'LANDED', 'landed');
   check(touch < 3, `soft touchdown (${touch.toFixed(2)} m/s just before)`);
-  await sleep(1500);
+  await gameWait(1.5);
   i = await info();
   check(i.ship.speed === 0 && i.ship.gear01 > 0.9, 'at rest, gear down');
   await shot('11-landed', '11-landed');
@@ -247,15 +255,15 @@ try {
 
   // ---- step out ------------------------------------------------------------------------------------------------
   await page.keyboard.press('KeyE');
-  i = await until((x) => x.state === 'ON_FOOT', 6000);
+  i = await until((x) => x.state === 'ON_FOOT', 6);
   check(i.state === 'ON_FOOT', 'stepped out with E');
-  await sleep(900);
+  await gameWait(0.9);
   i = await info();
   check(i.explorer.grounded || i.explorer.mode === 'wade', 'standing beside the ship');
   check(i.shipDistance < 9, 'next to the ship: ' + i.shipDistance.toFixed(1) + ' m');
   const p1 = i.explorer.p;
   await page.keyboard.down('KeyS');
-  await sleep(1500);
+  await gameWait(1.5);
   await page.keyboard.up('KeyS');
   i = await info();
   check(Math.hypot(i.explorer.p.x - p1.x, i.explorer.p.y - p1.y, i.explorer.p.z - p1.z) > 3, 'walking again');

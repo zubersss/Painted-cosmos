@@ -62,7 +62,10 @@ export function createHud(root) {
       thr.classList.toggle('pc-on', !!show);
       thrBar.style.width = Math.round(Math.max(0, t) * 100) + '%';
     },
-    setReadout(text) { if (text !== lastReadout) { lastReadout = text; readout.textContent = text; } },
+    setReadout(text, show = true) {
+      if (text !== lastReadout) { lastReadout = text; readout.textContent = text; }
+      readout.classList.toggle('pc-on', !!show);
+    },
     setReticle(on) { dot.classList.toggle('pc-on', !!on); },
     showStart(on) { card.classList.toggle('pc-on', !!on); },
     startCard: card,

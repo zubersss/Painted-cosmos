@@ -113,12 +113,16 @@ export class Game {
     hud.setThrottle(sim.sh.throttle, st === S.ATMOSPHERE || st === S.SPACE);
     hud.setReticle(st === S.ATMOSPHERE || st === S.SPACE || (st === S.ON_FOOT && sim.footCam.firstPerson));
     if (this.frameCount % 6 === 0) {
+      // On foot the screen is the painting and nothing else: the place name shows for a few
+      // seconds on arrival, then fades. In flight the read-out stays.
       const name = sim.mood.bodyId ? BODIES[sim.mood.bodyId].name : 'deep space';
+      const key = name + (isInShip(st) ? '' : ':foot');
+      if (key !== this._placeKey) { this._placeKey = key; this._placeAt = sim.t; }
       if (isInShip(st) && st !== S.LANDED) {
         const env = sim.flightEnv();
         const alt = env.sample ? sim.sh.altGround : env.hasBody ? env.altitude : null;
-        hud.setReadout(`${name}\n${alt == null ? '' : fmt(alt) + ' up   '}${Math.round(sim.sh.speed)} m/s`);
-      } else hud.setReadout(name);
+        hud.setReadout(`${name}\n${alt == null ? '' : fmt(alt) + ' up   '}${Math.round(sim.sh.speed)} m/s`, true);
+      } else hud.setReadout(name, this.started && sim.t - this._placeAt < 6);
     }
     if (this.input.used && !this.started) { this.started = true; hud.showStart(false); }
   }
