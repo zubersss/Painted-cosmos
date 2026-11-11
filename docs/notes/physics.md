@@ -172,7 +172,13 @@ INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is st
 with one change of type: the water uniforms are vec4 now (four trains; nobody had wired them).
 The tree is committed green: `node --test src/physics/` **175 pass** at the commit that carries this note.
 
-Stage P1 (foundations) and P2: done, accepted. **Stage P3** (this block; the tables below are still current):
+Stage P1 to P3: done, accepted. **Stage P4** so far: the lab runs inside the real painted
+pipeline (`?painted=1`), the reference material factory is proven with PAINTER's chunks and both
+render targets, six painted frames are judged, rain is prototyped four ways and measured for
+crawl; all under Answers, "The lab inside the painted pipeline". Not done in P4: shader
+agreement inside `PROP_VERT`, the branch rate, drifts.
+
+Stage P3 (this block; the tables below are still current):
 
 | P3 job | State |
 |---|---|
@@ -265,9 +271,9 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
   in the browser (title sheet up, no console errors, `physics 0.7 ms`).
 - Evidence, `docs/shots/physics/` (12 files): `planets-inner.jpg`, `planets-outer.jpg`,
   `globes.jpg`, `water-coast-gale.jpg` (Hs 0.60 m, 2.5 s, 9 m under a 25 m/s gale; the blue
-  mesh is the GLSL surface, the red dots the JS twin), and from P1 `meadow-gale-walk.jpg`,
-  `meadow-jetpack.jpg`, `rain-earth.jpg`, `thunderstorm-earth.jpg`, `snow-earth.jpg`,
-  `explorer-sand-prints.jpg`, `wind-terrain.jpg`, `ship-liftoff-hover-land.jpg`.
+  mesh is the GLSL surface, the red dots the JS twin), `draw-kits.jpg`, `meadow-gale-walk.jpg`,
+  and the six `painted-*.jpg` of P4 (the older debug shots of rain, snow, the jetpack, the
+  terrain wind and the ship were retired to stay at twelve files).
 
 ### Not done or not verified
 - Nobody draws my particles, marks, waves or weather yet (PAINTER's M3): I have only seen them
@@ -281,7 +287,6 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - Real-GPU cost of the textures is unmeasured (software GL only).
 - The cloud seas: I made them a light froth that carries a trimmed suit (see Decisions 16);
   nobody has walked into one in the game.
-- `explorer-sand-prints.jpg` and `ship-liftoff-hover-land.jpg` predate rims, pads and scour.
 
 ## For PILOT: wiring, in order
 
@@ -476,20 +481,48 @@ const kits = createPhysicsKits(physics, { makeMaterial });                   // 
 // every frame, after physics.update and after PILOT has placed the body roots:
 kits.update(bodyRootOf(physics.here.bodyId), camera, renderHeightInPixels);
 ```
-`makeMaterial(kind, info)` is yours. With your chunks it is about ten lines (not run by me with
-your chunks: I ran this exact shape with a flat colour in place of your wash, in
-`physics-lab.html`, function `standIn`):
+`makeMaterial(kind, info)` is yours. This one is **proven in your real pipeline** (your chunks,
+both render targets, your post pass; `physics-lab.html?painted=1`, source in
+`src/physics/three/painted-lab.js`, function `makeKitMaterial`; frames `painted-*.jpg`). Lift
+it as it stands:
 ```js
-const makeMaterial = (kind, info) => new THREE.ShaderMaterial({
-  uniforms: { ...yourBaseUniforms(), ...info.uniforms },         // info.uniforms: {} for the cpu kits
-  vertexShader: `${VERT_PARS}\n${info.vertexChunk}\nvarying vec3 vView;
-    void main() { vec4 mv = modelViewMatrix * vec4(pcKitPosition(), 1.0); vView = mv.xyz;
-      gl_Position = projectionMatrix * mv; ${VERT_END} }`,
-  fragmentShader: `${FRAG_PARS}\n${SHAPE_GLSL}\nvarying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView;
-    void main() { /* cut the shape with discard, pick the wash */ pcWrite(col, wet, nV, -vView.z, ${info.region.toFixed(1)}); }`,
-  side: THREE.DoubleSide,
-});  // then material.userData.pcPainted = true
+import { makeWashMaterial, bindBodyUniforms } from '../render/index.js';
+import { VERT_PARS, VERT_END, FRAG_PARS } from '../render/chunks.js';
+import { SHAPE_GLSL } from '../physics/three/index.js';
+function makeKitMaterial(kind, info) {
+  const base = makeWashMaterial({ color: INK[kind], unlit: true });      // the uniform set FRAG_PARS needs
+  const m = new THREE.ShaderMaterial({
+    uniforms: { ...base.uniforms, ...info.uniforms },
+    vertexShader: `${VERT_PARS}\n${info.vertexChunk}\nvarying vec3 vView;
+      void main() { vec4 mv = modelViewMatrix * vec4(pcKitPosition(), 1.0); vView = mv.xyz;
+        gl_Position = projectionMatrix * mv; ${VERT_END} }`,
+    fragmentShader: `${FRAG_PARS}\n${SHAPE_GLSL}\nuniform vec3 uColor;
+      varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView;
+      void main() {
+        #include <logdepthbuf_fragment>
+        ${FRAG[kind] || FRAG[info.shape]}      // cuts the hole (discard), sets vec3 c and float w
+        c = pcAtmos(pcTone(c, 2.0), pcFogAmount(length(vView)));
+        pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${info.region.toFixed(1)});
+      }`,
+    side: THREE.DoubleSide, polygonOffset: info.shape === 'mark' || info.shape === 'ring',
+    polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  m.userData.pcPainted = true;
+  return m;                 // then, once: bindBodyUniforms(m, world.bodyUniforms(bodyId))
+}
 ```
+`FRAG` is one line of GLSL a shape (the lab's are in `painted-lab.js`: a tapering stroke, a
+round dab, a ragged puff cut from `uNoise3D`, a ring, a print thinned through `uNoise3D`).
+**Three things the painted frames taught, which change the defaults for your pipeline:**
+1. Your post pass erases anything under about three internal pixels. Thin rain (1.2 px), rings
+   and 1.6 px flakes are simply gone. Give every kind `minPx` 3 or more
+   (`weather: { draw: { rain: { width: 0.07, exposure: 0.14, minPx: 3 }, snow: { size: 0.06,
+   minPx: 3.5 }, ... } }`; the lab's set is `DRAW_PAINTED`).
+2. Rain that reads is **a few broad strokes** (one drop in six, 7 cm wide, 140 ms exposure,
+   wetness 0.95), not many thin ones. Section "The lab inside the painted pipeline" has the
+   four options side by side with numbers.
+3. An opaque kit has to bring its own ink, and a fixed ink is wrong on ground it does not
+   know: kicked dust is a brown blot on the forest floor. See "missing" in that section.
 - `pcKitPosition()` returns the vertex in the mesh's own coordinates: body-local axes, metres,
   relative to the mesh, which the kit parents under the body root you pass and places at a
   body-local point (C3). Multiply by `modelViewMatrix` as for any mesh.
@@ -882,6 +915,77 @@ What behaves wrong, or does not show:
    pushed, 11-16 marks after a short walk), but at this resolution I cannot see grass part.
    Neptune's spawn is so dark at that hour that nothing at all can be judged there.
 7. On Mars the explorer spawned standing on top of a boulder. Harmless, odd.
+
+### The lab inside the painted pipeline (P4, job 1): `physics-lab.html?painted=1`
+
+Builds your (PAINTER's) world and painter from public exports only (`createPainter`,
+`RENDERER_OPTIONS`, `makeWashMaterial`, `bindBodyUniforms`; `createWorld` and the world's
+methods; the three chunks your contract names in `src/render/chunks.js`), runs the physics on
+it and adds the kits with the factory above. No PAINTER file is touched or reached into.
+Parameters: `body=`, `biome=` (via `world.findBiome`) or `lat=&lon=`, `hour=`, `t=` or
+`find=rain|thunderstorm|snow|dust|fog|<kind>` (the time at that place when the weather is
+there, else the nearest place), `pre=<s>` (simulate that long unseen before the page is
+ready: software GL draws a frame or two a second), `walk=<m/s>&circle=<m>` (an explorer on my
+body model, drawn as a plain painted capsule), `ship=hover|land` (`shipAlt`, `shipAway`,
+`shipDrift`), camera `yaw pitch dist up follow=1`, `rain=thin|broad|cover|blend`, `water=1`
+(`waterLift`, `waterN`, `waterStep`), `expand=gpu`, `kits=0`, `quality`, `scale`, `hud=1`,
+`freeze=1`. `window.__lab`: `info()`, `stability(dtMs, pairs, hideKits)`, `setRain(mode)`.
+Example: `node tools/shot.mjs "/physics-lab.html?painted=1&body=earth&find=thunderstorm&walk=2&pre=12" out.png --w 960 --h 540 --timeout 400000 --shot-timeout 240000`.
+
+**Frames at 960x540 (768x432 internal), quality 1, each opened and judged against the art bible:**
+
+| Frame | What is in it | Verdict |
+|---|---|---|
+| `painted-storm-forest.jpg` | Earth forest, thunderstorm 17.5 mm/h, 1370 drops, broad strokes | **Reads as rain**, as pale slanted strokes among the trees; thin on the open grass (pale on pale); sheltered under the crowns as it should be. The sun is out and the ground is dry in the picture: the sky and the wash know nothing of the storm. No splash rings (erased by the post pass). |
+| `painted-rain-options.jpg` | the four ways to draw rain, same storm | thin: **invisible** (1270 drops, none survive the post pass). cover: invisible. broad: visible, reads. blend (own pass after the painting): faint hairlines, and it draws over the paper border. |
+| `painted-snow.jpg` | Earth alpine meadow, blizzard, 1380 flakes at 6 cm, visibility 0.18 | **Fails.** A dozen white dots against the dark hill; white on a light wash is nothing. No snow on the ground, no closing in. Snow cannot be done by a particle kit alone: it is `snowDepth` on the ground wash and `visibility01` in the air first, flakes last. The footprints read. |
+| `painted-mars-dust.jpg` | Mars dunes, dust storm, visibility 0.10, 206 puffs, 509 sand grains | Puffs cut from your noise are acceptable dry-brush marks; **as a storm it fails**: fifteen separate blots in a clear sky. A dust storm is `dust01` in your haze, with these as accents. Footprints read well. |
+| `painted-marks.jpg` | Earth desert, a walked circle, the ship landed and left | **Footprints read**: small dark dabs, right size, stable. Pad prints are small dark ovals, acceptable. Scour dishes had to be reduced to a faint ring: dozens overlap and an opaque kit piles them into a dark patch. Kicked dust shows as ochre patches: tolerable here, a brown blot on forest litter. |
+| `painted-neptune-sea.jpg` | Neptune's sea, Hs 0.75 m, my patch lifted 0.8 m over your liquid, a hull hovering | **Fails as a sea.** A flat wash; the waves show only as the wavy far edge of the patch; spray under the hull reads. My patch fights your flat liquid surface (where it dips below yours you see yours), and my three-tone shading did not survive. This needs the wave chunk in your water material, not a second surface. |
+| (not kept) grass parting | meadow and forest floor, an explorer walking a circle | **Cannot be judged**: where I looked there are three tufts of grass in view; nothing to part. The push field is live; it needs a meadow with blades. |
+
+**Rain, measured for crawl** (pairs of frames 8 ms apart, five pairs, same storm, 1270-1390
+drops; mean absolute difference of the picture, and the share of pixels changing by more
+than 8 %): no kits 0.00035, 0.03 %; thin 0.00050, 0.06 %; cover 0.00038, 0.05 %; blend
+0.00024, 0.05 %; **broad 0.00175, 0.40 %**. Thin and cover add change without adding
+anything you can see: that is shimmer with no rain in it, the worst of both. Broad changes
+most because it is the only one that is there; its strokes move 5 cm in 8 ms along their
+own length (90 cm), which is travel, not crawl. Blend is the calmest and the least like the
+painting. My reading: broad strokes in your opaque pass, more of them over open ground, with
+the wet darkening done by your wash from `wetness01` rather than by the strokes.
+
+**Cost in the real pipeline** (kit CPU per frame, draw calls, triangles; limit 12 calls and
+60 k triangles for all kits): thunderstorm 0.10-0.21 ms, 4-5 calls, 3.2 k; blizzard 0.14 ms,
+4 calls, 3.0 k; Mars dust storm 0.12 ms, 3 calls, 1.5 k; marks and dust in the desert 0.07-0.4
+ms, 2-3 calls, 0.5-1.0 k; the sea with a 65 x 65 patch and wakes 1.1-1.5 ms, 4 calls, 8.7 k
+(too dear on the CPU at that size: the default 41 x 41 is 0.05 ms without wakes; another
+reason to use the chunk instead). `physics.update` read 0.5-1.4 ms in this page under
+software GL (0.3-0.5 in Node).
+
+**Missing in the contract or the exports** (I worked round none of these by reaching in):
+1. No public way to make the uniform set `FRAG_PARS` needs. I take it from
+   `makeWashMaterial(...).uniforms`, which is public and works; export `baseUniforms` or bless that.
+2. `VERT_PARS`, `VERT_END`, `FRAG_PARS` are named by the contract but live in
+   `src/render/chunks.js`, not in `index.js`. Re-export them.
+3. **An opaque pass cannot glaze.** Rain as a darker veil, dust as haze, a print as "the
+   ground, darker", a wet patch: all want to tint what is already there. A kit can only lay
+   its own ink over it, and the ink is wrong wherever the ground is not what the ink assumed.
+   What would fix it: the local ground wash available to a kit's fragment (a function in
+   `FRAG_PARS`, or a uniform colour per biome), or one multiplying pass after the scene pass.
+4. The post pass erases marks under about 3 px, with no way to ask it not to: no splash
+   rings, no fine rain, no snowflakes. Say what the least mark is, or give a region id that
+   is kept crisp.
+5. No way to move your liquid surface: `makeWaterMaterial` is not public and the world takes
+   no wave chunk. A second surface over yours cannot work (frame above).
+6. Nothing in the sky or the haze reads `physics.here.weather`: storms under the sun.
+
+**Shader agreement inside `PROP_VERT`: not measured.** From outside your files I cannot read
+a displaced vertex back: the scene targets are internal and the prop material is not public.
+What I can do without reaching in is a silhouette test (drive my own field arrays to a known
+steady load, render, and compare where a lone crown lands on screen with the JS prediction,
+using `world.sampleObstacles` for the tree's root and height): accurate to about a pixel,
+2-3 cm at 20 m. Not done in P4. A one-line hook from you would make it exact: a debug
+material flag that writes the displaced body-local position to the colour target.
 
 ## Ideas and critique
 

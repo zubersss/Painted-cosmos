@@ -28,6 +28,10 @@ import { makeWorld } from './src/physics/testworld.mjs';
 import { BODIES } from './src/data/bodies.js';
 import { hash3 } from './src/physics/util.js';
 
+// ?painted=1: the lab inside PAINTER's real pipeline (its world, its painter, the kits with a
+// material factory to its contract). Everything below this line is the plain debug lab.
+if (new URLSearchParams(location.search).get('painted') === '1') { await import('./src/physics/three/painted-lab.js'); await new Promise(() => {}); }
+
 // ---- parameters -----------------------------------------------------------------------------
 const Q = new URLSearchParams(location.search);
 // ?planet=<name>: one preset per world, showing the weather that is its own. Any parameter given

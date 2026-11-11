@@ -259,7 +259,7 @@ export function createWaterKit(physics, { makeMaterial, N = 40, step = 1.5 } = {
   geo.setAttribute('position', posA); geo.setAttribute('normal', nrmA); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setIndex(new THREE.BufferAttribute(gridIndices(N), 1));
   const mesh = new THREE.Mesh(geo, makeMaterial('water', { shape: 'surface', attributes: ['position', 'normal', 'uv'], draw: null, uniforms: {}, region: REGION.water, chunk: physics.glsl.water,
-    vertexChunk: chunkPlain('vec4(0.0)'), data: 'nothing (zeros); the mesh carries `normal`' }));
+    vertexChunk: chunkPlain('vec4(normal, 0.0)'), data: 'xyz: the surface normal (body-local axes, unit); the mesh also carries `normal`' }));
   mesh.name = 'pc-physics-water'; mesh.frustumCulled = false; mesh.visible = false;
   const stats = { ms: 0, drawCalls: 0, vertices: 0, triangles: 0 };
   return {
