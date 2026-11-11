@@ -33,6 +33,9 @@ export const FEEL = Object.freeze({
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const Y = V(0, 1, 0);
+// Touchdown on the legs: where the assist hands the hull to the landing gear (m over the
+// ground) and how fast the gear lets it down (m/s; PHYSICS' recipe).
+export const LEGS = Object.freeze({ gearAt: 1.0, sink: 0.6 });
 export const VISTA_RANGE = 14;      // metres: this close to a vista's spot, on foot, and it is yours
 const VACUUM = { density: 0, wind: V(), speed: 0, gust01: 0, turbulence: 0, temperature: 3, pressure: 0, soundSpeed: 0, viscosity: 0 };
 const VACUUM_AIR = (p, out) => (out ? Object.assign(out, VACUUM) : VACUUM);
@@ -210,7 +213,14 @@ export class Sim {
       this.stepFlying(h, I, mdx, mdy, pressed);
     } else if (st === S.LANDING) {
       if (first && inp.edges.has('KeyV')) this.shipCam.cockpit = !this.shipCam.cockpit;
-      const r = stepLanding(this.sh, h, this.sampler(this.shFrame.id));
+      // With PHYSICS the last metre belongs to the landing gear: the assist brings the hull to
+      // about a metre over the site, then the three sprung legs take it down and take the weight.
+      let r;
+      if (this.sh.landing && this.sh.landing.gear) r = this.stepLandingGear(h);
+      else {
+        r = stepLanding(this.sh, h, this.sampler(this.shFrame.id), undefined, this.physics && this.useGear ? LEGS : null);
+        if (r === 'gear') { this.beginLandingGear(); r = 'landing'; }
+      }
       if (r === 'touchdown') {
         this.bodyId = this.shFrame.id;
         this.sh.gearOn = false; this.sh.lift01 = 1;       // hand the hull to its landing gear
@@ -243,6 +253,43 @@ export class Sim {
       sh.gear01 = mix(sh.gear01, 1, 1 - Math.exp(-4 * h));
       sh.throttle01 = mix(sh.throttle01, 0, 1 - Math.exp(-2.5 * h));
     } else stepLanded(sh, h);
+  }
+
+  // Touchdown on the legs (PHYSICS' recipe): from about a metre up the hull is weightless on its
+  // lift and is let down at 0.6 m/s until a foot meets the ground; from then on the lift fades
+  // (Sim.stepParked) and the legs take the weight, sag and settle.
+  beginLandingGear() {
+    const sh = this.sh, sample = this.sampler(this.shFrame.id);
+    sh.landing.gear = { t: 0 };
+    this.physics.ship.wake(sh);
+    // No foot may start inside the ground (a bank under one leg): lift the hull clear first.
+    const legs = (this.physics.ship.tuning && this.physics.ship.tuning.legs) || [];
+    let low = Infinity;
+    for (const L of legs) {
+      const f = add(sh.p, qRotate(sh.q, V(L[0], L[1], L[2])));
+      const g = floorAt(sample, f);
+      low = Math.min(low, g.r - g.floor);
+    }
+    if (low < 0.25) sh.p = addScaled(sh.p, norm(sh.p), 0.25 - low);
+  }
+
+  stepLandingGear(h) {
+    const sh = this.sh, G = sh.landing.gear, up = norm(sh.p);
+    G.t += h;
+    const cmd = this._landCmd || (this._landCmd = { lift01: 1, hold: V() });
+    cmd.lift01 = 1;
+    cmd.hold.x = up.x * -LEGS.sink; cmd.hold.y = up.y * -LEGS.sink; cmd.hold.z = up.z * -LEGS.sink;
+    this.physics.ship.gear(sh, cmd, h, this.explorerEnv(this.shFrame.id));
+    sh.speed = len(sh.v);
+    const g = floorAt(this.sampler(this.shFrame.id), sh.p);
+    sh.altGround = Math.max(0, g.r - g.floor);
+    sh.gear01 = 1; sh.throttle = 0; sh.turnRate = 0;
+    sh.throttle01 = mix(sh.throttle01, 0.2, 1 - Math.exp(-3 * h));
+    if ((sh.phys && sh.phys.contacts > 0) || G.t > 5) {
+      sh.landing = null; sh.onLiquid = false; sh.restQ = null; sh.altGround = 0;
+      return 'touchdown';
+    }
+    return 'landing';
   }
 
   // Obstacles around a body-local point, as plain objects (copied: the world may reuse its own).

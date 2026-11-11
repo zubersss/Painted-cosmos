@@ -201,6 +201,42 @@ test('with physics: after a landing the hull is handed to the gear and stays whe
   assert.ok(len(sub(sim.ex.p, sim.sh.p)) < 8);
 });
 
+test('with physics: the last metre of a landing is taken on the legs (soft touch, three feet down, asleep)', { skip }, () => {
+  for (const body of ['earth', 'moon', 'jupiter']) {
+    const sim = newSim({ body });
+    const pad = new Pad();
+    sim.teleport({ body, ship: true, altitude: 40 });
+    play(sim, pad, 0.6);
+    pad.tap('KeyE');
+    play(sim, pad, 0.2);
+    assert.equal(sim.sm.state, S.LANDING, body + ': landing began');
+    let onGear = 0, fastest = 0, firstContacts = 0;
+    play(sim, pad, 60, {
+      each: () => {
+        if (sim.sh.landing && sim.sh.landing.gear) { onGear++; fastest = Math.max(fastest, -dot(sim.sh.v, norm(sim.sh.p))); }
+        if (sim.sm.state === S.LANDED && !firstContacts) firstContacts = sim.sh.phys.contacts;
+      },
+      until: () => sim.sm.state === S.LANDED,
+    });
+    assert.equal(sim.sm.state, S.LANDED, body + ': landed');
+    assert.ok(onGear > 10, `${body}: the legs took the last metre (${onGear} frames on the gear)`);
+    assert.ok(fastest <= 1.5, `${body}: sink rate on the gear ${fastest.toFixed(2)} m/s (R-SHIP-5: 1.5 or less)`);
+    const p0 = { ...sim.sh.p };
+    let deepest = 0;
+    play(sim, pad, 5, { each: () => { for (const c of sim.sh.phys.legCompress) deepest = Math.max(deepest, c); } });
+    assert.equal(sim.sh.phys.contacts, 3, body + ': three feet on the ground');
+    assert.ok(sim.sh.phys.asleep, body + ': settled and asleep within 5 s');
+    assert.ok(deepest > 0.005 && deepest < P.SHIP_BODY.gearTravel, `${body}: the legs took the weight without hitting the stops (${(deepest * 100).toFixed(1)} cm)`);
+    assert.ok(len(sub(sim.sh.p, p0)) < 0.6, `${body}: it stayed where it touched (moved ${len(sub(sim.sh.p, p0)).toFixed(2)} m)`);
+    const q = sim.sh.q, uy = { x: 2 * (q.x * q.y - q.w * q.z), y: 1 - 2 * (q.x * q.x + q.z * q.z), z: 2 * (q.y * q.z + q.w * q.x) };
+    assert.ok(dot(uy, norm(sim.sh.p)) > 0.9, body + ': upright');
+    // And the loop goes on: step out, walk.
+    pad.tap('KeyE');
+    play(sim, pad, 4, { until: () => sim.sm.state === S.ON_FOOT });
+    assert.equal(sim.sm.state, S.ON_FOOT, body + ': stepped out');
+  }
+});
+
 test('with physics: suit thrusters make the start and the stop crisp (the named assist)', { skip }, () => {
   const sim = newSim();
   const pad = new Pad();

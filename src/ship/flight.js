@@ -360,9 +360,13 @@ export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = nul
   return true;
 }
 
-// Returns 'landing' while descending, 'touchdown' on the frame the gear meets the ground, and
-// 'blocked' if the way to the site turned out to be barred and there is no level ground here.
-export function stepLanding(st, dt, sample, T = SHIP) {
+// Returns 'landing' while descending, 'touchdown' on the frame the gear meets the ground,
+// 'blocked' if the way to the site turned out to be barred and there is no level ground here,
+// and 'gear' when the last metre is the landing gear's (see opts.gearAt).
+// opts.gearAt (metres, optional): with PHYSICS' landing gear, the assist hands the hull over to
+// the legs this far above dry ground: it then returns 'gear' and the caller lets the hull down
+// on its three sprung feet (Sim.stepLandingGear) instead of setting it on the floor.
+export function stepLanding(st, dt, sample, T = SHIP, opts = null) {
   const L = st.landing;
   L.t += dt;
   const up = norm(st.p);
@@ -414,6 +418,10 @@ export function stepLanding(st, dt, sample, T = SHIP) {
     L.dir = norm(st.p); L.floor = g.floor; L.normal = g.normal; L.liquid = g.liquid;
     st.altGround = 1.5;
     return 'landing';
+  }
+  if (opts && opts.gearAt && L.phase === 'settle' && !g.liquid && !L.liquid && g.r - g.floor <= opts.gearAt && len(reject(st.v, up)) < 1.5) {
+    st.p = p;
+    return 'gear';
   }
   if (g.r - g.floor <= 0.04) {
     p = scale(norm(p), g.floor);
