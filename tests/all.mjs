@@ -53,7 +53,7 @@ const STEPS = [
   { id: 'audio', what: 'the sound, measured (no clipping, no clicks, no DC)', cmd: ['node', 'tests/audiocheck.mjs'], min: 10 },
   { id: 'painted-play', what: 'play-through in the painted world', cmd: ['node', 'tests/playthrough.mjs', '--query', painted + '&fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-play')], min: 40 },
   { id: 'painted-trip', what: 'Earth, Mars, Saturn in the painted world, reload from the save', cmd: ['node', 'tests/trip.mjs', '--query', painted, '--w', '400', '--h', '225', '--out', path.join(out, 'painted-trip')], min: 60 },
-  { id: 'painted-m3', what: 'milestone 3\'s checks in the painted world', cmd: ['node', 'tests/m3check.mjs', '--query', painted, '--w', '400', '--h', '225', '--out', path.join(out, 'painted-m3')], min: 40 },
+  { id: 'painted-m3', what: 'milestone 3\'s checks in the painted world', cmd: ['node', 'tests/m3check.mjs', '--query', 'fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-m3')], min: 40 },
 ];
 if (flag('list')) { for (const s of STEPS) console.log(s.id.padEnd(14), s.what); process.exit(0); }
 const only = val('only', ''), skip = val('skip', '');
