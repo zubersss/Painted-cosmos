@@ -290,3 +290,20 @@ the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
   screenshot as a problem instead of dying.
 - 2026-11-11: debug query parameters in the game (PILOT): `stub=1`, `dynres=0`, `scale=`,
   `quality=`, `pointerlock=0` (drag to look; use it in every headless run).
+- 2026-11-11: **PHYSICS stage P1 accepted** (`b0ad22b`; the coordinator re-ran
+  `node --test src/physics/`: 125 pass). INTEGRATION: ready. Wiring steps for PILOT and PAINTER
+  and the replacement tables are in `docs/notes/physics.md`. `physics.warmUp()` is called while
+  loading; `physics.stats.msMax` polices the 2 ms worst-frame budget.
+- 2026-11-11: **Ruling on reference checks that contradict real physics** (R-FOOT-1, -3, -4, -5,
+  R-JET-1, R-SHIP-2, R-PART-4 as answered in the PHYSICS notes). Physical behaviour is
+  PHYSICS's call and the owner asked for realism, so the model stays. The lead rewrites each
+  such check in `REFERENCES.md` as either the real behaviour (sand shortens braking and costs
+  top speed; a jet wash reaches the ground from 40 m) or a named assist target that PILOT
+  meets with PHYSICS's assist forces (`assistAccel`, `carve01`, `descentLimit`, `jetMaxRise`,
+  `airControl`, `setWindScale`). Feel is PILOT's call: PILOT chooses the assist levels.
+  Hard limits that stay whatever the physics says: the player is never trapped, never knocked
+  off their feet for good, and the ship is never uncontrollable (no fail state, brief section 1).
+- 2026-11-11: additive contract: `sampleSurface` results may carry `canopy01` (closed-canopy
+  fraction at that point, 0 in a glade) and `canopyHeight` (m). PAINTER provides them; PHYSICS
+  (wind shelter) and PILOT (ship cushion) read them. Plants carry a height and a stiffness per
+  kit for the flora chunk (`uPlantHeight`, `uStiff`).
