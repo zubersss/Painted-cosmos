@@ -1003,12 +1003,13 @@ ${FLORA_GLSL}
 uniform float uPhysOn;
 attribute vec3 iRoot;   // root relative to uOrigin (body-local metres)
 attribute vec4 iAxis;   // xyz the way the stroke grows (unit), w its length (0 = an empty slot)
-attribute vec4 iPar;    // x width (m), y width at half length (share; 2 a grass flick, 3 a flick left crisp), z hash, w born (s)
-attribute vec4 iCol;    // wash; a: curl of the tip (share of the length)
+attribute vec4 iPar;    // x width (m), y kind (under 1.5: a plain stroke, its width at half length; 2 a grass flick, 3 a flick left crisp, 4 a fan-brush touch, 5 a round touch facing the eye, 6 a touch laid flat; +0.25 left crisp), z hash, w born (s)
+attribute vec4 iCol;    // wash; a: curl of the tip (share of the length); a round touch: how high it is held (m); a flat one: its turn (radians)
 attribute vec2 iExt;    // x canopy shade at the root, y how much it gives to a push (0 rigid .. 1 grass)
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uNear;     // x full density out to here (m), y nothing beyond here, z now (s), w one pixel at 1 m (tangent)
+uniform vec4 uNear2;    // x, y the ring fades in between these distances (m), z how soft its marks are left
 uniform float uTime;
 uniform vec4 uWx;
 varying vec3 vBody;
@@ -1020,17 +1021,23 @@ varying float vFog;
 varying float vFlat;
 varying float vAcc;
 varying float vLoad;
+varying float vKind;
 void main() {
-  float t = position.y, side = position.x, h = iPar.z;
-  bool flick = iPar.y > 1.5;
-  vLoad = flick ? 0.4 : 1.0;
-  vAcc = flick ? iPar.y - 2.0 : step(fract(h * 13.7), 0.5);
+  float t = position.y, side = position.x, h = iPar.z, kind = iPar.y;
+  bool flick = kind > 1.5 && kind < 3.5;
+  bool broad = kind > 3.5;
+  bool fan = broad && kind < 4.5;
+  bool lying = kind > 5.5;
+  bool dab = broad && !fan && !lying;
+  vKind = kind;
+  vLoad = flick ? 0.4 : (broad ? 0.6 : 1.0);
+  vAcc = flick ? kind - 2.0 : (broad ? step(0.1, fract(kind)) : step(fract(h * 13.7), 0.5));
   vec3 root = iRoot;
   vec3 toCam = uCamLocal - root;
   float di = length(toCam);
   // every stroke has its own range (so the sward thins with distance) and grows in after it is laid
   float range = mix(uNear.x, uNear.y, fract(h * 7.31));
-  float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(0.8, 2.6, di);
+  float vis = (1.0 - smoothstep(range * 0.72, range, di)) * smoothstep(0.0, 0.7, uNear.z - iPar.w) * smoothstep(uNear2.x, uNear2.y, di);
   float flex = iExt.y;
   // fresh snow buries what is short: no stroke stands on a snowfield but the tall stubble
   float len = iAxis.w * vis * (1.0 - smoothstep(0.12, 0.50, uWx.z) * (1.0 - 0.30 * smoothstep(0.62, 0.95, iAxis.w)));
@@ -1049,18 +1056,37 @@ void main() {
   vec3 sd = cross(ax, toCam / max(di, 0.001));
   sd /= max(length(sd), 0.05);
   float wPx = uNear.w * di;                                       // metres across one pixel here
-  // (close to the eye a blade is as slender as a blade is; farther off it is as broad as the brush must be)
-  // (a flick is narrow where the brush touched down, full a third of the way up, and runs out
-  // to a point: a lancet, not a tooth)
-  float prof = flick ? (t < 0.25 ? 0.40 : (t < 0.75 ? 1.0 : 0.0)) : (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0));
-  float wid = max(iPar.x * mix(0.42, 1.0, smoothstep(2.0, 7.5, di)), wPx * (flick ? 1.7 : 2.3)) * prof * (1.0 + 0.25 * vFlat);
-  if (flick && t > 0.25 && t < 0.75) t = 0.34;
-  vec3 rel = ax * (len * t) + sd * (side * wid * min(1.0, vis * 3.0) + iCol.a * len * t * t);
-  if (flex > 0.01 && len > 0.0) {
-    if (uPhysOn > 0.5) {
-      rel = mix(rel, pcPhysDisplace(rel, up, max(iAxis.w, 0.05), pb.xy * (1.0 - vFlat)), flex);
+  vec3 rel;
+  float grow = min(1.0, vis * 3.0);
+  if (broad) {
+    t = min(1.0, t * 2.0);                                        // (the whole quad; the tip triangle closes to nothing)
+    if (lying) {
+      // laid on the ground's own plane, turned as it fell
+      vec3 t1 = normalize(cross(ax, vec3(0.3126, 0.8271, 0.4671)));
+      vec3 t2 = cross(ax, t1);
+      vec3 da = t1 * cos(iCol.a) + t2 * sin(iCol.a), db = cross(ax, da);
+      rel = da * (max(len, wPx * 1.2 * grow) * (t * 2.0 - 1.0)) + db * (side * max(iPar.x, wPx * 0.9) * grow);
+    } else if (dab) {
+      rel = ax * (iCol.a * (len / max(iAxis.w, 1e-4)) + max(len, wPx * 1.3 * grow) * t) + sd * (side * max(iPar.x, wPx * 1.3) * grow);
     } else {
-      rel += sd * (sin(uTime * 1.3 + h * 40.0) * 0.05 * len * t * t * flex);
+      // a fan-brush touch: broad at the foot, spreading a little, its top cut into blades by the fragment shader
+      rel = ax * (len * t) + sd * (side * iPar.x * (1.0 + 0.4 * t) * grow + iCol.a * len * t * t);
+    }
+  } else {
+    // (close to the eye a blade is as slender as a blade is; farther off it is as broad as the brush must be)
+    // (a flick is narrow where the brush touched down, full a third of the way up, and runs out
+    // to a point: a lancet, not a tooth)
+    float prof = flick ? (t < 0.25 ? 0.40 : (t < 0.75 ? 1.0 : 0.0)) : (t < 0.25 ? 1.0 : (t < 0.75 ? iPar.y : 0.0));
+    float wid = max(iPar.x * mix(0.42, 1.0, smoothstep(2.0, 7.5, di)), wPx * (flick ? 1.7 : 2.3)) * prof * (1.0 + 0.25 * vFlat);
+    if (flick && t > 0.25 && t < 0.75) t = 0.34;
+    rel = ax * (len * t) + sd * (side * wid * grow + iCol.a * len * t * t);
+  }
+  if (flex > 0.01 && len > 0.0 && !lying) {
+    if (uPhysOn > 0.5) {
+      rel = mix(rel, pcPhysDisplace(rel, up, max(iAxis.w + (dab ? iCol.a : 0.0), 0.05), pb.xy * (1.0 - vFlat)), flex);
+    } else {
+      float tt = dab ? 1.0 : t;
+      rel += sd * (sin(uTime * 1.3 + h * 40.0) * 0.05 * (dab ? iCol.a : len) * tt * tt * flex);
     }
   }
   vec3 wp = root + rel;
@@ -1077,6 +1103,7 @@ void main() {
 
 const NEAR_FRAG = /* glsl */`
 ${FRAG_PARS}
+uniform vec4 uNear2;
 varying vec3 vBody;
 varying vec3 vNV;
 varying vec3 vView;
@@ -1086,12 +1113,30 @@ varying float vFog;
 varying float vFlat;
 varying float vAcc;
 varying float vLoad;
+varying float vKind;
 void main() {
   #include <logdepthbuf_fragment>
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
   // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks
   vec4 n2 = texture(uNoise3D, vBody * vec3(7.0, 2.0, 7.0) + vS.z * 3.0);
-  if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
+  if (vKind > 4.5) {
+    // a round touch: the brush pressed down once, its edge a little ragged
+    vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
+    if (dot(q, q) > 0.78 + 0.44 * n2.g) discard;
+  } else {
+    if (vKind > 3.5) {
+      // a fan brush: a handful of blades of unequal height from one foot, lower at the sides
+      // (two combs of different pitch, so no two touches are cut alike and none is a crown)
+      float u = vS.y * 0.5 + 0.5, hz = vS.z;
+      float nb = 5.0 + floor(fract(hz * 5.37) * 5.0);
+      float b1 = u * nb + hz * 7.0 + 0.4 * sin(u * 9.0 + hz * 30.0), b2 = u * nb * 0.37 + hz * 3.0;
+      float h1 = 0.30 + 0.70 * fract(sin(floor(b1) * 12.9898 + hz * 78.233) * 43758.5453);
+      float h2 = 0.55 + 0.45 * fract(sin(floor(b2) * 39.3468 + hz * 11.135) * 24634.6345);
+      float top = h1 * h2 * (1.0 - 0.66 * vS.y * vS.y) * pow(max(1.0 - abs(fract(b1) - 0.5) * 2.0, 0.0), 0.45) + (n2.g - 0.5) * 0.25;
+      if (vS.x > max(top, 0.08)) discard;
+    }
+    if (vS.x > 0.5 && n2.r > 1.18 - vS.x * 0.62) discard;
+  }
   // (a flick carries little more pigment than the ground it stands on: a loaded, crisp, wet
   // mark pooled by the sheet as well was a black comma)
   float d = 1.0 + (0.55 - vS.x) * 0.7 * vLoad + (vS.z - 0.5) * 0.5 * vLoad + (n1.r - 0.5) * 0.5;
@@ -1106,9 +1151,9 @@ void main() {
   c = pcTone(c, lvl);
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
   c = pcAtmos(c, vFog);
-  // a third of the strokes are the crisp accents the brush leaves as drawn; the rest belong to the wash
-  // the accents are left as the brush drew them; the rest belong to the ground's wash
-  pcWrite(c, max(vAcc > 0.5 ? 0.2 : 0.45, vFog * 0.9), nV, -vView.z, (vAcc > 0.5 ? 6.0 : 4.0) + vS.z * 0.9);
+  // the accents are left as the brush drew them; the rest belong to the ground's wash, and
+  // the farther rings' touches are softer still
+  pcWrite(c, max(max(vAcc > 0.5 ? 0.2 : 0.45, uNear2.z), vFog * 0.9), nV, -vView.z, (vAcc > 0.5 ? 6.0 : 4.0) + vS.z * 0.9);
 }
 `;
 
@@ -1117,7 +1162,7 @@ export function makeNearMaterial(bodyU) {
     name: 'pc-near',
     uniforms: baseUniforms(bodyU, Object.assign({
       uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() },
-      uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) },
+      uNear: { value: new THREE.Vector4(5, 13, 0, 0.002) }, uNear2: { value: new THREE.Vector4(0.8, 2.6, 0, 0) },
     }, PHYS)),
     vertexShader: NEAR_VERT, fragmentShader: NEAR_FRAG,
     side: THREE.DoubleSide,

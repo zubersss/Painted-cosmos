@@ -139,7 +139,7 @@ export function placeUnder(S, face, level, ix, iy, grid) {
       else if (r3 < s.under * 0.62) {
         const damp = s.s < 16 ? 1 - s.s / 16 : 0;
         if (r4 < 0.10 + 0.22 * damp) { kind = U_FERN; scale = 0.7 + 0.7 * r5; }
-        else if (r4 < 0.135 + 0.22 * damp && s.trees > 0.25) { kind = U_BUSH; scale = 0.6 + 0.9 * r5; sink = 0.1; }
+        else if (r4 < 0.165 + 0.22 * damp && s.trees > 0.2) { kind = U_BUSH; scale = 0.6 + 0.9 * r5; sink = 0.1; }      // (the wood's middle storey: twice the bushes it had)
         else if (r4 > 0.955 - 0.05 * s.glade) { kind = U_FLOWER; scale = 0.7 + 0.6 * r5; }
         else { kind = U_GRASS; scale = 0.65 + 0.8 * r5 + 0.25 * s.glade; }
       }

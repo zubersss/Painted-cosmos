@@ -19,9 +19,9 @@ import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacl
 import { QUALITY } from '../render/shared.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
-const T0 = 52, T1 = 128, T_THIN = 300, T_FAR = 470;
-const UNDER_FAR = 60, GRASS_NEAR = 15;
-const RANGE_SCALE = [0.42, 0.82, 1.0];
+const T0 = 95, T1 = 230, T_THIN = 480, T_FAR = 760;      // (were 52, 128, 300, 470 while there was a triangle budget)
+const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget)
+const RANGE_SCALE = [0.24, 0.5, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData'];
@@ -392,7 +392,7 @@ export class Flora {
     if (this.lastUnderEval.distanceTo(camLocal) > 8) {
       this.lastUnderEval.copy(camLocal);
       if (alt < 400) {
-        this._wanted(UNDER_LEVEL, this.underSize, 44 * k + this.underSize * 0.6, this.underChunks, 'under');
+        this._wanted(UNDER_LEVEL, this.underSize, 44 * ([0.42, 0.82, 1.0][QUALITY.level] || 1) + this.underSize * 0.6, this.underChunks, 'under');
         this._wanted(UNDER_LEVEL - 1, this.underSize * 2, UNDER_FAR * k * 1.25 + this.underSize * 1.2, this.under2Chunks, 'under2');
       }
     }
