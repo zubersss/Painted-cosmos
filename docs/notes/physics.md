@@ -3,55 +3,74 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
-## Hand-over (kept current; last written at the end of P5 by the second PHYSICS agent)
+## Hand-over (kept current; last written during P6 by the third PHYSICS agent)
 
-This file is meant to be enough on its own. Read it top to bottom once; the code comments
-carry the physics (every module starts with what it models and from which source).
+This file is meant to be enough on its own. Read this section top to bottom once; the code
+comments carry the physics (every module starts with what it models and from which source).
 
-**Where things stand.** P1 to P4 are accepted. P5 (the coordinator's order,
-`docs/COORDINATOR.md` section E) is done except four items listed below. The tree is green at
-the commit that carries this note: `node --test src/physics/` **191 pass**. Nothing is half-edited.
+**Where things stand.** P1 to P5 are accepted. P6 (the coordinator's order, in
+`docs/COORDINATOR.md` section E and in "Stage P6" under Status below) has items 1, 2 and 3
+done and items 4 and 5 open (below). The tree is green at the commit that carries this note:
+`node --test src/physics/` **207 pass**; PILOT's `node --test tests/*.test.mjs` 102 pass with
+my changes. Nothing is half-edited. PAINTER (its third agent) is wiring weather into the
+picture right now and reads "For PAINTER" cold: **if you change a uniform, an export or a
+call named there, say so at the top of that section in the same commit.**
 
 **How to work here** (all of it learned the hard way):
 - Commit only with `tools/commit.sh physics "message"`; own only `src/physics/**`,
-  `physics-lab.html`, this file, `docs/shots/physics/**` (at most 12 jpg). Scratch goes in
-  `/home/user/.pc-scratch/physics/` (measuring scripts: `p5/cost.mjs <repo root>` gives the
-  worst reproducible frame of five scenes for any tree, so two commits can be compared under
-  the same load; older ones `costs.mjs`, `play.mjs`, `fly.mjs`, `browserplay.mjs`).
-- Tests: `node --test src/physics/` runs everything through `all.test.mjs` (Node 22 treats a
-  directory argument as one module; `package.json` here exists only for that). Under memory
-  pressure run file by file: `node --test src/physics/<name>.test.mjs`. Commit green: the
-  other two roles run these from the same tree.
+  `physics-lab.html`, this file, `docs/shots/physics/**` (at most 12 jpg). The coordinator
+  sometimes snapshots the working tree as it is (`[physics] WIP snapshot`): never leave it
+  red for longer than one command, and run the whole suite after every multi-file edit (I
+  left an undefined name in `index.js` for a minute; every page that loads the physics would
+  have failed in that minute).
+- Scratch goes in `/home/user/.pc-scratch/physics/`. What is there and worth knowing:
+  - `p6/crawl.mjs <repo root> <blizzard|dust|storm> <still|pan|walk|orbit>`: the kits'
+    marks followed from frame to frame WITHOUT GL (pure `expand.js`), counting what a painting
+    may not do: marks that vanish or appear at full size, marks that jump, marks that strobe.
+    `p6/base` is an export of the tree before P6 to compare with (`tools/export-head.sh`).
+  - `p6/nodeplay.mjs <body>`: the integrated game (PILOT's pure `Sim`, PAINTER's real ground
+    and obstacles, my physics) played with scripted keys at exactly 60 Hz in Node: the
+    numbers of the tables under "The integrated game, played in P6". Takes a minute a body.
+  - `p6/play.mjs <body>` (the first agent's `browserplay.mjs`) and `p6/fly2.mjs <body>`: the
+    same in a real browser with real key events (software GL, 1 to 4 frames a second: use
+    them to see that it works with keys, not for numbers).
+  - `p5/cost.mjs <repo root>`: the worst reproducible frame of `physics.update` in five
+    scenes, for any tree, so two commits can be compared under the same load.
+  - `p6/curv.mjs`, `p6/bench.mjs`: the two checks behind the curved-ground fix and the cost
+    of the dab expander.
+- Tests: `node --test src/physics/` runs everything through `all.test.mjs`. Keep the output
+  short (`| grep -E '^# (pass|fail)|^not ok|error:' | head`): a red run prints pages.
 - The pure core must not import three. Only `src/physics/three/` may (`kits.js`,
-  `painted-lab.js`); `three/expand.js` and `three/chunks.glsl.js` are pure and tested in Node
-  (`kits.test.mjs`). Three does not resolve in Node here.
-- Headless pictures: `node tools/shot.mjs "<page>?<query>" out.png --w 960 --h 540 --wait ms
-  [--eval js] [--timeout ms --shot-timeout ms]`. The debug lab: `physics-lab.html?scene=...`.
-  The painted lab: `physics-lab.html?painted=1&...` (PAINTER's real pipeline; give it
-  `--timeout 400000 --shot-timeout 240000` and `pre=<s>`; a page load takes two to four
-  minutes; run two at once in the background and wait on their logs). With the same `pre`
-  and `freeze=1` two loads give identical pixels: A/B frames are possible (`push=0`).
-  PNG to JPG: `python3` with PIL is installed.
+  `painted-lab.js`); `three/expand.js` and `three/chunks.glsl.js` are pure and tested in Node.
+- Headless pictures: `node tools/shot.mjs "<page>?<query>" out.png --w 960 --h 540 [--eval js]
+  --timeout 500000 --shot-timeout 240000`. The painted lab (`physics-lab.html?painted=1&...`)
+  takes two to five minutes a page; run two at once in the background and wait on their
+  files (`until [ -s out.png ]; do sleep 5; done`). **Any change to `flora.glsl.js` is
+  compiled into PAINTER's plants at once: load the painted lab and read "no console errors"
+  before committing it.** `expand=gpu` compiles `PARTICLE_GLSL`.
 - This machine is shared and slow (load averages of 20 on 4 cores are normal): single timings
-  lie. Cost is the same deterministic run repeated, each frame's best, then the worst frame
-  (`p5/cost.mjs`; `createPhysics({ timeBudget: false })` makes runs repeatable). The two
-  budget tests repeat a slow run and keep the least disturbed one for the same reason.
-- Things that bit me: `flat` is a reserved word in GLSL ES 3; string keys and object-field
-  doubles in hot loops allocate; the default weather seed is pinned by a test to PAINTER's
-  spawn; `physics.air()` reads the clock of the last `update`; a screenshot takes seconds
-  during which the game keeps running; PAINTER's post pass erases any mark under about 3 of
-  its internal pixels and its scene pass is opaque; a Kronecker sequence needs steps that are
-  independent over the rationals (alpha and 1 - alpha are not); PAINTER's meadow shows no
-  blades of grass at any distance I tried, so grass parting cannot be seen there at all.
+  lie, and the browser's read-out of `physics.update` (0.8 to 2.5 ms average, 30 to 95 ms
+  "worst") is the load, not the code. Cost is `p5/cost.mjs` in Node.
+- Things that bit me in P6: a unit vector eased by interpolation never turns round to the
+  opposite direction (turn it by the angle); `physics.warmUp` calls `update` with `dt = 0`
+  (anything divided by the step must be guarded); a relative "changed by 35 % in a frame"
+  measure fires at the small end of every fade (it is not a pop); the near ground grid is 2 m
+  (a kerb is a ramp to it); PAINTER's alpine meadow has 49 degree slopes; a place found by
+  "where it snows" may be the open sea.
 - Read at every sync: `docs/COORDINATOR.md` section E, `docs/lead/REVIEW.md`,
   `docs/notes/pilot.md`, `docs/notes/painter.md`. Answer MUST FIX items here.
 
-**Done in P5** (each with its tests; details under Status and in the sections it changed):
-ink (every particle and mark carries its ground material); the sea for PAINTER's liquid
-(slope, crest direction, crests, whitecaps, surf; chunk against twin in GL); kits that
-survive the post pass (floor with thinning, physical cover, snow cell, smear, dust from the
-dust in the air); the painted lab on PAINTER's public exports with ink by material; snow
-and the Mars dust storm re-shot; weather for the sky (`sky.js`, first agent).
+**Done in P6** (details under Status, "Stage P6", and in the sections each changed):
+1. *Crawl.* Nothing pops, jumps or strobes any more (numbers in "Crawl, measured"). On the
+   way two real bugs fell out: particles were published on the tangent plane of the frame's
+   anchor (rain ended up to 18 m above the ground 380 m from where the session began), and
+   the weather entered 18 m over the sea BED (no rain over deep water).
+2. *The game played* on Earth, Mars, the Moon, Venus, Jupiter and Neptune, in the browser
+   with real keys and at 60 Hz in Node: tables and what is physically off, with the assist
+   that keeps each forgiving ("The integrated game, played in P6"; "For PILOT", new items).
+3. *Branches and drifts.* `pcPhysBranch` / `plantBranch` (a crown no longer sways as one
+   piece; one line for PAINTER, no new texture) and `drift.js` / `physics.fields.drift`
+   (snow and sand in the lee and in hollows; the explorer's ground knows the depth).
 
 **Not done, each with where to start:**
 1. *A silhouette agreement test for the flora chunk inside `PROP_VERT`.* Not started. The
@@ -61,20 +80,26 @@ and the Mars dust storm re-shot; weather for the sky (`sky.js`, first agent).
    (it is the dark mass above the trunk; diff the frames), and compare the shift in pixels
    with `fields.flora.plantBendLite` + `plantDisplace` projected through the same camera.
    A one-line hook from PAINTER (a debug flag that writes the displaced body-local position
-   to the colour target) would make it exact.
-2. *Grass parting judged as a picture.* The A/B method works (frame
-   `painted-meadow-wash-ab.jpg`: the ship's wash moves the meadow's flowers by 10 to 20 px,
-   0.66 % of the pixels) but PAINTER's grass does not read as blades, so there is nothing to
-   see part. Needs PAINTER (visible blades near the eye), then: `painted=1&biome=alpine_meadow
-   &walk=1.5&circle=3&pre=14&freeze=1&kits=0&follow=1&dist=4` with and without `push=0`.
-3. *A third (branch) rate in trees.* Not started; needs a third oscillator in `flora.js`
-   (`PlantSim`), a fourth field texture and a change in PAINTER's shader. Wait until PAINTER
-   is on half-float fields with `PC_PHYS_LINEAR`.
-4. *Drifts of snow and sand in the lee.* Not started. `AirGrid.wake` knows where the lee
-   is; `DeformField.depth` is where a drift would be stored (negative values are piled-up
-   material); nobody draws `depth` yet, so do it when PAINTER reads `uPhysDeformMap`.
-5. *The integrated game was not played in the browser in this run* (the checks of PILOT's
-   new flight pace below are computed from its formula and my models, not flown).
+   to the colour target) would make it exact. Note `setWindScale` takes many seconds to
+   show at the focus (I asked for 0.12 and the wind fell from 5.6 to 4.6 m/s in 6 s): use
+   two page loads with different `seed`/time instead, or wait a minute of `pre`.
+2. *The look-critique items on my own marks*: flakes are still ovals of one tilt (they are
+   now drawn out to their travel, so a gale gives strokes; a calm gives near-round specks;
+   what is missing is tumble: give each flake its own aspect and a slow turn from `_ph`);
+   lone dust tufts against a clear sky read as leaves (a size distribution with a floor on
+   the smallest puff, or thin them by `share` where `sky.dust` is low); sand flecks too dark
+   and spray's material only says "liquid here" are colour: PAINTER's.
+3. *Grass parting judged as a picture*: needs PAINTER's visible blades (its item 5 of this
+   run), then `painted=1&biome=alpine_meadow&walk=1.5&circle=3&pre=14&freeze=1&kits=0
+   &follow=1&dist=4` with and without `push=0`.
+4. *Calm-air crawl of flakes* (sub-pixel motion of small opaque marks through PAINTER's post
+   pass): not isolated. The pairs I measured were in 5.6 m/s of wind, where a flake's own
+   travel (45 % of its width in 8 ms) is all of the change. Needs a place and time with snow
+   and under 1 m/s of wind (`find=` cannot ask for that yet).
+5. *Drifts and branches judged as a picture*: both are delivered as numbers and a chunk;
+   nothing draws them until PAINTER takes "For PAINTER" A (last bullet) and F.
+6. *When PAINTER's weather is in the picture*: re-shoot the storm, the blizzard, the dust
+   storm and Neptune's sea in the game itself and tune `DRAW_PAINTED` against them.
 
 ## API (current, exact; kept up to date with every commit)
 
@@ -271,6 +296,27 @@ physics.particles.rain / .snow / .hail / .dust / .sand / .ash / .spores / .leave
 physics.particles.events        // ring: { data Float32Array(256*8), head, total, origin }: x,y,z, kind (0 splash, 1 ripple, 2 settle, 3 bounce), strength, time, size, 0
 ```
 
+**Added in P6** (all additive):
+```js
+physics.update(dt, { ..., eye })          // the camera, body-local (optional): snow is simulated in an 8 m box round it
+physics.fields.drift                      // drifts of snow or sand: a 64 x 64 grid of 0.5 m cells round the focus (the marks' grid)
+  .factor  Float32Array(64*64)            // loose material at the cell in units of what lies on level ground:
+                                          //   0 level, +1 twice as deep, -1 blown bare (never over 2.5)
+  .level                                  // m lying on level ground here now (the snow depth, or the loose layer of sand: up to 0.12)
+  .snow                                   // true: what drifts is snow; false: sand or dust
+  .depthAt(p)                             // m above (below) the level deposit at a body-local point
+  .uniforms { uPhysDriftMap [cx, cz, 1/size, 64], uPhysDriftLevel [m] }    .version    .size 64    .cell 0.5
+physics.ground(bodyId, unitDir).snowDepth // near the focus this is now the depth at that very spot (level + drift)
+physics.fields.flora.plantBranch(re, rn, h, H, root, bend, out)   // -> { e, n, up } m: how far its branch moves a point of a crown
+  // (re, rn): the point's offset from the trunk (m east, north); h: its height; H: the plant's; root: body-local;
+  // bend: what plantBend(root, stiff01) returned. Add it to the point before plantDisplace. GLSL twin: pcPhysBranch.
+physics.fields.flora.uniforms.uPhysBranchPhase [4], .uPhysBranch [gustiness 0..1, gain, shaken swing rad, branch length / height]
+// the ship body (stepShipBody): cmd.carveAccel (m/s^2, optional): the most sideways acceleration the carve assist gives
+//   (absent: unbounded, as before);  st.phys.fieldCarve: m/s^2 the field is pushing sideways now (a glow, a sound, a read-out)
+// particle buffers: .left Float32Array(n) (s until the particle is gone, 1e9 when unknown), .radius (m: half-width of its box)
+// three/: DRAW_PAINTED (the draw table for PAINTER's pipeline), cellFor(D, eye, buf); DRAW fields fadeOut, strobe, streak, near
+```
+
 Reference data and helpers: `physics.data.{ATMOSPHERES, LIQUIDS, WINDS, REGIMES, MATERIALS, MATERIAL_IDS (15 names: a
 material's number is its place), MATERIAL_INDEX, MATERIAL_NONE (255), BIOMES, SPECIES}`,
 `physics.util.{airDensity, airTemperature, gravityAt, fallSpeed, terminalVelocity, cellsAt, saltationThreshold,
@@ -283,6 +329,98 @@ MARK, MARK_STRIDE, EVENT, WATER, QUALITY, DEFAULT_SEED`, and `windSea(U, fetch, 
 INTEGRATION: ready and wired (PILOT `a9c02bc`, PAINTER `1e1801e`). The API is stable; P2 and P3 only added to it,
 with one change of type: the water uniforms are vec4 now (four trains; nobody had wired them).
 The tree is committed green: `node --test src/physics/` **191 pass** at the commit that carries this note.
+
+**Stage P6** (the third agent; commits `ded1435` (the coordinator's snapshot of my tree), `16d5305`, and the two after):
+
+| P6 job | State | How it was verified |
+|---|---|---|
+| 1. Crawl of the kits | done: `buf.left` and `fadeOut`, snow in its own 8 m box round the eye and riding the air over slopes, the cell divides the box, dabs drawn out to their travel a frame, hairlines and marks at the lens gone, rain strokes taper | `p6/crawl.mjs` (table below): pops 11.7 to 0.0 a second, jumps 1.3 to 0, strobing 0.2 to 0; painted lab pairs 8 ms apart: 19 to 22 % less change than before, a camera orbiting at 6 deg/s adds no more than the scene's own; 9 new tests |
+| found on the way: curved ground | fixed: particles and splash rings are published at radius r0 + height on the line through the grid point, velocities turned to the local vertical | before: rain 16.4 to 38.1 m over the true ground 380 m from the anchor and splashes at 15 to 20 m; after: 0.00 to 18.00 m and splashes at 0.00 m, at 80, 161, 300 and 380 m (`p6/curv.mjs`); test at 300 m |
+| found on the way: rain over deep water | fixed: the weather enters over the surface it meets (ground or liquid), not 18 m over the bed | before: every flake of a blizzard over a 21 m deep sea was 3.6 to 15.6 m UNDER the surface; test over a 40 m sea: 0 drops under it, ripples on it |
+| 2. The game played | done: six worlds at 60 Hz in Node and four in the browser with real keys | tables and findings in "The integrated game, played in P6" |
+| 3a. Branch rate | done: `pcPhysBranch` in the flora chunk, `plantBranch` its twin, phases on the clock; no new texture, one line for PAINTER | 2 tests (nothing at the trunk, continuous all the way round, tips out of step, 1 to 2.5 Hz, bounded, scales with lean and gustiness); the chunk compiles inside PAINTER's plants (painted lab, no console errors). **Not seen as a picture: PAINTER has not called it.** |
+| 3b. Drifts | done: `drift.js`, `physics.fields.drift`, the ground under the explorer and under every print | 7 tests (level ground none, lee of a bank +0.2 to +0.5 m in 0.2 m of snow, windward face scoured to bare, a kerb's drift under 0.8 of the kerb, a hollow fills from any wind, nothing moves in a calm, melts and deepens with the snow, fixed in the world as the walker moves, behind a landed hull, in the game loop behind a hill); cost under 0.25 ms a frame. **Not seen as a picture.** |
+| carve assist bounded | done as an option: `cmd.carveAccel`, `st.phys.fieldCarve` | 1 test; PILOT's 102 tests pass unchanged (the default is as before) |
+| 4. Silhouette test in `PROP_VERT` | not done | Hand-over, 1 |
+| 5. Look-critique items | not done | Hand-over, 2 |
+
+**Cost after P6** (`p5/cost.mjs`, worst reproducible frame of `physics.update` in Node, ms; before -> after):
+running at the Earth spawn 0.33 -> 0.36; thunderstorm 0.45 -> 0.50; **blizzard 0.47 -> 0.75**
+(every flake now looks its ground up every step, to ride the air over it and to foretell its
+landing; plus the drift field); Mars dust storm 0.41 -> 0.44; Neptune storm with the ship low
+over the sea 0.87 -> 1.01. Budget 2 ms. The dab expander: 0.217 -> 0.223 ms for 2800 flakes.
+
+### Crawl, measured (P6)
+
+Method: `p6/crawl.mjs` runs a scene at 60 Hz and expands the kit's quads with the painted
+draw table for a camera 6 m behind and 2 m above the focus (50 degree lens, 432 internal
+lines). Every mark is followed from frame to frame (a particle's size is its own for life)
+and four things are counted, per second, among marks in the picture at least 3 px across:
+**popOut** (there in one frame, gone or under half a pixel in the next), **popIn** (the
+reverse, for marks old enough to be past their fade-in), **jump** (the centre moved by more
+than its velocity relative to the eye explains, by over 4 px and over its own length),
+**strobing** (the average number of marks in view that travel more than 1.5 times their
+drawn length a frame). Camera: still, panning 3 deg/s, orbiting the focus at 12 deg/s, or
+walking with it at 1.5 m/s.
+
+| Scene (in view) | camera | popOut /s | jump /s | strobing | after: popOut | jump | strobing |
+|---|---|---|---|---|---|---|---|
+| Blizzard, 8 m/s wind, 1698 flakes, on a 49 degree alpine slope (56 -> 65 in view) | still | 11.7 | 1.3 | 0.2 | **0.0** | 0.0 | 0.0 |
+| the same | pan | 15.3 | 0.9 | 0.1 | **0.0** | 0.0 | 0.0 |
+| the same | orbit | 14.7 | 1.7 | 0.2 | **0.0** | 0.0 | 0.0 |
+| the same, the walker kicking powder | walk | 9.3 | 2.5 | 0.1 | **0.5** | 0.0 | 0.0 |
+| Mars dust storm, 366 puffs (94 in view) | still | 7.6 (marks 80 to 94 px across) | 0 | 0 | **0.0** | 0 | 0 |
+| Thunderstorm 15 mm/h, 1516 drops (107 in view) | still | 85.8 (every stroke, whole, as its head lands) | 0 | 0 | **0.8** | 0 | 0 |
+
+What each was, and what was done:
+- *Jumps*: the simulation wraps a flake from one wall of its 48 m box to the other; the kit
+  showed flakes modulo an 18 m cell; 48 is not a whole number of 18, so every wrap moved the
+  shown flake 6 m in one frame. The cell now divides the box (`cellFor`), and snow has a box
+  of its own the size of the cell.
+- *Flakes vanishing in mid-air*: a flake was shown up to 24 m from where it was simulated,
+  over other ground, and went out when ITS ground came up. Now the snow is simulated where it
+  is shown (an 8 m box round the eye: `frame.eye`), each flake carries the time to its landing
+  (`buf.left`, from the rate its height over the ground is closing, eased over 0.15 s) and
+  shrinks to nothing over its last 0.3 s.
+- *A finding inside that one*: carried straight and level by the wind, flakes struck every
+  rise and left everything lower than the highest ground in the box bare (half the flakes in
+  view gone on a slope; on the same slope, blown downhill, they hung at the height where the
+  ground fell away as fast as they fell and never landed). The air over ground flows along
+  it. Flakes now ride the air's own rise and fall over sloping ground (through their drag,
+  a tenth of a second late): heights over the ground are evenly spread from 0 to 18 m on a
+  49 degree slope (263, 342, 277, 310, 286, 216 flakes in six 3 m layers).
+- *Dust puffs vanishing at full size* (a 2 m billow, 80 to 94 px, gone between two frames,
+  7.6 times a second): `left` is what remains of the grain's life; the mark shrinks over 0.7 s.
+- *Rain strokes going out whole*: a 0.9 m stroke vanished when its head reached the ground.
+  It now thins to a point over its last 0.08 s (40 cm). Rain and hail also grow in over 0.1 s.
+- *Strobing and hairlines*: a flake near the lens in a gale crossed more than its own
+  length a frame (a flash somewhere new every frame). A dab is now drawn out at least as far
+  as it travels in a frame (`strobe`: driving snow is slanted strokes that overlap from frame
+  to frame); one that would be more than `streak` (3) sizes long shrinks away, and nothing
+  is drawn nearer the eye than 0.4 of `near` (snow 3 m, dust 2.5 m).
+- What is left: about 0.5 pops a second from clods of powder kicked up by the walker's own
+  feet in snow (they live a third of a second and die against the slope they were kicked
+  at); marks growing over 3 to 5 frames at the inner edge of the `near` band (2 to 6 px wide,
+  about 5 a second in a gale: a fade, not a pop, but a quick one).
+
+In PAINTER's real pipeline (painted lab, `stability(8, 6, hideKits, orbit)`: pairs of frames
+8 ms apart; mean absolute difference of the picture and the share of pixels changing by more
+than 8 %), blizzard 0.8 mm/h in 5.6 m/s of wind, about 1000 flakes:
+
+| | before P6 | after | no kits |
+|---|---|---|---|
+| still camera, 8 ms | 0.00180, 0.683 % | 0.00148, 0.532 % | 0.00004, 0.003 % |
+| still camera, 16.7 ms | 0.00412, 1.548 % | 0.00333, 1.256 % | 0.00004, 0.003 % |
+| orbiting 6 deg/s, 8 ms (1700 flakes) | | 0.00371, 0.938 % | 0.00185, 0.205 % |
+| still, the same 1700 flakes | | 0.00181, 0.638 % | 0.00003, 0.002 % |
+
+Reading: the flakes cover about 1.6 % of the picture and move 45 % of their own width in
+8 ms in that wind, so 0.5 to 0.7 % of the pixels changing IS their travel; a slow camera move
+adds only the scene's own change (0.94 - 0.21 = 0.73 % against 0.64 % still). The Mars dust
+storm (75 billows of 2.4 m, wind 10.7 m/s): 0.406 % still, 1.026 % orbiting against 0.428 %
+for the scene alone. `expand: 'gpu'` renders the same blizzard within a frame pair's
+difference of the cpu path (mean difference 0.0015) and compiles without errors.
+**Not measured: flakes in still air** (Hand-over, 4).
 
 **Stage P5** (two agents; the second from `95bc128`):
 
@@ -509,6 +647,18 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
    one module); the game never loads it.
 
 ### Open on your side, as the coordinator relays it (each recipe is complete here)
+- **New in P6 (flown this time; numbers and reasons in "The integrated game, played in
+  P6"). Five levers, each one line, each yours to take or leave:**
+  1. `eye` in `physics.update` (step 1 above): the camera's body-local position, so that the
+     snow is where the lens is.
+  2. `carveAccel: 30` in the command to `stepShipBody` (next to `carve01`): Earth, Venus and
+     Neptune fly as today; Mars and the airless worlds run wide of the nose (29 deg/s, 150 m
+     at cruise instead of 42 deg/s). `st.phys.fieldCarve` (m/s2) is there for a glow or a hum.
+  3. `speedScale = clamp((1.225 / rho0)^0.4, 0.75, 3)`: the giants spread over 16 m/s (Neptune
+     50, Saturn 52, Uranus 58, Jupiter 62), Mars and the airless worlds at 138 m/s; with it
+     `brake: 0.15` in thin air (X stops from 138 m/s in 4 s) and `carveAccel: 40`.
+  4. `assistAccel = 4 * clamp(g / 9, 0.45, 1)`: the Moon and Mars let you slide a little.
+  5. `softFallSpeed` 4 m/s instead of 7: a hop ends on bent knees, not on a 2.7 m drop.
 - **Touchdown on the legs.** Step 5 above is the whole recipe: your assist flies `target`
   down to about 1 m at 1 to 1.5 m/s, then `stepShipGear(st, { lift01: 1, hold: up * -0.6 },
   dt, env)` every frame until `st.phys.contacts > 0`, then fade `lift01` to 0 over 1.5 s;
@@ -593,6 +743,119 @@ Ship (`src/ship/flight.js` SHIP -> `SHIP_BODY`):
 Measured through the body with your target law and `carve01: 1`: ground to space in 12.9 s on
 Earth at 55 degrees (peak 3.2 g felt), 21.7 s on Venus (drag-limited to 78 m/s), 11.0 s on Mars.
 
+## The integrated game, played in P6 (for PILOT; numbers from `p6/nodeplay.mjs` unless said)
+
+Played two ways: PILOT's pure `Sim` with PAINTER's real ground and obstacles and my physics,
+scripted keys, exactly 60 Hz, in Node (every number below); and the game itself in headless
+Chromium with real key events on Earth, Mars, the Moon, Venus, Jupiter and Neptune
+(`p6/play.mjs`, `p6/fly2.mjs`; software GL at 1 to 4 frames a second: it confirms that keys
+reach the bodies and that nothing errors, and its numbers agree with Node's to within what
+half-second frames allow: cruise 46 / 77 / 84 / 34 / 56 / 49 m/s, a 360 degree turn in 8.2 s
+on every world). The bodies do what the models say everywhere: jumps are ballistic to the
+centimetre, the jetpack's first push is 17 m/s2 less gravity, thrust is 22 m/s2.
+What follows is what a physicist would object to, and it is all in the assists.
+
+**On foot** (walk 4.2, run 7.4 m/s on every world; `assistAccel` 4 m/s2; g in m/s2):
+
+| World | g | walk: to 90 % | stop from a walk | friction alone would take | jump: take-off, apex, aloft | jetpack 3 s: climb, top, down at |
+|---|---|---|---|---|---|---|
+| Earth | 9.0 | 0.40 s | 0.53 s, 0.82 m | 0.52 s | 4.65 m/s, 1.23 m, 1.03 s | 8.4 m/s, 27 m, 7.0 m/s |
+| Mars | 4.6 | 0.55 s | 0.67 s, 1.18 m | 1.01 s | 5.08 m/s, 2.84 m, 2.22 s | 11.9 m/s, 49 m, 7.1 m/s |
+| Moon | 2.2 | 0.73 s | 0.80 s, 1.49 m | 2.07 s | 5.30 m/s, 6.43 m, 4.83 s | 17.0 m/s, 113 m, 7.1 m/s |
+| Venus | 8.6 | (run tops out at 5.4 m/s: the air) | 0.53 s | 0.54 s | 4.63 m/s, 1.08 m (drag), 1.00 s | 6.7 m/s, 20 m, 6.9 m/s (its terminal fall is 7) |
+| Jupiter | 11.5 | 0.4 s | 0.85 s from a run | 0.80 s | 4.39 m/s, 0.88 m, 0.77 s | 8.5 m/s, 24 m, 7.1 m/s |
+
+1. **The feet never leave the ground while running, on any world** ("feet down 100 % of the
+   time" at 7.4 m/s on the Moon). At 2.2 m/s2 a runner is in the air most of each stride; the
+   body is a capsule that only goes ballistic over a crest. What sells low gravity today is
+   the jump (6.4 m, 4.8 s) and nothing else. The honest gait is PAINTER's animation and a
+   bounce in the camera, not a force: the stride is already longer (`(g0 / g)^0.25`, in the
+   prints). Offer: `st.phys.stride01` (the phase of the stride, with a flight share that grows
+   as g falls) if PILOT or PAINTER want to bob the body by it.
+2. **On the Moon 70 % of the grip is the suit's thrusters.** Friction and footholds give 2.0
+   m/s2 there; `assistAccel` adds 4 on every world. So the Moon stops you from a walk in
+   0.80 s where the ground alone would take 2.07 s, and nobody ever slides. The model is
+   right; the assist is the same size on every world. Honest and still forgiving: scale it
+   with gravity, `assistAccel = 4 * clamp(g / 9, 0.45, 1)` (Moon 1.8: stop from a walk in
+   1.1 s over 2.3 m, from a run in 1.9 s; Mars 2.0; Earth unchanged).
+3. **Every fall ends at 7 m/s.** The descent brake (`descentLimit`, `softFallSpeed`) lets the
+   explorer hit the ground at 7.0 m/s after any jetpack hop on any world. That is a 2.7 m
+   drop on Earth onto straight legs: a parachutist lands at 4 to 5. With 45 m/s2 of retro
+   authority the brake can afford 4 m/s; it costs 15 cm more braking height.
+4. **The Moon hop is a rocket flight**: 3 s of jetpack reach 17 m/s and 113 m, and coming
+   down takes 19 s. (The first agent said this of Mars at 50 m.) The rise limiter
+   (`jetMaxRise`) is scaled up as gravity falls; held constant at 8.4 m/s the Moon hop would
+   top out near 45 m and the world would still feel light.
+5. Mars: the spawn stands in a boulder field; a run of 4 s stalls at 1.3 to 1.9 m/s against
+   the stones in two runs out of two (obstacle collision, not traction: `slip01` stays 0).
+
+**The ship** (4200 kg, 22 m/s2 of main thrust, 14 retro, 18 sideways from thrusters and lift;
+`speedScale = clamp((1.225 / rho0)^0.25, 0.75, 1.6)`):
+
+| World | air kg/m3 | cruise | 90 % after | q at cruise | turn at cruise | sideways, of which the field | thrusters and lift alone | brake (X) |
+|---|---|---|---|---|---|---|---|---|
+| Earth | 1.14 | 46.7 m/s | 3.0 s | 1083 Pa | 42.0 deg/s, 69 m | 37, 21 m/s2 | 20.4 deg/s, 141 m | 3.78 s, 97 m |
+| Mars | 0.0154 | 77.6 | 3.9 s | 43 Pa | 42.5 deg/s, 120 m | 66, 53 m/s2 | 11.6 deg/s, 441 m (thrusters only: no air to bank on) | 6.07 s, 253 m |
+| Moon | 0 | 78 to 84 | 3.8 s | 0 | 42.6 deg/s, 128 m | 71, 57 m/s2 | 10.8 deg/s, 505 m | 6.45 s, 287 m |
+| Venus | 59 | 34.9 | 3.2 s | 30 800 Pa | 39.6 deg/s, 30 m, and it slows to 21 m/s | 14, 3 m/s2 | 49 deg/s, 24 m | 2.43 s, 43 m |
+| Jupiter | 0.443 | 61.7 (at 60 m) | 4.6 s | 957 Pa | 43.2 deg/s, 90 m | 51, 36 m/s2 | 15.2 deg/s, 255 m | 4.87 s, 162 m |
+| Neptune | 0.963 | 48.6 | 3.0 s | 607 Pa | 42.5 deg/s, 68 m | 38, 21 m/s2 | 20.3 deg/s, 144 m | 3.98 s, 106 m |
+
+6. **Every world turns at 42 degrees a second, whatever the speed and whatever the air.**
+   That is the carve assist (`carve01`, mine), and it was unbounded: on the Moon the drive
+   field pushes the ship sideways at 57 m/s2, 5.8 g, with nothing said, and a 360 degree turn
+   costs no speed. Thrusters and lift alone would give 11 deg/s and a 500 m radius there. So
+   the worlds that fly "fast and loose" (flight.js's own words) are fast and not loose. New
+   in P6: **`cmd.carveAccel`** (m/s2: the most the field gives; absent = as today) and
+   `st.phys.fieldCarve` (what it gives now). With `carveAccel: 30` Earth and Neptune are
+   unchanged (they ask for 21), Jupiter runs a little wide (asks 36), and Mars and the Moon
+   turn at 29 deg/s with a 150 m radius at cruise: the nose comes round at once and the path
+   follows, which is what thin air is. Venus is already itself (the air does the turning and
+   takes 40 % of the speed for it).
+7. **The pace.** The coordinator's question: Earth 46, Neptune 49, Saturn 50, Uranus 53,
+   Jupiter 56 m/s near the ground; what would be honest? An airframe is limited by dynamic
+   pressure, not speed, so the honest governor holds q (speed as `rho^-0.5`):
+
+   | World | deck air kg/m3 | now | same q as Earth's cruise | full thrust against drag | proposal |
+   |---|---|---|---|---|---|
+   | Venus | 65 | 35 | 6 | 34 | 34 (the air sets it) |
+   | Earth | 1.23 | 46 | 46 | 251 | 46 |
+   | Neptune | 0.99 | 49 | 51 | 279 | 50 |
+   | Saturn | 0.91 | 50 | 53 | 291 | 52 |
+   | Uranus | 0.70 | 53 | 61 | 332 | 58 |
+   | Jupiter | 0.57 | 56 | 67 | 368 | 62 |
+   | Mars | 0.020 | 74 | 360 | 1962 | 138 |
+   | Moon, Mercury, Pluto | none | 74 | any | any | 138 |
+
+   So: **the giants cannot honestly differ much from Earth in speed**, because the deck the
+   game flies on sits near one bar on all four (0.57 to 0.99 kg/m3): the honest spread is
+   46 to 67, twice today's, and no more. Proposal: exponent 0.4 and the upper clamp at 3
+   (`clamp((1.225 / rho0)^0.4, 0.75, 3)`): the giants spread over 16 m/s instead of 10, and
+   the airless worlds fly at 138 m/s, which is where the honest difference is. What keeps
+   138 m/s forgiving is named and already there: the **field brake** (`cmd.brake`, up to 160
+   m/s2; PILOT passes 0 in air today, so X stops on retro thrusters alone: 9.9 s and 680 m
+   from 138 m/s; with `brake: 0.15` in thin air it is 4 s and 290 m) and the **carve** with
+   `carveAccel: 40` (radius 390 m at 138 m/s; today's unbounded carve would need 100 m/s2).
+   Where the giants honestly differ is their **wind** (Neptune blew 36.8 m/s at 60 m during
+   this flight, three quarters of the cruise speed, and the hover drifted 1.9 m in 5 s with
+   1.2 m/s of bobbing; on every other world the hover drifted under 13 cm) and their
+   gravity. The flight computer holds speed over the GROUND, so a gale costs nothing: upwind
+   on Neptune the hull is doing 86 m/s through the air (q 3550 Pa, three times the cruise)
+   and nobody knows. The honest version flies airspeed; the forgiving version is a share:
+   carry the ship with, say, half the wind aloft (upwind 30, downwind 67 m/s over the ground
+   on Neptune that day). That would make the giants the windy worlds they are. Feel: PILOT's.
+8. **The first second of throttle is still empty** on every world (0, 8 to 10 m/s after
+   1 s, then 20 to 22 m/s2): the lever's ramp on top of the engine's 0.45 s spool.
+9. **Hover in a gale is exact** except on Neptune (above): Mars 11.6 m/s of wind, 0.00 m of
+   drift; Earth 7.2 m/s, 0.12 m. The air is 80 times thinner on Mars, so that one is right.
+10. Touchdown: coming down on C from 60 m the sink reaches 18 to 29 m/s and is 1.0 m/s half
+    a metre up on every world; the gear takes 0.2 to 0.5 g and rests on 9.6 / 4.9 / 2.1 cm of
+    stroke (Earth / Mars / Moon: the weight). Lift-off: the feet leave after 0.65 to 1.1 s
+    and the ship is at its 10 m hover in 4 s at under 5.2 m/s. Nothing to object to.
+11. In the browser Jupiter's ship came to rest "LANDED" on the cloud sea with no leg in
+    contact (it floats there by PILOT's rule; my gear model never engaged). Fine as a rule;
+    it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
+
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
 
 Written to be read cold. `physics` is the object PILOT made with `createPhysics` and hands you
@@ -611,6 +874,10 @@ or E breaks:**
   uniform `uPcDraw3` (both arrive through the geometry and `info.uniforms`).
 - `physics.update` takes an optional `eye` (the camera, body-local): pass it in the gallery.
 - No uniform, chunk or call of A, B, D or E changed. `makeKitMaterial` in the lab is unchanged.
+- **Branches (second P6 commit).** The flora chunk gained `pcPhysBranch` and two uniforms
+  (`uPhysBranchPhase`, `uPhysBranch`, both in `physics.fields.flora.uniforms`, copy them with
+  the rest). Nothing changes until you call it: one line, A below.
+- **Drifts (second P6 commit).** `physics.fields.drift`: F below. Nothing changes until you read it.
 - Two fixes you will see: rain, snow, dust and splash rings now lie on the curved ground far
   from where the session started (they floated up to 18 m over it), and it rains over deep
   water (the weather entered 18 m over the sea BED, so over a sea deeper than that it fell
@@ -637,6 +904,21 @@ or E breaks:**
   exact as float32 (2.5 mm on a tip displaced 2 m).
 - Still unseen by anyone in the game: grass parting round the explorer and under the ship's
   wash. The push field is live (370 cells pushed on a short walk in the browser).
+- **New in P6, one line: crowns that do not sway as one piece.** A tree's branches swing two
+  to four times faster than its trunk and out of step with each other. For trees and tall
+  shrubs near the eye, between `pcPhysBend` and `pcPhysDisplace`:
+  ```glsl
+  vec3 rel = wp - io;
+  rel += pcPhysBranch(rel, up, heightInMetres, rootB, pb);   // pb: the vec4 pcPhysBend returned
+  wp = io + pcPhysDisplace(rel, up, heightInMetres, pb.xy);
+  ```
+  and copy two more uniforms from `physics.fields.flora.uniforms` each frame:
+  `uPhysBranchPhase` (vec4) and `uPhysBranch` (vec4). No new texture, four sines and an atan
+  a vertex. Nothing moves at the trunk, the tips most (a 3.5 m branch: about 10 cm in a
+  fresh breeze, half a metre in a storm, at 1 to 2.5 Hz); the motion is continuous all the
+  way round the trunk (whole lobes), so a crown mesh is never torn; each tree has its own
+  phase. A crown that the explorer brushes or the ship's wash hits shivers (`pb.w`). The
+  chunk compiles inside your plants today (painted lab); nobody has seen it move.
 
 ### B. Weather for the sky and the sheet: `physics.here.sky` (numbers) and `physics.here.weather` (detail), every frame, free
 - **Start here: `physics.here.sky`**, eleven numbers 0..1, continuous in time, no meteorology
@@ -869,6 +1151,26 @@ can paint it (an opaque pass cannot glaze). Each line names the number that driv
 | The sea | nothing | D above: `uPhysWaterSea` and the chunk; `physics.water(bodyId, p).whitecapCover` for far water |
 | Prints | prints, pads, scour rings in the ground's ink | nothing needed; a region id that is kept crisp would bring the rain rings back |
 
+### F. Drifts: where the snow lies deep and where the wind has swept the ground bare (new in P6)
+Wind does not leave loose snow or sand lying level: it piles in the lee of every rise, in
+hollows and behind a landed hull, and is scoured from windward faces and crests. The physics
+keeps this on the grid of the ground marks (64 x 64 cells of 0.5 m round the focus):
+- `physics.fields.drift.factor` (Float32Array(4096), one channel; re-upload when `.version`
+  changes: a few times a second in a gale, never in a calm): how much loose material lies at
+  the cell in units of what lies on level ground here. 0 level, +1 twice as deep (up to
+  +2.5), -1 blown bare.
+- `.level`: that level depth now in metres (the snow depth of `physics.here.weather`, or on
+  bare sand and dust a loose layer of up to 0.12 m); `.snow`: true when what drifts is snow.
+  `.uniforms.uPhysDriftMap` (centre east, centre north, 1 / size, 64: the same layout as
+  `uPhysDeformMap`) and `.uPhysDriftLevel`.
+- What to paint with it: with `sky.snow` at s, a ground wash whose snow cover is
+  `s * (1 + factor)` clamped: bare ground showing on windward faces and crests, white filling
+  the hollows and tailing off behind rocks, which is how a snowy hillside is drawn. On sand:
+  a paler, smoother wash where `factor > 0` (the tail), the darker bed where it is negative.
+- It is where it was when the walker comes back (it is a function of the ground and the wind
+  that last moved material), it melts with the snow and deepens with the next fall, and the
+  explorer sinks deeper in it (his prints say so). On level ground it is zero.
+
 ## For PILOT: what audio can read (all in `physics.here`, refreshed every frame, free)
 
 - Rain: `weather.precipitation.intensity01` (continuous), `.type`, `.rate` (mm/h), `.hail01`;
@@ -988,6 +1290,44 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     decided where it really is.
 18. **PAINTER's `phys: { ground }` is a family, my table keeps the finer word**: rock may stay
     glass or crystal. A test compares every override; two disagreements are on record (below).
+
+24. **(P6) A mark never ends between two frames.** Every particle carries `left`, the seconds
+    until it is gone (its life, or its landing foretold from the rate at which its height
+    over the ground is closing, never slower than it is falling), and the kits shrink it
+    over its kind's `fadeOut`. The estimate is eased over 0.15 s because the ground is rough.
+25. **(P6) Snow is simulated where it is seen** (replaces 23's reasoning, keeps its display):
+    in a box 16 m across round the eye (`frame.eye`; the focus when none is given), so every
+    flake lands on the ground it is over. The kit still shows the box modulo itself round
+    its own camera, which is the identity when the two eyes agree. The cell always divides
+    the box. Powder kicked from lying snow is never wrapped (it is where the foot is).
+26. **(P6) Flakes ride the air over the ground.** The air's vertical speed where a flake is
+    equals the rate the ground changes along its path, at every height of the 18 m it falls
+    through (the box wraps, so a slope across it is a slope without end, and over that the
+    air runs parallel to the ground). The flake follows through its drag. Rain does not: it
+    falls six times faster and its box is 48 m.
+27. **(P6) Particles live on the curved ground.** The simulation's coordinates are (grid x,
+    height over the sphere of the anchor's radius, grid z); published positions are at that
+    radius on the line through the grid point, velocities turned to the local vertical to
+    first order. A plane was wrong by d^2 / 2R.
+28. **(P6) Dabs are drawn out to their travel a frame, and no further than three sizes.**
+    Strobing (a mark that crosses more than its length a frame) reads as flicker; a hairline
+    is not a flake. Between them is the slanted stroke of driving snow.
+29. **(P6) Branches are a spectrum, not a field.** Four oscillators on the clock (1.3 Hz x
+    1, 1.37, 0.71, 1.93), their phase turning round the trunk in whole lobes and from tree to
+    tree; the swing follows the trunk's own lean (which carries the local wind, the shelter
+    and the gusts) times how gusty the air is, plus the shake of the push field. No new
+    texture and nothing integrated per tree: at branch scale what matters to the eye is that
+    parts of a crown are out of step and faster than the trunk, and both are exact here.
+30. **(P6) Drifts are an equilibrium, not a simulation.** The factor field relaxes toward a
+    function of the ground, the hull and the last wind that moved material: deposition by
+    Winstral's upwind shelter Sx, scour by the ground's rise into the wind. Not conserved
+    (what is scoured is not what is deposited); in return it is the same when the walker
+    comes back, costs a quarter of a millisecond, and cannot run away.
+31. **(P6) The carve assist is a force and has a size.** It reports the sideways
+    acceleration the field gives and can be bounded by the caller. The default stays
+    unbounded: the feel of a turn is PILOT's.
+32. **(P6) The weather enters over the surface it meets**: the ground, or the liquid standing
+    over it at the focus.
 
 ## Needs from the others
 
@@ -1358,6 +1698,27 @@ Blunt, as asked. All of it is about motion and behaviour; none of it is about lo
 - (P5, self) Thinning by a number per particle is right for marks that move little; a flake
   blown across the cell's wall still shrinks and regrows 18 m away. In a gale that is many
   flakes a second, each over about a quarter of a second. I have not measured it as crawl.
+- (P6, self) Three stages of rain were photographed standing where the session began. Walk
+  400 m and the rain ended 18 m over your head; swim out and it stopped raining. Both bugs
+  were found by a script that looked at where the particles were, not by a picture, and both
+  had passing tests round them. Tests that only look near the anchor prove little: every
+  field of mine should be tested 300 m from it and over deep water.
+- (P6, self) The snow has now been simulated three ways in three stages (a 48 m box, the same
+  shown modulo a cell, a small box round the eye). The third is the first that is honest
+  about what a flake lands on. I should have asked "where is it seen from" in P1.
+- (P6, self) Branches and drifts are numbers and a chunk. Until PAINTER calls one line and
+  reads one texture they do not exist for the owner, like the grass parting before them.
+  This role's output is now well ahead of what the picture shows: weather, waves, marks,
+  the push field, branches and drifts are all computed and none of them is painted.
+- (P6, to PILOT) The game flies the same on every world but Venus: one turn rate, one feel,
+  five cruise speeds within 10 m/s and three more at 74 to 84. Venus is the only world
+  whose air you can feel, and it is the best flight in the game for it. The assists
+  (carve unbounded, ground-speed hold, grip from thrusters on foot) iron every other world
+  flat. Each has a number now; turn one down and a world appears.
+- (P6, to PILOT) On foot the Moon is Earth with a long jump. Nothing slides, nothing bounds,
+  and a jetpack hop goes to 113 m.
+- (P6, to PAINTER) Mars's spawn puts the walker in a boulder field: two runs out of two
+  stalled against the stones within three seconds.
 - (self) I wrote the first kits before PAINTER's contract existed and had to turn them round
   in the same stage. Ask for the contract first next time.
 - (self) The lab draws dots and lines. I can prove a drop falls at the right speed and cannot
@@ -1374,10 +1735,12 @@ Blunt, as asked. All of it is about motion and behaviour; none of it is about lo
   for a glow: animation data that cost nothing.
 
 ## Next stage
-P6, in my order: (1) play the integrated game in the browser on Earth, Mars, Venus and
-Neptune and measure PILOT's new pace, the settle on C and the touchdown against the bodies;
-(2) once PAINTER reads `setMood.sky` and has the wave chunk in its liquid, re-shoot the storm,
-the blizzard, the dust storm and Neptune's sea in the game itself and judge them; measure the
-snow cell for crawl with `stability()`; (3) the silhouette test in `PROP_VERT`; (4) drifts in
-the lee, when `uPhysDeformMap` is read; (5) the branch rate, when the fields are half-float.
-See the Hand-over at the top for where each begins.
+P7, in my order: (1) when PAINTER's weather is in the picture (it is on it now), re-shoot the
+storm, the blizzard, the dust storm and Neptune's sea in the game itself and tune
+`DRAW_PAINTED` against the frames; ask to see branches and drifts drawn; (2) the silhouette
+test in `PROP_VERT`; (3) flakes that tumble and differ in shape, dust tufts that do not read
+as leaves; (4) flakes in still air measured for crawl; (5) with PILOT, whichever of the five
+levers of "The integrated game, played in P6" it takes: fly them again with `p6/nodeplay.mjs`
+and report the same tables; (6) the ship on liquid (a wake, a bob, the gear never engages on
+Jupiter's cloud sea); (7) wind carried by the ship (`windShare`), if PILOT wants the giants
+windy. See the Hand-over at the top for where each begins.
