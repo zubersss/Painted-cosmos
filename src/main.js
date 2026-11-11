@@ -7,16 +7,22 @@
 //   dynres=0   scale=<0.25..1>  quality=<0|1|2>   pin the resolution controller (for screenshots)
 //   pointerlock=0                    drag to look instead of locking the pointer
 //   card=0                           no start card (for captures)
+//   stats=1                          show the frame read-out (also the ` key)
+//   fresh=1                          forget the saved game       save=0   do not save
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
 import { Input } from './core/input.js';
 import { DynamicResolution } from './core/dynres.js';
 import { createHud } from './ui/hud.js';
+import { createMap } from './ui/map.js';
+import { readSave, restore, clearSave, AutoSave } from './core/save.js';
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('pc-canvas');
 const loading = document.getElementById('pc-loading');
+
+let debugNote = null;
 
 async function boot() {
   const prov = await loadProviders(location.search);
@@ -40,16 +46,43 @@ async function boot() {
   const explorer = prov.createExplorer();
   const ship = prov.createShip();
 
-  const hud = createHud(document.getElementById('pc-hud'));
-  const input = new Input(canvas, { pointerLock: params.get('pointerlock') !== '0' });
-  const game = new Game({ scene, camera, world, painter, explorer, ship, input, hud, params });
+  // PHYSICS (COORDINATOR.md C14): one instance, fed the world's sampleSurface; the world reads
+  // its fields, the simulation steps the explorer and the ship through its models.
+  let physics = null;
+  if (prov.createPhysics) {
+    try {
+      physics = prov.createPhysics({ sampleSurface: (bodyId, d) => world.sampleSurface(bodyId, d), seed: 1 });
+      if (world.setPhysics) world.setPhysics(physics);
+    } catch (e) {
+      physics = null;
+      console.warn('[painted-cosmos] physics could not start (' + (e && e.message) + '); using the built-in movement.');
+    }
+  }
+  prov.using.physics = physics ? 'real' : 'stub';
 
+  const hudRoot = document.getElementById('pc-hud');
+  const hud = createHud(hudRoot);
+  const input = new Input(canvas, { pointerLock: params.get('pointerlock') !== '0' });
   // Resolution: at most 1080p-class output; the controller scales the scene inside that.
   const dyn = new DynamicResolution({
     enabled: params.get('dynres') !== '0',
     scale: params.has('scale') ? Number(params.get('scale')) : 1,
     quality: params.has('quality') ? Number(params.get('quality')) : 2,
   });
+  const storage = safeStorage();
+  const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id) });
+  const game = new Game({
+    renderer, scene, camera, world, painter, explorer, ship, input, hud, map, params, physics, dyn,
+    autosave: storage && params.get('save') !== '0' ? new AutoSave(storage) : null,
+  });
+  game.showStats = params.get('stats') === '1';
+  // Continue where the last visit ended, unless asked for a fresh start (?fresh=1).
+  if (storage && params.get('fresh') === '1') clearSave(storage);
+  else if (storage && !params.has('body')) {
+    const saved = readSave(storage);
+    if (saved && restore(game.sim, saved)) debugNote = 'continued from a save';
+  }
+
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
@@ -68,7 +101,7 @@ async function boot() {
 
   const sim = game.sim;
   const debug = {
-    game, sim, world, painter, renderer, scene, camera, dyn, using: prov.using,
+    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, storage, using: prov.using, note: debugNote,
     info: () => ({ ...game.info(), using: prov.using, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
@@ -123,6 +156,16 @@ function worldSettled(world, frames) {
   if (typeof world.isSettled === 'function') return world.isSettled();
   if (typeof world.busy === 'number') return world.busy === 0 && frames > 3;
   return frames > 90;
+}
+
+// localStorage, or null where it is blocked (private windows, sandboxed frames): never throws.
+function safeStorage() {
+  try {
+    const s = window.localStorage;
+    const k = 'painted-cosmos.probe';
+    s.setItem(k, '1'); s.removeItem(k);
+    return s;
+  } catch { return null; }
 }
 
 function hasClipControl() {

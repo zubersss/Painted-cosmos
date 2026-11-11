@@ -34,6 +34,7 @@ export const SHIP = Object.freeze({
   spaceLevel: 0.35,          // how much of that levelling survives in deep space (to ecliptic up)
   // ground
   cushionHeight: 7,          // m: below this the descent rate is limited
+  cushionDecel: 6.5,         // m/s^2: the braking the cushion plans with at any height
   minClearance: 1.6,         // m: the hull never goes lower in free flight
   lookAhead: 0.8,            // s of terrain look-ahead for the automatic pull-up
   flareHeight: 75,           // m: below this a dive is progressively levelled out
@@ -164,16 +165,29 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   const inAir = env.hasBody && env.altitude < env.spaceAlt;
   const tau = mix(T.tauSpace, T.tauAtmo, inAir ? 1 : 0) * (input.cut ? T.brakeFactor : 1);
   let v;
-  const body = env.shipBody && !st.liftoff && env.pulseSpeed == null ? env.shipBody : null;
+  // In vacuum the drive field that makes the pulse possible is also the brake: asking for much
+  // less speed than the ship has (X, or throttling down) sheds it at the kinematic rate. The
+  // body model's retro thrusters (10 m/s^2) would take over a minute from cruise, and "let go
+  // and it stops" is the promise of this ship. Acceleration and all flight in air stay with
+  // the body model.
+  const fieldBrake = !inAir && (input.cut || dot(st.v, f) > st.throttle * vmax + 60 || len(st.v) > vmax + 60);
+  const body = env.shipBody && !st.liftoff && env.pulseSpeed == null && !fieldBrake ? env.shipBody : null;
   if (env.pulseSpeed != null) {
     // Pulse drive: the speed is the drive's, the direction is the nose.
     v = add(st.v, scale(sub(scale(f, env.pulseSpeed), st.v), damp(5, dt)));
   } else if (body) {
     // PHYSICS' ship: the flight computer asks for `target`; thrust, drag, gravity, lift and
     // gusts decide what the hull actually does. The assists below shape the request first.
-    if (ground && up) target = shapeTarget(st, target, ground, up, floorOf, T);
+    let tauBody = tau;
+    if (ground && up) {
+      target = shapeTarget(st, target, ground, up, floorOf, T);
+      // Sinking faster than the cushion allows, or terrain rising ahead: the flight computer
+      // is told to close that error at once, not at its leisure.
+      const vUpNow = dot(st.v, up);
+      if (vUpNow < -st.sinkLimit || dot(target, up) > vUpNow + 4) tauBody = Math.min(tau, 0.22);
+    }
     const p0 = st.p;
-    body(st, { target, tau, hover: true, boost: !inAir }, dt, env);
+    body(st, { target, tau: tauBody, hover: true, boost: !inAir }, dt, env);
     v = st.v;
     st.p = p0;                                   // position is integrated once, below
   } else {
@@ -249,14 +263,20 @@ function shapeTarget(st, v, ground, up, floorOf, T) {
   const vh = reject(v, up);
   const alt = ground.r - ground.floor;
   // Only the rise of the terrain counts, so hovering low over flat ground is left alone.
-  const ahead = floorOf(addScaled(st.p, reject(st.v, up), T.lookAhead));
-  const need = ahead.floor + clamp(alt, T.minClearance + 0.4, T.cushionHeight) - ground.r;
-  if (need > 0) vUp = Math.max(vUp, need / T.lookAhead);
-  // The closer to the floor, the slower the ship may sink.
-  if (alt < T.cushionHeight) {
-    const maxDown = Math.max(0.25, (alt - T.minClearance) * 1.8);
-    if (vUp < -maxDown) vUp = -maxDown;
+  // (Two looks, near and far, so that nothing between here and the far one is flown into.)
+  const vhNow = reject(st.v, up);
+  const keep = clamp(alt, T.minClearance + 0.4, T.cushionHeight);
+  for (let k = 0.5; k <= 1; k += 0.5) {
+    const ahead = floorOf(addScaled(st.p, vhNow, T.lookAhead * k));
+    const need = ahead.floor + keep - ground.r;
+    if (need > 0) vUp = Math.max(vUp, need / (T.lookAhead * k));
   }
+  // The closer to the floor, the slower the ship may sink: never faster than it can still stop
+  // from (a hull with mass needs room), and feather-slow in the last metres.
+  let maxDown = Math.sqrt(2 * T.cushionDecel * Math.max(0, alt - T.minClearance - 0.5)) + 0.25;
+  if (alt < T.cushionHeight) maxDown = Math.min(maxDown, Math.max(0.25, (alt - T.minClearance) * 1.8));
+  if (vUp < -maxDown) vUp = -maxDown;
+  st.sinkLimit = maxDown;
   return add(vh, scale(up, vUp));
 }
 

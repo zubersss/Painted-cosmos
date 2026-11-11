@@ -20,6 +20,9 @@ export function createHud(root) {
   const thr = el('div', 'pc-gauge pc-gauge-throttle', gauges);
   el('span', 'pc-label', thr, 'throttle');
   const thrBar = el('i', '', el('b', '', thr));
+  const notice = el('div', 'pc-notice', root);
+  const marks = el('div', 'pc-marks', root);
+  const stats = el('div', 'pc-stats', root);
   const readout = el('div', 'pc-readout pc-label', root);
   const dot = el('div', 'pc-reticle', root);
   const card = el('div', 'pc-panel pc-start', root);
@@ -30,7 +33,7 @@ export function createHud(root) {
     ['W A S D', 'walk'], ['Shift', 'run'], ['Space', 'jump, hold for the jetpack'],
     ['E', 'board, land, step out'], ['V', 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], ['C', 'sink'], ['W S', 'throttle'], ['A D', 'turn'],
-    ['mouse', 'point the nose'], ['X', 'stop'],
+    ['mouse', 'point the nose'], ['X', 'brake'], ['F', 'pulse drive (in space)'], ['M', 'map'],
   ].map(([k, t]) => (t ? `<span><kbd>${k}</kbd> ${t}</span>` : `<em>${k}</em>`)).join('');
 
   // Keep the start card inside small windows.
@@ -40,6 +43,9 @@ export function createHud(root) {
 
   let lastPrompt = '';
   let lastReadout = '';
+  let lastNotice = null;
+  let lastStats = '';
+  const markEls = [];
   return {
     root,
     setPrompt(p) {
@@ -67,6 +73,40 @@ export function createHud(root) {
       readout.classList.toggle('pc-on', !!show);
     },
     setReticle(on) { dot.classList.toggle('pc-on', !!on); },
+    // One line of feedback above the prompt ("Mars ahead", "Too steep to land here").
+    setNotice(text) {
+      if (text === lastNotice) return;
+      lastNotice = text;
+      notice.classList.toggle('pc-on', !!text);
+      if (text) notice.textContent = text;
+    },
+    // In-world markers. list: [{ id, x, y (css px), r (px), label, sub, kind: 'target'|'body'|'edge', angle }]
+    setMarks(list) {
+      while (markEls.length < list.length) {
+        const m = el('div', 'pc-mark', marks);
+        m._ring = el('i', '', m); m._label = el('span', 'pc-label', m);
+        markEls.push(m);
+      }
+      for (let i = 0; i < markEls.length; i++) {
+        const m = markEls[i], d = list[i];
+        if (!d) { if (m._on) { m.style.display = 'none'; m._on = false; } continue; }
+        if (!m._on) { m.style.display = ''; m._on = true; }
+        m.className = 'pc-mark pc-mark-' + d.kind;
+        m.style.transform = `translate(${d.x.toFixed(1)}px, ${d.y.toFixed(1)}px)`;
+        const size = Math.max(14, Math.min(260, d.r * 2 + 10));
+        m._ring.style.width = m._ring.style.height = size.toFixed(0) + 'px';
+        m._ring.style.margin = `${(-size / 2).toFixed(0)}px 0 0 ${(-size / 2).toFixed(0)}px`;
+        m._ring.style.transform = d.kind === 'edge' ? `rotate(${(d.angle || 0).toFixed(2)}rad)` : '';
+        m._label.style.top = (size / 2 + 3).toFixed(0) + 'px';
+        const text = d.sub ? d.label + '\n' + d.sub : d.label;
+        if (m._text !== text) { m._text = text; m._label.textContent = text; }
+      }
+    },
+    // The frame-time read-out (behind ?stats=1 or the ` key).
+    setStats(text) {
+      stats.classList.toggle('pc-on', !!text);
+      if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
+    },
     showStart(on) { card.classList.toggle('pc-on', !!on); },
     startCard: card,
   };

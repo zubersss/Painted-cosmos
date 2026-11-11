@@ -347,12 +347,17 @@ export class Sim {
       const g = floorAt(sample, p);
       const list = this.canopy;
       if (list.length) {
+        // Each tree is a tent: full height over its crown, sloping away to nothing, so the
+        // canopy is a surface the ship can follow rather than a field of posts.
         let top = 0;
         const r = g.r;
+        const run = 12 + this.sh.speed * 0.8;
         for (let i = 0; i < list.length; i++) {
           const o = list[i];
           const gap = Math.acos(Math.min(1, (p.x * o.unitDir.x + p.y * o.unitDir.y + p.z * o.unitDir.z) / r)) * r;
-          if (gap < o.radius + Math.max(2.5, o.height * 0.22) && o.height > top) top = o.height;
+          const over = gap - o.radius - Math.max(2.5, o.height * 0.22);
+          const h = over <= 0 ? o.height : o.height * (1 - over / run);
+          if (h > top) top = h;
         }
         if (top > 0) { g.floor += top; g.canopy = top; g.slope = 0; g.normal = scale(p, 1 / r); }
       }
@@ -513,7 +518,7 @@ export class Sim {
 
     // Tree tops under and ahead of a low-flying ship (looked up once a frame).
     if (env.floor) {
-      if (this._firstStep && sh.altGround < 90) this.canopy = this.obstaclesNear(this.shFrame.id, sh.p, Math.min(48, 16 + sh.speed * 0.85));
+      if (this._firstStep && sh.altGround < 90) this.canopy = this.obstaclesNear(this.shFrame.id, sh.p, Math.min(45, 20 + sh.speed * 0.6));
       else if (sh.altGround >= 90) this.canopy = [];
     } else this.canopy = [];
 

@@ -10,11 +10,20 @@ import { Sim } from './sim.js';
 import { S, isInShip } from './state.js';
 import { cameraPlanes, farthestExtent } from './depth.js';
 import { V } from './vec.js';
+import { pulseEta, arrivalRadius } from '../ship/pulse.js';
+
+const NO_KEYS = { down: () => false, axis: () => 0 };
+const NO_EVENTS = { edges: new Set(), dx: 0, dy: 0, wheel: 0 };
 
 export class Game {
-  constructor({ scene, camera, world, painter, explorer, ship, input, hud, params }) {
-    this.scene = scene; this.camera = camera; this.world = world; this.painter = painter;
+  constructor({ renderer, scene, camera, world, painter, explorer, ship, input, hud, map, params, physics, autosave, dyn }) {
+    this.renderer = renderer; this.scene = scene; this.camera = camera; this.world = world; this.painter = painter;
     this.explorerModel = explorer; this.shipModel = ship; this.input = input; this.hud = hud;
+    this.map = map || null; this.autosave = autosave || null; this.dyn = dyn || null;
+    this.showStats = false;
+    this.stats = { frameMs: 16.7, worstMs: 0, worldMs: 0, tris: 0, calls: 0, window: [] };
+    this.uiNotice = null; this.uiNoticeUntil = 0;
+    this._marks = []; this._p = new THREE.Vector3();
     const q = params || new URLSearchParams();
     const scratch = new THREE.Vector3();
 
@@ -29,6 +38,7 @@ export class Game {
         return sp && sp.unitDir ? V(sp.unitDir.x, sp.unitDir.y, sp.unitDir.z) : null;
       },
       sampleObstacles: world.sampleObstacles ? (bodyId, d, radius) => world.sampleObstacles(bodyId, scratch.set(d.x, d.y, d.z), radius) : null,
+      physics: physics || null,
       seat: ud.seat, hatch: ud.hatch,
       body: q.get('body'), hour: q.has('time') ? Number(q.get('time')) : null,
     });
@@ -39,7 +49,26 @@ export class Game {
 
   frame(realDt) {
     const sim = this.sim;
-    const dt = sim.frame(realDt, this.input, this.input.take());
+    const raw = this.input.take();
+    // Keys that belong to the interface, not to the explorer or the ship.
+    if (raw.edges.has('KeyM')) this.toggleMap();
+    if (raw.edges.has('Backquote')) this.showStats = !this.showStats;
+    let keys = this.input, events = raw;
+    if (this.map && this.map.open) {
+      if (raw.edges.has('ArrowRight') || raw.edges.has('ArrowDown')) this.map.step(1);
+      if (raw.edges.has('ArrowLeft') || raw.edges.has('ArrowUp')) this.map.step(-1);
+      if (raw.edges.has('Enter') || raw.edges.has('Escape')) this.toggleMap();
+      keys = NO_KEYS; events = NO_EVENTS;          // the world goes on; the hands are on the map
+    }
+    if (this.input.message) {
+      this.uiNotice = this.input.message; this.uiNoticeUntil = performance.now() + 9000;
+      this.input.message = null;
+    }
+    const st0 = this.stats;
+    st0.window.push(realDt * 1000);
+    if (st0.window.length > 90) st0.window.shift();
+    st0.frameMs += (realDt * 1000 - st0.frameMs) * 0.08;
+    const dt = sim.frame(realDt, keys, events);
     const v = sim.view(dt);
     const st = sim.sm.state;
     const world = this.world, origin = sim.origin, eph = sim.eph, t = sim.t;
@@ -98,21 +127,94 @@ export class Game {
     cam.updateMatrixWorld();
 
     // World, mood, paint.
+    const tw = performance.now();
     world.update(dt, cam.position, v.active ? v.active.id : null);
+    st0.worldMs += (performance.now() - tw - st0.worldMs) * 0.08;
     this.painter.setMood(sim.mood);
+    const info = this.renderer ? this.renderer.info : null;
+    if (info) {
+      // Count the whole frame (Painter renders in several passes) while the read-out is up.
+      if (info.autoReset === this.showStats) info.autoReset = !this.showStats;
+      if (this.showStats) info.reset();
+    }
     this.painter.render(this.scene, cam, dt);
+    if (info && this.showStats) { st0.tris = info.render.triangles; st0.calls = info.render.calls; }
+    this.updateMarks(v);
     this.updateHud();
+    if (this.autosave) this.autosave.update(sim);
+    if (this.map && this.map.open && this.frameCount % 30 === 0) this.map.refresh(this.mapData());
     this.frameCount++;
+  }
+
+  // ---- planet map -------------------------------------------------------------------------------
+  mapData() {
+    const sim = this.sim;
+    const positions = {};
+    for (const id of sim.eph.ids) positions[id] = sim.eph.position(id, sim.t);
+    return {
+      positions, here: sim.shFrame.kind === 'body' ? sim.shFrame.id : (sim.sm.state === S.ON_FOOT ? sim.bodyId : null),
+      selected: sim.target, target: sim.targetInfo(),
+      targetOf: (id) => { sim.setTarget(id); return sim.targetInfo(); },
+    };
+  }
+
+  toggleMap() {
+    if (!this.map) return;
+    if (this.map.open) this.map.hide(); else this.map.show(this.mapData());
+  }
+
+  // ---- markers: a ring on each world you can fly to, drawn where it is in the sky --------------
+  updateMarks(v) {
+    const sim = this.sim, hud = this.hud;
+    if (!hud || !hud.setMarks) return;
+    const list = this._marks;
+    list.length = 0;
+    const st = sim.sm.state;
+    const flying = st === S.ATMOSPHERE || st === S.SPACE || st === S.PULSE || st === S.LANDING;
+    if (flying && !(this.map && this.map.open)) {
+      const cam = this.camera, p = this._p;
+      const el = this.renderer ? this.renderer.domElement : null;
+      const w = el ? el.clientWidth : 1280, h = el ? el.clientHeight : 720;
+      const tanHalf = Math.tan((cam.fov * Math.PI) / 360);
+      const here = v.active ? v.active.id : null;
+      for (const [id, root] of this.world.bodies) {
+        const body = BODIES[id];
+        if (!body || id === here) continue;
+        const isTarget = id === sim.target;
+        if (!isTarget && st !== S.SPACE && st !== S.PULSE) continue;
+        const dist = root.position.length();
+        p.copy(root.position).applyMatrix4(cam.matrixWorldInverse);
+        const nx = p.z < 0 ? p.x / -p.z / (tanHalf * cam.aspect) : 9;
+        const ny = p.z < 0 ? p.y / -p.z / tanHalf : 9;
+        if (Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) {
+          const r = (body.radius / dist / tanHalf) * (h / 2);
+          const x = (nx * 0.5 + 0.5) * w, y = (-ny * 0.5 + 0.5) * h;
+          if (isTarget) {
+            const eta = pulseEta(Math.max(0, dist - arrivalRadius(body)));
+            list.push({ kind: 'target', x, y, r, label: body.name, sub: `${fmt(dist)}  ${Math.max(1, Math.round(eta))} s` });
+          } else if (r < 30) list.push({ kind: 'body', x, y, r, label: body.name, sub: null });
+        } else if (isTarget) {
+          // Off screen: a small arrow at the edge of the picture, pointing the way to turn.
+          const a = Math.atan2(-p.y, p.x);
+          list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * 0.36, r: 0, angle: a, label: body.name, sub: fmt(dist) });
+        }
+      }
+    }
+    hud.setMarks(list);
   }
 
   updateHud() {
     const hud = this.hud, sim = this.sim;
     if (!hud) return;
     const st = sim.sm.state;
-    hud.setPrompt(sim.promptNow);
+    hud.setPrompt(this.map && this.map.open ? null : sim.promptNow);
+    if (hud.setNotice) {
+      hud.setNotice(sim.notice ? sim.notice.text : this.uiNotice && performance.now() < this.uiNoticeUntil ? this.uiNotice : null);
+    }
+    if (hud.setStats) hud.setStats(this.showStats ? this.statsText() : null);
     hud.setFuel(sim.ex.fuel, st === S.ON_FOOT && sim.ex.fuel < 0.995);
     hud.setThrottle(sim.sh.throttle, st === S.ATMOSPHERE || st === S.SPACE);
-    hud.setReticle(st === S.ATMOSPHERE || st === S.SPACE || (st === S.ON_FOOT && sim.footCam.firstPerson));
+    hud.setReticle(st === S.ATMOSPHERE || st === S.SPACE || st === S.PULSE || (st === S.ON_FOOT && sim.footCam.firstPerson));
     if (this.frameCount % 6 === 0) {
       // On foot the screen is the painting and nothing else: the place name shows for a few
       // seconds on arrival, then fades. In flight the read-out stays.
@@ -128,8 +230,28 @@ export class Game {
     if (this.input.used && !this.started) { this.started = true; hud.showStart(false); }
   }
 
+  // One glance at how the machine is coping (shown with ?stats=1 or the ` key).
+  statsText() {
+    const s = this.stats, sim = this.sim, d = this.dyn;
+    const worst = Math.max(...s.window);
+    const fps = 1000 / Math.max(0.1, s.frameMs);
+    const k = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + ' M' : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n));
+    return [
+      `frame  ${s.frameMs.toFixed(1)} ms   worst ${worst.toFixed(0)} ms   ${fps.toFixed(0)} fps`,
+      `scene  ${k(s.tris)} triangles   ${s.calls} draw calls`,
+      `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}`,
+      `world ${s.worldMs.toFixed(1)} ms   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
+    ].join('\n');
+  }
+
   info() {
-    return { ...this.sim.info(), near: this.camera.near, far: this.camera.far };
+    const s = this.stats;
+    return {
+      ...this.sim.info(), near: this.camera.near, far: this.camera.far,
+      marks: this._marks.map((m) => ({ kind: m.kind, label: m.label, x: Math.round(m.x), y: Math.round(m.y), r: Math.round(m.r) })),
+      stats: { frameMs: +s.frameMs.toFixed(1), worldMs: +s.worldMs.toFixed(2), tris: s.tris, calls: s.calls, shown: this.showStats },
+      mapOpen: !!(this.map && this.map.open), uiNotice: this.uiNotice,
+    };
   }
 }
 

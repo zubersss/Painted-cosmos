@@ -97,3 +97,42 @@ test('walking through the real forest never ends up inside a trunk or under the 
   assert.ok(worst >= 0.3, 'closest approach to a trunk surface: ' + worst.toFixed(3) + ' m');
   assert.equal(under, 0, 'never under the ground');
 });
+
+test('flying low over the real forest: the ship rides above the tree tops, never through them', { skip: skipObs }, async () => {
+  const { Sim, FEEL } = await import('../src/core/sim.js');
+  const { Pad, play, len, norm, dot } = await import('./helpers.mjs');
+  const sim = new Sim({
+    sampleSurface: (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z),
+    getSpawn: (id) => surface.getSurface(id).getSpawn(),
+    sampleObstacles: (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r),
+  });
+  const pad = new Pad();
+  sim.teleport({ body: 'earth', ship: true, altitude: 30 });
+  play(sim, pad, 0.5);
+  pad.press('KeyW');
+  pad.press('KeyC');                                   // push down onto the canopy the whole way
+  let trees = 0, worst = Infinity, turn = 0;
+  for (let leg = 0; leg < 8; leg++) {
+    turn = leg % 2 ? 260 : -200;
+    play(sim, pad, 8, {
+      each: (t) => {
+        if (t < 0.5) pad.dx += turn / 30;
+        if (t < 0.3) return;
+        // Every tree whose crown we are over must be below the hull.
+        const r = len(sim.sh.p), up = norm(sim.sh.p);
+        const ground = surface.sampleSurfacePure('earth', up.x, up.y, up.z).radius;
+        const near = obstacles.sampleObstaclesPure('earth', up.x, up.y, up.z, 6);
+        for (const o of near) {
+          const gap = Math.acos(Math.min(1, dot(up, norm(o.unitDir)))) * r;
+          if (gap > o.radius + 1.5) continue;         // only trunks more or less directly below
+          trees++;
+          worst = Math.min(worst, r - ground - o.height);
+        }
+      },
+    });
+  }
+  assert.ok(trees > 20, 'flew over trees: ' + trees);
+  assert.ok(worst > 0.5, 'lowest hull height above a tree top directly below: ' + worst.toFixed(2) + ' m');
+  assert.equal(sim.sh.bounces, 0, 'no bumps');
+  assert.ok(FEEL);
+});

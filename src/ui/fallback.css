@@ -43,3 +43,29 @@ kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pc
   background: var(--pc-paper); color: var(--pc-sepia); font: italic 18px Georgia, serif; letter-spacing: 0.08em;
   transition: opacity 0.8s ease; pointer-events: none; }
 #pc-loading.pc-done { opacity: 0; }
+
+.pc-notice { position: absolute; left: 0; right: 0; bottom: 24%; text-align: center; font-size: 16px; font-style: italic;
+  color: var(--pc-ink); opacity: 0; transition: opacity 0.5s ease;
+  text-shadow: 0 0 2px var(--pc-paper), 0 0 6px var(--pc-paper), 0 0 12px var(--pc-paper); }
+.pc-notice.pc-on { opacity: 0.95; }
+.pc-marks { position: absolute; inset: 0; overflow: hidden; }
+.pc-mark { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.pc-mark i { position: absolute; display: block; box-sizing: border-box; border: 1.5px solid rgba(244, 239, 228, 0.75);
+  border-radius: 48% 52% 50% 50% / 52% 48% 51% 49%; }
+.pc-mark span { position: absolute; left: -90px; width: 180px; text-align: center; font-size: 12px; white-space: pre;
+  line-height: 1.25; color: var(--pc-ink); text-shadow: 0 0 2px var(--pc-paper), 0 0 5px var(--pc-paper), 0 0 9px var(--pc-paper); }
+.pc-mark-body i { border-color: rgba(244, 239, 228, 0.4); border-width: 1px; }
+.pc-mark-body span { opacity: 0.7; font-size: 11px; }
+.pc-mark-target i { border-width: 2px; border-color: rgba(244, 239, 228, 0.95); box-shadow: 0 0 0 1px rgba(44, 51, 80, 0.35); }
+.pc-mark-edge i { border: none; border-radius: 0; width: 0 !important; height: 0 !important; margin: -8px 0 0 -6px !important;
+  border-left: 13px solid var(--pc-paper); border-top: 8px solid transparent; border-bottom: 8px solid transparent;
+  filter: drop-shadow(0 0 2px rgba(44, 51, 80, 0.7)); }
+.pc-mark-edge span { top: 12px !important; }
+.pc-stats { position: absolute; left: 7%; top: 9%; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre;
+  color: var(--pc-ink); background: var(--pc-wash); padding: 8px 12px; border-radius: 4px; display: none; }
+.pc-stats.pc-on { display: block; }
+.pc-map { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 720px;
+  padding: 16px 20px 14px; text-align: center; display: none; pointer-events: auto; }
+.pc-map.pc-on { display: block; }
+.pc-map canvas { display: block; width: 680px; height: 400px; margin: 4px auto 6px; cursor: pointer; }
+.pc-map .pc-title { font-size: 22px; margin: 0; }

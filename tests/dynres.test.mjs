@@ -104,13 +104,15 @@ test('camera planes: tight near on foot, growing with clear air in flight, far c
 });
 
 test('provider plan: stubs by default until a module is flagged ready; URL can force either way', () => {
-  const none = { render: false, world: false, art: false, ui: false };
-  const all = { render: true, world: true, art: true, ui: true };
-  assert.deepEqual(planProviders('', none), { render: 'stub', world: 'stub', art: 'stub', ui: 'stub' });
-  assert.deepEqual(planProviders('', all), { render: 'real', world: 'real', art: 'real', ui: 'real' });
-  assert.deepEqual(planProviders('?stub=1', all), { render: 'stub', world: 'stub', art: 'stub', ui: 'stub' });
-  assert.deepEqual(planProviders('?stub=world', all), { render: 'real', world: 'stub', art: 'real', ui: 'real' });
-  assert.deepEqual(planProviders('?real=1', none), { render: 'real', world: 'real', art: 'real', ui: 'real' });
-  assert.deepEqual(planProviders('?real=world,art', none), { render: 'stub', world: 'real', art: 'real', ui: 'stub' });
-  assert.deepEqual(planProviders('?stub=1&real=1', none).render, 'stub', 'stub wins when both are given');
+  const none = { render: false, world: false, art: false, ui: false, physics: false };
+  const all = { render: true, world: true, art: true, ui: true, physics: true };
+  const every = (v) => ({ render: v, world: v, art: v, ui: v, physics: v });
+  assert.deepEqual(planProviders('', none), every('stub'));
+  assert.deepEqual(planProviders('', all), every('real'));
+  assert.deepEqual(planProviders('?stub=1', all), every('stub'));
+  assert.deepEqual(planProviders('?stub=world', all), { ...every('real'), world: 'stub' });
+  assert.deepEqual(planProviders('?stub=physics', all), { ...every('real'), physics: 'stub' });
+  assert.deepEqual(planProviders('?real=1', none), every('real'));
+  assert.deepEqual(planProviders('?real=world,art', none), { ...every('stub'), world: 'real', art: 'real' });
+  assert.equal(planProviders('?stub=1&real=1', none).render, 'stub', 'stub wins when both are given');
 });

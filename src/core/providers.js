@@ -14,25 +14,29 @@ import { planProviders } from './providers.plan.js';
 
 // Flip a flag to true when that module of Painter's is committed and usable.
 // 2026-11-11: render, world and art are in (Painter's "INTEGRATION: ready", commit d238c50).
-export const REAL_READY = { render: true, world: true, art: true, ui: false };
+// 2026-11-11: physics is wired in through `env` (COORDINATOR.md C14); `?stub=physics` turns it off
+// and the explorer and ship fall back to Pilot's kinematic rules.
+export const REAL_READY = { render: true, world: true, art: true, ui: false, physics: true };
 
 const REAL_PATH = {
   render: '../render/index.js',
   world: '../world/index.js',
   art: '../art/models.js',
+  physics: '../physics/index.js',
 };
-const STUB = { render: stubPainter, world: stubWorld, art: stubModels };
+const STUB = { render: stubPainter, world: stubWorld, art: stubModels, physics: { createPhysics: null } };
 const NEEDS = {
   render: ['createPainter'],
   world: ['createWorld'],
   art: ['createExplorer', 'createShip'],
+  physics: ['createPhysics'],
 };
 
 export async function loadProviders(search) {
   const plan = planProviders(search, REAL_READY);
   const mods = {};
   const using = {};
-  for (const key of ['render', 'world', 'art']) {
+  for (const key of ['render', 'world', 'art', 'physics']) {
     mods[key] = STUB[key];
     using[key] = 'stub';
     if (plan[key] !== 'real') continue;
@@ -46,8 +50,8 @@ export async function loadProviders(search) {
       console.warn(`[painted-cosmos] Painter's ${key} module is not usable yet (${e && e.message}); using the stub.`);
     }
   }
-  if (Object.values(using).includes('stub')) {
-    const which = Object.keys(using).filter((k) => using[k] === 'stub').join(', ');
+  if (['render', 'world', 'art'].some((k) => using[k] === 'stub')) {
+    const which = ['render', 'world', 'art'].filter((k) => using[k] === 'stub').join(', ');
     console.warn(`[painted-cosmos] running with Pilot's stub for: ${which}. This is a mock-up, not the painted game.`);
   }
   using.ui = plan.ui;
@@ -59,5 +63,6 @@ export async function loadProviders(search) {
     createWorld: mods.world.createWorld,
     createExplorer: mods.art.createExplorer,
     createShip: mods.art.createShip,
+    createPhysics: mods.physics.createPhysics || null,
   };
 }
