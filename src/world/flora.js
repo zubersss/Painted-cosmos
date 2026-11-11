@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
-import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
+import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY } from '../render/shared.js';
@@ -79,7 +79,7 @@ export class Flora {
     }, this._underMats(U, ''));
     this.kit = {
       far: farTreeGeometry(5),
-      grass: grassGeometry(31), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51),
+      grass: grassGeometry(31), patch: grassPatchGeometry(37), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51),
       rock: rockGeometry(61), flower: flowerGeometry(71), shard: shardGeometry(91),
     };
   }
@@ -89,6 +89,8 @@ export class Flora {
     const bodyUniforms = this.bodyUniforms, sh = U.shard || U.rock;
     return {
       under: makePropMaterial(bodyUniforms, { name: 'under' + tag, leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
+      // near grass: the same washes, each blade bent about its own root
+      patch: makePropMaterial(bodyUniforms, { name: 'patch' + tag, leafA: U.leaf[1], leafB: U.leaf[2], leafC: U.leaf[2].map((x) => x - (x - x * x) * 0.6), accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5, bladeRoot: true }),
       bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
       rock: makePropMaterial(bodyUniforms, { name: 'rock' + tag, barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
       shard: makePropMaterial(bodyUniforms, { name: 'shard' + tag, barkA: sh[0], barkB: sh[1], wind: 0 }),
@@ -298,7 +300,7 @@ export class Flora {
     // mesh so cells beyond that range do not submit them at all
     for (const [pk, lists] of sets) {
       const M = pk < 0 ? this.mats : this._palette(pk);
-      make(lists.gn, this.kit.grass, M.under, [0, GRASS_NEAR / 0.775, 1.0, 0.6], GRASS_NEAR);
+      make(lists.gn, this.kit.patch, M.patch, [0, GRASS_NEAR / 0.775, 1.0, 0.6], GRASS_NEAR);
       make(lists.gf, this.kit.grass, M.under, [0, 30, 0.9, 0.6], 0);
       make(lists.fern, this.kit.fern, M.under, [0, UNDER_FAR, 0.5, 0.75], 0);
       make(lists.reed, this.kit.reed, M.under, [0, UNDER_FAR, 0.4, 0.8], 0);
@@ -390,6 +392,7 @@ export class Flora {
       }
     }
     let t1 = performance.now(); if (t1 - t0 > prof.wanted) prof.wanted = t1 - t0;
+    this.kit.patch.setDrawRange(0, QUALITY.level === 0 ? 60 : Infinity);   // the low tier: five blades a patch
     // short-range grass is only submitted from cells close enough to show it
     for (const ch of this.underChunks.values()) {
       if (!ch.built) continue;

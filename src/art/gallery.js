@@ -298,12 +298,12 @@ if (P.get('models') === '1') {
   explorer = createExplorer(); ship = createShip();
   scene.add(explorer.object3D); scene.add(ship.object3D);
 }
-function placeModel(m, east, north) {
+function placeModel(m, east, north, lift) {
   const R = BODIES[bodyId].radius;
   frame(state.pos);
   const p = state.pos.clone().normalize().multiplyScalar(R).addScaledVector(_e, east).addScaledVector(_n, north).normalize();
   const up = p.clone();
-  p.multiplyScalar(groundRadius(p));
+  p.multiplyScalar(groundRadius(p) + (lift || 0));
   const root = world.bodies.get(bodyId);
   m.object3D.position.copy(p).add(root.position);
   m.object3D.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
@@ -318,18 +318,31 @@ function tick(now) {
   fly(dt);
   orient();
   placeBodies();
-  if (explorer) { placeModel(explorer, Math.sin(state.yaw) * 5 + 1.5, Math.cos(state.yaw) * 5); explorer.animate({ mode: 'idle' }, dt); }
-  if (ship) { placeModel(ship, Math.sin(state.yaw) * 14 - 6, Math.cos(state.yaw) * 14); ship.animate({ mode: 'landed' }, dt); }
+  if (explorer) { placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * 1.5, Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * 1.5); explorer.animate({ mode: 'idle' }, dt); }
+  if (ship) { placeModel(ship, Math.sin(state.yaw) * num('sdist', 14) - Math.cos(state.yaw) * 6, Math.cos(state.yaw) * num('sdist', 14) + Math.sin(state.yaw) * 6, num('hover', 0)); ship.animate({ mode: num('hover', 0) > 0 ? 'hover' : 'landed' }, dt); }
   if (physics) {
     const up = state.pos.clone().normalize();
     // what pushes the grass about: the explorer on show, and the ship's downwash (?wash=<newtons>)
-    const disturbers = [];
-    if (explorer) { const p = world.bodies.get(bodyId).worldToLocal(explorer.object3D.position.clone()); disturbers.push({ kind: 'explorer', p, v: { x: 0, y: 0, z: 0 }, radius: 0.45, strength: 1, grounded: true }); }
-    if (ship && P.has('wash')) { const p = world.bodies.get(bodyId).worldToLocal(ship.object3D.position.clone()); disturbers.push({ kind: 'downwash', p, v: { x: 0, y: 0, z: 0 }, radius: 6, strength: num('wash', 60000) }); }
+    // (&walk=<m/s>: during the pre-roll the explorer walks in from the left to where it stands)
+    const disturbers = [], root = world.bodies.get(bodyId), walk = num('walk', 0);
+    const setDisturbers = (back) => {
+      disturbers.length = 0;
+      if (explorer) {
+        placeModel(explorer, Math.sin(state.yaw) * num('mdist', 5) + Math.cos(state.yaw) * (1.5 - walk * back), Math.cos(state.yaw) * num('mdist', 5) - Math.sin(state.yaw) * (1.5 - walk * back));
+        const p = root.worldToLocal(explorer.object3D.position.clone());
+        frame(state.pos);
+        disturbers.push({ kind: 'explorer', p, v: { x: _r.x * walk, y: _r.y * walk, z: _r.z * walk }, radius: 0.45, strength: 1, grounded: true });
+      }
+      if (ship && P.has('wash')) { const p = root.worldToLocal(ship.object3D.position.clone()); disturbers.push({ kind: 'downwash', p, v: { x: 0, y: 0, z: 0 }, radius: 5, strength: num('wash', 60000) }); }
+    };
+    setDisturbers(0);
+    if (P.get('push') === '0') disturbers.length = 0;
     const L0 = world.getLighting();
     const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers };
     // pre-roll: let the weather fall for a while before the first frame, ending at wtime
-    for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; physics.update(1 / 30, fr); }
+    for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; setDisturbers(preroll); if (P.get('push') === '0') disturbers.length = 0; physics.update(1 / 30, fr); }
+    setDisturbers(0);
+    if (P.get('push') === '0') disturbers.length = 0;
     fr.time = wtime;
     physics.update(frozenT != null ? 0 : dt, fr);
     if (frozenT == null) wtime += dt;
@@ -348,7 +361,7 @@ function tick(now) {
   painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0, sky: forcedSky || (physics && physics.here ? physics.here.sky : null) });
   painter.render(scene, camera, frozenT != null ? 0 : dt);
   frames++;
-  if (settled && frames >= 3 && world.busy === 0 && (!physicsWanted || physics)) window.__pcReady = true;
+  if (settled && frames >= 3 && world.busy === 0 && (!physicsWanted || (physics && (world.kits || P.get('kits') === '0')))) window.__pcReady = true;
   if (frames % 20 === 0) $('stat').textContent = `${painter.info.internalWidth}x${painter.info.internalHeight} internal, ${renderer.info.render.calls} draws, ${(renderer.info.render.triangles / 1000) | 0}k tris, alt ${L.altitude.toFixed(0)} m`;
   requestAnimationFrame(tick);
 }

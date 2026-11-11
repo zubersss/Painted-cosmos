@@ -507,12 +507,20 @@ void main() {
     vec3 wp = (im * vec4(lp + sw * (1.0 - uPhysOn), 1.0)).xyz;
     if (uPhysOn > 0.5) {
       vec3 rootB = io + uOrigin;
+      #ifdef PC_BLADE_ROOT
+        // a patch of grass: every blade bends about its own root, so the sward parts
+        vec3 bro = (im * vec4(aMass.x, 0.0, aMass.z, 0.0)).xyz;
+        rootB += bro;
+        vec2 bendB = pcPhysBend(rootB, uStiff).xy;
+        wp = io + bro + pcPhysDisplace(wp - io - bro, normalize(rootB), uPlantHeight * length(im[1].xyz), bendB);
+      #else
       #ifdef PC_PHYS_FULL
         vec2 bend = pcPhysBend(rootB, uStiff).xy;
       #else
         vec2 bend = pcPhysBendLite(rootB, uStiff);
       #endif
       wp = io + pcPhysDisplace(wp - io, normalize(rootB), uPlantHeight * length(im[1].xyz), bend);
+      #endif
     }
     wp = io + (wp - io) * vis;
   #else
@@ -522,7 +530,11 @@ void main() {
   vObj = position;
   mat3 ir = mat3(im);
   vNV = normalMatrix * (ir * normal);
-  vMassV = normalMatrix * (ir * aMass);
+  #ifdef PC_BLADE_ROOT
+    vMassV = normalMatrix * (ir * vec3(aMass.x * 0.4, 1.0, aMass.z * 0.4));
+  #else
+    vMassV = normalMatrix * (ir * aMass);
+  #endif
   vec4 mv = modelViewMatrix * vec4(wp, 1.0);
   vView = mv.xyz;
   vUv = uv; vData = aData; vInst = inst;
@@ -717,6 +729,7 @@ export function makePropMaterial(bodyU, opts = {}) {
   if (opts.phys) {
     defines.PC_PHYS = 1;
     if (opts.phys === 'full') defines.PC_PHYS_FULL = 1;
+    if (opts.bladeRoot) defines.PC_BLADE_ROOT = 1;
     Object.assign(own, PHYS, { uStiff: { value: opts.stiff || 0 }, uPlantHeight: { value: opts.plantHeight || 1 } });
   }
   if (opts.far) {

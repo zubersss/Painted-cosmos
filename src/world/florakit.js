@@ -223,6 +223,31 @@ export function grassGeometry(seed) {
   return B.build();
 }
 
+// Near grass: a patch of broad brush flicks about a metre and a half across. A blade thinner
+// than three pixels is erased by the abstraction pass, so near the eye grass is laid as
+// strokes the width of a brush tip. Each blade keeps its own root (in aMass.xz, metres from
+// the patch centre) so that PHYSICS' push field bends blade by blade: the sward parts round
+// a walker instead of leaning as one piece.
+export function grassPatchGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const n = 12;
+  const roots = [];
+  for (let i = 0; i < n; i++) {
+    const ang = rnd() * 6.283, rr = 0.10 + 0.82 * Math.sqrt((i + 0.5) / n);
+    const root = V(Math.cos(ang + i * 2.4) * rr, -0.04, Math.sin(ang + i * 2.4) * rr);
+    const da = rnd() * 6.283, dir = V(Math.cos(da), 0, Math.sin(da));
+    stroke(B, root, dir, 0.36 + rnd() * 0.32, 0.019 + rnd() * 0.011, 0.25 + rnd() * 0.55, rnd, { segs: 2, sway: 0.5 });
+    roots.push(root);
+  }
+  const g = B.build();
+  // every stroke has (segs + 1) * 2 = 6 vertices and 12 indices, in order (the low tier
+  // draws the first five blades only: setDrawRange(0, 60))
+  const m = g.getAttribute('aMass');
+  for (let i = 0; i < m.count; i++) { const r = roots[Math.floor(i / 6)]; m.setXYZ(i, r.x, 1.0, r.z); }
+  m.needsUpdate = true;
+  return g;
+}
+
 export function reedGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
   const n = 8;
