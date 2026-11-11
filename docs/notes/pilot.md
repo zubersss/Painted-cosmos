@@ -105,6 +105,16 @@ open until review 4. M3: my half in place and extended (below). I am also the LE
 | landing survey (scratch `run2/landsurvey.mjs`: 24 spots a body, PHYSICS on, PAINTER's committed world) | export of `a46647f` | 235 of 240 land from a 55 m hover (3 "too steep" on alpine and lilac mountains, 2 "no level ground" at a crater and a storm wall, all said on screen); median 6.2 s, touchdown 1.12 m/s |
 | `node tests/tour.mjs --bodies earth` (painted, 960x540, quality 1) | export of `a46647f` | every biome frame NOT SETTLED after 90 s (`world.busy` 267 to 412; `world.update` worst 56 to 84 ms on a loaded machine). PAINTER's `world.busy` fix is not in its committed state yet: for review 4. |
 
+After PHYSICS' five levers went in (working tree at the commit that carries this line):
+`node --test tests/*.test.mjs` 102 pass; `node tests/trip.mjs` (stub visuals, PHYSICS on)
+PASSED: Earth to Mars 461 km in 67.9 s, Mars to Saturn 889 km in 95.4 s, 347 s of game time,
+Mars flown at its new pace; `node tests/playthrough.mjs` with PHYSICS PASSED (touchdown on the
+legs at 0.78 m/s, ground to space 17.2 s). `node tests/m3check.mjs` in the painted world at
+960x540, quality 1 (export of `5d411f2`): PASSED, 29 checks (the sketch of the painted forest,
+the book, the vista walked to and sketched, the simulated gamepad, the reload). Review 4's own
+runs (contract test, surveys, the tour of ten bodies, cost, space, weather rates) are in
+`docs/lead/REVIEW.md`.
+
 ### What this run added (answers to the coordinator's review of my domain)
 
 - **The tour stands where the game sends the player** (`tests/tour.mjs`). For every body:
@@ -488,6 +498,17 @@ Pulse (`src/ship/pulse.js` PULSE): top speed 30 km/s, 400 m/s2, spool 0.9 s, let
 820 m/s, steering at 0.3 x, target assist 0.6 rad/s, aim cone 15 degrees. Default boom is now
 6.4 m (was 5.6) while the explorer is a placeholder (PAINTER's request).
 
+## Contract additions made in this run (all additive)
+
+- `physics.update(dt, { ..., eye })`: the camera, body-local (PHYSICS' lever 1).
+- `Sim.teleport({ heading, lookPitch, firstPerson })` (degrees) and `window.__pc.flash(frames)`.
+- `world.getSpawn(body)` may carry `yaw` (and `pitch`), radians from north toward east: the
+  game then arrives facing that way. Nobody sends it yet; `findBiome` and vistas already do.
+- `info().stats.worldWorstMs` / `worldPeakMs`; `info().sketches`; the save has a sibling key
+  `painted-cosmos.sketches`.
+- `Input.axis` is analog (-1..1) when a gamepad is connected.
+- The stylesheet is `src/ui/theme.css`; `src/art/ui.css` and `painter.setMarks` are not needed.
+
 ## Needs from the other
 
 ### From PAINTER
@@ -508,13 +529,12 @@ planet); `physics.update`; `world.update(dt, camera.position, activeBodyId)`;
 `createExplorer` / `createShip` with `userData.seat` and `userData.hatch`.
 
 Open, most important first:
-1. **Cost on every planet** (REVIEW 3, MUST FIX 1): Neptune's spawn measured 727 k triangles at
-   quality 1 against a budget of 600 k and 350 draw calls (300 k at quality 0, 1.2 M at
-   quality 2). Measure in the integrated game with the read-out (` key, or
-   `index.html?stats=1&quality=1&dynres=0`), not only in the gallery.
-2. **`world.busy` must reach 0** when the view is built, also after the camera has moved to
-   another body. It is my readiness signal (`window.__pcReady`, `__pc.settle()`), and the tour
-   waits on it: a frame that never settles is captured after 75 s and marked "(unsettled)".
+1. **Review 4, MUST FIX 1** (`docs/lead/REVIEW.md`): the vista `earth-temperate_forest-1`
+   submits 645 k triangles and 352 draw calls for the world alone at quality 1 (budget 600 k,
+   350, with room for the real explorer and ship). The item says how to see it in the game.
+   The SHOULD FIX list there (thicket vistas, three orbit views, pepper in dark washes, dunes,
+   a pin for the build slice) is yours to order.
+2. (Done, thank you: `world.busy` reached 0 in all 114 tour frames of review 4.)
 3. **`world.update` inside 5 ms a frame** while building (REVIEW 3 measured 8.5 to 9.4 ms on
    Mercury, Mars and Neptune right after arrival).
 4. **Terrain ceiling**: keep walkable ground below `radius + 0.8 x spaceAltitude(body)`
