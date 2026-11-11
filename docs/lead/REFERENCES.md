@@ -299,7 +299,13 @@ Checks
   speed of sound depends on the body's air; no thunder on airless bodies).
 - `R-STORM-4` The flash is bare paper showing through the wash for one to three frames, never
   pure white and never a full-screen strobe.
-- `R-STORM-5` Gusts of 15 to 30 m/s; on foot `R-FOOT-5` still holds, in the ship `R-SHIP-8`.
+- `R-STORM-5` (reworded after review 5, the coordinator's ruling) Gusts of 15 to 30 m/s in a
+  thunderstorm, **measured in the open at 10 m above the ground**; under trees the canopy's
+  shelter is real and the wind at two metres may be a third of that. A blizzard is sustained
+  wind of 15 m/s and more at 10 m with `R-SNOW-3`'s visibility; a dust storm on Mars 15 m/s
+  and more at 10 m. On foot `R-FOOT-5` still holds, in the ship `R-SHIP-8`. Measured on
+  `0de3fb4` (P7.4): 16 to 23 m/s above the canopy at the Earth spawn and 11 at 10 m inside
+  the wood; 25 m/s at 10 m in the blizzard on the open meadow; 20 m/s in Mars' dust storm.
 
 ## 10. Snow
 
@@ -333,9 +339,11 @@ Checks
   at twelve places a body: cloud, overcast, storm and wetness change by at most 2 to 6 % of
   their range in a second everywhere; a snow squall front on Earth moves haze by 6.3 %/s and
   snowfall by 5.1 %/s; on Neptune, where the fronts ride the fastest winds in the system, rain
-  moves 8 %/s and a fog bank 14.6 %/s. Limits: 8 %/s for anything on Earth-like worlds,
-  15 %/s on the ice giants, lightning excepted. The picture must not pop for it: PAINTER
-  eases what it shows of `sky` with a time constant of 2 s or more (`flash` excepted).
+  moves 8 %/s and a fog bank 14.6 %/s. Limits (the coordinator's ruling after P7): **15 %/s on
+  the four giants** (Jupiter, Saturn, Uranus, Neptune), **8 %/s on the rocky worlds with one
+  point of tolerance** (Earth's 8.5 %/s passes), lightning excepted. The tolerance is there
+  because the picture does not pop for it: PAINTER eases what it shows of `sky` with a time
+  constant of 2 s or more (`flash` excepted; since M3 block 2 `world.update` does this itself).
 - `R-WX-2` Deterministic: the same seed, body, place and time give the same weather (a unit
   test in `src/physics`), in keeping with "the same planet on every visit".
 - `R-WX-3` A full change (clear to rain, rain to clear) takes 1 to 4 minutes.

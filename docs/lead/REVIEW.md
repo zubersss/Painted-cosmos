@@ -79,7 +79,11 @@ What I ran, and what came back:
   see the PHYSICS section.
 - My own unit tests: 105 pass. `node --test src/physics/`: 215 pass. `node --test
   src/world/*.test.mjs`: 19 pass.
-- BROWSER_CHECKS_PENDING
+- **The game end to end, on a clean export of `db22516`** (`node tests/all.mjs --export`, the
+  new one-command check): play-through in the painted world 37 of 37 checks, the Earth, Mars,
+  Saturn trip in the painted world 47 of 47 (reload from the save included), and the same on
+  stubs and with PHYSICS; no console errors, no request off the page's own server. One step
+  of thirteen failed, through a fault in the step, not in the game (see the addendum).
 
 ### PAINTER (M3 in progress)
 

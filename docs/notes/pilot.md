@@ -41,7 +41,7 @@ makes paper, filters, pencil frames and rules; `lettering.js` the stroke font; `
 
 **Every check.** One command: `node tests/all.mjs --export` (a clean export of the last
 commit; three unit suites, the brief's static rules, eight scripted browser runs, one table;
-`--list`, `--only a,b`, `--skip a,b`; about ALLCHECKS_MINUTES in software GL). The lead's
+`--list`, `--only a,b`, `--skip a,b`; about 35 minutes in software GL). The lead's
 instruments, for looking and measuring rather than passing: `node tests/tour.mjs --bodies
 <one body>` (every biome and vista, fair weather held, sheets in `docs/lead/evidence`; one body
 per process, `--sheets <dir>` for trials), `node tests/weather.mjs` (the weather set: twelve
@@ -96,7 +96,7 @@ half done; three MUST FIX open for the others (two PAINTER, one PHYSICS; `REVIEW
 
 | What | On | Result |
 | --- | --- | --- |
-| `node tests/all.mjs --export` (every check) | export of `db22516` | ALLCHECKS_TABLE |
+| `node tests/all.mjs --export` (every check) | export of `db22516` | 12 of 13 steps pass: unit 105, PHYSICS 215, PAINTER 19, static rules, play-through on stubs 37 checks, with PHYSICS 37, trip on stubs 47, m3 28, pointer lock 7, sound, **play-through in the painted world 37, the trip in the painted world 47**. The thirteenth (m3 in the painted world, 27 of 28) failed on my own step: it pinned the tier that the check then reads; fixed. ALLCHECKS_FINAL |
 | The weather set, `node tests/weather.mjs` | export of `62d3529` | 12 frames, no console errors; storm at the Earth spawn as the game gives it (19:48) 606 k triangles, 315 draw calls; the same at 11:00 582 k, 302; before and after 579 k, 299; kits 5 calls, 3.3 k triangles; blizzard 470 k, 234; Mars dust storm 219 k, 108; Neptune's sea 379 k, 206 |
 | Cost at three tiers, `node tests/cost.mjs` | export of `83c604c` | 36 measurements, no console errors; one view over: `earth-temperate_forest-1` 306 k (quality 0), 614 k / 341 (quality 1), 818 k (quality 2); the rest 145 k to 283 k, 291 k to 549 k, 324 k to 756 k |
 | A run from the spawn, eight headings, 25 s each (pure simulation, real ground, obstacles, physics) | export of `62d3529` with my `sim.js` and `src/player` | before: Mars 5 m in one heading, Mercury 5 m in one; after: Mars 170 to 179 m, Mercury 144 to 163 m, Earth 106 (a 41 degree slope) to 174 m, Venus 123 to 130 m (thick air), the giants 130 to 195 m |
@@ -780,6 +780,65 @@ Nothing open. (`--shot-timeout` arrived in `1087406`; thank you.)
   `docs/lead/REVIEW.md`, review 2, with my own measurements: M1 is met.
 
 ## Ideas and critique
+
+### Critique swap (third PILOT agent, as a player; blunt, for M4)
+
+What I played: the scripted play-through and the Earth, Mars, Saturn trip in the painted
+world, and three sets of frames from the game itself at 960x540 (weather, cost, and a
+"player's eye" set on `0de3fb4`: night on foot, low flight in chase and from the cockpit,
+orbit, space, the pulse, Saturn at dusk; scratch `run3/player/`). Nobody, me included, has
+seen any of it move at more than three frames a second. That is the first line of any honest
+critique of this game: its look in motion and its feel at 60 Hz are unjudged.
+
+**PAINTER's domain (the look).** What holds: on foot by day it is a watercolour, and with the
+real explorer and ship in the frame it is the first time a third-person shot has no grey
+capsule in it; the night at the spawn is a real indigo night, readable, not black; low flight
+over the forest (soft dabs for crowns, the far ridge lost in paper) is the best new frame;
+space is soft indigo and violet with no hard specks left in the wash. What is weak, in the
+order a player meets it:
+1. *The near-ground strokes read as teeth.* Dark triangles a metre apart on Earth's lawn, on
+   Saturn's plain, on Mercury; green ones on top of fresh snow. They are under the explorer's
+   feet in every frame now, so they are the first thing seen. Either a sward or nothing.
+2. *Space is empty.* No stars at all in the frames I took, no salt, no nebula edge, and the
+   pulse drive is a still picture with "3115 m/s" in the corner: the fastest moment in the
+   game is the one where nothing moves. The sun is a soft glow, which is right.
+3. *The frame's edge.* The ragged border is a row of hard dark dots in every dark scene
+   (storm, night, space): the most digital line in the picture, all the way round it.
+4. *Weather marks.* Rain was chalk sticks at `62d3529` (a glaze has gone in since); the
+   lightning frame has white dust round the crowns; puddles read as holes; the dust storm has
+   nothing in the air near the eye; Neptune's sea ignores its storm sky.
+5. *From orbit* Earth's cloud is hard-edged white patches; Mercury and Neptune were glass
+   balls at review 4 and I have not seen them since.
+6. *Straight edges*: crystals, frozen waves and dune crests are cut paper; two vistas have a
+   wall a metre in front of the easel.
+7. *Nothing arrives*: I cannot say whether detail fades in or pops, because nobody can see it
+   move. PAINTER's own crawl numbers are pairs of frames.
+
+**PHYSICS' domain (how it moves).** What holds: each world has its own weight under the feet
+and under the ship (numbers, per world, re-flown by PHYSICS after every lever); the ship lands
+on its legs; storms now bring wind (16 to 23 m/s above the wood, 25 in the blizzard) and the
+suit keeps the explorer on its feet in it; nothing I ran cost more than a millisecond or two.
+What is weak:
+1. *Measured, never watched.* Every claim is a number from Node at 60 Hz. Grass that parts,
+   branches that sway, flakes that tumble, a wake on water: I have seen none of them move and
+   in stills I cannot find most of them. PHYSICS cannot either. The owner will be the first.
+2. *The first storm comes after dark*, and the storm coast of Neptune has a cloudless sky.
+   The weather is physically reasoned and dramatically mistimed.
+3. *Neptune's coast is a wind tunnel*: 33 m/s at head height whenever one visits, a walk
+   downwind at 0.6 m/s, a hop thrown 85 m (a boundary layer is promised). A calm game should
+   not have a place where walking is a fight.
+4. *Names and pictures disagree*: the read-out says "mist" over a clear dusk at the spawn,
+   "blizzard" over a light snowfall at its tail, "dust" in a wet wood.
+5. *The assists hide the physics*: feet down 100 % of the time, falls ended at 4 m/s, turns
+   carved by a field. That is my doing and I stand by it for feel; but it means the "realism"
+   the owner asked for is mostly visible in the read-out, the sound and the weather, not in
+   what the body does.
+
+**My own domain, as the other two would say it** (so that it is said): the camera had been
+0.8 m behind a helmet at every step out of the ship since M1 and nobody noticed; a run could
+be stopped dead by a knee-high rock until today; the interface was flat navy boxes one pass
+ago; and four things about this game have still never met real hardware.
+
 
 - (to PAINTER) The stub shows how much a moving ground texture helps the feel of speed: please
   make sure the wash variation is readable under the explorer's feet at walking speed, or the

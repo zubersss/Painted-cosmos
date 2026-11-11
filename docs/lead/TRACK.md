@@ -48,7 +48,7 @@ been able to check are still the frame rate on a real GPU and how the game sound
 | How each planet looks from orbit | Painter | PART: five of eight read as painted globes; Mercury and Neptune as glass balls, Earth's cloud hard-edged (SHOULD FIX) | Lead: the orbit frame of each tour sheet |
 | Frame budget on every planet (600 k triangles, 350 calls at quality 1) | Painter | Carried into M3 as a MUST FIX (see M3) | Lead: reviews 4 and 5 |
 | `world.busy` drains; `world.update` inside 5 ms | Painter | `busy`: DONE (114 of 114 tour frames settled in 0.1 to 58 s). `world.update`: cannot be measured in software GL since the builder takes 30 % of a slow frame; a pin is asked for | Lead: review 4 |
-| Earth to Mars to Saturn in one sitting with no reload | all | DONE: on stubs, in the pure simulation on the real worlds, and in the painted game in a browser (ALLCHECKS_TRIP) | Lead: `node tests/trip.mjs`, `tests/contract.test.mjs`, `node tests/all.mjs --export` |
+| Earth to Mars to Saturn in one sitting with no reload | all | DONE: on stubs, in the pure simulation on the real worlds, and in the painted game in a browser (47 checks, on the export of `db22516`, with the real models, weather and the near-ground layer in) | Lead: `node tests/trip.mjs`, `tests/contract.test.mjs`, `node tests/all.mjs --export` |
 
 ## Milestone 3: the painting comes alive: UNDER WAY
 
@@ -76,7 +76,7 @@ been able to check are still the frame rate on a real GPU and how the game sound
 
 | Item | Owner | Status |
 | --- | --- | --- |
-| Every check, one command, one table | Pilot | DONE: `node tests/all.mjs --export` (a clean export of the last commit; three unit suites, the brief's static rules, eight scripted browser runs). ALLCHECKS_RESULT |
+| Every check, one command, one table | Pilot | DONE: `node tests/all.mjs --export` (a clean export of the last commit; three unit suites, the brief's static rules, eight scripted browser runs). Last run: export of `db22516`, 12 of 13 pass (the thirteenth was a fault in the step itself, fixed). ALLCHECKS_FINAL |
 | README for a new player | Pilot | DONE: where to play, the first minute, every control, the read-out line by line, what the tiers draw, what was never verified on real hardware; the static step of `all.mjs` fails if a control of the help card is missing from it |
 | Blunt critique of the other two domains, as a player | each role | Pilot's is in `docs/notes/pilot.md` ("Critique swap"); Painter's and Physics' of the others are theirs to write |
 | Fix the worst issues | all | TODO: the three MUST FIX above first |
