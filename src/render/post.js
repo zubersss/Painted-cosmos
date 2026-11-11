@@ -139,6 +139,7 @@ void main() {
   float ph = paper.r;
   // fine pits show in light washes; dark passages keep only the broad settling
   float gran = ((0.52 - ph) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmid.r) * 0.85 + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet);
+  gran *= 1.0 - 0.9 * uWxSheet.x;     // (heavy storm washes would turn the settling into pepper)
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
   d += uWxSheet.x * (0.75 + 0.5 * plo.r);

@@ -258,12 +258,19 @@ if (forcedSky) world.setWeather(forcedSky);
 // PHYSICS in the gallery (?physics=1): wind, gusts and bending plants from src/physics
 let wtime = num('wtime', 0), preroll = num('pre', 0);
 let physics = null;
-if (P.get('physics') === '1') {
+const physicsWanted = P.get('physics') === '1';
+if (physicsWanted) {
   import('../physics/index.js').then((m) => {
     physics = m.createPhysics({ sampleSurface: (id, d) => world.sampleSurface(id, d) });
     world.setPhysics(physics);
-  }).catch((e) => console.warn('physics not available: ' + e.message));
+    if (P.get('kits') !== '0') startKits();
+  }).catch((e) => {
+    // (the tree is shared: a module may be half-saved at the moment of loading. Try again.)
+    let n = 0; try { n = +sessionStorage.getItem('pcPhysTry') || 0; sessionStorage.setItem('pcPhysTry', n + 1); } catch (_) { n = 9; }
+    if (n < 4) setTimeout(() => location.reload(), 1500); else console.error('physics not available: ' + e.message);
+  });
 }
+function startKits() {}
 
 // --- start ----------------------------------------------------------------------------------
 function resize() {
@@ -336,7 +343,7 @@ function tick(now) {
   painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0, sky: forcedSky || (physics && physics.here ? physics.here.sky : null) });
   painter.render(scene, camera, frozenT != null ? 0 : dt);
   frames++;
-  if (settled && frames >= 3 && world.busy === 0) window.__pcReady = true;
+  if (settled && frames >= 3 && world.busy === 0 && (!physicsWanted || physics)) window.__pcReady = true;
   if (frames % 20 === 0) $('stat').textContent = `${painter.info.internalWidth}x${painter.info.internalHeight} internal, ${renderer.info.render.calls} draws, ${(renderer.info.render.triangles / 1000) | 0}k tris, alt ${L.altitude.toFixed(0)} m`;
   requestAnimationFrame(tick);
 }

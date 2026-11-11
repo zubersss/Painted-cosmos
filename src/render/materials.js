@@ -3,8 +3,9 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
-import { G, PHYS, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { G, PHYS, PHYSW, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
+import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
 const FOG_VERT = /* glsl */`
@@ -226,18 +227,34 @@ attribute vec4 aLiq;      // liquid wash colour, and how much it mirrors
 attribute vec4 aLiqP;     // x glow (lava), y cloud (a sea of cloud)
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
+uniform float uWaveLod;
 varying vec3 vBody;
 varying vec3 vToCam;
 varying vec3 vView;
 varying float vDepth;
 varying vec4 vLiq;
 varying vec2 vLiqP;
+varying vec3 vWake;
+// PHYSICS' sea: the surface rises and falls with its wave trains and wakes (C14)
+#define PC_PHYS_NO_WAKE
+${WATER_GLSL}
 void main() {
-  vBody = position + uOrigin;
-  vToCam = uCamLocal - position;
+  vec3 p = position;
+  vBody = p + uOrigin;
+  vec2 along;
+  vec3 w = pcPhysWaterD(vBody, along);
+  vWake = pcPhysWake(pcPhysGrid(vBody));
+  // the mesh carries the waves only where it is fine enough for them (the rest is painted),
+  // and they die away at the waterline, so the shore does not crawl
+  float lam = 6.2831853 / max(uPhysWaterK.x, 1e-3);
+  float carry = 1.0 - smoothstep(2.2 * lam * uWaveLod, 6.0 * lam * uWaveLod, distance(p, uCamLocal));
+  float shoal = smoothstep(0.0, 1.0, aDepth / max(uPhysWaterSea.x * 1.3, 0.05));
+  p += normalize(vBody) * ((w.x + vWake.x) * carry * shoal);
+  vBody = p + uOrigin;
+  vToCam = uCamLocal - p;
   vDepth = aDepth;
   vLiq = aLiq; vLiqP = aLiqP.xy;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
@@ -261,6 +278,9 @@ varying vec3 vView;
 varying float vDepth;
 varying vec4 vLiq;
 varying vec2 vLiqP;
+varying vec3 vWake;
+#define PC_PHYS_NO_WAKE
+${WATER_GLSL}
 
 // Mirror the painting itself: march the reflected ray through last frame's depth.
 // Returns uv and a confidence.
@@ -296,7 +316,18 @@ void main() {
   vec4 r1 = texture(uNoise3D, vBody / 4.6 + drift);
   vec4 r2 = texture(uNoise3D, vBody / 1.35 - drift * 1.7);
   vec4 r3 = texture(uNoise3D, vBody / 17.0);
-  vec3 n = normalize(up + (r1.xyz - 0.5) * 0.13 + (r2.xyz - 0.5) * 0.06);
+  // PHYSICS' sea at this point: height, slope, crests, foam. What the brush cannot hold at
+  // this distance is dropped (waves smaller than a pixel would shimmer): far water goes flat
+  // and is given its whitecaps as a few anchored dabs instead.
+  vec2 along;
+  vec3 wv = pcPhysWaterD(vBody, along) + vWake;
+  float hs = max(uPhysWaterSea.x, 1e-4);
+  float keep = 1.0 - smoothstep(0.22, 0.75, fwidth(wv.x) / hs);
+  wv *= keep;
+  float wavy = smoothstep(0.04, 0.35, uPhysWaterSea.x) * keep;      // 0 on a pond, 1 on a sea that is running
+  float hN = clamp(wv.x / hs, -1.5, 1.5) * wavy;                    // -1 in the troughs .. 1 on the crests
+  vec2 cf = pcPhysWaterCrest(wv);
+  vec3 n = normalize(pcPhysWaterNormal(wv, up) + (r1.xyz - 0.5) * 0.13 + (r2.xyz - 0.5) * 0.06);
   vec3 r = reflect(-Vd, n);
   float re = dot(r, up);
 
@@ -313,11 +344,13 @@ void main() {
   vec3 Rv = reflect(normalize(vView), nV);
   vec3 hit = pcReflect(vView, Rv);
   vec3 refl = texture(uPrevTex, hit.xy).rgb;
-  c = mix(c, refl, hit.z * uPrevOn);
+  // (a sea that is running is no mirror: it keeps its own wash and only takes a breath of the sky)
+  float rough = smoothstep(0.08, 0.9, uPhysWaterSea.x) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
+  c = mix(c, refl, hit.z * uPrevOn * (1.0 - 0.85 * rough));
   // the liquid's own wash: water takes a little of it and deepens the mirror; matte liquids
   // (lava, acid, a sea of cloud) are mostly their own colour
   float mirror = vLiq.a;
-  vec3 own = pcDensity(vLiq.rgb, 1.0 + (r3.g - 0.5) * 1.3 + (r1.r - 0.5) * 0.6);
+  vec3 own = pcDensity(vLiq.rgb, 1.0 + (r3.g - 0.5) * 1.3 + (r1.r - 0.5) * 0.6 - hN * 0.55);   // pigment gathers in the troughs
   // lava: paper-bright where it runs hot, dark crust drifting on it
   vec4 r4 = texture(uNoise3D, vBody / 9.0 + drift * 0.4);
   own = mix(own, vec3(1.0, 0.975, 0.86), vLiqP.x * smoothstep(0.50, 0.72, r4.r));
@@ -326,11 +359,19 @@ void main() {
   vec4 r5 = texture(uNoise3D, vBody / 47.0 + drift * 0.2);
   own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));
   own = mix(own, own * uGlaze, vLiqP.y * (1.0 - smoothstep(0.30, 0.52, r5.g)) * 0.6);
-  c = mix(own, pcDensity(c * mix(vec3(1.0), vLiq.rgb, 0.35), 1.12 + (r3.g - 0.5) * 0.35), mirror);
+  own = mix(own, own * uGlaze, vLiqP.y * smoothstep(0.1, -0.9, hN) * 0.5);      // the hollows of a rolling cloud sea
+  // rain stipples the surface: it mirrors less and takes the sky's value
+  mirror *= (1.0 - 0.45 * uWx.w) * (1.0 - 0.6 * rough);
+  c = mix(own, pcDensity(c * mix(vec3(1.0), vLiq.rgb, 0.35), 1.12 + (r3.g - 0.5) * 0.35 - hN * 0.40), mirror);
 
   // horizontal strokes of reflected sky where the surface is ruffled
   float ruf = smoothstep(0.585, 0.66, r1.b * 0.55 + r2.g * 0.45);
   c = mix(c, skyc, ruf * 0.55 * mirror);
+  // a sea that is running is laid in broken strokes of unequal weight: dark in the hollows
+  // between the sets, thin where the backs of the waves take the sky (the strokes are
+  // anchored to the planet; seen across the water they lie flat, as strokes on a sea do)
+  float band = (texture(uNoise3D, vBody / 7.3 + 0.21).g - 0.5) * 1.5 + (r3.b - 0.5) * 0.9;
+  c = pcDensity(c, 1.0 + rough * (band * 0.9 - hN * 0.25));
 
   // the bed shows through where the water is shallow or seen from above
   float fres = pow(1.0 - max(dot(Vd, up), 0.0), 2.5);
@@ -341,11 +382,35 @@ void main() {
   c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDepth)) * 0.35);
   // bare-paper glints: broken dashes where ripples catch the light
   float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDepth) * uDayness;
-  glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y);
+  glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y) * (1.0 - 0.7 * wavy);
+  // the sea running: bare paper along the tops of the higher waves, in broken dashes that lie
+  // the way the crests lie; whitecaps where it breaks, ragged; surf where it shoals at a shore
+  float liq = (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
+  float deep = smoothstep(0.04, 0.3, vDepth);
+  vec4 r6 = texture(uNoise3D, vBody / 0.62 + drift * 3.0);
+  float torn = r6.r * 0.55 + r2.g * 0.45;
+  // (the crest line itself: high water where the slope along the waves' way turns over)
+  float sAlong = abs(dot(wv.yz, uPhysWaterDir));
+  float crest = smoothstep(0.25, 0.70, hN) * (1.0 - smoothstep(0.07, 0.24, sAlong)) * smoothstep(0.36, 0.50, torn) * (0.35 + 0.65 * uDayness);
+  // (a whitecap is not a white sheet: torn dabs of paper on the front of the crest, with the
+  // sea's own wash showing between them)
+  float foam = cf.y * smoothstep(0.40, 0.90, hN) * smoothstep(0.44, 0.58, torn) * keep;
+  // far off: the same share of white, as a few anchored dabs
+  float capFar = uPhysWaterSea.y < 1.0e8 ? smoothstep(0.02, 0.12, uPhysWaterSea.w) : 0.0;
+  float capTh = 0.70 - 0.55 * uPhysWaterSea.w;
+  foam = max(foam, capFar * (1.0 - keep) * smoothstep(capTh, capTh + 0.05, r3.r * 0.6 + r1.g * 0.4) * (1.0 - smoothstep(500.0, 1500.0, dist)));
+  // (in the shallows the breaking crests are white, ragged lines; at the waterline a thin
+  // broken edge of swash that can still be seen from far off)
+  float sz = pcPhysWaterSurf(vDepth);
+  float surf = sz * sz * smoothstep(0.50, 0.85, hN + (r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5);
+  float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDepth)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
+  surf = max(surf, swash * smoothstep(0.40, 0.60, r2.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
+  float white = max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDepth)) * liq;
+  glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   float f = pcFogAmount(dist);
   c = pcAtmos(c, f);
-  pcWrite(c, mix(0.7, 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
+  pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
 `;
 
@@ -359,6 +424,8 @@ export function makeWaterMaterial(bodyU, skyU) {
       uBed: { value: new THREE.Vector3(0.80, 0.70, 0.52) },
       uTreeLine: { value: 0.30 },
       uPrevTex: G.uPrevTex, uPrevOn: G.uPrevOn,
+      uPhysAnchor: PHYS.uPhysAnchor, uPhysEast: PHYS.uPhysEast, uPhysNorth: PHYS.uPhysNorth, uPhysUp: PHYS.uPhysUp,
+      ...PHYSW,
     }),
     vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
   });

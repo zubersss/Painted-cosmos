@@ -115,3 +115,26 @@ export function syncPhysFlora(F) {
   for (const k in F.uniforms) if (PHYS[k]) PHYS[k].value.fromArray(F.uniforms[k]);
   PHYS.uPhysOn.value = 1;
 }
+
+// PHYSICS' sea (docs/notes/physics.md, "For PAINTER" D): the uniforms of its wave chunk, shared
+// by every liquid material. The world copies them from physics.fields.water each frame; with
+// no physics (or on a body it is not running on) the sea lies flat.
+export const PHYSW = {
+  uPhysWaterDir: { value: new THREE.Vector2(1, 0) }, uPhysWaterK: { value: new THREE.Vector4(1, 1, 1, 1) },
+  uPhysWaterAmp: { value: new THREE.Vector4() }, uPhysWaterPhase: { value: new THREE.Vector4() },
+  uPhysWaterGroup: { value: new THREE.Vector4() }, uPhysWaterSea: { value: new THREE.Vector4(0, 1e9, 1, 0) },
+  uPhysWake: { value: new Float32Array(64) }, uPhysWakeG: { value: 9.81 },
+  uWaveLod: { value: 1 },   // scales the distance over which the mesh can still carry the waves
+};
+const _noWake = new Float32Array(64);
+export function syncPhysWater(W) {
+  const u = W && W.uniforms;
+  if (!u) {
+    PHYSW.uPhysWaterAmp.value.set(0, 0, 0, 0); PHYSW.uPhysWaterSea.value.set(0, 1e9, 1, 0); PHYSW.uPhysWake.value = _noWake;
+    return;
+  }
+  PHYSW.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); PHYSW.uPhysWaterK.value.fromArray(u.uPhysWaterK);
+  PHYSW.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); PHYSW.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase);
+  PHYSW.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); PHYSW.uPhysWaterSea.value.fromArray(u.uPhysWaterSea);
+  PHYSW.uPhysWake.value = u.uPhysWake; PHYSW.uPhysWakeG.value = u.uPhysWakeG;
+}

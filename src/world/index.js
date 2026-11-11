@@ -14,7 +14,7 @@ import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
-import { makeBodyUniforms, SHEET, WX, skyNow, syncPhysFlora } from '../render/shared.js';
+import { makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { defaultBodyUniforms } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -117,6 +117,9 @@ export function createWorld(scene) {
     const active = activeBodyId && state.has(activeBodyId) ? state.get(activeBodyId) : null;
     // PHYSICS' flora field for the body it is running on (it has already updated this frame)
     syncPhysFlora(physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id) ? physics.fields.flora : null);
+    const physHere = physics && physics.fields && active && (!physics.here || !physics.here.bodyId || physics.here.bodyId === active.id);
+    syncPhysWater(physHere ? physics.fields.water : null);
+    PHYSW.uWaveLod.value = QUALITY.level === 0 ? 0.6 : 1;
     for (const st of state.values()) {
       const root = st.root;
       root.updateMatrixWorld(true);
