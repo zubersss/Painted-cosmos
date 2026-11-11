@@ -32,7 +32,9 @@ import { makeRng, clamp01 } from './util.js';
 
 export const PARTICLES = Object.freeze({
   kinds: ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'],
-  capacity: { rain: [700, 1600, 3200], snow: [800, 2000, 2800], hail: [0, 200, 400], dust: [300, 800, 1600], sand: [300, 800, 1600], ash: [200, 600, 1200], spores: [200, 500, 1000], leaves: [60, 160, 320], spray: [200, 500, 1000] },
+  capacity: { rain: [700, 1600, 3200], snow: [800, 2000, 2800], hail: [0, 200, 400], dust: [300, 1000, 2400], sand: [300, 1200, 2800], ash: [200, 600, 1200], spores: [200, 500, 1000], leaves: [80, 260, 600], spray: [200, 800, 1800] },
+  // (P10, the owner's instruction: no count is a budget. Dust, sand, leaves and spray were raised so that a storm's veils,
+  // the streamers of blowing sand and snow, a flock of leaves and the spume of a gale are many small marks, not a few large ones.)
   radius: 24,          // m: half-width of the simulated volume around the focus
   // Snow is simulated in a smaller box, and round the EYE (frame.eye; the focus when none is
   // given). A snowfall is the same everywhere near by, single flakes only read near the lens
@@ -64,6 +66,9 @@ function makeBuffer(cap) {
     count: 0, capacity: cap,
     pos: new Float32Array(cap * 3), vel: new Float32Array(cap * 3), size: new Float32Array(cap), age: new Float32Array(cap),
     mat: new Uint8Array(cap).fill(255), left: new Float32Array(cap).fill(1e9),
+    // hag: m above the ground under it (the loose kinds: dust, sand, leaves, spray ...; what falls from the sky leaves it 0).
+    // What blows is densest at the ground and thins upward: a veil's opacity follows this (three/expand.js expandVeils).
+    hag: new Float32Array(cap),
     origin: { x: 0, y: 0, z: 0 }, radius: PARTICLES.radius,
     species: null, fallSpeed: 0,
     // internal: frame coordinates (east, up, north), terminal speed, phase

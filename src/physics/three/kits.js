@@ -34,8 +34,8 @@
 // where info.attributes says so). Nothing needs blending: particles fade by shrinking, and
 // the shapes inside a quad are cut with `discard`. A material that ignores the chunk and just
 // uses `position` (makeWashMaterial from src/render/index.js) also works with the cpu kits.
-// Budget (PILOT): all kits together are at most 12 draw calls and, with every buffer full at
-// the highest quality, 31 k triangles; they set no render order (the draw order is PAINTER's).
+// Counts (no budget since the owner's instruction, COORDINATOR E): 12 draw calls; with every buffer full at
+// the highest quality about 37 k triangles (kits.test.mjs prints it); they set no render order (the draw order is PAINTER's).
 //
 // Coordinates (C3): each object sits at its buffer's origin, a body-local point, as a child of
 // the body root; vertices are relative to it in body-local axes. Nothing here knows about the
@@ -44,7 +44,7 @@
 // logdepthbuf chunks in a ShaderMaterial, as everywhere else).
 import * as THREE from 'three';
 import { PARTICLES } from '../particles.js';
-import { DRAW, makeEye, cellFor, expandStreaks, expandDabs, dabSize, expandShades, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './expand.js';
+import { DRAW, makeEye, cellFor, expandStreaks, expandDabs, dabSize, expandShades, expandVeils, expandMats, expandMarks, expandRings, expandWater, quadIndices, quadUvs, gridIndices } from './expand.js';
 import { PARTICLE_GLSL } from './chunks.glsl.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -57,6 +57,9 @@ const COLOR_ATTR = '#if !defined(USE_COLOR) && !defined(USE_COLOR_ALPHA)\nattrib
 const MAT_ATTR = 'attribute float aPcMat;\n', matOf = (inked) => (inked ? 'aPcMat' : '255.0');
 const chunkPlain = (data, inked) => `${VARYINGS}${inked ? MAT_ATTR : ''}vec3 pcKitPosition() { vPcUv = uv; vPcData = ${data}; vPcMat = ${matOf(inked)}; return position; }\n`;
 const chunkShaded = (inked) => `${VARYINGS}${COLOR_ATTR}${inked ? MAT_ATTR : ''}vec3 pcKitPosition() { vPcUv = uv; vPcData = vec4(color.r, 0.0, 0.0, 0.0); vPcMat = ${matOf(inked)}; return position; }\n`;
+// a cpu kind's chunk: its shade (if it varies), the ground it came from (if it can), and for a veil its opacity and softness
+const VEIL_ATTR = 'attribute vec3 aPcVeil;\n';
+const chunkCpu = (shaded, inked, veil) => `${VARYINGS}${shaded ? COLOR_ATTR : ''}${inked ? MAT_ATTR : ''}${veil ? VEIL_ATTR : ''}vec3 pcKitPosition() { vPcUv = uv; vPcData = vec4(${shaded ? 'color.r' : '1.0'}, ${veil ? 'aPcVeil.x, aPcVeil.y, aPcVeil.z' : '0.0, 0.0, 0.0'}); vPcMat = ${matOf(inked)}; return position; }\n`;
 const chunkData = (name, inked) => `${VARYINGS}attribute vec4 ${name};\n${inked ? MAT_ATTR : ''}vec3 pcKitPosition() { vPcUv = uv; vPcData = ${name}; vPcMat = ${matOf(inked)}; return position; }\n`;
 const chunkGpu = (shape, vary) => `${PARTICLE_GLSL}${VARYINGS}vec3 pcKitPosition() { vPcUv = uv; vPcData = vec4(pcPhysShade(${vary.toFixed(3)}), aPcAge, aPcSize, length(aPcVel)); vPcMat = aPcMat; return ${shape === 'streak' ? 'pcPhysStreak' : 'pcPhysDab'}(position.xy); }\n`;
 // the kinds that are raised from the ground (their particles carry its material; the others never do)
@@ -104,13 +107,14 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
   const U = gpu ? { uPcEye: { value: new THREE.Vector3() }, uPcEyeVel: { value: new THREE.Vector3() }, uPcRight: { value: new THREE.Vector3(1, 0, 0) }, uPcUp: { value: new THREE.Vector3(0, 1, 0) }, uPcFocus: { value: new THREE.Vector4() },
     uPcEast: { value: new THREE.Vector3(1, 0, 0) }, uPcNorth: { value: new THREE.Vector3(0, 0, -1) }, uPcShelter: { value: new THREE.Vector4() } } : null;
   eye.shelters = new Float32Array(16);
+  const band = { e: 0, n: 0, ox: 0, oy: 0, oz: 0, ok: false };
   const parts = [];
   for (const kind of kinds) {
     const buf = physics.particles[kind];
     if (!buf) continue;
     const D = { ...DRAW[kind], ...(draw[kind] || {}) };
     const cap = buf.capacity || buf.pos.length / 3;
-    let geo, posA = null, colA = null, matA = null, uniforms = null;
+    let geo, posA = null, colA = null, matA = null, veilA = null, uniforms = null;
     const inked = !!INKED[kind] && !!buf.mat;
     if (gpu) {
       geo = new THREE.InstancedBufferGeometry();
@@ -131,18 +135,22 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
       geo.setAttribute('uv', new THREE.BufferAttribute(quadUvs(cap), 2));
       if (D.vary > 0) { colA = dyn(new Float32Array(cap * 12).fill(1), 3); geo.setAttribute('color', colA); }
       if (inked) { matA = dyn(new Uint8Array(cap * 4).fill(255), 1); geo.setAttribute('aPcMat', matA); }
+      if (D.veil) { veilA = dyn(new Float32Array(cap * 12), 3); geo.setAttribute('aPcVeil', veilA); }
       geo.setIndex(new THREE.BufferAttribute(quadIndices(cap), 1));
       geo.setDrawRange(0, 0);
     }
     const info = { shape: D.shape, draw: D, region: REGION[kind],
-      attributes: gpu ? ['position', 'uv', 'aPcPos', 'aPcVel', 'aPcSize', 'aPcAge', 'aPcLeft', 'aPcMat'] : ['position', 'uv'].concat(colA ? ['color'] : [], matA ? ['aPcMat'] : []),
+      attributes: gpu ? ['position', 'uv', 'aPcPos', 'aPcVel', 'aPcSize', 'aPcAge', 'aPcLeft', 'aPcMat'] : ['position', 'uv'].concat(colA ? ['color'] : [], matA ? ['aPcMat'] : [], veilA ? ['aPcVeil'] : []),
       uniforms: uniforms || {}, inked: gpu || inked,
-      vertexChunk: gpu ? chunkGpu(D.shape, D.vary || 0) : (colA ? chunkShaded(inked) : chunkPlain('vec4(1.0, 0.0, 0.0, 0.0)', inked)),
-      data: gpu ? 'x: shade 1 - vary .. 1 (stays with the particle), y: age (s), z: grain size (m), w: speed (m/s)' : 'x: shade 1 - vary .. 1 (stays with the particle); y, z, w: 0',
+      vertexChunk: gpu ? chunkGpu(D.shape, D.vary || 0) : veilA ? chunkCpu(!!colA, inked, true) : (colA ? chunkShaded(inked) : chunkPlain('vec4(1.0, 0.0, 0.0, 0.0)', inked)),
+      veil: !!veilA,
+      data: gpu ? 'x: shade 1 - vary .. 1 (stays with the particle), y: age (s), z: grain size (m), w: speed (m/s)'
+        : veilA ? 'x: shade 1 - vary .. 1 (stays with the particle); y: opacity 0..1 (what the mark hides at its densest: most at the ground, thinning upward, coming and going with the mark); z: softness 0..1 (the share of its half-size that is feathered edge); w: 0 a round puff .. 1 a level streamer'
+          : 'x: shade 1 - vary .. 1 (stays with the particle); y, z, w: 0',
       chunk: gpu ? PARTICLE_GLSL : null };
     const mesh = new THREE.Mesh(geo, makeMaterial(kind, info));
     mesh.name = 'pc-physics-' + kind; mesh.frustumCulled = false; mesh.visible = false; mesh.matrixAutoUpdate = true;
-    parts.push({ kind, buf, D, mesh, geo, posA, colA, matA, cap, uniforms, drawn: 0, size: 0, share0: D.share > 0 ? D.share : 1 });
+    parts.push({ kind, buf, D, mesh, geo, posA, colA, matA, veilA, cap, uniforms, drawn: 0, size: 0, share0: D.share > 0 ? D.share : 1 });
   }
   // rings
   let ring = null;
@@ -191,6 +199,15 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         for (let k = 0; k < ns; k++) { const a = k * 4; eye.shelters[a] = S.shelters[a] - ge; eye.shelters[a + 1] = S.shelters[a + 1] - gn; eye.shelters[a + 2] = S.shelters[a + 2] - gu; eye.shelters[a + 3] = S.shelters[a + 3]; }
         eye.shelterCount = ns;
         if (gpu) { U.uPcEast.value.set(fr.ex, fr.ey, fr.ez); U.uPcNorth.value.set(fr.nx, fr.ny, fr.nz); if (ns) U.uPcShelter.value.set(eye.shelters[0], eye.shelters[1], eye.shelters[2], eye.shelters[3]); else U.uPcShelter.value.set(0, 0, 0, 0); } }
+      // bands (snow in a wind): the pattern is carried by the wind, as the flakes are (the mean wind at the
+      // focus, integrated on the physics clock; kept where it is on the ground when the frame re-anchors)
+      { const G = physics.fields.air, we = G ? G.cwe || 0 : 0, wn = G ? G.cwn || 0 : 0, U = Math.hypot(we, wn), O = fr;
+        if (band.ok) { band.e -= (O.ox - band.ox) * fr.ex + (O.oy - band.oy) * fr.ey + (O.oz - band.oz) * fr.ez; band.n -= (O.ox - band.ox) * fr.nx + (O.oy - band.oy) * fr.ny + (O.oz - band.oz) * fr.nz; }
+        band.ox = O.ox; band.oy = O.oy; band.oz = O.oz; band.ok = true;
+        band.e += we * track.dt; band.n += wn * track.dt;
+        eye.bandE = band.e; eye.bandN = band.n;
+        if (U > 0.5) { eye.bandWe = we / U; eye.bandWn = wn / U; }
+        const t = (U - 4) / 8; eye.band01 = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t); }
       for (const P of parts) {
         const b = P.buf, n = Math.min(b.count, P.cap);
         P.mesh.visible = n > 0; P.drawn = n;
@@ -202,7 +219,8 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
         eye.vx = track.vx; eye.vy = track.vy; eye.vz = track.vz;
         eye.rx = track.rx; eye.ry = track.ry; eye.rz = track.rz; eye.ux = track.ux; eye.uy = track.uy; eye.uz = track.uz;
         eye.fx = F.x - O.x; eye.fy = F.y - O.y; eye.fz = F.z - O.z; eye.radius = PARTICLES.radius; eye.pix = pix;
-        eye.wall01 = P.kind === 'dust' ? physics.here.weather.dustLoad01 || 0 : 0;
+        // (P10: what the wind itself raises is streamers too: the powder over blowing snow, the fines over blowing sand)
+        eye.wall01 = P.kind === 'dust' ? Math.max(physics.here.weather.dustLoad01 || 0, 0.9 * (physics.here.blown ? Math.max(physics.here.blown.snow, physics.here.blown.sand) : 0)) : 0;
         // (rain: more strokes the harder it rains; the share moves as slowly as the sky's number does)
         if (P.D.shareGain > 0) P.D.share = Math.min(1, P.share0 * (0.6 + P.D.shareGain * (physics.here.sky.rain || 0)));
         // how large a dab is now: its own size, or what the dust (snow) in the air needs to hide what it hides
@@ -234,6 +252,7 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
           send(P.posA, n * 12);
           if (P.colA) { expandShades(b, P.D.vary, P.colA.array); send(P.colA, n * 12); }
           if (P.matA) { expandMats(b, P.matA.array); send(P.matA, n * 4); }
+          if (P.veilA) { expandVeils(b, P.D, eye, P.veilA.array); send(P.veilA, n * 12); }
           P.geo.setDrawRange(0, n * 6);
         }
         stats.drawCalls++; stats.vertices += n * 4; stats.triangles += n * 2; stats.particles += n;

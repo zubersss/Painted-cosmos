@@ -258,12 +258,13 @@ test('cost of the arithmetic: a downpour, a full ring of marks and the water gri
   assert.ok(tS < 0.4 && tD < 0.4 && tC < 0.2 && tM < 0.5 && tW < 0.4, 'each well under half a millisecond');
 });
 
-test('the kits stay inside the budget PILOT set: 12 draw calls and far fewer than 60 k triangles with every buffer full', () => {
+test('what the kits can draw with every buffer full at the highest quality (reported; the owner removed the budget of 12 draw calls and 60 k triangles)', () => {
   let tris = 0, calls = 0;
   for (const k of PARTICLES.kinds) { tris += PARTICLES.capacity[k][2] * 2; calls++; }
   tris += PARTICLES.events * 2 + 256 * 2 + 40 * 40 * 2; calls += 3;      // rings, marks, the water patch
-  assert.ok(calls <= 12, 'draw calls: ' + calls);
-  assert.ok(tris <= 32000, 'triangles, everything full at the highest quality: ' + tris);
+  console.log(`# kits, everything full at the highest quality: ${calls} draw calls, ${tris} triangles`);
+  // (no count is a gate any more: COORDINATOR E, "OWNER'S INSTRUCTION". What is held is that the numbers are known.)
+  assert.ok(calls > 0 && tris > 0 && Number.isFinite(tris));
 });
 
 test('ink for the kits: a particle\'s material on its four vertices, a mark\'s on its quad', () => {
@@ -474,7 +475,7 @@ test('a flake has a shape of its own and turns slowly; driven by wind it lies al
   assert.ok(tumbling <= round * 1.1 + 0.02, `the largest change of shape between two wind speeds: ${tumbling} of the flake (round: ${round})`);
 });
 
-test('dust in a storm: a few low level walls, wider than high, instead of many round puffs; kicked dust in clear air stays a puff', () => {
+test('dust in a storm: low level veils, wider than high, instead of round puffs (P10: six in ten of the marks, it was one in twenty); kicked dust in clear air stays a puff', () => {
   const eye = makeEye(); eye.pix = 0.002;
   // the eye looks north-ish and a little down; local up is +y (east = +x, north = -z in makeEye)
   const pitch = 0.3; eye.ux = 0; eye.uy = Math.cos(pitch); eye.uz = -Math.sin(pitch);
@@ -496,10 +497,11 @@ test('dust in a storm: a few low level walls, wider than high, instead of many r
     assert.ok(Math.abs(a[1]) < 1e-6 * w, 'its long side is level'); assert.ok(Math.abs(u[0]) < 1e-6 && Math.abs(u[2]) < 1e-6, 'its short side is the local up');
   }
   assert.ok(drawn > n * D.wallShare * 0.5 && drawn < n * D.wallShare * 2.2, `${drawn} walls of ${n} puffs`);
-  // half way there are already few of them (thinned first, widened after)
+  // half way there are already about as few of them as in the storm (thinned first, widened after)
+  // (P10: the limit follows the share, 1.5 x wallShare + 2 %; it was a fixed 12 % when the share was 5 %)
   eye.wall01 = 0.5 * (D.wallFrom + D.wallFull); expandDabs(b, D, eye, o, 0.5 * (D.size + D.sizeMax));
   drawn = 0; for (let q = 0; q < n; q++) if (len(wide(q)) > 1e-3) drawn++;
-  assert.ok(drawn < n * 0.12, `half way: ${drawn} of ${n}`);
+  assert.ok(drawn < n * (1.5 * D.wallShare + 0.02), `half way: ${drawn} of ${n}`);
   // between the two it goes over steadily: a storm builds over a minute or more, 3600 frames; over 2000 steps
   // no mark changes its width by more than half a metre a step
   let worst = 0; const prev = new Float32Array(n).fill(NaN);

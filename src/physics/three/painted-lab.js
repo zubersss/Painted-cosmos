@@ -175,6 +175,10 @@ const FRAG = {
   // a puff of dust: not a disc but a ragged dry-brush patch cut from PAINTER's own noise, thinning
   // toward its edge; the pattern is fixed in the puff (it travels with it; nothing is re-rolled)
   puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; if (nz < 0.47 + 0.5 * rr * rr) discard; vec3 c = mix(vec3(1.0), ink, 0.8) * (0.9 + 0.1 * vPcData.x); float w = 0.75;',
+  // a leaf (P10): a lens with pointed ends on the thin quad the kit lays (3:1 at its broadest, a line edge-on)
+  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; if (abs(lp.y) > 1.0 - lp.x * lp.x) discard; vec3 c = ink * (0.72 + 0.28 * vPcData.x); float w = 0.3;',
+  // spume and surf (P10): a pale wet stroke like the rain's
+  spume: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * 0.97; float w = 0.95;',
   ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.22) discard; vec3 c = ink; float w = 0.8;',
   // a print: darker ground inside, a paler rim on loose ground. Shallow prints are faint, deep
   // ones full; a scour dish is only its pale ring. Fading thins the mark through PAINTER's noise
@@ -198,15 +202,70 @@ const DRAW_LAB = {}; for (const k in DRAW_PAINTED) DRAW_LAB[k] = { ...DRAW_PAINT
 for (const k of ['snowSize', 'snowMin', 'snowMax', 'snowCell', 'dustMax', 'dustSize']) if (Q.has(k)) { const kind = k.slice(0, 4), f = { Size: 'size', Min: 'minPx', Cell: 'cell', Max: k === 'dustMax' ? 'sizeMax' : 'maxPx' }[k.slice(4)]; DRAW_LAB[kind][f] = num(k, DRAW_LAB[kind][f]); }
 const kitMaterials = [];
 let palette = null;
+const figure = { value: 0 };
+// What blows as a GLAZE (P10; `glaze=0` puts dust and sand back in the painting as cut marks): the dust veils
+// and the skim of blowing sand or snow are laid over the finished painting in a pass of their own, alpha-blended,
+// because nothing cut with `discard` can be soft and every cut mark gets the post pass's dark outline (that
+// outline is why blowing sand read darker than the dune). This is the lab's stand-in for a glaze PAINTER would
+// lay inside its own pipeline (before the paper and the edge pass, tested against the scene's depth): here it
+// has no depth and no paper grain. What it shows is the physics' half: where the veils are, how low, how many,
+// how they thin upward (vPcData.y) and how soft their edges are (vPcData.z).
+const glazeOn = Q.get('glaze') !== '0';
+// (leaves too: a leaf seen edge-on is a line a pixel or two wide, and the post pass erases any mark under about
+// three of its pixels: in the painting a flock of 135 leaves left three specks)
+const GLAZED = { dust: true, sand: true, leaves: true };
+const SNOW_INDEX = MATERIAL_IDS.indexOf('snow');
+function makeGlaze(kind, info) {
+  palette = palette || inkPalette(world.sampleSurface(bodyId, up0).biomeId);
+  const veil = kind === 'dust', leaf = kind === 'leaves';
+  const m = new THREE.ShaderMaterial({
+    name: 'pc-glaze-' + kind, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { ...info.uniforms, uCol: { value: new THREE.Color(INK[kind]) }, uPcInk: { value: palette } },
+    vertexShader: `${info.vertexChunk}\nvoid main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(pcKitPosition(), 1.0); }`,
+    fragmentShader: `uniform vec3 uCol; uniform vec3 uPcInk[16]; varying vec2 vPcUv; varying vec4 vPcData; varying float vPcMat;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+void main() {
+  bool snow = abs(vPcMat - ${SNOW_INDEX}.0) < 0.5;
+  vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)].rgb : uCol;
+  // what blows is paler than the ground it left (lit grains against the ground's own shadow); blowing snow
+  // is bare paper (PAINTER's blizzard ground is a blue shadow wash since its block 4: figure and ground)
+  vec3 c = snow ? vec3(0.975, 0.98, 0.99) : mix(ink, vec3(0.97, 0.95, 0.91), 0.5);
+  float a;
+  ${leaf ? `vec2 lp = (vPcUv - 0.5) * 2.0;
+  // a lens with pointed ends on the thin quad the kit lays; its own shade of the leaf colour
+  a = 1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x));
+  c = uCol * (0.7 + 0.3 * vPcData.x);` : veil ? `vec2 p = (vPcUv - 0.5) * 2.0;
+  float soft = clamp(vPcData.z, 0.08, 1.0);
+  // a streamer, not a blob: long and level, its ends feathered over vPcData.z of its half-length, densest just
+  // above its foot and thinning to nothing at its top; wisps along its length (fixed in the veil, which
+  // travels with the wind)
+  float ends = 1.0 - smoothstep(1.0 - max(soft, 0.8), 1.0, abs(p.x));
+  // (a wisp: its top comes down toward its ends)
+  float up = (p.y + 1.0) * 0.5 / (0.3 + 0.7 * (1.0 - p.x * p.x));
+  float prof = smoothstep(0.0, 0.12 + 0.2 * soft, up) * exp(-2.6 * up) * (1.0 - smoothstep(0.75, 1.0, up));
+  a = ends * prof * 1.6;
+  // (a puff, where the kit says the mark is one: round, soft all the way in)
+  a = mix((1.0 - smoothstep(1.0 - soft, 1.0, length(p))) * 0.7, a, vPcData.w);
+  a *= 0.3 + 0.7 * vn(vec2(vPcUv.x * 2.4 + vPcData.x * 37.0, vPcUv.y * 6.5 + vPcData.x * 11.0));
+  a *= vPcData.y;` : `float tpr = abs(vPcUv.x - 0.5) * 2.0;
+  a = (1.0 - smoothstep(0.1, 1.0, tpr)) * (1.0 - vPcUv.y * vPcUv.y) * 0.8;`}
+  gl_FragColor = vec4(c, a);
+}` });
+  return m;
+}
 function makeKitMaterial(kind, info) {
-  let body = FRAG[kind === 'dust' || kind === 'ash' ? 'puff' : kind === 'snow' ? 'flake' : info.shape];
+  let body = FRAG[kind === 'dust' || kind === 'ash' ? 'puff' : kind === 'snow' ? 'flake' : kind === 'leaves' ? 'leaf' : kind === 'spray' ? 'spume' : info.shape];
+  // (P10) a flake over fresh snow was white on white until PAINTER's block 4 made the blizzard's ground a blue
+  // shadow wash; `figure=<0..1>` still draws flakes in a shadow tone by that much where fresh snow lies (default 0)
+  if (kind === 'snow') body = body.replace('vec3 c = ink;', 'vec3 c = mix(ink, vec3(0.66, 0.72, 0.84), uPcFigure);');
   if (kind === 'rain' && (rainMode === 'broad' || rainMode === 'game')) body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * 0.93; float w = 0.95;';
   if (kind === 'rain' && rainMode === 'cover') body = 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec2 cell = floor(vec2(vPcUv.x * 3.0, vPcUv.y * 14.0)); if (fract(sin(dot(cell + vPcData.x * 31.0, vec2(12.9898, 78.233))) * 43758.5453) > 0.6 - 0.45 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;';
   palette = palette || inkPalette(world.sampleSurface(bodyId, up0).biomeId);
   const m = new THREE.ShaderMaterial({
     name: 'pc-kit-' + kind,
     // everything FRAG_PARS declares (lit and hazed like the body once its uniforms are bound), plus the kit's own
-    uniforms: makePaintUniforms(world.bodyUniforms(bodyId) || undefined, { uColor: { value: _hex(INK[kind]) }, uPcInk: { value: palette }, ...info.uniforms }),
+    uniforms: makePaintUniforms(world.bodyUniforms(bodyId) || undefined, { uColor: { value: _hex(INK[kind]) }, uPcInk: { value: palette }, uPcFigure: figure, ...info.uniforms }),
     vertexShader: `${VERT_PARS}
 ${info.vertexChunk}
 varying vec3 vView;
@@ -220,6 +279,7 @@ void main() {
 ${SHAPE_GLSL}
 uniform vec3 uColor;
 uniform vec3 uPcInk[16];
+uniform float uPcFigure;
 varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView; varying float vPcMat;
 void main() {
   #include <logdepthbuf_fragment>
@@ -242,19 +302,21 @@ function makeBlendRain(info) {
     vertexShader: `${info.vertexChunk}\nvoid main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(pcKitPosition(), 1.0); }`,
     fragmentShader: 'uniform vec3 uCol; varying vec2 vPcUv; varying vec4 vPcData; void main() { float a = (1.0 - abs(vPcUv.x - 0.5) * 2.0) * (1.0 - vPcUv.y) * 0.75; gl_FragColor = vec4(uCol * vPcData.x, a); }' });
 }
-let kits = null, blendScene = null, rainMesh = null;
+let kits = null, blendScene = null, rainMesh = null, glazed = [];
 const blendRoot = new THREE.Group();
 function buildKits() {
   if (kits) kits.dispose();
   kitMaterials.length = 0; blendScene = null; rainMesh = null;
   if (Q.get('kits') === '0') { kits = null; return; }
   kits = createPhysicsKits(physics, {
-    makeMaterial: (kind, info) => (kind === 'rain' && rainMode === 'blend' ? makeBlendRain(info) : makeKitMaterial(kind, info)),
+    makeMaterial: (kind, info) => (kind === 'rain' && rainMode === 'blend' ? makeBlendRain(info) : glazeOn && GLAZED[kind] ? makeGlaze(kind, info) : makeKitMaterial(kind, info)),
     weather: { draw: { ...DRAW_LAB, rain: RAIN[rainMode] || DRAW_LAB.rain }, expand: Q.get('expand') === 'gpu' ? 'gpu' : 'cpu' },
     water: Q.get('water') === '1' ? { N: num('waterN', 64), step: num('waterStep', 1.25) } : false,      // PAINTER draws the liquid; the patch only on request
   });
   rainMesh = kits.weather.objects.find((o) => o.name === 'pc-physics-rain');
-  if (rainMode === 'blend') { blendScene = new THREE.Scene(); blendScene.add(blendRoot); }
+  // what is laid over the finished painting: the blended rain (rain=blend), the glazed kinds
+  glazed = kits.weather.objects.filter((o) => (o.name === 'pc-physics-rain' && rainMode === 'blend') || (glazeOn && GLAZED[o.name.slice(11)]));
+  if (glazed.length) { blendScene = new THREE.Scene(); blendScene.add(blendRoot); }
 }
 buildKits();
 
@@ -309,14 +371,19 @@ function draw(dt) {
     cost.kits += (kits.stats.ms - cost.kits) * 0.1;
     _vis();
     if (kits.water && num('waterLift', 0) > 0) { const m = kits.water.objects[0]; m.position.addScaledVector(up0, num('waterLift', 0)); }
-    if (blendScene && rainMesh) { blendRoot.position.copy(root.position); blendRoot.quaternion.copy(root.quaternion); blendRoot.add(rainMesh); }
+    if (blendScene) { blendRoot.position.copy(root.position); blendRoot.quaternion.copy(root.quaternion); for (const o of glazed) blendRoot.add(o); }
+    figure.value = Math.min(1, (physics.here.sky.fresh || 0) * 1.5) * num('figure', 0);
   }
   const L = world.getLighting();
   painter.setMood({ bodyId, timeOfDay: L.hours, altitude01: 0, inSpace01: L.space01, speed01: 0 });
   painter.render(scene, camera, dt);
-  if (blendScene && rainMesh && rainMesh.visible) {
-    // the blended pass: the rain alone, over the finished painting
-    const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.render(blendScene, camera); renderer.autoClear = ac;
+  if (blendScene && glazed.some((o) => o.visible)) {
+    // the blended pass: over the finished painting, inside the paper's margin
+    const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null);
+    const w = canvas.width, h = canvas.height, mx = Math.round(w * 0.026), my = Math.round(h * 0.046);
+    renderer.setScissor(mx, my, w - 2 * mx, h - 2 * my); renderer.setScissorTest(true);
+    renderer.render(blendScene, camera);
+    renderer.setScissorTest(false); renderer.autoClear = ac;
   }
 }
 function tick(now) {

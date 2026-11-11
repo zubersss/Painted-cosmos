@@ -81,6 +81,28 @@
 //           `wall` times as wide as high, at most `wallHigh` m high, only a share `wallShare` of
 //           them drawn (two or three in view, not twenty), nothing nearer than 0.4 of `wallNear`,
 //           growing and going over `wallFade` s more than a puff does.
+// New in P10 (the owner's quality push; CPU expanders only):
+//   aspect, flip, edge (dab WITH spin): a leaf is not a ball. The mark is `aspect` (short side to
+//           long, at most) when seen broadside and `edge` when seen edge-on, and goes between the two
+//           as it tumbles about its long side, `flip` rad/s (each at its own rate and phase) while it
+//           turns in the picture at `spin` rad/s, some one way, some the other.
+//   level (streak): 1 = the stroke lies along the ground: the grain's motion with its vertical part taken
+//           out (blowing sand is a skim over the surface; its grains' own hops are steep at both ends)
+//   veil (dab): the kind is a translucent thing (dust): the kit adds a per-vertex attribute
+//           aPcVeil = (opacity01, soft01, veil01) from expandVeils and puts it in vPcData.y, .z, .w:
+//           opacity01  how much of what is behind it the mark hides at its densest (dust is densest
+//                      at the ground and thins upward: veilLow at the ground, veilHigh from veilTop m
+//                      up; it comes and goes with the mark's fades instead of popping)
+//           soft01     how much of the mark's half-size is feathered edge (0 hard, 1 all of it):
+//                      veilSoft at the ground, 1 from veilTop up; a wall is softer than a puff
+//           veil01     0 the mark is a round puff .. 1 it is a level streamer (as its quad is laid)
+//   bands (dab with a cell; snow): 0..1. In a wind what falls comes in bands: the share drawn goes
+//           between 1 - bands and 1 with a pattern bandLong m along the wind and bandWide m across it
+//           that travels with the wind (eye.bandE, bandN: how far the wind has carried it; eye.band01:
+//           how much of this the wind of the moment calls for; the kit sets all three), so a flake
+//           stays in its band while both are carried along.
+import { noise3 } from '../util.js';     // (the lattice noise of the physics, -1..1: for the bands of what falls in a wind)
+
 export const DRAW = Object.freeze({
   rain: Object.freeze({ shape: 'streak', width: 0.012, exposure: 0.04, min: 0.05, fadeIn: 0.1, fadeOut: 0.08, vary: 0, minPx: 1.2 }),
   hail: Object.freeze({ shape: 'streak', width: 0.024, exposure: 0.018, min: 0.03, fadeIn: 0.1, fadeOut: 0, vary: 0, minPx: 1.2 }),
@@ -90,7 +112,7 @@ export const DRAW = Object.freeze({
   dust: Object.freeze({ shape: 'dab', size: 0.16, grow: 0.3, spin: 0, fadeIn: 0.15, fadeOut: 0.7, vary: 0.35, minPx: 1.6, sizeMax: 2.6, fill: 0.785, near: 2.5 }),
   ash: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 1.5, fadeIn: 0.3, fadeOut: 0.4, vary: 0.4, minPx: 1.6 }),
   spores: Object.freeze({ shape: 'dab', size: 0.03, grow: 0, spin: 0, fadeIn: 0.4, fadeOut: 0.4, vary: 0.3, minPx: 1.6 }),
-  leaves: Object.freeze({ shape: 'dab', size: 0.075, grow: 0, spin: 3.2, fadeIn: 0.3, fadeOut: 0.3, vary: 0.5, minPx: 1.6 }),
+  leaves: Object.freeze({ shape: 'dab', size: 0.09, grow: 0, spin: 3.2, aspect: 0.33, flip: 5, edge: 0.07, fadeIn: 0.3, fadeOut: 0.3, vary: 0.5, minPx: 1.6 }),
 });
 
 // The same table for PAINTER's pipeline, as overrides of DRAW (pass it as `draw` to the weather
@@ -107,15 +129,24 @@ export const DRAW_PAINTED = Object.freeze({
   // shareGain: the share drawn follows how hard it rains: share x (0.6 + shareGain x sky.rain): 0.16 in a drizzle, 0.4 in a downpour
   rain: Object.freeze({ width: 0.05, exposure: 0.12, minPx: 4, share: 0.25, shareGain: 1, parallel: 1, maxLen: 1.2, near: 6 }),
   // snow: PAINTER's sizes (0.07 m, 3.5 to 6.5 px: 0.1 m and 10 px were popcorn), each flake its own shape and turn
-  snow: Object.freeze({ size: 0.07, minPx: 3.5, maxPx: 6.5, exposure: 0.04, smear: 1.2, varySize: 0.5, cell: 9, tumble: 1.2, aspect: 0.5 }),
+  // (P10) in a wind a flake is a level stroke as long as it travels in a frame, up to 8 flake sizes (it was
+  // 3: beyond that the mark was taken away as a hairline, so a 19 m/s blizzard drew almost nothing near the
+  // eye); and the snow comes in bands
+  snow: Object.freeze({ size: 0.07, minPx: 3.5, maxPx: 6.5, exposure: 0.04, smear: 1.2, varySize: 0.5, cell: 9, tumble: 1.2, aspect: 0.5, streak: 8, bands: 0.8, bandLong: 9, bandWide: 2.2 }),
   hail: Object.freeze({ width: 0.05, minPx: 3, maxLen: 0.6 }),
-  sand: Object.freeze({ width: 0.035, minPx: 3, exposure: 0.05, vary: 0.12 }),
-  spray: Object.freeze({ width: 0.04, minPx: 3 }),
-  // dust: round ragged puffs where it is kicked up; in a storm a few low walls, four times as wide as high
-  dust: Object.freeze({ size: 0.5, grow: 0.35, minPx: 8, maxPx: 80, sizeMax: 2.6, fill: 0.3, exposure: 0.12, wall: 4, wallFrom: 0.25, wallFull: 0.7, wallShare: 0.05, wallHigh: 2.2, wallNear: 9, wallFade: 1.2 }),
+  // (P10) the skim of blowing sand (or snow): each grain a short low smear along its hop
+  sand: Object.freeze({ width: 0.08, minPx: 3, exposure: 0.22, vary: 0.12, maxLen: 1.4, level: 1, near: 3 }),
+  // (P10) spume and surf: each mark a flick of white as long as the drop flies in a tenth of a second
+  spray: Object.freeze({ width: 0.11, minPx: 4, exposure: 0.1, maxLen: 1.5, min: 0.12 }),
+  // dust: round ragged puffs where it is kicked up; in a storm low veils, eleven times as wide as high.
+  // (P10) many and soft: 6 in 10 of the marks are veils (it was 1 in 20: four or five blots), none over
+  // 1.1 m high, each translucent (veil: opacity and softness per vertex, for a glaze)
+  dust: Object.freeze({ size: 0.5, grow: 0.35, minPx: 8, maxPx: 160, sizeMax: 2.6, fill: 0.3, exposure: 0.12, wall: 11, wallFrom: 0.25, wallFull: 0.7, wallShare: 0.6, wallHigh: 1.1, wallNear: 3.5, wallFade: 1.2,
+    veil: 1, veilLow: 0.75, veilHigh: 0.15, veilTop: 3, veilSoft: 0.5 }),
   ash: Object.freeze({ size: 0.09, minPx: 4, exposure: 0.03 }),
   spores: Object.freeze({ size: 0.05, minPx: 3 }),
-  leaves: Object.freeze({ size: 0.1, minPx: 4 }),
+  // (P10) a leaf 17 cm long, never under 6 px long: thin, so its ink is a third of a disc's that size
+  leaves: Object.freeze({ size: 0.17, minPx: 6 }),
 });
 
 // The cell (m, half-width) a kind is shown modulo: the one nearest D.cell of which the
@@ -150,7 +181,10 @@ export function makeEye() {
     // and what keeps the weather off: shelters = [east, north (m from the eye), top (m above the eye), radius] x shelterCount
     ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: -1, shelters: null, shelterCount: 0,
     // 0..1: how much dust the weather carries (weather.dustLoad01): dust dabs with a `wall` become low walls in a storm
-    wall01: 0 };
+    wall01: 0,
+    // bands (P10): how far the wind has carried the band pattern (m along the local east and north, from the buffer's
+    // origin), the wind's direction (unit, east and north), and 0..1 how banded what falls is in this wind
+    bandE: 0, bandN: 0, bandWe: 1, bandWn: 0, band01: 0 };
 }
 
 // A number in 0..1 that stays with a particle for life (its size is its own).
@@ -182,6 +216,7 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
   const ex = D.exposure, hw = D.width * 0.5, min = D.min || 0, fin = D.fadeIn || 0, least = 0.5 * (D.minPx || 0) * eye.pix, most = 0.5 * (D.maxPx || 0) * eye.pix;
   const share = D.share > 0 && D.share < 1 ? D.share : 1, roomy = room > 1 ? room : 1;
   const maxLen = D.maxLen > 0 ? D.maxLen : 1e9, nearD = D.near || 0;
+  const level = D.level ? 1 : 0, Ux = eye.ey * eye.nz - eye.ez * eye.ny, Uy = eye.ez * eye.nx - eye.ex * eye.nz, Uz = eye.ex * eye.ny - eye.ey * eye.nx;
   // one direction for the frame: the mean motion relative to the eye, as the picture plane sees it
   // (dr, du: unit, along picture right and up; seen: the share of the motion that lies in the plane)
   let par = D.parallel ? 1 : 0, dr = 0, du = -1, seen = 0;
@@ -198,6 +233,8 @@ export function expandStreaks(buf, D, eye, out, room = 1) {
     const px = P[o], py = P[o + 1], pz = P[o + 2];
     // motion relative to the eye over the exposure
     let sx = (V[o] - eye.vx) * ex, sy = (V[o + 1] - eye.vy) * ex, sz = (V[o + 2] - eye.vz) * ex;
+    // level: the stroke lies along the ground (its motion with the part along the local up taken out)
+    if (level) { const d = sx * Ux + sy * Uy + sz * Uz; sx -= Ux * d; sy -= Uy * d; sz -= Uz * d; }
     let sl = Math.sqrt(sx * sx + sy * sy + sz * sz);
     const tx = px - eye.x, ty = py - eye.y, tz = pz - eye.z;
     let wx, wy, wz, wl = 1;
@@ -244,7 +281,7 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   const ex = spin === 0 ? D.exposure || 0 : 0, smear = 2 * (D.smear != null ? D.smear : 2);
   const vs = D.varySize || 0;
   const strobe = ex > 0 ? D.strobe || 0 : 0, streak = D.streak > 0 ? D.streak : 3;
-  const tumble = spin === 0 ? D.tumble || 0 : 0, aspect = D.aspect > 0 && D.aspect < 1 ? D.aspect : 1;
+  const tumble = spin === 0 ? D.tumble || 0 : 0, aspect = D.aspect > 0 && D.aspect < 1 ? D.aspect : 1;   // (with spin: a leaf, see `flip`)
   const cell = cellFor(D, eye, buf), c2 = cell * 2, M = buf.mat, SH = eye.shelters, nSH = cell > 0 && SH ? eye.shelterCount : 0;
   const Ex = eye.ex, Ey = eye.ey, Ez = eye.ez, Nx = eye.nx, Ny = eye.ny, Nz = eye.nz;
   // walls (dust in a storm): how far the marks have gone from puffs to walls, and the wall's axes:
@@ -260,6 +297,8 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   const share = (D.share > 0 && D.share < 1 ? D.share : 1) * wKeep, roomy = room > 1 ? room : 1;
   const nearD = (D.near || 0) + ((D.wallNear || D.near || 0) - (D.near || 0)) * wT;
   const fout = L ? (D.fadeOut || 0) + (D.wallFade || 0) * wT : 0, fin = (D.fadeIn || 0) + (D.wallFade || 0) * wT;
+  const band = D.bands > 0 && eye.band01 > 0 ? D.bands * eye.band01 : 0, bandLong = D.bandLong || 9, bandWide = D.bandWide || 2;
+  const flip = spin !== 0 && aspect < 1 ? D.flip || 0 : 0, edgeOn = D.edge > 0 ? D.edge : 0.08;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
     const age = A[i];
@@ -280,9 +319,16 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
       for (let k = 0; k < nSH; k++) { const a = k * 4, dx = we - SH[a], dz = wn - SH[a + 1]; if (dx * dx + dz * dz < SH[a + 3] * SH[a + 3] && (tx * Ux + ty * Uy + tz * Uz) < SH[a + 2]) { edge = 0; break; } }
     }
     const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    // bands: the share drawn here, where this flake is in the pattern the wind carries
+    let shr = share;
+    if (band > 0) {
+      const pe = px * Ex + py * Ey + pz * Ez - eye.bandE, pn = px * Nx + py * Ny + pz * Nz - eye.bandN;
+      const v = noise3((pe * eye.bandWe + pn * eye.bandWn) / bandLong, (pn * eye.bandWe - pe * eye.bandWn) / bandWide, (px * Ux + py * Uy + pz * Uz) / 6, 517);
+      shr *= 1 - band * (1 - smooth01((v + 0.25) / 0.5));
+    }
     // the floor: f times larger than it is, so one in f^2 is drawn (unless the physics leaves room)
-    if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), share * Math.min(1, roomy * f * f)); }
-    else if (share < 1) h *= thinned(own01(S[i]), share);
+    if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), shr * Math.min(1, roomy * f * f)); }
+    else if (shr < 1) h *= thinned(own01(S[i]), shr);
     if (most > 0 && h > most * dist) h = most * dist;
     const full = h;                                               // its size before the edge and the fades take from it
     if (dist < nearD) h *= smooth01((dist / nearD - 0.4) / 0.6);
@@ -292,7 +338,15 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
     let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h, lb = h;
     if (spin !== 0) {
       // each particle keeps its own phase (its size is its own and travels with it)
-      const a = age * spin + S[i] * 51413.7, c = Math.cos(a), s = Math.sin(a);
+      let a = age * spin + S[i] * 51413.7;
+      if (aspect < 1) {
+        // a leaf: turning in the picture at its own rate, one way or the other, and tumbling about
+        // its long side, so that it is seen broadside (aspect), then edge-on (a line), then broadside
+        const r1 = S[i] * 27183.31, f1 = r1 - Math.floor(r1), r2 = S[i] * 65537.17, f2 = r2 - Math.floor(r2);
+        a = age * spin * (f2 < 0.5 ? -(0.4 + 0.9 * f1) : 0.4 + 0.9 * f1) + f2 * 6.2831853;
+        lb = h * (edgeOn + (aspect - edgeOn) * Math.abs(Math.cos(age * flip * (0.6 + 0.8 * f2) + f1 * 6.2831853)));
+      }
+      const c = Math.cos(a), s = Math.sin(a);
       ax = eye.rx * c + eye.ux * s; ay = eye.ry * c + eye.uy * s; az = eye.rz * c + eye.uz * s;
       bx = eye.ux * c - eye.rx * s; by = eye.uy * c - eye.ry * s; bz = eye.uz * c - eye.rz * s;
     } else if (h > 0 && (ex > 0 || tumble > 0)) {
@@ -366,6 +420,27 @@ export function dabSize(D, extinction, count, volume, o) {
   if (extinction > 0 && count > 0) { want = Math.sqrt(extinction * volume / (count * fill)); s = want < D.size ? D.size : want > max ? max : want; }
   if (o) o.cover = want > 0 ? Math.min(1, (s * s) / (want * want)) : 1;
   return s;
+}
+
+// Veils (P10): what a translucent kind (dust) hides and how soft its edge is, per vertex:
+// out[3 per vertex] = opacity01, soft01, veil01 (see `veil` in the header; veil01: 0 a round puff ..
+// 1 a level streamer, as the kit lays its quad). buf.hag is the particle's height over the ground
+// under it; eye.wall01 what the wind carries (walls are softer).
+// out: Float32Array of at least count * 12. Returns the number of quads written.
+export function expandVeils(buf, D, eye, out) {
+  const n = Math.min(buf.count, Math.floor(out.length / 12)), A = buf.age, L = buf.left, H = buf.hag;
+  const lo = D.veilLow != null ? D.veilLow : 0.6, hi = D.veilHigh != null ? D.veilHigh : 0.15, top = D.veilTop > 0 ? D.veilTop : 3, s0 = D.veilSoft != null ? D.veilSoft : 0.5;
+  const wT = D.wall > 1 && eye.wall01 > 0 ? smooth01((eye.wall01 - (D.wallFrom || 0)) / Math.max(1e-6, (D.wallFull || 1) - (D.wallFrom || 0))) : 0;
+  const fin = (D.fadeIn || 0) + (D.wallFade || 0) * wT + 1e-3, fout = (D.fadeOut || 0) + (D.wallFade || 0) * wT + 1e-3;
+  for (let i = 0, q = 0; i < n; i++, q += 12) {
+    const up = smooth01((H ? H[i] : 0) / top);
+    let op = lo + (hi - lo) * up;
+    if (A[i] < fin) op *= A[i] / fin;
+    if (L && L[i] < fout) op *= L[i] > 0 ? L[i] / fout : 0;
+    const soft = Math.min(1, s0 + (1 - s0) * Math.max(up, 0.6 * wT));
+    for (let k = 0; k < 12; k += 3) { out[q + k] = op; out[q + k + 1] = soft; out[q + k + 2] = wT; }
+  }
+  return n;
 }
 
 // A shade per particle (the same on its four vertices) in 1 - vary .. 1, stable for the life

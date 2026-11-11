@@ -83,6 +83,10 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     cover,
     groundHeight: 0,          // m above the body's base radius, under the focus
     sky: skyNumbers(null, {}),  // the weather as eleven numbers 0..1 for a painter (sky.js), refreshed by update()
+    // what the wind is raising near the focus right now, each 0..1 (P10; for the picture and for sound):
+    // sand hopping in streamers, snow blowing along the ground (a ground blizzard at 1), spume torn off the
+    // sea's breaking crests, surf on a shore within the particle box
+    blown: { sand: 0, snow: 0, spume: 0, surf: 0 },
   };
   // Small weather near the focus, refreshed by update(): dust devils (features.js).
   const features = { devils };
@@ -303,6 +307,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     }
     // (until the ground under the focus has been sampled, nothing is known about the liquid here)
     water.update(dt, frame, airGrid.cwe, airGrid.cwn, coverKnown ? liqLevel : -1e9, liqDepth, cover.fetch || 80, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
+    // the sea's own spray: spume off the breaking crests, surf on the shore (loose.js; the drops move from the next step on)
+    loose.sea(dt, water, near, fx, fz, airGrid.cwe, airGrid.cwn, body.gravity, airGrid);
+    here.blown.sand = loose.saltation01; here.blown.snow = loose.blowingSnow01; here.blown.spume = loose.spume01; here.blown.surf = loose.surf01;
     stats.msWeather = t3 - t2; stats.msFlora = t4 - t3; stats.msParticles = now() - t4;
 
     let pc = 0;

@@ -23,7 +23,8 @@ import { saltationThreshold } from './weather.js';
 import { MATERIAL_INDEX, MATERIAL_NONE, materialNow } from './ground.js';
 import { BODIES } from '../data/bodies.js';
 import { PARTICLES, EVENT, publish } from './particles.js';
-import { clamp01, smoothstep } from './util.js';
+import { clamp01, smoothstep, noise3 } from './util.js';
+import { snowTransport01 } from './drift.js';
 
 // species: row of atmosphere.SPECIES for the fall speed.  life: [min, max] seconds.
 // puff: seconds for which a kicked or blown grain is carried by the parcel of air thrown up with
@@ -57,7 +58,43 @@ export const KICK = Object.freeze({
   impactRatio: { earth: 0.8, mars: 0.12, venus: 0.8, default: 0.8 },
 });
 
+// What the wind alone raises (P10).
+export const BLOWN = Object.freeze({
+  // Streamers: blowing sand and blowing snow do not leave the ground evenly but in sinuous bands a
+  // metre or so wide and tens of metres long that travel downwind and snake from side to side (the
+  // sweeps of the gusts near the ground; "snow snakes" on a road). The share of the ground in a
+  // band is about a third; grains are launched there and nowhere else.
+  streamLength: 16,       // m along the wind
+  streamWidth: 1.3,       // m across it
+  streamSnake: 2.2,       // m: how far a band wanders from side to side over streamWave m
+  streamWave: 28,
+  streamSpeed: 0.55,      // x the 10 m wind: how fast the bands travel downwind
+  // Blowing snow: dry snow on the ground is moved like sand, lower and slower (drift.js
+  // snowTransport01 says how hard); a ground blizzard is knee deep, a skim in a moderate wind.
+  snowRate: 1.0,          // of the sand capacity per 1.6 s at full transport
+  // Leaves: in a breeze a tree lets go of one now and then; the load on a leaf stalk goes with the
+  // square of the wind and the share of stalks that fail rises as steeply again with the load, so
+  // what is torn off goes with the fourth power of the wind; a gust front (the wind rising) strips
+  // what the lull left: a flock.
+  leafCalm: 0.002,        // of the capacity per second in still air
+  leafWind: 11,           // m/s (10 m, in the open): the wind at which the trees shed a full flock
+  leafGust: 2.5,          // x more while a gust is arriving (the wind rising at 1 m/s2)
+  // Spume and surf (the sea's own spray; before P10 only bodies raised spray).
+  // Spume: where a crest is breaking and the wind is over spumeFrom the wind tears the top off it:
+  // drops leave at the crest's speed plus a share of the wind, a little upward, and stream downwind
+  // within a metre or two of the water (Beaufort 8: "foam is blown in well-marked streaks", 9: "spray
+  // may affect visibility"; Anguelova et al. 1999 for the onset near 9 m/s of friction-scaled wind).
+  spumeFrom: 9,           // m/s at 10 m: no spume below this
+  spumeFull: 24,          // m/s: the whole capacity in the air
+  spumeLife: 2.2,         // x the life of a splash drop
+  // Surf: where the water is shallower than the waves are high the wave breaks whatever the wind:
+  // spray is thrown up and shoreward at about the speed of the breaker's lip, sqrt(g H).
+  surfDepth: 1.3,         // x the significant height: breaking starts where the water is shallower
+  surfShare: 0.5,         // of the spray capacity per second on a beach in a full sea
+});
+
 const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
+const _sf = {}, _sp = new Float64Array(2);
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
 
 export class Loose {
@@ -73,7 +110,12 @@ export class Loose {
       b.species = LOOSE[k].species;
       this.vt[k] = 1;
     }
-    this._carry = new Float64Array(8);   // fractional emissions carried between frames
+    this._carry = new Float64Array(12);  // fractional emissions carried between frames
+    this.blowingSnow01 = 0;              // 0..1: how hard the wind is moving snow along the ground at the focus (a ground blizzard)
+    this.spume01 = 0;                    // 0..1: how much spume the wind is tearing off the sea near the focus
+    this.surf01 = 0;                     // 0..1: how hard the sea is breaking on a shore near the focus
+    this._gustPrev = 0; this._gustRise = 0;
+    this._shore = new Float32Array(96).fill(1e9); this._shoreN = 0; this._shoreI = 0;   // places found shallow (surf)
     this.saltation01 = 0;                // 0..1: how hard sand is blowing at the focus right now
     this._wade = 0;
     this._T = 288;                       // K: air temperature at the focus (frozen ground glazes, warm ground muds)
@@ -100,6 +142,7 @@ export class Loose {
     const cap = PARTICLES.capacity[kind][this.P.quality];
     if (b._n >= cap) return false;
     const i = b._n++, o = i * 3, r = this.rng;
+    b.hag[i] = 0;
     b._p[o] = x; b._p[o + 1] = y; b._p[o + 2] = z;
     b._v[o] = vx; b._v[o + 1] = vy; b._v[o + 2] = vz;
     if (b._e) { b._e[o] = vx; b._e[o + 1] = vy; b._e[o + 2] = vz; }
@@ -148,8 +191,12 @@ export class Loose {
       const dust01 = wx ? wx.dustLoad01 || 0 : 0;
       const bd = P.buffers.dust, capD = PARTICLES.capacity.dust[P.quality];
       if (dust01 > 0.03 && rho > 0) {
-        carry[0] += capD * 0.6 * dust01 * h / 5;
-        while (carry[0] >= 1 && bd._n < capD * (0.25 + 0.6 * dust01)) {
+        // (P10: fed as fast as the wind carries it out of the box, so that the air near the player holds what the
+        // storm calls for: at 13 m/s a grain crosses the box in two or three seconds, and at the old rate, a fifth
+        // of the load a second, a storm that asked for 700 marks held 190)
+        const want = capD * (0.25 + 0.6 * dust01);
+        carry[0] += want * h * Math.max(0.2, 0.7 * u10 / (Rr + 6));
+        while (carry[0] >= 1 && bd._n < want) {
           carry[0] -= 1;
           // (P7) low: what reads as marks in a dust storm is the dense streamers within a few metres of
           // the ground; the dust above head height is haze (sky.dust), and a puff against the sky is a blot
@@ -161,6 +208,7 @@ export class Loose {
       // saltation: sand hops where the wind is over the threshold and the ground is loose sand
       const gp = this._ground(near, fx, fz, groundY, wet01, snowDepth);
       const loose = gp.repose > 0 ? gp.dust : 0, matHere = gp.mat;
+      const ue = u10 > 1e-6 ? cwe / u10 : 1, un = u10 > 1e-6 ? cwn / u10 : 0;
       this.saltation01 = 0;
       if (loose > 0.2 && rho > 0) {
         const ratio = KICK.impactRatio[bodyId] || KICK.impactRatio.default;
@@ -170,19 +218,51 @@ export class Loose {
           this.saltation01 = clamp01(excess / 0.7) * loose;
           const capS = PARTICLES.capacity.sand[P.quality];
           carry[1] += capS * clamp01(excess / 0.7) * loose * h / 1.6;
-          const ue = u10 > 1e-6 ? cwe / u10 : 1, un = u10 > 1e-6 ? cwn / u10 : 0;
           while (carry[1] >= 1) {
             carry[1] -= 1;
-            const x = fx + (rng() * 2 - 1) * Rr, z = fz + (rng() * 2 - 1) * Rr;
+            // (P10) in a streamer: the grains leave the ground in snaking bands, not evenly
+            this._streamPoint(fx, fz, Rr, time, ue, un, u10);
+            const x = _sp[0], z = _sp[1];
             const gy = near ? near.heightAt(x, z, groundY) : groundY;
             // launched at 50 degrees or so with a speed of a few threshold friction velocities
             const vu = (0.5 + rng() * 1.1) * Math.sqrt(9 / g) * (0.7 + 0.5 * Math.min(2, excess));
             if (!this.emit('sand', x, gy + 0.01, z, ue * vu * 0.6, vu, un * vu * 0.6, 1, 1, matHere)) break;
           }
           if (carry[1] > 4) carry[1] = 4;
-          // and the fines the hopping sand knocks loose are lifted as dust
+          // and the fines the hopping sand knocks loose are lifted as dust, over the streamers
           carry[2] += capD * 0.25 * clamp01(excess) * loose * h / 4;
-          while (carry[2] >= 1) { carry[2] -= 1; this.emit('dust', fx + (rng() * 2 - 1) * Rr, groundY + rng() * 0.6, fz + (rng() * 2 - 1) * Rr, cwe * 0.3, 0.4 + rng(), cwn * 0.3, 1, 1, matHere); }
+          while (carry[2] >= 1) {
+            carry[2] -= 1; this._streamPoint(fx, fz, Rr, time, ue, un, u10);
+            const gy = near ? near.heightAt(_sp[0], _sp[1], groundY) : groundY;
+            this.emit('dust', _sp[0], gy + rng() * 0.6, _sp[1], cwe * 0.3, 0.4 + rng(), cwn * 0.3, 1, 1, matHere);
+          }
+        }
+      }
+      // blowing snow (P10): dry snow on the ground is moved by the wind as sand is, in the same
+      // streamers: a skim of hopping grains (the sand kind, of snow: its ink is snow's) and over it
+      // the powder the wind keeps aloft (the dust kind, of snow), knee deep in a ground blizzard
+      this.blowingSnow01 = 0;
+      if (snowDepth > 0.01 && rho > 0.05) {
+        const pr = wx && wx.precipitation;
+        const tr = snowTransport01(u10, wet01, pr && pr.frozen01 > 0.5 ? pr.intensity01 || 0 : 0) * smoothstep(275, 271, this._T);
+        if (tr > 0.02) {
+          this.blowingSnow01 = tr;
+          carry[7] += PARTICLES.capacity.sand[P.quality] * BLOWN.snowRate * tr * h / 1.6;
+          while (carry[7] >= 1) {
+            carry[7] -= 1; this._streamPoint(fx, fz, Rr, time, ue, un, u10);
+            const gy = near ? near.heightAt(_sp[0], _sp[1], groundY) : groundY;
+            // a snow grain hops lower than sand (the bed is soft): centimetres, to knee height in a gale
+            const vu = (0.3 + rng() * 0.8) * Math.sqrt(9 / g) * (0.5 + 0.7 * tr);
+            if (!this.emit('sand', _sp[0], gy + 0.01, _sp[1], ue * (vu + u10 * 0.15), vu, un * (vu + u10 * 0.15), 1, 1, I_SNOW)) break;
+          }
+          if (carry[7] > 4) carry[7] = 4;
+          carry[8] += capD * 0.35 * tr * tr * h / 4;
+          while (carry[8] >= 1) {
+            carry[8] -= 1; this._streamPoint(fx, fz, Rr, time, ue, un, u10);
+            const gy = near ? near.heightAt(_sp[0], _sp[1], groundY) : groundY;
+            this.emit('dust', _sp[0], gy + 0.05 + rng() * rng() * 1.1, _sp[1], cwe * 0.5, 0.2 + 0.5 * rng(), cwn * 0.5, 1, 1, I_SNOW);
+          }
+          if (carry[8] > 4) carry[8] = 4;
         }
       }
       // hail in the core of a strong storm
@@ -193,10 +273,17 @@ export class Loose {
       }
       // the biome: leaves fall faster in gusts, spores and ash drift all the time
       if (rho > 0.05) {
-        const gusty = clamp01(0.15 + u10 / 9 + sigma * 0.4);
+        // (P10) a few at a time in a breeze, a flock when a gust front comes through: what is torn off
+        // goes with the fourth power of the wind where the trees stand (u10 here is the gusty wind at the
+        // focus), and more while that wind is rising (it strips what the lull left hanging)
+        const rise = Math.max(0, (u10 - this._gustPrev) / h); this._gustPrev = u10;
+        this._gustRise += (rise - this._gustRise) * Math.min(1, h / 0.4);
+        const wl = u10 / BLOWN.leafWind;
+        const torn = Math.min(1.6, BLOWN.leafCalm + wl * wl * wl * wl * (1 + BLOWN.leafGust * Math.min(1.5, this._gustRise)));
         const lv = (cover.leaves || 0) * (cover.canopy01 > 0.05 ? 1 : 0.3);
         if (lv > 0.01) {
-          carry[4] += PARTICLES.capacity.leaves[P.quality] * lv * gusty * h / 9;
+          carry[4] += PARTICLES.capacity.leaves[P.quality] * lv * torn * h;
+          if (carry[4] > 12) carry[4] = 12;
           const top = Math.max(3, cover.canopyHeight || 6);
           while (carry[4] >= 1) { carry[4] -= 1; if (!this.emit('leaves', fx + (rng() * 2 - 1) * Rr, groundY + top * (0.4 + 0.6 * rng()), fz + (rng() * 2 - 1) * Rr, cwe * 0.3, 0, cwn * 0.3)) break; }
         }
@@ -305,7 +392,7 @@ export class Loose {
       b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
       let alive = b._n;
       if (alive === 0) { b.count = 0; continue; }
-      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left;
+      const Pp = b._p, V = b._v, VT = b._vt, PH = b._ph, LF = b._life, AG = b.age, SZ = b.size, EJ = b._e, MT = b.mat, LT = b.left, HG = b.hag;
       const turb = K.turb * sigma, puff = K.puff || 0;
       for (let i = 0; i < alive; i++) {
         const o = i * 3;
@@ -347,9 +434,11 @@ export class Loose {
           vx = we + rx; vy = wu + ry; vz = wn + rz;
           x += vx * h; y += vy * h; z += vz * h;
           // the ground
+          HG[i] = y - groundY;
           if (y < groundY + 4) {
             let gy = near ? near.heightAt(x, z, NaN) : NaN;
             if (gy !== gy) gy = air.terrain.heightAt(x, z, groundY);
+            HG[i] = y > gy ? y - gy : 0;
             if (y <= gy) {
               if (K.ground === 1 && vy < 0) {
                 // saltation: the grain rebounds with about half its speed at a steeper angle,
@@ -372,7 +461,7 @@ export class Loose {
           if (i < alive) {
             const s = alive * 3;
             Pp[o] = Pp[s]; Pp[o + 1] = Pp[s + 1]; Pp[o + 2] = Pp[s + 2]; V[o] = V[s]; V[o + 1] = V[s + 1]; V[o + 2] = V[s + 2];
-            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive];
+            VT[i] = VT[alive]; PH[i] = PH[alive]; LF[i] = LF[alive]; AG[i] = AG[alive]; SZ[i] = SZ[alive]; MT[i] = MT[alive]; LT[i] = LT[alive]; HG[i] = HG[alive]; b._alt[i] = b._alt[alive]; b._rate[i] = b._rate[alive];
             if (EJ) { EJ[o] = EJ[s]; EJ[o + 1] = EJ[s + 1]; EJ[o + 2] = EJ[s + 2]; }
             i--;
           }
@@ -383,6 +472,101 @@ export class Loose {
       b._n = alive; b.count = alive;
       publish(b, frame, alive);                       // (on the curved ground: particles.js)
     }
+  }
+
+  // How much grid position (x, z) is in a streamer now: 0 between the bands .. 1 in the middle of one.
+  // (ue, un): unit vector of the wind; u10: its speed. The bands lie along the wind, travel with it
+  // at BLOWN.streamSpeed of its speed, and snake from side to side.
+  streamAt(x, z, time, ue, un, u10) {
+    const al = x * ue + z * un - BLOWN.streamSpeed * u10 * time, ac = z * ue - x * un;
+    const snake = BLOWN.streamSnake * noise3(al / BLOWN.streamWave, ac / 60, time * 0.03, 911);
+    const v = noise3(al / BLOWN.streamLength, (ac + snake) / BLOWN.streamWidth, time * 0.11, 733);
+    return smoothstep(0.02, 0.4, v);
+  }
+
+  // A place within R of (fx, fz) to launch a grain: in a streamer (up to six tries; the last one stands).
+  _streamPoint(fx, fz, R, time, ue, un, u10) {
+    const rng = this.rng;
+    for (let k = 0; k < 6; k++) {
+      _sp[0] = fx + (rng() * 2 - 1) * R; _sp[1] = fz + (rng() * 2 - 1) * R;
+      if (this.streamAt(_sp[0], _sp[1], time, ue, un, u10) > rng()) break;
+    }
+    return _sp;
+  }
+
+  // The sea's own spray (P10): spume torn off breaking crests by the wind, and surf on a shore.
+  // Call after water.update. water: the Water (water.js); near: the near ground cache (for the
+  // depth); (cwe, cwn): the wind at 10 m (frame axes); g: gravity; air: the wind grid (its coarse
+  // ground says what is land and what is sea beyond the near cache).
+  sea(dt, water, near, fx, fz, cwe, cwn, g, air = null) {
+    const h = dt > 0.1 ? 0.1 : dt, P = this.P, rng = this.rng, carry = this._carry;
+    this.spume01 = 0; this.surf01 = 0;
+    if (!(h > 0) || !water || !water.present || !(water.significant > 0.03)) return;
+    const Rr = PARTICLES.radius, capY = PARTICLES.capacity.spray[P.quality];
+    const u10 = Math.hypot(cwe, cwn), Hs = water.significant, lvl = water.level;
+    const dx = water.dir[0], dz = water.dir[1], c = water.speed || 0;
+    // spume: the wind over a breaking sea
+    // (a sea, not a puddle: nothing is torn off a chop under a hand high)
+    const sp = smoothstep(BLOWN.spumeFrom, BLOWN.spumeFull, u10) * (water.foamAt < 1e8 ? 1 : 0) * smoothstep(0.2, 0.6, Hs);
+    this.spume01 = sp;
+    if (sp > 0) {
+      carry[9] += capY * sp * h / 2.2;
+      // look for breaking water at up to 64 places a frame; each found sheds a sheet of drops
+      for (let k = 0; k < 64 && carry[9] >= 1; k++) {
+        const x = fx + (rng() * 2 - 1) * Rr, z = fz + (rng() * 2 - 1) * Rr;
+        water.surfaceAt(x, z, _sf);
+        if (!(_sf.foam01 > 0.25)) continue;
+        if (this._depthAt(near, air, x, z) < 0.05) continue;                // dry ground here (or nothing known)
+        const y = lvl + _sf.height;
+        let n = 3 + Math.floor(rng() * 6 * (0.5 + sp));
+        while (n-- > 0 && carry[9] >= 1) {
+          carry[9] -= 1;
+          // off the top of the crest, at the crest's own speed and a share of the wind, a little upward;
+          // fine drops (a third of a splash drop's size: they ride the wind for a second or two)
+          const a = 0.25 + 0.3 * rng(), up = (0.8 + 2.6 * rng()) * (0.6 + 0.4 * sp);
+          if (!this.emit('spray', x + (rng() - 0.5) * 0.4, y + 0.03 + rng() * 0.15, z + (rng() - 0.5) * 0.4, dx * c * 0.8 + cwe * a, up, dz * c * 0.8 + cwn * a, 0.3 + 0.25 * rng(), BLOWN.spumeLife)) { carry[9] = 0; break; }
+        }
+      }
+      if (carry[9] > 24) carry[9] = 24;
+    }
+    // surf: the wave breaks where the water is shallower than it is high, whatever the wind
+    if (near && Hs > 0.25) {
+      // the shore is a line, and a random place in the box is seldom on it: places found shallow are
+      // kept (a ring of 48, each checked again when it is used) and the breakers are looked for there
+      const SH = this._shore, lim = BLOWN.surfDepth * Hs;
+      for (let k = 0; k < 10; k++) {
+        const x = fx + (rng() * 2 - 1) * Rr, z = fz + (rng() * 2 - 1) * Rr, d = this._depthAt(near, air, x, z);
+        if (d > 0.02 && d < lim) { const o = (this._shoreI++ % 48) * 2; SH[o] = x; SH[o + 1] = z; if (this._shoreN < 48) this._shoreN++; }
+      }
+      let live = 0;
+      for (let k = 0; k < 12 && this._shoreN > 0; k++) {
+        const o = Math.floor(rng() * this._shoreN) * 2, x = SH[o], z = SH[o + 1];
+        if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+        const d = this._depthAt(near, air, x, z);
+        if (!(d > 0.02) || d > lim) { SH[o] = 1e9; continue; }
+        live++;
+        water.surfaceAt(x, z, _sf);
+        if (!(_sf.crest01 > 0.45)) continue;
+        carry[10] += capY * BLOWN.surfShare * clamp01(Hs / 1.5) * h * 0.5;
+        const lip = Math.sqrt(g * Math.min(Hs, d + _sf.height > 0.05 ? d + _sf.height : 0.05));
+        let n = 2 + Math.floor(rng() * 4);
+        while (n-- > 0 && carry[10] >= 1) {
+          carry[10] -= 1;
+          const a = rng() * 6.2831853, s = lip * (0.3 + 0.7 * rng());
+          if (!this.emit('spray', x + Math.cos(a) * 0.5, water.level + Math.max(0, _sf.height) + 0.05, z + Math.sin(a) * 0.5, dx * s * 0.8 + Math.cos(a) * 0.6 + cwe * 0.15, s * (0.6 + 0.6 * rng()), dz * s * 0.8 + Math.sin(a) * 0.6 + cwn * 0.15, 0.5 + 0.5 * rng(), 1.3)) { carry[10] = 0; break; }
+        }
+      }
+      this.surf01 = clamp01(live / 6) * clamp01(Hs / 1.5);
+      if (carry[10] > 12) carry[10] = 12;
+    }
+  }
+
+  // Depth of liquid (m) at grid position (x, z): from the near cache, else from the wind grid's
+  // coarse ground; 0 where the ground is dry or nothing is known.
+  _depthAt(near, air, x, z) {
+    let gy = near ? near.heightAt(x, z, NaN) : NaN, lq = near ? near.liquidAt(x, z) : NaN;
+    if (gy !== gy && air) { gy = air.terrain.heightAt(x, z, NaN); lq = air.terrain.liquidAt(x, z); }
+    return gy === gy && lq === lq && lq > gy ? lq - gy : 0;
   }
 
   // Powder kicked up from snow joins the snow buffer (it falls like any other flake).

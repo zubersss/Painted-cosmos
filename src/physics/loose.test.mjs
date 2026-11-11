@@ -358,10 +358,13 @@ const matsOf = (b) => { const o = {}; for (let i = 0; i < b.count; i++) { const 
 test('ink: kicked dust carries the material it was kicked from, on every kind of ground; what falls from the sky carries none', () => {
   for (const [bodyId, biome, want] of [['earth', 'desert_canyon', 'sand'], ['moon', 'mare', 'dust'], ['mars', 'dry_riverbeds', 'gravel'], ['earth', 'temperate_forest', 'litter'], ['venus', 'lava_rivers', 'rock']]) {
     const w = setup(bodyId, biome);
-    run(w, 1); walk(w, 3, 5);
-    const P = w.physics.particles, m = matsOf(P.dust);
+    // (P10: the most grains in the air at once during a walk of 8 s (it was the number left after 3 s): on
+    // forest litter that is two or three, and which of the two depended on how many leaves had been shed)
+    const P = w.physics.particles; let most = 0;
+    run(w, 1); walk(w, 8, 5, { each: () => { if (P.dust.count > most) most = P.dust.count; } });
+    const m = matsOf(P.dust);
     if (want === 'rock') { for (const k of Object.keys(m)) assert.ok(k === 'rock' || k === 'dust', 'only what the rock sheds, and the haze: ' + k); continue; }
-    assert.ok(P.dust.count > 2, `${biome}: dust raised: ${P.dust.count}`);
+    assert.ok(most > 2 && P.dust.count > 0, `${biome}: dust raised: ${most} at most, ${P.dust.count} at the end`);
     assert.deepEqual(Object.keys(m), [want], `${biome}: every grain says ${want}: ${JSON.stringify(m)}`);
     if (P.sand.count) assert.deepEqual(Object.keys(matsOf(P.sand)), [want]);
     // the prints say the same
