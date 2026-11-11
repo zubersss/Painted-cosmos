@@ -78,6 +78,44 @@
    "freshSnow": 0,
    "firstPerson": false,
    "physicsWorstMs": 101.4
+  },
+  {
+   "id": "earth-arrives",
+   "what": "the front arrives (first drops fell at 140 s)",
+   "file": "earth-arrives.jpg",
+   "wanted": 166,
+   "forced": null,
+   "settledSeconds": 11,
+   "seconds": 182,
+   "t": 170.7,
+   "hour": 11.9,
+   "state": "ON_FOOT",
+   "biome": "temperate_forest",
+   "busy": 0,
+   "tris": 522557,
+   "calls": 287,
+   "kits": {
+    "calls": 5,
+    "tris": 2016
+   },
+   "sky": {
+    "cloud": 0.93,
+    "overcast": 0.78,
+    "haze": 0.46,
+    "fog": 0.54,
+    "dust": 0,
+    "wet": 0.37,
+    "snow": 0,
+    "rain": 0.6,
+    "snowfall": 0,
+    "storm": 0.51,
+    "flash": 0
+   },
+   "kind": "thunderstorm",
+   "wind": 9.1,
+   "freshSnow": 0,
+   "firstPerson": false,
+   "physicsWorstMs": 101.4
   }
  ]
 }
