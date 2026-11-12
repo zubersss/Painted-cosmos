@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 226.9,
+   "settledFrames": 50,
+   "tris": 579259,
+   "calls": 300,
+   "worldWorstMs": 210.9,
+   "physicsWorstMs": 110.1,
+   "stoodIn": "lava_rivers",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "venus-fungal_towers-1",
+   "name": "Fungal Tower Forest",
+   "alsoVista": null,
+   "settledSeconds": 138.2,
+   "settledFrames": 35,
+   "tris": 1321132,
+   "calls": 401,
+   "worldWorstMs": 287,
+   "physicsWorstMs": 110.1,
+   "stoodIn": "fungal_towers",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 8.2,
+    "biome": "fungal_towers",
+    "radius": 3645.5514523980405
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 22.5,
+   "settledFrames": 9,
+   "tris": 78967,
+   "calls": 50,
+   "worldWorstMs": 287,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}
