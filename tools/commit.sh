@@ -8,7 +8,7 @@ if [ -z "$role" ] || [ -z "$msg" ]; then echo "usage: tools/commit.sh painter|pi
 cd "$(git rev-parse --show-toplevel)" || exit 2
 case "$role" in
   painter) paths=(src/render src/world src/art src/data/looks.js src/data/looks docs/shots/art gallery.html docs/notes/painter.md docs/shots/painter docs/lead/CRITIQUE-PAINTER.md) ;;
-  pilot) paths=(index.html src/main.js src/core src/player src/ship src/space src/ui src/audio src/data/bodies.js vendor tests README.md docs/notes/pilot.md docs/shots/pilot docs/lead .nojekyll .gitignore package.json) ;;
+  pilot) paths=(index.html src/main.js src/core src/player src/ship src/space src/ui src/audio src/data/bodies.js vendor tests README.md docs/notes/pilot.md docs/shots/pilot docs/lead ":(exclude)docs/lead/CRITIQUE-PHYSICS.md" ":(exclude)docs/lead/CRITIQUE-PAINTER.md" .nojekyll .gitignore package.json) ;;
   physics) paths=(src/physics physics-lab.html docs/notes/physics.md docs/shots/physics docs/lead/CRITIQUE-PHYSICS.md) ;;
   coordinator) paths=(docs/BRIEF.md docs/COORDINATOR.md tools) ;;
   # The owner's art pass (multi-agent workflow, by planet group): each body's look data and its evidence.
