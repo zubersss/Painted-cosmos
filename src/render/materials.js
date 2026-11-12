@@ -210,7 +210,9 @@ void main() {
 
   // Wet rock under a storm: a steep face takes a deeper wash (the pale cliffs of a storm coast stood
   // against the storm's sky as paper cut-outs with ruled edges).
-  c = pcDensity(c, 1.0 + (0.80 * uStorm + 0.35 * uWx.y) * (1.0 - smoothstep(0.50, 0.92, upf)) * (1.0 - snowC));
+  // (PAINTER 12: a wash already dark takes little more: Neptune's Payne's grey basalt under a gale went to a near-black
+  // slab; nothing is black, the darks stay indigo)
+  c = pcDensity(c, 1.0 + (0.80 * uStorm + 0.35 * uWx.y) * (1.0 - smoothstep(0.50, 0.92, upf)) * (1.0 - snowC) * smoothstep(0.10, 0.42, dot(c, vec3(0.3, 0.5, 0.2))));
   // A track: where a walker (or a hull's wash) has laid the growth flat the ground's wash is a tone
   // duller and deeper, as trodden grass is. PHYSICS lays the stems; the strokes standing over the
   // sward are too few to show the lane by themselves.

@@ -76,9 +76,11 @@ const SHAPES = {
   // blown sand: a drag of the dune's own wash lifted toward the paper (a pale skim, heavier than
   // it was: scattered specks did not read), thinning to its tail
   sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66 * smoothstep(1.6, 3.6, length(vView));',
+  // (PAINTER 12, PHYSICS P20: and thinner as it comes to the lens, gone at 1.6 m: drops crossing near the eye in Neptune's
+  // gale were large soft white blots over the picture)
   // spume and surf spray: a soft pale blot broken where the brush lifted (the drops off one crest run together
   // into a wisp of lifted paper; a fleck of 4 px was a glitter; the rain is a long grey stroke), laid after the brush
-  spume: 'vec2 sp = (vPcUv - 0.5) * 2.0; float rr = length(sp * vec2(1.0, 1.3)); if (rr > 1.0 || length(vView) < 1.6) discard; float nz = texture(uNoise3D, vec3(vPcUv * 1.6, vPcData.x * 7.0)).r * 0.7 + texture(uNoise3D, vec3(vPcUv * 4.1, vPcData.x * 3.0)).g * 0.3; vec3 c = mix(ink, vec3(0.995, 0.995, 0.985), 0.86); float w = 0.08; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.30, 0.62, nz + 0.30 * (1.0 - rr)) * 0.46;',
+  spume: 'vec2 sp = (vPcUv - 0.5) * 2.0; float rr = length(sp * vec2(1.0, 1.3)); if (rr > 1.0 || length(vView) < 1.6) discard; float nz = texture(uNoise3D, vec3(vPcUv * 1.6, vPcData.x * 7.0)).r * 0.7 + texture(uNoise3D, vec3(vPcUv * 4.1, vPcData.x * 3.0)).g * 0.3; vec3 c = mix(ink, vec3(0.995, 0.995, 0.985), 0.86); float w = 0.08; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.30, 0.62, nz + 0.30 * (1.0 - rr)) * 0.46 * smoothstep(1.6, 7.0, length(vView));',
   // a leaf in the wind: a lens with pointed ends on the thin quad the kit lays (a line when it is
   // edge-on); laid as a glaze after the brush pass, so a mark two pixels wide is not brushed away
   // (two tones: half the leaves dark, to be seen against the sky and the meadow, half pale ochre, against the
