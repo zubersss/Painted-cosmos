@@ -10,7 +10,9 @@ report for PAINTER), 2 (sub-second gusts), 3 (the wind grid's garbage, bit for b
 and committed. Item 5 (film and OPEN `tree-gust`, `clamber-walk-moon`, the storm frame; the PC_TIMING suite) is NOT done: the
 coordinator had not released the machine (the art pass and PAINTER 11 had it; load 13 to 16 throughout) when items 1-4 were
 done, so as told I wrote this and ended. Nothing in this block was looked at in a browser: no picture was made, the new GLSL
-was never compiled (see "For PAINTER", P18). Tests and counts: the commit that carries this note says them. Scratch:
+was never compiled (see "For PAINTER", P18). Tests: `node --test src/physics/` 288 pass (279 + 9 new: seamap.test.mjs 6,
+wind.test.mjs 3; load.test.mjs among them: every module loads alone, no import cycle), PILOT's `node --test tests/*.test.mjs`
+140 pass, on a clean export of `f6eaa17` (`tools/export-head.sh`). Not run under PC_TIMING (load 13 to 16). Scratch:
 `/home/user/.pc-scratch/physics/p18/` (`coastsyn.mjs <root> lagoon|beach|lake [secs] [windScale]`: the sea map on synthetic
 coasts, `DUMP=u,v` for a node's radials and the depth map; `stagecost.mjs`: the builder's cost by stage; `alloc.mjs`:
 garbage a frame of physics.update and AirGrid.update (`node --expose-gc --max-semi-space-size=128`); `ident.mjs`,
@@ -43,7 +45,7 @@ wired, and a lagoon is never drawn with the open sea's waves (while unread, a no
 sea's trains made higher, never steeper than 1 in 10: the JS twins far from the focus are approximate until then); (2) the wind sea turns toward its longest
 fetch, so on Neptune's storm coast the waves at the beach come in from the open water to the south-east: at 50 s (30 m/s, P16's
 window) 0.30 m where P16 had 0.21 m, at the storm's height (55 m/s, 240 s) 0.71 m; spray at the beach again (P17's `block.mjs`,
-34-44 s, q2: 1 -> 243 drops); (3) the point air (here.air, the explorer's
+34-44 s, q2, the map unread as in the game today: 0 -> 347 drops); (3) the point air (here.air, the explorer's
 wind load, the ship's air) has sub-second gusts; `here.air.turbulence` includes their share (higher near the ground: 0.27
 -> 0.35 m/s at 2 m in a light wind), and loose.js's leaf and litter sweeps read it (leaves at the Earth gust front, q2: 1273 ->
 1328); (4) the wind grid's fields are bit for bit as before (items 2 and 3).
@@ -83,7 +85,7 @@ fetch and depth, turns toward the longest fetch and refracts toward the shore.
   map on, surfaceAt's slope is heightAt's gradient within 2e-3.
 - *Cost*: the map 0.06 to 0.17 ms a frame on average on the synthetic coasts (slices 0.04 to 0.18 ms warm; cold first builds up
   to 16 ms, JIT and GC on a machine at load 13); physics.update at Neptune's storm coast, q2, main-thread CPU (P17's
-  `block.mjs`): 0.81 -> 0.89 ms; nothing on a dry world (no samples, no build).
+  `block.mjs`, the better of 2 runs; head 0.75 and 0.81 ms in two sessions): 0.89 ms; nothing on a dry world (no samples, no build).
 - *THE COAST REPORT for PAINTER* (`node src/physics/coast.mjs [root] [body:biome ...]`, default Earth sea_coast and Neptune
   storm_seas; about 13 s): finds the storm at the stand (the strongest wind in 9000 s, or `--t=`), runs the physics into it with
   the focus 2 m up the beach and prints, at the waterline and 20, 80, 200, 500 m out to sea, the fetch and the mean depth along
