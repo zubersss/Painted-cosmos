@@ -6,6 +6,54 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
+Written by the eleventh PAINTER agent (the lead's hardening review, `docs/lead/HARDENING.md`, while the
+owner's art pass ran). The tenth agent's handover is kept below it ("Handover of block 7"); its rules hold.
+
+- **Where things stand**: the review's PAINTER items are done and checked on clean exports: A3 (the branch
+  clock is bound and live), A2 (prewarm hooks; 0 programs built after the prewarm through night, day, storms
+  with every kit, tier 0, space, arrivals on foot on four other worlds), A1 (log depth written per vertex without
+  EXT_clip_control; no fragment shader writes `gl_FragDepth`; no hole or z-fighting at the ship's pad or the
+  shore), gap 17 (well-defined smoothstep edges and atan), gap 12 (an 8-bit fallback for the float targets,
+  `painter.floatFallback`). Also: the gallery's run and walk re-filmed after the heel change (they read), the
+  explorer's face shaded under the brim. See "M3 hardening" below for each, with the evidence.
+- **The art pass** (owner's order) still owns `src/data/looks.js` and `src/data/looks/` until the
+  coordinator ends it: keep to shared code.
+- **Next, in this order**: (1) **the coast fix**, as soon as the coordinator says the art pass is over:
+  both coast biomes must face open water toward the storm wind. The stands are mine (`src/art/easels.js`
+  STANDS), so a new stand is the simplest fix and moves no site; candidates and how they were found are in
+  "The coasts" below (Earth `sea_coast`: one beach with 2067 m of PHYSICS-measured fetch at 16 m deep;
+  Neptune `storm_seas`: the best reach 1.4 to 1.8 km, the biome ends at the ice spires: say so to the
+  coordinator, or open the coast recipe's water toward the biome's edge). PHYSICS 16 is writing a Node tool
+  that reports fetch, Hs and white-horse share at a stand: use it. Then re-film Neptune's gale and look for
+  the torn white crests. (2) In the same pass, the coast recipe (`surface.js` 'coast'): the cliffs are
+  near-vertical walls 1 to 2 m wide in plan with a level lip (a shaded height map, scratch
+  `hmap.mjs`/`hmap.py`, shows it), so a headland's end is a ruled vertical edge: widen the face, give it a
+  ledge and talus, and let a narrow headland's top fall toward its tip. (3) The blizzard's ruled crest:
+  the slope at lat 62.41 lon 49.46 rises 30 % and is smooth from 10 to 60 m (`bliz.mjs`): crags or drifts of
+  2 to 4 m on the alpine flanks (not the meadow floors where the stands are) would break the skyline; a
+  shader half is ready in scratch `snowpatch.py` (drifts along the contours, rocks through fresh snow),
+  untested. Both change Earth's alpine look: after the art pass. (4) The explorer's face: a shade laid under the brim now ("M3 hardening"); the head is still an egg. (5) Item 4 of block 7: the brush, two walled vistas, Mercury from orbit, Mars' dune crests,
+  PILOT's UI look review (the vistas, Mercury and Mars touch look data: after the art pass).
+- **How to work here**: scratch tools in `/home/user/.pc-scratch/painter/m11/` (may be gone): `mkexp.sh
+  <name>` (a clean export of the head with my changed files over it), `probe.mjs <export> <out>
+  [--nowarm] [--bodies a,b]` (counts `linkProgram` after ready through a set of events; `LAND=1` lands on
+  other worlds), `dump.mjs` / `dumpf.mjs` (the review's shader dump; `--noclip` hides EXT_clip_control,
+  `--nofloat` the float colour buffers; `ROOT=<export>`), `fdcheck.py <src dir>` (which shaders really
+  write `gl_FragDepth`, through the `#if`s), `mksteps.mjs` (steps: space, the ship's pad from 7 m, the
+  sea_coast shore and a wade, a colour space check), `gal.mjs <export> <prefix>` (the gallery figure:
+  run and walk poses by PHYSICS' stride, then its face), `beach.mjs <export> <body> <biome> <wind sectors>`
+  (beaches facing open water, PHYSICS' fetch measure), `fetch.mjs`, `hmap.mjs`, `bliz.mjs`. One browser at
+  a time; the game is ready after 4 to 7 minutes here, a 640 x 360 frame takes 1 to 3 minutes.
+- **Rules that bit me**: (1) three r187 keys a program on the geometry's attributes as well as the
+  material (`HAS_NORMAL` when it has a `normal`): a stand-in geometry compiles a variant nobody draws.
+  (2) A compile made with no render target bound keys programs to the canvas's colour space; the scene is
+  drawn into targets. `renderer.outputColorSpace` is now linear, so both agree (pixels unchanged). (3) The
+  review's "grep gl_FragDepth" check cannot tell an active write from one behind an `#if`: three expands
+  includes as text. (4) The gallery puts the explorer 1.5 m to the right of the view: at `mdist` 3.2 and
+  `fov` 34 it is half out of the frame (`mdist=6`, or `mside=0`).
+
+## Handover of block 7 (tenth PAINTER agent; kept)
+
 Written by the tenth PAINTER agent (M3 block 7, after the ninth was stopped by a usage limit).
 The eighth agent's handover is kept below it ("Handover of block 6"); its rules still hold.
 
@@ -126,6 +174,156 @@ Block 5 and the earlier records follow; "Rules that bit me" of the earlier agent
   Neptune's sky (yaw 236 from the `storm_seas` stand, 34 to 42 s): not looked for. (4) The
   brush at full resolution. (5) The short list (two vistas in a thicket, Mars' dune crests,
   branch sway and drifts, the explorer's face, the UI look review).
+
+## M3 hardening: A3, A2, A1, gaps 17 and 12 (eleventh PAINTER agent)
+
+The lead's hardening review (`docs/lead/HARDENING.md`, "PAINTER (in order)") and the coordinator's
+follow-ups. Every check ran on a clean export of the head with only my files laid over it (scratch
+`/home/user/.pc-scratch/painter/m11/`), SwiftShader through ANGLE, one browser at a time. Commits:
+`90025a3` (A2, A1, gap 17), the coordinator's snapshot `0b76f2c` and `46fcbf8` (gap 12, gallery, evidence).
+
+### A3 the branch clock: confirmed
+`probe.mjs` (the game at the Earth spawn, the loop running): `pc-prop-tall-broadleaf0` has
+`uniforms.uPhysBranchClock` (and `PC_PHYS_BRANCH`); read twice 10 s apart (frames 85 and 86, game clock
+12.12 and 12.37 s) it went from (1.972, 0.740, 3.944, 0.988) to (2.421, 1.377, 4.842, 2.254): bound and live.
+
+### A2 the prewarm hooks (PILOT's P3)
+- `world.prewarm()` (async, resolves true; `src/world/index.js`): awaits the kits' import (the promise is
+  kept from `buildKits`), makes every far world's dab, and puts an invisible group `pc-warm` in the scene
+  holding one tiny instanced mesh per flora wash of every world (`Flora.warmSet()`: kits and materials made
+  by `_init`, no cell built; each wash on a kit geometry it is drawn on), the near ground's wash if no world
+  has drawn it yet, and the PHYSICS kits not yet in any group. The group is never drawn and leaves the scene
+  30 world updates later; the materials stay, and with them their programs. Memory: kits and materials only.
+- `painter.prewarm(scene, camera)` (`src/render/index.js`, `post.warm()`): compiles the scene with the
+  scene pass's own target bound (compileAsync where KHR_parallel_shader_compile exists, else the plain
+  compile: three's compileAsync only warns there), then lays the 4- and 8-sector brush and the sheet once
+  into a 2 x 2 target, whatever the tier, so the first drop to a lower tier builds nothing. Without
+  arguments it only lays the brush passes. Resolves when the programs are ready.
+- `renderer.outputColorSpace = LinearSRGBColorSpace` (createPainter): no painted shader converts a colour
+  space, so the canvas now has the same program key as the painter's targets, and a compile made outside the
+  scene pass builds the programs that are drawn. The canvas still shows sRGB (three keeps
+  `drawingBufferColorSpace` 'srgb'): measured, the same pixels (canvas told sRGB or linear: mean 0.0007
+  levels, max 2, against 0.0004 between two frames at one setting).
+- Caught on the way: three r187 keys a program on whether the geometry has a `normal` (`HAS_NORMAL`); a
+  position-only stand-in compiled a variant nobody draws and missed Neptune's kelp. The stand-ins are the
+  real kit geometries now; terrain and water need none (every world's are in the scene from the start).
+- **Proved** (`probe.mjs`, the review's probe extended: it counts `linkProgram` and lists each new program;
+  480 x 270, the top tier, dynres off; ready after 254 s, every module real): after `await
+  world.prewarm(); await painter.prewarm(scene, camera)` (17 programs built there, 19 to 36; 15 s on
+  SwiftShader; no material in the scene left without a program), **0 links** through night (23 h), day, the
+  Earth spawn's storm at clocks 165 (rain, leaves, splash rings) and 230 (rain 0.92, hail), a forced tier 0
+  and back, the ship at 300 m (snow, dust, sand kits) and in space, Saturn's orbit, and **arrivals on foot on
+  Neptune (kelp), Uranus (frozen waves), Venus (fungus towers) and Jupiter (vines)**, each settled. No
+  console message, `fallback` and `__pc.errors` empty. (A first run, before the geometry fix: 1 link.)
+  PILOT's caller (`src/main.js` `prewarm()`, b990e8b) makes exactly these two calls before `__pcReady`;
+  on the head with it (`90025a3`, the A1 run with the extension below) the game loads with no console
+  message at all.
+
+### A1 log depth without EXT_clip_control (Firefox)
+`src/render/chunks.js` as HARDENING.md gives it: `logDepthBufFC` declared in VERT_PARS; in VERT_END
+`gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w)) * logDepthBufFC - 1.0) * gl_Position.w` for a
+perspective projection (`isPerspectiveMatrix`, as three's old path had); in FRAG_PARS
+`USE_LOGARITHMIC_DEPTH_BUFFER` is undefined after its declarations unless the material defines
+`PC_FRAG_LOGDEPTH`, so `#include <logdepthbuf_fragment>` writes no `gl_FragDepth`. A material that opts in
+also keeps three's own clip-space depth in its vertex stage. Where the extension exists none of this is
+compiled. Why per vertex is enough on these worlds: the depth is exact at the vertices and linear across the
+screen between them; for a triangle whose far corner is r times as far as its near one the error is about
+log2((1 + r) / 2) - log2(r) / 2: the terrain's LOD keeps a cell under 1/40 of its distance (r < 1.025: under
+a millimetre a metre); the ship's hull at its pad (1 to 2 m triangles at 5 to 10 m) about 1 %.
+- **Without the extension** (the review's `dump.mjs --noclip`; clean export of 932cd9d + my files, 640 x 360,
+  top tier; three: reversed 'false', logdepth 'true'): **37 programs, every one linked with empty logs**,
+  through the spawn, space, the ship's pad, the sea_coast shore and a wade; no page error; `fallback` empty
+  (the one console line was three's KHR_parallel_shader_compile warning from PILOT's earlier caller, gone
+  on the head). Through the preprocessor (`fdcheck.py`, which follows the `#if`s in three's expanded
+  sources): **no fragment shader writes `gl_FragDepth`** (the lens's run of the old code: 30 did); 28
+  vertex shaders write the log depth. (A plain `grep gl_FragDepth`, as HARDENING suggests, still lists
+  them: the include is expanded as text and stays behind its `#if`.)
+- **Shots, all opened** (`docs/shots/painter/a1-logdepth-clip-vs-noclip.jpg`: left the head `90025a3` with
+  the extension, right without; rows: the ship on its pad from 7 m, the explorer at the sea_coast pool's edge,
+  wading 2 m in; `a1-logdepth-crops.jpg` the same enlarged): the same depth layering in both (a birch in front
+  of the ship's tail, the legs into the meadow, the boots on the sand and in the water), no hole, no
+  z-fighting at the boots, the waterline or the hull. The spawn and space match the lens's
+  `logdepth/00-ready.jpg` and `01-space-earth.jpg`. No material needed `PC_FRAG_LOGDEPTH`. The early-Z gain
+  itself cannot be measured on SwiftShader.
+
+### Gap 17: well-defined edges
+Four reversed `smoothstep` edges (kitmat.js rain, orbit.js limb, materials.js cloud-sea hollows, sky.js
+heads) are written `1.0 - smoothstep(lo, hi, x)` (what drivers computed anyway), and three `atan(y, x)` that
+could meet (0, 0) (the near ground's round touch, the great storm's spiral, the pulse streaks) take x = 1
+there. Compiled in both depth paths above.
+
+### Gap 12: an 8-bit fallback for the float targets (`painter.floatFallback`)
+Where neither EXT_color_buffer_float nor EXT_color_buffer_half_float exists, `Post` makes the scene pass's
+second target, the half-size prep target and last frame's copy 8-bit and sets `G.uAux8` (shared.js) to 1:
+`pcWrite` then packs the second target into 0..1 (`pcAuxEnc` in FRAG_PARS: normal to 0..1, log depth over
+32, the region over 8 with its hash kept clear of the next class), the backdrop and the sky pack theirs,
+and every reader unpacks (`pcAuxDec`: the brush, the sheet's pencil and lightning, the water's mirror reading
+last frame's depth, the kits' and the stars' glazes). `painter.floatFallback` is true there, so PILOT's
+sentence on the bare sheet stays away. Where float targets exist `uAux8` is 0 and every value is as before.
+- **Checked** (`dumpf.mjs --nofloat`, both extensions hidden; clean export of 9b5c941 + these files):
+  `floatFallback` true, 36 programs linked with empty logs, no page error; the spawn, the storm at clock 230
+  and the sea_coast shore paint as with float targets (`docs/shots/painter/gap12-float-vs-8bit.jpg`, left
+  float, right 8-bit, opened): the same picture, a few more pencil lines in the near grass where the depth is
+  8-bit. One console warning remains: three's own "EXT_color_buffer_float extension not supported", when a
+  float data texture (the noise, PHYSICS' fields) is uploaded; sampling them needs no extension.
+
+### The gallery (PHYSICS' ask) and the run re-filmed
+- `gaitPose` takes the hips' rise and fall from PHYSICS' `strideBob(v, g, stride, T, o)` (d186b65: the
+  body's own `st.phys.bob`), no longer a copy of its formula.
+- `window.__pcModel` (the explorer's `face`, `dist` ahead and `side` to the right, read every frame; URL
+  `mside=`, default 1.5 m): several views of the figure from one load (scratch `gal.mjs`).
+- The run (4.2 m/s, six poses) and the walk (1.5 m/s, four) re-filmed after the tenth agent's heel change
+  (`docs/shots/painter/gait-gallery-after-heel.jpg`, opened): the run reads as running, the trailing heel
+  drawn up to about knee height (it knelt in the air at hip height before); the walk scissors, the heel
+  lifts a little. No console error.
+
+### The coasts (prepared, for when the art pass is over)
+The stands are mine (`src/art/easels.js` STANDS), not look data: both coast fixes can be a new stand with no
+site moved. Searched in Node on a clean export (scratch `beach.mjs`: dry level ground within 1.5 m of the
+water, water 8 to 20 m toward the wind, then PHYSICS' fetch measure of P16, `water.js FetchGauge`: the mean
+of five radials, +-12 deg, about the wind's sector, 16 m steps growing by a tenth, to 2500 m; the least of
+the storm's sectors). PHYSICS' P18 has since replaced that gauge with a sea map and written
+`src/physics/coast.mjs` (fetch, depth, Hs, white share and PASS/NOT YET at each coast stand): judge with it.
+- Earth `sea_coast`, sectors E and ESE (PHYSICS: 145 of 148 storm samples from ESE, E or SE): dir
+  (0.435960, -0.499126, -0.748874), fetch 2067 m, 16.0 m deep (1.26 km south of the old stand); the old
+  stand faces a pool, 8 to 50 m.
+- Neptune `storm_seas`, sectors E and ENE (137 of 150 from E or ENE): no beach of the biome reaches 2 km in
+  both (it ends 2.2 to 2.5 km east of the old stand, at the ice spires); the best reach 1.4 to 1.8 km at 14
+  to 20 m deep, e.g. dir (-0.221159, -0.326965, -0.918794), 1759 m, 14.6 m, headlands and stacks in view;
+  dir (-0.250956, 0.053563, -0.966515), 1560 m, 16.6 m. The old stand: 133 m. Either accept about 1.5 km
+  or also open the coast recipe's water toward the biome's edge (the coordinator's call).
+- Seen on the way (the A1 shore shots): the hill behind Earth's sea_coast pool shows a cliff face combed
+  into even vertical stripes; and Neptune's near headland is a table with a near-vertical wall 1 to 2 m wide
+  in plan and a level lip all round (scratch `hmap.mjs`, `hmap.py`): both for the coast pass.
+
+### The explorer's face (block 7 item 4)
+From the front the face was a blank oval under the hat (a doll's). A first try drew two dark eye touches and
+a nose blob: the sheet's pencil and pooling outlined the nose and the eyes read as buttons, a cartoon's face
+(seen, discarded). Now the head is a little finer (14 x 11) so a band of colour lands where it is meant:
+the brim's shade lies over the brow and the eyes, a cool darker wash across the upper face, and the cheeks
+and the chin take the light, warm (`models.js`, CHEEK, BROW). Gallery, front and three quarters at 1.9 m and
+front at 4 m, before | after (`docs/shots/painter/face-before-after.jpg`, opened): close up the face reads
+as in the hat's shade, without drawn features; at 4 m the change is slight. Weak: the head is still an egg
+(no jaw, ear or hair at the sides); the player sees the face only when turning the camera round.
+
+### For PILOT (eleventh PAINTER agent)
+1. Your `prewarm()` (b990e8b) is right with my hooks: `world.prewarm()`, then `painter.prewarm(scene,
+   camera)`; your own target-bound compile is not needed while the hook exists. If you ever call
+   `renderer.compileAsync` yourself, check `renderer.extensions.has('KHR_parallel_shader_compile')` first:
+   without it three warns on the console and only waits on a 10 ms timer.
+2. Your tier question: a tier change builds nothing new. The tiers change uniforms, counts and target sizes,
+   not defines, except the brush's sector count, and `painter.prewarm` lays the 4- and 8-sector brush and the
+   sheet once whatever the tier. Measured: a forced tier 0 and back after the prewarm, 0 links.
+3. Gap 12 is in: `painter.floatFallback` is true where neither float colour buffer extension exists, and the
+   game then paints on 8-bit targets (see above). Your sentence stays for any other cause.
+4. A landing on another world after ready: arrivals on foot on Neptune, Uranus, Venus and Jupiter after the
+   prewarm built nothing (A2 above). Your landing set, when the art pass frees the machine, is the proof by
+   flight.
+
+### For PHYSICS (eleventh PAINTER agent)
+1. The gallery takes `strideBob` now (your ask, d186b65).
+2. Your sea map (P18, `PC_PHYS_SEA_MAP`) is not wired yet: it goes in with the coast fix after the art pass,
+   judged with your `coast.mjs`.
 
 ## M3 block 7: the picture holding in motion, and the weather (ninth and tenth PAINTER agents)
 

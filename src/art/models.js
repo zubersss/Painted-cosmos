@@ -50,7 +50,7 @@ function spline(keys, sub_) {
 // ---- the palette (washes as they should look on paper) -----------------------------------------
 const CREAM = hex('#e4d4ae'), HEM = hex('#b79a70'), INK = hex('#3d4056'), TROUSER = hex('#6a6170');
 const PACK = hex('#6c7b8d'), ROLL = hex('#efe6cf'), COPPER = hex('#a9683f'), RED = hex('#c8452e');
-const FLESH = hex('#e9c9a6'), HAIR = hex('#5b4634'), GLASS = hex('#8eaab6'), OCHRE = hex('#c9914e');
+const FLESH = hex('#e9c9a6'), CHEEK = hex('#e3a68c'), BROW = hex('#9e8288'), HAIR = hex('#5b4634'), GLASS = hex('#8eaab6'), OCHRE = hex('#c9914e');
 const SEPIA = hex('#6f4e3a'), KEEL = hex('#86674b'), FLAME0 = [1, 0.99, 0.94], FLAME1 = hex('#f6c871'), FLAME2 = hex('#e79a52');
 
 // ---- geometry kit: lofted soft forms into one buffer ------------------------------------------
@@ -189,7 +189,10 @@ export function createExplorer() {
   }
   // 1 head: face, hair, the hat with its band
   B.part = 1;
-  B.blob([0, 1.585, 0], 0.112, 0.125, 0.118, { seg: 12, col: (p) => (p[2] < -0.04 && p[1] < 1.66 ? FLESH : HAIR), lump: 0.004, dry: 0.2 });
+  // (a blank oval under the hat read as a doll's face; eyes and a nose drawn on it read as a cartoon's. A painter lays the
+  // brim's shade over the brow and the eyes, a cool darker wash across the upper face, and lets the cheeks and the chin take
+  // the light, warm: the face is read from where the shade falls. Enough rings for the band to land where it is meant to)
+  B.blob([0, 1.585, 0], 0.112, 0.125, 0.118, { seg: 14, rings: 11, col: (p) => (p[2] < -0.035 && p[1] < 1.66 ? mixc(mixc(FLESH, CHEEK, sstep(0.03, 0.08, Math.abs(p[0])) * sstep(1.625, 1.57, p[1]) * 0.75), BROW, sstep(1.588, 1.612, p[1]) * 0.9) : HAIR), lump: 0.004, dry: 0.2 });
   B.loft(ringsY([[1.652, 0.06, 0.06], [1.658, 0.305, 0.315, 0, 0.01], [1.672, 0.318, 0.33, 0, 0.01], [1.688, 0.29, 0.30, 0, 0.01], [1.690, 0.142, 0.146], [1.715, 0.136, 0.14], [1.76, 0.128, 0.132], [1.80, 0.098, 0.102], [1.815, 0.05, 0.05]]), {
     seg: 16, lump: 0.007, cap: 0.15, dry: 0.35,
     col: (p) => (Math.hypot(p[0], p[2]) < 0.17 && p[1] > 1.688 && p[1] < 1.722 ? RED : INK),
