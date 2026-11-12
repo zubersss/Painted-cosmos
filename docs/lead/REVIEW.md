@@ -166,6 +166,20 @@ New worst frames from it (owners):
 - The Moon's and Pluto's easel frames have the ship in the painter's view (the tour parks it 16 m off
   every stand: an artefact of the instrument, not of play).
 
+### 3c. After the review: the Moon and Neptune on the newest clean tree (top tier)
+
+PAINTER 13 (`7a51d42`, the Moon's arrival and stands moved to the near side), PHYSICS `b2aa445`,
+PILOT `ce7e69d` (the locked Moon's hour, Neptune's season, the camera under a rise, the berths), built
+with `tests/cleantree.sh`; `tour.mjs --bodies moon,neptune --first 1`; every frame settled (the Moon's
+spawn 204 s, Neptune's 105 s), no console error. Sheets `docs/lead/evidence/tour-top-moon-7a51d42.jpg`,
+`tour-top-neptune-7a51d42.jpg` (opened). **The Moon's arrival now says Earth's moon**: Earth hangs
+in the indigo sky above the figure and the ship, a mottled green and rose globe (the brief's one image
+for the Moon), on the arrival and the Silver Mare vista; the near boulders are still smooth grey
+slabs. **Neptune's arrival is a daylight painting** with the season turned (a blue sky wash, violet
+kelp blades, a mint floor with yellow flecks), where it was a twilight at every hour. **The storm-seas
+vista has its figure back** in the frame (the camera fix; PAINTER 12 also moved that coast stand, so
+the view itself is new): a basalt beach before a calm sea and low far headlands, quiet and passing.
+
 ### 4. The picture in motion and the weather (`node tests/motion.mjs`, `node tests/weather.mjs`, top tier)
 
 **Motion** (nine scenes of consecutive frames at 1/30 s, 960x540, quality 2; sheets
@@ -363,16 +377,16 @@ none; is the spawn's glade counted as bare? Nothing else: review 7 is closed, P2
 ### 8. Not verified, and why
 
 - No frame time on a real GPU; the sound never heard; no real mouse or pad (as ever).
-- PILOT's `a46b6ee`, `dc876f9` and `a0e3fb1` changes were tested in Node and on clean exports
-  (unit 148, world 19, static), **not yet seen in a browser**: the camera under a rise, Neptune's new
-  season, the berths out of the surf, the floating ship (the tours ran on the art-pass tree, which has
-  PHYSICS P19 without `env.waterLevel`). The next browser run should be the top-tier Neptune tour and
-  a landing on Neptune's sea on the head.
+- Seen in a browser since (section 3c): Neptune's new season, the camera fix at the storm-seas vista,
+  the Moon facing Earth with PILOT's locked hour. **Still only in Node**: the floating ship (no landing
+  on the sea was filmed), the berths out of the surf (Earth's autumn_woodland stand not shot).
 - The grand tour ran on `5efc7f4` (before PILOT's commits); the painted play-through, trip and
   milestone 3 checks ran on `9c93e77`.
-- The Moon boulder run (`tests/boulderrun.mjs`) was not re-run: its classification changed by the
-  coordinator's ruling, and PHYSICS 18 ran it in the game (thrown 0.172 m at most, no boulder lifts
-  the feet over 0.1 m); PHYSICS 19's brace change came after.
+- The Moon boulder run was re-run at the end on the newest clean tree (PAINTER `7a51d42` with the
+  near-side stands, PHYSICS `b2aa445`, PILOT `ce7e69d`; quality 0): **PASSED**, thrown 0 m, no boulder
+  lifts the feet over 0.3 m, mean paces 4.55 to 6.05 m/s in four headings (top 7.4), one flight off a
+  rim the ground fell 4.57 m under (counted as the ground falling away, by the coordinator's ruling).
+  Mars' and Earth's boulder runs were not re-run.
 - PAINTER 12's work (`e866f6e`, `994074a`, the sea map `c08dddb`) came after the tree under these
   tours: none of its frames is judged here.
 

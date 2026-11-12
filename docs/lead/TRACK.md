@@ -166,5 +166,6 @@ been able to check are still the frame rate on a real GPU and how the game sound
    (SHOULD FIX now: the ship's landing and canopy checks ask 20 to 80 m; 260 of 536 trunks listed at
    80 m on Earth), the boulder fields of Pluto's and Mercury's arrivals, the night key at quality 0, Mars from
    orbit, foliage specks; PILOT's chase camera inside a crown in a forest landing (372 pops in the
-   motion set). PILOT changes not yet seen in a browser: the camera under a rise, Neptune's new
-   season, berths out of the surf, the floating ship.
+   motion set). Seen since on the newest tree: Earth hangs in the Moon's sky at its arrival (PAINTER 13
+   with PILOT's locked hour), Neptune's arrival in daylight (its season turned), the figure back in
+   Neptune's storm-seas vista (the camera fix). Still only in Node: the floating ship, the berths.
