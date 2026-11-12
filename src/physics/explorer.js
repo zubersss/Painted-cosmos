@@ -26,6 +26,26 @@ export const EXPLORER_BODY = Object.freeze({
   // air
   cdaUpright: 0.85,       // m^2: drag area standing or walking (Cd 1.2 x 0.7 m^2; pedestrians measure 0.8-0.9)
   cdaFall: 0.60,          // m^2: falling with the pack (a skydiver belly-down is 0.45-0.5 without one)
+  // (P23) THE GALE. Where the wind's push on the body nears what the soles can hold, a walker gets low: a crouch, then down
+  // on hands and knees (hunker01), side-on to it. Its drag area falls toward cdaLow, it meets the wind nearer the ground,
+  // where the wind is slower (the air is read hunkerHeight up, not a metre), and hands and knees add to the soles' hold. What
+  // the soles still cannot hold, beyond braceShare of their grip, the suit braces against with its thrusters (windBrace, up
+  // to braceForce: the jetpack's thrust), so a gust leans the body over and staggers it, and never carries it off: Neptune's
+  // squall at the storm stand blows 60-70 m/s at a metre with gusts to 175, a push of three to nine times the grip on a
+  // body standing (it was blown 19 m and up the cliff behind the beach in 15 s; PAINTER 13).
+  cdaLow: 0.30,           // m^2: down on hands and knees, side-on (a crouch is 0.4-0.5, lying flat 0.2-0.25)
+  hunkerHeight: 0.4,      // m above the ground the wind is read at, down low (1 m standing)
+  hunkerFrom: 0.5,        // the wind's push on the body upright, over g, at which the walker begins to get low (it can lean
+  hunkerFull: 1.0,        // ... no further than about 30 degrees into it) and at which it is right down
+  hunkerDown: 0.25,       // s: time constant getting down
+  hunkerUp: 1.5,          // s: and getting up again as the wind falls
+  hunkerGrip: 0.3,        // added to the soles' hold, right down (hands and knees, toes dug in)
+  hunkerPace: 1.2,        // m/s: the pace right down (a crawl into the storm, or with it)
+  windBrace: true,        // the suit braces against the wind the soles cannot hold (cmd.windBrace false: off) ...
+  braceFrom: 0.5,         // ... where the wind's push on the body upright is over this share of g (a wind that would carry a
+                          // body off any ground: a 20 m/s wind on Earth's ice still blows a walker along)
+  braceShare: 0.6,        // ... all of it beyond this share of the grip (the rest is the legs' to walk with)
+  braceForce: 1700,       // N: at most (the jetpack's thrust)
   // legs
   legAccel: 9.0,          // m/s^2: the hardest the legs push off firm ground (a sprint start is 8-10)
   legPower: 1600,         // W of external work the legs sustain: an athlete's sprint peak (1500-2000 W),
@@ -188,6 +208,8 @@ export const EXPLORER_BODY_STATE = () => ({
   vvPrev: 0,
   hip: 0,                 // m: leg length now minus standing (-legFold folded .. +legReach reaching down)
   hipV: 0,                // m/s: vertical speed of the hips
+  hunker01: 0,            // (P23) 0 upright .. 1 down on hands and knees in a gale (see EXPLORER_BODY.cdaLow); ride folds with it
+  windBrace: 0,           // (P23) N the suit is bracing against the wind with (on the ground; see EXPLORER_BODY.windBrace)
   trend: 0,               // m/s: the rate the ground has been rising under the feet (filtered over trendTime)
   base: 0,                // radius of the ground where the legs last stood at their standing length, carried on at `trend`
   baseLo: 0,              // (P21) the lowest ground radius the feet have stood on since then (base is never carried below it)
@@ -801,7 +823,8 @@ function stepGait(B, st, dt, grounded, gE, env, T, S) {
   B.bobMean += (raw - B.bobMean) * (1 - Math.exp(-dt / Math.max(0.25, o.period)));
   B.pulse = pulseAt(ph, o, gE, B.gaitV, raw - B.bobMean, T) * amp;
   B.surge = (B.surge + B.pulse * dt) * Math.exp(-dt);
-  B.ride = B.hip + bob;
+  // ((P23) down low in a gale (hunker01) the legs are folded at least that far: a crouch, then on hands and knees)
+  B.ride = Math.min(B.hip, -T.legFold * (B.hunker01 || 0)) + bob;
   B.gait = amp > 0.02 ? o.gait : 0; B.stepPhase = ph; B.cadence = stepping && v > 0.05 ? v / o.step : 0; B.stepLength = o.step; B.duty = o.duty;
   // the feet: down for `duty` of the stride, carried back under the hips; then swung forward to the next footfall
   const X = o.duty * o.step * amp, lift = (o.gait === 2 ? 0.12 + 0.1 * Math.min(1, B.gaitV / 7) : 0.07) * amp;
@@ -888,7 +911,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
 
   // ---- surroundings ------------------------------------------------------------------------
   let rho = 1.225, wx = 0, wy = 0, wz = 0;
-  if (env.air) { const rc = S.recv; rc.vx = st.v.x; rc.vy = st.v.y; rc.vz = st.v.z; const a = env.air(st.p, S.air, Math.max(0, r - groundR) + 1.0, rc); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
+  if (env.air) { const rc = S.recv; rc.vx = st.v.x; rc.vy = st.v.y; rc.vz = st.v.z; const a = env.air(st.p, S.air, Math.max(0, r - groundR) + (st.grounded ? 1.0 + (T.hunkerHeight - 1.0) * (B.hunker01 || 0) : 1.0), rc); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
   // A named assist (PILOT's lever; default 0 = the real wind): cmd.shelter01, 0..1, is the share of the
   // wind's FORCE on the body that the suit cancels. The force goes with the square of the wind, so the
   // body is given wind x sqrt(1 - shelter01); its own drag through still air is untouched.
@@ -951,7 +974,8 @@ function stepOnce(st, cmd, dt, env, T, S) {
   // a jet stronger than the weight lifts the feet off
   if (grounded && aJet > g * (1 - buoy) + 0.3) grounded = false;
 
-  const airK = 0.5 * rho * (grounded ? T.cdaUpright : T.cdaFall) / T.mass * (1 - sub);   // 1/m
+  const hk = B.hunker01 || 0;
+  const airK = 0.5 * rho * (grounded ? T.cdaUpright + (T.cdaLow - T.cdaUpright) * hk : T.cdaFall) / T.mass * (1 - sub);   // 1/m
   const onGround = grounded;
   let sF = null, GF = null;                              // (P19) the surface where the step ends in contact, and its ground (see the report)
 
@@ -994,6 +1018,28 @@ function stepOnce(st, cmd, dt, env, T, S) {
     d = ax * nx + ay * ny + az * nz; ax -= d * nx; ay -= d * ny; az -= d * nz;
     B.windAccel = Math.hypot(ax, ay, az);
     B.lean = Math.atan2(B.windAccel, g > 1e-6 ? g : 1e-6);
+    // (P23) THE GALE (see EXPLORER_BODY.cdaLow): the wind's own push on the body upright (its speed, not the run's: running
+    // through Venus' still air is no gale), over g: the walker gets low over hunkerFrom; and where it is over braceFrom, the
+    // suit braces against what is beyond braceShare of the soles' hold here (hands and knees adding to it down low, the
+    // slope's pull counted), braceForce at most
+    {
+      const wn = wx * nx + wy * ny + wz * nz, w2 = Math.max(0, wx * wx + wy * wy + wz * wz - wn * wn), gw = 0.5 * rho * T.cdaUpright / T.mass * (1 - sub) * w2 / Math.max(0.1, g);
+      const want = smoothstep(T.hunkerFrom, T.hunkerFull, gw);
+      B.hunker01 = hk + (want - hk) * (1 - Math.exp(-dt / (want > hk ? T.hunkerDown : T.hunkerUp)));
+      B.windBrace = 0;
+      if (T.windBrace && cmd.windBrace !== false && gw > T.braceFrom && B.windAccel > 1e-6) {
+        const hold0 = G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, sp)) + T.hunkerGrip * hk, fm = Math.max(1e-6, hold0 * support);
+        const lim = T.braceShare * fm, a2 = B.windAccel * B.windAccel, gl2 = ex * ex + ey * ey + ez * ez, ga = ex * ax + ey * ay + ez * az;
+        if (gl2 + 2 * ga + a2 > lim * lim) {
+          // the wind's share s kept: |g + s a| = lim (the larger root; none of it when the slope alone takes that much)
+          const disc = ga * ga - a2 * (gl2 - lim * lim);
+          let s = disc > 0 ? (-ga + Math.sqrt(disc)) / a2 : 0;
+          s = clamp01(s);
+          s = Math.max(s, 1 - T.braceForce / T.mass / B.windAccel);
+          if (s < 1) { B.windBrace = (1 - s) * B.windAccel * T.mass; ax *= s; ay *= s; az *= s; }
+        }
+      }
+    }
     ex += ax; ey += ay; ez += az;
     // soft ground: the work of pressing a footprint at every step opposes the motion
     if (sp > 1e-6) {
@@ -1010,7 +1056,9 @@ function stepOnce(st, cmd, dt, env, T, S) {
       tx = qx - ux * k; ty = qy - uy * k; tz = qz - uz * k;
       const tl = Math.hypot(tx, ty, tz);
       // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
-      if (tl > 1e-9) { const m = Math.min(qlen, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
+      // ((P23) down low in a gale, a crawl: hunkerPace right down)
+      const qh = hk > 0 && qlen > T.hunkerPace ? qlen + (T.hunkerPace - qlen) * hk : qlen;
+      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;
@@ -1030,7 +1078,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
     // as the ground will hold (traction control), so the force is the holding force (-outside
     // loads) plus as much of the wanted change as fits inside mu N. Only when the holding force
     // alone exceeds mu N does the body really slide, on kinetic friction.
-    const hold = G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, sp));
+    const hold = G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, sp)) + T.hunkerGrip * hk;   // ((P23) down low, hands and knees too)
     const fmax = Math.max(0, hold * support);
     const hl = Math.hypot(ex, ey, ez);
     if (hl > fmax) {
@@ -1346,6 +1394,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       vx = wx + rx * m; vy = wy + ry * m; vz = wz + rz * m;
       B.windAccel = airK * Math.hypot(wx, wy, wz) * Math.hypot(wx, wy, wz);
     } else B.windAccel = 0;
+    B.windBrace = 0; if (hk > 0) B.hunker01 = hk * Math.exp(-dt / T.hunkerUp);
     // liquid drag: vertical and horizontal
     if (sub > 0) {
       const kv = 0.5 * liq.density * T.sinkCdaV / T.mass * Math.min(1, sub * 3);

@@ -869,3 +869,54 @@ test('P22 a hill is not a face: a run onto a 35 or 43 degree hill seen coming is
     assert.ok(nUp > 0 && up / nUp > 3.5 && air === 0, `${tag}: ${(up / Math.max(1, nUp)).toFixed(2)} m/s up it (level), ${air} steps in the air`);
   }
 });
+
+// ---- (P23) the gale -----------------------------------------------------------------------------------------
+// Neptune's squall at the storm stand, as the game's air gives it at a walker: 60 to 70 m/s a metre up, the sub-second
+// eddies swinging it from a third to well over twice that, gusts to 175 m/s (PAINTER 13 saw 141 m/s, and the walker
+// blown 19 m and up the cliff behind the beach in 15 s). The wind's speed at a height h over sand: the log law.
+function galeRun({ g = 11.15, rho = 0.99, U1 = 65, hz = 60, secs = 30, slope = 0, wish = 0, ground = 'sand' } = {}) {
+  const k = Math.tan(slope * Math.PI / 180);
+  const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z), ux = d.x / l, uz = d.z / l, x = Math.atan2(ux, uz) * R, n = Math.hypot(1, k);
+    return { radius: R - k * x, normal: { x: (ux + uz * k) / n, y: d.y / l / n, z: (uz - ux * k) / n }, liquidRadius: 0 }; };
+  let t = 0;
+  const U = (tt) => { const base = U1 * (1 + 0.35 * Math.sin(2 * Math.PI * tt / 3.1) + 0.3 * Math.sin(2 * Math.PI * tt / 0.7 + 1)); const pk = Math.exp(-(((tt % 10) - 6) ** 2) / 0.18); return Math.max(0.3 * U1, base) * (1 - pk) + 2.7 * U1 * pk; };   // (a gust of 2.7 times the mean every 10 s: 175 m/s)
+  const z0 = 0.005;
+  const env = { sample, gravity: g,
+    air: (p, o, h) => { const f = Math.log(Math.max(0.1, h) / z0) / Math.log(1 / z0), s = U(t) * f, l = Math.hypot(p.x, p.y, p.z) || 1, ux = p.x / l, uz = p.z / l;
+      o.density = rho; o.wind.x = uz * s; o.wind.y = 0; o.wind.z = -ux * s; return o; },   // (blowing toward +x, downhill on the slope)
+    ground: (s, o) => Object.assign(o, ground === 'sand' ? { material: 'sand', friction: 0.6, kinetic: 0.5, foothold: 0.2, restitution: 0.05, sink: 0.05, drag: 0.25, dust: 0.6 } : { material: 'rock', friction: 0.9, kinetic: 0.7, foothold: 0.4, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 }) };
+  const st = { p: V(0, 0, sample(V(0, 0, 1)).radius), v: V(), grounded: true };
+  const o = { far: 0, fast: 0, air: 0, hunker: 0, lean: 0, brace: 0, finite: true };
+  for (let i = 0; i < hz * secs; i++) {
+    t = i / hz;
+    const th = Math.atan2(st.p.x, st.p.z);
+    stepExplorerBody(st, { wish: V(wish * Math.cos(th), 0, -wish * Math.sin(th)) }, 1 / hz, env);
+    const B = st.phys, x = th * R;
+    o.far = Math.max(o.far, Math.abs(x)); o.fast = Math.max(o.fast, Math.hypot(st.v.x, st.v.y, st.v.z));
+    if (!st.grounded) o.air++;
+    o.hunker = Math.max(o.hunker, B.hunker01); o.lean = Math.max(o.lean, B.lean); o.brace = Math.max(o.brace, B.windBrace);
+    o.finite = o.finite && Number.isFinite(st.p.x + st.v.x);
+    o.x = x;
+  }
+  return o;
+}
+
+test('P23 the gale: in Neptune\'s squall (60-70 m/s at a metre, gusts to 175 m/s) a walker gets low, leans into it and is braced: never carried off; it can still walk out of it; an ordinary storm leaves it upright', () => {
+  // Until P23 the wind's push on a standing body (0.85 m^2: three to nine times what sand holds at Neptune) slid it across
+  // the beach and up the cliff behind it (PAINTER 13: 19 m in 15 s). Now it gets low (less drag, the wind read nearer the
+  // ground, hands and knees on it) and the suit braces against what the soles cannot hold (its jet's thrust at most).
+  for (const hz of [60, 30]) for (const [slope, ground] of [[0, 'sand'], [10, 'sand'], [0, 'rock']]) {
+    const tag = `${hz} Hz, ${slope} degrees, ${ground}`;
+    const o = galeRun({ hz, slope, ground });
+    assert.ok(o.finite, `${tag}: NaN`);
+    assert.ok(o.far < 2 && o.fast < 2 && o.air === 0, `${tag}: standing, staggered ${o.far.toFixed(2)} m, at ${o.fast.toFixed(2)} m/s at most, ${o.air} steps in the air`);
+    assert.ok(o.hunker > 0.5 && o.lean > 0.3 && o.brace > 0, `${tag}: down low ${o.hunker.toFixed(2)}, leaning ${o.lean.toFixed(2)} rad, braced ${o.brace.toFixed(0)} N`);
+    // walking: into the wind it crawls on, with it it is not blown along faster than a run
+    const up = galeRun({ hz, slope, ground, wish: -4, secs: 10 }), dn = galeRun({ hz, slope, ground, wish: 4, secs: 10 });
+    assert.ok(up.x < -3 && dn.x > 3, `${tag}: walked ${up.x.toFixed(1)} m into it and ${dn.x.toFixed(1)} m with it in 10 s`);
+    assert.ok(dn.fast < 5 && up.air === 0 && dn.air === 0, `${tag}: with it at ${dn.fast.toFixed(2)} m/s at most`);
+  }
+  // an ordinary storm (Earth's coast storm: 10 m/s at a metre, gusts to 27): upright (a crouch at most in its gusts), no brace
+  const e = galeRun({ g: 9.81, rho: 1.2, U1: 10, secs: 12 });
+  assert.ok(e.hunker < 0.2 && e.brace === 0 && e.far < 0.05, `Earth's storm: down low ${e.hunker.toFixed(2)}, braced ${e.brace.toFixed(0)} N, moved ${e.far.toFixed(2)} m`);
+});

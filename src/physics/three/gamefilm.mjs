@@ -77,17 +77,21 @@ const MOON_SETUP = (off = 0, run = 14, minH = 0.6, pick = 0, v0 = 0, maxSlope = 
   const pc = G.pc, w = pc.world, body = 'moon', R = w.sampleSurface(body, { x: 0, y: 1, z: 0 }).radius;
   const at0 = w.findBiome(body, 'crater_fields'), d = G.nrm(at0.unitDir || at0);
   const ref = Math.abs(d.y) < 0.9 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 }, e = G.nrm(G.crs(ref, d)), nn = G.crs(d, e);
-  let best = null;
+  const sites = [];
   for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) {
     const q = G.nrm({ x: d.x + (e.x * i * 40 + nn.x * j * 40) / R, y: d.y + (e.y * i * 40 + nn.y * j * 40) / R, z: d.z + (e.z * i * 40 + nn.z * j * 40) / R });
     const low = (pc.sim.sampleObstacles(body, q, 28) || []).filter((o) => o.kind === 'rock' && o.height <= 1.35);
-    if (!best || low.length > best.n) best = { q, n: low.length };
+    sites.push({ q, n: low.length });
   }
+  sites.sort((x, y) => y.n - x.n);
+  // ((P23) the densest place with a candidate on level ground, among the twelve densest; else the densest)
+  let best = null, rocks = null, cands = null, flat = null;
+  for (let si = 0; si < Math.min(12, sites.length); si++) {
+  const site = sites[si].q;
   // candidates: boulders minH..1.2 m tall; the line of the run comes from the side with no other boulder within 1.6 m
   // of it over the last 'run' metres (a clear run-up), and passes 'off' metres beside the boulder's middle
-  const site = best.q, p0 = { x: site.x * R, y: site.y * R, z: site.z * R };
-  const rocks = (pc.sim.sampleObstacles(body, site, 28) || []).filter((o) => o.kind === 'rock');
-  const cands = [];
+  rocks = (pc.sim.sampleObstacles(body, site, 28) || []).filter((o) => o.kind === 'rock');
+  cands = [];
   for (const b of rocks) {
     if (b.height < ${minH} || b.height > 1.2) continue;
     if ((w.sampleSurface(body, G.nrm(b.unitDir)).slope || 0) > ${maxSlope}) continue;
@@ -97,11 +101,22 @@ const MOON_SETUP = (off = 0, run = 14, minH = 0.6, pick = 0, v0 = 0, maxSlope = 
       let clear = true;
       for (const o of rocks) { if (o === b) continue; const v = G.nrm(o.unitDir), dd = { x: (v.x - u.x) * R, y: (v.y - u.y) * R, z: (v.z - u.z) * R }, along = G.dot(dd, f), side = G.dot(dd, s) - ${off};
         if (along > -${run} - 1 && along < 3 && Math.abs(side) < 1.6 + (o.radius || 0.3)) { clear = false; break; } }
-      if (clear) cands.push({ b, u, f, s, h: b.height });
+      // ((P23) and on level ground: the run-up's terrain within 0.4 m of level over its last 'run' metres, no step in it over
+      // 0.2 a half metre. P22's strip started on a small crater rim's crest: a velocity set at a crest has no time to be read)
+      let lo = 1e9, hi = -1e9, steep = 0, prev = null;
+      for (let a2 = -${run}; a2 <= -1; a2 += 0.5) { const q = G.nrm({ x: u.x * R + f.x * a2 + s.x * ${off}, y: u.y * R + f.y * a2 + s.y * ${off}, z: u.z * R + f.z * a2 + s.z * ${off} }), hh = w.sampleSurface(body, q).radius;
+        lo = Math.min(lo, hh); hi = Math.max(hi, hh); if (prev != null) steep = Math.max(steep, Math.abs(hh - prev) / 0.5); prev = hh; }
+      if (clear) cands.push({ b, u, f, s, h: b.height, level: hi - lo <= 0.4 && steep <= 0.2 });
     }
   }
   cands.sort((x, y) => y.h - x.h);
-  const c = cands[Math.min(${pick}, cands.length - 1)];
+  flat = cands.filter((x) => x.level);
+  if (!best) best = { si, n: sites[si].n, cands, flat, rocks };
+  if (flat.length) { best = { si, n: sites[si].n, cands, flat, rocks }; break; }
+  }
+  cands = best.cands; flat = best.flat; rocks = best.rocks;
+  const from = flat.length ? flat : cands;
+  const c = from[Math.min(${pick}, from.length - 1)];
   if (!c) { window.__site = { none: true, rocks: rocks.length }; return; }
   const st = G.nrm({ x: c.u.x * R - c.f.x * ${run} + c.s.x * ${off}, y: c.u.y * R - c.f.y * ${run} + c.s.y * ${off}, z: c.u.z * R - c.f.z * ${run} + c.s.z * ${off} });
   const ref2 = Math.abs(st.y) < 0.95 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 }, E2 = G.nrm(G.crs(ref2, st)), N2 = G.crs(st, E2);
@@ -110,7 +125,7 @@ const MOON_SETUP = (off = 0, run = 14, minH = 0.6, pick = 0, v0 = 0, maxSlope = 
   // (a run-up: the explorer already running at v0 along the line, as a player arrives at a run; the Moon's grip builds a
   // run slowly, 3 m/s in 3.6 s uphill)
   window.__v0 = ${v0};
-  window.__site = { n: best.n, boulder: { height: G.r2(c.h), radius: G.r2(c.b.radius || 0), cands: cands.length }, heading: G.r2(heading), off: ${off}, run: ${run}, rockU: c.u, f: c.f, s: c.s };
+  window.__site = { n: best.n, densest: best.si + 1, boulder: { height: G.r2(c.h), radius: G.r2(c.b.radius || 0), cands: cands.length, level: flat.length }, heading: G.r2(heading), off: ${off}, run: ${run}, rockU: c.u, f: c.f, s: c.s };
 }`;
 // the numbers of a boulder run: where the feet are against the boulder (along the line, beside it), off the ground and
 // how high, how far the body rose above where the feet left the ground
@@ -149,7 +164,20 @@ const FLOAT_PROBE = `(G) => { const x = G.pc.sim.ex, p = x.p, R = Math.hypot(p.x
   const W = G.ph.fields.water, L = W.local(p, {}), wl = W.heightAt(p), B = x.phys || {};
   return { feet: G.r3(R - still), surf: G.r3(wl), under: G.r3(still + wl - R), sub: G.r2(B.submerged01 || 0), swim: x.swimming ? 1 : 0, vu: G.r2(G.dot(x.v, G.nrm(p))), Hs: G.r2(L.significant), depth: G.r2(still - s.radius), spray: G.ph.particles.spray.count, surfAt: G.r2(G.ph.here.blown ? G.ph.here.blown.surf || 0 : 0) }; }`;
 
+// (P23) the explorer standing on the beach at a coast stand in its storm (PAINTER 13: at Neptune's storm stand, clock 222
+// then 15 s held, the walker was blown 19 m and up the cliff behind the beach): placed at the stand facing out to sea
+const GALE_SETUP = (body, biome, t, heading) => `(G) => {
+  const pc = G.pc, w = pc.world, at0 = w.findBiome('${body}', '${biome}'), d0 = G.nrm(at0.unitDir || at0);
+  pc.setClock(${t}); pc.teleport({ body: '${body}', dir: [d0.x, d0.y, d0.z], hour: 11, heading: ${heading}, lookPitch: -4, firstPerson: false }); G.mark();
+  window.__site = { stand: [G.r3(d0.x), G.r3(d0.y), G.r3(d0.z)] }; window.__p0 = { ...pc.sim.ex.p };
+}`;
+const GALE_PROBE = `(G) => { const x = G.pc.sim.ex, B = x.phys || {}, a = G.ph.here.air || {}, p = x.p, q = window.__p0 || p;
+  return { wind2m: G.r2(a.speed || 0), windAccel: G.r2(B.windAccel || 0), hunker: G.r2(B.hunker01 || 0), brace: Math.round(B.windBrace || 0), lean: G.r2((B.lean || 0) * G.D), moved: G.r2(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z)), grounded: x.grounded ? 1 : 0, clamber: G.r2(B.clamber01 || 0) }; }`;
+
 export const SUBJECTS = {
+  // ---- (P23) the gale: Neptune's squall at the storm stand, the explorer standing on the beach (no keys) ----
+  'game-gale-neptune': { note: 'the game, Neptune storm_seas, the clock set to 222 and 15 s run (PAINTER 13\'s case: the squall, 60-70 m/s at a metre, gusts over 100): the explorer standing on the beach, facing the sea; 10 frames a second',
+    setup: GALE_SETUP('neptune', 'storm_seas', 222, 90), pre: 15, w: 640, h: 360, quality: 1, crop: [0.15, 0.15, 0.7, 0.75], tile: [224, 135], frames: 30, dt: 1 / 30, every: 3, cols: 6, probe: GALE_PROBE },
   // ---- the sub-second gusts (P18) in the meadow by the explorer: 30 frames a second, the storm's wind ----
   'game-grass-sub': { note: 'the game, Earth spawn, 176 s (the storm: 11 m/s at 10 m): the grass at the explorer\'s feet, 30 frames a second (0.4 s); does it move under a second?',
     setup: spawnAt(176 - 3, 0, -22), pre: 3, w: 640, h: 360, quality: 1, crop: [0.2, 0.45, 0.6, 0.55], frames: 12, dt: 1 / 30, every: 1, cols: 4, probe: GRASS_PROBE },
