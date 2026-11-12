@@ -146,7 +146,7 @@ export function createWorld(scene) {
       // internal pixels survive the brush), rain a little broader and longer: a few strokes
       const D = K.DRAW_PAINTED, draw = {};
       for (const k in D) draw[k] = { ...D[k] };
-      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5 };      // (the share drawn is PHYSICS': it follows how hard it rains)
+      draw.rain = { ...D.rain, width: 0.065, exposure: 0.13, minPx: 5, vary: 0.35 };      // (the share drawn is PHYSICS': it follows how hard it rains; vary: each drop its own number, for its stroke's length and breaks)
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)

@@ -311,7 +311,7 @@ class Surface {
 
   // Small tables of rock standing alone (sea stacks, islets of a sky-archipelago): one per
   // cell of a 3D grid. Returns 0..1: a flat top with a cliff all round, scaled per stack.
-  _stacks(X, Y, Z, cell, keep) {
+  _stacks(X, Y, Z, cell, keep, tiers) {
     const px = X / cell, py = Y / cell, pz = Z / cell;
     const ix = Math.floor(px), iy = Math.floor(py), iz = Math.floor(pz), sd = this.seed | 0;
     const h4 = hash3i(ix, iy, iz, sd ^ 911);
@@ -325,8 +325,27 @@ class Surface {
     const wob = this.nC.n3(X / (cell * 0.11) + 3.0, Y / (cell * 0.11), Z / (cell * 0.11) - 5.0) * 0.16;
     // (PAINTER 12: a crown a little rounded and a skirt of fallen rock at the foot: a stack stood as a table with sheer
     // sides, and in a gale under a dark sky it read as a black slab with ruled vertical edges)
-    const body = (1 - smoothstep(0.68, 0.97, d + wob)) * (0.90 + 0.10 * (1 - Math.min(1, d * d)));
     const skirt = (1 - smoothstep(0.86, 1.22, d + wob * 0.5)) * 0.20;
+    if (!tiers) {
+      const body = (1 - smoothstep(0.68, 0.97, d + wob)) * (0.90 + 0.10 * (1 - Math.min(1, d * d)));
+      return Math.max(body, skirt) * (0.45 + 0.55 * (h4 / keep));
+    }
+    // (PAINTER 13, sea stacks: a foot, a middle drum and a crown, each narrower than the one under it with its own ragged
+    // rim, the crown off the middle; a ledge between each and the next; the crown's top broken into knuckles. One body
+    // with a rounded crown stood in Neptune's gale as a single smooth block with flat sides. Faces for the shade: _stF)
+    const g1 = hash3i(ix, iy, iz, sd ^ 401), g2 = hash3i(ix, iy, iz, sd ^ 503), g3 = hash3i(ix, iy, iz, sd ^ 617);
+    const ox = (g1 - 0.5) * 0.30, oy = (g2 - 0.5) * 0.30, oz = (g3 - 0.5) * 0.30;
+    const ex = dx / rr - ox, ey = dy / rr - oy, ez = dz / rr - oz, dc = Math.sqrt(ex * ex + ey * ey + ez * ez);
+    const c2 = cell * 0.09, c3 = cell * 0.07, c4 = cell * 0.065;
+    const w2 = this.nC.n3(X / c2 + 11.0, Y / c2, Z / c2 - 6.0) * 0.13, w3 = this.nC.n3(X / c3 - 4.0, Y / c3 + 8.0, Z / c3) * 0.13;
+    const e1 = 1 - smoothstep(0.84, 0.98, d + wob);
+    const e2 = 1 - smoothstep(0.68, 0.82, d * 0.55 + dc * 0.45 + w2);
+    const e3 = 1 - smoothstep(0.48, 0.64, dc + w3);
+    const f1 = 0.32 + 0.14 * g2, f2 = 0.62 + 0.14 * g3;                       // the ledges' heights, a stack's own
+    const knuck = 0.88 + 0.14 * this.nC.n3(X / c4 + 2.0, Y / c4 - 1.0, Z / c4 + 7.0);   // the crown's top, broken
+    // (each tread falls a little toward its edge: ledges, not shelves)
+    const body = e1 * (f1 - 0.05 * d) + e2 * e1 * (f2 - f1 - 0.04 * dc) + e3 * e2 * (knuck - f2);
+    this._stF = clamp(Math.max(e1 * (1 - e1), e2 * (1 - e2), e3 * (1 - e3)) * 4, 0, 1);
     return Math.max(body, skirt) * (0.45 + 0.55 * (h4 / keep));
   }
 
@@ -387,18 +406,28 @@ class Surface {
         // shoulder; a narrow headland's top falls toward its tip. It was one step 3.3 m of the land's rise wide: a wall
         // a few metres across in plan with a level lip, so a headland ended in a ruled vertical edge, and seen from
         // afar the terrain's cells combed the face into even vertical stripes)
-        const q = hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.6;
-        const tq = clamp((q - 0.9) / 4.6, 0, 1);
+        // (PAINTER 13: the face is one even ramp with a ledge, not two steep lifts with a flat between them, and no lip
+        // is taken off a narrow headland: the two lifts and the 0.78 lip left land that rose only 2 to 4 m before its
+        // cliff on the ledge, up to 25 m lower than before PAINTER 12 (Earth's easel view lost its near hill). An even
+        // ramp gets as high as the old single step over the same land at a gentler steepest slope, and the 17 m wobble
+        // of the cliff line is halved: that wobble against the narrow face is what combed it into gullies (stripes).
+        // Measured round Earth's easel view: old - new height p90 21 -> 4.6 m, max 25 -> 11 m; gully index (|d2h/dt2|
+        // along the contour on faces) 1.57 before PAINTER 12, 0.96 after, 0.89 now)
+        const q = hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.3;
+        const tq = clamp((q - 0.9) / 4.4, 0, 1);
         const ledge = smoothstep(-0.1, 0.35, C.n3(X / 70 + 9.0, Y / 70, Z / 70 - 2.0));
-        const tal = smoothstep(0.0, 0.22, tq), f1 = smoothstep(0.14, 0.48, tq), f2 = smoothstep(0.48 + 0.08 * ledge, 0.84, tq), sh = smoothstep(0.76, 1.0, tq);
-        const cu = tal * 0.09 + f1 * (0.42 + 0.04 * ledge) + f2 * (0.41 - 0.04 * ledge) + sh * 0.08;
-        face = clamp(Math.max(f1 * (1 - f1), f2 * (1 - f2)) * 4 + tal * (1 - tal) * 1.2, 0, 1);
-        const top = 0.78 + 0.22 * smoothstep(3.0, 12.0, hh);
-        hh += cu * cl * top + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
+        const tal = smoothstep(0.0, 0.14, tq), u = clamp((tq - 0.05) / 0.65, 0, 1);
+        // (the ledge: the ramp eases over a band near mid-face, the slope it lost spread over the rest (8 % steeper there))
+        const lc = 0.14 * ledge, lm = 0.45 + 0.08 * C.n3(X / 90 - 3.0, Y / 90 + 6.0, Z / 90);
+        const ramp = u * (1 + lc) - lc * smoothstep(lm - 0.12, lm + 0.12, u);
+        const cu = tal * 0.07 + 0.85 * ramp + 0.08 * smoothstep(0.64, 1.0, tq);
+        face = clamp(Math.min(u, 1 - u) * 5 + tal * (1 - tal) * 1.2, 0, 1);
+        hh += cu * cl + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
       } else if (hh > -30 && hh < -1.5) {
         // stacks: stumps of the old cliff left standing in the shallows
-        const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks);
-        if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, st * (1 - st) * 4 * near); }
+        this._stF = 0;
+        const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks, true);
+        if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, this._stF * near); }
       }
       h = hh + C.n3(x * R / 9, y * R / 9 + 2.0, z * R / 9) * 0.25 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 2.6 + C.n3(x * R / 11 - 2.0, y * R / 11, z * R / 11 + 6.0) * 0.9 + C.n3(x * R / 3.7 + 8.0, y * R / 3.7, z * R / 3.7) * 0.4) * (1 - smoothstep(3, 16, Math.abs(hh)));
       t = clamp((h + 2) / 34, 0, 1); dry = 0.25 + 0.5 * t; wet = h < 1 ? 0.6 : 0.2;
@@ -937,9 +966,10 @@ export function getEaselPure(bodyId, biomeId) {
 
 // Where to arrive in a biome: its stand (a spot that shows the biome whichever way one
 // faces), else its easel, else its first site. -> { unitDir, yaw, pitch } | null
+// (a stand may name a pitch, its fifth number in degrees: the Moon's stands look up a little at Earth, PAINTER 13)
 export function getStandPure(bodyId, biomeId) {
   const e = STANDS[bodyId] && STANDS[bodyId][biomeId];
-  if (e) { const l = 1 / Math.hypot(e[0], e[1], e[2]); return { unitDir: { x: e[0] * l, y: e[1] * l, z: e[2] * l }, yaw: e[3] * D2R, pitch: 0 }; }
+  if (e) { const l = 1 / Math.hypot(e[0], e[1], e[2]); return { unitDir: { x: e[0] * l, y: e[1] * l, z: e[2] * l }, yaw: e[3] * D2R, pitch: (e[4] || 0) * D2R }; }
   return getEaselPure(bodyId, biomeId);
 }
 

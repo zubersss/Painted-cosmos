@@ -25,6 +25,13 @@ export const EASELS = {
     desert_canyon: [-0.944083, -0.274621, 0.182457, 170, 10.4],
     misty_wetland: [0.670709, 0.343774, 0.657243, 170, 4.1],
   },
+  // (PAINTER 13: the Moon's pictures are painted on the near side looking at Earth: the same places as its stands)
+  moon: {
+    mare: [-0.058016, 0.806398, -0.588521, 118, 4],
+    highlands: [-0.665473, -0.392552, 0.634861, 277, 4],
+    crater_fields: [-0.549487, 0.786366, 0.2823, 240, 5],
+    rilles: [0.061523, -0.217086, -0.974212, 86, 7],
+  },
   mars: {
     rust_canyons: [0.836769, -0.175432, 0.518692, 50, 6.3],
     dust_dunes: [0.823076, 0.481217, -0.301621, 0, 1.5],
@@ -58,7 +65,7 @@ export const EASELS = {
 };
 
 // Where to arrive in each biome (world.findBiome): level, dry ground that shows what the
-// biome is whichever way one faces: [x, y, z, yaw (degrees, the best way to face)].
+// biome is whichever way one faces: [x, y, z, yaw (degrees, the best way to face), pitch (degrees, optional)].
 export const STANDS = {
   mercury: {
     ochre_basins: [-0.134094, -0.002758, -0.990965, 90],
@@ -80,8 +87,14 @@ export const STANDS = {
     desert_canyon: [-0.942265, -0.23254, 0.24096, 170],
     misty_wetland: [0.670709, 0.343774, 0.657243, 170],
   },
+  // (PAINTER 13, the coordinator's ruling: the Moon is tidally locked and Earth hangs fixed in the near side's sky, at
+  // (-0.891, 0, -0.453) in the Moon's frame; every stand is on the near side, 70 to 75 degrees from the sub-Earth point,
+  // facing Earth, which stands 15 to 20 degrees up (its disc is 15 degrees across), and looks up a little at it)
   moon: {
-    rilles: [0.010488, 0.599502, 0.800305, 190],          // (PAINTER 12: on a rille's rim, looking along it; there was no stand and the first site never saw it)
+    mare: [-0.058016, 0.806398, -0.588521, 118, 3],        // (Earth over the flat silver plain, 15 degrees up)
+    highlands: [-0.665473, -0.392552, 0.634861, 277, 3],  // (over the rolling bright hills, 15 degrees up)
+    crater_fields: [-0.549487, 0.786366, 0.2823, 240, 4], // (over the crater rims, 18 degrees up)
+    rilles: [0.061523, -0.217086, -0.974212, 86, 6],      // (on a rille's rim, the rille winding toward Earth, 20 degrees up)
   },
   mars: {
     rust_canyons: [0.836522, -0.121244, 0.534351, 250],

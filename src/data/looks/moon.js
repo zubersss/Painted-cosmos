@@ -8,6 +8,10 @@ import { PIGMENTS, hexToRgb, pig, dilute, mixc, glazec, EARTH_SKY, m3, mkSky, B,
 // ground's own greys, so the plain reads as a plain and the eye has somewhere to rest.
 export default {
   seed: 'moon-2', seaLevel: null, cloud: 0,
+  // (the first landing, PAINTER 13: the Moon is tidally locked, so Earth hangs fixed in the near side's sky (the
+  // coordinator's ruling); the arrival is on the near side, on the flat silver mare, facing Earth 15 degrees up: the
+  // mare's stand. [x, y, z, yaw, pitch])
+  spawn: [-0.058016, 0.806398, -0.588521, 118, 3],
   // (no air, but the far plain still goes back in paler bands, toward a pale silver: the painter's convention, honoured
   // since PAINTER 12 on airless worlds; the horizon here is 70 to 400 m off, so the bands lie close)
   visibility: [900, 9000],

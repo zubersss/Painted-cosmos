@@ -49,7 +49,10 @@ const SHAPES = {
   // rain: a broad stroke, full at the head and thinning to its tail, laid wet
   // (nothing right in front of the lens: a drop a metre away would be a stick across the sheet)
   // (a glaze: see GLAZE below; `ga` is how much of the stroke's wash is laid over what is behind it)
-  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 3.2) discard; vec3 c = ink * (0.93 + 0.07 * vPcData.x); float w = 0.95; float ga = (1.0 - smoothstep(0.45, 1.0, tpr)) * (1.0 - 0.7 * vPcUv.y * vPcUv.y) * smoothstep(0.0, 0.1, vPcUv.y) * 0.78;',
+  // (PAINTER 13: each stroke its own length, tapering to its tail and broken where the brush skipped: in Neptune's gale every
+  // stroke lay level, one length, one weight, and the storm sky carried rows of ruled dashes. `rh` is the drop's own number:
+  // the world draws rain with vary 0.35, so vPcData.x is 0.65..1 and stays with the drop)
+  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; float rh = clamp((1.0 - vPcData.x) / 0.35, 0.0, 1.0); float rl = 0.38 + 0.62 * fract(rh * 7.31 + 0.13); if (tpr > 1.0 || vPcUv.y > rl || length(vView) < 3.2) discard; float yy = vPcUv.y / rl; float brk = smoothstep(0.28, 0.60, texture(uNoise3D, vec3(yy * 1.7 + rh * 13.0, rh * 5.3 + 0.21, 0.37)).r); vec3 c = ink * (0.95 + 0.05 * rh); float w = 0.95; float ga = (1.0 - smoothstep(0.25, 1.0, tpr)) * (1.0 - smoothstep(0.30, 1.0, yy)) * smoothstep(0.0, 0.12, yy) * mix(0.35, 1.0, brk) * 0.70;',
   streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
@@ -93,7 +96,8 @@ const SHAPES = {
   // (a glaze: a soft pale arc of paper colour, broken where the brush lifted, never a white wire)
   // (PAINTER 12, PHYSICS P20: a faint glaze a step lighter than the water, softer and a third as strong: in PHYSICS' float
   // strips the rings in the rain were crisp white ellipses all over the sea)
-  ring: 'float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.0, 0.34, cov) * smoothstep(0.30, 0.58, brk) * 0.22; if (ga < 0.02) discard; vec3 c = vec3(0.96, 0.965, 0.95); float w = 0.0;',
+  // ((P21) a flake settling (kind 2) and a hailstone's bounce (3) leave no ring)
+  ring: 'if (vPcData.x > 1.5) discard; float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.0, 0.34, cov) * smoothstep(0.30, 0.58, brk) * 0.22; if (ga < 0.02) discard; vec3 c = vec3(0.96, 0.965, 0.95); float w = 0.0;',
   // a print: this ground, darker; a paler rim on loose ground; fading thins it through the
   // noise (fixed in the mark, so it never boils)
   mark: 'float scour = step(3.5, vPcData.z); float cover = pcPhysMarkCover(vPcUv, vPcData.z) * (1.0 - scour), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * clamp(vPcData.x * 12.0, 0.15, 0.9), rim * mix(0.6, 0.22, scour)) * min(1.0, vPcData.w * 3.0); a = min(a, 0.62); if (a < texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.z * 0.37 + vPcData.x)).g) discard; vec3 c = mix(pcWetWash(ink, 1.0) * 0.66, mix(ink, vec3(1.0), 0.45), rim * (1.0 - cover)); float w = 0.2;',
