@@ -34,6 +34,11 @@ import { clamp01, smoothstep, TAU } from './util.js';
 
 export const WATER = Object.freeze({
   arriveTime: 1.5,                 // s of quick settling when the focus arrives somewhere new
+  // (P20) ...counted only once the sea there has been measured (the sea map's first build: its reference fetch and depth), or
+  // after this many s of known liquid without one (only where a map is being built: WaterField.expectMap, set by physics.update). Until P20 the 1.5 s ran out before the map was built, the sea settled
+  // to the short upwind estimate's small sea and then grew over growTime: arriving at a storm coast showed a calm sea
+  // rising for minutes (30 m off a gale's open coast: 0.13 m at 1 s, 0.50 m at 40 s, 0.98 m at 150 s).
+  arriveWait: 8,
   growTime: 25,                    // game s for the sea to follow a change of wind
   turnTime: 40,                    // game s for the wave direction to follow the wind
   // the four trains: length as a multiple of the peak wavelength, share of the amplitude,
@@ -594,7 +599,7 @@ export class WaterField {
   // prevailing (optional, m/s): the wind that prevails over this body's seas: somewhere out there it is
   // blowing, so an open sea has a swell on a calm day too (WATER.swellCalm of it)
   update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0, prevailing = 0) {
-    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.gphase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; this.wake.fill(0); this.attachMap(null); }
+    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.gphase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; this.arriveWait = 0; this.wake.fill(0); this.attachMap(null); }
     this.level = level; this.present = level > -1e8; this.g = g;
     this.fetch = fetch; this.depth = depth;     // (P16) what the sea was raised over (m), for the probe and the lab
     const U = Math.hypot(we, wn);
@@ -604,7 +609,7 @@ export class WaterField {
     windSea(this.present ? U : 0, fetch, g, rhoAir, rhoLiq, depth > 0 ? depth : 1e9, _t);
     const h = dt > 0.25 ? 0.25 : dt;
     const kh = 1 - Math.exp(-h / (fresh ? 0.2 : WATER.growTime));
-    if (fresh) { this.arrive -= h; this.dir[0] = we / U; this.dir[1] = wn / U; }
+    if (fresh) { if (this.map || !this.expectMap || (this.arriveWait = (this.arriveWait || 0) + h) > WATER.arriveWait) this.arrive -= h; this.dir[0] = we / U; this.dir[1] = wn / U; }
     this.height += (_t.height - this.height) * kh;
     if (this.height < 1e-5) this.height = 0;
     // period and length follow the same sea; do not let them collapse when the wind drops

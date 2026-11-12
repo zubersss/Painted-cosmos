@@ -22,7 +22,7 @@ import { Loose, LOOSE, KICK } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
-import { clamp01 } from './util.js';
+import { clamp01, smoothstep } from './util.js';
 import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
@@ -292,6 +292,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (An eye far from the focus is a map or a free camera: the focus then.)
     let ecx = fx, ecz = fz;
     if (f.eye) { const x = frame.lx(f.eye.x, f.eye.y, f.eye.z), z = frame.lz(f.eye.x, f.eye.y, f.eye.z); if (Math.abs(x - fx) < 60 && Math.abs(z - fz) < 60) { ecx = x; ecz = z; } }
+    // (P20) a raindrop's ring shows on still water, not among the waves of a running sea (Hs here, from the map: a calm lagoon keeps them)
+    { const hs = water.present ? water.localAt(fx, fz, _loc).significant : 0; particles.seaCalm01 = 1 - smoothstep(0.1, 0.5, hs > 0 ? hs : 0); }
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
@@ -345,6 +347,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       stats.msFetch = now() - tg;
     }
     water.attachMap(liqLevel > -1e8 && seaMap.target.on ? seaMap.target : null);
+    water.expectMap = true;     // (P20) the sea on arrival settles quickly until the map's first build has measured it (water.js arriveWait)
     // wakes: a body moving in the liquid, and thrusters blowing on it, leave rings of waves
     if (water.present && dist) {
       const rhoL = cover.liquidDensity || liquidOf(bodyId).density;

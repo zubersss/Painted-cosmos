@@ -121,6 +121,9 @@ export class Particles {
     this._wtx = 0; this._wtz = 0;              // grid position of the patch's first node (m)
     this.time = 0;
     this._ring = 0;                            // rings owed near the focus (P7)
+    // (P20) how calm the liquid about the focus is (1 still, 0 a running sea; set by physics.update from the sea there): a
+    // raindrop's ring shows on still water and is lost among the waves of a sea that is running (a storm sea drew crisp rings)
+    this.seaCalm01 = 1;
   }
 
   setQuality(q) { this.quality = q; }
@@ -147,6 +150,7 @@ export class Particles {
   }
 
   _event(frame, x, y, z, kind, strength, size) {
+    if (kind === EVENT.ripple) { strength *= this.seaCalm01; if (strength < 0.02) return; }   // (P20)
     const E = this.events, o = E.head * 8;
     // (heights are radial, the grid is the tangent plane at the anchor: see publish())
     const qx = frame.ox + frame.ex * x + frame.nx * z, qy = frame.oy + frame.ey * x + frame.ny * z, qz = frame.oz + frame.ez * x + frame.nz * z;

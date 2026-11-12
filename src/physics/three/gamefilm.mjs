@@ -178,10 +178,10 @@ export const SUBJECTS = {
   // ---- (item 3) the drawn sea and physics' sea: the explorer floating off the coast stand, 'out' m beyond the waterline
   // (deep enough to float), the camera behind it looking along the shore; probe: the feet's height over the still level,
   // the drawn surface there (physics' twin of the water shader), how much of the body is under, the sea there ----
-  'game-float-earth': { note: 'the game, Earth sea_coast at 1150 s (a fresh breeze): the explorer floating 25 m out, looking along the shore; 7.5 frames a second',
-    setup: COAST_SETUP('earth', 'sea_coast', 1150, 25), pre: 4, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
-  'game-float-neptune': { note: 'the game, Neptune storm_seas at 240 s (the storm): the explorer floating 25 m out, looking along the shore; 7.5 frames a second',
-    setup: COAST_SETUP('neptune', 'storm_seas', 240, 25), pre: 4, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
+  'game-float-earth': { note: 'the game, Earth sea_coast at 8850 s (the stand\'s storm, 13 m/s from the E: coast.mjs): the explorer floating 25 m out, looking along the shore; 7.5 frames a second',
+    setup: COAST_SETUP('earth', 'sea_coast', 8850 - 10, 25), pre: 10, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
+  'game-float-neptune': { note: 'the game, Neptune storm_seas at 240 s (the storm, 75 m/s from the E: coast.mjs): the explorer floating 25 m out, looking along the shore; 7.5 frames a second',
+    setup: COAST_SETUP('neptune', 'storm_seas', 240 - 10, 25), pre: 10, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
 };
 
 function arg(name, d) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : d; }

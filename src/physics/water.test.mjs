@@ -470,3 +470,48 @@ test('P20 a floating explorer rides the drawn sea: its body follows the waves th
     assert.ok(Math.abs(-mb + ms - EXPLORER_BODY.floatDepth) < 0.15, 'floats at the float depth under the moving surface: ' + (-mb + ms));
   } finally { setWindScale('earth', s0); }
 });
+
+test('P20 arriving at a coast in a gale, the sea is already running there: within 8 s, not over minutes', async () => {
+  // The quick settling on arrival (WATER.arriveTime) ran out before the sea map's first build had measured the fetch: the sea
+  // settled to the short upwind estimate's small sea and then grew over growTime (0.16 m at 8 s, 0.50 m at 40 s, 0.98 at 150 s).
+  const { coastWorld } = await import('./testworld.mjs');
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.3);
+    const R = BODIES.earth.radius, C = norm(V(0.6, 0.04, 0.8));
+    const world = coastWorld(C, (u, v) => (u < 0 ? 4 : -Math.min(20, 0.5 + 0.07 * u)), { R });
+    const physics = createPhysics({ sampleSurface: (id, q) => world(q), timeBudget: false });
+    const d = world.at(30, 0), p = V(d.x * R, d.y * R, d.z * R), hs = {};
+    for (let i = 1; i <= 60 * 30; i++) {
+      physics.update(1 / 30, { bodyId: 'earth', time: 300 + i / 30, focus: p });
+      void physics.fields.water.uniforms.uPhysSeaMap;     // read as the game's water shader reads it
+      if (i === 8 * 30 || i === 60 * 30) hs[i / 30] = physics.water('earth', p, {}).significant;
+    }
+    console.log(`# arriving 30 m off an open coast in a gale: Hs ${hs[8].toFixed(2)} m at 8 s, ${hs[60].toFixed(2)} m at 60 s`);
+    assert.ok(hs[60] > 0.5, 'a gale\'s sea: ' + hs[60]);
+    assert.ok(hs[8] > 0.8 * hs[60], `the sea is there on arrival: ${hs[8]} m at 8 s against ${hs[60]} m at 60 s`);
+  } finally { setWindScale('earth', s0); }
+});
+
+test('P20 raindrop rings show on still water and not among the waves of a running sea', async () => {
+  // (a storm sea at Neptune's coast was drawn under crisp rain rings, as a pond would be)
+  const { coastWorld } = await import('./testworld.mjs');
+  const { EVENT } = await import('./particles.js');
+  const s0 = WINDS.earth.scale;
+  try {
+    for (const [scale, want] of [[0.3, 'none'], [20, 'rings']]) {
+      setWindScale('earth', scale);
+      const R = BODIES.earth.radius, C = norm(V(0.6, 0.04, 0.8));
+      const world = coastWorld(C, (u, v) => (u < 0 ? 4 : -Math.min(20, 0.5 + 0.07 * u)), { R });
+      const physics = createPhysics({ sampleSurface: (id, q) => world(q), timeBudget: false });
+      const d = world.at(30, 0), p = V(d.x * R, d.y * R, d.z * R);
+      for (let i = 1; i <= 20 * 30; i++) physics.update(1 / 30, { bodyId: 'earth', time: 300 + i / 30, focus: p });
+      const S = physics.particles.system, hs = physics.water('earth', p, {}).significant, F = physics.fields.frame, E = S.events, t0 = E.total;
+      for (let k = 0; k < 50; k++) S._event(F, 0, 0, 0, EVENT.ripple, 0.8, 0.003);
+      const made = E.total - t0;
+      console.log(`# rain rings 30 m off the coast, wind scale ${scale}: Hs ${hs.toFixed(2)} m, calm ${S.seaCalm01.toFixed(2)}, ${made} of 50 ripples kept`);
+      if (want === 'none') assert.ok(hs > 0.5 && made === 0, `a running sea (Hs ${hs}) keeps no ring: ${made}`);
+      else assert.ok(made === 50, `still water (Hs ${hs}) keeps its rings: ${made}`);
+    }
+  } finally { setWindScale('earth', s0); }
+});
