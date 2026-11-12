@@ -12,7 +12,7 @@ import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
 import { WINDS, WIND, setWindScale, windLarge } from './wind.js';
 import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
-import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction } from './ground.js';
+import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction, splashOn } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
 import { FloraField, FLORA, PlantSim, plantDisplace, plantBranch, plantCrown, treeFrequency, stemFrequency } from './flora.js';
@@ -127,6 +127,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _dirv = { x: 0, y: 0, z: 0 };
   const _d3 = new Float64Array(3);
   const _g = {}, _g2 = {}, _cov = {}, _menv = {}, _m2 = {}, _wenv = {};
+  const _splash = new Float32Array(MATERIAL_IDS.length);   // (P21) a raindrop's splash on each ground, as it is now
   let sampleBody = 'earth';
   const sampleActive = (dir) => sampleSurface(sampleBody, dir);
 
@@ -294,6 +295,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (f.eye) { const x = frame.lx(f.eye.x, f.eye.y, f.eye.z), z = frame.lz(f.eye.x, f.eye.y, f.eye.z); if (Math.abs(x - fx) < 60 && Math.abs(z - fz) < 60) { ecx = x; ecz = z; } }
     // (P20) a raindrop's ring shows on still water, not among the waves of a running sea (Hs here, from the map: a calm lagoon keeps them)
     { const hs = water.present ? water.localAt(fx, fz, _loc).significant : 0; particles.seaCalm01 = 1 - smoothstep(0.1, 0.5, hs > 0 ? hs : 0); }
+    // (P21) and a raindrop's splash on the ground only where that ground shows one (ground.js splashOn), as it is now, by the
+    // material of each node of the near grid (groundInto keeps it at slot 8): none on a meadow, a forest floor or sand
+    { const S = _splash; for (let k = 0; k < S.length; k++) S[k] = splashOn(k, moist.wetness01, moist.snowDepth);
+      particles.splashOf = S; particles.splashCover = near.cover; particles.splashCW = near.CW; particles.splashSlot = 8;
+      const n = near.nearest(fx, fz); particles.splashHere = n >= 0 && near.cover ? S[near.cover[n * near.CW + 8] | 0] : 0; }
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way

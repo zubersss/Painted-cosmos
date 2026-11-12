@@ -655,3 +655,82 @@ test('P19 the ghost keeps to its own scratch: a run through a row of boulders OF
     }
   }
 });
+
+// ---- (P21) the brace ---------------------------------------------------------------------------------
+// Level ground, then from x = 10 m a straight slope of `deg` degrees (endless, or `H` m high and then falling at 10
+// degrees: a crater rim), the normals the slope's own; a run at `v0` started 6 m short of it already at speed, so that the
+// way ahead, read from about 9 m out, reads past the foot of the slope and never holds a pace for it.
+function kinkRun(g, deg, hz, H = 0, v0 = 6.7) {
+  const k = Math.tan(deg * Math.PI / 180), ka = Math.tan(-10 * Math.PI / 180), xTop = H ? 10 + H / k : 1e9;
+  const h = (x) => x < 10 ? 0 : x < xTop ? (x - 10) * k : H + (x - xTop) * ka, hs = (x) => x < 10 ? 0 : x < xTop ? k : ka;
+  const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z), ux = d.x / l, uz = d.z / l, x = Math.atan2(ux, uz) * R, s = hs(x), n = Math.hypot(1, s);
+    return { radius: R + h(x), normal: { x: (ux - uz * s) / n, y: d.y / l / n, z: (uz + ux * s) / n }, liquidRadius: 0 }; };
+  const env = { sample, gravity: g, ground: (s, o) => Object.assign(o, { material: 'rock', friction: 0.9, kinetic: 0.7, foothold: 0.4, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 }) };
+  const st = { p: V(Math.sin(4 / R) * R, 0, Math.cos(4 / R) * R), v: V(v0, 0, 0), grounded: true };
+  const o = { slowest: Infinity, air: 0, thrown: 0, read: 0, far: 0, finite: true };
+  let rel = 0, was = true;
+  for (let i = 0; i < hz * 4; i++) {
+    const t = Math.atan2(st.p.x, st.p.z);
+    stepExplorerBody(st, { wish: V(v0 * Math.cos(t), 0, -v0 * Math.sin(t)), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env);
+    const B = st.phys, x = Math.atan2(st.p.x, st.p.z) * R, r = len(st.p);
+    o.far = x; o.finite = o.finite && finite(st);
+    if (x < 10 && B.ahead) o.read++;
+    if (x > 10 && x < Math.min(16, xTop)) o.slowest = Math.min(o.slowest, B.speedGround);
+    if (!st.grounded) { if (was) rel = r; o.air++; o.thrown = Math.max(o.thrown, r - rel); }
+    was = st.grounded;
+  }
+  return o;
+}
+
+test('P21 the brace: a run onto a slope the way ahead missed loses only the speed into it; the speed along it carries on (Moon, Mars, Earth; 29 and 43 degrees; 60 and 30 Hz)', () => {
+  // Until P21, where the ground rose faster than the hips could follow (the legs folded to their end), the legs took up
+  // the WHOLE velocity, legCatch at most: a run on the Moon onto a 29 degree slope was held at 3.72 m/s, onto 43 degrees at
+  // 2.21 (P20: a crater rim in the game, 6.7 -> 2.2 m/s in 0.17 s), on Mars 4.04, on Earth 4.85. The ground pushes along
+  // its normal: the speed into it goes, the speed along it stays, which over level ground is v cos^2 of the slope (5.13
+  // m/s from 6.7 at 29 degrees, 3.58 at 43). (Mars and Earth at 43 degrees read the slope coming and slow before it: the
+  // soles, not the brace.)
+  for (const [name, g, deg] of [['Moon', 1.62, 29], ['Moon', 1.62, 43], ['Mars', 3.71, 29], ['Earth', 9.81, 29]]) for (const hz of [60, 30]) for (const H of [0, 2.2]) {
+    const o = kinkRun(g, deg, hz, H), want = 6.7 * Math.cos(deg * Math.PI / 180) ** 2, tag = `${name} ${deg} degrees ${hz} Hz ${H ? 'a 2.2 m rim' : 'a slope'}`;
+    assert.ok(o.finite, `${tag}: NaN`);
+    assert.equal(o.read, 0, `${tag}: the way ahead held a pace for it (the case is one it misses)`);
+    assert.ok(o.slowest >= 0.96 * want, `${tag}: ${o.slowest.toFixed(2)} m/s at the slowest on it, the speed along it is ${want.toFixed(2)}`);
+    if (!H) assert.equal(o.air, 0, `${tag}: ${o.air} steps in the air`);
+    // (over the rim's crest the ground falls away faster than a run can follow (Decision 50): the feet may leave it, but
+    // the body is not thrown up)
+    assert.ok(o.thrown <= 0.05 && o.far > 18, `${tag}: thrown up ${o.thrown.toFixed(3)} m, on to ${o.far.toFixed(1)} m`);
+  }
+});
+
+test('P21 the legs\' base is never carried below the ground the feet have stood on: between close boulders the hips can be raised for the next one (Earth, Moon; 60 and 30 Hz)', async () => {
+  // B.base, the ground the hips' reach is counted from while the legs work, was carried on at the rate the ground had been
+  // rising, and that rate is a descent's on the far side of a boulder: it went on sinking after the feet had reached the
+  // floor, up to 5.3 m under it in P19's row, the hips could not be raised for the next boulder, and it was met braced (the
+  // Moon, 60 Hz: 1.74 m/s at the slowest). P19's row of boulders, at one of its places.
+  const { scrambleSample } = await import('../player/explorer.js');
+  const ROCK = { material: 'rock', friction: 0.9, kinetic: 0.7, foothold: 0.4, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 };
+  const SANDY = { material: 'sand', friction: 0.6, kinetic: 0.5, foothold: 0.2, restitution: 0.05, sink: 0.05, drag: 0.25, dust: 0.6 };
+  const ROW = [[6, 0, 1], [8.6, 0.3, 0.9], [11.4, -0.4, 1.1], [14, 0.5, 1], [16.6, 0, 0.8], [19.4, -0.3, 1.2], [22.2, 0.2, 1], [25, 0, 1]];
+  const cross = (a, b) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+  const u0 = norm(V(0.3, 0.9, 0.3)), h0 = norm(cross(cross(u0, V(0.2, 1, 0.1)), u0)), n0 = cross(u0, h0);
+  const at = (s, o) => { const c = Math.cos(s / R), sn = Math.sin(s / R); return norm(V(u0.x * c + h0.x * sn + n0.x * o / R, u0.y * c + h0.y * sn + n0.y * o / R, u0.z * c + h0.z * sn + n0.z * o / R)); };
+  const obs = ROW.map(([s, o, h]) => ({ unitDir: at(s, o), radius: 0.6, height: h }));
+  const sample = scrambleSample((d) => ({ radius: R, normal: V(d.x, d.y, d.z), liquidRadius: 0 }), () => obs);
+  for (const g of [9.81, 1.62]) for (const hz of [60, 30]) {
+    const env = { sample, gravity: g, ground: (s, out) => Object.assign(out, s.radius > R + 0.01 ? ROCK : SANDY) };
+    const p0 = at(0, 0), st = { p: V(p0.x * R, p0.y * R, p0.z * R), v: V(), grounded: true };
+    let sunk = 0, least = 1e9, far = 0, off = 0, air = 0;
+    for (let i = 0; i < hz * 9; i++) {
+      const u = norm(st.p), t = Math.atan2(dot(u, h0), dot(u, u0)), c = Math.cos(t), sn = Math.sin(t);
+      stepExplorerBody(st, { wish: V(6 * (h0.x * c - u0.x * sn), 6 * (h0.y * c - u0.y * sn), 6 * (h0.z * c - u0.z * sn)) }, 1 / hz, env);
+      const B = st.phys; far = t * R;
+      if (st.grounded && Math.abs(len(st.p) - R) < 1e-6) sunk = Math.max(sunk, R - B.base);   // (the feet on the floor)
+      if (far > 5) least = Math.min(least, B.speedGround);
+      if (!st.grounded) air++;
+      off = Math.max(off, Math.abs(dot(norm(st.p), n0)) * R);
+    }
+    const tag = `g ${g}, ${hz} Hz`;
+    assert.ok(sunk < 1e-6, `${tag}: the legs' base ${sunk.toFixed(2)} m under the floor the feet stand on`);
+    assert.ok(least > 2.1 && far > 20, `${tag}: no slower than ${least.toFixed(2)} m/s past the first boulder, on to ${far.toFixed(0)} m`);
+    assert.ok(air === 0 && off < 0.005, `${tag}: ${air} steps in the air, ${off.toFixed(3)} m off the line`);
+  }
+});

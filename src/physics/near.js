@@ -225,6 +225,14 @@ export class TerrainGrid {
     q[2] = ws < 0.25 ? NaN : (h[n] * w00 + h[n + 1] * w10 + h[n + N] * w01 + h[n + N + 1] * w11) / ws;
   }
 
+  // (P21) groundQ, and q[4] = the index of the node nearest (x, z) when it has been sampled, else -1 (q: 5 numbers at
+  // least): the rain asks what the ground under a drop is made of (the caller's cover there)
+  groundQN(q) {
+    this.groundQ(q);
+    const N = this.N, ir = Math.round(q[0] / this.cell - this.ci + this.half), jr = Math.round(q[1] / this.cell - this.cj + this.half);
+    q[4] = ir >= 0 && jr >= 0 && ir < N && jr < N && this.valid[jr * N + ir] === 1 ? jr * N + ir : -1;
+  }
+
   // (P18) nearest() and known() at once through the scratch array, for the wind grid's upwind search: reads x = q[0],
   // z = q[1]; returns nearest(x, z) and writes q[4] = known(x, z) ? 1 : 0, exactly (nothing boxed: see groundQ).
   nearKnownQ(q) {

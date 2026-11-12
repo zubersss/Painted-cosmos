@@ -318,9 +318,11 @@ test('Venus: acid drizzle is virga on low ground (no drop lands) and reaches the
   assert.equal(low.physics.here.weather.kind, 'virga');
   assert.ok(low.physics.particles.rain.count > 3, 'drops are in the air: ' + low.physics.particles.rain.count);
   assert.equal(low.physics.particles.events.total, 0, 'and none of them reaches the ground');
+  assert.equal(low.physics.particles.system.landed, 0, 'none lands');
   const mesa = setup('venus', 'pale_mesas', { dir: hit.c, alt: 280 }); mesa.t = hit.t; run(mesa, 40);
   assert.equal(mesa.physics.here.weather.kind, 'acid drizzle');
-  assert.ok(mesa.physics.particles.events.total > 3, 'drops land on the mesa: ' + mesa.physics.particles.events.total);
+  // ((P21) counted as they land: hot dry rock throws up no crown, so no splash event shows them: Decision 55)
+  assert.ok(mesa.physics.particles.system.landed > 3, 'drops land on the mesa: ' + mesa.physics.particles.system.landed);
   let fall = 0; const b = mesa.physics.particles.rain; for (let i = 0; i < b.count; i++) fall += -dot(V(b.vel[i * 3], b.vel[i * 3 + 1], b.vel[i * 3 + 2]), mesa.up);
   assert.ok(fall / b.count < 0.6, 'they drift down at ' + (fall / b.count).toFixed(2) + ' m/s through air a twentieth as dense as water');
 });

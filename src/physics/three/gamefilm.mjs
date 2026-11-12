@@ -176,12 +176,13 @@ export const SUBJECTS = {
     setup: MOON_SETUP(0.45, 12, 0.6, 0, 6, 0.14), start: MOON_START, pre: 0.4, keys: ['ShiftLeft', 'KeyW'], w: 640, h: 360, quality: 1, crop: [0.15, 0.2, 0.7, 0.7], tile: [224, 126], frames: 30, dt: 1 / 30, every: 3, cols: 6,
     probe: MOON_PROBE, track: MOON_TRACK, after: MOON_AFTER },
   // ---- (item 3) the drawn sea and physics' sea: the explorer floating off the coast stand, 'out' m beyond the waterline
-  // (deep enough to float), the camera behind it looking along the shore; probe: the feet's height over the still level,
+  // (deep enough to float), the camera behind it looking along the shore ((P21) 15 s of clock first: the sea there on arrival,
+  // P20's last step); probe: the feet's height over the still level,
   // the drawn surface there (physics' twin of the water shader), how much of the body is under, the sea there ----
   'game-float-earth': { note: 'the game, Earth sea_coast at 8850 s (the stand\'s storm, 13 m/s from the E: coast.mjs): the explorer floating 25 m out, looking along the shore; 7.5 frames a second',
-    setup: COAST_SETUP('earth', 'sea_coast', 8850 - 10, 25), pre: 10, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
+    setup: COAST_SETUP('earth', 'sea_coast', 8850 - 15, 25), pre: 15, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
   'game-float-neptune': { note: 'the game, Neptune storm_seas at 240 s (the storm, 75 m/s from the E: coast.mjs): the explorer floating 25 m out, looking along the shore; 7.5 frames a second',
-    setup: COAST_SETUP('neptune', 'storm_seas', 240 - 10, 25), pre: 10, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
+    setup: COAST_SETUP('neptune', 'storm_seas', 240 - 15, 25), pre: 15, w: 640, h: 360, quality: 1, crop: [0.1, 0.15, 0.8, 0.75], tile: [256, 135], frames: 24, dt: 1 / 30, every: 4, cols: 6, probe: FLOAT_PROBE },
 };
 
 function arg(name, d) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : d; }

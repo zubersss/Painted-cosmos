@@ -418,7 +418,7 @@ const FRAG = {
   leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; if (abs(lp.y) > 1.0 - lp.x * lp.x) discard; vec3 c = ink * (0.72 + 0.28 * vPcData.x); float w = 0.3;',
   // spume and surf (P10): a pale wet stroke like the rain's
   spume: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.6 * vPcUv.y * vPcUv.y) discard; vec3 c = ink * 0.97; float w = 0.95;',
-  ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.22) discard; vec3 c = ink; float w = 0.8;',
+  ring: 'if (vPcData.x > 1.5 || pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.22) discard; vec3 c = ink; float w = 0.8;',   // ((P21) kinds 2 and 3, a flake settling and a hailstone's bounce, leave no ring)
   // a print: darker ground inside, a paler rim on loose ground. Shallow prints are faint, deep
   // ones full; a scour dish is only its pale ring. Fading thins the mark through PAINTER's noise
   // (fixed in the mark, so it never boils).

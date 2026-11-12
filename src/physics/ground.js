@@ -366,6 +366,23 @@ export function materialNow(dryId, mudding, slope, wet, snow, T) {
   return m;
 }
 
+// (P21) How a raindrop's splash shows on a ground (0..1): the crown and the ring a drop throws up in a film of water. Hard
+// ground that sheds the water (rock, glass, crystal, ice, a stream's bed) shows one once a film lies on it; earth only
+// soaked, standing in water (and mud, wet through); a sward (grass, moss, the litter of a forest floor) takes the drop
+// among its blades and leaves, and loose grains (sand, dust, ash, gravel) and snow swallow it: no ring there, ever (the
+// drop on dry dust lifts a puff a few millimetres high, under a pixel). Snow lying on the ground covers every one.
+//   id: an index into MATERIAL_IDS (the ground as it is when dry; the rain's own mud is reckoned here)
+//   wet: the ground's wetness 0..1 (weather.js), snow: m of snow lying on it
+const SPLASH_FILM = { rock: 1, glass: 1, crystal: 1, ice: 1, bed: 1 };
+export function splashOn(id, wet, snow) {
+  if (snow > GROUND.snowCover) return 0;
+  const name = MATERIAL_IDS[id];
+  if (SPLASH_FILM[name]) return smoothstep(0.2, 0.6, wet);
+  if (name === 'mud') return smoothstep(0.3, 0.7, wet);
+  if (name === 'soil') return smoothstep(GROUND.mudStart, 0.9, wet);
+  return 0;
+}
+
 // Liquids that are not the world's usual one, by biome (PAINTER's look table marks them
 // `glow` for lava and `cloud` for a cloud sea).
 export const BIOME_LIQUID = { lava_rivers: 'lava', gold_islands: 'cloud', sky_islands: 'cloud' };

@@ -86,7 +86,7 @@ function makeBuffer(cap) {
 }
 
 const _w = new Float64Array(8);
-const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
+const _gq = new Float64Array(5);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ); (P21) [4] the node (groundQN)
 const _carry = new Float64Array(2);  // (P20) a particle's grid position carried through a re-anchor (LocalFrame.carry)
 
 export class Particles {
@@ -124,6 +124,23 @@ export class Particles {
     // (P20) how calm the liquid about the focus is (1 still, 0 a running sea; set by physics.update from the sea there): a
     // raindrop's ring shows on still water and is lost among the waves of a sea that is running (a storm sea drew crisp rings)
     this.seaCalm01 = 1;
+    // (P21) how a raindrop's splash shows on the ground where it lands, as that ground is now (0..1; set by physics.update):
+    // splashOf[material id] (ground.js splashOn), the material of each node of the near grid read from splashCover
+    // (splashCW numbers a node, the id at splashSlot), splashHere where the node is not known. A drop leaves a ring on water
+    // and on hard ground under a film of water; a meadow, a forest floor, moss, sand, dust and snow take it with none (P20's
+    // strips: crisp rings all over the grass). null: everywhere, as before P21.
+    this.splashOf = null; this.splashCover = null; this.splashCW = 0; this.splashSlot = 0; this.splashHere = 1;
+    this.landed = 0;                          // (P21) drops and flakes that have reached the ground or the liquid so far (a crown or not)
+  }
+
+  // (P21) The splash a raindrop makes on the ground at near-grid node n (-1: not known), 0..1.
+  splashAt(n) {
+    const S = this.splashOf;
+    if (!S) return 1;
+    const C = this.splashCover;
+    if (n < 0 || !C) return this.splashHere;
+    const f = S[C[n * this.splashCW + this.splashSlot] | 0];
+    return f === f ? f : this.splashHere;
   }
 
   setQuality(q) { this.quality = q; }
@@ -310,8 +327,10 @@ export class Particles {
         for (let k = 0; k < nSH; k++) { const so = k * 4, dx = x - SH[so], dz = z - SH[so + 1]; if (dx * dx + dz * dz < SH[so + 3] * SH[so + 3] && gy < SH[so + 2]) { dry = true; break; } }
         if (dry) continue;
         const size = (pr.dropSize || 0.002) * (0.6 + 0.9 * big);
-        // on liquid a ripple, on the ground a crown: as the drops themselves
-        this._event(frame, x, gy, z, onLiquid ? EVENT.ripple : EVENT.splash, clamp01((pr.fallSpeed || 6) * size * 60), size);
+        // on liquid a ripple, on the ground a crown: as the drops themselves ((P21) where the ground shows one)
+        let st = clamp01((pr.fallSpeed || 6) * size * 60);
+        if (!onLiquid && this.splashOf) { st *= this.splashAt(near ? near.nearest(x, z) : -1); if (st < 0.02) continue; }
+        this._event(frame, x, gy, z, onLiquid ? EVENT.ripple : EVENT.splash, st, size);
       }
     } else this._ring = 0;
   }
@@ -324,7 +343,7 @@ export class Particles {
     if (n === 0) { b.count = 0; return; }
     const h = C.h, Rb = C.Rb, bx = C.bx, bz = C.bz, ground = C.ground, fx = C.fx, fy = C.fy, fz = C.fz, g = C.g, time = C.time, H = C.H;
     const canopyH = C.canopyH, through = C.through, liquid0 = C.liquid0, drip = C.drip, want = C.want, draining = C.draining, isSnow = C.isSnow, pr = C.pr, nSH = C.nSH;
-    const target = C.target ? b : null, SH = this.shelters, cp = this._cp, wv = this._wv, ht = this._ht, wtx = this._wtx, wtz = this._wtz;
+    const target = C.target ? b : null, SH = this.shelters, cp = this._cp, wv = this._wv, ht = this._ht, wtx = this._wtx, wtz = this._wtz, SO = this.splashOf;
   const P = b._p, V = b._v, VT = b._vt, PH = b._ph;
   const snowy = name === 'snow';
   const top = ground + H, bottom = Math.min(ground, fy) - PARTICLES.below;
@@ -369,12 +388,12 @@ export class Particles {
     b.age[i] += h;
     // the ground (only looked up when the particle is low)
     // (a flake is looked up all the way down: it rides the air over the ground, below)
-    let hit = false, gy = ground, wet = false, left = b.left[i] - h;
+    let hit = false, gy = ground, wet = false, left = b.left[i] - h, nm = -1;
     if (snowy || y < ground + 6) {
       left = 1e9;
       // (P17: TerrainGrid.groundQ, both lookups through a scratch array: nothing boxed, nothing to collect)
       const GQ = _gq; GQ[0] = x; GQ[1] = z;
-      if (near) { near.groundQ(GQ); gy = GQ[2]; } else { gy = NaN; GQ[3] = NaN; }
+      if (near) { near.groundQN(GQ); gy = GQ[2]; nm = GQ[4]; } else { gy = NaN; GQ[3] = NaN; }
       let lq = GQ[3];
       if (gy !== gy || lq !== lq) { const g1 = gy, l1 = lq; air.terrain.groundQ(GQ); gy = g1 === g1 ? g1 : GQ[2] === GQ[2] ? GQ[2] : ground; lq = l1 === l1 ? l1 : GQ[3]; }
       if (lq !== lq) lq = liquid0;
@@ -434,8 +453,14 @@ export class Particles {
     // (snow is bounded by the ground under each flake, not by a floor and a lid at the centre's height)
     if (hit || gone || (y < bottom && !snowy)) {
       if (hit) {
+        this.landed++;
         const sp = Math.hypot(vx, vy, vz);
-        if (Math.abs(x - bx) < PARTICLES.ringFar && Math.abs(z - bz) < PARTICLES.ringFar) this._event(frame, x, gy, z, snowy ? EVENT.settle : wet ? EVENT.ripple : EVENT.splash, clamp01(sp * b.size[i] * 60), b.size[i]);
+        if (Math.abs(x - bx) < PARTICLES.ringFar && Math.abs(z - bz) < PARTICLES.ringFar) {
+          // ((P21) a drop on the ground: as much of a crown as that ground shows)
+          let st = clamp01(sp * b.size[i] * 60);
+          if (!snowy && !wet && SO) st *= this.splashAt(nm);
+          if (st >= 0.02 || snowy || wet || !SO) this._event(frame, x, gy, z, snowy ? EVENT.settle : wet ? EVENT.ripple : EVENT.splash, st, b.size[i]);
+        }
       }
       if (draining || i >= want) {
         // retire: move the last live particle into this slot

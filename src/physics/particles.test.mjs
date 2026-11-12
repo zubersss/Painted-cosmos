@@ -82,7 +82,8 @@ test('every drop stays inside the box around the focus, even when the focus race
 });
 
 test('drops splash where the ground is: events carry position, strength and time', () => {
-  const w = rainy();
+  // ((P21) on ground that shows a splash: the mud of a wetland in the rain; a meadow shows none, see P21 below)
+  const w = rainy('earth', { biome: 'misty_wetland' });
   const E = w.physics.particles.events;
   run(w, 6);
   assert.ok(E.total > 50, 'splashes: ' + E.total);
@@ -401,7 +402,7 @@ test('every particle says how long it has left: a flake by its fall to the groun
 });
 
 test('far from the anchor of the frame the rain still ends on the ground (the grid is a plane, the ground is not)', () => {
-  const w = rainy('earth');
+  const w = rainy('earth', { biome: 'misty_wetland' });     // ((P21) ground that shows a splash: a meadow shows none)
   w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
   run(w, 1);
   // walk 300 m east at 30 m/s: the frame re-anchors only after 384 m
@@ -439,7 +440,7 @@ test('rings near the focus: in a downpour there are enough of them alive within 
     return { n, near };
   };
   assert.ok(PARTICLES.events >= 512 && PARTICLES.ringRate >= 60);
-  const w = rainy(); run(w, 6);
+  const w = rainy('earth', { biome: 'misty_wetland' }); run(w, 6);     // ((P21) ground that shows a crown: see P21 below)
   const g = count(w, EVENT.splash, 0.28);
   assert.ok(g.near >= 12, `${g.near} crowns alive within ${PARTICLES.ringRadius} m on the ground (${g.n} in all)`);
   const s = rainy('earth', { sea: BODIES.earth.radius + 2 }); run(s, 6);
@@ -512,4 +513,25 @@ test('P12 one air: what is carried rides the wind physics.air gives at its place
   console.log(`# one air: largest difference between the particles' wind and physics.air ${worst.toFixed(2)} m/s (${at.de} m toward the wood, ${at.hz} m up); at 2 m ${open.toFixed(1)} m/s in the meadow, ${calm.toFixed(1)} under the first crowns`);
   assert.ok(worst < 0.6, `the particles' air is ${worst.toFixed(2)} m/s off physics.air ${at.de} m toward the wood, ${at.hz} m up`);
   assert.ok(calm < open * 0.75, `it is calmer under the crowns: ${calm} against ${open} m/s`);
+});
+
+test('P21 a raindrop leaves a ring on water and on wet hard ground, none on a meadow, a forest floor or sand', async () => {
+  // P20's strips: small crisp rings all over the meadow in the rain, splash events made wherever a drop met the ground. The
+  // blades of a sward and the leaves of a forest floor take a drop with no ring; sand, dust and snow swallow it; a film of
+  // water on rock, ice or soaked earth throws a crown, and still water a ring (P20: none on a running sea).
+  const { splashOn, MATERIAL_INDEX: M } = await import('./ground.js');
+  for (const [biome, ground] of [['alpine_meadow', 'grass'], ['temperate_forest', 'litter'], ['desert_canyon', 'sand'], ['misty_wetland', 'mud'], ['pale_mesas', 'rock']]) {
+    const w = rainy('earth', { biome }); run(w, 6);
+    const E = w.physics.particles.events; let n = 0;
+    for (let k = 0; k < E.capacity; k++) if (E.data[k * 8 + 4] > 0 && E.data[k * 8 + 3] === EVENT.splash) n++;
+    const wet = w.physics.here.weather.wetness01, shows = splashOn(M[ground], wet, 0);
+    console.log(`# rain on ${biome} (${ground}): wetness ${wet.toFixed(2)}, ${n} splashes alive (head: 512, 512, 221, 512, 512)`);
+    if (shows === 0) assert.equal(n, 0, `${biome}: ${n} splashes on ${ground}`);
+    else assert.ok(shows > 0.9 && n > 100, `${biome}: ${n} splashes on wet ${ground} (shows ${shows.toFixed(2)})`);
+  }
+  // the ground as it is now: dry rock throws no crown, wet rock does; earth only soaked; snow lying covers everything
+  assert.ok(splashOn(M.rock, 0.1, 0) < 0.05 && splashOn(M.rock, 0.8, 0) === 1 && splashOn(M.ice, 0.8, 0) === 1);
+  assert.ok(splashOn(M.soil, 0.4, 0) === 0 && splashOn(M.soil, 0.95, 0) === 1);
+  for (const g of ['grass', 'moss', 'litter', 'sand', 'dust', 'ash', 'gravel', 'snow']) assert.equal(splashOn(M[g], 1, 0), 0, g);
+  assert.equal(splashOn(M.rock, 1, 0.1), 0, 'snow lying on the rock');
 });

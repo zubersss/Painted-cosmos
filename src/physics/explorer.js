@@ -60,6 +60,13 @@ export const EXPLORER_BODY = Object.freeze({
   braceAccel: 20,         // m/s^2 the limbs on a hold brake the body with (2 kN), not limited by the soles' grip
   braceDv: 2.5,           // m/s of forward speed the limbs take up in one hold on the way down;
                           // more than that tears the grip off and the body flies
+  // (P21) THE BRACE AGAINST A FACE. Where the ground ahead rises faster than the hips can follow (the legs at the end of
+  // their fold), the ground pushes the body along its own normal: the legs take up the velocity INTO the face (legCatch at
+  // most, the body coming on over its planted feet meanwhile), the velocity along it carries on: across the face whole,
+  // up it as fast as the hips may honestly rise (no faster than gravity and a hold can stop them within the reach over
+  // the ground ahead), the rest taken by the legs too. Until P21 the legs took up the whole velocity at legCatch: a run
+  // on the Moon onto a 29 degree slope was held at 3.7 m/s, and at a 43 degree crater rim checked 6.7 -> 2.2 m/s.
+  braceSide: 0.2,         // m either side of the step's end the face's tilt across the path is read at
   crestFilter: 0.15,      // (retired in P9: the stroke of the legs does this now; kept, unused)
   crestLaunch: true,      // leave the ground when it falls away faster than gravity (low-g bounding)
   // THE WAY AHEAD (P16). A face the hips must climb (its top more than the legs' stroke over the ground here, within a
@@ -160,6 +167,7 @@ export const EXPLORER_BODY_STATE = () => ({
   hipV: 0,                // m/s: vertical speed of the hips
   trend: 0,               // m/s: the rate the ground has been rising under the feet (filtered over trendTime)
   base: 0,                // radius of the ground where the legs last stood at their standing length, carried on at `trend`
+  baseLo: 0,              // (P21) the lowest ground radius the feet have stood on since then (base is never carried below it)
   clamber01: 0,           // 0 striding .. 1 legs at the end of their stroke (clambering over something)
   clamberT: 0,            // s left of looking ahead after the legs last worked
   grip: 0,                // 1 while the limbs hold a feature (taken at a convex edge, kept until standing again)
@@ -223,6 +231,7 @@ function stepScratch(ghost = false) {
     recv: { size: 0.5, vx: 0, vy: 0, vz: 0 },
     gt: {},                                 // gaitOf's out
     wr: [0],                                // (P20) env.waterLevel's rate: how fast the drawn sea rises at the body (m/s)
+    bf: { sx: 0, sy: 0, sz: 0, w1: 0, c1: 0, lam: 1, px: 0, py: 0, pz: 0, brace: 0, surge: 0 },   // (P21) braceFace's out
   };
 }
 const _walkS = stepScratch(), _ghostS = stepScratch(true);
@@ -436,6 +445,75 @@ function holdAhead(c, w, vh, feet, hD, T) {
   if (!(hD === hD)) return false;
   const m = vh > 0.3 ? clamp(w / vh, -2, 2) : 0;
   return c + m * T.look - hD > T.legReach + T.gripDepth && feet - hD <= T.clamber;
+}
+
+// The ground's radius under the point (x, y, z) (its unit direction left in D2).
+function radAt(env, D2, x, y, z) {
+  const l = Math.hypot(x, y, z) || 1;
+  D2.x = x / l; D2.y = y / l; D2.z = z / l;
+  return env.sample(D2).radius;
+}
+// (P21) THE BRACE AGAINST A FACE (see EXPLORER_BODY.braceSide). The legs are folded to their end and the ground where the
+// step would end (radius h1, the step being s dt from the feet at radius r) lies higher than the hips can be raised to.
+// The face: its rise along the path (gs, the secant from the feet to h1 over the step's run) and across it (gl, the
+// ground braceSide either side of the step's end). The mass rides at the hips: its velocity is vh along the path (the
+// horizontal part of s) and the hips' vertical speed w. The face pushes along its normal (u - gs e - gl l) / n3: the legs
+// take up the speed into it, legCatch dt at most this step; the push across the path (a face tilted to the side) is held
+// by the soles, whose grip the push itself presses on (hold x the normal impulse), so the run keeps its line when that is
+// enough. The speed along the face is kept: up it as fast as the hips may rise (wOk: stopped by gravity and a hold,
+// gE + pull, within the reach over the lowest ground they will be over meanwhile; never less than capB, what the legs
+// alone may heave them at), the rest of it taken by the legs too, within what is left of legCatch; met at a slant, the
+// face rises less along the path (gs) and takes less. The feet go up it no further than the hips allow (lam); the body
+// comes on over them meanwhile (surge), as in P13. Fills S.bf: the horizontal velocity after (sx, sy, sz), the hips'
+// speed and radius (w1, c1), where the feet end (px, py, pz), lam, the horizontal speed lost (brace) and surge (m).
+function braceFace(env, S, px, py, pz, r, ux, uy, uz, sx, sy, sz, c0, w, h1, dt, gE, pull, hD, capB, hold, T) {
+  const o = S.bf, fold = T.legFold, reach = T.legReach, D2 = S.dir2;
+  const su = sx * ux + sy * uy + sz * uz;
+  const hx = sx - su * ux, hy = sy - su * uy, hz = sz - su * uz;
+  const vh = Math.hypot(hx, hy, hz);
+  o.surge = 0; o.brace = 0;
+  if (!(vh > 1e-6) || !(h1 > r)) {
+    // (nothing rises ahead to brace against: the whole step, as before P21)
+    o.sx = hx; o.sy = hy; o.sz = hz; o.w1 = w; o.c1 = c0; o.lam = 1; o.px = px + sx * dt; o.py = py + sy * dt; o.pz = pz + sz * dt; return o;
+  }
+  const ex = hx / vh, ey = hy / vh, ez = hz / vh;                        // along the path
+  const lx = uy * ez - uz * ey, ly = uz * ex - ux * ez, lz = ux * ey - uy * ex;   // across it
+  const qx = px + sx * dt, qy = py + sy * dt, qz = pz + sz * dt, b = T.braceSide;
+  const gs = (h1 - r) / (vh * dt);
+  const gl = (radAt(env, D2, qx + lx * b, qy + ly * b, qz + lz * b) - radAt(env, D2, qx - lx * b, qy - ly * b, qz - lz * b)) / (2 * b);
+  const n3 = Math.sqrt(1 + gs * gs + gl * gl), budget = T.legCatch * dt;
+  // the speed into the face, and what the legs take of it
+  const dn = Math.min(Math.max(0, (gs * vh - w) / n3), budget);
+  // the push per unit of it: back along the path gs / n3, up 1 / n3, across -gl / n3. The soles hold the push across with
+  // a friction along the face across the path ((l + gl u) / sqrt(1 + gl^2): it lifts too), up to hold per unit of push;
+  // with a hold on the rock (pull) the limbs hold the rest, braceAccel at most, as they brake (LEGS, 2b)
+  const sl = Math.sqrt(1 + gl * gl), sg = gl < 0 ? -1 : 1, pushL = dn * Math.abs(gl) / n3;
+  const f = Math.min(pushL * sl, Math.max(0, hold) * dn), limb = pull > 0 ? T.braceAccel * dt : 0;
+  const side = -sg * Math.max(0, pushL - f / sl - limb);                    // what is left of the push across the path
+  let vq = vh - dn * gs / n3, wq = w + dn / n3 + f * Math.abs(gl) / sl;
+  // how fast the hips may rise
+  const a = Math.max(0.1, gE + pull);
+  if (!(hD === hD)) hD = radAt(env, D2, qx + ex * T.look, qy + ey * T.look, qz + ez * T.look);
+  let gmin = Math.min(h1, hD);
+  const L = Math.max(0, vq) * Math.max(0, wq) / a;
+  if (L > T.look) { const m = Math.min(L, T.aheadMax); gmin = Math.min(gmin, radAt(env, D2, qx + ex * m, qy + ey * m, qz + ez * m)); }
+  const wOk = Math.max(capB, Math.sqrt(2 * a * Math.max(0, gmin + reach - c0)));
+  if (wq > wOk && gs > 1e-6) {
+    // up the face faster than that: the legs take that up too, along the face (its tangent on the path: (e + gs u) / n2)
+    const n2 = Math.sqrt(1 + gs * gs), dtg = Math.min((wq - wOk) * n2 / gs, Math.sqrt(Math.max(0, budget * budget - dn * dn)));
+    vq -= dtg / n2; wq -= dtg * gs / n2;
+  }
+  if (vq < 0) vq = 0;
+  let w1 = Math.min(wq, wOk), c1 = c0 + w1 * dt;
+  const top = Math.max(c0, r + reach);
+  if (c1 > top) { c1 = top; w1 = (c1 - c0) / dt; }
+  // the feet: up the face no further than the hips allow
+  const lam = vq > 1e-9 ? clamp01((c1 + fold - r) / (gs * vq * dt)) : 1;
+  o.px = px + ((ex * vq + lx * side) * lam + su * ux) * dt; o.py = py + ((ey * vq + ly * side) * lam + su * uy) * dt; o.pz = pz + ((ez * vq + lz * side) * lam + su * uz) * dt;
+  o.surge = (1 - lam) * vq * dt;
+  o.brace = Math.max(0, vh - vq);
+  o.sx = ex * vq + lx * side; o.sy = ey * vq + ly * side; o.sz = ez * vq + lz * side; o.w1 = w1; o.c1 = c1; o.lam = lam;
+  return o;
 }
 
 // ---- (P13) the gait ------------------------------------------------------------------------------------
@@ -848,8 +926,15 @@ function stepOnce(st, cmd, dt, env, T, S) {
     if (!working && B.clamberT <= 0) B.grip = 0;
     const pull = feat ? T.gripAccel : 0;
     const trend = Math.max(0, B.trend);
-    if (!working) { B.trend += (clamp(gr, -20, 20) - B.trend) * (1 - Math.exp(-dt / T.trendTime)); B.base = r; }   // (a feature the legs are working on is not a hill)
-    else B.base += B.trend * dt;
+    if (!working) { B.trend += (clamp(gr, -20, 20) - B.trend) * (1 - Math.exp(-dt / T.trendTime)); B.base = r; B.baseLo = r; }   // (a feature the legs are working on is not a hill)
+    else {
+      B.base += B.trend * dt;
+      // (P21) ... but never below the lowest ground the feet have stood on since: carried down at the rate of a descent
+      // the legs were working on, it went on sinking after the feet had reached the floor (a metre under it between two
+      // close boulders on the Moon), and the hips, held within the reach over it, could not be raised for the next one
+      if (r < B.baseLo) B.baseLo = r;
+      if (B.base < B.baseLo) B.base = B.baseLo;
+    }
     // level the hips over the ground; about to climb down, stay low instead of standing up on top
     let tgt = h1;
     if (feat && hD < h1) tgt = Math.max(h1 - fold, hD);   // (false when hD is unknown)
@@ -869,14 +954,14 @@ function stepOnce(st, cmd, dt, env, T, S) {
       if (a > 0 && gE > 0) { const cap = trend + Math.sqrt(Math.max(0, 2 * (gE + pull) * (B.base + reach - c0))); if (wn > cap) { wn = Math.max(w, cap); cut = true; } }
       if (cut) { w1 = wn; c1 = c0 + 0.5 * (w + w1) * dt; }
     }
-    let lam = 1, held = true, face = false;
+    let lam = 1, held = true, face = false, capF = 0;
     if (c1 < h1 - fold) {
       // folded out
       const capB = Math.max(w, Math.sqrt(Math.max(0, 0.5 * (gE + pull) * (fold + reach))));   // (a quarter of the stroke: the rest is kept for the far side)
       const cUp = Math.min(c0 + capB * dt, Math.max(c0, r + reach));
       if (h1 - fold <= cUp) { c1 = h1 - fold; w1 = Math.max(w1, Math.min(capB, (c1 - c0) / dt)); }
       else if (dh > T.clamber && vh * dt > 1e-6) { c1 = Math.max(c0, r - fold); w1 = 0; lam = 0; }   // a wall, not a step: it stops the body
-      else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; face = true; }
+      else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; face = true; capF = capB; }
     } else if (c1 > h1 + reach) {
       // reached out
       if (!looked) { hD = groundAhead(env, S.dir2, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber); if (feat) B.grip = 1; }
@@ -893,25 +978,39 @@ function stepOnce(st, cmd, dt, env, T, S) {
     B.brace = 0;
     if (held && lam < 1) {
       // braced: the feet take only part of the step, and the rest of the forward speed is lost
-      p1x = px + sx * lam * dt; p1y = py + sy * lam * dt; p1z = pz + sz * lam * dt;
+      // (P21) against a face, only the speed into it (braceFace; see EXPLORER_BODY.braceSide)
+      const fb = face && T.braceSide > 0;
+      if (fb) {
+        const o = braceFace(env, S, px, py, pz, r, ux, uy, uz, sx, sy, sz, c0, w, h1, dt, gE, pull, hD, capF, hold, T);
+        p1x = o.px; p1y = o.py; p1z = o.pz; c1 = o.c1; w1 = o.w1; lam = o.lam;
+        sx = o.sx; sy = o.sy; sz = o.sz; B.surge = (B.surge || 0) + o.surge; B.brace = o.brace;
+      } else { p1x = px + sx * lam * dt; p1y = py + sy * lam * dt; p1z = pz + sz * lam * dt; }
       r1 = Math.hypot(p1x, p1y, p1z) || 1;
       D.x = p1x / r1; D.y = p1y / r1; D.z = p1z / r1;
       s1 = env.sample(D);
       h1 = s1.radius; n1x = s1.normal.x; n1y = s1.normal.y; n1z = s1.normal.z;
       if (c1 < h1 - fold) c1 = h1 - fold;                // (a face the legs cannot fold onto: the hips are heaved up it)
       else if (c1 > h1 + reach) c1 = h1 + reach;
-      // (P13) The FEET go no further up a face than the hips can follow (lam). The BODY is not stopped in
-      // that sixtieth of a second: it comes on over its planted feet and the legs take its speed up as they
-      // take a landing, legCatch at most (a run on the Moon met a 1 m boulder at 5.3 m/s and was at 2.0 m/s
-      // one frame later: 200 m/s^2; now 0.11 s, the body 0.15 m over its feet meanwhile: B.surge). A wall
-      // (lam 0) and a hold on the way down (its own limit, braceDv) are as they were.
-      let m = lam;
-      if (lam > 0 && face) {
-        const sn = Math.hypot(sx, sy, sz);
-        if (sn > 1e-6) { m = Math.max(lam, 1 - T.legCatch * dt / sn); B.surge = (B.surge || 0) + (m - lam) * sn * dt; }
+      if (fb) {
+        // (the horizontal velocity braceFace leaves, laid in the ground's own plane where the step ends with its horizontal
+        // part kept, when the step lays the velocity along that plane below (no hold): it would shorten it a second time.
+        // With a hold the velocity is laid level below, as braceFace leaves it.)
+        const l = Math.hypot(n1x, n1y, n1z), nu1 = l > 1e-9 ? (n1x * D.x + n1y * D.y + n1z * D.z) / l : 1;
+        if (q !== 0 && !B.grip && nu1 > 0.05) { const lm = -(sx * n1x + sy * n1y + sz * n1z) / (l * nu1); sx += lm * D.x; sy += lm * D.y; sz += lm * D.z; }
+      } else {
+        // (P13) The FEET go no further up a face than the hips can follow (lam). The BODY is not stopped in
+        // that sixtieth of a second: it comes on over its planted feet and the legs take its speed up as they
+        // take a landing, legCatch at most (a run on the Moon met a 1 m boulder at 5.3 m/s and was at 2.0 m/s
+        // one frame later: 200 m/s^2; now 0.11 s, the body 0.15 m over its feet meanwhile: B.surge). A wall
+        // (lam 0) and a hold on the way down (its own limit, braceDv) are as they were.
+        let m = lam;
+        if (lam > 0 && face) {
+          const sn = Math.hypot(sx, sy, sz);
+          if (sn > 1e-6) { m = Math.max(lam, 1 - T.legCatch * dt / sn); B.surge = (B.surge || 0) + (m - lam) * sn * dt; }
+        }
+        B.brace = (1 - m) * vh;
+        sx *= m; sy *= m; sz *= m;
       }
-      B.brace = (1 - m) * vh;
-      sx *= m; sy *= m; sz *= m;
     }
     if (!held) {
       // the feet leave the ground at full stretch, with the hips' velocity
