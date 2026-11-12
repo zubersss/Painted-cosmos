@@ -477,6 +477,7 @@ export function createWorld(scene) {
       // (a dust storm thickens the near air itself: the explorer at the eye's distance is a third lost in it, the ground at
       // the feet a sixth, half at 10 m; the stacked bands of the far washes left everything inside 20 m clear)
       G.uAirNear.value.set(0.70 * dustW * (1 - space01), 8);
+      G.uAirless.value = body.atmosphereHeight > 0 ? 0 : 1;
       skyU.uStormWash.value.copy(_storm);
       WX.key = (storm * 0.34 + oc * 0.14 + dustW * 0.10) * dayness; WX.flash = sk ? sk.flash * air : 0;
       // inks for the kits: each ground material in this place's own washes; rain is the sky's wet wash

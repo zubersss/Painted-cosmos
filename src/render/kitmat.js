@@ -54,10 +54,12 @@ const SHAPES = {
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
   flake: 'float rr = length((vPcUv - 0.5) * vec2(1.0, 1.25)) * 2.0; if (rr > 0.42 + 0.75 * texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.x * 7.0)).r) discard; vec3 c = ink; float w = 0.05;',
+  // (PAINTER 12, PHYSICS P20: where there is no air a kicked grain flies alone on its arc and falls: a small crisp touch of
+  // the ground's own dust, not a soft puff; the fan keeps its shape)
   // dust: a ragged dry-brush patch thinning toward its edge; the pattern travels with the puff
   // (a glaze, like the rain: a soft veil of the ground's own dust, densest at its middle, running
   // out to nothing, broken softly where the brush was dry; never a hard pale blot)
-  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0 || length(vView) < 1.6) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.22, 0.70, nz + 0.30 * (1.0 - rr)) * 0.52 * smoothstep(1.6, 3.6, length(vView));',
+  puff: 'float rr = length(vPcUv - 0.5) * 2.0; if (rr > 1.0 || length(vView) < 1.6) discard; float nz = 0.62 * texture(uNoise3D, vec3(vPcUv * 1.3, vPcData.x * 5.0)).r + 0.38 * texture(uNoise3D, vec3(vPcUv * vec2(3.0, 7.0), vPcData.x * 9.0)).g; vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * vPcData.x); float w = 0.95; float ga = (1.0 - smoothstep(0.10, 1.0, rr)) * smoothstep(0.22, 0.70, nz + 0.30 * (1.0 - rr)) * 0.52 * smoothstep(1.6, 3.6, length(vView)); if (uAirless > 0.5) { if (rr > 0.30) discard; c = pcDensity(ink, 1.30 + 0.25 * vPcData.x); ga = 0.88 * (1.0 - smoothstep(0.16, 0.30, rr + (nz - 0.5) * 0.12)); }',
   // a veil of dust (or of blown snow, or sand) as PHYSICS hands it over: vPcData.y its opacity,
   // .z how soft its ends are, .w 1 a long level streamer, 0 a round puff. A streamer is laid in
   // one level drag of a soft brush: densest just above its foot, thinning to nothing at its top
@@ -123,7 +125,7 @@ export function makeKitMaterial(kind, info, opts) {
   const glaze = !!GLAZE[kind] || kind === 'ring' || info.shape === 'ring';      // (a splash ring is a glaze too)
   const m = new THREE.ShaderMaterial({
     name: 'pc-kit-' + kind,
-    uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, ...info.uniforms }),
+    uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, uAirless: G.uAirless, ...info.uniforms }),
     vertexShader: `${VERT_PARS}
 ${info.vertexChunk}
 varying vec3 vView;
@@ -139,6 +141,7 @@ uniform vec3 uColor;
 uniform vec3 uPcInk[16];
 uniform highp sampler2D uSceneAux;
 uniform vec2 uSceneRes;
+uniform float uAirless;
 varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView; varying float vPcMat;
 void main() {
   #include <logdepthbuf_fragment>

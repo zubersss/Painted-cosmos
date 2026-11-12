@@ -45,6 +45,7 @@ export const G = {
   // the near air (x how much of what stands at distance y metres it veils, rising as 1 - exp(-d / y)): a dust storm
   // veils the explorer at the eye's own distance, which the far washes' stacked bands cannot (the world sets it)
   uAirNear: { value: new THREE.Vector2(0, 9) },
+  uAirless: { value: 0 },        // 1 on a world without air (the kits draw kicked dust as grains, not puffs)
   // the scene pass's second target (normal, log depth, region) and its size: glazes test their
   // depth against it by hand (set by the post passes)
   uSceneAux: { value: null }, uSceneRes: { value: new THREE.Vector2(2, 2) },
