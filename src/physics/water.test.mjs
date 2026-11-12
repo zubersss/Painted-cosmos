@@ -515,3 +515,25 @@ test('P20 raindrop rings show on still water and not among the waves of a runnin
     }
   } finally { setWindScale('earth', s0); }
 });
+
+test('P21 the floating twin copies the water shader\'s lift in the last 0.4 m of the shallows (PAINTER 12)', async () => {
+  // PAINTER 12 lays the drawn sheet higher where the still water is shallow (WATER_VERT, after the waves' mix:
+  // p += up * 0.06 * (1 - smoothstep(0.05, 0.40, aDepth))): the bed's bumps showed through as a halftone of dots. A body
+  // wading there stood 6 cm into the sheet until env.waterLevel added the same. In a dead calm the twin is that term alone.
+  const { smoothstep } = await import('./util.js');
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0);
+    const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'sea_coast', sea: R + 10 }), physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+    const d = norm(V(0.6, 0.04, 0.8)), p = V(d.x * (R + 9), d.y * (R + 9), d.z * (R + 9)), env = physics.bindEnv('earth', { sample, gravity: BODIES.earth.gravity });
+    for (let i = 0; i < 60; i++) physics.update(1 / 30, { bodyId: 'earth', time: 50 + i / 30, focus: p });
+    // (the calm's own small sea, its swell: under 0.078 m every depth from 0.1 m on takes the waves whole (the shader's shoal
+    // mix is 1 from 1.28 Hs, at least 0.05 m), so the difference from 2 m of water is the lift alone)
+    const hs = physics.water('earth', p, {}).significant;
+    assert.ok(hs < 0.078, 'a calm: Hs ' + hs);
+    for (const depth of [0.1, 0.2, 0.3, 0.4, 1]) {
+      const want = 0.06 * (1 - smoothstep(0.05, 0.40, depth)), got = env.waterLevel(p, depth) - env.waterLevel(p, 2);
+      assert.ok(Math.abs(got - want) < 0.002, `${depth} m of still water: the drawn sheet ${got.toFixed(4)} m over its level at 2 m deep, the shader's ${want.toFixed(4)}`);
+    }
+  } finally { setWindScale('earth', s0); }
+});

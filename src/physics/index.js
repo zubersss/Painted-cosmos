@@ -525,14 +525,19 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _locW = {};
   function waterLevelAt(bodyId, p, depth, rate) {
     if (rate) rate[0] = 0;
-    if (bodyId !== active || !water.present) return 0;
+    if (bodyId !== active) return 0;
+    // (P21) and PAINTER 12's lift of the sheet in the last 0.4 m of the shallows (WATER_VERT, after the waves' mix:
+    // p += up * 0.06 * (1 - smoothstep(0.05, 0.40, aDepth)), aDepth the still depth), still water or not: without it a
+    // figure wading ankle-deep stood 6 cm into the drawn sheet
+    const lift = depth > 0 ? 0.06 * (1 - smoothstep(0.05, 0.40, depth)) : 0;
+    if (!water.present) return lift;
     const lx = frame.lx(p.x, p.y, p.z), lz = frame.lz(p.x, p.y, p.z);
     const h = water.heightAt(lx, lz), hs = water.localAt(lx, lz, _locW).significant;
     const shoal = depth > 0 ? Math.min(1, depth / Math.max(1.28 * (hs > 0 ? hs : 0), 0.05)) : 0;
     const run = shoal < 1 ? water.runupAt(lx, lz, 0.07) : 0;
     const w = run + (h - run) * shoal;
     if (rate) { const r = water.rateAt(lx, lz) * shoal; rate[0] = r === r ? r : 0; }
-    return w === w ? w : 0;
+    return (w === w ? w : 0) + lift;
   }
 
   // Add physics to an env object for the explorer or ship step functions:

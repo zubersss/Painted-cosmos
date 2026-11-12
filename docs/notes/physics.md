@@ -10,22 +10,29 @@ rings on grass; (4) the float strips after P20's arrival fix, and any strip item
 speed INTO the face (the run keeps v cos^2 of a slope to within 2 %, where the head held it at 0.62 to 0.95 of that), and a
 fault found under it is fixed (the legs' base sank up to 5.3 m under the floor between close boulders); (2) no read-ahead fix
 is better in every case, measured, and why (item 2); (3) rain makes no splash on a meadow, a forest floor, sand or snow,
-only on water and wet hard ground; (4) the strips (item 4: filled in with the hand-over's commit). Commits: the code's (items 1 and 3, the tests) and the hand-over's. Tests: `node --test src/physics/` **299 pass**
-(296 + 3 new: `explorer.test.mjs` 2, `particles.test.mjs` 1; `load.test.mjs` among them), `node --test tests/*.test.mjs` **146
-pass** (PILOT added four), `node --test src/world/*.test.mjs` **19 pass**, on a clean export of `e866f6e` with this block's
-files (`final/`, `final3/`); `coast.mjs` PASS at both stands on it.
+only on water and wet hard ground; (4) six strips filmed on the head and OPENED (item 4). Added by the coordinator during the
+block, from PAINTER 12: (5) the floating twin copies PAINTER's new lift of the sheet in the shallows; (6) Neptune's coast
+report: the target, not the settle, was the thing to change (a sea grows with the wind's duration), and arriving and
+staying disagree (item 6: the first item of Next). Commits: `3cd06dc` (items 1 and 3, the tests) and the hand-over's (items 4
+to 6, the strips, these notes). Tests: `node --test src/physics/` **300
+pass** (296 + 4 new: `explorer.test.mjs` 2, `particles.test.mjs` 1, `water.test.mjs` 1; `load.test.mjs` among them), `node
+--test tests/*.test.mjs` **146 pass** (PILOT added four), `node --test src/world/*.test.mjs` **19 pass**, on a clean
+export of `e866f6e` with this block's final files (`final4/`); `coast.mjs` PASS at both stands on it.
 Every new test fails on the head (`adf0923`). Scratch: `/home/user/.pc-scratch/physics/p21/` (`head/`: the head as exported;
 `work/`: it with my files; `s/hill.mjs <tree> [g v hz degs H after]` a run onto a concave kink (`FILLET=` a gradual one),
 `s/t1.mjs <trees>` the brace test's cases, `s/kink.mjs` the game's Moon kink (P20's heading 180 at 9.2 s) in PILOT's Sim,
 `s/rowloss2.mjs <trees>` the close and spread rows with every measure, `s/p19row2.mjs` P19's row and how far the legs' base
 sinks, `s/rowtrace.mjs` the row step by step, `s/rings.mjs <trees>` splashes and ripples per ground in a downpour;
 `trace8-head.txt`, `trace8-work2.txt` PILOT's boulderrun replayed in Node on head and P21, 8 headings; `film/` the strips).
-**Next, in order:** (1) the close row's trial standard (item 2: a trial counts a face crossed only with no brace at all, which
+**Next, in order:** (0) the sea on arrival should be the sea the wind's recent history has raised, not the equilibrium of
+the wind now (item 6: at Neptune's stand an arriving player sees Hs 6.0 m 80 m out, one who stood through the squall 3.5 m);
+(1) the close row's trial standard (item 2: a trial counts a face crossed only with no brace at all, which
 is now stricter than the brace; deciding what a clean crossing is now is a design call, P16's and P17's tests would move);
 (2) a hill read as a face: on Mars and Earth a run onto a 43 degree slope is slowed by P16's law to 1.1-1.2 m/s, the law's
 pace for a face it cannot see the top of (item 1, the last paragraph); (3) the crest of a rim met at speed: the feet leave the
 falling ground (0.15 to 0.54 m up, not thrown: item 1); a read of crests would let the walker ease off before one.
-**API added (additive):** explorer.js `EXPLORER_BODY.braceSide` (m: where the face's tilt across the path is read),
+**API added (additive):** coast.mjs's report: `target` is now what the storm raises in the time it has blown, with
+`target.blownForEver` (the old target) and `target.settle`; explorer.js `EXPLORER_BODY.braceSide` (m: where the face's tilt across the path is read),
 `EXPLORER_BODY_STATE().baseLo` (the lowest ground the feet have stood on since the legs began to work); near.js
 `TerrainGrid.groundQN(q)` (groundQ and q[4] the nearest known node); ground.js `splashOn(id, wet, snow)`; particles.js
 `Particles.splashOf`, `.splashCover`, `.splashCW`, `.splashSlot`, `.splashHere`, `.splashAt(n)` (set by physics.update).
@@ -38,7 +45,8 @@ boulders the hips can be raised for the next one (the row on the Moon: 2.38 m/s 
 1.74); (3) over the crest of a crater rim met at speed the feet may leave the falling ground (item 1); (4) rain makes no
 splash events (rings) on grass, moss, a forest floor's litter, sand, dust, ash, gravel or snow; on rock, glass, crystal,
 ice and a stream's bed only once a film of water lies on them (wetness 0.2 to 0.6), on earth only soaked (0.55 to 0.9), on
-mud from 0.3; on liquid as before (P20: none on a running sea).
+mud from 0.3; on liquid as before (P20: none on a running sea); (5) the floating or wading explorer rides 6 cm higher
+in the last 0.4 m of the shallows, as the drawn sheet now lies (PAINTER 12).
 
 **1. The brace (`explorer.js` braceFace, the folded-out branch).** Where the ground ahead rises faster than the hips can be
 raised (the legs at the end of their fold) and no pace was held for it, P13 let the feet go only as far up as the hips could
@@ -131,9 +139,73 @@ meadow 512 -> 0, a forest floor 512 -> 0, sand 221 -> 0**; wet rock 512 and a we
 them on a wetland's mud. The drawing is PAINTER's: their ring shape ignores the event's kind, so a snowflake's settle and a
 hailstone's bounce would be drawn as rings too: the exact line is in "For PAINTER", P21 (my lab's ring shape has it).
 
-**4. The strips (`docs/shots/physics/motion-*.jpg` with `.json`).** (Filled in with the hand-over's commit.)
+**4. The strips (`docs/shots/physics/motion-*.jpg` with `.json`).** Filmed in the GAME (`gamefilm.mjs`) on a clean export of
+`e866f6e` (PAINTER 12's world) with this block's code, one browser, by the game's own clock; all OPENED. (A first run on
+`adf0923` was stopped when the head moved; its stale process then opened a browser for its next subject and was stopped by
+PID too, so for about two minutes two browsers of mine ran.)
+- `motion-game-float-neptune` (Neptune storm_seas at 240 s, 75 m/s, the explorer floating 25 m out, now **15 s** of clock after
+  arriving). Seen: the figure's head at the waterline in every frame, the sea a dark ultramarine heaving round it, basalt stacks
+  on the horizon, rain streaks driven flat, no raindrop rings on the storm sea, no large spray blots at the lens; on the left the
+  big cliff is still a near-black slab with a ruler-straight vertical edge (PAINTER 12 changed the stack, not this cliff).
+  Numbers: **Hs 25 m out 2.97 m rising to 4.87 m over the 3.2 s** (P20's strip, 10 s after arriving and before the arrival's
+  last step: 0.78 to 1.03 m), the feet 1.13 to 1.37 m under the drawn surface (float depth 1.25), the body heaving 0.84 m while
+  the surface there moves 0.93 m, spray 4 to 166 drops. Verdict: the sea is there on arrival in the game (P20 3b's last step),
+  and the figure rides it; the sea still rising at 18 s, and how high it rises on arrival, is item 6.
+- `motion-game-float-earth` (Earth sea_coast at 8850 s, 13 m/s from the E, 15 s after arriving). Seen: the explorer floating
+  head and shoulders out of a grey-green sea of soft strokes, an islet, the sandy headland on the right still combed with
+  diagonal stripes (PAINTER's), rain as small blue-grey dashes, no crisp rings on the sea. Numbers: **Hs 0.45 to 0.62 m** (P20:
+  0.13 to 0.16 m; `coast.mjs` about 0.5 m), feet 1.16 to 1.39 m under the drawn surface. Verdict: right.
+- `motion-game-moon-boulder` (the Moon, crater_fields' densest field, its tallest boulder on gentle ground: on PAINTER 12's
+  flatter boulders that is now 0.68 m, radius 1.07 m; Shift+W from 6 m/s; 30 Hz). Seen: the explorer runs out across a field of
+  violet-grey boulders under a starry indigo sky, crouches over the boulder at frames 14 to 16 with an arm out as it scrambles
+  over, and runs on; never in the air. Numbers: feet 0.000 m off the ground at all 90 steps, thrown up 0; **the face costs
+  7.40 -> 7.15 m/s** (P20, a different boulder: 7.40 -> 5.09 in 0.1 s), and over the top the hold checks the run so the feet
+  can follow the far side down, **7.15 -> 2.52 m/s in 0.3 s** (slowest within 3 m 2.42); the read-ahead held no pace for it
+  (P20 item 5's open finding). Verdict: the 0.3 m rule holds; where the speed is shed moved from the face to the top, which is
+  where a runner who had not slowed would have to shed it; a run that saw it coming would slow before it (Next 1).
+- `motion-game-moon-boulder-side` (the same field, a 0.65 m boulder met 0.45 m off its middle). Seen: the figure passes the
+  flank in a brief crouch (frames 15 to 16) and runs on. Numbers: **7.40 m/s throughout, not a step slower**, legs folding
+  0.34 m, feet 0.000 m off the ground at all 90 steps, thrown up 0 (P20 on its boulders: a bump 6.14 -> 3.51 and a rock 6.22 ->
+  2.37, both braced). Verdict: P17's off-path crossing, in the game.
+- `motion-game-grass-sub` (Earth spawn at 176 s, the storm, 30 frames a second for 0.4 s). Seen: the explorer in the meadow, the
+  grass strokes shifting a little from frame to frame, smooth, no flicker; **no rings at the feet** (P20's frame 0 had two crisp
+  white rings there: `film2/grass-p20-row.png` against `grass-p21-row.png`). Small pale specks with darker rims stand at the
+  upper right in every frame of both strips, the same places and sizes 0.1 s apart (`film2/grass-zoom0.png`, `-zoom3.png`):
+  not rings (a ring grows 3.5 cm in that time and is gone in 0.28 s); PAINTER's flower heads or flecks on the blades.
+  Numbers: the wind half a metre up 3.5 to 9.2 m/s within the 0.4 s, four blades leaning 16.9 -> 28.4, 24.5 -> 37.0, 39.5 ->
+  52.2, 22.0 -> 36.9 degrees. Verdict: item 3 holds in the game.
+- `motion-clamber-row-moon` (the lab, P19's close row on the Moon at 7.4 m/s; re-filmed: item 1 changes its third face). Seen:
+  the wide framing again (the figure small), the stand-in clambering cone after cone, never in the air; kicked dust left
+  behind as soft round puffs (in the lab; PAINTER's airless grains are set by the game's world). Numbers: mound 1 at the pace
+  held (2.66 m/s, no loss), mound 2 rising 2.70 -> 3.13, **mound 3 (1.1 m) 3.68 -> 3.12 m/s over 0.25 s at the face and 3.24 ->
+  2.76 over the top** (P20: met braced, 3.76 -> 2.46 in 1/8 s), then onto mound 4; the feet with the lab's boulders 0 m over
+  the rock throughout. Verdict: a continuous clamber; the third face no longer a stumble in the numbers (still too small to
+  see at this framing).
 
-**Not done or not verified.** (1) The close row's trial standard (item 2). (2) A 43 degree hill on Mars and Earth is read as a
+**5. The floating twin and PAINTER's lift in the shallows (the coordinator, from PAINTER 12; `index.js` waterLevelAt).**
+PAINTER 12 lays the drawn sheet higher where the still water is shallow (`materials.js` WATER_VERT, after the waves' mix:
+`p += up * 0.06 * (1 - smoothstep(0.05, 0.40, aDepth))`, aDepth the still depth: the bed's bumps showed through as a halftone).
+`env.waterLevel` adds the same term, waves or none (off the active body nothing): a wading figure stood 6 cm into the sheet.
+Test (`water.test.mjs`, P21, fails on the head): in a calm, from 0.1 to 1 m of water the twin over its level at 2 m deep is
+the shader's term within 2 mm (at 0.1 m deep 0.0567 m; the head gave 0).
+
+**6. Neptune's coast report: the target, not the settle (the coordinator, from PAINTER 12; `coast.mjs`).** The squall peaks
+at 240 s; the report's 150 s settle starts at 90 s, and the swell, which follows its wind over WATER.swellTime (90 s), never
+comes up: the most exposed water reaches 0.73 to 0.78 of the target, the stand 3.51 m at 80 m out against 4.19. The target
+was the sea the peak wind raises over 2.5 km of 20 m water blowing for ever. A sea grows with the wind's duration as well as
+its fetch, and the game's sea grows with it (the wind sea over growTime, the swell over swellTime): no water raises 4.19 m
+in this squall. So the settle (a player standing at the stand through the squall) is the honest measure, and the target
+should be what the same squall raises over the reference water in the same time, by the same growth: `coast.mjs` now
+integrates WaterField's two lags over the weather's wind at the stand from the settle's start (where the run arrives) to the
+storm, over 2.5 km of 20 m water. **Neptune: target 4.19 -> 2.96 m (wind sea 2.22, swell 1.95), the stand 3.51 m: 1.19 of it
+(was 0.84); Earth: 0.68 -> 0.52 m, the stand 0.54.** Both PASS, with room that is the terrain's, not the timing's. *The other
+half, mine and not done:* a player who ARRIVES at the stand 20 s before the peak (`--settle=20`) sees Hs **6.04 m** 80 m out
+(the most exposed water 6.53), one who stood there 150 s sees **3.51 m**. The arrival's quick settling (P20, Decision 51)
+settles to the equilibrium of the wind NOW, as if the storm had always blown; it should settle to what the wind's recent
+history raised (the same two lags over the past wind, as `moistureAt` sums past rain). Then arriving and staying agree and
+the report's 150 s settle is what every player sees. Next 0.
+
+**Not done or not verified.** (0) The arrival's sea from the wind's history (item 6). (1) The close row's trial standard (item 2). (2) A 43 degree hill on Mars and Earth is read as a
 face by P16's law and run at 1.1-1.2 m/s (item 1). (3) Over a rim's crest met at speed the feet leave the falling ground
 (0.15 to 0.54 m in the Node replay of the game run; physics by Decision 50, but new in this block); the walker reads faces,
 not crests. (4) The ship landed on water: done by PILOT (`a0e3fb1`, on `env.waterLevel`); the gear's floor left as PILOT asks. (5) No frame
@@ -3011,7 +3083,7 @@ What follows is what a physicist would object to, and it is all in the assists.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
 
-### P21, first (nineteenth PHYSICS agent): one line in the ring shape
+### P21, first (nineteenth PHYSICS agent): one line in the ring shape; your two P12 notes answered
 - **Rain no longer makes splash events on a meadow, a forest floor, sand, dust or snow** (Decision 55): the crisp rings on the
   grass in `game-grass-sub` and `game-storm` came from physics, and are gone at the source. Splashes remain on wet rock, ice,
   glass, crystal, mud and soaked earth, and ripples on still water.
@@ -3019,7 +3091,18 @@ What follows is what a physicist would object to, and it is all in the assists.
   flake settling, 3 a hailstone's bounce: "For PAINTER", C, item 4); a settling flake and a bouncing hailstone leave no ring.
   Exact change in `src/render/kitmat.js`, `SHAPES.ring`: begin the string with `if (vPcData.x > 1.5) discard; ` (my lab's ring
   has it). If you would rather draw a flake's settle as a soft puff of paper, that is yours: branch on the same number.
-- Seen in my strips: hand-over P21, item 4 (with the hand-over's commit).
+- **Your shallow-water lift** (your note 5): `env.waterLevel` adds `0.06 * (1 - smoothstep(0.05, 0.40, depth))` as your
+  WATER_VERT does (hand-over P21, item 5). If you change it, tell me.
+- **Neptune's settle** (your note 2): the target was the thing to change (Decision 56): `coast.mjs` now asks of the stand what
+  the squall raises over 2.5 km of 20 m water in the 150 s it has blown (2.96 m), and your stand has 3.51 m: 1.19 of it, the
+  room your terrain gives. Beaches that "missed by 1 to 5 %" under the old target are judged on the same footing now. But a
+  frame taken 10 s after a teleport shows the sea of a storm that has blown for ever (6 m at 80 m out here); a frame after
+  standing through the squall shows 3.5 m. Until I make the arrival honour the wind's history (my Next 0), take storm frames
+  after a teleport as the upper bound.
+- Seen in my strips (all opened, hand-over P21 item 4): Neptune's big cliff by the float stand is still a near-black slab with
+  a ruler-straight vertical edge; Earth's headland still carries the combed diagonal stripes; in the meadow at the spawn small
+  pale specks with dark rims stand in the grass (static: flowers or flecks; if they are meant as raindrops on the blades, they
+  read as rings).
 
 ### P20, first (eighteenth PHYSICS agent): the sea map wiring checked; one thing to tell me if you change it
 - **`c08dddb` is what P18/P19 asked for**, read line by line (hand-over P20, item 4). Nothing to change.
@@ -4015,6 +4098,9 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
 55. **(P21) A raindrop leaves a crown and a ring only in a film of water**: on liquid, on hard ground once it is wet, on earth
     once it is soaked; never on a sward, a forest floor, loose grains or snow. By the material of the ground where it lands,
     as it is now.
+56. **(P21) A sea is judged against what its storm can raise in the time it blows.** The coast report's target is the same
+    wind history over the reference water by the game's own growth, not the equilibrium of the peak wind; a short squall
+    raises no water's full sea. (Decision 51's arrival, which settles to the equilibrium of the wind now, is to follow it.)
 
 
 ## Needs from the others

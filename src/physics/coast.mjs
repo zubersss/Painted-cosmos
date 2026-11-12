@@ -11,6 +11,7 @@
 // the open sea's swell reaches, the white-horse fraction (% of the surface white) and which way the waves run (degrees off
 // the shore's normal; 0 = straight in). Then the far rose (fetch by compass point from the open water about) and where the
 // storms come from. Then the verdict against the targets: what the same storm raises over 2.5 km of water 20 m deep
+// ((P21) in the time it has blown: the same growth as the game's sea, over the same settle; blowing for ever is printed too)
 // (the coordinator's ruling: the coasts face open water, at least about 2 km of fetch at about 20 m deep toward the storm
 // wind), and the marks it must reach: 80 m out, fetch >= 2000 m, mean depth >= 12 m, Hs >= 0.75 x the target, white
 // >= 0.6 x the target; at the waterline the surf breaking (Hs over 0.25 m).
@@ -82,7 +83,27 @@ export function coastReport(W, bodyId, biomeId, opts = {}) {
   // the targets: the same storm over 2.5 km of water 20 m deep (the wind sea, the swell it raises beyond, the white share)
   const rhoA = W.airDensity(bodyId, 0), rhoL = W.liquidOf(bodyId).density, wsT = W.windSea(Ustorm, COAST_TARGET.fetch, g, rhoA, rhoL, COAST_TARGET.depth, {});
   const swT = W.windSea(Ustorm, COAST_TARGET.fetch * W.WATER.swellFetch, g, rhoA, rhoL, COAST_TARGET.depth, {});
-  const swH = swT.height * W.WATER.swellDecay, HsT = Math.sqrt(wsT.height ** 2 + swH ** 2), whiteT = 100 * W.foamCover(wsT.whitecap01);
+  const swH = swT.height * W.WATER.swellDecay, HsEq = Math.sqrt(wsT.height ** 2 + swH ** 2), whiteT = 100 * W.foamCover(wsT.whitecap01);
+  // (P21) ... in the time it blows. A sea grows with the wind's duration as well as its fetch: the game's sea follows the
+  // wind as WaterField does (the wind sea toward this wind's over WATER.growTime, the swell's wind rising with it and its
+  // height over WATER.swellTime), and the run above starts where the wind of the settle's start has raised its sea (it
+  // arrives there). The target is the same growth over the reference water under the same wind, so the verdict asks of
+  // the terrain what the storm can raise in the time it blows, not what a storm blowing for ever would: Neptune's squall
+  // peaks at 240 s, and a swell that takes 90 s to come up cannot reach its full height in it, over any water.
+  const grown = (() => {
+    const F = COAST_TARGET.fetch, Dp = COAST_TARGET.depth, Wt = W.WATER, dtg = 1 / 30, _q = {};
+    const ws = (U, f) => W.windSea(U, f, g, rhoA, rhoL, Dp, _q).height;
+    const kh = 1 - Math.exp(-dtg / Wt.growTime), ks = 1 - Math.exp(-dtg / Wt.swellTime);
+    let sw = windNow(t0).U, hW = ws(sw, F), hS = ws(sw, F * Wt.swellFetch) * Wt.swellDecay;
+    for (let t = t0 + dtg; t <= tStorm + 1e-9; t += dtg) {
+      const U = windNow(t).U;
+      hW += (ws(U, F) - hW) * kh;
+      sw += (U - sw) * (U > sw ? kh : ks);
+      hS += (ws(sw, F * Wt.swellFetch) * Wt.swellDecay - hS) * ks;
+    }
+    return { Hs: Math.sqrt(hW * hW + hS * hS), windSea: hW, swell: hS };
+  })();
+  const HsT = grown.Hs;
   const r80 = rows.find((r) => r.out === COAST_TARGET.out), r0 = rows[0];
   const checks = {
     fetch: r80.fetch >= COAST_TARGET.passFetch, depth: r80.meanDepth >= COAST_TARGET.passDepth,     // (a dry point fails every mark)
@@ -94,7 +115,8 @@ export function coastReport(W, bodyId, biomeId, opts = {}) {
     waterline: { east: r2(we0), north: r2(wn0), fromStand: r2(hi) }, outToSea: COMPASS[((Math.round(outA / (2 * Math.PI) * 16) % 16) + 16) % 16],
     rows, rose: Object.fromEntries(rose.map((r, k) => [COMPASS[Math.round(k * 15 / 22.5) % 16] + '(' + (k * 15) + ')', Math.round(r)])),
     reference: { fetch: Math.round(Ws.map.target.refFetch), depth: r2(Ws.map.target.refDepth), Hs: r2(Ws.field.significant) },
-    target: { Hs: r2(HsT), windSea: r2(wsT.height), swell: r2(swH), whitePct: r2(whiteT), fetch: COAST_TARGET.fetch, depth: COAST_TARGET.depth },
+    target: { Hs: r2(HsT), windSea: r2(grown.windSea), swell: r2(grown.swell), whitePct: r2(whiteT), fetch: COAST_TARGET.fetch, depth: COAST_TARGET.depth, settle: tStorm - t0,
+      blownForEver: { Hs: r2(HsEq), windSea: r2(wsT.height), swell: r2(swH) } },
     checks, pass: Object.values(checks).every(Boolean),
   };
 }
@@ -119,7 +141,7 @@ async function main() {
     for (const w of r.rows) console.log(`   ${String(w.out).padStart(7)}  ${String(w.waterDepth).padStart(11)}  ${String(w.fetch).padStart(9)}  ${String(w.meanDepth).padStart(10)}  ${String(w.Hs).padStart(6)}  ${String(w.windSea).padStart(8)}  ${String(w.swellReach).padStart(11)}  ${String(w.whitePct).padStart(7)}  ${String(w.wavesOffNormal).padStart(5)}`);
     console.log(`   far rose (fetch in m by direction, degrees from east toward north, from the water about that sees most open sea): ${Object.entries(r.rose).map(([k, v]) => k + ' ' + v).join(', ')}`);
     console.log(`   reference sea (the most exposed water about): fetch ${r.reference.fetch} m, depth ${r.reference.depth} m, Hs ${r.reference.Hs} m`);
-    console.log(`   TARGET (this storm over ${r.target.fetch} m of water ${r.target.depth} m deep): Hs ${r.target.Hs} m (wind sea ${r.target.windSea}, swell ${r.target.swell}), white ${r.target.whitePct} %`);
+    console.log(`   TARGET (this storm over ${r.target.fetch} m of water ${r.target.depth} m deep, in the ${r.target.settle} s it has blown): Hs ${r.target.Hs} m (wind sea ${r.target.windSea}, swell ${r.target.swell}), white ${r.target.whitePct} %; blowing for ever it would raise Hs ${r.target.blownForEver.Hs} m (wind sea ${r.target.blownForEver.windSea}, swell ${r.target.blownForEver.swell})`);
     console.log(`   ${COAST_TARGET.out} m out: fetch >= ${COAST_TARGET.passFetch} ${r.checks.fetch ? 'ok' : 'NO'}, mean depth >= ${COAST_TARGET.passDepth} ${r.checks.depth ? 'ok' : 'NO'}, Hs >= ${r2(COAST_TARGET.passHs * r.target.Hs)} ${r.checks.Hs ? 'ok' : 'NO'}, white >= ${r2(COAST_TARGET.passWhite * r.target.whitePct)} % ${r.checks.white ? 'ok' : 'NO'}; surf at the waterline (Hs >= ${COAST_TARGET.surfHs}) ${r.checks.surf ? 'ok' : 'NO'}  =>  ${r.pass ? 'PASS' : 'NOT YET'}`);
     allPass = allPass && r.pass;
   }
