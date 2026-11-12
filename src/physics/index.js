@@ -11,7 +11,7 @@
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
 import { WINDS, WIND, setWindScale, windLarge } from './wind.js';
-import { weatherAt, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
+import { weatherAt, weatherWind, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
 import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction, splashOn } from './ground.js';
 import { LocalFrame, TerrainGrid } from './near.js';
 import { AirGrid, airAt, AIR } from './air.js';
@@ -23,7 +23,7 @@ import { devilsNear, DEVILS } from './features.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01, smoothstep } from './util.js';
-import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
+import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf, strideBob } from './explorer.js';
@@ -380,6 +380,20 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
         if (Math.hypot(x - S.x, z - S.z) >= WATER.wakeEvery * L || time - S.t >= WATER.wakeEvery || time < S.t) { water.addWake(x, z, amp); S.x = x; S.z = z; S.t = time; }
       }
     }
+    // (P22) arriving, the sea is what the wind's history at the place has raised (water.js seaGrown): the large-scale
+    // wind there over the last 4 swell times, at the reference wind's strength now; found again once the sea has been
+    // measured (its fetch known) and if the fetch then moves by a fifth
+    if (water.arrive > 0 && liqLevel > -1e8 && coverKnown) {
+      const Ur = Math.hypot(swe, swn), key = frame.version * 2 + (water.seaMeasured ? 1 : 0);
+      if (_sh.key !== key || Math.abs(seaFetch - _sh.F) > 0.2 * _sh.F) {
+        _sh.key = key; _sh.F = seaFetch; _sh.b = bodyId; _sh.ux = ux; _sh.uy = uy; _sh.uz = uz;
+        const U0 = seaWindAt(time);
+        _sh.k = U0 > 0.3 && Ur > 0.3 ? Ur / U0 : 1;
+        seaGrown(_shU, time, seaFetch, seaDepth > 0 ? seaDepth : 1e9, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, WINDS[bodyId] ? WINDS[bodyId].U : 0, _sh.o);
+        _sh.o.ok = Ur > 0.3;
+        water.hist = _sh.o;
+      }
+    } else if (water.arrive <= 0) water.hist = null;
     // (until the ground under the focus has been sampled, nothing is known about the liquid here)
     water.update(dt, frame, swe, swn, coverKnown ? liqLevel : -1e9, seaDepth, seaFetch, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
     // the sea's own spray: spume off the breaking crests, surf on the shore (loose.js; the drops move from the next step on)
@@ -421,6 +435,18 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {}, bodyId === active ? devils : null, recv || null);
   }
 
+  // (P22) the large-scale wind at the place the sea's history is read for (as coast.mjs reads it), m/s at 10 m
+  const _sh = { key: -1, F: 1, b: null, ux: 0, uy: 1, uz: 0, k: 1, o: { ok: false } }, _shW = new Float64Array(4), _shWW = new Float64Array(6);
+  function seaWindAt(t) {
+    windLarge(_sh.b, _sh.ux, _sh.uy, _sh.uz, t, seed, _shW); weatherWind(_sh.b, _sh.ux, _sh.uy, _sh.uz, t, seed, _shWW);
+    let wx = _shW[0] * _shWW[0] + _shWW[1], wy = _shW[1] * _shWW[0] + _shWW[2], wz = _shW[2] * _shWW[0] + _shWW[3];
+    const bs = Math.hypot(wx, wy, wz), bl = bs > 1e-6 ? _shWW[5] * Math.min(1, bs / 2) / bs : 0;
+    // (the part along the ground)
+    const vr = wx * _sh.ux + wy * _sh.uy + wz * _sh.uz;
+    wx -= vr * _sh.ux; wy -= vr * _sh.uy; wz -= vr * _sh.uz;
+    return Math.hypot(wx, wy, wz) * (1 + bl);
+  }
+  const _shU = (t) => seaWindAt(t) * _sh.k;
   function nearFocus(bodyId, ux, uy, uz, metres) {
     if (bodyId !== active) return false;
     const r = Math.hypot(focus.x, focus.y, focus.z) || 1;

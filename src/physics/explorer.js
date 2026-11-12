@@ -345,7 +345,13 @@ function wayAhead(B, env, S, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh)
           if (A && Math.abs(N.d - A.d) < T.aheadSpan) { if (N.vc < A.vc && !A.tried) { A.vc = N.vc; A.rise = N.rise; } }
           else if (!A || paceCost(N, ab, T) < paceCost(A, ab, T)) A = B.ahead = N;
         }
-        if (!(A && A.tried && Math.abs(dR - A.d) < T.aheadSpan) && !(B.noTry && dR <= B.noTry.d)) probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, dR, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
+        if (!(A && A.tried && Math.abs(dR - A.d) < T.aheadSpan) && !(B.noTry && dR <= B.noTry.d)) {
+          const P = probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, dR, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
+          // ((P22) a hill: no face, the stand-in goes)
+          if (P.hill && A && !A.tried && Math.abs(A.d - dR) < T.aheadSpan) A = B.ahead = null;
+        }
+        // ((P22) a reading within a hill already found is the hill's)
+        else if (B.noTry && dR <= B.noTry.d && B.probe && B.probe.hill && A && !A.tried && Math.abs(A.d - dR) < T.aheadSpan) A = B.ahead = null;
       }
     }
   }
@@ -489,7 +495,7 @@ function paceCost(q, ab, T) { return Math.sqrt(q.vc * q.vc + 2 * ab * Math.max(0
 function probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, d, rise, v, fx, fy, fz, T) {
   const n = Math.max(2, Math.min(40, Math.round((T.aheadSpan + T.aheadProbeBefore + T.aheadProbeAfter) / T.aheadProbe) + 1));
   let Q = B.probe;
-  if (!Q || Q.prof.length < n) Q = B.probe = { active: false, prof: new Float64Array(n), nsl: new Float64Array(n), n: 0, step: T.aheadProbe, x: 0, y: 0, z: 0, d: 0, rise: 0, lo: 0, hi: 0, law: 0, tries: 0, vc: 1e9, surf: null, gnd: {}, G: null, end: { x: 0, y: 0, z: 0, d: 0 }, R: r, g: 0, env: null };
+  if (!Q || Q.prof.length < n) Q = B.probe = { active: false, hill: false, prof: new Float64Array(n), nsl: new Float64Array(n), n: 0, step: T.aheadProbe, x: 0, y: 0, z: 0, d: 0, rise: 0, lo: 0, hi: 0, law: 0, tries: 0, vc: 1e9, surf: null, gnd: {}, G: null, end: { x: 0, y: 0, z: 0, d: 0 }, R: r, g: 0, env: null };
   const s0 = Math.max(0.2, d - T.aheadSpan - T.aheadProbeBefore);
   // (each sample's height, and the slope along the way its own normal gives: the ghost meets the ground with the normals
   // the walker will meet it with, which need not be the profile's own: PILOT's boulders keep the level ground's)
@@ -526,7 +532,17 @@ function probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, d, rise, v, fx, f
   // (only what comes down again is tried: a hump, a boulder. Ground that goes on rising (a hill, a ledge) keeps P16's
   // reading: a hill is run at the pace the legs' power allows, a ledge over the stroke is the law's face. The way is
   // known to the profile's end either way, so a long slope is read once in every few metres, not every step.)
-  if (Q.prof[n - 1] > Q.prof[Math.round(Q.xTop / Q.step)] - T.legFold) { Q.active = false; B.noTry = { x: Q.end.x, y: Q.end.y, z: Q.end.z, d: Q.end.d }; }
+  // (P22) ... but a HILL is not a face: ground still rising steeply at the profile's end (over its last two looks, more
+  // than aheadSpan's 60 %: the slope that made it a face) has no top to bring the hips down from, and P16's law (the pace at
+  // which the hips can be raised onto a top and brought down beyond it) read a 43 degree hill on Mars and Earth as a face
+  // and slowed the run to 1.1-1.2 m/s before it. A hill is run onto at the pace the run has: its foot takes the speed into
+  // it (P21's brace: v cos^2 of it is kept), and up it the legs' power, the grip, the suit and gravity set the pace.
+  // Nothing is held for it (Q.hill: the law's stand-in for this reading is dropped in wayAhead).
+  // (and rising more than a clamber over the last two looks: no rock or ledge read as a face does; a row's next boulder,
+  // where the profile ends on its face, is not a hill)
+  const kL = Math.max(1, Math.round(2 * T.look / Q.step)), hill = n > kL && Q.prof[n - 1] - Q.prof[n - 1 - kL] > Math.max(T.clamber, 1.2 * T.look);
+  Q.hill = hill;
+  if (hill || Q.prof[n - 1] > Q.prof[Math.round(Q.xTop / Q.step)] - T.legFold) { Q.active = false; B.noTry = { x: Q.end.x, y: Q.end.y, z: Q.end.z, d: Q.end.d }; }
   Q.law = rise > T.legFold + 0.05 ? Math.max(0.5, Math.min(Q.hi, T.aheadPace / Math.pow(rise - T.legFold, T.aheadExp) / T.aheadProbeMargin)) : 0;
   return Q;
 }
@@ -958,6 +974,12 @@ function stepOnce(st, cmd, dt, env, T, S) {
     // velocity along the surface
     let d = vx * nx + vy * ny + vz * nz;
     let sx = vx - d * nx, sy = vy - d * ny, sz = vz - d * nz;
+    // (P22) ... losing only the speed the BODY has into it (see LEGS, 3, where the velocity is laid along the ground): the
+    // mass rides at the hips, and hips already rising with the new slope carry it along it
+    if (d < -1e-6 && B.hipV > 0) {
+      const vu = vx * ux + vy * uy + vz * uz, dc = Math.min(0, d + (B.hipV - vu) * nu), s2 = vx * vx + vy * vy + vz * vz - dc * dc, s0 = Math.hypot(sx, sy, sz);
+      if (dc > d && s0 > 1e-9 && s2 > s0 * s0) { const m = Math.sqrt(s2) / s0; sx *= m; sy *= m; sz *= m; }
+    }
     const sp = Math.hypot(sx, sy, sz);
     // gravity along the slope (downhill), less buoyancy
     const gk = -g * (1 - buoy);
@@ -1254,6 +1276,14 @@ function stepOnce(st, cmd, dt, env, T, S) {
       // keep the speed when the slope merely changes under the feet
       const a = Math.hypot(sx, sy, sz), b = Math.hypot(vx, vy, vz);
       if (b > 1e-6 && a > b && vsep > 0) { const m = a / b; vx *= m; vy *= m; vz *= m; }
+      else if (b > 1e-6 && a > b && vsep < 0) {
+        // (P22) ... and onto rising ground only the speed the BODY has into it is lost: the mass rides at the hips, and hips
+        // the legs have raised in time already move along the new slope (the tube): a run onto a hill met so loses nothing
+        // there. Until P22 the velocity was laid along the new ground whatever the hips did: v cos^2 of a slope, always.
+        const nu1 = n1x * D.x + n1y * D.y + n1z * D.z, su1 = sx * D.x + sy * D.y + sz * D.z;
+        const vc = Math.min(0, vsep + (B.hipV - su1) * nu1), b2 = Math.sqrt(Math.max(b * b, a * a - vc * vc));
+        if (b2 > b) { const m = b2 / b; vx *= m; vy *= m; vz *= m; }
+      }
     }
     B.clamber01 = grounded ? clamp01(Math.max(-B.hip / fold, B.hip / reach)) : 0;
     B.support = grounded ? support : 0;

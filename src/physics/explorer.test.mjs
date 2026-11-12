@@ -677,9 +677,12 @@ function kinkRun(g, deg, hz, H = 0, v0 = 6.7) {
   const st = { p: V(Math.sin(4 / R) * R, 0, Math.cos(4 / R) * R), v: V(v0, 0, 0), grounded: true };
   const o = { slowest: Infinity, air: 0, thrown: 0, read: 0, far: 0, finite: true };
   let rel = 0, was = true;
+  // (P22: the way ahead now reads on from what it has read and tries a hill, so it no longer misses this foot: the faces'
+  // read is switched off here (aheadFrom), so that the brace is what is tested; the crest is read all the same)
+  const T2 = { ...T, aheadFrom: 1e9 };
   for (let i = 0; i < hz * 4; i++) {
     const t = Math.atan2(st.p.x, st.p.z);
-    stepExplorerBody(st, { wish: V(v0 * Math.cos(t), 0, -v0 * Math.sin(t)), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env);
+    stepExplorerBody(st, { wish: V(v0 * Math.cos(t), 0, -v0 * Math.sin(t)), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env, T2);
     const B = st.phys, x = Math.atan2(st.p.x, st.p.z) * R, r = len(st.p);
     o.far = x; o.finite = o.finite && finite(st);
     if (x < 10 && B.ahead) o.read++;
@@ -838,5 +841,31 @@ test('P22 a run across the field of low boulders on the Moon keeps its feet down
     assert.ok(st.p.x >= 75, `${tag}: got across`);
     assert.ok(top <= 0.06, `${tag}: feet ${top.toFixed(2)} m off the ground`);
     assert.ok(lossy <= 6, `${tag}: ${lossy} steps lose more than 0.3 m/s (at 60 Hz; P21: 22, 5, 21 and 3)`);
+  }
+});
+
+test('P22 a hill is not a face: a run onto a 35 or 43 degree hill seen coming is not slowed before it; its foot takes the speed into it (v cos^2 kept) and up it the pace is the legs\' own (Moon, Mars, Earth; 60 and 30 Hz)', () => {
+  // Until P22 a steep hill read 12 m out was a face to P16's law (a rise of more than the stroke within a span, and the
+  // profile went on rising, so it was not tried): the run was slowed to the law's pace before its foot, 2.0 to 2.5 m/s, and
+  // the foot then took the speed into it: 1.07 to 1.26 m/s on a 43 degree hill on the Moon, Mars and Earth. A hill (still
+  // rising more than a clamber over the profile's last two looks) has no top to bring the hips down from.
+  for (const [name, g] of [['Moon', 1.62], ['Mars', 3.71], ['Earth', 9.81]]) for (const deg of [35, 43]) for (const hz of [60, 30]) {
+    const k = Math.tan(deg * Math.PI / 180), X = 25, h = (x) => Math.max(0, x - X) * k, hs = (x) => x < X ? 0 : k;
+    const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z), ux = d.x / l, uz = d.z / l, x = Math.atan2(ux, uz) * R, s = hs(x), n = Math.hypot(1, s);
+      return { radius: R + h(x), normal: { x: (ux - uz * s) / n, y: d.y / l / n, z: (uz + ux * s) / n }, liquidRadius: 0 }; };
+    const env = { sample, gravity: g, ground: (s, o) => Object.assign(o, { material: 'rock', friction: 0.9, kinetic: 0.7, foothold: 0.4, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 }) };
+    const st = { p: V(Math.sin(2 / R) * R, 0, Math.cos(2 / R) * R), v: V(7.4, 0, 0), grounded: true };
+    let foot = 0, on = Infinity, up = 0, nUp = 0, air = 0;
+    for (let i = 0; i < hz * 8; i++) {
+      const t = Math.atan2(st.p.x, st.p.z);
+      stepExplorerBody(st, { wish: V(7.4 * Math.cos(t), 0, -7.4 * Math.sin(t)), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env);
+      const x = Math.atan2(st.p.x, st.p.z) * R, v = st.phys.speedGround;
+      if (x < X) foot = v; else if (x < X + 6) { on = Math.min(on, v); if (!st.grounded) air++; if (x > X + 3) { up += v; nUp++; } }
+      if (x > X + 6) break;
+    }
+    const want = 7.4 * Math.cos(deg * Math.PI / 180) ** 2, tag = `${name} ${deg} degrees ${hz} Hz`;
+    assert.ok(foot > 7.2, `${tag}: ${foot.toFixed(2)} m/s at the foot (slowed before it)`);
+    assert.ok(on > 0.9 * want, `${tag}: ${on.toFixed(2)} m/s at the slowest on it, v cos^2 is ${want.toFixed(2)}`);
+    assert.ok(nUp > 0 && up / nUp > 3.5 && air === 0, `${tag}: ${(up / Math.max(1, nUp)).toFixed(2)} m/s up it (level), ${air} steps in the air`);
   }
 });

@@ -537,3 +537,22 @@ test('P21 the floating twin copies the water shader\'s lift in the last 0.4 m of
     }
   } finally { setWindScale('earth', s0); }
 });
+
+test('P22 arriving, the sea is what the wind\'s history has raised: a squall that rose 30 s ago is met at the height of a sea that has grown for 30 s, not at the equilibrium of the wind now (and one who stood through it sees the same)', async () => {
+  // Until P22 the arrival's quick settling (P20, Decision 51) settled to the equilibrium of the wind NOW, as if it had always
+  // blown: at Neptune's stand an arriving player saw Hs 6.0 m 80 m out where one who stood through the squall saw 3.5 m.
+  const W = await import('./water.js');
+  assert.equal(typeof W.seaGrown, 'function', 'seaGrown: the sea a wind\'s history has raised');
+  const F = 2500, D = 50, g = 9, rA = 1.2, rL = 999, U = (t) => (t < 600 ? 5 : 20), frame = { version: 1 };
+  // (stood through: the field under the same wind from long before)
+  const A = new WaterField(); A.expectMap = false;
+  for (let t = 0; t < 630; t += 1 / 30) A.update(1 / 30, frame, U(t), 0, 0, D, F, g, rA, rL);
+  // (arriving at 630 s with the history, and without it: the equilibrium of 20 m/s)
+  const B = new WaterField(); B.expectMap = false; B.hist = W.seaGrown(U, 630, F, D, g, rA, rL, 0, {}); B.hist.ok = true;
+  const C = new WaterField(); C.expectMap = false;
+  for (let i = 0; i < 90; i++) { B.update(1 / 30, frame, 20, 0, 0, D, F, g, rA, rL); C.update(1 / 30, frame, 20, 0, 0, D, F, g, rA, rL); }
+  const eq = windSea(20, F, g, rA, rL, D).height;
+  assert.ok(Math.abs(B.height - A.height) < 0.1 * A.height, `the arrival's wind sea ${B.height.toFixed(2)} m, stood through ${A.height.toFixed(2)} m`);
+  assert.ok(A.height < 0.85 * eq && C.height > 0.95 * eq, `30 s of a 20 m/s squall: ${A.height.toFixed(2)} m; its equilibrium ${eq.toFixed(2)} m (without the history the arrival shows ${C.height.toFixed(2)})`);
+  assert.ok(Math.abs(B.swellHeight - A.swellHeight) < 0.1 * Math.max(0.05, A.swellHeight), `the swell: arriving ${B.swellHeight.toFixed(2)} m, stood through ${A.swellHeight.toFixed(2)} m`);
+});

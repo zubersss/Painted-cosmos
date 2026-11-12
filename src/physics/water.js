@@ -333,6 +333,35 @@ function tapInto(src, c, u, v, dst, n) {
   for (let q = 0; q < c; q++) { const lo = src[a + q] + (src[b + q] - src[a + q]) * fu, hi = src[e + q] + (src[d + q] - src[e + q]) * fu; dst[o + q] = lo + (hi - lo) * fv; }
 }
 
+// (P22) THE SEA A WIND'S HISTORY HAS RAISED. The sea follows its wind with lags (the wind sea over WATER.growTime, the
+// swell's wind rising with it and outlasting it over WATER.swellTime, the swell's height over swellTime): what stands at
+// time t1 is not the equilibrium of the wind at t1 but what the wind from t1 - span to t1 has raised. Uat(t) gives the wind
+// (m/s) at the place; the sea over fetch F and depth D. Starts at the equilibrium of the wind at t1 - span (as coast.mjs's
+// target does) and steps the same lags WaterField.update does. o: { height, swellWind, swellHeight, length } and the
+// shares of the equilibrium of the wind at t1 (fW: wind sea, fL: its length, fSw: the swell's wind, fS: the swell's
+// height against the equilibrium of the swell's wind as it stands).
+const _gw = {}, _gs = {};
+export function seaGrown(Uat, t1, F, D, g, rhoAir, rhoLiq, prevailing = 0, o = {}, span = 4 * WATER.swellTime, step = 3) {
+  const t0 = t1 - span, Fs = F * WATER.swellFetch, calm = WATER.swellCalm * prevailing;
+  let U = Uat(t0); windSea(U, F, g, rhoAir, rhoLiq, D, _gw);
+  let hW = _gw.height, lW = _gw.length, sw = U;
+  windSea(Math.max(sw, calm), Fs, g, rhoAir, rhoLiq, D, _gs);
+  let hS = _gs.height * WATER.swellDecay;
+  const kh = 1 - Math.exp(-step / WATER.growTime), ks = 1 - Math.exp(-step / WATER.swellTime);
+  for (let t = t0 + step; t <= t1 + 1e-9; t += step) {
+    U = Uat(t); windSea(U, F, g, rhoAir, rhoLiq, D, _gw);
+    hW += (_gw.height - hW) * kh; if (_gw.length > 0) lW += (_gw.length - lW) * kh;
+    sw += (U - sw) * (U > sw ? kh : ks);
+    windSea(Math.max(sw, calm), Fs, g, rhoAir, rhoLiq, D, _gs);
+    hS += (_gs.height * WATER.swellDecay - hS) * ks;
+  }
+  windSea(U, F, g, rhoAir, rhoLiq, D, _gw); windSea(Math.max(sw, calm), Fs, g, rhoAir, rhoLiq, D, _gs);
+  o.height = hW; o.length = lW; o.swellWind = sw; o.swellHeight = hS; o.U = U;
+  o.fW = _gw.height > 1e-6 ? Math.min(1.5, hW / _gw.height) : 1; o.fL = _gw.length > 1e-6 ? Math.min(1.5, lW / _gw.length) : 1;
+  o.fSw = U > 0.3 ? Math.min(1.5, sw / U) : 1; o.fS = _gs.height > 1e-6 ? Math.min(1.5, hS / (_gs.height * WATER.swellDecay)) : 1;
+  return o;
+}
+
 export class WaterField {
   // opts.swell: false = the wind sea alone, also on an open sea (tests of the wind sea)
   constructor(opts = {}) {
@@ -352,6 +381,7 @@ export class WaterField {
     this.present = false;
     this.frameVersion = -1;
     this.arrive = 0;               // s left of the quick settling after arriving somewhere
+    this.hist = null;              // (P22) seaGrown's shares for the arrival (physics sets it; null: the equilibrium of the wind now)
     this.g = 9.81;
     // wakes: x, z (grid), age (s), amplitude (m). Unused slots have amplitude 0.
     this.wake = new Float32Array(WATER.wakes * 4);
@@ -607,6 +637,11 @@ export class WaterField {
     // quickly, since the wind estimate itself is still settling; from then on, slowly)
     const fresh = this.arrive > 0 && this.present && U > 0.3;
     windSea(this.present ? U : 0, fetch, g, rhoAir, rhoLiq, depth > 0 ? depth : 1e9, _t);
+    // (P22) arriving, the sea settles to what the wind's history has raised (this.hist, seaGrown's shares, set by physics
+    // when it knows the wind's past at the place), not to the equilibrium of the wind now: arriving at Neptune's stand 20 s
+    // before the squall's peak showed Hs 6.0 m 80 m out where one who stood through it saw 3.5 m
+    const Hh = fresh && this.hist && this.hist.ok ? this.hist : null;
+    if (Hh) { _t.height *= Hh.fW; _t.length *= Hh.fL; _t.period *= Math.sqrt(Hh.fL); }
     const h = dt > 0.25 ? 0.25 : dt;
     const kh = 1 - Math.exp(-h / (fresh ? 0.2 : WATER.growTime));
     if (fresh) { if (this.seaMeasured || !this.expectMap || (this.arriveWait = (this.arriveWait || 0) + h) > WATER.arriveWait) this.arrive -= h; this.dir[0] = we / U; this.dir[1] = wn / U; }
@@ -624,12 +659,12 @@ export class WaterField {
     }
     // the swell from the open side: the sea this wind raises over the open water beyond the game's fetch
     this.open = this.present && this.swellOn ? smoothstep(WATER.swellOpen[0], WATER.swellOpen[1], fetch) : 0;
-    const ks = 1 - Math.exp(-h / (fresh ? 0.2 : WATER.swellTime));
-    this.swellWind += (U - this.swellWind) * (U > this.swellWind ? 1 - Math.exp(-h / (fresh ? 0.2 : WATER.growTime)) : ks);   // (it rises with the sea and outlasts the wind)
+    const ks = 1 - Math.exp(-h / (fresh ? 0.2 : WATER.swellTime)), Uw = Hh ? U * Hh.fSw : U;
+    this.swellWind += (Uw - this.swellWind) * (Uw > this.swellWind || Hh ? 1 - Math.exp(-h / (fresh ? 0.2 : WATER.growTime)) : ks);   // (it rises with the sea and outlasts the wind)
     if (this.open > 0) {
       windSea(Math.max(this.swellWind, WATER.swellCalm * prevailing), fetch * WATER.swellFetch, g, rhoAir, rhoLiq, depth > 0 ? depth : 1e9, _s);
       const kq = fresh ? kh : ks;
-      this.swellHeight += (_s.height * WATER.swellDecay - this.swellHeight) * kq;
+      this.swellHeight += (_s.height * WATER.swellDecay * (Hh ? Hh.fS : 1) - this.swellHeight) * kq;
       if (_s.length > 0) this.swellLength += (_s.length - this.swellLength) * (this.swellLength > 0 ? kq : 1);
     } else { this.swellHeight = 0; }
     const u = this.uniforms, d0 = this.dir[0], d1 = this.dir[1];
