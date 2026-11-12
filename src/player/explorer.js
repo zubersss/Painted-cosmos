@@ -49,6 +49,11 @@ export const EXPLORER = Object.freeze({
 });
 
 const _airCmd = {};          // scratch for the air at the walker (the command to PHYSICS' body)
+// What feels that air (PHYSICS P18, physics.md "For PILOT"): the body itself, half a metre across, at
+// its own velocity, as PHYSICS' step asks for it (src/physics/explorer.js _recv). The sub-second eddies
+// smaller than the body, or met too often, fade; asked as a point at rest, the command's pace and the
+// suit's share of the wind followed eddies the body itself does not feel.
+const _airRecv = { size: 0.5, vx: 0, vy: 0, vz: 0 };
 
 export function createExplorerState(p, fwd) {
   const up = norm(p);
@@ -271,7 +276,8 @@ function stepExplorerBodied(st, input, dt, env, T) {
   cmd.shelter01 = 0;
   let pace = 1;
   if (env.air) {
-    const w = env.air(st.p, _airCmd, wasGrounded ? 1 : Math.max(0, st.altitude || 0) + 1).wind;
+    if (st.v) { _airRecv.vx = st.v.x; _airRecv.vy = st.v.y; _airRecv.vz = st.v.z; }
+    const w = env.air(st.p, _airCmd, wasGrounded ? 1 : Math.max(0, st.altitude || 0) + 1, _airRecv).wind;
     if (!wasGrounded) {
       // The force goes with the square of the wind: keep what a wind of windAirCap would give.
       const W = Math.hypot(w.x, w.y, w.z);
