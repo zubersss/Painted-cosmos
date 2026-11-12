@@ -18,14 +18,17 @@ Saturn's ring framed from orbit in `tour.mjs`; the world's own arrival steps off
 ship floats on the drawn sea, `stepAfloat`; the swim camera smoothed; boulderrun's classification),
 `dc876f9` (Neptune's tilt -0.49, PAINTER agreed; ship berths out of the surf, `surfAt`), `a46b6ee`
 (the coordinator's snapshot of my camera fix: the feet stay in the frame under a rise,
-`CAMERA.feetInFrame`), `2af3e51` (PHYSICS 20: obstacles 16 m round the explorer). Unit 148.
+`CAMERA.feetInFrame`), `2af3e51` (PHYSICS 20: obstacles 16 m round the explorer), `ce7e69d`
+(PAINTER 13's bug: a tidally locked body's orbit turns with its spin when its hour is set,
+`Ephemeris.orbitShift`, saved). Unit 150.
 **Next PILOT, in order**: (1) see in a browser what only Node has seen: the top-tier Neptune tour on
 the head (new season, the camera at the storm-seas vista), a landing on Neptune's sea (the ship should
 heave), Earth's autumn_woodland stand (the berth); (2) the landing's chase camera inside a crown
 (REVIEW section 4, 372 pops): shorten the ship's boom where `canopyHeight` puts the camera among
-crowns, eased, and re-film `node tests/motion.mjs --only landing`; (3) when PAINTER 13 moves the
-Moon's arrival and stands (the coordinator's ruling), rerun the contract tests and `tour.mjs --bodies
-moon --first 1`; (4) when PAINTER fixes `obstacles.js` (For PAINTER 1), rerun
+crowns, eased, and re-film `node tests/motion.mjs --only landing`; (3) PAINTER 13 moved the Moon's arrival and stands to the near side (`7a51d42`): unit, world and
+the Moon's places pass in Node; my `run10/runall3.sh` queued `boulderrun.mjs` on the Moon and the
+top-tier Moon and Neptune tours on a clean tree of `7a51d42` / `b2aa445` / `ce7e69d` after the coverage
+tour (results in `run10/boulder.log`, `run10/sheets-new/`, if they finished: see REVIEW); (4) when PAINTER fixes `obstacles.js` (For PAINTER 1), rerun
 `docs/lead/evidence/review6b/obsmiss.mjs` and the landing survey. Scratch:
 `/home/user/.pc-scratch/pilot/run10/` (`runall2.sh` = the browser queue; `tree/` the clean tree;
 `scripts/` the Node probes; `judge.md` the per-body notes). **Cost me time**: a top-tier load takes 6 to

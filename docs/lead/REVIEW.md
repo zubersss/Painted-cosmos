@@ -255,6 +255,17 @@ orange ellipses. Cost is small: the kits draw 0 to 6 calls and at most 9 k trian
    52 spawn and stand berths had a hull point in the water (Earth's autumn_woodland -0.19 m,
    misty_wetland -0.09 m); now 0; no other berth moved, no composed spawn changed (`berth.mjs`; contract
    test).
+9. **PHYSICS 20's wiring ask** (`2af3e51`): the explorer's trunks and boulders are looked up 16 m round
+   it, not 9, so a lunar run's read-ahead (12 to 13 m) sees a boulder in time. Checked against
+   PAINTER's wide-disc fault first: at 652 places a 16 m query lists everything a 9 m one does (the
+   misses begin beyond 20 m).
+10. **PAINTER 13's bug in PILOT's ephemeris** (`ce7e69d`): `setSunHour` turned the Moon's spin alone
+   and broke its tidal lock, so every teleport with an hour, `__pc.setHour` and a boot with
+   `?body=moon` moved Earth in the Moon's sky (by up to 178.5 degrees over six hours set). Now a locked
+   body's orbit turns with its spin (`orbitShift`, kept in the save): Earth stays within 2.3 degrees
+   (twice the Moon's tilt) at every hour (`moonearth.mjs`); a Moon boot at 9.5 has Earth 17.5 degrees up
+   from the arrival. PAINTER 13's near-side stands checked in Node: all four stands and seven vistas
+   dry, under 20 degrees, in their biome. Tests in `orbits.test.mjs` and `save.test.mjs`; unit 150.
 
 ### 6. Milestone 3's verdict, item by item against the brief
 
