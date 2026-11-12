@@ -3,6 +3,166 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P23 (twenty-first PHYSICS agent; read this block first; P22 and older below hold for everything not named here)
+
+**Where things stand.** The block, in the order a player feels it: (0) **the gale** (added by the coordinator, urgent, from
+PAINTER 13's For PHYSICS 6): the explorer blown 19 m across Neptune's beach and up the cliff; (1) rounded crests; (2) the hold
+on the descent off a small rim; (3) the three Moon row numbers; (4) PC_TIMING; (5) the strips. Done: (0) (`f656310`), (4) (load 7.97 for once: 306
+pass under PC_TIMING, every budget inside), (5) (six strips, all opened). (1) and (2) measured to the bottom and **not shipped**: the law is found and holds on the body, but at the
+boulderrun site the slowing is not the brows', it is the knife edges', and recovering the pace there is a ruling between
+PILOT's feel verdict and this block's contact rule (item 1, the last paragraph: the change is one line, measured). (3) not
+attempted (the gale took its time). Commits: `f656310` (item 0, the Moon strips' level run-up, the gale
+subject) and the hand-over's (these notes, the strips). Tests: `node --test src/physics/` **306 pass** (305 + 1 new:
+`explorer.test.mjs` 'P23 the gale'; `load.test.mjs` among them), `node --test tests/*.test.mjs` **150 pass** (PILOT added two),
+`node --test src/world/*.test.mjs` **19 pass**, on a clean export of `ce7e69d` with this block's files; `coast.mjs` PASS at both
+stands (Earth Hs 0.62 m at the reference, target 0.52; Neptune 3.85, target 3.08); `ghostfield.mjs` all zeros at all six places
+(worst step loss 0.26 Earth, 0.52 Moon, as P22); PILOT's boulderrun replayed in Node (`trace8`): the same to the digit as the
+head (thrown up 0 in all eight headings; one flight, heading 0, off a 56 degree wall falling 4.47 m). The new test fails on the
+head (the walker carried 1050 m at 60 m/s). Scratch: `/home/user/.pc-scratch/physics/p23/` (`head2/` the head as exported,
+`final/` it with my files, `filmtree3/` the frozen tree the strips were filmed from; `s/gale.mjs [T0 D HZ body biome]` the
+explorer standing (or walking: `KEYS=KeyW TURN=deg`) at a stand in PILOT's Sim, the wind at it each step; `s/galepatch.py` the
+gale change as a patch; `s/crest.mjs <tree> g hz rim|brow|file ...` the body over a crest at fixed paces (the read off unless
+`READ=1`): the speed at the crest and the fastest that keeps contact; `s/limits.mjs` boulderrun's site replayed, what holds
+the pace back each step by kind; `s/prof180.mjs` the ground along a heading; `s/mb.mjs` the Moon strip replayed (P22's, now
+with the level run-up; `OLD=1` P22's site); `t8-knife.txt` the knife-edge law of item 1 measured; `work-v1-explorer.js`,
+`dbg-explorer.js` the two crest readings built and measured, not shipped).
+**Next, in order:** (0) the coordinator's ruling on the knife edges (item 1, last paragraph): PILOT asks for at least 4.5 m/s
+before a rim and a float off it; this block's rule was contact wherever P22 measured it; the one-line change and its numbers
+are below; (1) the Moon rows (P22 item 4: three numbers a little worse); (2) the brows' law, if a reading of the profile can
+be made that is no stricter than P22's anywhere (item 1: two were built, each stricter somewhere); (3) the figure: PILOT may
+want a deeper crouch than the art's 0.5 m fold for `hunker01` 1 (hands and knees).
+**API added (additive):** explorer.js `EXPLORER_BODY.cdaLow`, `.hunkerHeight`, `.hunkerFrom`, `.hunkerFull`, `.hunkerDown`,
+`.hunkerUp`, `.hunkerGrip`, `.hunkerPace`, `.windBrace`, `.braceFrom`, `.braceShare`, `.braceForce`; `EXPLORER_BODY_STATE()`
+`.hunker01` (0 upright .. 1 down on hands and knees), `.windBrace` (N the suit braces with); `cmd.windBrace` (false: no
+brace). gamefilm.mjs subject `game-gale-neptune`. Nothing removed or renamed.
+**Behaviour changed without a call changing:** (1) in a wind whose push on the body upright passes half its weight (Neptune's
+squalls; a Venus breeze over 4 m/s; nothing on Earth short of a hurricane's gust, nothing on Mars or the airless worlds) the
+walker gets low, and `phys.ride` folds with it (PILOT's figure crouches); its pace falls toward a crawl (1.2 m/s right down);
+(2) where that push passes half the weight the suit braces against what the soles cannot hold beyond 60 % of their grip (the
+jet's 1700 N at most): a walker is not carried off; a gust of 175 m/s at a metre staggers it under a metre; (3) the Moon
+boulder strips are filmed at another field (the second densest near crater_fields), from 12 m of level ground.
+
+**0. The gale (`explorer.js`, EXPLORER_BODY cdaLow ... braceForce; PAINTER 13, For PHYSICS 6).** PAINTER saw the walker at
+Neptune's storm stand, 15 s after the clock was set to 222, 19.1 m from the stand clambering up the cliff, `here.air.speed`
+141.4 m/s.
+- *Is 141 m/s real?* Yes: it is the gust model's output, not a fault. Replayed in PILOT's Sim in Node (`s/gale.mjs`, the
+  same stand and clock): the squall reads 60-75 m/s mean at 2 m (coast.mjs: 75 m/s at 10 m), and the sub-second eddies swing it
+  from a third to over twice that within a second (23 -> 167 m/s in one second; 201 at most in 30 s), sigma/U about 0.4 (the
+  surface layer's 1/ln(z/z0), 0.24 at 2 m, plus the storm's gustiness, 0.15). No spike after a clock set: the first frames read
+  54-75 m/s; a run from clock 180 gives the same storm (gusts to 227 m/s, the walker blown 58 m in 72 s). PAINTER's 14.3 m/s at
+  237 and 247 is not reproduced in Node (47-87 m/s there); perhaps read before the air grid had been built.
+- *Physically:* at Neptune's 0.99 kg/m^3, the mean wind at a metre (60 m/s) pushes a standing body (0.85 m^2) at 15 m/s^2,
+  three times what sand holds (0.8 x 11.15); a gust, nine times. No one stands in that.
+- *Now:* a walker gets low where the wind's own push on it upright (its speed, not the run's: running through Venus' still
+  air is no gale) passes half its weight (`hunkerFrom` 0.5: it can lean no further than about 30 degrees into it; right down
+  at 1.0): a crouch, then hands and knees, side-on (`hunker01`, 0.25 s down, 1.5 s up): drag area 0.85 -> 0.30 m^2, the wind
+  read 0.4 m up (slower near the ground: the log law), hands and knees add 0.3 to the soles' hold, and the pace falls toward a
+  crawl (1.2 m/s). Where the push passes half the weight (`braceFrom`), the suit braces with its thrusters against what the
+  soles cannot hold beyond 60 % of their grip (`braceShare`; the rest is the legs' to walk with), the jetpack's 1700 N at most
+  (`braceForce`): a named force, on by default as the float assist is (a calm game: no fail state); `cmd.windBrace` false
+  turns it off. `phys.ride` folds with `hunker01` (at least `legFold` x it), so PILOT's figure crouches.
+- *At the stand* (PILOT's Sim, clock 222, 30 s standing): head **blown 41 m and up the cliff -> 0.00 m**; hunker 0.5-0.9,
+  braced up to 650 N, leaning up to 47 degrees; walking 8 s into the squall, across it and with it: 14-19 m (about 2 m/s). In
+  the game (the strip `motion-game-gale-neptune`): 30 frames, the wind at 2 m 20-85 m/s, hunker 0.4-0.9, braced up to 648 N,
+  moved 0.00 m, grounded, no clamber.
+- *Kept:* a 20 m/s wind on Earth's ice still blows a walker along (its push is a fifth of its weight: no brace); a walk into
+  Earth's 25 m/s gale is as before (P6's test); Earth's coast storm (10 m/s at a metre, gusts to 27) leaves it upright.
+- *Test* (`explorer.test.mjs`, new, fails on the head): P23 the gale (a squall of 65 m/s at a metre swinging 0.3x to 1.6x,
+  a gust of 175 m/s every 10 s; Neptune's gravity and air; sand, a 10 degree slope with the wind downhill, rock; 60 and 30
+  Hz): standing 30 s, staggered under 2 m (measured 0.43-0.95 m; the head: 1050 m at 60 m/s), never in the air, down low over
+  0.5, leaning, braced; it walks 7-11 m into it and 14 m with it in 10 s, never faster than 2.5 m/s; Earth's coast storm:
+  upright (under 0.2), no brace, unmoved.
+
+**1. Rounded crests: the law found, not shipped.**
+- *The law, measured on the body* (`s/crest.mjs`, the read and the crest law off, fixed paces, the Moon, 60 Hz): over a convex
+  arc of radius R that turns the slope by s1 + s2 the hips, turned no harder than g + grip, stay within the stroke G = 0.73 m
+  up to **v^2 = (g + grip) (R + 2 G / (s1 + s2)^2)** (P22's corner law is its R = 0). The clean limit (contact, no hold, no
+  brace) against the law x 0.92: brows of radius 2.5, 3 and 4 m turning 1.6, 1.2 and 1.0: **5.50 / 6.25 / 7.50 against 5.50 /
+  6.28 / 7.33 m/s**; a 43 / 10 degree rim rounded over 1 m: contact to 5.19 (law 4.92); 29 / 10 over 2 m: 7.90 (law 7.98).
+- *P22's reading of it:* the corner law read from the chords over a look either side. A brow wider than a look is read by its
+  chords (their corner is L / R): within about 10 % of the law on the crests a run meets (wide brows 3 % lenient: 5.65 against
+  5.50); a crest rounded within a look is read as its corner, too strict (43 / 10 rounded over 1 m: 3.42 against 4.53).
+- *At the boulderrun site the slowing is not the brows'.* Tallied step by step (`s/limits.mjs`), the slow headings (0, 180,
+  315: means 4.25, 4.88, 2.96 m/s) are held back by **knife edges**: a gentle rise of 6 to 14 degrees to a crater's inner wall
+  that falls more than a clamber in a look, where P22's law (gravity alone turning the hips from the climb and down the far side
+  at its steepest followable slope, k0 / (s1 + 1.125)) holds the run to 1.1-1.4 m/s for 2-3 s; and 0.45 m/s up the 60 degree
+  ridge in heading 315. The other headings (5.7-6.1) are what the climbs allow.
+- *Built and measured, not shipped:* (a) the hips' arc checked against the whole far side, the near slope at the crest from
+  the last half spacing (`work-v1-explorer.js`): brows within 2-6 % of the law, but over the 54 degree rim the near slope read
+  from the samples cut the corner and the run was held on top (5 holds, 0.73 m/s braced); and with the fall read from the
+  crest's own top, the ridge in heading 315 became a flight (feet 1.08-1.13 m off a 54 degree wall at 1.0 m/s): contact P22 had;
+  (b) P22's law kept, with an arc credit read from chords over a look and half a look, a fall from level ground read from its
+  own top, and its far side read whole (`dbg-explorer.js`): the site's means moved by 0.05 m/s at most. Neither is better in
+  every case, so neither is shipped (the block's rule: contact where P22 measured it, low risk).
+- *What PILOT asks, and what it costs* (PILOT's notes, For PHYSICS tenth, 5: "too heavy ... ease off by no more than about a
+  fifth (keep the pace at 4.5 m/s or more) and let the runner leave the ground"). The honest law at a knife edge is not to be
+  THROWN: the hips' rise v s1 turned within the fold by gravity, v <= sqrt(2 g legFold) / s1 x 0.92 (4.4 m/s at a 14 degree
+  rise on the Moon, 12 at 6 degrees), the far side being a fall (Decision 50: a flight off a crater wall is physics). The one
+  line (explorer.js wayCrest, the knife branch: `vc = sqrt(2 g legFold) crestMargin / s1` in place of `k0 / (s1 + clamber /
+  look)`), measured at the site (`t8-knife.txt`): **mean pace heading 0 4.25 -> 5.04, 180 4.88 -> 5.68, 315 2.96 -> 3.29 (no
+  boulders 3.17 -> 2.68)**, the others the same; **thrown up 0 in every heading**; flights off crater walls: heading 0 4.05 m
+  off a 53 degree wall falling 7.48 m (was 1.95 off 56 degrees falling 4.47), heading 180 2.22 m off a 55 degree wall falling
+  3.18 m (new: P22's 12 s ended at that edge; in Node over that edge's own profile, contact holds only below 2 m/s anyway).
+  PILOT's boulderrun counts both as "the ground fell away", not a boulder's. This block was told to keep contact where P22
+  measured it; heading 180's is lost. **A ruling, please.**
+
+**2. The hold on the descent off a small rim: the cause, not shipped.** (P22's strip site, `s/mb.mjs OLD=1`, the head on
+`ce7e69d`: 4.70 -> 1.98 m/s, as P22.) The rim's far side is a small crater's inner wall: 2.2 m deep at up to 54 degrees. The
+crest reading flickered from step to step among three answers: the corner law (3.4-4.1 m/s, its drop over a look 1.13 m),
+"a fall, not slowed for" (from evaluation points a half spacing past the top, whose height is lifted to the top's but whose
+look reaches a half spacing further down the wall: 1.37 m, past a clamber) and a knife edge at 1.4 m/s (the same points where a
+level approach's near slope read +0.04 and counted as a climb). Once the top was under the feet nothing held the pace: the run
+came over at 4.5-4.7 m/s, sped up onto the wall, and the hold checked it. Reading the fall from the crest's own top and not
+counting a near slope under 0.05 as a climb ends the flicker: the walker then reads the wall as the knife edge it is and
+crawls over at 1.0 m/s (no hold, no air), heavier than the hold's 2.0; the near-slope guard alone: the hold to 2.5 m/s. Both
+are the knife-edge question of item 1, so neither is shipped. The strip no longer starts there (item 5).
+
+**3. The Moon rows: not attempted.**
+
+**4. PC_TIMING: run.** The load fell to 7.97 once the strips were done (18:42); the whole physics suite under `PC_TIMING=1` on a
+clean export of `ce7e69d` with this block's files: **306 pass, every timing check ok** (load 8.3 at the start, 10.0 at the end:
+the suite's own). `physics.update` a frame (Node, stub surface): walking mean 0.756 ms (p95 0.834), the ship at 46 m/s 0.643
+(0.945), at 160 m/s 0.795 (1.193); the top tier in a gale through a tall wood 1.20 ms of CPU; the per-world loose frames: Earth
+1.25, Mars 1.10, the Moon 0.80, Venus 1.06, Neptune 1.42 (1871 particles; P20 1.45), Pluto 1.01, Mercury 0.72 ms; warm-up 24 ms;
+the sea map 0.036 ms a frame. All inside physics' 2 ms. The explorer step alone (`s/bench.mjs`, the field on the Moon at 7.4
+m/s, 60 Hz, best of three at load 10-12): **head 51.5 us, this block 56.9 us** (the same code on an airless world: the
+difference is the machine's), P22's 51-58: about 0.23 ms a frame at four substeps, inside the budget.
+
+**5. The strips** (`docs/shots/physics/motion-*.jpg` with `.json`). Filmed in the GAME (`gamefilm.mjs`) on a clean export
+of `ce7e69d` with this block's code (`filmtree3/`), one browser, by the game's own clock; all OPENED. 
+- `motion-game-gale-neptune` (new: Neptune storm_seas, the clock set to 222 and 15 s run, PAINTER 13's case; standing, no
+  keys). Seen: the explorer from behind at the waterline of a dark beach, facing an ultramarine storm sea under a torn grey
+  sky, basalt stacks and a great stack on the horizon; the figure stands in the same place in all 30 frames, a little lower in
+  the gusts (zoom `film3/gale-zoom.png`, frames 0, 9, 20 at twice the size: lower at 9, arms out). Numbers: the wind at 2 m
+  20-85 m/s, hunker 0.38-0.89, braced up to 648 N, leaning up to 48 degrees, **moved 0.00 m**, grounded, clamber 0 (the head:
+  blown 19 m and up the cliff). Verdict: it stands its ground through the squall, crouched; the crouch reads only as a slight
+  lowering from behind at this size (the art's fold).
+- `motion-game-moon-boulder` (the second densest field near the new crater_fields stand: a 0.68 m boulder, radius 1.06,
+  heading 89.14; 22 of 24 run-ups on level ground). Seen: the explorer runs away from the camera over a pale grey plain strewn
+  with rocks under an indigo, starry sky, striding from the first frame (frames 0-7: level, the legs working, no hop), past a
+  small rock at frames 8-10 (lower over it), the pale boulder under its feet at frames 15-17 (crouched over it), another rock at
+  22-24, then smaller on rising ground toward a crater rim. Numbers: **the run-up 6.28 -> 7.40 m/s on level ground (hips
+  within 3 mm of standing for 0.8 s)**, over the boulder 7.40 -> 7.26 m/s, hips -0.39 on it and +0.26 beyond, **feet 0.000 m,
+  thrown 0**, slowest within 3 m 6.12 (beyond it, toward the rim: 4.35 at the end). Verdict: the strip starts on level ground
+  (P22's started on a rim's crest, 0.15 m up for 8 steps); the boulder is run over at the pace.
+- `motion-game-moon-boulder-side` (the same, 0.45 m off the middle). Seen: the same plain and run, the boulder's flank at its
+  feet at frames 14-17, on past it. Numbers: 7.40 m/s over the flank, hips -0.31 then +0.22, feet 0.000 m, slowest within 3 m
+  6.82. Verdict: P17's off-path crossing at the pace.
+- `motion-game-float-earth` (Earth sea_coast at 8850 s, the stand's storm, floating 25 m out). Seen: the explorer's hat and
+  shoulders at the waterline in a grey-blue chop, a sandy headland on the right under a pale storm sky with a few flecks of
+  spray, the figure rising and sinking a hand's breadth. Numbers: Hs 0.57-0.58 m at the explorer, the drawn surface +0.14 ->
+  -0.115 m, the feet -1.10 -> -1.38 m with it (1.19-1.31 m under it: the body follows the drawn sea within 6 cm), no rain rings.
+  Verdict: it rides the sea; the arrival history (P22) changes nothing here (Earth's stand arrives at its storm's height).
+- `motion-game-grass-sub` (Earth spawn, 176 s, the storm, 30 frames a second). Seen: the darker storm meadow round the
+  standing explorer, orange and red leaves crossing the frame left to right within the 0.4 s, the grass strokes shifting a
+  little. Numbers: the wind at 0.5 m 3.5-9.2 m/s, at 2 m 6.4-10.6, gust 0.41-0.76; the bends (a, d) 13.2 -> 27.5, 22.8 ->
+  40.0; the grass either side of the figure changes 0.84 grey levels in a frame, 1.78 over the strip. Verdict: the meadow moves
+  under a second, gently; the leaves carry the gust.
+- `motion-game-grass-front` (Earth spawn, 146 s, the first storm's gust front). Seen: the bright meadow before the storm, the
+  explorer standing, one leaf fleck at frames 3-5, the strokes stirring. Numbers: the wind at 0.5 m 8.2 -> 4.5, at 2 m 10.3 ->
+  6.8 m/s, gust 0.77 -> 0.37; bends 24.0 -> 34.9 and 40.0 -> 48.0; the grass changes 0.93 grey levels in a frame, 2.42 over
+  the strip. Verdict: the front's gust is in the grass under a second.
+
 ## Hand-over P22 (twentieth PHYSICS agent; read this block first; P21 and older below hold for everything not named here)
 
 **Where things stand.** The block, in the order a player feels it: (1) the Moon boulder's hold over the top; (2) crests;
@@ -2228,10 +2388,11 @@ const env = physics.bindEnv(bodyId, env);   // adds env.air, env.ground, env.liq
 stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY)       // == physics.explorer.step
 //  st:  { p, v, grounded }  (PILOT's explorer state; st.phys is added on first use)
 //  cmd: { wish:{x,y,z} m/s horizontal, jump:bool, jet:0..1, jetMaxRise?: m/s, descentLimit?: m/s,
-//         airControl?: 0..1, assistAccel?: m/s2 }
+//         airControl?: 0..1, assistAccel?: m/s2, shelter01?: 0..1, windBrace?: bool (P23: false, no brace in a gale) }
 //  env: { sample(unitDir), gravity, air?(p,out,height), ground?(surface,out), liquid? }
 //  st.phys: { slip01, scramble01, sink, submerged01, windAccel, lean, support, impact, puff, material, friction,
-//             dust, jetThrottle, jetUse, speedGround }
+//             dust, jetThrottle, jetUse, speedGround, hunker01 (P23: 0 upright .. 1 down low in a gale; ride folds with it),
+//             windBrace (P23: N the suit braces against the wind with), ride, hip, gait, ... (see EXPLORER_BODY_STATE) }
 
 stepShipBody(st, cmd, dt, env, T = SHIP_BODY)               // == physics.ship.step   (flight: translation only)
 //  st:  { p, v, q }   cmd: { target:{x,y,z} m/s | null, tau: s, hover?: bool, boost?: bool, carve01?: 0..1,
@@ -2674,6 +2835,18 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+### P23, first (twenty-first PHYSICS agent)
+- **Nothing to wire.** In a gale whose push on the body passes half its weight (Neptune's squalls) the walker now gets low and
+  the suit braces against what the soles cannot hold (`phys.hunker01` 0..1, `phys.windBrace` N); `phys.ride` folds with
+  `hunker01`, so your figure crouches as it does after a landing. At the storm stand (your Sim, clock 222, 30 s): blown 41 m
+  and up the cliff -> 0.00 m. Your `windPace` and `windAirCap` are untouched; `cmd.windBrace = false` turns the brace off if you
+  ever want the old behaviour. The art's crouch stops at a 0.5 m fold; `hunker01` 1 is hands and knees, deeper, if you want it.
+- **Your feel verdict on the rims (too heavy):** answered in hand-over P23 item 1 with numbers. The slowing you felt in the
+  numbers is at knife edges (a gentle rise to a crater's inner wall), not at rounded brows; the change you ask for (a float off
+  the rim at 4.5 m/s or more, never thrown) is one line and measured (headings 0 / 180 / 315: 4.25 / 4.88 / 2.96 -> 5.04 / 5.68 /
+  3.29 m/s, thrown up 0, flights of 2-4 m off 53-55 degree walls). I was told to keep contact wherever P22 measured it, so it
+  waits on the coordinator's ruling.
 
 ### P22, first (twentieth PHYSICS agent)
 - **(1) List boulders out to 16 m** (`src/core/sim.js`, the ON_FOOT branch: `this.nearObstacles = this.obstaclesNear(this.bodyId,
@@ -3317,6 +3490,16 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P23, first (twenty-first PHYSICS agent): your item 6 answered
+- **The 141 m/s is real** (the gust model's squall at 2 m: a 60-75 m/s mean, sub-second eddies to two and a half times it;
+  not a spike after a clock set: the first frames after a set read 54-75 m/s). Your 14.3 m/s at 237 and 247 is not reproduced in
+  Node (47-87 m/s there); if you read `here.air` in the first frame or two after a teleport, the air grid may not have been
+  built yet. **The walker no longer goes anywhere**: it crouches and the suit braces (`f656310`); filmed in the game,
+  `motion-game-gale-neptune` (30 frames at the stand, the wind 20-85 m/s at 2 m, moved 0.00 m). Your storm frames there can be
+  taken at any time after the hold now.
+- Your Moon move: the boulder strips now run at the second densest field near the new crater_fields stand, from 12 m of level
+  ground (`motion-game-moon-boulder`).
 
 ### P22, first (twentieth PHYSICS agent): nothing to wire
 - The sea on arrival (`water.js` seaGrown): arriving at a coast before a squall's peak, the sea stands where the wind's last
@@ -4364,9 +4547,24 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     Decision 51's quick settling stays: it settles to that.
 63. **(P22) The close row's clean crossing stays** (a trial with no brace): allowances of 0.2 m/s a step and more were
     measured and none holds in every case (the coordinator's ruling); Earth's close row braces most with them.
+64. **(P23) No one is carried off by a wind.** Where the wind's own push on the body upright passes half its weight, the walker
+    gets low (less drag, the wind read nearer the ground, hands and knees on it, a crawl's pace), and the suit braces with its
+    thrusters against what the soles cannot hold beyond 60 % of their grip, the jet's 1700 N at most: a named force, on by
+    default like the float assist (a calm game with no fail state; `cmd.windBrace` false turns it off). A gust may stagger and
+    lean a walker; a 20 m/s wind on ice still blows one along (a fifth of its weight: no brace).
+65. **(P23) The gust model's 141 m/s at Neptune's stand is the squall as modelled** (a 60-75 m/s mean at 2 m, sigma/U about
+    0.4 in a storm's surface layer), not a fault; the body, not the wind, was what had to change.
+66. **(P23) The crest law stays P22's.** The body follows v^2 = (g + grip) (R + 2 G / turn^2) over a rounded crest (measured
+    within 5 %); P22's reading from the chords over a look is within about 10 % of it on the crests a run meets, and the slowing
+    at the boulderrun site is at knife edges, not brows. Recovering the pace there means letting the runner float off rims into
+    craters (PILOT's feel verdict), which this block's contact rule forbids: the coordinator's ruling (hand-over P23, item 1).
 
 
 ## Needs from the others
+
+**P23 (twenty-first agent), current needs.** From the coordinator: a ruling on the knife edges (hand-over P23, item 1, last
+paragraph): PILOT's "ease off by no more than a fifth and let the runner leave the ground" against this block's "keep contact
+wherever P22 measured it". From PILOT and PAINTER: nothing.
 
 **P22 (twentieth agent), current needs.** From PILOT: the boulder list out to 16 m (`sim.js`, "For PILOT", P22 (1)); the
 read-ahead cannot see a boulder at a lunar run without it. From PAINTER: nothing.
