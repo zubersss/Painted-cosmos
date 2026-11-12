@@ -187,11 +187,23 @@ export const GROUND = Object.freeze({
   snowSinkMax: 0.35,       // m: deepest a boot goes into deep snow
   mudStart: 0.55,          // wetness at which soil starts turning to mud
   frostStart: 0.3,         // wetness below freezing that glazes the ground with ice
+  // (P25) A forest floor's litter lies under its crowns; where the sky is open (a glade) the floor is a sward. The litter's
+  // share of a forest's level ground follows PAINTER's own canopy at the spot (the surface sample's canopy01, 0 in a glade),
+  // as PAINTER lays fallen leaves (src/world/nearground.js: none under 0.18, full from 0.8) over the grass it grows
+  // "wherever the canopy lets it". The spawn glade (canopy01 0.25) is then grass: its roots bind the soil and a step
+  // raises no puff (P17's KICK.stepDust), as drawn. Without canopy01 (a world that does not say) the floor is litter.
+  litterOpen: 0.18,        // canopy01 at and under which a forest floor is all sward
+  litterClosed: 0.80,      // canopy01 from which it is all litter
 });
 
 const NUM = ['muS', 'muK', 'wet', 'foothold', 'rest', 'sink', 'resist', 'repose', 'density', 'grain', 'dust', 'z0', 'imprint', 'mudding'];
 const _acc = {};
 const _w = { names: [], weights: [] };
+
+// (P25) level ground: a forest's litter only under its crowns (`litter`, 0..1, GROUND.litterOpen), a sward in the open
+function addLevel(name, w, litter) {
+  if (name === 'litter' && litter < 1) { addMat('litter', w * litter); addMat('grass', w * (1 - litter)); } else addMat(name, w);
+}
 
 function addMat(name, w) {
   if (w <= 0) return;
@@ -229,6 +241,8 @@ export function groundAt(bodyId, surface, state, out = {}) {
   const above = (surface.liquidRadius || 0) > 0 ? surface.radius - surface.liquidRadius : 1e9;
   const shore = liquid > 0 ? 0 : 1 - smoothstep(0.05, GROUND.shoreBand, above);
   let canopy = 0, canopyH = 0, moist = 0, fog = 0, dustSrc = 0, z0b = 0, snowBase = 0, dT = 0, wsum = 0;
+  // (P25) the share of a forest floor that is litter here: PAINTER's canopy at the spot (GROUND.litterOpen)
+  const litter = surface.canopy01 != null ? smoothstep(GROUND.litterOpen, GROUND.litterClosed, surface.canopy01) : 1;
   const bw = surface.biomeWeights;
   let any = false;
   if (bw) {
@@ -240,7 +254,7 @@ export function groundAt(bodyId, surface, state, out = {}) {
       wsum += w;
       canopy += b.canopy * w; canopyH += b.canopyH * b.canopy * w; moist += b.moist * w; fog += b.fog * w;
       dustSrc += b.dustSrc * w; z0b += b.z0 * w; snowBase += b.snowBase * w; dT += b.dT * w;
-      addMat(b.ground, w * (1 - steep) * (1 - shore));
+      addLevel(b.ground, w * (1 - steep) * (1 - shore), litter);
       addMat(b.steep, w * steep * (1 - shore));
       addMat(b.shore, w * shore);
     }
@@ -249,7 +263,7 @@ export function groundAt(bodyId, surface, state, out = {}) {
     const b = biomePhysics(bodyId, surface.biomeId);
     wsum = 1;
     canopy = b.canopy; canopyH = b.canopyH * b.canopy; moist = b.moist; fog = b.fog; dustSrc = b.dustSrc; z0b = b.z0; snowBase = b.snowBase; dT = b.dT;
-    addMat(b.ground, (1 - steep) * (1 - shore));
+    addLevel(b.ground, (1 - steep) * (1 - shore), litter);
     addMat(b.steep, steep * (1 - shore));
     addMat(b.shore, shore);
   }

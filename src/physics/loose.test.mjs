@@ -222,6 +222,50 @@ test('P17: a step on a living sward raises no puff (a run and landings on a dry 
   assert.ok(sand.born > 5, 'the sand smokes under the same run: ' + sand.born);
 });
 
+test('P25 the spawn glade is a sward, as drawn: a walk across it raises no puff; under the wood\'s closed canopy the litter still does', async () => {
+  // PILOT's review 6 and PHYSICS 23's play: a pale puff at the boot every few steps on the living meadow of Earth's spawn.
+  // The temperate forest's floor was litter everywhere (0.06 of loose fines, over P17's KICK.stepDust), and the spawn is a
+  // glade in it (PAINTER's canopy01 0.25 there): PAINTER draws a sward with flowers there and lays fallen leaves only under
+  // the crowns. Now a forest floor is litter as far as the crowns close over it (GROUND.litterOpen) and a sward in the open.
+  let real;
+  try { real = await import('../world/surface.js'); } catch (e) { console.log('# (skipped: src/world/surface.js did not load in Node: ' + e.message + ')'); return; }
+  const sampleSurface = (id, d) => real.sampleSurfacePure(id, d.x, d.y, d.z);
+  const sp = real.getSurface('earth').getSpawn(), d0 = norm(sp.unitDir || sp);
+  const ref = Math.abs(d0.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0);
+  const cr = (a, b) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+  const east = norm(cr(ref, d0)), north = cr(d0, east), R0 = BODIES.earth.radius;
+  const at = (e, n) => { const q = norm(V(d0.x + (east.x * e + north.x * n) / R0, d0.y + (east.y * e + north.y * n) / R0, d0.z + (east.z * e + north.z * n) / R0)); const r = sampleSurface('earth', q).radius; return V(q.x * r, q.y * r, q.z * r); };
+  // a walk at 4.2 m/s (the game's pace, the game's first minute: dry) from (e0, n0) metres along east, with a landing of 2.5 m/s each second; the dust born
+  const walkFrom = (e0, n0, seconds) => {
+    const physics = createPhysics({ sampleSurface }), P = physics.particles;
+    let t = 14, p = at(e0, n0), born = 0, last = 0, canopy = 0, k = 0;
+    const speed = 4.2, v = V(east.x * speed, east.y * speed, east.z * speed);
+    for (let i = 0; i < 60; i++) { t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus: p, sunDir: d0 }); }
+    for (let i = 0; i < Math.round(seconds * 60); i++) {
+      t += 1 / 60; k++;
+      p = V(p.x + v.x / 60, p.y + v.y / 60, p.z + v.z / 60); const r = sampleSurface('earth', p).radius, l = len(p); p = V(p.x * r / l, p.y * r / l, p.z * r / l);
+      canopy = Math.max(canopy, sampleSurface('earth', norm(p)).canopy01);
+      physics.update(1 / 60, { bodyId: 'earth', time: t, focus: p, sunDir: d0, disturbers: [{ kind: 'explorer', p, v, radius: 0.35, strength: 1, grounded: true, impact: k % 60 === 0 ? 2.5 : 0 }] });
+      const n = P.dust.count; if (n > last) born += n - last; last = n;
+    }
+    return { born, canopy, wet: physics.here.weather.wetness01 };
+  };
+  const glade = walkFrom(0, 0, 2.3);                 // 9.7 m east from the spawn: canopy01 0.25 to 0.30 all the way
+  const wood = walkFrom(0, 40, 3);                   // under the wood north of the glade: canopy01 1
+  console.log(`# P25 the spawn glade: ${glade.born} puffs in 2.3 s (head: 5), canopy01 up to ${glade.canopy.toFixed(2)}, wetness ${glade.wet.toFixed(2)}; the wood: ${wood.born} (canopy01 up to ${wood.canopy.toFixed(2)})`);
+  assert.ok(glade.wet < 0.05 && wood.wet < 0.05, 'dry ground (wetness ' + glade.wet + ', ' + wood.wet + ')');
+  assert.ok(glade.canopy < 0.35, 'the walk stays in the glade: canopy01 ' + glade.canopy);
+  assert.equal(glade.born, 0, 'puffs at the boot in the spawn glade: ' + glade.born);
+  assert.ok(wood.canopy > 0.9 && wood.born > 2, `under the closed wood the litter still puffs (P17): ${wood.born} (canopy01 ${wood.canopy})`);
+  // the ground as groundAt reports it: a sward in the glade, litter under the crowns, litter where a world gives no canopy01
+  const { groundAt } = await import('./ground.js');
+  const s0 = sampleSurface('earth', d0);
+  assert.equal(groundAt('earth', s0, null, {}).material, 'grass');
+  assert.ok(groundAt('earth', s0, null, {}).dust < 0.05);
+  assert.equal(groundAt('earth', { ...s0, canopy01: 0.95 }, null, {}).material, 'litter');
+  assert.equal(groundAt('earth', { ...s0, canopy01: undefined }, null, {}).material, 'litter');
+});
+
 test('wading throws spray and leaves rings; snow kicks up as powder', () => {
   const w = setup('earth', 'sea_coast', { sea: 0.4 }); run(w, 1); walk(w, 3, 2.5);
   const P = w.physics.particles;
