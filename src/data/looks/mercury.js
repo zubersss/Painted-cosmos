@@ -15,7 +15,7 @@ export default {
   },
   biomes: [
     B('ochre_basins', 'Cracked Ochre Basins', 'basin', ['yellowOchre', 'rawSienna', 'burntUmber', 'neutralTint', 'sepia'], 'cadOrange', ['yellowOchre', 'rawSienna', 'burntUmber'],
-      { t: { crack: 1.0, patch: [{ c: [0.93, 0.86, 0.68], wl: 13, thr: 0.05, soft: 0.3, amt: 0.5 }, { c: [0.60, 0.42, 0.34], wl: 43, thr: 0.0, soft: 0.4, amt: 0.4 }] }, under: { crust: [[0.95, 0.90, 0.76], [0.66, 0.48, 0.36], [0.88, 0.60, 0.40]], rock: [[0.86, 0.72, 0.54], [0.50, 0.37, 0.31]] }, near: { crust: 6, dab: 1 }, small: { rock: 0.022 }, phys: { ground: 'rock' } }),
+      { t: { crack: 1.0, patch: [{ c: [0.93, 0.86, 0.68], wl: 13, thr: 0.05, soft: 0.3, amt: 0.5 }, { c: [0.60, 0.42, 0.34], wl: 43, thr: 0.0, soft: 0.4, amt: 0.4 }] }, under: { crust: [[0.95, 0.90, 0.76], [0.66, 0.48, 0.36], [0.44, 0.34, 0.34]], rock: [[0.86, 0.72, 0.54], [0.50, 0.37, 0.31]] }, near: { crust: 6, dab: 3 }, small: { rock: 0.022 }, phys: { ground: 'rock' } }),
     B('obsidian_fields', 'Obsidian Glass Fields', 'flat', ['indigo', 'paynesGrey', 'neutralTint', 'cobaltViolet', 'sepia'], 'turquoise', ['paynesGrey', 'indigo', 'neutralTint'],
       { t: { amp: 14, crack: 0.5, dil: 0.0, patch: [{ c: [0.62, 0.60, 0.70], wl: 9, thr: 0.22, soft: 0.3, amt: 0.28 }, { c: [0.10, 0.10, 0.17], wl: 37, thr: -0.12, soft: 0.35, amt: 0.72 }] }, under: { rock: [[0.36, 0.35, 0.46], [0.14, 0.13, 0.21]], shard: [[0.44, 0.44, 0.58], [0.15, 0.15, 0.25]],
           // plates of glass that mirror the sky, the black glass itself, ash drifted between, a turquoise seam
