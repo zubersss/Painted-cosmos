@@ -133,6 +133,8 @@ Body by body, judged against the art bible and the freeze-frame test:
 10. **Uranus' arrival** (PAINTER): one value range and a confetti of white splinters (ARTPASS wish 11).
 11. **The Moon** (PAINTER 13, the coordinator's ruling): the arrival faces away from Earth.
 12. **Jupiter's islands and Neptune's stacks** (PAINTER, ARTPASS wish 8): extruded blocks.
+13. **Uranus' Frozen-Wave Forest II vista** (PAINTER; the tier-1 coverage, section 3b): a frozen wave
+    at the lens, a flat dark polygon over two thirds of the frame. Ranks with Pluto's arrival.
 
 **Passing**: the spawns of Earth, Mars, the Moon, Venus, Jupiter, Saturn, Uranus and Neptune (8 of 10)
 and every vista but Saturn's walled one and Neptune's (framing fixed; the stacks remain); the
@@ -143,8 +145,26 @@ from orbit, and Mercury shows a terminator.
 
 ### 3b. The tier-1 coverage tour (every biome and vista of every body, quality 1)
 
-Running when this review was committed (started 17:38 on the same tree, in four processes of two or
-three bodies each: about 13 frames a body); the results follow in an addendum to this section.
+`node tests/tour.mjs --quality 1` on the same tree: every biome from its easel (first person) and every
+vista (third person); Earth, Mercury and Venus at 960x540 with the orbit, the other seven at 640x360
+without it (the top-tier tour has the orbits; a 960x540 frame took 2.7 minutes). **107 frames, every
+one settled (26 to 47 game frames), no console error, every vista counted as found where it was
+stood on; one flag: Venus' lava_rivers stand moved 8 m to dry ground.** Sheets
+`docs/lead/evidence/tour-<body>.jpg` and `.json` (all ten opened). **The landform of every biome is
+in its frame (42 of 42), with four partly**: the Moon's rilles (no frame sees a rille), Neptune's
+aurora tundra (no aurora: the sky has none), Earth's misty wetland (a clear blue sky over it),
+Uranus' frozen waves (read as snowy humps along their crests): all four are on ARTPASS's weakest list.
+Earth hangs in the Moon's sky in two of its vistas (Silver Mare II, Winding Rilles II).
+New worst frames from it (owners):
+- **Uranus' Frozen-Wave Forest II vista** (PAINTER; worst of the run): a flat dark-blue polygon with a
+  ruler-straight edge fills two thirds of the frame: a frozen wave at the lens. The camera keeps clear
+  only of what `sampleObstacles` lists, at the radius it lists (a trunk's): give the wave a footprint
+  the size of its body there (or keep vista stands clear of waves) and PILOT's boom will stay out.
+- **Saturn's Crystal Reed Fields II vista** (PAINTER): a blue reed blade walls the right third.
+- **Neptune's Ultramarine Storm Seas vista**, again only the hat at the bottom (PILOT's camera, fixed
+  since in `a46b6ee`).
+- The Moon's and Pluto's easel frames have the ship in the painter's view (the tour parks it 16 m off
+  every stand: an artefact of the instrument, not of play).
 
 ### 4. The picture in motion and the weather (`node tests/motion.mjs`, `node tests/weather.mjs`, top tier)
 
@@ -329,8 +349,11 @@ unless said):
 8. **Venus' arrival**: the lava a flat orange band with no light or stroke; a muddy ground.
 9. **Uranus' arrival**: one value range; a confetti of white splinters (ARTPASS wish 11).
 10. **Extruded islands and stacks**: Jupiter's cliffs, Neptune's basalt stacks (ARTPASS wish 8).
-11. **The Moon facing Earth**: PAINTER 13 by the coordinator's ruling (the Moon is tidally locked);
-    PILOT reruns the tests that depend on its sites when that lands.
+11. **The Moon facing Earth**: done by PAINTER 13 (`7a51d42`); PILOT's ephemeris kept the lock at a
+    set hour since (`ce7e69d`).
+12. **A frozen wave at the lens** (Uranus' Frozen-Wave Forest II vista) and a reed blade walling
+    Saturn's Crystal Reed Fields II: list the wave (and tall blades) in `sampleObstacles` with a
+    footprint the size of its body, or keep vista stands clear of them (section 3b).
 
 **PHYSICS**: one question from the walk (section 4): a pale boot puff appears at the foot on Earth's
 living spawn meadow (`motion-walk.jpg`, frames 21 to 23), where P17's `KICK.stepDust` was to give
