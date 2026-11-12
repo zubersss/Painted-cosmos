@@ -403,3 +403,22 @@ test('the suit\'s share of the wind: a little of it in the pace on the ground, m
   assert.ok(Math.abs(gale.shelter01 - (1 - (EXPLORER.windAirCap / 40) ** 2)) < 1e-9, `40 m/s in the air: shelter ${gale.shelter01.toFixed(3)}`);
   assert.ok(gale.shelter01 > 0.85 && gale.shelter01 < 1);
 });
+
+test('a rise at the explorer\'s back lifts the third-person camera, and the explorer stays in the frame', () => {
+  // Review 6 (second half): under a rise the lifted camera kept aiming 9 m ahead and showed only the
+  // top of the hat (Neptune's storm_seas vista). Before the fix a 25 m bank put the feet 1.35 half-heights
+  // from the middle of the view (out of the frame).
+  const R = 4000, feetDir = norm({ x: 0, y: 0, z: 1 }), f = { x: 1, y: 0, z: 0 };
+  for (const hill of [null, { h: 12, at: 9, r: 7 }, { h: 25, at: 10, r: 9 }]) {
+    const world = makeWorld({ R, hill: hill ? { dir: norm({ x: -hill.at / R, y: 0, z: 1 }), radius: hill.r, height: hill.h } : null });
+    const feet = scale(feetDir, world(feetDir).radius);
+    const cam = createFootCamera(f, feetDir);
+    let pose; for (let i = 0; i < 120; i++) pose = updateFootCamera(cam, feet, 1 / 30, world);
+    const look = qRotate(pose.q, { x: 0, y: 0, z: -1 }), toF = norm(sub(feet, pose.p));
+    const k = Math.acos(Math.min(1, dot(look, toF))) / ((CAMERA.fovFoot * Math.PI) / 360);
+    if (hill) assert.ok(cam.lift > 3, `the boom lifts over the rise (${cam.lift.toFixed(2)} m)`);
+    assert.ok(k < 0.9, `${hill ? hill.h + ' m rise' : 'level'}: the feet ${k.toFixed(2)} of the half-height from the middle`);
+    if (!hill) assert.ok(k > 0.6, 'level ground: the explorer in the lower third as before');
+    assert.ok(len(sub(pose.p, feet)) > 2, 'the camera is not in the explorer');
+  }
+});

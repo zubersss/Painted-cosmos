@@ -5,7 +5,7 @@
 // is tested against sampleSurface along its length and the camera is lifted over terrain first,
 // and only pulled in when lifting is not enough.
 import {
-  V, add, sub, scale, addScaled, len, norm, tangent, rotateAround,
+  V, add, sub, scale, addScaled, len, norm, tangent, rotateAround, cross,
   clamp, mix, damp, qLook, qSlerp, qRotate, lerp,
 } from '../core/vec.js';
 
@@ -23,6 +23,7 @@ export const CAMERA = Object.freeze({
   boomTight: 2.3,            // a boom squeezed shorter than this starts to slide into the eyes
   boomEye: 1.3,              // ...and at this length the view is the explorer's own (a thicket)
   firstPersonClearance: 0.25,
+  feetInFrame: 0.85,         // of the half-height: the lowest the feet may sit in a third-person view
   shipBoom: 15,              // metres behind the ship
   shipBoomFast: 21,
   shipHeight: 3.6,           // metres above the ship
@@ -128,6 +129,17 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = 
   // Aim at a point ahead of the pivot so the explorer stays in the lower third of the frame.
   const aim = add(pivot, scale(look, 9));
   let dir = norm(sub(aim, p), look);
+  // However high the boom had to lift (a rise at the explorer's back), the explorer stays in the
+  // frame: the feet no further from the middle of the view than C.feetInFrame of its half-height
+  // (on level ground they sit at about 0.7 of it and nothing changes). Review 6: at a stand under a
+  // rise the lifted camera kept aiming 9 m ahead and showed only the top of the hat.
+  const toFeet = norm(sub(addScaled(feet, up, 0.05), p), dir);
+  const off = Math.acos(clamp(dir.x * toFeet.x + dir.y * toFeet.y + dir.z * toFeet.z, -1, 1));
+  const most = (C.fovFoot * Math.PI) / 360 * C.feetInFrame;
+  if (off > most) {
+    const ax = norm(cross(dir, toFeet), up);
+    dir = rotateAround(dir, ax, off - most);
+  }
 
   // A thicket (trunks, crystals, a hull at the explorer's back): a boom squeezed to a metre or
   // two frames the back of a head and nothing else. Rather than that, the view slides forward
