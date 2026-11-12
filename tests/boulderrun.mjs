@@ -124,8 +124,11 @@ try {
   summary.worstThrow = Math.max(0, ...summary.headings.map((h) => h.thrownUp));
   summary.pace = +(summary.headings.reduce((s, h) => s + h.pace, 0) / summary.headings.length).toFixed(2);
   const lim = Number(opt.limit);
-  const byBoulder = all.filter((a) => a.feetUp > lim && a.boulder && a.boulder.gap < 1.5);
-  const offEdge = all.filter((a) => a.feetUp > lim && a.rise <= lim && !(a.boulder && a.boulder.gap < 1.5));
+  // A flight is a boulder's only where the ground did not fall away by more than that boulder's
+  // height plus the limit: a run off a 37 to 44 degree crater wall near a boulder is the wall's
+  // (the coordinator's ruling, 2026-11-12; PHYSICS P20's two lines, Decision 50).
+  const byBoulder = all.filter((a) => a.feetUp > lim && a.boulder && a.boulder.gap < 1.5 && -a.groundLowest < a.boulder.height + lim);
+  const offEdge = all.filter((a) => a.feetUp > lim && a.rise <= lim && !byBoulder.includes(a));
   check(summary.worstThrow <= lim, `a run never throws the body more than ${lim} m above where the feet left the ground (largest ${summary.worstThrow} m)`);
   check(byBoulder.length === 0, `no boulder lifts the feet more than ${lim} m off the ground` + (byBoulder.length ? ': ' + byBoulder.map((a) => `heading ${a.heading} at ${a.t0} s, ${a.feetUp} m, boulder ${a.boulder.height} m tall`).join('; ') : ''));
   summary.offAnEdge = offEdge.map((a) => ({ heading: a.heading, t0: a.t0, seconds: a.seconds, feetUp: a.feetUp, groundFell: -a.groundLowest, speed: a.speed, slopeDeg: a.slopeDeg }));
