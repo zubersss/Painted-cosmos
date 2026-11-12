@@ -334,7 +334,8 @@ class Ring {
     for (let q = cnt(st.reed * this.reedy, 120); q > 0; q--) others.push(1);
     for (let q = cnt(st.needle * 1.6 * this.needly, 121); q > 0; q--) others.push(2);
     for (let q = cnt(st.ripple * 1.3, 122); q > 0; q--) others.push(4);
-    for (let q = cnt(st.dab * 1.2 * this.stony, 123) + (st.blade > 0 && this.meadow < 0.55 ? 1 : 0); q > 0; q--) others.push(3);
+    // (a pebble where the sward is thin, except between reed beds: there the mud is bare, and the pebbles stood on it as dots)
+    for (let q = cnt(st.dab * 1.2 * this.stony, 123) + (st.blade > 0 && this.meadow < 0.55 && !(st.reed > 0 && this.reedy < 0.6) ? 1 : 0); q > 0; q--) others.push(3);
     for (let q = cnt(st.crust * 2.2 * this.crusty, 124); q > 0; q--) others.push(5);
     // Grass grows in tufts, not in rows: a cell has one tuft, or two, or (one in six) none; a
     // tuft is a handful of flicks from nearly one root, fanned, one or two of them long. Tufts

@@ -6,6 +6,41 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
+Written by the fourteenth PAINTER agent (the finishing block before M4: the first ten minutes, every arrival and every
+world from orbit, item 6, the ARTPASS weakest list, PAINTER 13's "Still weak"). PAINTER 13's handover is kept below it
+("Handover of the headlands, the Moon and Neptune's storm coast"); its rules hold.
+
+- **Where things stand**: see "PAINTER 14" below for every change, its frames (all opened) and the verdict. In short:
+  the first ten minutes were filmed on Earth beat by beat (`p14-first10`) and pass as paintings; all ten arrivals and
+  all ten worlds from orbit were shot on one clean tree (`p14-arrivals`, `p14-orbits`): Pluto's and Mercury's arrivals no
+  longer stand in fields of stones, Mars from orbit is a rust world with a dark marking and a cap, Mercury no longer a
+  dark disc in a bright rim; Uranus' frozen waves curl instead of standing as snow peaks; Saturn's walled vista is open;
+  the Moon's rilles stand sees its rille; misty_wetland's reeds stand in beds. temperate_forest got paper on its birches'
+  sunlit sides and paler depths, but is still the lowest-key daylight frame (see Still weak 1).
+- **Next, in this order**: the M4 critique swap. Then, from "Still weak" below: (1) the forest's key (open the canopy);
+  (2) Pluto's long shadows; (3) the islands' boxy tables (Saturn, Jupiter); (4) Neptune's stacks under a storm.
+- **How to work here**: scratch `/home/user/.pc-scratch/painter/m14/`. `mkexp.sh <name>` (a clean export of the head with
+  my changed painter files over it); `v14.mjs <export> <prefix> <steps.json>` (v13 plus `orbit: true` (the tour's orbit
+  framing over the spawn, `rings: <outer>` for a ringed world) and `ship: true, altitude, pitchDeg` on a `dir` step);
+  `s1.json` .. `s4.json` (the step lists I ran), `pair.py`, `pairs.sh` (s1 | s2 by name), `grid.py` (a labelled sheet),
+  `lstat.py` (L* percentiles and paper share of a frame), Node tools in `tools/`: `farmap.mjs` (the far colour of the
+  hemisphere under the orbit camera, no light), `reedmap.mjs` + `reedplot.py` (undergrowth plan round a place),
+  `treesnear.mjs` (trees and stones round a place in a view's frame: fwd/right), `prof.mjs` (heights and wash along a
+  view), `scan.mjs`, `rillestand.mjs` (places that see the rille's bed toward Earth), `canopy.mjs`, `reg.mjs` +
+  `three-hook.mjs` (`node --import tools/reg.mjs` loads the three-based modules in Node: a quick check that a module
+  still loads before a browser run).
+- **Rules that bit me**: (1) **PILOT's `grandtour.mjs --beats 1` at the top tier is too slow here**: with two other
+  browsers the game made a frame every 60 to 80 s right after the title (busy building), so three beats took 9 minutes
+  and the walk to the ship would have taken an hour; I stopped it and filmed the rest with `v14.mjs` (hold + keys for the
+  walk and the jetpack, ship teleports for the climb). (2) **The tour's teleports park the ship next to you**: a terrain
+  change moves the berth, and the ship then stands in a frame it was not in (Mars' dunes, Saturn's vista): judge the land,
+  not the ship. (3) **The near layer is what the eye reads in a near frame**: the misty wetland's "comb" was the near
+  ring's grass flicks and reed stubble (nearground.js), not the flora reeds; changing floraplace alone changed nothing
+  visible. (4) The coordinator's snapshots swept my working files into the head three times (c8b8309, 45c5176, 8809fff):
+  name them in your commit.
+
+## Handover of the headlands, the Moon and Neptune's storm coast (thirteenth PAINTER agent; kept)
+
 Written by the thirteenth PAINTER agent (the headland regression, the Moon facing Earth, Neptune's storm coast, the
 things never seen in a frame, item 5). The twelfth agent's handover is kept below it ("Handover of the coasts and the
 art pass's causes"); its rules hold.
@@ -43,6 +78,160 @@ art pass's causes"); its rules hold.
   2.1-2.5 mm/h at t = 1600-1620 s). (3) Neptune's stand in its squall throws the explorer about within seconds: shoot
   the gale with a short hold. (4) The coordinator's snapshots sweep working files into the head every few minutes:
   name them in your own commit.
+
+## PAINTER 14: the first ten minutes, every arrival and every world from orbit, item 6, the weakest list (fourteenth PAINTER agent)
+
+Every frame was taken on a clean export of the head with my files over it (SwiftShader, one browser of mine at a time,
+960 x 540, the top tier, hour 10 unless said) and opened at full size; sheets in `docs/shots/painter/p14-*.jpg`. Every
+run: 36 programs, none with a link log, no console error or warning, `info().fallback` empty.
+
+### 1. The first ten minutes (`p14-first10`)
+- Filmed as a new player meets them: PILOT's `grandtour.mjs --beats 1` (top tier) for the title, the card lifting and the
+  first view (Rules 1: then stopped), `v14.mjs` for the rest: the arrival at the spawn in the game's own framing, the walk
+  (W held 1.5 and 3 s), the jetpack (Space held 0.75 and 1.5 s), the ship over the spawn at 30, 250 and 650 m and in space
+  at 1500 m, and the stream vista.
+- Verdict, frame by frame: the title card over the painting, the first view (meadow, birches, the stream on the left, the
+  ship among the trees), the walk into the wood, the jetpack among the crowns and pines, the canopy from 30 m, the land
+  falling away at 250 m (forest dabs, a canyon's pink buttes on the skyline), the curve of the world at 650 m and Earth
+  from space under deep indigo washes: each reads as a watercolour. The weakest: the 650 m frame, whose sky is one heavy
+  granulated grey-violet slab, and the jetpack frame at 0.75 s, where the camera rises through a pale crown (the window
+  round the figure keeps it in view). Nothing there failed outright, so nothing was changed for them.
+- **temperate_forest's paper light** (the stand, first person): (a) `earth.js` mist 0.95 -> 0.72: the wood's depths and
+  the sky over it paler (also the spawn's far wood on the left); (b) `materials.js` terrain: a patch of sun on a wood's
+  floor (canopy over 0.55: only Earth's forests) is laid thinner and its heart, the same dapple read at a higher threshold,
+  nearly to paper; (c) bark: a pale trunk keeps its sunlit side under the canopy's shade (the leaf shadow took it whole);
+  (d) foliage: in a wood (canopy over 0.6 at the crown's foot) the sunlit outside of a crown may reach the lit step (it was
+  capped a step below); (e) water: a sun glint within about 20 m is written as a crisp mark (region 6) the brush leaves as
+  drawn (laid into the brush's average, the stream's paper glints came out grey). Measured on the stand (L*, the frame
+  inside its border): head p1 30.2, median 54.3, p99 76.1, paper (L* >= 90) 0.00 %; after p1 33.9, median 56.2, p99 78.9,
+  paper 0.01 %; the brightest birch pixels L* 89 (`p14-forest`). (d) measured nothing (p99 79.0: the crowns' washes never
+  reach the cap under the canopy's dapple) and (e) drew the glints as one- and two-pixel white specks on the stream, not
+  dashes (the glint pattern is finer than the brush at stand distance): both reverted. Kept: (a), (b), (c). The mixed-age
+  birches are untouched (no tree data changed). The frame is still the lowest-key daylight frame (Still weak 1).
+- First tries with no visible change, reverted or folded into the above: the flecks' hearts alone (too rare to show);
+  lighter touches inside near crowns over the eye (the autumn wood's near crowns stayed one sienna mass: the shade under
+  a glaze is one deep wash whatever the light; reverted).
+
+### 2. Every arrival and every world from orbit (`p14-arrivals`, `p14-orbits`)
+All ten spawns (third person, as a player arrives) and all ten from the tour's orbit framing, on one clean tree. All pass
+as paintings in my judgement. Changes:
+- **Stones round a first landing** (`floraplace.js`): besides none within 6 m (PAINTER 12), fewer out to 22 m (a stone
+  between 6 and 22 m from a clearing is kept with a chance rising from 0 to 1): Pluto's spawn 37 stones within 20 m -> 16,
+  Mercury's 10 -> 2, Mars' 11 -> 7, Uranus' 9 -> 8. Pluto's and Mercury's arrivals (the two review 6b failed on fields of
+  lozenges) now stand on open ground: last row of `p14-arrivals`.
+- **Mars from orbit** (`surface.js` `t.farC`, a biome's far wash: `[r, g, b, amount]` mixed into what it reads as from far
+  away; `mars.js` dry_riverbeds a dark sepia-rust marking, dust_dunes orange ochre, rust_canyons burnt sienna; `limb` 0.64
+  -> 0.32): a pale peach disc with cream swirls -> a rust world with a dark marking over the spawn's side and the white
+  cap. It shows beyond 120 to 420 m, so on the ground only on far hills (Mars' horizon is about 110 m off).
+- **Mercury from orbit** (item 6; `mercury.js` obsidian_fields `farC` a mid violet-grey): the dark disc in a bright rim
+  (the obsidian under the camera) is a cratered grey-violet globe with its ochre basins; the obsidian stand's darkest
+  ground no longer lies at its skyline for the same reason.
+- **Neptune from orbit** (`neptune.js` deck streaks 0.9 -> 0.4): the high white streaks curved round the globe as bright
+  arcs, reflections on a glass ball; now a few soft white blots on the blue.
+- Seen, not changed: Earth's clouds from orbit are hard-edged white blots; Uranus' arrival is one pale value range;
+  Venus' arrival stands on a dark brown plain (a thinner wash, `dil` 0.14 -> 0.22, made no visible difference: reverted);
+  Mars' near shrubs break into specks at their edges; Neptune's arrival under its new season is a daylit blue meadow
+  with violet kelp (it was a lilac twilight).
+
+### 3. Item 6
+- **The brush**: its radius is a fraction of the picture's height (`uBrush` near 0.0036, far 0.0085 of the internal height),
+  so at the top tier (internal = output) the strokes keep their size on the sheet at any output size; nothing was changed,
+  and no 1920 x 1080 frame was taken (the machine's cost). "A finer brush at full resolution" (block 4) was never written
+  down further; if the critique asks for finer near detail at 1080p, lower `ub.x` there.
+- **The two walled vistas**: Saturn's "Pale Gold Sky-Islands" (a trunk a metre from the lens over the left fifth, a crown
+  into the top right): an easel may now ask for room round it, a sixth number in metres (`easels.js`, `surface.js`
+  clearings; additive); gold_islands asks for 5 m: the two trees go, the framing tree 7 m ahead stays (`p14-item4`). The
+  other wall (PILOT's review 4 "two vistas have a wall a metre in front of the easel") is not named anywhere I could find
+  and the tour frames only each world's first vista; the same sixth number fixes any other in one line.
+- **Mercury from orbit**: above (2).
+- **Mars' dune crests**: a finer meander (a third of a dune's length) was tried: the crest bent a little and the parked
+  ship moved into the frame; no clear gain, reverted. The crest in the dust_dunes stand reads as a dune crest with the
+  pale drags of blown sand across it.
+
+### 4. The ARTPASS weakest list
+- **misty_wetland's reeds as an even comb** (`nearground.js`, `floraplace.js`, `earth.js`): the comb was the near ring's
+  grass flicks and reed stubble (Rules 3). Reeds and sedge now stand in beds (a field 6 m across, `reedy`), the mud
+  between them nearly bare and without the pebble that stood on it as a dot; the far flora reeds in beds too (533 -> 208
+  within 40 m of the stand, in clumps); the beds' feet a deeper olive (the frame's dark). A first, narrower field left the
+  bank bare and stony (`p14-wetland`, middle); kept (right): a reed bed with a ragged edge on the right, the open bank in
+  front with its shore stones, the water beyond: no longer one comb, though the shore stones read as a cluster of dots.
+- **uranus/frozen_waves reading as peaks** (`florakit.js` waveGeometry, `flora.js` FAR_DIMS): a wave's crest stays nearly
+  level and drops only in its last eighth, and the far form (beyond about 190 m) is a long low ridge [11, 6, 0.12] instead
+  of a cone [8, 7.5, 0.5]: the middle distance is a row of level crests with dark hollows under their lips, the big wave
+  curls (`p14-item4`, row 1). The ship still fills the stand's foreground (its berth).
+- **saturn/gold_islands' flat gold and boxy table** (`saturn.js`): the gold a little more dilute (0.42 -> 0.48) and broken
+  near the eye by small raw-sienna touches, the tables' walls banded more strongly (strata 0.4 -> 0.75): the wall reads in
+  bands; the gold is still one warm value field. The table's shape is the islands recipe (Still weak 3).
+- **pluto/long_shadow_plain with no long shadows**: not changed. Nothing in the frame casts onto the ground but the
+  explorer and the ship; a shadow needs either a ground glaze per tall instance laid away from the sun (a GLAZES mesh, a
+  new program: not in a finishing block) or a strip in the spire kit's vertex stage, which cannot follow 60 m rolling
+  ground. Still weak 2.
+- **crystal_reeds and pearl_fog, one narrow value range each**: crystal_reeds has a davy's-grey violet gravel patch
+  between the reeds (`saturn.js`), its one dark beside the crystals' indigo edges (`p14-item4`). pearl_fog: darker stones
+  were tried as its dark; the boulders stayed mid-grey in the fog and the pebbles became a trail of dark dots: reverted;
+  kept only fewer pebble dabs (`near.dab` 1, the cross-verifier's follow-up).
+
+### 5. PAINTER 13's "Still weak"
+- **The stack's values under the storm key** (`surface.js` `_stacks`, coast): the treads of the ledges are laid lighter
+  (`_stT`, into the coast's `crown` wash): in the squall the stack shows a lighter band at its lower ledge and lighter
+  shoulders (`p14-item4`, last row, at 0.34; kept at 0.5). Still a narrow range.
+- **The rille as a pale dip**: two causes. The bed took the plain's palest wash (`surface.js` riverbed: a biome may give its
+  bed its own wash, `t.bedC`; the Moon's rilles a Payne's grey [0.36, 0.37, 0.45]); and the stand's rille lay 60 m north,
+  out of a frame looking east at Earth (scratch `scan.mjs`). The stand and easel moved 126 m to the rille's edge
+  (`easels.js` STANDS/EASELS `moon.rilles` [0.202942, 0.190753, -0.960431], yaw 96, pitch -3 / -2): Earth 15 degrees up
+  over the rille, its bed 20 to 40 m off, 12 degrees below the eye (`rillestand.mjs`; `p14-moon-rilles`). In the frame the rille is a valley
+  between two banks with a darker floor; still not a dark cut (the lit step and the airless haze lift it).
+- **The near autumn crown as one flat mass**: two tries, neither moved it (lighter touches inside the near shade; the
+  crowns' cap raised in a wood, (d) above): both reverted. Still weak 5.
+- **Earth's sparse white horses**: not changed (Earth's stand storm is Hs 0.5 m, 4.9 % white by PHYSICS; the frame at
+  PAINTER 13's change showed a few dashes; with no new frame I made no change).
+
+### Final checks (fourteenth PAINTER agent)
+On a clean export of `8809fff` (the head, which holds the coordinator's snapshots of my files) with my remaining files
+over it (scratch `c5`): `node --test src/world/*.test.mjs` 19/19, `node --test tests/*.test.mjs` 151/151, `node --test
+src/physics/` 307/307; every module of the world, the renderer and the art loads alone in Node; `node src/physics/coast.mjs`
+PASS at both stands (Earth sea_coast 80 m out: fetch 2145 m, mean depth 18.4 m, Hs 0.53 m, white 4.88 %; Neptune
+storm_seas: fetch 2206 m, mean depth 33.2 m, Hs 3.69 m, white 12.2 %). Browser runs (s1 to s6, about 70 frames): 36
+programs in every run, none with a link log, no console error or warning, `info().fallback` empty. FINAL_S6
+
+### For PILOT (fourteenth PAINTER agent)
+1. **The Moon's rilles stand and easel moved** (`src/art/easels.js`, the same place for both): [0.202942, 0.190753,
+   -0.960431], STANDS yaw 96 pitch -3, EASELS yaw 96 pitch -2 (126 m from the old one, on the rille's edge, Earth 14.7
+   degrees up at azimuth 93, slope about 10 degrees by my four-point check). `node --test src/world/*.test.mjs` passes
+   (every easel and stand on dry, gentle ground of its biome); your `tests/contract.test.mjs` passed on the export
+   (unit 150). Your tour, `boulderrun.mjs` (crater_fields, unchanged) and the weather set find it by `findBiome`.
+2. **An easel may carry a sixth number: metres of room** (additive; `getVistasPure` and `findBiome` read the first five as
+   before). Only Saturn's gold_islands has one (5): two trees near that vista are gone, so `sampleObstacles` there lists
+   two trunks fewer.
+3. **Fewer stones round every first landing** out to 22 m (`floraplace.js`, shared with `obstacles.js`, so collision
+   matches the drawing): the arrivals' obstacle lists are shorter (Pluto's spawn 37 -> 16 within 20 m). Your
+   `clearArrival` should move nothing new; it never had to move more than 5 m.
+4. **The beats at the top tier**: on this machine `grandtour.mjs --beats 1 --query quality=2` makes a frame every 60 to 80 s
+   just after the title, so the opening alone takes most of an hour; an option to hold the game and `step(0.25, n)` between
+   beats (as `v14.mjs` does) would let a top-tier run reach space in reasonable time. Yours to decide.
+5. Seen in the frames, yours: the tour's teleports park the ship beside the explorer, so a stand's frame often has the
+   ship in its foreground (Uranus' frozen_waves, Saturn's gold_islands, Mars' dust_dunes): the player who flew there sees
+   their own ship where they landed, so nothing to fix unless you want the tour to park it out of view.
+
+### For PHYSICS (fourteenth PAINTER agent)
+1. Colour only, nothing for you to change: the stacks' ledge treads are lighter (`surface.js`, no height moved; coast.mjs
+   PASS at both stands); the Moon's rille beds are darker (`t.bedC`, no height moved).
+2. The Moon's rilles stand moved (For PILOT 1); your `gamefilm.mjs` Moon subjects use crater_fields (unchanged).
+3. Stones round first landings thinned out to 22 m (`floraplace.js`): fewer boulders in the arrival's obstacle list.
+
+### Still weak, ranked by what a new player would notice first
+1. **temperate_forest is still low-key** (the stand: median L* 56, p99 79 after this block; paper only on the birches'
+   sunlit sides and the patches of sun): the canopy closes the sky at the top and the crowns are middle values. The next
+   lever is the canopy itself: honour `tallD` for forest terrain (floraplace.js placeTrees, opt-in per biome) or a broadleaf
+   scale under 1.25, then look at the spawn again (it is in the same biome).
+2. **Pluto's long_shadow_plain has no long shadows** (see 4).
+3. **Saturn's and Jupiter's island tables** are extruded blocks with level tops (the islands recipe); a ledge and a broken
+   rim would change both arrivals' biomes, so it needs its own frames on both worlds and the spawn and easel tests.
+4. **Uranus' arrival is one pale value range**; **Venus' arrival stands on a dark brown plain**; **Mars' near shrubs**
+   break into specks at their edges; **Earth's clouds from orbit** are hard-edged white blots.
+5. **Neptune's stacks under a storm** still move little in value; **the rille** is a valley, not yet a dark cut; **the
+   autumn near crowns** one sienna mass each.
+6. **pearl_fog** and **crystal_reeds** stay narrow in value (pearl fog is its idea); **Earth's white horses** sparse.
 
 ## PAINTER 13: the headland regression, the Moon facing Earth, Neptune's storm coast, item 4 and item 5 (thirteenth PAINTER agent)
 

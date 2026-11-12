@@ -566,10 +566,6 @@ void main() {
     farWhite = farSea * wh * smoothstep(0.008, 0.05, sea.w) * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
-  // (PAINTER 14: a sun glint near the eye is written as a crisp mark (region 6), which the brush leaves as it was drawn:
-  // laid into the brush's average with the water round it, the stream's bare-paper glints came out as grey dashes, and the
-  // reference forest had no paper anywhere)
-  float gSun = glint * (1.0 - smoothstep(16.0, 26.0, dist));
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
@@ -578,7 +574,7 @@ void main() {
   // (and what glows is seen through the haze: lava keeps its fire into the distance)
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
   c = pcAtmosV(c, f, vView);
-  pcWrite(c, mix(mix(0.7, 0.22, max(white, gSun)), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, gSun > 0.5 ? 6.0 : 2.0);
+  pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
 }
 `;
 

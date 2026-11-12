@@ -10,7 +10,9 @@ export default {
   // (the ground's drifts: toward cobalt violet and toward cerulean; the default warm drift laid
   // ochre stains on the ice spires' snow)
   hue: [[0.97, 0.94, 1.0], [0.90, 0.97, 1.0]],
-  deck: { height: 310, belts: 5, wobble: 0.16, a: [0.50, 0.62, 0.93], b: [0.27, 0.35, 0.74], streaks: 0.9, wet: 0.6 },
+  // (PAINTER 14: the high white streaks at less than half strength, 0.9 -> 0.4: from orbit they curved round the globe as
+  // bright arcs, reflections on a glass ball)
+  deck: { height: 310, belts: 5, wobble: 0.16, a: [0.50, 0.62, 0.93], b: [0.27, 0.35, 0.74], streaks: 0.4, wet: 0.6 },
   sky: mkSky([0.34, 0.46, 0.84], [0.82, 0.89, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
   flora: {
     tall: [
