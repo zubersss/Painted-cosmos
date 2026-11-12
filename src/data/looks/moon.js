@@ -28,6 +28,6 @@ export default {
     B('crater_fields', 'Crater Fields', 'crater', ['davysGrey', 'neutralTint', 'paynesGrey', 'indigo', 'sepia'], 'cerulean', ['neutralTint', 'davysGrey', 'paynesGrey'],
       { t: { patch: [{ c: [0.94, 0.94, 0.93], wl: 13, thr: 0.14, soft: 0.25, amt: 0.45 }] }, small: { rock: 0.020 }, phys: { ground: 'dust' } }),
     B('rilles', 'Winding Rilles', 'riverbed', ['davysGrey', 'neutralTint', 'paynesGrey', 'indigo', 'sepia'], 'cerulean', ['neutralTint', 'paynesGrey', 'davysGrey'],
-      { t: { amp: 40, bedC: [0.42, 0.43, 0.51], patch: [{ c: [0.60, 0.60, 0.66], wl: 38, thr: 0.05, soft: 0.4, amt: 0.4 }] }, small: { rock: 0.010 }, phys: { ground: 'dust' } }),     // (PAINTER 14: the rille's bed in Payne's grey: it read as a pale dip)
+      { t: { amp: 40, bedC: [0.36, 0.37, 0.45], patch: [{ c: [0.60, 0.60, 0.66], wl: 38, thr: 0.05, soft: 0.4, amt: 0.4 }] }, small: { rock: 0.010 }, phys: { ground: 'dust' } }),     // (PAINTER 14: the rille's bed in Payne's grey: it read as a pale dip)
   ],
 };

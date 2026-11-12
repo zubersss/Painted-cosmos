@@ -198,9 +198,9 @@ void main() {
   // wash is laid thin, nearly bare paper warmed by the light. The reference forest had no paper anywhere: its flecks
   // were the meadow's sunlit green, a middle value against the wood's shade. Open ground and the thinner stands of other
   // worlds (a canopy under 0.55: fungus, kelp, groves) are not touched.)
-  // (only the heart of each patch of sun: the same pattern read at a higher threshold, so a fleck goes from the sunlit
-  // green at its edge to paper in its middle, and the floor keeps its shade)
-  float fleck = sunny * pcDappleL(vBody, vPar.z * 1.08, 8.0) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
+  // (a patch of sun is laid thinner, and its heart (the same pattern read at a higher threshold) thinnest, so a fleck
+  // goes from a pale sunlit green at its edge to nearly paper in its middle; the floor keeps its shade)
+  float fleck = sunny * (0.55 + 0.45 * pcDappleL(vBody, vPar.z * 1.08, 8.0)) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
   c = mix(c, mix(c, vec3(1.0), 0.55) * uLight, fleck * 0.8);
 
   // dry brush on rough ground: the brush skips, paper sparkles through in small broken flecks
@@ -569,7 +569,7 @@ void main() {
   // (PAINTER 14: a sun glint near the eye is written as a crisp mark (region 6), which the brush leaves as it was drawn:
   // laid into the brush's average with the water round it, the stream's bare-paper glints came out as grey dashes, and the
   // reference forest had no paper anywhere)
-  float gSun = glint * (1.0 - smoothstep(30.0, 45.0, dist));
+  float gSun = glint * (1.0 - smoothstep(16.0, 26.0, dist));
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
@@ -838,7 +838,10 @@ void main() {
     #endif
     c = pcWetWash(pcDensity(c, 1.0 + (n1.r - 0.5) * 0.7), 0.9);     // wet bark goes dark
     x = dot(nV, sunV) * 0.5 + 0.5;
-    x *= mix(0.55, 1.0, pcDappleL(vBody, canopy * 0.8, 8.0 - vAbove));
+    // (PAINTER 14: a pale trunk keeps its sunlit side under the canopy's shade, so a birch wood's trunks are its paper
+    // lights, the shaded side glazed: the leaf shadow laid over them whole made the reference forest's birches light
+    // grey, and the frame had no paper anywhere)
+    x *= mix(0.55 + 0.30 * pale, 1.0, pcDappleL(vBody, canopy * 0.8, 8.0 - vAbove));
     x += (n1.g - 0.5) * 0.12;
     float lvl = pcLevel(x, 0.06);
     // pale bark takes a thinner shadow wash: by day the trunks stay the lights of the picture
@@ -884,13 +887,7 @@ void main() {
     // orange or gold crown made mud, the autumn wood's near crowns one flat sepia; a green crown's shade goes deep green,
     // not slate)
     vec3 deepF = pcDensity(c, 1.45) * mix(vec3(1.0), uGlaze, 0.45);
-    vec3 cw = c;
     c = mix(pcTone(c, lvl), deepF, (1.0 - smoothstep(0.8, 1.7, lvl)) * 0.75 * uDayness);
-    // (PAINTER 14: a crown close over the eye is laid in separate touches: here and there one at its own colour, where
-    // the sky's light comes into the mass. Below a glaze the shade is one deep wash whatever the light, and the autumn
-    // wood's near crowns each stood as one flat sienna mass)
-    float tch = smoothstep(0.50, 0.68, texture(uStrokeTex, suv * s0 * 0.7 + seed * 5.1 + 0.37).g + (n2.b - 0.5) * 0.3) * (1.0 - smoothstep(10.0, 26.0, vd)) * (1.0 - smoothstep(1.6, 2.2, lvl));
-    c = mix(c, pcTone(cw, 1.85 + 0.3 * n2.r), tch * 0.6 * uDayness);
     wet = max(uLeafP.w, uWx.y * 0.5);
     id = 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
   } else if (part < 2.5) {

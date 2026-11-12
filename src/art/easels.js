@@ -31,7 +31,7 @@ export const EASELS = {
     mare: [-0.058016, 0.806398, -0.588521, 118, 4],
     highlands: [-0.665473, -0.392552, 0.634861, 277, 4],
     crater_fields: [-0.549487, 0.786366, 0.2823, 240, 5],
-    rilles: [0.177279, 0.106301, -0.978403, 93, 1],
+    rilles: [0.202942, 0.190753, -0.960431, 96, -2],    // (PAINTER 14: the stand moved to the rille's edge; see STANDS)
   },
   mars: {
     rust_canyons: [0.836769, -0.175432, 0.518692, 50, 6.3],
@@ -95,7 +95,7 @@ export const STANDS = {
     mare: [-0.058016, 0.806398, -0.588521, 118, 3],        // (Earth over the flat silver plain, 15 degrees up)
     highlands: [-0.665473, -0.392552, 0.634861, 277, 3],  // (over the rolling bright hills, 15 degrees up)
     crater_fields: [-0.549487, 0.786366, 0.2823, 240, 4], // (over the crater rims, 18 degrees up)
-    rilles: [0.177279, 0.106301, -0.978403, 93, 2],       // (high on a rille's bank, looking down into it toward Earth, 14 degrees up)
+    rilles: [0.202942, 0.190753, -0.960431, 96, -3],      // (PAINTER 14: on the rille's edge, its dark bed 20 to 40 m off across the view toward Earth (15 degrees up), 12 degrees below the eye; the old stand's rille lay 60 m north, out of the frame)
   },
   mars: {
     rust_canyons: [0.836522, -0.121244, 0.534351, 250],

@@ -249,7 +249,7 @@ class Ring {
     this.needly = 1.9 * sstep(0.42, 0.72, vnoise(U / 6.7 + 23.1, V / 6.7 + 1.7, seed + 19));       // splinters stand in companies
     this.crusty = sstep(0.40, 0.66, vnoise(U / 4.3 + 3.9, V / 4.3 + 17.3, seed + 17) * 0.7 + 0.3 * this.drift);
     // (PAINTER 14: reeds stand in beds, with mud and water between them: the misty wetland's near reeds were one even comb)
-    this.reedy = 2.0 * sstep(0.46, 0.70, vnoise(U / 6.1 + 41.3, V / 6.1 + 9.9, seed + 23));
+    this.reedy = 1.8 * sstep(0.34, 0.58, vnoise(U / 6.1 + 41.3, V / 6.1 + 9.9, seed + 23));
     this.slots = []; this.map.set(key, this.slots);
     return true;
   }

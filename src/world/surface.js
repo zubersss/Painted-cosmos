@@ -461,7 +461,7 @@ class Surface {
         const stk = crown;
         shade += stk * (0.34 * (1 - smoothstep(1.5, 9, h)) + 0.14 * Math.max(0, C.n3(X / 7.3 + 2.0, Y / 7.3 + 3.0, Z / 7.3)));
         crown = stk * smoothstep(cl * 0.35, cl * 0.75, h) * (0.40 + 0.16 * C.n3(X / 5.1, Y / 5.1 - 4.0, Z / 5.1 + 1.0));
-        crown = Math.max(crown, stk * this._stT * smoothstep(3, 8, h) * 0.34);
+        crown = Math.max(crown, stk * this._stT * smoothstep(3, 8, h) * 0.5);
       }
     } else if (k === 'canyon') {
       // a plateau cut by a wandering network of gorges: flat dry floor, walls in steps, benches
@@ -569,10 +569,7 @@ class Surface {
       // steep slip face; smaller dunes ride the big ones
       const wl = T.wl || 150, amp = T.amp || 13;
       const ax = T.axis || [0.36, 0.48, 0.80];
-      // (PAINTER 14: and a finer meander, a third of a dune's length, so that a crest seen from its own back bends within the
-      // frame: one long ruled diagonal was the dune crests' 'cut paper')
-      const warp = A.n3(X / (wl * 2.6) + 4.0, Y / (wl * 2.6), Z / (wl * 2.6) - 1.0) * 0.55 + C.n3(X / (wl * 0.7), Y / (wl * 0.7) + 2.0, Z / (wl * 0.7)) * 0.10
-        + C.n3(X / (wl * 0.24) - 3.0, Y / (wl * 0.24), Z / (wl * 0.24) + 7.0) * 0.045;
+      const warp = A.n3(X / (wl * 2.6) + 4.0, Y / (wl * 2.6), Z / (wl * 2.6) - 1.0) * 0.55 + C.n3(X / (wl * 0.7), Y / (wl * 0.7) + 2.0, Z / (wl * 0.7)) * 0.10;
       const u = (X * ax[0] + Y * ax[1] + Z * ax[2]) / wl + warp;
       const sp = T.slip || 0.26;
       // one dune across its wavelength: 0 at the toe, 1 at the crest; lee = on the slip face

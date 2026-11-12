@@ -23,7 +23,7 @@ export default {
     B('polar_frost', 'Polar Frost Fields', 'terraced', ['davysGrey', 'roseMadder', 'cobaltBlue', 'rawSienna', 'neutralTint'], 'cadOrange', ['cobaltBlue', 'davysGrey', 'roseMadder'],
       { t: { amp: 40, steps: 6, wl: 760, crack: 0.8, frost: 0.85, strata: 0.7, riser: [0.84, 0.93] }, want: { high: 0.05, steep: 0.9, layers: 1.6, perch: 0.6 }, under: { rock: [[0.94, 0.92, 0.93], [0.68, 0.62, 0.70]], shard: [[0.97, 0.96, 0.97], [0.80, 0.76, 0.86]] }, near: { needle: 0, dab: 0 }, small: { shard: 0.012, rock: 0.015 }, phys: { ground: 'ice' } }),
     B('dry_riverbeds', 'Dry Riverbeds', 'riverbed', ['rawSienna', 'burntUmber', 'alizarin', 'yellowOchre', 'sepia'], 'alizarin', ['yellowOchre', 'rawSienna', 'burntUmber'],
-      { t: { amp: 26, dil: 0.28, bedW: 10, bedD: 2.8, bedPale: 0.55, farC: [0.50, 0.30, 0.24, 0.55] }, tall: [0, 0], tallD: 0.42, tallMix: 1, near: { dab: 1 }, small: { rock: 0.024, grass: 0.22, bush: 0.02 }, phys: { ground: 'gravel' } }),
+      { t: { amp: 26, dil: 0.28, bedW: 10, bedD: 2.8, bedPale: 0.55, farC: [0.46, 0.27, 0.22, 0.70] }, tall: [0, 0], tallD: 0.42, tallMix: 1, near: { dab: 1 }, small: { rock: 0.024, grass: 0.22, bush: 0.02 }, phys: { ground: 'gravel' } }),
   ],
   sites: [[10, 0, 'dry_riverbeds'], [-8, 60, 'rust_canyons'], [25, -60, 'dust_dunes'], [72, 20, 'polar_frost'], [-74, -40, 'polar_frost'], [-30, -20, 'rust_canyons'], [35, 110, 'dust_dunes'], [-20, 140, 'dry_riverbeds'],
     [5, -130, 'rust_canyons'], [-45, 80, 'dust_dunes'], [50, -150, 'dry_riverbeds'], [-10, -80, 'dust_dunes'], [60, 100, 'polar_frost'], [-55, -150, 'polar_frost'], [30, 40, 'rust_canyons'], [-35, 30, 'dry_riverbeds']],
