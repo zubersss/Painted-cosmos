@@ -290,7 +290,9 @@ export class Sim {
         faceView: this.footCam.firstPerson,
       }, h, this.explorerEnv(this.bodyId));
       // Trunks and boulders: looked up once a frame around the explorer, hit every step.
-      if (first) this.nearObstacles = this.obstaclesNear(this.bodyId, this.ex.p, 9);
+      // (16 m: PHYSICS 20, the read-ahead of a lunar run looks 12 to 13 m out; checked: a 16 m query
+      // lists everything a 9 m one does at 652 places, world.sampleObstacles starts missing beyond 20 m)
+      if (first) this.nearObstacles = this.obstaclesNear(this.bodyId, this.ex.p, 16);
       const moving = I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight') !== 0 || I.axis('KeyS', 'KeyW') + I.axis('ArrowDown', 'ArrowUp') !== 0;
       if (collideObstacles(this.ex, this.nearObstacles, undefined, { moving, dt: h }) && this.ex.grounded) {
         // Pushed sideways on sloping ground: put the feet back on it.
