@@ -34,7 +34,7 @@ export function snapshot(sim) {
     bodyId: sim.bodyId,
     explorer: { p: r3(sim.ex.p), fwd: r3(sim.ex.fwd), fuel: +sim.ex.fuel.toFixed(3) },
     view: { fwd: r3(sim.footCam.viewFwd), pitch: +sim.footCam.pitch.toFixed(3), boom: sim.footCam.boom, firstPerson: !!sim.footCam.firstPerson },
-    ship: { bodyId: sim.shFrame.id, p: r3(sim.sh.p), q: { x: sim.sh.q.x, y: sim.sh.q.y, z: sim.sh.q.z, w: sim.sh.q.w } },
+    ship: { bodyId: sim.shFrame.id, p: r3(sim.sh.p), q: qOf(sim.sh.float ? sim.sh.float.q0 : sim.sh.q) },     // (afloat: its still attitude, not this moment's pitch)
     target: sim.target, targetLocked: !!sim.targetLocked,
     visited: Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)])),
     vistas: Object.fromEntries(Object.entries(sim.vistas || {}).map(([k, v]) => [k, Object.keys(v)])),
@@ -61,6 +61,8 @@ export function validate(d) {
 // Put a validated save into the simulation. `sample(bodyId)` is the sim's sampler factory; the
 // explorer and the ship are set back on the ground as it is NOW (so a changed terrain function
 // cannot leave anyone buried or floating).
+const qOf = (q) => ({ x: q.x, y: q.y, z: q.z, w: q.w });
+
 export function restore(sim, d) {
   const why = validate(d);
   if (why) return false;
@@ -77,6 +79,7 @@ export function restore(sim, d) {
   const q = qNorm(d.ship.q);
   sim.sh = createShipState({ x: sg.dir.x * sg.floor, y: sg.dir.y * sg.floor, z: sg.dir.z * sg.floor }, q);
   sim.sh.restQ = q;
+  sim.sh.onLiquid = sg.floor > sg.radius;          // a ship saved afloat floats again (Sim.stepAfloat)
   sim.shFrame = bodyFrame(d.ship.bodyId, true);
   sim.shipCam = createShipCamera();
   sim.bodyId = d.bodyId;

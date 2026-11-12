@@ -33,6 +33,17 @@ export const FEEL = Object.freeze({
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const Y = V(0, 1, 0);
+// A ship at rest on water (Sim.stepAfloat): the hull that averages the sea, and how fast it follows.
+const FLOAT_ALONG = [-0.5, -0.25, 0, 0.25, 0.5], FLOAT_ACROSS = [-0.5, 0, 0.5];      // the grid, in hull lengths and beams
+const FLOAT = Object.freeze({
+  length: 8,                 // m, nose to tail (PHYSICS' legs span 5 m of it: ship.js TUNING.legs)
+  beam: 4.4,                 // m, across the hull at the legs
+  follow: 2.5,               // 1/s: the hull's inertia (a wave of 5 s is taken up almost whole, a slap of a fraction of a second is not)
+  tilt: 0.35,                // rad: the most it pitches or rolls
+  along: FLOAT_ALONG, across: FLOAT_ACROSS,
+  sa2: FLOAT_ALONG.reduce((s, a) => s + a * a, 0) * FLOAT_ACROSS.length,       // sum of a^2 over the grid
+  sb2: FLOAT_ACROSS.reduce((s, b) => s + b * b, 0) * FLOAT_ALONG.length,
+});
 // The world's own arrival (spawnOn with no place asked for): room round the feet and the lens.
 const ARRIVAL = Object.freeze({
   clear: 2.5,                // metres from the feet to the nearest boulder's or trunk's edge
@@ -152,6 +163,7 @@ export class Sim {
     this.bodyId = bodyId;
     this.ex = createExplorerState(feet, toShip);
     this.ex.grounded = !(opts.altitude > 0);
+    this._swimR = null;
     // Look a little to the side of the ship so both it and the landscape are in frame; at the world's
     // own arrival, to whichever side keeps a boulder or trunk out from between the lens and the explorer.
     this.footCam = createFootCamera(rotateAround(toShip, d, dir ? 0.45 : this.clearView(bodyId, feet, toShip)), d);
@@ -279,6 +291,7 @@ export class Sim {
       this.sh.canopy01 = mix(this.sh.canopy01, 0, 1 - Math.exp(-4 * h));
       if (pressed('Space')) {
         this.sh.gearOn = false;
+        this.sh.float = null;
         beginLiftoff(this.sh);
         this.sm.dispatch(EV.liftoff);
         this.emit('liftoff');
@@ -298,6 +311,7 @@ export class Sim {
       }
       if (r === 'touchdown') {
         this.bodyId = this.shFrame.id;
+        this.sh.float = null;                              // (afloat: the still pose is this one)
         this.sh.gearOn = false; this.sh.lift01 = 1;       // hand the hull to its landing gear
         this.sm.dispatch(EV.touchdown);
         this.emit('touchdown');
@@ -327,7 +341,43 @@ export class Sim {
       sh.throttle = 0; sh.turnRate = 0; sh.altGround = 0;
       sh.gear01 = mix(sh.gear01, 1, 1 - Math.exp(-4 * h));
       sh.throttle01 = mix(sh.throttle01, 0, 1 - Math.exp(-2.5 * h));
-    } else stepLanded(sh, h);
+    } else if (sh.onLiquid && this.physics && this.shFrame.kind === 'body' && this.shFrame.rotating) this.stepAfloat(h);
+    else stepLanded(sh, h);
+  }
+
+  // A ship at rest on water floats (the coordinator's ruling, 2026-11-12): it heaves and pitches
+  // with the drawn sea (PHYSICS' env.waterLevel, the surface PAINTER's water shader draws), averaged
+  // over the hull: the sea's height on a 5 x 3 grid over FLOAT.length x FLOAT.beam gives the mean
+  // (heave) and the least-squares slopes along and across the hull (pitch, roll); the hull takes
+  // them up at FLOAT.follow, its inertia. Waves shorter than the hull lift it little.
+  stepAfloat(h) {
+    const sh = this.sh, env = this.explorerEnv(this.shFrame.id);
+    stepLanded(sh, h);                                  // spool down, open up, no speed
+    if (!env.waterLevel) return;
+    let F = sh.float;
+    if (!F) {
+      const up0 = norm(sh.p), q0 = sh.restQ || sh.q;
+      const fwd = tangent(qRotate(q0, V(0, 0, -1)), up0, V(0, 0, -1));
+      F = sh.float = { p0: sh.p, q0, up: up0, fwd, right: cross(fwd, up0), z: 0, pitch: 0, roll: 0 };
+    }
+    const s = this.sampler(this.shFrame.id)(F.up);
+    const depth = Math.max(0, s.liquidRadius - s.radius);
+    let sum = 0, sa = 0, sb = 0;
+    for (const a of FLOAT.along) for (const b of FLOAT.across) {
+      const q = addScaled(addScaled(F.p0, F.fwd, a * FLOAT.length), F.right, b * FLOAT.beam);
+      const w = +env.waterLevel(q, depth) || 0;
+      sum += w; sa += w * a; sb += w * b;
+    }
+    // least squares over the grid: slope = sum(w x) / sum(x^2), x = a L (and b B across)
+    const n = FLOAT.along.length * FLOAT.across.length;
+    const heave = sum / n, along = sa / (FLOAT.sa2 * FLOAT.length), across = sb / (FLOAT.sb2 * FLOAT.beam);
+    const k = 1 - Math.exp(-FLOAT.follow * h);
+    F.z += (heave - F.z) * k;
+    F.pitch += (clamp(Math.atan(along), -FLOAT.tilt, FLOAT.tilt) - F.pitch) * k;
+    F.roll += (clamp(Math.atan(across), -FLOAT.tilt, FLOAT.tilt) - F.roll) * k;
+    sh.p = addScaled(F.p0, F.up, F.z);
+    // nose up when the sea is higher at the bow (about the right axis), the starboard side up when it is higher there
+    sh.q = qMul(qFromAxisAngle(F.fwd, -F.roll), qMul(qFromAxisAngle(F.right, F.pitch), F.q0));
   }
 
   // Touchdown on the legs (PHYSICS' recipe): from about a metre up the hull is weightless on its
@@ -948,7 +998,15 @@ export class Sim {
   }
 
   footPose(dt) {
-    return updateFootCamera(this.footCam, this.ex.p, dt, this.sampler(this.bodyId), undefined, this.cameraSolids(this.ex.p, this.nearObstacles));
+    // (PHYSICS P20) a swimmer rides the drawn sea (an sd of 0.29 m at 4 to 6 s in a gale on Earth):
+    // the view follows the swell's mean and lets each slap go (0.45 s; a 5 s wave keeps 85 % of its height)
+    let feet = this.ex.p;
+    if (this.ex.swimming) {
+      const r = len(feet);
+      this._swimR = this._swimR == null ? r : this._swimR + (r - this._swimR) * (1 - Math.exp(-Math.max(0, dt) / 0.45));
+      feet = scale(norm(feet), this._swimR);
+    } else this._swimR = null;
+    return updateFootCamera(this.footCam, feet, dt, this.sampler(this.bodyId), undefined, this.cameraSolids(this.ex.p, this.nearObstacles));
   }
 
   shipPose(dt) {
