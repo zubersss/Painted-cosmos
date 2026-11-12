@@ -628,7 +628,7 @@ test('P19 the ghost keeps to its own scratch: a run through a row of boulders OF
     for (const g of [9.81, 1.62]) for (const hz of [60, 30]) {
       const env = { sample, gravity: g, ground: (s, out) => Object.assign(out, s.radius > R + 0.01 ? ROCK : SANDY) };
       const p0 = at(0, 0), st = { p: V(p0.x * R, p0.y * R, p0.z * R), v: V(), grounded: true };
-      let radial = 0, off = 0, wrong = 0, air = 0, worst = 0, vPrev = 0, far = 0;
+      let radial = 0, off = 0, wrong = 0, air = 0, worst = 0, vPrev = 0, far = 0, least = 1e9;
       for (let i = 0; i < hz * 9; i++) {
         const u = norm(st.p), t = Math.atan2(dot(u, h0), dot(u, u0)), c = Math.cos(t), sn = Math.sin(t);
         stepExplorerBody(st, { wish: V(6 * (h0.x * c - u0.x * sn), 6 * (h0.y * c - u0.y * sn), 6 * (h0.z * c - u0.z * sn)) }, 1 / hz, env);
@@ -638,6 +638,7 @@ test('P19 the ghost keeps to its own scratch: a run through a row of boulders OF
           off = Math.max(off, Math.abs(dot(uu, n0)) * R);
           if (st.grounded && B.material !== (sample(uu).radius > R + 0.01 ? 'rock' : 'sand')) wrong++;
           worst = Math.max(worst, vPrev - v);
+          if (far > 5) least = Math.min(least, v);
         }
         vPrev = v;
       }
@@ -646,10 +647,11 @@ test('P19 the ghost keeps to its own scratch: a run through a row of boulders OF
       assert.ok(off < 0.05, `${at_}: ${off.toFixed(3)} m off the line it was steered along`);
       assert.equal(wrong, 0, `${at_}: ${wrong} steps report a material that is not the ground under the feet`);
       assert.equal(air, 0, `${at_}: the feet leave the ground in ${air} steps`);
-      assert.ok(worst <= T.legCatch / hz + 0.05, `${at_}: ${worst.toFixed(2)} m/s lost in one frame (the legs take a face up at legCatch: ${(T.legCatch / hz).toFixed(2)})`);
-      // (on, at least past the fifth boulder: P19 found the run crawling at 0.5 m/s at the sixth on Earth, in the x-z plane
-      // as off it, before this fix as after: see the notes, P19, "Not done")
-      assert.ok(far > 17, `${at_}: on to ${far.toFixed(0)} m`);
+      assert.ok(worst <= (T.legCatch + T.braceAccel) / hz + 0.05, `${at_}: ${worst.toFixed(2)} m/s lost in one frame (the legs take a face up at legCatch, a hold braces at braceAccel: ${((T.legCatch + T.braceAccel) / hz).toFixed(2)})`);
+      // (and on through the row at a clambering pace: until P19 the ghost was set down in the air when its profile began on
+      // the far flank of the boulder before, every trial failed, and the run crawled to the next boulder at the least pace:
+      // 0.5 m/s on Earth, 1.0 on the Moon)
+      assert.ok(least > 1.5 && far > 20, `${at_}: no slower than ${least.toFixed(2)} m/s past the first boulder, on to ${far.toFixed(0)} m`);
     }
   }
 });

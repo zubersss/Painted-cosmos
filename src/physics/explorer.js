@@ -341,8 +341,18 @@ function probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, d, rise, v, fx, f
   { const s = env.sample(D2); Q.surf = Q.surf || {}; for (const k in s) Q.surf[k] = s[k]; }
   Q.G = env.ground ? env.ground(Q.surf, Q.gnd) : null;
   Q.n = n; Q.step = T.aheadProbe; Q.x = fx; Q.y = fy; Q.z = fz; Q.d = d; Q.rise = rise; Q.R = r; Q.xFar = d - s0;
-  // (the ghost runs from a little before the ground starts to rise to where the body is back on its feet past the top)
-  { let i0 = 0, it = 0; while (i0 < n - 1 && Q.prof[i0] - Q.prof[0] < 0.05) i0++; for (let i = 1; i < n; i++) if (Q.prof[i] > Q.prof[it]) it = i; Q.x0 = Math.max(0, i0 - 1) * Q.step - 1.5; Q.xTop = it * Q.step; }
+  // (the ghost runs from a little before the ground starts to rise to where the body is back on its feet past the top.
+  // (P19) In a boulder field the profile can begin on the far flank of the boulder the walker is coming off. Then the
+  // rise starts at the valley (the lowest ground before the top, when the profile falls into it by more than 5 cm), not
+  // at the first sample, and the ghost's run-up lies on the valley's floor, not on the flank before it (that descent is
+  // the last feature's, and a ghost run off it at speed leaves the ground). Until P19 the rise was found only partway up
+  // the next boulder and the ghost was set down there at the first sample's height, in the air: every trial failed at
+  // its first step and the run crawled to that boulder at the least pace, 0.5 m/s.)
+  { let it = 0; for (let i = 1; i < n; i++) if (Q.prof[i] > Q.prof[it]) it = i;
+    let iv = 0; for (let i = 1; i < it; i++) if (Q.prof[i] < Q.prof[iv]) iv = i;
+    if (!(Q.prof[0] - Q.prof[iv] > 0.05)) iv = 0;
+    let i0 = iv; while (i0 < n - 1 && Q.prof[i0] - Q.prof[iv] < 0.05) i0++;
+    Q.x0 = iv > 0 ? Math.max(iv * Q.step, (i0 - 1) * Q.step - 1.5) : Math.max(0, i0 - 1) * Q.step - 1.5; Q.xTop = it * Q.step; }
   // (the trials run a margin faster than the pace: the body's limits are sharp (a hold that takes over at a few
   // millimetres more rise), and the ghost's ground is the profile, not the ground itself)
   Q.lo = 0.5; Q.hi = v / T.aheadProbeMargin; Q.tries = 0; Q.vc = 1e9; Q.active = true; Q.parent = env;
@@ -383,6 +393,13 @@ function ghostSample(dir) {
   o.radius = Q.R + h; o.normal.x = (dir.x - ex * sl) * l; o.normal.y = dir.y * l; o.normal.z = (dir.z - ez * sl) * l; o.slope = Math.atan(Math.abs(sl));
   return o;
 }
+// the profile's height at x m along it (relative to the walker's ground; held beyond its ends, as ghostSample)
+function profileAt(Q, x) {
+  const u = x / Q.step, P = Q.prof, n = Q.n;
+  if (u <= 0) return P[0];
+  if (u >= n - 1) return P[n - 1];
+  const i = Math.floor(u); return P[i] + (P[i + 1] - P[i]) * (u - i);
+}
 function ghostCrosses(Q, v, env, T) {
   let Tg = _gT.get(T);
   if (!Tg) { Tg = Object.freeze({ ...T, aheadFrom: 1e9 }); _gT.set(T, Tg); }     // (the ghost does not read ahead itself)
@@ -393,7 +410,8 @@ function ghostCrosses(Q, v, env, T) {
   genv.gravity = P.gravity; genv.liquid = P.liquid; genv.ground = Q.G ? genv.groundQ : undefined;
   _gQ = Q;
   const st = _gst, R = Q.R, end = (Q.n - 1) * Q.step + 0.3;
-  let t = Q.x0 / R, rr = R + Q.prof[0];
+  // (P19: set down on the profile where it starts, as ghostSample has it there)
+  let t = Q.x0 / R, rr = R + profileAt(Q, Q.x0);
   st.p.x = Math.sin(t) * rr; st.p.y = 0; st.p.z = Math.cos(t) * rr;
   st.v.x = Math.cos(t) * v; st.v.y = 0; st.v.z = -Math.sin(t) * v;
   st.grounded = true; st.phys = Object.assign(_gB, _gB0);
