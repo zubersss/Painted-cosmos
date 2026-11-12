@@ -55,7 +55,10 @@ export const SEA_MAP = Object.freeze({
   rows: [2, 3, 4],                // inner rows marched a frame, by quality (the outer level twice that)
   sweeps: 12, sweepFrames: 4,     // Gauss-Seidel sweeps of the warp a frame, for this many frames
   sor: 1.8,
-  edgeTaper: 2.5,                 // inner cells over which the turns die out toward the inner level's edge
+  edgeTaper: 2.5,                 // inner cells over which the turns die out toward the inner level's edge ...
+  edgeZero: 1,                    // ... (P19) to nothing this many cells short of it: the farthest out the shown warp is read
+                                  // (water.js _composeMap: the band's edge lies SEA_TEX.margin inside the grid, the warp is
+                                  // read up to half the band inside that), so beyond the band the warp holds no turn
   kSMax: 1.4,                     // the most shoaling and refraction may raise a wave before it breaks (the chunk's 0.78 d caps it)
   turnMaxRad: 1.2,                // a turn is never more than this (rad)
 });
@@ -185,6 +188,9 @@ export class SeaMap {
       warp: new Float32Array(NN * 2), inner: new Float32Array(NN * 4), outer: new Float32Array(NN * 4),
       info: new Float32Array(2 * NN * 6), depth: new Float32Array(2 * NN),
       HsRef: 0, wcRef: 0, refFetch: 0, refDepth: 0, refHeading: 0, refU: 0, ref: -1, refX: 0, refZ: 0,
+      // (P19) the inner grid of the build under way (from its snapshot until it is published): WaterField keeps the band
+      // where the inner level gives way to the outer one inside it too, so nothing shown steps when the build lands
+      nextOn: false, nextX0: 0, nextZ0: 0,
     };
     this.stage = 0; this.row = 0; this.sweep = 0; this.last = -1e9; this.built = 0; this.ref = -1; this._betterWp = -1;
     this._b = { x0: 0, z0: 0, cell: 16, x02: 0, z02: 0, ok2: false, U: 0, aU: 0, g: 9.81, rhoA: 1.2, rhoL: 1000, dirA: 0, swellH: 0, swellT: 0, depthLevel: 0, R: 1, body: null, rv: -1 };
@@ -192,10 +198,18 @@ export class SeaMap {
     this.wp = { ok: false, x: 0, z: 0, n: -1, depth: 0, cap: 80 };      // the far point (frame position), the inner node it is at
     this.stats = { samples: 0, built: 0 };
   }
-  reset() { this.stage = 0; this.last = -1e9; this.target.on = false; this.wp.ok = false; this.rose.reset(); this.outer.invalidate(); this.outer.frameVersion = -1; }
+  reset() { this.stage = 0; this.last = -1e9; this.target.on = false; this.target.nextOn = false; this.wp.ok = false; this.rose.reset(); this.outer.invalidate(); this.outer.frameVersion = -1; }
   // The frame re-anchored: the outer level's cells (128 m) do not divide the 16 m lattice, so it is sampled afresh;
-  // a build under way is dropped (its positions are in the old frame).
-  rebase(X, Z) { this.outer.invalidate(); this.outer.frameVersion = -1; this.stage = 0; this.last = -1e9; if (this.wp.ok) { this.wp.x -= X; this.wp.z -= Z; } }
+  // a build under way is dropped (its positions are in the old frame). (P19) The published target moves into the new frame
+  // with the ground it describes: the next build warm-starts its warp from it node by node and keeps its free constant
+  // (the crests stay put on average); left in the old frame it was 24 cells off after a 384 m re-anchor, the warp started
+  // cold and the crests slid 15 to 17 m in the 5 s after each re-anchor (review 7, finding 2). WaterField.rebase moves
+  // what it shows by the same, so attachMap still finds the shown nodes and the target's on the same ground.
+  rebase(X, Z) {
+    this.outer.invalidate(); this.outer.frameVersion = -1; this.stage = 0; this.last = -1e9;
+    if (this.wp.ok) { this.wp.x -= X; this.wp.z -= Z; }
+    const T = this.target; T.x0 -= X; T.z0 -= Z; T.x02 -= X; T.z02 -= Z; T.refX -= X; T.refZ -= Z; T.nextOn = false;
+  }
 
   // One frame. c: { frame, air (the AirGrid), bodyId, R, level (liquid surface about, or -1e9), we, wn (the 10 m wind,
   // frame axes), g, rhoAir, rhoLiq, dir (the reference sea's way, [e, n]), swellHeight, swellLength, sample, budget,
@@ -203,7 +217,7 @@ export class SeaMap {
   update(c) {
     this.stats.samples = 0;
     const T = c.air.terrain;
-    if (!(c.level > -1e8)) { if (this.target.on) { this.target.on = false; this.target.version++; } this.stage = 0; return 0; }
+    if (!(c.level > -1e8)) { if (this.target.on) { this.target.on = false; this.target.version++; } this.stage = 0; this.target.nextOn = false; return 0; }
     _capBody = c.bodyId;
     // the outer level first (it is the 2 km picture), then the far rose with what is left
     let used = this.outer.update(c.frame, c.fx, c.fz, c.sample, c.budget, capInto, c.clock, c.ms);
@@ -249,6 +263,7 @@ export class SeaMap {
   _snapshot(c, T, U, aU, dA) {
     const b = this._b, O = this.outer, D = this.D, cap = this.cap, lev = c.level;
     b.x0 = (T.ci - T.half) * T.cell; b.z0 = (T.cj - T.half) * T.cell; b.cell = T.cell;
+    { const P = this.target; P.nextOn = true; P.nextX0 = b.x0; P.nextZ0 = b.z0; }
     b.U = U; b.aU = aU; b.dirA = dA; b.g = c.g; b.rhoA = c.rhoAir; b.rhoL = c.rhoLiq; b.R = c.R; b.body = c.bodyId;
     b.exposed = !!c.exposed; b.fx = c.fx; b.fz = c.fz;
     b.swellH = c.swellHeight || 0; b.swellT = c.swellLength > 0 ? Math.sqrt(c.swellLength * TAU / c.g) : 0;
@@ -443,7 +458,7 @@ export class SeaMap {
     }
     for (let n = 0; n < NN; n++) {
       const i = n % N, j = (n / N) | 0, e = Math.min(i, j, N - 1 - i, N - 1 - j);
-      al[n] *= smoothstep(0, SEA_MAP.edgeTaper, e);
+      al[n] *= smoothstep(SEA_MAP.edgeZero, SEA_MAP.edgeZero + SEA_MAP.edgeTaper, e);
     }
     void Href;
   }
@@ -480,6 +495,7 @@ export class SeaMap {
 
   _publish(c) {
     const b = this._b, S = this.sea, T = this.target, D = this.D, ref = this.ref;
+    T.nextOn = false;
     if (ref < 0) { if (T.on) { T.on = false; T.version++; } return; }
     // the warp's free constant: what moves the crests least against the last build (its mean change over the water is nil)
     let mx = 0, mz = 0, cnt = 0;

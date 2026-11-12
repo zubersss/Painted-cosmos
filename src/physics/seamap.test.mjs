@@ -105,8 +105,12 @@ test('P18 refraction: on a beach the wind meets at 45 degrees the crests turn to
     const W = R.physics.fields.water.field, x0 = R.physics.fields.water.field._mg[0] + 5 * 16 + 3.3, z0 = R.physics.fields.water.field._mg[1] + 7 * 16 + 5.1;
     assert.ok(W._mapOn, 'the map is on');
     let worst = 0;
+    const g = W._mg, onLine = (a, a0) => { const r = ((a - a0) / 16) % 1; return r < 0.01 || r > 0.99; };
     for (let k = 0; k < 40; k++) {
       const x = x0 + k * 2.7, z = z0 + k * 1.9, e = 0.01, s = W.surfaceAt(x, z, {});
+      // (P19: not across a line of nodes, where the bilinear twin's slope is each cell's own and a central difference
+      // straddles two: k = 31 lies on one to the last digit)
+      if (onLine(x, g[0]) || onLine(z, g[1])) continue;
       const he = (W.heightAt(x + e, z) - W.heightAt(x - e, z)) / (2 * e), hn = (W.heightAt(x, z + e) - W.heightAt(x, z - e)) / (2 * e);
       assert.ok(Math.abs(s.height - W.heightAt(x, z)) < 1e-9, 'surfaceAt and heightAt agree');
       worst = Math.max(worst, Math.abs(he - s.de), Math.abs(hn - s.dn));
@@ -116,14 +120,14 @@ test('P18 refraction: on a beach the wind meets at 45 degrees the crests turn to
 });
 
 test('P18 the chunk carries the sea map behind PC_PHYS_SEA_MAP; without the define it is the chunk as before', () => {
-  for (const k of ['uPhysSeaMap', 'uPhysSeaGrid', 'uPhysSeaGrid2', 'pcPhysSeaTap', 'pcPhysSeaP', 'pcPhysSeaLocal', 'pcPhysSeaDir', 'pcPhysWaterCrestAt', 'pcPhysWaterSurfAt']) assert.ok(WATER_GLSL.includes(k), k);
+  for (const k of ['uPhysSeaMap', 'uPhysSeaGrid', 'uPhysSeaGrid2', 'uPhysSeaBand', 'pcPhysSeaTap', 'pcPhysSeaP', 'pcPhysSeaWarp', 'pcPhysSeaLocal', 'pcPhysSeaDir', 'pcPhysWaterCrestAt', 'pcPhysWaterSurfAt']) assert.ok(WATER_GLSL.includes(k), k);
   // every use of the map's uniforms sits inside an #ifdef PC_PHYS_SEA_MAP block
   let depth = 0, inMap = 0; const stack = [];
   for (const line of WATER_GLSL.split('\n')) {
     const t = line.trim();
     if (t.startsWith('#if')) { stack.push(t.includes('PC_PHYS_SEA_MAP')); if (stack[stack.length - 1]) inMap++; depth++; continue; }
     if (t.startsWith('#endif')) { if (stack.pop()) inMap--; depth--; continue; }
-    if (/uPhysSea(Map|Grid)/.test(t)) assert.ok(inMap > 0, 'outside the define: ' + t);
+    if (/uPhysSea(Map|Grid|Band)/.test(t)) assert.ok(inMap > 0, 'outside the define: ' + t);
   }
   assert.equal(depth, 0);
   const W = new WaterField(), u = W.uniforms;
@@ -160,5 +164,81 @@ test('P18 until the shader reads the map, the trains it draws everywhere are the
     assert.equal(A.physics.fields.water.field.mapRead, false);
     assert.ok(Math.abs(Ha - lag.o.significant) < 0.25 * Math.max(Ha, 0.05), `unread: the trains are the lagoon's sea (${Ha} against ${lag.o.significant})`);
     assert.ok(Hb > 2 * Ha, `read: the trains are the open sea's (${Hb} against ${Ha})`);
+  } finally { setWindScale('earth', s0); }
+});
+
+// (P19) Review 7, findings 2 and 3: the shown map seen from FIXED places while the focus walks along a coast at 6 m/s
+// (PILOT's docs/lead/evidence/review7/seamap-seams.mjs, shortened to one re-anchor of the frame)
+function walk(f, turn, secs, path, places, each) {
+  const world = coastWorld(C, f, { R: RE, turn });
+  const physics = createPhysics({ sampleSurface: (id, q) => world(q), timeBudget: false });
+  void physics.fields.water.uniforms.uPhysSeaMap;
+  const pts = places.map(([u, v]) => { const d = world.at(u, v); return V(d.x * RE, d.y * RE, d.z * RE); });
+  let ra = 0, pv = -1;
+  for (let i = 0; i < secs * 30; i++) {
+    const t = i / 30, [u, v] = path(t), fd = world.at(u, v);
+    physics.update(1 / 30, { bodyId: 'earth', time: 300 + t, focus: V(fd.x * (RE + 1.5), fd.y * (RE + 1.5), fd.z * (RE + 1.5)) });
+    const M = physics.fields.water.map, kind = physics.stats.reanchors !== ra ? 'reanchor' : M.target.version !== pv ? 'build' : 'other';
+    each(t, kind, physics, pts);
+    ra = physics.stats.reanchors; pv = M.target.version;
+  }
+}
+
+test('P19 the shown sea map does not step when a build lands after the focus has moved: at fixed places the sea changes on those frames no more than on any other (a coast with lagoons, a walk at 6 m/s)', () => {
+  // Until P19 a build landing moved the band between the levels by whole cells, gave new nodes the build's value at once,
+  // and after a re-anchor snapped the outer level: 60 m out Hs fell 0.242 m in a frame, in a lagoon the waves turned
+  // 27.9 degrees (p99 of other frames 0.0036 m). Now the band is a rectangle whose edges move continuously.
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.25);
+    const { up } = upwindAtC();
+    const inLag = (v) => ((v % 400) + 400) % 400 < 260;
+    const f = (u, v) => (u >= 0 && u < 24 && inLag(v) ? 1.5 : u > -160 && u < 0 && inLag(v) ? -3 : u < 0 ? 4 : -Math.min(20, 0.5 + 0.07 * u));
+    const S = [0, 1].map(() => ({ build: [], other: [], wb: [], wo: [] }));
+    let prev = null, builds = 0;
+    walk(f, up, 100, (t) => [-6, -380 + 6 * t], [[60, 0], [-80, 100]], (t, kind, physics, pts) => {
+      const cur = pts.map((p) => { const o = physics.water('earth', p, {}); return [o.significant, Math.atan2(o.dir.y, o.dir.x)]; });
+      if (prev && t > 30 && kind !== 'reanchor') {
+        if (kind === 'build') builds++;
+        cur.forEach((c, k) => {
+          const dh = Math.abs(c[0] - prev[k][0]), dw = Math.abs(Math.atan2(Math.sin(c[1] - prev[k][1]), Math.cos(c[1] - prev[k][1]))) * 180 / Math.PI;
+          S[k][kind === 'build' ? 'build' : 'other'].push(dh); S[k][kind === 'build' ? 'wb' : 'wo'].push(dw);
+        });
+      }
+      prev = cur;
+    });
+    const q99 = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length * 0.99)], max = (a) => Math.max(...a);
+    S.forEach((s, k) => {
+      const name = k ? 'in a lagoon' : '60 m out';
+      console.log(`# ${name}: Hs steps on ${builds} build frames at most ${max(s.build).toFixed(4)} m, other frames p99 ${q99(s.other).toFixed(4)}, at most ${max(s.other).toFixed(4)}; the waves' way ${max(s.wb).toFixed(2)} against ${q99(s.wo).toFixed(2)} (p99), ${max(s.wo).toFixed(2)} degrees`);
+      assert.ok(max(s.build) <= Math.max(1.5 * max(s.other), 5 * q99(s.other)), `${name}: Hs stepped ${max(s.build)} m on a build frame (other frames: p99 ${q99(s.other)}, at most ${max(s.other)})`);
+      assert.ok(max(s.wb) <= Math.max(1.5 * max(s.wo), 0.5), `${name}: the waves turned ${max(s.wb)} degrees on a build frame (other frames at most ${max(s.wo)})`);
+    });
+    assert.ok(builds > 50, `builds landed: ${builds}`);
+  } finally { setWindScale('earth', s0); }
+});
+
+test('P19 after a re-anchor of the frame the crests stay where they were: the warp moves no more in the 5 s after it than in any 5 s (an oblique beach, a walk along it at 6 m/s)', () => {
+  // Until P19 SeaMap.rebase left the published target in the old frame: the next build's warp started cold and the crests
+  // slid 14.6 m in the 5 s after a re-anchor (2.9 m in a typical 5 s).
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.25);
+    const f = (u, v) => { const s = u * 0.8 + v * 0.6; return s < 0 ? 3 : -Math.min(20, 0.3 + 0.03 * s); };
+    const steps = [];
+    let prevW = null;
+    walk(f, 0, 100, (t) => { const a = -380 + 6 * t; return [-4 * 0.8 - 0.6 * a, -4 * 0.6 + 0.8 * a]; }, [], (t, kind, physics) => {
+      const W = physics.fields.water.field, F = physics.fields.frame, b = -380 + 6 * t - 40;
+      const d = coastWorld(C, f, { R: RE, turn: 0 }).at(50 * 0.8 - 0.6 * b, 50 * 0.6 + 0.8 * b), p = V(d.x * RE, d.y * RE, d.z * RE);
+      const m = W._mapOn ? W._seaAt(F.lx(p.x, p.y, p.z), F.lz(p.x, p.y, p.z)) : null, w = m ? [m[12], m[13]] : null;
+      if (w && prevW && t > 30) steps.push({ t, dw: Math.hypot(w[0] - prevW[0], w[1] - prevW[1]), re: kind === 'reanchor' });
+      prevW = w;
+    });
+    const re = steps.filter((s) => s.re).map((s) => s.t), sum = (a) => a.reduce((x, y) => x + y, 0);
+    assert.equal(re.length, 1, 'one re-anchor in the walk');
+    const after = sum(steps.filter((s) => s.t >= re[0] && s.t < re[0] + 5).map((s) => s.dw));
+    const rest = steps.filter((s) => !(s.t >= re[0] && s.t < re[0] + 5)).map((s) => s.dw), typical = sum(rest) / (rest.length / 150);
+    console.log(`# the warp 50 m out: ${after.toFixed(2)} m in the 5 s after the re-anchor, ${typical.toFixed(2)} m in a typical 5 s`);
+    assert.ok(after < 2 * typical, `the crests slid ${after} m after the re-anchor (typical ${typical})`);
   } finally { setWindScale('earth', s0); }
 });
