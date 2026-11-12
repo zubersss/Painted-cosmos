@@ -77,7 +77,12 @@ const SHAPES = {
     // (seen in the game: a veil in the dust's own middle tone is lost against the hazy dune behind it. A veil
     // is the paper coming through: it is lifted toward the paper AFTER the air has been laid over it, so that
     // veils stand pale at every depth; less so after dark)
-    + ' vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * fract(vPcData.x * 7.0)); float w = 0.95; float lift = (0.42 + 0.26 * strm) * (0.35 + 0.65 * uDayness);',
+    + ' vec3 c = mix(uHaze * 0.97, pcDensity(ink, 1.25), 0.42 + 0.10 * fract(vPcData.x * 7.0)); float w = 0.95; float lift = (0.42 + 0.26 * strm) * (0.35 + 0.65 * uDayness);'
+    // (PAINTER 13: where there is no air the kicked dust is grains, not a veil: the dust kind is drawn with this shape (the
+    // painter's draw table makes it a veil), so PAINTER 12's grains in the puff never showed and a run on the Moon put up a
+    // soft white puff of smoke at the boot. Each particle is one small crisp touch of the ground's own dust, darker than the
+    // paper and not lifted toward it: a fan of grains that keeps its shape on its arcs and falls)
+    + ' if (uAirless > 0.5) { float rg = length(p); if (rg > 0.26) discard; c = pcDensity(ink, 1.30 + 0.25 * fract(vPcData.x * 7.0)); ga = 0.9 * (1.0 - smoothstep(0.13, 0.26, rg + (nz - 0.5) * 0.10)) * clamp(vPcData.y * 3.0, 0.0, 1.0); lift = 0.0; }',
   // blown sand: a drag of the dune's own wash lifted toward the paper (a pale skim, heavier than
   // it was: scattered specks did not read), thinning to its tail
   sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66 * smoothstep(1.6, 3.6, length(vView));',

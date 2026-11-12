@@ -540,7 +540,9 @@ void main() {
     }
     c = pcDensity(c, 1.0 + farSea * (hol * (0.75 + 0.60 * gale) - sw * 0.25));
     c = mix(c, skyc, farSea * sw * (0.50 + 0.22 * gale));
-    farWhite = farSea * wh * capFar * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
+    // (the share of white sets how many dashes break (capTh2); each one that breaks is white: a fresh breeze's 5 % of
+    // white drew its few dashes at a quarter strength, and none read)
+    farWhite = farSea * wh * smoothstep(0.008, 0.05, sea.w) * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
   glint = max(glint, white);

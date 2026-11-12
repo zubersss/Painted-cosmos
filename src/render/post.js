@@ -242,6 +242,14 @@ void main() {
     vec3 toe = vec3(0.25, 0.27, 0.37) + 0.025 * (psoft.r - 0.5);
     col = max(col, mix(col, toe + col * (1.0 - toe / 0.55), uNight * land * laid));
   }
+  // (and under a storm's key, PAINTER 13: the storm lays more pigment into every wash, and Neptune's basalt cliffs and
+  // stacks went to one flat near-black mass, L 14; the land's darkest washes are laid into a band above the floor, a
+  // gentle toe, so a cliff in a gale is dense indigo with its steps still in it)
+  if (uWxSheet.x > 0.003) {
+    float landS = step(0.5, pcAuxDec(texture(tAux, uv)).w);
+    vec3 toeS = vec3(0.12, 0.13, 0.21) + 0.02 * (psoft.r - 0.5);
+    col = max(col, mix(col, toeS + col * (1.0 - toeS / 0.55), min(uWxSheet.x, 1.0) * landS * laid));
+  }
   // nothing is pure black: the darkest darks are dense indigo and sepia
   col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoft.r - 0.5) + uNight * vec3(0.035, 0.045, 0.075));
   col = mix(vec3(1.0), col, painted * (1.0 - skip * 0.8));

@@ -413,7 +413,10 @@ class Surface {
         // of the cliff line is halved: that wobble against the narrow face is what combed it into gullies (stripes).
         // Measured round Earth's easel view: old - new height p90 21 -> 4.6 m, max 25 -> 11 m; gully index (|d2h/dt2|
         // along the contour on faces) 1.57 before PAINTER 12, 0.96 after, 0.89 now)
-        const q = hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.3;
+        // (and the wobble of the cliff line comes in only as the land rises, so the face starts at the shore: with the
+        // wobble whole at the waterline the land stepped up 10 to 20 m in one metre wherever the wobble was high there, a
+        // vertical step the terrain's cells combed into stripes and that stood as a ruled edge seen from the sea)
+        const q = hh + (C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.3) * smoothstep(0.9, 3.2, hh);
         const tq = clamp((q - 0.9) / 4.4, 0, 1);
         const ledge = smoothstep(-0.1, 0.35, C.n3(X / 70 + 9.0, Y / 70, Z / 70 - 2.0));
         const tal = smoothstep(0.0, 0.14, tq), u = clamp((tq - 0.05) / 0.65, 0, 1);
@@ -422,7 +425,10 @@ class Surface {
         const ramp = u * (1 + lc) - lc * smoothstep(lm - 0.12, lm + 0.12, u);
         const cu = tal * 0.07 + 0.85 * ramp + 0.08 * smoothstep(0.64, 1.0, tq);
         face = clamp(Math.min(u, 1 - u) * 5 + tal * (1 - tal) * 1.2, 0, 1);
-        hh += cu * cl + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
+        // (crags: knuckles and notches of a few metres laid on the face itself, never on the beach or the top, so a
+        // headland's end seen from the sea is a broken edge; PHYSICS' float strips showed it ruler-straight)
+        const crag = C.n3(X / 23 + 6.0, Y / 23 - 2.0, Z / 23 + 4.0) * 0.6 + C.n3(X / 10.5 - 3.0, Y / 10.5 + 9.0, Z / 10.5) * 0.4;
+        hh += cu * cl + cl * 0.09 * crag * Math.sin(Math.PI * u) + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
       } else if (hh > -30 && hh < -1.5) {
         // stacks: stumps of the old cliff left standing in the shallows
         this._stF = 0;
