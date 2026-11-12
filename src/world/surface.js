@@ -330,22 +330,27 @@ class Surface {
       const body = (1 - smoothstep(0.68, 0.97, d + wob)) * (0.90 + 0.10 * (1 - Math.min(1, d * d)));
       return Math.max(body, skirt) * (0.45 + 0.55 * (h4 / keep));
     }
-    // (PAINTER 13, sea stacks: a foot, a middle drum and a crown, each narrower than the one under it with its own ragged
-    // rim, the crown off the middle; a ledge between each and the next; the crown's top broken into knuckles. One body
-    // with a rounded crown stood in Neptune's gale as a single smooth block with flat sides. Faces for the shade: _stF)
+    // (PAINTER 13, sea stacks: steps, each narrower than the one under it with its own ragged rim, the crown off the middle,
+    // a ledge between each and the next, the crown's top broken into knuckles. One body with a rounded crown stood in
+    // Neptune's gale as a single smooth block with flat sides. Faces for the shade: _stF)
     const g1 = hash3i(ix, iy, iz, sd ^ 401), g2 = hash3i(ix, iy, iz, sd ^ 503), g3 = hash3i(ix, iy, iz, sd ^ 617);
     const ox = (g1 - 0.5) * 0.26, oy = (g2 - 0.5) * 0.26, oz = (g3 - 0.5) * 0.26;
     const ex = dx / rr - ox, ey = dy / rr - oy, ez = dz / rr - oz, dc = Math.sqrt(ex * ex + ey * ey + ez * ez);
     const c2 = cell * 0.09, c3 = cell * 0.07, c4 = cell * 0.065;
     const w2 = this.nC.n3(X / c2 + 11.0, Y / c2, Z / c2 - 6.0) * 0.13, w3 = this.nC.n3(X / c3 - 4.0, Y / c3 + 8.0, Z / c3) * 0.13;
-    const e1 = 1 - smoothstep(0.88, 0.99, d + wob);
-    const e2 = 1 - smoothstep(0.72, 0.86, d * 0.55 + dc * 0.45 + w2);
-    const e3 = 1 - smoothstep(0.46, 0.62, dc + w3);
-    const f1 = 0.44 + 0.12 * g2, f2 = 0.72 + 0.10 * g3;                       // the ledges' heights, a stack's own
-    const knuck = 0.88 + 0.14 * this.nC.n3(X / c4 + 2.0, Y / c4 - 1.0, Z / c4 + 7.0);   // the crown's top, broken
+    // (four steps, PAINTER 13 second try: a low ledge at the foot, a lower and an upper drum each a little narrower, a
+    // crown off the middle: a tall stack with stepped sides; three steps spread over the radius made a rounded haystack)
+    // (each step a fifth of the radius in from the one below: a ledge two or three metres wide reads from the shore, a
+    // metre-wide one was lost in the terrain's cells and the stack stood as one wall again)
+    const e1 = 1 - smoothstep(0.92, 0.99, d + wob);
+    const e2 = 1 - smoothstep(0.84, 0.93, d * 0.7 + dc * 0.3 + w2);
+    const e3 = 1 - smoothstep(0.62, 0.73, d * 0.4 + dc * 0.6 + w3);
+    const e4 = 1 - smoothstep(0.40, 0.53, dc + w2 * 0.6 - w3 * 0.4);
+    const f1 = 0.14 + 0.08 * g2, f2 = 0.44 + 0.10 * g3, f3 = 0.76 + 0.08 * g1;   // the ledges' heights, a stack's own
+    const knuck = 0.92 + 0.12 * this.nC.n3(X / c4 + 2.0, Y / c4 - 1.0, Z / c4 + 7.0);   // the crown's top, broken
     // (each tread falls a little toward its edge: ledges, not shelves)
-    const body = e1 * (f1 - 0.05 * d) + e2 * e1 * (f2 - f1 - 0.04 * dc) + e3 * e2 * (knuck - f2);
-    this._stF = clamp(Math.max(e1 * (1 - e1), e2 * (1 - e2), e3 * (1 - e3)) * 4, 0, 1);
+    const body = e1 * (f1 - 0.04 * d) + e1 * e2 * (f2 - f1 - 0.03 * d) + e2 * e3 * (f3 - f2 - 0.03 * dc) + e3 * e4 * (knuck - f3);
+    this._stF = clamp(Math.max(e2 * (1 - e2), e3 * (1 - e3), e4 * (1 - e4), e1 * (1 - e1)) * 4, 0, 1);
     return Math.max(body, skirt) * (0.45 + 0.55 * (h4 / keep));
   }
 
@@ -449,7 +454,7 @@ class Surface {
       if (crown > 0) {
         const stk = crown;
         shade += stk * (0.34 * (1 - smoothstep(1.5, 9, h)) + 0.14 * Math.max(0, C.n3(X / 7.3 + 2.0, Y / 7.3 + 3.0, Z / 7.3)));
-        crown = stk * smoothstep(cl * 0.45, cl * 0.85, h) * (0.24 + 0.12 * C.n3(X / 5.1, Y / 5.1 - 4.0, Z / 5.1 + 1.0));
+        crown = stk * smoothstep(cl * 0.35, cl * 0.75, h) * (0.40 + 0.16 * C.n3(X / 5.1, Y / 5.1 - 4.0, Z / 5.1 + 1.0));
       }
     } else if (k === 'canyon') {
       // a plateau cut by a wandering network of gorges: flat dry floor, walls in steps, benches
