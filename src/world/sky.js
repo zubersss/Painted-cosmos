@@ -44,6 +44,7 @@ uniform float uTime;
 varying vec3 vDirL;
 varying vec3 vDirW;
 layout(location = 1) out highp vec4 pcAux;
+uniform float uAux8;
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 ${RING_PROFILE}
@@ -250,14 +251,14 @@ void main() {
   }
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
-  pcAux = vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
+  pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
 }
 `;
 
 export function makeSkyUniforms() {
   ensureGlobals();
   return {
-    uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime,
+    uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime, uAux8: G.uAux8,
     uSunDirL: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
     uCamL: { value: new THREE.Vector3(0, 4000, 0) },
     uSkyZenith: { value: new THREE.Vector3(0.50, 0.69, 0.90) },
@@ -289,6 +290,7 @@ export function makeSkyUniforms() {
 const GLAZE_FRAG = /* glsl */`
 uniform highp sampler3D uNoise3D;
 uniform highp sampler2D uSceneAux;
+uniform float uAux8;
 uniform vec2 uSceneRes;
 uniform vec4 uAtmo;
 uniform vec4 uStreak;       // x strength 0..1, y flow (the painter's clock), z one pixel (tangent), w -
@@ -317,7 +319,7 @@ float spatter(vec3 d, float n, float share, float rMin, float rMax, float px) {
 }
 void main() {
   vec4 aux = texture(uSceneAux, gl_FragCoord.xy / uSceneRes);
-  if (aux.w > 0.5) discard;                                      // only the sky takes this glaze
+  if (aux.w * (uAux8 > 0.5 ? 8.0 : 1.0) > 0.5) discard;                                      // only the sky takes this glaze
   vec3 d = normalize(vDirW);
   float S = uStreak.x;
   // ---- stars
@@ -377,7 +379,7 @@ export function makeSkyGlaze(skyUniforms) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
   const uniforms = {
-    uNoise3D: G.uNoise3D, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes,
+    uNoise3D: G.uNoise3D, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, uAux8: G.uAux8,
     uAtmo: skyUniforms.uAtmo, uProjScale: skyUniforms.uProjScale, uCamRot: skyUniforms.uCamRot, uBodyInv: skyUniforms.uBodyInv,
     uStreak: { value: new THREE.Vector4(0, 0, 0.002, 0) },
     uTravel: { value: new THREE.Vector3(0, 0, -1) },

@@ -16,7 +16,7 @@ import { createExplorer, createShip } from './models.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { LOOKS } from '../data/looks.js';
 import { findVantage } from './vantage.js';
-import { gaitOf, EXPLORER_BODY } from '../physics/explorer.js';
+import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
 
 const P = new URLSearchParams(location.search);
 const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.get(k) : d);
@@ -307,9 +307,9 @@ const MP = {
   pose: P.get('pose') || 'idle', speed: P.has('speed') ? num('speed', 0) : null, phase: P.has('phase') ? num('phase', 0) : null,
   jet: num('jet', 1), lift: num('lift', 0), face: num('mface', 0), epitch: num('epitch', 0),
   smode: P.get('smode') || (num('hover', 0) > 0 ? 'hover' : 'landed'), gear: P.has('gear') ? num('gear', 1) : null, canopy: num('canopy', 0),
-  throttle: P.has('throttle') ? num('throttle', 0) : null, sface: num('sface', -70), dist: num('mdist', 5),
+  throttle: P.has('throttle') ? num('throttle', 0) : null, sface: num('sface', -70), dist: num('mdist', 5), side: num('mside', 1.5),
 };
-window.__pcModel = MP;     // (a tool may turn the explorer, .face, or move it, .dist, between frames: several views from one load)
+window.__pcModel = MP;     // (a tool may turn the explorer, .face, or move it, .dist ahead and .side to the right, between frames: several views from one load)
 const _mx = new THREE.Matrix4(), _fx = new THREE.Vector3(), _zx = new THREE.Vector3(), _xx = new THREE.Vector3();
 function placeModel(m, east, north, lift, face) {
   const R = BODIES[bodyId].radius;
@@ -332,15 +332,8 @@ if (GAIT) window.__pcGait = GAIT;     // (a tool may set .s, .v, .g between fram
 function gaitPose(dt) {
   const T = EXPLORER_BODY, o = gaitOf(Math.max(0.12, GAIT.v), GAIT.g, T, {});
   if (!GAIT.hold && o.step > 0) GAIT.s = (GAIT.s + GAIT.v * dt / (2 * o.step)) % 1;
-  const ph = (GAIT.s * 2) % 1, L = T.legLength, k = (1 - T.gaitRocker) * L, gE = Math.max(0.3, GAIT.g);
-  let bob = 0;
-  if (o.gait === 2) {
-    const tc = o.contact, t = ph * o.period, a = Math.PI / tc;
-    bob = t < tc ? -o.drop - 0.5 * gE * o.flight * t + o.A * (t - Math.sin(a * t) / a) / a - 0.5 * gE * t * t : -o.drop + 0.5 * gE * (o.flight - (t - tc)) * (t - tc);
-  } else if (o.gait === 1) {
-    const ds = 2 * o.duty - 1, s = o.step, yl = -k * (1 - Math.cos((ph - 0.5 * (1 + ds)) * s / L));
-    if (ph >= ds) bob = yl; else { const yt = -k * (1 - Math.cos((ph + 0.5 * (1 - ds)) * s / L)), w = ph / ds; bob = yt + (yl - yt) * w * w * (3 - 2 * w); }
-  }
+  // (the hips' rise and fall in a steady stride: PHYSICS' own, strideBob, the body's st.phys.bob to 1e-9)
+  const bob = strideBob(Math.max(0.12, GAIT.v), GAIT.g, GAIT.s, T, o);
   const X = o.duty * o.step, lift = o.gait === 2 ? 0.12 + 0.1 * Math.min(1, GAIT.v / 7) : 0.07, feet = [];
   for (let i = 0; i < 2; i++) {
     let p = GAIT.s - 0.5 * i; if (p < 0) p += 1;
@@ -383,7 +376,7 @@ function tick(now) {
   orient();
   placeBodies();
   if (ship) placeShip(dt);
-  if (explorer) placeExplorer(1.5, dt);
+  if (explorer) placeExplorer(MP.side, dt);
   if (physics) {
     const up = state.pos.clone().normalize();
     // what pushes the grass about: the explorer on show, and the ship's downwash (?wash=<newtons>)
@@ -392,7 +385,7 @@ function tick(now) {
     const setDisturbers = (back) => {
       disturbers.length = 0;
       if (explorer) {
-        placeExplorer(1.5 - walk * back, null);
+        placeExplorer(MP.side - walk * back, null);
         const p = root.worldToLocal(explorer.object3D.position.clone());
         frame(state.pos);
         disturbers.push({ kind: 'explorer', p, v: { x: _r.x * walk, y: _r.y * walk, z: _r.z * walk }, radius: 0.45, strength: 1, grounded: true });

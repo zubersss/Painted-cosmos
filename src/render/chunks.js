@@ -53,6 +53,10 @@ uniform float uDayness;
 uniform float uStorm;
 uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
 layout(location = 1) out highp vec4 pcAux;
+uniform float uAux8;
+// (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
+vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
+vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
 
 // Pigment density model: heavier pigment grows richer, not muddier.
 vec3 pcDensity(vec3 c, float d) {
@@ -188,6 +192,6 @@ vec4 pcTri8(vec3 p, vec3 n, float scale) {
 
 void pcWrite(vec3 col, float wet, vec3 nV, float viewZ, float id) {
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(wet, 0.0, 1.0));
-  pcAux = vec4(nV.xy, log2(1.0 + max(viewZ, 0.0)), id);
+  pcAux = pcAuxEnc(vec4(nV.xy, log2(1.0 + max(viewZ, 0.0)), id));
 }
 `;

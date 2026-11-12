@@ -64,7 +64,7 @@ export function makeRing(bodyU, R, rings) {
   const geo = new THREE.RingGeometry(R * rings.inner, R * rings.outer, 128, 1);
   const mat = new THREE.ShaderMaterial({
     name: 'pc-ring',
-    uniforms: Object.assign({ uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime, uColor: { value: new THREE.Vector3().fromArray(rings.color) }, uRadii: { value: new THREE.Vector2(R * rings.inner, R * rings.outer) } }, bodyU),
+    uniforms: Object.assign({ uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime, uAux8: G.uAux8, uColor: { value: new THREE.Vector3().fromArray(rings.color) }, uRadii: { value: new THREE.Vector2(R * rings.inner, R * rings.outer) } }, bodyU),
     vertexShader: RING_VERT, fragmentShader: RING_FRAG, side: THREE.DoubleSide,
   });
   mat.userData.pcPainted = true;
@@ -152,7 +152,7 @@ export function makeCloudShell(bodyU, radius, look, stormDir) {
   const mat = new THREE.ShaderMaterial({
     name: 'pc-cloudshell',
     uniforms: Object.assign({
-      uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime,
+      uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uTime: G.uTime, uAux8: G.uAux8,
       uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands ? 1 : 0) },
       uLimbCos: { value: 0.4 },
       uDeck: { value: new THREE.Vector4(D.belts || 7, D.wobble == null ? 0.10 : D.wobble, D.streaks || 0, D.wet == null ? 0.55 : D.wet) },

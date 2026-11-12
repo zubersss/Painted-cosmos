@@ -51,6 +51,10 @@ export const G = {
   // the scene pass's colour (what lies behind a glaze, before the brush): the star glaze reads
   // how dark the sky is there
   uSceneCol: { value: null },
+  // 1 where the browser cannot draw into float targets (no EXT_color_buffer_float or _half_float): the scene pass's
+  // second target (normal, log depth, region) and last frame's depth are then 8-bit, so they are written packed into
+  // 0..1 (pcAuxEnc) and unpacked where they are read (pcAuxDec); 0 everywhere else: nothing changes (see post.js)
+  uAux8: { value: 0 },
 };
 
 // Things laid as a GLAZE over the painted scene (rain): objects whose material blends. They are

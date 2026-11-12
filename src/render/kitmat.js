@@ -143,7 +143,7 @@ void main() {
   ${shapeOf(kind, info)}
   c = pcAtmosV(pcTone(c, 2.0), pcFogAmount(length(vView)), vView);
   ${info.veil && (kind === 'dust' || kind === 'ash' || kind === 'sand') ? 'c = mix(c, vec3(0.985, 0.975, 0.955), lift);' : ''}
-  ${glaze ? 'if (log2(1.0 + max(-vView.z, 0.0)) > texture(uSceneAux, gl_FragCoord.xy / uSceneRes).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
+  ${glaze ? 'if (log2(1.0 + max(-vView.z, 0.0)) > pcAuxDec(texture(uSceneAux, gl_FragCoord.xy / uSceneRes)).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,
     side: THREE.DoubleSide, transparent: glaze, depthWrite: !glaze, depthTest: !glaze,
     polygonOffset: info.shape === 'mark' || info.shape === 'ring', polygonOffsetFactor: -2, polygonOffsetUnits: -2,

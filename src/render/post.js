@@ -21,10 +21,16 @@ void main() {
 
 const BACKDROP_FRAG = /* glsl */`
 layout(location = 1) out highp vec4 pcAux;
+uniform float uAux8;
 void main() {
   gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-  pcAux = vec4(0.0, 0.0, 20.0, 0.0);
+  pcAux = uAux8 > 0.5 ? vec4(0.5, 0.5, 20.0 / 32.0, 0.0) : vec4(0.0, 0.0, 20.0, 0.0);
 }
+`;
+// the 8-bit fallback's unpacking (shared.js uAux8), for the passes that read the scene's second target
+const AUX_DEC = /* glsl */`
+uniform float uAux8;
+vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
 `;
 
 const PREP_FRAG = /* glsl */`
@@ -55,10 +61,11 @@ uniform vec2 uRes;         // internal resolution
 uniform vec4 uBrush;       // near radius, far radius (fractions of height), bleed radius, bleed amount
 uniform float uAbstraction;
 varying vec2 vUv;
+${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
   vec4 c0 = texture(tScene, vUv);
-  vec4 aux = texture(tAux, vUv);
+  vec4 aux = pcAuxDec(texture(tAux, vUv));
   float wet = c0.a;
   float cls = floor(aux.w + 0.001);
   // far things are fewer, larger, softer strokes; near things keep crisp accents
@@ -113,6 +120,7 @@ uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm
 uniform float uNight;     // the night key: 0 day .. 1 night on the ground
 uniform float uLaid;      // 1 the picture is on the paper; 0 bare paper; between: it comes up from the paper as one
 varying vec2 vUv;
+${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
   float sc = max(uOutRes.y / 1080.0, 0.62);
@@ -198,9 +206,9 @@ void main() {
 
   // graphite underdrawing on major silhouettes: faint, broken, catching the paper tooth
   vec2 guv = vUv + wob * 0.4 + vec2(1.4, -0.9) * sc / uOutRes;
-  vec4 a0 = texture(tAux, guv);
-  vec4 a1 = texture(tAux, guv + vec2(uInTexel.x * 1.5, 0.0));
-  vec4 a2 = texture(tAux, guv + vec2(0.0, uInTexel.y * 1.5));
+  vec4 a0 = pcAuxDec(texture(tAux, guv));
+  vec4 a1 = pcAuxDec(texture(tAux, guv + vec2(uInTexel.x * 1.5, 0.0)));
+  vec4 a2 = pcAuxDec(texture(tAux, guv + vec2(0.0, uInTexel.y * 1.5)));
   float dz = max(abs(a1.z - a0.z), abs(a2.z - a0.z));
   float c0 = floor(a0.w), c1 = floor(a1.w), c2 = floor(a2.w);
   // region changes count only where a solid thing (prop, character) meets something else
@@ -219,8 +227,8 @@ void main() {
     // (how much of the neighbourhood is open sky: the gaps in a crown are part of the crown,
     // a lone sky pixel there lifted to paper was a fringe of white specks round every tree)
     vec2 o2 = uInTexel * 3.0;
-    float isSky = 5.0 - step(0.5, texture(tAux, uv).w) - step(0.5, texture(tAux, uv + vec2(o2.x, o2.y)).w) - step(0.5, texture(tAux, uv + vec2(-o2.x, o2.y)).w)
-      - step(0.5, texture(tAux, uv + vec2(o2.x, -o2.y)).w) - step(0.5, texture(tAux, uv + vec2(-o2.x, -o2.y)).w);
+    float isSky = 5.0 - step(0.5, pcAuxDec(texture(tAux, uv)).w) - step(0.5, pcAuxDec(texture(tAux, uv + vec2(o2.x, o2.y))).w) - step(0.5, pcAuxDec(texture(tAux, uv + vec2(-o2.x, o2.y))).w)
+      - step(0.5, pcAuxDec(texture(tAux, uv + vec2(o2.x, -o2.y))).w) - step(0.5, pcAuxDec(texture(tAux, uv + vec2(-o2.x, -o2.y))).w);
     isSky = smoothstep(0.55, 1.0, isSky * 0.2);
     // (the thin parts of the cloud light up most: the sky's own values, not the paper's, shape the flash)
     float lift = uWxSheet.y * (isSky * (0.62 + 0.33 * smoothstep(0.0, 0.42, dot(sur, W))) + (1.0 - isSky) * smoothstep(0.25, 0.75, dot(col, W)) * 0.55);
@@ -249,6 +257,12 @@ function fsMaterial(frag, uniforms, extra) {
 export class Post {
   constructor(renderer) {
     this.renderer = renderer;
+    // Float targets need EXT_color_buffer_float or _half_float (nearly every desktop WebGL 2 has one). Without, every
+    // target is 8-bit and what the scene pass's second target and last frame's depth carry is packed (shared.js uAux8).
+    const ex = renderer.extensions;
+    this.floatFallback = !!(ex && ex.has && !ex.has('EXT_color_buffer_float') && !ex.has('EXT_color_buffer_half_float'));
+    G.uAux8.value = this.floatFallback ? 1 : 0;
+    const HF = this.floatFallback ? THREE.UnsignedByteType : THREE.HalfFloatType;
     const tex = getTextures();
     this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const geo = new THREE.BufferGeometry();
@@ -261,11 +275,11 @@ export class Post {
 
     this.rtScene = new THREE.WebGLRenderTarget(2, 2, { count: 2, depthBuffer: true, type: THREE.UnsignedByteType });
     this.rtScene.textures[0].minFilter = THREE.LinearFilter; this.rtScene.textures[0].magFilter = THREE.LinearFilter;
-    this.rtScene.textures[1].type = THREE.HalfFloatType;
+    this.rtScene.textures[1].type = HF;
     this.rtScene.textures[1].minFilter = THREE.NearestFilter; this.rtScene.textures[1].magFilter = THREE.NearestFilter;
     this.rtScene.depthTexture = new THREE.DepthTexture(2, 2, THREE.FloatType);
 
-    this.rtHalf = new THREE.WebGLRenderTarget(2, 2, { count: 2, depthBuffer: false, type: THREE.HalfFloatType });
+    this.rtHalf = new THREE.WebGLRenderTarget(2, 2, { count: 2, depthBuffer: false, type: HF });
     this.rtHalf.textures[1].type = THREE.UnsignedByteType;
     for (const t of this.rtHalf.textures) { t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; }
 
@@ -273,7 +287,7 @@ export class Post {
     this.rtAbs.texture.minFilter = THREE.LinearFilter; this.rtAbs.texture.magFilter = THREE.LinearFilter;
 
     // last frame's painting + depth, kept for the water's reflections
-    this.rtPrev = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.HalfFloatType });
+    this.rtPrev = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: HF });
     this.rtPrev.texture.minFilter = THREE.LinearFilter; this.rtPrev.texture.magFilter = THREE.LinearFilter;
     this.mKeep = fsMaterial(/* glsl */`
       uniform sampler2D tAbs; uniform highp sampler2D tAux; varying vec2 vUv;
@@ -282,7 +296,7 @@ export class Post {
     G.uPrevTex.value = this.rtPrev.texture;
     this.prevFrames = 0;
 
-    this.mBackdrop = fsMaterial(BACKDROP_FRAG, {});
+    this.mBackdrop = fsMaterial(BACKDROP_FRAG, { uAux8: G.uAux8 });
     this.mPrep = fsMaterial(PREP_FRAG, { tScene: { value: this.rtScene.textures[0] }, uTexel: { value: new THREE.Vector2() } });
     this.absUniforms = {
       tScene: { value: this.rtScene.textures[0] }, tAux: { value: this.rtScene.textures[1] },
@@ -290,7 +304,7 @@ export class Post {
       tPaper: { value: tex.paper },
       uTexel: { value: new THREE.Vector2() }, uRes: { value: new THREE.Vector2() },
       uBrush: { value: new THREE.Vector4(0.0036, 0.0085, 0.013, 0.8) },
-      uAbstraction: { value: 1 },
+      uAbstraction: { value: 1 }, uAux8: G.uAux8,
     };
     this.mAbs = {};
     for (const s of [4, 8]) this.mAbs[s] = fsMaterial(ABS_FRAG, this.absUniforms, { defines: { SECTORS: s } });
@@ -303,7 +317,7 @@ export class Post {
       uBorder: { value: new THREE.Vector4(0.030, 0.034, 0.9, 1) },
       uBoil: { value: new THREE.Vector2(0, 0) },
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
-      uNight: { value: 0 }, uLaid: { value: 1 },
+      uNight: { value: 0 }, uLaid: { value: 1 }, uAux8: G.uAux8,
     };
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms);
     this.debugView = 0;

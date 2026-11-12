@@ -30,7 +30,7 @@ function baseUniforms(bodyU, own) {
   ensureGlobals();
   const b = bodyU || defaultBodyUniforms();
   return Object.assign({
-    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear,
+    uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear, uAux8: G.uAux8,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
     uFog: b.uFog, uDayness: b.uDayness, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
@@ -334,7 +334,7 @@ vec3 pcReflect(vec3 P, vec3 R) {
     vec2 q = cp.xy / cp.w * 0.5 + 0.5;
     if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) break;
     uv = q;
-    float sd = exp2(texture(uPrevTex, q).a) - 1.0;
+    float sd = exp2(texture(uPrevTex, q).a * (uAux8 > 0.5 ? 32.0 : 1.0)) - 1.0;
     float rd = -p.z;
     conf = 0.55;
     if (sd < rd && rd - sd < max(2.5, t * 0.9)) { conf = 1.0; break; }

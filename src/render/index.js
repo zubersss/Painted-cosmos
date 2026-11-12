@@ -178,6 +178,8 @@ export function createPainter(renderer) {
       if (o.bleed != null) a.uBrush.value.w = o.bleed;
     },
     info,
+    // true where the browser cannot draw into float targets and the painting runs on 8-bit ones (post.js)
+    floatFallback: post.floatFallback,
     dispose() { post.dispose(); },
   };
 }
