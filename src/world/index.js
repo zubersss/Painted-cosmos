@@ -389,8 +389,11 @@ export function createWorld(scene) {
       let wDay = THREE.MathUtils.smoothstep(e, 0.06, 0.42);
       const wTwi = Math.max(0, 1 - wNight - wDay);
       const lost = wDay * twi;
-      wDay -= lost; wNight += lost * 0.22;
-      blendKeys(look, wDay, am ? wTwi : 0, (am ? 0 : wTwi) + lost * 0.78, wNight);
+      // (PAINTER 13, ARTPASS wish 4: a lasting twilight is cool: the day it loses goes to the rose dawn key and the night's
+      // cool light more than to the gold dusk; 78 % of it went to the dusk key, and a ring's shadow at noon turned
+      // grey-brown, a crystal garden's glaze one flat ultramarine)
+      wDay -= lost; wNight += lost * 0.24;
+      blendKeys(look, wDay, (am ? wTwi : 0) + lost * 0.40, (am ? 0 : wTwi) + lost * 0.36, wNight);
       const dayness = 1 - wNight;
       // ---- weather in the picture (PHYSICS' sky numbers; they belong to the air near the ground)
       // the sky numbers are eased over about two seconds before anything is painted from them

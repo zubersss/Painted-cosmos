@@ -334,14 +334,14 @@ class Surface {
     // rim, the crown off the middle; a ledge between each and the next; the crown's top broken into knuckles. One body
     // with a rounded crown stood in Neptune's gale as a single smooth block with flat sides. Faces for the shade: _stF)
     const g1 = hash3i(ix, iy, iz, sd ^ 401), g2 = hash3i(ix, iy, iz, sd ^ 503), g3 = hash3i(ix, iy, iz, sd ^ 617);
-    const ox = (g1 - 0.5) * 0.30, oy = (g2 - 0.5) * 0.30, oz = (g3 - 0.5) * 0.30;
+    const ox = (g1 - 0.5) * 0.26, oy = (g2 - 0.5) * 0.26, oz = (g3 - 0.5) * 0.26;
     const ex = dx / rr - ox, ey = dy / rr - oy, ez = dz / rr - oz, dc = Math.sqrt(ex * ex + ey * ey + ez * ez);
     const c2 = cell * 0.09, c3 = cell * 0.07, c4 = cell * 0.065;
     const w2 = this.nC.n3(X / c2 + 11.0, Y / c2, Z / c2 - 6.0) * 0.13, w3 = this.nC.n3(X / c3 - 4.0, Y / c3 + 8.0, Z / c3) * 0.13;
-    const e1 = 1 - smoothstep(0.84, 0.98, d + wob);
-    const e2 = 1 - smoothstep(0.68, 0.82, d * 0.55 + dc * 0.45 + w2);
-    const e3 = 1 - smoothstep(0.48, 0.64, dc + w3);
-    const f1 = 0.32 + 0.14 * g2, f2 = 0.62 + 0.14 * g3;                       // the ledges' heights, a stack's own
+    const e1 = 1 - smoothstep(0.88, 0.99, d + wob);
+    const e2 = 1 - smoothstep(0.72, 0.86, d * 0.55 + dc * 0.45 + w2);
+    const e3 = 1 - smoothstep(0.46, 0.62, dc + w3);
+    const f1 = 0.44 + 0.12 * g2, f2 = 0.72 + 0.10 * g3;                       // the ledges' heights, a stack's own
     const knuck = 0.88 + 0.14 * this.nC.n3(X / c4 + 2.0, Y / c4 - 1.0, Z / c4 + 7.0);   // the crown's top, broken
     // (each tread falls a little toward its edge: ledges, not shelves)
     const body = e1 * (f1 - 0.05 * d) + e2 * e1 * (f2 - f1 - 0.04 * dc) + e3 * e2 * (knuck - f2);
@@ -370,7 +370,7 @@ class Surface {
     const X = x * R, Y = y * R, Z = z * R;
     const T = bi.t || NOT, k = bi.terrain;
     let h = 0, t = 0.5, dry = 0.4, wet = 0.2, lq = NOLQ, grow = 1, bed = 0;
-    let shade = 0, snow = 0, veil = 0, lip = 0, meadow = 1, ember = 0, char = 0, crk = 0;
+    let shade = 0, snow = 0, veil = 0, lip = 0, meadow = 1, ember = 0, char = 0, crk = 0, crown = 0;
     if (k === 'alpine') {
       // meadows fill the valley floors; the peaks stand up sharply behind them
       const wl = T.wl || 1000, amp = T.amp || 480;
@@ -413,10 +413,7 @@ class Surface {
         // of the cliff line is halved: that wobble against the narrow face is what combed it into gullies (stripes).
         // Measured round Earth's easel view: old - new height p90 21 -> 4.6 m, max 25 -> 11 m; gully index (|d2h/dt2|
         // along the contour on faces) 1.57 before PAINTER 12, 0.96 after, 0.89 now)
-        // (and the wobble of the cliff line comes in only as the land rises, so the face starts at the shore: with the
-        // wobble whole at the waterline the land stepped up 10 to 20 m in one metre wherever the wobble was high there, a
-        // vertical step the terrain's cells combed into stripes and that stood as a ruled edge seen from the sea)
-        const q = hh + (C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.3) * smoothstep(0.9, 3.2, hh);
+        const q = hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.3;
         const tq = clamp((q - 0.9) / 4.4, 0, 1);
         const ledge = smoothstep(-0.1, 0.35, C.n3(X / 70 + 9.0, Y / 70, Z / 70 - 2.0));
         const tal = smoothstep(0.0, 0.14, tq), u = clamp((tq - 0.05) / 0.65, 0, 1);
@@ -428,12 +425,17 @@ class Surface {
         // (crags: knuckles and notches of a few metres laid on the face itself, never on the beach or the top, so a
         // headland's end seen from the sea is a broken edge; PHYSICS' float strips showed it ruler-straight)
         const crag = C.n3(X / 23 + 6.0, Y / 23 - 2.0, Z / 23 + 4.0) * 0.6 + C.n3(X / 10.5 - 3.0, Y / 10.5 + 9.0, Z / 10.5) * 0.4;
-        hh += cu * cl + cl * 0.09 * crag * Math.sin(Math.PI * u) + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
+        // (and the cliff rises out of the shore, never off it: where the wobble was high at the waterline the land stepped
+        // up 10 to 20 m within a metre, a vertical step the terrain's cells combed into stripes and that stood as a ruled
+        // edge seen from the sea; the rise is let in over the first 2 m of the land's own height. Where the wobble is low
+        // the beach is kept: the cliff starts behind it, where q passes the shore)
+        const gate = smoothstep(0.9, 2.9, hh);
+        hh += (cu * cl + cl * 0.09 * crag * Math.sin(Math.PI * u)) * gate + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
       } else if (hh > -30 && hh < -1.5) {
         // stacks: stumps of the old cliff left standing in the shallows
         this._stF = 0;
         const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks, true);
-        if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, this._stF * near); }
+        if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, this._stF * near); crown = st * near; }
       }
       h = hh + C.n3(x * R / 9, y * R / 9 + 2.0, z * R / 9) * 0.25 + (C.n3(x * R / 37 + 4.0, y * R / 37, z * R / 37) * 2.6 + C.n3(x * R / 11 - 2.0, y * R / 11, z * R / 11 + 6.0) * 0.9 + C.n3(x * R / 3.7 + 8.0, y * R / 3.7, z * R / 3.7) * 0.4) * (1 - smoothstep(3, 16, Math.abs(hh)));
       t = clamp((h + 2) / 34, 0, 1); dry = 0.25 + 0.5 * t; wet = h < 1 ? 0.6 : 0.2;
@@ -442,6 +444,13 @@ class Surface {
       meadow = smoothstep(cl * 0.5, cl * 0.8, h);
       bed = 1 - smoothstep(-0.5, 2.5, h);
       shade = face * 0.12;
+      // (a stack in values, PAINTER 13: its foot dark where the sea wets it, its drums laid heavier and lighter in drifts,
+      // its crown dry and pale; one even wash read as a single smooth block)
+      if (crown > 0) {
+        const stk = crown;
+        shade += stk * (0.34 * (1 - smoothstep(1.5, 9, h)) + 0.14 * Math.max(0, C.n3(X / 7.3 + 2.0, Y / 7.3 + 3.0, Z / 7.3)));
+        crown = stk * smoothstep(cl * 0.45, cl * 0.85, h) * (0.24 + 0.12 * C.n3(X / 5.1, Y / 5.1 - 4.0, Z / 5.1 + 1.0));
+      }
     } else if (k === 'canyon') {
       // a plateau cut by a wandering network of gorges: flat dry floor, walls in steps, benches
       const wl = T.wl || 620, amp = T.amp || 190;
@@ -674,6 +683,7 @@ class Surface {
     }
     // form laid in with a second, denser wash (cliff faces, slip faces, cut banks)
     if (shade > 0) { const kd = shade * 0.9, kg = Math.min(1, shade * 1.7); b.r -= (b.r - b.r * b.r) * kd; b.g -= (b.g - b.g * b.g) * kd; b.b -= (b.b - b.b * b.b) * kd * 0.6; b.r *= 1 - 0.26 * kg; b.g *= 1 - 0.28 * kg; b.b *= 1 - 0.08 * kg; }
+    if (crown > 0) { b.r += (0.93 - b.r) * crown; b.g += (0.92 - b.g) * crown; b.b += (0.90 - b.b) * crown; }
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
     if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
     if (bed > 0) { mix3(b, pal.low, bed * 0.6); if (T.bedPale) { const kb = bed * T.bedPale; b.r += (0.97 - b.r) * kb; b.g += (0.95 - b.g) * kb; b.b += (0.93 - b.b) * kb; } }

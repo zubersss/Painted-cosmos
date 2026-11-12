@@ -72,7 +72,7 @@ export class Flora {
     this.ready = true;
     const bodyUniforms = this.bodyUniforms, L = this.look;
     this.species = L.tall.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1] });
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal' });
       const gen = TALL_KITS[sp.kit];
       const fd = sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit];
       return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
@@ -115,7 +115,7 @@ export class Flora {
       patch: makePropMaterial(bodyUniforms, { name: 'patch' + tag, leafA: U.leaf[1], leafB: U.leaf[2], leafC: U.leaf[2].map((x) => x - (x - x * x) * 0.6), accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5, bladeRoot: true }),
       bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
       rock: makePropMaterial(bodyUniforms, { name: 'rock' + tag, barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
-      shard: makePropMaterial(bodyUniforms, { name: 'shard' + tag, barkA: sh[0], barkB: sh[1], wind: 0 }),
+      shard: makePropMaterial(bodyUniforms, { name: 'shard' + tag, barkA: sh[0], barkB: sh[1], wind: 0, gem: !!U.shard }),
     };
   }
   _palette(bi) {

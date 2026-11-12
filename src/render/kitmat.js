@@ -82,10 +82,16 @@ const SHAPES = {
     // painter's draw table makes it a veil), so PAINTER 12's grains in the puff never showed and a run on the Moon put up a
     // soft white puff of smoke at the boot. Each particle is one small crisp touch of the ground's own dust, darker than the
     // paper and not lifted toward it: a fan of grains that keeps its shape on its arcs and falls)
-    + ' if (uAirless > 0.5) { float rg = length(p); if (rg > 0.26) discard; c = pcDensity(ink, 1.30 + 0.25 * fract(vPcData.x * 7.0)); ga = 0.9 * (1.0 - smoothstep(0.13, 0.26, rg + (nz - 0.5) * 0.10)) * clamp(vPcData.y * 3.0, 0.0, 1.0); lift = 0.0; }',
+    // (a grain is a fleck two or three pixels across at the middle of its quad wherever it is, measured in pixels along each
+    // side of the quad: a grain a quarter of the half-metre quad wide was a soft grey blot 40 px across as it flew past the
+    // lens, and one drawn out by the quad's exposure was a thin pale scratch; laid a little darker than its ground)
+    + ' if (uAirless > 0.5) { float gpx = length(vec2(p.x / max(fwidth(p.x), 1e-4), p.y / max(fwidth(p.y), 1e-4))); if (gpx > 1.9 || length(p) > 1.0) discard; c = pcDensity(ink, 1.65 + 0.25 * fract(vPcData.x * 7.0)); ga = 0.92 * (1.0 - smoothstep(1.0, 1.9, gpx + (nz - 0.5) * 0.4)) * clamp(vPcData.y * 3.0, 0.0, 1.0); lift = 0.0; }',
   // blown sand: a drag of the dune's own wash lifted toward the paper (a pale skim, heavier than
   // it was: scattered specks did not read), thinning to its tail
-  sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66 * smoothstep(1.6, 3.6, length(vView));',
+  // (PAINTER 13: with no air there is no skim: a kicked grain there is a fleck of the ground's own dust at the head of its
+  // stroke, a little darker than its ground; the pale drags ran from the Moon walker's boots as thin white scratches)
+  sandStreak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 || length(vView) < 1.6) discard; vec3 c = mix(vec3(0.985, 0.972, 0.95), mix(uHaze, ink, 0.55), 0.58); float w = 0.9; float ga = (1.0 - tpr * tpr) * (1.0 - 0.8 * vPcUv.y) * smoothstep(0.0, 0.08, vPcUv.y) * 0.66 * smoothstep(1.6, 3.6, length(vView));'
+    + ' if (uAirless > 0.5) { float gpx = length(vec2((vPcUv.x - 0.5) / max(fwidth(vPcUv.x), 1e-4), (vPcUv.y - 0.12) / max(fwidth(vPcUv.y), 1e-4))); if (gpx > 1.9) discard; c = pcDensity(ink, 1.65); ga = 0.9 * (1.0 - smoothstep(1.0, 1.9, gpx)) * smoothstep(1.6, 3.6, length(vView)); }',
   // (PAINTER 12, PHYSICS P20: and thinner as it comes to the lens, gone at 1.6 m: drops crossing near the eye in Neptune's
   // gale were large soft white blots over the picture)
   // spume and surf spray: a soft pale blot broken where the brush lifted (the drops off one crest run together

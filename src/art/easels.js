@@ -30,7 +30,7 @@ export const EASELS = {
     mare: [-0.058016, 0.806398, -0.588521, 118, 4],
     highlands: [-0.665473, -0.392552, 0.634861, 277, 4],
     crater_fields: [-0.549487, 0.786366, 0.2823, 240, 5],
-    rilles: [0.061523, -0.217086, -0.974212, 86, 7],
+    rilles: [0.177279, 0.106301, -0.978403, 93, 1],
   },
   mars: {
     rust_canyons: [0.836769, -0.175432, 0.518692, 50, 6.3],
@@ -89,12 +89,12 @@ export const STANDS = {
   },
   // (PAINTER 13, the coordinator's ruling: the Moon is tidally locked and Earth hangs fixed in the near side's sky, at
   // (-0.891, 0, -0.453) in the Moon's frame; every stand is on the near side, 70 to 75 degrees from the sub-Earth point,
-  // facing Earth, which stands 15 to 20 degrees up (its disc is 15 degrees across), and looks up a little at it)
+  // facing Earth, which stands 14 to 18 degrees up (its disc is 15 degrees across), and looks up a little at it)
   moon: {
     mare: [-0.058016, 0.806398, -0.588521, 118, 3],        // (Earth over the flat silver plain, 15 degrees up)
     highlands: [-0.665473, -0.392552, 0.634861, 277, 3],  // (over the rolling bright hills, 15 degrees up)
     crater_fields: [-0.549487, 0.786366, 0.2823, 240, 4], // (over the crater rims, 18 degrees up)
-    rilles: [0.061523, -0.217086, -0.974212, 86, 6],      // (on a rille's rim, the rille winding toward Earth, 20 degrees up)
+    rilles: [0.177279, 0.106301, -0.978403, 93, 2],       // (high on a rille's bank, looking down into it toward Earth, 14 degrees up)
   },
   mars: {
     rust_canyons: [0.836522, -0.121244, 0.534351, 250],

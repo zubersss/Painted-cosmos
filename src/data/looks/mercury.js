@@ -20,8 +20,10 @@ export default {
       { t: { amp: 14, crack: 0.5, dil: 0.0, patch: [{ c: [0.62, 0.60, 0.70], wl: 9, thr: 0.22, soft: 0.3, amt: 0.28 }, { c: [0.22, 0.22, 0.32], wl: 37, thr: -0.12, soft: 0.35, amt: 0.6 }] }, under: { rock: [[0.36, 0.35, 0.46], [0.22, 0.21, 0.30]], shard: [[0.44, 0.44, 0.58], [0.15, 0.15, 0.25]],
           // plates of glass that mirror the sky, the black glass itself, ash drifted between, a turquoise seam
           crust: [[0.74, 0.76, 0.88], [0.22, 0.22, 0.32], [0.60, 0.58, 0.70], [0.34, 0.70, 0.70]] }, tall: [2, 2], tallD: 0.07, tallMix: 1, near: { crust: 8, needle: 0, dab: 0 }, small: { rock: 0.016, shard: 0.012 }, phys: { ground: 'rock' } }),
+    // (PAINTER 13: the splinters in the garden are the crystals' own rose and cream, a dusty rose-lilac in their shade: a
+    // saturated violet shard wash under the twilight glaze made every crystal the same blue-violet)
     B('crystal_gardens', 'Twilight Crystal Gardens', 'rolling', ['cobaltViolet', 'roseMadder', 'cerulean', 'neutralTint', 'indigo'], 'lemonYellow', ['cobaltViolet', 'roseMadder', 'neutralTint'],
-      { t: { amp: 45, wl: 380, dusk: 0.2 }, twilight: 0.45, tall: [0, 1], tallD: 0.11, tallMix: 0.5, under: { crust: [[0.94, 0.84, 0.94], [0.62, 0.52, 0.80], [0.96, 0.90, 0.58]], shard: [[0.88, 0.80, 0.92], [0.58, 0.48, 0.72]], rock: [[0.70, 0.62, 0.68], [0.40, 0.34, 0.46]] }, near: { crust: 5, needle: 0, dab: 1 }, small: { shard: 0.03, rock: 0.008 } }),
+      { t: { amp: 45, wl: 380, dusk: 0.2 }, twilight: 0.45, tall: [0, 1], tallD: 0.11, tallMix: 0.5, under: { crust: [[0.94, 0.84, 0.94], [0.62, 0.52, 0.80], [0.96, 0.90, 0.58]], shard: [[0.97, 0.91, 0.88], [0.70, 0.53, 0.68]], rock: [[0.70, 0.62, 0.68], [0.40, 0.34, 0.46]] }, near: { crust: 5, needle: 0, dab: 1 }, small: { shard: 0.03, rock: 0.008 } }),
     B('shadow_craters', 'Frozen Shadow Craters', 'crater', ['davysGrey', 'cobaltBlue', 'neutralTint', 'indigo', 'paynesGrey'], 'mint', ['davysGrey', 'cobaltBlue', 'neutralTint'],
       { t: { frost: 0.9, dusk: 0.25 }, twilight: 0.5, under: { rock: [[0.88, 0.91, 0.96], [0.52, 0.58, 0.74]] }, small: { rock: 0.03 }, phys: { ground: 'ice' } }),
   ],

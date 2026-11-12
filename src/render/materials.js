@@ -413,7 +413,20 @@ void main() {
   float hotD = smoothstep(0.30, 1.20, vDep + (r2.g - 0.5) * 0.5);
   own = mix(own, vec3(0.88, 0.25, 0.13), vLiqP.x * (1.0 - hotD) * 0.7);
   own = mix(own, vec3(1.0, 0.94, 0.64), vLiqP.x * hotD * smoothstep(0.40, 0.70, r4.r) * 0.92);
-  own = mix(own, vec3(0.21, 0.16, 0.20), smoothstep(0.75, 1.0, vLiqP.x) * smoothstep(0.58 - 0.20 * (1.0 - hotD), 0.70 - 0.18 * (1.0 - hotD), r4.g + (r2.b - 0.5) * 0.3));
+  // (PAINTER 13: the crust is plates, not spots: each blotch is cut by thin lines of fire where it has cracked, and its
+  // own wash is not one flat dark but laid heavier and lighter as it cooled; at its edge it goes scarlet before the
+  // orange. Dark round blotches on a flat orange read as a leopard's print)
+  float crustA = smoothstep(0.75, 1.0, vLiqP.x) * smoothstep(0.58 - 0.20 * (1.0 - hotD), 0.70 - 0.18 * (1.0 - hotD), r4.g + (r2.b - 0.5) * 0.3);
+  vec4 r7 = texture(uNoise3D, vBody / 3.4 + drift * 0.4 + 0.37);
+  float fire = 1.0 - smoothstep(0.0, 0.030 + 0.030 * r1.r, abs(r4.b - 0.5) * 0.7 + abs(r7.r - 0.5) * 0.3);
+  crustA *= 1.0 - 0.85 * fire * smoothstep(0.2, 0.6, crustA);
+  // (the crust gathers in rafts and along the banks, and the deep stream runs open between them: spots of one size laid
+  // evenly over the whole river were the leopard)
+  vec4 r8 = texture(uNoise3D, vBody / 38.0 + drift * 0.15 + 0.53);
+  crustA *= mix(smoothstep(0.44, 0.64, r8.r), 1.0, (1.0 - hotD) * 0.75);
+  vec3 crustC = mix(vec3(0.20, 0.15, 0.19), vec3(0.40, 0.29, 0.29), smoothstep(0.30, 0.72, r7.g * 0.7 + r2.r * 0.3));
+  own = mix(own, vec3(0.80, 0.20, 0.12), smoothstep(0.75, 1.0, vLiqP.x) * crustA * (1.0 - crustA) * 2.4);
+  own = mix(own, crustC, crustA);
   // cloud sea: bare-paper billows with soft shaded hollows
   vec4 r5 = texture(uNoise3D, vBody / 47.0 + drift * 0.2);
   own = mix(own, vec3(1.0), vLiqP.y * smoothstep(0.42, 0.66, r5.r * 0.7 + r3.b * 0.3));
@@ -726,6 +739,7 @@ uniform vec3 uLeafC;
 uniform vec4 uLeafP;   // raggedness, sky holes, dab scale, wetness
 uniform vec3 uAccent;
 uniform float uCanopy;
+uniform float uGem;       // 1: a crystal or a splinter of ice or glass, lit through its body (PAINTER 13)
 uniform mat3 normalMatrix;
 #ifdef PC_FAR
   uniform vec3 uFarA[8];
@@ -849,8 +863,16 @@ void main() {
     x *= mix(0.62, 1.0, pcDappleL(vBody, canopy * 0.6, 8.0 - vAbove));
     // each wash of the crown sits at its own value; a few dark touches inside
     x += (vData.w - 0.5) * 0.26 + (n2.g - 0.5) * 0.14 - smoothstep(0.55, 0.8, st.g) * 0.16;
+    // (PAINTER 13: light comes through a crown and off the sky into it: no wash of a crown goes below one glaze, and the
+    // floor itself wanders from wash to wash. The near autumn crowns overhead, their inner washes in the canopy's shade,
+    // went to the deepest step and stood as flat, hard sepia masses; a forest's near crowns as one dark slate)
+    x = max(x, 0.29 + 0.20 * st.g + (n2.r - 0.5) * 0.22 + (vData.w - 0.5) * 0.16);
     float lvl = min(pcLevel(x, 0.07), 2.6);
-    c = pcTone(c, lvl);
+    // (and a crown's shade is its own colour laid heavier with only half the cool glaze over it: the violet glaze over an
+    // orange or gold crown made mud, the autumn wood's near crowns one flat sepia; a green crown's shade goes deep green,
+    // not slate)
+    vec3 deepF = pcDensity(c, 1.45) * mix(vec3(1.0), uGlaze, 0.45);
+    c = mix(pcTone(c, lvl), deepF, (1.0 - smoothstep(0.8, 1.7, lvl)) * 0.75 * uDayness);
     wet = max(uLeafP.w, uWx.y * 0.5);
     id = 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
   } else if (part < 2.5) {
@@ -892,8 +914,13 @@ void main() {
     x *= mix(0.45, 1.0, pcDappleL(vBody, canopy, 8.0 - vAbove));
     vec4 nf = texture(uNoise3D, vBody / 0.55 + 0.61);
     x += (n1.g - 0.5) * 0.22 + (nr.g - 0.5) * 0.26 + (nf.b - 0.5) * 0.1;
+    // (a crystal is lit through: the middle of every facet keeps a light core of its own wash and no facet takes more than
+    // one glaze; where the light passes the edge goes to paper. As stone they went to the deep step and every one was the
+    // same saturated blue-violet, whatever its wash: Mercury's crystal gardens, ARTPASS weakest 3)
+    if (uGem > 0.5) x = max(x + 0.04, 0.28 + 0.18 * (1.0 - rimR) + (nr.g - 0.5) * 0.20);
     float lvl = pcLevel(x, 0.12);
     c = pcTone(c, lvl);
+    if (uGem > 0.5) c = mix(c, vec3(0.99, 0.985, 0.97), smoothstep(0.72, 0.92, rimR + (nr.b - 0.5) * 0.3) * smoothstep(1.6, 2.6, lvl) * 0.6);
     float dryM = smoothstep(0.60, 0.70, nf.b * 0.6 + nf.r * 0.4);
     c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));
     id = 3.0 + seed * 0.9;
@@ -919,6 +946,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uLeafP: { value: new THREE.Vector4().fromArray(opts.leafP || [0.8, 0.25, 1.0, 0.45]) },
     uAccent: v3(opts.accent, [0.85, 0.29, 0.17]),
     uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
+    uGem: { value: opts.gem ? 1 : 0 },
   };
   const defines = {};
   if (opts.phys) {
