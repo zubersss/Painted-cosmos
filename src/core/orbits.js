@@ -87,6 +87,48 @@ export class Ephemeris {
     this.spinPhase[id] += (d * Math.PI) / 12;
   }
 
+  // The hour as the world paints it at body-local unit direction `dir` (src/world/index.js,
+  // `lighting.hours` and `sunForHours`): 6 the sun on the horizon in the east, 12 at its highest,
+  // 18 on the horizon in the west, 0 at its lowest. localSolarTime above is the hour angle, which
+  // agrees with it only on the equator or at an equinox: on Earth's spawn (36 degrees north, in
+  // winter at t = 0) the hour angle's 6 and 18 have the sun 13 degrees below the horizon, and on
+  // Neptune's its 10 is sunrise. Every hour PILOT sets (the first morning, teleport, setHour) and the
+  // mood's timeOfDay are this one, so "hour 10" is the same light on every world.
+  sunHour(id, t, dir) {
+    return sunHourAt(this.sunDirLocal(id, t), norm(dir));
+  }
+
+  // Choose the spin phase so that sunHour at `dir` equals `hours` at time t. Where the sun never
+  // sets or never rises the world's hour does not reach every value: the nearest it comes is
+  // taken. Where an hour comes twice in a turn (a polar day), the one nearer the same hour angle.
+  setSunHour(id, t, dir, hours) {
+    const d = norm(dir), base = this.spinPhase[id], N = 720;
+    const at = (phi) => { this.spinPhase[id] = phi; return wrapHours(this.sunHour(id, t, d) - hours); };
+    const errs = [];
+    for (let k = 0; k < N; k++) errs.push(Math.abs(at(base + (k * TAU) / N)));
+    let best = 0;
+    for (let k = 1; k < N; k++) if (errs[k] < errs[best]) best = k;
+    // every local minimum as good as the best (to a quarter of an hour) is a candidate
+    const cands = [];
+    for (let k = 0; k < N; k++) {
+      const a = errs[(k + N - 1) % N], b = errs[(k + 1) % N];
+      if (errs[k] <= a && errs[k] <= b && errs[k] < errs[best] + 0.25) cands.push(k);
+    }
+    let pick = best, pickBy = Infinity;
+    for (const k of cands) {
+      this.spinPhase[id] = base + (k * TAU) / N;
+      const by = Math.abs(wrapHours(this.localSolarTime(id, t, d) - hours));
+      if (by < pickBy) { pickBy = by; pick = k; }
+    }
+    // refine inside the two grid steps round the pick (the hour is smooth there)
+    let lo = base + ((pick - 1) * TAU) / N, hi = base + ((pick + 1) * TAU) / N;
+    for (let i = 0; i < 40; i++) {
+      const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      if (Math.abs(at(m1)) <= Math.abs(at(m2))) hi = m2; else lo = m1;
+    }
+    this.spinPhase[id] = wrapAngle((lo + hi) / 2);
+  }
+
   // Radius of the sphere of influence used for choosing the flight frame (see frames.js).
   soiRadius(id) { return soiRadius(this.body(id)); }
 
@@ -100,6 +142,27 @@ export class Ephemeris {
     }
     return best;
   }
+}
+
+// Hours in (-12, 12].
+function wrapHours(h) {
+  h %= 24;
+  if (h > 12) h -= 24;
+  if (h <= -12) h += 24;
+  return h;
+}
+
+// The world's hour from the sun's body-local direction `s` at body-local unit direction `d`
+// (src/world/index.js: east = Y x up, the elevation is s . up).
+export function sunHourAt(s, d) {
+  let ex = d.z, ez = -d.x;
+  const el = Math.hypot(ex, ez);
+  if (el < 1e-6) { ex = 1; ez = 0; } else { ex /= el; ez /= el; }
+  const se = s.x * ex + s.z * ez, e = s.x * d.x + s.y * d.y + s.z * d.z;
+  let h = 12 + (Math.atan2(-se, e) * 12) / Math.PI;
+  h %= 24;
+  if (h < 0) h += 24;
+  return h;
 }
 
 export { spaceAltitude };
