@@ -530,8 +530,12 @@ void main() {
       sw += wgt * ln * smoothstep(0.40, 0.54, br);
       // (a white horse is a dash at least two pixels deep: seen across the water the band was a tenth of a pixel tall,
       // and a long dash along its wave came out as a row of single white specks, a glitter)
-      float c0 = 0.78 - 0.05 * gale, bw = clamp(2.6 * fwidth(q), 0.07, 0.22);
-      wh += wgt * smoothstep(c0 - bw * 0.5, c0, s) * (1.0 - smoothstep(c0 + bw * 0.4, c0 + bw * 0.9, s)) * smoothstep(capTh2, capTh2 + 0.05, br);
+      // (PAINTER 13: three pixels deep at least, and broken along the crest into dashes a few metres long: seen from a
+      // beach, the eye 2 or 3 m up, a dash two pixels deep was taken by the brush (it keeps nothing under three pixels)
+      // and Neptune's gale, 15 % of it white, showed hardly a white horse)
+      float c0 = 0.78 - 0.05 * gale, bw = clamp(3.4 * fwidth(q), 0.07, 0.36);
+      float brk = texture(uNoise3D, vec3(dot(vBody, A3) / (L * 0.9), id * 0.53 + 0.2, id * 0.29 + 0.71)).g;
+      wh += wgt * smoothstep(c0 - bw * 0.5, c0, s) * (1.0 - smoothstep(c0 + bw * 0.4, c0 + bw * 0.9, s)) * smoothstep(capTh2, capTh2 + 0.05, br) * smoothstep(0.40, 0.52, brk);
       hol += wgt * smoothstep(0.28, 0.52, s) * (1.0 - smoothstep(0.66, 0.76, s)) * smoothstep(0.35, 0.60, br);
     }
     c = pcDensity(c, 1.0 + farSea * (hol * (0.75 + 0.60 * gale) - sw * 0.25));
