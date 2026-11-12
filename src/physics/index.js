@@ -40,8 +40,24 @@ export const QUALITY = Object.freeze({
   burst: 3,                   // x that while a grid is mostly empty (after a teleport or landing)
   sampleMs: 0.35,             // ms of sampleSurface per grid per frame at most (after the first two calls)
   reanchor: 384,              // m the focus may wander from the anchor before the frame moves
+  // (P20) ...and no more than lets a ground point 30 m out move further in a re-anchor than it does on Earth. A re-anchor
+  // carries every grid over by whole cells, which is exact at the new anchor only: a point s m beyond it lands about
+  // D s (D + s) / R^2 off (D the distance moved). On Earth's 4 km at 384 m that is 0.30 m 30 m out; on the Moon's 1.4 km
+  // the same 384 m made it 2.4 m (0.8 m 10 m out: a trail in the dust jumped). Now D (D + 30) / R^2 <= reanchorShift on
+  // every world (reanchorAt): the Moon 125 m, Pluto 145, Mercury 205, Mars 284, Venus 344; Earth and the giants 384 as
+  // before. Points (particles, the wakes) are carried exactly whatever D is (near.js LocalFrame.carry).
+  reanchorShift: 0.00994,
+  // (P20) ...and the anchor keeps its radius through a re-anchor unless the focus has left this share of the world's radius
+  // about it: the grid's metres are metres at the anchor's radius, so a new radius rescales every grid by r0' / r0 about
+  // the anchor (a point s m out moves s dr / r0: on the Moon's crater fields the anchor's radius changed by up to 54 m in
+  // one re-anchor, 1.2 m 30 m out). Within the band a re-anchor rescales nothing; a grid metre is then within 2 % of a
+  // metre on the ground.
+  reanchorBand: 0.02,
   moistureEvery: 0.25,        // s between refreshes of the wetness / snow integrals at the focus
 });
+
+// (P20) how far the focus may wander from the anchor on a world of radius R (m): QUALITY.reanchor, or less on a small world
+export function reanchorAt(R) { return Math.min(QUALITY.reanchor, (Math.sqrt(900 + 4 * QUALITY.reanchorShift * R * R) - 30) / 2); }
 
 const now = typeof performance !== 'undefined' && performance.now ? () => performance.now() : () => 0;
 
@@ -64,6 +80,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _fill = { snow: 0, sand: 0 };
   const water = new WaterField();
   const _wk = [];            // per-disturber wake state: where and when it last left a ring
+  const _frame0 = { ox: 0, oy: 0, oz: 0, ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: 1 };   // (P20) the frame before a re-anchor
   let liqLevel = -1e9, liqDepth = 0, liqScan = 0;
   // (P16) the fetch measured upwind over the water there (water.js FetchGauge), from the water point: the focus where it
   // stands in water FETCH_GAUGE.minDepth deep, else the nearest node of the wind grid that is, else the deepest about
@@ -164,22 +181,27 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (re)anchor the near field
     let fx = frame.lx(fp.x, fp.y, fp.z), fz = frame.lz(fp.x, fp.y, fp.z);
     const rf = Math.hypot(fp.x, fp.y, fp.z);
+    const reach = reanchorAt(body ? body.radius : 4000);
     if (active !== bodyId || frame.bodyId !== bodyId || Math.hypot(fx, fz) > QUALITY.reanchor * 3) {
       // a new body, or a jump: start afresh under the focus
       frame.anchor(bodyId, fp.x, fp.y, fp.z);
       fx = 0; fz = 0; lastMoist = -1e9; stats.reanchors++;
       liqScan = 0; liqLevel = -1e9; liqDepth = 0; wp.ok = false; seaMap.reset();
-    } else if (Math.hypot(fx, fz) > QUALITY.reanchor) {
+    } else if (Math.hypot(fx, fz) > reach) {
       // wandered far from the anchor: move the anchor to the nearest point of the 16 m lattice
       // that every grid shares, and carry all the fields over (nothing is dropped or re-sampled)
       const X = Math.round(fx / 16) * 16, Z = Math.round(fz / 16) * 16;
       frame.dir(X, Z, _d3);
-      const r0 = frame.r0;
-      frame.anchor(bodyId, _d3[0] * rf, _d3[1] * rf, _d3[2] * rf);
+      const r0 = frame.r0, F0 = _frame0, band = QUALITY.reanchorBand * (body ? body.radius : 4000);
+      F0.ox = frame.ox; F0.oy = frame.oy; F0.oz = frame.oz; F0.ex = frame.ex; F0.ey = frame.ey; F0.ez = frame.ez; F0.nx = frame.nx; F0.ny = frame.ny; F0.nz = frame.nz;
+      // (P20) the anchor's radius: kept, unless the focus has left the band about it (then moved only to the band's edge)
+      const ra = rf > r0 + band ? rf - band : rf < r0 - band ? rf + band : r0;
+      frame.anchor(bodyId, _d3[0] * ra, _d3[1] * ra, _d3[2] * ra);
       const dr = r0 - frame.r0;
       near.rebase(frame, X, Z, dr); airGrid.terrain.rebase(frame, X, Z, dr);
-      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); drift.rebase(frame, X, Z); water.rebase(frame, X, Z); seaMap.rebase(X, Z);
-      for (let k = 0; k < _wk.length; k++) if (_wk[k]) { _wk[k].x -= X; _wk[k].z -= Z; }
+      // (P20) what is a point is carried exactly (particles, and the wakes' last ring); grids shift by whole cells
+      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr, F0); deform.rebase(frame, X, Z); drift.rebase(frame, X, Z); water.rebase(frame, X, Z); seaMap.rebase(X, Z);
+      for (let k = 0; k < _wk.length; k++) if (_wk[k] && _wk[k].x < 1e8) { frame.carry(F0, _wk[k].x, _wk[k].z, _d3); _wk[k].x = _d3[0]; _wk[k].z = _d3[1]; }
       if (liqLevel > -1e8) liqLevel += dr;
       fx = frame.lx(fp.x, fp.y, fp.z); fz = frame.lz(fp.x, fp.y, fp.z);
       moistX -= X; moistZ -= Z; stats.reanchors++;
@@ -483,6 +505,26 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     return o;
   }
 
+  // (P20) The height of the liquid's surface over its still level at body-local p, where the still liquid is `depth` m deep,
+  // as PAINTER's water shader draws it near the eye (materials.js WATER_VERT: the waves, the wake, and in the shallows,
+  // under 1.28 Hs of depth, the waves giving way to the swash at a beach of 0.07): what a floating or wading body rides.
+  // Until P20 the body floated on the still level and the drawn waves passed through it (Neptune's storm: +-2 m).
+  // 0 off the active body, on a still liquid, or beyond the field.
+  // rate (optional): rate[0] is how fast that surface rises there (m/s; the waves' share), which the body's drag in the
+  // liquid is measured against.
+  const _locW = {};
+  function waterLevelAt(bodyId, p, depth, rate) {
+    if (rate) rate[0] = 0;
+    if (bodyId !== active || !water.present) return 0;
+    const lx = frame.lx(p.x, p.y, p.z), lz = frame.lz(p.x, p.y, p.z);
+    const h = water.heightAt(lx, lz), hs = water.localAt(lx, lz, _locW).significant;
+    const shoal = depth > 0 ? Math.min(1, depth / Math.max(1.28 * (hs > 0 ? hs : 0), 0.05)) : 0;
+    const run = shoal < 1 ? water.runupAt(lx, lz, 0.07) : 0;
+    const w = run + (h - run) * shoal;
+    if (rate) { const r = water.rateAt(lx, lz) * shoal; rate[0] = r === r ? r : 0; }
+    return w === w ? w : 0;
+  }
+
   // Add physics to an env object for the explorer or ship step functions:
   //   env.air(p, out, height), env.ground(surface, out), env.liquid, and gravity / radius if missing.
   // With no body (deep space) the env is returned as it is: no air, no gravity.
@@ -493,6 +535,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     env.ground = (surface, out) => ground(bodyId, null, out, surface);
     env.liquid = liquidOf(bodyId);
     env.liquidOf = (surface) => liquidAt(bodyId, surface);
+    // (P20) the liquid's surface where a body floats or wades: the drawn sea (waterLevel), not its still level
+    env.waterLevel = (p, depth, rate) => waterLevelAt(bodyId, p, depth, rate);
     if (env.gravity == null) env.gravity = body.gravity;
     if (env.radius == null) env.radius = body.radius;
     return env;

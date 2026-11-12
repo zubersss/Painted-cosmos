@@ -110,10 +110,12 @@ const ex = { p: { x: 0, y: 0, z: 0 }, v: { x: 0, y: 0, z: 0 }, grounded: true };
 // radius> (default 0.6), on PILOT's own ground profile (src/player/explorer.js scrambleSample, imported: the
 // radius raised by a smoothstep dome that begins 0.7 m outside the boulder's edge). The world does not know it,
 // so the lab draws it: the same profile as a painted mound.
+// (P20) rocks=e,n,h[,r];e,n,h[,r];...: any number of them (metres east and north of the focus, height, radius
+// default 0.6), for a boulder met off the middle of the path (P17) and a close row (P19); added to rock=.
 const rockH = num('rock', 0), rockAt = num('rockAt', 6), rockR = num('rockR', 0.6);
 const rocks = [];
-if (rockH > 0) {
-  const c = at(rockAt, 0); rocks.push({ unitDir: c.clone().normalize(), radius: rockR, height: rockH });
+function addRock(e, n, rockH, rockR) {
+  const c = at(e, n); rocks.push({ unitDir: c.clone().normalize(), radius: rockR, height: rockH });
   const reach = rockR + PILOT_EXPLORER.scrambleSkirt, seg = 40, rings = 14, pos = [], idx = [];
   const upR = c.clone().normalize(), g0 = c.length();
   for (let j = 0; j <= rings; j++) for (let i = 0; i < seg; i++) {
@@ -124,6 +126,11 @@ if (rockH > 0) {
   for (let j = 0; j < rings; j++) for (let i = 0; i < seg; i++) { const a = j * seg + i, b = j * seg + (i + 1) % seg, c2 = a + seg, d2 = b + seg; idx.push(a, c2, b, b, c2, d2); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, makeWashMaterial({ color: 0x77706a, id: 7.0 })); mesh.name = 'lab-rock'; root.add(mesh);
+}
+if (rockH > 0) addRock(rockAt, 0, rockH, rockR);
+for (const s of (Q.get('rocks') || '').split(';')) {
+  const v = s.split(',').map(Number);
+  if (v.length >= 3 && v.every(isFinite) && v[2] > 0) addRock(v[0], v[1], v[2], v.length > 3 && v[3] > 0 ? v[3] : 0.6);
 }
 // (P14) stand-in birches (crown=): the reference for what PAINTER's tree shader must do with FLORA_GLSL. One geometry
 // in a tree's own frame (x, z across, y up; built for crownH), instanced at each place. Per vertex: aId, one number
@@ -721,7 +728,7 @@ function run(seconds, dt = 1 / 60, each = null) { const f = each ? _fn(each) : n
 const lab = { info, stability, film, run, ctl, ex, sh, enu, enuV, at, focus0, east0, north0, up0, bodyId, body, get time() { return time; },
   get yaw() { return yaw; }, set yaw(v) { yaw = v; },
   physics, world, painter, renderer, scene, camera, root, THREE, get kits() { return kits; },
-  crownTip, crownTips, crownList,
+  crownTip, crownTips, crownList, groundEx,      // (P20) groundEx: PILOT's ground with the lab's boulders
   get eye() { return camLocal; },        // (P15) where the lens is, body-local
   setRain(mode) { if (RAIN[mode]) { rainMode = mode; bound = false; buildKits(); } return rainMode; },
   hideKits(h) { if (kits) for (const o of kits.objects) o.userData.hide = !!h; } };

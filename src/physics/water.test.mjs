@@ -438,3 +438,35 @@ test('P16 in the game loop: a gale over a small lake raises a chop; over an open
     assert.ok(lake.worst <= most && open.worst <= most, 'the gauge keeps to its ration');
   } finally { setWindScale('earth', s0); }
 });
+
+test('P20 a floating explorer rides the drawn sea: its body follows the waves the shader draws, not the still level', async () => {
+  // The body step floated on the world's still liquid level; the waves PAINTER draws (the twin: fields.water.heightAt)
+  // passed through it. bindEnv now hands the step env.waterLevel, the drawn surface's height over the still level, and
+  // its rate, which the body's drag in the water is measured against (the water moves with its surface).
+  const { stepExplorerBody, EXPLORER_BODY } = await import('./explorer.js');
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.3);
+    const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'sea_coast', sea: R + 10 }), physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+    const d = norm(V(0.6, 0.04, 0.8)), env = physics.bindEnv('earth', { sample, gravity: BODIES.earth.gravity });
+    const st = { p: V(d.x * (R + 10 - EXPLORER_BODY.floatDepth), d.y * (R + 10 - EXPLORER_BODY.floatDepth), d.z * (R + 10 - EXPLORER_BODY.floatDepth)), v: V(), grounded: false };
+    const body = [], surf = [];
+    for (let i = 0; i < 120 * 30; i++) {
+      physics.update(1 / 30, { bodyId: 'earth', time: 100 + i / 30, focus: st.p });
+      stepExplorerBody(st, {}, 1 / 30, env);
+      if (i > 90 * 30) { body.push(len(st.p) - (R + 10)); surf.push(physics.fields.water.heightAt(st.p)); }
+    }
+    const n = body.length, mb = body.reduce((a, b) => a + b) / n, ms = surf.reduce((a, b) => a + b) / n;
+    let sbb = 0, sss = 0, sbs = 0, dd = 0;
+    for (let i = 0; i < n; i++) { const b = body[i] - mb, s = surf[i] - ms; sbb += b * b; sss += s * s; sbs += b * s; dd += (b - s) ** 2; }
+    const corr = sbs / Math.sqrt(sbb * sss), sdS = Math.sqrt(sss / n), sdB = Math.sqrt(sbb / n), sdD = Math.sqrt(dd / n);
+    console.log(`# floating in a gale (the drawn sea there: sd ${sdS.toFixed(3)} m): the body's height sd ${sdB.toFixed(3)} m, correlation ${corr.toFixed(3)}, off the surface sd ${sdD.toFixed(3)} m; feet ${(-mb + ms).toFixed(2)} m under the mean surface`);
+    assert.ok(sdS > 0.08, 'a sea that is running: sd ' + sdS);
+    assert.ok(corr > 0.9, 'the body rises and falls with the drawn waves: correlation ' + corr);
+    // (a body near its own heave period, about 2.2 s, rides the short waves a little higher than they are: damped, not
+    // stiff; the head floated at the still level: sd 0, correlation 0.04, 0.229 m off the surface)
+    assert.ok(sdD < 0.5 * sdS, `the body keeps to the surface: ${sdD} m off it against waves of sd ${sdS}`);
+    assert.ok(sdB > 0.7 * sdS && sdB < 1.5 * sdS, `it heaves as the sea does: sd ${sdB} against ${sdS}`);
+    assert.ok(Math.abs(-mb + ms - EXPLORER_BODY.floatDepth) < 0.15, 'floats at the float depth under the moving surface: ' + (-mb + ms));
+  } finally { setWindScale('earth', s0); }
+});

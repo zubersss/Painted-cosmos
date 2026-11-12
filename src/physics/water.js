@@ -803,6 +803,29 @@ export class WaterField {
     return WATER.swashSetup * b * q + 0.5 * swing * env * (Math.cos(a) + 0.5 * Math.sin(2 * a)) * 0.7698229407236336;
   }
 
+  // (P20) How fast the surface rises at grid position (x, z) (m/s): heightAt's derivative in time (the trains' phases
+  // run at omega, their sets at omega GK / 2; the wakes are left out). What a floating body's drag is measured against:
+  // the water there moves with its surface.
+  rateAt(x, z) {
+    const G = WATER.group;
+    let s = 0;
+    if (this._mapOn) {
+      const m = this._seaAt(x, z), xw = x + m[12], zw = z + m[13];
+      for (let i = 0; i < NT; i++) {
+        if (this.amp[i] === 0) continue;
+        const a = this.kx[i] * xw + this.kz[i] * zw - this.phase[i], e = this.gx[i] * xw + this.gz[i] * zw - this.gphase[i], om = this.omega[i];
+        s -= this.amp[i] * m[i < NT - 1 ? 0 : 1] * om * ((1 + G * Math.sin(e)) * Math.cos(a) + G * GK * 0.5 * Math.cos(e) * Math.sin(a));
+      }
+      return s;
+    }
+    for (let i = 0; i < NT; i++) {
+      if (this.amp[i] === 0) continue;
+      const a = this.kx[i] * x + this.kz[i] * z - this.phase[i], e = this.gx[i] * x + this.gz[i] * z - this.gphase[i], om = this.omega[i];
+      s -= this.amp[i] * om * ((1 + G * Math.sin(e)) * Math.cos(a) + G * GK * 0.5 * Math.cos(e) * Math.sin(a));
+    }
+    return s;
+  }
+
   heightAt(x, z) {
     if (this._mapOn) {
       const m = this._seaAt(x, z), xw = x + m[12], zw = z + m[13];

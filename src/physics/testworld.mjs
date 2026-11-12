@@ -3,7 +3,8 @@
 // (P16) Wall-clock asserts run only on request (PC_TIMING=1 node --test src/physics/), as in PILOT's tests: this machine
 // is shared with other workers' browsers, and a busy minute fails a budget that a quiet one meets. Otherwise a miss is
 // printed, not asserted. The limits themselves are unchanged.
-export const timing = (ok, msg) => { if (process.env.PC_TIMING) { if (!ok) throw new Error('timing: ' + msg); } else if (!ok) console.log('# (timing, not asserted without PC_TIMING=1: ' + msg + ')'); };
+// (P20) Under PC_TIMING every measurement is printed (`# timing ok: ...`), so one run reports them all.
+export const timing = (ok, msg) => { if (process.env.PC_TIMING) { console.log('# timing ' + (ok ? 'ok' : 'MISSED') + ': ' + msg); if (!ok) throw new Error('timing: ' + msg); } else if (!ok) console.log('# (timing, not asserted without PC_TIMING=1: ' + msg + ')'); };
 const norm = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
 

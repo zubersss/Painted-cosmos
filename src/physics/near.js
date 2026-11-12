@@ -66,6 +66,16 @@ export class LocalFrame {
     return ((px - this.ox) * this.nx + (py - this.oy) * this.ny + (pz - this.oz) * this.nz) * this.r0 / (d > m ? d : m);
   }
 
+  // (P20) This frame's grid coordinates of grid position (x, z) of another frame `o` (the frame as it was before a
+  // re-anchor: { ox, oy, oz, ex, ey, ez, nx, ny, nz }), through the ray of that ground: exact. A shift by the new
+  // anchor's old coordinates is exact only at the anchor (a point s m out lands about D s (D + s) / R^2 off after a
+  // re-anchor of D m: on the Moon 2.4 m 30 m out after 384 m). Writes out[0], out[1].
+  carry(o, x, z, out) {
+    const px = o.ox + o.ex * x + o.nx * z, py = o.oy + o.ey * x + o.ny * z, pz = o.oz + o.ez * x + o.nz * z;
+    out[0] = this.lx(px, py, pz); out[1] = this.lz(px, py, pz);
+    return out;
+  }
+
   // Unit direction of the surface point above/below grid position (x, z). Writes o[0..2].
   dir(x, z, o) {
     const px = this.ox + this.ex * x + this.nx * z, py = this.oy + this.ey * x + this.ny * z, pz = this.oz + this.ez * x + this.nz * z;

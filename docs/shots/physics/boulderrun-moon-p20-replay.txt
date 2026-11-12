@@ -1,0 +1,23 @@
+boulders heading 0: feet 0.01 m over the ground at most, thrown up 0.000 m at most, mean pace 6.09 m/s
+boulders heading 45: feet 2.02 m over the ground at most, thrown up 0.040 m at most, mean pace 5.87 m/s
+    4.93 s 1.67 s: feet 2.02 m, rose 0.04 m, ground fell 2.66 m, left at 5.8 m/s on 38 deg, boulder 0.60 m tall 0.43 m
+boulders heading 90: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.52 m/s
+boulders heading 135: feet 7.12 m over the ground at most, thrown up 0.025 m at most, mean pace 5.77 m/s
+    9.70 s 2.27 s: feet 7.12 m, rose 0.02 m, ground fell 10.38 m, left at 4.3 m/s on 43 deg, boulder 0.68 m tall -0.02 m
+boulders heading 180: feet 3.07 m over the ground at most, thrown up 0.059 m at most, mean pace 5.92 m/s
+    6.60 s 1.87 s: feet 3.07 m, rose 0.06 m, ground fell 3.17 m, left at 6.4 m/s on 45 deg, boulder 0.70 m tall -0.31 m
+boulders heading 225: feet 0.09 m over the ground at most, thrown up 0.164 m at most, mean pace 6.32 m/s
+    7.50 s 0.77 s: feet 0.09 m, rose 0.16 m, ground fell 0.02 m, left at 5.1 m/s on 13 deg, boulder 0.99 m tall -0.47 m
+boulders heading 270: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.37 m/s
+boulders heading 315: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.20 m/s
+no boulders heading 0: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.61 m/s
+no boulders heading 45: feet 2.09 m over the ground at most, thrown up 0.000 m at most, mean pace 5.83 m/s
+    4.90 s 1.70 s: feet 2.09 m, rose -0.03 m, ground fell 2.74 m, left at 7.0 m/s on 28 deg, boulder 0.60 m tall 0.56 m
+no boulders heading 90: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.61 m/s
+no boulders heading 135: feet 7.35 m over the ground at most, thrown up 0.028 m at most, mean pace 6.54 m/s
+    8.57 s 3.40 s: feet 7.35 m, rose 0.03 m, ground fell 10.83 m, left at 6.5 m/s on 36 deg, boulder 0.68 m tall 0.09 m
+no boulders heading 180: feet 1.79 m over the ground at most, thrown up 0.007 m at most, mean pace 6.05 m/s
+    6.60 s 1.57 s: feet 1.79 m, rose 0.01 m, ground fell 2.53 m, left at 4.0 m/s on 44 deg, boulder 0.70 m tall -0.31 m
+no boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.63 m/s
+no boulders heading 270: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.64 m/s
+no boulders heading 315: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.63 m/s

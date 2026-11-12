@@ -222,6 +222,7 @@ function stepScratch(ghost = false) {
     // (P18) what feels the air: a body half a metre across moving at its own velocity (the sub-second eddies, wind.js gustSubAt)
     recv: { size: 0.5, vx: 0, vy: 0, vz: 0 },
     gt: {},                                 // gaitOf's out
+    wr: [0],                                // (P20) env.waterLevel's rate: how fast the drawn sea rises at the body (m/s)
   };
 }
 const _walkS = stepScratch(), _ghostS = stepScratch(true);
@@ -618,7 +619,12 @@ function stepOnce(st, cmd, dt, env, T, S) {
   const s0 = env.sample(D);
   const g = env.gravity;
   const groundR = s0.radius;
-  const liquidR = (s0.liquidRadius || 0) > groundR ? s0.liquidRadius : 0;
+  let liquidR = (s0.liquidRadius || 0) > groundR ? s0.liquidRadius : 0;
+  // (P20) the surface the body floats and wades in is the drawn sea's (env.waterLevel, from bindEnv: the waves over the
+  // still level here, as the water shader displaces them), not the still level: until P20 the waves passed through it
+  // and the water there rises and falls with that surface (S.wr[0], m/s): the body's drag in it is measured against that
+  let wRate = 0;
+  if (liquidR && env.waterLevel) { const w = env.waterLevel(st.p, liquidR - groundR, S.wr); if (w === w) liquidR = Math.max(groundR, liquidR + w); wRate = S.wr[0] === S.wr[0] ? S.wr[0] : 0; }
   let nx = s0.normal.x, ny = s0.normal.y, nz = s0.normal.z;
   { const l = Math.hypot(nx, ny, nz); if (l > 1e-9) { nx /= l; ny /= l; nz /= l; } else { nx = ux; ny = uy; nz = uz; } }
   let nu = nx * ux + ny * uy + nz * uz;
@@ -1022,10 +1028,13 @@ function stepOnce(st, cmd, dt, env, T, S) {
       vv = vx * ux + vy * uy + vz * uz;
       hx = vx - vv * ux; hy = vy - vv * uy; hz = vz - vv * uz;
       const kvis = visc * sub * T.height;
-      vv /= 1 + (kv * Math.abs(vv) + kvis) * dt;
+      // (P20) vertically against the water, which rises and falls with the waves (wRate; 0 in still liquid)
+      let vr = vv - wRate;
+      vr /= 1 + (kv * Math.abs(vr) + kvis) * dt;
       const hm = 1 / (1 + (kh * Math.hypot(hx, hy, hz) + kvis) * dt);
       // bobbing is damped by wave-making as well as by drag
-      vv *= Math.exp(-2.2 * dt * Math.min(1, sub * 3));
+      vr *= Math.exp(-2.2 * dt * Math.min(1, sub * 3));
+      vv = vr + wRate;
       vx = hx * hm + vv * ux; vy = hy * hm + vv * uy; vz = hz * hm + vv * uz;
     }
     px += vx * dt; py += vy * dt; pz += vz * dt;
@@ -1061,7 +1070,8 @@ function stepOnce(st, cmd, dt, env, T, S) {
         hipIn = -soft * (n1x * D.x + n1y * D.y + n1z * D.z);
       }
       // touching down only counts when buoyancy does not carry the body there
-      const l1 = (s1.liquidRadius || 0) > s1.radius ? s1.liquidRadius - s1.radius : 0;
+      let l1 = (s1.liquidRadius || 0) > s1.radius ? s1.liquidRadius - s1.radius : 0;
+      if (l1 > 0 && env.waterLevel) { const w = env.waterLevel(st.p, l1); if (w === w) l1 = Math.max(0, l1 + w); }   // (P20) the drawn sea
       if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * D.x + vy * D.y + vz * D.z + hipIn; }
     }
     B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;

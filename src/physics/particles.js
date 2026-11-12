@@ -87,6 +87,7 @@ function makeBuffer(cap) {
 
 const _w = new Float64Array(8);
 const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
+const _carry = new Float64Array(2);  // (P20) a particle's grid position carried through a re-anchor (LocalFrame.carry)
 
 export class Particles {
   constructor(seed, quality = 1) {
@@ -124,10 +125,25 @@ export class Particles {
 
   setQuality(q) { this.quality = q; }
 
-  // The frame has re-anchored at old grid position (X, Z); the anchor radius changed by -dr.
-  rebase(frame, X, Z, dr) {
+  // The frame has re-anchored at old grid position (X, Z); the anchor radius changed by -dr. (P20) With `old` (the frame
+  // before: ox..nz) every particle is carried through the ray of its own ground (frame.carry: exact), not shifted by
+  // (X, Z), which is exact only at the anchor (on the Moon a drop 30 m out moved 2.4 m in the re-anchor's frame); its
+  // height over the anchor radius gains dr either way (|p| is unchanged). The events (splashes, settles; body-local
+  // offsets from events.origin, which update() moves to the new anchor) are moved with it: until P20 an event alive
+  // in that frame was drawn the whole re-anchor away (384 m) for the rest of its life.
+  rebase(frame, X, Z, dr, old) {
     this.frameVersion = frame.version;
-    for (const k in this.buffers) { const b = this.buffers[k], P = b._p; for (let i = 0; i < b._n; i++) { P[i * 3] -= X; P[i * 3 + 1] += dr; P[i * 3 + 2] -= Z; } }
+    const c = _carry;
+    for (const k in this.buffers) {
+      const b = this.buffers[k], P = b._p;
+      for (let i = 0; i < b._n; i++) {
+        if (old) { frame.carry(old, P[i * 3], P[i * 3 + 2], c); P[i * 3] = c[0]; P[i * 3 + 2] = c[1]; } else { P[i * 3] -= X; P[i * 3 + 2] -= Z; }
+        P[i * 3 + 1] += dr;
+      }
+    }
+    const E = this.events, dx = E.origin.x - frame.ox, dy = E.origin.y - frame.oy, dz = E.origin.z - frame.oz;
+    for (let k = 0; k < E.capacity; k++) { const o = k * 8; E.data[o] += dx; E.data[o + 1] += dy; E.data[o + 2] += dz; }
+    E.origin.x = frame.ox; E.origin.y = frame.oy; E.origin.z = frame.oz;
   }
 
   _event(frame, x, y, z, kind, strength, size) {

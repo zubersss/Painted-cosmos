@@ -46,7 +46,9 @@ const PAGE_HELPERS = `(() => {
     ex() { const p = L.enu(L.ex.p), v = L.enuV(L.ex.v), B = L.ex.phys || {}; return { e: r2(p.e), n: r2(p.n), h: r3(p.h), vh: r2(Math.hypot(v.e, v.n)), vu: r2(v.u), hip: r3(B.hip || 0), clamber: r2(B.clamber01 || 0), gnd: L.ex.grounded ? 1 : 0,
       // (P13) the gait: the hips off standing with the stride in it (m), which gait (0 stand 1 walk 2 run), the stride's phase, feet down
       // (1 left, 2 right, 3 both, 0 none: a flight), footfalls so far
-      ride: r3(B.ride || 0), gait: B.gait || 0, stride: r2(B.stride || 0), feet: B.footDown == null ? -1 : B.footDown, steps: B.steps || 0 }; },
+      ride: r3(B.ride || 0), gait: B.gait || 0, stride: r2(B.stride || 0), feet: B.footDown == null ? -1 : B.footDown, steps: B.steps || 0,
+      // (P20) up: the feet over PILOT's ground WITH the lab's boulders (h is over the world's ground alone)
+      up: L.groundEx ? (() => { const q = L.ex.p, r = Math.hypot(q.x, q.y, q.z); return r3(r - L.groundEx({ x: q.x / r, y: q.y / r, z: q.z / r }).radius); })() : null }; },
     // the ship: height of its origin over the ground, speeds, feet down, lift, tilt (deg from the local up), wash
     ship() { const s = L.sh, p = L.enu(s.p), v = L.enuV(s.v), B = s.phys || {}, q = s.q;
       const ux = 2 * (q.x * q.y - q.w * q.z), uy = 1 - 2 * (q.x * q.x + q.z * q.z), uz = 2 * (q.y * q.z + q.w * q.x), r = Math.hypot(s.p.x, s.p.y, s.p.z);
@@ -73,6 +75,8 @@ const PAGE_HELPERS = `(() => {
 })()`;
 
 const SPAWN = 'body=earth&hour=12.3';
+// (P20) P19's close row (explorer.test.mjs): [m east, m north, height], radius 0.6, as the lab's rocks= list
+const ROW = [[6, 0, 1], [8.6, 0.3, 0.9], [11.4, -0.4, 1.1], [14, 0.5, 1], [16.6, 0, 0.8], [19.4, -0.3, 1.2], [22.2, 0.2, 1], [25, 0, 1]].map((r) => r.join(',') + ',0.6').join(';');
 // (P12) put the explorer `e0` metres east of the focus, at rest or at a run-up speed, before a clamber strip
 const CLAMBER_BEFORE = (e0, v = 0, until = 2.2) => `(L) => { const p = L.at(${e0}, 0); L.ex.p.x = p.x; L.ex.p.y = p.y; L.ex.p.z = p.z; L.ex.v.x = L.ex.v.y = L.ex.v.z = 0; L.ex.grounded = true;
   ${v ? `for (let i = 0; i < 600 && L.enu(L.ex.p).e < ${until}; i++) { L.ctl.wish = [${v}, 0]; L.run(1 / 60, 1 / 60); }` : ''} }`;
@@ -245,6 +249,19 @@ export const SUBJECTS = {
   'clamber-run-moon': { note: 'the Moon: a run (7.4 m/s) over a 1 m boulder; 8 frames a second',
     q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rock=1&rockAt=6&rockR=0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 8, sub: 8,
     before: CLAMBER_BEFORE(-8, 7.4), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => P.ex()` },
+  // (P20) a run (7.4 m/s) at a 1 m boulder met 0.45 m off its middle (P17's off-path case: no brace, no hold, the feet
+  // never leave the ground), and a run through P19's close row of eight boulders (explorer.test.mjs, P19: 2.6 to 2.8 m
+  // apart, 0.8 to 1.2 m tall, up to 0.5 m off the line), on the Moon and on Earth; probe: P.ex() (up: the feet over the
+  // ground with the boulders), the pace the walker holds for the face it has seen (pA) and how far ahead that is (ad)
+  'clamber-run-moon-side': { note: 'the Moon: a run (7.4 m/s) at a 1 m boulder met 0.45 m off its middle; 8 frames a second',
+    q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rocks=6,0.45,1,0.6&lookE=6&dist=6.5&pitch=5&up=0.8&yaw=0', w: 640, h: 360, crop: [0.1, 0.25, 0.8, 0.55], tile: [320, 124], cols: 4, frames: 24, dt: 1 / 8, sub: 8,
+    before: CLAMBER_BEFORE(-8, 7.4), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => ({ ...P.ex(), pA: L.ex.phys && L.ex.phys.paceAhead < 1e8 ? P.r2(L.ex.phys.paceAhead) : -1 })` },
+  'clamber-row-moon': { note: "the Moon: a run (7.4 m/s) through P19's close row of eight boulders (6 to 25 m east); 8 frames a second",
+    q: 'body=moon&hour=10&t=60&pre=1&circle=0.01&rocks=' + ROW + '&lookE=15&dist=15&pitch=7&up=0.8&yaw=0&fov=60', w: 640, h: 360, crop: [0, 0.3, 1, 0.5], tile: [320, 90], cols: 4, frames: 32, dt: 1 / 8, sub: 8,
+    before: CLAMBER_BEFORE(-4, 7.4, 2), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => ({ ...P.ex(), pA: L.ex.phys && L.ex.phys.paceAhead < 1e8 ? P.r2(L.ex.phys.paceAhead) : -1, ad: L.ex.phys && L.ex.phys.ahead ? P.r2(L.ex.phys.ahead.d) : -1 })` },
+  'clamber-row': { note: "Earth spawn: a run (7.4 m/s) through P19's close row of eight boulders (6 to 25 m east); 8 frames a second",
+    q: SPAWN + '&t=60&pre=1&circle=0.01&rocks=' + ROW + '&lookE=15&dist=15&pitch=7&up=0.8&yaw=0&fov=60', w: 640, h: 360, crop: [0, 0.3, 1, 0.5], tile: [320, 90], cols: 4, frames: 32, dt: 1 / 8, sub: 8,
+    before: CLAMBER_BEFORE(-4, 7.4, 2), each: `(i, t, ctl) => { ctl.wish = [7.4, 0]; }`, probe: `(L) => ({ ...P.ex(), pA: L.ex.phys && L.ex.phys.paceAhead < 1e8 ? P.r2(L.ex.phys.paceAhead) : -1, ad: L.ex.phys && L.ex.phys.ahead ? P.r2(L.ex.phys.ahead.d) : -1 })` },
   // (P16) the same run seen from further back, from 10 m before the boulder: where the walker sees it and slows (its soles,
   // within the Moon's grip), the clamber, the run on; probe: the pace it holds for the face it has seen (pA) and how far
   // ahead that face is (ad)
