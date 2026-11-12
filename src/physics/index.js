@@ -23,7 +23,8 @@ import { devilsNear, DEVILS } from './features.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01 } from './util.js';
-import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE } from './water.js';
+import { WaterField, WATER_GLSL, WATER, windSea, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
+import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf, strideBob } from './explorer.js';
 import {
@@ -66,8 +67,18 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   let liqLevel = -1e9, liqDepth = 0, liqScan = 0;
   // (P16) the fetch measured upwind over the water there (water.js FetchGauge), from the water point: the focus where it
   // stands in water FETCH_GAUGE.minDepth deep, else the nearest node of the wind grid that is, else the deepest about
-  const gauge = new FetchGauge();
-  const wp = { ok: false, x: 0, y: 1, z: 0, depth: 0, cap: 80 };
+  // (P18) ... and since P18 the sea map (seamap.js): the sea raised at every node about over its own fetch and depth,
+  // turned toward its longest fetch and refracted toward its shore; its far rose replaces the P16 gauge's five radials
+  const seaMap = new SeaMap();
+  const _sc = { frame, air: airGrid, bodyId: null, R: 1, level: -1e9, we: 0, wn: 0, g: 9.81, rhoAir: 1.2, rhoLiq: 1000, dir: null, swellHeight: 0, swellLength: 0, sample: null, budget: 0, clock: null, ms: 0, quality: 1, fx: 0, fz: 0, time: 0 };
+  const _uf = new Float64Array(2), _loc = {};
+  // the old gauge's numbers, from the map: the reference sea's fetch and depth, the far rose's radials (API: fields.water.gauge)
+  const gauge = {
+    get fetch() { return seaMap.target.on ? seaMap.target.refFetch : -1; }, get depth() { return seaMap.target.on ? seaMap.target.refDepth : 0; },
+    get radial() { return Array.from(seaMap.rose.r); }, get ready() { return seaMap.target.on && seaMap.rose.ready; }, get final() { return seaMap.target.on; },
+    samples: 0, get measured() { return seaMap.rose.measured; },
+  };
+  const wp = { ok: false, x: 0, y: 1, z: 0, depth: 0, cap: 80 };     // the far point the rose is measured from (unit dir)
 
   let quality = 1;
   let warming = false;
@@ -156,7 +167,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       // a new body, or a jump: start afresh under the focus
       frame.anchor(bodyId, fp.x, fp.y, fp.z);
       fx = 0; fz = 0; lastMoist = -1e9; stats.reanchors++;
-      liqScan = 0; liqLevel = -1e9; liqDepth = 0; wp.ok = false; gauge.reset();
+      liqScan = 0; liqLevel = -1e9; liqDepth = 0; wp.ok = false; seaMap.reset();
     } else if (Math.hypot(fx, fz) > QUALITY.reanchor) {
       // wandered far from the anchor: move the anchor to the nearest point of the 16 m lattice
       // that every grid shares, and carry all the fields over (nothing is dropped or re-sampled)
@@ -166,7 +177,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       frame.anchor(bodyId, _d3[0] * rf, _d3[1] * rf, _d3[2] * rf);
       const dr = r0 - frame.r0;
       near.rebase(frame, X, Z, dr); airGrid.terrain.rebase(frame, X, Z, dr);
-      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); drift.rebase(frame, X, Z); water.rebase(frame, X, Z);
+      flora.rebase(frame, X, Z); particles.rebase(frame, X, Z, dr); deform.rebase(frame, X, Z); drift.rebase(frame, X, Z); water.rebase(frame, X, Z); seaMap.rebase(X, Z);
       for (let k = 0; k < _wk.length; k++) if (_wk[k]) { _wk[k].x -= X; _wk[k].z -= Z; }
       if (liqLevel > -1e8) liqLevel += dr;
       fx = frame.lx(fp.x, fp.y, fp.z); fz = frame.lz(fp.x, fp.y, fp.z);
@@ -283,48 +294,29 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       for (let n = 0; n < lq.length; n++) if (va[n] && lq[n] > -1e8) { if (lq[n] > liqLevel) liqLevel = lq[n]; if (lq[n] - hh[n] > liqDepth) liqDepth = lq[n] - hh[n]; }
       const l2 = near.liquidAt(fx, fz);
       if (l2 === l2 && l2 > -1e8) { liqLevel = l2; liqDepth = Math.max(liqDepth, l2 - gh); }
-      // (P16) the water point for the fetch gauge
-      wp.ok = false;
-      if (l2 === l2 && l2 > -1e8 && l2 - gh >= FETCH_GAUGE.minDepth) {
-        frame.dir(fx, fz, _d3); wp.ok = true; wp.depth = l2 - gh; wp.cap = cover.fetch || 80;
-      } else {
-        const N = T.N, CW = T.CW, cv = T.cover;
-        let best = 1e18, nb = -1, deepest = 0, nd = -1;
-        for (let n = 0; n < lq.length; n++) {
-          if (!va[n] || !(lq[n] > -1e8)) continue;
-          const d = lq[n] - hh[n];
-          if (d > deepest) { deepest = d; nd = n; }
-          if (d >= FETCH_GAUGE.minDepth) { const i = n % N, j = (n - i) / N, x = (T.ci + i - T.half) * T.cell - fx, z = (T.cj + j - T.half) * T.cell - fz; if (x * x + z * z < best) { best = x * x + z * z; nb = n; } }
-        }
-        if (nb < 0) nb = nd;
-        if (nb >= 0) {
-          const i = nb % N, j = (nb - i) / N;
-          frame.dir((T.ci + i - T.half) * T.cell, (T.cj + j - T.half) * T.cell, _d3);
-          wp.ok = true; wp.depth = lq[nb] - hh[nb]; wp.cap = (cv && cv[nb * CW + 14]) || 80;
-        }
-      }
-      if (wp.ok) { wp.x = _d3[0]; wp.y = _d3[1]; wp.z = _d3[2]; }
     }
-    // (P16) the fetch: measured upwind from the water point over the liquid the world has (a few samples a frame,
-    // more while nothing is known here; cached per place and sector of the wind), capped by the point's biome fetch;
-    // and the mean depth along it. Upwind is against the way the sea runs (it follows the wind over WATER.turnTime),
-    // or against the wind itself while the sea is settling on arrival.
-    let seaFetch = cover.fetch || 80, seaDepth = liqDepth;
+    // (P18) the sea map: raised at every node about over its own fetch and depth (seamap.js), built in slices; its outer
+    // level and far rose sample within the old gauge's ration (more while they are not known, on arrival). The reference
+    // sea (the trains) is the sea of the most exposed node; the map scales and turns it everywhere else (water.js).
+    let seaFetch = cover.fetch || 80, seaDepth = liqDepth, swe = airGrid.cwe, swn = airGrid.cwn;
     stats.fetchSamples = 0; stats.msFetch = 0;
-    if (wp.ok && liqLevel > -1e8) {
-      const fresh = water.arrive > 0 || !water.present, Uc = Math.hypot(airGrid.cwe, airGrid.cwn);
-      let ue = fresh && Uc > 0.3 ? -airGrid.cwe / Uc : -water.dir[0], un = fresh && Uc > 0.3 ? -airGrid.cwn / Uc : -water.dir[1];
-      let tx = frame.ex * ue + frame.nx * un, ty = frame.ey * ue + frame.ny * un, tz = frame.ez * ue + frame.nz * un;
-      const dp = tx * wp.x + ty * wp.y + tz * wp.z; tx -= dp * wp.x; ty -= dp * wp.y; tz -= dp * wp.z;
-      const tl = Math.hypot(tx, ty, tz);
-      if (tl > 1e-6) {
-        const gb = warming ? 64 : gauge.final ? Math.max(2, QUALITY.samples[quality] >> 1) : QUALITY.samples[quality] * QUALITY.burst;
-        const tg = now();
-        gauge.update(bodyId, wp.x, wp.y, wp.z, tx / tl, ty / tl, tz / tl, body.radius, wp.cap, wp.depth, sampleActive, gb, clock, gauge.final ? QUALITY.sampleMs : 3 * QUALITY.sampleMs);
-        stats.samples += gauge.samples; stats.fetchSamples = gauge.samples; stats.msFetch = now() - tg;
-        if (gauge.fetch >= 0) { seaFetch = gauge.fetch; seaDepth = gauge.depth > 0 ? gauge.depth : wp.depth; }
-      }
+    if (liqLevel > -1e8 && coverKnown) {
+      const tg = now(), known = seaMap.outer.invalid === 0 && seaMap.rose.ready;
+      _sc.bodyId = bodyId; _sc.R = body.radius; _sc.level = liqLevel; _sc.we = airGrid.cwe; _sc.wn = airGrid.cwn; _sc.g = body.gravity;
+      _sc.rhoAir = here.air.density; _sc.rhoLiq = cover.liquidDensity || liquidOf(bodyId).density; _sc.dir = water.dir;
+      _sc.swellHeight = water.open > 0 ? water.swellHeight : 0; _sc.swellLength = water.open > 0 ? water.swellLength : 0;
+      _sc.sample = sampleActive; _sc.budget = warming ? 64 : known ? Math.max(2, QUALITY.samples[quality] >> 1) : QUALITY.samples[quality] * QUALITY.burst;
+      _sc.clock = clock; _sc.ms = known ? QUALITY.sampleMs : 3 * QUALITY.sampleMs; _sc.quality = quality; _sc.fx = fx; _sc.fz = fz; _sc.time = time;
+      const n = seaMap.update(_sc);
+      stats.samples += n; stats.fetchSamples = n; gauge.samples = n;
+      const T = seaMap.target;
+      if (T.on) { seaFetch = T.refFetch; seaDepth = T.refDepth > 0 ? T.refDepth : liqDepth; swe = T.refU * Math.cos(T.refHeading); swn = T.refU * Math.sin(T.refHeading); }
+      else if (seaMap.upwindFetch(airGrid.cwe, airGrid.cwn, _uf)) { seaFetch = Math.min(seaFetch, _uf[0]); if (_uf[1] > 0) seaDepth = _uf[1]; }
+      const W = seaMap.wp;
+      if (W.ok) { frame.dir(W.x, W.z, _d3); wp.ok = true; wp.x = _d3[0]; wp.y = _d3[1]; wp.z = _d3[2]; wp.depth = W.depth; wp.cap = W.cap; } else wp.ok = false;
+      stats.msFetch = now() - tg;
     }
+    water.attachMap(liqLevel > -1e8 && seaMap.target.on ? seaMap.target : null);
     // wakes: a body moving in the liquid, and thrusters blowing on it, leave rings of waves
     if (water.present && dist) {
       const rhoL = cover.liquidDensity || liquidOf(bodyId).density;
@@ -351,7 +343,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       }
     }
     // (until the ground under the focus has been sampled, nothing is known about the liquid here)
-    water.update(dt, frame, airGrid.cwe, airGrid.cwn, coverKnown ? liqLevel : -1e9, seaDepth, seaFetch, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
+    water.update(dt, frame, swe, swn, coverKnown ? liqLevel : -1e9, seaDepth, seaFetch, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
     // the sea's own spray: spume off the breaking crests, surf on the shore (loose.js; the drops move from the next step on)
     loose.sea(dt, water, near, fx, fz, airGrid.cwe, airGrid.cwn, body.gravity, airGrid);
     here.blown.sand = loose.saltation01; here.blown.snow = loose.blowingSnow01; here.blown.spume = loose.spume01; here.blown.surf = loose.surf01; here.blown.leaves = loose.leafRate; here.blown.litter = loose.litterRate; here.blown.leafStock01 = loose.leafStock01;
@@ -459,21 +451,26 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   function waterAt(bodyId, p, out) {
     const o = out || {};
     const dir = o.dir || (o.dir = { x: 0, y: 0, z: 0 });
-    if (bodyId === active && airGrid.inside(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z))) {
+    const lx = bodyId === active ? frame.lx(p.x, p.y, p.z) : 0, lz = bodyId === active ? frame.lz(p.x, p.y, p.z) : 0;
+    // (P18: with the sea map, as far as its outer level reaches: 2 km)
+    if (bodyId === active && (airGrid.inside(lx, lz) || water._mapOn && Math.max(Math.abs(lx - frame.lx(focus.x, focus.y, focus.z)), Math.abs(lz - frame.lz(focus.x, focus.y, focus.z))) < 0.5 * (SEA_TEX.N - 1) * SEA_MAP.outerCell)) {
       o.present = water.present;
-      o.height = water.present ? water.heightAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z)) : 0;
-      o.significant = water.significant; o.period = water.period; o.length = water.length; o.speed = water.speed;
-      o.swell = water.open > 0 ? water.swellHeight * water.open : 0; o.swellLength = water.open > 0 ? water.swellLength : 0;
-      o.steepness = water.steepness; o.whitecap01 = water.whitecap01; o.whitecapCover = water.foamAt < 1e8 ? water.cover : 0;
-      o.fetch = water.fetch; o.depth = water.depth;     // (P16) what this sea was raised over: the measured fetch (m), the mean depth along it (m)
-      dir.x = frame.ex * water.dir[0] + frame.nx * water.dir[1]; dir.y = frame.ey * water.dir[0] + frame.ny * water.dir[1]; dir.z = frame.ez * water.dir[0] + frame.nz * water.dir[1];
+      o.height = water.present ? water.heightAt(lx, lz) : 0;
+      // (P18) the sea HERE: the map's local sea (the reference's where there is no map)
+      const L = water.localAt(lx, lz, _loc);
+      o.significant = L.significant; o.period = water.period; o.length = water.length; o.speed = water.speed;
+      o.swell = water.open > 0 ? water.swellHeight * (water._mapOn ? L.open * Math.min(1, L.s3) : water.open) : 0; o.swellLength = water.open > 0 ? water.swellLength : 0;
+      o.steepness = water.steepness; o.whitecap01 = water._mapOn ? (L.cover > 0 ? Math.pow(L.cover / WATER.foamMax, 1 / WATER.foamPower) : 0) : water.whitecap01; o.whitecapCover = water._mapOn ? L.cover : water.foamAt < 1e8 ? water.cover : 0;
+      o.fetch = L.fetch; o.depth = L.depth;     // (P16) what this sea was raised over: the measured fetch (m), the mean depth along it (m); (P18) here
+      o.waveHs = L.Hs; o.open = L.open; o.nodeDepth = L.nodeDepth;     // (P18) the wind sea here (m), how far the open sea's swell reaches here, the depth at the map's node (m)
+      dir.x = frame.ex * L.dirx + frame.nx * L.dirz; dir.y = frame.ey * L.dirx + frame.ny * L.dirz; dir.z = frame.ez * L.dirx + frame.nz * L.dirz;
     } else {
       const a = air(bodyId, p, _wa, 10), body = BODIES[bodyId];
       windSea(a.speed, FETCH_DEFAULT, body.gravity, a.density, liquidOf(bodyId).density, 1e9, _ws);
       o.swell = 0; o.swellLength = 0;
       o.present = true; o.height = 0; o.significant = _ws.height; o.period = _ws.period; o.length = _ws.length; o.speed = _ws.speed;
       o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01; o.whitecapCover = foamCover(_ws.whitecap01);
-      o.fetch = FETCH_DEFAULT; o.depth = Infinity;
+      o.fetch = FETCH_DEFAULT; o.depth = Infinity; o.waveHs = _ws.height; o.open = 0; o.nodeDepth = NaN;
       const s = a.speed > 1e-6 ? 1 / a.speed : 0; dir.x = a.wind.x * s; dir.y = a.wind.y * s; dir.z = a.wind.z * s;
     }
     return o;
@@ -573,6 +570,12 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       // (P16) the fetch gauge: fetch (m, the mean of its radials), depth (m), radial (m each), ready, final, samples (this frame);
       // and the water point it measures from (body-local unit direction, its depth and its biome's fetch, the cap)
       gauge, waterPoint: wp,
+      // (P18) the sea at body-local p (water.js localAt): significant, foamAt, edge, cover, dirx, dirz (frame axes), sW, s3,
+      // fetch, depth, Hs, open, heading, nodeDepth; and the surf there in `depth` m of liquid; the builder itself
+      local(p, out) { return water.localAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), out || {}); },
+      surfAt(p, depth) { if (!water.present) return 0; const L = water.localAt(frame.lx(p.x, p.y, p.z), frame.lz(p.x, p.y, p.z), _loc); return surf01(L.significant, depth); },
+      map: seaMap,
+      get mapVersion() { return water.mapVersion; },
       field: water,
     },
     air: airGrid,             // the wind grid itself (for the lab and for debugging)
@@ -619,6 +622,6 @@ export {
   stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf,
   stepShipBody, stepShipGear, wakeShip, SHIP_BODY, shipTopSpeed, shipTerminal, downwashSpeed, groundEffect, gearSag,
   planSpeedChange, sampleSpeedChange, pulseBrakeDistance, stepPulse,
-  FLORA_GLSL, WATER_GLSL, WATER, windSea, fetchOf, skyNumbers, SKY, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
+  FLORA_GLSL, WATER_GLSL, WATER, SEA_TEX, SEA_MAP, windSea, fetchOf, skyNumbers, SKY, FLORA, PARTICLES, EVENT, DEFORM, MARK, MARK_STRIDE, WEATHER, WIND, AIR, GROUND, DEFAULT_SEED, LOOSE, KICK, DEVILS,
   MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow,
 };

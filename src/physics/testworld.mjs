@@ -54,3 +54,22 @@ export function epoch0(fn) {
   const e = _REG.earth.epoch; _REG.earth.epoch = 0;
   try { return fn(); } finally { _REG.earth.epoch = e; }
 }
+
+// (P18) A world drawn on the tangent plane at unit direction C: f(u, v) -> the ground's height over the sea level (m;
+// negative under the sea), where (u, v) are metres along the axes turned by `turn` (rad) from east toward north: +u is
+// east turned by `turn`. The sea's surface lies at radius R everywhere f < 0. Biome `biome` (its fetch caps the gauge).
+export function coastWorld(C, f, { R = 4000, biome = 'sea_coast', turn = 0 } = {}) {
+  let ex = C.z, ez = -C.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+  const E = { x: ex, y: 0, z: ez }, Nn = { x: C.y * ez, y: C.z * ex - C.x * ez, z: -C.y * ex };
+  const ct = Math.cos(turn), st = Math.sin(turn);
+  const uv = (d) => { const k = R / Math.max(1e-9, dot(d, C)); const e = dot(d, E) * k, n = dot(d, Nn) * k; return [e * ct + n * st, -e * st + n * ct]; };
+  const sample = (dirIn) => {
+    const d = norm(dirIn), [u, v] = uv(d), h = f(u, v);
+    const eps = 0.5, hu = (f(u + eps, v) - f(u - eps, v)) / (2 * eps), hv = (f(u, v + eps) - f(u, v - eps)) / (2 * eps);
+    const ge = hu * ct - hv * st, gn = hu * st + hv * ct;      // the gradient along east and north
+    const n = norm({ x: d.x - E.x * ge - Nn.x * gn, y: d.y - E.y * ge - Nn.y * gn, z: d.z - E.z * ge - Nn.z * gn });
+    return { radius: R + h, normal: n, slope: Math.acos(Math.min(1, dot(n, d))), liquidRadius: h < 0 ? R : 0, isLiquid: h < 0, biomeId: biome, biomeWeights: { [biome]: 1 } };
+  };
+  sample.at = (u, v) => { const e = u * ct - v * st, n = u * st + v * ct; return norm({ x: C.x * R + E.x * e + Nn.x * n, y: C.y * R + E.y * e + Nn.y * n, z: C.z * R + E.z * e + Nn.z * n }); };
+  return sample;
+}

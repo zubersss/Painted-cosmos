@@ -142,6 +142,7 @@ export const BLOWN = Object.freeze({
 
 const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
 const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
+const _wl = {};
 const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
 
@@ -687,11 +688,14 @@ export class Loose {
     this._seaLevel = water && water.present ? water.level : -1e9;
     if (!(h > 0) || !water || !water.present || !(water.significant > 0.03)) return;
     const Rr = PARTICLES.radius, capY = PARTICLES.capacity.spray[P.quality];
-    const u10 = Math.hypot(cwe, cwn), Hs = water.significant, lvl = water.level;
-    const dx = water.dir[0], dz = water.dir[1], c = water.speed || 0;
+    // (P18) the sea HERE (water.js localAt: the sea map's local sea, the reference's without a map): a sheltered bay
+    // breaks less than the open shore beside it
+    const L = water.localAt ? water.localAt(fx, fz, _wl) : null;
+    const u10 = Math.hypot(cwe, cwn), Hs = L ? L.significant : water.significant, lvl = water.level;
+    const dx = L ? L.dirx : water.dir[0], dz = L ? L.dirz : water.dir[1], c = water.speed || 0;
     // spume: the wind over a breaking sea
     // (a sea, not a puddle: nothing is torn off a chop under a hand high)
-    const sp = smoothstep(BLOWN.spumeFrom, BLOWN.spumeFull, u10) * (water.foamAt < 1e8 ? 1 : 0) * smoothstep(0.2, 0.6, Hs);
+    const sp = smoothstep(BLOWN.spumeFrom, BLOWN.spumeFull, u10) * ((L ? L.foamAt : water.foamAt) < 1e8 ? 1 : 0) * smoothstep(0.2, 0.6, Hs);
     this.spume01 = sp;
     if (sp > 0) {
       carry[9] += capY * sp * h / 2.2;

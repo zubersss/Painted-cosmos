@@ -295,6 +295,39 @@ export function surf01(Hs, depth) {
 }
 
 const _wk3 = new Float64Array(3);
+
+// (P18) THE SEA MAP. Until P18 the sea was one state round the focus: four trains, one height, one way, the same over a
+// sheltered bay and the open shore beside it. seamap.js now raises the sea at every node of two levels round the focus
+// (inner: the wind grid's 17 x 17 nodes 16 m apart; outer: 17 x 17 nodes 128 m apart, 2 km across) over that node's own
+// fetch and depth, turned toward its longest fetch and refracted toward its shore, and hands it over (attachMap). The
+// trains stay one set of waves (their lengths and phases are the reference sea's: the most exposed water about); per
+// node the map holds
+//   rH    the wind sea's height there over the reference's      open  how far the open sea's swell reaches it (0..1)
+//   wc    its own whitecap01 (from its own steepness)            kS    shoaling and refraction of the long train there
+// and, on the inner level, a WARP (m, frame axes): the trains are read at g + warp(g), so where the warp turns, the
+// crests turn (its Jacobian is the turn: a least-squares fit, seamap.js). Each frame the field composes the texture
+// below from them and the trains of the moment; surfaceAt, heightAt, runupAt and localAt read it, and so does the
+// chunk (PC_PHYS_SEA_MAP: PAINTER opts in). Without a map everything is exactly as before.
+export const SEA_TEX = Object.freeze({
+  N: 17,                // nodes per side, both levels
+  rows: 51,             // texture rows: 0-16 inner (sW, s3, foamAt, cover), 17-33 inner warp (x, z, 0, 0), 34-50 outer (as inner)
+  band: 1.5,            // inner cells over which the inner level gives way to the outer one at its edge
+  ease: 3,              // s: the displayed map follows a new build
+  noFoam: 3,            // x the local significant height: the foam level where the sea does not break (never reached)
+});
+const MN = SEA_TEX.N, MNN = MN * MN;
+function easeArr(a, t, k) { for (let i = 0; i < a.length; i++) a[i] += (t[i] - a[i]) * k; }
+// an N x N field of `c` values moved by (di, dj) nodes (new(i, j) = old(i + di, j + dj)); new nodes take `src`'s values
+function shiftArr(a, src, c, di, dj) {
+  if (di === 0 && dj === 0) return;
+  const tmp = Float32Array.from(a);
+  for (let j = 0; j < MN; j++) for (let i = 0; i < MN; i++) {
+    const si = i + di, sj = j + dj, o = (j * MN + i) * c;
+    const from = si >= 0 && sj >= 0 && si < MN && sj < MN ? tmp : src, so = from === tmp ? (sj * MN + si) * c : o;
+    for (let q = 0; q < c; q++) a[o + q] = from[so + q];
+  }
+}
+
 export class WaterField {
   // opts.swell: false = the wind sea alone, also on an open sea (tests of the wind sea)
   constructor(opts = {}) {
@@ -326,7 +359,35 @@ export class WaterField {
     this.foamAt = 1e9;             // elevation (m) above which the sea is breaking now (1e9: it is not)
     // uPhysWaterSea: Hs (m), the elevation above which the sea breaks (m), the width of that edge (m), whitecap cover
     this.uniforms = { uPhysWaterDir: [1, 0], uPhysWaterK: [0, 0, 0, 0], uPhysWaterAmp: [0, 0, 0, 0], uPhysWaterPhase: [0, 0, 0, 0], uPhysWaterGroup: [0, 0, 0, 0],
-      uPhysWaterSea: [0, 1e9, 1, 0], uPhysWake: this.wake, uPhysWakeG: 9.81 };
+      uPhysWaterSea: [0, 1e9, 1, 0], uPhysWake: this.wake, uPhysWakeG: 9.81,
+      // (P18) the sea map (SEA_TEX): a 17 x 51 RGBA float texture's data, and where its two levels lie (frame m of node
+      // (0, 0), cell m, nodes a side; w = 0: no map). PAINTER: a DataTexture over uPhysSeaMap, needsUpdate when mapVersion moves.
+      uPhysSeaMap: new Float32Array(MN * SEA_TEX.rows * 4), uPhysSeaGrid: [0, 0, 16, 0], uPhysSeaGrid2: [0, 0, 128, 0] };
+    // (P18) the map: the builder's last target (seamap.js), and what is shown (eased toward it, kept with the ground it belongs to)
+    this.map = null;
+    this.mapVersion = 0;           // bumps whenever uPhysSeaMap was rewritten
+    this._mapOn = false;           // the map is in use (surfaceAt, heightAt, runupAt, localAt read it)
+    this._mw = new Float32Array(MNN * 2); this._mi = new Float32Array(MNN * 4); this._mo = new Float32Array(MNN * 4);
+    this._mg = [0, 0, 16, 0, 0, 0, 128, 0];    // the displayed levels' grids (inner x0, z0, cell, N; outer x0, z0, cell, N)
+    this._mver = -1;
+    this._mt = new Float64Array(16);
+  }
+
+  // (P18) Hand over a built sea map (seamap.js SeaMap.target), or null to drop it.
+  attachMap(T) {
+    if (!T || !T.on) { this.map = null; this._mapOn = false; this.uniforms.uPhysSeaGrid[3] = 0; this.uniforms.uPhysSeaGrid2[3] = 0; this._mver = -1; return; }
+    this.map = T;
+    if (T.version === this._mver) return;
+    const g = this._mg, first = this._mver < 0;
+    this._mver = T.version;
+    // the displayed nodes stay with their ground: moved by whole cells to the new origin, new nodes snap to the target
+    const di = (T.x0 - g[0]) / T.cell, dj = (T.z0 - g[1]) / T.cell, di2 = (T.x02 - g[4]) / T.cell2, dj2 = (T.z02 - g[5]) / T.cell2;
+    const whole = (a) => Math.abs(a - Math.round(a)) < 1e-6;
+    if (first || g[3] === 0 || !whole(di) || !whole(dj) || g[2] !== T.cell) { this._mw.set(T.warp); this._mi.set(T.inner); }
+    else { shiftArr(this._mw, T.warp, 2, Math.round(di), Math.round(dj)); shiftArr(this._mi, T.inner, 4, Math.round(di), Math.round(dj)); }
+    if (first || g[7] === 0 || !whole(di2) || !whole(dj2) || g[6] !== T.cell2 || !T.N2) this._mo.set(T.outer);
+    else shiftArr(this._mo, T.outer, 4, Math.round(di2), Math.round(dj2));
+    g[0] = T.x0; g[1] = T.z0; g[2] = T.cell; g[3] = MN; g[4] = T.x02; g[5] = T.z02; g[6] = T.cell2; g[7] = T.N2 ? MN : 0;
   }
 
   // The frame re-anchored at old grid position (X, Z): keep the waves where they are.
@@ -334,6 +395,113 @@ export class WaterField {
     this.frameVersion = frame.version;
     for (let i = 0; i < NT; i++) { this.phase[i] -= this.kx[i] * X + this.kz[i] * Z; this.gphase[i] -= this.gx[i] * X + this.gz[i] * Z; }
     for (let w = 0; w < this.wake.length; w += 4) { this.wake[w] -= X; this.wake[w + 1] -= Z; }
+    // (P18) the map's levels stay on their ground (the warp's phase offset k . warp is carried with it)
+    const g = this._mg; g[0] -= X; g[1] -= Z; g[4] -= X; g[5] -= Z;
+    const u = this.uniforms; u.uPhysSeaGrid[0] = g[0]; u.uPhysSeaGrid[1] = g[1]; u.uPhysSeaGrid2[0] = g[4]; u.uPhysSeaGrid2[1] = g[5];
+  }
+
+  // (P18) Ease the shown map toward the last build and write the texture's data from it and the trains of the moment.
+  _composeMap(h) {
+    const T = this.map, u = this.uniforms;
+    if (!T || !this.present || !(this.height > 0 || this.amp[NT - 1] > 0)) { this._mapOn = false; u.uPhysSeaGrid[3] = 0; u.uPhysSeaGrid2[3] = 0; return; }
+    const k = 1 - Math.exp(-h / SEA_TEX.ease);
+    easeArr(this._mw, T.warp, k); easeArr(this._mi, T.inner, k); if (T.N2) easeArr(this._mo, T.outer, k);
+    const D = u.uPhysSeaMap, A = this.amp, sh = WATER.shares;
+    const a012 = A[0] * A[0] + A[1] * A[1] + A[2] * A[2], A3 = A[NT - 1], aw3 = 0.5 * this.height * sh[NT - 1], sw2 = 0.5 * this.swellHeight;
+    // (the wind sea at a node rises with the reference's: its whitecaps by how far the reference has come toward its target)
+    const prog = T.HsRef > 1e-6 ? Math.min(1, this.height / T.HsRef) : 0;
+    for (let lev = 0; lev < 2; lev++) {
+      const S = lev ? this._mo : this._mi, r0 = lev ? 2 * MN : 0;
+      if (lev && !T.N2) break;
+      for (let n = 0; n < MNN; n++) {
+        const sW = S[n * 4], open = S[n * 4 + 1], wc = S[n * 4 + 2], kS = S[n * 4 + 3];
+        const w3 = aw3 * sW, a3 = w3 + (Math.max(w3, sw2 * kS) - w3) * open;
+        const s3 = A3 > 1e-9 ? a3 / A3 : sW;
+        const va = a012 * sW * sW + a3 * a3, sig = 4 * Math.sqrt(0.5 * va * VARG) / STD4;
+        let cover = foamCover(wc * prog), at = SEA_TEX.noFoam * sig + 0.1;
+        if (cover > WATER.foamMin && this.height * sW > 0.02) at = sig * foamLevel(cover, va > 0 ? a3 * a3 / va : R0); else cover = 0;
+        const o = ((r0 + (n / MN | 0)) * MN + n % MN) * 4;
+        D[o] = sW; D[o + 1] = s3; D[o + 2] = at; D[o + 3] = cover;
+      }
+    }
+    for (let n = 0; n < MNN; n++) { const o = (MNN + n) * 4; D[o] = this._mw[n * 2]; D[o + 1] = this._mw[n * 2 + 1]; D[o + 2] = 0; D[o + 3] = 0; }
+    const g = this._mg;
+    u.uPhysSeaGrid[0] = g[0]; u.uPhysSeaGrid[1] = g[1]; u.uPhysSeaGrid[2] = g[2]; u.uPhysSeaGrid[3] = MN;
+    u.uPhysSeaGrid2[0] = g[4]; u.uPhysSeaGrid2[1] = g[5]; u.uPhysSeaGrid2[2] = g[6]; u.uPhysSeaGrid2[3] = T.N2 ? MN : 0;
+    this._mapOn = true; this.mapVersion++;
+  }
+
+  // (P18) The twin of the chunk's pcPhysSeaTap: one level's four numbers at grid position (x, z), bilinear, with their
+  // derivatives along east and north (0 where the place is beyond the level and the edge value is held). o[oo + 0..3]
+  // the values, [oo + 4..7] d/deast, [oo + 8..11] d/dnorth.
+  _seaTap(gx0, gz0, cell, r0, x, z, o, oo) {
+    const D = this.uniforms.uPhysSeaMap, Nm = MN - 1;
+    const u = (x - gx0) / cell, v = (z - gz0) / cell;
+    const cu = u < 0 ? 0 : u > Nm ? Nm : u, cv = v < 0 ? 0 : v > Nm ? Nm : v;
+    const inx = Math.abs(u - cu) <= 1e-6 ? 1 / cell : 0, inz = Math.abs(v - cv) <= 1e-6 ? 1 / cell : 0;
+    const i = Math.min(Math.floor(cu), Nm - 1), j = Math.min(Math.floor(cv), Nm - 1), fu = cu - i, fv = cv - j;
+    const a = ((r0 + j) * MN + i) * 4, b = a + 4, c = a + MN * 4, d = c + 4;
+    for (let q = 0; q < 4; q++) {
+      const a00 = D[a + q], a10 = D[b + q], a01 = D[c + q], a11 = D[d + q];
+      const lo = a00 + (a10 - a00) * fu, hi = a01 + (a11 - a01) * fu;
+      o[oo + q] = lo + (hi - lo) * fv;
+      o[oo + 4 + q] = ((a10 - a00) * (1 - fv) + (a11 - a01) * fv) * inx;
+      o[oo + 8 + q] = (hi - lo) * inz;
+    }
+  }
+  // The twin of pcPhysSeaP: the per-node numbers (sW, s3, foam level, cover) at (x, z), the two levels blended, into
+  // _tp[0..11] (values, d/deast, d/dnorth); and the warp into _tp[12..23] (pcPhysSeaTap of the warp rows).
+  _seaAt(x, z) {
+    const o = this._tp || (this._tp = new Float64Array(36)), g = this.uniforms.uPhysSeaGrid, g2 = this.uniforms.uPhysSeaGrid2;
+    this._seaTap(g[0], g[1], g[2], MN, x, z, o, 12);
+    this._seaTap(g[0], g[1], g[2], 0, x, z, o, 0);
+    if (g2[3] < 2) return o;
+    this._seaTap(g2[0], g2[1], g2[2], 2 * MN, x, z, o, 24);
+    const Nm = MN - 1, uu = (x - g[0]) / g[2], vv = (z - g[1]) / g[2], B = SEA_TEX.band;
+    const e0 = uu, e1 = vv, e2 = Nm - uu, e3 = Nm - vv, e = Math.min(Math.min(e0, e1), Math.min(e2, e3));
+    let dex = 0, dez = 0;
+    if (e === e0) dex = 1 / g[2]; else if (e === e1) dez = 1 / g[2]; else if (e === e2) dex = -1 / g[2]; else dez = -1 / g[2];
+    const t = Math.min(1, Math.max(0, e / B)), w = t * t * (3 - 2 * t), dw = e > 0 && e < B ? 6 * t * (1 - t) / B : 0;
+    for (let q = 0; q < 4; q++) {
+      const p = o[q], r = o[24 + q];
+      o[4 + q] = w * o[4 + q] + (1 - w) * o[28 + q] + (p - r) * dw * dex;
+      o[8 + q] = w * o[8 + q] + (1 - w) * o[32 + q] + (p - r) * dw * dez;
+      o[q] = r + (p - r) * w;
+    }
+    return o;
+  }
+
+  // (P18) The local sea at grid position (x, z): what uPhysWaterSea is for the reference, here, and more. Fills o:
+  // significant (m), foamAt (m), edge (m), cover (share white), dirx, dirz (the way the waves run here, frame axes, unit),
+  // sW, s3 (the trains' scales here), and from the build (nearest node): fetch, depth (m, the mean along it), Hs (the wind
+  // sea there, m, target), open, heading (rad, frame axes), node depth (m). Without a map: the reference's.
+  localAt(x, z, o = {}) {
+    if (!this._mapOn) {
+      o.significant = this.significant; o.foamAt = this.foamAt; o.edge = Math.max(1e-4, this.height * WATER.foamEdge); o.cover = this.foamAt < 1e8 ? this.cover : 0;
+      o.dirx = this.dir[0]; o.dirz = this.dir[1]; o.sW = 1; o.s3 = 1; o.fetch = this.fetch; o.depth = this.depth; o.Hs = this.height; o.open = this.open; o.heading = Math.atan2(this.dir[1], this.dir[0]); o.nodeDepth = NaN;
+      return o;
+    }
+    const m = this._seaAt(x, z), A = this.amp;
+    const sW = m[0], s3 = m[1], a012 = A[0] * A[0] + A[1] * A[1] + A[2] * A[2];
+    o.significant = 4 * Math.sqrt(0.5 * VARG * (a012 * sW * sW + A[3] * A[3] * s3 * s3)) / STD4;
+    o.foamAt = m[3] > WATER.foamMin ? m[2] : 1e9; o.edge = Math.max(1e-4, this.height * WATER.foamEdge * sW); o.cover = m[3] > WATER.foamMin ? m[3] : 0;
+    // (the local wave vector: the gradient of the phase read at the warped place; [16], [17] are d/deast of the warp's x, z, [20], [21] d/dnorth)
+    const d0 = this.dir[0], d1 = this.dir[1], lx = (1 + m[16]) * d0 + m[17] * d1, lz = m[20] * d0 + (1 + m[21]) * d1, ll = Math.hypot(lx, lz) || 1;
+    o.dirx = lx / ll; o.dirz = lz / ll; o.sW = sW; o.s3 = s3;
+    const T = this.map; let F = this.fetch, Dp = this.depth, Hs = this.height * sW, op = this.open, hd = Math.atan2(o.dirz, o.dirx), nd = NaN;
+    if (T && T.info) {
+      const g = this.uniforms.uPhysSeaGrid, g2 = this.uniforms.uPhysSeaGrid2;
+      let i = Math.round((x - g[0]) / g[2]), j = Math.round((z - g[1]) / g[2]), I = T.info, base = 0;
+      if (i < 0 || j < 0 || i > MN - 1 || j > MN - 1) {
+        if (g2[3] >= 2) { i = Math.round((x - g2[0]) / g2[2]); j = Math.round((z - g2[1]) / g2[2]); base = MNN; }
+        i = i < 0 ? 0 : i > MN - 1 ? MN - 1 : i; j = j < 0 ? 0 : j > MN - 1 ? MN - 1 : j;
+      }
+      const q = (base + j * MN + i) * 6;
+      if (I[q + 5] > 0) { F = I[q]; Dp = I[q + 1]; Hs = I[q + 2]; op = I[q + 3]; hd = I[q + 4]; }
+      nd = T.depth ? T.depth[base + j * MN + i] : NaN;
+    }
+    o.fetch = F; o.depth = Dp; o.Hs = Hs; o.open = op; o.heading = hd; o.nodeDepth = nd;
+    return o;
   }
 
   // Something disturbed the liquid at grid position (x, z): a ring of waves of amplitude `amp`
@@ -352,7 +520,7 @@ export class WaterField {
   // prevailing (optional, m/s): the wind that prevails over this body's seas: somewhere out there it is
   // blowing, so an open sea has a swell on a calm day too (WATER.swellCalm of it)
   update(dt, frame, we, wn, level, depth, fetch, g, rhoAir, rhoLiq, fx = 0, fz = 0, prevailing = 0) {
-    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.gphase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; this.wake.fill(0); }
+    if (this.frameVersion !== frame.version) { this.frameVersion = frame.version; this.phase.fill(0); this.gphase.fill(0); this.height = 0; this.arrive = WATER.arriveTime; this.wake.fill(0); this.attachMap(null); }
     this.level = level; this.present = level > -1e8; this.g = g;
     this.fetch = fetch; this.depth = depth;     // (P16) what the sea was raised over (m), for the probe and the lab
     const U = Math.hypot(we, wn);
@@ -415,6 +583,8 @@ export class WaterField {
     this.slope = Math.sqrt(0.5 * slope4 * VARG);          // rms slope of the surface
     this.foamAt = this.cover > WATER.foamMin && this.height > 0.02 ? this.significant * foamLevel(this.cover, var4 > 0 ? this.amp[NT - 1] * this.amp[NT - 1] / var4 : R0) : 1e9;
     const S = u.uPhysWaterSea; S[0] = this.significant; S[1] = this.foamAt; S[2] = Math.max(1e-4, this.height * WATER.foamEdge); S[3] = this.foamAt < 1e8 ? this.cover : 0;
+    // (P18) the sea at every node about, from the last build and the trains of the moment
+    if (this.map || this._mapOn) this._composeMap(h);
     // wakes age and die
     const W = this.wake;
     for (let w = 0; w < W.length; w += 4) {
@@ -467,6 +637,7 @@ export class WaterField {
   //   ax, az (unit vector, frame axes: the way the crests lie here; a stroke runs along it),
   //   crest01 (0 flanks and troughs .. 1 the tops of the higher waves), foam01 (breaking now)
   surfaceAt(x, z, o = {}) {
+    if (this._mapOn) return this._surfaceMap(x, z, o);
     let h = 0, he = 0, hn = 0, Dx = this.dir[0] * 1e-6, Dz = this.dir[1] * 1e-6;
     const G = WATER.group;
     for (let i = 0; i < NT; i++) {
@@ -500,9 +671,56 @@ export class WaterField {
   // Stockdon et al. 2006 (ten field experiments on natural beaches): set-up 0.35 b sqrt(H0 L0), incident
   // swash 0.75 b sqrt(H0 L0) from its lowest to its highest (b the beach slope, H0 and L0 the height and
   // length of the waves offshore), never more than twice the wave height (a wave surging up a wall).
+  // (P18) surfaceAt with the sea map: the trains read at the warped place (so they run the way the map turns them), each
+  // scaled by the map there (sW the wind sea's three, s3 the long train), the slope with the warp's Jacobian and the
+  // scales' own gradients; crests and foam against the local sea. The twin of pcPhysWaterD under PC_PHYS_SEA_MAP.
+  _surfaceMap(x, z, o) {
+    const m = this._seaAt(x, z), G = WATER.group;
+    const xw = x + m[12], zw = z + m[13];
+    const Jxx = 1 + m[16], Jzx = m[17], Jxz = m[20], Jzz = 1 + m[21];
+    let h = 0, he = 0, hn = 0;
+    let Dx = (Jxx * this.dir[0] + Jzx * this.dir[1]) * 1e-6, Dz = (Jxz * this.dir[0] + Jzz * this.dir[1]) * 1e-6, s2 = 0;
+    for (let i = 0; i < NT; i++) {
+      const A = this.amp[i];
+      if (A === 0) continue;
+      const q = i < NT - 1 ? 1 : 0, s = m[q ? 0 : 1], sx = m[q ? 4 : 5], sz = m[q ? 8 : 9];
+      const kx = this.kx[i], kz = this.kz[i], gx = this.gx[i], gz = this.gz[i];
+      const kxl = kx * Jxx + kz * Jzx, kzl = kx * Jxz + kz * Jzz, gxl = gx * Jxx + gz * Jzx, gzl = gx * Jxz + gz * Jzz;
+      const a = kx * xw + kz * zw - this.phase[i], e = gx * xw + gz * zw - this.gphase[i];
+      const env = 1 + G * Math.sin(e), sa = Math.sin(a), ca = Math.cos(a), ce = Math.cos(e);
+      h += A * s * env * sa;
+      he += A * s * (env * ca * kxl + G * ce * sa * gxl) + A * env * sa * sx;
+      hn += A * s * (env * ca * kzl + G * ce * sa * gzl) + A * env * sa * sz;
+      const w = A * s * env / (this.k[i] || 1); Dx += w * kxl; Dz += w * kzl;
+      s2 += A * A * s * s * (kxl * kxl + kzl * kzl);
+    }
+    const wk = this.wakeInto(x, z, _wk3);
+    h += wk[0]; he += wk[1]; hn += wk[2];
+    const dl = Math.hypot(Dx, Dz) || 1;
+    o.height = h; o.de = he; o.dn = hn; o.ax = -Dz / dl; o.az = Dx / dl;
+    const A = this.amp, a012 = A[0] * A[0] + A[1] * A[1] + A[2] * A[2];
+    const sig = 4 * Math.sqrt(0.5 * VARG * (a012 * m[0] * m[0] + A[3] * A[3] * m[1] * m[1])) / STD4, hs = sig > 1e-4 ? sig : 1e-4;
+    const slope = Math.sqrt(0.5 * s2 * VARG);
+    o.crest01 = smoothstep(WATER.crestLow, WATER.crestHigh, h / hs);
+    o.line01 = o.crest01 * (1 - smoothstep(WATER.lineIn, WATER.lineOut, Math.abs(he * Dx + hn * Dz) / dl / (slope > 1e-6 ? slope : 1e-6)));
+    o.foam01 = m[3] > WATER.foamMin ? smoothstep(m[2], m[2] + Math.max(1e-4, this.height * WATER.foamEdge * m[0]), h) : 0;
+    return o;
+  }
+
   runupAt(x, z, slope) {
     const i = NT - 1;
     if (!this.present || !(this.amp[i] > 0) || !(this.k[i] > 0)) return 0;
+    if (this._mapOn) {
+      // (P18) the long train as the map has it here: its local wavelength and height, read at the warped place
+      const m = this._seaAt(x, z), A = this.amp, xw = x + m[12], zw = z + m[13];
+      const kxl = this.kx[i] * (1 + m[16]) + this.kz[i] * m[17], kzl = this.kx[i] * m[20] + this.kz[i] * (1 + m[21]), kl = Math.hypot(kxl, kzl);
+      const sig = 4 * Math.sqrt(0.5 * VARG * ((A[0] * A[0] + A[1] * A[1] + A[2] * A[2]) * m[0] * m[0] + A[i] * A[i] * m[1] * m[1])) / STD4;
+      if (!(kl > 0) || !(A[i] * m[1] > 0)) return 0;
+      const q = Math.sqrt(sig * TAU / kl), b = slope > 0 ? slope : 0, swing = Math.min(WATER.swashSwing * b * q, 2 * sig);
+      const a = this.kx[i] * xw + this.kz[i] * zw - this.phase[i];
+      const env = 1 + WATER.group * Math.sin(this.gx[i] * xw + this.gz[i] * zw - this.gphase[i]);
+      return WATER.swashSetup * b * q + 0.5 * swing * env * (Math.cos(a) + 0.5 * Math.sin(2 * a)) * 0.7698229407236336;
+    }
     const q = Math.sqrt(this.significant * TAU / this.k[i]), b = slope > 0 ? slope : 0;
     const swing = Math.min(WATER.swashSwing * b * q, 2 * this.significant);
     const a = this.kx[i] * x + this.kz[i] * z - this.phase[i];
@@ -511,6 +729,15 @@ export class WaterField {
   }
 
   heightAt(x, z) {
+    if (this._mapOn) {
+      const m = this._seaAt(x, z), xw = x + m[12], zw = z + m[13];
+      let s = 0;
+      for (let i = 0; i < NT; i++) {
+        if (this.amp[i] === 0) continue;
+        s += this.amp[i] * m[i < NT - 1 ? 0 : 1] * (1 + WATER.group * Math.sin(this.gx[i] * xw + this.gz[i] * zw - this.gphase[i])) * Math.sin(this.kx[i] * xw + this.kz[i] * zw - this.phase[i]);
+      }
+      return s + this.wakeAt(x, z);
+    }
     let s = 0;
     for (let i = 0; i < NT; i++) {
       if (this.amp[i] === 0) continue;
@@ -532,6 +759,79 @@ const train = (i) => `  {
     o.yz += A * k * (env * cos(a) * di + ${f(WATER.group)} * cos(e) * sa * gi);
     D += A * env * di;
   }`;
+
+// (P18) a train read through the sea map: at the warped place gw, its phase gradient turned by Jt (the warp's
+// Jacobian, transposed), scaled by sc with gradient dsc (the twin of WaterField._surfaceMap)
+const trainMap = (i) => `  {
+    vec2 di = vec2(d.x * ${f(COS[i])} - d.y * ${f(SIN[i])}, d.x * ${f(SIN[i])} + d.y * ${f(COS[i])});
+    vec2 gi = vec2(d.x * ${f(GCOS[i])} - d.y * ${f(GSIN[i])}, d.x * ${f(GSIN[i])} + d.y * ${f(GCOS[i])}) * ${f(GK)};
+    float k = uPhysWaterK.${C4[i]}, A = uPhysWaterAmp.${C4[i]};
+    float sc = ${i < 3 ? 'sm.x' : 'sm.y'}; vec2 dsc = ${i < 3 ? 'vec2(sdx.x, sdz.x)' : 'vec2(sdx.y, sdz.y)'};
+    vec2 kl = Jt * di, gl = Jt * gi;
+    float a = k * dot(di, gw) - uPhysWaterPhase.${C4[i]}, e = k * dot(gi, gw) - uPhysWaterGroup.${C4[i]};
+    float env = 1.0 + ${f(WATER.group)} * sin(e), sa = sin(a);
+    o.x += A * sc * env * sa;
+    o.yz += A * sc * k * (env * cos(a) * kl + ${f(WATER.group)} * cos(e) * sa * gl) + A * env * sa * dsc;
+    D += A * sc * env * kl;
+  }`;
+const SEA_GLSL = /* glsl */`
+#ifdef PC_PHYS_SEA_MAP
+// (P18) The sea map (physics.md, "For PAINTER", P18): the sea raised at every node about over its own fetch and depth,
+// turned toward its longest fetch and refracted toward its shore. A ${MN} x ${SEA_TEX.rows} RGBA float texture (nearest
+// filtering; read with texelFetch): rows 0-${MN - 1} the inner level (x the wind sea's scale, y the long train's, z the
+// elevation (m) above which the sea breaks there, w the share that is white), rows ${MN}-${2 * MN - 1} the inner level's
+// warp (xy, m, frame axes), rows ${2 * MN}-${3 * MN - 1} the outer level (as the inner).
+uniform highp sampler2D uPhysSeaMap;
+uniform vec4 uPhysSeaGrid;     // inner level: frame position (m) of node (0, 0), cell (m), nodes a side (under 2: no map)
+uniform vec4 uPhysSeaGrid2;    // outer level: the same (under 2: none)
+// One level's four numbers at grid position g (bilinear), with their derivatives along east and north (per m)
+vec4 pcPhysSeaTap(vec4 grid, int r0, vec2 g, out vec4 ddx, out vec4 ddz) {
+  float Nm = grid.w - 1.0;
+  vec2 uv = (g - grid.xy) / grid.z;
+  vec2 c = clamp(uv, vec2(0.0), vec2(Nm));
+  vec2 inside = vec2(abs(uv.x - c.x) <= 1e-6 ? 1.0 : 0.0, abs(uv.y - c.y) <= 1e-6 ? 1.0 : 0.0) / grid.z;
+  vec2 i0 = min(floor(c), vec2(Nm - 1.0));
+  vec2 fr = c - i0;
+  ivec2 b = ivec2(i0) + ivec2(0, r0);
+  vec4 a00 = texelFetch(uPhysSeaMap, b, 0), a10 = texelFetch(uPhysSeaMap, b + ivec2(1, 0), 0);
+  vec4 a01 = texelFetch(uPhysSeaMap, b + ivec2(0, 1), 0), a11 = texelFetch(uPhysSeaMap, b + ivec2(1, 1), 0);
+  vec4 lo = a00 + (a10 - a00) * fr.x, hi = a01 + (a11 - a01) * fr.x;
+  ddx = ((a10 - a00) * (1.0 - fr.y) + (a11 - a01) * fr.y) * inside.x;
+  ddz = (hi - lo) * inside.y;
+  return lo + (hi - lo) * fr.y;
+}
+// The per-node numbers at g, the two levels blended (the inner gives way to the outer over its last ${f(SEA_TEX.band)} cells)
+vec4 pcPhysSeaP(vec2 g, out vec4 ddx, out vec4 ddz) {
+  vec4 p = pcPhysSeaTap(uPhysSeaGrid, 0, g, ddx, ddz);
+  if (uPhysSeaGrid2.w < 2.0) return p;
+  vec4 dx2, dz2;
+  vec4 q = pcPhysSeaTap(uPhysSeaGrid2, ${2 * MN}, g, dx2, dz2);
+  vec2 uv = (g - uPhysSeaGrid.xy) / uPhysSeaGrid.z; float Nm = uPhysSeaGrid.w - 1.0;
+  float e0 = uv.x, e1 = uv.y, e2 = Nm - uv.x, e3 = Nm - uv.y, e = min(min(e0, e1), min(e2, e3));
+  vec2 de = (e == e0 ? vec2(1.0, 0.0) : e == e1 ? vec2(0.0, 1.0) : e == e2 ? vec2(-1.0, 0.0) : vec2(0.0, -1.0)) / uPhysSeaGrid.z;
+  float t = clamp(e / ${f(SEA_TEX.band)}, 0.0, 1.0), w = t * t * (3.0 - 2.0 * t);
+  vec2 dw = (e > 0.0 && e < ${f(SEA_TEX.band)}) ? 6.0 * t * (1.0 - t) / ${f(SEA_TEX.band)} * de : vec2(0.0);
+  ddx = w * ddx + (1.0 - w) * dx2 + (p - q) * dw.x;
+  ddz = w * ddz + (1.0 - w) * dz2 + (p - q) * dw.y;
+  return q + (p - q) * w;
+}
+// The local sea at a body-local point: what uPhysWaterSea is for the reference sea, here (x significant height (m),
+// y the elevation above which it breaks (m), z the width of that edge (m), w the share that is white)
+vec4 pcPhysSeaLocal(vec3 p) {
+  if (uPhysSeaGrid.w < 2.0) return uPhysWaterSea;
+  vec4 dx, dz; vec4 m = pcPhysSeaP(pcPhysGrid(p), dx, dz);
+  vec4 A = uPhysWaterAmp * vec4(m.x, m.x, m.x, m.y);
+  bool br = m.w > ${f(WATER.foamMin)};
+  return vec4(${f(4 / STD4)} * sqrt(${f(0.5 * VARG)} * dot(A, A)), br ? m.z : 1e9, max(1e-4, uPhysWaterSea.z * m.x), br ? m.w : 0.0);
+}
+// The way the waves run at a body-local point (frame axes, unit): uPhysWaterDir turned by the map
+vec2 pcPhysSeaDir(vec3 p) {
+  if (uPhysSeaGrid.w < 2.0) return uPhysWaterDir;
+  vec4 dx, dz; pcPhysSeaTap(uPhysSeaGrid, ${MN}, pcPhysGrid(p), dx, dz);
+  return normalize(mat2(1.0 + dx.x, dz.x, dx.y, 1.0 + dz.y) * uPhysWaterDir);
+}
+#endif
+`;
 
 // GLSL twin. Shares the frame uniforms with FLORA_GLSL (guarded, so both may be included).
 export const WATER_GLSL = /* glsl */`
@@ -558,7 +858,7 @@ uniform vec4 uPhysWaterSea;    // x: significant height Hs (m); y: the elevation
                                // now (1e9: it is not); z: the width of that edge (m); w: whitecap cover (share of the surface)
 uniform vec4 uPhysWake[${WATER.wakes}];     // wakes: x, z (frame axes, m), age (s), amplitude (m; 0 = unused)
 uniform float uPhysWakeG;      // gravity (m/s^2), for the speed of the wake waves
-
+${SEA_GLSL}
 // The wakes: xyz = (height, dh/deast, dh/dnorth). Skip it (PC_PHYS_NO_WAKE) on far water.
 vec3 pcPhysWake(vec2 g) {
   vec3 o = vec3(0.0);
@@ -588,6 +888,15 @@ vec3 pcPhysWaterLong(vec3 p) {
   vec2 d = uPhysWaterDir;
   vec3 o = vec3(0.0);
   vec2 D = vec2(0.0);
+#ifdef PC_PHYS_SEA_MAP
+  if (uPhysSeaGrid.w >= 2.0) {
+    vec4 wdx, wdz; vec4 wv = pcPhysSeaTap(uPhysSeaGrid, ${MN}, g, wdx, wdz);
+    vec2 gw = g + wv.xy; mat2 Jt = mat2(1.0 + wdx.x, wdz.x, wdx.y, 1.0 + wdz.y);
+    vec4 sdx, sdz; vec4 sm = pcPhysSeaP(g, sdx, sdz);
+${trainMap(3)}
+    return o;
+  }
+#endif
 ${train(3)}
   return o;
 }
@@ -600,7 +909,19 @@ vec3 pcPhysWaterD(vec3 p, out vec2 along) {
   vec2 d = uPhysWaterDir;
   vec3 o = vec3(0.0);
   vec2 D = d * 1e-6;
+#ifdef PC_PHYS_SEA_MAP
+  if (uPhysSeaGrid.w >= 2.0) {
+    vec4 wdx, wdz; vec4 wv = pcPhysSeaTap(uPhysSeaGrid, ${MN}, g, wdx, wdz);
+    vec2 gw = g + wv.xy; mat2 Jt = mat2(1.0 + wdx.x, wdz.x, wdx.y, 1.0 + wdz.y);
+    vec4 sdx, sdz; vec4 sm = pcPhysSeaP(g, sdx, sdz);
+    D = (Jt * d) * 1e-6;
+${[0, 1, 2, 3].map(trainMap).join('\n')}
+  } else {
+#endif
 ${[0, 1, 2, 3].map(train).join('\n')}
+#ifdef PC_PHYS_SEA_MAP
+  }
+#endif
   #ifndef PC_PHYS_NO_WAKE
     o += pcPhysWake(g);
   #endif
@@ -637,6 +958,22 @@ float pcPhysWaterRunup(vec3 p, float slope) {
   float k = uPhysWaterK.w;
   if (uPhysWaterAmp.w <= 0.0 || k <= 0.0) return 0.0;
   vec2 g = pcPhysGrid(p), d = uPhysWaterDir;
+#ifdef PC_PHYS_SEA_MAP
+  if (uPhysSeaGrid.w >= 2.0) {
+    // (P18) the long train as the map has it here: its local wavelength and height, read at the warped place
+    vec4 wdx, wdz; vec4 wv = pcPhysSeaTap(uPhysSeaGrid, ${MN}, g, wdx, wdz);
+    vec2 gw = g + wv.xy; mat2 Jt = mat2(1.0 + wdx.x, wdz.x, wdx.y, 1.0 + wdz.y);
+    vec4 sdx, sdz; vec4 sm = pcPhysSeaP(g, sdx, sdz);
+    vec2 di = vec2(d.x * ${f(COS[3])} - d.y * ${f(SIN[3])}, d.x * ${f(SIN[3])} + d.y * ${f(COS[3])});
+    vec2 gi = vec2(d.x * ${f(GCOS[3])} - d.y * ${f(GSIN[3])}, d.x * ${f(GSIN[3])} + d.y * ${f(GCOS[3])}) * ${f(GK)};
+    vec4 A = uPhysWaterAmp * vec4(sm.x, sm.x, sm.x, sm.y);
+    float kl = k * length(Jt * di), sig = ${f(4 / STD4)} * sqrt(${f(0.5 * VARG)} * dot(A, A));
+    if (kl <= 0.0 || A.w <= 0.0) return 0.0;
+    float q = sqrt(sig * 6.2831853 / kl), b = max(slope, 0.0);
+    float a = k * dot(di, gw) - uPhysWaterPhase.w, env = 1.0 + ${f(WATER.group)} * sin(k * dot(gi, gw) - uPhysWaterGroup.w);
+    return ${f(WATER.swashSetup)} * b * q + 0.5 * min(${f(WATER.swashSwing)} * b * q, 2.0 * sig) * env * (cos(a) + 0.5 * sin(2.0 * a)) * ${f(1 / 1.299)};
+  }
+#endif
   vec2 di = vec2(d.x * ${f(COS[3])} - d.y * ${f(SIN[3])}, d.x * ${f(SIN[3])} + d.y * ${f(COS[3])});
   vec2 gi = vec2(d.x * ${f(GCOS[3])} - d.y * ${f(GSIN[3])}, d.x * ${f(GSIN[3])} + d.y * ${f(GCOS[3])}) * ${f(GK)};
   float q = sqrt(uPhysWaterSea.x * 6.2831853 / k), b = max(slope, 0.0);
@@ -646,6 +983,16 @@ float pcPhysWaterRunup(vec3 p, float slope) {
 // The surf at a shore: 0..1, how far a wave of this sea has broken in liquid depth metres deep.
 float pcPhysWaterSurf(float depth) {
   return uPhysWaterSea.x > 0.02 ? 1.0 - smoothstep(0.5, ${f(1 / WATER.surfBreak)}, depth / uPhysWaterSea.x) : 0.0;
+}
+// (P18) The same two against a given sea (pcPhysSeaLocal(p) under PC_PHYS_SEA_MAP, else uPhysWaterSea): crests and foam,
+// and the surf at a shore, of the sea that is there
+vec2 pcPhysWaterCrestAt(vec3 w, vec4 sea) {
+  float hs = max(sea.x, 1e-4);
+  float foam = sea.y < 1e8 ? smoothstep(sea.y, sea.y + sea.z, w.x) : 0.0;
+  return vec2(smoothstep(${f(WATER.crestLow)}, ${f(WATER.crestHigh)}, w.x / hs), foam);
+}
+float pcPhysWaterSurfAt(float depth, vec4 sea) {
+  return sea.x > 0.02 ? 1.0 - smoothstep(0.5, ${f(1 / WATER.surfBreak)}, depth / sea.x) : 0.0;
 }
 // The unit normal of the surface (body-local) from pcPhysWater's result and the local up.
 vec3 pcPhysWaterNormal(vec3 w, vec3 up) { return normalize(up - w.y * uPhysEast - w.z * uPhysNorth); }
