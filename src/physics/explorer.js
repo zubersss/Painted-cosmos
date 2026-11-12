@@ -99,14 +99,14 @@ export const EXPLORER_BODY = Object.freeze({
   aheadProbeMargin: 0.92, // the pace planned, as a share of the fastest trial that crossed clean (and the pace is tried that much faster)
   aheadProbeTries: 6,     // trials at most (a bisection between 0.5 m/s and the pace: about a sixth of a metre a second)
   // (P22) THE WAY, SEEN. A runner looks where the feet will go: the ground along the path is kept as a row of samples
-  // (`way`, wayStep apart, out to what the hips must answer in time and to the read of the way ahead), sampled once as it
-  // comes into view and again each wayFresh metres nearer (what stands on the ground near the walker is known only near
-  // it: PILOT's boulders are listed within 9 m). The legs level the hips within the TUBE that ground allows: never lower,
-  // at any place within wayTime of travel, than that place's ground less the fold (the hips rise in time for a rock: before
-  // P22 they were heaved up its face at the ground's own rate and overshot its top, and the limbs then had to check the run
-  // so the feet could follow the far side down: the game's Moon boulder, 7.15 -> 2.52 m/s on top), never higher than its
-  // ground and the reach (the legs fold in time before a crest, so the stroke is there for the fall beyond). The line
-  // these are counted from rises at the rate the ground under the feet has been rising (a hill is not a rise).
+  // (`way`, wayStep apart, out to the read of the way ahead), sampled once as it comes into view and again each wayFresh
+  // metres nearer (what stands on the ground near the walker is known only near it: PILOT's boulders are listed within
+  // 9 m). Over the first wayTime of travel it gives the legs THE TUBE (wayUpdate): the hips rise no slower than clears the
+  // fold of the ground ahead and above them, no faster than keeps the reach of what is ahead, a line to a far sample past a
+  // nearer one's stroke not counted (LEGS, 3). So the hips are raised in time for a rock the stroke can take, only as far as
+  // its top asks (before P22 they were heaved up its face at the ground's own rate and overshot its top, and the limbs then
+  // checked the run so the feet could follow the far side down: the game's Moon boulder, 7.15 -> 2.52 m/s on top), and are
+  // folded before a crest. Over the whole of it the crests are read (wayCrest, crestMargin).
   wayStep: 0.3,           // m between the samples of the way
   wayLat: 0.35,           // m off the line of the run at which a sample is no longer on the way
   wayFresh: 3,            // m nearer than where it was last read, a sample is read again
@@ -458,16 +458,19 @@ function wayCrest(W, h0, vh, gE, ab, ts, T) {
     // (short of what is kept, the ground under the feet (h0), and behind them the slope the run is on: ts)
     const db = d - L, hb = db >= W.d[0] ? wayAt(W, db) : db >= 0 ? h0 + (W.h[0] - h0) * db / W.d[0] : h0 + ts * db, ha = wayAt(W, d + L);
     if (!(hb === hb) || !(ha === ha)) continue;
+    const sn = (hc - hb) / L, drop = hc - ha;
+    // (what cannot hold the run back now, at the most the near side could count, is not read further: the walker gains
+    // less than a metre a second in a step)
+    if (!((drop > T.clamber ? k0 : k) / Math.max(0.05, Math.max(sn, Math.min(ts, 2 * sn), 0) + Math.min(drop, T.clamber) / L) < vh + 1)) continue;
     // (the hips ride the near side only where it rises more than a clamber: a rock or a mound lower than that is crossed
     // within the stroke, the hips raised in time (the tube), and its face is read and tried (P16, P17); only its fall counts)
     let lo3 = Math.min(hc, hb); for (let i = (j >> 1); i >= 0 && W.d[i] >= d - 3 * L; i--) if (W.h[i] < lo3) lo3 = W.h[i];
     if (d - 3 * L < W.d[0] && h0 < lo3) lo3 = h0;
     // (or where the run is already on it, climbing at its slope: ts, the rise of the hips (or the ground's trend) per metre)
-    const sn = (hc - hb) / L, s1 = hc - lo3 > T.clamber || ts > 0.5 * sn ? Math.max(sn, Math.min(ts, 2 * sn)) : 0;
+    const s1 = hc - lo3 > T.clamber || ts > 0.5 * sn ? Math.max(sn, Math.min(ts, 2 * sn)) : 0;
     // (a drop deeper than a clamber in a look is a fall, not ground to follow: from level ground it is not slowed for; at
     // the top of a climb it is a knife edge, and the climb is: the hips must be turned from it within the stroke, whatever
     // is beyond (a 60 degree ridge on the Moon, climbed at 2 m/s, threw the body 0.5 m up off its crest))
-    const drop = hc - ha;
     if (drop > T.clamber && !(s1 > 0)) continue;
     const sig = s1 + Math.min(drop, T.clamber) / L;
     if (!(sig > 0.05)) continue;

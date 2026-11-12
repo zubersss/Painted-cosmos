@@ -3,6 +3,226 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P22 (twentieth PHYSICS agent; read this block first; P21 and older below hold for everything not named here)
+
+**Where things stand.** The block, in the order a player feels it: (1) the Moon boulder's hold over the top; (2) crests;
+(3) the 43 degree hill read as a face; (4) the close row's standard (the coordinator's ruling); (5) the arrival sea from the
+wind's history (P21's Next 0); (6) PC_TIMING when the load is under 8. Done: (1), (2), (3), (5); (4) measured, the standard
+kept (no new one holds in every case: item 4); (6) not run (the load stayed 9 to 14 all block). Found and fixed under (1)
+and (2): three faults in the read-ahead (item 1c). Commits: `e20f900` (items 1 and 2, the read-ahead fixes, tests), `a7e47c7`
+(items 3 and 5, item 4 measured, tests) and the hand-over's (the crest scan pruned, these notes, the strips). Tests: `node
+--test src/physics/` **305 pass** (300 + 5 new: `explorer.test.mjs` 4, `water.test.mjs` 1; three changed where item 1d says
+why; `load.test.mjs` among them), `node --test tests/*.test.mjs` **148 pass**, `node --test src/world/*.test.mjs` **19 pass**,
+on a clean export of `e20f900` with this block's files; `coast.mjs` PASS at both stands at settle 150 and 20. Every new
+test fails on the head before P22 (`d93944b`). `ghostfield.mjs`: radial 0, off the line 0, wrong materials 0, steps in the
+air 0 at all six places (worst step loss 0.26 on Earth, 0.52 on the Moon; P21 0.39 / 0.47). Scratch:
+`/home/user/.pc-scratch/physics/p22/` (`head/`, `work/`: the head as exported and it with my files; `h243/`: P21's head;
+`s/mb.mjs` the strip game-moon-boulder replayed in PILOT's Sim in Node (gamefilm's MOON_SETUP: the same site, run-up,
+keys; on `243c187`'s world it gives the strip's numbers to the digit), `s/rim.mjs <tree> g a1 H a2 [fillet hz read]` a rim at
+fixed paces, `s/hill43.mjs` hills seen coming, `s/row19.mjs`, `s/rowloss2.mjs` (P21's rows), `s/rowstd.mjs` (the row with a
+trial standard), `s/p17.mjs`, `s/clean.mjs` (the body alone over one boulder at fixed paces), `s/field.mjs` (the explorer
+test's field), `s/brsite.mjs` (boulderrun's site, found in Node), `s/trace8.mjs`, `s/tr1.mjs`, `s/prof1.mjs` (boulderrun
+replayed, one heading frame by frame, the ground along it), `s/bench.mjs` (the explorer step's cost); `trace8-*-head.txt`,
+`trace8-*-final.txt` at today's site (`site-head.json`) and P21's; `film/` the strips).
+**Next, in order:** (0) PILOT: list boulders out to 16 m (For PILOT, P22 (1)): the read-ahead is 12 to 13 m out at a lunar
+run and the list is 9 m, so a boulder is never read at a run on the Moon (the tube saves a rock the stroke can take; a 1 m
+boulder is met unread); (1) the crest law is a corner's: a rounded brow is read sharper than it is, so a run across crater
+fields slows more than it must (boulderrun's mean pace at today's site 5.0-6.2 -> 3.0-6.0 m/s); a check of the profile
+itself (the hips' arc against the ground, as the ghost does) would read brows at their own sharpness; (2) the Moon's rows
+in item 4's table: three numbers a little worse (steps over 0.3 m/s 2 -> 3, 4 -> 5 and 4 -> 5, one more hold); (3) PC_TIMING
+(the explorer step costs about 30 us more: item 6); (4) the strip game-moon-boulder on today's world starts on a small
+crest (item 1e).
+**API added (additive):** explorer.js `EXPLORER_BODY.wayStep`, `.wayLat`, `.wayFresh`, `.wayFill`, `.wayMax`, `.wayMargin`
+(the way and its tube), `.crestMargin` (the crest's law), `.trendSlip`; `export wayTime(gE, T)`; `EXPLORER_BODY_STATE()`
+`.paceCrest` (m/s: the pace held for the crests seen), `.readTo` (the far point last read), `.way` (the samples). water.js
+`export seaGrown(Uat, t1, F, D, g, rhoAir, rhoLiq, prevailing, o, span = 4 swellTime, step = 3)` (the sea a wind's history
+raised: o.height, .length, .swellWind, .swellHeight and the shares fW, fL, fSw, fS of the equilibrium now);
+`WaterField.hist` (those shares, set by physics on arrival; null: the equilibrium of the wind now). coast.mjs's report:
+`target.history` (s). Nothing removed or renamed.
+**Behaviour changed without a call changing:** (1) the hips are raised before a rock the stroke can take, only as far as
+its top asks, and folded before a crest; they no longer follow the ground's own rate up a face (the Moon boulder: 7.4 m/s
+over it, no hold on top); over rolling ground in low gravity the run keeps its feet down and works its legs (Pluto, rolls of
+1 m and 16 m at 7.4 m/s: 2.5 s in the air in 12 -> 0, the hips over 0.69 m of their stroke, Earth 0.2 m); (2) the run slows
+before a crest it sees (a rim, a brow, the top of a climb, a knife edge) to the pace at which its hips can be turned over
+it; flights remain off ground that falls away beyond reach, and where a crest comes too soon; (3) the read-ahead reads on
+from what it has read (no gaps), and counts a face's rise over the lower of the line run on and the ground just short of it:
+more boulders in a field are read and met at their pace; (4) a hill (rising more than a clamber over the read's last two
+looks) is run onto at the pace the run has: its foot takes the speed into it, as P21 made a missed one (a brace), and the
+climb is faster; (5) at a concave change of slope the body loses only the speed it has into the new ground (the mass rides
+at the hips): hips raised in time carry it on; (6) the trend (the hill's rate) is not read while the legs fold or stretch
+faster than 0.6 m/s against the ground; (7) arriving at a coast, the sea is what the wind's last six minutes there have
+raised, not the equilibrium of the wind now.
+
+**1. The Moon boulder's hold over the top (`explorer.js` wayUpdate, LEGS 3).** The strip (P21, `motion-game-moon-boulder`)
+replayed in Node (`s/mb.mjs`, on `243c187`'s world: the same site, boulder 0.68 m, radius 1.07 m, heading -157.38, the
+strip's numbers to the digit: 7.15 -> 2.52 m/s on top, slowest within 3 m 2.42). Two causes:
+- *(a) The read-ahead never saw it.* PILOT lists boulders within 9 m of the explorer (`sim.js` obstaclesNear(..., 9), once
+  a frame); at 7.4 m/s on the Moon the read is 12 to 13.2 m out. The far samples never held the boulder: the run met it at
+  full pace (P21's "the read-ahead held no pace"). Not mine to fix: For PILOT, P22 (1).
+- *(b) The legs chased the face.* They levelled the hips over the ground under the feet at its own rate (the critically
+  damped target moving at the ground's rate): up the boulder's face at 4 m/s, over the top 0.2 m higher than it asks (26.82
+  against 26.59 m), and the hold then checked the run so the feet could follow the far side down (paceCap 2.4 m/s,
+  braceAccel 20 m/s^2). A runner who sees a rock raises the hips in time, only as far as its top asks.
+- *Now: THE WAY, SEEN.* The ground along the run is kept as a row of samples (`B.way`: 0.3 m apart, sampled as it comes
+  into view out to the read distance, read again each 3 m nearer, so a boulder listed late is read once it is listed; up to
+  2 new and 2 refreshed a step, the whole of it when empty). From it, at each step, THE TUBE: the vertical speeds that carry
+  the hips straight on to the fold of each sample's ground (lo: the fastest of those above the hips) and to its reach (hi:
+  the slowest); a line to a far sample that would leave a nearer sample's stroke is not counted (a rock taller than the
+  stroke: the hips rise as far as the ground before it lets them, no faster than on to its top's fold, and the rest is the
+  legs' as before); so lo <= hi. The legs' own vertical speed is clamped into [lo, hi] (never out of the stroke this step,
+  never faster up than gravity and a hold can stop within the reach after this step), 2 cm kept from the stroke's ends.
+- *The strip's case, head -> P22: 7.15 -> 2.52 m/s on top (slowest 2.42) -> 7.40 m/s throughout, no brace, no hold, feet
+  0.000 m* (the hips 26.58-26.63 m across it: the legs fold 0.45 m on top and stretch 0.24 m beyond). Mars and Earth the same
+  (test). On today's world (PAINTER 13 moved the Moon's stands to the near side: the film finds another site, a 0.64 m
+  boulder, radius 1.00, heading -44.57, behind a small crater rim): P21 code crawls at 1.6 m/s for 3 m from the rim (P16's
+  law read the rim as a face); P22 crosses the rim at 4.5 m/s, a hold checks the descent into the dip (4.3 -> 2.0 m/s), and the
+  boulder is crossed at 6.6-7.0 m/s with no brace and no hold.
+- *1c. Three faults in the read-ahead, found under it.* (i) The read jumped forward: its far point grows with the pace, and
+  ground between the last far point and the new one was never read (the explorer test's field on the Moon: a 0.9 m boulder 4 m
+  past the end of what was known, met unread at 7.4 m/s, braced and held: 21 steps losing over 0.3 m/s, feet 0.19-0.21 m up).
+  Now the far point is never more than a span past what was read (`readTo`). (ii) A face's rise was counted over the line of
+  the slope being run on, carried on 8 m: climbing the flank of one boulder, the next lay under that line and was not read.
+  Now over the lower of that line and the ground just short of the face. (iii) The trend: the hips, raised in time for a rock,
+  passed through the legs' dead band on the way to its face, and the face read in those steps was taken for a hill's rise
+  (0.6 m/s): the body then left the far side at that rate (P12's test: +0.62 m/s, 0.11 m). Now the trend is not read while
+  the ground rises faster or slower than the hips by more than `trendSlip` (0.6 m/s).
+- *Measured (the explorer test's field, 24 boulders, 12 cases: Earth, Mars, Moon; 4.2 and 7.4 m/s; 60 and 20 Hz; PILOT's
+  profile and steep normals; `s/field.mjs`):* braced in all and steps losing over 0.3 m/s fall in 23 of 24 numbers (the Moon at
+  7.4 m/s 60 Hz: 6.65 -> 2.23 m/s braced, 22 -> 1 steps; Earth 7.4: 9.73 -> 1.05, 11 -> 0), feet off the ground at most 0.21 ->
+  0.05 m; the slowest is lower in some (the soles' planned pace for boulders now read). P17's single boulder (12 cases):
+  faster in 9, the same in 3, no brace, no hold. The 1 m boulder of P16 is crossed clean at 3.3-3.8 m/s (the law's 2.75).
+- *1d. Tests* (`explorer.test.mjs`, new, each fails on the head): P22 the game's Moon boulder (PILOT's profile, listed within
+  9 m, Moon, Mars, Earth, 60 and 30 Hz: not slower than 7 m/s, no brace, no hold, feet down; the head 3.94 on the Moon); P22
+  the field on the Moon read without gaps (feet <= 0.06 m, at most 6 steps losing over 0.3 m/s; the head 0.21 m). *Changed:*
+  'low gravity: running over rolling ground makes you bound' became 'the legs work through their stroke' (Pluto keeps its
+  feet down and uses over 0.5 m of its stroke, over twice Earth's: the bounding was the legs chasing the ground); P16's bound on
+  the pace at a 1 m boulder's face 3.3 -> 4.5 m/s (crossed clean faster: 3.3-3.8).
+- *1e. The strip on today's world* starts the run-up on a small crest (the feet 0.15 m up for 8 steps at its start: a
+  velocity set at a crest has no time to be read) — the film's site, not the walker.
+
+**2. Crests (`explorer.js` wayCrest).** The walker read faces, not crests: up a rim at speed the hips rose at the slope's
+own rate and could not be turned down in time over the crest. P21: 0.15-0.40 m flights over 2.2 m rims on the Moon. Today's
+crater_fields site (boulderrun's, found in Node, `site-head.json`; PAINTER 13 moved the stand) shows worse: rims of 43-60
+degrees, climbed at 2-7 m/s, launched the body off their crests: **thrown up 0.47, 2.38, 0.53, 1.19, 0.03, 1.32, 0.96, 1.40
+m** in the eight headings (PILOT's check: 0.3 m).
+- *The law, measured on the body* (`s/rim.mjs`: rims of 29/2.2 m/10, 43/2.2/10, 54/4/7 degrees, fixed paces, the read off):
+  contact is kept over the crest up to 5.9, 3.7-4.1 and 2.9-3.0 m/s on the Moon, 6.0-6.9, 4.1, 2.9-3.0 on Mars, 7.3, 4.8, 3.6
+  on Earth: within 5 % of **sqrt(2 (g + gripAccel) (legFold + legReach)) / (s1 + s2)** (the hips, coming up at v s1, turned to
+  v s2 down within the whole stroke, pulled by gravity and the limbs on the edge). Without the hold (beyond a knife edge, where
+  the drop is deeper than a clamber in a look: nothing to hold) gravity alone.
+- *Now:* every crest on the way known is read (at each sample and half way between; s1 and s2 over a look either side; the
+  crest's height the highest within half a spacing; behind the feet, the slope the run is on) and the pace held is
+  sqrt(vc^2 + 2 ab (d - look)), vc the law x 0.92. The near side counts only where it rises more than a clamber, or the run is
+  climbing it (the hips' rise or the trend over half its slope): a rock or a mound lower than that is the tube's and the face
+  read's (P16, P17). An edge falling away from level ground counts with s1 = 0, unless it falls more than a clamber in a look
+  (a fall: not slowed for).
+- *Rims at 7.4 m/s, read on (60 and 30 Hz, three worlds): feet at most 0.05 m, never thrown* (test). P21's 2.2 m rims: no
+  air (were 0.15-0.40 m).
+- *PILOT's boulderrun replayed in Node* (`s/trace8.mjs`, 8 headings, with and without the boulders). Today's site: **thrown up
+  0.47 / 2.38 / 0.53 / 1.19 / 0.03 / 1.32 / 0.96 / 1.40 -> 0 in every heading**; the feet leave the ground in one heading of
+  eight (heading 0: 1.95 m over ground that fell 4.47 m, left at 3.1 m/s on 56 degrees: a wall, not thrown; head: every
+  heading, up to 6.18 m). P21's site: thrown 0.013-0.024 -> 0; flights 4 -> 1 (heading 135, 2.16 m off a 57 degree wall that
+  fell 6.79 m; head 5.90 m). The cost: the mean pace falls where crests are many (today's site 5.04-6.24 -> 2.95-6.00 m/s;
+  heading 315, a 60 degree knife edge, 5.04 -> 2.95).
+- *Tests* (new, fail on the head): P22 the crest (rims of 29, 43, 54 degrees, Moon, Mars, Earth, 60 and 30 Hz: feet <= 0.05
+  m, thrown <= 0.02 m; the head 0.50 m up). *Changed:* P21's brace test now runs with the faces' read off (the read no
+  longer misses that foot: item 3) and asks no air over its rims (it allowed it), the slowest on a rim only over 1.5 m/s.
+
+**3. A hill is not a face (`explorer.js` probeStart, wayAhead; LEGS 1 and 3).** P16's law read a 43 degree hill on Mars and
+Earth as a face (a rise of more than the stroke within a span; the profile went on rising, so it was not tried): the run was
+slowed before its foot to the law's pace, 2.0-2.5 m/s, and the foot then took the speed into it. *Physically:* a face is a
+rise with a top within a clamber, from which the hips must be brought down again; a hill has no top within reach. Now a
+reading whose profile rises more than a clamber over its last two looks is a hill: nothing is held for it (the law's
+stand-in for the reading is dropped), its foot takes the speed into it (P21's brace: v cos^2 of it), and up it the legs'
+power, the grip, the suit's assist and gravity set the pace. And at a concave change of slope the body now loses only the
+speed IT has into the new ground (the mass rides at the hips; hips already rising with the new slope carry it on), where the
+velocity is laid along the ground and at the step's start. *43 degrees from 7.4 m/s (`s/hill43.mjs`), head -> P22, Moon /
+Mars / Earth:* at the foot **2.01 / 2.15 / 2.44 -> 7.40**, slowest on it **1.07 / 1.14 / 1.26 -> 4.16 / 4.20 / 4.23 m/s**
+(v cos^2 = 3.96), pace 3-6 m up it **3.86 / 2.88 / 2.83 -> 4.64 / 5.04 / 5.88 m/s** level (6.3, 6.9, 8.0 along the slope,
+the suit's assist with the legs; still settling from the entry). 35 degrees: 2.25 / 2.46 / 3.29 -> 7.40 at the foot, 1.33 ->
+5.15-5.19 on it. The foot's brace (the speed into it, legCatch at most) is what a runner who does not slow pays: 3.8-5.1 m/s
+in all over 0.2 s at 43 degrees. A row's next boulder at the end of a profile is not a hill (it rises less than a clamber).
+*Test* (new, fails on the head): P22 a hill is not a face (35 and 43 degrees, three worlds, 60 and 30 Hz: not slowed before
+it (over 7.2 m/s at the foot), not under 0.9 v cos^2 on it, over 3.5 m/s up it, no air).
+
+**4. The close row's standard (the coordinator's ruling).** A trial counts a crossing clean with no brace at all (P17). P21
+asked for a standard that counts the face's normal share as clean. With this block's tube the rows changed first (head ->
+P22, `s/rowloss2.mjs`: through, steps over 0.3 m/s (braced), braced in all, worst step, slowest past the first boulder, holds
+checking the run):
+
+| case | head (P21) | P22 |
+|---|---|---|
+| close Earth 60 | 7.95 s, 13 (13), 5.70, 0.39, 2.29, 3 | 7.43 s, 0 (0), 0.34, 0.26, 2.96, 0 |
+| close Earth 30 | 7.87 s, 11 (8), 5.24, 0.83, 2.22, 2 | 7.50 s, 1 (1), 0.83, 0.58, 2.65, 0 |
+| close Moon 60 | 10.62 s, 2 (1), 1.14, 0.47, 2.38, 16 | 9.48 s, 3 (2), 0.81, 0.49, 2.66, 6 |
+| close Moon 30 | 10.60 s, 4 (2), 1.47, 0.87, 2.40, 6 | 9.03 s, 5 (0), 0.00, 0.72, 2.44, 7 |
+| spread Earth 60 | >12 s, 0, 0.00, 0.09, 2.74, 0 | 10.65 s, 0, 0.00, 0.08, 3.62, 0 |
+| spread Earth 30 | >12 s, 0, 0.00, 0.17, 2.77, 0 | 10.83 s, 0, 0.00, 0.17, 3.23, 0 |
+| spread Moon 60 | >12 s, 4 (1), 0.77, 0.47, 2.46, 16 | >12 s, 5 (1), 0.60, 0.71, 2.50, 11 |
+| spread Moon 30 | >12 s, 4 (1), 0.55, 0.72, 2.50, 7 | >12 s, 3 (1), 0.52, 0.63, 2.44, 5 |
+
+No air and the feet on the ground in every case, both columns. Then the trial standard itself (`s/rowstd.mjs`: a trial
+counting a crossing clean when no step braces more than 0.2, 0.5 m/s, or at all): 0.2 changes nothing; 0.5 and above help
+the Moon's close row at 60 Hz (3 -> 1 steps, holds 6 -> 3) and hurt Earth's (0 -> 7 braced steps, braced 0.34 -> 3.0 m/s,
+holds 0 -> 2) and the Moon's spread row at 30 Hz (slowest 2.44 -> 2.36). **No new standard holds in every measured case:
+the clean crossing stays as it was.** (Item 1's tube and read are not a standard: they are the body; three Moon numbers
+above are a little worse than the head's, Next 2.)
+
+**5. The arrival sea from the wind's history (`water.js` seaGrown, `index.js`, `coast.mjs`).** On arrival (P20, Decision 51)
+the sea settled quickly to the equilibrium of the wind NOW, as if the storm had always blown: arriving at Neptune's stand 20 s
+before the squall's peak showed Hs 6.04 m 80 m out, standing through it 3.51 m. Now `seaGrown` steps WaterField's own lags
+(the wind sea over growTime, the swell's wind rising with it and outlasting it over swellTime, the swell's height over
+swellTime) over the wind at the place for the last four swell times (360 s, 3 s steps, from the equilibrium of the wind
+then), and the arrival settles to that: physics finds it on arrival (`index.js`: the large-scale wind at the focus, as
+coast.mjs reads it, at the reference wind's strength now) and again once the sea has been measured or its fetch moves by a
+fifth; WaterField scales its settling targets by the shares (`hist`). `coast.mjs`'s target is the same history over the
+reference water, whenever the run arrives. **Neptune storm_seas 80 m out: arriving 20 s before the peak 6.04 -> 3.69 m;
+standing 150 s 3.70 m** (they agree); Earth sea_coast 0.55 / 0.62 m. Targets: Neptune 2.96 -> 3.08 m, Earth 0.52 m. Both
+PASS at both. *Test* (`water.test.mjs`, new, fails on the head): a squall that rose 30 s ago is met at the height of a sea
+grown for 30 s (within 10 % of one that stood through it; without the history the arrival shows the equilibrium). Cost:
+one `seaGrown` (120 steps) per arrival and per measured map, about 1-3 ms once.
+
+**6. PC_TIMING: not run.** `uptime` stayed at 9 to 14 through the block (PAINTER's and PILOT's browsers). The explorer
+step alone (`s/bench.mjs`: the explorer test's field on the Moon at 7.4 m/s, 60 Hz, best of three at load 11): P21 26-29
+us a step, P22 51-58 us (the way's upkeep, the tube, more faces read and tried by the ghost, whose steps keep their own
+way); the crest scan about 5 us after pruning. Within physics' 2 ms, but not timed in the suite.
+
+**7. The strips** (`docs/shots/physics/motion-*.jpg` with `.json`). Filmed in the GAME (`gamefilm.mjs`) on a clean export of
+`e20f900` with this block's final code (`filmtree/`), one browser at a time, by the game's own clock; all OPENED. (A first
+run was stopped by PID after I re-synced the tree it served, mid-load; it was restarted from a frozen copy.) Today's
+crater_fields site is not P21's (PAINTER 13 moved the Moon's stands to the near side): a 0.64 m boulder, radius 1.00 m, heading
+-44.57, behind a small crater rim; the run-up starts on that rim.
+- `motion-game-moon-boulder` (met 0.32 m off the middle: the start drifted at the rim). Seen: the explorer runs away from the
+  camera over the grey-violet rim (frames 0-9; arms out at frames 2-4), down into the dip beyond, then across the flat; at frames
+  22-25 a pale boulder passes under its feet, the figure lower over it (crouched) and then striding long beyond it, never a
+  stumble; the ship lies ahead-left with its indigo shadow. Zoom `film/mb-zoom-20-25.png` (frames 20-25 at twice the size): the
+  rock under the boots at frames 23-24, the stride and its shadow at 25. Numbers: **over the boulder 6.26 -> 6.54 -> 6.83 -> 7.11
+  m/s, hips -0.34 on it and +0.26 beyond, feet 0.000 m, no brace, no hold** (P21's strip on its boulder: the face 7.40 ->
+  7.15, the hold over the top 7.15 -> 2.52). Two things that are not the boulder: the run-up starts on the rim's crest (feet
+  0.151 m up for 8 steps at 0.1-0.4 s: a velocity set at a crest cannot be read), and a hold checks the descent off the rim into
+  the dip (4.70 -> 1.98 m/s at 1.0-1.1 s: the rim is under a clamber, read as a face and tried by the ghost, whose profile ends
+  before the descent's foot; Not done 6). Verdict: the boulder is run over as a runner does in low gravity, at the pace;
+  the strip's start is the site's.
+- `motion-game-moon-boulder-side` (0.45 m planned off the middle, 0.38 met). Seen: the same rim and dip, the figure small
+  going down the slope at frames 12-17, then the flat and the boulder's flank at frames 23-26 (the rock at its feet, a short
+  crouch), on past it; at frames 27-29 the ship's shadow darkens the top of the frame. Numbers: over the flank 6.31 -> 7.15
+  m/s, hips -0.36 then +0.26, feet 0.000 m; the start 0.066 m up (the rim), the hold on the descent 4.48 -> 1.09 m/s.
+  Verdict: P17's off-path crossing, at the pace.
+- `motion-game-float-neptune` (item 5: Neptune storm_seas, arriving 15 s before the squall's 240 s peak, floating 25 m out).
+  Seen: the explorer's hat and shoulders at the waterline in a heaving ultramarine sea, lower in frames 6-11 as a swell lifts
+  the water round it, higher in 14-17; basalt stacks on the horizon under a pale storm sky, faint rain streaks, no rain rings;
+  on the left PAINTER's cliff is still a near-black slab with a ruled vertical edge. Numbers: **Hs at the explorer 3.69 -> 3.85
+  m over the 3.2 s** (P21's strip, the arrival settling to the wind now: 2.97 -> 4.87 m, still climbing), the feet 1.17-1.46 m
+  under the drawn surface, the body heaving with it (vu -1.26 to +0.72 m/s). Verdict: the sea stands where the squall's
+  history put it (coast.mjs: 3.69 m 80 m out arriving, 3.70 standing) and rides steady; the figure rides it.
+
+**Not done or not verified.** (0) PILOT's 16 m obstacle list (Next 0). (1) The crest law is a corner's (Next 1). (2) Three
+Moon row numbers (item 4). (3) PC_TIMING. (4) No frame rate on a real GPU. (5) `game-float-earth` and the grass strips not
+re-filmed (item 5 changes the sea only when arriving before a peak; Earth's stand arrives near its storm's peak). (6) A hold still checks the run on the descent off a rim
+lower than a clamber (the film site: 4.70 -> 1.98 m/s): the face read tries it with the ghost, whose profile (2.6 m past the
+far point) ends before the descent's foot, while the walker's hold reads the slope a look ahead; a ghost run to the end of
+the way kept would see it.
+
 ## Hand-over P21 (nineteenth PHYSICS agent; read this block first; P20 and older below hold for everything not named here)
 
 **Where things stand.** The block: (1) the brace at a face or concave slope the read-ahead misses; (2) the close row; (3) rain
@@ -2455,6 +2675,21 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+### P22, first (twentieth PHYSICS agent)
+- **(1) List boulders out to 16 m** (`src/core/sim.js`, the ON_FOOT branch: `this.nearObstacles = this.obstaclesNear(this.bodyId,
+  this.ex.p, 9)` -> `16`). The explorer's read-ahead looks 12-13 m out at a run on the Moon (aheadMax 12 + look 1.2; a
+  boulder's skirt reaches 2 m past its middle), and scrambleSample answers it only with the boulders in that list: at 9 m no
+  boulder is ever read at a lunar run, so none is met at its pace. This block's tube saves a rock the stroke can take (the
+  strip's 0.68 m boulder: 7.4 m/s over it, no hold), but a 1 m boulder is met unread and braced. obstaclesNear at 16 m is one
+  sampleObstaclesPure a frame over a larger disc (rock cells within 30 m are already listed for it). Your call on the cost; the
+  physics needs about 16 m.
+- **Nothing else to wire.** The run now slows before crests it sees (rims, brows, knife edges), runs onto steep hills at its
+  pace, and keeps contact over boulders and rolling ground; `tests/boulderrun.mjs` replayed in Node at today's crater_fields
+  site: thrown up 2.38 m at worst -> 0 in all eight headings; the feet leave the ground once (heading 0, off a 56 degree wall
+  that falls 4.47 m: your script counts it an edge, not a boulder). Mean pace there 5.0-6.2 -> 3.0-6.0 m/s (the crests).
+- **Feel:** if the slowing before crater rims feels heavy, say so: the law is a corner's and reads rounded brows sharper than
+  they are (my Next 1); `EXPLORER_BODY.crestMargin` is physics' margin, not a feel lever.
+
 ### P21, first (nineteenth PHYSICS agent)
 - **Nothing to wire.** A run onto rising ground that the read-ahead missed now loses only its speed into it (a crater rim on
   the Moon: 6.95 -> 4.09 m/s, was 6.95 -> 1.95), and between close boulders the hips can be raised for the next one.
@@ -3082,6 +3317,13 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P22, first (twentieth PHYSICS agent): nothing to wire
+- The sea on arrival (`water.js` seaGrown): arriving at a coast before a squall's peak, the sea stands where the wind's last
+  six minutes raised it (Neptune's stand 80 m out 6.04 -> 3.69 m, the same as standing through it). The drawn sea follows the
+  twin as before; nothing changes in WATER_VERT. coast.mjs's target is the history's (Neptune 3.08 m); both stands PASS.
+- The explorer's legs: over rocks within the stroke the hips are raised in time (the figure's `ride` rises before a rock and
+  the legs fold over it, stretch beyond): if the figure's knees are drawn from `hip`, they read it already.
 
 ### P21, first (nineteenth PHYSICS agent): one line in the ring shape; your two P12 notes answered
 - **Rain no longer makes splash events on a meadow, a forest floor, sand, dust or snow** (Decision 55): the crisp rings on the
@@ -4101,9 +4343,33 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
 56. **(P21) A sea is judged against what its storm can raise in the time it blows.** The coast report's target is the same
     wind history over the reference water by the game's own growth, not the equilibrium of the peak wind; a short squall
     raises no water's full sea. (Decision 51's arrival, which settles to the equilibrium of the wind now, is to follow it.)
+57. **(P22) A runner looks where the feet will go.** The ground along the run is kept as a row of samples, and the legs set
+    the hips' vertical speed within the tube it allows: no slower than clears the fold of the ground ahead and above them, no
+    faster than keeps the reach of what is ahead; a line to a far sample past a nearer sample's stroke is not their path. The
+    hips are raised before a rock only as far as its top asks, and folded before a crest. They no longer chase the ground's
+    own rate.
+58. **(P22) A crest is read.** It is met at the pace at which the hips, coming up its near side at v s1, can be turned to
+    v s2 down within the stroke, pulled by gravity and the limbs on the edge: sqrt(2 (g + grip) stroke) / (s1 + s2) (gravity
+    alone beyond a knife edge); the run slows to it with its soles from as far as it sees it. Flights remain where the ground
+    falls away beyond reach or a crest comes too soon: rarer, and honest.
+59. **(P22) A hill is not a face.** Ground rising more than a clamber over the read's last two looks has no top to bring the
+    hips down from: nothing is held for it; its foot takes the speed into it (Decision 53), and up it the legs, the suit, the
+    grip and gravity set the pace.
+60. **(P22) The mass rides at the hips.** At a concave change of slope the body loses only the speed it has into the new
+    ground: hips the legs have raised in time carry it on.
+61. **(P22) The way ahead is read without gaps.** The far point is never more than a span past what was read, and a face's
+    rise is counted over the lower of the line run on and the ground just short of it.
+62. **(P22) The sea on arrival is the sea its wind's history raised** (WaterField's own lags over the wind at the place for
+    the last four swell times), not the equilibrium of the wind now; the coast report's target is the same history.
+    Decision 51's quick settling stays: it settles to that.
+63. **(P22) The close row's clean crossing stays** (a trial with no brace): allowances of 0.2 m/s a step and more were
+    measured and none holds in every case (the coordinator's ruling); Earth's close row braces most with them.
 
 
 ## Needs from the others
+
+**P22 (twentieth agent), current needs.** From PILOT: the boulder list out to 16 m (`sim.js`, "For PILOT", P22 (1)); the
+read-ahead cannot see a boulder at a lunar run without it. From PAINTER: nothing.
 
 **P21 (nineteenth agent), current needs.** From PAINTER: one line in your ring shape (`kitmat.js`, "For PAINTER", P21) so that
 a snowflake's settle and a hailstone's bounce are not drawn as rings. From PILOT: nothing (the ship afloat is done, `a0e3fb1`, on
