@@ -295,7 +295,7 @@ resize();
 
 // models on show near the camera: ?models=1 (explorer 5 m ahead, ship 14 m ahead to the left)
 //   explorer: pose=idle|walk|jet|fall|wade|sit, speed=, phase= (radians of the stride), jet=, lift= (m),
-//             mface= (degrees to the right of the view direction; 0 shows its back), epitch=
+//             mface= (degrees to the right of the view direction; 0 shows its back), epitch=, mdist= (m ahead, 5), mside= (m to the right, 1.5)
 //   ship: smode=landed|hover|fly|pulse, gear=, canopy=, throttle=, sface=, hover= (m)
 //   cockpit=1: the view from the ship's seat, as PILOT's first person (fov 62, near 0.12 m)
 let explorer = null, ship = null;
