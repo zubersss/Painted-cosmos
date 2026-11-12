@@ -8,7 +8,9 @@ export default {
   cloud: 0.45,
   deck: { height: 560 },
   visibility: [185, 2600],   // metres at ground level, and from high up
-  sky: EARTH_SKY,
+  // (night: the planet's own last glaze laid lighter than the common key: the nocturne stays a deep
+  // indigo wash over paper, not a near-black sheet; dawn, noon and dusk are the common keys)
+  sky: Object.assign({}, EARTH_SKY, { night: Object.assign({}, EARTH_SKY.night, { grade: [0.78, 0.84, 0.98] }) }),
   flora: {
     tall: [
       { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.76, 0.85, 0.42], [0.58, 0.75, 0.36], [0.31, 0.51, 0.37]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5] },
