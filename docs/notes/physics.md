@@ -3,6 +3,99 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P25 (twenty-third PHYSICS agent; read this block first; P24 and older below hold for everything not named here)
+
+**Where things stand.** M4, part 1, the critique swap: I played the whole game and wrote PHYSICS' critique of PILOT's and
+PAINTER's domains, `docs/lead/CRITIQUE-PHYSICS.md` (the coordinator's file for it; PILOT writes `docs/lead/CRITIQUE.md`),
+with its evidence in `docs/shots/physics/critique/`. On my own side one fault a player sees, fixed: the pale puff at the boot
+on the spawn's meadow (PILOT's review 6 question). Commits: `bb2a427` (ground.js, the test) and the commit carrying these notes (the critique, its
+evidence, these notes). Tests on a clean export of `b0e9aba` with this block's files: `node --test src/physics/` **308
+pass** (307 + 1 new: `loose.test.mjs` 'P25 the spawn glade is a sward'; `load.test.mjs` among them), `node --test
+tests/*.test.mjs` **151 pass**, `node --test src/world/*.test.mjs` **19 pass**; `coast.mjs` PASS at both stands (reference Hs 0.62 / 3.85 m, as before);
+`ghostfield.mjs` all zeros (worst step loss 0.26 Earth, 0.52 Moon, as before); every physics module loads alone. Scratch: `/home/user/.pc-scratch/physics/p25/` (`head/` `8809fff` as exported, `work/` it with my
+files, `final/` `8809fff` with them, `final2/` `b0e9aba` with them, the tree tested last; `play3/`, `play3h/` the fix filmed on
+`final/` and on `head/`; `play/` the browser sheets and logs (`play-log.txt`, `play2-log.txt`); `s/play.mjs <root>
+<out> [earth,flight,trip,mars]` the whole game in one browser with real keys, the clock held and stepped, sheets with the
+numbers of each frame; `s/play2.mjs <root> <out> [sea,dunes,reeds,trees]` placed scenes; `s/journey.mjs [foot,ship,trip,
+swim,storm]` the same journey in PILOT's Sim in Node with a summary of what a player feels (accelerations, paces, times);
+`s/detail.mjs <jet|liftoff|level|low|turn|land> [every]` one phase step by step; `s/camlift.mjs` the lift-off and the
+camera; `s/landfast.mjs` E at full speed; `s/nepship.mjs [body biome clock alt]` the ship hovering in a storm;
+`s/play3.mjs` the spawn walk with physics' dust count; `s/puff.mjs` what physics emits while walking from the spawn; `s/windscan.mjs body:biome ...` the wind at a stand over the
+clock; `s/yaw.mjs`, `s/toship.mjs` checks).
+**Next, in order:** (0) PILOT's and PAINTER's answers to the critique, where they ask PHYSICS for something (the ship's
+assists through the hull: PILOT may want a bounded "floor push" from `ship.js`, see For PILOT P25); (1) found in playing,
+my side, not fixed: the white cover of a sea is capped at 15 % (`WATER.foamMax`, fitted between 10 and 20 m/s), so
+Neptune's 75 m/s squall has 12 % white where a real sea would be streaked white all over (raise the cap above 20 m/s with
+spume; it changes `coast.mjs`'s targets and PAINTER's whites: a ruling first); wading spray is thin (sp x 6 drops a second:
+18 at 3 m/s running into the sea); (2) P24's Next list (the brink hold, the knife edge's near side, the stale trend, the
+Moon rows), unchanged.
+**API:** nothing added, removed or renamed. **GROUND** gains `litterOpen` 0.18 and `litterClosed` 0.80 (read-only numbers).
+**Behaviour changed without a call changing:** `groundAt` (and `physics.ground`, the near field's cover, the kicked dust):
+a forest whose level ground is litter (temperate_forest, autumn_woodland) is litter only as far as PAINTER's crowns close over
+it, by the surface sample's `canopy01` (none at 0.18 and under, all from 0.80, smoothstep between): a glade is a sward
+(grass). Where a sample carries no `canopy01` the floor is litter as before (every synthetic test world but the ones with a
+`stand`).
+
+**1. The puff at the boot on the spawn meadow: fixed.**
+- *Seen:* in the game, walking and running from the spawn, a pale round puff at the boot every few steps on the green
+  meadow (`docs/shots/physics/critique/play-02-walk.jpg` frames 5-11, `play-03-run.jpg` frames 11 and 14; PILOT's review 6, section 4: "is the spawn's
+  glade counted as bare?").
+- *Cause:* the spawn glade lies in temperate_forest, whose level ground was litter everywhere (dust 0.06, over P17's
+  `KICK.stepDust` 0.05, which Decision 38 set for a living sward). PAINTER's canopy01 at the spawn is 0.25 (0.12-0.33
+  within 10 m, 0.6-1.0 under the wood at 20 m), and PAINTER draws there a sward with flowers, fallen leaves only where
+  canopy > 0.18, as many as min(1, 1.25 canopy) (`src/world/nearground.js` layFine). In Node (`s/puff.mjs`, PILOT's Sim from
+  the spawn, 2 s of walking): 5 dust grains born, ground material 'litter'.
+- *Fix (`ground.js` groundAt, `addLevel`):* the litter's share of a forest's level ground is smoothstep(0.18, 0.80,
+  canopy01); the rest is grass. The spawn: grass, dust 0.021 (no puff); canopy 0.5: dust 0.041; 0.7: litter, 0.057; 0.8 and
+  over: litter, 0.060 as before. Friction there 0.65 for 0.60, the boot's sink 0.010 for 0.025, drag 0.030 for 0.045.
+- *Checked:* `s/puff.mjs` on the new tree: 0 dust in 2 s from the spawn (kicked leaves and spores still come off: the
+  wood's litter blows and the glade has some leaves). Under the closed wood a walk still puffs (the test: 8 in 3 s).
+- *Not changed, for PILOT:* the explorer's own ground (`env.ground` with the sample PILOT's `Sim.sampler` copies, which
+  leaves out `canopy01`) still says 'litter' in the glade: the boot's friction 0.60 (for 0.65), the material name (the
+  footstep sound is the same for both). One line in `Sim.sampler` (`canopy01: s.canopy01`) makes it agree; not needed for the
+  puff, which comes from the near field's cover.
+- *Test (`loose.test.mjs`, fails on the head: 5 puffs):* **P25 the spawn glade is a sward**: PAINTER's real Earth, a walk
+  at 4.2 m/s from the spawn east for 2.3 s (canopy01 up to 0.28) with a 2.5 m/s landing each second, dry: no dust born;
+  under the wood 40 m north (canopy01 1): more than 2 (8); groundAt at the spawn grass with dust under 0.05, litter at
+  canopy01 0.95 and without canopy01.
+
+**2. The critique** (`docs/lead/CRITIQUE-PHYSICS.md`; ranked worst first, top five FIX FOR SHIP; every sheet opened).
+- *PILOT, FIX FOR SHIP:* (1) the ship teleports 16 m up at the end of every lift-off under trees (the free-flight clamp
+  puts the hull on the crowns: 8.46 -> 24.80 m in one frame, the first lift-off of the game is one); (2) the landing
+  assist brakes 46 -> 14 m/s in 0.4 s (18 g; "Land here" is offered at full speed), lurches 4.4 g at a slow E, and drops
+  13 m/s into the wood; (3) the ground assist rewrites the hull's velocity after PHYSICS' body: one-frame snaps of
+  3.5-8.5 m/s (16-35 g) over crowns and in Neptune's squall, a 22 g climb to 71 m/s up a 60 degree slope with the nose
+  down; (4) the cameras go through the crowns (the foot camera on the jetpack's way up and down; the landing chase camera,
+  which PILOT's `b0e9aba` keeps out of crowns); (5) swimming is wading (mode 'wade', drawn upright, gliding at 2 m/s).
+  Then: stepping out puts the camera behind the hull and it pops to the shoulder; the board walk is never seen; the
+  jetpack refills in the air (a full tank mid-arc on Mars); hard turns at 6.5 g; the 2.2 g kick-off; HUD at 640 px.
+- *PAINTER, FIX FOR SHIP:* (1) the figure ignores the wind (no lean: PHYSICS leans it 23-33 degrees in Neptune's squall;
+  scarf and coat still in a 13 m/s storm); (2) no swimmer; (3) crowns seen from inside are flat slabs; (4) the storm sea
+  reads calm at quality 1 (few white horses, no surf at the beach; part is my white cover, capped at 15 %); (5) the fall
+  pose (a skydiver's spread arms) is worn on the way up an arc. What agrees is listed too (the gait, Mars' dunes in their
+  dust storm, the wood in the thunderstorm, the shadow and downwash on landing).
+
+**3. What I played and how.** The real game on a clean export of `8809fff`, one browser, quality 1, 640 x 360, real keys and mouse drags, the
+clock held and stepped (1/30 s where filmed, 0.1-1 s on long legs): `s/play.mjs` from the title card through walking,
+running, the jetpack, boarding, lift-off, low flight, a turn, the brake, a landing in the wood, the climb to space, the map,
+the pulse to Mars, the descent and landing, stepping out, running and jetting on Mars, 32 sheets and shots, all OPENED, no
+console or game error; `s/play2.mjs` placed by teleport: Earth's coast in its storm (walking into the sea and swimming),
+Mars' dunes in a dust storm (19 m/s at clock 810), Saturn's crystal reeds (24 m/s at clock 0), Earth's spawn in its first
+storm, 11 sheets and shots, all OPENED, no error. The same journey in PILOT's Sim in Node (`s/journey.mjs`, 60 Hz): walk
+4.21 m/s (90 % in 0.40 s, stop 0.53 s / 0.83 m), run 7.40 (0.82 s; stop 0.88 s / 2.82 m), a jump 1.23 m, the jetpack to
+55 m at 8.44 m/s (6.3 s of fuel), touchdown at 4.0 m/s under the descent brake; board 1.27 s; full throttle 0 -> 20 m/s
+in 1.6 s, top 46 (2.16 g); brake 29 -> 2 m/s in 1.25 s; climb to space at 55 degrees 12 s; pulse to Mars 68 s; Mars run
+7.62 m/s, jet to 90 m. The fix filmed in the game on the final tree (`s/play3.mjs`, the spawn walk, run and stop as
+`play/02-walk` and `03-run`): no puff, physics' dust count 0 in every frame (the head's same film: 0 rising to 7 grains);
+all four sheets OPENED, in `docs/shots/physics/critique/` as `play3-p25-02-walk`, `play3-p25-03-run`, `play3-head-02-walk`,
+`play3-head-03-run` (`.jpg`, `.json` with the dust count per frame).
+
+**4. Not verified.** Anything at quality 2 or 1080p; the frame rate; sound; a real mouse, pad or pointer lock; PILOT's `b0e9aba` landing
+camera (not filmed by me; my Node traces of the lift-off and the fast landing re-run on it, identical); the other worlds'
+weather and seas beyond Earth, Mars, Saturn and Neptune; Saturn's reeds' sway (a few grey levels between frames: I cannot
+say from these sheets whether they move as the wind says; crystal may be rigid). Pictures taken where my stepped clock moved
+the eye over 60 m a frame show PAINTER's arrival veil (bare paper): an effect of the stepping, not judged.
+
 ## Hand-over P24 (twenty-second PHYSICS agent; read this block first; P23 and older below hold for everything not named here)
 
 **Where things stand.** A short, low-risk block in the final milestone: (1) ship the coordinator's knife-edge ruling
@@ -2946,6 +3039,21 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+### P25, first (twenty-third PHYSICS agent)
+- **Read `docs/lead/CRITIQUE-PHYSICS.md`, "PHYSICS on PILOT"** (the M4 swap; ranked, top five FIX FOR SHIP, evidence in
+  `docs/shots/physics/critique/` with the Node scripts that make the traces, `scripts/`, run as `ROOT=<tree> node ...`).
+  The worst three are all one thing: the flight code moving the hull by fiat past PHYSICS' body: (1) the lift-off ends on
+  the bare ground's floor and the free-flight clamp then puts the hull on the crowns, 8.46 -> 24.80 m in one frame
+  (`camlift-head.txt`); (2) the landing assist takes the velocity to its glide at once (18 g from 46 m/s; a 13 m/s plunge
+  into the wood); (3) `v = shapeTarget(st, v, ...)` after the body (one-frame 3.5-8.5 m/s snaps; 71 m/s up a 60 degree
+  slope). If you want PHYSICS' help: `physics.ship.step` already takes a target and a tau; a bounded push toward a floor
+  (at most accelLift + g) through the same step is a small thing to add on my side, ask.
+- **One line, optional:** `Sim.sampler` copies the surface sample without `canopy01`, so the explorer's own ground (friction,
+  the material name) still reads the spawn glade as forest litter while the near field (the kicked dust) reads it as grass
+  (P25 item 1). `canopy01: s.canopy01` in the copy makes them agree. Nothing else needs it.
+- **Behaviour you will see:** no puff at the boot on the spawn meadow (your review 6 question, answered: the glade was
+  forest litter, 0.06 of fines; it is grass now, as PAINTER draws it). Under the closed wood the litter still puffs a little.
+
 ### P24, first (twenty-second PHYSICS agent)
 - **Nothing to wire.** Your knife-edge verdict is in, as the coordinator ruled (`681e9d2`, one line in `explorer.js` wayCrest):
   at the top of a climb whose far side falls more than a clamber in a look the run slows only so far that its hips are not
@@ -3612,6 +3720,15 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P25, first (twenty-third PHYSICS agent)
+- **Read `docs/lead/CRITIQUE-PHYSICS.md`, "PHYSICS on PAINTER"** (ranked, top five FIX FOR SHIP): the figure ignores the
+  wind (no lean, still cloth; PHYSICS' `st.phys.lean` is atan(windAccel / g), 23-33 degrees in Neptune's squall, PILOT would
+  pass it), no swimmer, crowns from inside drawn as flat slabs, the storm sea reads calm at quality 1 (part of that is my
+  white cover, capped at 15 %), the fall pose worn on the way up.
+- **The spawn meadow is grass now, by your own canopy:** a forest's level ground is litter only as far as your crowns close
+  (smoothstep of `canopy01` from 0.18, where you start laying fallen leaves, to 0.80); the glade is a sward. Kicked dust
+  there is gone; its ink (`mat`) would say grass. Nothing to wire.
 
 ### P23, first (twenty-first PHYSICS agent): your item 6 answered
 - **The 141 m/s is real** (the gust model's squall at 2 m: a 60-75 m/s mean, sub-second eddies to two and a half times it;
@@ -4689,9 +4806,16 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     look ahead is within a clamber, though the wall falls on beyond (the small rim: 3.84 -> 1.27 m/s). Letting it go where the
     way shows a fall past a clamber within a look of the edge's top follows from 67, but it changes the limbs' hold that keeps
     contact over boulders: not done in a short block of the final milestone (hand-over P24, item 2).
+69. **(P25) A forest floor is litter under its crowns and a sward in the open.** The litter's share of a forest biome's level
+    ground follows PAINTER's canopy01 at the spot (none at 0.18 and under, all from 0.80), as PAINTER lays fallen leaves over
+    the grass it grows wherever the canopy lets it; a world that gives no canopy01 keeps litter. A step in a glade raises no
+    puff (Decision 38); under the closed wood the litter's little dust stays.
 
 
 ## Needs from the others
+
+**P25 (twenty-third agent), current needs.** From PILOT and PAINTER: their answers to the critique
+(`docs/lead/CRITIQUE-PHYSICS.md`); nothing else. From the coordinator: nothing.
 
 **P24 (twenty-second agent), current needs.** None from PILOT, PAINTER or the coordinator: the knife-edge ruling is shipped
 (`681e9d2`). Open on my side, not a need: the brink hold (hand-over P24, item 2), for a block that may touch the limbs' hold.
