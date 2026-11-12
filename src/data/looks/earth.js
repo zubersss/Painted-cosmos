@@ -34,8 +34,7 @@ export default {
         under: { leaf: [[0.92, 0.82, 0.40], [0.80, 0.64, 0.34], [0.54, 0.42, 0.30]], bush: [[0.90, 0.66, 0.34], [0.72, 0.46, 0.30], [0.44, 0.30, 0.30]] } }),
     B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
       ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
-      ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 },
-        under: { flowers: [[0.86, 0.52, 0.60], [0.97, 0.96, 0.92], [0.93, 0.86, 0.42]] } }),
+      ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 } }),
     B('sea_coast', 'Sea Cliffs and Coast', 'coast',
       ['cerulean', 'ultramarine', 'viridian', 'yellowOchre', 'rawUmber', 'davysGrey'], 'cadOrange',
       ['yellowOchre', 'oliveGreen', 'davysGrey'], { t: { cliff: 52, stacks: 0.5, strata: 0.5, patch: [{ c: [0.50, 0.58, 0.36], wl: 30, thr: 0.0, soft: 0.35, amt: 0.6 }, { c: [0.72, 0.68, 0.70], wl: 12, thr: 0.25, soft: 0.25, amt: 0.4 }] }, mist: 4, under: { leaf: [[0.88, 0.87, 0.52], [0.70, 0.75, 0.44], [0.46, 0.56, 0.42]] }, liquid: { color: [0.52, 0.72, 0.84], refl: 0.6 }, tall: [1, 0], tallD: 0.10, tallMix: 0.7, small: { grass: 0.45, rock: 0.05, bush: 0.05, flower: 0.03 } }),
@@ -45,7 +44,7 @@ export default {
         under: { leaf: [[0.88, 0.84, 0.56], [0.74, 0.72, 0.46], [0.54, 0.54, 0.40]], bush: [[0.78, 0.80, 0.60], [0.60, 0.66, 0.52], [0.42, 0.48, 0.44]], rock: [[0.86, 0.66, 0.52], [0.52, 0.34, 0.32]], accent: [0.30, 0.70, 0.69] } }),
     B('misty_wetland', 'Misty Wetland', 'wetland',
       ['oliveGreen', 'viridian', 'rawUmber', 'paynesGrey', 'yellowOchre', 'davysGrey'], 'lemonYellow',
-      ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.46], [0.64, 0.66, 0.38], [0.42, 0.46, 0.34]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.60, 0.68, 0.72], refl: 0.75 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
+      ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.46], [0.64, 0.66, 0.38], [0.42, 0.46, 0.34]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.74, 0.82, 0.84], refl: 0.9 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
   ],
   // Hand-placed biome sites: [latitude, longitude, biomeId]. The first one holds the spawn.
   sites: [
