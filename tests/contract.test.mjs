@@ -295,3 +295,31 @@ test('the world\'s own arrival stands clear of boulders and trunks, and a place 
     assert.ok(Math.hypot(sim.ex.p.x / R2 - sp.x / sl, sim.ex.p.y / R2 - sp.y / sl, sim.ex.p.z / R2 - sp.z / sl) * R2 < 0.01, `${id}: a teleport to a point lands on it`);
   }
 });
+
+test('the ship never waits in the surf: at every spawn and biome stand its hull stands 1.2 m over any still liquid', { skip: skipObs }, async () => {
+  // PAINTER 12: at a beach 1 m from the water the ship stood in a foam ring (the drawn sea and its
+  // run-up wash over a beach above the still level). Before the fix: Earth's autumn_woodland (-0.19 m)
+  // and misty_wetland (-0.09 m) had a hull point in the water.
+  const { Sim } = await import('../src/core/sim.js');
+  const { getLook } = await import('../src/data/looks.js');
+  const ss = (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z);
+  const so = (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r);
+  const wet = [];
+  for (const id of BODY_IDS) {
+    const sim = new Sim({ sampleSurface: ss, getSpawn: (b) => surface.getSurface(b).getSpawn(), sampleObstacles: so, body: id });
+    const places = [[null, 'spawn']];
+    for (const b of getLook(id).biomes || []) { const st = surface.getStandPure ? surface.getStandPure(id, b.id) : null; if (st && st.unitDir) places.push([st.unitDir, b.id]); }
+    for (const [u, name] of places) {
+      sim.teleport(u ? { body: id, dir: [u.x, u.y, u.z] } : { body: id });
+      const R = Math.hypot(sim.sh.p.x, sim.sh.p.y, sim.sh.p.z), d = { x: sim.sh.p.x / R, y: sim.sh.p.y / R, z: sim.sh.p.z / R };
+      let ex = d.z, ez = -d.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+      const n = { x: d.y * ez, y: d.z * ex - d.x * ez, z: -d.y * ex };
+      for (const [a, b] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const k = 4.5 / R, q = { x: d.x + (ex * a + n.x * b) * k, y: d.y + n.y * b * k, z: d.z + (ez * a + n.z * b) * k }, ql = Math.hypot(q.x, q.y, q.z);
+        const s = ss(id, { x: q.x / ql, y: q.y / ql, z: q.z / ql });
+        if (s.liquidRadius > 0 && s.radius - s.liquidRadius < 1.2) { wet.push(`${id}/${name} ${(s.radius - s.liquidRadius).toFixed(2)} m`); break; }
+      }
+    }
+  }
+  assert.deepEqual(wet, [], 'berths in the surf: ' + wet.join(', '));
+});

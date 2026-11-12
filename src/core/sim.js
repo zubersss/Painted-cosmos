@@ -33,6 +33,9 @@ export const FEEL = Object.freeze({
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const Y = V(0, 1, 0);
+// The ship's berth at an arrival (Sim.spawnOn, surfAt): dry by this much over a liquid's still level
+// under all of its hull, or it counts as in the surf.
+const BERTH = Object.freeze({ dry: 1.2, reach: 4.5, points: [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] });
 // A ship at rest on water (Sim.stepAfloat): the hull that averages the sea, and how fast it follows.
 const FLOAT_ALONG = [-0.5, -0.25, 0, 0.25, 0.5], FLOAT_ACROSS = [-0.5, 0, 0.5];      // the grid, in hull lengths and beams
 const FLOAT = Object.freeze({
@@ -156,7 +159,7 @@ export class Sim {
       const off = add(scale(east, Math.cos(a) * 16), scale(north, Math.sin(a) * 16));
       const cd = norm(addScaled(feet, off, 1));
       const g = floorAt(sample, scale(cd, len(feet)));
-      const score = g.slope + (g.liquid ? 2 : 0) + Math.abs(g.floor - s.radius) * 0.03;
+      const score = g.slope + (g.liquid ? 2 : 0) + Math.abs(g.floor - s.radius) * 0.03 + this.surfAt(sample, cd);
       if (!best || score < best.score) best = { score, dir: cd, off };
     }
     const toShip = tangent(best.off, d);
@@ -178,6 +181,20 @@ export class Sim {
     this.shipCam = createShipCamera();
     this.transition = null;
     this.sm.force(S.ON_FOOT);
+  }
+
+  // How far into the surf a ship parked at `d` would stand (0 on dry ground well above the water):
+  // PAINTER's sea and PHYSICS' run-up wash over a beach above the still level, so a berth whose hull
+  // (the middle and four points BERTH.reach out) stands less than BERTH.dry over a liquid's still
+  // level counts against it (PAINTER 12: at a beach 1 m from the water the ship stood in a foam ring).
+  surfAt(sample, d) {
+    let wet = 0;
+    const e = tangent(cross(Y, d), d, V(1, 0, 0)), n = cross(d, e), k = BERTH.reach / Math.max(1, sample(d).radius);
+    for (const [x, y] of BERTH.points) {
+      const s = sample(norm(add(d, add(scale(e, x * k), scale(n, y * k)))));
+      if (s.liquidRadius > 0) wet = Math.max(wet, clamp01((s.liquidRadius + BERTH.dry - s.radius) / BERTH.dry));
+    }
+    return wet * 2;
   }
 
   // Where the explorer arrives near the world's spawn `d`: the spawn itself unless a boulder or a

@@ -35,7 +35,7 @@ export const BODIES = {
   uranus: { id: 'uranus', name: 'Uranus', radius: 4200, gravity: 8.2, atmosphereHeight: 1000,
     parent: null, orbitRadius: 820e3, orbitPeriod: 90000, orbitPhase: 3.4, dayLength: 1200, axialTilt: 1.2 },
   neptune: { id: 'neptune', name: 'Neptune', radius: 4200, gravity: 10.2, atmosphereHeight: 1000,
-    parent: null, orbitRadius: 1000e3, orbitPeriod: 120000, orbitPhase: 0.9, dayLength: 1140, axialTilt: 0.49 },
+    parent: null, orbitRadius: 1000e3, orbitPeriod: 120000, orbitPhase: 0.9, dayLength: 1140, axialTilt: -0.49 },   // (tilted the other way, 2026-11-12: every Neptune stand is north, and with +0.49 its north was in winter: the spawn's sun never rose above 2 degrees; now 36 at noon; PAINTER agreed)
   pluto: { id: 'pluto', name: 'Pluto', radius: 1600, gravity: 1.4, atmosphereHeight: 120, spaceAltitude: 420,
     parent: null, orbitRadius: 1180e3, orbitPeriod: 160000, orbitPhase: 2.8, dayLength: 3000, axialTilt: 0.3 },
 };
