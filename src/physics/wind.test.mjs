@@ -1,7 +1,7 @@
 // Tests: the wind field. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WINDS, WIND, prevailing, windLarge, gustLevel, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, seaRoughness } from './wind.js';
+import { WINDS, WIND, prevailing, windLarge, gustLevel, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, seaRoughness, setWindScale } from './wind.js';
 import { BIOMES, coverAt, liquidRoughness } from './ground.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 
@@ -237,4 +237,70 @@ test('P18 gustNodes gives exactly gustLevelAt, gustCrossAt and gustFineAt at eve
       assert.ok(Object.is(L[k], gustLevelAt(...a)) && Object.is(Cc[k], gustCrossAt(...a)) && Object.is(F[k], gustFineAt(...a)), `${body} t ${t} point ${k}`);
     }
   }
+});
+
+// ---- P18: the sub-second eddies -------------------------------------------------------------------------------------
+// A mast at height z over open grass in a steady wind U10, composed as airAt composes a point: the mean at z (the log law),
+// the pattern's whole level (gustLevelFull) and the sub-second level (gustSubAt), the lull floor and the clamp. The shares
+// of sigma_u^2 = (I U10)^2 under one second and in two bands under it against Kaimal at that height; and across the wind.
+test('P18 sub-second gusts: under one second the wind at a point holds what Kaimal\'s spectrum puts there at its height, more near the ground, with the roughness', async () => {
+  const { gustLevelFull, gustCrossFull, gustSubAt, GUST_SUB } = await import('./wind.js');
+  const hz = 60, N = 240 * hz, o = new Float64Array(4);
+  const share = (x, p) => { const k = Math.round(p * hz); let n = 0, s = 0, q = 0; for (let i = 0; i + k <= N; i += k) { let a = 0; for (let j = i; j < i + k; j++) a += x[j]; a /= k; s += a; q += a * a; n++; } return q / n - (s / n) ** 2; };
+  const Ku = (n) => Math.pow(1 + 33 * n, -2 / 3), Kv = (n) => Math.pow(1 + 9.5 * n, -2 / 3);
+  const res = {};
+  for (const [z, z0, U10] of [[2, 0.03, 8], [10, 0.03, 8], [2, 0.03, 16], [2, 0.3, 8], [1, 0.03, 4]]) {
+    const I = turbulenceIntensity(10, z0), fz = heightFactor(z, z0), A = I * WIND.gustGain, u = new Float64Array(N), v = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const t = 1000 + i / hz, a = t / WIND.gustCycle, t1 = (a - Math.floor(a) - 0.5) * WIND.gustCycle, t2 = (a + 0.5 - Math.floor(a + 0.5) - 0.5) * WIND.gustCycle;
+      const gs = [U10 * t1, 0, 0, U10 * t2, 0, 0];
+      gustSubAt('earth', 0, 6371010, 0, gs, t, 18, z, fz, U10, o);
+      let g = gustLevelFull('earth', 0, 6371010, 0, U10, 0, 0, t, 18) + o[0];
+      g = Math.max(-WIND.gustMax, Math.min(WIND.gustMax, g));
+      u[i] = U10 * fz * Math.max(WIND.minFactor, 1 + A * g);
+      v[i] = U10 * fz * A * WIND.crossRatio * (gustCrossFull('earth', 0, 6371010, 0, U10, 0, 0, t, 18) + o[1]);
+    }
+    const su2 = (I * U10) ** 2, sv2 = (WIND.crossRatio * I * U10) ** 2, Uz = U10 * fz;
+    const all = share(u, 1 / hz), allv = share(v, 1 / hz);
+    const subU = (all - share(u, 0.5)) / su2, subV = (allv - share(v, 0.5)) / sv2;
+    const b1 = (share(u, 0.125) - share(u, 0.5)) / su2;                       // about 1 s to 0.25 s
+    const fTop = Math.min(U10 / GUST_SUB.edges[GUST_SUB.edges.length - 1], 20), wantU = Ku(z / Uz) - Ku(z * fTop / Uz), wantV = Kv(z / Uz) - Kv(z * fTop / Uz);      // Kaimal from 1 Hz to the eddies' top
+    // the frame-to-frame change of the wind at 60 Hz: what a body feels as buffeting
+    let d2 = 0; for (let i = 1; i < N; i++) d2 += (u[i] - u[i - 1]) ** 2; const dU = Math.sqrt(d2 / (N - 1));
+    res[`${z}/${z0}/${U10}`] = { subU, subV, dU };
+    console.log(`# sub-second at ${z} m over z0 ${z0} in ${U10} m/s: share of sigma_u^2 under 1 s ${subU.toFixed(3)} (Kaimal ${wantU.toFixed(3)} from 1 to ${fTop.toFixed(0)} Hz), across ${subV.toFixed(3)} (Kaimal ${wantV.toFixed(3)}), 1-0.25 s ${b1.toFixed(3)}; rms change a frame ${dU.toFixed(3)} m/s`);
+    if (!process.env.SUBSPEC) assert.ok(subU > 0.6 * wantU && subU < 1.6 * wantU, `${z} m ${U10} m/s: under 1 s ${subU} against ${wantU}`);
+    if (!process.env.SUBSPEC) assert.ok(subV > 0.5 * wantV && subV < 1.8 * wantV, `${z} m ${U10} m/s across: ${subV} against ${wantV}`);
+  }
+  assert.ok(res['2/0.03/8'].subU > 1.5 * res['10/0.03/8'].subU, 'more of the variance under a second near the ground');
+  assert.ok(res['2/0.3/8'].dU > 1.3 * res['2/0.03/8'].dU, 'rougher ground, stronger quick gusts');
+  // deterministic: the same point and time give the same numbers
+  const a = new Float64Array(4), b = new Float64Array(4), gs = [10, 0, 0, -20, 0, 0];
+  gustSubAt('earth', 5, 6371010, 7, gs, 123.4, 18, 2, 0.7, 8, a); gustSubAt('earth', 5, 6371010, 7, gs, 123.4, 18, 2, 0.7, 8, b);
+  assert.deepEqual(Array.from(a), Array.from(b));
+});
+
+test('P18 in the game loop: the explorer (half a metre) feels the sub-second gusts at its hips; the ship\'s hull (8 m) averages them away; a point at rest and a point moving fast meet them differently', async () => {
+  const { createPhysics } = await import('./index.js');
+  const { makeWorld, V, norm } = await import('./testworld.mjs');
+  const R = BODIES.earth.radius, d = norm(V(0.3, 0.5, 0.8)), s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.3);
+    const w = makeWorld({ R }), physics = createPhysics({ sampleSurface: (id, q) => w(q), timeBudget: false });
+    const p = V(d.x * (R + 1), d.y * (R + 1), d.z * (R + 1)), hz = 60, N = 90 * hz;
+    for (let i = 0; i < 20 * hz; i++) physics.update(1 / hz, { bodyId: 'earth', time: 300 + i / hz, focus: p });
+    const kinds = { explorer: { size: 0.5, vx: 0, vy: 0, vz: 0 }, hull: { size: 8, vx: 0, vy: 0, vz: 0 }, big: { size: 1000, vx: 0, vy: 0, vz: 0 } }, u = {}, o = {};
+    for (const k in kinds) u[k] = new Float64Array(N);
+    let U = 0;
+    for (let i = 0; i < N; i++) {
+      physics.update(1 / hz, { bodyId: 'earth', time: 320 + i / hz, focus: p });
+      for (const k in kinds) u[k][i] = physics.air('earth', p, o, 2, kinds[k]).speed;
+      U += Math.hypot(physics.fields.air.cwe, physics.fields.air.cwn) / N;
+    }
+    const v = (x, pp) => { const k = Math.max(1, Math.round(pp * hz)); let n = 0, s = 0, q = 0; for (let i = 0; i + k <= N; i += k) { let a = 0; for (let j = i; j < i + k; j++) a += x[j]; a /= k; s += a; q += a * a; n++; } return q / n - (s / n) ** 2; };
+    const sub = (k) => v(u[k], 1 / hz) - v(u[k], 0.5);
+    console.log(`# at 2 m in ${U.toFixed(1)} m/s (10 m): variance under 1 s ${sub('explorer').toFixed(4)} m2/s2 felt by the explorer, ${sub('hull').toFixed(4)} by the hull, ${sub('big').toFixed(4)} without the eddies (the grid's and the pattern's alone)`);
+    assert.ok(sub('explorer') > 5 * sub('big'), 'the explorer feels the sub-second gusts');
+    assert.ok(sub('hull') < 0.35 * sub('explorer'), 'the hull averages most of them away');
+  } finally { setWindScale('earth', s0); }
 });

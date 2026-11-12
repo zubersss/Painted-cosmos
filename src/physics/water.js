@@ -362,7 +362,14 @@ export class WaterField {
       uPhysWaterSea: [0, 1e9, 1, 0], uPhysWake: this.wake, uPhysWakeG: 9.81,
       // (P18) the sea map (SEA_TEX): a 17 x 51 RGBA float texture's data, and where its two levels lie (frame m of node
       // (0, 0), cell m, nodes a side; w = 0: no map). PAINTER: a DataTexture over uPhysSeaMap, needsUpdate when mapVersion moves.
-      uPhysSeaMap: new Float32Array(MN * SEA_TEX.rows * 4), uPhysSeaGrid: [0, 0, 16, 0], uPhysSeaGrid2: [0, 0, 128, 0] };
+      uPhysSeaGrid: [0, 0, 16, 0], uPhysSeaGrid2: [0, 0, 128, 0] };
+    // (P18) uPhysSeaMap is a getter: the first time anything outside reads it (PAINTER's syncPhysWater, wiring the map into the
+    // shader), `mapRead` turns true and the reference sea moves to the most exposed water about (seamap.js): until the shader
+    // reads the map the trains stay the sea of the water nearest the focus, so what is drawn is never the open sea's waves laid
+    // over a sheltered lagoon. Inside, the field uses _seaData.
+    this._seaData = new Float32Array(MN * SEA_TEX.rows * 4);
+    this.mapRead = false;
+    Object.defineProperty(this.uniforms, 'uPhysSeaMap', { enumerable: true, get: () => { this.mapRead = true; return this._seaData; } });
     // (P18) the map: the builder's last target (seamap.js), and what is shown (eased toward it, kept with the ground it belongs to)
     this.map = null;
     this.mapVersion = 0;           // bumps whenever uPhysSeaMap was rewritten
@@ -406,7 +413,7 @@ export class WaterField {
     if (!T || !this.present || !(this.height > 0 || this.amp[NT - 1] > 0)) { this._mapOn = false; u.uPhysSeaGrid[3] = 0; u.uPhysSeaGrid2[3] = 0; return; }
     const k = 1 - Math.exp(-h / SEA_TEX.ease);
     easeArr(this._mw, T.warp, k); easeArr(this._mi, T.inner, k); if (T.N2) easeArr(this._mo, T.outer, k);
-    const D = u.uPhysSeaMap, A = this.amp, sh = WATER.shares;
+    const D = this._seaData, A = this.amp, sh = WATER.shares;
     const a012 = A[0] * A[0] + A[1] * A[1] + A[2] * A[2], A3 = A[NT - 1], aw3 = 0.5 * this.height * sh[NT - 1], sw2 = 0.5 * this.swellHeight;
     // (the wind sea at a node rises with the reference's: its whitecaps by how far the reference has come toward its target)
     const prog = T.HsRef > 1e-6 ? Math.min(1, this.height / T.HsRef) : 0;
@@ -435,7 +442,7 @@ export class WaterField {
   // derivatives along east and north (0 where the place is beyond the level and the edge value is held). o[oo + 0..3]
   // the values, [oo + 4..7] d/deast, [oo + 8..11] d/dnorth.
   _seaTap(gx0, gz0, cell, r0, x, z, o, oo) {
-    const D = this.uniforms.uPhysSeaMap, Nm = MN - 1;
+    const D = this._seaData, Nm = MN - 1;
     const u = (x - gx0) / cell, v = (z - gz0) / cell;
     const cu = u < 0 ? 0 : u > Nm ? Nm : u, cv = v < 0 ? 0 : v > Nm ? Nm : v;
     const inx = Math.abs(u - cu) <= 1e-6 ? 1 / cell : 0, inz = Math.abs(v - cv) <= 1e-6 ? 1 / cell : 0;

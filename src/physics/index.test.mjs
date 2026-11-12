@@ -152,14 +152,17 @@ test('sampleSurface is called sparingly: a bounded number per frame, bursts only
 });
 
 test('re-anchoring the near field is seamless: the wind at the focus does not jump', () => {
-  const physics = createPhysics({ sampleSurface: stubSurface });
+  const physics = createPhysics({ sampleSurface: stubSurface }), _ao = {};
   const w = walker('earth', 40);
   let prev = null, worst = 0, between = 0, anchors = 0, lastVersion = -1, prevBend = null, worstBend = 0;
   for (let i = 0; i < 1500; i++) {
     const p = w.step(1 / 60);
     physics.update(1 / 60, { bodyId: 'earth', time: 500 + i / 60, focus: p });
     const v = physics.fields.frame.version, hop = v !== lastVersion; if (hop) { anchors++; lastVersion = v; }
-    const a = physics.here.air.wind;
+    // (P18: the grid's wind at the focus, as here.air was before the point's sub-second eddies: a receiver far larger than they
+    // are averages them away. A point moving at this walker's 40 m/s meets them up to 25 times a second, 0.7 m/s a frame, in
+    // the frames that re-anchor as in the others: they are no seam, and this test is about the seam)
+    const a = physics.air('earth', p, _ao, 2, { size: 1000, vx: 0, vy: 0, vz: 0 }).wind;
     // (P11) the frames in which the field re-anchored, against all the others
     if (prev && i > 200) { const d = Math.hypot(a.x - prev.x, a.y - prev.y, a.z - prev.z); if (hop) worst = Math.max(worst, d); else between = Math.max(between, d); }
     prev = { ...a };

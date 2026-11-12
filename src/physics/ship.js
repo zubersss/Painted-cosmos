@@ -100,6 +100,8 @@ export const SHIP_BODY_STATE = () => ({
 });
 
 const _air = { density: 0, wind: { x: 0, y: 0, z: 0 }, turbulence: 0 };
+// (P18) what feels the air: the hull (its planform's side) at its own velocity, so the sub-second eddies average away
+const _recv = { size: 8, vx: 0, vy: 0, vz: 0 };
 const _dir = { x: 0, y: 0, z: 0 };
 const _f = new Float64Array(3), _r = new Float64Array(3), _u = new Float64Array(3);
 
@@ -181,7 +183,7 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   B.lift01 += ((hover ? 1 : 0) - B.lift01) * (1 - Math.exp(-dt / T.liftSpool));
   // ---- air ---------------------------------------------------------------------------------------
   let rho = 0, wx = 0, wy = 0, wz = 0, sigma = 0;
-  if (env.air) { const a = env.air(st.p, _air, env.altGround); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; sigma = a.turbulence || 0; }
+  if (env.air) { _recv.size = Math.sqrt(T.gustArea); _recv.vx = st.v.x; _recv.vy = st.v.y; _recv.vz = st.v.z; const a = env.air(st.p, _air, env.altGround, _recv); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; sigma = a.turbulence || 0; }
   let rx = vx - wx, ry = vy - wy, rz = vz - wz;
   const airspeed = Math.hypot(rx, ry, rz);
   // drag along the three body axes (explicit estimate for the flight computer's feed-forward)

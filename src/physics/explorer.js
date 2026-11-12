@@ -204,6 +204,8 @@ export const EXPLORER_BODY_STATE = () => ({
 });
 
 const _air = { density: 1.225, wind: { x: 0, y: 0, z: 0 } };
+// (P18) what feels the air: a body half a metre across moving at its own velocity (the sub-second eddies, wind.js gustSubAt)
+const _recv = { size: 0.5, vx: 0, vy: 0, vz: 0 };
 const _gnd = {};
 const _dir = { x: 0, y: 0, z: 0 };
 const _dir2 = { x: 0, y: 0, z: 0 };
@@ -579,7 +581,7 @@ function stepOnce(st, cmd, dt, env, T) {
 
   // ---- surroundings ------------------------------------------------------------------------
   let rho = 1.225, wx = 0, wy = 0, wz = 0;
-  if (env.air) { const a = env.air(st.p, _air, Math.max(0, r - groundR) + 1.0); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
+  if (env.air) { _recv.vx = st.v.x; _recv.vy = st.v.y; _recv.vz = st.v.z; const a = env.air(st.p, _air, Math.max(0, r - groundR) + 1.0, _recv); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
   // A named assist (PILOT's lever; default 0 = the real wind): cmd.shelter01, 0..1, is the share of the
   // wind's FORCE on the body that the suit cancels. The force goes with the square of the wind, so the
   // body is given wind x sqrt(1 - shelter01); its own drag through still air is untouched.

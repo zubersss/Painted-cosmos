@@ -259,7 +259,10 @@ test('the GLSL chunk is self-consistent with the JS model', () => {
 test('plants shelter each other: the wind is slower in the lee of a wood, and recovers downwind and overhead', () => {
   // find which way the wind blows here, then plant a round wood upwind of the focus
   const probe = world(); run(probe, 1);
-  const a0 = probe.physics.here.air, sp0 = a0.speed;
+  // (P18: the MEAN wind, asked as a receiver larger than the point's sub-second eddies: in this 0.7 m/s breeze their lateral
+  // part swings one sample's direction by tens of degrees, and the wood would be planted beside the wind, not upwind)
+  const BIG = { size: 1000, vx: 0, vy: 0, vz: 0 };
+  const a0 = probe.physics.air('earth', probe.focus, {}, 2, BIG), sp0 = a0.speed;
   assert.ok(sp0 > 0.5);
   const wdir = norm(a0.wind), up = norm(probe.focus);
   const upwind = norm(V(probe.focus.x - wdir.x * 62, probe.focus.y - wdir.y * 62, probe.focus.z - wdir.z * 62));
@@ -268,7 +271,7 @@ test('plants shelter each other: the wind is slower in the lee of a wood, and re
   const w = { physics, focus: probe.focus, bodyId: 'earth' };
   run(w, 3);
   const side = norm(V(up.y * wdir.z - up.z * wdir.y, up.z * wdir.x - up.x * wdir.z, up.x * wdir.y - up.y * wdir.x));
-  const at = (along, across, h) => { const p = V(w.focus.x + wdir.x * along + side.x * across, w.focus.y + wdir.y * along + side.y * across, w.focus.z + wdir.z * along + side.z * across); const l = len(p); return physics.air('earth', V(p.x * R / l, p.y * R / l, p.z * R / l), {}, h).speed; };
+  const at = (along, across, h) => { const p = V(w.focus.x + wdir.x * along + side.x * across, w.focus.y + wdir.y * along + side.y * across, w.focus.z + wdir.z * along + side.z * across); const l = len(p); return physics.air('earth', V(p.x * R / l, p.y * R / l, p.z * R / l), {}, h, BIG).speed; };     // (P18: the mean, as above)
   // 32 m behind the edge of the wood (about two tree heights) against the same distance out to the side
   const lee = at(0, 0, 2), open = (at(0, 90, 2) + at(0, -90, 2)) / 2;
   assert.ok(lee < open * 0.75, `in the lee ${lee.toFixed(2)} m/s, in the open ${open.toFixed(2)} m/s`);

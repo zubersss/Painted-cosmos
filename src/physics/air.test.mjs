@@ -28,7 +28,7 @@ function scan(sampleSurface, dir, t0, t1, hz, heights) {
     uref = Math.max(uref, Math.hypot(grid.cwe, grid.cwn));
     for (let k = 0; k < heights.length; k++) {
       const o = out[k];
-      physics.air('earth', pts[k], a, heights[k]);
+      physics.air('earth', pts[k], a, heights[k], BIG);
       const w = [a.wind.x, a.wind.y, a.wind.z], s = Math.hypot(w[0], w[1], w[2]);
       o.lo = Math.min(o.lo, s); o.hi = Math.max(o.hi, s);
       if (o.prev) { const acc = Math.hypot(w[0] - o.prev[0], w[1] - o.prev[1], w[2] - o.prev[2]) * hz; if (acc > o.worst) { o.worst = acc; o.at = t; } }
@@ -55,6 +55,10 @@ function scan(sampleSurface, dir, t0, t1, hz, heights) {
 const GUST_LENGTHS = [WIND.gustLength, WIND.gustLength2, WIND.gustLength3, WIND.gustLength4];
 const EDGE = 1.875 * WIND.gustWeights.reduce((a, w, i) => a + w * WIND.gustNorm / WIND.gustMax / GUST_LENGTHS[i], 0);
 const bound = (o, uref) => (o.hi - o.lo) * uref * EDGE;
+// (P18) What these tests measure is the grid and the pattern it carries (a step at a hop, a wake that switches, a pattern that
+// slides through the air): the point's sub-second eddies (wind.js gustSubAt) are left out by asking the air as a receiver
+// far larger than they are, which averages them away (aerodynamic admittance); they have their own test (wind.test.mjs).
+const BIG = { size: 1000, vx: 0, vy: 0, vz: 0 };
 
 test('the first storm at the Earth spawn: at 2, 10 and 30 m the air accelerates no faster than the storm\'s own wind carries a gust past (open ground)', () => {
   const sample = makeWorld({ R: BODIES.earth.radius, biome: 'alpine_meadow' });
@@ -96,7 +100,7 @@ test('a runner crossing the storm feels no step in the wind when the grid hops a
     const l = Math.hypot(p.x, p.y, p.z) / (R0 + 2); p = V(p.x / l, p.y / l, p.z / l);
     physics.update(1 / hz, { bodyId: 'earth', time: t, focus: p });
     if (grid.terrain.ci !== ci || grid.terrain.cj !== cj) { hops++; ci = grid.terrain.ci; cj = grid.terrain.cj; }
-    physics.air('earth', p, a, 2); uref = Math.max(uref, Math.hypot(grid.cwe, grid.cwn));
+    physics.air('earth', p, a, 2, BIG); uref = Math.max(uref, Math.hypot(grid.cwe, grid.cwn));
     const w = [a.wind.x, a.wind.y, a.wind.z], s = Math.hypot(w[0], w[1], w[2]);
     o.lo = Math.min(o.lo, s); o.hi = Math.max(o.hi, s);
     if (prev) { const acc = Math.hypot(w[0] - prev[0], w[1] - prev[1], w[2] - prev[2]) * hz; if (acc > o.worst) { o.worst = acc; o.at = t; } }

@@ -230,10 +230,30 @@ const exMesh = new THREE.Group(); exMesh.visible = Q.get('explorer') !== '0';
 const exTorso = new THREE.Mesh(legsOn ? new THREE.CapsuleGeometry(0.27, 0.36, 4, 10) : new THREE.CapsuleGeometry(0.28, 1.2, 4, 10), actorMat);
 // (P13) two legs and two boots, each from its hip joint to its foot, where the gait has the foot (st.phys.feet: ahead of
 // or behind the body, off the ground in its swing), under hips that ride the stride (st.phys.ride) and surge with it.
-const exLegs = [0, 1].map(() => new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.07, 1, 8), actorMat));
+// (P18) each leg has a knee: a thigh and a shin (LEG_THIGH + LEG_SHIN: from the hips, 0.9 m up standing, to the ankle at the
+// top of the boot, 0.08 m up, with a slight flex), placed by the
+// two-bone solution in the plane of the leg and the way ahead, the knee bending forward; so a stride, a landing's fold and a
+// clamber bend the knee as the model's feet and hips say, where one stick from hip to foot only shortened
+const LEG_THIGH = 0.43, LEG_SHIN = 0.40;
+const exThighs = [0, 1].map(() => new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.08, 1, 8), actorMat));
+const exShins = [0, 1].map(() => new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 1, 8), actorMat));
+const exKnees = [0, 1].map(() => new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), actorMat));
 const exBoots = [0, 1].map(() => new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.3), actorMat));
+const exLegs = [...exThighs, ...exShins, ...exKnees];
 for (const m of [...exLegs, ...exBoots]) m.visible = legsOn;
 exMesh.add(exTorso, ...exLegs, ...exBoots);
+// a bone from P to Q (a unit cylinder along y, stretched and turned)
+const _bd = new THREE.Vector3();
+function placeBone(mesh, P, Q) { mesh.position.copy(P).add(Q).multiplyScalar(0.5); _bd.copy(P).sub(Q); mesh.scale.y = Math.max(1e-3, _bd.length()); mesh.quaternion.setFromUnitVectors(_Y, _bd.normalize()); }
+// the knee of a leg from hip A to ankle B (the figure's frame: -z ahead): within reach, the thigh leaves the line from hip to
+// ankle at the angle the law of cosines gives, turned toward the way ahead; out of reach the leg is straight
+const _ku = new THREE.Vector3(), _kp = new THREE.Vector3(), _kn = new THREE.Vector3(), _fw = new THREE.Vector3(0, 0, -1);
+function kneeOf(A, B, out) {
+  _ku.copy(B).sub(A); const d = Math.min(Math.max(_ku.length(), 0.05), LEG_THIGH + LEG_SHIN - 1e-4); _ku.normalize();
+  _kp.copy(_fw).addScaledVector(_ku, -_fw.dot(_ku)); if (_kp.lengthSq() < 1e-8) _kp.set(0, 1, 0).addScaledVector(_ku, -_ku.y); _kp.normalize();
+  const c = (LEG_THIGH * LEG_THIGH + d * d - LEG_SHIN * LEG_SHIN) / (2 * LEG_THIGH * d), sn = Math.sqrt(Math.max(0, 1 - c * c));
+  return out.copy(A).addScaledVector(_ku, LEG_THIGH * c).addScaledVector(_kp, LEG_THIGH * sn);
+}
 const _h = new THREE.Vector3(), _rt = new THREE.Vector3(), _bk = new THREE.Vector3(), _mb = new THREE.Matrix4(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
 root.add(exMesh);
 // (P11) scripted control, for the filmstrips. All optional; null/0 = the page's own behaviour.
@@ -269,9 +289,10 @@ function driveExplorer(dt) {
     for (let i = 0; i < 2; i++) {
       const F = B.feet ? B.feet[i] : null, side = F ? F.side : (i ? 0.08 : -0.08), fwd = F ? F.fwd : 0, up = F ? F.up : 0;
       _a.set(side, hipY, -sur); _b.set(side, Math.min(up + 0.04, hipY - 0.2), -fwd);
-      const leg = exLegs[i]; leg.position.copy(_a).add(_b).multiplyScalar(0.5); leg.scale.y = _a.distanceTo(_b);
-      leg.quaternion.setFromUnitVectors(_Y, _a.sub(_b).normalize());
       exBoots[i].position.set(side, _b.y, -fwd - 0.06);
+      _b.y += 0.04;                                                   // the ankle: the top of the boot
+      kneeOf(_a, _b, _kn);
+      placeBone(exThighs[i], _a, _kn); placeBone(exShins[i], _kn, _b); exKnees[i].position.copy(_kn);
     }
   } else exTorso.position.y = 0.88;
 }

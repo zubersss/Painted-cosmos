@@ -250,6 +250,7 @@ export class SeaMap {
     const b = this._b, O = this.outer, D = this.D, cap = this.cap, lev = c.level;
     b.x0 = (T.ci - T.half) * T.cell; b.z0 = (T.cj - T.half) * T.cell; b.cell = T.cell;
     b.U = U; b.aU = aU; b.dirA = dA; b.g = c.g; b.rhoA = c.rhoAir; b.rhoL = c.rhoLiq; b.R = c.R; b.body = c.bodyId;
+    b.exposed = !!c.exposed; b.fx = c.fx; b.fz = c.fz;
     b.swellH = c.swellHeight || 0; b.swellT = c.swellLength > 0 ? Math.sqrt(c.swellLength * TAU / c.g) : 0;
     const CW = T.CW;
     for (let n = 0; n < NN; n++) {
@@ -373,15 +374,26 @@ export class SeaMap {
     }
   }
 
-  // the reference: the most exposed node (the highest sea, the open sea's swell counted), deep enough
+  // the reference: the most exposed node (the highest sea, the open sea's swell counted), deep enough; or, while nothing reads
+  // the map (b.exposed false: the shader draws the trains everywhere), the water nearest the focus (P16's water point: the inner
+  // node nearest the focus at least minDepth deep, else the deepest), so a lagoon is drawn with its own sea, not the open sea's
   _reference() {
-    const S = this.sea, D = this.D;
+    const S = this.sea, D = this.D, b = this._b;
     let ref = -1, rs = -1, any = -1, as = -1;
-    for (let n = 0; n < 2 * NN; n++) {
-      if (!(S[n * 8 + 7] > 0)) continue;
-      const s = S[n * 8 + 2] * (1 + 0.5 * S[n * 8 + 5]);
-      if (s > as) { as = s; any = n; }
-      if (D[n] >= SEA_MAP.minDepth && s > rs) { rs = s; ref = n; }
+    if (b.exposed) {
+      for (let n = 0; n < 2 * NN; n++) {
+        if (!(S[n * 8 + 7] > 0)) continue;
+        const s = S[n * 8 + 2] * (1 + 0.5 * S[n * 8 + 5]);
+        if (s > as) { as = s; any = n; }
+        if (D[n] >= SEA_MAP.minDepth && s > rs) { rs = s; ref = n; }
+      }
+    } else {
+      for (let n = 0; n < NN; n++) {
+        if (!(S[n * 8 + 7] > 0)) continue;
+        const dx = b.x0 + (n % N) * b.cell - b.fx, dz = b.z0 + ((n / N) | 0) * b.cell - b.fz, d2 = dx * dx + dz * dz;
+        if (D[n] > as) { as = D[n]; any = n; }
+        if (D[n] >= SEA_MAP.minDepth && (rs < 0 || d2 < rs)) { rs = d2; ref = n; }
+      }
     }
     this.ref = ref >= 0 ? ref : any;
     // the far point should be the inner node that sees the most open water: the next snapshot moves it there
@@ -475,7 +487,7 @@ export class SeaMap {
     if (cnt && T.on) { mx /= cnt; mz /= cnt; } else { mx = 0; mz = 0; }
     // with no turn anywhere there is no warp at all
     let anyTurn = false; for (let n = 0; n < NN; n++) if (Math.abs(this.alpha[n]) > 1e-4) { anyTurn = true; break; }
-    const Href = S[ref * 8 + 2], wcRef = S[ref * 8 + 4];
+    const Href = S[ref * 8 + 2], wcRef = S[ref * 8 + 4], Lref = lengthAt(S[ref * 8 + 3], S[ref * 8 + 1] > 0 ? S[ref * 8 + 1] : 1e9, b.g);
     T.x0 = b.x0; T.z0 = b.z0; T.cell = b.cell; T.x02 = b.x02; T.z02 = b.z02; T.N2 = b.ok2 ? N : 0;
     for (let n = 0; n < NN; n++) { T.warp[n * 2] = anyTurn ? this.wx[n] - mx : 0; T.warp[n * 2 + 1] = anyTurn ? this.wz[n] - mz : 0; }
     for (let lev = 0; lev < 2; lev++) {
@@ -484,7 +496,8 @@ export class SeaMap {
         const q = (base + n) * 8, o = n * 4, wet = S[q + 7] > 0;
         val[n] = wet ? 1 : 0;
         const kW = lev ? 1 : this.kW[n], kS = lev ? 1 : this.kS[n];
-        arr[o] = wet ? (Href > 1e-4 ? Math.min(1.5, S[q + 2] * kW / Href) : 1) : 0;
+        // (a node whose sea is higher than the reference's is the reference's trains made higher: never steeper than 1 in 10)
+        arr[o] = wet ? (Href > 1e-4 ? Math.min(Math.max(1.5, 0.1 * Lref / Href), S[q + 2] * kW / Href) : 1) : 0;
         arr[o + 1] = wet ? S[q + 5] : 0; arr[o + 2] = wet ? S[q + 4] : 0; arr[o + 3] = wet ? kS : 1;
         const io = (base + n) * 6;
         T.info[io] = S[q]; T.info[io + 1] = S[q + 1]; T.info[io + 2] = S[q + 2] * kW; T.info[io + 3] = S[q + 5]; T.info[io + 4] = S[q + 6]; T.info[io + 5] = wet ? 1 : 0;

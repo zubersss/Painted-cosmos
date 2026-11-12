@@ -22,9 +22,11 @@ function upwindAtC() {
   for (let i = 0; i < 30; i++) p.update(1 / 30, { bodyId: 'earth', time: 300 + i / 30, focus: P0 });
   return { up: Math.atan2(-p.fields.air.cwn, -p.fields.air.cwe), U: Math.hypot(p.fields.air.cwe, p.fields.air.cwn) };
 }
-function run(f, turn, focusUV, secs = 24) {
+function run(f, turn, focusUV, secs = 24, readMap = true) {
   const world = coastWorld(C, f, { R: RE, turn });
   const physics = createPhysics({ sampleSurface: (id, q) => world(q), timeBudget: false });
+  // (as PAINTER's shader will once it is wired: reading the map moves the reference sea to the most exposed water)
+  if (readMap) void physics.fields.water.uniforms.uPhysSeaMap;
   const fd = world.at(focusUV[0], focusUV[1]), fo = V(fd.x * (RE + 1.5), fd.y * (RE + 1.5), fd.z * (RE + 1.5));
   let ms = 0, worst = 0, msMax = 0;
   for (let i = 0; i < secs * 30; i++) {
@@ -35,6 +37,11 @@ function run(f, turn, focusUV, secs = 24) {
   const at = (u, v) => { const d = world.at(u, v), p = V(d.x * RE, d.y * RE, d.z * RE); return { o: physics.water('earth', p, {}), L: physics.fields.water.local(p, {}), p }; };
   return { physics, world, at, msMean: ms / (secs * 30 - 301), msMax, worst };
 }
+const lagoonF = (u, v) => {
+  if (u >= 0 && u < 24 && v > -220 && v < 40) return 1.5;
+  if (u > -160 && u < 0 && v > -200 && v < 60) return -3;
+  return u < 0 ? 4 : -Math.min(20, 0.5 + 0.07 * u);
+};
 
 test('P18 a lagoon behind a barrier is calmer than the open shore beside it: lower sea, no swell, and the map is built in slices within the ration', () => {
   const s0 = WINDS.earth.scale;
@@ -139,5 +146,19 @@ test('P18 the coast report (coast.mjs): an open coast facing the storm passes th
     assert.equal(open.pass, true, JSON.stringify(open.checks));
     assert.equal(lag.pass, false);
     assert.equal(lag.checks.fetch, false);
+  } finally { setWindScale('earth', s0); }
+});
+
+test('P18 until the shader reads the map, the trains it draws everywhere are the sea of the water nearest the focus (a lagoon keeps its chop); once read, the most exposed water\'s', () => {
+  const s0 = WINDS.earth.scale;
+  try {
+    setWindScale('earth', 0.25);
+    const { up } = upwindAtC();
+    const A = run(lagoonF, up, [-100, -110], 24, false), B = run(lagoonF, up, [-100, -110], 24, true);
+    const lag = A.at(-100, -110), Ha = A.physics.fields.water.field.significant, Hb = B.physics.fields.water.field.significant;
+    console.log(`# the trains drawn everywhere: ${Ha.toFixed(2)} m with the map unread (the lagoon here: ${lag.o.significant.toFixed(2)} m), ${Hb.toFixed(2)} m once read (the open sea about); mapRead ${A.physics.fields.water.field.mapRead} / ${B.physics.fields.water.field.mapRead}`);
+    assert.equal(A.physics.fields.water.field.mapRead, false);
+    assert.ok(Math.abs(Ha - lag.o.significant) < 0.25 * Math.max(Ha, 0.05), `unread: the trains are the lagoon's sea (${Ha} against ${lag.o.significant})`);
+    assert.ok(Hb > 2 * Ha, `read: the trains are the open sea's (${Hb} against ${Ha})`);
   } finally { setWindScale('earth', s0); }
 });

@@ -128,7 +128,9 @@ test('Mars: a dust storm keeps sand hopping in winds far below the fluid thresho
   assert.ok(hit, 'found a dust storm');
   const w = setup('mars', 'dust_dunes', { dir: hit.c }); w.t = hit.t;
   run(w, 8);
-  const wx = w.physics.here.weather, air = w.physics.here.air;
+  // (P18: the mean wind at the focus against the fluid threshold, asked as a receiver larger than the point's sub-second
+  // eddies; one instant of here.air now carries them, and the claim is about the wind the storm blows, not its quickest gust)
+  const wx = w.physics.here.weather, air = w.physics.air('mars', w.focus, {}, 2, { size: 1000, vx: 0, vy: 0, vz: 0 });
   assert.equal(wx.kind, 'dust storm');
   assert.ok(wx.visibility01 < 0.35, 'visibility ' + wx.visibility01);
   assert.ok(air.speed < saltationThreshold('mars', air.density) * 0.8, `wind ${air.speed} is below the fluid threshold ${saltationThreshold('mars', air.density)}`);

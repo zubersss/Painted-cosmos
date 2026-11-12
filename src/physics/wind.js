@@ -279,6 +279,88 @@ export function gustLevelFull(bodyId, px, py, pz, wx, wy, wz, t, seed) {
     + gustFineAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed), -WIND.gustMax, WIND.gustMax);
 }
 
+// (P18) THE SUB-SECOND EDDIES. The pattern's finest octave is a 5 m lattice: in a 5 m/s wind nothing in it changed faster
+// than about a second, and a mast's wind under one second was 0.1 to 0.2 % of the variance where Kaimal's spectrum puts 4
+// to 10 % at 10 m and 10 to 25 % at 2 m (the spectrum shifts to higher frequencies near the ground: n = f z / U(z)). Three
+// more octaves of eddies, 3.5, 1.4 and 0.55 m, are added at a POINT (airAt: the explorer, the ship, here.air), carried with the
+// pattern (frozen turbulence: deterministic, and coherent over less than a metre), each weighted by the variance Kaimal
+// et al. (1972) put in its band of wavelengths at the point's own height z, of sigma_u = I U10 (the surface layer's
+// sigma_u does not change with height; I carries the roughness): along the wind f S / u*^2 = 105 n / (1 + 33 n)^(5/3),
+// across it 17 n / (1 + 9.5 n)^(5/3), whose shares above n are (1 + 33 n)^(-2/3) and (1 + 9.5 n)^(-2/3). Bands (m of
+// wavelength): 6 to 2.4, 2.4 to 0.95, 0.95 to 0.38. What feels them is a RECEIVER (optional): a body D across averages
+// eddies smaller than itself (Davenport's aerodynamic admittance, chi^2 = 1 / (1 + (2 D / lambda)^(4/3)): the explorer,
+// half a metre, feels them; the ship's 8 m hull hardly any), and an octave whose eddies the receiver meets more than 15 to
+// 25 times a second (the wind's speed relative to it over the lattice) fades out: a 60 Hz step would alias them.
+export const GUST_SUB = Object.freeze({
+  lengths: [8.7, 3.5, 1.4, 0.55],  // m: the lattices
+  edges: [15, 6, 2.4, 0.95, 0.38], // m: their bands of wavelength. The first band (15 to 6 m) the pattern's fine octaves already
+                                   // hold as Kaimal has it at 10 m: its octave carries only what the spectrum at a lower height
+                                   // wants there beyond that (nothing at 10 m and above). The rest the pattern hardly holds.
+  norm: 1.5, normV: 2.2,           // variance gains: a lattice of value noise spreads part of its variance below its band (measured:
+                                   // wind.test.mjs, the share under 1 s against Kaimal at 1, 2 and 10 m, 4 to 16 m/s, z0 0.03 and 0.3)
+  fadeHz: [15, 25],                // the octave fades out as U10 / length passes these
+  noiseSigma: 0.3947,              // sigma of one octave of noise3 (measured over 2e5 points)
+  minHeight: 0.5,                  // m: the height Kaimal is read at is never lower (z over the canopy's displacement)
+  minShare: 0.15,                  // the point's mean wind over the 10 m reference, never taken lower (under a canopy)
+});
+const kaimalU = (n) => Math.pow(1 + 33 * n, -2 / 3), kaimalV = (n) => Math.pow(1 + 9.5 * n, -2 / 3);
+// (the pattern's share of the first band at 10 m, along and across: what the first octave does not carry again)
+const SUB10U = kaimalU(10 / GUST_SUB.edges[0]) - kaimalU(10 / GUST_SUB.edges[1]), SUB10V = kaimalV(10 / GUST_SUB.edges[0]) - kaimalV(10 / GUST_SUB.edges[1]);
+const _ku = new Float64Array(GUST_SUB.edges.length), _kv = new Float64Array(GUST_SUB.edges.length);
+// The sub-second levels at body-local point (px,py,pz), carried as gustLevelAt's copies (gs: their six displacements),
+// for a point z m over the ground (or the canopy's displacement) whose mean wind is fz of the 10 m wind U10 (m/s).
+// D (m): the receiver's size (0: a point); Ue (m/s): the speed it meets the air at (default U10: standing).
+// o[0]: along the wind, o[1]: across it, in the level's units for this point (add them to the pattern's levels before
+// the clamp: airAt multiplies by (I + gustiness) * gustGain, the 10 m intensity, so they are divided here by fz and
+// gustGain: what they add to the wind is U10 (I + ...) times Kaimal's share); o[2], o[3]: the shares of sigma_u^2 and
+// sigma_v^2 they carry (for the turbulence the point reports).
+export function gustSubAt(bodyId, px, py, pz, gs, t, seed, z, fz, U10, o, D = 0, Ue = U10) {
+  const G = GUST_SUB, E = G.edges, zz = z > G.minHeight ? z : G.minHeight, f = fz > G.minShare ? fz : G.minShare;
+  const s = seedOf(bodyId, seed) + 501;
+  const T = WIND.gustCycle, a = t / T, c1 = Math.floor(a), f1 = a - c1, c2 = Math.floor(a + 0.5);
+  const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1, den = Math.sqrt(w1 * w1 + w2 * w2);
+  // Kaimal's shares above each edge (n = f z / U(z) with f = U10 / wavelength), once
+  for (let e = 0; e < E.length; e++) { const n = zz / (E[e] * f); _ku[e] = kaimalU(n); _kv[e] = kaimalV(n); }
+  const o1 = w1 > 0.001 ? hash1(c1, s) * 977 : 0, o2 = w2 > 0.001 ? hash1(c2, s + 55) * 977 : 0;
+  const ax = px - gs[0], ay = py - gs[1], az = pz - gs[2], bx = px - gs[3], by = py - gs[4], bz = pz - gs[5];
+  let su = 0, sv = 0, vu = 0, vv = 0;
+  for (let k = 0; k < G.lengths.length; k++) {
+    const L = G.lengths[k], hz = Ue / L, fade = (1 - smoothstep(G.fadeHz[0], G.fadeHz[1], hz)) / Math.sqrt(1 + Math.pow(2 * D / L, 4 / 3));
+    if (!(fade > 1e-3)) continue;
+    let eu = _ku[k] - _ku[k + 1], ev = _kv[k] - _kv[k + 1];
+    // (the first band: the pattern at this point holds f^2 of what Kaimal has there at 10 m; only the excess)
+    if (k === 0) { eu -= f * f * SUB10U; ev -= f * f * SUB10V; eu = eu > 0 ? eu : 0; ev = ev > 0 ? ev : 0; }
+    eu *= fade * fade * G.norm; ev *= fade * fade * G.normV;
+    vu += eu; vv += ev;
+    const kk = 1 / L, wu = Math.sqrt(eu) / G.noiseSigma, wv = Math.sqrt(ev) / G.noiseSigma, sk = s + 31 + 7 * k, q1 = o1 + 17.3 * k, q2 = o2 + 17.3 * k;
+    let gu = 0, gv = 0;
+    if (w1 > 0.001) {
+      gu += w1 * noise3(ax * kk + q1, ay * kk - q1, az * kk, sk);
+      gv += w1 * noise3(ax * kk - q1, ay * kk, az * kk + q1, sk + 1);
+    }
+    if (w2 > 0.001) {
+      gu += w2 * noise3(bx * kk + q2, by * kk - q2, bz * kk, sk + 2);
+      gv += w2 * noise3(bx * kk - q2, by * kk, bz * kk + q2, sk + 3);
+    }
+    su += wu * gu / den; sv += wv * gv / den;
+  }
+  const k0 = 1 / (f * WIND.gustGain);
+  o[0] = su * k0; o[1] = sv * k0; o[2] = vu; o[3] = vv;
+  return o;
+}
+
+// (P18) For the bound on how fast the wind at a point may change (air.test.mjs): the largest amplitude (level units) of each
+// sub-second octave at height z, share fz, for a point at rest, no fade (an upper bound), into out[k]
+export function gustSubAmplitudes(z, fz, out) {
+  const G = GUST_SUB, E = G.edges, zz = z > G.minHeight ? z : G.minHeight, f = fz > G.minShare ? fz : G.minShare;
+  for (let k = 0; k < G.lengths.length; k++) {
+    let eu = kaimalU(zz / (E[k] * f)) - kaimalU(zz / (E[k + 1] * f));
+    if (k === 0) { eu -= f * f * SUB10U; eu = eu > 0 ? eu : 0; }
+    out[k] = Math.sqrt(eu * G.norm) / G.noiseSigma / (f * WIND.gustGain);
+  }
+  return out;
+}
+
 // (P18) The three levels at many places at once, for the wind grid: for each of the n points P[3k..3k+2] (body-local, m),
 // carried as the copies' displacements gs[0..5] say (gustLevelAt's arguments), writes outL[k] = gustLevelAt (clamped),
 // outC[k] = gustCrossAt and outF[k] = gustFineAt, EXACTLY (the same arithmetic in the same order, the cycle's numbers worked

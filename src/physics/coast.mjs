@@ -62,6 +62,7 @@ export function coastReport(W, bodyId, biomeId, opts = {}) {
   const Ustorm = windNow(tStorm).U;      // (the targets are for the wind at the time reported)
   // run the physics into the storm with the focus 2 m up the beach
   const physics = W.createPhysics({ sampleSurface: (id, d) => W.sampleSurfacePure(id, d.x, d.y, d.z), seed, timeBudget: false });
+  void physics.fields.water.uniforms.uPhysSeaMap;      // (the sea as it is once the shader reads the map: the reference is the most exposed water)
   const [fe, fn] = beach(-2), fd = dirAt(fe, fn), sf = W.sampleSurfacePure(bodyId, fd.x, fd.y, fd.z), fr = Math.max(sf.radius, sf.liquidRadius || 0) + 1;
   const focus = { x: fd.x * fr, y: fd.y * fr, z: fd.z * fr };
   const settle = opts.settle || 150, t0 = Math.max(0, tStorm - settle);

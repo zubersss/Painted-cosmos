@@ -88,6 +88,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   let lastMoist = -1e9, moistX = 1e9, moistZ = 1e9;
   let fresh = 0, freshT = -1e9, freshBody = null; const freshP = { x: 0, y: 0, z: 0 };   // fresh snow at the focus, integrated as it falls
   const focus = { x: 0, y: 1, z: 0 };
+  const focusPrev = { x: 0, y: 0, z: 0, ok: false }, focusV = { size: 0, vx: 0, vy: 0, vz: 0 };     // (P18) the focus's velocity, for here.air
   const _wl4 = new Float64Array(4);
   const moist = { wetness01: 0, snowDepth: 0, freshSnow: 0 };
   const cover = { z0: 0.03, canopy01: 0, canopyHeight: 0, moist: 1, fog: 0.2, dustSource: 0.1, dT: 0, snowBase: 0, leaves: 0, spores: 0, ash: 0, fetch: 80, liquidDensity: 0 };
@@ -214,7 +215,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     _denv.rho = airDensity(bodyId, r - body.radius);
     devilsNear(bodyId, fp.x, fp.y, fp.z, time, seed, _denv, frame, devils);
     features.devils = devils;
-    airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils);
+    // (P18: felt by a point moving with the focus: the sub-second eddies it meets too often fade)
+    if (dt > 0 && focusPrev.ok && Math.hypot(fp.x - focusPrev.x, fp.y - focusPrev.y, fp.z - focusPrev.z) < 100) { const k = 1 - Math.exp(-dt / 0.1); focusV.vx += ((fp.x - focusPrev.x) / dt - focusV.vx) * k; focusV.vy += ((fp.y - focusPrev.y) / dt - focusV.vy) * k; focusV.vz += ((fp.z - focusPrev.z) / dt - focusV.vz) * k; }
+    else if (!(dt > 0 && focusPrev.ok)) { focusV.vx = 0; focusV.vy = 0; focusV.vz = 0; }
+    focusPrev.x = fp.x; focusPrev.y = fp.y; focusPrev.z = fp.z; focusPrev.ok = true;
+    airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils, focusV);
     _wenv.moist = cover.moist; _wenv.fog = cover.fog; _wenv.snowBase = cover.snowBase; _wenv.dT = cover.dT; _wenv.dustSource = cover.dustSource;
     // (the weather answers the large-scale wind here, not the gusty wind at the focus: fog does not come and go
     // with a three-second gust, and physics.weather() anywhere, any time, then says what physics.here says: P7)
@@ -305,6 +310,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       _sc.bodyId = bodyId; _sc.R = body.radius; _sc.level = liqLevel; _sc.we = airGrid.cwe; _sc.wn = airGrid.cwn; _sc.g = body.gravity;
       _sc.rhoAir = here.air.density; _sc.rhoLiq = cover.liquidDensity || liquidOf(bodyId).density; _sc.dir = water.dir;
       _sc.swellHeight = water.open > 0 ? water.swellHeight : 0; _sc.swellLength = water.open > 0 ? water.swellLength : 0;
+      _sc.exposed = water.mapRead;      // (the reference moves to the most exposed water once something reads the map: water.js)
       _sc.sample = sampleActive; _sc.budget = warming ? 64 : known ? Math.max(2, QUALITY.samples[quality] >> 1) : QUALITY.samples[quality] * QUALITY.burst;
       _sc.clock = clock; _sc.ms = known ? QUALITY.sampleMs : 3 * QUALITY.sampleMs; _sc.quality = quality; _sc.fx = fx; _sc.fz = fz; _sc.time = time;
       const n = seaMap.update(_sc);
@@ -378,8 +384,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // ---- environment queries ----------------------------------------------------------------------
   // The air at body-local point p. `height` (m above the ground) is optional: pass it when you
   // know it (the explorer and the ship do).
-  function air(bodyId, p, out, height) {
-    return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {}, bodyId === active ? devils : null);
+  // recv (optional, P18): what feels the air, { size (m), vx, vy, vz (m/s, body-local) } (air.js airAt)
+  function air(bodyId, p, out, height, recv) {
+    return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {}, bodyId === active ? devils : null, recv || null);
   }
 
   function nearFocus(bodyId, ux, uy, uz, metres) {
@@ -482,7 +489,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   function bindEnv(bodyId, env = {}) {
     const body = BODIES[bodyId];
     if (!body) { env.air = undefined; env.ground = undefined; return env; }
-    env.air = (p, out, height) => air(bodyId, p, out, height);
+    env.air = (p, out, height, recv) => air(bodyId, p, out, height, recv);
     env.ground = (surface, out) => ground(bodyId, null, out, surface);
     env.liquid = liquidOf(bodyId);
     env.liquidOf = (surface) => liquidAt(bodyId, surface);

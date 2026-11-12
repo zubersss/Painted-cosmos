@@ -9,7 +9,7 @@
 // Away from the focus the same layers are evaluated directly, without terrain.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature } from './atmosphere.js';
-import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, gustNodes, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, wakeAt, WAKE } from './wind.js';
+import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, gustNodes, gustSubAt, GUST_SUB, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, wakeAt, WAKE } from './wind.js';
 import { weatherWind } from './weather.js';
 import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
@@ -463,6 +463,7 @@ export function aloftFactor(bodyId, z) {
 
 const _s = {};
 const _dw = new Float64Array(3);
+const _sub = new Float64Array(4);
 
 // The air at body-local point (px,py,pz).
 //   grid: the AirGrid (or null), frame: its LocalFrame, used when the point is near the focus.
@@ -471,7 +472,9 @@ const _dw = new Float64Array(3);
 // Fills o: density (kg/m^3), wind {x,y,z} (m/s, body-local), speed, gust01 (0 lull .. 1 gust),
 // turbulence (sigma of the wind speed, m/s), temperature (K), pressure (Pa), soundSpeed (m/s),
 // viscosity (Pa s), altitude (m above the base radius), height (m above ground used), near (bool).
-export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, o = {}, devils = null) {
+// recv (optional, P18): what feels the air there, { size (m), vx, vy, vz (its velocity, body-local m/s) }: the sub-second
+// eddies smaller than it are averaged away and those it meets too often fade (wind.js gustSubAt). Without it: a point at rest.
+export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, o = {}, devils = null, recv = null) {
   const body = BODIES[bodyId], atm = ATMOSPHERES[bodyId];
   const r = Math.hypot(px, py, pz) || 1;
   const ux = px / r, uy = py / r, uz = pz / r;
@@ -504,11 +507,19 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
       const fc = Math.max(WIND.minFactor, 1 + A * gust);
       const kr = (body.radius + zh) / r;      // (P12) on the sphere, zh above it: see AirGrid.update
       gust += gustFineAt(bodyId, px * kr, py * kr, pz * kr, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
+      // (P18) the sub-second eddies at this point, by Kaimal's spectrum at its height (over the canopy's displacement), weighted
+      // against the OPEN profile here (the log law of the ground's roughness, no canopy, no lee): what they add is then U10 I
+      // times Kaimal's share times fMean / fOpen, so in the lee of a wood or under a canopy the small eddies are as much smaller
+      // as the mean wind is (sigma follows the local friction velocity), and in the open they are the surface layer's
+      const U10 = Math.hypot(grid.cwe, grid.cwn), Ue = recv ? Math.hypot(grid.cwx - (recv.vx || 0), grid.cwy - (recv.vy || 0), grid.cwz - (recv.vz || 0)) : U10;
+      const fOpen = heightFactor(zh, _s.z0 > 0 ? _s.z0 : WIND.refRoughness) * aloftFactor(bodyId, zh);
+      gustSubAt(bodyId, px * kr, py * kr, pz * kr, gs, t, grid.seed, zh - 0.65 * _s.canopyH * _s.canopy01, fOpen, U10, _sub, recv ? recv.size || 0 : 0, Ue);
+      gust += _sub[0];
       gust = gust > WIND.gustMax ? WIND.gustMax : gust < -WIND.gustMax ? -WIND.gustMax : gust;
       f *= Math.max(WIND.minFactor, 1 + A * gust) / fc;
       // (P12) the fine lateral eddies, exactly at this point: the grid's wind already swings with the two
       // large octaves (_s.cross); what the whole level adds to that, as a fraction of the mean wind here
-      let ct = _s.cross + gustCrossFineAt(bodyId, px * kr, py * kr, pz * kr, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed);
+      let ct = _s.cross + gustCrossFineAt(bodyId, px * kr, py * kr, pz * kr, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, grid.seed) + _sub[1];
       ct = ct > WIND.gustMax ? WIND.gustMax : ct < -WIND.gustMax ? -WIND.gustMax : ct;
       kx = A * WIND.crossRatio * (ct - _s.cross) / Math.max(WIND.minFactor, 1 + A * gust);
       veer = A * WIND.crossRatio * ct;
@@ -532,7 +543,8 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     o.speed = Math.hypot(we, wn, wu);
     o.gust01 = clamp01(0.5 + 0.5 * gust);
     o.veer = veer;                 // (P12) the lateral speed over the mean wind: the tangent of how far the wind has swung
-    o.turbulence = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn) * fMean / (1 + zh / 300);
+    // (P18: and the sub-second eddies' share of sigma_u^2 = ((I + ...) U10)^2)
+    { const ti = (_s.I + grid.gustiness * 0.15) * Math.hypot(grid.cwe, grid.cwn), tb = ti * fMean / (1 + zh / 300), fo = heightFactor(zh, _s.z0 > 0 ? _s.z0 : WIND.refRoughness) * aloftFactor(bodyId, zh), ts = ti * Math.min(1, fMean / Math.max(fo, 1e-3)); o.turbulence = Math.sqrt(tb * tb + ts * ts * _sub[2]); }
     o.height = zh; o.near = true; dT = _s.dT;
   } else {
     windLarge(bodyId, ux, uy, uz, t, seed, _w);

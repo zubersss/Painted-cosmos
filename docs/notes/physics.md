@@ -3,6 +3,154 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P18 (sixteenth PHYSICS agent; read this block first; P17 and older below hold for everything not named here)
+
+**Where things stand.** Items 1 (the sea's open items: the sea map, the turn toward the longest fetch, refraction, the coast
+report for PAINTER), 2 (sub-second gusts), 3 (the wind grid's garbage, bit for bit) and 4 (the lab stand-in's knee) are done
+and committed. Item 5 (film and OPEN `tree-gust`, `clamber-walk-moon`, the storm frame; the PC_TIMING suite) is NOT done: the
+coordinator had not released the machine (the art pass and PAINTER 11 had it; load 13 to 16 throughout) when items 1-4 were
+done, so as told I wrote this and ended. Nothing in this block was looked at in a browser: no picture was made, the new GLSL
+was never compiled (see "For PAINTER", P18). Tests and counts: the commit that carries this note says them. Scratch:
+`/home/user/.pc-scratch/physics/p18/` (`coastsyn.mjs <root> lagoon|beach|lake [secs] [windScale]`: the sea map on synthetic
+coasts, `DUMP=u,v` for a node's radials and the depth map; `stagecost.mjs`: the builder's cost by stage; `alloc.mjs`:
+garbage a frame of physics.update and AirGrid.update (`node --expose-gc --max-semi-space-size=128`); `ident.mjs`,
+`ident2.mjs`: the wind grid's checksum over a run (item 3's proof); `subspec.mjs`, `airloop.mjs`: the point wind under one
+second; `head/`: an export of `9b5c941`, the head before P18).
+**Next, in order:** (1) item 5 when the machine is free: film and OPEN `tree-gust`, `clamber-walk-moon` (now with the knee) and
+the storm frame; run `PC_TIMING=1 node --test src/physics/` at a load under 8; (2) once PAINTER has wired the sea map (For
+PAINTER, P18), film a coast with a sheltered bay (`shore-*`, `sea-out-*`) and judge it; (3) re-run `node src/physics/coast.mjs`
+after PAINTER's coast fix and say whether the surf is back (the targets are below); (4) re-film `clamber-run-moon` with a
+boulder off the line (P17's Next 3, still open).
+**API added (additive):** `physics.air(bodyId, p, out, height, recv?)` and `env.air(p, out, height, recv?)`: `recv = { size
+(m), vx, vy, vz }`, what feels the air (default: a point at rest); `airAt(..., devils, recv)`. `physics.water()` now reports
+the sea AT p (as far as the map reaches, 2 km) and three more fields: `waveHs` (the wind sea there, m), `open` (how far the
+open sea's swell reaches there), `nodeDepth`. `physics.fields.water.local(p, out)` (water.js `localAt`: significant, foamAt,
+edge, cover, dirx, dirz, sW, s3, fetch, depth, Hs, open, heading, nodeDepth), `.surfAt(p, depth)`, `.map` (the builder:
+`.target`, `.rose`, `.outer`, `.wp`, `.stats`), `.mapVersion`; `uniforms.uPhysSeaMap` (Float32Array 17 x 51 x 4),
+`.uPhysSeaGrid`, `.uPhysSeaGrid2`. `.gauge` is kept (fetch, depth, radial, ready, final, samples, measured) and now reads the
+map (the reference sea's fetch and depth, the far rose's 24 radials). water.js: `SEA_TEX`, `WaterField.attachMap`,
+`.localAt`, `.mapVersion`; GLSL (behind `PC_PHYS_SEA_MAP`): `uPhysSeaMap`, `uPhysSeaGrid`, `uPhysSeaGrid2`, `pcPhysSeaTap`,
+`pcPhysSeaP`, `pcPhysSeaLocal`, `pcPhysSeaDir`; and, outside the define, `pcPhysWaterCrestAt(w, sea)`, `pcPhysWaterSurfAt(depth,
+sea)`. New modules: `seamap.js` (`SeaMap`, `FetchRose`, `SEA_MAP`), `coast.mjs` (`coastReport`, `COAST_TARGET`; a CLI). wind.js:
+`GUST_SUB`, `gustSubAt`, `gustSubAmplitudes`, `gustNodes`; util.js `noise3q`; near.js `TerrainGrid.nearKnownQ`; testworld.mjs
+`coastWorld`; index.js exports `SEA_TEX`, `SEA_MAP`. Lab: the stand-in's legs have knees (`LEG_THIGH`, `LEG_SHIN`).
+**Behaviour changed without a call changing:** (1) the sea is no longer one state: every surface query (`fields.water.sample`,
+`.heightAt`, `.runup`, `physics.water`, the floating explorer through bindEnv's liquid) reads the sea map where there is one;
+the trains (the uniforms PAINTER's shader reads today) stay the sea of the water nearest the focus (P16's water point) UNTIL
+something reads `uniforms.uPhysSeaMap` (a getter: PAINTER's syncPhysWater, once wired), and from then on they are the sea of the
+MOST EXPOSED water about, which the map scales down everywhere sheltered; so nothing changes in the picture until the map is
+wired, and a lagoon is never drawn with the open sea's waves (while unread, a node with a bigger sea than the focus's is that
+sea's trains made higher, never steeper than 1 in 10: the JS twins far from the focus are approximate until then); (2) the wind sea turns toward its longest
+fetch, so on Neptune's storm coast the waves at the beach come in from the open water to the south-east: at 50 s (30 m/s, P16's
+window) 0.30 m where P16 had 0.21 m, at the storm's height (55 m/s, 240 s) 0.71 m; spray at the beach again (P17's `block.mjs`,
+34-44 s, q2: 1 -> 243 drops); (3) the point air (here.air, the explorer's
+wind load, the ship's air) has sub-second gusts; `here.air.turbulence` includes their share (higher near the ground: 0.27
+-> 0.35 m/s at 2 m in a light wind), and loose.js's leaf and litter sweeps read it (leaves at the Earth gust front, q2: 1273 ->
+1328); (4) the wind grid's fields are bit for bit as before (items 2 and 3).
+
+**1. The sea (`seamap.js` new, `water.js`, `index.js`, `loose.js`).** As the brief asked: the sea varies with each point's own
+fetch and depth, turns toward the longest fetch and refracts toward the shore.
+- *The map*: two levels round the focus, the wind grid's 17 x 17 nodes 16 m apart (their ground is already sampled) and a new
+  outer grid of 17 x 17 nodes 128 m apart (2 km; sampled only when liquid is near, within the old gauge's ration; resampled on
+  a re-anchor: 128 m does not divide the 16 m lattice). At each wet node, eleven radials 15 degrees apart about upwind run over
+  both levels' liquid until dry ground (half-cell steps on the inner level: a whole cell stepped over a barrier one node thick at
+  a corner); a radial that leaves both levels wet is carried on by the far rose (24 radials, to the biome's cap, from the inner
+  node that sees most open water upwind, kept by place: the P16 gauge's job, same ration), the far shore taken as square to the
+  radial (a radial that ran to the cap: open water to the cap from anywhere). A heading's fetch: its radial and the two beside
+  it (1/4, 1/2, 1/4: about the SPM's 24 degrees).
+- *The turn toward the longest fetch*: the wind sea runs on the heading (up to 60 degrees off the wind) that makes the most of
+  U cos(phi) over the fetch that way (fetch-limited H ~ U cos(phi) sqrt(F); fully developed (U cos(phi))^2): the slanting-fetch
+  result (Donelan et al. 1992; Pettersson et al. 2010). Then windSea (SPM 1984, depth-limited) at that heading, its whitecaps
+  from its own steepness; the open sea's swell reaches it as far as its fetch toward the wind over +-45 degrees is open.
+- *Refraction and shoaling* (inner level): over the local contours (the depth's gradient), Snell (sin / c kept, c / c0 = tanh kd
+  for each period), Ks = sqrt(cg0 / cg), Kr = sqrt(cos theta0 / cos theta); waves running off a shore are left alone; one way
+  for all four trains, the wind sea's and the swell's by their energy.
+- *How it is drawn*: the trains stay one set of waves (lengths and phases: the reference sea, the most exposed node's); per node
+  the map scales the wind sea's three trains (sW) and the long one (s3), and holds the local foam level and white share; where
+  the map turns the waves the trains are read at g + warp(g), the warp the least-squares fit of grad(warp) = R(-alpha) - I over
+  the inner level (Gauss-Seidel with over-relaxation, warm-started, the free constant set so the crests move least), so the
+  crests stay continuous lines that bend; the turns die out over the inner level's last 2.5 cells. Shown eased over 3 s, kept
+  with its ground when the grid scrolls. Built in slices (marching, the sea per row, refraction, the warp, publish: about 20
+  frames) when the ground, the wind or the far rose changes, at least every 4 s.
+- *Numbers*, synthetic coasts (`seamap.test.mjs`, `p18/coastsyn.mjs`; Earth, a 21 m/s gale): **a lagoon behind a barrier**,
+  3 m deep, 140 m and more from its mouth: Hs 0.07 m (fetch 73 to 142 m), no swell, white 2.2 %, against **the open shore beside
+  it** 0.43 m (fetch 2500 m, the swell whole, white 5.9 %) in a 24 s run (0.60 to 0.66 m once the swell is up); within 100 m of
+  the mouth 0.19 to 0.26 m (the open sea's fetch through the mouth, partly a leak of the 16 m grid round the barrier's end).
+  **A long lake** (1200 x 200 m, 4 m deep) with the gale 45 degrees across it: the sea runs 21 degrees off the wind toward the
+  axis, over 344 to 621 m of fetch (141 m straight downwind). **An oblique beach** (the wind 45 degrees onshore): the waves 54
+  degrees off the shore's normal 200 m out (14 m deep), 39 at 40 m (2.5 m deep), 34 at 10 m (0.4 m deep). Snell alone would
+  turn the wind sea to about 19 degrees at 0.3 m: the warp's fit smooths a turn that changes within two cells. The twin: with the
+  map on, surfaceAt's slope is heightAt's gradient within 2e-3.
+- *Cost*: the map 0.06 to 0.17 ms a frame on average on the synthetic coasts (slices 0.04 to 0.18 ms warm; cold first builds up
+  to 16 ms, JIT and GC on a machine at load 13); physics.update at Neptune's storm coast, q2, main-thread CPU (P17's
+  `block.mjs`): 0.81 -> 0.89 ms; nothing on a dry world (no samples, no build).
+- *THE COAST REPORT for PAINTER* (`node src/physics/coast.mjs [root] [body:biome ...]`, default Earth sea_coast and Neptune
+  storm_seas; about 13 s): finds the storm at the stand (the strongest wind in 9000 s, or `--t=`), runs the physics into it with
+  the focus 2 m up the beach and prints, at the waterline and 20, 80, 200, 500 m out to sea, the fetch and the mean depth along
+  it, Hs (all of it, and the wind sea), how far the swell reaches, the white-horse fraction, which way the waves run; the far
+  rose; where the storms come from; the TARGET (the same storm over 2.5 km of water 20 m deep: the ruling) and PASS / NOT YET
+  (80 m out: fetch >= 2000 m, mean depth >= 12 m, Hs >= 0.75 x target, white >= 0.6 x target; at the waterline Hs >= 0.25 m).
+  On the tree as it stood (art pass under way):
+
+  | stand | storm | 80 m out now: water depth, fetch, mean depth, Hs, white | target Hs (wind sea + swell), white | verdict |
+  |---|---|---|---|---|
+  | Neptune storm_seas | 55.4 m/s at 240 s, strong winds from E (5), ESE (3), ENE (2); the sea lies SE of the stand | 6.4 m, 778 m (turned SE), 10.9 m, 0.71 m, 10.6 % | 3.23 m (1.83 + 2.66), 15 % | NOT YET (fetch, depth, Hs) |
+  | Earth sea_coast | 15.3 m/s at 5460 s, strong winds from ESE (9 of 17), E, ENE, SSE: offshore; the sea lies W | dry (the waterline faces a pool 2 m deep 20 m out) | 0.78 m (0.40 + 0.67), 6.8 % | NOT YET (all) |
+
+**2. Sub-second gusts (`wind.js` `GUST_SUB`, `gustSubAt`; `air.js`; `explorer.js`, `ship.js`, `index.js` pass a receiver).**
+The pattern's finest lattice is 5 m: under one second a point's wind held 0.1 to 0.2 % of its variance (measured at 2 and 10
+m), where Kaimal's spectrum puts 4 to 10 % at 10 m and 10 to 25 % at 2 m. Now four more octaves (lattices 8.7, 3.5, 1.4, 0.55
+m) are added at a POINT (airAt: here.air, the explorer's wind load, the ship), carried with the pattern (frozen turbulence:
+deterministic), each weighted by Kaimal et al. (1972) at the point's own height over the canopy's displacement, of sigma_u = I
+U10 (the surface layer's sigma_u does not change with height; I carries the roughness), along (f S / u*^2 = 105 n / (1 + 33
+n)^(5/3)) and across (17 n / (1 + 9.5 n)^(5/3)); the first octave carries only what the spectrum wants below 10 m beyond what
+the pattern (fitted at 10 m) holds there. A receiver of size D averages eddies smaller than itself (Davenport's admittance 1 /
+(1 + (2 D / lambda)^(4/3))) and an octave fades as the receiver meets its eddies 15 to 25 times a second (aliasing at 60 Hz):
+the explorer is 0.5 m, the ship's hull 8 m (sqrt of its gust area), here.air a point moving with the focus. The octaves are
+weighted against the OPEN profile at the point (the log law of its ground's roughness, no canopy, no lee), so what they add is
+U10 I times Kaimal's share times fMean / fOpen: in the lee of a wood or under a canopy the small eddies are as much smaller as
+the mean wind is (sigma follows the local friction velocity). Variance gains 1.5
+along, 2.2 across (a lattice of value noise spreads part of its variance below its band; measured). Not in the wind grid: a 16
+m grid cannot carry a 1 m eddy, and the particles and plants keep their own (the grid's fields are bit for bit as before).
+- *Numbers* (`wind.test.mjs`, a mast composed as airAt composes a point): the share of sigma_u^2 under one second against
+  Kaimal's from 1 Hz to min(U10 / 0.38 m, 20 Hz): 2 m over grass in 8 m/s 0.126 (Kaimal 0.160), 10 m 0.069 (0.071), 2 m in 16
+  m/s 0.198 (0.239), 2 m over z0 0.3 0.090 (0.122), 1 m in 4 m/s 0.094 (0.131): 0.72 to 0.97 of it along, 0.69 to 1.06 across;
+  before, 0.002. Frame-to-frame (60 Hz) rms change at 2 m in 8 m/s 0.15 m/s; over rough ground (z0 0.3) 0.21. In the game loop
+  (Node world, 2 m, a light 1.4 m/s wind): share under 1 s 0.002 -> 0.048, rms change a frame 0.0011 -> 0.0088 m/s; the explorer
+  feels 11 times what the grid alone gives under a second, the hull a fifth of what the explorer feels.
+- *Cost*: a point query 0.79 -> 4.0 us (a handful a frame: about 20 us); gustSubAt 1.3 us.
+- *Tests changed, with the reason*: the three acceleration bounds in `air.test.mjs` (the first storm at the spawn, on PAINTER's
+  ground, the runner crossing the grid) and `index.test.mjs`'s re-anchoring seam test measure the grid and the pattern it carries
+  (a step at a hop, a wake that switches, a seam): they now ask the air as a receiver 1000 m across, which averages the point's
+  eddies away; their limits are unchanged. (Counted into the bound, the eddies raised it threefold and it would no longer have
+  caught the 407 m/s^2 step it was written for.) Two more read one instant of the wind where they meant the mean, and now ask
+  the same large receiver: `flora.test.mjs` "plants shelter each other" took the wind's direction from one sample of here.air to
+  plant its wood upwind (in its 0.7 m/s breeze the lateral eddies swing one sample by tens of degrees: the wood landed beside the
+  wind); `loose.test.mjs` "Mars: a dust storm keeps sand hopping" compares the storm's wind with the fluid threshold (one instant
+  read 27.6 against 0.8 x 33.4). New: the spectrum test, and the game-loop receiver test.
+
+**3. The wind grid's garbage (`wind.js` `gustNodes`, util.js `noise3q`, near.js `nearKnownQ`, `air.js`).** gustLevelAt,
+gustCrossAt and gustFineAt were called per node with twelve numbers each: every number handed over and every answer was boxed.
+Now `gustNodes` works the cycle's numbers out once and the 289 nodes' three levels in one call through `noise3q` (noise3 through
+a scratch array, line for line), and the upwind shelter search goes through `groundQ` and `nearKnownQ` (exactly heightAt,
+nearest, known). Garbage (Node world with bumps, gale x3.3, walking, 60 Hz; heap between clean frames): AirGrid.update 383 ->
+39 KB a frame, physics.update 455 -> 112 KB. **Bit for bit**: the same checksum (a4ac96f7) over 4.69 million numbers, every
+grid field and here.air over 1800 frames through a wood's wakes and two re-anchors, on the head before P18 (`9b5c941`) and
+after item 3; after item 2 the grid fields again (fafb4f5e). New test: gustNodes is `Object.is` each of the three at 5400
+points on three worlds, noise3q is noise3 at 2000. **A correction**: item 3's commit message (`45338f0`) quotes the checksum
+d0e1909c and 446 -> 103 KB; those came from a run whose test world was handed to createPhysics wrongly (its ground was NaN, so
+the grid's we, wn and shel were NaN: only gust, cross, fine and I were real numbers). The numbers in this paragraph are from
+the corrected run.
+
+**4. The lab stand-in's knee (`src/physics/three/painted-lab.js`, mine).** Each leg is a thigh (0.43 m) and a shin (0.40 m) from
+the hips to the ankle at the top of the boot, placed by the two-bone solution in the plane of the leg and the way ahead, the
+knee bending forward, with a knee cap; checked in Node (the bones keep their lengths, the knee lies ahead of the hip-ankle
+line; standing it bends about 9 degrees, a planted foot 0.3 m ahead under hips 0.1 m low 50, a swing foot 0.25 m up 95). Not
+seen: no strip was made (item 5).
+
+**5. Not done**: the strips `tree-gust`, `clamber-walk-moon`, the storm frame (not filmed, not opened); the PC_TIMING suite (not
+run: the load stayed 13 to 16). The GLSL of the sea map has never been compiled.
+
 ## Hand-over P17 (fifteenth PHYSICS agent; read this block first; P16 and older below hold for everything not named here)
 
 **Where things stand.** Item 1 (quality 2 confirmed, and made cheaper at every quality), item 2 (the boulder met off the
@@ -1157,7 +1305,8 @@ physics.update(dt, {
 ### Environment queries (cheap; pass an `out` object to avoid allocation)
 
 ```js
-physics.air(bodyId, p, out?, heightAboveGround?) ->
+// (P18) a fifth argument, recv = { size (m), vx, vy, vz }: what feels the air (sub-second eddies smaller than it average away)
+physics.air(bodyId, p, out?, heightAboveGround?, recv?) ->
   { density (kg/m3), wind:{x,y,z} (m/s, body-local), speed, gust01 (0 lull .. 1 gust),
     turbulence (sigma of wind speed, m/s), temperature (K), pressure (Pa), soundSpeed (m/s),
     viscosity (Pa s), altitude (m above base radius), height (m above ground used), near (bool) }
@@ -1189,6 +1338,7 @@ physics.ground(bodyId, unitDir, out?, surface?) ->        // pass `surface` if y
     z0 (m), imprint (0..1), density, grain, liquidDepth (m), wetness01, snowDepth, temperature,
     canopy01, canopyHeight, moist, fog, dustSource }
 
+// (P18) the sea AT p (the sea map, within 2 km of the focus): significant, whitecapCover, fetch, depth, dir are local; + waveHs, open, nodeDepth
 physics.water(bodyId, p, out?) ->                         // the liquid surface and its wind waves
   { present, height (elevation at p now, m), significant (Hs, m), period (s), length (m), speed (m/s),
     steepness, whitecap01 (0..1 how steep the sea is), whitecapCover (share of the surface that is
@@ -1669,6 +1819,17 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+### P18, first (sixteenth PHYSICS agent)
+- **Nothing to wire.** What changes under the same calls: (1) `physics.water(bodyId, p)` reports the sea at p (the sea map):
+  a sheltered bay is calmer than the open shore beside it, and `.fetch`, `.depth`, `.significant`, `.whitecapCover`, `.dir`
+  are that place's; new `.waveHs`, `.open`, `.nodeDepth`. The floating explorer rides the local sea through bindEnv as before.
+  (2) The point air has sub-second gusts (Kaimal at the point's height): `here.air.speed` and `.gust01` move under a second
+  now, so wind noise in the audio can follow them; `here.air.turbulence` is a little higher near the ground (it includes them).
+  (3) `physics.air(bodyId, p, out, height, recv?)` and `env.air(p, out, height, recv?)` take an optional receiver `{ size, vx,
+  vy, vz }`: the explorer and the ship pass their own inside the step functions; if your code asks the air for a body (a
+  camera shake, a flag), pass its size and velocity, or leave it out for a point at rest. (4) `physics.stats.fetchSamples` and
+  `.msFetch` now count the sea map (its outer level and far rose, within the old gauge's ration).
 
 ### P17, first (fifteenth PHYSICS agent)
 - **physics.setQuality may follow the render tier** (the hardening review's P13, `physics-quality-never-follows-tier`):
@@ -2241,6 +2402,57 @@ What follows is what a physicist would object to, and it is all in the assists.
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P18, first (sixteenth PHYSICS agent): wire the sea map; the coast fix's targets and how to prove them
+
+**A. Wire the sea map** (until you do, your shader draws one sea everywhere, the sea of the water nearest the focus, as in P16:
+nothing in your picture changed in P18. The first read of `physics.fields.water.uniforms.uPhysSeaMap` (your syncPhysWater below)
+moves the reference trains to the MOST EXPOSED water about, which the map then scales down in every sheltered place: so wire
+all of it in one go). The JS twins already read the map. Exactly:
+1. `src/render/shared.js`, beside `PHYSW`:
+   ```js
+   function seaTex(data) { const t = new THREE.DataTexture(data || new Float32Array(17 * 51 * 4), 17, 51, THREE.RGBAFormat, THREE.FloatType); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; }
+   ```
+   add to `PHYSW`: `uPhysSeaMap: { value: seaTex() }, uPhysSeaGrid: { value: new THREE.Vector4(0, 0, 16, 0) }, uPhysSeaGrid2: { value: new THREE.Vector4(0, 0, 128, 0) },`
+   and in `syncPhysWater(W)`: in the `!u` branch `PHYSW.uPhysSeaGrid.value.w = 0; PHYSW.uPhysSeaGrid2.value.w = 0;`; after the
+   other copies
+   ```js
+   if (u.uPhysSeaMap) {
+     if (PHYSW.uPhysSeaMap.value.image.data !== u.uPhysSeaMap) PHYSW.uPhysSeaMap.value = seaTex(u.uPhysSeaMap);   // the same array every frame: made once
+     if (W.mapVersion !== _seaV) { PHYSW.uPhysSeaMap.value.needsUpdate = true; _seaV = W.mapVersion; }
+     PHYSW.uPhysSeaGrid.value.fromArray(u.uPhysSeaGrid); PHYSW.uPhysSeaGrid2.value.fromArray(u.uPhysSeaGrid2);
+   }
+   ```
+   with `let _seaV = -1;` beside `_noWake`. (W is `physics.fields.water`: it has `uniforms` and `mapVersion`.)
+2. `src/render/materials.js`, `makeWaterMaterial`: `defines: { PC_PHYS_SEA_MAP: 1 }` in the ShaderMaterial's options (the
+   uniforms come with `...PHYSW`). Without the define the chunk is exactly as before.
+3. `WATER_VERT`: before `float shoal`, `vec4 sea = pcPhysSeaLocal(vBody);` and in `shoal` read `sea.x` for `uPhysWaterSea.x`.
+   (pcPhysWaterD, pcPhysWaterLong and pcPhysWaterRunup read the map themselves.)
+4. `WATER_FRAG` `main()`: after `vec3 wv = pcPhysWaterD(vBody, along) + vWake;` add `vec4 sea = pcPhysSeaLocal(vBody); vec2 sdir =
+   pcPhysSeaDir(vBody);` and below it read `sea` for every `uPhysWaterSea` (hs, wavy, rough, capFar, capTh, galeW, swash, gale,
+   farSea, capTh2), `pcPhysWaterCrestAt(wv, sea)` for `pcPhysWaterCrest(wv)`, `pcPhysWaterSurfAt(vDep, sea)` for
+   `pcPhysWaterSurf(vDep)`, and `sdir` for `uPhysWaterDir` (in `Dw`, `sAlong`, `D3`: `pcPhysWaterDir(sdir)`, `dot(wv.yz, sdir)`).
+   The first line (`pcPhysWaterRunup`) reads the map itself.
+5. **Not compiled by me** (no browser was mine in P18): I checked the chunk's text in Node (every map uniform inside the define,
+   names present, the JS twin's slope against its height) but no GPU has seen it. If it fails to compile, the define is the
+   switch. The texture: 17 x 51, row-major, rows 0-16 the inner level (x wind-sea scale, y long-train scale, z the foam level m,
+   w the white share), 17-33 the inner warp (x, z m), 34-50 the outer level; read with texelFetch, so no float filtering is needed.
+What it should look like once wired: in a bay behind a spit the waves are lower and fewer break than on the open shore beside
+it, and there is no swell in it; near a beach the crests come round toward the shore; on a long lake the sea runs along it.
+
+**B. The coast fix** (the coordinator's ruling: the coasts face open water, at least about 2 km of fetch at about 20 m deep
+toward the storm wind). Prove it with `node src/physics/coast.mjs` (from the repository root; `--json` for numbers only; exit
+code 0 only when every stand passes). The marks, 80 m out from the waterline nearest the stand: fetch >= 2000 m, mean depth
+along it >= 12 m, Hs >= 0.75 x the target, white >= 0.6 x the target; at the waterline Hs >= 0.25 m. The targets (this storm
+over 2.5 km of water 20 m deep), and where the storms come from:
+- **Neptune storm_seas**: the storm at the stand is 55 m/s (240 s); the strong winds come from the E (with ESE and ENE). Aim for
+  **Hs about 3.2 m (wind sea 1.8 m, swell 2.7 m) and 15 % white**; the pass marks 2.4 m and 9 %. Now: the beach faces SE onto
+  water 6 m deep with 0.8 km of fetch; Hs 0.71 m 80 m out. The open side must face east: 2 km and more of water about 20 m deep
+  east of the beach (the swell comes up fully from 2 km of fetch).
+- **Earth sea_coast**: the storm at the stand is 15 m/s (5460 s), from the ESE (and E, ENE): today offshore. Aim for **Hs about
+  0.8 m (wind sea 0.4 m, swell 0.7 m) and 7 % white**; the pass marks 0.6 m and 4 %. Now: the waterline faces a pool (dry 80 m
+  out); the open sea is 300 m and more to the west, downwind. A beach facing the ESE onto open water is what passes.
+The report also prints the far rose (fetch by compass direction) so you can see where the open water lies from the stand.
 
 ### P17, first (fifteenth PHYSICS agent): the gallery's gait formula, and the puff on the meadow
 - **`strideBob` instead of the copy** (you asked, through the coordinator): in `src/art/gallery.js` `gaitPose`, the twelve
@@ -3093,6 +3305,23 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     PC_TIMING, and a lost optimisation shows first as garbage and deopts, not as a failed test.
 38. **(P17) A step raises no puff from a living sward** (KICK.stepDust 0.05): grass and bare rock give none; the puff is
     the visible part of loose fines, and a meadow has too few to show.
+39. **(P18) The sea is raised where it is.** Every node of two levels round the focus (16 m and 128 m apart) has its own fetch
+    (eleven radials over the liquid, carried on by a far rose) and depth, and its own wind sea, whitecaps and share of the
+    swell. The trains stay one set of waves, those of the most exposed node, scaled per node: a sheltered bay keeps the open
+    sea's wavelengths at its own lower height (calm, if not short). Per-node wavelengths would need per-node phases, which a
+    continuous surface cannot have without a warp of its own.
+40. **(P18) Waves run where they grow most.** The wind sea's heading is the one (up to 60 degrees off the wind) that makes the
+    most of U cos(phi) over the fetch that way (slanting fetch); in shallow water it refracts by Snell over the local contours
+    and shoals (Ks, Kr); the four trains share one way, the wind sea's and the swell's by their energy.
+41. **(P18) A turn of the sea is a warp of where the trains are read**, the least-squares fit of grad(warp) = R(-alpha) - I,
+    so that crests stay continuous lines; turns die out at the inner level's edge, and a new warp keeps the crests where they
+    were on average. Smoothing a turn that changes within two cells is the price.
+42. **(P18) The sub-second eddies live at a point, not on the grid**: Kaimal's spectrum at the point's height, of sigma_u = I
+    U10, felt by a receiver of a given size and speed (admittance, encounter frequency). Tests of the grid and the pattern ask
+    the air as a receiver larger than every eddy, so they keep testing what they were written for.
+43. **(P18) Hot paths hand numbers through arrays** (gustNodes, noise3q, groundQ, nearKnownQ), and a change for speed is
+    proved bit for bit by a checksum over a whole run before and after (with a world that is not NaN: check the fields).
+
 
 ## Needs from the others
 
