@@ -822,6 +822,52 @@ test('P22 the crest: a run up a crater rim reads its crest and keeps its feet on
   }
 });
 
+// (P24) A KNIFE EDGE: level to 10 m, a rise at a1 degrees to H1, a crater's inner wall falling at a2 degrees by D (more than a
+// clamber in a look), a level floor.
+function knifeEdgeRun(g, a1, H1, a2, D, v, hz) {
+  const k1 = Math.tan(a1 * Math.PI / 180), k2 = Math.tan(a2 * Math.PI / 180), xT = 10 + H1 / k1, xF = xT + D / k2;
+  const h = (x) => x < 10 ? 0 : x < xT ? (x - 10) * k1 : x < xF ? H1 - (x - xT) * k2 : H1 - D;
+  const hs = (x) => x < 10 ? 0 : x < xT ? k1 : x < xF ? -k2 : 0;
+  const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z), ux = d.x / l, uz = d.z / l, x = Math.atan2(ux, uz) * R, s = hs(x), n = Math.hypot(1, s);
+    return { radius: R + h(x), normal: { x: (ux - uz * s) / n, y: d.y / l / n, z: (uz + ux * s) / n }, liquidRadius: 0 }; };
+  const env = { sample, gravity: g, ground: (s, o) => Object.assign(o, { material: 'rock', friction: 0.9, kinetic: 0.7, foothold: 0.4, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 }) };
+  const st = { p: V(Math.sin(2 / R) * R, 0, Math.cos(2 / R) * R), v: V(v, 0, 0), grounded: true };
+  const o = { edge: 0, air: 0, thrown: 0, far: 0, finite: true, xF };
+  let rel = 0, was = true;
+  for (let i = 0; i < hz * 10; i++) {
+    const t = Math.atan2(st.p.x, st.p.z);
+    stepExplorerBody(st, { wish: V(v * Math.cos(t), 0, -v * Math.sin(t)), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env);
+    const x = Math.atan2(st.p.x, st.p.z) * R, r = len(st.p); o.far = x; o.finite = o.finite && finite(st);
+    if (x > 10 && x < xT && st.grounded) o.edge = st.phys.speedGround;   // (the pace on the last of the rise)
+    if (!st.grounded) { if (was) rel = r; o.air++; o.thrown = Math.max(o.thrown, r - rel); }
+    was = st.grounded;
+    if (x > xF + 6) break;
+  }
+  return o;
+}
+
+test('P24 the knife edge (the coordinator\'s ruling): a run up a gentle rise to a crater\'s inner wall keeps its pace to the edge and may leave the ground off the wall, but is never thrown up (Moon, Mars, Earth; 60 and 30 Hz; a 60 degree ridge on the Moon)', () => {
+  // P22 read the top of a climb whose far side falls more than a clamber in a look as a crest to be followed down at its
+  // steepest followable slope, gravity alone turning the hips: sqrt(2 g stroke) / (s1 + clamber / look). Gentle rises to the
+  // game's crater walls were run at 1.1-1.4 m/s for 2-3 s (here 1.4-1.8 m/s at the edge on the Moon and Mars, 2.1-2.7 on
+  // Earth); PILOT's verdict: too heavy. The ruling: don't throw the runner up. The hips, rising at v s1, are turned to level
+  // within the fold by gravity alone, v <= sqrt(2 g fold) / s1 (x crestMargin); beyond the edge the ground falls away and a
+  // flight off it is allowed (the crater-wall ruling). Measured: 3.4-4.9 m/s at the edge, thrown up 0.09 m at most.
+  for (const [name, g] of [['Moon', 1.62], ['Mars', 3.71], ['Earth', 9.81]]) for (const hz of [60, 30]) for (const [a1, H1, a2, D] of [[10, 1.5, 55, 4], [6, 1, 50, 3]]) {
+    const o = knifeEdgeRun(g, a1, H1, a2, D, 7.4, hz), tag = `${name} ${hz} Hz, ${a1} degrees ${H1} m up, a ${a2} degree wall ${D} m down`;
+    assert.ok(o.finite, `${tag}: NaN`);
+    assert.ok(o.edge > 3.0, `${tag}: ${o.edge.toFixed(2)} m/s at the edge`);
+    assert.ok(o.thrown <= 0.15, `${tag}: thrown up ${o.thrown.toFixed(3)} m off the edge (${o.air} steps in the air)`);
+    assert.ok(o.far > o.xF + 3, `${tag}: down the wall and on (to ${o.far.toFixed(1)} m)`);
+  }
+  // (a steep ridge climbed at a crawl: the hips' rise is the climb's, and it is turned within the fold; P22's comment: a 60
+  // degree ridge on the Moon, climbed at 2 m/s, threw the body 0.5 m up off its crest)
+  for (const hz of [60, 30]) {
+    const o = knifeEdgeRun(1.62, 60, 3, 60, 3, 7.4, hz), tag = `Moon ${hz} Hz, a 60 degree ridge`;
+    assert.ok(o.finite && o.thrown <= 0.15 && o.far > o.xF + 3, `${tag}: thrown up ${o.thrown.toFixed(3)} m, on to ${o.far.toFixed(1)} m (the foot of the wall ${o.xF.toFixed(1)})`);
+  }
+});
+
 test('P22 a run across the field of low boulders on the Moon keeps its feet down and hardly braces: the way ahead is read without gaps (PILOT\'s profile and steep normals; 60 and 20 Hz)', () => {
   // Until P22 (a) the way ahead jumped forward as the pace and its far point grew, and ground between was never read, and
   // (b) the rise of a face was counted over the line of the slope being run on, carried 8 m on: climbing the flank of one

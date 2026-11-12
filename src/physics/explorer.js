@@ -466,9 +466,18 @@ function wayAt(W, d) {
 // pulled by gravity and the limbs on the edge), x crestMargin. The near side counts only where it rises more than a
 // clamber (a rim, a hill's brow) or the run is already climbing it; an edge falling away from level ground counts with
 // s1 = 0, unless it falls more than a clamber in a look (a fall).
+// (P24, the coordinator's ruling on knife edges) At a KNIFE EDGE (the top of a climb whose far side falls more than a clamber
+// in a look: a crater's inner wall) the far side is a fall, not ground to follow, and the law is only: DON'T THROW THE RUNNER
+// UP. The hips, rising at v s1, are turned to level within the legs' fold by gravity alone (nothing beyond the edge to hold):
+// v <= sqrt(2 g legFold) / s1, x crestMargin (on the Moon 4.5 m/s at a 14 degree rise, 6.3 at 10, 0.64 up a 60 degree
+// ridge; on Earth 11 at 14 degrees). Past the edge the body may leave the ground where the ground falls away (the
+// crater-wall ruling; Decision 50): low-gravity physics, as a runner off a crater wall on the Moon. Until P24 the knife edge
+// was read as a crest followed down its far side at its steepest followable slope (sqrt(2 g stroke) / (s1 + clamber /
+// look)): 1.1-1.4 m/s for 2-3 s on the gentle rise to a crater's inner wall (PILOT's verdict: too heavy). Rounded crests and
+// rims whose far side falls within a clamber in a look are read as before.
 function wayCrest(W, h0, vh, gE, ab, ts, T) {
   if (!W || !(W.n > 2)) return 1e9;
-  const L = T.look, st = (T.legFold + T.legReach) * 2, k = Math.sqrt(Math.max(0.1, gE + T.gripAccel) * st) * T.crestMargin, k0 = Math.sqrt(Math.max(0.1, gE) * st) * T.crestMargin;
+  const L = T.look, st = (T.legFold + T.legReach) * 2, k = Math.sqrt(Math.max(0.1, gE + T.gripAccel) * st) * T.crestMargin, kn = Math.sqrt(2 * Math.max(0.1, gE) * T.legFold) * T.crestMargin;
   let pace = 1e9;
   // (at each sample and half way to the next)
   for (let j = 0; j < 2 * W.n - 1; j++) {
@@ -483,7 +492,7 @@ function wayCrest(W, h0, vh, gE, ab, ts, T) {
     const sn = (hc - hb) / L, drop = hc - ha;
     // (what cannot hold the run back now, at the most the near side could count, is not read further: the walker gains
     // less than a metre a second in a step)
-    if (!((drop > T.clamber ? k0 : k) / Math.max(0.05, Math.max(sn, Math.min(ts, 2 * sn), 0) + Math.min(drop, T.clamber) / L) < vh + 1)) continue;
+    { const sm = Math.max(sn, Math.min(ts, 2 * sn), 0); if (!((drop > T.clamber ? kn / Math.max(0.05, sm) : k / Math.max(0.05, sm + Math.min(drop, T.clamber) / L)) < vh + 1)) continue; }
     // (the hips ride the near side only where it rises more than a clamber: a rock or a mound lower than that is crossed
     // within the stroke, the hips raised in time (the tube), and its face is read and tried (P16, P17); only its fall counts)
     let lo3 = Math.min(hc, hb); for (let i = (j >> 1); i >= 0 && W.d[i] >= d - 3 * L; i--) if (W.h[i] < lo3) lo3 = W.h[i];
@@ -491,13 +500,14 @@ function wayCrest(W, h0, vh, gE, ab, ts, T) {
     // (or where the run is already on it, climbing at its slope: ts, the rise of the hips (or the ground's trend) per metre)
     const s1 = hc - lo3 > T.clamber || ts > 0.5 * sn ? Math.max(sn, Math.min(ts, 2 * sn)) : 0;
     // (a drop deeper than a clamber in a look is a fall, not ground to follow: from level ground it is not slowed for; at
-    // the top of a climb it is a knife edge, and the climb is: the hips must be turned from it within the stroke, whatever
+    // the top of a climb it is a knife edge, and the climb is: the hips must be turned from it within the fold, whatever
     // is beyond (a 60 degree ridge on the Moon, climbed at 2 m/s, threw the body 0.5 m up off its crest))
     if (drop > T.clamber && !(s1 > 0)) continue;
     const sig = s1 + Math.min(drop, T.clamber) / L;
     if (!(sig > 0.05)) continue;
-    // (beyond a knife edge there is nothing within reach to hold: gravity alone turns the hips)
-    const vc = (drop > T.clamber ? k0 : k) / sig;
+    // (beyond a knife edge there is nothing within reach to hold: gravity alone turns the hips, and only their rise counts:
+    // P24, don't throw the runner up)
+    const vc = drop > T.clamber ? kn / Math.max(0.05, s1) : k / sig;
     const p = Math.sqrt(vc * vc + 2 * ab * Math.max(0, d - L));
     if (p < pace) pace = p;
   }
