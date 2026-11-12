@@ -23,6 +23,178 @@ is judged at the top tier from now on.
 
 ---
 
+## Review 7 (code): everything the other roles committed since `a671ca7` (2026-11-12, ninth PILOT agent)
+
+A lead developer's code review, Node and reading only: the art pass held the machine's two browsers
+(load 9 to 13), so nothing here was run in a browser. Read: PHYSICS 15 and 16 (`d186b65`, `c1c8e2c`,
+`45338f0`, `f6eaa17`, `5f480bf`; the sea map itself came in the coordinator's snapshot `11f91f8`)
+and PAINTER 11 (`90025a3`, `46fcbf8`, `8b058d7`, snapshots `0b76f2c`, `d874259`, `5b083c1`; the
+8-bit fallback came in snapshots), as `git diff a671ca7 HEAD` per file. Everything measured on a
+clean export of `98edfcd` (`git archive`), in my scratch `/home/user/.pc-scratch/pilot/run9/`.
+The two scripts that prove findings 1 to 3 are kept in `docs/lead/evidence/review7/` and take
+the trees to compare as arguments (`node docs/lead/evidence/review7/ghostfield.mjs <tree> [<tree>]`,
+`seamap-seams.mjs` likewise): run them before and after a fix. Ranked by severity. Line numbers are
+at `98edfcd`.
+
+**1. MUST FIX (PHYSICS), `src/physics/explorer.js:365-388` (`ghostCrosses`): the ghost run overwrites
+the walker's own step.** P17's ghost runs `stepExplorerBody` from inside the walker's `stepOnce`
+(`wayAhead`, :896, then `probeTrial`, then `ghostCrosses`). The ghost's `stepOnce` writes the
+module's scratch: `_dir` (:572, :777, :843: the walker's up at its new place) and, through
+`genv.ground` (:370, which passes the caller's `out`, which is `_gnd`), the walker's ground `G`
+(:589). After `wayAhead` returns, the walker's step still reads both: `_dir` is the normal the
+velocity is laid along whenever the walker is clambering (:898-903, `q1 = 0` when `B.grip` or on a
+step face), and `G` gives `B.material`, `B.friction`, the boot's sink and its dust (:1027-1032).
+The ghost runs on the great circle through +z (`st.p = (sin t, 0, cos t) r`), so after a trial
+`_dir` is about (0, 0, 1) whatever the place on the world.
+*Failure:* running through a boulder field (a grip on one boulder while the next one is tried),
+anywhere but the x-z plane. Measured with `ghostfield.mjs` (PILOT's `scrambleSample`, as
+`src/core/sim.js:509` builds the explorer's ground; eight boulders 0.8 to 1.2 m in a row; 6 m/s;
+a 4 km sphere): at the place (0.3, 0.9, 0.3), Earth gravity, the worst speed lost in one step is
+**2.17 m/s** (0.49 with the fix below), the velocity has up to **1.13 m/s radial** while the feet
+are on level ground (0 with the fix) and the run ends 0.91 m off its line (0); Moon gravity
+1.71 m/s, 0.88 m/s, 2.35 m off the line; at (0.8, 0.2, -0.55) 0.74 and 0.58 m/s radial. On the
+test plane at Earth gravity, where both runs take the same path, 17 grounded steps report a material that is not
+the ground underfoot against 11 with the fix (the 11 are the script's own timing at a boulder's
+edge): footstep sound, boot sink and dust from the far point's surface for those frames. *Why the
+tests pass:* PHYSICS' P17 test runs in the x-z plane through +z, the plane the ghost runs in, so
+the overwritten `_dir` is within 0.005 of the right one (radial speed 0.02 m/s there), and its
+single boulder is never gripped while a trial runs (the test, turned off that plane by any of
+three rotations, still passes; scratch `ghost2.mjs`).
+*Fix (exact; four lines in `ghostCrosses`):*
+```js
+const _gGnd = {};     // module level, beside _gT: the ghost's own ground (_gnd belongs to the step that runs the ghost)
+// in ghostCrosses:
+genv.ground = P.ground ? (s, out) => P.ground(Q.surf, _gGnd) : undefined;
+const dx0 = _dir.x, dy0 = _dir.y, dz0 = _dir.z;
+try { for (let k = 0; k < 900; k++) { /* as now */ } } finally { _dir.x = dx0; _dir.y = dy0; _dir.z = dz0; }
+```
+Checked on a copy (`fixed2`): the boulder field then runs exactly as a copy that saves and restores
+both around the whole `wayAhead` call, and PHYSICS' `explorer.test.mjs` passes 36 of 36. While
+there (cost, same lines): `Q.surf` never changes during a trial, so call `P.ground(Q.surf, _gGnd)`
+once per trial and let `genv.ground` return `_gGnd`. With physics' own `ground()` (through
+`bindEnv`, Moon, 30 Hz, 7.4 m/s) one frame of the explorer took up to 1.0 ms of CPU during trials
+(two sub-steps, one trial each) against 0.02 ms without reading ahead; with a trivial ground the same
+trials take 0.13 ms, so the ground call is most of it. Add a regression test: the P17 run with a
+row of boulders and the scene turned off the x-z plane, asserting no radial speed over 0.05 m/s
+while grounded.
+
+**2. SHOULD FIX (PHYSICS), `src/physics/seamap.js:198` (`SeaMap.rebase`): after every re-anchor the
+waves' crests slide.** `rebase` moves the far point but leaves the published `target` (`x0, z0,
+x02, z02, refX, refZ`) in the old frame. The next build's warp solver warm-starts by node offset
+from `target.x0` (:460): after a re-anchor of 384 m that offset is about 24 cells, so the warp
+starts cold, and `_publish` (:484-487) then picks the warp's free constant afresh. The shown warp
+eases to the new constant over `SEA_TEX.ease` (3 s), and the crests move with it. *Failure:* every
+384 m of travel along a shore where the map turns the waves. Measured (`seamap-seams.mjs`, part B:
+an oblique beach, a walk along it at 6 m/s, the warp at a place 50 m out): the warp moved 14.6 m and
+17.1 m in the 5 s after the two re-anchors, 2.9 m in a typical 5 s. *Fix:* in `rebase`, `const T =
+this.target; T.x0 -= X; T.z0 -= Z; T.x02 -= X; T.z02 -= Z; T.refX -= X; T.refZ -= Z;`. Nothing
+else reads those until the next build overwrites them (`attachMap` returns early while
+`T.version` has not moved; `localAt` indexes `T.info` by the shown grid). Checked on a copy: 2.4 m
+and 2.3 m after the re-anchors, 2.8 m typical; the one-frame steps of finding 3 are unchanged (a
+separate cause).
+
+**3. SHOULD FIX before PAINTER wires the map (PHYSICS), `src/physics/water.js:321-329` (`shiftArr`),
+`:384-397` (`attachMap`), `:461` (`_seaAt`) and its GLSL twin `pcPhysSeaP` (:811): the shown sea
+map steps in one frame at fixed places.** Three causes, all at the frame a build is published after
+the focus has moved: (a) the inner level, its edge and its blend band (`SEA_TEX.band`, 1.5 cells,
+:314) move by whole 16 m cells, 1.5 cells between builds at a walk and 2.3 at 50 m/s in a ship (the
+0.75 s soonest), so a place near the inner level's edge goes from mostly the inner level to all the
+outer one in a frame; (b) nodes new to a level take the build's value at once (`shiftArr` fills them
+from the target) instead of easing from what was shown there; (c) after a re-anchor the outer
+level's lattice moves by X mod 128 m (X is a multiple of 16), so `attachMap` snaps the whole outer
+level (`this._mo.set(T.outer)`, :395). Near a shore the two levels can disagree by a factor of two
+(the outer level's 128 m cells do not see a barrier), and the warp exists only on the inner level,
+so a place that leaves it loses its turn at once. Measured (`seamap-seams.mjs`, part A: a coast
+with lagoons behind barriers, a walk along it at 6 m/s for 150 s, `physics.water()` at a place
+60 m out and one in a lagoon): nine one-frame steps over 0.02 m or 2.9 degrees, every one on a
+frame that published a build; the worst: 60 m out the significant height fell **0.242 m** in a
+frame (the map's scale there 0.997 to 0.699); in the lagoon the waves turned **27.9 degrees** in a
+frame, and Hs fell 0.128 m on the frame the first build after a re-anchor landed (0.9 s after it).
+On frames without a build the 99th percentile step is 0.0036 m. Not seen in the game yet (no shader
+reads the map), but it reaches `physics.water()`, `loose.sea`'s spume and surf at the focus, and it
+will be painted the day PAINTER wires the map (AB 7: no pop, never swim). *Fix:* (a) blend the
+levels by distance from a centre that moves continuously: a new uniform (say `uPhysSeaFocus`, the
+focus in frame metres, which `WaterField.update` already receives as `fx, fz`), `e` measured from it
+in `_seaAt` and `pcPhysSeaP`, the band kept inside the published grid for the largest move between
+builds (about 2.5 cells), and the warp's taper on the same band; (b) in `shiftArr`, give a node new
+to a level what is shown at its place now (the old inner value, else the old outer level's bilinear
+value there; warp 0) and let the existing ease carry it to the target; (c) in `attachMap`, on a
+shift that is not whole cells, resample the old shown outer level at the new nodes (bilinear)
+instead of snapping. A test: part A's places, asserting no step on a build frame over five times
+the 99th percentile of the other frames.
+
+**4. Checked, no finding.**
+- *physics.setQuality follows the tier* (PHYSICS' P17 ask): `src/main.js:213` at boot and `:274` at
+  every change of the controller, the same 0 / 1 / 2 as `painter.setQuality`; `?quality=N` pins
+  both. `setQuality` only sets the number and the particles' capacity, so its place after
+  `physics.warmUp` (:182) does not matter. `tests/cost.mjs:50` forces only the painter's tier, but
+  it runs with `kits=0` and fair weather, so physics' tier changes nothing it counts.
+- *PAINTER's prewarm hooks with PILOT's caller* (`src/main.js:321-347`): `world.prewarm()` awaits
+  the kits' import only while it is pending, builds the invisible group and returns; PILOT then
+  calls `painter.prewarm(scene, camera)` with only microtasks between, so the compile always lands
+  well inside the 30 updates before `dropWarm` (`src/world/index.js:227`). three r187's `compile()`
+  gathers materials with `scene.traverse` (`vendor/three/three.module.js:17283`), so the invisible
+  group is compiled. `painter.prewarm` binds `post.rtScene`, so the programs are keyed as the scene
+  pass draws them; `post.warm()` lays both brush sector counts and the sheet. PILOT's fallback
+  branch (no painter hook) is unchanged. Consistent with the coordinator's 0 links after ready.
+- *`renderer.outputColorSpace = LinearSRGB` changes nothing PILOT owns*: no painted shader includes
+  `colorspace_fragment` or calls `linearToOutputTexel`, so the canvas holds what the sheet writes;
+  LinearSRGB's drawing buffer space is sRGB in the vendored three (`three.module.js:6821-6831`), so
+  the canvas stays sRGB; the sketch capture (`src/core/game.js:340-356`) draws the canvas into a 2D
+  canvas, so it takes the same pixels; the HUD is DOM and `src/ui/paint.js` draws 2D canvases; the
+  only three materials PILOT owns are in `src/core/stubs`, used only when the real painter is not
+  (then `createPainter` never runs); test screenshots read the page or the canvas. Not checked by a
+  pixel comparison (no browser in this block).
+- *Log depth in the vertex shader* (`src/render/chunks.js`): the same window depth as three's
+  fragment write (`log2(1 + w) * logDepthBufFC / 2` both ways); three's vertex chunk declares no
+  `logDepthBufFC` (`three.module.js:413`), so `VERT_PARS`' own declaration is no duplicate; GLSL ES
+  3.00 makes highp mandatory in fragment shaders, so the uniform's precision matches. The known
+  weakness, a triangle crossing the near plane with an interpolated depth, is PAINTER's stated
+  trade-off (`PC_FRAG_LOGDEPTH`); not seen by me.
+- *The 8-bit fallback*: every reader of the packed target unpacks it (prep, brush, sheet graphite
+  and lightning, the kits' glaze, the sky's glaze times 8, the stars' glaze); the keep pass copies
+  the packed depth and the water's reflection multiplies it by 32. `floatFallback` is set in
+  `Post`'s constructor, so the property `createPainter` returns is final when `src/main.js:90`
+  reads it.
+- *Gap 17*: the four reversed `smoothstep` edges are now `1 - smoothstep(lo, hi, x)` (the same
+  values); the three `atan(0, 0)` are guarded; the only other two-argument GLSL `atan` in `src`
+  (`src/physics/flora.glsl.js:164`) has a first argument that is zero only when its second is 1.
+- *Gallery and gaitPose*: `strideBob` is what PHYSICS' test pins to the body's bob;
+  `window.__pcModel` is gallery-only; `models.js`' reversed `sstep` is JS (clamped).
+- *Sub-second gusts* (`wind.js` `gustSubAt`, `air.js`): no NaN or Infinity path (a NaN height or
+  share falls back to the minimums; a NaN or negative receiver size or speed makes the octave's
+  fade NaN and it is skipped); a function of place, time and seed, so deterministic.
+  `gustNodes` is the three per-node functions' arithmetic, pinned by PHYSICS' `Object.is` test.
+- *The sea map's cost* (each stage alone, best of 30, quality 2, open water 2 km about: the
+  longest march): inner march 0.26 ms a frame, outer 0.25, refraction 0.10, twelve sweeps 0.05, on
+  this 2.1 GHz core. *Garbage*: physics.update at the Earth spawn's storm (6,250 particles,
+  quality 2) allocates 1 to 33 KB a frame (P17 measured 478 to 548 KB in storms before its fixes).
+- *No NaN path in the map*: `windSea` returns zeros for no wind, no fetch or no depth, and
+  deep-water values for a NaN depth; every division in `seamap.js` and the map paths of `water.js`
+  is guarded. The outer level never went dark after a re-anchor (it is resampled within one build).
+- *APIs PILOT depends on*: PILOT does not call `physics.water()`; `here.air.speed` and `.gust01`
+  (`src/core/game.js:385`, the sound) keep their meaning and now move under a second, which the
+  sound's 0.5 s smoothing takes; `env.air`'s fourth argument is optional; every explorer and ship
+  state field PILOT reads is still there.
+- *`coast.mjs`*: its waves' angle mixes the stand's axes with the frame's (anchored at the
+  waterline), but both coast stands are 4 m from their waterline, so the two easts agree to 0.0
+  degrees.
+
+**5. PILOT (fixed by me, `33abe08`).** `src/player/explorer.js` asked `env.air` for the walker's
+wind as a point at rest; PHYSICS P18 asks code that samples the air for a body to pass its receiver.
+It now passes `{ size: 0.5, the body's velocity }`, the receiver PHYSICS' step uses. Small effect:
+in a 17.9 m/s gale the wind along the heading moves 0.41 to 0.45 m/s a frame, was 0.53 to 0.56; the
+walk's pace jitters 1.6 % under a second, was 1.8 %. Unit 140, PHYSICS' explorer 36, static rules:
+all pass on a clean export of `98edfcd` with the file.
+
+**Not verified.** No browser in this block: the sea map's GLSL twin has never been compiled (no
+offline compiler here; its Jacobian and wave-vector algebra agree with the JS twin by reading), and
+the prewarm, the vertex log depth, the 8-bit fallback and the colour-space claim rest on reading
+plus PAINTER's and the coordinator's browser runs. Finding 1 was measured on a synthetic boulder row
+in Node, not filmed in the game. No frame time on a real integrated GPU.
+
+---
+
 ## Review 6, the tour: the first view of the worlds at the top tier (2026-11-11, seventh PILOT agent; PARTIAL, stopped for the owner's art pass)
 
 Run by me on one clean tree: PAINTER `b022507` (block 7 part 1), PHYSICS `2e6ce74` (P13),

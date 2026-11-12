@@ -5,8 +5,9 @@ and how), PART (works, with the stated gap), TODO, RISK.
 A role's milestone is done only when `docs/lead/REVIEW.md` has no open MUST FIX for it (the
 coordinator can waive an item).
 
-Last update: 2026-11-11, by the eighth PILOT agent: the hardening review's PILOT fixes are in
-(risk 9). Before that, the seventh PILOT agent, during review 6: the first half (the
+Last update: 2026-11-12, by the ninth PILOT agent: review 7 (code) of everything the other roles
+committed since `a671ca7` (risk 10). Before that, the eighth PILOT agent: the hardening review's
+PILOT fixes are in (risk 9). Before that, the seventh PILOT agent, during review 6: the first half (the
 mechanics on the changed worlds, the sixth agent's runs) is on record; the top-tier tour was
 stopped part-way (six bodies of ten, Venus and Saturn from the sixth agent's sheets) because
 the owner started an art pass over every planet (four agents); the tour and the second half
@@ -146,4 +147,12 @@ been able to check are still the frame rate on a real GPU and how the game sound
    sentences for no WebGL 2, no float targets, a failed load and a lost context. Open: PAINTER's
    A1 (no early-Z without EXT_clip_control) and the A2 hooks (in their working files, tested
    with mine), a float-target fallback (PAINTER, low); still never run on Safari, Firefox or real
-   hardware.
+   hardware. (Since: PAINTER's A1, A2 and the 8-bit fallback are committed and accepted; review 7
+   read them against my caller and found nothing to fix.)
+10. **Review 7 (code), 2026-11-12, ninth PILOT agent** (`docs/lead/REVIEW.md`, top): one MUST FIX
+   for PHYSICS (the explorer's ghost run overwrites the walker's own up and ground: up to 2.2 m/s
+   lost in a step and 1.1 m/s thrown radially running through a boulder field anywhere off the
+   x-z plane; a four-line fix given and checked), two SHOULD FIX for PHYSICS in the sea map (the
+   crests slide 15 m after every re-anchor, a one-line fix checked; one-frame steps of up to
+   0.24 m and 28 degrees at fixed places when a build lands, to fix before PAINTER wires the map).
+   Nothing to fix in PAINTER 11. PILOT's explorer now asks the air as the body feels it.
