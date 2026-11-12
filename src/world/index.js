@@ -368,10 +368,11 @@ export function createWorld(scene) {
       } else SHEET.laid = 1;     // (in slow frames a share of the frame, like the terrain)
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
-      let mist = 0, twi = 0;
+      let mist = 0, twi = 0, aur = 0;
       for (const b of look.biomes) {
         const w = here.biomeWeights[b.id];
         if (!w) continue;
+        aur += w * (b.aurora || 0);
         let m = b.mist || 1;
         // fog lying in the low ground: thick below its level, clear above it
         if (b.t && b.t.fog) m *= 0.2 + 0.8 * THREE.MathUtils.smoothstep(camR - body.radius, b.t.fog[0] - b.t.fog[1] * 0.5, b.t.fog[0] + b.t.fog[1]);
@@ -440,6 +441,15 @@ export function createWorld(scene) {
         tmpKey.light.lerp(_pale.copy(_dust).lerp(_white, 0.55), dustW * 0.6);
         _storm.lerp(_pale.copy(_dust).multiplyScalar(0.74), dustW * 0.9);
       }
+      // a misty biome pales its own sky: the air over a wetland or a honey-mist valley is full of water, and the blue
+      // of the world's clear day is seen through it as a pale wash running down into the mist (ARTPASS wish 5: the
+      // misty wetland stood under Earth's clear blue sky with its cumulus; sky keys are per body)
+      const mistK = Math.min(0.8, Math.max(0, (1 - mist) * 1.3)) * air;
+      if (mistK > 0.003) {
+        tmpKey.zenith.lerp(_pale.copy(tmpKey.haze).lerp(tmpKey.zenith, 0.2), mistK);
+        tmpKey.horizon.lerp(_pale.copy(tmpKey.haze).lerp(_white, 0.25), mistK * 0.8);
+        tmpKey.cloudShade.lerp(tmpKey.haze, mistK * 0.6);
+      }
       // night: the sheet lays the night's key over everything (far more pigment in every wash:
       // post.js). The sky's own washes are laid that much lighter here, so that they land on
       // the values the look gives them.
@@ -476,12 +486,17 @@ export function createWorld(scene) {
         KIT_INK.dust.copy(KIT_PALETTE[5]); KIT_INK.sand.copy(KIT_PALETTE[4]);
       }
       const v0 = look.visibility[0], v1 = look.visibility[1];
-      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * space01) + 40000 * space01;
-      bu.uFog.value.set(1 / vis, 6, 1 - space01 * 0.9, space01 * st.limbK);
+      // (an airless world is "in space" for its sky at any height, but its land still goes back in paler bands, as a
+      // painter lays a far plain: the look's visibility holds near the ground and gives way to space's clear air as the
+      // eye rises. It was 40 km on the ground: the Moon's horizon stood as a crisp ruled line of boulders; ARTPASS wish 6)
+      const air01 = body.atmosphereHeight > 0 ? space01 : THREE.MathUtils.smoothstep(alt, 250, 2500);
+      const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
+      bu.uFog.value.set(1 / vis, 6, 1 - air01 * 0.9, space01 * st.limbK);
       // sky
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
       skyU.uCamL.value.copy(st.camLocal);
       skyU.uSkyZenith.value.copy(tmpKey.zenith);
+      if (skyU.uAurora) skyU.uAurora.value.x = aur * (1 - space01);
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);

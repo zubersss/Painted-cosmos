@@ -84,7 +84,10 @@ float pcLevel(float x, float soft) {
 vec3 pcTone(vec3 c, float level) {
   vec3 lit = mix(c, vec3(1.0), 0.30) * uLight;
   vec3 g1 = c * uGlaze;
-  vec3 g2 = pcDensity(g1 * pow(uGlaze, vec3(0.75)), 1.3);
+  // (the deepest step is the same cool glaze over the local colour with the pigment pooled heavier, not a second
+  // glaze: two glazes and the density turned every deep shadow toward the glaze's own ultramarine, whatever was
+  // under it: Mercury's crystals all one blue, Jupiter's crowns slate, the autumn crowns flat sepia; ARTPASS wish 2)
+  vec3 g2 = pcDensity(g1, 1.55);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, c * mix(vec3(1.0), uLight, 0.55), clamp(level - 1.0, 0.0, 1.0));
   r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));

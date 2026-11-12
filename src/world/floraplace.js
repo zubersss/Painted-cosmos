@@ -122,6 +122,13 @@ export function placeUnder(S, face, level, ix, iy, grid) {
           if (r4 < acc) { kind = SMALL[q][1]; break; }
         }
         if (kind < 0) continue;
+        // (PAINTER 12, PILOT's review 6b: no boulder or shard within 6 m of a first landing's clearing: the arrival stood the
+        // explorer on one, and the view composed there had a stone at the feet)
+        if ((kind === U_ROCK || kind === U_SHARD) && S.clearings.length) {
+          let near = false;
+          for (const cl of S.clearings) { const dx = _d[0] - cl.x, dy = _d[1] - cl.y, dz = _d[2] - cl.z; if ((dx * dx + dy * dy + dz * dz) * R * R < 36) { near = true; break; } }
+          if (near) continue;
+        }
         scale = kind === U_ROCK ? 0.4 + 1.6 * r5 * r5 : kind === U_SHARD ? 0.6 + 1.6 * r5 * r5 : 0.65 + 0.8 * r5;
         sink = kind === U_ROCK ? 0.2 * scale : 0.04;
         const rr = R + s.h - sink;

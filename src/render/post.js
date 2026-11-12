@@ -234,6 +234,14 @@ void main() {
     float lift = uWxSheet.y * (isSky * (0.62 + 0.33 * smoothstep(0.0, 0.42, dot(sur, W))) + (1.0 - isSky) * smoothstep(0.25, 0.75, dot(col, W)) * 0.55);
     col = mix(col, vec3(1.0), clamp(lift, 0.0, 0.92));
   }
+  // (at night the land keeps a floor and its steps above it, PAINTER 12: the washes under about half value are laid
+  // into a band above the night's deepest indigo instead of running down into one flat mass at the floor below; the
+  // sky keeps its own night, and a frame of land with nothing lit is still two or three values; ARTPASS wish 3)
+  if (uNight > 0.003) {
+    float land = step(0.5, pcAuxDec(texture(tAux, uv)).w);
+    vec3 toe = vec3(0.25, 0.27, 0.37) + 0.025 * (psoft.r - 0.5);
+    col = max(col, mix(col, toe + col * (1.0 - toe / 0.55), uNight * land * laid));
+  }
   // nothing is pure black: the darkest darks are dense indigo and sepia
   col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoft.r - 0.5) + uNight * vec3(0.035, 0.045, 0.075));
   col = mix(vec3(1.0), col, painted * (1.0 - skip * 0.8));

@@ -40,6 +40,7 @@ uniform vec4 uRingS;        // a ringed world seen from under its rings: inner, 
 uniform vec3 uRingC;        // the rings' wash
 uniform vec4 uBelt;         // a banded world from inside: belts pole to pole, how far their edges wander (rad), strength
 uniform vec4 uSeaC;         // a sea of cloud: its top above the body's radius (m), strength, how high its heads stand
+uniform vec4 uAurora;       // an aurora over a biome that names it: x strength (0: none)
 uniform float uTime;
 varying vec3 vDirL;
 varying vec3 vDirW;
@@ -126,6 +127,23 @@ void main() {
       vec3 beltc = dens(mix(sky, uCloudShade, 0.62), 1.30 + (b1.g - 0.5) * 0.9 + (b2.b - 0.5) * 0.4);
       sky = mix(sky, mix(zone, beltc, belt), uBelt.z * smoothstep(-0.02, 0.07, e) * (1.0 - oc) * (1.0 - uAtmo.x));
     }
+  }
+
+  // ---- an aurora (a biome that names it, PAINTER 12): curtains hung low over the horizon, their lower edge a wavy
+  // pale line lifted out of the wash, rays running up from it and fading into violet; folded along the horizon
+  // (anchored to the planet, drifting slowly). By day a pale ghost in the blue, by night the palest thing low down.
+  if (uAurora.x > 0.001) {
+    vec3 ha = normalize(d - up * e + up * 1e-4);
+    vec4 fa = texture(uNoise3D, ha * 1.25 + vec3(0.7, 0.2, uTime * 0.0015));
+    vec4 fb = texture(uNoise3D, ha * 3.4 + vec3(0.1, uTime * 0.002, 0.4));
+    float fold = smoothstep(0.38, 0.62, fa.r * 0.7 + fb.g * 0.3);                    // where along the horizon a curtain hangs
+    float e0 = 0.07 + 0.10 * fa.g + 0.04 * (fb.r - 0.5);                             // its lower edge, wavy
+    float ray = texture(uNoise3D, vec3(ha.xz * 16.0, ha.y * 16.0) + vec3(0.0, uTime * 0.004, 0.0)).g;
+    ray = 0.45 + 0.55 * smoothstep(0.35, 0.70, ray);                                  // rays: streaks up the curtain
+    float hgt = 0.16 + 0.22 * fb.b;
+    float k = smoothstep(e0 - 0.012, e0 + 0.018, e) * (1.0 - smoothstep(e0 + 0.03, e0 + hgt, e)) * fold * ray;
+    vec3 ac = mix(vec3(0.84, 0.97, 0.88), vec3(0.83, 0.76, 0.95), smoothstep(e0, e0 + hgt * 0.8, e));
+    sky = mix(sky, ac, clamp(k * uAurora.x * (0.42 + 0.48 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.85));
   }
 
   // ---- a sea of cloud seen from one of its islands: beyond the island's rim the cloud tops
@@ -272,6 +290,7 @@ export function makeSkyUniforms() {
     uRingS: { value: new THREE.Vector4(1, 2, 0, 0) },
     uRingC: { value: new THREE.Vector3(0.93, 0.86, 0.66) },
     uBelt: { value: new THREE.Vector4(9, 0.02, 0, 0) },
+    uAurora: { value: new THREE.Vector4(0, 0, 0, 0) },
     uSeaC: { value: new THREE.Vector4(80, 0, 1, 0) },
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },

@@ -297,9 +297,40 @@ export function bushGeometry(seed) {
   return B.build();
 }
 
+// A boulder: a broken thing, not a pebble. A lumpy ellipsoid, wider than it is tall, cleaved by a few planes (its
+// fractured faces: a near-level top and leaning sides), so it shows planes of light in the value steps and a
+// silhouette with corners; the facets keep their own normals, the body between them its rounded one. (It was one
+// smooth lumpy ellipsoid lit by the ellipsoid's own normal: a soap lozenge whatever its wash; ARTPASS wish 1.)
 export function rockGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
-  blob(B, V(0, 0.28, 0), 0.75, 0.5, 0.6, rnd, { detail: 2, part: 4, noise: 0.32, rough: 0.09, massK: 0, sway: 0, shade0: 0, shadeK: 1.0, flatBottom: 0.4, uvScale: 1 });
+  B.branch = -1;
+  const I = ico(2), rx = 0.82, ry = 0.44, rz = 0.64, cy = 0.22;
+  const ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28, hash = rnd();
+  // the cleaving planes, in the unit sphere's space: a top tilted 10 to 30 degrees, four sides leaning in
+  const planes = [];
+  const a0 = rnd() * 6.28;
+  { const tilt = 0.18 + rnd() * 0.34, az = rnd() * 6.28; planes.push([Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az), 0.58 + rnd() * 0.12]); }
+  for (let i = 0; i < 4; i++) {
+    const az = a0 + i * 1.571 + (rnd() - 0.5) * 0.8, el = 0.10 + rnd() * 0.45;
+    planes.push([Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az), 0.62 + rnd() * 0.16]);
+  }
+  for (let i = 0; i < I.n; i++) {
+    const x = I.p[i * 3], y = I.p[i * 3 + 1], z = I.p[i * 3 + 2];
+    const k = 1 + 0.20 * (Math.sin(x * 3.1 + ph1) * Math.sin(y * 2.7 + ph2) + 0.6 * Math.sin(z * 4.3 + ph3 + x * 1.9))
+      + 0.06 * (Math.sin(x * 8.3 + ph2) * Math.sin(z * 7.1 + ph1 + y * 5.0) + 0.5 * Math.sin(y * 13.0 + ph3 + x * 6.0 + z * 4.0));
+    let ux = x * k, uy = y * k, uz = z * k, cut = -1, cs = 0;
+    for (let q = 0; q < planes.length; q++) { const P = planes[q], s = ux * P[0] + uy * P[1] + uz * P[2] - P[3]; if (s > cs) { cs = s; cut = q; } }
+    if (cut >= 0) { const P = planes[cut]; ux -= cs * P[0]; uy -= cs * P[1]; uz -= cs * P[2]; }
+    let px = ux * rx, py = uy * ry, pz = uz * rz;
+    if (py < 0) py *= 0.55;
+    // the facet's normal where it was cleaved (the plane's, through the ellipsoid's scaling), else the body's
+    let nx, ny, nz;
+    if (cut >= 0) { const P = planes[cut]; nx = P[0] / rx; ny = P[1] / ry; nz = P[2] / rz; } else { nx = x / rx; ny = y / ry; nz = z / rz; }
+    const l = 1 / Math.hypot(nx, ny, nz); nx *= l; ny *= l; nz *= l;
+    const shade = Math.min(1, Math.max(0, 0.5 - y * 0.5));
+    B.vert(px, cy + py, pz, nx, ny, nz, nx, ny, nz, I.uv[i * 2], I.uv[i * 2 + 1] * 0.5, 0, 4, shade, hash);
+  }
+  for (let i = 0; i < I.n; i += 3) B.tri(B.count - I.n + i, B.count - I.n + i + 1, B.count - I.n + i + 2);
   return B.build();
 }
 
@@ -311,12 +342,17 @@ export function flowerGeometry(seed) {
     const x = Math.cos(ang) * rr, z = Math.sin(ang) * rr;
     const dir = V(Math.cos(ang), 0, Math.sin(ang));
     stroke(B, V(x * 0.6, 0, z * 0.6), dir, h, 0.012, 0.25, rnd, { segs: 2, sway: 0.5 });
-    // the head: a small soft dab
-    const c = V(x * 0.6 + dir.x * h * 0.3, h * 0.96, z * 0.6 + dir.z * h * 0.3), s = 0.05 + rnd() * 0.035;
-    const base = B.count, hh = rnd();
-    const ring = 6;
-    B.vert(c.x, c.y + s * 0.5, c.z, 0, 1, 0, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh);
-    for (let k = 0; k < ring; k++) { const a = (k / ring) * 6.283; B.vert(c.x + Math.cos(a) * s, c.y, c.z + Math.sin(a) * s, Math.cos(a) * 0.5, 0.8, Math.sin(a) * 0.5, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh); }
+    // the head: a small cupped touch with five lobes (petals), its tips lifted and a little ragged, tilted to face
+    // out from the clump (it was a flat hexagon: seen from above a red disc, seen across the meadow a red dash)
+    const c = V(x * 0.6 + dir.x * h * 0.3, h * 0.96, z * 0.6 + dir.z * h * 0.3), s = 0.055 + rnd() * 0.04;
+    const base = B.count, hh = rnd(), a0 = rnd() * 6.283, tl = 0.35 + rnd() * 0.3;
+    const ring = 10;
+    B.vert(c.x, c.y + s * 0.15, c.z, 0, 1, 0, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh);
+    for (let k = 0; k < ring; k++) {
+      const a = a0 + (k / ring) * 6.283, lobe = k % 2 === 0 ? 1.0 + rnd() * 0.15 : 0.42 + rnd() * 0.12, r = s * lobe;
+      const lx = Math.cos(a) * r, lz = Math.sin(a) * r, ly = (k % 2 === 0 ? 0.35 : 0.12) * s + (lx * dir.x + lz * dir.z) * tl;
+      B.vert(c.x + lx, c.y + ly, c.z + lz, Math.cos(a) * 0.45 + dir.x * tl, 0.85, Math.sin(a) * 0.45 + dir.z * tl, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh);
+    }
     for (let k = 0; k < ring; k++) B.tri(base, base + 1 + ((k + 1) % ring), base + 1 + k);
   }
   return B.build();

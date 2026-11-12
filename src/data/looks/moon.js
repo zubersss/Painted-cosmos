@@ -7,10 +7,13 @@ import { PIGMENTS, hexToRgb, pig, dilute, mixc, glazec, EARTH_SKY, m3, mkSky, B,
 // splashed with pale ejecta, the rilles a winding dark cut. Boulders are few and stand in the
 // ground's own greys, so the plain reads as a plain and the eye has somewhere to rest.
 export default {
-  seed: 'moon-2', seaLevel: null, cloud: 0, visibility: [4000, 20000],
+  seed: 'moon-2', seaLevel: null, cloud: 0,
+  // (no air, but the far plain still goes back in paler bands, toward a pale silver: the painter's convention, honoured
+  // since PAINTER 12 on airless worlds; the horizon here is 70 to 400 m off, so the bands lie close)
+  visibility: [900, 9000],
   // (the drift of the ground's wash between two hues: kept near neutral, silver rather than ochre)
   hue: [[1.0, 0.965, 0.91], [0.92, 0.93, 1.0]],
-  sky: mkSky([0.20, 0.22, 0.34], [0.50, 0.52, 0.62]),
+  sky: mkSky([0.20, 0.22, 0.34], [0.50, 0.52, 0.62], { haze: [0.85, 0.85, 0.88] }),
   flora: { tall: [], under: { leaf: [[0.8, 0.8, 0.8], [0.6, 0.6, 0.62], [0.4, 0.4, 0.45]], accent: [0.45, 0.66, 0.82], bush: [[0.8, 0.8, 0.8], [0.6, 0.6, 0.62], [0.4, 0.4, 0.45]], rock: [[0.75, 0.74, 0.73], [0.40, 0.40, 0.46]], shard: [[0.82, 0.82, 0.84], [0.52, 0.52, 0.58]] } },
   biomes: [
     B('mare', 'Silver Mare', 'flat', ['davysGrey', 'neutralTint', 'paynesGrey', 'indigo', 'sepia'], 'cerulean', ['paynesGrey', 'neutralTint', 'davysGrey'],

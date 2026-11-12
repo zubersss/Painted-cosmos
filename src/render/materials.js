@@ -291,6 +291,10 @@ void main() {
   float shoal = clamp(aDepth / max(1.28 * sea.x, 0.05), 0.0, 1.0);
   float runup = pcPhysWaterRunup(vBody, 0.07);
   p += normalize(vBody) * mix(runup, (w.x - wl.x + vWake.x) * carry + wl.x * carryL, shoal);
+  // (in the last few centimetres of the shallows the bed's small bumps rose through the water's surface where the two
+  // meshes interpolate differently: a halftone of dots along every flat shore, ARTPASS wish 9. The sheet of water is
+  // laid a breath higher there, so the bed shows only through its own wash; the edge is still drawn by the discard)
+  p += normalize(vBody) * 0.06 * (1.0 - smoothstep(0.05, 0.40, aDepth));
   vBody = p + uOrigin;
   vToCam = uCamLocal - p;
   vDepth = aDepth;
@@ -478,7 +482,9 @@ void main() {
   // them are drawn, each a torn dash lying along its wave, sized to the distance, grouped by the sets, more on the
   // crests, forming and going. Between 30 and 150 m nothing broke at all: the near crests are dropped there as finer
   // than the brush, and the far strokes have not begun)
-  float galeW = smoothstep(0.5, 2.0, sea.x) * (sea.y < 1.0e8 ? 1.0 : 0.6);
+  // (PAINTER 12: and wherever the sea map says this water is breaking, by its own share of white, however low the
+  // waves: a fresh breeze on Earth's coast whitens a twentieth of the sea with Hs half a metre, and none showed)
+  float galeW = max(smoothstep(0.5, 2.0, sea.x) * (sea.y < 1.0e8 ? 1.0 : 0.6), sea.y < 1.0e8 ? 0.85 * smoothstep(0.012, 0.07, sea.w) : 0.0);
   float horseTh = 0.68 - 0.08 * galeW;
   foam = max(foam, galeW * smoothstep(horseTh, horseTh + 0.06, tornW * 0.62 + r3.r * 0.38) * (0.55 + 0.45 * smoothstep(-0.3, 0.5, hN)) * smoothstep(10.0, 30.0, dist) * (1.0 - smoothstep(600.0, 1500.0, dist)));
   // (in the shallows the breaking crests are white, ragged lines; at the waterline a thin
@@ -870,7 +876,8 @@ void main() {
     float rimR = 1.0 - abs(dot(nV, V));
     if (rimR > 0.92 - 0.20 * smoothstep(0.42, 0.74, nr.r)) discard;
     c = mix(barkA, barkB, clamp(vData.z * 0.8 + (n1.r - 0.5) * 0.5, 0.0, 1.0));
-    c = pcWetWash(pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5), 0.8);
+    // (the pigment gathers just inside the stone's edge, as a wash dries on a rough form)
+    c = pcWetWash(pcDensity(c, 1.0 + (n1.b - 0.5) * 0.9 + (nr.b - 0.5) * 0.5 + smoothstep(0.55, 0.88, rimR + (nr.r - 0.5) * 0.2) * 0.38), 0.8);
     float snowR = pcSnowCover(dot(nV, upV) * 0.5 + 0.5, nr.g * 0.6 + n1.r * 0.4, 0.0);
     c = mix(c, vec3(0.97, 0.98, 1.0), snowR);
     x = dot(nV, sunV) * 0.5 + 0.5;

@@ -358,6 +358,10 @@ class Surface {
       const m = A.n3(X / 260, Y / 260 + 7.0, Z / 260);
       const rise = Math.pow(up, 1.7) * (0.30 + 0.70 * rd) * pk;
       h = 42 + m * 7 * (1 - up) + rise * amp + (crag - 0.4) * amp * 0.10 * up + C.n3(X / 22, Y / 22, Z / 22) * 0.7 * (0.4 + up) + C.n3(X / 5, Y / 5, Z / 5) * 0.08;
+      // (PAINTER 12: on the flanks, above the meadow floors, rock teeth and drifts of 2 to 4 m along the small ridges,
+      // so a near slope's crest is broken against the sky: under fresh snow it stood as one ruled diagonal)
+      const flank = smoothstep(0.25, 0.50, up);
+      if (flank > 0) { const tooth = A.ridged(X / 13 + 5.0, Y / 13 - 3.0, Z / 13 + 1.0, 2, 2.1, 0.5); h += flank * Math.max(0, tooth - 0.60) * 8.0; }
       t = clamp(up * 0.55 + rise * 0.6, 0, 1); dry = 0.3 + 0.5 * t; wet = 0.15;
       grow = (1 - smoothstep(95, 170, h)) * smoothstep(0.05, 0.3, up);
       meadow = 1 - smoothstep(0.25, 0.6, up);
@@ -375,9 +379,18 @@ class Surface {
       const cl = T.cliff || 44;
       let face = 0;
       if (hh > 0.9) {
-        const cu = smoothstep(0.9, 4.2, hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.6);
-        face = cu * (1 - cu) * 4;
-        hh += cu * cl + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
+        // (the cliff in profile, PAINTER 12: a skirt of talus, the face, a ledge across it in places, and a rounded
+        // shoulder; a narrow headland's top falls toward its tip. It was one step 3.3 m of the land's rise wide: a wall
+        // a few metres across in plan with a level lip, so a headland ended in a ruled vertical edge, and seen from
+        // afar the terrain's cells combed the face into even vertical stripes)
+        const q = hh + C.n3(x * R / 60, y * R / 60 + 5.0, z * R / 60) * 2.5 + C.n3(X / 17, Y / 17, Z / 17 - 4.0) * 0.6;
+        const tq = clamp((q - 0.9) / 4.6, 0, 1);
+        const ledge = smoothstep(-0.1, 0.35, C.n3(X / 70 + 9.0, Y / 70, Z / 70 - 2.0));
+        const tal = smoothstep(0.0, 0.22, tq), f1 = smoothstep(0.14, 0.48, tq), f2 = smoothstep(0.48 + 0.08 * ledge, 0.84, tq), sh = smoothstep(0.76, 1.0, tq);
+        const cu = tal * 0.09 + f1 * (0.42 + 0.04 * ledge) + f2 * (0.41 - 0.04 * ledge) + sh * 0.08;
+        face = clamp(Math.max(f1 * (1 - f1), f2 * (1 - f2)) * 4 + tal * (1 - tal) * 1.2, 0, 1);
+        const top = 0.78 + 0.22 * smoothstep(3.0, 12.0, hh);
+        hh += cu * cl * top + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
       } else if (hh > -30 && hh < -1.5) {
         // stacks: stumps of the old cliff left standing in the shallows
         const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks);

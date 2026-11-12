@@ -87,7 +87,9 @@ const SHAPES = {
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
   // (a glaze: a soft pale arc of paper colour, broken where the brush lifted, never a white wire)
-  ring: 'float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.02, 0.24, cov) * smoothstep(0.30, 0.54, brk) * 0.58; if (ga < 0.02) discard; vec3 c = vec3(0.985, 0.975, 0.945); float w = 0.0;',
+  // (PAINTER 12, PHYSICS P20: a faint glaze a step lighter than the water, softer and a third as strong: in PHYSICS' float
+  // strips the rings in the rain were crisp white ellipses all over the sea)
+  ring: 'float cov = pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y); float brk = texture(uNoise3D, vec3(vPcUv * 2.1, vPcData.w * 37.0)).r; float ga = smoothstep(0.0, 0.34, cov) * smoothstep(0.30, 0.58, brk) * 0.22; if (ga < 0.02) discard; vec3 c = vec3(0.96, 0.965, 0.95); float w = 0.0;',
   // a print: this ground, darker; a paler rim on loose ground; fading thins it through the
   // noise (fixed in the mark, so it never boils)
   mark: 'float scour = step(3.5, vPcData.z); float cover = pcPhysMarkCover(vPcUv, vPcData.z) * (1.0 - scour), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * clamp(vPcData.x * 12.0, 0.15, 0.9), rim * mix(0.6, 0.22, scour)) * min(1.0, vPcData.w * 3.0); a = min(a, 0.62); if (a < texture(uNoise3D, vec3(vPcUv * 1.7, vPcData.z * 0.37 + vPcData.x)).g) discard; vec3 c = mix(pcWetWash(ink, 1.0) * 0.66, mix(ink, vec3(1.0), 0.45), rim * (1.0 - cover)); float w = 0.2;',
