@@ -27,7 +27,7 @@ export default {
   biomes: [
     B('temperate_forest', 'Temperate Forest', 'forest',
       ['sapGreen', 'hookersGreen', 'quinGold', 'burntSienna', 'rawUmber', 'ultramarine', 'cobaltViolet'], 'cadScarlet',
-      ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1], mist: 0.95 }),      // (a little less air than the planet's 185 m: the back of the wood steps toward the paper in bands)
+      ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1], mist: 0.72 }),      // (less air than the planet's 185 m: the back of the wood steps toward the paper in bands; PAINTER 14: 0.95 -> 0.72, the wood's depths and the sky over it go paler)
     B('autumn_woodland', 'Autumn Woodland', 'forest',
       ['quinGold', 'burntSienna', 'cadOrange', 'rawUmber', 'oliveGreen', 'ultramarine', 'cobaltViolet'], 'alizarin',
       ['quinGold', 'burntSienna', 'rawUmber'], { autumn: 1, tall: [2, 1], liquid: { color: [0.68, 0.78, 0.84], refl: 0.72 },
@@ -43,9 +43,11 @@ export default {
       ['burntSienna', 'rawSienna', 'yellowOchre', 'cobaltViolet', 'ultramarine', 'burntUmber'], 'turquoise',
       ['yellowOchre', 'rawSienna', 'burntSienna'], { t: { strata: 1, amp: 210, wl: 600, steps: 3, dil: 0.2 }, mist: 5, small: { rock: 0.035, grass: 0.03, bush: 0.008 }, phys: { ground: 'sand' },
         under: { leaf: [[0.88, 0.84, 0.56], [0.74, 0.72, 0.46], [0.54, 0.54, 0.40]], bush: [[0.86, 0.84, 0.66], [0.74, 0.72, 0.56], [0.60, 0.58, 0.48]], rock: [[0.86, 0.66, 0.52], [0.52, 0.34, 0.32]], accent: [0.30, 0.70, 0.69] } }),
+    // (PAINTER 14: the reeds stand in beds with mud and water between them (floraplace.js), their feet in a deeper olive: the
+    // bed's shade is the frame's one dark; an even comb of straw strokes with no dark was ARTPASS weakest 1)
     B('misty_wetland', 'Misty Wetland', 'wetland',
       ['oliveGreen', 'viridian', 'rawUmber', 'paynesGrey', 'yellowOchre', 'davysGrey'], 'lemonYellow',
-      ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.46], [0.64, 0.66, 0.38], [0.42, 0.46, 0.34]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.74, 0.82, 0.84], refl: 0.9 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
+      ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.46], [0.64, 0.66, 0.38], [0.34, 0.38, 0.30]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.74, 0.82, 0.84], refl: 0.9 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
   ],
   // Hand-placed biome sites: [latitude, longitude, biomeId]. The first one holds the spawn.
   sites: [

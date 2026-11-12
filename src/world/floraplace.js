@@ -125,11 +125,22 @@ export function placeUnder(S, face, level, ix, iy, grid) {
         // (PAINTER 12, PILOT's review 6b: no boulder or shard within 6 m of a first landing's clearing: the arrival stood the
         // explorer on one, and the view composed there had a stone at the feet)
         if ((kind === U_ROCK || kind === U_SHARD) && S.clearings.length) {
-          let near = false;
-          for (const cl of S.clearings) { const dx = _d[0] - cl.x, dy = _d[1] - cl.y, dz = _d[2] - cl.z; if ((dx * dx + dy * dy + dz * dz) * R * R < 36) { near = true; break; } }
-          if (near) continue;
+          let d2 = 1e9;
+          for (const cl of S.clearings) { const dx = _d[0] - cl.x, dy = _d[1] - cl.y, dz = _d[2] - cl.z, e = (dx * dx + dy * dy + dz * dz) * R * R; if (e < d2) d2 = e; }
+          // (PAINTER 14: and fewer of them out to 22 m, so the first view has a calm foreground: Pluto's arrival stood in a
+          // field of 37 stones within 20 m, an even scatter of lozenges round the figure, the arrival's failing frame)
+          if (d2 < 36 || (d2 < 484 && hash3i(a, b, 8, seed) > smoothstep(6, 22, Math.sqrt(d2)))) continue;
         }
         scale = kind === U_ROCK ? 0.4 + 1.6 * r5 * r5 : kind === U_SHARD ? 0.6 + 1.6 * r5 * r5 : 0.65 + 0.8 * r5;
+        // (PAINTER 14: reeds stand in beds a few metres across, with mud and open water between them, tallest in the
+        // middle of a bed and short at its ragged edge; the misty wetland's reeds were one even comb over the whole bank,
+        // ARTPASS weakest 1)
+        if (kind === U_REED) {
+          const fr = R / 7.5, fq = R / 2.6, x = _d[0], y = _d[1], z = _d[2];
+          const bed = smoothstep(-0.12, 0.22, S.nC.n3(x * fr + 17.0, y * fr - 3.0, z * fr + 29.0) + 0.35 * S.nC.n3(x * fq - 8.0, y * fq + 5.0, z * fq - 2.0));
+          if (hash3i(a, b, 7, seed) >= bed) continue;
+          scale = (0.50 + 0.80 * bed) * (0.80 + 0.45 * r5);
+        }
         sink = kind === U_ROCK ? 0.2 * scale : 0.04;
         const rr = R + s.h - sink;
         out.push(_d[0] * rr, _d[1] * rr, _d[2] * rr, scale, r2 * 6.2831853, kind, s.top, hash3i(a, b, 6, seed), (r5 - 0.5) * 2, (r3 - 0.5) * 1.2, s.canopy, 0.1 * r1);

@@ -29,7 +29,7 @@ const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first:
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01'];     // (the last two: trees only, PHYSICS' crown)
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
-const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [8, 7.5, 0.5], vine: [7.5, 9, 0.25] };
+const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();

@@ -6,7 +6,7 @@
 //   position, normal, uv, aMass (soft normal of the whole mass),
 //   aData = (sway, part, inner shade, blob hash); part: 0 bark, 1 foliage, 2 blade, 3 accent, 4 rock
 import * as THREE from 'three';
-import { mulberry32 } from './noise.js';
+import { mulberry32, smoothstep } from './noise.js';
 
 // Physical hints per kit for PHYSICS (C14): model height in metres before the instance scale,
 // and stiffness (0 = bends like grass, 1 = a tree).
@@ -451,7 +451,10 @@ export function waveGeometry(seed, lod) {
   const rows = [];
   for (let i = 0; i <= st; i++) {
     const a = i / st, xx = (a - 0.5) * L;
-    const k = (0.42 + 0.58 * Math.pow(Math.sin(Math.PI * (0.04 + 0.92 * a)), 0.45)) * (0.85 + 0.25 * rnd());     // lower toward the ends, where the curl shows in profile
+    // (PAINTER 14: the crest stays nearly level along the wave and drops only in its last eighth, where the curl shows in
+    // profile; lowered steadily toward both ends, every wave seen along its crest stood as a snow peak, ARTPASS weakest 5)
+    const ea = Math.min(a, 1 - a);
+    const k = (0.34 + 0.66 * smoothstep(0.0, 0.16, ea) * (0.92 + 0.08 * Math.sin(Math.PI * a))) * (0.90 + 0.14 * rnd());
     const fwd = (Math.abs(a - 0.5) * 2) ** 2 * 1.6 + (rnd() - 0.5) * 0.3;                         // the ends run ahead
     const row = [];
     for (let j = 0; j < np; j++) {

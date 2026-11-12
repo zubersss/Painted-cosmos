@@ -75,6 +75,9 @@ class Surface {
     this._buildSites();
     this._prepPalettes();
     this.clearings = [];   // [{x,y,z, r}] flora-free glades (spawn)
+    // (PAINTER 14: an easel may ask for room round it, a sixth number in metres: a vista whose frame had a trunk a metre
+    // from the lens, a wall over an eighth of the picture)
+    for (const e of Object.values(EASELS[bodyId] || {})) if (e[5] > 0) { const k = 1 / Math.hypot(e[0], e[1], e[2]); this.clearings.push({ x: e[0] * k, y: e[1] * k, z: e[2] * k, r: e[5] }); }
     this.pads = [];        // [{x,y,z, r, r2, h}] levelled places (a first landing chosen by eye)
     this._b = makeB();
     this._ctx = { x: 0, y: 0, z: 0, baseReady: false, L: 0, s: 1e9 };
@@ -351,6 +354,9 @@ class Surface {
     // (each tread falls a little toward its edge: ledges, not shelves)
     const body = e1 * (f1 - 0.04 * d) + e1 * e2 * (f2 - f1 - 0.03 * d) + e2 * e3 * (f3 - f2 - 0.03 * dc) + e3 * e4 * (knuck - f3);
     this._stF = clamp(Math.max(e2 * (1 - e2), e3 * (1 - e3), e4 * (1 - e4), e1 * (1 - e1)) * 4, 0, 1);
+    // (PAINTER 14: the treads of the ledges, where rain and spray dry first: laid lighter, so a stack keeps its steps in values
+    // under a storm's key, when its drums and faces run together)
+    this._stT = clamp(e1 * (1 - e2) + e2 * (1 - e3) + e3 * (1 - e4) - this._stF * 0.9, 0, 1);
     return Math.max(body, skirt) * (0.45 + 0.55 * (h4 / keep));
   }
 
@@ -438,7 +444,7 @@ class Surface {
         hh += (cu * cl + cl * 0.09 * crag * Math.sin(Math.PI * u)) * gate + C.n3(x * R / 40, y * R / 40, z * R / 40) * 3.0 * smoothstep(6, 20, hh);
       } else if (hh > -30 && hh < -1.5) {
         // stacks: stumps of the old cliff left standing in the shallows
-        this._stF = 0;
+        this._stF = 0; this._stT = 0;
         const st = this._stacks(X, Y, Z, T.stackCell || 95, T.stacks == null ? 0.45 : T.stacks, true);
         if (st > 0) { const near = smoothstep(-30, -16, hh) * (1 - smoothstep(-6, -1.5, hh)); hh += st * near * (cl * 0.9 - hh); face = Math.max(face, this._stF * near); crown = st * near; }
       }
@@ -455,6 +461,7 @@ class Surface {
         const stk = crown;
         shade += stk * (0.34 * (1 - smoothstep(1.5, 9, h)) + 0.14 * Math.max(0, C.n3(X / 7.3 + 2.0, Y / 7.3 + 3.0, Z / 7.3)));
         crown = stk * smoothstep(cl * 0.35, cl * 0.75, h) * (0.40 + 0.16 * C.n3(X / 5.1, Y / 5.1 - 4.0, Z / 5.1 + 1.0));
+        crown = Math.max(crown, stk * this._stT * smoothstep(3, 8, h) * 0.34);
       }
     } else if (k === 'canyon') {
       // a plateau cut by a wandering network of gorges: flat dry floor, walls in steps, benches
@@ -562,7 +569,10 @@ class Surface {
       // steep slip face; smaller dunes ride the big ones
       const wl = T.wl || 150, amp = T.amp || 13;
       const ax = T.axis || [0.36, 0.48, 0.80];
-      const warp = A.n3(X / (wl * 2.6) + 4.0, Y / (wl * 2.6), Z / (wl * 2.6) - 1.0) * 0.55 + C.n3(X / (wl * 0.7), Y / (wl * 0.7) + 2.0, Z / (wl * 0.7)) * 0.10;
+      // (PAINTER 14: and a finer meander, a third of a dune's length, so that a crest seen from its own back bends within the
+      // frame: one long ruled diagonal was the dune crests' 'cut paper')
+      const warp = A.n3(X / (wl * 2.6) + 4.0, Y / (wl * 2.6), Z / (wl * 2.6) - 1.0) * 0.55 + C.n3(X / (wl * 0.7), Y / (wl * 0.7) + 2.0, Z / (wl * 0.7)) * 0.10
+        + C.n3(X / (wl * 0.24) - 3.0, Y / (wl * 0.24), Z / (wl * 0.24) + 7.0) * 0.045;
       const u = (X * ax[0] + Y * ax[1] + Z * ax[2]) / wl + warp;
       const sp = T.slip || 0.26;
       // one dune across its wavelength: 0 at the toe, 1 at the crest; lee = on the slip face
@@ -691,7 +701,9 @@ class Surface {
     if (crown > 0) { b.r += (0.93 - b.r) * crown; b.g += (0.92 - b.g) * crown; b.b += (0.90 - b.b) * crown; }
     if (snow > 0) mix3(b, SNOW, clamp(snow, 0, 0.94));
     if (T.frost && k !== 'crater' && k !== 'basin') mix3(b, SNOW, clamp(T.frost * (0.45 + v * 1.6 + 0.3 * tt), 0, 0.92));
-    if (bed > 0) { mix3(b, pal.low, bed * 0.6); if (T.bedPale) { const kb = bed * T.bedPale; b.r += (0.97 - b.r) * kb; b.g += (0.95 - b.g) * kb; b.b += (0.93 - b.b) * kb; } }
+    // (`t.bedC`, PAINTER 14: a bed laid in its own wash: the Moon's rilles are winding dark cuts, and with the plain's
+    // palest wash in their beds they stood as pale shallow dips)
+    if (bed > 0) { mix3(b, T.bedC || pal.low, bed * (T.bedC ? 0.8 : 0.6)); if (T.bedPale) { const kb = bed * T.bedPale; b.r += (0.97 - b.r) * kb; b.g += (0.95 - b.g) * kb; b.b += (0.93 - b.b) * kb; } }
     if (char > 0) { const kc = char * (0.5 + v * 1.6) * (T.char == null ? 0.55 : T.char); mix3(b, CHAR, clamp(kc, 0, 0.85)); }
     if (ember > 0) { const ke = clamp(ember * (0.8 + v * 0.8), 0, 0.9); mix3(b, EMBER, ke * 0.62); }
     if (T.dusk) { const d = T.dusk; b.r *= 1 - 0.30 * d; b.g *= 1 - 0.30 * d; b.b *= 1 - 0.12 * d; }
@@ -699,6 +711,10 @@ class Surface {
     if (T.fog) { const fk = (1 - smoothstep(T.fog[0] - T.fog[1], T.fog[0] + T.fog[1], h + v * T.fog[1] * 2.5)) * 0.82; b.r += (0.99 - b.r) * fk; b.g += (0.975 - b.g) * fk; b.b += (0.93 - b.b) * fk; wet = wet + (1 - wet) * fk; }
     if (veil > 0) { b.r += (1 - b.r) * veil; b.g += (1 - b.g) * veil; b.b += (1 - b.b) * veil; wet = wet + (1 - wet) * veil; }
     b.r2 = b.r; b.g2 = b.g; b.b2 = b.b;
+    // (`t.farC` [r, g, b, amount], PAINTER 14: what a biome reads as from far away, where that is not its near wash: from
+    // orbit Mars was a pale peach disc with cream swirls (no rust, no dark markings), Mercury's obsidian a dark disc in a
+    // bright rim. It shows beyond 120 to 420 m, so on the ground only on far hills)
+    if (T.farC) { const fc = T.farC, ka = fc[3]; b.r2 += (fc[0] - b.r2) * ka; b.g2 += (fc[1] - b.g2) * ka; b.b2 += (fc[2] - b.b2) * ka; }
     if (lq !== NOLQ && h < lq) { const L = this.liq[bidx].color; b.r2 = L[0]; b.g2 = L[1]; b.b2 = L[2]; }
     b.dry = T.gloss ? 0.95 : dry; b.wet = wet;
     const dens = (bi.tallD || 0) * grow;

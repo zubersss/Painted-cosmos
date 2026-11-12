@@ -3,7 +3,8 @@
 // yaw, pitch (degrees; yaw from local north toward east)]. Found by src/art/vantage.js, looked
 // at, and kept, so the gallery's `cam=vista` and the evidence frames do not move when the
 // search is tuned. A biome without an entry is searched afresh. Each is tested to stand on dry,
-// gentle ground of its own biome (src/world/surface.test.mjs).
+// gentle ground of its own biome (src/world/surface.test.mjs). A sixth number asks for that many metres of room: no
+// tree stands within about three quarters of it (surface.js clearings).
 export const EASELS = {
   mercury: {
     ochre_basins: [-0.304839, 0.026022, -0.952048, 320, -1.8],
@@ -45,7 +46,7 @@ export const EASELS = {
     lightning_plains: [0.545695, -0.135619, -0.826937, 60, -0.6],
   },
   saturn: {
-    gold_islands: [0.044834, 0.164816, 0.985305, 230, -5.6],
+    gold_islands: [0.044834, 0.164816, 0.985305, 230, -5.6, 5],    // (PAINTER 14: 5 m of room: a trunk 4 m behind the easel, a metre from the lens, walled the vista's left fifth, and a crown hung into its top right; the framing tree 7 m ahead stays)
     crystal_reeds: [0.4383, 0.724522, 0.531941, 150, 2.5],
     ring_shadow: [-0.447475, -0.032393, -0.893709, 110, 1.5],
     honey_mist: [0.76583, -0.586113, -0.26453, 290, 7.7],

@@ -35,8 +35,10 @@ export default {
       { t: { amp: 16, wl: 90, slip: 0.2, lee: 0.6, swell: 14, ride: 0.3 }, want: { onLip: 0, along: 0, flora: 1.6, perch: 0.5 }, tall: [0, 0], tallD: 0.34, tallMix: 1, near: { crust: 5 }, small: { shard: 0.15 }, phys: { ground: 'ice' } }),
     // pearl: mint, lilac and rose laid wet into one another under the fog; the stones loom out of it darker
     B('pearl_fog', 'Pearl Fog Flats', 'flat', ['mint', 'roseMadder', 'cobaltViolet', 'davysGrey', 'neutralTint'], 'cerulean', ['mint', 'roseMadder', 'cobaltViolet'],
-      { t: { amp: 6, dil: 0.55, patch: [{ c: [0.97, 0.965, 0.975], wl: 22, thr: 0.0, soft: 0.35, amt: 0.55 }, { c: [0.86, 0.95, 0.92], wl: 70, thr: 0.05, soft: 0.4, amt: 0.45 }] }, mist: 0.10, small: { shard: 0.10, rock: 0.05 },
-        under: { rock: [[0.82, 0.82, 0.88], [0.48, 0.50, 0.62]], shard: [[0.96, 0.95, 0.98], [0.70, 0.70, 0.86]] }, phys: { ground: 'ice' } }),
+      { t: { amp: 6, dil: 0.55, patch: [{ c: [0.97, 0.965, 0.975], wl: 22, thr: 0.0, soft: 0.35, amt: 0.55 }, { c: [0.86, 0.95, 0.92], wl: 70, thr: 0.05, soft: 0.4, amt: 0.45 }] }, mist: 0.10, small: { shard: 0.10, rock: 0.05 }, near: { dab: 1 },
+        // (PAINTER 14: the stones that loom out of the fog are its one dark, a dense violet-grey; one value range from sky to
+        // ground was ARTPASS weakest 11. Fewer pebble dabs, so the darker stones do not stipple the flat)
+        under: { rock: [[0.74, 0.74, 0.82], [0.34, 0.35, 0.48]], shard: [[0.96, 0.95, 0.98], [0.70, 0.70, 0.86]] }, phys: { ground: 'ice' } }),
     // the pit's throat is the dark (indigo), its walls viridian, the plain mint ice; the pool a
     // reserved light of pale teal (no `glow`: that is the lava path, scarlet banks and paper-yellow streaks);
     // the wall a quiet slope with a few stones (rock 0.015, shard 0.04, one pebble dab: the dark stone

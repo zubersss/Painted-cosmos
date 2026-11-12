@@ -16,8 +16,10 @@ export default {
   biomes: [
     B('ochre_basins', 'Cracked Ochre Basins', 'basin', ['yellowOchre', 'rawSienna', 'burntUmber', 'neutralTint', 'sepia'], 'cadOrange', ['yellowOchre', 'rawSienna', 'burntUmber'],
       { t: { crack: 1.0, patch: [{ c: [0.93, 0.86, 0.68], wl: 13, thr: 0.05, soft: 0.3, amt: 0.5 }, { c: [0.60, 0.42, 0.34], wl: 43, thr: 0.0, soft: 0.4, amt: 0.4 }] }, under: { crust: [[0.95, 0.90, 0.76], [0.66, 0.48, 0.36], [0.44, 0.34, 0.34]], rock: [[0.86, 0.72, 0.54], [0.50, 0.37, 0.31]] }, near: { crust: 6, dab: 3 }, small: { rock: 0.022 }, phys: { ground: 'rock' } }),
+    // (PAINTER 14: the glass seen from far away (t.farC) is a mid violet-grey, the sky's light on it: as its near black wash
+    // it was a dark disc in a bright rim from orbit, and the darkest ground of its own view lay at the skyline)
     B('obsidian_fields', 'Obsidian Glass Fields', 'flat', ['indigo', 'paynesGrey', 'neutralTint', 'cobaltViolet', 'sepia'], 'turquoise', ['paynesGrey', 'indigo', 'neutralTint'],
-      { t: { amp: 14, crack: 0.5, dil: 0.0, patch: [{ c: [0.62, 0.60, 0.70], wl: 9, thr: 0.22, soft: 0.3, amt: 0.28 }, { c: [0.22, 0.22, 0.32], wl: 37, thr: -0.12, soft: 0.35, amt: 0.6 }] }, under: { rock: [[0.36, 0.35, 0.46], [0.22, 0.21, 0.30]], shard: [[0.44, 0.44, 0.58], [0.15, 0.15, 0.25]],
+      { t: { amp: 14, crack: 0.5, dil: 0.0, farC: [0.56, 0.54, 0.64, 0.55], patch: [{ c: [0.62, 0.60, 0.70], wl: 9, thr: 0.22, soft: 0.3, amt: 0.28 }, { c: [0.22, 0.22, 0.32], wl: 37, thr: -0.12, soft: 0.35, amt: 0.6 }] }, under: { rock: [[0.36, 0.35, 0.46], [0.22, 0.21, 0.30]], shard: [[0.44, 0.44, 0.58], [0.15, 0.15, 0.25]],
           // plates of glass that mirror the sky, the black glass itself, ash drifted between, a turquoise seam
           crust: [[0.74, 0.76, 0.88], [0.22, 0.22, 0.32], [0.60, 0.58, 0.70], [0.34, 0.70, 0.70]] }, tall: [2, 2], tallD: 0.07, tallMix: 1, near: { crust: 8, needle: 0, dab: 0 }, small: { rock: 0.016, shard: 0.012 }, phys: { ground: 'rock' } }),
     // (PAINTER 13: the splinters in the garden are the crystals' own rose and cream, a dusty rose-lilac in their shade: a

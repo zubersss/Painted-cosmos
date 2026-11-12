@@ -194,6 +194,14 @@ void main() {
   float lvl = pcLevel(x, 0.045);
   c = pcTone(c, lvl);
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
+  // (PAINTER 14: a sun fleck on the floor of a wood is the picture's light: where the sun gets through the canopy the
+  // wash is laid thin, nearly bare paper warmed by the light. The reference forest had no paper anywhere: its flecks
+  // were the meadow's sunlit green, a middle value against the wood's shade. Open ground and the thinner stands of other
+  // worlds (a canopy under 0.55: fungus, kelp, groves) are not touched.)
+  // (only the heart of each patch of sun: the same pattern read at a higher threshold, so a fleck goes from the sunlit
+  // green at its edge to paper in its middle, and the floor keeps its shade)
+  float fleck = sunny * pcDappleL(vBody, vPar.z * 1.22, 8.0) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
+  c = mix(c, mix(c, vec3(1.0), 0.55) * uLight, fleck * 0.8);
 
   // dry brush on rough ground: the brush skips, paper sparkles through in small broken flecks
   float dryM = mix(smoothstep(0.60, 0.69, fa.b * 0.62 + fa.r * 0.38), smoothstep(0.60, 0.69, fb.b * 0.62 + fb.r * 0.38), lf);
@@ -867,6 +875,9 @@ void main() {
     // floor itself wanders from wash to wash. The near autumn crowns overhead, their inner washes in the canopy's shade,
     // went to the deepest step and stood as flat, hard sepia masses; a forest's near crowns as one dark slate)
     x = max(x, 0.29 + 0.20 * st.g + (n2.r - 0.5) * 0.22 + (vData.w - 0.5) * 0.16);
+    // (PAINTER 14: a crown close over the eye is laid in separate touches, some a step lighter where the sky comes into
+    // it, some a step deeper: the autumn wood's near crowns each stood as one flat sienna mass)
+    x += ((st.g - 0.5) * 0.36 + (n2.b - 0.5) * 0.16) * (1.0 - smoothstep(8.0, 24.0, vd));
     float lvl = min(pcLevel(x, 0.07), 2.6);
     // (and a crown's shade is its own colour laid heavier with only half the cool glaze over it: the violet glaze over an
     // orange or gold crown made mud, the autumn wood's near crowns one flat sepia; a green crown's shade goes deep green,
