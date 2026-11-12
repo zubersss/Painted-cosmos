@@ -3,6 +3,116 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P24 (twenty-second PHYSICS agent; read this block first; P23 and older below hold for everything not named here)
+
+**Where things stand.** A short, low-risk block in the final milestone: (1) ship the coordinator's knife-edge ruling
+(COORDINATOR.md, "PHYSICS 21 (P23) accepted; RULING on knife edges"); (2) the descent hold off the small rim under it; (3) the
+three Moon row numbers; (4) re-film `motion-game-moon-boulder` and open it. Done: (1) (`681e9d2`: P23's one line, its
+pre-filter made to match, a new test), (4) (filmed in the game, OPENED). (2) re-measured: **not gone**, its cause found, not
+fixed (not low-risk: item 2). (3) re-measured: unchanged by (1), not fixed (no low-risk fix: item 3). Commits: `681e9d2`
+(code, test, strip) and the hand-over's (these notes). Tests on a clean export of `fb5d5ba` with this block's files: `node
+--test src/physics/` **307 pass** (306 + 1 new: `explorer.test.mjs` 'P24 the knife edge'; `load.test.mjs` among them), `node
+--test tests/*.test.mjs` **150 pass**, `node --test src/world/*.test.mjs` **19 pass**; `coast.mjs` PASS at both stands (Earth
+Hs 0.62 m at the reference, target 0.52; Neptune 3.85, target 3.08); `ghostfield.mjs` all zeros at all six places, the same as
+the head (worst step loss 0.26 Earth, 0.52 Moon); PILOT's boulderrun replayed in Node (`trace8`): **thrown up 0.000 in all
+eight headings**, with and without boulders. Scratch: `/home/user/.pc-scratch/physics/p24/` (`head/` `fb5d5ba` as exported,
+`final/` a fresh export with this block's two files, the tree tested and filmed; `s/knife.mjs [v hz]` synthetic knife edges
+(level, a rise, a wall, a floor; Moon, Mars, Earth), `s/knifev.mjs g a1 H1 a2 D [v hz every]` one of them step by step,
+`s/trace8b.mjs site.json` trace8 with the steps losing over 0.3 m/s and the distance in 12 s, `s/tr315.mjs site.json k [noobs]
+[every]` one heading step by step, `s/mbv.mjs` P23's mb.mjs with the crest pace printed (`OLD=1 VERBOSE=1`: P22's small rim);
+`t8b-head.txt`, `t8b-work.txt`, `knife-cases.txt`, `rows.txt`, `mbv-head.txt`, `mbv-work.txt`, `tr315-*.txt`; `work4/` a
+variant built and measured, not shipped (item 1)).
+**Next, in order:** (0) the brink hold (item 2): where the way shows the ground falling more than a clamber within a look of
+an edge's top, let P21's hold on the way down go (and let P17's ghost count a flight there, not thrown up, as crossing): the
+ruling's consequence, but it touches the limbs' hold that keeps contact over boulders; (1) the near side of a knife edge read
+as a corner (item 1, found): with (0), skip an evaluation point short of a knife edge's top (built and measured, `work3` in
+the item); (2) the stale trend in the knife law's s1 (item 1, found; `work4/`); (3) the Moon rows (item 3).
+**API:** nothing added, removed or renamed.
+**Behaviour changed without a call changing:** at a knife edge (the top of a climb whose far side falls more than a clamber in
+a look: a crater's inner wall, a steep ridge) the run slows only so far that the hips' rise is turned within the fold by
+gravity (don't throw the runner up), no longer so far that the far side could be followed: gentle rises to crater walls are
+run faster and the body leaves the ground off the wall where it falls away (at boulderrun's site, flights of 2.2 and 4.05 m
+off 53-55 degree walls; thrown up 0). Rounded crests, rims whose far side falls within a clamber in a look, and boulders: as
+before.
+
+**1. The ruling shipped (`explorer.js` wayCrest, the knife branch).**
+- *The change:* at a knife edge `vc = sqrt(2 g legFold) crestMargin / s1` (`kn / s1`) in place of `k0 / (s1 + clamber /
+  look)` (k0 = sqrt(g 2 (fold + reach)) crestMargin): P23's one line. The read's pre-filter ("what cannot hold the run back
+  now is not read further") bounds the new law the same way; the old bound was already below the new law for every slope under
+  76 degrees, and no number moved (trace8 to the digit as P23's `t8-knife.txt`). The law: on the Moon 4.5 m/s at a 14 degree
+  rise, 6.3 at 10, 0.64 up a 60 degree ridge (P22's: 1.0, 1.1, 0.50); on Earth 11 at 14 degrees (P22's 2.5).
+- *Before and after at boulderrun's site* (`s/trace8b.mjs`, PILOT's Sim in Node, 30 Hz, 12 s from a standstill, Shift+W):
+
+| heading | mean pace, boulders | no boulders | metres in 12 s (boulders / none) | flights (feet over 0.05 m) |
+|---|---|---|---|---|
+| 0 | 4.25 -> **5.04** | 4.49 -> 5.29 | 54.4 -> 64.1 / 57.3 -> 67.0 | 1.95 m off a 56 degree wall falling 4.47 m -> 4.05 m off 53 degrees falling 7.48 m (left at 3.9 m/s, rose -0.09) |
+| 45, 90, 135, 225, 270 | 6.00, 4.93, 5.97, 5.73, 5.89 (the same) | 5.98, 5.20, 5.99, 5.93, 6.06 (the same) | the same | none |
+| 180 | 4.88 -> **5.68** | 4.88 -> 5.66 | 60.8 -> 70.6 / 60.4 -> 70.1 | new: 2.22 m off a 55 degree wall falling 3.18 m (left at 4.3 m/s, rose -0.04) |
+| 315 | 2.96 -> **3.29** | 3.17 -> 2.68 | 39.9 -> 44.0 / 42.3 -> 36.4 | none |
+
+  **Thrown up 0.000 m in all sixteen runs**, head and now; both flights are off ground that fell away by far more than a
+  boulder's height plus 0.3 m (PILOT's boulderrun counts them as the ground's). Grounded steps losing over 0.3 m/s: the same
+  in every run but heading 315 with boulders (1 -> 2, worst 0.40 -> 0.84 m/s); heading 90's one check (1.35 m/s) is unchanged.
+- *Heading 315 without boulders is slower* (3.17 -> 2.68): the 60 degree ridge is climbed at 0.30-0.47 m/s where the head
+  made 0.44-0.65 (`tr315-*.txt`). The knife law hangs on s1 alone, and s1 is at least the run's own climb, ts = max(trend,
+  hipV) / pace, capped at twice the read slope; B.trend (a rate, m/s) is not updated while the legs work, so as the pace falls
+  ts grows, and up the ridge s1 reads twice tan 60 degrees: the pace halves. P22's law (s1 + 1.125 below) hardly felt it.
+  Built and measured (`work4/`: the knife law reads the hips' own rise, hipV / pace, in place of the stale trend): heading 315
+  none 2.68 -> 3.34 m/s (a 0.82 m flight off the ridge's far side, the ground falling 3.17 m, rose -0.05), but with boulders
+  3.29 -> 3.01; the other headings and the synthetic cases the same. Not better everywhere: not shipped (Next 2).
+- *Synthetic knife edges* (`s/knife.mjs`: level 10 m, a rise, a wall, a floor; rock; a wish of 7.4 m/s; `knife-cases.txt`),
+  the pace at the edge, head -> now: a 10 degree rise of 1.5 m to a 55 degree wall 4 m deep: Moon 1.51 -> 3.52, Mars 1.77 ->
+  3.99, Earth 2.16 -> 4.77 m/s; 6 degrees, 1 m, a 50 degree wall 3 m: Moon 1.44 -> 3.52, Mars 1.57 -> 3.90, Earth 2.66 ->
+  4.87; 14 degrees, 2 m, 53 degrees 7 m: Moon 1.13 -> 2.97; the 60 degree ridge on the Moon 0.52 -> 0.46 (the stale trend).
+  Thrown up at most 0.090 m (the head 0.011); the run lands on the wall or the floor and carries on; no NaN; 60 and 30 Hz
+  agree.
+- *Why 3.5 m/s at the edge, not the law's 6.3* (the Moon, 10 degrees; `s/knifev.mjs`): the evaluation points a few tenths of
+  a metre short of the top see the edge as a corner within a clamber (part of the look on the rise, part down the wall: a drop
+  just under 1.35 m), and the contact law applies there at about its strictest (by the law 2.8 m/s on the Moon, 3.7 on Earth).
+  Built and measured (`work3`, not kept: skip a point short of a knife edge's top, the ground still rising within a look to a
+  top that falls more than a clamber in a look): the edge at 3.3-6.2 m/s on the Moon, 4.9-6.6 on Mars, 4.8-6.3 on Earth, but
+  the run then meets the brink faster and P21's hold checks it (item 2): 3-5 held steps a case, a worst step of 2.5 m/s on
+  Earth's 14 degree case. Not shipped: it needs item 2's fix with it (Next 1).
+- *Kept, checked:* the 0.3 m rule (thrown up 0 in every heading); contact over rounded crests and boulders (every explorer
+  test unchanged and passing: P22's crest test, the game's boulder, the field, P16, P17, P19, P21); `ghostfield.mjs` all
+  zeros; the Moon strip's site replayed in Node identical to the head (`s/mbv.mjs`: slowest within 3 m 6.12, feet 0, thrown
+  0); the rows (item 3) identical.
+- *Tests.* No test encoded P22's knife-edge pace: all 306 pass with the change. P22's crest test's rims fall 7-10 degrees
+  beyond their crests and P21's brace test's rim 10 degrees: corners followed in contact, whose law is unchanged. New
+  (`explorer.test.mjs`, fails on the head: 1.51 m/s at the edge): **P24 the knife edge**: the Moon, Mars, Earth, 60 and 30 Hz,
+  a 10 degree rise to a 55 degree wall and a 6 degree rise to a 50 degree wall: over 3.0 m/s at the edge (measured 3.4-4.9;
+  the head 1.4-2.7), thrown up at most 0.15 m (measured 0.09), down the wall and on; a 60 degree ridge on the Moon: thrown up
+  at most 0.15 m (0.093), on past the wall's foot.
+
+**2. The descent hold off the small rim: not gone; the cause; not fixed.** (P22's strip site, `s/mbv.mjs OLD=1 VERBOSE=1`,
+PILOT's Sim in Node.) Head: **4.70 -> 1.98 m/s** over three steps at the brink. Now: **3.84 -> 1.27 m/s**, 2.32 of it in one
+step (braced 0.13), back to 3.3 m/s about 1.3 m on. The run comes to the brink slower (3.84, not 4.70) because P17's ghost now
+fails its trials there: run under the new law it leaves the ground off the rim's wall, and a trial fails whenever the ghost's
+feet leave the ground, so the face read settles at 2.85 m/s, not 4.80. The check is P21's hold on the way down: the ground a
+look ahead lies within a clamber of the feet (the wall: 2.2 m deep at up to 54 degrees, 1.1-1.3 m down in a look from the
+feet) and well below the hips' line, so the limbs take a hold, and with the legs at full reach the pace at which the feet can
+follow a 54 degree fall is |w| / slope (`paceCap` 1.19 m/s; the hold takes up to braceDv 2.5 m/s in a step). Under the ruling
+this is ground that truly falls away, and the honest move is a flight; the fix is to let the hold go where the way shows the
+ground falling more than a clamber within a look of the edge's top, and to let the ghost count a flight there (not thrown up)
+as a crossing. Both touch the limbs' hold that keeps contact over boulders and between close boulders (P12, P19, P21): not
+low-risk in the final milestone, not attempted (Next 0). The strip no longer starts there (P23).
+
+**3. The Moon rows: unchanged; not fixed.** `s/rowloss2.mjs` on the head and now, identical (`rows.txt`): close Moon 60 Hz, 3
+steps over 0.3 m/s (2 braced), held 6; close Moon 30 Hz, 5 (0), held 7; spread Moon 60 Hz, 5 (1), held 11; no air, feet down,
+in every case. The three numbers a little worse than P21's (one step more each, one more hold) come with P22's tube, which
+improved 23 of 24 numbers in the field; P22 measured three trial standards and none held in every case. No low-risk fix: not
+attempted.
+
+**4. The strip** (`docs/shots/physics/motion-game-moon-boulder.jpg` with `.json`). Filmed in the GAME (`gamefilm.mjs`) on
+`final/` (a clean export of `fb5d5ba` with this block's code), one browser, by the game's own clock; OPENED. Seen: the
+explorer from behind runs away from the camera over a pale grey plain strewn with rocks under an indigo, starry sky, striding
+from the first frame on level ground (frames 0-7), larger rocks passing on the left (6-11), the pale boulder under its feet at
+frames 15-17 (lower over it), another pale rock at 22-24, then rising ground toward a crater rim's curved bands (24-29); the
+feet on the ground in every frame. Numbers: the run-up 6.28 -> 7.40 m/s, over the 0.68 m boulder 7.39 -> 7.26 (hips -0.39 on
+it, +0.26 beyond), **feet 0.000 m, thrown 0**, slowest within 3 m 6.12, 4.35 at the end toward the rim: every number the same
+as P23's strip (the run meets no knife edge in its 3 s; the picture differs in bytes only). Verdict: unchanged by the ruling;
+the boulder is run over at the pace, in contact.
+
 ## Hand-over P23 (twenty-first PHYSICS agent; read this block first; P22 and older below hold for everything not named here)
 
 **Where things stand.** The block, in the order a player feels it: (0) **the gale** (added by the coordinator, urgent, from
@@ -2836,6 +2946,18 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 
 ## For PILOT: wiring, in order
 
+### P24, first (twenty-second PHYSICS agent)
+- **Nothing to wire.** Your knife-edge verdict is in, as the coordinator ruled (`681e9d2`, one line in `explorer.js` wayCrest):
+  at the top of a climb whose far side falls more than a clamber in a look the run slows only so far that its hips are not
+  thrown up, and it may leave the ground off the wall. Your `tests/boulderrun.mjs` replayed in Node at today's crater_fields
+  site: **thrown up 0.000 in all eight headings**; mean pace headings 0 / 180 / 315: 4.25 / 4.88 / 2.96 -> 5.04 / 5.68 / 3.29 m/s
+  (the other five unchanged); two flights, 4.05 m off a 53 degree wall falling 7.48 m (heading 0) and 2.22 m off a 55 degree
+  wall falling 3.18 m (heading 180), both "the ground fell away" by your classification.
+- **Still heavy, measured, not fixed** (hand-over P24, items 1 and 2): the run reaches a knife edge at about 3.5 m/s on the Moon
+  (the law allows 6.3 at a 10 degree rise: points just short of the top are read as a corner), and at a small rim's brink P21's
+  hold still checks it (3.84 -> 1.27 m/s at P22's old strip site). Both wait on a change to the limbs' hold, which keeps contact
+  over boulders; I did not make it in a short block of the final milestone.
+
 ### P23, first (twenty-first PHYSICS agent)
 - **Nothing to wire.** In a gale whose push on the body passes half its weight (Neptune's squalls) the walker now gets low and
   the suit braces against what the soles cannot hold (`phys.hunker01` 0..1, `phys.windBrace` N); `phys.ride` folds with
@@ -4558,9 +4680,21 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     within 5 %); P22's reading from the chords over a look is within about 10 % of it on the crests a run meets, and the slowing
     at the boulderrun site is at knife edges, not brows. Recovering the pace there means letting the runner float off rims into
     craters (PILOT's feel verdict), which this block's contact rule forbids: the coordinator's ruling (hand-over P23, item 1).
+67. **(P24) At a knife edge, don't throw the runner up** (the coordinator's ruling after P23, which supersedes the knife-edge
+    half of 66). The top of a climb whose far side falls more than a clamber in a look is met no faster than the hips' rise,
+    v s1, can be turned to level within the legs' fold by gravity alone (x crestMargin); beyond it the body may leave the
+    ground where the ground falls away (the crater-wall ruling, Decision 50). Rounded crests and corners whose far side falls
+    within a clamber in a look keep P22's law and contact; the 0.3 m rule and no flight off a boulder stand.
+68. **(P24) The brink hold stays, for now.** P21's hold on the way down still checks a run at the brink of a wall whose drop a
+    look ahead is within a clamber, though the wall falls on beyond (the small rim: 3.84 -> 1.27 m/s). Letting it go where the
+    way shows a fall past a clamber within a look of the edge's top follows from 67, but it changes the limbs' hold that keeps
+    contact over boulders: not done in a short block of the final milestone (hand-over P24, item 2).
 
 
 ## Needs from the others
+
+**P24 (twenty-second agent), current needs.** None from PILOT, PAINTER or the coordinator: the knife-edge ruling is shipped
+(`681e9d2`). Open on my side, not a need: the brink hold (hand-over P24, item 2), for a block that may touch the limbs' hold.
 
 **P23 (twenty-first agent), current needs.** From the coordinator: a ruling on the knife edges (hand-over P23, item 1, last
 paragraph): PILOT's "ease off by no more than a fifth and let the runner leave the ground" against this block's "keep contact
