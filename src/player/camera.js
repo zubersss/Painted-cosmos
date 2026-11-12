@@ -29,7 +29,94 @@ export const CAMERA = Object.freeze({
   shipHeight: 3.6,           // metres above the ship
   shipLag: 4.5,              // 1/s: how quickly the chase camera catches the ship's heading
   shipClearance: 1.2,
+  // Crowns round a low ship (review 6: setting down in the wood, the chase camera 15 m back sat
+  // inside a birch crown and leaf masses a metre from the lens jumped frame to frame). A tree's
+  // crown is taken as a cylinder round its trunk from crownLow to crownTop of its height, of
+  // radius crownWidth x height (at least crownMin): PAINTER's far tree, a crown 0.27 of its
+  // width round from 0.30 to 1.02 of its height, is 0.24 to 0.31 of the height round on Earth.
+  // A footprint of columnRadius or more is a column (spire, crystal, frozen wave), not a tree.
+  // The boom stops crownMargin short of either.
+  shipBoomMin: 5.5,          // the shortest boom crowns may squeeze it to
+  crownLow: 0.3,
+  crownTop: 1.05,
+  crownWidth: 0.32,
+  crownMin: 2,
+  columnRadius: 0.9,
+  crownMargin: 1.2,
+  crownIn: 4.5,              // 1/s: how quickly the boom shortens for a crown (eased in and out)...
+  crownOut: 1,               // ...and how slowly it lengthens again once the way is clear
+  crownLead: 1.5,            // s: the boom also looks where the lens will be this long ahead in a descent
+  crownDuck: 1.5,            // m: the most the lens drops under crowns that come down to its height
 });
+
+// Signed distance (m) from body-local `p` to the nearest tree of `crowns` ([{ base, u, h, r }]:
+// the trunk's foot, its unit up, its height, its trunk radius): negative inside a crown or a trunk.
+export function crownDistance(crowns, p, C = CAMERA) {
+  let best = Infinity;
+  for (const t of crowns) {
+    const dx = p.x - t.base.x, dy = p.y - t.base.y, dz = p.z - t.base.z;
+    const along = dx * t.u.x + dy * t.u.y + dz * t.u.z;
+    const horiz = Math.sqrt(Math.max(0, dx * dx + dy * dy + dz * dz - along * along));
+    // a column (spire, crystal, frozen wave: a body as wide as its footprint) has no crown
+    const column = t.r >= C.columnRadius;
+    const lo = column ? t.h : C.crownLow * t.h, hi = C.crownTop * t.h, cr = Math.max(C.crownMin, C.crownWidth * t.h);
+    let d = Infinity, a, b;
+    if (!column) {
+      // the crown: a cylinder from lo to hi
+      a = horiz - cr; b = Math.max(lo - along, along - hi);
+      d = a < 0 && b < 0 ? Math.max(a, b) : Math.hypot(Math.max(a, 0), Math.max(b, 0));
+    }
+    // the trunk under it (or the whole column)
+    a = horiz - (t.r + 0.3); b = Math.max(-along, along - lo);
+    d = Math.min(d, a < 0 && b < 0 ? Math.max(a, b) : Math.hypot(Math.max(a, 0), Math.max(b, 0)));
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+// Where the chase camera's boom should be among crowns. here(b): metres from the lens at boom
+// length b to the nearest crown; down(b): the same for the whole way the lens has still to come
+// down (a landing to the ground, free flight the next moments) as well. The lens never travels
+// through a crown to reach a length:
+// - with room where it is and on its way down, it stays, or goes out while the way stays clear
+//   (never while sinking in free flight, where only the next moments are looked at);
+// - inside a crown, it leaves it by the shortest way, in or out;
+// - clear where it is but not on the way down, it goes to the nearest length clear all the way
+//   down that it can reach without passing through a crown (in when as near: the ship stands in a
+//   clearing), else to the reachable length with the most room (the shorter when as good).
+function shipBoomTarget(here, down, full, now, sinking, C) {
+  const lo = Math.min(C.shipBoomMin, full), step = 0.75, m = C.crownMargin;
+  const b0 = clamp(now, lo, full), top = sinking ? b0 : full;
+  const inward = (k) => Math.max(lo, b0 - k * step), outward = (k) => Math.min(top, b0 + k * step);
+  const steps = Math.ceil((full - lo) / step) + 1;
+  if (down(b0) >= m * 0.5) {                      // (half the margin to stay: no flicker at an edge)
+    let b = b0;
+    while (b < top) { const nb = Math.min(top, b + step); if (down(nb) < m) break; b = nb; }
+    return b;
+  }
+  if (here(b0) < 0) {
+    for (let k = 1; k <= steps; k++) {
+      if (here(inward(k)) >= m * 0.5) return inward(k);
+      if (here(outward(k)) >= m * 0.5) return outward(k);
+    }
+    return lo;
+  }
+  let a = b0, z = b0;
+  while (a > lo && here(Math.max(lo, a - step)) >= 0) a = Math.max(lo, a - step);
+  while (z < top && here(Math.min(top, z + step)) >= 0) z = Math.min(top, z + step);
+  for (let k = 1; k <= steps; k++) {
+    const i = inward(k), o = outward(k);
+    if (i >= a && down(i) >= m) return i;
+    if (o <= z && down(o) >= m) return o;
+  }
+  let best = a, most = -Infinity;
+  for (let k = 0, b = a; k <= steps; k++, b = Math.min(z, b + step)) {
+    const r = down(b);
+    if (r > most + 0.05) { most = r; best = b; }
+    if (b >= z) break;
+  }
+  return best;
+}
 
 function clearanceAt(sample, p, margin) {
   // How far `p` (body-local) would have to rise to keep `margin` above ground and liquid.
@@ -162,12 +249,15 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = 
 
 // ---- ship chase camera -----------------------------------------------------------------
 export function createShipCamera() {
-  return { q: null, cockpit: false, lift: 0 };
+  // short: metres the boom is held in by crowns, eased (null: take the room at once, as on boarding)
+  return { q: null, cockpit: false, lift: 0, short: 0 };
 }
 
 // ship: { p, q } in its flight frame. opts: { upRef (unit, frame space, or null in deep space),
 // level01 (how strongly the camera keeps its horizon), speed01, seat (ship-local eye point),
-// sample (body-local sampler or null), toLocal (frame position -> body-local position or null) }
+// sample (body-local sampler or null), toLocal (frame position -> body-local position or null),
+// solid (body-local point -> signed metres to the nearest crown, or null: see crownDistance),
+// descent (metres a landing still has to come down, or null) }
 export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
   const fwd = qRotate(ship.q, V(0, 0, -1));
   const shipUp = qRotate(ship.q, V(0, 1, 0));
@@ -188,8 +278,61 @@ export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
 
   const back = qRotate(cam.q, V(0, 0, 1));
   const camUp = qRotate(cam.q, V(0, 1, 0));
-  const boom = mix(C.shipBoom, C.shipBoomFast, opts.speed01 || 0);
-  let p = add(add(ship.p, scale(back, boom)), scale(camUp, C.shipHeight + cam.lift));
+  const full = mix(C.shipBoom, C.shipBoomFast, opts.speed01 || 0);
+  // Crowns: the boom comes in, eased, to keep the lens out of every crown, now and all the way
+  // down while the ship comes down (opts.descent: the metres a landing still has to go; in free
+  // flight the sink of the next crownLead seconds), and goes back out slowly while the way is
+  // clear. With no crowns about nothing changes.
+  let room = full, inCrown = false, duck = 0;
+  if (opts.solid && opts.toLocal) {
+    const base = add(ship.p, scale(camUp, C.shipHeight + cam.lift));
+    const sink = opts.upRef && ship.v ? -(ship.v.x * opts.upRef.x + ship.v.y * opts.upRef.y + ship.v.z * opts.upRef.z) : 0;
+    const drop = opts.descent != null ? Math.max(0, opts.descent) : sink > 0.05 ? Math.min(8, sink * C.crownLead) : 0;
+    const solidAt = (q) => opts.solid(opts.toLocal(q));
+    const here = (b, dh = 0) => solidAt(addScaled(addScaled(base, back, b), camUp, -dh));
+    const at = (b, dh = 0) => {
+      const q = addScaled(base, back, b), d = drop + dh;
+      let r = solidAt(dh ? addScaled(q, camUp, -dh) : q);
+      for (let h = 2.5; r > -1 && h < d + 2.5; h += 2.5) r = Math.min(r, solidAt(addScaled(q, camUp, -Math.min(h, d))));
+      return r;
+    };
+    const lo = Math.min(C.shipBoomMin, full);
+    const now = clamp(cam.short == null ? full : full - cam.short, lo, full);
+    // (a landing's whole way down is looked at, so a clear length is clear to the ground; in free
+    // flight only the next moments are, and a sinking lens only comes in)
+    room = shipBoomTarget((b) => here(b, cam.duck || 0), (b) => at(b, cam.duck || 0), full, now, drop > 0.5 && opts.descent == null, C);
+    // Under the crowns: where the lens has no room at its length (crowns that overhang the
+    // clearing come down to its height), it ducks under them, by up to crownDuck.
+    if (at(room, cam.duck || 0) < C.crownMargin) {
+      let most = -Infinity;
+      for (let dh = 0; dh <= C.crownDuck + 1e-6; dh += C.crownDuck / 3) { const r = at(room, dh); if (r > most + 0.05) { most = r; duck = dh; } }
+    }
+    inCrown = here(now, cam.duck || 0) < 0;
+  }
+  const held = full - room;
+  cam.room = room;
+  // A critically damped follow (it eases in and out: the camera's speed never jumps); quick
+  // whenever the lens is in a crown or must come in, slow going back out through clear air.
+  const follow = (x, xv, target, w) => {
+    const n = Math.max(1, Math.ceil(dt * 30)), h = dt / n;
+    for (let i = 0; i < n; i++) { xv += (w * w * (target - x) - 2 * w * xv) * h; x += xv * h; }
+    return [x, xv];
+  };
+  if (cam.short == null) { cam.short = held; cam.shortV = 0; cam.duck = duck; cam.duckV = 0; }
+  else {
+    if (held > 0 || cam.short > 0) {
+      [cam.short, cam.shortV] = follow(cam.short, cam.shortV || 0, held, held > cam.short || inCrown ? C.crownIn : C.crownOut);
+      if (cam.short <= 1e-3 && held === 0) { cam.short = 0; cam.shortV = 0; }
+    }
+    if (duck > 0 || cam.duck > 0) {
+      [cam.duck, cam.duckV] = follow(cam.duck || 0, cam.duckV || 0, duck, duck > cam.duck || inCrown ? C.crownIn : C.crownOut);
+      if (cam.duck <= 1e-3 && duck === 0) { cam.duck = 0; cam.duckV = 0; }
+    }
+  }
+  cam.short = clamp(cam.short, 0, Math.max(0, full - C.shipBoomMin));
+  cam.duck = clamp(cam.duck || 0, 0, C.crownDuck);
+  const boom = full - cam.short, height = C.shipHeight - cam.duck;
+  let p = add(add(ship.p, scale(back, boom)), scale(camUp, height + cam.lift));
 
   if (opts.sample && opts.toLocal) {
     // Keep the chase camera above the terrain (only meaningful in the ground frame).
@@ -197,7 +340,7 @@ export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
     const need = clearanceAt(opts.sample, local, C.shipClearance);
     const lift = Math.max(0, cam.lift + need);
     cam.lift = lift > cam.lift ? mix(cam.lift, lift, damp(25, dt)) : mix(cam.lift, lift, damp(2, dt));
-    p = add(add(ship.p, scale(back, boom)), scale(camUp, C.shipHeight + cam.lift));
+    p = add(add(ship.p, scale(back, boom)), scale(camUp, height + cam.lift));
     const need2 = clearanceAt(opts.sample, opts.toLocal(p), C.shipClearance);
     if (need2 > 0) { p = addScaled(p, norm(opts.upRef || camUp), need2); }
   } else cam.lift = mix(cam.lift, 0, damp(2, dt));

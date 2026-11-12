@@ -4,7 +4,7 @@ import {
   SHIP, createShipState, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded,
   findLandingSite, restOnSurface, floorAt, maxSpeedAt,
 } from '../src/ship/flight.js';
-import { createShipCamera, updateShipCamera, CAMERA } from '../src/player/camera.js';
+import { createShipCamera, updateShipCamera, crownDistance, CAMERA } from '../src/player/camera.js';
 import { stubSurface } from '../src/core/stubs/surface.js';
 import { makeWorld, V, norm, dot, sub, scale, len, arc } from './helpers.mjs';
 import { tangent, cross, qLook, qRotate, add } from '../src/core/vec.js';
@@ -261,4 +261,42 @@ test('landing assist keeps clear of trees when there is open ground within reach
   assert.ok(nearest >= SHIP.landClearance, 'clear of every trunk: ' + nearest);
   // With no obstacles the spot straight below is chosen.
   assert.ok(arc(findLandingSite(p, sample).dir, start, R) < 0.01);
+});
+
+test('setting down in a clearing in the wood, the chase camera keeps out of the crowns, eased', () => {
+  // Review 6: the camera 15 m behind the ship sat inside a birch crown as the ship set down.
+  const sample = makeWorld({ R });
+  const east = cross(north, start);
+  const at = (n, e) => norm(add(add(start, scale(north, n / R)), scale(east, e / R)));
+  // A wood with a clearing 7 m round the spot: trunks 12 m tall on a 6 m grid, crowns 4 m round.
+  const crowns = [];
+  for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
+    const n = i * 6 + (j % 2) * 2, e = j * 6;
+    if (Math.hypot(n, e) < 7) continue;
+    const u = at(n, e);
+    crowns.push({ base: scale(u, R), u, h: 12, r: 0.3 });
+  }
+  const solid = (q) => crownDistance(crowns, q);
+  const run = (withCrowns) => {
+    const st = createShipState(scale(start, R + 26), qLook(north, start));
+    const cam = createShipCamera();
+    let worst = Infinity, step = 0, prev = null, boomEnd = 0;
+    for (let i = 0; i < 30 * 14; i++) {
+      const alt = Math.max(0, 26 - i / 30 * 2.2);                         // down at 2.2 m/s, then parked
+      st.p = scale(start, R + alt); st.v = alt > 0 ? scale(start, -2.2) : V(0, 0, 0);
+      const pose = updateShipCamera(cam, st, 1 / 30, { upRef: start, level01: 1, speed01: 0, sample, toLocal: (p) => p, solid: withCrowns ? solid : null, descent: alt });
+      const b = len(sub(pose.p, st.p));
+      if (prev != null) step = Math.max(step, Math.abs(b - prev));
+      prev = b; boomEnd = b;
+      worst = Math.min(worst, solid(pose.p));
+    }
+    return { worst, step, boomEnd };
+  };
+  const bare = run(false);
+  assert.ok(bare.worst < -0.5, 'a lens that keeps its full boom goes into a crown: ' + bare.worst.toFixed(2));
+  assert.ok(Math.abs(bare.boomEnd - Math.hypot(CAMERA.shipBoom, CAMERA.shipHeight)) < 0.3, 'with no crowns the boom is as it was');
+  const r = run(true);
+  assert.ok(r.worst >= 0, 'the lens never enters a crown: ' + r.worst.toFixed(2) + ' m');
+  assert.ok(r.step < 0.6, 'the boom changes by under 0.6 m a frame at 30 fps: ' + r.step.toFixed(2));
+  assert.ok(r.boomEnd >= CAMERA.shipBoomMin, 'and never closer than the shortest boom: ' + r.boomEnd.toFixed(2));
 });

@@ -9,7 +9,7 @@ import { BODIES, SUN } from '../data/bodies.js';
 import { Sim } from './sim.js';
 import { S, isInShip } from './state.js';
 import { cameraPlanes, farthestExtent } from './depth.js';
-import { V } from './vec.js';
+import { V, len, scale } from './vec.js';
 import { pulseEta, arrivalRadius } from '../ship/pulse.js';
 import { SKETCH, SKETCH_SLIP, biomeKey, vistaKey } from './sketches.js';
 import { figureArgs, hullTrim, hasFootfalls, footLoudness } from '../player/figure.js';
@@ -534,7 +534,10 @@ export class Game {
       if (key !== this._placeKey) { this._placeKey = key; this._placeAt = sim.t; }
       if (isInShip(st) && st !== S.LANDED) {
         const env = sim.flightEnv();
-        const alt = env.sample ? sim.sh.altGround : env.hasBody ? env.altitude : null;
+        // Height over the ground or the water (not over the tree tops, which the ship's own floor
+        // counts: rising out of the wood the read-out said "0 m up" for three seconds).
+        let alt = env.hasBody ? env.altitude : null;
+        if (env.sample) { const r = len(sim.sh.p), s = env.sample(scale(sim.sh.p, 1 / r)); alt = Math.max(0, r - Math.max(s.radius, s.liquidRadius || 0)); }
         hud.setReadout(`${name}\n${alt == null ? '' : fmt(alt) + ' up   '}${Math.round(sim.sh.speed)} m/s`, true);
       } else hud.setReadout(name, this.started && sim.t - this._placeAt < 6);
     }

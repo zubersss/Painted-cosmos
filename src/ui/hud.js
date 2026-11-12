@@ -49,9 +49,10 @@ export function createHud(root) {
   // walking keys are by position, so on AZERTY "W A S D" reads "Z Q S D").
   const rows = [
     [['KeyW', 'KeyA', 'KeyS', 'KeyD'], 'walk'], ['Shift', 'run'], [['KeyC'], 'stroll / pace'], ['Space', 'jump, hold for the jetpack'],
+    ['mouse', 'look (click the picture)'], ['wheel', 'camera nearer / farther'],
     [['KeyE'], 'board, land, step out'], [['KeyV'], 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], [['KeyC'], 'sink'], [['KeyW', 'KeyS'], 'throttle'], [['KeyA', 'KeyD'], 'turn'],
-    ['mouse', 'point the nose'], [['KeyX'], 'brake'], [['KeyF'], 'pulse drive (in space)'], [['KeyM'], 'map'],
+    ['mouse', 'point the nose'], [['KeyX'], 'brake'], [['KeyF'], 'pulse drive (in space)'], [['KeyM'], 'map'], [['KeyV'], 'cockpit / chase'],
     ['anywhere', ''], [['KeyB'], 'sketchbook'], [['KeyH'], 'this card'], ['`', 'frame read-out'], ['pad', 'a gamepad works too'],
   ];
   let labels = {};

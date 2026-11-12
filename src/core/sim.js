@@ -14,7 +14,7 @@ import {
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../player/explorer.js';
 import {
-  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom,
+  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom, crownDistance,
 } from '../player/camera.js';
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
@@ -578,6 +578,7 @@ export class Sim {
     if (!this.sm.dispatch(EV.board)) return;
     this.transition = { t: 0, dur: FEEL.boardSeconds, dir: 'in', from: this.camPose, exFrom: { ...this.ex.p }, exTo: this.hatchPoint() };
     this.shipCam.q = null;
+    this.shipCam.short = null;                        // the chase view starts clear of the crowns here
     this.ex.v = V();
   }
 
@@ -1034,8 +1035,31 @@ export class Sim {
     const speed01 = clamp01(this.sh.speed / SHIP.speedSpace);
     return updateShipCamera(this.shipCam, this.sh, dt, {
       upRef: up, level01: mix(0.55, 1, clamp01(env.upWeight)), speed01, seat: this.seat,
-      sample: env.sample, toLocal: env.sample ? (p) => p : null,
+      sample: env.sample, toLocal: env.sample ? (p) => p : null, solid: env.sample ? this.crownSolid() : null,
+      descent: this.sm.state === S.LANDING ? this.sh.altGround : null,
     });
+  }
+
+  // The trees round a low ship as crowns the chase camera keeps out of (camera.js crownDistance):
+  // looked up 32 m round the ship again whenever it has moved 4 m. null when there are none, or
+  // the ship is too high for its camera to reach a crown.
+  crownSolid() {
+    const f = this.shFrame, sh = this.sh;
+    if (!(f.kind === 'body' && f.rotating) || !(sh.altGround < 45)) { this._crowns = null; return null; }
+    // over the tallest crowns (about 22 m) a camera 3.6 m over the ship meets none: no look-up
+    // (a landing looks at its whole way down, so it always does)
+    if (this.sm.state !== S.LANDING && len(sh.p) - this.sampler(f.id)(norm(sh.p)).radius > 28) return null;
+    let c = this._crowns;
+    if (!c || c.body !== f.id || len(sub(c.at, sh.p)) > 4) {
+      const sample = this.sampler(f.id), list = [];
+      for (const o of this.obstaclesNear(f.id, sh.p, 32)) {
+        if (o.height < 4) continue;                   // boulders and shrubs: under the camera's 3.6 m
+        list.push({ base: scale(o.unitDir, sample(o.unitDir).radius), u: o.unitDir, h: o.height, r: o.radius });
+      }
+      c = this._crowns = { body: f.id, at: { ...sh.p }, list };
+    }
+    if (!c.list.length) return null;
+    return (p) => crownDistance(c.list, p);
   }
 
   // ---- view: where the camera is this frame, in universe coordinates ----------------------------
