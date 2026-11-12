@@ -50,7 +50,7 @@ export const EASELS = {
     teal_sinkholes: [0.921846, 0.054831, -0.383657, 80, 8.2],
   },
   neptune: {
-    storm_seas: [-0.517691, 0.027898, -0.855113, 160, 5.3],
+    storm_seas: [-0.485353, -0.035198, -0.873609, 95, -6],   // (PAINTER 12: on the cliff top over the opened reach, looking into the storm; the old easel is under it)
     kelp_forests: [0.287739, 0.957694, 0.00534, 60, 3.2],
     ice_spires: [-0.207175, 0.143826, 0.967674, 40, 8.4],
     aurora_tundra: [0.51429, 0.551752, 0.656564, 110, 1.2],
@@ -68,7 +68,7 @@ export const STANDS = {
   },
   venus: {
     fungal_towers: [-0.984553, 0.105534, -0.139708, 100],
-    lava_rivers: [0.093424, 0.761006, 0.641982, 180],
+    lava_rivers: [0.08719, 0.758823, 0.645435, 0],          // (PAINTER 12: on the west bank 10 m from the lava, looking up the river; it stood 0.8 m deep in it)
     acid_terraces: [0.722262, 0.173054, 0.669619, 250],
     pale_mesas: [-0.536989, 0.751044, -0.384155, 310],
   },
@@ -76,9 +76,12 @@ export const STANDS = {
     temperate_forest: [0.178487, 0.530946, 0.828395, 270],
     autumn_woodland: [-0.419258, 0.807771, 0.414401, 30],
     alpine_meadow: [-0.376536, -0.903749, 0.203614, 280],
-    sea_coast: [0.43596, -0.499126, -0.748874, 112],
+    sea_coast: [0.617395, 0.033112, -0.785956, 120],     // (PAINTER 12: a beach facing the storm wind over 2 km of open sea, a headland to the left; coast.mjs PASS)
     desert_canyon: [-0.942265, -0.23254, 0.24096, 170],
     misty_wetland: [0.670709, 0.343774, 0.657243, 170],
+  },
+  moon: {
+    rilles: [0.010488, 0.599502, 0.800305, 190],          // (PAINTER 12: on a rille's rim, looking along it; there was no stand and the first site never saw it)
   },
   mars: {
     rust_canyons: [0.836522, -0.121244, 0.534351, 250],
@@ -105,7 +108,7 @@ export const STANDS = {
     teal_sinkholes: [0.922033, 0.051027, -0.383735, 80],
   },
   neptune: {
-    storm_seas: [-0.468476, 0.045549, -0.882301, 90],
+    storm_seas: [-0.49573, -0.041193, -0.867499, 90],    // (PAINTER 12: a beach under the cliffs facing the storm over the opened reach; coast.mjs PASS)
     kelp_forests: [0.314361, 0.947882, -0.051927, 230],
     ice_spires: [-0.205386, 0.264073, 0.942381, 10],
     aurora_tundra: [-0.028544, 0.638505, -0.769088, 90],

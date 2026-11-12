@@ -28,7 +28,10 @@ export default {
     // basalt: the headlands laid in a dense Payne's grey (a pale grey plaster wall before) with
     // their beds showing, so the far headlands go back into the mist in steps instead of standing as paper cut-outs
     B('storm_seas', 'Ultramarine Storm Seas', 'coast', ['ultramarine', 'indigo', 'paynesGrey', 'cerulean', 'neutralTint'], 'mint', ['paynesGrey', 'neutralTint', 'indigo'],
-      { t: { cliff: 46, stacks: 0.8, stackCell: 80, strata: 0.55, dil: 0.14 }, want: { stand: 2.4 }, liquid: { color: [0.34, 0.42, 0.78], refl: 0.5 }, tall: [0, 0], tallD: 0.30, tallMix: 1, tallWet: 1, near: { crust: 4, dab: 4 }, small: { rock: 0.09 }, phys: { ground: 'rock' } }),
+      { t: { cliff: 46, stacks: 0.8, stackCell: 80, strata: 0.55, dil: 0.14,
+        // (PAINTER 12, the coordinator's ruling: open water toward the biome's eastern edge, kilometres of it, so the beach
+        // faces the storm wind over real fetch; the big island east of the old stand and the reefs round it are under it now)
+        open: { a: [-0.643483, 0.016623, -0.765280], b: [-0.859070, 0.008434, -0.511788], r: [560, 800], depth: 34 } }, want: { stand: 2.4 }, liquid: { color: [0.34, 0.42, 0.78], refl: 0.5 }, tall: [0, 0], tallD: 0.30, tallMix: 1, tallWet: 1, near: { crust: 4, dab: 4 }, small: { rock: 0.09 }, phys: { ground: 'rock' } }),
     // the floor: sea-green moss (viridian the middle wash) with violet hollows under the violet kelp; a
     // little less kelp, so less of the floor lies in the kelp's canopy glaze (all one violet before);
     // a few pale violet bushes (a band of saturated ultramarine blobs under the kelp was a large near-black)
@@ -42,6 +45,6 @@ export default {
     // (aurora_tundra: tried thinner grass, frost polygons and lichen patches; the bared ground showed the
     // kelp wood's indigo wrack as ink blots, then with pale lichens it read as before: reverted to the base)
     B('aurora_tundra', 'Aurora Tundra', 'flat', ['viridian', 'neutralTint', 'cobaltBlue', 'mint', 'indigo'], 'lemonYellow', ['neutralTint', 'viridian', 'cobaltBlue'],
-      { t: { amp: 12, ponds: 1, crack: 0.3 }, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 } }),
+      { t: { amp: 12, ponds: 1, crack: 0.3 }, aurora: 1, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 } }),
   ],
 };
