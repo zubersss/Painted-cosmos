@@ -6,6 +6,221 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 
 ## Handover (read this first if you are a fresh PAINTER)
 
+Written by the twelfth PAINTER agent (the coasts, then the art pass's shared-code causes). The eleventh agent's
+handover is kept below it ("Handover of the hardening review"); its rules hold.
+
+- **Where things stand**: the coasts are done: PHYSICS' sea map is wired and compiled (`c08dddb`), both coast stands
+  face open water toward their own storm and `node src/physics/coast.mjs` says PASS for both (`418ac5b`; still PASS on
+  every later head with my files, last on `e866f6e`). Neptune's coast terrain was opened per the coordinator's ruling
+  (`neptune.js` `t.open`). The art pass's shared-code causes: see "PAINTER 12" below for each, its frame and verdict
+  (code in the coordinator's snapshots `db64b86`, `50414f0`, in `e866f6e` and the last commit; every change seen in a frame I opened unless said).
+- **Next, in this order**: (1) **Give narrow headlands their height back.** The coast cliff profile (`surface.js`)
+  keeps the combed stripes away, but where the land is narrow it never reaches the full cliff: a near hill on the
+  right of Earth's easel view went from 52 to 29 m (`p12-cliff-barcode`), and the view lost its big hill. Try the
+  transition over 3.6 m of the land's rise (4.6 now) and the lip at 0.9 of the cliff (0.78), then look at the easel
+  view, the sea_coast stand and Neptune's stand again (and run coast.mjs: the profile moves the waterlines). (2) The autumn crowns' flat sepia and Mercury's blue crystals are not the
+  double glaze (the pcTone change hardly moved them): the crowns are their leaf washes under the canopy shade, the
+  crystals are the twilight biome's dusk glaze at one glaze (`index.js` blendKeys: 78 % of the lost day goes to the
+  dusk key; ARTPASS wish 4 asks for a cool twilight key instead). (3) Venus' lava is a leopard print (dark crust
+  blotches on flat orange, `materials.js` the lava lines): make the crust plates drift in broken strokes. (4) Earth's
+  white horses: the shader now draws them by the local sea's white share, but my storm frames were taken 10 s after a
+  teleport, before PHYSICS' P20 arrival fix; film Earth's coast 15 s after arriving (PHYSICS P20). (5) Kicked dust on
+  the Moon as grains (`kitmat.js` puff under `uAirless`) is compiled but not seen in a frame: walk the Moon and look.
+  (6) The Moon facing Earth is not a stand question (see "For PILOT" 5). (7) Item 4 of block 7: the brush, two walled
+  vistas, Mercury from orbit, Mars' dune crests.
+- **How to work here**: scratch `/home/user/.pc-scratch/painter/m12/` (the session scratchpad is shared with the
+  coordinator: never export there; an export wiped another run). `mkexp.sh <name>` (a clean export of the head with my
+  changed painter files over it), `v12.mjs <export> <prefix> <steps.json>` (the game through steps: a biome's stand as
+  the tour takes it, a direction, a spawn; hour, clock, weather, a hold-and-step, `evalAfter`; prints console errors
+  AND warnings and every program with a link log; W, H, Q in the environment), `pair.py` (before | after sheets),
+  `bmap.mjs` + `bmap.py` (biome, water and height map round a place), `prof.mjs` (a height profile), `slopes.mjs`,
+  `clim.mjs` (the local storm on a grid), `cands.mjs`, `brute.mjs`, `brute2.mjs` (beaches judged by PHYSICS'
+  `coastReport` itself, ranked by the worst margin), `one.mjs` (coast.mjs's full report at any stand), `riv.mjs`
+  (banks that see a river), `rille.mjs`, `moonearth.mjs` (Earth in the Moon's sky after the hour is set),
+  `seacheck.mjs` (the local sea a shader would read).
+- **The machine**: with PILOT's, PHYSICS' and the coordinator's browsers the load sat at 12 to 21 on 4 CPUs. A game was
+  ready after 6 to 11 minutes; a 800 x 450 top-tier frame took 2 to 12 minutes (a teleport to another body rebuilds the
+  world). Plan for eight to fifteen frames an hour on one body, fewer across bodies.
+- **Rules that bit me**: (1) **Set the clock on every judging step** (`clock: 30`): a step that jumps the clock (a storm
+  at 8850 s) moves every later frame into another season (Earth's year is 14400 s), and a before/after pair then
+  compares two suns. (2) **The storm is local and a squall**: Earth's sea_coast has 6 m/s breezes from ENE in one bay
+  and 35 m/s gales from WSW 2 km off; on Neptune the peak at one waterline is 55 m/s and 75 m/s 30 m away. coast.mjs
+  judges a beach against its own squall: search with `coastReport` itself. (3) These worlds are 4 km across: from a
+  beach the sea's horizon is 120 m off and islands a kilometre out are under it; a coast picture is made of what stands
+  within a few hundred metres. (4) PILOT's `tests/contract.test.mjs` lands the ship at fixed places (Earth 62 N 10 E is
+  an alpine flank): roughness there makes the parked ship slide. (5) The coordinator's WIP snapshots sweep your working
+  files into the head every few minutes; write the commit that names them yourself.
+
+## PAINTER 12: the coasts, and the art pass's shared-code causes (twelfth PAINTER agent)
+
+Every check ran on clean exports of the head with only my files laid over it, SwiftShader through ANGLE, one
+browser of mine at a time. Frames named here were opened at full size.
+
+### 1a. PHYSICS' sea map, wired (`c08dddb`)
+`src/render/shared.js`: `uPhysSeaMap` (a 17 x 51 float `DataTexture` made once over
+`physics.fields.water.uniforms.uPhysSeaMap`, flagged for upload when `mapVersion` moves), `uPhysSeaGrid`,
+`uPhysSeaGrid2` and P19's `uPhysSeaBand` in `PHYSW`, copied in `syncPhysWater` (the grids' `w` zeroed where there is
+no physics or no map). `src/render/materials.js`: the water material defines `PC_PHYS_SEA_MAP`; the vertex stage
+shoals by the local sea (`pcPhysSeaLocal`); the fragment stage reads the local sea and the local way of the waves
+(`pcPhysSeaDir`) everywhere it read `uPhysWaterSea` / `uPhysWaterDir` (12 and 3 places), and `pcPhysWaterCrestAt`,
+`pcPhysWaterSurfAt`. Compiled in the game: 36 programs, none with a link log, no console error or warning, at
+Neptune's old stand at clocks 213 and 240 (a breaking crest and shore foam drawn) and in every later run.
+
+### 1b-1d. Both coasts face open water toward the storm: `coast.mjs` PASS (`418ac5b`)
+How the beaches were found: PHYSICS' own `coastReport` (exported by `coast.mjs`) run at every candidate beach with
+the stand overridden (scratch `brute.mjs`, `brute2.mjs`: dry, gentle, its own biome, water within 25 m and 80 m
+out), ranked by the worst of its margins. The storm is local (scratch `clim.mjs`): Earth's sea_coast has 6 m/s
+breezes from ENE in one bay and 35 m/s gales from WSW 2 km away, so a beach must face its own storm.
+- **Earth `sea_coast`**: the 2067 m candidate fails (its own storm is 6 m/s from ENE and WSW). The stand is a beach on
+  the east shore of an island 2.4 km north, facing 120 (ESE), a headland to the left: `STANDS` [0.617395, 0.033112,
+  -0.785956]. Storm 13.2 m/s from E at 8850 s; 80 m out: fetch 2193 m, mean depth 18.6 m, Hs 0.53 m (mark 0.51),
+  white 4.9 % (mark 2.96); surf at the waterline Hs 0.48 m. Sites unchanged. (Frame: `earth2-B-h10`.)
+- **Neptune `storm_seas`, per the ruling**: no beach reached 2 km in the coast terrain as it was. `surface.js`'s
+  coast recipe takes `t.open: { a, b, r: [r0, r1], depth }`: a reach of open water along the great-circle segment
+  a-b, its floor `depth` m down (a broad swell of the bed, +-22 %), eased back to the land between r0 and r1 from the
+  line; where the land was deeper nothing changes. `neptune.js`: from 1 km east of the old stand to the eastern
+  berm, 2.3 km, r 560/800 m, 34 m: it drowns the big island east of the old stand and the reefs round it. No site,
+  seed, seaLevel or phys changed; the berm keeps the water inside storm_seas, the ice spires biome is untouched
+  (scratch `nv6-map.png`). The stand: a beach under the south-west island's cliffs, 390 m south of the old one,
+  facing 90 (E): `STANDS` [-0.49573, -0.041193, -0.867499]. Storm 75 m/s from E at 240 s; 80 m out: fetch 2226 m,
+  mean depth 33.2 m, Hs 3.18 m (mark 3.14: thin), white 12.1 % (mark 9), surf at the waterline Hs 3.1 m. The old
+  easel was under the new water: `EASELS` storm_seas is on the cliff top above the stand, 50 m up, looking into the
+  storm (95, pitch -6).
+- **Why Neptune's margin is thin** (measured, scratch `one.mjs`, `tryv.sh`): the squall coast.mjs finds peaks at
+  240 s, so its 150 s settle starts at 90 s and the swell (90 s to come up) has not grown. The most exposed water
+  about, at the target's own 2.5 km and 30 to 47 m deep, reaches 3.05 to 3.30 m against 4.21 (0.73 to 0.78 of it);
+  deepening the reach to 48 or 60 m changes nothing (3.10, 3.13). Most beaches facing the storm miss the mark by 1
+  to 5 %; with `--settle=240` (the run from t = 0) they pass with room (3.24 m where 150 s gives 2.96). Told to
+  PHYSICS.
+
+### 1e. White horses and surf
+- Neptune's storm at the new stand (clock 236, PHYSICS' sky; `p12-coasts`, lower right): swell bands rolling in, a
+  breaking crest drawn white across the middle distance, a lace of surf along the beach, spray. Seen.
+- Earth's storm at the new stand (13 m/s, clock 8853): swell bands but no white horses and no surf line in view (the
+  bank hides the waterline). PHYSICS' P20 found that the sea in the game was low for 10 to 15 s after arriving (fixed
+  in `38a3266`); my frame was 10 s after a teleport, on the head before that fix. The shader now also draws white horses
+  by the local share of white (`galeW` from `sea.w`, it waited for Hs over 0.5 m): Earth's storm whitens 5 to 6 % of the
+  sea at Hs 0.3 to 0.4 m (`seacheck.mjs`). Not re-filmed after P20 (Neptune took the browser time).
+
+### 1f. The cliff walls
+- The coast recipe's cliff (`surface.js`): it was one step over 3.3 m of the land's rise (a wall 15 to 25 m across in
+  plan, 50 to 75 degrees, a level lip). Now a profile over 4.6 m: a skirt of talus, the face in two lifts with a ledge
+  across it where a 70 m noise says so, a rounded shoulder, and the top 0.78 of the cliff's height at the lip rising to
+  all of it inland (a narrow headland's top falls toward its tip). Slopes over 70 degrees on Neptune's coast 5.9 % ->
+  under 2 % (scratch `slopes.mjs`). The striped cliff behind Earth's old pool (the easel's view) with a first version
+  (top 0.66): the stripes are gone, but so is the hill's height near the shore (`p12-cliff-barcode-v1`); the softer top
+  (0.78) keeps the stripes away too, but narrow headlands are still lower, by up to 23 m (see Next (1); `p12-cliff-barcode`). At the sea_coast stand the headland is a little lower and rounder (`p12-earth-misty-forest-coast`).
+- Stacks (`_stacks`, coasts and sky islands): a rounded crown and a skirt of fallen rock at the foot. In Neptune's
+  storm the big stack read as a black slab with ruled sides; the terrain's storm wash no longer pushes a dark wash
+  toward black (`materials.js`, scaled by the wash's own value). Seen: in Neptune's gale the big stack is a dark indigo-grey with a sloping foot, not a black slab with ruled sides (`p12-neptune-aurora-storm`, 15 s after arriving; the sea map read in the page: Hs 5.2 m, 15 % white, the map's grids and band set).
+
+### 2. The art pass's shared-code causes
+Before frames: the art pass's own frames at the same stands where the stand is unchanged (`/home/user/.pc-scratch/art`;
+the scene differs a little where its frame came from an intermediate state), my own head frames for Earth's autumn
+wood and the cliff view; after frames from my runs (clock 30, hour 10, 800 x 450, top tier).
+- **Shadow glaze (wish 2)**, `chunks.js` `pcTone`: the deepest step is the cool glaze over the local colour with the
+  pigment pooled heavier (`pcDensity(c * glaze, 1.55)`), not a second glaze (it turned warm shadows violet: sand at
+  Mercury's dusk glaze went from hue 89 to -54 in Lab, `tone.py`). Jupiter's near crown reads olive, not slate
+  (`p12-jupiter-glaze`); the autumn crowns and Mercury's crystals hardly change (`p12-autumn-glaze`,
+  `p12-crystal-glaze`): kept, causes named in "Next".
+- **Boulders (wish 1)**, `florakit.js` `rockGeometry`: cleaved by five planes (a top tilted 10 to 30 degrees, four
+  leaning sides), facets lit by their own normals, 0.57 of the scale high (0.78), pigment pooled at the stone's edge
+  (`materials.js` rock). `p12-desert-boulders(-crop)`: the pale soap lozenges are broken stones. `obstacles.js`: radius
+  0.58, height 0.37 of the scale, so the collision is what is drawn.
+- **Stands and views (wish 7)**: Venus `lava_rivers` stand on the west bank 10 m from the lava looking up the river
+  (it stood 0.8 m deep in it, the tour re-stood 8 m off in third person): the river is the subject
+  (`p12-venus-stand-mars-arrival`); the lava itself is a leopard print (see Next). Moon `rilles` stand on a rille's rim
+  looking along it (scratch `rille.mjs`: rim 1.3 to 2.6 bed-widths from the stream line): the winding rille reads
+  (`p12-moon-rilles`). The Moon facing Earth: see For PILOT 5.
+- **Misty sky and aurora (wish 5)**, `index.js` and `sky.js`: a biome's mist pales its own sky (the zenith toward the
+  haze by up to 0.8, the horizon toward paper, the cloud shadow toward the haze; misty_wetland 0.45 and honey_mist 0.30
+  take it, the temperate wood a breath). First strength (0.5): too weak (`p12-misty-shallows`); At 0.8 the sky over the wetland is a pale whitish blue running down into the mist, the cumulus softer (`p12-earth-misty-forest-coast`): kept.
+  Aurora: a biome may name it (`aurora: 1`, Neptune's tundra); curtains with a wavy pale viridian lower edge, rays
+  fading into violet, folded along the horizon, anchored to the planet and drifting; by day a pale ghost, by night the
+  palest thing low down. First version at 4 to 10 degrees up: lost in the near-paper low sky (`p12-neptune-aurora-v1-
+  stand`); Raised (its lower edge 9 to 19 degrees up), viridian to violet, 0.62 of the way by day: pale green curtains with rays stand in the upper sky by day (`p12-neptune-aurora-storm`): kept. Not seen at night.
+- **Airless haze (wish 6)**: `index.js` gives an airless world its look's visibility near the ground (it was 40 km),
+  easing to space's clear air from 250 to 2500 m up; `moon.js` visibility [900, 9000] and a pale silver haze. In the
+  rilles frame the far rims are softer, the effect is small (the horizon is 70 to 400 m off).
+- **Night key (wish 3)**, `post.js`: at night the land's washes under half value are laid into a band above the night's
+  deepest indigo (a toe, not a clamp); the sky keeps its own night. Mercury obsidian at 23 h: land median L 8.4 (one
+  flat mass) -> 23.5, p5 21, p95 24.5, a step under the low sky's 30 (`p12-night-key`).
+- **Arrival frames on Mercury and Mars**: no boulder or shard within 6 m of a first landing (`floraplace.js`), plus the
+  new boulders: Mercury's crowd of saturated violet boulders round the explorer is gone, Mars' pale lozenge too
+  (`p12-mercury-arrival`, `p12-venus-stand-mars-arrival`).
+- **Halftone on near shallows (wish 9)**: the bed's small bumps rose through the water where the two meshes interpolate
+  differently; the water is laid 6 cm higher in the last 0.4 m of depth (`materials.js` water vertex): the dots are
+  gone (`p12-misty-shallows`). PHYSICS told (their floating twin).
+- **Flower heads (wish 10)**: five lobes, cupped, tilted out of the clump (`florakit.js` flowerGeometry). At stand
+  distance they are a few pixels: no visible change either way (`jupiter hanging_gardens`).
+- **Blizzard crest (item 3)**: sparse rock teeth 0 to 3 m along small ridges on the alpine flanks above the meadows
+  (`surface.js` alpine): the ruled diagonal is broken (`p12-blizzard-crest`, before is the tenth agent's frame).
+- **PHYSICS P20's asks**: splash rings a faint soft glaze a step under paper (alpha 0.58 -> 0.22); spray thins toward
+  the lens from 7 m; kicked dust on airless worlds a small crisp grain, not a puff (`G.uAirless`); compiled (no link log, no console message) but not seen in a frame: no rain on water and no walk on the Moon was filmed.
+
+### For PILOT (twelfth PAINTER agent)
+1. **Your review 6b item 1 (SHOULD FIX), done**: `src/world/obstacles.js` `cellsAround` now reads every cell the
+   disc touches (a square grid of points at most 0.45 of a cell apart over the disc, and its rim as closely), and the
+   query's radius cap is 90 m (was 60; you ask 80 round a landing site). Your `obsmiss.mjs` (wide query / union of
+   4 m queries): Earth 80 m 554/536 (was 260/536), Mercury 80 m 132/126 (15/126), Neptune 80 m 209/202 (88/202),
+   Pluto 30 m 93/85 (22/85), Mercury 30 m 37/36 (18/36); the wide query now finds as many or a few more (the union is
+   sampled on a 5 m grid). Your contract tests pass with it.
+2. **Item 2, done**: no boulder or shard is placed within 6 m of a first landing's clearing (`floraplace.js`
+   `placeUnder`, the same cells the obstacles read). Your `arrival.mjs`: moved 0.0 m on all ten bodies (room 5.7 to
+   10.9 m; Jupiter and Uranus clear).
+3. **Item 3, Neptune's season: yes, flip it** (`axialTilt` 0.49). Arrivals in a lilac twilight at every hour are not
+   the painting; `aurora_tundra` keeps its aurora in the sky code whatever the sun. Say when it is in and I re-check
+   `kelp_forests` (the art pass tuned it under a 2-degree sun).
+4. **The boulders are a new shape** (ARTPASS wish 1, `florakit.js` `rockGeometry`): cleaved, flatter stones, 0.57 of
+   their scale high (were 0.78). `sampleObstacles` gives a boulder radius 0.58 and height 0.37 of its scale (were 0.62
+   and 0.58), so what you bump into is what is painted; the walker meets lower stones.
+5. **The Moon facing Earth (ARTPASS wish 7)**: not a stand question. The Moon turns once a month (3600 s), so after
+   `teleport({hour: 10})` Earth's place in its sky depends on the clock: at the rilles stand, azimuth 96 and 7 degrees
+   up at t = 0, under the horizon from about t = 300 to 2300 s, up in the west after (scratch `moonearth.mjs`). No yaw
+   faces it at every clock. If the tour or the arrival should show Earth, it is the hour or the Moon's `orbitPhase`
+   that would do it (yours).
+6. **The ship at a coast stand**: at a beach 1 m from the water the ship was set down in the shallows (foam ring round
+   its hull, Earth's first candidate beach); at the stand kept (`sea_coast`, facing 120) it is out of view. A ship
+   standing in surf is worth a look in `spawnOn` (dry ground for the gear).
+7. The sea map is wired (`c08dddb`): nothing for you, but a landing on water now meets the local sea.
+
+### For PHYSICS (twelfth PAINTER agent)
+1. **Your sea map is wired** (P18 and P19, `c08dddb`): `PC_PHYS_SEA_MAP` in the water material, the texture and the
+   three grids/band copied in `syncPhysWater`, the local sea and the local way of the waves read everywhere the shader
+   read `uPhysWaterSea` and `uPhysWaterDir`. Compiled on SwiftShader: 36 programs, no link log, no console message;
+   frames show a breaking crest, shore foam and swell bands.
+2. **coast.mjs: both PASS** (clean export of `418ac5b` and later). Neptune's margin is thin (Hs 3.18 m against the
+   mark 3.14), and here is why: the squall that coast.mjs finds peaks at 240 s, so its 150 s settle starts at 90 s,
+   and the swell (90 s to come up) has not grown: the most exposed water about, at the target's own 2.5 km and 30 to
+   47 m deep, reaches 3.05 to 3.30 m against the target's 4.21 (0.73 to 0.78 of it). Most beaches facing the storm
+   miss the mark by 1 to 5 %; with `--settle=240` (the run from t = 0) they pass with room (3.24 m at a beach that
+   fails at 150). Your call whether the target should be what this storm can raise in the time it blows.
+3. **Neptune's coast terrain changed** (the coordinator's ruling): `neptune.js` `storm_seas` `t.open`, a reach of
+   open water 2.3 km long east of the old stand, floor 34 m down; the big island east of the old stand is under it.
+   The stand moved 390 m south (STANDS `storm_seas`). Your lab or film subjects placed by `getStandPure('neptune',
+   'storm_seas')` move with it; the old stand's lagoon is now open water to the east.
+4. **The boulders are flatter** (0.57 of their scale high, were 0.78; `sampleObstacles` 0.37 of the scale over the
+   ground, was 0.58): if your clamber reads PILOT's boulders, it meets lower faces.
+5. **Your floating twin (P20 note)**: the water vertex stage now lays the sheet 6 cm higher in the last centimetres of
+   the shallows: after the waves' mix, `p += up * 0.06 * (1 - smoothstep(0.05, 0.40, aDepth))` (aDepth the still
+   depth): the bed's small bumps rose through the surface there as a halftone of dots (ARTPASS wish 9). Add the same
+   term to `waterLevel` near shore, or the figure stands 6 cm into the sheet in ankle-deep water. Nothing else in the
+   mix changed (1.28, the 0.07 beach and the carry are as they were).
+6. **Splash rings** (your P20 proposal): `kitmat.js` ring: cover alpha 0.58 -> 0.22, its edge softer (0..0.34), the
+   colour a step under paper (0.96); region kept (the rings are a glaze laid after the brush, so the region does not
+   soften them). Seen in a frame: see the hand-over.
+7. **White horses at Earth's coast**: the shader now breaks white horses wherever the local sea's white share says so
+   (`galeW` takes `smoothstep(0.012, 0.07, sea.w)`, it took Hs over 0.5 m only): Earth's 13 m/s storm whitens 5 to 6 %
+   of the sea at Hs 0.3 to 0.4 m. Your P20 arrival fix matters here: my storm frames were taken 10 s after a teleport.
+8. **Your other P20 asks**: spray (`kitmat.js` spume) thins toward the lens from 7 m and is gone at 1.6 m; kicked dust
+   on an airless world (`G.uAirless`, set by the world per body) is drawn as a small crisp grain of the ground's own
+   dust, not a soft puff, so a fan of grains keeps its shape (compiled; not yet seen in a frame of a walk on the Moon);
+   Neptune's near-black cliff: the terrain's storm wash no longer pushes an already dark wash toward black, and stacks
+   have a rounded crown and a skirt; Earth's combed headland stripes: the coast cliff profile (talus, two lifts, a
+   ledge, a rounded shoulder). See the hand-over for what was seen.
+
+## Handover of the hardening review (eleventh PAINTER agent; kept)
+
 Written by the eleventh PAINTER agent (the lead's hardening review, `docs/lead/HARDENING.md`, while the
 owner's art pass ran). The tenth agent's handover is kept below it ("Handover of block 7"); its rules hold.
 
