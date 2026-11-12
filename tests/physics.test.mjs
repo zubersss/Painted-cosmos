@@ -257,3 +257,22 @@ test('with physics: suit thrusters make the start and the stop crisp (the named 
   assert.ok(tStop != null && tStop < 1.0, 'stopped in ' + tStop + ' s');
   assert.ok(len(sub(sim.ex.p, p0)) < 1.3, 'within ' + len(sub(sim.ex.p, p0)).toFixed(2) + ' m');
 });
+
+test('with physics: on a light world a run still slides, but the suit stops it once the keys are let go', { skip }, () => {
+  // At the old 0.45 share a run took 7.7 m and 2.1 s to stop on the Moon, 10.5 m on Pluto.
+  const sim = newSim({ body: 'moon' });
+  sim.teleport({ body: 'moon' });
+  const pad = new Pad();
+  play(sim, pad, 1);
+  pad.press('KeyW'); pad.press('ShiftLeft');
+  let t90 = null;
+  play(sim, pad, 5, { each: (t) => { if (t90 == null && sim.ex.speed > EXPLORER.runSpeed * 0.9) t90 = t; } });
+  assert.ok(t90 != null && t90 > 1.2, 'the run still builds up slowly on the Moon: 90 % of pace in ' + t90 + ' s');
+  pad.release('KeyW'); pad.release('ShiftLeft');
+  const p0 = { ...sim.ex.p };
+  let tStop = null;
+  play(sim, pad, 4, { each: (t) => { if (tStop == null && sim.ex.speed < 0.2) tStop = t; } });
+  const d = len(sub(sim.ex.p, p0));
+  assert.ok(tStop != null && tStop < 1.9, 'stopped in ' + tStop + ' s');
+  assert.ok(d > 3 && d < 6.5, 'a slide of ' + d.toFixed(2) + ' m: longer than on Earth, not a skid');
+});

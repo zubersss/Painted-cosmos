@@ -25,6 +25,7 @@ export const EXPLORER = Object.freeze({
   jetThrust: 17,             // m/s^2 upward while burning (gravity is subtracted from this)
   jetMaxRise: 8.5,           // m/s cap on climb speed (rises in light gravity, see jetRiseCap)
   assistAccel: 4,            // m/s^2 of suit-thruster help for starting and stopping (with PHYSICS)
+  assistStopMin: 0.75,       // ...of which a light world keeps at least this share once the keys are let go
   windAirCap: 12,            // m/s: off the ground the suit holds off whatever wind is beyond this (PHYSICS' cmd.shelter01)
   windPace: 0.012,           // per m/s of wind along the walk: a headwind takes a little of the pace, a tailwind adds a little
   windPaceMin: 0.75,         // ...never less than this share of the pace (3.15 m/s walking into any gale)
@@ -294,8 +295,12 @@ function stepExplorerBodied(st, input, dt, env, T) {
   cmd.jetMaxRise = jetRiseCap(env.gravity, T);
   // Suit thrusters help the boots start and stop (PHYSICS' named assist force): without them a
   // 100 kg explorer at this pace takes 0.6 s and 1.2 m to stop on grass.
-  // The suit's help scales with the world's gravity: light worlds let you slide a little.
-  cmd.assistAccel = T.assistAccel * Math.min(1, Math.max(0.45, (env.gravity || 9) / 9));
+  // The suit's help scales with the world's gravity: light worlds let you slide a little. When
+  // the keys are let go it brakes harder than that (assistStopMin): at 0.45 a run took 7.7 m
+  // and 2.1 s to stop on the Moon and 10.5 m and 2.9 s on Pluto, so every view was overshot;
+  // now 5.7 m and 7.0 m. The run, its start and PHYSICS' read of the way ahead are unchanged.
+  const letGo = wish.x === 0 && wish.y === 0 && wish.z === 0;
+  cmd.assistAccel = T.assistAccel * Math.min(1, Math.max(letGo && T.assistStopMin != null ? T.assistStopMin : 0.45, (env.gravity || 9) / 9));
   // Falls are held to a gentle terminal speed, then eased down to a soft touchdown.
   // (0.45 m/s per metre: from the top of a jetpack hop the fall is gathered in early, not
   // caught at the last moment.)
