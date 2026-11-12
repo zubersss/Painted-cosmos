@@ -290,7 +290,7 @@ export class SeaMap {
       if (best >= 0) { wp.ok = true; wp.n = best; wp.x = b.x0 + (best % N) * b.cell; wp.z = b.z0 + ((best / N) | 0) * b.cell; wp.depth = D[best]; wp.cap = cap[best]; }
     }
     this._betterWp = -1;
-    b.rv = this.rose.version;
+    b.rv = this.rose.version; b.roseReady = !!this.rose.ready;   // (P20) a build made with the far rose finished measures the sea
     // the rose is geographic at its point: the frame's east there, as a geographic angle
     if (wp.ok) {
       const fr = c.frame; fr.dir(wp.x, wp.z, _d3);
@@ -541,6 +541,6 @@ export class SeaMap {
     T.refU = b.U * Math.cos(wrap(S[ref * 8 + 6] - b.aU - Math.PI)); T.ref = ref; T.refOpen = S[ref * 8 + 5];
     const rl = ref >= NN ? 1 : 0, rn = ref - rl * NN;
     T.refX = (rl ? b.x02 : b.x0) + (rn % N) * (rl ? SEA_MAP.outerCell : b.cell); T.refZ = (rl ? b.z02 : b.z0) + ((rn / N) | 0) * (rl ? SEA_MAP.outerCell : b.cell);
-    T.on = true; T.version++; this.built++; this.stats.built = this.built;
+    T.on = true; T.version++; this.built++; this.stats.built = this.built; T.roseReady = !!b.roseReady;
   }
 }

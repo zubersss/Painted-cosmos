@@ -347,7 +347,8 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       stats.msFetch = now() - tg;
     }
     water.attachMap(liqLevel > -1e8 && seaMap.target.on ? seaMap.target : null);
-    water.expectMap = true;     // (P20) the sea on arrival settles quickly until the map's first build has measured it (water.js arriveWait)
+    // (P20) the sea on arrival settles quickly until it has been measured: a map built with the far rose finished (water.js arriveWait)
+    water.expectMap = true; water.seaMeasured = seaMap.target.on && !!seaMap.target.roseReady;
     // wakes: a body moving in the liquid, and thrusters blowing on it, leave rings of waves
     if (water.present && dist) {
       const rhoL = cover.liquidDensity || liquidOf(bodyId).density;
