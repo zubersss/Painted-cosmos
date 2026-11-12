@@ -203,12 +203,28 @@ export const EXPLORER_BODY_STATE = () => ({
   gaitAmp: 0, gaitK: 1, gaitV: 0, bobFix: 0, bobMean: 0,
 });
 
-const _air = { density: 1.225, wind: { x: 0, y: 0, z: 0 } };
-// (P18) what feels the air: a body half a metre across moving at its own velocity (the sub-second eddies, wind.js gustSubAt)
-const _recv = { size: 0.5, vx: 0, vy: 0, vz: 0 };
-const _gnd = {};
-const _dir = { x: 0, y: 0, z: 0 };
-const _dir2 = { x: 0, y: 0, z: 0 };
+// (P19) THE STEP'S SCRATCH. Every object a body step writes and reads back between its own lines (the unit direction it
+// sampled last, the ground under the feet, the air, a point read ahead, the gait's numbers) belongs to one set, handed
+// down as an argument to each function the step calls; no step reaches for another's. The walker's steps have one set,
+// the ghost's (ghostCrosses: the body's own step run over a feature from INSIDE the walker's step) another. Until P19
+// both wrote one module-level set, and every trial left the walker's up (`_dir`, which lays the velocity along the
+// ground while clambering) and its ground (`_gnd`: material, friction, sink, dust) those of the ghost's run: off the
+// x-z plane a run through boulders gained up to 1.1 m/s of radial speed with its feet on level ground (review 7,
+// finding 1).
+function stepScratch(ghost = false) {
+  return {
+    ghost,                                  // the ghost's steps lay no stride: the gait is output only (P13), never read by a step
+    dir: { x: 0, y: 0, z: 0 },              // the unit direction sampled last: the body's up at its new place, once sampled
+    dir2: { x: 0, y: 0, z: 0 },             // a point read ahead (groundAhead, probeStart, the next footfall)
+    gnd: {},                                // env.ground's out
+    G: null, gEnv: null, gx: 0, gy: 0, gz: 0,   // the ground where the last step ended (env.ground's answer), and where
+    air: { density: 1.225, wind: { x: 0, y: 0, z: 0 } },
+    // (P18) what feels the air: a body half a metre across moving at its own velocity (the sub-second eddies, wind.js gustSubAt)
+    recv: { size: 0.5, vx: 0, vy: 0, vz: 0 },
+    gt: {},                                 // gaitOf's out
+  };
+}
+const _walkS = stepScratch(), _ghostS = stepScratch(true);
 const DEFAULT_GROUND = { material: 'soil', friction: 0.7, kinetic: 0.55, foothold: 0.3, restitution: 0.1, sink: 0.015, drag: 0.03, dust: 0.1 };
 const DEFAULT_LIQUID = { density: 999, viscosity: 1.14e-3 };
 
@@ -222,21 +238,22 @@ export function explorerTerminal(g, rho, T = EXPLORER_BODY) {
   return rho > 0 ? Math.sqrt(2 * T.mass * g / (rho * T.cdaFall)) : Infinity;
 }
 
-// The ground `dist` metres ahead of (px,py,pz) along (hx,hy,hz): its radius (one sample). NaN when not moving.
-function groundAhead(env, px, py, pz, hx, hy, hz, dist) {
+// The ground `dist` metres ahead of (px,py,pz) along (hx,hy,hz): its radius (one sample; its unit direction is left in
+// D2, the step's scratch.dir2). NaN when not moving.
+function groundAhead(env, D2, px, py, pz, hx, hy, hz, dist) {
   const l = Math.hypot(hx, hy, hz);
   if (!(l > 1e-9)) return NaN;
   const k = dist / l, x = px + hx * k, y = py + hy * k, z = pz + hz * k, r = Math.hypot(x, y, z) || 1;
-  _dir2.x = x / r; _dir2.y = y / r; _dir2.z = z / r;
-  return env.sample(_dir2).radius;
+  D2.x = x / r; D2.y = y / r; D2.z = z / r;
+  return env.sample(D2).radius;
 }
 // (P16) THE WAY AHEAD. Running, read the ground `d` ahead along the path (and aheadSpan short of it), d far enough for the
 // soles to brake from this pace; a face the hips must climb (a rise of more than the stroke within aheadSpan, and more
 // than the stroke over the line of the ground being run on, within a clamber) is remembered; the pace held is what still
 // meets it at the pace it can be crossed in contact. aB: the braking the grip and the assist can give (m/s^2).
 // (P17) Anything the legs must work on (a rise of more than their fold) is tried: see EXPLORER_BODY.aheadProbe. vw: the
-// pace wished for (a feature is tried at the faster of it and the pace now).
-function wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh) {
+// pace wished for (a feature is tried at the faster of it and the pace now). S: the step's scratch (see stepScratch).
+function wayAhead(B, env, S, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh) {
   const stroke = T.legFold + T.legReach, ab = Math.max(0.3, T.aheadMargin * aB);
   const r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r;
   let hx = sx, hy = sy, hz = sz; const hu = hx * ux + hy * uy + hz * uz; hx -= hu * ux; hy -= hu * uy; hz -= hu * uz;
@@ -269,11 +286,11 @@ function wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh) {
         } else if (A && !A.tried && Math.abs(Q.d - A.d) < T.aheadSpan + T.aheadProbeAfter) A = B.ahead = null;   // tried: no slowing
       }
     } else {
-      const hN = groundAhead(env, px, py, pz, hx, hy, hz, d - T.aheadSpan), hF = groundAhead(env, px, py, pz, hx, hy, hz, d);   // (_dir2: the far point)
+      const D2 = S.dir2, hN = groundAhead(env, D2, px, py, pz, hx, hy, hz, d - T.aheadSpan), hF = groundAhead(env, D2, px, py, pz, hx, hy, hz, d);   // (D2: the far point)
       const slope = B.trend > 0 ? B.trend / vh : 0, rise = hF - h1 - slope * d;
       const known = B.seen && d <= B.seen.d;
       if (!known && hF - hN > T.legFold && rise > T.legFold && hF - h1 <= T.clamber) {
-        const fx = _dir2.x, fy = _dir2.y, fz = _dir2.z;
+        const fx = D2.x, fy = D2.y, fz = D2.z;
         // the law stands in while it is tried (faces over the stroke, as in P16)
         if (hF - hN > stroke && rise > stroke) {
           const vc = Math.max(0.5, T.aheadPace / Math.pow(Math.max(0.05, rise - T.legFold), T.aheadExp));
@@ -282,7 +299,7 @@ function wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh) {
           if (A && Math.abs(N.d - A.d) < T.aheadSpan) { if (N.vc < A.vc && !A.tried) { A.vc = N.vc; A.rise = N.rise; } }
           else if (!A || paceCost(N, ab, T) < paceCost(A, ab, T)) A = B.ahead = N;
         }
-        if (!(A && A.tried && Math.abs(d - A.d) < T.aheadSpan) && !(B.noTry && d <= B.noTry.d)) probeStart(B, env, px, py, pz, h1, hx, hy, hz, r, d, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
+        if (!(A && A.tried && Math.abs(d - A.d) < T.aheadSpan) && !(B.noTry && d <= B.noTry.d)) probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, d, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
       }
     }
   }
@@ -302,24 +319,27 @@ function paceCost(q, ab, T) { return Math.sqrt(q.vc * q.vc + 2 * ab * Math.max(0
 // ---- (P17) the way ahead, tried ------------------------------------------------------------------------
 // The feature's profile along the path, relative to the ground under the walker, from aheadProbeBefore short of the
 // span to aheadProbeAfter beyond the far point at d; the trials then run the body itself over it.
-function probeStart(B, env, px, py, pz, h1, hx, hy, hz, r, d, rise, v, fx, fy, fz, T) {
+function probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, d, rise, v, fx, fy, fz, T) {
   const n = Math.max(2, Math.min(40, Math.round((T.aheadSpan + T.aheadProbeBefore + T.aheadProbeAfter) / T.aheadProbe) + 1));
   let Q = B.probe;
-  if (!Q || Q.prof.length < n) Q = B.probe = { active: false, prof: new Float64Array(n), nsl: new Float64Array(n), n: 0, step: T.aheadProbe, x: 0, y: 0, z: 0, d: 0, rise: 0, lo: 0, hi: 0, law: 0, tries: 0, vc: 1e9, surf: null, end: { x: 0, y: 0, z: 0, d: 0 }, R: r, g: 0, env: null };
+  if (!Q || Q.prof.length < n) Q = B.probe = { active: false, prof: new Float64Array(n), nsl: new Float64Array(n), n: 0, step: T.aheadProbe, x: 0, y: 0, z: 0, d: 0, rise: 0, lo: 0, hi: 0, law: 0, tries: 0, vc: 1e9, surf: null, gnd: {}, G: null, end: { x: 0, y: 0, z: 0, d: 0 }, R: r, g: 0, env: null };
   const s0 = Math.max(0.2, d - T.aheadSpan - T.aheadProbeBefore);
   // (each sample's height, and the slope along the way its own normal gives: the ghost meets the ground with the normals
   // the walker will meet it with, which need not be the profile's own: PILOT's boulders keep the level ground's)
   for (let i = 0; i < n; i++) {
     const k = s0 + i * T.aheadProbe, x = px + hx * k, y = py + hy * k, z = pz + hz * k, rr = Math.hypot(x, y, z) || 1;
-    _dir2.x = x / rr; _dir2.y = y / rr; _dir2.z = z / rr;
-    const sm = env.sample(_dir2), nm = sm.normal, nu = nm ? nm.x * _dir2.x + nm.y * _dir2.y + nm.z * _dir2.z : 1;
+    D2.x = x / rr; D2.y = y / rr; D2.z = z / rr;
+    const sm = env.sample(D2), nm = sm.normal, nu = nm ? nm.x * D2.x + nm.y * D2.y + nm.z * D2.z : 1;
     Q.prof[i] = sm.radius - h1;
     Q.nsl[i] = nm && nu > 0.05 ? -(nm.x * hx + nm.y * hy + nm.z * hz) / nu : 0;
   }
-  Q.end.x = _dir2.x; Q.end.y = _dir2.y; Q.end.z = _dir2.z; Q.end.d = s0 + (n - 1) * T.aheadProbe;
-  // the ground there (for its grip): the far point's own surface, kept
-  _dir2.x = fx; _dir2.y = fy; _dir2.z = fz;
-  { const s = env.sample(_dir2); Q.surf = Q.surf || {}; for (const k in s) Q.surf[k] = s[k]; }
+  Q.end.x = D2.x; Q.end.y = D2.y; Q.end.z = D2.z; Q.end.d = s0 + (n - 1) * T.aheadProbe;
+  // the ground there (for its grip): the far point's own surface, kept, and (P19) its contact properties, asked of the
+  // walker's env once, here, into the probe's own object: the ghost's steps read them and never call the walker's env
+  // (P17 asked env.ground at every ghost step, into the walker's own ground object: most of a trial's cost, and finding 1)
+  D2.x = fx; D2.y = fy; D2.z = fz;
+  { const s = env.sample(D2); Q.surf = Q.surf || {}; for (const k in s) Q.surf[k] = s[k]; }
+  Q.G = env.ground ? env.ground(Q.surf, Q.gnd) : null;
   Q.n = n; Q.step = T.aheadProbe; Q.x = fx; Q.y = fy; Q.z = fz; Q.d = d; Q.rise = rise; Q.R = r; Q.xFar = d - s0;
   // (the ghost runs from a little before the ground starts to rise to where the body is back on its feet past the top)
   { let i0 = 0, it = 0; while (i0 < n - 1 && Q.prof[i0] - Q.prof[0] < 0.05) i0++; for (let i = 1; i < n; i++) if (Q.prof[i] > Q.prof[it]) it = i; Q.x0 = Math.max(0, i0 - 1) * Q.step - 1.5; Q.xTop = it * Q.step; }
@@ -350,6 +370,7 @@ function probeTrial(Q, env, T) {
 const _gq = [0, 1, 2, 3].map(() => ({ radius: 0, normal: { x: 0, y: 1, z: 0 }, liquidRadius: 0, slope: 0, isLiquid: false }));
 let _gk = 0, _gQ = null;
 const _gst = { p: { x: 0, y: 0, z: 1 }, v: { x: 0, y: 0, z: 0 }, grounded: true, phys: null };
+const _gB0 = Object.freeze(EXPLORER_BODY_STATE()), _gB = EXPLORER_BODY_STATE();   // (P19) the ghost's body, set afresh each trial (no garbage)
 const _gcmd = { wish: { x: 0, y: 0, z: 0 } };
 const _gT = new WeakMap();
 function ghostSample(dir) {
@@ -366,18 +387,20 @@ function ghostCrosses(Q, v, env, T) {
   let Tg = _gT.get(T);
   if (!Tg) { Tg = Object.freeze({ ...T, aheadFrom: 1e9 }); _gT.set(T, Tg); }     // (the ghost does not read ahead itself)
   const P = Q.parent;
-  const genv = Q.env || (Q.env = { sample: ghostSample, gravity: 0, ground: null, liquid: undefined });
-  genv.gravity = P.gravity; genv.liquid = P.liquid; genv.ground = P.ground ? (s, out) => P.ground(Q.surf, out) : undefined;
+  // (P19) the ghost's env: its own samples (the profile), the walker's gravity and liquid, and the far point's ground as
+  // probeStart asked it (Q.G): nothing in a trial calls the walker's env or touches the walker's scratch (_ghostS below)
+  const genv = Q.env || (Q.env = { sample: ghostSample, gravity: 0, ground: undefined, liquid: undefined, groundQ: () => Q.G });
+  genv.gravity = P.gravity; genv.liquid = P.liquid; genv.ground = Q.G ? genv.groundQ : undefined;
   _gQ = Q;
   const st = _gst, R = Q.R, end = (Q.n - 1) * Q.step + 0.3;
   let t = Q.x0 / R, rr = R + Q.prof[0];
   st.p.x = Math.sin(t) * rr; st.p.y = 0; st.p.z = Math.cos(t) * rr;
   st.v.x = Math.cos(t) * v; st.v.y = 0; st.v.z = -Math.sin(t) * v;
-  st.grounded = true; st.phys = null;
+  st.grounded = true; st.phys = Object.assign(_gB, _gB0);
   for (let k = 0; k < 900; k++) {
     t = Math.atan2(st.p.x, st.p.z);
     _gcmd.wish.x = Math.cos(t) * v; _gcmd.wish.y = 0; _gcmd.wish.z = -Math.sin(t) * v;
-    stepExplorerBody(st, _gcmd, 1 / 60, genv, Tg);
+    stepBody(st, _gcmd, 1 / 60, genv, Tg, _ghostS);
     const B = st.phys;
     if (!st.grounded || B.brace > 1e-3) return false;
     if (B.grip && B.paceCap < 1e8) { const sp = Math.hypot(st.v.x, st.v.y, st.v.z); if (sp > B.paceCap + 0.02) return false; }
@@ -462,15 +485,14 @@ function pulseAt(ph, o, gE, v, dy, T) {
   if (o.gait === 1) return v > 0.2 ? clamp(-T.recovery * gE * dy / v, -0.3 * v, 0.3 * v) : 0;
   return 0;
 }
-const _gt = {};
 const mkFall = () => ({ n: 0, foot: 0, p: { x: 0, y: 0, z: 0 }, force: 0, speed: 0 });
 function footfall(B, foot, x, y, z, force, speed) {
   const f = B.footfalls[++B.steps & 3];
   f.n = B.steps; f.foot = foot; f.p.x = x; f.p.y = y; f.p.z = z; f.force = force; f.speed = speed; B.footfall = f;
 }
 // One step of the stride: called at the end of every body step, after st.p and st.v are set. It reads the
-// body and writes only the gait's own numbers: the body's path and pace are not touched by it.
-function stepGait(B, st, dt, grounded, gE, env, T) {
+// body and writes only the gait's own numbers: the body's path and pace are not touched by it. S: the step's scratch.
+function stepGait(B, st, dt, grounded, gE, env, T, S) {
   if (!B.feet) {
     B.feet = [{ fwd: 0, up: 0, side: -0.5 * T.stepWidth, down: 1 }, { fwd: 0, up: 0, side: 0.5 * T.stepWidth, down: 1 }];
     B.heading = { x: 0, y: 0, z: 0 }; B.footfalls = [mkFall(), mkFall(), mkFall(), mkFall()]; B.footfall = null;
@@ -485,7 +507,7 @@ function stepGait(B, st, dt, grounded, gE, env, T) {
     footfall(B, 2, px, py, pz, T.mass * (gE + Math.min(T.legCatch, B.impact * B.impact / (2 * T.legFold))), B.impact);
   }
   if (stepping) B.gaitV = v;
-  const o = gaitOf(Math.max(B.gaitV, 0.12), gE, T, _gt, B.gaitK);
+  const o = gaitOf(Math.max(B.gaitV, 0.12), gE, T, S.gt, B.gaitK);
   // how much of the stride there is: none at rest, in the air or sliding; less while the legs are folded on a clamber
   const ampT = stepping ? smoothstep(0.1, 0.5, v) * (1 - smoothstep(0.3, 0.9, B.clamber01)) : 0;
   B.gaitAmp += (ampT - B.gaitAmp) * (1 - Math.exp(-dt / 0.08));
@@ -519,10 +541,10 @@ function stepGait(B, st, dt, grounded, gE, env, T) {
   if (fell >= 0 && amp > 0.02) {
     // where the foot comes down: ahead of the body by half the stance's travel, to its own side, on the ground there
     const sd = (fell ? 0.5 : -0.5) * T.stepWidth, rx = H.y * uz - H.z * uy, ry = H.z * ux - H.x * uz, rz = H.x * uy - H.y * ux;
-    const x = px + H.x * X + rx * sd, y = py + H.y * X + ry * sd, z = pz + H.z * X + rz * sd, l = Math.hypot(x, y, z) || 1;
-    _dir2.x = x / l; _dir2.y = y / l; _dir2.z = z / l;
-    const gr = env.sample(_dir2).radius;
-    footfall(B, fell, _dir2.x * gr, _dir2.y * gr, _dir2.z * gr, T.mass * gE * (1 - amp + amp * o.peak), o.gait === 2 ? 0.5 * gE * o.flight : 0.25 * v);
+    const x = px + H.x * X + rx * sd, y = py + H.y * X + ry * sd, z = pz + H.z * X + rz * sd, l = Math.hypot(x, y, z) || 1, D2 = S.dir2;
+    D2.x = x / l; D2.y = y / l; D2.z = z / l;
+    const gr = env.sample(D2).radius;
+    footfall(B, fell, D2.x * gr, D2.y * gr, D2.z * gr, T.mass * gE * (1 - amp + amp * o.peak), o.gait === 2 ? 0.5 * gE * o.flight : 0.25 * v);
   }
 }
 
@@ -545,6 +567,10 @@ function stepGait(B, st, dt, grounded, gE, env, T) {
 //          liquidOf(surface) -> { density, viscosity }   optional: the liquid at a place (lava, cloud froth) }
 // Returns st. Sets st.grounded, st.p, st.v and st.phys.*; never allocates after the first call.
 export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
+  return stepBody(st, cmd, dt, env, T, _walkS);
+}
+// (P19) S: the scratch this run of steps writes (the walker's, or the ghost's: see stepScratch)
+function stepBody(st, cmd, dt, env, T, S) {
   // On the ground a step is never longer than the legs resolve (legStep): at a low frame rate a run would
   // otherwise cross the flank of a boulder in two samples. At 60 Hz a run is one step, as before.
   if (st.grounded && dt > 0 && st.v) {
@@ -553,14 +579,14 @@ export function stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY) {
       if (!(n <= 4)) n = 4;
       const jump = cmd.jump, h = dt / n;
       let brace = 0;
-      for (let i = 0; i < n; i++) { stepOnce(st, cmd, h, env, T); brace += st.phys.brace; if (i === 0 && jump) cmd.jump = false; }
+      for (let i = 0; i < n; i++) { stepOnce(st, cmd, h, env, T, S); brace += st.phys.brace; if (i === 0 && jump) cmd.jump = false; }
       cmd.jump = jump; st.phys.brace = brace;
       return st;
     }
   }
-  return stepOnce(st, cmd, dt, env, T);
+  return stepOnce(st, cmd, dt, env, T, S);
 }
-function stepOnce(st, cmd, dt, env, T) {
+function stepOnce(st, cmd, dt, env, T, S) {
   const B = st.phys || (st.phys = EXPLORER_BODY_STATE());
   if (!(dt > 0)) return st;
   let px = st.p.x, py = st.p.y, pz = st.p.z;
@@ -569,8 +595,9 @@ function stepOnce(st, cmd, dt, env, T) {
   if (!(vx === vx && vy === vy && vz === vz)) { vx = vy = vz = 0; }
   const r = Math.hypot(px, py, pz) || 1;
   const ux = px / r, uy = py / r, uz = pz / r;
-  _dir.x = ux; _dir.y = uy; _dir.z = uz;
-  const s0 = env.sample(_dir);
+  const D = S.dir;
+  D.x = ux; D.y = uy; D.z = uz;
+  const s0 = env.sample(D);
   const g = env.gravity;
   const groundR = s0.radius;
   const liquidR = (s0.liquidRadius || 0) > groundR ? s0.liquidRadius : 0;
@@ -581,12 +608,15 @@ function stepOnce(st, cmd, dt, env, T) {
 
   // ---- surroundings ------------------------------------------------------------------------
   let rho = 1.225, wx = 0, wy = 0, wz = 0;
-  if (env.air) { _recv.vx = st.v.x; _recv.vy = st.v.y; _recv.vz = st.v.z; const a = env.air(st.p, _air, Math.max(0, r - groundR) + 1.0, _recv); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
+  if (env.air) { const rc = S.recv; rc.vx = st.v.x; rc.vy = st.v.y; rc.vz = st.v.z; const a = env.air(st.p, S.air, Math.max(0, r - groundR) + 1.0, rc); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
   // A named assist (PILOT's lever; default 0 = the real wind): cmd.shelter01, 0..1, is the share of the
   // wind's FORCE on the body that the suit cancels. The force goes with the square of the wind, so the
   // body is given wind x sqrt(1 - shelter01); its own drag through still air is untouched.
   if (cmd.shelter01 > 0) { const k = Math.sqrt(1 - clamp01(cmd.shelter01)); wx *= k; wy *= k; wz *= k; }
-  const G = env.ground ? env.ground(s0, _gnd) : DEFAULT_GROUND;
+  // the ground the step is taken on: (P19) where the last step ended, as the report there asked it, while the body is
+  // still exactly there (so one env.ground call a step, as before: the report asks the ground where the step ends)
+  const G = !env.ground ? DEFAULT_GROUND
+    : S.gEnv === env && px === S.gx && py === S.gy && pz === S.gz ? S.G : (S.gEnv = null, S.G = env.ground(s0, S.gnd));
   const liq = env.liquidOf ? env.liquidOf(s0) : env.liquid || DEFAULT_LIQUID;
   // viscous (Stokes) drag: nothing in water, everything in lava. 3 pi mu L v on a body of length L.
   const visc = 3 * Math.PI * (liq.viscosity || 0) / T.mass;
@@ -643,6 +673,7 @@ function stepOnce(st, cmd, dt, env, T) {
 
   const airK = 0.5 * rho * (grounded ? T.cdaUpright : T.cdaFall) / T.mass * (1 - sub);   // 1/m
   const onGround = grounded;
+  let sF = null, GF = null;                              // (P19) the surface where the step ends in contact, and its ground (see the report)
 
   if (onGround) {
     // ================= on the ground: dynamics in the plane of the terrain ===================
@@ -654,7 +685,7 @@ function stepOnce(st, cmd, dt, env, T) {
     // A face too steep to hold by friction, but low (the ground one look ahead is within a
     // clamber of the feet), is a step: the walker goes up it on its legs and hands.
     if (q > 0 && qlen > 1e-6 && nu < 0.995 && Math.sqrt(1 - nu * nu) / nu > G.friction + G.foothold && qx * nx + qy * ny + qz * nz < 0) {
-      const hS = groundAhead(env, px, py, pz, qx, qy, qz, T.look);
+      const hS = groundAhead(env, S.dir2, px, py, pz, qx, qy, qz, T.look);
       if (hS - r <= T.clamber) q = 0;
     }
     if (q < 1) {
@@ -774,8 +805,8 @@ function stepOnce(st, cmd, dt, env, T) {
     const gE = g * (1 - buoy) - vh * vh / r;
     let p1x = px + sx * dt, p1y = py + sy * dt, p1z = pz + sz * dt;
     let r1 = Math.hypot(p1x, p1y, p1z) || 1;
-    _dir.x = p1x / r1; _dir.y = p1y / r1; _dir.z = p1z / r1;
-    let s1 = env.sample(_dir);
+    D.x = p1x / r1; D.y = p1y / r1; D.z = p1z / r1;
+    let s1 = env.sample(D);
     let h1 = s1.radius, n1x = s1.normal.x, n1y = s1.normal.y, n1z = s1.normal.z;
     let dh = h1 - r;
     const gr = dh / dt;                                  // m/s the ground rises under the feet
@@ -783,7 +814,7 @@ function stepOnce(st, cmd, dt, env, T) {
     const working = !(B.jumpT > 0) && (hip0 < -0.06 || hip0 > 0.1);   // (a crouch before a jump is not a clamber)
     let looked = false, feat = false, hD = NaN;
     if ((working || B.clamberT > 0) && vh > 0.2) {
-      hD = groundAhead(env, p1x, p1y, p1z, sx, sy, sz, T.look); looked = true;
+      hD = groundAhead(env, S.dir2, p1x, p1y, p1z, sx, sy, sz, T.look); looked = true;
       // (what stands out of the ground the legs last stood on, B.base, is a feature too: a hold underfoot)
       feat = holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber);
       // a hold once taken is kept until the legs are back at their standing length on plain ground
@@ -824,7 +855,7 @@ function stepOnce(st, cmd, dt, env, T) {
       else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; face = true; }
     } else if (c1 > h1 + reach) {
       // reached out
-      if (!looked) { hD = groundAhead(env, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber); if (feat) B.grip = 1; }
+      if (!looked) { hD = groundAhead(env, S.dir2, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber); if (feat) B.grip = 1; }
       held = false;
       if (feat || !T.crestLaunch) {
         const gp = gE + T.gripAccel, cLow = c0 + w * dt - 0.5 * gp * dt * dt;    // the lowest the hold can bring the hips
@@ -840,8 +871,8 @@ function stepOnce(st, cmd, dt, env, T) {
       // braced: the feet take only part of the step, and the rest of the forward speed is lost
       p1x = px + sx * lam * dt; p1y = py + sy * lam * dt; p1z = pz + sz * lam * dt;
       r1 = Math.hypot(p1x, p1y, p1z) || 1;
-      _dir.x = p1x / r1; _dir.y = p1y / r1; _dir.z = p1z / r1;
-      s1 = env.sample(_dir);
+      D.x = p1x / r1; D.y = p1y / r1; D.z = p1z / r1;
+      s1 = env.sample(D);
       h1 = s1.radius; n1x = s1.normal.x; n1y = s1.normal.y; n1z = s1.normal.z;
       if (c1 < h1 - fold) c1 = h1 - fold;                // (a face the legs cannot fold onto: the hips are heaved up it)
       else if (c1 > h1 + reach) c1 = h1 + reach;
@@ -872,19 +903,19 @@ function stepOnce(st, cmd, dt, env, T) {
       // whose legs are not working has the ground's own velocity and keeps it.
       if (gE > 0 && (working || B.grip) && w1 > Math.max(0, B.trend)) w1 = Math.max(0, B.trend);
       const rr = Math.max(h1, c1 - reach), vv1 = w1 - su;
-      px = _dir.x * rr; py = _dir.y * rr; pz = _dir.z * rr;
+      px = D.x * rr; py = D.y * rr; pz = D.z * rr;
       vx = sx + vv1 * ux; vy = sy + vv1 * uy; vz = sz + vv1 * uz;
       B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamberT = 0; B.grip = 0;
     } else {
-      px = _dir.x * h1; py = _dir.y * h1; pz = _dir.z * h1;
+      px = D.x * h1; py = D.y * h1; pz = D.z * h1; sF = s1;
       B.hip = clamp(c1 - h1, -fold, reach); B.hipV = w1;
       // the pace the feet can follow: the hips must be down within reach of the ground one look
       // ahead by the time the feet are there
       B.paceCap = 1e9;
       if (feat && hD === hD) {
-        const gp = Math.max(0.1, gE + T.gripAccel), D = c1 - hD - reach;
-        if (D > 0) {
-          B.paceCap = T.look * gp / (w1 + Math.sqrt(w1 * w1 + 2 * gp * D));
+        const gp = Math.max(0.1, gE + T.gripAccel), Dh = c1 - hD - reach;
+        if (Dh > 0) {
+          B.paceCap = T.look * gp / (w1 + Math.sqrt(w1 * w1 + 2 * gp * Dh));
           // ... and on the way there the ground must not fall away faster than the hips can be
           // brought down within the reach that is left: v x slope <= -w + sqrt(2 (g + grip) room)
           const slope = Math.max(vh > 0.2 ? -(h1 - r) / (vh * lam * dt + 1e-9) : 0, (h1 - hD) / T.look);
@@ -893,12 +924,13 @@ function stepOnce(st, cmd, dt, env, T) {
         }
       }
       // (P16) the way ahead (see EXPLORER_BODY.aheadFrom)
-      wayAhead(B, env, px, py, pz, h1, sx, sy, sz, vh, gE, Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0), T, qlen);
+      // (P19: the trials it runs step the ghost with the ghost's own scratch: D, the walker's up here, is read just below)
+      wayAhead(B, env, S, px, py, pz, h1, sx, sy, sz, vh, gE, Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0), T, qlen);
       // the velocity lies along the ground as the legs carry it (see LEGS, 1) at the new place
-      { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
+      { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = D.x; n1y = D.y; n1z = D.z; } }
       const q1 = q === 0 || B.grip ? 0 : 1;
       if (q1 < 1) {
-        n1x = _dir.x + (n1x - _dir.x) * q1; n1y = _dir.y + (n1y - _dir.y) * q1; n1z = _dir.z + (n1z - _dir.z) * q1;
+        n1x = D.x + (n1x - D.x) * q1; n1y = D.y + (n1y - D.y) * q1; n1z = D.z + (n1z - D.z) * q1;
         const l = Math.hypot(n1x, n1y, n1z); n1x /= l; n1y /= l; n1z /= l;
       }
       const vsep = sx * n1x + sy * n1y + sz * n1z;
@@ -981,12 +1013,12 @@ function stepOnce(st, cmd, dt, env, T) {
     px += vx * dt; py += vy * dt; pz += vz * dt;
     // meet the ground
     const r1 = Math.hypot(px, py, pz) || 1;
-    _dir.x = px / r1; _dir.y = py / r1; _dir.z = pz / r1;
-    const s1 = env.sample(_dir);
+    D.x = px / r1; D.y = py / r1; D.z = pz / r1;
+    const s1 = env.sample(D);
     if (r1 <= s1.radius) {
       let n1x = s1.normal.x, n1y = s1.normal.y, n1z = s1.normal.z;
-      { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = _dir.x; n1y = _dir.y; n1z = _dir.z; } }
-      px = _dir.x * s1.radius; py = _dir.y * s1.radius; pz = _dir.z * s1.radius;
+      { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = D.x; n1y = D.y; n1z = D.z; } }
+      px = D.x * s1.radius; py = D.y * s1.radius; pz = D.z * s1.radius; sF = s1;
       const vn = vx * n1x + vy * n1y + vz * n1z;
       let hipIn = 0;
       if (vn < 0) {
@@ -1002,17 +1034,17 @@ function stepOnce(st, cmd, dt, env, T) {
         vx -= vn * n1x; vy -= vn * n1y; vz -= vn * n1z;
         if (hard > 0) {
           const vt = Math.hypot(vx, vy, vz);
-          const G1 = env.ground ? env.ground(s1, _gnd) : DEFAULT_GROUND;
+          const G1 = env.ground ? (GF = env.ground(s1, S.gnd)) : DEFAULT_GROUND;
           const cut = G1.kinetic * hard;
           const m = vt > 1e-6 ? Math.max(0, 1 - cut / vt) : 0;
           vx *= m; vy *= m; vz *= m;
         }
         B.impact = -vn;
-        hipIn = -soft * (n1x * _dir.x + n1y * _dir.y + n1z * _dir.z);
+        hipIn = -soft * (n1x * D.x + n1y * D.y + n1z * D.z);
       }
       // touching down only counts when buoyancy does not carry the body there
       const l1 = (s1.liquidRadius || 0) > s1.radius ? s1.liquidRadius - s1.radius : 0;
-      if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * _dir.x + vy * _dir.y + vz * _dir.z + hipIn; }
+      if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * D.x + vy * D.y + vz * D.z + hipIn; }
     }
     B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;
     if (!grounded) { B.hip = 0; B.hipV = 0; B.trend = 0; B.grip = 0; }
@@ -1024,16 +1056,23 @@ function stepOnce(st, cmd, dt, env, T) {
   const rF = Math.hypot(px, py, pz) || 1;
   const vvF = (vx * px + vy * py + vz * pz) / rF;
   B.speedGround = Math.sqrt(Math.max(0, vx * vx + vy * vy + vz * vz - vvF * vvF));
-  B.material = G.material; B.friction = G.friction;
+  // (P19) the ground reported (material, friction, the boot's sink and its dust) is the ground under the feet where the
+  // step ENDS: the step that comes down on a boulder's rock from the sand reports rock (until P19 the step's own ground,
+  // where it began: one step late at every edge). It is kept, with the place, for the next step to start on.
+  let GR = G;
+  if (grounded && sF && env.ground) {
+    GR = S.G = GF || env.ground(sF, S.gnd); S.gEnv = env; S.gx = px; S.gy = py; S.gz = pz;
+  } else S.gEnv = null;
+  B.material = GR.material; B.friction = GR.friction;
   B.puff = B.impact > B.puff ? B.impact : B.puff * Math.exp(-dt / 0.1);
   if (B.puff < 0.05) B.puff = 0;
-  const sinkT = grounded ? G.sink * (0.7 + 0.3 * Math.min(1, B.speedGround / 3)) + Math.min(0.1, B.impact * 0.01) : 0;
+  const sinkT = grounded ? GR.sink * (0.7 + 0.3 * Math.min(1, B.speedGround / 3)) + Math.min(0.1, B.impact * 0.01) : 0;
   B.sink += (sinkT - B.sink) * (1 - Math.exp(-dt / 0.08));
-  B.dust = grounded ? clamp01((G.dust || 0) * (0.15 + B.speedGround / 6 + B.slip01 + B.impact * 0.15)) : 0;
+  B.dust = grounded ? clamp01((GR.dust || 0) * (0.15 + B.speedGround / 6 + B.slip01 + B.impact * 0.15)) : 0;
   st.p.x = px; st.p.y = py; st.p.z = pz;
   st.v.x = vx; st.v.y = vy; st.v.z = vz;
   st.grounded = grounded;
-  stepGait(B, st, dt, grounded, g * (1 - buoy), env, T);
+  if (!S.ghost) stepGait(B, st, dt, grounded, g * (1 - buoy), env, T, S);
   return st;
 }
 

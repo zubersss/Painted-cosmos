@@ -607,3 +607,49 @@ test('P17: strideBob is the hips the body lays in a steady stride (for a figure 
   }
 });
 
+
+test('P19 the ghost keeps to its own scratch: a run through a row of boulders OFF the x-z plane keeps its velocity in the ground, keeps to its line and reports the ground under its feet (Earth, Moon; 60 and 30 Hz)', async () => {
+  // Review 7, finding 1: the ghost (P17's trials, run from inside the walker's step) wrote the walker's own module scratch:
+  // its up (which lays the velocity along the ground while clambering) and its ground (material, sink, dust). The ghost
+  // runs on the great circle through +z, so in the x-z plane (P17's test) its up was nearly the walker's and nothing showed;
+  // anywhere else a run through boulders gained 0.6 to 1.1 m/s of radial speed with its feet on level ground, strayed
+  // 0.2 to 2.4 m off its line and reported the far point's material. PILOT's boulders (scrambleSample, as src/core/sim.js
+  // builds the explorer's ground): rock on a boulder, sand elsewhere.
+  const { scrambleSample } = await import('../player/explorer.js');
+  const ROCK = { material: 'rock', friction: 0.9, kinetic: 0.7, foothold: 0.4, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 };
+  const SANDY = { material: 'sand', friction: 0.6, kinetic: 0.5, foothold: 0.2, restitution: 0.05, sink: 0.05, drag: 0.25, dust: 0.6 };
+  const ROW = [[6, 0, 1], [8.6, 0.3, 0.9], [11.4, -0.4, 1.1], [14, 0.5, 1], [16.6, 0, 0.8], [19.4, -0.3, 1.2], [22.2, 0.2, 1], [25, 0, 1]];
+  const cross = (a, b) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+  for (const place of [V(0.3, 0.9, 0.3), V(0.8, 0.2, -0.55)]) {
+    const u0 = norm(place), h0 = norm(cross(cross(u0, V(0.2, 1, 0.1)), u0)), n0 = cross(u0, h0);
+    const at = (s, o) => { const c = Math.cos(s / R), sn = Math.sin(s / R); return norm(V(u0.x * c + h0.x * sn + n0.x * o / R, u0.y * c + h0.y * sn + n0.y * o / R, u0.z * c + h0.z * sn + n0.z * o / R)); };
+    const obs = ROW.map(([s, o, h]) => ({ unitDir: at(s, o), radius: 0.6, height: h }));
+    const sample = scrambleSample((d) => ({ radius: R, normal: V(d.x, d.y, d.z), liquidRadius: 0 }), () => obs);
+    for (const g of [9.81, 1.62]) for (const hz of [60, 30]) {
+      const env = { sample, gravity: g, ground: (s, out) => Object.assign(out, s.radius > R + 0.01 ? ROCK : SANDY) };
+      const p0 = at(0, 0), st = { p: V(p0.x * R, p0.y * R, p0.z * R), v: V(), grounded: true };
+      let radial = 0, off = 0, wrong = 0, air = 0, worst = 0, vPrev = 0, far = 0;
+      for (let i = 0; i < hz * 9; i++) {
+        const u = norm(st.p), t = Math.atan2(dot(u, h0), dot(u, u0)), c = Math.cos(t), sn = Math.sin(t);
+        stepExplorerBody(st, { wish: V(6 * (h0.x * c - u0.x * sn), 6 * (h0.y * c - u0.y * sn), 6 * (h0.z * c - u0.z * sn)) }, 1 / hz, env);
+        const B = st.phys, uu = norm(st.p), v = B.speedGround; far = t * R;
+        if (far > 2) {
+          if (st.grounded) radial = Math.max(radial, Math.abs(dot(st.v, uu))); else air++;
+          off = Math.max(off, Math.abs(dot(uu, n0)) * R);
+          if (st.grounded && B.material !== (sample(uu).radius > R + 0.01 ? 'rock' : 'sand')) wrong++;
+          worst = Math.max(worst, vPrev - v);
+        }
+        vPrev = v;
+      }
+      const at_ = `at ${JSON.stringify(place)}, g ${g}, ${hz} Hz`;
+      assert.ok(radial < 0.05, `${at_}: ${radial.toFixed(3)} m/s radial with the feet on the ground (level ground: none)`);
+      assert.ok(off < 0.05, `${at_}: ${off.toFixed(3)} m off the line it was steered along`);
+      assert.equal(wrong, 0, `${at_}: ${wrong} steps report a material that is not the ground under the feet`);
+      assert.equal(air, 0, `${at_}: the feet leave the ground in ${air} steps`);
+      assert.ok(worst <= T.legCatch / hz + 0.05, `${at_}: ${worst.toFixed(2)} m/s lost in one frame (the legs take a face up at legCatch: ${(T.legCatch / hz).toFixed(2)})`);
+      // (on, at least past the fifth boulder: P19 found the run crawling at 0.5 m/s at the sixth on Earth, in the x-z plane
+      // as off it, before this fix as after: see the notes, P19, "Not done")
+      assert.ok(far > 17, `${at_}: on to ${far.toFixed(0)} m`);
+    }
+  }
+});
