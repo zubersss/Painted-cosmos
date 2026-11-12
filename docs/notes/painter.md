@@ -185,7 +185,8 @@ Block 5 and the earlier records follow; "Rules that bit me" of the earlier agent
 The lead's hardening review (`docs/lead/HARDENING.md`, "PAINTER (in order)") and the coordinator's
 follow-ups. Every check ran on a clean export of the head with only my files laid over it (scratch
 `/home/user/.pc-scratch/painter/m11/`), SwiftShader through ANGLE, one browser at a time. Commits:
-`90025a3` (A2, A1, gap 17), the coordinator's snapshot `0b76f2c` and `46fcbf8` (gap 12, gallery, evidence).
+`90025a3` (A2, A1, gap 17); gap 12 and the gallery came into the head in the coordinator's snapshot `0b76f2c`
+(recorded in `46fcbf8` with the evidence); the face and these notes in its snapshots `d874259` and `5b083c1`.
 
 ### A3 the branch clock: confirmed
 `probe.mjs` (the game at the Earth spawn, the loop running): `pc-prop-tall-broadleaf0` has
@@ -220,9 +221,11 @@ follow-ups. Every check ran on a clean export of the head with only my files lai
   and back, the ship at 300 m (snow, dust, sand kits) and in space, Saturn's orbit, and **arrivals on foot on
   Neptune (kelp), Uranus (frozen waves), Venus (fungus towers) and Jupiter (vines)**, each settled. No
   console message, `fallback` and `__pc.errors` empty. (A first run, before the geometry fix: 1 link.)
-  PILOT's caller (`src/main.js` `prewarm()`, b990e8b) makes exactly these two calls before `__pcReady`;
-  on the head with it (`90025a3`, the A1 run with the extension below) the game loads with no console
-  message at all.
+  PILOT's caller (`src/main.js` `prewarm()`, b990e8b) makes exactly these two calls before `__pcReady`.
+- **A landing on another world after ready** (the coordinator's check; `LAND=1 probe.mjs --nowarm` on a
+  clean export of the head `5b083c1`, the game's own prewarm only: 36 programs at ready): **0 links** with
+  the ship over Mars at 300 m and then down on foot on Mars, Mercury, the Moon, Pluto and Saturn, each
+  settled; the branch clock read twice again (changed); no console message, `fallback` empty.
 
 ### A1 log depth without EXT_clip_control (Firefox)
 `src/render/chunks.js` as HARDENING.md gives it: `logDepthBufFC` declared in VERT_PARS; in VERT_END
@@ -321,9 +324,8 @@ as in the hat's shade, without drawn features; at 4 m the change is slight. Weak
    sheet once whatever the tier. Measured: a forced tier 0 and back after the prewarm, 0 links.
 3. Gap 12 is in: `painter.floatFallback` is true where neither float colour buffer extension exists, and the
    game then paints on 8-bit targets (see above). Your sentence stays for any other cause.
-4. A landing on another world after ready: arrivals on foot on Neptune, Uranus, Venus and Jupiter after the
-   prewarm built nothing (A2 above). Your landing set, when the art pass frees the machine, is the proof by
-   flight.
+4. A landing on another world after ready builds nothing: with your prewarm on the head, the ship over Mars
+   at 300 m and arrivals on Mars, Mercury, the Moon, Pluto and Saturn, 0 links (A2 above).
 
 ### For PHYSICS (eleventh PAINTER agent)
 1. The gallery takes `strideBob` now (your ask, d186b65).
