@@ -75,6 +75,42 @@ test('local solar time runs forward through a day: sunrise 6, noon 12, sunset 18
   assert.ok(e.sunElevationSin(id, 0, dir) > 0, 'morning is light');
 });
 
+test('the world\'s hour: 6 and 18 on the horizon, 12 highest, wherever one stands (ARTPASS wish 12)', () => {
+  // Earth at t = 0 is at a solstice: at 36 degrees north (the spawn's latitude) the hour angle's 6
+  // and 18 have the sun 13 degrees down. The world's hour (src/world/index.js) puts them on the horizon.
+  const la = (36 * Math.PI) / 180, dir = V(Math.cos(la) * 0.6, Math.sin(la), Math.cos(la) * 0.8);
+  const old = new Ephemeris(BODIES);
+  old.setLocalSolarTime('earth', 0, dir, 6);
+  assert.ok(old.sunElevationSin('earth', 0, dir) < -0.15, 'the hour angle\'s 6 is night here (the fault)');
+  const e = new Ephemeris(BODIES);
+  const east = norm(V(dir.z, 0, -dir.x));
+  for (const h of [6, 9.5, 10, 12, 15, 18, 22]) {
+    e.setSunHour('earth', 0, dir, h);
+    near(e.sunHour('earth', 0, dir), h, 1e-4, `set to ${h}`);
+    const s = e.sunDirLocal('earth', 0), el = e.sunElevationSin('earth', 0, dir);
+    if (h === 6 || h === 18) near(el, 0, 1e-4, `${h}: the sun on the horizon`);
+    if (h === 6) assert.ok(s.x * east.x + s.z * east.z > 0, '6: in the east');
+    if (h === 18) assert.ok(s.x * east.x + s.z * east.z < 0, '18: in the west');
+    if (h === 22) assert.ok(el < 0, '22: night');
+  }
+  e.setSunHour('earth', 0, dir, 12);
+  const noon = e.sunElevationSin('earth', 0, dir);
+  for (const h of [9.5, 11.5, 12.5, 14]) { const f = new Ephemeris(BODIES); f.setSunHour('earth', 0, dir, h); assert.ok(f.sunElevationSin('earth', 0, dir) < noon + 1e-9, `noon is the highest (${h})`); }
+  // The world's own formula, at a second place and time: the same number.
+  const d2 = norm(V(-0.3, -0.5, 0.8)), t2 = 777;
+  e.setSunHour('mars', t2, d2, 16.25);
+  const s2 = e.sunDirLocal('mars', t2), ea = norm(V(d2.z, 0, -d2.x));
+  const world = (12 + Math.atan2(-(s2.x * ea.x + s2.z * ea.z), s2.x * d2.x + s2.y * d2.y + s2.z * d2.z) * 12 / Math.PI + 24) % 24;
+  near(world, 16.25, 1e-4, 'matches src/world/index.js lighting.hours');
+  // A polar day (Uranus, 70 degrees north at t = 0): the sun never sets, so 6 is out of reach;
+  // the nearest the world's hour comes is taken, on the morning side.
+  const pd = norm(V(0.2, Math.sin(1.22), 0.3));
+  e.setSunHour('uranus', 0, pd, 6);
+  const hp = e.sunHour('uranus', 0, pd);
+  assert.ok(hp > 6 && hp < 12, `polar day: the earliest hour there is (${hp})`);
+  assert.ok(e.localSolarTime('uranus', 0, pd) < 12, 'and in the morning');
+});
+
 test('frames: round trip and continuity across a frame change', () => {
   const t = 4321;
   const frames = [HELIO, bodyFrame('earth', false), bodyFrame('earth', true), bodyFrame('moon', true)];

@@ -41,9 +41,9 @@ if (flag('export')) {
 
 const painted = 'scale=0.5&quality=0';
 const STEPS = [
-  { id: 'unit', what: 'PILOT\'s unit tests (simulation, flight, camera, save, sketchbook, contract with the real worlds)', cmd: ['node', '--test', 'tests/'], shell: 'node --test tests/*.test.mjs', min: 5 },
-  { id: 'physics-unit', what: 'PHYSICS\' unit tests', cmd: ['node', '--test', 'src/physics/'], min: 5 },
-  { id: 'world-unit', what: 'PAINTER\'s unit tests', shell: 'node --test src/world/*.test.mjs', min: 3 },
+  { id: 'unit', what: 'PILOT\'s unit tests (simulation, flight, camera, save, sketchbook, contract with the real worlds)', cmd: ['node', '--test', 'tests/'], shell: 'node --test tests/*.test.mjs', min: 15 },
+  { id: 'physics-unit', what: 'PHYSICS\' unit tests', cmd: ['node', '--test', 'src/physics/'], min: 20 },   // 291 tests: 145 in 5 min at a load of 18 (2026-11-12)
+  { id: 'world-unit', what: 'PAINTER\'s unit tests', shell: 'node --test src/world/*.test.mjs', min: 10 },
   { id: 'static', what: 'the brief\'s static rules', fn: staticRules },
   { id: 'play-stub', what: 'play-through on the stubs (walk, jetpack, board, orbit, land, step out)', cmd: ['node', 'tests/playthrough.mjs', '--out', path.join(out, 'play-stub')], min: 15 },
   { id: 'play-physics', what: 'play-through on the stubs with PHYSICS', cmd: ['node', 'tests/playthrough.mjs', '--query', 'stub=render,world,art&fresh=1', '--out', path.join(out, 'play-physics')], min: 15 },

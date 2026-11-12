@@ -234,7 +234,7 @@ async function boot() {
     // Set the game clock (seconds): the weather is a function of it. The sun moves with it
     // (use setHour or teleport({ hour }) afterwards to choose the light).
     setClock: (t) => { sim.t = Math.max(0, +t || 0); },
-    setHour: (h) => { sim.eph.setLocalSolarTime(sim.bodyId, sim.t, norm3(sim.ex.p), h); },
+    setHour: (h) => { sim.eph.setSunHour(sim.bodyId, sim.t, norm3(sim.ex.p), h); },
     // Resolves when the world has had nothing left to build for `frames` frames in a row.
     settle: (frames = 12) => new Promise((resolve) => {
       let n = 0;

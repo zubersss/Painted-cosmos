@@ -269,3 +269,29 @@ test('wading into the lava of Venus at the first landing, the screen says the wa
   assert.ok(sim.ex.liquidDepth <= 0, 'the jetpack lifts the explorer out of the lava');
   assert.ok(t < 3);
 });
+
+test('the world\'s own arrival stands clear of boulders and trunks, and a place asked for is kept', { skip: skipObs }, async () => {
+  // Mercury's and Pluto's spawns stood the explorer on a boulder (ARTPASS, "arrival frames"; review 6).
+  const { Sim } = await import('../src/core/sim.js');
+  const ss = (id, d) => surface.sampleSurfacePure(id, d.x, d.y, d.z);
+  const so = (id, d, r) => obstacles.sampleObstaclesPure(id, d.x, d.y, d.z, r);
+  for (const id of BODY_IDS) {
+    const sim = new Sim({ sampleSurface: ss, getSpawn: (b) => surface.getSurface(b).getSpawn(), sampleObstacles: so, body: id });
+    const R = Math.hypot(sim.ex.p.x, sim.ex.p.y, sim.ex.p.z), u = { x: sim.ex.p.x / R, y: sim.ex.p.y / R, z: sim.ex.p.z / R };
+    let room = Infinity;
+    for (const o of so(id, u, 4)) room = Math.min(room, Math.hypot(o.unitDir.x - u.x, o.unitDir.y - u.y, o.unitDir.z - u.z) * R - o.radius);
+    assert.ok(room >= 2, `${id}: the nearest boulder or trunk is ${room.toFixed(2)} m from the feet`);
+    const sp = surface.getSurface(id).getSpawn(), sl = Math.hypot(sp.x, sp.y, sp.z);
+    const moved = Math.hypot(u.x - sp.x / sl, u.y - sp.y / sl, u.z - sp.z / sl) * R;
+    assert.ok(moved <= 12.5, `${id}: stepped ${moved.toFixed(1)} m from the world's spawn`);
+    const s = ss(id, u);
+    assert.ok(!(s.liquidRadius > s.radius) && s.slope < 0.35, `${id}: dry, gentle ground`);
+    assert.equal(s.biomeId, ss(id, { x: sp.x / sl, y: sp.y / sl, z: sp.z / sl }).biomeId, `${id}: the spawn's own biome`);
+    const ship = Math.hypot(sim.sh.p.x - sim.ex.p.x, sim.sh.p.y - sim.ex.p.y, sim.sh.p.z - sim.ex.p.z);
+    assert.ok(ship > 13 && ship < 19, `${id}: the ship waits ${ship.toFixed(1)} m away`);
+    // a place asked for (an easel, a teleport to a point) is not moved, boulder or not
+    sim.teleport({ body: id, dir: [sp.x / sl, sp.y / sl, sp.z / sl] });
+    const R2 = Math.hypot(sim.ex.p.x, sim.ex.p.y, sim.ex.p.z);
+    assert.ok(Math.hypot(sim.ex.p.x / R2 - sp.x / sl, sim.ex.p.y / R2 - sp.y / sl, sim.ex.p.z / R2 - sp.z / sl) * R2 < 0.01, `${id}: a teleport to a point lands on it`);
+  }
+});

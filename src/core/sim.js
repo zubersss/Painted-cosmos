@@ -33,6 +33,14 @@ export const FEEL = Object.freeze({
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const Y = V(0, 1, 0);
+// The world's own arrival (spawnOn with no place asked for): room round the feet and the lens.
+const ARRIVAL = Object.freeze({
+  clear: 2.5,                // metres from the feet to the nearest boulder's or trunk's edge
+  reach: 12,                 // how far from the world's spawn the explorer may be stepped
+  slope: 0.3,                // rad: gentle ground only
+  lens: 0.6,                 // metres the boom keeps from a boulder or trunk
+  turns: [0.45, 0.25, 0.65, 0.05],   // rad from the ship: each keeps it in frame
+});
 // Touchdown on the legs: where the assist hands the hull to the landing gear (m over the
 // ground) and how fast the gear lets it down (m/s; PHYSICS' recipe).
 export const LEGS = Object.freeze({ gearAt: 1.0, sink: 0.6 });
@@ -122,7 +130,10 @@ export class Sim {
     if (!d) d = this.getSpawn(bodyId) || V(0.3, 0.4, 0.86);
     const face = typeof d.yaw === 'number' ? { yaw: d.yaw, pitch: d.pitch } : null;      // the world's own view of this place
     d = norm(d);
-    if (opts.hour != null) this.eph.setLocalSolarTime(bodyId, this.t, d, opts.hour);
+    // The world's own arrival (no place asked for) is stepped off a boulder or trunk: Mercury's and
+    // Pluto's first views stood the explorer on one. A place asked for (an easel, a teleport) is kept.
+    if (!dir) d = this.clearArrival(bodyId, d);
+    if (opts.hour != null) this.eph.setSunHour(bodyId, this.t, d, opts.hour);      // the world's hour: 6 sunrise, 12 the sun highest, 18 sunset, wherever one stands
     const s = sample(d);
     const feet = scale(d, Math.max(s.radius, 0) + (opts.altitude || 0));
     // The ship waits about 16 m away on the flattest dry ground nearby.
@@ -141,8 +152,9 @@ export class Sim {
     this.bodyId = bodyId;
     this.ex = createExplorerState(feet, toShip);
     this.ex.grounded = !(opts.altitude > 0);
-    // Look a little to the side of the ship so both it and the landscape are in frame.
-    this.footCam = createFootCamera(rotateAround(toShip, d, 0.45), d);
+    // Look a little to the side of the ship so both it and the landscape are in frame; at the world's
+    // own arrival, to whichever side keeps a boulder or trunk out from between the lens and the explorer.
+    this.footCam = createFootCamera(rotateAround(toShip, d, dir ? 0.45 : this.clearView(bodyId, feet, toShip)), d);
     if (face) {
       // PAINTER's request: arrive facing the way the picture was painted (yaw from north toward east).
       const fwd = add(scale(north, Math.cos(face.yaw)), scale(east, Math.sin(face.yaw)));
@@ -154,6 +166,53 @@ export class Sim {
     this.shipCam = createShipCamera();
     this.transition = null;
     this.sm.force(S.ON_FOOT);
+  }
+
+  // Where the explorer arrives near the world's spawn `d`: the spawn itself unless a boulder or a
+  // trunk stands within ARRIVAL.clear metres of the feet; then the nearest dry, gentle spot of the same
+  // biome within ARRIVAL.reach metres that has nothing that close (else the one with the most room).
+  clearArrival(bodyId, d) {
+    const A = ARRIVAL, sample = this.sampler(bodyId), R = Math.max(1, sample(d).radius);
+    // (small queries round each place: world.sampleObstacles misses things when asked for a wide disc)
+    const room = (u) => {
+      let m = Infinity;
+      for (const o of this.obstaclesNear(bodyId, scale(u, R), A.clear + 1.5)) m = Math.min(m, len(sub(o.unitDir, u)) * R - o.radius);
+      return m;
+    };
+    if (!this.sampleObstacles || room(d) >= A.clear) return d;
+    const biome = sample(d).biomeId;
+    const east = tangent(cross(Y, d), d, V(1, 0, 0)), north = cross(d, east);
+    let best = d, bestRoom = room(d);
+    for (let ring = 1; ring <= A.reach; ring += 1) {
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        const u = norm(add(d, add(scale(east, (Math.cos(a) * ring) / R), scale(north, (Math.sin(a) * ring) / R))));
+        const s = sample(u);
+        if (s.isLiquid || s.slope > A.slope || s.biomeId !== biome) continue;
+        const r = room(u);
+        if (r >= A.clear) return u;
+        if (r > bestRoom) { best = u; bestRoom = r; }
+      }
+    }
+    return best;
+  }
+
+  // At the world's own arrival the view looks to the side of the ship (0.45 rad); the first of a few
+  // turns that keeps the ship in frame and no boulder or trunk on the boom between the lens and the
+  // explorer (a stone at the bottom of Mercury's first view hid the figure's feet).
+  clearView(bodyId, feet, toShip) {
+    const d = norm(feet), R = len(feet);
+    if (!this.sampleObstacles) return 0.45;
+    for (const turn of ARRIVAL.turns) {
+      const back = scale(rotateAround(toShip, d, turn), -1);
+      let clear = true;
+      for (let k = 1; k <= 6 && clear; k++) {
+        const p = norm(addScaled(feet, back, (k / 6) * (CAMERA.boom + 1)));
+        for (const o of this.obstaclesNear(bodyId, scale(p, R), 2.5)) if (len(sub(o.unitDir, p)) * R < o.radius + ARRIVAL.lens) { clear = false; break; }
+      }
+      if (clear) return turn;
+    }
+    return 0.45;
   }
 
   // ---- one frame -----------------------------------------------------------------------------
@@ -993,7 +1052,7 @@ export class Sim {
     const body = BODIES[active.id];
     const edge = spaceAltitude(body);
     m.bodyId = active.id;
-    m.timeOfDay = this.eph.localSolarTime(active.id, this.t, active.dir);
+    m.timeOfDay = this.eph.sunHour(active.id, this.t, active.dir);
     m.altitude01 = clamp01(active.altitude / edge);
     m.inSpace01 = smoothstep(edge * 0.75, edge * 1.6, active.altitude);
     if (active.altitude < edge * 2) {
@@ -1067,7 +1126,8 @@ export class Sim {
 
   // Teleport: { body, dir:[x,y,z] | lat, lon (degrees), altitude, hour, ship: bool,
   //             pitchDeg (ship nose above the horizon), throttle,
-  //             heading, lookPitch (degrees: where the view faces on foot), firstPerson }.
+  //             heading, lookPitch (degrees: where the view faces on foot; heading also turns the
+  //             ship's nose before pitchDeg), firstPerson }.
   teleport(o = {}) {
     const body = o.body && BODIES[o.body] ? o.body : this.bodyId;
     let dir = null;
@@ -1098,6 +1158,11 @@ export class Sim {
       const alt = o.altitude == null ? 40 : o.altitude;
       this.sh.p = scale(up, g.floor + alt);
       this.sh.gear01 = 0;
+      if (o.heading != null) {
+        // the nose along a compass heading (degrees from local north toward east), level
+        const east = tangent(cross(Y, up), up, V(1, 0, 0)), north = cross(up, east), a = (o.heading * Math.PI) / 180;
+        this.sh.q = qLook(add(scale(north, Math.cos(a)), scale(east, Math.sin(a))), up);
+      }
       const rotating = alt + g.floor - BODIES[body].radius < spaceAltitude(BODIES[body]);
       if (!rotating) {
         const c = convertState(this.eph, this.t, bodyFrame(body, true), bodyFrame(body, false), this.sh);

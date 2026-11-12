@@ -25,6 +25,7 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { parseArgs, repo, settleWorld, fallbackProblem } from './browser.mjs';
 import { openPage } from '../tools/shot.mjs';
+import { getLook } from '../src/data/looks.js';
 
 const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/tour', w: 960, h: 540, quality: 2, hour: 10, settle: 3600, 'settle-frames': 300, first: 0, vistas: 1, orbit: 1, label: '', query: '', bodies: 'mercury,venus,earth,moon,mars,jupiter,saturn,uranus,neptune,pluto' });
 const W = Number(opt.w), H = Number(opt.h), SETTLE = Number(opt.settle);
@@ -182,13 +183,22 @@ async function capture(body, pl) {
 }
 
 // The body from orbit, from the ship: about one radius up (where a pulse hop arrives), nose on the planet.
+// A ringed world (looks.js `rings`) is seen from farther out, so that the whole ring is in the frame
+// (ARTPASS wish 12: from one radius up the camera is inside the ring and saw two bands at the edge).
 async function captureOrbit(body) {
   const t0 = Date.now();
-  await page.evaluate(({ b, hour }) => {
+  const rg = (getLook(body) || {}).rings || null;
+  await page.evaluate(({ b, hour, rings }) => {
     const pc = window.__pc, sp = pc.world.getSpawn(b).unitDir;
     const R = pc.sim.sampler(b)(sp).radius;
-    pc.teleport({ body: b, dir: [sp.x, sp.y, sp.z], hour, ship: true, altitude: R * 1.15, pitchDeg: -86 });
-  }, { b: body, hour: Number(opt.hour) });
+    if (!rings) { pc.teleport({ body: b, dir: [sp.x, sp.y, sp.z], hour, ship: true, altitude: R * 1.15, pitchDeg: -86 }); return; }
+    // 25 degrees off the ring's plane on the spawn's side of it, 1.8 times the ring's outer radius
+    // out; nose north (far out the camera levels on the ecliptic, so the ring leans by the world's
+    // tilt). Projected in Node for Saturn at 960x540: the ring x 207..768, y 65..370, the globe
+    // about 230 px across (scratch run10/scripts/ringframe.mjs)
+    const l = Math.hypot(sp.x, sp.z) || 1, la = (25 * Math.PI / 180) * (sp.y < 0 ? -1 : 1);
+    pc.teleport({ body: b, dir: [Math.cos(la) * sp.x / l, Math.sin(la), Math.cos(la) * sp.z / l], hour, ship: true, altitude: R * (rings.outer * 1.8 - 1), pitchDeg: -86, heading: 0 });
+  }, { b: body, hour: Number(opt.hour), rings: rg });
   const settled = await settle();
   await page.waitForTimeout(900);
   const m = await measure();
