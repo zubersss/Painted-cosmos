@@ -286,7 +286,9 @@ void main() {
   float carryL = 1.0 - smoothstep(2.2 * lamL * uWaveLod, 6.0 * lamL * uWaveLod, dcam);
   // In the shallows a wave is as high as the depth lets it be (PHYSICS: 0.78 of it), and at the edge
   // the water itself runs up the beach with each wave and drains back (pcPhysWaterRunup).
-  float shoal = clamp(aDepth / max(1.28 * uPhysWaterSea.x, 0.05), 0.0, 1.0);
+  // (PHYSICS P18: the sea that is here, from the sea map; uPhysWaterSea where there is no map)
+  vec4 sea = pcPhysSeaLocal(vBody);
+  float shoal = clamp(aDepth / max(1.28 * sea.x, 0.05), 0.0, 1.0);
   float runup = pcPhysWaterRunup(vBody, 0.07);
   p += normalize(vBody) * mix(runup, (w.x - wl.x + vWake.x) * carry + wl.x * carryL, shoal);
   vBody = p + uOrigin;
@@ -364,12 +366,16 @@ void main() {
   // and is given its whitecaps as a few anchored dabs instead.
   vec2 along;
   vec3 wv = pcPhysWaterD(vBody, along) + vWake;
-  float hs = max(uPhysWaterSea.x, 1e-4);
+  // (PHYSICS P18: the sea that is here and the way its waves run, from the sea map: lower and fewer breaking in a bay
+  // behind a spit, the crests coming round toward a beach; the reference sea where there is no map)
+  vec4 sea = pcPhysSeaLocal(vBody);
+  vec2 sdir = pcPhysSeaDir(vBody);
+  float hs = max(sea.x, 1e-4);
   float keep = 1.0 - smoothstep(0.22, 0.75, fwidth(wv.x) / hs);
   wv *= keep;
-  float wavy = smoothstep(0.04, 0.35, uPhysWaterSea.x) * keep;      // 0 on a pond, 1 on a sea that is running
+  float wavy = smoothstep(0.04, 0.35, sea.x) * keep;      // 0 on a pond, 1 on a sea that is running
   float hN = clamp(wv.x / hs, -1.5, 1.5) * wavy;                    // -1 in the troughs .. 1 on the crests
-  vec2 cf = pcPhysWaterCrest(wv);
+  vec2 cf = pcPhysWaterCrestAt(wv, sea);
   vec3 n = normalize(pcPhysWaterNormal(wv, up) + (r1.xyz - 0.5) * 0.13 + (r2.xyz - 0.5) * 0.06);
   vec3 r = reflect(-Vd, n);
   float re = dot(r, up);
@@ -388,7 +394,7 @@ void main() {
   vec3 hit = pcReflect(vView, Rv);
   vec3 refl = texture(uPrevTex, hit.xy).rgb;
   // (a sea that is running is no mirror: it keeps its own wash and only takes a breath of the sky)
-  float rough = smoothstep(0.08, 0.9, uPhysWaterSea.x) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
+  float rough = smoothstep(0.08, 0.9, sea.x) * (1.0 - vLiqP.y) * (1.0 - vLiqP.x);
   c = mix(c, refl, hit.z * uPrevOn * (1.0 - 0.85 * rough));
   // the liquid's own wash: water takes a little of it and deepens the mirror; matte liquids
   // (lava, acid, a sea of cloud) are mostly their own colour
@@ -448,7 +454,7 @@ void main() {
   // gale's white horses were a glitter of specks; now each is a short torn dash lying along its wave)
   float tornW = 0.5;
   {
-    vec3 Dw = normalize(pcPhysWaterDir(uPhysWaterDir)), Aw = normalize(cross(up, Dw));
+    vec3 Dw = normalize(pcPhysWaterDir(sdir)), Aw = normalize(cross(up, Dw));
     float lw = log2(max(dist, 20.0) / 20.0), kw = floor(lw), fw = lw - kw;
     // (and it is torn anew as it goes: a white horse forms and is gone in two or three seconds)
     vec3 qw = vec3(dot(vBody, Aw) / 1.9, dot(vBody, Dw) / 0.62, dot(vBody, up) / 0.62 + uTime * 0.3) + drift * 3.0;
@@ -459,34 +465,34 @@ void main() {
     tornW = tw;
   }
   // (the crest line itself: high water where the slope along the waves' way turns over)
-  float sAlong = abs(dot(wv.yz, uPhysWaterDir));
+  float sAlong = abs(dot(wv.yz, sdir));
   float crest = smoothstep(0.25, 0.70, hN) * (1.0 - smoothstep(0.07, 0.24, sAlong)) * smoothstep(0.36, 0.50, torn) * (0.35 + 0.65 * uDayness);
   // (a whitecap is not a white sheet: torn dabs of paper on the front of the crest, with the
   // sea's own wash showing between them)
   float foam = cf.y * smoothstep(0.40, 0.90, hN) * smoothstep(0.44, 0.58, torn) * keep;
   // far off: the same share of white, as a few anchored dabs
-  float capFar = uPhysWaterSea.y < 1.0e8 ? smoothstep(0.02, 0.12, uPhysWaterSea.w) : 0.0;
-  float capTh = 0.70 - 0.55 * uPhysWaterSea.w;
+  float capFar = sea.y < 1.0e8 ? smoothstep(0.02, 0.12, sea.w) : 0.0;
+  float capTh = 0.70 - 0.55 * sea.w;
   foam = max(foam, capFar * (1.0 - keep) * smoothstep(capTh, capTh + 0.05, r3.r * 0.6 + r1.g * 0.4) * (1.0 - smoothstep(500.0, 1500.0, dist)));
   // (a sea running high breaks all over: white horses beyond the first ten metres whether or not the waves under
   // them are drawn, each a torn dash lying along its wave, sized to the distance, grouped by the sets, more on the
   // crests, forming and going. Between 30 and 150 m nothing broke at all: the near crests are dropped there as finer
   // than the brush, and the far strokes have not begun)
-  float galeW = smoothstep(0.5, 2.0, uPhysWaterSea.x) * (uPhysWaterSea.y < 1.0e8 ? 1.0 : 0.6);
+  float galeW = smoothstep(0.5, 2.0, sea.x) * (sea.y < 1.0e8 ? 1.0 : 0.6);
   float horseTh = 0.68 - 0.08 * galeW;
   foam = max(foam, galeW * smoothstep(horseTh, horseTh + 0.06, tornW * 0.62 + r3.r * 0.38) * (0.55 + 0.45 * smoothstep(-0.3, 0.5, hN)) * smoothstep(10.0, 30.0, dist) * (1.0 - smoothstep(600.0, 1500.0, dist)));
   // (in the shallows the breaking crests are white, ragged lines; at the waterline a thin
   // broken edge of swash that can still be seen from far off)
-  float sz = pcPhysWaterSurf(vDep);
+  float sz = pcPhysWaterSurfAt(vDep, sea);
   // (beyond twenty metres the surf is torn by the pattern sized to the distance: a 0.6 m pattern there was a
   // glitter of white pixels over the shoaling bay)
   float surf = sz * sz * smoothstep(0.50, 0.85, hN + mix((r2.b - 0.5) * 0.7 + (r6.g - 0.5) * 0.5, (tornW - 0.5) * 1.3, smoothstep(14.0, 28.0, dist)));
   // (the swash runs up the shore with each wave and draws back: the depth here is the still depth plus
   // PHYSICS' run-up; and its lace is carried in with the waves, torn anew as it goes. A rim drawn from the
   // still depth and a still pattern was frozen from frame to frame)
-  vec3 D3 = normalize(pcPhysWaterDir(uPhysWaterDir));
+  vec3 D3 = normalize(pcPhysWaterDir(sdir));
   vec4 rsw = texture(uNoise3D, (vBody - D3 * (uTime * 0.55)) / 1.35);
-  float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDep)) * smoothstep(0.04, 0.3, uPhysWaterSea.x);
+  float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDep)) * smoothstep(0.04, 0.3, sea.x);
   // (lace, not a sheet: where the run-up is a film over the sand the foam is torn wide open)
   float film = 1.0 - smoothstep(-0.25, 0.02, vDepth);
   surf = max(surf, swash * smoothstep(0.40 + 0.05 * film, 0.60 + 0.05 * film, rsw.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
@@ -499,13 +505,13 @@ void main() {
   // another with distance, each one fixed to the planet)
   vec3 A3 = normalize(cross(up, D3));
   // (a sea running high: deeper hollows, paler backs and more white horses, so a gale reads from the shore)
-  float gale = smoothstep(0.6, 2.6, uPhysWaterSea.x);
+  float gale = smoothstep(0.6, 2.6, sea.x);
   float qd = dot(vBody, D3);
   float lk = max(0.0, log2(max(13.0 * fwidth(qd), 1.0e-3) / 8.5) / 1.3785);
   // (far: where a pixel is wider than the brush can draw a wave in, a metre or two of sea)
-  float farSea = smoothstep(0.35, 1.6, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, uPhysWaterSea.x) * liq * deep;
+  float farSea = smoothstep(0.35, 1.6, fwidth(qd) + fwidth(dot(vBody, A3))) * smoothstep(0.03, 0.22, sea.x) * liq * deep;
   if (farSea > 0.01) {
-    float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * uPhysWaterSea.w - 0.13 * gale;
+    float k0 = floor(lk), kf = lk - k0, capTh2 = 0.68 - 0.45 * sea.w - 0.13 * gale;
     float sw = 0.0, wh = 0.0, hol = 0.0;
     for (int i = 0; i < 2; i++) {
       float L = 8.5 * pow(2.6, k0 + float(i)), wgt = i == 0 ? 1.0 - kf : kf;
@@ -550,6 +556,8 @@ export function makeWaterMaterial(bodyU, skyU) {
       uPhysAnchor: PHYS.uPhysAnchor, uPhysEast: PHYS.uPhysEast, uPhysNorth: PHYS.uPhysNorth, uPhysUp: PHYS.uPhysUp,
       ...PHYSW,
     }),
+    // (PHYSICS' sea map, P18/P19: the uniforms come with PHYSW; without the define the chunk is as before)
+    defines: { PC_PHYS_SEA_MAP: 1 },
     vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
   });
   m.userData.pcPainted = true;

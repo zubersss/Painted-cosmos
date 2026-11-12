@@ -156,24 +156,42 @@ export function syncPhysFlora(F) {
 // PHYSICS' sea (docs/notes/physics.md, "For PAINTER" D): the uniforms of its wave chunk, shared
 // by every liquid material. The world copies them from physics.fields.water each frame; with
 // no physics (or on a body it is not running on) the sea lies flat.
+// (PHYSICS P18/P19: the sea map, `PC_PHYS_SEA_MAP` in the water material: the sea raised at every node about over
+// its own fetch and depth, a 17 x 51 float texture read with texelFetch, the two levels' grids and the band where
+// the inner level gives way to the outer one. With no map (uPhysSeaGrid.w 0) the chunk reads uPhysWaterSea as before.)
+function seaTex(data) {
+  const t = new THREE.DataTexture(data || new Float32Array(17 * 51 * 4), 17, 51, THREE.RGBAFormat, THREE.FloatType);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t;
+}
 export const PHYSW = {
   uPhysWaterDir: { value: new THREE.Vector2(1, 0) }, uPhysWaterK: { value: new THREE.Vector4(1, 1, 1, 1) },
   uPhysWaterAmp: { value: new THREE.Vector4() }, uPhysWaterPhase: { value: new THREE.Vector4() },
   uPhysWaterGroup: { value: new THREE.Vector4() }, uPhysWaterSea: { value: new THREE.Vector4(0, 1e9, 1, 0) },
   uPhysWake: { value: new Float32Array(64) }, uPhysWakeG: { value: 9.81 },
+  uPhysSeaMap: { value: seaTex() }, uPhysSeaGrid: { value: new THREE.Vector4(0, 0, 16, 0) },
+  uPhysSeaGrid2: { value: new THREE.Vector4(0, 0, 128, 0) }, uPhysSeaBand: { value: new THREE.Vector4(0, 0, 0, 0) },
   uWaveLod: { value: 1 },   // scales the distance over which the mesh can still carry the waves
 };
 const _noWake = new Float32Array(64);
+let _seaV = -1;
 export function syncPhysWater(W) {
   const u = W && W.uniforms;
   if (!u) {
     PHYSW.uPhysWaterAmp.value.set(0, 0, 0, 0); PHYSW.uPhysWaterSea.value.set(0, 1e9, 1, 0); PHYSW.uPhysWake.value = _noWake;
+    PHYSW.uPhysSeaGrid.value.w = 0; PHYSW.uPhysSeaGrid2.value.w = 0;
     return;
   }
   PHYSW.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); PHYSW.uPhysWaterK.value.fromArray(u.uPhysWaterK);
   PHYSW.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); PHYSW.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase);
   PHYSW.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); PHYSW.uPhysWaterSea.value.fromArray(u.uPhysWaterSea);
   PHYSW.uPhysWake.value = u.uPhysWake; PHYSW.uPhysWakeG.value = u.uPhysWakeG;
+  if (u.uPhysSeaMap) {
+    // (the same array every frame: the texture is made once over it, re-uploaded when the map was rewritten)
+    if (PHYSW.uPhysSeaMap.value.image.data !== u.uPhysSeaMap) { PHYSW.uPhysSeaMap.value.dispose(); PHYSW.uPhysSeaMap.value = seaTex(u.uPhysSeaMap); _seaV = -1; }
+    if (W.mapVersion !== _seaV) { PHYSW.uPhysSeaMap.value.needsUpdate = true; _seaV = W.mapVersion; }
+    PHYSW.uPhysSeaGrid.value.fromArray(u.uPhysSeaGrid); PHYSW.uPhysSeaGrid2.value.fromArray(u.uPhysSeaGrid2);
+    if (u.uPhysSeaBand) PHYSW.uPhysSeaBand.value.fromArray(u.uPhysSeaBand);
+  } else { PHYSW.uPhysSeaGrid.value.w = 0; PHYSW.uPhysSeaGrid2.value.w = 0; }
 }
 
 // Things that must be brought up to date with the camera just before a frame is painted

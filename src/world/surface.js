@@ -326,6 +326,22 @@ class Surface {
     return (1 - smoothstep(0.72, 0.96, d + wob)) * (0.45 + 0.55 * (h4 / keep));
   }
 
+  // The coast's open reach (looks `t.open: { a, b, r: [r0, r1], depth }`): the distance (m) from the point to the
+  // great circle segment a-b (its nearest point projected back onto the sphere), and the sea floor pressed down to
+  // about `depth` m within r0 of it, eased back to the land's own height by r1. Where the land was already deeper
+  // nothing changes. The floor is not level (a broad swell of the bed), so the reach shoals and deepens as a sea does.
+  _open(x, y, z, hh, o) {
+    const a = o.a, b = o.b, R = this.R;
+    const bx = b[0] - a[0], by = b[1] - a[1], bz = b[2] - a[2], bb = bx * bx + by * by + bz * bz;
+    let t = ((x - a[0]) * bx + (y - a[1]) * by + (z - a[2]) * bz) / (bb || 1); t = t < 0 ? 0 : t > 1 ? 1 : t;
+    let qx = a[0] + bx * t, qy = a[1] + by * t, qz = a[2] + bz * t; const ql = 1 / Math.hypot(qx, qy, qz); qx *= ql; qy *= ql; qz *= ql;
+    const d = Math.sqrt(Math.max(0, 2 - 2 * (x * qx + y * qy + z * qz))) * R;
+    if (d >= o.r[1]) return hh;
+    const m = 1 - smoothstep(o.r[0], o.r[1], d);
+    const fl = -o.depth * (1 + 0.22 * this.nA.n3(x * R / 420 + 3.0, y * R / 420 - 8.0, z * R / 420 + 1.0));
+    return hh > fl ? hh + (fl - hh) * m : hh;
+  }
+
   _generic(c, b, bi, pal, full, bidx) {
     const R = this.R, x = c.x, y = c.y, z = c.z, A = this.nA, C = this.nC;
     const X = x * R, Y = y * R, Z = z * R;
@@ -352,6 +368,10 @@ class Surface {
       const f = R / 780;
       const n = A.fbm(x * f - 9.0, y * f + 2.0, z * f + 14.0, 4, 2.0, 0.5);
       let hh = n * 70 - 9;
+      // (`t.open`: open water laid over the coast, a reach of sea along a line from a to b (unit directions) r[0] m
+      // either side, its floor `depth` m down, shoaling to the land over r[0]..r[1]: a storm coast that faces kilometres
+      // of open sea toward the storm wind, the surf raised over real fetch, COORDINATOR ruling 2026-11-12)
+      if (T.open) hh = this._open(x, y, z, hh, T.open);
       const cl = T.cliff || 44;
       let face = 0;
       if (hh > 0.9) {
