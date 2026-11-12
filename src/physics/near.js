@@ -215,6 +215,21 @@ export class TerrainGrid {
     q[2] = ws < 0.25 ? NaN : (h[n] * w00 + h[n + 1] * w10 + h[n + N] * w01 + h[n + N + 1] * w11) / ws;
   }
 
+  // (P18) nearest() and known() at once through the scratch array, for the wind grid's upwind search: reads x = q[0],
+  // z = q[1]; returns nearest(x, z) and writes q[4] = known(x, z) ? 1 : 0, exactly (nothing boxed: see groundQ).
+  nearKnownQ(q) {
+    const N = this.N, u = q[0] / this.cell - this.ci + this.half, v = q[1] / this.cell - this.cj + this.half;
+    const ir = Math.round(u), jr = Math.round(v);
+    q[4] = ir >= 0 && jr >= 0 && ir < N && jr < N && this.valid[jr * N + ir] === 1 ? 1 : 0;
+    let i = ir, j = jr;
+    if (i < 0) i = 0; else if (i > N - 1) i = N - 1;
+    if (j < 0) j = 0; else if (j > N - 1) j = N - 1;
+    const n = j * N + i;
+    if (this.valid[n]) return n;
+    const c = this.order[0];
+    return this.valid[c] ? c : -1;
+  }
+
   // Liquid surface (radius - r0) at (x, z): -1e9 where the nearest node is dry, NaN where it is
   // outside the grid or not sampled yet (unknown is not the same as dry).
   liquidAt(x, z) {

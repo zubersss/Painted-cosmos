@@ -15,7 +15,7 @@
 // Wind vectors are body-local, tangent to the sphere, metres per second, at the standard
 // reference: 10 m above open ground (roughness length z0 = 0.03 m).
 import { BODIES } from '../data/bodies.js';
-import { noise3, hash1, clamp, smoothstep, hashString } from './util.js';
+import { noise3, noise3q, hash1, clamp, smoothstep, hashString } from './util.js';
 
 // real: the real prevailing wind speed (m/s).  scale: the game divides it by this.  U = real / scale
 // is the prevailing speed used (filled in below).  bands: half-waves of the zonal jet between
@@ -277,6 +277,59 @@ export function gustLevelFull(bodyId, px, py, pz, wx, wy, wz, t, seed) {
   const t1 = (a - Math.floor(a) - 0.5) * T, t2 = (a + 0.5 - Math.floor(a + 0.5) - 0.5) * T;
   return clamp(gustLevelAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed)
     + gustFineAt(bodyId, px, py, pz, wx * t1, wy * t1, wz * t1, wx * t2, wy * t2, wz * t2, t, seed), -WIND.gustMax, WIND.gustMax);
+}
+
+// (P18) The three levels at many places at once, for the wind grid: for each of the n points P[3k..3k+2] (body-local, m),
+// carried as the copies' displacements gs[0..5] say (gustLevelAt's arguments), writes outL[k] = gustLevelAt (clamped),
+// outC[k] = gustCrossAt and outF[k] = gustFineAt, EXACTLY (the same arithmetic in the same order, the cycle's numbers worked
+// out once instead of per point). Called per node with twelve numbers each, the three functions boxed every number they
+// were handed and every answer: 385 KB of garbage a frame. Through the arrays and noise3q nothing is boxed.
+const _nq = new Float64Array(5);
+export function gustNodes(bodyId, P, n, gs, t, seed, outL, outC, outF) {
+  const s = seedOf(bodyId, seed) + 101, sc = seedOf(bodyId, seed) + 311;
+  const T = WIND.gustCycle;
+  const a = t / T, c1 = Math.floor(a), f1 = a - c1;
+  const c2 = Math.floor(a + 0.5);
+  const w1 = 1 - Math.abs(2 * f1 - 1), w2 = 1 - w1, on1 = w1 > 0.001, on2 = w2 > 0.001;
+  const k1 = 1 / WIND.gustLength, k2 = 1 / WIND.gustLength2, k3 = 1 / WIND.gustLength3, k4 = 1 / WIND.gustLength4;
+  const W = WIND.gustWeights, X = WIND.crossWeights, W0 = W[0], W1 = W[1], W2 = W[2], W3 = W[3], X0 = X[0], X1 = X[1];
+  const o1 = on1 ? hash1(c1, s) * 977 : 0, o2 = on2 ? hash1(c2, s + 55) * 977 : 0;
+  const p1 = on1 ? hash1(c1, sc) * 977 : 0, p2 = on2 ? hash1(c2, sc + 55) * 977 : 0;
+  const den = Math.sqrt(w1 * w1 + w2 * w2), q = _nq;
+  const ax = gs[0], ay = gs[1], az = gs[2], bx = gs[3], by = gs[4], bz = gs[5];
+  for (let k = 0; k < n; k++) {
+    const px = P[3 * k], py = P[3 * k + 1], pz = P[3 * k + 2];
+    let gl = 0, gc = 0, gf = 0;
+    if (on1) {
+      const x = px - ax, y = py - ay, z = pz - az;
+      q[0] = x * k1 + o1; q[1] = y * k1; q[2] = z * k1 - o1; q[4] = s; noise3q(q); const l0 = q[3];
+      q[0] = x * k2 - o1; q[1] = y * k2 + o1; q[2] = z * k2; q[4] = s + 7; noise3q(q); const l1 = q[3];
+      gl += w1 * (l0 * W0 + l1 * W1);
+      q[0] = x * k1 - p1; q[1] = y * k1 + p1; q[2] = z * k1; q[4] = sc; noise3q(q); const c0 = q[3];
+      q[0] = x * k2; q[1] = y * k2 - p1; q[2] = z * k2 + p1; q[4] = sc + 7; noise3q(q); const cc1 = q[3];
+      gc += w1 * (c0 * X0 + cc1 * X1);
+      q[0] = x * k3 + o1; q[1] = y * k3 - o1; q[2] = z * k3; q[4] = s + 17; noise3q(q); const f0 = q[3];
+      q[0] = x * k4; q[1] = y * k4 + o1; q[2] = z * k4 - o1; q[4] = s + 23; noise3q(q); const ff1 = q[3];
+      gf += w1 * (f0 * W2 + ff1 * W3);
+    }
+    if (on2) {
+      const x = px - bx, y = py - by, z = pz - bz;
+      q[0] = x * k1 + o2; q[1] = y * k1; q[2] = z * k1 - o2; q[4] = s + 3; noise3q(q); const l0 = q[3];
+      q[0] = x * k2 - o2; q[1] = y * k2 + o2; q[2] = z * k2; q[4] = s + 11; noise3q(q); const l1 = q[3];
+      gl += w2 * (l0 * W0 + l1 * W1);
+      q[0] = x * k1 - p2; q[1] = y * k1 + p2; q[2] = z * k1; q[4] = sc + 3; noise3q(q); const c0 = q[3];
+      q[0] = x * k2; q[1] = y * k2 - p2; q[2] = z * k2 + p2; q[4] = sc + 11; noise3q(q); const cc1 = q[3];
+      gc += w2 * (c0 * X0 + cc1 * X1);
+      q[0] = x * k3 + o2; q[1] = y * k3 - o2; q[2] = z * k3; q[4] = s + 19; noise3q(q); const f0 = q[3];
+      q[0] = x * k4; q[1] = y * k4 + o2; q[2] = z * k4 - o2; q[4] = s + 29; noise3q(q); const ff1 = q[3];
+      gf += w2 * (f0 * W2 + ff1 * W3);
+    }
+    gl /= den;
+    const gn = gl * WIND.gustNorm;
+    outL[k] = gn < -WIND.gustMax ? -WIND.gustMax : gn > WIND.gustMax ? WIND.gustMax : gn;
+    outC[k] = gc / den * WIND.crossNorm;
+    outF[k] = gf / den * WIND.gustNorm;
+  }
 }
 
 // Cycle bookkeeping of the two copies at time t: o[0], o[1] = the cycle number of copy 1 and 2

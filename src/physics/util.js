@@ -80,6 +80,34 @@ export function noise3(x, y, z, seed) {
   const y0 = x0 + (x1 - x0) * fy, y1 = x2 + (x3 - x2) * fy;
   return (y0 + (y1 - y0) * fz) * 2 - 1;
 }
+// (P18) noise3 through a scratch array, for loops that would otherwise box every number they hand over: reads x = q[0],
+// y = q[1], z = q[2], seed = q[4]; writes noise3(x, y, z, seed) to q[3], exactly (the same arithmetic, line for line).
+// A call that passes doubles to a function V8 does not inline (a loop of a dozen calls spends its inlining budget on the
+// first two) puts each in a fresh heap box, and the answer comes back in another: the wind grid's gusts were 385 KB a frame.
+export function noise3q(q) {
+  const x = q[0], y = q[1], z = q[2], seed = q[4];
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  let fx = x - ix, fy = y - iy, fz = z - iz;
+  fx = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+  fy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+  fz = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
+  const xa = Math.imul(ix | 0, 374761393), xb = Math.imul((ix + 1) | 0, 374761393);
+  const ya = Math.imul(iy | 0, 668265263), yb = Math.imul((iy + 1) | 0, 668265263);
+  const za = Math.imul(iz | 0, 2147483647) ^ Math.imul(seed | 0, 1274126177), zb = Math.imul((iz + 1) | 0, 2147483647) ^ Math.imul(seed | 0, 1274126177);
+  const K = 2.3283064365386963e-10;
+  let h;
+  h = xa ^ ya ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const a = (h >>> 0) * K;
+  h = xb ^ ya ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const b = (h >>> 0) * K;
+  h = xa ^ yb ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const c = (h >>> 0) * K;
+  h = xb ^ yb ^ za; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const d = (h >>> 0) * K;
+  h = xa ^ ya ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const e = (h >>> 0) * K;
+  h = xb ^ ya ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const f = (h >>> 0) * K;
+  h = xa ^ yb ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const g = (h >>> 0) * K;
+  h = xb ^ yb ^ zb; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const hh = (h >>> 0) * K;
+  const x0 = a + (b - a) * fx, x1 = c + (d - c) * fx, x2 = e + (f - e) * fx, x3 = g + (hh - g) * fx;
+  const y0 = x0 + (x1 - x0) * fy, y1 = x2 + (x3 - x2) * fy;
+  q[3] = (y0 + (y1 - y0) * fz) * 2 - 1;
+}
 // Two octaves, -1..1.
 export function noise3b(x, y, z, seed) {
   return (noise3(x, y, z, seed) + 0.5 * noise3(x * 2.03 + 11.3, y * 2.03 - 4.1, z * 2.03 + 7.7, seed + 19)) / 1.5;

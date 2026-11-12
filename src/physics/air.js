@@ -9,7 +9,7 @@
 // Away from the focus the same layers are evaluated directly, without terrain.
 import { BODIES } from '../data/bodies.js';
 import { ATMOSPHERES, airDensity, airTemperature } from './atmosphere.js';
-import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, wakeAt, WAKE } from './wind.js';
+import { WINDS, WIND, windLarge, gustLevel, gustLevelAt, gustFineAt, gustCross, gustCrossAt, gustCrossFineAt, gustPhase, gustNodes, turbulenceIntensity, heightFactor, slopeFactor, shelterFactor, wakeAt, WAKE } from './wind.js';
 import { weatherWind } from './weather.js';
 import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
@@ -223,9 +223,13 @@ export class AirGrid {
         const x = (T.ci + i - half) * cell, z = (T.cj + j - half) * cell;
         const h0 = T.h[n];
         let sx = -1.5, known = 0;
+        // (P18: the lookups go through a scratch array, T.groundQ and T.nearKnownQ, exactly heightAt, nearest and known:
+        // called with numbers they boxed each one)
+        const q = this._q || (this._q = new Float64Array(5));
         for (let k = 1; k <= AIR.shelterSteps; k++) {
           const dd = k * AIR.shelterStep;
-          const hk = T.heightAt(x - dwe * dd, z - dwn * dd, NaN);
+          q[0] = x - dwe * dd; q[1] = z - dwn * dd; T.groundQ(q);
+          const hk = q[2];
           if (hk !== hk) continue;
           known++;
           const a = Math.atan2(hk - h0, dd);
@@ -238,8 +242,9 @@ export class AirGrid {
         const c0 = T.cover[n * CW + 1], hc0 = T.cover[n * CW + 2];
         for (let k = 1; k <= AIR.shelterSteps; k++) {
           const dd = k * AIR.shelterStep;
-          const m = T.nearest(x - dwe * dd, z - dwn * dd);
-          if (T.known(x - dwe * dd, z - dwn * dd)) known++;
+          q[0] = x - dwe * dd; q[1] = z - dwn * dd;
+          const m = T.nearKnownQ(q);
+          if (q[4] === 1) known++;
           if (m < 0 || m === n) continue;
           const c = T.cover[m * CW + 1], hc = T.cover[m * CW + 2];
           if (!(c > 0.05) || !(hc > 0.5)) continue;
@@ -286,6 +291,19 @@ export class AirGrid {
     const gain = WIND.gustGain;
     const gs = this.gustShift;
     const Rref = BODIES[bodyId].radius;
+    // (P18) every node's place in the pattern first, then the three levels of every node in one call (wind.js gustNodes,
+    // exactly gustLevelAt, gustCrossAt, gustFineAt): called per node with twelve numbers each they were 385 KB of garbage
+    // a frame (every number handed over and every answer boxed); the fields are bit for bit as before (air.test.mjs)
+    const P = this._P || (this._P = new Float64Array(N * N * 3)), GL = this._GL || (this._GL = new Float64Array(N * N));
+    const GC = this._GC || (this._GC = new Float64Array(N * N)), GF = this._GF || (this._GF = new Float64Array(N * N));
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const x = (T.ci + i - half) * cell, z = (T.cj + j - half) * cell;
+      let px = frame.ox + frame.ex * x + frame.nx * z, py = frame.oy + frame.ey * x + frame.ny * z, pz = frame.oz + frame.ez * x + frame.nz * z;
+      { const kr = Rref / Math.sqrt(px * px + py * py + pz * pz); px *= kr; py *= kr; pz *= kr; }
+      const n = j * N + i;
+      P[3 * n] = px; P[3 * n + 1] = py; P[3 * n + 2] = pz;
+    }
+    gustNodes(bodyId, P, N * N, gs, t, this.seed, GL, GC, GF);
     for (let j = 0; j < N; j++) {
       const v = (gj0 + j - this._sj) / L - lb, b0 = v >= 1 ? 1 : 0, fv = v - b0;
       for (let i = 0; i < N; i++) {
@@ -295,23 +313,20 @@ export class AirGrid {
         const be = sup[k] * w00 + sup[k + 4] * w10 + sup[k + 12] * w01 + sup[k + 16] * w11;
         const bn = sup[k + 1] * w00 + sup[k + 5] * w10 + sup[k + 13] * w01 + sup[k + 17] * w11;
         const gi = (sup[k + 2] * w00 + sup[k + 6] * w10 + sup[k + 14] * w01 + sup[k + 18] * w11) * 0.15;
-        const x = (T.ci + i - half) * cell, z = (T.cj + j - half) * cell;
         // (P12) the pattern is read ON THE SPHERE, at the node's own direction and the body's base radius:
         // one function of place whatever the frame is anchored to. (It was read on the frame's tangent
         // plane, which 384 m from the anchor stands 18 m above a 4 km sphere: when the frame re-anchored
         // every node's place in the pattern moved by that much at once, and the gust level at the focus
         // stepped by up to 0.1.) airAt reads its fine eddies the same way, at the point's height above
-        // the ground.
-        let px = frame.ox + frame.ex * x + frame.nx * z, py = frame.oy + frame.ey * x + frame.ny * z, pz = frame.oz + frame.ez * x + frame.nz * z;
-        { const kr = Rref / Math.sqrt(px * px + py * py + pz * pz); px *= kr; py *= kr; pz *= kr; }
+        // the ground. (P18: the places and the levels are worked out above, all nodes at once.)
         const n = j * N + i;
-        const g = gustLevelAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
+        const g = GL[n];
         const A = (this.I[n] + gi) * gain, fc = Math.max(WIND.minFactor, 1 + A * g);
         // (P12) the lateral part: the wind swings as well as gusts (wind.js, crossWeights)
-        const cl = gustCrossAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
+        const cl = GC[n];
         const kc = A * WIND.crossRatio * cl, sh = this.shel[n];
         this.we[n] = (be * fc - bn * kc) * sh; this.wn[n] = (bn * fc + be * kc) * sh; this.gust[n] = g; this.cross[n] = cl;
-        const gt = g + gustFineAt(bodyId, px, py, pz, gs[0], gs[1], gs[2], gs[3], gs[4], gs[5], t, this.seed);
+        const gt = g + GF[n];
         this.fine[n] = Math.max(WIND.minFactor, 1 + A * (gt > WIND.gustMax ? WIND.gustMax : gt < -WIND.gustMax ? -WIND.gustMax : gt)) / fc;
       }
     }

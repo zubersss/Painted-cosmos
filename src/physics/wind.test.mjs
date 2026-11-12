@@ -216,3 +216,25 @@ test('P12 across the wind: the lateral part is three quarters of the longitudina
     assert.ok(Math.sqrt(d2 / N) > 5 && Math.sqrt(d2 / N) < 12 && dmax > 18 && dmax < 50, `U ${U}: direction ${Math.sqrt(d2 / N)} deg rms, ${dmax} at most`);
   }
 });
+
+// ---- P18: the wind grid's three levels in one call, exactly ----------------------------------------------------------
+test('P18 gustNodes gives exactly gustLevelAt, gustCrossAt and gustFineAt at every point (bit for bit), and noise3q exactly noise3', async () => {
+  const { gustNodes, gustLevelAt, gustCrossAt, gustFineAt } = await import('./wind.js');
+  const { noise3, noise3q } = await import('./util.js');
+  const q = new Float64Array(5);
+  for (let k = 0; k < 2000; k++) {
+    const x = (k * 37.17) % 900 - 450, y = (k * 11.3) % 300 - 150, z = (k * 71.9) % 1000 - 500, s = (k * 2654435761) | 0;
+    q[0] = x; q[1] = y; q[2] = z; q[4] = s; noise3q(q);
+    assert.ok(Object.is(q[3], noise3(x, y, z, s)), `noise3q at ${k}`);
+  }
+  const n = 300, P = new Float64Array(3 * n), L = new Float64Array(n), Cc = new Float64Array(n), F = new Float64Array(n);
+  for (const body of ['earth', 'mars', 'neptune']) for (const t of [0, 47.9, 48, 96.0001, 1000.25, 5555.5]) {
+    const gs = [t * 3.1, -t * 0.7, t * 1.9, -t * 2.2, t * 0.3, t * 4.4];
+    for (let k = 0; k < n; k++) { P[3 * k] = 1000 + k * 13.7; P[3 * k + 1] = 6371000 - k * 0.37; P[3 * k + 2] = -800 + k * 5.3; }
+    gustNodes(body, P, n, gs, t, 18, L, Cc, F);
+    for (let k = 0; k < n; k++) {
+      const a = [body, P[3 * k], P[3 * k + 1], P[3 * k + 2], ...gs, t, 18];
+      assert.ok(Object.is(L[k], gustLevelAt(...a)) && Object.is(Cc[k], gustCrossAt(...a)) && Object.is(F[k], gustFineAt(...a)), `${body} t ${t} point ${k}`);
+    }
+  }
+});
