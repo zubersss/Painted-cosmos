@@ -18,8 +18,13 @@ owner's art pass ran). The tenth agent's handover is kept below it ("Handover of
   explorer's face shaded under the brim. See "M3 hardening" below for each, with the evidence.
 - **The art pass** (owner's order) still owns `src/data/looks.js` and `src/data/looks/` until the
   coordinator ends it: keep to shared code.
-- **Next, in this order**: (1) **the coast fix**, as soon as the coordinator says the art pass is over:
-  both coast biomes must face open water toward the storm wind. The stands are mine (`src/art/easels.js`
+- **Next, in this order** (start only when the coordinator says the art pass is over): (0) **wire PHYSICS'
+  sea map** (P18, up to `5f480bf`): its "For PAINTER, P18" section in `docs/notes/physics.md` gives the
+  code (two uniforms and a texture in `shared.js`, the `PC_PHYS_SEA_MAP` define, the local sea in place of
+  `uPhysWaterSea` in the water shader); its GLSL has never been compiled: compile it and open a frame. Until
+  then the game draws P16's sea. (1) **the coast fix**, judged with `node src/physics/coast.mjs` until both
+  stands say PASS (today both NOT YET; Neptune: Hs 0.71 m 80 m out on 0.8 km of fetch against a target of
+  3.23 m and 15 % white): both coast biomes must face open water toward the storm wind. The stands are mine (`src/art/easels.js`
   STANDS), so a new stand is the simplest fix and moves no site; candidates and how they were found are in
   "The coasts" below (Earth `sea_coast`: one beach with 2067 m of PHYSICS-measured fetch at 16 m deep;
   Neptune `storm_seas`: the best reach 1.4 to 1.8 km, the biome ends at the ice spires: say so to the
