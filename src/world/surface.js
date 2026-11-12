@@ -323,7 +323,11 @@ class Surface {
     if (d > 1.25) return 0;
     // a lumpy outline, never a circle
     const wob = this.nC.n3(X / (cell * 0.11) + 3.0, Y / (cell * 0.11), Z / (cell * 0.11) - 5.0) * 0.16;
-    return (1 - smoothstep(0.72, 0.96, d + wob)) * (0.45 + 0.55 * (h4 / keep));
+    // (PAINTER 12: a crown a little rounded and a skirt of fallen rock at the foot: a stack stood as a table with sheer
+    // sides, and in a gale under a dark sky it read as a black slab with ruled vertical edges)
+    const body = (1 - smoothstep(0.68, 0.97, d + wob)) * (0.90 + 0.10 * (1 - Math.min(1, d * d)));
+    const skirt = (1 - smoothstep(0.86, 1.22, d + wob * 0.5)) * 0.20;
+    return Math.max(body, skirt) * (0.45 + 0.55 * (h4 / keep));
   }
 
   // The coast's open reach (looks `t.open: { a, b, r: [r0, r1], depth }`): the distance (m) from the point to the

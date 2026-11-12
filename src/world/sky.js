@@ -137,13 +137,15 @@ void main() {
     vec4 fa = texture(uNoise3D, ha * 1.25 + vec3(0.7, 0.2, uTime * 0.0015));
     vec4 fb = texture(uNoise3D, ha * 3.4 + vec3(0.1, uTime * 0.002, 0.4));
     float fold = smoothstep(0.38, 0.62, fa.r * 0.7 + fb.g * 0.3);                    // where along the horizon a curtain hangs
-    float e0 = 0.07 + 0.10 * fa.g + 0.04 * (fb.r - 0.5);                             // its lower edge, wavy
+    float e0 = 0.16 + 0.12 * fa.g + 0.05 * (fb.r - 0.5);                             // its lower edge, wavy (9 to 19 degrees up)
     float ray = texture(uNoise3D, vec3(ha.xz * 16.0, ha.y * 16.0) + vec3(0.0, uTime * 0.004, 0.0)).g;
-    ray = 0.45 + 0.55 * smoothstep(0.35, 0.70, ray);                                  // rays: streaks up the curtain
-    float hgt = 0.16 + 0.22 * fb.b;
-    float k = smoothstep(e0 - 0.012, e0 + 0.018, e) * (1.0 - smoothstep(e0 + 0.03, e0 + hgt, e)) * fold * ray;
-    vec3 ac = mix(vec3(0.84, 0.97, 0.88), vec3(0.83, 0.76, 0.95), smoothstep(e0, e0 + hgt * 0.8, e));
-    sky = mix(sky, ac, clamp(k * uAurora.x * (0.42 + 0.48 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.85));
+    ray = 0.40 + 0.60 * smoothstep(0.35, 0.70, ray);                                  // rays: streaks up the curtain
+    float hgt = 0.22 + 0.25 * fb.b;
+    float k = smoothstep(e0 - 0.012, e0 + 0.02, e) * (1.0 - smoothstep(e0 + 0.04, e0 + hgt, e)) * fold * ray;
+    // (pale viridian at the lower edge lifted out of the blue, violet where the rays fade: it has to stand against the
+    // middle of the sky, where the wash is deep; low down the sky is near paper and a pale curtain is lost in it)
+    vec3 ac = mix(vec3(0.66, 0.93, 0.78), vec3(0.80, 0.68, 0.93), smoothstep(e0, e0 + hgt * 0.8, e));
+    sky = mix(sky, ac, clamp(k * uAurora.x * (0.62 + 0.36 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.85));
   }
 
   // ---- a sea of cloud seen from one of its islands: beyond the island's rim the cloud tops
