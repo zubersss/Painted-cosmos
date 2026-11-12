@@ -248,6 +248,8 @@ class Ring {
     this.stony = 2.1 * sstep(0.44, 0.76, vnoise(U / 5.9 + 13.1, V / 5.9 + 7.7, seed + 15) * 0.75 + 0.25 * this.rough);
     this.needly = 1.9 * sstep(0.42, 0.72, vnoise(U / 6.7 + 23.1, V / 6.7 + 1.7, seed + 19));       // splinters stand in companies
     this.crusty = sstep(0.40, 0.66, vnoise(U / 4.3 + 3.9, V / 4.3 + 17.3, seed + 17) * 0.7 + 0.3 * this.drift);
+    // (PAINTER 14: reeds stand in beds, with mud and water between them: the misty wetland's near reeds were one even comb)
+    this.reedy = 2.0 * sstep(0.46, 0.70, vnoise(U / 6.1 + 41.3, V / 6.1 + 9.9, seed + 23));
     this.slots = []; this.map.set(key, this.slots);
     return true;
   }
@@ -329,7 +331,7 @@ class Ring {
     // what lies on bare ground: pebbles, drift ripples; what stands on it: reeds, splinters
     const others = [];
     const cnt = (share, k) => { const v = share * 8 * (per / 12); const nI = Math.floor(v); return nI + (H(k) < v - nI ? 1 : 0); };
-    for (let q = cnt(st.reed, 120); q > 0; q--) others.push(1);
+    for (let q = cnt(st.reed * this.reedy, 120); q > 0; q--) others.push(1);
     for (let q = cnt(st.needle * 1.6 * this.needly, 121); q > 0; q--) others.push(2);
     for (let q = cnt(st.ripple * 1.3, 122); q > 0; q--) others.push(4);
     for (let q = cnt(st.dab * 1.2 * this.stony, 123) + (st.blade > 0 && this.meadow < 0.55 ? 1 : 0); q > 0; q--) others.push(3);
@@ -341,7 +343,9 @@ class Ring {
     const t1 = H(4), t2 = H(5), t3 = H(6), t4 = H(7);
     const nTuft = t1 < 0.16 ? 0 : t1 < 0.70 ? 1 : 2;
     const tu = [(t2 - 0.5) * 0.5, (t4 - 0.5) * 0.5], tv = [(t3 - 0.5) * 0.5, (t2 * 7.13 % 1 - 0.5) * 0.5], tsz = [(0.55 + 1.0 * t3 * t3) * (1 + 0.45 * tall), (0.5 + 0.9 * t4) * (1 + 0.3 * tall)];
-    const nBlade = nTuft === 0 ? 0 : Math.min(Math.max(0, left - Math.min(others.length, 3)), Math.round(st.blade * (per - 1) * this.meadow * (0.7 + 0.5 * this.rough)));
+    // (where reeds grow, the sedge stands with them in the beds and the mud between is nearly bare)
+    const bedK = st.reed > 0 ? 0.3 + 0.7 * Math.min(1, this.reedy) : 1;
+    const nBlade = nTuft === 0 ? 0 : Math.min(Math.max(0, left - Math.min(others.length, 3)), Math.round(st.blade * (per - 1) * this.meadow * (0.7 + 0.5 * this.rough) * bedK));
     for (let k = 0; k < nBlade; k++) {
       const q1 = H(10 + k), q2 = H(24 + k), q3 = H(38 + k), q4 = H(52 + k), q5 = H(140 + k);
       const tf = nTuft === 2 ? (k & 1) : 0;
@@ -481,7 +485,7 @@ class Ring {
     }
     left -= nnd;
     // reeds by the water
-    const nrd = Math.min(left, Math.round(st.reed * 3 + H(190) - 0.5));
+    const nrd = Math.min(left, Math.round(st.reed * 3 * this.reedy + H(190) - 0.5));
     for (let q = 0; q < nrd; q++, k++) {
       const q1 = H(191 + q), q2 = H(194 + q), q3 = H(197 + q), p = at(q1, q2), c = st.leaf ? st.leaf[1] : [gr, gg, gb];
       this.put(p[0], p[1], 0, 0.1 * q2, q1 * 6.28, (0.5 + 0.5 * q3) * kh, (0.12 + 0.14 * q2) * kw, FAN, 0.3 + 0.3 * q3, born, dens(lerp(c[0], gr, 0.45), 1.3), dens(lerp(c[1], gg, 0.45), 1.3), dens(lerp(c[2], gb, 0.45), 1.3), (q1 - 0.5) * 0.3, flex);
@@ -489,7 +493,7 @@ class Ring {
     left -= nrd;
     // the grass: clumps, each one touch of a fan brush; taller and gone to seed where it is rough
     if (st.blade > 0 && left > 0) {
-      const ng = Math.min(left, Math.round(st.blade * per * this.meadow * (0.55 + 0.6 * this.rough) + H(200) - 0.5));
+      const ng = Math.min(left, Math.round(st.blade * per * this.meadow * (0.55 + 0.6 * this.rough) * (st.reed > 0 ? 0.3 + 0.7 * Math.min(1, this.reedy) : 1) + H(200) - 0.5));
       const L = st.leaf;
       for (let q = 0; q < ng; q++, k++) {
         const q1 = H(201 + q), q2 = H(208 + q), q3 = H(215 + q), q4 = H(222 + q), q5 = H(229 + q), p = at(q1, q2);

@@ -200,7 +200,7 @@ void main() {
   // worlds (a canopy under 0.55: fungus, kelp, groves) are not touched.)
   // (only the heart of each patch of sun: the same pattern read at a higher threshold, so a fleck goes from the sunlit
   // green at its edge to paper in its middle, and the floor keeps its shade)
-  float fleck = sunny * pcDappleL(vBody, vPar.z * 1.22, 8.0) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
+  float fleck = sunny * pcDappleL(vBody, vPar.z * 1.08, 8.0) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
   c = mix(c, mix(c, vec3(1.0), 0.55) * uLight, fleck * 0.8);
 
   // dry brush on rough ground: the brush skips, paper sparkles through in small broken flecks
@@ -566,6 +566,10 @@ void main() {
     farWhite = farSea * wh * smoothstep(0.008, 0.05, sea.w) * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
+  // (PAINTER 14: a sun glint near the eye is written as a crisp mark (region 6), which the brush leaves as it was drawn:
+  // laid into the brush's average with the water round it, the stream's bare-paper glints came out as grey dashes, and the
+  // reference forest had no paper anywhere)
+  float gSun = glint * (1.0 - smoothstep(30.0, 45.0, dist));
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
@@ -574,7 +578,7 @@ void main() {
   // (and what glows is seen through the haze: lava keeps its fire into the distance)
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
   c = pcAtmosV(c, f, vView);
-  pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
+  pcWrite(c, mix(mix(0.7, 0.22, max(white, gSun)), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, gSun > 0.5 ? 6.0 : 2.0);
 }
 `;
 
@@ -875,15 +879,18 @@ void main() {
     // floor itself wanders from wash to wash. The near autumn crowns overhead, their inner washes in the canopy's shade,
     // went to the deepest step and stood as flat, hard sepia masses; a forest's near crowns as one dark slate)
     x = max(x, 0.29 + 0.20 * st.g + (n2.r - 0.5) * 0.22 + (vData.w - 0.5) * 0.16);
-    // (PAINTER 14: a crown close over the eye is laid in separate touches, some a step lighter where the sky comes into
-    // it, some a step deeper: the autumn wood's near crowns each stood as one flat sienna mass)
-    x += ((st.g - 0.5) * 0.36 + (n2.b - 0.5) * 0.16) * (1.0 - smoothstep(8.0, 24.0, vd));
     float lvl = min(pcLevel(x, 0.07), 2.6);
     // (and a crown's shade is its own colour laid heavier with only half the cool glaze over it: the violet glaze over an
     // orange or gold crown made mud, the autumn wood's near crowns one flat sepia; a green crown's shade goes deep green,
     // not slate)
     vec3 deepF = pcDensity(c, 1.45) * mix(vec3(1.0), uGlaze, 0.45);
+    vec3 cw = c;
     c = mix(pcTone(c, lvl), deepF, (1.0 - smoothstep(0.8, 1.7, lvl)) * 0.75 * uDayness);
+    // (PAINTER 14: a crown close over the eye is laid in separate touches: here and there one at its own colour, where
+    // the sky's light comes into the mass. Below a glaze the shade is one deep wash whatever the light, and the autumn
+    // wood's near crowns each stood as one flat sienna mass)
+    float tch = smoothstep(0.50, 0.68, texture(uStrokeTex, suv * s0 * 0.7 + seed * 5.1 + 0.37).g + (n2.b - 0.5) * 0.3) * (1.0 - smoothstep(10.0, 26.0, vd)) * (1.0 - smoothstep(1.6, 2.2, lvl));
+    c = mix(c, pcTone(cw, 1.85 + 0.3 * n2.r), tch * 0.6 * uDayness);
     wet = max(uLeafP.w, uWx.y * 0.5);
     id = 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
   } else if (part < 2.5) {
