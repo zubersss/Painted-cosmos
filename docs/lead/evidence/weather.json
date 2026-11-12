@@ -1,7 +1,7 @@
 {
- "label": "commit 8d2905b (clean export)",
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77",
  "size": "960x540",
- "quality": 1,
+ "quality": 2,
  "frames": [
   {
    "id": "earth-start",
@@ -9,18 +9,19 @@
    "file": "earth-start.jpg",
    "wanted": 30,
    "forced": null,
-   "settledSeconds": 0.2,
-   "seconds": 131,
-   "t": 33.8,
-   "hour": 10,
+   "settledSeconds": 60.8,
+   "settledFrames": 9,
+   "seconds": 467,
+   "t": 34,
+   "hour": 11,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 520907,
-   "calls": 286,
+   "tris": 1445129,
+   "calls": 465,
    "kits": {
     "calls": 3,
-    "tris": 46
+    "tris": 142
    },
    "sky": {
     "cloud": 0.44,
@@ -36,10 +37,10 @@
     "flash": 0
    },
    "kind": "breeze",
-   "wind": 1.8,
+   "wind": 2.4,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.4
+   "physicsWorstMs": 89.3
   },
   {
    "id": "earth-before",
@@ -47,21 +48,22 @@
    "file": "earth-before.jpg",
    "wanted": 120,
    "forced": null,
-   "settledSeconds": 12.7,
-   "seconds": 139,
-   "t": 124,
-   "hour": 11.3,
+   "settledSeconds": 39.8,
+   "settledFrames": 9,
+   "seconds": 444,
+   "t": 124.2,
+   "hour": 12.3,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 520573,
-   "calls": 285,
+   "tris": 1446369,
+   "calls": 465,
    "kits": {
     "calls": 3,
-    "tris": 32
+    "tris": 1382
    },
    "sky": {
-    "cloud": 0.33,
+    "cloud": 0.34,
     "overcast": 0.06,
     "haze": 0.92,
     "fog": 0.08,
@@ -74,10 +76,10 @@
     "flash": 0
    },
    "kind": "breeze",
-   "wind": 8.4,
+   "wind": 6,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.4
+   "physicsWorstMs": 89.3
   },
   {
    "id": "earth-arrives",
@@ -85,37 +87,38 @@
    "file": "earth-arrives.jpg",
    "wanted": 166,
    "forced": null,
-   "settledSeconds": 11,
-   "seconds": 182,
-   "t": 170.7,
-   "hour": 11.9,
+   "settledSeconds": 47.6,
+   "settledFrames": 9,
+   "seconds": 779,
+   "t": 170.1,
+   "hour": 12.9,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 522557,
-   "calls": 287,
+   "tris": 1451451,
+   "calls": 467,
    "kits": {
     "calls": 5,
-    "tris": 2016
+    "tris": 6464
    },
    "sky": {
     "cloud": 0.93,
-    "overcast": 0.78,
-    "haze": 0.46,
-    "fog": 0.54,
+    "overcast": 0.77,
+    "haze": 0.47,
+    "fog": 0.53,
     "dust": 0,
-    "wet": 0.37,
+    "wet": 0.36,
     "snow": 0,
-    "rain": 0.6,
+    "rain": 0.59,
     "snowfall": 0,
-    "storm": 0.51,
+    "storm": 0.5,
     "flash": 0
    },
    "kind": "thunderstorm",
-   "wind": 9.1,
+   "wind": 9.2,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.4
+   "physicsWorstMs": 322.4
   },
   {
    "id": "earth-storm",
@@ -123,18 +126,19 @@
    "file": "earth-storm.jpg",
    "wanted": 240,
    "forced": null,
-   "settledSeconds": 13,
-   "seconds": 185,
-   "t": 244.4,
-   "hour": 13,
+   "settledSeconds": 40.4,
+   "settledFrames": 9,
+   "seconds": 594,
+   "t": 243.7,
+   "hour": 14,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 523633,
-   "calls": 287,
+   "tris": 1452637,
+   "calls": 467,
    "kits": {
     "calls": 5,
-    "tris": 3092
+    "tris": 7650
    },
    "sky": {
     "cloud": 0.96,
@@ -150,10 +154,10 @@
     "flash": 0
    },
    "kind": "thunderstorm",
-   "wind": 4.3,
+   "wind": 3.8,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.4
+   "physicsWorstMs": 322.4
   },
   {
    "id": "earth-flash",
@@ -161,18 +165,19 @@
    "file": "earth-flash.jpg",
    "wanted": 244,
    "forced": null,
-   "settledSeconds": 10.7,
-   "seconds": 64,
-   "t": 250.8,
-   "hour": 13.1,
+   "settledSeconds": 28.8,
+   "settledFrames": 9,
+   "seconds": 201,
+   "t": 250.7,
+   "hour": 14.1,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 523575,
-   "calls": 287,
+   "tris": 1452505,
+   "calls": 467,
    "kits": {
     "calls": 5,
-    "tris": 3034
+    "tris": 7518
    },
    "sky": {
     "cloud": 0.96,
@@ -188,10 +193,10 @@
     "flash": 1
    },
    "kind": "thunderstorm",
-   "wind": 3.8,
+   "wind": 2.9,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.4
+   "physicsWorstMs": 322.4
   },
   {
    "id": "earth-after",
@@ -199,37 +204,38 @@
    "file": "earth-after.jpg",
    "wanted": 400,
    "forced": null,
-   "settledSeconds": 11.1,
-   "seconds": 115,
-   "t": 404,
-   "hour": 15.2,
+   "settledSeconds": 48.4,
+   "settledFrames": 9,
+   "seconds": 472,
+   "t": 403.7,
+   "hour": 16.2,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 520585,
-   "calls": 284,
+   "tris": 1445679,
+   "calls": 464,
    "kits": {
     "calls": 2,
-    "tris": 44
+    "tris": 692
    },
    "sky": {
-    "cloud": 0.1,
+    "cloud": 0.15,
     "overcast": 0.01,
-    "haze": 0.61,
-    "fog": 0.39,
+    "haze": 0.39,
+    "fog": 0.61,
     "dust": 0,
-    "wet": 0.77,
+    "wet": 0.88,
     "snow": 0,
     "rain": 0,
     "snowfall": 0,
     "storm": 0,
     "flash": 0
    },
-   "kind": "breeze",
-   "wind": 1.1,
+   "kind": "mist",
+   "wind": 1.2,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.9
+   "physicsWorstMs": 322.4
   },
   {
    "id": "earth-storm-night",
@@ -237,18 +243,19 @@
    "file": "earth-storm-night.jpg",
    "wanted": 240,
    "forced": null,
-   "settledSeconds": 9.7,
-   "seconds": 121,
+   "settledSeconds": 42.9,
+   "settledFrames": 9,
+   "seconds": 508,
    "t": 243.7,
-   "hour": 22.3,
+   "hour": 22.1,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 523626,
-   "calls": 288,
+   "tris": 1452874,
+   "calls": 468,
    "kits": {
     "calls": 5,
-    "tris": 3084
+    "tris": 7886
    },
    "sky": {
     "cloud": 1,
@@ -264,10 +271,10 @@
     "flash": 0
    },
    "kind": "thunderstorm",
-   "wind": 4.4,
+   "wind": 3.3,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.9
+   "physicsWorstMs": 569.8
   },
   {
    "id": "earth-flash-night",
@@ -275,18 +282,19 @@
    "file": "earth-flash-night.jpg",
    "wanted": 244,
    "forced": null,
-   "settledSeconds": 6.7,
-   "seconds": 42,
-   "t": 250.9,
-   "hour": 22.4,
+   "settledSeconds": 29.3,
+   "settledFrames": 9,
+   "seconds": 166,
+   "t": 250.7,
+   "hour": 22.2,
    "state": "ON_FOOT",
    "biome": "temperate_forest",
    "busy": 0,
-   "tris": 523580,
-   "calls": 288,
+   "tris": 1452646,
+   "calls": 468,
    "kits": {
     "calls": 5,
-    "tris": 3038
+    "tris": 7658
    },
    "sky": {
     "cloud": 1,
@@ -302,10 +310,10 @@
     "flash": 1
    },
    "kind": "thunderstorm",
-   "wind": 3.8,
+   "wind": 3.1,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 101.9
+   "physicsWorstMs": 569.8
   },
   {
    "id": "earth-blizzard",
@@ -313,18 +321,19 @@
    "file": "earth-blizzard.jpg",
    "wanted": 190,
    "forced": null,
-   "settledSeconds": 22.3,
-   "seconds": 102,
-   "t": 194.9,
-   "hour": 11.5,
+   "settledSeconds": 204.5,
+   "settledFrames": 39,
+   "seconds": 445,
+   "t": 193.9,
+   "hour": 12.4,
    "state": "ON_FOOT",
    "biome": "alpine_meadow",
    "busy": 0,
-   "tris": 215184,
-   "calls": 112,
+   "tris": 379519,
+   "calls": 171,
    "kits": {
-    "calls": 3,
-    "tris": 3986
+    "calls": 6,
+    "tris": 9150
    },
    "sky": {
     "cloud": 0.97,
@@ -340,10 +349,10 @@
     "flash": 0
    },
    "kind": "blizzard",
-   "wind": 12.8,
+   "wind": 10.8,
    "freshSnow": 1,
    "firstPerson": false,
-   "physicsWorstMs": 11.6
+   "physicsWorstMs": 62.1
   },
   {
    "id": "mars-dust",
@@ -351,18 +360,19 @@
    "file": "mars-dust.jpg",
    "wanted": 840,
    "forced": null,
-   "settledSeconds": 12,
-   "seconds": 53,
-   "t": 844.9,
-   "hour": 11.2,
+   "settledSeconds": 96.9,
+   "settledFrames": 38,
+   "seconds": 192,
+   "t": 844.4,
+   "hour": 11.3,
    "state": "ON_FOOT",
    "biome": "dust_dunes",
    "busy": 0,
-   "tris": 214180,
-   "calls": 108,
+   "tris": 444403,
+   "calls": 133,
    "kits": {
-    "calls": 3,
-    "tris": 1896
+    "calls": 2,
+    "tris": 7308
    },
    "sky": {
     "cloud": 0.34,
@@ -378,10 +388,10 @@
     "flash": 0
    },
    "kind": "dust storm",
-   "wind": 14.8,
+   "wind": 15.2,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 11.6
+   "physicsWorstMs": 321.6
   },
   {
    "id": "neptune-gale",
@@ -389,15 +399,16 @@
    "file": "neptune-gale.jpg",
    "wanted": 150,
    "forced": null,
-   "settledSeconds": 7,
-   "seconds": 43,
-   "t": 154.7,
-   "hour": 11.3,
+   "settledSeconds": 92.6,
+   "settledFrames": 36,
+   "seconds": 197,
+   "t": 154.4,
+   "hour": 11.4,
    "state": "ON_FOOT",
    "biome": "storm_seas",
    "busy": 0,
-   "tris": 362116,
-   "calls": 204,
+   "tris": 557560,
+   "calls": 263,
    "kits": {
     "calls": 0,
     "tris": 0
@@ -416,10 +427,10 @@
     "flash": 0
    },
    "kind": "mist",
-   "wind": 12.3,
+   "wind": 19.6,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 11.6
+   "physicsWorstMs": 321.6
   },
   {
    "id": "neptune-gale-forced",
@@ -435,18 +446,19 @@
     "rain": 0.85,
     "storm": 0.85
    },
-   "settledSeconds": 2.6,
-   "seconds": 17,
-   "t": 160.9,
+   "settledSeconds": 11.3,
+   "settledFrames": 9,
+   "seconds": 79,
+   "t": 160.5,
    "hour": 11.5,
    "state": "ON_FOOT",
    "biome": "storm_seas",
    "busy": 0,
-   "tris": 362116,
-   "calls": 204,
+   "tris": 557576,
+   "calls": 264,
    "kits": {
-    "calls": 0,
-    "tris": 0
+    "calls": 1,
+    "tris": 16
    },
    "sky": {
     "cloud": 0.77,
@@ -462,10 +474,10 @@
     "flash": 0
    },
    "kind": "mist",
-   "wind": 26.9,
+   "wind": 27.3,
    "freshSnow": 0,
    "firstPerson": false,
-   "physicsWorstMs": 11.6
+   "physicsWorstMs": 321.6
   }
  ]
 }

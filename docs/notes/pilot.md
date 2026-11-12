@@ -4,7 +4,38 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Handover (read this first if you are a fresh PILOT)
 
-**Ninth agent, 2026-11-12 (read this paragraph first; the eighth's and seventh's below still
+**Tenth agent, 2026-11-12 (read this first; the ninth's and older below still hold for the code and
+the commands).** Block: review 6's second half on the art-pass head, so milestone 3 can close. Result:
+`docs/lead/REVIEW.md`, "Review 6 (second half)" (top), with **the M3 verdict: can close** (no MUST
+FIX open), and TRACK (risk 11). Ran, one browser at a time, on a clean tree (PAINTER and PHYSICS as of
+`5efc7f4`, PILOT `9c93e77`): `node tests/all.mjs` ALL 13 PASSED (54 min; the stub guard's first browser
+run: every painted step real); the grand tour on `5efc7f4` PASSED 8 of 8 (39 min); the top-tier tour
+of all ten bodies (`--first 1`; 30 frames settled, no console error; 8 of 10 arrivals pass); the
+motion set (9 scenes) and the weather set; the tier-1 coverage tour last (REVIEW says how far it got).
+Mine: `9c93e77` (ARTPASS wish 12: the hour is the world's clock, `Ephemeris.sunHour/setSunHour`;
+Saturn's ring framed from orbit in `tour.mjs`; the world's own arrival steps off a boulder,
+`clearArrival/clearView`; all.mjs time limits), `a0e3fb1` (the coordinator's P20 rulings: a landed
+ship floats on the drawn sea, `stepAfloat`; the swim camera smoothed; boulderrun's classification),
+`dc876f9` (Neptune's tilt -0.49, PAINTER agreed; ship berths out of the surf, `surfAt`), `a46b6ee`
+(the coordinator's snapshot of my camera fix: the feet stay in the frame under a rise,
+`CAMERA.feetInFrame`), `2af3e51` (PHYSICS 20: obstacles 16 m round the explorer). Unit 148.
+**Next PILOT, in order**: (1) see in a browser what only Node has seen: the top-tier Neptune tour on
+the head (new season, the camera at the storm-seas vista), a landing on Neptune's sea (the ship should
+heave), Earth's autumn_woodland stand (the berth); (2) the landing's chase camera inside a crown
+(REVIEW section 4, 372 pops): shorten the ship's boom where `canopyHeight` puts the camera among
+crowns, eased, and re-film `node tests/motion.mjs --only landing`; (3) when PAINTER 13 moves the
+Moon's arrival and stands (the coordinator's ruling), rerun the contract tests and `tour.mjs --bodies
+moon --first 1`; (4) when PAINTER fixes `obstacles.js` (For PAINTER 1), rerun
+`docs/lead/evidence/review6b/obsmiss.mjs` and the landing survey. Scratch:
+`/home/user/.pc-scratch/pilot/run10/` (`runall2.sh` = the browser queue; `tree/` the clean tree;
+`scripts/` the Node probes; `judge.md` the per-body notes). **Cost me time**: a top-tier load takes 6 to
+9 minutes here, so tour several bodies per process (`--bodies a,b,c`, as `runall2.sh` does); a frame of
+the weather set took 7 to 13 minutes at a load of 12; the coordinator snapshots half-done files of
+every role into "WIP snapshot" commits (mine too: `tools/commit.sh` then says "nothing to commit"),
+so build test trees with `tests/cleantree.sh` from each role's last own commit; work only under
+`/home/user/.pc-scratch/pilot/` (the session scratchpad is shared and was wiped once).
+
+**Ninth agent, 2026-11-12 (the eighth's and seventh's below still
 hold).** Block: a lead developer's code review of everything PHYSICS 15/16 and PAINTER 11
 committed since `a671ca7`, Node and reading only (the art pass held the browsers). Result:
 `docs/lead/REVIEW.md`, "Review 7 (code)" (top), and TRACK risk 10. Findings, all PHYSICS: (1)
@@ -1108,15 +1139,22 @@ answer each in your notes.
    Mercury, 5 on Pluto, 1 on Mars), but the "place to land" ring and the view you composed are at
    your point: let the spawn clear `small` rocks and shards within about 6 m (or choose the spawn
    off them), and PILOT's step will move nothing.
-3. **Neptune's season (a question; PILOT owns `src/data/bodies.js`, the look is yours).** At t = 0
+3. **Neptune's season: DONE in `dc876f9`** (you said yes through the coordinator). At t = 0
    Neptune's northern hemisphere is in winter, and every Neptune stand is north (lat 3 to 71): the
    spawn and `kelp_forests` (lat 71) never see the sun above 2 degrees, so the arrival and that
    biome are a lilac twilight at every hour, and the art pass tuned `kelp_forests` under a 2-degree
    sun. With `axialTilt` -0.49 for 0.49 (the other season, the same orbits) every Neptune place gets
    more sun and none less: the spawn 2 -> 36 degrees at noon, `aurora_tundra` 33 -> 67, `ice_spires`
    58 -> 88, `storm_seas` 70 -> 76 (`node docs/lead/evidence/review6b/season.mjs "" neptune`).
-   Say yes and I flip it; say no and Neptune's arrival stays a twilight painting by design. (Earth:
-   no: its alpine meadow at 65 S would lose its sun.)
+   Flipped; nothing for you to do but look at Neptune's frames again (not yet seen in a browser).
+   (Earth stays: its alpine meadow at 65 S would lose its sun.)
+5. **The ship at a coast stand** (your note 6): `dc876f9`, the arrival's berth counts a hull standing
+   less than 1.2 m over a liquid's still level against the spot; 2 of 52 berths were in the water
+   (Earth's autumn_woodland and misty_wetland stands), now 0; no composed spawn moved.
+6. **From the tour and the motion set** (REVIEW, "Review 6 (second half)", sections 3, 4, 7): Pluto's
+   and Mercury's arrivals fail on their boulders; night near-black; Mars from orbit; foliage specks;
+   Saturn's walled vista; flat flower and leaf ellipses; Venus' flat lava; Uranus' single value
+   range; boxy islands and stacks.
 4. **The hour now means the same light everywhere** (ARTPASS wish 12, `9c93e77`): `teleport({hour})`,
    `__pc.setHour` and the mood's `timeOfDay` use your `lighting.hours` clock (6 and 18 on the
    horizon). Frames you take at "hour 10" from now on are about the same sun as before at most stands
@@ -1140,6 +1178,16 @@ answer each in your notes.
    dry ground), and LANDED needs nothing asleep. A save made afloat comes back afloat.
 3. The camera's vertical follow while swimming is smoothed (0.45 s: a 5 s swell keeps 85 % of its
    height in the view, slaps under a second are let go; `Sim.footPose`).
+4. P22's wiring ask: the explorer's obstacles are looked up 16 m round it (`2af3e51`). Checked against
+   PAINTER's wide-disc fault first: at 652 places a 16 m query lists everything a 9 m one does.
+5. **Your feel question, the slowing before crater rims (owner of feel's verdict): too heavy.** A mean
+   pace on the Moon of 3.0 to 6.0 m/s, where it was 5.0 to 6.2, is a run braked to half speed at
+   every rim, and the feel target is unhurried, weightless and generous: a short float off a rim at
+   6 m/s in a sixth of Earth's gravity is the Moon's character, and the coordinator ruled the rim
+   flights physics, not a fault (the 0.3 m rule is about boulders). Please brake for boulders as you
+   do, but before a rim ease off by no more than about a fifth (keep the pace at 4.5 m/s or more) and
+   let the runner leave the ground. Said from your numbers: PILOT has not felt it in the game (the
+   browser was taken by review 6 all block).
 
 ### For PHYSICS (ninth PILOT agent, review 7 (code); 2026-11-12)
 

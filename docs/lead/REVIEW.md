@@ -23,6 +23,327 @@ is judged at the top tier from now on.
 
 ---
 
+## Review 6 (second half): every check, the tours, motion and weather on the art-pass head; milestone 3's verdict (2026-11-12, tenth PILOT agent)
+
+Everything below was run by me, one browser at a time (two other roles rendered beside me: load 13 to
+18), on clean trees, never on a "WIP snapshot". **The tree** for every browser run except the grand
+tour: PAINTER and PHYSICS as of `5efc7f4` (the art-pass head: the art pass `5f12995`, PHYSICS P19
+`1f07803`), PILOT `9c93e77` (built with `tests/cleantree.sh`). The grand tour ran on a clean export of
+`5efc7f4` itself (before my two commits). Scratch: `/home/user/.pc-scratch/pilot/run10/`; sheets
+copied to `docs/lead/evidence/` as named. Every sheet and frame judged below was opened. Software
+rendering: seconds are this machine's, frame counts are the game's.
+
+### 1. Every check (`node tests/all.mjs` in the clean tree): ALL 13 PASSED, 54 minutes
+
+| step | result |
+| --- | --- |
+| unit (PILOT) | pass 142 (with `9c93e77`'s two new tests; 146 after `a0e3fb1`) |
+| physics-unit | pass 291 (PHYSICS P19; the coordinator measured 296 on P20 `22df990`) |
+| world-unit (PAINTER) | pass 19 |
+| static rules | all hold |
+| play-through on stubs / with PHYSICS / in the painted world | 38 / 38 / 38 checks |
+| Earth, Mars, Saturn trip, stubs / painted world | 50 / 50 checks |
+| milestone 3's checks, stubs / painted world | 31 / 31 checks |
+| pointer lock | 9 checks |
+| sound, measured | PASSED |
+
+The stub guard's first browser run: every painted step printed "every module the run asked for is the
+real one" (render, world, art, physics real; ui is a stub by design). **One failure of mine, fixed**:
+before raising its limit the physics step timed out (PHYSICS' 291 tests had done 145 in the 5 minutes
+`all.mjs` allowed at a load of 18; they take 235 to 458 s here): the unit steps now have 15, 20 and 10
+minutes (`9c93e77`). No failure from another role.
+
+Review 7's findings re-measured on the same tree in Node: **closed**. The ghost run
+(`ghostfield.mjs`, six places, two gravities): 0 m/s radial while grounded, 0 m off the line, 0 wrong
+materials, 0 steps in the air (worst step loss 0.55 / 0.52 m/s, the legs at their limit). The sea map
+(`seamap-seams.mjs`): 0 steps over the limit, 0 on build frames; the warp moved 2.21 and 1.95 m after
+the re-anchors against 2.36 m in a typical 5 s.
+
+### 2. The grand tour (`node tests/grandtour.mjs`): PASSED, 8 of 8, one sitting
+
+A new player's play on a clean export of `5efc7f4`, quality 0 at 400x225 (it proves the play, not the
+picture), real key and mouse events only: the title card is up, a click starts the game, on foot in
+Earth's temperate forest, W walks 12.8 m in 3 s, Space jetpacks 16.2 m up and back down, E boards,
+lift-off, space above Earth; then M opens the map and a click sets each course, nose on the marker,
+pulse, come down, land, step out, walk 12 m, for Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune
+and Earth again. **Every landing on the first E, no bounce, one pulse a leg, no page reload, no console
+error**; 1659 s of play, 39.4 minutes. Landed in: ochre basins, fungal towers, dry riverbeds, hanging
+gardens, honey mist, pearl fog, ice spires, desert canyon. Evidence: `run10/grandtour-5efc7f4/`
+(`grandtour.json`, a frame per world; the montage was opened). The two commits after it changed the
+first hour of light and the arrival's footing at the spawn (Earth's spawn is not moved), not the play;
+the painted play-through, trip and milestone 3 checks passed on `9c93e77`. One frame to note: the tour
+came back to Earth at local midnight (desert canyon): a near-black indigo frame with the figure barely
+visible (tier 0's night key: section 3, item 3).
+
+### 3. The top-tier tour of all ten bodies (`node tests/tour.mjs --first 1`): every frame settled, no console error
+
+Quality 2, 960x540, fair weather held, hour 10 by the world's clock (section 5), HUD hidden: the spawn
+as the world's own arrival (third person), the first vista, the world from orbit. 30 frames, every one
+settled (`world.busy` 0 for ten frames), every run printed render, world, art and physics real, no
+console error, no flag on any sheet. Sheets: `docs/lead/evidence/tour-top-<body>.jpg` and `.json`
+(all ten opened). **Settle times on arrival** (game frames until nothing is left to build, the ten
+quiet frames included / seconds on this machine; at 60 frames a second every arrival is whole in under
+a second, and PAINTER's block 7 holds it as bare paper meanwhile):
+
+| body | spawn | first vista | orbit | the spawn's frame (information) |
+| --- | --- | --- | --- | --- |
+| Earth | 9 / 27 | Temperate Forest 41 / 461 | 9 / 58 | 1445 k triangles, 462 calls |
+| Mercury | 54 / 202 | Cracked Ochre Basins 39 / 147 | 9 / 17 | 480 k, 428 |
+| Venus | 50 / 227 | Fungal Tower Forest 35 / 138 | 9 / 23 | 579 k, 300 |
+| Moon | 31 / 78 | Silver Mare 21 / 50 | 24 / 24 | 383 k, 208 |
+| Mars | 43 / 158 | Rust Canyons 40 / 157 | 9 / 8 | 597 k, 331 |
+| Jupiter | 49 / 144 | Cream Sky-Islands 47 / 150 | 9 / 17 | 594 k, 298 |
+| Saturn | 52 / 220 | Pale Gold Sky-Islands 50 / 316 | 9 / 28 | 772 k, 276 |
+| Uranus | 46 / 232 | Mint Ice Shelves 30 / 103 | 9 / 22 | 755 k, 227 |
+| Neptune | 33 / 101 | Ultramarine Storm Seas 36 / 85 | 9 / 9 | 813 k, 284 |
+| Pluto | 51 / 109 | Lilac Mountains 26 / 109 | 24 / 49 | 760 k, 489 |
+
+Against review 6's partial tour (PAINTER `b022507`): arrivals settle in 9 to 54 frames as then (33 to
+52); the Moon's spawn draws less (383 k, was 666 k: the art pass's fewer boulders).
+
+Body by body, judged against the art bible and the freeze-frame test:
+
+- **Earth** (spawn 9 frames / 27 s; Temperate Forest vista 41 / 461 s; orbit 9 / 58 s; 1445 k triangles, 462 calls at the spawn). Spawn: **passes**, still the reference painting: a meadow in a birch and pine wood, the stream at left, the ship under the trees; the art pass's mixed-age birches have broken the picket fence (trunks of many heights and spacings), and bare paper now shows in the sky above the crowns. Digital: the near grass blades are crisp single strokes everywhere at one weight; the figure is a smooth shaded doll. Vista (the stream study): passes as a watercolour; still digital: the far bank keeps a band of white birch verticals at about one height across the left half, and the **red flowers are flat orange-red ellipses with hard rims** (three on the left bank, two at bottom right): unchanged since review 6, ARTPASS wish 10. Orbit: a mottled globe, rose-ochre land, white cloud as hard-edged blots; the ship sits in the middle of the view (the tour's chase camera, not a fault of the world).
+- **Mercury** (spawn 54 frames / 202 s; Cracked Ochre Basins 39 / 147 s; orbit 9 / 17 s). Spawn (now stepped 4 m off the boulder it stood on): the figure stands clear on the cracked obsidian plain, the ship beyond; the sky (a violet zenith paling to peach, granulated) and the slate glass ground with sepia cracks pass. **The boulders do not**: a dozen smooth, saturated cobalt-violet lozenges with pale speckles round the figure, evenly spread, hard rims: plastic pebbles, not rock (AB 3 dry brush, AB 6: saturated off the ground's hue). Better than review 6 (no white teeth, a dark glass plain), still the weakest arrival. Vista: **passes**, the best frame of the body (a sun-baked basin, sepia cracks, hills in two paler bands). Orbit: a pale blue-grey cratered globe with the terminator across it (a dark side at last); painted.
+- **Mars** (spawn 43 frames / 158 s; Rust Canyons 40 / 157 s; orbit 9 / 8 s). Spawn (stepped 1 m): **passes**: a dry ochre plain with grass strokes, a row of red-leaf groves on the skyline, the ship beyond the figure, a granulated peach sky. The pale lozenge next to the figure is out of the view (the boulders left now sit at the left edge, toned rust). Still digital: the nearest crowns (top left) break into speckled dots at their edge (AB 3: dry brush leaves paper, not pixels), less than in review 6. Vista: **passes**, a good painting (banded canyon walls into a warm haze, a dark spire, a raking ochre slope). Orbit: unchanged and **still not Mars**: a pale peach disc with cream worm-like swirls, no rust, no dark markings, no polar cap.
+- **The Moon** (spawn 31 frames / 78 s; Silver Mare 21 / 50 s; orbit 24 / 24 s). Spawn: **passes** as a quiet wash study: a silver-grey plain with dark basalt flecks, grey boulders a step below the ground (the art pass took the white soap away), a cool violet shadow from the figure, an indigo sky with salt blots and spattered stars. It still faces away from Earth, the brief's one image for the Moon, and the horizon is a crisp line of boulders (no haze on airless worlds: ARTPASS wishes 6, 7). Vista: the same view from a few metres; the near boulders are smooth grey slabs with hard rims. Orbit: a pale cratered disc on indigo, fully lit.
+- **Venus** (spawn 50 frames / 227 s; Fungal Tower Forest 35 / 138 s; orbit 9 / 23 s). Spawn: says Venus at once (an amber haze, fungal towers on the skyline, a basalt spire, the lava river beyond the ship, a sky of bare paper with sepia blots) and **passes** on the whole, but its lower half is still the weak part: a flat dark-brown ground with little in it, and the lava a flat orange band with no light or stroke in it (AB 3 turbulence, AB 9 water as reflected strokes). The stones are fewer and mid mauve-grey now. Vista: **passes**, still among the best frames of the game (striped trunks and caps in rows into the amber haze); the caps' edges break into specks at top left. Orbit: a mottled amber globe; Venus.
+- **Jupiter** (spawn 49 frames / 144 s; Cream Sky-Islands 47 / 150 s; orbit 9 / 17 s). Spawn: the sky says Jupiter in one look (cream and orange belts to a vanishing point, broad soft washes); a yellow-green meadow between cliff walls, now warm sienna-grey; **passes** as a painting. Still digital: the walls are flat vertical planes with square, level tops (extruded blocks: ARTPASS wish 8), and the meadow's red flowers are an even confetti of dots. Vista: **passes**, atmospheric (the cloud sea as a pale mist floor, far islands as grey blocks fading into it); the near island is the same box, and a row of pink dots runs along the bottom edge. Orbit: bold orange and cream bands with soft edges, Jupiter at once (no Great Red Spot).
+- **Saturn** (spawn 52 frames / 220 s; Pale Gold Sky-Islands 50 / 316 s; orbit 9 / 28 s). Spawn: the ring arc as pale ribbons across a cream-sepia sky over a gold meadow says Saturn in one look; the wash under the arc is clean now (review 6 found it muddy); **passes**. Still digital: the olive crowns break into speckled holes at their edges (worst top right), the same alpha-noise edge as Mars' groves. Vista: beyond the figure the mist and islands are good, but **a dark trunk still fills the left eighth of the frame** (a wall at the lens, review 6 item 8) and the crown over the figure is speckled. Orbit (**new framing, ARTPASS wish 12**): the whole ring is in the frame for the first time: a banded gold globe inside a pale ring with its dark division, leaning about 35 degrees (the world's tilt against the camera's ecliptic level), the near side across the globe; painted, and Saturn at once. (The ship sits in the middle of every orbit frame: the tour's chase camera.)
+- **Uranus** (spawn 46 frames / 232 s; Mint Ice Shelves 30 / 103 s; orbit 9 / 22 s). Spawn: a mint granulated sky over a pale aqua ice plain, blue shard grass and needles on the skyline: the palette says Uranus and it **passes** as a pale study, but it is still one value range from sky to ground (nothing darker than the figure and the ship; AB 2), the ice slab at right is a smooth grey lozenge, and the near ground is an even confetti of white splinter flecks (ARTPASS wish 11). Vista: **passes**: the seracs are slim leaning aqua needles now, not snowy firs (the art pass), before a shelf wall whose top edge is softer than in review 6. Orbit: a pale mint disc, white blots, a rose limb; quiet and right in colour.
+- **Neptune** (spawn 33 frames / 101 s; Ultramarine Storm Seas 36 / 85 s; orbit 9 / 9 s; on the art-pass tree, i.e. the old season: the spawn's sun 2 degrees up at "10:00"). Spawn: a twilight painting (a peach-to-violet sky, violet kelp blades as long strokes, a green floor with yellow flecks, a smooth pale boulder at right); **passes** as a dusk study, which it was at every hour (the season is turned since, `dc876f9`, section 5). Vista: the storm sea as horizontal blue strokes with a pale beach is good, but the basalt stacks are **boxy tables with level tops and vertical faces** (as Jupiter's islands), the ship stands in the middle of the view, and **the figure has dropped out of the frame** (only its hat shows at the bottom edge: the third-person camera lifted over a rise behind the stand and kept aiming ahead; PILOT's, fixed: section 5, item 6). Orbit: an ultramarine globe with white cloud streaks and a darker limb: painted, Neptune.
+- **Pluto** (spawn 51 frames / 109 s; Lilac Mountains 26 / 109 s; orbit 24 / 49 s). Spawn (stepped 5 m off the boulder it stood on): the figure stands clear, but **the slope is still a dense, even field of smooth lilac lozenges** with white shard clumps between (the art pass thinned lilac_mountains to 0.025 at its stand; the spawn's ground is busier): it **fails** on the boulders (AB 3 dry brush, AB 4 and 10: no rest for the eye), as Mercury's arrival did in review 6. Vista: the figure fills the bottom of the frame (the boom squeezed by something behind the stand: the camera's rule, by design) over an even confetti of white splinters; the lilac ridge and the far bands pass. Orbit: a pale rose-lilac cratered globe; painted, but the heart does not read.
+
+**The worst frames, worst first, with owners**
+1. **Pluto's arrival** (PAINTER): an even field of smooth lilac lozenges over the whole slope (AB 3, 4,
+   10); boulder shape (ARTPASS wish 1) and the spawn's density (For PAINTER 2).
+2. **Mercury's arrival** (PAINTER): saturated cobalt-violet lozenges with pale specks round the figure;
+   the same two causes. The figure no longer stands on one (PILOT, fixed).
+3. **Night at quality 0** (PAINTER, ARTPASS wish 3): the grand tour's return to Earth at midnight
+   (tier 0, 400x225) is a near-black frame with the figure barely visible (AB 1: nothing is pure
+   black). At the top tier the weather set's 22:00 storm is an indigo night that reads (section 4).
+4. **Neptune's storm-seas vista** (PAINTER for the stacks; PILOT for the figure): basalt stacks as
+   boxy tables; the figure out of the frame (PILOT's camera, fixed: section 5, item 6).
+5. **Mars from orbit** (PAINTER): a pale peach disc with cream swirls, no rust, no dark markings, no cap.
+6. **Saturn's vista** (PAINTER, ARTPASS wish 7): a dark trunk walls the left eighth of the frame.
+7. **Foliage edges in specks** (PAINTER): Mars' groves, Saturn's crowns, Venus' caps (an alpha cut with
+   noise reads as dithering).
+8. **Earth's stream vista** (PAINTER, ARTPASS wish 10): flat orange-red flower ellipses with hard rims.
+9. **Venus' arrival** (PAINTER): the lava a flat orange band without light; a muddy ground.
+10. **Uranus' arrival** (PAINTER): one value range and a confetti of white splinters (ARTPASS wish 11).
+11. **The Moon** (PAINTER 13, the coordinator's ruling): the arrival faces away from Earth.
+12. **Jupiter's islands and Neptune's stacks** (PAINTER, ARTPASS wish 8): extruded blocks.
+
+**Passing**: the spawns of Earth, Mars, the Moon, Venus, Jupiter, Saturn, Uranus and Neptune (8 of 10)
+and every vista but Saturn's walled one and Neptune's (framing fixed; the stacks remain); the
+strongest frames are Earth's spawn, Mercury's ochre basins, Mars' canyons, Venus' fungal forest and
+Jupiter's sky. **Fixed by the art pass since review 6**: Earth's picket fence, the white soap boulders
+on the Moon, Mercury's white teeth, Uranus' snowy firs, Saturn's muddy sky; Saturn's ring now whole
+from orbit, and Mercury shows a terminator.
+
+### 3b. The tier-1 coverage tour (every biome and vista of every body, quality 1)
+
+Running when this review was committed (started 17:38 on the same tree, in four processes of two or
+three bodies each: about 13 frames a body); the results follow in an addendum to this section.
+
+### 4. The picture in motion and the weather (`node tests/motion.mjs`, `node tests/weather.mjs`, top tier)
+
+**Motion** (nine scenes of consecutive frames at 1/30 s, 960x540, quality 2; sheets
+`docs/lead/evidence/motion-<scene>.jpg`, numbers `motion.json`; the measures are defined in the
+script's header; the still, walk, storm, landing and pulse sheets were opened):
+
+| scene | change a frame (worst pair) | pixels over 3 % | never changes | residual after following (mean, 99th) | blocks over 3 % | pops |
+| --- | --- | --- | --- | --- | --- | --- |
+| still-frozen (the same instant) | 0 % | 0 % | 100 % | 0, 0.01 % | 0 of 2400 | 0 |
+| still, clock running | 0.168 % (0.18) | 0.7 % | 68 % | 0.18, 0.86 % | 0 of 13920 | 0 |
+| turn, 11.6 degrees a second | 2.52 % (2.66) | 24 % | 11 % | 1.27, 3.69 % | 21 of 18720 | 1 in 1 of 39 pairs |
+| walk, 4.2 m/s | 3.30 % (3.89) | 32 % | 10 % | 1.91, 5.59 % | 63 of 22560 | 34 in 15 of 47 |
+| storm at the spawn | 0.362 % (0.40) | 2.3 % | 45 % | 0.37, 1.98 % | 2 of 13920 | 2 in 2 of 29 |
+| flight, 40 m up, 28.9 m/s | 1.28 % (1.48) | 12 % | 47 % | 0.70, 4.39 % | 62 of 22560 | 2 in 2 of 47 |
+| landing, the last two metres (new) | 2.16 % (4.66) | 17 % | 11 % | 1.60, 7.89 % | 371 of 42720 | 372 in 44 of 89 |
+| fill, arriving 600 m away | 1.13 % (2.21) | 5 % | 10 % | 1.06, 2.88 % | 47 of 13920 | **0** |
+| pulse, 674 m/s | 0.171 % (0.26) | 0.3 % | 54 % | 0.18, 0.77 % | 0 of 13920 | 0 |
+
+Against "Before review 6" (2026-11-11): the same instant paints the same picture; standing still
+in the wind changes 0.17 % of the picture a frame (was 0.30; R-PAINT-3 asks under 0.5 %); the turn
+holds R-PAINT-4 in all but 21 of 18720 blocks (was 62); **the arrival no longer pops** (fill: 0 pops,
+was 498 in 29 of 29 pairs: PAINTER's block 7); the pulse and space are calm. What moves wrongly:
+1. **The landing** (PILOT, SHOULD FIX): 372 pops, all in the left half: the chase camera, 15 m
+   behind the ship, sits inside a birch crown as the ship sets down in the wood, so leaf masses a
+   metre from the lens jump frame to frame (they also shake in the downwash). The camera keeps
+   clear of the ground, not of crowns. Fix planned: shorten the ship's boom where the canopy field
+   (`canopyHeight`) puts the camera among crowns, eased as the foot boom is; to be checked in a
+   browser.
+2. **The walk** (PHYSICS and PAINTER): 34 pops in 15 of 47 pairs (was 13 in 9): the largest are a
+   pale boot puff appearing at the foot on a living meadow (P17's `KICK.stepDust` was to give no puff
+   on a living sward) and flower dabs at the frame's lower edge; the rest are at the ragged border,
+   which stays on the screen by design.
+3. **The storm** changes twice as much as in review 5 (0.36 %, was 0.18 %): rain strokes and falling
+   leaves; the two pops are leaves, drawn as flat orange ellipses with hard rims (PAINTER: AB 9 asks
+   for falling leaves as brush marks).
+
+Space (the pulse's frames and every orbit frame): indigo and violet washes laid wet-in-wet, salt
+blots, spattered stars, the sun as bare paper with a warm halo: AB 8 met.
+
+**Weather** (twelve frames in the game, top tier, third person; sheet `docs/lead/evidence/weather.jpg`,
+numbers `weather.json`; opened, both halves): every frame settled, no console error. **Passing**: the
+Earth spawn's first minute and before the storm (the reference painting), the front arriving (a grey
+sky, mist down the stream), the storm at its heaviest (a wet, dark wood under rain strokes), the forced
+flash (bare paper through the sky), the gold, misty afternoon after it, **the storm at 22:00 and its
+flash** (dense indigo washes in which the figure, the birches and the ship still read: an indigo night,
+not black), Mars' dust storm (an ochre veil with streaks across the dunes, the figure in it: one of the
+best frames of the set). **Weak** (PAINTER): the blizzard on Earth's alpine meadow is a flat violet
+triangle under one ruler-straight crest line (AB 4; the known "ruled crest"); Neptune's gale has a
+pale ochre sand band along the basalt shore (the fixed shallows bed, ARTPASS wish 9), a near-black
+headland slab, and no white horses (on this tree: PAINTER 12's coast work and the wired sea map came
+after it, and the coordinator measured coast.mjs PASS at both stands since); falling leaves are flat
+orange ellipses. Cost is small: the kits draw 0 to 6 calls and at most 9 k triangles.
+
+### 5. PILOT's own work in this block (fixed by me)
+
+1. **ARTPASS wish 12, the hour** (`9c93e77`). The hour PILOT set was the hour angle; the world paints
+   by its own clock (`src/world/index.js` `lighting.hours`, `sunForHours`: 6 the sun on the horizon in
+   the east, 12 highest, 18 on the horizon in the west). They agree only on the equator or at an
+   equinox, and Earth is at a solstice at t = 0: at Earth's spawn (36 degrees north) the hour angle's 6
+   and 18 had the sun 13 degrees down (night), at Neptune's spawn hour 10 was sunrise, at Uranus' the
+   hours 6 to 10 all lay in a circling polar-day sun. Now `Ephemeris.sunHour` / `setSunHour` use the
+   world's clock for the first morning, `teleport({hour})`, `__pc.setHour` and the mood's `timeOfDay`:
+   6 and 18 are 0 degrees on every spawn where the sun rises; a polar day takes the nearest hour on the
+   morning side (test in `tests/orbits.test.mjs`; `node docs/lead/evidence/review6b/hours.mjs`). At
+   hour 10 most stands move by under 4 degrees (`standsun.mjs`); Uranus' polar stands get a lower sun
+   (`ice_shelves` 69 -> 48 degrees), Earth's first morning at 9.5 a higher one (21 -> 27).
+2. **ARTPASS wish 12, Saturn from orbit** (`9c93e77`). `tests/tour.mjs` `captureOrbit` looks at a
+   ringed world from 1.8 times the ring's outer radius, 25 degrees off the ring's plane, nose north
+   (`teleport` takes a ship heading now). From one radius up the camera was inside the ring. Projected
+   in Node (`ringframe.mjs`) the ring spans x 207..768, y 65..370 of 960x540; **seen in the game**: the
+   whole ring in frame, leaning about 35 degrees (the camera levels on the ecliptic far out).
+3. **The arrival frames on Mercury and Mars** (ARTPASS "arrival frames"; `9c93e77`). The spawn's place
+   is PAINTER's, the explorer's footing and view are PILOT's. Measured (`arrival.mjs`): Mercury's and
+   Pluto's spawns stood the explorer ON a boulder (its edge 0.03 m from the feet), Mars' had one 2.3 m
+   off. Now the world's own arrival (no place asked for) steps to the nearest dry, gentle spot of the
+   spawn's biome with 2.5 m of room (Mercury 4 m, Pluto 5 m, Mars 1 m; the other seven unchanged) and
+   turns the view off any boulder on the boom; a teleport to a point is never moved (contract test).
+   Seen at the top tier: Mercury's figure stands clear, Mars' pale lozenge is out of the view. What is
+   left is PAINTER's (the boulders themselves; the spawn's clearing does not thin rocks: For PAINTER 2).
+4. **The coordinator's P20 rulings** (`a0e3fb1`). A ship landed on water floats: `Sim.stepAfloat`
+   heaves, pitches and rolls with the drawn sea (`env.waterLevel`) averaged over the hull (5 x 3 points
+   over 8 m x 4.4 m, taken up at 2.5/s). With PHYSICS P20 in Node: Neptune's storm sea (Hs 0.76 m)
+   heave +-0.35 m, pitch +-3.6, roll +-4.4 degrees, at most 1 cm a frame; Earth's calm sea_coast within
+   2 cm (`seaship.mjs`); a model 1 m swell of 60 m heaves it 0.89 m and pitches it 5.4 degrees nose
+   up into the rising sea, 3 m chop lifts it 0.05 m (`tests/afloat.test.mjs`). A save made afloat comes
+   back afloat. The camera's vertical follow is smoothed while swimming (0.45 s). `tests/boulderrun.mjs`
+   counts a flight against a boulder only where the ground fell by less than its height plus the limit.
+   Not seen in a browser (the tree under the tours has P19, without `env.waterLevel`: there the ship
+   rests as before).
+5. `tests/all.mjs`: the unit steps' time limits (section 1).
+6. **The third-person camera under a rise** (found in the tour; in `a46b6ee`, the coordinator's
+   snapshot of my files, exactly as tested). A rise at the explorer's back lifts the boom (up to
+   5.7 m), but the camera kept aiming 9 m ahead, so the figure dropped out of the bottom of the view
+   (Neptune's storm-seas vista: only the hat). Now the view turns down just enough to keep the feet
+   within 0.85 of the half-height from the middle (`CAMERA.feetInFrame`); on level ground they sit at
+   0.71 as before. Model rise (scratch `camlift.mjs`): a 25 m bank 10 m behind 1.35 -> 0.85, a 12 m rise
+   1.03 -> 0.86; test in `tests/explorer.test.mjs`. Unit 148 on a clean export. Not yet seen in a
+   browser.
+7. **Neptune's season** (`dc876f9`; PAINTER said yes, the coordinator relayed). `axialTilt` -0.49
+   for 0.49: every Neptune stand is north, and its north was in winter at t = 0 (the spawn's sun never
+   above 2 degrees, a twilight at every hour; the tour's Neptune frames above were taken so). Now the
+   spawn 36 degrees at noon, `aurora_tundra` 33 -> 67, `ice_spires` 58 -> 88, `storm_seas` 71 -> 75; only
+   the spin axis turns (orbits, flight, frames unchanged). Not yet seen in a browser.
+8. **The ship's berth out of the surf** (`dc876f9`, PAINTER 12's note): at an arrival the ship's spot
+   counts a hull (the middle and four points 4.5 m out) less than 1.2 m over a liquid's still level
+   against it, since the drawn sea and its run-up wash over a beach above that level. On the head 2 of
+   52 spawn and stand berths had a hull point in the water (Earth's autumn_woodland -0.19 m,
+   misty_wetland -0.09 m); now 0; no other berth moved, no composed spawn changed (`berth.mjs`; contract
+   test).
+
+### 6. Milestone 3's verdict, item by item against the brief
+
+The brief's M3: "The painting comes alive. Painter: motion (wind, water, weather, day-night), space
+washes, the painted UI theme, and an art pass on the weakest biome of every planet. Pilot: HUD,
+sketchbook and vistas, audio, performance tiers, title screen, help card." A role's milestone is done
+when the lead's MUST FIX list for it is empty (`docs/lead/TRACK.md`).
+
+| item | owner | verdict | evidence (this review unless said) |
+| --- | --- | --- | --- |
+| Motion: wind | PAINTER + PHYSICS | MET | the still scene changes 0.17 % of the picture a frame in the wind with sky, paper and ground still (R-PAINT-3: under 0.5 %); grass and crowns move with PHYSICS' wind and gusts under a second (P18); section 4 |
+| Motion: water | PAINTER + PHYSICS | MET | the storm sea of Neptune as horizontal reflected strokes (tour vista); waves, wake and swash drawn by PAINTER from PHYSICS' sea (the sea map wired after this tree, `c08dddb`; both coast stands PASS by the coordinator's check); the floating explorer and now a landed ship ride the drawn sea |
+| Motion: weather | PAINTER + PHYSICS | MET, with SHOULD FIX | the weather set: the Earth storm by day and at 22:00, the flash, the clearing after, Mars' dust storm pass; SHOULD FIX (PAINTER): the blizzard's ruled crest, Neptune's sand band and slab (section 4) |
+| Motion: day-night | PAINTER (+ PILOT's clock) | MET, with SHOULD FIX | noon, a gold afternoon and an indigo night at the top tier in the weather set; the hour PILOT sets now means the same light on every world (section 5); **at quality 0 night goes near-black** (the grand tour's Earth midnight; ARTPASS wish 3 measured the spawn at 23 h at RGB 24, 29, 48; PAINTER, SHOULD FIX for M4); dawn not re-shot here |
+| Space washes | PAINTER | MET | every orbit frame of the tour: indigo and Payne's grey washes, salt blots, spattered stars, no black; the pulse scene (0.17 % a frame, 0 pops) |
+| The painted UI theme | PILOT (moved from PAINTER by the coordinator, 2026-11-11) | MET | `m3` 31 checks on stubs and in the painted world (title card, sketchbook, vistas, HUD); torn paper, ink keys, stroke lettering (TRACK); PAINTER has still not reviewed its look (open, not a gate) |
+| An art pass on the weakest biome of every planet | PAINTER (the owner's art pass) | MET | 36 of 42 biomes improved on all ten bodies (`docs/lead/ARTPASS.md`); the tour's arrivals pass on 8 of 10; what is left is listed in section 3 and ARTPASS's wishes 1 to 11 |
+| HUD | PILOT | MET | `m3`, play-through and trip (painted world); the frames of the grand tour |
+| Sketchbook and vistas | PILOT | MET | `m3` (a sketch per landscape and view; pages per world); the tour counts each vista as found where the explorer stood (no flag on 10 vistas) |
+| Audio | PILOT | MET (measured, never heard) | `audio` PASSED: no clipping, no clicks, no DC |
+| Performance tiers (and dynamic resolution) | PILOT | MET as logic; the frame rate on a real GPU is unmeasured | `tests/dynres.test.mjs`, `dynres-sweep.test.mjs` in unit 142; the tour runs at the top tier |
+| Title screen, help card | PILOT | MET | `m3` (the card is the loading screen, legible; H shows the help again); README lists every key (`static`) |
+
+**MUST FIX open: none.** Review 7's MUST FIX (PHYSICS) is closed and re-measured here; this review
+raises no MUST FIX: every remaining fault is a SHOULD FIX carried to M4 under "Done means" (every frame
+passes the freeze-frame test), where it belongs.
+
+**Verdict: milestone 3 can close.** Every item of the brief's M3 is in the game and checked; the
+weakest frames that remain (section 3) and the night key are look faults for M4, owned by PAINTER, and
+none of them is missing work. What M3 cannot claim, and nobody here can measure: the frame rate on an
+integrated GPU, the sound as heard, a real mouse and pad.
+
+### 7. Findings for the other roles (answer each in your notes)
+
+**PAINTER** (none is a MUST FIX for M3; all are for M4's "every frame passes the freeze-frame test"
+unless said):
+1. **SHOULD FIX now, `src/world/obstacles.js` `cellsAround`: a wide disc misses trunks and
+   boulders** (correctness, not look). It reads the cells under the disc's centre and eight rim points
+   only, so the wider the disc the more it misses, and the count falls as the radius grows (Pluto's
+   spawn: 24 obstacles within 12 m, 22 within 16.5, 18 within 20, 17 within 25). Against the union of
+   4 m queries tiling the same disc (`node docs/lead/evidence/review6b/obsmiss.mjs`): 80 m round
+   Earth's spawn lists 260 of 536 trunks, Mercury's 15 of 126, Neptune's 88 of 202; 30 m round Pluto's
+   22 of 85, Mercury's 18 of 36. PILOT asks 20 to 45 m for the canopy under a low ship and 80 m for the
+   trunks round a landing site, so the ship can fly through and set down on painted trunks the query
+   did not return (the contract tests share the function and cannot see it). Fix: read every cell the
+   disc's bounding box touches on its face(s) (or sample rings at most half a cell apart), deduplicated
+   as now; rerun `obsmiss.mjs` until both columns agree.
+2. **Boulders on the arrivals**: Pluto's arrival fails on an even field of smooth lilac lozenges and
+   Mercury's is crowded with saturated cobalt-violet ones (ARTPASS wish 1, the boulder's shape and
+   value); the spawn's clearing (`surface.js` :760, :836-838) thins trees and canopy only, never the
+   small kinds: clear rocks and shards within about 6 m of the spawn, and choose the spawn off a
+   boulder (PILOT now steps its arrival off one, but the "place to land" ring is your point).
+3. **Night at quality 0** (ARTPASS wish 3): the grand tour's Earth at local midnight (tier 0) is a
+   near-black frame; at the top tier the 22:00 storm reads as an indigo night. Also from the weather
+   set: the blizzard's ruled crest, Neptune's sand band and near-black headland slab.
+4. **Mars from orbit**: still a pale peach disc with cream swirls (no rust, no dark markings, no cap).
+5. **Foliage edges in specks**: Mars' groves, Saturn's crowns, Venus' caps.
+6. **Saturn's Pale Gold Sky-Islands vista**: the trunk at the lens (ARTPASS wish 7).
+7. **Flowers and leaves as flat ellipses**: Earth's stream vista's red flowers; the storm's falling
+   leaves (orange ellipses with hard rims; AB 9 wants brush marks).
+8. **Venus' arrival**: the lava a flat orange band with no light or stroke; a muddy ground.
+9. **Uranus' arrival**: one value range; a confetti of white splinters (ARTPASS wish 11).
+10. **Extruded islands and stacks**: Jupiter's cliffs, Neptune's basalt stacks (ARTPASS wish 8).
+11. **The Moon facing Earth**: PAINTER 13 by the coordinator's ruling (the Moon is tidally locked);
+    PILOT reruns the tests that depend on its sites when that lands.
+
+**PHYSICS**: one question from the walk (section 4): a pale boot puff appears at the foot on Earth's
+living spawn meadow (`motion-walk.jpg`, frames 21 to 23), where P17's `KICK.stepDust` was to give
+none; is the spawn's glade counted as bare? Nothing else: review 7 is closed, P20's two asks are done
+(section 5).
+
+### 8. Not verified, and why
+
+- No frame time on a real GPU; the sound never heard; no real mouse or pad (as ever).
+- PILOT's `a46b6ee`, `dc876f9` and `a0e3fb1` changes were tested in Node and on clean exports
+  (unit 148, world 19, static), **not yet seen in a browser**: the camera under a rise, Neptune's new
+  season, the berths out of the surf, the floating ship (the tours ran on the art-pass tree, which has
+  PHYSICS P19 without `env.waterLevel`). The next browser run should be the top-tier Neptune tour and
+  a landing on Neptune's sea on the head.
+- The grand tour ran on `5efc7f4` (before PILOT's commits); the painted play-through, trip and
+  milestone 3 checks ran on `9c93e77`.
+- The Moon boulder run (`tests/boulderrun.mjs`) was not re-run: its classification changed by the
+  coordinator's ruling, and PHYSICS 18 ran it in the game (thrown 0.172 m at most, no boulder lifts
+  the feet over 0.1 m); PHYSICS 19's brace change came after.
+- PAINTER 12's work (`e866f6e`, `994074a`, the sea map `c08dddb`) came after the tree under these
+  tours: none of its frames is judged here.
+
+---
+
 ## Review 7 (code): everything the other roles committed since `a671ca7` (2026-11-12, ninth PILOT agent)
 
 A lead developer's code review, Node and reading only: the art pass held the machine's two browsers
