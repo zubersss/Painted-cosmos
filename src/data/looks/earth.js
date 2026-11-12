@@ -2,6 +2,11 @@
 // The fields are described in common.js (the biome helper B) and src/world/surface.js (the terrain recipes).
 import { PIGMENTS, hexToRgb, pig, dilute, mixc, glazec, EARTH_SKY, m3, mkSky, B, P, PM } from './common.js';
 
+// The hand shared with the Moon (art pass, group "earth"): boulders a step below their ground's
+// value and never paper-pale, few enough to be accents rather than a scatter; the ground's own
+// handwriting laid as patches (t.patch) where one wash would read flat; birches a stand of all
+// ages (vary) so their trunks never stand as one fence. obs 0.34 is the drawn trunk's flared base
+// (florakit birchGeometry: 0.225 x 1.5), so the youngest birch still has a trunk to bump into.
 export default {
   seed: 'earth-7',
   seaLevel: 0,
@@ -40,7 +45,7 @@ export default {
         under: { leaf: [[0.88, 0.84, 0.56], [0.74, 0.72, 0.46], [0.54, 0.54, 0.40]], bush: [[0.78, 0.80, 0.60], [0.60, 0.66, 0.52], [0.42, 0.48, 0.44]], rock: [[0.86, 0.66, 0.52], [0.52, 0.34, 0.32]], accent: [0.30, 0.70, 0.69] } }),
     B('misty_wetland', 'Misty Wetland', 'wetland',
       ['oliveGreen', 'viridian', 'rawUmber', 'paynesGrey', 'yellowOchre', 'davysGrey'], 'lemonYellow',
-      ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.48], [0.60, 0.63, 0.38], [0.34, 0.40, 0.32]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.74, 0.82, 0.84], refl: 0.9 }, tall: [0, 0], tallD: 0.14, tallMix: 1, near: { gm: 0.3 }, small: { reed: 0.4, grass: 0.3, fern: 0.12, bush: 0.03 } }),
+      ['oliveGreen', 'rawUmber', 'davysGrey'], { mist: 0.45, under: { leaf: [[0.82, 0.82, 0.46], [0.64, 0.66, 0.38], [0.42, 0.46, 0.34]], accent: [0.93, 0.86, 0.40] }, liquid: { color: [0.60, 0.68, 0.72], refl: 0.75 }, tall: [0, 0], tallD: 0.08, tallMix: 1, small: { reed: 0.5, grass: 0.3, fern: 0.12, bush: 0.03 } }),
   ],
   // Hand-placed biome sites: [latitude, longitude, biomeId]. The first one holds the spawn.
   sites: [
