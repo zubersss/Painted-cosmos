@@ -6,7 +6,7 @@ import {
   HELIO, bodyFrame, frameState, posToUniverse, velToUniverse, velFromUniverse,
   convertState, chooseFrame, sameFrame, FloatingOrigin, quatToUniverse,
 } from '../src/core/frames.js';
-import { V, add, sub, scale, len, norm, qRotate, qLook } from '../src/core/vec.js';
+import { V, add, sub, scale, len, norm, qRotate, qLook, qConj } from '../src/core/vec.js';
 
 const eph = new Ephemeris(BODIES);
 const near = (a, b, eps, msg) => assert.ok(Math.abs(a - b) <= eps, `${msg || ''} ${a} vs ${b} (eps ${eps})`);
@@ -109,6 +109,25 @@ test('the world\'s hour: 6 and 18 on the horizon, 12 highest, wherever one stand
   const hp = e.sunHour('uranus', 0, pd);
   assert.ok(hp > 6 && hp < 12, `polar day: the earliest hour there is (${hp})`);
   assert.ok(e.localSolarTime('uranus', 0, pd) < 12, 'and in the morning');
+});
+
+test('setting the Moon\'s hour keeps Earth where it hangs in the Moon\'s sky (tidally locked; PAINTER 13)', () => {
+  const e = new Ephemeris(BODIES), t = 505;
+  const earthInMoon = () => qRotate(qConj(e.orientation('moon', t)), norm(sub(e.position('earth', t), e.position('moon', t))));
+  const before = earthInMoon();
+  const dir = norm(V(-0.85, 0.1, -0.5));                       // a near-side stand
+  for (const h of [6, 9.5, 10, 15.4, 18, 22]) {
+    e.setSunHour('moon', t, dir, h);
+    near(e.sunHour('moon', t, dir), h, 0.02, `the Moon's hour set to ${h}`);
+    // (to within twice the Moon's 0.03 rad axial tilt: the orbit turns about the ecliptic pole, the spin about the
+    // tilted axis, so Earth's latitude in the Moon's sky swings by up to the tilt either way; unlocked, it moved by up to 1 rad)
+    vnear(earthInMoon(), before, 0.065, `Earth stays put in the Moon's sky at hour ${h}`);
+  }
+  // a body that is not locked turns only its spin
+  const f = new Ephemeris(BODIES);
+  f.setSunHour('mars', t, dir, 10);
+  assert.equal(f.orbitShift.mars, 0, 'Mars keeps its orbit');
+  vnear(f.position('mars', t), new Ephemeris(BODIES).position('mars', t), 1e-9);
 });
 
 test('frames: round trip and continuity across a frame change', () => {

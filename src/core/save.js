@@ -30,6 +30,7 @@ export function snapshot(sim) {
     version: SAVE_VERSION,
     t: +sim.t.toFixed(2),
     spinPhase: { ...sim.eph.spinPhase },
+    orbitShift: { ...(sim.eph.orbitShift || {}) },
     state: st,
     bodyId: sim.bodyId,
     explorer: { p: r3(sim.ex.p), fwd: r3(sim.ex.fwd), fuel: +sim.ex.fuel.toFixed(3) },
@@ -68,6 +69,7 @@ export function restore(sim, d) {
   if (why) return false;
   sim.t = d.t;
   for (const id of Object.keys(d.spinPhase || {})) if (BODIES[id] && num(d.spinPhase[id])) sim.eph.spinPhase[id] = d.spinPhase[id];
+  for (const id of Object.keys(d.orbitShift || {})) if (BODIES[id] && num(d.orbitShift[id])) sim.eph.orbitShift[id] = d.orbitShift[id];
   const onGround = (bodyId, p) => {
     const dir = norm(p);
     const s = sim.sampler(bodyId)(dir);

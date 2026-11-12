@@ -176,3 +176,14 @@ test('a game saved while swimming comes back afloat, not on the bed', () => {
   play(b, pad, 2);
   assert.ok(len(b.ex.p) - bed > 4, 'and stays afloat: ' + (len(b.ex.p) - bed).toFixed(2) + ' m');
 });
+
+test('a game saved on the Moon after its hour was set keeps Earth where it hung (the orbit shift is saved)', () => {
+  const a = new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, body: 'moon', hour: 15 });
+  assert.notEqual(a.eph.orbitShift.moon, 0, 'setting the Moon\'s hour turned its orbit');
+  const d = JSON.parse(JSON.stringify(snapshot(a)));
+  const b = new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, body: 'earth' });
+  assert.ok(restore(b, d), 'restored');
+  assert.ok(Math.abs(b.eph.orbitShift.moon - a.eph.orbitShift.moon) < 1e-12, 'the same orbit shift');
+  const pa = a.eph.position('moon', a.t), pb = b.eph.position('moon', b.t);
+  assert.ok(Math.hypot(pa.x - pb.x, pa.y - pb.y, pa.z - pb.z) < 1e-6, 'the Moon where it was');
+});

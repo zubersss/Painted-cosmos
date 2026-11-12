@@ -13,6 +13,10 @@ export class Ephemeris {
     this.ids = Object.keys(bodies);
     this.spinPhase = {};            // extra spin angle per body (radians), set at boot / by tests
     for (const id of this.ids) this.spinPhase[id] = bodies[id].spinPhase || 0;
+    // extra orbit angle per body (radians): a tidally locked body's orbit turns with its spin when
+    // its hour is set (setSunHour), so its parent keeps its place in its sky (PAINTER 13)
+    this.orbitShift = {};
+    for (const id of this.ids) this.orbitShift[id] = 0;
     this._tilt = {};
     for (const id of this.ids) this._tilt[id] = qFromAxisAngle(V(1, 0, 0), bodies[id].axialTilt || 0);
   }
@@ -26,7 +30,7 @@ export class Ephemeris {
   // Position of the body centre in the universe frame at time t.
   position(id, t) {
     const b = this.body(id);
-    const a = b.orbitPhase + (TAU * t) / b.orbitPeriod;
+    const a = b.orbitPhase + (this.orbitShift[id] || 0) + (TAU * t) / b.orbitPeriod;
     // Counter-clockwise seen from +Y (north), the same sense as the spin.
     const p = V(Math.sin(a) * b.orbitRadius, 0, Math.cos(a) * b.orbitRadius);
     return b.parent ? add(this.position(b.parent, t), p) : p;
@@ -35,7 +39,7 @@ export class Ephemeris {
   velocity(id, t) {
     const b = this.body(id);
     const w = TAU / b.orbitPeriod;
-    const a = b.orbitPhase + w * t;
+    const a = b.orbitPhase + (this.orbitShift[id] || 0) + w * t;
     const v = V(Math.cos(a) * b.orbitRadius * w, 0, -Math.sin(a) * b.orbitRadius * w);
     return b.parent ? add(this.velocity(b.parent, t), v) : v;
   }
@@ -103,7 +107,10 @@ export class Ephemeris {
   // taken. Where an hour comes twice in a turn (a polar day), the one nearer the same hour angle.
   setSunHour(id, t, dir, hours) {
     const d = norm(dir), base = this.spinPhase[id], N = 720;
-    const at = (phi) => { this.spinPhase[id] = phi; return wrapHours(this.sunHour(id, t, d) - hours); };
+    // a tidally locked body (the Moon) turns its orbit with its spin: its parent stays put in its sky
+    const b = this.body(id), locked = !!b.parent && Math.abs(b.orbitPeriod - b.dayLength) < 1e-6, shift0 = this.orbitShift[id] || 0;
+    const set = (phi) => { this.spinPhase[id] = phi; if (locked) this.orbitShift[id] = shift0 + (phi - base); };
+    const at = (phi) => { set(phi); return wrapHours(this.sunHour(id, t, d) - hours); };
     const errs = [];
     for (let k = 0; k < N; k++) errs.push(Math.abs(at(base + (k * TAU) / N)));
     let best = 0;
@@ -116,7 +123,7 @@ export class Ephemeris {
     }
     let pick = best, pickBy = Infinity;
     for (const k of cands) {
-      this.spinPhase[id] = base + (k * TAU) / N;
+      set(base + (k * TAU) / N);
       const by = Math.abs(wrapHours(this.localSolarTime(id, t, d) - hours));
       if (by < pickBy) { pickBy = by; pick = k; }
     }
@@ -126,7 +133,9 @@ export class Ephemeris {
       const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
       if (Math.abs(at(m1)) <= Math.abs(at(m2))) hi = m2; else lo = m1;
     }
-    this.spinPhase[id] = wrapAngle((lo + hi) / 2);
+    set((lo + hi) / 2);
+    this.spinPhase[id] = wrapAngle(this.spinPhase[id]);
+    if (locked) this.orbitShift[id] = wrapAngle(this.orbitShift[id]);
   }
 
   // Radius of the sphere of influence used for choosing the flight frame (see frames.js).
