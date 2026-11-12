@@ -47,6 +47,7 @@ export const EXPLORER_BODY = Object.freeze({
   legTime: 0.12,          // s: time constant with which the legs level the hips (critically damped)
   legLift: 9.0,           // m/s^2: the hardest the legs raise the hips (the same legs as legAccel)
   trendTime: 0.3,         // s over which the rise of the ground counts as the slope of a hill, not a feature
+  trendSlip: 0.6,         // (P22) m/s: ground rising faster or slower than the hips by more than this is not read as the hill's slope
   legCatch: 30,           // m/s^2: the hardest they take up a descending body (eccentric: 3 g)
   clamber: 1.35,          // m: a leg and a half. A rise or a drop within it is clambered in contact,
                           // hands on the rock; a drop beyond it is a fall
@@ -97,6 +98,28 @@ export const EXPLORER_BODY = Object.freeze({
   aheadProbeAfter: 2.6,   // m read beyond it (a 1.3 m dome seen at its foot lies within that)
   aheadProbeMargin: 0.92, // the pace planned, as a share of the fastest trial that crossed clean (and the pace is tried that much faster)
   aheadProbeTries: 6,     // trials at most (a bisection between 0.5 m/s and the pace: about a sixth of a metre a second)
+  // (P22) THE WAY, SEEN. A runner looks where the feet will go: the ground along the path is kept as a row of samples
+  // (`way`, wayStep apart, out to what the hips must answer in time and to the read of the way ahead), sampled once as it
+  // comes into view and again each wayFresh metres nearer (what stands on the ground near the walker is known only near
+  // it: PILOT's boulders are listed within 9 m). The legs level the hips within the TUBE that ground allows: never lower,
+  // at any place within wayTime of travel, than that place's ground less the fold (the hips rise in time for a rock: before
+  // P22 they were heaved up its face at the ground's own rate and overshot its top, and the limbs then had to check the run
+  // so the feet could follow the far side down: the game's Moon boulder, 7.15 -> 2.52 m/s on top), never higher than its
+  // ground and the reach (the legs fold in time before a crest, so the stroke is there for the fall beyond). The line
+  // these are counted from rises at the rate the ground under the feet has been rising (a hill is not a rise).
+  wayStep: 0.3,           // m between the samples of the way
+  wayLat: 0.35,           // m off the line of the run at which a sample is no longer on the way
+  wayFresh: 3,            // m nearer than where it was last read, a sample is read again
+  wayFill: 2,             // samples read in a step to fill the way (refreshes: as many again); the whole of it when empty
+  wayMax: 14,             // m: the farthest the way is kept
+  wayMargin: 0.02,        // m kept from the ends of the stroke when the hips are set in time (what the step's own lag carries)
+  // (P22) A CREST seen on the way (wayCrest) is met at the pace at which the hips, coming up its near side, can be turned
+  // down its far side within the stroke (gravity and the limbs on the edge pulling them: a run up a 43 degree crater rim on
+  // the Moon left its crest at 6.5 m/s and the feet flew 2 m; the body measured keeps contact to 4.1 m/s over a 43 / 10
+  // degree crest, 6 m/s over 29 / 10, 3 m/s over 54 / 7, on the Moon, Mars and Earth alike within 5 % of the law);
+  // a runner who sees it coming shortens the stride and sheds the rest with the soles.
+  crestMargin: 0.92,      // the pace planned, as a share of that law
+  // wayTime (s): legTime x 3 + the time to fall through the reach (sqrt(2 reach / g)): 0.6 s on Earth, 0.95 s on the Moon
   // GAIT (P13). The stride-averaged body above (st.p, st.v: the path, the pace, the stops) is carried by
   // legs that step. Within the stride the hips ride the mechanics of a legged walker:
   //   a WALK is an inverted pendulum: the hips vault over the stance foot on a leg that rolls over the
@@ -173,10 +196,13 @@ export const EXPLORER_BODY_STATE = () => ({
   grip: 0,                // 1 while the limbs hold a feature (taken at a convex edge, kept until standing again)
   paceCap: 1e9,           // m/s: the pace the walker holds so its feet can follow the ground ahead
   paceAhead: 1e9,         // (P16) m/s: the pace it holds now to meet a face it has seen ahead at the pace it can climb it
+  paceCrest: 1e9,         // (P22) m/s: the pace it holds now to meet the crests it has seen at the pace it can follow them
   ahead: null,            // (P16) that face: { x, y, z (unit), rise (m), vc (m/s) } or null
   probe: null,            // (P17) a feature being tried (see EXPLORER_BODY.aheadProbe): its profile, the trials so far
   seen: null,             // (P17) the end of the way ahead known (a feature tried): { x, y, z (unit), d (m along) } or null
   noTry: null,            // (P17) the end of ground read and found to go on rising (not tried: P16's reading holds there)
+  readTo: null,           // (P22) the far point the way ahead was last read at (unit direction): the next read is no more than a span past it
+  way: null,              // (P22) the way seen (see EXPLORER_BODY.wayStep): { n, x, y, z (unit), h (radius), dS (m away when read), d (m along now) }
   brace: 0,               // m/s of forward speed lost this step against a face or to a hold
   support: 0,             // m/s^2 of normal support from the ground (0 when floating or airborne)
   impact: 0,              // m/s of the last landing (normal speed), set on the landing step
@@ -296,24 +322,155 @@ function wayAhead(B, env, S, px, py, pz, h1, sx, sy, sz, vh, gE, aB, T, vw = vh)
         } else if (A && !A.tried && Math.abs(Q.d - A.d) < T.aheadSpan + T.aheadProbeAfter) A = B.ahead = null;   // tried: no slowing
       }
     } else {
-      const D2 = S.dir2, hN = groundAhead(env, D2, px, py, pz, hx, hy, hz, d - T.aheadSpan), hF = groundAhead(env, D2, px, py, pz, hx, hy, hz, d);   // (D2: the far point)
-      const slope = B.trend > 0 ? B.trend / vh : 0, rise = hF - h1 - slope * d;
-      const known = B.seen && d <= B.seen.d;
+      // (P22) ... no further on than a span past what has been read: as the pace and the far point grew, the read jumped
+      // forward and left ground unread between (the field of boulders on the Moon: a 0.9 m boulder 4 m past the end of
+      // what was known was never read, and met braced at 7.4 m/s)
+      // (from here, when nothing read lies ahead on the path)
+      const rt = B.readTo ? alongWay(B.readTo, ux, uy, uz, hx, hy, hz, r) : -1e9;
+      const base = Math.max(rt > -1e8 ? rt : 0, B.seen ? B.seen.d : -1e9);
+      const dR = Math.max(T.aheadSpan + 0.5, Math.min(d, base + T.aheadSpan));
+      const D2 = S.dir2, hN = groundAhead(env, D2, px, py, pz, hx, hy, hz, dR - T.aheadSpan), hF = groundAhead(env, D2, px, py, pz, hx, hy, hz, dR);   // (D2: the far point)
+      const RT = B.readTo || (B.readTo = { x: 0, y: 0, z: 0 }); RT.x = D2.x; RT.y = D2.y; RT.z = D2.z;
+      // (the rise over the line of the ground being run on, or over the ground just short of it when that is lower: (P22)
+      // climbing the flank of one boulder, its slope carried on 8 m put the line over the next one, which was never read)
+      const slope = B.trend > 0 ? B.trend / vh : 0, rise = hF - Math.min(h1 + slope * dR, hN);
+      const known = B.seen && dR <= B.seen.d;
       if (!known && hF - hN > T.legFold && rise > T.legFold && hF - h1 <= T.clamber) {
         const fx = D2.x, fy = D2.y, fz = D2.z;
         // the law stands in while it is tried (faces over the stroke, as in P16)
         if (hF - hN > stroke && rise > stroke) {
           const vc = Math.max(0.5, T.aheadPace / Math.pow(Math.max(0.05, rise - T.legFold), T.aheadExp));
-          const N = { x: fx, y: fy, z: fz, rise, vc, d, tried: false };
+          const N = { x: fx, y: fy, z: fz, rise, vc, d: dR, tried: false };
           // (the same face read again a little further on: it is as high as its highest reading; another face: the dearer)
           if (A && Math.abs(N.d - A.d) < T.aheadSpan) { if (N.vc < A.vc && !A.tried) { A.vc = N.vc; A.rise = N.rise; } }
           else if (!A || paceCost(N, ab, T) < paceCost(A, ab, T)) A = B.ahead = N;
         }
-        if (!(A && A.tried && Math.abs(d - A.d) < T.aheadSpan) && !(B.noTry && d <= B.noTry.d)) probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, d, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
+        if (!(A && A.tried && Math.abs(dR - A.d) < T.aheadSpan) && !(B.noTry && dR <= B.noTry.d)) probeStart(B, env, D2, px, py, pz, h1, hx, hy, hz, r, dR, rise, Math.max(vh, Math.min(vw, vh + 2)), fx, fy, fz, T);
       }
     }
   }
   B.paceAhead = A ? Math.sqrt(A.vc * A.vc + 2 * ab * Math.max(0, A.d - T.look)) : 1e9;
+}
+
+// ---- (P22) the way, seen (see EXPLORER_BODY.wayStep) ----------------------------------------------------
+const WAY_N = 52;
+function wayRing() {
+  const f = () => new Float64Array(WAY_N);
+  return { n: 0, x: f(), y: f(), z: f(), h: f(), dS: f(), d: f(), ok: false, lo: 0, hi: 0 };
+}
+export function wayTime(gE, T = EXPLORER_BODY) { return 3 * T.legTime + Math.sqrt(2 * T.legReach / Math.max(0.3, gE)); }
+// Keep the way along (hx, hy, hz) (unit, level) from the feet at (px, py, pz) out to `far` m, and the tube for the hips
+// (radius c, the pace vh) over the first `near` m: W.lo and W.hi, the slowest and the fastest they may rise (m/s; see
+// LEGS, 3). D2: the step's scratch direction.
+function wayUpdate(B, env, D2, px, py, pz, h1, c, vh, hx, hy, hz, near, far, T) {
+  const W = B.way || (B.way = wayRing());
+  const r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r, lat2 = T.wayLat * T.wayLat;
+  // where each sample lies now; off the way or behind, it goes
+  let m = 0;
+  for (let i = 0; i < W.n; i++) {
+    const dx = W.x[i] - ux, dy = W.y[i] - uy, dz = W.z[i] - uz, d = (dx * hx + dy * hy + dz * hz) * r;
+    const ex = dx * r - d * hx, ey = dy * r - d * hy, ez = dz * r - d * hz;
+    if (d < -0.5 || d > far + 1 || ex * ex + ey * ey + ez * ez > lat2) continue;
+    W.x[m] = W.x[i]; W.y[m] = W.y[i]; W.z[m] = W.z[i]; W.h[m] = W.h[i]; W.dS[m] = W.dS[i]; W.d[m] = d; m++;
+  }
+  W.n = m;
+  // nearest first (they come in nearly in order)
+  for (let i = 1; i < W.n; i++) {
+    let j = i; const d = W.d[i];
+    if (W.d[j - 1] <= d) continue;
+    const x = W.x[i], y = W.y[i], z = W.z[i], h = W.h[i], s = W.dS[i];
+    while (j > 0 && W.d[j - 1] > d) { W.x[j] = W.x[j - 1]; W.y[j] = W.y[j - 1]; W.z[j] = W.z[j - 1]; W.h[j] = W.h[j - 1]; W.dS[j] = W.dS[j - 1]; W.d[j] = W.d[j - 1]; j--; }
+    W.x[j] = x; W.y[j] = y; W.z[j] = z; W.h[j] = h; W.dS[j] = s; W.d[j] = d;
+  }
+  // read again what has come wayFresh nearer since it was read (nearest first)
+  let k = T.wayFill;
+  for (let i = 0; i < W.n && k > 0; i++) if (W.dS[i] - W.d[i] > T.wayFresh && W.d[i] > 0) { D2.x = W.x[i]; D2.y = W.y[i]; D2.z = W.z[i]; W.h[i] = env.sample(D2).radius; W.dS[i] = W.d[i]; k--; }
+  // fill the gaps, nearest first (all of it when the way is empty)
+  k = W.n ? T.wayFill : WAY_N;
+  const ds = T.wayStep;
+  let prev = 0, i = 0;
+  while (k > 0 && W.n < WAY_N) {
+    while (i < W.n && W.d[i] <= prev + 1.6 * ds) { if (W.d[i] > prev) prev = W.d[i]; i++; }
+    const s = prev + ds;
+    if (s > far) break;
+    const x = px + hx * s, y = py + hy * s, z = pz + hz * s, l = Math.hypot(x, y, z) || 1;
+    D2.x = x / l; D2.y = y / l; D2.z = z / l;
+    const h = env.sample(D2).radius;
+    // (insert at i, keeping the order)
+    for (let j = W.n; j > i; j--) { W.x[j] = W.x[j - 1]; W.y[j] = W.y[j - 1]; W.z[j] = W.z[j - 1]; W.h[j] = W.h[j - 1]; W.dS[j] = W.dS[j - 1]; W.d[j] = W.d[j - 1]; }
+    W.x[i] = D2.x; W.y[i] = D2.y; W.z[i] = D2.z; W.h[i] = h; W.dS[i] = s; W.d[i] = s; W.n++;
+    prev = s; i++; k--;
+  }
+  // the tube over the first `near` metres: the vertical speeds (m/s at the pace vh) that carry the hips (radius c) straight
+  // on to the fold of the ground (L) at each sample and to its reach (U). The hips must rise no slower than to clear the
+  // fold of what is ahead and above them (lo), no faster than keeps the reach of what is ahead (hi); but a line on to a
+  // far sample that would leave the stroke of a nearer one is not their path (a rock taller than the stroke: they rise
+  // as far as the ground before it lets them, no faster than on to the fold of its top, and its top and far side are the
+  // legs' to take, as before): a fold beyond a nearer reach is not counted, and a reach beyond a nearer fold asks no
+  // more than that fold. So lo <= hi.
+  let lo = -1e9, hi = 1e9, maxL = -1e9, minU = 1e9;
+  const d0 = Math.max(0.25, T.wayStep * 0.8), deep = h1 - T.clamber;
+  for (let j = 0; j < W.n && W.d[j] <= near; j++) {
+    const d = W.d[j];
+    if (d < d0) continue;
+    // (a rise counts only above the hips: ground below them they come down to as the legs level them, and stop over it;
+    // a drop only within a clamber of the feet: beyond it is a fall, not ground to follow)
+    const L = W.h[j] - T.legFold + T.wayMargin, sL = vh * (L - c) / d, okU = W.h[j] > deep, sU = vh * (W.h[j] + T.legReach - T.wayMargin - c) / d;
+    if (L > c && sL <= minU && sL > lo) lo = sL;
+    if (okU) { const b = Math.max(sU, maxL); if (b < hi) hi = b; if (sU < minU) minU = sU; }
+    if (sL > maxL) maxL = sL;
+  }
+  W.ok = hi < 1e8; W.lo = lo; W.hi = hi;
+  return W;
+}
+
+// (P22) THE CREST (see EXPLORER_BODY.crestPace). The way's ground at d m along (interpolated; NaN beyond what is known).
+function wayAt(W, d) {
+  if (!(W.n > 1) || d < W.d[0] || d > W.d[W.n - 1]) return NaN;
+  let lo = 0, hi = W.n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (W.d[m] < d) lo = m; else hi = m; }
+  const i = hi, a = W.d[i - 1], b = W.d[i];
+  return b > a ? W.h[i - 1] + (W.h[i] - W.h[i - 1]) * (d - a) / (b - a) : W.h[i];
+}
+// The pace to hold now so that every crest along the way known is met at the pace the hips can follow over it, braking at
+// ab: a crest rising at s1 and falling at s2 (over a look either side) is followed in contact up to
+// sqrt(2 (g + gripAccel) stroke) / (s1 + s2) (the hips, coming up it at v s1, are turned to v s2 down within the stroke,
+// pulled by gravity and the limbs on the edge), x crestMargin. The near side counts only where it rises more than a
+// clamber (a rim, a hill's brow) or the run is already climbing it; an edge falling away from level ground counts with
+// s1 = 0, unless it falls more than a clamber in a look (a fall).
+function wayCrest(W, h0, vh, gE, ab, ts, T) {
+  if (!W || !(W.n > 2)) return 1e9;
+  const L = T.look, st = (T.legFold + T.legReach) * 2, k = Math.sqrt(Math.max(0.1, gE + T.gripAccel) * st) * T.crestMargin, k0 = Math.sqrt(Math.max(0.1, gE) * st) * T.crestMargin;
+  let pace = 1e9;
+  // (at each sample and half way to the next)
+  for (let j = 0; j < 2 * W.n - 1; j++) {
+    const d = j & 1 ? 0.5 * (W.d[j >> 1] + W.d[(j >> 1) + 1]) : W.d[j >> 1];
+    if (d < 0.3) continue;
+    // (the crest's own height: the highest within a half spacing, so that a corner between evaluations is not cut)
+    let hc = j & 1 ? wayAt(W, d) : W.h[j >> 1];
+    { const q = 0.5 * T.wayStep, a = wayAt(W, d - q), b = wayAt(W, d + q); if (a > hc) hc = a; if (b > hc) hc = b; }
+    // (short of what is kept, the ground under the feet (h0), and behind them the slope the run is on: ts)
+    const db = d - L, hb = db >= W.d[0] ? wayAt(W, db) : db >= 0 ? h0 + (W.h[0] - h0) * db / W.d[0] : h0 + ts * db, ha = wayAt(W, d + L);
+    if (!(hb === hb) || !(ha === ha)) continue;
+    // (the hips ride the near side only where it rises more than a clamber: a rock or a mound lower than that is crossed
+    // within the stroke, the hips raised in time (the tube), and its face is read and tried (P16, P17); only its fall counts)
+    let lo3 = Math.min(hc, hb); for (let i = (j >> 1); i >= 0 && W.d[i] >= d - 3 * L; i--) if (W.h[i] < lo3) lo3 = W.h[i];
+    if (d - 3 * L < W.d[0] && h0 < lo3) lo3 = h0;
+    // (or where the run is already on it, climbing at its slope: ts, the rise of the hips (or the ground's trend) per metre)
+    const sn = (hc - hb) / L, s1 = hc - lo3 > T.clamber || ts > 0.5 * sn ? Math.max(sn, Math.min(ts, 2 * sn)) : 0;
+    // (a drop deeper than a clamber in a look is a fall, not ground to follow: from level ground it is not slowed for; at
+    // the top of a climb it is a knife edge, and the climb is: the hips must be turned from it within the stroke, whatever
+    // is beyond (a 60 degree ridge on the Moon, climbed at 2 m/s, threw the body 0.5 m up off its crest))
+    const drop = hc - ha;
+    if (drop > T.clamber && !(s1 > 0)) continue;
+    const sig = s1 + Math.min(drop, T.clamber) / L;
+    if (!(sig > 0.05)) continue;
+    // (beyond a knife edge there is nothing within reach to hold: gravity alone turns the hips)
+    const vc = (drop > T.clamber ? k0 : k) / sig;
+    const p = Math.sqrt(vc * vc + 2 * ab * Math.max(0, d - L));
+    if (p < pace) pace = p;
+  }
+  return pace;
 }
 
 // Where a remembered point (unit direction P) lies on the way from (ux, uy, uz) along (hx, hy, hz): how far along it (m),
@@ -391,6 +548,7 @@ const _gq = [0, 1, 2, 3].map(() => ({ radius: 0, normal: { x: 0, y: 1, z: 0 }, l
 let _gk = 0, _gQ = null;
 const _gst = { p: { x: 0, y: 0, z: 1 }, v: { x: 0, y: 0, z: 0 }, grounded: true, phys: null };
 const _gB0 = Object.freeze(EXPLORER_BODY_STATE()), _gB = EXPLORER_BODY_STATE();   // (P19) the ghost's body, set afresh each trial (no garbage)
+const _gWay = wayRing();
 const _gcmd = { wish: { x: 0, y: 0, z: 0 } };
 const _gT = new WeakMap();
 function ghostSample(dir) {
@@ -425,6 +583,7 @@ function ghostCrosses(Q, v, env, T) {
   st.p.x = Math.sin(t) * rr; st.p.y = 0; st.p.z = Math.cos(t) * rr;
   st.v.x = Math.cos(t) * v; st.v.y = 0; st.v.z = -Math.sin(t) * v;
   st.grounded = true; st.phys = Object.assign(_gB, _gB0);
+  _gB.way = _gWay; _gWay.n = 0; _gWay.ok = false;          // (P22) the ghost's own way (no garbage)
   for (let k = 0; k < 900; k++) {
     t = Math.atan2(st.p.x, st.p.z);
     _gcmd.wish.x = Math.cos(t) * v; _gcmd.wish.y = 0; _gcmd.wish.z = -Math.sin(t) * v;
@@ -826,7 +985,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       tx = qx - ux * k; ty = qy - uy * k; tz = qz - uz * k;
       const tl = Math.hypot(tx, ty, tz);
       // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
-      if (tl > 1e-9) { const m = Math.min(qlen, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
+      if (tl > 1e-9) { const m = Math.min(qlen, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;
@@ -926,7 +1085,13 @@ function stepOnce(st, cmd, dt, env, T, S) {
     if (!working && B.clamberT <= 0) B.grip = 0;
     const pull = feat ? T.gripAccel : 0;
     const trend = Math.max(0, B.trend);
-    if (!working) { B.trend += (clamp(gr, -20, 20) - B.trend) * (1 - Math.exp(-dt / T.trendTime)); B.base = r; B.baseLo = r; }   // (a feature the legs are working on is not a hill)
+    // (a feature the legs are working on is not a hill; (P22) nor ground they are folding or stretching over fast, the hips
+    // passing through standing on their way from a rock's run-up, where they were raised in time, to its face: read in
+    // those steps as a hill's rise, the face was the slope the body then left the far side at, +0.6 m/s on the Moon)
+    if (!working) {
+      if (!(Math.abs(w - gr) > T.trendSlip)) B.trend += (clamp(gr, -20, 20) - B.trend) * (1 - Math.exp(-dt / T.trendTime));
+      B.base = r; B.baseLo = r;
+    }
     else {
       B.base += B.trend * dt;
       // (P21) ... but never below the lowest ground the feet have stood on since: carried down at the rate of a descent
@@ -941,6 +1106,25 @@ function stepOnce(st, cmd, dt, env, T, S) {
     if (B.jumpT > 0) tgt = Math.min(tgt, h1 - Math.min(fold, T.jumpPush));   // (P13) folding before a jump
     const om = 1 / T.legTime, y0 = c0 - (tgt - dh), v0 = w - gr, ee = Math.exp(-om * dt), kk = v0 + om * y0;
     let c1 = tgt + (y0 + kk * dt) * ee, w1 = gr + (v0 - om * kk * dt) * ee;
+    // (P22) ... but within the tube the way ahead allows (see EXPLORER_BODY.wayStep): the hips rise no faster than would
+    // carry them over the reach of any ground they will be over within wayTime, and no slower than clears the fold of any
+    // (straight on from where they are). Until P22 they were levelled over the ground under the feet at its own rate, up
+    // the face of a rock as fast as it rose, and overshot its top.
+    // (and never out of the stroke over the ground here in this step)
+    const W = B.way;
+    if (W && W.ok && vh > 0.3) {
+      const m = T.wayMargin, up = 2 * (h1 + reach - m - c0) / dt - w, dn = 2 * (h1 - fold + m - c0) / dt - w;
+      let wt = clamp(w1, W.lo, W.hi);
+      // (raised no faster than gravity, and a hold, can stop them again within the reach: the cap below, which the
+      // tube must not get round by asking for the speed in one step)
+      if (wt > w1) {
+        // (wt^2 = 2 a (room - wt dt): still able to stop within the reach after this step)
+        const a = Math.max(0.1, gE + pull), rm = Math.max(0, B.base + reach - m - c0), capU = trend - a * dt + Math.sqrt(a * a * dt * dt + 2 * a * rm);
+        wt = Math.max(w1, Math.min(wt, up, capU));
+      }
+      else if (wt < w1) wt = Math.min(w1, Math.max(wt, dn));
+      if (wt !== w1) { w1 = wt; c1 = c0 + 0.5 * (w + w1) * dt; }
+    }
     {
       let a = (w1 - w) / dt, cut = false;
       const aMax = w < -0.2 ? T.legCatch : T.legLift, aMin = T.crestLaunch ? -(gE + pull) : -1e9;
@@ -1028,7 +1212,8 @@ function stepOnce(st, cmd, dt, env, T, S) {
       const rr = Math.max(h1, c1 - reach), vv1 = w1 - su;
       px = D.x * rr; py = D.y * rr; pz = D.z * rr;
       vx = sx + vv1 * ux; vy = sy + vv1 * uy; vz = sz + vv1 * uz;
-      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamberT = 0; B.grip = 0;
+      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.paceCrest = 1e9; B.ahead = null; B.clamberT = 0; B.grip = 0;
+      if (B.way) B.way.ok = false;
     } else {
       px = D.x * h1; py = D.y * h1; pz = D.z * h1; sF = s1;
       B.hip = clamp(c1 - h1, -fold, reach); B.hipV = w1;
@@ -1049,6 +1234,14 @@ function stepOnce(st, cmd, dt, env, T, S) {
       // (P16) the way ahead (see EXPLORER_BODY.aheadFrom)
       // (P19: the trials it runs step the ghost with the ghost's own scratch: D, the walker's up here, is read just below)
       wayAhead(B, env, S, px, py, pz, h1, sx, sy, sz, vh, gE, Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0), T, qlen);
+      // (P22) the way, seen (see EXPLORER_BODY.wayStep): kept from here along the run, the tube for the next step
+      // and (P22) the crests along it (see EXPLORER_BODY.crestMargin), read as far as the soles need to brake for them
+      if (vh > 0.3) {
+        const sd = sx * D.x + sy * D.y + sz * D.z, ex = sx - sd * D.x, ey = sy - sd * D.y, ez = sz - sd * D.z, el = Math.hypot(ex, ey, ez);
+        const near = Math.max(T.look, vh * wayTime(gE, T)), ab = Math.max(0.3, T.aheadMargin * (Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0)));
+        const far = Math.min(T.wayMax, Math.max(near + 1, Math.min(T.aheadMax, vh * vh / (2 * ab)) + T.look + T.look));
+        if (el > 1e-9) { wayUpdate(B, env, S.dir2, px, py, pz, h1, h1 + B.hip, vh, ex / el, ey / el, ez / el, near, far, T); B.paceCrest = wayCrest(B.way, h1, vh, gE, ab, Math.max(0, B.trend, B.hipV) / vh, T); }
+      } else { if (B.way) B.way.ok = false; B.paceCrest = 1e9; }
       // the velocity lies along the ground as the legs carry it (see LEGS, 1) at the new place
       { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = D.x; n1y = D.y; n1z = D.z; } }
       const q1 = q === 0 || B.grip ? 0 : 1;
@@ -1173,7 +1366,8 @@ function stepOnce(st, cmd, dt, env, T, S) {
       if (l1 > 0 && env.waterLevel) { const w = env.waterLevel(st.p, l1); if (w === w) l1 = Math.max(0, l1 + w); }   // (P20) the drawn sea
       if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * D.x + vy * D.y + vz * D.z + hipIn; }
     }
-    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;
+    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.paceCrest = 1e9; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;
+    if (B.way) B.way.ok = false;
     if (!grounded) { B.hip = 0; B.hipV = 0; B.trend = 0; B.grip = 0; }
     B.slip01 = grounded ? 0 : B.slip01 * 0.9;
     B.scramble01 = 0;
