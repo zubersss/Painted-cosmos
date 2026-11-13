@@ -64,6 +64,8 @@ export function createWorld(scene) {
       // own wash to the edge (a pale rim on a dark ball reads as glass), looks.js `limb` says otherwise
       limbK: look.limb != null ? look.limb : Math.max(0, Math.min(1, (BODIES[id].atmosphereHeight || 0) / 700)),
     };
+    // (a great pale marking laid on the globe from orbit: looks `heart` { over: biome id, size }; materials.js TERRAIN_FRAG)
+    if (look.heart) { const S = getSurface(id), bi = S.biomes.findIndex((b) => b.id === look.heart.over), s0 = S.sites.find((x) => x.b === bi); if (s0) st.bu.uHeart.value.set(s0.x, s0.y, s0.z, look.heart.size || 0.4); }
     if (look.flora) st.flora = new Flora(id, root, bu);
     if (look.rings) { st.ring = makeRing(bu, BODIES[id].radius, look.rings); root.add(st.ring); }
     if (look.cloud > 0.05 && BODIES[id].atmosphereHeight > 0) {
@@ -295,6 +297,9 @@ export function createWorld(scene) {
       // camera in body-local coordinates
       st.camLocal.copy(cameraPos);
       root.worldToLocal(st.camLocal);
+      // (from orbit the limb closes on the mean sphere: chunks.js pcRound. Full relief to a third of a radius up, a quarter
+      // of it from 0.8 radii (at a third Earth's alpine range still stood off the limb as a bump); about the sea's level where the world has one, so a coast stays a coast)
+      { const R = st.body.radius; st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * 0.35, R * 0.8), R + (st.look.seaLevel || 0)); }
       // sun direction
       const bu = st.bu;
       if (st.forcedTime != null) {

@@ -8,6 +8,9 @@ import { PIGMENTS, hexToRgb, pig, dilute, mixc, glazec, EARTH_SKY, m3, mkSky, B,
 // small accent (the tholin orange of the heart's edge).
 export default {
   seed: 'pluto-2', seaLevel: null, cloud: 0,
+  // (the heart, as a painter lays it on the globe from orbit: one pale wash over the heart glacier's first site;
+  // world/index.js, materials.js TERRAIN_FRAG. PAINTER 17, the M4 critique's third item)
+  heart: { over: 'heart_glacier', size: 0.40 },
   // (a thin air, but enough that the far ridges go back in steps toward a pale blue haze band)
   visibility: [1600, 10000],
   // (the ground's drifts: toward rose and toward lilac; the default warm drift on mint turned the glacier green)

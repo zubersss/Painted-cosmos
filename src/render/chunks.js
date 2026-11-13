@@ -24,6 +24,17 @@ export const VERT_PARS = /* glsl */`
 #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
   uniform float logDepthBufFC;
 #endif
+// A world seen from orbit is round (PAINTER 17, the M4 critique's third item: Earth from a radius up was a lumpy potato,
+// its alpine range standing off the limb as a meringue; 300 m of relief on a 4 km ball is a fourteenth of the radius).
+// A painter draws the limb as one true curve with a hand's wobble: above about a third of a radius the relief is drawn
+// in toward the datum sphere, to a quarter of itself from 0.8 radii up. Only where a vertex is DRAWN moves (by this
+// shift, along the radius); what paints it (the body coordinates the washes are laid by) stays, so no wash swims
+// as the ship climbs. On the ground uRound.x is 0 and nothing moves at all.
+uniform vec2 uRound;
+vec3 pcRound(vec3 body) {
+  float r = max(length(body), 1.0);
+  return body * ((uRound.y - r) * uRound.x / r);
+}
 `;
 
 export const VERT_END = /* glsl */`

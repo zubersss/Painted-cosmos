@@ -43,6 +43,7 @@ export const G = {
   uCastK: { value: new THREE.Vector2(0, 0) },
   uNoHazeUp: { value: new THREE.Vector4(0, 0, 0, 0) }, uUpW0: { value: new THREE.Vector3(0, 1, 0) },   // (for body uniforms made before these existed)
   uMoon0: { value: 0 },
+  uRound0: { value: new THREE.Vector2(0, 4000) }, uHeart0: { value: new THREE.Vector4(0, 1, 0, 0) },
   // the near air (x how much of what stands at distance y metres it veils, rising as 1 - exp(-d / y)): a dust storm
   // veils the explorer at the eye's own distance, which the far washes' stacked bands cannot (the world sets it)
   uAirNear: { value: new THREE.Vector2(0, 9) },
@@ -90,6 +91,8 @@ export function makeBodyUniforms() {
     uHueA: { value: new THREE.Vector3(0.84, 0.99, 0.80) },               // the two drifts of neighbouring pigment in ground washes
     uHueB: { value: new THREE.Vector3(1.0, 0.90, 0.80) },
     uBodyR: { value: 4000 },                                             // base radius of the body (strata follow the height)
+    uHeart: { value: new THREE.Vector4(0, 1, 0, 0) },                    // a world's one great pale marking seen from orbit (Pluto's heart): xyz its place (unit, body-local), w its size (0: none)
+    uRound: { value: new THREE.Vector2(0, 4000) },                       // from orbit the limb closes on the mean sphere: x how far the relief is drawn in (0 on the ground .. 0.75), y the datum radius (chunks.js pcRound)
     uWx: { value: new THREE.Vector4(0, 0, 0, 0) },                       // weather: x overcast (flat cool light), y wet ground, z snow cover, w veil (rain or snow in the air)
   };
 }

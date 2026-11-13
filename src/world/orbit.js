@@ -91,6 +91,7 @@ const CLOUD_FRAG = /* glsl */`
 ${FRAG_PARS}
 uniform vec4 uCloud;      // coverage, feature size, drift, bands (0 = scattered cloud, 1 = a full banded deck)
 uniform vec4 uDeck;       // number of belts pole to pole, how far the weather pushes their edges, white streaks, wetness
+uniform vec4 uAxis;       // xyz: the axis the belts turn about (unit, body-local); w: matte, 0..1 (no sunlit wash on the deck)
 uniform vec3 uBandA;
 uniform vec3 uBandB;
 uniform vec4 uSpot;      // a great storm: unit direction, and its angular radius (0 = none)
@@ -106,7 +107,9 @@ void main() {
   float v = c1 * 0.60 + c2 * 0.28 + c3 * 0.12;
   // banded worlds: belts of wash laid along the latitude, their edges pushed about by the weather
   vec3 nrm = normalize(vPos);
-  float lat = asin(clamp(nrm.y, -1.0, 1.0)) / 1.5708;
+  // (the belts' axis is the look's own, deck.axis: Neptune's first landing is at 72 degrees north, and belts about the
+  // body's pole were rings concentric with the limb from above it, reflections on a glass ball; M4 critique, item 3)
+  float lat = asin(clamp(dot(nrm, uAxis.xyz), -1.0, 1.0)) / 1.5708;
   float wob = ((c1 - 0.5) + (c2 - 0.5) * 0.45) * uDeck.y;
   float sv = sin((lat + wob) * uDeck.x * 3.14159 + 0.6);
   float stripe = smoothstep(-0.20, 0.20, sv + (c3 - 0.5) * 0.35);
@@ -139,7 +142,9 @@ void main() {
   float streak = smoothstep(0.64, 0.72, texture(uNoise3D, vec3(q.x * 0.45, q.y * 3.6, q.z * 0.45) + 0.4).r + (c3 - 0.5) * 0.15);
   c = mix(c, vec3(1.0), streak * uDeck.z);
   c = mix(c, pcDensity(uSpotCol, 1.0 + spiral * 0.5), storm);
-  c = pcTone(c, pcLevel(x, 0.08));
+  // (matte: a deck of saturated wash takes no sunlit wash: the lit side of Neptune was a pale lobe following the limb,
+  // lighter than the belts beside it. Its day side is the belts' own colour; the terminator still falls into the glaze)
+  c = pcTone(c, pcLevel(mix(x, min(x, 0.62), uAxis.w), 0.08));
   float limb = pow(1.0 - ndv, 2.5) * uFog.w;
   c = mix(c, mix(uHaze, vec3(1.0), 0.4), limb);
   // the edge of a cloud is wet: it runs into the wash beneath instead of standing as a cut shape
@@ -156,6 +161,7 @@ export function makeCloudShell(bodyU, radius, look, stormDir) {
       uCloud: { value: new THREE.Vector4(look.cloud, 2600, 0.0006, look.bands ? 1 : 0) },
       uLimbCos: { value: 0.4 },
       uDeck: { value: new THREE.Vector4(D.belts || 7, D.wobble == null ? 0.10 : D.wobble, D.streaks || 0, D.wet == null ? 0.55 : D.wet) },
+      uAxis: { value: (() => { const a = new THREE.Vector3().fromArray(D.axis || [0, 1, 0]).normalize(); return new THREE.Vector4(a.x, a.y, a.z, D.matte || 0); })() },
       uBandA: { value: new THREE.Vector3().fromArray(D.a || sky.horizon) }, uBandB: { value: new THREE.Vector3().fromArray(D.b || sky.cloudShade) },
       uSpot: { value: stormDir ? new THREE.Vector4(stormDir.x, stormDir.y, stormDir.z, D.storm ? D.storm.size : 0.22) : new THREE.Vector4(0, 1, 0, 0) },
       uSpotCol: { value: new THREE.Vector3().fromArray((D.storm && D.storm.color) || [0.80, 0.36, 0.30]) },

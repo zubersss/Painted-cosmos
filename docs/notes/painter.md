@@ -42,10 +42,38 @@ the project's five checks one after another).
   kept: the sheet's key at 0.45 with the thinner masses the sixteenth had live (Neptune's squall went to a pale grey
   day: the midpoint is what is in the files). Not verified: quality 0 (the rain's draw is the same code at every tier).
 
-**In the middle of / next** (the round's order, by what a new player sees first): FIX 3 round worlds from orbit (the
-relief drawn in toward the datum sphere from a third of a radius up: `chunks.js pcRound`, `uRound`; Neptune's belts;
-Pluto's heart), FIX 4 Jupiter's arrival palette, FIX 5 Uranus' and Pluto's arrivals, then PHYSICS' five (the figure:
-wind lean, cloth, swim pose, arc pose; crowns at the lens; the storm sea's white water).
+- **FIX 3, round worlds from orbit, Neptune's belts, Pluto's heart: DONE** (seventeenth). (a) `chunks.js pcRound`,
+  `uRound` (a body uniform, `shared.js`, `materials.js baseUniforms`; set per body in `world/index.js`): from a third of
+  a radius up the relief is DRAWN in toward the datum sphere (the sea's level where there is one), to a quarter of
+  itself from 0.8 radii; only the drawn position moves (terrain, water, and every prop by its foot: `TERRAIN_VERT`,
+  `WATER_VERT`, `PROP_VERT`), the body coordinates the washes are laid by stay, so nothing swims as the ship climbs; on
+  the ground the uniform is 0 and nothing changes. A far world (Earth in the Moon's sky) gets the same. Tried at a
+  third (0.66): Earth's alpine range was still a bump on the limb. (b) Neptune: the belts turn about the look's own
+  axis (`deck.axis`, tilted 45 degrees; `orbit.js uAxis`): the first landing is at 72 degrees north and belts about the
+  body's pole were rings concentric with the limb from above it; six belts, less push at their edges, the dark belt a
+  step lighter, streaks 0.4 -> 0.15, and no sunlit wash on the deck (`deck.matte`). (c) Pluto: `heart: { over:
+  'heart_glacier', size: 0.40 }`: one pale cream wash in the shape of a heart laid over the far ground at the heart
+  glacier's first site, with a thin tholin line at its edge, only from orbit (`uHeart`, `TERRAIN_FRAG`; it fades out
+  with the relief below 0.8 radii). Frames opened (quality 1, 640x360, one radius up over each spawn, looking down):
+  `m4fix/03-orbits-after.jpg` (all ten: every limb one curve with a hand's wobble; Neptune a banded blue world; Mars,
+  the Moon, Mercury, Venus, Jupiter, Saturn, Uranus as they were but round), `m4fix/03-orbits-before-pilot12.jpg`
+  (PILOT's six frames), `m4fix/03-orbit-more-after.jpg` (Pluto from over its heart; Earth from 2 km and 1.5 km up: a
+  globe with a clean limb; Earth as a round ball in the Moon's sky). Pluto's heart is 56 degrees from its spawn: from
+  straight over the spawn it lies at the limb. Not verified: the top tier; the climb filmed frame by frame (the relief
+  eases in between 0.35 and 0.8 radii of altitude: I looked at 600 m, 1.5 km and 2 km only).
+- **FIX 4, Jupiter's arrival palette: DONE in part** (seventeenth). `looks/jupiter.js`: the sky-islands' sward is
+  ochre-olive (patches 0.52, 0.68, 0.34 -> 0.80, 0.72, 0.40 and 0.36, 0.54, 0.34 -> 0.60, 0.56, 0.34; `oliveGreen` for
+  `sapGreen`), its grass and bushes cream to rust (`under`), its trees a fifth tall kind, the broadleaf in cream, ochre
+  and rust (the green broadleaf stays in the Hanging Gardens; same `obs`, so PHYSICS' obstacles are unchanged).
+  `m4fix/04-jupiter-pair.jpg` (opened: a gold meadow with rust crowns under the orange belts). NOT done: the island's
+  edge and the cloud sea in the first view (I looked at headings 150, 240 and 330 from the spawn: the bench is ringed
+  by its own land; it needs another spawn, which moves PILOT's and PHYSICS' instruments: not in a final round), the
+  far islands' level tops.
+
+**In the middle of / next** (by what a new player sees first): the figure (wind lean, cloth, swim pose, arc pose:
+`art/models.js`, written, being looked at), crowns at the lens (`materials.js PROP_FRAG`, written), the storm sea's
+white water (`materials.js WATER_FRAG`, written), then FIX 5 (Uranus' and Pluto's arrivals: `nearground.js needly`
+drifts, a deep teal passage on Uranus, a deep violet one on Pluto: written, first frames taken).
 
 ## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
 

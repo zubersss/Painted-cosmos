@@ -32,7 +32,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear, uAux8: G.uAux8,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
-    uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
+    uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx, uRound: b.uRound || G.uRound0, uHeart: b.uHeart || G.uHeart0,
   }, own || {});
 }
 
@@ -77,7 +77,7 @@ void main() {
   vNL = nrm;
   vNV = normalMatrix * nrm;
   vUpV = normalMatrix * normalize(vBody);
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
   vCol = mix(aColor, aColorP, m); vCol2 = mix(aColor2.rgb, aColor2P.rgb, m); vPar = mix(aParams, aParamsP, m);
   gl_Position = projectionMatrix * mv;
@@ -102,6 +102,8 @@ varying vec3 vUpV;
 // PHYSICS' push field (what has been trodden or blown flat): the ground shows the track
 ${FLORA_GLSL}
 uniform float uPhysOn;
+uniform vec2 uRound;      // x: how far from the ground the eye is, as the relief is drawn in (0 on the ground .. 0.75 from orbit)
+uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place, w its size (0: none)
 void main() {
   #include <logdepthbuf_fragment>
   vec3 nV = normalize(vNV);
@@ -233,6 +235,24 @@ void main() {
   }
   float f = pcFogAmount(dist);
   c = pcAtmosV(c, f, vView);
+  // A world's one great marking, as a painter lays it on the globe from orbit (PAINTER 17, the M4 critique's third item:
+  // Pluto had no heart): one pale cream wash in the shape of a heart where the heart glacier lies, its left lobe barer
+  // paper, a thin tholin-orange line pooled along its edge. It is laid only from orbit (with the relief drawn in);
+  // on the ground and in low flight the land's own washes are all there is.
+  if (uHeart.w > 0.0 && uRound.x > 0.004) {
+    vec3 nb = normalize(vBody), hc = normalize(uHeart.xyz);
+    vec3 he = normalize(cross(vec3(0.0, 1.0, 0.0), hc)), hn = cross(hc, he);
+    vec2 hp = vec2(dot(nb, he), dot(nb, hn)) / uHeart.w;
+    hp += (texture(uNoise3D, nb * 1.7 + 0.3).rg - 0.5) * 0.22;                     // the hand's wobble
+    float hx = hp.x * 1.25, hy = hp.y * 1.25 + 0.30;
+    float hq = hx * hx + hy * hy - 1.0;
+    float hf = hq * hq * hq - hx * hx * hy * hy * hy;
+    float hm = (1.0 - smoothstep(-0.02, 0.05, hf)) * step(0.0, dot(nb, hc)) * (uRound.x / 0.75);
+    float hedge = (1.0 - smoothstep(0.0, 0.16, abs(hf + 0.02))) * step(0.0, dot(nb, hc)) * (uRound.x / 0.75);
+    vec3 heartC = mix(vec3(0.985, 0.955, 0.925), vec3(0.96, 0.88, 0.87), smoothstep(-0.1, 0.5, hx));
+    c = mix(c, pcDensity(heartC, 0.7 + (n1.r - 0.5) * 0.9), hm * 0.86);
+    c = mix(c, c * vec3(0.93, 0.74, 0.62), hedge * 0.55 * (0.5 + n1.g));
+  }
   // from space the limb of the planet thins into its haze, toward bare paper
   vec3 upV = normalize(vUpV);
   float limb = pow(1.0 - clamp(dot(upV, normalize(-vView)), 0.0, 1.0), 2.5) * uFog.w;
@@ -309,7 +329,7 @@ void main() {
   vToCam = uCamLocal - p;
   vDepth = aDepth;
   vLiq = aLiq; vLiqP = aLiqP.xy;
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
@@ -727,7 +747,7 @@ void main() {
   #else
     vMassV = normalMatrix * (ir * aMass);
   #endif
-  vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+  vec4 mv = modelViewMatrix * vec4(wp + pcRound(io + uOrigin), 1.0);     // (a thing stands on the ground where the ground is drawn)
   vView = mv.xyz;
   vUv = uv; vData = aData; vInst = inst;
   vFog = pcFogAmountV(di);
