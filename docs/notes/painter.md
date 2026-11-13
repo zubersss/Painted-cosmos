@@ -62,6 +62,45 @@ coast.mjs, ghostfield.mjs, wallrun.mjs one after another; `sheet.py` for labelle
   stands, `ghostfield.mjs` all zeros, `wallrun.mjs` 0.2 / 0.2 / 0.2 m; the game at quality 0 (the frames above, on
   `1294633` with the same file): no console error, fallback empty. The top tier: by the code the old lookup (`soft`
   0); one frame at quality 2 is taken in the session of item 3 (named below when taken).
+  Top tier, taken: `preship/04-top-tier-q2.jpg` top left (opened): the Earth spawn at quality 2 on the final code, as
+  crisp as before (no console error, fallback empty).
+- **ITEM 3, FLAT FRAMES (Uranus' Pearl Fog Flats, Mars at night, Venus' haze): DONE, Venus in part.** Three changes,
+  each seen before and after at the play-test's settings (quality 0, scale 0.5, 960x540) and at quality 2:
+  (a) FOG IN BANKS (`render/chunks.js FOG_BANK pcFogBank`, used by the terrain's fragment and the props' and the near
+  strokes' vertex fog in `render/materials.js`; `uFogBank` a body uniform in `render/shared.js`, set in
+  `world/index.js` from the biomes under the eye: look `bank`/`bankSize`, a biome's own `bank` over the look's). Where
+  a world's fog lies thick it lies in drifts anchored to the land, layered (three times faster with height than along
+  the ground), and the distance the fog is reckoned at is scaled by them: a thin drift shows the land a step darker, a
+  thick one takes it a little sooner; the far end still goes to the air. Worlds that say nothing are unchanged
+  (`bank` 0: every look but Uranus and Venus). Uranus `pearl_fog` bank 1.0 at 150 m; Venus bank 0.6 at 700 m, its
+  `pale_mesas` 0 (the mesas stand above the fog; with banks the far mesas went to leopard spots). Tried and taken out:
+  blots alike in three dimensions (dark spots over Venus' mesa faces), thick drifts up to 1.4 times the distance (the
+  near flats on Uranus went paler), Venus at 0.9 / 260 m (spots on the far mesas).
+  (b) PATCHES: Uranus' Pearl Fog Flats get pools of pearl-lilac shadow (a third `t.patch`, the white patch smaller,
+  the mint deeper) and the splinters' shaded side a step darker (0.60, 0.62, 0.80; 0.70, 0.70, 0.86 before); Venus'
+  pale mesas get broad patches of shadowed raw sienna and rose (`t.patch`; on their own view they hardly show).
+  (c) NIGHT: Mars keeps a lighter band low in its night sky (`looks/common.js mkSky` takes `nightHorizon`; Mars 0.90,
+  0.86, 0.88, it was 0.71, 0.69, 0.71), and on every world with air the sheet lays a graded darker wash over the near
+  land at night (`render/post.js`: land within about 20 m, easing out by 160 m, over the lower part of the sheet; the
+  figure, the ship and the lights keep theirs). Tried and taken out: the ground and water alone (the sward's strokes
+  stood on it as pale cut-outs).
+  Measured (`bands.py`: L* medians of six bands top to bottom; the 10-90 spread), quality 0: Uranus' view 7.2 -> 9.9
+  (lower bands 89.5 / 87.2 / 85.6 -> 87.9 / 85.1 / 84.9), turned 120 degrees 7.4 -> 10.3; Venus 225 m up 22.2 -> 24.6;
+  Venus' pale mesas 13.4 -> 13.4 (not improved: no banks there by choice, the patches do not show from the stand); Mars
+  at 23:30 19.2 -> 33.0 (sky band 51.7 -> 59.2, near ground 35.4 -> 30.2); Mars' polar frost 15.3 -> 23.7; Earth at
+  23:30 19.6 -> 20.0 (near ground 40.8 -> 35.6, the crowns as before). Quality 2: Uranus 7.9 -> 11.9 / 10.6, Mars 24.0
+  -> 36.6, frost 15.9 -> 24.3. Frames (opened): `preship/03-flat-frames-q0-before-after.jpg` (head `25074de` against
+  this, seven views) and `preship/04-top-tier-q2.jpg` (the same page with the live parts switched off and on; Uranus'
+  patch colours are in both). Judged: Uranus keeps its pale calm with a soft darker band and splinters in depth; Mars
+  by night is three washes and the groves stand against the band; Venus from the air has broken slopes and banded
+  mesas; Earth's night is a little darker at the feet (FIX 1's frame was not shot again at the top tier with its own
+  clock). Not measured: the frame time with the banks (two texture lookups a fragment on the terrain of Uranus and
+  Venus only). Not seen: Venus at quality 2 with the final numbers (seen at 0.9 / 260 m, then the final at quality 0).
+  Checks on a clean export of `5ba725f` with these files (`t7`): world 24, unit 198, physics 325, `coast.mjs` PASS at
+  both stands, `ghostfield.mjs` all zeros (0.26 / 0.52 as before), `wallrun.mjs` 0.2 / 0.2 / 0.2 m; the game at quality
+  0 on `t7` (loaded, Uranus' view drawn): no console error, no game error, fallback empty. (A slip, logged: I copied the
+  final `venus.js` into the tree a running browser served, `t6`; the page had loaded its modules long before and its
+  live values were set by hand to the same numbers; every check above is on `t7`, made after that browser closed.)
 
 An independent verifier checked the fix round below and did not accept one item (the figure) and found three
 regressions. This pass fixes exactly those. Began 09:30 UTC, 2026-11-13, on head `a686a98`. Scratch and harness:

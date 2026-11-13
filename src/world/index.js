@@ -404,11 +404,12 @@ export function createWorld(scene) {
       } else SHEET.laid = 1;     // (in slow frames a share of the frame, like the terrain)
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
-      let mist = 0, twi = 0, aur = 0;
+      let mist = 0, twi = 0, aur = 0, bank = 0;
       for (const b of look.biomes) {
         const w = here.biomeWeights[b.id];
         if (!w) continue;
         aur += w * (b.aurora || 0);
+        bank += w * (b.bank != null ? b.bank : (look.bank || 0));      // (PAINTER 19: a thick fog lies in banks, chunks.js pcFogBank)
         let m = b.mist || 1;
         // fog lying in the low ground: thick below its level, clear above it
         if (b.t && b.t.fog) m *= 0.2 + 0.8 * THREE.MathUtils.smoothstep(camR - body.radius, b.t.fog[0] - b.t.fog[1] * 0.5, b.t.fog[0] + b.t.fog[1]);
@@ -535,6 +536,7 @@ export function createWorld(scene) {
       const air01 = body.atmosphereHeight > 0 ? space01 : THREE.MathUtils.smoothstep(alt, 250, 2500);
       const vis = (v0 * mist + (v1 - v0 * mist) * THREE.MathUtils.smoothstep(alt, 6, 160)) * (hazeK + (1 - hazeK) * air01) + 40000 * air01;
       bu.uFog.value.set(1 / vis, 6, 1 - air01 * 0.9, space01 * st.limbK);
+      if (bu.uFogBank) bu.uFogBank.value.set(bank * (1 - air01), look.bankSize || 150);
       // sky
       skyU.uSunDirL.value.copy(bu.uSunDirL.value);
       skyU.uCamL.value.copy(st.camLocal);

@@ -219,6 +219,15 @@ void main() {
   // (night, PAINTER 16: the moon models the land in the materials now, chunks.js pcLevel, so the key only deepens the
   // washes a little; it was 0.68 to 0.94, which ran every middle value down into one dark, 80 % of the frame within 7 L*)
   d += uNight * (0.30 + 0.20 * plo.r) * (1.0 - lamp);
+  // (PAINTER 19, the blind player's UGLY 9: Mars by night was one blue-grey wash from the sky to the boots. A nocturne
+  // is darkest at the feet: the land within about twenty metres takes a deeper wash, easing out by 160 m, so that the
+  // near ground, the middle distance and the sky's lighter band are three washes. It is laid as a graded wash over
+  // the lower part of the sheet, the land and what stands on it alike (the ground alone left the sward's strokes as
+  // pale cut-outs on it); the figure and the ship (region 5) and the lights keep theirs: they are the subject)
+  float clsN = floor(auxU.w + 0.001);
+  float nearLand = step(0.5, auxU.w) * (1.0 - step(4.5, clsN) * step(clsN, 5.5)) * step(clsN, 6.5)
+                 * (1.0 - smoothstep(4.3, 7.3, auxU.z)) * (1.0 - smoothstep(0.30, 0.62, vUv.y));
+  d += uNight * 0.30 * nearLand * (1.0 - lamp);
 
   // ragged unpainted border: the wash simply stops, and pools where it stops
   vec2 bd = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);

@@ -6,11 +6,14 @@ import * as THREE from 'three';
 import { G, PHYS, PHYSW, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
-import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK } from './chunks.js';
 
 const FOG_VERT = /* glsl */`
 uniform vec4 uFog;
 uniform vec2 uAirNear;
+uniform highp sampler3D uNoise3D;
+uniform vec2 uFogBank;
+${FOG_BANK}
 float pcFogAmountV(float dist) {
   float f = 1.0 - exp(-dist * uFog.x);
   float q = f * uFog.y;
@@ -32,7 +35,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear, uAux8: G.uAux8,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
-    uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx, uRound: b.uRound || G.uRound0, uHeart: b.uHeart || G.uHeart0,
+    uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx, uRound: b.uRound || G.uRound0, uHeart: b.uHeart || G.uHeart0, uFogBank: b.uFogBank || G.uFogBank0,
   }, own || {});
 }
 
@@ -233,7 +236,7 @@ void main() {
       c = pcDensity(c, 1.0 + 0.42 * trod) * mix(vec3(1.0), vec3(0.95, 0.97, 0.90), trod);
     }
   }
-  float f = pcFogAmount(dist);
+  float f = pcFogAmount(dist * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks, chunks.js)
   c = pcAtmosV(c, f, vView);
   // A world's one great marking, as a painter lays it on the globe from orbit (PAINTER 17, the M4 critique's third item:
   // Pluto had no heart): one pale cream wash in the shape of a heart where the heart glacier lies, its left lobe barer
@@ -777,7 +780,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(wp + pcRound(io + uOrigin), 1.0);     // (a thing stands on the ground where the ground is drawn)
   vView = mv.xyz;
   vUv = uv; vData = aData; vInst = inst;
-  vFog = pcFogAmountV(di);
+  vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }
@@ -1388,7 +1391,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(wp, 1.0);
   vView = mv.xyz;
   vCol = iCol.rgb; vS = vec4(t, side, h, iExt.x);
-  vFog = pcFogAmountV(di);
+  vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
 }

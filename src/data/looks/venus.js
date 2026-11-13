@@ -4,6 +4,10 @@ import { PIGMENTS, hexToRgb, pig, dilute, mixc, glazec, EARTH_SKY, m3, mkSky, B,
 
 export default {
   seed: 'venus-3', seaLevel: null, cloud: 0.85, visibility: [230, 1000], bands: 0.6,
+  // (PAINTER 19, the blind player's UGLY 9: Venus' haze was big flat cream areas. The haze lies in banks some hundreds of
+  // metres across (chunks.js pcFogBank): the land under a thin drift a step darker, under a thick one paler. Tried 0.9 at
+  // 260 m: the far mesas went to leopard spots)
+  bank: 0.6, bankSize: 700,
   // the first landing: on the bank of a lava river where it runs away into the haze, a grove of the old towers beside it
   spawn: [0.441599, 0.870687, 0.216551, 352, -4, 15, 19.6],
   deck: { height: 450, belts: 3.2, wobble: 0.42, a: [0.99, 0.94, 0.66], b: [0.93, 0.70, 0.36], streaks: 0.35, wet: 0.7 },
@@ -30,7 +34,9 @@ export default {
         under: { crust: [[0.24, 0.22, 0.28], [0.90, 0.78, 0.36], [0.30, 0.26, 0.30], [0.93, 0.52, 0.22]], rock: [[0.58, 0.50, 0.50], [0.32, 0.27, 0.32]] }, near: { dab: 2, crust: 8, needle: 0 }, small: { rock: 0.035 }, phys: { ground: 'rock' } }),
     B('acid_terraces', 'Acid Lake Terraces', 'terraced', ['lemonYellow', 'oliveGreen', 'yellowOchre', 'viridian', 'rawUmber'], 'turquoise', ['lemonYellow', 'yellowOchre', 'oliveGreen'],
       { t: { amp: 150, steps: 12, pools: 1, wl: 430, riser: [0.72, 0.90] }, liquid: { color: [0.86, 0.93, 0.68], refl: 0.45 }, under: { crust: [[0.97, 0.96, 0.70], [0.70, 0.80, 0.44], [0.50, 0.72, 0.62]], rock: [[0.84, 0.76, 0.54], [0.54, 0.47, 0.34]] }, near: { crust: 6, needle: 2, dab: 2 }, small: { shard: 0.05, rock: 0.008 } }),
+    // (PAINTER 19: the mesas' cream broken by patches of shadowed raw sienna and of rose, t.patch; no fog banks seen from
+    // up here, `bank: 0`: the mesas stand above the fog and the hazy silhouettes of the far ones are the picture)
     B('pale_mesas', 'Pale Mesas', 'mesa', ['yellowOchre', 'davysGrey', 'rawSienna', 'neutralTint', 'roseMadder'], 'cobaltViolet', ['yellowOchre', 'davysGrey', 'rawSienna'],
-      { t: { amp: 330, strata: 0.7, wl: 520, fog: [22, 14] }, mist: 2.6, want: { perch: 1.2, liquid: 1.6, beyond: 2.4, steep: 1.0, below: 0.5, high: 0.08, relief: 1.2 }, under: { rock: [[0.94, 0.89, 0.76], [0.68, 0.58, 0.50]], bush: [[0.90, 0.84, 0.56], [0.74, 0.66, 0.44], [0.50, 0.44, 0.36]], crust: [[0.97, 0.94, 0.84], [0.74, 0.62, 0.52], [0.84, 0.66, 0.66]] }, near: { crust: 5, dab: 3 }, small: { rock: 0.018, bush: 0.01 }, phys: { ground: 'rock' } }),
+      { bank: 0, t: { amp: 330, strata: 0.7, wl: 520, fog: [22, 14], patch: [{ c: [0.70, 0.60, 0.52], wl: 40, thr: 0.05, soft: 0.4, amt: 0.34 }, { c: [0.88, 0.74, 0.70], wl: 12, thr: 0.25, soft: 0.25, amt: 0.26 }] }, mist: 2.6, want: { perch: 1.2, liquid: 1.6, beyond: 2.4, steep: 1.0, below: 0.5, high: 0.08, relief: 1.2 }, under: { rock: [[0.94, 0.89, 0.76], [0.68, 0.58, 0.50]], bush: [[0.90, 0.84, 0.56], [0.74, 0.66, 0.44], [0.50, 0.44, 0.36]], crust: [[0.97, 0.94, 0.84], [0.74, 0.62, 0.52], [0.84, 0.66, 0.66]] }, near: { crust: 5, dab: 3 }, small: { rock: 0.018, bush: 0.01 }, phys: { ground: 'rock' } }),
   ],
 };

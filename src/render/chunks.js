@@ -37,6 +37,26 @@ vec3 pcRound(vec3 body) {
 }
 `;
 
+// Fog in banks (PAINTER 19, the M4 pre-ship round: Uranus' Pearl Fog Flats were an almost empty mint-white page, Venus'
+// haze big flat cream areas: a fog that thickens evenly with the distance lays one flat wash over everything past the
+// first stones). Where a world's fog lies thick it lies in drifts anchored to the land, some tens of metres across and
+// layered (the drifts change three times faster with height than along the ground: on a cliff face they are bands,
+// not blots): in a thin drift the land is seen as if it were nearer, a step darker; a thick one takes it a little
+// sooner (only a little: the ground at the feet stays a step below the fog). The far end still goes to the air (only
+// the distance the fog is reckoned at changes). pcFogBank returns the factor on that distance: 1 where the world says
+// nothing (uFogBank.x 0). Needs uNoise3D and uFogBank declared. Tried: blots in three dimensions alike (dark spots
+// over Venus' mesas), thick drifts taking up to 1.4 times the distance (the near flats on Uranus went paler).
+export const FOG_BANK = /* glsl */`
+float pcFogBank(vec3 body) {
+  if (uFogBank.x < 0.003) return 1.0;
+  vec3 q = body / uFogBank.y, upB = normalize(body);
+  q += upB * (dot(q, upB) * 3.0);
+  float n = texture(uNoise3D, q + vec3(0.17, 0.41, 0.73)).r * 0.9 + texture(uNoise3D, q * 2.3 + vec3(0.61, 0.07, 0.29)).g * 0.1;
+  float thin = smoothstep(0.38, 0.66, n);
+  return 1.0 + uFogBank.x * (0.15 - 1.0 * thin);
+}
+`;
+
 export const VERT_END = /* glsl */`
 #include <logdepthbuf_vertex>
 #if defined(USE_LOGARITHMIC_DEPTH_BUFFER) && !defined(PC_FRAG_LOGDEPTH)
@@ -51,6 +71,8 @@ export const FRAG_PARS = /* glsl */`
   #undef USE_LOGARITHMIC_DEPTH_BUFFER
 #endif
 uniform highp sampler3D uNoise3D;
+uniform vec2 uFogBank;
+${FOG_BANK}
 uniform sampler2D uStrokeTex;
 uniform vec3 uSunDirW;
 uniform vec3 uSunDirL;

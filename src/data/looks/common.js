@@ -84,7 +84,8 @@ export function mkSky(zenith, horizon, o) {
   // (the night sky of a world with air is its day sky in the night's key: a middle wash, lighter than the land under it;
   // an airless world keeps the old deep keys with o.nightDeep: its sky is space, and only its far land takes the haze)
   const nz = o.nightDeep ? [zenith[0] * 0.28, zenith[1] * 0.30, zenith[2] * 0.44] : [zenith[0] * 0.60, zenith[1] * 0.56, zenith[2] * 0.68];
-  const nh = o.nightDeep ? [horizon[0] * 0.50, horizon[1] * 0.55, horizon[2] * 0.70] : [horizon[0] * 0.72, horizon[1] * 0.77, horizon[2] * 0.89];
+  // (o.nightHorizon, PAINTER 19: a world may keep a lighter band low in its night sky, so the land stands dark against it)
+  const nh = o.nightHorizon || (o.nightDeep ? [horizon[0] * 0.50, horizon[1] * 0.55, horizon[2] * 0.70] : [horizon[0] * 0.72, horizon[1] * 0.77, horizon[2] * 0.89]);
   const night = { zenith: nz, horizon: nh, haze: o.nightDeep ? m3(nh, [0.4, 0.44, 0.6], 0.5) : m3(nh, E.night.haze, 0.5), glaze: E.night.glaze, light: E.night.light,
     grade: o.nightGrade || (o.nightDeep ? [0.64, 0.70, 0.90] : E.night.grade), cloudShade: o.nightDeep ? [0.40, 0.44, 0.62] : E.night.cloudShade };
   return { day, dawn, dusk, night };

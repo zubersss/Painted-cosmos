@@ -7,7 +7,10 @@ export default {
   // (PAINTER 14, Mars from orbit: each biome's far wash (t.farC) rust, orange or a dark sepia marking, and a thinner limb
   // (0.64 by the air's depth): the haze laid over the whole disc made it a pale peach ball with cream swirls)
   limb: 0.32,
-  sky: mkSky([0.88, 0.72, 0.60], [0.985, 0.90, 0.80], { glaze: [0.74, 0.66, 0.80], light: [1.0, 0.95, 0.86], duskHorizon: [0.72, 0.84, 0.97], duskLight: [0.92, 0.94, 1.0], duskGrade: [0.94, 0.95, 1.0] }),
+  sky: mkSky([0.88, 0.72, 0.60], [0.985, 0.90, 0.80], { glaze: [0.74, 0.66, 0.80], light: [1.0, 0.95, 0.86], duskHorizon: [0.72, 0.84, 0.97], duskLight: [0.92, 0.94, 1.0], duskGrade: [0.94, 0.95, 1.0],
+    // (PAINTER 19, the blind player's UGLY 9: Mars by night was one blue-grey wash, sky and land one value with maroon
+    // blobs in it. A lighter band low in the night sky (it was 0.71, 0.69, 0.71): the land and the groves stand dark against it)
+    nightHorizon: [0.90, 0.86, 0.88] }),
   flora: {
     tall: [
       { kit: 'broadleaf', scale: 0.5, bark: [[0.42, 0.30, 0.27], [0.24, 0.18, 0.20]], leaf: [[0.96, 0.58, 0.42], [0.90, 0.44, 0.38], [0.64, 0.30, 0.32]], barkP: [0.55, 1, 0.6, 0.5], leafP: [0.85, 0.16, 0.7, 0.3], wind: 0.08, far: [7.5, 6.2, 0], obs: [0.2, 6] },
