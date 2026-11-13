@@ -7,8 +7,10 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 Read this first; the eighteenth's hand-over just below holds for everything not named here. The verifier did not accept
 item 1 of the round (the pulse) because of its regression R1, and found R2 to R4 (the task text of this pass lists
 them). Scratch: `/home/user/.pc-scratch/pilot/preship/refix/` (`head/` a clean export of `22120b9`, `base/` of
-`8c7d603`, `t1` the tree with my files, `vp/` copies of the verifier's probes from
-`/home/user/.pc-scratch/verify/preship-pilot/probes/`, `probes/` mine). Status:
+`8c7d603`, `vp/` copies of the verifier's probes from `/home/user/.pc-scratch/verify/preship-pilot/probes/`,
+`probes/` mine (also kept in `docs/shots/pilot/preship/refix/scripts/`), `film/` the real-game films, `g1` the grand
+tour's clean export; the trees `t1`, `c1`, `c2` with my files were deleted after use). All four items are done and
+committed; the grand tour's result is under "State of the tree" below.
 
 ### Done, with proof
 
@@ -26,8 +28,8 @@ them). Scratch: `/home/user/.pc-scratch/pilot/preship/refix/` (`head/` a clean e
    into the chosen world's sphere 715 m/s, never under the edge of its space, no other world within twice its edge of
    space (`arrive-fixed-first-hours.txt`); `recover.mjs` (Uranus -> Moon at clock 0): after 200 s the ship has long
    arrived, at rest 1.9 km from the Moon's centre (as every nose-on Moon arrival on `8c7d603`); Venus -> Earth at clock
-   0.3 from 945 m (the real-game case): round Mercury (closest 5 to 10 km), in at cruise, "Earth ahead" 4.2 km up
-   (`venus-earth-fixed.txt`). Tests (`tests/course.test.mjs`, 3 new): every world to every other at clocks 0, 3000 and
+   0.3 from 945 m (the real-game case): round Mercury (closest 5 to 10 km), in at cruise, "Earth ahead" said about 5 km up
+   (4.2 km up a second and a half later; `venus-earth-fixed.txt`). Tests (`tests/course.test.mjs`, 3 new): every world to every other at clocks 0, 3000 and
    3600 s, nose ahead and behind (540 pulses: let go at the sphere at no more than 1.25 x cruise, never inside 0.9 of
    the sphere while pulsing, never under the edge of space after, "<World> ahead", no pulse longer than 2.5 x its ETA +
    30 s, never inside another world's edge of space): on `22120b9` 27 of 540 fail; Venus -> Earth as above: fails on
