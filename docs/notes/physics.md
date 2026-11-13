@@ -339,7 +339,9 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
   at clock 205 (wind 45 m/s at the stand), Earth's sea coast at clock 60: **no console error, no game error,
   `info().fallback` empty**, render, world, art and physics real (ui the stub). Two of its frames opened (the
   figure on Neptune's grey shore with the ship beyond; the birch wood at the spawn under the storm's grey): they are a
-  load check, not a judgement of the picture.
+  load check, not a judgement of the picture. **Run once more on a clean export of the last code commit itself**
+  (`9addf0b`, `m4/last`; its `src`, `tests`, `vendor` and `index.html` are `m4/final4`'s to the byte): world 20, unit
+  181, physics 324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros (the browser was not opened again).
 - *The must-hold check* (PILOT's `docs/lead/evidence/pilot11/wallrun.mjs` on `m4/final4`; `m4fix/wallrun-final.txt`):
   Earth sea_coast 0.2 / 0.2 / 0.2 m gained on ground over 50 degrees in headings 0, 270, 315 and 0.0 in the other
   five; Earth desert_canyon 1.1 m (heading 225, the momentum of a 6.5 m/s arrival on the foot's curve) and 0.2: **P26's
