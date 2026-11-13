@@ -1,0 +1,10 @@
+# earth spawn clock 30 (breeze), KeyW, 14 s: 877 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 57 m, h22.5: 57 m, h45: 57 m, h67.5: 56 m, h90: 55 m, h112.5: 54 m, h135: 53 m, h157.5: 54 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 54 m, h270: 54 m, h292.5: 52 m, h315: 54 m, h337.5: 54 m
+# earth spawn clock 240 (thunderstorm), KeyW, 14 s: 819 m in all; 2 of 16 headings held under 1 m/s for more than 2 s
+  h0: 56 m, h22.5: 56 m, h45: 56 m, h67.5: 31 m (under 1 m/s for 6.0 s, on up to 24 deg), h90: 41 m (under 1 m/s for 3.8 s, on up to 26 deg), h112.5: 57 m, h135: 54 m, h157.5: 56 m, h180: 56 m, h202.5: 57 m, h225: 52 m, h247.5: 50 m, h270: 50 m, h292.5: 46 m, h315: 52 m, h337.5: 49 m
+# earth spawn clock 420 (mist), KeyW, 14 s: 812 m in all; 2 of 16 headings held under 1 m/s for more than 2 s
+  h0: 56 m, h22.5: 56 m, h45: 56 m, h67.5: 32 m (under 1 m/s for 5.6 s, on up to 25 deg), h90: 34 m (under 1 m/s for 5.3 s, on up to 27 deg), h112.5: 54 m, h135: 53 m, h157.5: 49 m (under 1 m/s for 1.4 s, on up to 28 deg), h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 52 m, h270: 52 m, h292.5: 49 m, h315: 53 m, h337.5: 51 m
+# earth spawn clock 700 (mist), KeyW, 14 s: 816 m in all; 2 of 16 headings held under 1 m/s for more than 2 s
+  h0: 56 m, h22.5: 56 m, h45: 56 m, h67.5: 51 m, h90: 30 m (under 1 m/s for 5.1 s, on up to 34 deg), h112.5: 38 m (under 1 m/s for 3.8 s, on up to 35 deg), h135: 46 m, h157.5: 48 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 54 m, h270: 54 m, h292.5: 52 m, h315: 53 m, h337.5: 54 m
+# earth spawn clock 1200 (mist), KeyW, 14 s: 877 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 57 m, h22.5: 56 m, h45: 56 m, h67.5: 56 m, h90: 55 m, h112.5: 53 m, h135: 52 m, h157.5: 54 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 54 m, h270: 55 m, h292.5: 53 m, h315: 54 m, h337.5: 54 m
