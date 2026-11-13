@@ -6,7 +6,7 @@ import { FLORA, PlantSim, plantDisplace, plantBranch, plantCrown, BRANCH_M, CROW
 import { FLORA_GLSL } from './flora.glsl.js';
 import { oscStep, TAU } from './util.js';
 import { setWindScale, WINDS } from './wind.js';
-import { makeWorld, V, norm, len } from './testworld.mjs';
+import { makeWorld, V, norm, len, epochP8 } from './testworld.mjs';
 
 const R = 4000;
 function world(bodyId = 'earth', biome = 'alpine_meadow', dir = V(0.3, 0.55, 0.78)) {
@@ -448,7 +448,7 @@ test('P14 a branch rings at its own frequency in a breeze and in a gale, out of 
   }
 });
 
-test('P14 the branches of a birch at the Earth spawn: a breeze barely stirs them at their own frequency, the storm tosses them half a metre, the gust front more', async () => {
+test('P14 the branches of a birch at the Earth spawn: a breeze barely stirs them at their own frequency, the storm tosses them half a metre, the gust front more', () => epochP8(async () => {
   const { BODIES } = await import('../data/bodies.js');
   const sample = makeWorld({ R: BODIES.earth.radius, biome: 'alpine_meadow' });
   const physics = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
@@ -474,7 +474,7 @@ test('P14 the branches of a birch at the Earth spawn: a breeze barely stirs them
   assert.ok(breeze.pp > 0.02 && breeze.pp < 0.12 && Math.abs(breeze.pk / breeze.hz - 1) < 0.3, 'a breeze: centimetres, at its own frequency');
   assert.ok(height.set > 0.25 && height.set < 0.45 && height.pp > 0.3 && height.pp < 0.75, 'the storm: streaming 0.3 m, tossed half a metre');
   assert.ok(front.pp > height.pp && front.pp < 1.2 && front.set <= FLORA.branchSetMax * L, 'the gust front: more, never past the limit');
-});
+}));
 
 test('P14 the crown in the field: the eddy trains are carried by the wind at crown height, stay wrapped and stay put when the frame re-anchors; the chunk declares it', async () => {
   const { FloraField } = await import('./flora.js');
@@ -519,7 +519,7 @@ test('P14 the crown in the field: the eddy trains are carried by the wind at cro
   for (const name of ['pcPhysCrown', 'pcPhysBranch', 'uPhysBranch', 'uPhysBranchPhase', 'uPhysBranchClock', String(FLORA.branchThrash), String(FLORA.crownTilt), String(FLORA.twigMax)]) assert.ok(FLORA_GLSL.includes(name), name);
 });
 
-test('in a storm a tree leans and tosses but does not whip back upwind (aerodynamic damping; P8, the thunderstorm at the Earth spawn)', async () => {
+test('in a storm a tree leans and tosses but does not whip back upwind (aerodynamic damping; P8, the thunderstorm at the Earth spawn)', () => epochP8(async () => {
   // (before P8 a lull in the gust front swung a tree from 12 degrees downwind to 11 upwind in 0.4 s,
   // at up to 104 degrees a second: the lightly damped sway of a calm day, driven by a gale)
   const { BODIES } = await import('../data/bodies.js');
@@ -550,7 +550,7 @@ test('in a storm a tree leans and tosses but does not whip back upwind (aerodyna
   assert.ok(storm.fastest < 30, 'no whip: fastest ' + storm.fastest + ' deg/s');
   assert.ok(storm.upwind > -2, 'never far upwind: ' + storm.upwind + ' deg');
   assert.ok(FLORA.stiffDamp < 0.2 && FLORA.aeroDamp * 3 < 0.1, 'in a breeze the sway is still free');
-});
+}));
 
 // ---- P11: flutter ------------------------------------------------------------------------------------
 test('P11 flutter: blades a metre apart are out of step, each swings near its own frequency, none bends upwind, and a re-anchoring does not move the eddies', async () => {

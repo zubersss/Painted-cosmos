@@ -6,7 +6,7 @@ import { PARTICLES, EVENT } from './particles.js';
 import { cellsAt, weatherAt, DEFAULT_SEED } from './weather.js';
 import { MARK, MARK_STRIDE, DeformField, DEFORM } from './deform.js';
 import { BODIES } from '../data/bodies.js';
-import { makeWorld, V, norm, len, dot } from './testworld.mjs';
+import { makeWorld, V, norm, len, dot, epochP8 } from './testworld.mjs';
 
 // a physics instance centred where it is raining (or snowing) right now
 function rainy(bodyId = 'earth', { biome = 'alpine_meadow', pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 5, sea = 0 } = {}) {
@@ -52,7 +52,7 @@ test('rain appears where it rains, in proportion, and drains away when it stops'
   assert.equal(w.physics.particles.rain.count, 0);
 });
 
-test('drops fall at the terminal speed of their size and slant with the wind', () => {
+test('drops fall at the terminal speed of their size and slant with the wind', () => epochP8(() => {
   const w = rainy();
   run(w, 8);
   const P = w.physics.particles, up = norm(w.focus);
@@ -64,7 +64,7 @@ test('drops fall at the terminal speed of their size and slant with the wind', (
   assert.ok(s.drift > air.speed * 0.5 && s.drift < air.speed * 2.2 + 0.5, `drift ${s.drift} vs wind ${air.speed}`);
   for (let i = 0; i < P.rain.count * 3; i++) assert.ok(Number.isFinite(P.rain.pos[i]) && Number.isFinite(P.rain.vel[i]));
   for (let i = 0; i < P.rain.count; i++) assert.ok(P.rain.size[i] > 0.0002 && P.rain.size[i] < 0.01);
-});
+}));
 
 test('every drop stays inside the box around the focus, even when the focus races away', () => {
   const w = rainy();
@@ -135,7 +135,7 @@ test('the same shower on other worlds: Neptune methane, Jupiter water', () => {
   assert.ok(kj > ke * 1.3, `Jupiter (thinner air, stronger gravity) ${kj.toFixed(0)} vs Earth ${ke.toFixed(0)} m/s per root metre`);
 });
 
-test('stable at 20 Hz and with a hitch; quality changes the count', () => {
+test('stable at 20 Hz and with a hitch; quality changes the count', () => epochP8(() => {
   const w = rainy();
   run(w, 6, { hz: 20 });
   const s = stats(w.physics.particles.rain, norm(w.focus));
@@ -146,7 +146,7 @@ test('stable at 20 Hz and with a hitch; quality changes the count', () => {
   const lo = rainy(), hi = rainy(); lo.physics.setQuality(0); hi.physics.setQuality(2);
   run(lo, 6); run(hi, 6);
   assert.ok(hi.physics.particles.rain.count > lo.physics.particles.rain.count * 2);
-});
+}));
 
 test('deterministic: two runs give identical buffers', () => {
   const a = rainy(), b = rainy();
@@ -155,7 +155,7 @@ test('deterministic: two runs give identical buffers', () => {
   assert.deepEqual(Array.from(a.physics.particles.rain.pos.subarray(0, 300)), Array.from(b.physics.particles.rain.pos.subarray(0, 300)));
 });
 
-test('footprints: one per stride, alternating feet, deeper in snow than on rock, none in the air', () => {
+test('footprints: one per stride, alternating feet, deeper in snow than on rock, none in the air', () => epochP8(() => {
   const walk = (bodyId, biome, speed, grounded = true) => {
     const R = BODIES[bodyId].radius, sample = makeWorld({ R, biome });
     const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
@@ -180,9 +180,9 @@ test('footprints: one per stride, alternating feet, deeper in snow than on rock,
   let any = 0; for (const x of sand.depth) if (x > 0) any++;
   assert.ok(any > 4, 'a trail in the depth field');
   assert.ok(sand.depthAt(V(sand.marks.origin.x + d[(sand.marks.head - 1) * MARK_STRIDE], sand.marks.origin.y + d[(sand.marks.head - 1) * MARK_STRIDE + 1], sand.marks.origin.z + d[(sand.marks.head - 1) * MARK_STRIDE + 2])) > 0.005);
-});
+}));
 
-test('prints on loose ground have a rim; on mud they do not; the depth field piles up beside the trail', () => {
+test('prints on loose ground have a rim; on mud they do not; the depth field piles up beside the trail', () => epochP8(() => {
   const walk = (biome) => {
     const R = BODIES.earth.radius, sample = makeWorld({ R, biome });
     const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
@@ -197,7 +197,7 @@ test('prints on loose ground have a rim; on mud they do not; the depth field pil
   assert.ok(dm[8] > 0.05 && dm[12] === 0, 'mud squeezes, it does not pile: depth ' + dm[8] + ' rim ' + dm[12]);
   let lo = 0, hi = 0; for (const x of sand.depth) { if (x < lo) lo = x; if (x > hi) hi = x; }
   assert.ok(hi > 0.02 && lo < -0.002, `trough ${hi} and pile ${lo}`);
-});
+}));
 
 test('falling snow fills prints in; in clear weather they last over a minute', () => {
   const snowy = rainy('earth', { biome: 'stub-polar', pred: (x) => x.precipitation.type === 'snow' && x.precipitation.rate > 4 });
@@ -451,7 +451,7 @@ test('rings near the focus: in a downpour there are enough of them alive within 
   for (let k = 0; k < E.capacity; k++) { const o = k * 8; if (E.data[o + 4] > 0) assert.ok(Math.abs(len(V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2])) - s.R - 2) < 0.3, 'on the water'); }
 });
 
-test('a ground blizzard (P10): in a blizzard the wind moves the snow along the ground: a skim of hopping grains, the powder over it, both of snow, both low', async () => {
+test('a ground blizzard (P10): in a blizzard the wind moves the snow along the ground: a skim of hopping grains, the powder over it, both of snow, both low', () => epochP8(async () => {
   const { MATERIAL_INDEX } = await import('./ground.js');
   const w = rainy('earth', { pred: (x) => x.kind === 'blizzard' });
   w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
@@ -476,7 +476,7 @@ test('a ground blizzard (P10): in a blizzard the wind moves the snow along the g
   const calm = rainy('earth', { pred: (x) => x.kind === 'clear' });
   calm.physics.warmUp({ bodyId: calm.bodyId, time: calm.t0, focus: calm.focus }); run(calm, 3);
   assert.equal(calm.physics.here.blown.snow, 0);
-});
+}));
 
 test('P12 one air: what is carried rides the wind physics.air gives at its place and height, at the edge of a wood', () => {
   // The focus stands in a meadow, the edge of a 14 m wood 20 m east of it. Twenty-second means at 36 places from

@@ -55,6 +55,19 @@ export function epoch0(fn) {
   const e = _REG.earth.epoch; _REG.earth.epoch = 0;
   try { return fn(); } finally { _REG.earth.epoch = e; }
 }
+// (M4) ... and with Earth's weather clock as it stood from P8 to M4 (REGIMES.earth.epoch = 480: the first thunderstorm
+// over the home forest from 160 to 320 s of the clock): the tests of the wind, the trees, the rain, the sea and the
+// prints that stand in that storm, or were tuned on the weather found at their place and time, run on the weather
+// they were written for. (In M4 the game's own clock moved, to -1200: the storm is at 1840 to 2000 s; weather.test.mjs
+// holds that.) fn may be async.
+export function epochP8(fn) {
+  const e = _REG.earth.epoch; _REG.earth.epoch = 480;
+  let r;
+  try { r = fn(); } catch (err) { _REG.earth.epoch = e; throw err; }
+  if (r && typeof r.then === 'function') return r.finally(() => { _REG.earth.epoch = e; });
+  _REG.earth.epoch = e;
+  return r;
+}
 
 // (P18) A world drawn on the tangent plane at unit direction C: f(u, v) -> the ground's height over the sea level (m;
 // negative under the sea), where (u, v) are metres along the axes turned by `turn` (rad) from east toward north: +u is

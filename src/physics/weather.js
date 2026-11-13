@@ -20,6 +20,12 @@ export const WEATHER = Object.freeze({
   timeScale: 60,           // game seconds of weather per real second (see above)
   dryTime: 3.0 * 3600,     // real s for a soaked surface to dry in still air at 288 K
   wetDepth: 3.0,           // mm of rain that wets the ground through (a heavy shower: about 20 game seconds)
+  // (M4) what the surface holds: leaves, sward and the top of the soil keep a few millimetres, the rest of a downpour
+  // runs off. Until M4 every millimetre that fell stayed to be dried (33 mm of the first storm). With the store the
+  // ground is never wetter than 1 - exp(-wetStore / wetDepth) = 0.95 and dries from there: after that storm, at noon
+  // in the sun and a light wind, 0.18 two minutes after the last drop (0.35 without the store); under a closed sky in
+  // still air 0.31 four minutes after (0.62).
+  wetStore: 9.0,           // mm of water the surface holds at most
   snowRatio: 10,           // m of fresh snow per m of water (100 kg/m^3)
   meltRate: 4.0,           // mm of water per kelvin above freezing per real day (degree-day factor)
   snowLife: 8 * 3600,      // real s before fresh snow settles (crusts, is trodden, blows off): 8 game minutes (30 h before P7)
@@ -78,9 +84,9 @@ export const REGIMES = {
   venus: { cells: 14, radius: [700, 1500], life: [1200, 2400], steer: 8, melt: 0, liquid: 'acid', solid: 'acid', virga: 160,
     kinds: [['haze', 5], ['acid', 3], ['cloud', 2]] },
   // `epoch` (s): where in the life of its weather systems a body's game clock starts (the initial
-  // condition of the weather). Earth's is chosen so that the first thunderstorm crosses the
-  // home forest in the first minutes of play, in daylight: see DEFAULT_SEED below.
-  earth: { cells: 22, radius: [500, 1300], life: [600, 1500], steer: 1.6, melt: 273.15, liquid: 'rain', solid: 'snow', virga: 0, epoch: 480,
+  // condition of the weather; it may be negative). Earth's is chosen so that the first day at the home
+  // forest is fair and the first thunderstorm crosses it at noon of the second: see DEFAULT_SEED below.
+  earth: { cells: 22, radius: [500, 1300], life: [600, 1500], steer: 1.6, melt: 273.15, liquid: 'rain', solid: 'snow', virga: 0, epoch: -1050,
     kinds: [['cloud', 3], ['drizzle', 1.2], ['rain', 2], ['shower', 2], ['storm', 1.1], ['fog', 1]] },
   mars: { cells: 9, radius: [600, 1400], life: [1200, 2600], steer: 1.3, melt: 1e9, liquid: 'frost', solid: 'frost', virga: 0, frostBelow: 200,
     kinds: [['dust', 3], ['cloud', 3], ['frost', 1]] },
@@ -114,12 +120,22 @@ for (const id in REGIMES) {
 }
 
 // The default seed and Earth's epoch (REGIMES.earth.epoch) put this over Earth's home forest
-// (weather.test.mjs checks it; change them only together with that test): a fair late morning
-// for the first two minutes of play (the game begins at 9:30; an hour of Earth's day is 62.5 s),
-// cloud building from 100 s, the first drops at 140 s, a thunderstorm from 160 to 320 s (noon to
-// half past two; heaviest, 20 mm/h and more, from 200 to 260 s), and a clear afternoon after 340 s.
-// Every Earth weather time of before P8 is 480 s earlier now (the storm was at 640 to 800 s, after
-// dark); no other body's weather moved.
+// (weather.test.mjs checks it; change them only together with that test). (M4; PILOT's critique of
+// PHYSICS, item 5: the first storm came two minutes into every new game.) By the game's clock
+// (PILOT's: a new game begins at 8:00, the first sunset is 11 minutes in, the second sunrise at
+// 22 minutes, the second noon at about 30): a fair first day, dusk and night with no system over
+// the forest (the first 17 minutes: under 0.12 of cloud from the weather; the sky's own fair-weather
+// clouds are PAINTER's), cloud over the second morning from 20 minutes (1230 s), a brightening, then
+// the first drops at 1670 s and the thunderstorm from 1690 to 1850 s (heaviest, 20 mm/h and more,
+// from 1730 to 1790 s: the second noon), and a clear afternoon from 1870 s.
+// Until P8 the epoch was 0 (the storm at 640 to 800 s: after dark as the clock then was, at dusk as
+// it is now); from P8 to M4 it was 480 (the storm at 160 to 320 s). Every Earth weather time of P8 to
+// M4 is 1530 s later now; no other body's weather moved. (Why -1050 and not a rounder number: the
+// large-scale wind runs on the game's clock and the systems on this one, so the epoch also decides
+// which storm is the strongest at Earth's sea coast in the first 9000 s, the one coast.mjs judges
+// PAINTER's coast by. With -1050 it comes from just south of east and finds 2151 m of fetch 80 m
+// out (PASS at 2000); with -1200, -1100 or -900 it comes 10 to 20 degrees further round and finds
+// 1474 to 1894 m.)
 export const DEFAULT_SEED = 18;
 
 // (the last lookup is remembered: building a string key on every call would allocate)
@@ -352,16 +368,22 @@ export function moistureAt(bodyId, ux, uy, uz, t, seed, env, o = {}) {
   // melting: degree-day law
   const meltPerS = T > melt ? WEATHER.meltRate * (T - melt) / 86400 * ts * WEATHER.snowRatio / 1000 : 0;   // m of snow per game s
   const settleTau = WEATHER.snowLife / ts;
-  let water = 0, snow = 0;
-  for (let k = 0; k < LAGS.length - 1; k++) {
+  // ((M4) the water from the oldest slice to the newest, drying between them and never more than the surface holds
+  // (WEATHER.wetStore: the rest ran off). Without the store this is the sum it was, mm x exp(-lag / dryTau), to the digit.)
+  let water = 0, snow = 0, lagPrev = 0.5 * (LAGS[LAGS.length - 2] + LAGS[LAGS.length - 1]);
+  for (let k = LAGS.length - 2; k >= 0; k--) {
     const lag = 0.5 * (LAGS[k] + LAGS[k + 1]), dl = LAGS[k + 1] - LAGS[k];
+    if (water > 0) water *= Math.exp(-(lagPrev - lag) / dryTau);
+    lagPrev = lag;
     precipAt(bodyId, ux, uy, uz, t - lag, seed, moist, T, _p);
     if (_p.rate <= 0) continue;
     const mm = _p.rate * dl * ts / 3600;                 // mm of water that fell in this slice
-    water += mm * (1 - _p.frozen) * Math.exp(-lag / dryTau);
+    water += mm * (1 - _p.frozen);
+    if (water > WEATHER.wetStore) water = WEATHER.wetStore;
     const depth = mm * _p.frozen * WEATHER.coldShare * WEATHER.snowRatio / 1000;     // m of fresh snow
     snow += Math.max(0, depth * Math.exp(-lag / settleTau) - meltPerS * lag * 0.5);
   }
+  if (water > 0) water *= Math.exp(-lagPrev / dryTau);
   // melting snow keeps the ground wet
   // (it comes in over the first 1.5 K above melting and the first centimetre of snow: until P7 it was a
   // step, and the wetness jumped by 55 % in a second where the afternoon crossed the melting point)
@@ -477,12 +499,25 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   // ---- fog and mist: a local condition (calm, damp, cool air) plus drifting fog banks --------
   const fogBiome = env && env.fog != null ? env.fog : 0.2;
   const calm = 1 - smoothstep(2.0, 7.0, wind);
-  const dawn = sun01 == null ? 0.35 : 1 - smoothstep(-0.05, 0.4, sun01);
+  // (M4; PILOT's critique of PHYSICS, item 5: the wood was misty from 6.5 minutes into a new game to the 24th.)
+  // Radiation mist is the night's work: the ground cools under a clear sky through the night, the mist is thickest
+  // before dawn, lies through the sunrise and is burnt off in the morning. Until M4 it hung on the sun's height alone
+  // (all of it under 23 degrees), so every gold evening and every dusk stood in it. With the sun's east part
+  // (env.sunEast: the sun's direction along east here, + in the morning) the hour is known: psi is the sun's angle
+  // round the sky, -90 at sunset, 0 at midnight, 90 at sunrise, +-180 at noon. No mist through the afternoon, the
+  // evening and the dusk; it gathers from an hour and a half after sunset, is whole from two hours after midnight to
+  // the sunrise, and is gone by mid-morning. Without env.sunEast (a caller that does not say): the old law.
+  // And a clouded night keeps its warmth: under a closed sky there is 0.3 of it.
+  let dawn;
+  if (sun01 == null) dawn = 0.35;
+  else if (env == null || env.sunEast == null) dawn = 1 - smoothstep(-0.05, 0.4, sun01);
+  else { const psi = Math.atan2(env.sunEast, -sun01) * 57.29578; dawn = smoothstep(-70, 20, psi) * (1 - smoothstep(95, 125, psi)); }
+  const openSky = env != null && env.sunEast != null ? 1 - 0.7 * clamp01(a.cloud) : 1;
   // radiation fog needs calm, cool, damp air; a few places (honey-mist valleys, pearl-fog flats)
   // are misty whatever the wind does
   // (only where the air is near the condensation point of something: not on Venus or Mars)
   const mistOK = regime && regime.cells && atm.rho0 > 0.3 && melt > 1 && melt < 1e8 && T < melt + 40;
-  const mist = mistOK ? Math.max(fogBiome * calm * (0.3 + 0.7 * dawn), 0.5 * smoothstep(0.92, 1, fogBiome)) : 0;
+  const mist = mistOK ? Math.max(fogBiome * calm * (0.3 + 0.7 * dawn) * openSky, 0.5 * smoothstep(0.92, 1, fogBiome)) : 0;
   // ---- a gale has a sky of its own (P7) -----------------------------------------------------------
   // The large-scale wind here (no gusts: it changes over minutes), with what the weather cells make
   // of it. From a strong gale to hurricane force (Beaufort 8 to 12) scud closes the sky, and over an

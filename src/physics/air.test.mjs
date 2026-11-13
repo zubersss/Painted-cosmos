@@ -6,7 +6,7 @@ import { createPhysics } from './index.js';
 import { WIND, gustLevel, gustLevelAt, gustPhase } from './wind.js';
 import { AIR, wakeAt } from './air.js';
 import { BODIES } from '../data/bodies.js';
-import { makeWorld, V, norm } from './testworld.mjs';
+import { makeWorld, V, norm, epochP8 } from './testworld.mjs';
 
 const SPAWN = norm(V(0.1736, 0.5817, 0.7946));     // PAINTER's Earth spawn (weather.test.mjs holds the storm over it)
 
@@ -60,7 +60,7 @@ const bound = (o, uref) => (o.hi - o.lo) * uref * EDGE;
 // far larger than they are, which averages them away (aerodynamic admittance); they have their own test (wind.test.mjs).
 const BIG = { size: 1000, vx: 0, vy: 0, vz: 0 };
 
-test('the first storm at the Earth spawn: at 2, 10 and 30 m the air accelerates no faster than the storm\'s own wind carries a gust past (open ground)', () => {
+test('the first storm at the Earth spawn: at 2, 10 and 30 m the air accelerates no faster than the storm\'s own wind carries a gust past (open ground)', () => epochP8(() => {
   const sample = makeWorld({ R: BODIES.earth.radius, biome: 'alpine_meadow' });
   const { out, uref } = scan((b, d) => sample(d), SPAWN, 150, 330, 60, [2, 10, 30]);
   assert.ok(uref > 12, 'this is the storm: reference wind up to ' + uref.toFixed(1) + ' m/s');
@@ -69,7 +69,7 @@ test('the first storm at the Earth spawn: at 2, 10 and 30 m the air accelerates 
     assert.ok(o.hi - o.lo > 5, `gusts at ${o.h} m`);
     assert.ok(o.worst < bound(o, uref), `at ${o.h} m: ${o.worst.toFixed(1)} m/s2 at t = ${o.at.toFixed(2)}, bound ${bound(o, uref).toFixed(1)}`);
   }
-});
+}));
 
 test('the first storm at the Earth spawn on PAINTER\'s real ground (forest: wakes of the stands upwind), if it loads in Node: the same bound, and no wake switches in one frame', async () => {
   let real;
@@ -113,7 +113,7 @@ test('a runner crossing the storm feels no step in the wind when the grid hops a
   assert.ok(o.worst < lim, `${o.worst.toFixed(1)} m/s2 at t = ${o.at.toFixed(2)}, bound ${lim.toFixed(1)}`);
 });
 
-test('seen from the air the gust pattern stands still: riding with the wind through the storm front the gust level only fades over its cycle (the stateless form slides through the air)', () => {
+test('seen from the air the gust pattern stands still: riding with the wind through the storm front the gust level only fades over its cycle (the stateless form slides through the air)', () => epochP8(() => {
   const sample = makeWorld({ R: BODIES.earth.radius, biome: 'alpine_meadow' });
   const physics = createPhysics({ sampleSurface: (b, d) => sample(d), timeBudget: false });
   const R = sample(SPAWN).radius, p0 = V(SPAWN.x * (R + 10), SPAWN.y * (R + 10), SPAWN.z * (R + 10));
@@ -136,7 +136,7 @@ test('seen from the air the gust pattern stands still: riding with the wind thro
   // the cross-fade alone: two copies trading weight over half a cycle
   assert.ok(ride < 8 / WIND.gustCycle, 'the pattern is carried by the air: ' + ride);
   assert.ok(veer > 0.1 && slide > 3 * ride, 'and this storm is one where the stateless form is not: ' + slide);
-});
+}));
 
 test('in a steady wind the carried pattern is the stateless one exactly, cycle after cycle', () => {
   const w = [7, 0.5, -3], gp = new Float64Array(4), s = [0, 0, 0, 0, 0, 0];

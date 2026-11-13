@@ -409,3 +409,70 @@ test('P13 the hovering hull in a wind: it rolls away from a side wind and swings
   // nothing to rock it in still air or with no air
   for (const cfg of [{ alt: 10 }, { rho: 0, wind: V(30, 0, 0), alt: 10 }]) { const z = flight(cfg); fly(z, 5, hover); const k = z.st.phys.buffetAngle; assert.ok(Math.abs(k.roll) < 1e-6 && Math.abs(k.yaw) < 1e-6 && Math.abs(k.pitch) < 1e-6); }
 });
+
+// ---- (M4) the hull in a storm ------------------------------------------------------------------------------------
+test('M4 the hull in a storm: hands off in a squall (60 to 240 m/s in gusts, a cliff\'s sheet of air going up at 150) the ship is carried a few metres, rocks 5 to 10 degrees and holds; in an ordinary storm the hull is handed the wind of the instant as it was, and holds its station; the field sheds the wind, never the hull\'s own drag (60 and 20 Hz)', () => {
+  // PILOT's critique of PHYSICS, item 4: 30 m over Neptune's storm coast the ship was carried 150 m in 30 s, between 7
+  // and 78 m up, at 5 g (12 g where the cliff's updraught took it), the drawn hull rocking 31 degrees.
+  const D = 180 / Math.PI, hover = { target: V(), hover: true, tau: 1 };
+  // a squall as air.js hands it at that stand: a level wind of 110 m/s in gusts from 0.55 to 2.2 of it, swinging, with a
+  // sheet of rising air 1.4 times as fast as the level wind for seconds at a time; Neptune's air and gravity
+  const squall = (st0) => (p, o) => {
+    const t = st0.env.time, gust = 1 + 0.6 * Math.sin(t * 2.3) + 0.4 * Math.sin(t * 5.1 + 1) + 0.2 * Math.sin(t * 11 + 2), W = 110 * Math.max(0.55, gust), a = 0.5 * Math.sin(t * 0.7);
+    o.density = 0.92; o.wind.x = W * Math.cos(a); o.wind.z = W * Math.sin(a); o.wind.y = Math.sin(t * 0.45) > 0.2 ? 1.4 * W : 0.1 * W; o.turbulence = 18; return o;
+  };
+  const run = (hz, cmd, seconds = 30) => {
+    const sim = flight({ g: 11.15, alt: 30 }); sim.env.air = squall(sim);
+    const p0 = { ...sim.st.p }; let far = 0, lo = 0, hi = 0, gHalf = 0, gFrame = 0, rock = 0, rockSum = 0, n = 0, shed = 0, felt = 0, k = 0, pv = { ...sim.st.v }, v2 = { ...sim.st.v };
+    fly(sim, seconds, cmd, { hz, each: (t, st) => {
+      const dx = st.p.x - p0.x, dy = st.p.y - p0.y, dz = st.p.z - p0.z; far = Math.max(far, Math.hypot(dx, dz)); lo = Math.min(lo, dy); hi = Math.max(hi, dy);
+      gFrame = Math.max(gFrame, Math.hypot(st.v.x - pv.x, st.v.y - pv.y, st.v.z - pv.z) * hz / 9.81); pv = { ...st.v };
+      if (++k % Math.round(hz / 2) === 0) { gHalf = Math.max(gHalf, Math.hypot(st.v.x - v2.x, st.v.y - v2.y, st.v.z - v2.z) * 2 / 9.81); v2 = { ...st.v }; }
+      const b = st.phys.buffetAngle, r = Math.hypot(b.pitch, b.roll, b.yaw) * D; rock = Math.max(rock, r); if (t > 5) { rockSum += r; n++; }
+      shed = Math.max(shed, st.phys.windShed || 0); if (st.phys.windFelt) felt = Math.max(felt, Math.hypot(st.phys.windFelt.x, st.phys.windFelt.z));
+      assert.ok(finite(st), 'NaN');
+    } });
+    return { far, lo, hi, gHalf, gFrame, rock, rockMean: rockSum / Math.max(1, n), shed, felt };
+  };
+  for (const hz of [60, 20]) {
+    const s = run(hz, hover);
+    console.log(`# M4 hands off in the squall, ${hz} Hz, 30 s: carried ${s.far.toFixed(1)} m, height ${s.lo.toFixed(1)} to ${s.hi.toFixed(1)} m, ${s.gFrame.toFixed(2)} g in a step, ${s.gHalf.toFixed(2)} g over half a second, rock ${s.rock.toFixed(1)} deg at most (mean ${s.rockMean.toFixed(1)}), the field shed up to ${s.shed.toFixed(0)} m/s^2, the level wind handed to the hull up to ${s.felt.toFixed(0)} m/s`);
+    assert.ok(s.far < 15, `${hz} Hz: carried ${s.far.toFixed(1)} m (before M4: over 100)`);
+    assert.ok(s.lo > -10 && s.hi < 10, `${hz} Hz: height ${s.lo.toFixed(1)} to ${s.hi.toFixed(1)} m`);
+    assert.ok(s.gHalf < 1.0 && s.gFrame < 1.5, `${hz} Hz: ${s.gHalf.toFixed(2)} g over half a second, ${s.gFrame.toFixed(2)} g in a step`);
+    assert.ok(s.rock < 12 && s.rockMean > 3, `${hz} Hz: the drawn hull rocks ${s.rock.toFixed(1)} deg at most, ${s.rockMean.toFixed(1)} in the mean`);
+    assert.ok(s.shed > 5 && s.felt < 110, `${hz} Hz: the field sheds what the thrusters cannot hold: ${s.shed.toFixed(1)} m/s^2, ${s.felt.toFixed(0)} m/s handed`);
+  }
+  // the same squall with the storm law off (cmd.storm false) is the hull in the raw wind: carried away
+  const raw = run(60, { ...hover, storm: false });
+  assert.ok(raw.far > 60 || raw.hi > 30, `the raw squall: carried ${raw.far.toFixed(0)} m, ${raw.hi.toFixed(0)} m up`);
+
+  // an ordinary storm (30 m/s on Earth, gusting 18 to 42, a chop of 5 m/s): the wind of the instant, as it always was
+  const storm30 = (cmd) => {
+    const sim = flight({ alt: 60 }); sim.env.air = (p, o) => { const t = sim.env.time, W = 30 * (1 + 0.4 * Math.sin(t * 1.9)); o.density = 1.115; o.wind.x = W; o.wind.y = 0; o.wind.z = 0.3 * W * Math.sin(t * 0.8); o.turbulence = 5; return o; };
+    const p0 = { ...sim.st.p }; let far = 0, rock = 0, same = true;
+    fly(sim, 20, cmd, { each: (t, st) => { far = Math.max(far, Math.hypot(st.p.x - p0.x, st.p.z - p0.z)); const b = st.phys.buffetAngle; rock = Math.max(rock, Math.hypot(b.pitch, b.roll, b.yaw) * D); if (st.phys.windFelt && Math.abs(st.phys.windFelt.x - 30 * (1 + 0.4 * Math.sin(sim.env.time * 1.9))) > 1e-9) same = false; } });
+    return { far, rock, same, shed: sim.st.phys.windShed };
+  };
+  const on = storm30(hover), off = storm30({ ...hover, storm: false });
+  assert.ok(on.same && on.shed === 0, 'in an ordinary storm the hull is handed the wind of the instant and the field sheds nothing');
+  assert.ok(on.rock > 3 && on.rock < 9 && on.rock < off.rock, `side-on to 42 m/s it rocks ${on.rock.toFixed(1)} deg (${off.rock.toFixed(1)} without the law: the lean saturates at rockMax on each axis)`);
+  assert.ok(on.far < 3 && on.far <= off.far + 0.05, `and holds its station: ${on.far.toFixed(2)} m (${off.far.toFixed(2)} m without the hold)`);
+
+  // the field sheds the WIND only: Venus' still air at full throttle is the main engine's to push through, as before
+  for (const cmd of [{ target: V(0, 0, -1e5), tau: 1 }, { target: V(0, 0, -1e5), tau: 1, storm: false }]) {
+    const sim = flight({ rho: 65, g: 8.6 }); fly(sim, 60, cmd);
+    assert.ok(Math.abs(-sim.st.v.z - shipTopSpeed(65)) < 0.01 * shipTopSpeed(65) && (sim.st.phys.windShed || 0) === 0, `Venus: ${-sim.st.v.z} m/s`);
+  }
+  // the station is where the hull came to rest, not where the throttle was cut: no pull back after a stop
+  {
+    const sim = flight({}); fly(sim, 6, { target: V(0, 0, -40), tau: 1 });
+    let rest = null, back = 0;
+    fly(sim, 20, hover, { each: (t, st) => { if (!rest && len(st.v) < 0.05) rest = { ...st.p }; if (rest) back = Math.max(back, Math.hypot(st.p.x - rest.x, st.p.z - rest.z)); } });
+    assert.ok(rest && back < 0.5, `after a stop the hull stays where it stopped: ${back.toFixed(2)} m`);
+    // and anything asked of it lets the station go
+    fly(sim, 3, { target: V(5, 0, 0), tau: 1 }); assert.equal(sim.st.phys.station.on, false);
+  }
+  // still air, hands off: nothing to hold against, nothing moves
+  { const sim = flight({ alt: 30 }); const p0 = { ...sim.st.p }; fly(sim, 10, hover); assert.ok(Math.hypot(sim.st.p.x - p0.x, sim.st.p.y - p0.y, sim.st.p.z - p0.z) < 1e-6); }
+});

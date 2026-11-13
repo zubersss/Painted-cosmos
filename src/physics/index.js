@@ -161,6 +161,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   function sun01At(bodyId, ux, uy, uz) {
     return sunDir && bodyId === active ? ux * sunDir.x + uy * sunDir.y + uz * sunDir.z : null;
   }
+  // (M4) the sun's direction along east at a place (+ in the morning, - in the evening: every body turns the same
+  // way about its +y; PILOT's sunHourAt has the same east), for the weather's hour (weather.js: the night's mist)
+  function sunEastAt(bodyId, ux, uy, uz) {
+    if (!sunDir || bodyId !== active) return null;
+    const el = Math.hypot(uz, ux);
+    return el < 1e-6 ? sunDir.x : (sunDir.x * uz - sunDir.z * ux) / el;
+  }
 
   // ---- per frame ----------------------------------------------------------------------------
   function update(dt, f) {
@@ -246,7 +253,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     _wenv.moist = cover.moist; _wenv.fog = cover.fog; _wenv.snowBase = cover.snowBase; _wenv.dT = cover.dT; _wenv.dustSource = cover.dustSource;
     // (the weather answers the large-scale wind here, not the gusty wind at the focus: fog does not come and go
     // with a three-second gust, and physics.weather() anywhere, any time, then says what physics.here says: P7)
-    _wenv.sun01 = sun01; _wenv.wind = windLarge(bodyId, ux, uy, uz, time, seed, _wl4)[3]; _wenv.fetch = cover.fetch || 0;
+    _wenv.sun01 = sun01; _wenv.sunEast = sunEastAt(bodyId, ux, uy, uz); _wenv.wind = windLarge(bodyId, ux, uy, uz, time, seed, _wl4)[3]; _wenv.fetch = cover.fetch || 0;
     weatherAt(bodyId, ux, uy, uz, r - body.radius, time, seed, _wenv, here.weather);
     if (time - lastMoist > QUALITY.moistureEvery || time < lastMoist || Math.hypot(fx - moistX, fz - moistZ) > 15) {
       lastMoist = time; moistX = fx; moistZ = fz;
@@ -468,7 +475,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const sun01 = sun01At(bodyId, ux, uy, uz);
     const env = {};
     if (cv) { env.moist = cv.moist; env.fog = cv.fog; env.snowBase = cv.snowBase; env.dT = cv.dT; env.dustSource = cv.dustSource; env.fetch = cv.fetch || 0; }
-    env.sun01 = sun01;
+    env.sun01 = sun01; env.sunEast = sunEastAt(bodyId, ux, uy, uz);
     const wl = windLarge(bodyId, ux, uy, uz, t, seed, _wl4)[3];
     env.wind = wl;
     weatherAt(bodyId, ux, uy, uz, r - body.radius, t, seed, env, o);

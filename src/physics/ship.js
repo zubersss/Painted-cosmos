@@ -54,6 +54,40 @@ export const SHIP_BODY = Object.freeze({
   cpPlan: 0.6,             // m the planform's centre is aft of it
   holdRate: 1.6,           // rad/s: natural frequency of the attitude hold
   holdDamp: 0.45,          // its damping ratio (under 1: it overshoots a little, as a craft in gusts does)
+  // (M4) THE HULL IN A STORM (PILOT's critique of PHYSICS, item 4: hands off 30 m over Neptune's storm coast the ship
+  // was carried 150 m in 30 s, between 7 and 78 m up, at 5 g, the drawn hull rocking 31 degrees; Earth's storm hardly
+  // touched it: a forgiving craft in a game with no fail state has a storm in between). Three things, all here:
+  //   - what the hull is handed. Its planform averages the air over its own nine metres and its mass over a second or
+  //     two: it feels the wind's mean (its own running mean over windMeanTime) and gusts no stronger than windGust
+  //     times it; and the sheet of air a cliff throws up (air.js: the flow follows the ground, 170 m/s upward at the
+  //     50 m sea cliff in a 75 m/s squall) is thinner than the hull: its vertical part is at most windUp of the
+  //     horizontal;
+  //   - the station hold. The flight computer cancels the drag it feels with its thrusters, as before; where the
+  //     wind's drag on a hull flying as commanded would be more than windHold of what a set of thrusters can give
+  //     (side-on on Neptune: from about 85 m/s), the drive field (the one behind the pulse and the brake) sheds the
+  //     rest (st.phys.windShed, m/s^2, for a glow or a sound): the ship drifts a few metres and holds;
+  //   - the chop is felt, not thrown: the buffet's acceleration saturates at buffetMax, and the hold's lean in the
+  //     wind's moments at rockMax on each axis: a squall rocks the drawn hull 5 to 10 degrees, slowly.
+  // cmd.storm === false switches all three off (the hull in the raw wind, as before M4).
+  windMeanTime: 3,         // s
+  windGust: 1.5,           // gusts handed to the hull, as a multiple of that mean
+  windGustTime: 2,         // s: ... and their envelope (the gust as the hull's mass meets it), not the sample of the instant
+  // ... and with the hands off (no velocity asked for, hovering, in air) the flight computer HOLDS STATION: from where the
+  // hull came to rest it leans on its thrusters against whatever has carried it off over the ground (holdGain per
+  // second squared of the level offset, holdAccel at most; its height is left to the pilot and to PILOT's ground
+  // assists), and lets go the moment anything is asked of it or it is carried holdReach away.
+  holdSpeed: 1.0,          // m/s: the hull is "at rest" under this, and the station is where it then is
+  holdGain: 0.6,           // 1/s^2
+  holdBrake: 2,            // 1/s
+  holdAccel: 4,            // m/s^2
+  holdReach: 25,           // m
+  windUp: 1 / 3,           // the vertical part handed to it, as a share of the horizontal
+  windUpFree: 8,           // m/s: ... or this, whichever is more
+  windFrom: 0.25, windFull: 0.6,   // the mean-and-envelope wind comes in between these shares of the side thrusters' authority (the wind's drag side-on)
+  windHold: 0.6,           // share of a thruster set's authority the wind's drag may ask for before the field sheds the rest
+  buffetMax: 2.2,          // m/s^2: the chop's acceleration saturates here (as it was up to three quarters of this; with its vertical share a third of a g at most: felt, in a seat)
+  buffetMeanTime: 2,       // s: ... and it is taken about its own mean over this long (it shakes the hull; it does not carry it)
+  rockMax: 0.085,          // rad: the lean the wind's moment holds on one axis saturates here (5 degrees; as it was up to three quarters of this)
   // landing gear: three legs, origin at the centre of the contact plane (COORDINATOR C10)
   legs: Object.freeze([Object.freeze([0, 0, -3.2]), Object.freeze([-2.2, 0, 1.8]), Object.freeze([2.2, 0, 1.8])]),
   gearFrequency: 1.6,      // Hz: bounce frequency of the craft on its legs
@@ -78,6 +112,12 @@ export const SHIP_BODY_STATE = () => ({
   buffet: { x: 0, y: 0, z: 0 },     // turbulence acceleration this step (m/s^2)
   buffetAngle: { pitch: 0, roll: 0, yaw: 0 },   // attitude off the commanded one, for the camera and the model (rad; three's rotateX, rotateZ, rotateY of a hull whose nose is -z): the chop, and (P13) the hull rocking and weathercocking in the wind
   gustAtt: { pitch: 0, roll: 0, yaw: 0, pitchV: 0, rollV: 0, yawV: 0 },   // (P13) the attitude hold's state
+  windMean: { x: 0, y: 0, z: 0, ok: false },   // (M4) the running mean of the level wind at the hull (frame coordinates, m/s; see SHIP_BODY.windGust)
+  windDev: { x: 0, y: 0, z: 0 },    // (M4) the gust's envelope: the level wind less that mean, eased over windGustTime
+  buffetMean: { x: 0, y: 0, z: 0 }, // (M4) the chop's own mean over buffetMeanTime (taken out of buffet)
+  station: { x: 0, y: 0, z: 0, on: false },   // (M4) the hull's offset from where it came to rest with the hands off (frame coordinates, m), while the hold is on
+  windFelt: { x: 0, y: 0, z: 0 },   // (M4) the wind the hull was handed this step (m/s): after the gust and the vertical caps and what the field shed
+  windShed: 0,                      // (M4) m/s^2 of the wind's drag the drive field is shedding right now (0 in any ordinary wind)
   q: 0,                             // dynamic pressure (Pa)
   airspeed: 0,                      // m/s relative to the air
   gLoad: 0,                         // felt acceleration in units of 9.81 m/s^2
@@ -111,6 +151,17 @@ function axes(q) {
   _r[0] = 1 - 2 * (y * y + z * z); _r[1] = 2 * (x * y + w * z); _r[2] = 2 * (x * z - w * y);
   _u[0] = 2 * (x * y - w * z); _u[1] = 1 - 2 * (x * x + z * z); _u[2] = 2 * (y * z + w * x);
   _f[0] = -2 * (x * z + w * y); _f[1] = -2 * (y * z - w * x); _f[2] = -(1 - 2 * (x * x + y * y));
+}
+
+// (M4) x as it is up to capKnee of `max`, then bending over to `max` (smooth: the slope is 1 at the knee): an ordinary
+// storm's chop and lean are what they were, to the digit; a squall's saturate.
+const CAP_KNEE = 0.75;
+const smooth01 = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+function softCap(x, max) {
+  const a = x < 0 ? -x : x, k = CAP_KNEE * max;
+  if (a <= k) return x;
+  const y = k + (max - k) * Math.tanh((a - k) / (max - k));
+  return x < 0 ? -y : y;
 }
 
 // Top speed (m/s) at which full main thrust balances drag, nose-on, in air of density rho.
@@ -184,6 +235,64 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   // ---- air ---------------------------------------------------------------------------------------
   let rho = 0, wx = 0, wy = 0, wz = 0, sigma = 0;
   if (env.air) { _recv.size = Math.sqrt(T.gustArea); _recv.vx = st.v.x; _recv.vy = st.v.y; _recv.vz = st.v.z; const a = env.air(st.p, _air, env.altGround, _recv); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; sigma = a.turbulence || 0; }
+  // (M4) THE HULL IN A STORM (see SHIP_BODY.windGust): what the hull is handed, and what the field sheds
+  B.windShed = 0;
+  const storm = cmd.storm !== false && rho > 0 && T.windGust > 0;
+  if (storm) {
+    const M = B.windMean || (B.windMean = { x: 0, y: 0, z: 0, ok: false });
+    // the level part and the vertical part (in deep space, with no up, the whole is "level")
+    let wu = wx * ux + wy * uy + wz * uz, hx = wx - ux * wu, hy = wy - uy * wu, hz = wz - uz * wu;
+    const D = B.windDev || (B.windDev = { x: 0, y: 0, z: 0 });
+    if (!M.ok || fresh) { M.x = hx; M.y = hy; M.z = hz; M.ok = true; D.x = D.y = D.z = 0; }
+    else {
+      const k = 1 - Math.exp(-dt / T.windMeanTime), kg = T.windGustTime > 0 ? 1 - Math.exp(-dt / T.windGustTime) : 1;
+      M.x += (hx - M.x) * k; M.y += (hy - M.y) * k; M.z += (hz - M.z) * k;
+      D.x += (hx - M.x - D.x) * kg; D.y += (hy - M.y - D.y) * kg; D.z += (hz - M.z - D.z) * kg;
+    }
+    // the gust's envelope, no stronger than windGust times the mean (and lulls no deeper than the same below it) ...
+    {
+      const mm = Math.hypot(M.x, M.y, M.z), dl = Math.hypot(D.x, D.y, D.z), lim = (T.windGust - 1) * mm, m = dl > lim && dl > 1e-9 ? lim / dl : 1;
+      // ... in a wind that is a storm to THIS hull in THIS air: one whose drag side-on asks more than windFrom of the
+      // side thrusters (on Earth from 49 m/s, wholly from windFull, 76 m/s; in Venus' air from 7 m/s). Under it the
+      // hull is handed the wind of the instant, as it always was: an ordinary storm's gusts jolt it as they did.
+      const w2 = Math.max(hx * hx + hy * hy + hz * hz, mm * mm), load = 0.5 * rho * T.cdaSide * w2 / (T.mass * T.accelSide);
+      const b = smooth01((load - T.windFrom) / (T.windFull - T.windFrom));
+      hx += (M.x + D.x * m - hx) * b; hy += (M.y + D.y * m - hy) * b; hz += (M.z + D.z * m - hz) * b;
+    }
+    // the vertical part no more than windUp of the level part (what is under windUpFree passes as it is: a thermal, a
+    // dust devil's updraught, a slope's lift in a breeze)
+    const hl = Math.hypot(hx, hy, hz), cap = Math.max(T.windUpFree, T.windUp * hl);
+    if (wu > cap) wu = cap; else if (wu < -cap) wu = -cap;
+    wx = hx + ux * wu; wy = hy + uy * wu; wz = hz + uz * wu;
+    // what the field sheds: the drag of this wind on a hull flying as commanded, against what each set of thrusters
+    // gives. Only the WIND is shed, never the drag of the hull's own commanded speed (Venus' air at full throttle asks
+    // more than windHold of the main engine by itself): the wind is scaled, all of it by one factor, until on every
+    // axis the air past the hull is no faster than the thrusters' share allows, or than the commanded speed alone.
+    const tg0 = cmd.target;
+    if (tg0) {
+      const k0 = 0.5 * rho / T.mass;
+      const tF = tg0.x * _f[0] + tg0.y * _f[1] + tg0.z * _f[2], tS = tg0.x * _r[0] + tg0.y * _r[1] + tg0.z * _r[2], tU = tg0.x * _u[0] + tg0.y * _u[1] + tg0.z * _u[2];
+      const wF = wx * _f[0] + wy * _f[1] + wz * _f[2], wS = wx * _r[0] + wy * _r[1] + wz * _r[2], wU = wx * _u[0] + wy * _u[1] + wz * _u[2];
+      let keep = 1;
+      for (let a = 0; a < 3; a++) {
+        const t = a === 0 ? tF : a === 1 ? tS : tU, w = a === 0 ? wF : a === 1 ? wS : wU, q = t - w;
+        const cda = a === 0 ? T.cdaForward : a === 1 ? T.cdaSide : T.cdaVertical;
+        const acc = a === 0 ? (q > 0 ? T.accelMain : T.accelReverse) : a === 1 ? T.accelSide : T.accelLift;
+        const qmax = Math.max(Math.sqrt(T.windHold * acc / Math.max(1e-12, k0 * cda)), Math.abs(t));
+        if (Math.abs(q) > qmax && Math.abs(w) > 1e-9) { const k = (q > 0 ? t - qmax : t + qmax) / w; if (k < keep) keep = k < 0 ? 0 : k; }
+      }
+      if (keep < 1) {
+        const q0x = tg0.x - wx, q0y = tg0.y - wy, q0z = tg0.z - wz;
+        wx *= keep; wy *= keep; wz *= keep;
+        // (reported: the drag acceleration shed, on the hull as it flies now)
+        const q1x = tg0.x - wx, q1y = tg0.y - wy, q1z = tg0.z - wz;
+        const d0 = k0 * Math.hypot(T.cdaForward * (q0x * _f[0] + q0y * _f[1] + q0z * _f[2]) ** 2, T.cdaSide * (q0x * _r[0] + q0y * _r[1] + q0z * _r[2]) ** 2, T.cdaVertical * (q0x * _u[0] + q0y * _u[1] + q0z * _u[2]) ** 2);
+        const d1 = k0 * Math.hypot(T.cdaForward * (q1x * _f[0] + q1y * _f[1] + q1z * _f[2]) ** 2, T.cdaSide * (q1x * _r[0] + q1y * _r[1] + q1z * _r[2]) ** 2, T.cdaVertical * (q1x * _u[0] + q1y * _u[1] + q1z * _u[2]) ** 2);
+        B.windShed = Math.max(0, d0 - d1);
+      }
+    }
+  } else if (B.windMean) B.windMean.ok = false;
+  if (B.windFelt) { B.windFelt.x = wx; B.windFelt.y = wy; B.windFelt.z = wz; }
   let rx = vx - wx, ry = vy - wy, rz = vz - wz;
   const airspeed = Math.hypot(rx, ry, rz);
   // drag along the three body axes (explicit estimate for the flight computer's feed-forward)
@@ -191,7 +300,8 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   const rf = rx * _f[0] + ry * _f[1] + rz * _f[2], rs = rx * _r[0] + ry * _r[1] + rz * _r[2], ru = rx * _u[0] + ry * _u[1] + rz * _u[2];
   // ---- turbulence: a band-limited, deterministic chop ------------------------------------------
   const time = env.time != null ? env.time : B.time + dt;
-  const amp = 0.5 * rho * airspeed * sigma * T.gustArea / T.mass;
+  const amp0 = 0.5 * rho * airspeed * sigma * T.gustArea / T.mass;
+  const amp = storm && T.buffetMax > 0 ? softCap(amp0, T.buffetMax) : amp0;   // ((M4) the chop saturates: see SHIP_BODY.windGust)
   const ph = time * T.buffetRate;
   const b1 = noise3(ph, 3.7, 1.1, 911), b2 = noise3(ph * 1.7 + 40, 9.2, 5.5, 912), b3 = noise3(ph * 0.8 - 17, 2.2, 8.8, 913);
   // mostly vertical (lift response), some sideways, little fore-aft
@@ -199,15 +309,25 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   B.buffet.x = _u[0] * bu + _r[0] * bs + _f[0] * bf;
   B.buffet.y = _u[1] * bu + _r[1] * bs + _f[1] * bf;
   B.buffet.z = _u[2] * bu + _r[2] * bs + _f[2] * bf;
+  // ((M4) the chop shakes the hull, it does not carry it: its own mean over the last seconds is taken out. The noise's
+  // mean over half a minute is not nothing: at the squall's chop it sank a hovering hull 14 m in 30 s.)
+  if (storm && T.buffetMeanTime > 0) {
+    const Bm = B.buffetMean || (B.buffetMean = { x: 0, y: 0, z: 0 }), k = 1 - Math.exp(-dt / T.buffetMeanTime);
+    Bm.x += (B.buffet.x - Bm.x) * k; Bm.y += (B.buffet.y - Bm.y) * k; Bm.z += (B.buffet.z - Bm.z) * k;
+    B.buffet.x -= Bm.x; B.buffet.y -= Bm.y; B.buffet.z -= Bm.z;
+  }
   const wob = clamp(amp * 0.012, 0, 0.05);
   // (P13) the wind's moments on the hull against the attitude hold (see cpHeight)
   const A = B.gustAtt || (B.gustAtt = { pitch: 0, roll: 0, yaw: 0, pitchV: 0, rollV: 0, yawV: 0 });
   {
     const Fs = -0.5 * rho * T.cdaSide * airspeed * rs, Fu = -0.5 * rho * T.cdaVertical * airspeed * ru, I = T.inertia;
     const w2 = T.holdRate * T.holdRate, c = 2 * T.holdDamp * T.holdRate, h = Math.min(dt, 0.05);
-    A.rollV += (-Fs * T.cpHeight / I[2] - c * A.rollV - w2 * A.roll) * h; A.roll = clamp(A.roll + A.rollV * h, -0.3, 0.3);
-    A.yawV += (Fs * T.cpAft / I[1] - c * A.yawV - w2 * A.yaw) * h; A.yaw = clamp(A.yaw + A.yawV * h, -0.3, 0.3);
-    A.pitchV += (-Fu * T.cpPlan / I[0] - c * A.pitchV - w2 * A.pitch) * h; A.pitch = clamp(A.pitch + A.pitchV * h, -0.3, 0.3);
+    // ((M4) the lean each moment would hold saturates at rockMax: see SHIP_BODY.windGust)
+    let mR = -Fs * T.cpHeight / I[2], mY = Fs * T.cpAft / I[1], mP = -Fu * T.cpPlan / I[0];
+    if (storm && T.rockMax > 0) { const L = T.rockMax * w2; mR = softCap(mR, L); mY = softCap(mY, L); mP = softCap(mP, L); }
+    A.rollV += (mR - c * A.rollV - w2 * A.roll) * h; A.roll = clamp(A.roll + A.rollV * h, -0.3, 0.3);
+    A.yawV += (mY - c * A.yawV - w2 * A.yaw) * h; A.yaw = clamp(A.yaw + A.yawV * h, -0.3, 0.3);
+    A.pitchV += (mP - c * A.pitchV - w2 * A.pitch) * h; A.pitch = clamp(A.pitch + A.pitchV * h, -0.3, 0.3);
   }
   B.buffetAngle.pitch = wob * noise3(ph * 1.3 + 7, 4.4, 2.2, 914) + A.pitch;
   B.buffetAngle.roll = wob * 1.6 * noise3(ph * 1.1 - 9, 6.6, 3.3, 915) + A.roll;
@@ -223,8 +343,30 @@ export function stepShipBody(st, cmd, dt, env, T = SHIP_BODY) {
   // (half at 0.01 kg/m^3: Mars 0.67 of the full gain, Earth 0.99, the Moon none).
   const h = env.altGround;
   const ge = h != null && h < T.thrusterRadius * 6 && rho > 0 ? 1 + (groundEffect(Math.max(h, 0.3), T) - 1) * rho / (rho + T.groundAir) : 1;
+  // (M4) the station hold (see SHIP_BODY.holdSpeed)
+  {
+    const Sn = B.station || (B.station = { x: 0, y: 0, z: 0, on: false });
+    // (nothing asked for over the ground: a climb asked of it, the pilot's or PILOT's ground assist's, leaves the station as it is)
+    let tl = 1;
+    if (tg) { const tu = tg.x * ux + tg.y * uy + tg.z * uz; tl = Math.hypot(tg.x - ux * tu, tg.y - uy * tu, tg.z - uz * tu); }
+    const idle = storm && hover && tg && !cmd.boost && T.holdGain > 0 && tl < 1e-6;
+    if (!idle) Sn.on = false;
+    else if (!Sn.on) { const vu = vx * ux + vy * uy + vz * uz; if (vx * vx + vy * vy + vz * vz - vu * vu < T.holdSpeed * T.holdSpeed) { Sn.on = true; Sn.x = Sn.y = Sn.z = 0; } }
+    else {
+      Sn.x += vx * dt; Sn.y += vy * dt; Sn.z += vz * dt;
+      { const su = Sn.x * ux + Sn.y * uy + Sn.z * uz; Sn.x -= ux * su; Sn.y -= uy * su; Sn.z -= uz * su; }   // (level only: the height is the pilot's, and PILOT's ground assists')
+      if (Sn.x * Sn.x + Sn.y * Sn.y + Sn.z * Sn.z > T.holdReach * T.holdReach) Sn.on = false;      // carried off: a new station where it next comes to rest
+    }
+  }
   if (tg) {
     ax = (tg.x - vx) / tau; ay = (tg.y - vy) / tau; az = (tg.z - vz) / tau;
+    if (B.station && B.station.on) {
+      const Sn = B.station; let hx = -T.holdGain * Sn.x, hy = -T.holdGain * Sn.y, hz = -T.holdGain * Sn.z;
+      // (and it closes its drift over the ground harder than a commanded speed: holdBrake more per second)
+      { const vu = vx * ux + vy * uy + vz * uz; hx -= T.holdBrake * (vx - ux * vu); hy -= T.holdBrake * (vy - uy * vu); hz -= T.holdBrake * (vz - uz * vu); }
+      const hl = Math.hypot(hx, hy, hz); if (hl > T.holdAccel) { const m = T.holdAccel / hl; hx *= m; hy *= m; hz *= m; }
+      ax += hx; ay += hy; az += hz;
+    }
     // feed-forward: cancel the drag it can feel, and (while hovering) whatever weight the lift
     // has not picked up yet. With no target the computer is off and the engines idle.
     const dF = kf * Math.abs(rf) * rf, dS = ks * Math.abs(rs) * rs, dU = kv * Math.abs(ru) * ru;

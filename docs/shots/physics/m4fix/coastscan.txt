@@ -1,0 +1,11 @@
+# m4/s/coastscan.mjs: coast.mjs' verdict at Earth's sea coast by Earth's weather epoch (the storm it picks, the fetch 80 m out toward its wind; PASS at 2000 m)
+epoch 480: storm at 8850 s 13.21 m/s from E; 80 m out fetch 2145 depth 18.44 Hs 0.53 white 4.88 off normal 39; target Hs 0.52 white 4.93; checks {"fetch":true,"depth":true,"Hs":true,"white":true,"surf":true} => PASS
+epoch -700: storm at 2370 s 11.32 m/s from E; 80 m out fetch 1466 depth 18.95 Hs 0.42 white 5.16 off normal 59; target Hs 0.49 white 3.3; checks {"fetch":false,"depth":true,"Hs":true,"white":true,"surf":true} => NOT YET
+epoch -800: storm at 2490 s 12.22 m/s from E; 80 m out fetch 2004 depth 17.58 Hs 0.62 white 5.07 off normal 51; target Hs 0.55 white 4.06; checks {"fetch":true,"depth":true,"Hs":true,"white":true,"surf":true} => PASS
+epoch -900: storm at 2580 s 12.98 m/s from E; 80 m out fetch 1890 depth 18.67 Hs 0.61 white 5.94 off normal 51; target Hs 0.58 white 4.72; checks {"fetch":false,"depth":true,"Hs":true,"white":true,"surf":true} => NOT YET
+epoch -950: storm at 2610 s 13.28 m/s from E; 80 m out fetch 1947 depth 18.08 Hs 0.62 white 5.66 off normal 53; target Hs 0.58 white 4.99; checks {"fetch":false,"depth":true,"Hs":true,"white":true,"surf":true} => NOT YET
+epoch -1000: storm at 2670 s 13.55 m/s from E; 80 m out fetch 2068 depth 16.93 Hs 0.69 white 5.8 off normal 56; target Hs 0.61 white 5.23; checks {"fetch":true,"depth":true,"Hs":true,"white":true,"surf":true} => PASS
+epoch -1050: storm at 2730 s 13.71 m/s from E; 80 m out fetch 2151 depth 16.71 Hs 0.73 white 5.99 off normal 58; target Hs 0.63 white 5.37; checks {"fetch":true,"depth":true,"Hs":true,"white":true,"surf":true} => PASS
+epoch -1100: storm at 2760 s 13.92 m/s from E; 80 m out fetch 1857 depth 13.98 Hs 0.61 white 6.75 off normal 68; target Hs 0.62 white 5.56; checks {"fetch":false,"depth":true,"Hs":true,"white":true,"surf":true} => NOT YET
+epoch -1150: storm at 2820 s 14 m/s from E; 80 m out fetch 1894 depth 13.81 Hs 0.65 white 7.05 off normal 68; target Hs 0.64 white 5.64; checks {"fetch":false,"depth":true,"Hs":true,"white":true,"surf":true} => NOT YET
+epoch -1200: storm at 2850 s 14.05 m/s from E; 80 m out fetch 1474 depth 18.54 Hs 0.5 white 8.29 off normal 62; target Hs 0.63 white 5.68; checks {"fetch":false,"depth":true,"Hs":true,"white":true,"surf":true} => NOT YET

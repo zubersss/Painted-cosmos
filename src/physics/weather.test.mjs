@@ -29,22 +29,79 @@ test('deterministic: the same place and time always has the same weather', () =>
   assert.notEqual(JSON.stringify(cellsAt('earth', 500, 1).map((c) => c.x)), JSON.stringify(cellsAt('earth', 500, 2).map((c) => c.x)));
 });
 
-test('the first storm over Earth\'s home forest is seen: a fair late morning, a thunderstorm between 150 and 340 s of play, a clear afternoon (default seed, Earth\'s epoch)', () => {
-  // (lead review 5, P2: it used to cross at 640 to 800 s, which is half past six to nine in the evening)
+test('M4 the first day at Earth\'s home forest is fair; the first thunderstorm crosses it at the second noon (1690 to 1850 s of play), seen coming, and the afternoon is clear (default seed, Earth\'s epoch)', () => {
+  // (lead review 5, P2: it crossed at 640 to 800 s, after dark as the clock then was; P8 to M4: at 160 to 320 s.
+  // PILOT's critique of PHYSICS in M4, item 5: two minutes into every new game is too soon, the first ten minutes are
+  // when a player learns to walk and finds the ship; hold the first front off for about ten minutes. Ten minutes in is
+  // the dusk of PILOT's clock (sunset at 11 minutes, sunrise at 22): the storm is at the second day's noon.)
   const d = { x: 0.1736, y: 0.5817, z: 0.7946 };                // PAINTER's spawn
-  const fair = (t) => { const w = wx('earth', d, t); assert.ok(w.precipitation.rate < 0.03 && w.storm01 === 0 && w.fog01 < 0.25 && ['clear', 'breeze', 'overcast', 'mist', 'windy'].includes(w.kind), `t=${t}: ${w.kind}`); };
-  for (let t = 0; t <= 120; t += 10) fair(t);
-  // ... you see it come (the shield is over you before the first drop), it comes, and the sky opens again
-  assert.ok(wx('earth', d, 100).cloud01 < 0.45 && wx('earth', d, 150).cloud01 > 0.6, 'cloud builds');
+  const fair = (t) => { const w = wx('earth', d, t); assert.ok(w.precipitation.rate < 0.03 && w.storm01 === 0 && w.fog01 < 0.25 && ['clear', 'breeze', 'overcast', 'mist', 'windy'].includes(w.kind), `t=${t}: ${w.kind}`); return w; };
+  // the first day, its dusk and most of the night (17 minutes): no rain, and no system's cloud over the forest
+  for (let t = 0; t <= 1050; t += 10) assert.ok(fair(t).cloud01 < 0.12, `t=${t}: cloud ${wx('earth', d, t).cloud01.toFixed(2)}`);
+  // the second morning clouds over, brightens, and you see the storm come (the shield is over you before the first drop)
+  for (let t = 1050; t <= 1650; t += 10) fair(t);
+  assert.ok(wx('earth', d, 1350).cloud01 > 0.6 && wx('earth', d, 1630).cloud01 < 0.45 && wx('earth', d, 1680).cloud01 > 0.6, 'cloud builds');
   let wettest = 0, when = 0, first = -1, last = -1;
-  for (let t = 0; t <= 600; t += 10) { const w = wx('earth', d, t); if (w.precipitation.rate > wettest) { wettest = w.precipitation.rate; when = t; } if (w.kind === 'thunderstorm') { if (first < 0) first = t; last = t; } }
-  assert.ok(wettest > 15 && when >= 190 && when <= 280, `the storm: ${wettest.toFixed(1)} mm/h at ${when} s`);
-  assert.ok(first >= 150 && first <= 200 && last >= 280 && last <= 340, `called a thunderstorm from ${first} to ${last} s`);
-  for (let t = 350; t <= 900; t += 10) fair(t);
+  for (let t = 0; t <= 2400; t += 10) { const w = wx('earth', d, t); if (w.precipitation.rate > wettest) { wettest = w.precipitation.rate; when = t; } if (w.kind === 'thunderstorm') { if (first < 0) first = t; last = t; } }
+  assert.ok(wettest > 15 && when >= 1720 && when <= 1810, `the storm: ${wettest.toFixed(1)} mm/h at ${when} s`);
+  assert.ok(first >= 1680 && first <= 1730 && last >= 1810 && last <= 1870, `called a thunderstorm from ${first} to ${last} s`);
+  for (let t = 1880; t <= 2430; t += 10) fair(t);
   // PILOT's stub spawn has a fair first ten minutes
   for (let t = 0; t <= 600; t += 20) { const w = wx('earth', { x: 0.3339, y: 0.1072, z: -0.9365 }, t); assert.ok(w.precipitation.rate < 0.03 && w.storm01 === 0, `stub t=${t}: ${w.kind}`); }
   // the epoch is Earth's alone: no other body's weather clock moved
   for (const id in REGIMES) if (id !== 'earth') assert.ok(!REGIMES[id].epoch, id);
+});
+
+test('M4 the night\'s mist: none through the afternoon, the evening and the dusk; it gathers in the night, lies through the sunrise and is gone by mid-morning; a clouded night has little; without the sun\'s east part, the old law', () => {
+  // (PILOT's critique of PHYSICS, item 5: mist from 6.5 minutes into a new game to the 24th: every evening and dusk
+  // stood in it, because it hung on the sun's height alone.) A calm damp place with no system over it:
+  let P = null;
+  for (let k = 0; k < 600 && !P; k++) { const a = k * 2.399963, y = -0.6 + 1.2 * ((k * 0.618034) % 1), r = Math.sqrt(1 - y * y), q = { x: Math.cos(a) * r, y, z: Math.sin(a) * r }; const w = wx('earth', q, 50, { moist: 1, fog: 0.3, sun01: 0.6, wind: 1 }); if (w.cloud01 < 0.1 && w.storm01 === 0 && w.precipitation.rate === 0 && w.fog01 < 0.35) P = q; }
+  assert.ok(P, 'a place under an open sky');
+  // the sun round the sky: psi -90 sunset, 0 midnight, 90 sunrise, +-180 noon (sun01 = -cos psi x 0.8, sunEast = sin psi x 0.8)
+  const at = (psi, extra = {}) => { const a = psi * Math.PI / 180; return wx('earth', P, 50, { moist: 1, fog: 0.3, wind: 1, sun01: -Math.cos(a) * 0.8, sunEast: Math.sin(a) * 0.8, ...extra }).fog01; };
+  const noon = at(180), afternoon = at(-135), goldEvening = at(-100), sunset = at(-90), dusk = at(-75), midnight = at(0), small = at(45), sunrise = at(90), early = at(100), midMorning = at(130);
+  assert.ok(Math.abs(afternoon - noon) < 1e-9 && Math.abs(goldEvening - noon) < 1e-9 && Math.abs(sunset - noon) < 1e-9 && Math.abs(dusk - noon) < 1e-9, `no more in the evening than at noon: ${noon.toFixed(2)} ${goldEvening.toFixed(2)} ${sunset.toFixed(2)} ${dusk.toFixed(2)}`);
+  assert.ok(noon < 0.35, `a clear day: ${noon.toFixed(2)}`);
+  assert.ok(midnight > noon + 0.2 && small > midnight && small > 0.6 && Math.abs(sunrise - small) < 1e-9 && early > 0.5, `the night's mist: midnight ${midnight.toFixed(2)}, the small hours ${small.toFixed(2)}, sunrise ${sunrise.toFixed(2)}, after it ${early.toFixed(2)}`);
+  assert.ok(Math.abs(midMorning - noon) < 1e-9, `burnt off by mid-morning: ${midMorning.toFixed(2)}`);
+  // it comes and goes steadily: under 0.03 of fog01 for a degree of the sun's turning (a degree is a second or more of any clock PILOT runs)
+  let worst = 0, prev = at(-180); for (let psi = -179; psi <= 180; psi += 1) { const f = at(psi); worst = Math.max(worst, Math.abs(f - prev)); prev = f; }
+  assert.ok(worst < 0.03, `steady: ${worst.toFixed(3)} a degree`);
+  // the old law where the east part is not given: the evening as misty as the morning
+  const old = (s) => wx('earth', P, 50, { moist: 1, fog: 0.3, wind: 1, sun01: s }).fog01;
+  assert.ok(old(0.1) > 0.5 && Math.abs(old(-0.3) - small) < 1e-9, `without sunEast: ${old(0.1).toFixed(2)} at a low sun`);
+  // a clouded night keeps its warmth: under a closed sky, less than half the mist
+  const hit = find('earth', (w) => w.cloud01 > 0.9 && w.precipitation.rate === 0 && w.fog01 < 0.3 && w.kind === 'overcast');
+  if (hit) {
+    const cl = (extra) => weatherAt('earth', hit.d.x, hit.d.y, hit.d.z, 30, hit.t, DEFAULT_SEED, { moist: 1, fog: 0.3, wind: 1, sun01: -0.5, ...extra }, {});
+    const under = cl({ sunEast: 0.6 }), oldUnder = cl({});
+    assert.ok(under.fog01 < oldUnder.fog01 - 0.15, `under cloud ${under.cloud01.toFixed(2)}: fog ${under.fog01.toFixed(2)} for ${oldUnder.fog01.toFixed(2)}`);
+  } else console.log('# (no overcast without rain found: the clouded night not checked)');
+});
+
+test('M4 the ground holds a few millimetres and the rest runs off: it is never wetter than the store, and after the first storm the sward is under 0.3 wet within three minutes of the last drop in the sun, under 0.35 within four under a closed sky', () => {
+  // (PILOT's critique of PHYSICS, item 5: "let the sward dry in three or four minutes once the sun is back". Every
+  // millimetre of the storm's 33 stayed to be dried: by the old law, with this storm where it now is, 0.35 two minutes
+  // after the last drop in the noon sun and 0.62 four minutes after it under a closed sky in still air.)
+  const d = { x: 0.1736, y: 0.5817, z: 0.7946 };                // PAINTER's spawn
+  // the afternoon after the storm, as the game has it there: a light wind, the sun 40 degrees up
+  const m = (t, e = {}) => moistureAt('earth', d.x, d.y, d.z, t, DEFAULT_SEED, { moist: 1, T: 290, wind: 2, sun01: 0.64, ...e }, {}).wetness01;
+  let end = 1750; while (wx('earth', d, end).precipitation.rate > 0.02) end += 5;
+  assert.ok(end > 1840 && end < 1880, `the last drop at ${end} s`);
+  const peak = m(1790), top = 1 - Math.exp(-WEATHER.wetStore / WEATHER.wetDepth);
+  assert.ok(peak > 0.9 && peak <= top + 1e-9, `soaked in the storm, and no wetter than the store: ${peak.toFixed(3)} (${top.toFixed(3)})`);
+  const a2 = m(end + 120), a3 = m(end + 180), closed = { sun01: 0, wind: 1 }, c4 = m(end + 240, closed);
+  console.log(`# M4 the sward after the first storm (the last drop at ${end} s): wetness ${peak.toFixed(2)} at its height, ${m(end).toFixed(2)} at the last drop; in the sun ${a2.toFixed(2)} two minutes after and ${a3.toFixed(2)} three (the old law: 0.35, 0.15); under a closed sky in still air ${c4.toFixed(2)} four minutes after (the old law: 0.62)`);
+  assert.ok(a2 < 0.25 && a3 < 0.12, `in the sun: ${a2.toFixed(2)} after two minutes, ${a3.toFixed(2)} after three`);
+  assert.ok(c4 < 0.35 && c4 > a3, `under a closed sky in still air, four minutes after: ${c4.toFixed(2)}`);
+  for (let t = end; t <= end + 600; t += 5) assert.ok(m(t + 5, closed) <= m(t, closed) + 1e-3 && m(t, closed) - m(t + 5, closed) < 0.06, `drying steadily at ${t}: ${m(t, closed).toFixed(3)} -> ${m(t + 5, closed).toFixed(3)}`);
+  // a shower that does not fill the store wets and dries as it did
+  const hit = find('earth', (w) => w.precipitation.type === 'drizzle' && w.precipitation.rate > 0.3 && w.precipitation.rate < 1);
+  if (hit) {
+    const now = moistureAt('earth', hit.d.x, hit.d.y, hit.d.z, hit.t, DEFAULT_SEED, { moist: 1, T: 288, wind: 3, sun01: 0.3 }, {}).wetness01;
+    assert.ok(now > 0 && now < top - 0.05, `a drizzle: ${now.toFixed(3)}`);
+  }
 });
 
 test('cells are born, drift with the wind, and die; nothing teleports while alive', () => {

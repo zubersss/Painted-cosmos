@@ -18,10 +18,14 @@ clock, `epochscan.mjs`, `wxline.mjs` the spawn's weather on the weather's own cl
 Evidence in the repository: `docs/shots/physics/m4fix/`.
 
 **State of the items (the workflow's numbers), updated after each:**
-- **3 (rain stops a walk dead on a forest bank): DONE**, item A below.
-- 7 (Neptune's storm throws the ship), 9 (the first storm's timing, the long mist), 2 and 10 (a floor under what moves;
-  the gust's envelope), 4 and 6 (snow and rain as PAINTER needs them), 1 (the scramble at Neptune's storm coast), 5 (rims),
-  8 (wakes): **not yet done; next in that order** (9 is in work in `w9/`: the epoch, the night's mist, the surface's store).
+- **3 (rain stops a walk dead on a forest bank): DONE**, item A below (`141997f`).
+- **9 (the first storm two minutes in, the wood wet and misty for a quarter of an hour): DONE**, item B below.
+  **PILOT's and PAINTER's instruments that set Earth's clock for the storm must add 1530 s: see "For PILOT and
+  PAINTER, M4 fix round" under item C.**
+- **7 (Neptune's storm coast throws the ship): DONE**, item C below (single frames of 2.5 g that are left are PILOT's
+  ground assist's: For PILOT).
+- 2 and 10 (a floor under what moves; the gust's envelope), 4 and 6 (snow and rain as PAINTER needs them), 1 (the
+  scramble at Neptune's storm coast), 5 (rims), 8 (wakes): **not yet done; next in that order.**
 
 **A. RAIN NO LONGER STOPS A WALK (item 3; `explorer.js`: SHORT STEPS, `EXPLORER_BODY.holdMargin`, `st.phys.paceHold`).**
 - *Reproduced* (PILOT's `pilot12/wetstall.mjs`; `m4/s/wettrace.mjs head earth spawn 240 90`): 21.4 m east of the spawn, on
@@ -61,6 +65,129 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
   the spawn, a walk and the storm at clock 240: no console error, no game error, fallback empty (one frame opened).
 - *Not done here:* the pace above the soles' whole hold is still the hold's (wet litter at 26 to 33 degrees is climbed at
   4.2 m/s, faster than at 24: PILOT's "holds and lets go" is now "slows and lets go"); not filmed in the game.
+
+**B. THE FIRST DAY IS FAIR; THE FIRST STORM IS AT THE SECOND NOON; THE EVENING HAS NO MIST (item 9; `weather.js`,
+`index.js`).** Three changes, each with its test (`weather.test.mjs`; all three fail on `1aa9718`).
+- *Was* (`m4/s/onset2.mjs head`, PILOT's Sim left to itself at the spawn, PILOT's new clock): cloud 0.55 in the first
+  second, the thunderstorm from 150 to 310 s, the ground wet to 600 s, **mist (fog01 0.54 to 0.72) from 7.5 minutes to
+  the 23rd**: the gold evening, the dusk, the night and the dawn all in it.
+- *(1) The epoch* (`REGIMES.earth.epoch` 480 -> **-1050**; it may be negative): the same storm of the same seed, 1530 s
+  later on the game's clock. PILOT asked for "about ten minutes"; ten minutes in is the dusk of PILOT's own clock (sunset
+  at 11.2 minutes, sunrise at 21.9, the second noon at about 30), and a storm at dusk is the dark picture PILOT's item 1
+  on PAINTER was about. Chosen (logged as my choice): the first day, its dusk and most of its night have no system over
+  the forest (weather cloud under 0.12 to 1050 s; PAINTER's own fair-weather clouds stay); cloud comes over from 18
+  minutes, the second morning is overcast from 20 to 25.5, brightens, **first drops at 1670 s, thunderstorm 1690 to 1850
+  s (heaviest 1730 to 1790 s: the second noon, the sun 45 degrees up, the light PAINTER keyed the storm in)**, clear
+  from 1870 s, sunset at 38 minutes (`m4fix/onset-after.txt`: the spawn left to itself, every minute). The spawn's
+  weather on the weather's own clock (`m4/s/wxline.mjs`): the one thunderstorm in eleven hours at that place is this
+  one; an hour and ten minutes before it nothing. Other bodies: untouched.
+  **Why -1050 and not -1200 (a clear misty dawn, which I would have liked better):** the large-scale wind runs on the
+  game's clock and the systems on the epoch's, so the epoch also decides which storm is the strongest at Earth's sea
+  coast in the first 9000 s, the one `coast.mjs` judges PAINTER's coast by, and that verdict is thin: by epoch
+  (`m4/s/coastscan.mjs`), fetch 80 m out toward the storm's wind: 480: 2145 m; -700: 1466; -800: 2004; -900: 1890;
+  -950: 1947; -1000: 2068; **-1050: 2151**; -1100: 1857; -1150: 1894; -1200: 1474 (PASS at 2000). The storm then comes
+  from 10 to 20 degrees north of east, where the coast has less open water. For PAINTER, after M4: the sea coast faces
+  open water in a sector a few degrees wide.
+- *(2) The night's mist* (`weatherAt`, `env.sunEast`): radiation mist hung on the sun's height alone (all of it under
+  23 degrees, morning or evening). Now the hour is known from the sun's east part (`index.js` hands
+  `env.sunEast` = sun . east at the place, + in the morning; PILOT's `sunHourAt` has the same east): none through the
+  afternoon, the evening and the dusk; it gathers from an hour and a half after sunset, is whole from two hours after
+  midnight to the sunrise, is burnt off by mid-morning; under a closed sky 0.3 of it. A caller that gives no
+  `sunEast` gets the old law. At the spawn by the game's clock: fog01 0.07 at the start, 0.31 through the evening and
+  the dusk (the biome's own haze), mist 0.56 to 0.69 from 16 to 19.5 minutes (the second half of the night; the dawn
+  under the cloud that comes over: 0.48 at 20 minutes, 0.31 at 22).
+- *(3) The surface's store* (`WEATHER.wetStore` 9 mm; `moistureAt`): the ground kept every millimetre that fell to be
+  dried (33 of that storm); now what is over the store has run off. Never wetter than 0.95; after the storm at noon
+  in the sun 0.18 two minutes after the last drop and 0.08 after three (the old law there: 0.35, 0.15); under a closed
+  sky in still air 0.31 after four (0.62); no rise while drying (under a closed sky the old sum rose in 105 of the 1180
+  seconds after the rain). In the game's run (`onset2`, the last drop at about 1860 s): sky.wet 0.93 in the storm,
+  0.72 at 1861 s, 0.33 at 1921 s, 0.16 at 1981 s, 0.07 at 2161 s.
+- *Tests.* **M4 the first day ... is fair; the first thunderstorm ... at the second noon** (replaces P8's "the first
+  storm ... between 150 and 340 s"); **M4 the night's mist**; **M4 the ground holds a few millimetres**. Eleven older
+  tests stand in that storm or were tuned on Earth's weather at fixed clock times (air 2, flora 2, particles 5, water
+  2): they now run with `epochP8(fn)` (`testworld.mjs`: Earth's clock as it was from P8 to M4, for the length of the
+  test), unchanged otherwise.
+- *Checks for B and C together* (a clean export of `507486f` with this commit's physics, `m4/final2`): world 20, unit
+  181, physics **319** (316 + 3: weather +2 net, ship +1), `coast.mjs` PASS at both stands (Earth: reference Hs 0.79 m,
+  target 0.63, white 5.99 % for 5.37, fetch 2151 m 80 m out; Neptune as before), `ghostfield.mjs` all zeros; the game
+  at quality 0 (480 x 270): the spawn, the storm at clock 1770 (`m4fix/game-spawn-storm-clock-1770.jpg`, opened: the
+  storm's key, rain strokes, the figure in the glade), ten seconds hands off 30 m over Neptune's storm coast at clock
+  205 (moved 1.6 m, 27.6 to 30.4 m up, 0.52 g at most, rock 9.3 degrees; `m4fix/game-ship-neptune-squall-after.jpg`,
+  opened: the ship level over the grey beach, the cliff behind): no console error, no game error, fallback empty.
+- *API:* `WEATHER.wetStore`; `weatherAt`'s `env.sunEast` (optional); `REGIMES.earth.epoch` -1050; `testworld.mjs
+  epochP8`. `physics.weather()` and `physics.here.weather` hand `sunEast` themselves.
+
+**C. THE SHIP IN A STORM (item 7; `ship.js`: THE HULL IN A STORM, `SHIP_BODY.windGust` and the constants under it).**
+- *Reproduced* (`m4/s/hover.mjs head neptune storm_seas 205,236`: PILOT's Sim, 60 Hz, hands off 30 s from 30 m): carried
+  161 / 148 m, the hull's own height -0.4 to +96 / 0 to +101 m, 4.6 / 5.8 g in a frame, 2.4 / 3.0 g over half a second,
+  the drawn hull rocking 31 degrees (mean 25). Earth's storm at the spawn, 60 m up (35 over the crowns; at PILOT's 30 m
+  the hull sits 7 m over the wood, in its lee): carried 1.6 m, rock 4.1 degrees (mean 2.2): what PILOT asks for Earth is
+  already there once the hull is out of the wood's shelter.
+- *Now*, in `stepShipBody` (all of it off with `cmd.storm === false`):
+  - **what the hull is handed**: in a wind that is a storm to this hull in this air (its drag side-on over a quarter
+    of the side thrusters' authority: from 49 m/s on Earth, wholly from 76) the wind's own mean over 3 s and the gust's
+    envelope over 2 s, no stronger than 1.5 times the mean; under that the wind of the instant, as before. The vertical
+    part at most a third of the level part (or 8 m/s): the sheet of air `air.js` sends up a cliff (170 m/s at the 50 m
+    sea cliff in the squall) is thinner than the hull. (`air.js` itself is unchanged: rain, leaves and the explorer in
+    the air still get that sheet. It overstates a cliff's updraught: a flow turned by a 75 degree face does not gain
+    3.7 times its speed. Not changed in a final round: every receiver and several tests hang on it.)
+  - **the field sheds** what the thrusters cannot hold: the wind (never the drag of the hull's own commanded speed) is
+    scaled until on every axis the air past a hull flying as commanded asks no more than 0.6 of that axis' thrusters
+    (`st.phys.windShed`, m/s^2; `st.phys.windFelt` the wind handed);
+  - **the station hold**: with nothing asked of it over the ground (PILOT's hands off; a climb asked by PILOT's ground
+    assist does not count), hovering, in air, from where the hull came to rest (under 1 m/s) the flight computer leans
+    against whatever carries it off: 0.6 /s^2 of the level offset and 2 /s of the drift, 4 m/s^2 at most; let go when
+    anything is asked or it is carried 25 m (`st.phys.station`). Level only: the height is the pilot's and PILOT's
+    assists';
+  - **the chop** saturates (`buffetMax` 2.2 m/s^2; as it was up to three quarters of that) and is taken about its own
+    mean over 2 s (the noise's mean over half a minute sank a hovering hull 14 m); **the lean** each wind moment holds
+    saturates at `rockMax` 5 degrees an axis (as it was to 3.7).
+- *Measured after* (the same instrument, `m4/final2`): Neptune 205 / 236: carried **2.7 / 5.6 m**, own height -2.5 to
+  +2.6 / -0.2 to +5.6 m, **0.35 / 0.60 g over half a second**, rock **9.3 / 8.4 degrees at most, mean 7**; clock 300
+  (11 to 57 m/s): 2.5 m (16.2), rock 8.5 (21.1). Earth's storm 60 m up: carried about a metre, rock 4 to 6 (mean 2 to
+  3): as before. Jupiter's storm wall: 0.5 to 0.8 m (1.3 to 1.4), rock 3 to 4 as before
+  (`m4fix/hover-before-after.txt`). PILOT's own `pilot12/shipair.mjs` before and after on six places
+  (`m4fix/shipair-before-after.txt`): Neptune hover drift 137.5 / 101.0 m -> 0.3 / 0.7 m, height 6.9..73.6 / 7.8..77.6
+  -> 27.6..32.9 / 29.8..35.5 m, hull off level mean 19 worst 26 -> mean 5 worst 7; cruise at half throttle in the
+  squall 11 / 4 / 30 / 2 m off the nose's line -> 2 / 1 / 1 / 0, tilt 23 -> 6 to 8; top speed there 60 / 55 -> 51 m/s
+  (the squall no longer carries it); Earth, Mars and Jupiter the same lines (X stops 0.1 s and a metre apart); Venus
+  the same speeds, its cruise tilt 17 -> 6 degrees (the lean's ceiling).
+- *Left, and whose:* **single frames of 2.3 to 2.5 g, one to four at a time, a few times in 30 s: PILOT's ground assist**
+  (`flight.js boundAssist`: when the hull sinks at half a metre a second while it drifts over ground that rises ahead,
+  the assist adds its whole lift, 14 m/s^2 + g, until the climb it wants is there: 1.2 m/s in four frames). For PILOT.
+- *Test* (`ship.test.mjs`, new, fails on the commit before: carried 457 m, 1730 m up, 27 g in a step, rock 32): **M4 the
+  hull in a storm** (a synthetic squall, 60 to 240 m/s in gusts, a sheet going up at 1.4 times the level wind, 60 and 20
+  Hz: carried under 15 m (2.0), height within 10 m (2.6), under 1 g over half a second (0.5), rock under 12 degrees
+  and over 3 in the mean (9.8, 8.2), the field shedding; with `cmd.storm` false carried away; an ordinary 30 m/s storm:
+  the wind of the instant handed on, nothing shed, the station held; Venus' still air at full throttle: the same top
+  speed; no pull back after a stop; still air: nothing moves). PHYSICS' 24 older ship tests pass unchanged.
+- *API (additive):* `SHIP_BODY.windMeanTime, windGust, windGustTime, windUp, windUpFree, windFrom, windFull, windHold,
+  holdSpeed, holdGain, holdBrake, holdAccel, holdReach, buffetMax, buffetMeanTime, rockMax`; `st.phys.windMean,
+  windDev, windFelt, windShed, station, buffetMean`; `cmd.storm` (false: the hull in the raw wind).
+
+### For PILOT and PAINTER, M4 fix round (twenty-fifth PHYSICS agent)
+
+- **Earth's weather clock moved by +1530 s (item B).** Every instrument that sets the game's clock to stand in the
+  first storm at Earth's spawn now needs the new times: fair to 1050 s, cloud from 1080, overcast 1200 to 1530, **first
+  drops 1670, storm 1690 to 1850 (heaviest 1730 to 1790), clear from 1870**. PILOT's files, the exact changes:
+  `tests/weather.mjs` SHOTS: `earth-before` t 120 -> 1650, `earth-arrives` 166 -> 1696, `earth-storm` and
+  `earth-storm-night` 240 -> 1770, `earth-flash` and `earth-flash-night` 244 -> 1774, `earth-after` 400 -> 1930,
+  `earth-blizzard` 190 -> 1720 (its comment "under one from 120 to 220 s" -> "1650 to 1750 s"), and the header's "160
+  to 320 s of play, noon to half past two" -> "1690 to 1850 s of play, the second noon"; `tests/motion.mjs` scene
+  `storm` t 240 -> 1770 (and its two comments). `earth-start` (t 30) and every scene at t 30 stay. PAINTER's harness:
+  the storm frames taken at `T: 240` are at `T: 1770` now; the mist frames at 600 s have no mist any more (the night's
+  mist is at 960 to 1170 s of a new game left to itself). PILOT's `docs/lead/evidence/pilot12/*.mjs` (wetstall, onset,
+  hovertrace: clocks 170 to 700 at the spawn) show fair weather now; the wet bank is tested with the ground soaked by
+  hand (`explorer.test.mjs`, "M4 on PAINTER's real Earth, soaked"). Not re-run by me: `tests/weather.mjs`,
+  `tests/motion.mjs` (PILOT's films; they will show a fair day at their old clocks until changed).
+- **PILOT, `flight.js boundAssist`** (item C, "Left"): a small correction of the hull's vertical speed is given at the
+  assist's whole lift, 2.5 g for one to four frames, at any height. Suggested: where the hull is over `cushionHeight`
+  and `want - vUp` is under about 2 m/s, give it over a third of a second (a third of `lift`).
+- **PILOT, the hands-off hover is now a station hold in air** (item C): it leans back to where the hull came to rest,
+  level only, and lets go when anything is asked. If a mode of PILOT's wants the old free drift it passes
+  `cmd.storm = false` (which also hands the hull the raw wind).
+- **PAINTER:** nothing to wire for B or C. `st.phys.windShed` (m/s^2) is there if the hull should glow while the field
+  holds it in a squall.
 
 ## Hand-over P26 (twenty-fourth PHYSICS agent; P27 above is newer; P25 and older below hold for everything not named here)
 
