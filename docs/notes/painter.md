@@ -4,6 +4,44 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over closing PAINTER 14's block (written by the fifteenth PAINTER agent, the M4 critic; read this first)
+
+PAINTER 14 was cut off by the account's limit before it committed anything itself. Its work is whole in the head, in
+four coordinator snapshots: **c8b8309** (stones thinned round first landings, Mars' and Mercury's far washes, frozen
+waves, the gold islands, easel room, the rille's bed), **45c5176** and **8809fff** (the forest's paper light in
+`materials.js`, the wetland's reed beds in `nearground.js`, the Moon's rilles stand in `easels.js`, looks of Mars, the
+Moon, Uranus, Venus, the stacks' treads in `surface.js`) and **76d8182** (its notes below, six sheets, Neptune's deck
+streaks, the last of `materials.js` and `nearground.js`). I changed no code of its block.
+
+- **What it changed**: every item is in "PAINTER 14" below (sections 1 to 5) with file, number and verdict. In one line
+  each: the forest stand a little lighter (mist 0.95 -> 0.72, paper hearts in sun patches, birches keep a sunlit side);
+  fewer stones within 22 m of every first landing (Pluto 37 -> 16, Mercury 10 -> 2); Mars from orbit a rust world with a
+  dark marking and a cap; Mercury from orbit no longer a dark disc; Neptune's orbit streaks soft blots; Uranus' frozen
+  waves curl; Saturn's walled vista opened (an easel's sixth number, metres of room); the wetland's reeds in beds; the
+  Moon's rilles stand moved to the rille's edge with a Payne's grey bed; the stacks' ledge treads lighter.
+- **Where the evidence is** (all seven opened by me at full size on 2026-11-13): `docs/shots/painter/p14-first10.jpg`,
+  `p14-arrivals.jpg`, `p14-orbits.jpg`, `p14-item4.jpg`, `p14-moon-rilles.jpg`, `p14-wetland.jpg`, and `p14-forest.jpg`.
+  The last one is named in section 1 but was never copied out of scratch: I saved PAINTER 14's own pair
+  (`m14/pair-tf3.jpg`, head | after, made at 21:15) under that name, after opening the same stand from its final run
+  (`m14/s6/F-tf-stand.jpg`): the two "after" frames agree. Its verdicts hold in what I see: the arrivals and orbits pass;
+  the forest pair differs by very little (paler depths, lighter birch sides), as its own numbers say (median L* 54 -> 56).
+- **Checked by me on a clean export of ca0b3db** (scratch `m4/crit/exp0`): `node --test src/world/*.test.mjs` 19 of 19;
+  `node src/physics/coast.mjs` PASS at both stands (Earth sea_coast, Neptune storm_seas). Its final scratch tree (`m14/c5`,
+  the tree its own final checks ran on) is byte-identical to the head in `src/render`, `src/world`, `src/art` and
+  `src/data/looks` (`diff -rq`): nothing of its block is missing from the head. Not re-run by me for this hand-over: the
+  unit and physics suites (the coordinator ran them on 76d8182: unit 152, physics 308), any browser frame of its block.
+- **Still weak** (its own ranked list, "Still weak" at the end of "PAINTER 14", is right; the first lines):
+  (1) temperate_forest is the lowest-key daylight frame (the canopy closes the sky); (2) Pluto's long_shadow_plain has
+  no long shadows; (3) Saturn's and Jupiter's island tables are extruded blocks; (4) Uranus' arrival is one pale value
+  range, Venus' arrival a dark brown plain, Mars' near shrubs break into specks, Earth's clouds from orbit are hard
+  white blots; (5) Neptune's stacks move little under the storm key, the rille is a valley not a dark cut, the near
+  autumn crowns one sienna mass each. Seen by me in its sheets and not in its list: the 650 m frame of `p14-first10`
+  (one heavy grey-violet slab of sky over a pale world: the weakest frame of the climb), and the wetland's "kept" frame
+  still has a scatter of even grey pebble dots on the bank.
+- **Next**: the M4 critique (docs/lead/CRITIQUE-PAINTER.md, PAINTER on PILOT and on PHYSICS) and then the fix round on
+  PAINTER's own FIX FOR SHIP items from the other two critiques (docs/lead/CRITIQUE-PHYSICS.md "PHYSICS on PAINTER",
+  docs/lead/CRITIQUE.md).
+
 ## Handover (read this first if you are a fresh PAINTER)
 
 Written by the fourteenth PAINTER agent (the finishing block before M4: the first ten minutes, every arrival and every
