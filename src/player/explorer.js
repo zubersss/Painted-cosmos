@@ -31,12 +31,10 @@ export const EXPLORER = Object.freeze({
   windPaceMin: 0.75,         // ...never less than this share of the pace (3.15 m/s walking into any gale)
   windPaceMax: 1.1,
   jetFuelSeconds: 4.2,       // seconds of continuous burn on a full tank
-  rechargeGroundSeconds: 2.2,  // seconds to refill standing on the ground
-  rechargeAirDelay: 0.9,     // seconds after burning before it starts refilling in the air
-  rechargeAirSeconds: 10,    // seconds to refill while falling (slow: you cannot hover forever), on Earth; on a lighter
-                             // world as much longer as its gravity is less (airRecharge): hovering there takes so little
-                             // burning that at Earth's rate the tank refilled faster than it emptied (PHYSICS: on Mars it
-                             // was full again four seconds after the top of an arc; the Moon and Pluto, the same)
+  rechargeGroundSeconds: 2.2,  // seconds to refill standing on the ground (or afloat). Never in the air (PHYSICS'
+                             // critique of PILOT, item 8; the re-fix pass, M4): a tank that refilled while falling,
+                             // however slowly, kept a light world's explorer up for ever with burn-and-coast
+                             // (Pluto: burn to half, coast, relight under 8 m: 42 relights in 1200 s, never down)
   jetStartDelay: 0.16,       // hold Space this long after a jump before the jetpack lights
   terminalFall: 24,          // m/s: falls stay gentle, there is no fall damage
   softFallHeight: 3,         // metres above ground where a fast fall is cushioned
@@ -53,8 +51,6 @@ export const EXPLORER = Object.freeze({
   swimTurnRate: 3.2,         // 1/s: ...and where it swims: a body laid along the water comes round, it does not spin
 });
 
-// Seconds a tank takes to refill in the air under gravity g (m/s^2).
-export const airRecharge = (g, T = EXPLORER) => T.rechargeAirSeconds * Math.max(1, 9 / Math.max(0.5, g || 9));
 
 const _airCmd = {};          // scratch for the air at the walker (the command to PHYSICS' body)
 // What feels that air (PHYSICS P18, physics.md "For PILOT"): the body itself, half a metre across, at
@@ -233,7 +229,6 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
   // ---- fuel ------------------------------------------------------------------------------
   if (!jetting) {
     if (grounded || st.swimming) st.fuel = Math.min(1, st.fuel + dt / T.rechargeGroundSeconds);
-    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / airRecharge(env.gravity, T));
   }
 
   // ---- facing ----------------------------------------------------------------------------
@@ -338,7 +333,6 @@ function stepExplorerBodied(st, input, dt, env, T) {
   if (B.impact > 0.5 && st.grounded && !wasGrounded) st.landedHard = B.impact;
   if (!st.jetting) {
     if (st.grounded || st.swimming) st.fuel = Math.min(1, st.fuel + dt / T.rechargeGroundSeconds);
-    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / airRecharge(env.gravity, T));
   }
 
   let fwd = tangent(st.fwd, up2, f);

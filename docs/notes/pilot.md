@@ -45,12 +45,23 @@ The verifier's probes are read from `/home/user/.pc-scratch/verify/pilot/probes/
    same, smaller. With no place a metre clear of every crown there is no lens position that shows no leaves; what is
    left is PAINTER's dissolve within 3.6 m.
 
+2. **PHYSICS 8, the jetpack refills in mid-air; Pluto stayed up for ever** (verifier's regression 5).
+   `explorer.js`: the tank refills on the ground or afloat only (`rechargeAirDelay`, `rechargeAirSeconds` and
+   `airRecharge` are gone), as PHYSICS' critique offered ("if not, refill only on the ground or in water"). However
+   slowly a falling tank refilled, a light world's coast was long enough to pay for the next burn. README's Space
+   line says so. Test `M4 burn and coast` (explorer.test) rewritten: Jupiter, Earth, Mars, the Moon, Pluto, five
+   strategies each (burn to 0.03 / 0.5 / 0.4 / 0.3 / 0.7, relight under 14 / 8 / 4 m): the tank never rises in the
+   air and the explorer comes down; it fails on `51cdda2` (Jupiter: the tank rose in 114 steps). Proof, the
+   verifier's `jet2.mjs` on the tree (`docs/shots/pilot/m4refix/jet2-burn-and-coast.txt`): Pluto burn to a half,
+   relight under 8 m: down after 36 s (head: never in 1200 s); to 0.4 and 0.3: 39 s and 41 s; to 0.03 under 14 m:
+   47 s; the Moon 26 s and 36 s; Earth 8 s; Mars 14 s. Checks on a clean export of `51cdda2` with these files:
+   world 22, unit 181, physics 324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros.
+
 ### Next, in this order (each prepared in `s17/`, not yet in the tree unless listed above)
 
-2. The landing's chase camera filmed again (`film2.mjs liftoff,landfast` on `t1`, out in `s17/out2`).
-3. PHYSICS 8, Pluto: the tank refills only on the ground or afloat (`s17/next/src/player/explorer.js`,
-   `next/tests/explorer.test.mjs`; README line on Space). Proof: the verifier's `jet2.mjs pluto 1200
-   '[{"lo":0.5,"H":8}]'` and the others.
+3. The landing's chase camera (PHYSICS 4's last part): filmed again on `t1` (`s17/out2/landfast.jpg`, opened):
+   as in the fix round, frames 20 to 22 (1.5 s) a flat crown over the left half of the frame on the way down into
+   the clearing. Not yet changed.
 4. PAINTER 3, the label on the ship with the nose 3 to 8 degrees off (`next/src/ui/layout.js` slides a label that
    must show clear; `next/tests/layout.test.mjs` fails on the old layout with the verifier's box 261-379, 205-244).
 5. The swimmer's turn about (`s17/swimturn-patch.py`, then `swimturn.mjs`), the easel's walk over cliffs

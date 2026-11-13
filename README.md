@@ -46,7 +46,7 @@ On foot
 | W A S D | walk |
 | Shift | run |
 | C | stroll: a true walk (1.7 m/s) in place of the usual easy lope (4.2 m/s); C again for the pace. A gamepad stick tilted a little strolls too |
-| Space | jump; hold to fire the jetpack (it refills on the ground and in water, and slowly while falling: you cannot hover for ever, on any world). Afloat, Space does not hop: held, the jetpack lifts you out. From a stand the legs fold for an eighth of a second first; from a run, half that |
+| Space | jump; hold to fire the jetpack (it refills on the ground and in water, never in the air: what a tank lifts you, you come down from). Afloat, Space does not hop: held, the jetpack lifts you out. From a stand the legs fold for an eighth of a second first; from a run, half that |
 | mouse | look (click the picture to capture the pointer; or hold the left button and drag) |
 | mouse wheel | camera closer / farther (a touchpad swipe moves it a little at a time) |
 | V | first person / third person |

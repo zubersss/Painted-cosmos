@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample, airRecharge } from '../src/player/explorer.js';
+import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../src/player/explorer.js';
 import { createFootCamera, lookFootCamera, updateFootCamera, CAMERA } from '../src/player/camera.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { makeWorld, arc, V, norm, dot, sub, scale, len } from './helpers.mjs';
@@ -455,29 +455,37 @@ test('M4 afloat: Space does not hop a swimmer; held, the jetpack lifts them out;
 });
 
 // ---- M4: the jetpack on a light world (PHYSICS' critique of PILOT, item 8) -----------------------
-test('M4 burn and coast: the tank does not refill in the air faster than hovering empties it, on any world', () => {
-  // A player who wants to stay up: burns the tank to climb, coasts over the top and down while it
-  // refills, and burns again when the ground is near.
-  const aloft = (gravity, seconds = 400) => {
+test('M4 burn and coast: the tank refills only on the ground or afloat, so no burn-and-coast keeps the explorer up, on any world', () => {
+  // A player who wants to stay up: burns the tank down to `lo` to climb, coasts over the top and down,
+  // and burns again when falling under `H` m. (The re-fix pass: with a slow refill in the air Pluto
+  // stayed up for ever burning to a half and relighting under 8 m: 42 relights in 1200 s.)
+  const aloft = (gravity, lo, H, seconds = 600) => {
     const env = { sample: makeWorld({ R }), gravity };
     const st = createExplorerState(scale(start, R), fwd0);
     stepExplorer(st, { jump: true, jet: true, viewFwd: fwd0 }, DT, env);
-    let t = 0, landed = null, low = 1, burn = true;
+    let t = 0, landed = null, rose = 0, burn = true, last = st.fuel;
     for (; t < seconds; t += DT) {
-      if (burn && st.fuel < 0.03) burn = false;
-      else if (!burn && dot(st.v, norm(st.p)) < 0 && st.altitude < 14) burn = true;
+      if (burn && st.fuel < lo) burn = false;
+      else if (!burn && dot(st.v, norm(st.p)) < 0 && st.altitude < H) burn = true;
       stepExplorer(st, { jet: burn, viewFwd: fwd0 }, DT, env);
-      low = Math.min(low, st.fuel);
+      if (!st.grounded && !st.swimming && st.fuel > last + 1e-12) rose++;
+      last = st.fuel;
       if (t > 3 && st.grounded) { landed = t; break; }
     }
-    return { landed, low };
+    return { landed, rose };
   };
-  for (const [name, g] of [['Earth', 9], ['Mars', 4.6], ['the Moon', 2.2], ['Pluto', 1.4]]) {
-    const r = aloft(g);
-    assert.ok(r.landed != null, `${name}: the tank runs out and the explorer comes down (after ${r.landed == null ? 'never' : r.landed.toFixed(0) + ' s'}; lowest tank ${r.low.toFixed(2)})`);
-    assert.ok(r.landed > 6, `${name}: a good flight all the same: ${r.landed.toFixed(0)} s`);
+  for (const [name, g] of [['Jupiter', 11.5], ['Earth', 9], ['Mars', 4.6], ['the Moon', 2.2], ['Pluto', 1.4]]) {
+    for (const [lo, H] of [[0.03, 14], [0.5, 8], [0.4, 8], [0.3, 8], [0.7, 4]]) {
+      const r = aloft(g, lo, H);
+      assert.equal(r.rose, 0, `${name}, burn to ${lo}, relight under ${H} m: the tank never rises in the air`);
+      assert.ok(r.landed != null, `${name}, burn to ${lo}, relight under ${H} m: the explorer comes down (${r.landed == null ? 'never' : 'after ' + r.landed.toFixed(0) + ' s'})`);
+    }
+    assert.ok(aloft(g, 0.03, 14).landed > 4, `${name}: a good flight all the same`);
   }
-  // and on Earth nothing changed: a tank is 10 s in the air
-  assert.equal(airRecharge(9), EXPLORER.rechargeAirSeconds);
-  assert.ok(airRecharge(11.5) === EXPLORER.rechargeAirSeconds && airRecharge(2.2) > 4 * EXPLORER.rechargeAirSeconds);
+  // on the ground it refills in rechargeGroundSeconds, as before
+  const env = { sample: makeWorld({ R }), gravity: 9 };
+  const st = createExplorerState(scale(start, R), fwd0);
+  st.fuel = 0;
+  for (let t = 0; t < EXPLORER.rechargeGroundSeconds + 0.1; t += DT) stepExplorer(st, { viewFwd: fwd0 }, DT, env);
+  assert.equal(st.fuel, 1);
 });
