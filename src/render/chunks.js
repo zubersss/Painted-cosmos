@@ -5,9 +5,9 @@
 //               (how much this surface bleeds wet-in-wet in the post passes)
 //   location 1: xy = view-space normal, z = log2(1 + view depth in metres), w = region id
 //               (integer part = class: 0 sky, 1 ground, 2 water, 3 solid prop, 4 foliage,
-//                5 character / ship / foreign, 6 small crisp marks the brush leaves as drawn, 7 a light of
-//                its own (a flame, a lamp, a lit cabin: the night's key and the last glaze leave it as
-//                painted, post.js); fraction = a per-object hash)
+//                5 character / ship / foreign, 6 small crisp marks the brush leaves as drawn, 7 what
+//                flies in the air (kitmat.js), 8 a light of its own (a flame, a lamp, a lit cabin: the
+//                night's key and the last glaze leave it as painted, post.js); fraction = a per-object hash)
 
 // Depth. Where the browser has EXT_clip_control three keeps a reversed float depth and none of this is
 // compiled. Where it has not (Firefox, docs/lead/HARDENING.md A1), three falls back to a logarithmic depth

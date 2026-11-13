@@ -1196,7 +1196,7 @@ void main() {
   c = mix(c, cabin, lampN * (0.80 + 0.20 * n1.r));
   float f = pcFogAmount(length(vView));
   c = pcAtmosV(c, f, vView);
-  pcWrite(c, max(vMat.y, f * 0.8), nV, -vView.z, max(glowK, lampN) > 0.5 ? 7.0 : uFig.w);
+  pcWrite(c, max(vMat.y, f * 0.8), nV, -vView.z, max(glowK, lampN) > 0.5 ? 8.0 : uFig.w);
 }
 `;
 

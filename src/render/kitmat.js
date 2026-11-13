@@ -49,10 +49,14 @@ const SHAPES = {
   // rain: a broad stroke, full at the head and thinning to its tail, laid wet
   // (nothing right in front of the lens: a drop a metre away would be a stick across the sheet)
   // (a glaze: see GLAZE below; `ga` is how much of the stroke's wash is laid over what is behind it)
+  // (PAINTER 16, the M4 critiques: the heaviest rain could not be seen against the land: a stroke in one middle wash is lost
+  // on every middle value. A stroke of rain is a mark LIFTED out of a dark passage with a damp brush, pale against the wood
+  // and the wet meadow, and the sky's wet wash drawn down, darker, against a light sky: it reads what lies behind it
+  // (the scene's colour before the brush) and is laid a step lighter or a step darker; over a middle value it is fainter)
   // (PAINTER 13: each stroke its own length, tapering to its tail and broken where the brush skipped: in Neptune's gale every
   // stroke lay level, one length, one weight, and the storm sky carried rows of ruled dashes. `rh` is the drop's own number:
   // the world draws rain with vary 0.35, so vPcData.x is 0.65..1 and stays with the drop)
-  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; float rh = clamp((1.0 - vPcData.x) / 0.35, 0.0, 1.0); float rl = 0.38 + 0.62 * fract(rh * 7.31 + 0.13); if (tpr > 1.0 || vPcUv.y > rl || length(vView) < 3.2) discard; float yy = vPcUv.y / rl; float brk = smoothstep(0.28, 0.60, texture(uNoise3D, vec3(yy * 1.7 + rh * 13.0, rh * 5.3 + 0.21, 0.37)).r); vec3 c = ink * (0.95 + 0.05 * rh); float w = 0.95; float ga = (1.0 - smoothstep(0.25, 1.0, tpr)) * (1.0 - smoothstep(0.30, 1.0, yy)) * smoothstep(0.0, 0.12, yy) * mix(0.35, 1.0, brk) * 0.70;',
+  rain: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; float rh = clamp((1.0 - vPcData.x) / 0.35, 0.0, 1.0); float rl = 0.38 + 0.62 * fract(rh * 7.31 + 0.13); if (tpr > 1.0 || vPcUv.y > rl || length(vView) < 3.2) discard; float yy = vPcUv.y / rl; float brk = smoothstep(0.28, 0.60, texture(uNoise3D, vec3(yy * 1.7 + rh * 13.0, rh * 5.3 + 0.21, 0.37)).r); vec3 bg = texture(uSceneCol, gl_FragCoord.xy / uSceneRes).rgb; float bl = dot(bg, vec3(0.3, 0.5, 0.2)); vec3 c = mix(mix(bg, vec3(0.94, 0.955, 0.97), 0.60), bg * ink * (0.95 + 0.05 * rh), smoothstep(0.50, 0.74, bl)); float w = 0.95; float ga = (1.0 - smoothstep(0.25, 1.0, tpr)) * (1.0 - smoothstep(0.30, 1.0, yy)) * smoothstep(0.0, 0.12, yy) * mix(0.35, 1.0, brk) * 0.70 * (1.0 - 0.45 * smoothstep(0.42, 0.56, bl) * (1.0 - smoothstep(0.62, 0.76, bl)));',
   streak: 'float tpr = abs(vPcUv.x - 0.5) * 2.0; if (tpr > 1.0 - 0.8 * vPcUv.y) discard; vec3 c = ink * vPcData.x; float w = 0.55;',
   dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = ink * vPcData.x; float w = 0.35;',
   // a flake: a speck of bare paper with a ragged edge (drawn out along its motion by the kit)
@@ -140,7 +144,7 @@ export function makeKitMaterial(kind, info, opts) {
   const glaze = !!GLAZE[kind] || kind === 'ring' || info.shape === 'ring';      // (a splash ring is a glaze too)
   const m = new THREE.ShaderMaterial({
     name: 'pc-kit-' + kind,
-    uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, uAirless: G.uAirless, ...info.uniforms }),
+    uniforms: makePaintUniforms(opts.bodyUniforms || undefined, { uColor: { value: KIT_INK[kind] || KIT_INK.dust }, uPcInk: { value: KIT_PALETTE }, uSceneAux: G.uSceneAux, uSceneRes: G.uSceneRes, uSceneCol: G.uSceneCol, uAirless: G.uAirless, ...info.uniforms }),
     vertexShader: `${VERT_PARS}
 ${info.vertexChunk}
 varying vec3 vView;
@@ -155,6 +159,7 @@ ${opts.shapeGlsl || ''}
 uniform vec3 uColor;
 uniform vec3 uPcInk[16];
 uniform highp sampler2D uSceneAux;
+uniform sampler2D uSceneCol;
 uniform vec2 uSceneRes;
 uniform float uAirless;
 varying vec2 vPcUv; varying vec4 vPcData; varying vec3 vView; varying float vPcMat;
@@ -163,7 +168,7 @@ void main() {
   // the ink: that of the ground the thing came from, where it came from the ground
   vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${shapeOf(kind, info)}
-  c = pcAtmosV(pcTone(c, 2.0), pcFogAmount(length(vView)), vView);
+  ${kind === 'rain' ? '' : 'c = pcAtmosV(pcTone(c, 2.0), pcFogAmount(length(vView)), vView);'}
   ${info.veil && (kind === 'dust' || kind === 'ash' || kind === 'sand') ? 'c = mix(c, vec3(0.985, 0.975, 0.955), lift);' : ''}
   ${glaze ? 'if (log2(1.0 + max(-vView.z, 0.0)) > pcAuxDec(texture(uSceneAux, gl_FragCoord.xy / uSceneRes)).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,

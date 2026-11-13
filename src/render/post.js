@@ -91,8 +91,8 @@ void main() {
   float keep = (1.0 - far) * (cls == 3.0 || cls == 5.0 ? 0.72 : 0.30);
   // region 6: small crisp marks (splash rings) the brush leaves as they were drawn
   if (cls == 6.0) keep = 0.92;
-  // region 7: a light of its own (a lamp, a flame, a lit cabin): its small warm shape is kept too
-  if (cls == 7.0) keep = 0.85;
+  // region 8: a light of its own (a lamp, a flame, a lit cabin): its small warm shape is kept too
+  if (cls == 8.0) keep = 0.85;
   keep = mix(1.0, keep, uAbstraction);
   vec3 col = mix(kuw, c0.rgb, keep);
   // wet-in-wet: wet areas take up the (wetness-weighted) colour around them, feathered
@@ -138,10 +138,10 @@ void main() {
   vec4 c = texture(tAbs, uv);
   vec3 col = c.rgb;
   float wet = c.a;
-  // (what lies here: the region, and whether it is a light of its own: a lamp, a flame, a lit cabin, region 7; such a
+  // (what lies here: the region, and whether it is a light of its own: a lamp, a flame, a lit cabin, region 8; such a
   // light is left as it was painted by the night's key and the last glaze: the one warm thing in the indigo)
   vec4 auxU = pcAuxDec(texture(tAux, uv));
-  float lamp = step(6.95, auxU.w);      // (region 6's marks carry a hash up to 6.9)
+  float lamp = step(7.95, auxU.w);      // (region 7 is what flies in the air: flakes, hail; its hash goes up to 7.9)
   // A picture being laid (an arrival): the washes come up out of the bare paper as one, the sky and the
   // far end a little before the ground at the feet, in broad soft tides that follow the paper: never
   // a piece at a time, never a stipple.
