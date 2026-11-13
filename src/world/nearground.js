@@ -98,15 +98,26 @@ class Ring {
     this.map = new Map();            // cell key -> the slots of its clump (null: nothing there)
     this.free = []; for (let i = N - 1; i >= 0; i--) this.free.push(i);
     this.high = 0; this.lo = N; this.hi = -1; this.all = true;
+    // (what the GPU holds, PAINTER 19: three takes an attribute's update ranges only in a frame that draws the mesh,
+    // and the ranges were laid down afresh in every update. A frame built and not drawn (a held clock stepped on, a
+    // leap, a frame put aside to be painted later) lost what it had changed, a full upload after a teleport among
+    // it, and the GPU kept the strokes of the place before, written against the old origin on the old ground's
+    // plane: whole sheets of them stood leaning into the sky (Earth's alpine meadow, reached from the forest). What
+    // has changed is now kept, and sent again with whatever changes next, until the GPU has taken it: `sent`)
+    this.sent = false;
+    this.aExt.onUpload(() => { this.sent = true; });       // (the last of the five: all are taken in one go)
     this.pending = []; this.li = 1e9; this.lj = 1e9; this.lf = -1; this.now = 0; this.filled = false; this.range = 0; this.lastGrown = -10; this.okAt = -10;
     this.s = makeSample(S.nB); this.d = [0, 0, 0]; this.fo = { face: 0, u: 0, v: 0 };
   }
+  // the GPU has taken what was sent: what changes from here is a fresh account
+  taken() { if (this.sent) { this.sent = false; this.all = false; this.lo = this.N; this.hi = -1; } }
 
   // (still busy while clumps laid inside the range are growing in: a frame taken at 0 shows a whole sward)
   get busy() { return this.mesh.visible ? this.pending.length + (this.now - this.lastGrown < GROW_T + 0.1 ? 1 : 0) : 0; }
   get triangles() { return this.mesh.visible ? this.high * 3 : 0; }
 
   clear() {
+    this.taken();
     this.map.clear(); this.free.length = 0; for (let i = this.N - 1; i >= 0; i--) this.free.push(i);
     this.pending.length = 0; this.lf = -1; this.filled = false; this.high = 0;
     this.lo = this.N; this.hi = -1;
@@ -116,6 +127,7 @@ class Ring {
 
   update(camLocal, alt, sliceMs, dt, pixel, ready) {
     const cfg = this.cfg, RANGE = cfg.range[QUALITY.level] || 0;
+    this.taken();
     if (!(RANGE > 0) || alt > cfg.alt) { this.hide(); return 0; }
     if (RANGE !== this.range) { this.range = RANGE; if (this.mesh.visible) this.clear(); }
     this.mesh.visible = true;
@@ -201,7 +213,7 @@ class Ring {
         if (!this.all) a.addUpdateRange(this.lo * a.itemSize, (this.hi - this.lo + 1) * a.itemSize);
         a.needsUpdate = true;
       }
-      this.all = false; this.lo = this.N; this.hi = -1;
+      // (all, lo and hi stand until the GPU has taken them: taken(), at the next update after a frame that drew this)
     }
     return spent;
   }

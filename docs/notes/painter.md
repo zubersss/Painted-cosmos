@@ -4,7 +4,47 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of the M4 RE-FIX pass (eighteenth PAINTER agent; READ THIS FIRST)
+## Hand-over of the M4 PRE-SHIP round (nineteenth PAINTER agent; READ THIS FIRST; kept current after every item)
+
+The last fix round before ship (the coordinator's ruling of 15:40 UTC, 2026-11-13: workflow m4-preship). The list, in
+order: (1) the column of leaf dabs in the alpine meadow's sky; (2) stair-stepped figure and ship at tier 0 and half
+scale (the blind player's UGLY 8); (3) flat frames: Uranus' Pearl Fog Flats, Mars at night, Venus' haze (UGLY 9);
+(4) if time: the climb to space (MINOR 10), the Uranus view sketch's dark wash (MINOR 12: PILOT's numbers).
+Began 15:38 UTC on head `e39a197`. Scratch and harness: `/home/user/.pc-scratch/painter/preship/` (`mk.sh <dir>`: a
+clean export of the head with PAINTER's working-tree paths over it; `live3.mjs <tree> <out> <quality> <WxH>` with
+`send.sh <out> <name> < cmd.js` and the command files in `cmds/`; `checks.sh <tree> <out>`: world, unit, physics,
+coast.mjs, ghostfield.mjs, wallrun.mjs one after another; `sheet.py` for labelled sheets; trees `h0` (the head
+`e39a197`), `t1` (item 1), `t2` (item 2)). Evidence: `docs/shots/painter/preship/` (every picture named here opened).
+
+- **ITEM 1, THE COLUMN OF LEAF DABS IN THE SKY: DONE.** Cause (found by hiding each kind of object from a frame hook
+  in the live page at quality 2: the land, the flora, PHYSICS' kits each left it standing; the near ground's three
+  rings took it away, the fine ring the cascade at the upper left, the mid and far rings the column): the strokes
+  were the FOREST's. `world/nearground.js` laid each frame's update ranges down afresh (`clearUpdateRanges` then
+  `addUpdateRange` in every `update`), but three takes an attribute's ranges only in a frame that draws the mesh, so
+  a frame built and not drawn lost what it had changed. After a leap (forest -> meadow) the ring clears and asks for a
+  whole upload, then lays the new sward a few clumps a frame; when the frames in between are not drawn (every
+  instrument's held clock stepped with the painting put aside: the PHYSICS verifier's sessions, my live harness, the
+  play-test drivers), only the last frame's range reached the GPU, which kept the forest's strokes written against
+  the old origin on the old ground's plane: tilted sheets of them stood up into the sky. With the land hidden the
+  sheets show whole (frame below). Fix: what has changed since the GPU last took the arrays is kept (`all`, `lo`,
+  `hi`) and sent again with whatever changes next, until three's `onUpload` says the GPU has it (`Ring.sent`,
+  `Ring.taken()`). In the game's own loop every `world.update` is followed by a drawn frame, so whether a player could
+  ever see it I cannot say (I found no path in play that builds a frame without drawing it); every instrument could.
+  New test `src/world/nearground.test.mjs` (a stand-in for three's WebGLAttributes with its rules; forest -> alpine
+  meadow, frames drawn every one, one in seven, none, at quality 2 and 0; every stroke the GPU would draw must stand on
+  the meadow): on the head it FAILS at both qualities (quality 2, one frame in seven drawn: fine 305, mid 2401, far
+  2909 strokes off the ground or out of their ring, worst 89 m; quality 0: fine 1259, worst 14 m); passes now. World
+  tests 22 -> 24. Proof in the game: `preship/01-leaf-column-before-after.jpg` (opened): top, quality 2 at 960x540 on
+  the head (the column and the cascade), the same page with the land hidden (the forest's sheets on a tilted plane),
+  the same page after forcing a whole upload (gone, and the meadow's own tufts and flowers appear: they had been
+  missing); bottom, the PHYSICS verifier's own scripts (`sessionD.mjs` quality 2, `sessionC.mjs` quality 0, 960x540) on
+  the fix: no leaf in the sky (the sessions' logs: no console error, no game error, fallback empty), and sessionC on the
+  head at quality 0 with the dabs at the upper left. (The verifier's head was `e380647`, before PILOT's +1530 s on the
+  weather clock: the fix's frames are in a lighter snow at the same clock; the column never depended on the weather.)
+  Checks on a clean export of `1294633` with these two files (`t1`): world 24, unit 184, physics 325, `coast.mjs` PASS
+  at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs` Earth sea_coast
+  0.2 / 0.2 / 0.2 m on ground over 50 degrees (as before); the game at quality 2 and 0 (the two sessions): no console
+  error, fallback empty.
 
 An independent verifier checked the fix round below and did not accept one item (the figure) and found three
 regressions. This pass fixes exactly those. Began 09:30 UTC, 2026-11-13, on head `a686a98`. Scratch and harness:
