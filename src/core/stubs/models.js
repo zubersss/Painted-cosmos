@@ -48,8 +48,9 @@ export function createExplorer() {
       const mode = state.mode || 'idle';
       const speed = state.speed || 0;
       const jet = state.jet01 || 0;
-      phase += dt * (mode === 'walk' || mode === 'wade' ? 2.2 + speed * 1.5 : 1.2);
-      const swing = mode === 'walk' || mode === 'wade' ? Math.min(0.75, 0.2 + speed * 0.09) : 0;
+      const moving = mode === 'walk' || mode === 'wade' || mode === 'swim';
+      phase += dt * (moving ? 2.2 + speed * 1.5 : 1.2);
+      const swing = moving ? Math.min(0.75, 0.2 + speed * 0.09) : 0;
       const air = mode === 'jet' || mode === 'fall' ? 1 : 0;
       legL.rotation.x = Math.sin(phase) * swing + air * 0.25;
       legR.rotation.x = -Math.sin(phase) * swing - air * 0.1;

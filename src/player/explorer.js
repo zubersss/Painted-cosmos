@@ -69,7 +69,7 @@ export function createExplorerState(p, fwd) {
     sinceJet: 99,                // seconds since the jetpack last burned
     airTime: 0,
     jumpHeld: 0,                 // seconds Space has been held since leaving the ground
-    mode: 'idle',                // 'idle' | 'walk' | 'jet' | 'fall' | 'wade'
+    mode: 'idle',                // 'idle' | 'walk' | 'jet' | 'fall' | 'wade' | 'swim' (afloat)
     liquidDepth: 0,              // metres of liquid above the feet
     swimming: false,
     slope: 0,
@@ -238,7 +238,8 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
 
   // ---- animation mode ----------------------------------------------------------------------
   if (jetting) st.mode = 'jet';
-  else if (st.swimming || (grounded && st.liquidDepth > 0.3)) st.mode = 'wade';
+  else if (st.swimming) st.mode = 'swim';
+  else if (grounded && st.liquidDepth > 0.3) st.mode = 'wade';
   else if (!grounded) st.mode = st.airTime > 0.12 ? 'fall' : st.mode;
   else st.mode = st.speed > 0.4 ? 'walk' : 'idle';
   return st;
@@ -337,7 +338,10 @@ function stepExplorerBodied(st, input, dt, env, T) {
   }
   st.fwd = fwd;
 
+  // Afloat is 'swim' (M4; PHYSICS' flag when it gives one: the feet off the bottom and a third
+  // of the body under); wading is feet on the bed in liquid over the ankles.
   if (st.jetting) st.mode = 'jet';
+  else if (B.swim != null ? B.swim && !st.grounded : st.swimming) st.mode = 'swim';
   else if (st.swimming || (st.grounded && st.liquidDepth > 0.3)) st.mode = 'wade';
   else if (!st.grounded) st.mode = st.airTime > 0.12 ? 'fall' : st.mode;
   else st.mode = st.speed > 0.4 ? 'walk' : 'idle';

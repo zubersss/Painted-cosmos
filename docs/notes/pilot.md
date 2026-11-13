@@ -2,6 +2,53 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## For PAINTER (M4): the figure's state, as `animate(state, dt)` now receives it
+
+Thirteenth PILOT agent (the M4 fixer), 2026-11-13. `src/player/figure.js` `figureArgs` passes PHYSICS' body state
+(`docs/notes/physics.md`, "For PILOT and PAINTER: the figure's state, M4") to `explorerModel.animate(state, dt)` on
+every frame on foot. **Everything is already in the figure's own axes** (forward = the way the figure faces, the
+model's -Z; right = its right hand, +X; up = +Y): no world vectors, no projection on your side. All are plain finite
+numbers, 0 when there is nothing to say. The old fields (mode, speed, jet01, lookPitch, hip, ride, clamber01, grounded,
+stride, footDown, feet, surge, crouch01, gait) are unchanged.
+
+| read | unit | what it is |
+|---|---|---|
+| `state.leanFwd` | rad | the lean into the wind, forward part: + tips the TOP of the body forward (toward -Z). A run in still air: about +0.03. |
+| `state.leanRight` | rad | its sideways part: + tips the top of the body to the figure's right (+X). Neptune's squall: 0.40 to 0.57 rad in all. |
+| `state.lean` | rad | its size, `hypot(leanFwd, leanRight)`. |
+| `state.hunker01` | 0..1 | 0 upright .. 1 down on hands and knees in a gale (deeper than `hip` folds; `ride` already carries the fold). |
+| `state.windFwd`, `state.windRight`, `state.windUp` | m/s | the air's velocity PAST the body (the wind less the body's own motion): cloth streams ALONG it. A run in still air is `windFwd` about -7.4 (the air goes backward past the runner); a wind from the figure's left is `windRight` positive. |
+| `state.windSpeed` | m/s | its length. |
+| `state.windLoad01` | 0..1 | its load on cloth: the square of the speed by the air's density, 1 = flat out (15 m/s in Earth's air; Mars' thin air hardly lifts a scarf at 20 m/s). |
+| `state.gust01` | 0..1 | the gust of the moment (for the flap). 0 without PHYSICS. |
+| `state.windBrace` | N | the suit's thrusters bracing against the wind (0..1700), if you draw them lit. |
+| `state.mode === 'swim'` | | afloat and swimming (new mode; see the handshake below). `'wade'` is now only feet on the bed in liquid over the ankles. |
+| `state.swim` | 0 or 1 | the same as a number: 1 afloat (feet off the bottom, a third of the body under). |
+| `state.stroke` | 0..1 | the phase of the arms' cycle: drive the stroke from it (it never jumps; it keeps turning slowly while treading water). |
+| `state.strokeRate` | 1/s | cycles a second: 0.625 treading water, about 1.1 at the swim's 2 m/s; 0 when not swimming. |
+| `state.swimSpeed` | m/s | the pace made through the liquid. |
+| `state.submerged01` | 0..1 | the share of the body under the liquid (0.69 floating: the waterline is at the chest; the figure's origin, its feet, is 1.25 m under the surface). |
+| `state.arc` | 1, -1, 0 | 1 rising in the air, -1 falling, 0 on the ground or afloat. |
+| `state.vUp` | m/s | vertical speed, + up. |
+| `state.airTime` | s | since the feet left the ground into the air; 0 on the ground and afloat. |
+| `state.altitude` | m | the feet over the solid ground (the last metre before a landing). |
+| `state.wall` | 0, 1, 2 | 1 held at a wall's foot (hands on the rock), 2 riding up one on momentum. |
+| `state.slip01` | 0..1 | sliding back. |
+
+**The one handshake: `swims`.** Until your model has a swimmer, a `'swim'` mode would show as `'idle'` (a statue
+gliding), so `src/core/game.js` hands a model that does not say it swims the `'wade'` it knows (with `state.swim` 1
+beside it, exactly today's picture). When `animate` draws `'swim'`, return `{ object3D, animate, swims: true }` from
+`createExplorer` and the mode arrives as `'swim'`. Nothing else to wire.
+
+PHYSICS' suggestions for the pose (its critique, PAINTER items 1, 2, 5): tip the torso by `leanFwd` about the figure's
+right axis and by `leanRight` about its forward axis; stream the scarf and flare the coat along (`windFwd`,
+`windRight`, `windUp`) by `windLoad01`; crouch with `hunker01` beyond what `hip` gives; in `'swim'` lay the body near
+level, waterline at the shoulders, and drive the arms from `stroke`; pose the air by `arc` (rising: arms in, legs
+trailing; the present fall pose only when `arc` is -1 and `airTime` > 1 or `vUp` < -8).
+
+Tests: `tests/figure.test.mjs`, the four that begin "M4" (the axes, a run's own wind and lean, the arc of a jump,
+swim against wade, no NaN).
+
 ## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
 
 PHYSICS 24 finished block P26 (commits `ee39533`, `a70d668`; hand-over at the top of `docs/notes/physics.md`, and

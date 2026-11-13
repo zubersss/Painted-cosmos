@@ -270,7 +270,7 @@ try {
   check(i.state === 'ON_FOOT', 'stepped out with E');
   await gameWait(0.9);
   i = await info();
-  check(i.explorer.grounded || i.explorer.mode === 'wade', 'standing beside the ship');
+  check(i.explorer.grounded || i.explorer.mode === 'wade' || i.explorer.mode === 'swim', 'standing beside the ship');
   check(i.shipDistance < 9, 'next to the ship: ' + i.shipDistance.toFixed(1) + ' m');
   // Walk away from the ship (straight ahead is away from the hull; a trunk may be in the way,
   // so what counts is that the legs carry the explorer somewhere).

@@ -151,7 +151,12 @@ export class Game {
       // The figure steps with PHYSICS' gait: the hips ride the stride (`ride`, passed as `hip`
       // too), the feet are placed, the legs fold before a jump (src/player/figure.js). The
       // explorer's place and the camera stay on the stride's mean (st.p): the view does not bob.
-      this.explorerModel.animate(figureArgs(sim.ex, sim.footCam.pitch, this._figure), dt);
+      // M4: and PHYSICS' body state in the figure's own axes (the lean into the wind, the gale's
+      // crouch, the air past the cloth, the swimmer's stroke, the arc of a flight, a wall).
+      const fa = figureArgs(sim.ex, sim.footCam.pitch, this._figure, sim.physics && sim.physics.here && sim.physics.here.bodyId ? sim.physics.here.air : null);
+      // A model that has no swimmer yet is handed the wader it knows (with swim: 1 beside it).
+      if (fa.mode === 'swim' && !this.explorerModel.swims) fa.mode = 'wade';
+      this.explorerModel.animate(fa, dt);
     }
 
     // Camera: always at the scene origin; near and far follow the situation.

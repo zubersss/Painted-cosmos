@@ -120,6 +120,99 @@ test('the fold before a jump: an eighth of a second from a stand, half that from
   assert.ok(run.left > EXPLORER.jumpCrouchRun - 0.02 && run.left < EXPLORER.jumpCrouchRun + 0.05, 'from a run after ' + run.left.toFixed(3) + ' s');
 });
 
+// ---- M4: PHYSICS' body state reaches the figure, in the figure's own axes ---------------------
+test('M4 the figure is handed the lean, the wind past it, the gale\'s crouch and a wall, in its own axes', () => {
+  // The body faces -Z on top of the world (+Y up): its right hand is +X.
+  const ex = {
+    mode: 'walk', speed: 4, jet01: 0, grounded: true, swimming: false, altitude: 0, airTime: 0,
+    p: { x: 0, y: 1000, z: 0 }, fwd: { x: 0, y: 0, z: -1 }, v: { x: 0, y: 0, z: -4 },
+    phys: {
+      ride: 0, leanV: { x: 0.1, y: 0, z: -0.3 }, lean: Math.hypot(0.1, 0.3), hunker01: 0.4,
+      relWind: { x: -6, y: 1, z: 20 }, relWindSpeed: Math.hypot(6, 1, 20), windBrace: 800,
+      swim: 0, stroke: 0.25, strokeRate: 0, swimSpeed: 0, submerged01: 0, arc: 0, vUp: 0.2, airTime: 0, wall: 1, slip01: 0.5,
+    },
+  };
+  const a = figureArgs(ex, 0, {}, { density: 1.2, gust01: 0.3 });
+  assert.ok(Math.abs(a.leanFwd - 0.3) < 1e-12, 'the top of the body tips forward ' + a.leanFwd);
+  assert.ok(Math.abs(a.leanRight - 0.1) < 1e-12, 'and to its right ' + a.leanRight);
+  assert.ok(Math.abs(a.lean - Math.hypot(0.1, 0.3)) < 1e-12);
+  assert.equal(a.hunker01, 0.4);
+  assert.ok(Math.abs(a.windFwd + 20) < 1e-12, 'a headwind is air going backward past the body: ' + a.windFwd);
+  assert.ok(Math.abs(a.windRight + 6) < 1e-12 && Math.abs(a.windUp - 1) < 1e-12);
+  assert.ok(Math.abs(a.windSpeed - Math.hypot(6, 1, 20)) < 1e-9);
+  assert.equal(a.windLoad01, 1, 'flat out past 15 m/s in Earth\'s air');
+  assert.equal(a.gust01, 0.3); assert.equal(a.windBrace, 800);
+  assert.equal(a.wall, 1); assert.equal(a.slip01, 0.5); assert.equal(a.vUp, 0.2);
+  // Thin air carries less: the same 21 m/s in Mars' air hardly lifts a scarf.
+  assert.ok(figureArgs(ex, 0, {}, { density: 0.015 }).windLoad01 < 0.05);
+  // Turned a quarter to its left (facing -X, its right hand toward -Z), the same lean is to its right and a little back.
+  const b = figureArgs({ ...ex, fwd: { x: -1, y: 0, z: 0 } }, 0);
+  assert.ok(Math.abs(b.leanFwd + 0.1) < 1e-12 && Math.abs(b.leanRight - 0.3) < 1e-12, `${b.leanFwd} ${b.leanRight}`);
+  // Nothing from PHYSICS, or rubbish: plain zeros, never NaN.
+  const c = figureArgs({ ...ex, phys: { leanV: { x: NaN, y: 0, z: 0 }, relWind: null, hunker01: 7, stroke: NaN } }, 0);
+  for (const k of ['leanFwd', 'leanRight', 'lean', 'windFwd', 'windRight', 'windUp', 'windSpeed', 'windLoad01', 'gust01', 'stroke', 'strokeRate', 'vUp', 'airTime', 'slip01']) assert.ok(Number.isFinite(c[k]), k + ' ' + c[k]);
+  assert.equal(c.hunker01, 1);
+});
+
+test('M4 with PHYSICS: a run leans into its own wind, a jump rises then falls, the air past the body is its own motion', { skip }, () => {
+  const sim = newSim(), pad = new Pad(), a = {};
+  play(sim, pad, 0.6);
+  pad.press('KeyW'); pad.press('ShiftLeft');
+  play(sim, pad, 3);
+  figureArgs(sim.ex, 0, a, sim.physics.here && sim.physics.here.air);
+  // (the stub ground's weather at seed 1 blows about 4 m/s in the runner's face on top of the run's own 7.4)
+  const still = sim.ex.speed;
+  assert.ok(a.windFwd < -still * 0.7 && a.windFwd > -still - 12, 'the air goes past a runner backward: ' + a.windFwd.toFixed(2) + ' m/s at a run of ' + still.toFixed(2));
+  assert.ok(a.leanFwd > 0.005 && a.leanFwd < 0.3, 'and the runner leans forward into it: ' + a.leanFwd.toFixed(3) + ' rad');
+  assert.ok(Math.abs(a.lean - sim.ex.phys.lean) < 1e-6, 'the lean\'s size is PHYSICS\' own: ' + a.lean + ' ' + sim.ex.phys.lean);
+  assert.equal(a.arc, 0); assert.equal(a.swim, 0);
+  pad.releaseAll();
+  play(sim, pad, 1.5);
+  pad.tap('Space');
+  const arcs = [];
+  let top = 0;
+  play(sim, pad, 2.5, { each: () => { figureArgs(sim.ex, 0, a); arcs.push(a.arc); top = Math.max(top, a.airTime); assert.ok(a.arc === 0 || Math.sign(a.vUp) === a.arc || a.vUp === 0, `arc ${a.arc} with vUp ${a.vUp}`); } });
+  const seq = arcs.filter((x, i) => i === 0 || x !== arcs[i - 1]).join(',');
+  assert.match(seq, /^0,1,-1,0$/, 'standing, rising, falling, standing: ' + seq);
+  assert.ok(top > 0.4 && top < 2, 'air time counted: ' + top.toFixed(2) + ' s');
+});
+
+test('M4 afloat the mode is swim and the stroke turns over; in the shallows it is wade', { skip }, () => {
+  const sea = (id, d) => { const s = stubSurface(id, d); return { ...s, liquidRadius: s.radius + 6, isLiquid: true }; };
+  const physics = P.createPhysics({ sampleSurface: sea, seed: 1 });
+  const sim = new Sim({ sampleSurface: sea, getSpawn: (id) => stubSpawn(id).unitDir, physics });
+  const pad = new Pad(), a = {};
+  play(sim, pad, 4);
+  figureArgs(sim.ex, 0, a);
+  assert.equal(sim.ex.mode, 'swim', 'afloat: ' + sim.ex.mode);
+  assert.equal(a.mode, 'swim'); assert.equal(a.swim, 1);
+  assert.ok(a.submerged01 > 0.4, 'most of the body under: ' + a.submerged01.toFixed(2));
+  assert.ok(Math.abs(a.strokeRate - 0.625) < 0.2, 'treading water: ' + a.strokeRate.toFixed(3) + ' cycles a second');
+  assert.equal(a.arc, 0, 'afloat is not a flight');
+  pad.press('KeyW');
+  play(sim, pad, 3);
+  const phases = [];
+  play(sim, pad, 3, { each: () => { figureArgs(sim.ex, 0, a); phases.push(a.stroke); } });
+  assert.ok(a.swimSpeed > 1 && a.strokeRate > 0.7, `swimming ${a.swimSpeed.toFixed(2)} m/s at ${a.strokeRate.toFixed(2)} strokes a second`);
+  let wraps = 0;
+  for (let i = 1; i < phases.length; i++) { assert.ok(phases[i] >= 0 && phases[i] < 1); if (phases[i] < phases[i - 1]) wraps++; }
+  assert.ok(wraps >= 2 && wraps <= 6, 'the stroke turned over ' + wraps + ' times in 3 s');
+  // Knee-deep: wading, feet on the bed.
+  const shallow = (id, d) => { const s = stubSurface(id, d); return { ...s, liquidRadius: s.radius + 0.6, isLiquid: true }; };
+  const sim2 = new Sim({ sampleSurface: shallow, getSpawn: (id) => stubSpawn(id).unitDir, physics: P.createPhysics({ sampleSurface: shallow, seed: 1 }) });
+  play(sim2, pad, 3);
+  assert.equal(sim2.ex.mode, 'wade', 'knee-deep: ' + sim2.ex.mode);
+  assert.equal(figureArgs(sim2.ex, 0).swim, 0);
+});
+
+test('M4 without PHYSICS a swimmer is still a swimmer', () => {
+  const sea = (id, d) => { const s = stubSurface(id, d); return { ...s, liquidRadius: s.radius + 6, isLiquid: true }; };
+  const sim = new Sim({ sampleSurface: sea, getSpawn: (id) => stubSpawn(id).unitDir });
+  play(sim, new Pad(), 3);
+  const a = figureArgs(sim.ex, 0);
+  assert.equal(sim.ex.mode, 'swim'); assert.equal(a.swim, 1); assert.equal(a.arc, 0); assert.equal(a.stroke, 0);
+});
+
 test('the drawn hull takes pitch, roll and yaw from the buffet, clamped', () => {
   const t = hullTrim({ pitch: 0.02, roll: -0.5, yaw: 0.05 });
   assert.equal(t.pitch, 0.02); assert.equal(t.roll, -HULL_TRIM_MAX); assert.equal(t.yaw, 0.05);
