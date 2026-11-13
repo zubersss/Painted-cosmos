@@ -669,6 +669,10 @@ attribute float aBorn;    // per instance: when it came into this mesh (the wash
   uniform float uFarTrunk[8];
   uniform float uFarDrop[8];
 #endif
+#ifdef PC_HOLLOW
+  uniform vec4 uHollow;   // a spire's form in its own units: x girth at the foot, y height, z lean of the top along +Z (of the height)
+  varying float vHollow;  // 0 the eye is clear of this one .. 1 the eye is inside it
+#endif
 uniform vec3 uOrigin;
 uniform vec3 uCamLocal;
 uniform vec4 uLod;        // min distance, max distance, jitter, fade start fraction
@@ -716,6 +720,18 @@ void main() {
   #endif
   vec3 io = im[3].xyz;
   float di = distance(io, uCamLocal);
+  #ifdef PC_HOLLOW
+    // (the last fixes, the second blind player on Neptune: on foot the camera's boom and the landing camera pass into an
+    // ice spire 17 to 27 m tall, and from inside one the eye saw only the few faces turned toward it, hard-edged dark
+    // polygons at the corners of the frame. A spire the eye is in, or at the skin of, parts round it as a crown at the
+    // lens does: the eye in the spire's own frame, against its girth at that height, leaning and tapering as it does)
+    vec3 ce = uCamLocal - io;
+    vec3 el = vec3(dot(im[0].xyz, ce) / dot(im[0].xyz, im[0].xyz), dot(im[1].xyz, ce) / dot(im[1].xyz, im[1].xyz), dot(im[2].xyz, ce) / dot(im[2].xyz, im[2].xyz));
+    float hy = clamp(el.y / uHollow.y, 0.0, 1.0);
+    float gr = uHollow.x * max(1.0 - 0.7 * hy, 0.6);
+    float rr = length(vec2(el.x, el.z - hy * hy * uHollow.y * uHollow.z));
+    vHollow = (1.0 - smoothstep(gr * 0.95, gr * 1.5 + 0.3, rr)) * step(-1.0, el.y) * (1.0 - smoothstep(uHollow.y * 1.2, uHollow.y * 1.45, el.y));
+  #endif
   float j = 1.0 + (inst.z - 0.5) * uLod.z;
   // strokes at the edge of their range shrink away instead of popping
   float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di));
@@ -807,6 +823,9 @@ uniform mat3 normalMatrix;
   uniform vec3 uFarBarkB[8];
   varying float vSpecies;
 #endif
+#ifdef PC_HOLLOW
+  varying float vHollow;
+#endif
 uniform vec4 uFocus;      // the explorer's figure in view space (w 1 while it is shown)
 varying vec3 vBody;
 varying vec3 vObj;
@@ -833,6 +852,11 @@ void main() {
   float near = 1.0 - smoothstep(30.0, 110.0, vd);
   // strokes part when they are right in front of the eye (the explorer can walk through trunks)
   if (vd < 1.6 && texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1 > smoothstep(0.35, 1.6, vd)) discard;
+  #ifdef PC_HOLLOW
+    // a spire the eye is in parts into a few broad ragged washes (not a stipple of chips), none of it left once the eye
+    // is inside its skin (vertex shader)
+    if (vHollow > 0.001 && texture(uNoise3D, vBody / 3.2).g * 0.62 + texture(uNoise3D, vBody / 0.8).b * 0.26 + 0.06 < vHollow) discard;
+  #endif
   // (PHYSICS' and PILOT's critiques, M4: a crown at the lens, in the jetpack's first second under the birches or as the
   // ship sets down in a wood, was one flat green slab over a third of the frame, with a black branch bar across it.
   // A crown within three and a half metres of the eye breaks into separate dabs with the picture between them, fewer
@@ -1029,6 +1053,11 @@ export function makePropMaterial(bodyU, opts = {}) {
     if (opts.bladeRoot) defines.PC_BLADE_ROOT = 1;
     if (opts.branch) defines.PC_PHYS_BRANCH = 1;
     Object.assign(own, PHYS, { uStiff: { value: opts.stiff || 0 }, uPlantHeight: { value: opts.plantHeight || 1 } });
+  }
+  if (opts.hollow) {
+    // a spire parts round an eye inside it (PROP_VERT, PC_HOLLOW): its girth at the foot, height and lean, in its own units
+    defines.PC_HOLLOW = 1;
+    own.uHollow = { value: new THREE.Vector4(opts.hollow[0], opts.hollow[1], opts.hollow[2] || 0, 0) };
   }
   if (opts.far) {
     // far trees of every species share one mesh: per-instance species picks the washes

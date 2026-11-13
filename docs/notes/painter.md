@@ -4,7 +4,58 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of the M4 PRE-SHIP RE-FIX pass (twentieth PAINTER agent; READ THIS FIRST)
+## Hand-over of the LAST FIXES (twenty-first PAINTER agent; READ THIS FIRST; kept current after every item)
+
+The last fix round before ship (workflow m4-last-fixes), from the second blind player's play (on `45629a7`, README only,
+960x540, quality 0 at render scale 0.5; its log and frames `/home/user/.pc-scratch/verify/player2/`). The list, in order,
+each only if small and safe: (1) Neptune's hard-edged dark-blue polygons at the frame corners; (2) Saturn's dark spires that
+seem to hang above the horizon (`163_sat_look.jpg`); (3) the hard-edged faceted slab in first person at Mars' canyon walls;
+(4) if time: Uranus' plain, Venus' cream haze at 439 m. Began 22:20 UTC, 2026-11-13, on head `e56a93f`.
+Scratch: `/home/user/.pc-scratch/painter/last/` (`live3.mjs`, `lib.mjs`, `send.sh`, `mk.sh`, `checks.sh`, `sheet.py` copied
+from the pre-ship round's harness; command files in `cmds/`; `views.sh` the Neptune spire views, `sat.sh` the far-form views;
+trees `F` the head, `G` the head with my working files, `C1` the check tree; live logs and frames in `L1`..`L8`; `L1` was a
+long session whose state drifted, its frames are not used as evidence: every before/after pair is two fresh pages run
+through the same command sequence). Evidence: `docs/shots/painter/last/` (every picture named here was opened by me).
+
+**State:** item 1 DONE (committed, see below). Items 2 to 4 not started at the time of writing.
+
+- **ITEM 1, NEPTUNE'S HARD-EDGED DARK-BLUE POLYGONS AT THE FRAME CORNERS: DONE.** What they were (found in the live page,
+  quality 0 at half scale, 960x540, the Wind-Carved Ice Spires): the EYE INSIDE AN ICE SPIRE. Neptune's ice spires are 17
+  to 27 m tall (kit `spire`, slim, scale 2.1); on foot PILOT's camera boom passes into one (the crown rule that keeps the
+  lens out of crowns works only in the air, and a spire has no crown, `src/player/camera.js` CROWN_KITS), and so does the
+  landing camera; a probe of the frame with the triangle put the camera 0.91 m from the spire's axis at 1.26 m up, well
+  inside its 2 to 3 m girth. From inside, with back faces culled, the eye sees only the few faces turned toward it: a
+  ruled triangle at a corner (the player's `174_nep_low.jpg`), a slab with a straight edge (`179_nep_turn2.jpg`); at the
+  top tier, with the finely cut near form, a huge ragged cobalt shape over half the frame. Hiding the tall spires took
+  the triangle away. Not the far forms (they start about 45 m out at quality 0) and not a missing watercolour pass.
+  Fix (`render/materials.js` PROP_VERT/PROP_FRAG, define `PC_HOLLOW`, uniform `uHollow`; `world/flora.js` gives it only to
+  spire materials: slim [girth 1.3, height 10.5, lean 0.3], stout [2.0, 12, 0], in the kit's own units): the vertex shader
+  finds the eye in the spire's own frame (the instance matrix's columns carry its girth and height), measures it against
+  the spire's girth at that height (tapering, the slim one leaning as florakit.js leans it) and gives every vertex of that
+  spire one number, 0 clear of it, 1 inside; the fragment shader parts the spire into a few broad ragged washes (noise at
+  3.2 m and 0.8 m, anchored to the body) and leaves nothing once the eye is inside its skin. Every other material's shader
+  is unchanged (no define). Tried and not kept: a narrower reach (`gr*0.95 .. gr*1.3+0.15`: with the eye at a spire's skin a
+  large slab with a ragged edge was left), noise at 1.4 m (a stipple of chips at the top tier).
+  Proof: before/after, the same five places on two fresh pages each (quality 0 at half scale and quality 2 at full),
+  `docs/shots/painter/last/01-neptune-spires-eye-inside-before-after.jpg` (opened): V1 (the camera inside a spire) the
+  triangle at the top left gone, and at the top tier the half-frame of cobalt gone; V3 (the camera at a spire's skin) the
+  ruled slab over the left third gone; V2 (first person 6 m from a spire), V4 (the ship hovering 7 m up beside one), V5
+  (an open view) unchanged. Saturn, Mars and Jupiter's spawns at quality 2 with the change: drawn, no console error.
+  New test `src/world/hollow.test.mjs` (3 cases: the shader's formula read as text and mirrored; only spire materials on
+  every world carry it, nine spire species; the numbers fit the kit's own geometry over fifteen seeds, both forms and both
+  kinds: an eye on a spire's centre line parts it (5th percentile over 0.9), halfway to its skin as good as gone (median
+  over 0.99, 5th percentile over 0.6), a step clear of it whole (95th percentile under 0.2)): FAILS on the head (2 of 3),
+  passes now. World tests 25 -> 28.
+  Checks on a clean export of `3066381` with these files (`C1`): world 28, unit 208, physics 325, `coast.mjs` PASS at both
+  stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs` Earth sea_coast 0.2 m at most on
+  ground over 50 degrees; the game at quality 0 and 2 (five fresh pages): no console error, no game error, fallback empty.
+  Not verified: the player's own place (its position was not logged; reproduced at the ice spires' stand instead); the
+  descent (`174`'s situation) only as a ship hovering 7 m up beside a spire, with the camera outside it.
+  Left as it is and for PILOT, not needed for the fix: the boom still passes into spires (and into the buttress and fallen
+  blocks at a spire's foot, which the hollow does not reach: they stay solid); an eye inside one of those sees the same
+  kind of faces, but they are small (under 1.6 m).
+
+## Hand-over of the M4 PRE-SHIP RE-FIX pass (twentieth PAINTER agent)
 
 The verifier of the pre-ship round accepted items 1 to 3 (NOT ACCEPTED: none) and found two minor regressions with one
 cause, and a note. This pass fixes exactly that and nothing else. Began 18:48 UTC, 2026-11-13, on head `22120b9`.
