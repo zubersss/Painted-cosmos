@@ -1,0 +1,10 @@
+22:38:19   ok: every module the run asked for is the real one: {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"}
+22:39:54   FAIL: the first page: [] 40.0 s of game time after the look; the ship 16.0 m off, in the middle of the view: true
+22:40:07   ok: at the ship: Board ship
+22:40:26   FAIL: Space held 1.5 s from inside the walk in (state when released: BOARDING): lifted off 11.2 s of game time after the boarding began (state LANDED)
+22:40:26   ok: fallback empty: []
+22:40:41   ok: no console errors, page errors, failed or external requests
+22:40:41 FAILED (2) {}
+  - the first page: [] 40.0 s of game time after the look; the ship 16.0 m off, in the middle of the view: true
+  - Space held 1.5 s from inside the walk in (state when released: BOARDING): lifted off 11.2 s of game time after the boarding began (state LANDED)
+exit 1

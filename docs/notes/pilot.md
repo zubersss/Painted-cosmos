@@ -2,6 +2,76 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, LAST FIX ROUND (twentieth PILOT agent; started about 22:25 UTC 2026-11-13; kept current after every item)
+
+Read this first; the nineteenth's hand-over just below holds for everything not named here. The task: the m3
+regression first (tests/all.mjs failed on `45629a7`, steps m3 and painted-m3), then the second blind player's small
+items (1) to (5) if small and safe, then `node tests/all.mjs` in a clean tree. Scratch:
+`/home/user/.pc-scratch/pilot/last/`. First commit's parent: `45629a7`.
+
+### Item 0, the first page never came (m3, painted-m3): DONE
+
+Cause: at the game's start the explorer stands 16 m from the parked ship with the hull in the middle of the first
+view (hull over 4.2 % of the middle of the frame; `sim.shipInPicture()` true). `5ba725f` made a page wait for the
+hull within 40 m (`EXIT.near`, was 14: so 16 m now counted) for up to `SKETCH_SLIP.shipWait` 45 s (was 30); a wanted
+page lives only 40 s past its time (`updateSketches`: `t > w.due + 40` drops it and it is wanted afresh), so "45 s at
+most" never ended: standing at the start, the first page never came. (The `levelView` on a thrown lock is not in it:
+m3check runs with `pointerlock=0`.) Fix: `game.js captureSketch` paints the kept frame without the parked ship as
+well as without the figure (their shade goes with them: the world lays shade only for what is visible), and the wait
+for the hull is gone (`SKETCH_SLIP.shipWait` removed). README: "without you or the ship in it".
+Test: `tests/sketchpage.test.mjs` (new, 2 tests, both fail on `45629a7`).
+Proof (`docs/shots/pilot/last/`): `tests/m3check.mjs` (stubs) on a clean export of HEAD with these files PASSED (the
+first page "b:earth:stub-lowland" about 5 s after the click; `m3-stub-after.log`; on `45629a7` it FAILED,
+`m3-stub-before-45629a7.log`, the coordinator's); the painted variant (`--query fresh=1 --w 400 --h 225`) PASSED (the
+first page "b:earth:temperate_forest" 15 s of real time after the click; `m3-painted-after.log`). In the real game at
+quality 0, half scale, 960 x 540 (`scripts/firstpage.mjs`): on HEAD no page in 40 s of game time; with the fix the page
+3.7 s of game time after the first look, the ship 16 m off in the middle of the view (`real-game-*-log.txt`); the screen
+and the page side by side, opened: `first-page-without-the-ship.jpg` (the clearing and its birches, no hull, no
+figure, no shade where the ship stood).
+
+### Items (1), (2), (3), (5): DONE
+
+(1) The first Space hold after boarding ignored. Cause: Space lifts off only on its press, in LANDED; at a few frames a
+second the walk into the ship (1.5 to 3 s of game time, game time at most 0.25 s a frame) takes several seconds of
+real time, and a press inside it was dropped. `sim.js`: Space pressed during the walk in (`transition.dir === 'in'`)
+is kept (`_liftQueued`) and the ship lifts off as soon as the explorer is seated; Space held from the jetpack since
+before E still does not lift off. Test: `tests/loop.test.mjs` new case (fails on `45629a7`: "hold: the ship lifts
+off once the explorer is seated (state LANDED)"). In the real game (the same probe, quality 0, 960 x 540): Space held 1.5 s and let go
+inside the walk in: on HEAD still LANDED 11.2 s of game time later; with the fix lifted off 3.0 s after the boarding began.
+(2) Other worlds' labels under the edge of space. Cause: in the air the world nearest the nose became the target and
+its label showed (Uranus over Venus, Jupiter over Mars). `game.js updateMarks`: under the edge of space (ATMOSPHERE,
+LANDING) a world is marked only if it is the course chosen on the map (`sim.targetLocked`); above the air as before.
+(5) "a place to land": the arrow down meant behind. `game.js edgeAngle`: a flight edge arrow (the place to land and the
+course's world) for a point behind the view points to the side it lies on (a little low, as on foot), and near dead
+behind (within about 14 degrees) keeps the side it had (the label jumped sides as the nose swung); in front of the
+view as before (down for a place ahead and below). Test for (2) and (5): `tests/flightmarks.test.mjs` (new, 3 tests,
+all fail on `45629a7`).
+(3) README: "a place to land" is "where a newcomer to that world stands, the landscape it opens with"; the views to find
+are scattered, some near, some kilometres off, and stepping out a line says how far (measured in Node from each
+world's spawn to its nearest view: Moon 0, Pluto 0.08, Neptune 0.19, Mars 0.27, Mercury 0.28, Uranus 0.45, Venus 2.0,
+Earth 2.3, Jupiter 3.8, Saturn 5.5 km: `/home/user/.pc-scratch/pilot/last/sitevista.mjs`). The game is unchanged.
+
+### Item (4), the third-person camera in Mars' slot canyon: NOT FIXED (not reproduced)
+
+Probe `/home/user/.pc-scratch/pilot/last/probes/canyon.mjs` (the real Mars surface and obstacles in Node): 403 spots in
+Rust Canyons at the foot of a wall rising more than 10 m within 8 m; at five of them (walls rising 15 to 57 m) the
+explorer ran (Shift+W) 10 s into the wall and 10 s away from it: running into the wall the view never dipped below
+-27 degrees (mostly -7), the lift stayed 0, the camera kept at least 1.15 m clear of the ground; with the wall at the
+explorer's back it dipped to -56 degrees at worst while near it, never under -60. The player's "staring straight
+down" (frame `085_mars_pitch.jpg`) matches the foot camera's lift cap (`camera.js updateFootCamera`: a rise behind
+lifts the lens up to 0.9 x boom + 1 m, then the boom is pulled in toward 2.2 m: the lens over the head, looking down);
+changing that rule moves every slope's view and the footcam tests' cases; without the player's spot (their log gives
+only "400 to 510 m from the ship") I could not show a before/after, so it is left. The faceted slab in first person is
+the terrain mesh close up (PAINTER's).
+
+### State of the tree and checks (this round)
+
+Checks on a clean export of `e56a93f` with this round's files (`t1`): world 25, unit 208 (202 + `sketchpage.test` 2,
+`flightmarks.test` 3, the new `loop.test` case), physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all
+zeros (worst step loss 0.26 / 0.52 as always); the painted game at quality 0 loads with no console error, fallback
+`[]` (the probe). Commits: the code commit (items 0, 1, 2, 3, 5) is the first of this round. `node tests/all.mjs` in a
+clean tree: NOT YET RUN (next).
+
 ## Hand-over, PRE-SHIP RE-FIX pass (nineteenth PILOT agent; started about 19:15 UTC 2026-11-13; kept current after every item)
 
 Read this first; the eighteenth's hand-over just below holds for everything not named here. The verifier did not accept

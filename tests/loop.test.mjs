@@ -293,3 +293,48 @@ test('M4 stepping out: the first picture is the land with the explorer in it, no
     assert.equal(sim.shipInPicture(), true, body + ': looking at the ship from beside it, the page waits');
   }
 });
+
+// M4's second blind player, on Venus at a few frames a second: Space held while the explorer was
+// still climbing in was lost (the walk in takes seconds of real time there), and only a second hold
+// lifted off. Space pressed during the walk in is kept for the seat; Space held from the jetpack
+// before E is not a lift-off.
+test('Space pressed while climbing into the ship lifts off once seated; the jetpack held into boarding does not', () => {
+  const board = (sim, pad) => {
+    pad.dx += (sim.info().shipBearingDeg * RAD) / FEEL.mouseFoot;
+    play(sim, pad, 0.2);
+    pad.press('KeyW');
+    play(sim, pad, 20, { until: () => sim.info().canBoard });
+    pad.release('KeyW');
+    assert.ok(sim.info().canBoard, 'reached the ship');
+  };
+  for (const how of ['hold', 'tap']) {
+    const sim = newSim(), pad = new Pad();
+    play(sim, pad, 0.5);
+    board(sim, pad);
+    pad.tap('KeyE');
+    play(sim, pad, 0.3);
+    assert.equal(sim.sm.state, S.BOARDING, how + ': climbing in');
+    if (how === 'hold') pad.press('Space'); else pad.tap('Space');
+    play(sim, pad, 0.2);
+    assert.equal(sim.sm.state, S.BOARDING, how + ': still climbing in when Space went down');
+    let lifted = false;
+    play(sim, pad, 5, { each: () => { if (sim.sm.state === S.ATMOSPHERE) lifted = true; }, until: () => lifted });
+    pad.releaseAll();
+    assert.ok(lifted, `${how}: the ship lifts off once the explorer is seated (state ${sim.sm.state})`);
+  }
+  // Holding Space from the jetpack into the boarding: seated and waiting, as before.
+  const sim = newSim(), pad = new Pad();
+  play(sim, pad, 0.5);
+  board(sim, pad);
+  pad.press('Space');
+  play(sim, pad, 0.15);
+  pad.tap('KeyE');
+  play(sim, pad, 5, { until: () => sim.sm.state === S.LANDED });
+  assert.equal(sim.sm.state, S.LANDED, 'seated');
+  play(sim, pad, 1);
+  assert.equal(sim.sm.state, S.LANDED, 'Space held since before E does not lift off');
+  pad.releaseAll();
+  pad.tap('Space');
+  play(sim, pad, 0.3);
+  assert.equal(sim.sm.state, S.ATMOSPHERE, 'a press in the seat lifts off');
+});

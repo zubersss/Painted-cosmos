@@ -1,0 +1,20 @@
+== on a clean export of e56a93f (code of 45629a7) with the new tests
+not ok 1 - the kept frame is of the place: neither the figure nor the parked ship is in it, and both are back after
+  error: |-
+not ok 2 - a new player gets the first page a few seconds in, with the parked ship in the middle of the first view
+  error: |-
+not ok 1 - in the air only the course's world is marked; the world the nose points at is not
+  error: |-
+not ok 2 - the edge arrow of a place to land behind the ship points to its side, and keeps it near dead behind
+  error: 'behind and to the right: the arrow points right, not down (angle 87 deg)'
+not ok 3 - the course's world behind the ship: its edge arrow points to the side too
+  error: 'left, not down (angle 99 deg)'
+not ok 1 - Space pressed while climbing into the ship lifts off once seated; the jetpack held into boarding does not
+  error: 'hold: the ship lifts off once the explorer is seated (state LANDED)'
+== on t1 (the same with this round's files)
+ok 1 - the kept frame is of the place: neither the figure nor the parked ship is in it, and both are back after
+ok 2 - a new player gets the first page a few seconds in, with the parked ship in the middle of the first view
+ok 1 - in the air only the course's world is marked; the world the nose points at is not
+ok 2 - the edge arrow of a place to land behind the ship points to its side, and keeps it near dead behind
+ok 3 - the course's world behind the ship: its edge arrow points to the side too
+ok 1 - Space pressed while climbing into the ship lifts off once seated; the jetpack held into boarding does not

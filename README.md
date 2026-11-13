@@ -31,7 +31,10 @@ and press `F`: the ship turns onto the course by itself (its marker comes round 
 the way. Near the world the drive lets go by itself; fly down, and press `E` when the prompt
 says you can land. A world you have not walked on yet shows "a place
 to land" (a small ring on the ground, or an arrow at the edge of the picture when it lies round
-the curve): the spot its first view was painted from. You may land anywhere else.
+the curve or behind you): where a newcomer to that world stands, the landscape it opens with.
+You may land anywhere else. The views to find for the sketchbook are scattered over the world,
+some near that place, some kilometres from it: when you step out of the ship with none close
+by, a line says how far the nearest one is and which way.
 `H` shows the controls again at any time.
 
 ## Controls
@@ -110,7 +113,7 @@ arrow at the picture's edge) says "a view"; stepping out of the ship with none t
 line says how far the nearest one is and which way. Walk up to it and it is found; press `E` there to
 stand at its easel: you are walked to the spot and turned the way the picture was painted, and
 the page is drawn. Every landscape gets a sketch the first time you walk into it. A sketch is
-drawn in washes and pencil from the picture on the screen, without you in it.
+drawn in washes and pencil from the picture on the screen, without you or the ship in it.
 
 A day is not even: the world you stand on turns slowly while its sun is near the horizon and
 quickly through the night, so dusk and dawn last about five minutes each on Earth and the

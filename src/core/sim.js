@@ -156,8 +156,8 @@ const EXIT = Object.freeze({
   turns: [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75, 2.1, -2.1, 2.5, -2.5],   // rad from straight away
   cover: 1 / 6,                        // the most of the frame the hull may take
   aspect: 16 / 9,
-  near: 40,                            // metres from the ship within which a sketch waits while the hull...
-                                       // (14 let Venus' first landscape sketch keep the ship: M4's blind play-test)
+  near: 40,                            // metres from the ship within which the ship is "the picture" while the hull...
+                                       // (shipInPicture; a sketch no longer waits on it: game.js captureSketch paints the page without the ship)
   middle: 0.7,                         // ...lies in this share of the frame round its middle...
   inPicture: 0.02,                     // ...over more than this share of it
 });
@@ -447,12 +447,18 @@ export class Sim {
       if (pressed('KeyE') && this.boardable()) this.beginBoarding();
       else if (pressed('KeyE') && this.easelOffer) this.beginEasel(this.easelOffer);
     } else if (st === S.BOARDING) {
+      // Space pressed while the explorer is still climbing in is kept for the seat: the ship lifts
+      // off as soon as they sit (M4's second blind player: at a few frames a second the walk in
+      // takes several seconds, the first Space hold fell inside it and was lost).
+      if (pressed('Space') && this.transition && this.transition.dir === 'in') this._liftQueued = true;
       this.stepBoarding(h);
     } else if (st === S.LANDED) {
       if (first && inp.edges.has('KeyV')) this.shipCam.cockpit = !this.shipCam.cockpit;
       this.stepParked(h);
       this.sh.canopy01 = mix(this.sh.canopy01, 0, 1 - Math.exp(-4 * h));
-      if (pressed('Space')) {
+      const queued = this._liftQueued;
+      this._liftQueued = false;
+      if (pressed('Space') || queued) {
         this.sh.gearOn = false;
         this.sh.float = null;
         beginLiftoff(this.sh);
@@ -863,6 +869,7 @@ export class Sim {
 
   beginBoarding() {
     if (!this.sm.dispatch(EV.board)) return;
+    this._liftQueued = false;
     const to = this.hatchPoint();
     // (the walk to the hatch is 0.7 of the transition: stepBoarding)
     const dur = clamp(len(sub(to, this.ex.p)) / FEEL.boardPace / 0.7, FEEL.boardSeconds, FEEL.boardSecondsMax);
@@ -914,7 +921,8 @@ export class Sim {
 
   // Is the ship the picture just now? On foot within EXIT.near metres of it (the first moments
   // after stepping out, or standing beside it) with the hull over more than EXIT.inPicture of the
-  // middle of the frame. A page of the sketchbook is not drawn then: it waits for the land.
+  // middle of the frame. (A page of the sketchbook used to wait for the land then; it is now
+  // painted without the ship: game.js captureSketch.)
   shipInPicture() {
     if (this.sm.state !== S.ON_FOOT || len(sub(this.sh.p, this.ex.p)) > EXIT.near) return false;
     return this.hullInView(EXIT.middle) > EXIT.inPicture;

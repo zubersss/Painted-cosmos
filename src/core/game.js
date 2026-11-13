@@ -336,9 +336,8 @@ export class Game {
       // Wait for the world to finish what it is building here (a few seconds at most).
       const busy = typeof this.world.busy === 'number' && this.world.busy > 0;
       if (busy && t < w.due + 8) continue;
-      // The ship is not the place: just stepped out, or standing by it with the hull in the middle
-      // of the frame, the page waits until the view is of the land (half a minute at most).
-      if (t < w.due + SKETCH_SLIP.shipWait && sim.shipInPicture && sim.shipInPicture()) continue;
+      // (The ship is not the place: captureSketch paints the kept frame without it, so the page
+      // does not wait for the hull to leave the view.)
       delete want[k];
       const url = this.captureSketch(k);
       if (url && sk.put(k, url)) {
@@ -358,17 +357,21 @@ export class Game {
   // A thumbnail of the frame that has just been painted (a data URL), or null. The frame is
   // read straight after painter.render, while it is still in the canvas; nothing here can
   // throw into the frame loop.
-  // The page is of the place, not of the explorer's back: for the frame that is kept the figure
-  // steps out of the picture (the frame is painted once more without them, kept, and painted
-  // again as it was, all before the screen is shown: the player sees no gap). The kept frame is
-  // then drawn over by the sketch's hand (sketches.js sketchHand): washes, pencil, a ragged edge.
+  // The page is of the place, not of the explorer's back nor of the parked ship's hull: for the
+  // frame that is kept the figure and the ship step out of the picture (the frame is painted once
+  // more without them, their shade with them, kept, and painted again as it was, all before the
+  // screen is shown: the player sees no gap). The kept frame is then drawn over by the sketch's
+  // hand (sketches.js sketchHand): washes, pencil, a ragged edge.
+  // (The ship used to be waited out instead, up to 45 s within 40 m: at the game's start it
+  // stands 16 m off in the middle of the first view, and the first page never came.)
   captureSketch(key) {
-    const fig = this.explorerModel ? this.explorerModel.object3D : null;
-    const hide = !!(fig && fig.visible && this.painter && this.scene && this.camera);
+    const can = !!(this.painter && this.scene && this.camera);
+    const out = can ? [this.explorerModel, this.shipModel].map((m) => (m ? m.object3D : null)).filter((o) => o && o.visible) : [];
+    const hide = out.length > 0;
     try {
       const src = this.renderer ? this.renderer.domElement : null;
       if (!src || !src.width || !src.height || typeof document === 'undefined') return null;
-      if (hide) { fig.visible = false; this.repaint(); }
+      if (hide) { for (const o of out) o.visible = false; this.repaint(); }
       const c = this._sketchCanvas || (this._sketchCanvas = document.createElement('canvas'));
       c.width = SKETCH.width; c.height = SKETCH.height;
       const g = c.getContext('2d', { willReadFrequently: true });
@@ -390,7 +393,7 @@ export class Game {
       if (url.length > SKETCH.maxEach) url = c.toDataURL('image/jpeg', SKETCH.qualityLow);
       return url.length > SKETCH.maxEach ? null : url;
     } catch { return null; } finally {
-      if (hide) { fig.visible = true; try { this.repaint(); } catch { /* the next frame repaints */ } }
+      if (hide) { for (const o of out) o.visible = true; try { this.repaint(); } catch { /* the next frame repaints */ } }
     }
   }
 
@@ -481,6 +484,10 @@ export class Game {
         if (!body || id === here) continue;
         const isTarget = id === sim.target;
         if (!isTarget && st !== S.SPACE && st !== S.PULSE) continue;
+        // Under the edge of space only the course's world (chosen on the map) is marked, not the
+        // world the nose happens to point at (M4's second blind player: "Uranus 709 km" through
+        // Venus' air all the way down to the ground, "Jupiter" over Mars' mesas).
+        if (st !== S.SPACE && st !== S.PULSE && !sim.targetLocked) continue;
         const dist = root.position.length();
         p.copy(root.position).applyMatrix4(cam.matrixWorldInverse);
         const nx = p.z < 0 ? p.x / -p.z / (tanHalf * cam.aspect) : 9;
@@ -497,7 +504,7 @@ export class Game {
           } else if (r < 30) list.push({ kind: 'body', x, y, r, label: body.name, sub: null });
         } else if (isTarget) {
           // Off screen: a small arrow at the edge of the picture, pointing the way to turn.
-          const a = Math.atan2(-p.y, p.x);
+          const a = this.edgeAngle(p, id);
           list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: body.name, sub: fmt(dist) });
         }
       }
@@ -521,7 +528,7 @@ export class Game {
           if (over > 2 && Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) {
             list.push({ kind: 'body', keep: true, x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a place to land', sub: fmt(dist) });
           } else {
-            const a = Math.atan2(-p.y, p.x);
+            const a = this.edgeAngle(p, 'site');
             list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: 'a place to land', sub: fmt(dist) });
           }
         }
@@ -573,6 +580,21 @@ export class Game {
       }
     }
     hud.setMarks(list, view);
+  }
+
+  // Which way a flight mark's edge arrow points, for its point p in camera space. In front of the
+  // view it points where the point lies past the edge of the picture. Behind the view the point's
+  // projection pointed down for anything behind and below (M4's second blind player: "the arrow
+  // pointing down meant behind"): there it points to the side the point lies on, the way to turn,
+  // a little low as on foot; near dead behind it keeps the side it had (the label jumped from
+  // side to side as the nose swung across the place behind).
+  edgeAngle(p, key) {
+    const sides = this._edgeSides || (this._edgeSides = {});
+    let side = p.x >= 0 ? 1 : -1;
+    if (p.z < 0) { sides[key] = side; return Math.atan2(-p.y, p.x); }
+    if (sides[key] && Math.abs(p.x) < 0.25 * p.z) side = sides[key];
+    sides[key] = side;
+    return side > 0 ? 0.3 : Math.PI - 0.3;
   }
 
   // Where the world itself would set a newcomer down (world.getSpawn), as a point in the body's
