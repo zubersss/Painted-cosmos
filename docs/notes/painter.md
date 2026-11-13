@@ -13,8 +13,9 @@ Scratch: `/home/user/.pc-scratch/painter/preship/refix/` (trees `F` the head wit
 verifier's instruments, `sheet3.py` the three-column sheet; frames in `q2/`, `q0/`). The verifier's own files:
 `/home/user/.pc-scratch/verify/preship-painter/`.
 
-**State at the end of the pass:** the one fix DONE and committed (the commit after `22120b9`, named in the log below
-it). Nothing of mine half-done in the working tree. Item 4 (the climb to space; the Uranus sketch's change for PILOT)
+**State at the end of the pass:** the one fix DONE and committed as `d9f0ea4` (on `22120b9`; its code, test and frame
+match the checked tree `F` file for file). Nothing of mine half-done in the working tree; the scratch trees were
+deleted after use (disk). Item 4 (the climb to space; the Uranus sketch's change for PILOT)
 stands as the round left it, below.
 
 - **RE-FIX, THE NIGHT WASH OVER THE NEAR LAND ON EVERY WORLD (the verifier's two minor regressions): DONE.** Item 3(c)
