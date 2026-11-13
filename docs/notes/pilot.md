@@ -156,18 +156,30 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
     swapped for a stand-in is an empty canvas (a brown blot on the page). The game never does that, but
     `sketchHand` now refuses a frame with nothing in it and the page is wanted again (test in sketches.test).
 21. **No widow in a wrapped line** (`layout.js wrapLettering`): "A view for the sketchbook: / Temperate Forest".
+22. **The figure's shade is out of the sketch too** (`game.js repaint`): the kept frame is painted through the world
+    again (`world.update(0, ...)`, then the painter), so PAINTER's cast shade is laid for what can be seen; the hidden
+    figure used to leave its shade on the ground, a dark smear in the middle of the page on a pale plain
+    (`m4fix/book-mars-with-shade.jpg`, `book-mars-top-tier-with-shade.jpg` against `book-mars-after.jpg`; opened; the
+    figure and its shade are back in the frame the player sees, `slip-after.jpg`).
+23. **A view whose page could not be drawn while it was held** (the book opened over it) is offered again
+    (`sim.js stepEasel`; test in vista.test).
 
-### State of the tree (commit `b289c21`, on `70aec16`)
+### State of the tree
 
-All of the above is committed in `b289c21` (the thirteenth's flight work came in with the coordinator's snapshots
-`8418918` and `c03bce6`). Measured on a clean export of `70aec16` with PILOT's files of `b289c21` (`s14/t6`):
-unit 181, world 19, physics 314, `coast.mjs` PASS at both stands, `ghostfield.mjs` every counter zero (worst step
-loss 0.26 and 0.52 as before); the game loads at quality 0 with no console error and no fall-back (the film runs);
-in the browser on the stubs, all PASSED: `tests/m3check.mjs` (title card, sketch, book, the view found, offered,
-drawn from its easel, the controls given back, save and reload), `tests/playthrough.mjs` with PHYSICS (walk,
-jetpack, board, space, land, step out), `tests/trip.mjs` (Earth, Mars, Saturn in one sitting, reload).
-**Not run:** the painted play-through, trip and m3 (`tests/all.mjs` painted-*), the grand tour, the motion and
-weather sets, anything at quality 2 or at 1080p.
+My commits, in order: `b289c21` (on `70aec16`; the body of the round), `7ee3620` (notes), `f7b757a` (the dusk and the
+swimmer filmed, the browser helper's load limit), `52e74d1` (the cockpit's slips, the sketch's guard, the wrap, the
+top-tier frames), and the one that carries this paragraph (the shade out of the sketch, the easel offered again,
+the hand-over). The thirteenth's flight work came in with the coordinator's snapshots `8418918` and `c03bce6`.
+
+Measured on a clean export of `e371a93` with PILOT's files of the last commit (`s14/t11`): **unit 181, world 20,
+physics 314**, `coast.mjs` PASS at both stands, `ghostfield.mjs` every counter zero (worst step loss 0.26 and 0.52
+as before); the game loads at quality 0 with no console error and no fall-back (the film runs on that tree).
+In the browser on the stubs, on `b289c21`'s files, all PASSED: `tests/m3check.mjs` (title card, sketch, book, the
+view found, offered, drawn from its easel, the controls given back, save and reload), `tests/playthrough.mjs` with
+PHYSICS (walk, jetpack, board, space, land, step out), `tests/trip.mjs` (Earth, Mars, Saturn in one sitting,
+reload). **Not run after `b289c21`:** those three browser tests (what changed since is the cockpit's CSS, the
+sketch's guard and repaint, the wrap, one line of the easel). **Never run in this round:** the painted play-through,
+trip and m3 (`tests/all.mjs` painted-*), the grand tour, the motion and weather sets, anything at 1080p.
 
 ### Not done (and why), for whoever comes next
 

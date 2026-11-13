@@ -182,7 +182,8 @@ export class Game {
 
     // World, mood, paint.
     const tw = performance.now();
-    world.update(dt, cam.position, v.active ? v.active.id : null);
+    this._activeId = v.active ? v.active.id : null;
+    world.update(dt, cam.position, this._activeId);
     const wms = performance.now() - tw;
     st0.worldMs += (wms - st0.worldMs) * 0.08;
     // The worst world.update of the last 90 frames (the budget is a worst frame, not an average).
@@ -361,7 +362,7 @@ export class Game {
     try {
       const src = this.renderer ? this.renderer.domElement : null;
       if (!src || !src.width || !src.height || typeof document === 'undefined') return null;
-      if (hide) { fig.visible = false; this.painter.render(this.scene, this.camera, 0); }
+      if (hide) { fig.visible = false; this.repaint(); }
       const c = this._sketchCanvas || (this._sketchCanvas = document.createElement('canvas'));
       c.width = SKETCH.width; c.height = SKETCH.height;
       const g = c.getContext('2d', { willReadFrequently: true });
@@ -383,8 +384,16 @@ export class Game {
       if (url.length > SKETCH.maxEach) url = c.toDataURL('image/jpeg', SKETCH.qualityLow);
       return url.length > SKETCH.maxEach ? null : url;
     } catch { return null; } finally {
-      if (hide) { fig.visible = true; try { this.painter.render(this.scene, this.camera, 0); } catch { /* the next frame repaints */ } }
+      if (hide) { fig.visible = true; try { this.repaint(); } catch { /* the next frame repaints */ } }
     }
+  }
+
+  // Paint the frame again as it stands; no time passes. The world goes first: it lays the shade
+  // of whatever stands on the land and can be seen (a figure taken out of the picture left its
+  // shade on the ground: a dark smear in the middle of the page).
+  repaint() {
+    if (this.world && this.world.update) this.world.update(0, this.camera.position, this._activeId || null);
+    this.painter.render(this.scene, this.camera, 0);
   }
 
   // The footfall to sound this frame, if PHYSICS counted a new one: { foot, loud }, or null.
