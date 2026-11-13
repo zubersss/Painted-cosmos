@@ -266,11 +266,22 @@ void main() {
     float sunS = 1.0 - smoothstep(uAtmo.z * 0.82, uAtmo.z, ang);
     sp = mix(sp, vec3(1.0, 0.985, 0.93), clamp(halo, 0.0, 1.0));
     sp = mix(sp, vec3(1.0), sunS);
-    col = mix(col, sp, uAtmo.x);
+    // (PILOT's M4 critique, item 10: below the edge of the air the blue sky and the indigo of space were mixed half and
+    // half over the whole sky into one flat grey-violet, with stars already on it: two good washes mixed in the middle
+    // are mud. As the air thins the day's sky runs out toward bare paper, and space is a second wash that comes down
+    // from the zenith with a wet, wandering edge and a pale bloom where it stops: above the edge indigo and its stars,
+    // below it the thin pale sky down to the world's rim. No star lies where its ground is not yet indigo.)
+    float spA = uAtmo.x;
+    vec3 thin = mix(col, vec3(0.985, 0.98, 0.965), smoothstep(0.0, 0.8, spA) * 0.80 * uAtmo.y * (1.0 - clamp(halo, 0.0, 1.0)));
+    float spWob = (s1.r - 0.5) * 0.34 + (s2.g - 0.5) * 0.14;
+    float spEdge = mix(1.30, -0.60, smoothstep(0.04, 1.0, spA));
+    float inSp = spA >= 0.999 ? 1.0 : smoothstep(spEdge - 0.06, spEdge + 0.20, e + spWob);
+    float spBloom = (1.0 - smoothstep(0.0, 0.22, abs(e + spWob - spEdge + 0.06))) * (1.0 - inSp) * spA;
+    col = mix(mix(thin, vec3(1.0), spBloom * 0.30), sp, inSp);
     // stars: in space everywhere but in the sun's glare; from the ground at night, above the
     // horizon haze and where no cloud lies
     float night = (1.0 - uAtmo.y) * (1.0 - cloud) * (1.0 - oc) * smoothstep(0.03, 0.30, e);
-    starOK = mix(night, 1.0, uAtmo.x) * (1.0 - clamp(halo * 1.6, 0.0, 1.0));
+    starOK = mix(night, 1.0, inSp) * (1.0 - clamp(halo * 1.6, 0.0, 1.0));
   }
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));

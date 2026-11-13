@@ -121,10 +121,35 @@ the project's five checks one after another).
   stretched from every splinter and stone needs shadow marks that turn with the sun in `NEAR_VERT`: not a final-round
   change), a low sun.
 
-**Still to do, in this order, if a successor reads this**: PILOT's lower-ranked items (the canopy's paper, Venus'
-floor and lava, the cockpit, the grey-violet band under space, sticker flowers, Mars' shrubs, the peg-doll idle, the
-boot cloud): none touched in this round. Own-side list of the fifteenth agent's hand-over below: untouched but for
-its items 3 (night), 4 (the figure) and 9 (rain).
+- **PILOT's item 10 (lower-ranked), the grey-violet mud below the edge of the air: DONE** (`world/sky.js`): the day's
+  sky and space are no longer mixed half and half over the whole sky. As the air thins the day's sky runs out toward
+  bare paper, and space is a second wash that comes down from the zenith with a wet, wandering edge and a pale bloom
+  where it stops; a star lies only where its ground is already indigo (`starOK` follows the wash). On the ground, in
+  space and at night on the ground nothing changes (checked by reading and in frames: the spawn at ten, first person
+  looking up at midnight, the Moon). `m4fix/11-edge-of-the-air.jpg` (opened; quality 1): before, Earth at 600 m and
+  PILOT's frame at 703 m (one flat grey-violet with stars on it); after, 600, 650, 700, 760 m, 650 m at midnight, and
+  the same edge on Mars, Jupiter, Venus and Neptune. Not verified: the top tier; the climb in motion (the edge comes
+  down with altitude; I looked at stations, not at a film).
+- **Seen on the committed tree at the top tier and at quality 0** (no console error, fallback empty in either):
+  `m4fix/09-top-tier-committed-tree.jpg` (Earth, Neptune, Pluto, Mars from orbit; the storm and ten in the morning at
+  the spawn), `m4fix/10-quality-0-committed-tree.jpg` (the storm with its rain strokes, a fair midnight, Neptune's
+  squall, Earth from orbit, Uranus' arrival, the swimmer).
+
+**Still to do, in this order, if a successor reads this**: (1) what is "in part" above: Jupiter's island edge in the
+first view (another spawn), Pluto's long shadows, crisp white horses on Earth's storm coast; (2) PILOT's lower-ranked
+items not touched in this round: the canopy's paper (6), Venus' floor and lava (7), the cockpit (8), sticker flowers
+and dashed strokes (11), Mars' near shrubs (12), the peg-doll idle (13), the boot cloud (14: the dust veil is lifted
+42 % toward paper in `kitmat.js` whatever raised it; a kicked puff could take `lift` by its stream number); (3) the
+fifteenth agent's own-side list below, untouched but for its items 3 (night), 4 (the figure) and 9 (rain); its item
+11 (the last place's litter in the air after a debug teleport) met again: every evidence frame taken by a teleport
+inside one body can show it.
+
+**Rules that bit the seventeenth**: (1) a backtick in a GLSL comment inside a JS template string ends the string
+(`node --check` every painter file before an export); (2) `send.sh` needs `<out>/live.log` to exist (a symlink to the
+session's log); (3) the top tier takes five to seven minutes to load here with the other roles at work, quality 1 two,
+quality 0 under one: iterate at quality 1 and take the top tier once per commit; (4) look data cannot be patched in a
+live page, shader strings can (`__hp.patch` in `live2.mjs` / `live3.mjs`); (5) commit one finished item while another
+is half written: copy the tested export's painter paths over the working tree, commit, copy the work back (`s17/wip*`).
 
 ## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
 
