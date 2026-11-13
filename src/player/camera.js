@@ -26,6 +26,12 @@ export const CAMERA = Object.freeze({
   feetInFrame: 0.85,         // of the half-height: the lowest the feet may sit in a third-person view
   swimLift: 0.6,             // m the view rises over a swimmer (the lens 2 m over the still water: over the chop, looking down on the stroke)
   swimEase: 1.2,             // s
+  // From the seat: where the eye sits from the model's seat point (ship axes: up +Y, ahead -Z).
+  // PAINTER's critique 9 asked for 0.25 m up and 0.3 m ahead ("a third of the frame is cowl"); tried
+  // in M4's fix round: the cowl leaves the frame, but the canopy's hoop then crosses the upper
+  // third of the glass as a thick bar (docs/shots/pilot/m4fix/cockpit-eye-tried.jpg). The eye
+  // stays at the seat until the hoop is redrawn; this is the one number to set then.
+  cockpitEye: Object.freeze({ x: 0, y: 0, z: 0 }),
   shipBoom: 15,              // metres behind the ship
   shipBoomFast: 21,
   shipHeight: 3.6,           // metres above the ship
@@ -298,9 +304,9 @@ export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
   const fov = mix(C.fovShip, C.fovShipFast, opts.speed01 || 0);
 
   if (cam.cockpit) {
-    const seat = opts.seat || V(0, 2.2, -1.2);
+    const seat = opts.seat || V(0, 2.2, -1.2), e = C.cockpitEye;
     cam.q = ship.q;
-    return { p: add(ship.p, qRotate(ship.q, seat)), q: ship.q, fov, look: fwd };
+    return { p: add(ship.p, qRotate(ship.q, V(seat.x + e.x, seat.y + e.y, seat.z + e.z))), q: ship.q, fov, look: fwd };
   }
 
   // The camera's own up: the planet's up near a planet (the horizon stays level while the ship

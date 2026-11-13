@@ -38,7 +38,8 @@ export const SKETCH_SLIP = Object.freeze({
 //  - what has an edge in the frame gets a pencil line;
 //  - toward a ragged edge everything is lifted to white: there is no rectangle. (The page shows
 //    it multiplied onto its paper, so white is the paper itself: theme.css.)
-// Pure and fixed for a given picture and seed: nothing random at draw time.
+// Pure and fixed for a given picture and seed: nothing random at draw time. Returns the pixels,
+// or null (and leaves them alone) for a frame with nothing in it.
 export const SKETCH_HAND = Object.freeze({
   keep: 0.34,                  // of the frame's own colour left in the wash
   washes: 3,                   // flat tones between paper and the darkest ink
@@ -50,6 +51,7 @@ export const SKETCH_HAND = Object.freeze({
   pencilFrom: 0.42,            // ...and how strong an edge has to be to get one (of the frame's range of tone over three pixels)
   edge: 0.2,                   // of the half-size: where the ragged fade to paper begins, from the border in
   rag: 0.55,                   // how ragged that edge is (0 an even oval .. 1)
+  blank: 0.02,                 // a frame whose tones span less than this is taken for an empty canvas
 });
 const INK_DARK = [58, 50, 52], INK_MID = [128, 104, 84], PENCIL = [62, 60, 66];
 function lattice(ix, iy, seed) {
@@ -75,6 +77,9 @@ export function sketchHand(px, w, h, seed = 1, H = SKETCH_HAND) {
   // the frame's own range of tones is spread over the washes (a dusk and a noon both read)
   let lo = 1, hi = 0;
   for (let i = 0; i < n; i += 7) { if (L[i] < lo) lo = L[i]; if (L[i] > hi) hi = L[i]; }
+  // A frame with nothing in it (a canvas that was read after it was cleared, a lost context) is no
+  // sketch: the caller keeps nothing and tries again.
+  if (hi - lo < H.blank) return null;
   const span = Math.max(0.15, hi - lo), F = 192 / w;          // (the grain and the rag were set at 192 pixels across)
   const at = (x, y) => L[Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))];
   for (let y = 0; y < h; y++) {

@@ -142,6 +142,20 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
     a newcomer needs; the list of keys is the same card, whole, on H. Opened: `m4fix/title-after.jpg`,
     `help-card.jpg` (640 x 360: there the title slip is half the frame; at 1280 x 720 it is a third of the width).
 18. **PILOT 12's own-side 5**: `tests/browser.mjs startRun` gives the game thirty minutes to load, not five.
+19. **PAINTER 9, the cockpit's slips** (`theme.css .pc-cockpit`): the prompt and the notice are tucked onto the cowl
+    (11 % and 20 % from the foot; they lay on the horizon at 39 % and 47 %). Opened: `m4fix/cockpit-before.jpg`
+    against `cockpit-after.jpg` (in flight, a two-line notice and "Land here": the glass is clear) and
+    `cockpit-landed-after.jpg`. **The eye point was tried and put back**: 0.25 m up and 0.3 m ahead takes the cowl
+    out of the frame but brings the canopy's hoop across the upper third of the glass as a thick bar
+    (`m4fix/cockpit-eye-tried.jpg`). `CAMERA.cockpitEye` (zero now) is the number to set once the hoop is redrawn.
+20. **Seen at the top tier, 960 x 540** (quality 2, the long legs simulated and not drawn): `m4fix/title-top-tier.jpg`,
+    `first-frame-top-tier.jpg` (8 h, the place named), `vista-offer-top-tier.jpg` (the notice at the top, the first
+    page's slip in the corner, the mark, the prompt under the feet), `vista-easel-top-tier.jpg` (the composed
+    picture), `stepout-mars-top-tier.jpg` (the plain and its trees, the explorer in the lower third, a wing tip at
+    the left edge). That run showed one thing about instruments: a sketch captured while `painter.render` is
+    swapped for a stand-in is an empty canvas (a brown blot on the page). The game never does that, but
+    `sketchHand` now refuses a frame with nothing in it and the page is wanted again (test in sketches.test).
+21. **No widow in a wrapped line** (`layout.js wrapLettering`): "A view for the sketchbook: / Temperate Forest".
 
 ### State of the tree (commit `b289c21`, on `70aec16`)
 
@@ -157,8 +171,8 @@ weather sets, anything at quality 2 or at 1080p.
 
 ### Not done (and why), for whoever comes next
 
-- **The cockpit's eye point** (PAINTER 9), **the ship rolled on arrival** (PAINTER 12), **the map as ten dots** (13),
-  **the cursor** (14), **the frame read-out's type** (16): not started; none is a FIX FOR SHIP.
+- **The cockpit's eye point** (PAINTER 9: tried, put back, see 19), **the ship rolled on arrival** (PAINTER 12), **the
+  map as ten dots** (13), **the cursor** (14), **the frame read-out's type** (16): not done; none is a FIX FOR SHIP.
 - **The sky's change at the edge of the air** (PAINTER 17: blue at 490 m, starred indigo at 640 m): not PILOT's number.
   `mood.inSpace01` is `smoothstep(0.75, 1.6)` of the way to space: on Earth 0 at 600 m and 0.003 at 640 m. Whatever
   turns the sky between 490 and 640 m reads the height itself (`altitude01`, or the world's own eye height).
@@ -179,6 +193,8 @@ weather sets, anything at quality 2 or at 1080p.
   is still open: a painted easel or cairn at each view, and a first view within 150 m of each spawn (Earth's is
   2418 m from its spawn, so a new player still meets no mark in a first sitting).
 - **The first hour is 8 h now** (it was 9.5): the first view is lit by a lower sun.
+- **The cockpit**: with the hoop as it is the eye cannot go forward (item 19 above). When the hoop is lighter or
+  further out, name the eye point (metres up and ahead of the seat) and PILOT sets `CAMERA.cockpitEye`.
 - **The clock**: dusk and dawn now last about five minutes each at Earth's spawn; the night about five and a half.
   **For every instrument that sets an hour and lets the clock run** (`tests/tour.mjs`, `weather.mjs`, PAINTER's and
   PHYSICS' harnesses): at night the world now turns three times as fast, so a held "22 h" drifts three times as far

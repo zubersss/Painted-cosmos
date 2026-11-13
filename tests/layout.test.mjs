@@ -74,5 +74,10 @@ test('M4 lettering is wrapped to its slip and to the window', () => {
   for (const line of n.split('\n')) assert.ok(measureLettering(line, 13.5) <= room, `"${line}" is ${measureLettering(line, 13.5).toFixed(0)} px of ${room}`);
   assert.ok(letteringSize(n, 13.5).w <= room + 2);
   assert.equal(wrapLettering('Mars ahead', 13.5, 400), 'Mars ahead', 'a short line is left alone');
+  // no word left alone on the last line: the lines are of about one length
+  const v = wrapLettering('A view for the sketchbook: Temperate Forest', 13.5, 386).split('\n');
+  assert.equal(v.length, 2);
+  assert.ok(measureLettering(v[1], 13.5) > 0.55 * measureLettering(v[0], 13.5), `"${v[0]}" / "${v[1]}"`);
+  for (const line of v) assert.ok(measureLettering(line, 13.5) <= 386);
   assert.equal(wrapLettering('one\ntwo', 10, 400), 'one\ntwo', 'lines already there are kept');
 });

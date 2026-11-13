@@ -19,7 +19,121 @@ const dom = (c) => c.page.evaluate(() => {
   const q = (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { cls: e.className, text: (e.textContent || '').replace(/\s+/g, ' ').slice(0, 90), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), op: getComputedStyle(e).opacity }; };
   return { hud: document.querySelector('.pc-hud').className, prompt: q('.pc-prompt'), notice: q('.pc-notice'), hint: q('.pc-hint'), slip: q('.pc-newsketch'), simPrompt: window.__pc.sim.promptNow, simNotice: window.__pc.sim.notice && window.__pc.sim.notice.text, offer: window.__pc.sim.easelOffer && window.__pc.sim.easelOffer.id };
 });
+// Steps simulated and not drawn (painter.render swapped for a stand-in meanwhile), for the long legs at the top tier.
+const fastRun = (c, seconds, cond = null, dt = 1 / 30) => c.page.evaluate(({ n, dt, cond }) => {
+  const pc = window.__pc, painter = pc.game.painter, real = painter.render;
+  const done = () => { const i = pc.sim; return cond === 'offer' ? !!i.easelOffer : cond === 'hold' ? !!(i.easel && i.easel.phase === 'hold') : cond === 'noeasel' ? !i.easel : cond === 'landed' ? i.sm.state === 'LANDED' : cond === 'foot' ? i.sm.state === 'ON_FOOT' : false; };
+  painter.render = () => {};
+  let k = 0;
+  try { for (; k < n && !done(); k++) pc.step(dt, 1); } finally { painter.render = real; }
+  pc.step(dt, 1);
+  return { steps: k, state: pc.sim.sm.state, t: +pc.sim.t.toFixed(1) };
+}, { n: Math.round(seconds / dt), dt, cond });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export default {
+  // the hero frames at the top tier (run with Q=2 W=960 H=540 CARD=1): the first frame, a view offered, the easel,
+  // the new page's slip, the book; stepping out on Mars and its page
+  async top(c) {
+    await wait(1500);
+    await c.shot('top-0-first');
+    await c.page.evaluate(() => { const sim = window.__pc.sim, d = sim.vistasOf('earth')[0].dir, k = 17 / 4000; window.__pc.teleport({ body: 'earth', dir: [d.x + k, d.y, d.z - k * 0.3] }); });
+    await c.settle();
+    const n = await c.page.evaluate(() => window.__pc.sim.nearestVista());
+    c.log('top: view ' + n.distance.toFixed(0) + ' m, bearing ' + n.bearingDeg.toFixed(0));
+    await c.drag(n.bearingDeg * RADm / c.MOUSE_FOOT, 0);
+    await c.press('KeyW');
+    c.log('top: walk ' + JSON.stringify(await fastRun(c, 6, 'offer')));
+    await c.release('KeyW');
+    await fastRun(c, 0.8);
+    await wait(1500);
+    await c.shot('top-1-offer');
+    await c.tap('KeyE');
+    c.log('top: to the easel ' + JSON.stringify(await fastRun(c, 6, 'hold')));
+    await c.shot('top-2-easel');
+    c.log('top: held ' + JSON.stringify(await fastRun(c, 9, 'noeasel')));
+    await fastRun(c, 0.5);
+    await wait(1500);
+    await c.shot('top-3-slip');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    await wait(800);
+    await c.shot('top-4-book-earth');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    await c.tp({ body: 'mars', ship: true, altitude: 30 });
+    await fastRun(c, 1);
+    await c.tap('KeyE');
+    c.log('top: landing ' + JSON.stringify(await fastRun(c, 90, 'landed', 1 / 20)));
+    await fastRun(c, 1.5);
+    await c.tap('KeyE');
+    c.log('top: out ' + JSON.stringify(await fastRun(c, 6, 'foot')));
+    await fastRun(c, 0.3);
+    await wait(1200);
+    await c.shot('top-5-stepped-out-mars');
+    await c.press('KeyW'); await fastRun(c, 3); await c.release('KeyW');
+    await fastRun(c, 5);
+    await wait(1500);
+    await c.shot('top-6-mars-slip');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    await wait(800);
+    await c.shot('top-7-book-mars');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    c.log('top: sketches ' + JSON.stringify(await c.page.evaluate(() => { const i = window.__pc.info(); return { keys: i.sketches.keys, chars: i.sketches.chars }; })));
+  },
+  // PAINTER 9: from the seat, landed and in low flight with the prompt up
+  async cockpit(c) {
+    await c.toShipAndBoard();
+    await c.tap('KeyV');
+    await c.run(1, { dt: 0.1 });
+    await wait(1200);
+    await c.shot('cockpit-0-landed');
+    await c.tap('Space');
+    await c.run(9, { dt: 0.1 });
+    await c.press('KeyW');
+    await c.run(5, { dt: 0.1, steer: c.holdPitch(0) });
+    await c.release('KeyW');
+    await wait(1200);
+    await c.shot('cockpit-1-flight');
+    await c.page.evaluate(() => window.__pc.sim.say('Thin air on Mars: the ship runs fast and turns wide. Hold X to slow it', 8));
+    await c.run(0.4, { dt: 0.1 });
+    await wait(1200);
+    await c.shot('cockpit-2-notice');
+    await c.tap('KeyV');
+  },
+  // the sketches at the top tier, drawn from painted frames (the frames round each capture are drawn)
+  async top2(c) {
+    await c.page.evaluate(() => { const sim = window.__pc.sim, d = sim.vistasOf('earth')[0].dir, k = 17 / 4000; window.__pc.teleport({ body: 'earth', dir: [d.x + k, d.y, d.z - k * 0.3] }); });
+    await c.settle();
+    const n = await c.page.evaluate(() => window.__pc.sim.nearestVista());
+    await c.drag(n.bearingDeg * RADm / c.MOUSE_FOOT, 0);
+    await c.press('KeyW');
+    await fastRun(c, 6, 'offer');
+    await c.release('KeyW');
+    await c.tap('KeyE');
+    c.log('top2: to the easel ' + JSON.stringify(await fastRun(c, 6, 'hold')));
+    await c.run(2.8, { dt: 0.1, until: (i) => !i.easel });
+    await wait(1500);
+    await c.shot('top2-0-slip');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    await wait(800);
+    await c.shot('top2-1-book-earth');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    await c.tp({ body: 'mars', ship: true, altitude: 30 });
+    await fastRun(c, 1);
+    await c.tap('KeyE');
+    await fastRun(c, 90, 'landed', 1 / 20);
+    await fastRun(c, 1.5);
+    await c.tap('KeyE');
+    await fastRun(c, 6, 'foot');
+    await c.run(4.5, { dt: 0.1, until: (i) => i.sketches && i.sketches.keys.some((k) => k.startsWith('b:mars')) });
+    await c.press('KeyW'); await fastRun(c, 2.5); await c.release('KeyW');
+    await fastRun(c, 1);
+    await wait(1500);
+    await c.shot('top2-2-mars-slip');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    await wait(800);
+    await c.shot('top2-3-book-mars');
+    await c.tap('KeyB'); await fastRun(c, 0.3);
+    c.log('top2: sketches ' + JSON.stringify(await c.page.evaluate(() => { const i = window.__pc.info(); return { keys: i.sketches.keys, chars: i.sketches.chars }; })));
+  },
   // the offer at a found view: what the HUD holds
   async offer(c) {
     await c.page.evaluate(() => { const sim = window.__pc.sim, d = sim.vistasOf('earth')[0].dir, k = 30 / 4000; window.__pc.teleport({ body: 'earth', dir: [d.x + k, d.y, d.z - k * 0.3] }); });

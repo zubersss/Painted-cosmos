@@ -375,7 +375,8 @@ export class Game {
         const img = g.getImageData(0, 0, c.width, c.height);
         let seed = 7;
         for (const ch of String(key || '')) seed = (Math.imul(seed, 31) + ch.charCodeAt(0)) | 0;
-        sketchHand(img.data, c.width, c.height, seed);
+        // (an empty canvas is no page: nothing is kept, and the page is wanted again)
+        if (!sketchHand(img.data, c.width, c.height, seed)) return null;
         g.putImageData(img, 0, 0);
       } catch { /* a canvas that cannot be read keeps the plain frame */ }
       let url = c.toDataURL('image/jpeg', SKETCH.quality);

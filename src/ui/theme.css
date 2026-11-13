@@ -49,8 +49,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 /* From the cockpit the lower third of the frame is the cowl and its three dials. */
 .pc-hud.pc-cockpit .pc-gauges { bottom: auto; top: 8.5%; left: auto; right: 7%; transform: none; }
 .pc-hud.pc-cockpit .pc-readout { bottom: auto; top: 8.5%; }
-.pc-hud.pc-cockpit .pc-prompt { bottom: 39%; }
-.pc-hud.pc-cockpit .pc-notice { bottom: 47%; }
+/* (the prompt and the notice are tucked onto the cowl, as a note would be; they lay on the horizon, at 39% and 47%) */
+.pc-hud.pc-cockpit .pc-prompt { bottom: 11%; }
+.pc-hud.pc-cockpit .pc-notice { bottom: 20%; }
 /* On foot in third person the figure fills the lower middle (its feet about 14% up): the
    prompt lies under the feet, the gauge and any notice just above it, not across the legs. */
 .pc-hud.pc-foot3 .pc-prompt { bottom: 4.4%; }

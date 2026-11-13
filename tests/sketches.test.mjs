@@ -109,6 +109,10 @@ test('M4 a kept frame is drawn as a sketch: washes and pencil, lifted to paper a
   };
   const a = sketchHand(frame(), w, h, 5), b = sketchHand(frame(), w, h, 5), c = sketchHand(frame(), w, h, 6), src = frame();
   assert.deepEqual(a, b, 'the same frame and seed give the same sketch');
+  // an empty canvas (all one value) is no sketch, and is left as it was
+  const blank = new Uint8ClampedArray(w * h * 4);
+  assert.equal(sketchHand(blank, w, h, 5), null);
+  assert.ok(blank.every((x) => x === 0));
   assert.notDeepEqual(a, c, 'another page has another ragged edge');
   const at = (px, x, y) => [px[4 * (y * w + x)], px[4 * (y * w + x) + 1], px[4 * (y * w + x) + 2]];
   // the border is bare paper all the way round (white: the page multiplies it onto its paper)

@@ -7,14 +7,29 @@ import { measureLettering, LETTERING } from './lettering.js';
 // Break `text` into lines no wider than `maxWidth` pixels at cap height `size` (the lettering
 // does not wrap by itself). Lines already in the text are kept; a word longer than a line stays whole.
 export function wrapLettering(text, size, maxWidth) {
-  const out = [];
-  for (const para of String(text == null ? '' : text).split('\n')) {
+  const fill = (para, width) => {
+    const lines = [];
     let line = '';
     for (const word of para.split(' ')) {
       const next = line ? line + ' ' + word : word;
-      if (line && measureLettering(next, size) > maxWidth) { out.push(line); line = word; } else line = next;
+      if (line && measureLettering(next, size) > width) { lines.push(line); line = word; } else line = next;
     }
-    out.push(line);
+    lines.push(line);
+    return lines;
+  };
+  const out = [];
+  for (const para of String(text == null ? '' : text).split('\n')) {
+    let lines = fill(para, maxWidth);
+    // No widow: the same number of lines, of about one length ("... Temperate / Forest" left one
+    // word alone on the second line).
+    if (lines.length > 1) {
+      const share = measureLettering(para, size) / lines.length;
+      for (let f = 1.02; share * f < maxWidth; f += 0.06) {
+        const even = fill(para, share * f);
+        if (even.length === lines.length) { lines = even; break; }       // the narrowest width that keeps the count
+      }
+    }
+    out.push(...lines);
   }
   return out.join('\n');
 }
