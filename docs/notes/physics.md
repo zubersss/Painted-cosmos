@@ -3,7 +3,66 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
-## Hand-over P26 (twenty-fourth PHYSICS agent; read this block first; P25 and older below hold for everything not named here)
+## Hand-over P27, the M4 fix round (twenty-fifth PHYSICS agent, the fixer; READ THIS BLOCK FIRST; kept current after every item; P26 and older below hold for everything not named here)
+
+**The block.** The critics' FIX FOR SHIP items on PHYSICS (the ten of the workflow's list: PILOT's `docs/lead/CRITIQUE.md`
+"PILOT on PHYSICS" and PAINTER's `docs/lead/CRITIQUE-PAINTER.md` "PAINTER on PHYSICS", merged and ranked), worst first as
+I judge them, each committed when finished. First commit sits on `6cfab48` (the work was begun on `1aa9718`). Scratch:
+`/home/user/.pc-scratch/physics/m4/` (`head/` `1aa9718` as exported; `work/` it with the block's explorer.js; `final1/`
+`6cfab48` with item A's files, the tree its checks ran on; `w9/` the weather's work; `s/` the instruments: `slopepace.mjs
+<root> [g wish dirs hz]` a straight slope by material and wetness, `wettrace.mjs` the wet bank step by step, `kept.sh <tree>
+<label>` P22 to P26's measured sets, boulderrun's replay, wallrun, runfield and ghostfield at PILOT's places,
+`checks.sh <tree> <label>` the project's node checks, `loadcheck.mjs <root> <out> [quality w h scenes]` the game in one
+browser, `hover.mjs` a hands-off hover in a storm, `onset2.mjs <root> [epoch to every]` the spawn's weather by the game's
+clock, `epochscan.mjs`, `wxline.mjs` the spawn's weather on the weather's own clock; `out/` every output named below).
+Evidence in the repository: `docs/shots/physics/m4fix/`.
+
+**State of the items (the workflow's numbers), updated after each:**
+- **3 (rain stops a walk dead on a forest bank): DONE**, item A below.
+- 7 (Neptune's storm throws the ship), 9 (the first storm's timing, the long mist), 2 and 10 (a floor under what moves;
+  the gust's envelope), 4 and 6 (snow and rain as PAINTER needs them), 1 (the scramble at Neptune's storm coast), 5 (rims),
+  8 (wakes): **not yet done; next in that order** (9 is in work in `w9/`: the epoch, the night's mist, the surface's store).
+
+**A. RAIN NO LONGER STOPS A WALK (item 3; `explorer.js`: SHORT STEPS, `EXPLORER_BODY.holdMargin`, `st.phys.paceHold`).**
+- *Reproduced* (PILOT's `pilot12/wetstall.mjs`; `m4/s/wettrace.mjs head earth spawn 240 90`): 21.4 m east of the spawn, on
+  24 to 25 degrees of wet litter, 0.03 to 0.2 m/s for 3.5 s with W held, `slip01` flickering, then 4.4 m/s up 26 to 32
+  degrees. On a straight slope (`m4/s/slopepace.mjs`, W with PILOT's assist; `m4fix/slopepace-before-after.txt`): wet
+  litter 0.78 / 0.37 / 0.17 m/s at 20 / 22 / 24 degrees; wet grass 0.55 / 0.11 at 24 / 26; and **dry sand 0.63 to 0.11
+  m/s from 22 to 36 degrees** (any dune face: nobody had measured it); Shift+W the same on each. Above the soles' whole
+  hold (friction + foothold) every one of them is climbed at the full pace (the low face that is "a step": P26's Next 1).
+- *The causes.* (a) The ground's drag (the work of pressing a footprint: litter 0.045, wet 0.11, sand 0.28 of the
+  weight) was counted among the loads the soles must hold; near their limit, a stride's drag put the body into the
+  slide branch, where friction acts against the motion: up a slope that is gravity, friction and drag against the suit's
+  4 m/s^2, to a stand, then a start, thirty times a second. (b) Between what the soles hold at a run and what they hold
+  with their footholds nothing held the pace: the body ran into the slide and out of it.
+- *Now.* The slide is judged on gravity along the ground and the wind alone (the drag is the legs' work: it still costs
+  force and power); and where that load is between friction x support and (friction + foothold) x support the walker
+  pushes no faster than the pace at which its footholds still serve (`paceHold`: `runFoothold` 4.5 m/s where it needs
+  none, 1.8 where it needs them all, by the inverse of the footholds' own fade, 4 % in hand). It does not brake for
+  that pace: a run that comes onto such ground slides down to it, as it did.
+- *Measured after* (the same instruments): wet litter 3.76 / 3.11 / 2.39 m/s at 20 / 22 / 24 degrees, wet grass 2.89 /
+  2.17 at 24 / 26, dry sand 4.1 to 3.3 m/s from 22 to 36 degrees, no step slipping; nothing slower than before at any
+  slope from 10 to 46 degrees, walking or running. PILOT's wetstall at the spawn: headings held under 1 m/s for more
+  than 2 s: **2 of 16 at clocks 240, 420 and 700 -> 0 at each** (`m4fix/wetstall-after.txt`).
+- *Kept, measured* (`m4/s/kept.sh`, head against the final code): boulderrun's replay thrown up 0.000 in all sixteen runs,
+  mean paces within 0.02 m/s but heading 90 with boulders 4.93 -> 5.00; `runfield` at the seven stands: the same means
+  (Earth's spawn 6.42 -> 6.45), the same slowest seconds; `wallrun` at eight places: the same metres on ground over 50
+  degrees (three fields of "slope at the fastest climb" differ by a degree or two); P22 to P26's knife, rows, field, p17,
+  hill43 and mbv sets: identical but one line, the OLD Moon strip site (`OLD=1 mbv`: the slide down the small rim's
+  wall, slowest within 3 m 4.54 -> 3.68 m/s: going DOWN soft ground the drag used to help the soles "hold");
+  `ghostfield.mjs` all zeros, the same losses.
+- *Tests* (`explorer.test.mjs`, two new, both fail on `1aa9718`): **M4 short steps** (wet litter 16 to 24 degrees, wet
+  grass 22 to 26, dry sand 22 to 30, 60 and 30 Hz: no second under 1.5 m/s (2.5 on sand), no slipping, no faster on
+  steeper ground, down the bank the same; wet and level: the walk's own pace); **M4 on PAINTER's real Earth, soaked** (W
+  from the spawn on sixteen headings for 14 s with the ground at wetness 0.99: no second under 1 m/s on dry land under
+  30 degrees; the head: five headings, 6 s at 0.07 m/s on heading 90).
+- *Checks* (a clean export of `6cfab48` with the two files, `m4/final1`): world 20, unit 181, physics **316** (314 + 2),
+  `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game loaded at quality 0 (480 x 270), stepped through
+  the spawn, a walk and the storm at clock 240: no console error, no game error, fallback empty (one frame opened).
+- *Not done here:* the pace above the soles' whole hold is still the hold's (wet litter at 26 to 33 degrees is climbed at
+  4.2 m/s, faster than at 24: PILOT's "holds and lets go" is now "slows and lets go"); not filmed in the game.
+
+## Hand-over P26 (twenty-fourth PHYSICS agent; P27 above is newer; P25 and older below hold for everything not named here)
 
 **Where things stand.** The block, in order: (1) MUST FIX, the explorer runs up cliffs (PILOT's critique, item 1); (2) the
 white-water cap (the coordinator's ruling); (3) the sudden checks on arrival ground; (4) the state for the drawn figure;

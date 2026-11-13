@@ -1115,3 +1115,84 @@ test('P26 the figure\'s state: the lean is a vector into the wind, the air past 
   }
   assert.deepEqual([a.st.p, a.st.v], [b.st.p, b.st.v]);
 });
+
+// ---- (M4) short steps: a slope the soles hold only with their footholds ------------------------------------------
+test('M4 short steps: a slope the soles hold only with their footholds (wet leaves, wet grass) and a soft slope they do hold (dry sand) are walked up, never stood on with the key down (60 and 30 Hz)', async () => {
+  // PILOT's critique of PHYSICS, item 2: in the rain W held up 23 to 26 degrees of leaf litter left the figure standing
+  // (0.07 to 0.2 m/s for 4 to 6 s). Two causes: the ground's drag (the work of pressing a footprint) was counted as a
+  // load the soles must hold, so a walk up a slope near their limit "slid" at every stride, friction against it; and
+  // nothing held the pace to what the footholds serve. On dry sand (drag 0.28) the same stood a walker on any dune
+  // face from 22 to 36 degrees.
+  const { groundAt } = await import('./ground.js');
+  const gr = (biome, slope, wet) => groundAt('earth', { radius: R, slope, liquidRadius: 0, biomeId: biome, biomeWeights: { [biome]: 1 } }, { wetness01: wet, snowDepth: 0, temperature: 288 }, {});
+  const climb = (biome, wet, deg, hz, wish = 4.2, way = -1) => {
+    const a = deg * Math.PI / 180, H = 400, rad = H / Math.tan(a), x0 = (way < 0 ? 0.75 : 0.35) * rad;
+    const sim = make({ world: { cone: { dir: norm(V(0, 0, 1)), radius: rad, height: H } }, dir: V(Math.sin(x0 / R), 0, Math.cos(x0 / R)), g: 9.81, ground: gr(biome, a, wet) });
+    let sum = 0, n = 0, slip = 0, worst = 99, last = { ...sim.st.p }, k = 0;
+    run(sim, 9, { wish: V(way * wish, 0, 0), assistAccel: 4 }, { hz, each: (t, st) => {
+      if (t > 3) { sum += speed(st); n++; if (st.phys.slip01 > 0) slip++; }
+      if (++k % hz === 0) { const m = len(V(st.p.x - last.x, st.p.y - last.y, st.p.z - last.z)); if (k > hz) worst = Math.min(worst, m); last = { ...st.p }; }
+    } });
+    assert.ok(finite(sim.st), `${biome} ${deg}: NaN`);
+    return { mean: sum / n, worst, slip: slip / n, hold: sim.st.phys.paceHold };
+  };
+  for (const hz of [60, 30]) {
+    // wet leaves over soil: the soles hold to 19.8 degrees at a run, to about 25 with their footholds
+    let prev = 9;
+    for (const deg of [16, 20, 22, 24]) {
+      const c = climb('temperate_forest', 1, deg, hz);
+      assert.ok(c.worst > 1.5, `wet litter ${deg} degrees, ${hz} Hz: slowest second ${c.worst.toFixed(2)} m/s (head: 0.78, 0.37, 0.17 at 20, 22, 24)`);
+      assert.ok(c.mean <= prev + 0.05, `wet litter: no faster on steeper ground (${deg}: ${c.mean.toFixed(2)} after ${prev.toFixed(2)})`);
+      assert.ok(c.slip < 0.05, `wet litter ${deg} degrees: the feet hold (slipping ${c.slip.toFixed(2)} of the steps)`);
+      prev = c.mean;
+    }
+    assert.ok(prev > 1.8 && prev < 3.2, `wet litter at 24 degrees: short steps (${prev.toFixed(2)} m/s)`);
+    assert.ok(climb('temperate_forest', 1, 12, hz).hold > 1e8, 'no limit where the soles hold at a run');
+    for (const deg of [22, 24, 26]) { const c = climb('alpine_meadow', 1, deg, hz); assert.ok(c.worst > 1.5 && c.slip < 0.05, `wet grass ${deg} degrees, ${hz} Hz: ${c.worst.toFixed(2)} m/s, slipping ${c.slip.toFixed(2)}`); }
+    // a dune's face: the soles hold it (0.60 to 31 degrees); pressing footprints is the legs' work
+    for (const deg of [22, 26, 30]) { const c = climb('desert_canyon', 0, deg, hz); assert.ok(c.worst > 2.5 && c.slip < 0.05, `dry sand ${deg} degrees, ${hz} Hz: ${c.worst.toFixed(2)} m/s (head: 0.6 to 0.1), slipping ${c.slip.toFixed(2)}`); }
+    // down the same wet bank: the same short steps, no runaway
+    const d = climb('temperate_forest', 1, 24, hz, 4.2, 1);
+    assert.ok(d.mean > 1.5 && d.mean < 3.4 && d.slip < 0.05, `down 24 degrees of wet litter: ${d.mean.toFixed(2)} m/s, slipping ${d.slip.toFixed(2)}`);
+    // wet and level: the walk's own pace, no limit
+    const lv = make({ g: 9.81, ground: gr('temperate_forest', 0, 1) }); run(lv, 4, { wish: V(4.2, 0, 0), assistAccel: 4 }, { hz });
+    assert.ok(Math.abs(speed(lv.st) - 4.2) < 0.1 && lv.st.phys.paceHold > 1e8, `wet and level: ${speed(lv.st).toFixed(2)} m/s`);
+  }
+});
+
+test('M4 on PAINTER\'s real Earth, soaked: W from the spawn on sixteen headings for 14 s is never under 1 m/s for a second on dry land under 30 degrees (the bank under the wood east of the first view)', async () => {
+  let real;
+  try { real = await import('../world/surface.js'); } catch (e) { console.log('# (skipped: src/world/surface.js did not load in Node: ' + e.message + ')'); return; }
+  if (typeof real.sampleSurfacePure !== 'function' || typeof real.getSurface !== 'function') { console.log('# (skipped: sampleSurfacePure / getSurface not exported)'); return; }
+  const { groundAt } = await import('./ground.js');
+  const sampleSurface = (id, d) => real.sampleSurfacePure(id, d.x, d.y, d.z);
+  const d0 = norm(real.getSurface('earth').getSpawn()), hz = 30;
+  const cr = (a, b) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+  // (the surface as PILOT's Sim hands it to the explorer: plain numbers, a copy; the ground soaked, as 100 s into the first storm)
+  const sample = (d) => { const s = sampleSurface('earth', d); return { radius: s.radius, normal: { x: s.normal.x, y: s.normal.y, z: s.normal.z }, slope: s.slope || 0, liquidRadius: s.liquidRadius || 0, biomeId: s.biomeId, biomeWeights: s.biomeWeights }; };
+  const WET = { wetness01: 0.99, snowDepth: 0, temperature: 290 };
+  let stalled = 0, total = 0; const rows = [];
+  for (let heading = 0; heading < 360; heading += 22.5) {
+    const env = { sample, gravity: 9.81, air: (p, o) => { o.density = 1.2; o.wind.x = 0; o.wind.y = 0; o.wind.z = 0; return o; }, ground: (su, o) => groundAt('earth', su, WET, o) };
+    const r0 = sample(d0).radius, st = { p: V(d0.x * r0, d0.y * r0, d0.z * r0), v: V(), grounded: true };
+    let slow = 0, worst = 99, k = 0, last = { ...st.p }, steepest = 0, land = true, under30 = true;
+    for (let i = 0; i < hz * 14; i++) {
+      const up = norm(st.p), east = norm(cr(V(0, 1, 0), up)), north = cr(up, east), a = heading * Math.PI / 180;
+      const f = V(north.x * Math.cos(a) + east.x * Math.sin(a), north.y * Math.cos(a) + east.y * Math.sin(a), north.z * Math.cos(a) + east.z * Math.sin(a));
+      stepExplorerBody(st, { wish: V(f.x * 4.2, f.y * 4.2, f.z * 4.2), assistAccel: 4 }, 1 / hz, env);
+      const s = sample(norm(st.p));
+      if (s.liquidRadius > s.radius + 0.3) land = false;
+      if (s.slope * 57.3 >= 30) under30 = false;
+      if (++k % hz === 0) {
+        const m = len(V(st.p.x - last.x, st.p.y - last.y, st.p.z - last.z));
+        if (k > hz && land && under30) { worst = Math.min(worst, m); if (m < 1) { slow++; steepest = Math.max(steepest, s.slope * 57.3); } }
+        last = { ...st.p }; land = true; under30 = true;
+      }
+      assert.ok(finite(st), `heading ${heading}: NaN`);
+    }
+    total += len(V(st.p.x - d0.x * r0, st.p.y - d0.y * r0, st.p.z - d0.z * r0));
+    if (slow > 0) { stalled++; rows.push(`h${heading}: ${slow} s under 1 m/s on up to ${steepest.toFixed(0)} degrees (slowest ${worst.toFixed(2)} m/s)`); }
+  }
+  console.log(`# M4 Earth spawn, soaked, W on sixteen headings for 14 s: ${total.toFixed(0)} m in all; ${stalled} headings with a second under 1 m/s on dry land under 30 degrees${rows.length ? ': ' + rows.join('; ') : ''}`);
+  assert.equal(stalled, 0, rows.join('; '));
+});

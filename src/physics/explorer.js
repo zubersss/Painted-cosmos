@@ -52,6 +52,14 @@ export const EXPLORER_BODY = Object.freeze({
                           // held by the suit. It sets the speed uphill, in sand, snow, water and dense air.
   response: 0.11,         // s: time constant with which the legs cancel a velocity error
   runFoothold: 4.5,       // m/s: above this speed footholds no longer help
+  // (M4) SHORT STEPS. On a slope (or in a wind) that the soles hold only with their footholds (the load along the ground
+  // over friction x support, under (friction + foothold) x support) the walker holds the pace at which those footholds
+  // still serve (st.phys.paceHold: runFoothold where it needs none of them, 0.4 runFoothold where it needs them all): wet
+  // leaves at 24 degrees are climbed on short steps at about 2 m/s, with the key down, where until M4 the body slid back
+  // at every stride and stood (0.1 m/s). And the work of pressing a footprint (the ground's drag) is the legs' own: it is
+  // not a load the soles must hold, so a soft slope the soles do hold (a dune's face under its angle of repose) is not
+  // a slide either (it was: 0.1 to 0.6 m/s up 22 to 36 degrees of dry sand).
+  holdMargin: 0.04,       // share of the footholds kept in hand at that pace
   arrest: 0.85,           // sliding out of control, the body digs in heels and hands: friction is this
                           // fraction of the holding traction (never less than the kinetic coefficient)
   // LEGS (P9). st.p is the feet; the mass rides at the hips, one leg above them. The legs are a
@@ -250,6 +258,7 @@ export const EXPLORER_BODY_STATE = () => ({
   paceAhead: 1e9,         // (P16) m/s: the pace it holds now to meet a face it has seen ahead at the pace it can climb it
   paceCrest: 1e9,         // (P22) m/s: the pace it holds now to meet the crests it has seen at the pace it can follow them
   paceWall: 1e9,          // (P26) m/s: the pace it holds now to stop at the foot of a wall it has seen (see EXPLORER_BODY.scrambleSlope)
+  paceHold: 1e9,          // (M4) m/s: the pace it holds now so that its footholds serve on this slope, in this wind (see EXPLORER_BODY.holdMargin; 1e9: no limit)
   wall: 0,                // (P26) 1 on a step whose feet a wall stopped (the speed into it taken), 2 on one that rode up a wall on its momentum, else 0
   wallAt: null,           // (P26) the last two places on the way that looked like a wall, and whether each is one (see wayWall)
   ahead: null,            // (P16) that face: { x, y, z (unit), rise (m), vc (m/s) } or null
@@ -1145,10 +1154,22 @@ function stepOnce(st, cmd, dt, env, T, S) {
       }
     }
     ex += ax; ey += ay; ez += az;
-    // soft ground: the work of pressing a footprint at every step opposes the motion
+    // (M4) what the soles must hold: gravity along the ground and the wind (see EXPLORER_BODY.holdMargin), ...
+    const esx = ex, esy = ey, esz = ez, hls = Math.hypot(esx, esy, esz);
+    // soft ground: the work of pressing a footprint at every step opposes the motion (... not this: it is the legs' work)
     if (sp > 1e-6) {
       const res = G.drag * support * Math.tanh(sp / 0.5) / sp;
       ex -= sx * res; ey -= sy * res; ez -= sz * res;
+    }
+    // (M4) SHORT STEPS: the pace at which the footholds this load needs still serve
+    B.paceHold = 1e9;
+    if (q > 0 && support > 1e-6 && G.foothold > 1e-6) {
+      const needFh = (hls / support - G.friction - T.hunkerGrip * hk) / G.foothold * (1 + T.holdMargin) + T.holdMargin;
+      if (needFh > 0 && needFh < 1) {                  // (all of them and more: no pace holds it: a step, or a slide, as before)
+        // the footholds' share at a pace is 1 - smoothstep(0.4 runFoothold, runFoothold, pace): its inverse
+        const y = 1 - needFh, x = 0.5 - Math.sin(Math.asin(1 - 2 * y) / 3);
+        B.paceHold = T.runFoothold * (0.4 + 0.6 * x);
+      }
     }
     // wading: liquid drag on the submerged legs and trunk (implicit below), as a rate
     const liqK = depth > 0 ? 0.5 * liq.density * T.wadeWidth * Math.min(depth, T.height) / T.mass : 0;
@@ -1162,7 +1183,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
       // ((P23) down low in a gale, a crawl: hunkerPace right down)
       const qh = hk > 0 && qlen > T.hunkerPace ? qlen + (T.hunkerPace - qlen) * hk : qlen;
-      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9, B.paceWall >= 0 ? B.paceWall : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
+      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9, B.paceWall >= 0 ? B.paceWall : 1e9, B.paceHold > sp ? B.paceHold : sp) / tl; tx *= m; ty *= m; tz *= m; }   // ((M4) short steps: it pushes no faster than its footholds serve, and does not brake for them: a run that comes onto such ground slides down to that pace, as it did)
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;
@@ -1184,7 +1205,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
     // alone exceeds mu N does the body really slide, on kinetic friction.
     const hold = G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, sp)) + T.hunkerGrip * hk;   // ((P23) down low, hands and knees too)
     const fmax = Math.max(0, hold * support);
-    const hl = Math.hypot(ex, ey, ez);
+    const hl = hls;                                    // ((M4) the loads the soles must hold: not the ground's drag)
     if (hl > fmax) {
       // cannot even hold: sliding. Friction is kinetic, or better when the body digs in
       const fk = Math.max(0, Math.max(G.kinetic, T.arrest * hold) * support);
@@ -1197,10 +1218,10 @@ function stepOnce(st, cmd, dt, env, T, S) {
     } else {
       B.slip01 = 0;
       if (fl > fmax) {
-        const dx = fx + ex, dy = fy + ey, dz = fz + ez;           // wanted change beyond holding
-        const a = dx * dx + dy * dy + dz * dz, b = -(ex * dx + ey * dy + ez * dz), c = hl * hl - fmax * fmax;
+        const dx = fx + esx, dy = fy + esy, dz = fz + esz;        // wanted change beyond holding
+        const a = dx * dx + dy * dy + dz * dz, b = -(esx * dx + esy * dy + esz * dz), c = hl * hl - fmax * fmax;
         const lam = a > 1e-12 ? clamp01((-b + Math.sqrt(Math.max(0, b * b - a * c))) / a) : 0;
-        fx = -ex + dx * lam; fy = -ey + dy * lam; fz = -ez + dz * lam;
+        fx = -esx + dx * lam; fy = -esy + dy * lam; fz = -esz + dz * lam;
         B.scramble01 = clamp01(1 - fmax / fl);
       } else B.scramble01 = 0;
     }
