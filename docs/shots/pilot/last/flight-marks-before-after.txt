@@ -1,0 +1,8 @@
+before 1200 m north of the place, heading -12: state ATMOSPHERE, 141 m up; marks [{"kind":"edge","label":"a place to land","x":285,"y":358,"r":0}]
+before 1200 m north of the place, heading 12: state ATMOSPHERE, 141 m up; marks [{"kind":"edge","label":"a place to land","x":681,"y":357,"r":0}]
+before 3000 m north of the place, heading -20: state ATMOSPHERE, 150 m up; marks [{"kind":"edge","label":"a place to land","x":296,"y":360,"r":0}]
+before nose on Jupiter (off 0.0, -0.2 deg), state ATMOSPHERE, target jupiter locked false; marks [{"kind":"target","label":"Jupiter","x":480,"y":256,"r":5},{"kind":"edge","label":"a place to land","x":512,"y":372,"r":0}]
+after 1200 m north of the place, heading -12: state ATMOSPHERE, 141 m up; marks [{"kind":"edge","label":"a place to land","x":113,"y":300,"r":0}]
+after 1200 m north of the place, heading 12: state ATMOSPHERE, 141 m up; marks [{"kind":"edge","label":"a place to land","x":113,"y":300,"r":0}]
+after 3000 m north of the place, heading -20: state ATMOSPHERE, 150 m up; marks [{"kind":"edge","label":"a place to land","x":113,"y":300,"r":0}]
+after nose on Jupiter (off 0.0, -0.2 deg), state ATMOSPHERE, target jupiter locked false; marks [{"kind":"edge","label":"a place to land","x":512,"y":372,"r":0}]

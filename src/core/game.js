@@ -520,6 +520,20 @@ export class Game {
         const dist = p.length();
         const over = -(ox * p.x + oy * p.y + oz * p.z) / R;       // the camera's height over the site's own horizon
         if (dist > 60) {
+          // Where the place lies over the ground from here (these worlds are small: the straight line
+          // to a place round the curve goes down through the ground): behind the way the view faces
+          // and to which side, unless it is nearly under the ship (nearer over the ground than the
+          // ship is high), where the way to it is down.
+          const up = this._u || (this._u = new THREE.Vector3()), fw = this._f || (this._f = new THREE.Vector3()), hv = this._h || (this._h = new THREE.Vector3());
+          up.copy(root.position).multiplyScalar(-1);
+          const high = up.length() - R;
+          up.normalize();
+          const ground = R * Math.acos(Math.max(-1, Math.min(1, (ox * up.x + oy * up.y + oz * up.z) / R)));
+          cam.getWorldDirection(fw).addScaledVector(up, -fw.dot(up));
+          hv.copy(p).addScaledVector(up, -p.dot(up));
+          const fl = fw.length(), along = fl > 1e-6 ? -hv.dot(fw) / fl : 0;
+          const across = fl > 1e-6 ? hv.dot(fw.cross(up)) / fl : 0;
+          const behind = along > 0 && ground > high;
           // In sight: a ring on the place. Round the curve of the world or out of the picture: an
           // arrow at the picture's edge, the way to fly.
           p.applyMatrix4(cam.matrixWorldInverse);
@@ -528,7 +542,7 @@ export class Game {
           if (over > 2 && Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) {
             list.push({ kind: 'body', keep: true, x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a place to land', sub: fmt(dist) });
           } else {
-            const a = this.edgeAngle(p, 'site');
+            const a = this.edgeAngle(p, 'site', behind, across, along);
             list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: 'a place to land', sub: fmt(dist) });
           }
         }
@@ -587,12 +601,14 @@ export class Game {
   // projection pointed down for anything behind and below (M4's second blind player: "the arrow
   // pointing down meant behind"): there it points to the side the point lies on, the way to turn,
   // a little low as on foot; near dead behind it keeps the side it had (the label jumped from
-  // side to side as the nose swung across the place behind).
-  edgeAngle(p, key) {
+  // side to side as the nose swung across the place behind). `behind`, `across` (to the right)
+  // and `along` (backward) may be given in the caller's own terms (the place to land: over the
+  // ground); by default they are read off p.
+  edgeAngle(p, key, behind = p.z >= 0, across = p.x, along = p.z) {
     const sides = this._edgeSides || (this._edgeSides = {});
-    let side = p.x >= 0 ? 1 : -1;
-    if (p.z < 0) { sides[key] = side; return Math.atan2(-p.y, p.x); }
-    if (sides[key] && Math.abs(p.x) < 0.25 * p.z) side = sides[key];
+    let side = across >= 0 ? 1 : -1;
+    if (!behind) { sides[key] = side; return Math.atan2(-p.y, p.x); }
+    if (sides[key] && Math.abs(across) < 0.25 * Math.abs(along)) side = sides[key];
     sides[key] = side;
     return side > 0 ? 0.3 : Math.PI - 0.3;
   }

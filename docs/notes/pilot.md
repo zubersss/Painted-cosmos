@@ -41,11 +41,19 @@ inside the walk in: on HEAD still LANDED 11.2 s of game time later; with the fix
 (2) Other worlds' labels under the edge of space. Cause: in the air the world nearest the nose became the target and
 its label showed (Uranus over Venus, Jupiter over Mars). `game.js updateMarks`: under the edge of space (ATMOSPHERE,
 LANDING) a world is marked only if it is the course chosen on the map (`sim.targetLocked`); above the air as before.
-(5) "a place to land": the arrow down meant behind. `game.js edgeAngle`: a flight edge arrow (the place to land and the
-course's world) for a point behind the view points to the side it lies on (a little low, as on foot), and near dead
-behind (within about 14 degrees) keeps the side it had (the label jumped sides as the nose swung); in front of the
-view as before (down for a place ahead and below). Test for (2) and (5): `tests/flightmarks.test.mjs` (new, 3 tests,
-all fail on `45629a7`).
+(5) "a place to land": the arrow down meant behind. `game.js edgeAngle`: a flight edge arrow for a point behind points
+to the side it lies on (a little low, as on foot), and near dead behind (within about 14 degrees) keeps the side it had
+(the label jumped sides as the nose swung); in front of the view as before (down for a place ahead and below). For the
+place to land "behind" is judged OVER THE GROUND (second commit of this round): these worlds are 3 to 4 km round, and
+the straight line to a place round the curve goes steeply down through the ground (the player's 6.6 km on Mars); a
+place nearer over the ground than the ship is high (the ship over it, the nose raised) is pointed at down, the way to
+it. (The first commit judged behind by the lens alone: with the nose raised over the place the arrow went to the side;
+filmed, corrected.) For the course's world, behind the lens. Test for (2) and (5): `tests/flightmarks.test.mjs` (new,
+3 tests, all fail on `45629a7`). Filmed in the real game (quality 0, 960 x 540, the ship teleported 150 m over Mars;
+`docs/shots/pilot/last/flight-marks-before-after.jpg` and `.txt`, opened): the place 1.2 km behind and a little left:
+before, an arrow at the lower left pointing down; after, at the left edge pointing left (3 km behind: left too); the
+nose on Jupiter in the air with the ship over the place: before, "Jupiter 418 km 71 s" over the ship and the place's
+arrow down; after, no Jupiter label, the place's arrow down. No console error, fallback `[]`.
 (3) README: "a place to land" is "where a newcomer to that world stands, the landscape it opens with"; the views to find
 are scattered, some near, some kilometres off, and stepping out a line says how far (measured in Node from each
 world's spawn to its nearest view: Moon 0, Pluto 0.08, Neptune 0.19, Mars 0.27, Mercury 0.28, Uranus 0.45, Venus 2.0,
@@ -66,7 +74,9 @@ the terrain mesh close up (PAINTER's).
 
 ### State of the tree and checks (this round)
 
-Checks on a clean export of `e56a93f` with this round's files (`t1`): world 25, unit 208 (202 + `sketchpage.test` 2,
+Second code commit (the place-to-land arrow over the ground): checks on a clean export of `0a92d45` (PAINTER's last
+fixes in) with it (`t2`): world 30, unit 208, physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all
+zeros. First code commit `3066381`: checks on a clean export of `e56a93f` with its files (`t1`): world 25, unit 208 (202 + `sketchpage.test` 2,
 `flightmarks.test` 3, the new `loop.test` case), physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all
 zeros (worst step loss 0.26 / 0.52 as always); the painted game at quality 0 loads with no console error, fallback
 `[]` (the probe). Commits: the code commit (items 0, 1, 2, 3, 5) is the first of this round. `node tests/all.mjs` in a

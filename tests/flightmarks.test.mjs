@@ -87,6 +87,15 @@ test('the edge arrow of a place to land behind the ship points to its side, and 
   P.g.landingSite = () => at(0, -300);
   m = one(P.marks());
   assert.ok(m && m.kind === 'edge' && Math.sin(m.angle) > 0.9, `ahead and below: down (angle ${m && (m.angle * 180 / Math.PI).toFixed(0)} deg)`);
+  // Behind the lens but nearly under the ship (nearer over the ground than the ship is high): down.
+  P.g.landingSite = () => at(60, 300);
+  m = one(P.marks());
+  assert.ok(m && m.kind === 'edge' && Math.sin(m.angle) > 0.9, `behind but nearly under the ship: down (angle ${m && (m.angle * 180 / Math.PI).toFixed(0)} deg)`);
+  // Far round the curve behind (4 km over the ground on a world 3.6 km round: the straight line to it
+  // goes steeply down through the ground, as on the player's Mars at 6.6 km): to the side, the way to turn.
+  P.g.landingSite = () => at(300, 7200);
+  m = one(P.marks());
+  assert.ok(m && m.kind === 'edge' && Math.cos(m.angle) > 0.9, `round the curve behind and to the right: right (angle ${m && (m.angle * 180 / Math.PI).toFixed(0)} deg)`);
 });
 
 test('the course\'s world behind the ship: its edge arrow points to the side too', () => {
