@@ -58,8 +58,8 @@ export function epoch0(fn) {
 // (M4) ... and with Earth's weather clock as it stood from P8 to M4 (REGIMES.earth.epoch = 480: the first thunderstorm
 // over the home forest from 160 to 320 s of the clock): the tests of the wind, the trees, the rain, the sea and the
 // prints that stand in that storm, or were tuned on the weather found at their place and time, run on the weather
-// they were written for. (In M4 the game's own clock moved, to -1200: the storm is at 1840 to 2000 s; weather.test.mjs
-// holds that.) fn may be async.
+// they were written for. (In M4 the game's own clock moved, to REGIMES.earth.epoch = -1050: the first drops at 1670 s,
+// the thunderstorm over the home forest from 1690 to 1850 s; weather.test.mjs holds that.) fn may be async.
 export function epochP8(fn) {
   const e = _REG.earth.epoch; _REG.earth.epoch = 480;
   let r;

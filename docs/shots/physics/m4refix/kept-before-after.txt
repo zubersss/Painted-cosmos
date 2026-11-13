@@ -1,0 +1,131 @@
+# M4 re-fix, R1: PHYSICS' kept sets (m4/s/kept.sh), a clean export of 246fce6 (head) against it with this commit's explorer.js (work). Lines that differ only by the tree's label are left out.
+=== kept (kept: P22-P26's knife, rows, mbv, hill43, field, p17; t8b: boulderrun's replay; ghostfield at PILOT's six places)
+43c43
+< slowest within 3 m 3.68, worst step loss 0.02 at -2.82 m, braced 0.00 m/s, feet 0.149 m up at most, thrown 0.000, 8 steps in the air
+---
+> slowest within 3 m 3.82, worst step loss 0.02 at -2.66 m, braced 0.00 m/s, feet 0.151 m up at most, thrown 0.000, 8 steps in the air
+=== t8b (kept: P22-P26's knife, rows, mbv, hill43, field, p17; t8b: boulderrun's replay; ghostfield at PILOT's six places)
+10c10
+<     grounded steps losing over 0.3 m/s 0, worst 0.28 m/s; 70.6 m in 12 s
+---
+>     grounded steps losing over 0.3 m/s 0, worst 0.27 m/s; 70.6 m in 12 s
+29,30c29,30
+< no boulders heading 180: feet 2.28 m over the ground at most, thrown up 0.000 m at most, mean pace 5.66 m/s
+<     10.47 s 1.50 s: feet 2.28 m, rose -0.16 m, ground fell 3.30 m, left at 4.2 m/s on 53 deg, boulder 0.62 m tall 3.73 m
+---
+> no boulders heading 180: feet 2.34 m over the ground at most, thrown up 0.000 m at most, mean pace 5.66 m/s
+>     10.47 s 1.50 s: feet 2.34 m, rose -0.13 m, ground fell 3.29 m, left at 4.2 m/s on 53 deg, boulder 0.62 m tall 3.73 m
+32c32
+< no boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.93 m/s
+---
+> no boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.92 m/s
+=== ghostfield (kept: P22-P26's knife, rows, mbv, hill43, field, p17; t8b: boulderrun's replay; ghostfield at PILOT's six places)
+(identical)
+=== wallrun-earth-alpine_meadow
+(identical)
+=== wallrun-earth-desert_canyon
+(identical)
+=== wallrun-earth-sea_coast
+1c1
+< earth sea_coast | h0: steepest 54, climb 0.7 m/s (on 53 deg), up 0.2 m on >50 deg | h45: steepest 24, climb 0.7 m/s (on 14 deg), up 0.0 m on >50 deg | h90: steepest 75, climb 2.3 m/s (on 32 deg), up 0.0 m on >50 deg | h135: steepest 21, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg | h180: steepest 21, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg | h225: steepest 50, climb 1.0 m/s (on 15 deg), up 0.0 m on >50 deg | h270: steepest 53, climb 1.0 m/s (on 46 deg), up 0.2 m on >50 deg | h315: steepest 57, climb 0.0 m/s (on 53 deg), up 0.2 m on >50 deg
+---
+> earth sea_coast | h0: steepest 54, climb 0.7 m/s (on 53 deg), up 0.2 m on >50 deg | h45: steepest 24, climb 0.7 m/s (on 14 deg), up 0.0 m on >50 deg | h90: steepest 75, climb 2.3 m/s (on 31 deg), up 0.0 m on >50 deg | h135: steepest 21, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg | h180: steepest 21, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg | h225: steepest 50, climb 1.0 m/s (on 14 deg), up 0.0 m on >50 deg | h270: steepest 53, climb 1.0 m/s (on 46 deg), up 0.2 m on >50 deg | h315: steepest 57, climb 0.0 m/s (on 53 deg), up 0.2 m on >50 deg
+=== wallrun-mars-rust_canyons
+(identical)
+=== wallrun-mercury-spawn
+(identical)
+=== wallrun-neptune-ice_spires
+(identical)
+=== wallrun-neptune-storm_seas
+(identical)
+=== wallrun-pluto-lilac_mountains
+(identical)
+=== runfield-earth-desert_canyon
+(identical)
+=== runfield-earth-spawn
+(identical)
+=== runfield-mars-rust_canyons
+(identical)
+=== runfield-mercury-spawn
+(identical)
+=== runfield-moon-crater_fields
+(identical)
+=== runfield-moon-spawn
+(identical)
+=== runfield-pluto-spawn
+(identical)
+
+######## raw, head
+    grounded steps losing over 0.3 m/s 0, worst 0.28 m/s; 64.1 m in 12 s
+boulders heading 0: feet 4.05 m over the ground at most, thrown up 0.000 m at most, mean pace 5.04 m/s
+    9.77 s 2.20 s: feet 4.05 m, rose -0.10 m, ground fell 7.48 m, left at 3.9 m/s on 53 deg, no boulder within 6 m
+    grounded steps losing over 0.3 m/s 0, worst 0.10 m/s; 74.7 m in 12 s
+boulders heading 45: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.00 m/s
+    grounded steps losing over 0.3 m/s 1, worst 1.34 m/s; 64.2 m in 12 s
+boulders heading 90: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.00 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.6 m in 12 s
+boulders heading 135: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.97 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.28 m/s; 70.6 m in 12 s
+boulders heading 180: feet 2.22 m over the ground at most, thrown up 0.000 m at most, mean pace 5.68 m/s
+    10.47 s 1.50 s: feet 2.22 m, rose -0.04 m, ground fell 3.18 m, left at 4.3 m/s on 55 deg, boulder 0.62 m tall 3.81 m
+    grounded steps losing over 0.3 m/s 0, worst 0.12 m/s; 71.0 m in 12 s
+boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.73 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 72.4 m in 12 s
+boulders heading 270: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.89 m/s
+    grounded steps losing over 0.3 m/s 2, worst 0.95 m/s; 44.2 m in 12 s
+boulders heading 315: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 3.31 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 67.0 m in 12 s
+no boulders heading 0: feet 4.31 m over the ground at most, thrown up 0.000 m at most, mean pace 5.29 m/s
+    9.37 s 2.60 s: feet 4.31 m, rose -0.03 m, ground fell 7.61 m, left at 3.9 m/s on 53 deg, no boulder within 6 m
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.3 m in 12 s
+no boulders heading 45: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.98 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.12 m/s; 65.8 m in 12 s
+no boulders heading 90: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.19 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.4 m in 12 s
+no boulders heading 135: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.98 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.12 m/s; 70.1 m in 12 s
+no boulders heading 180: feet 2.28 m over the ground at most, thrown up 0.000 m at most, mean pace 5.66 m/s
+    10.47 s 1.50 s: feet 2.28 m, rose -0.16 m, ground fell 3.30 m, left at 4.2 m/s on 53 deg, boulder 0.62 m tall 3.73 m
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.0 m in 12 s
+no boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.93 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.14 m/s; 73.9 m in 12 s
+no boulders heading 270: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.04 m/s
+    grounded steps losing over 0.3 m/s 1, worst 0.43 m/s; 36.3 m in 12 s
+no boulders heading 315: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 2.67 m/s
+######## raw, work
+    grounded steps losing over 0.3 m/s 0, worst 0.28 m/s; 64.1 m in 12 s
+boulders heading 0: feet 4.05 m over the ground at most, thrown up 0.000 m at most, mean pace 5.04 m/s
+    9.77 s 2.20 s: feet 4.05 m, rose -0.10 m, ground fell 7.48 m, left at 3.9 m/s on 53 deg, no boulder within 6 m
+    grounded steps losing over 0.3 m/s 0, worst 0.10 m/s; 74.7 m in 12 s
+boulders heading 45: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.00 m/s
+    grounded steps losing over 0.3 m/s 1, worst 1.34 m/s; 64.2 m in 12 s
+boulders heading 90: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.00 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.6 m in 12 s
+boulders heading 135: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.97 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.27 m/s; 70.6 m in 12 s
+boulders heading 180: feet 2.22 m over the ground at most, thrown up 0.000 m at most, mean pace 5.68 m/s
+    10.47 s 1.50 s: feet 2.22 m, rose -0.04 m, ground fell 3.18 m, left at 4.3 m/s on 55 deg, boulder 0.62 m tall 3.81 m
+    grounded steps losing over 0.3 m/s 0, worst 0.12 m/s; 71.0 m in 12 s
+boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.73 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 72.4 m in 12 s
+boulders heading 270: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.89 m/s
+    grounded steps losing over 0.3 m/s 2, worst 0.95 m/s; 44.2 m in 12 s
+boulders heading 315: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 3.31 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 67.0 m in 12 s
+no boulders heading 0: feet 4.31 m over the ground at most, thrown up 0.000 m at most, mean pace 5.29 m/s
+    9.37 s 2.60 s: feet 4.31 m, rose -0.03 m, ground fell 7.61 m, left at 3.9 m/s on 53 deg, no boulder within 6 m
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.3 m in 12 s
+no boulders heading 45: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.98 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.12 m/s; 65.8 m in 12 s
+no boulders heading 90: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.19 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.4 m in 12 s
+no boulders heading 135: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.98 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.12 m/s; 70.1 m in 12 s
+no boulders heading 180: feet 2.34 m over the ground at most, thrown up 0.000 m at most, mean pace 5.66 m/s
+    10.47 s 1.50 s: feet 2.34 m, rose -0.13 m, ground fell 3.29 m, left at 4.2 m/s on 53 deg, boulder 0.62 m tall 3.73 m
+    grounded steps losing over 0.3 m/s 0, worst 0.11 m/s; 73.0 m in 12 s
+no boulders heading 225: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 5.92 m/s
+    grounded steps losing over 0.3 m/s 0, worst 0.14 m/s; 73.9 m in 12 s
+no boulders heading 270: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 6.04 m/s
+    grounded steps losing over 0.3 m/s 1, worst 0.43 m/s; 36.3 m in 12 s
+no boulders heading 315: feet 0.00 m over the ground at most, thrown up 0.000 m at most, mean pace 2.67 m/s

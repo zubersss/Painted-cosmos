@@ -71,6 +71,18 @@ export const EXPLORER_BODY = Object.freeze({
   // not a load the soles must hold, so a soft slope the soles do hold (a dune's face under its angle of repose) is not
   // a slide either (it was: 0.1 to 0.6 m/s up 22 to 36 degrees of dry sand).
   holdMargin: 0.04,       // share of the footholds kept in hand at that pace
+  // (M4 re-fix) ... up, across and a little down only. Going DOWN a slope (or with the wind behind) the short steps ease
+  // out and the walker keeps the walk's own pace, as before M4: wet litter at 24 degrees is walked down at 3.7 m/s, not
+  // 2.2 (the M4 fix slowed every wet or soft descent: wet desert at 36 degrees 3.27 -> 1.63 m/s, a step slower than the
+  // degree steeper, which the soles did not hold at any pace and was walked down at 3.09). Where the soles do not hold
+  // the walk's pace going down, the body skids down at it, as before M4 (no runaway: the slide's friction and the legs).
+  // And the ground's drag, which is the legs' work and no load on the soles where it works against them (M4), going down
+  // holds what it holds (it holds the body back): the soles hold the lesser of the load with it and without it, so a
+  // descent the soles held before M4 is held again, step for step. Straight down to 53 degrees off it: as before M4;
+  // up, across and to 12 degrees below across: as the M4 fix left it; between, a blend of the two.
+  holdDownFrom: 0.2,      // cosine of the angle between the walk and the load (straight down it: 1, across: 0) at which
+                          // the short steps begin to ease out (12 degrees below across) ...
+  holdDown: 0.6,          // ... and at which they are gone (53 degrees off straight down)
   arrest: 0.85,           // sliding out of control, the body digs in heels and hands: friction is this
                           // fraction of the holding traction (never less than the kinetic coefficient)
   // LEGS (P9). st.p is the feet; the mass rides at the hips, one leg above them. The legs are a
@@ -271,7 +283,7 @@ export const EXPLORER_BODY_STATE = () => ({
   paceAhead: 1e9,         // (P16) m/s: the pace it holds now to meet a face it has seen ahead at the pace it can climb it
   paceCrest: 1e9,         // (P22) m/s: the pace it holds now to meet the crests it has seen at the pace it can follow them
   paceWall: 1e9,          // (P26) m/s: the pace it holds now to stop at the foot of a wall it has seen (see EXPLORER_BODY.scrambleSlope)
-  paceHold: 1e9,          // (M4) m/s: the pace it holds now so that its footholds serve on this slope, in this wind (see EXPLORER_BODY.holdMargin; 1e9: no limit)
+  paceHold: 1e9,          // (M4) m/s: the pace it holds now so that its footholds serve on this slope, in this wind (see EXPLORER_BODY.holdMargin; 1e9: no limit; (M4 re-fix) a walk down the load eases out of it: EXPLORER_BODY.holdDown)
   wall: 0,                // (P26) 1 on a step whose feet a wall stopped (the speed into it taken), 2 on one that rode up a wall on its momentum, else 0
   wallAt: null,           // (P26) the last two places on the way that looked like a wall, and whether each is one (see wayWall)
   ahead: null,            // (P16) that face: { x, y, z (unit), rise (m), vc (m/s) } or null
@@ -1169,11 +1181,26 @@ function stepOnce(st, cmd, dt, env, T, S) {
     }
     ex += ax; ey += ay; ez += az;
     // (M4) what the soles must hold: gravity along the ground and the wind (see EXPLORER_BODY.holdMargin), ...
-    const esx = ex, esy = ey, esz = ez, hls = Math.hypot(esx, esy, esz);
+    const lsx = ex, lsy = ey, lsz = ez, lsl = Math.hypot(lsx, lsy, lsz);
+    let esx = lsx, esy = lsy, esz = lsz, hls = lsl;
+    // (M4 re-fix) how far the walk goes DOWN that load (see EXPLORER_BODY.holdDown): 0 against it, across it and to 12
+    // degrees below across, 1 within 53 degrees of straight down it (the wish's heading along the ground, as the target
+    // below takes it)
+    let wDown = 0;
+    if (qlen > 1e-6 && lsl > 1e-9) {
+      const k = (qx * nx + qy * ny + qz * nz) / nu, ax = qx - ux * k, ay = qy - uy * k, az = qz - uz * k, al = Math.hypot(ax, ay, az);
+      const c = al > 1e-9 ? (ax * lsx + ay * lsy + az * lsz) / (al * lsl) : 0;
+      wDown = smoothstep(T.holdDownFrom, T.holdDown, c);
+    }
     // soft ground: the work of pressing a footprint at every step opposes the motion (... not this: it is the legs' work)
     if (sp > 1e-6) {
       const res = G.drag * support * Math.tanh(sp / 0.5) / sp;
       ex -= sx * res; ey -= sy * res; ez -= sz * res;
+      // ((M4 re-fix) ... but going down, where it holds part of that load, it holds it, as before M4)
+      if (wDown > 0) {
+        const hx = lsx + (ex - lsx) * wDown, hy = lsy + (ey - lsy) * wDown, hz = lsz + (ez - lsz) * wDown, h2 = Math.hypot(hx, hy, hz);
+        if (h2 < hls) { esx = hx; esy = hy; esz = hz; hls = h2; }
+      }
     }
     // (M4) SHORT STEPS: the pace at which the footholds this load needs still serve
     B.paceHold = 1e9;
@@ -1197,7 +1224,11 @@ function stepOnce(st, cmd, dt, env, T, S) {
       // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
       // ((P23) down low in a gale, a crawl: hunkerPace right down)
       const qh = hk > 0 && qlen > T.hunkerPace ? qlen + (T.hunkerPace - qlen) * hk : qlen;
-      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9, B.paceWall >= 0 ? B.paceWall : 1e9, B.paceHold > sp ? B.paceHold : sp) / tl; tx *= m; ty *= m; tz *= m; }   // ((M4) short steps: it pushes no faster than its footholds serve, and does not brake for them: a run that comes onto such ground slides down to that pace, as it did)
+      // ((M4 re-fix) the short steps are for a walk up the load or across it: going down it (with the wind behind) they
+      // ease out, gone within 53 degrees of straight down: the walk's own pace, as before M4 (where the soles do not hold
+      // that pace the body skids down, as it did; see EXPLORER_BODY.holdDown))
+      const ph = B.paceHold < qh ? B.paceHold + (qh - B.paceHold) * wDown : B.paceHold;
+      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9, B.paceWall >= 0 ? B.paceWall : 1e9, ph > sp ? ph : sp) / tl; tx *= m; ty *= m; tz *= m; }   // ((M4) short steps: it pushes no faster than its footholds serve, and does not brake for them: a run that comes onto such ground slides down to that pace, as it did)
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;

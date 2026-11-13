@@ -3,6 +3,98 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
+## Hand-over P28, the M4 RE-FIX pass (twenty-sixth PHYSICS agent; READ THIS BLOCK FIRST; P27 below holds for everything not named here)
+
+**The pass.** The independent verifier accepted every item of P27 and found two PHYSICS regressions to fix, nothing
+else: **(R1, minor, feel)** P27 item A's short steps (`paceHold`) also bind going DOWNHILL, so descents on wet or soft
+slopes became much slower than on `6cfab48` (wet litter 3.68 -> 2.24 m/s at 24 degrees, wet desert 3.27 -> 1.63 at 36;
+the verifier's `/home/user/.pc-scratch/verify/physics/scripts/slope2.mjs`, outputs in `.../verify/physics/o/slope2-all.txt`);
+no test covered descent. **(R2, nit)** `testworld.mjs` `epochP8`'s comment gives the wrong new epoch and storm times.
+Two observations that are not PHYSICS' (the leaf column at the alpine stand is PAINTER's drawing; the two footcam
+failures were PILOT's and are resolved at `5fd7a0a`) are only passed on. Scratch: `/home/user/.pc-scratch/physics/m4/r/`
+(`head/` a clean export of `246fce6`, `c6/` `6cfab48`'s `src`, `work/` the work tree, `slope2.mjs` the verifier's
+instrument copied; `sweep.sh <root> <out>` its fourteen sections on a tree, `cmp.py a b [filter]` two sweeps compared,
+`slopeang.mjs <root> [g wish hz deg cases]` a walk at every heading on a slope, `downtest.mjs <root>` the new test's
+measurement; `out/` their outputs).
+
+**State:** R1 DONE and R2 DONE, one commit (the one that carries this block; its message names both). Nothing of
+this pass is open. What was not verified is under "Not verified" at the end of this block.
+
+**R1. GOING DOWN, THE WALK'S OWN PACE (`explorer.js`: `EXPLORER_BODY.holdDownFrom` 0.2, `.holdDown` 0.6).**
+- *Reproduced* on a clean export of `246fce6` with the verifier's own `slope2.mjs`, to the digit of its report (wet litter
+  down 22 / 24 / 25 degrees 2.95 / 2.24 / 2.32 m/s, wet grass 24 / 25 / 26 2.67 / 2.37 / 2.01, dry sand 34 / 36 / 40 2.87 /
+  2.81 / 2.70, wet desert 36 1.63; `6cfab48` 3.73 / 3.68 / 3.65, 3.68 / 3.65 / 3.62, 3.35 / 3.27 / 3.09, 3.27). Worse than
+  slow, it was uneven: wet litter at 25 degrees 2.32 m/s, at 26 (which no pace holds, so no short steps) 3.62; wet desert
+  at 36 degrees 1.63, at 40 3.09.
+- *The cause.* Two things of P27 item A applied going down as well as up: (a) the short steps' cap (`paceHold`), and (b)
+  the soles' load without the ground's drag. Going down, the drag works WITH the soles (it holds the body back), so
+  leaving it out made a descent the soles had held at the walk's pace before M4 need the footholds, and so short steps.
+- *The fix* (my choice, logged: a descent should flow; the short steps were made for the climb that stood still, and a
+  descent never stood still): `wDown`, how far the walk's heading goes down the load (gravity along the ground and the
+  wind), 0 from straight up to 12 degrees below across, 1 from 53 degrees off straight down, a smoothstep between. With
+  it (1) the short steps ease out (`ph = paceHold + (wish - paceHold) x wDown`) and (2) the soles hold the lesser of the
+  load without the drag and the load with `wDown` of it. At `wDown` 1 the step is `6cfab48`'s to the digit; at 0 it is
+  `246fce6`'s to the digit. Where the soles do not hold the walk's pace going down the body skids down at it, as before
+  M4 (`slip01` > 0; no runaway: the slide's friction and the legs; nothing in the game draws or plays `slip01`).
+- *Measured after* (`docs/shots/physics/m4refix/descent-before-after.txt`, the verifier's fourteen sections: down, across,
+  up; g 9, 4.6, 2.2, 1.4; walk and run; 30 and 60 Hz): **every DOWN section is `6cfab48`'s to the digit** (wet litter 3.73
+  / 3.68 / 3.65, wet desert at 36 degrees 3.27, at g 4.6 wet litter at 25 3.65, at g 1.4 wet grass at 27 3.59); **every UP
+  and ACROSS section is `246fce6`'s to the digit** (across wet litter at 24 degrees 2.47 m/s with no slipping, the line
+  held: 0.02 m lost a second; `6cfab48`: 2.93 m/s, 90 % slipping, 0.38 m lost a second). At every heading
+  (`m4refix/headings-before-after.txt`, 24, 30 and 36 degrees): up to 10 degrees below across the M4 fix's numbers,
+  from 45 degrees below across `6cfab48`'s, a blend at 20 to 30 (wet litter at 24 degrees, 20 degrees below across:
+  3.30 m/s skidding; head 2.50 held; `6cfab48` 4.14 skidding).
+- *Test* (`explorer.test.mjs`, new, fails on `246fce6`: "down 22 degrees of wet temperate_forest at g 9.81, 60 Hz: 3.30
+  m/s"): **M4 re-fix: a wet or soft slope is walked DOWN at the walk's own pace** (wet litter 16 to 40 degrees, wet grass
+  20 to 40, dry sand 26 to 40, wet sand 30 to 40; g 9.81, 4.6, 1.4; 60 and 30 Hz: mean speed 3.9 to 4.8 m/s, no second
+  under 2.5 m; up wet litter at 24 degrees still on short steps, 1.8 to 3.2 m/s, held; across wet litter and wet grass at
+  24 degrees held, under 0.1 m lost a second). P27's **M4 short steps** test's descent line ("down the same wet bank: the
+  same short steps", 1.5 to 3.4 m/s) now asks for the walk's pace (3.9 to 4.4 m/s, held).
+
+**R2. THE COMMENT ON `epochP8`** (`testworld.mjs`): "-1200 ... 1840 to 2000 s" -> "REGIMES.earth.epoch = -1050: the first
+drops at 1670 s, the thunderstorm over the home forest from 1690 to 1850 s" (what `weather.js` and `weather.test.mjs` say).
+
+**Kept, measured** (`m4/s/kept.sh` on `246fce6` and on it with this `explorer.js`; `m4refix/kept-before-after.txt`):
+boulderrun's replay thrown up 0.000 in all sixteen runs (one drop's feet over the ground 2.28 -> 2.34 m, mean paces within
+0.01 m/s); P22 to P26's knife, rows, field, p17 and hill43 sets identical; mbv identical but the OLD Moon strip line (the
+slide down the small rim's wall, slowest within 3 m 3.68 -> 3.82 m/s: back toward its 4.54 before M4); `runfield` at the
+seven stands identical; `wallrun` at the eight places the same metres on ground over 50 degrees; `ghostfield` identical.
+**The must-hold check** (PILOT's `docs/lead/evidence/pilot11/wallrun.mjs` on the checked tree; `m4refix/wallrun-final.txt`):
+Earth sea_coast 0.2 / 0.2 / 0.2 m on ground over 50 degrees (headings 0, 270, 315), desert_canyon 1.1 / 0.2 (225, 270):
+P26's and P27's numbers to the digit.
+
+**Checks** (a clean export of `246fce6` with this commit's three files, `m4/r/final`, `cmp`-identical to the committed
+files; `m4refix/checks-final.txt`): `node --test src/world/*.test.mjs` 22 of 22; `node --test tests/*.test.mjs` 184 of
+184; `node --test src/physics/` **325 of 325** (324 + the new test); `node src/physics/coast.mjs` PASS at both stands
+(Earth: reference Hs 0.79 m, target 0.63, white 5.37 %; Neptune 3.85, 3.08, 100 %); `ghostfield.mjs` every counter zero
+(worst step loss 0.26 and 0.52, as before). The game in one browser at quality 0, 480 x 270 (`m4/s/loadcheck.mjs`;
+`m4refix/load-final.txt`): the spawn, a walk, the storm at clock 1770 (thunderstorm): **no console error, no game error,
+`info().fallback` empty**, render, world, art and physics real (ui the stub). One frame opened (the walk: the figure in
+the birch wood, the ship beyond): a load check, not a judgement of the picture.
+
+**New for callers** (additive): `EXPLORER_BODY.holdDownFrom` (0.2), `.holdDown` (0.6). **Behaves differently with no
+call changed:** a walk down a slope (or with the wind behind) is no longer held to short steps (see R1); `st.phys.paceHold`
+is the same law but its load counts the drag going down, and it binds a walk down the load less and less (gone from 53
+degrees off straight down).
+
+**For PILOT (feel; the verifier asked that PILOT judge it):** the choice made here is "a descent flows, as before M4":
+straight down a wet or soft slope at the walk's pace, skidding (`slip01` > 0, which nothing draws) where the soles do
+not hold it; the climb and the traverse keep the M4 short steps. If a careful descent is wanted instead, raise
+`EXPLORER_BODY.holdDownFrom` and `.holdDown` toward 1 (keep `holdDown` above `holdDownFrom`; with both over 1, e.g. 2
+and 3, the M4 fix's descent comes back whole: the short steps straight down, which the verifier measured as the
+regression; the new test would then fail, as it should).
+
+**Passed on, not PHYSICS':** (a) for PAINTER, from the verifier: at Earth's `alpine_meadow` stand at quality 2 a tall
+leaning column of green leaf dabs fills the sky and a cascade of leaf dabs hangs at the upper left, on `6cfab48` as on the
+head, in calm weather too; PHYSICS' leaves buffer is empty there (0 in the page and in Node), so it comes from drawn
+objects (the verifier's frames `/home/user/.pc-scratch/verify/physics/o/D/*.jpg`, `o/B/head-blizzard-*.jpg`); not looked
+into by me. (b) The two `tests/footcam.test.mjs` failures were PILOT's and pass from `5fd7a0a` (unit 184 of 184 here).
+
+**Not verified (plainly):** R1 was not seen in the game's picture or played in a browser: the descents are measured in
+Node only (the verifier's instrument, mine, the tests, the kept sets, PAINTER's real Earth in "M4 on PAINTER's real Earth,
+soaked": 893 m in all on both trees, no stall); no frame at quality 1 or 2 in this pass; the frame rate not measured;
+PILOT's browser play-throughs not run.
+
 ## Hand-over P27, the M4 fix round (twenty-fifth PHYSICS agent, the fixer; READ THIS BLOCK FIRST; kept current after every item; P26 and older below hold for everything not named here)
 
 **The block.** The critics' FIX FOR SHIP items on PHYSICS (the ten of the workflow's list: PILOT's `docs/lead/CRITIQUE.md`

@@ -1152,12 +1152,55 @@ test('M4 short steps: a slope the soles hold only with their footholds (wet leav
     for (const deg of [22, 24, 26]) { const c = climb('alpine_meadow', 1, deg, hz); assert.ok(c.worst > 1.5 && c.slip < 0.05, `wet grass ${deg} degrees, ${hz} Hz: ${c.worst.toFixed(2)} m/s, slipping ${c.slip.toFixed(2)}`); }
     // a dune's face: the soles hold it (0.60 to 31 degrees); pressing footprints is the legs' work
     for (const deg of [22, 26, 30]) { const c = climb('desert_canyon', 0, deg, hz); assert.ok(c.worst > 2.5 && c.slip < 0.05, `dry sand ${deg} degrees, ${hz} Hz: ${c.worst.toFixed(2)} m/s (head: 0.6 to 0.1), slipping ${c.slip.toFixed(2)}`); }
-    // down the same wet bank: the same short steps, no runaway
+    // down the same wet bank: ((M4 re-fix) not short steps, the walk's own pace, as before M4), held, no runaway
     const d = climb('temperate_forest', 1, 24, hz, 4.2, 1);
-    assert.ok(d.mean > 1.5 && d.mean < 3.4 && d.slip < 0.05, `down 24 degrees of wet litter: ${d.mean.toFixed(2)} m/s, slipping ${d.slip.toFixed(2)}`);
+    assert.ok(d.mean > 3.9 && d.mean < 4.4 && d.slip < 0.05, `down 24 degrees of wet litter: ${d.mean.toFixed(2)} m/s, slipping ${d.slip.toFixed(2)}`);
     // wet and level: the walk's own pace, no limit
     const lv = make({ g: 9.81, ground: gr('temperate_forest', 0, 1) }); run(lv, 4, { wish: V(4.2, 0, 0), assistAccel: 4 }, { hz });
     assert.ok(Math.abs(speed(lv.st) - 4.2) < 0.1 && lv.st.phys.paceHold > 1e8, `wet and level: ${speed(lv.st).toFixed(2)} m/s`);
+  }
+});
+
+// ---- (M4 re-fix) the short steps are for the climb and the traverse: a wet or soft slope is walked DOWN at the walk's pace
+test('M4 re-fix: a wet or soft slope is walked DOWN at the walk\'s own pace, as before M4, never on short steps (60 and 30 Hz; g 9.81, 4.6, 1.4); the climb and the traverse keep their short steps', async () => {
+  // The verifier of the M4 fix round: the short steps also bound going down, wherever the soles needed their footholds:
+  // wet litter at 22 / 24 / 25 degrees 3.73 / 3.68 / 3.65 -> 2.95 / 2.24 / 2.32 m/s, wet grass at 24 / 25 / 26 3.68 / 3.65 /
+  // 3.62 -> 2.67 / 2.37 / 2.01, dry sand at 34 / 36 / 40 3.35 / 3.27 / 3.09 -> 2.87 / 2.81 / 2.70, wet desert at 36 3.27 ->
+  // 1.63 (a degree steeper, which no pace held, 3.09); at g 4.6 wet litter at 25 3.65 -> 1.62, at g 1.4 wet grass at 27
+  // 3.59 -> 1.87 (W held, progress over the ground at 30 Hz). Going down, the walker keeps the walk's pace; where the soles
+  // do not hold it the body skids down at it, as before M4 (the slide's friction and the legs: no runaway).
+  const { groundAt } = await import('./ground.js');
+  const gr = (biome, slope, wet) => groundAt('earth', { radius: R, slope, liquidRadius: 0, biomeId: biome, biomeWeights: { [biome]: 1 } }, { wetness01: wet, snowDepth: 0, temperature: 288 }, {});
+  const walk = (biome, wet, deg, hz, g, way) => {
+    const a = deg * Math.PI / 180, H = 400, rad = H / Math.tan(a), x0 = (way === 'up' ? 0.75 : way === 'down' ? 0.35 : 0.55) * rad;
+    const sim = make({ world: { cone: { dir: norm(V(0, 0, 1)), radius: rad, height: H } }, dir: V(Math.sin(x0 / R), 0, Math.cos(x0 / R)), g, ground: gr(biome, a, wet) });
+    const wish = way === 'up' ? V(-4.2, 0, 0) : way === 'down' ? V(4.2, 0, 0) : V(0, 4.2, 0);
+    let sum = 0, n = 0, slip = 0, worst = 99, last = { ...sim.st.p }, k = 0, r3 = 0;
+    run(sim, 9, { wish, assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, { hz, each: (t, st) => {
+      if (t > 3) { sum += speed(st); n++; if (st.phys.slip01 > 0) slip++; }
+      if (Math.abs(t - 3) < 0.5 / hz) r3 = len(st.p);
+      if (++k % hz === 0) { const m = len(V(st.p.x - last.x, st.p.y - last.y, st.p.z - last.z)); if (k > hz) worst = Math.min(worst, m); last = { ...st.p }; }
+    } });
+    assert.ok(finite(sim.st), `${biome} ${deg} ${way}: NaN`);
+    return { mean: sum / n, worst, slip: slip / n, rise: (len(sim.st.p) - r3) / 6 };
+  };
+  const DOWN = [['temperate_forest', 1, [16, 20, 22, 24, 25, 26, 30, 34, 40]], ['alpine_meadow', 1, [20, 22, 24, 26, 27, 30, 34, 40]], ['desert_canyon', 0, [26, 30, 34, 36, 40]], ['desert_canyon', 1, [30, 34, 36, 40]]];
+  for (const hz of [60, 30]) {
+    for (const g of [9.81, 4.6, 1.4]) {
+      for (const [biome, wet, degs] of DOWN) for (const deg of degs) {
+        const d = walk(biome, wet, deg, hz, g, 'down');
+        assert.ok(d.mean > 3.9 && d.mean < 4.8, `down ${deg} degrees of ${wet ? 'wet' : 'dry'} ${biome} at g ${g}, ${hz} Hz: ${d.mean.toFixed(2)} m/s along the ground (the walk's pace is 4.2, no runaway; 246fce6: down to 1.87)`);
+        assert.ok(d.worst > 2.5, `down ${deg} degrees of ${wet ? 'wet' : 'dry'} ${biome} at g ${g}, ${hz} Hz: slowest second ${d.worst.toFixed(2)} m (246fce6: 1.84)`);
+      }
+    }
+    // the climb and the traverse keep the short steps of the M4 fix: up wet litter at 24 degrees on short steps, held; across
+    // it held, the line kept (6cfab48: slipping 0.83 of the steps, 0.38 m lost a second)
+    const up = walk('temperate_forest', 1, 24, hz, 9.81, 'up');
+    assert.ok(up.mean > 1.8 && up.mean < 3.2 && up.slip < 0.05, `up 24 degrees of wet litter: ${up.mean.toFixed(2)} m/s, slipping ${up.slip.toFixed(2)}`);
+    for (const biome of ['temperate_forest', 'alpine_meadow']) {
+      const ac = walk(biome, 1, 24, hz, 9.81, 'across');
+      assert.ok(ac.slip < 0.05 && ac.rise > -0.1 && ac.mean > 2.2, `across 24 degrees of wet ${biome}: ${ac.mean.toFixed(2)} m/s, slipping ${ac.slip.toFixed(2)}, ${ac.rise.toFixed(2)} m a second lost`);
+    }
   }
 });
 
