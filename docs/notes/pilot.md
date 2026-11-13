@@ -35,7 +35,7 @@ items are done or named under "Not fixed"; nothing is half-done in the working t
    (`m4refix/spawnout.txt`; head: no figure at Earth, Saturn, Neptune). `stepout2.mjs -v` (52 assisted landings): boom
    under 4 m at 0, hull over a sixth of the frame at 1 (Venus' acid_terraces, 17 %), mean cover 3.9 %
    (`docs/shots/pilot/m4fix/stepout-after.txt` rewritten from this tree, all 52 lines; the old file predated the
-   crown rule). Real game, quality 0, 640 x 360, the verifier's scenes (`s17/out1`, copied to `docs/shots/pilot/m4refix/`: walk-spawn, walk-autumn, stepout-earth-spawn(-settled), stepout-saturn, stepout-neptune, jet-by-ship-up/down, film1.log; all opened): the first walk of a new
+   crown rule). Real game, quality 0, 640 x 360, the verifier's scenes (`s17/out1`, copied to `docs/shots/pilot/m4refix/`: walk-spawn, walk-autumn, stepout-earth-spawn(-settled), stepout-saturn, stepout-neptune, jet-by-ship-up/down, film1-log.txt; all opened): the first walk of a new
    game, W held 24 s from the spawn: figure not drawn in 0 of 720 steps (head 143); stepping out at Earth's spawn
    (`v-out`): 0 of 72 steps without the figure, settled boom 5.2 m, hull 6.9 % of the frame, the explorer in the lower
    middle (head: boom 1.6, tight 0.78, no figure); the jetpack beside the ship up and down (`jet2-up`, `jet2-down`):
@@ -97,7 +97,7 @@ items are done or named under "Not fixed"; nothing is half-done in the working t
    PASS at both stands, `ghostfield.mjs` all zeros.
 
 7. **Seen in the real game: the label off the ship** (item 3). The verifier's `aimoff` scene (quality 0, 640 x 360,
-   chase view 5 km over Earth, Mars the target; `docs/shots/pilot/m4refix/aimoff-*.jpg` and `aimoff.log`, opened):
+   chase view 5 km over Earth, Mars the target; `docs/shots/pilot/m4refix/aimoff-*.jpg` and `aimoff-log.txt`, opened):
    the nose on Mars, 2, 4 and 7 degrees over it, 5 right, 8 left, 3 under: the label off the ship's box every time
    (nose 4 degrees over: label y 133-172 over the ship's top at 173, the ship whole; the fix round's head had it at
    y 204-243 on the ship). Game errors none.
@@ -107,7 +107,7 @@ items are done or named under "Not fixed"; nothing is half-done in the working t
 - **The landing's chase camera beside a crown (PHYSICS 4's last part).** Filmed on this tree
   (`m4refix/landfast.jpg`, opened): as in the fix round, frames 20 to 22 (1.5 s of an 11 s landing) a flat crown over
   the left half of the picture as the ship goes down into the clearing. Measured in the real game
-  (`m4refix/landdiag.log`, the scene `scripts/landdiag.mjs`; rays from the lens through the cameras' crown model):
+  (`m4refix/landdiag-log.txt`, the scene `scripts/landdiag.mjs`; rays from the lens through the cameras' crown model):
   the lens keeps its margin (1.44 m from the nearest crown) but that crown, 3.6 to 8 m ahead-left, covers 29 to 45 %
   of the picture from 11 m over the ground to 3 m. Tried and taken out again (the tree is as committed):
   (a) a clear line of sight to the ship: no effect, the crown is beside the line; (b) a larger margin in a landing
