@@ -13,12 +13,17 @@ seem to hang above the horizon (`163_sat_look.jpg`); (3) the hard-edged faceted 
 (4) if time: Uranus' plain, Venus' cream haze at 439 m. Began 22:20 UTC, 2026-11-13, on head `e56a93f`.
 Scratch: `/home/user/.pc-scratch/painter/last/` (`live3.mjs`, `lib.mjs`, `send.sh`, `mk.sh`, `checks.sh`, `sheet.py` copied
 from the pre-ship round's harness; command files in `cmds/`; `views.sh` the Neptune spire views, `sat.sh` the far-form views;
-trees `F` the head, `G` the head with my working files, `C1` the check tree; live logs and frames in `L1`..`L8`; `L1` was a
+trees `F` the head, `G` the head with my working files, `C1`/`C2` the check trees, all deleted after use; live logs and
+frames kept in `L1`..`L9`, `M1` (Mars); `L1` was a
 long session whose state drifted, its frames are not used as evidence: every before/after pair is two fresh pages run
 through the same command sequence). Evidence: `docs/shots/painter/last/` (every picture named here was opened by me).
 
-**State:** item 1 DONE (committed `0112e5e`, on `3066381`); item 2 DONE (committed with this note); items 3 and 4 not
-started at the time of writing.
+**State at the end of the round:** item 1 DONE (`0112e5e`, on `3066381`); item 2 DONE (`5fd389b`); item 3 NOT fixed
+(investigated, not reproduced as the player saw it, the cause most likely outside PAINTER's paths: below); item 4 NOT done
+(by choice: below). Nothing of mine is half-done in the working tree; the scratch trees were deleted after use (disk).
+For another role: PILOT, the foot camera's boom and the first-person eye against walls and inside tall props (items 1 and
+3 below). What a successor could take next: the eye inside the rendered terrain on a canyon wall at quality 0 (item 3's
+hypothesis, to prove or drop), Uranus' flats, Venus' climb.
 
 - **ITEM 1, NEPTUNE'S HARD-EDGED DARK-BLUE POLYGONS AT THE FRAME CORNERS: DONE.** What they were (found in the live page,
   quality 0 at half scale, 960x540, the Wind-Carved Ice Spires): the EYE INSIDE AN ICE SPIRE. Neptune's ice spires are 17
@@ -84,6 +89,27 @@ started at the time of writing.
   Not verified: the player's own place on Saturn (not logged; the Ring-Shadow stand is the lilac plain with violet spires
   the log describes); the hand-over between a near spire and its far form while walking (the far form is now nearer the
   near one's shape, by the code; not filmed).
+- **ITEM 3, THE HARD-EDGED FACETED SLAB IN FIRST PERSON AT MARS' CANYON WALLS: NOT FIXED.** The player's frames
+  (`094_mars_fp.jpg` to `096_mars_fp3.jpg`, first person, pressed against a canyon wall 400 m from the ship; `103`/`105` are
+  third person and show the canyon well) show a broad ochre band with ruled edges across pale paper, the sun in the pale
+  above it, faint grey ruled lines in the pale below it. I went to Mars' Rust Canyons at quality 0, half scale (the stand,
+  then a wall found by sampling the slope round it, 234 m south), stood 1 to 3 m from the wall in first person and walked
+  into it (5 s of W; W with the jetpack 2.5 s): the wall at the lens is one flat rust wash with pale dry-brush flecks;
+  looking 45 degrees up, the wall's crest is a nearly straight diagonal against the sky; never the player's band
+  (`docs/shots/painter/last/03-mars-wall-first-person-not-fixed.jpg`, opened). My reading, NOT proven: the player's eye
+  was inside the drawn wall (the pale below the band is the sky seen through the culled inside of the ground, the band a
+  face of the far side turned toward the eye). At quality 0 a terrain node splits only when the eye is nearer than 0.68 of
+  its size (`terrain.js SPLIT_BY_QUALITY`), so the drawn wall near the eye can be a level coarser than the surface the
+  explorer collides with and the camera keeps its clearance from (`sampleSurface`); on a stepped canyon riser the two can
+  differ by a metre. A fix would be either PILOT's (the first-person eye and the boom kept clear of the drawn ground, e.g.
+  a larger clearance against steep faces) or a change to the terrain's near detail at quality 0 (cost on every world at
+  the tier that is already at 1 to 3 frames a second): neither is small and safe in this round. Left as it is.
+- **ITEM 4, URANUS' PLAIN AND VENUS' CREAM HAZE AT 439 m: NOT DONE, by choice.** Both are looks verified in earlier rounds
+  (Uranus' Pearl Fog Flats: the pre-ship round's item 3, value spread 7.2 -> 9.9; Venus' climb: the pre-ship round left
+  4b undone because it moves the edge of the air verified twice in M4); a tuning that helps one frame without a round of
+  frames at both tiers and a verifier is the kind of change this round was told to leave. Seen in the player's frames
+  (`187` to `191`): Uranus' landing is a pale mint plain with small scattered marks and an empty horizon, calm but dull;
+  it is not broken.
 
 ## Hand-over of the M4 PRE-SHIP RE-FIX pass (twentieth PAINTER agent)
 
