@@ -270,6 +270,8 @@ async function flyLeg(to, n) {
   for (leg.landTries = 1; leg.landTries <= 14; leg.landTries++) {
     await page.keyboard.press('KeyE');
     i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED', 2.5);
+    // (M4: E at speed slows the ship first; the assist begins when it has)
+    if (i.state === 'ATMOSPHERE' && i.prompt === 'Cancel landing') i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED' || x.prompt !== 'Cancel landing', 40);
     heard(leg, i);
     if (i.state === 'LANDING') await beat('landing');
     if (i.state === 'LANDING' || i.state === 'LANDED') break;

@@ -107,6 +107,8 @@ async function leg(to, n) {
   for (let tries = 0; tries < 8; tries++) {
     await page.keyboard.press('KeyE');
     i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED', 2.5);
+    // (M4: E at speed slows the ship first; the assist begins when it has)
+    if (i.state === 'ATMOSPHERE' && i.prompt === 'Cancel landing') i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED' || x.prompt !== 'Cancel landing', 40);
     if (i.state === 'LANDING' || i.state === 'LANDED') break;
     run.log('  (E did not start a landing: ' + (i.notice || 'no prompt at that moment') + '; trying again)');
     i = await until((x) => x.ship.canLand, 120, async (x) => {

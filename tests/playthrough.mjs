@@ -253,7 +253,11 @@ try {
   await page.keyboard.press('KeyE');
   await gameWait(0.3);
   i = await info();
-  check(i.state === 'LANDING', 'E starts the landing assist');
+  // (M4: pressed faster than the assist takes the hull over, the ship first slows with its own
+  // brakes, "Slowing down to land", and the assist begins when it has)
+  check(i.state === 'LANDING' || i.prompt === 'Cancel landing', 'E starts the landing: ' + (i.state === 'LANDING' ? 'the assist at once' : `slowing first from ${Math.round(i.ship.speed)} m/s ("${i.notice}")`));
+  i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED', 30);
+  check(i.state === 'LANDING' || i.state === 'LANDED', 'the landing assist takes the hull over');
   let touch = 99;
   i = await until((x) => x.state === 'LANDED', 60, async (x) => { touch = x.ship.speed; });
   check(i.state === 'LANDED', 'landed');

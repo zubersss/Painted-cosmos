@@ -168,18 +168,21 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
 
 My commits, in order: `b289c21` (on `70aec16`; the body of the round), `7ee3620` (notes), `f7b757a` (the dusk and the
 swimmer filmed, the browser helper's load limit), `52e74d1` (the cockpit's slips, the sketch's guard, the wrap, the
-top-tier frames), and the one that carries this paragraph (the shade out of the sketch, the easel offered again,
-the hand-over). The thirteenth's flight work came in with the coordinator's snapshots `8418918` and `c03bce6`.
+top-tier frames), `6cfab48` (the shade out of the sketch, the easel offered again), and the one that carries this
+paragraph (the browser tests follow "slowing down to land"; the hand-over). The thirteenth's flight work came in
+with the coordinator's snapshots `8418918` and `c03bce6`.
 
-Measured on a clean export of `e371a93` with PILOT's files of the last commit (`s14/t11`): **unit 181, world 20,
+Measured on a clean export of `e371a93` with PILOT's files of `6cfab48` (`s14/t11`): **unit 181, world 20,
 physics 314**, `coast.mjs` PASS at both stands, `ghostfield.mjs` every counter zero (worst step loss 0.26 and 0.52
-as before); the game loads at quality 0 with no console error and no fall-back (the film runs on that tree).
-In the browser on the stubs, on `b289c21`'s files, all PASSED: `tests/m3check.mjs` (title card, sketch, book, the
+as before); the game loads at quality 0 with no console error and no fall-back (the film runs on that tree). The
+last commit changes three browser tests only; on a clean export of `141997f` with it (`s14/t12`): unit 181, world 20.
+In the browser on the stubs, on those last files, all PASSED: `tests/m3check.mjs` (title card, sketch, book, the
 view found, offered, drawn from its easel, the controls given back, save and reload), `tests/playthrough.mjs` with
 PHYSICS (walk, jetpack, board, space, land, step out), `tests/trip.mjs` (Earth, Mars, Saturn in one sitting,
-reload). **Not run after `b289c21`:** those three browser tests (what changed since is the cockpit's CSS, the
-sketch's guard and repaint, the wrap, one line of the easel). **Never run in this round:** the painted play-through,
-trip and m3 (`tests/all.mjs` painted-*), the grand tour, the motion and weather sets, anything at 1080p.
+reload). (`playthrough.mjs` asked for the landing assist 0.3 s after E; with E at speed the ship now slows first,
+so it failed once on that line at `6cfab48`; it, `trip.mjs` and `grandtour.mjs` now wait for the slowing.)
+**Never run in this round:** the painted play-through, trip and m3 (`tests/all.mjs` painted-*), the grand tour
+(its landing step is changed and has not been run), the motion and weather sets, anything at 1080p.
 
 ### Not done (and why), for whoever comes next
 
@@ -188,6 +191,10 @@ trip and m3 (`tests/all.mjs` painted-*), the grand tour, the motion and weather 
 - **The sky's change at the edge of the air** (PAINTER 17: blue at 490 m, starred indigo at 640 m): not PILOT's number.
   `mood.inSpace01` is `smoothstep(0.75, 1.6)` of the way to space: on Earth 0 at 600 m and 0.003 at 640 m. Whatever
   turns the sky between 490 and 640 m reads the height itself (`altitude01`, or the world's own eye height).
+- **Mercury's spawn, heading 0** (the coordinator's relay: `collideObstacles` stops a run dead on a 2.2 m column,
+  7.40 -> 0.79 m/s in one frame): not touched in this round.
+- **The eleventh agent's Node instruments** (`docs/lead/evidence/pilot11/`) still seed PHYSICS with 1 and leave its
+  time budget on; the thirteenth's and mine (`m4fix/scripts/`) make PHYSICS with `timeBudget: false` and no seed.
 - **Hard turns at 6.5 g** (PHYSICS 9) and **the 2.2 g kick-off** (PHYSICS 10): left. Both are the feel of the arcade
   ship that every flight test and the tour were tuned on; changing `carve01` or `tauAtmo` in the last round would
   need the whole flight survey again.
