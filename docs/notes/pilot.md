@@ -113,8 +113,9 @@ error, fallback `[]`. Seen in it, older than this round and not on this pass's l
 
 ### State of the tree and checks
 
-My commits this pass: `015bc21` (R1, R2), `23e7c81` (R3, R4), `da7d587` (the films' evidence, this hand-over), and
-the last one (the grand tour). First commit's parent: `db31c96` (PAINTER's re-fix hand-over). Nothing of mine is
+My commits this pass: `015bc21` (R1, R2), `23e7c81` (R3, R4), `da7d587` (the films' evidence, this hand-over),
+`5bad2dc` (the coordinator's WIP snapshot of two small edits to this hand-over), `37e7573` (the grand tour) and the
+last one (this list). First commit's parent: `db31c96` (PAINTER's re-fix hand-over). Nothing of mine is
 half-done in the working tree; PAINTER's uncommitted files there are not mine.
 
 **`tests/grandtour.mjs` on a clean export of `23e7c81` (the code of this pass whole): PASSED**
