@@ -36,11 +36,15 @@ export const SHIP = Object.freeze({
   cushionHeight: 7,          // m: below this the descent rate is limited
   cushionDecel: 6.5,         // m/s^2: the braking the cushion plans with at any height
   minClearance: 1.6,         // m: the hull never goes lower in free flight
+  fastSkim: 50,              // m/s: faster than this (the thin-air worlds, a dive out of space) the hull rides higher,
+  fastSkimRise: 0.25,        // m more for each m/s (8.6 m at 78 m/s, 24 m at 138, 42 m at 210): room to lift over what comes
   lookAhead: 0.8,            // s of terrain look-ahead for the automatic pull-up, at least...
   lookMin: 30,               // m: ...this far, and at least as far as the hull needs to stop in:
   lookDecel: 10,             // m/s^2 (the look reaches v^2 / (2 lookDecel) + v lookAhead: 143 m at 46 m/s; it was 37 m)
-  lookAt: Object.freeze([0.1, 0.22, 0.38, 0.56, 0.77, 1]),   // where along that reach the ground is looked at
+  lookAt: Object.freeze([0.03, 0.07, 0.14, 0.25, 0.42, 0.66, 1]),   // where along that reach the ground is looked at (4 to 143 m at 46 m/s)
   assistLift: 14,            // m/s^2 beyond the weight: the most the assist changes the hull's vertical speed by itself (PHYSICS' accelLift)
+  assistField: 160,          // m/s^2: the most it brakes a sink that the lift alone could not stop above the ground (the drive field: PHYSICS' fieldBrake)...
+  assistFieldSoft: 60,       // m/s^2: ...and above the tree tops, which are not a wall
   assistRise: 8,             // m/s: how fast the assist lifts a hull that is under the tree tops (an abandoned landing)
   assistCrawl: 1.5,          // m/s: the least forward speed kept at the foot of a wall the hull is climbing
   flareHeight: 75,           // m: below this a dive is progressively levelled out
@@ -63,6 +67,7 @@ export const SHIP = Object.freeze({
   landMinDescent: 1.1,       // m/s at touchdown: soft
   landMaxSlope: 0.62,        // rad: steeper spots are refused
   landClearance: 6,          // m: trees and boulders closer than this to the spot count against it
+  landFootprint: 4.5,        // m from the middle: the ground is looked at this far out all round (the legs, the hatch)
 });
 
 export function createShipState(p, q) {
@@ -191,6 +196,7 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   const inAir = env.hasBody && env.altitude < env.spaceAlt;
   const tau = mix(T.tauSpace, T.tauAtmo, inAir ? 1 : 0) * (input.cut ? T.brakeFactor : 1);
   let v;
+  const vUpWas = up ? dot(st.v, up) : 0;      // (PHYSICS' body moves st.v in place)
   // In vacuum the drive field that makes the pulse possible is also the brake (PHYSICS'
   // `cmd.brake`): it sheds the speed the 14 m/s2 retro thrusters cannot, so X or throttling
   // down stops the ship in seconds, not minutes. Flight in air stays on thrusters alone.
@@ -221,6 +227,7 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     // In vacuum the field brake is whole; in thin air (Mars, the airless worlds' ground frame)
     // X gets the share the world allows (env.airBrake); in thick air the thrusters and the air do it.
     cmd.brake = inAir ? (input.cut ? env.airBrake || 0 : 0) : 1;
+    if (assist && assist.brake > cmd.brake) cmd.brake = assist.brake;
     cmd.carveAccel = env.carveAccel;           // undefined: unbounded, as before
     // While the ground assist is what raises the climb, the field turns the velocity upward no
     // harder than the hull's lift (at tau 0.22 it gave 40 m/s^2 on top of the thrusters' 14).
@@ -278,7 +285,7 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
     // ...and the hull has mass: what the assist adds to the hull's own motion in one step is
     // bounded by what its lift can do (it used to rewrite the velocity outright: one-frame
     // jolts of 3.5 to 8.5 m/s, 16 to 35 g, and a 22 g climb at the foot of a steep slope).
-    v = boundAssist(v, assist, up, dt, env.gravity, dot(v, up) - dot(st.v, up), T);
+    v = boundAssist(v, assist, up, dt, env.gravity, dot(v, up) - vUpWas, T);
     st.gear01 = mix(st.gear01, 0, damp(3, dt));
   } else if (!st.liftoff) {
     st.gear01 = mix(st.gear01, 0, damp(3, dt));
@@ -297,7 +304,7 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
       const up2 = scale(p, 1 / g2.r);
       const n = g2.normal;
       const vn = dot(v, n);
-      if (vn < -2.5) {
+      if (vn < -Math.max(2.5, 0.06 * len(v))) {
         v = addScaled(v, n, -(1 + T.bounceRestitution) * vn);       // reflect softly
         v = scale(v, 0.8);
         st.throttle *= 0.5;
@@ -342,45 +349,64 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
 //            faster than the hull can climb at this speed, it slows down and goes up the slope;
 //            it is not shot up it
 //   hardAlt  m over the solid ground or the liquid
+//   brake    0..1: the drive field's share asked for to slow down in the room there is
+//   mustUp   m/s^2: the steady lift it takes not to touch the solid ground ahead (a dive at a
+//            mountain face): the one thing the assist exceeds the hull's own lift for
 function groundAssist(st, target, ground, up, floorOf, liftSpeed, T) {
   const alt = ground.r - ground.floor;
-  const A = st._assist || (st._assist = { climb: 0, ahead: 0, maxDown: 0, vhCap: Infinity, hardAlt: 0 });
-  A.hardAlt = alt + (ground.canopy || 0);
+  const A = st._assist || (st._assist = { climb: 0, ahead: 0, maxDown: 0, vhCap: Infinity, hardAlt: 0, alt: 0, brake: 0 });
+  A.hardAlt = alt + (ground.canopy || 0); A.alt = alt;
   // Only the rise of the terrain counts, so hovering low over flat ground is left alone.
   // The look goes where the hull is going: along its velocity, turned a little toward what is
   // asked of it (a start from a hover, a turn). It reaches as far as the hull needs to stop in,
   // so that a wall is seen while there is still room to slow down for it (0.8 s ahead at 46 m/s
   // was 37 m: the climb a 60 degree slope then asked for was a rocket's, 22 g to 71 m/s).
   const vhNow = reject(st.v, up), u = lerp(vhNow, reject(target, up), 0.3), sp = len(u);
-  const keep = clamp(alt, T.minClearance + 0.4, T.cushionHeight);
-  let ahead = 0, vhCap = Infinity;
+  // The height the hull stands off the floor at: the clearance, and more the faster it flies.
+  const stand = T.minClearance + Math.max(0, len(vhNow) - T.fastSkim) * T.fastSkimRise;
+  const keep = clamp(alt, stand + 0.4, Math.max(T.cushionHeight, stand + 0.4));
+  let ahead = 0, vhCap = Infinity, brake = 0, mustUp = 0;
   if (sp > 0.5) {
-    const reach = Math.max(T.lookMin, sp * sp / (2 * T.lookDecel) + sp * T.lookAhead);
+    const reach = Math.max(T.lookMin, sp * sp / (2 * T.lookDecel) + sp * T.lookAhead), spNow = len(vhNow), vUpNow = dot(st.v, up);
     for (let k = 0; k < T.lookAt.length; k++) {
       const d = reach * T.lookAt[k], t = d / sp;
-      const need = floorOf(addScaled(st.p, u, t)).floor + keep - ground.r;
+      const g = floorOf(addScaled(st.p, u, t));
+      const need = g.floor + keep - ground.r;
+      // The steady lift it takes from here to clear the SOLID ground there by the clearance (a
+      // quarter of a second off or more: nearer than that the last-two-metres rule has it).
+      if (t >= 0.25) {
+        const a = 2 * (g.floor - (g.canopy || 0) + T.minClearance - ground.r - vUpNow * t) / (t * t);
+        if (a > mustUp) mustUp = a;
+      }
       if (need <= 0) continue;
       const rate = need / t;
       if (rate > ahead) ahead = rate;
       // More than the hull climbs at: it must take longer to get there (need / liftSpeed, and
       // the second its climb takes to build).
-      if (rate > liftSpeed) vhCap = Math.min(vhCap, d / (need / liftSpeed + 1));
+      if (rate > liftSpeed) {
+        const cap = Math.max(T.assistCrawl, d / (need / liftSpeed + 1));
+        if (cap < vhCap) vhCap = cap;
+        // ...and if its own thrusters cannot slow it to that in the room there is (a hull still
+        // at 200 m/s from a dive, low over thin-air ground), the drive field brakes it, by what it takes.
+        if (spNow > cap) brake = Math.max(brake, (spNow * spNow - cap * cap) / (2 * d));
+      }
     }
     if (ahead > liftSpeed) ahead = liftSpeed;
-    if (vhCap < T.assistCrawl) vhCap = T.assistCrawl;
   }
+  A.brake = brake > T.lookDecel ? Math.min(1, 1.25 * brake / T.assistField) : 0;
+  A.mustUp = Math.min(T.assistField, 1.25 * mustUp);
   let climb = ahead > 0 ? ahead : -Infinity;
   // Under the floor's clearance (a landing abandoned among the trees, a canopy that came up
   // round a hovering hull): out of it at a calm rise, and no dash through the trunks meanwhile.
-  if (alt < T.minClearance) {
-    climb = Math.max(climb, Math.min(T.assistRise, Math.sqrt(2 * 3 * (T.minClearance - alt)) + 0.2));
+  if (alt < stand) {
+    climb = Math.max(climb, Math.min(T.assistRise, Math.sqrt(2 * 3 * (stand - alt)) + 0.2));
     if (alt < 0) vhCap = Math.min(vhCap, Math.max(T.assistCrawl, len(reject(target, up)) * clamp01(1 + alt / 8)));
   }
   // The closer to the floor, the slower the ship may sink: never faster than it can still stop
   // from (a hull with mass needs room), and feather-slow in the last metres (to a stand 0.2 m
   // over the clearance: the floor itself is no longer a wall the hull is set on).
-  let maxDown = Math.sqrt(2 * T.cushionDecel * Math.max(0, alt - T.minClearance - 0.5)) + 0.25;
-  if (alt < T.cushionHeight) maxDown = Math.min(maxDown, Math.max(0, (alt - T.minClearance - 0.2) * 1.8));
+  let maxDown = Math.sqrt(2 * T.cushionDecel * Math.max(0, alt - stand - 0.5)) + 0.25;
+  if (alt < T.cushionHeight + stand - T.minClearance) maxDown = Math.min(maxDown, Math.max(0, (alt - stand - 0.2) * 1.8));
   A.climb = climb; A.ahead = ahead; A.maxDown = maxDown; A.vhCap = vhCap;
   st.sinkLimit = maxDown;
   return A;
@@ -401,17 +427,24 @@ function shapeTarget(v, A, up, slow) {
 // The assists on the hull's own velocity, after the flight computer (and PHYSICS' body) has
 // moved it: the same shape, but the hull's vertical speed changes in one step by no more than
 // its lift can give (assistLift beyond its weight; `moved` is what this step has already
-// changed it by, which counts against that), rising steeply only in the last two metres over
-// solid ground, where the alternative is to touch it.
+// changed it by, which counts against that). More only where the alternative is to touch the
+// ground: in the last two metres over it, for a sink the lift could not stop in the room
+// there is (a dive out of space arrives at 200 m/s 500 m up: the drive field brakes it, at
+// just what it takes, steadily, where it used to be cut to the cushion's speed in one frame;
+// over the tree tops, which are no wall, by less), and for solid ground ahead that the lift
+// could not clear (A.mustUp).
 function boundAssist(v, A, up, dt, gravity, moved, T) {
   const vUp = dot(v, up);
   let want = vUp;
   if (want < A.climb) want = A.climb;
   if (want < -A.maxDown) want = -A.maxDown;
-  if (want === vUp) return v;
+  if (want <= vUp) return v;
   const near = clamp01((T.minClearance + 2 - A.hardAlt) / 2);
-  const lim = (T.assistLift + (gravity > 0 ? gravity : 9.8)) * dt * (1 + 8 * near * near);
-  return addScaled(v, up, clamp(want - vUp, 0, Math.max(0, lim - Math.max(0, moved))));
+  const lift = (T.assistLift + (gravity > 0 ? gravity : 9.8)) * (1 + 8 * near * near);
+  const need = (room) => 1.25 * vUp * vUp / (2 * Math.max(0.25, room - T.minClearance - 0.3));
+  // (a hull already in under the tree tops has nothing left to stop above: the lift brings it out)
+  const must = vUp < 0 ? Math.max(Math.min(T.assistField, need(A.hardAlt)), A.alt > T.minClearance ? Math.min(T.assistFieldSoft, need(A.alt)) : 0) : 0;
+  return addScaled(v, up, Math.min(want - vUp, Math.max(0, Math.max(lift, must, A.mustUp || 0) * dt - Math.max(0, moved))));
 }
 
 export function beginLiftoff(st) {
@@ -446,6 +479,17 @@ export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = n
   };
   const consider = (dir, distance) => {
     const g = floorAt(sample, scale(dir, r));
+    // The ground under all of the hull, not only its middle: the steepest of the middle and four
+    // points landFootprint out, and the tilt of the ground between them (a level shelf at the lip
+    // of a canyon wall is no place to stand a ship, or to step out of one).
+    if (!g.liquid && T.landFootprint > 0) {
+      for (let i = 0; i < 4; i++) {
+        const off = add(scale(a, Math.cos(i * Math.PI / 2 + 0.4) * T.landFootprint), scale(b, Math.sin(i * Math.PI / 2 + 0.4) * T.landFootprint));
+        const q = floorAt(sample, scale(norm(addScaled(scale(dir, r), off, 1)), r));
+        const tilt = Math.atan(Math.abs(q.floor - g.floor) / T.landFootprint);
+        g.slope = Math.max(g.slope, q.liquid ? 0 : q.slope, tilt);
+      }
+    }
     const score = g.slope * (here ? 20 : 60) + (g.liquid ? 14 : 0) + distance * (here ? 3 : 0.35) + crowd(dir) * 25;
     const ok = g.liquid || (holds ? holds(dir, g) : g.slope <= T.landMaxSlope);
     if (ok && (!best || score < best.score)) {

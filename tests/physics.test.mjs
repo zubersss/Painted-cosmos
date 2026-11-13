@@ -9,7 +9,8 @@ import { EXPLORER } from '../src/player/explorer.js';
 import { SHIP } from '../src/ship/flight.js';
 import { BODIES } from '../src/data/bodies.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
-import { Pad, play, len, sub, norm, dot } from './helpers.mjs';
+import { Pad, play, len, sub, norm, dot, makeWorld } from './helpers.mjs';
+import { V, cross, tangent, add, scale } from '../src/core/vec.js';
 
 // Wall-clock time says how busy the machine is, not whether the code is right: three agents
 // render on four cores here. Timings are reported, and only asserted when asked for
@@ -275,4 +276,148 @@ test('with physics: on a light world a run still slides, but the suit stops it o
   const d = len(sub(sim.ex.p, p0));
   assert.ok(tStop != null && tStop < 1.9, 'stopped in ' + tStop + ' s');
   assert.ok(d > 3 && d < 6.5, 'a slide of ' + d.toFixed(2) + ' m: longer than on Earth, not a skid');
+});
+
+// ---- M4: the hull has mass (PHYSICS' critique of PILOT, items 1 to 3) ---------------------------
+// A recorder of the flying hull: the largest change of its velocity in one step, and the largest
+// move in one step beyond what its velocity accounts for (a clamp that sets the hull somewhere).
+function hullRecorder(sim) {
+  const R = { dv: 0, dvUp: 0, hop: 0, sink: 0, sinkLow: 0, climb: 0, lastV: null, lastP: null, lastT: 0 };
+  R.each = () => {
+    const sh = sim.sh, up = norm(sh.p), dt = sim.t - R.lastT;
+    if (R.lastV && dt > 0) {
+      const d = sub(sh.v, R.lastV);
+      R.dv = Math.max(R.dv, len(d)); R.dvUp = Math.max(R.dvUp, Math.abs(dot(d, up)));
+      const exp = { x: (sh.v.x + R.lastV.x) * 0.5 * dt, y: (sh.v.y + R.lastV.y) * 0.5 * dt, z: (sh.v.z + R.lastV.z) * 0.5 * dt };
+      R.hop = Math.max(R.hop, len(sub(sub(sh.p, R.lastP), exp)));
+    }
+    const vUp = dot(sh.v, up);
+    R.sink = Math.max(R.sink, -vUp); R.climb = Math.max(R.climb, vUp);
+    if (sh.landing && sh.altGround < 25) R.sinkLow = Math.max(R.sinkLow, -vUp);
+    R.lastV = { ...sh.v }; R.lastP = { ...sh.p }; R.lastT = sim.t;
+  };
+  return R;
+}
+// The stub ground under a wood: crowns 23 m up everywhere (Painter's canopy field), so the floor
+// free flight uses is the tree tops, as at Earth's spawn.
+const wood = (id, d) => ({ ...stubSurface(id, d), canopyHeight: 23 });
+function boardAt(sim, pad) {
+  play(sim, pad, 0.5);
+  pad.dx += (sim.info().shipBearingDeg * RAD) / FEEL.mouseFoot;
+  pad.press('KeyW');
+  play(sim, pad, 30, { until: () => sim.info().canBoard });
+  pad.release('KeyW');
+  pad.tap('KeyE');
+  play(sim, pad, 4, { until: () => sim.sm.state === S.LANDED });
+  assert.equal(sim.sm.state, S.LANDED);
+  play(sim, pad, 1);
+}
+
+test('M4 lift-off under trees: the hull rises out of the wood under its own lift; it is never set on the crowns', { skip }, () => {
+  for (const fps of [60, 30]) {
+    const physics = P.createPhysics({ sampleSurface: wood, seed: 1 });
+    const sim = new Sim({ sampleSurface: wood, getSpawn: (id) => stubSpawn(id).unitDir, physics });
+    const pad = new Pad();
+    boardAt(sim, pad);
+    pad.tap('Space');
+    const R = hullRecorder(sim);
+    let free = null, t = 0;
+    play(sim, pad, 16, { fps, each: () => { R.each(); t += 1 / fps; if (free == null && sim.sm.state === S.ATMOSPHERE && !sim.sh.liftoff) free = t; } });
+    const h = len(sim.sh.p) - stubSurface('earth', norm(sim.sh.p)).radius;
+    assert.ok(R.hop < 0.1, `${fps} Hz: the hull never moves more than its velocity says: ${R.hop.toFixed(2)} m in one step (it was 16 m)`);
+    assert.ok(R.dv < 0.5 * (60 / fps), `${fps} Hz: no jolt: ${R.dv.toFixed(2)} m/s in one step`);
+    assert.ok(free != null && free < 12, `${fps} Hz: free flight after ${free} s`);
+    assert.ok(h > 23 + SHIP.minClearance && h < 23 + 9, `${fps} Hz: over the crowns: ${h.toFixed(1)} m over the ground`);
+    assert.ok(R.climb < SHIP.liftoffRise + 1.5, `${fps} Hz: a calm rise: ${R.climb.toFixed(1)} m/s at most`);
+    assert.ok(sim.sh.altGround >= SHIP.minClearance, 'clear of the tree tops: ' + sim.sh.altGround.toFixed(2));
+  }
+});
+
+test('M4 E at full speed: the ship slows with its own brakes, then lands; nothing is taken from it at once', { skip }, () => {
+  const sim = newSim();
+  const pad = new Pad();
+  sim.teleport({ body: 'earth', ship: true, altitude: 30 });
+  play(sim, pad, 0.5);
+  pad.press('KeyW');
+  play(sim, pad, 9, { each: () => holdPitch(sim, pad, 0) });
+  pad.release('KeyW');
+  assert.ok(sim.sh.speed > 40, 'at speed: ' + sim.sh.speed.toFixed(1));
+  assert.equal(sim.promptNow && sim.promptNow.text, 'Land here');
+  const R = hullRecorder(sim);
+  pad.tap('KeyE');
+  play(sim, pad, 0.1, { each: R.each });
+  assert.equal(sim.sm.state, S.ATMOSPHERE, 'still flying: slowing first');
+  assert.match(sim.notice.text, /Slowing down to land/);
+  assert.equal(sim.promptNow.text, 'Cancel landing');
+  let began = null, t = 0;
+  play(sim, pad, 60, { each: () => { R.each(); t += 1 / 60; if (began == null && sim.sm.state === S.LANDING) { began = t; assert.ok(sim.sh.speed <= 13, 'the assist takes over at ' + sim.sh.speed.toFixed(1) + ' m/s'); } }, until: () => sim.sm.state === S.LANDED });
+  assert.equal(sim.sm.state, S.LANDED, 'landed');
+  assert.ok(began > 1.5 && began < 8, 'slowed down for ' + began.toFixed(1) + ' s (46 m/s at the hull\'s own 14 m/s^2 is 3.3 s)');
+  assert.ok(R.dv < 0.6, `the largest change of velocity in one step: ${R.dv.toFixed(2)} m/s (it was 3.1, 18 g)`);
+  assert.ok(R.hop < 0.1, 'no hop: ' + R.hop.toFixed(2));
+  assert.ok(R.sinkLow <= SHIP.landMaxDescent + 0.3, `the descent near the ground: ${R.sinkLow.toFixed(1)} m/s (it was 13)`);
+  assert.equal(sim.sh.bounces, 0);
+  // W or Space lets the slowing go.
+  sim.teleport({ body: 'earth', ship: true, altitude: 30 });
+  play(sim, pad, 0.5);
+  pad.press('KeyW'); play(sim, pad, 9, { each: () => holdPitch(sim, pad, 0) }); pad.release('KeyW');
+  pad.tap('KeyE'); play(sim, pad, 0.5);
+  pad.tap('Space'); play(sim, pad, 4);
+  assert.equal(sim.sm.state, S.ATMOSPHERE);
+  assert.equal(sim.promptNow && sim.promptNow.text, 'Land here', 'the landing was let go');
+});
+
+test('M4 E at a hover, and a landing abandoned among the trees: no lurch, no hop', { skip }, () => {
+  const physics = P.createPhysics({ sampleSurface: wood, seed: 1 });
+  const sim = new Sim({ sampleSurface: wood, getSpawn: (id) => stubSpawn(id).unitDir, physics });
+  const pad = new Pad();
+  sim.teleport({ body: 'earth', ship: true, altitude: 40 });
+  play(sim, pad, 1.5);
+  const R = hullRecorder(sim);
+  pad.tap('KeyE');
+  const ground = () => len(sim.sh.p) - stubSurface('earth', norm(sim.sh.p)).radius;
+  play(sim, pad, 40, { each: R.each, until: () => sim.sm.state === S.LANDING && ground() < 12 });
+  assert.equal(sim.sm.state, S.LANDING);
+  assert.ok(ground() < 12, 'among the trees: ' + ground().toFixed(1) + ' m up, the crowns at 23');
+  assert.ok(R.dv < 0.35, `the landing begins without a lurch: ${R.dv.toFixed(2)} m/s in one step (it was 1.2, 4.4 g)`);
+  assert.ok(R.sink <= SHIP.landHighDescent + 0.3, 'descent ' + R.sink.toFixed(1) + ' m/s');
+  const R2 = hullRecorder(sim);
+  pad.tap('Space');
+  play(sim, pad, 12, { each: R2.each });
+  assert.equal(sim.sm.state, S.ATMOSPHERE);
+  assert.ok(R2.hop < 0.1, `given back to the pilot under the crowns, the hull is not set on top of them: ${R2.hop.toFixed(2)} m in one step`);
+  assert.ok(R2.dv < 0.6, `and its velocity is not rewritten: ${R2.dv.toFixed(2)} m/s in one step`);
+  assert.ok(R2.climb <= SHIP.assistRise + 2.5, 'it rises out at ' + R2.climb.toFixed(1) + ' m/s');
+  assert.ok(sim.sh.altGround > SHIP.minClearance - 0.2, 'and ends over the tree tops: ' + sim.sh.altGround.toFixed(2) + ' m');
+});
+
+test('M4 a steep slope at full throttle: the ship slows and climbs within its lift; no rocket, no jolt, no bump', { skip }, () => {
+  // A cone 150 m high with sides of 62 degrees, 400 m ahead of a ship skimming at 46 m/s.
+  const hill = { dir: V(0, 1, 0), radius: 80, height: 150 };
+  const world = makeWorld({ R: BODIES.earth.radius, hill });
+  const ss = (id, d) => world(d);
+  const physics = P.createPhysics({ sampleSurface: ss, seed: 1 });
+  const start = norm(V(0.3, 0.4, 0.86));
+  const sim = new Sim({ sampleSurface: ss, getSpawn: () => start, physics });
+  const pad = new Pad();
+  sim.teleport({ body: 'earth', ship: true, altitude: 8, heading: 0 });
+  const up = norm(sim.sh.p), east = tangent(cross(V(0, 1, 0), up), up, V(1, 0, 0)), north = cross(up, east);
+  hill.dir = norm(add(up, scale(north, 400 / BODIES.earth.radius)));
+  play(sim, pad, 0.5);
+  const R = hullRecorder(sim);
+  let minClear = Infinity, slowest = Infinity, far = 0;
+  pad.press('KeyW');
+  play(sim, pad, 30, { each: () => {
+    holdPitch(sim, pad, 0); R.each();
+    const g = world(norm(sim.sh.p));
+    minClear = Math.min(minClear, len(sim.sh.p) - g.radius);
+    far = Math.acos(Math.min(1, dot(norm(sim.sh.p), up))) * BODIES.earth.radius;
+    if (far > 250 && far < 420) slowest = Math.min(slowest, sim.sh.speed);
+  } });
+  assert.equal(sim.sh.bounces, 0, 'no bump');
+  assert.ok(far > 520, 'over the cone and on: ' + far.toFixed(0) + ' m');
+  assert.ok(minClear >= SHIP.minClearance - 0.05, 'never nearer the ground than ' + minClear.toFixed(2) + ' m');
+  assert.ok(R.dvUp < 0.46, `the largest change of vertical speed in one step: ${R.dvUp.toFixed(2)} m/s, the hull's own lift (it was 3.5 to 8.5, 16 to 35 g)`);
+  assert.ok(R.climb < 26, `it climbs at ${R.climb.toFixed(1)} m/s at most (it was shot up at 71)`);
+  assert.ok(slowest < 40, 'and slows for the slope: ' + slowest.toFixed(1) + ' m/s');
 });

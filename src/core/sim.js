@@ -25,7 +25,7 @@ export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
   mouseShip: 0.0017,         // rad per pixel in the ship (the nose follows with a little weight)
   boardSeconds: 1.25,        // walking up the hatch and sitting down
-  exitSeconds: 0.95,
+  exitSeconds: 1.6,          // down the ladder and three steps clear of the wing (it was 0.95: a cut)
   simStep: 1 / 60,           // fixed physics step (the feel is identical at any frame rate)
   maxFrame: 0.25,            // seconds of real time simulated per frame at most
   startHour: 9.5,            // local solar time at the first spawn: a clear morning
@@ -59,6 +59,21 @@ const ARRIVAL = Object.freeze({
 // ground) and how fast the gear lets it down (m/s; PHYSICS' recipe).
 export const LEGS = Object.freeze({ gearAt: 1.0, sink: 0.6 });
 export const VISTA_RANGE = 14;      // metres: this close to a vista's spot, on foot, and it is yours
+// Stepping out of the ship (PAINTER's critique, item 1: "the first picture of every landing is
+// your own wing"). The explorer walks a few steps clear of the hull while the view comes round, and
+// the view is chosen for the picture: the hull never between the lens and the figure, never over
+// more than a sixth of the frame, the boom free, open ground ahead, and as near to "straight away
+// from the ship" as that allows.
+const EXIT = Object.freeze({
+  walk: [3.4, 2.6, 1.8, 1.0, 0],       // metres out from the ladder, the first that is fit to stand on
+  turns: [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75, 2.1, -2.1, 2.5, -2.5],   // rad from straight away
+  cover: 1 / 6,                        // the most of the frame the hull may take
+  aspect: 16 / 9,
+});
+// The hull as a picture sees it: spheres [x, y, z, radius] in the ship's own axes (PAINTER's model:
+// the body from the bow to the stern, the glass bubble, the fin, the cloth wings and their tips).
+const HULL_SHAPE = [[0, 1.3, -3.3, 1.2], [0, 1.45, -1.3, 1.6], [0, 1.3, 1.0, 1.6], [0, 1.6, 3.2, 1.4], [0, 2.5, 4.0, 0.9],
+  [-2.4, 1.5, 1.0, 1.0], [2.4, 1.5, 1.0, 1.0], [-3.3, 1.6, 1.25, 0.7], [3.3, 1.6, 1.25, 0.7]];
 const VACUUM = { density: 0, wind: V(), speed: 0, gust01: 0, turbulence: 0, temperature: 3, pressure: 0, soundSpeed: 0, viscosity: 0 };
 const VACUUM_AIR = (p, out) => (out ? Object.assign(out, VACUUM) : VACUUM);
 
@@ -582,28 +597,124 @@ export class Sim {
     this.ex.v = V();
   }
 
+  // The hull's spheres in the frame the ship rests in (body-local when it is parked).
+  hullShape() {
+    const sh = this.sh;
+    return HULL_SHAPE.map((h) => ({ p: add(sh.p, qRotate(sh.q, V(h[0], h[1], h[2]))), radius: h[3] }));
+  }
+
+  // How much of a picture the parked hull takes: the share (0..1) of a frame seen from `p` along
+  // unit `dir` (vertical field `fovDeg`) that its spheres cover; `mid` (0..1) keeps to that share
+  // of the frame round its middle. 0 when the ship is not on this world.
+  hullCover(p, dir, fovDeg = CAMERA.fovFoot, mid = 1, shape = null) {
+    if (!shape) {
+      if (!(this.shFrame.kind === 'body' && this.shFrame.rotating && this.shFrame.id === this.bodyId) || len(sub(this.sh.p, p)) > 60) return 0;
+      shape = this.hullShape();
+    }
+    const up = norm(p), right = norm(cross(dir, up), V(1, 0, 0)), top = cross(right, dir);
+    const th = Math.tan((fovDeg * Math.PI) / 360), tw = th * EXIT.aspect;
+    const discs = [];
+    for (const h of shape) {
+      const v = sub(h.p, p), d = dot(v, dir);
+      if (d < 0.3) { if (len(v) < h.radius) return 1; continue; }             // the lens inside the hull: all of it
+      discs.push({ x: dot(v, right) / d, y: dot(v, top) / d, r: h.radius / d });
+    }
+    if (!discs.length) return 0;
+    const NX = 16, NY = 9;
+    let hit = 0;
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+      const x = ((i + 0.5) / NX * 2 - 1) * tw * mid, y = ((j + 0.5) / NY * 2 - 1) * th * mid;
+      for (const c of discs) if ((x - c.x) * (x - c.x) + (y - c.y) * (y - c.y) < c.r * c.r) { hit++; break; }
+    }
+    return hit / (NX * NY);
+  }
+
+  // The parked hull in the view on foot now: the share of the middle of the frame it covers
+  // (the sketch of a place waits until the ship is out of it).
+  hullInView(mid = 0.7) {
+    const pose = this.camPose;
+    if (this.sm.state !== S.ON_FOOT || !pose || !pose.look) return 0;
+    return this.hullCover(pose.p, pose.look, pose.fov || CAMERA.fovFoot, mid);
+  }
+
+  // Where the explorer walks to from the ladder: a few steps straight out from the hull, clear of
+  // the wing, on ground fit to stand on (not a bank, not a trunk, not deeper water than the ladder's).
+  exitSpot(hp, away) {
+    const sample = this.sampler(this.shFrame.id), up = norm(hp), r0 = len(hp);
+    const near = this.obstaclesNear(this.shFrame.id, hp, 8);
+    const s0 = sample(up), wet0 = s0.liquidRadius > s0.radius;
+    for (const d of EXIT.walk) {
+      if (d === 0) break;
+      const u = norm(addScaled(hp, away, d)), g = sample(u);
+      const wet = g.liquidRadius > g.radius;
+      const r = Math.max(g.radius, wet ? g.liquidRadius - EXPLORER.swimDepth : 0);
+      if ((wet && !wet0) || g.slope > 0.5 || Math.abs(r - r0) > 0.3 + d * 0.5) continue;
+      // nothing tall on the way or at the spot
+      let clear = true;
+      for (const o of near) {
+        if (o.height <= EXPLORER.scramble) continue;
+        const q = sub(scale(o.unitDir, r0), hp), along = clamp(dot(q, away), 0, d);
+        if (len(sub(q, scale(away, along))) < o.radius + 0.7) { clear = false; break; }
+      }
+      if (clear) return scale(u, r);
+    }
+    return hp;
+  }
+
   beginExit() {
     if (!this.sm.dispatch(EV.exit)) return;
     const hp = this.hatchPoint();
     const up = norm(hp);
-    // Step out facing away from the hull.
+    // Step out facing away from the hull, and walk a few steps clear of it.
     const away = tangent(sub(hp, this.sh.p), up, qRotate(this.sh.q, V(-1, 0, 0)));
+    const out = this.exitSpot(hp, away);
     this.ex = createExplorerState(hp, away);
     this.ex.fuel = 1;
     this.bodyId = this.shFrame.id;
-    // The view: as near to "half over the shoulder, away from the ship" as leaves the boom
-    // room. Straight away from the hull puts the camera inside it (a boom of 0.8 m: the back
-    // of a helmet); so turn the view along the hull, either way, until the boom is free.
-    const solid = this.cameraSolids(hp);
-    let best = 0.5, room = -1;
-    for (const a of [0.5, -0.5, 0.95, -0.95, 1.4, -1.4, 1.85, -1.85, 2.4, -2.4, Math.PI]) {
-      const r = boomRoom(hp, rotateAround(away, up, a), -0.12, solid);
-      if (r > room + 0.05) { room = r; best = a; }
-      if (r >= CAMERA.boom - 0.05) break;
-    }
-    this.footCam = createFootCamera(rotateAround(away, up, best), up);
+    this.footCam = createFootCamera(rotateAround(away, norm(out), this.exitView(out, away)), norm(out));
     this.footCam.firstPerson = false;
-    this.transition = { t: 0, dur: FEEL.exitSeconds, dir: 'out', from: this.camPose };
+    this.transition = { t: 0, dur: FEEL.exitSeconds, dir: 'out', from: this.camPose, exFrom: hp, exTo: out };
+  }
+
+  // Which way the view faces as the explorer steps out at `feet` (an angle from `away`, the way
+  // straight out from the hull): chosen for the picture. Each candidate is the frame the foot
+  // camera would settle to; it is marked down for the hull between the lens and the figure, for
+  // the hull over more than a sixth of the frame (and a little for any of it), for a boom the
+  // hull or a trunk cuts short, for ground that rises in front or a trunk in the way, and for
+  // turning far from straight out.
+  exitView(feet, away) {
+    const up = norm(feet), R = len(feet), sample = this.sampler(this.shFrame.id);
+    const solid = this.cameraSolids(feet), shape = this.hullShape();
+    const near = this.obstaclesNear(this.shFrame.id, feet, 14);
+    const pitch = -0.12, pivot = addScaled(feet, up, CAMERA.pivotHeight), chest = addScaled(feet, up, 1.2);
+    const here = sample(up).radius;
+    let best = 0, bestScore = Infinity;
+    for (const a of EXIT.turns) {
+      const f = rotateAround(away, up, a);
+      const look = norm(add(scale(f, Math.cos(pitch)), scale(up, Math.sin(pitch))));
+      const room = boomRoom(feet, f, pitch, solid);
+      const lens = addScaled(pivot, look, -Math.min(room, CAMERA.boom));
+      const cover = this.hullCover(lens, look, CAMERA.fovFoot, 1, shape);
+      // the hull between the lens and the figure
+      let hidden = false;
+      const seg = sub(chest, lens), sl = len(seg), sd = scale(seg, 1 / sl);
+      for (const h of shape) {
+        const q = sub(h.p, lens), t = clamp(dot(q, sd), 0, sl);
+        if (len(sub(q, scale(sd, t))) < h.radius) { hidden = true; break; }
+      }
+      // open ground ahead: no bank rising in front, no trunk in the first metres of the view
+      const rise = Math.max(0, sample(norm(addScaled(feet, f, 14))).radius - here) / 14;
+      let trunk = 0;
+      for (const o of near) {
+        if (o.height <= CAMERA.pivotHeight) continue;
+        const q = sub(scale(o.unitDir, R), feet), along = dot(q, f);
+        if (along > 0.5 && along < 9 && len(sub(q, scale(f, along))) < o.radius + 1.2) trunk = Math.max(trunk, 1 - along / 9);
+      }
+      const score = (hidden ? 100 : 0) + (cover > EXIT.cover ? 40 + cover * 40 : cover * 4)
+        + Math.max(0, CAMERA.boom - room) * 3 + rise * 4 + trunk * 2 + Math.abs(a) * 0.3;
+      if (score < bestScore - 1e-9) { bestScore = score; best = a; }
+    }
+    return best;
   }
 
   stepBoarding(h) {
@@ -623,8 +734,19 @@ export class Sim {
       this.sh.canopy01 = Math.sin(Math.PI * clamp01(k * 1.1)) ** 0.7;
       if (k >= 1) { this.transition = null; this.sh.canopy01 = 0; this.sm.dispatch(EV.seated); }
     } else {
+      // Down the ladder and a few steps out, clear of the wing, while the view comes round.
+      if (T.exTo && T.exFrom) {
+        const e = smoothstep(0.12, 0.92, k);
+        const q = lerp(T.exFrom, T.exTo, e), d = norm(q), g = this.sampler(this.bodyId)(d);
+        const wet = g.liquidRadius > g.radius;
+        this.ex.p = scale(d, Math.max(g.radius, wet ? g.liquidRadius - EXPLORER.swimDepth : 0, Math.min(len(T.exFrom), len(T.exTo))));
+        const walking = e > 0.02 && e < 0.98 && len(sub(T.exTo, T.exFrom)) > 0.5;
+        this.ex.mode = walking ? 'walk' : 'idle';
+        this.ex.speed = walking ? 2.5 : 0;
+        if (k >= 1) this.ex.p = { ...T.exTo };
+      }
       this.sh.canopy01 = Math.sin(Math.PI * clamp01(k)) ** 0.7;
-      if (k >= 1) { this.transition = null; this.sh.canopy01 = 0; this.sm.dispatch(EV.steppedOut); }
+      if (k >= 1) { this.transition = null; this.sh.canopy01 = 0; this.ex.mode = 'idle'; this.ex.speed = 0; this.sm.dispatch(EV.steppedOut); }
     }
   }
 

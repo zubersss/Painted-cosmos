@@ -300,3 +300,69 @@ test('setting down in a clearing in the wood, the chase camera keeps out of the 
   assert.ok(r.step < 0.6, 'the boom changes by under 0.6 m a frame at 30 fps: ' + r.step.toFixed(2));
   assert.ok(r.boomEnd >= CAMERA.shipBoomMin, 'and never closer than the shortest boom: ' + r.boomEnd.toFixed(2));
 });
+
+// ---- M4: PHYSICS' critique of PILOT, items 1 to 3, on the flight model alone -----------------
+test('M4 lift-off under a canopy (no PHYSICS): on up through the wood, never placed on the crowns', () => {
+  const sample = makeWorld({ R });
+  const floor = (p) => { const g = floorAt(sample, p); g.floor += 23; g.canopy = 23; return g; };
+  const st = restOnSurface(sample, start, north);
+  beginLiftoff(st);
+  let hop = 0, n = 0;
+  while (st.liftoff && n++ < 60 * 30) {
+    const p0 = { ...st.p };
+    stepFlight(st, {}, DT, envFor(st, sample, { floor }));
+    hop = Math.max(hop, len(sub(st.p, p0)) - st.speed * DT);
+  }
+  for (let i = 0; i < 120; i++) { const p0 = { ...st.p }; stepFlight(st, {}, DT, envFor(st, sample, { floor })); hop = Math.max(hop, len(sub(st.p, p0)) - st.speed * DT); }
+  assert.equal(st.liftoff, null);
+  assert.ok(hop < 0.05, 'no step moved the hull more than its speed says: ' + hop.toFixed(2) + ' m (it was 16)');
+  const h = len(st.p) - R;
+  assert.ok(h >= 23 + SHIP.liftoffClear - 0.6 && h < 23 + 8, 'handed over above the crowns: ' + h.toFixed(1) + ' m');
+});
+
+test('M4 the landing assist changes the hull\'s velocity no faster than its thrusters can', () => {
+  const sample = makeWorld({ R });
+  const st = hovering(sample, 70);
+  st.v = scale(north, 30);
+  assert.equal(beginLanding(st, sample), true);
+  let r = 'landing', t = 0, worst = 0, sink = 0;
+  while (r === 'landing' && t < 90) {
+    const v0 = { ...st.v };
+    r = stepLanding(st, DT, sample); t += DT;
+    if (r === 'landing') worst = Math.max(worst, len(sub(st.v, v0)) / DT);
+    sink = Math.max(sink, -dot(st.v, norm(st.p)));
+  }
+  assert.equal(r, 'touchdown');
+  assert.ok(worst <= Math.hypot(SHIP.landAccel, SHIP.assistLift) + 0.5, 'largest acceleration ' + worst.toFixed(1) + ' m/s^2 (it was 105: 3.5 / s of 30 m/s at once)');
+  assert.ok(sink <= SHIP.landHighDescent + 0.2, 'descent ' + sink.toFixed(1) + ' m/s (it was 13)');
+});
+
+test('M4 the landing assist does not choose a shelf at the lip of a wall', () => {
+  // A cone with sides of 67 degrees; hovering over flat ground 3 m from its foot.
+  const hillDir = norm(add(start, scale(north, 33 / R)));
+  const sample = makeWorld({ R, hill: { dir: hillDir, radius: 30, height: 70 } });
+  const site = findLandingSite(scale(start, R + 30), sample);
+  assert.ok(site, 'a site');
+  const fromFoot = arc(site.dir, hillDir, R) - 30;
+  assert.ok(fromFoot >= 4.3, 'the hull stands clear of the wall\'s foot: ' + fromFoot.toFixed(1) + ' m (it was 3)');
+  assert.ok(site.slope < 0.1, 'on level ground all round: ' + site.slope.toFixed(2));
+});
+
+test('M4 the chase camera rides behind the hull\'s motion: a jolt of the hull is not a jump of the picture', () => {
+  const sample = makeWorld({ R });
+  const cam = createShipCamera();
+  const st = hovering(sample, 60);
+  st.v = scale(north, 40);
+  const opts = () => ({ upRef: norm(st.p), level01: 1, speed01: 0.05, sample, toLocal: (p) => p });
+  let last = null, lastV = null, worst = 0;
+  for (let i = 0; i < 240; i++) {
+    if (i === 120) st.v = add(st.v, scale(norm(st.p), 8));          // a hop: 8 m/s more, upward, between two frames
+    st.p = add(st.p, scale(st.v, DT));
+    const pose = updateShipCamera(cam, st, DT, opts());
+    if (last) { const v = scale(sub(pose.p, last), 1 / DT); if (lastV && i >= 118) worst = Math.max(worst, len(sub(v, lastV))); lastV = v; }
+    last = pose.p;
+  }
+  assert.ok(worst < 2, `the lens' velocity changes by ${worst.toFixed(2)} m/s between frames at most (the hull's by 8)`);
+  const slack = len(sub(add(cam.follow.e, V()), V()));
+  assert.ok(slack < 0.2, 'and the slack is taken up again: ' + slack.toFixed(2) + ' m after two seconds');
+});

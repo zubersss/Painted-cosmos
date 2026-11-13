@@ -28,6 +28,13 @@ export const CAMERA = Object.freeze({
   shipBoomFast: 21,
   shipHeight: 3.6,           // metres above the ship
   shipLag: 4.5,              // 1/s: how quickly the chase camera catches the ship's heading
+  // The chase camera rides behind the ship's motion, not on the hull: a change of the hull's
+  // velocity reaches the camera over shipFollow seconds and the slack it leaves is taken up over
+  // shipSettle (a steady 14 m/s^2 leaves the ship 1.1 m ahead of where the lens expects it; never
+  // more than shipSlack). A hop of the hull is then not a jump of the whole picture.
+  shipFollow: 0.18,
+  shipSettle: 0.45,
+  shipSlack: 3,
   shipClearance: 1.2,
   // Crowns round a low ship (review 6: setting down in the wood, the chase camera 15 m back sat
   // inside a birch crown and leaf masses a metre from the lens jumped frame to frame). A tree's
@@ -332,7 +339,20 @@ export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
   cam.short = clamp(cam.short, 0, Math.max(0, full - C.shipBoomMin));
   cam.duck = clamp(cam.duck || 0, 0, C.crownDuck);
   const boom = full - cam.short, height = C.shipHeight - cam.duck;
-  let p = add(add(ship.p, scale(back, boom)), scale(camUp, height + cam.lift));
+  // Where the boom hangs from: the ship, less the slack its changes of velocity have left (only
+  // in a body's ground frame, where the velocity is continuous; the look stays on the ship).
+  let hang = ship.p;
+  if (opts.sample && ship.v && dt > 0) {
+    const F = cam.follow || (cam.follow = { v: { ...ship.v }, e: V() });
+    F.v = lerp(F.v, ship.v, damp(1 / C.shipFollow, dt));
+    const keep = Math.exp(-dt / C.shipSettle);
+    F.e = add(scale(F.e, keep), scale(sub(F.v, ship.v), dt));
+    const l = len(F.e);
+    if (l > C.shipSlack) F.e = scale(F.e, C.shipSlack / l);
+    hang = add(ship.p, F.e);
+  } else if (!opts.sample || !ship.v) cam.follow = null;
+  else if (cam.follow) hang = add(ship.p, cam.follow.e);
+  let p = add(add(hang, scale(back, boom)), scale(camUp, height + cam.lift));
 
   if (opts.sample && opts.toLocal) {
     // Keep the chase camera above the terrain (only meaningful in the ground frame).
@@ -340,7 +360,7 @@ export function updateShipCamera(cam, ship, dt, opts, C = CAMERA) {
     const need = clearanceAt(opts.sample, local, C.shipClearance);
     const lift = Math.max(0, cam.lift + need);
     cam.lift = lift > cam.lift ? mix(cam.lift, lift, damp(25, dt)) : mix(cam.lift, lift, damp(2, dt));
-    p = add(add(ship.p, scale(back, boom)), scale(camUp, height + cam.lift));
+    p = add(add(hang, scale(back, boom)), scale(camUp, height + cam.lift));
     const need2 = clearanceAt(opts.sample, opts.toLocal(p), C.shipClearance);
     if (need2 > 0) { p = addScaled(p, norm(opts.upRef || camUp), need2); }
   } else cam.lift = mix(cam.lift, 0, damp(2, dt));
