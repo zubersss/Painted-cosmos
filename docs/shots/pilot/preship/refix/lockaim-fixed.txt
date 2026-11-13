@@ -1,0 +1,9 @@
+pointed at Mars (no map): prompt "Pulse to Mars" locked false
+F: state PULSE locked f
+F again (drop out): state SPACE target mars locked false notice Turning onto the course for Mars
+now pointed straight at Jupiter: prompt "Pulse to Jupiter" aimed jupiter target jupiter
+F: turning null state PULSE notice null
+
+second run: pointed at Saturn then away: prompt "Pulse to Saturn"
+F, F (turn stopped): notice Turn stopped: F turns onto the course again locked false
+pointed straight at Mars: prompt "Pulse to Mars" aimed mars

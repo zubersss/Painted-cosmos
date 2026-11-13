@@ -175,3 +175,161 @@ test('a pulse to Saturn with Venus right in front goes round Venus and arrives a
   assert.ok(nearVenus > arrivalRadius(BODIES.venus), `passed Venus outside its sphere (${(nearVenus / 1000).toFixed(1)} km)`);
   assert.ok(!said.some((x) => /Venus/.test(x)), 'nothing said about Venus: ' + JSON.stringify(said));
 });
+
+// The pre-ship verifier's R1 (on b0710fe): routed round a world, the pulse planned its speed along
+// the nose only. With the nose on the tangent past the world just left (or one between) the course's
+// world was off the line of flight, the drive ran up toward 30 km/s, and once round it had less room
+// than braking takes: it went into that world's ground at 4 to 30 km/s, or round it at top speed
+// without end (98 of 2160 routes and clocks; Earth -> Venus and Earth -> Mercury at clocks 3000 and
+// 3600 s; Venus -> Earth in the real game hit Earth at 4.2 km/s). The test starts at three game clocks
+// of the first hour, from every world to every other, the nose on the world or dead behind it.
+test('every world to every other at three clocks: the pulse lets go at the chosen world\'s sphere, never runs into it, never circles it', () => {
+  const ALL = ['mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
+  const bad = [];
+  let runs = 0, worstIn = 0, lowest = Infinity, longest = 0;
+  for (const T0 of [0, 3000, 3600]) {
+    for (const from of ALL) for (const to of ALL) {
+      if (from === to) continue;
+      for (const where of ['ahead', 'behind']) {
+        const sim = newSim();
+        sim.t = T0;
+        const pad = new Pad();
+        sim.teleport({ body: from, lat: 10, lon: 30, ship: true, altitude: 3 * spaceAltitude(BODIES[from]) });
+        play(sim, pad, 0.2);
+        const t = norm(sub(sim.bodyInShipFrame(to), sim.sh.p));
+        const side = norm(cross(t, Math.abs(t.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0)));
+        sim.sh.q = where === 'behind' ? qLook(V(-t.x, -t.y, -t.z), side) : qLook(t, side);
+        sim.sh.v = V();
+        sim.setTarget(to);
+        play(sim, pad, 0.1);
+        const d0 = len(sub(sim.bodyInShipFrame(to), sim.sh.p));
+        const R = arrivalRadius(BODIES[to]);
+        pad.tap('KeyF');
+        runs++;
+        let tP = 0, vIn = null, inPulse = Infinity, after = Infinity, other = Infinity, otherId = null, ended = null;
+        const said = [];
+        play(sim, pad, 600, {
+          fps: 30,
+          each: () => {
+            const pulsing = sim.sm.state === S.PULSE;
+            if (pulsing) tP += 1 / 30;
+            const d = len(sub(sim.bodyInShipFrame(to), sim.sh.p));
+            if (tP > 0 && vIn == null && d < R) vIn = sim.pulse ? sim.pulse.v : sim.sh.speed;
+            if (pulsing) inPulse = Math.min(inPulse, d);
+            if (ended != null) after = Math.min(after, d - BODIES[to].radius);
+            if (pulsing) for (const id of ALL) {
+              if (id === to || id === from) continue;
+              const a = len(sub(sim.bodyInShipFrame(id), sim.sh.p)) - BODIES[id].radius - spaceAltitude(BODIES[id]);
+              if (a < other) { other = a; otherId = id; }
+            }
+            if (tP > 0 && ended == null && !pulsing) ended = sim.t;
+            if (sim.notice && !said.includes(sim.notice.text)) said.push(sim.notice.text);
+          },
+          until: () => ended != null && sim.t - ended > 20,
+        });
+        const tag = `clock ${T0} ${from}->${to} (${where}): ${JSON.stringify(said)}`;
+        const why = [];
+        if (ended == null) why.push(tP > 0 ? `still pulsing after ${tP.toFixed(0)} s` : 'the drive never started');
+        else {
+          if (vIn != null && vIn > PULSE.exitSpeed * 1.25) why.push(`into its sphere at ${vIn.toFixed(0)} m/s`);
+          if (inPulse < R * 0.9) why.push(`pulsing ${(inPulse / 1000).toFixed(1)} km from its centre (sphere ${(R / 1000).toFixed(1)})`);
+          if (after < spaceAltitude(BODIES[to])) why.push(`down to ${after.toFixed(0)} m over its ground after letting go`);
+          if (!said.includes(BODIES[to].name + ' ahead')) why.push('no word of arriving');
+          if (tP > 2.5 * PULSE_ETA(d0 - R) + 30) why.push(`a pulse of ${tP.toFixed(0)} s for ${(d0 / 1000).toFixed(0)} km`);
+        }
+        if (other < 0) why.push(`within the edge of ${otherId}'s space by ${(-other).toFixed(0)} m`);
+        if (why.length) bad.push(`${tag}: ${why.join('; ')}`);
+        if (vIn != null) worstIn = Math.max(worstIn, vIn);
+        if (after < Infinity) lowest = Math.min(lowest, after - spaceAltitude(BODIES[to]));
+        longest = Math.max(longest, tP / Math.max(1, PULSE_ETA(d0 - R)));
+      }
+    }
+  }
+  console.log(`      ${runs} pulses; fastest into a sphere ${worstIn.toFixed(0)} m/s; lowest ${lowest.toFixed(0)} m over the edge of space; longest ${longest.toFixed(2)} x its ETA`);
+  assert.deepEqual(bad.slice(0, 20), [], `${bad.length} of ${runs}`);
+});
+const PULSE_ETA = (d) => pulse.pulseEta(Math.max(0, d));
+
+// The verifier's real-game case: Venus at 945 m, the clock at 0.3 s, Earth chosen on the map, the
+// nose on Earth, F. On b0710fe the pulse passed Mercury and hit Earth's ground at 4.2 km/s (and lay
+// on it nose-down with "F Drop out of pulse"); on 8c7d603 it stopped 162 km out ("Mercury is in the way").
+test('Venus to Earth at the start of the clock: round Mercury and in front of Earth, at cruise speed', () => {
+  const sim = newSim();
+  sim.t = 0.3;
+  const pad = new Pad();
+  sim.teleport({ body: 'venus', lat: 10, lon: 30, ship: true, altitude: 945 });
+  play(sim, pad, 0.2);
+  assert.equal(sim.sm.state, S.SPACE);
+  const t = norm(sub(sim.bodyInShipFrame('earth'), sim.sh.p));
+  sim.sh.q = qLook(t, norm(cross(t, V(0, 1, 0))));
+  sim.sh.v = V();
+  sim.setTarget('earth');
+  play(sim, pad, 0.1);
+  pad.tap('KeyF');
+  const said = [];
+  let pulsed = false, vIn = null, low = Infinity, mercury = Infinity;
+  const R = arrivalRadius(BODIES.earth);
+  play(sim, pad, 400, {
+    fps: 30,
+    each: () => {
+      if (sim.sm.state === S.PULSE) pulsed = true;
+      const d = len(sub(sim.bodyInShipFrame('earth'), sim.sh.p));
+      if (pulsed && vIn == null && d < R) vIn = sim.pulse ? sim.pulse.v : sim.sh.speed;
+      low = Math.min(low, d - BODIES.earth.radius);
+      if (pulsed) mercury = Math.min(mercury, len(sub(sim.bodyInShipFrame('mercury'), sim.sh.p)));
+      if (sim.notice && !said.includes(sim.notice.text)) said.push(sim.notice.text);
+    },
+    until: () => pulsed && sim.sm.state === S.SPACE && sim.sh.speed < 30,
+  });
+  assert.ok(pulsed && sim.sm.state === S.SPACE, 'pulsed and let go: ' + JSON.stringify(said));
+  assert.ok(said.includes('Earth ahead'), JSON.stringify(said));
+  assert.ok(vIn < PULSE.exitSpeed * 1.25, `into Earth's sphere at ${vIn && vIn.toFixed(0)} m/s`);
+  assert.ok(low > spaceAltitude(BODIES.earth), `never lower than the edge of Earth's space: ${low.toFixed(0)} m over its ground`);
+  assert.ok(mercury > arrivalRadius(BODIES.mercury), `round Mercury outside its sphere (${(mercury / 1000).toFixed(1)} km)`);
+});
+
+// The verifier's R2 (on b0710fe): F held the course until arrival or the map, so after "Turn
+// stopped" or a drop-out the prompt stayed on the old world with the nose dead on another, and F
+// turned the ship away from the world in the middle of the picture. F's hold now ends with its turn
+// or its pulse; a world chosen on the map still holds.
+test('after a stopped turn or a drop-out, the course is again the marker last pointed at; a world chosen on the map holds', () => {
+  const sim = newSim();
+  const pad = new Pad();
+  sim.teleport({ body: 'earth', lat: 10, lon: 30, ship: true, altitude: 3 * spaceAltitude(BODIES.earth) });
+  play(sim, pad, 0.2);
+  const aim = (id, back = false) => {
+    const t = norm(sub(sim.bodyInShipFrame(id), sim.sh.p));
+    sim.sh.q = qLook(back ? V(-t.x, -t.y, -t.z) : t, norm(cross(t, V(0, 1, 0))));
+    sim.sh.v = V();
+    play(sim, pad, 0.3);
+  };
+  aim('saturn'); aim('saturn', true);
+  assert.equal(sim.promptNow.text, 'Pulse to Saturn', 'the marker last pointed at');
+  pad.tap('KeyF'); play(sim, pad, 1);
+  assert.ok(sim.turn, 'turning onto the course for Saturn');
+  pad.tap('KeyF'); play(sim, pad, 0.3);
+  assert.equal(sim.turn, null);
+  aim('mars');
+  assert.equal(sim.promptNow.text, 'Pulse to Mars', 'after "Turn stopped" the nose on Mars names Mars');
+  // a drop-out
+  pad.tap('KeyF');
+  play(sim, pad, 30, { until: () => sim.sm.state === S.PULSE });
+  assert.equal(sim.sm.state, S.PULSE);
+  play(sim, pad, 3);
+  pad.tap('KeyF');
+  play(sim, pad, 90, { until: () => sim.sm.state === S.SPACE });
+  assert.equal(sim.sm.state, S.SPACE, 'dropped out');
+  aim('jupiter');
+  assert.equal(sim.promptNow.text, 'Pulse to Jupiter', 'after a drop-out the nose on Jupiter names Jupiter');
+  pad.tap('KeyF'); play(sim, pad, 1);
+  assert.ok(sim.sm.state === S.PULSE || (sim.turn && sim.turn.dest === 'jupiter'), 'F goes to Jupiter');
+  pad.tap('KeyF'); play(sim, pad, 90, { until: () => sim.sm.state === S.SPACE && !sim.turn });
+  // chosen on the map: pointing elsewhere does not change it, after a stopped turn or a drop-out either
+  sim.setTarget('neptune');
+  aim('mars');
+  assert.equal(sim.promptNow.text, 'Pulse to Neptune', 'the map\'s choice holds');
+  pad.tap('KeyF'); play(sim, pad, 1);
+  pad.tap('KeyF'); play(sim, pad, 0.3);
+  aim('mars');
+  assert.equal(sim.promptNow.text, 'Pulse to Neptune', 'and holds after a stopped turn');
+});

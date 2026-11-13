@@ -60,13 +60,33 @@ export function pulseAdvice(p, f, spheres, T = PULSE) {
     const off2 = d * d - along * along;
     if (off2 >= s.radius * s.radius) continue;             // the line of flight misses it
     const entry = along - Math.sqrt(s.radius * s.radius - off2);
-    const room = Math.max(0, entry);
-    // Speed from which we can still be down to exit speed at the sphere.
-    const v = Math.sqrt(T.exitSpeed * T.exitSpeed + 2 * T.accel * T.brakeShare * room);
-    const allowed = Math.max(T.exitSpeed * 0.6, v - T.accel * T.brakeLead);
+    const allowed = brakeSpeed(entry, T);
     if (allowed < vWant) { vWant = allowed; block = s.id; }
   }
   return { vWant, block, inside };
+}
+
+// The speed from which the drive can still be down to exit speed after `room` metres.
+export function brakeSpeed(room, T = PULSE) {
+  const v = Math.sqrt(T.exitSpeed * T.exitSpeed + 2 * T.accel * T.brakeShare * Math.max(0, room));
+  return Math.max(T.exitSpeed * 0.6, v - T.accel * T.brakeLead);
+}
+
+// The speed on a course to `dest`: pulseAdvice along the nose, and besides it the distance left
+// to the course's world itself, wherever that world lies. (While the nose follows the tangent
+// past a world between, or is still being drawn round, the course's world is off the line of
+// flight; planned along the nose alone the drive ran up toward top speed with less room left
+// than braking takes, and went into that world at km/s, or round it at 30 km/s without end:
+// the pre-ship verifier's R1.) The straight distance is never longer than the way round, so the
+// drive is always slow enough to let go at the world's arrival sphere, wherever the nose is.
+// Returns pulseAdvice's { vWant, block, inside }; block is `dest` where that limits.
+export function courseAdvice(p, f, dest, spheres, T = PULSE) {
+  const adv = pulseAdvice(p, f, spheres, T);
+  const D = dest ? spheres.find((s) => s.id === dest) : null;
+  if (!D) return adv;
+  const v = brakeSpeed(len(sub(D.c, p)) - D.radius, T);
+  if (v < adv.vWant) { adv.vWant = v; adv.block = dest; }
+  return adv;
 }
 
 // The direction of the course to `dest` from p: straight at it, or, when another sphere lies

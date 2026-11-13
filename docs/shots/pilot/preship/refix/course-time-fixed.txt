@@ -1,0 +1,4 @@
+{"runs":2160,"arrived":2160,"stoppedShort":0,"hitWorld":0,"stillPulsing":0,"other":0}
+(verifier's course-time.mjs <root> ahead 24 3; then behind 24 3; then TMAX=7200 ahead 12 3)
+{"runs":2160,"arrived":2160,"stoppedShort":0,"hitWorld":0,"stillPulsing":0,"other":0}
+{"runs":1080,"arrived":1080,"stoppedShort":0,"hitWorld":0,"stillPulsing":0,"other":0}

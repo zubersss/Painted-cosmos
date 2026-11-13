@@ -20,7 +20,7 @@ import {
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
 } from '../ship/flight.js';
-import { PULSE, arrivalRadius, createPulse, pulseAdvice, stepPulseSpeed, pulseEta, courseDir } from '../ship/pulse.js';
+import { PULSE, arrivalRadius, createPulse, pulseAdvice, courseAdvice, stepPulseSpeed, pulseEta, courseDir } from '../ship/pulse.js';
 
 export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
@@ -194,7 +194,8 @@ export class Sim {
     this.nearObstacles = [];
     this.canopy = [];
     this.target = null;            // body id the pulse drive and the markers point at
-    this.targetLocked = false;     // chosen on the map: aiming elsewhere does not change it
+    this.targetLocked = false;     // true: chosen on the map, aiming elsewhere does not change it;
+                                   // 'f': held by F for its turn and pulse only (unlockCourse)
     this.aimed = null;
     this.pulse = null;
     this.turn = null;              // { dest, t, w }: F with the course off the nose turns the ship onto it first
@@ -1211,20 +1212,28 @@ export class Sim {
   // times). Without a course F pulses along the nose, as before.
   pressF() {
     if (this.sm.state !== S.SPACE) return false;
-    if (this.turn) { this.turn = null; this.say('Turn stopped: F turns onto the course again', 3); return false; }
+    if (this.turn) { this.turn = null; this.unlockCourse(); this.say('Turn stopped: F turns onto the course again', 3); return false; }
     if (!this.target) return this.tryPulse();
-    this.targetLocked = true;                     // the course holds while the nose swings past other worlds
+    // The course holds while the nose swings past other worlds, for this turn and pulse only (a
+    // world chosen on the map holds until it is reached or the map changes it).
+    if (this.targetLocked !== true) this.targetLocked = 'f';
     const f = qRotate(this.sh.q, V(0, 0, -1));
     const spheres = this.pulseSpheres();
     const c = this.course(f, spheres);
     const off = c ? Math.acos(clamp(dot(f, c.dir), -1, 1)) : 0;
     const adv = pulseAdvice(this.sh.p, f, spheres);
-    if (!c || (off < PULSE.turnFirst && !adv.inside && adv.vWant >= PULSE.exitSpeed * 1.5) || this.tooNear(adv)) return this.tryPulse();
+    if (!c || (off < PULSE.turnFirst && !adv.inside && adv.vWant >= PULSE.exitSpeed * 1.5) || this.tooNear(adv)) return this.tryPulse() || (this.unlockCourse(), false);
     this.turn = { dest: this.target, t: 0, w: 0 };
     this.say(`Turning onto the course for ${BODIES[this.target].name}`, 4);
     this.emit('course-turn');
     return true;
   }
+
+  // F's hold on the course ends with its turn or its pulse (stopped, refused, dropped out of):
+  // the course is again the marker last pointed at, as README says (the pre-ship verifier's R2:
+  // after "Turn stopped" or a drop-out the prompt stayed on the old world with the nose dead on
+  // another, and F turned the ship away from the world in the middle of the picture).
+  unlockCourse() { if (this.targetLocked === 'f') this.targetLocked = false; }
 
   // Already at the course's world (its sphere is the one that stops the drive, right ahead or
   // round us): no turn, the drive says so.
@@ -1238,24 +1247,25 @@ export class Sim {
   stepCourseTurn(h, I, mdx, mdy) {
     const T = this.turn;
     if (!T) return false;
-    if (this.sm.state !== S.SPACE || !this.target) { this.turn = null; return false; }
+    if (this.sm.state !== S.SPACE || !this.target) { this.turn = null; this.unlockCourse(); return false; }
     T.dest = this.target;
     T.t += h;
     const steer = Math.abs(I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight')) > 0.3;
     T.hand = (T.hand || 0) * Math.exp(-3 * h) + Math.abs(mdx) + Math.abs(mdy);
     if (steer || T.hand > 60 || T.t > PULSE.turnMax) {
       this.turn = null;
+      this.unlockCourse();
       if (T.t <= PULSE.turnMax) this.say('Turn stopped: F turns onto the course again', 3);
       return false;
     }
     const sh = this.sh;
     const f = qRotate(sh.q, V(0, 0, -1));
     const c = this.course(f);
-    if (!c) { this.turn = null; return false; }
+    if (!c) { this.turn = null; this.unlockCourse(); return false; }
     const ang = Math.acos(clamp(dot(f, c.dir), -1, 1));
     if (ang < PULSE.turnDone) {
       this.turn = null;
-      this.tryPulse();
+      if (!this.tryPulse()) this.unlockCourse();
       return false;
     }
     T.w = Math.min(PULSE.turnRate, T.w + PULSE.turnAccel * h, Math.sqrt(2 * PULSE.turnAccel * ang));
@@ -1341,7 +1351,10 @@ export class Sim {
           f = qRotate(sh.q, V(0, 0, -1));
         }
       }
-      const adv = pulseAdvice(sh.p, f, spheres);
+      // The speed: whatever lies along the nose, and the distance left to the course's world
+      // wherever it lies (pulse.js courseAdvice: routed round a world, the drive ran up to top
+      // speed with the world off the nose and went into it, or round it without end).
+      const adv = courseAdvice(sh.p, f, bound, spheres);
       stepPulseSpeed(ps, ps.cancel ? PULSE.exitSpeed * 0.9 : adv.vWant, h);
       ps.block = adv.block;
       env.pulseSpeed = ps.v;
@@ -1365,6 +1378,7 @@ export class Sim {
           this.emit('arrived');
         } else {
           if (!ps.cancel && adv.block === 'sun') this.say(this.target ? 'The Sun lies on your course: F goes on round it' : 'The Sun is in the way: steer round it and pulse again', 6);
+          else this.unlockCourse();                 // dropped out by the pilot
           this.emit('pulse-off');
         }
       }

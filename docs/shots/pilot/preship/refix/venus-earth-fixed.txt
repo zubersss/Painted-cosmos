@@ -1,0 +1,15 @@
+course around mercury d0 336 km
+0 SPACE v 0 earth 336.0 km (alt 331963 ) mercury 181.6 km block null
+5 PULSE v 1833 earth 332.1 km (alt 328138 ) mercury 177.5 km block earth
+10 PULSE v 3833 earth 318.4 km (alt 314359 ) mercury 163.5 km block earth
+15 PULSE v 5833 earth 294.4 km (alt 290406 ) mercury 139.3 km block earth
+20 PULSE v 7833 earth 260.5 km (alt 256459 ) mercury 105.1 km block earth
+25 PULSE v 9833 earth 216.5 km (alt 212525 ) mercury 60.9 km block earth
+30 PULSE v 9946 earth 164.8 km (alt 160824 ) mercury 10.3 km block earth
+35 PULSE v 8349 earth 118.8 km (alt 114756 ) mercury 37.7 km block earth
+40 PULSE v 6746 earth 80.5 km (alt 76549 ) mercury 76.0 km block earth
+45 PULSE v 5142 earth 50.4 km (alt 46359 ) mercury 106.4 km block earth
+50 PULSE v 3538 earth 28.2 km (alt 24193 ) mercury 128.9 km block earth
+55 PULSE v 1932 earth 14.1 km (alt 10083 ) mercury 143.2 km block earth
+58.4 say Earth ahead
+60 SPACE v 358 earth 8.2 km (alt 4198 ) mercury 149.4 km block null

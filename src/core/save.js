@@ -36,7 +36,7 @@ export function snapshot(sim) {
     explorer: { p: r3(sim.ex.p), fwd: r3(sim.ex.fwd), fuel: +sim.ex.fuel.toFixed(3) },
     view: { fwd: r3(sim.footCam.viewFwd), pitch: +Math.max(VIEW_PITCH[0], Math.min(VIEW_PITCH[1], sim.footCam.pitch)).toFixed(3), boom: sim.footCam.boom, firstPerson: !!sim.footCam.firstPerson },
     ship: { bodyId: sim.shFrame.id, p: r3(sim.sh.p), q: qOf(sim.sh.float ? sim.sh.float.q0 : sim.sh.q) },     // (afloat: its still attitude, not this moment's pitch)
-    target: sim.target, targetLocked: !!sim.targetLocked,
+    target: sim.target, targetLocked: sim.targetLocked === true,
     visited: Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)])),
     vistas: Object.fromEntries(Object.entries(sim.vistas || {}).map(([k, v]) => [k, Object.keys(v)])),
   };

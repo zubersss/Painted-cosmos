@@ -2,6 +2,54 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, PRE-SHIP RE-FIX pass (nineteenth PILOT agent; started 19:40 UTC 2026-11-13; kept current after every item)
+
+Read this first; the eighteenth's hand-over just below holds for everything not named here. The verifier did not accept
+item 1 of the round (the pulse) because of its regression R1, and found R2 to R4 (the task text of this pass lists
+them). Scratch: `/home/user/.pc-scratch/pilot/preship/refix/` (`head/` a clean export of `22120b9`, `base/` of
+`8c7d603`, `t1` the tree with my files, `vp/` copies of the verifier's probes from
+`/home/user/.pc-scratch/verify/preship-pilot/probes/`, `probes/` mine). Status:
+
+### Done, with proof
+
+1. **R1, the pulse into the chosen world or round it without end (and so item 1 of the round).** Cause as the verifier
+   said: in a pulse the speed was planned along the nose only (`pulseAdvice`); with the nose on the tangent past the
+   world just left or one between, the course's world was off the line of flight, the drive ran up toward 30 km/s, and
+   once round it had less room than braking takes. `pulse.js courseAdvice` (and `brakeSpeed`, the braking curve
+   pulled out of `pulseAdvice` unchanged): the speed is also held to the braking curve for the STRAIGHT distance to the
+   course's world's arrival sphere, wherever that world lies; the straight distance is never longer than the way round,
+   so the drive is always slow enough to let go at that sphere (inside it the curve allows only cruise speed, so an
+   overshoot lets go too: no circling). `sim.js stepFlying` uses it for the pulse (bound to `ps.dest`). Proof
+   (`docs/shots/pilot/preship/refix/`): the verifier's `course-time.mjs` on the tree: nose ahead 24 clocks x 90 pairs
+   2160 of 2160 arrive, 0 into a world, 0 still pulsing (head: 98 into the world); nose behind 2160 of 2160; the first
+   two hours 1080 of 1080 (head 46 bad) (`course-time-fixed.txt`); my `arrive.mjs` (first hours, 540 runs): fastest
+   into the chosen world's sphere 715 m/s, never under the edge of its space, no other world within twice its edge of
+   space (`arrive-fixed-first-hours.txt`); `recover.mjs` (Uranus -> Moon at clock 0): after 200 s the ship has long
+   arrived, at rest 1.9 km from the Moon's centre (as every nose-on Moon arrival on `8c7d603`); Venus -> Earth at clock
+   0.3 from 945 m (the real-game case): round Mercury (closest 5 to 10 km), in at cruise, "Earth ahead" 4.2 km up
+   (`venus-earth-fixed.txt`). Tests (`tests/course.test.mjs`, 3 new): every world to every other at clocks 0, 3000 and
+   3600 s, nose ahead and behind (540 pulses: let go at the sphere at no more than 1.25 x cruise, never inside 0.9 of
+   the sphere while pulsing, never under the edge of space after, "<World> ahead", no pulse longer than 2.5 x its ETA +
+   30 s, never inside another world's edge of space): on `22120b9` 27 of 540 fail; Venus -> Earth as above: fails on
+   `22120b9`. The verifier's course-matrix (11520 runs) is being run on the tree (see the state below).
+2. **R2, F's hold on the course.** `sim.js`: `targetLocked` is `true` for a world chosen on the map (held until it is
+   reached or the map changes it) and `'f'` for F's own hold, which ends with its turn or its pulse (`unlockCourse`: F
+   stops the turn, A / D or the mouse stops it, the turn ends refused, the pilot drops out of a pulse); "<World> lies on
+   your course: F goes on round it to Saturn" keeps the hold (it promises that). `save.js` saves only the map's hold.
+   The course is again "the marker last pointed at" as README says. Proof: the verifier's `lockaim.mjs` on the tree
+   (`lockaim-fixed.txt`): after F, F (a drop-out) the nose on Jupiter says "Pulse to Jupiter" and F pulses to it; after
+   "Turn stopped" the nose on Mars says "Pulse to Mars". Test (course.test, new): the same, and a world chosen on the
+   map still holds after a stopped turn; fails on `22120b9`.
+
+Checks for 1 and 2 on a clean export of `db31c96` with these files (`c1`): world 25, unit 201, physics 325, `coast.mjs`
+PASS at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as always), `wallrun.mjs` earth sea_coast
+0.2 m at most on ground over 50 degrees; the game at quality 0 loads with no console error, fallback `[]`.
+
+### To do
+
+- R3 (label slide distance) and R4 (one nonsense trip ends the lock for the visit): done in the working tree, being
+  checked (layout.js, layout.test; input.js, input.test, lockcheck.mjs, README).
+
 ## Hand-over, PRE-SHIP fix round (eighteenth PILOT agent; started 15:50 UTC 2026-11-13; kept current after every item)
 
 Read this first; the seventeenth's hand-over below holds for everything not named here. The task: the blind new
