@@ -46,11 +46,11 @@ On foot
 | W A S D | walk |
 | Shift | run |
 | C | stroll: a true walk (1.7 m/s) in place of the usual easy lope (4.2 m/s); C again for the pace. A gamepad stick tilted a little strolls too |
-| Space | jump; hold to fire the jetpack (it refills on the ground). From a stand the legs fold for an eighth of a second first; from a run, half that |
+| Space | jump; hold to fire the jetpack (it refills on the ground and in water, and slowly while falling: you cannot hover for ever, on any world). Afloat, Space does not hop: held, the jetpack lifts you out. From a stand the legs fold for an eighth of a second first; from a run, half that |
 | mouse | look (click the picture to capture the pointer; or hold the left button and drag) |
 | mouse wheel | camera closer / farther (a touchpad swipe moves it a little at a time) |
 | V | first person / third person |
-| E | board the ship when you are next to it |
+| E | board the ship when you are next to it; at a view you have found, stand at its easel |
 
 In the ship
 
@@ -64,7 +64,7 @@ In the ship
 | X | brake |
 | F | pulse drive (in space): point at a world's marker and press F; F again drops out |
 | M | the map: click a world, or use the arrow keys, to set a course; M or Enter closes it |
-| E | land when the prompt shows; step out when landed |
+| E | land when the prompt shows (pressed at speed, the ship first slows down with its own brakes, then sets down; Space or W lets it go); step out when landed |
 | V | cockpit / chase view |
 
 The ship hovers when you let go, levels itself, rides above the tree tops, and will not let
@@ -74,7 +74,7 @@ Anywhere
 
 | Key | Action |
 | --- | --- |
-| B | the sketchbook: a page per world with a sketch of every landscape walked and every view found (arrow keys turn the pages) |
+| B | the sketchbook: a page per world with the sketches drawn there, of every landscape walked and every view drawn from its easel (arrow keys turn the pages) |
 | H | the help card (these controls) |
 | ` (backquote) | the frame read-out (explained under "Is it fast enough on my machine?") |
 | Esc | releases the mouse (click the picture to capture it again; if the browser says "too soon", click once more); closes the map or the sketchbook |
@@ -96,8 +96,15 @@ click on the picture captures it again. If the browser keeps refusing to capture
 times in a row, not just after Esc), or reports nonsense while it does (twice), the game says
 so and you look around by holding the left button and dragging.
 
-Each world has marked views to find: walk up to one and it goes into the sketchbook, with a
-small sketch of the moment (so does every landscape the first time you walk into it). All sound
+Each world has views to find. On foot, within 150 m of one not yet drawn, a small ring (or an
+arrow at the picture's edge) says "a view". Walk up to it and it is found; press `E` there to
+stand at its easel: you are walked to the spot and turned the way the picture was painted, and
+the page is drawn. Every landscape gets a sketch the first time you walk into it. A sketch is
+drawn in washes and pencil from the picture on the screen, without you in it.
+
+A day is not even: the world you stand on turns slowly while its sun is near the horizon and
+quickly through the night, so dusk and dawn last about five minutes each on Earth and the
+night about as long. A new game begins at eight in the morning. All sound
 is made in code (wind that follows the real wind, rain, thunder, the ship, the jetpack,
 footsteps, a quiet pad per planet); `?audio=0` turns it off. It starts with your first click
 or key press (browsers allow no sound before one) and goes quiet while the tab is hidden.
@@ -189,6 +196,7 @@ scripted input. These things have never been checked on a real machine by anyone
 | `stub=1` | run on Pilot's grey stub world and plain renderer (also `stub=render,world,art`) |
 | `real=1` | try Painter's modules even if they are not flagged ready (also `real=world`, ...) |
 | `body=mars` `time=18` | start on another body, at another local hour |
+| `clock=even` | every world turns at its own even rate (the game slows dusk and dawn and hurries the night) |
 | `quality=1` | pin the quality tier (0, 1 or 2); the resolution still adapts |
 | `scale=0.75` | the render scale the game starts at |
 | `dynres=0` | switch the controller off: tier and scale stay where the address put them |

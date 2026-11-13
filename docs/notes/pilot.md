@@ -2,6 +2,174 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, M4 fix round (fourteenth PILOT agent, the successor; started 05:11 UTC 2026-11-13; kept current after every item)
+
+Read this first. The thirteenth agent was cut off at 05:08 UTC (container restart); its finished commit is `dea95fb`
+(the figure's state, below), its half-done work was in the coordinator's snapshots `8418918` and `c03bce6`. I checked that
+work, kept all of it (each change is proven below), and went on down the list. Scratch: `/home/user/.pc-scratch/pilot/m4/`
+(`scripts/` the thirteenth's instruments: `shipfeel.mjs`, `survey.mjs`, `stepout.mjs`, `film.mjs`, `checks.sh`, `mktree.sh`;
+`s14/` mine: `scenes.mjs` extra film scenes, `stepout2.mjs`, `clockdbg.mjs`, logs, `t0` a clean export of `21aa969`).
+One browser at a time; a quality-0 film of 30 frames takes 3 to 4 minutes here with three roles rendering.
+
+**State of the tree at `21aa969` (the snapshots, before my first commit), measured on a clean export:** unit 164, world 19,
+physics 314, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game loads at quality 0 with no console
+error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems: none`).
+
+### Done, with proof
+
+1. **PHYSICS 1, the 16 m jump at the end of a lift-off under trees** (`src/ship/flight.js`: the lift-off ends where free
+   flight can take over, `liftoffClear` 3 m over the floor free flight uses, rising at `liftoffRise` 8 m/s; the clearance
+   clamp never sets the hull on the crowns, only solid ground and liquid are hard). Proof: `shipfeel.mjs` in Node on the
+   real Earth spawn, largest move of the hull beyond its own velocity 16.25 m -> 0.00 m, free flight after 5.9 s at
+   25.8 m; tests `M4 lift-off under a canopy (no PHYSICS)` (flight.test) and `M4 lift-off under trees` (physics.test),
+   both fail on `dea95fb` (15.60 m and 16.05 m in one step); filmed in the real game, `docs/shots/pilot/m4fix/liftoff.jpg`
+   (20 frames 0.5 s apart from the first lift-off of a new game: one continuous rise through the birches; opened).
+2. **PHYSICS 2, the landing assist** (`flight.js stepLanding`: the hull goes to the glide and the descent from its own
+   velocity at no more than `landAccel` 8 m/s^2 level and `landAccelDown` 5 m/s^2 down, descent 6 m/s near the ground
+   and 9 from high up (it was 13), a glide that can stop at the site; `sim.js`: E faster than `LAND_BEGIN_SPEED` 12 m/s
+   first slows the ship with its own brakes, "Slowing down to land", Space or W lets it go; `state.js` the prompt).
+   The prompt "Land here" is still offered at speed, on purpose: E always does something, and says what. Proof:
+   `shipfeel.mjs`: E at 46 m/s largest change of velocity in one step 3.10 -> 0.23 m/s (18.9 g -> 1.4 g), descent
+   12.98 -> 6.00 m/s; E at a hover 1.20 -> under 0.35 m/s; tests `M4 the landing assist changes the hull's velocity no
+   faster than its thrusters can`, `M4 E at full speed`, `M4 E at a hover, and a landing abandoned among the trees` (all
+   fail on `dea95fb`); filmed, `docs/shots/pilot/m4fix/landfast.jpg` with `landfast.json` (E at 46 m/s over the wood: 2.5 s
+   of slowing, a 12 m glide, down at 6 to 7.7 m/s, touch at 1.1 m/s, 11 s in all; opened).
+3. **PHYSICS 3, the ground assist** (`flight.js groundAssist / shapeTarget / boundAssist`: the look reaches as far as the
+   hull needs to stop in, 143 m at 46 m/s where it was 37; a slope it cannot climb at this speed slows it, `vhCap`; what
+   the assist adds to the hull's vertical speed in one step is bounded by its lift, `assistLift` 14 m/s^2 beyond the
+   weight, more only in the last two metres and for a dive that could not otherwise be stopped above the ground;
+   `camera.js`: the chase camera rides behind the hull's motion, `shipFollow / shipSettle / shipSlack`). Proof:
+   `shipfeel.mjs` low flight nose down, largest step 8.55 -> 0.40 m/s, the 73.97 m/s climb -> 22.7 m/s; `survey.mjs`
+   (careless low flight on all ten bodies, 80 s each, and a dive from 400 m): largest step 138.5 -> 1.76 m/s, bounces
+   5 -> 0 in low flight; tests `M4 a steep slope at full throttle` and `M4 the chase camera rides behind the hull's
+   motion` (fail on `dea95fb`); filmed, `docs/shots/pilot/m4fix/low.jpg`. Cost of the longer look: 0.45 -> 0.50 ms a step on
+   Earth (`cost-flight.mjs`). **Known, left:** Pluto's dive (60 degrees down at full throttle from 400 m into a 55 to 61
+   degree face at 73 m/s) ends in one soft bounce (before: a 72.6 m/s rewrite of the velocity in one frame, no bounce).
+   Neptune's squall still throws a hovering ship (4 g steps: PHYSICS' wind, PILOT's critique of PHYSICS item 4).
+4. **PHYSICS 4, the landing's chase camera in the wood, filmed** (`landfast.jpg`, frames 18 to 23: the lens is in no
+   crown; a crown stands close on the left of the frame for about 1.5 s on the way down into the clearing).
+5. **The landing site** (`flight.js findLandingSite`, `landFootprint` 4.5 m: the ground under all of the hull): test `M4
+   the landing assist does not choose a shelf at the lip of a wall` (fails on `dea95fb`: 3.0 m from a 67 degree wall).
+
+6. **PAINTER 1, stepping out** (`sim.js`: `exitSpot` walks the explorer up to 3.4 m clear of the ladder during the
+   transition, `exitView` chooses the view for the picture by what the hull covers in the frame (`hullCover`: its
+   spheres projected), never between lens and figure, never over a sixth of the frame, boom free, open ground ahead;
+   `FEEL.exitSeconds` 0.95 -> 1.6; `view()` turns the blended camera onto the explorer through the middle of the move;
+   `shipInPicture()` and `game.js updateSketches`: a page waits up to `SKETCH_SLIP.shipWait` 30 s while the hull lies in
+   the middle of the frame within 14 m of the ship). Proof: `stepout2.mjs` in Node, the ship landed by the assist at
+   every spawn and stand of the ten bodies (52 landings): hull over a sixth of the frame at 52 -> 1 (Venus'
+   acid_terraces, 17 %: the terrace lets the explorer walk only one metre), between lens and figure 50 -> 0, mean cover
+   34.4 % -> 3.9 % (`docs/shots/pilot/m4fix/stepout-before.txt`, `stepout-after.txt`); test `M4 stepping out` (loop.test;
+   fails on `dea95fb`); frames from the real game, opened: `m4fix/stepout-mars-before.jpg` (the wing, the nacelle and
+   the canopy over the lower right third, "Board ship" on the wing) against `stepout-mars-after.jpg` and the strips
+   `stepout-mars-strip-after.jpg`, `stepout-wood-strip-after.jpg`; the book's Mars page: `book-mars-before.jpg` (the wing)
+   against `book-mars-after.jpg` (the dry riverbed's trees).
+7. **PAINTER 3, the slips** (`src/ui/layout.js`, new and pure: `layoutMarks` places every marker's label off the ship,
+   off the slips that are up and off each other, the target first and then from the nose outward, a world with no room
+   for its name keeps its ring; `wrapLettering`; `hud.js setMarks(list, view)`, `setNotice`, `setHint`, `showSketch` wrap
+   to the window and the slip; `game.js`: the ship's screen box as a keep-out in the chase view, the figure's on foot,
+   an edge arrow's lower half rides at 0.69 of the height (`edgeY`), over the notice, prompt and gauges; `theme.css`: on
+   foot the notice lies at the top, not across the legs; the title card names the backquote key as a word). Proof:
+   `tests/layout.test.mjs` (four tests); frames opened: PAINTER's own before frames
+   (`docs/shots/painter/critique/pilot-20-aimed-label-over-ship.jpg`, `pilot-22`), against
+   `m4fix/aim-aimed-after.jpg` (aimed at Mars: the label over the ring, the ship whole, Uranus named beside),
+   `aim-long-notice-640.jpg` (the long notice in two lines inside a 640 px window; still crowded there: the read-out
+   touches the prompt at that size).
+8. **PAINTER 5, the clock** (`sim.js CLOCK, clockRate, stepClock`; `orbits.js turnBy, spinRate`: the world under the player
+   turns at 0.4 of its rate while the sun is within 8 degrees of the horizon where they stand, three times as fast
+   under 16 degrees below it, eased between and eased back to the body's own turning with height, 0.2 to 0.6 of the way
+   to space, so a ship leaves a world that turns as the ephemeris says; a locked Moon's orbit turns with it; a new game
+   starts at 8 h, `FEEL.startHour`). Proof: `tests/clock.test.mjs` (four); `clockdbg.mjs` at the real Earth spawn: the
+   first sunset 8.8 -> 11.2 minutes in (7.4 with the old 9.5 h start), the sun under 8 degrees below the horizon
+   14.8 -> 5.6 minutes of a day, the gold (12 to 0 degrees) 1.4 -> 3.8 minutes, the blue hour (0 to -8) 0.9 -> 2.7, the
+   day (sun over 12 degrees) unchanged at 9.5 (`m4fix/clock-earth-spawn.txt`). Not seen in a browser as a strip of
+   frames (PAINTER's dusk sheet is the thing to re-shoot); the frames I took at 8 h are the wood in morning light.
+9. **PAINTER 4, a view is a picture** (`sim.js`: `vistaMark` the nearest view not yet drawn within `VISTA_MARK` 150 m,
+   `easelOffer`, `beginEasel`, `stepEasel`, `EASEL`: found by walking up to it as before, then offered, "E Stand at the
+   easel": the explorer walks to the easel's spot at 3.4 m/s while the view comes round to the heading and pitch the
+   world gives for it (`getVistas` yaw, pitch), third person at the usual boom; held 1.8 s or until the page is drawn;
+   then the controls are the player's. `game.js`: the page of a view is drawn only there (a view found and not stood
+   at stays "seen, not yet drawn" in the book and keeps its mark); the mark on foot, "a view" with its distance, a ring
+   or an edge arrow. `state.js` the prompt. Proof: `tests/vista.test.mjs` (three); frames opened: `m4fix/vista-mark.jpg`
+   (55 m from Earth's first view: ring and label over the figure's head), `vista-easel-strip.jpg` (E: the walk along
+   the stream and the view coming round, 12 frames a third of a second apart), `vista-after.jpg` (the composed
+   picture, the new page's slip). `tests/m3check.mjs` now presses E at the found view (not yet re-run: see below).
+10. **PAINTER 2, the sketchbook** (`sketches.js sketchHand`: the kept frame is redrawn as a sketch on its own pixels:
+    three flat washes from the frame's own range of tone, most of the way to sepia and graphite, a pencil line on
+    edges, lifted to white at a ragged edge, no rectangle; 256 x 144; `game.js captureSketch`: the figure is out of the
+    kept frame (painted once more without it, kept, painted again: no gap on screen); `book.js`, `theme.css`: a page
+    shows what has been drawn, large while it is little (420 px for one, 120 px for thirteen and more), no empty
+    boxes, no names of what is not found, no fractions on the tabs, one pencilled line for what is left ("five more
+    landscapes and seven more views on Earth"), the tally at the foot; the sheet has one size on every page). Proof:
+    test `M4 a kept frame is drawn as a sketch` (sketches.test); `m4fix/sketch-hand-preview.jpg` (four real frames and
+    their sketches on paper, offline; opened); frames opened: `book-mars-after.jpg`, `book-earth-after.jpg`,
+    `slip-after.jpg`. PAINTER offered the treatment: its numbers are `SKETCH_HAND` (see "For PAINTER" below).
+11. **PHYSICS 4, the foot camera among trees** (`camera.js footBoomAmongCrowns`, `sim.js footCrowns`: the boom is cut
+    short of a crown, the lens keeps a metre from crowns and trunks). Proof: `tests/footcam.test.mjs` (two): on the
+    jetpack in a glade ringed by 22 m birches the lens came 2.45 m inside a crown, now never nearer than 0.15 m
+    outside. Filmed in the real game, opened: from the spawn's glade up and down, no frame with a crown at the lens
+    (`m4fix/jet-glade-up-after.jpg`, `jet-glade-down-after.jpg`); from beside the ship under the birches, where
+    PAINTER and PHYSICS filmed the slabs (`docs/shots/painter/critique/pilot-05-jetpack-sheet.jpg`: jet0, jet1, fall6,
+    fall7, landed, leaf slabs over half the frame and more, across the figure): `jet-by-ship-up-after.jpg`,
+    `jet-by-ship-down-after.jpg`: the figure is in sight in every frame; **still there**: while the figure itself
+    passes through the crown layer, leaf masses stand over the left third of the frame for one or two frames a third
+    of a second apart (up: frame 3; down: frames 13 to 15). With the head in a crown the boom is left alone: there is
+    no view of that from outside. What a crown looks like from inside is PAINTER's (its item "crowns at the lens").
+12. **PHYSICS 5, a swimmer's controls and camera** (`explorer.js`: Space does not hop a swimmer, held it lights the
+    jetpack; a swimmer turns at `swimTurnRate` 3.2 /s, not 11; `camera.js swimLift`: the view rides 0.6 m higher over a
+    swimmer, eased). Proof: test `M4 afloat` (explorer.test; fails on `dea95fb`: a 4.5 m/s hop).
+13. **PHYSICS 8, the jetpack refilling in the air** (`explorer.js airRecharge`: a tank takes 10 s to refill in the air
+    on Earth, as before, and as much longer on a lighter world as its gravity is less). Proof: test `M4 burn and coast`
+    (fails on `dea95fb`: on the Moon the explorer never comes down); README says so.
+14. **PAINTER 8 / PHYSICS 7, boarding** (`sim.js beginBoarding`: the walk to the hatch at 3.6 m/s, 1.5 to 3 s, where it
+    was 1.25 s from anywhere; the view is turned onto the explorer through the middle of the move, as in stepping out).
+
+15. **PAINTER 6, the slips at night and in space** (`theme.css --pc-key`, `game.js updateHud`: the slips' paper is
+    multiplied by a key, white by day, toward (158, 173, 219) at night by the world's hour and out in space; the map,
+    the book and the card stay paper). Measured in the real game by the ship at the spawn: the prompt's paper
+    (238, 231, 225) by day, (147, 160, 194) at 23 h, against a night picture of about (88, 105, 132) beside it
+    (`m4fix/slip-day.jpg`, `slip-night.jpg`; opened). Lettering straight on the wash in space: not done.
+16. **PAINTER 15, the place's name** (`game.js updateHud`): named for six seconds when the game begins (the click),
+    on a new world and on stepping out; not on sitting down in the ship.
+17. **PAINTER 7, the title card** (`hud.js`, `theme.css .pc-title-only`): until the game begins the card is the title
+    alone, small, in the upper third: the name, the line under it, "click to begin", and one line of the keys a
+    newcomer needs; the list of keys is the same card, whole, on H.
+
+### State of the working tree
+
+Everything above from 6 on is in the working tree and in the unit suite (182 tests pass there). See the commit
+message of the commit that carries this paragraph for what was checked on a clean tree and seen in the browser.
+
+### Not done (and why), for whoever comes next
+
+- **The cockpit's eye point** (PAINTER 9), **the ship rolled on arrival** (PAINTER 12), **the map as ten dots** (13),
+  **the cursor** (14), **the frame read-out's type** (16): not started; none is a FIX FOR SHIP.
+- **The sky's change at the edge of the air** (PAINTER 17: blue at 490 m, starred indigo at 640 m): not PILOT's number.
+  `mood.inSpace01` is `smoothstep(0.75, 1.6)` of the way to space: on Earth 0 at 600 m and 0.003 at 640 m. Whatever
+  turns the sky between 490 and 640 m reads the height itself (`altitude01`, or the world's own eye height).
+- **Hard turns at 6.5 g** (PHYSICS 9) and **the 2.2 g kick-off** (PHYSICS 10): left. Both are the feel of the arcade
+  ship that every flight test and the tour were tuned on; changing `carve01` or `tauAtmo` in the last round would
+  need the whole flight survey again.
+- **Venus' acid_terraces step-out** (17 % of the frame is hull) and **Pluto's 60 degree dive** (one soft bounce).
+- **A small window (640 x 360)**: the notice is wrapped, but the read-out, the prompt and a two-line notice touch.
+
+### For PAINTER (from this round)
+
+- **The sketch's hand** is `src/core/sketches.js` `SKETCH_HAND` (keep, washes, soft, lift, gamma, broad, pencil,
+  pencilFrom, edge, rag) and the three inks `INK_DARK`, `INK_MID`, `PENCIL` there. It is PILOT's file; say what the
+  numbers should be, or what else the hand should do, and PILOT sets them. The page multiplies the sketch onto its
+  paper (`theme.css .pc-sketch-frame img`, `.pc-newsketch img`: `mix-blend-mode: multiply`).
+- **Views**: PILOT now shows a mark within 150 m and takes the explorer to the easel on E, with `yaw` and `pitch` from
+  `getVistas`. Second sites (`... II`) give no yaw: the view keeps the player's heading there. PAINTER's half of item 4
+  is still open: a painted easel or cairn at each view, and a first view within 150 m of each spawn (Earth's is
+  2418 m from its spawn, so a new player still meets no mark in a first sitting).
+- **The first hour is 8 h now** (it was 9.5): the first view is lit by a lower sun.
+- **The clock**: dusk and dawn now last about five minutes each at Earth's spawn; the night about five and a half.
+  **For every instrument that sets an hour and lets the clock run** (`tests/tour.mjs`, `weather.mjs`, PAINTER's and
+  PHYSICS' harnesses): at night the world now turns three times as fast, so a held "22 h" drifts three times as far
+  while the frames settle (at dusk and dawn it drifts less than half as far as before). Add `clock=even` to the
+  query, or set `window.__pc.sim.unevenClock = false`, and every world turns evenly as before.
+
 ## For PAINTER (M4): the figure's state, as `animate(state, dt)` now receives it
 
 Thirteenth PILOT agent (the M4 fixer), 2026-11-13. `src/player/figure.js` `figureArgs` passes PHYSICS' body state

@@ -24,6 +24,8 @@ export const CAMERA = Object.freeze({
   boomEye: 1.3,              // ...and at this length the view is the explorer's own (a thicket)
   firstPersonClearance: 0.25,
   feetInFrame: 0.85,         // of the half-height: the lowest the feet may sit in a third-person view
+  swimLift: 0.6,             // m the view rises over a swimmer (the lens 2 m over the still water: over the chop, looking down on the stroke)
+  swimEase: 1.2,             // s
   shipBoom: 15,              // metres behind the ship
   shipBoomFast: 21,
   shipHeight: 3.6,           // metres above the ship
@@ -54,6 +56,15 @@ export const CAMERA = Object.freeze({
   crownOut: 1,               // ...and how slowly it lengthens again once the way is clear
   crownLead: 1.5,            // s: the boom also looks where the lens will be this long ahead in a descent
   crownDuck: 1.5,            // m: the most the lens drops under crowns that come down to its height
+  // The foot camera among trees (PHYSICS' and PAINTER's critiques, M4: on the jetpack's way up and
+  // down the lens went through crowns, flat slabs over half the frame; a birch a metre from the lens
+  // was a white slab over a fifth of it). The boom is cut short of a crown it would pass into, and
+  // the lens keeps footLens metres clear of crowns and trunks (it comes in a little past a trunk
+  // beside it). Nothing changes while the explorer's own head is inside a crown: there is no view
+  // of that from outside.
+  footLens: 1.0,             // m the lens keeps from a crown or a trunk
+  footThrough: 0.25,         // m: the boom may graze a crown this closely on its way to the lens
+  footStep: 0.4,             // m: how finely the boom is looked along
 });
 
 // Signed distance (m) from body-local `p` to the nearest tree of `crowns` ([{ base, u, h, r }]:
@@ -179,7 +190,22 @@ export function boomRoom(feet, viewFwd, pitch, obstacles, C = CAMERA) {
 
 // feet: explorer position (body-local). obstacles: [{ p, radius }] spheres the camera must not
 // enter (the ship's hull). Returns { p, q, fov, look } and updates the smoothing.
-export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = null) {
+// How long the foot boom may be among `crowns` ([{ base, u, h, r }], see crownDistance): from
+// `pivot` along unit `back`, at most `boom`. The longest length whose lens is footLens clear of
+// every crown and trunk and whose way there enters none. With the pivot itself in a crown: `boom`.
+export function footBoomAmongCrowns(pivot, back, boom, crowns, C = CAMERA) {
+  if (!crowns || !crowns.length || crownDistance(crowns, pivot, C) < C.footThrough) return boom;
+  let best = 0;
+  for (let t = C.footStep; t < boom + C.footStep; t += C.footStep) {
+    const b = Math.min(t, boom), d = crownDistance(crowns, addScaled(pivot, back, b), C);
+    if (d < C.footThrough) break;                 // the boom would pass into a crown or a trunk here
+    if (d >= C.footLens) best = b;                // a place the lens may be
+    if (b >= boom) break;
+  }
+  return best;
+}
+
+export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = null, crowns = null) {
   const up = norm(feet);
   cam.viewFwd = tangent(cam.viewFwd, up, cam.viewFwd);        // carry the yaw along the sphere
   const f = cam.viewFwd;
@@ -199,6 +225,7 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = 
   const N = 5;
   let lift = 0, boom = cam.boom;
   if (obstacles) boom = boomThroughSpheres(pivot, back, boom, obstacles, 0.8);
+  if (crowns) boom = Math.max(0.8, footBoomAmongCrowns(pivot, back, boom, crowns, C));
   for (let i = 1; i <= N; i++) {
     const t = i / N;
     const q = addScaled(pivot, back, boom * t);

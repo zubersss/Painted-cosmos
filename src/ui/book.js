@@ -3,6 +3,7 @@
 // B opens and closes it; the arrow keys (or a click on a tab) turn the pages.
 // Painted like the rest of the interface (src/ui/paint.js): torn paper, hand lettering.
 import { ink, SIZE } from './paint.js';
+import { wrapLettering } from './layout.js';
 
 // el(tag, class, parent, text, size): `text` is lettered by hand at `size` (cap height, px).
 function el(tag, cls, parent, text, size) {
@@ -13,73 +14,75 @@ function el(tag, cls, parent, text, size) {
   return e;
 }
 
-// Break a caption into lines of at most `n` letters (lettering does not wrap by itself).
-function wrap(text, n) {
-  const out = [''];
-  for (const w of String(text).split(' ')) {
-    if (out[out.length - 1].length + w.length + 1 > n && out[out.length - 1]) out.push(w);
-    else out[out.length - 1] += (out[out.length - 1] ? ' ' : '') + w;
-  }
-  return out.join('\n');
-}
+// A count in words, as one would pencil it ("five more landscapes").
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const words = (n) => (n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
+const plural = (n, one, many) => `${words(n)} more ${n === 1 ? one : many}`;
+// How wide a sketch is laid on the page (px), by how many the page holds: large and loose while
+// they are few. The page itself never changes size (one scale for the whole book).
+const tileWidth = (n) => (n <= 1 ? 420 : n <= 2 ? 310 : n <= 6 ? 205 : n <= 12 ? 152 : 120);
 
 export function createBook(root) {
   const panel = el('div', 'pc-panel pc-book', root);
   const head = el('div', 'pc-book-head', panel);
   ink(el('div', 'pc-title', head), 'sketchbook', SIZE.head + 3, { rough: true, tracking: 1.1 });
-  const tally = el('div', 'pc-label pc-book-tally', head, '');
   const body = el('div', 'pc-book-body', panel);
   const tabs = el('div', 'pc-book-tabs', body);
   const page = el('div', 'pc-book-page', body);
   const foot = el('div', 'pc-label pc-book-foot', panel, '');
   let open = false, pages = [], at = 0, hintText = '';
 
-  const count = (p) => {
-    const all = p.biomes.concat(p.vistas);
-    return { done: all.filter((x) => x.done).length, total: all.length };
-  };
+  // Pages drawn: a landscape walked, a view drawn from its easel (found is not yet drawn).
+  const count = (p) => ({ done: p.biomes.filter((x) => x.done).length + p.vistas.filter((x) => x.done && x.sketch).length, total: p.biomes.length + p.vistas.length });
 
-  function tile(parent, x, kind) {
-    const t = el('figure', 'pc-sketch' + (x.done ? ' pc-on' : '') + (kind === 'vista' ? ' pc-sketch-vista' : ''), parent);
+  // A page of the book shows what has been drawn, and nothing of what has not: no empty boxes,
+  // no names of places not yet seen (PAINTER's critique, M4 item 2: "a sketchbook is not a
+  // completion table"). What is left on a world is one pencilled line at the foot of its page.
+  function tile(parent, x, w) {
+    const t = el('figure', 'pc-sketch pc-on' + (x.sketch ? '' : ' pc-bare'), parent);
+    t.style.width = w + 'px';
     const frame = el('div', 'pc-sketch-frame', t);
-    if (x.done && x.sketch) { const img = el('img', '', frame); img.alt = x.name; img.draggable = false; img.src = x.sketch; }
-    else el('span', '', frame, x.done ? 'no sketch kept' : kind === 'vista' ? 'a view to find' : 'not yet walked', SIZE.tiny);
-    el('figcaption', '', t, wrap(x.name, 19), SIZE.tiny);
+    if (x.sketch) { const img = el('img', '', frame); img.alt = x.name; img.draggable = false; img.src = x.sketch; }
+    else el('span', '', frame, 'seen, not yet drawn', SIZE.tiny);
+    el('figcaption', '', t, wrapLettering(x.name, SIZE.tiny, w - 6), SIZE.tiny);
     return t;
+  }
+
+  // One scale for the whole book: the sheet has one size whatever its page holds, so the fit to
+  // a small window is the same on every page (it was taken from each page's own height, and
+  // turning from Earth's page to the Moon's rescaled the whole sheet).
+  function fit() {
+    panel.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / (panel.offsetWidth + 30), window.innerHeight / (panel.offsetHeight + 30))));
   }
 
   function draw() {
     const p = pages[at];
     tabs.innerHTML = '';
     pages.forEach((q, i) => {
-      const c = count(q);
       const b = el('button', 'pc-book-tab' + (i === at ? ' pc-on' : '') + (q.visited ? '' : ' pc-dim'), tabs);
       el('b', '', b, q.name, SIZE.body);
-      el('span', '', b, c.total ? `${c.done}/${c.total}` : '', SIZE.tiny);
       b.addEventListener('click', () => { at = i; draw(); });
     });
     page.innerHTML = '';
     if (!p) return;
-    const nb = p.biomes.filter((x) => x.done).length, nv = p.vistas.filter((x) => x.done).length;
     el('div', 'pc-book-world', page, p.name, SIZE.head);
-    el('div', 'pc-label pc-book-sub', page, !p.visited ? 'not yet visited' + (p.biomes.length ? `: ${p.biomes.length} landscapes and ${p.vistas.length} views wait here` : '')
-      : `${nb} of ${p.biomes.length} landscape${p.biomes.length === 1 ? '' : 's'} walked` + (p.vistas.length ? `, ${nv} of ${p.vistas.length} views found` : ''));
-    if (p.biomes.length) {
-      el('div', 'pc-label pc-book-kind', page, 'landscapes', SIZE.tiny);
-      const g = el('div', 'pc-book-grid', page);
-      for (const x of p.biomes) tile(g, x, 'biome');
+    // what is on the page: the landscapes walked, then the views found (a view found but not yet
+    // drawn from its easel, or a page whose picture could not be kept, is named on bare paper)
+    const shown = p.biomes.filter((x) => x.done).concat(p.vistas.filter((x) => x.done));
+    if (shown.length) {
+      const g = el('div', 'pc-book-grid', page), w = tileWidth(shown.length);
+      for (const x of shown) tile(g, x, w);
     }
-    if (p.vistas.length) {
-      el('div', 'pc-label pc-book-kind', page, 'views', SIZE.tiny);
-      const g = el('div', 'pc-book-grid', page);
-      for (const x of p.vistas) tile(g, x, 'vista');
-    }
+    const nb = p.biomes.filter((x) => !x.done).length, nv = p.vistas.filter((x) => !x.done).length;
+    const where = p.name === 'Moon' ? 'the Moon' : p.name;
+    const left = !p.visited ? 'not yet visited'
+      : nb && nv ? `${plural(nb, 'landscape', 'landscapes')} and ${plural(nv, 'view', 'views')} on ${where}`
+        : nb ? `${plural(nb, 'landscape', 'landscapes')} on ${where}` : nv ? `${plural(nv, 'view', 'views')} on ${where}` : `every page of ${where} is drawn`;
+    el('div', 'pc-label pc-book-left', page, left, SIZE.small);
     let done = 0, total = 0;
     for (const q of pages) { const c = count(q); done += c.done; total += c.total; }
-    ink(tally, total ? `${done} of ${total} pages drawn` : '', SIZE.small);
-    ink(foot, (hintText ? hintText + '\n' : '') + 'arrow keys turn the page, B closes', SIZE.small, { align: 'center' });
-    // Fit the open book inside small windows (its laid-out size is not changed by the scale).
-    panel.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / (panel.offsetWidth + 30), window.innerHeight / (panel.offsetHeight + 30))));
+    ink(foot, (hintText ? hintText + '\n' : '') + (total ? `${done} of ${total} pages drawn   ·   ` : '') + 'arrow keys turn the page, B closes', SIZE.small, { align: 'center' });
+    fit();
   }
 
   return {
@@ -93,7 +96,8 @@ export function createBook(root) {
       const i = pages.findIndex((p) => p.id === here);
       at = i >= 0 ? i : Math.max(0, pages.findIndex((p) => p.visited));
       const where = (deg) => (Math.abs(deg) < 25 ? 'ahead' : Math.abs(deg) > 155 ? 'behind you' : deg > 0 ? (deg < 90 ? 'ahead to the right' : 'behind to the right') : (deg > -90 ? 'ahead to the left' : 'behind to the left'));
-      hintText = hint ? `the nearest view not yet drawn: ${hint.name}, ${hint.distance >= 1000 ? (hint.distance / 1000).toFixed(1) + ' km' : Math.round(hint.distance) + ' m'} ${where(hint.bearingDeg)}` : '';
+      // (no name: a view is named when it is found)
+      hintText = hint ? `the nearest view not yet found is ${hint.distance >= 1000 ? (hint.distance / 1000).toFixed(1) + ' km' : Math.round(hint.distance) + ' m'} ${where(hint.bearingDeg)}` : '';
       panel.classList.add('pc-on');
       draw();
     },

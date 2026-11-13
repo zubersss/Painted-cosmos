@@ -2,6 +2,7 @@
 // for the worlds, the title and help card. Everything on it is painted (src/ui/paint.js):
 // torn paper slips, hand lettering, ink rings; src/ui/theme.css lays it out.
 import { installTheme, ink, ringPath, iconSvg, SIZE } from './paint.js';
+import { layoutMarks, ringSize, wrapLettering } from './layout.js';
 
 // el(tag, class, parent, text, size): `text` is lettered by hand at `size` (cap height, px).
 function el(tag, cls, parent, text, size) {
@@ -44,6 +45,13 @@ export function createHud(root) {
   const status = el('div', 'pc-status', card);
   const statusText = el('span', '', status, 'click to begin', SIZE.prompt);
   status.insertAdjacentHTML('beforeend', '<i class="pc-dabs"><b></b><b></b><b></b></i>');
+  // The title is the title (PAINTER's critique 7: "the title card is the manual, and it covers the
+  // painting"): until the game has begun the card is small, in the upper third, and carries the
+  // name, the line under it, the stroke that says "click to begin" and one line of the keys a
+  // newcomer needs; the painting is open under it. The whole list of keys is the same card on H.
+  const first = el('div', 'pc-label pc-first', card);
+  const firstLine = () => ink(first, `${keyName(['KeyW', 'KeyA', 'KeyS', 'KeyD'])} walk   \u00b7   the mouse looks\n${keyName(['KeyE'])} boards the ship   \u00b7   ${keyName(['KeyH'])} shows every key`, SIZE.small, { align: 'center' });
+  card.classList.add('pc-title-only');
   const help = el('div', 'pc-help pc-label', card);
   // Keys named by code are relabelled for the player's keyboard layout (setKeyLabels; the
   // walking keys are by position, so on AZERTY "W A S D" reads "Z Q S D").
@@ -53,10 +61,10 @@ export function createHud(root) {
     [['KeyE'], 'board, land, step out'], [['KeyV'], 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], [['KeyC'], 'sink'], [['KeyW', 'KeyS'], 'throttle'], [['KeyA', 'KeyD'], 'turn'],
     ['mouse', 'point the nose'], [['KeyX'], 'brake'], [['KeyF'], 'pulse drive (in space)'], [['KeyM'], 'map'], [['KeyV'], 'cockpit / chase'],
-    ['anywhere', ''], [['KeyB'], 'sketchbook'], [['KeyH'], 'this card'], ['`', 'frame read-out'], ['pad', 'a gamepad works too'],
+    ['anywhere', ''], [['KeyB'], 'sketchbook'], [['KeyH'], 'this card'], ['backquote', 'frame read-out'], ['pad', 'a gamepad works too'],
   ];
   let labels = {};
-  const keyName = (k) => (Array.isArray(k) ? k.map((c) => labels[c] || c.slice(3)).join(' ') : k);
+  function keyName(k) { return Array.isArray(k) ? k.map((c) => labels[c] || c.slice(3)).join(' ') : k; }
   const promptKey = (k) => (typeof k === 'string' && k.length === 1 && labels['Key' + k]) || k;
   const keyEls = [];
   for (const [k, t] of rows) {
@@ -67,6 +75,7 @@ export function createHud(root) {
     el('span', '', row, t, SIZE.body);
   }
 
+  firstLine();
   // Keep the start card inside small windows.
   // (measured, not assumed: the card's laid-out size is not changed by the scale itself)
   const fit = () => card.style.setProperty('--pc-fit', String(Math.min(1,
@@ -79,6 +88,19 @@ export function createHud(root) {
   let lastNotice = null;
   let lastStats = '';
   const markEls = [];
+  // Where the slips that are up lie on the screen (read every few frames: they seldom move):
+  // the markers' labels keep off them.
+  let slips = [], slipTick = 0;
+  const slipRects = () => {
+    const out = [];
+    const take = (e) => { const r = e.getBoundingClientRect(); if (r.width > 0) out.push({ x0: r.left - 5, y0: r.top - 4, x1: r.right + 5, y1: r.bottom + 4, soft: true }); };
+    if (prompt.classList.contains('pc-on')) for (const b of prompt.children) take(b);
+    for (const e of [notice, hint, fuel, thr, readout, fresh]) if (e.classList.contains('pc-on')) take(e);
+    return out;
+  };
+  // The widest a line of a notice or the hint may be lettered, for this window: on foot in third
+  // person the notice lies at the top, between the edge and the new page's slip in the corner.
+  const lineRoom = (share) => Math.max(140, Math.min(640, (window.innerWidth || 1280) * share - 36));
   return {
     root,
     setPrompt(p) {
@@ -97,6 +119,7 @@ export function createHud(root) {
     setKeyLabels(map) {
       labels = map || {};
       for (const [kb, k] of keyEls) ink(kb, keyName(k), SIZE.key);
+      firstLine();
       lastPrompt = '';                    // the next prompt is drawn afresh with the new names
       fit();
     },
@@ -115,14 +138,27 @@ export function createHud(root) {
     },
     setReticle(on) { dot.classList.toggle('pc-on', !!on); },
     // One line of feedback above the prompt ("Mars ahead", "Too steep to land here").
+    // (wrapped to the window: the lettering does not wrap by itself, and a long line ran off a small one)
     setNotice(text) {
-      if (text === lastNotice) return;
-      lastNotice = text;
+      const room = lineRoom(root.classList.contains('pc-foot3') ? 0.44 : 0.8);
+      const key = text ? text + '|' + room : null;
+      if (key === lastNotice) return;
+      lastNotice = key;
       notice.classList.toggle('pc-on', !!text);
-      if (text) ink(notice, text, SIZE.prompt);
+      if (text) ink(notice, wrapLettering(text, SIZE.prompt, room), SIZE.prompt, { align: 'center' });
     },
     // In-world markers. list: [{ id, x, y (css px), r (px), label, sub, kind: 'target'|'body'|'edge', angle }]
-    setMarks(list) {
+    // view: { w, h (css px of the picture), keep: [{ x0, y0, x1, y1 }] rectangles no label may lie on
+    // (the ship in the chase view) }. The labels are laid out here (src/ui/layout.js): off the ship,
+    // off the slips that are up, off each other; a world whose name has no room keeps its ring.
+    setMarks(list, view) {
+      if (list.length) {
+        if (slipTick++ % 6 === 0) slips = slipRects();
+        layoutMarks(list, {
+          w: (view && view.w) || window.innerWidth, h: (view && view.h) || window.innerHeight,
+          sizeOf: (d) => (d.kind === 'target' ? SIZE.small : SIZE.tiny), keep: ((view && view.keep) || []).concat(slips),
+        });
+      } else slipTick = 0;
       while (markEls.length < list.length) {
         const m = el('div', 'pc-mark', marks);
         m._ring = el('i', '', m); m._label = el('span', 'pc-label', m); m._seed = markEls.length + 1;
@@ -136,7 +172,7 @@ export function createHud(root) {
         m.style.transform = `translate(${d.x.toFixed(1)}px, ${d.y.toFixed(1)}px)`;
         // The ring is one pull of a loaded brush (paper-white over a thin ink line, so it
         // reads on indigo and on a bright world alike); its size moves in 2 px steps.
-        const size = Math.round(Math.max(14, Math.min(260, d.r * 2 + 10)) / 2) * 2;
+        const size = ringSize(d.r);
         const shape = d.kind + size;
         if (m._shape !== shape) {
           m._shape = shape;
@@ -145,17 +181,20 @@ export function createHud(root) {
           m._ring.innerHTML = `<svg width="${2 * half}" height="${2 * half}" viewBox="${-half} ${-half} ${2 * half} ${2 * half}" style="left:${-half}px;top:${-half}px"><path class="pc-ring-ink" d="${path}"/><path class="pc-ring-paper" d="${path}"/></svg>`;
         }
         m._ring.style.transform = d.kind === 'edge' ? `rotate(${(d.angle || 0).toFixed(2)}rad)` : '';
-        if (d.above) { m._label.style.top = 'auto'; m._label.style.bottom = (size / 2 + 7).toFixed(0) + 'px'; }
-        else { m._label.style.bottom = 'auto'; m._label.style.top = (d.kind === 'edge' ? 14 : size / 2 + 7).toFixed(0) + 'px'; }
-        const text = d.sub ? d.label + '\n' + d.sub : d.label;
+        const text = d.text || null;
+        if (!text) { if (m._text !== null) { m._text = null; m._label.style.display = 'none'; } continue; }
+        if (m._text === null || m._text === undefined) m._label.style.display = '';
+        m._label.style.left = d.lx.toFixed(0) + 'px'; m._label.style.top = d.ly.toFixed(0) + 'px';
         if (m._text !== text) { m._text = text; ink(m._label, text, d.kind === 'target' ? SIZE.small : SIZE.tiny, { align: 'center' }); }
       }
     },
     // "A new page": the sketch that was just kept, its name, and where it went.
     showSketch(url, title, sub, seconds = 6) {
       freshImg.src = url;
-      ink(freshTitle, title || '', SIZE.body);
-      ink(freshSub, sub || '', SIZE.tiny);
+      // (a long name is wrapped to the slip: "Alpine Meadow and Snow Peaks" ran off it and off the screen)
+      const room = Math.max(120, (fresh.clientWidth || 160) - 14);
+      ink(freshTitle, wrapLettering(title || '', SIZE.body, room), SIZE.body);
+      ink(freshSub, wrapLettering(sub || '', SIZE.tiny, room), SIZE.tiny);
       fresh.classList.add('pc-on');
       clearTimeout(freshTimer);
       freshTimer = setTimeout(() => fresh.classList.remove('pc-on'), seconds * 1000);
@@ -167,7 +206,12 @@ export function createHud(root) {
       stats.classList.toggle('pc-on', !!text);
       if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
     },
-    showStart(on) { if (on) fit(); card.classList.toggle('pc-on', !!on); },
+    // (the first time the card is put away the game has begun: from then on it is the help card, whole)
+    showStart(on) {
+      if (!on) card.classList.remove('pc-title-only');
+      if (on) fit();
+      card.classList.toggle('pc-on', !!on);
+    },
     get startShown() { return card.classList.contains('pc-on'); },
     setSubtitle(text) { ink(sub, text, SIZE.prompt); },
     // The card's one line of status ("preparing the paper...", "click to begin", "H closes this card").
@@ -178,7 +222,7 @@ export function createHud(root) {
     // While the first view is being built only the title card shows, on the bare sheet.
     setWaiting(on) { root.classList.toggle('pc-waiting', !!on); },
     // A quiet line at the top: how to look around while the mouse is not captured.
-    setHint(text) { hint.classList.toggle('pc-on', !!text); if (text) ink(hint, text, SIZE.small); },
+    setHint(text) { hint.classList.toggle('pc-on', !!text); if (text) ink(hint, wrapLettering(text, SIZE.small, lineRoom(0.86)), SIZE.small, { align: 'center' }); },
     startCard: card,
   };
 }

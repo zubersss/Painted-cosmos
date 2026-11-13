@@ -4,6 +4,7 @@
 // URL parameters (all optional):
 //   stub=1 | stub=render,world,art   force stubs        real=1 | real=...   try real modules
 //   body=<id>  time=<hours>          where and when to start
+//   clock=even                       no uneven clock (slow dusk and dawn, short night): for instruments
 //   quality=<0|1|2>  pin the quality tier;  scale=<0.25..1>  where the resolution starts;
 //   dynres=0   pin both (for screenshots). Without any of them: best tier, full resolution,
 //   and the controller steps down only when the frame rate asks.
@@ -223,6 +224,9 @@ async function boot() {
   }
 
   const sim = game.sim;
+  // ?clock=even: every world turns at its own even rate (the game's clock is uneven: slow dusks
+  // and dawns, short nights; an instrument that sets an hour and lets the clock run wants it even).
+  if (params.get('clock') === 'even') sim.unevenClock = false;
   const debug = {
     game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, using: prov.using, note: debugNote, gl,
     info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),

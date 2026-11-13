@@ -2,7 +2,7 @@
 // no storage failure can throw into the game.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SketchStore, SKETCH, SKETCH_KEY, biomeKey, vistaKey } from '../src/core/sketches.js';
+import { SketchStore, SKETCH, SKETCH_KEY, biomeKey, vistaKey, sketchHand } from '../src/core/sketches.js';
 import { Sim } from '../src/core/sim.js';
 import { stubSurface } from '../src/core/stubs/surface.js';
 
@@ -92,4 +92,44 @@ test('the sketchbook lists every view of a world with whether it was found', () 
   const page = sim.sketchbook().find((p) => p.id === 'earth');
   assert.deepEqual(page.vistas, [{ id: 'earth-1', name: 'First', found: false }, { id: 'earth-2', name: 'Second', found: true }]);
   assert.equal(page.vistasTotal, 2);
+});
+
+// ---- M4: the sketch's hand (PAINTER's critique of PILOT, item 2: "the sketchbook keeps screenshots") ----
+test('M4 a kept frame is drawn as a sketch: washes and pencil, lifted to paper at a ragged edge, no rectangle', () => {
+  const w = SKETCH.width, h = SKETCH.height;
+  // a frame: a blue sky over a green land with a dark wood on the left and a red thing in the middle
+  const frame = () => {
+    const px = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const o = 4 * (y * w + x), sky = y < 44, wood = !sky && x < 70 && y < 70, thing = Math.hypot(x - 110, y - 64) < 7;
+      const c = thing ? [190, 60, 40] : wood ? [30, 60, 34] : sky ? [150, 190, 232] : [112, 150, 70];
+      px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
+    }
+    return px;
+  };
+  const a = sketchHand(frame(), w, h, 5), b = sketchHand(frame(), w, h, 5), c = sketchHand(frame(), w, h, 6), src = frame();
+  assert.deepEqual(a, b, 'the same frame and seed give the same sketch');
+  assert.notDeepEqual(a, c, 'another page has another ragged edge');
+  const at = (px, x, y) => [px[4 * (y * w + x)], px[4 * (y * w + x) + 1], px[4 * (y * w + x) + 2]];
+  // the border is bare paper all the way round (white: the page multiplies it onto its paper)
+  let border = 0, borderN = 0;
+  for (let x = 0; x < w; x++) for (const y of [0, 1, h - 2, h - 1]) { borderN++; if (Math.min(...at(a, x, y)) >= 250) border++; }
+  for (let y = 0; y < h; y++) for (const x of [0, 1, w - 2, w - 1]) { borderN++; if (Math.min(...at(a, x, y)) >= 250) border++; }
+  assert.equal(border, borderN, 'no pixel of the border carries ink: there is no rectangle');
+  // the edge is ragged: along a line a little way in, some of it is paper and some is not
+  let paper = 0;
+  for (let x = 10; x < w - 10; x++) if (Math.min(...at(a, x, 9)) >= 250) paper++;
+  assert.ok(paper > 8 && paper < w - 28, `the edge wanders: ${paper} of ${w - 20} pixels of row 9 are paper`);
+  // inside: the wood is darker than the land, the land darker than the sky (the tones are kept)
+  const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  const wood = lum(at(a, 40, 58)), land = lum(at(a, 150, 80)), sky = lum(at(a, 96, 26));
+  assert.ok(wood < land - 12 && land < sky - 12, `wood ${wood.toFixed(0)} < land ${land.toFixed(0)} < sky ${sky.toFixed(0)}`);
+  assert.ok(sky > 225, 'the lights are left as paper: ' + sky.toFixed(0));
+  // the colour is mostly ink: far less saturated than the frame
+  const sat = (c) => (Math.max(...c) - Math.min(...c)) / Math.max(1, Math.max(...c));
+  assert.ok(sat(at(a, 150, 80)) < 0.55 * sat(at(src, 150, 80)), `the land's colour ${sat(at(a, 150, 80)).toFixed(2)} of ${sat(at(src, 150, 80)).toFixed(2)}`);
+  // a pencil line where the frame has an edge: the wood's edge against the land is darker than the wash either side
+  let line = 255;
+  for (let x = 66; x <= 74; x++) line = Math.min(line, lum(at(a, x, 60)));
+  assert.ok(line < Math.min(wood, land) - 6, `a pencil line at the wood's edge: ${line.toFixed(0)} against ${wood.toFixed(0)} and ${land.toFixed(0)}`);
 });

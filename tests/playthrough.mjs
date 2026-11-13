@@ -92,7 +92,7 @@ try {
   const fb = await fallbackProblem(page, query);
   check(!fb, fb || 'every module the run asked for is the real one');
   check(i.state === 'ON_FOOT' && i.body === 'earth', 'starts on foot on Earth');
-  check(Math.abs(i.mood.timeOfDay - 9.5) < 0.2, 'local time is a clear morning: ' + i.mood.timeOfDay.toFixed(2));
+  check(Math.abs(i.mood.timeOfDay - 8) < 0.3, 'local time is a clear morning: ' + i.mood.timeOfDay.toFixed(2));
   await shot('00-start');
 
   // ---- walk ------------------------------------------------------------------------------------

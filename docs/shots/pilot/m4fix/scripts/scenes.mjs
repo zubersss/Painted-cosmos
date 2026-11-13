@@ -1,0 +1,167 @@
+// Extra scenes for film.mjs (SCENES=<this file>): PILOT 14's fix round.
+const landHere = async (c, o) => {
+  await c.tp(o);
+  await c.run(1, { dt: 0.1 });
+  await c.tap('KeyE');
+  await c.run(90, { dt: 0.1, until: (i) => i.state === 'LANDED' });
+  await c.run(1.5, { dt: 0.1 });
+};
+const stepOut = async (c, name) => {
+  await c.shot(name + '-0-landed');
+  await c.tap('KeyE');
+  await c.film(name, { frames: 12, every: 6, dt: 1 / 30, cols: 6, tile: [320, 180] });
+  await c.run(1.3, { dt: 0.1 });
+  await c.shot(name + '-9-out');
+  c.log(name + ' sketches ' + JSON.stringify(await c.page.evaluate(() => { const i = window.__pc.info(); return { sk: i.sketches, inPic: window.__pc.sim.shipInPicture ? window.__pc.sim.shipInPicture() : null, hull: window.__pc.sim.hullInView ? window.__pc.sim.hullInView(1) : null }; })));
+};
+const RADm = Math.PI / 180;
+const dom = (c) => c.page.evaluate(() => {
+  const q = (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { cls: e.className, text: (e.textContent || '').replace(/\s+/g, ' ').slice(0, 90), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), op: getComputedStyle(e).opacity }; };
+  return { hud: document.querySelector('.pc-hud').className, prompt: q('.pc-prompt'), notice: q('.pc-notice'), hint: q('.pc-hint'), slip: q('.pc-newsketch'), simPrompt: window.__pc.sim.promptNow, simNotice: window.__pc.sim.notice && window.__pc.sim.notice.text, offer: window.__pc.sim.easelOffer && window.__pc.sim.easelOffer.id };
+});
+export default {
+  // the offer at a found view: what the HUD holds
+  async offer(c) {
+    await c.page.evaluate(() => { const sim = window.__pc.sim, d = sim.vistasOf('earth')[0].dir, k = 30 / 4000; window.__pc.teleport({ body: 'earth', dir: [d.x + k, d.y, d.z - k * 0.3] }); });
+    await c.settle();
+    await c.run(0.5, { dt: 0.1 });
+    const n = await c.page.evaluate(() => window.__pc.sim.nearestVista());
+    await c.drag(n.bearingDeg * RADm / c.MOUSE_FOOT, 0);
+    await c.press('KeyW');
+    await c.run(40, { dt: 0.1, until: (i) => !!i.easelOffer, steer: async () => { const m = await c.page.evaluate(() => window.__pc.sim.nearestVista()); if (m && Math.abs(m.bearingDeg) > 5) await c.drag(m.bearingDeg * RADm / c.MOUSE_FOOT * 0.6, 0); } });
+    await c.release('KeyW');
+    c.log('offer dom at once ' + JSON.stringify(await dom(c)));
+    await c.run(0.8, { dt: 0.1 });
+    c.log('offer dom +0.8 ' + JSON.stringify(await dom(c)));
+    await c.shot('offer-0');
+    await new Promise((r) => setTimeout(r, 1500));
+    await c.shot('offer-1-later');
+    c.log('offer dom later ' + JSON.stringify(await dom(c)));
+  },
+  // PHYSICS on PILOT 4 / PAINTER 10: the jetpack up through the glade's crowns and down again, from the spawn
+  async jet(c) {
+    await c.page.evaluate(() => window.__pc.teleport({ body: 'earth' }));
+    await c.settle();
+    await c.run(0.5, { dt: 0.1 });
+    await c.press('Space');
+    await c.film('jet-up', { frames: 12, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180] });
+    await c.release('Space');
+    await c.film('jet-down', { frames: 18, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180], until: (p) => p.exAlt < 0.05 && p.exV < 0.5 && p.mode !== 'fall' && p.mode !== 'jet' });
+    await c.shot('jet-9-landed');
+  },
+  // the jetpack from beside the ship, under the birches (where PAINTER and PHYSICS filmed the slabs)
+  async jet2(c) {
+    await c.page.evaluate(() => window.__pc.teleport({ body: 'earth' }));
+    await c.settle();
+    let i = await c.info();
+    await c.drag((i.shipBearingDeg || 0) * RADm / c.MOUSE_FOOT, 0);
+    await c.press('KeyW');
+    await c.run(40, { dt: 0.1, until: (j) => j.canBoard, steer: async (j) => { if (j.shipBearingDeg != null && Math.abs(j.shipBearingDeg) > 4) await c.drag(j.shipBearingDeg * RADm / c.MOUSE_FOOT * 0.5, 0); } });
+    await c.release('KeyW');
+    await c.run(0.6, { dt: 0.1 });
+    await c.press('Space');
+    await c.film('jet2-up', { frames: 12, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180] });
+    await c.release('Space');
+    await c.film('jet2-down', { frames: 18, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180], until: (p) => p.exAlt < 0.05 && p.mode !== 'fall' && p.mode !== 'jet' });
+    await c.shot('jet2-9-landed');
+  },
+  // PAINTER 6: the slips at night (on foot by the ship: the prompt) and by day, the same place
+  async night(c) {
+    await c.page.evaluate(() => window.__pc.setHour(13));
+    await c.run(1.2, { dt: 0.1 });
+    await new Promise((r) => setTimeout(r, 1200));
+    await c.shot('night-0-day');
+    await c.page.evaluate(() => window.__pc.setHour(23));
+    await c.run(1.2, { dt: 0.1 });
+    await new Promise((r) => setTimeout(r, 1200));
+    await c.shot('night-1-night');
+    c.log('night key ' + (await c.page.evaluate(() => document.querySelector('.pc-hud').style.getPropertyValue('--pc-key') + ' rate ' + window.__pc.sim.clockRate)));
+    await c.page.evaluate(() => window.__pc.setHour(10));
+    await c.run(1, { dt: 0.1 });
+  },
+  // PAINTER 7 and 15: the first frame after the click (the place's name), and the help card on H
+  async first(c) {
+    await new Promise((r) => setTimeout(r, 1500));
+    await c.shot('first-0-after-click');
+    await c.tap('KeyH'); await c.run(0.3, { dt: 0.1 });
+    await new Promise((r) => setTimeout(r, 1200));
+    await c.shot('first-1-help');
+    await c.tap('KeyH'); await c.run(0.3, { dt: 0.1 });
+  },
+  // PAINTER 8 / PHYSICS 7: boarding from where the prompt first shows
+  async board(c) {
+    let i = await c.info();
+    await c.drag((i.shipBearingDeg || 0) * RADm / c.MOUSE_FOOT, 0);
+    await c.press('KeyW');
+    await c.run(40, { dt: 0.1, until: (j) => j.canBoard, steer: async (j) => { if (j.shipBearingDeg != null && Math.abs(j.shipBearingDeg) > 4) await c.drag(j.shipBearingDeg * RADm / c.MOUSE_FOOT * 0.5, 0); } });
+    await c.release('KeyW');
+    await c.run(0.4, { dt: 0.1 });
+    c.log('board from ' + (await c.info()).shipDistance.toFixed(1) + ' m');
+    await c.tap('KeyE');
+    await c.film('board', { frames: 12, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180], until: (p) => p.st === 'LANDED' });
+    await c.run(1, { dt: 0.1 });
+  },
+  // PAINTER on PILOT 3: the slips. In space: the worlds' names; aimed at Mars: its label and the ship; the pulse.
+  async aim(c) {
+    await c.tp({ body: 'earth', ship: true, altitude: 5000 });
+    await c.run(1, { dt: 0.1 });
+    await c.shot('aim-0-space');
+    await c.page.evaluate(() => window.__pc.sim.setTarget('mars'));
+    for (let k = 0; k < 60; k++) {
+      const a = await c.page.evaluate(() => window.__pc.sim.aimAt('mars'));
+      if (Math.abs(a.yawDeg) < 1.5 && Math.abs(a.pitchDeg) < 1.5) break;
+      await c.drag(Math.max(-120, Math.min(120, a.yawDeg * RADm / c.MOUSE_SHIP * 0.5)), -Math.max(-80, Math.min(80, a.pitchDeg * RADm / c.MOUSE_SHIP * 0.5)));
+      await c.run(0.3, { dt: 0.1 });
+    }
+    await c.run(1, { dt: 0.1 });
+    await c.shot('aim-1-aimed');
+    await c.tap('KeyF');
+    await c.run(6, { dt: 0.1 });
+    await c.shot('aim-2-pulse');
+    c.log('aim marks ' + JSON.stringify((await c.info()).marks));
+    await c.page.evaluate(() => window.__pc.sim.say('M opens the map: choose a world, point the nose at its mark, press F for the pulse drive', 8));
+    await c.run(0.6, { dt: 0.1 });
+    await c.shot('aim-3-long-notice');
+  },
+  // PAINTER on PILOT 4: a view. 30 m from Earth's first: the mark; walked up to: found and offered; E: to the easel.
+  async vista(c) {
+    await c.page.evaluate(() => { const sim = window.__pc.sim, d = sim.vistasOf('earth')[0].dir, k = 60 / 4000; window.__pc.teleport({ body: 'earth', dir: [d.x + k, d.y, d.z - k * 0.3] }); });
+    await c.settle();
+    await c.run(0.5, { dt: 0.1 });
+    let n = await c.page.evaluate(() => window.__pc.sim.nearestVista());
+    c.log('vista: ' + n.name + ' ' + n.distance.toFixed(0) + ' m, bearing ' + n.bearingDeg.toFixed(0));
+    await c.shot('vista-0-far');
+    await c.drag(n.bearingDeg * RADm / c.MOUSE_FOOT, 0);
+    await c.run(0.5, { dt: 0.1 });
+    await c.shot('vista-1-mark');
+    await c.press('KeyW');
+    await c.run(40, { dt: 0.1, until: (i) => !!i.easelOffer, steer: async () => { const m = await c.page.evaluate(() => window.__pc.sim.nearestVista()); if (m && Math.abs(m.bearingDeg) > 5) await c.drag(m.bearingDeg * RADm / c.MOUSE_FOOT * 0.6, 0); } });
+    await c.release('KeyW');
+    await c.run(0.6, { dt: 0.1 });
+    await c.shot('vista-2-offer');
+    await c.tap('KeyE');
+    await c.film('vista-easel', { frames: 12, every: 10, dt: 1 / 30, cols: 6, tile: [320, 180] });
+    await c.shot('vista-3-held');
+    await c.run(3, { dt: 0.1 });
+    await c.shot('vista-4-after');
+    c.log('vista info ' + JSON.stringify(await c.page.evaluate(() => { const i = window.__pc.info(); return { easel: i.easel, offer: i.easelOffer, sk: i.sketches.keys, notice: i.notice, prompt: i.prompt }; })));
+    await c.tap('KeyB'); await c.run(0.3, { dt: 0.1 });
+    await c.shot('vista-5-book');
+    await c.tap('ArrowRight'); await c.run(0.3, { dt: 0.1 });
+    await c.shot('vista-6-book-moon');
+    await c.tap('KeyB'); await c.run(0.3, { dt: 0.1 });
+  },
+  // PAINTER on PILOT 1: stepping out on Mars (the first step on a new world) and in Earth's wood
+  async stepout_mars(c) { await landHere(c, { body: 'mars', ship: true, altitude: 30 }); await stepOut(c, 'stepout-mars'); },
+  async stepout_wood(c) { await landHere(c, { body: 'earth', ship: true, altitude: 30 }); await stepOut(c, 'stepout-wood'); },
+  // the page of the book for the place just stepped out on
+  async book(c) {
+    await c.run(4, { dt: 0.1 });
+    await c.press('KeyW'); await c.run(3, { dt: 0.1 }); await c.release('KeyW');
+    await c.run(1, { dt: 0.1 });
+    await c.shot('book-0-slip');
+    await c.tap('KeyB'); await c.run(0.3, { dt: 0.1 });
+    await c.shot('book-1-open');
+    await c.tap('KeyB'); await c.run(0.3, { dt: 0.1 });
+  },
+};

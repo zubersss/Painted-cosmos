@@ -10,6 +10,7 @@ import { BODIES } from '../src/data/bodies.js';
 import { spaceAltitude } from '../src/core/orbits.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { Pad, play, len, sub, norm, dot } from './helpers.mjs';
+import { V, add, scale, cross, qRotate } from '../src/core/vec.js';
 
 const RAD = Math.PI / 180;
 function newSim(opts = {}) {
@@ -32,7 +33,7 @@ test('M1 loop on Earth: walk, jetpack, board, lift off, reach space, return, lan
   play(sim, pad, 0.5, opts());
   assert.equal(sim.sm.state, S.ON_FOOT);
   assert.equal(sim.bodyId, 'earth');
-  assert.ok(Math.abs(sim.mood.timeOfDay - 9.5) < 0.1, 'starts on a clear morning');
+  assert.ok(Math.abs(sim.mood.timeOfDay - FEEL.startHour) < 0.1, 'starts on a clear morning');
   const p0 = { ...sim.ex.p };
   pad.press('KeyW');
   play(sim, pad, 2, opts());
@@ -232,4 +233,63 @@ test('teleport puts you where you ask, on any body', () => {
   const i = sim.teleport({ body: 'earth', ship: true, altitude: 5000 });
   assert.equal(i.state, S.SPACE);
   assert.equal(i.frame, 'earth:orbit');
+});
+
+// ---- M4: stepping out (PAINTER's critique of PILOT, item 1) ------------------------------------
+// The hull as a picture sees it (PAINTER's model, measured: body, glass, fin, wings, wing tips),
+// projected by the test's own arithmetic: the share of a 16:9 frame its spheres cover from the
+// camera's pose, and whether any of them lies between the lens and the explorer's chest.
+const HULL = [[0, 1.3, -3.3, 1.2], [0, 1.45, -1.3, 1.6], [0, 1.3, 1.0, 1.6], [0, 1.6, 3.2, 1.4], [0, 2.5, 4.0, 0.9], [-2.4, 1.5, 1.0, 1.0], [2.4, 1.5, 1.0, 1.0], [-3.3, 1.6, 1.25, 0.7], [3.3, 1.6, 1.25, 0.7]];
+function hullInFrame(sim) {
+  const pose = sim.camPose, p = pose.p, dir = qRotate(pose.q, V(0, 0, -1)), sh = sim.sh;
+  const shape = HULL.map((h) => ({ p: add(sh.p, qRotate(sh.q, V(h[0], h[1], h[2]))), radius: h[3] }));
+  const up = norm(p), right = norm(cross(dir, up)), top = cross(right, dir), th = Math.tan((pose.fov * Math.PI) / 360), tw = th * 16 / 9;
+  const discs = [];
+  for (const h of shape) { const v = sub(h.p, p), d = dot(v, dir); if (d > 0.3) discs.push({ x: dot(v, right) / d, y: dot(v, top) / d, r: h.radius / d }); }
+  let hit = 0, mid = 0, midN = 0; const NX = 48, NY = 27;
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const nx = (i + 0.5) / NX * 2 - 1, ny = (j + 0.5) / NY * 2 - 1, inMid = Math.abs(nx) < 0.5 && Math.abs(ny) < 0.5;
+    if (inMid) midN++;
+    for (const c of discs) if ((nx * tw - c.x) ** 2 + (ny * th - c.y) ** 2 < c.r * c.r) { hit++; if (inMid) mid++; break; }
+  }
+  const chest = add(sim.ex.p, scale(norm(sim.ex.p), 1.2)), seg = sub(chest, p), sl = len(seg), sd = scale(seg, 1 / sl);
+  let hidden = false;
+  for (const h of shape) { const q = sub(h.p, p), t = Math.max(0, Math.min(sl, dot(q, sd))); if (len(sub(q, scale(sd, t))) < h.radius) hidden = true; }
+  return { cover: hit / (NX * NY), middle: mid / midN, hidden };
+}
+
+test('M4 stepping out: the first picture is the land with the explorer in it, not the ship\'s wing', () => {
+  for (const body of ['earth', 'mars', 'pluto']) {
+    const sim = newSim();
+    const pad = new Pad();
+    sim.teleport({ body, ship: true, altitude: 30 });
+    play(sim, pad, 1);
+    pad.tap('KeyE');
+    play(sim, pad, 90, { until: () => sim.sm.state === S.LANDED });
+    assert.equal(sim.sm.state, S.LANDED, body + ': landed');
+    play(sim, pad, 1.5);
+    pad.tap('KeyE');
+    // the way out is a walk, not a cut: the explorer is seen all the way, and moves
+    let seen = true, t = 0;
+    const p0 = { ...sim.hatchPoint() };
+    play(sim, pad, 6, { each: () => { t += 1 / 60; if (sim.sm.state === S.BOARDING && !sim.explorerVisible()) seen = false; }, until: () => sim.sm.state === S.ON_FOOT });
+    assert.equal(sim.sm.state, S.ON_FOOT, body + ': stepped out');
+    assert.ok(seen, body + ': the explorer is in sight all the way out');
+    assert.ok(t > 1.3 && t < 2.6, `${body}: out in ${t.toFixed(2)} s (it was 0.95: a cut)`);
+    assert.ok(len(sub(sim.ex.p, p0)) > 2.4, `${body}: a few steps clear of the wing: ${len(sub(sim.ex.p, p0)).toFixed(1)} m from the ladder`);
+    assert.equal(sim.ex.mode, 'idle', body + ': standing');
+    for (const wait of [0, 2.5]) {
+      play(sim, pad, wait);
+      const f = hullInFrame(sim);
+      assert.ok(!f.hidden, `${body} +${wait} s: the hull is not between the lens and the explorer`);
+      assert.ok(f.cover < 1 / 6, `${body} +${wait} s: the hull takes ${(f.cover * 100).toFixed(0)} % of the frame (it took 35 %; a sixth at most)`);
+      assert.ok(f.middle < 0.05, `${body} +${wait} s: and ${(f.middle * 100).toFixed(0)} % of its middle`);
+    }
+    assert.ok(sim.footCam.boomNow > CAMERA.boom - 0.3, `${body}: the boom is free: ${sim.footCam.boomNow.toFixed(1)} m`);
+    assert.equal(sim.shipInPicture(), false, body + ': a sketch of the place may be drawn');
+    // turned to look at the ship from beside it, the page waits
+    pad.dx += (sim.info().shipBearingDeg * RAD) / FEEL.mouseFoot;
+    play(sim, pad, 0.5);
+    assert.equal(sim.shipInPicture(), true, body + ': looking at the ship from beside it, the page waits');
+  }
 });

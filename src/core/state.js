@@ -128,7 +128,7 @@ export function canBeginLanding(state, altitudeAboveGround, speed) {
 // The one line of help shown at the bottom of the screen: { key, text } or null.
 export function promptFor(state, q) {
   switch (state) {
-    case S.ON_FOOT: return q.canBoard ? { key: 'E', text: 'Board ship' } : null;
+    case S.ON_FOOT: return q.canBoard ? { key: 'E', text: 'Board ship' } : q.canEasel ? { key: 'E', text: 'Stand at the easel' } : null;
     case S.LANDED: return { key: 'SPACE', text: 'Lift off', key2: 'E', text2: 'Step out' };
     case S.ATMOSPHERE:
       if (q.liftingOff) return null;

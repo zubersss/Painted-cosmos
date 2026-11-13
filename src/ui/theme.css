@@ -37,6 +37,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 /* The long thin slips (the hint, a notice, a marker's name) need a deeper tear to show one. */
 .pc-hint::before, .pc-notice::before, .pc-mark span::before { inset: -2px -3px;
   filter: url(#pc-rag-c) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* The slips take the sheet's key (PAINTER's critique 6: at night and in space the paper-white
+   slips were the light source of the picture): their paper is multiplied by --pc-key, white by
+   day, a moonlit blue-grey at night and in space (game.js updateHud). The open sheets (the map,
+   the book, the card) stay paper: they are the thing to read. */
+.pc-button::before, .pc-readout::before, .pc-gauge::before, .pc-notice::before, .pc-hint::before, .pc-mark span::before,
+.pc-newsketch::before { background-color: var(--pc-key, #fff); background-blend-mode: multiply; }
 /* With the map or the sketchbook open the picture behind steps back toward paper, as under a
    sheet of tracing paper: the open sheet is the thing to read, on any sky. */
 .pc-hud.pc-paneled::before { content: ''; position: fixed; inset: 0; background: rgba(244, 239, 228, 0.6); }
@@ -49,7 +55,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
    prompt lies under the feet, the gauge and any notice just above it, not across the legs. */
 .pc-hud.pc-foot3 .pc-prompt { bottom: 4.4%; }
 .pc-hud.pc-foot3 .pc-gauges { bottom: 11.4%; }
-.pc-hud.pc-foot3 .pc-notice { bottom: 17%; }
+/* (a notice at 17% lay across the figure from the hips down: on foot it goes to the top of the
+   sheet, where the sky is, under the hint when that is up) */
+.pc-hud.pc-foot3 .pc-notice { bottom: auto; top: 8.5%; }
+.pc-hud.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: 15.5%; }
 .pc-hud .pc-prompt { transition: opacity 0.25s ease, bottom 0.4s ease; }
 .pc-hud .pc-notice { transition: opacity 0.5s ease, bottom 0.4s ease; }
 .pc-hud .pc-gauges { transition: bottom 0.4s ease; }
@@ -114,7 +123,7 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 .pc-ring-paper { fill: none; stroke: var(--pc-paper); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: url(#pc-rough); }
 .pc-mark-body .pc-ring-ink { stroke-width: 2.6; stroke: rgba(35, 42, 69, 0.4); }
 .pc-mark-body .pc-ring-paper { stroke-width: 1.3; opacity: 0.85; }
-.pc-mark span { position: absolute; left: 0; transform: translateX(-50%); width: max-content; padding: 4px 9px 2px; color: var(--pc-dark); }
+.pc-mark span { position: absolute; left: 0; top: 0; transform: translateX(-50%); width: max-content; padding: 4px 9px 2px; color: var(--pc-dark); }
 .pc-mark span .pc-ink { position: relative; }
 .pc-mark-body span { opacity: 0.85; }
 
@@ -131,6 +140,12 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 .pc-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 548px;
   padding: 26px 36px 24px; opacity: 0; transition: opacity 0.5s ease; display: flex; flex-direction: column; align-items: center; }
 .pc-start.pc-on { opacity: 1; }
+/* Before the game has begun the card is the title alone: small, in the upper third, the painting
+   open under it; one line of the keys a newcomer needs. The list of keys is the whole card, on H. */
+.pc-first { display: none; margin-top: 12px; color: var(--pc-dark); }
+.pc-start.pc-title-only { top: 26%; width: 440px; padding: 20px 30px 16px; }
+.pc-start.pc-title-only .pc-help { display: none; }
+.pc-start.pc-title-only .pc-first { display: block; }
 .pc-title { color: var(--pc-dark); margin-bottom: 4px; }
 .pc-start .pc-sub { margin-top: 2px; }
 /* "click to begin": the words left as bare paper in one broad stroke of indigo: loaded at the
@@ -174,12 +189,10 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 .pc-book-head { display: flex; align-items: flex-end; justify-content: space-between; background: var(--pc-rule) left bottom / 100% 6px no-repeat;
   padding-bottom: 9px; margin-bottom: 10px; }
 .pc-book .pc-title { margin: 0; }
-.pc-book-tally { color: var(--pc-dark); }
 .pc-book-body { display: grid; grid-template-columns: 128px 1fr; gap: 0 18px; }
 .pc-book-tabs { display: flex; flex-direction: column; gap: 3px; }
 .pc-book-tab { all: unset; cursor: var(--pc-cursor), pointer; display: flex; justify-content: space-between; align-items: center;
   padding: 6px 9px 4px; color: var(--pc-dark); border-radius: 4px 9px 5px 10px / 9px 4px 10px 5px; }
-.pc-book-tab span { color: var(--pc-sepia); }
 .pc-book-tab.pc-dim b { opacity: 0.5; }
 .pc-book-tab { position: relative; isolation: isolate; }
 .pc-book-tab.pc-on { color: var(--pc-paper); }
@@ -187,34 +200,32 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
   background: linear-gradient(90deg, rgba(35, 42, 69, 0.96) 0%, rgba(47, 58, 93, 0.93) 55%, rgba(47, 58, 93, 0.78) 100%);
   box-shadow: inset 0 0 0 1.5px rgba(35, 42, 69, 0.5); filter: url(#pc-stroke); }
 .pc-book-tab.pc-on b { opacity: 1; }
-.pc-book-tab.pc-on span { color: var(--pc-paper); }
-.pc-book-page { min-height: 440px; }
-.pc-book-world { color: var(--pc-dark); margin-bottom: 3px; }
-.pc-book-sub { margin-bottom: 4px; color: var(--pc-dark); }
-.pc-book-kind { margin: 11px 0 6px; }
-.pc-book-grid { display: grid; grid-template-columns: repeat(5, 130px); gap: 8px 13px; }
+/* The page has one size whatever it holds (one scale for the whole book): what has been drawn,
+   laid large and loose while there is little of it; under it one pencilled line for what is left. */
+.pc-book-page { height: 452px; overflow: hidden; display: flex; flex-direction: column; }
+.pc-book-world { color: var(--pc-dark); margin-bottom: 10px; }
+.pc-book-grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 16px; }
 .pc-sketch { margin: 0; }
-/* A sketch not yet made: a loose pencil frame, drawn freehand, waiting. */
-.pc-sketch-frame { width: 130px; height: 73px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
-  background: var(--pc-frame-a) center / 100% 100% no-repeat; color: var(--pc-sepia); }
-.pc-sketch:nth-child(3n+2) .pc-sketch-frame { background-image: var(--pc-frame-b); }
-.pc-sketch:nth-child(3n) .pc-sketch-frame { background-image: var(--pc-frame-c); }
-.pc-sketch.pc-on .pc-sketch-frame { background: #fbf8f1; padding: 3px;
-  box-shadow: 0 0 0 1px rgba(88, 68, 53, 0.45), 1px 2px 5px rgba(35, 42, 69, 0.25); }
-.pc-sketch:nth-child(3n+1).pc-on .pc-sketch-frame { transform: rotate(-0.8deg); }
-.pc-sketch:nth-child(3n+2).pc-on .pc-sketch-frame { transform: rotate(0.6deg); }
-.pc-sketch-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.pc-sketch figcaption { margin-top: 4px; min-height: 30px; color: var(--pc-sepia); }
-.pc-sketch.pc-on figcaption { color: var(--pc-dark); }
+/* A sketch lies on the page itself: its edge is ragged and lifted to white (sketches.js
+   sketchHand), and white multiplied onto the paper is the paper. No frame, no rectangle. */
+.pc-sketch-frame { width: 100%; aspect-ratio: 16 / 9; box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: var(--pc-sepia); }
+/* (the tilt is on the picture itself: a transform on its frame would make the frame a layer of
+   its own, and the picture would be multiplied onto nothing: a white rectangle on the page) */
+.pc-sketch-frame img { width: 100%; height: 100%; object-fit: cover; display: block; mix-blend-mode: multiply; }
+.pc-sketch:nth-child(3n+1) .pc-sketch-frame img { transform: rotate(-0.8deg); }
+.pc-sketch:nth-child(3n+2) .pc-sketch-frame img { transform: rotate(0.6deg); }
+.pc-sketch figcaption { margin-top: 1px; min-height: 26px; color: var(--pc-dark); }
+.pc-sketch.pc-bare figcaption { color: var(--pc-sepia); }
+.pc-book-left { margin-top: auto; padding-top: 8px; color: var(--pc-sepia); }
 .pc-book-foot { margin-top: 8px; padding-top: 11px; background: var(--pc-rule-b) left top / 100% 6px no-repeat; display: flex; justify-content: center;
   color: var(--pc-dark); }
 
 /* A new page in the sketchbook, shown as it is made: the sketch on a slip of paper, tucked into
    the top right corner of the painting, small, above where the ship stands in a first view
    (and held back at an arrival until the explorer sets off: game.js, SKETCH_SLIP). */
-.pc-newsketch { position: absolute; right: 4.5%; top: 5.5%; width: clamp(152px, 19vw, 172px); padding: 6px 6px 7px; color: var(--pc-dark);
+.pc-newsketch { position: absolute; right: 4.5%; top: 5.5%; width: clamp(168px, 21vw, 232px); padding: 6px 8px 7px; color: var(--pc-dark);
   opacity: 0; transform: translateY(-14px) rotate(4deg) scale(0.92); transition: opacity 0.7s ease, transform 0.7s ease; }
 .pc-newsketch.pc-on { opacity: 1; transform: rotate(1.6deg); }
-.pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; box-shadow: 0 0 0 1px rgba(88, 68, 53, 0.4); }
+.pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; mix-blend-mode: multiply; }
 .pc-newsketch b { display: block; margin-top: 7px; font-weight: normal; }
 .pc-newsketch span { display: block; margin-top: 1px; }

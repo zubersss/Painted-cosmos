@@ -10,7 +10,7 @@ import {
 import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip, LAND_PROMPT_ALTITUDE, LAND_BEGIN_SPEED } from './state.js';
 import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
-  qLook, qRotate, qConj, qMul, qFromAxisAngle, rotateAround,
+  qLook, qRotate, qConj, qMul, qFromAxisAngle, qSlerp, rotateAround,
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../player/explorer.js';
 import {
@@ -24,11 +24,13 @@ import { PULSE, arrivalRadius, createPulse, pulseAdvice, stepPulseSpeed, pulseEt
 export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
   mouseShip: 0.0017,         // rad per pixel in the ship (the nose follows with a little weight)
-  boardSeconds: 1.25,        // walking up the hatch and sitting down
+  boardSeconds: 1.5,         // walking up to the hatch and sitting down, at the least (from right beside it)...
+  boardPace: 3.6,            // ...and from further off as long as the walk takes at this pace (m/s), to...
+  boardSecondsMax: 3,        // ...this at most (it was 1.25 s from anywhere: 8.5 m at a sprint, the explorer out of the frame in 0.2 s)
   exitSeconds: 1.6,          // down the ladder and three steps clear of the wing (it was 0.95: a cut)
   simStep: 1 / 60,           // fixed physics step (the feel is identical at any frame rate)
   maxFrame: 0.25,            // seconds of real time simulated per frame at most
-  startHour: 9.5,            // local solar time at the first spawn: a clear morning
+  startHour: 8,              // the world's hour at the first spawn: a clear morning, a long day ahead (it was 9.5: night fell ten minutes in)
 });
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -59,6 +61,43 @@ const ARRIVAL = Object.freeze({
 // ground) and how fast the gear lets it down (m/s; PHYSICS' recipe).
 export const LEGS = Object.freeze({ gearAt: 1.0, sink: 0.6 });
 export const VISTA_RANGE = 14;      // metres: this close to a vista's spot, on foot, and it is yours
+export const VISTA_MARK = 150;      // metres: this near a view not yet drawn, one quiet mark shows where it is
+// A view is a picture, not a spot (PAINTER's critique, M4 item 4): found, it is offered ("E:
+// stand at the easel"); the explorer walks to the easel's place and the view comes round to the
+// heading and pitch the picture was painted with, is held while the page is drawn, and the
+// controls are the player's again.
+export const EASEL = Object.freeze({
+  pace: 3.4,                 // m/s: the walk to the easel...
+  minSeconds: 2,             // ...never quicker than this (the view's turn is eased over it),
+  maxSeconds: 4.2,           // nor longer
+  hold: 1.8,                 // s the picture is held while the page is drawn
+  reach: 3,                  // m beyond VISTA_RANGE the offer stays up once made
+});
+// The clock of the world the player is on (PAINTER's critique, M4 item 5: of Earth's 25 minutes
+// eleven were night, one dark blue, and the gold and the rose went by in half a minute each).
+// While the sun is well up the world turns as it does. Within `slowFrom` degrees of the horizon
+// it turns at `slow` of that: the hours a painting changes in are the long ones. Under
+// `nightBelow` it turns `fast` times as quickly. Measured at Earth's spawn (in its winter, the sun
+// 39 degrees up at noon): the sun over 12 degrees for 9.5 minutes as before; from there to the
+// horizon 3.8 minutes (it was 1.4), on to 8 degrees under it 2.7 (0.9), the night below that 5.6
+// (14.8), the dawn 5.6; a first sitting from 8 h has its sunset 11.2 minutes in and its sunrise at 21.9.
+export const CLOCK = Object.freeze({
+  easeFrom: 12,              // degrees of the sun over the horizon: from here the turning eases down...
+  slowFrom: 8,               // ...to `slow` here...
+  slowTo: -8,                // ...and stays so down to here;
+  nightBelow: -16,           // under this it is `fast`
+  slow: 0.4,
+  fast: 3,
+  top: 0.6,                  // of the way up to space: from `low` of it on up the clock eases back to the body's own, so
+  low: 0.2,                  // that a ship leaving the ground frame leaves a world that turns as the ephemeris says
+});
+export function clockRate(elevDeg, C = CLOCK) {
+  if (elevDeg >= C.easeFrom) return 1;
+  if (elevDeg >= C.slowFrom) return mix(C.slow, 1, smoothstep(C.slowFrom, C.easeFrom, elevDeg));
+  if (elevDeg >= C.slowTo) return C.slow;
+  if (elevDeg >= C.nightBelow) return mix(C.fast, C.slow, smoothstep(C.nightBelow, C.slowTo, elevDeg));
+  return C.fast;
+}
 // Stepping out of the ship (PAINTER's critique, item 1: "the first picture of every landing is
 // your own wing"). The explorer walks a few steps clear of the hull while the view comes round, and
 // the view is chosen for the picture: the hull never between the lens and the figure, never over
@@ -69,6 +108,9 @@ const EXIT = Object.freeze({
   turns: [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75, 2.1, -2.1, 2.5, -2.5],   // rad from straight away
   cover: 1 / 6,                        // the most of the frame the hull may take
   aspect: 16 / 9,
+  near: 14,                            // metres from the ship within which a sketch waits while the hull...
+  middle: 0.7,                         // ...lies in this share of the frame round its middle...
+  inPicture: 0.02,                     // ...over more than this share of it
 });
 // The hull as a picture sees it: spheres [x, y, z, radius] in the ship's own axes (PAINTER's model:
 // the body from the bow to the stern, the glass bubble, the fin, the cloth wings and their tips).
@@ -88,6 +130,11 @@ export class Sim {
     this.getVistas = getVistas || null;
     this.vistas = {};              // bodyId -> { vistaId: true } found so far
     this.onVistaFound = null;      // (bodyId, vistaId) -> void, set by the presenter
+    this.vistaDrawn = null;        // (bodyId, vistaId) -> bool: has its page a picture (set by the presenter)
+    this.stood = {};               // bodyId -> { vistaId: true }: stood at its easel in this sitting
+    this.easelOffer = null;        // the found view whose easel is within reach just now
+    this.easel = null;             // { id, phase: 'go' | 'hold', t, ... } while the explorer is taken to an easel
+    this.unevenClock = true;       // false: every world turns at its own even rate (instruments that hold an hour: ?clock=even)
     this._vistaList = {};
     this.sampleSurface = sampleSurface;
     this.sampleObstacles = sampleObstacles || null;
@@ -191,6 +238,7 @@ export class Sim {
       this.footCam = createFootCamera(fwd, d);
       if (face.pitch != null) this.footCam.pitch = clamp(face.pitch, CAMERA.pitchMin, CAMERA.pitchMax);
     }
+    this.easel = null; this.easelOffer = null;
     this.sh = restOnSurface(sample, best.dir, rotateAround(toShip, d, -1.9));
     this.shFrame = bodyFrame(bodyId, true);
     this.shipCam = createShipCamera();
@@ -268,11 +316,35 @@ export class Sim {
     const steps = Math.max(1, Math.ceil(simDt / FEEL.simStep - 1e-6));
     const h = simDt / steps;
     for (let i = 0; i < steps; i++) this.step(h, inp, i === 0);
+    this.stepClock(simDt);
     this.updatePhysics(simDt);
     this.noteVisit();
     this.checkVistas();
     this.frameCount++;
     return simDt;
+  }
+
+  // The uneven clock (CLOCK): the world under the player turns slowly while its sun is near the
+  // horizon where they stand and quickly while it is night there. Only that world, and only
+  // while the player is in its ground frame (on foot, landed, flying in its air): everything in
+  // that frame rides with it, so nothing moves in the picture but the light. Higher up the
+  // rate eases back to 1, well before the ship leaves the frame.
+  stepClock(dt) {
+    const st = this.sm.state, eph = this.eph;
+    let id = null, p = null, high = 0;
+    if (st === S.ON_FOOT || st === S.BOARDING) { id = this.bodyId; p = this.ex.p; }
+    else if (this.shFrame.kind === 'body' && this.shFrame.rotating) {
+      id = this.shFrame.id; p = this.sh.p;
+      high = smoothstep(CLOCK.low, CLOCK.top, (len(p) - BODIES[id].radius) / spaceAltitude(BODIES[id]));
+    }
+    let rate = 1;
+    if (id && this.unevenClock) {
+      const elev = Math.asin(clamp(eph.sunElevationSin(id, this.t, norm(p)), -1, 1)) * 180 / Math.PI;
+      rate = mix(clockRate(elev), 1, high);
+    }
+    for (const k in eph.spinRate) if (k !== id && eph.spinRate[k] !== 1) eph.spinRate[k] = 1;
+    if (id) eph.turnBy(id, dt, rate);
+    this.clockRate = rate;
   }
 
   // ---- simulation step -----------------------------------------------------------------------
@@ -285,7 +357,12 @@ export class Sim {
     const mdx = first ? inp.dx : 0, mdy = first ? inp.dy : 0;
     const st = this.sm.state;
 
-    if (st === S.ON_FOOT) {
+    if (st === S.ON_FOOT && this.easel) {
+      // Taken to an easel: the walk there and the held picture; the hands are off the controls.
+      this.stepEasel(h);
+      if (this.easel && this.easel.phase === 'hold') stepExplorer(this.ex, { moveX: 0, moveZ: 0, run: false, stroll: false, jump: false, jet: false, viewFwd: this.footCam.viewFwd, faceView: false }, h, this.explorerEnv(this.bodyId));
+      if (this.shFrame.kind === 'body' && this.shFrame.rotating) this.stepParked(h);
+    } else if (st === S.ON_FOOT) {
       if (first && inp.edges.has('KeyV')) this.footCam.firstPerson = !this.footCam.firstPerson;
       // C: a stroll (a true walking gait) in place of the usual easy lope; Shift still runs.
       if (pressed('KeyC')) {
@@ -317,6 +394,7 @@ export class Sim {
       if (this.shFrame.kind === 'body' && this.shFrame.rotating) this.stepParked(h);     // the ship waits on its gear
       this.thickWord(h, moving);
       if (pressed('KeyE') && this.boardable()) this.beginBoarding();
+      else if (pressed('KeyE') && this.easelOffer) this.beginEasel(this.easelOffer);
     } else if (st === S.BOARDING) {
       this.stepBoarding(h);
     } else if (st === S.LANDED) {
@@ -502,7 +580,9 @@ export class Sim {
     if (this.getVistas) {
       try {
         list = (this.getVistas(bodyId) || []).filter((v) => v && v.unitDir && v.id != null)
-          .map((v) => ({ id: String(v.id), name: v.name || 'a view', dir: norm(V(v.unitDir.x, v.unitDir.y, v.unitDir.z)) }));
+          .map((v) => ({ id: String(v.id), name: v.name || 'a view', dir: norm(V(v.unitDir.x, v.unitDir.y, v.unitDir.z)),
+            // the way the picture was painted (radians: yaw from local north toward east, pitch up), where the world says
+            yaw: Number.isFinite(v.yaw) ? v.yaw : null, pitch: Number.isFinite(v.pitch) ? v.pitch : null }));
       } catch { list = []; }
     }
     this._vistaList[bodyId] = list;
@@ -511,20 +591,110 @@ export class Sim {
 
   // Walking up to a vista finds it (within VISTA_RANGE metres of its spot, on foot).
   checkVistas() {
-    if (this.sm.state !== S.ON_FOOT) return;
+    if (this.sm.state !== S.ON_FOOT) { this.easelOffer = null; return; }
     const list = this.vistasOf(this.bodyId);
-    if (!list.length) return;
+    if (!list.length) { this.easelOffer = null; return; }
     const found = this.vistas[this.bodyId] || (this.vistas[this.bodyId] = {});
     const r = len(this.ex.p), up = scale(this.ex.p, 1 / r);
+    let offer = null;
     for (const v of list) {
-      if (found[v.id]) continue;
       const d = Math.acos(Math.min(1, dot(up, v.dir))) * r;
-      if (d < VISTA_RANGE) {
+      if (!found[v.id] && d < VISTA_RANGE) {
         found[v.id] = true;
         this.say('A view for the sketchbook: ' + v.name, 6);
         this.emit('vista');
         if (this.onVistaFound) this.onVistaFound(this.bodyId, v.id);
       }
+      // Found and not yet drawn: its easel is offered while it is within reach.
+      // (on the ground or afloat: not to a jetpack overhead)
+      if (!offer && found[v.id] && !this.easel && (this.ex.altitude < 2.5 || this.ex.swimming) && d < VISTA_RANGE + (this.easelOffer === v ? EASEL.reach : 0) && this.undrawn(this.bodyId, v)) offer = v;
+    }
+    this.easelOffer = offer;
+  }
+
+  // A view whose page has no picture yet: not stood at in this sitting, and no sketch kept.
+  undrawn(bodyId, v) {
+    if (this.stood[bodyId] && this.stood[bodyId][v.id]) return false;
+    return !(this.vistaDrawn && this.vistaDrawn(bodyId, v.id));
+  }
+
+  // The nearest view of this world not yet drawn, within VISTA_MARK metres, for the one quiet mark
+  // on foot: { id, name, distance, p (body-local, at eye height over its spot) } or null.
+  vistaMark() {
+    if (this.sm.state !== S.ON_FOOT || this.easel) return null;
+    const r = len(this.ex.p), up = scale(this.ex.p, 1 / r);
+    let best = null;
+    for (const v of this.vistasOf(this.bodyId)) {
+      const d = Math.acos(Math.min(1, dot(up, v.dir))) * r;
+      if (d > VISTA_MARK || (best && d >= best.distance) || !this.undrawn(this.bodyId, v)) continue;
+      best = { id: v.id, name: v.name, distance: d, dir: v.dir };
+    }
+    if (!best) return null;
+    const g = this.sampler(this.bodyId)(best.dir);
+    best.p = scale(best.dir, Math.max(g.radius, g.liquidRadius || 0) + 1.5);
+    return best;
+  }
+
+  // E at a found view: to its easel. The explorer walks to the spot the picture was painted
+  // from; the view turns to the picture's heading and pitch (a view the world gives no heading
+  // for keeps the way the player looks), third person, at the usual boom.
+  beginEasel(v) {
+    if (this.sm.state !== S.ON_FOOT || this.easel) return false;
+    const cam = this.footCam, g = this.sampler(this.bodyId)(v.dir);
+    const to = scale(v.dir, Math.max(g.radius, g.liquidRadius > g.radius ? g.liquidRadius - EXPLORER.swimDepth : 0));
+    let fwd = tangent(cam.viewFwd, v.dir, cam.viewFwd), pitch = cam.pitch;
+    if (v.yaw != null) {
+      const east = tangent(cross(Y, v.dir), v.dir, V(1, 0, 0)), north = cross(v.dir, east);
+      fwd = add(scale(north, Math.cos(v.yaw)), scale(east, Math.sin(v.yaw)));
+      pitch = clamp(v.pitch == null ? -0.12 : v.pitch, CAMERA.pitchMin, CAMERA.pitchMax);
+    }
+    const dist = len(sub(to, this.ex.p));
+    this.easel = {
+      id: v.id, name: v.name, phase: 'go', t: 0, dur: clamp(dist / EASEL.pace, EASEL.minSeconds, EASEL.maxSeconds), dist,
+      fromP: { ...this.ex.p }, toP: to, fromFwd: cam.viewFwd, toFwd: fwd, fromPitch: cam.pitch, toPitch: pitch, fromBoom: cam.boom,
+      firstPerson: cam.firstPerson,
+    };
+    cam.firstPerson = false;
+    this.ex.v = V();
+    this.easelOffer = null;
+    this.notice = null;
+    this.emit('easel');
+    return true;
+  }
+
+  stepEasel(h) {
+    const E = this.easel, cam = this.footCam;
+    E.t += h;
+    if (E.phase === 'go') {
+      const k = clamp01(E.t / E.dur), e = smoothstep(0, 1, k), ex = this.ex;
+      const q = lerp(E.fromP, E.toP, e), d = norm(q), g = this.sampler(this.bodyId)(d);
+      ex.p = scale(d, Math.max(g.radius, g.liquidRadius > g.radius ? g.liquidRadius - EXPLORER.swimDepth : 0));
+      const walking = E.dist > 0.6 && e > 0.03 && e < 0.97;
+      ex.mode = walking ? 'walk' : 'idle';
+      ex.speed = walking ? Math.min(EASEL.pace, 1.5 * E.dist / E.dur) : 0;
+      ex.v = V(); ex.grounded = true;
+      // The figure faces the way it walks, and at the easel the way the picture looks.
+      const way = E.dist > 0.6 ? tangent(sub(E.toP, E.fromP), d, E.toFwd) : tangent(E.toFwd, d, E.toFwd);
+      ex.fwd = tangent(lerp(way, tangent(E.toFwd, d, E.toFwd), smoothstep(0.7, 1, k)), d, way);
+      // The view comes round the short way to the picture's heading, its pitch and the usual boom.
+      const a0 = tangent(E.fromFwd, d, E.toFwd), a1 = tangent(E.toFwd, d, E.toFwd);
+      const ang = Math.atan2(dot(cross(a0, a1), d), dot(a0, a1));
+      cam.viewFwd = tangent(rotateAround(a0, d, ang * e), d, a1);
+      cam.pitch = mix(E.fromPitch, E.toPitch, e);
+      cam.boom = mix(E.fromBoom, CAMERA.boom, e);
+      if (k >= 1) {
+        // There: a fresh stance on the spot (as stepping out of the ship is), the picture held.
+        const fuel = ex.fuel;
+        this.ex = createExplorerState(E.toP, a1);
+        this.ex.fuel = fuel;
+        cam.viewFwd = a1; cam.pitch = E.toPitch; cam.boom = CAMERA.boom;
+        (this.stood[this.bodyId] || (this.stood[this.bodyId] = {}))[E.id] = true;
+        E.phase = 'hold'; E.t = 0;
+      }
+    } else if (E.t >= EASEL.hold && (E.t > 8 || !this.vistaDrawn || this.vistaDrawn(this.bodyId, E.id))) {
+      // (held until the presenter has the page: the world may still be laying the view)
+      if (E.firstPerson) cam.firstPerson = true;
+      this.easel = null;
     }
   }
 
@@ -591,7 +761,10 @@ export class Sim {
 
   beginBoarding() {
     if (!this.sm.dispatch(EV.board)) return;
-    this.transition = { t: 0, dur: FEEL.boardSeconds, dir: 'in', from: this.camPose, exFrom: { ...this.ex.p }, exTo: this.hatchPoint() };
+    const to = this.hatchPoint();
+    // (the walk to the hatch is 0.7 of the transition: stepBoarding)
+    const dur = clamp(len(sub(to, this.ex.p)) / FEEL.boardPace / 0.7, FEEL.boardSeconds, FEEL.boardSecondsMax);
+    this.transition = { t: 0, dur, dir: 'in', from: this.camPose, exFrom: { ...this.ex.p }, exTo: to };
     this.shipCam.q = null;
     this.shipCam.short = null;                        // the chase view starts clear of the crowns here
     this.ex.v = V();
@@ -635,6 +808,14 @@ export class Sim {
     const pose = this.camPose;
     if (this.sm.state !== S.ON_FOOT || !pose || !pose.look) return 0;
     return this.hullCover(pose.p, pose.look, pose.fov || CAMERA.fovFoot, mid);
+  }
+
+  // Is the ship the picture just now? On foot within EXIT.near metres of it (the first moments
+  // after stepping out, or standing beside it) with the hull over more than EXIT.inPicture of the
+  // middle of the frame. A page of the sketchbook is not drawn then: it waits for the land.
+  shipInPicture() {
+    if (this.sm.state !== S.ON_FOOT || len(sub(this.sh.p, this.ex.p)) > EXIT.near) return false;
+    return this.hullInView(EXIT.middle) > EXIT.inPicture;
   }
 
   // Where the explorer walks to from the ladder: a few steps straight out from the hull, clear of
@@ -1158,12 +1339,35 @@ export class Sim {
     // (PHYSICS P20) a swimmer rides the drawn sea (an sd of 0.29 m at 4 to 6 s in a gale on Earth):
     // the view follows the swell's mean and lets each slap go (0.45 s; a 5 s wave keeps 85 % of its height)
     let feet = this.ex.p;
+    // (M4) and the view rides a little higher over a swimmer, eased in and out (CAMERA.swimLift)
+    this._swimLift = (this._swimLift || 0) + ((this.ex.swimming ? CAMERA.swimLift : 0) - (this._swimLift || 0)) * (1 - Math.exp(-Math.max(0, dt) / CAMERA.swimEase));
     if (this.ex.swimming) {
       const r = len(feet);
       this._swimR = this._swimR == null ? r : this._swimR + (r - this._swimR) * (1 - Math.exp(-Math.max(0, dt) / 0.45));
-      feet = scale(norm(feet), this._swimR);
-    } else this._swimR = null;
-    return updateFootCamera(this.footCam, feet, dt, this.sampler(this.bodyId), undefined, this.cameraSolids(this.ex.p, this.nearObstacles));
+      feet = scale(norm(feet), this._swimR + this._swimLift);
+    } else {
+      this._swimR = null;
+      if (this._swimLift > 0.005) feet = addScaled(feet, norm(feet), this._swimLift);
+    }
+    return updateFootCamera(this.footCam, feet, dt, this.sampler(this.bodyId), undefined, this.cameraSolids(this.ex.p, this.nearObstacles), this.footCrowns());
+  }
+
+  // The trees round the explorer as crowns the foot camera keeps out of (camera.js
+  // footBoomAmongCrowns): from the obstacles already looked up round the explorer each frame,
+  // their feet put on the ground again whenever the explorer has moved 3 m. null when none.
+  footCrowns() {
+    const near = this.nearObstacles;
+    if (!near || !near.length) { this._footCrowns = null; return null; }
+    let c = this._footCrowns;
+    if (!c || c.body !== this.bodyId || c.n !== near.length || len(sub(c.at, this.ex.p)) > 3) {
+      const sample = this.sampler(this.bodyId), list = [];
+      for (const o of near) {
+        if (o.height < 4) continue;                   // boulders, shrubs, reeds: the trunk spheres have them
+        list.push({ base: scale(o.unitDir, sample(o.unitDir).radius), u: o.unitDir, h: o.height, r: o.radius });
+      }
+      c = this._footCrowns = { body: this.bodyId, at: { ...this.ex.p }, n: near.length, list };
+    }
+    return c.list.length ? c.list : null;
   }
 
   shipPose(dt) {
@@ -1211,6 +1415,18 @@ export class Sim {
       const k = smoothstep(0, 1, T.t / T.dur);
       const target = T.dir === 'in' ? this.shipPose(dt) : this.footPose(dt);
       pose = T.from ? blendPose(T.from, target, k) : target;
+      // The explorer stays in the picture on the way round (PAINTER's critique 8: boarding was a
+      // whip pan with the explorer out of the frame in 0.2 s, stepping out a cut to an empty
+      // field): through the middle of the move the view is turned onto them, the walk to the
+      // hatch and the steps away from the ladder are seen; at its ends it is the old and the new view.
+      if (T.from) {
+        const kl = T.t / T.dur;
+        const w = T.dir === 'in' ? smoothstep(0.04, 0.3, kl) * (1 - smoothstep(0.5, 0.74, kl)) : smoothstep(0.1, 0.42, kl) * (1 - smoothstep(0.7, 1, kl));
+        if (w > 0) {
+          const up = norm(this.ex.p), aim = addScaled(this.ex.p, up, 1.3), d = sub(aim, pose.p);
+          if (len(d) > 0.5) pose = { p: pose.p, q: qSlerp(pose.q, qLook(norm(d), norm(pose.p)), w), fov: pose.fov };
+        }
+      }
       view = T.dir === 'in' ? (k > 0.5 ? 'chase' : 'foot') : (k > 0.5 ? 'foot' : 'chase');
       if (view === 'chase' && this.shipCam.cockpit) view = 'cockpit';
     } else {
@@ -1239,6 +1455,7 @@ export class Sim {
     const offerLanding = this._offClear || this._offT > 8;
     const q = {
       canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable() && offerLanding, liftingOff: !!this.sh.liftoff,
+      canEasel: st === S.ON_FOOT && !!this.easelOffer && !this.easel,
       slowingToLand: st === S.ATMOSPHERE && !!this._landWish,
       target: ti ? ti.name : null,
     };
@@ -1331,6 +1548,8 @@ export class Sim {
     out.notice = this.notice ? this.notice.text : null;
     out.visited = Object.fromEntries(Object.entries(this.visited).map(([k, v]) => [k, Object.keys(v.biomes)]));
     out.vistas = Object.fromEntries(Object.entries(this.vistas).map(([k, v]) => [k, Object.keys(v)]));
+    out.easel = this.easel ? { id: this.easel.id, phase: this.easel.phase } : null;
+    out.easelOffer = this.easelOffer ? this.easelOffer.id : null;
     out.physics = this.physics ? { ms: this.physicsMs, worstMs: this.physicsWorstMs } : null;
     const env = this.flightEnv();
     const f = qRotate(sh.q, V(0, 0, -1));

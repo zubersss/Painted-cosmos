@@ -33,7 +33,10 @@ export const EXPLORER = Object.freeze({
   jetFuelSeconds: 4.2,       // seconds of continuous burn on a full tank
   rechargeGroundSeconds: 2.2,  // seconds to refill standing on the ground
   rechargeAirDelay: 0.9,     // seconds after burning before it starts refilling in the air
-  rechargeAirSeconds: 10,    // seconds to refill while falling (slow: you cannot hover forever)
+  rechargeAirSeconds: 10,    // seconds to refill while falling (slow: you cannot hover forever), on Earth; on a lighter
+                             // world as much longer as its gravity is less (airRecharge): hovering there takes so little
+                             // burning that at Earth's rate the tank refilled faster than it emptied (PHYSICS: on Mars it
+                             // was full again four seconds after the top of an arc; the Moon and Pluto, the same)
   jetStartDelay: 0.16,       // hold Space this long after a jump before the jetpack lights
   terminalFall: 24,          // m/s: falls stay gentle, there is no fall damage
   softFallHeight: 3,         // metres above ground where a fast fall is cushioned
@@ -47,7 +50,11 @@ export const EXPLORER = Object.freeze({
   swimDepth: 1.25,           // deeper than this the explorer floats (feet this far under)
   swimSpeed: 2.6,
   turnRate: 11,              // 1/s: how fast the body turns to face where it walks
+  swimTurnRate: 3.2,         // 1/s: ...and where it swims: a body laid along the water comes round, it does not spin
 });
+
+// Seconds a tank takes to refill in the air under gravity g (m/s^2).
+export const airRecharge = (g, T = EXPLORER) => T.rechargeAirSeconds * Math.max(1, 9 / Math.max(0.5, g || 9));
 
 const _airCmd = {};          // scratch for the air at the walker (the command to PHYSICS' body)
 // What feels that air (PHYSICS P18, physics.md "For PILOT"): the body itself, half a metre across, at
@@ -148,7 +155,9 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
 
   // ---- vertical: jump, jetpack, gravity ------------------------------------------------
   let grounded = wasGrounded;
-  if (input.jump && (wasGrounded || swimming)) {
+  // (afloat there is nothing to push off from: Space does not hop a swimmer; held, it lights the
+  // jetpack, which lifts them out)
+  if (input.jump && wasGrounded && !swimming) {
     vv = T.jumpSpeed;
     grounded = false;
     st.jumpHeld = 0;
@@ -224,15 +233,15 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
   // ---- fuel ------------------------------------------------------------------------------
   if (!jetting) {
     if (grounded || st.swimming) st.fuel = Math.min(1, st.fuel + dt / T.rechargeGroundSeconds);
-    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / T.rechargeAirSeconds);
+    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / airRecharge(env.gravity, T));
   }
 
   // ---- facing ----------------------------------------------------------------------------
   let fwd = tangent(st.fwd, up2, f);
   if (input.faceView) fwd = tangent(f, up2, fwd);
   else if (len(wish) > 0.1) {
-    const want = tangent(wish, up2, fwd);
-    fwd = tangent(add(scale(fwd, 1 - damp(T.turnRate, dt)), scale(want, damp(T.turnRate, dt))), up2, want);
+    const want = tangent(wish, up2, fwd), k = damp(st.swimming ? T.swimTurnRate : T.turnRate, dt);
+    fwd = tangent(add(scale(fwd, 1 - k), scale(want, k)), up2, want);
   }
   st.fwd = fwd;
 
@@ -263,8 +272,10 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const wish = clampLen(add(scale(f, input.moveZ || 0), scale(right, input.moveX || 0)), 1);
   const maxSpeed = input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
 
+  // (afloat there is nothing to push off from: a swimmer does not hop, PHYSICS saw one rise at 2 m/s
+  // from open water; held, Space lights the jetpack, which lifts them out)
   let jump = false;
-  if (input.jump && (wasGrounded || floating)) { jump = true; st.jumpHeld = 0; }
+  if (input.jump && wasGrounded && !floating) { jump = true; st.jumpHeld = 0; }
   if (input.jet) st.jumpHeld += dt; else st.jumpHeld = 0;
   const jetOn = !!input.jet && (!wasGrounded || jump) && st.jumpHeld >= T.jetStartDelay && st.fuel > 0;
 
@@ -327,14 +338,14 @@ function stepExplorerBodied(st, input, dt, env, T) {
   if (B.impact > 0.5 && st.grounded && !wasGrounded) st.landedHard = B.impact;
   if (!st.jetting) {
     if (st.grounded || st.swimming) st.fuel = Math.min(1, st.fuel + dt / T.rechargeGroundSeconds);
-    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / T.rechargeAirSeconds);
+    else if (st.sinceJet > T.rechargeAirDelay) st.fuel = Math.min(1, st.fuel + dt / airRecharge(env.gravity, T));
   }
 
   let fwd = tangent(st.fwd, up2, f);
   if (input.faceView) fwd = tangent(f, up2, fwd);
   else if (len(wish) > 0.1) {
-    const want = tangent(wish, up2, fwd);
-    fwd = tangent(add(scale(fwd, 1 - damp(T.turnRate, dt)), scale(want, damp(T.turnRate, dt))), up2, want);
+    const want = tangent(wish, up2, fwd), k = damp(st.swimming ? T.swimTurnRate : T.turnRate, dt);
+    fwd = tangent(add(scale(fwd, 1 - k), scale(want, k)), up2, want);
   }
   st.fwd = fwd;
 

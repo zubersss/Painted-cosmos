@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../src/player/explorer.js';
+import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample, airRecharge } from '../src/player/explorer.js';
 import { createFootCamera, lookFootCamera, updateFootCamera, CAMERA } from '../src/player/camera.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { makeWorld, arc, V, norm, dot, sub, scale, len } from './helpers.mjs';
@@ -421,4 +421,63 @@ test('a rise at the explorer\'s back lifts the third-person camera, and the expl
     if (!hill) assert.ok(k > 0.6, 'level ground: the explorer in the lower third as before');
     assert.ok(len(sub(pose.p, feet)) > 2, 'the camera is not in the explorer');
   }
+});
+
+// ---- M4: a swimmer (PHYSICS' critique of PILOT, item 5: "make sure the controls suit a swimmer") ----
+test('M4 afloat: Space does not hop a swimmer; held, the jetpack lifts them out; a swimmer comes round, it does not spin', () => {
+  const world = makeWorld({ R: R - 6, sea: R });
+  const env = { sample: world, gravity: 9 };
+  const st = createExplorerState(scale(start, R - EXPLORER.swimDepth), fwd0);
+  st.grounded = false;
+  run(st, env, 1, { viewFwd: fwd0 });
+  assert.ok(st.swimming);
+  // a tap of Space: no hop (it was a 4.8 m/s jump off the water)
+  let top = -Infinity;
+  stepExplorer(st, { jump: true, jet: true, viewFwd: fwd0 }, DT, env);
+  for (let i = 0; i < 0.1 / DT; i++) { stepExplorer(st, { viewFwd: fwd0 }, DT, env); top = Math.max(top, dot(st.v, norm(st.p))); }
+  assert.ok(top < 0.6, 'no hop: rising at ' + top.toFixed(2) + ' m/s at most');
+  assert.ok(st.swimming, 'still afloat');
+  // held: the jetpack lights after its short delay and lifts the swimmer out
+  run(st, env, 1.6, { jet: true, viewFwd: fwd0 });
+  assert.ok(len(st.p) > R + 3, 'the jetpack lifted them out: ' + (len(st.p) - R).toFixed(1) + ' m');
+  // turning: asked to swim the other way, the body comes round in about a second, not in a tenth
+  const sw = createExplorerState(scale(start, R - EXPLORER.swimDepth), fwd0);
+  sw.grounded = false;
+  run(sw, env, 1, { viewFwd: fwd0, moveZ: 1 });
+  const turnTime = (s, e, inp) => { let t = 0; const f0 = { ...s.fwd }; while (t < 5 && dot(s.fwd, f0) > -0.7) { stepExplorer(s, inp, DT, e); t += DT; } return t; };
+  const side = rotateAround(fwd0, start, 0.2);
+  const tSwim = turnTime(sw, env, { viewFwd: side, moveZ: -1 });
+  const walker = createExplorerState(scale(start, R), fwd0), land = { sample: makeWorld({ R }), gravity: 9 };
+  run(walker, land, 1, { viewFwd: fwd0, moveZ: 1 });
+  const tWalk = turnTime(walker, land, { viewFwd: side, moveZ: -1 });
+  assert.ok(tSwim > 0.5 && tSwim < 2, `a swimmer comes about in ${tSwim.toFixed(2)} s`);
+  assert.ok(tSwim > 2.5 * tWalk, `a walker in ${tWalk.toFixed(2)} s`);
+});
+
+// ---- M4: the jetpack on a light world (PHYSICS' critique of PILOT, item 8) -----------------------
+test('M4 burn and coast: the tank does not refill in the air faster than hovering empties it, on any world', () => {
+  // A player who wants to stay up: burns the tank to climb, coasts over the top and down while it
+  // refills, and burns again when the ground is near.
+  const aloft = (gravity, seconds = 400) => {
+    const env = { sample: makeWorld({ R }), gravity };
+    const st = createExplorerState(scale(start, R), fwd0);
+    stepExplorer(st, { jump: true, jet: true, viewFwd: fwd0 }, DT, env);
+    let t = 0, landed = null, low = 1, burn = true;
+    for (; t < seconds; t += DT) {
+      if (burn && st.fuel < 0.03) burn = false;
+      else if (!burn && dot(st.v, norm(st.p)) < 0 && st.altitude < 14) burn = true;
+      stepExplorer(st, { jet: burn, viewFwd: fwd0 }, DT, env);
+      low = Math.min(low, st.fuel);
+      if (t > 3 && st.grounded) { landed = t; break; }
+    }
+    return { landed, low };
+  };
+  for (const [name, g] of [['Earth', 9], ['Mars', 4.6], ['the Moon', 2.2], ['Pluto', 1.4]]) {
+    const r = aloft(g);
+    assert.ok(r.landed != null, `${name}: the tank runs out and the explorer comes down (after ${r.landed == null ? 'never' : r.landed.toFixed(0) + ' s'}; lowest tank ${r.low.toFixed(2)})`);
+    assert.ok(r.landed > 6, `${name}: a good flight all the same: ${r.landed.toFixed(0)} s`);
+  }
+  // and on Earth nothing changed: a tank is 10 s in the air
+  assert.equal(airRecharge(9), EXPLORER.rechargeAirSeconds);
+  assert.ok(airRecharge(11.5) === EXPLORER.rechargeAirSeconds && airRecharge(2.2) > 4 * EXPLORER.rechargeAirSeconds);
 });

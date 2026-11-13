@@ -58,7 +58,7 @@ const SHOTS = [
 ];
 const WANT = SHOTS.filter((s) => !opt.only || String(opt.only).split(',').includes(s.id));
 
-const query = `dynres=0&pointerlock=0&card=0&fresh=1&save=0&audio=0&stats=1&quality=${opt.quality}`;
+const query = `dynres=0&pointerlock=0&card=0&fresh=1&save=0&audio=0&stats=1&clock=even&quality=${opt.quality}`;       // (clock=even: a held hour stays held)
 const { page, browser, problems, close } = await openPage({ pagePath: '/index.html?' + query, w: W, h: H, root: opt.root });
 // With --only, the frames not shot again are kept from the last run (their numbers and files).
 let rows = [];

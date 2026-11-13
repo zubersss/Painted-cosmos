@@ -56,7 +56,7 @@ try {
     for (let k = 0; k < d.length; k += 4) { const l = (d[k] + d[k + 1] + d[k + 2]) / 3; if (l < lo) lo = l; if (l > hi) hi = l; }
     return { w: img.width, h: img.height, lo: Math.round(lo), hi: Math.round(hi), chars: url.length };
   });
-  check(px.w === 192 && px.h === 108 && px.hi - px.lo > 25 && px.chars < 16000, `the sketch is a real picture of the frame: ${px.w}x${px.h}, luminance ${px.lo} to ${px.hi}, ${px.chars} characters`);
+  check(px.w === 256 && px.h === 144 && px.hi - px.lo > 25 && px.chars < 16000, `the sketch is a real picture of the frame: ${px.w}x${px.h}, luminance ${px.lo} to ${px.hi}, ${px.chars} characters`);
   // Walk: wind bed and footsteps are mixed from the world; values are finite and in range.
   await page.keyboard.down('KeyW');
   await gameWait(2.5);
@@ -70,13 +70,13 @@ try {
   i = await info();
   check(i.bookOpen, 'B opens the sketchbook');
   let text = await page.evaluate(() => document.querySelector('.pc-book').textContent);
-  check(/Earth/.test(text) && /Neptune/.test(text) && /landscape/.test(text) && /views/.test(text) && /pages drawn/.test(text), 'it has a page per world, with its landscapes and views');
-  const pics = await page.evaluate(() => ({ imgs: document.querySelectorAll('.pc-book img').length, empty: document.querySelectorAll('.pc-book .pc-sketch:not(.pc-on)').length, page: window.__pc.book.page }));
-  check(pics.page === 'earth' && pics.imgs === 1 && pics.empty >= 1, `it opens at the world you are on, with the sketch on its page and empty frames for what is left: ${pics.imgs} sketch, ${pics.empty} empty`);
+  check(/Earth/.test(text) && /Neptune/.test(text) && /more (landscape|view)/.test(text) && /pages drawn/.test(text), 'it has a page per world, with what is drawn and a line for what is left');
+  const pics = await page.evaluate(() => ({ imgs: document.querySelectorAll('.pc-book img').length, tiles: document.querySelectorAll('.pc-book .pc-sketch').length, left: document.querySelector('.pc-book-left').textContent, page: window.__pc.book.page }));
+  check(pics.page === 'earth' && pics.imgs === 1 && pics.tiles === 1 && /more (landscape|view)/.test(pics.left), `it opens at the world you are on, with the sketch on its page, no empty frames, and one line for what is left: ${pics.imgs} sketch, ${pics.tiles} tile, "${pics.left}"`);
   await shot('m3-sketchbook', 'm3-sketchbook');
   await page.keyboard.press('ArrowRight');
   await gameWait(0.3);
-  text = await page.evaluate(() => window.__pc.book.page + ': ' + document.querySelector('.pc-book-sub').textContent);
+  text = await page.evaluate(() => window.__pc.book.page + ': ' + document.querySelector('.pc-book-left').textContent);
   check(/^moon: not yet visited/.test(text), 'the arrow keys turn the page: ' + text);
   await page.keyboard.press('KeyB');
   await gameWait(0.2);
@@ -130,9 +130,15 @@ try {
     await gameWait(1.5);
     const saved = await page.evaluate(() => { try { return JSON.parse(window.__pc.storage.getItem('painted-cosmos.save')); } catch { return null; } });
     check(saved && saved.vistas && (saved.vistas.earth || []).length === 1, 'the found view is in the save');
-    // The view gets its sketch too, and both pictures are kept beside the save.
-    i = await until((x) => x.sketches && x.sketches.keys.some((k) => k.startsWith('v:earth:')), 15);
-    check(i.sketches.keys.some((k) => k.startsWith('v:earth:')), 'the view found is sketched: ' + JSON.stringify(i.sketches.keys));
+    // The view is offered: E takes the explorer to its easel and the view to the picture's heading;
+    // there its page is drawn, and both pictures are kept beside the save.
+    i = await info();
+    check(i.prompt === 'Stand at the easel' && i.easelOffer, 'the found view is offered: "' + i.prompt + '"');
+    await page.keyboard.press('KeyE');
+    i = await until((x) => x.sketches && x.sketches.keys.some((k) => k.startsWith('v:earth:')), 25);
+    check(i.sketches.keys.some((k) => k.startsWith('v:earth:')), 'the view is drawn from its easel: ' + JSON.stringify(i.sketches.keys));
+    i = await until((x) => !x.easel, 12);
+    check(!i.easel && i.state === 'ON_FOOT', 'and the controls are given back');
     await shot('m3-vista-sketch');
     const kept = await page.evaluate(() => { try { return Object.keys(JSON.parse(window.__pc.storage.getItem('painted-cosmos.sketches')).items); } catch { return []; } });
     check(kept.length === i.sketches.count && i.sketches.saved, `the sketches are stored beside the save: ${kept.length} pictures, ${i.sketches.chars} characters`);

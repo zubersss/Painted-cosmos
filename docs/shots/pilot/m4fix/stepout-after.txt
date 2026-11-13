@@ -1,0 +1,2 @@
+venus    acid_terraces          hull  17 % of the frame (lower half 27 %; at the first frame on foot 17 %)  boom 5.2 m, 3.9 m from the ship, slope 2 deg, mode idle
+52 landings: hull over a sixth of the frame at 1, between lens and figure at 0, boom under 4 m at 0; mean cover 3.9 %, worst 17 %

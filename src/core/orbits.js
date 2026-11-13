@@ -19,6 +19,21 @@ export class Ephemeris {
     for (const id of this.ids) this.orbitShift[id] = 0;
     this._tilt = {};
     for (const id of this.ids) this._tilt[id] = qFromAxisAngle(V(1, 0, 0), bodies[id].axialTilt || 0);
+    // How fast each body turns just now against its own day (1 unless the game slows a dusk or
+    // hurries a night where the player stands: turnBy, Sim.stepClock).
+    this.spinRate = {};
+  }
+
+  // Turn body `id` for `dt` seconds at `rate` times its own spin (the part beyond its own turning
+  // goes into spinPhase, so spinAngle(id, t) stays the truth at every t). A tidally locked body's
+  // orbit turns with it, as in setSunHour. rate 1 changes nothing.
+  turnBy(id, dt, rate) {
+    const b = this.body(id);
+    this.spinRate[id] = rate;
+    if (rate === 1 || !(dt > 0)) return;
+    const d = ((rate - 1) * TAU * dt) / b.dayLength;
+    this.spinPhase[id] = wrapAngle(this.spinPhase[id] + d);
+    if (b.parent && Math.abs(b.orbitPeriod - b.dayLength) < 1e-6) this.orbitShift[id] = wrapAngle((this.orbitShift[id] || 0) + d);
   }
 
   body(id) {
@@ -57,7 +72,7 @@ export class Ephemeris {
   // Angular velocity vector of the body in the universe frame (rad/s).
   angularVelocity(id) {
     const b = this.body(id);
-    return scale(qRotate(this._tilt[id], V(0, 1, 0)), TAU / b.dayLength);
+    return scale(qRotate(this._tilt[id], V(0, 1, 0)), (TAU / b.dayLength) * (this.spinRate[id] || 1));
   }
 
   // Unit direction from the body centre to the sun, in body-local coordinates.

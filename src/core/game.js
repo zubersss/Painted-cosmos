@@ -11,10 +11,16 @@ import { S, isInShip } from './state.js';
 import { cameraPlanes, farthestExtent } from './depth.js';
 import { V, len, scale } from './vec.js';
 import { pulseEta, arrivalRadius } from '../ship/pulse.js';
-import { SKETCH, SKETCH_SLIP, biomeKey, vistaKey } from './sketches.js';
+import { SKETCH, SKETCH_SLIP, biomeKey, vistaKey, sketchHand } from './sketches.js';
 import { figureArgs, hullTrim, hasFootfalls, footLoudness } from '../player/figure.js';
 
 const NO_KEYS = { down: () => false, axis: () => 0 };
+// The ship as the chase view sees it, in metres round its middle: half its span, and how far it
+// stands over and under its origin (the fin, the gear).
+const SHIP_BOX = Object.freeze({ half: 4.6, over: 3.4, under: 1.2 });
+// An arrow at the picture's edge rides an ellipse round the middle; its lower half is flatter, so
+// that the arrow and its label stay over the band where the notice, the prompt and the gauges lie.
+const edgeY = (a) => (Math.sin(a) > 0 ? 0.19 : 0.36);
 const NO_EVENTS = { edges: new Set(), dx: 0, dy: 0, wheel: 0 };
 
 export class Game {
@@ -54,6 +60,7 @@ export class Game {
       body: q.get('body'), hour: q.has('time') ? Number(q.get('time')) : null,
     });
     this.sim.onVistaFound = (bodyId, id) => { if (world.setVistaFound) world.setVistaFound(bodyId, id, true); };
+    this.sim.vistaDrawn = (bodyId, id) => !!(this.sketches && this.sketches.has(vistaKey(bodyId, id)));
     this._planes = { near: 0, far: 0, fov: 0, aspect: 0 };
     this._figure = {}; this._hullTrim = { pitch: 0, roll: 0, yaw: 0 };   // reused each frame
     this.frameCount = 0;
@@ -266,7 +273,10 @@ export class Game {
   // How many pages the book has, and how many are filled (a landscape walked, a view found).
   bookProgress() {
     let done = 0, total = 0;
-    for (const p of this.bookPages()) for (const x of p.biomes.concat(p.vistas)) { total++; if (x.done) done++; }
+    for (const p of this.bookPages()) {
+      for (const x of p.biomes) { total++; if (x.done) done++; }
+      for (const x of p.vistas) { total++; if (x.done && x.sketch) done++; }      // a view is a page once it is drawn from its easel
+    }
     return { done, total };
   }
 
@@ -302,17 +312,14 @@ export class Game {
         // A little way in, so the picture is of the place and not of its border.
         if (!sk.has(k) && !want[k]) want[k] = { due: t + 2.5, kind: 'biome', bodyId: body, id: biome };
       }
-      const found = sim.vistas[body];
-      if (found) {
-        const r = Math.hypot(sim.ex.p.x, sim.ex.p.y, sim.ex.p.z);
-        for (const v of sim.vistasOf(body)) {
-          if (!found[v.id]) continue;
-          const k = vistaKey(body, v.id);
-          if (sk.has(k) || want[k]) continue;
-          const d = Math.acos(Math.min(1, (sim.ex.p.x * v.dir.x + sim.ex.p.y * v.dir.y + sim.ex.p.z * v.dir.z) / r)) * r;
-          if (d < 25) want[k] = { due: t + 0.5, kind: 'vista', bodyId: body, id: v.id, name: v.name };
-        }
-      }
+    }
+    // A view is drawn from its easel (PAINTER's critique 4: the page of a view was whatever the
+    // camera happened to hold as the explorer walked into its 14 m): the page is wanted while the
+    // explorer is held there, the view turned the way the picture was painted (sim.easel).
+    const E = sim.easel;
+    if (E && E.phase === 'hold') {
+      const k = vistaKey(body, E.id);
+      if (!sk.has(k) && !want[k]) want[k] = { due: t + 0.3, kind: 'vista', bodyId: body, id: E.id, name: E.name };
     }
     const panel = (this.map && this.map.open) || (this.book && this.book.open) || (this.hud && this.hud.startShown);
     for (const k in want) {
@@ -322,8 +329,11 @@ export class Game {
       // Wait for the world to finish what it is building here (a few seconds at most).
       const busy = typeof this.world.busy === 'number' && this.world.busy > 0;
       if (busy && t < w.due + 8) continue;
+      // The ship is not the place: just stepped out, or standing by it with the hull in the middle
+      // of the frame, the page waits until the view is of the land (half a minute at most).
+      if (t < w.due + SKETCH_SLIP.shipWait && sim.shipInPicture && sim.shipInPicture()) continue;
       delete want[k];
-      const url = this.captureSketch();
+      const url = this.captureSketch(k);
       if (url && sk.put(k, url)) {
         const names = this.biomesOf(body);
         const hit = w.kind === 'biome' && names ? names.find((b) => b.id === w.id) : null;
@@ -331,7 +341,7 @@ export class Game {
         const pr = this.bookProgress();
         this.lastSketch = { key: k, title, t };
         const sub = `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}\nB opens the sketchbook`;
-        if (!ff.off) this._slipHeld = { body, url, title, sub };          // shown once they set off
+        if (!ff.off && w.kind !== 'vista') this._slipHeld = { body, url, title, sub };          // shown once they set off
         else this.showSketchSlip(url, title, sub);
       }
       break;                                // one picture a frame is plenty
@@ -341,23 +351,39 @@ export class Game {
   // A thumbnail of the frame that has just been painted (a data URL), or null. The frame is
   // read straight after painter.render, while it is still in the canvas; nothing here can
   // throw into the frame loop.
-  captureSketch() {
+  // The page is of the place, not of the explorer's back: for the frame that is kept the figure
+  // steps out of the picture (the frame is painted once more without them, kept, and painted
+  // again as it was, all before the screen is shown: the player sees no gap). The kept frame is
+  // then drawn over by the sketch's hand (sketches.js sketchHand): washes, pencil, a ragged edge.
+  captureSketch(key) {
+    const fig = this.explorerModel ? this.explorerModel.object3D : null;
+    const hide = !!(fig && fig.visible && this.painter && this.scene && this.camera);
     try {
       const src = this.renderer ? this.renderer.domElement : null;
       if (!src || !src.width || !src.height || typeof document === 'undefined') return null;
+      if (hide) { fig.visible = false; this.painter.render(this.scene, this.camera, 0); }
       const c = this._sketchCanvas || (this._sketchCanvas = document.createElement('canvas'));
       c.width = SKETCH.width; c.height = SKETCH.height;
-      const g = c.getContext('2d');
+      const g = c.getContext('2d', { willReadFrequently: true });
       // Crop the frame to the sketch's proportions (centre), then scale it down.
       const ar = SKETCH.width / SKETCH.height;
       let sw = src.width, sh = src.height;
       if (sw / sh > ar) sw = sh * ar; else sh = sw / ar;
       g.imageSmoothingQuality = 'high';
       g.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, c.width, c.height);
+      try {
+        const img = g.getImageData(0, 0, c.width, c.height);
+        let seed = 7;
+        for (const ch of String(key || '')) seed = (Math.imul(seed, 31) + ch.charCodeAt(0)) | 0;
+        sketchHand(img.data, c.width, c.height, seed);
+        g.putImageData(img, 0, 0);
+      } catch { /* a canvas that cannot be read keeps the plain frame */ }
       let url = c.toDataURL('image/jpeg', SKETCH.quality);
       if (url.length > SKETCH.maxEach) url = c.toDataURL('image/jpeg', SKETCH.qualityLow);
       return url.length > SKETCH.maxEach ? null : url;
-    } catch { return null; }
+    } catch { return null; } finally {
+      if (hide) { fig.visible = true; try { this.painter.render(this.scene, this.camera, 0); } catch { /* the next frame repaints */ } }
+    }
   }
 
   // The footfall to sound this frame, if PHYSICS counted a new one: { foot, loud }, or null.
@@ -426,11 +452,13 @@ export class Game {
     list.length = 0;
     const st = sim.sm.state;
     const flying = st === S.ATMOSPHERE || st === S.SPACE || st === S.PULSE || st === S.LANDING;
+    const cam = this.camera, p = this._p;
+    const el = this.renderer ? this.renderer.domElement : null;
+    const w = el ? el.clientWidth : 1280, h = el ? el.clientHeight : 720;
+    const tanHalf = Math.tan((cam.fov * Math.PI) / 360);
+    const view = this._markView || (this._markView = { w: 0, h: 0, keep: [] });
+    view.w = w; view.h = h; view.keep.length = 0;
     if (flying && !(this.map && this.map.open)) {
-      const cam = this.camera, p = this._p;
-      const el = this.renderer ? this.renderer.domElement : null;
-      const w = el ? el.clientWidth : 1280, h = el ? el.clientHeight : 720;
-      const tanHalf = Math.tan((cam.fov * Math.PI) / 360);
       const here = v.active ? v.active.id : null;
       for (const [id, root] of this.world.bodies) {
         const body = BODIES[id];
@@ -454,7 +482,7 @@ export class Game {
         } else if (isTarget) {
           // Off screen: a small arrow at the edge of the picture, pointing the way to turn.
           const a = Math.atan2(-p.y, p.x);
-          list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * 0.36, r: 0, angle: a, label: body.name, sub: fmt(dist) });
+          list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: body.name, sub: fmt(dist) });
         }
       }
       // The world's own landing place (where its first view was painted from), until the player
@@ -475,15 +503,51 @@ export class Game {
           const nx = p.z < 0 ? p.x / -p.z / (tanHalf * cam.aspect) : 9;
           const ny = p.z < 0 ? p.y / -p.z / tanHalf : 9;
           if (over > 2 && Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) {
-            list.push({ kind: 'body', x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a place to land', sub: fmt(dist) });
+            list.push({ kind: 'body', keep: true, x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a place to land', sub: fmt(dist) });
           } else {
             const a = Math.atan2(-p.y, p.x);
-            list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * 0.36, r: 0, angle: a, label: 'a place to land', sub: fmt(dist) });
+            list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: 'a place to land', sub: fmt(dist) });
+          }
+        }
+      }
+      // (the ship's keep-out follows)
+    }
+    // On foot: one quiet mark for the nearest view not yet drawn within VISTA_MARK metres (a small
+    // ring where its easel is, or an arrow at the picture's edge), as "a place to land" is in flight.
+    if (st === S.ON_FOOT && !(this.map && this.map.open) && !(this.book && this.book.open) && this.started) {
+      const vm = sim.vistaMark();
+      const root = vm && vm.distance > 5 ? this.world.bodies.get(sim.bodyId) : null;
+      if (root) {
+        p.set(vm.p.x, vm.p.y, vm.p.z).applyQuaternion(root.quaternion).add(root.position).applyMatrix4(cam.matrixWorldInverse);
+        const nx = p.z < 0 ? p.x / -p.z / (tanHalf * cam.aspect) : 9;
+        const ny = p.z < 0 ? p.y / -p.z / tanHalf : 9;
+        if (Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) list.push({ kind: 'body', keep: true, x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a view', sub: fmt(vm.distance) });
+        else {
+          const a = Math.atan2(-p.y, p.x);
+          list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: 'a view', sub: fmt(vm.distance) });
+        }
+        // the figure is the subject on foot: the label keeps off it
+        if (!sim.footCam.firstPerson) {
+          p.copy(this.explorerModel.object3D.position).applyMatrix4(cam.matrixWorldInverse);
+          if (p.z < -0.5) {
+            const k = (h / 2) / (-p.z * tanHalf), sx = w / 2 + p.x * k, sy = h / 2 - p.y * k;
+            view.keep.push({ x0: sx - 0.8 * k, x1: sx + 0.8 * k, y0: sy - 2.2 * k, y1: sy + 0.1 * k });
           }
         }
       }
     }
-    hud.setMarks(list);
+    if (flying && !(this.map && this.map.open)) {
+      // The ship is the subject of the chase view: its place in the picture is kept clear of the
+      // labels (aimed at a world, the world's name lay on the ship for the whole pulse drive).
+      if (list.length && v.view === 'chase') {
+        p.copy(this.shipModel.object3D.position).applyMatrix4(cam.matrixWorldInverse);
+        if (p.z < -1) {
+          const k = (h / 2) / (-p.z * tanHalf), sx = w / 2 + p.x * k, sy = h / 2 - p.y * k;
+          view.keep.push({ x0: sx - SHIP_BOX.half * k, x1: sx + SHIP_BOX.half * k, y0: sy - SHIP_BOX.over * k, y1: sy + SHIP_BOX.under * k });
+        }
+      }
+    }
+    hud.setMarks(list, view);
   }
 
   // Where the world itself would set a newcomer down (world.getSpawn), as a point in the body's
@@ -531,12 +595,26 @@ export class Game {
     hud.setFuel(sim.ex.fuel, st === S.ON_FOOT && sim.ex.fuel < 0.995);
     hud.setThrottle(sim.sh.throttle, st === S.ATMOSPHERE || st === S.SPACE);
     hud.setReticle(st === S.ATMOSPHERE || st === S.SPACE || st === S.PULSE || (st === S.ON_FOOT && sim.footCam.firstPerson));
+    if (this.frameCount % 6 === 0 && hud.root) {
+      // The slips' paper takes the sheet's key: white by day, toward a moonlit blue-grey as the
+      // night comes on (the world's hour: 18 the sun on the horizon) and out in space.
+      const h = sim.mood.timeOfDay == null || !sim.mood.bodyId ? 12 : sim.mood.timeOfDay;
+      const ramp = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      const night = h >= 12 ? ramp(17.7, 18.9, h) : 1 - ramp(5.1, 6.3, h);
+      const q = Math.round(Math.max(night, 0.85 * (sim.mood.inSpace01 || 0)) * 16) / 16;
+      if (q !== this._slipKey) { this._slipKey = q; hud.root.style.setProperty('--pc-key', `rgb(${Math.round(255 - 97 * q)}, ${Math.round(255 - 82 * q)}, ${Math.round(255 - 36 * q)})`); }
+    }
     if (this.frameCount % 6 === 0) {
       // On foot the screen is the painting and nothing else: the place name shows for a few
       // seconds on arrival, then fades. In flight the read-out stays.
       const name = sim.mood.bodyId ? BODIES[sim.mood.bodyId].name : 'deep space';
-      const key = name + (isInShip(st) ? '' : ':foot');
-      if (key !== this._placeKey) { this._placeKey = key; this._placeAt = sim.t; }
+      // The place is named when it is come to: a new world, the first frame of the game, stepping
+      // out of the ship. (It used to be named again on sitting down in the ship, and at the start
+      // of a new game its six seconds ran out behind the title card: PAINTER's critique 15.)
+      const afoot = st === S.ON_FOOT;
+      const key = name + (this.started ? '' : ':card');
+      if (key !== this._placeKey || (afoot && this._placeFoot === false)) { this._placeKey = key; this._placeAt = sim.t; }
+      if (st !== S.BOARDING) this._placeFoot = afoot;
       if (isInShip(st) && st !== S.LANDED) {
         const env = sim.flightEnv();
         // Height over the ground or the water (not over the tree tops, which the ship's own floor

@@ -41,7 +41,7 @@ if (!label) {
 // from review to review, and a storm that happens to cross a stand would make that impossible.
 // The weather itself is judged on its own sheet: node tests/weather.mjs.
 const fair = String(opt.weather || '0') === '0' ? '&weather=fair&kits=0' : '';
-const query = `dynres=0&pointerlock=0&card=0&fresh=1&save=0&audio=0&quality=${opt.quality}${fair}` + (opt.query ? '&' + opt.query : '');
+const query = `dynres=0&pointerlock=0&card=0&fresh=1&save=0&audio=0&clock=even&quality=${opt.quality}${fair}` + (opt.query ? '&' + opt.query : '');
 const { page, browser, problems, close } = await openPage({ pagePath: '/index.html?' + query, w: W, h: H, root: opt.root });
 const summary = { label, quality: Number(opt.quality), size: `${W}x${H}`, settleLimit: SETTLE, bodies: {} };
 let failed = false;
