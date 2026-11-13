@@ -1,0 +1,1 @@
+earth spawn, the hour by the game clock of a new game (6 sunrise, 18 sunset): 0 s: 9.5 h, 60 s: 10.9 h, 130 s: 12.6 h, 240 s: 15.1 h, 330 s: 16.5 h, 400 s: 17.5 h, 480 s: 18.4 h, 530 s: 18.9 h, 600 s: 19.7 h, 700 s: 20.8 h, 800 s: 22.0 h, 900 s: 23.3 h, 1200 s: 3.3 h, 1280 s: 4.2 h, 1500 s: 6.8 h

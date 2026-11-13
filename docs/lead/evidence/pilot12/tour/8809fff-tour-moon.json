@@ -1,0 +1,62 @@
+{
+ "label": "HEAD 8809fff (PAINTER 14 WIP) + PILOT 11 working files, top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 49.8,
+   "settledFrames": 45,
+   "tris": 420950,
+   "calls": 236,
+   "worldWorstMs": 312.5,
+   "physicsWorstMs": 4.9,
+   "stoodIn": "mare",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "moon-mare-1",
+   "name": "Silver Mare",
+   "alsoVista": null,
+   "settledSeconds": 5.6,
+   "settledFrames": 9,
+   "tris": 422030,
+   "calls": 237,
+   "worldWorstMs": 239,
+   "physicsWorstMs": 6.7,
+   "stoodIn": "mare",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0,
+    "biome": "mare",
+    "radius": 1412.6351831127622
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 25.8,
+   "settledFrames": 25,
+   "tris": 435449,
+   "calls": 347,
+   "worldWorstMs": 7.8,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

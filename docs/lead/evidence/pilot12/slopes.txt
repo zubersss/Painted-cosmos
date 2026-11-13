@@ -1,0 +1,2 @@
+earth spawn, within 60 m (dry ground, 1185 samples; 72 in water): 0-10 deg 60.1 %, 10-20 deg 24.0 %, 20-30 deg 11.7 %, 30-40 deg 3.3 %, 40-50 deg 0.9 %, 50-90 deg 0.0 %
+earth spawn, within 150 m (dry ground, 7654 samples; 191 in water): 0-10 deg 72.3 %, 10-20 deg 20.2 %, 20-30 deg 5.1 %, 30-40 deg 1.9 %, 40-50 deg 0.4 %, 50-90 deg 0.0 %

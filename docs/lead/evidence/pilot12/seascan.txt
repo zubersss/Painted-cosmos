@@ -1,0 +1,38 @@
+# earth sea_coast: 144 m out on bearing 120: 6.7 m deep
+      0  breeze        wind   6.8 m/s  Hs 0.15 m  period 1.3 s  whitecaps 9 %
+    300  windy         wind   9.1 m/s  Hs 0.29 m  period 1.6 s  whitecaps 24 %
+    600  windy         wind   8.9 m/s  Hs 0.39 m  period 1.6 s  whitecaps 27 %
+    900  overcast      wind   6.2 m/s  Hs 0.39 m  period 1.6 s  whitecaps 34 %
+   1200  drizzle       wind  10.6 m/s  Hs 0.39 m  period 1.6 s  whitecaps 35 %
+   1500  breeze        wind   4.1 m/s  Hs 0.42 m  period 1.6 s  whitecaps 22 %
+   1800  mist          wind   4.4 m/s  Hs 0.44 m  period 1.6 s  whitecaps 10 %
+   2100  breeze        wind   4.8 m/s  Hs 0.42 m  period 1.6 s  whitecaps 9 %
+   2400  breeze        wind   7.1 m/s  Hs 0.43 m  period 1.6 s  whitecaps 17 %
+   2700  windy         wind   8.9 m/s  Hs 0.44 m  period 1.6 s  whitecaps 22 %
+   3000  windy         wind   9.0 m/s  Hs 0.45 m  period 1.6 s  whitecaps 28 %
+   3300  windy         wind   7.5 m/s  Hs 0.45 m  period 1.6 s  whitecaps 29 %
+   3600  windy         wind   9.1 m/s  Hs 0.46 m  period 1.6 s  whitecaps 29 %
+   3900  drizzle       wind   8.5 m/s  Hs 0.45 m  period 1.6 s  whitecaps 28 %
+   4200  breeze        wind   6.8 m/s  Hs 0.45 m  period 1.6 s  whitecaps 29 %
+   4500  breeze        wind   6.9 m/s  Hs 0.45 m  period 1.6 s  whitecaps 26 %
+   4800  breeze        wind   6.3 m/s  Hs 0.46 m  period 1.6 s  whitecaps 22 %
+   5100  breeze        wind   4.9 m/s  Hs 0.45 m  period 1.6 s  whitecaps 16 %
+   5400  mist          wind   3.3 m/s  Hs 0.45 m  period 1.6 s  whitecaps 7 %
+   5700  mist          wind   1.5 m/s  Hs 0.41 m  period 1.5 s  whitecaps 0 %
+   6000  clear         wind   1.9 m/s  Hs 0.38 m  period 1.4 s  whitecaps 0 %
+  Hs over 21 clocks: least 0.15, most 0.46 m; wind most 10.6 m/s
+# neptune storm_seas: 132 m out on bearing 105: 26.0 m deep
+      0  thunderstorm  wind  23.8 m/s  Hs 1.56 m  period 2.5 s  whitecaps 32 %
+    100  mist          wind  33.0 m/s  Hs 2.64 m  period 2.5 s  whitecaps 75 %
+    200  rain          wind  91.3 m/s  Hs 3.10 m  period 2.5 s  whitecaps 51 %
+    300  drizzle       wind  29.1 m/s  Hs 3.28 m  period 2.6 s  whitecaps 97 %
+    400  thunderstorm  wind  28.9 m/s  Hs 3.34 m  period 2.5 s  whitecaps 99 %
+    500  mist          wind  36.6 m/s  Hs 3.36 m  period 2.5 s  whitecaps 100 %
+    600  mist          wind  34.8 m/s  Hs 3.36 m  period 2.5 s  whitecaps 100 %
+    700  drizzle       wind  41.0 m/s  Hs 3.36 m  period 2.5 s  whitecaps 100 %
+    800  thunderstorm  wind  27.5 m/s  Hs 3.36 m  period 2.5 s  whitecaps 100 %
+    900  thunderstorm  wind  30.3 m/s  Hs 3.35 m  period 2.5 s  whitecaps 100 %
+   1000  thunderstorm  wind  21.7 m/s  Hs 3.34 m  period 2.4 s  whitecaps 100 %
+   1100  thunderstorm  wind  24.7 m/s  Hs 3.27 m  period 2.4 s  whitecaps 100 %
+   1200  thunderstorm  wind  24.6 m/s  Hs 3.19 m  period 2.4 s  whitecaps 100 %
+  Hs over 13 clocks: least 1.56, most 3.36 m; wind most 91.3 m/s

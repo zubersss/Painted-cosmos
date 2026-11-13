@@ -1,0 +1,1426 @@
+{
+ "query": "quality=0&dynres=0&pointerlock=0&fresh=1&save=0&audio=0&card=0",
+ "beats": [
+  {
+   "n": 1,
+   "name": "storm-spawn",
+   "file": "01-storm-spawn.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "temperate_forest",
+   "prompt": null,
+   "notice": null,
+   "t": 238.1,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 3,
+    "rain": 22.8
+   }
+  },
+  {
+   "n": 2,
+   "name": "storm-wet-bank-W-held",
+   "file": "02-storm-wet-bank-W-held.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "temperate_forest",
+   "prompt": null,
+   "notice": null,
+   "t": 250.3,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 4,
+    "rain": 20.8
+   },
+   "last": [
+    {
+     "t": 10.23,
+     "made": 29.9,
+     "pace": 4.39,
+     "slope": 28,
+     "mode": "walk"
+    },
+    {
+     "t": 10.73,
+     "made": 32.1,
+     "pace": 3.51,
+     "slope": 21,
+     "mode": "walk"
+    },
+    {
+     "t": 11.23,
+     "made": 34,
+     "pace": 4.2,
+     "slope": 7,
+     "mode": "walk"
+    },
+    {
+     "t": 11.73,
+     "made": 36,
+     "pace": 4.23,
+     "slope": 1,
+     "mode": "walk"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "name": "storm-after-shift",
+   "file": "03-storm-after-shift.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "temperate_forest",
+   "prompt": null,
+   "notice": null,
+   "t": 254.5,
+   "last": [
+    {
+     "t": 2.7,
+     "made": 55.8,
+     "pace": 3.28,
+     "slope": 5,
+     "mode": "walk"
+    },
+    {
+     "t": 3.2,
+     "made": 58,
+     "pace": 5.69,
+     "slope": 5,
+     "mode": "walk"
+    },
+    {
+     "t": 3.7,
+     "made": 61.5,
+     "pace": 7.78,
+     "slope": 1,
+     "mode": "walk"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "name": "fair-same-bank",
+   "file": "04-fair-same-bank.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "temperate_forest",
+   "prompt": null,
+   "notice": null,
+   "t": 47.5,
+   "wx": {
+    "kind": "breeze",
+    "wind": 1.5,
+    "rain": 0
+   },
+   "last": [
+    {
+     "t": 10.22,
+     "made": 39.7,
+     "pace": 4.25,
+     "slope": 4,
+     "mode": "walk"
+    },
+    {
+     "t": 10.73,
+     "made": 41.8,
+     "pace": 4.25,
+     "slope": 1,
+     "mode": "walk"
+    },
+    {
+     "t": 11.23,
+     "made": 43.9,
+     "pace": 4.26,
+     "slope": 3,
+     "mode": "walk"
+    },
+    {
+     "t": 11.73,
+     "made": 46,
+     "pace": 4.25,
+     "slope": 2,
+     "mode": "walk"
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "name": "coast-facing-the-sea",
+   "file": "05-coast-facing-the-sea.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 605.6,
+   "wx": {
+    "kind": "windy",
+    "wind": 7.3,
+    "rain": 0
+   }
+  },
+  {
+   "n": 6,
+   "name": "wading-in",
+   "file": "06-wading-in.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 614.7
+  },
+  {
+   "n": 7,
+   "name": "swimming",
+   "file": "07-swimming.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 623
+  },
+  {
+   "n": 8,
+   "name": "afloat-still",
+   "file": "08-afloat-still.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 627.2
+  },
+  {
+   "n": 9,
+   "name": "jet-out-of-the-water",
+   "file": "09-jet-out-of-the-water.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 628.4
+  },
+  {
+   "n": 10,
+   "name": "back-in-the-water",
+   "file": "10-back-in-the-water.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 631.3
+  },
+  {
+   "n": 11,
+   "name": "cliff-run-9s",
+   "file": "11-cliff-run-9s.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "sea_coast",
+   "prompt": null,
+   "notice": null,
+   "t": 611.4,
+   "climbed": 46.2
+  },
+  {
+   "n": 12,
+   "name": "squall-hover-start",
+   "file": "12-squall-hover-start.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 218.4,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 125.4,
+    "rain": 7.5
+   }
+  },
+  {
+   "n": 13,
+   "name": "squall-hover-2s",
+   "file": "13-squall-hover-2s.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 220.5,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 64.2,
+    "rain": 11.3
+   },
+   "last": {
+    "t": 1.58,
+    "alt": 3.4,
+    "v": 1.3,
+    "vUp": 1.2
+   }
+  },
+  {
+   "n": 14,
+   "name": "squall-hover-4s",
+   "file": "14-squall-hover-4s.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 222.5,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 52.2,
+    "rain": 15.2
+   },
+   "last": {
+    "t": 1.55,
+    "alt": 6.1,
+    "v": 2.9,
+    "vUp": 0.4
+   }
+  },
+  {
+   "n": 15,
+   "name": "squall-hover-6s",
+   "file": "15-squall-hover-6s.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 224.7,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 120,
+    "rain": 19.5
+   },
+   "last": {
+    "t": 1.7,
+    "alt": 6,
+    "v": 7.1,
+    "vUp": 0.7
+   }
+  },
+  {
+   "n": 16,
+   "name": "squall-hover-8s",
+   "file": "16-squall-hover-8s.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 226.9,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 68.3,
+    "rain": 23.8
+   },
+   "last": {
+    "t": 1.72,
+    "alt": 6.1,
+    "v": 1.2,
+    "vUp": 0.1
+   }
+  },
+  {
+   "n": 17,
+   "name": "squall-hover-10s",
+   "file": "17-squall-hover-10s.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 229.1,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 40.5,
+    "rain": 28.5
+   },
+   "last": {
+    "t": 1.72,
+    "alt": 21.6,
+    "v": 12.7,
+    "vUp": 12.2
+   }
+  },
+  {
+   "n": 18,
+   "name": "squall-hover-12s",
+   "file": "18-squall-hover-12s.jpg",
+   "state": "ATMOSPHERE",
+   "body": "neptune",
+   "biome": "storm_seas",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 231.4,
+   "wx": {
+    "kind": "thunderstorm",
+    "wind": 147.1,
+    "rain": 33.4
+   },
+   "last": {
+    "t": 1.72,
+    "alt": 24.3,
+    "v": 3.8,
+    "vUp": -2.7
+   }
+  },
+  {
+   "n": 19,
+   "name": "night-earth-q0",
+   "file": "19-night-earth-q0.jpg",
+   "state": "ON_FOOT",
+   "body": "earth",
+   "biome": "temperate_forest",
+   "prompt": null,
+   "notice": null,
+   "t": 46.5,
+   "hour": 0
+  },
+  {
+   "n": 20,
+   "name": "night-mars-q0",
+   "file": "20-night-mars-q0.jpg",
+   "state": "ON_FOOT",
+   "body": "mars",
+   "biome": "dry_riverbeds",
+   "prompt": null,
+   "notice": null,
+   "t": 45.2,
+   "hour": 0
+  },
+  {
+   "n": 21,
+   "name": "night-moon-q0",
+   "file": "21-night-moon-q0.jpg",
+   "state": "ON_FOOT",
+   "body": "moon",
+   "biome": "mare",
+   "prompt": null,
+   "notice": "A view for the sketchbook: Silver Mare",
+   "t": 45.4,
+   "hour": 0
+  }
+ ],
+ "traces": {
+  "storm-walk-east": [
+   {
+    "t": 0,
+    "made": 0,
+    "pace": 0,
+    "slope": 4,
+    "mode": "idle"
+   },
+   {
+    "t": 0.55,
+    "made": 1,
+    "pace": 3.55,
+    "slope": 7,
+    "mode": "walk"
+   },
+   {
+    "t": 1.23,
+    "made": 4,
+    "pace": 4.45,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 1.73,
+    "made": 6.2,
+    "pace": 4.35,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 2.23,
+    "made": 8.3,
+    "pace": 4.3,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 2.73,
+    "made": 10.5,
+    "pace": 4.44,
+    "slope": 4,
+    "mode": "walk"
+   },
+   {
+    "t": 3.23,
+    "made": 12.7,
+    "pace": 4.3,
+    "slope": 4,
+    "mode": "walk"
+   },
+   {
+    "t": 3.73,
+    "made": 14.9,
+    "pace": 4.26,
+    "slope": 6,
+    "mode": "walk"
+   },
+   {
+    "t": 4.23,
+    "made": 17,
+    "pace": 4.3,
+    "slope": 10,
+    "mode": "walk"
+   },
+   {
+    "t": 4.73,
+    "made": 19.1,
+    "pace": 3.68,
+    "slope": 16,
+    "mode": "walk"
+   },
+   {
+    "t": 5.23,
+    "made": 20.7,
+    "pace": 2.37,
+    "slope": 21,
+    "mode": "walk"
+   },
+   {
+    "t": 5.73,
+    "made": 21.5,
+    "pace": 0.77,
+    "slope": 25,
+    "mode": "walk"
+   },
+   {
+    "t": 6.23,
+    "made": 21.6,
+    "pace": 0.06,
+    "slope": 25,
+    "mode": "idle"
+   },
+   {
+    "t": 6.73,
+    "made": 21.6,
+    "pace": 0.04,
+    "slope": 25,
+    "mode": "idle"
+   },
+   {
+    "t": 7.23,
+    "made": 21.7,
+    "pace": 0.11,
+    "slope": 25,
+    "mode": "idle"
+   },
+   {
+    "t": 7.73,
+    "made": 21.7,
+    "pace": 0.09,
+    "slope": 25,
+    "mode": "idle"
+   },
+   {
+    "t": 8.23,
+    "made": 21.8,
+    "pace": 1.17,
+    "slope": 26,
+    "mode": "walk"
+   },
+   {
+    "t": 8.73,
+    "made": 23.1,
+    "pace": 3.06,
+    "slope": 31,
+    "mode": "walk"
+   },
+   {
+    "t": 9.23,
+    "made": 25.2,
+    "pace": 4.16,
+    "slope": 32,
+    "mode": "walk"
+   },
+   {
+    "t": 9.73,
+    "made": 27.5,
+    "pace": 4.28,
+    "slope": 33,
+    "mode": "walk"
+   },
+   {
+    "t": 10.23,
+    "made": 29.9,
+    "pace": 4.39,
+    "slope": 28,
+    "mode": "walk"
+   },
+   {
+    "t": 10.73,
+    "made": 32.1,
+    "pace": 3.51,
+    "slope": 21,
+    "mode": "walk"
+   },
+   {
+    "t": 11.23,
+    "made": 34,
+    "pace": 4.2,
+    "slope": 7,
+    "mode": "walk"
+   },
+   {
+    "t": 11.73,
+    "made": 36,
+    "pace": 4.23,
+    "slope": 1,
+    "mode": "walk"
+   }
+  ],
+  "storm-run-on": [
+   {
+    "t": 0,
+    "made": 38.1,
+    "pace": 4.34,
+    "slope": 3,
+    "mode": "walk"
+   },
+   {
+    "t": 0.7,
+    "made": 42.5,
+    "pace": 7.61,
+    "slope": 1,
+    "mode": "walk"
+   },
+   {
+    "t": 1.2,
+    "made": 46.3,
+    "pace": 7.87,
+    "slope": 2,
+    "mode": "walk"
+   },
+   {
+    "t": 1.7,
+    "made": 50.1,
+    "pace": 7.64,
+    "slope": 4,
+    "mode": "walk"
+   },
+   {
+    "t": 2.2,
+    "made": 53.9,
+    "pace": 7.73,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 2.7,
+    "made": 55.8,
+    "pace": 3.28,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 3.2,
+    "made": 58,
+    "pace": 5.69,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 3.7,
+    "made": 61.5,
+    "pace": 7.78,
+    "slope": 1,
+    "mode": "walk"
+   }
+  ],
+  "fair-walk-east": [
+   {
+    "t": 0,
+    "made": 0,
+    "pace": 0,
+    "slope": 4,
+    "mode": "idle"
+   },
+   {
+    "t": 0.52,
+    "made": 1.3,
+    "pace": 4.06,
+    "slope": 7,
+    "mode": "walk"
+   },
+   {
+    "t": 1.02,
+    "made": 3.4,
+    "pace": 4.22,
+    "slope": 6,
+    "mode": "walk"
+   },
+   {
+    "t": 1.52,
+    "made": 5.5,
+    "pace": 4.22,
+    "slope": 4,
+    "mode": "walk"
+   },
+   {
+    "t": 2.02,
+    "made": 7.6,
+    "pace": 4.22,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 2.52,
+    "made": 9.8,
+    "pace": 4.22,
+    "slope": 5,
+    "mode": "walk"
+   },
+   {
+    "t": 3.02,
+    "made": 11.9,
+    "pace": 4.24,
+    "slope": 2,
+    "mode": "walk"
+   },
+   {
+    "t": 3.52,
+    "made": 14,
+    "pace": 4.21,
+    "slope": 7,
+    "mode": "walk"
+   },
+   {
+    "t": 4.02,
+    "made": 16.1,
+    "pace": 4.2,
+    "slope": 7,
+    "mode": "walk"
+   },
+   {
+    "t": 4.52,
+    "made": 18.2,
+    "pace": 4.1,
+    "slope": 14,
+    "mode": "walk"
+   },
+   {
+    "t": 5.02,
+    "made": 20.3,
+    "pace": 4.03,
+    "slope": 20,
+    "mode": "walk"
+   },
+   {
+    "t": 5.52,
+    "made": 22.4,
+    "pace": 3.78,
+    "slope": 29,
+    "mode": "walk"
+   },
+   {
+    "t": 6.03,
+    "made": 23.2,
+    "pace": 3.23,
+    "slope": 31,
+    "mode": "walk"
+   },
+   {
+    "t": 6.72,
+    "made": 25.8,
+    "pace": 3.09,
+    "slope": 33,
+    "mode": "walk"
+   },
+   {
+    "t": 7.22,
+    "made": 27.5,
+    "pace": 3.06,
+    "slope": 33,
+    "mode": "walk"
+   },
+   {
+    "t": 7.72,
+    "made": 29.3,
+    "pace": 3.69,
+    "slope": 29,
+    "mode": "walk"
+   },
+   {
+    "t": 8.22,
+    "made": 31.4,
+    "pace": 3.85,
+    "slope": 26,
+    "mode": "walk"
+   },
+   {
+    "t": 8.72,
+    "made": 33.5,
+    "pace": 4.18,
+    "slope": 11,
+    "mode": "walk"
+   },
+   {
+    "t": 9.22,
+    "made": 35.6,
+    "pace": 4.24,
+    "slope": 2,
+    "mode": "walk"
+   },
+   {
+    "t": 9.72,
+    "made": 37.6,
+    "pace": 4.25,
+    "slope": 3,
+    "mode": "walk"
+   },
+   {
+    "t": 10.22,
+    "made": 39.7,
+    "pace": 4.25,
+    "slope": 4,
+    "mode": "walk"
+   },
+   {
+    "t": 10.73,
+    "made": 41.8,
+    "pace": 4.25,
+    "slope": 1,
+    "mode": "walk"
+   },
+   {
+    "t": 11.23,
+    "made": 43.9,
+    "pace": 4.26,
+    "slope": 3,
+    "mode": "walk"
+   },
+   {
+    "t": 11.73,
+    "made": 46,
+    "pace": 4.25,
+    "slope": 2,
+    "mode": "walk"
+   }
+  ],
+  "walk-in": [
+   {
+    "t": 0,
+    "pace": 0.22,
+    "depth": 0,
+    "mode": "idle",
+    "grounded": true
+   },
+   {
+    "t": 0.7,
+    "pace": 3.8,
+    "depth": 0,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 1.2,
+    "pace": 3.77,
+    "depth": 0,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 1.7,
+    "pace": 3.85,
+    "depth": 0,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 2.2,
+    "pace": 3.7,
+    "depth": 0,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 2.7,
+    "pace": 3.81,
+    "depth": 0,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 3.2,
+    "pace": 3.82,
+    "depth": 0,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 3.7,
+    "pace": 3.7,
+    "depth": 0.05,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 4.2,
+    "pace": 3.38,
+    "depth": 0.27,
+    "mode": "walk",
+    "grounded": true
+   },
+   {
+    "t": 4.7,
+    "pace": 3.22,
+    "depth": 0.36,
+    "mode": "wade",
+    "grounded": true
+   },
+   {
+    "t": 5.2,
+    "pace": 3.33,
+    "depth": 0.35,
+    "mode": "wade",
+    "grounded": true
+   },
+   {
+    "t": 5.7,
+    "pace": 2.56,
+    "depth": 0.75,
+    "mode": "wade",
+    "grounded": true
+   },
+   {
+    "t": 6.2,
+    "pace": 1.8,
+    "depth": 1.22,
+    "mode": "wade",
+    "grounded": true
+   },
+   {
+    "t": 6.6,
+    "pace": 1.99,
+    "depth": 1.32,
+    "mode": "wade",
+    "grounded": false
+   },
+   {
+    "t": 7.1,
+    "pace": 2.05,
+    "depth": 1.27,
+    "mode": "wade",
+    "grounded": false
+   },
+   {
+    "t": 7.6,
+    "pace": 2.07,
+    "depth": 1.22,
+    "mode": "wade",
+    "grounded": false
+   },
+   {
+    "t": 8.1,
+    "pace": 2.08,
+    "depth": 1.22,
+    "mode": "wade",
+    "grounded": false
+   },
+   {
+    "t": 8.6,
+    "pace": 2.07,
+    "depth": 1.31,
+    "mode": "wade",
+    "grounded": false
+   }
+  ],
+  "swim-out": [
+   {
+    "t": 0,
+    "pace": 2.07,
+    "depth": 1.28,
+    "mode": "wade",
+    "vUp": 0.04
+   },
+   {
+    "t": 0.72,
+    "pace": 2.07,
+    "depth": 1.23,
+    "mode": "wade",
+    "vUp": -0.04
+   },
+   {
+    "t": 1.23,
+    "pace": 2.06,
+    "depth": 1.24,
+    "mode": "wade",
+    "vUp": 0.06
+   },
+   {
+    "t": 1.73,
+    "pace": 2.06,
+    "depth": 1.19,
+    "mode": "wade",
+    "vUp": 0
+   },
+   {
+    "t": 2.23,
+    "pace": 2.07,
+    "depth": 1.27,
+    "mode": "wade",
+    "vUp": -0.17
+   },
+   {
+    "t": 2.73,
+    "pace": 2.05,
+    "depth": 1.29,
+    "mode": "wade",
+    "vUp": 0
+   },
+   {
+    "t": 3.23,
+    "pace": 2.06,
+    "depth": 1.29,
+    "mode": "wade",
+    "vUp": 0.03
+   },
+   {
+    "t": 3.73,
+    "pace": 2.05,
+    "depth": 1.23,
+    "mode": "wade",
+    "vUp": 0.15
+   },
+   {
+    "t": 4.23,
+    "pace": 2.07,
+    "depth": 1.19,
+    "mode": "wade",
+    "vUp": -0.02
+   },
+   {
+    "t": 4.73,
+    "pace": 2.07,
+    "depth": 1.21,
+    "mode": "wade",
+    "vUp": -0.19
+   },
+   {
+    "t": 5.23,
+    "pace": 2.06,
+    "depth": 1.34,
+    "mode": "wade",
+    "vUp": -0.04
+   },
+   {
+    "t": 5.73,
+    "pace": 2.07,
+    "depth": 1.36,
+    "mode": "wade",
+    "vUp": 0.03
+   },
+   {
+    "t": 6.23,
+    "pace": 2.05,
+    "depth": 1.22,
+    "mode": "wade",
+    "vUp": 0.2
+   },
+   {
+    "t": 6.73,
+    "pace": 2.06,
+    "depth": 1.16,
+    "mode": "wade",
+    "vUp": 0.17
+   },
+   {
+    "t": 7.23,
+    "pace": 2.07,
+    "depth": 1.22,
+    "mode": "wade",
+    "vUp": -0.47
+   },
+   {
+    "t": 7.73,
+    "pace": 2.05,
+    "depth": 1.36,
+    "mode": "wade",
+    "vUp": -0.05
+   }
+  ],
+  "let-go": [
+   {
+    "t": 0,
+    "pace": 1.93,
+    "depth": 1.36,
+    "vUp": 0.03
+   },
+   {
+    "t": 0.7,
+    "pace": 0.19,
+    "depth": 1.16,
+    "vUp": 0.19
+   },
+   {
+    "t": 1.2,
+    "pace": 0.02,
+    "depth": 1.24,
+    "vUp": -0.29
+   },
+   {
+    "t": 1.7,
+    "pace": 0.02,
+    "depth": 1.26,
+    "vUp": 0.16
+   },
+   {
+    "t": 2.2,
+    "pace": 0.03,
+    "depth": 1.22,
+    "vUp": -0.1
+   },
+   {
+    "t": 2.7,
+    "pace": 0.04,
+    "depth": 1.39,
+    "vUp": -0.28
+   },
+   {
+    "t": 3.2,
+    "pace": 0.03,
+    "depth": 1.35,
+    "vUp": 0.35
+   },
+   {
+    "t": 3.7,
+    "pace": 0.03,
+    "depth": 1.19,
+    "vUp": 0.15
+   }
+  ],
+  "cliff-run": [
+   {
+    "t": 0,
+    "up": 0,
+    "pace": 0,
+    "vUp": 0,
+    "slope": 11,
+    "grounded": true,
+    "mode": "idle"
+   },
+   {
+    "t": 0.75,
+    "up": 0.2,
+    "pace": 6.04,
+    "vUp": 0,
+    "slope": 29,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 1.03,
+    "up": 1.6,
+    "pace": 3.92,
+    "vUp": 0,
+    "slope": 74,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 1.53,
+    "up": 4.5,
+    "pace": 1.63,
+    "vUp": 0,
+    "slope": 78,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 2.03,
+    "up": 7.5,
+    "pace": 1.55,
+    "vUp": 0,
+    "slope": 79,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 2.53,
+    "up": 10.5,
+    "pace": 1.71,
+    "vUp": 0,
+    "slope": 78,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 3.03,
+    "up": 13.5,
+    "pace": 1.65,
+    "vUp": 0,
+    "slope": 78,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 3.53,
+    "up": 16.4,
+    "pace": 1.63,
+    "vUp": 0,
+    "slope": 79,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 4.03,
+    "up": 19.4,
+    "pace": 1.63,
+    "vUp": 0,
+    "slope": 78,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 4.53,
+    "up": 22.4,
+    "pace": 1.87,
+    "vUp": 0,
+    "slope": 76,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 5.03,
+    "up": 25.4,
+    "pace": 2.58,
+    "vUp": 0,
+    "slope": 72,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 5.53,
+    "up": 28.3,
+    "pace": 3.17,
+    "vUp": 0,
+    "slope": 69,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 6.03,
+    "up": 31.3,
+    "pace": 2.5,
+    "vUp": 0,
+    "slope": 74,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 6.53,
+    "up": 34.3,
+    "pace": 2.71,
+    "vUp": 0,
+    "slope": 74,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 7.03,
+    "up": 37.2,
+    "pace": 2.9,
+    "vUp": 0,
+    "slope": 74,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 7.53,
+    "up": 40.2,
+    "pace": 2.96,
+    "vUp": 0,
+    "slope": 74,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 8.03,
+    "up": 43.2,
+    "pace": 2.85,
+    "vUp": 0,
+    "slope": 74,
+    "grounded": true,
+    "mode": "walk"
+   },
+   {
+    "t": 8.53,
+    "up": 46.2,
+    "pace": 2.79,
+    "vUp": 0,
+    "slope": 75,
+    "grounded": true,
+    "mode": "walk"
+   }
+  ],
+  "squall-0": [
+   {
+    "t": 0,
+    "alt": 11.5,
+    "v": 9.5,
+    "vUp": -8.9
+   },
+   {
+    "t": 0.72,
+    "alt": 5.2,
+    "v": 6.5,
+    "vUp": -6.4
+   },
+   {
+    "t": 1.08,
+    "alt": 3.6,
+    "v": 2.9,
+    "vUp": -2.7
+   },
+   {
+    "t": 1.58,
+    "alt": 3.4,
+    "v": 1.3,
+    "vUp": 1.2
+   }
+  ],
+  "squall-1": [
+   {
+    "t": 0,
+    "alt": 4.7,
+    "v": 4.5,
+    "vUp": 3.7
+   },
+   {
+    "t": 0.5,
+    "alt": 6,
+    "v": 1.8,
+    "vUp": 1.5
+   },
+   {
+    "t": 1.05,
+    "alt": 6.2,
+    "v": 0.3,
+    "vUp": 0
+   },
+   {
+    "t": 1.55,
+    "alt": 6.1,
+    "v": 2.9,
+    "vUp": 0.4
+   }
+  ],
+  "squall-2": [
+   {
+    "t": 0,
+    "alt": 6.1,
+    "v": 2,
+    "vUp": 0.2
+   },
+   {
+    "t": 0.68,
+    "alt": 6.1,
+    "v": 0.1,
+    "vUp": 0
+   },
+   {
+    "t": 1.2,
+    "alt": 6.1,
+    "v": 4.5,
+    "vUp": 0.5
+   },
+   {
+    "t": 1.7,
+    "alt": 6,
+    "v": 7.1,
+    "vUp": 0.7
+   }
+  ],
+  "squall-3": [
+   {
+    "t": 0,
+    "alt": 6,
+    "v": 5,
+    "vUp": 0.4
+   },
+   {
+    "t": 0.72,
+    "alt": 6.1,
+    "v": 5.3,
+    "vUp": 0.5
+   },
+   {
+    "t": 1.22,
+    "alt": 6.1,
+    "v": 2.6,
+    "vUp": 0.3
+   },
+   {
+    "t": 1.72,
+    "alt": 6.1,
+    "v": 1.2,
+    "vUp": 0.1
+   }
+  ],
+  "squall-4": [
+   {
+    "t": 0,
+    "alt": 6.8,
+    "v": 3.8,
+    "vUp": 3.8
+   },
+   {
+    "t": 0.7,
+    "alt": 11.5,
+    "v": 8.5,
+    "vUp": 8.5
+   },
+   {
+    "t": 1.22,
+    "alt": 16.1,
+    "v": 11.3,
+    "vUp": 10.3
+   },
+   {
+    "t": 1.72,
+    "alt": 21.6,
+    "v": 12.7,
+    "vUp": 12.2
+   }
+  ],
+  "squall-5": [
+   {
+    "t": 0,
+    "alt": 26.7,
+    "v": 7.2,
+    "vUp": 7.2
+   },
+   {
+    "t": 0.72,
+    "alt": 28.1,
+    "v": 2.8,
+    "vUp": -2.2
+   },
+   {
+    "t": 1.22,
+    "alt": 26.1,
+    "v": 5,
+    "vUp": -4.6
+   },
+   {
+    "t": 1.72,
+    "alt": 24.3,
+    "v": 3.8,
+    "vUp": -2.7
+   }
+  ]
+ }
+}

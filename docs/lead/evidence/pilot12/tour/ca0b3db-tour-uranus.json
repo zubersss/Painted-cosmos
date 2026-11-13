@@ -1,0 +1,62 @@
+{
+ "label": "clean export of HEAD ca0b3db (PAINTER 76d8182, PILOT 904b6fe, PHYSICS 2f924cd), top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 101.5,
+   "settledFrames": 43,
+   "tris": 754010,
+   "calls": 227,
+   "worldWorstMs": 339.2,
+   "physicsWorstMs": 209.5,
+   "stoodIn": "ice_shelves",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "uranus-ice_shelves-1",
+   "name": "Mint Ice Shelves",
+   "alsoVista": null,
+   "settledSeconds": 103.7,
+   "settledFrames": 29,
+   "tris": 811272,
+   "calls": 236,
+   "worldWorstMs": 366.6,
+   "physicsWorstMs": 15.6,
+   "stoodIn": "ice_shelves",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.8,
+    "biome": "ice_shelves",
+    "radius": 4289.525706631927
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 17.4,
+   "settledFrames": 9,
+   "tris": 62931,
+   "calls": 37,
+   "worldWorstMs": 366.6,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}
