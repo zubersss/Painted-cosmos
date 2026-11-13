@@ -135,10 +135,17 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
     alone, small, in the upper third: the name, the line under it, "click to begin", and one line of the keys a
     newcomer needs; the list of keys is the same card, whole, on H.
 
-### State of the working tree
+### State of the tree (commit `b289c21`, on `70aec16`)
 
-Everything above from 6 on is in the working tree and in the unit suite (182 tests pass there). See the commit
-message of the commit that carries this paragraph for what was checked on a clean tree and seen in the browser.
+All of the above is committed in `b289c21` (the thirteenth's flight work came in with the coordinator's snapshots
+`8418918` and `c03bce6`). Measured on a clean export of `70aec16` with PILOT's files of `b289c21` (`s14/t6`):
+unit 181, world 19, physics 314, `coast.mjs` PASS at both stands, `ghostfield.mjs` every counter zero (worst step
+loss 0.26 and 0.52 as before); the game loads at quality 0 with no console error and no fall-back (the film runs);
+in the browser on the stubs, all PASSED: `tests/m3check.mjs` (title card, sketch, book, the view found, offered,
+drawn from its easel, the controls given back, save and reload), `tests/playthrough.mjs` with PHYSICS (walk,
+jetpack, board, space, land, step out), `tests/trip.mjs` (Earth, Mars, Saturn in one sitting, reload).
+**Not run:** the painted play-through, trip and m3 (`tests/all.mjs` painted-*), the grand tour, the motion and
+weather sets, anything at quality 2 or at 1080p.
 
 ### Not done (and why), for whoever comes next
 
