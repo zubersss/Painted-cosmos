@@ -76,7 +76,8 @@ export class Input {
     this._px = 0; this._py = 0;           // the last movement under the lock
     this._unlockAt = -1e9;                // when the lock was last let go
     this._req = 0; this._refusedReq = -1; this._refusals = 0;
-    this._trips = 0; this._rearm = false;
+    this._trips = 0;
+    this.thrown = false;                  // the lock reported nonsense before it was dropped: the game levels the view
     this.inShip = false;                  // set by the game: the triggers are the throttle in the ship
     this.pad = null;                      // the gamepad's last reading (null without one)
     this._padButtons = null;
@@ -106,8 +107,9 @@ export class Input {
       this.used = true;
       if (e.button !== 0) return;
       this.dragging = true; this._lx = e.clientX; this._ly = e.clientY;
-      // After the lock misbehaved once, the next click tries it once more.
-      if (!this.usePointerLock && this._rearm) { this._rearm = false; this.usePointerLock = true; this._odd = []; }
+      // Once the game has fallen back to dragging it stays there: a click that took the lock
+      // again brought the nonsense back with it, every time (M4's blind play-test: "every
+      // mousedown captured the pointer again", the view thrown straight up, dragging dead).
       if (this.usePointerLock && !this.locked && el.requestPointerLock) {
         const req = ++this._req;
         try {
@@ -118,7 +120,7 @@ export class Input {
     });
     doc.addEventListener('mouseup', () => { this.dragging = false; });
     doc.addEventListener('mousemove', (e) => {
-      if (this.locked) {
+      if (this.locked && this.usePointerLock) {
         // Some browsers report one enormous delta when the lock is taken or focus returns. The
         // browser sends one move per frame: at 30 fps each carries two 60 Hz frames of a flick,
         // so the line for an impossible delta grows with the frame time (at most threefold).
@@ -135,6 +137,9 @@ export class Input {
     });
     doc.addEventListener('pointerlockchange', () => {
       const was = this.locked;
+      // A lock that arrives after the game has given up on it (a request still on its way) is
+      // let go at once.
+      if (!this.usePointerLock && doc.pointerLockElement === el) { try { doc.exitPointerLock(); } catch { /* ignore */ } this.locked = false; return; }
       this.locked = doc.pointerLockElement === el; this._pm = null; this._px = 0; this._py = 0;
       if (this.locked) { this.looked = true; this._refusals = 0; }
       else if (was) { this.looked = false; this._unlockAt = now(); }   // lost the lock: show the hint again
@@ -174,14 +179,15 @@ export class Input {
     this.message = text;
     this.dx = 0; this.dy = 0; this.dragging = false;
     try { if (this._doc.pointerLockElement === this.el) this._doc.exitPointerLock(); } catch { /* ignore */ }
+    this.locked = false;                  // (whether or not the browser says so: the moves are the drag's now)
   }
 
   // Under a pointer lock some environments report nonsense: jumps the size of the window that
   // are taken back by the very next event, or a stream of huge deltas. A real hand cannot do
   // either. A large delta is therefore held back for one event: if the next one undoes it,
   // both are dropped; if not, it was a real flick and is applied. Three undone jumps (or
-  // impossible spikes) within a second and a half: stop trusting the lock (the first time
-  // until the next click, the second time for the session).
+  // impossible spikes) within a second and a half: stop trusting the lock for the session (it
+  // once came back at the next click, and the nonsense with it).
   // k: how many 60 Hz frames one event covers (1 to 3): the spike line scales with it; every
   // large delta, whatever the frame rate, goes through the test above.
   // Returns true when this event has been dealt with here.
@@ -214,10 +220,9 @@ export class Input {
     this._odd.push(t);
     if (this._odd.length < 3 || !this.usePointerLock) return;
     this._odd = [];
-    if (this._trips++ === 0) {
-      this.fallBack('Mouse capture is misbehaving: click to try it again, or hold the left button and drag to look');
-      this._rearm = true;
-    } else this.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
+    this._trips++;
+    this.thrown = true;
+    this.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
   }
 
   down(code) {

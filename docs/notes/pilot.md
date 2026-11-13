@@ -9,7 +9,8 @@ player's findings on `3d38bb2` (landed on 3 of 8 worlds), PILOT's list 1 to 6, t
 clean export and a film of the pulse from Earth with the mark behind. Scratch: `/home/user/.pc-scratch/pilot/preship/`
 (`mktree.sh <dir>`: a clean export of HEAD with my changed files over it; `checks.sh <root>`: world, unit, physics,
 coast, ghostfield, wallrun; `head/` a clean export of `3d38bb2` for before/after; `probes/`, `film/`). My scripts kept
-in `docs/shots/pilot/preship/scripts/`. First commit's parent: `1294633` (the coordinator's log on top of `3d38bb2`).
+in `docs/shots/pilot/preship/scripts/`. First commit's parent: `8c7d603` (PAINTER's item 1, on top of the coordinator's
+`1294633`).
 
 ### Done, with proof
 
@@ -60,16 +61,71 @@ in `docs/shots/pilot/preship/scripts/`. First commit's parent: `1294633` (the co
    on Earth, Venus and Mars sinks 60+ m and never climbs 15 m (head: Venus 265 -> 282 m); re-boarding on Venus as
    above. The first three fail on `3d38bb2`.
 
+   **Why the drag did nothing (frames 130 and 132): the player's harness, not the game.** Its driver keeps the mouse
+   where the last drag left it, so repeated upward drags walk it off the top of the page; measured in headless
+   Chromium (`docs/shots/pilot/preship/drag-off-page.txt`, `scripts/drag-off-page.mjs`): a drag that starts inside
+   and leaves the page is delivered whole (10 moves, 400 px); one that starts off the page delivers nothing (no
+   mousedown, no move). After the reload the player's click on the title card put the mouse back on the page.
+
 Checks for 1 and 2 on a clean export of `1294633` with these files (`t1`): world 22, unit 192 (184 + 8 new), physics
 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs`
 earth sea_coast 0.2 m at most on ground over 50 degrees; the game at quality 0 loads with no game error, fallback empty.
+Committed `b0710fe`.
 
-### Next (in order)
+3. **Pointer lock's fall-back (BROKEN 3).** `input.js`: once the lock has reported nonsense the game falls back to
+   dragging FOR THE SESSION (the first fall-back used to re-arm the lock for the next click, and in headless Chromium
+   every click took the lock again with the nonsense: dragging never turned the view); a lock that arrives after the
+   fall-back is let go at once; moves count as lock moves only while the game still uses the lock (headless keeps
+   the canvas as `pointerLockElement`); `input.thrown` makes the game level the view (`sim.levelView`). `save.js`:
+   the view's pitch is saved and restored within `camera.js VIEW_PITCH` (26 degrees down to 17 up), so a view thrown
+   straight up is not the next session's first view. Tests (input.test, rewritten and new; save.test new): the
+   nonsense drops the lock for good, five later clicks never ask for it, the drags turn the view 200 px; a late lock
+   is let go and the lock's deltas never pass for a drag; a view saved at 1.25, 1.2, -1.1, -1.15 rad comes back
+   within the range (fails on `3d38bb2`: "saved at 1.25: the first view's pitch 1.20"; the input cases fail there
+   too). `tests/lockcheck.mjs` (headless Chromium's real lock) rewritten to the rule and PASSED on `t2`: the lock
+   dropped, three more clicks do not take it, drag-look 40 px = 0.092 rad. README says so.
+4. **The way back to the ship (CONFUSING 4).** `sim.js shipMark` (`SHIP_MARK` 40 m), `game.js updateMarks`: on foot,
+   with the ship parked on this world, farther than 40 m or out of the picture, a slip "the ship" with the distance:
+   a ring over it in view, an arrow at the picture's edge out of it (behind or below the view the arrow goes to the
+   side the ship lies on: straight down it lay on the figure's legs). Test (vista.test): beside the ship near, after
+   a 9 s run 40+ m and shown; none in the ship. Filmed (`docs/shots/pilot/preship/foot-ship-mark-and-hud.jpg`,
+   opened; quality 0, 640 x 360, Earth's spawn): facing away 16 m (arrow), walked off 72 m (arrow), turned 60 degrees
+   ("the ship 72 m" at the right edge), facing it (a ring over it among the birches, the label over the ring); no game
+   error, fallback empty. The side-arrow rule came after that film (the first two frames show the arrow on the legs):
+   not filmed yet. README says so.
+5. **HUD overlaps (MINOR 11), README gaps, Mercury's column.** `theme.css`: the prompt, the notice and (on foot) the
+   jetpack gauge are placed in pixels as well as shares of the window (`max(16%, calc(9.5% + 36px))` and so on): at
+   640 x 360 the notice lay over the prompt and the prompt on the throttle (seen in the pulse film); with the frame
+   read-out up (`pc-stats-on`) the hint and a notice on foot go under it. `layout.js`: a label that must show slides
+   to a place clear of the slips before it lies on one ("a place to land 256 m" over "Land here" and the throttle);
+   test in layout.test with the player's frame (fails on `3d38bb2`: the label on the prompt). Filmed: the turn's
+   notice now over "F Stop turning", the throttle clear; the read-out with a notice on foot under it. Not found: the
+   frame with the Neptune label on the ship (the player's Neptune frames show only edge arrows; the label-on-ship
+   rule of the last pass holds there). Mercury: `explorer.js collideObstacles`, `EXPLORER.glance` 0.6: a run that
+   meets one trunk or column glances off it, a share of the speed lost into it carrying on round it; test
+   (explorer.test; fails on `3d38bb2`: 7.4 -> 0.0 m/s dead on); the real Mercury spawn with PHYSICS
+   (`mercury-spawn-run.txt`): heading 0 slowest after the first second 0.79 -> 4.45 m/s, worst one-frame loss 6.61 ->
+   2.24 m/s, the other seven headings identical to the digit.
+6. **Sketchbook captions and a word toward the nearest view (MINOR 12 in part, CONFUSING 7).** `game.js bookPages`: a
+   view named as a landscape of its page is captioned "<name>, the view" (Uranus: "Pearl Fog Flats" twice); not seen
+   in the game (game.js does not load in Node). `sim.js EXIT.near` 14 -> 40 m and `SKETCH_SLIP.shipWait` 30 -> 45 s:
+   a landscape sketch waits while the hull lies in the middle of the frame within 40 m (Venus' sketch kept the ship);
+   not filmed. `sim.js viewWord`: stepping out with no view within its mark's 150 m, the notice "A view to find 1.5
+   km ahead to the left: fly nearer, or walk" (8 s); test (vista.test). Not done: the dark grey view sketch of Uranus'
+   white fog (needs the frame it was drawn from; not looked into).
 
-3. Pointer lock's fall-back (no re-capture once fallen back; no near-vertical pitch saved). 4. The way back to the
-ship (a slip with an arrow and the distance on foot). 5. HUD overlaps (the notice over the prompt is seen in the pulse
-film too), README gaps, Mercury's column. 6. Sketchbook captions, a hint toward the nearest view after a landing.
-Then `tests/grandtour.mjs` once on a clean export.
+### State of the tree and checks
+
+Items 3 to 6 checked on a clean export of `25074de` with these files (`t2`): world 24 (PAINTER's new test), unit 198,
+physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros, `wallrun.mjs` 0.2 m at most over 50
+degrees; lockcheck PASSED; the game at quality 0 (the foot film): no game error, fallback empty. The same checks
+again on `t3` (with the side-arrow rule in game.js): world 24, unit 198, physics 325, coast PASS, ghostfield zeros,
+wallrun 0.2 m.
+
+### Next
+
+`tests/grandtour.mjs` once on a clean export of the last commit (8 landings from the title card, about 40 minutes);
+then the hand-over's last word here.
 
 ## Hand-over, M4 RE-FIX pass (seventeenth PILOT agent; started 12:24 UTC 2026-11-13; kept current after every item)
 

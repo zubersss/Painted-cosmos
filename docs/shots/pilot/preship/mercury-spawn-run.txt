@@ -1,0 +1,18 @@
+== 3d38bb2 (head)
+mercury heading 0: mean 6.34 m/s, slowest after 1 s 0.79, worst one-frame loss 6.61 m/s, 46.3 m in 8 s
+mercury heading 45: mean 7.26 m/s, slowest after 1 s 4.55, worst one-frame loss 0.00 m/s, 53.3 m in 8 s
+mercury heading 90: mean 7.26 m/s, slowest after 1 s 4.53, worst one-frame loss 0.00 m/s, 53.3 m in 8 s
+mercury heading 135: mean 7.26 m/s, slowest after 1 s 4.51, worst one-frame loss 0.00 m/s, 53.1 m in 8 s
+mercury heading 180: mean 7.26 m/s, slowest after 1 s 4.51, worst one-frame loss 0.00 m/s, 53.2 m in 8 s
+mercury heading 225: mean 7.26 m/s, slowest after 1 s 4.51, worst one-frame loss 0.06 m/s, 53.3 m in 8 s
+mercury heading 270: mean 7.25 m/s, slowest after 1 s 4.50, worst one-frame loss 0.00 m/s, 53.2 m in 8 s
+mercury heading 315: mean 7.26 m/s, slowest after 1 s 4.52, worst one-frame loss 0.00 m/s, 53.3 m in 8 s
+== this tree
+mercury heading 0: mean 6.81 m/s, slowest after 1 s 4.45, worst one-frame loss 2.24 m/s, 47.8 m in 8 s
+mercury heading 45: mean 7.26 m/s, slowest after 1 s 4.55, worst one-frame loss 0.00 m/s, 53.3 m in 8 s
+mercury heading 90: mean 7.26 m/s, slowest after 1 s 4.53, worst one-frame loss 0.00 m/s, 53.3 m in 8 s
+mercury heading 135: mean 7.26 m/s, slowest after 1 s 4.51, worst one-frame loss 0.00 m/s, 53.1 m in 8 s
+mercury heading 180: mean 7.26 m/s, slowest after 1 s 4.51, worst one-frame loss 0.00 m/s, 53.2 m in 8 s
+mercury heading 225: mean 7.26 m/s, slowest after 1 s 4.51, worst one-frame loss 0.06 m/s, 53.3 m in 8 s
+mercury heading 270: mean 7.25 m/s, slowest after 1 s 4.50, worst one-frame loss 0.00 m/s, 53.2 m in 8 s
+mercury heading 315: mean 7.26 m/s, slowest after 1 s 4.52, worst one-frame loss 0.00 m/s, 53.3 m in 8 s

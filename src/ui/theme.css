@@ -51,11 +51,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-hud.pc-cockpit .pc-readout { bottom: auto; top: 8.5%; }
 /* (the prompt and the notice are tucked onto the cowl, as a note would be; they lay on the horizon, at 39% and 47%) */
 .pc-hud.pc-cockpit .pc-prompt { bottom: 11%; }
-.pc-hud.pc-cockpit .pc-notice { bottom: 20%; }
+.pc-hud.pc-cockpit .pc-notice { bottom: max(20%, calc(11% + 46px)); }
 /* On foot in third person the figure fills the lower middle (its feet about 14% up): the
    prompt lies under the feet, the gauge and any notice just above it, not across the legs. */
 .pc-hud.pc-foot3 .pc-prompt { bottom: 4.4%; }
-.pc-hud.pc-foot3 .pc-gauges { bottom: 11.4%; }
+.pc-hud.pc-foot3 .pc-gauges { bottom: max(11.4%, calc(4.4% + 42px)); }
 /* (a notice at 17% lay across the figure from the hips down: on foot it goes to the top of the
    sheet, where the sky is, under the hint when that is up) */
 .pc-hud.pc-foot3 .pc-notice { bottom: auto; top: 8.5%; }
@@ -64,6 +64,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-hud .pc-notice { transition: opacity 0.5s ease, bottom 0.4s ease; }
 .pc-hud .pc-gauges { transition: bottom 0.4s ease; }
 .pc-hud.pc-cockpit .pc-stats { top: 21%; }
+/* The frame read-out (top left, about 110 px tall) is up: what is lettered across the top of the
+   sheet (the hint, a notice on foot) goes under it (M4's blind play-test: the read-out lay over the
+   pointer-lock message). */
+.pc-hud.pc-stats-on .pc-hint { top: calc(9% + 116px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 116px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 116px); }
 
 /* ---- prompt: a key in ink, an action in the hand ---- */
 /* A key is a loose dab of wash with a broken pencil ring round it (PAINTER's look review):
@@ -84,7 +90,7 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 :nth-child(4n) > kbd::before { inset: 1px -4px -3px 0; border-radius: 52% 48% 38% 62% / 62% 38% 56% 44%;
   background: radial-gradient(ellipse at 52% 40%, rgba(70, 104, 170, 0.13) 0%, rgba(70, 96, 170, 0.26) 56%, rgba(47, 58, 93, 0.45) 100%); }
 :nth-child(4n) > kbd::after { background-image: var(--pc-key-d); inset: -2px -2px -3px -4px; }
-.pc-prompt { position: absolute; left: 0; right: 0; bottom: 16%; display: flex; justify-content: center; gap: 18px; opacity: 0;
+.pc-prompt { position: absolute; left: 0; right: 0; bottom: max(16%, calc(9.5% + 36px)); display: flex; justify-content: center; gap: 18px; opacity: 0;
   transition: opacity 0.25s ease; }
 .pc-prompt.pc-on { opacity: 1; }
 .pc-button { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px 7px 9px; }
@@ -108,7 +114,9 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 .pc-reticle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50% 44% 52% 46%;
   background: var(--pc-dark); box-shadow: 0 0 0 1.5px rgba(244, 239, 228, 0.7); opacity: 0; }
 .pc-reticle.pc-on { opacity: 0.5; }
-.pc-notice { position: absolute; left: 0; right: 0; bottom: 24%; width: max-content; max-width: 80%; margin: 0 auto; padding: 7px 16px 5px;
+/* (in pixels as well as in shares of the window: the slips are lettered at a fixed size, and in a
+   window 360 px high the notice lay over the prompt and the prompt on the throttle) */
+.pc-notice { position: absolute; left: 0; right: 0; bottom: max(24%, calc(16% + 46px), calc(9.5% + 82px)); width: max-content; max-width: 80%; margin: 0 auto; padding: 7px 16px 5px;
   opacity: 0; transition: opacity 0.5s ease; }
 .pc-notice.pc-on { opacity: 1; }
 .pc-hint { position: absolute; left: 0; right: 0; top: 8.5%; margin: 0 auto; width: max-content; max-width: 86%; padding: 6px 14px 4px;

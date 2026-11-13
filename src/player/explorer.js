@@ -12,6 +12,8 @@ export const EXPLORER = Object.freeze({
   height: 1.8,
   eyeHeight: 1.62,
   scramble: 1.3,             // m: anything this low (a boulder, a stump) is walked over, not round
+  glance: 0.6,               // share of the speed lost into a trunk or a column met at a run that carries on round it
+                             // (Mercury's spawn: a 2.2 m column took a run from 7.4 to 0.8 m/s in one frame)
   scrambleSkirt: 0.7,        // m: the rise onto it begins this far outside its edge
   walkSpeed: 4.2,            // m/s, the pace (by PHYSICS' gait an easy lope: a walking gait is under 2 m/s on Earth)
   runSpeed: 7.4,             // m/s with Shift
@@ -409,7 +411,7 @@ export function scrambleSample(sample, list, E = EXPLORER) {
 // walking into a trunk slides round it. Above the top (jetpack) there is nothing to hit.
 export function collideObstacles(st, obstacles, bodyRadius = 0.35, help = null) {
   if (!obstacles || !obstacles.length) { st.stuck = 0; st.detour = null; return 0; }
-  let hits = 0, c1 = null, c2 = null;
+  let hits = 0, c1 = null, c2 = null, lost = 0, lostN = null;
   const r = len(st.p), up = scale(st.p, 1 / r);
   for (const ob of obstacles) {
     if (ob.height <= EXPLORER.scramble) continue;          // low things are ground (scrambleSample)
@@ -421,11 +423,20 @@ export function collideObstacles(st, obstacles, bodyRadius = 0.35, help = null) 
     const n = dist > 1e-4 ? scale(d, 1 / dist) : scale(st.fwd, -1);
     st.p = scale(norm(addScaled(st.p, n, min - dist)), r);
     const vn = dot(st.v, n);
-    if (vn < 0) st.v = addScaled(st.v, n, -vn);
+    if (vn < 0) { st.v = addScaled(st.v, n, -vn); if (-vn > lost) { lost = -vn; lostN = n; } }
     hits++;
     if (!c1 || ob.radius < c1.ob.radius) { c2 = c1; c1 = { ob, n }; } else if (!c2 || ob.radius < c2.ob.radius) c2 = { ob, n };
   }
   if (!help) return hits;
+  // Met at a run, one trunk or column is glanced off rather than stopped at: a share of the
+  // speed that went into it carries on round it, on the side the run leans to (or the walk
+  // looks to, dead on). Wedged between two, the walk round below does it.
+  if (help.moving && st.grounded && hits === 1 && lost > 1.2 && lostN) {
+    const t = cross(up, lostN);
+    const tv = dot(st.v, t);
+    const side = Math.abs(tv) > 0.05 ? Math.sign(tv) : dot(st.fwd, t) >= 0 ? 1 : -1;
+    st.v = addScaled(st.v, t, side * lost * EXPLORER.glance);
+  }
   // Wedged between two trunks (or crystals) with the key held: each takes away the part of
   // the velocity that points into it and nothing is left. Nobody should have to work out why
   // the explorer stopped: after a quarter of a second the suit walks round the thinner of the

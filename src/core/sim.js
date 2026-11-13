@@ -15,7 +15,7 @@ import {
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../player/explorer.js';
 import {
-  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom, crownDistance, crownShape,
+  CAMERA, VIEW_PITCH, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom, crownDistance, crownShape,
 } from '../player/camera.js';
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
@@ -101,6 +101,7 @@ const ARRIVAL = Object.freeze({
 export const LEGS = Object.freeze({ gearAt: 1.0, sink: 0.6 });
 export const VISTA_RANGE = 14;      // metres: this close to a vista's spot, on foot, and it is yours
 export const VISTA_MARK = 150;      // metres: this near a view not yet drawn, one quiet mark shows where it is
+export const SHIP_MARK = 40;        // metres: farther from the ship than this on foot (or with it out of the picture), a mark shows the way back
 // A view is a picture, not a spot (PAINTER's critique, M4 item 4): found, it is offered ("E:
 // stand at the easel"); the explorer walks to the easel's place and the view comes round to the
 // heading and pitch the picture was painted with, is held while the page is drawn, and the
@@ -155,7 +156,8 @@ const EXIT = Object.freeze({
   turns: [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75, 2.1, -2.1, 2.5, -2.5],   // rad from straight away
   cover: 1 / 6,                        // the most of the frame the hull may take
   aspect: 16 / 9,
-  near: 14,                            // metres from the ship within which a sketch waits while the hull...
+  near: 40,                            // metres from the ship within which a sketch waits while the hull...
+                                       // (14 let Venus' first landscape sketch keep the ship: M4's blind play-test)
   middle: 0.7,                         // ...lies in this share of the frame round its middle...
   inPicture: 0.02,                     // ...over more than this share of it
 });
@@ -684,6 +686,20 @@ export class Sim {
     return best;
   }
 
+  // The way back to the ship on foot (M4's blind play-test: ten minutes hunting for it on Mars at
+  // night after walking six seconds away): where it stands (a point over its middle, in the
+  // body's ground frame) and how far, or null when it is not parked on this world. `near`: within
+  // SHIP_MARK metres, where the mark shows only while the ship is out of the picture.
+  shipMark() {
+    if (this.sm.state !== S.ON_FOOT || this.easel) return null;
+    const f = this.shFrame;
+    if (f.kind !== 'body' || !f.rotating || f.id !== this.bodyId) return null;
+    const up = norm(this.sh.p);
+    const p = addScaled(this.sh.p, up, 2.5);
+    const distance = len(sub(this.sh.p, this.ex.p));
+    return { p, distance, near: distance <= SHIP_MARK };
+  }
+
   // E at a found view: to its easel. The explorer walks to the spot the picture was painted
   // from; the view turns to the picture's heading and pitch (a view the world gives no heading
   // for keeps the way the player looks), third person, at the usual boom.
@@ -787,6 +803,18 @@ export class Sim {
     const to = tangent(sub(best.dir, up), up, this.footCam.viewFwd);
     best.bearingDeg = Math.atan2(dot(cross(this.footCam.viewFwd, to), scale(up, -1)), dot(this.footCam.viewFwd, to)) * 180 / Math.PI;
     return best;
+  }
+
+  // Stepping out where no view is near enough for its mark (VISTA_MARK): one word on the way to
+  // the nearest one not yet found (M4's blind play-test: landed at "a place to land" on Uranus,
+  // the nearest view was 1.5 to 1.8 km off through blank fog, and nothing said where).
+  viewWord() {
+    if (this.sm.state !== S.ON_FOOT || this.vistaMark()) return;
+    const v = this.nearestVista();
+    if (!v || v.distance > 6000) return;
+    const d = v.distance >= 1000 ? (v.distance / 1000).toFixed(1) + ' km' : Math.round(v.distance / 10) * 10 + ' m';
+    const a = v.bearingDeg, way = Math.abs(a) < 25 ? 'ahead' : Math.abs(a) > 155 ? 'behind you' : a > 0 ? (a < 90 ? 'ahead to the right' : 'behind to the right') : (a > -90 ? 'ahead to the left' : 'behind to the left');
+    this.say(`A view to find ${d} ${way}: fly nearer, or walk`, 8);
   }
 
   // What the sketchbook shows: per body, the biomes stood on and the vistas found.
@@ -1000,7 +1028,7 @@ export class Sim {
         if (k >= 1) this.ex.p = { ...T.exTo };
       }
       this.sh.canopy01 = Math.sin(Math.PI * clamp01(k)) ** 0.7;
-      if (k >= 1) { this.transition = null; this.sh.canopy01 = 0; this.ex.mode = 'idle'; this.ex.speed = 0; this.sm.dispatch(EV.steppedOut); }
+      if (k >= 1) { this.transition = null; this.sh.canopy01 = 0; this.ex.mode = 'idle'; this.ex.speed = 0; this.sm.dispatch(EV.steppedOut); this.viewWord(); }
     }
   }
 
@@ -1165,6 +1193,10 @@ export class Sim {
   }
 
   say(text, seconds = 3.5) { this.notice = { text, until: this.t + seconds }; }
+
+  // The view on foot taken back to looking out over the land (save.js VIEW_PITCH): after a
+  // pointer lock that threw it about, and for a new session's first view.
+  levelView() { this.footCam.pitch = clamp(this.footCam.pitch, VIEW_PITCH[0], VIEW_PITCH[1]); }
 
   // The course to the target from where the ship is: { dir, around } (pulse.js courseDir), or null.
   course(f = qRotate(this.sh.q, V(0, 0, -1)), spheres = this.pulseSpheres(), dest = this.target) {

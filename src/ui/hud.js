@@ -204,6 +204,7 @@ export function createHud(root) {
     // The frame-time read-out (behind ?stats=1 or the ` key).
     setStats(text) {
       stats.classList.toggle('pc-on', !!text);
+      root.classList.toggle('pc-stats-on', !!text);
       if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
     },
     // (the first time the card is put away the game has begun: from then on it is the help card, whole)

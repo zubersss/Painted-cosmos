@@ -25,7 +25,7 @@ export const SKETCH_SLIP = Object.freeze({
   moved: 4,                    // metres from where the explorer stood at the arrival...
   wait: 25,                    // ...or this many seconds standing there
   seconds: 5,                  // how long the slip stays
-  shipWait: 30,                // seconds a new page waits for the parked ship to be out of the middle of the frame
+  shipWait: 45,                // seconds a new page waits for the parked ship to be out of the middle of the frame
 });
 
 // ---- the sketch's hand -----------------------------------------------------------------------

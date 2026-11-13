@@ -9,6 +9,10 @@ import {
   clamp, mix, damp, qLook, qSlerp, qRotate, lerp,
 } from '../core/vec.js';
 
+// The view pitch a session starts with, and the view is taken back to after a pointer lock
+// that threw it about (rad: 26 degrees down, 17 up).
+export const VIEW_PITCH = Object.freeze([-0.45, 0.3]);
+
 export const CAMERA = Object.freeze({
   fovFoot: 58,               // vertical degrees
   fovShip: 62,

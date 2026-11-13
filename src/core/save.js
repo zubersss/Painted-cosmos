@@ -9,7 +9,7 @@ import { BODIES } from '../data/bodies.js';
 import { S } from './state.js';
 import { bodyFrame } from './frames.js';
 import { createExplorerState, EXPLORER } from '../player/explorer.js';
-import { createFootCamera, createShipCamera } from '../player/camera.js';
+import { createFootCamera, createShipCamera, VIEW_PITCH } from '../player/camera.js';
 import { createShipState } from '../ship/flight.js';
 import { norm, len, tangent, qNorm, qRotate, V } from './vec.js';
 
@@ -34,7 +34,7 @@ export function snapshot(sim) {
     state: st,
     bodyId: sim.bodyId,
     explorer: { p: r3(sim.ex.p), fwd: r3(sim.ex.fwd), fuel: +sim.ex.fuel.toFixed(3) },
-    view: { fwd: r3(sim.footCam.viewFwd), pitch: +sim.footCam.pitch.toFixed(3), boom: sim.footCam.boom, firstPerson: !!sim.footCam.firstPerson },
+    view: { fwd: r3(sim.footCam.viewFwd), pitch: +Math.max(VIEW_PITCH[0], Math.min(VIEW_PITCH[1], sim.footCam.pitch)).toFixed(3), boom: sim.footCam.boom, firstPerson: !!sim.footCam.firstPerson },
     ship: { bodyId: sim.shFrame.id, p: r3(sim.sh.p), q: qOf(sim.sh.float ? sim.sh.float.q0 : sim.sh.q) },     // (afloat: its still attitude, not this moment's pitch)
     target: sim.target, targetLocked: !!sim.targetLocked,
     visited: Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)])),
@@ -96,7 +96,10 @@ export function restore(sim, d) {
   if (num(d.explorer.fuel)) sim.ex.fuel = Math.min(1, Math.max(0, d.explorer.fuel));
   const view = d.view || {};
   sim.footCam = createFootCamera(vec(view.fwd) ? view.fwd : sim.ex.fwd, eg.dir);
-  if (num(view.pitch)) sim.footCam.pitch = Math.max(-1.1, Math.min(1.2, view.pitch));
+  // The first view of a new session looks out over the land: a view saved looking near straight
+  // up or down (M4's blind play-test: a pointer lock gone wrong had thrown it straight up, and
+  // after a reload first person showed only sky) comes back eased into VIEW_PITCH.
+  if (num(view.pitch)) sim.footCam.pitch = Math.max(VIEW_PITCH[0], Math.min(VIEW_PITCH[1], view.pitch));
   if (num(view.boom)) sim.footCam.boom = Math.max(2.2, Math.min(14, view.boom));
   sim.footCam.firstPerson = !!view.firstPerson;
   sim.target = d.target && BODIES[d.target] ? d.target : null;

@@ -187,3 +187,35 @@ test('a game saved on the Moon after its hour was set keeps Earth where it hung 
   const pa = a.eph.position('moon', a.t), pb = b.eph.position('moon', b.t);
   assert.ok(Math.hypot(pa.x - pb.x, pa.y - pb.y, pa.z - pb.z) < 1e-6, 'the Moon where it was');
 });
+
+// M4's blind play-test: a pointer lock gone wrong threw the view straight up, and that pitch was
+// saved: after a reload first person showed only sky.
+test('a view saved looking straight up or down comes back looking out over the land; levelView does the same in play', async () => {
+  const { CAMERA } = await import('../src/player/camera.js');
+  const VIEW_PITCH = [-0.45, 0.3];            // (camera.js VIEW_PITCH: 26 degrees down to 17 up)
+  for (const pitch of [CAMERA.pitchMax, 1.2, -1.1, CAMERA.pitchMin]) {
+    const a = newSim();
+    const pad = new Pad();
+    play(a, pad, 0.5);
+    a.footCam.pitch = pitch;
+    a.footCam.firstPerson = true;
+    const text = JSON.stringify(snapshot(a));
+    // An older save holds the raw pitch: a session started from one is eased too.
+    const old = JSON.parse(text); old.view.pitch = pitch;
+    for (const d of [JSON.parse(text), old]) {
+      const b = newSim();
+      assert.equal(restore(b, d), true);
+      assert.ok(b.footCam.pitch >= VIEW_PITCH[0] - 1e-9 && b.footCam.pitch <= VIEW_PITCH[1] + 1e-9, `saved at ${pitch}: the first view's pitch ${b.footCam.pitch.toFixed(2)}`);
+      assert.equal(b.footCam.firstPerson, true);
+    }
+    a.levelView();
+    assert.ok(a.footCam.pitch >= VIEW_PITCH[0] - 1e-9 && a.footCam.pitch <= VIEW_PITCH[1] + 1e-9);
+  }
+  // A view within the range is kept as it was.
+  const c = newSim();
+  play(c, new Pad(), 0.2);
+  c.footCam.pitch = 0.1;
+  const r = newSim();
+  restore(r, JSON.parse(JSON.stringify(snapshot(c))));
+  assert.ok(Math.abs(r.footCam.pitch - 0.1) < 1e-3);
+});

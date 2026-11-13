@@ -167,3 +167,53 @@ test('M4 the re-fix: the walk to an easel stops a metre short of a cliff and is 
   const edge = ground(at(5.6));
   assert.ok(len(sub(sim.easelWay(edge, ground(at(14))), edge)) < 1e-9);
 });
+
+// M4's blind play-test: ten minutes hunting for the parked ship on Mars at night after walking
+// six seconds away. On foot the ship has a mark (game.js updateMarks draws it as "the ship" with
+// the distance, a ring where it stands or an arrow at the picture's edge): sim.shipMark says
+// where and how far, near (within SHIP_MARK) only while it is out of the picture.
+test('the way back to the ship: on foot, a mark with the distance; near it, only when it is out of the picture; none in the ship or on another world', async () => {
+  const { SHIP_MARK } = await import('../src/core/sim.js');
+  const sim = new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir });
+  const pad = new Pad();
+  sim.teleport({ body: 'mars', ship: true, altitude: 30 });
+  play(sim, pad, 0.3);
+  pad.tap('KeyE');
+  play(sim, pad, 60, { until: () => sim.sm.state === S.LANDED });
+  assert.equal(sim.shipMark(), null, 'none in the ship');
+  pad.tap('KeyE');
+  play(sim, pad, 4, { until: () => sim.sm.state === S.ON_FOOT });
+  let m = sim.shipMark();
+  assert.ok(m && m.near && m.distance < SHIP_MARK, 'beside the ship: near (shown only if it is out of the picture)');
+  pad.press('KeyW'); pad.press('ShiftLeft');
+  play(sim, pad, 9);
+  pad.releaseAll();
+  m = sim.shipMark();
+  assert.ok(m && !m.near && m.distance > SHIP_MARK, 'a short run away: the mark shows, ' + (m && m.distance.toFixed(0)) + ' m');
+  assert.ok(Math.abs(m.distance - len(sub(sim.sh.p, sim.ex.p))) < 1e-6);
+  assert.ok(len(m.p) > len(sim.sh.p), 'the mark stands over the ship');
+  sim.teleport({ body: 'venus' });
+  play(sim, pad, 0.2);
+  assert.equal(sim.shipMark() && sim.shipMark().distance > 1e4 ? 'far' : sim.shipMark() ? 'here' : null, 'here', 'teleported on foot: the ship comes along to this world');
+});
+
+// M4's blind play-test (CONFUSING 7): on Uranus "a place to land" put the player 1.5 to 1.8 km from
+// the nearest view not yet found, through blank fog, and nothing said where it was.
+test('stepping out with no view near enough for its mark: one word says how far the nearest is, and which way', () => {
+  // one view about 1.5 km east of Mars' spawn, one farther west
+  const up = norm(stubSpawn('mars').unitDir), east = norm(cross(V(0, 1, 0), up)), R = 3000;
+  const farViews = [{ id: 'far', name: 'Far Ridge', unitDir: norm(add(up, scale(east, 1600 / R))) }, { id: 'farther', name: 'Farther', unitDir: norm(add(up, scale(east, -3000 / R))) }];
+  const sim = new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, getVistas: (id) => (id === 'mars' ? farViews : []) });
+  const pad = new Pad();
+  sim.teleport({ body: 'mars', ship: true, altitude: 30 });
+  play(sim, pad, 0.3);
+  pad.tap('KeyE');
+  play(sim, pad, 60, { until: () => sim.sm.state === S.LANDED });
+  pad.tap('KeyE');
+  play(sim, pad, 4, { until: () => sim.sm.state === S.ON_FOOT });
+  assert.equal(sim.sm.state, S.ON_FOOT);
+  const d = sim.nearestVista().distance;
+  assert.ok(d > 1300 && d < 1700, 'the nearest view is ' + d.toFixed(0) + ' m off');
+  assert.ok(sim.notice && sim.notice.text.startsWith(`A view to find ${(d / 1000).toFixed(1)} km `), 'said: ' + (sim.notice && sim.notice.text));
+  assert.match(sim.notice.text, / (ahead|behind)/);
+});

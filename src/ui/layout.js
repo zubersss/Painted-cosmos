@@ -54,9 +54,10 @@ export const ringSize = (r) => Math.round(Math.max(MARKS.ringMin, Math.min(MARKS
 const hits = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
 
 // A label that must show and whose four places all touch something (the nose a few degrees off
-// a target, its ring over the ship: under, over, right and left of the ring are all on the hull):
-// each place is slid on away from the ring, in 2 px steps, until it is clear. The nearest clear
-// place wins, clear of everything first, then of the hard keep-outs (the ship) at least. The
+// a target, its ring over the ship: under, over, right and left of the ring are all on the hull;
+// a place to land under the prompt): each place is slid on away from the ring, in 2 px steps,
+// until it is clear. The nearest clear place wins, clear of everything first (the slips too),
+// then of the hard keep-outs (the ship) at least. The
 // re-fix pass, M4: such a label fell back to its first place, under the ring, on the ship
 // (the nose 4 degrees over Mars: "Mars 463.0 km 76 s" over the ship, two wing tips showing).
 const AWAY = { below: [0, 1], above: [0, -1], right: [1, 0], left: [-1, 0] };
@@ -106,8 +107,10 @@ export function layoutMarks(list, view) {
     const rect = (c) => ({ x0: m.x + c.lx - lw / 2, x1: m.x + c.lx + lw / 2, y0: m.y + c.ly, y1: m.y + c.ly + lh });
     const inside = (r) => r.x0 >= M.margin && r.x1 <= w - M.margin && r.y0 >= M.margin && r.y1 <= h - M.margin;
     const free = (r, soft) => inside(r) && !placed.some((p) => hits(r, p)) && !keep.some((k) => (soft || !k.soft) && hits(r, k));
+    // A label that must show slides to a place clear of everything before it lies on a slip
+    // (M4's blind play-test: "a place to land 256 m" over the "Land here" prompt and the throttle).
     let pick = cands.find((c) => free(rect(c), true));
-    if (!pick && must) pick = cands.find((c) => free(rect(c), false)) || slide(cands, rect, free, w, h) || cands[0];
+    if (!pick && must) pick = slide(cands, rect, free, w, h) || cands[0];
     m.lw = lw; m.lh = lh;
     if (!pick) { m.label = null; m.text = null; continue; }
     m.lx = pick.lx; m.ly = pick.ly;

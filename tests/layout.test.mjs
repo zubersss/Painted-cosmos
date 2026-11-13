@@ -110,3 +110,20 @@ test('M4 the re-fix: the nose a few degrees off the target, its ring over the sh
   }
   assert.ok(n > 600 && onNotice === 0, `${n} places, on the notice at ${onNotice}`);
 });
+
+// M4's blind play-test (3d38bb2): low over Venus, "a place to land 256 m" lay on the "Land here"
+// prompt and on the throttle bar (its ring just over the prompt, the ship above it). A label that
+// must show now slides to a place clear of the slips before it lies on one.
+test('a place to land under the ship, just over the prompt: its label keeps off the prompt, the throttle and the ship', () => {
+  const prompt = { x0: 405, x1: 555, y0: 414, y1: 456, soft: true };
+  const throttle = { x0: 488, x1: 716, y0: 458, y1: 492, soft: true };
+  const readout = { x0: 62, x1: 246, y0: 436, y1: 494, soft: true };
+  const ship = { x0: 360, x1: 600, y0: 285, y1: 372 };
+  for (const [x, y] of [[480, 400], [470, 410], [520, 392], [455, 380], [600, 440]]) {
+    const list = [{ kind: 'body', keep: true, x, y, r: 3, label: 'a place to land', sub: '256 m' }];
+    layoutMarks(list, { w: W, h: H, sizeOf, keep: [prompt, throttle, readout, ship] });
+    const r = rectOf(list[0]);
+    for (const [name, k] of [['prompt', prompt], ['throttle', throttle], ['read-out', readout], ['ship', ship]]) assert.ok(!hits(r, k), `ring at ${x},${y}: the label is off the ${name} (${JSON.stringify(r)})`);
+    assert.ok(r.x0 >= MARKS.margin && r.x1 <= W - MARKS.margin && r.y0 >= MARKS.margin && r.y1 <= H - MARKS.margin, 'inside the picture');
+  }
+});

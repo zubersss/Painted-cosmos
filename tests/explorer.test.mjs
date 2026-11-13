@@ -513,3 +513,28 @@ test('M4 burn and coast: the tank refills only on the ground or afloat, so no bu
   for (let t = 0; t < EXPLORER.rechargeGroundSeconds + 0.1; t += DT) stepExplorer(st, { viewFwd: fwd0 }, DT, env);
   assert.equal(st.fuel, 1);
 });
+
+// Mercury's spawn (the coordinator's ruling of P26, PILOT's): collideObstacles stopped a run dead
+// on a 2.2 m column, 7.40 -> 0.79 m/s in one frame. A run now glances off a trunk or a column and
+// carries on round it.
+test('a run into a column glances off it and goes on round, instead of stopping dead', () => {
+  const right = cross(fwd0, start);
+  const at = (ahead, side) => norm(add(start, add(scale(fwd0, ahead / R), scale(right, side / R))));
+  for (const side of [0, 0.3, -0.6]) {
+    const col = [{ unitDir: at(9, side), radius: 1.1, height: 2.2 + EXPLORER.scramble }];
+    const env = { sample: makeWorld({ R }), gravity: 3.7 };
+    const st = createExplorerState(scale(start, R), fwd0);
+    let before = 0, after = Infinity, met = false, minGap = Infinity;
+    for (let i = 0; i < 4 / DT; i++) {
+      const v0 = st.speed;
+      stepExplorer(st, { moveZ: 1, run: true, viewFwd: fwd0 }, DT, env);
+      const hit = collideObstacles(st, col, undefined, { moving: true, dt: DT });
+      if (hit && !met) { met = true; before = v0; after = len(st.v); }
+      minGap = Math.min(minGap, arc(st.p, col[0].unitDir, R) - col[0].radius);
+    }
+    assert.ok(met && before > 5, `side ${side}: ran into it at ${before.toFixed(1)} m/s`);
+    assert.ok(after > before * 0.5, `side ${side}: kept ${after.toFixed(1)} of ${before.toFixed(1)} m/s in the frame it met the column`);
+    assert.ok(minGap > 0.3, 'never inside it: ' + minGap.toFixed(2));
+    assert.ok(dot(sub(st.p, scale(start, R)), fwd0) > 14, `side ${side}: past it, ${dot(sub(st.p, scale(start, R)), fwd0).toFixed(1)} m on after 4 s`);
+  }
+});

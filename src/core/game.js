@@ -103,6 +103,9 @@ export class Game {
       this.uiNotice = this.input.message; this.uiNoticeUntil = performance.now() + 9000;
       this.input.message = null;
     }
+    // The lock reported nonsense before the game stopped trusting it: whatever it did to the
+    // view (thrown straight up, in the blind play-test) is taken back to looking over the land.
+    if (this.input.thrown) { this.input.thrown = false; if (sim.levelView) sim.levelView(); }
     const st0 = this.stats;
     st0.window.push(realDt * 1000);
     if (st0.window.length > 90) st0.window.shift();
@@ -266,7 +269,10 @@ export class Game {
       const known = this.biomesOf(p.id) || p.biomes.map((id) => ({ id, name: pretty(id) }));
       const biomes = known.map((b) => ({ id: b.id, name: b.name, done: walked.has(b.id), sketch: sk && walked.has(b.id) ? sk.get(biomeKey(p.id, b.id)) : null }));
       for (const id of p.biomes) if (!known.some((b) => b.id === id)) biomes.push({ id, name: pretty(id), done: true, sketch: sk ? sk.get(biomeKey(p.id, id)) : null });
-      const vistas = (p.vistas || []).map((v) => ({ id: v.id, name: v.name, done: v.found, sketch: sk && v.found ? sk.get(vistaKey(p.id, v.id)) : null }));
+      // (a view named as a landscape of the page is captioned as the view: on Uranus' page the
+      // landscape and the view were both "Pearl Fog Flats", M4's blind play-test)
+      const names = new Set(biomes.map((b) => b.name));
+      const vistas = (p.vistas || []).map((v) => ({ id: v.id, name: names.has(v.name) ? `${v.name}, the view` : v.name, done: v.found, sketch: sk && v.found ? sk.get(vistaKey(p.id, v.id)) : null }));
       return { id: p.id, name: p.name, visited: p.visited, biomes, vistas };
     });
   }
@@ -523,26 +529,35 @@ export class Game {
       // (the ship's keep-out follows)
     }
     // On foot: one quiet mark for the nearest view not yet drawn within VISTA_MARK metres (a small
-    // ring where its easel is, or an arrow at the picture's edge), as "a place to land" is in flight.
+    // ring where its easel is, or an arrow at the picture's edge), as "a place to land" is in flight;
+    // and the way back to the ship, farther than SHIP_MARK metres or out of the picture.
     if (st === S.ON_FOOT && !(this.map && this.map.open) && !(this.book && this.book.open) && this.started) {
-      const vm = sim.vistaMark();
-      const root = vm && vm.distance > 5 ? this.world.bodies.get(sim.bodyId) : null;
-      if (root) {
-        p.set(vm.p.x, vm.p.y, vm.p.z).applyQuaternion(root.quaternion).add(root.position).applyMatrix4(cam.matrixWorldInverse);
+      const root = this.world.bodies.get(sim.bodyId);
+      const mark = (q, label, distance, always) => {
+        p.set(q.x, q.y, q.z).applyQuaternion(root.quaternion).add(root.position).applyMatrix4(cam.matrixWorldInverse);
         const nx = p.z < 0 ? p.x / -p.z / (tanHalf * cam.aspect) : 9;
         const ny = p.z < 0 ? p.y / -p.z / tanHalf : 9;
-        if (Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) list.push({ kind: 'body', keep: true, x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label: 'a view', sub: fmt(vm.distance) });
-        else {
-          const a = Math.atan2(-p.y, p.x);
-          list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label: 'a view', sub: fmt(vm.distance) });
+        if (Math.abs(nx) < 0.9 && Math.abs(ny) < 0.82) {
+          if (always) list.push({ kind: 'body', keep: true, x: (nx * 0.5 + 0.5) * w, y: (-ny * 0.5 + 0.5) * h, r: 3, label, sub: fmt(distance) });
+        } else {
+          let a = Math.atan2(-p.y, p.x);
+          // Behind (or below) the view the arrow goes to the side the mark lies on, a little low:
+          // straight down it lay on the figure's legs, in the lower middle of the picture.
+          if (p.z >= 0 || Math.sin(a) > 0.7) a = p.x >= 0 ? 0.3 : Math.PI - 0.3;
+          list.push({ kind: 'edge', x: w / 2 + Math.cos(a) * w * 0.4, y: h / 2 + Math.sin(a) * h * edgeY(a), r: 0, angle: a, label, sub: fmt(distance) });
         }
-        // the figure is the subject on foot: the label keeps off it
-        if (!sim.footCam.firstPerson) {
-          p.copy(this.explorerModel.object3D.position).applyMatrix4(cam.matrixWorldInverse);
-          if (p.z < -0.5) {
-            const k = (h / 2) / (-p.z * tanHalf), sx = w / 2 + p.x * k, sy = h / 2 - p.y * k;
-            view.keep.push({ x0: sx - 0.8 * k, x1: sx + 0.8 * k, y0: sy - 2.2 * k, y1: sy + 0.1 * k });
-          }
+      };
+      const n0 = list.length;
+      const vm = root ? sim.vistaMark() : null;
+      if (vm && vm.distance > 5) mark(vm.p, 'a view', vm.distance, true);
+      const sm = root && sim.shipMark ? sim.shipMark() : null;
+      if (sm) mark(sm.p, 'the ship', sm.distance, !sm.near);
+      // the figure is the subject on foot: the labels keep off it
+      if (list.length > n0 && !sim.footCam.firstPerson) {
+        p.copy(this.explorerModel.object3D.position).applyMatrix4(cam.matrixWorldInverse);
+        if (p.z < -0.5) {
+          const k = (h / 2) / (-p.z * tanHalf), sx = w / 2 + p.x * k, sy = h / 2 - p.y * k;
+          view.keep.push({ x0: sx - 0.8 * k, x1: sx + 0.8 * k, y0: sy - 2.2 * k, y1: sy + 0.1 * k });
         }
       }
     }

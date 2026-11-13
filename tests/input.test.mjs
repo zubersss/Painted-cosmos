@@ -76,22 +76,52 @@ test('flicks at 20 to 60 fps keep the lock and turn the view as far as the hand 
   }
 });
 
-test('nonsense under the lock (window-sized jumps undone at once) still drops it: once until the next click, then for good', () => {
+// M4's blind play-test (3d38bb2): the lock reported nonsense, the game noticed and said "hold
+// the left mouse button and drag", but every mousedown took the lock again (the first fall-back
+// re-armed it for the next click), so dragging never turned the camera, and the view the
+// nonsense had thrown straight up was saved. Now the fall-back holds for the session.
+test('nonsense under the lock drops it for good: no click takes the lock again, the drag turns the view, the view is levelled', () => {
   const { doc, el, input } = page();
   el.fire('mousedown', { button: 0 });
+  assert.equal(input.locked, true);
   let t = 1000;
   const jump = () => { t += 16; doc.fire('mousemove', { movementX: 500 * 0.6, movementY: 0, timeStamp: t }); t += 16; doc.fire('mousemove', { movementX: -500 * 0.6, movementY: 0, timeStamp: t }); };
   for (let i = 0; i < 3; i++) jump();
   assert.equal(input.usePointerLock, false); assert.equal(input.locked, false);
-  assert.match(input.message, /click to try it again/);
-  el.fire('mousedown', { button: 0 });
-  assert.equal(input.locked, true, 'the next click tries the lock once more');
-  for (let i = 0; i < 3; i++) jump();
-  assert.equal(input.usePointerLock, false);
-  assert.match(input.message, /in this browser/);
-  el.fire('mousedown', { button: 0 });
-  assert.equal(input.locked, false, 'and then not again');
+  assert.equal(doc.pointerLockElement, null, 'the lock is let go');
+  assert.match(input.message, /hold the left button and drag/);
+  assert.equal(input.thrown, true, 'the game is told to level the view');
   assert.equal(input.dx, 0, 'none of it turned the view');
+  doc.fire('mouseup', {});
+  // Every later click is a drag, never a lock.
+  let asked = 0;
+  const req = el.requestPointerLock;
+  el.requestPointerLock = () => { asked++; return req(); };
+  for (let k = 0; k < 5; k++) {
+    el.fire('mousedown', { button: 0, clientX: 300, clientY: 200 });
+    assert.equal(input.locked, false, 'click ' + (k + 1) + ' does not take the lock');
+    doc.fire('mousemove', { clientX: 300, clientY: 160, movementX: 999, movementY: 999 });
+    doc.fire('mouseup', {});
+  }
+  assert.equal(asked, 0, 'the lock is never asked for again');
+  const o = input.take(1 / 60);
+  assert.equal(o.dy, -200, 'five drags of 40 px up turned the view by 200 px');
+  assert.equal(o.dx, 0);
+});
+
+test('a lock that arrives after the fall-back (a request still on its way) is let go at once, and the drag still turns the view', () => {
+  const { doc, el, input } = page();
+  input.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
+  doc.pointerLockElement = el; doc.fire('pointerlockchange');
+  assert.equal(doc.pointerLockElement, null, 'let go');
+  assert.equal(input.locked, false);
+  // Even a browser that never lets go (headless keeps the canvas as the lock element) cannot
+  // turn the drag into lock moves.
+  doc.exitPointerLock = () => {};
+  doc.pointerLockElement = el; doc.fire('pointerlockchange');
+  el.fire('mousedown', { button: 0, clientX: 100, clientY: 100 });
+  doc.fire('mousemove', { clientX: 130, clientY: 100, movementX: 640, movementY: -360 });
+  assert.equal(input.take(1 / 60).dx, 30, 'the drag, not the lock\'s nonsense');
 });
 
 // What headless Chromium sends for scripted drags under the lock (recorded, run 8): jumps to and

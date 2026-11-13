@@ -95,11 +95,18 @@ continues from there on the next visit. Add `?fresh=1` to the address to start a
 
 Opening the map or the sketchbook lets go of the mouse, so that you can click on the page; a
 click on the picture captures it again. If the browser keeps refusing to capture the mouse (three
-times in a row, not just after Esc), or reports nonsense while it does (twice), the game says
-so and you look around by holding the left button and dragging.
+times in a row, not just after Esc), or reports nonsense while it does, the game says so and
+for the rest of the visit you look around by holding the left button and dragging (a click no
+longer captures the mouse; reload the page to try again). A view left looking straight up or
+down is not carried into the next visit: it starts looking out over the land.
+
+On foot, farther than about 40 m from the parked ship (or with it out of the picture), a small
+slip says "the ship" and how far it is: a ring over it, or an arrow at the picture's edge
+pointing the way to turn. Walk to it and press `E`.
 
 Each world has views to find. On foot, within 150 m of one not yet drawn, a small ring (or an
-arrow at the picture's edge) says "a view". Walk up to it and it is found; press `E` there to
+arrow at the picture's edge) says "a view"; stepping out of the ship with none that near, a
+line says how far the nearest one is and which way. Walk up to it and it is found; press `E` there to
 stand at its easel: you are walked to the spot and turned the way the picture was painted, and
 the page is drawn. Every landscape gets a sketch the first time you walk into it. A sketch is
 drawn in washes and pencil from the picture on the screen, without you in it.
