@@ -4,7 +4,53 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of the M4 PRE-SHIP round (nineteenth PAINTER agent; READ THIS FIRST; kept current after every item)
+## Hand-over of the M4 PRE-SHIP RE-FIX pass (twentieth PAINTER agent; READ THIS FIRST)
+
+The verifier of the pre-ship round accepted items 1 to 3 (NOT ACCEPTED: none) and found two minor regressions with one
+cause, and a note. This pass fixes exactly that and nothing else. Began 18:48 UTC, 2026-11-13, on head `22120b9`.
+Scratch: `/home/user/.pc-scratch/painter/preship/refix/` (trees `F` the head with PAINTER's working tree, `H` the head,
+`B` the head with PAINTER's paths at `25074de`, before item 3; `frames.mjs`, `rows.py`, `pair.py` are copies of the
+verifier's instruments, `sheet3.py` the three-column sheet; frames in `q2/`, `q0/`). The verifier's own files:
+`/home/user/.pc-scratch/verify/preship-painter/`.
+
+**State at the end of the pass:** the one fix DONE and committed (the commit after `22120b9`, named in the log below
+it). Nothing of mine half-done in the working tree. Item 4 (the climb to space; the Uranus sketch's change for PILOT)
+stands as the round left it, below.
+
+- **RE-FIX, THE NIGHT WASH OVER THE NEAR LAND ON EVERY WORLD (the verifier's two minor regressions): DONE.** Item 3(c)
+  laid the graded darker wash over the near land at night (`render/post.js`) on every world; it was judged on Mars, and
+  on Earth it sank the one lighter mass of each nocturne toward the dark: the spawn's moonlit meadow at the top tier
+  (L* 10-90 19.9 -> 16.9 in the verifier's frames) and the sea coast's pale beach at quality 0 (12.6 -> 11.4). Its
+  strength is now a world's own: a look's `nightNear` (Mars 0.30, the value item 3 was judged with; every other look
+  says nothing and has none), carried as `SHEET.nightNear` (set beside `SHEET.night` in `world/index.js`, 0 in deep
+  space) to a new sheet uniform `uNightNear` (`render/index.js`, `render/post.js`, `render/shared.js`). With 0 the
+  sheet lays exactly what it laid before the wash existed. Mars' night sky band (`nightHorizon`) and every other part
+  of item 3 are untouched. The verifier's NOTE (the wash gated only on the night key, no check for air) is moot now:
+  only Mars, which has air, asks for it.
+  Measured with the verifier's own `frames.mjs` (the real game, clock held at 300 s, 23:30, 960x540, HUD hidden) on
+  `B` (before item 3) / `H` (the head) / `F` (this), L* 10-90 spread and the lower three bands' medians: quality 2
+  scale 1, Earth spawn 19.7 (38.4/40.2/39.8) / 16.8 (35.1/35.2/34.5) / 19.7 (38.4/40.2/39.8), and `F` against `B` a mean
+  difference of 0.24 of 255 (0.3 % of pixels over 8: the settle's own steps); quality 0 scale 0.5, Earth spawn 20.1 /
+  17.8 / 20.1, the sea coast 12.5 (49.0/49.0/48.6) / 11.4 (46.3/44.7/44.2) / 12.5 (49.0/49.0/48.6), `F` against `B` 0.25
+  and 0.22 of 255. Mars kept: quality 2 spawn 36.4 (head) / 36.6 (this), quality 0 spawn 32.7 / 32.7 (19.2 before item
+  3), polar frost 23.6 / 23.7 (15.1 before); `F` against `H` on Mars 0.04 to 0.5 of 255. Frames (opened, every one):
+  `preship/06-night-wash-mars-only.jpg` (three columns: before item 3, head, this; six rows: Earth spawn at q2, Mars at
+  q2, Earth spawn, sea coast, Mars, Mars' frost at q0). Seen: on Earth the moonlit meadow and the pale beach are again
+  the lighter masses under the dark wood and the sea; Mars is three washes as item 3 left it.
+  A slip, caught and logged: my first try had a backtick in the new comment inside the sheet's shader (a JS template
+  string), which ended the string; the game loaded with `fallback: ["render: Unexpected identifier 'nightNear'"]`. The
+  frames.mjs run said so; fixed before any frame was kept. Hence the new test also checks that the four files parse.
+  New test `src/world/nightwash.test.mjs` (one case: only Mars asks for the wash, Earth does not, the four files parse,
+  the wash's strength is `uNightNear` and the look's number reaches it, deep space lays none): FAILS on the head
+  `22120b9`, passes now. World tests 24 -> 25.
+  Checks on a clean export of `22120b9` with these files (`F`): world 25, unit 198, physics 325, `coast.mjs` PASS at
+  both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs` Earth sea_coast 0.2 m
+  at most on ground over 50 degrees; the game at quality 2 and at quality 0 (`frames.mjs` on `F`): no console error, no
+  game error, fallback empty. (I copied the new test file into `F` while a browser served it; the page never loads a
+  test file.) Not verified: the other worlds' nights with the wash were never measured by anyone (the round judged Mars
+  and Earth); they are now back to the state before item 3, which is what had been verified.
+
+## Hand-over of the M4 PRE-SHIP round (nineteenth PAINTER agent; kept current after every item)
 
 The last fix round before ship (the coordinator's ruling of 15:40 UTC, 2026-11-13: workflow m4-preship). The list, in
 order: (1) the column of leaf dabs in the alpine meadow's sky; (2) stair-stepped figure and ship at tier 0 and half
@@ -90,7 +136,8 @@ the climb to space (4b), Venus at quality 2 with the final bank numbers (not see
   0.86, 0.88, it was 0.71, 0.69, 0.71), and on every world with air the sheet lays a graded darker wash over the near
   land at night (`render/post.js`: land within about 20 m, easing out by 160 m, over the lower part of the sheet; the
   figure, the ship and the lights keep theirs). Tried and taken out: the ground and water alone (the sward's strokes
-  stood on it as pale cut-outs).
+  stood on it as pale cut-outs). (RE-FIX, above: the near-land wash is now Mars' own, a look's `nightNear`; on every
+  world it made Earth's nocturnes flatter.)
   Measured (`bands.py`: L* medians of six bands top to bottom; the 10-90 spread), quality 0: Uranus' view 7.2 -> 9.9
   (lower bands 89.5 / 87.2 / 85.6 -> 87.9 / 85.1 / 84.9), turned 120 degrees 7.4 -> 10.3; Venus 225 m up 22.2 -> 24.6;
   Venus' pale mesas 13.4 -> 13.4 (not improved: no banks there by choice, the patches do not show from the stand); Mars

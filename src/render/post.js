@@ -120,6 +120,7 @@ uniform vec4 uBorder;     // width, raggedness, pooling, enabled
 uniform vec2 uBoil;
 uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm), y lightning flash
 uniform float uNight;     // the night key: 0 day .. 1 night on the ground
+uniform float uNightNear; // the world's own deeper night wash over the near land (a look's nightNear; 0 on most worlds)
 uniform float uLaid;      // 1 the picture is on the paper; 0 bare paper; between: it comes up from the paper as one
 varying vec2 vUv;
 ${AUX_DEC}
@@ -224,10 +225,12 @@ void main() {
   // near ground, the middle distance and the sky's lighter band are three washes. It is laid as a graded wash over
   // the lower part of the sheet, the land and what stands on it alike (the ground alone left the sward's strokes as
   // pale cut-outs on it); the figure and the ship (region 5) and the lights keep theirs: they are the subject)
+  // (its strength is the world's own, a look's nightNear, Mars 0.30: laid on every world it sank Earth's moonlit
+  // meadow and pale beach, each the one lighter mass of its nocturne, toward the wood's and the sea's value)
   float clsN = floor(auxU.w + 0.001);
   float nearLand = step(0.5, auxU.w) * (1.0 - step(4.5, clsN) * step(clsN, 5.5)) * step(clsN, 6.5)
                  * (1.0 - smoothstep(4.3, 7.3, auxU.z)) * (1.0 - smoothstep(0.30, 0.62, vUv.y));
-  d += uNight * 0.30 * nearLand * (1.0 - lamp);
+  d += uNight * uNightNear * nearLand * (1.0 - lamp);
 
   // ragged unpainted border: the wash simply stops, and pools where it stops
   vec2 bd = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);
@@ -377,7 +380,7 @@ export class Post {
       uBorder: { value: new THREE.Vector4(0.030, 0.034, 0.9, 1) },
       uBoil: { value: new THREE.Vector2(0, 0) },
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
-      uNight: { value: 0 }, uLaid: { value: 1 }, uAux8: G.uAux8,
+      uNight: { value: 0 }, uNightNear: { value: 0 }, uLaid: { value: 1 }, uAux8: G.uAux8,
     };
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms);
     this.debugView = 0;

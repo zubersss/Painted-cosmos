@@ -116,6 +116,7 @@ export const SHEET = {
   grade: new THREE.Vector3(1, 1, 1),
   valid: false,
   night: 0,      // 0 day .. 1 night on the ground: the sheet's night key (see post.js)
+  nightNear: 0,  // the world's own deeper night wash over the near land (a look's nightNear, post.js; 0 on most worlds)
   laid: 1,       // 1: the picture is on the paper; 0: bare paper (an arrival: the land is being laid under it); between: it comes up as one
 };
 

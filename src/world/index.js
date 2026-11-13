@@ -498,7 +498,7 @@ export function createWorld(scene) {
       // the values the look gives them.
       // (a wet night under a closed sky is dark enough by its own washes: the key is eased there)
       const nightK = (1 - dayness) * (1 - space01) * (1 - 0.30 * oc);
-      SHEET.night = nightK;
+      SHEET.night = nightK; SHEET.nightNear = look.nightNear || 0;   // (PAINTER 19 re-fix: Mars only; post.js)
       if (nightK > 0.003) { const k = 0.40 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
       bu.uGlaze.value.copy(tmpKey.glaze);
       bu.uLight.value.copy(tmpKey.light);
@@ -582,7 +582,7 @@ export function createWorld(scene) {
       skyU.uSunDirL.value.copy(_v2.sub(cameraPos)).normalize();
       skyU.uBodyInv.value.identity();
       skyU.uCamL.value.set(0, 1, 0);
-      SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0; SHEET.laid = 1; veil.on = false;
+      SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0; SHEET.nightNear = 0; SHEET.laid = 1; veil.on = false;
       G.uAirNear.value.x = 0;
       const du = defaultBodyUniforms();
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0); du.uMoon.value = 0;
