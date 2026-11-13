@@ -835,7 +835,11 @@ void main() {
   // A crown within three and a half metres of the eye breaks into separate dabs with the picture between them, fewer
   // the nearer, and its branches thin away with it. vAbove: only what stands well over a plant's foot: the grass,
   // the ferns and the bushes at the boots are left whole)
-  if (vAbove > 1.7 && vd < 3.6) {
+  // (the re-fix: only the crown's own washes (part 1) and its thin branches (bark laid with a twig's shade: a trunk's is
+  // 0). As first written the rule took every part: a birch's trunk 1.8 m from the eye was cut into floating white
+  // blocks above eye level, and by the same reading a tall reed, a kelp ribbon, an ice needle or a fungal tower would
+  // be. A trunk, a blade and a stone part only right at the lens, by the rule above, as before)
+  if (vAbove > 1.7 && vd < 3.6 && ((part > 0.5 && part < 1.5) || (part < 0.5 && vData.z > 0.5))) {
     float nl = part > 0.5 ? texture(uNoise3D, vBody / 1.1).r * 0.62 + texture(uNoise3D, vBody / 0.36).g * 0.38 : texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1;
     if (nl > mix(0.20, 1.0, smoothstep(0.9, 3.6, vd))) discard;
   }

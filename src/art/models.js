@@ -324,7 +324,10 @@ export function createExplorer() {
     const lean = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.05 * w.rise - 0.16 * w.land - 0.10 * sit - 0.30 * crouch - 0.22 * w.cr - leanF;
     const L1 = 0.41, L2 = 0.48, hipY = L1 + L2 + Math.max(-0.5, Math.min(0.06, ride));
     const leg = (thigh, shin, phi, side, F) => {
-      const sw = Math.max(0, Math.cos(phi));
+      // (`swing`: the swinging leg's weight in the stride. It was named `sw` and hid the swim weight of the same name
+      // from the three lines below that blend the swimmer in: on land every swinging leg was pulled to the tread-water
+      // pose, and afloat the kick hung on whatever stride PHYSICS held. The verifier's finding on 7d27bf4.)
+      const swing = Math.max(0, Math.cos(phi));
       let th, kn;
       if (F) {
         // two bones to the boot: the swinging leg folds (the heel comes up toward the hip, most at a run), so
@@ -338,7 +341,7 @@ export function createExplorer() {
         th = (Math.atan2(dz, dy) + Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + D * D - L2 * L2) / (2 * L1 * D)))) - lean) * grounded;
         kn = -knee * grounded;
       } else {
-        th = A * Math.sin(phi) * grounded; kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(sw, 0.8)) * w.walk * grounded;
+        th = A * Math.sin(phi) * grounded; kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(swing, 0.8)) * w.walk * grounded;
       }
       th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45
         + w.rise * (side < 0 ? -0.10 : -0.26) + w.drop * (side < 0 ? 0.22 : -0.04) + w.land * (side < 0 ? 0.50 : 0.36);

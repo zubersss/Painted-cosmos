@@ -4,6 +4,62 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of the M4 RE-FIX pass (eighteenth PAINTER agent; READ THIS FIRST)
+
+An independent verifier checked the fix round below and did not accept one item (the figure) and found three
+regressions. This pass fixes exactly those. Began 09:30 UTC, 2026-11-13, on head `a686a98`. Scratch and harness:
+`/home/user/.pc-scratch/painter/m4/refix/` (trees `t1`, `t2`: a clean export of the head with PAINTER's working tree
+over it, by `../fix/mk.sh`; `h0` the head as it was, `b0` the head with `21aa969`'s `models.js`; `node/gait.mjs`,
+`node/swim.mjs` (the verifier's instruments, run with `node --import node/reg.mjs`), `node/gaitcmp.py <a.json> <b.json>`;
+the live browser is the seventeenth's `../fix/live3.mjs` with `send.sh`; `helpers3.js` is the verifier's `__tree`).
+The verifier's own files: `/home/user/.pc-scratch/verify/painter/` (`out/`, `node/`, `h/`). Evidence kept:
+`docs/shots/painter/m4fix/14-..` onward (every picture named here was opened by me).
+
+- **RE-FIX 1, THE WALK AND THE RUN (the verifier's regression 1; PHYSICS 1, 2, 5 not accepted for it): DONE.**
+  `art/models.js leg()`: the local swing weight was named `sw` and hid the swim weight `sw = w.swim` of the enclosing
+  function, so the three lines `7d27bf4` added inside `leg()` (the swim blend and the kick's splay) ran on the swing
+  weight: on land every swinging leg was pulled to the tread-water pose, afloat the kick hung on the stride PHYSICS
+  happened to hold. The local is now `swing`; the three lines read the swim weight. Nothing else in the file changed.
+  Measured with the verifier's `gait.mjs` (the real Sim, PHYSICS' explorer on the stub ground, ankles read from the
+  matrix palette), `21aa969`'s `models.js` in today's tree against the head and against the re-fix, the same strides:
+  the ankle's greatest distance from its place before, head: 0.66 m at the 4.0 m/s pace, 0.71 m at the 7.2 m/s run,
+  0.36 m strolling, 0.03 m standing; re-fix: 0.002 m, 0.003 m, 0.001 m, 0.000 m (knees within 0.001 m; I take what is left
+  to be the lean into the wind, which `21aa969`'s model had not: not traced). Against the verifier's own `gait-before.json` (tree `21aa969`): 0.002,
+  0.004, 0.021 (stroll: PHYSICS' gait itself moved a little since), 0.000 m. Afloat (`swim.mjs`): on the head neither
+  knee moved at a held stride of 0 or 0.5 and one leg only at 0.25 or 0.75; now both knees bend 0.22 to 1.27 rad at a
+  swim and 0.24 to 0.56 rad treading, at every stride. New test, in PAINTER's paths (the unit tests are PILOT's and
+  did not catch it): `src/world/figure.test.mjs`, two cases, "on land the boot is where the foot is, through the whole
+  swing" (within 0.06 m ahead of the hips at 1.6, 4.2 and 7.2 m/s, never under the foot) and "afloat both legs kick
+  with the stroke, whatever stride is held": both FAIL on the head `a686a98`, the first passes and the second fails on
+  `21aa969`'s model (it had no swimmer), both pass now. World tests 20 -> 22.
+  Seen in the game (quality 1, 640x360, the verifier's own command: D held at the Earth spawn, sixteen frames a
+  thirtieth of a second apart, and the same with Shift for the run): `m4fix/14-refix-walk-run.jpg` (opened: top, the
+  verifier's strip on `21aa969`; second, its strip on the head: legs bunched, the swing boot dragging; third, the
+  re-fix: the knee lifts and the stride opens as on `21aa969`; bottom, the run on the re-fix: the heel folds up in
+  flight and the long stride reaches; last, Mars at quality 0, the verifier's command: the knee lifts and the stride
+  opens there too). The swim and the tread at Earth's coast seen again (scratch `out/swim-refix.jpg`: as accepted; the
+  legs are under water, so the kick of both legs is in the numbers and not in a picture).
+- **RE-FIX 2, TRUNKS NEAR THE EYE (the verifier's regression 2): DONE.** `render/materials.js PROP_FRAG`: the crown's
+  dissolve (over 1.7 m above a plant's foot, within 3.6 m of the eye) is for the crown's own washes (part 1) and its
+  thin branches (bark laid with a twig's shade, `vData.z > 0.5`: `florakit.js` gives a trunk 0 and a branch 0.7 or
+  0.8) and for nothing else. A trunk, a blade (a tall reed, a kelp ribbon), an accent and a stone (an ice needle, a
+  fungal tower, a spire: part 4) part only right at the lens, within 1.6 m, by the older rule, as on `21aa969`.
+  Seen (`m4fix/15-refix-trunk-crown.jpg`, opened: top two, the verifier's sheets at quality 0 on `21aa969` and on the
+  head, where the birch 1.8 m off is floating white blocks; third, the re-fix at quality 0, the verifier's own five
+  stands: the trunk whole at 1.8 m as at 2.5 and 3.2 m; fourth, quality 1: first person 1.2, 1.8 and 2.5 m from the
+  same birch looking up 20 degrees, and 1.8 m looking up 55 degrees: one whole stroke up into the crown; bottom, a
+  jet up through the crown at quality 1: the crown still breaks into separate dabs with the picture between them and
+  its branches into dashes, as accepted). Not seen: another world's tall props (an ice needle, a fungal tower, kelp)
+  at the lens: by the rule they are as on `21aa969`.
+- **Checks for RE-FIX 1 and 2** on a clean export of `a686a98` with these files (`t1`): world 22 (20 and the two new),
+  unit 181, physics 324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as
+  before); the game at quality 1 and at quality 0 through every scene above: no console error, fallback empty.
+- **IN THE MIDDLE OF: RE-FIX 3 (minor), the far world as a dark grey dot below the edge of the air.** Found: the far
+  world's veil (`world/index.js`, "far bodies: plain daylight") thins with the altitude alone and goes into the blue
+  of the ground's sky, while `e784574` made the sky itself paper-pale there. The change is written and saved as
+  `/home/user/.pc-scratch/painter/m4/refix/index.js.dotfix` (NOT in this commit): the veil follows the sky's own two
+  washes. Then: the top tier once on the final tree, the checks, this block.
+
 ## Hand-over of the M4 fix round (sixteenth and seventeenth PAINTER agents; READ THIS FIRST)
 
 The sixteenth agent began the round at 04:09 UTC and was cut off by a container restart at 05:08; the seventeenth took
