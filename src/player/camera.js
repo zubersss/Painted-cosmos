@@ -67,9 +67,10 @@ export const CAMERA = Object.freeze({
   // down the lens went through crowns, flat slabs over half the frame). IN THE AIR ONLY (sim.js
   // footCrowns), the boom is cut short of a crown it would pass into WHEN THAT GIVES THE LENS A
   // PLACE footLens clear of every crown and trunk no nearer the figure than footBoomMin. Where
-  // there is no such place the boom is left as it is: the figure is never taken out of the
-  // picture for a crown (PAINTER's crowns part into dabs within 3.6 m of the eye). Nothing changes
-  // while the explorer's own head is inside a crown either: there is no view of that from outside.
+  // there is no such place (and while the explorer's own head is in a crown) the boom is
+  // footBoomMin: the figure is never taken out of the picture for a crown, and what crown is
+  // between the lens and the figure is within 3.6 m of the eye, where PAINTER's crowns part
+  // into dabs (and its focus window opens round the line of sight to the figure).
   // (The re-fix pass, M4: the first form of this rule ran on the ground too and, with no place for
   // the lens, drew the boom into the explorer's eyes: a walk in a wood cut in and out of first
   // person, the figure not drawn for a fifth of it, and stepping out under a birch showed no explorer.)
@@ -224,11 +225,14 @@ export function boomRoom(feet, viewFwd, pitch, obstacles, C = CAMERA) {
 // How long the foot boom should be among `crowns` ([{ base, u, h, r, c }], see crownDistance):
 // from `pivot` along unit `back`, at most `boom`. The longest length whose lens is footLens clear
 // of every crown and trunk and whose way there enters none, IF that is no shorter than
-// footBoomMin; otherwise `boom` itself: where a crown leaves no such place the view is as it
-// would be without this rule (never drawn into the explorer's eyes). With the pivot itself in a
-// crown: `boom`.
+// footBoomMin. Where a crown leaves no such place (or the head itself is in a crown), footBoomMin:
+// never nearer (the figure stays whole in the frame, never the explorer's eyes), and no further
+// either, so that all of the crown between the lens and the figure is within PAINTER's 3.6 m,
+// where a crown parts into dabs (render/materials.js), and none of it a solid wash over the figure.
 export function footBoomAmongCrowns(pivot, back, boom, crowns, C = CAMERA) {
-  if (!crowns || !crowns.length || crownDistance(crowns, pivot, C) < C.footThrough) return boom;
+  if (!crowns || !crowns.length) return boom;
+  const floor = Math.min(boom, C.footBoomMin);
+  if (crownDistance(crowns, pivot, C) < C.footThrough) return floor;
   let best = 0;
   for (let t = C.footStep; t < boom + C.footStep; t += C.footStep) {
     const b = Math.min(t, boom), d = crownDistance(crowns, addScaled(pivot, back, b), C);
@@ -236,7 +240,7 @@ export function footBoomAmongCrowns(pivot, back, boom, crowns, C = CAMERA) {
     if (d >= C.footLens) best = b;                // a place the lens may be
     if (b >= boom) break;
   }
-  return best >= Math.min(boom, C.footBoomMin) ? best : boom;
+  return best >= floor ? best : floor;
 }
 
 // feet: explorer position (body-local). obstacles: [{ p, radius }] spheres the camera must not

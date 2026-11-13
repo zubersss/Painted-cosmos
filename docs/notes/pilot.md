@@ -2,6 +2,61 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, M4 RE-FIX pass (seventeenth PILOT agent; started 12:24 UTC 2026-11-13; kept current after every item)
+
+Read this first; the fourteenth's hand-over below holds for everything not named here. The verifier did not accept
+four items of the fix round and found nine regressions (the task text of this pass lists them). The fifteenth agent
+was cut off after eight minutes (nothing committed); its half-done edits came in with the coordinator's snapshot
+`6e550ce` (`src/player/camera.js`, `src/core/sim.js`), with which 2 of 181 unit tests failed. The sixteenth only read.
+Scratch: `/home/user/.pc-scratch/pilot/m4/s17/` (`t1` a clean export with my files, `out1` the first film, `next/`
+and `*-patch.py` the prepared changes for the items after the camera, `glade.mjs`, `kits.mjs`, `whyhid.mjs` probes).
+The verifier's probes are read from `/home/user/.pc-scratch/verify/pilot/probes/` (run with `ROOT=<tree>`).
+
+### Done, with proof
+
+1. **The foot camera's crown rule (verifier's MAJOR regressions 1 and 2, regression 3, PHYSICS 4, PAINTER 1).**
+   Kept the snapshot `6e550ce` and finished it: `sim.js footCrowns` hands the crowns to the foot camera IN THE AIR
+   ONLY (0.35 s off the ground and 2 m over it, not afloat): on the ground the view is as it was before the round,
+   the figure always drawn. `camera.js footBoomAmongCrowns`: where a crown leaves no place for the lens a metre clear
+   at `footBoomMin` 3 m or beyond (and while the head itself is in a crown) the boom is `footBoomMin`, never shorter
+   (the first rule took it to 0 / 0.8 m: the explorer's eyes) and never longer (the crown between lens and figure all
+   within PAINTER's 3.6 m, where it parts into dabs). `sim.js plantKit`, `camera.js CROWN_KITS / crownShape`: a plant
+   carries a crown by its kit (broadleaf, conifer, fungus), so reeds, kelp, crystals, spires and waves are solid
+   for themselves only (`kits.mjs`: Saturn's crystal reeds 30 of 30 no crown, Neptune's kelp 19 and 26 of 26, Earth's
+   birches and pines all crowned, Venus' fungal towers a cap). Tests: `tests/footcam.test.mjs` rewritten to the new
+   rule (into a crown: footBoomMin; a reed has no crown; the jetpack in a glade 12 m round: the lens never in a crown,
+   boom cut 231 frames; 9.5 m round, no room: never under 3 m, the figure drawn in every frame).
+   Proof: the verifier's `walkcam.mjs` on the tree, Earth: spawn 0 % hidden, 0 flips (head 40 %, 25); autumn woodland
+   3 %, 4 flips (head 29 %, 23; dea95fb 3 %, 6): the 3 % is the parked ship passed 4.5 m away in the first 6 s and one
+   trunk for 0.2 s (`whyhid.mjs`), both as on dea95fb (`docs/shots/pilot/m4refix/walkcam-earth.txt`). `spawnout.mjs`: stepping out of the
+   ship where the game parks it, the figure in the first and the settled picture at all ten spawns, boom 4.5 to 5.2 m
+   (`m4refix/spawnout.txt`; head: no figure at Earth, Saturn, Neptune). `stepout2.mjs -v` (52 assisted landings): boom
+   under 4 m at 0, hull over a sixth of the frame at 1 (Venus' acid_terraces, 17 %), mean cover 3.9 %
+   (`docs/shots/pilot/m4fix/stepout-after.txt` rewritten from this tree, all 52 lines; the old file predated the
+   crown rule). Real game, quality 0, 640 x 360, the verifier's scenes (`s17/out1`, copied to `docs/shots/pilot/m4refix/`: walk-spawn, walk-autumn, stepout-earth-spawn(-settled), stepout-saturn, stepout-neptune, jet-by-ship-up/down, film1.log; all opened): the first walk of a new
+   game, W held 24 s from the spawn: figure not drawn in 0 of 720 steps (head 143); stepping out at Earth's spawn
+   (`v-out`): 0 of 72 steps without the figure, settled boom 5.2 m, hull 6.9 % of the frame, the explorer in the lower
+   middle (head: boom 1.6, tight 0.78, no figure); the jetpack beside the ship up and down (`jet2-up`, `jet2-down`):
+   the figure in every frame; Earth's autumn woodland, W held 20 s: 0 of 600 steps (head 142); stepping out after an
+   assisted landing at Saturn's and at Neptune's spawn: 0 of 72 steps each, settled boom 5.2 m, figure drawn (head:
+   no figure at either). Game errors none, no fall-back. **Still there:** on the jetpack's way down beside the ship
+   (`jet2-down` frames 12 to 14, about 0.8 s as the figure passes down through the birches' crown layer) broken leaf
+   dabs over the left part of the frame, the figure clear in the middle; on the way up (`jet2-up` frames 3 to 5) the
+   same, smaller. With no place a metre clear of every crown there is no lens position that shows no leaves; what is
+   left is PAINTER's dissolve within 3.6 m.
+
+### Next, in this order (each prepared in `s17/`, not yet in the tree unless listed above)
+
+2. The landing's chase camera filmed again (`film2.mjs liftoff,landfast` on `t1`, out in `s17/out2`).
+3. PHYSICS 8, Pluto: the tank refills only on the ground or afloat (`s17/next/src/player/explorer.js`,
+   `next/tests/explorer.test.mjs`; README line on Space). Proof: the verifier's `jet2.mjs pluto 1200
+   '[{"lo":0.5,"H":8}]'` and the others.
+4. PAINTER 3, the label on the ship with the nose 3 to 8 degrees off (`next/src/ui/layout.js` slides a label that
+   must show clear; `next/tests/layout.test.mjs` fails on the old layout with the verifier's box 261-379, 205-244).
+5. The swimmer's turn about (`s17/swimturn-patch.py`, then `swimturn.mjs`), the easel's walk over cliffs
+   (`s17/easel-patch.py`, then `easel.mjs`), the weather and motion films' clocks (+1530 s, PHYSICS' list in
+   `docs/notes/physics.md` "For PILOT and PAINTER, M4 fix round").
+
 ## Hand-over, M4 fix round (fourteenth PILOT agent, the successor; started 05:11 UTC 2026-11-13; kept current after every item)
 
 Read this first. The thirteenth agent was cut off at 05:08 UTC (container restart); its finished commit is `dea95fb`

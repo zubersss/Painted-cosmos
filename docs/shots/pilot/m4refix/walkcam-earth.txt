@@ -1,0 +1,8 @@
+earth    spawn                figure hidden   0 % of 40 s, flips   0, shortest boom 2.42 m, tall things near (most) 33, mode walk
+earth    temperate_forest     figure hidden   1 % of 40 s, flips   1, shortest boom 1.37 m, tall things near (most) 26, mode walk
+earth    autumn_woodland      figure hidden   3 % of 40 s, flips   4, shortest boom 0.80 m, tall things near (most) 36, mode walk
+earth    alpine_meadow        figure hidden   0 % of 40 s, flips   0, shortest boom 5.20 m, tall things near (most) 0, mode walk
+earth    sea_coast            figure hidden   2 % of 40 s, flips   2, shortest boom 0.80 m, tall things near (most) 0, mode swim
+earth    desert_canyon        figure hidden   1 % of 40 s, flips   2, shortest boom 0.81 m, tall things near (most) 0, mode idle
+earth    misty_wetland        figure hidden   1 % of 40 s, flips   2, shortest boom 0.81 m, tall things near (most) 0, mode walk
+all: hidden 1.1 % of the frames, flips 11
