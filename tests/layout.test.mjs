@@ -81,3 +81,32 @@ test('M4 lettering is wrapped to its slip and to the window', () => {
   for (const line of v) assert.ok(measureLettering(line, 13.5) <= 386);
   assert.equal(wrapLettering('one\ntwo', 10, 400), 'one\ntwo', 'lines already there are kept');
 });
+
+test('M4 the re-fix: the nose a few degrees off the target, its ring over the ship: the label slides clear of the ship', () => {
+  // the verifier's frame (640 x 360, the chase view in space, Mars the target): the ship's box
+  // x 229-411, y 173-265; the nose 4 degrees over Mars puts the ring 10 px under the middle of the
+  // picture, and under, over, right and left of the ring all touch the hull. It fell back to under
+  // the ring, on the ship ("Mars 463.0 km 76 s", label box x 261-379, y 204-243)
+  const w = 640, h = 360, ship = { x0: 229, x1: 411, y0: 173, y1: 265 };
+  const at = (x, y, keep = [ship]) => {
+    const list = [{ kind: 'target', x, y, r: 3, above: false, label: 'Mars', sub: '463.0 km  76 s' }];
+    layoutMarks(list, { w, h, sizeOf, keep });
+    return list[0];
+  };
+  const m = at(320, 190);
+  assert.ok(m.text, 'the label shows');
+  const r = rectOf(m);
+  assert.ok(!hits(r, ship), `off the ship: label x ${r.x0.toFixed(0)}-${r.x1.toFixed(0)}, y ${r.y0.toFixed(0)}-${r.y1.toFixed(0)}`);
+  assert.ok(r.y1 <= ship.y0 && r.y1 > ship.y0 - 6 && m.lx === 0, 'just over the ship, over the ring: y1 ' + r.y1.toFixed(1));
+  // wherever the ring lies on the ship (the nose 3 to 8 degrees over or beside the target), the
+  // label is off the ship and inside the picture, and a notice that is up (soft) is kept clear of as well where it can be
+  const notice = { x0: 150, x1: 490, y0: 8, y1: 40, soft: true };
+  let n = 0, onNotice = 0;
+  for (let x = ship.x0; x <= ship.x1; x += 6) for (let y = ship.y0 - 30; y <= ship.y1; y += 5) {
+    const q = at(x, y, [ship, notice]), qr = rectOf(q);
+    assert.ok(q.text && !hits(qr, ship), `ring at ${x}, ${y}: the label is off the ship`);
+    assert.ok(qr.x0 >= MARKS.margin && qr.x1 <= w - MARKS.margin && qr.y0 >= MARKS.margin && qr.y1 <= h - MARKS.margin, `ring at ${x}, ${y}: inside the picture`);
+    n++; if (hits(qr, notice)) onNotice++;
+  }
+  assert.ok(n > 600 && onNotice === 0, `${n} places, on the notice at ${onNotice}`);
+});

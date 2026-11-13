@@ -57,13 +57,25 @@ The verifier's probes are read from `/home/user/.pc-scratch/verify/pilot/probes/
    47 s; the Moon 26 s and 36 s; Earth 8 s; Mars 14 s. Checks on a clean export of `51cdda2` with these files:
    world 22, unit 181, physics 324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros.
 
+3. **PAINTER 3, the target's label on the ship with the nose 3 to 8 degrees off** (verifier's regression 4).
+   `src/ui/layout.js slide`: a label that must show and whose four places (under, over, right, left of the ring) all
+   touch something is slid on away from the ring in 2 px steps to the nearest clear place, clear of everything first,
+   then of the hard keep-outs (the ship) at least; it fell back to under the ring, on the ship. Test (layout.test,
+   new): the verifier's frame (640 x 360, ship box x 229-411, y 173-265, the ring 10 px under the middle): the label
+   just over the ship, over the ring; the ring anywhere on the ship box: off the ship, inside the picture, off a notice
+   that is up; it fails on `1146112` with the verifier's own box (x 261-379, y 205-244). The verifier's random
+   `layout.mjs` (`docs/shots/pilot/m4refix/layout-random.txt`, 4000 scenes a size): a label on the ship 459 / 591 /
+   683 / 798 -> 0 at all four sizes, a name on another 17 / 15 / 14 / 23 -> 0, off the picture 8 / 2 / 3 / 0 -> 0;
+   on a soft slip (the prompt, a notice) about 500 as before (a label that must show may lie on one: by design).
+   Not yet seen in the real game (the verifier's `aimoff` scene is to be filmed with the next browser run).
+   Checks on a clean export of `1146112` with these files: world 22, unit 182, physics 324, `coast.mjs` PASS at both
+   stands, `ghostfield.mjs` all zeros.
+
 ### Next, in this order (each prepared in `s17/`, not yet in the tree unless listed above)
 
 3. The landing's chase camera (PHYSICS 4's last part): filmed again on `t1` (`s17/out2/landfast.jpg`, opened):
    as in the fix round, frames 20 to 22 (1.5 s) a flat crown over the left half of the frame on the way down into
    the clearing. Not yet changed.
-4. PAINTER 3, the label on the ship with the nose 3 to 8 degrees off (`next/src/ui/layout.js` slides a label that
-   must show clear; `next/tests/layout.test.mjs` fails on the old layout with the verifier's box 261-379, 205-244).
 5. The swimmer's turn about (`s17/swimturn-patch.py`, then `swimturn.mjs`), the easel's walk over cliffs
    (`s17/easel-patch.py`, then `easel.mjs`), the weather and motion films' clocks (+1530 s, PHYSICS' list in
    `docs/notes/physics.md` "For PILOT and PAINTER, M4 fix round").

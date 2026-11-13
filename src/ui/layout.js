@@ -53,6 +53,27 @@ export const ringSize = (r) => Math.round(Math.max(MARKS.ringMin, Math.min(MARKS
 
 const hits = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
 
+// A label that must show and whose four places all touch something (the nose a few degrees off
+// a target, its ring over the ship: under, over, right and left of the ring are all on the hull):
+// each place is slid on away from the ring, in 2 px steps, until it is clear. The nearest clear
+// place wins, clear of everything first, then of the hard keep-outs (the ship) at least. The
+// re-fix pass, M4: such a label fell back to its first place, under the ring, on the ship
+// (the nose 4 degrees over Mars: "Mars 463.0 km 76 s" over the ship, two wing tips showing).
+const AWAY = { below: [0, 1], above: [0, -1], right: [1, 0], left: [-1, 0] };
+function slide(cands, rect, free, w, h) {
+  const most = Math.max(w, h);
+  for (const soft of [true, false]) {
+    for (let d = 2; d <= most; d += 2) {
+      for (const c of cands) {
+        const [ax, ay] = AWAY[c.side];
+        const moved = { lx: c.lx + ax * d, ly: c.ly + ay * d, side: c.side };
+        if (free(rect(moved), soft)) return moved;
+      }
+    }
+  }
+  return null;
+}
+
 // One pass over this frame's marks. list: [{ kind: 'target' | 'body' | 'edge', x, y, r, label, sub,
 // above (prefer the label over the ring), keep (a label that must show: a place to land, a view) }].
 // view: { w, h, sizeOf(mark) -> lettering cap height, keep: [{ x0, y0, x1, y1, soft }] } where
@@ -77,8 +98,8 @@ export function layoutMarks(list, view) {
     m.text = m.sub ? m.label + '\n' + m.sub : m.label;
     const s = letteringSize(m.text, view.sizeOf ? view.sizeOf(m) : 10);
     const lw = s.w + 2 * M.padX, lh = s.h + 2 * M.padY, ring = m.kind === 'edge' ? 0 : ringSize(m.r) / 2;
-    const below = { lx: 0, ly: m.kind === 'edge' ? M.edgeGap : ring + M.gap }, above = { lx: 0, ly: -(m.kind === 'edge' ? M.edgeGap : ring + M.gap) - lh };
-    const right = { lx: ring + M.gap + 2 + lw / 2, ly: -lh / 2 }, left = { lx: -(ring + M.gap + 2 + lw / 2), ly: -lh / 2 };
+    const below = { lx: 0, ly: m.kind === 'edge' ? M.edgeGap : ring + M.gap, side: 'below' }, above = { lx: 0, ly: -(m.kind === 'edge' ? M.edgeGap : ring + M.gap) - lh, side: 'above' };
+    const right = { lx: ring + M.gap + 2 + lw / 2, ly: -lh / 2, side: 'right' }, left = { lx: -(ring + M.gap + 2 + lw / 2), ly: -lh / 2, side: 'left' };
     // (a world not aimed at is named under or over its ring only: of a pile, two names at most)
     const must = m.kind !== 'body' || !!m.keep;
     const cands = m.kind === 'edge' || !must ? (m.above ? [above, below] : [below, above]) : m.above ? [above, below, right, left] : [below, above, right, left];
@@ -86,7 +107,7 @@ export function layoutMarks(list, view) {
     const inside = (r) => r.x0 >= M.margin && r.x1 <= w - M.margin && r.y0 >= M.margin && r.y1 <= h - M.margin;
     const free = (r, soft) => inside(r) && !placed.some((p) => hits(r, p)) && !keep.some((k) => (soft || !k.soft) && hits(r, k));
     let pick = cands.find((c) => free(rect(c), true));
-    if (!pick && must) pick = cands.find((c) => free(rect(c), false)) || cands[0];
+    if (!pick && must) pick = cands.find((c) => free(rect(c), false)) || slide(cands, rect, free, w, h) || cands[0];
     m.lw = lw; m.lh = lh;
     if (!pick) { m.label = null; m.text = null; continue; }
     m.lx = pick.lx; m.ly = pick.ly;
