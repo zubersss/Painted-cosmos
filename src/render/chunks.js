@@ -82,7 +82,9 @@ float pcLevel(float x, float soft) {
   soft += 0.08 * uWx.x;
   // under a storm cloud nothing is lit at all: every form stands in the cloud's shadow, in the
   // cool glaze and the deep one (the ground loses its sun before the rain comes)
-  x = mix(x, 0.17 + x * 0.26, uStorm);
+  // (PAINTER 16/17: it was 0.17 + 0.26 x, every form in the two deepest washes; the lit side keeps the local wash now,
+  // so a wood in the rain is still a wood in three values)
+  x = mix(x, 0.25 + x * 0.36, uStorm);
   return smoothstep(0.26 - soft, 0.26 + soft, x)
        + smoothstep(0.50 - soft, 0.50 + soft, x)
        + smoothstep(0.76 - soft, 0.76 + soft, x);

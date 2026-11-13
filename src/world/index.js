@@ -151,7 +151,7 @@ export function createWorld(scene) {
       // six of what it has to widen, so a 23 mm/h thunderstorm showed some thirty stubby rectangles, none of which read.
       // A broad nominal width with a cap in pixels keeps every stroke about 2.6 px wide at any distance and nothing is
       // thinned away; twice the exposure and the length; the glaze is laid after the brush, so thin strokes survive)
-      draw.rain = { ...D.rain, width: 0.25, exposure: 0.26, minPx: 2.4, maxPx: 2.8, maxLen: 2.4, share: 0.34, vary: 0.35 };      // (the share drawn follows how hard it rains; vary: each drop its own number, for its stroke's length and breaks)
+      draw.rain = { ...D.rain, width: 0.25, exposure: 0.26, minPx: 2.4, maxPx: 2.8, maxLen: 2.4, share: 0.5, vary: 0.35 };      // (the share drawn follows how hard it rains; vary: each drop its own number, for its stroke's length and breaks)
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)
@@ -439,8 +439,9 @@ export function createWorld(scene) {
       // storm's own grey, and a headland gone to white there stood against the dark sky as a pale slab with ruled edges.
       // The low sky takes the same mist, so that the far land runs into the sky behind it)
       _fogC.set(0.955, 0.96, 0.965).lerp(_pale.copy(_storm).lerp(_white, 0.48), Math.min(1, storm * oc) * 0.85);
-      tmpKey.haze.lerp(_fogC, fogW * 0.7);
-      tmpKey.horizon.lerp(_fogC, fogW * 0.7);
+      // (PAINTER 17: under the moon a mist is the palest thing on the land, paper coming forward: it takes more of the
+      // far washes by night than by day, where the day's own haze is already pale)
+      { const fk = fogW * (0.7 + 0.3 * (1 - dayness)); tmpKey.haze.lerp(_fogC, fk); tmpKey.horizon.lerp(_fogC, fk); }
       // (falling snow: the air is a blue-grey veil, so that the flakes, bare paper, have a ground to be seen against)
       tmpKey.haze.lerp(_pale.set(0.76, 0.81, 0.89), veilS * 0.62);
       if (dustW > 0.003) {

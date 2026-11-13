@@ -190,7 +190,10 @@ void main() {
   gran *= 1.0 - 0.5 * uWxSheet.x;
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
-  d += uWxSheet.x * (0.75 + 0.5 * plo.r);
+  // (PAINTER 16/17, the M4 critique's second item: at its full weight the key laid a thunderstorm at three in the afternoon
+  // as dark as midnight, median L* 27; a rain study is a light picture. A little over half of it: the wood and the meadow
+  // keep their steps and the storm is told by the sky's wash, the veil and the rain)
+  d += uWxSheet.x * 0.55 * (0.75 + 0.5 * plo.r);
   // (night, PAINTER 16: the moon models the land in the materials now, chunks.js pcLevel, so the key only deepens the
   // washes a little; it was 0.68 to 0.94, which ran every middle value down into one dark, 80 % of the frame within 7 L*)
   d += uNight * (0.30 + 0.20 * plo.r) * (1.0 - lamp);
@@ -203,7 +206,8 @@ void main() {
   float bn = b + (plo.g - 0.5) * uBorder.y + (mix(pmid.g, psoft.g, dark) - 0.5) * uBorder.y * 0.45 + (paper.g - 0.5) * 0.006 * (1.0 - dark) - (1.0 - corner) * 0.012;
   float painted = mix(1.0, smoothstep(uBorder.x * 0.72, uBorder.x, bn), uBorder.w);
   float lip = (1.0 - smoothstep(uBorder.x, uBorder.x * 2.2, bn)) * painted * uBorder.w;
-  d += lip * uBorder.z * (0.4 + 0.6 * plo.r);
+  // (a dark wash does not pool again where it stops: under the storm's key the border was a dirty grey rim round the sheet)
+  d += lip * uBorder.z * (0.4 + 0.6 * plo.r) * mix(1.0, 0.25, dark);
   // dry edge: near the border the brush skips the paper's peaks
   // (a loaded dark wash skips far less: a few broad flecks of paper, never a pale rim with dark specks in it)
   float skL = smoothstep(0.46, 0.62, mix(ph, pmid.r, 0.65));

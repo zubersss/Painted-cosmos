@@ -4,6 +4,49 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Hand-over of the M4 fix round (sixteenth and seventeenth PAINTER agents; READ THIS FIRST)
+
+The sixteenth agent began the round at 04:09 UTC and was cut off by a container restart at 05:08; the seventeenth took
+over at 05:11 (2026-11-13). Each item is committed as soon as it is finished; this block is brought up to date after
+each. Evidence: `docs/shots/painter/m4fix/` (every picture named here was opened by the agent that names it).
+Scratch and harness: `/home/user/.pc-scratch/painter/m4/fix/` (`mk.sh <dir>`: a clean export of the head with PAINTER's
+working-tree paths over it; `live2.mjs <tree> <out> <quality> <WxH>`: one browser kept open on the real game, commands
+sent as files with `send.sh <out> <name> < body.js` (directives `//! place`, `//! run s dt`, `//! canvas name`,
+`//! problems`, `//! quit`); `helpers.js` (`__go(body, { biome, T, hour, ship, altitude, pitchDeg })`); `tone.py`
+(L* percentiles of a frame inside the border); `sheet.py` (a labelled contact sheet); `s17/checks.sh <tree> <out>`:
+the project's five checks one after another).
+
+- **FIX 1, night in its own key: DONE** (sixteenth, commit `b579366`; its message has every number). The moon is the
+  light at night (`uMoon`, `chunks.js pcLevel`), the sheet's night key no longer runs the middle values together, the
+  night sky is two steps lighter than the wood, the cabin glass is the one warm accent. Seen again by the seventeenth
+  at the top tier on the final tree of FIX 2 (`m4fix/02-mist-pair.jpg`, bottom right: fair midnight, median L* 38.7,
+  10-90 spread 20.2; the meadow lighter than the wood, the sky lighter than both, white birches, the lit cabin).
+- **FIX 2, the storm and mist key, visible rain: DONE** (sixteenth's work in the coordinator's snapshot `3def4e7`,
+  finished by the seventeenth). What changed: (a) rain is a stroke LIFTED out of the darks and drawn down darker on
+  a light sky: `kitmat.js` rain reads the scene's colour behind it (`G.uSceneCol`, set in `post.js`) and lays a pale
+  mark over a dark passage, a darker one over a light sky, fainter over a middle value; `world/index.js` draws it as
+  long thin strokes (2.4 to 2.8 px wide at any distance, up to 2.4 m long, half of PHYSICS' drops; it was 6.5 cm wide,
+  never under 5 px, a sixth drawn: some thirty stubby rectangles); (b) the storm's key on the sheet at 0.55 of its
+  weight (`post.js`: `d += uWxSheet.x * 0.55 * ...`), the lit side of a form under a storm keeps its local wash
+  (`chunks.js pcLevel`: 0.25 + 0.36 x), the sky's storm masses a little thinner with shallower bellies (`world/sky.js`
+  `mass`), so the closed sky is no longer the darkest thing in the picture; (c) the border's pooled lip is not laid
+  again on a dark wash (`post.js`: `lip ... * mix(1.0, 0.25, dark)`): the paper border is clean in a storm; (d) under
+  the moon a mist takes more of the far washes (`world/index.js`: `fogW * (0.7 + 0.3 * (1 - dayness))`); (e) regions:
+  7 is what flies in the air, 8 a light of its own (`chunks.js`, `post.js`, `materials.js FIG_FRAG`).
+  Measured at the top tier, 960x540, the spawn at 240 s of a new game (PILOT's frame against mine, `tone.py`):
+  median L* 26.7 -> 41.3, the darkest hundredth 8.2 -> 24.8, under L* 12: 2.3 % -> 0.1 %, 10-90 spread 12.9 -> 21.6;
+  the mist at 600 s: median 28.8 -> 40.0, spread 13.2 -> 22.6. Frames opened: `m4fix/02-storm-pair.jpg` (rain strokes
+  pale over the wood and dark against the pale sky, a clean border, the far wood lost in a pale veil, the sky's dark
+  undersides lighter than the wood), `m4fix/02-mist-pair.jpg`, `m4fix/02-neptune-squall-after.jpg` (Neptune's storm
+  coast in its squall, T 240, 88 m/s: still a wet indigo sky over a pale veil; under L* 12: 0.3 %). Tried and not
+  kept: the sheet's key at 0.45 with the thinner masses the sixteenth had live (Neptune's squall went to a pale grey
+  day: the midpoint is what is in the files). Not verified: quality 0 (the rain's draw is the same code at every tier).
+
+**In the middle of / next** (the round's order, by what a new player sees first): FIX 3 round worlds from orbit (the
+relief drawn in toward the datum sphere from a third of a radius up: `chunks.js pcRound`, `uRound`; Neptune's belts;
+Pluto's heart), FIX 4 Jupiter's arrival palette, FIX 5 Uranus' and Pluto's arrivals, then PHYSICS' five (the figure:
+wind lean, cloth, swim pose, arc pose; crowns at the lens; the storm sea's white water).
+
 ## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
 
 PHYSICS 24 finished block P26 (commits `ee39533`, `a70d668`; hand-over at the top of `docs/notes/physics.md`). For PAINTER:

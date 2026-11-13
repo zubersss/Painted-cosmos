@@ -213,7 +213,10 @@ void main() {
   cl = dens(cl, 1.0 + (n2.r - 0.5) * 0.8);
   // under an overcast the cloud is no longer bare paper: it is the wash itself, in heavy masses
   // with dark bellies; their torn edges stay pale, where the light still comes through
-  vec3 mass = dens(uStormWash, 0.10 + 1.25 * belly + 0.3 * uWxSky.y + (n2.r - 0.5) * 0.4);
+  // (PAINTER 16/17, the M4 critique: under Earth's thunderstorm the closed sky was the darkest thing in the picture, its
+  // darkest hundredth at L* 8, the crowns paler cut-outs against it. The sky is the light of a rain picture: the masses
+  // are laid a little thinner and their bellies less deep, so that the sky's darks stay above the wood's)
+  vec3 mass = dens(mix(uStormWash, vec3(1.0), 0.12), 0.10 + 1.05 * belly + 0.22 * uWxSky.y + (n2.r - 0.5) * 0.4);
   cl = mix(cl, mass, oc * (0.30 + 0.70 * body));
   vec3 col = mix(sky, cl, cloud);
 
