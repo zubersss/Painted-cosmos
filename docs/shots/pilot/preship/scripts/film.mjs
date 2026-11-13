@@ -63,6 +63,67 @@ try {
     await step(1 / 30, 15);
     await shot('arrived');
   }
+  if (scene === 'foot' || scene === 'arrow') {
+    // The way back to the ship: from the spawn, walk away from the ship (W held, real keys), then
+    // turn round to it; then the HUD in Earth's orbit at this size (the turn's notice over the
+    // prompt), and the frame read-out with a notice on foot.
+    await page.evaluate(() => window.__pc.hold(true));
+    const i0 = await info();
+    log(`spawn: ship ${i0.shipDistance.toFixed(1)} m, bearing ${i0.shipBearingDeg.toFixed(0)}`);
+    // face away from the ship: drag the view by (bearing + 180) degrees
+    const turnBy = async (deg) => {
+      const px = (deg * Math.PI / 180) / 0.0023;
+      await page.mouse.move(+W / 2, +H / 2); await page.mouse.down();
+      const n = Math.max(1, Math.ceil(Math.abs(px) / 120));
+      for (let k = 1; k <= n; k++) { await page.mouse.move(+W / 2 + (px * k) / n, +H / 2); await step(1 / 30, 1); }
+      await page.mouse.up(); await step(1 / 30, 1);
+      await page.mouse.move(+W / 2, +H / 2);
+    };
+    const wrap = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+    // (drags must not wrap round the window: in pieces of up to 120 px from the middle)
+    const turnTo = async (deg) => { let left = deg; while (Math.abs(left) > 1) { const d = Math.max(-15, Math.min(15, left)); const b0 = (await info()).shipBearingDeg; await turnBy(d); const b1 = (await info()).shipBearingDeg; left -= wrap(b0 - b1); } };
+    await turnTo(wrap(i0.shipBearingDeg + 180));
+    await step(1 / 30, 10);
+    await shot('facing-away-near');
+    await page.keyboard.down('KeyW');
+    for (let k = 0; k < 14; k++) await step(1 / 30, 30);
+    await page.keyboard.up('KeyW');
+    await step(1 / 30, 30);
+    await shot('walked-away');
+    if (scene === 'arrow') {
+      await page.keyboard.press('KeyV'); await step(1 / 30, 15); await shot('walked-away-first-person');
+      await page.keyboard.press('KeyV'); await step(1 / 30, 15);
+      // a new page's slip and a notice on foot together
+      await page.evaluate(() => { const g = window.__pc.game; const c = document.createElement('canvas'); c.width = 160; c.height = 90; const x = c.getContext('2d'); x.fillStyle = '#c9b48a'; x.fillRect(0, 0, 160, 90); g.hud.showSketch(c.toDataURL(), 'Temperate Forest', 'Earth  page 1 of 114', 30); window.__pc.sim.say('A view to find 3.0 km to the right: fly nearer, or walk', 30); });
+      await step(1 / 30, 10);
+      await new Promise((r) => setTimeout(r, 1500));
+      await shot('sketch-slip-and-notice');
+    }
+    const i1 = scene === 'arrow' ? null : await info();
+    if (scene !== 'arrow') {
+    await turnTo(wrap(i1.shipBearingDeg - 60));
+    await step(1 / 30, 15);
+    await shot('ship-off-to-the-side');
+    const i2 = await info();
+    await turnTo(i2.shipBearingDeg);
+    await step(1 / 30, 15);
+    await shot('facing-the-ship');
+    // stats on, a notice on foot
+    await page.keyboard.press('Backquote');
+    await page.evaluate(() => window.__pc.sim.say('A notice on foot, lettered at the top of the sheet', 30));
+    await step(1 / 30, 10);
+    await shot('stats-and-notice');
+    await page.keyboard.press('Backquote');
+    // Earth's orbit: the turn onto a course (notice and prompt together)
+    await page.evaluate(() => { window.__pc.teleport({ body: 'earth', lat: 10, lon: 30, ship: true, altitude: 2400 }); });
+    await step(1 / 30, 5);
+    await page.evaluate(() => { const sim = window.__pc.sim; sim.setTarget('saturn'); const P = sim.bodyInShipFrame('saturn'), p = sim.sh.p; const t = { x: p.x - P.x, y: p.y - P.y, z: p.z - P.z }; const L = Math.hypot(t.x, t.y, t.z); const f = { x: t.x / L, y: t.y / L, z: t.z / L }; const yaw = Math.atan2(-f.x, -f.z), pitch = Math.asin(f.y); const cy = Math.cos(yaw / 2), sy = Math.sin(yaw / 2), cp = Math.cos(pitch / 2), sp = Math.sin(pitch / 2); sim.sh.q = { x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }; sim.sh.v = { x: 0, y: 0, z: 0 }; });
+    await step(1 / 30, 20);
+    await page.keyboard.press('KeyF');
+    await step(1 / 30, 40);
+    await shot('turn-notice-and-prompt');
+    }
+  }
   log('problems: ' + JSON.stringify(problems) + ' game errors: ' + JSON.stringify(await page.evaluate(() => window.__pc.errors)) + ' fallback: ' + JSON.stringify(await page.evaluate(() => window.__pc.info().fallback)));
 } catch (e) { log('FAILED ' + e.message); }
 await close();

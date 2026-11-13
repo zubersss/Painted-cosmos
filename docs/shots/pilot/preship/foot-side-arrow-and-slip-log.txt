@@ -1,0 +1,8 @@
+ready after 12 s; fallback []; errors []
+spawn: ship 16.0 m, bearing 26
+00-facing-away-near.jpg: t 7.2 ON_FOOT prompt "" notice "" turning null target - speed 0
+01-walked-away.jpg: t 22.2 ON_FOOT prompt "" notice "" turning null target - speed 0
+02-walked-away-first-person.jpg: t 22.7 ON_FOOT prompt "" notice "" turning null target - speed 0
+03-sketch-slip-and-notice.jpg: t 23.6 ON_FOOT prompt "" notice "A view to find 3.0 km to the right: fly nearer, or walk" turning null target - speed 0
+problems: [] game errors: [] fallback: []
+done in 350 s

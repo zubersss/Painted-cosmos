@@ -196,10 +196,11 @@ export function createHud(root) {
       ink(freshTitle, wrapLettering(title || '', SIZE.body, room), SIZE.body);
       ink(freshSub, wrapLettering(sub || '', SIZE.tiny, room), SIZE.tiny);
       fresh.classList.add('pc-on');
+      root.classList.add('pc-sketching');
       clearTimeout(freshTimer);
-      freshTimer = setTimeout(() => fresh.classList.remove('pc-on'), seconds * 1000);
+      freshTimer = setTimeout(() => { fresh.classList.remove('pc-on'); root.classList.remove('pc-sketching'); }, seconds * 1000);
     },
-    hideSketch() { clearTimeout(freshTimer); fresh.classList.remove('pc-on'); },
+    hideSketch() { clearTimeout(freshTimer); fresh.classList.remove('pc-on'); root.classList.remove('pc-sketching'); },
     get sketchShown() { return fresh.classList.contains('pc-on'); },
     // The frame-time read-out (behind ?stats=1 or the ` key).
     setStats(text) {

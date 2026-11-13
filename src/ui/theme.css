@@ -67,6 +67,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 /* The frame read-out (top left, about 110 px tall) is up: what is lettered across the top of the
    sheet (the hint, a notice on foot) goes under it (M4's blind play-test: the read-out lay over the
    pointer-lock message). */
+/* A new page's slip is up in the top right corner: a notice on foot, lettered across the top,
+   moves to the left of it (the grand tour at 400 x 225: "A view to find 3.0 km..." under the slip). */
+.pc-hud.pc-foot3.pc-sketching .pc-notice { margin: 0 auto 0 7%; }
 .pc-hud.pc-stats-on .pc-hint { top: calc(9% + 116px); }
 .pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 116px); }
 .pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 116px); }

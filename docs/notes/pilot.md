@@ -91,8 +91,9 @@ Committed `b0710fe`.
    a 9 s run 40+ m and shown; none in the ship. Filmed (`docs/shots/pilot/preship/foot-ship-mark-and-hud.jpg`,
    opened; quality 0, 640 x 360, Earth's spawn): facing away 16 m (arrow), walked off 72 m (arrow), turned 60 degrees
    ("the ship 72 m" at the right edge), facing it (a ring over it among the birches, the label over the ring); no game
-   error, fallback empty. The side-arrow rule came after that film (the first two frames show the arrow on the legs):
-   not filmed yet. README says so.
+   error, fallback empty. The side-arrow rule came after that film (its first two frames show the arrow on the legs);
+   filmed after it (`foot-side-arrow-and-slip.jpg`, opened): facing away 16 m and 72 m, and in first person, the
+   arrow at the left edge, a little low, off the figure. README says so.
 5. **HUD overlaps (MINOR 11), README gaps, Mercury's column.** `theme.css`: the prompt, the notice and (on foot) the
    jetpack gauge are placed in pixels as well as shares of the window (`max(16%, calc(9.5% + 36px))` and so on): at
    640 x 360 the notice lay over the prompt and the prompt on the throttle (seen in the pulse film); with the frame
@@ -105,7 +106,9 @@ Committed `b0710fe`.
    meets one trunk or column glances off it, a share of the speed lost into it carrying on round it; test
    (explorer.test; fails on `3d38bb2`: 7.4 -> 0.0 m/s dead on); the real Mercury spawn with PHYSICS
    (`mercury-spawn-run.txt`): heading 0 slowest after the first second 0.79 -> 4.45 m/s, worst one-frame loss 6.61 ->
-   2.24 m/s, the other seven headings identical to the digit.
+   2.24 m/s, the other seven headings identical to the digit. Seen in the grand tour's frames at 400 x 225: a notice on
+   foot under the new page's slip in the top right corner; `hud.js` (`pc-sketching`) and `theme.css`: while the slip
+   is up a notice on foot is lettered from the left (filmed, `foot-side-arrow-and-slip.jpg`, last tile: clear).
 6. **Sketchbook captions and a word toward the nearest view (MINOR 12 in part, CONFUSING 7).** `game.js bookPages`: a
    view named as a landscape of its page is captioned "<name>, the view" (Uranus: "Pearl Fog Flats" twice); not seen
    in the game (game.js does not load in Node). `sim.js EXIT.near` 14 -> 40 m and `SKETCH_SLIP.shipWait` 30 -> 45 s:
@@ -114,18 +117,43 @@ Committed `b0710fe`.
    km ahead to the left: fly nearer, or walk" (8 s); test (vista.test). Not done: the dark grey view sketch of Uranus'
    white fog (needs the frame it was drawn from; not looked into).
 
+### Not fixed (and why)
+
+- **The view sketch of Uranus' white fog drawn as a dark grey wash** (MINOR 12, part): not looked into (it needs the
+  frame the sketch was drawn from; the sketch is drawn from the picture on the screen at the easel).
+- **"The Neptune target's label sits on the ship"** (MINOR 11, part): not found in the player's frames (its Neptune
+  frames 127, 128, 151-155 show the label beside an edge arrow, off the ship); the last pass's slide rule holds there.
+- **A gentler mouse pitch in the air than 0.8**: 0.6, 0.7 and 0.75 each make the real-world trip in contract.test
+  fail one Mars landing ("No level ground here": the landing assist's glide to a site 45 m away meets a slope at
+  4 m and gives the ship back). That fragility of the landing assist is older than this round and not touched.
+- **UGLY 8 and 9, MINOR 10** (the stair-stepped figure and ship at tier 0, the flat frames, the climb to space): the
+  picture, PAINTER's (its items 2 to 4 of this round).
+
+### For PAINTER (seen, not mine to change)
+
+- Arriving at Saturn by pulse (chase view, 5.2 km up, 788 m/s, quality 0, 640 x 360), the left third of the picture
+  is one flat paper-pale wash (the ring plane seen from inside it?): the last tile of
+  `docs/shots/pilot/preship/pulse-behind-earth.jpg`, full frame `/home/user/.pc-scratch/pilot/preship/film/out1/12-arrived.jpg`.
+
 ### State of the tree and checks
 
-Items 3 to 6 checked on a clean export of `25074de` with these files (`t2`): world 24 (PAINTER's new test), unit 198,
-physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros, `wallrun.mjs` 0.2 m at most over 50
-degrees; lockcheck PASSED; the game at quality 0 (the foot film): no game error, fallback empty. The same checks
-again on `t3` (with the side-arrow rule in game.js): world 24, unit 198, physics 325, coast PASS, ghostfield zeros,
-wallrun 0.2 m.
+My commits: `b0710fe` (items 1 and 2), `5ba725f` (items 3 to 6), and the last one (the slip rule, the grand tour's
+evidence, this hand-over). Items 3 to 6 checked on a clean export of `25074de` with these files (`t2`, `t3`): world 24
+(PAINTER's new test), unit 198, physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros (worst step
+loss 0.26 / 0.52 as always), `wallrun.mjs` earth sea_coast 0.2 m at most over 50 degrees; lockcheck PASSED; the game
+at quality 0: no game error, fallback empty. The last commit's two files (hud.js, theme.css) checked on a clean
+export of `4bbbae4` with them (`t4`): the same numbers; filmed in the game, no game error, fallback empty.
 
-### Next
+**`tests/grandtour.mjs` on a clean export of `5ba725f`: PASSED** (`docs/shots/pilot/preship/grandtour/`: the log,
+`grandtour.json`, `summary.json`, a sheet of its nine frames, opened): from the title card with real keys and mouse,
+8 landings of 8 (Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Earth) in one sitting, 30.4 minutes, 1578 s
+of game time; every leg one pulse, nothing refused, nothing barred ("<World> ahead" each time); Saturn's landing
+took three tries ("Too steep to land here", then "Setting down on level ground 70 m away"); no console error, page
+error, failed or outside request. The harness aims at the marker before F, so no leg needed the turn onto the course
+(that is item 1's own test and film).
 
-`tests/grandtour.mjs` once on a clean export of the last commit (8 landings from the title card, about 40 minutes);
-then the hand-over's last word here.
+Not run in this round: `node tests/all.mjs` whole, the top tier (quality 2) in the game, `tests/trip.mjs`,
+`tests/playthrough.mjs`, `tests/m3check.mjs`, `tests/audiocheck.mjs`.
 
 ## Hand-over, M4 RE-FIX pass (seventeenth PILOT agent; started 12:24 UTC 2026-11-13; kept current after every item)
 
