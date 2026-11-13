@@ -31,7 +31,11 @@ them). Scratch: `/home/user/.pc-scratch/pilot/preship/refix/` (`head/` a clean e
    3600 s, nose ahead and behind (540 pulses: let go at the sphere at no more than 1.25 x cruise, never inside 0.9 of
    the sphere while pulsing, never under the edge of space after, "<World> ahead", no pulse longer than 2.5 x its ETA +
    30 s, never inside another world's edge of space): on `22120b9` 27 of 540 fail; Venus -> Earth as above: fails on
-   `22120b9`. The verifier's course-matrix (11520 runs) is being run on the tree (see the state below).
+   `22120b9`. The verifier's `course-matrix.mjs` (11520 runs: 10 start worlds, 4 heights, still and moving, 4
+   longitudes, 9 targets, mark behind / above / below / beside): no failure with a pulse (`22120b9`: 196, Venus ->
+   Earth into Earth's air among them); its 1095 others are the probe's own "moving" pose that points the ship down
+   into the air before F, the same 1095 as on `22120b9`; `climbF.mjs` (climb out of Earth, F with a course): 144 of 144
+   arrive (`course-matrix-fixed.txt`).
 2. **R2, F's hold on the course.** `sim.js`: `targetLocked` is `true` for a world chosen on the map (held until it is
    reached or the map changes it) and `'f'` for F's own hold, which ends with its turn or its pulse (`unlockCourse`: F
    stops the turn, A / D or the mouse stops it, the turn ends refused, the pilot drops out of a pulse); "<World> lies on
@@ -82,6 +86,34 @@ the map; `docs/shots/pilot/preship/refix/venus-earth-real-game.jpg` and `-log.tx
 up, Earth chosen on the map, the nose on Earth, F: the pulse passes Mercury 4.4 to 5.3 km over its ground at 9.9 km/s,
 brakes from 77 km out, lets go at 905 m/s 5.1 km over Earth with "Earth ahead", and coasts to 2.8 km up at 225 m/s
 with Earth filling the picture (on `22120b9` it hit Earth's ground at 4.2 km/s). No console or game error, fallback `[]`.
+
+**The pulse from Earth with the mark behind, filmed on the final code** (the verifier's `play.mjs earthF` on `c2`,
+quality 0, 640 x 360, real M, a click on the map, F as the prompt says; `earth-mark-behind-real-game.jpg` and `-log.txt`,
+opened): Saturn's mark behind the ship 2.6 km over Earth, "Pulse to Saturn"; F: "Turning onto the course for Saturn",
+"F Stop turning", the arrow swings up the right edge and Saturn's ring comes to the nose in 3.8 s, the drive starts,
+brakes from about 150 km and lets go "Saturn ahead" 5.2 km up at 784 m/s; Neptune's mark above: turned in 3 s,
+"Neptune ahead" 4.6 km up; Jupiter's mark behind: turned in 3.8 s, "Jupiter ahead" 5.5 km up. No console or game
+error, fallback `[]`. Seen in it, older than this round and not on this pass's list (the verifier's "not counted"
+(a)): with the mark dead behind, its edge arrow and label sit at the bottom middle by the "Pulse to Saturn" prompt
+(first tile), and with "Neptune ahead" up Jupiter's ring lies on the fading prompt (tenth tile).
+
+### Not fixed (and why)
+
+- **The verifier's "seen, older than this round, not counted"**: (a) the flight target's edge arrow at the bottom
+  middle by the prompt with the mark dead behind, and a world's ring on the prompt (seen again in my Earth film,
+  tiles 1 and 10); (b) the foot camera's thicket rule giving an eye view with no figure in Earth's wood. Not on this
+  pass's list ("fix exactly these, and nothing else"); left for a later round. A cheap way for (a): in `game.js`
+  `edgeY` / the edge arrow's place, lift an arrow pointing straight down above the prompt band as the place-to-land
+  arrow already is (`layout.test` "an arrow pointing straight down rides at 0.69 of the picture's height").
+- **The rest of the eighteenth's "Not fixed"** stands (Uranus' dark view sketch: PAINTER gave the exact change in
+  `docs/notes/painter.md` lines 160-171 for `src/core/sketches.js sketchHand`, not applied in this pass; the Neptune label on
+  the ship not found; mouse pitch 0.8 in the air).
+
+### State of the tree and checks
+
+My commits this pass: `015bc21` (R1, R2), `23e7c81` (R3, R4), and the last one (this hand-over, the grand tour, the
+films' evidence). First commit's parent: `db31c96` (PAINTER's re-fix hand-over). Nothing of mine is half-done in the
+working tree; PAINTER's uncommitted files there are not mine.
 
 ## Hand-over, PRE-SHIP fix round (eighteenth PILOT agent; started 15:50 UTC 2026-11-13; kept current after every item)
 
