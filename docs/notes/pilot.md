@@ -113,9 +113,21 @@ error, fallback `[]`. Seen in it, older than this round and not on this pass's l
 
 ### State of the tree and checks
 
-My commits this pass: `015bc21` (R1, R2), `23e7c81` (R3, R4), and the last one (this hand-over, the grand tour, the
-films' evidence). First commit's parent: `db31c96` (PAINTER's re-fix hand-over). Nothing of mine is half-done in the
-working tree; PAINTER's uncommitted files there are not mine.
+My commits this pass: `015bc21` (R1, R2), `23e7c81` (R3, R4), `da7d587` (the films' evidence, this hand-over), and
+the last one (the grand tour). First commit's parent: `db31c96` (PAINTER's re-fix hand-over). Nothing of mine is
+half-done in the working tree; PAINTER's uncommitted files there are not mine.
+
+**`tests/grandtour.mjs` on a clean export of `23e7c81` (the code of this pass whole): PASSED**
+(`docs/shots/pilot/preship/refix/grandtour/`: the log, `grandtour.json`, `summary.json`, a sheet of its nine frames at
+400 x 225, opened): from the title card with real keys and mouse, 8 landings of 8 (Mercury, Venus, Mars, Jupiter,
+Saturn, Uranus, Neptune, Earth) in one sitting, 27.4 minutes, 1552 s of game time; every leg one pulse, nothing
+refused, nothing barred ("<World> ahead" each time; the drive let go 5.1 to 11.3 km from the world's centre, each
+world's arrival sphere), every landing at the first try; no console error, page error, failed or outside request.
+Seen in its frames, not this pass's: at Uranus the notice "A view to find 1.1 km behind to the right" and the new
+page's slip take most of the small picture.
+
+Not run in this pass: `node tests/all.mjs` whole, the top tier (quality 2) in the game, `tests/trip.mjs`,
+`tests/playthrough.mjs`, `tests/m3check.mjs`, `tests/audiocheck.mjs`.
 
 ## Hand-over, PRE-SHIP fix round (eighteenth PILOT agent; started 15:50 UTC 2026-11-13; kept current after every item)
 

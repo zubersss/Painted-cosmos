@@ -1,0 +1,179 @@
+19:55:19   ok: every module the run asked for is the real one: {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"}
+19:55:19 ready. providers: {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"} to fly: mercury, venus, mars, jupiter, saturn, uranus, neptune, earth
+19:55:19   ok: the title card is up
+19:55:20   ok: a click on the title starts the game
+19:55:20   ok: on foot on Earth (temperate_forest)
+19:55:28   ok: W walks: 12.9 m in 3 s
+19:55:36   ok: Space is the jetpack: 16.0 m up, back on the ground
+19:55:45 LEG 1: earth -> mercury
+19:56:02   ok: in the ship on earth
+19:56:12   ok: lifted off from earth
+19:56:34   ok: reached space above earth
+19:56:44   ok: M opens the map
+19:56:44   ok: clicking mercury on the map sets the course (152 km)
+19:56:45   ok: M closes the map
+19:56:48   ok: nose on mercury (off by 2.9, 0.8 deg)
+19:56:48   ok: the target marker is on screen near the nose: {"kind":"target","label":"Mercury","x":208,"y":105,"r":2}
+19:57:25   the screen says: "Mercury ahead"
+19:57:25   ok: arrived at mercury: 5.1 km away after 37.5 s of pulse, 7144 m/s at most
+19:57:34   ok: flying in the frame of mercury: mercury:ground
+19:57:35   ok: entered the atmosphere of mercury
+19:57:37   ok: landing prompt over mercury
+19:57:37   the screen says: "Slowing down to land"
+19:57:42   ok: landed on mercury
+19:57:45   ok: stepped out on mercury
+19:57:49   ok: standing on mercury (crystal_gardens, walk, local time 20.2)
+19:57:49   ok: walked 12.6 m on mercury
+19:57:49   ok: the sketchbook has mercury: ["crystal_gardens"]
+19:58:00   leg done: {"n":1,"from":"earth","to":"mercury","said":["Mercury ahead","Slowing down to land"],"refused":[],"barred":[],"vMax":7144,"landTries":1,"t0":17,"spaceAt":36,"km":152,"prompt":"Pulse to Mercury","beatPulse":2,"pulseSeconds":37.5,"pulses":1,"arrivedKm":5.1,"bounces":0,"walked":12.6,"biome":"crystal_gardens","mode":"walk","hour":20.2,"gameSeconds":109,"wallSeconds":135,"landed":true}
+19:58:00 LEG 2: mercury -> venus
+19:58:06   ok: in the ship on mercury
+19:58:10   ok: lifted off from mercury
+19:58:22   ok: reached space above mercury
+19:58:26   ok: M opens the map
+19:58:26   ok: clicking venus on the map sets the course (182 km)
+19:58:27   ok: M closes the map
+19:58:38   ok: nose on venus (off by -0.6, -2.5 deg)
+19:58:38   ok: the target marker is on screen near the nose: {"kind":"target","label":"Venus","x":198,"y":115,"r":3}
+19:59:18   the screen says: "Venus ahead"
+19:59:18   ok: arrived at venus: 8.2 km away after 40 s of pulse, 7734 m/s at most
+19:59:26   ok: flying in the frame of venus: venus:orbit
+19:59:36   ok: entered the atmosphere of venus
+20:00:17   ok: landing prompt over venus
+20:00:17   the screen says: "Setting down on level ground 12 m away"
+20:00:33   ok: landed on venus
+20:00:37   ok: stepped out on venus
+20:00:40   ok: standing on venus (acid_terraces, idle, local time 14.8)
+20:00:40   ok: walked 9 m on venus
+20:00:40   ok: the sketchbook has venus: ["acid_terraces"]
+20:00:55   leg done: {"n":2,"from":"mercury","to":"venus","said":["Venus ahead","Setting down on level ground 12 m away"],"refused":[],"barred":[],"vMax":7734,"landTries":1,"t0":136,"spaceAt":20,"km":182,"prompt":"Pulse to Venus","beatPulse":2,"pulseSeconds":40,"pulses":1,"arrivedKm":8.2,"bounces":0,"walked":9,"biome":"acid_terraces","mode":"idle","hour":14.8,"gameSeconds":155,"wallSeconds":175,"landed":true}
+20:00:55 LEG 3: venus -> mars
+20:01:01   ok: in the ship on venus
+20:01:06   ok: lifted off from venus
+20:01:33   ok: reached space above venus
+20:01:46   ok: M opens the map
+20:01:46   ok: clicking mars on the map sets the course (348 km)
+20:01:46   ok: M closes the map
+20:01:53   ok: nose on mars (off by -0.7, -2.5 deg)
+20:01:53   ok: the target marker is on screen near the nose: {"kind":"target","label":"Mars","x":198,"y":115,"r":1}
+20:02:51   the screen says: "Mars ahead"
+20:02:51   ok: arrived at mars: 6.9 km away after 58.2 s of pulse, 10881 m/s at most
+20:02:59   ok: flying in the frame of mars: mars:orbit
+20:03:05   ok: entered the atmosphere of mars
+20:03:06   the screen says: "Thin air on Mars: the ship runs fast and turns wide. Hold X to slow it"
+20:03:11   ok: landing prompt over mars
+20:03:11   the screen says: "Slowing down to land"
+20:03:18   ok: landed on mars
+20:03:21   ok: stepped out on mars
+20:03:26   ok: standing on mars (dry_riverbeds, walk, local time 14.4)
+20:03:26   ok: walked 14.3 m on mars
+20:03:26   ok: the sketchbook has mars: ["dry_riverbeds"]
+20:03:37   leg done: {"n":3,"from":"venus","to":"mars","said":["Mars ahead","Thin air on Mars: the ship runs fast and turns wide. Hold X to slow it","Slowing down to land"],"refused":[],"barred":[],"vMax":10881,"landTries":1,"t0":300,"spaceAt":34,"km":348,"prompt":"Pulse to Mars","beatPulse":2,"pulseSeconds":58.2,"pulses":1,"arrivedKm":6.9,"bounces":0,"walked":14.3,"biome":"dry_riverbeds","mode":"walk","hour":14.4,"gameSeconds":145,"wallSeconds":161,"landed":true}
+20:03:37 LEG 4: mars -> jupiter
+20:03:44   ok: in the ship on mars
+20:03:48   ok: lifted off from mars
+20:04:00   ok: reached space above mars
+20:04:05   ok: M opens the map
+20:04:05   ok: clicking jupiter on the map sets the course (401 km)
+20:04:06   ok: M closes the map
+20:04:13   ok: nose on jupiter (off by 0.6, -2.8 deg)
+20:04:13   ok: the target marker is on screen near the nose: {"kind":"target","label":"Jupiter","x":202,"y":115,"r":2}
+20:05:15   the screen says: "Jupiter ahead"
+20:05:15   ok: arrived at jupiter: 11.3 km away after 62.1 s of pulse, 11638 m/s at most
+20:05:23   ok: flying in the frame of jupiter: jupiter:orbit
+20:05:35   ok: entered the atmosphere of jupiter
+20:05:56   ok: landing prompt over jupiter
+20:05:57   the screen says: "Slowing down to land"
+20:06:12   ok: landed on jupiter
+20:06:15   ok: stepped out on jupiter
+20:06:20   ok: standing on jupiter (hanging_gardens, idle, local time 16)
+20:06:20   ok: walked 13 m on jupiter
+20:06:20   ok: the sketchbook has jupiter: ["hanging_gardens"]
+20:06:35   leg done: {"n":4,"from":"mars","to":"jupiter","said":["Jupiter ahead","Slowing down to land"],"refused":[],"barred":[],"vMax":11638,"landTries":1,"t0":455,"spaceAt":21,"km":401,"prompt":"Pulse to Jupiter","beatPulse":2,"pulseSeconds":62.1,"pulses":1,"arrivedKm":11.3,"bounces":0,"walked":13,"biome":"hanging_gardens","mode":"idle","hour":16,"gameSeconds":160,"wallSeconds":178,"landed":true}
+20:06:35 LEG 5: jupiter -> saturn
+20:06:40   ok: in the ship on jupiter
+20:06:45   ok: lifted off from jupiter
+20:07:07   ok: reached space above jupiter
+20:07:20   ok: M opens the map
+20:07:20   ok: clicking saturn on the map sets the course (1080 km)
+20:07:20   ok: M closes the map
+20:07:28   ok: nose on saturn (off by -0.2, -2.2 deg)
+20:07:28   ok: the target marker is on screen near the nose: {"kind":"target","label":"Saturn","x":200,"y":114,"r":1}
+20:09:14   the screen says: "Saturn ahead"
+20:09:14   ok: arrived at saturn: 10.4 km away after 105.4 s of pulse, 19368 m/s at most
+20:09:22   ok: flying in the frame of saturn: saturn:orbit
+20:09:33   ok: entered the atmosphere of saturn
+20:09:54   ok: landing prompt over saturn
+20:09:55   the screen says: "Setting down on level ground 26 m away"
+20:10:11   ok: landed on saturn
+20:10:14   ok: stepped out on saturn
+20:10:19   ok: standing on saturn (gold_islands, idle, local time 12.9)
+20:10:19   ok: walked 14 m on saturn
+20:10:19   ok: the sketchbook has saturn: ["gold_islands"]
+20:10:34   leg done: {"n":5,"from":"jupiter","to":"saturn","said":["Saturn ahead","Setting down on level ground 26 m away"],"refused":[],"barred":[],"vMax":19368,"landTries":1,"t0":627,"spaceAt":31,"km":1080,"prompt":"Pulse to Saturn","beatPulse":2,"pulseSeconds":105.4,"pulses":1,"arrivedKm":10.4,"bounces":0,"walked":14,"biome":"gold_islands","mode":"idle","hour":12.9,"gameSeconds":220,"wallSeconds":239,"landed":true}
+20:10:34 LEG 6: saturn -> uranus
+20:10:40   ok: in the ship on saturn
+20:10:46   ok: lifted off from saturn
+20:11:12   ok: reached space above saturn
+20:11:26   ok: M opens the map
+20:11:26   ok: clicking uranus on the map sets the course (1090 km)
+20:11:26   ok: M closes the map
+20:11:33   ok: nose on uranus (off by -0.4, -2.1 deg)
+20:11:33   ok: the target marker is on screen near the nose: {"kind":"target","label":"Uranus","x":199,"y":114,"r":1}
+20:13:20   the screen says: "Uranus ahead"
+20:13:20   ok: arrived at uranus: 9.6 km away after 106.3 s of pulse, 19480 m/s at most
+20:13:28   ok: flying in the frame of uranus: uranus:orbit
+20:13:38   ok: entered the atmosphere of uranus
+20:13:57   ok: landing prompt over uranus
+20:13:57   the screen says: "Setting down on level ground 70 m away"
+20:14:14   ok: landed on uranus
+20:14:17   ok: stepped out on uranus
+20:14:21   ok: standing on uranus (frozen_waves, idle, local time 14.3)
+20:14:21   ok: walked 11.4 m on uranus
+20:14:21   ok: the sketchbook has uranus: ["frozen_waves"]
+20:14:39   leg done: {"n":6,"from":"saturn","to":"uranus","said":["Uranus ahead","Setting down on level ground 70 m away"],"refused":[],"barred":[],"vMax":19480,"landTries":1,"t0":859,"spaceAt":35,"km":1090,"prompt":"Pulse to Uranus","beatPulse":2,"pulseSeconds":106.3,"pulses":1,"arrivedKm":9.6,"bounces":0,"walked":11.4,"biome":"frozen_waves","mode":"idle","hour":14.3,"gameSeconds":222,"wallSeconds":244,"landed":true}
+20:14:39 LEG 7: uranus -> neptune
+20:14:44   ok: in the ship on uranus
+20:14:50   ok: lifted off from uranus
+20:15:10   ok: reached space above uranus
+20:15:20   ok: M opens the map
+20:15:20   ok: clicking neptune on the map sets the course (1731 km)
+20:15:20   ok: M closes the map
+20:15:28   ok: nose on neptune (off by 0.6, -2.6 deg)
+20:15:28   ok: the target marker is on screen near the nose: {"kind":"target","label":"Neptune","x":202,"y":115,"r":0}
+20:17:44   the screen says: "Neptune ahead"
+20:17:44   ok: arrived at neptune: 9.6 km away after 134.7 s of pulse, 24609 m/s at most
+20:17:52   ok: flying in the frame of neptune: neptune:orbit
+20:18:02   ok: entered the atmosphere of neptune
+20:18:29   ok: landing prompt over neptune
+20:18:44   ok: landed on neptune
+20:18:47   ok: stepped out on neptune
+20:18:52   ok: standing on neptune (aurora_tundra, idle, local time 12.9)
+20:18:52   ok: walked 11.7 m on neptune
+20:18:52   ok: the sketchbook has neptune: ["aurora_tundra"]
+20:19:12   leg done: {"n":7,"from":"uranus","to":"neptune","said":["Neptune ahead"],"refused":[],"barred":[],"vMax":24609,"landTries":1,"t0":1090,"spaceAt":29,"km":1731,"prompt":"Pulse to Neptune","beatPulse":2,"pulseSeconds":134.7,"pulses":1,"arrivedKm":9.6,"bounces":0,"walked":11.7,"biome":"aurora_tundra","mode":"idle","hour":12.9,"gameSeconds":249,"wallSeconds":273,"landed":true}
+20:19:12 LEG 8: neptune -> earth
+20:19:18   ok: in the ship on neptune
+20:19:22   ok: lifted off from neptune
+20:19:47   ok: reached space above neptune
+20:19:58   ok: M opens the map
+20:19:58   ok: clicking earth on the map sets the course (795 km)
+20:19:59   ok: M closes the map
+20:20:07   ok: nose on earth (off by 0.7, -3.0 deg)
+20:20:07   ok: the target marker is on screen near the nose: {"kind":"target","label":"Earth","x":202,"y":116,"r":1}
+20:21:37   the screen says: "Earth ahead"
+20:21:37   ok: arrived at earth: 9.1 km away after 89.6 s of pulse, 16573 m/s at most
+20:21:45   ok: flying in the frame of earth: earth:orbit
+20:21:55   ok: entered the atmosphere of earth
+20:22:07   ok: landing prompt over earth
+20:22:08   the screen says: "Slowing down to land"
+20:22:23   ok: landed on earth
+20:22:26   ok: stepped out on earth
+20:22:30   ok: standing on earth (sea_coast, idle, local time 3.1)
+20:22:30   ok: walked 13.1 m on earth
+20:22:30   ok: the sketchbook has earth: ["temperate_forest","sea_coast"]
+20:22:42   leg done: {"n":8,"from":"neptune","to":"earth","said":["Earth ahead","Slowing down to land"],"refused":[],"barred":[],"vMax":16573,"landTries":1,"t0":1348,"spaceAt":32,"km":795,"prompt":"Pulse to Earth","beatPulse":2,"pulseSeconds":89.6,"pulses":1,"arrivedKm":9.1,"bounces":0,"walked":13.1,"biome":"sea_coast","mode":"idle","hour":3.1,"gameSeconds":193,"wallSeconds":210,"landed":true}
+20:22:42   ok: landed on 8 of 8: mercury, venus, mars, jupiter, saturn, uranus, neptune, earth
+20:22:42   ok: one sitting: the page was never reloaded (0 navigations)
+20:22:45   ok: no console errors, page errors, failed or external requests
+20:22:45 PASSED {"gameSeconds":1552,"wallMinutes":27.4}
