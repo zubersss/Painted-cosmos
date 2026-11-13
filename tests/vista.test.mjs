@@ -124,4 +124,17 @@ test('M4 a view the world gives no heading for keeps the way the player looks; a
   drawn = true;
   play(sim, pad, 0.1);
   assert.equal(sim.easel, null, 'drawn: given back');
+  assert.equal(sim.easelOffer, null, 'and not offered again');
+  // a page that could not be drawn while the picture was held (the book was opened over it): after
+  // eight seconds the controls come back, and the easel is still on offer
+  const w3 = world(), sim3 = w3.sim, pad3 = new Pad();
+  sim3.vistaDrawn = () => false;
+  play(sim3, pad3, 0.3);
+  walkTo(sim3, pad3, w3.vistas[0].unitDir, () => !!sim3.easelOffer);
+  pad3.tap('KeyE');
+  play(sim3, pad3, 8, { until: () => sim3.easel && sim3.easel.phase === 'hold' });
+  play(sim3, pad3, 8.3);
+  assert.equal(sim3.easel, null, 'given back after eight seconds');
+  play(sim3, pad3, 0.1);
+  assert.equal(sim3.easelOffer && sim3.easelOffer.id, 'v1', 'still on offer: the page has no picture');
 });

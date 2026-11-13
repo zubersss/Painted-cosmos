@@ -688,7 +688,9 @@ export class Sim {
         this.ex = createExplorerState(E.toP, a1);
         this.ex.fuel = fuel;
         cam.viewFwd = a1; cam.pitch = E.toPitch; cam.boom = CAMERA.boom;
-        (this.stood[this.bodyId] || (this.stood[this.bodyId] = {}))[E.id] = true;
+        // (with a presenter, a view is drawn when its page has a picture: if the page could not be
+        // drawn while the picture was held, the easel is offered again; without one, standing there is it)
+        if (!this.vistaDrawn) (this.stood[this.bodyId] || (this.stood[this.bodyId] = {}))[E.id] = true;
         E.phase = 'hold'; E.t = 0;
       }
     } else if (E.t >= EASEL.hold && (E.t > 8 || !this.vistaDrawn || this.vistaDrawn(this.bodyId, E.id))) {
