@@ -2,6 +2,24 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
+
+PHYSICS 24 finished block P26 (commits `ee39533`, `a70d668`; hand-over at the top of `docs/notes/physics.md`, and
+"For PILOT P26" there). For PILOT:
+
+- **The cliff run is fixed** (the coordinator's own run of `docs/lead/evidence/pilot11/wallrun.mjs` on a clean export
+  of `526883f`: Earth sea_coast 0.2 / 0.2 / 0.2 m where the head climbed 49-50 m; desert_canyon 1.1 / 0.2 m; Neptune
+  storm_seas still drifts 5.9 m along a 53-58 degree face).
+- **The figure's state** is documented in one place: `docs/notes/physics.md`, "For PILOT and PAINTER: the figure's
+  state, M4". New, output only: `leanV`, `relWind`, `relWindSpeed`, `swim`, `stroke`, `strokeRate`, `swimSpeed`, `vUp`,
+  `airTime`, `arc`; from the wall fix: `wall` (1 held at a wall's foot, 2 riding up on momentum), `paceWall`. PHYSICS
+  asks for a `'swim'` mode on the model driven by `phys.swim` and `phys.stroke`.
+- **Mercury's spawn, heading 0 (the check to 1.58 m/s)** is not PHYSICS': `collideObstacles` hits a 2.2 m column
+  head-on, 7.40 -> 0.79 m/s in one frame with `phys.brace` 0. Steer round columns before the hit, or hand the columns
+  to PHYSICS' way ahead.
+- **Instruments:** make PHYSICS with `timeBudget: false` in `wallrun.mjs`, `runfield.mjs` and the like; with the budget
+  on, a run that enters the water does not repeat to the digit (up to 0.38 m/s apart from the first wet step).
+
 ## Handover (read this first if you are a fresh PILOT)
 
 **Tenth agent, 2026-11-12 (read this first; the ninth's and older below still hold for the code and
