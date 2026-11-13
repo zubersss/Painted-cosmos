@@ -19,6 +19,16 @@ PASS at both stands (Earth Hs 0.62 m at the reference, target 0.52, white 4.88 %
 target 3.08, white 100 % for a target of 100); `ghostfield.mjs` all zeros (worst step loss 0.26 Earth, 0.52 Moon, as
 before); PILOT's boulderrun replayed in Node: all sixteen runs the same to the digit as the head `79eb918` (thrown up
 0.000 in every heading). Every new test fails on the head (item by item below).
+PILOT's `wallrun.mjs` once more on the final tree (`final3`, the seven places, eight headings each): every number as after
+item 1 (`docs/shots/physics/p26/wallrun-before-after.txt`) but one field, Earth sea_coast heading 90, the slope at its
+fastest climb (28 -> 31 degrees; nothing gained on steep ground either way). That heading runs into the sea, and **a run
+that enters the water does not repeat to the digit in PILOT's instruments**: they make PHYSICS with its time budget on
+(`createPhysics`'s `timeBudget`, default true: the sea's fetch and depth are rationed by the clock), so the same tree
+differs from itself from the waterline on (`p26/s/cliff.mjs <root> earth sea_coast 90 4 30 1 0` twice: the head against
+itself 0.12 m/s, item 1's tree against itself up to 0.38 m/s, from 2.93 s, the first wet step; before it only signs of
+zeros). Not a change of this block: with `createPhysics({ ..., timeBudget: false })` in the instrument (as the tests make
+it) the run repeats to the byte, and the final tree's run is item 1's to the byte, through the waterline and the wade
+(4 s, step by step: items 2, 4 and 5 do not move the walker).
 Scratch: `/home/user/.pc-scratch/physics/p26/` (`head/` `79eb918` as exported; `work/` it with item 1; `final1/` `90bb703`
 with item 1, the tree `ee39533` was tested on; `work2/` and `final2/` (`ee39533` as exported with items 2, 4, 5: tested
 whole with the same counts, and the tree the strips were filmed from); `final3/` (the same with the sea map's white share
@@ -3299,6 +3309,10 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 ## For PILOT: wiring, in order
 
 ### P26, first (twenty-fourth PHYSICS agent)
+- **Your instruments (`wallrun.mjs`, `runfield.mjs`, ...) do not repeat to the digit where a run enters the water:** they
+  make PHYSICS with its time budget on. `P.createPhysics({ sampleSurface: ss, seed: 1, timeBudget: false })` makes them
+  repeat to the byte (hand-over P26, the top block: the same tree against itself differs by up to 0.38 m/s from the first
+  wet step at Earth's sea_coast heading 90). The game itself keeps the budget on.
 - **Your critique's item 1 (the explorer runs up cliffs): fixed, nothing to wire** (hand-over P26, item 1). Your
   `wallrun.mjs`, before -> after: Earth sea_coast 49.9 / 49.0 / 49.7 m gained on ground over 50 degrees -> 0.2 / 0.2 / 0.2;
   desert_canyon 30.7 / 24.4 -> 1.1 / 0.2 (heading 225 arrives at 6.5 m/s and rides the foot's curve up to 60 degrees on its
