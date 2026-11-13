@@ -7,7 +7,8 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 Read this first; the nineteenth's hand-over just below holds for everything not named here. The task: the m3
 regression first (tests/all.mjs failed on `45629a7`, steps m3 and painted-m3), then the second blind player's small
 items (1) to (5) if small and safe, then `node tests/all.mjs` in a clean tree. Scratch:
-`/home/user/.pc-scratch/pilot/last/`. First commit's parent: `45629a7`.
+`/home/user/.pc-scratch/pilot/last/` (scripts also in `docs/shots/pilot/last/scripts/`). First commit's parent: `e56a93f`
+(the coordinator's log on top of `45629a7`).
 
 ### Item 0, the first page never came (m3, painted-m3): DONE
 
@@ -72,6 +73,18 @@ changing that rule moves every slope's view and the footcam tests' cases; withou
 only "400 to 510 m from the ship") I could not show a before/after, so it is left. The faceted slab in first person is
 the terrain mesh close up (PAINTER's).
 
+### Not fixed, and for whoever comes next
+
+- Item (4), the canyon camera: above (not reproduced; the lift cap is the likely rule).
+- PAINTER's note for PILOT (`docs/notes/painter.md`, this round's items 1 and 3): the foot camera's boom passes into
+  tall props without crowns (Neptune's ice spires, 17 to 27 m; `camera.js CROWN_KITS` keeps the lens out of crowns
+  only) and the landing camera too; PAINTER made a spire hollow and soft when the eye is inside it (`0112e5e`), so the
+  frame no longer shows the hard polygons, but the boom itself still goes in. Not touched in this round (a camera rule
+  for every world, the last round).
+- Older, still standing: PAINTER's exact change for the Uranus view sketch's dark wash (`sketches.js sketchHand`, span
+  floor 0.45; `docs/notes/painter.md`), not applied; the foot camera's thicket rule giving an eye view with no figure in
+  Earth's wood; mouse pitch 0.8 in the air; the Neptune label on the ship not found.
+
 ### State of the tree and checks (this round)
 
 Second code commit (the place-to-land arrow over the ground): checks on a clean export of `0a92d45` (PAINTER's last
@@ -79,8 +92,9 @@ fixes in) with it (`t2`): world 30, unit 208, physics 325, `coast.mjs` PASS at b
 zeros. First code commit `3066381`: checks on a clean export of `e56a93f` with its files (`t1`): world 25, unit 208 (202 + `sketchpage.test` 2,
 `flightmarks.test` 3, the new `loop.test` case), physics 325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all
 zeros (worst step loss 0.26 / 0.52 as always); the painted game at quality 0 loads with no console error, fallback
-`[]` (the probe). Commits: the code commit (items 0, 1, 2, 3, 5) is the first of this round. `node tests/all.mjs` in a
-clean tree: NOT YET RUN (next).
+`[]` (the probes). Commits: `3066381` (items 0, 1, 2, 3, 5), `3cfd184` (item 5 corrected: behind over the ground), and
+the hand-over. `node tests/all.mjs --export` on `3066381`: ALL 13 PASSED (`docs/shots/pilot/last/all-mjs-3066381.txt`);
+on `3cfd184` (with PAINTER's `0112e5e`, `5fd389b`): RUNNING.
 
 ## Hand-over, PRE-SHIP RE-FIX pass (nineteenth PILOT agent; started about 19:15 UTC 2026-11-13; kept current after every item)
 
