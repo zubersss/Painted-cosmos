@@ -152,6 +152,10 @@ export const BLOWN = Object.freeze({
   // leaf, 3 cm across, slipping through the air at 1.5 m/s turns some 5 times a second, so a two-toned leaf shows its other
   // side about ten times a second. A flutterer rocks through +-leafRock radians at half that rate and never turns over.
   leafRo: [0.2, 0.4],
+  // (M4; PAINTER's critique of PHYSICS, item 8: "a tumbling leaf changes colour from one frame to the next") ... which
+  // thirty frames a second cannot show: a leaf drawn with two faces flickers. The turn that is handed over (buf.turn)
+  // goes no faster than leafTurnMax: a turn and a half a second, each face seen for a third of a second.
+  leafTurnMax: 9.42,    // rad/s
   leafRock: [0.9, 1.35],
   // Spume and surf (the sea's own spray; before P10 only bodies raised spray).
   // Spume: where a crest is breaking and the wind is over spumeFrom the wind tears the top off it:
@@ -628,7 +632,7 @@ export class Loose {
         // (P15) a leaf turns about its long side at its slip through the air (BLOWN.leafRo): end over end, or rocking
         // (P17: own in [0, 1), so `own * k % 1` is own * k less its floor, exactly; the slip is the one just damped)
         if (TU) {
-          const own = ph * 0.15915494, f7 = own * 7.31, w = 2 * (ro0 + roD * (f7 - Math.floor(f7))) * sl * m / (0.6 * SZ[i]);
+          const own = ph * 0.15915494, f7 = own * 7.31, w0 = 2 * (ro0 + roD * (f7 - Math.floor(f7))) * sl * m / (0.6 * SZ[i]), w = w0 > BLOWN.leafTurnMax ? BLOWN.leafTurnMax : w0;
           const f3 = own * 3.7, f13 = own * 13.1;
           if (f3 - Math.floor(f3) < K.tumble) { let t = TP[i] + (f13 - Math.floor(f13) < 0.5 ? -w : w) * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = t; }
           else { const f5 = own * 5.3; let t = TP[i] + 0.5 * w * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = (rk0 + rkD * (f5 - Math.floor(f5))) * fsin(t); }

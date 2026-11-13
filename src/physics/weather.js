@@ -39,6 +39,7 @@ export const WEATHER = Object.freeze({
   // galeCloud of the sky, and over an open sea spray takes the view (sprayExt: extinction in units of clear air:
   // 12 = a visual range of 1.5 km in a hurricane-force wind over a breaking sea)
   galeFrom: 18, galeFull: 34, galeCloud: 0.9, sprayExt: 12,
+  nameGale: 12,            // m/s: (M4) in a wind over this the air is not called mist or fog (see weatherAt: kind)
   // (P8) home-grown storms: where the surface feeds the air far more moisture than the body's mean
   // (a biome's `moist` over ownFrom: Neptune's storm seas 1.6, Jupiter's storm wall 1.4 and
   // lightning plains 1.3) convection builds over the place itself, the way thunderstorms stand
@@ -599,6 +600,10 @@ export function weatherAt(bodyId, ux, uy, uz, altitude, t, seed, env, o = {}) {
   else if (type === 'frost') { kind = 'frost fall'; inten = pr.intensity01; }
   // (the meteorologist's lines: fog and dust storm under 1 km of visual range, mist and haze under 5 km)
   else if (o.dust01 > 0.78) { kind = 'dust storm'; inten = o.dust01; }
+  // ((M4; PILOT's critique of PHYSICS, item 8) mist and fog do not stand in a gale: at Neptune's storm coast the air was
+  // called mist for 348 of 600 s with 5 to 41 m/s blowing. What takes the view there is spray off the sea, or scud: in
+  // a wind over nameGale the grey air is 'spray' over open water and 'windy' elsewhere; its numbers are unchanged.)
+  else if (o.fog01 > 0.5 && wind * o.windFactor > WEATHER.nameGale) { kind = sprayExt > 0.5 * fogExt ? 'spray' : 'windy'; inten = clamp01((wind * o.windFactor - 8) / 12); }
   else if (o.fog01 > 0.78) { kind = 'fog'; inten = o.fog01; }
   else if (o.haze01 > 0.7) { kind = 'haze'; inten = o.haze01; }
   else if (o.fog01 > 0.5) { kind = 'mist'; inten = o.fog01 / 0.78; }

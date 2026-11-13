@@ -7,9 +7,15 @@ Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/s
 
 **The block.** The critics' FIX FOR SHIP items on PHYSICS (the ten of the workflow's list: PILOT's `docs/lead/CRITIQUE.md`
 "PILOT on PHYSICS" and PAINTER's `docs/lead/CRITIQUE-PAINTER.md` "PAINTER on PHYSICS", merged and ranked), worst first as
-I judge them, each committed when finished. First commit sits on `6cfab48` (the work was begun on `1aa9718`). Scratch:
+I judge them, each committed when finished. First commit sits on `6cfab48` (the work was begun on `1aa9718`). **The
+block's four commits:** `141997f` (A), `33786a9` (B, C), `9917fab` (D, E, F; G measured), and the last (I: the weather's
+names, the leaf's turn, this hand-over). **THE BLOCK IS CLOSED: "The state at the end" below (after item I) has the last
+checks, what changed for callers, what was not verified and what is next.** Scratch:
 `/home/user/.pc-scratch/physics/m4/` (`head/` `1aa9718` as exported; `work/` it with the block's explorer.js; `final1/`
-`6cfab48` with item A's files, the tree its checks ran on; `w9/` the weather's work; `s/` the instruments: `slopepace.mjs
+`6cfab48` with item A's files, the tree its checks ran on; `final2/`, `final3/`, `final4/` the same for the second, third
+and last commit (`final4` = a clean export of `9917fab` with the last commit's four files); `heads/` a clean export of
+`9917fab`; `w2/` the flora floor that was not shipped (do not copy its `flora.js`); `w9/` the weather's work; `s/` the
+instruments: `slopepace.mjs
 <root> [g wish dirs hz]` a straight slope by material and wetness, `wettrace.mjs` the wet bank step by step, `kept.sh <tree>
 <label>` P22 to P26's measured sets, boulderrun's replay, wallrun, runfield and ghostfield at PILOT's places,
 `checks.sh <tree> <label>` the project's node checks, `loadcheck.mjs <root> <out> [quality w h scenes]` the game in one
@@ -32,10 +38,15 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
 - **2 (on a fair day the painting does not move): NOT FIXED, measured**, item G: the floor PAINTER asked for was built
   and filmed at two sizes and does not show; the dropped link is the drawing. Not shipped.
 - **6 (rain as sheets), 1 (the scramble at Neptune's storm coast), 5 (rims): NOT FIXED**, item H (why).
+- **Lower-ranked:** the weather's names and the tumbling leaf DONE, the litter after a teleport answered (not
+  PHYSICS'), the rest not done: item I.
 - *Checks for D, E, F together* (a clean export of `33786a9` with their seven files, `m4/final3`): world 20, unit 181,
   physics **322** (319 + 3), `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game at quality 1 (640 x
   360) through three takes (afloat off Earth's coast, Neptune's squall, the alpine blizzard): no console error, no
   game error, fallback empty.
+- ***The last checks*** (a clean export of `9917fab` with the last commit's four files, `m4/final4`): world 20, unit
+  181, physics **324**, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game at quality 0 through five
+  scenes with no console error, no game error, fallback empty: the whole of it under "The state at the end".
 
 **A. RAIN NO LONGER STOPS A WALK (item 3; `explorer.js`: SHORT STEPS, `EXPLORER_BODY.holdMargin`, `st.phys.paceHold`).**
 - *Reproduced* (PILOT's `pilot12/wetstall.mjs`; `m4/s/wettrace.mjs head earth spawn 240 90`): 21.4 m east of the spawn, on
@@ -280,6 +291,89 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
 - *5, the run checked at rims and boulder rows:* as P24 and P26 left it. Their two built variants each break a rule
   of the block (thrown up 0.26 and 0.47 m at boulderrun's ridge; a worst step of 2.5 m/s); Mercury's check is PILOT's
   column. Nothing new was tried: the hold over boulders is what keeps the feet down everywhere else.
+
+**I. THE LOWER-RANKED ITEMS.**
+- *The weather's names do not match its wind (PILOT 8): DONE* (`weather.js` kind, `WEATHER.nameGale` 12 m/s): in a
+  wind over that the grey air is not called mist or fog: `spray` where the loss of view is the sea's spray, `windy`
+  elsewhere; every number is unchanged. At Neptune's storm coast over 600 s (`m4fix/names.mjs`,
+  `m4fix/names-before-after.txt`; Earth's sea coast and Neptune's ice spires: the same names as before): mist 360 s, 310 of
+  them with over 12 m/s at the walker -> spray 360 s, mist in a gale 0 s. Nothing in the game reads the name (checked:
+  `src/ui`, `src/audio`, `src/core/game.js`). Not done: holding a name for a minute (the name is a function of the
+  moment; there are still 8 changes in the 600 s). Test: **M4 mist and fog do not stand in a gale** (`weather.test.mjs`;
+  fails on `9917fab`).
+- *A tumbling leaf changes colour from one frame to the next (PAINTER 8): DONE on PHYSICS' side* (`loose.js`
+  `BLOWN.leafTurnMax`): a leaf autorotates about ten times a second, which thirty frames a second show as a flicker
+  between its two faces; the turn handed over (`buf.turn`) goes no faster than a turn and a half a second. In the
+  autumn wood: the fastest turn 49.6 -> 9.4 rad/s. Test: **M4 a leaf's turn** (`loose.test.mjs`; fails on `9917fab`).
+  Not seen in a frame.
+- *After a debug teleport the last place's litter hangs in the air (PAINTER 10): NOT PHYSICS'.* Probed
+  (`m4fix/leap.mjs`: PILOT's Sim, twenty seconds at the spawn, then a teleport inside Earth of 300, 600, 1200 and 8369
+  m): one frame after every leap PHYSICS' buffers are empty (leaves 10 -> 0, spores 25 -> 0 or 1 new-born), nothing
+  still in the air at any time. What hangs is PAINTER's near layer (its own finding too: `painter.md`, the
+  seventeenth's hand-over).
+- *The walk and the run paint the same (PAINTER 6): the numbers that carry the gait* have been in `st.phys` since P13
+  and are documented at `EXPLORER_BODY_STATE` (`explorer.js`): `gait` (1 walk, 2 run), `stride` and `stepPhase`,
+  `cadence`, `stepLength`, `duty`, `footDown`, `flight`, `bob` and `bobV` (the hips' rise and fall: 2 cm in a walk, 6
+  to 8 in a run), `pulse` and `surge` (the forward speed within the stride), `load` (the legs' force over the weight:
+  2 to 4 at a run's mid-stance), `feet` (each foot's place), `leanV` (a run leans 2 degrees into its own wind). A
+  trunk pitched forward with `pulse`, arms swung on `stride`, a hem bounced by `bobV` are the model's to draw: nothing
+  new is needed from PHYSICS. Not done by anyone in this round.
+- *Not done, lower-ranked:* swimming as a stroke with a surge and a glide, and a drift in wind and surf (PILOT 6: the
+  swimmer's pace is still one number; `stroke` and `strokeRate` are there for the drawing); physics nobody has
+  watched move (PILOT 7: three takes were filmed in this block at quality 1, none at the top tier); crystal reeds that
+  stand and tremble (PAINTER 7: it needs PAINTER's mark of what is mineral); the ship's breath in a hover and its
+  settling on the gear (PAINTER 9; C gives it the storm's rock only).
+
+**J. THE STATE AT THE END (the block is closed; a successor starts here).**
+- *Commits:* the first sits on `6cfab48`; `141997f` (A), `33786a9` (B, C), `9917fab` (D, E, F; G's evidence), the
+  last (I, this section, the last evidence).
+- *The last checks*, on `m4/final4` (a clean export of `9917fab` with the last commit's `weather.js`,
+  `weather.test.mjs`, `loose.js`, `loose.test.mjs`; the last commit changes nothing else but these notes and
+  `docs/shots/physics/m4fix/`, and `diff -rq src/physics m4/final4/src/physics` was empty before it):
+  `node --test src/world/*.test.mjs` 20 of 20; `node --test tests/*.test.mjs` 181 of 181; `node --test src/physics/`
+  **324 of 324** (314 when the block began; eleven new tests named "M4 ...", one of them in the place of P8's storm
+  test); `node src/physics/coast.mjs` PASS at both stands (Earth: reference sea Hs 0.79 m, target 0.63 m, white 5.4 %;
+  Neptune: 3.85 m, 3.08 m, white 100 %); `node docs/lead/evidence/review7/ghostfield.mjs` every counter zero at its
+  six places (worst step loss 0.26 and 0.52, as before the block). The game in one browser at quality 0, 480 x 270
+  (`m4fix/loadcheck.mjs`; `m4fix/load-final.txt`): the spawn, a walk, the storm at clock 1770, Neptune's storm coast
+  at clock 205 (wind 45 m/s at the stand), Earth's sea coast at clock 60: **no console error, no game error,
+  `info().fallback` empty**, render, world, art and physics real (ui the stub). Two of its frames opened (the
+  figure on Neptune's grey shore with the ship beyond; the birch wood at the spawn under the storm's grey): they are a
+  load check, not a judgement of the picture.
+- *The must-hold check* (PILOT's `docs/lead/evidence/pilot11/wallrun.mjs` on `m4/final4`; `m4fix/wallrun-final.txt`):
+  Earth sea_coast 0.2 / 0.2 / 0.2 m gained on ground over 50 degrees in headings 0, 270, 315 and 0.0 in the other
+  five; Earth desert_canyon 1.1 m (heading 225, the momentum of a 6.5 m/s arrival on the foot's curve) and 0.2: **P26's
+  numbers to the digit** (`p26/wallrun-before-after.txt`: the head before P26 gained 49.9 and 30.7 m). Neptune
+  storm_seas 4.5 / 2.2 / 6.0 m: as P26 left it, not fixed (item H).
+- *The kept sets* on `m4/final4` against the tree after item A (`m4fix/kept.sh`): boulderrun's replay thrown up 0.000
+  in all sixteen runs; knife, rows, mbv, hill43, field, p17 and ghostfield the same lines; runfield and wallrun the
+  same but for Earth's weather clock (Earth's spawn: seconds under 3 m/s 5.5 -> 5.4).
+- *New for callers, all additive* (each documented where it is declared): `explorer.js` `EXPLORER_BODY.holdMargin`,
+  `.hunkerHold`, `.figureGust`; `st.phys.paceHold`, `.hunkerNow`, `.leanNow`, `.windE`. `weather.js`
+  `WEATHER.wetStore`, `.nameGale`; `env.sunEast` (handed by `index.js`); the kind `spray`. `ship.js`
+  `SHIP_BODY.windMeanTime`, `.windGust`, `.windGustTime`, `.windUp`, `.windUpFree`, `.windFrom`, `.windFull`,
+  `.windHold`, `.holdSpeed`, `.holdGain`, `.holdBrake`, `.holdAccel`, `.holdReach`, `.buffetMax`, `.buffetMeanTime`,
+  `.rockMax`; `st.phys.windShed` and the state under it; `cmd.storm` (false: the raw wind, no station hold).
+  `three/expand.js` `maxLenPx`. `loose.js` `WADE.ringEvery`, `.treadEvery`, `.ringSide`, `.ownCalm`, `.swimSpray`,
+  `.collarRate`, `.collarOut`, `.collarUp`; `BLOWN.leafTurnMax`. `testworld.mjs` `epochP8(fn)`.
+- *What behaves differently with no call changed:* **Earth's weather is 1530 s later on the game's clock**
+  (`REGIMES.earth.epoch` -1050; the other bodies are untouched); the evening and dusk have no mist; the ground dries
+  in minutes; a walker takes short steps where a slope needs the footholds and no longer stops on a wet bank or a
+  dune face; `st.phys.lean`, `leanV`, `relWind`, `hunker01` hold through a gust (the forces go by the instant's);
+  a hull hands-off in air holds its place and is handed a storm's mean and gust, not its samples; a snow stroke is no
+  longer than 30 px and nothing is drawn nearer than 2 m; a swimmer and a wader lay their own rings and spray; a
+  leaf's handed turn is at most 9.42 rad/s; the weather's name in a gale is `spray` or `windy`, not `mist` or `fog`.
+- *NOT verified by me, plainly:* nothing at quality 2 or at 1080p in this block (three takes at quality 1, the load
+  checks at quality 0); the frame rate; item A in the game's picture (Node and the kept sets only); the snow's cap in
+  a driving wind in the game (the film's walker had 2.2 to 2.5 m/s); the swimmer's rings and collar in a frame (the
+  take did not have the figure in the picture); the leaf's turn in a frame; PILOT's `tests/weather.mjs` and
+  `tests/motion.mjs` (not re-run; they need the clock changes below); PILOT's browser play-throughs.
+- *Next, in order, for a successor:* (1) with PAINTER, the fair day (item G: the floor belongs in the drawing; the
+  patch `m4fix/flora-floor-not-shipped.patch` is the physics half if a floor from this side is still wanted, and its
+  numbers say why it does not show); (2) rain as sheets per gust front (item H, 6: a new mark and its material);
+  (3) the scramble at Neptune's storm coast and (4) the rims: both are P26's Next (1), the honest hill, with
+  boulderrun's replay as the rule it must not break; (5) slower, fewer flakes near the eye once a blizzard has been
+  judged at the top tier; (6) the storm sea's crest lines; (7) a name held for a minute; (8) item I's not-done list.
 
 ### For PILOT and PAINTER, M4 fix round (twenty-fifth PHYSICS agent)
 

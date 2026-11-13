@@ -28,7 +28,8 @@ try {
         const surf = await import('/src/world/surface.js'); const d = biome === 'spawn' ? surf.getSurface(body).getSpawn() : surf.getStandPure(body, biome).unitDir;
         pc.teleport({ body, dir: [d.x, d.y, d.z], ...(hour !== '' && hour != null ? { hour: +hour } : {}) }); pc.step(1 / 30, 30);
       }, [a[1], a[2], a[3] || '', a[4] || '']);
-      await page.evaluate(() => window.__pc.settle(6).then(() => window.__pc.step(1 / 30, 10))).catch(() => {});
+      // (the frame loop is held: the world builds only while frames are stepped)
+      await page.evaluate(() => { const pc = window.__pc; let ok = 0; for (let i = 0; i < 240 && ok < 6; i++) { pc.step(1 / 240, 1); ok = pc.info().settled ? ok + 1 : 0; } pc.step(1 / 30, 10); });
       await shot(`place-${a[1]}-${a[2]}-${a[3] || 'now'}`);
     } else if (a[0] === 'ship') {
       const r = await page.evaluate(async ([body, biome, clock, alt]) => {

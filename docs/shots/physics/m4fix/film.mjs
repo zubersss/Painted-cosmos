@@ -17,13 +17,16 @@ try {
   for (const T of takes) {
     await page.evaluate(async (T) => {
       const pc = window.__pc; if (T.clock != null) pc.setClock(T.clock);
-      if (T.body) { const surf = await import('/src/world/surface.js'); const d = !T.place || T.place === 'spawn' ? surf.getSurface(T.body).getSpawn() : surf.getStandPure(T.body, T.place).unitDir; pc.teleport({ body: T.body, dir: [d.x, d.y, d.z], ...(T.hour != null ? { hour: T.hour } : {}), ...(T.heading != null ? { heading: T.heading } : {}), ...(T.lookPitch != null ? { lookPitch: T.lookPitch } : {}), ...(T.firstPerson != null ? { firstPerson: T.firstPerson } : {}) }); }
+      if (T.body) { const surf = await import('/src/world/surface.js'); let d = T.at ? (() => { const a = T.at.lat * Math.PI / 180, b = T.at.lon * Math.PI / 180, c = Math.cos(a); return { x: c * Math.sin(b), y: Math.sin(a), z: c * Math.cos(b) }; })() : !T.place || T.place === 'spawn' ? surf.getSurface(T.body).getSpawn() : surf.getStandPure(T.body, T.place).unitDir;
+        if (T.offset) { const R = pc.sim.bodyRadius ? pc.sim.bodyRadius(T.body) : 4000; let ex = d.z, ez = -d.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el; const nx = d.y * ez, ny = d.z * ex - d.x * ez, nz = -d.y * ex; const e = T.offset[0] / (T.R || 4000), n = T.offset[1] / (T.R || 4000); const q = { x: d.x + ex * e + nx * n, y: d.y + ny * n, z: d.z + ez * e + nz * n }; const l = Math.hypot(q.x, q.y, q.z); d = { x: q.x / l, y: q.y / l, z: q.z / l }; }
+        pc.teleport({ body: T.body, dir: [d.x, d.y, d.z], ...(T.hour != null ? { hour: T.hour } : {}), ...(T.heading != null ? { heading: T.heading } : {}), ...(T.lookPitch != null ? { lookPitch: T.lookPitch } : {}), ...(T.firstPerson != null ? { firstPerson: T.firstPerson } : {}) }); }
       if (T.js) (0, eval)(T.js);
       pc.step(1 / 30, 2);
     }, T);
     for (const k of T.keys || []) await page.keyboard.down(k);
     await page.evaluate((s) => window.__pc.step(1 / 15, Math.max(1, Math.round(s * 15))), T.pre || 1);
-    await page.evaluate(() => window.__pc.settle(6)).catch(() => {});
+    // (the frame loop is held: the world builds only while frames are stepped; up to 240 of them, without moving the clock much)
+    await page.evaluate(() => { const pc = window.__pc; let ok = 0; for (let i = 0; i < 240 && ok < 6; i++) { pc.step(1 / 240, 1); ok = pc.info().settled ? ok + 1 : 0; } return ok; });
     const probe = [];
     for (let i = 0; i < T.n; i++) {
       if (i) await page.evaluate((s) => window.__pc.step(1 / 15, Math.max(1, Math.round(s * 15))), T.every);

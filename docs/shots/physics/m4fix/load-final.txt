@@ -1,0 +1,12 @@
+  29 s ready
+  56 s shot /home/user/.pc-scratch/physics/m4/out/load-final4/spawn.jpg
+  56 s spawn {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":6.966736666666642,"weather":"breeze","wind":1.6099364319619915,"quality":0}
+ 114 s shot /home/user/.pc-scratch/physics/m4/out/load-final4/walk.jpg
+ 114 s walk {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":9.966736666666737,"weather":"breeze","wind":0.45532902297769595,"quality":0}
+ 144 s shot /home/user/.pc-scratch/physics/m4/out/load-final4/clock-1770.jpg
+ 144 s storm:1770 {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":1770.999999999999,"weather":"thunderstorm","wind":1.2837206431711679,"quality":0}
+ 263 s shot /home/user/.pc-scratch/physics/m4/out/load-final4/place-neptune-storm_seas-205.jpg
+ 263 s place:neptune:storm_seas:205:11 {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":207.33333333333348,"weather":"drizzle","wind":45.02869126827096,"quality":0}
+ 364 s shot /home/user/.pc-scratch/physics/m4/out/load-final4/place-earth-sea_coast-60.jpg
+ 364 s place:earth:sea_coast:60 {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":62.33333333333405,"weather":"breeze","wind":5.0487121347313995,"quality":0}
+OK: no console error, no game error, fallback empty (quality 0, using {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"})

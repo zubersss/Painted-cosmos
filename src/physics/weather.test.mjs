@@ -104,6 +104,24 @@ test('M4 the ground holds a few millimetres and the rest runs off: it is never w
   }
 });
 
+test('M4 mist and fog do not stand in a gale: over 12 m/s the grey air is called spray over open water and windy elsewhere; in calm air it is mist as before', () => {
+  // PILOT's critique of PHYSICS, item 8: at Neptune's storm coast the weather was called mist for 348 of 600 s with 5 to 41 m/s blowing
+  let P = null;
+  for (let k = 0; k < 800 && !P; k++) { const a = k * 2.399963, y = -0.8 + 1.6 * ((k * 0.618034) % 1), r = Math.sqrt(1 - y * y), q = { x: Math.cos(a) * r, y, z: Math.sin(a) * r }; const w = wx('neptune', q, 40, { moist: 1, fog: 0.3, sun01: 0.6, wind: 30, fetch: 2500 }); if (w.precipitation.rate === 0 && w.storm01 === 0 && w.gale01 > 0.6) P = q; }
+  assert.ok(P, 'a place in a gale with nothing falling');
+  const sea = wx('neptune', P, 40, { moist: 1, fog: 0.3, sun01: 0.6, wind: 30, fetch: 2500 });
+  assert.ok(sea.fog01 > 0.5 && sea.kind === 'spray', `over the open sea in the gale: ${sea.kind} (fog01 ${sea.fog01.toFixed(2)})`);
+  // a pearl-fog flat (the biome's own fog, whatever the wind) in the same gale, inland: not mist
+  const land = wx('neptune', P, 40, { moist: 1, fog: 1, sun01: 0.6, wind: 30, fetch: 0 });
+  assert.ok(land.fog01 > 0.5 && land.kind === 'windy', `inland in the gale: ${land.kind} (fog01 ${land.fog01.toFixed(2)})`);
+  // the numbers are what they were: only the name changed
+  assert.ok(sea.visibility01 < 0.5 && land.visibility01 < 0.5);
+  // calm damp air before dawn: mist, as before
+  const d = dir(40, 20); let calm = null;
+  for (let t = 0; t < 3000 && !calm; t += 50) { const w = wx('earth', d, t, { moist: 1, fog: 0.3, sun01: -0.3, wind: 1 }); if (w.precipitation.rate === 0 && w.cloud01 < 0.3 && w.fog01 > 0.5) calm = w; }
+  assert.ok(calm && (calm.kind === 'mist' || calm.kind === 'fog'), 'calm: ' + (calm && calm.kind));
+});
+
 test('cells are born, drift with the wind, and die; nothing teleports while alive', () => {
   for (const id of ['earth', 'neptune', 'mars', 'venus']) {
     const R = BODIES[id].radius;

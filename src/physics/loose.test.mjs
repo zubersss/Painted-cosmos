@@ -656,3 +656,22 @@ test('M4 the water takes a mark: a swimmer leaves rings along its path and a col
   const t0 = w.physics.particles.events.total; P._event(w.physics.fields.frame, 0, 0, 0, EVENT.ripple, 0.3, 0.003);
   assert.equal(w.physics.particles.events.total, t0, 'a drop\'s ring is lost in the chop, as before');
 });
+
+test('M4 a leaf\'s turn, as it is handed over, goes no faster than a turn and a half a second: a tumbling leaf does not change face from one frame to the next', () => {
+  // PAINTER's critique of PHYSICS, item 8. A falling leaf autorotates about ten times a second (BLOWN.leafRo): right, and
+  // at thirty frames a second a flicker between its two faces.
+  const w = setup('earth', 'autumn_woodland'); run(w, 25);
+  const L = w.physics.particles.leaves; let worst = 0, tracked = 0, turning = 0;
+  let prevAge = new Float32Array(L.capacity), prevTurn = new Float32Array(L.capacity), have = false;
+  run(w, 4, { each: () => {
+    if (have) for (let i = 0; i < L.count; i++) {
+      if (Math.abs(L.age[i] - prevAge[i] - 1 / 60) > 1e-4) continue;                 // (the same leaf as a step ago)
+      let d = Math.abs(L.turn[i] - prevTurn[i]); if (d > Math.PI) d = 2 * Math.PI - d;
+      worst = Math.max(worst, d * 60); tracked++; if (d * 60 > 3) turning++;
+    }
+    prevAge.set(L.age); prevTurn.set(L.turn); have = true;
+  } });
+  console.log(`# M4 leaves in the autumn wood: ${tracked} leaf-steps followed, the fastest turn handed over ${worst.toFixed(1)} rad/s (${(worst / 6.2832).toFixed(2)} turns a second; before M4 about ten), ${turning} of them turning faster than 3 rad/s`);
+  assert.ok(tracked > 500 && turning > 20, `leaves are in the air and turning: ${tracked}, ${turning}`);
+  assert.ok(worst <= 9.42 + 0.05, `the fastest turn: ${worst.toFixed(2)} rad/s`);
+});
