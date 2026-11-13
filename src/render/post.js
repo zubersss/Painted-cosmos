@@ -124,6 +124,16 @@ uniform float uLaid;      // 1 the picture is on the paper; 0 bare paper; betwee
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
+// The picture read through a smooth cubic B-spline: four bilinear taps (PAINTER 19, below)
+vec4 pcCubic(sampler2D t, vec2 uv, vec2 texel) {
+  vec2 st = uv / texel - 0.5, i = floor(st), f = st - i, f2 = f * f, f3 = f2 * f;
+  vec2 w0 = (-f3 + 3.0 * f2 - 3.0 * f + 1.0) / 6.0, w1 = (3.0 * f3 - 6.0 * f2 + 4.0) / 6.0;
+  vec2 w2 = (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0) / 6.0, w3 = f3 / 6.0;
+  vec2 g0 = w0 + w1, g1 = w2 + w3;
+  vec2 h0 = (i - 0.5 + w1 / g0) * texel, h1 = (i + 1.5 + w3 / g1) * texel;
+  return g0.y * (g0.x * texture(t, h0) + g1.x * texture(t, vec2(h1.x, h0.y)))
+       + g1.y * (g0.x * texture(t, vec2(h0.x, h1.y)) + g1.x * texture(t, h1));
+}
 void main() {
   float sc = max(uOutRes.y / 1080.0, 0.62);
   vec2 px = gl_FragCoord.xy;
@@ -135,7 +145,19 @@ void main() {
   // the painter's hand: edges wobble with the paper, never ruler-straight
   vec2 wob = ((pmid.ba - 0.5) * 2.0 + (plo.ba - 0.5) * 1.2) * uPig.z * sc / uOutRes;
   vec2 uv = vUv + wob;
-  vec4 c = texture(tAbs, uv);
+  // (PAINTER 19, the soft enlargement. At the lowest tier at half scale the scene is drawn at under a third of the
+  // sheet's size, and a plain bilinear lookup enlarged every stair of an aliased edge into a block three pixels a
+  // side: the figure and the ship were the most digital things on the page. Where the scene is drawn small it is
+  // read through a smooth cubic, at a place the paper's tooth shakes by about half a pixel of the scene: a stair
+  // becomes a soft edge with a little of the hand's tremor in it. At full size nothing here changes.)
+  float up = uOutRes.y * uInTexel.y;                       // sheet pixels to one pixel of the scene
+  float soft = smoothstep(1.15, 1.9, up);
+  vec2 shake = vec2(0.0);
+  if (soft > 0.0) {
+    shake = (vec2(texture(tPaper, puv * 0.83 + 0.21, 0.4).r, texture(tPaper, puv * 0.71 + 0.63, 0.4).r) - 0.5) * 2.0 * uInTexel * 0.6 * soft;
+    uv += shake;
+  }
+  vec4 c = soft > 0.0 ? mix(texture(tAbs, uv), pcCubic(tAbs, uv, uInTexel), soft) : texture(tAbs, uv);
   vec3 col = c.rgb;
   float wet = c.a;
   // (what lies here: the region, and whether it is a light of its own: a lamp, a flame, a lit cabin, region 8; such a
@@ -217,7 +239,7 @@ void main() {
   col = clamp(col - (col - col * col) * (d - 1.0), 0.0, 1.0);
 
   // graphite underdrawing on major silhouettes: faint, broken, catching the paper tooth
-  vec2 guv = vUv + wob * 0.4 + vec2(1.4, -0.9) * sc / uOutRes;
+  vec2 guv = vUv + wob * 0.4 + shake + vec2(1.4, -0.9) * sc / uOutRes;      // (shake: the pencil follows the soft enlargement)
   vec4 a0 = pcAuxDec(texture(tAux, guv));
   vec4 a1 = pcAuxDec(texture(tAux, guv + vec2(uInTexel.x * 1.5, 0.0)));
   vec4 a2 = pcAuxDec(texture(tAux, guv + vec2(0.0, uInTexel.y * 1.5)));

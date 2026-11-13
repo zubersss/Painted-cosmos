@@ -45,6 +45,23 @@ coast.mjs, ghostfield.mjs, wallrun.mjs one after another; `sheet.py` for labelle
   at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs` Earth sea_coast
   0.2 / 0.2 / 0.2 m on ground over 50 degrees (as before); the game at quality 2 and 0 (the two sessions): no console
   error, fallback empty.
+- **ITEM 2, STAIR-STEPPED SILHOUETTES AT TIER 0 AND HALF SCALE: DONE.** At quality 0 and render scale 0.5 the scene is
+  drawn at 298x167 for a 960x540 sheet (0.62 x 0.5); the sheet read it with a plain bilinear lookup, which enlarged
+  every stair of an aliased edge into a block three pixels a side (and the edge pooling, which reads the same
+  neighbours, put a dark pixel on each corner). `render/post.js SHEET_FRAG`: where the sheet is drawn over 1.15 times
+  the scene's size (`up`, eased in to 1.9), the picture is read through a smooth cubic B-spline (four bilinear taps,
+  `pcCubic`) at a place the paper's tooth shakes by up to 0.6 of a scene pixel (`shake`, two lookups of the paper's
+  grain; the pencil follows it). A stair becomes a soft edge with a little tremor in it. At full scale (`up` 1: the top
+  tier, quality 1 at scale 1 is 1.25, nearly nothing) the old lookup is used unchanged. Tried and not kept: a blend
+  of 0.7 cubic and 0.3 bilinear (the stairs still showed on the coat's edge). Seen, same page and instant with only the
+  lookup switched (`preship/02-soft-enlargement-q0-half-scale.jpg`, opened: the Earth spawn, the figure, Mars at 23:30
+  with the ship, the ship in flight, crops enlarged 2x): the blocks on the figure, the hull and the canopy are gone;
+  the picture as a whole is a little softer. Cost at quality 0, scale 0.5, 960x540 (eight drawn frames, three runs
+  each, nothing else running): 420 ms a frame before, 425 after, inside the runs' own spread (409 to 436).
+  Checks on a clean export of `b0710fe` with this file (`t3`): world 24, unit 192, physics 325, `coast.mjs` PASS at both
+  stands, `ghostfield.mjs` all zeros, `wallrun.mjs` 0.2 / 0.2 / 0.2 m; the game at quality 0 (the frames above, on
+  `1294633` with the same file): no console error, fallback empty. The top tier: by the code the old lookup (`soft`
+  0); one frame at quality 2 is taken in the session of item 3 (named below when taken).
 
 An independent verifier checked the fix round below and did not accept one item (the figure) and found three
 regressions. This pass fixes exactly those. Began 09:30 UTC, 2026-11-13, on head `a686a98`. Scratch and harness:
