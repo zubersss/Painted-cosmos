@@ -8,9 +8,11 @@ Read this first; the fourteenth's hand-over below holds for everything not named
 four items of the fix round and found nine regressions (the task text of this pass lists them). The fifteenth agent
 was cut off after eight minutes (nothing committed); its half-done edits came in with the coordinator's snapshot
 `6e550ce` (`src/player/camera.js`, `src/core/sim.js`), with which 2 of 181 unit tests failed. The sixteenth only read.
-Scratch: `/home/user/.pc-scratch/pilot/m4/s17/` (`t1` a clean export with my files, `out1` the first film, `next/`
-and `*-patch.py` the prepared changes for the items after the camera, `glade.mjs`, `kits.mjs`, `whyhid.mjs` probes).
-The verifier's probes are read from `/home/user/.pc-scratch/verify/pilot/probes/` (run with `ROOT=<tree>`).
+Scratch: `/home/user/.pc-scratch/pilot/m4/s17/` (`t1`, `t2` clean exports with my files, `out1` .. `out5` the films,
+`next/` and `*-patch.py` the changes as prepared, all applied now). My probes are kept in
+`docs/shots/pilot/m4refix/scripts/` (glade, kits, whyhid, landcam, landdiag, easeltrace, wxclock, scenes17); the
+verifier's are read from `/home/user/.pc-scratch/verify/pilot/probes/` (run with `ROOT=<tree>`). **All of this pass's
+items are done or named under "Not fixed"; nothing is half-done in the working tree.**
 
 ### Done, with proof
 
@@ -94,12 +96,47 @@ The verifier's probes are read from `/home/user/.pc-scratch/verify/pilot/probes/
    Checks for 4 to 6 on a clean export of `5fd7a0a` with these files: world 22, unit 184, physics 324, `coast.mjs`
    PASS at both stands, `ghostfield.mjs` all zeros.
 
-### Next, in this order (each prepared in `s17/`, not yet in the tree unless listed above)
+7. **Seen in the real game: the label off the ship** (item 3). The verifier's `aimoff` scene (quality 0, 640 x 360,
+   chase view 5 km over Earth, Mars the target; `docs/shots/pilot/m4refix/aimoff-*.jpg` and `aimoff.log`, opened):
+   the nose on Mars, 2, 4 and 7 degrees over it, 5 right, 8 left, 3 under: the label off the ship's box every time
+   (nose 4 degrees over: label y 133-172 over the ship's top at 173, the ship whole; the fix round's head had it at
+   y 204-243 on the ship). Game errors none.
 
-3. The landing's chase camera (PHYSICS 4's last part): filmed again on `t1` (`s17/out2/landfast.jpg`, opened):
-   as in the fix round, frames 20 to 22 (1.5 s) a flat crown over the left half of the frame on the way down into
-   the clearing. Not yet changed.
-4. The real game's `aimoff` (the verifier's scene) to see the label off the ship; the landing camera (3 above).
+### Not fixed (and why)
+
+- **The landing's chase camera beside a crown (PHYSICS 4's last part).** Filmed on this tree
+  (`m4refix/landfast.jpg`, opened): as in the fix round, frames 20 to 22 (1.5 s of an 11 s landing) a flat crown over
+  the left half of the picture as the ship goes down into the clearing. Measured in the real game
+  (`m4refix/landdiag.log`, the scene `scripts/landdiag.mjs`; rays from the lens through the cameras' crown model):
+  the lens keeps its margin (1.44 m from the nearest crown) but that crown, 3.6 to 8 m ahead-left, covers 29 to 45 %
+  of the picture from 11 m over the ground to 3 m. Tried and taken out again (the tree is as committed):
+  (a) a clear line of sight to the ship: no effect, the crown is beside the line; (b) a larger margin in a landing
+  (`landMargin` 2 to 5 m): in Node 45 -> 18 % at 2.5 m, in the real game no change at all (the boom target keeps a
+  lens that has half the margin: 1.44 > 1.25), film identical; (c) the middle of the picture kept clear of crowns
+  over the whole way down: no crown in the picture at all, but the boom comes in to its shortest (5.5 m) from 30 m
+  up and the hull lies over the lower third of the picture for the whole landing
+  (`m4refix/landfast-tried-picture-rule.jpg`, opened): a worse picture for a landscape painting than 1.5 s of a
+  crown; (d) the same over the last 12 m only: the boom dollies in through the leaves at touchdown (Node: lens 0.78 m
+  from a crown, 35 % of the picture within 3.6 m). What would serve: in a landing among trees, raise the lens over
+  the crown tops and look down into the clearing (a new move of the chase camera; not attempted in this pass).
+- **Assisted landings take about twice as long** (the verifier's regression 7: median 9.9 s for 4.7 s, 27.6 s at
+  Jupiter's spawn): by design of the fix round (no 18 g stop, 6 m/s down near the ground); a known cost, unchanged.
+- **The jetpack's way down through the crown layer** (item 1, still there): leaf dabs over the left of the frame for
+  about 0.8 s, the figure clear.
+- **Node walkcam, autumn woodland 3 %** (item 1): the parked ship passed at 4.5 m in the first 6 s and one trunk for
+  0.2 s squeeze the boom into the eyes, as on `dea95fb` and every round before (the hull and trunk spheres, not the
+  crown rule); in the real game's autumn walk 0 of 600 steps.
+- **The easel's walk through a trunk or a boulder (8 of 288) and into liquid (8)**: not on this pass's list.
+
+### State of the tree and checks
+
+My commits in this pass: `51cdda2` (item 1, completes the snapshot `6e550ce`), `1146112` (item 2), `5fd7a0a`
+(item 3), `246fce6` (items 4 to 6), and the one with this hand-over (notes and evidence only). Each code commit was
+checked on a clean export of its parent with its files: world 22, unit 181 -> 182 -> 184 (three new tests, one
+rewritten), physics 324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros. The game was played at
+quality 0 in four browser runs on those trees (`s17/film1.log` .. `film5.log`): `game errors: []`, no problem,
+`__pc.info().fallback` empty. Not done in this pass: the top tier (quality 2, 960 x 540), the painted play-through,
+`tests/weather.mjs` and `tests/motion.mjs` themselves (their clocks were moved and checked in Node only).
 
 ## Hand-over, M4 fix round (fourteenth PILOT agent, the successor; started 05:11 UTC 2026-11-13; kept current after every item)
 
