@@ -217,6 +217,12 @@ export const EXPLORER_BODY = Object.freeze({
   swimForce: 400,         // N: stroke plus suit thrusters (a strong swimmer makes 100-150 N)
   swimTime: 0.4,          // s
   sinkCdaV: 0.25,         // m^2: drag area moving vertically through liquid
+  // (P26) THE FIGURE'S STATE (st.phys: leanV, relWind, swim, stroke, strokeRate, swimSpeed, vUp, airTime, arc; see
+  // figureState). Output only: no step reads it. A swimmer's stroke: one cycle of the arms for every swimStroke metres
+  // made through the liquid (a crawl or a breaststroke covers 1.5 to 2.2 m a cycle), never slower than a tread, one
+  // cycle in treadTime, which is what keeps a body afloat at rest.
+  swimStroke: 1.8,        // m through the liquid for one cycle of the stroke
+  treadTime: 1.6,         // s for one cycle treading water (the slowest the stroke goes)
 });
 
 export const EXPLORER_BODY_STATE = () => ({
@@ -283,6 +289,17 @@ export const EXPLORER_BODY_STATE = () => ({
   footfalls: null,        // the last four (a ring: footfalls[n & 3])
   feet: null,             // [left, right]: { fwd (m ahead of st.p along heading), up (m off the ground), side (m to the right), down (0 | 1) }
   heading: null,          // unit vector the body is travelling along (kept when it stops)
+  // (P26) the figure's state (output only; see figureState and docs/notes/physics.md, "the figure's state, M4")
+  leanV: null,            // {x,y,z} body-local, level: the way the body leans to balance the wind (into it: against its push), its length the lean (rad, = lean)
+  relWind: null,          // {x,y,z} body-local, m/s: the air's velocity past the body (the wind less the body's own velocity): what streams a scarf and a coat
+  relWindSpeed: 0,        // m/s: its length
+  swim: 0,                // 1 while the body is afloat and swimming (the feet off the bottom, a third of it under), else 0 (wading is submerged01 with grounded)
+  stroke: 0,              // phase of the swimmer's stroke, 0 .. 1 (kept when not swimming)
+  strokeRate: 0,          // cycles of it a second now (swimSpeed / swimStroke, a tread's 1 / treadTime at least; 0 when not swimming)
+  swimSpeed: 0,           // m/s made over the liquid, level (0 when not swimming)
+  vUp: 0,                 // m/s: the body's vertical speed (+ up): on the ground the rise of the ground under its feet
+  airTime: 0,             // s since the feet left the ground into the air (0 on the ground and afloat)
+  arc: 0,                 // 1 rising in the air, -1 falling, 0 on the ground or afloat
   gaitAmp: 0, gaitK: 1, gaitV: 0, bobFix: 0, bobMean: 0,
 });
 
@@ -301,6 +318,7 @@ function stepScratch(ghost = false) {
     dir2: { x: 0, y: 0, z: 0 },             // a point read ahead (groundAhead, probeStart, the next footfall)
     gnd: {},                                // env.ground's out
     gw: {},                                 // (P26) env.ground's out for the ground where a step would end on a steep face (a wall?)
+    la: { x: 0, y: 0, z: 0 },               // (P26) the way the wind pushes the body this step (unit, along the ground; 0 when it does not): the figure leans against it
     G: null, gEnv: null, gx: 0, gy: 0, gz: 0,   // the ground where the last step ended (env.ground's answer), and where
     air: { density: 1.225, wind: { x: 0, y: 0, z: 0 } },
     // (P18) what feels the air: a body half a metre across moving at its own velocity (the sub-second eddies, wind.js gustSubAt)
@@ -1103,6 +1121,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
     d = ax * nx + ay * ny + az * nz; ax -= d * nx; ay -= d * ny; az -= d * nz;
     B.windAccel = Math.hypot(ax, ay, az);
     B.lean = Math.atan2(B.windAccel, g > 1e-6 ? g : 1e-6);
+    { const a = B.windAccel, k = a > 1e-9 ? 1 / a : 0, la = S.la; la.x = ax * k; la.y = ay * k; la.z = az * k; }   // ((P26) for the figure: see figureState)
     // (P23) THE GALE (see EXPLORER_BODY.cdaLow): the wind's own push on the body upright (its speed, not the run's: running
     // through Venus' still air is no gale), over g: the walker gets low over hunkerFrom; and where it is over braceFrom, the
     // suit braces against what is beyond braceShare of the soles' hold here (hands and knees adding to it down low, the
@@ -1539,6 +1558,9 @@ function stepOnce(st, cmd, dt, env, T, S) {
       vx = wx + rx * m; vy = wy + ry * m; vz = wz + rz * m;
       B.windAccel = airK * Math.hypot(wx, wy, wz) * Math.hypot(wx, wy, wz);
     } else B.windAccel = 0;
+    // ((P26) for the figure: in the air too the lean is what would balance the wind's push, level: see figureState)
+    { const wu = wx * ux + wy * uy + wz * uz, hx_ = wx - wu * ux, hy_ = wy - wu * uy, hz_ = wz - wu * uz, hl_ = Math.hypot(hx_, hy_, hz_), k = hl_ > 1e-9 ? 1 / hl_ : 0, la = S.la;
+      la.x = hx_ * k; la.y = hy_ * k; la.z = hz_ * k; B.lean = Math.atan2(B.windAccel, g > 1e-6 ? g : 1e-6); }
     B.windBrace = 0; if (hk > 0) B.hunker01 = hk * Math.exp(-dt / T.hunkerUp);
     // liquid drag: vertical and horizontal
     if (sub > 0) {
@@ -1620,8 +1642,33 @@ function stepOnce(st, cmd, dt, env, T, S) {
   st.p.x = px; st.p.y = py; st.p.z = pz;
   st.v.x = vx; st.v.y = vy; st.v.z = vz;
   st.grounded = grounded;
-  if (!S.ghost) stepGait(B, st, dt, grounded, g * (1 - buoy), env, T, S);
+  if (!S.ghost) { stepGait(B, st, dt, grounded, g * (1 - buoy), env, T, S); figureState(B, st, dt, grounded, sub, wx, wy, wz, S, T); }
   return st;
+}
+
+// (P26) THE FIGURE'S STATE: what a drawn figure needs beyond the gait (stepGait), under stable names, from the step just
+// taken. Output only (the ghost lays none): the lean as a vector, the air past the body, the swimmer's stroke, the arc
+// of a flight. sub: the share of the body under liquid; (wx, wy, wz): the wind the body met (m/s, body-local).
+function figureState(B, st, dt, grounded, sub, wx, wy, wz, S, T) {
+  const px = st.p.x, py = st.p.y, pz = st.p.z, r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r;
+  const vx = st.v.x, vy = st.v.y, vz = st.v.z, vu = vx * ux + vy * uy + vz * uz;
+  // the lean: against the wind's push, level, as long as the lean itself
+  const L = B.leanV || (B.leanV = { x: 0, y: 0, z: 0 }), la = S.la;
+  { let x = -la.x, y = -la.y, z = -la.z; const d = x * ux + y * uy + z * uz; x -= d * ux; y -= d * uy; z -= d * uz;
+    const l = Math.hypot(x, y, z), k = l > 1e-9 ? B.lean / l : 0; L.x = x * k; L.y = y * k; L.z = z * k; }
+  // the air past the body
+  const W = B.relWind || (B.relWind = { x: 0, y: 0, z: 0 });
+  W.x = wx - vx; W.y = wy - vy; W.z = wz - vz; B.relWindSpeed = Math.hypot(W.x, W.y, W.z);
+  // the swimmer
+  const swimming = !grounded && sub > 0.3;
+  B.swim = swimming ? 1 : 0;
+  B.swimSpeed = swimming ? Math.sqrt(Math.max(0, vx * vx + vy * vy + vz * vz - vu * vu)) : 0;
+  B.strokeRate = swimming ? Math.max(B.swimSpeed / T.swimStroke, 1 / T.treadTime) : 0;
+  if (swimming) { const s = (B.stroke || 0) + B.strokeRate * dt; B.stroke = s - Math.floor(s); }
+  // the arc of a flight
+  B.vUp = vu;
+  B.airTime = grounded || swimming ? 0 : (B.airTime || 0) + dt;
+  B.arc = B.airTime > 0 ? (vu > 0 ? 1 : -1) : 0;
 }
 
 // The steady speed (m/s) the legs can hold on level ground of contact `G` in air of density rho

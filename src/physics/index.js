@@ -18,12 +18,12 @@ import { AirGrid, airAt, AIR } from './air.js';
 import { FloraField, FLORA, PlantSim, plantDisplace, plantBranch, plantCrown, treeFrequency, stemFrequency } from './flora.js';
 import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
-import { Loose, LOOSE, KICK } from './loose.js';
+import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01, smoothstep } from './util.js';
-import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
+import { WaterField, WATER_GLSL, WATER, windSea, seaGrown, fetchOf, wakeLength, foamCover, whiteWind, surf01, FetchGauge, FETCH_GAUGE, SEA_TEX } from './water.js';
 import { SeaMap, SEA_MAP, FetchRose } from './seamap.js';
 import { DeformField, DEFORM, MARK, MARK_STRIDE } from './deform.js';
 import { stepExplorerBody, EXPLORER_BODY, jumpSpeedFor, explorerTerminal, sustainableSpeed, gaitOf, strideBob } from './explorer.js';
@@ -525,7 +525,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       const L = water.localAt(lx, lz, _loc);
       o.significant = L.significant; o.period = water.period; o.length = water.length; o.speed = water.speed;
       o.swell = water.open > 0 ? water.swellHeight * (water._mapOn ? L.open * Math.min(1, L.s3) : water.open) : 0; o.swellLength = water.open > 0 ? water.swellLength : 0;
-      o.steepness = water.steepness; o.whitecap01 = water._mapOn ? (L.cover > 0 ? Math.pow(L.cover / WATER.foamMax, 1 / WATER.foamPower) : 0) : water.whitecap01; o.whitecapCover = water._mapOn ? L.cover : water.foamAt < 1e8 ? water.cover : 0;
+      o.steepness = water.steepness; o.whitecap01 = water._mapOn ? (L.cover > 0 ? Math.pow(Math.min(1, L.cover / WATER.foamMax), 1 / WATER.foamPower) : 0) : water.whitecap01; o.whitecapCover = water._mapOn ? L.cover : water.foamAt < 1e8 ? water.cover : 0;
       o.fetch = L.fetch; o.depth = L.depth;     // (P16) what this sea was raised over: the measured fetch (m), the mean depth along it (m); (P18) here
       o.waveHs = L.Hs; o.open = L.open; o.nodeDepth = L.nodeDepth;     // (P18) the wind sea here (m), how far the open sea's swell reaches here, the depth at the map's node (m)
       dir.x = frame.ex * L.dirx + frame.nx * L.dirz; dir.y = frame.ey * L.dirx + frame.ny * L.dirz; dir.z = frame.ez * L.dirx + frame.nz * L.dirz;
@@ -534,7 +534,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       windSea(a.speed, FETCH_DEFAULT, body.gravity, a.density, liquidOf(bodyId).density, 1e9, _ws);
       o.swell = 0; o.swellLength = 0;
       o.present = true; o.height = 0; o.significant = _ws.height; o.period = _ws.period; o.length = _ws.length; o.speed = _ws.speed;
-      o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01; o.whitecapCover = foamCover(_ws.whitecap01);
+      o.steepness = _ws.steepness; o.whitecap01 = _ws.whitecap01; o.whitecapCover = foamCover(_ws.whitecap01, whiteWind(a.speed, body.gravity, a.density, liquidOf(bodyId).density));
       o.fetch = FETCH_DEFAULT; o.depth = Infinity; o.waveHs = _ws.height; o.open = 0; o.nodeDepth = NaN;
       const s = a.speed > 1e-6 ? 1 / a.speed : 0; dir.x = a.wind.x * s; dir.y = a.wind.y * s; dir.z = a.wind.z * s;
     }

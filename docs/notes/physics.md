@@ -5,36 +5,66 @@ Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/s
 
 ## Hand-over P26 (twenty-fourth PHYSICS agent; read this block first; P25 and older below hold for everything not named here)
 
-**Where things stand (this block is being written commit by commit; this is its first).** The block, in order: (1) MUST FIX,
-the explorer runs up cliffs (PILOT's critique, item 1); (2) the white-water cap (the coordinator's ruling); (3) the sudden
-checks on arrival ground; (4) the state for the drawn figure; (5) the wading splash. **Done and in this commit: (1).** Tests
-on a clean export of `90bb703` with this commit's two files (`p26/final1`): `node --test src/physics/` **311 pass** (308 + 3
-new, `explorer.test.mjs` 'P26 ...'; `load.test.mjs` among them: every physics module loads alone), `node --test
-tests/*.test.mjs` **152 pass**, `node --test src/world/*.test.mjs` **19 pass**; `coast.mjs` PASS at both stands
-(reference Hs 0.62 / 3.85 m, as before); `ghostfield.mjs` all zeros (worst step loss 0.26 Earth, 0.52 Moon, as before).
-Scratch: `/home/user/.pc-scratch/physics/p26/` (`head/` `79eb918` as exported, `work/` it with item 1, `final1/` `90bb703`
-with item 1; `p21/`, `hp21/` (the head's tree with P21's explorer.js); `s/face.mjs <root> g deg H [hz secs every mu foothold
-v]` a synthetic face step by step (`X0=`, `V0=`: where and how fast it starts), `s/cliff.mjs <root> body place heading [secs
-fps every from]` the real ground step by step, `s/diag.mjs` a wall met at an angle, `s/fastmeet.mjs` walls met at pace,
-`s/survey.mjs <root> [body ...]` every stand and spawn of the ten bodies, `s/thrown.mjs` the flights at one stand,
-`s/wallsite.mjs` wallrun at boulderrun's site, `s/kept.sh <tree>` the measured sets of P22 to P25 (`knife`, `rowloss2`,
-`mbv`, `hill43`, `field`, `p17`), `s/runall.sh <tree>` wallrun, runfield and ghostfield at every place of PILOT's lists,
-`s/obsnear.mjs` what stands near the explorer when it is checked; `out/` every output named below). In the repository,
-`docs/shots/physics/p26/`: `wallrun-before-after.txt` (PILOT's instrument at its seven places, the head and P26), `survey-head.txt`
-and `survey-p26.txt` (every stand and spawn), and the instruments `survey.mjs`, `face.mjs`, `cliff.mjs`, `fastmeet.mjs`, `diag.mjs`
-(each takes the tree's root as its first argument).
-**API added (additive):** explorer.js `EXPLORER_BODY.scrambleSlope`, `.scramblePull`, `.wallGap`; `EXPLORER_BODY_STATE()`
-`.paceWall` (m/s: the pace held to stop at a wall seen ahead), `.wall` (1 on a step whose feet a wall stopped, 2 on one
-that rode up a wall on its momentum, else 0), `.wallAt` (the reading's memory). Nothing removed or renamed.
-**Behaviour changed without a call changing:** a face steeper than the limbs scramble (see item 1) that rises on more than
-a clamber stops the walker at its foot; a runner slows for one it sees; a body on one slides back, and the suit's
-start-and-stop thrusters do not push up it; on one's way DOWN a wall there is no hold either: the body slides down it.
+**Where things stand.** The block, in order: (1) MUST FIX, the explorer runs up cliffs (PILOT's critique, item 1); (2) the
+white-water cap (the coordinator's ruling); (3) the sudden checks on arrival ground; (4) the state for the drawn figure;
+(5) the wading splash. **Done: (1)** (`ee39533`), **(2), (4), (5)** (the commit carrying these notes); **(3) measured to its causes and not fixed**
+(one is PILOT's collision; the fix for the other throws the runner up 0.47 m at another place: item 3). Two strips of the
+game filmed and opened (item 6): the cliff holds in the game; **the squall's sea is no whiter in PAINTER's picture, though
+PHYSICS now hands it 100 % white** (item 6, For PAINTER P26). Tests on a clean
+export of `ee39533` with this block's files (`p26/final3`, byte for byte this commit's `src/physics`; the head `cf7711c`
+differs from `ee39533` in PILOT's documents only): `node --test src/physics/` **314 pass** (308 + 6 new:
+`explorer.test.mjs` 4, `water.test.mjs` 1, `loose.test.mjs` 1; `load.test.mjs` among them: every physics module loads
+alone), `node --test tests/*.test.mjs` **152 pass**, `node --test src/world/*.test.mjs` **19 pass**; `coast.mjs`
+PASS at both stands (Earth Hs 0.62 m at the reference, target 0.52, white 4.88 % for a target of 4.93; Neptune 3.85 m,
+target 3.08, white 100 % for a target of 100); `ghostfield.mjs` all zeros (worst step loss 0.26 Earth, 0.52 Moon, as
+before); PILOT's boulderrun replayed in Node: all sixteen runs the same to the digit as the head `79eb918` (thrown up
+0.000 in every heading). Every new test fails on the head (item by item below).
+Scratch: `/home/user/.pc-scratch/physics/p26/` (`head/` `79eb918` as exported; `work/` it with item 1; `final1/` `90bb703`
+with item 1, the tree `ee39533` was tested on; `work2/` and `final2/` (`ee39533` as exported with items 2, 4, 5: tested
+whole with the same counts, and the tree the strips were filmed from); `final3/` (the same with the sea map's white share
+worked out once a map instead of once a node, `foamCoverM` in `water.js`, its only difference: the tree tested last);
+`work3/` item 3's variant; `p21/`, `hp21/` (the head's tree with P21's explorer.js); `s/face.mjs
+<root> g deg H [hz secs every mu foothold v]` a synthetic face step by step (`X0=`, `V0=`: where and how fast it starts),
+`s/cliff.mjs <root> body place heading [secs fps every from]` the real ground step by step, `s/diag.mjs` a wall met at an
+angle, `s/fastmeet.mjs` walls met at pace, `s/survey.mjs <root> [body ...]` every stand and spawn of the ten bodies,
+`s/thrown.mjs` the flights at one stand, `s/wallsite.mjs` wallrun at boulderrun's site, `s/kept.sh <tree>` the measured
+sets of P22 to P25 (`knife`, `rowloss2`, `mbv`, `hill43`, `field`, `p17`), `s/runall.sh <tree>` wallrun, runfield and
+ghostfield at every place of PILOT's lists, `s/obsnear.mjs` what stands near the explorer when it is checked, `s/wade.mjs`
+the wading spray; `out/` every output named below; `film/` the strips). In the repository, `docs/shots/physics/p26/`:
+`wallrun-before-after.txt` (PILOT's instrument at its seven places, the head and P26), `survey-head.txt` and
+`survey-p26.txt` (every stand and spawn), and the instruments `survey.mjs`, `face.mjs`, `cliff.mjs`, `fastmeet.mjs`,
+`diag.mjs` (each takes the tree's root as its first argument).
+**Next, in order:** (0) what PILOT's critique added while this block ran ('PILOT on PHYSICS' items 2, 4, 5, 6, 8: a walk
+stopped dead by rain on a 23 to 26 degree forest bank, the ship in Neptune's squall, the first storm's timing, the
+swimmer's surge and drift, the weather's names): read, not answered; (1) **the hold below a wall is still P22's**: a hill
+friction holds and the scramble above it are climbed at the run's pace with the limbs' hold, whatever the legs' power (43
+degrees at 6.15 m/s level on Earth: 5.6 kW; honest: 4.35), so a run arrives at a wall's foot fast, rides a metre up it and,
+where the face hovers at the scramble's limit, drifts along it (Neptune's storm_seas, item 1); the honest hill (the facet,
+the legs' power, the suit's assist; the hold for features only) changes every rim of the boulderrun replay; (2) the crest
+law's stale trend (item 3: Pluto's summit; it needs a way that does not throw the runner off heading 315's ridge); (3)
+P24's list (the brink hold, the knife edge's near side, the Moon rows), unchanged; (4) PAINTER's painting of the white
+share past 15 % (For PAINTER P26: in the game the squall's sea is as dark as it was under the cap, item 6: the law is in
+the numbers and not yet in the picture).
+**API added (additive):** explorer.js `EXPLORER_BODY.scrambleSlope`, `.scramblePull`, `.wallGap`, `.swimStroke`,
+`.treadTime`; `EXPLORER_BODY_STATE()` `.paceWall`, `.wall`, `.wallAt`, `.leanV`, `.relWind`, `.relWindSpeed`, `.swim`,
+`.stroke`, `.strokeRate`, `.swimSpeed`, `.vUp`, `.airTime`, `.arc`. water.js `foamCover(whitecap01, Ue = 0)` (the second
+argument), `export whiteWind(U, g, rhoAir, rhoLiq)`, `WATER.whiteM`, `.whiteExp`, `.earthG`, `WaterField.whiteWind`.
+loose.js `export WADE`. coast.mjs's report: `target.whiteWind`. gamefilm.mjs subject `game-cliff-earth`; the gale
+subject's probe gains `white`, `Hs`, `foamAt`. Nothing removed or renamed.
+**Behaviour changed without a call changing:** (1) a face steeper than the limbs scramble that rises on more than a
+clamber stops the walker at its foot; a runner slows for one it sees; a body on one slides back, and the suit's
+start-and-stop thrusters do not push up it; down a wall there is no hold either: the body slides down it; (2) the white
+share of a sea (`cover`, `whitecapCover`, `uPhysWaterSea.w`, the sea map's fourth channel) runs to 1 beyond a gale, and the
+level above which the sea is white (`foamAt`, `uPhysWaterSea.y`) goes below the mean surface past half; (3) `phys.lean` is
+set in the air too (the wind's push alone; it kept its last value on the ground); (4) wading throws spray with the square
+of the pace and with the depth.
 
 **1. THE EXPLORER RAN UP CLIFFS: fixed (`explorer.js`: a WALL; `EXPLORER_BODY.scrambleSlope`, `.scramblePull`, `.wallGap`).**
 - *Reproduced on the head* (`docs/lead/evidence/pilot11/wallrun.mjs`, PILOT's Sim in Node, 30 Hz, 12 s of Shift+W): Earth
   sea_coast 49.9 / 49.0 / 49.7 m gained on ground over 50 degrees (headings 0, 270, 315), desert_canyon 30.7 / 24.4 m (225,
   270): PILOT's numbers to the digit. On a synthetic face (`p26/s/face.mjs`: level, a face 10 m high, level) the head runs
-  up every slope from 35 to 80 degrees, rock or regolith, on Earth, Mars and the Moon (46 of 48 cases reach the top).
+  up every slope from 35 to 80 degrees, rock or regolith, on Earth, Mars and the Moon (44 of 48 cases reach the top;
+  the four that do not are 70 and 80 degrees on Mars and 80 on the Moon).
 - *The cause* (`p26/s/cliff.mjs earth sea_coast 0`, every step). Two things, both the limbs' hold (`B.grip`, LEGS 1: "with a
   hold the body is carried on its limbs, not on the facet: the tilt of the rock under the boot does not count", so gravity
   does not pull along the face). (a) LEGS 3 gave a hold to "what stands out of the ground the legs last stood on" whenever the
@@ -63,7 +93,7 @@ start-and-stop thrusters do not push up it; on one's way DOWN a wall there is no
 | place (wallrun.txt) | head: m gained on ground over 50 degrees | P26 |
 |---|---|---|
 | earth sea_coast | h0 49.9, h270 49.0, h315 49.7 (climb 5.6-6.0 m/s on 70-74 degrees) | 0.2, 0.2, 0.2 (steepest stood on 53-59 degrees) |
-| earth desert_canyon | h225 30.7, h270 24.4 (5.6-5.8 m/s on 72-77 degrees) | 1.1, 0.2 (h225 arrives at 6.5 m/s and rides the foot's curve to 60 degrees on its momentum: 1.44 m above the sand in all) |
+| earth desert_canyon | h225 30.7, h270 24.4 (5.6-5.8 m/s on 72-77 degrees) | 1.1, 0.2 (h225 arrives at 6.5 m/s and rides the foot's curve to 60 degrees on its momentum: 1.4 m above the sand in all) |
 | earth alpine_meadow, mars rust_canyons, mercury spawn, neptune ice_spires, pluto lilac_mountains | 0.0 in every heading | the same lines to the digit |
 
   The synthetic face, Shift+W for 10 s from a stand 8 m off (rock; Earth, Mars, Moon; 60 and 30 Hz): **0.00 m gained**, the
@@ -102,6 +132,130 @@ start-and-stop thrusters do not push up it; on one's way DOWN a wall there is no
   Earth and a scramble on the Moon): fails on the head at its last line. **P26 on PAINTER's real Earth** (the sea_coast
   stand, headings 0, 270, 315, 30 Hz, 10 s through `physics.bindEnv`: under a clamber gained on ground over 50 degrees,
   measured 0.39 / 0.35 / 0.54 m; under 3 m above the stand): fails on the head (50.03 m).
+
+**2. THE WHITE-WATER CAP LIFTED (the coordinator's ruling; `water.js` foamCover, whiteWind, foamLevel; `index.js`; `coast.mjs`).**
+- *Was:* cover = `foamMax` whitecap01^`foamPower`, whitecap01 from the sea's steepness: 15 % at most (a sea cannot stand
+  steeper than it does in a gale). Neptune's 75 m/s squall: 12 % white 80 m out, target 15 %.
+- *Now:* where it is more than that, **cover = 1 - exp(-whitecap01 x 3.84e-6 Ue^3.41)**: Monahan and O'Muircheartaigh's law
+  carried on past the gale and saturating (patches of white laid at random overlap: a law that asks for W covers 1 -
+  exp(-W)). Ue is the wind as the sea has felt it (`WaterField.swellWind`: it rises with the sea over `growTime` and outlasts
+  the wind over `swellTime`: foam and streaks linger), made Earth's by the wind's power on the liquid's weight, `whiteWind(U,
+  g, rhoAir, rhoLiq)` = U ((rhoAir / rhoLiq) / earthRatio x 9.81 / g)^(1 / 3.41) (Neptune's 75 m/s over methane: 85.7 m/s).
+  The two laws cross at about 21 m/s on an open sea: **to a gale nothing changes, to the digit** (test). `foamLevel` (the
+  elevation above which that share of the surface stands) goes on from the old table's 40 % to all of the surface (a second
+  table, even in the share; the first unchanged): a sea white all over breaks down to its lowest trough, and the foam is
+  still exactly that share of the surface (counted: within 8 % at 30, 40 and 55 m/s).
+- *Numbers* (an open sea, 2500 m of fetch, deep; the field after 90 s of that wind; `uPhysWaterSea` = Hs, foamAt, edge, cover):
+
+| wind at 10 m | Earth: white share | foamAt | Hs | Neptune (methane, 0.99 kg/m3 of air): white share | foamAt | Hs |
+|---|---|---|---|---|---|---|
+| 15 m/s | 5.2 % (as before) | +0.41 Hs (0.16 m) | 0.38 m | 15.0 % (as before) | +0.26 Hs | 0.48 m |
+| 30 m/s | **33.5 %** (was 14 %) | +0.11 Hs (0.08 m) | 0.77 m | **48.3 %** | +0.01 Hs | 0.96 m |
+| 55 m/s | **96.3 %** (was 15 %) | -0.64 Hs (-0.89 m) | 1.40 m | **99.5 %** | -0.86 Hs | 1.76 m |
+| 75 m/s | **100 %** (was 15 %) | -0.90 Hs (-1.72 m) | 1.91 m | **100 %** | -0.90 Hs (-2.17 m) | 2.40 m |
+
+  Between: 20 m/s 9.0 % (as before), 22 m/s 11.2 %, 25 m/s 18.1 %, 40 m/s 67.2 % (Earth).
+- *`coast.mjs`:* the white target is the same law over the reference water (the steepness's law of the storm's wind sea, and
+  beyond a gale the wind's, with the swell's wind of the same history: `seaGrown`'s `swellWind`); the report's target gains
+  `whiteWind`. **Earth sea_coast** (13.2 m/s): white 4.79 to 5.62 % at the five rows, target 4.93 % (pass at 2.96 %): the
+  same numbers as the head, PASS. **Neptune storm_seas** (75 m/s): white **100 % at every row** (the head: 12 %), target 100
+  % (pass at 60 %; the head's 15 % and 9 %), PASS. Hs as before (reference 0.62 / 3.85 m, targets 0.52 / 3.08 m).
+- *API:* `foamCover(whitecap01, Ue = 0)` (the second argument added: left out, the old law alone), `export whiteWind(U, g,
+  rhoAir, rhoLiq)`, `WATER.whiteM` 3.84e-6, `.whiteExp` 3.41, `.earthG` 9.81; `WaterField.whiteWind` (m/s), `.cover` now 0
+  to 1 (was 0 to 0.15); `physics.water(...).whitecapCover` likewise, `.whitecap01` still 0 to 1 (the steepness). The GLSL
+  chunk is unchanged: `foam01` is 1 on that share of the surface, whatever the share.
+- *Not changed:* the spume (`here.blown.spume01`, the drops thrown off breaking water: the same count, now from anywhere on
+  a sea that is white all over), the surf, the wind sea's height.
+- *Test* (`water.test.mjs`, new): **P26 white water in a storm**: to 20 m/s the same as the old law to the digit; 30 m/s 28
+  to 40 % (33.4), 40 m/s 60 to 75 %, 55 m/s 93 to 99 %, 75 m/s over 99.9 %; never falling with the wind (2 to 90 m/s);
+  whiteWind: Earth's own, Neptune's 75 -> 80 to 92, more in denser air, less under more gravity; the level a quantile all the
+  way (falling, under the mean surface past half, no step where the tables meet); the foam counted on the sea at 30, 40 and
+  55 m/s; the white lingers after the wind falls (20 s after 55 -> 10 m/s still over half, ten minutes after under 5 %).
+  On the head the file does not load (`whiteWind` is not exported there); its numbers there: `foamCover(1)` 0.15 at any wind.
+
+**3. THE SUDDEN CHECKS ON ARRIVAL GROUND: the causes found; not fixed, and why.**
+- *Mercury's spawn, heading 0 (1.58 m/s for a second):* **not PHYSICS'.** The explorer, at 7.40 m/s on 2 degrees of glass,
+  meets a column 2.2 m tall and 0.5 m in radius dead on, and PILOT's `collideObstacles` takes the speed into it: 7.40 ->
+  0.79 m/s in one frame at 6.87 s (`s/obsnear.mjs <root> mercury spawn 0 6.7 7.0`: `phys.brace` 0, no pace held by
+  PHYSICS, the column 0.47 m off the frame before, `stuck` counting from the hit). The way ahead reads ground and low
+  boulders, not columns. For PILOT P26: a detour before the hit, or the columns handed to PHYSICS' way ahead.
+- *Pluto's spawn, heading 135 (1.27 m/s for a second):* the crest law at the summit of a 33 m climb. The run goes up a
+  mountainside of ice steepening from 13 to 49 degrees with the hold (the legs at work all the way: `B.trend` is not read
+  while they work, so it stays at the 4.7 m/s it had on the steep part), and at the summit ridge the crest law's near slope
+  is the larger of the ground's and `max(trend, hipV) / pace`: as the pace falls the stale trend doubles the slope read
+  (capped at twice the ground's) and the pace held for the crest falls from 3.0 to 0.34 m/s over the last second.
+  P24's hand-over named this (its Next 2: the stale trend in the knife law's s1).
+- *Built and measured, not shipped* (`p26/work3`, on top of item 1; `out/t8b-work3.txt`, `runfield-work3-pluto-spawn.txt`):
+  (a) P24's variant (the knife branch reads the hips' own rise): Pluto's spawn **unchanged to the digit** (the check is in the
+  corner branch), boulderrun heading 315 with boulders 3.29 -> 3.01 m/s. (b) The trend not counted in either branch while
+  the legs work (`max(0, working ? 0 : B.trend, B.hipV) / pace`): Pluto's spawn heading 135 slowest second **1.27 -> 3.49
+  m/s**, the mean of its eight headings 6.52 -> 6.86, seconds under 3 m/s 2.4 -> 0.2; boulderrun faster in most headings
+  (0: 5.04 -> 5.20; 225: 5.73 -> 5.90; 315: 3.29 -> 4.49 with boulders, 2.68 -> 3.82 without); **but thrown up 0.258 m
+  (heading 315 with boulders) and 0.473 m (without), where the head throws no one**: the 60 degree ridge is then crested
+  at 0.9 to 1.0 m/s with the hips still rising. The rule of the block (every measured case holds or improves) and the 0.3
+  m rule both fail on it. The two causes P24 named for the other checks (the hold on the way down; the point short of a
+  knife edge's top) were not rebuilt: P24 measured that the second needs the first, and the first changes the hold that
+  keeps contact over boulders.
+- *What item 1 changed here, measured:* the descent hold off P22's small rim (P24's item 2: 3.84 -> 1.27 m/s) is gone at
+  that site, because its inner wall is a wall (61 to 63 degrees): the walker slides down it (slowest 2.88 m/s; one step of
+  4.08 -> 2.92 as the hold goes). Earth's desert canyon (1.21 m/s for a second while climbing the cliff) now ends standing at
+  the wall. `runfield.mjs` on the other five stands: the same to the digit.
+
+**4. THE STATE FOR THE FIGURE (`explorer.js` figureState; see "For PILOT and PAINTER: the figure's state, M4" below).**
+- *Checked against what PILOT and PAINTER are about to draw:* the crouch was there (`hunker01`, `crouch01`, `clamber01`,
+  `ride`); the lean was an angle with no direction (`lean`), stale in the air; there was no swimmer's flag or stroke
+  (PILOT's own `st.swimming` is its mode); nothing said whether a body in the air was rising or falling.
+- *Added (output only: no step reads them; the ghost lays none):* `leanV` (the lean as a level vector, into the wind, its
+  length `lean`; `lean` is now set in the air too, from the wind's push alone), `relWind` and `relWindSpeed` (the air past
+  the body: what streams a scarf), `swim` (0 | 1), `stroke` (phase 0..1), `strokeRate`, `swimSpeed` (one cycle of the
+  stroke for every `EXPLORER_BODY.swimStroke` 1.8 m made, never slower than a tread, one cycle in `treadTime` 1.6 s), `vUp`,
+  `airTime`, `arc` (1 rising, -1 falling, 0 on the ground or afloat).
+- *Test* (`explorer.test.mjs`, new): **P26 the figure's state**: a wind from the west leans a standing body west by `lean`,
+  level; the air past a body running with an 18 m/s wind is the difference; still air: a run leans 2 degrees into its own
+  wind, standing none; a jump's arc reads 0, 1, -1, 0 and `airTime` counts and resets; afloat `swim` is 1, the stroke
+  treads at 1 / treadTime at rest and turns once for every 1.8 m at 2 m/s; wading is not swimming; a run with the state
+  overwritten at every step goes the same way to the last digit.
+
+**5. THE WADING SPLASH (`loose.js` WADE).**
+- *Was:* 6 drops a metre at any pace and depth (18 a second at a 3 m/s run), all thrown at one speed (1.2 to 2.7 m/s up).
+- *Now:* the legs' drag in a liquid is 0.5 rho Cd A v^3 of power and the spray carries a share of it at about the legs'
+  speed: drops per metre waded = (`WADE.perMetre` 6 + `perV2` 4 x v^2) x the depth's share (a third ankle-deep, all from
+  `depthFull` 0.3 m): 10 a metre at 1 m/s, 22 at 2, 42 at 3; thrown sideways at 0.3 + 0.35 v and up at (0.4 + 0.5 v) x 0.6 to 1.4.
+- *Measured* (`p26/s/wade.mjs`, drops in the air on average over 3 s, shin-deep, head -> now): 3 m/s **8.9 -> 48.9** (126
+  born a second for 18), 2 m/s 5.6 -> 13.0, 1 m/s 3.2 -> 2.3; ankle-deep at 3 m/s 8.9 -> 15.7; the highest over the water
+  0.36 -> 0.35 m at 3 m/s, 0.30 -> 0.09 m at 1 m/s (a slow wade ruffles the water; it threw drops a third of a metre up).
+- *Test* (`loose.test.mjs`, new, fails on the head: 8.9 in the air): **P26 wading**. Not seen in a frame (no strip of it).
+
+**6. THE STRIPS** (`docs/shots/physics/motion-game-cliff-earth.jpg`, `motion-game-gale-neptune-p26.jpg`, each with its
+`.json`). Filmed in the GAME (`gamefilm.mjs game-cliff-earth,game-gale-neptune`, one browser, quality 1, 640 x 360, 30 Hz)
+on `p26/final2` (this commit's code but for `foamCoverM`); both sheets opened.
+- *game-cliff-earth* (new subject: Earth sea_coast, the clock at 30 s, Shift+W held 12 s from the stand toward the sea cliff
+  north of it, PILOT's wallrun heading 0, where the head gained 49.9 m; 36 frames, three a second; 651 s to make). **Seen:**
+  the explorer from behind and above; in frames 0 and 1 it runs over greenish ground toward an ochre face that fills the
+  frame (a sliver of sky top right, the ship's edge at the right); from frame 2 (1.0 s) to the last (12 s) it stands at one
+  place at the foot of the face, small, its long indigo shadow lying up the rock; nothing moves but the shadow's edge.
+  **Numbers** (the probe, a frame apart): up 0.06 m at 0.67 s (5.06 m/s, `paceWall` 4.71: it has seen the wall and slows),
+  0.64 m at 1.0 s (2.38 m/s on 48 degrees, `paceWall` 2.2, `grip` 1), 0.70 at 1.33 s, 0.73 at 2.0 s (0.22 m/s), then 0.73
+  to 0.71 m to the end on 51 to 52 degrees of ground, 0.02 to 0.08 m/s, `gait` 0, on the ground in every frame. Verdict: in
+  the game the cliff is not run up; the walker ends three quarters of a metre up the scramble at the wall's foot and stands.
+  The same run in Node step by step (`p26/s/cliff.mjs <root> earth sea_coast 0 12 30 1 11.5`) ends at the same 0.71 m: the
+  rock under it is at 52 degrees, past what friction and footholds climb (51.3), the next 1.2 m ahead rise 3.1 m (69
+  degrees: the wall, which gives no hold), `wall` and `paceWall` read nothing: it is not pressed to the face, it stands
+  where its feet stop gripping, creeping at 0.03 to 0.11 m/s with W held and sliding back as much.
+- *game-gale-neptune* (P23's subject, the same clock and stand: Neptune storm_seas in its squall, 3 s at ten frames a second;
+  616 s to make; the probe now also reads the sea). **Numbers:** white share 100 % in all 30 frames (P23: 12 to 15 %), Hs
+  3.95 to 4.02 m, `foamAt` -3.03 to -3.08 m (every point of the sea stands above it); the wind, the hunker and the brace
+  as in P23's strip to the digit (47 to 85 m/s at 2 m, hunker 0.38 to 0.89, braced to 648 N, not moved). **Seen:** the same
+  picture as P23's: the explorer crouched on a dark beach, a thin pale waterline, a dark indigo sea to a hazed horizon with
+  stacks, a streaked storm sky; on the water a few short white dashes, a few more than in P23's sheet. **No field of
+  foam, no streaks, no pale sea.** Measured on the two sheets (the band of sea between the horizon and the beach in every
+  frame, grey values of 255): median 70 -> 71, the 99th percentile 100 -> 104, the 99.9th 122 -> 130; pixels brighter than
+  100: 0.98 % -> 1.36 %; brighter than 150: 0.01 % -> 0.05 %. Verdict: the field in the game holds a white share of 1.0 (the probe reads `WaterField.cover`, which `uPhysWaterSea.w`
+  is set from at every update; the sea map's fourth channel reads 100 % at this stand and storm in Node, `coast.mjs`) and
+  **the picture does not show it**; what `sea.w` is inside the shader was not read back; why the picture stays dark was not
+  found by reading
+  `src/render/materials.js` (its gates are named under For PAINTER P26) and not looked for in a second browser (the
+  block's rule: one). My earlier guess from the code (a flat white far sea) is wrong: nothing of the kind is in the sheet.
 
 ## Hand-over P25 (twenty-third PHYSICS agent; P26 above is newer; P24 and older below hold for everything not named here)
 
@@ -2659,7 +2813,7 @@ physics.ground(bodyId, unitDir, out?, surface?) ->        // pass `surface` if y
 physics.water(bodyId, p, out?) ->                         // the liquid surface and its wind waves
   { present, height (elevation at p now, m), significant (Hs, m), period (s), length (m), speed (m/s),
     steepness, whitecap01 (0..1 how steep the sea is), whitecapCover (share of the surface that is
-    breaking, 0..0.15), dir:{x,y,z} (body-local, the way the waves run) }
+    white: 0..0.15 to a gale, (P26) on to 1 beyond it by the wind), dir:{x,y,z} (body-local, the way the waves run) }
 
 physics.features.devils // dust devils near the focus: array with .count; each { p (body-local foot), x, z (grid),
                         //   radius (m), height (m), speed (swirl, m/s), up (m/s), spin (+1/-1), strength 0..1, age, life, id }
@@ -2697,6 +2851,8 @@ stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY)       // == physics.explor
 //             dust, jetThrottle, jetUse, speedGround, hunker01 (P23: 0 upright .. 1 down low in a gale; ride folds with it),
 //             windBrace (P23: N the suit braces against the wind with), wall (P26: 1 held at a wall's foot, 2 riding up
 //             one on momentum), paceWall (P26: m/s held for a wall seen ahead), ride, hip, gait, ... (see EXPLORER_BODY_STATE) }
+//             (P26, the figure's state; see "For PILOT and PAINTER: the figure's state, M4") leanV {x,y,z}, relWind {x,y,z},
+//             relWindSpeed, swim (0 | 1), stroke (0..1), strokeRate, swimSpeed, vUp, airTime, arc (1 | -1 | 0)
 
 stepShipBody(st, cmd, dt, env, T = SHIP_BODY)               // == physics.ship.step   (flight: translation only)
 //  st:  { p, v, q }   cmd: { target:{x,y,z} m/s | null, tau: s, hover?: bool, boost?: bool, carve01?: 0..1,
@@ -2795,8 +2951,10 @@ physics.glsl.flora              // GLSL (ES 3.00): pcPhysBend(root, stiff01) -> 
 
 physics.fields.water
   .uniforms   // { uPhysWaterDir[2], uPhysWaterK[4], uPhysWaterAmp[4], uPhysWaterPhase[4], uPhysWaterGroup[4],
-              //   uPhysWaterSea[4] (Hs m, the elevation above which the sea is breaking m (1e9: it is not),
-              //   the width of that edge m, whitecap cover), uPhysWake Float32Array(64) (16 x: x, z, age s,
+              //   uPhysWaterSea[4] (Hs m, the elevation above which the sea is breaking m (1e9: it is not;
+              //   (P26) under the mean surface, negative, where more than half of the sea is white), the width of
+              //   that edge m, the white share of the surface: 0 .. 0.15 to a gale, (P26) on to 1 beyond it),
+              //   uPhysWake Float32Array(64) (16 x: x, z, age s,
               //   amplitude m), uPhysWakeG }, refreshed every update
   .heightAt(p) -> m               // CPU twin of pcPhysWaterHeight (waves, sets and wakes): a floating thing rides the painted sea
   .sample(p, out) -> { height, de, dn (slope along the frame's east and north), ax, az (unit, frame axes: the way
@@ -3165,6 +3323,17 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
   `speed^2 / (2 x 8 m/s^2) + 1 m` on the path and within its radius + 0.35 m of it, to the side the path already leans
   (the detour you start after 0.12 s of `stuck`, started before the hit); or pass such columns to PHYSICS as
   `env.columns` and I will have the way ahead hold a pace for them as it does for a wall.
+- **The figure's state, in one place:** "For PILOT and PAINTER: the figure's state, M4" (below the PAINTER section's
+  head): `st.phys.leanV` (the lean as a vector), `.relWind` (the air past the body), `.hunker01`, `.swim`, `.stroke`,
+  `.strokeRate`, `.swimSpeed`, `.arc`, `.vUp`, `.airTime`, `.wall`; with the lines for `figureArgs`. Your critique's item
+  6 (swimming is a glide): the stroke's phase and rate are there for the figure's beat; the body's pace within the stroke,
+  the drift downwind and the heave are not changed in this block.
+- **The white water's cap is lifted** (`physics.water(...).whitecapCover` and the field's `cover` now run to 1): if the
+  mixer reads it for the sea's hiss, Neptune's squall is 1.0 where it was 0.12; Earth's storms are as they were.
+- **Wading** throws about five times the spray at a run (49 drops in the air for 9); nothing to wire.
+- **New in your critique since my block began (items 2, 4, 5, 6, 8 of 'PILOT on PHYSICS', the twelfth's): not in this
+  block.** Read, not answered: the wet bank that stops a walk (item 2), the ship in Neptune's squall (4), the first
+  storm's timing (5), the swimmer's surge and drift (6), the weather's names (8).
 
 ### P25, first (twenty-third PHYSICS agent)
 - **Read `docs/lead/CRITIQUE-PHYSICS.md`, "PHYSICS on PILOT"** (the M4 swap; ranked, top five FIX FOR SHIP, evidence in
@@ -3846,7 +4015,91 @@ What follows is what a physicist would object to, and it is all in the assists.
     contact (it floats there by PILOT's rule; my gear model never engaged). Fine as a rule;
     it wants a wake and a bob from `physics.fields.water`, which the ship does not read.
 
+## For PILOT and PAINTER: the figure's state, M4
+
+Everything a drawn figure needs from PHYSICS' body is in `st.phys` (the explorer's state after `physics.explorer.step`;
+PILOT's `sim.ex.phys`), under these names. They are stable: none will be renamed or change meaning. All vectors are
+body-local (the planet's frame, as `st.p`); "level" means at right angles to up (`norm(st.p)`). Output only: writing to
+them changes nothing. PILOT passes what PAINTER's `animate(state, dt)` takes through `src/player/figure.js` `figureArgs`
+(today: mode, speed, jet01, lookPitch, hip/ride, clamber01, grounded, stride, footDown, feet, surge, crouch01, gait).
+
+| the figure | field | what it is |
+|---|---|---|
+| **leans into the wind** | `leanV` {x,y,z} | (P26) the lean as a vector: level, pointing the way the TOP of the body goes (into the wind, against its push), its length the angle in rad. In the figure's own axes: forward `dot(leanV, fwd)`, to its right `dot(leanV, right)`. By its law (atan(0.5 rho 0.85 U^2 / (100 g))): 0.05 rad in 10 m/s of Earth's air at the body, 0.21 in 20; 0.40 to 0.57 rad in Neptune's squall (P23's strip). A run in still air leans 0.03 rad forward into its own wind (measured). |
+| | `lean` | rad: its length, atan(windAccel / g). On the ground the wind's load along the ground (the body's own motion counted); (P26) in the air the wind's push alone. |
+| | `windAccel` | m/s^2 the air pushes the body with. |
+| **cloth in the wind** | `relWind` {x,y,z}, `relWindSpeed` | (P26) the air's velocity past the body, m/s: the wind at the body less the body's own velocity (what PILOT's `shelter01` leaves of the wind). A scarf streams along it; its square is the load (flat out by about 15 m/s on Earth: scale with the air's density, `physics.here.air.density`). `physics.here.air.gust01` for the flap. |
+| **crouches in a gale** | `hunker01` | 0 upright .. 1 down on hands and knees, side-on (P23). From the wind's push on the body upright passing half its weight (0.25 s down, 1.5 s up). `ride` already folds with it; the art's crouch stops at 0.5 m of fold, `hunker01` 1 is deeper. |
+| | `windBrace` | N the suit's thrusters brace against the wind with (0 to 1700): thrusters lit, if drawn. |
+| **folds before a jump** | `crouch01` | 0 .. 1 through the legs' fold before the push (P13); 0 at any other time. |
+| **hips and legs** | `ride` | m: the hips off standing height: the legs' fold or reach plus the stride's bob (pass it where `hip` was passed). |
+| | `hip`, `clamber01` | m the legs are folded (-0.45) or reached (+0.28); 0 striding .. 1 at the end of the stroke (hands down). |
+| | `gait`, `stride`, `stepPhase`, `cadence`, `stepLength`, `duty`, `footDown`, `flight`, `feet`, `surge`, `pulse`, `load`, `steps`, `footfall` | the gait (P13; API section): 0 standing, 1 walk, 2 run; the stride's phase; which feet are down; each foot's place. |
+| **at a wall** | `wall` | (P26) 1 while a wall holds the feet at its foot (hands on the rock; the walker stands or goes along it), 2 while it rides up one on its momentum, else 0. `slip01` is up while it slides back. |
+| **swims** | `swim` | (P26) 1 while afloat and swimming (the feet off the bottom, at least a third of the body under), else 0. Wading is `grounded` with `submerged01` > 0. |
+| | `stroke` | (P26) phase of the stroke, 0 .. 1, one cycle of the arms; kept when the swimmer stops (it treads on from there). |
+| | `strokeRate`, `swimSpeed` | (P26) cycles a second now: swimSpeed / 1.8 m, a tread's 0.625 a second at least (0 when not swimming); m/s made over the liquid, level. At PILOT's 2 m/s: 1.1 strokes a second. |
+| | `submerged01` | the share of the body under the liquid (0.69 floating: the feet 1.25 m under). The body's height already rides the drawn sea (P20). |
+| **rises or falls in an arc** | `arc` | (P26) 1 rising in the air, -1 falling, 0 on the ground or afloat. |
+| | `vUp` | (P26) m/s: the body's vertical speed, + up (on the ground: the rise of the ground under the feet). |
+| | `airTime` | (P26) s since the feet left the ground into the air; 0 on the ground and afloat. (Spread the arms after about a second of falling or faster than 8 m/s down; the last metre before a landing: `st.altitude`, PILOT's.) |
+| **lands, slides, kicks dust** | `impact`, `puff`, `slip01`, `scramble01`, `sink`, `dust`, `material`, `support` | as before (API section). |
+| **jets** | `jetThrottle`, `jetUse` | 0 .. 1. |
+
+Exact changes, if you want them (each is one line in your own file; PHYSICS edits neither):
+- **PILOT, `src/player/figure.js` `figureArgs`:** `out.leanFwd = ph ? dot(ph.leanV, ex.fwd) : 0; out.leanRight = ph ? dot(ph.leanV, right) : 0;`
+  (right = cross(fwd, up)), `out.hunker01 = ph ? num(ph.hunker01) : 0`, `out.relWind = ph ? ph.relWind : null` (or its
+  components along fwd, right, up), `out.swim = ph ? ph.swim : 0; out.stroke = ph ? num(ph.stroke) : 0; out.strokeRate = ph ? num(ph.strokeRate) : 0`,
+  `out.arc = ph ? ph.arc : 0; out.vUp = ph ? num(ph.vUp) : 0; out.airTime = ph ? num(ph.airTime) : 0; out.wall = ph ? ph.wall : 0`.
+  And a `'swim'` mode in `src/player/explorer.js` where it sets `'wade'` while `st.swimming` (PHYSICS' critique, PILOT item 5).
+- **PAINTER, `src/art/models.js` `animate(state, dt)`:** tip the torso by `leanFwd` about the figure's right axis and by
+  `leanRight` about its forward axis; stream the scarf and flare the coat along `relWind` (in the figure's frame) with the
+  square of its speed; crouch with `hunker01` beyond what `hip` gives; in `'swim'` lay the body near level and drive the
+  arms from `stroke` (a tread, arms sculling, when `strokeRate` is 0.625); pose the air by `arc` (rising: arms in, legs
+  trailing; falling: the present pose only when `airTime` > 1 or `vUp` < -8).
+
 ## For PAINTER: everything you need, on its own (current at the commit that carries this note)
+
+### P26, first (twenty-fourth PHYSICS agent)
+- **The white water's cap is lifted** (the coordinator's ruling; hand-over P26, item 2). The share of the sea that is white
+  (`uPhysWaterSea.w`, the sea map's fourth channel, `physics.water(...).whitecapCover`) now goes **from 0 to 1**, where it
+  stopped at 0.15. To a gale nothing changes, to the digit (Earth's coast in its 13 m/s storm: 4.8 to 5.6 %, as before).
+  Beyond it (an open sea; Earth / Neptune's methane sea): **15 m/s 5 % / 15 %; 30 m/s 33 % / 48 %; 55 m/s 96 % / 99.5 %; 75
+  m/s 100 % / 100 %** (22 m/s 11 %, 25 m/s 18 %, 40 m/s 67 % on Earth). Neptune's storm stand in its squall: 100 % at the
+  waterline and 500 m out (it was 12 %).
+- **What your shader is handed, and where it will show.** `foam01` (the chunk's `pcPhysWaterCrest().y`) is 1 on exactly that
+  share of the surface: the part standing above `uPhysWaterSea.y`, which is now BELOW the mean surface past half (at 55 m/s
+  on Earth -0.89 m with Hs 1.40 m; at 75 m/s -1.72 m with Hs 1.91 m; it was always positive): at 100 % every point of the
+  sea has `foam01` 1. The chunk is unchanged.
+- **Seen in the game: your picture does not show it yet** (`docs/shots/physics/motion-game-gale-neptune-p26.jpg`, opened;
+  P23's `motion-game-gale-neptune.jpg` is the same stand under the cap; hand-over P26, item 6). Neptune's storm stand in
+  its squall, quality 1, 640 x 360, the field's white share 1.0 (`uPhysWaterSea.w`; the map's fourth channel 100 % at
+  every row of `coast.mjs`), Hs 4 m, the breaking level 3 m below the mean surface: the sea is as dark
+  as under the cap, with a few white dashes more (pixels of the sea brighter than 100 of 255: 0.98 % -> 1.36 %; the median
+  70 -> 71). No white sheet either. I did not find the cause by reading and had no second browser to look. Where `sea.w`
+  and `foam01` enter `src/render/materials.js` (the water's fragment shader), for you to look with the sea in front of you:
+  (1) `foam = cf.y * smoothstep(0.40, 0.90, hN) * smoothstep(0.44, 0.58, torn) * keep`: `cf.y` is now 1 everywhere, so this
+  should be torn dabs on the upper half of every wave you draw; the sheet shows almost none; (2) `capFar` / `capTh = 0.70 -
+  0.55 * sea.w` (written for `sea.w` to 0.15; at 1 the threshold is 0.15) times `(1 - keep)`; (3) `galeW` and `horseTh =
+  0.68 - 0.08 * galeW`: saturated at `sea.w` 0.07, so the white horses are as many at 100 % as at 7 %; (4) `capTh2 = 0.68 -
+  0.45 * sea.w - 0.13 * gale` and `farWhite`'s `smoothstep(0.008, 0.05, sea.w)` in the far strokes; then `white = max(max(
+  crest * 0.85, foam) * deep, surf ...) * liq`, `c = mix(c, vec3(1.0), glint)`, the fog and the storm's tone after it.
+- **What a sea is at those shares** (for the painting; the ruling: broken foam, streaks and spray, never a flat white
+  area): to 15 % whitecaps on the crests, as you paint them; from about 20 to 60 % (25 to 40 m/s) the crests' foam is
+  blown into **streaks along the wind** (`pcPhysWaterDir`, a few metres apart, tens of metres long), the water between
+  them still dark; from 60 % to all of it (over 40 m/s) the streaks close up and the surface is hidden by **driven foam
+  and spray**: the tone of the whole sea rises toward the paper, the wave forms stay as value steps inside it (the troughs
+  greyer, the crests' fronts bare paper), and spume flies off every crest (`physics.here.blown.spume01`, PHYSICS' spray
+  drops). Suggested (not tried: the shader is yours and I could not see why the present terms stay dark): keep the caps'
+  terms to `min(sea.w, 0.15)` as they were written, and add the rest as its own term after them, `streak = smoothstep(0.15,
+  0.6, sea.w) * <a noise stretched 12:1 along pcPhysWaterDir>`, and a paper wash over the whole sea of `smoothstep(0.5,
+  1.0, sea.w) * 0.5`, with the wave's own value steps on top; then film this stand again: the sea band's median should
+  leave 70 of 255.
+- **The figure's state** is documented in one place for you and PILOT: "For PILOT and PAINTER: the figure's state, M4"
+  (the lean as a vector, the air past the body for the scarf and coat, the gale's crouch, the swimmer's flag and stroke,
+  the arc of a flight, the hold at a wall).
+- **Wading throws more water** (item 5): at a run through shin-deep water about 49 spray drops are in the air at once
+  (there were 9), thrown a third of a metre up; a slow wade 2, a hand high. They are the same `spray` buffer you draw.
 
 ### P25, first (twenty-third PHYSICS agent)
 - **Read `docs/lead/CRITIQUE-PHYSICS.md`, "PHYSICS on PAINTER"** (ranked, top five FIX FOR SHIP): the figure ignores the
@@ -4950,6 +5203,22 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     that meets a wall with more speed along it than the legs' reach can take rides up on it (0.16 m on Earth from a 7.4
     m/s run, 1.0 m on Mars, 1.2 m on the Moon) and slides back; on a wall `cmd.assistAccel` has no part up its fall line
     (on the Moon it is more than gravity): the lift is the jetpack's, with its fuel.
+73. **(P26) Beyond a gale the white of the sea follows the wind** (the coordinator's ruling: the 15 % cap lifted). The
+    steepness's law stays as far as it is the larger (to about 21 m/s on an open sea: nothing changes there); beyond it
+    cover = 1 - exp(-whitecap01 x 3.84e-6 Ue^3.41): Monahan's law carried on, and saturating because patches of white laid
+    at random overlap. A third of the sea at 30 m/s, nearly all of it at 55, all of it at 75.
+74. **(P26) The wind that whitens a sea is the wind as the sea has felt it, as on Earth.** It rises with the sea and
+    outlasts the wind (the swell's wind: foam and streaks linger), and on another world it is scaled by the wind's power on
+    the liquid's weight, (rhoAir / rhoLiq) U^3 / g (Neptune's 75 m/s over methane whitens as 86 m/s on Earth's sea).
+75. **(P26) The trend stays in the crest law while the legs work, for now.** Taking it out (the crest read from the hips'
+    own rise) lifts Pluto's summit check from 1.27 to 3.49 m/s and most boulderrun headings, and throws the runner 0.26 to
+    0.47 m up off the 60 degree ridge of heading 315: the 0.3 m rule decides. The other check PILOT measured (Mercury's
+    spawn) is a column met at a run: PILOT's collision, not a pace PHYSICS holds.
+76. **(P26) The figure's state has stable names and moves nothing.** The lean is a vector (`leanV`), the air past the body
+    is given (`relWind`), a swimmer has a flag and a stroke (one cycle for every 1.8 m made, never slower than a tread), a
+    flight has an arc (`arc`, `vUp`, `airTime`); they are laid after the step, as the gait is, and no step reads them.
+77. **(P26) Wading throws water with the square of the pace and with the depth** (the legs' drag there is 0.5 rho Cd A v^3
+    and the spray carries a share of it at the legs' speed): 10 drops a metre at 1 m/s, 42 at 3, a third of that ankle-deep.
 
 
 ## Needs from the others
@@ -4957,6 +5226,11 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
 ### P26 (twenty-fourth PHYSICS agent)
 - **PILOT:** Mercury's spawn check (your critique's item 3) is your column collision (For PILOT P26): a detour before the
   hit, or columns handed to PHYSICS' way ahead.
+- **PILOT:** pass the figure's state on (`figureArgs`: `leanV` along the figure's axes, `relWind`, `hunker01`, `swim`,
+  `stroke`, `strokeRate`, `arc`, `vUp`, `airTime`, `wall`) and add a `'swim'` mode ("the figure's state, M4").
+- **PAINTER:** paint the white share past 15 % as streaks and driven foam (For PAINTER P26: `capTh = 0.70 - 0.55 * sea.w`
+  passes nearly all of the far sea at `sea.w` 1); draw the lean, the cloth in `relWind`, the swimmer from `stroke`, the
+  flight by `arc`.
 
 **P25 (twenty-third agent), current needs.** From PILOT and PAINTER: their answers to the critique
 (`docs/lead/CRITIQUE-PHYSICS.md`); nothing else. From the coordinator: nothing.

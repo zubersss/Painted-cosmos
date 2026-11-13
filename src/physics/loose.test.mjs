@@ -266,6 +266,25 @@ test('P25 the spawn glade is a sward, as drawn: a walk across it raises no puff;
   assert.equal(groundAt('earth', { ...s0, canopy01: undefined }, null, {}).material, 'litter');
 });
 
+test('P26 wading: the legs throw the water with the square of the pace and with the depth: a run through shin-deep water throws sheets, a slow wade ruffles it', () => {
+  // Until P26: 6 drops a metre at any pace and depth (18 a second at a 3 m/s run: a thin sprinkle), all thrown at one
+  // speed. The legs' drag in the liquid is 0.5 rho Cd A v^3 of power and the spray carries a share of it: the drops
+  // thrown per metre go with v^2 and with the depth (to the knee), and fly as that speed throws them.
+  // (the drops in the air at once, on average over 3 s of wading, and the highest over the water)
+  const wade = (sea, speed) => {
+    const w = setup('earth', 'sea_coast', { sea }); run(w, 1); walk(w, 1, speed);
+    const P = w.physics.particles; let sum = 0, n = 0, top = 0;
+    walk(w, 3, speed, { each: () => { sum += P.spray.count; n++; for (const hgt of heights(w, P.spray)) top = Math.max(top, hgt - sea); } });
+    return { air: sum / n, top };
+  };
+  const run3 = wade(0.4, 3), walk1 = wade(0.4, 1), ankle = wade(0.08, 3);
+  console.log(`# P26 wading, drops in the air: ${run3.air.toFixed(1)} at 3 m/s shin-deep (the head: 8.9), ${walk1.air.toFixed(1)} at 1 m/s (3.2), ${ankle.air.toFixed(1)} at 3 m/s ankle-deep (8.9); thrown ${run3.top.toFixed(2)} m over the water at 3 m/s, ${walk1.top.toFixed(2)} m at 1 m/s (0.36, 0.30)`);
+  assert.ok(run3.air > 35 && run3.air < 80, 'a run at 3 m/s: ' + run3.air + ' in the air');
+  assert.ok(walk1.air > 0.5 && walk1.air < 6, 'a wade at 1 m/s: ' + walk1.air + ' in the air');
+  assert.ok(ankle.air < 0.5 * run3.air && ankle.air > 0.2 * run3.air, 'ankle-deep: ' + ankle.air + ' in the air');
+  assert.ok(run3.top > 0.2 && run3.top < 0.6 && walk1.top < 0.15, `thrown ${run3.top} m at a run, ${walk1.top} m at a wade`);
+});
+
 test('wading throws spray and leaves rings; snow kicks up as powder', () => {
   const w = setup('earth', 'sea_coast', { sea: 0.4 }); run(w, 1); walk(w, 3, 2.5);
   const P = w.physics.particles;

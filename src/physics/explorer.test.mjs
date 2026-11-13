@@ -1065,3 +1065,53 @@ test('P26 on PAINTER\'s real Earth: Shift+W from the sea_coast stand into its cl
     assert.ok(top < 3, `heading ${heading}: ${top.toFixed(2)} m above the stand`);
   }
 });
+
+// ---- (P26) the figure's state ---------------------------------------------------------------------------------
+test('P26 the figure\'s state: the lean is a vector into the wind, the air past the body is given, a swimmer has a stroke, a flight an arc; none of it moves the body', () => {
+  // PILOT and PAINTER draw the figure leaning into the wind, crouching in a gale, swimming, and rising or falling in an
+  // arc (PHYSICS' critique of PAINTER, items 1, 2 and 5). Until P26 the lean was an angle with no direction, there was
+  // no swimmer's flag or stroke, and nothing said whether a body in the air was going up or coming down.
+  // a wind from the west (blowing toward +x) on a standing body: it leans west, as far as lean; the air streams past it east
+  const w = make({ wind: V(18, 0, 0) }); run(w, 3, { wish: V() });
+  const B = w.st.phys, up = norm(w.st.p);
+  assert.ok(B.lean > 0.05 && Math.abs(len(B.leanV) - B.lean) < 1e-9, `lean ${B.lean}, |leanV| ${len(B.leanV)}`);
+  assert.ok(B.leanV.x < -0.9 * B.lean && Math.abs(dot(B.leanV, up)) < 1e-9, `into the wind, level: ${JSON.stringify(B.leanV)}`);
+  assert.ok(Math.abs(B.relWind.x - 18) < 1e-6 && Math.abs(B.relWindSpeed - 18) < 1e-6 && B.arc === 0 && B.airTime === 0 && B.swim === 0, 'standing in it: the air passes at the wind\'s speed');
+  // running with it at 7.4 m/s: the air passes at the difference
+  run(w, 4, { wish: V(7.4, 0, 0) });
+  assert.ok(Math.abs(w.st.phys.relWind.x - (18 - w.st.v.x)) < 1e-6 && w.st.phys.relWindSpeed < 11.5, `running with it: ${w.st.phys.relWindSpeed} m/s past the body`);
+  // still air: a run makes its own wind, and the runner leans a little into it (forward: 2 degrees at 7.4 m/s); standing, none
+  const c = make(); run(c, 3, { wish: V(7.4, 0, 0) });
+  assert.ok(c.st.phys.leanV.x > 0.02 && len(c.st.phys.leanV) < 0.05 && Math.abs(c.st.phys.relWind.x + 7.4) < 0.05, `still air, running: lean ${JSON.stringify(c.st.phys.leanV)}, the air past the body ${c.st.phys.relWind.x}`);
+  run(c, 3, { wish: V() });
+  assert.ok(len(c.st.phys.leanV) === 0 && c.st.phys.relWindSpeed === 0, 'still air, standing: no lean, no air past the body');
+  // a jump: rising, then falling, then down; the time in the air counts up and is 0 again on the ground
+  const j = make(); run(j, 1, { wish: V(4.2, 0, 0) });
+  const seen = []; let tMax = 0;
+  run(j, 2.5, (t) => ({ wish: V(4.2, 0, 0), jump: t < 0.05 }), { each: (t, st) => { const P = st.phys; if (seen[seen.length - 1] !== P.arc) seen.push(P.arc); tMax = Math.max(tMax, P.airTime);
+    if (!st.grounded) assert.equal(P.arc, vert(st) > 0 ? 1 : -1); else assert.ok(P.arc === 0 && P.airTime === 0);
+    assert.ok(Math.abs(P.vUp - vert(st)) < 1e-9); } });
+  assert.deepEqual(seen, [0, 1, -1, 0], 'the arc of a jump: ' + seen);
+  assert.ok(tMax > 0.6 && tMax < 1.4, 'in the air for ' + tMax + ' s');
+  // a swimmer: afloat in deep water the flag is up and the stroke turns once for every swimStroke metres, never slower than a tread
+  const s = make({ world: { sea: R + 6 }, alt: 4.75, g: 9.81 });
+  run(s, 3, { wish: V() });
+  assert.ok(!s.st.grounded && s.st.phys.swim === 1 && s.st.phys.arc === 0 && s.st.phys.airTime === 0, 'afloat: swimming, not in an arc');
+  assert.ok(Math.abs(s.st.phys.strokeRate - 1 / T.treadTime) < 1e-9 && s.st.phys.swimSpeed < 0.05, `treading water: ${s.st.phys.strokeRate} cycles a second`);
+  let turns = 0, prev = s.st.phys.stroke, x0 = null, x1 = 0;
+  run(s, 8, { wish: V(7.4, 0, 0) }, { each: (t, st) => { const p = st.phys.stroke; if (t > 3) { if (x0 == null) x0 = st.p.x; x1 = st.p.x; turns += p >= prev ? p - prev : p + 1 - prev; } prev = p; assert.ok(p >= 0 && p < 1); } });
+  const v = s.st.phys.swimSpeed;
+  assert.ok(v > 1 && v < 3 && Math.abs(s.st.phys.strokeRate - v / T.swimStroke) < 1e-9, `swimming at ${v} m/s: ${s.st.phys.strokeRate} strokes a second`);
+  assert.ok(Math.abs((x1 - x0) / turns - T.swimStroke) < 0.1, `${((x1 - x0) / turns).toFixed(2)} m a stroke`);
+  // wading is not swimming
+  const wd = make({ world: { sea: R + 0.6 } }); run(wd, 3, { wish: V(4.2, 0, 0) });
+  assert.ok(wd.st.grounded && wd.st.phys.swim === 0 && wd.st.phys.strokeRate === 0 && wd.st.phys.submerged01 > 0.2, 'wading: feet down, no stroke');
+  // output only: the same run with the figure's state wiped at every step goes the same way to the last digit
+  const a = make({ wind: V(9, 0, 4) }), b = make({ wind: V(9, 0, 4) });
+  const cmd = (t) => ({ wish: V(7.4 * Math.cos(t), 0, 7.4 * Math.sin(t)), jump: Math.abs(t - 2) < 0.02 });
+  for (let i = 0; i < 300; i++) {
+    stepExplorerBody(a.st, cmd(i / 60), 1 / 60, a.env); stepExplorerBody(b.st, cmd(i / 60), 1 / 60, b.env);
+    const P = b.st.phys; P.leanV.x = 9; P.relWind.z = -7; P.stroke = 0.5; P.vUp = 3; P.airTime = 9; P.arc = 1; P.swim = 1; P.strokeRate = 2; P.swimSpeed = 5; P.relWindSpeed = 1;
+  }
+  assert.deepEqual([a.st.p, a.st.v], [b.st.p, b.st.v]);
+});

@@ -50,6 +50,18 @@ export const LOOSE = Object.freeze({
 });
 export const LOOSE_KINDS = Object.keys(LOOSE);
 
+// (P26) WADING. Legs driven through a liquid throw it: their drag there is 0.5 rho Cd A v^3 of power (A: their width times
+// the depth they are in), and the spray carries a share of it off as drops thrown at about the legs' own speed. So the
+// drops thrown for each metre waded go with v^2 and with the depth, as far as the knee; and they fly as high as that
+// speed throws them (a walk ruffles the water, a run throws sheets of it knee high and more). Until P26: 6 a metre at any
+// pace and depth (18 a second at a 3 m/s run: a thin sprinkle), thrown at one speed.
+export const WADE = Object.freeze({
+  perMetre: 6,          // drops thrown per metre waded at a crawl, knee-deep
+  perV2: 4,             // ... and this many more for each (m/s)^2 of the pace (10 a metre at 1 m/s, 22 at 2, 42 at 3)
+  depthFull: 0.3,       // m of liquid from which the legs throw all of that (ankle-deep: a third)
+  out: 0.3, outV: 0.35, // m/s the drops leave sideways: out + outV x pace
+  up: 0.4, upV: 0.5,    // m/s upward: (up + upV x pace) x 0.6 .. 1.4 (0.9 to 2.6 m/s at 3 m/s: a third of a metre high on Earth)
+});
 export const KICK = Object.freeze({
   perMetre: 5,          // dust grains raised per metre walked on the loosest ground
   landing: 10,          // grains per m/s of landing speed
@@ -459,8 +471,10 @@ export class Loose {
           if (gp.liquid > 0.05) {
             // wading: droplets thrown up by the legs, and a ring on the water now and then
             if (grounded && sp > 0.6) {
-              let n = sp * 6 * h + rng();
-              while (n >= 1) { n -= 1; const a = rng() * 6.2831853; this.emit('spray', x + Math.cos(a) * 0.3, gp.h + gp.liquid + 0.02, z + Math.sin(a) * 0.3, vx * 0.5 + Math.cos(a) * 0.8, 1.2 + rng() * 1.5, vz * 0.5 + Math.sin(a) * 0.8, 1, 1, gp.mat); }
+              // ((P26) see WADE: per metre waded, with v^2 and the depth; thrown at about the legs' speed)
+              const dk = Math.min(1, Math.max(1 / 3, gp.liquid / WADE.depthFull)), vo = WADE.out + WADE.outV * sp, vu = WADE.up + WADE.upV * sp;
+              let n = (WADE.perMetre + WADE.perV2 * sp * sp) * dk * sp * h + rng();
+              while (n >= 1) { n -= 1; const a = rng() * 6.2831853; if (!this.emit('spray', x + Math.cos(a) * 0.3, gp.h + gp.liquid + 0.02, z + Math.sin(a) * 0.3, vx * 0.5 + Math.cos(a) * vo, vu * (0.6 + 0.8 * rng()), vz * 0.5 + Math.sin(a) * vo, 1, 1, gp.mat)) break; }
               this._wade += h * sp;
               if (this._wade > 0.5) { this._wade = 0; P._event(frame, x, gp.h + gp.liquid, z, EVENT.ripple, clamp01(sp / 3), 0.3); }
             }

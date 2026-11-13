@@ -29,6 +29,15 @@
 // cover = foamMax whitecap01^foamPower, which is within a factor 1.5 of that law from 10 to
 // 20 m/s over the game's fetches; and the sea breaks where it stands highest: the foam is
 // the part of the surface above the level that leaves exactly that share above it.
+// (P26, the coordinator's ruling: the cap lifted) A sea cannot stand steeper than it does in a gale, so that law stops at
+// foamMax (15 %), which a real sea passes at about 22 m/s: at hurricane force (33 m/s, Beaufort 12) the sea is white
+// with foam and streaks, and beyond it there is no telling sea from air. Above the gale the white share follows the
+// wind itself, by the same law of Monahan and O'Muircheartaigh carried on and saturating: patches of white laid at
+// random overlap, so a law that asks for W covers 1 - exp(-W): cover = 1 - exp(-whitecap01 x whiteM Ue^whiteExp),
+// where it is more than the steepness's law (it is from about 21 m/s on an open sea: below that nothing changes).
+// Ue is the wind as the sea has felt it (it rises with the sea and outlasts the wind: WaterField.swellWind), made
+// Earth's by the wind's power on the liquid's weight (whiteWind: (rhoAir / rhoLiq) U^3 / g). Open sea on Earth: 5 % at
+// 15 m/s (as before), 33 % at 30, 96 % at 55, all of it at 75. PAINTER paints that share as broken foam, streaks and spray.
 // At a shore a wave breaks when it is 0.78 of the depth high (McCowan 1894): surf01.
 import { clamp01, smoothstep, TAU } from './util.js';
 
@@ -62,7 +71,9 @@ export const WATER = Object.freeze({
   wakeWidth: 1.6,                  // wavelengths: width of the packet
   // crests and foam (see the header)
   crestLow: 0.12, crestHigh: 0.42, // elevation / Hs where a crest begins and where it is fully one (the top third .. the top 5 % of the sea)
-  foamMax: 0.15, foamPower: 1.8,   // whitecap cover = foamMax whitecap01^foamPower (share of the surface)
+  foamMax: 0.15, foamPower: 1.8,   // whitecap cover = foamMax whitecap01^foamPower (share of the surface), as far as a gale
+  whiteM: 3.84e-6, whiteExp: 3.41, // (P26) ... and beyond it 1 - exp(-whitecap01 whiteM Ue^whiteExp), Ue (m/s) the wind as on Earth (see the header)
+  earthG: 9.81,                    // (P26) m/s^2: the gravity that law was measured under
   foamMin: 5e-4,                   // below this share the sea does not break at all
   foamEdge: 0.06,                  // x Hs: the width of the edge of a foam patch
   surfBreak: 0.78,                 // a wave breaks when it is this fraction of the depth high
@@ -261,13 +272,16 @@ const QN = 25, QLO = -3.4, QHI = -0.4;         // log10 of the share: 0.04 % .. 
 // (0.15), and four seas with more and more swell under them (a sea that is mostly one long train has
 // shorter tails still). Elevations in units of the significant height of the whole (4 sigma / STD4).
 const QR = 5, R0 = WATER.shares[3] * WATER.shares[3] / WATER.shares.reduce((a, x) => a + x * x, 0), R1 = 0.95;
-let _quant = null;
+// (P26) ... and above that table's last share (40 %) evenly to all of the surface: a sea white all over breaks down to
+// its lowest trough
+const QH = 9, QW0 = Math.pow(10, QHI);
+let _quant = null, _quantHi = null;
 function quantiles() {
   if (_quant) return _quant;
   const N = 30000, v = new Float32Array(N), sh = WATER.shares, g = WATER.group;
   const al = [2, 3, 5, 7, 11, 13, 17, 19].map((p) => Math.sqrt(p) % 1);       // independent over the rationals
   const rest = 0.25 * (sh[0] * sh[0] + sh[1] * sh[1] + sh[2] * sh[2]);
-  _quant = new Float32Array(QN * QR);
+  _quant = new Float32Array(QN * QR); _quantHi = new Float32Array(QH * QR);
   for (let row = 0; row < QR; row++) {
     const r = R0 + (R1 - R0) * row / (QR - 1), a3 = Math.sqrt(r / (1 - r) * rest), unit = 4 * Math.sqrt(0.5 * VARG * (rest + a3 * a3)) / STD4;
     for (let n = 0; n < N; n++) {
@@ -277,6 +291,7 @@ function quantiles() {
     }
     v.sort();
     for (let k = 0; k < QN; k++) { const W = Math.pow(10, QLO + (QHI - QLO) * k / (QN - 1)); _quant[row * QN + k] = v[Math.min(N - 1, Math.max(0, Math.round(N * (1 - W))))]; }
+    for (let k = 0; k < QH; k++) { const W = QW0 + (1 - QW0) * k / (QH - 1); _quantHi[row * QH + k] = v[Math.min(N - 1, Math.max(0, Math.round(N * (1 - W))))]; }
   }
   return _quant;
 }
@@ -284,15 +299,36 @@ function quantiles() {
 // swell01 (optional): the share of the surface's variance that the longest train holds (a sea with a swell under it)
 export function foamLevel(cover, swell01 = R0) {
   const q = quantiles();
+  let rr = (swell01 - R0) / (R1 - R0) * (QR - 1); rr = rr < 0 ? 0 : rr > QR - 1 ? QR - 1 : rr;
+  const j = Math.min(QR - 2, rr | 0), fj = rr - j;
+  if (cover > QW0) {
+    // (P26) more than 40 % of the surface
+    const h = _quantHi, th = Math.min(QH - 1, (cover - QW0) / (1 - QW0) * (QH - 1)), ih = Math.min(QH - 2, th | 0), ah = j * QH + ih, bh = ah + QH;
+    return (h[ah] + (h[ah + 1] - h[ah]) * (th - ih)) * (1 - fj) + (h[bh] + (h[bh + 1] - h[bh]) * (th - ih)) * fj;
+  }
   let t = (Math.log10(cover > 1e-9 ? cover : 1e-9) - QLO) / (QHI - QLO) * (QN - 1);
   t = t < 0 ? 0 : t > QN - 1 ? QN - 1 : t;
   const i = Math.min(QN - 2, t | 0);
-  let rr = (swell01 - R0) / (R1 - R0) * (QR - 1); rr = rr < 0 ? 0 : rr > QR - 1 ? QR - 1 : rr;
-  const j = Math.min(QR - 2, rr | 0), fj = rr - j, a = j * QN + i, b = a + QN;
+  const a = j * QN + i, b = a + QN;
   return (q[a] + (q[a + 1] - q[a]) * (t - i)) * (1 - fj) + (q[b] + (q[b + 1] - q[b]) * (t - i)) * fj;
 }
-// share of the sea surface that is white, from how steep the sea is (0..1, as windSea's whitecap01)
-export const foamCover = (whitecap01) => WATER.foamMax * Math.pow(whitecap01 > 0 ? whitecap01 : 0, WATER.foamPower);
+// share of the sea surface that is white, from how steep the sea is (0..1, as windSea's whitecap01) and, (P26) beyond a
+// gale, from the wind over it (Ue, m/s, as whiteWind gives it; 0 or left out: the steepness's law alone, 15 % at most)
+export function foamCover(whitecap01, Ue = 0) { return foamCoverM(whitecap01, Ue > 0 ? WATER.whiteM * Math.pow(Ue, WATER.whiteExp) : 0); }
+// (the same with Monahan's number for the wind, whiteM Ue^whiteExp, worked out once: the sea map asks at every node)
+function foamCoverM(whitecap01, mU) {
+  const w = whitecap01 > 0 ? whitecap01 : 0, c = WATER.foamMax * Math.pow(w, WATER.foamPower);
+  if (!(mU > 0)) return c;
+  const m = 1 - Math.exp(-w * mU);
+  return m > c ? m : c;
+}
+// (P26) The wind U (m/s at 10 m) over a liquid of density rhoLiq under gravity g in air of density rhoAir, as the wind on
+// Earth's sea that whitens it as much: the white share goes with the wind's power on the liquid's weight,
+// (rhoAir / rhoLiq) U^3 / g (Neptune's squall of 75 m/s over methane: 86 m/s of Earth's).
+export function whiteWind(U, g, rhoAir, rhoLiq) {
+  if (!(U > 0) || !(g > 0) || !(rhoAir > 0) || !(rhoLiq > 0)) return 0;
+  return U * Math.pow((rhoAir / rhoLiq) / WATER.earthRatio * WATER.earthG / g, 1 / WATER.whiteExp);
+}
 // 0..1: how far a wave of this sea has broken in liquid `depth` metres deep (the surf at a shore)
 export function surf01(Hs, depth) {
   if (!(Hs > 0.02)) return 0;
@@ -390,7 +426,8 @@ export class WaterField {
     // swell (P7): the wind it remembers, its height and length, how open the sea is (0 pond .. 1 open sea),
     // and the significant height of everything together (wind sea and swell: 4 sigma of the surface)
     this.swellWind = 0; this.swellHeight = 0; this.swellLength = 0; this.open = 0; this.significant = 0; this.slope = 0;
-    this.cover = 0;                // share of the surface that is breaking (whitecaps), 0 .. foamMax
+    this.cover = 0;                // share of the surface that is white (whitecaps; (P26) in a storm, foam and streaks): 0 .. 1
+    this.whiteWind = 0;            // (P26) m/s: the wind as the sea has felt it, as on Earth (water.js whiteWind of swellWind): what foamCover takes
     this.foamAt = 1e9;             // elevation (m) above which the sea is breaking now (1e9: it is not)
     // uPhysWaterSea: Hs (m), the elevation above which the sea breaks (m), the width of that edge (m), whitecap cover
     this.uniforms = { uPhysWaterDir: [1, 0], uPhysWaterK: [0, 0, 0, 0], uPhysWaterAmp: [0, 0, 0, 0], uPhysWaterPhase: [0, 0, 0, 0], uPhysWaterGroup: [0, 0, 0, 0],
@@ -482,6 +519,7 @@ export class WaterField {
     const a012 = A[0] * A[0] + A[1] * A[1] + A[2] * A[2], A3 = A[NT - 1], aw3 = 0.5 * this.height * sh[NT - 1], sw2 = 0.5 * this.swellHeight;
     // (the wind sea at a node rises with the reference's: its whitecaps by how far the reference has come toward its target)
     const prog = T.HsRef > 1e-6 ? Math.min(1, this.height / T.HsRef) : 0;
+    const mU = this.whiteWind > 0 ? WATER.whiteM * Math.pow(this.whiteWind, WATER.whiteExp) : 0;      // ((P26) see foamCover)
     for (let lev = 0; lev < 2; lev++) {
       const S = lev ? this._mo : this._mi, r0 = lev ? 2 * MN : 0;
       if (lev && !g[7]) break;
@@ -490,7 +528,7 @@ export class WaterField {
         const w3 = aw3 * sW, a3 = w3 + (Math.max(w3, sw2 * kS) - w3) * open;
         const s3 = A3 > 1e-9 ? a3 / A3 : sW;
         const va = a012 * sW * sW + a3 * a3, sig = 4 * Math.sqrt(0.5 * va * VARG) / STD4;
-        let cover = foamCover(wc * prog), at = SEA_TEX.noFoam * sig + 0.1;
+        let cover = foamCoverM(wc * prog, mU), at = SEA_TEX.noFoam * sig + 0.1;
         if (cover > WATER.foamMin && this.height * sW > 0.02) at = sig * foamLevel(cover, va > 0 ? a3 * a3 / va : R0); else cover = 0;
         const o = ((r0 + (n / MN | 0)) * MN + n % MN) * 4;
         D[o] = sW; D[o + 1] = s3; D[o + 2] = at; D[o + 3] = cover;
@@ -689,7 +727,9 @@ export class WaterField {
     }
     u.uPhysWaterDir[0] = d0; u.uPhysWaterDir[1] = d1; u.uPhysWakeG = g;
     // whitecaps: how much of the surface is breaking, and so how high it has to stand to break
-    this.cover = foamCover(this.whitecap01);
+    // ((P26) beyond a gale by the wind as the sea has felt it: see the header)
+    this.whiteWind = whiteWind(this.swellWind, g, rhoAir, rhoLiq);
+    this.cover = foamCover(this.whitecap01, this.whiteWind);
     // (the significant height of all four trains together, the swell with them: 4 sigma. The foam level is
     // measured for the standard four in units of their Hs; with a swell under them the surface stands
     // higher by the ratio of the two)

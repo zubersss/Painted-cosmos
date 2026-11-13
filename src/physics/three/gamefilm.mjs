@@ -172,9 +172,19 @@ const GALE_SETUP = (body, biome, t, heading) => `(G) => {
   window.__site = { stand: [G.r3(d0.x), G.r3(d0.y), G.r3(d0.z)] }; window.__p0 = { ...pc.sim.ex.p };
 }`;
 const GALE_PROBE = `(G) => { const x = G.pc.sim.ex, B = x.phys || {}, a = G.ph.here.air || {}, p = x.p, q = window.__p0 || p;
-  return { wind2m: G.r2(a.speed || 0), windAccel: G.r2(B.windAccel || 0), hunker: G.r2(B.hunker01 || 0), brace: Math.round(B.windBrace || 0), lean: G.r2((B.lean || 0) * G.D), moved: G.r2(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z)), grounded: x.grounded ? 1 : 0, clamber: G.r2(B.clamber01 || 0) }; }`;
+  const F = G.ph.fields.water.field || {};
+  return { wind2m: G.r2(a.speed || 0), windAccel: G.r2(B.windAccel || 0), hunker: G.r2(B.hunker01 || 0), brace: Math.round(B.windBrace || 0), lean: G.r2((B.lean || 0) * G.D), moved: G.r2(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z)), grounded: x.grounded ? 1 : 0, clamber: G.r2(B.clamber01 || 0),
+    white: G.r2(100 * (F.cover || 0)), Hs: G.r2(F.significant || 0), foamAt: F.foamAt < 1e8 ? G.r2(F.foamAt) : -99 }; }`;
+
+// (P26) the explorer run at a cliff (PILOT's critique, item 1: Shift+W into Earth's sea cliff from the sea_coast stand, the
+// heading that ran up it 50 m): how high it gets over where it started, its pace, the slope under its feet, what stopped it
+const CLIFF_PROBE = `(G) => { const x = G.pc.sim.ex, B = x.phys || {}, p = x.p, q = window.__p0 || p, s = G.pc.world.sampleSurface(G.pc.sim.bodyId, G.nrm(p));
+  return { up: G.r2(Math.hypot(p.x, p.y, p.z) - Math.hypot(q.x, q.y, q.z)), vh: G.r2(x.speed || 0), slope: Math.round((s.slope || 0) * G.D), wall: B.wall || 0, paceWall: B.paceWall < 1e8 ? G.r2(B.paceWall) : -1, grip: B.grip || 0, slip: G.r2(B.slip01 || 0), gait: B.gait || 0, grounded: x.grounded ? 1 : 0 }; }`;
 
 export const SUBJECTS = {
+  // ---- (P26) the cliff: Shift+W from Earth's sea_coast stand into the sea cliff north of it (heading 0), 12 s ----
+  'game-cliff-earth': { note: 'the game, Earth sea_coast, the clock at 30 s: Shift+W from the stand at the sea cliff north of it (PILOT\'s wallrun, heading 0: 49.9 m up it before P26), 12 s; 3 frames a second, simulated at 30 Hz',
+    setup: GALE_SETUP('earth', 'sea_coast', 30, 0), pre: 1, keys: ['ShiftLeft', 'KeyW'], w: 640, h: 360, quality: 1, crop: [0.1, 0.05, 0.8, 0.9], tile: [224, 142], frames: 36, dt: 1 / 30, every: 10, cols: 6, probe: CLIFF_PROBE },
   // ---- (P23) the gale: Neptune's squall at the storm stand, the explorer standing on the beach (no keys) ----
   'game-gale-neptune': { note: 'the game, Neptune storm_seas, the clock set to 222 and 15 s run (PAINTER 13\'s case: the squall, 60-70 m/s at a metre, gusts over 100): the explorer standing on the beach, facing the sea; 10 frames a second',
     setup: GALE_SETUP('neptune', 'storm_seas', 222, 90), pre: 15, w: 640, h: 360, quality: 1, crop: [0.15, 0.15, 0.7, 0.75], tile: [224, 135], frames: 30, dt: 1 / 30, every: 3, cols: 6, probe: GALE_PROBE },

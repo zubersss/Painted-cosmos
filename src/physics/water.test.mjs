@@ -1,7 +1,7 @@
 // Tests: wind waves. Run: node --test src/physics/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { windSea, WaterField, WATER_GLSL, WATER, fetchOf, foamLevel, foamCover, surf01, FetchGauge } from './water.js';
+import { windSea, WaterField, WATER_GLSL, WATER, fetchOf, foamLevel, foamCover, whiteWind, surf01, FetchGauge } from './water.js';
 import { createPhysics, QUALITY } from './index.js';
 import { setWindScale, WINDS } from './wind.js';
 import { BODIES } from '../data/bodies.js';
@@ -255,6 +255,49 @@ test('whitecaps: the breaking share of the sea follows the wind as measured at s
   const B = gale(4);
   assert.equal(B.uniforms.uPhysWaterSea[3], 0); assert.ok(B.uniforms.uPhysWaterSea[1] > 1e8);
   for (let k = 0; k < 500; k++) assert.equal(B.surfaceAt(k * 3.3, k * 1.7, o).foam01, 0);
+});
+
+test('P26 white water in a storm (the coordinator\'s ruling: the 15 % cap lifted): beyond a gale the white share follows the wind by Monahan\'s law carried on, saturating toward all of the sea; to a gale nothing changes; other worlds by the wind\'s power on the liquid\'s weight', () => {
+  // Until P26 cover = foamMax whitecap01^foamPower stopped at 15 % (a sea cannot stand steeper than it does in a gale):
+  // Neptune's 75 m/s squall had 12 % of its sea white, where a real sea at hurricane force (33 m/s) is white with foam
+  // and streaks. Now, where it is more, cover = 1 - exp(-whitecap01 x 3.84e-6 Ue^3.41): patches of white laid at random
+  // overlap, so the law's W covers 1 - exp(-W).
+  const sea = (U) => windSea(U, 2500, 9.81, 1.225, 999, 1e9), cov = (U) => foamCover(sea(U).whitecap01, whiteWind(U, 9.81, 1.225, 999));
+  // to a fresh gale: as it was, to the digit
+  for (const U of [4, 8, 10, 12, 15, 18, 20]) assert.equal(cov(U), foamCover(sea(U).whitecap01), `${U} m/s: ${cov(U)}`);
+  // beyond it: the law carried on (30 m/s: a third of the sea; 55: nearly all; 75: all), rising all the way
+  const c30 = cov(30), c40 = cov(40), c55 = cov(55), c75 = cov(75);
+  console.log(`# P26 white share of an open sea on Earth: ${[15, 20, 22, 25, 30, 40, 55, 75].map((U) => U + ' m/s ' + (100 * cov(U)).toFixed(1) + ' %').join(', ')}`);
+  assert.ok(Math.abs(c30 - (1 - Math.exp(-sea(30).whitecap01 * 3.84e-6 * Math.pow(30, 3.41)))) < 1e-12, '30 m/s: ' + c30);
+  assert.ok(c30 > 0.28 && c30 < 0.40 && c40 > 0.6 && c40 < 0.75 && c55 > 0.93 && c55 < 0.99 && c75 > 0.999 && c75 <= 1, `30, 40, 55, 75 m/s: ${c30.toFixed(3)}, ${c40.toFixed(3)}, ${c55.toFixed(3)}, ${c75.toFixed(5)}`);
+  let prev = 0; for (let U = 2; U <= 90; U += 1) { const c = cov(U); assert.ok(c >= prev - 1e-12 && c <= 1, `${U} m/s: ${c} after ${prev}`); prev = c; }
+  assert.equal(foamCover(1), WATER.foamMax, 'with no wind given: the steepness\'s law alone');
+  // the wind as on Earth: Earth's own; Neptune's 75 m/s over methane (0.99 kg/m3 of air, 450 of liquid, 11.15 m/s2) about 86
+  assert.ok(Math.abs(whiteWind(30, 9.81, 1.225, 999) - 30) < 1e-9);
+  const nep = whiteWind(75, 11.15, 0.99, 450);
+  assert.ok(nep > 80 && nep < 92, 'Neptune: ' + nep);
+  assert.ok(whiteWind(30, 9.81, 2.45, 999) > 30 && whiteWind(30, 19.6, 1.225, 999) < 30 && whiteWind(0, 9.81, 1.225, 999) === 0, 'denser air whitens more, more gravity less');
+  // the level is a quantile all the way: lower for a larger share, under the mean surface beyond half of it, the lowest trough at all of it
+  prev = 9; for (const W of [0.15, 0.3, 0.398, 0.4, 0.5, 0.67, 0.8, 0.96, 0.999, 1]) { const q = foamLevel(W); assert.ok(q <= prev + 1e-9 && q > -1.2, `${W}: ${q} after ${prev}`); prev = q; }
+  assert.ok(foamLevel(0.6) < 0 && foamLevel(0.3) > 0 && Math.abs(foamLevel(0.3981) - foamLevel(0.3982)) < 2e-3, 'half the surface stands above its mean; no step where the tables meet');
+  // on the sea itself: count the foam in a storm, a hurricane and beyond
+  const o = {};
+  for (const U of [30, 40, 55]) {
+    const F = gale(U, 60);
+    assert.ok(Math.abs(F.whiteWind - U) < 0.5, `U ${U}: the sea has felt ${F.whiteWind} m/s`);
+    assert.ok(Math.abs(F.cover - foamCover(F.whitecap01, F.whiteWind)) < 1e-12 && F.cover > 0.3, `U ${U}: cover ${F.cover}`);
+    let foam = 0, N = 0;
+    for (let j = 0; j < 220; j++) for (let i = 0; i < 220; i++) { F.surfaceAt(i * 2.7 + j * 0.31, j * 3.1, o); N++; if (o.height > F.foamAt) foam++; }
+    assert.ok(Math.abs(foam / N / F.cover - 1) < 0.08, `U ${U}: ${(100 * foam / N).toFixed(1)} % of the surface is white, the law says ${(100 * F.cover).toFixed(1)} %`);
+    assert.deepEqual(F.uniforms.uPhysWaterSea.map((x) => +x.toFixed(6)), [F.significant, F.foamAt, F.height * WATER.foamEdge, F.cover].map((x) => +x.toFixed(6)));
+  }
+  // the white outlasts the wind as the swell does (foam and streaks linger): 20 s after a 55 m/s wind falls to 10, still
+  // mostly white; ten minutes after, a fresh breeze's sea
+  const F = gale(55, 60), frame = { version: 1 }, c0 = F.cover;
+  for (let i = 0; i < 20 * 60; i++) F.update(1 / 60, frame, 8, 6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0);
+  const c20 = F.cover;
+  for (let i = 0; i < 600 * 60; i++) F.update(1 / 60, frame, 8, 6, 0, 200, 2500, 9.81, 1.225, 999, 0, 0);
+  assert.ok(c0 > 0.93 && c20 > 0.5 && c20 < c0 && F.cover < 0.05, `the white share: ${c0.toFixed(2)} in the storm, ${c20.toFixed(2)} 20 s after, ${F.cover.toFixed(3)} ten minutes after`);
 });
 
 test('surf: a wave breaks where the liquid is shallower than 1.28 wave heights', () => {

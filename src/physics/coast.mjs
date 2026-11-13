@@ -17,7 +17,7 @@
 // >= 0.6 x the target; at the waterline the surf breaking (Hs over 0.25 m).
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { seaGrown as seaGrownHere } from './water.js';   // (P22: when the caller's W does not carry it)
+import { seaGrown as seaGrownHere, whiteWind as whiteWindHere } from './water.js';   // (P22, P26: when the caller's W does not carry them)
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEF_ROOT = path.resolve(here, '../..');
@@ -84,7 +84,7 @@ export function coastReport(W, bodyId, biomeId, opts = {}) {
   // the targets: the same storm over 2.5 km of water 20 m deep (the wind sea, the swell it raises beyond, the white share)
   const rhoA = W.airDensity(bodyId, 0), rhoL = W.liquidOf(bodyId).density, wsT = W.windSea(Ustorm, COAST_TARGET.fetch, g, rhoA, rhoL, COAST_TARGET.depth, {});
   const swT = W.windSea(Ustorm, COAST_TARGET.fetch * W.WATER.swellFetch, g, rhoA, rhoL, COAST_TARGET.depth, {});
-  const swH = swT.height * W.WATER.swellDecay, HsEq = Math.sqrt(wsT.height ** 2 + swH ** 2), whiteT = 100 * W.foamCover(wsT.whitecap01);
+  const swH = swT.height * W.WATER.swellDecay, HsEq = Math.sqrt(wsT.height ** 2 + swH ** 2);
   // (P21) ... in the time it blows. A sea grows with the wind's duration as well as its fetch: the game's sea follows the
   // wind as WaterField does (the wind sea toward this wind's over WATER.growTime, the swell's wind rising with it and its
   // height over WATER.swellTime), and the run above starts where the wind of the settle's start has raised its sea (it
@@ -97,9 +97,12 @@ export function coastReport(W, bodyId, biomeId, opts = {}) {
   // the storm's equilibrium and the arrival showed it)
   const grown = (() => {
     const o = (W.seaGrown || seaGrownHere)((t) => windNow(t).U, tStorm, COAST_TARGET.fetch, COAST_TARGET.depth, g, rhoA, rhoL, 0, {});
-    return { Hs: Math.sqrt(o.height * o.height + o.swellHeight * o.swellHeight), windSea: o.height, swell: o.swellHeight };
+    return { Hs: Math.sqrt(o.height * o.height + o.swellHeight * o.swellHeight), windSea: o.height, swell: o.swellHeight, swellWind: o.swellWind };
   })();
   const HsT = grown.Hs;
+  // (P26) the white share by the same law as the sea's (water.js foamCover): the steepness's law as far as a gale, the
+  // wind's beyond it (the wind as that history's sea has felt it, as on Earth: whiteWind of the swell's wind)
+  const whiteUe = (W.whiteWind || whiteWindHere)(grown.swellWind, g, rhoA, rhoL), whiteT = 100 * W.foamCover(wsT.whitecap01, whiteUe);
   const r80 = rows.find((r) => r.out === COAST_TARGET.out), r0 = rows[0];
   const checks = {
     fetch: r80.fetch >= COAST_TARGET.passFetch, depth: r80.meanDepth >= COAST_TARGET.passDepth,     // (a dry point fails every mark)
@@ -111,7 +114,7 @@ export function coastReport(W, bodyId, biomeId, opts = {}) {
     waterline: { east: r2(we0), north: r2(wn0), fromStand: r2(hi) }, outToSea: COMPASS[((Math.round(outA / (2 * Math.PI) * 16) % 16) + 16) % 16],
     rows, rose: Object.fromEntries(rose.map((r, k) => [COMPASS[Math.round(k * 15 / 22.5) % 16] + '(' + (k * 15) + ')', Math.round(r)])),
     reference: { fetch: Math.round(Ws.map.target.refFetch), depth: r2(Ws.map.target.refDepth), Hs: r2(Ws.field.significant) },
-    target: { Hs: r2(HsT), windSea: r2(grown.windSea), swell: r2(grown.swell), whitePct: r2(whiteT), fetch: COAST_TARGET.fetch, depth: COAST_TARGET.depth, settle: tStorm - t0, history: 4 * W.WATER.swellTime,
+    target: { Hs: r2(HsT), windSea: r2(grown.windSea), swell: r2(grown.swell), whitePct: r2(whiteT), whiteWind: r2(whiteUe), fetch: COAST_TARGET.fetch, depth: COAST_TARGET.depth, settle: tStorm - t0, history: 4 * W.WATER.swellTime,
       blownForEver: { Hs: r2(HsEq), windSea: r2(wsT.height), swell: r2(swH) } },
     checks, pass: Object.values(checks).every(Boolean),
   };
@@ -125,7 +128,7 @@ async function main() {
   const imp = (p) => import(pathToFileURL(path.join(root, p)).href);
   const [phys, surf, bodies, wind, weather, water, atmo] = await Promise.all(['src/physics/index.js', 'src/world/surface.js', 'src/data/bodies.js', 'src/physics/wind.js', 'src/physics/weather.js', 'src/physics/water.js', 'src/physics/atmosphere.js'].map(imp));
   const W = { createPhysics: phys.createPhysics, sampleSurfacePure: surf.sampleSurfacePure, getStandPure: surf.getStandPure, BODIES: bodies.BODIES, windLarge: wind.windLarge,
-    weatherWind: weather.weatherWind, windSea: water.windSea, seaGrown: water.seaGrown, foamCover: water.foamCover, WATER: water.WATER, liquidOf: atmo.liquidOf, airDensity: atmo.airDensity };
+    weatherWind: weather.weatherWind, windSea: water.windSea, seaGrown: water.seaGrown, foamCover: water.foamCover, whiteWind: water.whiteWind, WATER: water.WATER, liquidOf: atmo.liquidOf, airDensity: atmo.airDensity };
   let allPass = true;
   for (const [b, bi] of stands) {
     const r = coastReport(W, b, bi, { t: flags.t != null ? +flags.t : undefined, settle: flags.settle ? +flags.settle : undefined });
