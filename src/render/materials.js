@@ -742,7 +742,14 @@ void main() {
     float crown = step(0.5, aData.y);
     lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;                 // pines, spires: taper to a point
     // rock-like kinds have no trunk: the form stands on the ground
-    lp = mix(lp * mix(uFarTrunk[fsi], 1.0, crown), vec3(lp.x * 1.5, (lp.y - 0.30) * 1.45, lp.z * 1.5), crown * (1.0 - uFarTrunk[fsi]));
+    // (the last fixes, the second blind player on Saturn: that form was the crown's blob set down on its lowest point, a
+    // spindle standing on its tip, and far off, where the tip was lost in the haze, Saturn's spires and the crystals hung
+    // above the horizon. Its lower half is pressed into a broad foot, the widest girth a quarter of the way up, and it
+    // stands on the ground as the near spire does; a hanging kind keeps its fall)
+    float foot = crown * (1.0 - uFarTrunk[fsi]) * (1.0 - uFarDrop[fsi]);
+    float yb = lp.y < 0.66 ? 0.66 - (0.66 - lp.y) * 0.3 : lp.y;
+    vec3 rockP = mix(vec3(lp.x * 1.5, (lp.y - 0.30) * 1.45, lp.z * 1.5), vec3(lp.x * 1.5, (yb - 0.566) * 2.23, lp.z * 1.5), foot);
+    lp = mix(lp * mix(uFarTrunk[fsi], 1.0, crown), rockP, crown * (1.0 - uFarTrunk[fsi]));
     lp.y -= uFarDrop[fsi] * 0.97;                                   // hanging kinds: the wash falls below its root
   #endif
   vec3 sw = pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);

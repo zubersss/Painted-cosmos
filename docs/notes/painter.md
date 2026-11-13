@@ -17,7 +17,8 @@ trees `F` the head, `G` the head with my working files, `C1` the check tree; liv
 long session whose state drifted, its frames are not used as evidence: every before/after pair is two fresh pages run
 through the same command sequence). Evidence: `docs/shots/painter/last/` (every picture named here was opened by me).
 
-**State:** item 1 DONE (committed, see below). Items 2 to 4 not started at the time of writing.
+**State:** item 1 DONE (committed `0112e5e`, on `3066381`); item 2 DONE (committed with this note); items 3 and 4 not
+started at the time of writing.
 
 - **ITEM 1, NEPTUNE'S HARD-EDGED DARK-BLUE POLYGONS AT THE FRAME CORNERS: DONE.** What they were (found in the live page,
   quality 0 at half scale, 960x540, the Wind-Carved Ice Spires): the EYE INSIDE AN ICE SPIRE. Neptune's ice spires are 17
@@ -54,6 +55,35 @@ through the same command sequence). Evidence: `docs/shots/painter/last/` (every 
   Left as it is and for PILOT, not needed for the fix: the boom still passes into spires (and into the buttress and fallen
   blocks at a spire's foot, which the hollow does not reach: they stay solid); an eye inside one of those sees the same
   kind of faces, but they are small (under 1.6 m).
+- **ITEM 2, SATURN'S DARK SPIRES THAT SEEM TO HANG ABOVE THE HORIZON: DONE.** What they were: the FAR FORMS of the kinds
+  with no trunk (spires, crystals, frozen waves, kelp). Every species shares one far form (`florakit.js farTreeGeometry`,
+  a crown blob over a stick of a trunk); for a kind with no trunk the prop shader folded the trunk away and set the blob
+  down on its lowest point (`(lp.y - 0.30) * 1.45`), so each stood on a sliver of a foot with its lowest point clear of
+  the ground (0.06 of its height: 0.7 m on a 12 m spire) and, without a taper, widest halfway up. At quality 0 trees hand
+  over to that form at about 50 m (RANGE_SCALE 0.28), and far off, where the foot was lost in the haze and the soft
+  enlargement, the masses hung over the land line with sky under them (the player's `163_sat_look.jpg`; the same on
+  Neptune: a double blob over the ridge at the ice spires' stand, heading 90). Fix (`render/materials.js` PROP_VERT,
+  PC_FAR, three lines): for a kind with no trunk and no fall (`foot`), the blob's lower half is pressed down to three
+  tenths of its depth and the whole form set on the ground: the widest girth about a quarter of the way up, the foot as
+  broad as the widest girth for a spire, the top where it was (0.92 of the old height, the lumps' sinking). A tree with a
+  trunk and a hanging kind (vines) are drawn exactly as before.
+  Proof: the same seven places (Saturn's Ring-Shadow Twilight at headings 0, 90, 180; Neptune's ice spires 0, 90;
+  Uranus' Frozen-Wave Forest; Mercury's Twilight Crystal Gardens) on two fresh pages each, head + item 1 / + item 2, at
+  quality 0 half scale and quality 2: `docs/shots/painter/last/02-far-forms-broad-foot-before-after.jpg` (opened; crops of
+  the horizon band): on Saturn the dark blobs that floated over the ridge now stand on it, the far spires are cones on
+  the land, not spindles; on Neptune the double blob over the ridge is one form standing on it; at the top tier the far
+  spires keep their look with broader feet. Uranus' and Mercury's stands show few far forms: no visible change there.
+  New test `src/world/farfoot.test.mjs` (2 cases: the shader's lines read as text; the mirror run on the real far form for
+  four tapers: the foot on the ground, as tall as before, widest low down, the girth near the ground at least 0.74 of the
+  widest (0.43 to 0.67 before); trees and vines vertex for vertex as before; the old form's lowest point 0.06 over the
+  ground): FAILS on `0112e5e` (the shader's lines), passes now. World tests 28 -> 30.
+  Checks on a clean export of `0112e5e` with these files (`C2`): world 30, unit 208, physics 325, `coast.mjs` PASS at both
+  stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs` 0.2 m at most on ground over 50
+  degrees; the game at quality 0 and 2 (two fresh pages, seven places each): no console error, no game error, fallback
+  empty.
+  Not verified: the player's own place on Saturn (not logged; the Ring-Shadow stand is the lilac plain with violet spires
+  the log describes); the hand-over between a near spire and its far form while walking (the far form is now nearer the
+  near one's shape, by the code; not filmed).
 
 ## Hand-over of the M4 PRE-SHIP RE-FIX pass (twentieth PAINTER agent)
 
