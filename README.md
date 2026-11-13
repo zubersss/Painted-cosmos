@@ -94,11 +94,12 @@ The game saves itself when you land, when you step out, and every 20 seconds on 
 continues from there on the next visit. Add `?fresh=1` to the address to start again on Earth.
 
 Opening the map or the sketchbook lets go of the mouse, so that you can click on the page; a
-click on the picture captures it again. If the browser keeps refusing to capture the mouse (three
-times in a row, not just after Esc), or reports nonsense while it does, the game says so and
-for the rest of the visit you look around by holding the left button and dragging (a click no
-longer captures the mouse; reload the page to try again). A view left looking straight up or
-down is not carried into the next visit: it starts looking out over the land.
+click on the picture captures it again. If the browser reports nonsense while it holds the
+mouse, the game says so and you look around by holding the left button and dragging; a click
+some fifteen seconds later tries capturing the mouse once more, and if the nonsense comes back
+(or the browser keeps refusing to capture the mouse: three times in a row, not just after Esc)
+dragging is how you look for the rest of the visit (reload the page to try again). A view left
+looking straight up or down is not carried into the next visit: it starts looking out over the land.
 
 On foot, farther than about 40 m from the parked ship (or with it out of the picture), a small
 slip says "the ship" and how far it is: a ring over it, or an arrow at the picture's edge

@@ -14,7 +14,7 @@ function target() {
   };
 }
 globalThis.window = globalThis.window || target();
-const { Input, bindingOf, keyLabels } = await import('../src/core/input.js');
+const { Input, bindingOf, keyLabels, LOCK_RETRY_MS } = await import('../src/core/input.js');
 
 // A page: the document, the canvas, and a pointer lock that is granted (or refused) at once.
 function page({ grant = true } = {}) {
@@ -80,7 +80,12 @@ test('flicks at 20 to 60 fps keep the lock and turn the view as far as the hand 
 // the left mouse button and drag", but every mousedown took the lock again (the first fall-back
 // re-armed it for the next click), so dragging never turned the camera, and the view the
 // nonsense had thrown straight up was saved. Now the fall-back holds for the session.
-test('nonsense under the lock drops it for good: no click takes the lock again, the drag turns the view, the view is levelled', () => {
+// The pre-ship round (M4's blind play-test, BROKEN 3): every click after the fall-back took the lock
+// again, the nonsense with it, and dragging never turned the view. The round made the fall-back
+// for the session; the verifier's R4: one glitch of a real browser then left the player dragging
+// until a reload. Now the clicks right after a trip drag; a click LOCK_RETRY_MS later tries the lock
+// once more; a second trip is for the session.
+test('nonsense under the lock: the clicks after it drag and turn the view; a click later tries the lock once more; a second trip is for good', () => {
   const { doc, el, input } = page();
   el.fire('mousedown', { button: 0 });
   assert.equal(input.locked, true);
@@ -92,21 +97,46 @@ test('nonsense under the lock drops it for good: no click takes the lock again, 
   assert.match(input.message, /hold the left button and drag/);
   assert.equal(input.thrown, true, 'the game is told to level the view');
   assert.equal(input.dx, 0, 'none of it turned the view');
+  assert.ok(Math.abs(input._retryAt - performance.now() - LOCK_RETRY_MS) < 1000, 'a later click may try it again');
   doc.fire('mouseup', {});
-  // Every later click is a drag, never a lock.
+  // The clicks that follow are drags, never a lock.
   let asked = 0;
   const req = el.requestPointerLock;
   el.requestPointerLock = () => { asked++; return req(); };
-  for (let k = 0; k < 5; k++) {
-    el.fire('mousedown', { button: 0, clientX: 300, clientY: 200 });
-    assert.equal(input.locked, false, 'click ' + (k + 1) + ' does not take the lock');
-    doc.fire('mousemove', { clientX: 300, clientY: 160, movementX: 999, movementY: 999 });
-    doc.fire('mouseup', {});
-  }
-  assert.equal(asked, 0, 'the lock is never asked for again');
-  const o = input.take(1 / 60);
+  const drags = (n) => {
+    for (let k = 0; k < n; k++) {
+      el.fire('mousedown', { button: 0, clientX: 300, clientY: 200 });
+      assert.equal(input.locked, false, 'click ' + (k + 1) + ' does not take the lock');
+      doc.fire('mousemove', { clientX: 300, clientY: 160, movementX: 999, movementY: 999 });
+      doc.fire('mouseup', {});
+    }
+  };
+  drags(5);
+  assert.equal(asked, 0, 'the lock is not asked for right after the trip');
+  let o = input.take(1 / 60);
   assert.equal(o.dy, -200, 'five drags of 40 px up turned the view by 200 px');
   assert.equal(o.dx, 0);
+  // LOCK_RETRY_MS later: a click asks for the lock once more (a real browser that glitched once)
+  input._retryAt -= LOCK_RETRY_MS;
+  el.fire('mousedown', { button: 0, clientX: 300, clientY: 200 });
+  assert.equal(asked, 1, 'a later click tries the lock again');
+  assert.equal(input.locked, true, 'and has it');
+  doc.fire('mouseup', {});
+  t += 5000;
+  doc.fire('mousemove', { movementX: 12, movementY: -5, timeStamp: (t += 16) });
+  o = input.take(1 / 60);
+  assert.equal(o.dx, 12, 'the lock turns the view again');
+  // a second trip: for the session, however long after
+  input.thrown = false;
+  for (let i = 0; i < 3; i++) jump();
+  assert.equal(input.usePointerLock, false); assert.equal(input.locked, false);
+  assert.equal(input.thrown, true);
+  assert.match(input.message, /in this browser/);
+  doc.fire('mouseup', {});
+  input._retryAt -= 1e9;
+  drags(3);
+  assert.equal(asked, 1, 'never asked for again');
+  assert.equal(input.take(1 / 60).dy, -120, 'the drags turn the view');
 });
 
 test('a lock that arrives after the fall-back (a request still on its way) is let go at once, and the drag still turns the view', () => {

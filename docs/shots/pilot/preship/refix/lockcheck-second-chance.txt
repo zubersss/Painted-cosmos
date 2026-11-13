@@ -1,0 +1,17 @@
+node tests/lockcheck.mjs --root <clean export of 015bc21 with input.js, lockcheck.mjs and the rest of R3/R4> (headless Chromium's real pointer lock, stub=1, 640x360)
+19:40:29   ok: every module the run asked for is the real one: {"render":"stub","world":"stub","art":"stub","physics":"stub","ui":"stub"}
+19:40:29   ok: starts wanting pointer lock, not yet locked
+19:40:34   ok: the browser granted the lock
+19:40:37   ok: the game stopped trusting the lock and released it
+19:40:38   ok: three more clicks: the lock is not taken again (pointerLockElement false)
+19:40:38   ok: and says so on screen: "Mouse capture misbehaved: hold the left button and drag to look (a later click tries capture again)"
+19:40:38   ok: the nonsense did not throw the view about: pitch moved 0.000 rad
+19:40:41   ok: drag-look: 40 px up turned the view 0.092 rad
+19:40:53   ok: 10.1 s later a click tries the lock once more (locked true)
+19:40:54   ok: the nonsense again: the lock let go for the session (trips 2)
+19:40:54   ok: and the screen says so: "Mouse capture is misbehaving in this browser: hold the left button and drag to look"
+19:41:10   ok: three clicks 16 s later: the lock is not taken again (pointerLockElement false)
+19:41:11   ok: drag-look after the second trip: 40 px up turned the view 0.092 rad
+19:41:13   ok: no console errors, page errors, failed or external requests
+19:41:13 PASSED {}
+(the "10.1 s later" is the wait that was left of LOCK_RETRY_MS = 15 s after the first trip when the script asked)

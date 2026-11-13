@@ -54,6 +54,7 @@ export function keyLabels(layout) {
 }
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+export const LOCK_RETRY_MS = 15000;     // after the lock's first trip, a click this much later tries it again
 
 export class Input {
   // opts.pointerLock: false keeps to drag-look (for embeds and for headless tests, where
@@ -77,6 +78,7 @@ export class Input {
     this._unlockAt = -1e9;                // when the lock was last let go
     this._req = 0; this._refusedReq = -1; this._refusals = 0;
     this._trips = 0;
+    this._retryAt = Infinity;             // after the lock's first trip: from when a click may try it once more
     this.thrown = false;                  // the lock reported nonsense before it was dropped: the game levels the view
     this.inShip = false;                  // set by the game: the triggers are the throttle in the ship
     this.pad = null;                      // the gamepad's last reading (null without one)
@@ -107,9 +109,14 @@ export class Input {
       this.used = true;
       if (e.button !== 0) return;
       this.dragging = true; this._lx = e.clientX; this._ly = e.clientY;
-      // Once the game has fallen back to dragging it stays there: a click that took the lock
-      // again brought the nonsense back with it, every time (M4's blind play-test: "every
-      // mousedown captured the pointer again", the view thrown straight up, dragging dead).
+      // After the lock's first trip into nonsense the game drags; a click LOCK_RETRY_MS later
+      // tries the lock once more (a real browser that glitched once is not left on dragging for
+      // the visit: the pre-ship verifier's R4); a second trip is for the session. (A click right
+      // after the trip does not take it back: in M4's blind play-test every mousedown captured
+      // the pointer again, the nonsense with it, the view thrown straight up, dragging dead.)
+      if (!this.usePointerLock && this._trips === 1 && now() >= this._retryAt) {
+        this._retryAt = Infinity; this.usePointerLock = true; this._odd = []; this._pm = null;
+      }
       if (this.usePointerLock && !this.locked && el.requestPointerLock) {
         const req = ++this._req;
         try {
@@ -186,8 +193,8 @@ export class Input {
   // are taken back by the very next event, or a stream of huge deltas. A real hand cannot do
   // either. A large delta is therefore held back for one event: if the next one undoes it,
   // both are dropped; if not, it was a real flick and is applied. Three undone jumps (or
-  // impossible spikes) within a second and a half: stop trusting the lock for the session (it
-  // once came back at the next click, and the nonsense with it).
+  // impossible spikes) within a second and a half: stop trusting the lock; the first time a
+  // click LOCK_RETRY_MS later tries it again, the second time it is for the session.
   // k: how many 60 Hz frames one event covers (1 to 3): the spike line scales with it; every
   // large delta, whatever the frame rate, goes through the test above.
   // Returns true when this event has been dealt with here.
@@ -222,7 +229,10 @@ export class Input {
     this._odd = [];
     this._trips++;
     this.thrown = true;
-    this.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
+    if (this._trips === 1) {
+      this.fallBack('Mouse capture misbehaved: hold the left button and drag to look (a later click tries capture again)');
+      this._retryAt = now() + LOCK_RETRY_MS;
+    } else this.fallBack('Mouse capture is misbehaving in this browser: hold the left button and drag to look');
   }
 
   down(code) {

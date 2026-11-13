@@ -127,3 +127,44 @@ test('a place to land under the ship, just over the prompt: its label keeps off 
     assert.ok(r.x0 >= MARKS.margin && r.x1 <= W - MARKS.margin && r.y0 >= MARKS.margin && r.y1 <= H - MARKS.margin, 'inside the picture');
   }
 });
+
+// The pre-ship verifier's R3 (on 5ba725f): a label that must show slid as far as it took to keep off
+// the slips, up to a whole picture away from its ring (the round's own rectangles, rings below the
+// ship and off every slip: 314 of 3719 labels more than 60 px from their ring, worst 217 px; at 640 x
+// 360 worst 441 px). Now it moves 40 px at most to keep off a slip, away from the ring and across,
+// and with no clear place that near it lies on as little of the slip as it can.
+test('a place to land near the slips: its label keeps within 60 px of its ring, and off the slips wherever a place that near is clear', () => {
+  const area = (a, b) => (hits(a, b) ? (Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * (Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0)) : 0);
+  const scenes = [
+    // the round's own frame (960 x 540): prompt, throttle, frame read-out, ship
+    { W: 960, H: 540, slips: [{ x0: 405, x1: 555, y0: 414, y1: 456, soft: true }, { x0: 488, x1: 716, y0: 458, y1: 492, soft: true }, { x0: 62, x1: 246, y0: 436, y1: 494, soft: true }],
+      ship: { x0: 360, x1: 600, y0: 285, y1: 372 }, y: [372, 510], onSlip: 0 },
+  ];
+  for (const [w, h] of [[640, 360], [960, 540], [1280, 720]]) {
+    const k = w / 960;
+    scenes.push({ W: w, H: h, slips: [{ x0: w / 2 - 75, x1: w / 2 + 75, y0: h * 0.77, y1: h * 0.77 + 42, soft: true }, { x0: w / 2 + 8, x1: w / 2 + 236 * k, y0: h * 0.85, y1: h * 0.85 + 34, soft: true },
+      { x0: 62 * k, x1: 246 * k, y0: h * 0.81, y1: h * 0.81 + 58, soft: true }, { x0: w / 2 - 160, x1: w / 2 + 160, y0: h * 0.62, y1: h * 0.62 + 34, soft: true }],
+    ship: { x0: w / 2 - 120 * k, x1: w / 2 + 120 * k, y0: h * 0.53, y1: h * 0.69 }, y: [h * 0.45, h * 0.95], onSlip: w < 900 ? 0.25 : 0 });
+  }
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (const sc of scenes) {
+    let n = 0, worst = 0, worstCover = 0;
+    for (let i = 0; i < 1500; i++) {
+      const x = 40 + rnd() * (sc.W - 80), y = sc.y[0] + rnd() * (sc.y[1] - sc.y[0]);
+      if ([...sc.slips, sc.ship].some((s) => x > s.x0 - 4 && x < s.x1 + 4 && y > s.y0 - 4 && y < s.y1 + 4)) continue;
+      const list = [{ kind: 'body', keep: true, x, y, r: 3, label: 'a place to land', sub: Math.round(rnd() * 900) + ' m' }];
+      layoutMarks(list, { w: sc.W, h: sc.H, sizeOf, keep: [...sc.slips, sc.ship] });
+      const r = rectOf(list[0]);
+      n++;
+      const gap = Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.y0 - y, 0, y - r.y1));
+      worst = Math.max(worst, gap);
+      worstCover = Math.max(worstCover, sc.slips.reduce((a, s) => a + area(r, s), 0) / ((r.x1 - r.x0) * (r.y1 - r.y0)));
+      assert.ok(!hits(r, sc.ship), `${sc.W}x${sc.H} ring ${x.toFixed(0)},${y.toFixed(0)}: off the ship`);
+      assert.ok(r.x0 >= MARKS.margin && r.x1 <= sc.W - MARKS.margin && r.y0 >= MARKS.margin && r.y1 <= sc.H - MARKS.margin, 'inside the picture');
+    }
+    assert.ok(n > 300, 'enough rings');
+    assert.ok(worst <= 60, `${sc.W}x${sc.H}: the farthest label ${worst.toFixed(0)} px from its ring`);
+    assert.ok(worstCover <= sc.onSlip, `${sc.W}x${sc.H}: at most ${sc.onSlip * 100}% of a label on a slip (${(worstCover * 100).toFixed(0)}%)`);
+  }
+});

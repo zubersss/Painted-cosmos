@@ -2,7 +2,7 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
-## Hand-over, PRE-SHIP RE-FIX pass (nineteenth PILOT agent; started 19:40 UTC 2026-11-13; kept current after every item)
+## Hand-over, PRE-SHIP RE-FIX pass (nineteenth PILOT agent; started about 19:15 UTC 2026-11-13; kept current after every item)
 
 Read this first; the eighteenth's hand-over just below holds for everything not named here. The verifier did not accept
 item 1 of the round (the pulse) because of its regression R1, and found R2 to R4 (the task text of this pass lists
@@ -45,10 +45,43 @@ Checks for 1 and 2 on a clean export of `db31c96` with these files (`c1`): world
 PASS at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as always), `wallrun.mjs` earth sea_coast
 0.2 m at most on ground over 50 degrees; the game at quality 0 loads with no console error, fallback `[]`.
 
-### To do
+3. **R3, a label that must show slid up to a whole picture from its ring.** `layout.js placeMust / nearest`: to keep off
+   a slip (the prompt, the notice, the gauges, the read-out) a label that must show (a place to land, a view, the ship,
+   the target) now moves at most `MARKS.reach` (40 px) from one of its four places, away from the ring AND across it
+   (a label beside the ring nudged 4 px up between the ship and the prompt is the player's own frame); the nearest such
+   place clear of everything wins; with none that near it lies on as little of a slip as a place within reach allows;
+   off the SHIP it still slides as far as the hull takes (the M4 re-fix rule) and then at most 40 px more to keep off
+   a slip. Proof (`docs/shots/pilot/preship/refix/layout-reach.txt`; the verifier's two probes and mine, which also
+   measures how much of a label lies on a slip): the round's own frame (960 x 540): 0 of 3719 labels more than 60 px
+   from the ring (head 314, worst 217 px), worst 29 px, 0 on a slip (base `8c7d603` 560 on a slip, 60 % of the label
+   on average); the verifier's random scenes: 640 x 360 0 more than 60 px (head 458, worst 441), worst 55 px, 150 of
+   2483 touch a slip with 4 % of the label on average and 20 % at worst (base 785, 34 %, 121 %); 960 x 540 and
+   1280 x 720: 0 far, 0 on a slip. Test (layout.test, new): those four scenes, 1500 rings each: every label within 60
+   px of its ring, off the ship, inside the picture, at most 25 % of it on a slip at 640 x 360 and none above; fails on
+   `22120b9` ("960x540: the farthest label 207 px from its ring"). The other six layout tests pass unchanged.
+4. **R4, one nonsense trip under the lock ended it for the visit.** `input.js`: after the lock's first trip (three
+   undone jumps in 1.5 s) the game drags, and the clicks right after do not take the lock (that is what trapped the
+   blind player: every click took it back, the nonsense with it); a click `LOCK_RETRY_MS` (15 s) later tries the lock
+   once more; a second trip is for the session (as on `8c7d603`, but with the round's fixes that keep the drag working
+   whatever the browser does with the lock: `locked` false on the fall-back, the lock's moves never pass for a drag, a
+   late lock let go). Messages: "Mouse capture misbehaved: hold the left button and drag to look (a later click tries
+   capture again)", then "Mouse capture is misbehaving in this browser: hold the left button and drag to look". README
+   says so. Tests: input.test (rewritten case: five clicks after the trip drag 200 px and never ask; 15 s later a click
+   asks and has the lock, a move under it turns the view; a second trip ends it, three later clicks never ask, the
+   drags turn the view; fails on `22120b9`: "a later click may try it again"); `tests/lockcheck.mjs` extended and
+   PASSED in headless Chromium with its real lock (`lockcheck-second-chance.txt`): the trip, three clicks not taken,
+   drag 40 px = 0.092 rad, 10 s later a click takes the lock again, the nonsense trips it again, the lock is gone for
+   the session, three clicks 16 s later not taken, the drag still 0.092 rad. Not measured: a real browser on a real
+   mouse that glitches once (none here).
 
-- R3 (label slide distance) and R4 (one nonsense trip ends the lock for the visit): done in the working tree, being
-  checked (layout.js, layout.test; input.js, input.test, lockcheck.mjs, README).
+Checks for 3 and 4 on a clean export of `015bc21` with these files (`c2`): world 25, unit 202, physics 325, `coast.mjs`
+PASS at both stands, `ghostfield.mjs` all zeros, `wallrun.mjs` 0.2 m at most over 50 degrees; lockcheck PASSED.
+
+**R1 in the real game** (the verifier's `play.mjs venusEarth` on `c2`, quality 0, 640 x 360, real keys and a click on
+the map; `docs/shots/pilot/preship/refix/venus-earth-real-game.jpg` and `-log.txt`, opened): clock 0.3, Venus 1 km
+up, Earth chosen on the map, the nose on Earth, F: the pulse passes Mercury 4.4 to 5.3 km over its ground at 9.9 km/s,
+brakes from 77 km out, lets go at 905 m/s 5.1 km over Earth with "Earth ahead", and coasts to 2.8 km up at 225 m/s
+with Earth filling the picture (on `22120b9` it hit Earth's ground at 4.2 km/s). No console or game error, fallback `[]`.
 
 ## Hand-over, PRE-SHIP fix round (eighteenth PILOT agent; started 15:50 UTC 2026-11-13; kept current after every item)
 

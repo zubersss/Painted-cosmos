@@ -45,6 +45,7 @@ export const MARKS = Object.freeze({
   gap: 7,                      // between a ring and its label
   edgeGap: 14,                 // between an edge arrow and its label
   margin: 4,                   // a label keeps this far inside the picture
+  reach: 40,                   // a label slides at most this far from its place to keep off a slip
   ringMin: 14, ringMax: 260,   // the drawn ring's diameter (hud.js)
 });
 
@@ -55,24 +56,57 @@ const hits = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
 
 // A label that must show and whose four places all touch something (the nose a few degrees off
 // a target, its ring over the ship: under, over, right and left of the ring are all on the hull;
-// a place to land under the prompt): each place is slid on away from the ring, in 2 px steps,
-// until it is clear. The nearest clear place wins, clear of everything first (the slips too),
-// then of the hard keep-outs (the ship) at least. The
-// re-fix pass, M4: such a label fell back to its first place, under the ring, on the ship
-// (the nose 4 degrees over Mars: "Mars 463.0 km 76 s" over the ship, two wing tips showing).
+// a place to land just over the prompt) is moved to the nearest clear place. The re-fix pass,
+// M4: such a label fell back to its first place, under the ring, on the ship (the nose 4 degrees
+// over Mars: "Mars 463.0 km 76 s" over the ship, two wing tips showing).
+//
+// How far: to keep off a slip (the prompt, the notice, the gauges) a label moves MARKS.reach at
+// most from one of its places (away from the ring, and across); with no clear place that near it
+// lies on as little of the slip as it can rather than float off from its ring (the pre-ship
+// verifier's R3: sliding as far as it took put "a place to land" up to a whole picture away from
+// its ring). Off the ship it slides as far as the hull takes, and then at most MARKS.reach further
+// to keep off a slip as well.
 const AWAY = { below: [0, 1], above: [0, -1], right: [1, 0], left: [-1, 0] };
-function slide(cands, rect, free, w, h) {
-  const most = Math.max(w, h);
-  for (const soft of [true, false]) {
-    for (let d = 2; d <= most; d += 2) {
-      for (const c of cands) {
-        const [ax, ay] = AWAY[c.side];
-        const moved = { lx: c.lx + ax * d, ly: c.ly + ay * d, side: c.side };
-        if (free(rect(moved), soft)) return moved;
+// The best place within `reach` of the candidates slid `base` px away from the ring: the lowest
+// score(rect, displacement) among the places free(rect, soft) allows (score null: not allowed).
+function nearest(cands, rect, free, soft, score, base = 0, reach = MARKS.reach) {
+  let best = null, bestS = Infinity;
+  for (const c of cands) {
+    const [ax, ay] = AWAY[c.side];
+    for (let d = 0; d <= reach; d += 2) {
+      for (let e = 0; e * e + d * d <= reach * reach; e += 2) {
+        for (const sgn of e ? [1, -1] : [1]) {
+          const moved = { lx: c.lx + ax * (base + d) - ay * e * sgn, ly: c.ly + ay * (base + d) + ax * e * sgn, side: c.side, d: base + d };
+          const r = rect(moved);
+          if (!free(r, soft)) continue;
+          const sc = score(r, Math.hypot(d, e));
+          if (sc < bestS) { bestS = sc; best = moved; }
+        }
       }
     }
   }
+  return best;
+}
+function slide(cands, rect, free, soft, from, to) {
+  for (let d = from; d <= to; d += 2) {
+    for (const c of cands) {
+      const [ax, ay] = AWAY[c.side];
+      const moved = { lx: c.lx + ax * d, ly: c.ly + ay * d, side: c.side, d };
+      if (free(rect(moved), soft)) return moved;
+    }
+  }
   return null;
+}
+function placeMust(cands, rect, free, w, h, slipCover) {
+  const near = nearest(cands, rect, free, true, (r, m) => m);
+  if (near) return near;
+  // on a slip, then, but on as little of it as a place within reach allows (a little nearer the
+  // ring is worth a little more of the slip covered)
+  const onSlip = nearest(cands, rect, free, false, (r, m) => slipCover(r) + m * 0.5);
+  if (onSlip) return onSlip;
+  const offShip = slide(cands, rect, free, false, 2, Math.max(w, h));
+  if (!offShip) return null;
+  return nearest(cands, rect, free, true, (r, m) => m, offShip.d) || offShip;
 }
 
 // One pass over this frame's marks. list: [{ kind: 'target' | 'body' | 'edge', x, y, r, label, sub,
@@ -107,10 +141,12 @@ export function layoutMarks(list, view) {
     const rect = (c) => ({ x0: m.x + c.lx - lw / 2, x1: m.x + c.lx + lw / 2, y0: m.y + c.ly, y1: m.y + c.ly + lh });
     const inside = (r) => r.x0 >= M.margin && r.x1 <= w - M.margin && r.y0 >= M.margin && r.y1 <= h - M.margin;
     const free = (r, soft) => inside(r) && !placed.some((p) => hits(r, p)) && !keep.some((k) => (soft || !k.soft) && hits(r, k));
-    // A label that must show slides to a place clear of everything before it lies on a slip
-    // (M4's blind play-test: "a place to land 256 m" over the "Land here" prompt and the throttle).
+    // A label that must show slides a little to a place clear of everything before it lies on a
+    // slip (M4's blind play-test: "a place to land 256 m" over the "Land here" prompt and the
+    // throttle), and off the ship as far as it takes (placeMust).
     let pick = cands.find((c) => free(rect(c), true));
-    if (!pick && must) pick = slide(cands, rect, free, w, h) || cands[0];
+    const slipCover = (r) => keep.reduce((a, k) => a + (k.soft && hits(r, k) ? (Math.min(r.x1, k.x1) - Math.max(r.x0, k.x0)) * (Math.min(r.y1, k.y1) - Math.max(r.y0, k.y0)) : 0), 0);
+    if (!pick && must) pick = placeMust(cands, rect, free, w, h, slipCover) || cands[0];
     m.lw = lw; m.lh = lh;
     if (!pick) { m.label = null; m.text = null; continue; }
     m.lx = pick.lx; m.ly = pick.ly;

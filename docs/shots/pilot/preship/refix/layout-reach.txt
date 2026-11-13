@@ -1,0 +1,21 @@
+== 8c7d603 (base)
+fixer geometry 960x540: 3725 labels; on a slip 560 (mean 60% of the label, worst 100%, over half 362); >60 px from the ring 0; worst 17 px
+random 640x360: 2483 labels; on a slip 785 (mean 34% of the label, worst 121%, over half 212); >60 px from the ring 0; worst 17 px
+random 960x540: 3070 labels; on a slip 244 (mean 57% of the label, worst 100%, over half 141); >60 px from the ring 0; worst 17 px
+random 1280x720: 3335 labels; on a slip 71 (mean 36% of the label, worst 100%, over half 26); >60 px from the ring 0; worst 17 px
+== 22120b9 (head)
+fixer geometry 960x540: 3725 labels; on a slip 0 (mean 0% of the label, worst 0%, over half 0); >60 px from the ring 276; worst 207 px
+random 640x360: 2483 labels; on a slip 30 (mean 9% of the label, worst 19%, over half 0); >60 px from the ring 458; worst 441 px
+random 960x540: 3070 labels; on a slip 0 (mean 0% of the label, worst 0%, over half 0); >60 px from the ring 132; worst 207 px
+random 1280x720: 3335 labels; on a slip 0 (mean 0% of the label, worst 0%, over half 0); >60 px from the ring 39; worst 289 px
+== this tree
+fixer geometry 960x540: 3725 labels; on a slip 0 (mean 0% of the label, worst 0%, over half 0); >60 px from the ring 0; worst 29 px
+random 640x360: 2483 labels; on a slip 150 (mean 4% of the label, worst 20%, over half 0); >60 px from the ring 0; worst 55 px
+random 960x540: 3070 labels; on a slip 0 (mean 0% of the label, worst 0%, over half 0); >60 px from the ring 0; worst 29 px
+random 1280x720: 3335 labels; on a slip 0 (mean 0% of the label, worst 0%, over half 0); >60 px from the ring 0; worst 35 px
+
+verifier's layout-fixer-geom.mjs and layout-random.mjs on this tree:
+960x540, the fixer's slips, rings below the ship and off every slip: 3719 labels; on a slip 0; more than 60 px from the ring 0; more than 120 px 0; worst 29 px (ring 31,464 label {"x0":4,"x1":114,"y0":400,"y1":435})
+640x360: 2483 labels; on a slip 150; on the ship 0; label more than 60 px from its ring 0, more than 120 px 0; worst 55 px
+960x540: 3062 labels; on a slip 0; on the ship 0; label more than 60 px from its ring 0, more than 120 px 0; worst 29 px
+1280x720: 3296 labels; on a slip 0; on the ship 0; label more than 60 px from its ring 0, more than 120 px 0; worst 33 px
