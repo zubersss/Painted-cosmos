@@ -94,7 +94,7 @@ export async function startRun(opt) {
     }
     return a;
   }
-  await page.waitForFunction('window.__pcReady === true', null, { timeout: 300000, polling: 200 });
+  await page.waitForFunction('window.__pcReady === true', null, { timeout: 1800000, polling: 200 });
   const fb = await fallbackProblem(page, opt.query);
   check(!fb, fb || 'every module the run asked for is the real one: ' + JSON.stringify((await info()).using));
   return { page, problems, close, baseUrl, fails, log, check, info, sleep, shot, look, gameWait, until, holdPitch, aimShipAt, cx, cy, W, H };

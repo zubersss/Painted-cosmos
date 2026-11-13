@@ -82,8 +82,12 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
    starts at 8 h, `FEEL.startHour`). Proof: `tests/clock.test.mjs` (four); `clockdbg.mjs` at the real Earth spawn: the
    first sunset 8.8 -> 11.2 minutes in (7.4 with the old 9.5 h start), the sun under 8 degrees below the horizon
    14.8 -> 5.6 minutes of a day, the gold (12 to 0 degrees) 1.4 -> 3.8 minutes, the blue hour (0 to -8) 0.9 -> 2.7, the
-   day (sun over 12 degrees) unchanged at 9.5 (`m4fix/clock-earth-spawn.txt`). Not seen in a browser as a strip of
-   frames (PAINTER's dusk sheet is the thing to re-shoot); the frames I took at 8 h are the wood in morning light.
+   day (sun over 12 degrees) unchanged at 9.5 (`m4fix/clock-earth-spawn.txt`). In the real game, opened:
+   `m4fix/dusk-strip-after.jpg` with `dusk-strip-after.json` (the spawn from 16.6 h, a frame every 25 s of play, the
+   frames between simulated and not drawn): the sun at 12 degrees 35 s in, on the horizon at 260 s, 8.8 degrees
+   under it at 435 s; from the last ochre (frame 14) to the night's blue (frame 17) 75 s and more, where PAINTER's
+   sheet `docs/shots/painter/critique/pilot-35-dusk-sheet.jpg` has it in 35 s. (A storm of PHYSICS' own clock crosses
+   the strip from 150 to 275 s.) The first frame of a new game at 8 h: `m4fix/first-frame-after-click.jpg`.
 9. **PAINTER 4, a view is a picture** (`sim.js`: `vistaMark` the nearest view not yet drawn within `VISTA_MARK` 150 m,
    `easelOffer`, `beginEasel`, `stepEasel`, `EASEL`: found by walking up to it as before, then offered, "E Stand at the
    easel": the explorer walks to the easel's spot at 3.4 m/s while the view comes round to the heading and pitch the
@@ -117,7 +121,9 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
     no view of that from outside. What a crown looks like from inside is PAINTER's (its item "crowns at the lens").
 12. **PHYSICS 5, a swimmer's controls and camera** (`explorer.js`: Space does not hop a swimmer, held it lights the
     jetpack; a swimmer turns at `swimTurnRate` 3.2 /s, not 11; `camera.js swimLift`: the view rides 0.6 m higher over a
-    swimmer, eased). Proof: test `M4 afloat` (explorer.test; fails on `dea95fb`: a 4.5 m/s hop).
+    swimmer, eased). Proof: test `M4 afloat` (explorer.test; fails on `dea95fb`: a 4.5 m/s hop). In the real game off
+    Earth's sea coast, opened: `m4fix/swim-after.jpg`, `swim-turn-strip-after.jpg` (the swimmer low in the middle of
+    the frame, the view over them and the sea all round; a tap of Space: 0.39 m/s, no hop; held: lifted out).
 13. **PHYSICS 8, the jetpack refilling in the air** (`explorer.js airRecharge`: a tank takes 10 s to refill in the air
     on Earth, as before, and as much longer on a lighter world as its gravity is less). Proof: test `M4 burn and coast`
     (fails on `dea95fb`: on the Moon the explorer never comes down); README says so.
@@ -132,8 +138,10 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
 16. **PAINTER 15, the place's name** (`game.js updateHud`): named for six seconds when the game begins (the click),
     on a new world and on stepping out; not on sitting down in the ship.
 17. **PAINTER 7, the title card** (`hud.js`, `theme.css .pc-title-only`): until the game begins the card is the title
-    alone, small, in the upper third: the name, the line under it, "click to begin", and one line of the keys a
-    newcomer needs; the list of keys is the same card, whole, on H.
+    alone, small, in the upper third: the name, the line under it, "click to begin", and two short lines of the keys
+    a newcomer needs; the list of keys is the same card, whole, on H. Opened: `m4fix/title-after.jpg`,
+    `help-card.jpg` (640 x 360: there the title slip is half the frame; at 1280 x 720 it is a third of the width).
+18. **PILOT 12's own-side 5**: `tests/browser.mjs startRun` gives the game thirty minutes to load, not five.
 
 ### State of the tree (commit `b289c21`, on `70aec16`)
 

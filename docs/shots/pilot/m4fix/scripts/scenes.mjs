@@ -79,6 +79,79 @@ export default {
     await c.page.evaluate(() => window.__pc.setHour(10));
     await c.run(1, { dt: 0.1 });
   },
+  // PAINTER 5: the dusk under the uneven clock, at the spawn: from 16.6 h on, a frame every 25 s of play
+  // (the frames between are simulated and not drawn: painter.render is swapped for a stand-in meanwhile)
+  async dusk(c) {
+    await c.page.evaluate(() => { window.__pc.teleport({ body: 'earth' }); });
+    await c.settle();
+    await c.page.evaluate(() => { window.__pc.setHour(16.6); });
+    await c.run(1, { dt: 0.1 });
+    const rows = [];
+    await c.page.evaluate(() => {
+      const S = window.__dusk = { c: document.createElement('canvas'), tw: 320, th: 180, cols: 6, n: 0 };
+      S.c.width = S.tw * S.cols; S.c.height = S.th * 3; const g = S.c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, S.c.width, S.c.height);
+    });
+    for (let k = 0; k < 18; k++) {
+      const r = await c.page.evaluate(() => {
+        const pc = window.__pc, painter = pc.game.painter, real = painter.render;
+        if (window.__dusk.n > 0) { painter.render = () => {}; for (let i = 0; i < 100; i++) pc.step(0.25, 1); painter.render = real; }
+        pc.step(1 / 30, 1);
+        const S = window.__dusk, gl = document.getElementById('pc-canvas') || document.querySelector('canvas'), g = S.c.getContext('2d');
+        const x = (S.n % S.cols) * S.tw, y = Math.floor(S.n / S.cols) * S.th; g.drawImage(gl, 0, 0, gl.width, gl.height, x, y, S.tw, S.th);
+        const sim = pc.sim, i = pc.info(), up = (() => { const p = sim.ex.p, l = Math.hypot(p.x, p.y, p.z); return { x: p.x / l, y: p.y / l, z: p.z / l }; })();
+        const el = Math.asin(sim.eph.sunElevationSin('earth', sim.t, up)) * 180 / Math.PI;
+        const s = S.n + '  ' + (S.n * 25) + ' s  ' + i.mood.timeOfDay.toFixed(2) + ' h  sun ' + el.toFixed(1) + ' deg';
+        g.font = '11px monospace'; g.textBaseline = 'top'; g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(x, y, s.length * 6.7 + 4, 13); g.fillStyle = '#000'; g.fillText(s, x + 2, y + 1);
+        S.n++;
+        return { n: S.n - 1, t: +sim.t.toFixed(1), hour: +i.mood.timeOfDay.toFixed(2), sunDeg: +el.toFixed(1), rate: +sim.clockRate.toFixed(2) };
+      });
+      rows.push(r);
+      c.log('dusk ' + JSON.stringify(r));
+    }
+    const res = await c.page.evaluate(() => window.__dusk.c.toDataURL('image/jpeg', 0.86));
+    const fs = await import('node:fs'), path = await import('node:path');
+    fs.writeFileSync(path.join(c.outDir, 'dusk.jpg'), Buffer.from(res.split(',')[1], 'base64'));
+    fs.writeFileSync(path.join(c.outDir, 'dusk.json'), JSON.stringify(rows) + '\n');
+  },
+  // PHYSICS 5: a swimmer off Earth's coast: the view over them, a turn, Space (no hop), Space held (the jetpack)
+  async swim(c) {
+    const ok = await c.page.evaluate(() => {
+      const pc = window.__pc, st = pc.world.findBiome ? pc.world.findBiome('earth', 'sea_coast') : null;
+      if (!st) return null;
+      const d = st.unitDir; pc.teleport({ body: 'earth', dir: [d.x, d.y, d.z] });
+      // which way is the sea: the first of sixteen headings with deep liquid 70 m out
+      const sim = pc.sim, p = sim.ex.p, R = Math.hypot(p.x, p.y, p.z), up = { x: p.x / R, y: p.y / R, z: p.z / R };
+      const e = (() => { let x = up.z, z = -up.x; const l = Math.hypot(x, z) || 1; return { x: x / l, y: 0, z: z / l }; })();
+      const n = { x: up.y * e.z - up.z * e.y, y: up.z * e.x - up.x * e.z, z: up.x * e.y - up.y * e.x };
+      let best = null;
+      for (let k = 0; k < 16; k++) {
+        const a = k / 16 * Math.PI * 2, f = { x: n.x * Math.cos(a) + e.x * Math.sin(a), y: n.y * Math.cos(a) + e.y * Math.sin(a), z: n.z * Math.cos(a) + e.z * Math.sin(a) };
+        let wet = 0;
+        for (const m of [40, 70, 100]) { const q = { x: up.x + f.x * m / R, y: up.y + f.y * m / R, z: up.z + f.z * m / R }; const g = sim.sampler('earth')(q); if (g.liquidRadius > g.radius + 1.5) wet++; }
+        if (!best || wet > best.wet) best = { wet, deg: a * 180 / Math.PI };
+      }
+      pc.teleport({ body: 'earth', dir: [d.x, d.y, d.z], heading: best.deg });
+      return best;
+    });
+    c.log('swim: the sea lies ' + JSON.stringify(ok));
+    if (!ok) return;
+    await c.settle();
+    await c.press('KeyW');
+    await c.run(60, { dt: 0.1, until: (i) => i.explorer.mode === 'swim' });
+    await c.run(4, { dt: 0.1 });
+    await c.shot('swim-0-swimming');
+    await c.press('KeyD');
+    await c.film('swim-turn', { frames: 12, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180] });
+    await c.release('KeyD');
+    await c.release('KeyW');
+    await c.run(1, { dt: 0.1 });
+    await c.tap('Space');
+    await c.run(0.3, { dt: 1 / 30 });
+    c.log('swim: after a tap of Space ' + JSON.stringify(await c.page.evaluate(() => { const i = window.__pc.info(); return { mode: i.explorer.mode, vUp: +i.explorer.vUp.toFixed(2) }; })));
+    await c.press('Space');
+    await c.film('swim-jet', { frames: 6, every: 8, dt: 1 / 30, cols: 6, tile: [320, 180] });
+    await c.release('Space');
+  },
   // PAINTER 7 and 15: the first frame after the click (the place's name), and the help card on H
   async first(c) {
     await new Promise((r) => setTimeout(r, 1500));
