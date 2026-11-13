@@ -168,9 +168,11 @@ error and no fall-back (the film run `s14/film-a.log`: `game errors: [] problems
 
 My commits, in order: `b289c21` (on `70aec16`; the body of the round), `7ee3620` (notes), `f7b757a` (the dusk and the
 swimmer filmed, the browser helper's load limit), `52e74d1` (the cockpit's slips, the sketch's guard, the wrap, the
-top-tier frames), `6cfab48` (the shade out of the sketch, the easel offered again), and the one that carries this
-paragraph (the browser tests follow "slowing down to land"; the hand-over). The thirteenth's flight work came in
-with the coordinator's snapshots `8418918` and `c03bce6`.
+top-tier frames), `6cfab48` (the shade out of the sketch, the easel offered again), `da9a49f` (the browser tests
+follow "slowing down to land"; the hand-over), and the one that carries this sentence (notes only). The
+thirteenth's flight work came in with the coordinator's snapshots `8418918` and `c03bce6`; a third snapshot,
+`e371a93` (07:00 UTC), swept two of my files while I worked: the easel offered again in `src/core/sim.js` and its
+test in `tests/vista.test.mjs`, which `6cfab48` describes and completes.
 
 Measured on a clean export of `e371a93` with PILOT's files of `6cfab48` (`s14/t11`): **unit 181, world 20,
 physics 314**, `coast.mjs` PASS at both stands, `ghostfield.mjs` every counter zero (worst step loss 0.26 and 0.52
