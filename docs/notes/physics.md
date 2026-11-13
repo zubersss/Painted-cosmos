@@ -7,12 +7,12 @@ Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/s
 
 **Where things stand.** The block, in order: (1) MUST FIX, the explorer runs up cliffs (PILOT's critique, item 1); (2) the
 white-water cap (the coordinator's ruling); (3) the sudden checks on arrival ground; (4) the state for the drawn figure;
-(5) the wading splash. **Done: (1)** (`ee39533`), **(2), (4), (5)** (the commit carrying these notes); **(3) measured to its causes and not fixed**
+(5) the wading splash. **Done: (1)** (`ee39533`), **(2), (4), (5)** (`a70d668`, with the strips and these notes); **(3) measured to its causes and not fixed**
 (one is PILOT's collision; the fix for the other throws the runner up 0.47 m at another place: item 3). Two strips of the
 game filmed and opened (item 6): the cliff holds in the game; **the squall's sea is no whiter in PAINTER's picture, though
 PHYSICS now hands it 100 % white** (item 6, For PAINTER P26). Tests on a clean
-export of `ee39533` with this block's files (`p26/final3`, byte for byte this commit's `src/physics`; the head `cf7711c`
-differs from `ee39533` in PILOT's documents only): `node --test src/physics/` **314 pass** (308 + 6 new:
+export of `ee39533` with this block's files (`p26/final3`, byte for byte `a70d668`'s `src/physics`; between `ee39533` and
+`a70d668` nothing changed under `src`, `tests`, `tools`, `vendor` or in `index.html`: PILOT's and PAINTER's documents only): `node --test src/physics/` **314 pass** (308 + 6 new:
 `explorer.test.mjs` 4, `water.test.mjs` 1, `loose.test.mjs` 1; `load.test.mjs` among them: every physics module loads
 alone), `node --test tests/*.test.mjs` **152 pass**, `node --test src/world/*.test.mjs` **19 pass**; `coast.mjs`
 PASS at both stands (Earth Hs 0.62 m at the reference, target 0.52, white 4.88 % for a target of 4.93; Neptune 3.85 m,
