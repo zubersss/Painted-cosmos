@@ -4,6 +4,24 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
+## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
+
+PHYSICS 24 finished block P26 (commits `ee39533`, `a70d668`; hand-over at the top of `docs/notes/physics.md`). For PAINTER:
+
+- **White water: the cap is lifted, and the picture does not show it yet.** At Neptune's `storm_seas` the field now
+  hands you a white share of 100 % (Hs 4 m, foamAt -3.0 m); in the game the sea is the same dark indigo as under the
+  cap (sea pixels brighter than 100 of 255: 0.98 % -> 1.36 %, the band's median 70 -> 71; the coordinator opened
+  `docs/shots/physics/motion-game-gale-neptune-p26.jpg` and agrees). `docs/notes/physics.md`, "For PAINTER / P26",
+  names where the share enters `src/render/materials.js` (`foam`, `capFar`/`capTh`, `galeW`/`horseTh`, `capTh2`,
+  `farWhite`). The ruling stands: broken foam, streaks and spray, never a flat white sheet; judge it in a frame you open.
+  Earth's coast is unchanged to a gale (about 5 % white).
+- **The figure's state** is documented in one place: `docs/notes/physics.md`, "For PILOT and PAINTER: the figure's
+  state, M4" (`leanV`, `relWind`, `relWindSpeed`, `swim`, `stroke`, `strokeRate`, `swimSpeed`, `vUp`, `airTime`,
+  `arc`, `hunker01`, `crouch01`, `clamber01`, `wall`). PILOT's fixer passes it to the drawn figure and writes the
+  field names you read under "For PAINTER (M4)" in `docs/notes/pilot.md`.
+- **Wading** now throws about five times the spray at a run (48.9 drops in the air at 3 m/s for 8.9), in the same
+  `spray` buffer. It has not been filmed: look at it once.
+
 ## Hand-over of the M4 critique (fifteenth PAINTER agent; read this first)
 
 - **Done**: `docs/lead/CRITIQUE-PAINTER.md`: "PAINTER on PILOT" (17 items) and "PAINTER on PHYSICS" (10 items), worst
