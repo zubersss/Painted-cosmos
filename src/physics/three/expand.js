@@ -54,6 +54,11 @@
 //           to `streak` dab sizes (default 3); beyond that a camera would smear it to nothing
 //           and so does this: it shrinks away, gone at 1.6 times that (a hairline is not a
 //           flake: one near the lens in a gale). 0 = off
+//   maxLenPx (dab with an exposure; M4): pixels. The longest a dab may be drawn out along its motion ON SCREEN,
+//           whatever `streak` allows in dab sizes; and a dab that travels further than that in a frame
+//           (`strobe`) is not a mark the eye can follow: it shrinks away, gone at 1.6 times that. PAINTER's
+//           critique of PHYSICS, item 2: walking into a blizzard, the flakes nearest the lens were ruled lines
+//           up to 100 px long fanning from the middle of the picture; one short stroke of 30 px at most. 0 = off
 //   near (dab): m. Nothing is drawn nearer the eye than 0.4 of this, and marks grow to their
 //           full size between there and it: a flake at arm's length crosses the whole picture
 //           in a frame or two, a blot the painter would not have put there. 0 = off
@@ -135,7 +140,9 @@ export const DRAW_PAINTED = Object.freeze({
   // (P10) in a wind a flake is a level stroke as long as it travels in a frame, up to 8 flake sizes (it was
   // 3: beyond that the mark was taken away as a hairline, so a 19 m/s blizzard drew almost nothing near the
   // eye); and the snow comes in bands
-  snow: Object.freeze({ size: 0.07, minPx: 3.5, maxPx: 6.5, exposure: 0.04, smear: 1.2, varySize: 0.5, cell: 9, tumble: 1.2, aspect: 0.5, streak: 8, bands: 0.8, bandLong: 9, bandWide: 2.2 }),
+  // (M4; PAINTER's critique of PHYSICS, item 2) ... and no longer than 30 px on screen, none nearer than 2 m (full from 5):
+  // near the lens the storm's weight is the veils' (sky.snowfall) and the skim's, not ruled lines
+  snow: Object.freeze({ size: 0.07, minPx: 3.5, maxPx: 6.5, exposure: 0.04, smear: 1.2, varySize: 0.5, cell: 9, tumble: 1.2, aspect: 0.5, streak: 8, bands: 0.8, bandLong: 9, bandWide: 2.2, maxLenPx: 30, near: 5 }),
   hail: Object.freeze({ width: 0.05, minPx: 3, maxLen: 0.6 }),
   // (P10) the skim of blowing sand (or snow): each grain a short low smear along its hop
   sand: Object.freeze({ width: 0.08, minPx: 3, exposure: 0.22, vary: 0.12, maxLen: 1.4, level: 1, near: 3 }),
@@ -284,6 +291,7 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   const ex = spin === 0 ? D.exposure || 0 : 0, smear = 2 * (D.smear != null ? D.smear : 2);
   const vs = D.varySize || 0;
   const strobe = ex > 0 ? D.strobe || 0 : 0, streak = D.streak > 0 ? D.streak : 3;
+  const lenPx = ex > 0 && D.maxLenPx > 0 && eye.pix > 0 ? D.maxLenPx * eye.pix : 0;      // ((M4) m of stroke per m of distance)
   const tumble = spin === 0 ? D.tumble || 0 : 0, aspect = D.aspect > 0 && D.aspect < 1 ? D.aspect : 1;   // (with spin: a leaf, see `flip`)
   const cell = cellFor(D, eye, buf), c2 = cell * 2, M = buf.mat, SH = eye.shelters, nSH = cell > 0 && SH ? eye.shelterCount : 0;
   const Ex = eye.ex, Ey = eye.ey, Ez = eye.ez, Nx = eye.nx, Ny = eye.ny, Nz = eye.nz;
@@ -371,7 +379,9 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
           // drawn out by its motion during the exposure, capped; but never less than it travels in
           // a frame (else it strobes), and shrinking away where that would make it a hairline
           if (travel > streak * 2 * full) { const k = 1 - smooth01((travel / (streak * 2 * full) - 1) / 0.6); h *= k; }
-          const cap = Math.max(smear * h, travel);
+          let cap = Math.max(smear * h, travel);
+          // ((M4) maxLenPx: no stroke longer than that on screen; what crosses more than that in a frame is not drawn)
+          if (lenPx > 0) { const lm = lenPx * dist; if (travel > lm) h *= 1 - smooth01((travel / lm - 1) / 0.6); if (cap > lm) cap = lm; }
           if (sl > cap) sl = cap;
           sl *= 1 - wT;                                              // a wall is not drawn out: it is one
         } else sl = 0;

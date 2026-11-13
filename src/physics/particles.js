@@ -166,8 +166,9 @@ export class Particles {
     E.origin.x = frame.ox; E.origin.y = frame.oy; E.origin.z = frame.oz;
   }
 
-  _event(frame, x, y, z, kind, strength, size) {
-    if (kind === EVENT.ripple) { strength *= this.seaCalm01; if (strength < 0.02) return; }   // (P20)
+  // (own (M4), 0..1: the least share of its strength a ring keeps on a rough sea: a body's own rings, see loose.js WADE.ownCalm)
+  _event(frame, x, y, z, kind, strength, size, own = 0) {
+    if (kind === EVENT.ripple) { strength *= own > this.seaCalm01 ? own : this.seaCalm01; if (strength < 0.02) return; }   // (P20)
     const E = this.events, o = E.head * 8;
     // (heights are radial, the grid is the tangent plane at the anchor: see publish())
     const qx = frame.ox + frame.ex * x + frame.nx * z, qy = frame.oy + frame.ey * x + frame.ny * z, qz = frame.oz + frame.ez * x + frame.nz * z;

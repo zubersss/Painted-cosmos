@@ -595,3 +595,29 @@ test('blowing sand is a skim: its strokes lie along the ground whatever the grai
   assert.ok(D.level); expandStreaks(b, D, eye, o);
   for (let q = 0; q < 2; q++) { const head = V(o, q * 4), tail = V(o, q * 4 + 3), mid0 = [(V(o, q * 4)[1] + V(o, q * 4 + 1)[1]) / 2, (V(o, q * 4 + 2)[1] + V(o, q * 4 + 3)[1]) / 2]; assert.ok(Math.abs(mid0[0] - mid0[1]) < 1e-3, 'level: ' + mid0); assert.ok(len(sub(head, tail)) > 0.3); }
 });
+
+test('M4 snow at the lens: walking into a blizzard no flake is a ruled line: no stroke longer than 30 px on screen, none nearer than 2 m; further off the driving snow is still strokes', () => {
+  // PAINTER's critique of PHYSICS, item 2: "walking into the wind, the flakes nearest the lens become thin straight lines
+  // up to 100 px long, fanning from the middle of the picture like the lines of a zoom".
+  const eye = makeEye(); eye.pix = 2 * Math.tan(24 * Math.PI / 180) / 540; eye.radius = 8;      // a 48 degree lens, 540 px high
+  eye.vz = -4.2;                                                                                  // walking forward (the view is along -z)
+  // a 13.5 m/s blizzard blowing at the walker from half left (9.5 m/s across the picture, 9.5 toward the eye), the flakes
+  // falling 1 m/s: 1 to 9 m ahead, all over the picture. (The kit draws a flake out along its motion ACROSS the picture.)
+  const n = 2400, list = Array.from({ length: n }, (_, i) => { const d = 1 + ((i * 1299709) % 1000) / 1000 * 8; return { p: [(((i * 7919) % 1000) / 1000 - 0.5) * d * 1.4, (((i * 104729) % 1000) / 1000 - 0.5) * d * 0.8, -d], v: [9.5, -1, 9.5], size: 1e-4 + i * 2.9e-7, age: 3 }; });
+  const b = buf(list), o = new Float32Array(n * 12);
+  const px = (q, O) => { const a = sub(V(O, q * 4 + 1), V(O, q * 4)), s = sub(V(O, q * 4 + 3), V(O, q * 4)), d = -list[q].p[2]; return [len(a) / (eye.pix * Math.hypot(list[q].p[0], list[q].p[1], d)), len(s)]; };
+  const stat = (D) => { expandDabs(b, D, eye, o); let longest = 0, drawn = 0, nearest = 99, far = 0; for (let q = 0; q < n; q++) { const [l, s] = px(q, o); if (s < 1e-4) continue; drawn++; longest = Math.max(longest, l); nearest = Math.min(nearest, -list[q].p[2]); if (-list[q].p[2] > 6) far++; } return { longest, drawn, nearest, far }; };
+  const base = { ...DRAW.snow, ...DRAW_PAINTED.snow, fadeIn: 0, fadeOut: 0, cell: 0 };
+  const was = stat({ ...base, maxLenPx: 0, near: 3 }), now = stat(base);
+  console.log(`# M4 snow at the lens, walking into 13.5 m/s from half left: before: ${was.drawn} flakes drawn, the longest stroke ${was.longest.toFixed(0)} px, the nearest ${was.nearest.toFixed(1)} m; now ${now.drawn}, ${now.longest.toFixed(0)} px, ${now.nearest.toFixed(1)} m (${now.far} of them beyond 6 m)`);
+  assert.ok(was.longest > 60, `the old table: a stroke of ${was.longest.toFixed(0)} px`);
+  assert.equal(DRAW_PAINTED.snow.maxLenPx, 30);
+  assert.ok(now.longest < 30 + 2 * DRAW_PAINTED.snow.maxPx + 1, `now the longest is ${now.longest.toFixed(0)} px`);
+  assert.ok(now.nearest >= 2 - 1e-6, `none nearer than 2 m: ${now.nearest.toFixed(2)}`);
+  assert.ok(now.far > 30, `the snow further off is still drawn: ${now.far} flakes beyond 6 m`);
+  // a calm snowfall is untouched: the same flakes, the same marks
+  const calm = buf(list.map((f) => ({ ...f, v: [0.4, -1, 0.3] }))), o1 = new Float32Array(n * 12), o2 = new Float32Array(n * 12);
+  eye.vz = 0; expandDabs(calm, { ...base, near: 3 }, eye, o1); expandDabs(calm, { ...base, near: 3, maxLenPx: 0 }, eye, o2);
+  let diff = 0; for (let i = 0; i < o1.length; i++) diff = Math.max(diff, Math.abs(o1[i] - o2[i]));
+  assert.ok(diff < 1e-9, 'a calm snowfall: the cap changes nothing (' + diff + ')');
+});

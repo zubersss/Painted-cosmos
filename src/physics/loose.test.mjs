@@ -623,3 +623,36 @@ test('the loose leaves on the trees are a stock: a long gale drains it, a calm r
     console.log(`# stock after a minute of gale ${s60.toFixed(2)} (torn ${r60.toFixed(0)} a second)`);
   } finally { setWindScale('earth', s0); }
 });
+
+test('M4 the water takes a mark: a swimmer leaves rings along its path and a collar of spray; a wader leaves a ring at each leg; a chop does not take a body\'s own rings', () => {
+  // PAINTER's critique of PHYSICS, item 4: "wading in at 2.5 m/s and swimming at 2 m/s leave the sea untouched: no ring,
+  // no wake, no white at the legs or the shoulders". A swimmer laid nothing; a wader's rings (one for half a metre) were
+  // taken away on any sea over 0.1 m high, as a rain drop's ring is.
+  const rings = (w) => { let rip = 0; const E = w.physics.particles.events; for (let k = 0; k < Math.min(E.total, E.capacity); k++) if (E.data[k * 8 + 3] === EVENT.ripple && E.data[k * 8 + 4] > 0) rip++; return rip; };
+  // afloat in 6 m of water: the body's feet 1.3 m under the surface, swimming east at 2 m/s for 4 s
+  const swim = (speed, seconds = 4) => {
+    const w = setup('earth', 'sea_coast', { sea: 6 }); run(w, 1);
+    const fr = w.physics.fields.frame, v = V(fr.ex * speed, fr.ey * speed, fr.ez * speed), Rs = w.R + 6 - 1.3; let air = 0, n = 0, top = 0;
+    w.focus = V(w.up.x * Rs, w.up.y * Rs, w.up.z * Rs);
+    run(w, seconds, { disturbers: () => { w.focus = V(w.focus.x + v.x / 60, w.focus.y + v.y / 60, w.focus.z + v.z / 60); const l = len(w.focus); w.focus = V(w.focus.x * Rs / l, w.focus.y * Rs / l, w.focus.z * Rs / l); return [{ kind: 'explorer', p: w.focus, v, radius: 0.35, strength: 1, grounded: false }]; },
+      each: () => { const P = w.physics.particles; air += P.spray.count; n++; for (const hgt of heights(w, P.spray)) top = Math.max(top, hgt - 6); } });
+    return { rings: rings(w), air: air / n, top, w };
+  };
+  const s2 = swim(2), tread = swim(0);
+  console.log(`# M4 a swimmer at 2 m/s for 4 s: ${s2.rings} rings laid, ${s2.air.toFixed(1)} drops of spray in the air on average, the highest ${s2.top.toFixed(2)} m over the water; treading water 4 s: ${tread.rings} rings, ${tread.air.toFixed(1)} drops (before M4: 0 and 0)`);
+  assert.ok(s2.rings >= 30 && s2.rings <= 80, 'rings along the swimmer\'s path: ' + s2.rings);      // (8 m: three for every 0.45 m)
+  assert.ok(s2.air > 4 && s2.air < 40 && s2.top > 0.02 && s2.top < 0.25, `a collar, low: ${s2.air.toFixed(1)} drops, ${s2.top.toFixed(2)} m`);
+  assert.ok(tread.rings >= 9 && tread.rings <= 24 && tread.air > 0.5, `treading water: ${tread.rings} rings, ${tread.air.toFixed(1)} drops`);
+  // the rings lie along the path: the newest near the swimmer, the oldest well behind
+  { const E = s2.w.physics.particles.events, fr = s2.w.physics.fields.frame; let lo = 1e9, hi = -1e9;
+    for (let k = 0; k < Math.min(E.total, E.capacity); k++) if (E.data[k * 8 + 3] === EVENT.ripple) { const x = (E.origin.x + E.data[k * 8] - s2.w.focus.x) * fr.ex + (E.origin.y + E.data[k * 8 + 1] - s2.w.focus.y) * fr.ey + (E.origin.z + E.data[k * 8 + 2] - s2.w.focus.z) * fr.ez; lo = Math.min(lo, x); hi = Math.max(hi, x); }
+    assert.ok(hi < 0.6 && hi > -1.5 && lo < -6, `from ${lo.toFixed(1)} m behind to ${hi.toFixed(1)} m`); }
+  // a wader in a chop: the sea 0.4 m high takes a rain drop's ring and leaves the wader's
+  const w = setup('earth', 'sea_coast', { sea: 0.4 }); run(w, 1);
+  w.physics.particles.system.seaCalm01 = 0.05; walk(w, 3, 2.5);
+  const P = w.physics.particles.system; P.seaCalm01 = 0.05;
+  const before = rings(w);
+  assert.ok(before >= 20, 'a wader\'s rings in a chop: ' + before + ' (before M4: none)');
+  const t0 = w.physics.particles.events.total; P._event(w.physics.fields.frame, 0, 0, 0, EVENT.ripple, 0.3, 0.003);
+  assert.equal(w.physics.particles.events.total, t0, 'a drop\'s ring is lost in the chop, as before');
+});

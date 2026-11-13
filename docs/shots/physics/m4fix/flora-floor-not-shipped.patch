@@ -1,0 +1,109 @@
+--- final2/src/physics/flora.js	2026-11-13 07:39:52.000000000 +0000
++++ w2/src/physics/flora.js	2026-11-13 08:23:03.740145111 +0000
+@@ -169,6 +169,31 @@
+   branchGain: 1,                // a lever on all of it (1 = the model; 1.3 rad per rad of trunk lean before P14)
+   branchShake: 0.08,            // rad: swing of a crown that has just been brushed or blown on (shake01 = 1)
+   crown: 0.27,                  // a branch is this long, as a share of the plant's height (3.5 m on a 13 m birch; 0.35 before P14)
++  // (M4) A FLOOR UNDER WHAT THE EYE IS GIVEN (PAINTER's critique of PHYSICS, item 1: "on a fair day the painting does not
++  // move": at the spawn in its usual breeze, 1.6 to 2.3 m/s, frames half a second apart differ in 0.8 % of their pixels;
++  // PAINTER's ask, as the owner of the look: a floor under what the eye is given, separate from the load the physics
++  // computes; calm, large, slow). The computed load of that breeze is 0.02 at blade height: a mean bend of four
++  // degrees that the flutter and the honami move by one, a centimetre at a blade's tip; a 12 m birch's top sways three.
++  // That is the right size, and it is not seen. So, in any air that moves at all (breathFrom to breathFull m/s at 2 m)
++  // and only while the computed load is small (it fades out between breathSoftOut / breathStiffOut: a storm is what
++  // the wind makes it), the field's two reference oscillators are driven by a little more than the wind gives:
++  //   GUST FRONTS over the sward: two trains of fronts run down the mean wind at breathSpeed (a gust front outruns
++  //     the air at blade height), breathFrontL apart (one every 12 s, a fainter one every 19 s, half a radian off),
++  //     each a band about 12 m deep (the bend field's cells are 8 m) that takes a second and a half to pass and
++  //     bends the grass under it 12 to 15 degrees (breathSoft of load): the honami given an amplitude the eye can
++  //     follow;
++  //   THE BREATH of the crowns: two slow swells (breathSwellHz, breathSwellL long: masses of 35 and 55 m) lean the
++  //     trunks a little more and less (breathStiff of load; the crown's own oscillator answers 1.3 to 1.7 times
++  //     that): five to eight centimetres at the top of a 12 m tree, three to five at a crown's edge.
++  // Both ride in the bend field itself (the JS twins and the shader chunk read them as they read the wind's load: no
++  // uniform, nothing to wire). Still air: nothing, exactly, as before.
++  breathFrom: 0.4, breathFull: 1.2,
++  breathAir: Object.freeze([0.05, 0.4]),        // kg/m^3: none in air thinner than the first, all of it from the second
++  breathSoft: 0.12, breathSoftOut: Object.freeze([0.08, 0.35]),
++  breathSpeed: 8,
++  breathFrontL: Object.freeze([96, 152]), breathFrontA: Object.freeze([1, 0.6]), breathFrontAng: Object.freeze([0, 0.5]), breathFrontW: Object.freeze([0.075, 0.055]),
++  breathStiff: 0.18, breathStiffOut: Object.freeze([0.15, 0.6]),
++  breathSwellHz: Object.freeze([0.30, 0.19]), breathSwellL: Object.freeze([70, 110]), breathSwellA: Object.freeze([0.6, 0.4]), breathSwellAng: Object.freeze([0.3, -0.6]),
+ });
+ // Without a number per branch (pcPhysBranch, plantBranch) the crown moves in whole lobes round the trunk
+ // (whole numbers: the motion is continuous all the way round), each eddy train with its own count and its own
+@@ -196,6 +221,7 @@
+ const _coef = new Float64Array(8);
+ const _tmp2 = new Float64Array(2);
+ const _dwf = new Float64Array(3);
++const _br = new Float64Array(8);
+ 
+ // Coefficients of the exact oscillator step for (w, z, dt): [a11, a12, a21, a22].
+ function oscCoef(w, z, dt, o, i) {
+@@ -236,6 +262,8 @@
+     this.rho = 1.225;
+     this.wavePhase = new Float64Array(3);
+     this.flutPhase = new Float64Array(3);        // (P11) phases of the three flutter trains
++    this.breathPhase = new Float64Array(4);      // (M4) phases of the two trains of gust fronts and of the two swells of the crowns (FLORA.breathSoft)
++    this.breath = 1;                             // (M4) a lever on that floor (1 = as FLORA says; 0 = the wind's load alone, as before M4)
+     this.waveDir = new Float64Array(2); this.waveDir[0] = 1;
+     this.gustMean = 0;
+     // uniforms for FLORA_GLSL, refreshed every update (plain arrays; PAINTER copies them)
+@@ -283,6 +311,7 @@
+       this.wavePhase[i] -= ki * (ex * dx + ez * dz);
+     }
+     for (let i = 0; i < 3; i++) this.flutPhase[i] -= FLORA.flutterK[i] * (FLUT_D[i][0] * dx + FLUT_D[i][1] * dz);
++    for (let i = 0; i < 4; i++) { const a = i < 2 ? FLORA.breathFrontAng[i] : FLORA.breathSwellAng[i - 2], L = i < 2 ? FLORA.breathFrontL[i] : FLORA.breathSwellL[i - 2]; this.breathPhase[i] -= TAU / L * ((d0 * Math.cos(a) - d1 * Math.sin(a)) * dx + (d0 * Math.sin(a) + d1 * Math.cos(a)) * dz); }
+     for (let i = 0; i < 3; i++) this.branchPhase[i] -= FLORA.crownK[i] * (CROWN_D[i][0] * dx + CROWN_D[i][1] * dz);
+     for (let i = 0; i < 4; i++) this.clockPhase[i] -= FLORA.clockK[i][0] * dx + FLORA.clockK[i][1] * dz;
+   }
+@@ -328,6 +357,14 @@
+     const bend = this.bend, vel = this._vel, wind = this.wind;
+     let gsum = 0, se = 0, sn = 0, tsum = 0, sce = 0, scn = 0;
+     const swirl = !!devils && devils.count > 0;
++    // (M4) the floor (FLORA.breathSoft): the four trains' directions and wavenumbers, once a step
++    const BR = _br, wd0 = this.waveDir[0], wd1 = this.waveDir[1];
++    for (let i = 0; i < 4; i++) {
++      const a = i < 2 ? FLORA.breathFrontAng[i] : FLORA.breathSwellAng[i - 2], k = TAU / (i < 2 ? FLORA.breathFrontL[i] : FLORA.breathSwellL[i - 2]);
++      BR[i * 2] = (wd0 * Math.cos(a) - wd1 * Math.sin(a)) * k; BR[i * 2 + 1] = (wd0 * Math.sin(a) + wd1 * Math.cos(a)) * k;
++    }
++    // (air that carries a load at all: Mars' gale moves nothing, and the floor does not either)
++    const bph = this.breathPhase, breathK = this.breath * smoothstep(FLORA.breathAir[0], FLORA.breathAir[1], rho);
+     for (let j = 0; j < N; j++) {
+       const z = (this.cj + j - N / 2 + 0.5) * cell;
+       for (let i = 0; i < N; i++) {
+@@ -346,7 +383,23 @@
+         // is at their height (air.js wakeAt), not as it is near the ground, which is what we, wn carry
+         const zc = _s[11] > FLORA.stiffHeight ? _s[11] : FLORA.stiffHeight, wkc = _s[9] < 1 && _s[9] > 0.01 ? wakeAt(_s[9], _s[10], zc) / _s[9] : 1;
+         const ls = kq * sp * hs * hs, lt = kq * sp * ht * ht * wkc * wkc;
+-        const tse = we * ls, tsn = wn * ls, tte = we * lt, ttn = wn * lt;
++        let tse = we * ls, tsn = wn * ls, tte = we * lt, ttn = wn * lt;
++        // (M4) the floor under what the eye is given (FLORA.breathSoft): gust fronts over the sward, the crowns' breath
++        const u2 = sp * h2;
++        if (u2 > FLORA.breathFrom && breathK > 0) {
++          const air01 = breathK * smoothstep(FLORA.breathFrom, FLORA.breathFull, u2), ux0 = we / sp, uz0 = wn / sp;
++          const fS = air01 * (1 - smoothstep(FLORA.breathSoftOut[0], FLORA.breathSoftOut[1], ls * sp));
++          if (fS > 0) {
++            let fr = 0;
++            for (let q = 0; q < 2; q++) { let f = (BR[q * 2] * x + BR[q * 2 + 1] * z - bph[q]) / TAU; f -= Math.floor(f); const e = (f - 0.5) / FLORA.breathFrontW[q]; fr += FLORA.breathFrontA[q] * Math.exp(-e * e); }
++            const a = FLORA.breathSoft * fS * fr; tse += ux0 * a; tsn += uz0 * a;
++          }
++          const fT = air01 * (1 - smoothstep(FLORA.breathStiffOut[0], FLORA.breathStiffOut[1], lt * sp));
++          if (fT > 0) {
++            const sw = FLORA.breathSwellA[0] * Math.sin(BR[4] * x + BR[5] * z - bph[2]) + FLORA.breathSwellA[1] * Math.sin(BR[6] * x + BR[7] * z - bph[3]);
++            const a = FLORA.breathStiff * fT * sw; tte += ux0 * a; ttn += uz0 * a;
++          }
++        }
+         let d = bend[o] - tse, v = vel[o];
+         bend[o] = tse + a11 * d + a12 * v; vel[o] = a21 * d + a22 * v;
+         d = bend[o + 1] - tsn; v = vel[o + 1];
+@@ -393,6 +446,9 @@
+     for (let i = 0; i < 3; i++) {
+       this.wavePhase[i] = (this.wavePhase[i] + FLORA.waveK * WAVE_K[i] * FLORA.waveSpeed * WAVE_C[i] * ms * h) % (TAU * 1024);
+     }
++    // (M4) the floor's trains (FLORA.breathSoft): the fronts run at breathSpeed, the swells at their own frequencies
++    for (let i = 0; i < 2; i++) this.breathPhase[i] = (this.breathPhase[i] + TAU / FLORA.breathFrontL[i] * FLORA.breathSpeed * h) % (TAU * 1024);
++    for (let i = 0; i < 2; i++) this.breathPhase[2 + i] = (this.breathPhase[2 + i] + TAU * FLORA.breathSwellHz[i] * h) % (TAU * 1024);
+     // (P11) the flutter trains are carried by the wind at blade height (se, sn: its mean over the field)
+     for (let i = 0; i < 3; i++) this.flutPhase[i] = (this.flutPhase[i] + FLORA.flutterK[i] * (FLUT_D[i][0] * se + FLUT_D[i][1] * sn) * h) % (TAU * 1024);
+     this.gustMean = gsum * inv;

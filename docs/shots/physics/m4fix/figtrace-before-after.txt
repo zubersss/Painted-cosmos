@@ -1,0 +1,22 @@
+# m4/s/figtrace.mjs: what the drawn figure is handed, every tenth of a second (wind m/s / lean deg / crouch). BEFORE (33786a9):
+neptune storm_seas clock 205, standing 8 s: wind at the walker 14.10 to 110.81 (largest change in a tenth of a second 42.52) m/s; the lean handed to the figure 0.65 to 49.74 (largest change in a tenth of a second 45.85) deg, its direction turning 131.2 deg in a tenth of a second at most; the crouch 0.49 to 0.99 (largest change in a tenth of a second 0.13); the air past the body 7.16 to 79.75 (largest change in a tenth of a second 51.48) m/s
+47/13/0.74 59/22/0.72 63/19/0.67 39/24/0.68 43/10/0.65 56/11/0.60 49/18/0.62 19/2/0.58 41/12/0.55 34/2/0.51 58/20/0.49 67/30/0.52 29/21/0.63 45/24/0.59 26/1/0.56 68/28/0.56 29/1/0.52 51/4/0.49 91/50/0.59 54/25/0.69 57/27/0.69 66/25/0.76 63/32/0.84 47/5/0.80 18/2/0.75 27/1/0.70 40/5/0.66 52/26/0.63 79/19/0.59 104/47/0.73 104/40/0.82 79/36/0.88 65/11/0.85 51/3/0.79 35/6/0.74 45/2/0.69 47/13/0.65 53/10/0.61 60/15/0.59 78/31/0.61 47/38/0.74 78/28/0.75 52/18/0.80 68/10/0.76 81/29/0.77 64/21/0.82 101/41/0.81 105/40/0.87 66/26/0.92 54/7/0.86 66/21/0.82 78/25/0.84 48/13/0.82 80/40/0.84 94/45/0.90 89/34/0.93 90/23/0.95 111/44/0.97 110/40/0.98 74/25/0.99 89/30/0.99 52/18/0.99 74/8/0.93 64/19/0.90 67/16/0.84 75/26/0.85 40/14/0.81 57/1/0.76 91/25/0.79 61/23/0.79 78/20/0.76 53/25/0.84 56/24/0.87 77/25/0.87 56/35/0.91 42/9/0.89 55/19/0.84 18/18/0.85 14/2/0.79 28/2/0.74
+
+# AFTER (this commit):
+neptune storm_seas clock 205, standing 8 s: wind at the walker 14.10 to 110.81 (largest change in a tenth of a second 42.52) m/s; the lean handed to the figure 11.88 to 24.31 (largest change in a tenth of a second 1.78) deg, its direction turning 6.0 deg in a tenth of a second at most; the crouch 0.67 to 0.99 (largest change in a tenth of a second 0.08); the air past the body 23.12 to 47.19 (largest change in a tenth of a second 2.44) m/s
+47/14/0.82 59/15/0.82 63/15/0.81 39/15/0.80 43/15/0.80 56/14/0.79 49/14/0.78 19/13/0.77 41/13/0.76 34/12/0.75 58/12/0.74 67/13/0.73 29/14/0.72 45/13/0.71 26/13/0.71 68/13/0.70 29/13/0.69 51/12/0.68 91/13/0.67 54/14/0.69 57/15/0.69 66/15/0.76 63/16/0.84 47/16/0.84 18/15/0.83 27/14/0.83 40/13/0.82 52/13/0.81 79/13/0.80 104/15/0.80 104/17/0.82 79/18/0.88 65/18/0.88 51/17/0.87 35/16/0.87 45/15/0.86 47/15/0.85 53/14/0.84 60/15/0.83 78/14/0.82 47/16/0.81 78/16/0.81 52/17/0.81 68/17/0.81 81/16/0.81 64/17/0.82 101/17/0.82 105/19/0.87 66/20/0.92 54/19/0.91 66/18/0.91 78/19/0.91 48/18/0.90 80/19/0.90 94/20/0.90 89/21/0.93 90/21/0.95 111/22/0.97 110/24/0.98 74/24/0.99 89/24/0.99 52/24/0.99 74/23/0.99 64/22/0.99 67/22/0.98 75/22/0.97 40/21/0.97 57/20/0.96 91/20/0.95 61/20/0.94 78/19/0.93 53/19/0.93 56/19/0.92 77/19/0.92 56/20/0.92 42/19/0.92 55/18/0.92 18/18/0.92 14/17/0.91 28/16/0.91
+
+# PILOT's pilot12/stormwalk.mjs at the same place and clock. BEFORE:
+# neptune storm_seas clock 205: weather ice fall (1.00), rain 0.3 mm/h, wind at the walker 68.8 m/s, gust01 0.79
+  W        8 s: h0: 17.8 m (slowest second 1.7 m/s), h90: 13.5 m (slowest second 1.3 m/s), h180: 25.1 m (slowest second 2.7 m/s), h270: 15.6 m (slowest second 1.3 m/s)
+  Shift+W  8 s: h0: 30.1 m (slowest second 2.9 m/s), h90: 18.8 m (slowest second 1.6 m/s), h180: 37.7 m (slowest second 2.9 m/s), h270: 15.6 m (slowest second 0.1 m/s)
+  standing still 10 s: moved 0.00 m (farthest 0.00 m)
+  a jump: 1.0 m up, 1.0 s off the ground, down 0.2 m from the take-off
+  the jetpack held 2 s: 17.5 m up, 5.8 s off the ground, down 6.5 m from the take-off
+# AFTER:
+# neptune storm_seas clock 205: weather ice fall (1.00), rain 0.3 mm/h, wind at the walker 68.8 m/s, gust01 0.79
+  W        8 s: h0: 17.8 m (slowest second 1.7 m/s), h90: 13.5 m (slowest second 1.3 m/s), h180: 25.1 m (slowest second 2.7 m/s), h270: 15.6 m (slowest second 1.3 m/s)
+  Shift+W  8 s: h0: 30.1 m (slowest second 2.9 m/s), h90: 18.7 m (slowest second 1.6 m/s), h180: 37.7 m (slowest second 2.9 m/s), h270: 15.6 m (slowest second 0.1 m/s)
+  standing still 10 s: moved 0.00 m (farthest 0.00 m)
+  a jump: 1.0 m up, 1.0 s off the ground, down 0.2 m from the take-off
+  the jetpack held 2 s: 17.5 m up, 5.8 s off the ground, down 6.5 m from the take-off

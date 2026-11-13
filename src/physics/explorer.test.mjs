@@ -1072,9 +1072,10 @@ test('P26 the figure\'s state: the lean is a vector into the wind, the air past 
   // arc (PHYSICS' critique of PAINTER, items 1, 2 and 5). Until P26 the lean was an angle with no direction, there was
   // no swimmer's flag or stroke, and nothing said whether a body in the air was going up or coming down.
   // a wind from the west (blowing toward +x) on a standing body: it leans west, as far as lean; the air streams past it east
-  const w = make({ wind: V(18, 0, 0) }); run(w, 3, { wish: V() });
+  // ((M4) the vector is eased over the gust's envelope, EXPLORER_BODY.figureGust: in a steady wind it comes to the lean)
+  const w = make({ wind: V(18, 0, 0) }); run(w, 15, { wish: V() });
   const B = w.st.phys, up = norm(w.st.p);
-  assert.ok(B.lean > 0.05 && Math.abs(len(B.leanV) - B.lean) < 1e-9, `lean ${B.lean}, |leanV| ${len(B.leanV)}`);
+  assert.ok(B.lean > 0.05 && Math.abs(len(B.leanV) - B.lean) < 1e-4 * B.lean, `lean ${B.lean}, |leanV| ${len(B.leanV)}`);
   assert.ok(B.leanV.x < -0.9 * B.lean && Math.abs(dot(B.leanV, up)) < 1e-9, `into the wind, level: ${JSON.stringify(B.leanV)}`);
   assert.ok(Math.abs(B.relWind.x - 18) < 1e-6 && Math.abs(B.relWindSpeed - 18) < 1e-6 && B.arc === 0 && B.airTime === 0 && B.swim === 0, 'standing in it: the air passes at the wind\'s speed');
   // running with it at 7.4 m/s: the air passes at the difference
@@ -1083,7 +1084,7 @@ test('P26 the figure\'s state: the lean is a vector into the wind, the air past 
   // still air: a run makes its own wind, and the runner leans a little into it (forward: 2 degrees at 7.4 m/s); standing, none
   const c = make(); run(c, 3, { wish: V(7.4, 0, 0) });
   assert.ok(c.st.phys.leanV.x > 0.02 && len(c.st.phys.leanV) < 0.05 && Math.abs(c.st.phys.relWind.x + 7.4) < 0.05, `still air, running: lean ${JSON.stringify(c.st.phys.leanV)}, the air past the body ${c.st.phys.relWind.x}`);
-  run(c, 3, { wish: V() });
+  run(c, 20, { wish: V() });
   assert.ok(len(c.st.phys.leanV) === 0 && c.st.phys.relWindSpeed === 0, 'still air, standing: no lean, no air past the body');
   // a jump: rising, then falling, then down; the time in the air counts up and is 0 again on the ground
   const j = make(); run(j, 1, { wish: V(4.2, 0, 0) });
@@ -1195,4 +1196,47 @@ test('M4 on PAINTER\'s real Earth, soaked: W from the spawn on sixteen headings 
   }
   console.log(`# M4 Earth spawn, soaked, W on sixteen headings for 14 s: ${total.toFixed(0)} m in all; ${stalled} headings with a second under 1 m/s on dry land under 30 degrees${rows.length ? ': ' + rows.join('; ') : ''}`);
   assert.equal(stalled, 0, rows.join('; '));
+});
+
+// ---- (M4) the gust, not the sample ----------------------------------------------------------------------------------
+test('M4 the gust, not the sample: in a squall whose wind at the walker goes 77, 61, 52, 69, 25, 12, 24, 15, 49, 108, 77 m/s in a second, the figure is handed a lean, a crouch and an air past the body that hold through the gust; the body\'s own forces are the instant\'s', () => {
+  // PAINTER's critique of PHYSICS, item 5 (the numbers are its own, from Neptune's storm coast): "a sixfold change inside
+  // half a second is noise, and noise cannot be painted ... crouch with the lean, and hold the crouch through the gust".
+  const seq = [77, 61, 52, 69, 25, 12, 24, 15, 49, 108, 77], D = 180 / Math.PI;
+  const mk = () => {
+    const sim = make({ g: 11.15, rho: 0.92 }); let t = 0;
+    sim.env.air = (p, o) => { const i = t * 10, a = Math.floor(i) % seq.length, b = (a + 1) % seq.length, f = i - Math.floor(i), W = seq[a] + (seq[b] - seq[a]) * f, ang = 0.5 * Math.sin(t * 4.1); o.density = 0.92; o.wind.x = W * Math.cos(ang); o.wind.y = W * Math.sin(ang); o.wind.z = 0; return o; };      // (the body stands at +z: x and y are level)
+    sim.tick = (dt) => { t += dt; };
+    return sim;
+  };
+  const sim = mk(); let leanJump = 0, turn = 0, airJump = 0, hkDrop = 0, nowDrop = 0, leanLo = 9, leanHi = 0, prev = null, k = 0; const hk = [], hn = [];
+  run(sim, 14, { wish: V() }, { each: (t, st) => {
+    sim.tick(1 / 60); const B = st.phys;
+    if (t < 4 || ++k % 6) return;                       // every tenth of a second, once the gale has blown a while
+    const L = B.leanV, l = len(L) * D;
+    leanLo = Math.min(leanLo, l); leanHi = Math.max(leanHi, l); hk.push(B.hunker01); hn.push(B.hunkerNow);
+    if (prev) {
+      leanJump = Math.max(leanJump, Math.abs(l - prev.l)); airJump = Math.max(airJump, Math.abs(B.relWindSpeed - prev.rw));
+      const c = (L.x * prev.x + L.y * prev.y + L.z * prev.z) / Math.max(1e-9, len(L) * Math.hypot(prev.x, prev.y, prev.z)); turn = Math.max(turn, Math.acos(Math.min(1, c)) * D);
+    }
+    prev = { l, rw: B.relWindSpeed, x: L.x, y: L.y, z: L.z };
+  } });
+  for (let i = 5; i < hk.length; i++) { hkDrop = Math.max(hkDrop, hk[i - 5] - hk[i]); nowDrop = Math.max(nowDrop, hn[i - 5] - hn[i]); }
+  console.log(`# M4 the figure in the squall: lean ${leanLo.toFixed(1)} to ${leanHi.toFixed(1)} deg, ${leanJump.toFixed(2)} deg in a tenth of a second at most, turning ${turn.toFixed(1)} deg; the air past it changing ${airJump.toFixed(1)} m/s in a tenth; the drawn crouch ${Math.min(...hk).toFixed(2)} to ${Math.max(...hk).toFixed(2)}, falling ${hkDrop.toFixed(2)} in half a second at most (the body's own: ${Math.min(...hn).toFixed(2)} to ${Math.max(...hn).toFixed(2)}, ${nowDrop.toFixed(2)})`);
+  assert.ok(leanLo > 5 && leanHi < 4 * leanLo, `the lean holds: ${leanLo.toFixed(1)} to ${leanHi.toFixed(1)} deg (the head: 2 to 54)`);
+  assert.ok(leanJump < 3 && turn < 10, `and does not jump: ${leanJump.toFixed(2)} deg and a turn of ${turn.toFixed(1)} deg in a tenth of a second (the head: 20 and more)`);
+  assert.ok(airJump < 6, `the air past the body: ${airJump.toFixed(1)} m/s in a tenth of a second (the sample: up to 59)`);
+  assert.ok(Math.min(...hk) > 0.6 && hkDrop < 0.12, `the crouch is held through the lull: ${Math.min(...hk).toFixed(2)} at its least, ${hkDrop.toFixed(2)} lost in half a second`);
+  assert.ok(Math.min(...hk) >= Math.min(...hn) - 1e-9 && hk.every((v, i) => v >= hn[i] - 1e-9), 'never less than the body\'s own crouch');
+  // the body is not carried off, and it goes exactly as it would with the figure's state thrown away at every step
+  assert.ok(Math.hypot(sim.st.p.x, sim.st.p.y) < 3 && sim.st.grounded, 'braced: it stands');
+  const a = mk(), b = mk();
+  run(a, 6, { wish: V(3, 0, 0) }, { each: () => a.tick(1 / 60) });
+  run(b, 6, { wish: V(3, 0, 0) }, { each: (t, st) => { b.tick(1 / 60); const B = st.phys; B.leanV = { x: 9, y: 9, z: 9 }; B.relWind = { x: 1, y: 2, z: 3 }; B.windE = { x: 5, y: 5, z: 5 }; B.hunker01 = 0.123; } });
+  assert.ok(a.st.p.x === b.st.p.x && a.st.p.y === b.st.p.y && a.st.v.x === b.st.v.x, 'output only: no step reads it');
+  // when the wind drops for good the figure straightens: upright again within ten seconds
+  const c = mk(); run(c, 6, { wish: V() }, { each: () => c.tick(1 / 60) });
+  c.env.air = (p, o) => { o.density = 0.92; o.wind.x = 3; o.wind.y = 0; o.wind.z = 0; return o; };
+  run(c, 10, { wish: V() });
+  assert.ok(c.st.phys.hunker01 < 0.05 && len(c.st.phys.leanV) * D < 1, `the wind gone: crouch ${c.st.phys.hunker01.toFixed(3)}, lean ${(len(c.st.phys.leanV) * D).toFixed(2)} deg`);
 });

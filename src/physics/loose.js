@@ -61,6 +61,21 @@ export const WADE = Object.freeze({
   depthFull: 0.3,       // m of liquid from which the legs throw all of that (ankle-deep: a third)
   out: 0.3, outV: 0.35, // m/s the drops leave sideways: out + outV x pace
   up: 0.4, upV: 0.5,    // m/s upward: (up + upV x pace) x 0.6 .. 1.4 (0.9 to 2.6 m/s at 3 m/s: a third of a metre high on Earth)
+  // (M4) THE WATER TAKES A MARK (PAINTER's critique of PHYSICS, item 4: "wading in at 2.5 m/s and swimming at 2 m/s leave
+  // the sea untouched: no ring, no wake, no white at the legs or the shoulders"). What was there: a wader laid one ring
+  // for every half metre, of strength pace / 3, and on a sea over 0.1 m high the rings were taken away (a rain drop's
+  // ring is lost in a chop: P20; at Earth's coast, Hs 0.14 to 0.46 m, nearly all of them); a swimmer laid none and
+  // threw nothing. Now a body in liquid leaves RINGS of its own, that a chop does not take (ownCalm of them at least):
+  // a wader two for every ringEvery metres, one at each leg; a swimmer three for every ringEvery metres swum or every
+  // treadEvery seconds treading, at the shoulders and behind: laid along its path they are its wake. And a swimmer has
+  // a COLLAR: swimSpray drops a metre (collarRate a second at least), thrown low and slow where the body meets the
+  // surface (PAINTER's spray is a pale blot half a metre wide: together a wisp of white round the shoulders).
+  ringEvery: 0.45,      // m
+  treadEvery: 0.7,      // s
+  ringSide: 0.3,        // m to either side of the body
+  ownCalm: 0.6,         // a body's own rings keep at least this share of their strength on a rough sea
+  swimSpray: 12, collarRate: 8,    // drops a metre swum; a second at least
+  collarOut: 0.5, collarUp: 1.2,   // m/s: sideways and upward (x 0.6 .. 1.4: a hand's breadth over the water)
 });
 export const KICK = Object.freeze({
   perMetre: 5,          // dust grains raised per metre walked on the loosest ground
@@ -476,7 +491,24 @@ export class Loose {
               let n = (WADE.perMetre + WADE.perV2 * sp * sp) * dk * sp * h + rng();
               while (n >= 1) { n -= 1; const a = rng() * 6.2831853; if (!this.emit('spray', x + Math.cos(a) * 0.3, gp.h + gp.liquid + 0.02, z + Math.sin(a) * 0.3, vx * 0.5 + Math.cos(a) * vo, vu * (0.6 + 0.8 * rng()), vz * 0.5 + Math.sin(a) * vo, 1, 1, gp.mat)) break; }
               this._wade += h * sp;
-              if (this._wade > 0.5) { this._wade = 0; P._event(frame, x, gp.h + gp.liquid, z, EVENT.ripple, clamp01(sp / 3), 0.3); }
+              // ((M4) see WADE.ringEvery: a ring at each leg, the wader's own)
+              if (this._wade > WADE.ringEvery) {
+                this._wade = 0; const k = WADE.ringSide / sp, st = clamp01(0.45 + sp / 4);
+                P._event(frame, x - vz * k, gp.h + gp.liquid, z + vx * k, EVENT.ripple, st, 0.3, WADE.ownCalm);
+                P._event(frame, x + vz * k, gp.h + gp.liquid, z - vx * k, EVENT.ripple, st, 0.3, WADE.ownCalm);
+              }
+            } else if (!grounded && hgt > gp.liquid - 2.5 && hgt < gp.liquid + 0.4) {
+              // ((M4) afloat: the swimmer's rings and its collar, see WADE.ringEvery)
+              this._wade += h * sp; this._tread = (this._tread || 0) + h;
+              if (this._wade > WADE.ringEvery || this._tread > WADE.treadEvery) {
+                this._wade = 0; this._tread = 0;
+                const st = clamp01(0.5 + sp / 4), dx = sp > 0.2 ? vx / sp : 1, dz = sp > 0.2 ? vz / sp : 0, y = gp.h + gp.liquid;
+                P._event(frame, x - dz * WADE.ringSide, y, z + dx * WADE.ringSide, EVENT.ripple, st, 0.3, WADE.ownCalm);
+                P._event(frame, x + dz * WADE.ringSide, y, z - dx * WADE.ringSide, EVENT.ripple, st, 0.3, WADE.ownCalm);
+                P._event(frame, x - dx * 0.5, y, z - dz * 0.5, EVENT.ripple, st * 0.8, 0.3, WADE.ownCalm);
+              }
+              let n = Math.max(WADE.collarRate, WADE.swimSpray * sp) * h + rng();
+              while (n >= 1) { n -= 1; const a = rng() * 6.2831853; if (!this.emit('spray', x + Math.cos(a) * 0.35, gp.h + gp.liquid + 0.03, z + Math.sin(a) * 0.35, vx * 0.6 + Math.cos(a) * WADE.collarOut, WADE.collarUp * (0.6 + 0.8 * rng()), vz * 0.6 + Math.sin(a) * WADE.collarOut, 1, 1, gp.mat)) break; }
             }
             continue;
           }

@@ -39,6 +39,17 @@ export const EXPLORER_BODY = Object.freeze({
   hunkerFull: 1.0,        // ... no further than about 30 degrees into it) and at which it is right down
   hunkerDown: 0.25,       // s: time constant getting down
   hunkerUp: 1.5,          // s: and getting up again as the wind falls
+  // (M4) THE GUST, NOT THE SAMPLE (PAINTER's critique of PHYSICS, item 5: at Neptune's storm coast the wind at the walker
+  // reads 77, 61, 52, 69, 25, 12, 24, 15 m/s in eight tenths of a second; the figure shortened by a tenth and
+  // lengthened again). A walker who has got down in a gale does not stand up in a lull of a second. The crouch the
+  // FIGURE is handed (st.phys.hunker01, and ride with it) is held through the gust: down as fast as the body gets
+  // down, up no faster than over hunkerHold. The crouch the body's FORCES go by (st.phys.hunkerNow: its drag, its
+  // grip, its pace) is what it was, so a walk in a squall makes the metres it made (tried: holding that one too made
+  // every walk in Neptune's squall a crawl at hunkerPace: 10 m in 8 s for 14 to 25). And what the drawn figure is
+  // handed of the wind (st.phys.leanV, relWind) is the gust's envelope: the wind of the last figureGust seconds,
+  // eased; the forces on the body are the wind of the instant, as before.
+  hunkerHold: 2.0,        // s: the drawn crouch comes up over this long
+  figureGust: 1.5,        // s: the time the drawn figure's lean and the air past it are eased over
   hunkerGrip: 0.3,        // added to the soles' hold, right down (hands and knees, toes dug in)
   hunkerPace: 1.2,        // m/s: the pace right down (a crawl into the storm, or with it)
   windBrace: true,        // the suit braces against the wind the soles cannot hold (cmd.windBrace false: off) ...
@@ -241,13 +252,15 @@ export const EXPLORER_BODY_STATE = () => ({
   sink: 0,                // m the feet are pressed into the ground (for drawing and footprints)
   submerged01: 0,         // fraction of the body under liquid
   windAccel: 0,           // m/s^2 the wind is pushing with
-  lean: 0,                // rad the body must lean into the wind to balance it: atan(windAccel / g)
+  lean: 0,                // rad the body leans into the wind to balance it: atan(windAccel / g), (M4) eased over the gust's envelope (the length of leanV)
+  leanNow: 0,             // (M4) rad: the same for the wind of the instant (what lean was until M4)
   unload: 0,              // (retired in P9, always 0)
   vvPrev: 0,
   hip: 0,                 // m: leg length now minus standing (-legFold folded .. +legReach reaching down)
   hipV: 0,                // m/s: vertical speed of the hips
   hunker01: 0,            // (P23) 0 upright .. 1 down on hands and knees in a gale (see EXPLORER_BODY.cdaLow); ride folds with it
   windBrace: 0,           // (P23) N the suit is bracing against the wind with (on the ground; see EXPLORER_BODY.windBrace)
+  hunkerNow: 0,           // (M4) the crouch the body's forces go by (as hunker01 was until M4: down in hunkerDown, up in hunkerUp); hunker01 is that, held through the gust (EXPLORER_BODY.hunkerHold)
   trend: 0,               // m/s: the rate the ground has been rising under the feet (filtered over trendTime)
   base: 0,                // radius of the ground where the legs last stood at their standing length, carried on at `trend`
   baseLo: 0,              // (P21) the lowest ground radius the feet have stood on since then (base is never carried below it)
@@ -299,8 +312,9 @@ export const EXPLORER_BODY_STATE = () => ({
   feet: null,             // [left, right]: { fwd (m ahead of st.p along heading), up (m off the ground), side (m to the right), down (0 | 1) }
   heading: null,          // unit vector the body is travelling along (kept when it stops)
   // (P26) the figure's state (output only; see figureState and docs/notes/physics.md, "the figure's state, M4")
-  leanV: null,            // {x,y,z} body-local, level: the way the body leans to balance the wind (into it: against its push), its length the lean (rad, = lean)
-  relWind: null,          // {x,y,z} body-local, m/s: the air's velocity past the body (the wind less the body's own velocity): what streams a scarf and a coat
+  leanV: null,            // {x,y,z} body-local, level: the way the body leans to balance the wind (into it: against its push), its length the lean (rad); (M4) eased over the gust's envelope (EXPLORER_BODY.figureGust): in a steady wind = lean
+  relWind: null,          // {x,y,z} body-local, m/s: the air's velocity past the body (the wind, (M4) eased over the gust's envelope, less the body's own velocity): what streams a scarf and a coat
+  windE: null,            // (M4) {x,y,z} body-local, m/s: that eased wind
   relWindSpeed: 0,        // m/s: its length
   swim: 0,                // 1 while the body is afloat and swimming (the feet off the bottom, a third of it under), else 0 (wading is submerged01 with grounded)
   stroke: 0,              // phase of the swimmer's stroke, 0 .. 1 (kept when not swimming)
@@ -1017,7 +1031,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
 
   // ---- surroundings ------------------------------------------------------------------------
   let rho = 1.225, wx = 0, wy = 0, wz = 0;
-  if (env.air) { const rc = S.recv; rc.vx = st.v.x; rc.vy = st.v.y; rc.vz = st.v.z; const a = env.air(st.p, S.air, Math.max(0, r - groundR) + (st.grounded ? 1.0 + (T.hunkerHeight - 1.0) * (B.hunker01 || 0) : 1.0), rc); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
+  if (env.air) { const rc = S.recv; rc.vx = st.v.x; rc.vy = st.v.y; rc.vz = st.v.z; const a = env.air(st.p, S.air, Math.max(0, r - groundR) + (st.grounded ? 1.0 + (T.hunkerHeight - 1.0) * (B.hunkerNow || 0) : 1.0), rc); rho = a.density; wx = a.wind.x; wy = a.wind.y; wz = a.wind.z; }
   // A named assist (PILOT's lever; default 0 = the real wind): cmd.shelter01, 0..1, is the share of the
   // wind's FORCE on the body that the suit cancels. The force goes with the square of the wind, so the
   // body is given wind x sqrt(1 - shelter01); its own drag through still air is untouched.
@@ -1080,7 +1094,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
   // a jet stronger than the weight lifts the feet off
   if (grounded && aJet > g * (1 - buoy) + 0.3) grounded = false;
 
-  const hk = B.hunker01 || 0;
+  const hk = B.hunkerNow || 0;
   const airK = 0.5 * rho * (grounded ? T.cdaUpright + (T.cdaLow - T.cdaUpright) * hk : T.cdaFall) / T.mass * (1 - sub);   // 1/m
   const onGround = grounded;
   let sF = null, GF = null;                              // (P19) the surface where the step ends in contact, and its ground (see the report)
@@ -1138,7 +1152,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
     {
       const wn = wx * nx + wy * ny + wz * nz, w2 = Math.max(0, wx * wx + wy * wy + wz * wz - wn * wn), gw = 0.5 * rho * T.cdaUpright / T.mass * (1 - sub) * w2 / Math.max(0.1, g);
       const want = smoothstep(T.hunkerFrom, T.hunkerFull, gw);
-      B.hunker01 = hk + (want - hk) * (1 - Math.exp(-dt / (want > hk ? T.hunkerDown : T.hunkerUp)));
+      B.hunkerNow = hk + (want - hk) * (1 - Math.exp(-dt / (want > hk ? T.hunkerDown : T.hunkerUp)));
       B.windBrace = 0;
       if (T.windBrace && cmd.windBrace !== false && gw > T.braceFrom && B.windAccel > 1e-6) {
         const hold0 = G.friction + G.foothold * (1 - smoothstep(T.runFoothold * 0.4, T.runFoothold, sp)) + T.hunkerGrip * hk, fm = Math.max(1e-6, hold0 * support);
@@ -1582,7 +1596,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
     // ((P26) for the figure: in the air too the lean is what would balance the wind's push, level: see figureState)
     { const wu = wx * ux + wy * uy + wz * uz, hx_ = wx - wu * ux, hy_ = wy - wu * uy, hz_ = wz - wu * uz, hl_ = Math.hypot(hx_, hy_, hz_), k = hl_ > 1e-9 ? 1 / hl_ : 0, la = S.la;
       la.x = hx_ * k; la.y = hy_ * k; la.z = hz_ * k; B.lean = Math.atan2(B.windAccel, g > 1e-6 ? g : 1e-6); }
-    B.windBrace = 0; if (hk > 0) B.hunker01 = hk * Math.exp(-dt / T.hunkerUp);
+    B.windBrace = 0; if (hk > 0) B.hunkerNow = hk * Math.exp(-dt / T.hunkerUp);
     // liquid drag: vertical and horizontal
     if (sub > 0) {
       const kv = 0.5 * liq.density * T.sinkCdaV / T.mass * Math.min(1, sub * 3);
@@ -1674,12 +1688,21 @@ function figureState(B, st, dt, grounded, sub, wx, wy, wz, S, T) {
   const px = st.p.x, py = st.p.y, pz = st.p.z, r = Math.hypot(px, py, pz) || 1, ux = px / r, uy = py / r, uz = pz / r;
   const vx = st.v.x, vy = st.v.y, vz = st.v.z, vu = vx * ux + vy * uy + vz * uz;
   // the lean: against the wind's push, level, as long as the lean itself
-  const L = B.leanV || (B.leanV = { x: 0, y: 0, z: 0 }), la = S.la;
+  // ((M4) ... eased over the gust's envelope, EXPLORER_BODY.figureGust: the lean the body holds, not the instant's)
+  const fresh = !B.leanV, L = B.leanV || (B.leanV = { x: 0, y: 0, z: 0 }), la = S.la;
+  const ke = fresh || !(T.figureGust > 0) || !(dt > 0) ? 1 : 1 - Math.exp(-dt / T.figureGust);
   { let x = -la.x, y = -la.y, z = -la.z; const d = x * ux + y * uy + z * uz; x -= d * ux; y -= d * uy; z -= d * uz;
-    const l = Math.hypot(x, y, z), k = l > 1e-9 ? B.lean / l : 0; L.x = x * k; L.y = y * k; L.z = z * k; }
-  // the air past the body
+    const l = Math.hypot(x, y, z), k = l > 1e-9 ? B.lean / l : 0; L.x += (x * k - L.x) * ke; L.y += (y * k - L.y) * ke; L.z += (z * k - L.z) * ke;
+    if (k === 0 && L.x * L.x + L.y * L.y + L.z * L.z < 1e-8) { L.x = 0; L.y = 0; L.z = 0; }      // (no push at all: upright, exactly)
+    // (lean is that vector's length: the lean the body holds; the instant's, atan(windAccel / g), is leanNow)
+    B.leanNow = B.lean; B.lean = Math.hypot(L.x, L.y, L.z); }
+  // the air past the body: the wind's envelope less the body's own velocity (a run streams the scarf at once)
+  const E = B.windE || (B.windE = { x: wx, y: wy, z: wz });
+  E.x += (wx - E.x) * ke; E.y += (wy - E.y) * ke; E.z += (wz - E.z) * ke;
   const W = B.relWind || (B.relWind = { x: 0, y: 0, z: 0 });
-  W.x = wx - vx; W.y = wy - vy; W.z = wz - vz; B.relWindSpeed = Math.hypot(W.x, W.y, W.z);
+  W.x = E.x - vx; W.y = E.y - vy; W.z = E.z - vz; B.relWindSpeed = Math.hypot(W.x, W.y, W.z);
+  // the crouch the figure is handed: the body's own, held through the gust (EXPLORER_BODY.hunkerHold)
+  { const hn = B.hunkerNow || 0, h0 = B.hunker01 || 0; B.hunker01 = hn >= h0 || !(T.hunkerHold > 0) ? hn : hn + (h0 - hn) * Math.exp(-dt / T.hunkerHold); if (B.hunker01 < 1e-4) B.hunker01 = 0; }
   // the swimmer
   const swimming = !grounded && sub > 0.3;
   B.swim = swimming ? 1 : 0;

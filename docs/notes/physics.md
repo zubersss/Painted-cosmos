@@ -24,8 +24,18 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
   PAINTER, M4 fix round" under item C.**
 - **7 (Neptune's storm coast throws the ship): DONE**, item C below (single frames of 2.5 g that are left are PILOT's
   ground assist's: For PILOT).
-- 2 and 10 (a floor under what moves; the gust's envelope), 4 and 6 (snow and rain as PAINTER needs them), 1 (the
-  scramble at Neptune's storm coast), 5 (rims), 8 (wakes): **not yet done; next in that order.**
+- **10 (the gale has no rhythm): DONE on PHYSICS' side**, item D below (the figure is handed the gust's envelope).
+- **4 (snow: ruled lines at the lens): DONE in part**, item E (the stroke is capped at 30 px and nothing is drawn
+  nearer than 2 m; "slower flakes near the eye" is not done: for PAINTER).
+- **8 (the water takes no mark): DONE on PHYSICS' side**, item F (a swimmer's and a wader's own rings and collar; the
+  storm sea's crest lines are not done).
+- **2 (on a fair day the painting does not move): NOT FIXED, measured**, item G: the floor PAINTER asked for was built
+  and filmed at two sizes and does not show; the dropped link is the drawing. Not shipped.
+- **6 (rain as sheets), 1 (the scramble at Neptune's storm coast), 5 (rims): NOT FIXED**, item H (why).
+- *Checks for D, E, F together* (a clean export of `33786a9` with their seven files, `m4/final3`): world 20, unit 181,
+  physics **322** (319 + 3), `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game at quality 1 (640 x
+  360) through three takes (afloat off Earth's coast, Neptune's squall, the alpine blizzard): no console error, no
+  game error, fallback empty.
 
 **A. RAIN NO LONGER STOPS A WALK (item 3; `explorer.js`: SHORT STEPS, `EXPLORER_BODY.holdMargin`, `st.phys.paceHold`).**
 - *Reproduced* (PILOT's `pilot12/wetstall.mjs`; `m4/s/wettrace.mjs head earth spawn 240 90`): 21.4 m east of the spawn, on
@@ -165,6 +175,112 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
   holdSpeed, holdGain, holdBrake, holdAccel, holdReach, buffetMax, buffetMeanTime, rockMax`; `st.phys.windMean,
   windDev, windFelt, windShed, station, buffetMean`; `cmd.storm` (false: the hull in the raw wind).
 
+**D. THE FIGURE IS HANDED THE GUST, NOT THE SAMPLE (item 10; `explorer.js`: `EXPLORER_BODY.hunkerHold`, `.figureGust`).**
+- *Reproduced* (`m4/s/figtrace.mjs`, PILOT's Sim at Neptune's storm coast, clock 205, standing 8 s, every tenth of a
+  second): wind at the walker 14 to 111 m/s (42 m/s apart in a tenth); the lean handed to the figure 0.7 to 49.7
+  degrees, **45.9 degrees apart in a tenth of a second, its direction turning 131 degrees**; the crouch 0.49 to 0.99;
+  the air past the body 7 to 80 m/s. PAINTER's model eases what it is handed over a fifth of a second: it pulsed.
+- *Now* (output only: the body's forces are the wind of the instant, to the digit): `st.phys.leanV` and `lean` are the
+  lean the body HOLDS (the push of the last `figureGust` 1.5 s, eased; `leanNow` is the instant's, what `lean` was);
+  `relWind` is the wind's envelope (`windE`, the same easing) less the body's own velocity (a run still streams the
+  scarf at once); `hunker01` (and `ride` with it) is the crouch held through the gust: down as fast as the body gets
+  down, up no faster than over `hunkerHold` 2 s. The crouch the forces go by is `hunkerNow` (what `hunker01` was).
+  Tried and not kept: holding the forces' crouch too made every walk in the squall a crawl at 1.2 m/s (10 m in 8 s
+  for 14 to 25).
+- *Measured after* (the same trace; `m4fix/figtrace-before-after.txt`): the lean 11.9 to 24.3 degrees, **1.8 degrees
+  apart in a tenth of a second, turning 6 degrees**; the crouch 0.67 to 0.99; the air past the body 23 to 47 m/s (2.4
+  apart). PILOT's `pilot12/stormwalk.mjs` there: every metre and every slowest second as before. In the game
+  (quality 1, 640 x 360, standing at that stand, clock 210, three frames 0.3 s apart after the arrival veil;
+  `m4fix/game-figure-neptune-squall-after.jpg`, opened): the figure on the grey beach by the white-lined sea, its
+  scarf out, in much the same attitude in the three; not a film, and no before: the trace is the proof.
+- *Tests:* **M4 the gust, not the sample** (`explorer.test.mjs`, new; PAINTER's own wind series; fails on `33786a9`:
+  the lean 2 to 54 degrees). **P26 the figure's state** adjusted in two lines (a steady wind is given 15 s for the
+  lean's vector to come to the lean; still air 20 s to come upright exactly). PILOT's `tests/figure.test.mjs` passes
+  unchanged (it asks that the lean's size be `st.phys.lean`: it is).
+- *API (additive):* `EXPLORER_BODY.hunkerHold`, `.figureGust`; `st.phys.hunkerNow`, `.leanNow`, `.windE`. Changed
+  meaning: `hunker01`, `lean`, `leanV`, `relWind` are the held, eased ones.
+
+**E. SNOW AT THE LENS (item 4; the kit: `three/expand.js` `maxLenPx`, `DRAW_PAINTED.snow`).**
+- *What PAINTER asked and what was there:* "per flake, where it was a frame ago (or its velocity)": every buffer has
+  had `vel` since P1, and the snow kit draws each flake out along it; P10 let that stroke be as long as the flake
+  travels in a frame, up to 8 flake sizes (a 19 m/s blizzard drew nothing near the eye before). Near the lens that
+  is PAINTER's ruled line.
+- *Now:* `maxLenPx` (a dab with an exposure): no stroke longer than that on screen, and a flake that travels more than
+  that in a frame is not a mark the eye can follow: it shrinks away (gone at 1.6 times). The painted table's snow:
+  `maxLenPx: 30`, `near: 5` (nothing nearer than 2 m, full size from 5). PAINTER's own override in
+  `world/index.js` (size, minPx, maxPx, varySize) keeps both.
+- *Measured* (the kit's arithmetic, a 48 degree lens 540 px high, walking at 4.2 m/s into 13.5 m/s from half left,
+  2400 flakes 1 to 9 m ahead): the longest stroke **77 px -> 34 px** (30 and the flake's own size), the nearest flake
+  1.3 m -> 2.1 m, 1768 -> 1476 drawn (375 beyond 6 m). A calm snowfall: identical marks.
+- *Test:* **M4 snow at the lens** (`kits.test.mjs`, new; fails on `33786a9`).
+- *Not done:* "fewer, larger, slower flakes near the eye (a calm game can let the near snow fall at 2 m/s whatever the
+  wind)": slower than the wind is a picture's choice with a cost I could not judge without a blizzard film at the top
+  tier; the flakes that are left in a blizzard are those 4 m and more away. **In the game** (quality 1, 640 x 360, a
+  walk up the alpine meadow at clock 1721 in what is called a blizzard there; `m4fix/game-blizzard-walk-after.jpg`,
+  opened: two frames of PAINTER's arrival veil, then the figure on a pale snow slope under soft slanted veils, a few
+  pale specks, no line at the lens): the wind at the walker was 2.2 to 2.5 m/s in those frames, so they do not show
+  the cap at work in a driving wind: the kit's arithmetic above is the proof; for PAINTER to judge in a gale.
+
+**F. THE WATER TAKES A MARK (item 8; `loose.js` WADE, `particles.js _event`).**
+- *What was there:* the wakes as heights (`water.js`: a swimmer's ring source 2.4 cm at 2 m/s, 5 cm of wave behind it:
+  in the surface PAINTER's water rides, as before); as MARKS a wader laid one ring for every half metre, of strength
+  pace / 3, and on any sea over 0.1 m high the rings were taken away as a rain drop's are (P20: at Earth's coast, Hs
+  0.14 to 0.46 m, nearly all); a swimmer laid no ring and threw nothing.
+- *Now:* a body in liquid leaves rings of its own that a chop does not take (`WADE.ownCalm` 0.6 of their strength at
+  least): a wader one at each leg for every `ringEvery` 0.45 m; a swimmer three (the shoulders and behind) for every
+  0.45 m swum or every 0.7 s treading: laid along its path they are its wake. And a swimmer has a collar: 12 drops of
+  spray a metre (8 a second at least), thrown a hand's breadth up where the body meets the surface (PAINTER's spray
+  is a pale blot half a metre wide: together a wisp of white round the shoulders).
+- *Measured* (`loose.test.mjs`): a swimmer at 2 m/s for 4 s: **51 rings, 5 drops in the air on average, 0.15 m over the
+  water at most** (0 and 0); treading water: 15 rings, 1.7 drops; a wader at 2.5 m/s for 3 s on a sea 0.4 m high: over
+  20 rings (none).
+- *Test:* **M4 the water takes a mark** (new; fails on `33786a9`: no ring).
+- *Not done:* the storm sea as shapes (crest lines with a breaking fraction, streak directions); splashes as curved
+  drops (the spray's stroke is PAINTER's override: `world/index.js draw.spray`). **Not judged in a frame:** filmed once
+  (`m4fix/game-swim-after.jpg`, opened: the explorer put down on open water 55 m off Earth's coast with W held; the
+  frames show the blue sea from close to its surface, pale flecks near the lens in the first two, the ship afloat in
+  the last two; the figure is not in the picture), so neither the rings nor the collar can be told from it.
+
+**G. ON A FAIR DAY THE PAINTING DOES NOT MOVE (item 2): measured; the floor was built, filmed and NOT shipped.**
+- *What PHYSICS hands at the spawn in its breeze* (0.6 to 2.6 m/s; `m4/s/breathe.mjs`, `adrift.mjs`, 40 to 60 s): the
+  grass bends 0.3 to 6 degrees (mean 1.7), 1.1 to 1.8 degrees apart in half a second (a centimetre at a blade's tip);
+  the top of a 12 m tree stands 5 to 18 cm off the vertical and moves up to 4.3 cm in a second; **14 leaves and 25
+  spores are adrift in the air at any moment** (2.3 and 2.1 born a second). In the thunderstorm: the grass 14 to 25
+  degrees in the mean, to 50 and 65, **25 to 30 degrees apart in half a second**; the tree's top 0.4 to 2.6 m, 0.5 to
+  0.9 m in a second; 1100 leaves in the air.
+- *The floor PAINTER asked for, built* (kept as `m4fix/flora-floor-not-shipped.patch` against this commit's
+  `flora.js`: gust fronts every 12 s bending the sward for a second and a half, a slow breath of the crowns; in the
+  bend field itself, no uniform; `FloraField.breath` a lever on it): at PAINTER's size (12 to 15 degrees, 5 to 8 cm)
+  and at a larger one (20 to 27 degrees, 20 to 30 cm; the patch has the larger).
+- *Filmed in the game* (quality 1, 640 x 360, the spawn at clock 60, frames half a second apart; `m4/s/film.mjs`,
+  `flick.py`: the share of pixels whose L* moves by more than 6 between two frames): **no floor 0.49 %; PAINTER's size
+  0.54 %; the larger size 0.54 % (12 frames); eight times PAINTER's size (the grass flat in every front) 1.19 %, 1.78 %
+  in the grass, 1.32 % in the crowns.** The thunderstorm: 2.23 % in all, 4.08 % in the crowns, **0.95 % in the grass**,
+  with 25 to 30 degrees of bend handed every half second. The amplified differences opened
+  (`m4fix/meadow-floor-diff.jpg`: no floor, PAINTER's size, eight times, the storm): only at eight times do blades
+  change, and only in the nearest few metres; in the storm the rain's strokes and the crowns change, the meadow hardly.
+- *So:* the link that drops the motion is the drawing, not the load. PAINTER's near strokes take 0.7 of the bend
+  (`world/nearground.js` `flex` 0.7, 0.6 for the broad kinds) and its far strokes none (`flex = far ? 0 : 0.6`); a
+  blade's tip moving a hand's breadth does not survive the brush; crowns moving 5 to 20 cm are a pixel or two at 20 m;
+  the leaves adrift did not read at the top tier either (PAINTER's own critique: "nothing falls, nothing flies", with
+  14 in the air). A floor from PHYSICS large enough to register would lay the grass flat in a breeze. **Not shipped;
+  for PAINTER** (below).
+
+**H. NOT FIXED, AND WHY.**
+- *6, the heaviest rain cannot be seen:* PAINTER's own FIX 2 (`608b687`) redrew the rain with the kit's existing
+  levers (long thin strokes, half of PHYSICS' drops, lifted out of the darks and laid dark on a light sky), and the
+  storm's frame at clock 1770 shows them (`m4fix/game-spawn-storm-clock-1770.jpg`). The far veils under the cloud are
+  in PAINTER's sky since M3 (`sky.rain`). Rain "as sheets per gust front" would be a new mark and a new material: not
+  begun in a final round.
+- *1, the scramble at Neptune's storm coast* (one look: `wallrun` 4.5 / 2.2 / 6.0 m gained on ground over 50 degrees,
+  climbs of 2.5 to 4.7 m/s on 55 to 57 degrees): the faces there are ledges under a clamber high, one above the
+  other; each is a step by the law (P26: a wall is a facet from which the ground goes on up more than a clamber within
+  two looks), and a flight of them is climbed at the pace the hold gives. Slowing it is P26's Next (1), the honest
+  hill, which changes every rim of the boulderrun replay: not in a final round.
+- *5, the run checked at rims and boulder rows:* as P24 and P26 left it. Their two built variants each break a rule
+  of the block (thrown up 0.26 and 0.47 m at boulderrun's ridge; a worst step of 2.5 m/s); Mercury's check is PILOT's
+  column. Nothing new was tried: the hold over boulders is what keeps the feet down everywhere else.
+
 ### For PILOT and PAINTER, M4 fix round (twenty-fifth PHYSICS agent)
 
 - **Earth's weather clock moved by +1530 s (item B).** Every instrument that sets the game's clock to stand in the
@@ -186,8 +302,19 @@ Evidence in the repository: `docs/shots/physics/m4fix/`.
 - **PILOT, the hands-off hover is now a station hold in air** (item C): it leans back to where the hull came to rest,
   level only, and lets go when anything is asked. If a mode of PILOT's wants the old free drift it passes
   `cmd.storm = false` (which also hands the hull the raw wind).
-- **PAINTER:** nothing to wire for B or C. `st.phys.windShed` (m/s^2) is there if the hull should glow while the field
-  holds it in a squall.
+- **PAINTER:** nothing to wire for B, C, D, E or F. `st.phys.windShed` (m/s^2) is there if the hull should glow while
+  the field holds it in a squall. D: the figure's lean, crouch and scarf wind now hold through a gust (1.5 to 2 s):
+  the model's own easing (`1 - exp(-5 dt)`) can stay. E: the snow's stroke is capped at 30 px and nothing is nearer
+  than 2 m; judge a blizzard at the top tier (Earth's alpine meadow, lat 62.41 lon 49.46, clock 1720); if the near air
+  is too empty, `draw.snow.maxLenPx` and `near` are yours to override. F: a swimmer now lays three rings every 0.45 m
+  and throws 24 drops of spray a second at 2 m/s: the ring's and the spray's look are yours (`draw.spray`, the ring
+  material): look once at Earth's coast.
+- **PAINTER, the fair day (item G):** the grass and the crowns do move in what PHYSICS hands you (numbers in G); what
+  the picture shows of it is under one percent of its pixels. Where it is lost: `world/nearground.js` gives the far
+  strokes `flex` 0 and the near ones 0.6 to 0.7; a blade 0.5 m long bent 2 degrees moves 2 cm, 25 degrees 20 cm, and
+  the brush keeps nothing under three pixels. A floor for the eye belongs where the stroke is drawn (a slow sway of
+  whole tufts and crown masses in `NEAR_VERT` / `PROP_VERT`, scaled by `pcPhysBend`'s load so that it follows the
+  wind's direction and dies in still air); the load itself is right.
 
 ## Hand-over P26 (twenty-fourth PHYSICS agent; P27 above is newer; P25 and older below hold for everything not named here)
 
