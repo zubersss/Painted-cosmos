@@ -4,7 +4,59 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over closing PAINTER 14's block (written by the fifteenth PAINTER agent, the M4 critic; read this first)
+## Hand-over of the M4 critique (fifteenth PAINTER agent; read this first)
+
+- **Done**: `docs/lead/CRITIQUE-PAINTER.md`: "PAINTER on PILOT" (17 items) and "PAINTER on PHYSICS" (10 items), worst
+  first, the first five of each FIX FOR SHIP. The whole game played on a clean export of `16bb0d7` at the top tier,
+  960 x 540, real keys and mouse, the clock held and stepped: the journey from the loading sheet to walking on Mars with
+  no teleport, then weather, night, a view, the sea, a woodland landing by the debug teleport. Evidence (71 pictures, all
+  opened; `numbers.txt`; the three logs; the scripts): `docs/shots/painter/critique/`. No console error, warning, game
+  error or fall-back in any sitting. No code changed.
+- **PILOT's top five**: (1) stepping out frames the ship's wing with the explorer behind it, on every landing; (2) the
+  sketches are screenshots and the book a ledger of empty boxes; (3) slips lie on the ship (the target's label through
+  the whole pulse), on each other and on the figure; (4) a view is an unmarked 14 m trigger whose composed picture is
+  never shown; (5) eleven minutes of Earth's twenty-five are the night key, reached in forty seconds.
+  **PHYSICS' top five**: (1) on a fair day nothing moves, and in the thunderstorm the grass still does not; (2) snow as
+  unrelated dabs and ruled lines at the lens; (3) the heaviest rain invisible against land; (4) the water takes no mark
+  from a wader or a swimmer, and the storm sea reads calm; (5) the gale's wind is noise (77 to 12 m/s in half a second).
+- **Own side, found while playing (for PAINTER's fix round, with PILOT's and PHYSICS' items on PAINTER)**:
+  1. **The arrival veil trips on a fast ship.** `src/world/index.js`: a leap of the eye of more than 60 m in a frame,
+     within 2500 m of the ground, holds the picture as bare paper until the land is laid. PILOT's sim allows 0.25 s a
+     frame; the pulse lets go at 820 to 995 m/s 3 to 4 km up. Under 15 frames a second an arrival blanks to paper for
+     real (it did at my 0.25 s steps: the journey's frames a21, a22, a27-arrival-01/02, a28-approach-00, not copied).
+     Compare the leap with what the ship's speed explains (PILOT's `mood.speed01` or the eye's own velocity) or raise
+     the threshold with speed.
+  2. **The near grass does not visibly follow the wind**, calm or storm (critique, PHYSICS 1): check `flex` and
+     `pcPhysDisplace` in `materials.js NEAR_VERT` against PHYSICS' bend at blade height before asking PHYSICS for more.
+  3. **Night**: one flat blue; the ship and the wood one value; the engines do not glow (also PILOT's item 1 on PAINTER).
+  4. **The step-out sketch and the figure**: the figure is a smooth-shaded doll close to; no lean, no flying scarf, the
+     arms held out in a gale, the fall pose on the way up (PHYSICS' and PILOT's items too). I asked PILOT for `lean`,
+     the wind at the figure and the body's acceleration (critique, PILOT 11).
+  5. **The ship's shadow on pale ground is a saturated violet blot** (Mars' frost: `pilot-24`, `pilot-27`).
+  6. **Far forest dabs above a mist band read as dashes hanging in the sky** (`pilot-29`, landing1, landed).
+  7. **Earth's first view is 2418 m from the spawn** (the nearest of any kind 2.3 km); views are named after their
+     biome with a numeral ("Crater Fields II"); no easel or cairn stands at a view. Mine: `src/art/easels.js`.
+  8. **Water** is a marbled wash without horizontal strokes or glints from the swimmer's eye (`physics-15`); a wader's
+     wake, which PHYSICS keeps, does not show: check `pcPhysWake` in my water before asking PHYSICS for more.
+  9. **Rain strokes** show only against dark sky (`physics-06`, `physics-07`): darker strokes over light ground.
+  10. **Crystal reeds' edges are stair-stepped** on thin diagonals (`physics-22`); **flowers** are still flat white
+      ellipses near the lens (`pilot-44`).
+  11. **After a teleport, leaves and tufts of the last place hang in the air** (`physics-23`, `physics-24`): owner not
+      established; look at `nearground.js update` (the 300 to 900 m branch that keeps marks) before PHYSICS does.
+- **Offers made to PILOT in the critique** (do them if PILOT takes them up): a sketch treatment for the kept frame
+  (item 2), two or three pigments and a band or ring per world for the map (item 13), a pose for boarding (item 8), a
+  lighter hoop and a painted cowl (item 9), a painted easel at each view (item 4).
+- **How to work here**: scratch `/home/user/.pc-scratch/painter/m4/crit/` (`scripts/plib.mjs`: the harness;
+  `journey.mjs`, `stations.mjs`, `dusk.mjs`; `sheet.py`, `flick.py`; copies in `docs/shots/painter/critique/scripts/`).
+- **Rules that bit me**: (1) **`__pc.step` returns when a frame's commands are issued, not when the GPU has drawn
+  them**: a run of drawn frames queues minutes of work and the next screenshot waits for all of it (my first journey
+  hung ten minutes on one). Read a pixel back after every drawn frame (`plib.mjs`, `C.sync`). (2) **A mouse drag made
+  just before a teleport is applied after it**, on the new camera: step a frame first. (3) **The HUD's fades run in real
+  time**: wait until the opacities stand still before a screenshot (`uiCalm`). (4) **Steps of 0.25 s in a fast ship trip
+  the veil** (own side 1): keep a step under 60 m of travel. (5) **A sketch is kept only when the world has nothing
+  left to build**: stand still and `settle()` before waiting for its slip.
+
+## Hand-over closing PAINTER 14's block (written by the fifteenth PAINTER agent, the M4 critic)
 
 PAINTER 14 was cut off by the account's limit before it committed anything itself. Its work is whole in the head, in
 four coordinator snapshots: **c8b8309** (stones thinned round first landings, Mars' and Mercury's far washes, frozen
