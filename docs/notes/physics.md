@@ -17,8 +17,10 @@ instrument copied; `sweep.sh <root> <out>` its fourteen sections on a tree, `cmp
 `slopeang.mjs <root> [g wish hz deg cases]` a walk at every heading on a slope, `downtest.mjs <root>` the new test's
 measurement; `out/` their outputs).
 
-**State:** R1 DONE and R2 DONE, one commit (the one that carries this block; its message names both). Nothing of
-this pass is open. What was not verified is under "Not verified" at the end of this block.
+**State:** R1 DONE and R2 DONE in one commit, `da44e1f` (its `src`, `tests`, `vendor` and `index.html` are the checked
+tree `m4/r/final`'s to the byte; PILOT's `bafcfc7` between touched only its notes and evidence). Nothing of this pass is
+open. What was not verified is under "Not verified" at the end of this block. (`m4/r/work/` was removed: it was
+`final/`'s `src` to the byte.)
 
 **R1. GOING DOWN, THE WALK'S OWN PACE (`explorer.js`: `EXPLORER_BODY.holdDownFrom` 0.2, `.holdDown` 0.6).**
 - *Reproduced* on a clean export of `246fce6` with the verifier's own `slope2.mjs`, to the digit of its report (wet litter
