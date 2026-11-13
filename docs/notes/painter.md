@@ -15,6 +15,14 @@ sent as files with `send.sh <out> <name> < body.js` (directives `//! place`, `//
 `//! problems`, `//! quit`); `helpers.js` (`__go(body, { biome, T, hour, ship, altitude, pitchDeg })`); `tone.py`
 (L* percentiles of a frame inside the border); `sheet.py` (a labelled contact sheet); `s17/checks.sh <tree> <out>`:
 the project's five checks one after another).
+`live3.mjs` is `live2.mjs` with `//! keydown Code`, `//! keyup Code`, `//! drag dx dy`, `//! film name frames every dt`
+and `//! probe`; `helpers2.js` adds `__coast(body, biome, T, back, hour)` (stand on the beach facing the sea) and
+`__orbit(body, k, hour, pitch, dir)`; `s17/figcheck.mjs <tree>` (the explorer's `animate` over 4536 states in Node:
+`node --import /home/user/.pc-scratch/painter/m14/tools/reg.mjs s17/figcheck.mjs <tree>`).
+**Commits of the round**: `b579366` (FIX 1, the sixteenth), then the seventeenth's on `21aa969`: `608b687` (FIX 2),
+`70aec16` (FIX 3 and 4), `7d27bf4` (PHYSICS' five and FIX 5), `e784574` (the edge of the air), `a8437ca` (the
+arrival veil). Checks on a clean export of the last one's tree: world 20, unit 181, physics 314, `coast.mjs` PASS at
+both stands, `ghostfield.mjs` all zeros; the game loads at quality 0, 1 and 2 with no console error, fallback empty.
 
 - **FIX 1, night in its own key: DONE** (sixteenth, commit `b579366`; its message has every number). The moon is the
   light at night (`uMoon`, `chunks.js pcLevel`), the sheet's night key no longer runs the middle values together, the
@@ -138,6 +146,10 @@ the project's five checks one after another).
   debug teleport still holds the picture: `m4fix/12-arrival-veil.txt`; the frame after the run opened: a painting).
   New test, failing on the commit before (the module is not there): `src/world/arrival.test.mjs`, "M4 arrival: a leap
   is an arrival only where the frame before does not explain it" (world tests 19 -> 20).
+- **The final tree (`a8437ca`'s files) seen at the top tier and at quality 0** (no console error, fallback empty):
+  `m4fix/13-top-tier-final-tree.jpg` (opened: the edge of the air at 700 m and 620 m, the figure rising after a jet
+  with its arms in, coasting down, swimming, treading water); at quality 0 the edge of the air at 700 m and the spawn
+  at ten (opened, not kept).
 - **Seen on the committed tree at the top tier and at quality 0** (no console error, fallback empty in either):
   `m4fix/09-top-tier-committed-tree.jpg` (Earth, Neptune, Pluto, Mars from orbit; the storm and ten in the morning at
   the spawn), `m4fix/10-quality-0-committed-tree.jpg` (the storm with its rain strokes, a fair midnight, Neptune's
