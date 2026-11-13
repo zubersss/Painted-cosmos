@@ -139,6 +139,30 @@ export const EXPLORER_BODY = Object.freeze({
   // degree crest, 6 m/s over 29 / 10, 3 m/s over 54 / 7, on the Moon, Mars and Earth alike within 5 % of the law);
   // a runner who sees it coming shortens the stride and sheds the rest with the soles.
   crestMargin: 0.92,      // the pace planned, as a share of that law
+  // (P26) A WALL. On hands and feet (a scramble) the walker goes up ground its soles alone do not hold: any ground up to
+  // scrambleSlope (toes kicked in, hands down), and ground that grips as far as the soles' hold with the hands' pull
+  // added, friction + foothold + scramblePull / g (the hands hold a force, not a share of the weight: 100 N is a tenth of
+  // the body's weight on Earth and most of it on the Moon: dry rock is scrambled to 53 degrees on Earth, 57 on Mars, 62
+  // on the Moon; turf, regolith and ice to 47 on Earth, regolith to 53 on the Moon, the game's Pluto's ice to 52). A face
+  // steeper than that which rises on more than a clamber within two looks has no top for the hands and nothing for the
+  // feet: a WALL.
+  //   - It is no step and gives no hold: a body on one is carried by its facet, where gravity pulls it back and friction
+  //     is what it is, and the suit's start-and-stop thrusters (cmd.assistAccel) have no part up its fall line (on the
+  //     Moon they are stronger than gravity: the lift is the jetpack's, with its fuel).
+  //   - A walker does not put a foot on one. Where a step would end on a wall, the wall takes the velocity into it (along
+  //     its normal: the mass rides at the hips). If what is left along it would lift the body no more than the legs
+  //     reach (w^2 / 2 g within legReach), the legs take that too and the feet stay: the walker stands at its foot, or goes
+  //     along it with the speed it has along it (as round a trunk). More than that is momentum: the body rides up the
+  //     wall on it, sliding, and comes back down (in low gravity a run carries further: a 7.4 m/s run met by a 70 degree
+  //     wall with no room to slow rises 0.16 m on Earth, 1.0 m on Mars, 1.2 m on the Moon).
+  //   - A runner who sees one on the way (a rise of more than a clamber, steeper along the path and by its own facet
+  //     than its own ground is scrambled) sheds its pace with its soles and stops at its foot (paceWall).
+  // Until P26 any rising ground gave the limbs a hold once the legs were at work, and since P22 they are at work at the
+  // foot of every rise (the tube raises the hips in time): a walker carried on its limbs feels no gravity along the
+  // face, and Earth's sea cliffs (70 to 79 degrees) were run up 50 m at 6 m/s (PILOT's critique, item 1).
+  scrambleSlope: 1.08,    // m/m (47 degrees): the steepest ground scrambled whatever it is made of
+  scramblePull: 1.0,      // m/s^2 (100 N): what the hands add to the soles' hold, over g
+  wallGap: 0.2,           // m short of its foot the pace read for a wall comes to nothing
   // wayTime (s): legTime x 3 + the time to fall through the reach (sqrt(2 reach / g)): 0.6 s on Earth, 0.95 s on the Moon
   // GAIT (P13). The stride-averaged body above (st.p, st.v: the path, the pace, the stops) is carried by
   // legs that step. Within the stride the hips ride the mechanics of a legged walker:
@@ -219,6 +243,9 @@ export const EXPLORER_BODY_STATE = () => ({
   paceCap: 1e9,           // m/s: the pace the walker holds so its feet can follow the ground ahead
   paceAhead: 1e9,         // (P16) m/s: the pace it holds now to meet a face it has seen ahead at the pace it can climb it
   paceCrest: 1e9,         // (P22) m/s: the pace it holds now to meet the crests it has seen at the pace it can follow them
+  paceWall: 1e9,          // (P26) m/s: the pace it holds now to stop at the foot of a wall it has seen (see EXPLORER_BODY.scrambleSlope)
+  wall: 0,                // (P26) 1 on a step whose feet a wall stopped (the speed into it taken), 2 on one that rode up a wall on its momentum, else 0
+  wallAt: null,           // (P26) the last two places on the way that looked like a wall, and whether each is one (see wayWall)
   ahead: null,            // (P16) that face: { x, y, z (unit), rise (m), vc (m/s) } or null
   probe: null,            // (P17) a feature being tried (see EXPLORER_BODY.aheadProbe): its profile, the trials so far
   seen: null,             // (P17) the end of the way ahead known (a feature tried): { x, y, z (unit), d (m along) } or null
@@ -273,6 +300,7 @@ function stepScratch(ghost = false) {
     dir: { x: 0, y: 0, z: 0 },              // the unit direction sampled last: the body's up at its new place, once sampled
     dir2: { x: 0, y: 0, z: 0 },             // a point read ahead (groundAhead, probeStart, the next footfall)
     gnd: {},                                // env.ground's out
+    gw: {},                                 // (P26) env.ground's out for the ground where a step would end on a steep face (a wall?)
     G: null, gEnv: null, gx: 0, gy: 0, gz: 0,   // the ground where the last step ended (env.ground's answer), and where
     air: { density: 1.225, wind: { x: 0, y: 0, z: 0 } },
     // (P18) what feels the air: a body half a metre across moving at its own velocity (the sub-second eddies, wind.js gustSubAt)
@@ -304,6 +332,13 @@ function groundAhead(env, D2, px, py, pz, hx, hy, hz, dist) {
   const k = dist / l, x = px + hx * k, y = py + hy * k, z = pz + hz * k, r = Math.hypot(x, y, z) || 1;
   D2.x = x / r; D2.y = y / r; D2.z = z / r;
   return env.sample(D2).radius;
+}
+// (P26) The steepest ground (rise per metre) the limbs scramble on ground G under gravity g (see EXPLORER_BODY.scrambleSlope)
+function scrambleHold(G, g, T) { return Math.max(T.scrambleSlope, G.friction + G.foothold + T.scramblePull / Math.max(0.3, g)); }
+// (P26) Does the ground go on up from (px, py, pz) (radius h) along (hx, hy, hz): more than a clamber over h within a look
+// or two? (the second half of what makes a steep face a WALL: see EXPLORER_BODY.scrambleSlope)
+function risesOn(env, D2, px, py, pz, h, hx, hy, hz, T) {
+  return groundAhead(env, D2, px, py, pz, hx, hy, hz, T.look) - h > T.clamber || groundAhead(env, D2, px, py, pz, hx, hy, hz, 2 * T.look) - h > T.clamber;
 }
 // (P16) THE WAY AHEAD. Running, read the ground `d` ahead along the path (and aheadSpan short of it), d far enough for the
 // soles to brake from this pace; a face the hips must climb (a rise of more than the stroke within aheadSpan, and more
@@ -514,6 +549,38 @@ function wayCrest(W, h0, vh, gE, ab, ts, T) {
   return pace;
 }
 
+// (P26) THE WALL SEEN (see EXPLORER_BODY.scrambleSlope). The pace to hold now so that the soles, braking at ab, bring the
+// walker to a stop wallGap short of the nearest wall on the way known: the first of its samples from which the way goes
+// on up steeper than `slope` (a first look: 0.75 of what the ground under the feet is scrambled to) and rises more than
+// a clamber within a look or two, and whose own facet is steeper than its own ground is scrambled under gravity g: the
+// facet a step would be stopped at (LEGS, 3), seen from as far as the soles need. The facet and its ground are asked of
+// the world once for each such sample and kept (the last two: B.wallAt; G: the ground where the world tells nothing of
+// it); what only looks like a wall from here (a band of steps in a slope, a ridge whose top is within a clamber) is passed
+// over.
+function wayWall(B, env, S, W, ab, slope, G, g, T) {
+  if (!W || !(W.n > 1)) return 1e9;
+  let asked = 0;
+  for (let m = 0; m < W.n - 1; m++) {
+    const d = W.d[m], h = W.h[m];
+    if (!((W.h[m + 1] - h) > slope * (W.d[m + 1] - d))) continue;
+    if (!(wayAt(W, d + T.look) - h > T.clamber || wayAt(W, d + 2 * T.look) - h > T.clamber)) continue;
+    // a wall by its own facet and ground?
+    const C = B.wallAt || (B.wallAt = [{ x: 0, y: 0, z: 0, is: false, ok: false, env: null, k: 0 }, { x: 0, y: 0, z: 0, is: false, ok: false, env: null, k: 0 }]);
+    let c = C[0].ok && C[0].env === env && C[0].x === W.x[m] && C[0].y === W.y[m] && C[0].z === W.z[m] ? C[0] : C[1].ok && C[1].env === env && C[1].x === W.x[m] && C[1].y === W.y[m] && C[1].z === W.z[m] ? C[1] : null;
+    if (!c) {
+      if (asked++) return 1e9;                                                   // (one new place a step)
+      c = C[C[0].k = 1 - C[0].k];
+      const D2 = S.dir2; D2.x = W.x[m]; D2.y = W.y[m]; D2.z = W.z[m];
+      const sm = env.sample(D2), nm = sm.normal, nl = nm ? Math.hypot(nm.x, nm.y, nm.z) : 0, cn = nl > 1e-9 ? (nm.x * D2.x + nm.y * D2.y + nm.z * D2.z) / nl : 1;
+      const tn = cn > 0.05 ? Math.sqrt(Math.max(0, 1 - cn * cn)) / cn : 1e9;
+      c.x = D2.x; c.y = D2.y; c.z = D2.z; c.ok = true; c.env = env;
+      c.is = tn > scrambleHold(env.ground ? env.ground(sm, S.gw) : G, g, T);
+    }
+    if (c.is) return Math.sqrt(2 * ab * Math.max(0, d - T.wallGap));
+  }
+  return 1e9;
+}
+
 // Where a remembered point (unit direction P) lies on the way from (ux, uy, uz) along (hx, hy, hz): how far along it (m),
 // or -1e9 when it is `behind` m behind or more than a metre off the path.
 function alongWay(P, ux, uy, uz, hx, hy, hz, r, behind = 0.5) {
@@ -600,6 +667,7 @@ let _gk = 0, _gQ = null;
 const _gst = { p: { x: 0, y: 0, z: 1 }, v: { x: 0, y: 0, z: 0 }, grounded: true, phys: null };
 const _gB0 = Object.freeze(EXPLORER_BODY_STATE()), _gB = EXPLORER_BODY_STATE();   // (P19) the ghost's body, set afresh each trial (no garbage)
 const _gWay = wayRing();
+const _gWallAt = [{ x: 0, y: 0, z: 0, is: false, ok: false, env: null, k: 0 }, { x: 0, y: 0, z: 0, is: false, ok: false, env: null, k: 0 }];   // (P26) the ghost's own (no garbage)
 const _gcmd = { wish: { x: 0, y: 0, z: 0 } };
 const _gT = new WeakMap();
 function ghostSample(dir) {
@@ -635,6 +703,7 @@ function ghostCrosses(Q, v, env, T) {
   st.v.x = Math.cos(t) * v; st.v.y = 0; st.v.z = -Math.sin(t) * v;
   st.grounded = true; st.phys = Object.assign(_gB, _gB0);
   _gB.way = _gWay; _gWay.n = 0; _gWay.ok = false;          // (P22) the ghost's own way (no garbage)
+  _gB.wallAt = _gWallAt; _gWallAt[0].ok = false; _gWallAt[1].ok = false;
   for (let k = 0; k < 900; k++) {
     t = Math.atan2(st.p.x, st.p.z);
     _gcmd.wish.x = Math.cos(t) * v; _gcmd.wish.y = 0; _gcmd.wish.z = -Math.sin(t) * v;
@@ -995,10 +1064,16 @@ function stepOnce(st, cmd, dt, env, T, S) {
     // before). Clambering, with a hold on a feature (B.grip), the feet stand on holds and the body
     // is carried on its limbs, not on the facet: gravity acts along the path of the hips, and the
     // tilt of the rock under the boot does not count.
+    // (P26) ... but not on a WALL (see EXPLORER_BODY.scrambleSlope): a facet steeper than the limbs scramble from which the
+    // ground goes on up its fall line more than a clamber within two looks is no step and gives no hold: a body set
+    // down on one (a landing, a slide) is carried by the facet, where gravity pulls it back
+    const steep = nu < 0.995 ? Math.sqrt(1 - nu * nu) / nu : 0;
+    const onWall = steep > scrambleHold(G, g, T) && risesOn(env, S.dir2, px, py, pz, r, nu * ux - nx, nu * uy - ny, nu * uz - nz, T);
+    if (onWall) B.grip = 0;
     let q = B.grip ? 0 : 1;
     // A face too steep to hold by friction, but low (the ground one look ahead is within a
     // clamber of the feet), is a step: the walker goes up it on its legs and hands.
-    if (q > 0 && qlen > 1e-6 && nu < 0.995 && Math.sqrt(1 - nu * nu) / nu > G.friction + G.foothold && qx * nx + qy * ny + qz * nz < 0) {
+    if (q > 0 && !onWall && qlen > 1e-6 && steep > G.friction + G.foothold && qx * nx + qy * ny + qz * nz < 0) {
       const hS = groundAhead(env, S.dir2, px, py, pz, qx, qy, qz, T.look);
       if (hS - r <= T.clamber) q = 0;
     }
@@ -1068,7 +1143,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       // LEGS, 2: clambering, the walker holds the pace at which its feet can follow the ground ahead
       // ((P23) down low in a gale, a crawl: hunkerPace right down)
       const qh = hk > 0 && qlen > T.hunkerPace ? qlen + (T.hunkerPace - qlen) * hk : qlen;
-      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
+      if (tl > 1e-9) { const m = Math.min(qh, B.paceCap, B.paceAhead >= 0 ? B.paceAhead : 1e9, B.paceCrest >= 0 ? B.paceCrest : 1e9, B.paceWall >= 0 ? B.paceWall : 1e9) / tl; tx *= m; ty *= m; tz *= m; }
     }
     // what the legs would like to do: close the velocity error and cancel the outside loads
     let fx = (tx - sx) / T.response - ex, fy = (ty - sy) / T.response - ey, fz = (tz - sz) / T.response - ez;
@@ -1116,14 +1191,23 @@ function stepOnce(st, cmd, dt, env, T, S) {
       zx = (tx - sx) / T.response - (ex + fx); zy = (ty - sy) / T.response - (ey + fy); zz = (tz - sz) / T.response - (ez + fz);
       const zl = Math.hypot(zx, zy, zz);
       if (zl > cmd.assistAccel) { const m = cmd.assistAccel / zl; zx *= m; zy *= m; zz *= m; }
+      // (P26) ... but they do not push the body up a WALL (see EXPLORER_BODY.scrambleSlope): on one their push has no part
+      // up its fall line (the lift is the jetpack's, with its fuel): the body slides back as gravity and friction have it
+      if (onWall) {
+        const ax = ux - nu * nx, ay = uy - nu * ny, az = uz - nu * nz, a2 = ax * ax + ay * ay + az * az;
+        const zu = a2 > 1e-18 ? (zx * ax + zy * ay + zz * az) / a2 : 0;
+        if (zu > 0) { zx -= ax * zu; zy -= ay * zu; zz -= az * zu; }
+      }
     }
     // integrate along the surface
     sx += (ex + fx + zx) * dt; sy += (ey + fy + zy) * dt; sz += (ez + fz + zz) * dt;
     if (liqK > 0) { const m = 1 / (1 + (liqK * Math.hypot(sx, sy, sz) + visc * Math.min(depth, T.height)) * dt); sx *= m; sy *= m; sz *= m; }
     // LEGS, 2b: with a hold on the rock the limbs brace the body back to that pace (braceAccel), whatever the soles grip
-    if (B.grip && B.paceCap < 1e8) {
-      const sn = Math.hypot(sx, sy, sz);
-      if (sn > B.paceCap) { const m = Math.max(B.paceCap, sn - T.braceAccel * dt) / sn; sx *= m; sy *= m; sz *= m; }
+    // ((P26) and to the pace held for a wall seen ahead: a scramble up to the foot of a wall ends there, on its holds;
+    // it is not carried onto the wall by the pace the hold gave it)
+    if (B.grip && (B.paceCap < 1e8 || B.paceWall < 1e8)) {
+      const sn = Math.hypot(sx, sy, sz), cap = B.paceWall >= 0 && B.paceWall < B.paceCap ? B.paceWall : B.paceCap;
+      if (sn > cap) { const m = Math.max(cap, sn - T.braceAccel * dt) / sn; sx *= m; sy *= m; sz *= m; }
     }
     // snap to rest: never creep
     if (qlen < 1e-6 && B.slip01 === 0 && Math.hypot(sx, sy, sz) < 0.02) { sx = sy = sz = 0; }
@@ -1142,17 +1226,68 @@ function stepOnce(st, cmd, dt, env, T, S) {
     //     none, or a drop beyond a clamber, the feet leave the ground: a fall, or a bound in low
     //     gravity, with the hips' own velocity.
     const fold = T.legFold, reach = T.legReach;
-    const hip0 = B.hip, c0 = r + hip0, w = B.hipV;
-    const su = sx * ux + sy * uy + sz * uz;
-    const vh = Math.sqrt(Math.max(0, sx * sx + sy * sy + sz * sz - su * su));
-    // (the hips' weight in this radial frame: gravity less buoyancy less v^2/r, the round world falling away)
-    const gE = g * (1 - buoy) - vh * vh / r;
+    const hip0 = B.hip, c0 = r + hip0;
+    let su = sx * ux + sy * uy + sz * uz;
+    let vh = Math.sqrt(Math.max(0, sx * sx + sy * sy + sz * sz - su * su));
     let p1x = px + sx * dt, p1y = py + sy * dt, p1z = pz + sz * dt;
     let r1 = Math.hypot(p1x, p1y, p1z) || 1;
     D.x = p1x / r1; D.y = p1y / r1; D.z = p1z / r1;
     let s1 = env.sample(D);
     let h1 = s1.radius, n1x = s1.normal.x, n1y = s1.normal.y, n1z = s1.normal.z;
     let dh = h1 - r;
+    // (P26) A WALL (see EXPLORER_BODY.scrambleSlope): where the step would end, going up, on a facet steeper than the limbs
+    // scramble (by the ground there) from which the ground goes on up along the path more than a clamber within two looks.
+    // The wall takes the velocity into it, along its normal (the mass rides at the hips: its velocity is the level part
+    // of s and the hips' own rise w). If what is left along it would lift the body no more than the legs reach, the feet
+    // do not go onto it: the legs take the rest of the level speed into it and the step is taken along its foot with the
+    // speed along it (if that ends on it too, the walker stands). Otherwise the body rides up it on its momentum: feet
+    // and hips together along it, carried by its facet from here on (no hold, no step).
+    B.wall = 0;
+    let wallTook = 0, w = B.hipV;
+    for (let pass = 0; pass < 2 && dh > 1e-6 && vh > 1e-6; pass++) {
+      const l1 = Math.hypot(n1x, n1y, n1z), c1n = l1 > 1e-9 ? (n1x * D.x + n1y * D.y + n1z * D.z) / l1 : 1;
+      const t1 = c1n > 0.05 ? Math.sqrt(Math.max(0, 1 - c1n * c1n)) / c1n : 1e9;
+      if (!(t1 > 0.75 * scrambleHold(G, g, T))) break;
+      const Gw = env.ground ? env.ground(s1, S.gw) : DEFAULT_GROUND;
+      if (!(t1 > scrambleHold(Gw, g, T))) break;
+      const hx0 = sx - su * ux, hy0 = sy - su * uy, hz0 = sz - su * uz;       // (the level part of s: vh)
+      if (!risesOn(env, S.dir2, p1x, p1y, p1z, h1, hx0, hy0, hz0, T)) break;
+      // (the level part of its normal, out of the wall; cu: its upward part)
+      const cu = (n1x * ux + n1y * uy + n1z * uz) / l1;
+      const ox = n1x / l1 - cu * ux, oy = n1y / l1 - cu * uy, oz = n1z / l1 - cu * uz, ol = Math.hypot(ox, oy, oz);
+      // (the body's rise: the hips' own, coming to the wall; on it already, the feet's along it, which gravity is slowing:
+      // the hips go with them)
+      const wb = onWall ? su : w;
+      const vn = hx0 * ox + hy0 * oy + hz0 * oz + wb * cu;                 // (the body's velocity along the wall's normal: negative into it)
+      const wUp = vn < 0 ? wb - vn * cu : wb;                               // (its rise once the wall has taken that)
+      let lx, ly, lz, sv;                                                   // (the level velocity and the rise that are left)
+      const ride = pass === 0 && ol > 1e-9 && wUp > 0 && wUp * wUp > 2 * Math.max(0.05, g * (1 - buoy)) * T.legReach;
+      if (ride) {
+        // momentum: up the wall with what is left
+        const k = vn < 0 ? vn : 0;
+        lx = hx0 - k * ox; ly = hy0 - k * oy; lz = hz0 - k * oz; sv = wUp; w = wUp;
+        B.wall = 2; B.grip = 0; q = 1;
+      } else {
+        // the feet stay off it: the level speed into it goes, the speed along its foot stays (the first time round)
+        const into = ol > 1e-9 ? -(hx0 * ox + hy0 * oy + hz0 * oz) / ol : vh;
+        if (pass === 0 && into > 0 && into < vh * 0.9999) { const m = into / ol; lx = hx0 + ox * m; ly = hy0 + oy * m; lz = hz0 + oz * m; }
+        else { lx = 0; ly = 0; lz = 0; }
+        // (and of the rise the feet had along their path, the share of the path that is left)
+        sv = su * Math.max(0, lx * hx0 + ly * hy0 + lz * hz0) / (vh * vh);
+        B.wall = 1;
+      }
+      sx = lx + sv * ux; sy = ly + sv * uy; sz = lz + sv * uz; su = sv;
+      { const v0 = vh; vh = Math.hypot(lx, ly, lz); wallTook += Math.max(0, v0 - vh); }
+      p1x = px + sx * dt; p1y = py + sy * dt; p1z = pz + sz * dt;
+      r1 = Math.hypot(p1x, p1y, p1z) || 1;
+      D.x = p1x / r1; D.y = p1y / r1; D.z = p1z / r1;
+      s1 = env.sample(D);
+      h1 = s1.radius; n1x = s1.normal.x; n1y = s1.normal.y; n1z = s1.normal.z;
+      dh = h1 - r;
+      if (ride) break;
+    }
+    // (the hips' weight in this radial frame: gravity less buoyancy less v^2/r, the round world falling away)
+    const gE = g * (1 - buoy) - vh * vh / r;
     const gr = dh / dt;                                  // m/s the ground rises under the feet
     // the walker looks ahead while its legs are working (and for half a second after)
     const working = !(B.jumpT > 0) && (hip0 < -0.06 || hip0 > 0.1);   // (a crouch before a jump is not a clamber)
@@ -1160,7 +1295,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
     if ((working || B.clamberT > 0) && vh > 0.2) {
       hD = groundAhead(env, S.dir2, p1x, p1y, p1z, sx, sy, sz, T.look); looked = true;
       // (what stands out of the ground the legs last stood on, B.base, is a feature too: a hold underfoot)
-      feat = holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber);
+      feat = !onWall && B.wall !== 2 && (holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber));   // ((P26) a wall gives no hold)
       // a hold once taken is kept until the legs are back at their standing length on plain ground
       if (feat) B.grip = 1; else if (B.grip && r - hD <= T.clamber) feat = true;
     } else if (B.grip) feat = true;                      // (standing still on it, the hold is kept)
@@ -1231,7 +1366,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       else { c1 = cUp; w1 = Math.min(capB, Math.max(w1, (c1 - c0) / dt)); lam = dh > 1e-9 ? clamp01((c1 + fold - r) / dh) : 1; face = true; capF = capB; }
     } else if (c1 > h1 + reach) {
       // reached out
-      if (!looked) { hD = groundAhead(env, S.dir2, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber); if (feat) B.grip = 1; }
+      if (!looked) { hD = groundAhead(env, S.dir2, p1x, p1y, p1z, sx, sy, sz, T.look); feat = feat || (!onWall && B.wall !== 2 && (holdAhead(c0, w, vh, r, hD, T) || (h1 - B.base > 0.1 && r - hD <= T.clamber))); if (feat) B.grip = 1; }
       held = false;
       if (feat || !T.crestLaunch) {
         const gp = gE + T.gripAccel, cLow = c0 + w * dt - 0.5 * gp * dt * dt;    // the lowest the hold can bring the hips
@@ -1242,7 +1377,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
         }
       }
     }
-    B.brace = 0;
+    B.brace = wallTook;
     if (held && lam < 1) {
       // braced: the feet take only part of the step, and the rest of the forward speed is lost
       // (P21) against a face, only the speed into it (braceFace; see EXPLORER_BODY.braceSide)
@@ -1250,7 +1385,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       if (fb) {
         const o = braceFace(env, S, px, py, pz, r, ux, uy, uz, sx, sy, sz, c0, w, h1, dt, gE, pull, hD, capF, hold, T);
         p1x = o.px; p1y = o.py; p1z = o.pz; c1 = o.c1; w1 = o.w1; lam = o.lam;
-        sx = o.sx; sy = o.sy; sz = o.sz; B.surge = (B.surge || 0) + o.surge; B.brace = o.brace;
+        sx = o.sx; sy = o.sy; sz = o.sz; B.surge = (B.surge || 0) + o.surge; B.brace = wallTook + o.brace;
       } else { p1x = px + sx * lam * dt; p1y = py + sy * lam * dt; p1z = pz + sz * lam * dt; }
       r1 = Math.hypot(p1x, p1y, p1z) || 1;
       D.x = p1x / r1; D.y = p1y / r1; D.z = p1z / r1;
@@ -1275,7 +1410,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
           const sn = Math.hypot(sx, sy, sz);
           if (sn > 1e-6) { m = Math.max(lam, 1 - T.legCatch * dt / sn); B.surge = (B.surge || 0) + (m - lam) * sn * dt; }
         }
-        B.brace = (1 - m) * vh;
+        B.brace = wallTook + (1 - m) * vh;
         sx *= m; sy *= m; sz *= m;
       }
     }
@@ -1295,7 +1430,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       const rr = Math.max(h1, c1 - reach), vv1 = w1 - su;
       px = D.x * rr; py = D.y * rr; pz = D.z * rr;
       vx = sx + vv1 * ux; vy = sy + vv1 * uy; vz = sz + vv1 * uz;
-      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.paceCrest = 1e9; B.ahead = null; B.clamberT = 0; B.grip = 0;
+      B.hip = 0; B.hipV = 0; B.trend = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.paceCrest = 1e9; B.paceWall = 1e9; B.ahead = null; B.clamberT = 0; B.grip = 0;
       if (B.way) B.way.ok = false;
     } else {
       px = D.x * h1; py = D.y * h1; pz = D.z * h1; sF = s1;
@@ -1323,8 +1458,8 @@ function stepOnce(st, cmd, dt, env, T, S) {
         const sd = sx * D.x + sy * D.y + sz * D.z, ex = sx - sd * D.x, ey = sy - sd * D.y, ez = sz - sd * D.z, el = Math.hypot(ex, ey, ez);
         const near = Math.max(T.look, vh * wayTime(gE, T)), ab = Math.max(0.3, T.aheadMargin * (Math.max(0, hold * support) + (cmd.assistAccel > 0 ? cmd.assistAccel : 0)));
         const far = Math.min(T.wayMax, Math.max(near + 1, Math.min(T.aheadMax, vh * vh / (2 * ab)) + T.look + T.look));
-        if (el > 1e-9) { wayUpdate(B, env, S.dir2, px, py, pz, h1, h1 + B.hip, vh, ex / el, ey / el, ez / el, near, far, T); B.paceCrest = wayCrest(B.way, h1, vh, gE, ab, Math.max(0, B.trend, B.hipV) / vh, T); }
-      } else { if (B.way) B.way.ok = false; B.paceCrest = 1e9; }
+        if (el > 1e-9) { wayUpdate(B, env, S.dir2, px, py, pz, h1, h1 + B.hip, vh, ex / el, ey / el, ez / el, near, far, T); B.paceCrest = wayCrest(B.way, h1, vh, gE, ab, Math.max(0, B.trend, B.hipV) / vh, T); B.paceWall = wayWall(B, env, S, B.way, ab, 0.75 * scrambleHold(G, g, T), G, g, T); }
+      } else { if (B.way) B.way.ok = false; B.paceCrest = 1e9; B.paceWall = 1e9; }
       // the velocity lies along the ground as the legs carry it (see LEGS, 1) at the new place
       { const l = Math.hypot(n1x, n1y, n1z); if (l > 1e-9) { n1x /= l; n1y /= l; n1z /= l; } else { n1x = D.x; n1y = D.y; n1z = D.z; } }
       const q1 = q === 0 || B.grip ? 0 : 1;
@@ -1458,7 +1593,7 @@ function stepOnce(st, cmd, dt, env, T, S) {
       if (l1 > 0 && env.waterLevel) { const w = env.waterLevel(st.p, l1); if (w === w) l1 = Math.max(0, l1 + w); }   // (P20) the drawn sea
       if (clamp01(l1 / T.height) * liq.density / rhoBody < 1) { grounded = true; B.hip = 0; B.hipV = vx * D.x + vy * D.y + vz * D.z + hipIn; }
     }
-    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.paceCrest = 1e9; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;
+    B.support = 0; B.brace = 0; B.paceCap = 1e9; B.paceAhead = 1e9; B.paceCrest = 1e9; B.paceWall = 1e9; B.wall = 0; B.ahead = null; B.clamber01 = 0; B.clamberT = 0;
     if (B.way) B.way.ok = false;
     if (!grounded) { B.hip = 0; B.hipV = 0; B.trend = 0; B.grip = 0; }
     B.slip01 = grounded ? 0 : B.slip01 * 0.9;

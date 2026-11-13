@@ -3,7 +3,107 @@
 Branch: `cosmos` (shared with PAINTER and PILOT, one working tree). Commits: `tools/commit.sh physics`.
 Owner of: `src/physics/**`, `physics-lab.html`, `docs/notes/physics.md`, `docs/shots/physics/**`.
 
-## Hand-over P25 (twenty-third PHYSICS agent; read this block first; P24 and older below hold for everything not named here)
+## Hand-over P26 (twenty-fourth PHYSICS agent; read this block first; P25 and older below hold for everything not named here)
+
+**Where things stand (this block is being written commit by commit; this is its first).** The block, in order: (1) MUST FIX,
+the explorer runs up cliffs (PILOT's critique, item 1); (2) the white-water cap (the coordinator's ruling); (3) the sudden
+checks on arrival ground; (4) the state for the drawn figure; (5) the wading splash. **Done and in this commit: (1).** Tests
+on a clean export of `90bb703` with this commit's two files (`p26/final1`): `node --test src/physics/` **311 pass** (308 + 3
+new, `explorer.test.mjs` 'P26 ...'; `load.test.mjs` among them: every physics module loads alone), `node --test
+tests/*.test.mjs` **152 pass**, `node --test src/world/*.test.mjs` **19 pass**; `coast.mjs` PASS at both stands
+(reference Hs 0.62 / 3.85 m, as before); `ghostfield.mjs` all zeros (worst step loss 0.26 Earth, 0.52 Moon, as before).
+Scratch: `/home/user/.pc-scratch/physics/p26/` (`head/` `79eb918` as exported, `work/` it with item 1, `final1/` `90bb703`
+with item 1; `p21/`, `hp21/` (the head's tree with P21's explorer.js); `s/face.mjs <root> g deg H [hz secs every mu foothold
+v]` a synthetic face step by step (`X0=`, `V0=`: where and how fast it starts), `s/cliff.mjs <root> body place heading [secs
+fps every from]` the real ground step by step, `s/diag.mjs` a wall met at an angle, `s/fastmeet.mjs` walls met at pace,
+`s/survey.mjs <root> [body ...]` every stand and spawn of the ten bodies, `s/thrown.mjs` the flights at one stand,
+`s/wallsite.mjs` wallrun at boulderrun's site, `s/kept.sh <tree>` the measured sets of P22 to P25 (`knife`, `rowloss2`,
+`mbv`, `hill43`, `field`, `p17`), `s/runall.sh <tree>` wallrun, runfield and ghostfield at every place of PILOT's lists,
+`s/obsnear.mjs` what stands near the explorer when it is checked; `out/` every output named below). In the repository,
+`docs/shots/physics/p26/`: `wallrun-before-after.txt` (PILOT's instrument at its seven places, the head and P26), `survey-head.txt`
+and `survey-p26.txt` (every stand and spawn), and the instruments `survey.mjs`, `face.mjs`, `cliff.mjs`, `fastmeet.mjs`, `diag.mjs`
+(each takes the tree's root as its first argument).
+**API added (additive):** explorer.js `EXPLORER_BODY.scrambleSlope`, `.scramblePull`, `.wallGap`; `EXPLORER_BODY_STATE()`
+`.paceWall` (m/s: the pace held to stop at a wall seen ahead), `.wall` (1 on a step whose feet a wall stopped, 2 on one
+that rode up a wall on its momentum, else 0), `.wallAt` (the reading's memory). Nothing removed or renamed.
+**Behaviour changed without a call changing:** a face steeper than the limbs scramble (see item 1) that rises on more than
+a clamber stops the walker at its foot; a runner slows for one it sees; a body on one slides back, and the suit's
+start-and-stop thrusters do not push up it; on one's way DOWN a wall there is no hold either: the body slides down it.
+
+**1. THE EXPLORER RAN UP CLIFFS: fixed (`explorer.js`: a WALL; `EXPLORER_BODY.scrambleSlope`, `.scramblePull`, `.wallGap`).**
+- *Reproduced on the head* (`docs/lead/evidence/pilot11/wallrun.mjs`, PILOT's Sim in Node, 30 Hz, 12 s of Shift+W): Earth
+  sea_coast 49.9 / 49.0 / 49.7 m gained on ground over 50 degrees (headings 0, 270, 315), desert_canyon 30.7 / 24.4 m (225,
+  270): PILOT's numbers to the digit. On a synthetic face (`p26/s/face.mjs`: level, a face 10 m high, level) the head runs
+  up every slope from 35 to 80 degrees, rock or regolith, on Earth, Mars and the Moon (46 of 48 cases reach the top).
+- *The cause* (`p26/s/cliff.mjs earth sea_coast 0`, every step). Two things, both the limbs' hold (`B.grip`, LEGS 1: "with a
+  hold the body is carried on its limbs, not on the facet: the tilt of the rock under the boot does not count", so gravity
+  does not pull along the face). (a) LEGS 3 gave a hold to "what stands out of the ground the legs last stood on" whenever the
+  legs were at work, with no word on how high it stands: a boulder, and equally a hill or a cliff. (b) Since P22 the legs ARE
+  at work at the foot of every rise: the tube raises the hips in time (hip +0.11 m at the cliff's foot, on 28 degrees of
+  turf), so the hold is taken there and kept all the way up, and against the face the hips' rise only ratchets up (the
+  brace keeps `max(w, ...)`): 5.97 m/s at the sea cliff, the body 25 m up in 4 s. P21 at the same cliff (the head's tree with
+  `3cd06dc`'s explorer.js): no hold, the facet carries the body, 0.78 m up the foot's curve and it stands where friction
+  ends (58 to 60 degrees, slip 0.2). On the synthetic face, whose foot is a sharp corner, P21 runs up too (5 of 6 cases:
+  the legs fold at the corner and the same hold is taken): the fault is older than P22; P22 made every rise take it.
+- *Now: A WALL.* On hands and feet a walker scrambles what the soles alone do not hold: any ground up to `scrambleSlope`
+  (1.08: 47 degrees), and ground that grips as far as friction + foothold + `scramblePull` / g (the hands hold a force, 100
+  N, not a share of the weight: dry rock to 53 degrees on Earth, 57 on Mars, 62 on the Moon). A facet steeper than that
+  from which the ground goes on up more than a clamber within two looks is a wall:
+  - it is no step and gives no hold (LEGS 1 and 3): a body on one is carried by its facet, gravity pulls it back, and the
+    suit's start-and-stop thrusters (`cmd.assistAccel`) do not push up it (on the Moon they are stronger than gravity);
+  - a walker does not put a foot on one (LEGS 3): where a step would end on a wall, the wall takes the velocity into it
+    (along its normal; the mass rides at the hips); if what is left along it would lift the body no more than the legs'
+    reach, the legs take that too and the feet stay: it stands at the foot, or goes along it with the speed it has along
+    it (`phys.wall` 1); more is momentum: the body rides up on it, feet and hips together, and slides back (`phys.wall` 2);
+  - a runner who sees one on the way (the same test on the way's samples, the facet and its ground asked of the world
+    once for each: `wayWall`) sheds its pace with its soles and stops `wallGap` short of it (`phys.paceWall`); with a hold
+    on the scramble below it, the limbs brace to that pace (LEGS 2b).
+- *Measured after* (the same instruments; `p26/out/wallrun-*`):
+
+| place (wallrun.txt) | head: m gained on ground over 50 degrees | P26 |
+|---|---|---|
+| earth sea_coast | h0 49.9, h270 49.0, h315 49.7 (climb 5.6-6.0 m/s on 70-74 degrees) | 0.2, 0.2, 0.2 (steepest stood on 53-59 degrees) |
+| earth desert_canyon | h225 30.7, h270 24.4 (5.6-5.8 m/s on 72-77 degrees) | 1.1, 0.2 (h225 arrives at 6.5 m/s and rides the foot's curve to 60 degrees on its momentum: 1.44 m above the sand in all) |
+| earth alpine_meadow, mars rust_canyons, mercury spawn, neptune ice_spires, pluto lilac_mountains | 0.0 in every heading | the same lines to the digit |
+
+  The synthetic face, Shift+W for 10 s from a stand 8 m off (rock; Earth, Mars, Moon; 60 and 30 Hz): **0.00 m gained**, the
+  walker at the foot at 0.00 m/s (the head: 10.00 m, on top). Met at 7.4 m/s with no room to slow (0.4 m off, a face 60 m
+  high): 0.16 m on Earth, 1.01 on Mars, 1.22 on the Moon, thrown under 0.08 m, back at the foot. Met at 45 degrees: along
+  the foot at 2.8 m/s on Earth (29 m in 10 s), highest 0.01 m. Set down 3 m up it: slides to the foot.
+- *Every stand and spawn of the ten bodies* (`p26/s/survey.mjs`, 52 places x 8 headings x 12 s; `out/survey-head.txt`,
+  `survey-work.txt`): the worst heading's gain on ground over 50 degrees, head -> P26: Earth sea_coast 49.9 -> 0.2,
+  desert_canyon 30.7 -> 1.1, Neptune storm_seas 35.0 -> 5.9, Jupiter hanging_gardens 25.8 -> 0.2, Mercury
+  shadow_craters 14.9 -> 0.0, Uranus ice_shelves 13.5 -> 0.0, Jupiter lightning_plains 4.4 -> 2.0,
+  storm_wall 3.5 -> 1.6, Venus acid_terraces 2.6 -> 0.7, Uranus frozen_waves 0.1 -> 0.0; the other 42 places 0.0 before and
+  after. No NaN at any; nobody thrown up (the rises after leaving the ground are bodies afloat, 0.2 to 1.1 m on the swell at
+  the two coasts and Uranus' sinkhole, as on the head; Jupiter's storm_wall 0.03 m).
+- *Kept, measured* (`p26/s/kept.sh`, `trace8b.mjs`): PILOT's boulderrun replayed in Node at the Moon site: **all sixteen runs
+  the same to the digit as the head** (thrown up 0.000 in every heading; the two flights off crater walls); P24's knife
+  cases, P22's rows, the new Moon strip site (`mbv`), the 35 and 43 degree hills (`hill43`: 4.64 / 5.04 / 5.88 m/s up 43
+  degrees), the field (12 cases), P17's boulder (24 cases): identical output; `ghostfield.mjs` all zeros, the same numbers;
+  `runfield.mjs` at the seven stands of runfield.txt: six the same to the digit, Earth desert_canyon's two cliff headings now
+  end standing at the wall (slowest second 0.03 and 0.05 m/s; the head 1.66 and 1.21 while climbing it).
+- *Changed where a wall is met going DOWN* (P22's old Moon strip site, `OLD=1 mbv.mjs`, the small rim of Decision 68): its
+  inner wall is 61 to 63 degrees of rock, a wall on the Moon too (62): the walker has no hold on it now and slides down it
+  on its soles (4.08 -> 2.92 m/s in the step the hold goes, then 2.9 to 4.7 m/s down it) where the head's hold checked it
+  3.59 -> 1.27 m/s. Slowest within 3 m of the boulder 5.27 -> 4.54.
+- *Not changed, and still not physics:* below a wall the hold is as P22 left it. A hill friction holds, and the scramble
+  between the soles' hold and the limbs' (rock on Earth: 51 to 53 degrees), are climbed at the run's pace with the hold:
+  43 degrees at 6.15 m/s level on Earth (5.7 m/s up: 5.6 kW; the legs' 1600 W and the suit's 4 m/s^2 give 4.35). At Neptune's
+  storm_seas the walker runs up a ramp steepening from 35 to 53 degrees at 7 m/s, meets the wall at 5.8, rides a metre up it
+  and then drifts along the cliff's foot, 1 to 3 m up and down, at 3 to 6 m/s (the survey's 5.9 m). An honest
+  hill (the facet, the legs' power, the suit's assist; the hold for features only) changes every rim of the boulderrun
+  replay: not a change for a finishing block (Next 1).
+- *Tests* (`explorer.test.mjs`, three new): **P26 a wall is not run up** (70 degrees 10 m, Earth, Mars, Moon, 60 and 30 Hz,
+  rock and turf, 66 to 89 degrees: under a clamber, in fact under 0.3 m, at the foot at rest; met at 7.4 m/s: under a
+  clamber, thrown under 0.3 m, back at the foot; set down 3 m up: slides back; met at 45 degrees: along the foot): fails on
+  the head ("Earth 60 Hz, 70 degrees: 10.00 m up the face"). **P26 what the limbs scramble is still climbed** (a 70 degree
+  face 1.3 m high is a step; rock at 53 degrees on Earth, 56 on Mars, 60 on the Moon is climbed; 58 degrees is a wall on
+  Earth and a scramble on the Moon): fails on the head at its last line. **P26 on PAINTER's real Earth** (the sea_coast
+  stand, headings 0, 270, 315, 30 Hz, 10 s through `physics.bindEnv`: under a clamber gained on ground over 50 degrees,
+  measured 0.39 / 0.35 / 0.54 m; under 3 m above the stand): fails on the head (50.03 m).
+
+## Hand-over P25 (twenty-third PHYSICS agent; P26 above is newer; P24 and older below hold for everything not named here)
 
 **Where things stand.** M4, part 1, the critique swap: I played the whole game and wrote PHYSICS' critique of PILOT's and
 PAINTER's domains, `docs/lead/CRITIQUE-PHYSICS.md` (the coordinator's file for it; PILOT writes `docs/lead/CRITIQUE.md`),
@@ -2595,7 +2695,8 @@ stepExplorerBody(st, cmd, dt, env, T = EXPLORER_BODY)       // == physics.explor
 //  env: { sample(unitDir), gravity, air?(p,out,height), ground?(surface,out), liquid? }
 //  st.phys: { slip01, scramble01, sink, submerged01, windAccel, lean, support, impact, puff, material, friction,
 //             dust, jetThrottle, jetUse, speedGround, hunker01 (P23: 0 upright .. 1 down low in a gale; ride folds with it),
-//             windBrace (P23: N the suit braces against the wind with), ride, hip, gait, ... (see EXPLORER_BODY_STATE) }
+//             windBrace (P23: N the suit braces against the wind with), wall (P26: 1 held at a wall's foot, 2 riding up
+//             one on momentum), paceWall (P26: m/s held for a wall seen ahead), ride, hip, gait, ... (see EXPLORER_BODY_STATE) }
 
 stepShipBody(st, cmd, dt, env, T = SHIP_BODY)               // == physics.ship.step   (flight: translation only)
 //  st:  { p, v, q }   cmd: { target:{x,y,z} m/s | null, tau: s, hover?: bool, boost?: bool, carve01?: 0..1,
@@ -3038,6 +3139,32 @@ takes about 30 s to pass, so even Neptune's weather arrives rather than switches
 - The cloud seas (a light froth, Decisions 16): nobody has walked into one in the game.
 
 ## For PILOT: wiring, in order
+
+### P26, first (twenty-fourth PHYSICS agent)
+- **Your critique's item 1 (the explorer runs up cliffs): fixed, nothing to wire** (hand-over P26, item 1). Your
+  `wallrun.mjs`, before -> after: Earth sea_coast 49.9 / 49.0 / 49.7 m gained on ground over 50 degrees -> 0.2 / 0.2 / 0.2;
+  desert_canyon 30.7 / 24.4 -> 1.1 / 0.2 (heading 225 arrives at 6.5 m/s and rides the foot's curve up to 60 degrees on its
+  momentum); alpine_meadow, mars rust_canyons, mercury spawn, neptune ice_spires, pluto lilac_mountains: the same lines to the
+  digit. Your `runfield.mjs`: six of the seven stands of runfield.txt the same to the digit; Earth desert_canyon's two cliff
+  headings now end standing at the wall. Your boulderrun replayed in Node: all sixteen runs the same to the digit.
+- **What a wall is now** (so that the jetpack and a hint can answer it): a face steeper than the limbs scramble (rock: 53
+  degrees on Earth, 57 on Mars, 62 on the Moon; turf, regolith and ice 47 on Earth) that rises on more than 1.35 m.
+  `st.phys.wall` is 1 on a step whose feet a wall held (the walker stands at its foot or goes along it), 2 while it rides up
+  one on its momentum; `st.phys.paceWall` is the pace it holds for a wall seen ahead (1e9: none). If you want a pose (hands
+  on the rock) or a line on the HUD ("too steep: the jetpack"), those are the signals; `slip01` is up while it slides back.
+- **Other worlds, by the same rule** (my survey of every stand and spawn, 8 headings, 12 s; hand-over P26, item 1): the
+  cliffs that were run up 13 to 35 m at Neptune's storm_seas, Jupiter's hanging_gardens, Mercury's shadow_craters and Uranus'
+  ice_shelves stop the walker now (0.0 to 0.2 m; Neptune's storm_seas 5.9 m: a ramp of 50 to 53 degrees that rock holds
+  there, with a metre's ride on momentum past it).
+- **Your item 3, Mercury's spawn, heading 0 (1.58 m/s for a second): that check is not PHYSICS'.** At 6.83 s of your run
+  the explorer, at 7.40 m/s on 2 degrees of glass, meets a column 2.2 m tall and 0.5 m in radius dead on and
+  `collideObstacles` takes the speed into it: 7.40 -> 0.79 m/s in one frame (`st.phys.brace` 0, no pace held by PHYSICS;
+  `p26/s/obsnear.mjs <root> mercury spawn 0 6.7 7.0`: the column 0.47 m off at 6.83 s, `stuck` counting from 6.87 s). The
+  way ahead reads the ground (and your low boulders), not columns. Exact change, yours: in `src/player/explorer.js`, before
+  `collideObstacles`, steer the wished direction round a column (height over `EXPLORER.scramble`) that lies within
+  `speed^2 / (2 x 8 m/s^2) + 1 m` on the path and within its radius + 0.35 m of it, to the side the path already leans
+  (the detour you start after 0.12 s of `stuck`, started before the hit); or pass such columns to PHYSICS as
+  `env.columns` and I will have the way ahead hold a pace for them as it does for a wall.
 
 ### P25, first (twenty-third PHYSICS agent)
 - **Read `docs/lead/CRITIQUE-PHYSICS.md`, "PHYSICS on PILOT"** (the M4 swap; ranked, top five FIX FOR SHIP, evidence in
@@ -4810,9 +4937,26 @@ Example: `node tools/shot.mjs "/physics-lab.html?scene=ship&fixed=1&fast=3" out.
     ground follows PAINTER's canopy01 at the spot (none at 0.18 and under, all from 0.80), as PAINTER lays fallen leaves over
     the grass it grows wherever the canopy lets it; a world that gives no canopy01 keeps litter. A step in a glade raises no
     puff (Decision 38); under the closed wood the litter's little dust stays.
+70. **(P26) A wall is not climbed.** A facet steeper than the limbs scramble from which the ground goes on up more than a
+    clamber within two looks is a wall: no step, no hold; a walker does not put a foot on it (the wall takes the velocity
+    into it; what is left along it, if it would lift the body no more than the legs' reach, the legs take too: it stands at
+    the foot, or goes along it); a body on one is carried by its facet and slides back; a runner who sees one stops at its
+    foot with its soles. The hold underfoot (P9: "what stands out of the ground the legs last stood on") is a feature's.
+71. **(P26) The limbs scramble what the soles do not hold, as far as the hands can hold the weight.** Any ground to
+    `scrambleSlope` (47 degrees), and ground that grips to friction + foothold + `scramblePull` / g: the hands hold a force
+    (100 N), not a share of the weight, so rock is scrambled to 53 degrees on Earth, 57 on Mars and Mercury, 62 on the Moon.
+    (This keeps what P22 to P24 measured on the Moon's rims of 53 to 59 degrees, and makes a wall of the same rock on Earth.)
+72. **(P26) Momentum, not the wall, carries a body up a wall, and the suit's start-and-stop thrusters do not lift.** A body
+    that meets a wall with more speed along it than the legs' reach can take rides up on it (0.16 m on Earth from a 7.4
+    m/s run, 1.0 m on Mars, 1.2 m on the Moon) and slides back; on a wall `cmd.assistAccel` has no part up its fall line
+    (on the Moon it is more than gravity): the lift is the jetpack's, with its fuel.
 
 
 ## Needs from the others
+
+### P26 (twenty-fourth PHYSICS agent)
+- **PILOT:** Mercury's spawn check (your critique's item 3) is your column collision (For PILOT P26): a detour before the
+  hit, or columns handed to PHYSICS' way ahead.
 
 **P25 (twenty-third agent), current needs.** From PILOT and PAINTER: their answers to the critique
 (`docs/lead/CRITIQUE-PHYSICS.md`); nothing else. From the coordinator: nothing.

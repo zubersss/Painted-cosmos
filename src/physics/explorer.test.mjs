@@ -966,3 +966,102 @@ test('P23 the gale: in Neptune\'s squall (60-70 m/s at a metre, gusts to 175 m/s
   const e = galeRun({ g: 9.81, rho: 1.2, U1: 10, secs: 12 });
   assert.ok(e.hunker < 0.2 && e.brace === 0 && e.far < 0.05, `Earth's storm: down low ${e.hunker.toFixed(2)}, braced ${e.brace.toFixed(0)} N, moved ${e.far.toFixed(2)} m`);
 });
+
+// ---- (P26) a wall -------------------------------------------------------------------------------------------
+// Level ground to 10 m, a face at `deg` degrees H m high, level beyond it (the same along y: a wall met at `ang` degrees
+// off square on is a wish turned by that). Shift+W as the game gives it (a wish of 7.4 m/s, PILOT's assist), from x0 at v0
+// (up0: set down on the face that high, at rest). The ground: rock (holds 52 degrees to the soles, 61 to a scramble).
+function wallRun(g, deg, H, hz, { secs = 10, x0 = 2, v0 = 0, ang = 0, up0 = 0, friction = 0.9, foothold = 0.4 } = {}) {
+  const k = Math.tan(deg * Math.PI / 180), xT = 10 + H / k, a = ang * Math.PI / 180, v = 7.4;
+  const h = (x) => x < 10 ? 0 : x < xT ? (x - 10) * k : H, hs = (x) => x < 10 || x >= xT ? 0 : k;
+  const sample = (d) => { const l = Math.hypot(d.x, d.y, d.z), ux = d.x / l, uz = d.z / l, x = Math.atan2(ux, uz) * R, s = hs(x), n = Math.hypot(1, s);
+    return { radius: R + h(x), normal: { x: (ux - uz * s) / n, y: d.y / l / n, z: (uz + ux * s) / n }, liquidRadius: 0, slope: Math.atan(Math.abs(s)) }; };
+  const env = { sample, gravity: g, ground: (s, o) => Object.assign(o, { material: 'rock', friction, kinetic: 0.78 * friction, foothold, restitution: 0.1, sink: 0, drag: 0, dust: 0.03 }) };
+  if (up0 > 0) x0 = 10 + up0 / k;
+  const r0 = R + h(x0), st = { p: V(Math.sin(x0 / R) * r0, 0, Math.cos(x0 / R) * r0), v: V(v0, 0, 0), grounded: true };
+  const o = { top: 0, air: 0, finite: true, x: x0, up: 0, y: 0, v: 0, wall: 0, thrown: 0 };
+  let rel = 0, was = true;
+  for (let i = 0; i < hz * secs; i++) {
+    const t = Math.atan2(st.p.x, st.p.z);
+    stepExplorerBody(st, { wish: V(v * Math.cos(a) * Math.cos(t), v * Math.sin(a), -v * Math.cos(a) * Math.sin(t)), assistAccel: 4 * Math.min(1, Math.max(0.45, g / 9)) }, 1 / hz, env);
+    o.finite = o.finite && finite(st);
+    o.x = Math.atan2(st.p.x, st.p.z) * R; o.up = len(st.p) - R; o.y = st.p.y; o.v = st.phys.speedGround;
+    if (o.up > o.top) o.top = o.up;
+    if (!st.grounded) { if (was) rel = len(st.p); o.air++; o.thrown = Math.max(o.thrown, len(st.p) - rel); }
+    was = st.grounded;
+    if (st.phys.wall) o.wall++;
+  }
+  return o;
+}
+
+test('P26 a wall is not run up: Shift+W into a 70 degree face 10 m high gains less than a clamber and the walker stands at its foot (Earth, Mars, Moon; 60 and 30 Hz; rock and turf; 66 to 89 degrees)', () => {
+  // PILOT's critique, item 1: the explorer ran up Earth's sea cliffs (70 to 79 degrees), 50 m at 6 m/s, feet on the face.
+  // Any rising ground gave the limbs a hold once the legs were at work, and since P22 they are at work at the foot of
+  // every rise; carried on its limbs, the walker felt no gravity along the face. Now a face steeper than the limbs
+  // scramble (the soles' hold and the hands' pull, EXPLORER_BODY.scrambleSlope) that rises on more than a clamber is a
+  // wall: no step, no hold, and a walker does not put a foot on it. (On the head every case here ends on top of the
+  // face: 10 m.)
+  for (const [name, g] of [['Earth', 9.81], ['Mars', 3.71], ['Moon', 1.62]]) for (const hz of [60, 30]) {
+    for (const [deg, friction, foothold] of [[70, 0.9, 0.4], [70, 0.65, 0.3], [66, 0.9, 0.4], [79, 0.9, 0.4], [89, 0.9, 0.4]]) {
+      const o = wallRun(g, deg, 10, hz, { friction, foothold }), tag = `${name} ${hz} Hz, ${deg} degrees, hold ${friction + foothold}`;
+      assert.ok(o.finite, `${tag}: NaN`);
+      assert.ok(o.top < T.clamber, `${tag}: ${o.top.toFixed(2)} m up the face`);
+      assert.ok(o.top < 0.3 && Math.abs(o.x - 10) < 0.6 && o.up < 0.05 && o.v < 0.3 && o.air === 0, `${tag}: at its foot (x ${o.x.toFixed(2)}, ${o.up.toFixed(2)} m up, ${o.v.toFixed(2)} m/s, highest ${o.top.toFixed(2)} m, ${o.air} steps in the air)`);
+    }
+    // met at the pace, with no room to shed it (0.4 m short of a face 60 m high at 7.4 m/s): the wall takes the speed into
+    // it and the body rides up on what is left along it, as far as its momentum has it (2.5 m/s along the face: 0.16 m
+    // on Earth, 1.0 m on Mars, 1.2 m on the Moon), and slides back to the foot: the wall does not carry it up
+    const f = wallRun(g, 70, 60, hz, { x0: 9.6, v0: 7.4 }), tag = `${name} ${hz} Hz, met at 7.4 m/s`;
+    assert.ok(f.finite && f.top < T.clamber && f.thrown < 0.3 && Math.abs(f.x - 10) < 0.6 && f.up < 0.05 && f.v < 0.3, `${tag}: highest ${f.top.toFixed(2)} m, thrown ${f.thrown.toFixed(2)} m, ends x ${f.x.toFixed(2)}, ${f.up.toFixed(2)} m up at ${f.v.toFixed(2)} m/s`);
+    // set down on it 3 m up (a landing): it slides back to the foot, whatever the keys ask
+    const s = wallRun(g, 70, 60, hz, { up0: 3 }), tag2 = `${name} ${hz} Hz, set down 3 m up it`;
+    assert.ok(s.finite && s.top < 3.05 && s.up < 0.3, `${tag2}: highest ${s.top.toFixed(2)} m, ends ${s.up.toFixed(2)} m up`);
+    // met at 45 degrees: the walker goes along its foot with the speed it has along it
+    const d = wallRun(g, 70, 60, hz, { ang: 45 }), tag3 = `${name} ${hz} Hz, met at 45 degrees`;
+    assert.ok(d.finite && d.top < 0.3 && d.y > 5, `${tag3}: highest ${d.top.toFixed(2)} m, ${d.y.toFixed(1)} m along its foot in 10 s`);
+  }
+});
+
+test('P26 what the limbs scramble is still climbed: a 70 degree face a clamber high is a step; rock a little steeper than the soles hold is scrambled, steeper in low gravity (Earth 53, Mars 56, Moon 60 degrees; 60 and 30 Hz)', () => {
+  for (const [name, g, deg] of [['Earth', 9.81, 53], ['Mars', 3.71, 56], ['Moon', 1.62, 60]]) for (const hz of [60, 30]) {
+    const step = wallRun(g, 70, 1.3, hz), tag = `${name} ${hz} Hz`;
+    assert.ok(step.finite && step.x > 12 && Math.abs(step.up - 1.3) < 0.05, `${tag}: a 70 degree face 1.3 m high: x ${step.x.toFixed(1)}, ${step.up.toFixed(2)} m up`);
+    // (the soles hold 52.4 degrees of this rock; the hands add scramblePull / g)
+    const slope = wallRun(g, deg, 6, hz);
+    assert.ok(slope.finite && slope.wall === 0 && slope.top > 5.9, `${tag}: a ${deg} degree rock slope 6 m high: ${slope.top.toFixed(2)} m up, ${slope.wall} steps at a wall`);
+  }
+  // (what Earth's gravity makes a wall is scrambled on the Moon: the hands hold a force, not a share of the weight)
+  const e = wallRun(9.81, 58, 6, 60), m = wallRun(1.62, 58, 6, 60);
+  assert.ok(e.top < T.clamber && m.top > 5.9, `58 degrees of rock: ${e.top.toFixed(2)} m up on Earth, ${m.top.toFixed(2)} m on the Moon`);
+});
+
+test('P26 on PAINTER\'s real Earth: Shift+W from the sea_coast stand into its cliffs (70 to 79 degrees) gains less than a clamber on ground steeper than 50 degrees (the three headings that ran up them)', async () => {
+  let real;
+  try { real = await import('../world/surface.js'); } catch (e) { console.log('# (skipped: src/world/surface.js did not load in Node: ' + e.message + ')'); return; }
+  if (typeof real.sampleSurfacePure !== 'function' || typeof real.getStandPure !== 'function') { console.log('# (skipped: sampleSurfacePure / getStandPure not exported)'); return; }
+  const { createPhysics } = await import('./index.js');
+  const sampleSurface = (id, d) => real.sampleSurfacePure(id, d.x, d.y, d.z);
+  const d0 = norm(real.getStandPure('earth', 'sea_coast').unitDir), hz = 30;
+  const cr = (a, b) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+  for (const heading of [0, 270, 315]) {
+    const physics = createPhysics({ sampleSurface, seed: 1 });
+    // (the surface as PILOT's Sim hands it to the explorer: plain numbers, a copy)
+    const sample = (d) => { const s = sampleSurface('earth', d); return { radius: s.radius, normal: { x: s.normal.x, y: s.normal.y, z: s.normal.z }, slope: s.slope || 0, liquidRadius: s.liquidRadius || 0, biomeId: s.biomeId, biomeWeights: s.biomeWeights }; };
+    const env = physics.bindEnv('earth', { sample, gravity: 9.81 });
+    const r0 = sample(d0).radius, st = { p: V(d0.x * r0, d0.y * r0, d0.z * r0), v: V(), grounded: true };
+    physics.update(1 / hz, { bodyId: 'earth', time: 30, focus: st.p, sunDir: d0 });
+    let steep = 0, top = 0, prev = r0, fin = true;
+    for (let i = 0; i < hz * 10; i++) {
+      const up = norm(st.p), east = norm(cr(V(0, 1, 0), up)), north = cr(up, east), a = heading * Math.PI / 180;
+      const f = V(north.x * Math.cos(a) + east.x * Math.sin(a), north.y * Math.cos(a) + east.y * Math.sin(a), north.z * Math.cos(a) + east.z * Math.sin(a));
+      stepExplorerBody(st, { wish: V(f.x * 7.4, f.y * 7.4, f.z * 7.4), assistAccel: 4 }, 1 / hz, env);
+      const r = len(st.p), s = sample(norm(st.p));
+      if (st.grounded && s.slope * 57.3 > 50 && r > prev) steep += r - prev;
+      prev = r; top = Math.max(top, r - r0); fin = fin && finite(st);
+    }
+    console.log(`# P26 Earth sea_coast heading ${heading}: ${steep.toFixed(2)} m gained on ground over 50 degrees (head: 49 to 50 m), ${top.toFixed(2)} m above the stand at most`);
+    assert.ok(fin, `heading ${heading}: NaN`);
+    assert.ok(steep < T.clamber, `heading ${heading}: ${steep.toFixed(2)} m up ground steeper than 50 degrees`);
+    assert.ok(top < 3, `heading ${heading}: ${top.toFixed(2)} m above the stand`);
+  }
+});
