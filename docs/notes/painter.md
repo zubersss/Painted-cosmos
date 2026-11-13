@@ -76,8 +76,30 @@ The verifier's own files: `/home/user/.pc-scratch/verify/painter/` (`out/`, `nod
 - **Checks on the final tree** (a clean export of `5de71a7` with `world/index.js`, `t4`): world 22, unit 181, physics
   324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game at quality 1 through the edge of the air,
   a jet and its arc (arms in rising, a little out falling: as accepted), a walk: no console error, fallback empty.
-- **IN THE MIDDLE OF: the top tier once on the final tree** (a browser on `refix/t3`, out `refix/M2`: the side walk,
-  the birch at 1.8 m, a jet through the crown, the edge of the air at 600 to 700 m). Nothing else is open.
+- **THE TOP TIER, once, on the final tree: DONE** (quality 2, 960x540; no console error, fallback empty):
+  `m4fix/17-refix-top-tier-final-tree.jpg` (opened: top, the verifier's strip of the head's side walk, legs bunched;
+  second, the same command on the re-fix: the knee lifts and the stride opens; third, first person 1.8 m from the
+  birch looking up 20 degrees: one whole trunk; a jet up through the crown: dabs with the picture between them; the
+  edge of the air at 600, 650, 700 m: a faint mark near the sun at 600 m (22 of 255 darker than its sky), the
+  verifier's dot at 650 m 24 darker on the head and 13 now, pale worlds on the indigo; fourth, those marks enlarged).
+- **One part of the verifier's regression 2 I judge not to be the crown's dissolve, shown by a frame.** "At the top
+  tier the trunk in L2/crown-00.jpg ends in mid-air": in the jet's first frame the camera sits toward the trunk and
+  the trunk stands between the lens and the figure; what cuts it is the figure's FOCUS WINDOW (`PROP_FRAG`: "strokes
+  that stand between the lens and the explorer's figure part round the line of sight to it"), a rule older than
+  `7d27bf4`. Proof (bottom row of `m4fix/17-..`): the same instant on the head (the verifier's frame), on the re-fix
+  (the trunk ends at the same place), and on the re-fix with the focus window switched off in the live page only
+  (`__hp.patch`): the trunk is whole from the top of the frame to the ground and stands across the figure. The same
+  parted trunk is in the verifier's own frames of `21aa969` (`B1/crown-00.jpg`, `B1/crown-01.jpg`: the trunk cut in
+  the middle with its foot standing below). Left as it is: the window is what keeps the figure in sight.
+- **Commits of the pass**: `5de71a7` (RE-FIX 1 and 2), `91fd6bf` (RE-FIX 3), and this hand-over with the top tier's
+  evidence. The working tree's code is the checked tree's (`t4`) to the byte.
+- **Not verified, said plainly**: another world's tall props at the lens (ice needles, fungal towers, kelp: by the
+  rule they are as on `21aa969`); the far world's veil on a world other than the Earth and in motion (stations at 60
+  to 760 m, not a film of the climb); the kick of both legs afloat in a picture (the legs are under water: numbers
+  and the new test only); the wind frames in Neptune's squall were not taken again (the lean, the cloth and the arms
+  are code this pass did not touch; a jet and its arc were seen again at quality 1: arms in rising, as accepted).
+- **What is next, if a successor reads this**: nothing of this pass is open. The list "Still to do" in the block
+  below stands as the seventeenth left it.
 
 ## Hand-over of the M4 fix round (sixteenth and seventeenth PAINTER agents; READ THIS FIRST)
 
