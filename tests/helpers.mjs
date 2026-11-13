@@ -117,7 +117,9 @@ export function flyTo(sim, pad, to, log) {
   let vMax = 0;
   const tPulse = play(sim, pad, 300, { each: () => { vMax = Math.max(vMax, sim.sh.speed); }, until: () => sim.sm.state === S.SPACE });
   assert.equal(sim.sm.state, S.SPACE, 'dropped out of pulse');
-  const d1 = sim.targetInfo() ? sim.targetInfo().distance : len(sub(sim.bodyInShipFrame(to), sim.sh.p));
+  // (The distance to the world flown to, not to the target of the moment: inside the world's
+  // frame the course is dropped, and whatever lies near the nose then becomes the target.)
+  const d1 = len(sub(sim.bodyInShipFrame(to), sim.sh.p));
   assert.ok(d1 < arrivalRadius(BODIES[to]) * 1.25, `arrived at ${to}: ${(d1 / 1000).toFixed(1)} km from its centre`);
   assert.ok(d1 > BODIES[to].radius + spaceAltitude(BODIES[to]), 'still in space');
   log.push({ to, km: Math.round(d0 / 1000), pulseSeconds: +tPulse.toFixed(1), vMax: Math.round(vMax) });

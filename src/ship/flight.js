@@ -27,7 +27,11 @@ export const SHIP = Object.freeze({
   maxTurn: 1.6,              // rad/s
   pendingMax: 0.9,           // rad of mouse aim that may be queued
   keyYawRate: 0.85,          // rad/s from A / D
-  pitchLimit: 1.36,          // rad (78 deg) nose up or down near a planet
+  pitchLimit: 1.36,          // rad (78 deg) nose up or down in a world's air (above it none: a world's mark overhead must be reachable)
+  airPitchGain: 0.8,         // share of the mouse's pitch in a world's air (fast over the ground a 120 px drag
+                             // was a dive turned into a climb: M4's blind play-test); 1 above the air
+  airTop: 2.5,               // the air's ways (pitch limit, levelling to the horizon, following the curve of
+                             // the world, the gentler pitch) fade out from the edge of space to this many times its height
   bankGain: 0.55,            // rad of bank per rad/s of turn
   maxBank: 0.62,             // rad
   rollLevelRate: 3.2,        // 1/s wings-level strength
@@ -110,11 +114,16 @@ export function maxSpeedAt(altitude, spaceAlt, hasBody, T = SHIP) {
 export function stepFlight(st, input, dt, env, T = SHIP) {
   const w = env.up ? clamp01(env.upWeight) : 0;
   const upRef = env.up ? norm(lerp(env.universeUp, env.up, w), env.up) : env.universeUp;
-  const level = mix(T.spaceLevel, 1, w);
+  // How much of the air's ways hold here: all of them in a world's air, none from airTop times
+  // the height of the air on (M4's blind play-test: climbing out of Venus with its mark overhead,
+  // the 78 degree limit, held to 9 km up, kept the mark an arrow at the top of the picture, and
+  // A / D, turning round Venus' up, only swung that arrow round the edge).
+  const wa = env.hasBody && env.up ? w * (1 - smoothstep(env.spaceAlt, env.spaceAlt * T.airTop, env.altitude)) : 0;
+  const level = mix(T.spaceLevel, 1, wa);
 
   // ---- steering ------------------------------------------------------------------------
   st.pending.yaw = clamp(st.pending.yaw + (input.aimX || 0), -T.pendingMax, T.pendingMax);
-  st.pending.pitch = clamp(st.pending.pitch + (input.aimY || 0), -T.pendingMax, T.pendingMax);
+  st.pending.pitch = clamp(st.pending.pitch + (input.aimY || 0) * mix(1, T.airPitchGain, wa), -T.pendingMax, T.pendingMax);
   const k = damp(T.steerRate, dt);
   const turn = env.pulseSpeed != null ? (env.turnScale == null ? 0.3 : env.turnScale) : 1;
   let yawStep = clamp(st.pending.yaw * k, -T.maxTurn * dt, T.maxTurn * dt) * turn;       // + = right
@@ -127,14 +136,18 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   let q = st.q;
   let f = qRotate(q, V(0, 0, -1));
   const shipUp = qRotate(q, V(0, 1, 0));
-  if (w > 0.3) {
-    // Near a planet the nose cannot go past the pitch limit: no accidental loops.
+  if (w > 0.3 && env.hasBody && env.altitude < env.spaceAlt) {
+    // In a world's air the nose cannot go past the pitch limit: no accidental loops (above it,
+    // in space, a world's mark overhead must be reachable).
     const elev = Math.asin(clamp(dot(f, upRef), -1, 1));
     const lim = T.pitchLimit;
     if (pitchStep < 0 && elev - pitchStep > lim) pitchStep = Math.min(0, -(lim - elev));
     if (pitchStep > 0 && elev - pitchStep < -lim) pitchStep = Math.max(0, elev + lim);
   }
-  const yawAxis = norm(lerp(shipUp, upRef, level), shipUp);
+  // A / D turn round the world's up while the nose is near its horizon, round the ship's own up
+  // as it points up or down (round the world's up they would only roll the picture).
+  const cosE0 = Math.sqrt(Math.max(0, 1 - dot(f, upRef) ** 2));
+  const yawAxis = norm(lerp(shipUp, upRef, level * smoothstep(0.17, 0.5, cosE0)), shipUp);
   const right = qRotate(q, V(1, 0, 0));
   q = qMul(qFromAxisAngle(yawAxis, -yawStep), qMul(qFromAxisAngle(right, -pitchStep), q));
   st.turnRate = mix(st.turnRate, dt > 0 ? yawStep / dt : 0, damp(5, dt));
@@ -188,6 +201,12 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
   }
   const liftDir = w > 0.3 ? upRef : qRotate(st.q, V(0, 1, 0));
   let target = add(scale(f, st.throttle * vmax), scale(liftDir, (input.lift || 0) * liftSpeed));
+  // C sinks and Space rises whatever the nose does: the lift's speed is the least of it (with
+  // the nose up at speed, C held 12 s climbed from 225 to 320 m: M4's blind play-test).
+  if (input.lift && w > 0.3) {
+    const vu = dot(target, liftDir), want = input.lift * liftSpeed;
+    if (input.lift < 0 ? vu > want : vu < want) target = addScaled(target, liftDir, want - vu);
+  }
   // The ground assists of this step (the climb the ground ahead asks for, the sink the cushion
   // allows, the forward speed the hull may keep), worked out once and used on the request and
   // on the hull.
@@ -319,12 +338,15 @@ export function stepFlight(st, input, dt, env, T = SHIP) {
 
   // Follow the curve of the world: on a planet a few kilometres across, "level" has to bend
   // with the horizon or every straight line would climb away into the sky.
-  if (up && w > 0) {
+  // (Not in a pulse, and not above the air: there a straight line is straight, or a pulse past a
+  // world bends round it into its sphere.)
+  const wc = env.pulseSpeed != null ? 0 : wa;
+  if (up && wc > 0) {
     const upNew = norm(p);
     const axis = cross(up, upNew);
     const sinA = len(axis);
     if (sinA > 1e-12) {
-      const rot = qFromAxisAngle(scale(axis, 1 / sinA), Math.asin(Math.min(1, sinA)) * w);
+      const rot = qFromAxisAngle(scale(axis, 1 / sinA), Math.asin(Math.min(1, sinA)) * wc);
       st.q = qNorm(qMul(rot, st.q));
       v = add(v, scale(sub(qRotate(rot, v), v), 1));
     }

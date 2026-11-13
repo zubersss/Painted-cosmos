@@ -11,7 +11,7 @@ import {
 import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip, LAND_PROMPT_ALTITUDE, LAND_BEGIN_SPEED } from './state.js';
 import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
-  qLook, qRotate, qConj, qMul, qFromAxisAngle, qSlerp, rotateAround,
+  qLook, qRotate, qConj, qMul, qFromAxisAngle, qSlerp, qNorm, rotateAround,
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../player/explorer.js';
 import {
@@ -20,7 +20,7 @@ import {
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
 } from '../ship/flight.js';
-import { PULSE, arrivalRadius, createPulse, pulseAdvice, stepPulseSpeed, pulseEta } from '../ship/pulse.js';
+import { PULSE, arrivalRadius, createPulse, pulseAdvice, stepPulseSpeed, pulseEta, courseDir } from '../ship/pulse.js';
 
 export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
@@ -195,6 +195,7 @@ export class Sim {
     this.targetLocked = false;     // chosen on the map: aiming elsewhere does not change it
     this.aimed = null;
     this.pulse = null;
+    this.turn = null;              // { dest, t, w }: F with the course off the nose turns the ship onto it first
     this.notice = null;            // { text, until } one line of feedback for the HUD
     this.stroll = false;           // C on foot: walk at a stroll (EXPLORER.strollSpeed) instead of the usual pace
     this.visited = {};             // bodyId -> { biomes: { id: true } }  (the sketchbook's data)
@@ -1117,7 +1118,7 @@ export class Sim {
       this.sm.dispatch(EV.leftAtmosphere); this.emit('space');
       // The first time above the air on a journey that has seen one world only: say how to go
       // on (the title card listed M among sixteen keys, minutes ago).
-      if (!this._saidMap && Object.keys(this.visited).length <= 1) this.say('M opens the map: choose a world, point the nose at its mark, press F', 9);
+      if (!this._saidMap && Object.keys(this.visited).length <= 1) this.say('M opens the map: choose a world there, then press F to fly to it', 9);
       this._saidMap = true;
     }
     else if (this.sm.state === S.SPACE && inAtmo) { this.sm.dispatch(EV.enteredAtmosphere); this.emit('entry'); }
@@ -1164,6 +1165,74 @@ export class Sim {
   }
 
   say(text, seconds = 3.5) { this.notice = { text, until: this.t + seconds }; }
+
+  // The course to the target from where the ship is: { dir, around } (pulse.js courseDir), or null.
+  course(f = qRotate(this.sh.q, V(0, 0, -1)), spheres = this.pulseSpheres(), dest = this.target) {
+    return dest ? courseDir(this.sh.p, f, dest, spheres) : null;
+  }
+
+  // F in space. With a course (a world chosen on the map, or the one last aimed at, which the
+  // prompt names: "Pulse to Saturn"), F takes the ship to that world whether or not its mark is
+  // on the screen: a nose far off the course is first turned onto it, in plain sight, and the
+  // drive starts when it is on (it used to fire straight along the nose, away from the world,
+  // while the prompt still said "Pulse to Saturn": M4's blind play-test lost minutes to it three
+  // times). Without a course F pulses along the nose, as before.
+  pressF() {
+    if (this.sm.state !== S.SPACE) return false;
+    if (this.turn) { this.turn = null; this.say('Turn stopped: F turns onto the course again', 3); return false; }
+    if (!this.target) return this.tryPulse();
+    this.targetLocked = true;                     // the course holds while the nose swings past other worlds
+    const f = qRotate(this.sh.q, V(0, 0, -1));
+    const spheres = this.pulseSpheres();
+    const c = this.course(f, spheres);
+    const off = c ? Math.acos(clamp(dot(f, c.dir), -1, 1)) : 0;
+    const adv = pulseAdvice(this.sh.p, f, spheres);
+    if (!c || (off < PULSE.turnFirst && !adv.inside && adv.vWant >= PULSE.exitSpeed * 1.5) || this.tooNear(adv)) return this.tryPulse();
+    this.turn = { dest: this.target, t: 0, w: 0 };
+    this.say(`Turning onto the course for ${BODIES[this.target].name}`, 4);
+    this.emit('course-turn');
+    return true;
+  }
+
+  // Already at the course's world (its sphere is the one that stops the drive, right ahead or
+  // round us): no turn, the drive says so.
+  tooNear(adv) {
+    return !!this.target && adv.block === this.target && adv.vWant < PULSE.exitSpeed * 1.5;
+  }
+
+  // The turn onto the course: the nose swings at up to PULSE.turnRate, easing in and out, the
+  // hands off the stick (the mouse and A / D stop it: the pilot wants it back); on the course
+  // the drive starts. Returns true while it turns (the flight step then takes no steering).
+  stepCourseTurn(h, I, mdx, mdy) {
+    const T = this.turn;
+    if (!T) return false;
+    if (this.sm.state !== S.SPACE || !this.target) { this.turn = null; return false; }
+    T.dest = this.target;
+    T.t += h;
+    const steer = Math.abs(I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight')) > 0.3;
+    T.hand = (T.hand || 0) * Math.exp(-3 * h) + Math.abs(mdx) + Math.abs(mdy);
+    if (steer || T.hand > 60 || T.t > PULSE.turnMax) {
+      this.turn = null;
+      if (T.t <= PULSE.turnMax) this.say('Turn stopped: F turns onto the course again', 3);
+      return false;
+    }
+    const sh = this.sh;
+    const f = qRotate(sh.q, V(0, 0, -1));
+    const c = this.course(f);
+    if (!c) { this.turn = null; return false; }
+    const ang = Math.acos(clamp(dot(f, c.dir), -1, 1));
+    if (ang < PULSE.turnDone) {
+      this.turn = null;
+      this.tryPulse();
+      return false;
+    }
+    T.w = Math.min(PULSE.turnRate, T.w + PULSE.turnAccel * h, Math.sqrt(2 * PULSE.turnAccel * ang));
+    let axis = cross(f, c.dir);
+    if (len(axis) < 1e-5) axis = qRotate(sh.q, V(0, 1, 0));    // dead astern: round through the ship's own up
+    sh.q = qNorm(qMul(qFromAxisAngle(norm(axis), Math.min(ang, T.w * h)), sh.q));
+    sh.pending.yaw = 0; sh.pending.pitch = 0;
+    return true;
+  }
 
   tryPulse() {
     if (this.sm.state !== S.SPACE) return false;
@@ -1216,23 +1285,31 @@ export class Sim {
     this.updateTarget();
 
     // ---- pulse drive ---------------------------------------------------------------------------
-    if (this.sm.state === S.SPACE && pressed('KeyF')) this.tryPulse();
-    else if (this.sm.state === S.PULSE && this.pulse) {
+    const fNow = this.sm.state === S.SPACE && pressed('KeyF');
+    if (fNow) this.pressF();
+    const turning = this.stepCourseTurn(h, I, mdx, mdy);
+    if (turning) { mdx = 0; mdy = 0; }
+    if (this.sm.state === S.PULSE && this.pulse && !fNow) {
       const ps = this.pulse;
       if (pressed('KeyF') || pressed('KeyX') || pressed('KeyS') || pressed('Space')) ps.cancel = true;
       let f = qRotate(sh.q, V(0, 0, -1));
-      // Draw the nose onto the target, so "point roughly and go" arrives.
-      if (this.target && !ps.cancel) {
-        const want = norm(sub(this.bodyInShipFrame(this.target), sh.p));
+      // Draw the nose onto the course, so "point roughly and go" arrives, and round whatever
+      // lies across the straight line (the course goes along the tangent past it).
+      // (Bound for the world of the pulse's start: a world that comes near the nose on the way,
+      // or the course dropped inside the world's own frame near the end, does not turn it.)
+      const spheres = this.pulseSpheres();
+      const bound = ps.dest || this.target;
+      if (bound && !ps.cancel) {
+        const want = this.course(f, spheres, bound).dir;
         const axis = cross(f, want);
         const sinA = len(axis);
         const ang = Math.atan2(sinA, dot(f, want));
-        if (sinA > 1e-6 && ang < 1.2) {
+        if (sinA > 1e-6) {
           sh.q = qMul(qFromAxisAngle(scale(axis, 1 / sinA), Math.min(ang, PULSE.assistRate * h)), sh.q);
           f = qRotate(sh.q, V(0, 0, -1));
         }
       }
-      const adv = pulseAdvice(sh.p, f, this.pulseSpheres());
+      const adv = pulseAdvice(sh.p, f, spheres);
       stepPulseSpeed(ps, ps.cancel ? PULSE.exitSpeed * 0.9 : adv.vWant, h);
       ps.block = adv.block;
       env.pulseSpeed = ps.v;
@@ -1249,12 +1326,13 @@ export class Sim {
           // Arrived where we were going (or, with no course set, at whatever lay ahead)...
           const dest = ps.dest || this.target;
           if (!dest || adv.block === dest) this.say(`${BODIES[adv.block].name} ahead`, 5);
-          // ...or stopped short by a world that lies between (often the one just left).
-          else this.say(`${BODIES[adv.block].name} is in the way: steer round it and pulse again`, 6);
+          // ...or stopped short by a world that lies between (the course goes round them, so
+          // only if the pilot steered into one): F goes on, round it.
+          else this.say(`${BODIES[adv.block].name} lies on your course: F goes on round it to ${BODIES[dest] ? BODIES[dest].name : 'the world you chose'}`, 7);
           if (adv.block === this.target || adv.block === dest) this.targetLocked = false;
           this.emit('arrived');
         } else {
-          if (!ps.cancel && adv.block === 'sun') this.say('The Sun is in the way: steer round it and pulse again', 6);
+          if (!ps.cancel && adv.block === 'sun') this.say(this.target ? 'The Sun lies on your course: F goes on round it' : 'The Sun is in the way: steer round it and pulse again', 6);
           this.emit('pulse-off');
         }
       }
@@ -1522,7 +1600,7 @@ export class Sim {
       canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable() && offerLanding, liftingOff: !!this.sh.liftoff,
       canEasel: st === S.ON_FOOT && !!this.easelOffer && !this.easel,
       slowingToLand: st === S.ATMOSPHERE && !!this._landWish,
-      target: ti ? ti.name : null,
+      target: ti ? ti.name : null, turning: st === S.SPACE && !!this.turn,
     };
     this.promptNow = promptFor(st, q);
     if (this.notice && this.t > this.notice.until) this.notice = null;
@@ -1610,6 +1688,7 @@ export class Sim {
     out.target = this.targetInfo();
     out.aimed = this.aimed;
     out.pulse = this.pulse ? { v: this.pulse.v, block: this.pulse.block, cancel: this.pulse.cancel } : null;
+    out.turning = this.turn ? { dest: this.turn.dest, t: this.turn.t } : null;
     out.notice = this.notice ? this.notice.text : null;
     out.visited = Object.fromEntries(Object.entries(this.visited).map(([k, v]) => [k, Object.keys(v.biomes)]));
     out.vistas = Object.fromEntries(Object.entries(this.vistas).map(([k, v]) => [k, Object.keys(v)]));

@@ -2,6 +2,75 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, PRE-SHIP fix round (eighteenth PILOT agent; started 15:50 UTC 2026-11-13; kept current after every item)
+
+Read this first; the seventeenth's hand-over below holds for everything not named here. The task: the blind new
+player's findings on `3d38bb2` (landed on 3 of 8 worlds), PILOT's list 1 to 6, then `tests/grandtour.mjs` once on a
+clean export and a film of the pulse from Earth with the mark behind. Scratch: `/home/user/.pc-scratch/pilot/preship/`
+(`mktree.sh <dir>`: a clean export of HEAD with my changed files over it; `checks.sh <root>`: world, unit, physics,
+coast, ghostfield, wallrun; `head/` a clean export of `3d38bb2` for before/after; `probes/`, `film/`). My scripts kept
+in `docs/shots/pilot/preship/scripts/`. First commit's parent: `1294633` (the coordinator's log on top of `3d38bb2`).
+
+### Done, with proof
+
+1. **The pulse goes where the course says (BROKEN 1, CONFUSING 5).** `sim.js pressF / stepCourseTurn / course`,
+   `pulse.js courseDir`, `PULSE.turnFirst / turnRate / turnAccel / turnDone / passMargin / blockMargin`. F with a
+   course (a world chosen on the map, or the marker last aimed at: the one the prompt names) and the nose more than
+   12 degrees off it first turns the ship onto the course in plain sight (0.7 rad/s at most, eased in and out, a half
+   turn in about 5 s; the notice "Turning onto the course for Saturn", the prompt "F Stop turning"; F again, A / D or
+   a deliberate mouse movement stops it), then pulses; within 12 degrees it pulses at once and the drive draws the
+   nose on. The course goes along the tangent past any sphere (the world just left, a world between, the Sun) that
+   lies across the straight line, at 1.18 x its radius, so the drive goes round Venus instead of stopping in front of
+   it; the pulse steers by the world it was started for (`ps.dest`), not by whatever comes near the nose; F locks the
+   course. In a pulse the ship no longer "follows the curve of the world" (flight.js: that rotation bent a pulse past
+   Venus into its sphere). Should a pilot steer the drive into a world anyway, the screen says "Venus lies on your
+   course: F goes on round it to Saturn". Choice logged: the drive steers round (not only a word), because a new player
+   should not have to plan around worlds. Tests: `tests/course.test.mjs` (4): from Earth's orbit with the mark behind,
+   above and beside the nose, a course to each of the 9 other worlds arrives (27 runs; each says "Turning onto the
+   course" and "<World> ahead", never flies more than 2 km further away, a calm turn of 1.9 to 5 s); courseDir by
+   itself; the turn stopped by F and by the mouse; a pulse to Saturn with Venus dead ahead goes round Venus and arrives
+   with nothing said about Venus. All fail on `3d38bb2` (`course-head.txt`: the mark behind, F flew 468 -> 11828 km
+   from Mars, 706 -> 11705 km from Saturn; above or beside: "Too close to Earth" or 878 -> 11738 km from Neptune;
+   `course-after.txt`: every one arrives). Filmed in the real game (quality 0, 640 x 360, `docs/shots/pilot/preship/
+   pulse-behind-earth.jpg` and `-log.txt`, opened): Saturn's mark behind the ship 2.6 km over Earth, "Pulse to
+   Saturn"; F: the ship swings round over 4 s with the notice up, Saturn's ring comes to the nose, the drive starts,
+   arrives "Saturn ahead" at 5.2 km up; no game error, fallback empty. `tests/grandtour.mjs` waits out the turn after
+   F and follows "lies on your course" by pressing F again. `helpers.mjs flyTo` measures the distance to the world
+   flown to (it read the target of the moment, which inside the world's frame is whatever lies near the nose).
+   README: the first minute and the F line say what F does now; the first word above the air says "M opens the map:
+   choose a world there, then press F to fly to it".
+
+2. **Steering above the air, after re-boarding, and C (BROKEN 2, CONFUSING 6).** Cause of "the mark overhead stays an
+   arrow, A / D swing it round the edge": the 78 degree pitch limit held as long as the world's up did (to 9.4 km over
+   Venus; the air ends at 0.9 km), and A / D turned round the world's up, which with the nose overhead is a roll of the
+   picture. `flight.js`: the pitch limit only in a world's air (altitude under the edge of space); the air's other ways
+   (levelling to the horizon, A / D round the world's up, following the curve, a gentler pitch) fade out from the edge
+   of space to 2.5 times its height (`SHIP.airTop`); A / D turn round the ship's own up as the nose points within about
+   30 degrees of straight up or down; the mouse's pitch is 0.8 of itself in the air (`airPitchGain`; 0.6 and 0.75 were
+   tried: the real-world trip in contract.test then fails one Mars landing, "No level ground here", the landing
+   assist's glide meeting a slope: not touched); C sinks and Space rises at the lift's speed whatever the nose does.
+   **The drag that did nothing after a re-boarding on Venus was not found in the game:** a new test steps out on Venus,
+   boards again, climbs above the air and drags up, down, right and left 300 px: the nose turns 0.8 to 1.25 of what
+   was asked each time, A turns it; the frames the player quotes (130, 132) are in deep space, where nothing in the sim
+   limits the nose; the player's driver keeps the mouse where its last drag left it, so repeated upward drags walk it
+   off the top of the page (see item 2's note below on what headless Chromium does with that). Tests:
+   `tests/steer.test.mjs` (4): over Venus at 1.5, 2.7 and 6 km with Saturn overhead the mouse brings the nose within
+   2 degrees of it and D then swings the nose 25+ degrees off it (head: stuck 12.1 degrees off); in the air the limit
+   holds and a 120 px drag pitches 0.8 of itself (head 11.7 for 11.7); C held 12 s with the nose 20 degrees up at 225 m
+   on Earth, Venus and Mars sinks 60+ m and never climbs 15 m (head: Venus 265 -> 282 m); re-boarding on Venus as
+   above. The first three fail on `3d38bb2`.
+
+Checks for 1 and 2 on a clean export of `1294633` with these files (`t1`): world 22, unit 192 (184 + 8 new), physics
+325, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as before), `wallrun.mjs`
+earth sea_coast 0.2 m at most on ground over 50 degrees; the game at quality 0 loads with no game error, fallback empty.
+
+### Next (in order)
+
+3. Pointer lock's fall-back (no re-capture once fallen back; no near-vertical pitch saved). 4. The way back to the
+ship (a slip with an arrow and the distance on foot). 5. HUD overlaps (the notice over the prompt is seen in the pulse
+film too), README gaps, Mercury's column. 6. Sketchbook captions, a hint toward the nearest view after a landing.
+Then `tests/grandtour.mjs` once on a clean export.
+
 ## Hand-over, M4 RE-FIX pass (seventeenth PILOT agent; started 12:24 UTC 2026-11-13; kept current after every item)
 
 Read this first; the fourteenth's hand-over below holds for everything not named here. The verifier did not accept

@@ -4,7 +4,7 @@
 // so that it arrives at cruise speed on the "arrival sphere" of whatever lies ahead: close
 // enough that the planet fills the view, far enough to take it in. It cannot be flown into
 // anything: every body (and the sun) is a sphere the drive will not enter.
-import { sub, dot, len, clamp, damp } from '../core/vec.js';
+import { V, sub, add, scale, norm, cross, dot, len, clamp, damp } from '../core/vec.js';
 import { spaceAltitude } from '../data/bodies.js';
 
 export const PULSE = Object.freeze({
@@ -17,6 +17,20 @@ export const PULSE = Object.freeze({
   aimCone: 0.26,           // rad (15 deg): a body this close to the nose becomes the target
   brakeShare: 0.8,         // fraction of `accel` the braking curve plans with (the rest is margin)
   brakeLead: 0.6,          // s of travel kept in hand
+  // The course (a world chosen on the map, or aimed at): F takes the ship there whether or not
+  // its mark is on the screen. A nose more than `turnFirst` off the course is first turned onto
+  // it, calmly (the picture swings round in a few seconds), and the drive starts when it is on.
+  turnFirst: 0.21,         // rad (12 deg): closer than this the drive starts at once and draws the nose on
+  turnRate: 0.7,           // rad/s: the turn's top rate (half a turn in about five seconds)
+  turnAccel: 0.9,          // rad/s^2: how gently it starts and stops
+  turnDone: 0.026,         // rad (1.5 deg): on the course
+  turnMax: 20,             // s: a turn that has not arrived by then gives up (never seen)
+  // Another world (or the Sun) across the straight line to the course's world: the course goes
+  // along the tangent past it, passMargin outside its sphere, and on to the world (it used to
+  // stop in front of it: "Venus is in the way"). A straight line counts as across a sphere
+  // within blockMargin of it: once round, the course goes straight on only with room to spare.
+  passMargin: 1.18,
+  blockMargin: 1.08,
 });
 
 // Where a pulse toward `body` ends: its centre distance. The planet then spans about 55 degrees.
@@ -53,6 +67,50 @@ export function pulseAdvice(p, f, spheres, T = PULSE) {
     if (allowed < vWant) { vWant = allowed; block = s.id; }
   }
   return { vWant, block, inside };
+}
+
+// The direction of the course to `dest` from p: straight at it, or, when another sphere lies
+// across that line (within blockMargin of its radius) before the world's own (the world just
+// left, a world between, the Sun), along the tangent past that sphere at passMargin times its radius. Inside a sphere and
+// heading in toward its centre: across, along its surface. `f` (the nose) picks the side to
+// pass on when the world lies dead behind the obstacle. spheres: as for pulseAdvice.
+// Returns { dir (unit), around (the id passed round, or null) }, or null without `dest`.
+export function courseDir(p, f, dest, spheres, T = PULSE) {
+  const D = spheres.find((s) => s.id === dest);
+  if (!D) return null;
+  const toD = sub(D.c, p);
+  const dD = len(toD);
+  if (dD < 1e-6) return { dir: f, around: null };
+  const t = scale(toD, 1 / dD);
+  const reach = dD - D.radius;
+  let best = null, bestEntry = Infinity;
+  for (const s of spheres) {
+    if (s.id === dest) continue;
+    const oc = sub(s.c, p);
+    const d = len(oc);
+    const along = dot(oc, t);
+    if (along <= 0) continue;                                    // behind, or heading out of it
+    if (d < s.radius) {
+      if (bestEntry > 0) { bestEntry = 0; best = { s, d, oc }; }
+      continue;
+    }
+    const off2 = d * d - along * along;
+    const rb = s.radius * T.blockMargin;
+    if (off2 >= rb * rb) continue;                               // the straight line misses it
+    const entry = along - Math.sqrt(rb * rb - off2);
+    if (entry > reach || entry >= bestEntry) continue;            // beyond the world, or not the first
+    bestEntry = entry; best = { s, d, oc };
+  }
+  if (!best) return { dir: t, around: null };
+  const { s, d, oc } = best;
+  const c = scale(oc, 1 / d);
+  let u = sub(t, scale(c, dot(t, c)));
+  if (len(u) < 1e-4) u = sub(f, scale(c, dot(f, c)));
+  if (len(u) < 1e-4) u = cross(c, Math.abs(c.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0));
+  u = norm(u);
+  const r = s.radius * T.passMargin;
+  const a = d > r ? Math.asin(r / d) : Math.PI / 2;
+  return { dir: norm(add(scale(c, Math.cos(a)), scale(u, Math.sin(a)))), around: s.id };
 }
 
 // Advance the drive's speed toward vWant with limited, smoothly spooled acceleration.

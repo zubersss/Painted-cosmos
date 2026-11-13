@@ -25,9 +25,11 @@ no network requests once loaded. Serve the folder with any static server and ope
 mixes the colours (every shader the journey needs is compiled here, so that nothing stalls
 later) and says "click to begin" when the first view is painted. Click. You stand in a clearing in Earth's forest, the ship a few
 steps away. Walk to it with `W A S D`, press `E` to board, hold `Space` to lift off, push the
-throttle with `W` and point the nose at the sky. Above the air, press `M`, choose a world,
-point at its marker and press `F`. Near a world the drive lets go by itself; fly down, and
-press `E` when the prompt says you can land. A world you have not walked on yet shows "a place
+throttle with `W` and point the nose at the sky. Above the air, press `M`, choose a world
+and press `F`: the ship turns onto the course by itself (its marker comes round to the nose;
+`F` again stops the turn) and the pulse drive takes you there, round any world or the Sun in
+the way. Near the world the drive lets go by itself; fly down, and press `E` when the prompt
+says you can land. A world you have not walked on yet shows "a place
 to land" (a small ring on the ground, or an arrow at the edge of the picture when it lies round
 the curve): the spot its first view was painted from. You may land anywhere else.
 `H` shows the controls again at any time.
@@ -57,18 +59,18 @@ In the ship
 | Key | Action |
 | --- | --- |
 | Space | lift off; in flight: rise |
-| C | sink (settle onto the ground to land) |
+| C | sink, whatever the nose does (settle onto the ground to land) |
 | W / S | throttle up / down (it stays where you leave it) |
 | A / D | turn |
-| mouse | point the nose |
+| mouse | point the nose (a little gentler in a world's air, where the nose also stops short of straight up or down; above the air it goes anywhere) |
 | X | brake |
-| F | pulse drive (in space): point at a world's marker and press F; F again drops out |
+| F | pulse drive (in space), to the world on your course (chosen on the map, or the marker last pointed at; the prompt names it): the ship first turns onto the course, the drive goes round whatever lies in the way and lets go in front of the world; F during the turn stops it, F in the pulse drops out. With no world chosen, F pulses straight along the nose |
 | M | the map: click a world, or use the arrow keys, to set a course; M or Enter closes it |
 | E | land when the prompt shows (pressed at speed, the ship first slows down with its own brakes, then sets down; Space or W lets it go); step out when landed |
 | V | cockpit / chase view |
 
 The ship hovers when you let go, levels itself, rides above the tree tops, and will not let
-you crash. The pulse drive brakes by itself and lets go in front of the world ahead.
+you crash. The pulse drive brakes by itself and lets go in front of the world you chose.
 
 Anywhere
 

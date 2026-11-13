@@ -116,12 +116,26 @@ async function steerBy(id, want, tol = 20, tries = 70) {
   return false;
 }
 
-// A moment of pulse in the direction the nose points, then let go (F again).
-async function shortPulse(leg, seconds) {
-  await page.keyboard.press('KeyF');
+// F with a course set may first turn the ship onto the course ("Turning onto the course for
+// Saturn"): wait for the turn, hands off, until the drive starts or the turn ends.
+async function afterF(leg) {
   await gameWait(0.4);
   let i = await info();
   heard(leg, i);
+  if (i.turning) {
+    leg.turns = (leg.turns || 0) + 1;
+    i = await until((x) => !x.turning, 30, async (x) => heard(leg, x));
+    await gameWait(0.3);
+    i = await info();
+    heard(leg, i);
+  }
+  return i;
+}
+
+// A moment of pulse in the direction the nose points, then let go (F again).
+async function shortPulse(leg, seconds) {
+  await page.keyboard.press('KeyF');
+  let i = await afterF(leg);
   if (i.state !== 'PULSE') return false;
   await gameWait(seconds);
   if ((await info()).state === 'PULSE') await page.keyboard.press('KeyF');
@@ -145,9 +159,7 @@ async function pulseTo(to, from, leg) {
       await beat('aimed');
     }
     await page.keyboard.press('KeyF');
-    await gameWait(0.4);
-    i = await info();
-    heard(leg, i);
+    i = await afterF(leg);
     if (i.state === 'PULSE' && !leg.beatPulse) { leg.beatPulse = 1; await beat('pulse-begins'); }
     if (i.state !== 'PULSE') {
       // Refused, and the screen says why. "Too close to X: turn away from it first".
@@ -175,8 +187,11 @@ async function pulseTo(to, from, leg) {
     if (i.state !== 'SPACE') { leg.problem = 'the pulse never let go'; return null; }
     const d = (await aim(to)).distance;
     if (d < near) { leg.pulses = attempt; leg.arrivedKm = +(d / 1000).toFixed(1); return i; }
-    // The drive let go in front of something else ("X ahead"). Go round it.
+    // The drive let go in front of something else ("X lies on your course: F goes on round it"):
+    // do what it says (the next try aims and presses F; the course goes round). Older words
+    // ("X ahead"): go round it by hand.
     leg.barred.push(`${i.notice || 'let go'} (${Math.round(d / 1000)} km still to go)`);
+    if (/lies on your course/.test(i.notice || '')) continue;
     await steerBy(to, (x) => ({ yaw: wrap(x.yawDeg - 85 * side), pitch: x.pitchDeg }), 15);
     await shortPulse(leg, 3);
     side = -side;

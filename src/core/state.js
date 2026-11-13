@@ -136,7 +136,9 @@ export function promptFor(state, q) {
       if (q.canLand) return { key: 'E', text: 'Land here' };
       return null;
     case S.LANDING: return { key: 'SPACE', text: 'Cancel landing' };
-    case S.SPACE: return q.target ? { key: 'F', text: 'Pulse to ' + q.target } : null;
+    // F with a course takes the ship there whether or not its mark is on the screen (it turns
+    // the ship onto the course first): the prompt is true wherever the nose points.
+    case S.SPACE: return q.turning ? { key: 'F', text: 'Stop turning' } : q.target ? { key: 'F', text: 'Pulse to ' + q.target } : null;
     case S.PULSE: return { key: 'F', text: 'Drop out of pulse' };
     default: return null;
   }
