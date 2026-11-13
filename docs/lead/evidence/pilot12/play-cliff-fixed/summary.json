@@ -1,0 +1,186 @@
+{
+  "query": "quality=0&dynres=0&pointerlock=0&fresh=1&save=0&audio=0&card=0",
+  "beats": [
+    {
+      "n": 1,
+      "name": "cliff-run-9s",
+      "file": "01-cliff-run-9s.jpg",
+      "state": "ON_FOOT",
+      "body": "earth",
+      "biome": "sea_coast",
+      "prompt": null,
+      "notice": null,
+      "t": 613.5,
+      "climbed": 0.7
+    }
+  ],
+  "traces": {
+    "cliff-run": [
+      {
+        "t": 0,
+        "up": 0,
+        "pace": 0,
+        "vUp": 0,
+        "slope": 11,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 0.6,
+        "up": 0,
+        "pace": 5.24,
+        "vUp": 0.51,
+        "slope": 14,
+        "grounded": true,
+        "mode": "walk"
+      },
+      {
+        "t": 1.1,
+        "up": 0.7,
+        "pace": 1.41,
+        "vUp": 0,
+        "slope": 53,
+        "grounded": true,
+        "mode": "walk"
+      },
+      {
+        "t": 1.6,
+        "up": 0.7,
+        "pace": 0.63,
+        "vUp": 0.05,
+        "slope": 53,
+        "grounded": true,
+        "mode": "walk"
+      },
+      {
+        "t": 2.1,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": 0,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 2.6,
+        "up": 0.7,
+        "pace": 0.12,
+        "vUp": 0.1,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 3.1,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": 0.02,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 3.6,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": -0.04,
+        "slope": 54,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 4.1,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": 0.02,
+        "slope": 54,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 4.6,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": -0.05,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 5.1,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": 0.01,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 5.6,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": -0.04,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 6.02,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": -0.05,
+        "slope": 53,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 6.7,
+        "up": 0.7,
+        "pace": 0.05,
+        "vUp": 0.03,
+        "slope": 52,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 7.2,
+        "up": 0.7,
+        "pace": 0.05,
+        "vUp": -0.04,
+        "slope": 52,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 7.7,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": -0.05,
+        "slope": 52,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 8.13,
+        "up": 0.7,
+        "pace": 0.04,
+        "vUp": -0.05,
+        "slope": 52,
+        "grounded": true,
+        "mode": "idle"
+      },
+      {
+        "t": 8.63,
+        "up": 0.7,
+        "pace": 0.11,
+        "vUp": 0.06,
+        "slope": 52,
+        "grounded": true,
+        "mode": "idle"
+      }
+    ]
+  },
+  "errors": [],
+  "fallback": [],
+  "fails": []
+}

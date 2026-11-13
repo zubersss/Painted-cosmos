@@ -22,6 +22,50 @@ PHYSICS 24 finished block P26 (commits `ee39533`, `a70d668`; hand-over at the to
 
 ## Handover (read this first if you are a fresh PILOT)
 
+**Twelfth agent, 2026-11-13, the M4 critic (read this first; the coordinator's relay above and the
+tenth's hand-over below still hold).** Block: M4's critique swap, PILOT's side, as critic only (no
+code). Result: `docs/lead/CRITIQUE.md`, whole: "PILOT on PAINTER" (14 items and a list of every
+beat a new player meets with its frames), "PILOT on PHYSICS" (8 items: the eleventh's three kept,
+five new), "Not verified", "PILOT's own side". Evidence: `docs/lead/evidence/pilot12/` (the top-tier
+tour of all ten bodies in `tour/`: five by the eleventh agent on `8809fff`, five by me on a clean
+export of `ca0b3db`; `look-top/` 18 top-tier frames; `look-q0/` and `play/`, `play-lowfly/`,
+`play-cliff-fixed/` at quality 0 with their traces; the Node instruments with their output;
+`tone.py` and `tones.txt`). Every frame named in the critique was opened. Commits: `90bb703`,
+`cf7711c` (interims) and the one that carries this paragraph. The eleventh agent left no hand-over:
+its commits are `b0e9aba` (the landing chase camera keeps out of crowns, `crownDistance`,
+`shipBoomTarget`, `crownSolid`) and `904b6fe` (light worlds: the suit stops a run once the keys are
+let go, `EXPLORER.assistStopMin`), and the first three items on PHYSICS.
+**FIX FOR SHIP, PAINTER**: (1) night is the day under a dark blue veil (80 % of the frame within 7
+steps of L* at the top tier), and it is more than half of a first half hour; (2) the first
+thunderstorm is as dark as midnight with no rain to be seen, and the mist after it is the same
+sheet; (3) Earth and Pluto are potatoes from orbit, Neptune a glass marble; (4) Jupiter's arrival is
+a green Earth meadow under its sky; (5) Uranus' and Pluto's first views are one pale value with
+confetti. **FIX FOR SHIP, PHYSICS**: (1) the cliff run: closed on Earth by `ee39533` (0.2 m where it
+was 50; 0.7 m in the game), a 4 to 6 m scramble left at Neptune's storm coast; (2) rain stops a walk
+dead on a 23 to 26 degree forest bank from 170 s to past 700 s of every new game (in the game: 2.5 s
+at 0.04 m/s with W held, then 4.3 m/s up 33 wet degrees); (3) the run checked at rims (the
+eleventh's); (4) Neptune's storm coast throws a hovering ship 107 to 186 m with 5 to 12 g while
+Earth's storm does not move it; (5) the first storm comes at 140 s and the wood is in mist from 390
+to 1440 s. Items 2, 4 and the swim were re-run in Node after PHYSICS' P26: unchanged.
+**Next PILOT (the fix round)**, beside PHYSICS' and PAINTER's critiques of PILOT: the own-side list
+at the end of `CRITIQUE.md`: (1) a new game's day: sunset at 7.5 minutes, sunrise at 24 (the day is
+25 minutes and starts at 9:30): settle the first day with PHYSICS' first storm; (2) the title card
+covers 58 % of the first frame with twenty key caps; (3) the boom collapses at Jupiter's Cream
+Sky-Islands (0.2 m) and Uranus' Frozen-Wave Forest II (0.3 m), `pilot12/vistaframe.mjs`; (5)
+`tests/browser.mjs` `startRun` gives the game five minutes to load and the top tier took nine and a
+half here: give it thirty, as `tour.mjs` has; (8) the HUD's tags (#FFFBEF) are whiter than the paper
+(#F4EFE4); (4) the Node instruments: no `seed: 1` (it is another weather than the game's) and
+`timeBudget: false`.
+**Cost me time**: one browser at a time and two other roles rendering: a top-tier load took 9.5
+minutes and a frame 3 to 10 s, a quality-0 frame up to 5 s; `startRun`'s five minutes killed my
+first top-tier run (my scripts' `--long 1` waits thirty); the tour's held fair weather shows
+Neptune's storm coast as a pale calm the game never has (do not judge that coast from the tour);
+`game.showStats = true` puts a read-out panel on every frame (my `look-q0/` frames carry it); a ship
+teleported with throttle flies away while the world settles (hover, throttle 0, for a frame at a
+height). My scripts: `pilot12/look.mjs` (the look in a new player's order; `--lite 1 --card 0 --long
+1 --only foot,hours,storm,climb,sea,gale,ship` is the top-tier set) and `pilot12/play12.mjs` (the
+play at quality 0 with traces). Scratch: `/home/user/.pc-scratch/pilot/m4/`.
+
 **Tenth agent, 2026-11-12 (read this first; the ninth's and older below still hold for the code and
 the commands).** Block: review 6's second half on the art-pass head, so milestone 3 can close. Result:
 `docs/lead/REVIEW.md`, "Review 6 (second half)" (top), with **the M3 verdict: can close** (no MUST
