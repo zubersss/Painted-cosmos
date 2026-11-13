@@ -54,11 +54,30 @@ The verifier's own files: `/home/user/.pc-scratch/verify/painter/` (`out/`, `nod
 - **Checks for RE-FIX 1 and 2** on a clean export of `a686a98` with these files (`t1`): world 22 (20 and the two new),
   unit 181, physics 324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros (worst step loss 0.26 / 0.52 as
   before); the game at quality 1 and at quality 0 through every scene above: no console error, fallback empty.
-- **IN THE MIDDLE OF: RE-FIX 3 (minor), the far world as a dark grey dot below the edge of the air.** Found: the far
-  world's veil (`world/index.js`, "far bodies: plain daylight") thins with the altitude alone and goes into the blue
-  of the ground's sky, while `e784574` made the sky itself paper-pale there. The change is written and saved as
-  `/home/user/.pc-scratch/painter/m4/refix/index.js.dotfix` (NOT in this commit): the veil follows the sky's own two
-  washes. Then: the top tier once on the final tree, the checks, this block.
+- **RE-FIX 3 (minor), THE FAR WORLD BELOW THE EDGE OF THE AIR (the verifier's regression 3): DONE.** Cause: the far
+  world's veil (`world/index.js`, "far bodies: plain daylight") thinned with the altitude alone, `(1 - space01)`, and
+  went into the blue of the ground's sky, while `e784574` made the sky itself paper-pale below the edge: at 600 m a
+  far world stood at half its own wash on near paper, a dark grey dot. Now the veil follows the sky's own two washes
+  (`sky.js spEdge`, the same numbers, taken a tenth higher because the edge wanders): a far world whose ground is
+  still the thin pale sky keeps the day's veil (0.72), and into that sky's own pale wash (`uHaze` run toward paper as
+  the sky is); as the sky pales a little more veil (to 0.84 at most), so the mark is never stronger than it is from
+  the ground; it clears as the indigo comes down over it, and eases out as the air ends (no step at `space01` 1). On
+  the ground, at night and in space the numbers are the ones before (read in the page: the ground at 10:30, veil 0.72,
+  haze 0.755 0.848 0.945; 650 m at midnight, veil 0; 700 m by day: Mercury, Venus and Saturn on the indigo veil 0, the
+  Moon and Jupiter below the edge 0.83).
+  Measured at quality 1, 640x360, the darkest of the dab against the sky round it, in 255ths: the head at 600 m 71
+  darker; now 25 at 600 m, 26 at 500 m, 26 from 60 m (the ground's look, which is unchanged); the second dot at
+  650 m (left of the ship) 17 darker on the head, not to be found now (7, the paper's own grain).
+  `m4fix/16-refix-far-world-below-the-edge.jpg` (opened: top, the head's 600, 650, 700 and 760 m with the dark dot at
+  600 m; middle, the re-fix at 500 to 760 m and 650 m at midnight: a faint mark at 500 and 600 m, nothing dark on the
+  pale sky at 650 m, pale and gold worlds on the indigo from 650 m up; bottom, the dot four times enlarged, head
+  against re-fix against the ground). The choice, logged: a far world by day stays the faint grey mark it has always
+  been from the ground (not a lifted pale disc): changing the ground's look is outside this pass.
+- **Checks on the final tree** (a clean export of `5de71a7` with `world/index.js`, `t4`): world 22, unit 181, physics
+  324, `coast.mjs` PASS at both stands, `ghostfield.mjs` all zeros; the game at quality 1 through the edge of the air,
+  a jet and its arc (arms in rising, a little out falling: as accepted), a walk: no console error, fallback empty.
+- **IN THE MIDDLE OF: the top tier once on the final tree** (a browser on `refix/t3`, out `refix/M2`: the side walk,
+  the birch at 1.8 m, a jet through the crown, the edge of the air at 600 to 700 m). Nothing else is open.
 
 ## Hand-over of the M4 fix round (sixteenth and seventeenth PAINTER agents; READ THIS FIRST)
 

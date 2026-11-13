@@ -343,10 +343,32 @@ export function createWorld(scene) {
         if (st.near) st.near.update(st.camLocal, false);
         // far bodies: plain daylight; seen through the air of the world we stand on they are
         // veiled by its sky (a pale disc by day, as the moon is), clear at night and from space
-        const veil = active && lastActive === active.id ? (1 - skyU.uAtmo.value.x) * skyU.uAtmo.value.y * 0.72 : 0;
-        if (veil > 0.01 || farVeil > 0.01) {
-          bu.uFog.value.set(1, 6, Math.max(veil, farVeil), st.limbK);
+        // (the re-fix, below the edge of the air: the veil follows the sky's own two washes there (sky.js: the day's sky
+        // run out toward paper, the indigo of space coming down from the zenith). A far world whose ground is still the
+        // thin pale sky keeps the day's veil, into that pale wash; it clears as the indigo comes down over it. The veil
+        // was thinned by the altitude alone and into the blue of the ground's sky: at 600 m over the Earth a far world
+        // was a dark grey dot on a paper-pale sky. On the ground and in space nothing changes.)
+        let skyVeil = 0, thinK = 0;
+        if (active && lastActive === active.id) {
+          const spA = skyU.uAtmo.value.x, day = skyU.uAtmo.value.y;
+          let inSp = spA >= 0.999 ? 1 : 0;
+          if (spA > 0.001 && spA < 0.999) {
+            root.getWorldPosition(_v2).sub(cameraPos);
+            const eB = hzn > 0 ? _v2.dot(_hup) / Math.max(1, _v2.length()) : 1;
+            // (the sky's edge, sky.js spEdge, taken a little higher: the edge wanders by a fifth, and a world shown clear must lie on indigo)
+            const spEdge = THREE.MathUtils.lerp(1.30, -0.60, THREE.MathUtils.smoothstep(spA, 0.04, 1.0));
+            inSp = Math.max(THREE.MathUtils.smoothstep(eB, spEdge + 0.10, spEdge + 0.36), THREE.MathUtils.smoothstep(spA, 0.8, 0.999));      // (and no step as the air ends)
+            thinK = THREE.MathUtils.smoothstep(spA, 0, 0.8) * 0.80 * day * (1 - inSp);
+          }
+          // (and as that sky pales the same share of the world's own wash would stand darker against it: a little more veil,
+          // so the mark is never stronger than it is from the ground. Measured at quality 0, the darkest of the dab against
+          // its sky, in 255ths: 27 from the ground, 34 at 600 m without this)
+          skyVeil = (1 - inSp) * day * 0.72 + 0.15 * thinK;
+        }
+        if (skyVeil > 0.01 || farVeil > 0.01) {
+          bu.uFog.value.set(1, 6, Math.max(skyVeil, farVeil), st.limbK);
           bu.uHaze.value.copy(skyU.uSkyZenith.value).lerp(skyU.uSkyHorizon.value, 0.45);
+          if (thinK > 0.001) { const h = bu.uHaze.value; h.x += (0.985 - h.x) * thinK; h.y += (0.98 - h.y) * thinK; h.z += (0.965 - h.z) * thinK; }
           // (behind a storm cloud it is lost into the cloud's own wash, not into the pale sky)
           if (farVeil > 0.01) bu.uHaze.value.lerp(skyU.uStormWash.value, Math.min(1, skyU.uWxSky.value.y * 1.25) * farVeil * 0.85);
         }
