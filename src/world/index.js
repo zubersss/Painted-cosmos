@@ -15,6 +15,7 @@ import { sampleObstaclesPure } from './obstacles.js';
 import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
+import { isArrival } from './arrival.js';
 import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
@@ -252,9 +253,12 @@ export function createWorld(scene) {
       active.root.updateMatrixWorld(true);
       _camL.copy(cameraPos); active.root.worldToLocal(_camL);
       if (!active.camPrev) active.camPrev = new THREE.Vector3(1e9, 0, 0);
-      if (_camL.length() - active.body.radius < 2500 && (active.seenFrame !== frameNo - 1 || active.camPrev.distanceToSquared(_camL) > 3600)) {
+      // (arrival.js: a leap the frame before does not explain; a fast ship at a low frame rate is not an arrival)
+      const seenLast = active.seenFrame === frameNo - 1, leap = active.camPrev.distanceTo(_camL);
+      if (_camL.length() - active.body.radius < 2500 && isArrival(leap, active.leapPrev || 0, seenLast)) {
         veil.on = true; veil.lift = -1; veil.wall = nowW; veil.frames = 0; veil.calm = 0;
       }
+      active.leapPrev = seenLast ? leap : 0;
       active.camPrev.copy(_camL); active.seenFrame = frameNo;
       active.root.getWorldPosition(_hup);
       _hup.subVectors(cameraPos, _hup);

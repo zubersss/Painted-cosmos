@@ -130,6 +130,14 @@ the project's five checks one after another).
   PILOT's frame at 703 m (one flat grey-violet with stars on it); after, 600, 650, 700, 760 m, 650 m at midnight, and
   the same edge on Mars, Jupiter, Venus and Neptune. Not verified: the top tier; the climb in motion (the edge comes
   down with altitude; I looked at stations, not at a film).
+- **Own-side 1 of the fifteenth's list, the arrival veil trips on a fast ship: DONE** (`world/arrival.js`, new and
+  pure; `world/index.js`): a leap of the eye is an arrival only where the frame before does not explain it (flight is
+  one leap after another of about the same length). Before, any frame of more than 60 m held the picture as bare
+  paper, and for as long as the ship was fast: at four frames a second from 265 m/s (measured: the ship 2300 m over
+  the spawn, Shift+W, 40 steps of 0.25 s: `SHEET.laid` 0 from 265 m/s to the end of the run; after: 1 throughout; a
+  debug teleport still holds the picture: `m4fix/12-arrival-veil.txt`; the frame after the run opened: a painting).
+  New test, failing on the commit before (the module is not there): `src/world/arrival.test.mjs`, "M4 arrival: a leap
+  is an arrival only where the frame before does not explain it" (world tests 19 -> 20).
 - **Seen on the committed tree at the top tier and at quality 0** (no console error, fallback empty in either):
   `m4fix/09-top-tier-committed-tree.jpg` (Earth, Neptune, Pluto, Mars from orbit; the storm and ten in the morning at
   the spawn), `m4fix/10-quality-0-committed-tree.jpg` (the storm with its rain strokes, a fair midnight, Neptune's
