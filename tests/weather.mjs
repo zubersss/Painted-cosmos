@@ -2,8 +2,8 @@
 // In the integrated game, third person as the player sees it, 960x540, the top tier (quality 2
 // unless --quality says otherwise), HUD hidden:
 //   - the Earth spawn as a new player meets it: the first minute, before, as the front arrives,
-//     in and after the default seed's first thunderstorm (160 to 320 s of play, noon to half
-//     past two; the game clock is set a few seconds ahead of each moment and left to run up to
+//     in and after the default seed's first thunderstorm (1690 to 1850 s of play, the second
+//     noon; the game clock is set a few seconds ahead of each moment and left to run up to
 //     it), and the same storm with the sun held at ten in the evening;
 //   - one forced lightning flash in that storm (window.__pc.flash), by day and after dark;
 //   - a blizzard on Earth's alpine meadow (fresh snow left to gather by itself);
@@ -38,20 +38,20 @@ const STORM = { cloud: 1, overcast: 0.95, haze: 0.35, fog: 0.5, wet: 0.9, rain: 
 const SHOTS = [
   // What a new player gets, standing at the spawn from the first second (the game begins at
   // 9:30; Earth's day is 25 minutes): fair, the front arriving at noon, the storm, fair again.
-  // PHYSICS' clock since 1cbbcc6: first drops at 140 s, thunderstorm from 160 to 320 s (20 mm/h
-  // and more from 200 to 260 s), a clear afternoon from 340 s.
+  // PHYSICS' clock since 33786a9 (its M4 fix round moved Earth's weather 1530 s later: the first day
+  // is fair): first drops at 1670 s, thunderstorm from 1690 to 1850 s (heaviest 1730 to 1790 s), clear from 1870 s.
   { id: 'earth-start', what: 'Earth spawn, the first minute of a new game', body: 'earth', place: 'spawn', t: 30, pre: 10 },
-  { id: 'earth-before', what: 'Earth spawn, two minutes in, before the thunderstorm', body: 'earth', place: 'spawn', t: 120, pre: 10, stay: true },
-  { id: 'earth-arrives', what: 'the front arrives (first drops fell at 140 s)', body: 'earth', place: 'spawn', t: 166, pre: 16, stay: true },
-  { id: 'earth-storm', what: 'in the thunderstorm, at its heaviest', body: 'earth', place: 'spawn', t: 240, pre: 14, stay: true },
-  { id: 'earth-flash', what: 'the same storm, one forced lightning flash (__pc.flash)', body: 'earth', place: 'spawn', t: 244, pre: 0, flash: true, stay: true },
-  { id: 'earth-after', what: 'the clear afternoon after the storm (the clock was jumped, so the ground had less time to dry than PHYSICS gives it)', body: 'earth', place: 'spawn', t: 400, pre: 10, stay: true },
+  { id: 'earth-before', what: 'Earth spawn, before the thunderstorm', body: 'earth', place: 'spawn', t: 1650, pre: 10, stay: true },
+  { id: 'earth-arrives', what: 'the front arrives (first drops fell at 1670 s)', body: 'earth', place: 'spawn', t: 1696, pre: 16, stay: true },
+  { id: 'earth-storm', what: 'in the thunderstorm, at its heaviest', body: 'earth', place: 'spawn', t: 1770, pre: 14, stay: true },
+  { id: 'earth-flash', what: 'the same storm, one forced lightning flash (__pc.flash)', body: 'earth', place: 'spawn', t: 1774, pre: 0, flash: true, stay: true },
+  { id: 'earth-after', what: 'the clear afternoon after the storm (the clock was jumped, so the ground had less time to dry than PHYSICS gives it)', body: 'earth', place: 'spawn', t: 1930, pre: 10, stay: true },
   // The same storm with the sun held at ten in the evening: the storm as a night picture, and
   // the dearest the spawn gets (review 5's cost finding was this view).
-  { id: 'earth-storm-night', what: 'in the storm, sun held at 22:00', body: 'earth', place: 'spawn', t: 240, pre: 14, hour: 22 },
-  { id: 'earth-flash-night', what: 'the same, one forced lightning flash', body: 'earth', place: 'spawn', t: 244, pre: 0, hour: 22, flash: true, stay: true },
-  // A blizzard on land: lat 62.41, lon 49.46 (alpine meadow) is under one from 120 to 220 s.
-  { id: 'earth-blizzard', what: 'blizzard on Earth\'s alpine meadow, lat 62.41 lon 49.46 (fresh snow gathered by itself)', body: 'earth', at: { lat: 62.41, lon: 49.46 }, t: 190, pre: 32, hour: 11 },
+  { id: 'earth-storm-night', what: 'in the storm, sun held at 22:00', body: 'earth', place: 'spawn', t: 1770, pre: 14, hour: 22 },
+  { id: 'earth-flash-night', what: 'the same, one forced lightning flash', body: 'earth', place: 'spawn', t: 1774, pre: 0, hour: 22, flash: true, stay: true },
+  // A blizzard on land: lat 62.41, lon 49.46 (alpine meadow) is under one from 1650 to 1750 s.
+  { id: 'earth-blizzard', what: 'blizzard on Earth\'s alpine meadow, lat 62.41 lon 49.46 (fresh snow gathered by itself)', body: 'earth', at: { lat: 62.41, lon: 49.46 }, t: 1720, pre: 32, hour: 11 },
   { id: 'mars-dust', what: 'dust storm on Mars\' dunes', body: 'mars', place: 'dust_dunes', t: 840, pre: 12, hour: 11 },
   { id: 'neptune-gale', what: 'Neptune\'s storm sea under PHYSICS\' own sky', body: 'neptune', place: 'storm_seas', t: 150, pre: 12, hour: 11 },
   { id: 'neptune-gale-forced', what: 'the same sea under a forced storm sky (world.setWeather)', body: 'neptune', place: 'storm_seas', t: 156, pre: 4, hour: 11, stay: true, force: STORM },

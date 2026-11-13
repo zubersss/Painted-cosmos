@@ -138,3 +138,32 @@ test('M4 a view the world gives no heading for keeps the way the player looks; a
   play(sim3, pad3, 0.1);
   assert.equal(sim3.easelOffer && sim3.easelOffer.id, 'v1', 'still on offer: the page has no picture');
 });
+
+test('M4 the re-fix: the walk to an easel stops a metre short of a cliff and is not offered on a face', () => {
+  // the stub world with a cliff 6 m east of the spawn: 18 m down over a metre (Neptune's
+  // 'Ultramarine Storm Seas II': the walk went 29.6 m down a 78 degree face in 6 s)
+  const spawn = norm(stubSpawn('earth').unitDir), R = stubSurface('earth', spawn).radius;
+  const east = tangent(cross(V(0, 1, 0), spawn), spawn, V(1, 0, 0)), north = cross(spawn, east);
+  const along = (d) => dot(d, east) * R;
+  const cliff = (id, d) => {
+    const g = stubSurface(id, d), e = along(norm(d));
+    if (id !== 'earth' || e < 6) return g;
+    const k = Math.min(1, e - 6);
+    return { ...g, radius: g.radius - 18 * k, slope: k < 1 ? 1.4 : g.slope };
+  };
+  const sim = new Sim({ sampleSurface: cliff, getSpawn: (id) => stubSpawn(id).unitDir });
+  play(sim, new Pad(), 0.3);
+  const at = (e, n = 0) => norm(add(spawn, add(scale(east, e / R), scale(north, n / R))));
+  const ground = (d) => scale(d, cliff('earth', d).radius);
+  // the spot 14 m east, beyond the cliff: the walk ends a metre short of the edge, on the top
+  const to = sim.easelWay(ground(at(0)), ground(at(14)));
+  const e = along(norm(to));
+  assert.ok(e > 4.4 && e < 5.2, 'stops a metre short of the edge: ' + e.toFixed(2) + ' m east');
+  assert.ok(Math.abs(len(to) - cliff('earth', at(0)).radius) < 0.3, 'on the top');
+  // the spot along the top: all of the way
+  const top = ground(at(0, 12));
+  assert.ok(len(sub(sim.easelWay(ground(at(0)), top), top)) < 1e-9);
+  // standing at the edge: no walk at all
+  const edge = ground(at(5.6));
+  assert.ok(len(sub(sim.easelWay(edge, ground(at(14))), edge)) < 1e-9);
+});

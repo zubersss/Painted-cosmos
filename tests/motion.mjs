@@ -18,7 +18,7 @@
 //   landing       the last two metres of a landing (the ship's height at every frame is kept).
 //   fill          an arrival: the first frames at a place nobody has painted yet.
 //   pulse         the pulse drive from high above Earth towards another world.
-//   storm         the first thunderstorm at the Earth spawn (clock 240 s), standing.
+//   storm         the first thunderstorm at the Earth spawn (clock 1770 s), standing.
 //
 // Measures, on luminance at half size (0..1 of the displayed value):
 //   change        mean |difference| between consecutive frames, in % of full scale, and the
@@ -74,7 +74,7 @@ const SCENES = [
   { id: 'still', what: 'Earth spawn, standing still, the clock running', place: 'spawn', stay: true, t: 30, frames: 30 },
   { id: 'turn', what: 'Earth spawn, a slow turn of the camera (mouse held, 3 px a frame)', place: 'spawn', stay: true, t: 30, frames: 40, mouse: 3, stuck: true },
   { id: 'walk', what: 'walking through the home forest (W held)', place: 'spawn', stay: true, t: 30, frames: 48, keys: ['KeyW'], lead: 12 },
-  { id: 'storm', what: 'the first thunderstorm at the Earth spawn (clock 240 s), standing still', place: 'spawn', stay: true, t: 240, pre: 4, frames: 30 },
+  { id: 'storm', what: 'the first thunderstorm at the Earth spawn (clock 1770 s), standing still', place: 'spawn', stay: true, t: 1770, pre: 4, frames: 30 },
   { id: 'flight', what: 'the ship low over the wood', place: 'spawn', t: 30, frames: 48, ship: { altitude: 40, speed: 35, throttle: 0.5 }, lead: 6 },
   { id: 'landing', what: 'the last two metres of a landing at the Earth spawn (E pressed in a hover 8 m up)', place: 'spawn', t: 30, frames: 90, ship: { altitude: 8, speed: 0, throttle: 0 }, land: 2.2 },
   { id: 'fill', what: 'arriving on foot 600 m east of the spawn: the first frames, while the land is still being painted', place: 'east', t: 30, frames: 30, noSettle: true },

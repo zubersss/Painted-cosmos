@@ -454,6 +454,30 @@ test('M4 afloat: Space does not hop a swimmer; held, the jetpack lifts them out;
   assert.ok(tSwim > 2.5 * tWalk, `a walker in ${tWalk.toFixed(2)} s`);
 });
 
+test('M4 the re-fix: a swimmer asked to turn about (S, the view straight behind) comes round, it does not swim backward', () => {
+  // The land's eased blend of the two directions hardly turns from straight away: afloat, at
+  // swimTurnRate, S swam backward for 5.8 s (the verifier's swimturn.mjs at Earth's sea coast).
+  const world = makeWorld({ R: R - 6, sea: R });
+  const env = { sample: world, gravity: 9 };
+  const sw = createExplorerState(scale(start, R - EXPLORER.swimDepth), fwd0);
+  sw.grounded = false;
+  run(sw, env, 2, { viewFwd: fwd0, moveZ: 1 });
+  assert.ok(sw.swimming);
+  const f0 = { ...sw.fwd }, view = { ...f0 };
+  let t = 0, back = 0, fastest = 0, prev = { ...sw.fwd };
+  while (t < 4 && dot(sw.fwd, f0) > -0.7) {
+    stepExplorer(sw, { viewFwd: view, moveZ: -1 }, DT, env);
+    t += DT;
+    const v = sw.v, sp = len(v);
+    if (sp > 0.5 && dot(scale(v, 1 / sp), sw.fwd) < -0.5) back += DT;
+    fastest = Math.max(fastest, Math.acos(Math.min(1, dot(prev, sw.fwd))) / DT);
+    prev = { ...sw.fwd };
+  }
+  assert.ok(t < 1.5, 'come about in ' + t.toFixed(2) + ' s');
+  assert.ok(back < 0.3, 'swimming backward for ' + back.toFixed(2) + ' s');
+  assert.ok(fastest <= EXPLORER.swimTurnRate + 1e-6, 'never faster than swimTurnRate: ' + fastest.toFixed(2) + ' rad/s');
+});
+
 // ---- M4: the jetpack on a light world (PHYSICS' critique of PILOT, item 8) -----------------------
 test('M4 burn and coast: the tank refills only on the ground or afloat, so no burn-and-coast keeps the explorer up, on any world', () => {
   // A player who wants to stay up: burns the tank down to `lo` to climb, coasts over the top and down,

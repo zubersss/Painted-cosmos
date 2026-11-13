@@ -1,0 +1,290 @@
+# the verifier's probes/easel.mjs on this tree (288 approaches); its own run on the fix round's head: /home/user/.pc-scratch/verify/pilot/easel-head.txt (over a face steeper than 40 deg: 6)
+mercury  Cracked Ochre Basins         from   0: 0.03 m in 3.85 s, yaw 5.59; ok
+mercury  Cracked Ochre Basins         from  90: 13.11 m in 5.68 s, yaw 5.59; ok
+mercury  Cracked Ochre Basins         from 180: 13.05 m in 5.67 s, yaw 5.59; ok
+mercury  Cracked Ochre Basins         from 270: 13.44 m in 5.78 s, yaw 5.59; ok
+mercury  Obsidian Glass Fields        from   0: 12.94 m in 5.63 s, yaw 1.22; ok
+mercury  Obsidian Glass Fields        from  90: 12.95 m in 5.63 s, yaw 1.22; ok
+mercury  Obsidian Glass Fields        from 180: 12.99 m in 5.65 s, yaw 1.22; ok
+mercury  Obsidian Glass Fields        from 270: 12.95 m in 5.63 s, yaw 1.22; ok
+mercury  Twilight Crystal Gardens     from   0: 13.06 m in 5.67 s, yaw 0.17; ok
+mercury  Twilight Crystal Gardens     from  90: 13.11 m in 5.68 s, yaw 0.17; ok
+mercury  Twilight Crystal Gardens     from 180: 13.07 m in 5.67 s, yaw 0.17; ok
+mercury  Twilight Crystal Gardens     from 270: 13.18 m in 5.70 s, yaw 0.17; ok
+mercury  Frozen Shadow Craters        from 0: no offer in 25 s (mode idle, 28.94 m off)
+mercury  Frozen Shadow Craters        from  90: 13.56 m in 5.82 s, yaw 2.27; ok
+mercury  Frozen Shadow Craters        from 180: 14.81 m in 6.05 s, yaw 2.27; ok
+mercury  Frozen Shadow Craters        from 270: 14.17 m in 6.00 s, yaw 2.27; ok
+mercury  Frozen Shadow Craters II     from   0: 12.95 m in 5.63 s, yaw -; ok
+mercury  Frozen Shadow Craters II     from  90: 13.24 m in 5.72 s, yaw -; ok
+mercury  Frozen Shadow Craters II     from 180: 12.96 m in 5.63 s, yaw -; ok
+mercury  Frozen Shadow Craters II     from 270: 13.01 m in 5.65 s, yaw -; ok
+mercury  Twilight Crystal Gardens II  from   0: 13.03 m in 5.67 s, yaw -; ok
+mercury  Twilight Crystal Gardens II  from  90: 13.03 m in 5.67 s, yaw -; ok
+mercury  Twilight Crystal Gardens II  from 180: 13.21 m in 5.72 s, yaw -; ok
+mercury  Twilight Crystal Gardens II  from 270: 13.05 m in 5.67 s, yaw -; ok
+mercury  Cracked Ochre Basins II      from   0: 13.04 m in 5.67 s, yaw -; ok
+mercury  Cracked Ochre Basins II      from  90: 12.99 m in 5.65 s, yaw -; ok
+mercury  Cracked Ochre Basins II      from 180: 13.01 m in 5.65 s, yaw -; ok
+mercury  Cracked Ochre Basins II      from 270: 1.32 m in 0.52 s, yaw -; ok
+venus    Fungal Tower Forest          from   0: 13.83 m in 5.92 s, yaw 5.41; ok
+venus    Fungal Tower Forest          from  90: 13.49 m in 5.80 s, yaw 5.41; ok
+venus    Fungal Tower Forest          from 180: 13.32 m in 5.75 s, yaw 5.41; ok
+venus    Fungal Tower Forest          from 270: 13.30 m in 5.75 s, yaw 5.41; THROUGH {"h":10,"r":0.62,"gap":0.61}
+venus    Lava Rivers                  from   0: 13.57 m in 5.83 s, yaw 3.49; ok
+venus    Lava Rivers                  from  90: 13.63 m in 5.85 s, yaw 3.49; ok
+venus    Lava Rivers                  from 180: no offer in 25 s (mode swim, 14.36 m off)
+venus    Lava Rivers                  from 270: 14.03 m in 5.97 s, yaw 3.49; in liquid
+venus    Acid Lake Terraces           from   0: 14.19 m in 6.02 s, yaw 4.71; in liquid
+venus    Acid Lake Terraces           from  90: 13.68 m in 5.87 s, yaw 4.71; ok
+venus    Acid Lake Terraces           from 180: 13.67 m in 5.87 s, yaw 4.71; ok
+venus    Acid Lake Terraces           from 270: 1.51 m in 0.52 s, yaw 4.71; ok
+venus    Pale Mesas                   from 0: no offer in 25 s (mode idle, 26.35 m off)
+venus    Pale Mesas                   from  90: 14.46 m in 6.05 s, yaw 1.05; ok
+venus    Pale Mesas                   from 180: 13.52 m in 5.82 s, yaw 1.05; ok
+venus    Pale Mesas                   from 270: 14.24 m in 6.02 s, yaw 1.05; ok
+venus    Pale Mesas II                from   0: 1.22 m in 0.52 s, yaw -; ok
+venus    Pale Mesas II                from  90: 13.35 m in 5.77 s, yaw -; ok
+venus    Pale Mesas II                from 180: 13.35 m in 5.77 s, yaw -; ok
+venus    Pale Mesas II                from 270: 13.30 m in 5.75 s, yaw -; ok
+venus    Acid Lake Terraces II        from   0: 1.37 m in 0.52 s, yaw -; ok
+venus    Acid Lake Terraces II        from  90: 1.34 m in 0.52 s, yaw -; ok
+venus    Acid Lake Terraces II        from 180: 1.57 m in 0.52 s, yaw -; ok
+venus    Acid Lake Terraces II        from 270: 13.53 m in 5.82 s, yaw -; ok
+venus    Fungal Tower Forest II       from   0: 13.63 m in 5.85 s, yaw -; ok
+venus    Fungal Tower Forest II       from  90: 13.53 m in 5.82 s, yaw -; ok
+venus    Fungal Tower Forest II       from 180: 13.32 m in 5.75 s, yaw -; ok
+venus    Fungal Tower Forest II       from 270: 13.29 m in 5.75 s, yaw -; ok
+earth    Temperate Forest             from   0: 13.20 m in 5.72 s, yaw 2.97; ok
+earth    Temperate Forest             from  90: 13.65 m in 5.85 s, yaw 2.97; ok
+earth    Temperate Forest             from 180: 13.20 m in 5.72 s, yaw 2.97; in liquid
+earth    Temperate Forest             from 270: 13.16 m in 5.70 s, yaw 2.97; in liquid
+earth    Autumn Woodland              from   0: 13.47 m in 5.80 s, yaw 0.52; in liquid
+earth    Autumn Woodland              from  90: 13.25 m in 5.73 s, yaw 0.52; ok
+earth    Autumn Woodland              from 180: 13.26 m in 5.73 s, yaw 0.52; ok
+earth    Autumn Woodland              from 270: 13.20 m in 5.72 s, yaw 0.52; ok
+earth    Alpine Meadow and Snow Peaks from   0: 13.27 m in 5.73 s, yaw 4.89; ok
+earth    Alpine Meadow and Snow Peaks from  90: 13.22 m in 5.73 s, yaw 4.89; ok
+earth    Alpine Meadow and Snow Peaks from 180: 13.23 m in 5.73 s, yaw 4.89; ok
+earth    Alpine Meadow and Snow Peaks from 270: 1.36 m in 0.52 s, yaw 4.89; ok
+earth    Sea Cliffs and Coast         from   0: 13.79 m in 5.90 s, yaw 6.11; in liquid
+earth    Sea Cliffs and Coast         from  90: 13.19 m in 5.72 s, yaw 6.11; ok
+earth    Sea Cliffs and Coast         from 180: 13.21 m in 5.72 s, yaw 6.11; ok
+earth    Sea Cliffs and Coast         from 270: 1.45 m in 0.52 s, yaw 6.11; ok
+earth    Desert Canyon                from   0: 1.33 m in 0.52 s, yaw 2.97; ok
+earth    Desert Canyon                from  90: 1.30 m in 0.52 s, yaw 2.97; ok
+earth    Desert Canyon                from 180: 13.44 m in 5.80 s, yaw 2.97; ok
+earth    Desert Canyon                from 270: 13.28 m in 5.75 s, yaw 2.97; ok
+earth    Misty Wetland                from   0: 13.12 m in 5.70 s, yaw 2.97; ok
+earth    Misty Wetland                from  90: 13.12 m in 5.70 s, yaw 2.97; ok
+earth    Misty Wetland                from 180: 13.25 m in 5.73 s, yaw 2.97; ok
+earth    Misty Wetland                from 270: 13.17 m in 5.72 s, yaw 2.97; ok
+earth    Autumn Woodland II           from   0: 13.38 m in 5.77 s, yaw -; ok
+earth    Autumn Woodland II           from  90: 13.23 m in 5.73 s, yaw -; ok
+earth    Autumn Woodland II           from 180: 13.37 m in 5.77 s, yaw -; ok
+earth    Autumn Woodland II           from 270: 13.22 m in 5.73 s, yaw -; ok
+earth    Alpine Meadow and Snow Peaks II from   0: 1.68 m in 0.52 s, yaw -; ok
+earth    Alpine Meadow and Snow Peaks II from  90: 13.20 m in 5.72 s, yaw -; ok
+earth    Alpine Meadow and Snow Peaks II from 180: 13.48 m in 5.80 s, yaw -; ok
+earth    Alpine Meadow and Snow Peaks II from 270: 13.24 m in 5.73 s, yaw -; ok
+moon     Silver Mare                  from   0: 1.55 m in 0.52 s, yaw 2.06; ok
+moon     Silver Mare                  from  90: 12.95 m in 5.63 s, yaw 2.06; ok
+moon     Silver Mare                  from 180: 1.56 m in 0.52 s, yaw 2.06; ok
+moon     Silver Mare                  from 270: 12.95 m in 5.63 s, yaw 2.06; ok
+moon     Bright Highlands             from   0: 12.95 m in 5.63 s, yaw 4.83; ok
+moon     Bright Highlands             from  90: 12.93 m in 5.63 s, yaw 4.83; ok
+moon     Bright Highlands             from 180: 12.94 m in 5.63 s, yaw 4.83; ok
+moon     Bright Highlands             from 270: 12.92 m in 5.63 s, yaw 4.83; ok
+moon     Crater Fields                from   0: 12.94 m in 5.63 s, yaw 4.19; ok
+moon     Crater Fields                from  90: 12.91 m in 5.63 s, yaw 4.19; ok
+moon     Crater Fields                from 180: 12.92 m in 5.63 s, yaw 4.19; ok
+moon     Crater Fields                from 270: 1.30 m in 0.52 s, yaw 4.19; ok
+moon     Winding Rilles               from   0: 1.41 m in 0.52 s, yaw 1.68; ok
+moon     Winding Rilles               from  90: 12.99 m in 5.65 s, yaw 1.68; ok
+moon     Winding Rilles               from 180: 13.40 m in 5.77 s, yaw 1.68; ok
+moon     Winding Rilles               from 270: 1.32 m in 0.52 s, yaw 1.68; ok
+moon     Crater Fields II             from   0: 1.50 m in 0.52 s, yaw -; ok
+moon     Crater Fields II             from  90: 13.11 m in 5.68 s, yaw -; ok
+moon     Crater Fields II             from 180: 1.29 m in 0.52 s, yaw -; ok
+moon     Crater Fields II             from 270: no offer in 25 s (mode idle, 22.53 m off)
+moon     Winding Rilles II            from   0: 1.51 m in 0.52 s, yaw -; ok
+moon     Winding Rilles II            from  90: 12.95 m in 5.63 s, yaw -; ok
+moon     Winding Rilles II            from 180: 12.91 m in 5.62 s, yaw -; ok
+moon     Winding Rilles II            from 270: 12.90 m in 5.62 s, yaw -; ok
+moon     Bright Highlands II          from   0: 13.04 m in 5.67 s, yaw -; ok
+moon     Bright Highlands II          from  90: 13.31 m in 5.75 s, yaw -; ok
+moon     Bright Highlands II          from 180: 13.07 m in 5.67 s, yaw -; ok
+moon     Bright Highlands II          from 270: 0.05 m in 3.85 s, yaw -; ok
+mars     Rust Canyons                 from 0: no offer in 25 s (mode idle, 23.89 m off)
+mars     Rust Canyons                 from  90: 12.95 m in 5.63 s, yaw 0.87; ok
+mars     Rust Canyons                 from 180: 13.18 m in 5.70 s, yaw 0.87; ok
+mars     Rust Canyons                 from 270: 13.35 m in 5.77 s, yaw 0.87; ok
+mars     Dust-Storm Dunes             from   0: 13.25 m in 5.73 s, yaw 0.00; ok
+mars     Dust-Storm Dunes             from  90: 12.95 m in 5.63 s, yaw 0.00; ok
+mars     Dust-Storm Dunes             from 180: 13.01 m in 5.65 s, yaw 0.00; ok
+mars     Dust-Storm Dunes             from 270: 13.44 m in 5.78 s, yaw 0.00; ok
+mars     Polar Frost Fields           from   0: 2.93 m in 3.85 s, yaw 6.11; ok
+mars     Polar Frost Fields           from  90: 12.98 m in 5.65 s, yaw 6.11; ok
+mars     Polar Frost Fields           from 180: 13.00 m in 5.65 s, yaw 6.11; ok
+mars     Polar Frost Fields           from 270: 0.03 m in 3.85 s, yaw 6.11; ok
+mars     Dry Riverbeds                from   0: 13.22 m in 5.72 s, yaw 1.05; ok
+mars     Dry Riverbeds                from  90: 12.97 m in 5.65 s, yaw 1.05; ok
+mars     Dry Riverbeds                from 180: 13.28 m in 5.73 s, yaw 1.05; ok
+mars     Dry Riverbeds                from 270: 1.37 m in 0.52 s, yaw 1.05; ok
+mars     Polar Frost Fields II        from   0: 1.36 m in 0.52 s, yaw -; ok
+mars     Polar Frost Fields II        from  90: 13.06 m in 5.67 s, yaw -; ok
+mars     Polar Frost Fields II        from 180: 12.99 m in 5.65 s, yaw -; ok
+mars     Polar Frost Fields II        from 270: 1.33 m in 0.52 s, yaw -; ok
+mars     Rust Canyons II              from   0: 13.11 m in 5.68 s, yaw -; ok
+mars     Rust Canyons II              from  90: 12.99 m in 5.65 s, yaw -; ok
+mars     Rust Canyons II              from 180: 13.59 m in 5.83 s, yaw -; ok
+mars     Rust Canyons II              from 270: no offer in 25 s (mode idle, 48.16 m off)
+mars     Dust-Storm Dunes II          from   0: 13.18 m in 5.72 s, yaw -; ok
+mars     Dust-Storm Dunes II          from  90: 13.14 m in 5.70 s, yaw -; ok
+mars     Dust-Storm Dunes II          from 180: 13.00 m in 5.65 s, yaw -; ok
+mars     Dust-Storm Dunes II          from 270: 13.01 m in 5.65 s, yaw -; ok
+jupiter  Cream Sky-Islands            from   0: 13.58 m in 5.87 s, yaw 2.27; NO FIGURE in the held picture (boom 0.80)
+jupiter  Cream Sky-Islands            from 90: no offer in 25 s (mode wade, 25.87 m off)
+jupiter  Cream Sky-Islands            from 180: 13.62 m in 5.82 s, yaw 2.27; NO FIGURE in the held picture (boom 0.80)
+jupiter  Cream Sky-Islands            from 270: 13.41 m in 5.80 s, yaw 2.27; NO FIGURE in the held picture (boom 0.80)
+jupiter  Storm-Wall Cliffs            from   0: 1.40 m in 0.52 s, yaw 3.67; ok
+jupiter  Storm-Wall Cliffs            from  90: 13.10 m in 5.68 s, yaw 3.67; ok
+jupiter  Storm-Wall Cliffs            from 180: 1.58 m in 0.52 s, yaw 3.67; ok
+jupiter  Storm-Wall Cliffs            from 270: 13.59 m in 5.83 s, yaw 3.67; ok
+jupiter  Hanging Gardens              from   0: 13.29 m in 5.75 s, yaw 2.62; ok
+jupiter  Hanging Gardens              from  90: 13.35 m in 5.77 s, yaw 2.62; ok
+jupiter  Hanging Gardens              from 180: 1.36 m in 0.52 s, yaw 2.62; ok
+jupiter  Hanging Gardens              from 270: 13.12 m in 5.70 s, yaw 2.62; ok
+jupiter  Lightning Plains             from   0: 6.13 m in 3.85 s, yaw 1.05; ok
+jupiter  Lightning Plains             from 90: no offer in 25 s (mode idle, 39.50 m off)
+jupiter  Lightning Plains             from 180: 13.63 m in 5.85 s, yaw 1.05; ok
+jupiter  Lightning Plains             from 270: 13.43 m in 5.78 s, yaw 1.05; ok
+jupiter  Hanging Gardens II           from   0: 13.24 m in 5.73 s, yaw -; ok
+jupiter  Hanging Gardens II           from  90: 1.38 m in 0.52 s, yaw -; ok
+jupiter  Hanging Gardens II           from 180: 13.26 m in 5.73 s, yaw -; ok
+jupiter  Hanging Gardens II           from 270: 13.28 m in 5.75 s, yaw -; ok
+jupiter  Lightning Plains II          from   0: 13.26 m in 5.73 s, yaw -; ok
+jupiter  Lightning Plains II          from  90: 13.38 m in 5.77 s, yaw -; ok
+jupiter  Lightning Plains II          from 180: 13.37 m in 5.77 s, yaw -; ok
+jupiter  Lightning Plains II          from 270: 13.25 m in 5.73 s, yaw -; ok
+jupiter  Storm-Wall Cliffs II         from   0: 13.37 m in 5.77 s, yaw -; ok
+jupiter  Storm-Wall Cliffs II         from  90: 13.35 m in 5.77 s, yaw -; ok
+jupiter  Storm-Wall Cliffs II         from 180: 13.38 m in 5.78 s, yaw -; ok
+jupiter  Storm-Wall Cliffs II         from 270: no offer in 25 s (mode idle, 28.00 m off)
+saturn   Pale Gold Sky-Islands        from   0: 0.02 m in 3.85 s, yaw 4.01; ok
+saturn   Pale Gold Sky-Islands        from  90: 14.32 m in 6.05 s, yaw 4.01; ok
+saturn   Pale Gold Sky-Islands        from 180: 13.22 m in 5.72 s, yaw 4.01; ok
+saturn   Pale Gold Sky-Islands        from 270: no offer in 25 s (mode swim, 17.61 m off)
+saturn   Crystal Reed Fields          from   0: 1.58 m in 0.52 s, yaw 2.62; ok
+saturn   Crystal Reed Fields          from  90: 13.38 m in 5.78 s, yaw 2.62; ok
+saturn   Crystal Reed Fields          from 180: 13.31 m in 5.75 s, yaw 2.62; ok
+saturn   Crystal Reed Fields          from 270: 13.19 m in 5.72 s, yaw 2.62; ok
+saturn   Ring-Shadow Twilight         from   0: 13.27 m in 5.73 s, yaw 1.92; ok
+saturn   Ring-Shadow Twilight         from  90: 13.62 m in 5.85 s, yaw 1.92; ok
+saturn   Ring-Shadow Twilight         from 180: 1.40 m in 0.52 s, yaw 1.92; ok
+saturn   Ring-Shadow Twilight         from 270: 13.11 m in 5.70 s, yaw 1.92; ok
+saturn   Honey Mist Valleys           from   0: 13.67 m in 5.87 s, yaw 5.06; ok
+saturn   Honey Mist Valleys           from  90: 13.64 m in 5.85 s, yaw 5.06; ok
+saturn   Honey Mist Valleys           from 180: 13.39 m in 5.78 s, yaw 5.06; ok
+saturn   Honey Mist Valleys           from 270: 13.39 m in 5.78 s, yaw 5.06; ok
+saturn   Ring-Shadow Twilight II      from   0: 13.35 m in 5.77 s, yaw -; ok
+saturn   Ring-Shadow Twilight II      from  90: 13.53 m in 5.82 s, yaw -; THROUGH {"h":8,"r":1.42,"gap":1.35}
+saturn   Ring-Shadow Twilight II      from 180: 13.31 m in 5.75 s, yaw -; ok
+saturn   Ring-Shadow Twilight II      from 270: 13.08 m in 5.68 s, yaw -; ok
+saturn   Crystal Reed Fields II       from   0: 13.21 m in 5.72 s, yaw -; ok
+saturn   Crystal Reed Fields II       from  90: 13.29 m in 5.75 s, yaw -; THROUGH {"h":6.2,"r":0.41,"gap":0.38}; NO FIGURE in the held picture (boom 1.08)
+saturn   Crystal Reed Fields II       from 180: 13.29 m in 5.75 s, yaw -; THROUGH {"h":5.2,"r":0.35,"gap":0.29}
+saturn   Crystal Reed Fields II       from 270: 13.14 m in 5.70 s, yaw -; ok
+saturn   Honey Mist Valleys II        from   0: 13.22 m in 5.73 s, yaw -; ok
+saturn   Honey Mist Valleys II        from  90: 13.38 m in 5.77 s, yaw -; ok
+saturn   Honey Mist Valleys II        from 180: 13.21 m in 5.72 s, yaw -; ok
+saturn   Honey Mist Valleys II        from 270: 13.11 m in 5.68 s, yaw -; ok
+uranus   Mint Ice Shelves             from   0: 13.12 m in 5.70 s, yaw 2.62; ok
+uranus   Mint Ice Shelves             from  90: 13.26 m in 5.73 s, yaw 2.62; ok
+uranus   Mint Ice Shelves             from 180: 13.04 m in 5.67 s, yaw 2.62; ok
+uranus   Mint Ice Shelves             from 270: 13.00 m in 5.65 s, yaw 2.62; ok
+uranus   Frozen-Wave Forest           from 0: no offer in 25 s (mode idle, 17.12 m off)
+uranus   Frozen-Wave Forest           from  90: 13.13 m in 5.70 s, yaw 2.97; ok
+uranus   Frozen-Wave Forest           from 180: 13.28 m in 5.75 s, yaw 2.97; ok
+uranus   Frozen-Wave Forest           from 270: 1.37 m in 0.52 s, yaw 2.97; ok
+uranus   Pearl Fog Flats              from   0: 13.17 m in 5.72 s, yaw 1.57; ok
+uranus   Pearl Fog Flats              from  90: 12.99 m in 5.65 s, yaw 1.57; ok
+uranus   Pearl Fog Flats              from 180: 13.13 m in 5.70 s, yaw 1.57; ok
+uranus   Pearl Fog Flats              from 270: 13.21 m in 5.72 s, yaw 1.57; ok
+uranus   Glowing Teal Sinkholes       from   0: 1.14 m in 0.52 s, yaw 1.40; ok
+uranus   Glowing Teal Sinkholes       from  90: 13.55 m in 5.82 s, yaw 1.40; in liquid
+uranus   Glowing Teal Sinkholes       from 180: 13.46 m in 5.80 s, yaw 1.40; ok
+uranus   Glowing Teal Sinkholes       from 270: 15.47 m in 6.05 s, yaw 1.40; ok
+uranus   Pearl Fog Flats II           from   0: 13.14 m in 5.70 s, yaw -; ok
+uranus   Pearl Fog Flats II           from  90: 12.98 m in 5.65 s, yaw -; ok
+uranus   Pearl Fog Flats II           from 180: 13.13 m in 5.70 s, yaw -; ok
+uranus   Pearl Fog Flats II           from 270: 13.29 m in 5.75 s, yaw -; ok
+uranus   Frozen-Wave Forest II        from   0: 13.30 m in 5.75 s, yaw -; THROUGH {"h":10,"r":5.01,"gap":4.99}
+uranus   Frozen-Wave Forest II        from  90: 1.32 m in 0.52 s, yaw -; ok
+uranus   Frozen-Wave Forest II        from 180: 13.25 m in 5.73 s, yaw -; THROUGH {"h":9,"r":4.5,"gap":4.49}; NO FIGURE in the held picture (boom 1.58)
+uranus   Frozen-Wave Forest II        from 270: 13.40 m in 5.78 s, yaw -; THROUGH {"h":8.8,"r":4.42,"gap":4.41}
+uranus   Glowing Teal Sinkholes II    from 0: no offer in 25 s (mode swim, 25.25 m off)
+uranus   Glowing Teal Sinkholes II    from  90: 12.91 m in 5.63 s, yaw -; ok
+uranus   Glowing Teal Sinkholes II    from 180: 1.40 m in 0.52 s, yaw -; ok
+uranus   Glowing Teal Sinkholes II    from 270: 13.35 m in 5.77 s, yaw -; ok
+neptune  Ultramarine Storm Seas       from 0: no offer in 25 s (mode idle, 35.38 m off)
+neptune  Ultramarine Storm Seas       from 90: no offer in 25 s (mode idle, 34.01 m off)
+neptune  Ultramarine Storm Seas       from 180: 13.25 m in 5.73 s, yaw 1.66; ok
+neptune  Ultramarine Storm Seas       from 270: 13.40 m in 5.78 s, yaw 1.66; ok
+neptune  Blue-Violet Kelp Forests     from   0: 13.22 m in 5.73 s, yaw 1.05; ok
+neptune  Blue-Violet Kelp Forests     from  90: 13.33 m in 5.77 s, yaw 1.05; ok
+neptune  Blue-Violet Kelp Forests     from 180: 13.21 m in 5.73 s, yaw 1.05; ok
+neptune  Blue-Violet Kelp Forests     from 270: 13.08 m in 5.68 s, yaw 1.05; ok
+neptune  Wind-Carved Ice Spires       from   0: 1.57 m in 0.52 s, yaw 0.70; ok
+neptune  Wind-Carved Ice Spires       from  90: 13.01 m in 5.67 s, yaw 0.70; ok
+neptune  Wind-Carved Ice Spires       from 180: 13.17 m in 5.72 s, yaw 0.70; ok
+neptune  Wind-Carved Ice Spires       from 270: 13.33 m in 5.77 s, yaw 0.70; ok
+neptune  Aurora Tundra                from   0: 13.28 m in 5.75 s, yaw 1.92; ok
+neptune  Aurora Tundra                from  90: 13.18 m in 5.72 s, yaw 1.92; ok
+neptune  Aurora Tundra                from 180: 13.32 m in 5.75 s, yaw 1.92; ok
+neptune  Aurora Tundra                from 270: 13.42 m in 5.78 s, yaw 1.92; ok
+neptune  Aurora Tundra II             from   0: 13.23 m in 5.73 s, yaw -; ok
+neptune  Aurora Tundra II             from  90: 13.13 m in 5.70 s, yaw -; ok
+neptune  Aurora Tundra II             from 180: 13.49 m in 5.82 s, yaw -; ok
+neptune  Aurora Tundra II             from 270: 13.33 m in 5.77 s, yaw -; ok
+neptune  Wind-Carved Ice Spires II    from   0: 13.20 m in 5.72 s, yaw -; ok
+neptune  Wind-Carved Ice Spires II    from  90: 13.05 m in 5.67 s, yaw -; ok
+neptune  Wind-Carved Ice Spires II    from 180: 13.47 m in 5.80 s, yaw -; ok
+neptune  Wind-Carved Ice Spires II    from 270: 13.30 m in 5.75 s, yaw -; ok
+neptune  Ultramarine Storm Seas II    from   0: 1.45 m in 0.52 s, yaw -; ok
+neptune  Ultramarine Storm Seas II    from  90: 13.64 m in 5.85 s, yaw -; in liquid
+neptune  Ultramarine Storm Seas II    from 180: 1.45 m in 0.52 s, yaw -; ok
+neptune  Ultramarine Storm Seas II    from 270: 6.48 m in 3.85 s, yaw -; ok
+pluto    Lilac Mountains              from   0: 1.45 m in 0.52 s, yaw -; ok
+pluto    Lilac Mountains              from  90: 13.46 m in 5.78 s, yaw -; ok
+pluto    Lilac Mountains              from 180: 13.00 m in 5.65 s, yaw -; THROUGH {"h":10,"r":1.08,"gap":1.03}
+pluto    Lilac Mountains              from 270: 1.19 m in 0.52 s, yaw -; ok
+pluto    Lilac Mountains II           from   0: 1.38 m in 0.52 s, yaw -; ok
+pluto    Lilac Mountains II           from  90: 13.19 m in 5.70 s, yaw -; ok
+pluto    Lilac Mountains II           from 180: 1.39 m in 0.52 s, yaw -; ok
+pluto    Lilac Mountains II           from 270: 1.15 m in 0.52 s, yaw -; ok
+pluto    Nitrogen Dunes               from   0: 1.31 m in 0.52 s, yaw -; ok
+pluto    Nitrogen Dunes               from  90: 12.85 m in 5.60 s, yaw -; ok
+pluto    Nitrogen Dunes               from 180: 1.51 m in 0.52 s, yaw -; ok
+pluto    Nitrogen Dunes               from 270: 12.94 m in 5.63 s, yaw -; ok
+pluto    Nitrogen Dunes II            from   0: 13.28 m in 5.73 s, yaw -; ok
+pluto    Nitrogen Dunes II            from  90: 12.89 m in 5.62 s, yaw -; ok
+pluto    Nitrogen Dunes II            from 180: 12.99 m in 5.65 s, yaw -; ok
+pluto    Nitrogen Dunes II            from 270: 12.95 m in 5.63 s, yaw -; ok
+pluto    Long-Shadow Plain            from   0: 12.89 m in 5.62 s, yaw -; ok
+pluto    Long-Shadow Plain            from  90: 1.32 m in 0.52 s, yaw -; ok
+pluto    Long-Shadow Plain            from 180: 12.97 m in 5.65 s, yaw -; ok
+pluto    Long-Shadow Plain            from 270: 12.94 m in 5.63 s, yaw -; ok
+pluto    Pale Heart Glacier           from   0: 1.55 m in 0.52 s, yaw -; ok
+pluto    Pale Heart Glacier           from  90: 12.88 m in 5.62 s, yaw -; ok
+pluto    Pale Heart Glacier           from 180: 12.88 m in 5.62 s, yaw -; ok
+pluto    Pale Heart Glacier           from 270: 12.90 m in 5.62 s, yaw -; ok
+pluto    Long-Shadow Plain II         from   0: 1.33 m in 0.52 s, yaw -; ok
+pluto    Long-Shadow Plain II         from  90: 1.30 m in 0.52 s, yaw -; ok
+pluto    Long-Shadow Plain II         from 180: 1.51 m in 0.52 s, yaw -; ok
+pluto    Long-Shadow Plain II         from 270: 12.89 m in 5.62 s, yaw -; ok
+pluto    Pale Heart Glacier II        from   0: 12.87 m in 5.62 s, yaw -; ok
+pluto    Pale Heart Glacier II        from  90: 12.85 m in 5.60 s, yaw -; ok
+pluto    Pale Heart Glacier II        from 180: 12.92 m in 5.63 s, yaw -; ok
+pluto    Pale Heart Glacier II        from 270: 12.88 m in 5.62 s, yaw -; ok
+288 approaches: no offer 14, walked through a trunk or a boulder 8, in liquid 8, no figure in the held picture 5, over a face steeper than 40 deg 0, longest 6.05 s

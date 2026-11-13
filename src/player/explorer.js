@@ -49,7 +49,21 @@ export const EXPLORER = Object.freeze({
   swimSpeed: 2.6,
   turnRate: 11,              // 1/s: how fast the body turns to face where it walks
   swimTurnRate: 3.2,         // 1/s: ...and where it swims: a body laid along the water comes round, it does not spin
+                             // (turned through the angle itself, at most this many rad/s: swimTurn below)
 });
+
+// A swimmer's body turned from `fwd` toward `want` (unit tangents at `up`): through the angle itself,
+// at swimTurnRate x min(angle, 1) rad/s, so it eases in over the last radian, comes round at no more
+// than swimTurnRate rad/s, and does not stall when it is asked to turn about. (The re-fix pass, M4:
+// the land's eased blend of the two directions hardly turns at all from straight away, and a
+// swimmer asked to turn about, S, swam backward for 5.8 s; on the ground turnRate 11 hides that.)
+function swimTurn(fwd, want, up, T, dt) {
+  const c = Math.max(-1, Math.min(1, dot(fwd, want))), s = dot(cross(fwd, want), up);
+  const a = Math.atan2(Math.abs(s), c);
+  if (a < 1e-6) return want;
+  const step = Math.min(a, T.swimTurnRate * Math.min(a, 1) * dt);
+  return tangent(rotateAround(fwd, up, s < 0 ? -step : step), up, want);
+}
 
 
 const _airCmd = {};          // scratch for the air at the walker (the command to PHYSICS' body)
@@ -235,8 +249,8 @@ export function stepExplorer(st, input, dt, env, T = EXPLORER) {
   let fwd = tangent(st.fwd, up2, f);
   if (input.faceView) fwd = tangent(f, up2, fwd);
   else if (len(wish) > 0.1) {
-    const want = tangent(wish, up2, fwd), k = damp(st.swimming ? T.swimTurnRate : T.turnRate, dt);
-    fwd = tangent(add(scale(fwd, 1 - k), scale(want, k)), up2, want);
+    const want = tangent(wish, up2, fwd), k = damp(T.turnRate, dt);
+    fwd = st.swimming ? swimTurn(fwd, want, up2, T, dt) : tangent(add(scale(fwd, 1 - k), scale(want, k)), up2, want);
   }
   st.fwd = fwd;
 
@@ -338,8 +352,8 @@ function stepExplorerBodied(st, input, dt, env, T) {
   let fwd = tangent(st.fwd, up2, f);
   if (input.faceView) fwd = tangent(f, up2, fwd);
   else if (len(wish) > 0.1) {
-    const want = tangent(wish, up2, fwd), k = damp(st.swimming ? T.swimTurnRate : T.turnRate, dt);
-    fwd = tangent(add(scale(fwd, 1 - k), scale(want, k)), up2, want);
+    const want = tangent(wish, up2, fwd), k = damp(T.turnRate, dt);
+    fwd = st.swimming ? swimTurn(fwd, want, up2, T, dt) : tangent(add(scale(fwd, 1 - k), scale(want, k)), up2, want);
   }
   st.fwd = fwd;
 

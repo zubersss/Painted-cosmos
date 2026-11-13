@@ -111,6 +111,14 @@ export const EASEL = Object.freeze({
   maxSeconds: 4.2,           // nor longer
   hold: 1.8,                 // s the picture is held while the page is drawn
   reach: 3,                  // m beyond VISTA_RANGE the offer stays up once made
+  // The walk goes no further than ground fit to walk (Sim.easelWay): it stops a metre short of
+  // dry ground steeper than `steep` (rad) or a rise or drop of more than `step` m in `look` m (a
+  // cliff, a bank, a ledge), and the picture is composed from there. (The re-fix pass, M4: the
+  // walk was laid on the ground point by point and went straight over cliffs: Neptune's
+  // 'Ultramarine Storm Seas II', 29.6 m down a 78 degree face in 6 s.)
+  steep: 0.7,
+  step: 0.25,
+  look: 0.25,
 });
 // The clock of the world the player is on (PAINTER's critique, M4 item 5: of Earth's 25 minutes
 // eleven were night, one dark blue, and the gold and the rose went by in half a minute each).
@@ -645,8 +653,9 @@ export class Sim {
         if (this.onVistaFound) this.onVistaFound(this.bodyId, v.id);
       }
       // Found and not yet drawn: its easel is offered while it is within reach.
-      // (on the ground or afloat: not to a jetpack overhead)
-      if (!offer && found[v.id] && !this.easel && (this.ex.altitude < 2.5 || this.ex.swimming) && d < VISTA_RANGE + (this.easelOffer === v ? EASEL.reach : 0) && this.undrawn(this.bodyId, v)) offer = v;
+      // (on the ground or afloat: not to a jetpack overhead, nor to an explorer on a face steeper than
+      // the easel's walk takes, sliding down it whatever is pressed)
+      if (!offer && found[v.id] && !this.easel && (this.ex.altitude < 2.5 || this.ex.swimming) && !(this.ex.grounded && this.ex.slope > EASEL.steep) && d < VISTA_RANGE + (this.easelOffer === v ? EASEL.reach : 0) && this.undrawn(this.bodyId, v)) offer = v;
     }
     this.easelOffer = offer;
   }
@@ -680,7 +689,7 @@ export class Sim {
   beginEasel(v) {
     if (this.sm.state !== S.ON_FOOT || this.easel) return false;
     const cam = this.footCam, g = this.sampler(this.bodyId)(v.dir);
-    const to = scale(v.dir, Math.max(g.radius, g.liquidRadius > g.radius ? g.liquidRadius - EXPLORER.swimDepth : 0));
+    const to = this.easelWay(this.ex.p, scale(v.dir, Math.max(g.radius, g.liquidRadius > g.radius ? g.liquidRadius - EXPLORER.swimDepth : 0)));
     let fwd = tangent(cam.viewFwd, v.dir, cam.viewFwd), pitch = cam.pitch;
     if (v.yaw != null) {
       const east = tangent(cross(Y, v.dir), v.dir, V(1, 0, 0)), north = cross(v.dir, east);
@@ -699,6 +708,28 @@ export class Sim {
     this.notice = null;
     this.emit('easel');
     return true;
+  }
+
+  // How far along the straight way from `from` to `to` (body-local points on the ground or the
+  // swimming level) the walk to an easel goes: all of it, or to a metre short of the first dry
+  // place steeper than EASEL.steep or the first rise or drop of more than EASEL.step in EASEL.look
+  // (where it would be under 0.6 m, nowhere: the picture is composed where the explorer stands).
+  easelWay(from, to) {
+    const sample = this.sampler(this.bodyId), d = Math.acos(clamp(dot(norm(from), norm(to)), -1, 1)) * len(from);    // (along the ground)
+    if (d < 0.6) return to;
+    const at = (k) => { const u = norm(lerp(from, to, k)), g = sample(u), wet = g.liquidRadius > g.radius; return { u, wet, slope: g.slope || 0, r: Math.max(g.radius, wet ? g.liquidRadius - EXPLORER.swimDepth : 0) }; };
+    const n = Math.ceil(d / EASEL.look), most = EASEL.step * (d / n) / EASEL.look;
+    let prev = len(from), ok = 0;
+    for (let i = 1; i <= n; i++) {
+      const q = at(i / n);
+      if ((!q.wet && q.slope > EASEL.steep) || Math.abs(q.r - prev) > most) break;
+      prev = q.r; ok = i / n;
+    }
+    if (ok >= 1) return to;
+    const k = ok - 1 / d;
+    if (k * d < 0.6) return { ...from };
+    const q = at(k);
+    return scale(q.u, q.r);
   }
 
   stepEasel(h) {

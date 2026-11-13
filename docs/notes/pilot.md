@@ -71,14 +71,35 @@ The verifier's probes are read from `/home/user/.pc-scratch/verify/pilot/probes/
    Checks on a clean export of `1146112` with these files: world 22, unit 182, physics 324, `coast.mjs` PASS at both
    stands, `ghostfield.mjs` all zeros.
 
+4. **A swimmer asked to turn about swam backward for 5.8 s** (verifier's regression 6). `explorer.js swimTurn`: a
+   swimmer's body turns through the angle itself at `swimTurnRate` x min(angle, 1) rad/s (eased over the last radian,
+   never faster than 3.2 rad/s, no stall facing away); the land's eased blend of the two directions, kept for
+   walkers, hardly turns from straight away. Test `M4 the re-fix: a swimmer asked to turn about` (explorer.test;
+   fails on `5fd7a0a`: not round in 4 s). The verifier's `swimturn.mjs` (`m4refix/swimturn.txt`): S afloat 6.43 s,
+   5.77 s backward -> 0.75 s, 0 s; D 0.27 -> 0.25 s; on land unchanged (1.83 s, as before the round).
+5. **The easel's walk carried the explorer over cliffs** (verifier's regression 9). `sim.js easelWay`, `EASEL.steep /
+   step / look`: the walk goes along the ground to the spot, or to a metre short of the first dry place steeper than
+   40 degrees or the first rise or drop of more than 0.25 m in 0.25 m, and the picture is composed from there (under
+   0.6 m: where the explorer stands); and the easel is not offered to an explorer standing on such a face (on
+   Neptune's 78 degree face the explorer slides 32 m in 8 s whatever is pressed: `scripts/easeltrace2.mjs`). Test
+   `M4 the re-fix: the walk to an easel stops a metre short of a cliff` (vista.test). The verifier's `easel.mjs`
+   (`m4refix/easel.txt`): over a face steeper than 40 degrees 6 -> 0 of 288 approaches; no figure in the held picture
+   10 -> 5; no offer 13 -> 14 (Jupiter's Lightning Plains from 90: the walker is on a 52 degree face). Not touched:
+   the walk still goes through a trunk or a boulder in 8 approaches and into liquid in 8 (not on the list).
+6. **The weather and motion films' clocks** moved by PHYSICS' +1530 s (`tests/weather.mjs` SHOTS and comments,
+   `tests/motion.mjs` scene storm), exactly as PHYSICS listed. Checked in Node with PHYSICS' `weatherAt` at the spawn
+   (`m4refix/weather-clocks.txt`, `scripts/wxclock.mjs`): at the old clocks a breeze everywhere; at the new ones
+   earth-before 1650 fair (cloud 0.29), earth-arrives 1696 thunderstorm 6.1 mm/h, earth-storm 1770 22.3 mm/h,
+   earth-flash 1774 21.8 mm/h, earth-after 1930 fair, the blizzard at 1720 snow 5.2 mm/h. Not filmed.
+   Checks for 4 to 6 on a clean export of `5fd7a0a` with these files: world 22, unit 184, physics 324, `coast.mjs`
+   PASS at both stands, `ghostfield.mjs` all zeros.
+
 ### Next, in this order (each prepared in `s17/`, not yet in the tree unless listed above)
 
 3. The landing's chase camera (PHYSICS 4's last part): filmed again on `t1` (`s17/out2/landfast.jpg`, opened):
    as in the fix round, frames 20 to 22 (1.5 s) a flat crown over the left half of the frame on the way down into
    the clearing. Not yet changed.
-5. The swimmer's turn about (`s17/swimturn-patch.py`, then `swimturn.mjs`), the easel's walk over cliffs
-   (`s17/easel-patch.py`, then `easel.mjs`), the weather and motion films' clocks (+1530 s, PHYSICS' list in
-   `docs/notes/physics.md` "For PILOT and PAINTER, M4 fix round").
+4. The real game's `aimoff` (the verifier's scene) to see the label off the ship; the landing camera (3 above).
 
 ## Hand-over, M4 fix round (fourteenth PILOT agent, the successor; started 05:11 UTC 2026-11-13; kept current after every item)
 
