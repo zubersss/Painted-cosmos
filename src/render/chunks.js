@@ -75,7 +75,7 @@ float pcLevel(float x, float soft) {
   // tops of things are the lights, what faces away and what the canopy shades is the deep wash. The light changes hands
   // in the middle of twilight, when nothing is modelled at all (the blue hour is flat): no form flips in a frame.
   float mk = abs(2.0 * uMoon - 1.0);
-  x = mix(0.47, uMoon > 0.5 ? 0.17 + x * 0.66 : xs, mk);
+  x = mix(0.47, uMoon > 0.5 ? 0.12 + x * 0.78 : xs, mk);
   // overcast: the light comes from the whole sky. Nothing is sunlit, forms are modelled in two
   // soft steps (local colour and one glaze) that run into each other
   x = mix(x, 0.37 + x * 0.25, uWx.x);

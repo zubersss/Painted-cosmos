@@ -522,7 +522,14 @@ export function createWorld(scene) {
       // handed its direction in the sun's place (the sky keeps the sun; the hours are told from the sun)
       _sunTrue.copy(bu.uSunDirL.value);
       bu.uMoon.value = moon;
-      if (moon > 0.5) { bu.uSunDirW.value.negate(); bu.uSunDirL.value.negate(); }
+      // (a painter's moon, not an almanac's: opposite the sun and lifted well up the sky, 50 degrees and more, so that in
+      // the first hour of the night, when the true anti-solar point is on the horizon, the open ground is already the
+      // light and the figure's hat and shoulders catch it)
+      if (moon > 0.5) {
+        bu.uSunDirL.value.negate().addScaledVector(_up, 1.2).normalize();
+        st.root.getWorldQuaternion(_q);
+        bu.uSunDirW.value.copy(bu.uSunDirL.value).applyQuaternion(_q);
+      }
       // objects painted with the default wash (explorer, ship, stand-ins) share this light
       const du = defaultBodyUniforms();
       for (const k of Object.keys(bu)) { const a = du[k].value, b = bu[k].value; if (a && a.copy) a.copy(b); else du[k].value = b; }
