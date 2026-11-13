@@ -13,8 +13,15 @@ scale (the blind player's UGLY 8); (3) flat frames: Uranus' Pearl Fog Flats, Mar
 Began 15:38 UTC on head `e39a197`. Scratch and harness: `/home/user/.pc-scratch/painter/preship/` (`mk.sh <dir>`: a
 clean export of the head with PAINTER's working-tree paths over it; `live3.mjs <tree> <out> <quality> <WxH>` with
 `send.sh <out> <name> < cmd.js` and the command files in `cmds/`; `checks.sh <tree> <out>`: world, unit, physics,
-coast.mjs, ghostfield.mjs, wallrun.mjs one after another; `sheet.py` for labelled sheets; trees `h0` (the head
-`e39a197`), `t1` (item 1), `t2` (item 2)). Evidence: `docs/shots/painter/preship/` (every picture named here opened).
+coast.mjs, ghostfield.mjs, wallrun.mjs one after another; `sheet.py` for labelled sheets; `bands.py` for the L* of
+six horizontal bands; `sk/` the sketch test; the trees were deleted after use (disk)). Evidence:
+`docs/shots/painter/preship/` (every picture named here was opened by me).
+
+**State at the end of the round:** items 1, 2 and 3 DONE and committed (`8c7d603`, `25074de`, `18c1e33`; the first on
+`1294633`); item 4a written for PILOT (the sketch's span floor, their file); item 4b (the climb to space) NOT done, with
+the reason below. Nothing of mine is half-done in the working tree. For another role: PILOT, the one-line change to
+`src/core/sketches.js` (item 4a). What a successor could take next: Venus' pale mesas' own view (item 3: not improved),
+the climb to space (4b), Venus at quality 2 with the final bank numbers (not seen).
 
 - **ITEM 1, THE COLUMN OF LEAF DABS IN THE SKY: DONE.** Cause (found by hiding each kind of object from a frame hook
   in the live page at quality 2: the land, the flora, PHYSICS' kits each left it standing; the near ground's three
@@ -101,6 +108,26 @@ coast.mjs, ghostfield.mjs, wallrun.mjs one after another; `sheet.py` for labelle
   0 on `t7` (loaded, Uranus' view drawn): no console error, no game error, fallback empty. (A slip, logged: I copied the
   final `venus.js` into the tree a running browser served, `t6`; the page had loaded its modules long before and its
   live values were set by hand to the same numbers; every check above is on `t7`, made after that browser closed.)
+- **ITEM 4a, THE URANUS VIEW SKETCH'S DARK WASH (MINOR 12): the cause found, the change written for PILOT (their file).**
+  `src/core/sketches.js sketchHand` spreads the frame's own range of tones over every ink ("a dusk and a noon both
+  read"), with a floor of 0.15 on the span. A fog frame with the figure hidden (the game hides it for a sketch) spans
+  only about 0.80 to 0.95 of luminance, so the palest fog went to paper and the slightly less pale fog to the middle and
+  dark inks: a grey-brown wash with dark blots. Run in Node on 256x144 crops of my frames with the figure painted out
+  (`preship/05-uranus-sketch-for-pilot.jpg`, opened): today a dark mottled wash; with the change a pale fog sketch.
+  The Earth spawn, Mars at night and Venus from the air come out byte for byte the same (mean difference 0.0); the two
+  Uranus frames 14.1 and 4.1 of 255 lighter on average. **For PILOT, the exact change** (line 83 of `sketches.js`):
+  `const span = Math.max(0.15, hi - lo), F = 192 / w;` becomes
+  `const span = Math.max(0.45, hi - lo), F = 192 / w; lo = Math.min(lo, hi - span);` (and `lo` must then be declared
+  with `let`, which it is, line 78). A frame's tones are then stretched only when they span less than 0.45 from its lightest
+  down, so a pale frame stays a pale sketch and a dark one is still read. (If a named number is wanted:
+  `SKETCH_HAND.minSpan: 0.45`.) The captions (both Uranus sketches "Pearl Fog Flats") and Venus' landscape sketch with
+  the ship in it are PILOT's too; not looked into.
+- **ITEM 4b, THE CLIMB TO SPACE (MINOR 10): NOT DONE, by choice.** The sky's change between 300 m and 1.3 km is the edge
+  of the air that `e784574` laid and `91fd6bf` re-fixed, each verified at stations 500 to 760 m (the verifier's dots,
+  the far world's veil). Spreading it over a longer climb moves those verified frames and `space01` (the sky's stars,
+  the far worlds' veil, PILOT's `inSpace01` mood), and the atmosphere's height is PILOT's (`bodies.js`); to judge it the
+  climb has to be filmed frame by frame at both tiers, which this round had no time left for after items 1 to 3. A
+  successor who takes it: `world/sky.js spEdge` and `world/index.js` `space01` (the 0.55 / 1.15 of `atmosphereHeight`).
 
 An independent verifier checked the fix round below and did not accept one item (the figure) and found three
 regressions. This pass fixes exactly those. Began 09:30 UTC, 2026-11-13, on head `a686a98`. Scratch and harness:
