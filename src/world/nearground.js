@@ -246,7 +246,10 @@ class Ring {
     this.which = vnoise(U / 27 + 7.1, V / 27 + 1.9, seed + 11);
     // stones lie in drifts with bare ground between, crust in patches of its own (and one more, larger, slower field: which crust)
     this.stony = 2.1 * sstep(0.44, 0.76, vnoise(U / 5.9 + 13.1, V / 5.9 + 7.7, seed + 15) * 0.75 + 0.25 * this.rough);
-    this.needly = 1.9 * sstep(0.42, 0.72, vnoise(U / 6.7 + 23.1, V / 6.7 + 1.7, seed + 19));       // splinters stand in companies
+    // (PAINTER 17, the M4 critique's fifth item: Uranus' and Pluto's first views were an even scatter of white splinters, one
+    // size at one spacing. Drifts: larger companies, denser at their hearts, with bare ground between; about as many in all.
+    // It was 1.9 * sstep(0.42, 0.72, noise at 6.7 m))
+    this.needly = 2.7 * sstep(0.52, 0.76, vnoise(U / 10.5 + 23.1, V / 10.5 + 1.7, seed + 19));       // splinters stand in companies
     this.crusty = sstep(0.40, 0.66, vnoise(U / 4.3 + 3.9, V / 4.3 + 17.3, seed + 17) * 0.7 + 0.3 * this.drift);
     // (PAINTER 14: reeds stand in beds, with mud and water between them: the misty wetland's near reeds were one even comb)
     this.reedy = 1.8 * sstep(0.34, 0.58, vnoise(U / 6.1 + 41.3, V / 6.1 + 9.9, seed + 23));

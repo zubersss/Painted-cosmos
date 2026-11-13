@@ -70,10 +70,61 @@ the project's five checks one after another).
   by its own land; it needs another spawn, which moves PILOT's and PHYSICS' instruments: not in a final round), the
   far islands' level tops.
 
-**In the middle of / next** (by what a new player sees first): the figure (wind lean, cloth, swim pose, arc pose:
-`art/models.js`, written, being looked at), crowns at the lens (`materials.js PROP_FRAG`, written), the storm sea's
-white water (`materials.js WATER_FRAG`, written), then FIX 5 (Uranus' and Pluto's arrivals: `nearground.js needly`
-drifts, a deep teal passage on Uranus, a deep violet one on Pluto: written, first frames taken).
+- **PHYSICS 1, 2, 5, THE FIGURE: DONE** (seventeenth; `art/models.js createExplorer animate`; it reads PILOT's fields,
+  "For PAINTER (M4)" at the top of `docs/notes/pilot.md`; all in the figure's own axes). (1) The wind: the torso tips
+  about the hips by PHYSICS' own `leanFwd` / `leanRight` (0.92 of it) and the legs stay under it; in the gale's crouch
+  (`hunker01`) the head goes down and the arms come in and forward (they were held out by the hips' fold); the coat's
+  skirt is blown downwind by `windLoad01` and flaps with `gust01`; the scarf's tail streams along the air past the body
+  (`windFwd`, `windRight`, `windUp`), flat out when the load is whole, with a droop kept so that from behind it lies
+  across the shoulder and not across the hat, and round the shoulder when the air comes from behind. (2) The swimmer:
+  `swims: true` is returned, so `game.js` hands the model the 'swim' mode; the body lies forward (0.30 rad treading,
+  1.2 rad at a swim), the shoulders at the waterline (`submerged01`), the back awash at a swim; the arms reach ahead
+  together, sweep out and back and come forward under the chest once a `stroke`; a frog kick at a swim, a slow scissor
+  and sculling arms treading water. (5) The air: with PHYSICS' `arc`, rising the arms are in and the legs trail;
+  coasting down the arms are a little out and the knees give; the skydiver's spread only after a second of FALLING
+  (counted in the model: `airTime` runs from the moment the feet left the ground) or faster than 8 m/s down; in the
+  last metre and a half the arms come forward and the legs are ready. Without those fields the old poses stand.
+  Seen at quality 1, 640x360 (strips in scratch `s17/L6`, `s17/L7`; kept: `m4fix/05-figure.jpg`): a jet and its arc
+  frame by frame (arms in while rising, a little out at the top, spread from one second of falling, forward before the
+  ground, no spread after landing), the swim and the tread at Earth's coast, Earth's thunderstorm (the scarf blown to
+  the side, the coat displaced; PHYSICS' lean there is 0.03 rad), Neptune's squall (crouched, head down, the scarf
+  streaming, lean by PHYSICS' number of the instant). Node: `s17/figcheck.mjs`: 4536 states of every mode, arc, lean,
+  load and wind: no NaN in any bone. Not done: PILOT's item 13 (the idle "peg doll": one hand at the strap needs an
+  elbow the one-bone arm has not).
+- **PHYSICS 3 / PILOT 9, A CROWN AT THE LENS: DONE** (`materials.js PROP_FRAG`): what stands more than 1.7 m over a
+  plant's foot (`vAbove`: crowns and their branches, not the grass, ferns or bushes) and within 3.6 m of the eye breaks
+  into separate dabs with the picture between them, fewer the nearer. Seen at quality 1: a walk under the wood's
+  edge and a jet up through a crown (`m4fix/06-crown-at-the-lens.jpg`): the near crown is a cluster of broken dabs,
+  not one slab. The dabs are hard-edged dark touches (a pine's shadow green): a softer edge needs a blend the opaque
+  pass has not.
+- **PHYSICS 4, THE STORM SEA'S WHITE WATER: DONE for the squall, in part for Earth's coast** (`materials.js
+  WATER_FRAG`). Beyond a white share of 0.15 (`sea.w`; PHYSICS P26 lifted the cap) the crests' foam is blown into
+  streaks along the wind (a pattern drawn out twelve to one, sized to the distance), and from a half up the streaks
+  close and the whole sea rises toward the paper with the waves' own values in it (troughs greyer, crest fronts
+  paper, torn): Neptune's squall, 100 % white by PHYSICS, is a pale driven sea with darker bands, no longer the dark
+  indigo band, and not a flat white sheet (`m4fix/07-storm-seas.jpg`). To a gale: the surf zone PHYSICS gives is laid
+  as torn foam where the waves are finer than the brush; the swash runs further up the beach and its lace is closer
+  from Hs 0.3 m; a few more white horses (`horseTh`). Earth's coast in its 13 m/s storm (5 % white), top tier: a
+  broken white swash line along the beach and pale streaks on the sea (`m4fix/07-storm-seas.jpg`, opened); still no
+  crisp white horses: the brush (the abstraction pass keeps nothing under three pixels) softens them to pale streaks.
+  An instrument's trap met again here: after a debug teleport from the wood to the beach the wood's tufts and leaves
+  hang in the air (the fifteenth's own-side 11); teleport by way of another body first. Not done: spume in the air off the crests.
+- **FIX 5, Uranus' and Pluto's first views: DONE in part** (`world/nearground.js needly`: splinters in drifts, larger
+  companies with bare ground between; `looks/uranus.js`: the blue ice under the frost a deep teal in broad passages
+  (0.18, 0.46, 0.58 over 90 m at 0.72; 0.30, 0.60, 0.68 over 47 m at 0.5 before), the needles' shadow side deep teal,
+  fewer standing shards; `looks/pluto.js`: a fourth ground wash on the Lilac Mountains, broad passages of deep violet,
+  the penitents' shadow side deeper). Uranus' arrival, quality 1: 10-90 spread of L* 15.0 -> 25.7, median 85 -> 78:
+  a pale mint sky over a deep teal ice field with dark seams; at the top tier, PILOT's frame against mine: spread
+  14.9 -> 25.2, median 85.5 -> 78.4 (`m4fix/08-uranus-pluto-arrivals.jpg`, opened). Pluto's arrival: a deeper violet
+  ground under pale rose mountains, the splinters in one drift with bare ground round it; its spread did not grow
+  (top tier 20.4 -> 18.8, median 70.8 -> 62.7): the ground went darker as one mass. NOT done: Pluto's long shadows (a violet glaze
+  stretched from every splinter and stone needs shadow marks that turn with the sun in `NEAR_VERT`: not a final-round
+  change), a low sun.
+
+**Still to do, in this order, if a successor reads this**: PILOT's lower-ranked items (the canopy's paper, Venus'
+floor and lava, the cockpit, the grey-violet band under space, sticker flowers, Mars' shrubs, the peg-doll idle, the
+boot cloud): none touched in this round. Own-side list of the fifteenth agent's hand-over below: untouched but for
+its items 3 (night), 4 (the figure) and 9 (rain).
 
 ## Coordinator's relay for the M4 fixer (2026-11-13; read with the hand-over below)
 

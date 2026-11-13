@@ -251,18 +251,44 @@ export function createExplorer() {
   const b = rig.bones;
 
   // pose weights (smoothed so one mode runs into the next) and the stride phase
-  const w = { walk: 0, run: 0, jet: 0, fall: 0, wade: 0, sit: 0 };
-  let t = 0, ph = 0, jetS = 0, first = true;
+  const w = { walk: 0, run: 0, jet: 0, fall: 0, wade: 0, sit: 0, swim: 0, rise: 0, drop: 0, land: 0 };
+  // PHYSICS' body state, eased (M4; figure.js figureArgs hands it in the figure's own axes): the lean into the wind
+  // (forward, to the right), the gale's crouch, the air past the body (a unit direction and its load on cloth), the swim's pace
+  const W = { lf: 0, lr: 0, hk: 0, load: 0, x: 0, y: 0, z: 0, gust: 0, sp: 0 };
+  const num = (v, d) => (Number.isFinite(v) ? v : d || 0);
+  let t = 0, ph = 0, jetS = 0, first = true, fallT = 0;
   function animate(state, dt) {
     const s = state || {};
     dt = Math.max(0, Math.min(0.1, dt || 0)); t += dt;
     const mode = s.mode || 'idle';
     const speed = s.speed == null ? (mode === 'walk' ? 1.4 : mode === 'wade' ? 0.8 : 0) : Math.max(0, s.speed);
     const moving = mode === 'walk' || mode === 'wade';
-    const k = first || s.snap ? 1 : 1 - Math.exp(-9 * dt); first = false;
+    const snapNow = first || s.snap;
+    const k = snapNow ? 1 : 1 - Math.exp(-9 * dt); first = false;
     const to = (key, v) => { w[key] += (v - w[key]) * k; };
     to('walk', moving ? clamp01(speed / 0.9) : 0); to('run', moving ? sstep(1.8, 4.2, speed) : 0);
-    to('jet', mode === 'jet' ? 1 : 0); to('fall', mode === 'fall' ? 1 : 0); to('wade', mode === 'wade' ? 1 : 0); to('sit', mode === 'sit' ? 1 : 0);
+    // THE AIR (PHYSICS' critique of PAINTER, item 5: the skydiver's spread was worn on the way up an arc, on a drop of a few
+    // metres and in the frame after landing). With PHYSICS' arc (`arc` 1 rising, -1 falling; `vUp`, `airTime`, `altitude`):
+    // rising, the arms are in and the legs trail; coasting down a short way the arms are a little out and the knees give;
+    // the spread is for a long fall only (a second of falling, or faster than 8 m/s down); in the last metre and a half
+    // the arms come forward and the legs are ready. Without those numbers: the old fall pose.
+    const falling = mode === 'fall', hasArc = Number.isFinite(s.arc) && (Number.isFinite(s.vUp) || Number.isFinite(s.airTime));
+    // (a second of FALLING, counted here: `airTime` runs from the moment the feet left the ground, so after a jet's burn
+    // it is over a second before the fall has begun, and the arms spread at the top of the arc)
+    fallT = falling && hasArc && s.arc < 0 ? fallT + dt : 0;
+    const longFall = falling && (!hasArc || (s.arc < 0 && (fallT > 1.0 || num(s.vUp) < -8)));
+    const nearLand = falling && hasArc && s.arc < 0 && Number.isFinite(s.altitude) && s.altitude < 1.5 && num(s.vUp) < -1.2;
+    to('fall', longFall && !nearLand ? 1 : 0); to('rise', falling && hasArc && !longFall && s.arc > 0 ? 1 : 0);
+    to('drop', falling && hasArc && !longFall && !nearLand && !(s.arc > 0) ? 1 : 0); to('land', nearLand ? 1 : 0);
+    to('jet', mode === 'jet' ? 1 : 0); to('wade', mode === 'wade' ? 1 : 0); to('sit', mode === 'sit' ? 1 : 0); to('swim', mode === 'swim' ? 1 : 0);
+    // the wind on the body and on its cloth
+    { const kw = snapNow ? 1 : 1 - Math.exp(-5 * dt), cl = (v, a) => Math.max(-a, Math.min(a, v));
+      W.lf += (cl(num(s.leanFwd), 0.75) - W.lf) * kw; W.lr += (cl(num(s.leanRight), 0.75) - W.lr) * kw; W.hk += (clamp01(num(s.hunker01)) - W.hk) * kw;
+      W.load += (clamp01(num(s.windLoad01)) - W.load) * kw; W.gust += (clamp01(num(s.gust01)) - W.gust) * kw;
+      let wx = num(s.windRight), wy = num(s.windUp), wz = -num(s.windFwd); const wl = Math.hypot(wx, wy, wz);
+      if (wl > 0.05) { wx /= wl; wy /= wl; wz /= wl; } else { wx = 0; wy = 0; wz = 0; }
+      W.x += (wx - W.x) * kw; W.y += (wy - W.y) * kw; W.z += (wz - W.z) * kw;
+      W.sp += (clamp01(num(s.swimSpeed, speed) / 1.2) - W.sp) * (snapNow ? 1 : 1 - Math.exp(-3 * dt)); }
     jetS += ((s.jet01 == null ? (mode === 'jet' ? 1 : 0) : s.jet01) - jetS) * k;
     // the stride matches the ground covered: one step is 0.45 m + 0.22 s of travel
     const step = Math.max(0.5, Math.min(1.5, 0.45 + 0.22 * speed));
@@ -275,7 +301,16 @@ export function createExplorer() {
     const ride = Number.isFinite(s.ride) ? s.ride : Number.isFinite(s.hip) ? s.hip : 0, surge = Number.isFinite(s.surge) ? Math.max(-0.3, Math.min(0.3, s.surge)) : 0;
     if (s.phase != null) ph = s.phase; else if (feet && Number.isFinite(s.stride)) ph = 2 * Math.PI * s.stride + Math.PI / 2; else if (moving) ph += dt * Math.PI * speed / step;
     const A = Math.min(0.82, Math.asin(Math.min(0.95, step / 1.76))) * w.walk * (1 - 0.35 * w.wade);
-    const air = Math.max(w.jet, w.fall), sit = w.sit, grounded = 1 - Math.max(air, sit);
+    const sw = w.swim, air = Math.min(1, Math.max(w.jet, w.fall + w.rise + w.drop + w.land)), sit = w.sit, grounded = 1 - Math.max(air, sit, sw);
+    // SWIMMING (PHYSICS' critique, item 2: afloat the figure was the wader cut off at the chest, gliding). The body lies
+    // forward in the water, nearly level at a swim and nearly upright treading, the waterline at the shoulders; the arms
+    // reach ahead together, sweep out and back to the hips and come forward under the chest, once a stroke of PHYSICS'
+    // (`stroke` 0..1, which never jumps and keeps turning slowly at rest); the legs draw up and kick as the arms reach.
+    const su = 2 * Math.PI * num(s.stroke, (t * 0.6) % 1), swPitch = 0.30 + 0.90 * W.sp;
+    const kick = Math.pow(Math.max(0, Math.cos(su - 2 * Math.PI * 0.72)), 2);
+    // the lean into the wind (PHYSICS' critique, item 1): the body tips by PHYSICS' own angle toward where the wind comes
+    // from, about the hips, and the legs stay under it; not while sitting or afloat
+    const wl = (1 - sit) * (1 - sw), leanF = W.lf * 0.92 * wl, leanR = W.lr * 0.92 * wl;
     // PHYSICS' hips (`hip`: metres below standing height; about 0.3 for half a second after a landing): the knees
     // fold by the angle that lowers the hips that far, the back leans into it, and the figure straightens as it eases
     // (PHYSICS' `hip` is the leg's length less its standing length: NEGATIVE while the legs are folded. It was read
@@ -286,7 +321,7 @@ export function createExplorer() {
     // the anticipation that makes the jump read; the hips' fall itself is in `ride`)
     const cr01 = Number.isFinite(s.crouch01) ? Math.max(0, Math.min(1, s.crouch01)) : 0;
     w.cr = (w.cr || 0) + (cr01 - (w.cr || 0)) * (first || s.snap ? 1 : 1 - Math.exp(-30 * dt));
-    const lean = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.10 * sit - 0.30 * crouch - 0.22 * w.cr;
+    const lean = -(0.035 + 0.075 * w.run) * w.walk * grounded - 0.20 * w.jet * (0.4 + 0.6 * jetS) + 0.07 * w.fall - 0.05 * w.rise - 0.16 * w.land - 0.10 * sit - 0.30 * crouch - 0.22 * w.cr - leanF;
     const L1 = 0.41, L2 = 0.48, hipY = L1 + L2 + Math.max(-0.5, Math.min(0.06, ride));
     const leg = (thigh, shin, phi, side, F) => {
       const sw = Math.max(0, Math.cos(phi));
@@ -305,39 +340,86 @@ export function createExplorer() {
       } else {
         th = A * Math.sin(phi) * grounded; kn = -(0.10 + (0.55 + 0.75 * w.run) * Math.pow(sw, 0.8)) * w.walk * grounded;
       }
-      th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45;
-      kn += w.jet * (-0.42 - 0.1 * side) + w.fall * (side < 0 ? -0.55 : -0.85) - sit * 1.45;
+      th += w.jet * (-0.22 - 0.07 * side + 0.03 * Math.sin(t * 2.3 + side)) + w.fall * (side < 0 ? 0.38 : -0.12) + sit * 1.45
+        + w.rise * (side < 0 ? -0.10 : -0.26) + w.drop * (side < 0 ? 0.22 : -0.04) + w.land * (side < 0 ? 0.50 : 0.36);
+      kn += w.jet * (-0.42 - 0.1 * side) + w.fall * (side < 0 ? -0.55 : -0.85) - sit * 1.45
+        + w.rise * (side < 0 ? -0.18 : -0.42) + w.drop * (side < 0 ? -0.46 : -0.30) + w.land * (side < 0 ? -0.72 : -0.60);
+      // afloat: the frog kick at a swim, a slow scissor treading water
+      if (sw > 0.001) {
+        const tr = 0.26 * Math.sin(su + (side < 0 ? 0 : Math.PI));
+        const thS = (0.12 + 0.55 * kick) * W.sp + (0.10 + tr) * (1 - W.sp), knS = -(0.22 + 1.05 * kick) * W.sp - (0.40 - tr * 0.6) * (1 - W.sp);
+        th = th * (1 - sw) + thS * sw; kn = kn * (1 - sw) + knS * sw;
+      }
       // at rest the weight is on one leg (with PHYSICS' feet too: standing, both boots are under the hips and the
       // figure may settle on one; it straightens out of it as the stride begins)
       const ease = (1 - w.walk) * grounded * (side < 0 ? 1 : 0.25) * (F ? 1 - w.cr : 1);
       thigh.rotation.x = th + 0.09 * ease + (F ? 0 : crouch); shin.rotation.x = kn - 0.17 * ease - (F ? 0 : 2 * crouch);
-      thigh.rotation.z = side * (0.02 + 0.10 * w.fall + 0.04 * w.jet);
+      thigh.rotation.z = side * (0.02 + 0.10 * w.fall + 0.04 * w.jet + 0.05 * w.drop + 0.30 * kick * W.sp * sw) + leanR * (1 - air);
     };
     leg(b.thighL, b.shinL, ph, -1, feet && feet[0]); leg(b.thighR, b.shinR, ph + Math.PI, 1, feet && feet[1]);
     const breathe = Math.sin(t * 1.5);
     // hips: bob twice a stride (highest as the legs pass), lean into the walk, sink to sit
     // (with PHYSICS' gait the hips ride where it says: its bob, and the body a little ahead or behind within the stride)
-    b.torso.position.y = b.torso.userData.rest.y + (feet ? Math.max(-0.5, Math.min(0.06, ride)) * (1 - sit) * (1 - air) : (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded - w.hip * (1 - sit)) + breathe * 0.003 - sit * 0.40;
-    b.torso.position.z = b.torso.userData.rest.z - (feet ? surge * grounded : 0);
-    b.torso.rotation.x = lean;
+    // (afloat the hips ride where the shoulders come to the waterline: PHYSICS' `submerged01` of the 1.82 m figure, 1.25 m
+    // over the feet without it; the shoulders are 0.475 m from the hips along the body)
+    const waterY = Number.isFinite(s.submerged01) && s.submerged01 > 0.25 ? s.submerged01 * 1.82 : 1.25;
+    // (at a swim the back is awash: the pack rides half under, it stood on the water like a float)
+    const swimY = waterY - 0.035 - 0.10 * W.sp - 0.475 * Math.cos(swPitch) + 0.012 * Math.sin(su) - b.torso.userData.rest.y;
+    b.torso.position.y = b.torso.userData.rest.y + ((feet ? Math.max(-0.5, Math.min(0.06, ride)) * (1 - sit) * (1 - air) : (Math.cos(2 * ph) * (0.014 + 0.026 * w.run) - 0.02 - 0.03 * w.run) * w.walk * grounded - w.hip * (1 - sit)) + breathe * 0.003 - sit * 0.40) * (1 - sw) + swimY * sw;
+    b.torso.position.z = b.torso.userData.rest.z - (feet ? surge * grounded : 0) + 0.26 * W.sp * sw;
+    b.torso.rotation.x = lean * (1 - sw) - (swPitch + 0.05 * Math.sin(su + 0.6) * W.sp) * sw;
     b.torso.rotation.y = 0.07 * Math.sin(ph) * w.walk * grounded;
-    b.torso.rotation.z = (0.022 + Math.sin(t * 0.47) * 0.012) * (1 - w.walk) * grounded + 0.03 * Math.sin(ph) * w.walk * w.wade;
+    b.torso.rotation.z = (0.022 + Math.sin(t * 0.47) * 0.012) * (1 - w.walk) * grounded + 0.03 * Math.sin(ph) * w.walk * w.wade - leanR;
     const pitch = Math.max(-0.7, Math.min(0.7, s.lookPitch || 0));
-    b.head.rotation.x = pitch * 0.55 - b.torso.rotation.x * 0.7 - 0.18 * w.fall;
-    b.head.rotation.y = -b.torso.rotation.y * 0.8 + Math.sin(t * 0.31) * 0.10 * (1 - w.walk) * (1 - air);
+    // (in a gale the head goes down between the shoulders; afloat it is held up out of the water)
+    b.head.rotation.x = (pitch * 0.55 - b.torso.rotation.x * 0.7 - 0.18 * w.fall - 0.22 * W.hk * wl) * (1 - sw) + (swPitch * 0.86 + pitch * 0.3) * sw;
+    b.head.rotation.y = -b.torso.rotation.y * 0.8 + Math.sin(t * 0.31) * 0.10 * (1 - w.walk) * (1 - air) * (1 - sw);
+    b.head.rotation.z = leanR * 0.55;
     const arm = (bone, side, phi) => {
-      bone.rotation.x = -Math.sin(phi) * (0.30 + 0.45 * w.run) * w.walk * grounded * (1 - 0.5 * w.wade) + 0.22 * w.run * w.walk + 0.25 * w.jet - 0.25 * w.fall + 0.55 * sit - 0.65 * w.cr;
-      bone.rotation.z = side * (0.03 + 0.012 * breathe + 0.50 * crouch + 0.45 * w.jet + 1.95 * w.fall + 0.42 * w.wade * w.walk + 0.08 * Math.sin(t * 6.1 + side) * w.fall);
+      // (in PHYSICS' gale crouch the arms come in and forward, bracing: they were held out by the hips' fold)
+      let ax = -Math.sin(phi) * (0.30 + 0.45 * w.run) * w.walk * grounded * (1 - 0.5 * w.wade) + 0.22 * w.run * w.walk + 0.25 * w.jet - 0.25 * w.fall + 0.55 * sit - 0.65 * w.cr
+        + 0.14 * w.rise + 0.10 * w.drop + 0.78 * w.land + 0.42 * W.hk * wl * grounded;
+      let az = 0.03 + 0.012 * breathe + 0.50 * crouch * (1 - 0.75 * W.hk) + 0.45 * w.jet + 1.95 * w.fall + 0.42 * w.wade * w.walk + 0.08 * Math.sin(t * 6.1 + side) * w.fall
+        + 0.20 * w.rise + 0.52 * w.drop + 0.34 * w.land + 0.14 * W.hk * wl * grounded;
+      if (sw > 0.001) {
+        const axS = (1.6 + 1.1 * Math.cos(su)) * W.sp + (1.15 + 0.25 * Math.cos(su + side * 0.5)) * (1 - W.sp);
+        const azS = (0.15 + 1.05 * Math.max(0, Math.sin(su))) * W.sp + (0.95 + 0.22 * Math.sin(su + side * 0.5)) * (1 - W.sp);
+        ax = ax * (1 - sw) + axS * sw; az = az * (1 - sw) + azS * sw;
+      }
+      bone.rotation.x = ax;
+      bone.rotation.z = side * az + leanR * 0.5 * (1 - air);
     };
     arm(b.armL, -1, ph); arm(b.armR, 1, ph + Math.PI);
     // the coat: streams back when moving, flares in the air
     const flutter = Math.sin(t * 7.3) * 0.5 + Math.sin(t * 11.9 + 1.3) * 0.5;
-    b.skirt.rotation.x = -(0.07 + 0.16 * w.run) * w.walk * grounded + 0.045 * Math.sin(2 * ph + 0.6) * w.walk * grounded - 0.16 * w.jet + 0.03 * flutter * air + 0.75 * sit;
-    b.skirt.rotation.z = 0.035 * Math.sin(ph + 0.4) * w.walk * grounded + Math.sin(t * 0.9) * 0.006;
-    const fl = 1 + 0.10 * w.jet + 0.30 * w.fall + 0.05 * w.run * w.walk;
-    b.skirt.scale.set(fl, 1 - 0.16 * w.fall - 0.25 * sit, fl + 0.06 * w.walk);
-    b.scarf.rotation.x = -(0.25 * w.walk + 0.75 * w.run * w.walk) * grounded - 0.85 * w.jet - 2.45 * w.fall + (0.03 * Math.sin(t * 1.1) + 0.07 * flutter * Math.max(w.run * w.walk, air));
-    b.scarf.rotation.z = 0.05 * Math.sin(t * 0.8) + 0.10 * flutter * Math.max(w.walk * 0.5, air);
+    // (the wind in the cloth, PHYSICS' critique, item 1: the coat's skirt is blown downwind by the air's load on it and
+    // flaps with the gust; the scarf's tail streams along the air past the body, flat out when the load is whole
+    // (15 m/s in Earth's air), and snaps. `W.x, W.y, W.z`: where that air goes, in the figure's axes; a run's own
+    // wind and a fall's are in it, so the old terms for those give way as the load grows)
+    const flap = (0.4 + 0.6 * W.gust) * W.load * (1 - sit) * (1 - sw);
+    b.skirt.rotation.x = -(0.07 + 0.16 * w.run) * w.walk * grounded + 0.045 * Math.sin(2 * ph + 0.6) * w.walk * grounded - 0.16 * w.jet + 0.03 * flutter * air + 0.75 * sit
+      - 0.40 * W.load * W.z * wl + 0.13 * flap * flutter + 0.10 * W.sp * sw;
+    b.skirt.rotation.z = 0.035 * Math.sin(ph + 0.4) * w.walk * grounded + Math.sin(t * 0.9) * 0.006 + 0.40 * W.load * W.x * wl + 0.08 * flap * Math.sin(t * 9.1 + 0.7);
+    const fl = 1 + 0.10 * w.jet + 0.30 * w.fall + 0.08 * w.drop + 0.05 * w.run * w.walk + 0.10 * W.load * wl;
+    b.skirt.scale.set(fl, 1 - 0.16 * w.fall - 0.25 * sit - 0.08 * sw, fl + 0.06 * w.walk);
+    let scX = -(0.25 * w.walk + 0.75 * w.run * w.walk) * grounded - 0.85 * w.jet - 2.45 * w.fall - 1.1 * w.drop - 0.5 * w.land + 0.12 * w.rise + (0.03 * Math.sin(t * 1.1) + 0.07 * flutter * Math.max(w.run * w.walk, air));
+    let scZ = 0.05 * Math.sin(t * 0.8) + 0.10 * flutter * Math.max(w.walk * 0.5, air);
+    if (W.load > 0.002 && wl > 0.001) {
+      // the tail hangs by its weight and is carried by the air: its way is between straight down and the air's own
+      const g = 2.6 * W.load / (1.06 - W.load);
+      let dx = W.x * g, dy = -1 + W.y * g, dz = W.z * g;
+      // (air from behind: the tail is blown round the shoulder, not through the head)
+      if (dz < 0) { dx += (W.x < -0.05 ? -1 : W.x > 0.05 ? 1 : -1) * -dz * 0.9; dz *= 0.12; }
+      let dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
+      // (a wet wool scarf never flies quite level: it keeps a droop, so that from behind it lies across the pack and the
+      // shoulder and not across the hat)
+      if (dy > -0.32) { dy = -0.32; dl = Math.hypot(dx, dz) || 1; const k2 = Math.sqrt(1 - 0.32 * 0.32) / dl; dx *= k2; dz *= k2; }
+      const m = sstep(0.03, 0.30, W.load) * wl;
+      scX = scX * (1 - m) + (Math.atan2(-dz, -dy) + 0.30 * flap * flutter) * m;
+      scZ = scZ * (1 - m) + (Math.asin(Math.max(-1, Math.min(1, dx))) + 0.22 * flap * Math.sin(t * 8.3 + 1.1)) * m;
+    }
+    b.scarf.rotation.x = scX * (1 - sw) + (-0.30 + 0.08 * Math.sin(t * 1.3)) * sw;
+    b.scarf.rotation.z = scZ * (1 - sw) + 0.10 * Math.sin(t * 0.9) * sw;
     // the jets: the flame boils at about eight frames a second, never faster
     const boil = hash3(Math.floor(t * 8), 3.3, 1.7);
     const fs = jetS * (0.78 + 0.34 * boil);
@@ -346,7 +428,8 @@ export function createExplorer() {
   }
   animate({ mode: 'idle' }, 0);
   G.figure = g;      // (the flora parts where it stands between the lens and the figure: see flora.js `_focus`)
-  return { object3D: g, animate };
+  // (`swims`: the handshake with src/core/game.js: this figure draws the 'swim' mode)
+  return { object3D: g, animate, swims: true };
 }
 
 // =================================================================================================

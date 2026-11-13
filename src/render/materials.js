@@ -528,7 +528,7 @@ void main() {
   // (PAINTER 12: and wherever the sea map says this water is breaking, by its own share of white, however low the
   // waves: a fresh breeze on Earth's coast whitens a twentieth of the sea with Hs half a metre, and none showed)
   float galeW = max(smoothstep(0.5, 2.0, sea.x) * (sea.y < 1.0e8 ? 1.0 : 0.6), sea.y < 1.0e8 ? 0.85 * smoothstep(0.012, 0.07, sea.w) : 0.0);
-  float horseTh = 0.68 - 0.08 * galeW;
+  float horseTh = 0.68 - 0.11 * galeW;      // (PAINTER 17: 0.08; Earth's coast in its 13 m/s storm, a twentieth of it white by PHYSICS, showed no white horse at 640 x 360)
   foam = max(foam, galeW * smoothstep(horseTh, horseTh + 0.06, tornW * 0.62 + r3.r * 0.38) * (0.55 + 0.45 * smoothstep(-0.3, 0.5, hN)) * smoothstep(10.0, 30.0, dist) * (1.0 - smoothstep(600.0, 1500.0, dist)));
   // (in the shallows the breaking crests are white, ragged lines; at the waterline a thin
   // broken edge of swash that can still be seen from far off)
@@ -541,10 +541,18 @@ void main() {
   // still depth and a still pattern was frozen from frame to frame)
   vec3 D3 = normalize(pcPhysWaterDir(sdir));
   vec4 rsw = texture(uNoise3D, (vBody - D3 * (uTime * 0.55)) / 1.35);
-  float swash = (1.0 - smoothstep(0.03, 0.05 + 0.22 * hs, vDep)) * smoothstep(0.04, 0.3, sea.x);
+  // (PAINTER 17: a sea of half a metre and more runs further up the beach and its lace is closer: the storm's waterline
+  // was a hair of white at 640 x 360, lost to the brush)
+  float swK = smoothstep(0.30, 0.60, hs);
+  float swash = (1.0 - smoothstep(0.03, 0.05 + (0.22 + 0.30 * swK) * hs, vDep)) * smoothstep(0.04, 0.3, sea.x);
   // (lace, not a sheet: where the run-up is a film over the sand the foam is torn wide open)
   float film = 1.0 - smoothstep(-0.25, 0.02, vDepth);
-  surf = max(surf, swash * smoothstep(0.40 + 0.05 * film, 0.60 + 0.05 * film, rsw.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
+  surf = max(surf, swash * smoothstep(0.40 + 0.05 * film - 0.07 * swK, 0.60 + 0.05 * film - 0.07 * swK, rsw.g * 0.6 + r1.b * 0.4 + 0.25 * hN));
+  // (PHYSICS' critique of PAINTER, item 4: no surf at the beach in a storm. The surf above is drawn on the crests of waves
+  // the mesh carries; where they are finer than the brush, a few metres out already at 640 x 360, nothing broke at all.
+  // There the surf zone PHYSICS gives is laid as torn foam carried in with the waves: ragged lines along the shore,
+  // the sea's wash between them, never a white band)
+  surf = max(surf, sz * (1.0 - keep) * smoothstep(0.50, 0.66, tornW * 0.45 + rsw.g * 0.40 + r1.b * 0.15) * smoothstep(0.10, 0.45, sea.x));
   // far off, where the waves are finer than the brush can hold: the swell as a painter lays it,
   // long broken strokes lying the way the crests lie (anchored to the planet), the hollow before
   // each one darker, and on a sea that is breaking a white horse here and there along them
@@ -586,6 +594,25 @@ void main() {
     farWhite = farSea * wh * smoothstep(0.008, 0.05, sea.w) * (0.35 + 0.65 * uDayness) * (1.0 - smoothstep(900.0, 2200.0, dist));
   }
   float white = max(max(max(crest * 0.85, foam) * deep, surf * smoothstep(0.0, 0.03, vDep)) * liq, farWhite);
+  // (PHYSICS P26: the cap on white water is lifted and the sea's white share, sea.w, runs to 1; the coordinator's ruling:
+  // paint whatever share comes as broken foam, streaks and spray, never a flat white area. To 0.15 the caps above are the
+  // picture, as they were. Beyond it the crests' foam is blown into streaks along the wind, drawn out twelve to one and
+  // sized to the distance, the sea's own wash dark between them; from about a half the streaks close up and the whole
+  // sea rises toward the paper: driven foam with the waves' own values still in it, the troughs greyer, the fronts of
+  // the crests bare paper, torn everywhere. Neptune's squall, 100 % white by PHYSICS, was the same dark indigo band.)
+  float wOver = sea.y < 1.0e8 ? smoothstep(0.15, 0.60, sea.w) * liq * deep : 0.0;
+  if (wOver > 0.001) {
+    float lsS = log2(max(dist, 12.0) / 12.0), ksS = floor(lsS), fsS = lsS - ksS;
+    vec3 qS = vec3(dot(vBody, A3) / 0.9, dot(vBody, D3) / 11.0 - uTime * 0.05, dot(vBody, up) / 0.9) + drift * 2.0;
+    float s0 = texture(uNoise3D, qS / exp2(ksS) + 0.31).g, s1 = texture(uNoise3D, qS / exp2(ksS + 1.0) + 0.77).g;
+    float sk = mix(s0, s1, fsS);
+    sk = 0.5 + (sk - 0.5) * (1.0 + 0.45 * fsS * (1.0 - fsS) * 4.0);
+    float closeUp = smoothstep(0.50, 1.0, sea.w);
+    float sth = mix(0.60, 0.40, closeUp);
+    float streak = smoothstep(sth, sth + 0.10, sk * 0.75 + tornW * 0.25) * (0.55 + 0.45 * smoothstep(0.36, 0.60, torn));
+    float form = 0.42 + 0.58 * smoothstep(-0.5, 0.6, hN);
+    white = max(white, wOver * max(streak * form, closeUp * 0.46 * form * (0.75 + 0.5 * (tornW - 0.5))));
+  }
   glint = max(glint, white);
   c = mix(c, vec3(1.0), glint);
   // (a sea running high keeps its body under the murk: in a gale the air is thick enough to
@@ -803,6 +830,15 @@ void main() {
   float near = 1.0 - smoothstep(30.0, 110.0, vd);
   // strokes part when they are right in front of the eye (the explorer can walk through trunks)
   if (vd < 1.6 && texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1 > smoothstep(0.35, 1.6, vd)) discard;
+  // (PHYSICS' and PILOT's critiques, M4: a crown at the lens, in the jetpack's first second under the birches or as the
+  // ship sets down in a wood, was one flat green slab over a third of the frame, with a black branch bar across it.
+  // A crown within three and a half metres of the eye breaks into separate dabs with the picture between them, fewer
+  // the nearer, and its branches thin away with it. vAbove: only what stands well over a plant's foot: the grass,
+  // the ferns and the bushes at the boots are left whole)
+  if (vAbove > 1.7 && vd < 3.6) {
+    float nl = part > 0.5 ? texture(uNoise3D, vBody / 1.1).r * 0.62 + texture(uNoise3D, vBody / 0.36).g * 0.38 : texture(uNoise3D, vBody / 0.7).r * 0.8 + 0.1;
+    if (nl > mix(0.20, 1.0, smoothstep(0.9, 3.6, vd))) discard;
+  }
   // strokes that stand between the lens and the explorer's figure part round the line of sight to it:
   // a window in the crown, ragged like everything else, so the figure is never lost behind foliage
   if (uFocus.w > 0.5 && vView.z > uFocus.z + 0.4) {
