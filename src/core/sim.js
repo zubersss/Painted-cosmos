@@ -2,6 +2,7 @@
 // with no three and no DOM. src/core/game.js presents it; tests/loop.test.mjs plays the whole
 // loop through it in Node.
 import { BODIES, SUN } from '../data/bodies.js';
+import { LOOKS } from '../data/looks.js';
 import { Ephemeris, spaceAltitude } from './orbits.js';
 import {
   HELIO, bodyFrame, sameFrame, frameState, posToUniverse, quatToUniverse, quatFromUniverse,
@@ -14,7 +15,7 @@ import {
 } from './vec.js';
 import { EXPLORER, createExplorerState, stepExplorer, collideObstacles, scrambleSample } from '../player/explorer.js';
 import {
-  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom, crownDistance,
+  CAMERA, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom, crownDistance, crownShape,
 } from '../player/camera.js';
 import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
@@ -38,6 +39,44 @@ const Y = V(0, 1, 0);
 // The ship's berth at an arrival (Sim.spawnOn, surfAt): dry by this much over a liquid's still level
 // under all of its hull, or it counts as in the surf.
 const BERTH = Object.freeze({ dry: 1.2, reach: 4.5, points: [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] });
+
+// Which plant a tall obstacle is (its kit: 'broadleaf', 'kelp', ...), for the crown the cameras keep
+// out of (camera.js crownShape). The world's obstacles do not name their plant; they are the look's
+// `obs: [footprint, height]` of the plant scaled as one, so the footprint over the height names it
+// on its world. (An obstacle that carries `kit` itself is taken at its word: docs/notes/pilot.md
+// asks PAINTER for that line.) undefined when it cannot be told: the camera then goes by the footprint.
+const KITS = new Map();
+function kitsOf(bodyId) {
+  let tab = KITS.get(bodyId);
+  if (!tab) {
+    tab = [];
+    const walk = (o, depth) => {
+      if (!o || typeof o !== 'object' || depth > 6) return;
+      if (typeof o.kit === 'string' && Array.isArray(o.obs) && o.obs[1] > 0) tab.push([o.obs[0] / o.obs[1], o.kit]);
+      for (const k in o) if (o[k] && typeof o[k] === 'object') walk(o[k], depth + 1);
+    };
+    walk(LOOKS[bodyId], 0);
+    KITS.set(bodyId, tab);
+  }
+  return tab;
+}
+export function plantKit(bodyId, o) {
+  if (o.kit) return o.kit;
+  if (o.kind && o.kind !== 'tree') return 'stone';
+  const q = o.radius / o.height;
+  let kit;
+  for (const [ratio, k] of kitsOf(bodyId)) if (Math.abs(q - ratio) <= 1e-6 * ratio) { if (kit && kit !== k) return undefined; kit = k; }
+  return kit;
+}
+// The tall things of `list` (the world's obstacles) as the cameras' trees: [{ base, u, h, r, c }].
+function crownList(bodyId, list, sample) {
+  const out = [];
+  for (const o of list) {
+    if (o.height < 4) continue;                       // boulders, shrubs, reeds: under the cameras
+    out.push({ base: scale(o.unitDir, sample(o.unitDir).radius), u: o.unitDir, h: o.height, r: o.radius, c: crownShape(plantKit(bodyId, o), o.radius) });
+  }
+  return out;
+}
 // A ship at rest on water (Sim.stepAfloat): the hull that averages the sea, and how fast it follows.
 const FLOAT_ALONG = [-0.5, -0.25, 0, 0.25, 0.5], FLOAT_ACROSS = [-0.5, 0, 0.5];      // the grid, in hull lengths and beams
 const FLOAT = Object.freeze({
@@ -1355,19 +1394,17 @@ export class Sim {
   }
 
   // The trees round the explorer as crowns the foot camera keeps out of (camera.js
-  // footBoomAmongCrowns): from the obstacles already looked up round the explorer each frame,
-  // their feet put on the ground again whenever the explorer has moved 3 m. null when none.
+  // footBoomAmongCrowns), IN THE AIR ONLY: on the jetpack's way up and down, once the feet are
+  // footAirHeight over the ground. On the ground (a walk in a wood, stepping out under a birch)
+  // the view is as it always was: null. From the obstacles already looked up round the explorer
+  // each frame, their feet put on the ground again whenever the explorer has moved 3 m.
   footCrowns() {
-    const near = this.nearObstacles;
+    const near = this.nearObstacles, ex = this.ex;
     if (!near || !near.length) { this._footCrowns = null; return null; }
+    if (ex.grounded || ex.swimming || !(ex.airTime > CAMERA.footAir) || !(ex.altitude > CAMERA.footAirHeight)) return null;
     let c = this._footCrowns;
-    if (!c || c.body !== this.bodyId || c.n !== near.length || len(sub(c.at, this.ex.p)) > 3) {
-      const sample = this.sampler(this.bodyId), list = [];
-      for (const o of near) {
-        if (o.height < 4) continue;                   // boulders, shrubs, reeds: the trunk spheres have them
-        list.push({ base: scale(o.unitDir, sample(o.unitDir).radius), u: o.unitDir, h: o.height, r: o.radius });
-      }
-      c = this._footCrowns = { body: this.bodyId, at: { ...this.ex.p }, n: near.length, list };
+    if (!c || c.body !== this.bodyId || c.n !== near.length || len(sub(c.at, ex.p)) > 3) {
+      c = this._footCrowns = { body: this.bodyId, at: { ...ex.p }, n: near.length, list: crownList(this.bodyId, near, this.sampler(this.bodyId)) };
     }
     return c.list.length ? c.list : null;
   }
@@ -1394,12 +1431,7 @@ export class Sim {
     if (this.sm.state !== S.LANDING && len(sh.p) - this.sampler(f.id)(norm(sh.p)).radius > 28) return null;
     let c = this._crowns;
     if (!c || c.body !== f.id || len(sub(c.at, sh.p)) > 4) {
-      const sample = this.sampler(f.id), list = [];
-      for (const o of this.obstaclesNear(f.id, sh.p, 32)) {
-        if (o.height < 4) continue;                   // boulders and shrubs: under the camera's 3.6 m
-        list.push({ base: scale(o.unitDir, sample(o.unitDir).radius), u: o.unitDir, h: o.height, r: o.radius });
-      }
-      c = this._crowns = { body: f.id, at: { ...sh.p }, list };
+      c = this._crowns = { body: f.id, at: { ...sh.p }, list: crownList(f.id, this.obstaclesNear(f.id, sh.p, 32), this.sampler(f.id)) };
     }
     if (!c.list.length) return null;
     return (p) => crownDistance(c.list, p);

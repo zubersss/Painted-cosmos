@@ -49,8 +49,9 @@ export const CAMERA = Object.freeze({
   // crown is taken as a cylinder round its trunk from crownLow to crownTop of its height, of
   // radius crownWidth x height (at least crownMin): PAINTER's far tree, a crown 0.27 of its
   // width round from 0.30 to 1.02 of its height, is 0.24 to 0.31 of the height round on Earth.
-  // A footprint of columnRadius or more is a column (spire, crystal, frozen wave), not a tree.
-  // The boom stops crownMargin short of either.
+  // Which plants carry a crown is CROWN_KITS below (by the plant's kit; a plant whose kit is not
+  // known is a tree under columnRadius of footprint and a column from it up). The boom stops
+  // crownMargin short of a crown or a trunk.
   shipBoomMin: 5.5,          // the shortest boom crowns may squeeze it to
   crownLow: 0.3,
   crownTop: 1.05,
@@ -63,31 +64,57 @@ export const CAMERA = Object.freeze({
   crownLead: 1.5,            // s: the boom also looks where the lens will be this long ahead in a descent
   crownDuck: 1.5,            // m: the most the lens drops under crowns that come down to its height
   // The foot camera among trees (PHYSICS' and PAINTER's critiques, M4: on the jetpack's way up and
-  // down the lens went through crowns, flat slabs over half the frame; a birch a metre from the lens
-  // was a white slab over a fifth of it). The boom is cut short of a crown it would pass into, and
-  // the lens keeps footLens metres clear of crowns and trunks (it comes in a little past a trunk
-  // beside it). Nothing changes while the explorer's own head is inside a crown: there is no view
-  // of that from outside.
+  // down the lens went through crowns, flat slabs over half the frame). IN THE AIR ONLY (sim.js
+  // footCrowns), the boom is cut short of a crown it would pass into WHEN THAT GIVES THE LENS A
+  // PLACE footLens clear of every crown and trunk no nearer the figure than footBoomMin. Where
+  // there is no such place the boom is left as it is: the figure is never taken out of the
+  // picture for a crown (PAINTER's crowns part into dabs within 3.6 m of the eye). Nothing changes
+  // while the explorer's own head is inside a crown either: there is no view of that from outside.
+  // (The re-fix pass, M4: the first form of this rule ran on the ground too and, with no place for
+  // the lens, drew the boom into the explorer's eyes: a walk in a wood cut in and out of first
+  // person, the figure not drawn for a fifth of it, and stepping out under a birch showed no explorer.)
   footLens: 1.0,             // m the lens keeps from a crown or a trunk
   footThrough: 0.25,         // m: the boom may graze a crown this closely on its way to the lens
   footStep: 0.4,             // m: how finely the boom is looked along
+  footBoomMin: 3.0,          // m: a crown never brings the boom in nearer than this (boomTight is 2.3: the figure stays whole in the frame)
+  footAir: 0.35,             // s in the air and...
+  footAirHeight: 2,          // ...m over the ground before the rule begins (a hop is 1.3 m and 1 s on Earth)
 });
 
-// Signed distance (m) from body-local `p` to the nearest tree of `crowns` ([{ base, u, h, r }]:
-// the trunk's foot, its unit up, its height, its trunk radius): negative inside a crown or a trunk.
+// The crown a tall plant carries, by its kit (PAINTER's src/world/florakit.js): [from, to (of its
+// height), radius (of its height)], or null for a plant with none (a crystal needle, a kelp
+// ribbon, a spire, a frozen wave: only the thing itself is solid). A broadleaf and a conifer:
+// PAINTER's far tree, a crown 0.27 of its width round from 0.30 to 1.02 of its height. A fungal
+// tower: a stalk that leans up to 0.15 of its height under a drooping cap 0.3 to 0.4 of it round.
+export const CROWN_KITS = Object.freeze({
+  broadleaf: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
+  conifer: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
+  fungus: Object.freeze([0.8, 1.15, 0.45]),
+});
+// kit: the plant's kit when it is known (a name), undefined when it is not: then a footprint under
+// columnRadius is taken for a tree with a crown, as before.
+export function crownShape(kit, radius, C = CAMERA) {
+  if (kit == null) return radius >= C.columnRadius ? null : CROWN_KITS.broadleaf;
+  return CROWN_KITS[kit] || null;
+}
+
+// Signed distance (m) from body-local `p` to the nearest tree of `crowns` ([{ base, u, h, r, c }]:
+// the trunk's foot, its unit up, its height, its trunk radius, its crown (crownShape: [from, to,
+// radius] of its height, null for none, undefined: by its footprint)): negative inside a crown or
+// a trunk.
 export function crownDistance(crowns, p, C = CAMERA) {
   let best = Infinity;
   for (const t of crowns) {
     const dx = p.x - t.base.x, dy = p.y - t.base.y, dz = p.z - t.base.z;
     const along = dx * t.u.x + dy * t.u.y + dz * t.u.z;
     const horiz = Math.sqrt(Math.max(0, dx * dx + dy * dy + dz * dz - along * along));
-    // a column (spire, crystal, frozen wave: a body as wide as its footprint) has no crown
-    const column = t.r >= C.columnRadius;
-    const lo = column ? t.h : C.crownLow * t.h, hi = C.crownTop * t.h, cr = Math.max(C.crownMin, C.crownWidth * t.h);
+    const c = t.c === undefined ? crownShape(undefined, t.r, C) : t.c;
+    // (a plant with no crown is solid for its whole height)
+    const lo = c ? c[0] * t.h : t.h;
     let d = Infinity, a, b;
-    if (!column) {
+    if (c) {
       // the crown: a cylinder from lo to hi
-      a = horiz - cr; b = Math.max(lo - along, along - hi);
+      a = horiz - Math.max(C.crownMin, c[2] * t.h); b = Math.max(lo - along, along - c[1] * t.h);
       d = a < 0 && b < 0 ? Math.max(a, b) : Math.hypot(Math.max(a, 0), Math.max(b, 0));
     }
     // the trunk under it (or the whole column)
@@ -194,11 +221,12 @@ export function boomRoom(feet, viewFwd, pitch, obstacles, C = CAMERA) {
   return boomThroughSpheres(addScaled(feet, up, C.pivotHeight), scale(look, -1), C.boom, obstacles || [], 0);
 }
 
-// feet: explorer position (body-local). obstacles: [{ p, radius }] spheres the camera must not
-// enter (the ship's hull). Returns { p, q, fov, look } and updates the smoothing.
-// How long the foot boom may be among `crowns` ([{ base, u, h, r }], see crownDistance): from
-// `pivot` along unit `back`, at most `boom`. The longest length whose lens is footLens clear of
-// every crown and trunk and whose way there enters none. With the pivot itself in a crown: `boom`.
+// How long the foot boom should be among `crowns` ([{ base, u, h, r, c }], see crownDistance):
+// from `pivot` along unit `back`, at most `boom`. The longest length whose lens is footLens clear
+// of every crown and trunk and whose way there enters none, IF that is no shorter than
+// footBoomMin; otherwise `boom` itself: where a crown leaves no such place the view is as it
+// would be without this rule (never drawn into the explorer's eyes). With the pivot itself in a
+// crown: `boom`.
 export function footBoomAmongCrowns(pivot, back, boom, crowns, C = CAMERA) {
   if (!crowns || !crowns.length || crownDistance(crowns, pivot, C) < C.footThrough) return boom;
   let best = 0;
@@ -208,9 +236,12 @@ export function footBoomAmongCrowns(pivot, back, boom, crowns, C = CAMERA) {
     if (d >= C.footLens) best = b;                // a place the lens may be
     if (b >= boom) break;
   }
-  return best;
+  return best >= Math.min(boom, C.footBoomMin) ? best : boom;
 }
 
+// feet: explorer position (body-local). obstacles: [{ p, radius }] spheres the camera must not
+// enter (the ship's hull). Returns { p, q, fov, look } and updates the smoothing.
+// crowns: the trees the boom is cut short of (footBoomAmongCrowns), or null (on the ground).
 export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = null, crowns = null) {
   const up = norm(feet);
   cam.viewFwd = tangent(cam.viewFwd, up, cam.viewFwd);        // carry the yaw along the sphere
@@ -231,7 +262,7 @@ export function updateFootCamera(cam, feet, dt, sample, C = CAMERA, obstacles = 
   const N = 5;
   let lift = 0, boom = cam.boom;
   if (obstacles) boom = boomThroughSpheres(pivot, back, boom, obstacles, 0.8);
-  if (crowns) boom = Math.max(0.8, footBoomAmongCrowns(pivot, back, boom, crowns, C));
+  if (crowns) boom = footBoomAmongCrowns(pivot, back, boom, crowns, C);
   for (let i = 1; i <= N; i++) {
     const t = i / N;
     const q = addScaled(pivot, back, boom * t);
