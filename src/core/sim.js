@@ -7,7 +7,7 @@ import {
   HELIO, bodyFrame, sameFrame, frameState, posToUniverse, quatToUniverse, quatFromUniverse,
   convertState, chooseFrame, FloatingOrigin, posFromUniverse,
 } from './frames.js';
-import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip, LAND_PROMPT_ALTITUDE } from './state.js';
+import { StateMachine, S, EV, canBoard, canBeginLanding, promptFor, isInShip, LAND_PROMPT_ALTITUDE, LAND_BEGIN_SPEED } from './state.js';
 import {
   V, add, sub, scale, addScaled, dot, len, norm, cross, tangent, lerp, clamp, clamp01, mix, smoothstep,
   qLook, qRotate, qConj, qMul, qFromAxisAngle, rotateAround,
@@ -891,13 +891,23 @@ export class Sim {
       else if (sh.altGround >= 90) this.canopy = [];
     } else this.canopy = [];
 
+    // E pressed faster than the landing assist takes the hull over (LAND_BEGIN_SPEED): the ship
+    // first slows down with its own brakes, as X does, through the same flight computer and the
+    // same ground assists; the landing begins when it has. W or Space lets it go.
+    let slowing = this._landWish && this.sm.state === S.ATMOSPHERE && !sh.liftoff ? this._landWish : (this._landWish = null);
+    if (slowing) {
+      slowing.t += h;
+      if (pressed('Space') || pressed('KeyW') || pressed('ArrowUp')) { this._landWish = slowing = null; this.say('Landing cancelled', 2); }
+      else if (slowing.t > 25 || sh.altGround > LAND_PROMPT_ALTITUDE + 15) { this._landWish = slowing = null; this.say(this.slowWord(env)); }
+      else sh.throttle = mix(sh.throttle, 0, 1 - Math.exp(-6 * h));
+    }
     stepFlight(sh, {
       aimX: mdx * FEEL.mouseShip,
       aimY: mdy * FEEL.mouseShip,
       yawKey: I.axis('KeyA', 'KeyD') + I.axis('ArrowLeft', 'ArrowRight'),
-      throttle: I.axis('KeyS', 'KeyW') + I.axis('ArrowDown', 'ArrowUp'),
-      cut: I.down('KeyX'),
-      lift: this.sm.state === S.PULSE ? 0 : (I.down('Space') ? 1 : 0) - (I.down('KeyC') ? 1 : 0),
+      throttle: slowing ? 0 : I.axis('KeyS', 'KeyW') + I.axis('ArrowDown', 'ArrowUp'),
+      cut: !!slowing || I.down('KeyX'),
+      lift: this.sm.state === S.PULSE || slowing ? 0 : (I.down('Space') ? 1 : 0) - (I.down('KeyC') ? 1 : 0),
     }, h, env);
     if (sh.bounce === 0) this.emit('bounce');
 
@@ -922,7 +932,12 @@ export class Sim {
       if (stalled && sh.speed >= 5 && this._firstStep && !this.notice) this.say(this.slowWord(env));
       const settle = I.down('KeyC') && sh.speed < 5 && (sh.altGround < SHIP.minClearance + 1.2 || stalled);
       if (settle) this._sink = null;
-      if ((pressed('KeyE') && this.landable()) || settle) {
+      const asked = pressed('KeyE') && !slowing && this.landable();
+      if (asked && sh.speed > LAND_BEGIN_SPEED && !settle) {
+        this._landWish = { t: 0 };
+        this.say('Slowing down to land', 3);
+      } else if (asked || settle || (slowing && sh.speed <= LAND_BEGIN_SPEED)) {
+        this._landWish = null;
         const trees = this.obstaclesNear(this.shFrame.id, sh.p, 80);
         // With PHYSICS, a site is good when the ground's friction will hold the parked ship.
         const id = this.shFrame.id;
@@ -940,7 +955,7 @@ export class Sim {
           if (off > 6) this.say(`Setting down on level ground ${Math.round(off)} m away`, 4);
         }
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
-      } else if (pressed('KeyE')) {
+      } else if (pressed('KeyE') && !slowing) {
         // E without the prompt: never silence. Say what the landing is waiting for.
         this.say(sh.altGround > LAND_PROMPT_ALTITUDE ? `Come down below ${LAND_PROMPT_ALTITUDE} m to land` : this.slowWord(env));
       }
@@ -1102,6 +1117,7 @@ export class Sim {
     const offerLanding = this._offClear || this._offT > 8;
     const q = {
       canBoard: st === S.ON_FOOT && this.boardable(), canLand: this.landable() && offerLanding, liftingOff: !!this.sh.liftoff,
+      slowingToLand: st === S.ATMOSPHERE && !!this._landWish,
       target: ti ? ti.name : null,
     };
     this.promptNow = promptFor(st, q);

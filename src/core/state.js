@@ -117,6 +117,9 @@ export function canBoard(distToHatch, distToShip) {
 
 export const LAND_PROMPT_ALTITUDE = 90;   // metres above the ground (or the liquid surface)
 export const LAND_PROMPT_SPEED = 75;      // m/s
+// The landing assist takes the hull over under this speed. E pressed faster than this (the
+// prompt is up to LAND_PROMPT_SPEED) first slows the ship with its own brakes, then lands.
+export const LAND_BEGIN_SPEED = 12;       // m/s
 
 export function canBeginLanding(state, altitudeAboveGround, speed) {
   return state === S.ATMOSPHERE && altitudeAboveGround <= LAND_PROMPT_ALTITUDE && speed <= LAND_PROMPT_SPEED;
@@ -129,6 +132,7 @@ export function promptFor(state, q) {
     case S.LANDED: return { key: 'SPACE', text: 'Lift off', key2: 'E', text2: 'Step out' };
     case S.ATMOSPHERE:
       if (q.liftingOff) return null;
+      if (q.slowingToLand) return { key: 'SPACE', text: 'Cancel landing' };
       if (q.canLand) return { key: 'E', text: 'Land here' };
       return null;
     case S.LANDING: return { key: 'SPACE', text: 'Cancel landing' };
