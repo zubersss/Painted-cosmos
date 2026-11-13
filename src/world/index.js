@@ -20,7 +20,7 @@ import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitm
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
-const _up = new THREE.Vector3(), _east = new THREE.Vector3(), _north = new THREE.Vector3();
+const _up = new THREE.Vector3(), _east = new THREE.Vector3(), _north = new THREE.Vector3(), _sunTrue = new THREE.Vector3();
 const Y = new THREE.Vector3(0, 1, 0), _hup = new THREE.Vector3();
 
 // the wash that, laid with k more pigment (the density model), comes out as c
@@ -337,7 +337,7 @@ export function createWorld(scene) {
           if (farVeil > 0.01) bu.uHaze.value.lerp(skyU.uStormWash.value, Math.min(1, skyU.uWxSky.value.y * 1.25) * farVeil * 0.85);
         }
         else bu.uFog.value.set(1e-7, 6, 0, st.limbK);
-        bu.uDayness.value = 1; bu.uWx.value.set(0, 0, 0, 0); bu.uStorm.value = 0; bu.uHazeUp.value.w = 0;
+        bu.uDayness.value = 1; bu.uMoon.value = 0; bu.uWx.value.set(0, 0, 0, 0); bu.uStorm.value = 0; bu.uHazeUp.value.w = 0;
       }
     }
     if (active) {
@@ -386,6 +386,8 @@ export function createWorld(scene) {
       _east.crossVectors(Y, _up).normalize();
       const am = bu.uSunDirL.value.dot(_east) > 0;
       let wNight = 1 - THREE.MathUtils.smoothstep(e, -0.24, -0.03);
+      // (the night's own light, PAINTER 16: under an air, with the sun down, the moon is the light: chunks.js pcLevel)
+      const moon = wNight * (1 - space01);
       let wDay = THREE.MathUtils.smoothstep(e, 0.06, 0.42);
       const wTwi = Math.max(0, 1 - wNight - wDay);
       const lost = wDay * twi;
@@ -459,7 +461,7 @@ export function createWorld(scene) {
       // (a wet night under a closed sky is dark enough by its own washes: the key is eased there)
       const nightK = (1 - dayness) * (1 - space01) * (1 - 0.30 * oc);
       SHEET.night = nightK;
-      if (nightK > 0.003) { const k = 0.81 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
+      if (nightK > 0.003) { const k = 0.40 * nightK; for (const c of [tmpKey.zenith, tmpKey.horizon, tmpKey.haze, _storm, tmpKey.cloudShade]) { c.x = undens(c.x, k); c.y = undens(c.y, k); c.z = undens(c.z, k); } }
       bu.uGlaze.value.copy(tmpKey.glaze);
       bu.uLight.value.copy(tmpKey.light);
       bu.uHaze.value.copy(tmpKey.haze);
@@ -516,11 +518,16 @@ export function createWorld(scene) {
       skyU.uBodyInv.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(_q.invert()));
       SHEET.grade.copy(tmpKey.grade).lerp(new THREE.Vector3(1, 1, 1), space01);
       SHEET.valid = true;
+      // the moon stands where the sun is not: from the middle of twilight on, every painted thing of this world is
+      // handed its direction in the sun's place (the sky keeps the sun; the hours are told from the sun)
+      _sunTrue.copy(bu.uSunDirL.value);
+      bu.uMoon.value = moon;
+      if (moon > 0.5) { bu.uSunDirW.value.negate(); bu.uSunDirL.value.negate(); }
       // objects painted with the default wash (explorer, ship, stand-ins) share this light
       const du = defaultBodyUniforms();
       for (const k of Object.keys(bu)) { const a = du[k].value, b = bu[k].value; if (a && a.copy) a.copy(b); else du[k].value = b; }
       lighting.bodyId = st.id; lighting.sunElevation = e; lighting.dayness = dayness; lighting.altitude = alt; lighting.space01 = space01;
-      lighting.hours = (12 + Math.atan2(-bu.uSunDirL.value.dot(_east), e) * 12 / Math.PI + 24) % 24;
+      lighting.hours = (12 + Math.atan2(-_sunTrue.dot(_east), e) * 12 / Math.PI + 24) % 24;
     } else {
       // deep space: no atmosphere anywhere
       skyU.uAtmo.value.set(1, 1, 0.03, 1);
@@ -532,7 +539,7 @@ export function createWorld(scene) {
       SHEET.grade.set(1, 1, 1); SHEET.valid = true; SHEET.night = 0; SHEET.laid = 1; veil.on = false;
       G.uAirNear.value.x = 0;
       const du = defaultBodyUniforms();
-      du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0);
+      du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0); du.uMoon.value = 0;
       lighting.bodyId = null; lighting.space01 = 1;
     }
     castShade(active);
@@ -547,7 +554,9 @@ export function createWorld(scene) {
     const K = G.uCastK.value, U = G.uCast.value;
     K.set(0, 0);
     if (!active) return;
-    const sunL = active.bu.uSunDirL.value, ov = active.bu.uWx.value.x, day = active.bu.uDayness.value;
+    // (by night the moon throws the shade: uSunDirL is then the moon's direction; nothing is thrown in the middle of twilight)
+    const moon = active.bu.uMoon.value, mk = Math.abs(2 * moon - 1);
+    const sunL = active.bu.uSunDirL.value, ov = active.bu.uWx.value.x, day = moon > 0.5 ? mk * 0.8 : active.bu.uDayness.value * mk;
     for (const o of scene.children) {
       const kind = o.userData && o.userData.pcCaster;
       if (!kind || !o.visible) continue;

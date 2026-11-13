@@ -63,9 +63,12 @@ export const EARTH_SKY = {
   day: { zenith: [0.50, 0.69, 0.90], horizon: [0.90, 0.94, 0.97], haze: [0.93, 0.955, 0.975], glaze: [0.71, 0.72, 0.875], light: [1.0, 0.985, 0.93], grade: [1, 1, 1], cloudShade: [0.80, 0.80, 0.90] },
   dawn: { zenith: [0.66, 0.72, 0.90], horizon: [1.0, 0.80, 0.76], haze: [1.0, 0.90, 0.87], glaze: [0.66, 0.66, 0.88], light: [1.0, 0.88, 0.82], grade: [1.0, 0.94, 0.93], cloudShade: [0.86, 0.72, 0.80] },
   dusk: { zenith: [0.58, 0.63, 0.86], horizon: [1.0, 0.80, 0.50], haze: [1.0, 0.89, 0.70], glaze: [0.60, 0.58, 0.84], light: [1.0, 0.84, 0.58], grade: [1.0, 0.92, 0.80], cloudShade: [0.84, 0.66, 0.66] },
-  // night: a dark-toned painting of its own (the sheet's night key, post.js): a deep zenith
-  // running to a paler band over the land, a light last glaze; the lights are reserved paper
-  night: { zenith: [0.15, 0.19, 0.36], horizon: [0.46, 0.52, 0.68], haze: [0.40, 0.46, 0.63], glaze: [0.55, 0.58, 0.80], light: [0.80, 0.86, 1.0], grade: [0.64, 0.70, 0.90], cloudShade: [0.40, 0.44, 0.62] },
+  // night: a painting in its own key (PAINTER 16; the M4 critique: it was the day's picture under a dark veil). The moon
+  // is the light (chunks.js pcLevel, world/index.js), so the sky is a middle indigo wash thinning to a pale band over the
+  // land, two steps lighter than the wood under it; the open ground a step lighter than the wood, the lights reserved
+  // paper (stars, birch bark, a lit cabin), a light last glaze. It was zenith [0.15, 0.19, 0.36], horizon
+  // [0.46, 0.52, 0.68], grade [0.64, 0.70, 0.90]: a sky as dark as the land.
+  night: { zenith: [0.33, 0.38, 0.60], horizon: [0.66, 0.72, 0.86], haze: [0.56, 0.62, 0.78], glaze: [0.55, 0.58, 0.80], light: [0.80, 0.86, 1.0], grade: [0.70, 0.76, 0.94], cloudShade: [0.50, 0.54, 0.70] },
 };
 
 export function m3(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
@@ -78,8 +81,12 @@ export function mkSky(zenith, horizon, o) {
   const dawnH = o.dawnHorizon || m3(horizon, E.dawn.horizon, 0.65), duskH = o.duskHorizon || m3(horizon, E.dusk.horizon, 0.7);
   const dawn = { zenith: m3(zenith, E.dawn.zenith, 0.45), horizon: dawnH, haze: m3(dawnH, [1, 1, 1], 0.4), glaze: E.dawn.glaze, light: o.dawnLight || E.dawn.light, grade: E.dawn.grade, cloudShade: E.dawn.cloudShade };
   const dusk = { zenith: m3(zenith, E.dusk.zenith, 0.45), horizon: duskH, haze: m3(duskH, [1, 1, 1], 0.35), glaze: E.dusk.glaze, light: o.duskLight || E.dusk.light, grade: o.duskGrade || E.dusk.grade, cloudShade: E.dusk.cloudShade };
-  const nz = [zenith[0] * 0.28, zenith[1] * 0.30, zenith[2] * 0.44], nh = [horizon[0] * 0.50, horizon[1] * 0.55, horizon[2] * 0.70];
-  const night = { zenith: nz, horizon: nh, haze: m3(nh, [0.4, 0.44, 0.6], 0.5), glaze: E.night.glaze, light: E.night.light, grade: o.nightGrade || E.night.grade, cloudShade: E.night.cloudShade };
+  // (the night sky of a world with air is its day sky in the night's key: a middle wash, lighter than the land under it;
+  // an airless world keeps the old deep keys with o.nightDeep: its sky is space, and only its far land takes the haze)
+  const nz = o.nightDeep ? [zenith[0] * 0.28, zenith[1] * 0.30, zenith[2] * 0.44] : [zenith[0] * 0.60, zenith[1] * 0.56, zenith[2] * 0.68];
+  const nh = o.nightDeep ? [horizon[0] * 0.50, horizon[1] * 0.55, horizon[2] * 0.70] : [horizon[0] * 0.72, horizon[1] * 0.77, horizon[2] * 0.89];
+  const night = { zenith: nz, horizon: nh, haze: o.nightDeep ? m3(nh, [0.4, 0.44, 0.6], 0.5) : m3(nh, E.night.haze, 0.5), glaze: E.night.glaze, light: E.night.light,
+    grade: o.nightGrade || (o.nightDeep ? [0.64, 0.70, 0.90] : E.night.grade), cloudShade: o.nightDeep ? [0.40, 0.44, 0.62] : E.night.cloudShade };
   return { day, dawn, dusk, night };
 }
 

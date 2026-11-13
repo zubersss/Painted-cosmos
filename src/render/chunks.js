@@ -5,7 +5,9 @@
 //               (how much this surface bleeds wet-in-wet in the post passes)
 //   location 1: xy = view-space normal, z = log2(1 + view depth in metres), w = region id
 //               (integer part = class: 0 sky, 1 ground, 2 water, 3 solid prop, 4 foliage,
-//                5 character / ship / foreign; fraction = a per-object hash)
+//                5 character / ship / foreign, 6 small crisp marks the brush leaves as drawn, 7 a light of
+//                its own (a flame, a lamp, a lit cabin: the night's key and the last glaze leave it as
+//                painted, post.js); fraction = a per-object hash)
 
 // Depth. Where the browser has EXT_clip_control three keeps a reversed float depth and none of this is
 // compiled. Where it has not (Firefox, docs/lead/HARDENING.md A1), three falls back to a logarithmic depth
@@ -50,6 +52,7 @@ uniform vec4 uFog;
 uniform vec2 uAirNear;  // the near air: x its share at distance y (m), see shared.js
 uniform float uTime;
 uniform float uDayness;
+uniform float uMoon;   // the night's light on the ground: 0 the sun is the light .. 1 the moon is (the world then hands the moon's direction in uSunDir*)
 uniform float uStorm;
 uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
 layout(location = 1) out highp vec4 pcAux;
@@ -65,7 +68,14 @@ vec3 pcDensity(vec3 c, float d) {
 
 // Light in four soft value steps. x in 0..1 -> level in 0..3.
 float pcLevel(float x, float soft) {
-  x = mix(0.37 + x * 0.30, x, uDayness);   // night: a dim, even moonlight, nothing near black
+  float xs = mix(0.37 + x * 0.30, x, uDayness);   // night with no moon (an airless world, the far side seen from space): a dim, even light, nothing near black
+  // Night on the ground is a picture in its own key (PAINTER 16, the M4 critique's first item: night was the day's picture
+  // under a dark veil, one value from sky to boots). The moon stands where the sun is not (a full moon), the world hands
+  // its direction in the sun's place, and it models every form as the sun does, in fewer steps: the open ground and the
+  // tops of things are the lights, what faces away and what the canopy shades is the deep wash. The light changes hands
+  // in the middle of twilight, when nothing is modelled at all (the blue hour is flat): no form flips in a frame.
+  float mk = abs(2.0 * uMoon - 1.0);
+  x = mix(0.47, uMoon > 0.5 ? 0.17 + x * 0.66 : xs, mk);
   // overcast: the light comes from the whole sky. Nothing is sunlit, forms are modelled in two
   // soft steps (local colour and one glaze) that run into each other
   x = mix(x, 0.37 + x * 0.25, uWx.x);

@@ -17,7 +17,7 @@ export default {
   visibility: [900, 9000],
   // (the drift of the ground's wash between two hues: kept near neutral, silver rather than ochre)
   hue: [[1.0, 0.965, 0.91], [0.92, 0.93, 1.0]],
-  sky: mkSky([0.20, 0.22, 0.34], [0.50, 0.52, 0.62], { haze: [0.85, 0.85, 0.88] }),
+  sky: mkSky([0.20, 0.22, 0.34], [0.50, 0.52, 0.62], { haze: [0.85, 0.85, 0.88], nightDeep: true }),
   flora: { tall: [], under: { leaf: [[0.8, 0.8, 0.8], [0.6, 0.6, 0.62], [0.4, 0.4, 0.45]], accent: [0.45, 0.66, 0.82], bush: [[0.8, 0.8, 0.8], [0.6, 0.6, 0.62], [0.4, 0.4, 0.45]], rock: [[0.75, 0.74, 0.73], [0.40, 0.40, 0.46]], shard: [[0.82, 0.82, 0.84], [0.52, 0.52, 0.58]] } },
   biomes: [
     B('mare', 'Silver Mare', 'flat', ['davysGrey', 'neutralTint', 'paynesGrey', 'indigo', 'sepia'], 'cerulean', ['paynesGrey', 'neutralTint', 'davysGrey'],

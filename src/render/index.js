@@ -178,6 +178,8 @@ export function createPainter(renderer) {
       if (o.bleed != null) a.uBrush.value.w = o.bleed;
     },
     info,
+    // (for instruments only: the post passes themselves, so that a study can read a pass or try a shader in a running page)
+    _post: post,
     // true where the browser cannot draw into float targets and the painting runs on 8-bit ones (post.js)
     floatFallback: post.floatFallback,
     dispose() { post.dispose(); },

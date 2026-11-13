@@ -65,7 +65,7 @@ function makeBuilder() {
     const lump = o.lump == null ? 0.012 : o.lump, freq = o.freq || 3.3, seed = (base * 0.371) % 19;
     const dry = o.dry == null ? 0.5 : o.dry, wet = o.wet == null ? 0.12 : o.wet, glow = o.glow || 0;
     const put = (p, c, t, a, ring) => {
-      const cc = col(p, t, a, ring), j = glow ? 1 : 0.93 + 0.14 * noise3(p[0] * 2.1 + seed, p[1] * 2.1, p[2] * 2.1 + 7.7);
+      const cc = col(p, t, a, ring), j = glow > 0 ? 1 : 0.93 + 0.14 * noise3(p[0] * 2.1 + seed, p[1] * 2.1, p[2] * 2.1 + 7.7);
       P.push(p[0], p[1], p[2]); C.push(Math.min(1, cc[0] * j), Math.min(1, cc[1] * j), Math.min(1, cc[2] * j)); M.push(dry, wet, glow); Q.push(B.part);
     };
     for (let i = 0; i < n; i++) {
@@ -420,7 +420,8 @@ export function createShip() {
   {
     const rings = [];
     for (let i = 0; i < 10; i++) { const th = Math.PI * (0.07 + 0.86 * (i / 9)), sn = Math.sin(th); rings.push({ c: [0, CAN.c[1], CAN.c[2] - CAN.rz * Math.cos(th)], u: X, v: Y, ru: CAN.rx * sn, rv: CAN.ry * sn, e: 2.1 }); }
-    B.loft(rings, { seg: 20, lump: 0.010, freq: 1.8, wet: 0.45, dry: 0.0, cap: 0.2,
+    // (glow -1: the glass is lit from within when the light goes, a cabin lamp: the night's one warm accent; materials.js FIG_FRAG)
+    B.loft(rings, { seg: 20, lump: 0.010, freq: 1.8, wet: 0.45, dry: 0.0, cap: 0.2, glow: -1,
       col: (p, t, a) => { const up = sstep(1.45, 2.2, p[1]); const glint = sstep(0.55, 0.9, Math.cos(a - 2.2)) * sstep(0.25, 0.45, t) * sstep(0.75, 0.5, t); return mixc(mixc(GLASS, hex('#d9e6e9'), up), [1, 1, 1], glint); } });
     const hoop = (z, r) => { const k = Math.sqrt(Math.max(0, 1 - ((z - CAN.c[2]) / CAN.rz) ** 2)), pts = []; for (let i = 0; i <= 22; i++) { const a = Math.PI * (i / 22); pts.push([Math.cos(a) * (CAN.rx * k + 0.012), CAN.c[1] - 0.06 + Math.sin(a) * (CAN.ry * k + 0.072), z]); } B.path(pts, r, { seg: 7, col: SEPIA, lump: 0.006, ref: Z, dry: 0.3 }); };
     hoop(-1.95, 0.019); hoop(-1.25, 0.019); hoop(-0.55, 0.022);

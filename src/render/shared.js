@@ -42,6 +42,7 @@ export const G = {
   uCast: { value: [new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1), new THREE.Vector4(0, 0, 0, 1), new THREE.Vector4(1, 0, 0, 1)] },
   uCastK: { value: new THREE.Vector2(0, 0) },
   uNoHazeUp: { value: new THREE.Vector4(0, 0, 0, 0) }, uUpW0: { value: new THREE.Vector3(0, 1, 0) },   // (for body uniforms made before these existed)
+  uMoon0: { value: 0 },
   // the near air (x how much of what stands at distance y metres it veils, rising as 1 - exp(-d / y)): a dust storm
   // veils the explorer at the eye's own distance, which the far washes' stacked bands cannot (the world sets it)
   uAirNear: { value: new THREE.Vector2(0, 9) },
@@ -85,6 +86,7 @@ export function makeBodyUniforms() {
     uFog: { value: new THREE.Vector4(1 / 4000, 5, 1, 0) },               // 1/visibility, bands, max, altitude01
     uStorm: { value: 0 },                                                // 0 .. 1: under a storm cloud nothing is lit
     uDayness: { value: 1 },                                              // 1 day .. 0 night
+    uMoon: { value: 0 },                                                 // 0 the sun is the light .. 1 night on the ground: the moon is, and uSunDir* hold its direction (chunks.js pcLevel)
     uHueA: { value: new THREE.Vector3(0.84, 0.99, 0.80) },               // the two drifts of neighbouring pigment in ground washes
     uHueB: { value: new THREE.Vector3(1.0, 0.90, 0.80) },
     uBodyR: { value: 4000 },                                             // base radius of the body (strata follow the height)

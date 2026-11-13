@@ -91,6 +91,8 @@ void main() {
   float keep = (1.0 - far) * (cls == 3.0 || cls == 5.0 ? 0.72 : 0.30);
   // region 6: small crisp marks (splash rings) the brush leaves as they were drawn
   if (cls == 6.0) keep = 0.92;
+  // region 7: a light of its own (a lamp, a flame, a lit cabin): its small warm shape is kept too
+  if (cls == 7.0) keep = 0.85;
   keep = mix(1.0, keep, uAbstraction);
   vec3 col = mix(kuw, c0.rgb, keep);
   // wet-in-wet: wet areas take up the (wetness-weighted) colour around them, feathered
@@ -136,6 +138,10 @@ void main() {
   vec4 c = texture(tAbs, uv);
   vec3 col = c.rgb;
   float wet = c.a;
+  // (what lies here: the region, and whether it is a light of its own: a lamp, a flame, a lit cabin, region 7; such a
+  // light is left as it was painted by the night's key and the last glaze: the one warm thing in the indigo)
+  vec4 auxU = pcAuxDec(texture(tAux, uv));
+  float lamp = step(6.95, auxU.w);      // (region 6's marks carry a hash up to 6.9)
   // A picture being laid (an arrival): the washes come up out of the bare paper as one, the sky and the
   // far end a little before the ground at the feet, in broad soft tides that follow the paper: never
   // a piece at a time, never a stipple.
@@ -151,7 +157,7 @@ void main() {
   // and (below) every wash carries far more pigment, so the darks and middles run together
   // into a few deep masses while whatever was left as paper stays paper: the reserved lights
   float lit0 = dot(col, W);
-  col = mix(col, vec3(lit0) * vec3(0.88, 0.97, 1.13), 0.58 * uNight * (1.0 - smoothstep(0.80, 0.97, lit0)));
+  col = mix(col, vec3(lit0) * vec3(0.88, 0.97, 1.13), 0.58 * uNight * (1.0 - smoothstep(0.80, 0.97, lit0)) * (1.0 - lamp));
   float lum = dot(col, W);
 
   // pigment pools just inside the border of each wash: wide (compare with the blurred
@@ -185,7 +191,9 @@ void main() {
   float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
   d += uWxSheet.x * (0.75 + 0.5 * plo.r);
-  d += uNight * (0.68 + 0.26 * plo.r);
+  // (night, PAINTER 16: the moon models the land in the materials now, chunks.js pcLevel, so the key only deepens the
+  // washes a little; it was 0.68 to 0.94, which ran every middle value down into one dark, 80 % of the frame within 7 L*)
+  d += uNight * (0.30 + 0.20 * plo.r) * (1.0 - lamp);
 
   // ragged unpainted border: the wash simply stops, and pools where it stops
   vec2 bd = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);
@@ -234,19 +242,20 @@ void main() {
     float lift = uWxSheet.y * (isSky * (0.62 + 0.33 * smoothstep(0.0, 0.42, dot(sur, W))) + (1.0 - isSky) * smoothstep(0.25, 0.75, dot(col, W)) * 0.55);
     col = mix(col, vec3(1.0), clamp(lift, 0.0, 0.92));
   }
-  // (at night the land keeps a floor and its steps above it, PAINTER 12: the washes under about half value are laid
-  // into a band above the night's deepest indigo instead of running down into one flat mass at the floor below; the
-  // sky keeps its own night, and a frame of land with nothing lit is still two or three values; ARTPASS wish 3)
+  // (at night the land keeps a floor, PAINTER 12; PAINTER 16: a soft floor only. The darkest washes gather a little above
+  // the night's deepest indigo and everything over them keeps its step: the old toe laid all the washes under half value
+  // into one narrow band, which was most of why the land at night was one value)
   if (uNight > 0.003) {
-    float land = step(0.5, pcAuxDec(texture(tAux, uv)).w);
-    vec3 toe = vec3(0.25, 0.27, 0.37) + 0.025 * (psoft.r - 0.5);
-    col = max(col, mix(col, toe + col * (1.0 - toe / 0.55), uNight * land * laid));
+    float land = step(0.5, auxU.w) * (1.0 - lamp);
+    vec3 toe = vec3(0.16, 0.175, 0.27) + 0.025 * (psoft.r - 0.5);
+    vec3 c2 = col * col, t2 = toe * toe;
+    col = mix(col, sqrt(sqrt(c2 * c2 + t2 * t2)), uNight * land * laid);
   }
   // (and under a storm's key, PAINTER 13: the storm lays more pigment into every wash, and Neptune's basalt cliffs and
   // stacks went to one flat near-black mass, L 14; the land's darkest washes are laid into a band above the floor, a
   // gentle toe, so a cliff in a gale is dense indigo with its steps still in it)
   if (uWxSheet.x > 0.003) {
-    float landS = step(0.5, pcAuxDec(texture(tAux, uv)).w);
+    float landS = step(0.5, auxU.w);
     vec3 toeS = vec3(0.12, 0.13, 0.21) + 0.02 * (psoft.r - 0.5);
     col = max(col, mix(col, toeS + col * (1.0 - toeS / 0.55), min(uWxSheet.x, 1.0) * landS * laid));
   }
@@ -257,7 +266,7 @@ void main() {
   // paper: warm off-white, lit so its tooth shows faintly even where it is bare
   float relief = (ph - 0.5) * 0.055 * mix(1.0, 0.35, dark) + (plo.g - 0.5) * 0.02;
   // the last glaze over the sheet (night indigo, dusk gold); at night what was reserved stays paper
-  float reserve = max(smoothstep(0.90, 0.985, dot(col, W)) * uNight, min(uWxSheet.y, 1.0) * smoothstep(0.45, 0.80, dot(col, W)));
+  float reserve = max(max(smoothstep(0.90, 0.985, dot(col, W)) * uNight, lamp), min(uWxSheet.y, 1.0) * smoothstep(0.45, 0.80, dot(col, W)));
   vec3 outc = uPaperColor * col * (1.0 + relief) * mix(vec3(1.0), mix(uGrade, vec3(1.0), reserve), painted);
   gl_FragColor = vec4(outc, 1.0);
 }

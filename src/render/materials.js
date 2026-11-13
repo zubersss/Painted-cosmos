@@ -32,7 +32,7 @@ function baseUniforms(bodyU, own) {
   return Object.assign({
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear, uAux8: G.uAux8,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
-    uFog: b.uFog, uDayness: b.uDayness, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
+    uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx,
   }, own || {});
 }
 
@@ -466,7 +466,7 @@ void main() {
   // pigment pools at the water's edge
   c = pcDensity(c, 1.0 + (1.0 - smoothstep(0.0, 0.09, vDep)) * 0.35);
   // bare-paper glints: broken dashes where ripples catch the light
-  float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDep) * uDayness;
+  float glint = smoothstep(0.715, 0.76, r2.r * 0.62 + r1.b * 0.38) * smoothstep(0.04, 0.2, vDep) * max(uDayness, uMoon);
   glint *= (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - vLiqP.y) * (1.0 - 0.7 * wavy);
   // (glints are the sun's: under a closed sky there are none; in a gale they were a glitter of white pixels)
   glint *= 1.0 - 0.9 * uWx.x;
@@ -841,7 +841,7 @@ void main() {
     x += (n1.g - 0.5) * 0.12;
     float lvl = pcLevel(x, 0.06);
     // pale bark takes a thinner shadow wash: by day the trunks stay the lights of the picture
-    c = mix(pcTone(c, lvl), pcTone(c, max(lvl, 1.0) * 0.5 + 1.0), pale * 0.75 * uDayness);
+    c = mix(pcTone(c, lvl), pcTone(c, max(lvl, 1.0) * 0.5 + 1.0), pale * 0.75 * max(uDayness, uMoon));     // (and by night: birch bark is one of a nocturne's reserved lights)
     id = 3.0 + seed * 0.9;
   } else if (part < 1.5) {
     // ---- foliage mass: a few overlapping washes with a ragged, dabbed edge.
@@ -1176,7 +1176,7 @@ void main() {
   float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.35 + uFig.y * smoothstep(0.35, 0.95, rim + (n2.b - 0.5) * 0.25);
   // a few long soft strokes down the form: folds in cloth, runs of weather on a hull
   float fold = texture(uNoise3D, vObj * vec3(2.6, 0.22, 2.6) * uFig.x + 0.17).b;
-  d += (smoothstep(0.42, 0.62, fold) - 0.45) * 0.55 * (1.0 - vMat.z);
+  d += (smoothstep(0.42, 0.62, fold) - 0.45) * 0.55 * (1.0 - max(vMat.z, 0.0));
   vec3 c = pcWetWash(pcDensity(vCol, d), 0.7);
   // light in soft steps that run into each other inside the form; the shadow side is a glaze
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
@@ -1187,10 +1187,16 @@ void main() {
   vec4 st = pcTri(vObj * uFig.z, normalize(vNO), 0.5);
   float dryM = smoothstep(0.56, 0.70, st.r * 0.8 + st.b * 0.3) * smoothstep(0.45, 0.60, n2.r);
   lit = mix(lit, vec3(1.0), dryM * vMat.x * 0.16 * clamp(lvl - 1.0, 0.0, 1.5));
-  c = mix(lit, vCol, vMat.z);
+  // (aMat.z: 0..1 a light of its own, a flame or a lantern, not modelled by the sun; below 0: glass that is lit from
+  // within when the light goes: a cabin lamp, warm paper with a touch of quinacridone gold, the one warm thing in a night)
+  float lampN = max(-vMat.z, 0.0) * (1.0 - uDayness);
+  float glowK = max(vMat.z, 0.0);
+  c = mix(lit, vCol, glowK);
+  vec3 cabin = mix(vec3(1.0, 0.90, 0.62), vec3(1.0, 0.97, 0.84), smoothstep(0.35, 0.75, n1.b + (n2.r - 0.5) * 0.4));
+  c = mix(c, cabin, lampN * (0.80 + 0.20 * n1.r));
   float f = pcFogAmount(length(vView));
   c = pcAtmosV(c, f, vView);
-  pcWrite(c, max(vMat.y, f * 0.8), nV, -vView.z, uFig.w);
+  pcWrite(c, max(vMat.y, f * 0.8), nV, -vView.z, max(glowK, lampN) > 0.5 ? 7.0 : uFig.w);
 }
 `;
 
