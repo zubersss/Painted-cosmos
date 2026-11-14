@@ -17,8 +17,24 @@ before/after pair: t, raw bands, halo share, dE76 per region, L* percentiles, bo
 (every station, q2 1280x720, A at E_150_45, E_400_90, E_1000_45, E_1000_90); `trees/base` an export of the head;
 `node/mipstats.mjs`, `node/crackstats.mjs` the noise statistics the prefilter's constants come from).
 
-**State:** W2.1 COMMITTED (`9d8c0ba`), W2.2 COMMITTED (the commit after `0902c56`; numbers below). Nothing of mine is
+**State:** W2.1 COMMITTED (`9d8c0ba`), W2.2 COMMITTED (`afe8c40`; numbers below). Nothing of mine is
 half-done in the tree. Part 2 of the lane (W2.3 free wins, W2.4 post savings, W2.5 anti-aliasing) is not begun.
+
+### For other roles (from this part of the lane)
+- PILOT (tiers, W6): the old brush and old sheet come back whenever the scene is drawn under 0.6 of the sheet's size
+  (`index.js`: `post.inH < 0.6 * post.outH`). Today dynres can still reach that in play (q1 x 0.5, q0 x 0.5); with the
+  plan's resolution floor (0.67, W6) only the URL pins reach it, as the plan intends. Until then a slow machine sees the
+  brush change style when the controller drops that low.
+- PILOT (the guard, `tests/stations.mjs --compare`): its L* 10/50/90 rule flags nearly every station once the brush
+  stops averaging (a sharp picture has a wider spread of values than a blurred one); the plan's W2.2 acceptance names
+  the mean colour only. Its region means also flag tiny regions (a few hundred pixels of props or foliage at class edges
+  on Mars, Saturn, Neptune). A minimum region share for the colour rule would read better. The `--sheet` mode needs
+  `thumbs/` in the before run's directory (I copied the baseline run's).
+- The lead: the leaf shadow's fine hatch at 1 km straight down (above) is a choice between the 2x alias index and that
+  texture; and the two halo misses are the wet-in-wet bleed I kept as part of the washes.
+- Part 2 of this lane (W2.3, W2.4, W2.5) is not begun. W2.4 should count the sheet at 21 reads now (was 16) and the
+  new full-size prep pass (one read a pixel, one mip chain); W2.5's aux readers now include the sheet's edge test (3 aux
+  reads, class change and depth step) as well as the graphite line.
 
 ### W2.2 what was done (post.js, index.js)
 - **The brush turned round** (ABS_FRAG): keep = mix(near keep, 1, far) (near keep as before: 0.30 ground and foliage,
