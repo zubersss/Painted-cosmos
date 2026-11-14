@@ -4,7 +4,7 @@
 // markers, a brush-tip cursor. Nothing here animates by itself, so nothing can shimmer; the
 // only moving part of the theme is the loading dabs, which change twice a second.
 import { PAPER, PIGMENTS } from '../data/looks.js';
-import { letterPath } from './lettering.js';
+import { letterPath, measureLettering } from './lettering.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 export const INK = Object.freeze({
@@ -112,9 +112,13 @@ export function ink(el, text, size = SIZE.body, opts = {}) {
   if (!t) { el.textContent = ''; return el; }
   const p = letterPath(t, size, opts);
   const esc = t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-  el.innerHTML = `<svg class="pc-ink" xmlns="${SVG}" width="${p.width}" height="${p.height}" viewBox="0 0 ${p.width} ${p.height}" role="img" aria-label="${esc.replace(/"/g, '&quot;')}"><desc>${esc}</desc><path d="${p.d}" fill="none" stroke="currentColor" stroke-width="${p.stroke.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"${opts.rough ? ' filter="url(#pc-rough)"' : ''}/></svg>`;
+  // (data-size: the cap height it was lettered at, so a test can tell its size on the screen)
+  el.innerHTML = `<svg class="pc-ink" xmlns="${SVG}" width="${p.width}" height="${p.height}" viewBox="0 0 ${p.width} ${p.height}" data-size="${size}" role="img" aria-label="${esc.replace(/"/g, '&quot;')}"><desc>${esc}</desc><path d="${p.d}" fill="none" stroke="currentColor" stroke-width="${p.stroke.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"${opts.rough ? ' filter="url(#pc-rough)"' : ''}/></svg>`;
   return el;
 }
+
+// How wide `text` is lettered at `size` (css px, as ink() and inkOnCanvas() draw it).
+export const measureInk = (text, size = SIZE.body, tracking = 1) => ({ width: measureLettering(text, size, tracking) + 2 });
 
 // The same hand on a 2D canvas (the map). (x, y) is the left end (or the centre) of the baseline.
 export function inkOnCanvas(g, text, x, y, size = SIZE.small, opts = {}) {
@@ -223,6 +227,26 @@ const ICONS = {
 };
 // A pencilled cross: the corner that closes a sheet on a touch screen (fills its box).
 export const CLOSE_SVG = `<svg class="pc-ink" xmlns="${SVG}" viewBox="0 0 20 20" width="100%" height="100%" aria-hidden="true"><path d="M5.2 4.6C8.4 8 11.6 11.6 15 15.6M14.6 4.8C11.4 8.2 8.4 11.8 5 15.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" filter="url(#pc-rough)"/></svg>`;
+// The touch controls drawn small, for the help card on a touch screen (W3.3): the stick's ring
+// with a thumb on it, a finger dragging, two fingers pinching, the round paper buttons, a prompt's
+// slip, the tabs. 44 x 34, pencil and wash, currentColor ink.
+const TOUCH_ICONS = {
+  stick: '<circle cx="20" cy="17" r="13.5" fill="rgba(77,96,178,0.08)" stroke="currentColor" stroke-width="1.3" filter="url(#pc-rough)"/>'
+    + '<circle cx="25" cy="13" r="6.2" fill="rgba(77,96,178,0.45)" filter="url(#pc-wash)"/><path d="M20 17L25 13" stroke="currentColor" stroke-width="0.9" opacity="0.5"/>',
+  drag: '<circle cx="12" cy="22" r="5.4" fill="rgba(77,96,178,0.4)" filter="url(#pc-wash)"/>'
+    + '<path d="M14 18C19 10 27 8 36 10M31.5 6.4L36.4 10.2L31.4 13.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
+  pinch: '<circle cx="16" cy="19" r="4.6" fill="rgba(77,96,178,0.4)" filter="url(#pc-wash)"/><circle cx="28" cy="15" r="4.6" fill="rgba(77,96,178,0.4)" filter="url(#pc-wash)"/>'
+    + '<path d="M11 22L5 25M8.4 21.4L5 25L9.4 26.6M33 12L39 9M35.4 7.6L39 9L37.8 12.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+  jump: '<circle cx="22" cy="17" r="14.5" fill="#fbf8f1" stroke="rgba(88,68,53,0.55)" stroke-width="1.1" filter="url(#pc-rough)"/><circle cx="22" cy="17" r="11" fill="none" stroke="rgba(77,96,178,0.25)" stroke-width="3"/>',
+  buttons: '<circle cx="13" cy="20" r="10" fill="#fbf8f1" stroke="rgba(88,68,53,0.55)" stroke-width="1.1" filter="url(#pc-rough)"/>'
+    + '<circle cx="32" cy="12" r="9" fill="#fbf8f1" stroke="rgba(88,68,53,0.55)" stroke-width="1.1" filter="url(#pc-rough)"/>',
+  slip: '<path d="M3 9.5L41 8.4L41.6 25.6L3.4 26.4Z" fill="#fbf8f1" stroke="rgba(88,68,53,0.55)" stroke-width="1.1" filter="url(#pc-rag)"/><path d="M10 17.6H34" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.7"/>',
+  tabs: [0, 1, 2, 3].map((i) => `<rect x="${1.5 + i * 10.6}" y="11" width="8.6" height="8.6" rx="1.6" fill="#fbf8f1" stroke="rgba(88,68,53,0.6)" stroke-width="1"/>`).join(''),
+};
+export function touchIconSvg(name) {
+  const i = TOUCH_ICONS[name];
+  return i ? `<svg class="pc-icon" xmlns="${SVG}" width="44" height="34" viewBox="0 0 44 34" aria-hidden="true">${i}</svg>` : '';
+}
 export function iconSvg(name, size = 18, wash = INK.accent) {
   const i = ICONS[name];
   if (!i) return '';

@@ -13,6 +13,7 @@ import { V, len, scale } from './vec.js';
 import { pulseEta, arrivalRadius } from '../ship/pulse.js';
 import { SKETCH, SKETCH_SLIP, biomeKey, vistaKey, sketchHand } from './sketches.js';
 import { figureArgs, hullTrim, hasFootfalls, footLoudness } from '../player/figure.js';
+import { words } from './words.js';
 
 const NO_KEYS = { down: () => false, axis: () => 0 };
 // The ship as the chase view sees it, in metres round its middle: half its span, and how far it
@@ -83,7 +84,7 @@ export class Game {
     if (raw.edges.has('KeyB')) { if (this.map && this.map.open) this.map.hide(); this.toggleBook(); }
     if (raw.edges.has('KeyH') && this.started) {
       this.hud.showStart(!this.hud.startShown);
-      if (this.hud.setStartStatus) this.hud.setStartStatus('H closes this card');
+      if (this.hud.setStartStatus) this.hud.setStartStatus('{KeyH} closes this card');
       if (this.audio) this.audio.event('paper');
     }
     if (raw.edges.has('Backquote')) this.showStats = !this.showStats;
@@ -354,7 +355,7 @@ export class Game {
         const title = w.kind === 'vista' ? w.name : hit ? hit.name : pretty(w.id);
         const pr = this.bookProgress();
         this.lastSketch = { key: k, title, t };
-        const sub = `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}\nB opens the sketchbook`;
+        const sub = `${BODIES[body].name}  \u00b7  page ${pr.done} of ${pr.total}\n` + (this.say('{KeyB} opens the sketchbook') || '');
         if (!ff.off && w.kind !== 'vista') this._slipHeld = { body, url, title, sub };          // shown once they set off
         else this.showSketchSlip(url, title, sub);
       }
@@ -639,10 +640,24 @@ export class Game {
     return out;
   }
 
+  // Which hand is on the game, for the words that name its controls (src/core/words.js): the
+  // fingers while the touch layer is up, the pad when it was the last thing touched, else the keys.
+  wordMode() {
+    const tp = this.input && this.input.touch;
+    if (tp && tp.shown) return 'touch';
+    return this.input && this.input.lastDevice === 'pad' ? 'pad' : 'keys';
+  }
+
+  // A sentence about the controls, lettered for that hand; null where it is not said to it.
+  say(text) {
+    return words(text, this.wordMode(), { labels: this.hud && this.hud.labels, inShip: isInShip(this.sim.sm.state) });
+  }
+
   updateHud() {
     const hud = this.hud, sim = this.sim;
     if (!hud) return;
     const st = sim.sm.state;
+    if (hud.setWords) hud.setWords(this.wordMode(), isInShip(st));
     const panelOpen = (this.map && this.map.open) || (this.book && this.book.open);
     hud.setPrompt(panelOpen ? null : sim.promptNow);
     if (panelOpen && hud.sketchShown) hud.hideSketch();
@@ -666,10 +681,12 @@ export class Game {
     if (hud.setHint) {
       // Until the player has looked around once (and again whenever the capture is lost), say how.
       const need = this.started && !this.input.looked && !panelOpen && this.hintOn !== false;
-      hud.setHint(need ? (touchOn ? 'drag on the right to look around' : this.input.usePointerLock ? 'click the picture to look around with the mouse' : 'hold the left mouse button and drag to look around') : null);
+      hud.setHint(need ? this.say(this.input.usePointerLock ? 'click the picture to look around with the mouse' : 'hold the left mouse button and drag to look around') : null);
     }
     if (hud.setNotice) {
-      hud.setNotice(sim.notice ? sim.notice.text : this.uiNotice && performance.now() < this.uiNoticeUntil ? this.uiNotice : null);
+      // (said for the hand on the game: by touch no key and no mouse is named, and what is about a
+      // control the fingers do not have is not said at all)
+      hud.setNotice(sim.notice ? this.say(sim.notice.text) : this.uiNotice && performance.now() < this.uiNoticeUntil ? this.say(this.uiNotice) : null);
     }
     if (hud.setStats) hud.setStats(this.showStats ? this.statsText() : null);
     hud.setFuel(sim.ex.fuel, st === S.ON_FOOT && sim.ex.fuel < 0.995);
@@ -754,7 +771,8 @@ export class Game {
         worldPeakMs: +s.worldPeakMs.toFixed(2), tris: s.tris, calls: s.calls, shown: this.showStats,
       },
       weather: this.weatherStats(),
-      mapOpen: !!(this.map && this.map.open), bookOpen: !!(this.book && this.book.open), uiNotice: this.uiNotice,
+      mapOpen: !!(this.map && this.map.open), bookOpen: !!(this.book && this.book.open), uiNotice: this.uiNotice ? words(this.uiNotice) : this.uiNotice,
+      words: this.wordMode(),
       audio: this.audio ? { state: this.audio.state, ready: this.audio.ready, mix: this.audio.debug() } : null,
       sketches: this.sketches ? { count: this.sketches.count, chars: this.sketches.total, saved: this.sketches.saved, keys: Object.keys(this.sketches.items), last: this.lastSketch || null } : null,
     };

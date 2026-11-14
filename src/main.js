@@ -152,8 +152,10 @@ async function boot() {
   // (on a touch screen a sheet's corner presses its key, as the touch HUD's tabs do)
   const tap = (code) => touch.tap(code, performance.now() / 1000);
   const audio = createAudio({ enabled: params.get('audio') !== '0' });
-  const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id), press: tap });
-  const book = createBook(hudRoot, { press: tap, onTurn: () => audio.event('paper') });
+  // (the sheets letter their lines for the hand on the game: src/core/words.js, game.wordMode)
+  const wordMode = () => { try { return game.wordMode(); } catch { return 'keys'; } };
+  const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id), press: tap, mode: wordMode });
+  const book = createBook(hudRoot, { press: tap, onTurn: () => audio.event('paper'), mode: wordMode });
   // Sound may start only inside a click, a tap or a key press (Safari for the whole session;
   // Chrome, where a gamepad is not a gesture): start it there, in the capture phase so that no
   // handler can swallow the event first. Idempotent; a running context ignores it.
@@ -308,7 +310,7 @@ async function boot() {
         dyn.rest();
         loading.classList.add('pc-done');
         hud.setWaiting(false);
-        hud.setStartStatus('click to begin');
+        hud.setStartStatus('{click} to begin');
         game.canStart = true;
         if (world.setBuildBudget) world.setBuildBudget(5);
       }

@@ -87,6 +87,7 @@ export class Input {
     this.pad = null;                      // the gamepad's last reading (null without one)
     this._padButtons = null;
     this.touch = null;                    // the touch layer's pad (src/core/touch.js attachTouch), if any
+    this.lastDevice = 'keys';             // the last hand on the game: 'keys' (keyboard, mouse) or 'pad' (src/core/words.js names the controls by it)
 
     doc.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;       // leave browser shortcuts alone
@@ -98,7 +99,7 @@ export class Input {
       if (was && was !== b) this.keys.delete(was);
       this._held.set(e.code, b);
       this.keys.add(b);
-      if (!e.repeat) { this.edges.add(b); this.used = true; }
+      if (!e.repeat) { this.edges.add(b); this.used = true; this.lastDevice = 'keys'; }
     });
     doc.addEventListener('keyup', (e) => {
       // Release what this key's press held (not another key's binding of the same name).
@@ -114,6 +115,7 @@ export class Input {
       // A mouse event a browser makes up from a touch is not a mouse: no drag, no pointer lock
       // (the canvas's touchstart is cancelled, so there should be none; this is the belt).
       if (this.fromTouch(e)) return;
+      this.lastDevice = 'keys';
       if (e.button !== 0) return;
       this.dragging = true; this._lx = e.clientX; this._ly = e.clientY;
       // After the lock's first trip into nonsense the game drags; a click LOCK_RETRY_MS later
@@ -298,7 +300,7 @@ export class Input {
     this.pad = r;
     for (const code of r.edges) this.edges.add(code);
     this.dx += r.lookX; this.dy += r.lookY;
-    if (r.active) this.used = true;
+    if (r.active) { this.used = true; this.lastDevice = 'pad'; }
     if (Math.abs(r.lookX) + Math.abs(r.lookY) > 0.5) this.looked = true;
   }
 

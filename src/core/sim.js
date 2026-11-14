@@ -21,6 +21,7 @@ import {
   SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
 } from '../ship/flight.js';
 import { PULSE, arrivalRadius, createPulse, pulseAdvice, courseAdvice, stepPulseSpeed, pulseEta, courseDir } from '../ship/pulse.js';
+import { words } from './words.js';
 
 export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
@@ -418,7 +419,7 @@ export class Sim {
       // C: a stroll (a true walking gait) in place of the usual easy lope; Shift still runs.
       if (pressed('KeyC')) {
         this.stroll = !this.stroll;
-        this.say(this.stroll ? 'Strolling: C for the usual pace' : 'The usual pace', 2.5);
+        this.say(this.stroll ? 'Strolling: {KeyC} for the usual pace' : 'The usual pace', 2.5);
       }
       if (first && inp.wheel) this.footCam.boom = clamp(this.footCam.boom + inp.wheel * 0.8, CAMERA.boomMin, CAMERA.boomMax);
       lookFootCamera(this.footCam, norm(this.ex.p), mdx * FEEL.mouseFoot, mdy * FEEL.mouseFoot);
@@ -1155,7 +1156,7 @@ export class Sim {
       this.sm.dispatch(EV.leftAtmosphere); this.emit('space');
       // The first time above the air on a journey that has seen one world only: say how to go
       // on (the title card listed M among sixteen keys, minutes ago).
-      if (!this._saidMap && Object.keys(this.visited).length <= 1) this.say('M opens the map: choose a world there, then press F to fly to it', 9);
+      if (!this._saidMap && Object.keys(this.visited).length <= 1) this.say('{KeyM} opens the map: choose a world there, then {press} {KeyF} to fly to it', 9);
       this._saidMap = true;
     }
     else if (this.sm.state === S.SPACE && inAtmo) { this.sm.dispatch(EV.enteredAtmosphere); this.emit('entry'); }
@@ -1220,7 +1221,7 @@ export class Sim {
   // times). Without a course F pulses along the nose, as before.
   pressF() {
     if (this.sm.state !== S.SPACE) return false;
-    if (this.turn) { this.turn = null; this.unlockCourse(); this.say('Turn stopped: F turns onto the course again', 3); return false; }
+    if (this.turn) { this.turn = null; this.unlockCourse(); this.say('Turn stopped: {KeyF} turns onto the course again', 3); return false; }
     if (!this.target) return this.tryPulse();
     // The course holds while the nose swings past other worlds, for this turn and pulse only (a
     // world chosen on the map holds until it is reached or the map changes it).
@@ -1263,7 +1264,7 @@ export class Sim {
     if (steer || T.hand > 60 || T.t > PULSE.turnMax) {
       this.turn = null;
       this.unlockCourse();
-      if (T.t <= PULSE.turnMax) this.say('Turn stopped: F turns onto the course again', 3);
+      if (T.t <= PULSE.turnMax) this.say('Turn stopped: {KeyF} turns onto the course again', 3);
       return false;
     }
     const sh = this.sh;
@@ -1381,11 +1382,11 @@ export class Sim {
           if (!dest || adv.block === dest) this.say(`${BODIES[adv.block].name} ahead`, 5);
           // ...or stopped short by a world that lies between (the course goes round them, so
           // only if the pilot steered into one): F goes on, round it.
-          else this.say(`${BODIES[adv.block].name} lies on your course: F goes on round it to ${BODIES[dest] ? BODIES[dest].name : 'the world you chose'}`, 7);
+          else this.say(`${BODIES[adv.block].name} lies on your course: {KeyF} goes on round it to ${BODIES[dest] ? BODIES[dest].name : 'the world you chose'}`, 7);
           if (adv.block === this.target || adv.block === dest) this.targetLocked = false;
           this.emit('arrived');
         } else {
-          if (!ps.cancel && adv.block === 'sun') this.say(this.target ? 'The Sun lies on your course: F goes on round it' : 'The Sun is in the way: steer round it and pulse again', 6);
+          if (!ps.cancel && adv.block === 'sun') this.say(this.target ? 'The Sun lies on your course: {KeyF} goes on round it' : 'The Sun is in the way: steer round it and pulse again', 6);
           else this.unlockCourse();                 // dropped out by the pilot
           this.emit('pulse-off');
         }
@@ -1484,12 +1485,12 @@ export class Sim {
     const liq = env && env.liquidOf && ex.surface ? env.liquidOf(ex.surface) : null;
     if (!liq || !(liq.viscosity > 1)) return;                 // water and froth do not hold anyone
     this._bogSaid = true;
-    this.say(`The ${liq.name || 'liquid'} is thick: hold Space and the jetpack lifts you out`, 7);
+    this.say(`The ${liq.name || 'liquid'} is thick: hold {Space} and the jetpack lifts you out`, 7);
   }
 
   slowWord(env) {
     if (!env || !(env.airBrake > 0)) return 'Slow down to land';
-    return env.airless ? 'Slow down to land: no air to slow the ship here, hold X' : 'Slow down to land: the air is thin here, hold X';
+    return env.airless ? 'Slow down to land: no air to slow the ship here, hold {KeyX}' : 'Slow down to land: the air is thin here, hold {KeyX}';
   }
 
   // A word on the screen when thin air limits the ship (PHYSICS' critique: "nothing telling the
@@ -1502,14 +1503,14 @@ export class Sim {
     const T = this._thin && this._thin.id === id ? this._thin : (this._thin = { id, told: false, slip: 0, wideAt: -1e9 });
     if (!T.told && sh.altGround < 250 && sh.speed > SHIP.speedGround * 1.25 && !this.notice) {
       T.told = true;
-      this.say(`${env.airless ? 'No air' : 'Thin air'} on ${name}: the ship runs fast and turns wide. Hold X to slow it`, 6);
+      this.say(`${env.airless ? 'No air' : 'Thin air'} on ${name}: the ship runs fast and turns wide. Hold {KeyX} to slow it`, 6);
     }
     const f = qRotate(sh.q, V(0, 0, -1));
     const off = sh.speed > 40 ? Math.acos(clamp(dot(f, sh.v) / sh.speed, -1, 1)) : 0;
     T.slip = off > 0.5 ? T.slip + h : 0;
     if (T.slip > 1.5 && this.t - T.wideAt > 60 && !this.notice) {
       T.wideAt = this.t;
-      this.say(`${env.airless ? 'No air to bank on' : 'Thin air'}: the ship turns wide at this speed. Ease off (S) and it turns tighter`, 5);
+      this.say(`${env.airless ? 'No air to bank on' : 'Thin air'}: the ship turns wide at this speed. Ease off ({KeyS}) and it turns tighter`, 5);
     }
   }
 
@@ -1743,7 +1744,9 @@ export class Sim {
     out.aimed = this.aimed;
     out.pulse = this.pulse ? { v: this.pulse.v, block: this.pulse.block, cancel: this.pulse.cancel } : null;
     out.turning = this.turn ? { dest: this.turn.dest, t: this.turn.t } : null;
-    out.notice = this.notice ? this.notice.text : null;
+    // (a notice that names a control is written once with its tokens, src/core/words.js: here as
+    // the keyboard reads it; the HUD letters it for the hand that is on the game)
+    out.notice = this.notice ? words(this.notice.text) : null;
     out.visited = Object.fromEntries(Object.entries(this.visited).map(([k, v]) => [k, Object.keys(v.biomes)]));
     out.vistas = Object.fromEntries(Object.entries(this.vistas).map(([k, v]) => [k, Object.keys(v)]));
     out.easel = this.easel ? { id: this.easel.id, phase: this.easel.phase } : null;

@@ -2,6 +2,106 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, RELEASE 1, PILOT lane part 3: W3.3 (phone layouts and words), W3.4 (platform), W3.5 (the phone preset) (started 12:20 UTC 2026-11-14; kept current)
+
+**Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3" items 3, 4, 5. First commit's parent:
+`f9cf6fe` (PAINTER's W2.3, after this lane's `77b9d9e`). Scratch: `/home/user/.pc-scratch/pilot/r1/p3/`. Parts 1 and 2
+(W1, W3.1, W3.2) are below, done.
+
+**State:** W3.3 DONE (its commit: the code tested on `/home/user/.pc-scratch/pilot/r1/p3/ex`, a clean export of
+`fb40efe` with the W3.3 files). W3.4 and W3.5 are written (saved in `/home/user/.pc-scratch/pilot/r1/p3/wip/` while
+the W3.3 commit was made, then put back) and being proved; then the loop by touch with every new check (stubs and
+painted), the README section and `node tests/all.mjs --export`. Two small W3.3 follow-ups go with the W3.4 commit:
+the sketch slip's name wrapped to its column on a short screen, and words only under 300 px.
+
+### W3.3 phone layouts and words
+
+- **Files:** `src/core/words.js` (new: `name(code, mode)` and `words(text, mode)`, the one place a control is named;
+  modes `keys` (the desktop, every string as it always read), `touch` (no key, no mouse) and `pad`), `src/core/sim.js`
+  (the said strings that name a control written with tokens: `'Turn stopped: {KeyF} turns onto the course again'`;
+  `info().notice` gives the keys form), `src/core/game.js` (`wordMode()`, `say()`: notices, the hint, the card's
+  status and the sketch slip lettered for the hand on the game; `hud.setWords`), `src/core/input.js` (`lastDevice`:
+  keys or pad), `src/ui/hud.js` (the title card's line and status by mode, the help card's touch drawing, the title
+  card kept inside the top edge, the help card a sheet under the tabs that a tap puts away, the sketch slip's 'how'
+  line apart), `src/ui/map.js` (the touch chart: fills the sheet, drawn at its own size, names 11.5 css px or more
+  placed off each other, a world taken within 26 css px, a moon 46 css px from its planet; `spotOnScreen`,
+  `labelSizes`), `src/ui/book.js` (touch: nothing under 11.5 css px, the tabs a 44 px strip beside the title that
+  slides, the page scrolls, tiles sized to the page), `src/ui/paint.js` (`data-size` on every lettering, `measureInk`,
+  `touchIconSvg`), `src/ui/theme.css` (the touch sheets, the touch help card, the short sketch slip), `src/main.js`
+  (`{click} to begin`, the sheets' word mode), `tests/words.test.mjs` (new, 7), `tests/guards.test.mjs` (reads the
+  keys form of a notice), `tests/touch.mjs` (the W3.3 checks below).
+- **How it plays by touch:** the title card says "tap to begin" and "the left thumb walks · a drag on the right
+  looks / tap "Board ship" at the ship · ? shows the controls", and sits inside the top edge; the map fills the screen
+  (on a phone held sideways the chart on the left, its title, its line and the 'set course' slip in a column on the
+  right), names lettered 11.5 css px or more and kept off each other, Earth and the Moon 46 css px apart; the
+  sketchbook fills the screen, its name and the worlds' tabs in one 44 px strip along the top (sliding where they do not
+  fit), the page under it; the help card is the touch controls drawn small, each with what it does, a sheet under the
+  tabs that a tap anywhere puts away; every notice that names a control names the touch control ("Hold brake to slow
+  it", "Turn stopped: the pulse slip turns onto the course again"), and what has no touch control (the stroll, the
+  mouse's capture) is not said. A new page's slip on a short screen is small (the sketch beside its name, the 'how to
+  open the book' line left out; words only under 300 px). The desktop reads every string as before.
+- **Acceptance, measured** (`node tests/touch.mjs --part all` on a clean export of `fb40efe` with the W3.3 files:
+  **PASSED**, 1200 s, log `/home/user/.pc-scratch/pilot/r1/p3/touch-all.log`; W3.1/W3.2's checks all still pass):
+  - **Title card top** 8.0 css px on the iPhone 14 and on the Pixel 7 (115 on the iPad Pro 11); on a clean export of
+    `fb40efe` the same check FAILS: **-13.1** (`touch-before.log`).
+  - **Smallest lettering** on the map **11.50** css px (12 strings, the names on the chart included), on the book
+    **11.50** (16), on the help card **11.50** (8), measured on the screen (cap height `data-size` x the svg's scale) at
+    the loop's stages on the iPhone 14; the same on the Pixel 7 and the iPad Pro 11 (scratch run `look.mjs`: map 11.5,
+    book 11.5, help 11.5; names 11.5, 11.5, 15.4). Before: about 6 css px on the map, 6-7 in the help card, 4-6 in the
+    book (the mobile audit's frames; the sheets were scaled 0.58-0.65).
+  - **Earth and the Moon** 46.0 css px apart on the chart (8.5 before); a tap 18 css px off the Moon's dot takes the
+    Moon; a world is taken within 26 css px of its dot (MAP_TOUCH.hit; the plan: 22 or more).
+  - **The book's tab strip** 44 css px tall (15 before).
+  - **No touch-mode string names a key or the mouse:** every lettered string on the screen checked at all 14 stages of
+    the loop (14 to 23 strings a stage) and the title card on three profiles: none. Before (`fb40efe`): the title card
+    by touch says "click to begin" and "W A S D walk · the mouse looks / E boards the ship · H shows every key" (FAIL).
+    Unit: `tests/words.test.mjs` scans every sentence the source puts on the screen (say, notices, the hint, the
+    card's status, the mouse's messages, the sheets' lines): by touch none names a key (or it is not said).
+  - **Desktop strings unchanged:** `tests/words.test.mjs` holds 21 sentences, as the game now writes them, to the exact
+    desktop strings of before (`'Turn stopped: F turns onto the course again'`, the title card's line, "click to
+    begin", "H closes this card", the map's and the book's lines, the mouse's messages), and the AZERTY letters; the
+    desktop page of `--part input` (no touch layer, pointer lock as before); `tests/layout.test.mjs` unchanged.
+  - Frames, OPENED: the map (chart left, column right, Mars chosen), the book, the help card's drawing and the title card
+    on the iPhone 14 (`look.mjs`, scratch); the painted world's title card by touch on the iPhone 14 profile and the
+    desktop's at 640x360 ("click to begin", the keys) (`load-w33-*.png`); the compact sketch slip on the iPhone and at
+    400x225 (`docs/shots/pilot/r1/touch-w33-sketch-slip.jpg`; first try: the name ran off the slip, fixed by wrapping
+    it to its column: that fix and the words-only slip under 300 px are in the W3.4 commit). Sheets in the repository:
+    `docs/shots/pilot/r1/touch-w33-iphone14-sheets.jpg` (title, map, book, help on the iPhone 14),
+    `touch-w33-pixel7-ipad.jpg` (the Pixel 7's map and help card, the iPad Pro 11's map and book), both OPENED; every run's
+    numbers `touch-w33-runs.json`.
+- **Checks on a clean export of `fb40efe` with the W3.3 files:** unit **234** (227 + words 7), physics 325, world 38,
+  coast PASS at both stands, ghostfield 6 of 6 all zeros, static rules hold; the real game (q0) loads on the iPhone 14
+  profile (touch words) and on a desktop page (keys words) with no console error and `fallback` empty.
+- **Rulings (W3.3):** (1) "lettering" is measured as the hand lettering's cap height (`SIZE`, css px) times its scale on
+  the screen, the unit the mobile audit's "about 6 px" used; 11 css px of cap height is about a 15 px font. (2) The
+  11 px floor holds on touch screens (the sheets are laid out for a phone there and never scaled down); the desktop's
+  sheets are as they were (desktop unchanged). (3) "A drawing of the touch controls": each control drawn small (the
+  stick's ring with a thumb, a finger dragging, a pinch, the round buttons, a slip, the tabs) beside what it does, as
+  the desktop card sets a key beside its action; a drawing of a whole screen with labels did not fit 11 px lettering on
+  a phone. (4) The help card on touch is a sheet that takes the finger (a tap on it puts it away) and lies under the
+  tabs (it lay over the VIEW tab); the title card is left to the fingers' first tap as before. (5) A world is taken
+  within 26 css px (the desktop's 26 chart units) and Earth's Moon is drawn 46 css px off it on touch (the map is a
+  schematic: a moon's place off its planet was never to scale). (6) `name(code)` has a pad mode too (the pad's
+  buttons by their standard names, used once the pad is the last hand on the game); the title card is lettered before
+  any pad is touched, so the desktop's first words are always the keys'. (7) A sentence about a control the fingers do
+  not have (the stroll on C, the mouse's capture) is not said by touch at all.
+
+### W3.4 platform and W3.5 the phone and tablet preset, part 1
+
+- **Files:** `src/core/platform.js` (new: fullscreen and then the sideways lock on the first touch, asked once, every
+  refusal silent; the Screen Wake Lock while playing by touch, asked again when the page comes back;
+  `navigator.audioSession.type = 'playback'`; iOS's "For the whole screen: Share, then Add to Home Screen" once ever,
+  8 s into the game, remembered under `painted-cosmos.home-screen-hint`; `?fullscreen=0` asks nothing), `src/ui/manifest.webmanifest`
+  (new: relative `start_url`/`scope` `../../`, `display: fullscreen`, `orientation: landscape`, the paper's colour,
+  `icons: []`), `index.html` (`theme-color`, `mobile-web-app-capable`, the `apple-mobile-web-app-*` metas, the manifest
+  link), `src/player/camera.js` (`portraitFov`, `horizontalFov`: held upright the view keeps 60 degrees across),
+  `src/core/game.js` (the field from `portraitFov`; `repaintFitted`; the read-out's `device` line), `src/core/preset.js`
+  (new: `choosePreset`, `bufferSize`, `PRESETS`), `src/main.js` (the preset sizes the buffer and starts the tier;
+  `?preset=`; the platform; a phone held upright: the slip, the game waits, the picture laid again under it),
+  `src/ui/hud.js` (`setUpright`: the slip "turn the phone sideways to play" with a phone drawn turning),
+  `src/ui/theme.css` (the slip; room for the read-out's sixth line), `tests/preset.test.mjs` (4),
+  `tests/platform.test.mjs` (6), `tests/touch.mjs --part platform`.
+
 ## Hand-over, RELEASE 1, PILOT lane part 2: W3.1 (gesture guard, touch input) and W3.2 (touch HUD) (started 10:00 UTC 2026-11-14; kept current)
 
 **Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3". This part is W3.1 and W3.2; W3.3

@@ -339,3 +339,61 @@ html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select:
   .pc-hud.pc-touch .pc-readout { top: calc(var(--pc-st) + 58px); left: calc(var(--pc-sl) + 8px); }
   .pc-stick-rest { left: calc(var(--pc-sl) + 10% + 56px); bottom: calc(var(--pc-sb) + 14% + 56px); }
 }
+
+/* ---- phone and tablet layouts (W3.3): the sheets at their own size, lettered 11 css px or more ----
+   On a touch screen the map and the sketchbook fill the screen inside the safe area (a margin of
+   10 px is left round them: a tap there, on the picture, puts them away); nothing is scaled down. */
+.pc-map-chart { display: block; }
+.pc-hud.pc-touch .pc-map, .pc-hud.pc-touch .pc-book { left: calc(var(--pc-sl) + 10px); right: calc(var(--pc-sr) + 10px);
+  top: calc(var(--pc-st) + 10px); bottom: calc(var(--pc-sb) + 10px); width: auto; transform: none; box-sizing: border-box; }
+.pc-hud.pc-touch .pc-map { padding: 12px 18px 12px; }
+.pc-hud.pc-touch .pc-map.pc-on { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "title" "chart" "line" "go"; justify-items: center; align-items: center; row-gap: 4px; }
+.pc-hud.pc-touch .pc-map > .pc-title { grid-area: title; margin: 0; }
+.pc-hud.pc-touch .pc-map-chart { grid-area: chart; position: relative; justify-self: stretch; align-self: stretch; min-width: 0; min-height: 0; }
+.pc-hud.pc-touch .pc-map-chart canvas { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
+.pc-hud.pc-touch .pc-map-line { grid-area: line; justify-self: stretch; display: flex; justify-content: center; }
+.pc-hud.pc-touch .pc-map-go { grid-area: go; margin: 2px auto 0; }
+/* a phone held sideways: the chart on the left, its title, its line and the slip in a column on the
+   right (under the close corner) */
+@media (max-height: 520px) {
+  .pc-hud.pc-touch .pc-map.pc-on { grid-template-columns: minmax(0, 1fr) minmax(200px, 30%); grid-template-rows: 40px auto minmax(0, 1fr) auto;
+    grid-template-areas: "chart ." "chart title" "chart line" "chart go"; column-gap: 12px; padding: 10px 12px; }
+  .pc-hud.pc-touch .pc-map-go { margin: 6px auto 4px; }
+}
+/* The sketchbook: its name and the worlds' tabs in one strip along the top, the tabs 44 css px tall,
+   sliding sideways where they do not fit (left of the close corner); the page under them takes the
+   rest and scrolls up and down when full; a swipe across it turns it. */
+.pc-hud.pc-touch .pc-book { padding: 8px 14px 8px; }
+.pc-hud.pc-touch .pc-book.pc-on { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) auto;
+  grid-template-areas: "head tabs" "page page" "foot foot"; column-gap: 14px; row-gap: 4px; }
+.pc-hud.pc-touch .pc-book-head { grid-area: head; margin: 0; padding: 0 0 4px; align-self: center; background: none; }
+.pc-hud.pc-touch .pc-book-body { display: contents; }
+.pc-hud.pc-touch .pc-book-tabs { grid-area: tabs; flex-direction: row; gap: 2px; min-height: 44px; margin-right: 44px; overflow-x: auto; overflow-y: hidden;
+  touch-action: pan-x; scrollbar-width: none; overscroll-behavior: contain; align-self: center; }
+.pc-hud.pc-touch .pc-book-tabs::-webkit-scrollbar { display: none; }
+.pc-hud.pc-touch .pc-book-tab { flex: none; min-height: 44px; box-sizing: border-box; padding: 4px 11px 2px; touch-action: pan-x; }
+.pc-hud.pc-touch .pc-book-page { grid-area: page; height: auto; min-height: 0; overflow-x: hidden; overflow-y: auto; touch-action: pan-y;
+  overscroll-behavior: contain; padding-top: 6px; background: var(--pc-rule) left top / 100% 6px no-repeat; }
+.pc-hud.pc-touch .pc-book-world { margin-bottom: 4px; }
+.pc-hud.pc-touch .pc-book-foot { grid-area: foot; margin-top: 2px; padding-top: 7px; }
+/* The help card on a touch screen: the touch controls drawn small, each with what it does, in place
+   of the keys; no title (the title card has it); a sheet under the tabs that a tap puts away. */
+.pc-help-touch { display: none; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) .pc-help { display: none; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) .pc-help-touch { display: grid; grid-template-columns: auto auto; gap: 8px 18px; margin-top: 12px;
+  color: var(--pc-dark); }
+.pc-help-touch > span { display: flex; align-items: center; gap: 9px; min-height: 36px; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) { width: auto; padding: 16px 22px 16px; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) > .pc-title, .pc-hud.pc-touch .pc-start:not(.pc-title-only) > .pc-sub { display: none; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) .pc-status { margin-top: 2px; }
+.pc-hud.pc-touch .pc-start.pc-on:not(.pc-title-only) { pointer-events: auto; touch-action: none; }
+/* A new page's slip on a short screen (a phone held sideways): small, the sketch beside its name,
+   one line under it; the line that says how to open the book is left out. */
+@media (max-height: 520px) {
+  .pc-hud.pc-touch .pc-newsketch { width: 196px; right: calc(var(--pc-sr) + 12px); top: calc(var(--pc-st) + 64px); padding: 5px 7px 6px;
+    display: grid; grid-template-columns: 74px 1fr; column-gap: 8px; align-items: center; }
+  .pc-hud.pc-touch .pc-newsketch img { grid-row: 1 / span 2; width: 74px; }
+  .pc-hud.pc-touch .pc-newsketch b { margin-top: 0; }
+  .pc-hud.pc-touch .pc-newsketch-how { display: none; }
+}

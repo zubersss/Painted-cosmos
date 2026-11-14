@@ -1,0 +1,1322 @@
+{
+ "note": "W3.3 proof: tests/touch.mjs --part all on a clean export of fb40efe with the W3.3 files (PASSED, 1200 s); and --part input --devices iphone14 against a clean export of fb40efe (before: FAILS 2)",
+ "after": {
+  "part": "all",
+  "root": "/home/user/.pc-scratch/pilot/r1/p3/ex",
+  "runs": [
+   {
+    "device": "iphone14",
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "titleCard": {
+     "top": 8,
+     "bottom": 211
+    },
+    "titleWords": [
+     "Painted Cosmos",
+     "a watercolour to walk into",
+     "tap to begin",
+     "the left thumb walks   \u00b7   a drag on the right looks\ntap \"Board ship\" at the ship   \u00b7   ? shows the controls"
+    ],
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.81,
+     "vmax": 2.77,
+     "gameS": 3.08
+    },
+    "run": {
+     "vmax": 7.19
+    },
+    "jump": 1.96,
+    "jet": 25.47,
+    "together": {
+     "m": 23.19,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 82,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   },
+   {
+    "device": "pixel7",
+    "size": {
+     "w": 863,
+     "h": 360,
+     "dpr": 2.625,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "titleCard": {
+     "top": 8,
+     "bottom": 211
+    },
+    "titleWords": [
+     "Painted Cosmos",
+     "a watercolour to walk into",
+     "tap to begin",
+     "the left thumb walks   \u00b7   a drag on the right looks\ntap \"Board ship\" at the ship   \u00b7   ? shows the controls"
+    ],
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.32,
+     "vmax": 2.76,
+     "gameS": 3.12
+    },
+    "run": {
+     "vmax": 7.17
+    },
+    "jump": 3.17,
+    "jet": 24.07,
+    "together": {
+     "m": 24.23,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 94.1,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   },
+   {
+    "device": "ipadpro11",
+    "size": {
+     "w": 1194,
+     "h": 834,
+     "dpr": 2,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "titleCard": {
+     "top": 115.3,
+     "bottom": 318.3
+    },
+    "titleWords": [
+     "Painted Cosmos",
+     "a watercolour to walk into",
+     "tap to begin",
+     "the left thumb walks   \u00b7   a drag on the right looks\ntap \"Board ship\" at the ship   \u00b7   ? shows the controls"
+    ],
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.87,
+     "vmax": 2.77,
+     "gameS": 3.2
+    },
+    "run": {
+     "vmax": 7.31
+    },
+    "jump": 4.53,
+    "jet": 22.52,
+    "together": {
+     "m": 30.7,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 109.6,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   },
+   {
+    "device": "desktop",
+    "size": {
+     "w": 1280,
+     "h": 720,
+     "dpr": 1,
+     "coarse": false,
+     "touchPoints": 0
+    },
+    "state": {
+     "started": true,
+     "shown": false,
+     "padShown": false,
+     "display": "none",
+     "jump": 0,
+     "req": 1,
+     "root": "pc-hud pc-foot3"
+    }
+   },
+   {
+    "device": "iphone14",
+    "painted": false,
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "stages": {
+     "on foot": [
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "on foot, with an iPhone's safe area (47, 47, 21)": [
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 617,
+       "y0": 233,
+       "x1": 689,
+       "y1": 305,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 61,
+       "y0": 14,
+       "x1": 105,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 113,
+       "y0": 14,
+       "x1": 157,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 165,
+       "y0": 14,
+       "x1": 209,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 217,
+       "y0": 14,
+       "x1": 261,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "at the ship (\"Board ship\")": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 601,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "landed (\"Lift off\", \"Step out\")": [
+      {
+       "what": "Space button slip \"Lift off\"",
+       "x0": 630,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 106,
+       "h": 48
+      },
+      {
+       "what": "KeyE button slip \"Step out\"",
+       "x0": 619,
+       "y0": 70,
+       "x1": 736,
+       "y1": 118,
+       "w": 117,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "flying (rise, sink, brake)": [
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 594,
+       "y0": 270,
+       "x1": 650,
+       "y1": 326,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the map open": [
+      {
+       "what": " close",
+       "x0": 694,
+       "y0": 10,
+       "x1": 740,
+       "y1": 56,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "the map, a course chosen": [
+      {
+       "what": " button map-go \"set course\nfor Mars\"",
+       "x0": 553,
+       "y0": 266,
+       "x1": 691,
+       "y1": 316,
+       "w": 138,
+       "h": 50
+      },
+      {
+       "what": " close",
+       "x0": 694,
+       "y0": 10,
+       "x1": 740,
+       "y1": 56,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "in space (\"Pulse to Mars\")": [
+      {
+       "what": "KeyF button slip \"Pulse to Mars\"",
+       "x0": 573,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 163,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 594,
+       "y0": 270,
+       "x1": 650,
+       "y1": 326,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the pulse (\"Drop out of pulse\")": [
+      {
+       "what": "KeyF button slip \"Drop out of pulse\"",
+       "x0": 540,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 196,
+       "h": 48
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "over Mars (\"Land here\")": [
+      {
+       "what": "KeyE button slip \"Land here\"",
+       "x0": 607,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 129,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 594,
+       "y0": 270,
+       "x1": 650,
+       "y1": 326,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "on foot on Mars": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 601,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the sketchbook open": [
+      {
+       "what": " close",
+       "x0": 694,
+       "y0": 10,
+       "x1": 740,
+       "y1": 56,
+       "w": 46,
+       "h": 46
+      },
+      {
+       "what": " book-tab dim \"Mercury\"",
+       "x0": 199,
+       "y0": 19,
+       "x1": 284,
+       "y1": 63,
+       "w": 85,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Venus\"",
+       "x0": 286,
+       "y0": 19,
+       "x1": 355,
+       "y1": 63,
+       "w": 69,
+       "h": 44
+      },
+      {
+       "what": " book-tab \"Earth\"",
+       "x0": 357,
+       "y0": 19,
+       "x1": 422,
+       "y1": 63,
+       "w": 65,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Moon\"",
+       "x0": 424,
+       "y0": 19,
+       "x1": 488,
+       "y1": 63,
+       "w": 64,
+       "h": 44
+      },
+      {
+       "what": " book-tab on \"Mars\"",
+       "x0": 490,
+       "y0": 19,
+       "x1": 551,
+       "y1": 63,
+       "w": 61,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Jupiter\"",
+       "x0": 553,
+       "y0": 19,
+       "x1": 630,
+       "y1": 63,
+       "w": 77,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Saturn\"",
+       "x0": 632,
+       "y0": 19,
+       "x1": 705,
+       "y1": 63,
+       "w": 73,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Uranus\"",
+       "x0": 707,
+       "y0": 19,
+       "x1": 783,
+       "y1": 63,
+       "w": 76,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Neptune\"",
+       "x0": 785,
+       "y0": 19,
+       "x1": 871,
+       "y1": 63,
+       "w": 86,
+       "h": 44
+      },
+      {
+       "what": " book-tab dim \"Pluto\"",
+       "x0": 873,
+       "y0": 19,
+       "x1": 935,
+       "y1": 63,
+       "w": 62,
+       "h": 44
+      }
+     ],
+     "the help card": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 601,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH close",
+       "x0": 614,
+       "y0": 70,
+       "x1": 660,
+       "y1": 116,
+       "w": 46,
+       "h": 46
+      }
+     ]
+    },
+    "legs": {
+     "pulseSeconds": 67.9,
+     "gameSeconds": 244
+    },
+    "words": {
+     "on foot": [
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "Earth",
+      "jump",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "on foot, with an iPhone's safe area (47, 47, 21)": [
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "Earth",
+      "jump",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "at the ship (\"Board ship\")": [
+      "Board ship",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Earth",
+      "jump",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "landed (\"Lift off\", \"Step out\")": [
+      "Lift off",
+      "Step out",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Earth",
+      "rise",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "flying (rise, sink, brake)": [
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Earth\n6 m up   4 m/s",
+      "rise",
+      "sink",
+      "brake",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "the map open": [
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view",
+      "the system",
+      "tap a world to set a course"
+     ],
+     "the map, a course chosen": [
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view",
+      "the system",
+      "Mars: 463 km away,\nabout 76 s by pulse drive",
+      "set course\nfor Mars"
+     ],
+     "in space (\"Pulse to Mars\")": [
+      "Pulse to Mars",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "The map tab opens the map: choose a world\nthere, then tap the pulse slip to fly to it",
+      "Mars\n462.7 km",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Earth\n11.2 km up   750 m/s",
+      "rise",
+      "sink",
+      "brake",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "the pulse (\"Drop out of pulse\")": [
+      "Drop out of pulse",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "Turning onto the course for Mars",
+      "Mercury",
+      "Mars\n461.1 km  75 s",
+      "Uranus",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "deep space\n817 m/s",
+      "brake",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "over Mars (\"Land here\")": [
+      "Land here",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "Thin air on Mars: the ship runs fast\nand turns wide. Hold brake to slow it",
+      "a place to land\n5.2 km",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Mars\n24 m up   12 m/s",
+      "rise",
+      "sink",
+      "brake",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "on foot on Mars": [
+      "Board ship",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "A view to find 1.7 km behind\nto the left: fly nearer, or walk",
+      "the ship\n6 m",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Mars",
+      "jump",
+      "?",
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ],
+     "the sketchbook open": [
+      "tap to begin",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view",
+      "sketchbook",
+      "Mercury",
+      "Venus",
+      "Earth",
+      "Moon",
+      "Mars",
+      "Jupiter",
+      "Saturn",
+      "Uranus",
+      "Neptune",
+      "Pluto",
+      "seen, not yet drawn",
+      "stub lowland",
+      "three more views on Mars",
+      "the nearest view not yet found is 1.7 km behind to the left\n2 of 32 pages drawn   \u00b7   a swipe turns the page, a tap outside closes it"
+     ],
+     "the help card": [
+      "Board ship",
+      "jetpack",
+      "throttle",
+      "drag on the right to look around",
+      "A view to find 1.7 km behind\nto the left: fly nearer, or walk",
+      "the ship\n6 m",
+      "stub lowland",
+      "Earth  \u00b7  page 1 of 31",
+      "Mars",
+      "jump",
+      "?",
+      "a tap anywhere closes this card",
+      "the left thumb walks\nin the ship: turn, throttle",
+      "drag on the right: look\nin the ship: the nose",
+      "pinch: the camera\nnearer, farther",
+      "jump, hold for the jetpack\nin the ship: rise",
+      "in the ship: sink, brake",
+      "tap a slip: board, land,\nstep out, pulse",
+      "the tabs: map, sketchbook,\nhelp, view"
+     ]
+    },
+    "lettering": {
+     "the map open": {
+      "min": 11.5,
+      "n": 12,
+      "smallest": [
+       "tap a world to set a course"
+      ]
+     },
+     "the sketchbook open": {
+      "min": 11.5,
+      "n": 16,
+      "smallest": [
+       "Mercury",
+       "Venus",
+       "Earth"
+      ]
+     },
+     "the help card": {
+      "min": 11.5,
+      "n": 8,
+      "smallest": [
+       "the left thumb walks\nin the ship: turn, throttle",
+       "drag on the right: look\nin the ship: the nose",
+       "pinch: the camera\nnearer, farther"
+      ]
+     }
+    },
+    "earthMoon": 46,
+    "bookStrip": {
+     "h": 44,
+     "w": 483
+    },
+    "events": {
+     "mousemove": 1,
+     "pointerdown:touch": 46,
+     "touchstart": 46,
+     "pointerup:touch": 46,
+     "touchend": 40,
+     "lock": false,
+     "req": 0
+    }
+   }
+  ],
+  "fails": [],
+  "seconds": 1200
+ },
+ "before_fb40efe": {
+  "part": "input",
+  "root": "/home/user/.pc-scratch/pilot/r1/p3/head",
+  "runs": [
+   {
+    "device": "iphone14",
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "titleCard": {
+     "top": -13.1,
+     "bottom": 189.9
+    },
+    "titleWords": [
+     "Painted Cosmos",
+     "a watercolour to walk into",
+     "click to begin",
+     "W A S D walk   \u00b7   the mouse looks\nE boards the ship   \u00b7   H shows every key"
+    ],
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.28,
+     "vmax": 2.77,
+     "gameS": 3.1
+    },
+    "run": {
+     "vmax": 7.25
+    },
+    "jump": 4.07,
+    "jet": 23.47,
+    "together": {
+     "m": 22.91,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 95,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   }
+  ],
+  "fails": [
+   "W3.3: the title card's top -13.1 css px from the top edge (at least 8; -13 on the iPhone before)",
+   "W3.3: the title card by touch names no key and no mouse: [\"Painted Cosmos\",\"a watercolour to walk into\",\"click to begin\",\"W A S D walk   \u00b7   the mouse looks\\nE boards the ship   \u00b7   H shows every key\"]"
+  ],
+  "seconds": 117
+ }
+}

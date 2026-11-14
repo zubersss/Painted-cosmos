@@ -34,6 +34,7 @@ import { GL_ARGS } from '../tools/shot.mjs';
 import { startServer } from '../tools/serve.mjs';
 import { fallbackProblem } from './browser.mjs';
 import { TOUCH, LOOK_GAIN } from '../src/core/touch.js';
+import { namesAKey } from '../src/core/words.js';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -143,6 +144,24 @@ function turnDeg(a, b, upv) {
   return Math.atan2(dot(cross(fb, fa), up), dot(fa, fb)) * DEG;
 }
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+// Every lettered string on the HUD that is laid out (display and visibility; a faded slip still
+// holds its words), with its cap height on the screen: data-size (the size it was lettered at)
+// times the svg's scale on the screen. sheet: the sheet it lies on (map, book, card) or hud.
+const lettering = (page) => page.evaluate(() => {
+  const out = [];
+  for (const svg of document.querySelectorAll('.pc-hud svg.pc-ink')) {
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    let e = svg, shown = true;
+    while (e && e.id !== 'pc-hud') { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') { shown = false; break; } e = e.parentElement; }
+    if (!shown) continue;
+    const d = svg.querySelector('desc');
+    // (a lettering without data-size, before W3.3: its words, no size)
+    out.push({ t: d ? d.textContent : '', size: svg.dataset.size ? +(+svg.dataset.size * r.height / +svg.getAttribute('height')).toFixed(2) : null,
+      sheet: svg.closest('.pc-map') ? 'map' : svg.closest('.pc-book') ? 'book' : svg.closest('.pc-start') ? 'card' : 'hud' });
+  }
+  return out;
+});
 const rectOf = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height } : null; }, sel);
 
 // ---- part input: W3.1's acceptance on one profile ------------------------------------------------
@@ -160,6 +179,15 @@ async function partInput(device) {
     let s = await page.evaluate(() => ({ started: window.__pc.game.started, touch: window.__pc.game.hud.touchShown, card: window.__pc.game.hud.startShown }));
     check(s.card && !s.started, 'the title card waits for a first touch');
     check(s.touch, 'a phone or a tablet: the touch controls are up from the start (coarse pointer and touch points)');
+    // W3.3: the title card lies inside the top edge, and its words name no key and no mouse
+    await sleep(700);
+    const card = await page.evaluate(() => { const q = document.querySelector('.pc-start').getBoundingClientRect(); return { top: +q.top.toFixed(1), bottom: +q.bottom.toFixed(1) }; });
+    rec.titleCard = card;
+    check(card.top >= 8, `W3.3: the title card's top ${card.top} css px from the top edge (at least 8; -13 on the iPhone before)`);
+    const tw = (await lettering(page)).filter((x) => x.sheet === 'card');
+    const keyed = tw.filter((x) => namesAKey(x.t));
+    rec.titleWords = tw.map((x) => x.t);
+    check(tw.length >= 3 && keyed.length === 0, `W3.3: the title card by touch names no key and no mouse: ${JSON.stringify(tw.map((x) => x.t))}`);
     // 1. a tap starts the game: no compatibility mouse events, no pointer lock
     await page.evaluate(() => { for (const k in window.__evc) delete window.__evc[k]; });
     await fingers.tap(W * 0.62, H * 0.42);
@@ -389,11 +417,30 @@ async function partLoop() {
     return { ok: false, i: await info() };
   }
   const tabAt = (code) => rectOf(page, `.pc-tab[data-code="${code}"]`);
+  // W3.3: no string on the screen by touch names a key or the mouse (checked at every stage)
+  rec.words = {};
+  async function wordsCheck(stage) {
+    const l = await lettering(page);
+    const keyed = [...new Set(l.filter((x) => namesAKey(x.t)).map((x) => x.t))];
+    rec.words[stage] = [...new Set(l.map((x) => x.t))];
+    check(keyed.length === 0, `${stage}: ${rec.words[stage].length} strings on the screen, none names a key or the mouse` + (keyed.length ? ': ' + JSON.stringify(keyed) : ''));
+    return l;
+  }
+  // W3.3: the smallest lettering of a sheet on the screen (11 css px or more)
+  rec.lettering = {};
+  async function letteringCheck(stage, sheet) {
+    const l = (await lettering(page)).filter((x) => x.sheet === sheet);
+    let sizes = l.map((x) => (x.size == null ? 0 : x.size));
+    if (sheet === 'map') sizes = sizes.concat((await page.evaluate(() => window.__pc.map.labelSizes())).map((x) => x.size));
+    const min = sizes.length ? Math.min(...sizes) : 0;
+    rec.lettering[stage] = { min, n: sizes.length, smallest: l.filter((x) => x.size === min).map((x) => x.t).slice(0, 3) };
+    check(sizes.length > 0 && min >= 11, `${stage}: the smallest lettering on the ${sheet} ${min.toFixed(2)} css px (at least 11; ${sizes.length} strings)`);
+  }
   // every control on the screen now: its size, and (on a phone, in play) the subject box
   async function measure(stage, inPlay = true) {
     const m = await page.evaluate(() => {
       const list = [];
-      for (const e of document.querySelectorAll('.pc-tbtn, .pc-tab, .pc-prompt .pc-button, .pc-close, .pc-map-go')) {
+      for (const e of document.querySelectorAll('.pc-tbtn, .pc-tab, .pc-prompt .pc-button, .pc-close, .pc-map-go, .pc-book.pc-on .pc-book-tab')) {
         const q = e.getBoundingClientRect();
         if (q.width <= 0 || q.height <= 0 || getComputedStyle(e).visibility !== 'visible' || getComputedStyle(e).pointerEvents === 'none') continue;
         list.push({ what: (e.dataset.code || '') + ' ' + e.className.replace(/pc-/g, '').trim() + (e.textContent ? ' "' + e.textContent.trim().slice(0, 24) + '"' : ''), x0: Math.round(q.left), y0: Math.round(q.top), x1: Math.round(q.right), y1: Math.round(q.bottom), w: Math.round(q.width), h: Math.round(q.height) });
@@ -406,6 +453,7 @@ async function partLoop() {
     rec.stages[stage] = m;
     check(m.length > 0 && small.length === 0, `${stage}: ${m.length} controls, every hit area 44 css px or more (smallest ${Math.min(...m.map((c) => Math.min(c.w, c.h)))} px)` + (small.length ? ': ' + JSON.stringify(small) : ''));
     if (phone && inPlay) check(inBox.length === 0, `${stage}: no control in the subject box (x 30-70 %, y 55-100 %)` + (inBox.length ? ': ' + JSON.stringify(inBox) : ''));
+    await wordsCheck(stage);
     return m;
   }
   try {
@@ -489,10 +537,21 @@ async function partLoop() {
     await gameWait(0.4);
     check((await info()).mapOpen, 'the MAP tab opens the map');
     await measure('the map open', false);
-    const spot = await page.evaluate(() => {
-      const m = window.__pc.map, s = m.spots().find((x) => x.id === 'mars'), q = m.canvas.getBoundingClientRect();
-      return { x: q.left + (s.x / 680) * q.width, y: q.top + (s.y / 400) * q.height };
-    });
+    await letteringCheck('the map open', 'map');
+    // W3.3: Earth and the Moon are two places for a finger; a world is taken within 22 css px
+    const em = await page.evaluate(() => ({ earth: window.__pc.map.spotOnScreen('earth'), moon: window.__pc.map.spotOnScreen('moon'), here: window.__pc.game.mapData().here }));
+    const emd = Math.hypot(em.earth.x - em.moon.x, em.earth.y - em.moon.y);
+    rec.earthMoon = +emd.toFixed(1);
+    check(emd >= 44, `W3.3: Earth and the Moon ${emd.toFixed(1)} css px apart on the chart (8.5 on the iPhone before; at least 44, two hit circles of 22)`);
+    if (em.here !== 'moon') {
+      // a tap 18 css px off the Moon's dot, away from Earth, takes the Moon
+      const ux = (em.moon.x - em.earth.x) / emd, uy = (em.moon.y - em.earth.y) / emd;
+      await tapAt({ x: em.moon.x + ux * 18, y: em.moon.y + uy * 18 });
+      await gameWait(0.4);
+      const tm = await info();
+      check(tm.target && tm.target.id === 'moon', 'W3.3: a tap 18 css px off the Moon\'s dot takes the Moon: ' + (tm.target ? tm.target.id : 'none'));
+    }
+    const spot = await page.evaluate(() => window.__pc.map.spotOnScreen('mars'));
     await tapAt(spot);
     await gameWait(0.4);
     i = await info();
@@ -579,6 +638,10 @@ async function partLoop() {
     let bk = await page.evaluate(() => ({ open: window.__pc.book.open, page: window.__pc.book.page }));
     check(bk.open, 'the SKETCHBOOK tab opens the book at ' + bk.page);
     await measure('the sketchbook open', false);
+    await letteringCheck('the sketchbook open', 'book');
+    const strip = await page.evaluate(() => { const q = document.querySelector('.pc-book-tabs').getBoundingClientRect(); return { h: Math.round(q.height), w: Math.round(q.width) }; });
+    rec.bookStrip = strip;
+    check(strip.h >= 40, `W3.3: the book's tab strip ${strip.h} css px tall (at least 40; 15 on the iPhone before)`);
     await shot('book');
     const bp = await page.evaluate(() => { const q = document.querySelector('.pc-book-page').getBoundingClientRect(); return { x0: q.left, x1: q.right, y: q.top + q.height * 0.5 }; });
     await fingers.drag(40, bp.x0 + (bp.x1 - bp.x0) * 0.75, bp.y, bp.x0 + (bp.x1 - bp.x0) * 0.25, bp.y, { steps: 8, stepMs: 25 });
@@ -606,6 +669,9 @@ async function partLoop() {
     await gameWait(0.4);
     check(await page.evaluate(() => window.__pc.game.hud.startShown), 'the HELP tab shows the help card');
     await measure('the help card', false);
+    await letteringCheck('the help card', 'card');
+    const drawn = await page.evaluate(() => document.querySelectorAll('.pc-start .pc-help-touch svg.pc-icon').length);
+    check(drawn >= 6, `W3.3: the help card draws the touch controls (${drawn} drawings)`);
     await shot('help');
     await tapAt({ x: W * 0.5, y: H * 0.5 });
     await gameWait(0.4);
