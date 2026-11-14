@@ -236,13 +236,19 @@ export function flickerIndex(a, b, W, H, m, dx = 0.25) {
   return rr > 0 ? Math.sqrt(ee / rr) : null;
 }
 
-// The halo share: final pixels that overshoot the raw scene's 3x3 range there by more than `tol`
-// (8/255), over the mask. The final's tone differs from the raw scene's (the sheet's grade, the
-// paper), so the raw is first carried to the final's tone by a least-squares straight line over the
-// mask. Sharpening rims (an RCAS, the edge pooling) show up here; a blur does not.
-export function haloShare(fin, raw, W, H, m, tol = 8 / 255) {
+// The halo share: pixels of a post output (the final sheet, or the abstraction pass's output) that
+// overshoot the raw scene's 3x3 range there by more than `tol` (8/255), over the mask. The output's
+// tone differs from the raw scene's (the sheet's grade, the paper), so the raw is first carried to
+// the output's tone by a least-squares straight line fitted on both pictures blurred by a Gaussian of
+// `coarse` px (the tone, not the detail: a fit on the pixels themselves is pulled flat wherever the
+// output is blurred). Sharpening rims (an RCAS) and the paper's own marks show here; on the final
+// sheet the paper's grain, granulation and edge pooling alone put about 16 % of the land over the
+// line at E_150_45 even with the far brush off (the lead's x26), so the 0.5 % bound of the plan is
+// read on the abstraction output (0.02 % for x26), the final's share against its baseline.
+export function haloShare(fin, raw, W, H, m, tol = 8 / 255, coarse = 4) {
+  const X = coarse ? blur(raw, W, H, coarse) : raw, Y = coarse ? blur(fin, W, H, coarse) : fin;
   let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
-  for (let i = 0; i < m.length; i++) if (m[i]) { const x = raw[i], y = fin[i]; n++; sx += x; sy += y; sxx += x * x; sxy += x * y; }
+  for (let i = 0; i < m.length; i++) if (m[i]) { const x = X[i], y = Y[i]; n++; sx += x; sy += y; sxx += x * x; sxy += x * y; }
   if (n < 200) return null;
   const den = n * sxx - sx * sx, a = den > 1e-12 ? (n * sxy - sx * sy) / den : 1, b = (sy - a * sx) / n;
   let over = 0;
@@ -328,9 +334,13 @@ export function measure({ W, H, views, cls, dep, rgb }) {
     out[key] = {};
     for (const [mk, m] of Object.entries(M)) out[key][mk] = round(stats(y, W, H, refBands, m, pre));
   }
-  if (views.final && views.raw) {
-    const h = haloShare(views.final, views.raw, W, H, M.land);
-    out.halo = h ? { land: Math.round(h.share * 1e5) / 1e5, fit: h.fit } : null;
+  if (views.raw) {
+    out.halo = {};
+    for (const key of ['abs', 'final']) {
+      if (!views[key]) continue;
+      const h = haloShare(views[key], views.raw, W, H, M.land);
+      out.halo[key] = h ? { land: Math.round(h.share * 1e5) / 1e5, fit: h.fit } : null;
+    }
   }
   if (rgb) {
     out.palette = {};

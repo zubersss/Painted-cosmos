@@ -10,8 +10,78 @@ Scratch: `/home/user/.pc-scratch/pilot/r1/`. First commit's parent: `56382c2` (t
 `tests/stationlib/metrics.mjs` and `png.mjs`, the port begun by the agent before the 04:59 restart; this agent continues
 it).
 
-**State:** in progress. Items: W1.1 harness (in progress), W1.1b baseline numbers (pending), W1.2 green gate (code
-committed; its proof runs pending: painted-trip 3 times, all.mjs once).
+**State:** in progress. Items: W1.1 harness (committed; reproduction of E_150_45's raw lapvar under study, below),
+W1.1b baseline numbers (pending: run after the study), W1.2 green gate (code committed `419074c`; its proof runs
+pending: painted-trip 3 times, all.mjs once).
+
+### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
+
+| Number | Plan / audit | This harness |
+| --- | --- | --- |
+| E_150_45 final land t1 / t2 / t3 | 0.04 / 0.25 / 0.68 | 0.04 / 0.25 / 0.68 |
+| E_150_45 abstraction output t1 / t2 | 0.05 / 0.24-0.25 | 0.05 / 0.24 |
+| E_150_45 x26 (far brush off, wobble 0.3) final land t1 / t2 | 1.15 / 1.14 | 1.14 / 1.13 |
+| E_150_45 x21 (far brush off) / x23 (x26 + RCAS 0.5) | 0.67 / 1.03, 1.30 / 1.16 | 0.66 / 1.02, 1.29 / 1.15 |
+| E_150_45 raw A (aliasing index) | 0.447 | 0.444 |
+| E_150_45 cost | 450 calls, 910,623 triangles | 450, 910,623 |
+| E_1000_90 cost | 441 calls, 669,283 triangles | 441, 669,283 |
+| E_150_45 raw land lapvar | 520-525 | **555.9** (6 % over) |
+
+The raw lapvar is the one miss. Cause found so far: the picture is not the same instant. The audit's harness did
+not hold the loop and left the game's clocks where they were; this one pins the game clock (900 s), the painter's wash
+clock (100) and renders once before the measured render. A pixel difference of this raw frame against the audit's
+(same camera to the millimetre): crowns' edges everywhere (the trees sway with the clocks) and the stream (the water
+reflects the frame before: here the same view, in the audit a frame of the game's own camera, since its loop ran
+between grabs). The lead's two placements in one page differed by 0.4 % (520.75, 522.62). Study of how far the clocks
+move it: next.
+
+### W1.1 The station harness: HOW TO RUN A STATION SET (for PAINTER and whoever measures a picture)
+
+One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EXPORT, never the shared working tree:
+
+    tools/export-head.sh /home/user/.pc-scratch/<role>/r1/after          # or: git archive <sha> | tar -x -C <dir>
+    node tests/stations.mjs --root /home/user/.pc-scratch/<role>/r1/after --set quick --tier q2 --size 1280x720 \
+         --taps --out /home/user/.pc-scratch/<role>/r1/st-after
+    node tests/stations.mjs --compare tests/baselines/stations-784183b.json --with /home/user/.pc-scratch/<role>/r1/st-after
+    node tests/stations.mjs --sheet <before-run-dir>,<after-run-dir> --labels before,after --out <dir>/before-after.jpg
+
+- `--set`: `quick` (E_foot, E_150_45, E_1000_45), `audit` (the sharpness audit's twenty), `earth`, `air`, `all` (24),
+  `phone` (with `--device iphone14`), station names or regular expressions, comma separated (`--set 'E_150_45,M_.*_90'`);
+  the stations always run in the list's order. `--tier q2|q1|q0` (render scale 1), `--size WxH` (or `--device
+  iphone14|pixel7|ipadpro11`, Playwright's landscape profiles).
+- Extras: `--taps` (post passes' texture reads per pixel, counted in instrumented copies of their shaders, as they
+  run: per pass, per frame, and the abstraction pass on far land), `--flicker` (F, one more render), `--alias` (A: two
+  more renders at twice the size; slow), `--exp x21,x26,x23` (post experiments on the held scene, measured against the
+  station's own raw scene; `--exp-abs` also keeps their v5).
+- A run writes `run.json` (every number), `summary.txt` (one line a station, the audit's format plus halo, cost, A, F,
+  taps), `frames/<station>_v<k>.png` (v0 final, v1 raw scene, v3 depth, v4 regions, v5 abstraction output; lossless),
+  `sheet.jpg` (final | raw per station) and `crops.jpg` (1:1 crops of the land). OPEN the sheets and crops.
+- `--compare` prints the guard's rules (plan section 5) per station: ok or FLAG (an item's own exceptions apply, e.g.
+  W2.1's raw b1, W7.1's budget). `--baseline OUT.json --commit SHA --from DIR[,DIR]` collects runs into a baseline file.
+- Timing on this machine (SwiftShader): the page loads in 4 to 6 min at q2 1280x720; a station takes about a minute
+  plus the extras (see the run's `secs`). Free memory first (`free -m`); one browser of yours at a time.
+- Determinism: the harness fixes the game clock (900 s) and the painter's wash clock (100) at every station, sets the
+  hour again after the settle, and renders once before the measured render (the water reflects the frame before).
+- Measures (tests/stationlib/metrics.mjs, a number-for-number port of the audit's metrics.py: on the audit's own frames
+  of E_150_45 the largest difference over 144 numbers is 6e-5; tests/stationmetrics.test.mjs holds metrics.py's numbers
+  on a synthetic set): lapvar, b1 b2 b3 (2-6, 6-16, 16-40 px), t1 t2 t3 (transfer of the raw scene's own detail) over
+  the land, the ground, the ground by view distance (0-30, 30-150, 150-600, 600+ m), the foliage, the props; region
+  shares; CIELAB mean and L* 10/50/90 per region (final and raw); the paper border strip's mean colour; cost (draw calls
+  and triangles over every pass, renderer.info).
+- HALO SHARE, a ruling of mine (the plan names the measure, not the view): pixels overshooting the raw scene's 3x3 range
+  by more than 8/255 after the raw is carried to the output's tone (a straight line fitted on both blurred by 4 px).
+  On the FINAL sheet the paper's grain, granulation and edge pooling alone put about 16 % of the land over the line at
+  E_150_45 even with the far brush off (the lead's x26 frames: 16.6 %; its abstraction output: 0.02 %), so the plan's
+  "halo share at most 0.5 %" is read on the abstraction output (`halo.abs`); the final's share is recorded and compared
+  with its baseline, and an RCAS raises it (x23: 23 % against x26's 16.6 %).
+- F (flicker): the projection is shifted by 0.25 px (nothing in the world moves), the fine-band change the shift does
+  not explain over the fine band of the still frame. The run records `rawWrongWay` (the same with the sign flipped) as
+  a check of the shift's direction: it must be larger. A: the same view at twice the size box-filtered down is the
+  reference (the audit's alias.py); on the final the screen-space paper confounds it (the audit's note), so read A on
+  v1 and v5.
+- Post reads counted (`--taps`) at q2, native size: prep 4 per half-size pixel, abstraction 13 per pixel (far land 13),
+  keep 2 per half-size pixel, sheet 16 per output pixel (the audit's static count said 17: one read is in the
+  enlargement branch, not taken at native size).
 
 ### W1.2 A green gate (test-only; the game is not touched)
 
