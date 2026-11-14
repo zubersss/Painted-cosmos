@@ -17,7 +17,7 @@ before/after pair: t, raw bands, halo share, dE76 per region, L* percentiles, bo
 (every station, q2 1280x720, A at E_150_45, E_400_90, E_1000_45, E_1000_90); `trees/base` an export of the head;
 `node/mipstats.mjs`, `node/crackstats.mjs` the noise statistics the prefilter's constants come from).
 
-**State:** W2.1 COMMITTED (the commit after `2df378d`; its numbers below). W2.2 drafted in scratch (`w22/post.js` with
+**State:** W2.1 COMMITTED (`9d8c0ba`; its numbers below). W2.2 drafted in scratch (`w22/post.js` with
 full-size statistics for the near brush, `w22/post-halfstats.js` without, `w22/index.js`), NOT in the tree; its design
 experiments are running in PILOT's harness (`st-w21b`, experiments w1..w8 added to the scratch tree's copy of
 `tests/stationlib/stations.mjs` only, plus a scratch station `E_150_45_night`, the plan's W2.2 night station that the
@@ -28,6 +28,23 @@ harness lacks). Next: choose the near brush from `st-w21b`, write W2.2 into the 
   at E_1000_90: the 2x reference's best match is 5 px to the side; the fine bands of the two uncorrelated). Its A numbers
   (and mine from it before 07:15, `logs/alias2.jsonl`) are void; PILOT's harness holds the loop, and my copy of the audit
   harness now does too (`bin/stations.py`). Its t, lapvar and band numbers are good (all views from one render).
+
+### W2.2 design experiments (PILOT's harness on the W2.1 tree, `st-w21b`, post passes patched on the held scene)
+Half-size statistics for the near brush (`w22/post-halfstats.js`), edge-only wobble, measured against each station's own
+raw scene (final land t1/t2; halo read on the abstraction output):
+- w1 (near brush 1.4 px, wobble 0.3 inside, full on edges): E_foot 0.55/0.91, E_50_45 0.77/1.04, E_150_45 0.93/1.09,
+  E_400_90 1.14/1.18, E_1000_45 1.23/1.09 (halo 0.72 %), E_1000_90 1.20/1.25, M_foot 0.73/1.04, M_150_45 1.11/1.13,
+  S_150_45 1.05/1.07, E_150_45_night 0.56/0.64. The radius hardly matters (1.0, 1.4, 2.0 alike: the half-size prep is a
+  4 px box at its finest); no near brush at all: E_foot 0.83/0.99; near keep 0.5: E_foot 0.62/0.93; wobble 0.3
+  everywhere: E_foot 0.70/0.95, E_150_45 1.15/1.15. Frames opened (`sheets/w22exp-E150.jpg`): from 150 m every crown,
+  trunk, the path and the clearing are there, the paper, the washes and the border as before.
+- So: E_foot misses t1 0.6 with half-size statistics (hence the full-size prep in the draft, `w22/post.js`), the edge
+  test fires on much of the foot frame (t1 0.55 against 0.70 with the 0.3 px wobble everywhere), E_1000_45's halo
+  (0.72 % with no brush at all) is the wet-in-wet bleed of the far air, and the night station's t2 0.64 is the night key
+  itself (no brush: 0.65; the abstraction output 0.91): the night's toe and pigment load lay the darks together by
+  design (the M4 night key), which the plan's 0.9 would undo.
+- Running: `st-w22a`, the draft (full-size statistics) at all 25 stations with variants e2..e7 (edge test thresholds,
+  silhouettes and border only, near keep 0.5, half-size statistics, wobble 0.3 everywhere).
 
 ### W2.1 what was done (chunks.js, materials.js)
 - `pcFp` (the pixel's footprint on the land, metres: the longer of the two screen derivatives of the body position, the
@@ -57,7 +74,9 @@ harness lacks). Next: choose the near brush from `st-w21b`, write W2.2 into the 
   0.533 -> 0.36; raw lapvar E_1000_45 372.6 -> 59.7, E_1000_90 1082 -> 199; draw calls and triangles unchanged at every
   station; final t, halo unchanged (today's brush). At 1.5 (my held page): A E_1000_45 0.378, E_1000_90 0.322, E_400_90
   0.320 (ground alone 0.246: the rest is the trees' silhouettes, W2.5's MSAA); lapvar 97, 324. The final run at 1.4 is
-  `st-w21b` (numbers go here when it ends).
+  `st-w21b`: raw A E_400_90 0.321, E_1000_45 0.3782, E_1000_90 0.3200 (the 0.6 x baseline lines are 0.241, 0.3780,
+  0.3198); raw land lapvar E_1000_45 100.7, E_1000_90 336.8 (bounds 150, 350); raw b3 28.2 / 34.2 / 24.5; calls and
+  triangles equal to the baseline's at every station.
 - Raw b3 within 10 % (E_1000_90 25.0 -> 24.4, E_1000_45 33.6 -> 34.0), raw land dE76 1.18 / 1.58 (at most 2); E_foot
   b1/b2 -0.6 / +0.1 %, E_50_45 -1.9 / -0.8 % (within 5 %) (audit harness, my base run vs W2.1 at 3.5).
 - **Not met: A at most 0.6 x baseline.** E_1000_45 0.378 (target 0.378) and E_1000_90 0.32 (0.320) sit on the line at
