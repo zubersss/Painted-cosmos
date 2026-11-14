@@ -17,17 +17,72 @@ before/after pair: t, raw bands, halo share, dE76 per region, L* percentiles, bo
 (every station, q2 1280x720, A at E_150_45, E_400_90, E_1000_45, E_1000_90); `trees/base` an export of the head;
 `node/mipstats.mjs`, `node/crackstats.mjs` the noise statistics the prefilter's constants come from).
 
-**State:** W2.1 COMMITTED (`9d8c0ba`; its numbers below). W2.2 drafted in scratch (`w22/post.js` with
-full-size statistics for the near brush, `w22/post-halfstats.js` without, `w22/index.js`), NOT in the tree; its design
-experiments are running in PILOT's harness (`st-w21b`, experiments w1..w8 added to the scratch tree's copy of
-`tests/stationlib/stations.mjs` only, plus a scratch station `E_150_45_night`, the plan's W2.2 night station that the
-harness lacks). Next: choose the near brush from `st-w21b`, write W2.2 into the tree, run every station, commit.
+**State:** W2.1 COMMITTED (`9d8c0ba`), W2.2 COMMITTED (the commit after `0902c56`; numbers below). Nothing of mine is
+half-done in the tree. Part 2 of the lane (W2.3 free wins, W2.4 post savings, W2.5 anti-aliasing) is not begun.
 
-- **The audit's harness did not hold the game's loop** (`__pc.hold` is never called in its `inpage.js`/`stations.py`):
-  between the 1x and the 2x render of its alias index the game ran some frames and the view moved about 5 px (measured
-  at E_1000_90: the 2x reference's best match is 5 px to the side; the fine bands of the two uncorrelated). Its A numbers
-  (and mine from it before 07:15, `logs/alias2.jsonl`) are void; PILOT's harness holds the loop, and my copy of the audit
-  harness now does too (`bin/stations.py`). Its t, lapvar and band numbers are good (all views from one render).
+### W2.2 what was done (post.js, index.js)
+- **The brush turned round** (ABS_FRAG): keep = mix(near keep, 1, far) (near keep as before: 0.30 ground and foliage,
+  0.72 props and figures, 0.92 marks, 0.85 lights); the radius is in internal pixels, `BRUSH_PX` 1.4 (index.js), broader
+  by night (x1.45, the night factor now only on the near brush), capped at 2 px, 0 far; where keep >= 0.995 the
+  rotation tap and the 8 sector taps are not read (far land: 4 reads a pixel, was 13, counted by PILOT's --taps). The
+  near brush's statistics come from a new full-size prep (PREPF_FRAG into `rtFull`, colour and luma squared, mipmapped;
+  drawn only while the near brush is in use): from the half-size prep (a 4 px box at its finest) a 1.4 px brush was a 4 px
+  blur and E_foot's t1 was 0.56. The half-size prep stays for the bleed and the pooling.
+- **The old brush below 0.6 of the sheet's size** (only a pinned scale reaches it after R4; today also dynres at its
+  lowest scales): `uBrushR.y` / `uSheetOld` = internal height < 0.6 x output: the old ABS path (far radius, far pixels
+  repainted) and the old sheet (wobble everywhere, the old per-pixel pooling), exactly as before (the tests' pinned
+  q0/0.5 runs: static, painted-play, painted-m3 run on it, below).
+- **The wobble on edges only** (SHEET_FRAG): 0.3 px (`uWobIn`, px at 1080p like uPig.z) inside a wash, the full 2.6 px
+  where an edge is: a value step at the wash's scale (the half-size prep at lod 0.6 against lod 2.2, 0.05-0.12), a
+  depth step (log2 depth 0.3-0.8 across 2 px), the sky, the water or a figure/ship meeting something else, and the
+  ragged border. A first, wider test (trunks and every crown's depth step counted) took t1 from 0.95 to 0.74 at
+  E_150_45 for little visible tremor; the 0.3 px everywhere variant (no edge wobble) is within 0.02 of the kept one in the
+  air (it differs at M_foot: 1.09 against 0.90).
+- **The pooling at the washes' scale** (SHEET_FRAG): the wide pool and the edge gradient are read on the half-size prep
+  (lod 0.6, the old blots' scale) instead of the brushed picture's own pixels, and the pixel against that few-pixel
+  picture pools both ways (`uPoolFine` 2.0, clamp 0.08): read on the scene's own pixels, as the brush no longer repaints
+  them, every fine mark from the air took a pool and a dark rim and the far land went 3-5.6 dE76 darker (run a: E_400_90
+  land 5.63, E_1000_90 5.08, E_150_45 4.14); one-sided at the washes' scale alone it kept the colour (2.9 at most) but t1
+  fell to 0.74-0.88 (run b); the two-sided fine term gives the sharpness back with no mean (run c/d).
+- Sheet reads 16 -> 21 a pixel (the edge test 4, the pooling's prep reads); total post reads a frame at 1280x720: far
+  stations 28.1 M -> 25.3 M, near stations 28.1 M -> 33.1 M (the full-size prep). W2.4 is where the sheet's reads go down.
+
+### W2.2 numbers (PILOT's harness, q2 1280x720, all 25 stations, run `st-w22d` on a clean export of `0902c56` + post.js
+and index.js; guard against `tests/baselines/stations-784183b.json`: `docs/shots/painter/r1/w22-guard-compare.txt`,
+one line a station: `w22-summary-q2-1280.txt`)
+- Final land t1 / t2 (plan: at least 0.9 / 0.95 at every 150 m, 400 m, 1 km station on Earth, Mars, Saturn): E_150_45
+  1.10/1.13, E_150_90 1.10/1.11, E_400_45 1.18/1.19, E_400_90 1.16/1.19, E_1000_45 1.18/1.05, E_1000_90 1.15/1.18,
+  M_150_45 1.21/1.18, M_150_90 1.14/1.19, M_400_45 1.27/1.17, M_400_90 1.25/1.16, M_1000_45 1.23/1.22, M_1000_90
+  1.24/1.23, S_150_45 1.09/1.09, S_150_90 0.98/1.04: ALL MET (baseline 0.00-0.13 / 0.13-0.44). t1 at most 1.4: met
+  everywhere (largest 1.27).
+- On foot (plan: t1 0.6, t2 0.85): E_foot 0.84/1.03 (0.30/0.72), M_foot 0.90/1.09 (0.34/0.71): MET.
+- Halo of the abstraction output at most 0.5 %: met at 23 of 25; E_1000_45 0.72 % (baseline 3.4) and E_150_45_storm
+  0.95 % (6.1): NOT MET, both the wet-in-wet bleed (kept: the washes) at the 2-3 km limb and under the rain; no brush at
+  all gives the same 0.72 %.
+- Palette, mean colour per region within dE76 3: land and ground within 3 at every station but E_400_90 (land 3.13,
+  ground 2.93): the brush's averaging lifted the darkest marks, the sharp picture restores them (L10 53 -> 39, L50 62.7
+  -> 61.9). Larger dE in tiny regions only: props/foliage slivers on Mars (14-18), Saturn and Neptune foliage (16-18,
+  share 0.00-0.01), E_50_45 props 7.5 (share 0.00), E_400_90 water 5.2 (a narrow stream): pixels at class edges that
+  the old brush filled with the neighbours' colour. The guard's L* 10/50/90 rule flags most stations: the sharp picture
+  has a wider spread of values than a blurred one (L10 darker, L90 lighter) by its nature; the plan's W2.2 acceptance
+  names the mean colour only.
+- Paper border strip: 0.00-0.03/255 at every station (at most 2): MET.
+- Abstraction reads per far pixel 13 -> 4: MET.
+- E_150_45 at night t2 at least 0.9: NOT MET, 0.70 (baseline 0.09); the abstraction output's is 0.92: the rest is the
+  night key itself (its toe and pigment load lay the darks together by design, PAINTER 16), not the brush.
+- The guard's detail rule (raw b2 at least 0.95 x baseline) flags E_400_45, E_1000_45, E_1000_90 (b2 -6 to -15 %): that
+  is W2.1's prefilter at the 6-16 px band (the rows of dashes' band), not W2.2.
+- Frames OPENED: every station before | after (`w22-before-after-q2-1280-1..5.jpg`), 1:1 crops (`w22-before-after-
+  crops-1.jpg`, `-2.jpg` opened; `-3..5` made the same way), the pooling scale (`w22-pooling-scale.jpg`). From 150 m
+  every crown, trunk, the path and the clearings are there; Mars' strata and spires crisp from 1 km; the paper, the
+  washes, the border and the palette as before. Left for the lead: at E_1000_90 (and faintly E_1000_45) the leaf
+  shadow's fine diagonal hatch shows on the shaded wood (W2.1's factor 1.4: the design's 3.25 m lattice at the pixel's
+  Nyquist); reading the leaf shadow one mip level coarser removes it but takes the 2x alias index from 0.32 to 0.65 (the
+  2x reference keeps the hatch). The trees' stair-stepped edges at 1:1 are geometry: W2.5's MSAA.
+- Checks on a clean export of `0902c56` with post.js and index.js: world 30, unit 216, physics 325, coast PASS at both
+  stands, ghostfield 6 of 6 all zeros; `tests/all.mjs --only static,painted-play,painted-m3` in that tree: ALL 3 PASSED
+  (static rules hold, painted-play 39 checks, painted-m3 33 checks); every station page: no console error, fallback
+  empty (the harness's problems list empty, every system real).
 
 ### W2.2 design experiments (PILOT's harness on the W2.1 tree, `st-w21b`, post passes patched on the held scene)
 Half-size statistics for the near brush (`w22/post-halfstats.js`), edge-only wobble, measured against each station's own

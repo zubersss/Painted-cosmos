@@ -29,6 +29,9 @@ const TIERS = [
   { scale: 1.00, sectors: 8, graphite: 0.40 },
 ];
 
+// (R1 W2.2) the near brush's radius, internal pixels
+const BRUSH_PX = 1.4;
+
 const GRADES = [   // hour, sheet grade (used only when no world has published one)
   [0, [0.42, 0.48, 0.70]], [4.5, [0.42, 0.48, 0.70]], [6, [1.0, 0.965, 0.955]], [8, [1, 1, 1]],
   [16, [1, 1, 1]], [18, [1.0, 0.96, 0.90]], [19.5, [0.42, 0.48, 0.70]], [24, [0.42, 0.48, 0.70]],
@@ -119,6 +122,11 @@ export function createPainter(renderer) {
     post.sheetUniforms.uPig.value.w = graphite * (1 - 0.75 * night);
     const ub = post.absUniforms.uBrush.value;
     ub.x = 0.0036 * (1 + 0.45 * night); ub.y = 0.0085 * (1 + 0.30 * night); ub.z = 0.013 * (1 + 0.5 * night);
+    // (R1 W2.2: the near brush in internal pixels, broader by night, capped at 2 px in the shader; the old brush, which
+    // grew with the distance, only where the scene is drawn under 0.6 of the sheet's size: post.js ABS_FRAG)
+    const br = post.absUniforms.uBrushR.value;
+    br.x = BRUSH_PX * (1 + 0.45 * night); br.y = post.inH < 0.6 * post.outH ? 1 : 0;
+    post.sheetUniforms.uSheetOld.value = br.y;
     MOTION.speed01 = +mood.speed01 || 0; MOTION.space01 = +mood.inSpace01 || 0;
     // (PILOT's mood.pulse01, 0 to 1: the pulse drive spooling up and dropping out; without it the ship model's mode says so)
     MOTION.given = typeof mood.pulse01 === 'number' ? Math.max(0, Math.min(1, mood.pulse01)) : null;

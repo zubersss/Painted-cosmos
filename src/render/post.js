@@ -50,15 +50,29 @@ void main() {
 }
 `;
 
+// (R1 W2.2) the near brush's statistics at the scene's own size: the colour and the luma squared of each pixel, mipmapped
+// (the half-size prep is a 4 px box at its finest: a brush of a pixel or two read from it was a 4 px blur)
+const PREPF_FRAG = /* glsl */`
+uniform sampler2D tScene;
+varying vec2 vUv;
+void main() {
+  vec3 c = texture(tScene, vUv).rgb;
+  float l = dot(c, vec3(0.3, 0.5, 0.2));
+  gl_FragColor = vec4(c, l * l);
+}
+`;
+
 const ABS_FRAG = /* glsl */`
 uniform sampler2D tScene;
 uniform highp sampler2D tAux;
 uniform highp sampler2D tHalfA;
+uniform highp sampler2D tFullA;   // (R1 W2.2) PREPF_FRAG's statistics at the scene's size
 uniform sampler2D tHalfB;
 uniform sampler2D tPaper;
 uniform vec2 uTexel;       // 1 / internal resolution
 uniform vec2 uRes;         // internal resolution
-uniform vec4 uBrush;       // near radius, far radius (fractions of height), bleed radius, bleed amount
+uniform vec4 uBrush;       // near radius, far radius (fractions of height: the old brush), bleed radius, bleed amount
+uniform vec2 uBrushR;      // (R1 W2.2) x the near brush's radius in internal pixels, y 1: the old brush (below)
 uniform float uAbstraction;
 varying vec2 vUv;
 ${AUX_DEC}
@@ -68,33 +82,49 @@ void main() {
   vec4 aux = pcAuxDec(texture(tAux, vUv));
   float wet = c0.a;
   float cls = floor(aux.w + 0.001);
-  // far things are fewer, larger, softer strokes; near things keep crisp accents
   float far = smoothstep(3.6, 8.2, aux.z);
-  float r = mix(uBrush.x, uBrush.y, far) * uRes.y;     // brush radius in internal pixels
-  float lod = max(0.0, log2(max(r, 1.0)) - 1.0);
-  vec3 acc = vec3(0.0);
-  float wsum = 0.0;
-  float aspect = uRes.y / uRes.x;
-  // a fixed-on-paper rotation breaks the regular 8-fold symmetry of the sectors
-  float rot = texture(tPaper, vUv * vec2(1.0, aspect) * 2.3).b * 6.283;
-  for (int k = 0; k < SECTORS; k++) {
-    float a = rot + float(k) * (6.2831853 / float(SECTORS));
-    vec2 off = vec2(cos(a), sin(a)) * r * 0.62 * uTexel;
-    vec4 m = textureLod(tHalfA, vUv + off, lod);
-    float l = dot(m.rgb, W);
-    float var = max(0.0, m.a - l * l);
-    float w = 1.0 / (0.00012 + var * var * 900.0 + var * 0.6);
-    acc += m.rgb * w; wsum += w;
-  }
-  vec3 kuw = acc / wsum;
   // solid props (trunks, rocks, characters) keep more of their drawing
-  float keep = (1.0 - far) * (cls == 3.0 || cls == 5.0 ? 0.72 : 0.30);
+  float keepN = cls == 3.0 || cls == 5.0 ? 0.72 : 0.30;
   // region 6: small crisp marks (splash rings) the brush leaves as they were drawn
-  if (cls == 6.0) keep = 0.92;
+  if (cls == 6.0) keepN = 0.92;
   // region 8: a light of its own (a lamp, a flame, a lit cabin): its small warm shape is kept too
-  if (cls == 8.0) keep = 0.85;
+  if (cls == 8.0) keepN = 0.85;
+  // (R1 W2.2, docs/lead/SHARP-SMOOTH-PLAN.md: the brush turned round. It was a brush that grew with the distance and
+  // repainted every far pixel: from the ship all the ground is far, and all of it was 6 to 9 px blots. Now the near
+  // things take a small brush, a pixel or two of the scene's own size, and with the distance it lets the scene through:
+  // from the air the land is drawn as the scene drew it. The palette, the paper, the washes, the pooling, the grain and
+  // the pencil are all still laid by the sheet.)
+  float keep = mix(keepN, 1.0, far);
+  float r = min(uBrushR.x, 2.0) * (1.0 - far);         // brush radius in internal pixels
+  float lod = max(0.0, log2(max(r, 1.0)));              // (read from the statistics at the scene's own size)
+  // (the old brush where the scene is drawn under 0.6 of the sheet's size, which only a pinned scale reaches: there the
+  // big far brush is what smooths the enlargement's steps. Far things fewer, larger, softer strokes, repainted whole.)
+  if (uBrushR.y > 0.5) {
+    keep = cls == 6.0 || cls == 8.0 ? keepN : (1.0 - far) * keepN;
+    r = mix(uBrush.x, uBrush.y, far) * uRes.y;
+    lod = max(0.0, log2(max(r, 1.0)) - 1.0);
+  }
   keep = mix(1.0, keep, uAbstraction);
-  vec3 col = mix(kuw, c0.rgb, keep);
+  vec3 col = c0.rgb;
+  float aspect = uRes.y / uRes.x;
+  // (where the scene is let through whole the sectors are not read at all)
+  if (keep < 0.995) {
+    vec3 acc = vec3(0.0);
+    float wsum = 0.0;
+    // a fixed-on-paper rotation breaks the regular 8-fold symmetry of the sectors
+    // (its level set by hand: an implicit one is undefined inside a branch some pixels of a quad skip)
+    float rot = textureLod(tPaper, vUv * vec2(1.0, aspect) * 2.3, max(0.0, log2(1177.6 * uTexel.x))).b * 6.283;
+    for (int k = 0; k < SECTORS; k++) {
+      float a = rot + float(k) * (6.2831853 / float(SECTORS));
+      vec2 off = vec2(cos(a), sin(a)) * r * 0.62 * uTexel;
+      vec4 m = uBrushR.y > 0.5 ? textureLod(tHalfA, vUv + off, lod) : textureLod(tFullA, vUv + off, lod);
+      float l = dot(m.rgb, W);
+      float var = max(0.0, m.a - l * l);
+      float w = 1.0 / (0.00012 + var * var * 900.0 + var * 0.6);
+      acc += m.rgb * w; wsum += w;
+    }
+    col = mix(acc / wsum, c0.rgb, keep);
+  }
   // wet-in-wet: wet areas take up the (wetness-weighted) colour around them, feathered
   vec2 feather = (texture(tPaper, vUv * vec2(1.0, aspect) * 5.1).ba - 0.5) * uBrush.z * 1.4;
   float blod = max(0.0, log2(max(uBrush.z * uRes.y, 1.0)) - 1.0);
@@ -116,6 +146,9 @@ uniform vec2 uInTexel;
 uniform vec3 uPaperColor;
 uniform vec3 uGrade;
 uniform vec4 uPig;        // edge pooling, granulation, wobble px (at 1080p), graphite
+uniform float uWobIn;     // (R1 W2.2) the wobble inside a wash, px at 1080p: the full uPig.z only on edges
+uniform float uPoolFine;  // (R1 W2.2) the pooling of a pixel against its few-pixel neighbourhood, both ways
+uniform float uSheetOld;  // (R1 W2.2) 1 with the old brush (post.js ABS_FRAG): the wobble everywhere and the pooling as it was
 uniform vec4 uBorder;     // width, raggedness, pooling, enabled
 uniform vec2 uBoil;
 uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm), y lightning flash
@@ -144,7 +177,26 @@ void main() {
   vec4 pmid = texture(tPaper, puv * 0.47 + 0.11 + uBoil);
 
   // the painter's hand: edges wobble with the paper, never ruler-straight
-  vec2 wob = ((pmid.ba - 0.5) * 2.0 + (plo.ba - 0.5) * 1.2) * uPig.z * sc / uOutRes;
+  // (R1 W2.2: only edges. The tremor resampled the whole sheet up to two pixels off, which smeared every fine thing
+  // inside a wash; it is kept where an edge is: a step in the wash's value (the scene's own value at a few pixels against
+  // its broad surround), a silhouette (a step in depth, or a solid thing, the sky or the water meeting something else)
+  // and the ragged border. Inside a wash the paper moves the picture by a third of a pixel.)
+  vec3 sur = textureLod(tHalfA, vUv, 2.2).rgb;
+  float eV = abs(dot(textureLod(tHalfA, vUv, 0.6).rgb - sur, W));
+  vec2 eo = uInTexel * 2.0;
+  vec4 e0 = pcAuxDec(texture(tAux, vUv)), e1 = pcAuxDec(texture(tAux, vUv + vec2(eo.x, 0.0))), e2 = pcAuxDec(texture(tAux, vUv + vec2(0.0, eo.y)));
+  float eZ = max(abs(e1.z - e0.z), abs(e2.z - e0.z));
+  vec3 ec = vec3(floor(e0.w + 0.001), floor(e1.w + 0.001), floor(e2.w + 0.001));
+  // (a class that draws an outline: the sky (0), the water (2), a figure or the ship (5); the foliage against the ground
+  // is not one, nor a trunk or a stone, unless it stands well in front of what is behind it (the depth step): from the
+  // air the whole wood would tremble)
+  vec3 eS = step(abs(ec - 0.0), vec3(0.1)) + step(abs(ec - 2.0), vec3(0.1)) + step(abs(ec - 5.0), vec3(0.1));
+  float eC = step(0.5, abs(ec.y - ec.x) + abs(ec.z - ec.x)) * step(0.5, eS.x + eS.y + eS.z);
+  vec2 bd0 = min(vUv, 1.0 - vUv) * vec2(uOutRes.x / uOutRes.y, 1.0);
+  float eB = 1.0 - smoothstep(uBorder.x * 1.2, uBorder.x * 2.6, min(bd0.x, bd0.y));
+  float edgeW = max(max(smoothstep(0.05, 0.12, eV), smoothstep(0.30, 0.80, eZ)), max(eC, eB * uBorder.w));
+  edgeW = max(edgeW, uSheetOld);
+  vec2 wob = ((pmid.ba - 0.5) * 2.0 + (plo.ba - 0.5) * 1.2) * mix(uWobIn, uPig.z, edgeW) * sc / uOutRes;
   vec2 uv = vUv + wob;
   // (PAINTER 19, the soft enlargement. At the lowest tier at half scale the scene is drawn at under a third of the
   // sheet's size, and a plain bilinear lookup enlarged every stair of an aliased edge into a block three pixels a
@@ -185,12 +237,30 @@ void main() {
 
   // pigment pools just inside the border of each wash: wide (compare with the blurred
   // surround) plus a little right at the edge (local gradient)
-  vec3 sur = textureLod(tHalfA, uv, 2.2).rgb;
-  float pool = max(0.0, dot(sur, W) - lum);
-  vec3 cx = texture(tAbs, uv + vec2(uInTexel.x, 0.0)).rgb - texture(tAbs, uv - vec2(uInTexel.x, 0.0)).rgb;
-  vec3 cy = texture(tAbs, uv + vec2(0.0, uInTexel.y)).rgb - texture(tAbs, uv - vec2(0.0, uInTexel.y)).rgb;
-  float grad = length(cx) + length(cy);
-  float edge = pool * 3.2 + smoothstep(0.03, 0.45, grad) * 0.35;
+  // (R1 W2.2: read on the picture a few pixels wide, the half-size prep, the scale the old brush's blots had: on the
+  // scene's own pixels, which the brush no longer repaints, every fine mark from the air took a pool and a dark rim, and
+  // the far land went 5 L* darker; the washes' edges pool as before)
+  vec2 go = uInTexel * 2.0;
+  float mid = dot(textureLod(tHalfA, uv, 0.6).rgb, W);
+  float pool = max(0.0, dot(sur, W) - mid);
+  float grad;
+  // (and the pixel against that few-pixel picture, on both sides: a mark darker than its neighbourhood takes a little more
+  // pigment, a lighter one a little less, as the brush's pooling did at its own scale; nothing on average, so the far
+  // land keeps its value)
+  float fineP = clamp(mid - lum, -0.08, 0.08);
+  if (uSheetOld > 0.5) {
+    // (the old brush's sheet: its blots are the washes, read on its own pixels, one-sided)
+    pool = max(0.0, dot(textureLod(tHalfA, uv, 2.2).rgb, W) - lum);
+    fineP = 0.0;
+    vec3 cx = texture(tAbs, uv + vec2(uInTexel.x, 0.0)).rgb - texture(tAbs, uv - vec2(uInTexel.x, 0.0)).rgb;
+    vec3 cy = texture(tAbs, uv + vec2(0.0, uInTexel.y)).rgb - texture(tAbs, uv - vec2(0.0, uInTexel.y)).rgb;
+    grad = length(cx) + length(cy);
+  } else {
+    vec3 cx = textureLod(tHalfA, uv + vec2(go.x, 0.0), 0.6).rgb - textureLod(tHalfA, uv - vec2(go.x, 0.0), 0.6).rgb;
+    vec3 cy = textureLod(tHalfA, uv + vec2(0.0, go.y), 0.6).rgb - textureLod(tHalfA, uv - vec2(0.0, go.y), 0.6).rgb;
+    grad = length(cx) + length(cy);
+  }
+  float edge = pool * 3.2 + fineP * uPoolFine + smoothstep(0.03, 0.45, grad) * 0.35;
 
   // granulation: pigment settles into the valleys of the paper, strongest in darks and wets
   float ph = paper.r;
@@ -346,6 +416,11 @@ export class Post {
     this.rtHalf.textures[1].type = THREE.UnsignedByteType;
     for (const t of this.rtHalf.textures) { t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; }
 
+    // (R1 W2.2) the near brush's statistics at the scene's own size (PREPF_FRAG), mipmapped
+    this.rtFull = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: HF });
+    this.rtFull.texture.generateMipmaps = true; this.rtFull.texture.minFilter = THREE.LinearMipmapLinearFilter; this.rtFull.texture.magFilter = THREE.LinearFilter;
+    this.mPrepF = fsMaterial(PREPF_FRAG, { tScene: { value: this.rtScene.textures[0] } });
+
     this.rtAbs = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.UnsignedByteType });
     this.rtAbs.texture.minFilter = THREE.LinearFilter; this.rtAbs.texture.magFilter = THREE.LinearFilter;
 
@@ -363,10 +438,11 @@ export class Post {
     this.mPrep = fsMaterial(PREP_FRAG, { tScene: { value: this.rtScene.textures[0] }, uTexel: { value: new THREE.Vector2() } });
     this.absUniforms = {
       tScene: { value: this.rtScene.textures[0] }, tAux: { value: this.rtScene.textures[1] },
-      tHalfA: { value: this.rtHalf.textures[0] }, tHalfB: { value: this.rtHalf.textures[1] },
+      tHalfA: { value: this.rtHalf.textures[0] }, tHalfB: { value: this.rtHalf.textures[1] }, tFullA: { value: this.rtFull.texture },
       tPaper: { value: tex.paper },
       uTexel: { value: new THREE.Vector2() }, uRes: { value: new THREE.Vector2() },
       uBrush: { value: new THREE.Vector4(0.0036, 0.0085, 0.013, 0.8) },
+      uBrushR: { value: new THREE.Vector2(1.4, 0) },
       uAbstraction: { value: 1 }, uAux8: G.uAux8,
     };
     this.mAbs = {};
@@ -376,7 +452,7 @@ export class Post {
       tPaper: { value: tex.paper },
       uOutRes: { value: new THREE.Vector2() }, uInTexel: { value: new THREE.Vector2() },
       uPaperColor: G.uPaperColor, uGrade: { value: new THREE.Vector3(1, 1, 1) },
-      uPig: { value: new THREE.Vector4(1.0, 1.0, 2.6, 0.55) },
+      uPig: { value: new THREE.Vector4(1.0, 1.0, 2.6, 0.55) }, uWobIn: { value: 0.3 }, uPoolFine: { value: 2.0 }, uSheetOld: { value: 0 },
       uBorder: { value: new THREE.Vector4(0.030, 0.034, 0.9, 1) },
       uBoil: { value: new THREE.Vector2(0, 0) },
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
@@ -401,6 +477,7 @@ export class Post {
     this.outW = outW; this.outH = outH; this.inW = inW; this.inH = inH;
     this.rtScene.setSize(inW, inH);
     this.rtHalf.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
+    this.rtFull.setSize(inW, inH);
     this.rtAbs.setSize(inW, inH);
     this.rtPrev.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
     this.prevFrames = 0; G.uPrevOn.value = 0;
@@ -431,6 +508,8 @@ export class Post {
   // glazes: objects drawn over the brushed picture (see shared.js GLAZES), with the scene's camera
   finish(glazes, camera) {
     this._pass(this.mPrep, this.rtHalf);
+    // (the near brush's statistics, at the scene's own size: not drawn where the old brush is in use)
+    if (this.absUniforms.uBrushR.value.y < 0.5 && this.absUniforms.uAbstraction.value > 0) this._pass(this.mPrepF, this.rtFull);
     this._pass(this.mAbs[this.sectors], this.rtAbs);
     if (glazes && glazes.length) {
       const r = this.renderer;
@@ -456,11 +535,11 @@ export class Post {
   // the machine is already struggling. (The prep, keep and backdrop passes run from the first frame.)
   warm() {
     const t = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.UnsignedByteType });
-    for (const m of [this.mAbs[4], this.mAbs[8], this.mSheet]) this._pass(m, t);
+    for (const m of [this.mPrepF, this.mAbs[4], this.mAbs[8], this.mSheet]) this._pass(m, t);
     t.dispose();
   }
 
   dispose() {
-    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose();
+    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtFull.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose();
   }
 }
