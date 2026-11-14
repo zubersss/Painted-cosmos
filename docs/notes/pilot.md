@@ -8,9 +8,13 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 `fb40efe` (PAINTER's W2.4). Scratch: `/home/user/.pc-scratch/pilot/r1/p3/` (`look.mjs`, `load.mjs`, `slip.mjs`, `mkex.sh`:
 a clean export of HEAD with PILOT's working files laid over it). Parts 1 and 2 (W1, W3.1, W3.2) are below, done.
 
-**State (about 14:35 UTC): W3.3, W3.4 and W3.5 DONE and committed; the README has its section for phones and
-tablets.** Nothing of PILOT's is half-done or uncommitted. `node tests/all.mjs --export` on `c426212`: RUNNING (its
-result goes here). Commits of this part:
+**State (15:30 UTC): W3.3, W3.4 and W3.5 DONE and committed; the README has its section for phones and tablets.
+`node tests/all.mjs --export` on `c426212` (a clean tree): ALL 17 PASSED** (unit 244, physics 325, world 43, coast 2 of
+2 stands, ghostfield 6 of 6 all zeros, static, play-stub 39, play-physics 39, trip-stub 50, m3 33, lock 14, touch 220
+checks in 840 s (input on three profiles and a desktop, the platform part on six, the loop on stubs), audio,
+painted-play 39, painted-trip 50, painted-m3 33, painted-touch 67; table `docs/shots/pilot/r1/all-mjs-c426212.txt`).
+Its painted-touch frame of the map at 400x225 (`touch-w33-map-400x225-c426212.jpg`, OPENED): the names lie apart with
+the narrower column (`c426212`'s follow-up). Nothing of PILOT's is half-done or uncommitted. Commits of this part:
 
 | Commit | What |
 | --- | --- |
