@@ -158,8 +158,9 @@ painted) carrying every new check. Last: `node tests/all.mjs --export` in a clea
     the map, "Pulse to Mars", "Land here", the book, the help card, "Board ship" on Mars). Seen there, at 400x225 only
     (a window smaller than a phone at full screen): the map's chart is small beside its 200 px column and its names
     crowd (Moon on Neptune, Jupiter on Mercury); the book's page has room only for the world's name under a four-line
-    foot; the help card is scaled to fit (6.8 px). The map's column is made narrower in narrow windows next (tested
-    by all.mjs's painted-touch step).
+    foot; the help card is scaled to fit (6.8 px). The map's column is narrower in windows under 480 px wide (the
+    commit after: 140 px), and the chart then has room for its names (stubs at 400x225, frame opened in scratch:
+    `look400/`); proved by all.mjs's painted-touch step.
 - **Checks on a clean export of `d22ea35` with these files:** unit **244** (234 + preset 4 + platform 6), physics 325,
   world 43, coast PASS at both stands, ghostfield 6 of 6 all zeros, static rules hold; the painted loop's page: no
   console error, `fallback` empty. Numbers of every run: `docs/shots/pilot/r1/touch-w345-runs.json`.

@@ -361,6 +361,10 @@ html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select:
     grid-template-areas: "chart ." "chart title" "chart line" "chart go"; column-gap: 12px; padding: 10px 12px; }
   .pc-hud.pc-touch .pc-map-go { margin: 6px auto 4px; }
 }
+/* (a window under 480 px wide: the column narrower, the chart the larger share) */
+@media (max-height: 520px) and (max-width: 480px) {
+  .pc-hud.pc-touch .pc-map.pc-on { grid-template-columns: minmax(0, 1fr) 140px; column-gap: 8px; padding: 8px 10px; }
+}
 /* The sketchbook: its name and the worlds' tabs in one strip along the top, the tabs 44 css px tall,
    sliding sideways where they do not fit (left of the close corner); the page under them takes the
    rest and scrolls up and down when full; a swipe across it turns it. */
