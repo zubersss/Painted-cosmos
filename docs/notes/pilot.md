@@ -9,21 +9,30 @@ accept, each with proof. Scratch: `/home/user/.pc-scratch/pilot/r1/rf/` (`mkex.s
 working files; `head/`: HEAD alone; `mapsweep.mjs`: the touch chart's names over 200 clock times; logs). First commit's
 parent: `3cd414b`.
 
-**State (19:05 UTC): all three fixed and committed in `64f447a`** (checks on a clean export before it: unit 251,
+**State (20:25 UTC): all three fixed and committed in `64f447a`** (checks on a clean export before it: unit 251,
 world 43, physics 325, coast 2 of 2 PASS, ghostfield 6 of 6 all zeros, the real game loads with no console error and
-`fallback` empty). Running after it, one browser at a time (`rf/chain3.sh`, log `rf/chain3.log`): the touch loop with a
-landing given back, the painted trip with one given back on each world, then `node tests/all.mjs --export --out
-rf/all`, then three plain painted trips. Their results go here when done. Items:
+`fallback` empty). **`node tests/all.mjs --export` on `ca3a56a` (that code and the notes) in a clean tree: ALL 17
+PASSED** (unit 251, physics 325, world 43, coast 2 of 2, ghostfield 6 of 6 zeros, static, play-stub 39, play-physics
+39, trip-stub 50, m3 33, lock 14, touch 222, audio, painted-play 39, painted-trip 50 (it met "Too steep" once and flew
+on), painted-m3 33, painted-touch 68; table `docs/shots/pilot/r1/all-mjs-ca3a56a.txt` and `.json`). Its painted-touch
+map at 400x225 (`rf/all/painted-touch/loop-iphone14-painted-map.jpg`, OPENED): all ten names apart, each by its dot,
+Mars ringed; its touch map at the iPhone 14's size (`rf/all/touch/loop-iphone14-map.jpg`, OPENED): the same. In the
+painted-touch run the 'a place to land' label over Mars lay on no control and on 1899 px2 of the throttle gauge (of its
+3850): see the judged item below. Nothing of PILOT's is half-done or uncommitted. Items:
 - **RF-A, W1.2's gate (painted-trip 2 of 3 on 3cd414b):** fixed in the tests (`tests/trip.mjs`, `tests/touch.mjs`,
   `tests/browser.mjs` giveLandingBack, `tests/landingback.test.mjs`). The cause, as the verifier said: a landing that
   BEGAN and was then given back by the game ("No level ground here", `src/ship/flight.js` stepLanding's 'blocked',
   `src/core/sim.js` line 488) was waited on for 90 s. Now the scripts wait for the landing to END (`state !== 'LANDING'`)
   and, if it was given back, fly on (4 s full throttle, nose level) and come down to the prompt again, as on "Too steep".
   `--block-landings N` gives the first N landings (on each world, in the trip) back on purpose, the way the game does,
-  so the path runs every time it is asked for. Proof so far: stubs, `--block-landings 1`: PASSED, both landings given
-  back and the ship landed after each (`rf/trip-stub-block1.log`); the code before the fix (3cd414b's trip.mjs) with the
-  same injection FAILS exactly as the verifier's run 2: "landed on mars" after the 90 s wait, then "standing on",
-  "the sketchbook has" (`rf/trip-before-inject.log`).
+  so the path runs every time it is asked for. Proof: the code before the fix (3cd414b's trip.mjs) with the same
+  injection FAILS exactly as the verifier's run 2 did: "landed on mars" after the 90 s wait, then "standing on", "the
+  sketchbook has", 10 failures in all (`rf/trip-before-inject.log`); with the fix, on a clean export of the final
+  code: the stub trip with one landing given back on each world PASSED (`rf/trip-stub-block1.log`), the painted trip
+  (q0, 400x225, the all.mjs command plus `--block-landings 1`) PASSED: given back over Mars and over Saturn, flown on,
+  landed 14 s and 40 s later, 50 checks (`rf/ptrip-block.log`; its Saturn frame `rf/ptrip-block/m2-saturn.jpg`
+  OPENED: the explorer on Saturn, the ship 12 m off); the touch loop on stubs (iPhone 14) with its landing over Mars
+  given back PASSED (`rf/touch-loop-block.log`; the label over Mars on no control, on no gauge).
 - **RF-B, the upright field on a desktop window:** the plan asks it of a tablet held upright, so the game now asks it only
   on the phone and tablet presets (`Game.fieldOfView`, `src/core/game.js`); a desktop window keeps 58 degrees whatever
   its shape, as before release 1 (the verifier: 600x900 gave 81.8). Unit: `tests/preset.test.mjs` (the desktop at
@@ -74,6 +83,21 @@ rf/all`, then three plain painted trips. Their results go here when done. Items:
   the lane (the verifier found it in an older desktop frame): not this pass's.
 - **The 1280x720 screenshot timeout:** not attributed to PILOT by the verifier and not investigated here (the page
   itself reported started, no console error, fallback empty).
+
+**Rulings of this pass (logged):** (1) The upright field is gated on the preset rather than kept for every tall window
+and the comment corrected: the plan asks it of a tablet held upright and the lane claimed every desktop window
+unchanged; a wider field for a tall desktop window may well be better, but that is a change for the lead to ask for.
+(2) On the touch chart a name that has no clear place by its own dot is left off rather than drawn on another name or
+by another world's dot (the desktop's marks already do this: "a world whose name has no room keeps its ring"); the
+chosen world's name and the name of the world you are at always show. (3) Names on a chart under 260 px tall may be
+lettered down to 9 css px (the 11 px floor is W3.3's at the phones' and the tablet's sizes; the help card is already
+scaled to fit under 300 px). (4) The 'a place to land' label on the gauge at 400x225 is the labels' rule working as
+ruled (R3), in a window smaller than any phone: left, and now measured.
+
+**For other roles:** nothing to do. (For the verifier: `node tests/trip.mjs --query 'scale=0.5&quality=0' --w 400 --h
+225 --block-landings 1` runs the given-back path on both worlds every time; `node tests/touch.mjs --part loop
+--block-landings 1` the same by touch; the "before" was 3cd414b's tests/trip.mjs with one `giveLandingBack(page)` call
+added after the E loop.)
 
 ## Hand-over, RELEASE 1, PILOT lane part 3: W3.3 (phone layouts and words), W3.4 (platform), W3.5 (the phone preset) (started 12:20 UTC 2026-11-14; kept current)
 
