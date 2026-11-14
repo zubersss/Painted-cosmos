@@ -29,9 +29,10 @@ throttle with `W` and point the nose at the sky. Above the air, press `M`, choos
 and press `F`: the ship turns onto the course by itself (its marker comes round to the nose;
 `F` again stops the turn) and the pulse drive takes you there, round any world or the Sun in
 the way. Near the world the drive lets go by itself; fly down, and press `E` when the prompt
-says you can land. A world you have not walked on yet shows "a place
-to land" (a small ring on the ground, or an arrow at the edge of the picture when it lies round
-the curve or behind you): where a newcomer to that world stands, the landscape it opens with.
+says you can land (it is not offered over ground too steep to hold the ship: fly on a
+little). A world you have not walked on yet shows "a place to land" (a small ring on the
+ground, or an arrow at the edge of the picture when it lies round the curve or behind you):
+where a newcomer to that world stands, the landscape it opens with.
 You may land anywhere else. The views to find for the sketchbook are scattered over the world,
 some near that place, some kilometres from it: when you step out of the ship with none close
 by, a line says how far the nearest one is and which way.
