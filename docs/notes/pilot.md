@@ -6,9 +6,11 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 **Read this first.** The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W1 = section 4 "PILOT · W1 Gate", the quality guard =
 section 5). This part of the lane is W1 only (W1.1 the station harness, W1.2 a green gate); W3 (touch) comes next.
-Scratch: `/home/user/.pc-scratch/pilot/r1/`. First commit's parent: `56382c2` (the coordinator's WIP snapshot of
-`tests/stationlib/metrics.mjs` and `png.mjs`, the port begun by the agent before the 04:59 restart; this agent continues
-it).
+Scratch: `/home/user/.pc-scratch/pilot/r1/`. First commit's parent: `0efcc3b` (the coordinator's log; under it `56382c2`,
+the coordinator's WIP snapshot of `tests/stationlib/metrics.mjs` and `png.mjs`, the port begun by the agent before the
+04:59 restart, which this agent continued). Commits of this part: `419074c` (W1.2), `2355594` (W1.1 harness), `8811ca4`
+(harness reproduces; baseline q2 1280x720), `7a41b0c`, `2df378d` (W1.2 proof), `64dda38` (two runs agree), and the
+rest of the baseline after them.
 
 **State:** in progress. Items: W1.1 harness (committed `2355594`, game clock pinned at 120 s since; reproduces the
 baseline, table below), W1.1b baseline numbers (q2 1280x720, all 24 stations, committed; q2 1920x1080, q1, q0 and the
@@ -94,6 +96,13 @@ reproduced station by station within about 3 % in raw lapvar (E_foot 190.6 / 185
 | E_150_45_dusk | 281.1 | 0.03 / 0.15 / 0.44 | 11.1 / 7.6 | 0.448 / 0.257 | 0.407 / 0.232 | 451 / 910624 | 0.31 |
 | E_150_45_storm | 97.4 | 0.03 / 0.20 / 0.54 | 6.1 / 5.0 | 0.417 / 0.237 | 0.468 / 0.261 | 450 / 910623 | 0.31 |
 | N_150_45 | 103.6 | 0.05 / 0.26 / 0.63 | 2.6 / 3.1 | 0.454 / 0.282 | 0.501 / 0.291 | 311 / 703081 | 0.01 |
+
+**q2 at 1920x1080** (run `/home/user/.pc-scratch/pilot/r1/base-q2-1920/`, 21 min of stations after a 16 min load; no
+console error, fallback empty; sheet `docs/shots/pilot/baseline/q2-1920x1080-sheet.jpg`, shrunk to 1000 px wide, OPENED;
+`q2-1920x1080-summary.txt`): the brush is a fraction of the frame's height, so more pixels buy no detail from the air:
+E_150_45 final land t1/t2 0.02/0.11 (0.04/0.25 at 720p), E_400_90 0.00/0.03, E_1000_90 0.00/0.03, E_foot 0.19/0.57,
+M_150_45 0.07/0.27, S_150_45 0.02/0.17; the same draw calls and triangles as at 720p; post reads 63.2 M a frame (the
+same reads per pixel). No A at this size (its reference would be 3840x2160).
 
 Post reads counted (`--taps`), every station: prep 4 per half-size pixel, abstraction 13 per pixel (13 on far land),
 keep 2 per half-size pixel, sheet 16 per output pixel: 28.1 M reads a frame at 1280x720. The halo share of today's
