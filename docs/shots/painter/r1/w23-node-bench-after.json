@@ -1,0 +1,138 @@
+{
+ "root": "/home/user/.pc-scratch/painter/r1/trees/w23",
+ "Q": 2,
+ "BUDGET": 5,
+ "SPEED": 15,
+ "mx": [
+  {
+   "name": "stand",
+   "frames": 600,
+   "worldMs": 152.1,
+   "matrixMs": 9,
+   "share": 5.9
+  },
+  {
+   "name": "walk 4.2 m/s",
+   "frames": 1800,
+   "worldMs": 2398.9,
+   "matrixMs": 28.3,
+   "share": 1.2
+  },
+  {
+   "name": "fly 150 m at 56 m/s",
+   "frames": 1800,
+   "worldMs": 5871,
+   "matrixMs": 31.8,
+   "share": 0.5
+  }
+ ],
+ "ground0": {
+  "cells": 102,
+  "laid": 102,
+  "meshes": 271,
+  "drawn": 142,
+  "tris": 207290,
+  "seeable": 142,
+  "seeableUnlaid": 0,
+  "queue": 0
+ },
+ "at1000": {
+  "cells": 0,
+  "laid": 0,
+  "meshes": 0,
+  "drawn": 0,
+  "tris": 0,
+  "seeable": 0,
+  "seeableUnlaid": 0,
+  "queue": 0
+ },
+ "descent": [
+  {
+   "alt": 400,
+   "cells": 0,
+   "laid": 0,
+   "meshes": 0,
+   "drawn": 0,
+   "tris": 0,
+   "seeable": 0,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 200,
+   "cells": 1,
+   "laid": 1,
+   "meshes": 3,
+   "drawn": 0,
+   "tris": 0,
+   "seeable": 0,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 150,
+   "cells": 29,
+   "laid": 29,
+   "meshes": 106,
+   "drawn": 0,
+   "tris": 0,
+   "seeable": 0,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 110,
+   "cells": 47,
+   "laid": 47,
+   "meshes": 177,
+   "drawn": 48,
+   "tris": 71262,
+   "seeable": 48,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 50,
+   "cells": 78,
+   "laid": 78,
+   "meshes": 232,
+   "drawn": 105,
+   "tris": 172302,
+   "seeable": 105,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 10,
+   "cells": 102,
+   "laid": 102,
+   "meshes": 271,
+   "drawn": 141,
+   "tris": 206474,
+   "seeable": 141,
+   "seeableUnlaid": 0,
+   "queue": 0
+  }
+ ],
+ "touchdown": {
+  "cells": 103,
+  "laid": 103,
+  "meshes": 272,
+  "drawn": 142,
+  "tris": 207290,
+  "seeable": 142,
+  "seeableUnlaid": 0,
+  "queue": 0
+ },
+ "touchdownFrames": 3994,
+ "settled": {
+  "cells": 103,
+  "laid": 103,
+  "meshes": 272,
+  "drawn": 142,
+  "tris": 207290,
+  "seeable": 142,
+  "seeableUnlaid": 0,
+  "queue": 0
+ }
+}

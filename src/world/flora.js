@@ -21,6 +21,7 @@ import { QUALITY, G } from '../render/shared.js';
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
 const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
 const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget)
+const RELIEF = 250;            // (R1 W2.3) metres the ground in an undergrowth cell's reach may stand above the ground under the eye
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -54,6 +55,7 @@ export class Flora {
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
+    this._origins = new Map();         // (R1 W2.3) where undergrowth cells lie that were looked at and not wanted
     this.groundReady = null;           // (face, u, v) -> is the ground there on the paper as it will stay (set by the world)
     this.focusV = new THREE.Vector4(); this._focusFrame = -1; this._focusCam = null;       // the wash clock (s): real time, in steps of at most 0.1 s (it runs when the wind's clock is frozen too)
     this.retierCursor = 0;
@@ -350,6 +352,7 @@ export class Flora {
       for (let a = list.length - 1; a > 0; a--) { const b = Math.floor(d[list[a] * INST_STRIDE + 7] * 9973.1 % 1 * (a + 1)); const t = list[a]; list[a] = list[b]; list[b] = t; }
       const mesh = this._instanced(chunk, geo, mat, list.length, lod, false);
       const im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array;
+      let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
       for (let a = 0; a < list.length; a++) {
         const o = list[a] * INST_STRIDE;
         _p.set(d[o], d[o + 1], d[o + 2]);
@@ -361,13 +364,19 @@ export class Flora {
         _m.compose(_p.sub(chunk.origin), _q, _s.set(sc, sc * (d[o + 5] === U_STONE ? 0.55 : 1), sc));
         _m.toArray(im, a * 16);
         ia[a * 4] = d[o + 8]; ia[a * 4 + 1] = d[o + 9]; ia[a * 4 + 2] = d[o + 7]; ia[a * 4 + 3] = d[o + 10];
+        if (_p.x < x0) x0 = _p.x; if (_p.x > x1) x1 = _p.x; if (_p.y < y0) y0 = _p.y; if (_p.y > y1) y1 = _p.y; if (_p.z < z0) z0 = _p.z; if (_p.z > z1) z1 = _p.z;
       }
+      // (R1 W2.3) where its strokes stand (body-local: the box round their roots, as a sphere) and how far one can be seen
+      // at all (PROP_VERT: a stroke is drawn while its root is nearer than uLod.y x (1 + (seed - 0.5) uLod.z), at most
+      // lod[1] x (1 + lod[2] / 2), times the tier's range scale): a mesh no stroke of which can be seen is not submitted
+      mesh.userData.rootC = new THREE.Vector3((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5).add(chunk.origin);
+      mesh.userData.rootR = 0.5 * Math.hypot(x1 - x0, y1 - y0, z1 - z0) + 0.01;
+      mesh.userData.reach = lod[1] * (1 + 0.5 * lod[2]);
       mesh.userData.full = list.length;
       mesh.count = QUALITY.level === 0 ? Math.ceil(list.length * 0.5) : list.length;
       mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true;
       mesh.userData.near = near; mesh.userData.skipLow = !!skipLow;
       mesh.userData.plantH = geo === this.kit.reed ? FLORA_PHYS.reed.height : geo === this.kit.fern ? FLORA_PHYS.fern.height : geo === this.kit.flower ? FLORA_PHYS.flower.height : FLORA_PHYS.grass.height;
-      if (skipLow && QUALITY.level === 0) mesh.visible = false;
     };
     // grass: the seed (0..1) sets how far each tuft is drawn; short-range tufts get their own
     // mesh so cells beyond that range do not submit them at all
@@ -397,13 +406,23 @@ export class Flora {
   }
 
   // Which chunks should exist around the camera: walk a tangent-plane grid and bucket by cell.
-  _wanted(level, size, radius, map, kind) {
+  // (R1 W2.3) `reach` (undergrowth): a cell is wanted only while its ground lies within that many metres of the eye
+  // itself, not of the ground under it: from the ship at 150 m no stroke of the undergrowth can be seen (PROP_VERT
+  // shrinks each away by its root's distance), and they were built and submitted all the same, and kept at any height
+  // (98 draws of nothing at 150 m, 303 at 1 km). Walked only while the eye is near enough the ground for any cell to
+  // be in reach; a cell beyond reach by more than the old margin is let go at any height.
+  _wanted(level, size, radius, map, kind, reach) {
     const R = this.R, cam = this.camLocal;
     const c = _up.copy(cam).normalize();
     const e = new THREE.Vector3().crossVectors(_Y, c); if (e.lengthSq() < 1e-6) e.set(1, 0, 0); e.normalize();
     const n = new THREE.Vector3().crossVectors(c, e);
-    const step = size * 0.5, K = Math.ceil(radius / step), cells = 1 << level;
+    const step = size * 0.5, cells = 1 << level;
+    let K = Math.ceil(radius / step);
     const seen = new Set();
+    if (reach != null) {
+      const above = cam.length() - R - this.S.heightAt(c.x, c.y, c.z);
+      if (above > reach + size * 0.75 + RELIEF) K = -1;
+    }
     for (let j = -K; j <= K; j++) for (let i = -K; i <= K; i++) {
       if ((i * i + j * j) * step * step > (radius + step) * (radius + step)) continue;
       const x = c.x * R + e.x * i * step + n.x * j * step, y = c.y * R + e.y * i * step + n.y * j * step, z = c.z * R + e.z * i * step + n.z * j * step;
@@ -412,17 +431,27 @@ export class Flora {
       const ix = Math.min(cells - 1, Math.max(0, Math.floor((_ff.u + 1) * 0.5 * cells))), iy = Math.min(cells - 1, Math.max(0, Math.floor((_ff.v + 1) * 0.5 * cells)));
       const key = _ff.face * 1e8 + ix * 1e4 + iy;
       if (seen.has(key)) continue;
-      seen.add(key);
-      if (!map.has(key)) {
-        const span = 2 / cells;
+      const span = 2 / cells;
+      let origin = map.has(key) ? map.get(key).origin : null;
+      if (!origin && reach != null) origin = this._origins.get(key);
+      if (!origin) {
         faceToDir(_ff.face, -1 + (ix + 0.5) * span, -1 + (iy + 0.5) * span, _dd);
         const h = this.S.heightAt(_dd[0], _dd[1], _dd[2]);
-        map.set(key, { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far', origin: new THREE.Vector3(_dd[0], _dd[1], _dd[2]).multiplyScalar(R + h), meshes: [], built: false, queued: false, dead: false });
+        origin = new THREE.Vector3(_dd[0], _dd[1], _dd[2]).multiplyScalar(R + h);
+        if (reach != null) { if (this._origins.size > 4096) this._origins.clear(); this._origins.set(key, origin); }
+      }
+      if (reach != null && origin.distanceTo(cam) - size * 0.75 > reach) continue;
+      seen.add(key);
+      if (!map.has(key)) {
+        map.set(key, { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far', origin, meshes: [], built: false, queued: false, dead: false });
       }
     }
     for (const [key, ch] of map) {
       if (seen.has(key)) continue;
-      if (ch.origin.distanceTo(cam) > radius + size * 2.2) { this._disposeChunk(ch); map.delete(key); }
+      if (ch.origin.distanceTo(cam) > (reach != null ? reach + size * 0.75 : radius) + size * 2.2) {
+        if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+        this._disposeChunk(ch); map.delete(key);
+      }
     }
     for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
   }
@@ -445,8 +474,36 @@ export class Flora {
       // the far forms that stood in for these trees are lifted out as the trees are laid
       if (ch.kind === 'near') { const far = this.farChunks.get(ch.face * 1e8 + (ch.ix >> 1) * 1e4 + (ch.iy >> 1)); if (far && far.built && !far.held && !far.dead) this._retier(far); }
     } else {
-      for (const m of ch.meshes) { m.userData.laid = now; m.visible = !(m.userData.skipLow && QUALITY.level === 0); }
+      for (const m of ch.meshes) m.userData.laid = now;
+      this._showUnder(ch);
       if (ch.meshes.length) this.lastLaid = now;
+    }
+  }
+
+  // (R1 W2.3) an undergrowth cell's meshes, each submitted only while one of its strokes can be seen (the nearest root
+  // nearer than the mesh's reach), and the bushes not at the low tier. A held cell stays hidden (_hold).
+  _showUnder(ch) {
+    if (!ch.built || ch.held || ch.dead) return;
+    const cam = this.camLocal, k = this.rangeScale, low = QUALITY.level === 0;
+    for (const m of ch.meshes) {
+      const u = m.userData;
+      let on = !(u.skipLow && low);
+      if (on && u.reach) {
+        const reach = u.reach * k, dc = cam.distanceTo(u.rootC);
+        if (dc - u.rootR >= reach) on = false;
+        else if (dc + u.rootR >= reach) {
+          // (the sphere straddles the reach: the strokes drawn, root by root)
+          const a = m.instanceMatrix.array, o = ch.origin, r2 = reach * reach;
+          const cx = cam.x - o.x, cy = cam.y - o.y, cz = cam.z - o.z;
+          on = false;
+          for (let i = 0, n = m.count * 16; i < n; i += 16) {
+            const dx = a[i + 12] - cx, dy = a[i + 13] - cy, dz = a[i + 14] - cz;
+            if (dx * dx + dy * dy + dz * dz < r2) { on = true; break; }
+          }
+        }
+      }
+      if (on && u.near) on = ch.origin.distanceTo(cam) - ch.size * 0.75 < u.near * k * 1.5;
+      m.visible = on;
     }
   }
 
@@ -486,25 +543,22 @@ export class Flora {
     }
     if (this.lastUnderEval.distanceTo(camLocal) > 8) {
       this.lastUnderEval.copy(camLocal);
-      if (alt < 400) {
-        this._wanted(UNDER_LEVEL, this.underSize, 44 * ([0.42, 0.82, 1.0][QUALITY.level] || 1) + this.underSize * 0.6, this.underChunks, 'under');
-        this._wanted(UNDER_LEVEL - 1, this.underSize * 2, UNDER_FAR * k * 1.25 + this.underSize * 1.2, this.under2Chunks, 'under2');
-      }
+      // (R1 W2.3: at every height, by the distance from the eye; the radius at the ground is the reach)
+      const rU = 44 * ([0.42, 0.82, 1.0][QUALITY.level] || 1) + this.underSize * 0.6, rU2 = UNDER_FAR * k * 1.25 + this.underSize * 1.2;
+      this._wanted(UNDER_LEVEL, this.underSize, rU, this.underChunks, 'under', rU);
+      this._wanted(UNDER_LEVEL - 1, this.underSize * 2, rU2, this.under2Chunks, 'under2', rU2);
     }
     let t1 = performance.now(); if (t1 - t0 > prof.wanted) prof.wanted = t1 - t0;
     this.kit.patch.setDrawRange(0, QUALITY.level === 0 ? 60 : Infinity);   // the low tier: five blades a patch
-    // short-range grass is only submitted from cells close enough to show it
-    for (const ch of this.underChunks.values()) {
-      if (!ch.built) continue;
-      const d = ch.origin.distanceTo(camLocal) - ch.size * 0.75;
-      for (const m of ch.meshes) if (m.userData.near) m.visible = d < m.userData.near * k * 1.5;
-    }
-    // the low tier leaves out the bushes
+    // the low tier draws half of each undergrowth mesh
     if (QUALITY.level !== this.lastQ) {
       this.lastQ = QUALITY.level;
-      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) { if (m.userData.skipLow) m.visible = QUALITY.level > 0; if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.5) : m.userData.full; }
+      for (const ch of this.under2Chunks.values()) for (const m of ch.meshes) if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.5) : m.userData.full;
       for (const ch of this.underChunks.values()) for (const m of ch.meshes) if (m.userData.full) m.count = QUALITY.level === 0 ? Math.ceil(m.userData.full * 0.5) : m.userData.full;
     }
+    // (R1 W2.3) an undergrowth mesh is submitted only while a stroke of it can be seen; the low tier leaves out the bushes
+    for (const ch of this.underChunks.values()) this._showUnder(ch);
+    for (const ch of this.under2Chunks.values()) this._showUnder(ch);
     // build queue: nearest first; always allowed one item when nothing was built for a while
     let spent = false;
     if (this.queue.length) {

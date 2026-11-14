@@ -4,7 +4,80 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of RELEASE 1, W2.1 and W2.2 (sharp from the ship; READ THIS FIRST; kept current after every item)
+## Hand-over of RELEASE 1, part 2: W2.3, W2.4, W2.5 (READ THIS FIRST; kept current after every item)
+
+The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W2 items 3-5, section 5). Part 1 (W2.1, W2.2) is the section after this one.
+Began 10:50 UTC 2026-11-14 on head `e87f6be`. Scratch: `/home/user/.pc-scratch/painter/r1/` (`trees/` exports: `base`
+= the head I began on, `w23`, `w24`, `w25` = base plus each item's files, `chk*` clean exports for the checks; `w23/bench.mjs`
+the Node world bench for W2.3; `bin/ab.mjs` the in-page A/B driver on PILOT's harness page (`--mode under`: the frame as
+drawn against the same held frame with every undergrowth mesh the range test left out shown; `--mode post`: this tree's
+post passes against the BASE tree's sheet and backdrop on the same held scene; `--mode msaa`: the region view with MSAA
+and the rule against the same view drawn with one sample), `bin/basesrc.mjs` (a tree's post shader sources from its own
+Post class), `bin/runcmp.mjs` (two station runs: cost and frames), `bin/diffimg.py`; runs `st-w23`, `ab-w24`, ...).
+
+**STATE:** W2.3 COMMITTED (the commit after `e87f6be`, "W2.3 free wins"). W2.4 (post savings) is written and
+measured, in the working tree and in `trees/w24` (post.js, shared.js, materials.js, test `src/world/postsave.test.mjs`
+in `trees/w24` only), not committed yet. W2.5 (MSAA and the region rule) is written in `trees/w25` (post.js on top of
+W2.4 via `w25/post_patch.py`, index.js, chunks.js, test `src/world/aaregion.test.mjs`), not yet run in a browser.
+
+### W2.3 free wins: what was done (src/world/flora.js, src/world/index.js; test src/world/undergrowth.test.mjs)
+- **Undergrowth and grass cells by the distance from the eye, at every height.** Their strokes are drawn only while the
+  root is nearer than the mesh's reach (PROP_VERT: `uLod.y x (1 + (seed - 0.5) uLod.z)`, at most `lod[1] x (1 + lod[2]/2)`
+  times the tier's range scale: grass 43.5 m, ferns 137.5 m at q2), yet the cells were picked on the ground under the
+  eye, built only below 400 m and never let go above it: from the ship at 150 m every one was built and submitted for
+  nothing, and at 1 km the cells of the last low pass stayed. Now `_wanted(..., reach)` keeps the old walk at the ground
+  but wants a cell only while its ground (origin) lies within its reach (the old radius: reach + margin) of the eye
+  itself; beyond reach plus the old margin a cell is let go at any height (and taken off the build queue). The walk
+  is skipped while the eye is higher above the ground under it than reach + 250 m (RELIEF: a hill that high within the
+  reach is a cliff). Where cells were looked at and not wanted, their places are cached (`_origins`, cleared past 4096).
+- **A mesh is submitted only while a stroke of it can be seen** (`_showUnder`, every frame and on release): the box round
+  its roots (`rootC`, `rootR`, made with the instances) against its reach; where the box straddles the reach, root by
+  root. Held cells stay hidden, the bushes stay out at tier 0 (as before).
+- **The forced matrix walks**: `world.update` called `root.updateMatrixWorld(true)` for the active body and again for
+  every body, every frame: two forced walks of every mesh (the renderer walks them again before it draws). Now
+  `root.updateWorldMatrix(true, false)`: the root's own matrix (game.js already sets it each frame); its meshes are
+  brought up to date by the renderer, as before.
+- **Not done: "upload only the per-patch uniforms instead of uniformsNeedUpdate"** (terrain.js, flora.js). Three r187
+  offers no way to upload a few uniforms of a program from onBeforeRender (it runs before the program is bound), and its
+  setters cache every value, so the flag costs a walk of the material's uniform list in JS, not GL calls. Left; not in
+  this part's brief.
+
+### W2.3 numbers
+- PILOT's harness, q2 1280x720, all 25 stations (`st-w23`, the head plus these files) against W2.2's run (`st-w22d`):
+  draw calls / triangles at E_1000_90 442 / 669,284 -> **139 / 233,608** (plan: at most 160 / 260k; the lead's
+  reproduction 138 / 233,607); E_150_45 451 / 910,624 -> 283 / 655,924; E_150_90 493 -> 232; E_400_90 539 / 822k -> 236
+  / 387k; E_foot 463 -> 414 (meshes with no stroke in reach were drawn on foot too); M_150_90 238 -> 158; S_150_90 372 ->
+  251; N_150_45 312 -> 188. Every station fewer or equal (`docs/shots/painter/r1/w23-cost-and-frames-vs-w22.txt`).
+  Final land t1/t2/t3, raw lapvar and the bands the same at every station to the harness's two decimals.
+- Node world bench (`w23/bench.mjs`, q2, Earth, budget 5 ms; `docs/shots/painter/r1/w23-node-bench-before.json`,
+  `-after.json`): matrix walks' share of world.update standing 53.5 % -> 5.9 % (0.29 -> 0.015 ms a frame; what is left
+  is the thirteen roots' own matrices and their getWorldPosition calls), walking 4.2 m/s 25.0 % -> **1.2 %**, flying at
+  150 m 10.7 % -> 0.5 % (plan: at most 5 % of world.update; the audit's 24.7 % was its whole bench, my walking figure
+  matches it). Undergrowth on a scripted descent from 1 km at 15 m/s (cells built / laid, meshes submitted): before 104
+  cells and 275 meshes at every height (393k triangles submitted at 1 km, 0 strokes seen); after 0 cells at 1 km and at
+  400 m, 29 cells and **0 meshes submitted at 150 m**, at 110 m 47 cells laid and every mesh with a stroke in reach laid
+  and submitted (48 of 48), touchdown 103 laid cells against 104 before (**-1 %**, plan within 10 %), submitted 142
+  meshes (the 142 with a stroke in reach; before 275).
+- Test `src/world/undergrowth.test.mjs` (4): on foot a mesh is submitted exactly when a stroke of it can be seen; 150 m
+  up none submitted, 1 km up none kept; the descent: laid by 110 m, as many cells at touchdown as on a standing start;
+  world.update updates no mesh's matrix (2,686 a frame before). FAILS 4 of 4 on the head I began on (`e87f6be`).
+- Frames: every station before | after OPENED (`docs/shots/painter/r1/w23-before-after-q2-1280-1..4.jpg`): the same
+  pictures. Between two runs the frames differ only where the game's state moves from page to page (crowns swaying in
+  PHYSICS' field, the stream): `w23-cost-and-frames-vs-w22.txt`. The exact check is in-page:
+- **In-page A/B** (`bin/ab.mjs --mode under`, run `ab-w24`, the W2.4 tree, which holds these files): at each station the
+  held frame as drawn, then every undergrowth mesh the range test left out shown and the frame drawn again. Shown: 122
+  meshes at E_foot, 183 at E_50_45/90, 247 at E_150_45/90 (none built at 400 m and 1 km). Outside the water (region 2
+  grown by 4 px) the final frames differ by **at most 2/255** (E_foot 6 pixels over 1/255; E_50 none; E_150 one pixel),
+  which is the page's own noise floor: at E_400 and E_1000, where nothing was shown and nothing changed, two renders
+  differ by up to 2-3/255 near the water (the water reflects the frame before, and the wet-in-wet bleed spreads it a
+  few pixels; the lead's reproduction saw the same 2/255). The region view is identical everywhere. Undergrowth meshes
+  submitted at E_150_45 and E_150_90: **0** (plan: 0; 98 before).
+- Checks on a clean export of `e87f6be` with these files (`trees/chk23`): world 34 (30 + the 4 new), unit 225, physics
+  325, coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the station run's page and the A/B page: no
+  console error, fallback empty. `tests/all.mjs`' painted-play and painted-m3 are run at the end of this part, on the
+  last state (one browser at a time).
+
+## Hand-over of RELEASE 1, W2.1 and W2.2 (part 1 of the lane; done; part 2 is the section above)
 
 The owner's request after play: much sharper (the ground seen from the ship, "not some blurry blobs"), smoother, mobile,
 without losing quality. The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (sections 0, 2, 4 W2, 5). This lane, part 1: W2.1
