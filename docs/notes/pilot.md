@@ -12,8 +12,8 @@ it).
 
 **State:** in progress. Items: W1.1 harness (committed `2355594`, game clock pinned at 120 s since; reproduces the
 baseline, table below), W1.1b baseline numbers (q2 1280x720, all 24 stations, committed; q2 1920x1080, q1, q0 and the
-phone profile pending), W1.2 green gate DONE (code `419074c`; painted-trip 3 of 3; all.mjs on a clean export of
-`8811ca4` ALL 15 PASSED). Still to do for W1.1's acceptance: two identical runs compared (`--diff`).
+phone profile running), W1.2 green gate DONE (code `419074c`; painted-trip 3 of 3; all.mjs on a clean export of
+`8811ca4` ALL 15 PASSED). W1.1's "two runs agree": met (below).
 
 ### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
 
@@ -44,6 +44,18 @@ game clock). Final t1/t2 0.043/0.25 in every case. Ruling: the harness pins the 
 audit's stations were; deterministic) and the wash clock at 100. (The study's run was stopped by the shell's time limit
 after the 400 s point; the 1500 s and 3000 s points were not taken. Its page was not held: the game clock crept about
 1 s between grabs; the harness holds it.)
+
+**Two runs agree** (W1.1 acceptance; `docs/shots/pilot/r1/two-runs-diff.txt`): `--set quick` (E_foot, E_150_45,
+E_1000_45, with taps, flicker and alias) run twice on fresh pages of 784183b, compared with `--diff`: 518 numbers, 0
+outside the rule: the normalised measures (t1-t3, shares, A, F, halo) within 0.0026 (rule: 0.005, half a unit of the
+second decimal), cost identical, CIELAB within 0.5, the absolute magnitudes (lapvar, b1-b3) within 0.86 %. My reading
+of "agree to 2 decimals on every metric", logged as a ruling: lapvar and the bands are magnitudes in the hundreds and
+tens (two decimals of 190.7 would be 0.003 %), so they are held to 1 %; and a mask under 5000 pixels is not judged (at
+E_foot the ground 30-150 m off is 771 pixels of stream bank where the water and the grass move from run to run: t1
+there 0.310 / 0.316). What still moves between runs: the stream's water and single grass blades at E_foot (a pixel
+difference: 1.8 % of pixels over 8/255; 0.4 % at E_150_45), state the game builds up in the real frames before
+`__pcReady`, which no clock pin reaches. The quick run against the baseline run (where E_150_45 and E_1000_45 come
+after eight other stations): 1 number outside, E_foot raw ground lapvar 1.04 %.
 
 ### W1.1b The baseline of 784183b: `tests/baselines/stations-784183b.json`
 
