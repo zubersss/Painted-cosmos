@@ -16,6 +16,7 @@
 //   node tests/stations.mjs --compare BASE.json[:KEY] --with RUNDIR       the guard's rules, no browser
 //   node tests/stations.mjs --baseline OUT.json --commit SHA --from RUNDIR[,RUNDIR...]   collect runs
 //   node tests/stations.mjs --sheet RUNDIR_A,RUNDIR_B --out SHEET.jpg      before/after sheet and 1:1 crops
+//   node tests/stations.mjs --diff RUNDIR_A,RUNDIR_B        two runs' numbers side by side: the largest differences
 //
 // --set: set names (quick, audit, earth, air, phone, all), station names or regular expressions,
 //   comma separated; the stations always run in the list's order. --root: the tree to serve (a clean
@@ -48,6 +49,7 @@ const r4 = (v) => (typeof v === 'number' ? Math.round(v * 1e4) / 1e4 : v);
 const DEVICES = { iphone14: 'iPhone 14 landscape', pixel7: 'Pixel 7 landscape', ipadpro11: 'iPad Pro 11 landscape' };
 
 if (flag('compare')) process.exit(compare(val('compare'), val('with')));
+if (flag('diff')) process.exit(diffRuns(val('diff').split(',')));
 if (flag('baseline')) process.exit(collect(val('baseline'), val('commit', '?'), val('from', '')));
 if (flag('sheet') && !flag('set')) { await sheetOnly(val('sheet').split(','), val('out')); process.exit(0); }
 process.exit(await run());
@@ -349,4 +351,23 @@ function compare(baseSpec, withDir) {
   }
   console.log(flags ? `${flags} flags (read each against the item's own exceptions)` : 'no flags');
   return flag('strict') && flags ? 1 : 0;
+}
+
+// Two runs of the same stations: every number of the measures compared; the largest differences, and whether every
+// one agrees to two decimals (the harness's acceptance: two runs agree to 2 decimals on every metric).
+function diffRuns([a, b]) {
+  const A = JSON.parse(fs.readFileSync(path.join(a, 'run.json'), 'utf8')).stations, B = JSON.parse(fs.readFileSync(path.join(b, 'run.json'), 'utf8')).stations;
+  const skip = new Set(['secs', 'place', 'station', 'size', 'refSize', 'fit', 'costAt2x', 'perFrame', 'min', 'max', 'total']);
+  const rows = [];
+  const walk = (x, y, k) => {
+    if (typeof x === 'number' && typeof y === 'number') { rows.push({ k, a: x, b: y, d: Math.abs(x - y) }); return; }
+    if (x && y && typeof x === 'object') for (const key of Object.keys(x)) if (!skip.has(key) && key in y) walk(x[key], y[key], k + '.' + key);
+  };
+  for (const n of Object.keys(A)) if (B[n]) walk(A[n], B[n], n);
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const off = rows.filter((r) => r2(r.a) !== r2(r.b));
+  rows.sort((p, q) => q.d - p.d);
+  for (const r of rows.slice(0, 15)) console.log(r.k.padEnd(48), r.a, r.b, 'diff', +r.d.toPrecision(3));
+  console.log(`${rows.length} numbers compared; ${off.length} differ at two decimals` + (off.length ? ': ' + off.slice(0, 8).map((r) => `${r.k} ${r.a} / ${r.b}`).join('; ') : ''));
+  return off.length ? 1 : 0;
 }

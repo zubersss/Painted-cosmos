@@ -10,9 +10,10 @@ Scratch: `/home/user/.pc-scratch/pilot/r1/`. First commit's parent: `56382c2` (t
 `tests/stationlib/metrics.mjs` and `png.mjs`, the port begun by the agent before the 04:59 restart; this agent continues
 it).
 
-**State:** in progress. Items: W1.1 harness (committed; reproduction of E_150_45's raw lapvar under study, below),
-W1.1b baseline numbers (pending: run after the study), W1.2 green gate (code committed `419074c`; its proof runs
-pending: painted-trip 3 times, all.mjs once).
+**State:** in progress. Items: W1.1 harness (committed `2355594`, game clock pinned at 120 s since; reproduces the
+baseline, table below), W1.1b baseline numbers (q2 1280x720, all 24 stations, committed; q2 1920x1080, q1, q0 and the
+phone profile pending), W1.2 green gate (code committed `419074c`; its proof runs pending: painted-trip 3 times,
+all.mjs once). Still to do for W1.1's acceptance: two identical runs compared (`--diff`).
 
 ### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
 
@@ -25,15 +26,69 @@ pending: painted-trip 3 times, all.mjs once).
 | E_150_45 raw A (aliasing index) | 0.447 | 0.444 |
 | E_150_45 cost | 450 calls, 910,623 triangles | 450, 910,623 |
 | E_1000_90 cost | 441 calls, 669,283 triangles | 441, 669,283 |
-| E_150_45 raw land lapvar | 520-525 | **555.9** (6 % over) |
+| E_150_45 raw land lapvar | 520-525 | 555.9 with the game clock at 900 s; **520.9** with it at 120 s (the baseline run) |
 
 The raw lapvar is the one miss. Cause found so far: the picture is not the same instant. The audit's harness did
 not hold the loop and left the game's clocks where they were; this one pins the game clock (900 s), the painter's wash
 clock (100) and renders once before the measured render. A pixel difference of this raw frame against the audit's
 (same camera to the millimetre): crowns' edges everywhere (the trees sway with the clocks) and the stream (the water
 reflects the frame before: here the same view, in the audit a frame of the game's own camera, since its loop ran
-between grabs). The lead's two placements in one page differed by 0.4 % (520.75, 522.62). Study of how far the clocks
-move it: next.
+between grabs). The lead's two placements in one page differed by 0.4 % (520.75, 522.62).
+
+**Clock study** (`/home/user/.pc-scratch/pilot/r1/bin/clockstudy.mjs`, log `clockstudy.log`; one page of 784183b, E_150_45,
+raw land lapvar): the audit's way (no clock set, no warm render; the game clock at 14 s, as a fresh page stands) 521.0,
+with a warm render 522.7; the wash clock at 0, 37, 100, 250, 523, 1000, 2000: 524.8, 524.9, 524.0, 524.5, 525.5, 525.8,
+526.0 (1 %); the GAME clock at 120 s 522.0, 400 s 526.9, 900 s 554.5 (the wind and what sways with it move with the
+game clock). Final t1/t2 0.043/0.25 in every case. Ruling: the harness pins the game clock at 120 s (early, as the
+audit's stations were; deterministic) and the wash clock at 100. (The study's run was stopped by the shell's time limit
+after the 400 s point; the 1500 s and 3000 s points were not taken. Its page was not held: the game clock crept about
+1 s between grabs; the harness holds it.)
+
+### W1.1b The baseline of 784183b: `tests/baselines/stations-784183b.json`
+
+Measured with this harness on a clean export of `784183b` (the same game code as the live game and as HEAD before R1),
+q2, 1280x720, all 24 stations, with taps, flicker and alias (run `/home/user/.pc-scratch/pilot/r1/base-q2-1280/`, 21 min
+of stations after a 10 min load; no console error, fallback empty). Sheets, OPENED (every station's final and raw, and
+1:1 crops of the land): `docs/shots/pilot/baseline/q2-1280x720-sheet.jpg`, `q2-1280x720-crops.jpg`; one line a station:
+`q2-1280x720-summary.txt`. What they show: the raw scene has every crown, trunk and path; the final has blobs from
+150 m up; at 1 km the raw ground is rows of dashes (the dapple aliasing W2.1 removes). The sharpness audit's summary
+reproduced station by station within about 3 % in raw lapvar (E_foot 190.6 / 185.0, E_150_90 423.1 / 435.9, E_400_45
+409.2 / 408.8, E_1000_90 1082.2 / 1086.0) and to two decimals in the final t1/t2 at all twenty.
+
+| Station | raw land lapvar | final land t1 / t2 / t3 | halo % abs / final | A raw / abs | F raw / abs | calls / triangles | foliage share |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| E_foot | 190.6 | 0.30 / 0.72 / 0.91 | 1.6 / 2.2 | 0.525 / 0.438 | 0.464 / 0.390 | 462 / 1456987 | 0.29 |
+| E_50_45 | 237.5 | 0.22 / 0.60 / 0.88 | 4.2 / 4.3 | 0.421 / 0.272 | 0.407 / 0.265 | 509 / 1290599 | 0.46 |
+| E_50_90 | 208.7 | 0.31 / 0.74 / 0.94 | 2.3 / 3.4 | 0.395 / 0.254 | 0.386 / 0.244 | 365 / 1021177 | 0.30 |
+| E_150_45 | 520.9 | 0.04 / 0.25 / 0.68 | 11.6 / 11.3 | 0.447 / 0.251 | 0.417 / 0.211 | 450 / 910623 | 0.31 |
+| E_150_90 | 423.1 | 0.08 / 0.33 / 0.71 | 12.2 / 11.5 | 0.386 / 0.226 | 0.347 / 0.191 | 492 / 1006015 | 0.24 |
+| E_400_45 | 409.2 | 0.01 / 0.15 / 0.64 | 7.8 / 7.7 | 0.474 / 0.356 | 0.323 / 0.256 | 299 / 462758 | 0.03 |
+| E_400_90 | 604.3 | 0.01 / 0.13 / 0.59 | 16.3 / 15.9 | 0.402 / 0.286 | 0.329 / 0.223 | 538 / 822388 | 0.08 |
+| E_1000_45 | 372.6 | 0.01 / 0.37 / 0.79 | 3.4 / 3.6 | 0.630 / 0.322 | 0.344 / 0.223 | 97 / 164643 | 0.00 |
+| E_1000_90 | 1082.2 | 0.00 / 0.14 / 0.73 | 3.0 / 3.2 | 0.533 / 0.459 | 0.367 / 0.276 | 441 / 669283 | 0.00 |
+| M_foot | 38.2 | 0.34 / 0.71 / 0.88 | 1.1 / 2.8 | 0.472 / 0.361 | 0.423 / 0.290 | 292 / 452645 | 0.00 |
+| M_50_45 | 48.8 | 0.26 / 0.57 / 0.84 | 0.6 / 1.1 | 0.423 / 0.330 | 0.443 / 0.354 | 253 / 398942 | 0.00 |
+| M_50_90 | 53.3 | 0.38 / 0.74 / 0.93 | 0.4 / 1.2 | 0.436 / 0.342 | 0.381 / 0.307 | 149 / 257290 | 0.00 |
+| M_150_45 | 19.2 | 0.13 / 0.44 / 0.71 | 2.2 / 2.9 | 0.284 / 0.181 | 0.312 / 0.178 | 272 / 377970 | 0.00 |
+| M_150_90 | 26.3 | 0.11 / 0.33 / 0.63 | 0.8 / 1.0 | 0.381 / 0.299 | 0.363 / 0.298 | 237 / 343062 | 0.00 |
+| M_400_45 | 15.7 | 0.09 / 0.29 / 0.68 | 3.2 / 3.6 | 0.215 / 0.204 | 0.139 / 0.182 | 205 / 289391 | 0.00 |
+| M_400_90 | 10.8 | 0.13 / 0.34 / 0.61 | 2.7 / 3.2 | 0.235 / 0.195 | 0.191 / 0.198 | 291 / 405739 | 0.00 |
+| M_1000_45 | 36.0 | 0.05 / 0.37 / 0.77 | 1.1 / 1.3 | 0.249 / 0.256 | 0.162 / 0.194 | 56 / 115591 | 0.00 |
+| M_1000_90 | 33.7 | 0.04 / 0.23 / 0.67 | 1.6 / 1.8 | 0.232 / 0.288 | 0.144 / 0.217 | 180 / 373495 | 0.00 |
+| S_150_45 | 38.8 | 0.06 / 0.30 / 0.68 | 3.3 / 3.9 | 0.336 / 0.212 | 0.376 / 0.217 | 302 / 512286 | 0.00 |
+| S_150_90 | 38.5 | 0.07 / 0.34 / 0.70 | 0.7 / 1.1 | 0.427 / 0.325 | 0.441 / 0.335 | 371 / 724630 | 0.01 |
+| E_foot_night | 144.3 | 0.18 / 0.44 / 0.58 | 2.4 / 1.0 | 0.558 / 0.503 | 0.485 / 0.432 | 490 / 1492056 | 0.29 |
+| E_150_45_dusk | 281.1 | 0.03 / 0.15 / 0.44 | 11.1 / 7.6 | 0.448 / 0.257 | 0.407 / 0.232 | 451 / 910624 | 0.31 |
+| E_150_45_storm | 97.4 | 0.03 / 0.20 / 0.54 | 6.1 / 5.0 | 0.417 / 0.237 | 0.468 / 0.261 | 450 / 910623 | 0.31 |
+| N_150_45 | 103.6 | 0.05 / 0.26 / 0.63 | 2.6 / 3.1 | 0.454 / 0.282 | 0.501 / 0.291 | 311 / 703081 | 0.01 |
+
+Post reads counted (`--taps`), every station: prep 4 per half-size pixel, abstraction 13 per pixel (13 on far land),
+keep 2 per half-size pixel, sheet 16 per output pixel: 28.1 M reads a frame at 1280x720. The halo share of today's
+abstraction output is high where its brush is wide (11-16 % from 150-400 m up): the measure counts a blur's spread as
+well as overshoot, so it means "no false sharpness" only where the output follows the raw scene (x26's: 0.02 %).
+The 1000 m stations: the ship is above the edge of the air there (state SPACE, the world turns under it while the
+world settles), so the ground under it is a few hundred metres from the 150 m stations' (E: autumn_woodland, 969 m up;
+M: dry_riverbeds, 1004 m), as in the audit's runs; with the clocks pinned it is the same ground every run.
 
 ### W1.1 The station harness: HOW TO RUN A STATION SET (for PAINTER and whoever measures a picture)
 
@@ -60,7 +115,7 @@ One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EX
   W2.1's raw b1, W7.1's budget). `--baseline OUT.json --commit SHA --from DIR[,DIR]` collects runs into a baseline file.
 - Timing on this machine (SwiftShader): the page loads in 4 to 6 min at q2 1280x720; a station takes about a minute
   plus the extras (see the run's `secs`). Free memory first (`free -m`); one browser of yours at a time.
-- Determinism: the harness fixes the game clock (900 s) and the painter's wash clock (100) at every station, sets the
+- Determinism: the harness fixes the game clock (120 s) and the painter's wash clock (100) at every station, sets the
   hour again after the settle, and renders once before the measured render (the water reflects the frame before).
 - Measures (tests/stationlib/metrics.mjs, a number-for-number port of the audit's metrics.py: on the audit's own frames
   of E_150_45 the largest difference over 144 numbers is 6e-5; tests/stationmetrics.test.mjs holds metrics.py's numbers

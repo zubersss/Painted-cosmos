@@ -16,7 +16,9 @@
     pinnedScale: null,
     jitterPx: 0,          // a sub-pixel pan of the picture (the flicker index): the projection is shifted, nothing else
     washClock: 100,       // the painter's wash clock at every measured render (sway, drift): the same picture every run
-    gameClock: 900,       // the game's clock at each station (s), before the hour is set
+    gameClock: 120,       // the game's clock at each station (s), before the hour is set: early, as the audit's stations were
+                          // (its loop ran from a fresh page: 14 s at the first station). The wind moves with it: E_150_45's raw
+                          // land lapvar is 522 at 120 s and at 14 s, 527 at 400 s, 555 at 900 s; the wash clock moves it 1 %.
     hud(on) { const h = document.getElementById('pc-hud'); if (h) h.style.visibility = on ? '' : 'hidden'; },
     settled() { const w = pc.world; return typeof w.isSettled === 'function' ? w.isSettled() : w.busy === 0; },
     // Step the held loop until the world has had nothing to build for `need` frames (the audit's settle: the
@@ -51,7 +53,7 @@
       }
       const w = pc.world;
       if (w.setWeather) w.setWeather(o.weather === 'storm' ? STORM : {});
-      pc.setClock(this.gameClock);
+      if (this.gameClock != null) pc.setClock(this.gameClock);
       const d = o.where === 'spawn' ? w.getSpawn(o.body).unitDir : w.findBiome(o.body, o.where).unitDir;
       const dir = [d.x, d.y, d.z], hour = o.hour == null ? 11 : o.hour;
       if (o.foot) {
@@ -64,7 +66,7 @@
         pc.sim.shipCam.cockpit = true; this.hideShip = true; this.cam = { pitch: o.pitch, heading: o.heading };
       }
       const s = this.settle(1200);
-      pc.setHour(hour);   // the light of the hour asked, whatever game time the settle took
+      if (this.gameClock != null) pc.setHour(hour);   // the light of the hour asked, whatever game time the settle took
       const p = o.foot ? pc.sim.ex.p : pc.sim.sh.p, l = Math.hypot(p.x, p.y, p.z);
       const smp = w.sampleSurface(o.body, { x: p.x / l, y: p.y / l, z: p.z / l });
       return { s, dir, w: this.where(), heightAboveGround: l - smp.radius, biome: smp.biomeId, canopy: smp.canopyHeight };
@@ -106,7 +108,7 @@
         pm[8] = keep8 + (2 * this.jitterPx) / pc.renderer.domElement.width;
         cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
       }
-      P.setTime(this.washClock);
+      if (this.washClock != null) P.setTime(this.washClock);
       P.setDebugView(view | 0);
       try { P.render(pc.scene, cam, 0); }
       finally {
@@ -133,7 +135,7 @@
     // the post passes only, on the scene pass already in the targets (post experiments; the loop must be held)
     postOnly() {
       const P = pc.painter, post = P._post;
-      P.setTime(this.washClock);
+      if (this.washClock != null) P.setTime(this.washClock);
       P.setDebugView(0);
       post.finish([], pc.camera);
     },
