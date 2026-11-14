@@ -104,6 +104,24 @@ E_150_45 final land t1/t2 0.02/0.11 (0.04/0.25 at 720p), E_400_90 0.00/0.03, E_1
 M_150_45 0.07/0.27, S_150_45 0.02/0.17; the same draw calls and triangles as at 720p; post reads 63.2 M a frame (the
 same reads per pixel). No A at this size (its reference would be 3840x2160).
 
+**q1 and q0 at 1280x720** (runs `base-q1-1280/` and `base-q0-1280/`, 6 and 5 min of stations; no console error,
+fallback empty; sheets `q1-1280x720-sheet.jpg`, `q0-1280x720-sheet.jpg`, shrunk, OPENED: at q0 the forest from 150 m
+is the purple canopy wash with no trees, as the audit found). Internal size 1024x576 (q1) and 794x446 (q0), enlarged to
+1280x720 by the sheet (22 reads an output pixel there: 16 + 6 in the enlargement branch). The finals are also measured
+against the q2 run's raw scene (`node tests/stations.mjs --reref <run> --ref <q2 run>`, offline from the frames; key
+`vsRef` in the baseline), the plan's tier measure. Final land t1/t2 against the q2 raw, foliage share, calls/triangles:
+
+| Station | q1 | q0 |
+| --- | --- | --- |
+| E_foot | 0.20 / 0.58, 0.25, 315 / 735228 | 0.04 / 0.20, 0.17, 169 / 265350 |
+| E_150_45 | 0.03 / 0.18, 0.20, 277 / 469046 | 0.02 / 0.13, 0.01, 136 / 160718 |
+| E_400_90 | 0.01 / 0.09, 0.00, 297 / 432886 | 0.01 / 0.09, 0.00, 162 / 191310 |
+| E_1000_45 | 0.01 / 0.37, 0.00, 76 / 127043 | 0.01 / 0.28, 0.00, 47 / 69913 |
+| M_150_45 | 0.12 / 0.43, 0.00, 177 / 301942 | 0.10 / 0.41, 0.00, 79 / 139468 |
+
+(The audit's tiers-all: E_150_45 t2 0.18 (q1) and 0.12 (q0), E_foot 0.53 and 0.17, M_150_45 0.43 and 0.40; costs at
+E_150_45 277 / 469k and 136 / 161k: reproduced.)
+
 Post reads counted (`--taps`), every station: prep 4 per half-size pixel, abstraction 13 per pixel (13 on far land),
 keep 2 per half-size pixel, sheet 16 per output pixel: 28.1 M reads a frame at 1280x720. The halo share of today's
 abstraction output is high where its brush is wide (11-16 % from 150-400 m up): the measure counts a blur's spread as

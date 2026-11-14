@@ -17,6 +17,8 @@
 //   node tests/stations.mjs --baseline OUT.json --commit SHA --from RUNDIR[,RUNDIR...]   collect runs
 //   node tests/stations.mjs --sheet RUNDIR_A,RUNDIR_B --out SHEET.jpg      before/after sheet and 1:1 crops
 //   node tests/stations.mjs --diff RUNDIR_A,RUNDIR_B        two runs' numbers side by side: the largest differences
+//   node tests/stations.mjs --reref RUNDIR --ref REFDIR       a lower tier's final against the top tier's raw scene
+//        (no browser: the frames on disk; adds `vsRef` to each station of RUNDIR/run.json)
 //
 // --set: set names (quick, audit, earth, air, phone, all), station names or regular expressions,
 //   comma separated; the stations always run in the list's order. --root: the tree to serve (a clean
@@ -50,6 +52,7 @@ const DEVICES = { iphone14: 'iPhone 14 landscape', pixel7: 'Pixel 7 landscape', 
 
 if (flag('compare')) process.exit(compare(val('compare'), val('with')));
 if (flag('diff')) process.exit(diffRuns(val('diff').split(',')));
+if (flag('reref')) process.exit(reref(val('reref'), val('ref')));
 if (flag('baseline')) process.exit(collect(val('baseline'), val('commit', '?'), val('from', '')));
 if (flag('sheet') && !flag('set')) { await sheetOnly(val('sheet').split(','), val('out')); process.exit(0); }
 process.exit(await run());
@@ -392,4 +395,31 @@ function diffRuns([a, b]) {
   console.log(`largest relative difference of an absolute measure: ${(worstRel.r * 100).toFixed(2)} % (${worstRel.k}: ${worstRel.a} / ${worstRel.b})`);
   console.log(`${rows.length} numbers compared (${JSON.stringify(counts)}; ${small} masks under 5000 pixels not judged); ${bad.length} outside the rule` + (bad.length ? ': ' + bad.slice(0, 8).map((r) => `${r.k} ${r.a} / ${r.b}`).join('; ') : ''));
   return bad.length ? 1 : 0;
+}
+
+// A tier's pictures against another run's raw scene of the same station (the plan's tier measures read "against the
+// q2 raw": the q1 and q0 finals are measured with the q2 raw scene's bands as the reference, over the q2 run's land).
+function reref(dir, refDir) {
+  const runFile = path.join(dir, 'run.json'), j = JSON.parse(fs.readFileSync(runFile, 'utf8'));
+  const refRun = JSON.parse(fs.readFileSync(path.join(refDir, 'run.json'), 'utf8'));
+  const load = (d, n, v) => { const f = path.join(d, 'frames', `${n}_v${v}.png`); return fs.existsSync(f) ? readPng(fs.readFileSync(f)) : null; };
+  for (const [n, rec] of Object.entries(j.stations)) {
+    const R1 = load(refDir, n, 1), R4 = load(refDir, n, 4), F0 = load(dir, n, 0), F5 = load(dir, n, 5), F1 = load(dir, n, 1);
+    if (!R1 || !R4 || !F0) { console.log(n, 'missing frames'); continue; }
+    if (R1.width !== F0.width || R1.height !== F0.height) { console.log(n, 'sizes differ'); continue; }
+    const W = F0.width, H = F0.height, lum = (p) => MX.lumaOf(p.rgba, W, H, false);
+    const { M } = MX.masks(MX.classesOf(R4.rgba, W, H, false), null, W, H);
+    const rb = MX.bands(lum(R1), W, H);
+    rec.vsRef = { ref: refRun.label };
+    for (const [key, p] of [['final', F0], ['abs', F5], ['raw', F1]]) {
+      if (!p) continue;
+      const y = lum(p), pre = { bands: MX.bands(y, W, H), lap: MX.lap(y, W, H) };
+      rec.vsRef[key] = {};
+      for (const mk of ['land', 'ground', 'foliage']) rec.vsRef[key][mk] = MX.round(MX.stats(y, W, H, rb, M[mk], pre));
+    }
+    const f = rec.vsRef.final.land;
+    console.log(n.padEnd(15), `final land vs ${refRun.label} raw: t1 ${f ? f.t1.toFixed(2) : '-'} t2 ${f ? f.t2.toFixed(2) : '-'} t3 ${f ? f.t3.toFixed(2) : '-'}`);
+  }
+  fs.writeFileSync(runFile, JSON.stringify(j, null, 1));
+  return 0;
 }
