@@ -125,21 +125,26 @@ export function canBeginLanding(state, altitudeAboveGround, speed) {
   return state === S.ATMOSPHERE && altitudeAboveGround <= LAND_PROMPT_ALTITUDE && speed <= LAND_PROMPT_SPEED;
 }
 
-// The one line of help shown at the bottom of the screen: { key, text } or null.
+// The one line of help shown at the bottom of the screen: { key, text } or null. `code` (and
+// `code2`) is the action as the input names it (src/core/input.js): on a touch screen the prompt
+// is a button that presses it (src/ui/hud.js); `key` is what is lettered for a keyboard.
+const E = (text) => ({ key: 'E', code: 'KeyE', text });
+const SPACE = (text) => ({ key: 'SPACE', code: 'Space', text });
+const F = (text) => ({ key: 'F', code: 'KeyF', text });
 export function promptFor(state, q) {
   switch (state) {
-    case S.ON_FOOT: return q.canBoard ? { key: 'E', text: 'Board ship' } : q.canEasel ? { key: 'E', text: 'Stand at the easel' } : null;
-    case S.LANDED: return { key: 'SPACE', text: 'Lift off', key2: 'E', text2: 'Step out' };
+    case S.ON_FOOT: return q.canBoard ? E('Board ship') : q.canEasel ? E('Stand at the easel') : null;
+    case S.LANDED: return { ...SPACE('Lift off'), key2: 'E', code2: 'KeyE', text2: 'Step out' };
     case S.ATMOSPHERE:
       if (q.liftingOff) return null;
-      if (q.slowingToLand) return { key: 'SPACE', text: 'Cancel landing' };
-      if (q.canLand) return { key: 'E', text: 'Land here' };
+      if (q.slowingToLand) return SPACE('Cancel landing');
+      if (q.canLand) return E('Land here');
       return null;
-    case S.LANDING: return { key: 'SPACE', text: 'Cancel landing' };
+    case S.LANDING: return SPACE('Cancel landing');
     // F with a course takes the ship there whether or not its mark is on the screen (it turns
     // the ship onto the course first): the prompt is true wherever the nose points.
-    case S.SPACE: return q.turning ? { key: 'F', text: 'Stop turning' } : q.target ? { key: 'F', text: 'Pulse to ' + q.target } : null;
-    case S.PULSE: return { key: 'F', text: 'Drop out of pulse' };
+    case S.SPACE: return q.turning ? F('Stop turning') : q.target ? F('Pulse to ' + q.target) : null;
+    case S.PULSE: return F('Drop out of pulse');
     default: return null;
   }
 }

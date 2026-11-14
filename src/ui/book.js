@@ -2,7 +2,7 @@
 // view found (kept at the moment it happened), and empty frames for the ones still to find.
 // B opens and closes it; the arrow keys (or a click on a tab) turn the pages.
 // Painted like the rest of the interface (src/ui/paint.js): torn paper, hand lettering.
-import { ink, SIZE } from './paint.js';
+import { ink, SIZE, CLOSE_SVG } from './paint.js';
 import { wrapLettering } from './layout.js';
 
 // el(tag, class, parent, text, size): `text` is lettered by hand at `size` (cap height, px).
@@ -22,8 +22,29 @@ const plural = (n, one, many) => `${words(n)} more ${n === 1 ? one : many}`;
 // they are few. The page itself never changes size (one scale for the whole book).
 const tileWidth = (n) => (n <= 1 ? 420 : n <= 2 ? 310 : n <= 6 ? 205 : n <= 12 ? 152 : 120);
 
-export function createBook(root) {
+// On a touch screen (W3.2): a corner closes the book (press('KeyB'): the game puts it away), and a
+// swipe across the page turns it (onTurn: the paper's sound).
+export function createBook(root, { press, onTurn } = {}) {
   const panel = el('div', 'pc-panel pc-book', root);
+  const close = el('div', 'pc-close', panel);
+  close.innerHTML = CLOSE_SVG;
+  close.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
+  close.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); if (press) press('KeyB'); });
+  // A swipe: a finger that went 48 css px or more across, more across than up or down.
+  let swipe = null;
+  panel.addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'touch' && !swipe) swipe = { id: ev.pointerId, x: ev.clientX, y: ev.clientY }; });
+  const lift = (ev) => {
+    if (!swipe || ev.pointerId !== swipe.id) return;
+    const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
+    swipe = null;
+    if (ev.type === 'pointerup' && Math.abs(dx) >= 48 && Math.abs(dx) > 1.4 * Math.abs(dy) && open && pages.length) {
+      at = (at + (dx < 0 ? 1 : -1) + pages.length) % pages.length;
+      draw();
+      if (onTurn) onTurn();
+    }
+  };
+  panel.addEventListener('pointerup', lift);
+  panel.addEventListener('pointercancel', lift);
   const head = el('div', 'pc-book-head', panel);
   ink(el('div', 'pc-title', head), 'sketchbook', SIZE.head + 3, { rough: true, tracking: 1.1 });
   const body = el('div', 'pc-book-body', panel);

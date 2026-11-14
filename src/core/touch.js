@@ -175,6 +175,12 @@ export function attachTouch(input, el, { doc = document, win = window } = {}) {
   const pad = new TouchPad();
   input.touch = pad;
   const now = () => ((win.performance && win.performance.now) ? win.performance.now() : Date.now()) / 1000;
+  // When the finger did it, for telling a tap from a hold: the event's own time (a frame that runs
+  // long must not turn a tap into a hold: the events wait for it and come in together), else the
+  // time it is handled. What the rest of the game asks (when was the last touch: the fade, a mouse
+  // event made up from a touch) is on the page's clock, whatever clock the events keep.
+  const at = (e) => (e && e.timeStamp > 0 ? e.timeStamp / 1000 : now());
+  const seen = () => { pad.lastAt = now(); };
   let touchAt = -Infinity, mouseTravel = 0;
   const show = (on) => {
     if (pad.shown === !!on) return;
@@ -189,15 +195,17 @@ export function attachTouch(input, el, { doc = document, win = window } = {}) {
     if (e.pointerType !== 'touch') return;
     try { el.setPointerCapture(e.pointerId); } catch { /* the finger is still followed */ }
     touchAt = now(); show(true);
-    pad.down(e.pointerId, e.clientX, e.clientY, touchAt, win.innerWidth || 1);
+    pad.down(e.pointerId, e.clientX, e.clientY, at(e), win.innerWidth || 1);
+    seen();
     input.used = true;
   });
   el.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'touch') return;
-    pad.move(e.pointerId, e.clientX, e.clientY, now());
+    pad.move(e.pointerId, e.clientX, e.clientY, at(e));
+    seen();
   });
-  el.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') pad.up(e.pointerId, now(), false); });
-  el.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') pad.up(e.pointerId, now(), true); });
+  el.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') { pad.up(e.pointerId, at(e), false); seen(); } });
+  el.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') { pad.up(e.pointerId, at(e), true); seen(); } });
   // Shown on a touch anywhere; put away by a key or a real mouse (not the moves a browser may
   // make up from a touch, which are mouse events without a pointer of their own).
   doc.addEventListener('pointerdown', (e) => {

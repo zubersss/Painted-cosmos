@@ -214,3 +214,29 @@ test('the guard and the layer: touchstart is cancelled (non-passive), Safari\'s 
   r.win.navigator = { maxTouchPoints: 0 };
   assert.equal(attachTouch(r.input, r.el, { doc: r.doc, win: r.win }).shown, false, 'a coarse pointer without touch (a TV remote) is not a touch screen');
 });
+
+test('a tap is timed by the events\' own times: a long frame between finger down and up does not make it a hold', () => {
+  const { input, el, doc, win } = page();
+  attachTouch(input, el, { doc, win });
+  clock += 10;
+  const t = clock * 1000;
+  el.fire('pointerdown', { pointerType: 'touch', pointerId: 1, clientX: 500, clientY: 100, timeStamp: t });
+  clock += 0.9;                                           // the game's frame took 0.9 s before the lift was handled
+  el.fire('pointerup', { pointerType: 'touch', pointerId: 1, clientX: 500, clientY: 100, timeStamp: t + 60 });
+  assert.equal(input.take(0.02).taps.length, 1, 'a 60 ms tap handled 0.9 s late is a tap');
+});
+
+test('W3.2: every prompt names the code its button presses (the keys\' codes, as Input names them)', async () => {
+  const { promptFor, S } = await import('../src/core/state.js');
+  const cases = [
+    [S.ON_FOOT, { canBoard: true }, 'KeyE'], [S.ON_FOOT, { canEasel: true }, 'KeyE'], [S.LANDED, {}, 'Space', 'KeyE'],
+    [S.ATMOSPHERE, { canLand: true }, 'KeyE'], [S.ATMOSPHERE, { slowingToLand: true }, 'Space'], [S.LANDING, {}, 'Space'],
+    [S.SPACE, { target: 'Mars' }, 'KeyF'], [S.SPACE, { turning: true }, 'KeyF'], [S.PULSE, {}, 'KeyF'],
+  ];
+  for (const [st, q, code, code2] of cases) {
+    const p = promptFor(st, q);
+    assert.equal(p.code, code, `${st} "${p.text}" presses ${code}`);
+    if (code2) assert.equal(p.code2, code2, `${st} "${p.text2}" presses ${code2}`);
+    assert.equal(p.key, { KeyE: 'E', Space: 'SPACE', KeyF: 'F' }[code], 'the lettered key is unchanged for the keyboard');
+  }
+});

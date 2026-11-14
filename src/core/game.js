@@ -87,6 +87,14 @@ export class Game {
       if (this.audio) this.audio.event('paper');
     }
     if (raw.edges.has('Backquote')) this.showStats = !this.showStats;
+    // On a touch screen a tap on the picture outside an open sheet puts it away; the help card,
+    // which lies on the picture, goes at a tap anywhere (W3.2). (The tap that begins the game
+    // only begins it.)
+    if (raw.taps && raw.taps.length) {
+      if (this.map && this.map.open) this.toggleMap();
+      else if (this.book && this.book.open) this.toggleBook();
+      else if (this.started && this.hud.startShown) { this.hud.showStart(false); if (this.audio) this.audio.event('paper'); }
+    }
     let keys = this.input, events = raw;
     const panel = (this.map && this.map.open) || (this.book && this.book.open);
     if (this.map && this.map.open) {

@@ -2,7 +2,7 @@
 // use the arrow keys) to choose where the pulse drive should take you; M or Enter closes it.
 // Drawn in code on a 2D canvas; names and the line under the chart are lettered by hand.
 import { BODIES, BODY_IDS } from '../data/bodies.js';
-import { ink, inkOnCanvas, SIZE } from './paint.js';
+import { ink, inkOnCanvas, SIZE, CLOSE_SVG } from './paint.js';
 
 const INK = '#232a45', SEPIA = '#584435';
 // Mock pigments per body (the painted palettes are Painter's; these only tell the dots apart).
@@ -20,14 +20,23 @@ function el(tag, cls, parent, text) {
   return e;
 }
 
-export function createMap(root, { onSelect } = {}) {
+// press(code): on a touch screen (W3.2) the corner that closes the sheet and the 'set course'
+// slip press the map's key (the game puts the sheet away on it; the course is set by the pick).
+export function createMap(root, { onSelect, press } = {}) {
   const panel = el('div', 'pc-panel pc-map', root);
   ink(el('div', 'pc-title', panel), 'the system', SIZE.head + 3, { rough: true, tracking: 1.1 });
   const canvas = el('canvas', '', panel);
   canvas.width = W * 2; canvas.height = H * 2;
   const line = el('div', 'pc-label pc-map-line', panel);
+  const go = el('div', 'pc-button pc-map-go', panel);
+  const close = el('div', 'pc-close', panel);
+  close.innerHTML = CLOSE_SVG;
+  for (const e of [go, close]) {
+    e.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
+    e.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); if (press) press('KeyM'); });
+  }
   const g = canvas.getContext('2d');
-  let open = false, spots = [], selected = null, here = null, last = null;
+  let open = false, spots = [], selected = null, here = null, last = null, goSize = SIZE.prompt;
 
   // Orbit radius on the chart: compressed so Mercury and Pluto both fit.
   const R = (m) => 26 + 150 * Math.log(1 + m / 60e3) / Math.log(1 + 1180e3 / 60e3) * 1.15;
@@ -114,6 +123,8 @@ export function createMap(root, { onSelect } = {}) {
     const t = data.target;
     ink(line, t ? `${t.name}: ${fmt(t.distance)} away, about ${Math.max(1, Math.round(t.eta))} s by pulse drive`
       : 'click a world, or use the arrow keys, to set a course', SIZE.body);
+    panel.classList.toggle('pc-has-course', !!t);
+    if (t) ink(go, 'set course for ' + t.name, goSize);
   }
 
   function pick(id) {
@@ -142,9 +153,18 @@ export function createMap(root, { onSelect } = {}) {
       panel.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / 780, window.innerHeight / 520)));
       panel.classList.add('pc-on');
       draw(data);
+      // (on a touch screen the sheet is taller by the 'set course' slip: fitted as laid out)
+      // (and its slip is lettered at 12 px or more on the screen, whatever the sheet's scale)
+      if (root.classList.contains('pc-touch')) {
+        const k = Math.min(1, window.innerWidth / 780, window.innerHeight / (panel.offsetHeight + 40));
+        panel.style.setProperty('--pc-fit', String(k));
+        goSize = Math.max(SIZE.prompt, 12 / k);
+        draw(data);
+      }
     },
     hide() { open = false; panel.classList.remove('pc-on'); },
     refresh(data) { if (open) { here = data.here; draw(data); } },
+    get courseSlip() { return go; },
     // Arrow keys step through the worlds in order from the sun.
     step(dir) {
       const ids = BODY_IDS.filter((id) => id !== here);

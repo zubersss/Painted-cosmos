@@ -216,9 +216,13 @@ const ICONS = {
   thrust: ['M4.6 18.6L12 4.6L19.4 18.6L12 15.2Z', 'M4.8 18.4L12 5L19.2 18.4M7.4 17.4L12 15.4L16.6 17.4'],
   // a view found: an eye of the horizon with the sun in it
   view: ['M2.6 12.6C6 7.8 9 6.2 12 6.2C15 6.2 18 7.8 21.4 12.6C18 16.8 15 18.2 12 18.2C9 18.2 6 16.8 2.6 12.6Z', 'M2.8 12.4C6 8 9 6.6 12 6.6C15 6.6 18 8 21.2 12.4C18 16.4 15 17.8 12 17.8C9 17.8 6 16.4 2.8 12.4M12 9.4A2.9 2.9 0 1 0 12.1 9.4'],
+  // the map: a chart folded in three, an orbit pencilled across it, a world on it
+  map: ['M3 6.2L9 4.2L15 6.2L21 4.2V17.8L15 19.8L9 17.8L3 19.8Z', 'M3.2 6.4L9 4.4L15 6.4L20.8 4.4V17.6L15 19.6L9 17.6L3.2 19.6ZM9 4.6V17.4M15 6.6V19.4M4.6 15.4C7.6 10.6 12.4 8.6 18.6 9.4M17.2 7.9A1.5 1.5 0 1 0 17.3 7.9'],
   // the sketchbook
   book: ['M4.4 5.4H19L19.6 19.4H5Z', 'M4.6 5.6H18.8L19.4 19.2H5.2ZM8 5.6L8.5 19.2M11 9.4H16.4M11 12.4H15.4'],
 };
+// A pencilled cross: the corner that closes a sheet on a touch screen (fills its box).
+export const CLOSE_SVG = `<svg class="pc-ink" xmlns="${SVG}" viewBox="0 0 20 20" width="100%" height="100%" aria-hidden="true"><path d="M5.2 4.6C8.4 8 11.6 11.6 15 15.6M14.6 4.8C11.4 8.2 8.4 11.8 5 15.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" filter="url(#pc-rough)"/></svg>`;
 export function iconSvg(name, size = 18, wash = INK.accent) {
   const i = ICONS[name];
   if (!i) return '';

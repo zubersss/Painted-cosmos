@@ -1,0 +1,1496 @@
+{
+ "note": "tests/touch.mjs runs on clean exports of e87f6be with the W3.2 files: --part all (input on iPhone 14, Pixel 7, iPad Pro 11, desktop; the loop on the iPhone 14 profile, stubs with PHYSICS) and --part loop --painted (q0, 400x225); every control measured at each stage (css px)",
+ "all": {
+  "part": "all",
+  "root": "/home/user/.pc-scratch/pilot/r1/touch/chk3",
+  "runs": [
+   {
+    "device": "iphone14",
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.7,
+     "vmax": 2.77,
+     "gameS": 3.05
+    },
+    "run": {
+     "vmax": 7.15
+    },
+    "jump": 3.58,
+    "jet": 23.37,
+    "together": {
+     "m": 24.48,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 94.2,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   },
+   {
+    "device": "pixel7",
+    "size": {
+     "w": 863,
+     "h": 360,
+     "dpr": 2.625,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.35,
+     "vmax": 2.77,
+     "gameS": 3.03
+    },
+    "run": {
+     "vmax": 7.26
+    },
+    "jump": 2.18,
+    "jet": 22.89,
+    "together": {
+     "m": 20.74,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 85.2,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   },
+   {
+    "device": "ipadpro11",
+    "size": {
+     "w": 1194,
+     "h": 834,
+     "dpr": 2,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.02,
+     "vmax": 2.77,
+     "gameS": 3
+    },
+    "run": {
+     "vmax": 7.15
+    },
+    "jump": 5.95,
+    "jet": 22.6,
+    "together": {
+     "m": 27.63,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 92.5,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    }
+   },
+   {
+    "device": "desktop",
+    "size": {
+     "w": 1280,
+     "h": 720,
+     "dpr": 1,
+     "coarse": false,
+     "touchPoints": 0
+    },
+    "state": {
+     "started": true,
+     "shown": false,
+     "padShown": false,
+     "display": "none",
+     "jump": 0,
+     "req": 1,
+     "root": "pc-hud pc-foot3"
+    }
+   },
+   {
+    "device": "iphone14",
+    "painted": false,
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "stages": {
+     "on foot": [
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "on foot, with an iPhone's safe area (47, 47, 21)": [
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 617,
+       "y0": 233,
+       "x1": 689,
+       "y1": 305,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 61,
+       "y0": 14,
+       "x1": 105,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 113,
+       "y0": 14,
+       "x1": 157,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 165,
+       "y0": 14,
+       "x1": 209,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 217,
+       "y0": 14,
+       "x1": 261,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "at the ship (\"Board ship\")": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 601,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "landed (\"Lift off\", \"Step out\")": [
+      {
+       "what": "Space button slip \"Lift off\"",
+       "x0": 630,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 106,
+       "h": 48
+      },
+      {
+       "what": "KeyE button slip \"Step out\"",
+       "x0": 619,
+       "y0": 70,
+       "x1": 736,
+       "y1": 118,
+       "w": 117,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "flying (rise, sink, brake)": [
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 594,
+       "y0": 270,
+       "x1": 650,
+       "y1": 326,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the map open": [
+      {
+       "what": " close",
+       "x0": 539,
+       "y0": 7,
+       "x1": 585,
+       "y1": 53,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "the map, a course chosen": [
+      {
+       "what": " button map-go \"set course for Mars\"",
+       "x0": 285,
+       "y0": 274,
+       "x1": 465,
+       "y1": 324,
+       "w": 180,
+       "h": 50
+      },
+      {
+       "what": " close",
+       "x0": 539,
+       "y0": 7,
+       "x1": 585,
+       "y1": 53,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "in space (\"Pulse to Mars\")": [
+      {
+       "what": "KeyF button slip \"Pulse to Mars\"",
+       "x0": 573,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 163,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 594,
+       "y0": 270,
+       "x1": 650,
+       "y1": 326,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the pulse (\"Drop out of pulse\")": [
+      {
+       "what": "KeyF button slip \"Drop out of pulse\"",
+       "x0": 540,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 196,
+       "h": 48
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "over Mars (\"Land here\")": [
+      {
+       "what": "KeyE button slip \"Land here\"",
+       "x0": 607,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 129,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 594,
+       "y0": 270,
+       "x1": 650,
+       "y1": 326,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 674,
+       "y0": 188,
+       "x1": 726,
+       "y1": 240,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "on foot on Mars": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 601,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the sketchbook open": [
+      {
+       "what": " close",
+       "x0": 580,
+       "y0": 8,
+       "x1": 626,
+       "y1": 54,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "the help card": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 601,
+       "y0": 126,
+       "x1": 736,
+       "y1": 174,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 664,
+       "y0": 254,
+       "x1": 736,
+       "y1": 326,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 14,
+       "y0": 14,
+       "x1": 58,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 66,
+       "y0": 14,
+       "x1": 110,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 118,
+       "y0": 14,
+       "x1": 162,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 170,
+       "y0": 14,
+       "x1": 214,
+       "y1": 58,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH close",
+       "x0": 502,
+       "y0": 12,
+       "x1": 548,
+       "y1": 58,
+       "w": 46,
+       "h": 46
+      }
+     ]
+    },
+    "legs": {
+     "pulseSeconds": 68.2,
+     "gameSeconds": 235
+    },
+    "events": {
+     "mousemove": 2,
+     "pointerdown:touch": 47,
+     "touchstart": 47,
+     "pointerup:touch": 47,
+     "touchend": 41,
+     "mousedown": 1,
+     "mouseup": 1,
+     "click:touch": 1,
+     "lock": false,
+     "req": 0
+    }
+   }
+  ],
+  "fails": [],
+  "seconds": 1040
+ },
+ "painted": {
+  "part": "loop",
+  "root": "/home/user/.pc-scratch/pilot/r1/touch/chk2",
+  "runs": [
+   {
+    "device": "iphone14",
+    "painted": true,
+    "size": {
+     "w": 400,
+     "h": 225,
+     "dpr": 1,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "stages": {
+     "on foot": [
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "at the ship (\"Board ship\")": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 257,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "landed (\"Lift off\", \"Step out\")": [
+      {
+       "what": "Space button slip \"Lift off\"",
+       "x0": 286,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 106,
+       "h": 48
+      },
+      {
+       "what": "KeyE button slip \"Step out\"",
+       "x0": 275,
+       "y0": 35,
+       "x1": 392,
+       "y1": 83,
+       "w": 117,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "flying (rise, sink, brake)": [
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 256,
+       "y0": 161,
+       "x1": 312,
+       "y1": 217,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 196,
+       "y0": 163,
+       "x1": 248,
+       "y1": 215,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the map open": [
+      {
+       "what": " button map-go \"set course for Pluto\"",
+       "x0": 114,
+       "y0": 168,
+       "x1": 286,
+       "y1": 218,
+       "w": 172,
+       "h": 50
+      },
+      {
+       "what": " close",
+       "x0": 285,
+       "y0": 2,
+       "x1": 331,
+       "y1": 48,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "the map, a course chosen": [
+      {
+       "what": " button map-go \"set course for Mars\"",
+       "x0": 115,
+       "y0": 168,
+       "x1": 285,
+       "y1": 218,
+       "w": 170,
+       "h": 50
+      },
+      {
+       "what": " close",
+       "x0": 285,
+       "y0": 2,
+       "x1": 331,
+       "y1": 48,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "in space (\"Pulse to Mars\")": [
+      {
+       "what": "KeyF button slip \"Pulse to Mars\"",
+       "x0": 229,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 163,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 256,
+       "y0": 161,
+       "x1": 312,
+       "y1": 217,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 196,
+       "y0": 163,
+       "x1": 248,
+       "y1": 215,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the pulse (\"Drop out of pulse\")": [
+      {
+       "what": "KeyF button slip \"Drop out of pulse\"",
+       "x0": 196,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 196,
+       "h": 48
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 196,
+       "y0": 163,
+       "x1": 248,
+       "y1": 215,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "over Mars (\"Land here\")": [
+      {
+       "what": "KeyE button slip \"Land here\"",
+       "x0": 263,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 129,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"rise\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyC tbtn tbtn-sink \"sink\"",
+       "x0": 256,
+       "y0": 161,
+       "x1": 312,
+       "y1": 217,
+       "w": 56,
+       "h": 56
+      },
+      {
+       "what": "KeyX tbtn tbtn-brake \"brake\"",
+       "x0": 196,
+       "y0": 163,
+       "x1": 248,
+       "y1": 215,
+       "w": 52,
+       "h": 52
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "on foot on Mars": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 257,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      }
+     ],
+     "the sketchbook open": [
+      {
+       "what": " close",
+       "x0": 320,
+       "y0": 5,
+       "x1": 366,
+       "y1": 51,
+       "w": 46,
+       "h": 46
+      }
+     ],
+     "the help card": [
+      {
+       "what": "KeyE button slip \"Board ship\"",
+       "x0": 257,
+       "y0": 89,
+       "x1": 392,
+       "y1": 137,
+       "w": 135,
+       "h": 48
+      },
+      {
+       "what": "Space tbtn tbtn-jump \"jump\"",
+       "x0": 320,
+       "y0": 145,
+       "x1": 392,
+       "y1": 217,
+       "w": 72,
+       "h": 72
+      },
+      {
+       "what": "KeyM tab",
+       "x0": 8,
+       "y0": 8,
+       "x1": 52,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyB tab",
+       "x0": 56,
+       "y0": 8,
+       "x1": 100,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH tab \"?\"",
+       "x0": 104,
+       "y0": 8,
+       "x1": 148,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyV tab",
+       "x0": 152,
+       "y0": 8,
+       "x1": 196,
+       "y1": 52,
+       "w": 44,
+       "h": 44
+      },
+      {
+       "what": "KeyH close",
+       "x0": 269,
+       "y0": 8,
+       "x1": 315,
+       "y1": 54,
+       "w": 46,
+       "h": 46
+      }
+     ]
+    },
+    "legs": {
+     "pulseSeconds": 66.6,
+     "gameSeconds": 236
+    },
+    "events": {
+     "mousemove": 2,
+     "pointerdown:touch": 42,
+     "touchstart": 42,
+     "pointerup:touch": 42,
+     "touchend": 36,
+     "mousedown": 1,
+     "mouseup": 1,
+     "click:touch": 1,
+     "lock": false,
+     "req": 0
+    }
+   }
+  ],
+  "fails": [],
+  "seconds": 553
+ }
+}

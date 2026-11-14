@@ -8,7 +8,95 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 (phone layouts and words), W3.4 (platform) and W3.5 (the phone preset) are part 3. First commit's parent: `0902c56`.
 Scratch: `/home/user/.pc-scratch/pilot/r1/touch/`.
 
-**State:** W3.1 DONE (commit below). W3.2 in progress (not committed).
+**State:** W3.1 DONE (`290780b`). W3.2 DONE (committed after `290780b`; its acceptance below). Still running when
+W3.2 was committed (results added below when in): the loop on the Pixel 7 profile, the painted loop again on the
+final code, m3check and lockcheck (the desktop unchanged), and the loop on a clean export of `290780b` (must fail).
+Nothing else of PILOT's is half-done.
+
+### W3.2 the touch HUD: prompts become buttons (DONE)
+
+- **Files:** `src/core/state.js` (`promptFor` gives each prompt its action's `code`/`code2`: KeyE, Space, KeyF; the
+  lettered `key` unchanged), `src/ui/hud.js` (on touch each prompt slip is a button that taps its code, no key
+  lettered; the tabs MAP, SKETCHBOOK, HELP, VIEW in the top left, 44 css px square; the help card's close corner;
+  the tabs and buttons are kept clear of the markers' labels), `src/ui/map.js` (close corner, a 'set course for
+  <world>' slip under the chart that puts the map away, the sheet fitted with the slip on touch, the slip lettered at
+  12 px or more on the screen), `src/ui/book.js` (close corner; a swipe of 48 css px or more across the page turns
+  it, with the paper's sound), `src/ui/paint.js` (a map icon: a chart folded in three; `CLOSE_SVG`, a pencilled
+  cross), `src/ui/theme.css` (the slips in the right thumb's arc 48 px tall, two high, over the round buttons; the
+  tabs; the gauges at the top on touch; the hint and the foot notice under the tabs; the close corners 46 px on the
+  screen whatever the sheet's scale; a short-window layout under 300 px tall: the buttons in one row, the gauges
+  at the top right), `src/core/game.js` (a tap on the picture puts away an open map or book, or the help card),
+  `src/main.js` (the sheets' corners press through the pad), `src/core/touch.js` (a tap is timed by the events' own
+  time stamps, the activity by the page's clock), `tests/touch.mjs --part loop` (and `--painted`), `tests/all.mjs`
+  steps `touch` and `painted-touch`, `README.md` (how to play by touch; what was never tried on a real phone).
+- **How it plays:** on a touch screen the slips of the prompt ("Board ship", "Lift off" / "Step out", "Land here",
+  "Cancel landing", "Pulse to Mars", "Stop turning", "Drop out of pulse") sit in the right thumb's arc over the round
+  buttons, 48 css px tall, the first nearest the thumb, two at most (LANDED), lettered without a key; a tap on one
+  is its key's press (a tap only: a slip that vanishes under the finger cannot leave Space held and the ship rising).
+  The map's world is picked by a tap as before (the course is set by the pick); the 'set course for Mars' slip
+  under the chart puts the map away. Each sheet has a pencilled close corner (46 css px on the screen at any scale)
+  and goes away at a tap on the picture outside it; the help card goes at a tap anywhere on it. The controls (the
+  buttons, the tabs, the stick's ring) fade to 35 % after 4 s untouched; the prompt slips do not fade. All placed
+  with `env(safe-area-inset-*)`. Desktop: none of it shows (`.pc-touchui`, the corners and the slip are
+  `display:none` without `.pc-touch`; the prompt keeps its key and its place).
+
+- **Acceptance, measured** (`tests/touch.mjs`, CDP touch only: not one key pressed, no mouse event; on clean
+  exports of `e87f6be` with the W3.2 files):
+  - **The whole loop by touch, iPhone 14 landscape, stubs with PHYSICS: PASSED** (`--part all`, 1040 s with the
+    input part): a tap begins; the VIEW tab changes the view; walked to the ship by the stick (a second finger
+    steering by the look) in 2.6 s of game time; "Board ship" slip boards; "Lift off" lifts off; the stick's
+    throttle and a nose-up drag climb above the air; the MAP tab opens the map, a tap on Mars sets the course (463
+    km), "set course for Mars" puts it away; its corner and a tap outside it close it; "Pulse to Mars" turns the ship
+    onto the course and pulses (68 s), arrives 6.9 km off; nose down and the stick's throttle into the air of Mars,
+    to the landing prompt; "Land here" lands; "Step out": on foot on Mars; the SKETCHBOOK tab opens the book at Mars,
+    a swipe left turns to Jupiter and right back, its corner and a tap outside close it; the HELP tab shows the help
+    card, a tap on it puts it away, its corner too; no pointer lock asked for, 0 pointercancel, 0 keydown.
+  - **The same loop in the painted world, q0, 400x225 (the iPhone 14 profile on a window of that size): PASSED**
+    (`--part loop --painted`, 553 s; landed in Mars' dry riverbeds; no console error).
+  - **Every hit area at least 44 css px:** at 13 stages (on foot; with an iPhone's safe area; at the ship; landed;
+    flying; the map open; the map with a course; in space; the pulse; over Mars; on foot on Mars; the book open; the
+    help card) every control measured: the smallest 44 px (the tabs), the round buttons 72/56/52, the slips 48 tall,
+    the close corners 46 on the screen (at the sheets' 0.6 scale).
+  - **On a phone, no control in the subject box** (x 30-70 %, y 55-100 %) at any of the 9 stages where the picture is
+    played (iPhone 14; the Pixel 7 run below).
+  - **The safe area** (CDP `Emulation.setSafeAreaInsetsOverride` 47 / 47 / 21, an iPhone held sideways): every
+    control inside it.
+  - **The fade:** 4.6 s untouched, the controls go to 0.35; a touch brings them back.
+  - **W3.1's input part again on the W3.2 code** (`--part all`): all three profiles and the desktop page PASS (33.6
+    degrees for 120 px, 9.0-9.7 m walked, jump 2.2-6.0 m, jetpack 22.6-23.4 m, scale 1, nose 14.9 degrees,
+    throttle 0 -> 1).
+  - **The desktop is unchanged:** the desktop page of `--part input` (no touch layer, pointer lock as before);
+    `tests/layout.test.mjs` in the unit suite; m3check: see below.
+  - Frames, OPENED: `docs/shots/pilot/r1/touch-w32-loop-iphone14.jpg` (landed with "Step out" over "Lift off" and
+    RISE; flying, the controls faded, the read-out under the tabs; the map with "set course for Mars"; in space with
+    "Pulse to Mars", BRAKE, SINK, RISE; over Mars with "Land here"; the help card with its corner),
+    `touch-w32-painted-a.jpg`, `-b.jpg` (the painted world at 400x225, from the run before the read-out moved: the
+    read-out lay against BRAKE there, which is why it moved). Numbers: `touch-w32-runs.json`.
+  - Unit: `tests/touch.test.mjs` 11 (two new: a tap timed by its events' stamps; every prompt names its code),
+    `tests/vista.test.mjs` updated (the prompt now carries `code`).
+- **Checks** on a clean export of `e87f6be` with these files (PAINTER's uncommitted `src/world`, `src/render` left out):
+  unit **227** (225 + 2), physics 325, world 30, coast PASS at both stands, ghostfield all zeros, static rules hold;
+  the painted loop ran the real game with no console error and `fallback` empty.
+- **Rulings (W3.2):** (1) "Every hit area at least 44 css px" is read as the touch controls this item adds (the
+  round buttons, the slips, the tabs, the close corners, the 'set course' slip); the book's tab strip (15 css px
+  tall on the iPhone) and the map's world radius are W3.3's, with their own numbers there. (2) The subject box (x
+  30-70 %, y 55-100 %) is judged while the picture is played; with the map or the book open the sheet covers the
+  picture (the 'set course' slip sits at the sheet's foot, in the box) and the touch HUD is hidden. (3) The help
+  card's tab is HELP only: the game does not pause behind the card, as on the desktop (the world goes on there too).
+  (4) The slips always stand 166 css px over the bottom (over BRAKE's place, even on foot): a slip 48 px tall then
+  ends above 55 % of the height on the iPhone 14 (340 px) and the Pixel 7 (360 px), so no slip can reach the subject
+  box whatever its width or the safe area's. (5) On touch the gauges go to the top middle (to the top right in a window
+  under 300 px tall): at the bottom middle the throttle ran under SINK (frame opened in W3.1's run). (6) A tap on the
+  picture is timed by the events' own time stamps (a real touch screen stamps them; a frame that runs long must not
+  make a tap a hold), the last activity (the fade, a mouse event made up from a touch) by the page's clock; the test
+  stamps its CDP events as a touch screen would (CDP waits for the page to take each event, so an unstamped lift is
+  stamped a slow frame later: 1 to 7 s in the painted world here). (7) On touch the read-out moves to the top left under
+  the tabs (W3.3 names it; done here because the short window's row of buttons ran into it at the lower left, and
+  the lower left is the left thumb's).
+- **Not done here (W3.3's, part 3):** the words on touch (the title card says "click to begin", the help card lists
+  keys and "H closes this card", the map "click a world, or use the arrow keys", the book "arrow keys turn the page,
+  B closes"); the map's world radius and names, the book's tab strip, the help drawing; the
+  edge arrow of "the ship" can sit beside the "Board ship" slip at the right edge (seen in the frames).
 
 ### W3.1 the gesture guard and touch input (DONE)
 

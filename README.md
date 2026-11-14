@@ -11,7 +11,7 @@ and nothing can go wrong: the ship will not let you crash and the explorer canno
 **In the browser:** <https://zubersss.github.io/Painted-cosmos/> (GitHub Pages, served from the
 `main` branch). A desktop browser with WebGL 2 is needed (a current Chrome, Edge, Firefox or
 Safari 16.4 or newer; the page says so in a sentence if yours cannot run it); a keyboard and
-mouse, or a gamepad.
+mouse, or a gamepad; or a phone or a tablet held sideways, played by touch.
 
 **From a copy of this repository:** the game is plain ES modules with no build step and makes
 no network requests once loaded. Serve the folder with any static server and open it:
@@ -92,6 +92,18 @@ A device the browser does not report in the standard layout (a flight stick, ped
 cannot map) is not used, and the game says so once. Browsers do not let a gamepad start
 sound: click or press a key once (the game reminds you). Not tried with a real pad: the
 mapping is tested with a simulated one.
+
+**By touch** (a phone or a tablet; the touch controls show from the start there, and on any
+screen at the first touch; a key or the mouse puts them away again): the left side of the
+picture is a stick wherever your thumb comes down (hold it at the edge of its ring and the
+explorer runs; in the ship it turns and moves the throttle); drag anywhere else to look round
+or to point the nose; pinch to bring the camera nearer or farther. The round buttons in the
+lower right corner are jump (hold it for the jetpack; in the ship, rise), sink and brake; the
+prompts (board ship, lift off, step out, land here, pulse to a world) are slips over them to
+tap. The tabs in the top left open the map, the sketchbook, the help card and change the view;
+a sheet closes by its corner or by a tap outside it, and the sketchbook's pages turn by a
+swipe. The controls fade after four seconds untouched. Tested only in Chromium with phone and
+tablet profiles (an emulation, not a real phone): how the stick and the look feel is not known.
 
 The game saves itself when you land, when you step out, and every 20 seconds on foot, and
 continues from there on the next visit. Add `?fresh=1` to the address to start again on Earth.
@@ -196,6 +208,9 @@ scripted input. These things have never been checked on a real machine by anyone
   button and dragging; that fallback is tested.
 - **A real gamepad, other keyboard layouts.** The standard mapping is tested with a simulated
   pad only; AZERTY, Dvorak and Colemak with simulated key events.
+- **A real phone or tablet.** Touch is tested with Chromium's iPhone 14, Pixel 7 and iPad Pro
+  11 profiles and scripted fingers; never on iOS Safari or a real device, so the feel of the
+  stick and the look, Safari's gestures and the frame rate on a phone are not known.
 - **Safari and Firefox.** Only Chromium was run here: the rule that sound starts on a click,
   frame-rate caps and a change of screen scale are written to the browsers' documented
   behaviour, not observed in them.
@@ -240,6 +255,10 @@ The steps, which can also be run by hand:
                                      # that continues from the save
     node tests/m3check.mjs           # title card, look hint, sketchbook and its sketches, a view found
     node tests/lockcheck.mjs         # pointer lock and the drag-to-look fallback
+    node tests/touch.mjs --part all  # touch on phone and tablet profiles (stick, look, pinch,
+                                     # buttons; no zoom, no pointer lock), then the whole loop
+                                     # played by touch; --part loop --painted: the same loop in
+                                     # the painted world
     node tests/audiocheck.mjs        # the sound, measured: every situation rendered through the game's
                                      # own audio graph and checked for level, clipping, DC, clicks
 

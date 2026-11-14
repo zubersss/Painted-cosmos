@@ -149,9 +149,11 @@ async function boot() {
     maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
   });
   const storage = safeStorage();
-  const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id) });
-  const book = createBook(hudRoot);
+  // (on a touch screen a sheet's corner presses its key, as the touch HUD's tabs do)
+  const tap = (code) => touch.tap(code, performance.now() / 1000);
   const audio = createAudio({ enabled: params.get('audio') !== '0' });
+  const map = createMap(hudRoot, { onSelect: (id) => game.sim.setTarget(id), press: tap });
+  const book = createBook(hudRoot, { press: tap, onTurn: () => audio.event('paper') });
   // Sound may start only inside a click, a tap or a key press (Safari for the whole session;
   // Chrome, where a gamepad is not a gesture): start it there, in the capture phase so that no
   // handler can swallow the event first. Idempotent; a running context ignores it.

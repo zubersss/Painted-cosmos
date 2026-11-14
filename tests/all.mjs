@@ -11,7 +11,8 @@
 // try/catch), then the scripted browser runs in headless Chromium, one at a time (two at once
 // make each other flaky on this machine): play-through on stubs, with PHYSICS, and in the
 // painted world; the Earth, Mars, Saturn trip on stubs and in the painted world; milestone 3's
-// checks; pointer lock and its fallback; the sound, measured. Every browser run fails on any
+// checks; pointer lock and its fallback; touch on phone and tablet profiles, and the loop played
+// by touch on stubs and in the painted world; the sound, measured. Every browser run fails on any
 // console error, page error, failed request or request that leaves the page's own server.
 // Exit code 0 only if every step that ran passed. Logs: one file per step in --out.
 //
@@ -53,10 +54,12 @@ const STEPS = [
   { id: 'trip-stub', what: 'Earth, Mars, Saturn in one sitting, reload from the save (stubs)', cmd: ['node', 'tests/trip.mjs', '--out', path.join(out, 'trip-stub')], min: 20 },
   { id: 'm3', what: 'milestone 3: title card, sketchbook and sketches, vistas, gamepad, tiers', cmd: ['node', 'tests/m3check.mjs', '--out', path.join(out, 'm3')], min: 15 },
   { id: 'lock', what: 'pointer lock and the drag-to-look fallback', cmd: ['node', 'tests/lockcheck.mjs', '--out', path.join(out, 'lock')], min: 10 },
+  { id: 'touch', what: 'touch: the stick, the look, the pinch and the buttons on three phone and tablet profiles, a desktop page, then the whole loop by touch (stubs)', cmd: ['node', 'tests/touch.mjs', '--part', 'all', '--out', path.join(out, 'touch')], min: 30 },
   { id: 'audio', what: 'the sound, measured (no clipping, no clicks, no DC)', cmd: ['node', 'tests/audiocheck.mjs'], min: 10 },
   { id: 'painted-play', what: 'play-through in the painted world', cmd: ['node', 'tests/playthrough.mjs', '--query', painted + '&fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-play')], min: 40 },
   { id: 'painted-trip', what: 'Earth, Mars, Saturn in the painted world, reload from the save', cmd: ['node', 'tests/trip.mjs', '--query', painted, '--w', '400', '--h', '225', '--out', path.join(out, 'painted-trip')], min: 60 },
   { id: 'painted-m3', what: 'milestone 3\'s checks in the painted world', cmd: ['node', 'tests/m3check.mjs', '--query', 'fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-m3')], min: 40 },
+  { id: 'painted-touch', what: 'the whole loop by touch in the painted world (q0, 400x225, the iPhone 14 profile)', cmd: ['node', 'tests/touch.mjs', '--part', 'loop', '--painted', '--out', path.join(out, 'painted-touch')], min: 60 },
 ];
 if (flag('list')) { for (const s of STEPS) console.log(s.id.padEnd(14), s.what); process.exit(0); }
 const only = val('only', ''), skip = val('skip', '');
