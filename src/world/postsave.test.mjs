@@ -53,23 +53,27 @@ test('the scene pass begins with clears, no backdrop pass', () => {
   assert.equal(post.mBackdrop, undefined, 'no backdrop material');
 });
 
-test('last frame\'s painting is kept only while water is drawn, and the frame after', () => {
+test('last frame\'s painting is kept on a world once its water has been drawn there, never on a world without water', () => {
   const { post, log } = stand();
-  const frame = (water) => {
+  const frame = (water, body) => {
     log.length = 0;
+    shared.PREV.body = body;                 // (index.js, from the mood, every frame)
     post.beginScene();
-    if (water) shared.PREV.water = true;    // (what the water material's onBeforeRender does as it is drawn)
+    if (water) shared.PREV.water = true;     // (what the water material's onBeforeRender does as it is drawn)
     post.finish([], null);
     return { keep: draws(log).some((e) => e.material === post.mKeep), on: G.uPrevOn.value };
   };
-  const seq = [false, false, true, true, false, false, false, true, false, true].map(frame);
-  assert.deepEqual(seq.map((f) => f.keep), [false, false, true, true, true, false, false, true, true, true]);
-  // the water reflects last frame only where it was kept (a gap of one frame keeps it; after a longer one the first
-  // frame back reflects nothing rather than an old picture)
-  assert.deepEqual(seq.map((f) => f.on), [0, 0, 1, 1, 1, 0, 0, 1, 1, 1]);
+  // Mars: no water, never kept; Earth: from the first water on, every frame, also while no water is in view (R1 re-fix:
+  // the W2.4 rule stopped after a frame without water, so water coming back into view reflected nothing for a frame)
+  const seq = [[false, 'mars'], [false, 'mars'], [false, 'earth'], [true, 'earth'], [true, 'earth'], [false, 'earth'], [false, 'earth'],
+    [false, 'earth'], [true, 'earth'], [false, 'mars'], [false, 'mars'], [true, 'neptune'], [false, 'neptune']].map(([w, b]) => frame(w, b));
+  assert.deepEqual(seq.map((f) => f.keep), [false, false, false, true, true, true, true, true, true, false, false, true, true]);
+  // the water reflects last frame only where it was kept: the first water a world shows reflects nothing for that frame
+  assert.deepEqual(seq.map((f) => f.on), [0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1]);
+  shared.PREV.body = null;
 });
 
-test('the paper is laid once per size of the sheet', () => {
+test('the paper is laid once per size of the sheet, into three targets read with three fetches', () => {
   const { post, log } = stand();
   const sheetFrame = () => { log.length = 0; post.beginScene(); post.finish([], null); return draws(log).filter((e) => e.material === post.mPaper).length; };
   assert.ok(post.mSheet.defines && post.mSheet.defines.PC_PAPER_BAKED, 'the sheet reads the laid paper');
@@ -79,8 +83,40 @@ test('the paper is laid once per size of the sheet', () => {
   assert.deepEqual([post.rtPaper.width, post.rtPaper.height], [1920, 1080]);
   post.sheetUniforms.uBorder.value.y += 0.001;
   assert.equal(sheetFrame(), 1, 'and when the border\'s roughness changes');
-  // its targets: the steep values in half floats, the rest 8-bit
-  assert.deepEqual(post.rtPaper.textures.map((t) => t.type), [1016, 1009]);
+  // (R1 re-fix) three targets (the tremor and the border's terms, and ph pmidR ploR skD, in half floats; the grain's four
+  // 8-bit), read with three fetches (was two targets and two live reads of the paper: four)
+  assert.deepEqual(post.rtPaper.textures.map((t) => t.type), [1016, 1016, 1009]);
+  const sheetMain = post.mSheet.fragmentShader.slice(post.mSheet.fragmentShader.indexOf('void main()'));
+  const baked = sheetMain.slice(sheetMain.indexOf('#ifdef PC_PAPER_BAKED'), sheetMain.indexOf('#else'));
+  assert.equal((baked.match(/texelFetch\(tPap/g) || []).length, 3, 'three fetches of the paper');
+  assert.equal((baked.match(/texture\(tPaper/g) || []).length, 0, 'no live read of the paper');
+});
+
+// (R1 re-fix) the sheet's pooling and outlines are read from two passes of their own, every frame, before the sheet
+test('the pool (half size) and the edges (the scene\'s size) are drawn before the sheet; the post AA where it is on', () => {
+  const { post, log } = stand();
+  const order = () => { log.length = 0; post.beginScene(); post.finish([], null); return draws(log).map((e) => e.material.name || (e.material === post.mSheet ? 'sheet' : e.material === post.mKeep ? 'keep' : e.material === post.mPrep ? 'prep' : Object.values(post.mAbs).includes(e.material) ? 'abs' : e.material === post.mPrepF ? 'prepF' : '?')); };
+  order();
+  const o = order();
+  assert.ok(o.indexOf('pool') > o.indexOf('prep') && o.indexOf('pool') < o.indexOf('sheet'), o.join(' '));
+  assert.ok(o.indexOf('edges') >= 0 && o.indexOf('edges') < o.indexOf('sheet'), o.join(' '));
+  assert.equal(o.indexOf('post-aa'), -1, 'no post AA unless asked');
+  assert.deepEqual([post.rtPool.width, post.rtPool.height], [640, 360]);
+  assert.deepEqual([post.rtEdge.width, post.rtEdge.height], [1280, 720]);
+  post.setPostAA(true);
+  const o2 = order();
+  assert.ok(o2.indexOf('post-aa') > o2.indexOf('abs') && o2.indexOf('post-aa') < o2.indexOf('sheet'), o2.join(' '));
+  assert.equal(post.sheetUniforms.tAbs.value, post.rtAA.texture);
+  post.setPostAA(false);
+  assert.equal(post.sheetUniforms.tAbs.value, post.rtAbs.texture);
+  // the old brush's sheet reads its own pooling: no pool pass then
+  post.sheetUniforms.uSheetOld.value = 1;
+  assert.equal(order().indexOf('pool'), -1);
+  post.sheetUniforms.uSheetOld.value = 0;
+  // the sheet no longer reads the half-size prep or the region target for its pooling, outlines and pencil
+  const sheetMain = post.mSheet.fragmentShader;
+  const newPath = sheetMain.slice(sheetMain.indexOf('void main()'));
+  assert.equal((newPath.match(/texture\(tAux/g) || []).length, 1 + 5, 'the region read once where the picture is (and five times only under a lightning flash)');
 });
 
 test('on the 8-bit fallback the sheet reads the paper itself, and the clear is the packed value', () => {

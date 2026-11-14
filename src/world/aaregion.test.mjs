@@ -151,12 +151,28 @@ test('MSAA belongs to the tier: 4 samples at tiers 2 and 1 while they cost under
   p.setQuality(1);
   assert.equal(p.info.aa, 4, 'q1 at 1920x1080 (1536 x 864 drawn): 4 samples, 91 MiB');
   p.setQuality(0);
-  assert.equal(p.info.aa, 0, 'tier 0: none');
+  assert.equal(p.info.aa, 0, 'tier 0: no samples');
+  assert.equal(p.info.postAA, true, 'tier 0: the light post AA instead (R1 re-fix, ruling 4)');
+  assert.equal(post.sheetUniforms.tAbs.value, post.rtAA.texture, 'the sheet reads the post AA\'s output');
+  assert.equal(p.aaMode(), 'post (fxaa)');
   assert.equal(post.rtScene, post.rtScene1);
   assert.equal(post.absUniforms.tAux.value, post.rtScene1.textures[1], 'without samples the region is read as drawn');
   p.setQuality(2); p.resize(1280, 720);
-  p.setAA('off'); assert.equal(p.info.aa, 0, 'aa=0');
-  p.setAA('msaa'); assert.equal(p.info.aa, 4, 'aa=msaa');
+  assert.equal(p.info.postAA, false, 'with samples no post AA');
+  assert.equal(post.sheetUniforms.tAbs.value, post.rtAbs.texture);
+  p.setAA('off'); assert.equal(p.info.aa, 0, 'aa=0'); assert.equal(p.info.postAA, false, 'aa=0: none at all');
+  p.setAA('post'); assert.equal(p.info.aa, 0, 'aa=post'); assert.equal(p.info.postAA, true);
+  p.setAA('msaa'); assert.equal(p.info.aa, 4, 'aa=msaa'); assert.equal(p.info.postAA, false);
   p.setAA('auto'); assert.equal(p.info.aa, 4);
+  assert.equal(p.aaMode(), 'msaa 4x');
   assert.equal(p.info.depth, 'reversed-z');
+  // (R1 re-fix) the budget is the tier's full size's: the resolution controller's steps never change the samples (at
+  // 1920x1080 q2 the samples were 2 at scale 1 and 4 below about 0.83, so each step rebuilt the multisampled targets)
+  p.resize(1920, 1080);
+  const seen = new Set();
+  for (const s of [1, 0.9, 0.83, 0.8, 0.7, 0.6, 0.5, 0.75, 1]) { p.setRenderScale(s); seen.add(p.info.aa); }
+  assert.deepEqual([...seen], [2], 'q2 at 1920x1080: 2 samples at every render scale');
+  const ms = post.rtSceneMS;
+  p.setRenderScale(0.6); p.setRenderScale(1);
+  assert.equal(post.rtSceneMS, ms, 'the multisampled target is kept (resized), not rebuilt');
 });
