@@ -38,6 +38,42 @@ export function createHud(root) {
   let freshTimer = 0;
   const readout = el('div', 'pc-readout pc-label', root);
   const dot = el('div', 'pc-reticle', root);
+  // ---- the touch controls (src/core/touch.js; shown only while the touch layer is up) --------
+  // The stick's ring where the left thumb is (a faint one where it would be, while no thumb is
+  // down), and round paper buttons in the right thumb's arc that press the keys' codes: JUMP
+  // (RISE in the ship) 72 css px across, SINK 56, BRAKE 52. A tap on JUMP jumps, a hold is the
+  // jetpack; in the ship RISE and SINK are held, BRAKE too.
+  const touchUi = el('div', 'pc-touchui', root);
+  const stick = el('div', 'pc-stick', touchUi);
+  const stickDab = el('i', '', stick);
+  el('div', 'pc-stick-rest', touchUi);
+  const arc = el('div', 'pc-arc', touchUi);
+  let touchPad = null, touchMode = '';
+  const tnow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // A control: a finger on it presses `code` (held while the finger stays, or a tap only), and
+  // the finger is its own (captured: it does not become the stick or the look).
+  const control = (e, code, hold) => {
+    e.dataset.code = code;
+    e.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
+    e.addEventListener('pointerdown', (ev) => {
+      ev.stopPropagation();
+      if (!touchPad) return;
+      try { e.setPointerCapture(ev.pointerId); } catch { /* still pressed */ }
+      if (hold) touchPad.press(code, ev.pointerId, tnow()); else touchPad.tap(code, tnow());
+      e.classList.add('pc-down');
+    });
+    const up = (ev) => { if (touchPad) touchPad.release(ev.pointerId); e.classList.remove('pc-down'); };
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) e.addEventListener(t, up);
+    return e;
+  };
+  const tbtn = (cls, code, word) => {
+    const b = control(el('div', 'pc-tbtn ' + cls, arc), code, true);
+    b._word = el('span', '', b, word, SIZE.small);
+    return b;
+  };
+  const jumpBtn = tbtn('pc-tbtn-jump', 'Space', 'jump');
+  tbtn('pc-tbtn-sink', 'KeyC', 'sink');
+  tbtn('pc-tbtn-brake', 'KeyX', 'brake');
   const card = el('div', 'pc-panel pc-start', root);
   ink(el('div', 'pc-title', card), 'Painted Cosmos', SIZE.title, { rough: true, tracking: 1.12 });
   const sub = el('div', 'pc-label pc-sub', card, 'a watercolour to walk into', SIZE.prompt);
@@ -208,6 +244,31 @@ export function createHud(root) {
       root.classList.toggle('pc-stats-on', !!text);
       if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
     },
+    // The touch layer's pad (src/core/touch.js), for the touch controls to press.
+    bindTouch(pad) { touchPad = pad || null; },
+    // t: null (no touch layer: the desktop HUD, untouched) or { on, idle (fade the controls),
+    // mode ('foot', 'board', 'landed', 'fly', 'pulse', 'landing': which buttons show), stick
+    // (the stick's centre cx, cy and its thumb x, y in css px, or null) }.
+    setTouch(t) {
+      const on = !!(t && t.on);
+      if (root.classList.contains('pc-touch') !== on) root.classList.toggle('pc-touch', on);
+      if (!on) return;
+      root.classList.toggle('pc-idle', !!t.idle);
+      const mode = t.mode || 'foot';
+      if (mode !== touchMode) {
+        if (touchMode) root.classList.remove('pc-t-' + touchMode);
+        root.classList.add('pc-t-' + mode);
+        touchMode = mode;
+        ink(jumpBtn._word, mode === 'foot' ? 'jump' : 'rise', SIZE.small);
+      }
+      const s = t.stick;
+      stick.classList.toggle('pc-on', !!s);
+      if (s) {
+        stick.style.transform = `translate(${s.cx.toFixed(1)}px, ${s.cy.toFixed(1)}px)`;
+        stickDab.style.transform = `translate(${(s.x - s.cx).toFixed(1)}px, ${(s.y - s.cy).toFixed(1)}px)`;
+      }
+    },
+    get touchShown() { return root.classList.contains('pc-touch'); },
     // (the first time the card is put away the game has begun: from then on it is the help card, whole)
     showStart(on) {
       if (!on) card.classList.remove('pc-title-only');

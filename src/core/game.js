@@ -646,10 +646,19 @@ export class Game {
       // slips used to lie across the legs: they go under the feet instead.
       hud.root.classList.toggle('pc-foot3', st === S.ON_FOOT && !sim.footCam.firstPerson);
     }
+    // The touch layer (src/core/touch.js): which controls show, the stick's ring, the fade.
+    const tp = this.input && this.input.touch, touchOn = !!(tp && tp.shown);
+    if (hud.setTouch) {
+      hud.setTouch(touchOn ? {
+        on: true, idle: tp.idle(performance.now() / 1000), stick: tp.stick,
+        mode: st === S.ON_FOOT ? (sim.easel ? 'board' : 'foot') : st === S.BOARDING ? 'board' : st === S.LANDED ? 'landed'
+          : st === S.PULSE ? 'pulse' : st === S.LANDING ? 'landing' : 'fly',
+      } : null);
+    }
     if (hud.setHint) {
       // Until the player has looked around once (and again whenever the capture is lost), say how.
       const need = this.started && !this.input.looked && !panelOpen && this.hintOn !== false;
-      hud.setHint(need ? (this.input.usePointerLock ? 'click the picture to look around with the mouse' : 'hold the left mouse button and drag to look around') : null);
+      hud.setHint(need ? (touchOn ? 'drag on the right to look around' : this.input.usePointerLock ? 'click the picture to look around with the mouse' : 'hold the left mouse button and drag to look around') : null);
     }
     if (hud.setNotice) {
       hud.setNotice(sim.notice ? sim.notice.text : this.uiNotice && performance.now() < this.uiNoticeUntil ? this.uiNotice : null);

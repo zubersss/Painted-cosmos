@@ -1,0 +1,222 @@
+{
+ "after": {
+  "tree": "working tree = 0902c56 + W3.1 files",
+  "runs": [
+   {
+    "device": "iphone14",
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 9.2,
+     "vmax": 2.77,
+     "gameS": 3
+    },
+    "run": {
+     "vmax": 7.16
+    },
+    "jump": 2.42,
+    "jet": 21.38,
+    "together": {
+     "m": 19.74,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 86.9,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    },
+    "fails": 0
+   },
+   {
+    "device": "pixel7",
+    "size": {
+     "w": 863,
+     "h": 360,
+     "dpr": 2.625,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 8.71,
+     "vmax": 2.79,
+     "gameS": 2.95
+    },
+    "run": {
+     "vmax": 7.19
+    },
+    "jump": 1.98,
+    "jet": 19.67,
+    "together": {
+     "m": 18.93,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 95.8,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    },
+    "fails": 0
+   },
+   {
+    "device": "ipadpro11",
+    "size": {
+     "w": 1194,
+     "h": 834,
+     "dpr": 2,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1
+    },
+    "look": {
+     "deg": 33.6,
+     "cancel": 0
+    },
+    "walk": {
+     "m": 10.07,
+     "vmax": 2.75,
+     "gameS": 3.25
+    },
+    "run": {
+     "vmax": 7.22
+    },
+    "jump": 1.94,
+    "jet": 23.74,
+    "together": {
+     "m": 31.77,
+     "deg": -23.5
+    },
+    "pinch": {
+     "scale": 1,
+     "boom0": 5.2,
+     "boom": 6.27
+    },
+    "shipPitch": {
+     "from": 0,
+     "to": 14.9
+    },
+    "shipYaw": 99.8,
+    "throttle": {
+     "from": 0,
+     "to": 1
+    },
+    "fails": 0
+   },
+   {
+    "device": "desktop",
+    "size": {
+     "w": 1280,
+     "h": 720,
+     "dpr": 1,
+     "coarse": false,
+     "touchPoints": 0
+    },
+    "state": {
+     "started": true,
+     "shown": false,
+     "padShown": false,
+     "display": "none",
+     "jump": 0,
+     "req": 1,
+     "root": "pc-hud pc-foot3"
+    },
+    "fails": 0
+   }
+  ]
+ },
+ "before": {
+  "tree": "clean export of 0902c56",
+  "fails": [
+   "a phone or a tablet: the touch controls are up from the start (coarse pointer and touch points)",
+   "with 0 compatibility mouse events (mousedown 1, mouseup 1, click 0; pointerdown:touch 1)",
+   "and no pointer lock asked for (requests 1, locked true)",
+   "a 120 px drag turned the view 0.0 degrees (at least 30)",
+   "with 0 pointercancel events (1)",
+   "the stick held 3.4 s (game time) walked 0.0 m (at least 5; top speed 0.00 m/s)",
+   "held at the rim it runs: 0.00 m/s against 0.00 walking",
+   "the JUMP button is up: null",
+   "iphone14: exception: TypeError: Cannot read properties of null (reading 'x')\n    at partInput (file:///home/user/painted-cosmos/tests/touch.mjs:202:26)\n    at async file:///home/user/painted-cosmos/tests/touch.mjs:322:143"
+  ],
+  "runs": [
+   {
+    "device": "iphone14",
+    "size": {
+     "w": 750,
+     "h": 340,
+     "dpr": 3,
+     "coarse": true,
+     "touchPoints": 1
+    },
+    "tap": {
+     "pointerdown:touch": 1,
+     "touchstart": 1,
+     "pointerup:touch": 1,
+     "touchend": 1,
+     "mousemove": 3,
+     "mousedown": 1,
+     "mouseup": 1,
+     "click:touch": 1
+    },
+    "look": {
+     "deg": 0,
+     "cancel": 1
+    },
+    "walk": {
+     "m": 0,
+     "vmax": 0,
+     "gameS": 3.35
+    },
+    "run": {
+     "vmax": 0
+    }
+   }
+  ]
+ }
+}

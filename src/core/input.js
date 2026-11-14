@@ -1,6 +1,8 @@
 // Keyboard and mouse. Pointer lock when the browser grants it; when it does not (an embedded
 // frame, a headless test), holding the left button and dragging looks around instead.
-// A gamepad, when one is connected, feeds the same axes, keys and look (src/core/gamepad.js).
+// A gamepad, when one is connected, feeds the same axes, keys and look (src/core/gamepad.js);
+// so do the fingers on a phone or a tablet (src/core/touch.js: input.touch, merged in take()).
+// A touch never asks for pointer lock.
 //
 // Keys (hardening review P6): walking and flying keys are read by POSITION (e.code: W A S D,
 // Space, Shift, the arrows sit where they sit on any layout), the action keys by the LETTER on
@@ -54,6 +56,7 @@ export function keyLabels(layout) {
 }
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+const NO_TAPS = Object.freeze([]);
 export const LOCK_RETRY_MS = 15000;     // after the lock's first trip, a click this much later tries it again
 
 export class Input {
@@ -83,6 +86,7 @@ export class Input {
     this.inShip = false;                  // set by the game: the triggers are the throttle in the ship
     this.pad = null;                      // the gamepad's last reading (null without one)
     this._padButtons = null;
+    this.touch = null;                    // the touch layer's pad (src/core/touch.js attachTouch), if any
 
     doc.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;       // leave browser shortcuts alone
@@ -107,6 +111,9 @@ export class Input {
 
     el.addEventListener('mousedown', (e) => {
       this.used = true;
+      // A mouse event a browser makes up from a touch is not a mouse: no drag, no pointer lock
+      // (the canvas's touchstart is cancelled, so there should be none; this is the belt).
+      if (this.fromTouch(e)) return;
       if (e.button !== 0) return;
       this.dragging = true; this._lx = e.clientX; this._ly = e.clientY;
       // After the lock's first trip into nonsense the game drags; a click LOCK_RETRY_MS later
@@ -160,6 +167,13 @@ export class Input {
       e.preventDefault();
     }, { passive: false });
     el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // Did this mouse event come from a finger? (Chromium says so; elsewhere a touch in the last second.)
+  fromTouch(e) {
+    if (e && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return true;
+    const t = this.touch;
+    return !!t && (t.clock ? t.clock() : now() / 1000) - t.lastAt < 1;
   }
 
   // Let go of the mouse (a panel opened: the map and the sketchbook want the cursor).
@@ -238,16 +252,24 @@ export class Input {
   down(code) {
     if (this.keys.has(code)) return true;
     const p = this.pad;
-    return !!p && (p.held.includes(code) || (code === 'ShiftLeft' && p.run && !this.inShip));
+    if (p && (p.held.includes(code) || (code === 'ShiftLeft' && p.run && !this.inShip))) return true;
+    const t = this.touch;
+    return !!t && (t.holds(code) || (code === 'ShiftLeft' && t.run && !this.inShip));
   }
 
-  // -1..1: keys give the ends, the gamepad's sticks (and, in the ship, its triggers) the range between.
+  // -1..1: keys give the ends, the gamepad's sticks (and, in the ship, its triggers) and the
+  // touch stick the range between.
   axis(neg, pos) {
     let v = (this.keys.has(pos) ? 1 : 0) - (this.keys.has(neg) ? 1 : 0);
     const p = this.pad;
     if (p) {
       if (neg === 'KeyA' && pos === 'KeyD') v += p.moveX;
       else if (neg === 'KeyS' && pos === 'KeyW') v += p.moveY + (this.inShip ? p.throttle : 0);
+    }
+    const t = this.touch;
+    if (t) {
+      if (neg === 'KeyA' && pos === 'KeyD') v += t.moveX;
+      else if (neg === 'KeyS' && pos === 'KeyW') v += t.moveY;
     }
     return v > 1 ? 1 : v < -1 ? -1 : v;
   }
@@ -281,10 +303,21 @@ export class Input {
   }
 
   // Everything that happened since the last frame, consumed once. dt: seconds since the last call.
+  // taps: fingers that tapped the picture (the game closes an open panel on one).
   take(dt = 1 / 60) {
     if (dt > 0) this._frameMs += (Math.min(100, dt * 1000) - this._frameMs) * 0.2;
     this.pollPad(Math.min(0.1, dt));
-    const out = { edges: this.edges, dx: this.dx, dy: this.dy, wheel: this.wheel };
+    let taps = NO_TAPS;
+    const t = this.touch;
+    if (t) {
+      const r = t.frame(Math.min(0.1, Math.max(0, dt)));
+      for (const code of r.edges) this.edges.add(code);
+      this.dx += r.dx; this.dy += r.dy; this.wheel += r.wheel;
+      if (t.used) this.used = true;
+      if (t.looked) this.looked = true;
+      if (r.taps.length) taps = r.taps;
+    }
+    const out = { edges: this.edges, dx: this.dx, dy: this.dy, wheel: this.wheel, taps };
     this.edges = new Set(); this.dx = 0; this.dy = 0; this.wheel = 0;
     return out;
   }

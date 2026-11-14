@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
 import { Input, keyLabels } from './core/input.js';
+import { attachTouch } from './core/touch.js';
 import { DynamicResolution } from './core/dynres.js';
 import { createHud } from './ui/hud.js';
 import { createMap } from './ui/map.js';
@@ -129,6 +130,10 @@ async function boot() {
     }
   } catch { /* not in a frame, not here */ }
   const input = new Input(canvas, { pointerLock: params.get('pointerlock') !== '0' });
+  // Fingers (src/core/touch.js): the stick, the look and the pinch on the picture, the touch
+  // HUD's controls; shown only once a finger touches, or on a phone or a tablet from the start.
+  const touch = attachTouch(input, canvas);
+  hud.bindTouch(touch);
   // Resolution: the output is capped at OUTPUT_MAX_PIXELS (resize, below); the controller
   // scales the scene inside that.
   const dyn = new DynamicResolution({
@@ -228,7 +233,7 @@ async function boot() {
   // and dawns, short nights; an instrument that sets an hour and lets the clock run wants it even).
   if (params.get('clock') === 'even') sim.unevenClock = false;
   const debug = {
-    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, using: prov.using, note: debugNote, gl,
+    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, touch, using: prov.using, note: debugNote, gl,
     info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),

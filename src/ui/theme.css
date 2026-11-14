@@ -241,3 +241,48 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 .pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; mix-blend-mode: multiply; }
 .pc-newsketch b { display: block; margin-top: 7px; font-weight: normal; }
 .pc-newsketch span { display: block; margin-top: 1px; }
+
+/* ---- touch (W3 of the sharp-smooth plan: src/core/touch.js, the touch controls in hud.js) ----
+   The gesture guard: the page itself never scrolls, zooms, selects text or calls up a callout;
+   the picture and the controls keep every touch (none of it changes anything for a mouse). */
+html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+#pc-canvas { touch-action: none; }
+/* (viewport-fit=cover: the picture runs under a phone's notch and rounded corners; the controls
+   keep inside the safe area) */
+:root { --pc-sl: env(safe-area-inset-left, 0px); --pc-sr: env(safe-area-inset-right, 0px);
+  --pc-st: env(safe-area-inset-top, 0px); --pc-sb: env(safe-area-inset-bottom, 0px); }
+/* Nothing of the touch layer exists for the eye until a finger has touched (or the device is a
+   phone or a tablet): the desktop HUD is the desktop HUD. */
+.pc-touchui { display: none; }
+.pc-hud.pc-touch .pc-touchui { display: block; position: absolute; inset: 0; }
+.pc-touchui > * { transition: opacity 0.9s ease; }
+/* unused for four seconds, the controls fade back to a third, so the painting is the painting */
+.pc-hud.pc-touch.pc-idle .pc-touchui > * { opacity: 0.35; }
+/* The round paper buttons in the right thumb's arc: JUMP (RISE in the ship) in the corner, SINK
+   beside it, BRAKE over it. */
+.pc-tbtn { position: absolute; display: none; align-items: center; justify-content: center; box-sizing: border-box;
+  border-radius: 50%; pointer-events: auto; touch-action: none; color: var(--pc-dark); isolation: isolate; }
+.pc-tbtn::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 50%;
+  background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px; background-color: var(--pc-key, #fff); background-blend-mode: multiply;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.18), inset 0 0 16px rgba(88, 68, 53, 0.16);
+  filter: url(#pc-rag-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* held down: the paper takes a wash */
+.pc-tbtn.pc-down::before { box-shadow: inset 0 0 0 1.5px rgba(47, 58, 93, 0.42), inset 0 0 24px rgba(77, 96, 178, 0.42); }
+.pc-tbtn-jump { width: 72px; height: 72px; right: calc(var(--pc-sr) + 14px); bottom: calc(var(--pc-sb) + 14px); }
+.pc-tbtn-sink { width: 56px; height: 56px; right: calc(var(--pc-sr) + 100px); bottom: calc(var(--pc-sb) + 14px); }
+.pc-tbtn-brake { width: 52px; height: 52px; right: calc(var(--pc-sr) + 24px); bottom: calc(var(--pc-sb) + 100px); }
+.pc-hud.pc-t-foot .pc-tbtn-jump, .pc-hud.pc-t-landed .pc-tbtn-jump, .pc-hud.pc-t-fly .pc-tbtn-jump, .pc-hud.pc-t-landing .pc-tbtn-jump,
+.pc-hud.pc-t-fly .pc-tbtn-sink, .pc-hud.pc-t-fly .pc-tbtn-brake, .pc-hud.pc-t-pulse .pc-tbtn-brake { display: flex; }
+/* The stick: a pencilled ring where the left thumb came down, a dab of wash under the thumb;
+   while no thumb is down, a faint ring where one would go. */
+.pc-stick, .pc-stick-rest { position: absolute; width: 0; height: 0; pointer-events: none; }
+.pc-stick { left: 0; top: 0; display: none; }
+.pc-stick.pc-on { display: block; }
+.pc-stick-rest { left: calc(var(--pc-sl) + 14% + 56px); bottom: calc(var(--pc-sb) + 24% + 56px); opacity: 0.45; }
+.pc-stick.pc-on ~ .pc-stick-rest, .pc-hud.pc-t-board .pc-stick-rest, .pc-hud.pc-t-pulse .pc-stick-rest { display: none; }
+.pc-stick::before, .pc-stick-rest::before { content: ''; position: absolute; left: -56px; top: -56px; width: 112px; height: 112px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(244, 239, 228, 0.16) 0%, rgba(244, 239, 228, 0.08) 70%, rgba(77, 96, 178, 0.16) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(35, 42, 69, 0.5), 0 0 0 1px rgba(244, 239, 228, 0.35); filter: url(#pc-rough); }
+.pc-stick i { position: absolute; left: -21px; top: -21px; width: 42px; height: 42px; border-radius: 46% 54% 50% 50% / 52% 48% 54% 46%;
+  background: radial-gradient(ellipse at 44% 42%, rgba(77, 96, 178, 0.3) 0%, rgba(77, 96, 178, 0.48) 60%, rgba(47, 58, 93, 0.7) 100%); filter: url(#pc-wash); }

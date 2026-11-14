@@ -2,6 +2,64 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, RELEASE 1, PILOT lane part 2: W3.1 (gesture guard, touch input) and W3.2 (touch HUD) (started 10:00 UTC 2026-11-14; kept current)
+
+**Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3". This part is W3.1 and W3.2; W3.3
+(phone layouts and words), W3.4 (platform) and W3.5 (the phone preset) are part 3. First commit's parent: `0902c56`.
+Scratch: `/home/user/.pc-scratch/pilot/r1/touch/`.
+
+**State:** W3.1 DONE (commit below). W3.2 in progress (not committed).
+
+### W3.1 the gesture guard and touch input (DONE)
+
+- **Files:** `src/core/touch.js` (new: `TOUCH` constants, `TouchPad` the fingers as numbers, `attachTouch` the DOM
+  wiring), `src/core/input.js` (`input.touch` merged in `take()`, `axis()`, `down()` the way the gamepad is; a mouse
+  event made up from a touch never drags or asks for pointer lock: `fromTouch`), `index.html` (viewport
+  `viewport-fit=cover`, `maximum-scale=1, user-scalable=no`), `src/ui/theme.css` (the guard: `touch-action:none` on
+  html, body and the canvas, `overscroll-behavior:none`, user-select, touch-callout and tap-highlight off; the touch
+  controls' look), `src/ui/hud.js` (the stick's ring and the round paper buttons JUMP/RISE 72 px, SINK 56, BRAKE 52,
+  `bindTouch`, `setTouch`), `src/core/game.js` (`setTouch` each frame: which buttons, the fade, the stick; the hint
+  says "drag on the right to look around" on touch), `src/main.js` (`attachTouch(input, canvas)`, `__pc.touch`),
+  `tests/touch.test.mjs` (9 tests), `tests/touch.mjs` (browser, `--part input`).
+- **How it works:** a finger on the left 40 % of the picture is a floating stick (centre where it lands, 56 px full,
+  8 px dead zone, the centre follows a thumb past the rim; at the rim (0.92) for 0.25 s it runs on foot); elsewhere a
+  relative drag looks (0.28 degrees per css px on foot, `LOOK_GAIN` = 2.12 mouse px per css px, so the nose turns at
+  FEEL.mouseShip's rate, about 0.21 degrees per px); a second finger beside the look finger pinches the camera boom
+  (60 px of spread = one wheel notch); a control (hud.js) presses a code while held (JUMP/RISE = Space, SINK = C,
+  BRAKE = X) or taps it (W3.2's prompts and tabs: only the edge, so a slip that vanishes under the finger cannot leave
+  a key held). Taps on the picture reach the game in `take().taps` (W3.2 closes panels with them). Shown on the
+  first touch or from the start with `(pointer: coarse)` and touch points; hidden by a key press or a real mouse move
+  (over 24 px, more than 1 s after a touch; a 0-movement hover move does not count). Without touch nothing shows and
+  nothing changes (`.pc-touchui` is `display:none`).
+- **Acceptance, measured** (`node tests/touch.mjs --part input`: Playwright's iPhone 14, Pixel 7 and iPad Pro 11
+  landscape profiles, CDP touch, stubs with PHYSICS; and a desktop 1280x720 page). All three profiles PASS:
+  a tap starts the game with **0** compatibility mouse events (mousedown, mouseup, click) and 0 pointer-lock
+  requests; a 120 px drag turns the view **33.6 degrees** with **0** pointercancel; the stick held 2.5 s (2.9-3.2 s of
+  game time by the time the finger lifts) walks **8.7-10.1 m** (2.8 m/s at 40 px deflection), held at the rim it runs
+  at 7.2 m/s; JUMP tapped **1.9-2.4 m** up, held 2 s the jetpack **19.7-23.7 m**; stick and look at once **18.9-31.8 m**
+  and 23.5 degrees; a pinch leaves `visualViewport.scale` **1** and moves the boom 5.20 -> 6.27 m; in the ship (160 m)
+  a 90 px drag up lifts the nose **0 -> 14.9 degrees**, stick right turns it **87-100 degrees** in 1.5 s, stick up opens
+  the throttle **0 -> 1.00**; no console error. Desktop: no touch layer (`display:none`, JUMP 0 px wide), a click
+  asks for pointer lock as before. (The audit's live patch: 39.5 degrees, 15.3 m at 4.22 m/s, 18.5 m, scale 1.)
+  The same script on a clean export of `0902c56` FAILS 9 checks (mousedown 1 and a pointer lock from the tap, 0.0
+  degrees with a pointercancel, 0.0 m walked, no JUMP). Evidence: `docs/shots/pilot/r1/touch-w31-input.json` (every
+  number, before and after), `touch-w31-iphone14-ship.jpg` (OPENED: the paper buttons rise/sink/brake in the right
+  corner, the stick's resting ring at the left).
+- **Unchanged and green:** `tests/input.test.mjs` + `tests/gamepad.test.mjs` 13 pass, `tests/lockcheck.mjs` PASSED.
+- **Checks** on a clean export of `0902c56` with these files (PAINTER's uncommitted `src/render` left out): unit
+  **225** (216 + touch 9), physics 325, world 30, coast PASS at both stands, ghostfield all zeros, static rules hold,
+  lockcheck PASSED; the real game (q0, 640x360, desktop) loads with no console error, `fallback` empty, no touch layer.
+- **Rulings (W3.1):** (1) the look gain is per css px, not per screen width: the plan's "about 200 degrees per screen
+  width" and "120 px turns 30 degrees or more" disagree on the Pixel 7 (863 px: 28 degrees) and the iPad (1194 px:
+  20 degrees); a thumb's travel is a physical distance and a css px is about the same size on a phone and a tablet,
+  so 0.28 degrees per px (210 degrees across the iPhone 14). (2) The round buttons JUMP/RISE, SINK, BRAKE came with
+  W3.1, not W3.2: W3.1's own acceptance (jump, jetpack) needs one. (3) `user-scalable=no, maximum-scale=1` are in the
+  viewport besides `viewport-fit=cover` (Chrome on Android honours them; iOS ignores them, the gesture events and
+  `touch-action` do it there). (4) In the ship the stick does not run (Shift is the run on foot only, as the pad's).
+  (5) Playwright's profiles report `maxTouchPoints` 1: the coarse-pointer test asks for at least one.
+- **For the feel (only a phone can tell):** gain 0.28 degrees per px, dead zone 8 px, rim 0.92 for 0.25 s, pinch 60 px a
+  notch: all in `TOUCH` at the top of `src/core/touch.js`.
+
 ## Hand-over, RELEASE 1 of the sharp-smooth plan, PILOT lane part 1: W1 (the gate) (started 05:00 UTC 2026-11-14; kept current)
 
 **Read this first.** The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W1 = section 4 "PILOT · W1 Gate", the quality guard =
