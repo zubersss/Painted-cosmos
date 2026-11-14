@@ -12,8 +12,8 @@ it).
 
 **State:** in progress. Items: W1.1 harness (committed `2355594`, game clock pinned at 120 s since; reproduces the
 baseline, table below), W1.1b baseline numbers (q2 1280x720, all 24 stations, committed; q2 1920x1080, q1, q0 and the
-phone profile pending), W1.2 green gate (code committed `419074c`; painted-trip passed 3 of 3; all.mjs on a clean
-export running). Still to do for W1.1's acceptance: two identical runs compared (`--diff`).
+phone profile pending), W1.2 green gate DONE (code `419074c`; painted-trip 3 of 3; all.mjs on a clean export of
+`8811ca4` ALL 15 PASSED). Still to do for W1.1's acceptance: two identical runs compared (`--diff`).
 
 ### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
 
@@ -28,9 +28,10 @@ export running). Still to do for W1.1's acceptance: two identical runs compared 
 | E_1000_90 cost | 441 calls, 669,283 triangles | 441, 669,283 |
 | E_150_45 raw land lapvar | 520-525 | 555.9 with the game clock at 900 s; **520.9** with it at 120 s (the baseline run) |
 
-The raw lapvar is the one miss. Cause found so far: the picture is not the same instant. The audit's harness did
-not hold the loop and left the game's clocks where they were; this one pins the game clock (900 s), the painter's wash
-clock (100) and renders once before the measured render. A pixel difference of this raw frame against the audit's
+The raw lapvar was the one miss of the first commit (`2355594`, game clock pinned at 900 s), now resolved (the clock
+study below; the harness pins 120 s since `8811ca4`). The audit's harness did not hold the loop and left the game's
+clocks where they were; this one pins the game clock, the painter's wash clock (100) and renders once before the
+measured render. A pixel difference of this raw frame against the audit's
 (same camera to the millimetre): crowns' edges everywhere (the trees sway with the clocks) and the stream (the water
 reflects the frame before: here the same view, in the audit a frame of the game's own camera, since its loop ran
 between grabs). The lead's two placements in one page differed by 0.4 % (520.75, 522.62).
@@ -161,6 +162,11 @@ One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EX
   PASS (470 s, 489 s, 50 checks each). Logs: `docs/shots/pilot/r1/painted-trip-run{1,2,3}.txt`. Said plainly: in none of
   the three did the ship bump or the game say "Too steep", so the two restored paths were not exercised by these runs
   (they guard against what failed the verifier's runs on `a539086` and `45629a7`).
+- **`node tests/all.mjs --export` on `8811ca4`: ALL 15 PASSED** (07:13-07:59 UTC; unit 216, physics 325, world 30, coast
+  2 of 2 stands, ghostfield 6 of 6 all zeros, static, play-stub 39, play-physics 39, trip-stub 50, m3 33, lock 14, audio,
+  painted-play 39, painted-trip 50 (a fourth pass), painted-m3 33). Table: `docs/shots/pilot/r1/all-mjs-8811ca4.txt`.
+  W1.2 is DONE. (`stations-quick` and `touch` steps: later, as the plan says; stations-quick takes the section 5
+  thresholds once W2 has landed.)
 
 ## SHIPPED STATE (coordinator, 2026-11-14 ~02:00 UTC; read this first)
 
