@@ -4,7 +4,62 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of the LAST FIXES (twenty-first PAINTER agent; READ THIS FIRST; kept current after every item)
+## Hand-over of the LAST FIXES' RE-FIX pass (twenty-second PAINTER agent; READ THIS FIRST)
+
+The verifier of the last fixes accepted item 2 and found item 1 partly fixed (the eye inside a spire: fixed and confirmed;
+a hard-edged slab beside a slim Neptune spire seen from OUTSIDE it, the descent's last frame `q0_dsc4`, still there, the
+same on base and head), one MINOR regression of item 1's hollow (with the eye at the skin of a stout spire the spire breaks
+into a ragged mass and dark chips; the fade starts about 2 m outside the skin) and a pre-existing violet slab on Saturn
+(`sfptp`). Its files: `/home/user/.pc-scratch/verify/last-painter/`. The owner's word relayed with this pass: for this
+play test use what the game has now and go on. Began 00:15 UTC, 2026-11-14, on head `a539086`.
+Scratch: `/home/user/.pc-scratch/painter/last/re/` (`bin/` the verifier's `run.mjs`, `lib.mjs`, `sheet.py`, copied
+unchanged; trees `H` the head, `F`, `F2` the head with the two tries; frames in `out/`; `sout.mjs` the outline measure).
+
+**State at the end of the pass: NO CODE CHANGED; the head stands (`0112e5e` and `5fd389b` as verified).** Both tries
+looked no better or worse in the verifier's own views and were reverted; the open slab has no small safe fix. Evidence
+`docs/shots/painter/last/04-refix-tried-not-kept.jpg` (opened) and `04-outline-measure.mjs`. World tests on a clean export
+of `a539086`: 30 pass. Every page of the pass (H, F, F2 at quality 0, half scale, 960x540): no console error, no game
+error, fallback empty.
+
+- **THE SLAB BESIDE A SPIRE SEEN FROM OUTSIDE (`q0_dsc4`): NOT FIXED, pre-existing.** Reproduced with the verifier's
+  descent on a fresh page of the head (ship 16 m up 4.5 m from a slim ice spire, C held to the ground): `dsc2` to `dsc4`
+  show the spire as a cobalt slab with ruler-straight vertical edges and a V at its foot. What it is: at quality 0 there
+  are no near forms (`flora.js _retier`: "the low tier draws no full trees"), so a spire a few metres from the lens is
+  its MIDDLE form, an icosahedron of detail 1 stretched 4.5 times taller than wide: tall sliver facets 5 to 8 m long, and
+  its egg-shaped foot narrows to a point at the ground (the V). The verifier's reading that the player's `177` (top right,
+  a V-bottomed polygon) is this kind fits what I see; the player's place was not logged. Three fixes looked at, none
+  small and safe now:
+  (a) a ragged outline cut in the shader, found from the spire's own axis (the sine of the angle between the line of
+  sight and the way out from the axis is 1 on the outline of a round form). Written and measured before any frame, on the
+  kit's own middle forms (eight seeds per kind, eyes 1.6 to 4.5 girths out; `04-outline-measure.mjs`, checked first on a
+  smooth cylinder: 100 % of its side outline over 0.94): on the slim spires only 49 % of the side outline is over 0.9
+  and 14 % under 0.5 (stout 67 % / 3 %): the wind-carved lumps (noise 0.30), the lean and the off-centre body turn the
+  real outline away from the axis, so a cut that always takes the outline would eat half the spire. Not kept, no frame.
+  (b) a finer middle form: the facets are slivers, so detail 2 still leaves 4 m straight edges and detail 3 (2 m) costs
+  about 1300 triangles a spire at the slowest tier, on every world with spires. (c) the near form at quality 0 within
+  some metres: the near and middle forms are different spires (other seeds, height and lean), so it would change shape
+  in front of the player. For a successor, with frames at every tier: a middle form cut as rings and sides from the near
+  form's own seed (the same spire, coarser, with a broad foot), then (c) is safe; or PILOT's landing and foot cameras kept
+  a few metres clear of a spire.
+- **THE HOLLOW'S SIDE EFFECT AT THE SKIN (MINOR regression): two tries, neither kept; the head's hollow stands.** The cause
+  is item 1's one number per spire: the real skin wanders about 30 % round the girth the shader assumes, so the reach must
+  start outside it. From the verifier's views the window is narrow: Saturn `sfp2` (stout spire, eye at 1.19 of the assumed
+  girth) had dark ruled strips on base that the hollow removed, Mars `mfp2` (stout, 1.27) was a plain wash on base and
+  is broken up on the head; a tighter reach cannot tell the two apart, and the fixer's narrower reach left a slab at the
+  skin (V3). Tried instead (fragment shader only, spire materials only): an eye only near a spire, not inside it, parts
+  only what is near the eye, the whole spire still going once the eye is inside (`hv = vHollow * mix(1 - smoothstep(a,
+  b, vd), 1, smoothstep(0.86, 0.98, vHollow))`). F (a, b = 2.5, 8 m): 28 of the 29 views within 0.05 to 0.7 of 255 of the
+  head on average (the 29th, `sfptp`, differs by a lit patch on the ground, the sky's light, not a spire); `mfp2` keeps
+  its broken mass and blots, `sfp2` its chip. F2 (1.5,
+  4.5 m): `mfp2` and `sfp2` the same, and `V3` gains a dark streak and chips at the lower left: worse. Both reverted.
+  Kept as it is because removing the hollow brings back what the verifier confirmed it fixed (V1, V3, `fpw2`, `fpw3` at
+  quality 0; the half-frame of ragged cobalt from inside a spire at the top tier), which is worse than spatter at the
+  skin; the verifier called it MINOR and, at the top tier, arguably better.
+- **SATURN `sfptp` (third person 3.2 m from a spire, a flat violet slab with a straight edge): not touched,
+  pre-existing.** At quality 0 it is the same middle form as above; at the top tier the near form at 3.2 m. Same
+  successor's work.
+
+## Hand-over of the LAST FIXES (twenty-first PAINTER agent; kept current after every item)
 
 The last fix round before ship (workflow m4-last-fixes), from the second blind player's play (on `45629a7`, README only,
 960x540, quality 0 at render scale 0.5; its log and frames `/home/user/.pc-scratch/verify/player2/`). The list, in order,
