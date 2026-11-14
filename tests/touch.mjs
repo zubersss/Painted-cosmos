@@ -10,7 +10,8 @@
 //   node tests/touch.mjs --part platform      W3.4 and W3.5: the presets, the buffer, the read-out, the
 //                                             upright views, fullscreen, the wake lock, the manifest
 //   node tests/touch.mjs --part all           input, platform, then the loop on stubs (tests/all.mjs step 'touch')
-//   [--root DIR] [--out DIR] [--query "..."] [--keep]
+//   [--root DIR] [--out DIR] [--query "..."] [--keep] [--block-landings N] (loop: the first N landings
+//                                             are given back on the way down, on purpose)
 //
 // part input (W3.1's acceptance): a tap starts the game with no compatibility mouse event and
 // no pointer lock; a 120 px drag turns the view 30 degrees or more with no pointercancel; the
@@ -34,7 +35,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { GL_ARGS } from '../tools/shot.mjs';
 import { startServer } from '../tools/serve.mjs';
-import { fallbackProblem } from './browser.mjs';
+import { fallbackProblem, giveLandingBack } from './browser.mjs';
 import { TOUCH, LOOK_GAIN } from '../src/core/touch.js';
 import { namesAKey } from '../src/core/words.js';
 
@@ -419,6 +420,18 @@ async function partPlatform(device) {
       rec.platform = i.platform;
       if (device === 'desktop') {
         check(i.platform.fullscreen === 'not asked' && i.platform.wakeLock === 'not asked', `W3.4: the desktop asks for nothing (fullscreen ${i.platform.fullscreen}, wake lock ${i.platform.wakeLock})`);
+        // a desktop window taller than wide keeps the field it always had (the upright field is the
+        // phone's and the tablet's: the verifier's 600x900 window had gone from 58 to 81.8 degrees)
+        const wide = await page.evaluate(() => ({ fov: window.__pc.camera.fov, view: window.__pc.game._viewFov }));
+        await page.setViewportSize({ width: 600, height: 900 });
+        await sleep(800);
+        await gameWait(0.4);
+        const tall = await page.evaluate(() => ({ fov: window.__pc.camera.fov, view: window.__pc.game._viewFov, aspect: window.__pc.camera.aspect }));
+        rec.tallWindow = { wide, tall };
+        check(Math.abs(tall.aspect - 600 / 900) < 0.01 && Math.abs(tall.fov - tall.view) < 0.01 && Math.abs(tall.fov - wide.fov) < 0.5,
+          `a desktop window of 600x900: the vertical field ${tall.fov.toFixed(2)} degrees (the view's own ${(+tall.view).toFixed(2)}; ${wide.fov.toFixed(2)} at 1920x1080), not widened`);
+        await page.setViewportSize({ width: W, height: H });
+        await sleep(500);
       } else {
         // (an iPhone: no fullscreen for a page, said nowhere; elsewhere asked, and Chromium grants it)
         if (iphone) check(i.platform.fullscreen === 'unsupported', `W3.4: an iPhone has no whole screen for a page: ${i.platform.fullscreen}, nothing said (the sideways lock: ${i.platform.orientation})`);
@@ -495,6 +508,9 @@ async function partLoop() {
   const { page, fingers, info, gameWait, sleep, size } = r;
   const W = size.w, H = size.h, phone = !painted && (device === 'iphone14' || device === 'pixel7');
   const rec = { device, painted, size, stages: {}, legs: {} };
+  // --block-landings N: the first N landings that begin are given back on the way down (see the landing)
+  const blocks = { asked: Number(val('block-landings', 0)), left: Number(val('block-landings', 0)), done: 0 };
+  rec.landingsGivenBack = [];
   const LX = W * 0.5, LY = H * 0.42;                    // where a look drag starts: clear of every control
   const SX = W * 0.16, SY = H * 0.72;                   // where the left thumb comes down
   const PX_PER_RAD_SHIP = 1 / (LOOK_GAIN * 0.0017);     // css px of drag per radian of nose (FEEL.mouseShip)
@@ -739,20 +755,47 @@ async function partLoop() {
     check(i.ship.canLand, `the landing prompt over Mars (${Math.round(i.ship.altGround)} m up, ${Math.round(i.ship.speed)} m/s)`);
     await measure('over Mars ("Land here")');
     await shot('land-here');
+    // The markers' labels (a place to land) by the touch controls: never on a control (the slips,
+    // the tabs, the buttons: hard for every label on a touch screen); on a gauge only where no clear
+    // place is near (the gauges are soft, src/ui/layout.js placeMust). Measured as drawn.
+    const marksBy = await page.evaluate(() => {
+      const R = (e) => { const q = e.getBoundingClientRect(); return { x0: q.left, y0: q.top, x1: q.right, y1: q.bottom, w: q.width }; };
+      const ov = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+      const hard = [...document.querySelectorAll('.pc-prompt.pc-on .pc-button, .pc-touchui .pc-tab, .pc-touchui .pc-tbtn')].map(R).filter((r) => r.w > 0);
+      const soft = [...document.querySelectorAll('.pc-gauge.pc-on, .pc-notice.pc-on, .pc-hint.pc-on')].map(R).filter((r) => r.w > 0);
+      return [...document.querySelectorAll('.pc-mark .pc-label')].filter((l) => l.querySelector('svg') && l.getBoundingClientRect().width > 0 && getComputedStyle(l.parentElement).display !== 'none')
+        .map((l) => { const r = R(l), svg = l.querySelector('svg'); return { text: svg.getAttribute('aria-label'), onControl: Math.round(hard.reduce((a, h) => a + ov(r, h), 0)), onGauge: Math.round(soft.reduce((a, h) => a + ov(r, h), 0)), area: Math.round((r.x1 - r.x0) * (r.y1 - r.y0)) }; });
+    });
+    rec.landHereLabels = marksBy;
+    check(marksBy.every((m) => m.onControl === 0), `the markers' labels over Mars lie on no control: ${JSON.stringify(marksBy)}`);
+    // A tap on the slip, and the landing seen through (as tests/trip.mjs does it by keys): the
+    // prompt gone when the tap arrived, wait for it and tap again; "Too steep to land here", or a
+    // landing begun and given back on the way down ("No level ground here": the assist's glide met
+    // a ledge, sim.js stepLanding's 'blocked'), fly on and come down again. --block-landings N
+    // gives the first N landings back on purpose (tests/browser.mjs giveLandingBack).
     let landed = false;
     for (let k = 0; k < 8 && !landed; k++) {
       t = await tapSlip('Land here', (x) => x.state === 'LANDING' || x.state === 'LANDED' || x.prompt === 'Cancel landing', 3);
       i = t.i;
       if (i.state === 'ATMOSPHERE' && i.prompt === 'Cancel landing') i = await r.until((x) => x.state === 'LANDING' || x.state === 'LANDED' || x.prompt !== 'Cancel landing', 40);
-      if (i.state === 'LANDING' || i.state === 'LANDED') { landed = true; break; }
-      log('  (the tap did not start a landing: ' + (i.notice || 'no prompt then') + '; flying on)');
-      if (/steep|level/i.test(i.notice || '')) await stick(0, -55, 4, holdPitch(0));
+      let givenBack = false;
+      if (i.state === 'LANDING' || i.state === 'LANDED') {
+        if (i.state === 'LANDING' && blocks.left > 0 && await giveLandingBack(page)) { blocks.left--; blocks.done++; log('  (--block-landings: this landing given back on purpose, as the game does on a ledge)'); }
+        i = await r.until((x) => x.state !== 'LANDING', 90);
+        if (i.state === 'LANDED') { landed = true; break; }
+        if (i.state === 'LANDING') break;              // (still descending after 90 s: the check below says so)
+        givenBack = true;
+        rec.landingsGivenBack.push(i.notice || i.state);
+        log('  (the landing was given back: ' + (i.notice || i.state) + '; flying on)');
+      } else log('  (the tap did not start a landing: ' + (i.notice || 'no prompt then') + '; flying on)');
+      if (givenBack || /steep|level/i.test(i.notice || '')) await stick(0, -55, 4, holdPitch(0));
       i = await r.until((x) => x.ship.canLand, 120, async (x) => {
         await holdPitch(x.ship.altGround > 110 ? -18 : -7)(x);
         if (x.ship.throttle < 0.18) await stick(0, -55, 0.15);
         if (x.ship.speed > 60) await stick(0, 55, 0.2);
       });
     }
+    if (blocks.asked) check(blocks.done === blocks.asked, `--block-landings: ${blocks.done} of ${blocks.asked} landings given back on purpose, and landed after`);
     i = await r.until((x) => x.state === 'LANDED', 90);
     check(i.state === 'LANDED' && i.body === 'mars', 'landed on Mars by touch');
     await gameWait(1);

@@ -9,11 +9,12 @@ import {
   clamp, mix, damp, qLook, qSlerp, qRotate, lerp,
 } from '../core/vec.js';
 
-// A screen held upright (a tablet; a phone in a window taller than wide) keeps at least MIN_HFOV
-// degrees across (W3.4): the vertical field of view, given for a landscape screen, is widened in
-// proportion to what the aspect takes away (a 58 degree view on an upright iPad Pro 11 was 42
-// degrees across). Effects that widen the view (the ship at speed) widen it as before, on top.
-// Nothing changes on a screen wider than about 1.04 to 1 (every desktop window and landscape screen).
+// A phone's or a tablet's screen held upright keeps at least MIN_HFOV degrees across (W3.4): the
+// vertical field of view, given for a landscape screen, is widened in proportion to what the
+// aspect takes away (a 58 degree view on an upright iPad Pro 11 was 42 degrees across). Effects
+// that widen the view (the ship at speed) widen it as before, on top. Nothing changes on a screen
+// wider than about 1.04 to 1 (a landscape screen). The game asks it only on the phone and tablet
+// presets (Game.fieldOfView): a desktop window keeps its field whatever its shape.
 export const MIN_HFOV = 60;
 export function portraitFov(vfovDeg, aspect, base = 58) {
   if (!(aspect > 0) || !(vfovDeg > 0)) return vfovDeg;

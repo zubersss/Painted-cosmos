@@ -2,6 +2,71 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, RELEASE 1, PILOT RE-FIX pass (the verifier's findings on the lane; started 18:00 UTC 2026-11-14; kept current)
+
+**Read this first.** The lane's commits were checked by an independent verifier; this pass fixes exactly what it did not
+accept, each with proof. Scratch: `/home/user/.pc-scratch/pilot/r1/rf/` (`mkex.sh`: a clean export of HEAD with PILOT's
+working files; `head/`: HEAD alone; `mapsweep.mjs`: the touch chart's names over 200 clock times; logs). First commit's
+parent: `3cd414b`.
+
+**State (in progress):**
+- **RF-A, W1.2's gate (painted-trip 2 of 3 on 3cd414b):** fixed in the tests (`tests/trip.mjs`, `tests/touch.mjs`,
+  `tests/browser.mjs` giveLandingBack, `tests/landingback.test.mjs`). The cause, as the verifier said: a landing that
+  BEGAN and was then given back by the game ("No level ground here", `src/ship/flight.js` stepLanding's 'blocked',
+  `src/core/sim.js` line 488) was waited on for 90 s. Now the scripts wait for the landing to END (`state !== 'LANDING'`)
+  and, if it was given back, fly on (4 s full throttle, nose level) and come down to the prompt again, as on "Too steep".
+  `--block-landings N` gives the first N landings (on each world, in the trip) back on purpose, the way the game does,
+  so the path runs every time it is asked for. Proof so far: stubs, `--block-landings 1`: PASSED, both landings given
+  back and the ship landed after each (`rf/trip-stub-block1.log`); the code before the fix (3cd414b's trip.mjs) with the
+  same injection FAILS exactly as the verifier's run 2: "landed on mars" after the 90 s wait, then "standing on",
+  "the sketchbook has" (`rf/trip-before-inject.log`).
+- **RF-B, the upright field on a desktop window:** the plan asks it of a tablet held upright, so the game now asks it only
+  on the phone and tablet presets (`Game.fieldOfView`, `src/core/game.js`); a desktop window keeps 58 degrees whatever
+  its shape, as before release 1 (the verifier: 600x900 gave 81.8). Unit: `tests/preset.test.mjs` (the desktop at
+  600x900 keeps every field; the tablet and the phone are widened as before); browser: `tests/touch.mjs --part platform`
+  on the desktop now resizes to 600x900 and checks the field. Run on the export (`--platform-devices
+  desktop,ipadpro11-up`, `rf/platform.log`): PASSED; "a desktop window of 600x900: the vertical field 58.00 degrees (the
+  view's own 58.00; 58.00 at 1920x1080), not widened" (3cd414b: 81.8, the verifier's `desk/head.json`); the iPad held
+  upright still sees 60.0 degrees across (vertical 79.16). The real game (q0) loads on a desktop page and on the iPhone
+  14 profile with no console error and `fallback` empty (`rf/load-desktop.log`, `rf/load-iphone.log`).
+- **RF-C, the touch chart's names at 400x225:** fixed (`src/ui/layout.js` placeChartNames and chartNameBox,
+  `src/ui/map.js` chartDots / chartNameList, `tests/chartnames.test.mjs`). The cause: with all four sides of its dot
+  taken a name fell back to its first side, over whatever was there, and its test box missed the halo and the
+  descenders by about 2 px. Now: the box is the ink as drawn (checked against letterPath's own points); a name tries its
+  four sides, then 16 directions on six rings out to 32 px from its dot, only where it lies nearer the EDGE of its own
+  dot than of any other (by 3 px beyond 9 px off its own: a name is read as the dot's it lies by; a try without this
+  rule put 'Jupiter' by Mercury, and one measured to the dots' centres put 'Uranus' nearer Pluto's dot); a name in the
+  way may move to another clear place; on a chart under 260 px tall (a window under about 300 px: smaller than any
+  phone held sideways; the painted runs' 400x225) a crowded name may be lettered down to 9 css px; with no room even
+  then it is left off (its dot stays, a tap names it in the line), never the chosen world's name or yours (those may go
+  out to 54 px and, with nothing better, lie where another dot is as near). Placement is cached while the dots stand
+  still (they creep a fraction of a pixel a second); 2-5 ms a placement in Node.
+  **Measured** over 400 clock times on the real chart (the unit test; scratch `evalnames.mjs` / `unclear3.mjs`): names
+  on names or on dots in 0 layouts at 212x189 (the chart of the 400x225 window), 482x300 (iPhone 14), 561x320 (Pixel 7)
+  and 1138x678 (iPad Pro 11), against names on names in every layout with the old placement (box test: 1431 pairs at
+  212x189, 202 at the iPhone 14). The cost: at the phones and the tablet every name at its full size, one name left off
+  where dots clump (two worlds drawn on one spot, three outer worlds in a knot) in 19 of 400 layouts on the iPhone 14,
+  10 on the Pixel 7, 3 on the iPad; at 212x189, 457 names of 4000 left off (280 layouts, at most 5 in one) and about
+  1000 lettered between 9 and 10.25 css px: names apart, each by its own dot, some left off, rather than all ten in a
+  heap. **Browser sweep** (`rf/mapsweep.mjs`, 200 clock times per profile, the ink measured in the page with
+  letterPath, halo included; `rf/sweep/head2.log` on 3cd414b, the final version's log below): 3cd414b: names on names
+  404 pairs at 400x225, 25 on the iPhone 14, 12 on the Pixel 7, 4 on the iPad; names on another world's dot 494 / 24 /
+  14 / 10; names off the chart 261 / 6 / 3 / 1. Frames OPENED: `rf/sweep/head2-iphone14-400.jpg` ('Moon' over 'Uranus',
+  'Jupiter' on Earth's dot) and the same clock after the fix (names apart; Jupiter's name left off at 400x225).
+- **The 'a place to land' label on the throttle gauge at 400x225: judged, not changed.** The labels' rule
+  (`src/ui/layout.js` placeMust, the pre-ship R3 ruling) keeps every label off a control on a touch screen (the slips,
+  the tabs, the buttons: hard) and lets a label that must show lie on as little of a gauge or a notice (soft) as it can
+  when no clear place lies within 40 px, rather than float away from its mark. In the 400x225 window the right column
+  is the gauge (y 40-62), the 'Land here' slip (y 90-135) and the three buttons: the 28 px between the gauge and the
+  slip, less the 4 px the rule keeps round each, cannot hold a two-line label 40 px tall, so it takes the gauge's end:
+  the rule doing what it was ruled to do, in a window smaller than any phone. At the phones' and the tablet's own
+  sizes the label lies clear (the verifier's own frames `loop-iphone14-land-here.jpg`, `loop-pixel7-land-here.jpg`,
+  opened). `tests/touch.mjs` (the loop, over Mars) now measures the labels as drawn and fails if one lies on a control;
+  the cover of a gauge is recorded (`landHereLabels` in the run's summary). The arrow on the 'Land here' slip predates
+  the lane (the verifier found it in an older desktop frame): not this pass's.
+- **The 1280x720 screenshot timeout:** not attributed to PILOT by the verifier and not investigated here (the page
+  itself reported started, no console error, fallback empty).
+
 ## Hand-over, RELEASE 1, PILOT lane part 3: W3.3 (phone layouts and words), W3.4 (platform), W3.5 (the phone preset) (started 12:20 UTC 2026-11-14; kept current)
 
 **Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3" items 3, 4, 5. First commit's parent:

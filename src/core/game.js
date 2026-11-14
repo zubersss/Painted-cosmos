@@ -185,9 +185,9 @@ export class Game {
     cam.quaternion.set(v.camQ.x, v.camQ.y, v.camQ.z, v.camQ.w);
     const planes = cameraPlanes(v.view, v.clearance, farthestExtent(v.camU, items));
     const P = this._planes;
-    // (held upright the view keeps 60 degrees across: src/player/camera.js portraitFov)
+    // (a phone or a tablet held upright keeps 60 degrees across: fieldOfView)
     this._viewFov = v.fov;
-    const fov = portraitFov(v.fov, cam.aspect);
+    const fov = this.fieldOfView(v.fov, cam.aspect);
     if (Math.abs(planes.near - P.near) > P.near * 0.02 || Math.abs(planes.far - P.far) > P.far * 0.02
         || Math.abs(fov - P.fov) > 0.01 || cam.aspect !== P.aspect) {
       cam.near = planes.near; cam.far = planes.far; cam.fov = fov;
@@ -414,8 +414,18 @@ export class Game {
   // the view's field fitted to the new aspect, then painted as it stands.
   repaintFitted() {
     const cam = this.camera;
-    if (this._viewFov) { cam.fov = portraitFov(this._viewFov, cam.aspect); this._planes.fov = cam.fov; this._planes.aspect = cam.aspect; cam.updateProjectionMatrix(); }
+    if (this._viewFov) { cam.fov = this.fieldOfView(this._viewFov, cam.aspect); this._planes.fov = cam.fov; this._planes.aspect = cam.aspect; cam.updateProjectionMatrix(); }
     this.repaint();
+  }
+
+  // The vertical field of view for a screen of this aspect. On the phone and tablet presets
+  // (W3.4, main.js fills this.device) a screen held upright keeps 60 degrees across
+  // (src/player/camera.js portraitFov). A desktop window keeps the field it always had, whatever
+  // its shape: the plan asks it of a tablet held upright, and a desktop window taller than wide
+  // (the verifier's 600x900: 58 degrees became 81.8) is left as it was before release 1.
+  fieldOfView(vfov, aspect) {
+    const d = this.device;
+    return d && d.preset && d.preset !== 'desktop' ? portraitFov(vfov, aspect) : vfov;
   }
 
   // Paint the frame again as it stands; no time passes. The world goes first: it lays the shade

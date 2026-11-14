@@ -6,11 +6,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { register } from 'node:module';
 import { PRESETS, choosePreset, bufferSize } from '../src/core/preset.js';
 import { portraitFov, horizontalFov, CAMERA } from '../src/player/camera.js';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// (src/core/game.js imports 'three': resolved to the vendored copy, as tests/flightmarks.test.mjs does)
+const three = pathToFileURL(path.join(repo, 'vendor/three/three.module.js')).href;
+register('data:text/javascript,' + encodeURIComponent(`
+export async function resolve(specifier, context, next) {
+  if (specifier === 'three') return { url: '${three}', shortCircuit: true };
+  return next(specifier, context);
+}`), import.meta.url);
+const { Game } = await import('../src/core/game.js');
 
 // Playwright's profiles (viewport, screen, device pixel ratio): what tests/touch.mjs runs.
 const IPHONE14 = { coarse: true, touchPoints: 5, screenW: 390, screenH: 844, css: [750, 340], dpr: 3 };
@@ -78,4 +87,25 @@ test('held upright a screen keeps 60 degrees across; landscape screens are uncha
   assert.ok(portraitFov(CAMERA.fovShipFast, ipadUp) > portraitFov(CAMERA.fovShip, ipadUp));
   // no step as a window passes square
   assert.ok(Math.abs(portraitFov(58, 1.0) - portraitFov(58, 1.001)) < 0.05);
+});
+
+test('the upright field is the phone\'s and the tablet\'s: a desktop window keeps its field whatever its shape', () => {
+  // The verifier's 600 x 900 desktop window went from 58 to 81.8 degrees (re-fix of release 1):
+  // the plan asks the wider field of a tablet held upright, not of a desktop window.
+  const field = (preset, vfov, aspect) => Game.prototype.fieldOfView.call({ device: preset ? { preset } : undefined }, vfov, aspect);
+  const tall = 600 / 900, ipadUp = 834 / 1194;
+  for (const fov of [CAMERA.fovFoot, CAMERA.fovShip, CAMERA.fovShipFast]) {
+    assert.equal(field('desktop', fov, tall), fov, 'a desktop window taller than wide: as before');
+    assert.equal(field('desktop', fov, 16 / 9), fov);
+    assert.equal(field(null, fov, tall), fov, 'no preset (a test, a stand-in): as before');
+    assert.equal(field('tablet', fov, ipadUp), portraitFov(fov, ipadUp), 'a tablet held upright: widened');
+    assert.ok(horizontalFov(field('tablet', fov, ipadUp), ipadUp) >= 60 - 1e-9);
+    assert.equal(field('phone', fov, tall), portraitFov(fov, tall), 'a phone in a window taller than wide: widened');
+    assert.equal(field('tablet', fov, 1194 / 834), fov, 'a tablet held sideways: as before');
+  }
+  assert.ok(Math.abs(horizontalFov(field('desktop', 58, tall), tall) - horizontalFov(58, tall)) < 1e-9);
+  // the game sets the camera through it, both where the view is laid and where it is laid again
+  const g = fs.readFileSync(path.join(repo, 'src/core/game.js'), 'utf8');
+  assert.equal((g.match(/portraitFov\(/g) || []).length, 1, 'portraitFov is called in one place, fieldOfView');
+  assert.equal((g.match(/this\.fieldOfView\(/g) || []).length, 2);
 });
