@@ -5,12 +5,54 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 ## Hand-over, RELEASE 1, PILOT lane part 3: W3.3 (phone layouts and words), W3.4 (platform), W3.5 (the phone preset) (started 12:20 UTC 2026-11-14; kept current)
 
 **Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3" items 3, 4, 5. First commit's parent:
-`f9cf6fe` (PAINTER's W2.3, after this lane's `77b9d9e`). Scratch: `/home/user/.pc-scratch/pilot/r1/p3/`. Parts 1 and 2
-(W1, W3.1, W3.2) are below, done.
+`fb40efe` (PAINTER's W2.4). Scratch: `/home/user/.pc-scratch/pilot/r1/p3/` (`look.mjs`, `load.mjs`, `slip.mjs`, `mkex.sh`:
+a clean export of HEAD with PILOT's working files laid over it). Parts 1 and 2 (W1, W3.1, W3.2) are below, done.
 
-**State:** W3.3 DONE (`ac0a84a`). W3.4 and W3.5 DONE (one commit after it: they share `main.js`'s resize and tick
-and the test's platform part), with the README section for phones and tablets and the loop by touch (stubs and
-painted) carrying every new check. Last: `node tests/all.mjs --export` in a clean tree, then this hand-over's end.
+**State (about 14:35 UTC): W3.3, W3.4 and W3.5 DONE and committed; the README has its section for phones and
+tablets.** Nothing of PILOT's is half-done or uncommitted. `node tests/all.mjs --export` on `c426212`: RUNNING (its
+result goes here). Commits of this part:
+
+| Commit | What |
+| --- | --- |
+| `ac0a84a` | W3.3: `src/core/words.js` (one `name(code)`, sentences with tokens lettered for keys, touch or pad), the touch map, book and help card, the title card inside the top edge, the short sketch slip; `tests/words.test.mjs` |
+| `8b050e3` | W3.4 and W3.5 together (shared `main.js` resize and tick): `src/core/preset.js`, `src/core/platform.js`, `src/ui/manifest.webmanifest`, the metas, the upright slip and field, the read-out's device line; `tests/preset.test.mjs`, `tests/platform.test.mjs`, `tests/touch.mjs --part platform`; README "Phones and tablets"; fixes W3.3's test measure |
+| `c426212` | W3.3 follow-up: the map's column narrower in windows under 480 px wide |
+
+**The acceptance, item by item** (details and every number in the sections below):
+- **W3.3:** title card top **8.0** css px on the iPhone 14 and the Pixel 7 (**-13.1** before); smallest lettering on
+  the map, the book and the help card **11.50** css px (iPhone 14, Pixel 7, iPad Pro 11; 6-7 before); Earth and the
+  Moon **46** css px apart (8.5 before), a world taken within 26 css px; the book's strip **44** px (15); no string on
+  the screen by touch names a key or the mouse (every stage of the loop; the title card says "tap to begin"); the
+  desktop's strings word for word as before (`tests/words.test.mjs`, 21 sentences).
+- **W3.4:** the static rules pass; no console error in any run (every unsupported call is silent); iPad Pro 11
+  upright **60.0** degrees across (42.3 before); an upright phone shows the slip and waits under it; the manifest is
+  read by Chromium with no error.
+- **W3.5:** iPhone 14 landscape buffer **937x425 = css x 1.25** (1125x510 before), tier 1; iPad Pro 11 **1.55 MP**
+  (2.24 before); a desktop 1920x1080 window keeps **1920x1080**; the read-out names the preset, the AA and the depth.
+- **The loop by touch** (walk to the ship, board, lift off, climb, map, Mars, set course, pulse, descend, land, step
+  out, book, help) on the iPhone 14 profile: stubs **PASSED**, painted world q0 400x225 **PASSED**, with every W3.2 and
+  W3.3 check at every stage.
+
+**Not done, and why** (also in the sections below):
+- In a window under 300 css px tall (smaller than any phone held sideways at full screen; the painted runs' 400x225)
+  the help card is scaled to fit (6.8 css px measured) and the book's page is cramped under a four-line foot: the 11 px
+  floor is held, and tested, at the phones' and the tablet's own sizes. Paging the help card for such windows: left.
+- The ship's edge arrow can still sit beside the "Board ship" slip at the right edge (W3.2's note): not this lane's
+  items; left.
+- Only Chromium's emulation was run: Safari's fullscreen (none on an iPhone, an iPad's), the sideways lock, the wake
+  lock (headless Chromium refuses it), the audio session (Safari only), the Home Screen, the touch feel and a phone's
+  frame rate are unverified (README "Phones and tablets"; plan section 6 asks the owner).
+
+**For other roles:**
+- PAINTER: the read-out's AA comes from `painter.info.aa` (W2.5's samples): it shows `msaa 4x` / `none`. Nothing to do.
+- Coordinator: the manifest is `src/ui/manifest.webmanifest` because `tools/commit.sh pilot` commits no new root file;
+  to have it at the root, add `manifest.webmanifest` to pilot's paths in `tools/commit.sh` (then PILOT moves it, sets
+  `start_url`/`scope` to `./` and changes the link in `index.html`). Optional: `tools/serve.mjs` could serve
+  `.webmanifest` as `application/manifest+json` (Chromium parses it anyway: checked).
+
+**For the next PILOT part (W6):** the preset is `src/core/preset.js` (`PRESETS`, `choosePreset`, `bufferSize`): W6.2's
+0.75 floor and even pacing go with it; the read-out's device line is `Game.deviceText()`; the touch test's platform
+part reads `__pc.info().device` and `.platform`.
 
 ### W3.3 phone layouts and words
 
