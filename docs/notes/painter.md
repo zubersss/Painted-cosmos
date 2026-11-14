@@ -15,9 +15,9 @@ post passes against the BASE tree's sheet and backdrop on the same held scene; `
 and the rule against the same view drawn with one sample), `bin/basesrc.mjs` (a tree's post shader sources from its own
 Post class), `bin/runcmp.mjs` (two station runs: cost and frames), `bin/diffimg.py`; runs `st-w23`, `ab-w24`, ...).
 
-**STATE:** W2.3 COMMITTED (`f9cf6fe`). W2.4 COMMITTED (the commit after it, "W2.4 post savings"). W2.5 (MSAA and the
-region rule) is written in `trees/w25` (post.js = W2.4's plus `w25/post_patch.py`, index.js, chunks.js, test
-`src/world/aaregion.test.mjs`); its station run (`st-w25`, with A and F) is running; not committed yet.
+**STATE:** W2.3 COMMITTED (`f9cf6fe`), W2.4 COMMITTED (`fb40efe`), W2.5 COMMITTED (the commit after it, "W2.5
+anti-aliasing"). Nothing of mine is half-done in the tree. What was not met, and why, is with each item's numbers; the
+list for the return is in "For other roles and the lead" below.
 
 ### W2.3 free wins: what was done (src/world/flora.js, src/world/index.js; test src/world/undergrowth.test.mjs)
 - **Undergrowth and grass cells by the distance from the eye, at every height.** Their strokes are drawn only while the
@@ -121,6 +121,104 @@ region rule) is written in `trees/w25` (post.js = W2.4's plus `w25/post_patch.py
   types; the 8-bit fallback reads the paper itself and clears to the packed value. FAILS 4 of 4 on `f9cf6fe`.
 - Checks on a clean export of `f9cf6fe` with these files (`trees/chk24`): world 38, unit 227, physics 325, coast.mjs
   PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the A/B page (this tree): no console error, fallback empty.
+
+### W2.5 anti-aliasing: what was done (src/render/post.js, index.js, chunks.js; test src/world/aaregion.test.mjs)
+- **MSAA on the scene pass** (`Post.setAA(n)`, `_sceneTarget(samples)`): a second scene target with 4 (or 2) samples, made
+  only when asked and dropped when not; three draws it into multisampled renderbuffers and resolves both colour
+  attachments after the scene pass; the depth is a multisampled 32-bit float renderbuffer (the reversed-Z needs float;
+  three takes the format from the target's DepthTexture type, so the single-sample depth texture stays attached and
+  unused), neither resolved (`resolveDepthBuffer: false`) nor kept after the pass (`storeMultisampledDepthBuffer: false`,
+  invalidated). Every reader of the scene's targets is pointed at the ones in use (`_bindScene`: prep, full prep, brush,
+  sheet, keep, the debug views, the glazes' `G.uSceneAux` / `G.uSceneCol`). Not on the 8-bit fallback.
+- **The region through the resolve (the plan's new risk 1).** An average of regions is not a region: half sky (0) and
+  half foliage (4) resolved to 2, water. `pcWrite` (chunks.js) now writes the region squared into aux.y (it held the view
+  normal's y, which nothing read; the sky already writes 0 there and region 0), so after the resolve `y - w^2` is the
+  spread of the regions under the pixel. AUXFIX_FRAG (one pass at the scene's size, into `rtAux`, before anything reads
+  the second target): a pixel whose samples lay on one region (spread under 0.12; half floats keep a pure pixel under
+  0.07) is kept as resolved (its depth and normal the mean of its samples on one surface); a mixed pixel takes the whole
+  aux of the neighbour nearest it in depth among the pure ones (3x3, then the 5x5 ring); with none, the region its
+  samples' spread points to (w2/w, exact when one of the regions is the sky). So the region, depth and normal every
+  reader sees are a real surface's, as with one sample; only the colour is the resolve's.
+- **The tier's samples** (index.js): MSAA at tiers 2 and 1, not at tier 0 and not on a touch device with a coarse
+  pointer (its GPU pays for samples in bandwidth; ruling 4 says post AA on phones until a real phone shows MSAA holds).
+  Four samples while what they add (colour 4, region 8, depth 4 bytes a sample, and the repaired region 8 bytes a
+  pixel: 72 bytes a pixel at 4x) stays under 100 MiB, else two (40 bytes), else none: 1280x720 at q2 4x (63 MiB);
+  1920x1080 at q2 2x (79 MiB; 4x would be 142 MiB); 1920x1080 at q1 4x (91 MiB). The plan's rule for over 100 MB was
+  "pack aux into RGBA8 while MSAA is on": not taken, the 8-bit pack holds the log depth in 1/8 steps of log2 metres,
+  coarser than the brush's, the edge test's and the pencil's thresholds, so the picture would change; fewer samples
+  keep it. `painter.setAA('auto'|'off'|'msaa'|'msaa2')`, `?aa=0|msaa|2` read by index.js; `painter.info.aa` (samples
+  drawn) and `painter.info.depth` ('reversed-z' | 'log' | 'standard') for the stats line. 'post' AA is not built.
+
+### W2.5 numbers (PILOT's harness, q2 1280x720, all 25 stations with A, F and taps: run `st-w25`; the region check: run
+`ab-w25`; tables `docs/shots/painter/r1/w25-table.txt`, `w25-region-check.txt`, guard `w25-guard-vs-w23.txt`)
+- **Aliasing index A (raw scene)**: E_150_45 0.447 (base) -> 0.397 (one sample, after W2.1) -> **0.350** (plan at most
+  0.40: met; the live MSAA patch had 0.397); E_400_90 0.402 -> 0.321 -> **0.293** (plan at most 0.85 x base = 0.342:
+  met). Elsewhere: E_foot 0.521 -> 0.461, E_50_45 0.413 -> 0.372, M_foot 0.452 -> 0.368, S_150_45 0.336 -> 0.254; at 1 km
+  unchanged (0.378, 0.320: no geometry edges there, the land's own marks are W2.1's). A of the abstraction output at most
+  the baseline raw's at every station (guard).
+- **The region honest through the resolve** (`bin/ab.mjs --mode msaa`, run `ab-w25`: the region view with MSAA and the
+  rule against the same held view drawn with one sample, all 25 stations; `w25-region-check.txt`): pixels whose region
+  is none of their 3x3 one-sample neighbours **0 to 0.008 %** (plan at most 0.05 %: met; the most, E_150_45 at night, 73
+  pixels, in the canopy; not examined one by one); **no water** away from water at any station (plan:
+  none); 0.04-2 % of pixels take the other side of an edge than one sample did. OPENED: `w25-region-view-E150-crop.jpg`
+  (the two region views alike; the differences are edge pixels).
+- **Raw b1/b2 within 5 %** (against the one-sample run `st-w23`): b2 within 1.1 % at every station (no blur); b1 +0.1 to
+  -5.1 % at 19 of 25, NOT met at M_foot -5.9 %, M_50_45 -5.7 %, M_50_90 -5.7 %, S_150_90 -6.2 % (and E_150_45_storm -5.1,
+  N_150_45 -5.0 on the line): the 2-6 px band is where a stair-stepped edge has its energy, and on Mars' and Saturn's
+  plain ground the spires', rocks' and cliffs' outlines are a good part of it; the crops show the outlines smooth, no
+  softer marks.
+- **Flicker index F (raw) at most 0.8 x the baseline raw's at every air station**: met at 12 of 22 (E_400 0.63/0.66,
+  E_1000 0.41, M_50 0.74/0.76, M_150_90 0.74, M_400_90 0.77, M_1000 0.69/0.74, S_150 0.71/0.76, ...); NOT met at 10:
+  E_50_45 0.89, E_50_90 0.89, E_150_90 0.83, E_150_45 0.80 (0.8004, on the line), M_150_45 0.81, M_400_45 0.82,
+  E_150_45_dusk 0.81, storm 0.84, N_150_45 0.85, E_150_45_night 0.80 (0.8033). What still flickers there is inside surfaces and
+  at cut-outs: the crowns' leaf cut-outs are discards, which MSAA does not smooth (alpha-to-coverage would take its
+  coverage from the colour target's alpha, which is the wetness), and the crowns' own marks (W2.1 prefiltered the
+  ground's marks, the leaf shadow and the near strokes, not every crown mark). The plan: "shader aliasing is item 1's
+  job, not MSAA's"; left for W7.
+- Look against the one-sample run (`st-w23`, the guard's rules): only the two halo flags W2.2 already had (abstraction
+  output at E_1000_45 0.70 %, storm 0.82 %; were 0.72 / 0.95): every region's mean colour, L* percentiles, the border
+  strip, detail and cost within the rules. Final land t1/t2 the same or a hair higher (E_foot 0.84/1.03 -> 0.86/1.03,
+  M_foot 0.90 -> 0.94: measured against a raw scene with fewer stair steps).
+- **Cost**: draw calls and triangles unchanged (the scene is drawn once); the region pass 1.0-1.5 reads a pixel (0.9-1.35
+  M a frame at 1280x720; post reads E_foot 31.3 -> 32.6 M), the item's stated cost. **Extra target memory at 1920x1080**:
+  the auto policy draws 2 samples there, 79 MiB (4 samples would be 142 MiB, over the plan's 100 MB); at 1280x720 4
+  samples, 63 MiB; at 1920x1080 q1 4 samples, 91 MiB. Real GPUs' bandwidth for this: not measurable here.
+- Frames OPENED: every station one sample | MSAA (`w25-before-after-q2-1280-1..3.jpg`: the same pictures at sheet scale) and 1:1
+  crops at 2x of ten stations, raw and final (`w25-crops-2x-1..3.jpg`): the figure's hat and outline, Mars' spires,
+  Saturn's cliff and Neptune's spires lose their stair steps; crowns' outlines smoother, their leaf cut-outs still
+  stepped; no rim, halo or dark edge round any silhouette (the region rule keeps the brush, the pooling and the pencil
+  on real surfaces).
+- Test `src/world/aaregion.test.mjs` (5): pcWrite writes the region squared, the sky and the clear agree; the rule runs
+  before every reader and the glazes read its output; the shader's rule read and mirrored on made pictures drawn with 4
+  samples (edges between every pair of regions at seven angles, lines a quarter pixel wide, three regions meeting): no
+  repaired pixel takes a region not among its one-sample neighbours, no water away from water (the plain resolve has
+  some: checked); the tier's samples (4 at 1280x720 q2, 2 at 1920x1080 q2, 4 at 1920x1080 q1, 0 at q0, the overrides),
+  the depth unresolved and not kept, 32-bit float. FAILS 5 of 5 on `fb40efe`.
+- Checks on a clean export of `fb40efe` with these files (`trees/chk25`, so with W2.3 and W2.4): world 43, unit 227,
+  physics 325, coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; `tests/all.mjs --only
+  static,painted-play,painted-m3` in that tree: ALL 3 PASSED (static rules hold, painted-play 39 checks, painted-m3 33
+  checks; these run at q0 half scale: no MSAA there); the station run's and the region check's pages (q2, 4 samples): no
+  console error, fallback empty. Not run in a browser: q1, `?aa=` in the URL, a touch profile (the policy is covered by
+  the test, with a stand-in renderer).
+
+### For other roles and the lead (from this part of the lane)
+- PILOT (tiers, W6; the stats line): `painter.info.aa` is the samples drawn (4, 2 or 0) and `painter.info.depth` the depth
+  mode ('reversed-z' where EXT_clip_control exists, else 'log'); `painter.setAA('auto'|'off'|'msaa'|'msaa2')` and the URL
+  `?aa=0|msaa|2` (read in render/index.js, since the painter builds the targets; move it to main.js if you prefer: one
+  line, `if (q.aa) painter.setAA(q.aa)`). MSAA is the tier's: the controller should drop it (setAA('off')) before it
+  drops pixels, as ruling 4 says. On a touch device with a coarse pointer the painter draws no MSAA (no post AA either:
+  'post' is not built; ruling 4's phone post AA is open for W6/W7). The budget rule (4 samples under 100 MiB of extra
+  targets, else 2) is in index.js (AA_MB); at 1920x1080 q2 it gives 2 samples.
+- PILOT (the harness): `tests/stationlib/inpage.js` still names a 'backdrop' pass (post.mBackdrop is gone: harmless);
+  the new passes show as 'region-resolve' and 'paper-bake' (the latter only in a frame that lays the paper) in `--taps`.
+  Two renders of a held frame differ near the water by up to 3/255 (the reflection reads the frame before): an in-page
+  A/B must mask it (my `bin/ab.mjs` grows region 2 by 4 px).
+- PILOT/PHYSICS: the scene target's aux.y is now the region squared (pcWrite), no longer the view normal's y; nothing in
+  the tree read it (searched: post passes, sky.js, kitmat.js, PHYSICS' lab).
+- The lead: W2.4's sheet reads (19, plan 11) and W2.5's flicker index at the canopy stations (10 of 22 air stations over
+  0.8 x) and raw b1 on Mars' and Saturn's plain ground (4 stations at -5.7 to -6.2 %) are the misses of this part; the
+  reasons are with the numbers above. The phone question for the paper bake (two full-size fetches against four cached
+  reads) and for MSAA's bandwidth can only be answered on the owner's devices (plan section 6).
 
 ## Hand-over of RELEASE 1, W2.1 and W2.2 (part 1 of the lane; done; part 2 is the section above)
 

@@ -282,6 +282,8 @@ vec4 pcTri8(vec3 p, vec3 n, float scale) {
 
 void pcWrite(vec3 col, float wet, vec3 nV, float viewZ, float id) {
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(wet, 0.0, 1.0));
-  pcAux = pcAuxEnc(vec4(nV.xy, log2(1.0 + max(viewZ, 0.0)), id));
+  // (R1 W2.5: .y carries the region squared, not the normal's y, which nothing read: after a multisample resolve
+  // y - w^2 says whether the samples under a pixel lay on more than one region, post.js AUXFIX_FRAG)
+  pcAux = pcAuxEnc(vec4(nV.x, uAux8 > 0.5 ? nV.y : id * id, log2(1.0 + max(viewZ, 0.0)), id));
 }
 `;

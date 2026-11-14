@@ -32,6 +32,18 @@ const TIERS = [
 // (R1 W2.2) the near brush's radius, internal pixels
 const BRUSH_PX = 1.4;
 
+// (R1 W2.5) anti-aliasing is part of the tier (docs/lead/SHARP-SMOOTH-PLAN.md, ruling 4): MSAA on the scene pass at
+// tiers 2 and 1 on a desktop, none at tier 0 or on a phone or tablet (a coarse pointer with touch: their GPUs pay for
+// samples in bandwidth, not yet seen to hold). Four samples while what they add stays under AA_MB (the targets'
+// samples: colour 4, region and depth 8, z 4 bytes each, and the repaired region 8 a pixel: 72 bytes a pixel at 4x,
+// 142 MiB at 1920x1080 drawn whole; 40 at 2x, 79 MiB), else two, else none. `?aa=0|msaa|2` (or setAA) overrides, for
+// tests; 'post' is not built yet (it draws as 0). (The plan's rule above 100 MB, the region packed into 8 bits while
+// MSAA is on, is not taken: 8 bits hold the log depth in eighths of a log2 metre, coarser than the brush's, the edges'
+// and the pencil's thresholds, and the picture would change; fewer samples keep it.)
+const AA_MB = 100;
+const TOUCH = typeof matchMedia === 'function' && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
+const AA_URL = (() => { try { return new URLSearchParams(location.search).get('aa'); } catch (e) { return null; } })();
+
 const GRADES = [   // hour, sheet grade (used only when no world has published one)
   [0, [0.42, 0.48, 0.70]], [4.5, [0.42, 0.48, 0.70]], [6, [1.0, 0.965, 0.955]], [8, [1, 1, 1]],
   [16, [1, 1, 1]], [18, [1.0, 0.96, 0.90]], [19.5, [0.42, 0.48, 0.70]], [24, [0.42, 0.48, 0.70]],
@@ -43,7 +55,11 @@ export function createPainter(renderer) {
   let quality = 1, renderScale = 1, outW = 2, outH = 2, graphite = 0.4;
   const mood = { bodyId: null, biomeWeights: null, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0 };
   const swapped = [], glazed = [];
-  const info = { internalWidth: 2, internalHeight: 2, quality: 1 };
+  const info = { internalWidth: 2, internalHeight: 2, quality: 1, aa: 0, depth: '' };
+  let aaMode = AA_URL === '0' || AA_URL === 'off' || AA_URL === 'post' ? 'off' : AA_URL === 'msaa' || AA_URL === '4' ? 'msaa' : AA_URL === '2' ? 'msaa2' : 'auto';
+  // (which depth the scene is drawn with, for the stats line: reversed-Z where the browser has EXT_clip_control, else
+  // a logarithmic depth written by every fragment, which costs the early depth test and MSAA's depth per sample)
+  { const c = renderer.capabilities || {}; info.depth = c.reversedDepthBuffer ? 'reversed-z' : c.logarithmicDepthBuffer ? 'log' : 'standard'; }
 
   renderer.autoClear = false;
   renderer.setPixelRatio(1);
@@ -58,7 +74,14 @@ export function createPainter(renderer) {
     post.sectors = t.sectors;
     graphite = t.graphite; post.sheetUniforms.uPig.value.w = graphite;
     post.setSize(outW, outH, Math.min(1, Math.max(0.3, t.scale * renderScale)));
-    info.internalWidth = post.inW; info.internalHeight = post.inH; info.quality = quality;
+    // (R1 W2.5) the samples this tier and size are given
+    const px = post.inW * post.inH, mb = (n) => (px * (n * 16 + 8)) / (1024 * 1024);
+    let n = 0;
+    if (aaMode === 'msaa') n = 4;
+    else if (aaMode === 'msaa2') n = 2;
+    else if (aaMode === 'auto' && quality >= 1 && !TOUCH) n = mb(4) <= AA_MB ? 4 : mb(2) <= AA_MB ? 2 : 0;
+    post.setAA(n);
+    info.internalWidth = post.inW; info.internalHeight = post.inH; info.quality = quality; info.aa = post.samples;
   }
 
   function resize(w, h) {
@@ -157,6 +180,8 @@ export function createPainter(renderer) {
     setTime(seconds) { G.uTime.value = seconds; },
     getTime() { return G.uTime.value; },
     setDebugView(n) { post.debugView = n | 0; },
+    // (R1 W2.5) 'auto' (the tier's own), 'off', 'msaa' (4 samples) or 'msaa2'; info.aa says what is drawn
+    setAA(mode) { aaMode = mode === 'off' || mode === 0 || mode === '0' ? 'off' : mode === 'msaa' || mode === 4 ? 'msaa' : mode === 'msaa2' || mode === 2 ? 'msaa2' : 'auto'; applySize(); },
     // PILOT's P3 (docs/lead/HARDENING.md A2), behind the loading card, after world.prewarm(): with a scene
     // and camera it compiles the scene as the scene pass draws it (into the pass's own target; the glazes
     // are laid into a target too, so one compile covers them); with or without, it lays each of the brush's

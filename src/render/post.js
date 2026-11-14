@@ -54,6 +54,36 @@ void main() {
 }
 `;
 
+// (R1 W2.5) The region through the multisample resolve. The scene pass's second target is drawn with four (or two)
+// samples a pixel and resolved by averaging them, so a pixel half sky (0) and half foliage (4) came out 2: water. Every
+// material writes its region squared beside it (chunks.js pcWrite, .y), so after the resolve y - w^2 is the spread of
+// the regions under the pixel: 0 where every sample lay on one region. Such a pixel is kept as it is (its depth and
+// normal the mean of its samples, on one surface); a pixel whose samples lay on different regions takes the whole of
+// the neighbour (3x3, then 5x5) nearest it in depth whose samples did not; with none, the region its samples' spread
+// points to (w2 / w: exact where one of them is the sky). Every reader of the second target reads this one.
+export const AUXFIX_FRAG = /* glsl */`
+uniform highp sampler2D tAux;
+const float MIXED = 0.12;
+void main() {
+  ivec2 ip = ivec2(gl_FragCoord.xy), hi = textureSize(tAux, 0) - 1;
+  highp vec4 a = texelFetch(tAux, ip, 0);
+  if (a.y - a.w * a.w < MIXED) { gl_FragColor = a; return; }
+  highp vec4 best = a;
+  float bd = 1e9;
+  for (int r = 1; r <= 2; r++) {
+    for (int j = -r; j <= r; j++) for (int i = -r; i <= r; i++) {
+      if (max(abs(i), abs(j)) != r) continue;
+      highp vec4 n = texelFetch(tAux, clamp(ip + ivec2(i, j), ivec2(0), hi), 0);
+      float dz = abs(n.z - a.z);
+      if (n.y - n.w * n.w < MIXED && dz < bd) { bd = dz; best = n; }
+    }
+    if (bd < 1e8) break;
+  }
+  if (bd > 1e8) best.w = a.y / max(a.w, 1e-3);
+  gl_FragColor = best;
+}
+`;
+
 const ABS_FRAG = /* glsl */`
 uniform sampler2D tScene;
 uniform highp sampler2D tAux;
@@ -455,11 +485,16 @@ export class Post {
     this.outW = 2; this.outH = 2; this.inW = 2; this.inH = 2;
     this.sectors = 8;
 
-    this.rtScene = new THREE.WebGLRenderTarget(2, 2, { count: 2, depthBuffer: true, type: THREE.UnsignedByteType });
-    this.rtScene.textures[0].minFilter = THREE.LinearFilter; this.rtScene.textures[0].magFilter = THREE.LinearFilter;
-    this.rtScene.textures[1].type = HF;
-    this.rtScene.textures[1].minFilter = THREE.NearestFilter; this.rtScene.textures[1].magFilter = THREE.NearestFilter;
-    this.rtScene.depthTexture = new THREE.DepthTexture(2, 2, THREE.FloatType);
+    this.HF = HF;
+    this.rtScene1 = this._sceneTarget(0);
+    this.rtScene = this.rtScene1;
+    // (R1 W2.5) multisampled scene pass: off until setAA asks for it; its second target read through the region rule
+    // (AUXFIX_FRAG) into rtAux
+    this.samples = 0; this.rtSceneMS = null;
+    this.rtAux = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: HF });
+    this.rtAux.texture.minFilter = THREE.NearestFilter; this.rtAux.texture.magFilter = THREE.NearestFilter; this.rtAux.texture.generateMipmaps = false;
+    this.mAuxFix = fsMaterial(AUXFIX_FRAG, { tAux: { value: null } });
+    this.mAuxFix.name = 'region-resolve';
 
     this.rtHalf = new THREE.WebGLRenderTarget(2, 2, { count: 2, depthBuffer: false, type: HF });
     this.rtHalf.textures[1].type = THREE.UnsignedByteType;
@@ -530,6 +565,43 @@ export class Post {
         else if (uMode == 3) { vec4 a = texture(tB, vUv); gl_FragColor = vec4(a.xy * 0.5 + 0.5, a.z / 20.0, 1.0); }
         else { vec4 a = texture(tB, vUv); gl_FragColor = vec4(fract(a.w), floor(a.w) / 6.0, 0.5, 1.0); }
       }`, { tA: { value: null }, tB: { value: this.rtScene.textures[1] }, uMode: { value: 1 } });
+    this._bindScene();
+  }
+
+  // the scene pass's target: two attachments (colour and wetness; normal, log depth, region) and a 32-bit float depth
+  // (with samples, a multisampled one: three draws it into renderbuffers and resolves the colours after the pass; the
+  // depth is neither resolved nor kept)
+  _sceneTarget(samples) {
+    const rt = new THREE.WebGLRenderTarget(Math.max(2, this.inW), Math.max(2, this.inH), samples
+      ? { count: 2, depthBuffer: true, type: THREE.UnsignedByteType, samples, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false }
+      : { count: 2, depthBuffer: true, type: THREE.UnsignedByteType });
+    rt.textures[0].minFilter = THREE.LinearFilter; rt.textures[0].magFilter = THREE.LinearFilter;
+    rt.textures[1].type = this.HF;
+    rt.textures[1].minFilter = THREE.NearestFilter; rt.textures[1].magFilter = THREE.NearestFilter;
+    rt.depthTexture = new THREE.DepthTexture(Math.max(2, this.inW), Math.max(2, this.inH), THREE.FloatType);
+    return rt;
+  }
+
+  // (R1 W2.5) MSAA on the scene pass: 0 (none), 2 or 4 samples. Not where the browser cannot draw into float targets
+  // (the region and depth are packed into 8 bits there and an average of them means nothing).
+  setAA(samples) {
+    const n = this.floatFallback ? 0 : samples >= 4 ? 4 : samples >= 2 ? 2 : 0;
+    if (n === this.samples) return;
+    if (this.rtSceneMS) { this.rtSceneMS.depthTexture.dispose(); this.rtSceneMS.dispose(); this.rtSceneMS = null; }
+    this.samples = n;
+    if (n) this.rtSceneMS = this._sceneTarget(n);
+    this.rtScene = n ? this.rtSceneMS : this.rtScene1;
+    this.prevFrames = 0; G.uPrevOn.value = 0;
+    this._bindScene();
+  }
+
+  // every reader of the scene pass's targets pointed at the ones in use
+  _bindScene() {
+    const col = this.rtScene.textures[0], aux = this.samples ? this.rtAux.texture : this.rtScene.textures[1];
+    this.mPrep.uniforms.tScene.value = col; this.mPrepF.uniforms.tScene.value = col; this.absUniforms.tScene.value = col;
+    this.absUniforms.tAux.value = aux; this.sheetUniforms.tAux.value = aux; this.mKeep.uniforms.tAux.value = aux; this.mCopy.uniforms.tB.value = aux;
+    this.mAuxFix.uniforms.tAux.value = this.rtScene.textures[1];
+    G.uSceneAux.value = aux; G.uSceneCol.value = col;
   }
 
   setSize(outW, outH, scale) {
@@ -537,7 +609,9 @@ export class Post {
     const inW = Math.max(2, Math.round(outW * scale)), inH = Math.max(2, Math.round(outH * scale));
     if (outW === this.outW && outH === this.outH && inW === this.inW && inH === this.inH) return;
     this.outW = outW; this.outH = outH; this.inW = inW; this.inH = inH;
-    this.rtScene.setSize(inW, inH);
+    this.rtScene1.setSize(inW, inH);
+    if (this.rtSceneMS) this.rtSceneMS.setSize(inW, inH);
+    this.rtAux.setSize(inW, inH);
     this.rtHalf.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
     this.rtFull.setSize(inW, inH);
     this.rtAbs.setSize(inW, inH);
@@ -547,7 +621,8 @@ export class Post {
     this.mPrep.uniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uRes.value.set(inW, inH);
-    G.uSceneAux.value = this.rtScene.textures[1]; G.uSceneRes.value.set(inW, inH); G.uSceneCol.value = this.rtScene.textures[0];
+    G.uSceneRes.value.set(inW, inH);
+    this._bindScene();
     this.sheetUniforms.uOutRes.value.set(outW, outH);
     this.sheetUniforms.uInTexel.value.set(1 / inW, 1 / inH);
   }
@@ -580,6 +655,8 @@ export class Post {
 
   // glazes: objects drawn over the brushed picture (see shared.js GLAZES), with the scene's camera
   finish(glazes, camera) {
+    // (R1 W2.5) the region through the resolve, before anything reads it
+    if (this.samples) this._pass(this.mAuxFix, this.rtAux);
     this._pass(this.mPrep, this.rtHalf);
     // (the near brush's statistics, at the scene's own size: not drawn where the old brush is in use)
     if (this.absUniforms.uBrushR.value.y < 0.5 && this.absUniforms.uAbstraction.value > 0) this._pass(this.mPrepF, this.rtFull);
@@ -623,6 +700,7 @@ export class Post {
   }
 
   dispose() {
-    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtFull.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose(); this.rtPaper.dispose();
+    this.rtScene1.dispose(); if (this.rtSceneMS) this.rtSceneMS.dispose(); this.rtAux.dispose();
+    this.rtHalf.dispose(); this.rtFull.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose(); this.rtPaper.dispose();
   }
 }
