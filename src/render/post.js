@@ -815,6 +815,10 @@ export class Post {
     this.rtAA.setSize(inW, inH);
     this.rtPrev.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
     if (this.paperBaked) this.rtPaper.setSize(outW, outH);
+    // (R1 re-fix: a resized target loses what was laid in it; laid again at the next frame whatever the size is then: a
+    // size that changed and changed back before a frame was drawn (the station harness's settle does it, so can a tier
+    // and a scale changed in one step) kept the old key and drew with a cleared target)
+    this.absPaperAt = ''; this.paperAt[0] = 0;
     this.prevFrames = 0; G.uPrevOn.value = 0;
     this.mPrep.uniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uTexel.value.set(1 / inW, 1 / inH);

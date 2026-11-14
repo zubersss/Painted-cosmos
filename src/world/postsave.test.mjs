@@ -92,6 +92,21 @@ test('the paper is laid once per size of the sheet, into three targets read with
   assert.equal((baked.match(/texture\(tPaper/g) || []).length, 0, 'no live read of the paper');
 });
 
+// (R1 re-fix) a target resized loses what was laid in it: the paper and the brush's paper are laid again at the next frame,
+// also when the size changed and changed back with no frame between (the station harness's settle; a tier and a scale
+// stepped together). Before this the key was the size, so the round trip drew with cleared targets.
+test('the laid paper and the brush\'s paper are laid again after any resize, also a round trip with no frame between', () => {
+  const { post, log } = stand();
+  const frame = () => { log.length = 0; post.beginScene(); post.finish([], null); return { paper: draws(log).filter((e) => e.material === post.mPaper).length, absP: draws(log).filter((e) => e.material === post.mAbsP).length }; };
+  frame();
+  assert.deepEqual(frame(), { paper: 0, absP: 0 }, 'nothing laid again while nothing changes');
+  post.setSize(1280, 720, 0.34); post.setSize(1280, 720, 1);     // (a settle at a small scale, and back, no frame between)
+  const f = frame();
+  assert.equal(f.paper, 1, 'the paper laid again');
+  assert.equal(f.absP, post.absPaperBaked ? 1 : 0, 'the brush\'s paper laid again (where it is baked)');
+  assert.deepEqual(frame(), { paper: 0, absP: 0 });
+});
+
 // (R1 re-fix) the sheet's pooling and outlines are read from two passes of their own, every frame, before the sheet
 test('the pool (half size) and the edges (the scene\'s size) are drawn before the sheet; the post AA where it is on', () => {
   const { post, log } = stand();
