@@ -286,12 +286,11 @@ test('M4 stepping out: the first picture is the land with the explorer in it, no
       assert.ok(f.middle < 0.05, `${body} +${wait} s: and ${(f.middle * 100).toFixed(0)} % of its middle`);
     }
     assert.ok(sim.footCam.boomNow > CAMERA.boom - 0.3, `${body}: the boom is free: ${sim.footCam.boomNow.toFixed(1)} m`);
-    assert.equal(sim.shipInPicture(), false, body + ': stepped out, the ship is not in the picture');
-    // turned to look at the ship from beside it, the hull is in the picture (a page no longer
-    // waits on that: game.js captureSketch paints the kept frame without the ship)
+    assert.equal(sim.shipInPicture(), false, body + ': a sketch of the place may be drawn');
+    // turned to look at the ship from beside it, the page waits
     pad.dx += (sim.info().shipBearingDeg * RAD) / FEEL.mouseFoot;
     play(sim, pad, 0.5);
-    assert.equal(sim.shipInPicture(), true, body + ': looking at the ship from beside it, the hull is in the picture');
+    assert.equal(sim.shipInPicture(), true, body + ': looking at the ship from beside it, the page waits');
   }
 });
 

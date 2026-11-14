@@ -2,6 +2,19 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## SHIPPED STATE (coordinator, 2026-11-14 ~02:00 UTC; read this first)
+
+The owner chose to ship the last fully checked code rather than wait for the re-fix pass below. That pass (the
+twenty-first and twenty-second PILOT agents: an honest "Land here" prompt over ground too steep to hold the ship, the
+painted-trip script's per-leg bump count) was stopped half done. Its code is NOT in the shipped tree: `src/`, `tests/`,
+`README.md`, `index.html` and `vendor/` were restored to `0bc7b64` (code of `3cfd184` with PAINTER's `0112e5e` and
+`5fd389b`; `tests/all.mjs` ALL 13 PASSED on it in a clean tree, the twentieth agent's run). The half-done work is in
+history for whoever comes next: snapshots `97e5949`, `1c406e2`, `d874a8c` (src/core/sim.js, src/ship/flight.js,
+tests/landprompt.test.mjs, tests/trip.mjs, tests/loop.test.mjs, README.md). Known open, shipped: over Saturn's
+honey_mist the game can offer "Land here" and then answer E with "Too steep to land here" (48 of 520 hover spots; fly on
+100 to 150 m and it holds); `tests/all.mjs`' painted-trip step is flaky for that reason and because `tests/trip.mjs`
+never resets the ship's bump count between legs.
+
 ## Hand-over, LAST FIX ROUND, RE-FIX pass (twenty-first PILOT agent; started about 01:15 UTC 2026-11-14; kept current)
 
 **State:** in progress. The game's code is not touched in this pass; only the scripted trip and a test's wording.
