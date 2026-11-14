@@ -7,17 +7,22 @@ first agent's record of M1 is kept at the end ("Earlier answers").
 ## Hand-over of RELEASE 1, part 2: W2.3, W2.4, W2.5 (READ THIS FIRST; kept current after every item)
 
 The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W2 items 3-5, section 5). Part 1 (W2.1, W2.2) is the section after this one.
-Began 10:50 UTC 2026-11-14 on head `e87f6be`. Scratch: `/home/user/.pc-scratch/painter/r1/` (`trees/` exports: `base`
-= the head I began on, `w23`, `w24`, `w25` = base plus each item's files, `chk*` clean exports for the checks; `w23/bench.mjs`
+Began 10:50 UTC 2026-11-14 on head `e87f6be`. Scratch: `/home/user/.pc-scratch/painter/r1/` (`trees/`: the exports I
+measured, base plus each item's files and clean exports for the checks, deleted at the end; `w23/bench.mjs`
 the Node world bench for W2.3; `bin/ab.mjs` the in-page A/B driver on PILOT's harness page (`--mode under`: the frame as
 drawn against the same held frame with every undergrowth mesh the range test left out shown; `--mode post`: this tree's
 post passes against the BASE tree's sheet and backdrop on the same held scene; `--mode msaa`: the region view with MSAA
 and the rule against the same view drawn with one sample), `bin/basesrc.mjs` (a tree's post shader sources from its own
 Post class), `bin/runcmp.mjs` (two station runs: cost and frames), `bin/diffimg.py`; runs `st-w23`, `ab-w24`, ...).
 
-**STATE:** W2.3 COMMITTED (`f9cf6fe`), W2.4 COMMITTED (`fb40efe`), W2.5 COMMITTED (the commit after it, "W2.5
-anti-aliasing"). Nothing of mine is half-done in the tree. What was not met, and why, is with each item's numbers; the
-list for the return is in "For other roles and the lead" below.
+**STATE (end of part 2): W2.3 `f9cf6fe`, W2.4 `fb40efe`, W2.5 `d22ea35`, all COMMITTED.** Nothing of mine is half-done
+in the tree. What was not met, and why, is with each item's numbers and gathered in "For other roles and the lead".
+Final checks on a clean export of `d22ea35` (with PILOT's W3.3, `trees/final`): world 43, unit 234, physics 325,
+coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the real game from that export (`tools/shot.mjs`, q2
+pinned, 960x540): no console error, `__pc.info().fallback` empty, `painter.info.aa` 4, depth 'reversed-z'; its frame
+30 s after ready OPENED (`docs/shots/painter/r1/w25-final-game-q2-msaa.jpg`: the spawn as it should be; a frame taken at
+ready is pale, the arrival's picture still coming up from the paper).
+My first commit's parent: `77b9d9e` (PILOT's, made after I began on `e87f6be`).
 
 ### W2.3 free wins: what was done (src/world/flora.js, src/world/index.js; test src/world/undergrowth.test.mjs)
 - **Undergrowth and grass cells by the distance from the eye, at every height.** Their strokes are drawn only while the
