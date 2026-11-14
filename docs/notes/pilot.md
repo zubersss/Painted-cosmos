@@ -8,10 +8,20 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 (phone layouts and words), W3.4 (platform) and W3.5 (the phone preset) are part 3. First commit's parent: `0902c56`.
 Scratch: `/home/user/.pc-scratch/pilot/r1/touch/`.
 
-**State:** W3.1 DONE (`290780b`). W3.2 DONE (committed after `290780b`; its acceptance below). Still running when
-W3.2 was committed (results added below when in): the loop on the Pixel 7 profile, the painted loop again on the
-final code, m3check and lockcheck (the desktop unchanged), and the loop on a clean export of `290780b` (must fail).
-Nothing else of PILOT's is half-done.
+**State at the end of this part (about 11:58 UTC): W3.1 DONE (`290780b`), W3.2 DONE (`dfb4701`, its last proofs in
+the notes commit after it).** Nothing of PILOT's is half-done or uncommitted. Commits of this part: `290780b` (W3.1),
+`dfb4701` (W3.2), and a notes-only commit with the final runs.
+
+**For part 3 (W3.3 phone layouts and words, W3.4 platform, W3.5 the phone preset):** the touch layer is in
+`src/core/touch.js` (`TOUCH` holds every feel number), the touch HUD in `src/ui/hud.js` (`setTouch`, `control`,
+the tabs, the slips in `setPrompt`) and at the end of `src/ui/theme.css` (all touch rules are under `.pc-hud.pc-touch`
+or `.pc-touchui`, so the desktop is untouched). `hud.touchShown` / `__pc.touch.shown` say whether it is up. The
+browser test is `tests/touch.mjs` (`--part input|loop|all`, `--painted`); its `measure()` checks hit areas and the
+subject box at each stage and is where W3.3's lettering sizes can be measured too. Known, left for W3.3: the touch
+words (title card "click to begin", the help card's keys and "H closes this card", the map's "click a world, or use
+the arrow keys", the book's "arrow keys turn the page, B closes"), the map's world radius and names (Earth and the
+Moon 8.5 css px apart on the iPhone), the book's tab strip (15 px tall), the help card partly over the VIEW tab at
+the iPhone's size, the ship's edge arrow beside the "Board ship" slip at the right edge.
 
 ### W3.2 the touch HUD: prompts become buttons (DONE)
 
@@ -52,13 +62,18 @@ Nothing else of PILOT's is half-done.
     a swipe left turns to Jupiter and right back, its corner and a tap outside close it; the HELP tab shows the help
     card, a tap on it puts it away, its corner too; no pointer lock asked for, 0 pointercancel, 0 keydown.
   - **The same loop in the painted world, q0, 400x225 (the iPhone 14 profile on a window of that size): PASSED**
-    (`--part loop --painted`, 553 s; landed in Mars' dry riverbeds; no console error).
+    twice: on the code before the read-out moved (553 s) and on the final code of `dfb4701` (460 s; arrived 6.8 km
+    off Mars after a 67 s pulse, landed in Mars' dry riverbeds; no console error, `fallback` empty).
+  - **The loop on the Pixel 7 landscape profile, stubs: PASSED** (427 s, final code): every hit area 44 px or more at
+    13 stages, no control in the subject box at the 9 played ones, every control inside the safe area.
+  - **Before:** the same loop on a clean export of `290780b` (W3.1 only) FAILS: one control on the screen (JUMP), no
+    tab to tap (the script stops there: `docs/shots/pilot/r1/touch-w32-runs.json`, `before290780b`).
   - **Every hit area at least 44 css px:** at 13 stages (on foot; with an iPhone's safe area; at the ship; landed;
     flying; the map open; the map with a course; in space; the pulse; over Mars; on foot on Mars; the book open; the
     help card) every control measured: the smallest 44 px (the tabs), the round buttons 72/56/52, the slips 48 tall,
     the close corners 46 on the screen (at the sheets' 0.6 scale).
-  - **On a phone, no control in the subject box** (x 30-70 %, y 55-100 %) at any of the 9 stages where the picture is
-    played (iPhone 14; the Pixel 7 run below).
+  - **On a phone, no control in the subject box** (x 30-70 %, y 55-100 %) at all 9 checks where the picture is
+    played (8 stages of the loop, and on foot with the safe area), on the iPhone 14 and the Pixel 7 profiles.
   - **The safe area** (CDP `Emulation.setSafeAreaInsetsOverride` 47 / 47 / 21, an iPhone held sideways): every
     control inside it.
   - **The fade:** 4.6 s untouched, the controls go to 0.35; a touch brings them back.
@@ -66,17 +81,22 @@ Nothing else of PILOT's is half-done.
     degrees for 120 px, 9.0-9.7 m walked, jump 2.2-6.0 m, jetpack 22.6-23.4 m, scale 1, nose 14.9 degrees,
     throttle 0 -> 1).
   - **The desktop is unchanged:** the desktop page of `--part input` (no touch layer, pointer lock as before);
-    `tests/layout.test.mjs` in the unit suite; m3check: see below.
+    `tests/layout.test.mjs` in the unit suite; **m3check PASSED** (33 checks: the title card, the look hint, the
+    sketchbook, the help card, the gamepad, a view found, the reload) and **lockcheck PASSED**, both on the final code.
   - Frames, OPENED: `docs/shots/pilot/r1/touch-w32-loop-iphone14.jpg` (landed with "Step out" over "Lift off" and
     RISE; flying, the controls faded, the read-out under the tabs; the map with "set course for Mars"; in space with
     "Pulse to Mars", BRAKE, SINK, RISE; over Mars with "Land here"; the help card with its corner),
-    `touch-w32-painted-a.jpg`, `-b.jpg` (the painted world at 400x225, from the run before the read-out moved: the
-    read-out lay against BRAKE there, which is why it moved). Numbers: `touch-w32-runs.json`.
+    `touch-w32-painted-a.jpg`, `-b.jpg` (the painted world at 400x225 on the final code: landed, flying with the
+    controls faded, the map's slip, "Pulse to Mars", "Land here" with "a place to land" lettered above the slip, the
+    book, the help card, "Board ship"; in the run before, the read-out lay against BRAKE at the lower left and "a place
+    to land" over the "Land here" slip, which is why the read-out moved and the controls became hard keep-outs).
+    Numbers: `touch-w32-runs.json`.
   - Unit: `tests/touch.test.mjs` 11 (two new: a tap timed by its events' stamps; every prompt names its code),
     `tests/vista.test.mjs` updated (the prompt now carries `code`).
-- **Checks** on a clean export of `e87f6be` with these files (PAINTER's uncommitted `src/world`, `src/render` left out):
-  unit **227** (225 + 2), physics 325, world 30, coast PASS at both stands, ghostfield all zeros, static rules hold;
-  the painted loop ran the real game with no console error and `fallback` empty.
+- **Checks on a clean export of `dfb4701`** (PAINTER's uncommitted `src/world`, `src/render` are not in it): unit
+  **227** (225 + 2), physics 325, world 30, coast PASS at both stands, ghostfield all zeros, static rules hold; the
+  painted loop ran the real game with no console error and `fallback` empty; m3check, lockcheck, the Pixel 7 loop and
+  the painted loop ran on a tree identical in code to `dfb4701` (checked: only docs differ).
 - **Rulings (W3.2):** (1) "Every hit area at least 44 css px" is read as the touch controls this item adds (the
   round buttons, the slips, the tabs, the close corners, the 'set course' slip); the book's tab strip (15 css px
   tall on the iPhone) and the map's world radius are W3.3's, with their own numbers there. (2) The subject box (x
