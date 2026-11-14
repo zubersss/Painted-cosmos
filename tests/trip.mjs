@@ -36,6 +36,14 @@ async function leg(to, n) {
   let i = await info();
   const from = i.body;
   log(`LEG ${n}: ${from} -> ${to}`);
+  // Bumps are counted for this leg alone (the ship's count runs from the page's start: one bump
+  // on the first leg used to fail the second leg's check too), and by stretch, so a failure says
+  // where it happened.
+  const bump = { n: (i.ship && i.ship.bounces) || 0, where: [] };
+  const bumpsIn = (x, stretch) => {
+    const b = (x && x.ship && x.ship.bounces) || 0;
+    if (b > bump.n) { bump.where.push(`${b - bump.n} in ${stretch}`); bump.n = b; }
+  };
   // ---- to the ship, up, out ----------------------------------------------------------------
   if (i.state === 'ON_FOOT') {
     await look((i.shipBearingDeg * RAD) / MOUSE_FOOT, 0);
@@ -53,6 +61,7 @@ async function leg(to, n) {
   await page.keyboard.up('KeyW');
   i = await until((x) => x.state === 'SPACE', 180, holdPitch(50));
   check(i.state === 'SPACE', 'reached space above ' + from);
+  bumpsIn(i, 'the climb from ' + from);
   i = await until((x) => alt(x) > x.ship.spaceAlt * 3, 120, holdPitch(50));
   // ---- choose, aim, pulse ---------------------------------------------------------------------
   const target = await chooseOnMap(to, n === 1 ? 'm2-map' : null, 'm2-map');
@@ -89,6 +98,7 @@ async function leg(to, n) {
   await page.keyboard.up('KeyW');
   i = await until((x) => x.state === 'ATMOSPHERE', 300, holdPitch(-58));
   check(i.state === 'ATMOSPHERE', 'entered the atmosphere of ' + to);
+  bumpsIn(i, 'the way to ' + to + "'s air");
   // A world not yet walked on shows where it would set a newcomer down (a ring, or an arrow at
   // the picture's edge when the place is round the curve or out of the picture).
   const site = (i.marks || []).find((m) => m.label === 'a place to land');
@@ -102,6 +112,7 @@ async function leg(to, n) {
     if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
   });
   check(i.ship.canLand, 'landing prompt over ' + to);
+  bumpsIn(i, 'the descent to the landing prompt');
   // Press E on the prompt, as a player does: if the prompt had gone by the time the key
   // arrived (rough ground at two frames a second), wait for it and press again.
   for (let tries = 0; tries < 8; tries++) {
@@ -111,6 +122,16 @@ async function leg(to, n) {
     if (i.state === 'ATMOSPHERE' && i.prompt === 'Cancel landing') i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED' || x.prompt !== 'Cancel landing', 40);
     if (i.state === 'LANDING' || i.state === 'LANDED') break;
     run.log('  (E did not start a landing: ' + (i.notice || 'no prompt at that moment') + '; trying again)');
+    if (/steep/i.test(i.notice || '')) {
+      // The game says no ground near enough here will hold the parked ship (with PHYSICS, a
+      // slope its friction will not hold; it looks up to 45 m round). A player flies on, as the
+      // script now does: about 4 s at full throttle, nose level, 100 to 150 m along, then down
+      // again. (Pressing E on the same hover, as the script did, failed over Saturn's honey_mist
+      // eight times running: the verifier's runs on a539086 and 45629a7.)
+      await page.keyboard.down('KeyW');
+      await until(() => false, 4, holdPitch(0));
+      await page.keyboard.up('KeyW');
+    }
     i = await until((x) => x.ship.canLand, 120, async (x) => {
       await holdPitch(x.ship.altGround > 110 ? -18 : -7)(x);
       if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
@@ -119,7 +140,8 @@ async function leg(to, n) {
   }
   i = await until((x) => x.state === 'LANDED', 90);
   check(i.state === 'LANDED', 'landed on ' + to);
-  check(i.ship.bounces === 0, 'no bumps');
+  bumpsIn(i, 'the landing');
+  check(bump.where.length === 0, 'no bumps' + (bump.where.length ? ' (' + bump.where.join(', ') + ')' : ''));
   await gameWait(1);
   await page.keyboard.press('KeyE');
   i = await until((x) => x.state === 'ON_FOOT', 6);

@@ -2,6 +2,36 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, RELEASE 1 of the sharp-smooth plan, PILOT lane part 1: W1 (the gate) (started 05:00 UTC 2026-11-14; kept current)
+
+**Read this first.** The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W1 = section 4 "PILOT · W1 Gate", the quality guard =
+section 5). This part of the lane is W1 only (W1.1 the station harness, W1.2 a green gate); W3 (touch) comes next.
+Scratch: `/home/user/.pc-scratch/pilot/r1/`. First commit's parent: `56382c2` (the coordinator's WIP snapshot of
+`tests/stationlib/metrics.mjs` and `png.mjs`, the port begun by the agent before the 04:59 restart; this agent continues
+it).
+
+**State:** in progress. Items: W1.1 harness (in progress), W1.1b baseline numbers (pending), W1.2 green gate (code
+committed; its proof runs pending: painted-trip 3 times, all.mjs once).
+
+### W1.2 A green gate (test-only; the game is not touched)
+
+- `tests/trip.mjs` and `tests/loop.test.mjs` restored from `d874a8c` (the trip fixes were made in `97e5949`; `1c406e2` and
+  `d874a8c` carry the same files): bumps counted per leg and by stretch (the ship's count runs from the page's start: one
+  bump on the first leg failed the second leg's "no bumps" too); on "Too steep to land here" the script flies on as a
+  player does (4 s at full throttle, nose level: 100 to 150 m) before coming down again (it pressed E on the same hover
+  eight times over Saturn's honey_mist). The loop test's two messages say what is checked; assertions unchanged. NOT
+  restored: `1c406e2`'s game change (sim.js, flight.js: the honest 'Land here' over steep ground) and its test
+  `landprompt.test.mjs`: game code, not part of W1.2 (the plan says test-only); the shipped game still offers 'Land here'
+  over 48 of 520 hover spots on honey_mist and then says 'Too steep'.
+- `tests/all.mjs`: two new steps after the unit suites, `coast` (`src/physics/coast.mjs`; both stands must print
+  "=>  PASS" and the exit code agree) and `ghostfield` (`docs/lead/evidence/review7/ghostfield.mjs`, which always exits 0:
+  judged on its six JSON lines, radial speed while grounded, off the line, wrong material and steps in the air all 0;
+  the worst step loss 0.26 / 0.52 m/s is printed, not judged). Both judges checked against made-up failing output (a
+  stand NOT YET, a missing stand, one non-zero, a missing run: each FAIL). `--only coast,ghostfield` on the tree: 2 of 2
+  stands PASS, 6 of 6 runs all zeros.
+- Checks on a clean export of `0efcc3b` with these files: unit 208, physics 325, world 30, coast PASS at both stands,
+  ghostfield all zeros.
+
 ## SHIPPED STATE (coordinator, 2026-11-14 ~02:00 UTC; read this first)
 
 The owner chose to ship the last fully checked code rather than wait for the re-fix pass below. That pass (the
