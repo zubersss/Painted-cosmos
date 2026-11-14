@@ -12,8 +12,8 @@ it).
 
 **State:** in progress. Items: W1.1 harness (committed `2355594`, game clock pinned at 120 s since; reproduces the
 baseline, table below), W1.1b baseline numbers (q2 1280x720, all 24 stations, committed; q2 1920x1080, q1, q0 and the
-phone profile pending), W1.2 green gate (code committed `419074c`; its proof runs pending: painted-trip 3 times,
-all.mjs once). Still to do for W1.1's acceptance: two identical runs compared (`--diff`).
+phone profile pending), W1.2 green gate (code committed `419074c`; painted-trip passed 3 of 3; all.mjs on a clean
+export running). Still to do for W1.1's acceptance: two identical runs compared (`--diff`).
 
 ### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
 
@@ -156,6 +156,11 @@ One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EX
   stands PASS, 6 of 6 runs all zeros.
 - Checks on a clean export of `0efcc3b` with these files: unit 208, physics 325, world 30, coast PASS at both stands,
   ghostfield all zeros.
+- **painted-trip 3 of 3** (`node tests/all.mjs --export --only painted-trip`, one after another, 06:49-07:14 UTC, PAINTER's
+  browser running beside it): run 1 on a clean export of `2355594` PASS (492 s, 50 checks), runs 2 and 3 on `8811ca4`
+  PASS (470 s, 489 s, 50 checks each). Logs: `docs/shots/pilot/r1/painted-trip-run{1,2,3}.txt`. Said plainly: in none of
+  the three did the ship bump or the game say "Too steep", so the two restored paths were not exercised by these runs
+  (they guard against what failed the verifier's runs on `a539086` and `45629a7`).
 
 ## SHIPPED STATE (coordinator, 2026-11-14 ~02:00 UTC; read this first)
 
