@@ -307,8 +307,12 @@ function collect(outFile, commit, from) {
   for (const d of from.split(',').filter(Boolean)) {
     const j = JSON.parse(fs.readFileSync(path.join(d, 'run.json'), 'utf8'));
     const key = `${j.config.tier}@${j.config.device || j.config.size}`;
-    const prev = base.configs[key] || { stations: {} };
-    base.configs[key] = { label: j.label, when: j.when, query: j.config.query, device: j.config.device, using: j.using, problems: j.problems, stations: { ...prev.stations, ...j.stations } };
+    const prev = base.configs[key];
+    if (prev) {
+      // more stations into a configuration already collected: its first run's label stays; the run is listed
+      prev.stations = { ...prev.stations, ...j.stations };
+      prev.addedRuns = [...(prev.addedRuns || []), { label: j.label, when: j.when, stations: Object.keys(j.stations), problems: j.problems }];
+    } else base.configs[key] = { label: j.label, when: j.when, query: j.config.query, device: j.config.device, using: j.using, problems: j.problems, stations: { ...j.stations } };
     console.log('collected', key, Object.keys(j.stations).length, 'stations from', d);
   }
   fs.mkdirSync(path.dirname(path.resolve(outFile)), { recursive: true });

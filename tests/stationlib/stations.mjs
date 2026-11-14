@@ -22,6 +22,8 @@ add({ name: 'E_150_45_dusk', body: 'earth', where: 'spawn', alt: 150, pitch: 45,
 // the storm: tests/weather.mjs' forced storm sky (world.setWeather), at hour 11; no rain marks (kits=0)
 add({ name: 'E_150_45_storm', body: 'earth', where: 'spawn', alt: 150, pitch: 45, heading: 0, weather: 'storm' });
 add({ name: 'N_150_45', body: 'neptune', where: 'spawn', alt: 150, pitch: 45, heading: 0 });
+// W2.2's night station ("E_150_45 at night: t2 at least 0.9"), added last so the stations before it keep their order
+add({ name: 'E_150_45_night', body: 'earth', where: 'spawn', alt: 150, pitch: 45, heading: 0, hour: 23 });
 
 export const byName = (n) => STATIONS.find((s) => s.name === n);
 

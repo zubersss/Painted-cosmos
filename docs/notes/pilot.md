@@ -12,10 +12,34 @@ the coordinator's WIP snapshot of `tests/stationlib/metrics.mjs` and `png.mjs`, 
 (harness reproduces; baseline q2 1280x720), `7a41b0c`, `2df378d` (W1.2 proof), `64dda38` (two runs agree), and the
 rest of the baseline after them.
 
-**State:** in progress. Items: W1.1 harness (committed `2355594`, game clock pinned at 120 s since; reproduces the
-baseline, table below), W1.1b baseline numbers (q2 1280x720, all 24 stations, committed; q2 1920x1080, q1, q0 and the
-phone profile running), W1.2 green gate DONE (code `419074c`; painted-trip 3 of 3; all.mjs on a clean export of
-`8811ca4` ALL 15 PASSED). W1.1's "two runs agree": met (below).
+**State at the end of this part (about 09:50 UTC): W1 DONE.** Nothing of PILOT's is half-done or uncommitted (PAINTER's
+uncommitted `src/render` files in the shared tree are PAINTER's W2.2 work in progress).
+
+- **W1.1 the station harness: DONE.** `tests/stations.mjs` + `tests/stationlib/` (inpage.js, stations.mjs, metrics.mjs,
+  png.mjs) + `tests/stationmetrics.test.mjs` (8 tests). Reproduces the plan's numbers on a clean export of 784183b:
+  E_150_45 raw land lapvar 520.9 (520-525), final t1/t2 0.04/0.25, x26 1.14/1.13 (1.15/1.14), raw A 0.447, E_1000_90 441
+  calls / 669,283 triangles (table below). Two identical runs agree (518 numbers, 0 outside the rule; below). How to
+  run a station set: the section "HOW TO RUN A STATION SET" below.
+- **W1.1b the baseline: DONE.** `tests/baselines/stations-784183b.json`: q2 at 1280x720 (25 stations, with A, F, taps),
+  q2 at 1920x1080, q1 and q0 at 1280x720 (24 stations each, with F and taps; q1/q0 also against the q2 raw, `vsRef`), and
+  the iPhone 14 landscape profile (E_foot, E_150_45; today's behaviour: q2, DPR capped 1.5, buffer 1125x510; the phone
+  preset of W3.5 does not exist yet). Sheets in `docs/shots/pilot/baseline/`, every one OPENED.
+- **W1.2 a green gate: DONE.** `419074c`; painted-trip 3 of 3; `node tests/all.mjs --export` on `8811ca4` ALL 15 PASSED.
+
+**Rulings of mine logged here (each explained where it is used below):** the harness pins the game clock at 120 s and
+the wash clock at 100 (the clock study); the halo share's 0.5 % bound is read on the abstraction output, the final's
+share is compared with its baseline (the paper alone puts 11-16 % of the land over the line); "two runs agree to two
+decimals" is read as normalised measures within 0.005, magnitudes within 1 %, masks under 5000 pixels not judged; the
+storm station uses tests/weather.mjs' forced storm sky at hour 11 with no rain marks; Neptune's station looks along
+heading 0; W2.2's night station `E_150_45_night` (hour 23) was added last (PAINTER asked for it in its notes) and
+baselined alone; the counted sheet reads are 16 an output pixel at native size (the audit's 17 counted the
+enlargement branch's read); `1c406e2`'s game change (honest 'Land here') was not restored with the trip fixes.
+
+**For whoever comes next (W3, touch, is the rest of this lane):** the plan's W1.2 also names later steps `touch` and
+`stations-quick` for `tests/all.mjs`: `stations-quick` should run `node tests/stations.mjs --set quick` on the
+export and judge it with the section 5 thresholds once W2 has landed (`--compare tests/baselines/stations-784183b.json
+--strict` exits 1 on any flag; today every station flags the halo rule, which W2.2 is meant to fix). A quick set takes
+about 15 min (10 min of page load).
 
 ### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
 
@@ -97,6 +121,11 @@ reproduced station by station within about 3 % in raw lapvar (E_foot 190.6 / 185
 | E_150_45_storm | 97.4 | 0.03 / 0.20 / 0.54 | 6.1 / 5.0 | 0.417 / 0.237 | 0.468 / 0.261 | 450 / 910623 | 0.31 |
 | N_150_45 | 103.6 | 0.05 / 0.26 / 0.63 | 2.6 / 3.1 | 0.454 / 0.282 | 0.501 / 0.291 | 311 / 703081 | 0.01 |
 
+**E_150_45_night** (W2.2's night station, hour 23; added after the run above and baselined alone on a fresh page, run
+`base-q2-1280-night/`, sheet `q2-1280x720-night-sheet.jpg`, OPENED: the raw scene has every crown, the final a dark blue
+blur): raw land lapvar 446.8, final land t1/t2/t3 0.02/0.09/0.36 (W2.2's target t2 >= 0.9), halo abs/final 16.2/11.4 %,
+A raw/abs 0.449/0.285, F raw/abs 0.397/0.238, 451 calls / 910,624 triangles.
+
 **q2 at 1920x1080** (run `/home/user/.pc-scratch/pilot/r1/base-q2-1920/`, 21 min of stations after a 16 min load; no
 console error, fallback empty; sheet `docs/shots/pilot/baseline/q2-1920x1080-sheet.jpg`, shrunk to 1000 px wide, OPENED;
 `q2-1920x1080-summary.txt`): the brush is a fraction of the frame's height, so more pixels buy no detail from the air:
@@ -122,6 +151,12 @@ against the q2 run's raw scene (`node tests/stations.mjs --reref <run> --ref <q2
 (The audit's tiers-all: E_150_45 t2 0.18 (q1) and 0.12 (q0), E_foot 0.53 and 0.17, M_150_45 0.43 and 0.40; costs at
 E_150_45 277 / 469k and 136 / 161k: reproduced.)
 
+**The phone profile** (`--device iphone14`: Playwright's iPhone 14 landscape, 750x340 css at DPR 3; run `base-phone/`;
+sheet and crops `iphone14-sheet.jpg`, `iphone14-crops.jpg`, OPENED): today the game draws it at q2 with the DPR capped
+at 1.5, a 1125x510 buffer; E_foot final land t1/t2 0.36/0.83, raw lapvar 231.7, 489 calls / 1,513,359 triangles; E_150_45
+0.10/0.48, 663.6, 470 / 956,829; 17.5 M post reads a frame. W3.5's preset (DPR 1.25, tier 1) does not exist yet, so these
+are the phone's "before".
+
 Post reads counted (`--taps`), every station: prep 4 per half-size pixel, abstraction 13 per pixel (13 on far land),
 keep 2 per half-size pixel, sheet 16 per output pixel: 28.1 M reads a frame at 1280x720. The halo share of today's
 abstraction output is high where its brush is wide (11-16 % from 150-400 m up): the measure counts a blur's spread as
@@ -140,7 +175,7 @@ One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EX
     node tests/stations.mjs --compare tests/baselines/stations-784183b.json --with /home/user/.pc-scratch/<role>/r1/st-after
     node tests/stations.mjs --sheet <before-run-dir>,<after-run-dir> --labels before,after --out <dir>/before-after.jpg
 
-- `--set`: `quick` (E_foot, E_150_45, E_1000_45), `audit` (the sharpness audit's twenty), `earth`, `air`, `all` (24),
+- `--set`: `quick` (E_foot, E_150_45, E_1000_45), `audit` (the sharpness audit's twenty), `earth`, `air`, `all` (25),
   `phone` (with `--device iphone14`), station names or regular expressions, comma separated (`--set 'E_150_45,M_.*_90'`);
   the stations always run in the list's order. `--tier q2|q1|q0` (render scale 1), `--size WxH` (or `--device
   iphone14|pixel7|ipadpro11`, Playwright's landscape profiles).
@@ -153,6 +188,9 @@ One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EX
   `sheet.jpg` (final | raw per station) and `crops.jpg` (1:1 crops of the land). OPEN the sheets and crops.
 - `--compare` prints the guard's rules (plan section 5) per station: ok or FLAG (an item's own exceptions apply, e.g.
   W2.1's raw b1, W7.1's budget). `--baseline OUT.json --commit SHA --from DIR[,DIR]` collects runs into a baseline file.
+  `--diff DIR_A,DIR_B` compares two runs number by number; `--reref DIR --ref Q2DIR` measures a lower tier's finals
+  against the q2 run's raw scene (offline, from the frames). The baseline's frames (lossless) stay in
+  `/home/user/.pc-scratch/pilot/r1/base-*/frames/` for a before/after `--sheet`.
 - Timing on this machine (SwiftShader): the page loads in 4 to 6 min at q2 1280x720; a station takes about a minute
   plus the extras (see the run's `secs`). Free memory first (`free -m`); one browser of yours at a time.
 - Determinism: the harness fixes the game clock (120 s) and the painter's wash clock (100) at every station, sets the

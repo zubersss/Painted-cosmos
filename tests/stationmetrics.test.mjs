@@ -125,7 +125,7 @@ test('metrics: CIELAB of white, black and sRGB red; the border strip', () => {
 test('stations: the audit\'s twenty in its order, the plan\'s additions, the sets, the experiments', () => {
   assert.deepEqual(SETS.audit, ['E_foot', 'E_50_45', 'E_50_90', 'E_150_45', 'E_150_90', 'E_400_45', 'E_400_90', 'E_1000_45', 'E_1000_90',
     'M_foot', 'M_50_45', 'M_50_90', 'M_150_45', 'M_150_90', 'M_400_45', 'M_400_90', 'M_1000_45', 'M_1000_90', 'S_150_45', 'S_150_90']);
-  for (const n of ['E_foot_night', 'E_150_45_dusk', 'E_150_45_storm', 'N_150_45']) assert.ok(STATIONS.some((s) => s.name === n), n);
+  for (const n of ['E_foot_night', 'E_150_45_dusk', 'E_150_45_storm', 'N_150_45', 'E_150_45_night']) assert.ok(STATIONS.some((s) => s.name === n), n);
   assert.deepEqual(SETS.quick, ['E_foot', 'E_150_45', 'E_1000_45']);
   assert.deepEqual(pick('E_1000_45,E_foot').map((s) => s.name), ['E_foot', 'E_1000_45'], 'list order kept');
   const e = STATIONS.find((s) => s.name === 'E_150_45');
