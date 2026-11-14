@@ -2,6 +2,42 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, LAST FIX ROUND, RE-FIX pass (twenty-first PILOT agent; started about 01:15 UTC 2026-11-14; kept current)
+
+**State:** in progress. The game's code is not touched in this pass; only the scripted trip and a test's wording.
+(The owner's word relayed with the task, "use whatever it has now and continue with the rest", was said of the second
+blind play-test, stopped with its goal met: `docs/COORDINATOR.md`, 22:10 UTC; read as: carry on with the round.) The
+twentieth's hand-over just below holds for everything not named here. Scratch: `/home/user/.pc-scratch/pilot/last/refix/`.
+
+The verifier did not accept only item (4), the canyon camera, and only because it was not fixed (it did not try it).
+It is still left: see "Not fixed" below. It found no regression of the round, but `tests/all.mjs` not green: the
+painted-trip step failed twice in three runs on `a539086` and the same way on `45629a7`.
+
+### painted-trip (tests/trip.mjs), test only: in progress
+
+Two faults of the script, neither of the game: (a) `ship.bounces` counts from the page's start and is never reset, so
+one bump on the first leg failed the second leg's "no bumps" as well (the verifier's run 1: one bump on the way to
+Mars, "no bumps" failed twice); now counted per leg, and the failure names the stretch it happened in (the climb, the
+way to the air, the descent to the prompt, the landing). (b) Over Saturn's honey_mist the game said "Too steep to land
+here" (with PHYSICS a site must be a slope the ground's friction holds; it looks up to 45 m round) and the script
+pressed E on the same hover eight times, then waited 90 s: 7 checks failed (runs 2 and base). Now, on "Too steep", it
+flies on as a player does (4 s at full throttle, nose level: 100 to 150 m) before coming down to try again.
+`tests/loop.test.mjs`: the two messages that said "the page waits" for the ship now say what is checked (the hull is or
+is not in the picture); the assertions are unchanged.
+
+### Not fixed (as the twentieth left them)
+
+- Item (4), the third-person camera jammed into Mars' canyon walls or staring down: not reproduced by the twentieth
+  at five wall spots; the likely rule (the foot camera's lift cap) moves every slope's view. Not touched: nothing new
+  about it came with this pass (the verifier did not try it), a blind change to the foot camera moves every world's
+  view, and the game ships next.
+- PAINTER's note: the foot camera's boom (and the landing camera) passes into crownless spires; PAINTER's `0112e5e`
+  makes a spire hollow and soft with the eye inside. Not touched, same reason.
+- The verifier's minor findings, left as they are: the course's world behind the ship gets the side arrow a little
+  low even when high in the sky; the map's pre-selected (circled, not clicked) world gets no label in the air; the
+  flattened grass under the parked ship as a darker strip on the first page; a place far round the curve ahead pointed
+  at straight down (as on `45629a7`); `sim.shipInPicture()` now used only by tests (kept: the tests read it).
+
 ## Hand-over, LAST FIX ROUND (twentieth PILOT agent; started about 22:25 UTC 2026-11-13; kept current after every item)
 
 **State at the end of the round (00:15 UTC 2026-11-14):** item 0 (the m3 regression) and items (1), (2), (3), (5) done,
