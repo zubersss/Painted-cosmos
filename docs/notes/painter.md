@@ -15,10 +15,9 @@ post passes against the BASE tree's sheet and backdrop on the same held scene; `
 and the rule against the same view drawn with one sample), `bin/basesrc.mjs` (a tree's post shader sources from its own
 Post class), `bin/runcmp.mjs` (two station runs: cost and frames), `bin/diffimg.py`; runs `st-w23`, `ab-w24`, ...).
 
-**STATE:** W2.3 COMMITTED (the commit after `e87f6be`, "W2.3 free wins"). W2.4 (post savings) is written and
-measured, in the working tree and in `trees/w24` (post.js, shared.js, materials.js, test `src/world/postsave.test.mjs`
-in `trees/w24` only), not committed yet. W2.5 (MSAA and the region rule) is written in `trees/w25` (post.js on top of
-W2.4 via `w25/post_patch.py`, index.js, chunks.js, test `src/world/aaregion.test.mjs`), not yet run in a browser.
+**STATE:** W2.3 COMMITTED (`f9cf6fe`). W2.4 COMMITTED (the commit after it, "W2.4 post savings"). W2.5 (MSAA and the
+region rule) is written in `trees/w25` (post.js = W2.4's plus `w25/post_patch.py`, index.js, chunks.js, test
+`src/world/aaregion.test.mjs`); its station run (`st-w25`, with A and F) is running; not committed yet.
 
 ### W2.3 free wins: what was done (src/world/flora.js, src/world/index.js; test src/world/undergrowth.test.mjs)
 - **Undergrowth and grass cells by the distance from the eye, at every height.** Their strokes are drawn only while the
@@ -76,6 +75,52 @@ W2.4 via `w25/post_patch.py`, index.js, chunks.js, test `src/world/aaregion.test
   325, coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the station run's page and the A/B page: no
   console error, fallback empty. `tests/all.mjs`' painted-play and painted-m3 are run at the end of this part, on the
   last state (one browser at a time).
+
+### W2.4 post savings with the same picture: what was done (src/render/post.js, shared.js, materials.js; test src/world/postsave.test.mjs)
+- **The backdrop pass is gone.** It drew a triangle over the whole scene target writing white and (normal 0, log depth
+  20, region 0); `beginScene` now clears the target white and clears the second attachment alone with
+  `gl.clearBufferfv(COLOR, 1, ...)` to that value (the 8-bit fallback: its packed value 0.5, 0.5, 20/32, 0).
+- **Last frame's painting is kept only while there is water** (`PREV.water`, shared.js; the water material says so in its
+  onBeforeRender): the keep pass (half size, 2 reads a pixel) runs in a frame where water was drawn and in the frame
+  after; where it did not run the frame before, `uPrevOn` is 0 and the water reflects nothing for that one frame
+  rather than an old picture (the same as the first frame after a resize already did). A held frame is unchanged.
+- **The paper is laid once per size.** Of the sheet's six reads of the paper texture, the two the tremor is taken from
+  (plo, pmid) stay live: the tremor moves where the picture and the region target are read, and the region is read
+  without filtering, so a half float's rounding of the offset moved a few pencil pixels by up to 4/255 in a first
+  version that baked the offset (4 pixels of 921,600 at E_foot; that version is gone). The other four (paper, psoft,
+  pfine, pmed) depend only on the pixel and the sheet's size: laid by PAPER_FRAG into two targets at the sheet's size
+  (RGBA16F: the paper's value, the dark wash's dry-edge measure without its live part, and the two terms the paper adds
+  to the ragged border, small numbers where a half float is finest; RGBA8: the grain's three) and read back with two
+  `texelFetch`. Laid again when the size, uBoil or the border's settings change; not on the 8-bit fallback (the sheet
+  reads the paper itself there, `PC_PAPER_BAKED` undefined). The sheet's code reads the paper through PAPER_LIVE and
+  PAPER_STATIC, the same text in the bake and in the live path.
+- Memory: the two targets are 12 bytes a pixel of the sheet (1920x1080: 23.7 MiB; 1280x720: 10.5 MiB; 1266x585: 8.5
+  MiB). Whether two full-size fetches beat four reads of a small cached texture on a phone's bandwidth is not measurable
+  here; the live path stays (PC_PAPER_BAKED undefined, as on the 8-bit fallback, `post.paperBaked`): W6 can choose it
+  per device with a one-line switch at the Post's construction.
+
+### W2.4 numbers
+- **The same picture** (in-page A/B, `bin/ab.mjs --mode post`, run `ab-w24`: this tree's post passes against the base's
+  sheet and backdrop on the same held scene, all 25 stations; `docs/shots/painter/r1/w24-ab-summary.txt`): outside the
+  water every station's final frame is **within 1/255** (max 1, mean 0.006-0.011/255: rounding); on Mars, Saturn and
+  Neptune, the whole frame within 1/255. In and round the water of the Earth stations up to 2-3/255 at a few pixels
+  (E_1000_45 184 pixels, E_1000_90 128): there the raw scene itself differs by as much (the B render is one more round
+  of the reflection's feedback), not the post passes. The region view identical everywhere. Diff maps OPENED:
+  `w24-ab-diff-same-held-scene.jpg` (six stations, |diff| x32: speckle of 1/255 only).
+  A first version that also laid the tremor's paper put 4 pixels of E_foot at 2-4/255 (pencil texels flipped by the
+  half float's rounding of the offset): the tremor's reads were made live again before this run.
+- **Reads** (PILOT's --taps instrument, post passes): the sheet 21 -> **19** reads an output pixel (plan: 17 -> at most
+  11, NOT met: W2.2 added the edge test's 4 reads and the pooling's 4 at the washes' scale, and with the same picture
+  only the paper's reads can go); post reads a frame at 1280x720: near stations 33.6 -> 31.8 M, far stations 25.3 -> 23.5
+  M, and on a world without water also the keep pass (0.46 M, 2 reads a half-size pixel) and always the backdrop's
+  full-size write (12 bytes a pixel, no reads). At 1920x1080 (the same reads per pixel): near 75.7 -> 71.6 M, far
+  57.0 -> 52.9 M (the plan's 147 -> 115 M was the performance audit's model, which counted differently; PILOT's harness
+  counted 63.2 M at 784183b at that size). The phone at 1266x585 (sheet only): 15.6 -> 14.1 M.
+- Test `src/world/postsave.test.mjs` (4): no backdrop pass, the clears and their values; the keep pass only with water
+  and the frame after, and uPrevOn; the paper laid once per size (again on resize and on a border change), its targets'
+  types; the 8-bit fallback reads the paper itself and clears to the packed value. FAILS 4 of 4 on `f9cf6fe`.
+- Checks on a clean export of `f9cf6fe` with these files (`trees/chk24`): world 38, unit 227, physics 325, coast.mjs
+  PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the A/B page (this tree): no console error, fallback empty.
 
 ## Hand-over of RELEASE 1, W2.1 and W2.2 (part 1 of the lane; done; part 2 is the section above)
 

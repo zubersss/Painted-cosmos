@@ -3,7 +3,7 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
-import { G, PHYS, PHYSW, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { G, PHYS, PHYSW, PREV, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK } from './chunks.js';
@@ -666,6 +666,8 @@ export function makeWaterMaterial(bodyU, skyU) {
     vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
   });
   m.userData.pcPainted = true;
+  // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
+  m.onBeforeRender = () => { PREV.water = true; };
   return m;
 }
 

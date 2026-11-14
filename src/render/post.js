@@ -9,7 +9,7 @@
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
 // the painting (wash variation, strokes, light) is anchored in the world by the materials.
 import * as THREE from 'three';
-import { getTextures, G } from './shared.js';
+import { getTextures, G, PREV } from './shared.js';
 
 const FS_VERT = /* glsl */`
 varying vec2 vUv;
@@ -19,14 +19,6 @@ void main() {
 }
 `;
 
-const BACKDROP_FRAG = /* glsl */`
-layout(location = 1) out highp vec4 pcAux;
-uniform float uAux8;
-void main() {
-  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-  pcAux = uAux8 > 0.5 ? vec4(0.5, 0.5, 20.0 / 32.0, 0.0) : vec4(0.0, 0.0, 20.0, 0.0);
-}
-`;
 // the 8-bit fallback's unpacking (shared.js uAux8), for the passes that read the scene's second target
 const AUX_DEC = /* glsl */`
 uniform float uAux8;
@@ -136,11 +128,60 @@ void main() {
 }
 `;
 
+// (R1 W2.4) The paper under a pixel of the sheet. Of its six reads of the paper texture, the two the hand's tremor is
+// taken from stay live (PAPER_LIVE: the tremor moves where the picture and the region target are read, and the region
+// is read without filtering, so the offset must be the very value it was); the other four depend only on the pixel and
+// the sheet's size and are laid once per size into two targets (PAPER_STATIC into PAPER_FRAG), read back with two
+// fetches. What goes through a steep step keeps a half float: the paper under the border's raggedness (as the two terms
+// it adds, both small, where a half float is finest), the dark wash's dry-edge measure and the paper's own value (the
+// light wash's dry edge, the pencil, the relief); the grain's three are 8-bit (they move a wash's pigment by under a
+// thousandth). The live reads stay for the 8-bit fallback (no float targets).
+const PAPER_LIVE = /* glsl */`
+  {
+    vec4 plo = texture(tPaper, puv * 0.19 + 0.37);
+    vec4 pmid = texture(tPaper, puv * 0.47 + 0.11 + uBoil);
+    w0 = (pmid.ba - 0.5) * 2.0 + (plo.ba - 0.5) * 1.2;
+    ploR = plo.r; ploG = plo.g; pmidR = pmid.r; pmidG = pmid.g;
+  }
+`;
+// in: puv, uBoil, uBorder; out: ph, s1 (the dark wash's dry edge, but for the live part), bnP0, bnPD (the border's
+// paper: bn's own term and the term the dark wash adds), psoftR, pfine, pmed
+const PAPER_STATIC = /* glsl */`
+  {
+    vec4 paper = texture(tPaper, puv, 0.55);
+    vec4 psoft = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 3.6);
+    pfine = texture(tPaper, puv, 1.5).r; pmed = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 1.2).r;
+    ph = paper.r; psoftR = psoft.r;
+    s1 = psoft.r * 0.6 + (pmed - 0.5) * 0.2;
+    bnP0 = (paper.g - 0.5) * 0.006;
+    bnPD = psoft.g * uBorder.y * 0.45 - (paper.g - 0.5) * 0.006;
+  }
+`;
+const PAPER_FRAG = /* glsl */`
+uniform sampler2D tPaper;
+uniform vec2 uOutRes;
+uniform vec2 uBoil;
+uniform vec4 uBorder;
+layout(location = 1) out highp vec4 pcP1;
+void main() {
+  float sc = max(uOutRes.y / 1080.0, 0.62);
+  vec2 puv = gl_FragCoord.xy / (512.0 * sc);
+  float ph, s1, bnP0, bnPD, psoftR, pfine, pmed;
+  ${PAPER_STATIC}
+  gl_FragColor = vec4(ph, s1, bnP0, bnPD);
+  pcP1 = vec4(psoftR, pfine, pmed, 1.0);
+}
+`;
+
 const SHEET_FRAG = /* glsl */`
 uniform sampler2D tAbs;
 uniform highp sampler2D tAux;
 uniform highp sampler2D tHalfA;
 uniform sampler2D tPaper;
+#ifdef PC_PAPER_BAKED
+uniform highp sampler2D tPap0;   // (R1 W2.4) PAPER_FRAG's two targets at this sheet's size
+uniform highp sampler2D tPap1;
+#endif
 uniform vec2 uOutRes;
 uniform vec2 uInTexel;
 uniform vec3 uPaperColor;
@@ -172,9 +213,19 @@ void main() {
   float sc = max(uOutRes.y / 1080.0, 0.62);
   vec2 px = gl_FragCoord.xy;
   vec2 puv = px / (512.0 * sc);
-  vec4 paper = texture(tPaper, puv, 0.55);
-  vec4 plo = texture(tPaper, puv * 0.19 + 0.37);
-  vec4 pmid = texture(tPaper, puv * 0.47 + 0.11 + uBoil);
+  // the paper under this pixel (R1 W2.4: the tremor's two reads live, the other four laid once per size, above)
+  vec2 w0; float ploR, ploG, pmidR, pmidG, ph, s1, bnP0, bnPD, psoftR, pfine, pmed;
+  ${PAPER_LIVE}
+#ifdef PC_PAPER_BAKED
+  {
+    ivec2 ip = ivec2(px);
+    vec4 q0 = texelFetch(tPap0, ip, 0), q1 = texelFetch(tPap1, ip, 0);
+    ph = q0.x; s1 = q0.y; bnP0 = q0.z; bnPD = q0.w;
+    psoftR = q1.x; pfine = q1.y; pmed = q1.z;
+  }
+#else
+  ${PAPER_STATIC}
+#endif
 
   // the painter's hand: edges wobble with the paper, never ruler-straight
   // (R1 W2.2: only edges. The tremor resampled the whole sheet up to two pixels off, which smeared every fine thing
@@ -196,7 +247,7 @@ void main() {
   float eB = 1.0 - smoothstep(uBorder.x * 1.2, uBorder.x * 2.6, min(bd0.x, bd0.y));
   float edgeW = max(max(smoothstep(0.05, 0.12, eV), smoothstep(0.30, 0.80, eZ)), max(eC, eB * uBorder.w));
   edgeW = max(edgeW, uSheetOld);
-  vec2 wob = ((pmid.ba - 0.5) * 2.0 + (plo.ba - 0.5) * 1.2) * mix(uWobIn, uPig.z, edgeW) * sc / uOutRes;
+  vec2 wob = w0 * mix(uWobIn, uPig.z, edgeW) * sc / uOutRes;
   vec2 uv = vUv + wob;
   // (PAINTER 19, the soft enlargement. At the lowest tier at half scale the scene is drawn at under a third of the
   // sheet's size, and a plain bilinear lookup enlarged every stair of an aliased edge into a block three pixels a
@@ -223,7 +274,7 @@ void main() {
   float laid = 1.0;
   if (uLaid < 0.999) {
     // (slowly: no part of the sheet changes by more than a thirtieth of its depth in a thirtieth of a second)
-    float when = 0.11 * (1.0 - vUv.y) + 0.07 * plo.r + 0.02 * pmid.r;
+    float when = 0.11 * (1.0 - vUv.y) + 0.07 * ploR + 0.02 * pmidR;
     laid = smoothstep(0.0, 1.0, uLaid * 1.2 - when);
     col = mix(vec3(1.0), col, laid);
     wet *= laid;
@@ -263,7 +314,6 @@ void main() {
   float edge = pool * 3.2 + fineP * uPoolFine + smoothstep(0.03, 0.45, grad) * 0.35;
 
   // granulation: pigment settles into the valleys of the paper, strongest in darks and wets
-  float ph = paper.r;
   // fine pits show in light washes; dark passages keep only the broad settling
   // In light and middle washes the pigment sits in the pits of the paper: a fine speckle. In
   // a dark wash the pits are full: what shows there is the broad soft settling of the pigment
@@ -274,22 +324,20 @@ void main() {
   float gl = dot(uGrade, W);
   float dark = 1.0 - smoothstep(0.42, 0.80, lum * gl);
   dark = max(dark, uWxSheet.x * 1.15 * (1.0 - smoothstep(0.50, 0.88, lum)));     // under a storm key the middle washes are dark too
-  vec4 psoft = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 3.6);
-  float pfine = texture(tPaper, puv, 1.5).r, pmed = texture(tPaper, puv * 0.47 + 0.11 + uBoil, 1.2).r;
   float pits = (0.52 - pfine) * 0.36 * smoothstep(0.10, 0.42, lum) + (0.5 - pmed) * 0.85;
-  float settle = (0.5 - psoft.r) * 0.7 + (0.5 - plo.r) * 0.8;
+  float settle = (0.5 - psoftR) * 0.7 + (0.5 - ploR) * 0.8;
   dark = min(dark, 1.0);
-  float gran = (mix(pits, settle, dark) + (0.5 - plo.r) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet) * mix(1.0, 0.4, dark);
+  float gran = (mix(pits, settle, dark) + (0.5 - ploR) * 0.35) * (0.22 + 0.85 * (1.0 - lum) * smoothstep(0.02, 0.30, lum)) * (0.55 + 0.8 * wet) * mix(1.0, 0.4, dark);
   gran *= 1.0 - 0.5 * uWxSheet.x;
-  float d = 1.0 + uPig.x * edge + uPig.y * gran + (plo.g - 0.5) * 0.10;
+  float d = 1.0 + uPig.x * edge + uPig.y * gran + (ploG - 0.5) * 0.10;
   // a storm shifts the whole key: every wash carries more pigment (richer, not greyer)
   // (PAINTER 16/17, the M4 critique's second item: at its full weight the key laid a thunderstorm at three in the afternoon
   // as dark as midnight, median L* 27; a rain study is a light picture. A little over half of it: the wood and the meadow
   // keep their steps and the storm is told by the sky's wash, the veil and the rain)
-  d += uWxSheet.x * 0.55 * (0.75 + 0.5 * plo.r);
+  d += uWxSheet.x * 0.55 * (0.75 + 0.5 * ploR);
   // (night, PAINTER 16: the moon models the land in the materials now, chunks.js pcLevel, so the key only deepens the
   // washes a little; it was 0.68 to 0.94, which ran every middle value down into one dark, 80 % of the frame within 7 L*)
-  d += uNight * (0.30 + 0.20 * plo.r) * (1.0 - lamp);
+  d += uNight * (0.30 + 0.20 * ploR) * (1.0 - lamp);
   // (PAINTER 19, the blind player's UGLY 9: Mars by night was one blue-grey wash from the sky to the boots. A nocturne
   // is darkest at the feet: the land within about twenty metres takes a deeper wash, easing out by 160 m, so that the
   // near ground, the middle distance and the sky's lighter band are three washes. It is laid as a graded wash over
@@ -307,15 +355,16 @@ void main() {
   float b = min(bd.x, bd.y);
   float corner = smoothstep(0.0, 0.08, bd.x) * smoothstep(0.0, 0.08, bd.y);
   // (the edge of a dark wash is ragged in broad pieces only: fine tooth there is a row of dots)
-  float bn = b + (plo.g - 0.5) * uBorder.y + (mix(pmid.g, psoft.g, dark) - 0.5) * uBorder.y * 0.45 + (paper.g - 0.5) * 0.006 * (1.0 - dark) - (1.0 - corner) * 0.012;
+  // (R1 W2.4: the paper's terms, PAPER_STATIC, gathered by what the dark wash changes)
+  float bn = b + (ploG - 0.5) * uBorder.y + (pmidG - 0.5) * uBorder.y * 0.45 + bnP0 - (1.0 - corner) * 0.012 + dark * (bnPD - pmidG * uBorder.y * 0.45);
   float painted = mix(1.0, smoothstep(uBorder.x * 0.72, uBorder.x, bn), uBorder.w);
   float lip = (1.0 - smoothstep(uBorder.x, uBorder.x * 2.2, bn)) * painted * uBorder.w;
   // (a dark wash does not pool again where it stops: under the storm's key the border was a dirty grey rim round the sheet)
-  d += lip * uBorder.z * (0.4 + 0.6 * plo.r) * mix(1.0, 0.25, dark);
+  d += lip * uBorder.z * (0.4 + 0.6 * ploR) * mix(1.0, 0.25, dark);
   // dry edge: near the border the brush skips the paper's peaks
   // (a loaded dark wash skips far less: a few broad flecks of paper, never a pale rim with dark specks in it)
-  float skL = smoothstep(0.46, 0.62, mix(ph, pmid.r, 0.65));
-  float skD = smoothstep(0.63, 0.72, psoft.r * 0.6 + plo.r * 0.4 + (pmed - 0.5) * 0.2) * 0.55;
+  float skL = smoothstep(0.46, 0.62, mix(ph, pmidR, 0.65));
+  float skD = smoothstep(0.63, 0.72, s1 + ploR * 0.4) * 0.55;
   float skip = (1.0 - smoothstep(uBorder.x * 0.9, uBorder.x * 1.6, bn)) * mix(skL, skD, dark) * uBorder.w;
 
   col = clamp(col - (col - col * col) * (d - 1.0), 0.0, 1.0);
@@ -334,7 +383,7 @@ void main() {
   float fol = max(step(3.5, a0.w) * step(a0.w, 4.99), max(step(3.5, a1.w) * step(a1.w, 4.99), step(3.5, a2.w) * step(a2.w, 4.99)));
   float line = max(smoothstep(0.14, 0.38, dz) * 0.6, min(idc, 1.0) * 0.38) * (1.0 - fol * 0.85);
   line *= 1.0 - max(step(5.5, a0.w), max(step(5.5, a1.w), step(5.5, a2.w)));   // nothing is outlined in the air
-  line *= smoothstep(0.50, 0.70, plo.r + (pmid.r - 0.5) * 0.7) * (0.30 + 0.70 * smoothstep(0.35, 0.6, ph)) * (1.0 - smoothstep(6.5, 9.5, a0.z));
+  line *= smoothstep(0.50, 0.70, ploR + (pmidR - 0.5) * 0.7) * (0.30 + 0.70 * smoothstep(0.35, 0.6, ph)) * (1.0 - smoothstep(6.5, 9.5, a0.z));
   col *= mix(vec3(1.0), vec3(0.46, 0.46, 0.50), line * uPig.w * laid);
 
   // lightning: for a frame or two the paper shows through. The sky and the lights go bare,
@@ -355,7 +404,7 @@ void main() {
   // into one narrow band, which was most of why the land at night was one value)
   if (uNight > 0.003) {
     float land = step(0.5, auxU.w) * (1.0 - lamp);
-    vec3 toe = vec3(0.16, 0.175, 0.27) + 0.025 * (psoft.r - 0.5);
+    vec3 toe = vec3(0.16, 0.175, 0.27) + 0.025 * (psoftR - 0.5);
     vec3 c2 = col * col, t2 = toe * toe;
     col = mix(col, sqrt(sqrt(c2 * c2 + t2 * t2)), uNight * land * laid);
   }
@@ -364,15 +413,15 @@ void main() {
   // gentle toe, so a cliff in a gale is dense indigo with its steps still in it)
   if (uWxSheet.x > 0.003) {
     float landS = step(0.5, auxU.w);
-    vec3 toeS = vec3(0.12, 0.13, 0.21) + 0.02 * (psoft.r - 0.5);
+    vec3 toeS = vec3(0.12, 0.13, 0.21) + 0.02 * (psoftR - 0.5);
     col = max(col, mix(col, toeS + col * (1.0 - toeS / 0.55), min(uWxSheet.x, 1.0) * landS * laid));
   }
   // nothing is pure black: the darkest darks are dense indigo and sepia
-  col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoft.r - 0.5) + uNight * vec3(0.035, 0.045, 0.075));
+  col = max(col, vec3(0.085, 0.09, 0.145) + 0.03 * (psoftR - 0.5) + uNight * vec3(0.035, 0.045, 0.075));
   col = mix(vec3(1.0), col, painted * (1.0 - skip * 0.8));
 
   // paper: warm off-white, lit so its tooth shows faintly even where it is bare
-  float relief = (ph - 0.5) * 0.055 * mix(1.0, 0.35, dark) + (plo.g - 0.5) * 0.02;
+  float relief = (ph - 0.5) * 0.055 * mix(1.0, 0.35, dark) + (ploG - 0.5) * 0.02;
   // the last glaze over the sheet (night indigo, dusk gold); at night what was reserved stays paper
   float reserve = max(max(smoothstep(0.90, 0.985, dot(col, W)) * uNight, lamp), min(uWxSheet.y, 1.0) * smoothstep(0.45, 0.80, dot(col, W)));
   vec3 outc = uPaperColor * col * (1.0 + relief) * mix(vec3(1.0), mix(uGrade, vec3(1.0), reserve), painted);
@@ -433,8 +482,18 @@ export class Post {
       { tAbs: { value: this.rtAbs.texture }, tAux: { value: this.rtScene.textures[1] } });
     G.uPrevTex.value = this.rtPrev.texture;
     this.prevFrames = 0;
+    this.waterLast = false;
+    // (R1 W2.4: the scene's second target cleared to what the backdrop pass wrote: normal 0, log depth 20, region 0 (the
+    // sky); the 8-bit fallback's packed value)
+    this.auxClear = new Float32Array(this.floatFallback ? [0.5, 0.5, 20 / 32, 0] : [0, 0, 20, 0]);
 
-    this.mBackdrop = fsMaterial(BACKDROP_FRAG, { uAux8: G.uAux8 });
+    // (R1 W2.4) the paper under every pixel of the sheet, laid once per size (PAPER_FRAG): steep values in half floats,
+    // the rest 8-bit; none where the browser cannot draw into float targets (the sheet reads the paper itself there)
+    this.paperBaked = !this.floatFallback;
+    this.rtPaper = new THREE.WebGLRenderTarget(2, 2, { count: 2, depthBuffer: false, type: THREE.UnsignedByteType });
+    this.rtPaper.textures[0].type = THREE.HalfFloatType;
+    for (const t of this.rtPaper.textures) { t.minFilter = THREE.NearestFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; }
+    this.paperAt = [0, 0, NaN, NaN, NaN, NaN];
     this.mPrep = fsMaterial(PREP_FRAG, { tScene: { value: this.rtScene.textures[0] }, uTexel: { value: new THREE.Vector2() } });
     this.absUniforms = {
       tScene: { value: this.rtScene.textures[0] }, tAux: { value: this.rtScene.textures[1] },
@@ -458,7 +517,10 @@ export class Post {
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
       uNight: { value: 0 }, uNightNear: { value: 0 }, uLaid: { value: 1 }, uAux8: G.uAux8,
     };
-    this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms);
+    Object.assign(this.sheetUniforms, { tPap0: { value: this.rtPaper.textures[0] }, tPap1: { value: this.rtPaper.textures[1] } });
+    this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms, this.paperBaked ? { defines: { PC_PAPER_BAKED: 1 } } : null);
+    this.mPaper = fsMaterial(PAPER_FRAG, { tPaper: this.sheetUniforms.tPaper, uOutRes: this.sheetUniforms.uOutRes, uBoil: this.sheetUniforms.uBoil, uBorder: this.sheetUniforms.uBorder });
+    this.mPaper.name = 'paper-bake';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`
       uniform sampler2D tA; uniform highp sampler2D tB; uniform int uMode; varying vec2 vUv;
@@ -480,6 +542,7 @@ export class Post {
     this.rtFull.setSize(inW, inH);
     this.rtAbs.setSize(inW, inH);
     this.rtPrev.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
+    if (this.paperBaked) this.rtPaper.setSize(outW, outH);
     this.prevFrames = 0; G.uPrevOn.value = 0;
     this.mPrep.uniforms.uTexel.value.set(1 / inW, 1 / inH);
     this.absUniforms.uTexel.value.set(1 / inW, 1 / inH);
@@ -501,8 +564,18 @@ export class Post {
     r.setRenderTarget(this.rtScene);
     r.setClearColor(0xffffff, 1);
     r.clear(true, true, true);
-    this.tri.material = this.mBackdrop;
-    r.render(this.tri, this.cam);
+    // (R1 W2.4: the backdrop was a pass over the whole picture writing white and this value; a clear does the same)
+    const gl = r.getContext();
+    gl.clearBufferfv(gl.COLOR, 1, this.auxClear);
+    PREV.water = false;
+  }
+
+  // (R1 W2.4) the paper laid again when the sheet's size or the paper's own settings changed
+  _paper() {
+    const a = this.paperAt, u = this.sheetUniforms, bo = u.uBoil.value, br = u.uBorder.value;
+    if (a[0] === this.outW && a[1] === this.outH && a[2] === bo.x && a[3] === bo.y && a[4] === br.x && a[5] === br.y) return;
+    a[0] = this.outW; a[1] = this.outH; a[2] = bo.x; a[3] = bo.y; a[4] = br.x; a[5] = br.y;
+    this._pass(this.mPaper, this.rtPaper);
   }
 
   // glazes: objects drawn over the brushed picture (see shared.js GLAZES), with the scene's camera
@@ -516,8 +589,15 @@ export class Post {
       r.setRenderTarget(this.rtAbs);
       for (const o of glazes) { o.visible = true; r.render(o, camera); }
     }
-    this._pass(this.mKeep, this.rtPrev);
-    this.prevFrames++;
+    // last frame's painting for the water's reflections (R1 W2.4: only while water is drawn, and the frame after it went,
+    // so a frame or two without water costs nothing and a gap of one frame keeps the reflections; where it was not kept
+    // the frame before, the water reflects nothing for a frame rather than an old picture)
+    const water = PREV.water;
+    if (water || this.waterLast) {
+      this._pass(this.mKeep, this.rtPrev);
+      this.prevFrames++;
+    } else this.prevFrames = 0;
+    this.waterLast = water;
     G.uPrevOn.value = this.prevFrames >= 1 ? 1 : 0;
     if (this.debugView) {
       const m = this.mCopy;
@@ -526,20 +606,23 @@ export class Post {
       if (this.debugView === 5) m.uniforms.uMode.value = 1;
       this._pass(m, null);
     } else {
+      if (this.paperBaked) this._paper();
       this._pass(this.mSheet, null);
     }
   }
 
   // The brush's passes that are not drawn every frame laid once into a 2 x 2 sheet (PILOT's P3), so that
   // none is first built mid-game: the four-sector brush is otherwise first drawn at the lowest tier, when
-  // the machine is already struggling. (The prep, keep and backdrop passes run from the first frame.)
+  // the machine is already struggling. (The prep and keep passes run from the first frame; the paper is laid when the
+  // sheet first is.)
   warm() {
     const t = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: THREE.UnsignedByteType });
     for (const m of [this.mPrepF, this.mAbs[4], this.mAbs[8], this.mSheet]) this._pass(m, t);
     t.dispose();
+    if (this.paperBaked) { this.paperAt[0] = 0; this._paper(); }
   }
 
   dispose() {
-    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtFull.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose();
+    this.rtScene.dispose(); this.rtHalf.dispose(); this.rtFull.dispose(); this.rtAbs.dispose(); this.rtPrev.dispose(); this.rtPaper.dispose();
   }
 }
