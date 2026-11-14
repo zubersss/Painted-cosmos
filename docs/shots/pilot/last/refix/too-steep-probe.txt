@@ -1,0 +1,2 @@
+saturn honey_mist: 520 hover spots (60 m up, every 150 m within 6000 m of the spawn); "too steep" at 48 (9.2 %)
+  of those, flying on 100 to 160 m finds ground that holds on 297 of 384 headings (77 %); on at least one heading at 48 of 48

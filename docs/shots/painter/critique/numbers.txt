@@ -1,0 +1,184 @@
+PAINTER critic (M4): how much the picture changes from frame to frame. flick.py (scripts/): per pair of frames, the mean absolute change of L* (0..100), the share of pixels whose L* moved by more than 6 and by more than 12, the 99th percentile; 'there-and-back': pixels that moved by more than 6 in one frame and had more than half of it undone in the next (flicker).
+All frames: the real game, a clean export of 16bb0d7, quality 2, 960x540, canvas only (no HUD).
+
+== a03-idle: the spawn in the first seconds of a new game, six consecutive frames (1/30 s), wind 1.3 to 1.6 m/s
+0->1: mean dL 0.35  >6: 0.2 %  >12: 0.0 %  p99 2.8
+1->2: mean dL 0.35  >6: 0.2 %  >12: 0.1 %  p99 2.9
+2->3: mean dL 0.35  >6: 0.2 %  >12: 0.0 %  p99 2.9
+3->4: mean dL 0.35  >6: 0.2 %  >12: 0.0 %  p99 3.0
+4->5: mean dL 0.34  >6: 0.2 %  >12: 0.0 %  p99 2.9
+first->last: mean dL 0.48  >6: 0.7 %  >12: 0.2 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.1 % 0.1 % 0.0 % 0.1 %
+
+== b00-calm-slow: the spawn at the clock's 42 s, eight frames 0.5 s apart, wind 1.6 to 2.3 m/s (whole frame)
+0->1: mean dL 0.59  >6: 0.9 %  >12: 0.3 %  p99 5.7
+1->2: mean dL 0.57  >6: 0.8 %  >12: 0.2 %  p99 5.2
+2->3: mean dL 0.57  >6: 0.7 %  >12: 0.2 %  p99 5.0
+3->4: mean dL 0.60  >6: 1.0 %  >12: 0.3 %  p99 5.9
+4->5: mean dL 0.58  >6: 0.8 %  >12: 0.2 %  p99 5.3
+5->6: mean dL 0.58  >6: 0.8 %  >12: 0.2 %  p99 5.3
+6->7: mean dL 0.60  >6: 0.9 %  >12: 0.3 %  p99 5.7
+first->last: mean dL 0.81  >6: 1.8 %  >12: 0.4 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.4 % 0.3 % 0.3 % 0.4 % 0.2 % 0.3 %
+
+== the same, the grass at the left foreground (crop 60,330,400,180)
+0->1: mean dL 0.49  >6: 0.4 %  >12: 0.1 %  p99 4.0
+1->2: mean dL 0.47  >6: 0.3 %  >12: 0.0 %  p99 3.6
+2->3: mean dL 0.49  >6: 0.4 %  >12: 0.1 %  p99 3.8
+3->4: mean dL 0.48  >6: 0.3 %  >12: 0.0 %  p99 3.9
+4->5: mean dL 0.50  >6: 0.5 %  >12: 0.1 %  p99 4.1
+5->6: mean dL 0.53  >6: 0.5 %  >12: 0.1 %  p99 4.5
+6->7: mean dL 0.51  >6: 0.5 %  >12: 0.1 %  p99 4.2
+first->last: mean dL 0.75  >6: 1.6 %  >12: 0.4 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.1 % 0.1 % 0.1 % 0.1 % 0.1 % 0.1 %
+
+== b00-calm-crowns: looking up into the crowns, six frames 0.5 s apart
+0->1: mean dL 0.73  >6: 1.8 %  >12: 0.5 %  p99 8.8
+1->2: mean dL 0.71  >6: 1.7 %  >12: 0.5 %  p99 8.4
+2->3: mean dL 0.76  >6: 2.0 %  >12: 0.6 %  p99 9.4
+3->4: mean dL 0.70  >6: 1.6 %  >12: 0.5 %  p99 8.0
+4->5: mean dL 0.72  >6: 1.7 %  >12: 0.5 %  p99 8.5
+first->last: mean dL 1.04  >6: 2.8 %  >12: 0.9 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.5 % 0.9 % 0.7 % 0.6 %
+
+== b02-storm: the thunderstorm at the spawn (clock 200 s, rain 0.89), eight consecutive frames
+0->1: mean dL 0.37  >6: 0.4 %  >12: 0.1 %  p99 3.3
+1->2: mean dL 0.37  >6: 0.4 %  >12: 0.1 %  p99 3.4
+2->3: mean dL 0.38  >6: 0.4 %  >12: 0.1 %  p99 3.5
+3->4: mean dL 0.38  >6: 0.4 %  >12: 0.1 %  p99 3.5
+4->5: mean dL 0.39  >6: 0.4 %  >12: 0.1 %  p99 3.7
+5->6: mean dL 0.39  >6: 0.5 %  >12: 0.1 %  p99 3.7
+6->7: mean dL 0.38  >6: 0.4 %  >12: 0.1 %  p99 3.5
+first->last: mean dL 0.62  >6: 1.2 %  >12: 0.3 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.1 % 0.1 % 0.1 % 0.1 % 0.1 % 0.1 %
+
+== b03-storm-slow: the same, six frames 0.4 s apart (wind 2 to 9 m/s)
+0->1: mean dL 0.68  >6: 1.4 %  >12: 0.3 %  p99 7.1
+1->2: mean dL 0.70  >6: 1.5 %  >12: 0.3 %  p99 7.3
+2->3: mean dL 0.72  >6: 1.6 %  >12: 0.3 %  p99 7.6
+3->4: mean dL 0.73  >6: 1.6 %  >12: 0.3 %  p99 7.8
+4->5: mean dL 0.80  >6: 1.7 %  >12: 0.4 %  p99 7.8
+first->last: mean dL 0.92  >6: 2.1 %  >12: 0.4 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.7 % 0.7 % 0.7 % 0.6 %
+
+== b06-storm-crowns: looking up in the storm, six consecutive frames
+0->1: mean dL 0.57  >6: 1.2 %  >12: 0.3 %  p99 6.6
+1->2: mean dL 0.58  >6: 1.2 %  >12: 0.3 %  p99 6.8
+2->3: mean dL 0.57  >6: 1.3 %  >12: 0.3 %  p99 6.8
+3->4: mean dL 0.57  >6: 1.2 %  >12: 0.3 %  p99 6.8
+4->5: mean dL 0.56  >6: 1.1 %  >12: 0.2 %  p99 6.4
+first->last: mean dL 1.00  >6: 3.3 %  >12: 1.1 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.3 % 0.3 % 0.3 % 0.3 %
+
+== b07-storm-crowns-slow: four frames 0.4 s apart, the crowns (crop 520,40,400,330)
+0->1: mean dL 1.91  >6: 7.6 %  >12: 2.5 %  p99 18.1
+1->2: mean dL 1.78  >6: 7.0 %  >12: 2.1 %  p99 16.1
+2->3: mean dL 1.81  >6: 7.4 %  >12: 2.4 %  p99 17.0
+first->last: mean dL 2.60  >6: 11.8 %  >12: 4.8 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 2.5 % 2.3 %
+
+== b31-sea: Earth's coast at the clock's 600 s (wind 7 m/s), six consecutive frames, the sea (crop 30,225,900,110)
+0->1: mean dL 0.66  >6: 0.1 %  >12: 0.0 %  p99 3.4
+1->2: mean dL 0.50  >6: 0.0 %  >12: 0.0 %  p99 2.8
+2->3: mean dL 0.50  >6: 0.0 %  >12: 0.0 %  p99 2.8
+3->4: mean dL 0.51  >6: 0.0 %  >12: 0.0 %  p99 2.8
+4->5: mean dL 0.51  >6: 0.0 %  >12: 0.0 %  p99 2.9
+first->last: mean dL 1.13  >6: 0.7 %  >12: 0.0 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.0 % 0.0 % 0.0 % 0.0 %
+
+== b32-sea-slow: six frames 0.5 s apart, the sea (same crop)
+0->1: mean dL 1.52  >6: 2.1 %  >12: 0.1 %  p99 7.3
+1->2: mean dL 1.73  >6: 2.8 %  >12: 0.1 %  p99 7.7
+2->3: mean dL 1.60  >6: 2.0 %  >12: 0.0 %  p99 7.0
+3->4: mean dL 1.40  >6: 1.2 %  >12: 0.0 %  p99 6.2
+4->5: mean dL 1.32  >6: 1.1 %  >12: 0.1 %  p99 6.1
+first->last: mean dL 2.41  >6: 7.8 %  >12: 0.8 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.7 % 1.0 % 0.5 % 0.4 %
+
+== b32-sea-slow: the sky with the hanging leaves and tufts (crop 30,30,900,190): nothing moves in 2.5 s
+0->1: mean dL 0.04  >6: 0.0 %  >12: 0.0 %  p99 0.7
+1->2: mean dL 0.04  >6: 0.0 %  >12: 0.0 %  p99 0.7
+2->3: mean dL 0.04  >6: 0.0 %  >12: 0.0 %  p99 0.7
+3->4: mean dL 0.04  >6: 0.0 %  >12: 0.0 %  p99 0.7
+4->5: mean dL 0.04  >6: 0.0 %  >12: 0.0 %  p99 0.7
+first->last: mean dL 0.07  >6: 0.0 %  >12: 0.0 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.0 % 0.0 % 0.0 % 0.0 %
+
+== b39-storm-sea: Earth's coast in its storm (clock 8844 s, wind 12 to 14 m/s), six consecutive frames, the sea (crop 30,225,900,110)
+0->1: mean dL 0.56  >6: 0.3 %  >12: 0.0 %  p99 3.4
+1->2: mean dL 0.56  >6: 0.3 %  >12: 0.0 %  p99 3.5
+2->3: mean dL 0.56  >6: 0.4 %  >12: 0.1 %  p99 3.4
+3->4: mean dL 0.58  >6: 0.4 %  >12: 0.1 %  p99 3.5
+4->5: mean dL 0.57  >6: 0.4 %  >12: 0.0 %  p99 3.5
+first->last: mean dL 1.50  >6: 2.4 %  >12: 0.2 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.1 % 0.1 % 0.1 % 0.1 %
+
+== b39-storm-sea-slow: six frames 0.5 s apart, the sea
+0->1: mean dL 3.16  >6: 14.1 %  >12: 2.1 %  p99 14.5
+1->2: mean dL 3.59  >6: 18.3 %  >12: 3.7 %  p99 17.1
+2->3: mean dL 3.71  >6: 18.2 %  >12: 4.9 %  p99 19.7
+3->4: mean dL 3.78  >6: 18.3 %  >12: 5.0 %  p99 21.3
+4->5: mean dL 3.58  >6: 17.8 %  >12: 4.0 %  p99 18.8
+first->last: mean dL 4.54  >6: 28.2 %  >12: 6.4 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 3.6 % 4.8 % 4.1 % 4.2 %
+
+== b41-snow: the blizzard on the alpine meadow (wind 13 to 14 m/s, snowfall 0.99), six consecutive frames
+0->1: mean dL 0.36  >6: 1.1 %  >12: 0.5 %  p99 6.4
+1->2: mean dL 0.33  >6: 1.0 %  >12: 0.5 %  p99 5.7
+2->3: mean dL 0.31  >6: 0.9 %  >12: 0.5 %  p99 5.1
+3->4: mean dL 0.32  >6: 0.9 %  >12: 0.5 %  p99 5.4
+4->5: mean dL 0.37  >6: 1.1 %  >12: 0.6 %  p99 6.8
+first->last: mean dL 0.47  >6: 1.4 %  >12: 0.7 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.4 % 0.4 % 0.4 % 0.4 %
+
+== b53-gale-sea: Neptune's sea in its squall, six consecutive frames, the sea (crop 30,180,900,90)
+0->1: mean dL 0.28  >6: 0.2 %  >12: 0.0 %  p99 2.8
+1->2: mean dL 0.27  >6: 0.1 %  >12: 0.0 %  p99 2.5
+2->3: mean dL 0.25  >6: 0.1 %  >12: 0.0 %  p99 2.5
+3->4: mean dL 0.25  >6: 0.1 %  >12: 0.0 %  p99 2.5
+4->5: mean dL 0.24  >6: 0.1 %  >12: 0.0 %  p99 2.2
+first->last: mean dL 0.48  >6: 0.8 %  >12: 0.2 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.0 % 0.0 % 0.0 % 0.0 %
+
+== b61-dust: Mars' dunes in the dust storm (wind 14 to 17 m/s), six consecutive frames
+0->1: mean dL 0.67  >6: 2.5 %  >12: 0.7 %  p99 10.1
+1->2: mean dL 0.59  >6: 2.1 %  >12: 0.5 %  p99 9.1
+2->3: mean dL 0.51  >6: 1.5 %  >12: 0.4 %  p99 7.6
+3->4: mean dL 0.49  >6: 1.4 %  >12: 0.3 %  p99 7.3
+4->5: mean dL 0.54  >6: 1.7 %  >12: 0.4 %  p99 8.1
+first->last: mean dL 1.49  >6: 8.4 %  >12: 2.8 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.5 % 0.2 % 0.3 % 0.3 %
+
+== b71-reeds: Saturn's crystal reeds (wind 20 to 24 m/s), six consecutive frames
+0->1: mean dL 0.47  >6: 0.9 %  >12: 0.2 %  p99 5.6
+1->2: mean dL 0.47  >6: 1.0 %  >12: 0.3 %  p99 5.9
+2->3: mean dL 0.46  >6: 0.9 %  >12: 0.2 %  p99 5.8
+3->4: mean dL 0.45  >6: 0.8 %  >12: 0.2 %  p99 5.4
+4->5: mean dL 0.44  >6: 0.8 %  >12: 0.2 %  p99 5.2
+first->last: mean dL 0.88  >6: 3.1 %  >12: 1.1 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 0.1 % 0.1 % 0.1 % 0.1 %
+
+== b71-reeds-slow: six frames 1/3 s apart (wind 11 to 22 m/s)
+0->1: mean dL 1.48  >6: 6.3 %  >12: 2.9 %  p99 21.4
+1->2: mean dL 1.58  >6: 6.5 %  >12: 3.1 %  p99 23.3
+2->3: mean dL 1.46  >6: 5.9 %  >12: 2.8 %  p99 21.9
+3->4: mean dL 1.18  >6: 4.6 %  >12: 1.8 %  p99 16.8
+4->5: mean dL 1.15  >6: 4.5 %  >12: 1.7 %  p99 15.9
+first->last: mean dL 1.98  >6: 8.6 %  >12: 4.7 %
+there-and-back (moved by more than 6 in one frame, more than half undone in the next): 2.3 % 2.4 % 2.1 % 2.2 %
+
+== the wind where the explorer stands (m/s), frame by frame, from the game (physics.here.air.speed)
+a03-idle dt between frames 0.033 s: 1.9 1.88 1.89 1.94 2.01 2.04 | weather: breeze
+b00-calm-slow dt between frames 0.500 s: 1.71 2.04 2.3 1.77 1.66 1.62 1.79 1.59 | weather: breeze
+b02-storm dt between frames 0.033 s: 4.54 3.77 3.78 4.57 5.22 4.85 4.04 5.27 | weather: thunderstorm
+b03-storm-slow dt between frames 0.400 s: 1.9 6.66 7.37 8.77 6.95 8.51 | weather: thunderstorm
+b07-storm-crowns-slow dt between frames 0.400 s: 3.95 1.76 2.58 2.11 | weather: thunderstorm
+b32-sea-slow dt between frames 0.500 s: 6.01 6.95 7.45 5.02 6.11 6.75 | weather: windy
+b39-storm-sea dt between frames 0.033 s: 13.22 12.48 12.21 12.98 13.84 14.18 | weather: rain
+b41-snow dt between frames 0.033 s: 14.15 13.17 12.89 14.44 13.52 12.6 | weather: blizzard
+b51-gale dt between frames 0.100 s: 77.08 61.17 52.15 68.92 25.4 12.23 24.42 15.36 | weather: thunderstorm
+b52-gale-walk dt between frames 0.167 s: 27.73 14.29 33.08 42.46 34.6 48.75 107.54 76.99 | weather: thunderstorm
+b54-gale-ship dt between frames 0.100 s: 170.5 221.58 164.36 160.69 157.95 154.76 169.69 121.75 | weather: thunderstorm
+b61-dust dt between frames 0.033 s: 15.48 16.41 15.57 14.38 15.02 16.56 | weather: dust storm
+b71-reeds dt between frames 0.033 s: 19.97 21.95 22.95 23.92 22.75 20.25 | weather: windy
+b71-reeds-slow dt between frames 0.333 s: 11.11 10.65 14.86 21.59 22.44 18.83 | weather: windy

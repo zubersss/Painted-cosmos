@@ -1,0 +1,36 @@
+exported 3066381 to /home/user/.pc-scratch/pilot/last/all/export
+22:43:08 unit ... pass (68 s) pass 208, fail 0
+22:44:17 physics-unit ... pass (157 s) pass 325, fail 0
+22:46:54 world-unit ... pass (10 s) pass 25, fail 0
+22:47:04 static ... pass (0 s) all rules hold
+22:47:04 play-stub ... pass (161 s) 39 checks
+22:49:45 play-physics ... pass (178 s) 39 checks
+22:52:44 trip-stub ... pass (381 s) 50 checks
+22:59:05 m3 ... pass (57 s) 33 checks
+23:00:01 lock ... pass (37 s) 14 checks
+23:00:38 audio ... pass (17 s) PASSED
+23:00:55 painted-play ... pass (245 s) 39 checks
+23:05:00 painted-trip ... pass (436 s) 50 checks
+23:12:16 painted-m3 ... pass (406 s) 33 checks
+
+==============================================================================
+Painted Cosmos: every check, exported 3066381 to /home/user/.pc-scratch/pilot/last/all/export
+==============================================================================
+PASS  unit             68 s  pass 208, fail 0
+PASS  physics-unit    157 s  pass 325, fail 0
+PASS  world-unit       10 s  pass 25, fail 0
+PASS  static            0 s  all rules hold
+PASS  play-stub       161 s  39 checks
+PASS  play-physics    178 s  39 checks
+PASS  trip-stub       381 s  50 checks
+PASS  m3               57 s  33 checks
+PASS  lock             37 s  14 checks
+PASS  audio            17 s  PASSED
+PASS  painted-play    245 s  39 checks
+PASS  painted-trip    436 s  50 checks
+PASS  painted-m3      406 s  33 checks
+------------------------------------------------------------------------------
+ALL 13 PASSED
+Not checked here, and not checkable in this sandbox: frame rate on a real GPU, a real mouse
+under pointer lock, a real gamepad, how the sound sounds.
+exit 0

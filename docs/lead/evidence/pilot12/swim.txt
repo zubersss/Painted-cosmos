@@ -1,0 +1,18 @@
+# head ca0b3db (PHYSICS 2f924cd, PILOT 904b6fe), clean export, Node
+# earth sea_coast: nearest water 2 m deep 24 m away, bearing 120
+## clock 30: weather breeze (0.27), wind 5.7 m/s, sea Hs 0.29 m, period 1.4 s
+  walk in (W) until afloat   6.0 s: 21.3 m made, pace mean 3.50 max 4.03 m/s; feet -1.19 .. 4001.94 m against the still level; swimming 0 %, grounded 100 %; modes {"idle":1,"walk":123,"wade":56}; depth 1.22
+  swim out (W)               12.0 s: 24.8 m made, pace mean 2.07 max 2.10 m/s; feet -1.37 .. -1.15 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":360}; depth 1.35
+  let go                     10.0 s: 0.5 m made, pace mean 0.08 max 2.07 m/s; feet -1.42 .. -1.02 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":300}; depth 1.29
+  swim (Shift+W)             6.0 s: 11.7 m made, pace mean 1.94 max 2.10 m/s; feet -1.53 .. -1.04 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":180}; depth 1.47
+  Space held                 2.0 s: 9.6 m made, pace mean 0.39 max 2.05 m/s; feet -1.47 .. 7.83 m against the still level; swimming 32 %, grounded 0 %; modes {"wade":5,"jet":55}; depth 0.00
+  after Space, let go        4.0 s: 9.9 m made, pace mean 0.59 max 1.08 m/s; feet -1.52 .. 12.80 m against the still level; swimming 21 %, grounded 0 %; modes {"jet":8,"fall":87,"wade":25}; depth 1.53
+  back to the shore (W)      21.6 s: 45.6 m made, pace mean 2.10 max 3.86 m/s; feet -1.57 .. -0.05 m against the still level; swimming 83 %, grounded 17 %; modes {"wade":634,"walk":15}; depth 0.03
+## clock 600: weather windy (0.34), wind 6.0 m/s, sea Hs 0.07 m, period 0.8 s
+  walk in (W) until afloat   6.2 s: 21.2 m made, pace mean 3.40 max 3.95 m/s; feet -1.17 .. 4001.94 m against the still level; swimming 0 %, grounded 100 %; modes {"idle":1,"walk":127,"wade":57}; depth 1.19
+  swim out (W)               12.0 s: 24.7 m made, pace mean 2.05 max 2.09 m/s; feet -1.55 .. -1.00 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":360}; depth 1.54
+  let go                     10.0 s: 0.5 m made, pace mean 0.09 max 2.05 m/s; feet -1.55 .. -0.93 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":300}; depth 1.18
+  swim (Shift+W)             6.0 s: 11.6 m made, pace mean 1.92 max 2.08 m/s; feet -1.52 .. -1.09 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":180}; depth 1.36
+  Space held                 2.0 s: 9.2 m made, pace mean 0.41 max 2.07 m/s; feet -1.36 .. 7.57 m against the still level; swimming 27 %, grounded 0 %; modes {"wade":5,"jet":55}; depth 0.00
+  after Space, let go        4.0 s: 9.9 m made, pace mean 0.96 max 1.66 m/s; feet -1.31 .. 12.50 m against the still level; swimming 21 %, grounded 0 %; modes {"jet":8,"fall":87,"wade":25}; depth 1.32
+  back to the shore (W)      20.3 s: 42.7 m made, pace mean 2.09 max 3.74 m/s; feet -1.44 .. -0.06 m against the still level; swimming 81 %, grounded 19 %; modes {"wade":593,"walk":17}; depth 0.04

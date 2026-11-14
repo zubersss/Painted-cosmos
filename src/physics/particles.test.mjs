@@ -1,0 +1,537 @@
+// Tests: rain and snow particles, footprints. Run: node --test src/physics/
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createPhysics } from './index.js';
+import { PARTICLES, EVENT } from './particles.js';
+import { cellsAt, weatherAt, DEFAULT_SEED } from './weather.js';
+import { MARK, MARK_STRIDE, DeformField, DEFORM } from './deform.js';
+import { BODIES } from '../data/bodies.js';
+import { makeWorld, V, norm, len, dot, epochP8 } from './testworld.mjs';
+
+// a physics instance centred where it is raining (or snowing) right now
+function rainy(bodyId = 'earth', { biome = 'alpine_meadow', pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 5, sea = 0 } = {}) {
+  const R = BODIES[bodyId].radius;
+  const sample = makeWorld({ R, biome, sea });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+  for (let t = 0; t < 8000; t += 53) for (const c of cellsAt(bodyId, t)) {
+    const w = weatherAt(bodyId, c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {});
+    if (pred(w)) return { physics, bodyId, focus: V(c.x * R, c.y * R, c.z * R), t0: t, R };
+  }
+  throw new Error('no such weather found on ' + bodyId);
+}
+function run(w, seconds, { hz = 60, each, disturbers } = {}) {
+  for (let i = 0; i < Math.round(seconds * hz); i++) {
+    w.t0 += 1 / hz;
+    w.physics.update(1 / hz, { bodyId: w.bodyId, time: w.t0, focus: w.focus, disturbers: disturbers ? disturbers(w.t0) : undefined });
+    if (each) each(w.t0);
+  }
+}
+function stats(buf, up) {
+  let vv = 0, vh = 0, n = buf.count;
+  for (let i = 0; i < n; i++) {
+    const vx = buf.vel[i * 3], vy = buf.vel[i * 3 + 1], vz = buf.vel[i * 3 + 2];
+    const d = vx * up.x + vy * up.y + vz * up.z;
+    vv += -d; vh += Math.hypot(vx - d * up.x, vy - d * up.y, vz - d * up.z);
+  }
+  return { fall: vv / n, drift: vh / n, n };
+}
+
+test('rain appears where it rains, in proportion, and drains away when it stops', () => {
+  const w = rainy();
+  run(w, 6);
+  const P = w.physics.particles, wx = w.physics.here.weather;
+  assert.equal(wx.precipitation.type, 'rain');
+  assert.ok(P.rain.count > 100, 'drops: ' + P.rain.count);
+  assert.ok(P.rain.count <= PARTICLES.capacity.rain[1]);
+  assert.equal(P.snow.count, 0);
+  // walk out of the weather: a clear sky has no rain
+  const far = norm(V(-w.focus.z, 0.3 * w.R, w.focus.x));
+  let clearAt = null;
+  for (let k = 0; k < 400 && !clearAt; k++) { const d = norm(V(far.x + k * 0.01, far.y, far.z - k * 0.007)); const c = weatherAt('earth', d.x, d.y, d.z, 0, w.t0, DEFAULT_SEED, { moist: 1 }, {}); if (c.precipitation.rate === 0) clearAt = V(d.x * w.R, d.y * w.R, d.z * w.R); }
+  w.focus = clearAt; run(w, 5);
+  assert.equal(w.physics.particles.rain.count, 0);
+});
+
+test('drops fall at the terminal speed of their size and slant with the wind', () => epochP8(() => {
+  const w = rainy();
+  run(w, 8);
+  const P = w.physics.particles, up = norm(w.focus);
+  const s = stats(P.rain, up), wx = w.physics.here.weather, air = w.physics.here.air;
+  // the population is a spread of sizes around the species diameter
+  assert.ok(s.fall > wx.precipitation.fallSpeed * 0.75 && s.fall < wx.precipitation.fallSpeed * 1.5, `mean fall ${s.fall} vs species ${wx.precipitation.fallSpeed}`);
+  assert.ok(s.fall > 4.5 && s.fall < 10, 'Earth rain: ' + s.fall);
+  // horizontal drift is the wind at drop height (2 m wind .. 20 m wind)
+  assert.ok(s.drift > air.speed * 0.5 && s.drift < air.speed * 2.2 + 0.5, `drift ${s.drift} vs wind ${air.speed}`);
+  for (let i = 0; i < P.rain.count * 3; i++) assert.ok(Number.isFinite(P.rain.pos[i]) && Number.isFinite(P.rain.vel[i]));
+  for (let i = 0; i < P.rain.count; i++) assert.ok(P.rain.size[i] > 0.0002 && P.rain.size[i] < 0.01);
+}));
+
+test('every drop stays inside the box around the focus, even when the focus races away', () => {
+  const w = rainy();
+  run(w, 4);
+  const up = norm(w.focus), e = norm(V(-up.z, 0, up.x));
+  // a ship at 60 m/s
+  run(w, 3, { each: () => { w.focus = V(w.focus.x + e.x, w.focus.y + e.y, w.focus.z + e.z); const r = len(w.focus); w.focus = V(w.focus.x * w.R / r, w.focus.y * w.R / r, w.focus.z * w.R / r); } });
+  const b = w.physics.particles.rain;
+  assert.ok(b.count > 50);
+  for (let i = 0; i < b.count; i++) {
+    const p = V(b.origin.x + b.pos[i * 3] - w.focus.x, b.origin.y + b.pos[i * 3 + 1] - w.focus.y, b.origin.z + b.pos[i * 3 + 2] - w.focus.z);
+    const upn = norm(w.focus), hgt = dot(p, upn), hor = Math.sqrt(Math.max(0, dot(p, p) - hgt * hgt));
+    assert.ok(hor < PARTICLES.radius * 1.5 + 2 && hgt < PARTICLES.height + 6 && hgt > -PARTICLES.below - 3, `drop ${i} at ${hor}, ${hgt}`);
+  }
+});
+
+test('drops splash where the ground is: events carry position, strength and time', () => {
+  // ((P21) on ground that shows a splash: the mud of a wetland in the rain; a meadow shows none, see P21 below)
+  const w = rainy('earth', { biome: 'misty_wetland' });
+  const E = w.physics.particles.events;
+  run(w, 6);
+  assert.ok(E.total > 50, 'splashes: ' + E.total);
+  for (let k = 0; k < Math.min(E.total, E.capacity); k++) {
+    const o = k * 8;
+    const p = V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2]);
+    assert.ok(Math.abs(len(p) - w.R) < 0.25, 'on the ground: ' + (len(p) - w.R));
+    assert.equal(E.data[o + 3], EVENT.splash);
+    assert.ok(E.data[o + 4] >= 0 && E.data[o + 4] <= 1 && E.data[o + 5] <= w.t0 + 1e-6);
+  }
+  // on water they are ripples
+  const s = rainy('earth', { sea: BODIES.earth.radius + 2 });
+  run(s, 5);
+  const Es = s.physics.particles.events;
+  assert.ok(Es.total > 20 && Es.data[3] === EVENT.ripple);
+  assert.ok(Math.abs(len(V(Es.origin.x + Es.data[0], Es.origin.y + Es.data[1], Es.origin.z + Es.data[2])) - s.R - 2) < 0.25, 'on the water surface');
+});
+
+test('snow: slow, fluttering, and it settles instead of splashing', () => {
+  // an alpine place in the cold: use the meadow biome on a tall world so the air is below freezing
+  const w = rainy('earth', { biome: 'stub-polar', pred: (x) => x.precipitation.rate > 4 });
+  run(w, 14);
+  const P = w.physics.particles, wx = w.physics.here.weather;
+  assert.equal(wx.precipitation.type, 'snow', 'it snows in the polar stub biome: ' + wx.kind + ' at ' + wx.temperature);
+  assert.ok(P.snow.count > 100 && P.rain.count === 0);
+  const s = stats(P.snow, norm(w.focus));
+  assert.ok(s.fall > 0.4 && s.fall < 2.6, 'snow falls at ' + s.fall);
+  const E = P.events; let settles = 0;
+  for (let k = 0; k < Math.min(E.total, E.capacity); k++) if (E.data[k * 8 + 3] === EVENT.settle) settles++;
+  assert.ok(settles > 0);
+  assert.ok(wx.snowDepth >= 0);
+});
+
+test('the same shower on other worlds: Neptune methane, Jupiter water', () => {
+  const n = rainy('neptune', { biome: 'storm_seas', pred: (x) => x.precipitation.type === 'rain' && x.precipitation.rate > 4 });
+  run(n, 6);
+  assert.equal(n.physics.particles.rain.species, 'methaneRain');
+  const sn = stats(n.physics.particles.rain, norm(n.focus));
+  assert.ok(sn.n > 50 && sn.fall > 3 && sn.fall < 14, 'Neptune rain falls at ' + sn.fall);
+  const j = rainy('jupiter', { biome: 'lightning_plains', pred: (x) => x.precipitation.type === 'rain' && x.precipitation.rate > 4 });
+  run(j, 6);
+  const sj = stats(j.physics.particles.rain, norm(j.focus));
+  const e = rainy(); run(e, 6);
+  const se = stats(e.physics.particles.rain, norm(e.focus));
+  // (the two showers are not equally heavy, so their drops are not the same size: compare
+  // the fall speed per root of drop diameter, which is what gravity and air density set)
+  const size = (b) => { let a = 0; for (let i = 0; i < b.count; i++) a += b.size[i]; return a / b.count; };
+  const kj = sj.fall / Math.sqrt(size(j.physics.particles.rain)), ke = se.fall / Math.sqrt(size(e.physics.particles.rain));
+  assert.ok(kj > ke * 1.3, `Jupiter (thinner air, stronger gravity) ${kj.toFixed(0)} vs Earth ${ke.toFixed(0)} m/s per root metre`);
+});
+
+test('stable at 20 Hz and with a hitch; quality changes the count', () => epochP8(() => {
+  const w = rainy();
+  run(w, 6, { hz: 20 });
+  const s = stats(w.physics.particles.rain, norm(w.focus));
+  assert.ok(s.fall > 4.5 && s.fall < 10);
+  w.physics.update(5, { bodyId: w.bodyId, time: w.t0 + 5, focus: w.focus }); w.t0 += 5;
+  run(w, 1);
+  for (let i = 0; i < w.physics.particles.rain.count * 3; i++) assert.ok(Number.isFinite(w.physics.particles.rain.pos[i]));
+  const lo = rainy(), hi = rainy(); lo.physics.setQuality(0); hi.physics.setQuality(2);
+  run(lo, 6); run(hi, 6);
+  assert.ok(hi.physics.particles.rain.count > lo.physics.particles.rain.count * 2);
+}));
+
+test('deterministic: two runs give identical buffers', () => {
+  const a = rainy(), b = rainy();
+  run(a, 3); run(b, 3);
+  assert.equal(a.physics.particles.rain.count, b.physics.particles.rain.count);
+  assert.deepEqual(Array.from(a.physics.particles.rain.pos.subarray(0, 300)), Array.from(b.physics.particles.rain.pos.subarray(0, 300)));
+});
+
+test('footprints: one per stride, alternating feet, deeper in snow than on rock, none in the air', () => epochP8(() => {
+  const walk = (bodyId, biome, speed, grounded = true) => {
+    const R = BODIES[bodyId].radius, sample = makeWorld({ R, biome });
+    const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+    let p = V(0, 0, R); const v = V(speed, 0, 0);
+    for (let i = 0; i < 600; i++) {
+      p = V(p.x + speed / 60, 0, p.z); const r = len(p); p = V(p.x * R / r, 0, p.z * R / r);
+      physics.update(1 / 60, { bodyId, time: 50 + i / 60, focus: p, disturbers: [{ kind: 'explorer', p, v, radius: 0.35, strength: 1, grounded }] });
+    }
+    return physics.fields.deform;
+  };
+  const sand = walk('earth', 'desert_canyon', 4.2), rock = walk('venus', 'pale_mesas', 4.2), air = walk('earth', 'desert_canyon', 4.2, false);
+  const moon = walk('moon', 'mare', 4.2);
+  assert.equal(rock.marks.total, 0, 'no prints on bare rock');
+  assert.equal(air.marks.total, 0, 'no prints while airborne');
+  const stride = 0.5 + 0.13 * 4.2;
+  assert.ok(Math.abs(sand.marks.total - 42 / stride) <= 2, `prints over 42 m: ${sand.marks.total} (stride ${stride})`);
+  assert.ok(moon.marks.total < sand.marks.total * 0.8, 'longer strides in low gravity: ' + moon.marks.total);
+  const d = sand.marks.data;
+  assert.ok(d[9] !== d[MARK_STRIDE + 9] && [MARK.footLeft, MARK.footRight].includes(d[9]), 'feet alternate');
+  assert.ok(d[8] > 0.03 && d[8] < 0.1, 'sand print depth ' + d[8]);
+  assert.ok(Math.abs(d[3] - 1) < 0.01, 'the print points the way you walk');
+  let any = 0; for (const x of sand.depth) if (x > 0) any++;
+  assert.ok(any > 4, 'a trail in the depth field');
+  assert.ok(sand.depthAt(V(sand.marks.origin.x + d[(sand.marks.head - 1) * MARK_STRIDE], sand.marks.origin.y + d[(sand.marks.head - 1) * MARK_STRIDE + 1], sand.marks.origin.z + d[(sand.marks.head - 1) * MARK_STRIDE + 2])) > 0.005);
+}));
+
+test('prints on loose ground have a rim; on mud they do not; the depth field piles up beside the trail', () => epochP8(() => {
+  const walk = (biome) => {
+    const R = BODIES.earth.radius, sample = makeWorld({ R, biome });
+    const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+    let p = V(0, 0, R); const v = V(4, 0, 0);
+    for (let i = 0; i < 300; i++) { p = V(p.x + 4 / 60, 0, p.z); const r = len(p); p = V(p.x * R / r, 0, p.z * R / r); physics.update(1 / 60, { bodyId: 'earth', time: 50 + i / 60, focus: p, disturbers: [{ kind: 'explorer', p, v, radius: 0.35, strength: 1, grounded: true }] }); }
+    return physics.fields.deform;
+  };
+  const sand = walk('desert_canyon'), mud = walk('misty_wetland');
+  const ds = sand.marks.data, dm = mud.marks.data;
+  assert.equal(sand.marks.stride, MARK_STRIDE);
+  assert.ok(Math.abs(ds[12] / ds[8] - 0.2) < 1e-6, 'sand rim is a fifth of the depth: ' + ds[12] / ds[8]);
+  assert.ok(dm[8] > 0.05 && dm[12] === 0, 'mud squeezes, it does not pile: depth ' + dm[8] + ' rim ' + dm[12]);
+  let lo = 0, hi = 0; for (const x of sand.depth) { if (x < lo) lo = x; if (x > hi) hi = x; }
+  assert.ok(hi > 0.02 && lo < -0.002, `trough ${hi} and pile ${lo}`);
+}));
+
+test('falling snow fills prints in; in clear weather they last over a minute', () => {
+  const snowy = rainy('earth', { biome: 'stub-polar', pred: (x) => x.precipitation.type === 'snow' && x.precipitation.rate > 4 });
+  const fr0 = () => snowy.physics.fields.frame;
+  run(snowy, 2);
+  const v = V(fr0().ex * 4, fr0().ey * 4, fr0().ez * 4);
+  let p = snowy.focus;
+  run(snowy, 3, { disturbers: () => { p = V(p.x + v.x / 60, p.y + v.y / 60, p.z + v.z / 60); const l = len(p); p = V(p.x * snowy.R / l, p.y * snowy.R / l, p.z * snowy.R / l); snowy.focus = p; return [{ kind: 'explorer', p, v, radius: 0.35, strength: 1, grounded: true }]; } });
+  const M = snowy.physics.fields.deform.marks;
+  assert.ok(M.total > 5);
+  const d0 = M.data[8];
+  assert.ok(d0 > 0.1, 'a deep print in snow: ' + d0);
+  run(snowy, 12);
+  assert.ok(M.data[8] < d0 * 0.9, `the first print is filling: ${d0} -> ${M.data[8]}`);
+  // the mechanism itself, with a steady snowfall of 1 mm of depth a second: hollows fill six times
+  // as fast as level ground gains snow, the rim shrinks with the print, and a filled print is over
+  const F = new DeformField(), fr = snowy.physics.fields.frame;
+  F.update(0, fr, 0, 0, null, null, 9, 0, null);
+  F._mark(fr, 1, 0, 1, 1, 0, 0.3, 0.12, 0.12, MARK.footLeft, 0, 100, 0.024); F._splat(1, 1, 0.12);
+  for (let i = 0; i < 10 * 60; i++) F.update(1 / 60, fr, 0, 0, null, null, 9, i / 60, { snow: 0.001, sand: 0 });
+  assert.ok(Math.abs(F.marks.data[8] - (0.12 - 10 * 0.001 * DEFORM.snowFill)) < 1e-4, 'after 10 s: ' + F.marks.data[8]);
+  assert.ok(Math.abs(F.marks.data[12] / F.marks.data[8] - 0.2) < 1e-4, 'the rim shrinks with it');
+  for (let i = 0; i < 15 * 60; i++) F.update(1 / 60, fr, 0, 0, null, null, 9, 10 + i / 60, { snow: 0.001, sand: 0 });
+  assert.equal(F.marks.data[8], 0); assert.equal(F.marks.data[11], 0, 'life over');
+  assert.equal(F.depthAt(1, 1), 0, 'and the trough is level again');
+  // blowing sand does the same
+  const G = new DeformField(); G.update(0, fr, 0, 0, null, null, 9, 0, null);
+  G._mark(fr, 1, 0, 1, 1, 0, 0.3, 0.12, 0.06, MARK.footLeft, 0, 100, 0.012);
+  for (let i = 0; i < 8 * 60; i++) G.update(1 / 60, fr, 0, 0, null, null, 9, i / 60, { snow: 0, sand: 1 });
+  assert.equal(G.marks.data[8], 0, 'a sandstorm erases a print in seconds');
+  // no weather: the same print is still there after a minute
+  const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+  // (at 30 degrees north, in the calm of the horse latitudes: no sand is blowing. P9: on Earth's clock as the
+  // game has it the one fixed longitude this used had weather of its own at t = 50 and the print was blown in,
+  // so the probe is the first longitude on that latitude with a light wind and nothing falling for the minute)
+  let q = null;
+  for (let k = 0; k < 24 && !q; k++) {
+    const a = k * Math.PI / 12, c = V(Math.sin(a) * Math.sqrt(0.75), 0.5, Math.cos(a) * Math.sqrt(0.75));
+    let calm = true;
+    for (const t of [50, 75, 100, 122]) { const w = weatherAt('earth', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 0.3, sun01: 0.5, wind: 4 }, {}); if (w.precipitation.rate > 0 || w.dust01 > 0.02 || w.storm01 > 0.05 || w.windFactor > 1.3) calm = false; }
+    if (calm) q = V(c.x * R, c.y * R, c.z * R);
+  }
+  assert.ok(q, 'a calm dry minute somewhere along 30 degrees north');
+  for (let i = 0; i < 120; i++) { q = V(q.x + 4 / 60, q.y, q.z); const r = len(q); q = V(q.x * R / r, q.y * R / r, q.z * R / r); physics.update(1 / 60, { bodyId: 'earth', time: 50 + i / 60, focus: q, disturbers: [{ kind: 'explorer', p: q, v: V(4, 0, 0), radius: 0.35, strength: 1, grounded: true }] }); }
+  const depth = physics.fields.deform.marks.data[8], born = physics.fields.deform.marks.data[10], life = physics.fields.deform.marks.data[11];
+  for (let i = 0; i < 70 * 20; i++) physics.update(1 / 20, { bodyId: 'earth', time: 52 + i / 20, focus: q });
+  assert.equal(physics.fields.deform.marks.data[8], depth);
+  assert.ok(life > 60 && born + life > 52 + 70, 'life ' + life);
+});
+
+test('the ship leaves three pad prints where it comes down, and a jet scours a dish with a ring', () => {
+  const R = BODIES.earth.radius, sample = makeWorld({ R, biome: 'desert_canyon' });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false });
+  const p = V(0, R, 0), q = { x: 0, y: 0, z: 0, w: 1 };
+  const frame = (hgt, extra = []) => ({ bodyId: 'earth', time: (t += 1 / 60), focus: p, disturbers: [{ kind: 'ship', p: V(0, R + hgt, 0), v: V(), radius: 4.2, strength: 1, q }, ...extra] });
+  let t = 10;
+  for (let i = 0; i < 60; i++) physics.update(1 / 60, frame(6));
+  const M = physics.fields.deform.marks;
+  assert.equal(M.total, 0, 'hovering leaves no pad prints');
+  for (let i = 0; i < 30; i++) physics.update(1 / 60, frame(0));
+  assert.equal(M.total, 3, 'three pads');
+  const kinds = [0, 1, 2].map((k) => M.data[k * MARK_STRIDE + 9]);
+  assert.deepEqual(kinds, [MARK.gear, MARK.gear, MARK.gear]);
+  assert.ok(M.data[8] > 0.08 && M.data[8] <= 0.3, 'pad depth in sand ' + M.data[8]);
+  // the three pads are where the legs are: 3.2 m ahead and 2.2 m to each side, 1.8 m behind
+  const d = (a, b) => Math.hypot(M.data[a * MARK_STRIDE] - M.data[b * MARK_STRIDE], M.data[a * MARK_STRIDE + 1] - M.data[b * MARK_STRIDE + 1], M.data[a * MARK_STRIDE + 2] - M.data[b * MARK_STRIDE + 2]);
+  assert.ok(Math.abs(d(1, 2) - 4.4) < 0.05 && Math.abs(d(0, 1) - Math.hypot(5, 2.2)) < 0.05);
+  for (let i = 0; i < 120; i++) physics.update(1 / 60, frame(0));
+  assert.equal(M.total, 3, 'standing still adds none');
+  // lift off on thrusters: the downwash scours the sand
+  for (let i = 0; i < 180; i++) physics.update(1 / 60, frame(1.5, [{ kind: 'downwash', p: V(0, R + 1.5, 0), v: V(), radius: 2.2, strength: 12000 }]));
+  let scour = 0; for (let k = 0; k < M.total; k++) if (M.data[k * MARK_STRIDE + 9] === MARK.scour) scour++;
+  assert.ok(scour >= 3, 'scour marks: ' + scour);
+  const D = physics.fields.deform;
+  assert.ok(D.depthAt(V(0.3, R, 0.3)) > 0.004, 'a dish under the jet: ' + D.depthAt(V(0.3, R, 0.3)));
+  assert.ok(D.depthAt(V(3.3, R, 0)) < 0, 'a raised ring round it: ' + D.depthAt(V(3.3, R, 0)));
+  // on rock a jet scours nothing
+  const rock = createPhysics({ sampleSurface: (id, dd) => makeWorld({ R, biome: 'pale_mesas' })(dd), timeBudget: false });
+  for (let i = 0; i < 120; i++) rock.update(1 / 60, { bodyId: 'venus', time: 5 + i / 60, focus: V(0, 3600, 0), disturbers: [{ kind: 'jet', p: V(0, 3601.5, 0), v: V(), radius: 0.15, strength: 1700 }] });
+  assert.equal(rock.fields.deform.marks.total, 0);
+});
+
+// ---- shelter ------------------------------------------------------------------------------------
+function rainyWood(canopy01, pred = (w) => w.precipitation.type === 'rain' && w.precipitation.rate > 8) {
+  const R = BODIES.earth.radius;
+  for (let t = 0; t < 8000; t += 53) for (const c of cellsAt('earth', t)) {
+    const w = weatherAt('earth', c.x, c.y, c.z, 0, t, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {});
+    if (!pred(w)) continue;
+    const sample = makeWorld({ R, biome: 'alpine_meadow', stand: { dir: norm(V(c.x, c.y, c.z)), radius: 400, canopy01, canopyHeight: 14 } });
+    return { physics: createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false }), bodyId: 'earth', focus: V(c.x * R, c.y * R, c.z * R), t0: t, R, cell: c };
+  }
+  throw new Error('no rain found');
+}
+const below = (w, buf, hMax) => { let n = 0; for (let i = 0; i < buf.count; i++) { const p = V(buf.origin.x + buf.pos[i * 3], buf.origin.y + buf.pos[i * 3 + 1], buf.origin.z + buf.pos[i * 3 + 2]); if (len(p) - w.R < hMax) n++; } return n; };
+
+test('a closed canopy keeps much of the rain off the ground under it, and less of it once it is soaked', () => {
+  const open = rainyWood(0), wood = rainyWood(1);
+  run(open, 8); run(wood, 8);
+  const no = below(open, open.physics.particles.rain, 6), nw = below(wood, wood.physics.particles.rain, 6);
+  const wet = wood.physics.here.weather.wetness01;
+  const through = PARTICLES.throughDry + (PARTICLES.throughWet - PARTICLES.throughDry) * wet;
+  assert.ok(no > 150, 'drops low in the open: ' + no);
+  assert.ok(nw < no * (through + 0.15) && nw > no * (through - 0.15), `under the leaves ${nw} of ${no} (expected about ${(through * 100).toFixed(0)} % at wetness ${wet.toFixed(2)})`);
+  // above the crowns it rains as hard as anywhere
+  const above = (w) => w.physics.particles.rain.count - below(w, w.physics.particles.rain, 14);
+  assert.ok(Math.abs(above(wood) - above(open)) < above(open) * 0.25, `above the canopy: ${above(wood)} against ${above(open)}`);
+});
+
+test('after the rain the wood goes on dripping: big slow drops from the leaves, none in the open', () => {
+  const wood = rainyWood(1), open = rainyWood(0);
+  // find when this shower ends at the cell centre, and go there
+  let tEnd = wood.t0; const c = wood.cell;
+  while (weatherAt('earth', c.x, c.y, c.z, 0, tEnd, DEFAULT_SEED, { moist: 1, sun01: 0.5, wind: 4 }, {}).precipitation.rate > 0.02 && tEnd < wood.t0 + 3000) tEnd += 5;
+  for (const w of [wood, open]) { w.t0 = tEnd - 20; run(w, 20 + 25, { hz: 30 }); }      // (the last drizzle takes a while to come down)
+  const P = wood.physics.particles, wx = wood.physics.here.weather;
+  assert.equal(wx.precipitation.type, 'none');
+  assert.ok(wx.wetness01 > 0.6, 'the wood is soaked: ' + wx.wetness01);
+  assert.ok(P.system.dripping > 0.3 && P.rain.count > 20, `dripping ${P.system.dripping.toFixed(2)}, drops ${P.rain.count}`);
+  let big = 0, high = 0; for (let i = 0; i < P.rain.count; i++) { if (P.rain.size[i] > 0.0035) big++; const p = V(P.rain.origin.x + P.rain.pos[i * 3], P.rain.origin.y + P.rain.pos[i * 3 + 1], P.rain.origin.z + P.rain.pos[i * 3 + 2]); if (len(p) - wood.R > 14.01) high++; }
+  assert.ok(big > P.rain.count * 0.7, 'big drops: ' + big + ' of ' + P.rain.count);
+  assert.equal(high, 0, 'none above the crowns');
+  assert.ok(open.physics.particles.rain.count < P.rain.count * 0.2, `the open meadow has all but stopped: ${open.physics.particles.rain.count} against ${P.rain.count} in the wood`);
+  assert.equal(open.physics.particles.system.dripping, 0);
+  // they fall from rest: none is faster than free fall from the crown allows
+  let fastest = 0; for (let i = 0; i < P.rain.count; i++) fastest = Math.max(fastest, Math.hypot(P.rain.vel[i * 3], P.rain.vel[i * 3 + 1], P.rain.vel[i * 3 + 2]));
+  assert.ok(fastest < Math.sqrt(2 * 9.81 * 14) + 0.5 && fastest > 3, 'fastest drip ' + fastest);
+});
+
+test('the hull keeps the rain off what is under it', () => {
+  const w = rainyWood(0);
+  const up = norm(w.focus), ship = V(up.x * (w.R + 2.5), up.y * (w.R + 2.5), up.z * (w.R + 2.5));
+  const ev0 = w.physics.particles.events.total;
+  const hull = () => [{ kind: 'ship', p: ship, v: V(0, 0, 0), radius: 4.2, strength: 1 }];
+  run(w, 8, { disturbers: hull });
+  const b = w.physics.particles.rain, fr = w.physics.fields.frame;
+  // (P11: counted at eight instants a quarter of a second apart, not at one. A single instant held one or
+  // two drops in the ring by luck of where they stood; the gust pattern changed and the count went from 2 to 1.)
+  // (P12: 48 instants, twelve seconds, not eight: with the gust pattern read on the sphere the same two seconds
+  // held a slant that reached further under the edge, 24 against 37; over twelve seconds it is 94 against 267,
+  // and with the pattern as it was 88 against 294. The limit is unchanged.)
+  let under = 0, ring = 0;
+  for (let k = 0; k < 48; k++) {
+    for (let i = 0; i < b.count; i++) {
+      const p = V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2]);
+      const x = fr.lx(p.x, p.y, p.z), z = fr.lz(p.x, p.y, p.z), h = len(p) - w.R, r = Math.hypot(x, z);
+      if (h < 3.5) { if (r < 2.8) under++; else if (r > 5 && r < 5 + 2.8 * 0.6) ring++; }      // (the ring has about the same area)
+    }
+    run(w, 0.25, { t0: 108 + k * 0.25, disturbers: hull });
+  }
+  assert.ok(ring >= 8, 'rain all around: ' + ring);
+  // (P7: a storm brings its own wind now, 16 m/s: rain driven at sixty degrees reaches a little way under the edge)
+  assert.ok(under <= ring * 0.5, `under the hull ${under} against ${ring} beside it`);
+  // and it lands on the hull instead: splashes up there
+  const E = w.physics.particles.events; let onHull = 0;
+  for (let k = 0; k < E.capacity; k++) { const o = k * 8; const p = V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2]); if (E.data[o + 4] > 0 && Math.abs(len(p) - w.R - 4.7) < 0.3) onHull++; }
+  assert.ok(E.total > ev0 && onHull > 3, 'splashes on the hull: ' + onHull);
+});
+
+test('over deep water the weather enters above the surface, not above the bed', () => {
+  // a sea 40 m deep everywhere; the focus swims at the surface
+  const w = rainy('earth', { sea: BODIES.earth.radius + 40 });
+  const R = w.R + 40; const u = norm(w.focus); w.focus = V(u.x * (R + 0.5), u.y * (R + 0.5), u.z * (R + 0.5));
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 6);
+  const b = w.physics.particles.rain; let above = 0, under = 0, top = -1e9;
+  for (let i = 0; i < b.count; i++) { const h = len(V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2])) - R; if (h > -0.3) above++; else under++; if (h > top) top = h; }
+  assert.ok(b.count > 200 && under === 0, `${above} drops above the sea, ${under} under it`);
+  assert.ok(top > PARTICLES.height - 3 && top < PARTICLES.height + 5, `the highest ${top.toFixed(1)} m over the surface`);
+  // and they end on the surface as ripples
+  const E = w.physics.particles.events; let ripples = 0; for (let k = 0; k < E.capacity; k++) if (E.data[k * 8 + 4] > 0 && E.data[k * 8 + 3] === EVENT.ripple) ripples++;
+  assert.ok(ripples > 20, `${ripples} ripples`);
+});
+
+test('every particle says how long it has left: a flake by its fall to the ground, dust by its life', () => {
+  // (P9: on Earth's clock as the game has it the first heavy snow found is a blizzard, 12 m/s and gusty, where a
+  // flake's vertical speed of the moment (0.3 to 0.9 m/s, fluttering) is not its rate of fall and h / fall is no
+  // reference; the reference holds in a steady snowfall, so the probe is the first one that is not a blizzard)
+  const w = rainy('earth', { pred: (x) => x.precipitation.type === 'snow' && x.precipitation.intensity01 > 0.6 && x.kind !== 'blizzard' });
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 8);
+  const b = w.physics.particles.snow, u = norm(w.focus);
+  assert.ok(b.left instanceof Float32Array && b.left.length === b.pos.length / 3);
+  // (P10: `left` is the height over the rate at which that height has been closing, eased over 0.15 s; the
+  // reference here is the flake's vertical speed of the moment. In this 9 m/s gusty snowfall a fluttering flake
+  // can be 13 % apart from it (one of 311 was, 4.23 s against 4.87 s at 2.5 m up, once the gusts moved with the
+  // air and the population changed). So: at most one flake in a hundred is more than 0.1 s + 10 % from the
+  // reference, and none more than 0.1 s + 25 %. It was: none more than 0.1 s + 10 %. The property that matters,
+  // landings announced in time, is held unchanged below.)
+  let low = 0, bad = 0, wild = 0, high = 0;
+  for (let i = 0; i < b.count; i++) {
+    const h = len(V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2])) - w.R;
+    const fall = -(b.vel[i * 3] * u.x + b.vel[i * 3 + 1] * u.y + b.vel[i * 3 + 2] * u.z);
+    if (h < 3 && fall > 0.2) { low++; const e = Math.abs(b.left[i] - h / fall); if (e > 0.1 + 0.1 * h / fall) bad++; if (e > 0.1 + 0.25 * h / fall) wild++; } else if (h > 8) { high++; assert.ok(b.left[i] > 2, `at ${h.toFixed(1)} m: ${b.left[i]}`); }
+  }
+  assert.ok(low > 30 && bad <= low * 0.01 && wild === 0 && high > 100, `${low} low flakes, ${bad} off by over 10 %, ${wild} by over 25 %, ${high} high`);
+  // each flake is seen shrinking before it lands: no flake is retired with much time left
+  const seen = new Map(); let lastLeft = [];
+  run(w, 3, { each: () => { const now = new Map(); for (let i = 0; i < b.count; i++) now.set(b.size[i], b.left[i]); for (const [id, l] of seen) if (!now.has(id)) lastLeft.push(l); seen.clear(); for (const [id, l] of now) seen.set(id, l); } });
+  lastLeft.sort((x, y) => x - y);
+  assert.ok(lastLeft.length > 50 && lastLeft[Math.floor(lastLeft.length * 0.98)] < 0.08, `${lastLeft.length} landings; 98 % were announced to within ${lastLeft[Math.floor(lastLeft.length * 0.98)].toFixed(3)} s`);
+});
+
+test('far from the anchor of the frame the rain still ends on the ground (the grid is a plane, the ground is not)', () => {
+  const w = rainy('earth', { biome: 'misty_wetland' });     // ((P21) ground that shows a splash: a meadow shows none)
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 1);
+  // walk 300 m east at 30 m/s: the frame re-anchors only after 384 m
+  const fr = w.physics.fields.frame, e = V(fr.ex, fr.ey, fr.ez), re0 = w.physics.stats.reanchors;
+  for (let i = 0; i < 600; i++) {
+    w.focus = V(w.focus.x + e.x * 0.5, w.focus.y + e.y * 0.5, w.focus.z + e.z * 0.5); const l = len(w.focus) / w.R; w.focus = V(w.focus.x / l, w.focus.y / l, w.focus.z / l);
+    run(w, 1 / 60);
+  }
+  run(w, 2);
+  const d = Math.hypot(fr.lx(w.focus.x, w.focus.y, w.focus.z), fr.lz(w.focus.x, w.focus.y, w.focus.z));
+  assert.ok(w.physics.stats.reanchors === re0 && d > 280, `${d.toFixed(0)} m from the anchor`);
+  // (a plane through the anchor would be d^2 / 2R = 11 m above the ground here)
+  const b = w.physics.particles.rain; let lo = 1e9, hi = -1e9;
+  for (let i = 0; i < b.count; i++) { const h = len(V(b.origin.x + b.pos[i * 3], b.origin.y + b.pos[i * 3 + 1], b.origin.z + b.pos[i * 3 + 2])) - w.R; lo = Math.min(lo, h); hi = Math.max(hi, h); }
+  assert.ok(b.count > 300 && lo > -0.2 && lo < 0.6 && hi < PARTICLES.height + 4.5, `drops from ${lo.toFixed(2)} to ${hi.toFixed(2)} m over the ground`);
+  const E = w.physics.particles.events; let n = 0, worst = 0;
+  for (let k = 0; k < E.capacity; k++) if (E.data[k * 8 + 4] > 0 && w.t0 - E.data[k * 8 + 5] < 1) { n++; worst = Math.max(worst, Math.abs(len(V(E.origin.x + E.data[k * 8], E.origin.y + E.data[k * 8 + 1], E.origin.z + E.data[k * 8 + 2])) - w.R)); }
+  assert.ok(n > 50 && worst < 0.02, `${n} splashes, the worst ${worst.toFixed(3)} m off the ground`);
+  // and a drop falls along the local vertical there, not the anchor's (4 degrees apart at 300 m)
+  const u = norm(w.focus); let side = 0, down = 0;
+  for (let i = 0; i < b.count; i++) { const vx = b.vel[i * 3], vy = b.vel[i * 3 + 1], vz = b.vel[i * 3 + 2], dn = -(vx * u.x + vy * u.y + vz * u.z); down += dn; side += vx * fr.ex + vy * fr.ey + vz * fr.ez + dn * (fr.ex * u.x + fr.ey * u.y + fr.ez * u.z); }
+  void side; assert.ok(down / b.count > 3);
+});
+
+// ---- P7 ---------------------------------------------------------------------------------------------
+
+test('rings near the focus: in a downpour there are enough of them alive within ten metres to be seen, on ground and on water', () => {
+  const count = (w, kind, life) => {
+    const E = w.physics.particles.events, F = w.physics.focus; let n = 0, near = 0;
+    for (let k = 0; k < E.capacity; k++) {
+      const o = k * 8; if (!(E.data[o + 4] > 0) || E.data[o + 3] !== kind || w.physics.time - E.data[o + 5] > life) continue;
+      n++;
+      if (Math.hypot(E.origin.x + E.data[o] - F.x, E.origin.y + E.data[o + 1] - F.y, E.origin.z + E.data[o + 2] - F.z) < PARTICLES.ringRadius + 0.5) near++;
+    }
+    return { n, near };
+  };
+  assert.ok(PARTICLES.events >= 512 && PARTICLES.ringRate >= 60);
+  const w = rainy('earth', { biome: 'misty_wetland' }); run(w, 6);     // ((P21) ground that shows a crown: see P21 below)
+  const g = count(w, EVENT.splash, 0.28);
+  assert.ok(g.near >= 12, `${g.near} crowns alive within ${PARTICLES.ringRadius} m on the ground (${g.n} in all)`);
+  const s = rainy('earth', { sea: BODIES.earth.radius + 2 }); run(s, 6);
+  const r = count(s, EVENT.ripple, 1.4);
+  assert.ok(r.near >= 60 && r.n <= PARTICLES.events, `${r.near} ripples alive within ${PARTICLES.ringRadius} m on the water (${r.n} in all)`);
+  // every one of them on the surface it fell on
+  const E = s.physics.particles.events;
+  for (let k = 0; k < E.capacity; k++) { const o = k * 8; if (E.data[o + 4] > 0) assert.ok(Math.abs(len(V(E.origin.x + E.data[o], E.origin.y + E.data[o + 1], E.origin.z + E.data[o + 2])) - s.R - 2) < 0.3, 'on the water'); }
+});
+
+test('a ground blizzard (P10): in a blizzard the wind moves the snow along the ground: a skim of hopping grains, the powder over it, both of snow, both low', () => epochP8(async () => {
+  const { MATERIAL_INDEX } = await import('./ground.js');
+  const w = rainy('earth', { pred: (x) => x.kind === 'blizzard' });
+  w.physics.warmUp({ bodyId: w.bodyId, time: w.t0, focus: w.focus });
+  run(w, 8);
+  const P = w.physics.particles, skim = P.sand, powder = P.dust, U = Math.hypot(w.physics.fields.air.cwe, w.physics.fields.air.cwn);
+  assert.ok(U > 9, 'a blizzard blows: ' + U.toFixed(1) + ' m/s');
+  assert.ok(w.physics.here.blown.snow > 0.5, 'blown.snow ' + w.physics.here.blown.snow);
+  assert.ok(skim.count > 150 && powder.count > 20, `the skim ${skim.count}, the powder ${powder.count}`);
+  const hs = []; let along = 0;
+  const fr = w.physics.fields.frame, G = w.physics.fields.air, ue = G.cwe / U, un = G.cwn / U;
+  for (let i = 0; i < skim.count; i++) {
+    assert.equal(skim.mat[i], MATERIAL_INDEX.snow, 'the skim is snow'); hs.push(skim.hag[i]);
+    const ve = skim.vel[i * 3] * fr.ex + skim.vel[i * 3 + 1] * fr.ey + skim.vel[i * 3 + 2] * fr.ez, vn = skim.vel[i * 3] * fr.nx + skim.vel[i * 3 + 1] * fr.ny + skim.vel[i * 3 + 2] * fr.nz;
+    if (ve * ue + vn * un > 0.5) along++;
+  }
+  hs.sort((a, b) => a - b);
+  assert.ok(hs[hs.length >> 1] < 0.35 && hs[Math.floor(hs.length * 0.95)] < 1.2, `knee deep at most: median ${hs[hs.length >> 1].toFixed(2)} m, 95 % under ${hs[Math.floor(hs.length * 0.95)].toFixed(2)} m`);
+  assert.ok(along > skim.count * 0.85, 'going downwind: ' + along + ' of ' + skim.count);
+  let high = 0; for (let i = 0; i < powder.count; i++) { assert.equal(powder.mat[i], MATERIAL_INDEX.snow); if (powder.hag[i] > 3) high++; }
+  assert.ok(high < powder.count * 0.1, 'the powder stays low: ' + high + ' of ' + powder.count + ' over 3 m');
+  // where no snow lies, or in a light wind, there is none (a fair day at the test place)
+  const calm = rainy('earth', { pred: (x) => x.kind === 'clear' });
+  calm.physics.warmUp({ bodyId: calm.bodyId, time: calm.t0, focus: calm.focus }); run(calm, 3);
+  assert.equal(calm.physics.here.blown.snow, 0);
+}));
+
+test('P12 one air: what is carried rides the wind physics.air gives at its place and height, at the edge of a wood', () => {
+  // The focus stands in a meadow, the edge of a 14 m wood 20 m east of it. Twenty-second means at 36 places from
+  // 20 m out in the meadow to 24 m toward the wood, 1 to 22 m up. Before: every particle had the profile of the
+  // ground the focus stood on and the whole lee of the trees at every height: 1.4 to 2.5 m/s too fast under the
+  // first crowns, 2.4 to 3.5 m/s too slow at 22 m, above the lee (largest difference 3.5 m/s). Now each node of
+  // the wind grid has its own profile, for physics.air and for the particles alike.
+  const R = BODIES.earth.radius, up = norm(V(0.3, 0.8, 0.52)), e = norm(V(-up.z, 0, up.x));
+  const cdir = norm(V(up.x + e.x * 420 / R, up.y + e.y * 420 / R, up.z + e.z * 420 / R));
+  const sample = makeWorld({ R, biome: 'alpine_meadow', stand: { dir: cdir, radius: 400, canopy01: 0.9, canopyHeight: 14 } });
+  const physics = createPhysics({ sampleSurface: (id, d) => sample(d), timeBudget: false }), focus = V(up.x * R, up.y * R, up.z * R);
+  let t = 300; for (let i = 0; i < 600; i++) { t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus }); }
+  const S = physics.fields.frame, sys = physics.particles.system, wv = sys._wv, ht = sys._ht;
+  const carried = (x, z, hz) => {      // the lookup of particles.js and loose.js
+    const u = Math.min(3.999, Math.max(0, (x - sys._wtx) / 16)), v = Math.min(3.999, Math.max(0, (z - sys._wtz) / 16));
+    const iu = u | 0, iv = v | 0, fu = u - iu, fv = v - iv, pn = iv * 5 + iu, ih = Math.min(23, hz | 0), fh = hz - ih, t0 = pn * 25 + ih, a0 = pn * 2;
+    const H = (o) => ht[t0 + o] + (ht[t0 + o + 1] - ht[t0 + o]) * fh;
+    const h00 = H(0) * (1 - fu) * (1 - fv), h10 = H(25) * fu * (1 - fv), h01 = H(125) * (1 - fu) * fv, h11 = H(150) * fu * fv;
+    return Math.hypot(wv[a0] * h00 + wv[a0 + 2] * h10 + wv[a0 + 10] * h01 + wv[a0 + 12] * h11, wv[a0 + 1] * h00 + wv[a0 + 3] * h10 + wv[a0 + 11] * h01 + wv[a0 + 13] * h11);
+  };
+  const fx = S.lx(focus.x, focus.y, focus.z), fz = S.lz(focus.x, focus.y, focus.z), d = [0, 0, 0], pts = [];
+  for (const de of [-20, -8, 0, 8, 16, 24]) for (const hz of [1, 2, 5, 10, 16, 22]) {
+    const x = fx + de * (S.ex * e.x + S.ey * e.y + S.ez * e.z), z = fz + de * (S.nx * e.x + S.ny * e.y + S.nz * e.z);
+    S.dir(x, z, d); const g = sample({ x: d[0], y: d[1], z: d[2] }).radius;
+    pts.push({ de, hz, x, z, p: V(d[0] * (g + hz), d[1] * (g + hz), d[2] * (g + hz)), air: 0, part: 0 });
+  }
+  const M = 1200;
+  for (let i = 0; i < M; i++) {
+    t += 1 / 60; physics.update(1 / 60, { bodyId: 'earth', time: t, focus });
+    for (const q of pts) { q.air += physics.air('earth', q.p).speed / M; q.part += carried(q.x, q.z, q.hz) / M; }
+  }
+  let worst = 0, at = null, calm = 9, open = 0;
+  for (const q of pts) { const dq = Math.abs(q.part - q.air); if (dq > worst) { worst = dq; at = q; } if (q.de === 24 && q.hz === 2) calm = q.part; if (q.de === -20 && q.hz === 2) open = q.part; }
+  console.log(`# one air: largest difference between the particles' wind and physics.air ${worst.toFixed(2)} m/s (${at.de} m toward the wood, ${at.hz} m up); at 2 m ${open.toFixed(1)} m/s in the meadow, ${calm.toFixed(1)} under the first crowns`);
+  assert.ok(worst < 0.6, `the particles' air is ${worst.toFixed(2)} m/s off physics.air ${at.de} m toward the wood, ${at.hz} m up`);
+  assert.ok(calm < open * 0.75, `it is calmer under the crowns: ${calm} against ${open} m/s`);
+});
+
+test('P21 a raindrop leaves a ring on water and on wet hard ground, none on a meadow, a forest floor or sand', async () => {
+  // P20's strips: small crisp rings all over the meadow in the rain, splash events made wherever a drop met the ground. The
+  // blades of a sward and the leaves of a forest floor take a drop with no ring; sand, dust and snow swallow it; a film of
+  // water on rock, ice or soaked earth throws a crown, and still water a ring (P20: none on a running sea).
+  const { splashOn, MATERIAL_INDEX: M } = await import('./ground.js');
+  for (const [biome, ground] of [['alpine_meadow', 'grass'], ['temperate_forest', 'litter'], ['desert_canyon', 'sand'], ['misty_wetland', 'mud'], ['pale_mesas', 'rock']]) {
+    const w = rainy('earth', { biome }); run(w, 6);
+    const E = w.physics.particles.events; let n = 0;
+    for (let k = 0; k < E.capacity; k++) if (E.data[k * 8 + 4] > 0 && E.data[k * 8 + 3] === EVENT.splash) n++;
+    const wet = w.physics.here.weather.wetness01, shows = splashOn(M[ground], wet, 0);
+    console.log(`# rain on ${biome} (${ground}): wetness ${wet.toFixed(2)}, ${n} splashes alive (head: 512, 512, 221, 512, 512)`);
+    if (shows === 0) assert.equal(n, 0, `${biome}: ${n} splashes on ${ground}`);
+    else assert.ok(shows > 0.9 && n > 100, `${biome}: ${n} splashes on wet ${ground} (shows ${shows.toFixed(2)})`);
+  }
+  // the ground as it is now: dry rock throws no crown, wet rock does; earth only soaked; snow lying covers everything
+  assert.ok(splashOn(M.rock, 0.1, 0) < 0.05 && splashOn(M.rock, 0.8, 0) === 1 && splashOn(M.ice, 0.8, 0) === 1);
+  assert.ok(splashOn(M.soil, 0.4, 0) === 0 && splashOn(M.soil, 0.95, 0) === 1);
+  for (const g of ['grass', 'moss', 'litter', 'sand', 'dust', 'ash', 'gravel', 'snow']) assert.equal(splashOn(M[g], 1, 0), 0, g);
+  assert.equal(splashOn(M.rock, 1, 0.1), 0, 'snow lying on the rock');
+});

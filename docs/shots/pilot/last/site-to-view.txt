@@ -1,0 +1,11 @@
+node docs/shots/pilot/last/scripts/sitevista.mjs   (each world's spawn, which is "a place to land", to its nearest marked view, great-circle)
+mercury  vistas 7 nearest to the spawn 0.28 km Obsidian Glass Fields
+venus    vistas 7 nearest to the spawn 2.02 km Pale Mesas
+earth    vistas 8 nearest to the spawn 2.30 km Misty Wetland
+moon     vistas 7 nearest to the spawn 0.00 km Silver Mare
+mars     vistas 7 nearest to the spawn 0.27 km Dry Riverbeds
+jupiter  vistas 7 nearest to the spawn 3.82 km Storm-Wall Cliffs
+saturn   vistas 7 nearest to the spawn 5.51 km Ring-Shadow Twilight II
+uranus   vistas 7 nearest to the spawn 0.45 km Mint Ice Shelves
+neptune  vistas 7 nearest to the spawn 0.19 km Blue-Violet Kelp Forests
+pluto    vistas 8 nearest to the spawn 0.08 km Lilac Mountains

@@ -1,0 +1,76 @@
+before E: speed 46.0 hAG 15.3 prompt Land here canLand true
+30.55 ATMOSPHERE v 46.03 hAG 15.31 |a| 0.0 - 
+30.58 LANDING v 43.26 hAG 38.71 |a| 178.7 glide Setting down on level ground 12 m away
+30.60 LANDING v 40.63 hAG 38.76 |a| 170.9 glide Setting down on level ground 12 m away
+30.62 LANDING v 38.14 hAG 38.78 |a| 163.3 glide Setting down on level ground 12 m away
+30.63 LANDING v 35.78 hAG 38.78 |a| 155.9 glide Setting down on level ground 12 m away
+30.65 LANDING v 33.56 hAG 38.77 |a| 148.8 glide Setting down on level ground 12 m away
+30.67 LANDING v 31.47 hAG 38.74 |a| 141.8 glide Setting down on level ground 12 m away
+30.68 LANDING v 29.50 hAG 38.70 |a| 135.1 glide Setting down on level ground 12 m away
+30.70 LANDING v 27.66 hAG 38.64 |a| 128.6 glide Setting down on level ground 12 m away
+30.72 LANDING v 25.94 hAG 38.57 |a| 122.4 glide Setting down on level ground 12 m away
+30.73 LANDING v 24.35 hAG 38.49 |a| 116.4 glide Setting down on level ground 12 m away
+30.75 LANDING v 22.88 hAG 38.42 |a| 110.7 glide Setting down on level ground 12 m away
+30.77 LANDING v 21.52 hAG 38.34 |a| 105.2 glide Setting down on level ground 12 m away
+30.78 LANDING v 20.28 hAG 38.26 |a| 100.0 glide Setting down on level ground 12 m away
+30.80 LANDING v 19.16 hAG 38.17 |a| 95.0 glide Setting down on level ground 12 m away
+30.82 LANDING v 18.15 hAG 38.08 |a| 90.2 glide Setting down on level ground 12 m away
+30.83 LANDING v 17.25 hAG 37.98 |a| 85.7 glide Setting down on level ground 12 m away
+30.85 LANDING v 16.45 hAG 37.87 |a| 81.3 glide Setting down on level ground 12 m away
+30.87 LANDING v 15.76 hAG 37.75 |a| 77.2 glide Setting down on level ground 12 m away
+30.88 LANDING v 15.17 hAG 37.63 |a| 73.2 glide Setting down on level ground 12 m away
+30.90 LANDING v 14.68 hAG 37.49 |a| 69.5 glide Setting down on level ground 12 m away
+30.92 LANDING v 14.28 hAG 37.35 |a| 66.0 glide Setting down on level ground 12 m away
+30.93 LANDING v 13.96 hAG 37.21 |a| 62.6 glide Setting down on level ground 12 m away
+30.95 LANDING v 13.72 hAG 37.06 |a| 59.4 glide Setting down on level ground 12 m away
+30.97 LANDING v 13.55 hAG 36.90 |a| 56.3 glide Setting down on level ground 12 m away
+30.98 LANDING v 13.44 hAG 36.74 |a| 53.4 glide Setting down on level ground 12 m away
+31.00 LANDING v 13.39 hAG 36.58 |a| 50.7 glide Setting down on level ground 12 m away
+31.05 LANDING v 13.48 hAG 36.07 |a| 43.3 glide Setting down on level ground 12 m away
+31.15 LANDING v 14.31 hAG 34.98 |a| 31.6 glide Setting down on level ground 12 m away
+31.25 LANDING v 15.35 hAG 33.72 |a| 23.1 glide Setting down on level ground 12 m away
+31.35 LANDING v 16.27 hAG 32.33 |a| 17.0 glide Setting down on level ground 12 m away
+31.45 LANDING v 17.02 hAG 30.87 |a| 12.6 glide Setting down on level ground 12 m away
+31.55 LANDING v 17.39 hAG 29.36 |a| 7.0 glide Setting down on level ground 12 m away
+31.65 LANDING v 17.36 hAG 27.89 |a| 6.1 glide Setting down on level ground 12 m away
+31.75 LANDING v 17.05 hAG 26.50 |a| 7.8 glide Setting down on level ground 12 m away
+31.85 LANDING v 16.57 hAG 24.99 |a| 9.4 glide Setting down on level ground 12 m away
+31.95 LANDING v 16.01 hAG 23.44 |a| 10.4 glide Setting down on level ground 12 m away
+32.05 LANDING v 15.44 hAG 22.01 |a| 10.7 descend Setting down on level ground 12 m away
+32.15 LANDING v 14.90 hAG 20.68 |a| 10.6 descend Setting down on level ground 12 m away
+32.25 LANDING v 14.44 hAG 19.40 |a| 10.1 descend Setting down on level ground 12 m away
+32.35 LANDING v 14.05 hAG 18.13 |a| 9.4 descend Setting down on level ground 12 m away
+32.45 LANDING v 13.74 hAG 16.78 |a| 8.6 descend Setting down on level ground 12 m away
+32.55 LANDING v 13.51 hAG 15.46 |a| 7.6 descend Setting down on level ground 12 m away
+32.65 LANDING v 13.23 hAG 14.15 |a| 7.1 descend Setting down on level ground 12 m away
+32.75 LANDING v 12.71 hAG 12.88 |a| 7.6 descend Setting down on level ground 12 m away
+32.85 LANDING v 12.04 hAG 11.67 |a| 8.1 descend Setting down on level ground 12 m away
+32.95 LANDING v 11.27 hAG 10.52 |a| 8.5 descend Setting down on level ground 12 m away
+33.05 LANDING v 10.45 hAG 9.45 |a| 8.7 descend Setting down on level ground 12 m away
+33.15 LANDING v 9.62 hAG 8.46 |a| 8.6 descend Setting down on level ground 12 m away
+33.25 LANDING v 8.79 hAG 7.55 |a| 8.3 settle Setting down on level ground 12 m away
+33.35 LANDING v 7.99 hAG 6.72 |a| 8.0 settle Setting down on level ground 12 m away
+33.45 LANDING v 7.23 hAG 5.97 |a| 7.5 settle Setting down on level ground 12 m away
+33.55 LANDING v 6.52 hAG 5.29 |a| 7.0 settle Setting down on level ground 12 m away
+33.65 LANDING v 5.85 hAG 4.68 |a| 6.5 settle Setting down on level ground 12 m away
+33.75 LANDING v 5.23 hAG 4.13 |a| 6.0 settle Setting down on level ground 12 m away
+33.85 LANDING v 4.67 hAG 3.64 |a| 5.4 settle Setting down on level ground 12 m away
+33.95 LANDING v 4.15 hAG 3.20 |a| 5.0 settle Setting down on level ground 12 m away
+34.05 LANDING v 3.69 hAG 2.81 |a| 4.5 settle Setting down on level ground 12 m away
+34.15 LANDING v 3.27 hAG 2.47 |a| 4.0 settle Setting down on level ground 12 m away
+34.25 LANDING v 2.89 hAG 2.17 |a| 3.6 settle Setting down on level ground 12 m away
+34.35 LANDING v 2.55 hAG 1.90 |a| 3.2 settle Setting down on level ground 12 m away
+34.45 LANDING v 2.25 hAG 1.66 |a| 2.9 settle Setting down on level ground 12 m away
+34.55 LANDING v 1.98 hAG 1.45 |a| 2.6 settle Setting down on level ground 12 m away
+34.65 LANDING v 1.74 hAG 1.27 |a| 2.3 settle 
+34.75 LANDING v 1.55 hAG 1.11 |a| 1.6 settle 
+34.85 LANDING v 1.41 hAG 0.96 |a| 1.4 settle 
+34.95 LANDING v 1.29 hAG 0.83 |a| 1.2 settle 
+35.05 LANDING v 1.18 hAG 0.70 |a| 1.0 settle 
+35.15 LANDING v 1.09 hAG 0.59 |a| 0.8 settle 
+35.25 LANDING v 1.02 hAG 0.49 |a| 0.7 settle 
+35.35 LANDING v 0.95 hAG 0.39 |a| 0.6 settle 
+35.45 LANDING v 0.90 hAG 0.30 |a| 0.5 settle 
+35.55 LANDING v 0.85 hAG 0.21 |a| 0.4 settle 
+35.65 LANDING v 0.81 hAG 0.13 |a| 0.4 settle 
+max |a| 178.7 state LANDED

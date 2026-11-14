@@ -1,0 +1,208 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; tier 1, 640x360",
+ "size": "640x360",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "heart_glacier",
+   "name": "Pale Heart Glacier",
+   "alsoVista": "Pale Heart Glacier",
+   "settledSeconds": 43.2,
+   "settledFrames": 35,
+   "tris": 421030,
+   "calls": 266,
+   "worldWorstMs": 207.1,
+   "physicsWorstMs": 43,
+   "stoodIn": "heart_glacier",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.6,
+    "biome": "heart_glacier",
+    "radius": 1615.2666342988168
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "lilac_mountains",
+   "name": "Lilac Mountains",
+   "alsoVista": null,
+   "settledSeconds": 41.7,
+   "settledFrames": 37,
+   "tris": 425056,
+   "calls": 284,
+   "worldWorstMs": 320.1,
+   "physicsWorstMs": 43,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 18.5,
+    "biome": "lilac_mountains",
+    "radius": 1699.0793443310981
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "long_shadow_plain",
+   "name": "Long-Shadow Plain",
+   "alsoVista": "Long-Shadow Plain",
+   "settledSeconds": 29.2,
+   "settledFrames": 31,
+   "tris": 382781,
+   "calls": 311,
+   "worldWorstMs": 173.8,
+   "physicsWorstMs": 43,
+   "stoodIn": "long_shadow_plain",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 5.9,
+    "biome": "long_shadow_plain",
+    "radius": 1631.0883924618804
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "nitrogen_dunes",
+   "name": "Nitrogen Dunes",
+   "alsoVista": "Nitrogen Dunes",
+   "settledSeconds": 30.9,
+   "settledFrames": 36,
+   "tris": 293805,
+   "calls": 136,
+   "worldWorstMs": 230.4,
+   "physicsWorstMs": 90.4,
+   "stoodIn": "nitrogen_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 12.2,
+    "biome": "nitrogen_dunes",
+    "radius": 1648.6236109300266
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-lilac_mountains-1",
+   "name": "Lilac Mountains",
+   "alsoVista": null,
+   "settledSeconds": 17.3,
+   "settledFrames": 28,
+   "tris": 476855,
+   "calls": 298,
+   "worldWorstMs": 309.2,
+   "physicsWorstMs": 90.4,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 9.4,
+    "biome": "lilac_mountains",
+    "radius": 1697.21208658061
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-lilac_mountains-2",
+   "name": "Lilac Mountains II",
+   "alsoVista": null,
+   "settledSeconds": 33,
+   "settledFrames": 35,
+   "tris": 331583,
+   "calls": 190,
+   "worldWorstMs": 426.8,
+   "physicsWorstMs": 5.8,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13,
+    "biome": "lilac_mountains",
+    "radius": 1748.3857585102353
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-nitrogen_dunes-2",
+   "name": "Nitrogen Dunes II",
+   "alsoVista": null,
+   "settledSeconds": 32.7,
+   "settledFrames": 35,
+   "tris": 307586,
+   "calls": 140,
+   "worldWorstMs": 234.6,
+   "physicsWorstMs": 5.8,
+   "stoodIn": "nitrogen_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 12.8,
+    "biome": "nitrogen_dunes",
+    "radius": 1612.6458394115984
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-long_shadow_plain-2",
+   "name": "Long-Shadow Plain II",
+   "alsoVista": null,
+   "settledSeconds": 31.4,
+   "settledFrames": 33,
+   "tris": 456465,
+   "calls": 336,
+   "worldWorstMs": 187,
+   "physicsWorstMs": 5.8,
+   "stoodIn": "long_shadow_plain",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.8,
+    "biome": "long_shadow_plain",
+    "radius": 1642.5928849687548
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-heart_glacier-2",
+   "name": "Pale Heart Glacier II",
+   "alsoVista": null,
+   "settledSeconds": 31.2,
+   "settledFrames": 35,
+   "tris": 430679,
+   "calls": 270,
+   "worldWorstMs": 241.6,
+   "physicsWorstMs": 6.6,
+   "stoodIn": "heart_glacier",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.2,
+    "biome": "heart_glacier",
+    "radius": 1613.4436454403638
+   },
+   "flags": []
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+# spawn: earth state ON_FOOT biome undefined ship 16.02 m away, bearing 25.78
+walk W: 90% of pace in 0.40 s, pace 4.21 m/s (last second 4.21-4.21)
+  release: stopped (<0.1 m/s) in 0.53 s, slid 0.83 m
+run Shift+W: 90% of pace in 0.82 s, pace 7.40 m/s (7.38-7.41), peak accel 11.61 m/s2
+  run, flick 180 deg in 0.25 s: slowest 0.70 m/s, back to 90% at 1.17 s after the flick ends
+  release from a run: stopped in 0.88 s, slid 2.82 m, peak decel 11.30
+jump (tap Space): peak feet 1.23 m, airborne 1.05 s, takeoff delay 0.12 s
+jetpack (hold Space 8 s): peak feet 54.86 m, peak climb 8.44 m/s, peak up-accel 278.93, fuel 1.00 -> 0.00, empty at 6.30 s
+  fall: landed after 5.15 s, at -17.94 m/s down (max), feet then 0.01
+  refuel: 0.47 -> 90% at 0.95 s, full at 1.17 s
+walk to the ship: 6.70 s until the board prompt (8.93 m)
+board (E): seated in 1.27 s, state LANDED
+lift-off (Space): state ATMOSPHERE; hover 3.01 m after 6 s; 8 m at - s; peak up-accel 4.98, peak climb 4.62 m/s
+full throttle, nose level, 14 s: throttle 1 at 1.25 s; speed 20 m/s at 1.62 s, 40 at 2.72; top 46.08 m/s; peak horizontal accel 21.16 m/s2 (2.16 g); height over ground 3.00-33.58 m
+low flight 20 s: height 5.57-42.26 m (mean 15.72), speed 51.62 m/s, vertical accel -52.42..484.90 m/s2, |jerk| max 29342.72 m/s3, bounces 0
+hard turn 4 s (mouse right): heading change 141.69 deg (velocity), speed 59.95 -> min 29.79, lateral accel max 64.38 m/s2
+brake X 6 s: 29.41 -> under 2 m/s at 1.25 s; peak decel 26.48 m/s2; throttle after 0.00
+climb to space at 55 deg, full throttle: 11.95 s; top speed 152.11 m/s; peak accel 25.35
+aim at Mars: 1.20 s; prompt "Pulse to Mars"
+pulse to Mars: 68.18 s, peak 13 km/s, state SPACE
+descend to Mars' air at -60 deg: 3.67 s
+  to 170 m: 6.57 s; to the landing prompt 7.97 s more; canLand true
+  landing assist: 4.62 s to LANDED; touchdown at -0.97 m/s; bounces 0; peak decel 252.00
+  out on mars: biome undefined
+  Mars run: pace 7.62 m/s
+  Mars jetpack 8 s: peak feet 90.46 m, climb 11.89 m/s
+  Mars fall: 12.13 s, hits at -22.69 m/s

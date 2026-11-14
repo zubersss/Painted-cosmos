@@ -1,0 +1,28 @@
+# PILOT's docs/lead/evidence/pilot11/wallrun.mjs on the block's last tree (a clean export of 9917fab with the last commit's physics): Shift+W 12 s from the stand, eight headings
+earth sea_coast 
+ h0: steepest 54, climb 0.7 m/s (on 53 deg), up 0.2 m on >50 deg 
+ h45: steepest 24, climb 0.7 m/s (on 14 deg), up 0.0 m on >50 deg 
+ h90: steepest 75, climb 2.3 m/s (on 31 deg), up 0.0 m on >50 deg 
+ h135: steepest 21, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg 
+ h180: steepest 21, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg 
+ h225: steepest 50, climb 1.0 m/s (on 15 deg), up 0.0 m on >50 deg 
+ h270: steepest 53, climb 1.0 m/s (on 46 deg), up 0.2 m on >50 deg 
+ h315: steepest 57, climb 0.0 m/s (on 53 deg), up 0.2 m on >50 deg
+earth desert_canyon 
+ h0: steepest 2, climb 0.2 m/s (on 1 deg), up 0.0 m on >50 deg 
+ h45: steepest 3, climb 0.4 m/s (on 2 deg), up 0.0 m on >50 deg 
+ h90: steepest 2, climb 0.1 m/s (on 0 deg), up 0.0 m on >50 deg 
+ h135: steepest 3, climb 0.5 m/s (on 1 deg), up 0.0 m on >50 deg 
+ h180: steepest 3, climb 0.1 m/s (on 1 deg), up 0.0 m on >50 deg 
+ h225: steepest 60, climb 1.5 m/s (on 60 deg), up 1.1 m on >50 deg 
+ h270: steepest 54, climb 0.5 m/s (on 54 deg), up 0.2 m on >50 deg 
+ h315: steepest 3, climb 0.2 m/s (on 2 deg), up 0.0 m on >50 deg
+neptune storm_seas 
+ h0: steepest 18, climb 0.5 m/s (on 8 deg), up 0.0 m on >50 deg 
+ h45: steepest 25, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg 
+ h90: steepest 25, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg 
+ h135: steepest 28, climb 0.0 m/s (on 0 deg), up 0.0 m on >50 deg 
+ h180: steepest 23, climb 0.7 m/s (on 6 deg), up 0.0 m on >50 deg 
+ h225: steepest 56, climb 2.5 m/s (on 55 deg), up 4.5 m on >50 deg 
+ h270: steepest 57, climb 3.4 m/s (on 57 deg), up 2.2 m on >50 deg 
+ h315: steepest 58, climb 4.7 m/s (on 56 deg), up 6.0 m on >50 deg

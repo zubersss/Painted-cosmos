@@ -1,0 +1,13 @@
+# PILOT's docs/lead/evidence/pilot12/wetstall.mjs (Node, PILOT's Sim with PHYSICS, 30 Hz, the game's weather seed), Earth's spawn.
+# BEFORE: docs/lead/evidence/pilot12/wetstall.txt (2 of 16 headings held under 1 m/s for more than 2 s at clocks 240, 420 and 700)
+# AFTER (a clean export of 6cfab48 with this commit's explorer.js):
+# earth spawn clock 30 (breeze), KeyW, 14 s: 877 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 57 m, h22.5: 57 m, h45: 57 m, h67.5: 56 m, h90: 55 m, h112.5: 54 m, h135: 52 m, h157.5: 55 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 54 m, h270: 54 m, h292.5: 52 m, h315: 54 m, h337.5: 54 m
+# earth spawn clock 240 (thunderstorm), KeyW, 14 s: 867 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 56 m, h22.5: 56 m, h45: 56 m, h67.5: 54 m, h90: 56 m, h112.5: 58 m, h135: 54 m, h157.5: 55 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 52 m, h270: 53 m, h292.5: 48 m, h315: 52 m, h337.5: 52 m
+# earth spawn clock 420 (breeze), KeyW, 14 s: 864 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 56 m, h22.5: 56 m, h45: 56 m, h67.5: 49 m, h90: 54 m, h112.5: 54 m, h135: 53 m, h157.5: 54 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 53 m, h270: 54 m, h292.5: 52 m, h315: 53 m, h337.5: 53 m
+# earth spawn clock 700 (mist), KeyW, 14 s: 856 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 56 m, h22.5: 56 m, h45: 56 m, h67.5: 53 m, h90: 51 m, h112.5: 50 m, h135: 48 m, h157.5: 50 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 54 m, h270: 55 m, h292.5: 52 m, h315: 54 m, h337.5: 54 m
+# earth spawn clock 1200 (mist), KeyW, 14 s: 877 m in all; 0 of 16 headings held under 1 m/s for more than 2 s
+  h0: 57 m, h22.5: 56 m, h45: 56 m, h67.5: 56 m, h90: 55 m, h112.5: 54 m, h135: 52 m, h157.5: 55 m, h180: 56 m, h202.5: 57 m, h225: 54 m, h247.5: 54 m, h270: 55 m, h292.5: 53 m, h315: 54 m, h337.5: 54 m

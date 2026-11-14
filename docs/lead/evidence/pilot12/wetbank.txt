@@ -1,0 +1,50 @@
+## the storm, clock 240, heading 90 from the spawn
+   0.5 s    0.8 m  pace 3.08  slope  6  grass    friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   1.0 s    2.8 m  pace 4.30  slope  7  grass    friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   1.5 s    5.0 m  pace 4.42  slope  4  grass    friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   2.0 s    7.2 m  pace 4.31  slope  5  grass    friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   2.5 s    9.4 m  pace 4.36  slope  6  grass    friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   3.0 s   11.6 m  pace 4.32  slope  3  grass    friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   3.5 s   13.7 m  pace 4.23  slope  7  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   4.0 s   15.8 m  pace 4.24  slope  7  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h11.6)
+   4.5 s   17.9 m  pace 4.14  slope 13  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 3 (? r0.1 h4.6, ? r0.3 h11.6, ? r0.1 h3.8)
+   5.0 s   19.8 m  pace 3.10  slope 18  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 2 (? r0.1 h4.6, ? r0.1 h3.8)
+   5.5 s   21.0 m  pace 1.61  slope 23  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 1 grounded true  biome temperate_forest  things within 3 m 2 (? r0.3 h13.4, ? r0.1 h3.8)
+   6.0 s   21.4 m  pace 0.22  slope 24  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 1 grounded true  biome temperate_forest  things within 3 m 2 (? r0.3 h13.4, ? r0.1 h3.8)
+   6.5 s   21.5 m  pace 0.16  slope 25  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 1 grounded true  biome temperate_forest  things within 3 m 2 (? r0.3 h13.4, ? r0.1 h3.8)
+   7.0 s   21.6 m  pace 0.12  slope 25  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 0 grounded true  biome temperate_forest  things within 3 m 2 (? r0.3 h13.4, ? r0.1 h3.8)
+   7.5 s   21.6 m  pace 0.09  slope 25  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 0 grounded true  biome temperate_forest  things within 3 m 2 (? r0.3 h13.4, ? r0.1 h3.8)
+   8.0 s   21.6 m  pace 0.07  slope 25  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 0 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+   8.5 s   21.7 m  pace 0.04  slope 25  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 0 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+   9.0 s   21.7 m  pace 0.09  slope 25  litter   friction 0.36 wet 0.99  depth 0.00  idle gait 0 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+   9.5 s   21.8 m  pace 1.01  slope 26  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 1 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+  10.0 s   23.1 m  pace 3.32  slope 31  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+  10.5 s   25.3 m  pace 4.40  slope 33  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+  11.0 s   27.7 m  pace 4.33  slope 33  litter   friction 0.37 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+  11.5 s   30.1 m  pace 4.43  slope 28  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+  12.0 s   32.3 m  pace 3.59  slope 19  litter   friction 0.36 wet 0.99  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.5 h19.4)
+## fair weather, clock 30, the same heading
+   0.5 s    1.1 m  pace 3.99  slope  7  grass    friction 0.65 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   1.0 s    3.2 m  pace 4.22  slope  7  grass    friction 0.65 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   1.5 s    5.3 m  pace 4.24  slope  4  grass    friction 0.65 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   2.0 s    7.5 m  pace 4.23  slope  5  grass    friction 0.65 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   2.5 s    9.6 m  pace 4.21  slope  5  grass    friction 0.65 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   3.0 s   11.7 m  pace 4.24  slope  2  grass    friction 0.63 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   3.5 s   13.8 m  pace 4.22  slope  7  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   4.0 s   15.9 m  pace 4.21  slope  7  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h11.6)
+   4.5 s   18.1 m  pace 4.12  slope 13  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 3 (? r0.1 h4.6, ? r0.3 h11.6, ? r0.1 h3.8)
+   5.0 s   20.1 m  pace 4.04  slope 19  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 3 (? r0.3 h13.4, ? r0.1 h4.6, ? r0.1 h3.8)
+   5.5 s   22.2 m  pace 3.81  slope 28  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+   6.0 s   23.0 m  pace 2.87  slope 31  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+   6.5 s   25.0 m  pace 3.17  slope 32  litter   friction 0.62 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.3 h13.4)
+   7.0 s   26.7 m  pace 3.10  slope 34  litter   friction 0.64 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   7.5 s   28.4 m  pace 3.28  slope 31  litter   friction 0.61 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   8.0 s   30.3 m  pace 3.78  slope 28  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+   8.5 s   32.4 m  pace 4.03  slope 19  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.5 h19.4)
+   9.0 s   34.5 m  pace 4.23  slope  4  litter   friction 0.60 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.5 h19.4)
+   9.5 s   36.6 m  pace 4.24  slope  1  litter   friction 0.61 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.5 h20.0)
+  10.0 s   38.6 m  pace 4.23  slope  3  litter   friction 0.61 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.4 h15.2)
+  10.5 s   40.7 m  pace 4.22  slope  3  litter   friction 0.61 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 1 (? r0.4 h15.2)
+  11.0 s   42.7 m  pace 4.23  slope  1  litter   friction 0.61 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+  11.5 s   44.8 m  pace 4.23  slope  3  litter   friction 0.61 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0
+  12.0 s   46.9 m  pace 4.27  slope  2  litter   friction 0.62 wet 0.00  depth 0.00  walk gait 2 grounded true  biome temperate_forest  things within 3 m 0

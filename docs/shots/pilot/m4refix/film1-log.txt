@@ -1,0 +1,35 @@
+12:34:17 settled {"ok":true,"frames":5,"seconds":2.2}
+12:34:17 --- scene info
+12:34:17 info {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"state":"ON_FOOT","hour":8.140401501705629,"quality":0,"errors":[]}
+12:34:17 --- scene walk
+12:34:53 walk-spawn: 36 frames, 20 steps of 0.033 s each; figure not drawn in 0 of 720 steps (0 %), flips 0; frames without the figure: 
+12:34:54 shot walk-spawn-end
+12:34:54 --- scene jet2
+12:36:29 jet2-up: 12 frames in 78 s, sheet 1920x360
+12:37:47 jet2-down: 18 frames in 77 s, sheet 1920x540
+12:37:48 shot jet2-9-landed
+12:37:48 --- scene v_board
+12:37:48 board from 5.5 m
+12:37:58 v-board: 12 frames, 8 steps of 0.033 s each; figure not drawn in 31 of 96 steps (32 %), flips 1; frames without the figure: 8 9 10 11
+12:37:58 board rows [[0,"BOARDING",true],[1,"BOARDING",true],[2,"BOARDING",true],[3,"BOARDING",true],[4,"BOARDING",true],[5,"BOARDING",true],[6,"BOARDING",true],[7,"BOARDING",true],[8,"BOARDING",false],[9,"BOARDING",false],[10,"BOARDING",false],[11,"LANDED",false]]
+12:38:04 shot v-board-9-seated
+12:38:04 seated: readout {"on":false,"text":"Earth"}
+12:38:04 --- scene v_out
+12:38:11 v-out: 12 frames, 6 steps of 0.033 s each; figure not drawn in 0 of 72 steps (0 %), flips 1; frames without the figure: 
+12:38:20 shot v-out-9
+12:38:20 --- scene outinfo
+12:38:20 out info {"vis":true,"boom":5.2,"tight":0,"lift":0,"slopeDeg":3.8,"near":17,"shipDist":5.8,"hull":0.069}
+12:38:20 --- scene walk_autumn
+12:39:15 walk-autumn: 30 frames, 20 steps of 0.033 s each; figure not drawn in 0 of 600 steps (0 %), flips 0; frames without the figure: 
+12:39:15 --- scene stepout_saturn
+12:39:28 saturn landing {"steps":144,"state":"LANDED","t":102.1}
+12:39:40 shot stepout-saturn-0-landed
+12:39:46 stepout-saturn: 12 frames, 6 steps of 0.033 s each; figure not drawn in 0 of 72 steps (0 %), flips 1; frames without the figure: 
+12:39:48 shot stepout-saturn-9-out
+12:39:48 saturn out {"vis":true,"boom":5.2,"tight":0,"mode":"idle","prompt":{"key":"E","text":"Board ship"}}
+12:39:48 --- scene stepout_neptune
+12:40:00 neptune landing {"steps":144,"state":"LANDED","t":125.5}
+12:40:10 stepout-neptune: 12 frames, 6 steps of 0.033 s each; figure not drawn in 0 of 72 steps (0 %), flips 1; frames without the figure: 
+12:40:12 shot stepout-neptune-9-out
+12:40:12 neptune out {"vis":true,"boom":5.2,"tight":0,"mode":"idle"}
+12:40:12 game errors: []  problems: none

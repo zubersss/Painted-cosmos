@@ -1,0 +1,8 @@
+  21 s ready
+  36 s shot /home/user/.pc-scratch/physics/m4/r/load/spawn.jpg
+  36 s spawn {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":6.666646666666654,"weather":"breeze","wind":1.4995206494756002,"quality":0}
+  65 s shot /home/user/.pc-scratch/physics/m4/r/load/walk.jpg
+  65 s walk {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":9.666646666666733,"weather":"breeze","wind":0.6493018212046449,"quality":0}
+  81 s shot /home/user/.pc-scratch/physics/m4/r/load/clock-1770.jpg
+  81 s storm:1770 {"fallback":[],"using":{"render":"real","world":"real","art":"real","physics":"real","ui":"stub"},"errors":[],"t":1770.999999999999,"weather":"thunderstorm","wind":1.5021669376753446,"quality":0}
+OK: no console error, no game error, fallback empty (quality 0, using {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"})

@@ -1,0 +1,42 @@
+== tree /home/user/.pc-scratch/physics/m4/r/final (13:43:12)
+== world
+# tests 22
+# pass 22
+# fail 0
+== unit
+# tests 184
+# pass 184
+# fail 0
+== physics
+# tests 325
+# pass 325
+# fail 0
+== coast
+   out (m)  water depth  fetch (m)  mean depth  Hs (m)  wind sea  swell reach  white %  waves off the normal (deg)
+   reference sea (the most exposed water about): fetch 2449 m, depth 15.94 m, Hs 0.79 m
+   TARGET (this storm over 2500 m of water 20 m deep, its last 360 s): Hs 0.63 m (wind sea 0.36, swell 0.52), white 5.37 %; blowing for ever it would raise Hs 0.7 m (wind sea 0.36, swell 0.6)
+   80 m out: fetch >= 2000 ok, mean depth >= 12 ok, Hs >= 0.47 ok, white >= 3.22 % ok; surf at the waterline (Hs >= 0.25) ok  =>  PASS
+   out (m)  water depth  fetch (m)  mean depth  Hs (m)  wind sea  swell reach  white %  waves off the normal (deg)
+   reference sea (the most exposed water about): fetch 2500 m, depth 30.64 m, Hs 3.85 m
+   TARGET (this storm over 2500 m of water 20 m deep, its last 360 s): Hs 3.08 m (wind sea 2.24, swell 2.11), white 100 %; blowing for ever it would raise Hs 4.19 m (wind sea 2.45, swell 3.4)
+   80 m out: fetch >= 2000 ok, mean depth >= 12 ok, Hs >= 2.31 ok, white >= 60 % ok; surf at the waterline (Hs >= 0.25) ok  =>  PASS
+== ghostfield
+
+place (0.3, 0.9, 0.3), g 9.81
+  final        {"worstStepLoss":0.26,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+place (0.3, 0.9, 0.3), g 1.62
+  final        {"worstStepLoss":0.52,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+place (0.8, 0.2, -0.55), g 9.81
+  final        {"worstStepLoss":0.26,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+place (0.8, 0.2, -0.55), g 1.62
+  final        {"worstStepLoss":0.52,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+place (0, 0, 1): the plane PHYSICS' P17 test runs in, g 9.81
+  final        {"worstStepLoss":0.26,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+place (0, 0, 1): the plane PHYSICS' P17 test runs in, g 1.62
+  final        {"worstStepLoss":0.52,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+== done (13:47:55)

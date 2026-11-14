@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 78.3,
+   "settledFrames": 31,
+   "tris": 383447,
+   "calls": 208,
+   "worldWorstMs": 389.9,
+   "physicsWorstMs": 277.8,
+   "stoodIn": "mare",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "moon-mare-1",
+   "name": "Silver Mare",
+   "alsoVista": null,
+   "settledSeconds": 50.1,
+   "settledFrames": 21,
+   "tris": 389252,
+   "calls": 214,
+   "worldWorstMs": 304.3,
+   "physicsWorstMs": 277.8,
+   "stoodIn": "mare",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.1,
+    "biome": "mare",
+    "radius": 1417.7722730669068
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 23.9,
+   "settledFrames": 24,
+   "tris": 453629,
+   "calls": 335,
+   "worldWorstMs": 304.3,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

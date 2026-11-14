@@ -15,6 +15,8 @@ export const BODY_IDS = [
 // orbitRadius: distance from parent centre (the sun unless `parent` is set).
 // orbitPeriod / dayLength: seconds for one revolution / one spin. orbitPhase: starting angle.
 // atmosphereHeight: height above `radius` where the atmosphere ends (0 = airless feel).
+// spaceAltitude (optional): overrides the ATMOSPHERE/SPACE boundary (see spaceAltitude() below);
+// set on the Moon and Pluto because their painted mountains reach 250 m and more.
 export const BODIES = {
   mercury: { id: 'mercury', name: 'Mercury', radius: 2200, gravity: 4.4, atmosphereHeight: 180,
     parent: null, orbitRadius: 90e3, orbitPeriod: 5400, orbitPhase: 0.6, dayLength: 2400, axialTilt: 0.02 },
@@ -22,7 +24,7 @@ export const BODIES = {
     parent: null, orbitRadius: 150e3, orbitPeriod: 9000, orbitPhase: 2.3, dayLength: 2100, axialTilt: 0.05 },
   earth: { id: 'earth', name: 'Earth', radius: 4000, gravity: 9.0, atmosphereHeight: 800,
     parent: null, orbitRadius: 220e3, orbitPeriod: 14400, orbitPhase: 0.0, dayLength: 1500, axialTilt: 0.41 },
-  moon: { id: 'moon', name: 'Moon', radius: 1400, gravity: 2.2, atmosphereHeight: 0,
+  moon: { id: 'moon', name: 'Moon', radius: 1400, gravity: 2.2, atmosphereHeight: 0, spaceAltitude: 420,
     parent: 'earth', orbitRadius: 30e3, orbitPeriod: 3600, orbitPhase: 1.1, dayLength: 3600, axialTilt: 0.03 },
   mars: { id: 'mars', name: 'Mars', radius: 3000, gravity: 4.6, atmosphereHeight: 450,
     parent: null, orbitRadius: 300e3, orbitPeriod: 21600, orbitPhase: 4.1, dayLength: 1560, axialTilt: 0.44 },
@@ -33,10 +35,24 @@ export const BODIES = {
   uranus: { id: 'uranus', name: 'Uranus', radius: 4200, gravity: 8.2, atmosphereHeight: 1000,
     parent: null, orbitRadius: 820e3, orbitPeriod: 90000, orbitPhase: 3.4, dayLength: 1200, axialTilt: 1.2 },
   neptune: { id: 'neptune', name: 'Neptune', radius: 4200, gravity: 10.2, atmosphereHeight: 1000,
-    parent: null, orbitRadius: 1000e3, orbitPeriod: 120000, orbitPhase: 0.9, dayLength: 1140, axialTilt: 0.49 },
-  pluto: { id: 'pluto', name: 'Pluto', radius: 1600, gravity: 1.4, atmosphereHeight: 120,
+    parent: null, orbitRadius: 1000e3, orbitPeriod: 120000, orbitPhase: 0.9, dayLength: 1140, axialTilt: -0.49 },   // (tilted the other way, 2026-11-12: every Neptune stand is north, and with +0.49 its north was in winter: the spawn's sun never rose above 2 degrees; now 36 at noon; PAINTER agreed)
+  pluto: { id: 'pluto', name: 'Pluto', radius: 1600, gravity: 1.4, atmosphereHeight: 120, spaceAltitude: 420,
     parent: null, orbitRadius: 1180e3, orbitPeriod: 160000, orbitPhase: 2.8, dayLength: 3000, axialTilt: 0.3 },
 };
+
+// Height above `radius` where flight stops being "in the atmosphere" and becomes space: the
+// ATMOSPHERE/SPACE boundary of the state machine and the top of the ground (co-rotating) flight
+// frame. Airless bodies still get a near-surface zone so landing has room to work.
+// Terrain (including floating islands) should stay below radius + 0.8 * spaceAltitude(body).
+export function spaceAltitude(body) {
+  return body.spaceAltitude || Math.max(body.atmosphereHeight || 0, body.radius * 0.2);
+}
+
+// Radius of the sphere inside which a ship flies in this body's own frame (it follows the body
+// along its orbit). No two spheres overlap at any time (tests/orbits.test.mjs).
+export function soiRadius(body) {
+  return body.soiRadius || body.radius * 4;
+}
 
 export function getBody(id) {
   const b = BODIES[id];

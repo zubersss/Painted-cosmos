@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Painted Cosmos: physics lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<!-- OWNER: PHYSICS. A debug page, not part of the game and not painted: plain lines and points
+     that make the motion judgeable. URL parameters are documented in docs/notes/physics.md. -->
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe4; overflow: hidden; font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; color: #2f3a5d; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #hud { position: fixed; left: 8px; top: 6px; white-space: pre; background: rgba(244, 239, 228, 0.82); padding: 5px 8px; border-radius: 3px; pointer-events: none; max-width: 62ch; }
+  #key { position: fixed; right: 8px; bottom: 6px; white-space: pre; background: rgba(244, 239, 228, 0.82); padding: 5px 8px; border-radius: 3px; pointer-events: none; text-align: right; }
+</style>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">loading...</div>
+<div id="key"></div>
+<script type="module">
+import * as THREE from 'three';
+import { createPhysics, stepExplorerBody, stepShipBody, stepShipGear, wakeShip, FLORA_GLSL, WATER_GLSL, EXPLORER_BODY, SHIP_BODY } from './src/physics/index.js';
+import { createPhysicsKits, PARTICLE_GLSL, SHAPE_GLSL } from './src/physics/three/index.js';
+import { cellsAt, weatherAt } from './src/physics/weather.js';
+import { makeWorld } from './src/physics/testworld.mjs';
+import { BODIES } from './src/data/bodies.js';
+import { hash3 } from './src/physics/util.js';
+
+// ?painted=1: the lab inside PAINTER's real pipeline (its world, its painter, the kits with a
+// material factory to its contract). Everything below this line is the plain debug lab.
+if (new URLSearchParams(location.search).get('painted') === '1') { await import('./src/physics/three/painted-lab.js'); await new Promise(() => {}); }
+
+// ---- parameters -----------------------------------------------------------------------------
+const Q = new URLSearchParams(location.search);
+// ?planet=<name>: one preset per world, showing the weather that is its own. Any parameter given
+// in the URL as well wins over the preset.
+const PLANETS = {
+  mercury: { scene: 'explorer', body: 'mercury', ground: 'ochre_basins', walk: '4', jet: '0' },                        // vacuum: kicked dust flies in parabolas
+  moon: { scene: 'explorer', body: 'moon', ground: 'mare', walk: '4', jet: '0' },                                         // the same, in a sixth of a g
+  venus: { scene: 'rain', body: 'venus', ground: 'acid_terraces', find: 'virga', alt: '20' },                   // acid rain that never reaches the low ground
+  'venus-mesa': { scene: 'rain', body: 'venus', ground: 'pale_mesas', find: 'virga', alt: '280' },              // ... and does reach a high mesa
+  mars: { scene: 'explorer', body: 'mars', ground: 'dust_dunes', find: 'devil', walk: '0', dist: '120', pitch: '16' },   // a dust devil crossing the dunes
+  'mars-storm': { scene: 'explorer', body: 'mars', ground: 'dust_dunes', find: 'dust', walk: '3' },             // a dust storm with hopping sand
+  jupiter: { scene: 'storm', body: 'jupiter', ground: 'lightning_plains', find: 'thunderstorm' },                // a storm on a jet, with lightning
+  'jupiter-globe': { scene: 'globe', body: 'jupiter' },                                                         // the jets, the storm tracks, the Great Red Spot
+  saturn: { scene: 'rain', body: 'saturn', ground: 'crystal_reeds', find: 'drizzle' },                            // fine drizzle and mist on the broad jet
+  'saturn-globe': { scene: 'globe', body: 'saturn' },
+  uranus: { scene: 'snow', body: 'uranus', ground: 'frozen_waves', find: 'ice fall' },                           // slow methane snow
+  neptune: { scene: 'storm', body: 'neptune', ground: 'storm_seas', sea: '0.6', world: 'hills', find: 'thunderstorm' },   // methane rain in the fastest winds there are
+  'neptune-globe': { scene: 'globe', body: 'neptune' },
+  pluto: { scene: 'snow', body: 'pluto', ground: 'nitrogen_dunes', find: 'frost fall' },                         // nitrogen frost falling out of almost nothing
+};
+{ const pz = PLANETS[Q.get('planet')]; if (pz) for (const k in pz) if (!Q.has(k)) Q.set(k, pz[k]); }
+const scene = Q.get('scene') || 'flora';             // flora | wind | rain | snow | storm | explorer | ship | globe
+const bodyId = Q.get('body') && BODIES[Q.get('body')] ? Q.get('body') : 'earth';
+const worldKind = Q.get('world') || (scene === 'wind' ? 'stub' : 'flat');     // flat | hills | slope | stub | real
+const speed = Number(Q.get('speed') || 1);
+const seedQ = Q.get('seed') ? Number(Q.get('seed')) : undefined;
+const groundQ = Q.get('ground');                     // biome id for the synthetic worlds
+const findQ = Q.get('find') || ({ rain: 'rain', snow: 'snow', storm: 'thunderstorm' })[scene] || null;
+const quality = Q.get('quality') ? Number(Q.get('quality')) : 1;
+const windQ = Q.get('wind') ? Number(Q.get('wind')) : null;   // override: steady wind speed in m/s (east)
+let time = Number(Q.get('t') || 600);
+const body = BODIES[bodyId];
+const R = body.radius;
+
+// ---- the world behind sampleSurface -----------------------------------------------------------
+const defaultBiome = { earth: scene === 'snow' ? 'stub-polar' : 'alpine_meadow', mars: 'dust_dunes', moon: 'mare', venus: 'fungal_towers', jupiter: 'lightning_plains', saturn: 'crystal_reeds', uranus: 'frozen_waves', neptune: 'aurora_tundra', pluto: 'nitrogen_dunes', mercury: 'ochre_basins' }[bodyId];
+const biome = groundQ || defaultBiome;
+let sampleSurface;
+if (worldKind === 'stub') {
+  const m = await import('./src/core/stubs/surface.js');
+  sampleSurface = (id, d) => m.stubSurface(id, d);
+} else if (worldKind === 'real') {
+  const m = await import('./src/world/surface.js');
+  sampleSurface = (id, d) => m.sampleSurfacePure(id, d.x, d.y, d.z);
+} else {
+  const up0 = { x: 0.31, y: 0.56, z: 0.77 }, l0 = Math.hypot(up0.x, up0.y, up0.z);
+  const dir0 = { x: up0.x / l0, y: up0.y / l0, z: up0.z / l0 };
+  const opts = { R: R + Number(Q.get('alt') || 0), biome };      // alt: raise the whole synthetic ground above the datum
+  if (worldKind === 'hills') opts.bumps = { amp: 1.6, length: 46 };
+  if (worldKind === 'slope') { const e = { x: dir0.z, y: 0, z: -dir0.x }, el = Math.hypot(e.x, e.z); const k = 260 / R; opts.cone = { dir: norm3({ x: dir0.x + e.x / el * k, y: dir0.y, z: dir0.z + e.z / el * k }), radius: 300, height: 300 * Math.tan(Number(Q.get('slope') || 14) * Math.PI / 180) }; }
+  if (Q.get('sea')) opts.sea = R + Number(Q.get('sea'));
+  const s = makeWorld(opts);
+  sampleSurface = (id, d) => s(d);
+}
+function norm3(a) { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; }
+
+const physics = createPhysics({ sampleSurface, seed: seedQ });
+physics.setQuality(quality);
+const frame = physics.fields.frame;
+
+// ---- where and when -----------------------------------------------------------------------------
+let startDir = norm3({ x: 0.31, y: 0.56, z: 0.77 });
+if (worldKind === 'stub') { const m = await import('./src/core/stubs/surface.js'); startDir = norm3(m.stubSpawn(bodyId).unitDir); }
+if (worldKind === 'real') { const m = await import('./src/world/surface.js'); startDir = norm3(m.getSurface(bodyId).getSpawn()); }
+if (findQ) {
+  // search time (and, off the flat world, place) for the weather that was asked for
+  const want = (w) => (findQ === 'rain' ? w.precipitation.type === 'rain' && w.precipitation.rate > 6
+    : findQ === 'snow' ? w.precipitation.type === 'snow' && w.precipitation.rate > 2.5 && w.temperature < 266
+    : findQ === 'thunderstorm' ? w.storm01 > 0.6 && w.lightning.rate > 2
+    : findQ === 'dust' ? w.dust01 > 0.8 : w.kind === findQ);
+  let found = false;
+  for (let t = time; t < time + 9000 && !found; t += 41) for (const c of cellsAt(bodyId, t, physics.seed)) {
+    const w = weatherAt(bodyId, c.x, c.y, c.z, 0, t + 20, physics.seed, { moist: 1, sun01: 0.5, wind: 4, dustSource: 1, dT: (physics.data.BIOMES[biome] || { dT: 0 }).dT }, {});
+    if (want(w)) { time = t; found = true; if (worldKind !== 'flat' && worldKind !== 'hills' && worldKind !== 'slope') startDir = { x: c.x, y: c.y, z: c.z }; else startDirOverride = { x: c.x, y: c.y, z: c.z }; break; }
+  }
+}
+var startDirOverride;
+if (findQ === 'gale' || findQ === 'calm') {
+  // the windiest (or stillest) place on the globe right now
+  physics.update(1e-6, { bodyId, time, focus: { x: startDir.x * R, y: startDir.y * R, z: startDir.z * R } });     // (sets the clock that physics.air reads)
+  let best = null, bs = findQ === 'gale' ? -1 : 1e9; const o = {};
+  for (let k = 0; k < 4000; k++) {
+    const y = 1 - 2 * (k + 0.5) / 4000, rr = Math.sqrt(1 - y * y), a = k * 2.399963;
+    const d = { x: Math.cos(a) * rr, y, z: Math.sin(a) * rr };
+    const sp = physics.air(bodyId, { x: d.x * R, y: d.y * R, z: d.z * R }, o, 10).speed;
+    if (findQ === 'gale' ? sp > bs : sp < bs) { bs = sp; best = d; }
+  }
+  if (worldKind === 'flat' || worldKind === 'hills' || worldKind === 'slope') startDirOverride = best; else startDir = best;
+}
+if (startDirOverride) {
+  // the synthetic worlds are the same everywhere, so simply stand under the weather
+  startDir = startDirOverride;
+}
+const s0 = sampleSurface(bodyId, startDir);
+let start = { x: startDir.x * s0.radius, y: startDir.y * s0.radius, z: startDir.z * s0.radius };
+if (findQ === 'devil') {
+  // run the clock forward until a dust devil in its prime stands near, then go and stand beside it
+  const sunUp = norm3(start);
+  for (let k = 0; k < 20000; k++) {
+    physics.update(0, { bodyId, time, focus: start, sunDir: sunUp });
+    const D = physics.features.devils; let hit = null;
+    for (let i = 0; i < D.count; i++) if (D[i].strength > 0.9 && D[i].life - D[i].age > 60 && D[i].age < 20) hit = D[i];
+    if (hit) { const fr = physics.fields.frame, q = { x: hit.p.x + fr.ex * 14 - fr.nx * 6, y: hit.p.y + fr.ey * 14 - fr.ny * 6, z: hit.p.z + fr.ez * 14 - fr.nz * 6 }, d = norm3(q), r = sampleSurface(bodyId, d).radius; start = { x: d.x * r, y: d.y * r, z: d.z * r }; break; }
+    time += 0.5;
+  }
+}
+
+// ---- three -------------------------------------------------------------------------------------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(1);
+renderer.setClearColor(0xf4efe4, 1);
+const scene3 = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 4000);
+function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+// Lab space: frame coordinates (east, up, north) -> three (x, y, -z).
+const toLab = (p, out) => { const x = frame.lx(p.x, p.y, p.z), z = frame.lz(p.x, p.y, p.z); const y = (p.x - frame.ox) * frame.ax + (p.y - frame.oy) * frame.ay + (p.z - frame.oz) * frame.az; out.set(x, y, -z); return out; };
+const vecLab = (v, out) => { out.set(v.x * frame.ex + v.y * frame.ey + v.z * frame.ez, v.x * frame.ax + v.y * frame.ay + v.z * frame.az, -(v.x * frame.nx + v.y * frame.ny + v.z * frame.nz)); return out; };
+const _d = [0, 0, 0], _dv = { x: 0, y: 0, z: 0 };
+// ground height in lab space (metres above the anchor's tangent plane), straight from sampleSurface
+function groundY(x, z) { frame.dir(x, z, _d); _dv.x = _d[0]; _dv.y = _d[1]; _dv.z = _d[2]; const s = sampleSurface(bodyId, _dv); return s.radius * (_d[0] * frame.ax + _d[1] * frame.ay + _d[2] * frame.az) - frame.r0; }
+function liquidY(x, z) { frame.dir(x, z, _d); _dv.x = _d[0]; _dv.y = _d[1]; _dv.z = _d[2]; const s = sampleSurface(bodyId, _dv); return (s.liquidRadius || 0) > s.radius ? s.liquidRadius * (_d[0] * frame.ax + _d[1] * frame.ay + _d[2] * frame.az) - frame.r0 : null; }
+
+const C = { ink: 0x2f3a5d, sepia: 0x584435, green: 0x4f7a3a, leaf: 0x3d6a47, blue: 0x4d60b2, sky: 0x73a9d1, red: 0xda492c, gold: 0xdba436, grey: 0x8f9189, violet: 0x8c7aba };
+const line = (color, opacity = 1) => new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity });
+
+// ---- ground mesh ---------------------------------------------------------------------------------
+const view = { wind: 150, globe: 0, ship: 13, explorer: 7, flora: 16, rain: 22, snow: 22, storm: 26 }[scene] ?? 16;   // half-width shown, m
+const GN = 40, gHalf = Math.max(view * 1.6, 30);
+const groundGeo = new THREE.BufferGeometry();
+const gPos = new Float32Array((GN + 1) * (GN + 1) * 3);
+groundGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
+{ const idx = []; for (let j = 0; j <= GN; j++) for (let i = 0; i <= GN; i++) { const n = j * (GN + 1) + i; if (i < GN) idx.push(n, n + 1); if (j < GN) idx.push(n, n + GN + 1); } groundGeo.setIndex(idx); }
+const groundMesh = new THREE.LineSegments(groundGeo, line(C.grey, 0.45));
+scene3.add(groundMesh);
+let gCx = 1e9, gCz = 1e9;
+function rebuildGround(cx, cz) {
+  const step = gHalf * 2 / GN;
+  cx = Math.round(cx / step) * step; cz = Math.round(cz / step) * step;
+  if (cx === gCx && cz === gCz) return;
+  gCx = cx; gCz = cz;
+  for (let j = 0; j <= GN; j++) for (let i = 0; i <= GN; i++) {
+    const x = cx + (i - GN / 2) * step, z = cz + (j - GN / 2) * step, o = (j * (GN + 1) + i) * 3;
+    gPos[o] = x; gPos[o + 1] = groundY(x, z); gPos[o + 2] = -z;
+  }
+  groundGeo.attributes.position.needsUpdate = true; groundGeo.computeBoundingSphere();
+}
+
+// ---- the liquid surface, drawn with the physics wave chunk; red dots are the JS twin ----------------
+const WN = 56, wHalf = 34;
+const waterU = { uPhysAnchor: { value: new THREE.Vector3(0, 0, 0) }, uPhysEast: { value: new THREE.Vector3(1, 0, 0) }, uPhysNorth: { value: new THREE.Vector3(0, 0, -1) }, uPhysUp: { value: new THREE.Vector3(0, 1, 0) },
+  uPhysWaterDir: { value: new THREE.Vector2(1, 0) }, uPhysWaterK: { value: new THREE.Vector4() }, uPhysWaterAmp: { value: new THREE.Vector4() }, uPhysWaterPhase: { value: new THREE.Vector4() }, uPhysWaterGroup: { value: new THREE.Vector4() },
+  uPhysWaterSea: { value: new THREE.Vector4(0, 1e9, 1, 0) },
+  uPhysWake: { value: physics.fields.water.uniforms.uPhysWake }, uPhysWakeG: { value: 9.81 }, uOffset: { value: new THREE.Vector3() } };
+const waterGeo = new THREE.BufferGeometry();
+{ const pos = new Float32Array((WN + 1) * (WN + 1) * 3), idx = []; const step = wHalf * 2 / WN;
+  for (let j = 0; j <= WN; j++) for (let i = 0; i <= WN; i++) { const o = (j * (WN + 1) + i) * 3, n = j * (WN + 1) + i; pos[o] = (i - WN / 2) * step; pos[o + 1] = 0; pos[o + 2] = -(j - WN / 2) * step; if (i < WN) idx.push(n, n + 1); if (j < WN && i % 4 === 0) idx.push(n, n + WN + 1); }
+  waterGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); waterGeo.setIndex(idx); }
+const waterMesh = new THREE.LineSegments(waterGeo, new THREE.ShaderMaterial({ uniforms: waterU, transparent: true,
+  vertexShader: `${WATER_GLSL}
+    uniform vec3 uOffset; varying float vH; varying vec2 vCrest;
+    void main() { vec3 p = position + uOffset; vec3 w = pcPhysWater(p); vH = w.x; vCrest = pcPhysWaterCrest(w); p.y += w.x; gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
+  // blue: the surface; pale: its crests (crest01); red: where it is breaking (foam01)
+  fragmentShader: `varying float vH; varying vec2 vCrest; void main() { vec3 c = mix(vec3(0.30, 0.38, 0.70), vec3(0.80, 0.90, 0.97), vCrest.x); gl_FragColor = vec4(mix(c, vec3(0.85, 0.25, 0.2), vCrest.y), 0.8); }` }));
+waterMesh.frustumCulled = false; waterMesh.visible = false; scene3.add(waterMesh);
+const waterDots = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: C.red, size: 4, sizeAttenuation: false }));
+waterDots.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(40 * 3), 3)); waterDots.frustumCulled = false; waterDots.visible = false; scene3.add(waterDots);
+function updateWater(cx, cz) {
+  const W = physics.fields.water.field;
+  const lv = liquidY(cx, cz) ?? (W.present ? W.level : null);
+  waterMesh.visible = waterDots.visible = W.present && lv != null;
+  if (!waterMesh.visible) return;
+  const u = physics.fields.water.uniforms, step = wHalf * 2 / WN;
+  waterU.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); waterU.uPhysWaterK.value.fromArray(u.uPhysWaterK); waterU.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); waterU.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase); waterU.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); waterU.uPhysWaterSea.value.fromArray(u.uPhysWaterSea); waterU.uPhysWakeG.value = u.uPhysWakeG;
+  waterU.uOffset.value.set(Math.round(cx / step) * step, lv, -Math.round(cz / step) * step);
+  const a = waterDots.geometry.attributes.position.array;
+  for (let i = 0; i < 40; i++) { const x = cx + (i - 20) * 1.1, z = cz + ((i * 7) % 11 - 5) * 1.3; a[i * 3] = x; a[i * 3 + 1] = lv + W.heightAt(x, z); a[i * 3 + 2] = -z; }
+  waterDots.geometry.attributes.position.needsUpdate = true;
+}
+
+// ---- flora drawn with the physics GLSL chunk ------------------------------------------------------
+const F = physics.fields.flora;
+// Two ways to give the fields to the GPU. Default: 32-bit float textures, nearest filter, the
+// chunk does its own bilinear blend (4 texel fetches a lookup; works everywhere).
+// ?linear=1: 16-bit half-float textures with the hardware's linear filter and
+// `#define PC_PHYS_LINEAR` in front of the chunk (1 fetch a lookup; filterable in every WebGL2).
+const LINEAR = Q.get('linear') === '1';
+const PHYS_DEFINE = LINEAR ? '#define PC_PHYS_LINEAR\n' : '';
+const halfOf = (arr) => new Uint16Array(arr.length);
+const toHalf = (src, dst) => { for (let i = 0; i < src.length; i++) dst[i] = THREE.DataUtils.toHalfFloat(src[i]); };
+const tex = (arr, n) => {
+  const t = LINEAR ? new THREE.DataTexture(halfOf(arr), n, n, THREE.RGBAFormat, THREE.HalfFloatType) : new THREE.DataTexture(arr, n, n, THREE.RGBAFormat, THREE.FloatType);
+  t.minFilter = t.magFilter = LINEAR ? THREE.LinearFilter : THREE.NearestFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.userData.src = arr; if (LINEAR) toHalf(arr, t.image.data);
+  t.needsUpdate = true; return t;
+};
+const upload = (t) => { if (LINEAR) toHalf(t.userData.src, t.image.data); t.needsUpdate = true; };
+const tBend = tex(F.bend, F.size), tWind = tex(F.wind, F.size), tPush = tex(F.push, F.nearSize);
+const U = {
+  uPhysBend: { value: tBend }, uPhysWind: { value: tWind }, uPhysPush: { value: tPush },
+  uPhysAnchor: { value: new THREE.Vector3(0, 0, 0) }, uPhysEast: { value: new THREE.Vector3(1, 0, 0) },
+  uPhysNorth: { value: new THREE.Vector3(0, 0, -1) }, uPhysUp: { value: new THREE.Vector3(0, 1, 0) },
+  uPhysWindMap: { value: new THREE.Vector4() }, uPhysNearMap: { value: new THREE.Vector4() },
+  uPhysWave: { value: new THREE.Vector4() }, uPhysWavePhase: { value: new THREE.Vector4() }, uPhysShape: { value: new THREE.Vector4() },
+  uColor: { value: new THREE.Color(C.green) },
+};
+const plantVert = `
+${PHYS_DEFINE}${FLORA_GLSL}
+attribute vec3 aRoot;      // lab-space root (in the lab, "body-local" is lab space: anchor 0, east +X, north -Z, up +Y)
+attribute vec4 aPlant;     // height (m), stiff01, yaw, lean seed
+varying float vShake;
+void main() {
+  vec4 b = aPlant.w > 0.5 ? vec4(pcPhysBendLite(aRoot, aPlant.y), 0.0, 0.0) : pcPhysBend(aRoot, aPlant.y);
+  // the blade model is a unit stem along +Y with a little sideways shape in x
+  float c = cos(aPlant.z), s = sin(aPlant.z);
+  vec3 rel = vec3(position.x * c * aPlant.x, position.y * aPlant.x, position.x * s * aPlant.x);
+  vec3 p = aRoot + pcPhysDisplace(rel, vec3(0.0, 1.0, 0.0), aPlant.x, b.xy);
+  vShake = b.w;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`;
+const plantFrag = `uniform vec3 uColor; varying float vShake; void main() { gl_FragColor = vec4(mix(uColor, vec3(0.86, 0.29, 0.17), clamp(vShake, 0.0, 1.0) * 0.8), 1.0); }`;
+function plantMaterial(color) { return new THREE.ShaderMaterial({ uniforms: { ...U, uColor: { value: new THREE.Color(color) } }, vertexShader: plantVert, fragmentShader: plantFrag }); }
+// a grass blade: 5 segments, slightly curved; a tree: trunk and a ragged crown outline
+function bladeGeo() { const v = []; const n = 5; for (let i = 0; i < n; i++) { const a = i / n, b = (i + 1) / n; v.push(0.04 * Math.sin(a * 2.2), a, 0, 0.04 * Math.sin(b * 2.2), b, 0); } return v; }
+function treeGeo() { const v = [0, 0, 0, 0, 0.55, 0]; const n = 12; for (let i = 0; i < n; i++) { const a = i / n * 6.283, b = (i + 1) / n * 6.283; const r = (t) => 0.2 + 0.05 * Math.sin(t * 3.0); v.push(Math.cos(a) * r(a), 0.75 + Math.sin(a) * 0.25, 0, Math.cos(b) * r(b), 0.75 + Math.sin(b) * 0.25, 0); } v.push(0, 0.55, 0, 0, 0.9, 0); return v; }
+function makePlants(base, maxCount, color) {
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(base, 3));
+  const roots = new Float32Array(maxCount * 3), params = new Float32Array(maxCount * 4);
+  g.setAttribute('aRoot', new THREE.InstancedBufferAttribute(roots, 3));
+  g.setAttribute('aPlant', new THREE.InstancedBufferAttribute(params, 4));
+  const m = new THREE.LineSegments(g, plantMaterial(color));
+  m.frustumCulled = false;
+  scene3.add(m);
+  return { g, roots, params, m, count: 0 };
+}
+const showFlora = scene !== 'globe' && scene !== 'wind' && (Q.get('flora') ? Q.get('flora') !== '0' : scene !== 'explorer');
+const grassHalf = scene === 'ship' ? 18 : 14, grassCell = scene === 'ship' ? 0.55 : 0.42;
+const GN2 = Math.ceil(grassHalf * 2 / grassCell);
+const grass = showFlora ? makePlants(bladeGeo(), GN2 * GN2, C.green) : null;
+const trees = showFlora ? makePlants(treeGeo(), 400, C.leaf) : null;
+const grassH = Number(Q.get('grass') || ({ earth: 0.5 }[bodyId] ?? 0.5));
+let pCx = 1e9, pCz = 1e9;
+const probes = [];            // plants whose tips are also computed on the CPU
+function rebuildPlants(cx, cz) {
+  if (!showFlora) return;
+  const ci = Math.round(cx / 4), cj = Math.round(cz / 4);
+  if (ci === pCx && cj === pCz) return;
+  pCx = ci; pCz = cj;
+  probes.length = 0;
+  let n = 0;
+  const i0 = Math.floor((ci * 4 - grassHalf) / grassCell), j0 = Math.floor((cj * 4 - grassHalf) / grassCell);
+  for (let j = 0; j < GN2; j++) for (let i = 0; i < GN2; i++) {
+    const gi = i0 + i, gj = j0 + j;
+    const x = (gi + hash3(gi, gj, 1, 7)) * grassCell, z = (gj + hash3(gi, gj, 2, 7)) * grassCell;
+    const y = groundY(x, z);
+    const lq = liquidY(x, z); if (lq != null && lq > y + 0.05) continue;
+    const h = grassH * (0.6 + 0.8 * hash3(gi, gj, 3, 7));
+    grass.roots[n * 3] = x; grass.roots[n * 3 + 1] = y; grass.roots[n * 3 + 2] = -z;
+    grass.params[n * 4] = h; grass.params[n * 4 + 1] = 0; grass.params[n * 4 + 2] = hash3(gi, gj, 4, 7) * 6.283; grass.params[n * 4 + 3] = 0;
+    if (hash3(gi, gj, 5, 7) < 0.012 && probes.length < 60) probes.push({ x, y, z, h, stiff: 0 });
+    n++;
+  }
+  grass.count = n; grass.g.instanceCount = n; grass.g.attributes.aRoot.needsUpdate = true; grass.g.attributes.aPlant.needsUpdate = true;
+  // trees on a 9 m jittered grid, outside a clearing round the start
+  n = 0;
+  const th = 60, tc = 9, ti0 = Math.floor((ci * 4 - th) / tc), tj0 = Math.floor((cj * 4 - th) / tc), TN = Math.ceil(th * 2 / tc);
+  const treeDensity = Number(Q.get('trees') ?? (scene === 'flora' || scene === 'storm' ? 0.22 : 0.08));
+  for (let j = 0; j < TN && n < 400; j++) for (let i = 0; i < TN && n < 400; i++) {
+    const gi = ti0 + i, gj = tj0 + j;
+    if (hash3(gi, gj, 9, 11) > treeDensity) continue;
+    const x = (gi + hash3(gi, gj, 1, 11)) * tc, z = (gj + hash3(gi, gj, 2, 11)) * tc;
+    if (Math.hypot(x, z) < 11) continue;
+    const y = groundY(x, z), h = 8 + 7 * hash3(gi, gj, 3, 11);
+    trees.roots[n * 3] = x; trees.roots[n * 3 + 1] = y; trees.roots[n * 3 + 2] = -z;
+    trees.params[n * 4] = h; trees.params[n * 4 + 1] = 1; trees.params[n * 4 + 2] = hash3(gi, gj, 4, 11) * 6.283; trees.params[n * 4 + 3] = 1;      // w = 1: the one-lookup variant
+    if (probes.length < 75 && Math.hypot(x - cx, z - cz) < 40) probes.push({ x, y, z, h, stiff: 1 });
+    n++;
+  }
+  trees.count = n; trees.g.instanceCount = n; trees.g.attributes.aRoot.needsUpdate = true; trees.g.attributes.aPlant.needsUpdate = true;
+}
+// CPU twin: the same tips computed in JS, drawn as dots. They must sit on the shader-drawn tips.
+const probeGeo = new THREE.BufferGeometry();
+const probePos = new Float32Array(80 * 3);
+probeGeo.setAttribute('position', new THREE.BufferAttribute(probePos, 3));
+const probePts = new THREE.Points(probeGeo, new THREE.PointsMaterial({ color: C.red, size: 5, sizeAttenuation: false }));
+probePts.frustumCulled = false; scene3.add(probePts);
+const _b = {}, _dp = {};
+function updateProbes() {
+  let n = 0;
+  for (const p of probes) {
+    if (p.stiff) F.field.plantBendLite(p.x, p.z, p.stiff, _b); else F.field.plantBend(p.x, p.z, p.stiff, _b);
+    // the tip of a blade is the model point (0.04 sin(2.2), 1): its own sideways offset is ignored here (4 % of the height)
+    const tipH = p.stiff ? p.h * 0.9 : p.h;
+    F.plantDisplace(tipH, p.h, _b.e, _b.n, _dp);
+    probePos[n * 3] = p.x + _dp.e; probePos[n * 3 + 1] = p.y + _dp.up; probePos[n * 3 + 2] = -(p.z + _dp.n);
+    n++;
+  }
+  probeGeo.setDrawRange(0, n); probeGeo.attributes.position.needsUpdate = true;
+}
+
+// ---- shader against JS, in numbers ----------------------------------------------------------------
+// The probe plants are drawn once more as single points into a float target, one texel each,
+// whose colour is the displaced tip the GLSL chunk computes. Read back and compared with the JS
+// twin, that is the agreement in metres.
+let agreeRT = null, agreeMesh = null, agreeScene = null, agreeCam = null;
+function shaderAgreement() {
+  const n = probes.length;
+  if (!n || !showFlora) return null;
+  if (!agreeRT) {
+    agreeRT = new THREE.WebGLRenderTarget(80, 1, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(80 * 3), 3));
+    g.setAttribute('aRoot', new THREE.BufferAttribute(new Float32Array(80 * 3), 3));
+    g.setAttribute('aPlant', new THREE.BufferAttribute(new Float32Array(80 * 4), 4));
+    const m = new THREE.ShaderMaterial({
+      uniforms: U,
+      vertexShader: `${PHYS_DEFINE}${FLORA_GLSL}
+        attribute vec3 aRoot; attribute vec4 aPlant; varying vec3 vTip;
+        void main() {
+          vec2 bend = aPlant.w > 0.5 ? pcPhysBendLite(aRoot, aPlant.y) : pcPhysBend(aRoot, aPlant.y).xy;
+          vTip = aRoot + pcPhysDisplace(vec3(0.0, aPlant.z, 0.0), vec3(0.0, 1.0, 0.0), aPlant.x, bend);
+          gl_Position = vec4((position.x + 0.5) / 80.0 * 2.0 - 1.0, 0.0, 0.0, 1.0);
+          gl_PointSize = 1.0;
+        }`,
+      fragmentShader: 'varying vec3 vTip; void main() { gl_FragColor = vec4(vTip, 1.0); }',
+    });
+    agreeMesh = new THREE.Points(g, m); agreeMesh.frustumCulled = false;
+    agreeScene = new THREE.Scene(); agreeScene.add(agreeMesh); agreeCam = new THREE.Camera();
+  }
+  const g = agreeMesh.geometry, ip = g.attributes.position.array, ar = g.attributes.aRoot.array, ap = g.attributes.aPlant.array;
+  for (let i = 0; i < n; i++) {
+    const p = probes[i];
+    ip[i * 3] = i; ar[i * 3] = p.x; ar[i * 3 + 1] = p.y; ar[i * 3 + 2] = -p.z;
+    ap[i * 4] = p.h; ap[i * 4 + 1] = p.stiff; ap[i * 4 + 2] = p.stiff ? p.h * 0.9 : p.h; ap[i * 4 + 3] = p.stiff ? 1 : 0;
+  }
+  g.attributes.position.needsUpdate = g.attributes.aRoot.needsUpdate = g.attributes.aPlant.needsUpdate = true;
+  g.setDrawRange(0, n);
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(agreeRT); renderer.clear(); renderer.render(agreeScene, agreeCam); renderer.setRenderTarget(prev);
+  const px = new Float32Array(80 * 4);
+  renderer.readRenderTargetPixels(agreeRT, 0, 0, 80, 1, px);
+  let max = 0, sum = 0, disp = 0, maxSoft = 0, maxStiff = 0;
+  for (let i = 0; i < n; i++) {
+    const p = probes[i];
+    const e = Math.hypot(px[i * 4] - probePos[i * 3], px[i * 4 + 1] - probePos[i * 3 + 1], px[i * 4 + 2] - probePos[i * 3 + 2]);
+    const tipH = p.stiff ? p.h * 0.9 : p.h;
+    disp = Math.max(disp, Math.hypot(probePos[i * 3] - p.x, probePos[i * 3 + 1] - (p.y + tipH), probePos[i * 3 + 2] + p.z));
+    max = Math.max(max, e); sum += e * e;
+    if (p.stiff) maxStiff = Math.max(maxStiff, e); else maxSoft = Math.max(maxSoft, e);
+  }
+  return { plants: n, maxError: max, rmsError: Math.sqrt(sum / n), maxErrorGrass: maxSoft, maxErrorTrees: maxStiff, largestTipDisplacement: disp };
+}
+
+// ---- the wave chunk against its JS twin, in numbers --------------------------------------------------
+// 120 points of the sea are drawn as single texels into a float target, two rows: the first holds
+// (height, dh/deast, dh/dnorth, crest01) as the GLSL chunk computes them, the second (foam01,
+// along.x, along.y, surf01 at 0.6 m). Read back and compared with WaterField.surfaceAt.
+let wagRT = null, wagMesh = null, wagScene = null;
+function waterAgreement() {
+  const W = physics.fields.water.field;
+  if (!W.present) return null;
+  const N = 120;
+  if (!wagRT) {
+    wagRT = new THREE.WebGLRenderTarget(N, 2, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
+    g.setAttribute('aAt', new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
+    const m = new THREE.ShaderMaterial({ uniforms: waterU,
+      vertexShader: `${WATER_GLSL}
+        attribute vec3 aAt; varying vec4 vOut;
+        void main() {
+          vec2 along; vec3 w = pcPhysWaterD(aAt, along); vec2 c = pcPhysWaterCrest(w);
+          vOut = position.y < 0.5 ? vec4(w, c.x) : vec4(c.y, along, pcPhysWaterSurf(0.6));
+          gl_Position = vec4((position.x + 0.5) / ${N}.0 * 2.0 - 1.0, position.y - 0.5, 0.0, 1.0); gl_PointSize = 1.0;
+        }`,
+      fragmentShader: 'varying vec4 vOut; void main() { gl_FragColor = vOut; }' });
+    wagMesh = new THREE.Points(g, m); wagMesh.frustumCulled = false; wagScene = new THREE.Scene(); wagScene.add(wagMesh);
+  }
+  const u = physics.fields.water.uniforms;
+  waterU.uPhysWaterDir.value.fromArray(u.uPhysWaterDir); waterU.uPhysWaterK.value.fromArray(u.uPhysWaterK); waterU.uPhysWaterAmp.value.fromArray(u.uPhysWaterAmp); waterU.uPhysWaterPhase.value.fromArray(u.uPhysWaterPhase); waterU.uPhysWaterGroup.value.fromArray(u.uPhysWaterGroup); waterU.uPhysWaterSea.value.fromArray(u.uPhysWaterSea); waterU.uPhysWakeG.value = u.uPhysWakeG;
+  const g = wagMesh.geometry, ip = g.attributes.position.array, at = g.attributes.aAt.array, pts = [];
+  // points round the focus (the lab frame: x east, -z north), a few of them on the wakes if there are any
+  const F0 = physics.focus, fx = frame.lx(F0.x, F0.y, F0.z), fz = frame.lz(F0.x, F0.y, F0.z);
+  for (let i = 0; i < N; i++) { const x = fx + Math.sin(i * 1.7) * (2 + i * 0.4), z = fz + Math.cos(i * 2.3) * (2 + i * 0.4); pts.push([x, z]);
+    for (let r = 0; r < 2; r++) { const o = (r * N + i) * 3; ip[o] = i; ip[o + 1] = r; ip[o + 2] = 0; at[o] = x; at[o + 1] = 0; at[o + 2] = -z; } }
+  g.attributes.position.needsUpdate = g.attributes.aAt.needsUpdate = true;
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(wagRT); renderer.clear(); renderer.render(wagScene, new THREE.Camera()); renderer.setRenderTarget(prev);
+  const px = new Float32Array(N * 2 * 4); renderer.readRenderTargetPixels(wagRT, 0, 0, N, 2, px);
+  const o = {}, e = { height: 0, slope: 0, crest01: 0, foam01: 0, along: 0, surf01: 0 }; let hMax = 0, sMax = 0, crests = 0, foams = 0;
+  for (let i = 0; i < N; i++) {
+    W.surfaceAt(pts[i][0], pts[i][1], o);
+    const a = i * 4, b = (N + i) * 4;
+    e.height = Math.max(e.height, Math.abs(px[a] - o.height)); e.slope = Math.max(e.slope, Math.abs(px[a + 1] - o.de), Math.abs(px[a + 2] - o.dn));
+    e.crest01 = Math.max(e.crest01, Math.abs(px[a + 3] - o.crest01)); e.foam01 = Math.max(e.foam01, Math.abs(px[b] - o.foam01));
+    e.along = Math.max(e.along, Math.hypot(px[b + 1] - o.ax, px[b + 2] - o.az)); e.surf01 = Math.max(e.surf01, Math.abs(px[b + 3] - physics.fields.water.surf01(0.6)));
+    hMax = Math.max(hMax, Math.abs(o.height)); sMax = Math.max(sMax, Math.hypot(o.de, o.dn)); if (o.crest01 > 0.5) crests++; if (o.foam01 > 0.5) foams++;
+  }
+  let wakes = 0; for (let w = 3; w < W.wake.length; w += 4) if (W.wake[w] > 0) wakes++;
+  return { points: N, maxError: e, largestHeight: hMax, steepestSlope: sMax, onCrests: crests, inFoam: foams, wakes, Hs: W.height, cover: W.cover, breakingAbove: W.foamAt };
+}
+
+// ---- wind arrows -----------------------------------------------------------------------------------
+const A = physics.fields.air;
+const arrowN = A.N * A.N;
+const arrowGeo = new THREE.BufferGeometry();
+const arrowPos = new Float32Array(arrowN * 6 * 3), arrowCol = new Float32Array(arrowN * 6 * 3);
+arrowGeo.setAttribute('position', new THREE.BufferAttribute(arrowPos, 3));
+arrowGeo.setAttribute('color', new THREE.BufferAttribute(arrowCol, 3));
+const arrows = new THREE.LineSegments(arrowGeo, new THREE.LineBasicMaterial({ vertexColors: true }));
+arrows.frustumCulled = false; scene3.add(arrows);
+const showArrows = Q.get('arrows') !== '0';
+const _s = {};
+function updateArrows() {
+  if (!showArrows) { arrowGeo.setDrawRange(0, 0); return; }
+  const T = A.terrain, k = scene === 'wind' ? 3.2 : 0.9, lift = scene === 'wind' ? 3 : 2;
+  let n = 0;
+  const cLo = new THREE.Color(C.sky), cHi = new THREE.Color(C.red), c = new THREE.Color();
+  for (let j = 0; j < A.N; j++) for (let i = 0; i < A.N; i++) {
+    const x = (T.ci + i - T.half) * A.cell, z = (T.cj + j - T.half) * A.cell;
+    if (Math.abs(x - cam.fx) > view * 1.7 || Math.abs(z - cam.fz) > view * 1.7) continue;
+    A.sample(x, z, _s);
+    const y = (_s.h === _s.h ? _s.h : 0) + lift;
+    // the arrow shows the wind at 2 m: reference wind x height factor (taken from the flora wind field)
+    const we = _s.we * 0.72, wn = _s.wn * 0.72, sp = Math.hypot(we, wn);
+    const ex = x + we * k, ez = z + wn * k;
+    const hx = sp > 1e-3 ? we / sp : 1, hz = sp > 1e-3 ? wn / sp : 0, hl = Math.min(1.2, sp * k * 0.3);
+    const o = n * 18;
+    const P = [x, y, -z, ex, y, -ez, ex, y, -ez, ex - (hx * 0.9 - hz * 0.5) * hl, y, -(ez - (hz * 0.9 + hx * 0.5) * hl), ex, y, -ez, ex - (hx * 0.9 + hz * 0.5) * hl, y, -(ez - (hz * 0.9 - hx * 0.5) * hl)];
+    c.copy(cLo).lerp(cHi, Math.min(1, Math.max(0, 0.5 + 0.5 * _s.gust)));
+    for (let q = 0; q < 18; q++) { arrowPos[o + q] = P[q]; arrowCol[o + q] = q % 3 === 0 ? c.r : q % 3 === 1 ? c.g : c.b; }
+    n++;
+  }
+  arrowGeo.setDrawRange(0, n * 6); arrowGeo.attributes.position.needsUpdate = true; arrowGeo.attributes.color.needsUpdate = true;
+}
+
+// ---- particles ---------------------------------------------------------------------------------------
+const P = physics.particles;
+const rainGeo = new THREE.BufferGeometry();
+const rainPos = new Float32Array(P.rain.capacity * 6);
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+const rainLines = new THREE.LineSegments(rainGeo, line(C.blue, 0.75)); rainLines.frustumCulled = false; scene3.add(rainLines);
+const snowGeo = new THREE.BufferGeometry();
+const snowPos = new Float32Array(P.snow.capacity * 3);
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+const snowPts = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: C.violet, size: 3, sizeAttenuation: false })); snowPts.frustumCulled = false; scene3.add(snowPts);
+const evGeo = new THREE.BufferGeometry();
+const evPos = new Float32Array(P.events.capacity * 12);
+evGeo.setAttribute('position', new THREE.BufferAttribute(evPos, 3));
+const evLines = new THREE.LineSegments(evGeo, line(C.ink, 0.8)); evLines.frustumCulled = false; scene3.add(evLines);
+// the loose kinds, each a cloud of points in its own colour
+const LOOSE_DRAW = { dust: [C.sepia, 2.5], sand: [C.gold, 2.5], ash: [C.grey, 2.5], spores: [C.green, 3], leaves: [C.red, 4], spray: [C.sky, 2.5], hail: [C.ink, 4] };
+const looseDraw = {};
+for (const k of Object.keys(LOOSE_DRAW)) {
+  const g = new THREE.BufferGeometry(); const a = new Float32Array(P[k].capacity * 3);
+  g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: LOOSE_DRAW[k][0], size: LOOSE_DRAW[k][1], sizeAttenuation: false })); m.frustumCulled = false; scene3.add(m);
+  looseDraw[k] = { g, a, m };
+}
+// dust devils: a ring at the foot and a line up the core
+const devilGeo = new THREE.BufferGeometry();
+const devilPos = new Float32Array(6 * 34 * 6);
+devilGeo.setAttribute('position', new THREE.BufferAttribute(devilPos, 3));
+const devilLines = new THREE.LineSegments(devilGeo, line(C.sepia, 0.8)); devilLines.frustumCulled = false; scene3.add(devilLines);
+function updateDevils() {
+  const D = physics.features.devils; let m = 0;
+  for (let k = 0; k < D.count; k++) {
+    const d = D[k], y = groundY(d.x, d.z), r = d.radius;
+    for (let i = 0; i < 32; i++) { const a = i / 32 * 6.283, b = (i + 1) / 32 * 6.283; devilPos.set([d.x + Math.cos(a) * r, y + 0.1, -(d.z + Math.sin(a) * r), d.x + Math.cos(b) * r, y + 0.1, -(d.z + Math.sin(b) * r)], m * 6); m++; }
+    devilPos.set([d.x, y, -d.z, d.x, y + d.height * d.strength, -d.z], m * 6); m++;
+  }
+  devilGeo.setDrawRange(0, m * 2); devilGeo.attributes.position.needsUpdate = true;
+}
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _pp = { x: 0, y: 0, z: 0 };
+function updateParticles() {
+  for (const k of Object.keys(looseDraw)) {
+    const b = P[k], L = looseDraw[k];
+    for (let i = 0; i < b.count; i++) { _pp.x = b.origin.x + b.pos[i * 3]; _pp.y = b.origin.y + b.pos[i * 3 + 1]; _pp.z = b.origin.z + b.pos[i * 3 + 2]; toLab(_pp, _v); L.a[i * 3] = _v.x; L.a[i * 3 + 1] = _v.y; L.a[i * 3 + 2] = _v.z; }
+    L.g.setDrawRange(0, b.count); L.g.attributes.position.needsUpdate = true;
+  }
+  updateDevils();
+  const b = P.rain; let n = b.count;
+  for (let i = 0; i < n; i++) {
+    _pp.x = b.origin.x + b.pos[i * 3]; _pp.y = b.origin.y + b.pos[i * 3 + 1]; _pp.z = b.origin.z + b.pos[i * 3 + 2];
+    toLab(_pp, _v); _pp.x = b.vel[i * 3]; _pp.y = b.vel[i * 3 + 1]; _pp.z = b.vel[i * 3 + 2]; vecLab(_pp, _v2);
+    const o = i * 6, e = 0.045;       // a 45 ms exposure: the streak is the velocity
+    rainPos[o] = _v.x; rainPos[o + 1] = _v.y; rainPos[o + 2] = _v.z; rainPos[o + 3] = _v.x - _v2.x * e; rainPos[o + 4] = _v.y - _v2.y * e; rainPos[o + 5] = _v.z - _v2.z * e;
+  }
+  rainGeo.setDrawRange(0, n * 2); rainGeo.attributes.position.needsUpdate = true;
+  const s = P.snow; n = s.count;
+  for (let i = 0; i < n; i++) { _pp.x = s.origin.x + s.pos[i * 3]; _pp.y = s.origin.y + s.pos[i * 3 + 1]; _pp.z = s.origin.z + s.pos[i * 3 + 2]; toLab(_pp, _v); snowPos[i * 3] = _v.x; snowPos[i * 3 + 1] = _v.y; snowPos[i * 3 + 2] = _v.z; }
+  snowGeo.setDrawRange(0, n); snowGeo.attributes.position.needsUpdate = true;
+  // splashes: a little crown that opens for a third of a second
+  const E = P.events; let m = 0;
+  for (let k = 0; k < Math.min(E.total, E.capacity); k++) {
+    const o = k * 8, age = physics.time - E.data[o + 5];
+    if (age < 0 || age > 0.35) continue;
+    _pp.x = E.origin.x + E.data[o]; _pp.y = E.origin.y + E.data[o + 1]; _pp.z = E.origin.z + E.data[o + 2]; toLab(_pp, _v);
+    const r = 0.05 + age * 0.9 * (0.4 + E.data[o + 4]), hgt = E.data[o + 3] === 1 ? 0.01 : 0.25 * Math.sin(age / 0.35 * 3.1416) * (0.4 + E.data[o + 4]);
+    const q = m * 12;
+    evPos[q] = _v.x - r; evPos[q + 1] = _v.y + hgt; evPos[q + 2] = _v.z; evPos[q + 3] = _v.x + r; evPos[q + 4] = _v.y + hgt; evPos[q + 5] = _v.z;
+    evPos[q + 6] = _v.x; evPos[q + 7] = _v.y + hgt; evPos[q + 8] = _v.z - r; evPos[q + 9] = _v.x; evPos[q + 10] = _v.y + hgt; evPos[q + 11] = _v.z + r;
+    m++;
+  }
+  evGeo.setDrawRange(0, m * 4); evGeo.attributes.position.needsUpdate = true;
+}
+
+// ---- the draw kits (src/physics/three), with plain stand-in materials -------------------------------
+// ?kits=cpu (default): quads built by the kit, any material (here MeshBasicMaterial).
+// ?kits=gpu: particles instanced straight from the physics buffers through PARTICLE_GLSL.
+// ?kits=0: the lab's old dots and lines instead.
+const KITS = scene === 'globe' ? '0' : (Q.get('kits') || 'cpu');
+const KIT_COLOR = { rain: C.blue, snow: 0xa79fd6, hail: C.ink, dust: 0x8a6a4c, sand: C.gold, ash: C.grey, spores: 0x7fae4e, leaves: C.red, spray: C.sky, ring: C.ink, mark: C.sepia, water: 0x5f7fc4 };
+// The stand-in is built the way PAINTER's material contract asks: the kit's vertex chunk gives
+// pcKitPosition() and the varyings vPcUv / vPcData; the fragment is opaque and cuts its shapes
+// with discard (no blending anywhere), a flat colour standing in for PAINTER's wash.
+function standIn(kind, info) {
+  const col = new THREE.Color(KIT_COLOR[kind]);
+  if (kind === 'water') return new THREE.MeshBasicMaterial({ color: col, wireframe: true });
+  const shape = { streak: 'float t = abs(vPcUv.x - 0.5) * 2.0; if (t > 1.0 - 0.75 * vPcUv.y) discard; vec3 c = uCol * vPcData.x;',      // a stroke that tapers to its tail
+    dab: 'if (length(vPcUv - 0.5) > 0.5) discard; vec3 c = uCol * vPcData.x;',
+    ring: 'if (pcPhysRingCover(vPcUv, vPcData.z) * (0.4 + 0.6 * vPcData.y) < 0.2) discard; vec3 c = uCol;',
+    mark: 'float cover = pcPhysMarkCover(vPcUv, vPcData.z), rim = pcPhysMarkRim(vPcUv, vPcData.z) * step(1e-4, vPcData.y); float a = max(cover * min(1.0, 0.45 + vPcData.x * 10.0), rim * 0.8) * min(1.0, vPcData.w * 3.0); if (a < fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453)) discard; vec3 c = mix(uCol, vec3(0.93, 0.9, 0.82), rim * (1.0 - cover));' }[info.shape];
+  return new THREE.ShaderMaterial({ uniforms: { ...info.uniforms, uCol: { value: col } }, side: THREE.DoubleSide,
+    polygonOffset: info.shape === 'mark' || info.shape === 'ring', polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    vertexShader: `${info.vertexChunk}
+      void main() { vec3 p = pcKitPosition(); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+    fragmentShader: `${SHAPE_GLSL}
+      uniform vec3 uCol; varying vec2 vPcUv; varying vec4 vPcData;
+      void main() { ${shape} gl_FragColor = vec4(c, 1.0); }` });
+}
+const kits = KITS === '0' ? null : createPhysicsKits(physics, { makeMaterial: standIn, weather: { expand: KITS === 'gpu' ? 'gpu' : 'cpu' }, water: Q.get('patch') === '1' ? {} : false });   // patch=1: the CPU water patch (reference only)
+// the lab's space is the field frame's: a root that carries body-local coordinates into it
+const labRoot = new THREE.Group(); labRoot.matrixAutoUpdate = false; scene3.add(labRoot);
+function placeLabRoot() {
+  labRoot.matrix.set(frame.ex, frame.ey, frame.ez, 0, frame.ax, frame.ay, frame.az, -frame.r0, -frame.nx, -frame.ny, -frame.nz, 0, 0, 0, 0, 1);
+  labRoot.matrixWorldNeedsUpdate = true;
+}
+const kitCost = { ms: 0, n: 0, worst: 0 };
+function updateKits() {
+  placeLabRoot(); kits.update(labRoot, camera, renderer.domElement.height);
+  kitCost.ms += (kits.stats.ms - kitCost.ms) * 0.05; kitCost.worst = Math.max(kitCost.worst * 0.999, kits.stats.ms);
+}
+if (kits) { for (const o of [rainLines, snowPts, evLines]) o.visible = false; for (const k in looseDraw) looseDraw[k].m.visible = false; }
+
+// ---- footprints -----------------------------------------------------------------------------------------
+const Mk = physics.fields.deform.marks;
+const markGeo = new THREE.BufferGeometry();
+const markPos = new Float32Array(Mk.capacity * 8 * 3);
+markGeo.setAttribute('position', new THREE.BufferAttribute(markPos, 3));
+const markLines = new THREE.LineSegments(markGeo, line(C.sepia, 0.9)); markLines.frustumCulled = false; scene3.add(markLines);
+function updateMarks() {
+  let m = 0;
+  for (let k = 0; k < Math.min(Mk.total, Mk.capacity); k++) {
+    const o = k * Mk.stride, d = Mk.data, age = physics.time - d[o + 10];
+    if (age > d[o + 11]) continue;
+    _pp.x = Mk.origin.x + d[o]; _pp.y = Mk.origin.y + d[o + 1]; _pp.z = Mk.origin.z + d[o + 2]; toLab(_pp, _v);
+    _pp.x = d[o + 3]; _pp.y = d[o + 4]; _pp.z = d[o + 5]; vecLab(_pp, _v2);
+    const L = d[o + 6] / 2, W = d[o + 7] / 2, fx = _v2.x, fz = _v2.z, sx = -fz, sz = fx, y = _v.y + 0.02 - d[o + 8] * 0.3;
+    const c = [[-L, -W], [L, -W], [L, W], [-L, W]].map(([a, b]) => [_v.x + fx * a + sx * b, _v.z + fz * a + sz * b]);
+    const q = m * 24;
+    for (let e = 0; e < 4; e++) { const a = c[e], b = c[(e + 1) % 4]; markPos.set([a[0], y, a[1], b[0], y, b[1]], q + e * 6); }
+    m++;
+  }
+  markGeo.setDrawRange(0, m * 8); markGeo.attributes.position.needsUpdate = true;
+}
+
+// ---- actors ------------------------------------------------------------------------------------------------
+function wire(points, color) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); const m = new THREE.LineSegments(g, line(color)); m.frustumCulled = false; scene3.add(m); return m; }
+function capsule() { const v = []; const n = 14; for (const y of [0.25, 0.9, 1.55]) for (let i = 0; i < n; i++) { const a = i / n * 6.283, b = (i + 1) / n * 6.283; v.push(Math.cos(a) * 0.3, y, Math.sin(a) * 0.3, Math.cos(b) * 0.3, y, Math.sin(b) * 0.3); } for (let i = 0; i < 4; i++) { const a = i / 4 * 6.283; v.push(Math.cos(a) * 0.3, 0.25, Math.sin(a) * 0.3, Math.cos(a) * 0.3, 1.55, Math.sin(a) * 0.3); v.push(Math.cos(a) * 0.3, 1.55, Math.sin(a) * 0.3, 0, 1.8, 0); v.push(Math.cos(a) * 0.3, 0.25, Math.sin(a) * 0.3, 0, 0, 0); } return v; }
+function shipWire() { const v = []; const L = [[0, 0.9, -4.5], [2.6, 0.9, 1.2], [1.6, 0.9, 4.2], [-1.6, 0.9, 4.2], [-2.6, 0.9, 1.2]]; for (let i = 0; i < 5; i++) { const a = L[i], b = L[(i + 1) % 5]; v.push(...a, ...b); v.push(a[0], a[1] + 1.2 * (i === 0 ? 0.3 : 1), a[2], b[0], b[1] + 1.2 * ((i + 1) % 5 === 0 ? 0.3 : 1), b[2]); v.push(...a, a[0], a[1] + 1.2 * (i === 0 ? 0.3 : 1), a[2]); } return v; }
+const exMesh = wire(capsule(), C.ink);
+const exVel = wire([0, 0, 0, 0, 0, 0], C.gold);
+const shMesh = wire(shipWire(), C.ink);
+const legGeo = new Float32Array(18); const legMesh = wire(legGeo, C.red);
+const ringMesh = wire(new Float32Array(64 * 6), C.sky);
+const useShip = scene === 'ship';
+const useExplorer = scene !== 'globe' && scene !== 'wind' && !useShip && Q.get('explorer') !== '0';
+exMesh.visible = exVel.visible = useExplorer; shMesh.visible = legMesh.visible = ringMesh.visible = useShip;
+
+const env = physics.bindEnv(bodyId, { sample: (d) => sampleSurface(bodyId, d), gravity: body.gravity });
+if (windQ != null) {
+  // steady wind override for clean demonstrations: replace the air lookup of the bodies
+  const base = env.air;
+  env.air = (p, out, height) => { const o = base(p, out, height); o.wind.x = frame.ex * windQ; o.wind.y = frame.ey * windQ; o.wind.z = frame.ez * windQ; return o; };
+}
+const ex = { p: { ...start }, v: { x: 0, y: 0, z: 0 }, grounded: true };
+const walkSpeed = Number(Q.get('walk') || (scene === 'explorer' ? 7.4 : 2.2));
+const jetOn = Q.get('jet') !== '0' && (scene === 'flora' || scene === 'explorer');
+let exT = 0;
+function driveExplorer(dt) {
+  exT += dt;
+  // a slow circle round the start; a jetpack hop every ten seconds
+  const x = frame.lx(ex.p.x, ex.p.y, ex.p.z), z = frame.lz(ex.p.x, ex.p.y, ex.p.z);
+  const rad = scene === 'explorer' ? 9 : 5, r = Math.hypot(x, z);
+  let te = 1, tn = 0;
+  if (r > 0.05) {
+    te = -z / r; tn = x / r;                         // tangent of the circle
+    const pull = (rad - r) * 0.5; te += x / r * pull; tn += z / r * pull;
+    const tl = Math.hypot(te, tn) || 1; te /= tl; tn /= tl;
+  }
+  const still = scene === 'rain' || scene === 'snow' || scene === 'storm' || Q.get('walk') === '0';
+  const sp = still ? 0 : walkSpeed;
+  const wish = { x: (frame.ex * te + frame.nx * tn) * sp, y: (frame.ey * te + frame.ny * tn) * sp, z: (frame.ez * te + frame.nz * tn) * sp };
+  const ph = exT % 10;
+  const cmd = { wish, jump: jetOn && ph < dt, jet: jetOn && ph > 0.2 && ph < 2.2 ? 1 : 0, jetMaxRise: 6, descentLimit: 9 };
+  stepExplorerBody(ex, cmd, dt, env);
+}
+// ship: land -> lift off -> hover -> slide across -> land again
+const sh = { p: { ...start }, v: { x: 0, y: 0, z: 0 }, q: { x: 0, y: 0, z: 0, w: 1 } };
+let shT = 0, shPhase = 'landed';
+function qFromFrame() {
+  // orientation with up = frame up, forward (-Z of the ship) = frame north
+  const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(frame.ex, frame.ey, frame.ez), new THREE.Vector3(frame.ax, frame.ay, frame.az), new THREE.Vector3(-frame.nx, -frame.ny, -frame.nz));
+  const q = new THREE.Quaternion().setFromRotationMatrix(m); return { x: q.x, y: q.y, z: q.z, w: q.w };
+}
+const shEnv = { ...env, up: null, altGround: 0 };
+function shipAlt() { const r = Math.hypot(sh.p.x, sh.p.y, sh.p.z); _dv.x = sh.p.x / r; _dv.y = sh.p.y / r; _dv.z = sh.p.z / r; const s = sampleSurface(bodyId, _dv); return r - Math.max(s.radius, s.liquidRadius || 0); }
+function driveShip(dt) {
+  shT += dt;
+  const cyc = shT % 30;
+  const r = Math.hypot(sh.p.x, sh.p.y, sh.p.z), up = { x: sh.p.x / r, y: sh.p.y / r, z: sh.p.z / r };
+  shEnv.up = up; shEnv.altGround = shipAlt(); shEnv.time = physics.time;
+  const upv = (s) => ({ x: up.x * s, y: up.y * s, z: up.z * s });
+  const east = (s, u = 0) => ({ x: frame.ex * s + up.x * u, y: frame.ey * s + up.y * u, z: frame.ez * s + up.z * u });
+  const side = Math.floor(shT / 30) % 2 ? -1 : 1;
+  if (cyc < 3) { shPhase = 'landed'; stepShipGear(sh, { lift01: 0 }, dt, shEnv); }
+  else if (cyc < 5) { shPhase = 'spool up'; wakeShip(sh); stepShipGear(sh, { lift01: (cyc - 3) / 2 }, dt, shEnv); }
+  else if (cyc < 9) { shPhase = 'lift off'; stepShipBody(sh, { target: upv(shEnv.altGround < 6 ? 2.2 : 0), tau: 0.8 }, dt, shEnv); }
+  else if (cyc < 13) { shPhase = 'hover'; stepShipBody(sh, { target: upv((6 - shEnv.altGround) * 0.8), tau: 0.8 }, dt, shEnv); }
+  else if (cyc < 18) { shPhase = 'translate'; stepShipBody(sh, { target: east(4 * side, (6 - shEnv.altGround) * 0.8), tau: 1.0 }, dt, shEnv); }
+  else if (cyc < 24 && !(sh.phys && sh.phys.contacts > 0 && cyc > 19)) { shPhase = 'descend'; if (shEnv.altGround > 0.9) stepShipBody(sh, { target: upv(-Math.max(0.5, Math.min(1.6, shEnv.altGround * 0.5))), tau: 0.6 }, dt, shEnv); else stepShipGear(sh, { lift01: 1, hold: upv(-0.6) }, dt, shEnv); if (sh.phys.contacts > 0) shDown = cyc; }
+  else { shPhase = 'touchdown'; stepShipGear(sh, { lift01: Math.max(0, 1 - (cyc - (shDown || 24)) / 1.5) }, dt, shEnv); }
+}
+let shDown = 0;
+// anchor the near field before anything moves, and stand the ship on its legs
+physics.update(0, { bodyId, time, focus: start });
+sh.q = qFromFrame();
+const _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _labRot = new THREE.Matrix4();
+function placeActors() {
+  if (useExplorer) {
+    toLab(ex.p, exMesh.position);
+    const sink = ex.phys ? ex.phys.sink : 0; exMesh.position.y -= sink;
+    vecLab(ex.v, _v);
+    const g = exVel.geometry.attributes.position.array; g[0] = exMesh.position.x; g[1] = exMesh.position.y + 1; g[2] = exMesh.position.z; g[3] = g[0] + _v.x * 0.4; g[4] = g[1] + _v.y * 0.4; g[5] = g[2] + _v.z * 0.4; exVel.geometry.attributes.position.needsUpdate = true;
+  }
+  if (useShip) {
+    toLab(sh.p, shMesh.position);
+    // body-local quaternion -> lab space: lab = M * body, with M rows (east, up, -north)
+    _labRot.set(frame.ex, frame.ey, frame.ez, 0, frame.ax, frame.ay, frame.az, 0, -frame.nx, -frame.ny, -frame.nz, 0, 0, 0, 0, 1);
+    _m.makeRotationFromQuaternion(_q.set(sh.q.x, sh.q.y, sh.q.z, sh.q.w)).premultiply(_labRot);
+    shMesh.quaternion.setFromRotationMatrix(_m);
+    // legs: from the hull down to the foot (shortened by the compression)
+    const B = sh.phys;
+    for (let i = 0; i < 3; i++) {
+      const L = SHIP_BODY.legs[i], c = B ? B.legCompress[i] : 0;
+      _v.set(L[0], 0.9, L[2]).applyQuaternion(shMesh.quaternion).add(shMesh.position);
+      _v2.set(L[0], c, L[2]).applyQuaternion(shMesh.quaternion).add(shMesh.position);
+      legGeo.set([_v.x, _v.y, _v.z, _v2.x, _v2.y, _v2.z], i * 6);
+    }
+    legMesh.geometry.attributes.position.needsUpdate = true;
+    // downwash footprint ring on the ground
+    const ring = ringMesh.geometry.attributes.position.array, dw = B ? B.downwash : null;
+    const rr = dw && dw.thrust > 100 ? dw.radius + 0.25 * Math.max(0, shEnv.altGround) : 0;
+    for (let i = 0; i < 64; i++) { const a = i / 64 * 6.283, b = (i + 1) / 64 * 6.283; const x1 = shMesh.position.x + Math.cos(a) * rr, z1 = shMesh.position.z + Math.sin(a) * rr, x2 = shMesh.position.x + Math.cos(b) * rr, z2 = shMesh.position.z + Math.sin(b) * rr; ring.set([x1, groundY(x1, -z1) + 0.05, z1, x2, groundY(x2, -z2) + 0.05, z2], i * 6); }
+    ringMesh.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+// ---- the globe view: weather cells and prevailing wind on the whole sphere ------------------------------------
+let globe = null;
+if (scene === 'globe') {
+  globe = new THREE.Group(); scene3.add(globe);
+  groundMesh.visible = false; arrows.visible = false;
+  const pts = [];
+  for (let lat = -75; lat <= 75; lat += 15) for (let lon = 0; lon < 360; lon += 6) { const a = lat * Math.PI / 180; for (const l of [lon, lon + 6]) { const b = l * Math.PI / 180; pts.push(Math.cos(a) * Math.sin(b), Math.sin(a), Math.cos(a) * Math.cos(b)); } }
+  for (let lon = 0; lon < 360; lon += 30) for (let lat = -90; lat < 90; lat += 6) for (const l of [lat, lat + 6]) { const a = l * Math.PI / 180, b = lon * Math.PI / 180; pts.push(Math.cos(a) * Math.sin(b), Math.sin(a), Math.cos(a) * Math.cos(b)); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  globe.add(new THREE.LineSegments(g, line(C.grey, 0.35)));
+  const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(40 * 48 * 6), 3)); cg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(40 * 48 * 6), 3));
+  globe.cells = new THREE.LineSegments(cg, new THREE.LineBasicMaterial({ vertexColors: true })); globe.add(globe.cells);
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(900 * 6), 3));
+  globe.winds = new THREE.LineSegments(wg, line(C.sky, 0.9)); globe.add(globe.winds);
+  globe.rotation.x = 0.35;
+}
+const KIND_COLOR = { cloud: C.grey, drizzle: C.sky, rain: C.blue, shower: C.blue, storm: C.red, fog: C.violet, dust: C.gold, haze: C.gold, acid: C.green, ice: C.sky, frost: C.violet, veil: C.grey };
+function updateGlobe() {
+  const cells = cellsAt(bodyId, physics.time, physics.seed);
+  const pos = globe.cells.geometry.attributes.position.array, col = globe.cells.geometry.attributes.color.array;
+  const c = new THREE.Color(); let n = 0;
+  for (const cell of cells) {
+    let ex = cell.z, ez = -cell.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+    const nx = cell.y * ez, ny = cell.z * ex - cell.x * ez, nz = -cell.y * ex;
+    c.set(KIND_COLOR[cell.kindId] || C.ink).lerp(new THREE.Color(0xf4efe4), 1 - cell.w);
+    const a = cell.r / R;
+    for (let i = 0; i < 48 && n < 40 * 48; i++, n++) {
+      for (let e = 0; e < 2; e++) {
+        const t = (i + e) / 48 * 6.283, x = cell.x + (ex * Math.cos(t) + nx * Math.sin(t)) * a, y = cell.y + ny * Math.sin(t) * a, z = cell.z + (ez * Math.cos(t) + nz * Math.sin(t)) * a, l = Math.hypot(x, y, z) / 1.004;
+        pos.set([x / l, y / l, z / l], n * 6 + e * 3); col.set([c.r, c.g, c.b], n * 6 + e * 3);
+      }
+    }
+  }
+  globe.cells.geometry.setDrawRange(0, n * 2); globe.cells.geometry.attributes.position.needsUpdate = true; globe.cells.geometry.attributes.color.needsUpdate = true;
+  const wp = globe.winds.geometry.attributes.position.array; let m = 0; const o = {};
+  for (let lat = -80; lat <= 80; lat += 10) for (let lon = 0; lon < 360 && m < 900; lon += 12) {
+    const a = lat * Math.PI / 180, b = lon * Math.PI / 180, d = { x: Math.cos(a) * Math.sin(b), y: Math.sin(a), z: Math.cos(a) * Math.cos(b) };
+    physics.air(bodyId, { x: d.x * R, y: d.y * R, z: d.z * R }, o, 10);
+    const k = 0.012 * 5.5 / Math.max(1, physics.data.WINDS[bodyId].U);
+    wp.set([d.x * 1.008, d.y * 1.008, d.z * 1.008, (d.x + o.wind.x * k) * 1.008, (d.y + o.wind.y * k) * 1.008, (d.z + o.wind.z * k) * 1.008], m * 6); m++;
+  }
+  globe.winds.geometry.setDrawRange(0, m * 2); globe.winds.geometry.attributes.position.needsUpdate = true;
+  globe.rotation.y = -physics.time * 0.01;
+}
+
+// ---- camera ----------------------------------------------------------------------------------------------------
+const cam = { fx: 0, fz: 0, fy: 0 };
+function placeCamera() {
+  if (scene === 'globe') { camera.position.set(0, 0, 3.1); camera.lookAt(0, 0, 0); return; }
+  const yaw = Number(Q.get('yaw') || 28) * Math.PI / 180, pitch = Number(Q.get('pitch') || ({ wind: 62, rain: 12, snow: 12, storm: 14, explorer: 20, ship: 16 }[scene] ?? 26)) * Math.PI / 180;
+  const dist = Number(Q.get('dist') || view * 2.3);
+  const t = new THREE.Vector3(cam.fx, cam.fy + (scene === 'rain' || scene === 'snow' || scene === 'storm' ? 4 : 1), -cam.fz);
+  camera.position.set(t.x + Math.sin(yaw) * Math.cos(pitch) * dist, t.y + Math.sin(pitch) * dist, t.z + Math.cos(yaw) * Math.cos(pitch) * dist);
+  camera.lookAt(t);
+}
+
+// ---- loop ----------------------------------------------------------------------------------------------------------
+const hud = document.getElementById('hud'), key = document.getElementById('key');
+let agree = null;
+key.textContent = 'physics lab: ' + scene + '\ngreen: plants drawn by the GLSL chunk\nred dots: the same tips from the JS model\nblue/red arrows: wind at 2 m (lull/gust)\nblue streaks: rain   violet: snow   ink: hail\nbrown dots: dust   gold: sand   grey: ash\ngreen dots: spores   red: leaves   sky: spray\nbrown lines: footprints, dust devils';
+let last = performance.now(), frames = 0, hudT = 0, acc = 0;
+const dist = [];
+const fixed = Q.get('fixed') === '1';       // advance a fixed 1/30 s per rendered frame (for slow headless runs)
+const fast = Math.max(1, Number(Q.get('fast') || 1));   // with fixed=1: simulated frames per rendered frame
+function simulate(dt) {
+  time += dt;
+  // bodies at a fixed 60 Hz
+  acc += dt; let steps = 0;
+  while (acc >= 1 / 60 - 1e-9 && steps < 8) { if (useExplorer) driveExplorer(1 / 60); if (useShip) driveShip(1 / 60); acc -= 1 / 60; steps++; }
+  if (steps === 8) acc = 0;
+  const focus = useShip ? sh.p : useExplorer ? ex.p : start;
+  dist.length = 0;
+  if (useExplorer) physics.explorer.disturbers(ex, dist);
+  if (useShip) physics.ship.disturbers(sh, dist);
+  // the sun: mid-morning (only temperature and mist depend on it)
+  const sun = findQ === 'devil' ? norm3(start) : norm3({ x: startDir.x * 0.6 + 0.5, y: startDir.y * 0.6 + 0.2, z: startDir.z * 0.6 });
+  physics.update(dt, { bodyId, time, focus, sunDir: sun, disturbers: dist });
+  return focus;
+}
+function tick(now) {
+  let focus;
+  if (fixed) { for (let k = 0; k < fast; k++) focus = simulate(1 / 30); }
+  else { const dt = Math.min(0.1, (now - last) / 1000) * speed; focus = simulate(dt); }
+  last = now;
+
+  cam.fx = frame.lx(focus.x, focus.y, focus.z); cam.fz = frame.lz(focus.x, focus.y, focus.z);
+  cam.fy = groundY(cam.fx, cam.fz);
+  if (scene !== 'globe') {
+    rebuildGround(cam.fx, cam.fz); rebuildPlants(cam.fx, cam.fz);
+    const u = F.uniforms;
+    U.uPhysWindMap.value.fromArray(u.uPhysWindMap); U.uPhysNearMap.value.fromArray(u.uPhysNearMap);
+    U.uPhysWave.value.fromArray(u.uPhysWave); U.uPhysWavePhase.value.fromArray(u.uPhysWavePhase); U.uPhysShape.value.fromArray(u.uPhysShape);
+    upload(tBend); upload(tWind); upload(tPush);
+    updateArrows(); updateProbes(); placeActors();
+    if (!kits) { updateParticles(); updateMarks(); updateWater(cam.fx, cam.fz); } else updateDevils();
+  } else updateGlobe();
+  placeCamera();
+  if (kits) updateKits();
+  renderer.render(scene3, camera);
+  frames++;
+  if (now - hudT > 200) { hudT = now; writeHud(); }
+  if (frames >= 3) window.__pcReady = true;
+  requestAnimationFrame(tick);
+}
+function writeHud() {
+  const h = physics.here, a = h.air, w = h.weather, st = physics.stats;
+  const L = [];
+  L.push(`${body.name}  ${worldKind} world (${biome})  t=${time.toFixed(1)} s  x${speed}  quality ${physics.quality}`);
+  L.push(`air  rho ${a.density.toPrecision(3)} kg/m3  ${a.temperature.toFixed(0)} K  wind ${a.speed.toFixed(2)} m/s at ${a.height.toFixed(1)} m  gust ${a.gust01.toFixed(2)}  sigma ${a.turbulence.toFixed(2)}`);
+  L.push(`wx   ${w.kind} ${w.intensity01.toFixed(2)}  ${w.precipitation.type} ${w.precipitation.rate.toFixed(1)} mm/h falls ${w.precipitation.fallSpeed.toFixed(2)} m/s  cloud ${w.cloud01.toFixed(2)}  vis ${w.visibility.toFixed(0)} m (${w.visibility01.toFixed(2)})`);
+  L.push(`     wet ${w.wetness01.toFixed(2)}  snow ${(w.snowDepth * 100).toFixed(1)} cm  lightning ${w.lightning.rate.toFixed(1)}/min flash ${w.lightning.flash01.toFixed(2)} next ${Number.isFinite(w.lightning.nextIn) ? w.lightning.nextIn.toFixed(1) + ' s' : '-'} thunder in ${Number.isFinite(w.lightning.thunderIn) ? w.lightning.thunderIn.toFixed(1) + ' s' : '-'}`);
+  if (useExplorer && ex.phys) { const B = ex.phys; L.push(`walk ${B.speedGround.toFixed(2)} m/s on ${B.material} (mu ${B.friction.toFixed(2)})  ${ex.grounded ? 'grounded' : 'airborne'}  slip ${B.slip01.toFixed(2)} scramble ${B.scramble01.toFixed(2)}  sink ${(B.sink * 100).toFixed(1)} cm  jet ${B.jetThrottle.toFixed(2)}  wind push ${B.windAccel.toFixed(2)} m/s2`); }
+  if (useShip && sh.phys) { const B = sh.phys; L.push(`ship ${shPhase}  alt ${shEnv.altGround.toFixed(2)} m  v ${Math.hypot(sh.v.x, sh.v.y, sh.v.z).toFixed(2)} m/s  lift ${B.lift01.toFixed(2)}  feet ${B.contacts}  legs ${Array.from(B.legCompress).map((x) => (x * 100).toFixed(1)).join('/')} cm  ${B.asleep ? 'asleep' : ''}`); L.push(`     downwash ${(B.downwash.thrust / 1000).toFixed(1)} kN  ${B.downwash.speed.toFixed(1)} m/s  ground effect x${B.groundEffect.toFixed(2)}  buffet ${Math.hypot(B.buffet.x, B.buffet.y, B.buffet.z).toFixed(2)} m/s2`); }
+  const kinds = ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'].filter((k) => P[k].count > 0).map((k) => `${k} ${P[k].count}`).join('  ') || 'none';
+  L.push(`air- ${kinds}   devils ${physics.features.devils.count}`);
+  { const W = physics.fields.water.field; if (W.present) L.push(`sea  Hs ${W.height.toFixed(2)} m  period ${W.period.toFixed(1)} s  length ${W.length.toFixed(1)} m  speed ${W.speed.toFixed(1)} m/s  steepness ${W.steepness.toFixed(3)}  whitecaps ${W.whitecap01.toFixed(2)} (${(100 * (W.foamAt < 1e8 ? W.cover : 0)).toFixed(1)} % of the surface, above ${W.foamAt < 1e8 ? W.foamAt.toFixed(2) + ' m' : 'nothing'})`); }
+  L.push(`sim  ${st.ms.toFixed(2)} ms (avg ${st.msAvg.toFixed(2)})  ${st.samples} surface samples  ${st.pushCells} push cells  ${Mk.total} marks  ${P.events.total} events`);
+  if (kits) {
+    const K = kits, per = (k) => `${k.stats.drawCalls} calls ${k.stats.vertices} verts ${k.stats.ms.toFixed(2)} ms`;
+    L.push(`kits (${KITS})  weather ${per(K.weather)}  |  marks ${per(K.marks)}  |  water ${K.water ? per(K.water) : 'chunk only'}  |  all ${K.stats.ms.toFixed(2)} ms (avg ${kitCost.ms.toFixed(2)}, worst ${kitCost.worst.toFixed(2)})`);
+  }
+  if (frames % 20 === 0) agree = shaderAgreement();
+  if (agree) L.push(`glsl vs js: ${agree.plants} tips, max ${(agree.maxError * 1000).toFixed(2)} mm, rms ${(agree.rmsError * 1000).toFixed(2)} mm (largest tip displacement ${(agree.largestTipDisplacement * 100).toFixed(0)} cm)`);
+  hud.textContent = L.join('\n');
+}
+// debug handle for scripted checks: node tools/shot.mjs ... --eval "window.__lab.info()"
+window.__lab = {
+  kits, labRoot, camera, THREE,
+  physics, ex, sh, frame,
+  info() { return { time, here: JSON.parse(JSON.stringify(physics.here)), stats: { ...physics.stats }, explorer: useExplorer ? { speed: ex.phys && ex.phys.speedGround, grounded: ex.grounded, material: ex.phys && ex.phys.material } : null, ship: useShip ? { phase: shPhase, alt: shEnv.altGround, contacts: sh.phys && sh.phys.contacts, asleep: sh.phys && sh.phys.asleep } : null, probes: probes.length, grass: grass ? grass.count : 0, rain: P.rain.count, snow: P.snow.count }; },
+  uniforms() { return JSON.parse(JSON.stringify(F.uniforms)); },
+  // metres between the tips the GLSL chunk computes on the GPU and the tips the JS twin computes
+  shaderAgreement() { updateProbes(); return shaderAgreement(); },
+  waterAgreement,
+};
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

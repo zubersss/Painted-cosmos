@@ -1,0 +1,11 @@
+# the verifier's probes/layout.mjs (4000 random scenes a window size), on 51cdda2 (before) and with the slide (after)
+## before
+640x360: 4000 scenes, 16475 marks, 12551 named, 3271 targets | a label on the ship 459 (target 420), on another label 17, off the picture 8 (target 8), on a slip 505 (target 282)
+960x540: 4000 scenes, 16335 marks, 12634 named, 3201 targets | a label on the ship 591 (target 552), on another label 15, off the picture 2 (target 0), on a slip 476 (target 273)
+1280x720: 4000 scenes, 16415 marks, 12911 named, 3186 targets | a label on the ship 683 (target 640), on another label 14, off the picture 3 (target 0), on a slip 429 (target 262)
+1920x1080: 4000 scenes, 16490 marks, 12824 named, 3205 targets | a label on the ship 798 (target 750), on another label 23, off the picture 0 (target 0), on a slip 500 (target 285)
+## after
+640x360: 4000 scenes, 16475 marks, 12551 named, 3271 targets | a label on the ship 0 (target 0), on another label 0, off the picture 0 (target 0), on a slip 498 (target 278)
+960x540: 4000 scenes, 16335 marks, 12607 named, 3201 targets | a label on the ship 0 (target 0), on another label 0, off the picture 0 (target 0), on a slip 473 (target 273)
+1280x720: 4000 scenes, 16415 marks, 12862 named, 3186 targets | a label on the ship 0 (target 0), on another label 0, off the picture 0 (target 0), on a slip 426 (target 262)
+1920x1080: 4000 scenes, 16490 marks, 12766 named, 3205 targets | a label on the ship 0 (target 0), on another label 0, off the picture 0 (target 0), on a slip 494 (target 285)

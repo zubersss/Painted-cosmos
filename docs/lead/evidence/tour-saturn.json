@@ -1,0 +1,252 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; tier 1, 640x360",
+ "size": "640x360",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "gold_islands",
+   "name": "Pale Gold Sky-Islands",
+   "alsoVista": null,
+   "settledSeconds": 92.1,
+   "settledFrames": 47,
+   "tris": 393759,
+   "calls": 207,
+   "worldWorstMs": 253.9,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "gold_islands",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.6,
+    "biome": "gold_islands",
+    "radius": 4651.3276586179545
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "crystal_reeds",
+   "name": "Crystal Reed Fields",
+   "alsoVista": null,
+   "settledSeconds": 42.5,
+   "settledFrames": 27,
+   "tris": 504976,
+   "calls": 189,
+   "worldWorstMs": 219.8,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "crystal_reeds",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.3,
+    "biome": "crystal_reeds",
+    "radius": 4619.076382978732
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "ring_shadow",
+   "name": "Ring-Shadow Twilight",
+   "alsoVista": null,
+   "settledSeconds": 32.8,
+   "settledFrames": 27,
+   "tris": 357007,
+   "calls": 194,
+   "worldWorstMs": 210.9,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "ring_shadow",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 2.3,
+    "biome": "ring_shadow",
+    "radius": 4616.269789928686
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "honey_mist",
+   "name": "Honey Mist Valleys",
+   "alsoVista": null,
+   "settledSeconds": 41.5,
+   "settledFrames": 35,
+   "tris": 441537,
+   "calls": 204,
+   "worldWorstMs": 343.5,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "honey_mist",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.5,
+    "biome": "honey_mist",
+    "radius": 4757.213321601784
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-gold_islands-1",
+   "name": "Pale Gold Sky-Islands",
+   "alsoVista": null,
+   "settledSeconds": 39.4,
+   "settledFrames": 29,
+   "tris": 554313,
+   "calls": 260,
+   "worldWorstMs": 165.8,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "gold_islands",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 16.5,
+    "biome": "gold_islands",
+    "radius": 4690.010790746755
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-crystal_reeds-1",
+   "name": "Crystal Reed Fields",
+   "alsoVista": null,
+   "settledSeconds": 34.7,
+   "settledFrames": 29,
+   "tris": 515969,
+   "calls": 196,
+   "worldWorstMs": 246.5,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "crystal_reeds",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.7,
+    "biome": "crystal_reeds",
+    "radius": 4612.616917025773
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-ring_shadow-1",
+   "name": "Ring-Shadow Twilight",
+   "alsoVista": null,
+   "settledSeconds": 29.2,
+   "settledFrames": 30,
+   "tris": 374208,
+   "calls": 205,
+   "worldWorstMs": 208.5,
+   "physicsWorstMs": 104.1,
+   "stoodIn": "ring_shadow",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4,
+    "biome": "ring_shadow",
+    "radius": 4637.22300137665
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-honey_mist-1",
+   "name": "Honey Mist Valleys",
+   "alsoVista": null,
+   "settledSeconds": 34.5,
+   "settledFrames": 30,
+   "tris": 527424,
+   "calls": 207,
+   "worldWorstMs": 186.6,
+   "physicsWorstMs": 0.8,
+   "stoodIn": "honey_mist",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 15.7,
+    "biome": "honey_mist",
+    "radius": 4736.39531179778
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-ring_shadow-2",
+   "name": "Ring-Shadow Twilight II",
+   "alsoVista": null,
+   "settledSeconds": 31.5,
+   "settledFrames": 28,
+   "tris": 371817,
+   "calls": 201,
+   "worldWorstMs": 174.7,
+   "physicsWorstMs": 5.8,
+   "stoodIn": "ring_shadow",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 5.8,
+    "biome": "ring_shadow",
+    "radius": 4632.113703373115
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-crystal_reeds-2",
+   "name": "Crystal Reed Fields II",
+   "alsoVista": null,
+   "settledSeconds": 35.7,
+   "settledFrames": 29,
+   "tris": 584839,
+   "calls": 220,
+   "worldWorstMs": 262.5,
+   "physicsWorstMs": 5.8,
+   "stoodIn": "crystal_reeds",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 0.9,
+    "biome": "crystal_reeds",
+    "radius": 4614.9390499543615
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-honey_mist-2",
+   "name": "Honey Mist Valleys II",
+   "alsoVista": null,
+   "settledSeconds": 37.4,
+   "settledFrames": 30,
+   "tris": 449204,
+   "calls": 215,
+   "worldWorstMs": 232.9,
+   "physicsWorstMs": 6.6,
+   "stoodIn": "honey_mist",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 7.5,
+    "biome": "honey_mist",
+    "radius": 4766.446125781339
+   },
+   "flags": []
+  }
+ ]
+}

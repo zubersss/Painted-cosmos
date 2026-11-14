@@ -1,0 +1,165 @@
+{
+ "body": "moon",
+ "biome": "crater_fields",
+ "stepHz": 30,
+ "headings": [
+  {
+   "heading": 0,
+   "metres": 70.9,
+   "pace": 5.9,
+   "topSpeed": 7.4,
+   "feetUp": 0,
+   "thrownUp": 0,
+   "framesOffGround": 0,
+   "framesStalled": 2,
+   "biomes": [
+    "crater_fields"
+   ],
+   "offTheGround": []
+  },
+  {
+   "heading": 90,
+   "metres": 71.8,
+   "pace": 5.98,
+   "topSpeed": 7.4,
+   "feetUp": 0.162,
+   "thrownUp": 0.047,
+   "framesOffGround": 29,
+   "framesStalled": 2,
+   "biomes": [
+    "crater_fields"
+   ],
+   "offTheGround": [
+    {
+     "t0": 27.22,
+     "speed": 6.4,
+     "slopeDeg": 18,
+     "boulder": {
+      "gap": -0.16,
+      "height": 0.72
+     },
+     "feetUp": 0.162,
+     "rise": 0.047,
+     "groundLowest": -0.32,
+     "seconds": 0.76,
+     "groundAtLanding": -0.33
+    }
+   ]
+  },
+  {
+   "heading": 180,
+   "metres": 68.3,
+   "pace": 5.69,
+   "topSpeed": 7.4,
+   "feetUp": 0.077,
+   "thrownUp": 0.007,
+   "framesOffGround": 1,
+   "framesStalled": 2,
+   "biomes": [
+    "crater_fields"
+   ],
+   "offTheGround": [
+    {
+     "t0": 37.75,
+     "speed": 4,
+     "slopeDeg": 34,
+     "boulder": {
+      "gap": -0.2,
+      "height": 1.01
+     },
+     "feetUp": 0.077,
+     "rise": 0.007,
+     "groundLowest": -0.07,
+     "seconds": 0.03,
+     "groundAtLanding": 0.39
+    }
+   ]
+  },
+  {
+   "heading": 270,
+   "metres": 78.6,
+   "pace": 6.55,
+   "topSpeed": 7.4,
+   "feetUp": 3.722,
+   "thrownUp": 0.049,
+   "framesOffGround": 86,
+   "framesStalled": 2,
+   "biomes": [
+    "crater_fields"
+   ],
+   "offTheGround": [
+    {
+     "t0": 47.62,
+     "speed": 5.8,
+     "slopeDeg": 4,
+     "boulder": {
+      "gap": -0.41,
+      "height": 1.09
+     },
+     "feetUp": 0.051,
+     "rise": -0.002,
+     "groundLowest": -0.06,
+     "seconds": 0.16,
+     "groundAtLanding": 0.21
+    },
+    {
+     "t0": 50.35,
+     "speed": 7.4,
+     "slopeDeg": 3,
+     "boulder": {
+      "gap": 0.65,
+      "height": 0.71
+     },
+     "feetUp": 0.115,
+     "rise": 0.049,
+     "groundLowest": -0.07,
+     "seconds": 0.17,
+     "groundAtLanding": 0.15
+    },
+    {
+     "t0": 53.05,
+     "speed": 6.6,
+     "slopeDeg": 35,
+     "boulder": {
+      "gap": 3.41,
+      "height": 0.68
+     },
+     "feetUp": 3.722,
+     "rise": -0.109,
+     "groundLowest": -6.72,
+     "seconds": 2.43,
+     "groundAtLanding": -6.69
+    }
+   ]
+  }
+ ],
+ "timings": {
+  "wallSeconds": 397
+ },
+ "site": {
+  "dir": [
+   -0.761541698026186,
+   0.49900717644312786,
+   0.41357717541669314
+  ],
+  "count": 63,
+  "tallest": 1.0868949437141417,
+  "others": 0,
+  "east": 280,
+  "north": -320
+ },
+ "worstLift": 3.722,
+ "worstThrow": 0.049,
+ "pace": 6.03,
+ "offAnEdge": [
+  {
+   "heading": 270,
+   "t0": 53.05,
+   "seconds": 2.43,
+   "feetUp": 3.722,
+   "groundFell": 6.72,
+   "speed": 6.6,
+   "slopeDeg": 35
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+mercury Cracked Ochre Basins               feet 0.15  hat 0.47  boom 5.2 m  pitch -2 deg  slope 4
+mercury Obsidian Glass Fields              feet 0.14  hat 0.47  boom 5.2 m  pitch 2 deg  slope 2
+mercury Twilight Crystal Gardens           feet 0.13  hat 0.47  boom 5.2 m  pitch 4 deg  slope 10
+mercury Frozen Shadow Craters              feet 0.08  hat 0.36  boom 5.6 m  pitch -4 deg  slope 34
+mercury Frozen Shadow Craters II           feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 11
+mercury Twilight Crystal Gardens II        feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 6
+mercury Cracked Ochre Basins II            feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 5
+venus Fungal Tower Forest                feet 0.14  hat 0.47  boom 5.2 m  pitch 0 deg  slope 8
+venus Lava Rivers                        feet 0.13  hat 0.47  boom 5.2 m  pitch 6 deg  slope 22
+venus Acid Lake Terraces                 feet 0.14  hat 0.47  boom 5.2 m  pitch 1 deg  slope 18
+venus Pale Mesas                         feet 0.15  hat 0.46  boom 5.3 m  pitch -6 deg  slope 15
+venus Pale Mesas II                      feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 3
+venus Acid Lake Terraces II              feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 12
+venus Fungal Tower Forest II             feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 10
+earth Temperate Forest                   feet 0.14  hat 0.47  boom 5.2 m  pitch 3 deg  slope 19
+earth Autumn Woodland                    feet 0.14  hat 0.47  boom 5.2 m  pitch 0 deg  slope 6
+earth Alpine Meadow and Snow Peaks       feet 0.12  hat 0.47  boom 5.1 m  pitch 14 deg  slope 1
+earth Sea Cliffs and Coast               feet 0.12  hat 0.47  boom 5.1 m  pitch 10 deg  slope 3
+earth Desert Canyon                      feet 0.12  hat 0.47  boom 5.1 m  pitch 10 deg  slope 1
+earth Misty Wetland                      feet 0.14  hat 0.47  boom 5.2 m  pitch 4 deg  slope 4
+earth Autumn Woodland II                 feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 9
+earth Alpine Meadow and Snow Peaks II    feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 13
+moon Silver Mare                        feet 0.14  hat 0.47  boom 5.2 m  pitch 4 deg  slope 0
+moon Bright Highlands                   feet 0.14  hat 0.47  boom 5.2 m  pitch 4 deg  slope 5
+moon Crater Fields                      feet 0.13  hat 0.47  boom 5.2 m  pitch 5 deg  slope 2
+moon Winding Rilles                     feet 0.15  hat 0.47  boom 5.2 m  pitch -2 deg  slope 9
+moon Crater Fields II                   feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 2
+moon Winding Rilles II                  feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 4
+moon Bright Highlands II                feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 13
+mars Rust Canyons                       feet 0.13  hat 0.47  boom 5.2 m  pitch 6 deg  slope 13
+mars Dust-Storm Dunes                   feet 0.14  hat 0.47  boom 5.2 m  pitch 2 deg  slope 4
+mars Polar Frost Fields                 feet 0.15  hat 0.47  boom 5.2 m  pitch -1 deg  slope 7
+mars Dry Riverbeds                      feet 0.13  hat 0.47  boom 5.2 m  pitch 6 deg  slope 4
+mars Polar Frost Fields II              feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1
+mars Rust Canyons II                    feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 10
+mars Dust-Storm Dunes II                feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 6
+jupiter Cream Sky-Islands                  feet behind the lens  hat behind the lens  boom 0.2 m  pitch -5 deg  slope 16   <-- OUT OF THE FRAME
+jupiter Storm-Wall Cliffs                  feet 0.12  hat 0.47  boom 5.1 m  pitch 14 deg  slope 2
+jupiter Hanging Gardens                    feet 0.12  hat 0.47  boom 5.1 m  pitch 15 deg  slope 1
+jupiter Lightning Plains                   feet 0.15  hat 0.47  boom 5.2 m  pitch -1 deg  slope 20
+jupiter Hanging Gardens II                 feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1
+jupiter Lightning Plains II                feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1
+jupiter Storm-Wall Cliffs II               feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 0
+saturn Pale Gold Sky-Islands              feet 0.16  hat 0.47  boom 5.3 m  pitch -6 deg  slope 16
+saturn Crystal Reed Fields                feet 0.14  hat 0.47  boom 5.2 m  pitch 3 deg  slope 1
+saturn Ring-Shadow Twilight               feet 0.14  hat 0.47  boom 5.2 m  pitch 2 deg  slope 4
+saturn Honey Mist Valleys                 feet 0.13  hat 0.47  boom 5.2 m  pitch 8 deg  slope 16
+saturn Ring-Shadow Twilight II            feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 6
+saturn Crystal Reed Fields II             feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1
+saturn Honey Mist Valleys II              feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 7
+uranus Mint Ice Shelves                   feet 0.12  hat 0.47  boom 5.1 m  pitch 11 deg  slope 4
+uranus Frozen-Wave Forest                 feet 0.15  hat 0.47  boom 5.2 m  pitch -1 deg  slope 7
+uranus Pearl Fog Flats                    feet 0.14  hat 0.47  boom 5.2 m  pitch 3 deg  slope 1
+uranus Glowing Teal Sinkholes             feet 0.08  hat 0.38  boom 5.4 m  pitch 8 deg  slope 26
+uranus Pearl Fog Flats II                 feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 2
+uranus Frozen-Wave Forest II              feet -2.62  hat 1.93  boom 0.3 m  pitch -7 deg  slope 5   <-- OUT OF THE FRAME
+uranus Glowing Teal Sinkholes II          feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 2
+neptune Ultramarine Storm Seas             feet 0.16  hat 0.47  boom 5.3 m  pitch -6 deg  slope 11
+neptune Blue-Violet Kelp Forests           feet 0.14  hat 0.47  boom 5.2 m  pitch 3 deg  slope 5
+neptune Wind-Carved Ice Spires             feet 0.13  hat 0.47  boom 5.1 m  pitch 8 deg  slope 4
+neptune Aurora Tundra                      feet 0.14  hat 0.47  boom 5.2 m  pitch 1 deg  slope 2
+neptune Aurora Tundra II                   feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1
+neptune Wind-Carved Ice Spires II          feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 5
+neptune Ultramarine Storm Seas II          feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 16
+pluto Lilac Mountains                    feet 0.07  hat 0.57  boom 3.1 m  pitch -7 deg  slope 9
+pluto Lilac Mountains II                 feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 13
+pluto Nitrogen Dunes                     feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 12
+pluto Nitrogen Dunes II                  feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 13
+pluto Long-Shadow Plain                  feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 6
+pluto Pale Heart Glacier                 feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1
+pluto Long-Shadow Plain II               feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 2
+pluto Pale Heart Glacier II              feet 0.16  hat 0.47  boom 5.3 m  pitch -7 deg  slope 1

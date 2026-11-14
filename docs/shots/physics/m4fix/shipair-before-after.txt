@@ -1,0 +1,63 @@
+# PILOT's docs/lead/evidence/pilot12/shipair.mjs on six places. BEFORE: a clean export of 6cfab48 with 141997f's physics.
+# earth spawn clock 30: weather breeze (0.21), wind at the hull 5.9 m/s, gust01 0.82, air 1.04 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 6.8 .. 6.8 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h90: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h180: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h270: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0
+  full throttle at 40 m: top 50 m/s (half of it in 1.9 s, 90 % in 3.8 s); X: stopped in 3.7 s over 66 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.76 m/s, said "Setting down on level ground 12 m away"; ground 3 deg; in the 20 s after: moved 0.13 m, hull off level up to 4.2 deg
+# venus spawn clock 30: weather clear (0.00), wind at the hull 0.3 m/s, gust01 0.62, air 54.81 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 23.9 .. 23.9 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 17.3 m/s along the nose, 0 m off its line (0.1 deg), worst tilt 8; h90: 17.3 m/s along the nose, 0 m off its line (0.1 deg), worst tilt 17; h180: 16.8 m/s along the nose, 0 m off its line (0.1 deg), worst tilt 17; h270: 17.3 m/s along the nose, 1 m off its line (0.1 deg), worst tilt 9
+  full throttle at 40 m: top 35 m/s (half of it in 1.7 s, 90 % in 3.4 s); X: stopped in 2.4 s over 43 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.75 m/s; ground 0 deg; in the 20 s after: moved 0.08 m, hull off level up to 0.1 deg
+# neptune storm_seas clock 205: weather drizzle (1.00), wind at the hull 71.3 m/s, gust01 0.52, air 0.91 kg/m3
+  hover, hands off 30 s: drifted 137.5 m (fastest 26.5 m/s); height over the ground 6.9 .. 73.6 m (most in one second 21.3 m); hull off level mean 19.0, worst 26.4 deg
+  cruise at half throttle 16 s: h0: 25.1 m/s along the nose, 11 m off its line (1.5 deg), worst tilt 23; h90: 24.7 m/s along the nose, 4 m off its line (0.6 deg), worst tilt 20; h180: 25.0 m/s along the nose, 30 m off its line (4.3 deg), worst tilt 24; h270: 24.9 m/s along the nose, 2 m off its line (0.3 deg), worst tilt 13
+  full throttle at 40 m: top 60 m/s (half of it in 2.3 s, 90 % in 5.0 s); X: stopped in 3.8 s over 99 m
+  E at 25 m: LANDED in 7.5 s, sink at the end 0.85 m/s, said "Setting down on level ground 12 m away"; ground 4 deg; in the 20 s after: moved 0.30 m, hull off level up to 20.7 deg
+# neptune storm_seas clock 236: weather thunderstorm (1.00), wind at the hull 111.2 m/s, gust01 0.57, air 0.91 kg/m3
+  hover, hands off 30 s: drifted 101.0 m (fastest 37.9 m/s); height over the ground 7.8 .. 77.6 m (most in one second 13.8 m); hull off level mean 17.9, worst 25.8 deg
+  cruise at half throttle 16 s: h0: 25.9 m/s along the nose, 64 m off its line (8.7 deg), worst tilt 26; h90: 24.8 m/s along the nose, 4 m off its line (0.6 deg), worst tilt 23; h180: 26.0 m/s along the nose, 41 m off its line (5.7 deg), worst tilt 27; h270: 24.9 m/s along the nose, 1 m off its line (0.1 deg), worst tilt 17
+  full throttle at 40 m: top 55 m/s (half of it in 2.2 s, 90 % in 3.3 s); X: stopped in 3.9 s over 104 m
+  E at 25 m: LANDED in 5.7 s, sink at the end 0.83 m/s, said "Setting down on level ground 12 m away"; ground 5 deg; in the 20 s after: moved 0.25 m, hull off level up to 18.9 deg
+# mars spawn clock 30: weather windy (0.34), wind at the hull 11.0 m/s, gust01 0.63, air 0.01 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 29.8 .. 29.8 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 40.1 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h90: 39.9 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h180: 39.8 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h270: 40.6 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0
+  full throttle at 40 m: top 125 m/s (half of it in 3.5 s, 90 % in 25.5 s); X: stopped in 3.6 s over 190 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.77 m/s; ground 1 deg; in the 20 s after: moved 0.10 m, hull off level up to 0.9 deg
+# jupiter spawn clock 30: weather clear (0.41), wind at the hull 2.4 m/s, gust01 0.48, air 0.42 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 26.8 .. 26.8 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 32.6 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 1; h90: 31.2 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h180: 33.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 1; h270: 32.7 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0
+  full throttle at 40 m: top 69 m/s (half of it in 2.2 s, 90 % in 4.6 s); X: stopped in 4.9 s over 165 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.76 m/s; ground 2 deg; in the 20 s after: moved 0.17 m, hull off level up to 2.3 deg
+
+# AFTER: the same tree with this commit's ship.js
+# earth spawn clock 30: weather breeze (0.21), wind at the hull 5.9 m/s, gust01 0.82, air 1.04 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 6.8 .. 6.8 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h90: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h180: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h270: 23.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0
+  full throttle at 40 m: top 50 m/s (half of it in 1.9 s, 90 % in 3.8 s); X: stopped in 3.6 s over 65 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.76 m/s, said "Setting down on level ground 12 m away"; ground 3 deg; in the 20 s after: moved 0.13 m, hull off level up to 4.2 deg
+# venus spawn clock 30: weather clear (0.00), wind at the hull 0.3 m/s, gust01 0.62, air 54.81 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 23.9 .. 23.9 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 17.3 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 5; h90: 17.3 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 6; h180: 16.8 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 6; h270: 17.3 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 6
+  full throttle at 40 m: top 35 m/s (half of it in 1.7 s, 90 % in 3.3 s); X: stopped in 2.4 s over 43 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.75 m/s; ground 0 deg; in the 20 s after: moved 0.08 m, hull off level up to 0.1 deg
+# neptune storm_seas clock 205: weather drizzle (1.00), wind at the hull 60.3 m/s, gust01 0.51, air 0.91 kg/m3
+  hover, hands off 30 s: drifted 0.3 m (fastest 2.0 m/s); height over the ground 27.6 .. 32.9 m (most in one second 1.8 m); hull off level mean 5.1, worst 7.3 deg
+  cruise at half throttle 16 s: h0: 25.2 m/s along the nose, 2 m off its line (0.2 deg), worst tilt 6; h90: 25.1 m/s along the nose, 1 m off its line (0.1 deg), worst tilt 8; h180: 25.1 m/s along the nose, 1 m off its line (0.1 deg), worst tilt 7; h270: 25.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 6
+  full throttle at 40 m: top 51 m/s (half of it in 1.9 s, 90 % in 3.2 s); X: stopped in 3.9 s over 104 m
+  E at 25 m: LANDED in 6.1 s, sink at the end 0.96 m/s, said "Setting down on level ground 12 m away"; ground 4 deg; in the 20 s after: moved 0.45 m, hull off level up to 6.9 deg
+# neptune storm_seas clock 236: weather thunderstorm (1.00), wind at the hull 104.9 m/s, gust01 0.57, air 0.92 kg/m3
+  hover, hands off 30 s: drifted 0.7 m (fastest 2.0 m/s); height over the ground 29.8 .. 35.5 m (most in one second 1.4 m); hull off level mean 5.0, worst 6.8 deg
+  cruise at half throttle 16 s: h0: 25.2 m/s along the nose, 1 m off its line (0.1 deg), worst tilt 7; h90: 25.2 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 8; h180: 25.2 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 6; h270: 25.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 6
+  full throttle at 40 m: top 51 m/s (half of it in 1.9 s, 90 % in 3.3 s); X: stopped in 3.9 s over 105 m
+  E at 25 m: LANDED in 5.9 s, sink at the end 0.95 m/s, said "Setting down on level ground 12 m away"; ground 4 deg; in the 20 s after: moved 0.45 m, hull off level up to 6.1 deg
+# mars spawn clock 30: weather windy (0.34), wind at the hull 11.0 m/s, gust01 0.63, air 0.01 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 29.8 .. 29.8 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 40.1 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h90: 39.9 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h180: 39.8 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h270: 40.6 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0
+  full throttle at 40 m: top 125 m/s (half of it in 3.5 s, 90 % in 25.5 s); X: stopped in 3.6 s over 190 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.77 m/s; ground 1 deg; in the 20 s after: moved 0.10 m, hull off level up to 0.9 deg
+# jupiter spawn clock 30: weather clear (0.41), wind at the hull 2.4 m/s, gust01 0.48, air 0.42 kg/m3
+  hover, hands off 30 s: drifted 0.0 m (fastest 0.0 m/s); height over the ground 26.8 .. 26.8 m (most in one second 0.0 m); hull off level mean 0.0, worst 0.0 deg
+  cruise at half throttle 16 s: h0: 32.6 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 1; h90: 31.2 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0; h180: 33.0 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 1; h270: 32.7 m/s along the nose, 0 m off its line (0.0 deg), worst tilt 0
+  full throttle at 40 m: top 69 m/s (half of it in 2.2 s, 90 % in 4.6 s); X: stopped in 4.9 s over 166 m
+  E at 25 m: LANDED in 6.3 s, sink at the end 0.76 m/s; ground 2 deg; in the 20 s after: moved 0.17 m, hull off level up to 2.3 deg

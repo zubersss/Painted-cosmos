@@ -1,0 +1,19 @@
+13:34:54 before E {"t":39.8,"st":"ATMOSPHERE","exV":2.5,"exAlt":0,"mode":"idle","fuel":1,"shV":46.1,"hAG":18.74,"shH":38.29,"shVUp":1.22,"thr":1,"lift":0,"land":null,"prompt":"Land here","notice":null,"cam":42.65,"view":"chase","hour":9.06,"marks":[]}
+13:34:55 land {"t":44.83,"st":"LANDING","hAG":44.9,"boom":14.96,"lensCrown":30.61,"near":0,"mid":0,"far":0,"leftHalf":0,"room":15.08}
+13:34:55 land {"t":45.33,"st":"LANDING","hAG":42,"boom":15.18,"lensCrown":26.53,"near":0,"mid":0,"far":0,"leftHalf":0,"room":15.07}
+13:34:55 land {"t":45.83,"st":"LANDING","hAG":38.6,"boom":15.39,"lensCrown":22.81,"near":0,"mid":0,"far":0,"leftHalf":0,"room":12.76}
+13:34:55 land {"t":46.33,"st":"LANDING","hAG":35.2,"boom":14.95,"lensCrown":19.49,"near":0,"mid":0,"far":0,"leftHalf":0,"room":14.36}
+13:34:55 land {"t":46.83,"st":"LANDING","hAG":32.1,"boom":14.6,"lensCrown":16.41,"near":0,"mid":0,"far":0,"leftHalf":0,"room":14.03}
+13:34:55 land {"t":47.33,"st":"LANDING","hAG":29.1,"boom":14.51,"lensCrown":13.47,"near":0,"mid":0,"far":0,"leftHalf":0,"room":13.99}
+13:34:55 land {"t":47.83,"st":"LANDING","hAG":26.1,"boom":14.47,"lensCrown":10.61,"near":0,"mid":0,"far":0,"leftHalf":0,"room":13.99}
+13:34:55 land {"t":48.33,"st":"LANDING","hAG":23.1,"boom":14.45,"lensCrown":7.85,"near":0,"mid":0,"far":0,"leftHalf":0,"room":13.99}
+13:34:55 land {"t":48.83,"st":"LANDING","hAG":20.1,"boom":14.44,"lensCrown":5.33,"near":0,"mid":0,"far":0,"leftHalf":0,"room":13.99}
+13:34:55 land {"t":49.33,"st":"LANDING","hAG":17.1,"boom":14.44,"lensCrown":3.63,"near":0,"mid":0,"far":6,"leftHalf":6,"room":13.99}
+13:34:55 land {"t":49.83,"st":"LANDING","hAG":14.1,"boom":14.44,"lensCrown":3.46,"near":0,"mid":10,"far":7,"leftHalf":16,"room":13.99}
+13:34:55 land {"t":50.33,"st":"LANDING","hAG":11.1,"boom":14.44,"lensCrown":2.07,"near":0,"mid":29,"far":3,"leftHalf":30,"room":13.99}
+13:34:55 land {"t":50.83,"st":"LANDING","hAG":8.1,"boom":14.44,"lensCrown":1.44,"near":0,"mid":43,"far":3,"leftHalf":43,"room":13.99}
+13:34:55 land {"t":51.33,"st":"LANDING","hAG":5.1,"boom":14.43,"lensCrown":1.44,"near":0,"mid":45,"far":5,"leftHalf":45,"room":13.98}
+13:34:55 land {"t":51.83,"st":"LANDING","hAG":2.9,"boom":14.37,"lensCrown":1.44,"near":0,"mid":37,"far":7,"leftHalf":40,"room":13.97}
+13:34:55 land {"t":52.33,"st":"LANDING","hAG":1.6,"boom":14.14,"lensCrown":2.18,"near":0,"mid":23,"far":7,"leftHalf":27,"room":13.95}
+13:34:55 land {"t":52.83,"st":"LANDING","hAG":0.8,"boom":14.14,"lensCrown":2.85,"near":0,"mid":18,"far":7,"leftHalf":23,"room":14.7}
+13:34:55 land {"t":53.33,"st":"LANDING","hAG":0.2,"boom":14.34,"lensCrown":2.8,"near":0,"mid":17,"far":8,"leftHalf":23,"room":15.01}

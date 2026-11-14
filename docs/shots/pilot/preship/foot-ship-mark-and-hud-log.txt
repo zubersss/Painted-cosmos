@@ -1,0 +1,10 @@
+ready after 16 s; fallback []; errors []
+spawn: ship 16.0 m, bearing 26
+00-facing-away-near.jpg: t 7.8 ON_FOOT prompt "" notice "" turning null target - speed 0
+01-walked-away.jpg: t 22.8 ON_FOOT prompt "" notice "" turning null target - speed 0
+02-ship-off-to-the-side.jpg: t 23.9 ON_FOOT prompt "" notice "" turning null target - speed 0
+03-facing-the-ship.jpg: t 24.7 ON_FOOT prompt "" notice "" turning null target - speed 0
+04-stats-and-notice.jpg: t 25.0 ON_FOOT prompt "" notice "A notice on foot, lettered at the top of the sheet" turning null target - speed 0
+05-turn-notice-and-prompt.jpg: t 27.2 SPACE prompt "Stop turning" notice "Turning onto the course for Saturn" turning {"dest":"saturn","t":1.3333333333333335} target saturn 697 km speed 0
+problems: [] game errors: [] fallback: []
+done in 346 s

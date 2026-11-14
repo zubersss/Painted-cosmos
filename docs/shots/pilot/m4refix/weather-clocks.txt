@@ -1,0 +1,14 @@
+earth-before old   t  120: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+earth-before new   t 1650: breeze        rain   0.0 mm/h (none) cloud 0.29 storm 0.00
+earth-arrives old  t  166: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+earth-arrives new  t 1696: thunderstorm  rain   6.1 mm/h (rain) cloud 0.94 storm 0.44
+earth-storm old    t  240: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+earth-storm new    t 1770: thunderstorm  rain  22.3 mm/h (rain) cloud 0.96 storm 0.83
+earth-flash old    t  244: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+earth-flash new    t 1774: thunderstorm  rain  21.8 mm/h (rain) cloud 0.96 storm 0.82
+earth-after old    t  400: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+earth-after new    t 1930: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+motion storm old   t  240: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+motion storm new   t 1770: thunderstorm  rain  22.3 mm/h (rain) cloud 0.96 storm 0.83
+earth-blizzard     t  190: breeze        rain   0.0 mm/h (none) cloud 0.04 storm 0.00
+earth-blizzard     t 1720: blizzard      rain   5.2 mm/h (snow) cloud 0.97 storm 0.68

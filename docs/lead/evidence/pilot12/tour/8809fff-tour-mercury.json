@@ -1,0 +1,62 @@
+{
+ "label": "HEAD 8809fff (PAINTER 14 WIP) + PILOT 11 working files, top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 102.8,
+   "settledFrames": 41,
+   "tris": 505401,
+   "calls": 440,
+   "worldWorstMs": 409.8,
+   "physicsWorstMs": 209.6,
+   "stoodIn": "obsidian_fields",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mercury-ochre_basins-1",
+   "name": "Cracked Ochre Basins",
+   "alsoVista": null,
+   "settledSeconds": 101.9,
+   "settledFrames": 37,
+   "tris": 489380,
+   "calls": 140,
+   "worldWorstMs": 416.8,
+   "physicsWorstMs": 209.6,
+   "stoodIn": "ochre_basins",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4.1,
+    "biome": "ochre_basins",
+    "radius": 2254.216288818666
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 2.6,
+   "settledFrames": 9,
+   "tris": 55649,
+   "calls": 29,
+   "worldWorstMs": 416.8,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

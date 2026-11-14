@@ -1,0 +1,11 @@
+# the verifier's probes/swimturn.mjs (Earth's sea coast, PHYSICS on)
+## before (5fd7a0a)
+afloat, D (a quarter turn): 0.27 s (moving backward for 0.00 s)
+afloat, S (about): 6.43 s (moving backward for 5.77 s)
+afloat, S with the mouse moved 3 px: 1.97 s (moving backward for 0.98 s)
+on land, S (about): 1.83 s (moving backward for 1.30 s)
+## after
+afloat, D (a quarter turn): 0.25 s (moving backward for 0.00 s)
+afloat, S (about): 0.75 s (moving backward for 0.00 s)
+afloat, S with the mouse moved 3 px: 0.75 s (moving backward for 0.00 s)
+on land, S (about): 1.83 s (moving backward for 1.30 s)

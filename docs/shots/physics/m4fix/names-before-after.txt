@@ -1,0 +1,7 @@
+# The weather's name at Neptune's storm coast and Earth's sea coast, every 10 s for 600 s (names.mjs). BEFORE = a clean export of 9917fab, AFTER = the same with the last commit's weather.js.
+BEFORE neptune storm_seas, 600 s: thunderstorm 130 s, drizzle 110 s, mist 360 s, rain 10 s; 8 changes of name; called mist or fog with over 12 m/s at the walker: 310 s 
+AFTER  neptune storm_seas, 600 s: thunderstorm 130 s, drizzle 110 s, spray 360 s, rain 10 s; 8 changes of name; called mist or fog with over 12 m/s at the walker: 0 s 
+BEFORE earth sea_coast, 600 s: breeze 150 s, drizzle 60 s, rain 20 s, windy 380 s; 4 changes of name; called mist or fog with over 12 m/s at the walker: 0 s 
+AFTER  earth sea_coast, 600 s: breeze 150 s, drizzle 60 s, rain 20 s, windy 380 s; 4 changes of name; called mist or fog with over 12 m/s at the walker: 0 s 
+BEFORE neptune ice_spires, 600 s: overcast 50 s, windy 560 s; 1 changes of name; called mist or fog with over 12 m/s at the walker: 0 s 
+AFTER  neptune ice_spires, 600 s: overcast 50 s, windy 560 s; 1 changes of name; called mist or fog with over 12 m/s at the walker: 0 s 

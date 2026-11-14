@@ -1,0 +1,10 @@
+# neptune storm_seas, 600 s standing there: 12 changes of the weather's name (one every 50 s); wind 5 .. 96 m/s; while it was called mist or fog the wind was 5 .. 41 m/s
+  thunderstorm 74 s, rain 2 s, drizzle 12 s, mist 114 s, ice fall 4 s, drizzle 2 s, rain 2 s, thunderstorm 54 s, rain 2 s, drizzle 6 s, mist 44 s, drizzle 94 s, mist 190 s
+# neptune spawn, 600 s standing there: 3 changes of the weather's name (one every 200 s); wind 3 .. 24 m/s
+  ice fall 114 s, windy 310 s, ice fall 108 s, windy 68 s
+# earth spawn, 600 s standing there: 7 changes of the weather's name (one every 86 s); wind 0 .. 12 m/s; while it was called mist or fog the wind was 0 .. 2 m/s
+  breeze 130 s, drizzle 16 s, rain 4 s, thunderstorm 154 s, rain 6 s, drizzle 16 s, breeze 44 s, mist 230 s
+# mars dust_dunes, 600 s standing there: 1 changes of the weather's name (one every 600 s); wind 1 .. 21 m/s
+  breeze 574 s, dust haze 26 s
+# jupiter spawn, 600 s standing there: 3 changes of the weather's name (one every 200 s); wind 0 .. 3 m/s; while it was called mist or fog the wind was 1 .. 3 m/s
+  clear 278 s, mist 44 s, fog 126 s, mist 152 s

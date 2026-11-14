@@ -1,0 +1,97 @@
+{
+ "label": "exported 3066381 to /home/user/.pc-scratch/pilot/last/all/export",
+ "when": "2026-11-13T23:19:02.434Z",
+ "rows": [
+  {
+   "id": "unit",
+   "ok": true,
+   "sec": 68,
+   "detail": "pass 208, fail 0",
+   "what": "PILOT's unit tests (simulation, flight, camera, save, sketchbook, contract with the real worlds)"
+  },
+  {
+   "id": "physics-unit",
+   "ok": true,
+   "sec": 157,
+   "detail": "pass 325, fail 0",
+   "what": "PHYSICS' unit tests"
+  },
+  {
+   "id": "world-unit",
+   "ok": true,
+   "sec": 10,
+   "detail": "pass 25, fail 0",
+   "what": "PAINTER's unit tests"
+  },
+  {
+   "id": "static",
+   "ok": true,
+   "sec": 0,
+   "detail": "all rules hold",
+   "what": "the brief's static rules"
+  },
+  {
+   "id": "play-stub",
+   "ok": true,
+   "sec": 161,
+   "detail": "39 checks",
+   "what": "play-through on the stubs (walk, jetpack, board, orbit, land, step out)"
+  },
+  {
+   "id": "play-physics",
+   "ok": true,
+   "sec": 178,
+   "detail": "39 checks",
+   "what": "play-through on the stubs with PHYSICS"
+  },
+  {
+   "id": "trip-stub",
+   "ok": true,
+   "sec": 381,
+   "detail": "50 checks",
+   "what": "Earth, Mars, Saturn in one sitting, reload from the save (stubs)"
+  },
+  {
+   "id": "m3",
+   "ok": true,
+   "sec": 57,
+   "detail": "33 checks",
+   "what": "milestone 3: title card, sketchbook and sketches, vistas, gamepad, tiers"
+  },
+  {
+   "id": "lock",
+   "ok": true,
+   "sec": 37,
+   "detail": "14 checks",
+   "what": "pointer lock and the drag-to-look fallback"
+  },
+  {
+   "id": "audio",
+   "ok": true,
+   "sec": 17,
+   "detail": "PASSED",
+   "what": "the sound, measured (no clipping, no clicks, no DC)"
+  },
+  {
+   "id": "painted-play",
+   "ok": true,
+   "sec": 245,
+   "detail": "39 checks",
+   "what": "play-through in the painted world"
+  },
+  {
+   "id": "painted-trip",
+   "ok": true,
+   "sec": 436,
+   "detail": "50 checks",
+   "what": "Earth, Mars, Saturn in the painted world, reload from the save"
+  },
+  {
+   "id": "painted-m3",
+   "ok": true,
+   "sec": 406,
+   "detail": "33 checks",
+   "what": "milestone 3's checks in the painted world"
+  }
+ ]
+}

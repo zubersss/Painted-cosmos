@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 220.1,
+   "settledFrames": 52,
+   "tris": 772001,
+   "calls": 276,
+   "worldWorstMs": 373.6,
+   "physicsWorstMs": 110.1,
+   "stoodIn": "gold_islands",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "saturn-gold_islands-1",
+   "name": "Pale Gold Sky-Islands",
+   "alsoVista": null,
+   "settledSeconds": 316.1,
+   "settledFrames": 50,
+   "tris": 794574,
+   "calls": 307,
+   "worldWorstMs": 278.5,
+   "physicsWorstMs": 51.1,
+   "stoodIn": "gold_islands",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 16.5,
+    "biome": "gold_islands",
+    "radius": 4690.010790746755
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 27.8,
+   "settledFrames": 9,
+   "tris": 29081,
+   "calls": 20,
+   "worldWorstMs": 269.3,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+# earth sea_coast, 144 m out, clock 600: windy, wind 9.6 m/s; PHYSICS' sea: Hs 0.50 m, period 1.7 s, length 4.2 m, steepness 0.05, whitecaps 31 %
+  hands off 12 s: feet -1.58 .. -0.95 m against the still level (a range of 0.63 m); rising up to 0.5, falling 0.8 m/s; largest vertical acceleration 0.2 g; moved 0.5 m (0.04 m/s); afloat 100 % of it; mean submerged 0.71; head under the wave 0 % of it
+  W         12 s: feet -1.57 .. -0.99 m against the still level (a range of 0.58 m); rising up to 0.8, falling 1.1 m/s; largest vertical acceleration 0.4 g; moved 23.9 m (1.99 m/s); afloat 100 % of it; mean submerged 0.72; head under the wave 0 % of it
+# neptune storm_seas, 132 m out, clock 200: thunderstorm, wind 69.7 m/s; PHYSICS' sea: Hs 3.52 m, period 3.1 s, length 15.5 m, steepness 0.13, whitecaps 85 %
+  hands off 12 s: feet -3.38 .. 0.03 m against the still level (a range of 3.40 m); rising up to 3.1, falling 2.8 m/s; largest vertical acceleration 0.8 g; moved 0.5 m (0.04 m/s); afloat 100 % of it; mean submerged 0.75; head under the wave 0 % of it
+  W         12 s: feet -3.87 .. 1.16 m against the still level (a range of 5.04 m); rising up to 3.6, falling 4.6 m/s; largest vertical acceleration 1.5 g; moved 32.4 m (2.70 m/s); afloat 96 % of it; mean submerged 0.79; head under the wave 27 % of it
+# neptune storm_seas, 132 m out, clock 500: mist, wind 41.0 m/s; PHYSICS' sea: Hs 2.93 m, period 2.4 s, length 9.3 m, steepness 0.10, whitecaps 100 %
+  hands off 12 s: feet -2.82 .. 0.17 m against the still level (a range of 3.00 m); rising up to 2.8, falling 2.0 m/s; largest vertical acceleration 0.9 g; moved 0.5 m (0.04 m/s); afloat 100 % of it; mean submerged 0.74; head under the wave 0 % of it
+  W         12 s: feet -3.16 .. 0.29 m against the still level (a range of 3.44 m); rising up to 2.8, falling 3.3 m/s; largest vertical acceleration 1.0 g; moved 32.5 m (2.71 m/s); afloat 100 % of it; mean submerged 0.78; head under the wave 5 % of it

@@ -1,0 +1,7 @@
+# the same instruments on a clean export of b25457f (PHYSICS a70d668): items 2, 4 and 6 after P26
+# earth spawn clock 240 (thunderstorm), KeyW, 14 s: 819 m in all; 2 of 16 headings held under 1 m/s for more than 2 s
+  worst: 24.8 g in a frame, hull rock 31.5 deg
+  worst: 0.0 g in a frame, hull rock 0.3 deg
+  walk in (W) until afloat   6.1 s: 21.0 m made, pace mean 3.42 max 3.95 m/s; feet -1.09 .. 4001.94 m against the still level; swimming 0 %, grounded 100 %; modes {"idle":1,"walk":128,"wade":53}; depth 1.11
+  swim out (W)               12.0 s: 24.7 m made, pace mean 2.05 max 2.09 m/s; feet -1.45 .. -1.09 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":360}; depth 1.34
+  let go                     10.0 s: 0.4 m made, pace mean 0.09 max 2.08 m/s; feet -1.50 .. -1.01 m against the still level; swimming 100 %, grounded 0 %; modes {"wade":300}; depth 1.14

@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 144.4,
+   "settledFrames": 49,
+   "tris": 593614,
+   "calls": 298,
+   "worldWorstMs": 551.3,
+   "physicsWorstMs": 110.1,
+   "stoodIn": "sky_islands",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "jupiter-sky_islands-1",
+   "name": "Cream Sky-Islands",
+   "alsoVista": null,
+   "settledSeconds": 149.9,
+   "settledFrames": 47,
+   "tris": 734296,
+   "calls": 294,
+   "worldWorstMs": 295.5,
+   "physicsWorstMs": 110.1,
+   "stoodIn": "sky_islands",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 15.9,
+    "biome": "sky_islands",
+    "radius": 5118.132426039149
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 17.3,
+   "settledFrames": 9,
+   "tris": 71791,
+   "calls": 46,
+   "worldWorstMs": 295.5,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

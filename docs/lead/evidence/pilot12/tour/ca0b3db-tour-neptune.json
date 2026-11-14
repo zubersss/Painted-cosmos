@@ -1,0 +1,62 @@
+{
+ "label": "clean export of HEAD ca0b3db (PAINTER 76d8182, PILOT 904b6fe, PHYSICS 2f924cd), top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 124.3,
+   "settledFrames": 30,
+   "tris": 821744,
+   "calls": 284,
+   "worldWorstMs": 333,
+   "physicsWorstMs": 73.9,
+   "stoodIn": "kelp_forests",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "neptune-storm_seas-1",
+   "name": "Ultramarine Storm Seas",
+   "alsoVista": null,
+   "settledSeconds": 157.1,
+   "settledFrames": 38,
+   "tris": 524771,
+   "calls": 229,
+   "worldWorstMs": 336.4,
+   "physicsWorstMs": 73.9,
+   "stoodIn": "storm_seas",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 10.7,
+    "biome": "storm_seas",
+    "radius": 4248.885668259242
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 23.6,
+   "settledFrames": 9,
+   "tris": 75769,
+   "calls": 48,
+   "worldWorstMs": 336.4,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

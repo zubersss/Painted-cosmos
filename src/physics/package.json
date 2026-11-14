@@ -1,0 +1,7 @@
+{
+  "name": "painted-cosmos-physics",
+  "private": true,
+  "type": "module",
+  "main": "all.test.mjs",
+  "description": "Dev only: makes `node --test src/physics/` run every test file (Node 22 treats a directory argument as one module)."
+}

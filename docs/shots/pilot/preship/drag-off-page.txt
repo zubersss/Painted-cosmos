@@ -1,0 +1,4 @@
+inside, 400 px down from y=85: {"down":1,"moves":10,"dy":400}
+from y=85, 400 px up (leaves the top): {"down":1,"moves":10,"dy":-400}
+starting at y=-315 (off the top), 400 px down: {"down":0,"moves":0,"dy":0}
+starting at y=-715, 400 px down (all off the page): {"down":0,"moves":0,"dy":0}

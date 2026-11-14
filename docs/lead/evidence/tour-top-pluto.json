@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 109.4,
+   "settledFrames": 51,
+   "tris": 759567,
+   "calls": 489,
+   "worldWorstMs": 295.2,
+   "physicsWorstMs": 277.3,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "pluto-lilac_mountains-1",
+   "name": "Lilac Mountains",
+   "alsoVista": null,
+   "settledSeconds": 108.5,
+   "settledFrames": 26,
+   "tris": 816104,
+   "calls": 509,
+   "worldWorstMs": 343.3,
+   "physicsWorstMs": 277.3,
+   "stoodIn": "lilac_mountains",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 9.4,
+    "biome": "lilac_mountains",
+    "radius": 1697.21208658061
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 49.3,
+   "settledFrames": 24,
+   "tris": 890861,
+   "calls": 521,
+   "worldWorstMs": 343.3,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

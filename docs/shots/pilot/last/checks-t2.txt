@@ -1,0 +1,23 @@
+== world
+# pass 30
+# fail 0
+== unit
+# pass 208
+# fail 0
+== physics
+# pass 325
+# fail 0
+== coast
+   80 m out: fetch >= 2000 ok, mean depth >= 12 ok, Hs >= 0.47 ok, white >= 3.22 % ok; surf at the waterline (Hs >= 0.25) ok  =>  PASS
+   80 m out: fetch >= 2000 ok, mean depth >= 12 ok, Hs >= 2.31 ok, white >= 60 % ok; surf at the waterline (Hs >= 0.25) ok  =>  PASS
+== ghostfield
+
+place (0, 0, 1): the plane PHYSICS' P17 test runs in, g 9.81
+  t2           {"worstStepLoss":0.26,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+place (0, 0, 1): the plane PHYSICS' P17 test runs in, g 1.62
+  t2           {"worstStepLoss":0.52,"radialWhileGrounded":0,"offLine":0,"wrongMaterialSteps":0,"stepsInAir":0}
+
+real	4m31.903s
+user	6m30.749s
+sys	0m6.496s

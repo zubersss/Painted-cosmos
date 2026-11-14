@@ -1,0 +1,679 @@
+{
+ "query": "quality=0&dynres=0&pointerlock=0&fresh=1&save=0&audio=0&card=0",
+ "beats": [
+  {
+   "n": 1,
+   "name": "hover-earth",
+   "file": "01-hover-earth.jpg",
+   "state": "ATMOSPHERE",
+   "body": "earth",
+   "biome": "alpine_meadow",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 38,
+   "wx": {
+    "kind": "clear",
+    "wind": 3.9,
+    "rain": 0
+   }
+  },
+  {
+   "n": 2,
+   "name": "low-flight-earth",
+   "file": "02-low-flight-earth.jpg",
+   "state": "ATMOSPHERE",
+   "body": "earth",
+   "biome": "alpine_meadow",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 44.2,
+   "v": 51.7,
+   "alt": 10.2
+  },
+  {
+   "n": 3,
+   "name": "turning-earth",
+   "file": "03-turning-earth.jpg",
+   "state": "ATMOSPHERE",
+   "body": "earth",
+   "biome": "alpine_meadow",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 47.4,
+   "v": 48.6
+  },
+  {
+   "n": 4,
+   "name": "before-landing-earth",
+   "file": "04-before-landing-earth.jpg",
+   "state": "ATMOSPHERE",
+   "body": "earth",
+   "biome": "alpine_meadow",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 54.4,
+   "canLand": true
+  },
+  {
+   "n": 5,
+   "name": "landed-earth",
+   "file": "05-landed-earth.jpg",
+   "state": "LANDED",
+   "body": "earth",
+   "biome": "alpine_meadow",
+   "prompt": "Lift off",
+   "notice": null,
+   "t": 64.1
+  },
+  {
+   "n": 6,
+   "name": "hover-mars",
+   "file": "06-hover-mars.jpg",
+   "state": "ATMOSPHERE",
+   "body": "mars",
+   "biome": "rust_canyons",
+   "prompt": "Land here",
+   "notice": null,
+   "t": 35.4,
+   "wx": {
+    "kind": "windy",
+    "wind": 21,
+    "rain": 0
+   }
+  },
+  {
+   "n": 7,
+   "name": "low-flight-mars",
+   "file": "07-low-flight-mars.jpg",
+   "state": "ATMOSPHERE",
+   "body": "mars",
+   "biome": "rust_canyons",
+   "prompt": null,
+   "notice": "Thin air on Mars: the ship runs fast and turns wide. Hold X to slow it",
+   "t": 41.5,
+   "v": 89,
+   "alt": 24.4
+  },
+  {
+   "n": 8,
+   "name": "turning-mars",
+   "file": "08-turning-mars.jpg",
+   "state": "ATMOSPHERE",
+   "body": "mars",
+   "biome": "rust_canyons",
+   "prompt": null,
+   "notice": "Thin air on Mars: the ship runs fast and turns wide. Hold X to slow it",
+   "t": 44.6,
+   "v": 107.3
+  },
+  {
+   "n": 9,
+   "name": "before-landing-mars",
+   "file": "09-before-landing-mars.jpg",
+   "state": "ATMOSPHERE",
+   "body": "mars",
+   "biome": "rust_canyons",
+   "prompt": null,
+   "notice": null,
+   "t": 71.4,
+   "canLand": false
+  },
+  {
+   "n": 10,
+   "name": "landed-mars",
+   "file": "10-landed-mars.jpg",
+   "state": "ATMOSPHERE",
+   "body": "mars",
+   "biome": "rust_canyons",
+   "prompt": null,
+   "notice": null,
+   "t": 99.9
+  }
+ ],
+ "traces": {
+  "throttle-up-earth": [
+   {
+    "t": 0,
+    "v": 0,
+    "alt": 24.2,
+    "thr": 0
+   },
+   {
+    "t": 0.68,
+    "v": 3.1,
+    "alt": 24.2,
+    "thr": 0.55
+   },
+   {
+    "t": 1.18,
+    "v": 11,
+    "alt": 24.2,
+    "thr": 0.95
+   },
+   {
+    "t": 1.68,
+    "v": 20.9,
+    "alt": 24.2,
+    "thr": 1
+   },
+   {
+    "t": 2.18,
+    "v": 31.2,
+    "alt": 24.7,
+    "thr": 1
+   },
+   {
+    "t": 2.68,
+    "v": 38.8,
+    "alt": 24.2,
+    "thr": 1
+   },
+   {
+    "t": 3.18,
+    "v": 43,
+    "alt": 24.2,
+    "thr": 1
+   },
+   {
+    "t": 3.68,
+    "v": 44.9,
+    "alt": 23.4,
+    "thr": 1
+   },
+   {
+    "t": 4.18,
+    "v": 45.8,
+    "alt": 22.5,
+    "thr": 1
+   },
+   {
+    "t": 4.68,
+    "v": 46.7,
+    "alt": 15.3,
+    "thr": 1
+   },
+   {
+    "t": 5.18,
+    "v": 47.4,
+    "alt": 10.8,
+    "thr": 1
+   },
+   {
+    "t": 5.73,
+    "v": 51.7,
+    "alt": 10.2,
+    "thr": 1
+   }
+  ],
+  "turn-earth": [
+   {
+    "t": 0,
+    "v": 57,
+    "alt": 15.5
+   },
+   {
+    "t": 0.5,
+    "v": 57.3,
+    "alt": 8.1
+   },
+   {
+    "t": 1.25,
+    "v": 52.5,
+    "alt": 27.3
+   },
+   {
+    "t": 1.75,
+    "v": 50.3,
+    "alt": 35.6
+   },
+   {
+    "t": 2.25,
+    "v": 49.1,
+    "alt": 40.7
+   },
+   {
+    "t": 2.75,
+    "v": 48.6,
+    "alt": 51.7
+   }
+  ],
+  "brake-earth": [
+   {
+    "t": 0,
+    "v": 48.9,
+    "alt": 58.5
+   },
+   {
+    "t": 0.52,
+    "v": 46.8,
+    "alt": 68
+   },
+   {
+    "t": 1.02,
+    "v": 41.5,
+    "alt": 73
+   },
+   {
+    "t": 1.52,
+    "v": 35,
+    "alt": 75.7
+   },
+   {
+    "t": 2.02,
+    "v": 28,
+    "alt": 76.5
+   },
+   {
+    "t": 2.52,
+    "v": 21,
+    "alt": 80.2
+   },
+   {
+    "t": 3.02,
+    "v": 14,
+    "alt": 87.9
+   },
+   {
+    "t": 3.52,
+    "v": 7,
+    "alt": 92.3
+   },
+   {
+    "t": 4.1,
+    "v": 0.4,
+    "alt": 93.1
+   },
+   {
+    "t": 4.6,
+    "v": 1,
+    "alt": 93
+   }
+  ],
+  "landing-earth": [
+   {
+    "t": 0,
+    "v": 7.9,
+    "alt": 88.6,
+    "vUp": 0,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 0.7,
+    "v": 15.8,
+    "alt": 87.3,
+    "vUp": -11.81,
+    "state": "LANDING"
+   },
+   {
+    "t": 1.03,
+    "v": 15,
+    "alt": 83.5,
+    "vUp": -12.62,
+    "state": "LANDING"
+   },
+   {
+    "t": 1.53,
+    "v": 13.5,
+    "alt": 77.2,
+    "vUp": -12.93,
+    "state": "LANDING"
+   },
+   {
+    "t": 2.03,
+    "v": 13,
+    "alt": 70.8,
+    "vUp": -12.99,
+    "state": "LANDING"
+   },
+   {
+    "t": 2.53,
+    "v": 13,
+    "alt": 64.3,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 3.03,
+    "v": 13,
+    "alt": 57.8,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 3.53,
+    "v": 13,
+    "alt": 51.3,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 4.03,
+    "v": 13,
+    "alt": 44.8,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 4.53,
+    "v": 13,
+    "alt": 38.3,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 5.03,
+    "v": 13,
+    "alt": 31.8,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 5.53,
+    "v": 13,
+    "alt": 25.3,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 6.15,
+    "v": 13,
+    "alt": 17.3,
+    "vUp": -13,
+    "state": "LANDING"
+   },
+   {
+    "t": 6.65,
+    "v": 11.5,
+    "alt": 11,
+    "vUp": -11.5,
+    "state": "LANDING"
+   },
+   {
+    "t": 7.15,
+    "v": 7.5,
+    "alt": 6.3,
+    "vUp": -7.54,
+    "state": "LANDING"
+   },
+   {
+    "t": 7.65,
+    "v": 4.4,
+    "alt": 3.4,
+    "vUp": -4.36,
+    "state": "LANDING"
+   }
+  ],
+  "throttle-up-mars": [
+   {
+    "t": 0,
+    "v": 0,
+    "alt": 16.3,
+    "thr": 0
+   },
+   {
+    "t": 0.62,
+    "v": 3.7,
+    "alt": 16.3,
+    "thr": 0.49
+   },
+   {
+    "t": 1.12,
+    "v": 12.2,
+    "alt": 17.3,
+    "thr": 0.89
+   },
+   {
+    "t": 1.62,
+    "v": 22.4,
+    "alt": 16.9,
+    "thr": 1
+   },
+   {
+    "t": 2.12,
+    "v": 33.1,
+    "alt": 18.6,
+    "thr": 1
+   },
+   {
+    "t": 2.62,
+    "v": 44,
+    "alt": 15.3,
+    "thr": 1
+   },
+   {
+    "t": 3.12,
+    "v": 55,
+    "alt": 18,
+    "thr": 1
+   },
+   {
+    "t": 3.62,
+    "v": 65.3,
+    "alt": 16.9,
+    "thr": 1
+   },
+   {
+    "t": 4.12,
+    "v": 72.2,
+    "alt": 14,
+    "thr": 1
+   },
+   {
+    "t": 4.62,
+    "v": 75.8,
+    "alt": 16.1,
+    "thr": 1
+   },
+   {
+    "t": 5.22,
+    "v": 77.7,
+    "alt": 17.1,
+    "thr": 1
+   },
+   {
+    "t": 5.58,
+    "v": 89,
+    "alt": 24.4,
+    "thr": 1
+   }
+  ],
+  "turn-mars": [
+   {
+    "t": 0,
+    "v": 120.2,
+    "alt": 58.5
+   },
+   {
+    "t": 0.55,
+    "v": 124.6,
+    "alt": 6.3
+   },
+   {
+    "t": 1.05,
+    "v": 118.7,
+    "alt": 37
+   },
+   {
+    "t": 1.55,
+    "v": 112.5,
+    "alt": 45.1
+   },
+   {
+    "t": 2.05,
+    "v": 108.5,
+    "alt": 41.8
+   },
+   {
+    "t": 2.55,
+    "v": 107.3,
+    "alt": 60.9
+   }
+  ],
+  "brake-mars": [
+   {
+    "t": 0,
+    "v": 107,
+    "alt": 77.7
+   },
+   {
+    "t": 0.62,
+    "v": 94.6,
+    "alt": 103.3
+   },
+   {
+    "t": 1.12,
+    "v": 75,
+    "alt": 123.5
+   },
+   {
+    "t": 1.62,
+    "v": 53,
+    "alt": 175.9
+   },
+   {
+    "t": 2.12,
+    "v": 30.9,
+    "alt": 224.3
+   },
+   {
+    "t": 2.62,
+    "v": 11.5,
+    "alt": 224.5
+   },
+   {
+    "t": 3.12,
+    "v": 3.5,
+    "alt": 226
+   },
+   {
+    "t": 3.63,
+    "v": 0.8,
+    "alt": 226.2
+   },
+   {
+    "t": 4.02,
+    "v": 0.3,
+    "alt": 226
+   },
+   {
+    "t": 4.52,
+    "v": 0.1,
+    "alt": 226
+   }
+  ],
+  "landing-mars": [
+   {
+    "t": 0,
+    "v": 22.6,
+    "alt": 161.7,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 0.7,
+    "v": 24.9,
+    "alt": 172.2,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 1.2,
+    "v": 26.5,
+    "alt": 211.7,
+    "vUp": 0.03,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 1.7,
+    "v": 29.6,
+    "alt": 218.8,
+    "vUp": 0.03,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 2.2,
+    "v": 32.7,
+    "alt": 219.9,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 2.7,
+    "v": 34.9,
+    "alt": 225.6,
+    "vUp": 0,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 3.2,
+    "v": 36.5,
+    "alt": 243,
+    "vUp": 0.01,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 3.55,
+    "v": 38,
+    "alt": 263.4,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 4.05,
+    "v": 41.5,
+    "alt": 276,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 4.65,
+    "v": 45.7,
+    "alt": 276,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 5.15,
+    "v": 47.8,
+    "alt": 275.9,
+    "vUp": 0.02,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 5.75,
+    "v": 49.1,
+    "alt": 275.9,
+    "vUp": 0.01,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 6.1,
+    "v": 49.4,
+    "alt": 276.1,
+    "vUp": 0,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 6.6,
+    "v": 49.6,
+    "alt": 276.1,
+    "vUp": 0,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 7.23,
+    "v": 49.2,
+    "alt": 229.9,
+    "vUp": 0,
+    "state": "ATMOSPHERE"
+   },
+   {
+    "t": 7.73,
+    "v": 46.1,
+    "alt": 224.8,
+    "vUp": 0,
+    "state": "ATMOSPHERE"
+   }
+  ]
+ }
+}

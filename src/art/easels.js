@@ -1,0 +1,130 @@
+// Painted Cosmos: the easels (pure data). OWNER: PAINTER.
+// Where the painter stood for each biome's picture: [x, y, z (unit direction, body-local),
+// yaw, pitch (degrees; yaw from local north toward east)]. Found by src/art/vantage.js, looked
+// at, and kept, so the gallery's `cam=vista` and the evidence frames do not move when the
+// search is tuned. A biome without an entry is searched afresh. Each is tested to stand on dry,
+// gentle ground of its own biome (src/world/surface.test.mjs). A sixth number asks for that many metres of room: no
+// tree stands within about three quarters of it (surface.js clearings).
+export const EASELS = {
+  mercury: {
+    ochre_basins: [-0.304839, 0.026022, -0.952048, 320, -1.8],
+    obsidian_fields: [0.41076, 0.910351, 0.050371, 70, 1.9],
+    crystal_gardens: [-0.60293, 0.211125, 0.769352, 10, 4.3],
+    shadow_craters: [0.169027, 0.567502, 0.805836, 130, -3.9],
+  },
+  venus: {
+    fungal_towers: [-0.994844, 0.077375, -0.065557, 310, 0.3],
+    lava_rivers: [0.108532, 0.751264, 0.651017, 200, 5.6],
+    acid_terraces: [0.756628, 0.196739, 0.623545, 270, 1.2],
+    pale_mesas: [0.801522, 0.590077, -0.09681, 60, -5.5],
+  },
+  earth: {
+    temperate_forest: [0.614656, 0.673585, 0.410465, 170, 3.1],
+    autumn_woodland: [-0.419258, 0.807771, 0.414401, 30, 0.3],
+    alpine_meadow: [-0.421371, -0.889455, 0.176964, 280.0, 14.2],
+    sea_coast: [0.49112, -0.208896, -0.845673, 350, 10.2],
+    desert_canyon: [-0.944083, -0.274621, 0.182457, 170, 10.4],
+    misty_wetland: [0.670709, 0.343774, 0.657243, 170, 4.1],
+  },
+  // (PAINTER 13: the Moon's pictures are painted on the near side looking at Earth: the same places as its stands)
+  moon: {
+    mare: [-0.058016, 0.806398, -0.588521, 118, 4],
+    highlands: [-0.665473, -0.392552, 0.634861, 277, 4],
+    crater_fields: [-0.549487, 0.786366, 0.2823, 240, 5],
+    rilles: [0.202942, 0.190753, -0.960431, 96, -2],    // (PAINTER 14: the stand moved to the rille's edge; see STANDS)
+  },
+  mars: {
+    rust_canyons: [0.836769, -0.175432, 0.518692, 50, 6.3],
+    dust_dunes: [0.823076, 0.481217, -0.301621, 0, 1.5],
+    polar_frost: [-0.227216, -0.967474, 0.111209, 350, -1.3],
+    dry_riverbeds: [0.080467, 0.224142, 0.971229, 60, 5.8],
+  },
+  jupiter: {
+    sky_islands: [0.725579, 0.687592, -0.027429, 130, -5],
+    storm_wall: [0.558881, -0.330154, 0.760691, 210, 13.7],
+    hanging_gardens: [-0.724292, 0.569513, 0.388658, 150.0, 14.8],
+    lightning_plains: [0.545695, -0.135619, -0.826937, 60, -0.6],
+  },
+  saturn: {
+    gold_islands: [0.044834, 0.164816, 0.985305, 230, -5.6, 5],    // (PAINTER 14: 5 m of room: a trunk 4 m behind the easel, a metre from the lens, walled the vista's left fifth, and a crown hung into its top right; the framing tree 7 m ahead stays)
+    crystal_reeds: [0.4383, 0.724522, 0.531941, 150, 2.5],
+    ring_shadow: [-0.447475, -0.032393, -0.893709, 110, 1.5],
+    honey_mist: [0.76583, -0.586113, -0.26453, 290, 7.7],
+  },
+  uranus: {
+    ice_shelves: [-0.074355, 0.902994, 0.423171, 150, 11.4],
+    frozen_waves: [0.252224, 0.456036, -0.853472, 170, -1.3],
+    pearl_fog: [-0.667573, 0.580857, 0.46578, 90, 2.6],
+    teal_sinkholes: [0.921846, 0.054831, -0.383657, 80, 8.2],
+  },
+  neptune: {
+    storm_seas: [-0.485353, -0.035198, -0.873609, 95, -6],   // (PAINTER 12: on the cliff top over the opened reach, looking into the storm; the old easel is under it)
+    kelp_forests: [0.287739, 0.957694, 0.00534, 60, 3.2],
+    ice_spires: [-0.207175, 0.143826, 0.967674, 40, 8.4],
+    aurora_tundra: [0.51429, 0.551752, 0.656564, 110, 1.2],
+  },
+};
+
+// Where to arrive in each biome (world.findBiome): level, dry ground that shows what the
+// biome is whichever way one faces: [x, y, z, yaw (degrees, the best way to face), pitch (degrees, optional)].
+export const STANDS = {
+  mercury: {
+    ochre_basins: [-0.134094, -0.002758, -0.990965, 90],
+    obsidian_fields: [0.462527, 0.886431, 0.017557, 230],
+    crystal_gardens: [-0.44609, 0.080707, 0.891342, 290],
+    shadow_craters: [0.294287, 0.569278, 0.76767, 170],
+  },
+  venus: {
+    fungal_towers: [-0.984553, 0.105534, -0.139708, 100],
+    lava_rivers: [0.08719, 0.758823, 0.645435, 0],          // (PAINTER 12: on the west bank 10 m from the lava, looking up the river; it stood 0.8 m deep in it)
+    acid_terraces: [0.722262, 0.173054, 0.669619, 250],
+    pale_mesas: [-0.536989, 0.751044, -0.384155, 310],
+  },
+  earth: {
+    temperate_forest: [0.178487, 0.530946, 0.828395, 270],
+    autumn_woodland: [-0.419258, 0.807771, 0.414401, 30],
+    alpine_meadow: [-0.376536, -0.903749, 0.203614, 280],
+    sea_coast: [0.617395, 0.033112, -0.785956, 120],     // (PAINTER 12: a beach facing the storm wind over 2 km of open sea, a headland to the left; coast.mjs PASS)
+    desert_canyon: [-0.942265, -0.23254, 0.24096, 170],
+    misty_wetland: [0.670709, 0.343774, 0.657243, 170],
+  },
+  // (PAINTER 13, the coordinator's ruling: the Moon is tidally locked and Earth hangs fixed in the near side's sky, at
+  // (-0.891, 0, -0.453) in the Moon's frame; every stand is on the near side, 70 to 75 degrees from the sub-Earth point,
+  // facing Earth, which stands 14 to 18 degrees up (its disc is 15 degrees across), and looks up a little at it)
+  moon: {
+    mare: [-0.058016, 0.806398, -0.588521, 118, 3],        // (Earth over the flat silver plain, 15 degrees up)
+    highlands: [-0.665473, -0.392552, 0.634861, 277, 3],  // (over the rolling bright hills, 15 degrees up)
+    crater_fields: [-0.549487, 0.786366, 0.2823, 240, 4], // (over the crater rims, 18 degrees up)
+    rilles: [0.202942, 0.190753, -0.960431, 96, -3],      // (PAINTER 14: on the rille's edge, its dark bed 20 to 40 m off across the view toward Earth (15 degrees up), 12 degrees below the eye; the old stand's rille lay 60 m north, out of the frame)
+  },
+  mars: {
+    rust_canyons: [0.836522, -0.121244, 0.534351, 250],
+    dust_dunes: [0.823076, 0.481217, -0.301621, 0],
+    polar_frost: [0.118025, 0.935169, 0.333959, 280],
+    dry_riverbeds: [0.080467, 0.224142, 0.971229, 60],
+  },
+  jupiter: {
+    sky_islands: [0.018494, 0.160973, 0.986786, 40],
+    storm_wall: [0.604175, -0.437031, 0.666316, 260],
+    hanging_gardens: [-0.324317, -0.776218, 0.540652, 30],
+    lightning_plains: [-0.43367, 0.825117, -0.362095, 310],
+  },
+  saturn: {
+    gold_islands: [0.011221, 0.168419, 0.985652, 140],
+    crystal_reeds: [0.386432, 0.804565, 0.450937, 110],
+    ring_shadow: [-0.481291, 0.006459, -0.876537, 60],
+    honey_mist: [0.737615, -0.618553, -0.27077, 10],
+  },
+  uranus: {
+    ice_shelves: [-0.427471, 0.77307, -0.468649, 300],
+    frozen_waves: [-0.93486, 0.269924, -0.230603, 180],
+    pearl_fog: [0.691069, 0.709996, 0.135384, 240],
+    teal_sinkholes: [0.922033, 0.051027, -0.383735, 80],
+  },
+  neptune: {
+    storm_seas: [-0.49573, -0.041193, -0.867499, 90],    // (PAINTER 12: a beach under the cliffs facing the storm over the opened reach; coast.mjs PASS)
+    kelp_forests: [0.314361, 0.947882, -0.051927, 230],
+    ice_spires: [-0.205386, 0.264073, 0.942381, 10],
+    aurora_tundra: [-0.028544, 0.638505, -0.769088, 90],
+  },
+};

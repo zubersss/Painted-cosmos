@@ -1,0 +1,243 @@
+/* The painted interface (art bible 8). Layout and the paper look; the lettering, the paper
+   tile, the torn-edge filters, the ink rings and the cursor are made in src/ui/paint.js and
+   arrive here as custom properties and SVG. Nothing in this file animates except the three
+   loading dabs (two changes a second) and slow fades: the theme cannot shimmer.
+
+   Paper: every panel and slip is a piece of torn cold-press paper (::before carries the
+   generated tile and the torn-edge filter, so the lettering on top stays crisp). Ink on
+   paper is what makes the interface readable on a pale wash and on the indigo of space. */
+:root { --pc-paper: #f4efe4; --pc-ink: #2f3a5d; --pc-dark: #232a45; --pc-sepia: #584435; --pc-accent: #b6623c;
+  --pc-paper-img: none; --pc-cursor: crosshair; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-paper); }
+#pc-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: var(--pc-cursor), crosshair; }
+.pc-hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; color: var(--pc-dark); user-select: none;
+  font: 15px/1.35 Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; cursor: var(--pc-cursor), default; }
+.pc-hud.pc-waiting > :not(.pc-start) { visibility: hidden; }
+.pc-hud.pc-paneled > :not(.pc-panel) { visibility: hidden; }
+.pc-ink { display: block; overflow: visible; }
+.pc-icon { display: block; flex: none; }
+.pc-label { color: var(--pc-sepia); }
+
+/* ---- paper ---- */
+.pc-panel, .pc-button, .pc-readout, .pc-gauge, .pc-notice, .pc-hint, .pc-mark span, .pc-newsketch, .pc-stats {
+  position: relative; isolation: isolate; }
+.pc-panel::before, .pc-button::before, .pc-readout::before, .pc-gauge::before, .pc-notice::before, .pc-hint::before,
+.pc-mark span::before, .pc-newsketch::before, .pc-stats::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.16), inset 0 0 14px rgba(88, 68, 53, 0.13);
+  filter: url(#pc-rag) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+.pc-panel::before { inset: -4px; box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.14), inset 0 0 34px rgba(88, 68, 53, 0.14);
+  filter: url(#pc-torn) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
+.pc-panel { padding: 22px 30px; }
+/* No two sheets are torn alike. */
+.pc-map::before { filter: url(#pc-torn-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
+.pc-book::before { filter: url(#pc-torn-c) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.4)) drop-shadow(2px 7px 16px rgba(35, 42, 69, 0.28)); }
+.pc-readout::before, .pc-gauge::before, .pc-newsketch::before {
+  filter: url(#pc-rag-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* The long thin slips (the hint, a notice, a marker's name) need a deeper tear to show one. */
+.pc-hint::before, .pc-notice::before, .pc-mark span::before { inset: -2px -3px;
+  filter: url(#pc-rag-c) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* The slips take the sheet's key (PAINTER's critique 6: at night and in space the paper-white
+   slips were the light source of the picture): their paper is multiplied by --pc-key, white by
+   day, a moonlit blue-grey at night and in space (game.js updateHud). The open sheets (the map,
+   the book, the card) stay paper: they are the thing to read. */
+.pc-button::before, .pc-readout::before, .pc-gauge::before, .pc-notice::before, .pc-hint::before, .pc-mark span::before,
+.pc-newsketch::before { background-color: var(--pc-key, #fff); background-blend-mode: multiply; }
+/* With the map or the sketchbook open the picture behind steps back toward paper, as under a
+   sheet of tracing paper: the open sheet is the thing to read, on any sky. */
+.pc-hud.pc-paneled::before { content: ''; position: fixed; inset: 0; background: rgba(244, 239, 228, 0.6); }
+/* From the cockpit the lower third of the frame is the cowl and its three dials. */
+.pc-hud.pc-cockpit .pc-gauges { bottom: auto; top: 8.5%; left: auto; right: 7%; transform: none; }
+.pc-hud.pc-cockpit .pc-readout { bottom: auto; top: 8.5%; }
+/* (the prompt and the notice are tucked onto the cowl, as a note would be; they lay on the horizon, at 39% and 47%) */
+.pc-hud.pc-cockpit .pc-prompt { bottom: 11%; }
+.pc-hud.pc-cockpit .pc-notice { bottom: max(20%, calc(11% + 46px)); }
+/* On foot in third person the figure fills the lower middle (its feet about 14% up): the
+   prompt lies under the feet, the gauge and any notice just above it, not across the legs. */
+.pc-hud.pc-foot3 .pc-prompt { bottom: 4.4%; }
+.pc-hud.pc-foot3 .pc-gauges { bottom: max(11.4%, calc(4.4% + 42px)); }
+/* (a notice at 17% lay across the figure from the hips down: on foot it goes to the top of the
+   sheet, where the sky is, under the hint when that is up) */
+.pc-hud.pc-foot3 .pc-notice { bottom: auto; top: 8.5%; }
+.pc-hud.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: 15.5%; }
+.pc-hud .pc-prompt { transition: opacity 0.25s ease, bottom 0.4s ease; }
+.pc-hud .pc-notice { transition: opacity 0.5s ease, bottom 0.4s ease; }
+.pc-hud .pc-gauges { transition: bottom 0.4s ease; }
+.pc-hud.pc-cockpit .pc-stats { top: 21%; }
+/* The frame read-out (top left, about 110 px tall) is up: what is lettered across the top of the
+   sheet (the hint, a notice on foot) goes under it (M4's blind play-test: the read-out lay over the
+   pointer-lock message). */
+/* A new page's slip is up in the top right corner: a notice on foot, lettered across the top,
+   moves to the left of it (the grand tour at 400 x 225: "A view to find 3.0 km..." under the slip). */
+.pc-hud.pc-foot3.pc-sketching .pc-notice { margin: 0 auto 0 7%; }
+.pc-hud.pc-stats-on .pc-hint { top: calc(9% + 116px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 116px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 116px); }
+
+/* ---- prompt: a key in ink, an action in the hand ---- */
+/* A key is a loose dab of wash with a broken pencil ring round it (PAINTER's look review):
+   the dab is laid first, off register, pooled along its edge; the ring is drawn by hand and
+   does not close; four of each, so that no two neighbours are alike. The letter is ink. */
+kbd { position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  min-width: 25px; height: 24px; padding: 0 7px; color: var(--pc-dark); background: none; }
+kbd::before { content: ''; position: absolute; z-index: -1; inset: 2px -3px -2px 2px; border-radius: 46% 54% 42% 58% / 58% 44% 62% 40%;
+  background: radial-gradient(ellipse at 44% 42%, rgba(77, 96, 178, 0.14) 0%, rgba(77, 96, 178, 0.27) 58%, rgba(47, 58, 93, 0.46) 100%);
+  filter: url(#pc-wash); }
+kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px -3px; background: var(--pc-key-a) center / 100% 100% no-repeat; }
+:nth-child(4n+2) > kbd::before { inset: 0 1px -3px -3px; border-radius: 58% 42% 55% 45% / 42% 60% 40% 58%;
+  background: radial-gradient(ellipse at 60% 52%, rgba(86, 110, 170, 0.14) 0%, rgba(77, 96, 178, 0.25) 60%, rgba(47, 58, 93, 0.44) 100%); }
+:nth-child(4n+2) > kbd::after { background-image: var(--pc-key-b); inset: -3px -2px -1px -4px; }
+:nth-child(4n+3) > kbd::before { inset: 3px -1px -1px -2px; border-radius: 40% 60% 60% 40% / 50% 50% 46% 54%;
+  background: radial-gradient(ellipse at 40% 58%, rgba(110, 104, 168, 0.15) 0%, rgba(92, 100, 176, 0.27) 62%, rgba(47, 58, 93, 0.42) 100%); }
+:nth-child(4n+3) > kbd::after { background-image: var(--pc-key-c); inset: -1px -4px -3px -2px; }
+:nth-child(4n) > kbd::before { inset: 1px -4px -3px 0; border-radius: 52% 48% 38% 62% / 62% 38% 56% 44%;
+  background: radial-gradient(ellipse at 52% 40%, rgba(70, 104, 170, 0.13) 0%, rgba(70, 96, 170, 0.26) 56%, rgba(47, 58, 93, 0.45) 100%); }
+:nth-child(4n) > kbd::after { background-image: var(--pc-key-d); inset: -2px -2px -3px -4px; }
+.pc-prompt { position: absolute; left: 0; right: 0; bottom: max(16%, calc(9.5% + 36px)); display: flex; justify-content: center; gap: 18px; opacity: 0;
+  transition: opacity 0.25s ease; }
+.pc-prompt.pc-on { opacity: 1; }
+.pc-button { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px 7px 9px; }
+
+/* ---- gauges: a wash filling a pencilled bar ---- */
+.pc-gauges { position: absolute; left: 50%; bottom: 9.5%; transform: translateX(-50%); display: flex; gap: 22px; }
+.pc-gauge { opacity: 0; transition: opacity 0.4s ease; display: flex; align-items: center; gap: 7px; padding: 4px 12px 4px 8px; }
+.pc-gauge.pc-on { opacity: 1; }
+.pc-gauge .pc-label { color: var(--pc-dark); }
+.pc-gauge > b { display: block; width: 118px; height: 9px; box-sizing: border-box; border: 1.2px solid rgba(35, 42, 69, 0.8);
+  border-radius: 4px 7px 3px 8px / 7px 4px 8px 3px; overflow: hidden; transform: rotate(-0.5deg); filter: url(#pc-rough); }
+/* the wash in the bar: thin in the middle, pooled along its edges and at its leading end */
+.pc-gauge > b > i { display: block; height: 100%; width: 100%; border-radius: 2px 5px 6px 2px / 3px 5px 4px 3px;
+  background: linear-gradient(180deg, rgba(77, 96, 178, 0.92), rgba(77, 96, 178, 0.6) 45%, rgba(77, 96, 178, 0.74) 72%, rgba(60, 76, 150, 0.95));
+  box-shadow: inset -3px 0 2px -1px rgba(47, 58, 93, 0.55); }
+.pc-gauge-fuel > b > i { background: linear-gradient(180deg, rgba(182, 98, 60, 0.92), rgba(182, 98, 60, 0.6) 45%, rgba(182, 98, 60, 0.74) 72%, rgba(150, 76, 44, 0.95));
+  box-shadow: inset -3px 0 2px -1px rgba(120, 58, 36, 0.6); }
+
+.pc-readout { position: absolute; left: 7%; bottom: 9.5%; padding: 7px 13px 5px; opacity: 0; transition: opacity 1.2s ease; }
+.pc-readout.pc-on { opacity: 1; }
+.pc-reticle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50% 44% 52% 46%;
+  background: var(--pc-dark); box-shadow: 0 0 0 1.5px rgba(244, 239, 228, 0.7); opacity: 0; }
+.pc-reticle.pc-on { opacity: 0.5; }
+/* (in pixels as well as in shares of the window: the slips are lettered at a fixed size, and in a
+   window 360 px high the notice lay over the prompt and the prompt on the throttle) */
+.pc-notice { position: absolute; left: 0; right: 0; bottom: max(24%, calc(16% + 46px), calc(9.5% + 82px)); width: max-content; max-width: 80%; margin: 0 auto; padding: 7px 16px 5px;
+  opacity: 0; transition: opacity 0.5s ease; }
+.pc-notice.pc-on { opacity: 1; }
+.pc-hint { position: absolute; left: 0; right: 0; top: 8.5%; margin: 0 auto; width: max-content; max-width: 86%; padding: 6px 14px 4px;
+  opacity: 0; transition: opacity 0.6s ease; }
+.pc-hint.pc-on { opacity: 1; }
+
+/* ---- markers: a ring pulled round a world with a loaded brush, its name on a slip ---- */
+.pc-marks { position: absolute; inset: 0; overflow: hidden; }
+.pc-mark { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.pc-mark i { position: absolute; left: 0; top: 0; display: block; }
+.pc-mark svg { position: absolute; overflow: visible; }
+.pc-ring-ink { fill: none; stroke: rgba(35, 42, 69, 0.55); stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; }
+.pc-ring-paper { fill: none; stroke: var(--pc-paper); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: url(#pc-rough); }
+.pc-mark-body .pc-ring-ink { stroke-width: 2.6; stroke: rgba(35, 42, 69, 0.4); }
+.pc-mark-body .pc-ring-paper { stroke-width: 1.3; opacity: 0.85; }
+.pc-mark span { position: absolute; left: 0; top: 0; transform: translateX(-50%); width: max-content; padding: 4px 9px 2px; color: var(--pc-dark); }
+.pc-mark span .pc-ink { position: relative; }
+.pc-mark-body span { opacity: 0.85; }
+
+/* ---- the frame read-out is an instrument, not part of the painting: plain type on a slip ---- */
+.pc-stats { position: absolute; left: 7%; top: 9%; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre;
+  color: var(--pc-dark); padding: 8px 12px; display: none; }
+.pc-stats.pc-on { display: block; }
+
+/* ---- the title and help card (also the loading screen) ---- */
+#pc-loading { position: fixed; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: center;
+  padding: 0 8vw 7vh; text-align: center; box-sizing: border-box; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  color: var(--pc-sepia); font: italic 18px Georgia, serif; letter-spacing: 0.08em; transition: opacity 0.8s ease; pointer-events: none; }
+#pc-loading.pc-done { opacity: 0; }
+.pc-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 548px;
+  padding: 26px 36px 24px; opacity: 0; transition: opacity 0.5s ease; display: flex; flex-direction: column; align-items: center; }
+.pc-start.pc-on { opacity: 1; }
+/* Before the game has begun the card is the title alone: small, in the upper third, the painting
+   open under it; one line of the keys a newcomer needs. The list of keys is the whole card, on H. */
+.pc-first { display: none; margin-top: 12px; color: var(--pc-dark); }
+.pc-start.pc-title-only { top: 26%; width: 440px; padding: 20px 30px 16px; }
+.pc-start.pc-title-only .pc-help { display: none; }
+.pc-start.pc-title-only .pc-first { display: block; }
+.pc-title { color: var(--pc-dark); margin-bottom: 4px; }
+.pc-start .pc-sub { margin-top: 2px; }
+/* "click to begin": the words left as bare paper in one broad stroke of indigo: loaded at the
+   left, running dry to the right, the pigment pooled along its edges. */
+.pc-status { position: relative; isolation: isolate; display: flex; align-items: center; gap: 10px; margin: 13px auto 2px; padding: 8px 40px 6px 22px;
+  color: var(--pc-paper); }
+.pc-status::before { content: ''; position: absolute; z-index: -2; inset: -2px 14px -3px -7px; border-radius: 15px 9px 8px 30px / 17px 11px 12px 13px;
+  background: linear-gradient(90deg, rgba(35, 42, 69, 0.98) 0%, rgba(47, 58, 93, 0.95) 70%, rgba(47, 58, 93, 0.9) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(35, 42, 69, 0.55), inset 0 0 7px rgba(35, 42, 69, 0.5); filter: url(#pc-stroke); }
+.pc-status::after { content: ''; position: absolute; z-index: -1; top: 0; bottom: -1px; right: -16px; width: 52px; border-radius: 4px 22px 26px 4px / 8px 15px 18px 9px;
+  background: linear-gradient(90deg, rgba(47, 58, 93, 0.9) 0%, rgba(47, 58, 93, 0.82) 45%, rgba(47, 58, 93, 0.5) 100%); filter: url(#pc-brush); }
+.pc-status.pc-wait { color: var(--pc-dark); }
+.pc-status.pc-wait::before, .pc-status.pc-wait::after { display: none; }
+.pc-dabs { display: none; gap: 5px; }
+.pc-status.pc-wait .pc-dabs { display: flex; }
+.pc-dabs b { width: 9px; height: 9px; border-radius: 55% 45% 50% 48% / 48% 52% 46% 54%; background: var(--pc-accent); opacity: 0.16; }
+/* Three dabs laid one after another: two steps a second, no tweening (a hand, not a spinner). */
+.pc-dabs b:nth-child(1) { animation: pc-dab1 2s steps(1) infinite; }
+.pc-dabs b:nth-child(2) { animation: pc-dab2 2s steps(1) infinite; background: #dba436; }
+.pc-dabs b:nth-child(3) { animation: pc-dab3 2s steps(1) infinite; background: #4d60b2; }
+@keyframes pc-dab1 { 0% { opacity: 0.16; } 25%, 100% { opacity: 0.8; } }
+@keyframes pc-dab2 { 0%, 25% { opacity: 0.16; } 50%, 100% { opacity: 0.8; } }
+@keyframes pc-dab3 { 0%, 50% { opacity: 0.16; } 75%, 100% { opacity: 0.8; } }
+.pc-help { align-self: stretch; margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 26px; color: var(--pc-dark); }
+.pc-help > span { display: flex; align-items: center; gap: 9px; }
+.pc-help em { grid-column: 1 / -1; margin-top: 8px; padding-bottom: 7px; color: var(--pc-sepia); background: var(--pc-rule) left bottom / 100% 6px no-repeat; }
+.pc-help em ~ em { background-image: var(--pc-rule-b); }
+.pc-help kbd { height: 21px; min-width: 22px; padding: 0 6px; }
+
+/* ---- the map ---- */
+.pc-map { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 720px;
+  padding: 18px 22px 16px; display: none; flex-direction: column; align-items: center; pointer-events: auto; }
+.pc-map.pc-on { display: flex; }
+.pc-map canvas { display: block; width: 680px; height: 400px; margin: 4px auto 8px; cursor: var(--pc-cursor), pointer; }
+.pc-map-line { color: var(--pc-dark); min-height: 18px; }
+
+/* ---- the sketchbook ---- */
+.pc-book { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--pc-fit, 1)); width: 860px;
+  padding: 18px 24px 14px; display: none; pointer-events: auto; text-align: left; }
+.pc-book.pc-on { display: block; }
+.pc-book-head { display: flex; align-items: flex-end; justify-content: space-between; background: var(--pc-rule) left bottom / 100% 6px no-repeat;
+  padding-bottom: 9px; margin-bottom: 10px; }
+.pc-book .pc-title { margin: 0; }
+.pc-book-body { display: grid; grid-template-columns: 128px 1fr; gap: 0 18px; }
+.pc-book-tabs { display: flex; flex-direction: column; gap: 3px; }
+.pc-book-tab { all: unset; cursor: var(--pc-cursor), pointer; display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 9px 4px; color: var(--pc-dark); border-radius: 4px 9px 5px 10px / 9px 4px 10px 5px; }
+.pc-book-tab.pc-dim b { opacity: 0.5; }
+.pc-book-tab { position: relative; isolation: isolate; }
+.pc-book-tab.pc-on { color: var(--pc-paper); }
+.pc-book-tab.pc-on::before { content: ''; position: absolute; z-index: -1; inset: -1px -4px -1px -3px; border-radius: 9px 16px 8px 18px / 12px 8px 14px 9px;
+  background: linear-gradient(90deg, rgba(35, 42, 69, 0.96) 0%, rgba(47, 58, 93, 0.93) 55%, rgba(47, 58, 93, 0.78) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(35, 42, 69, 0.5); filter: url(#pc-stroke); }
+.pc-book-tab.pc-on b { opacity: 1; }
+/* The page has one size whatever it holds (one scale for the whole book): what has been drawn,
+   laid large and loose while there is little of it; under it one pencilled line for what is left. */
+.pc-book-page { height: 452px; overflow: hidden; display: flex; flex-direction: column; }
+.pc-book-world { color: var(--pc-dark); margin-bottom: 10px; }
+.pc-book-grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 16px; }
+.pc-sketch { margin: 0; }
+/* A sketch lies on the page itself: its edge is ragged and lifted to white (sketches.js
+   sketchHand), and white multiplied onto the paper is the paper. No frame, no rectangle. */
+.pc-sketch-frame { width: 100%; aspect-ratio: 16 / 9; box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: var(--pc-sepia); }
+/* (the tilt is on the picture itself: a transform on its frame would make the frame a layer of
+   its own, and the picture would be multiplied onto nothing: a white rectangle on the page) */
+.pc-sketch-frame img { width: 100%; height: 100%; object-fit: cover; display: block; mix-blend-mode: multiply; }
+.pc-sketch:nth-child(3n+1) .pc-sketch-frame img { transform: rotate(-0.8deg); }
+.pc-sketch:nth-child(3n+2) .pc-sketch-frame img { transform: rotate(0.6deg); }
+.pc-sketch figcaption { margin-top: 1px; min-height: 26px; color: var(--pc-dark); }
+.pc-sketch.pc-bare figcaption { color: var(--pc-sepia); }
+.pc-book-left { margin-top: auto; padding-top: 8px; color: var(--pc-sepia); }
+.pc-book-foot { margin-top: 8px; padding-top: 11px; background: var(--pc-rule-b) left top / 100% 6px no-repeat; display: flex; justify-content: center;
+  color: var(--pc-dark); }
+
+/* A new page in the sketchbook, shown as it is made: the sketch on a slip of paper, tucked into
+   the top right corner of the painting, small, above where the ship stands in a first view
+   (and held back at an arrival until the explorer sets off: game.js, SKETCH_SLIP). */
+.pc-newsketch { position: absolute; right: 4.5%; top: 5.5%; width: clamp(168px, 21vw, 232px); padding: 6px 8px 7px; color: var(--pc-dark);
+  opacity: 0; transform: translateY(-14px) rotate(4deg) scale(0.92); transition: opacity 0.7s ease, transform 0.7s ease; }
+.pc-newsketch.pc-on { opacity: 1; transform: rotate(1.6deg); }
+.pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; mix-blend-mode: multiply; }
+.pc-newsketch b { display: block; margin-top: 7px; font-weight: normal; }
+.pc-newsketch span { display: block; margin-top: 1px; }

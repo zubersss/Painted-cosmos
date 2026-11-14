@@ -1,0 +1,11 @@
+mercury  stepping out of the ship where the game parked it: at the first frame on foot figure (boom 5.16); 2.5 s later figure (boom 5.20), hull in the frame 3 %, tall things within 16 m: 0
+venus    stepping out of the ship where the game parked it: at the first frame on foot figure (boom 5.16); 2.5 s later figure (boom 5.20), hull in the frame 3 %, tall things within 16 m: 1
+earth    stepping out of the ship where the game parked it: at the first frame on foot figure (boom 4.46); 2.5 s later figure (boom 5.20), hull in the frame 10 %, tall things within 16 m: 18
+moon     stepping out of the ship where the game parked it: at the first frame on foot figure (boom 5.16); 2.5 s later figure (boom 5.20), hull in the frame 3 %, tall things within 16 m: 0
+mars     stepping out of the ship where the game parked it: at the first frame on foot figure (boom 4.83); 2.5 s later figure (boom 5.20), hull in the frame 6 %, tall things within 16 m: 2
+jupiter  stepping out of the ship where the game parked it: at the first frame on foot figure (boom 4.80); 2.5 s later figure (boom 5.20), hull in the frame 5 %, tall things within 16 m: 2
+saturn   stepping out of the ship where the game parked it: at the first frame on foot figure (boom 5.20); 2.5 s later figure (boom 5.20), hull in the frame 13 %, tall things within 16 m: 2
+uranus   stepping out of the ship where the game parked it: at the first frame on foot figure (boom 5.16); 2.5 s later figure (boom 5.20), hull in the frame 3 %, tall things within 16 m: 0
+neptune  stepping out of the ship where the game parked it: at the first frame on foot figure (boom 5.16); 2.5 s later figure (boom 5.20), hull in the frame 4 %, tall things within 16 m: 11
+pluto    stepping out of the ship where the game parked it: at the first frame on foot figure (boom 4.82); 2.5 s later figure (boom 5.20), hull in the frame 3 %, tall things within 16 m: 0
+10 spawns: no figure in the settled picture at 0

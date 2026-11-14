@@ -1,0 +1,208 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; tier 1, 640x360",
+ "size": "640x360",
+ "quality": 1,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "rust_canyons",
+   "name": "Rust Canyons",
+   "alsoVista": null,
+   "settledSeconds": 23.8,
+   "settledFrames": 46,
+   "tris": 333365,
+   "calls": 200,
+   "worldWorstMs": 190,
+   "physicsWorstMs": 25,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.4,
+    "biome": "rust_canyons",
+    "radius": 3023.8483866039596
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "dust_dunes",
+   "name": "Dust-Storm Dunes",
+   "alsoVista": "Dust-Storm Dunes",
+   "settledSeconds": 27,
+   "settledFrames": 33,
+   "tris": 252087,
+   "calls": 108,
+   "worldWorstMs": 233.3,
+   "physicsWorstMs": 25,
+   "stoodIn": "dust_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 4,
+    "biome": "dust_dunes",
+    "radius": 3018.2154190471183
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "polar_frost",
+   "name": "Polar Frost Fields",
+   "alsoVista": null,
+   "settledSeconds": 21.7,
+   "settledFrames": 32,
+   "tris": 194488,
+   "calls": 114,
+   "worldWorstMs": 165.8,
+   "physicsWorstMs": 25,
+   "stoodIn": "polar_frost",
+   "moved": 0,
+   "found": null,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.9,
+    "biome": "polar_frost",
+    "radius": 3043.003253219557
+   },
+   "flags": []
+  },
+  {
+   "kind": "biome",
+   "id": "dry_riverbeds",
+   "name": "Dry Riverbeds",
+   "alsoVista": "Dry Riverbeds",
+   "settledSeconds": 32.2,
+   "settledFrames": 37,
+   "tris": 402389,
+   "calls": 226,
+   "worldWorstMs": 216.5,
+   "physicsWorstMs": 25,
+   "stoodIn": "dry_riverbeds",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 3.6,
+    "biome": "dry_riverbeds",
+    "radius": 3020.348794956606
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-rust_canyons-1",
+   "name": "Rust Canyons",
+   "alsoVista": null,
+   "settledSeconds": 26.2,
+   "settledFrames": 29,
+   "tris": 287081,
+   "calls": 170,
+   "worldWorstMs": 171.9,
+   "physicsWorstMs": 25,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13.4,
+    "biome": "rust_canyons",
+    "radius": 3068.864790382551
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-polar_frost-1",
+   "name": "Polar Frost Fields",
+   "alsoVista": null,
+   "settledSeconds": 20.9,
+   "settledFrames": 29,
+   "tris": 220876,
+   "calls": 130,
+   "worldWorstMs": 161.8,
+   "physicsWorstMs": 38.6,
+   "stoodIn": "polar_frost",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.9,
+    "biome": "polar_frost",
+    "radius": 3049.2979035246576
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-polar_frost-2",
+   "name": "Polar Frost Fields II",
+   "alsoVista": null,
+   "settledSeconds": 19.3,
+   "settledFrames": 28,
+   "tris": 225110,
+   "calls": 126,
+   "worldWorstMs": 204.8,
+   "physicsWorstMs": 38.6,
+   "stoodIn": "polar_frost",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 1.3,
+    "biome": "polar_frost",
+    "radius": 3050.1351980288905
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-rust_canyons-2",
+   "name": "Rust Canyons II",
+   "alsoVista": null,
+   "settledSeconds": 23.4,
+   "settledFrames": 39,
+   "tris": 286415,
+   "calls": 165,
+   "worldWorstMs": 162.9,
+   "physicsWorstMs": 26.4,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 10.4,
+    "biome": "rust_canyons",
+    "radius": 3182.3827277903965
+   },
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-dust_dunes-2",
+   "name": "Dust-Storm Dunes II",
+   "alsoVista": null,
+   "settledSeconds": 28.8,
+   "settledFrames": 32,
+   "tris": 284603,
+   "calls": 118,
+   "worldWorstMs": 186.5,
+   "physicsWorstMs": 26.4,
+   "stoodIn": "dust_dunes",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 6.2,
+    "biome": "dust_dunes",
+    "radius": 3035.6262200388865
+   },
+   "flags": []
+  }
+ ]
+}

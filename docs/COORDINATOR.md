@@ -5,16 +5,23 @@ here, write the request in your notes file and report it; the coordinator record
 
 ## A. How this build is set up (and why)
 
-- **Mode: two parallel subagents in one session, one shared branch.** No GitHub repository for
-  this game was attached to the session, and the only reachable repositories are the owner's
-  other projects, which the brief says to leave alone. Separate cloud threads would have had no
-  shared remote to sync through, so the brief's fallback applies.
-- **Repository:** `/home/user/painted-cosmos` (local git, no remote yet). Shared work branch:
-  **`cosmos`**. `main` holds the bootstrap commit and receives the finished game at M4.
-  There is nothing to push to; "commit and push" means **commit**. Commit often.
-- **Both roles work in the same working tree.** You see each other's files the moment they are
+- **Mode: parallel subagents in one session, one shared branch.** No GitHub repository for
+  this game was attached when the session began, so the brief's fallback applied: the roles run
+  as subagents sharing one branch and one working tree.
+- **UPDATE 2026-11-11: there are now THREE workers.** The owner asked for a third role,
+  **PHYSICS**, devoted to how everything moves (section F below). This replaces the brief's
+  "exactly two". PAINTER and PILOT keep their ownership and milestones unchanged.
+- **Repository:** `/home/user/painted-cosmos`. Shared work branch: **`cosmos`**. `main` holds the
+  bootstrap commit and receives the finished game at M4.
+  **UPDATE 2026-11-10: a remote now exists**, `origin` = `https://github.com/zubersss/painted-cosmos`
+  (the owner created it for this game). `tools/commit.sh` now pushes `cosmos` after every commit,
+  so keep using it exactly as before and commit often; nothing else changes. Both roles stay on
+  the one shared branch in the one working tree. At M4, Pilot opens the one pull request
+  `cosmos` -> `main` (the owner has given permission to merge it).
+- **All roles work in the same working tree.** You see each other's files the moment they are
   saved, including half-written ones. Rules that keep this safe:
-  1. Commit with `tools/commit.sh painter "msg"` or `tools/commit.sh pilot "msg"`. It stages and
+  1. Commit with `tools/commit.sh painter "msg"`, `tools/commit.sh pilot "msg"` or
+     `tools/commit.sh physics "msg"`. It stages and
      commits only your own paths. Never `git add -A`, `git add .`, `git commit -a`, `git stash`,
      `git reset --hard`, `git checkout -- <path>`, `git clean`, rebase, or amend.
   2. Never create, edit, move, or delete a file outside your ownership list, not even to fix an
@@ -25,11 +32,13 @@ here, write the request in your notes file and report it; the coordinator record
      `node tools/shot.mjs /index.html out.jpg --root <dir>`.
   4. Scratch files (trial screenshots, logs, experiments) go in your own scratch directory
      outside the repo, never in the repo: `/home/user/.pc-scratch/painter/` or
-     `/home/user/.pc-scratch/pilot/`.
-  5. Do not start further agents or threads. There are exactly two workers.
+     `/home/user/.pc-scratch/pilot/`, `/home/user/.pc-scratch/physics/`.
+  5. Do not start further agents or threads. Only the owner adds workers.
 - **Extra ownership (not named in the brief):**
-  PILOT also owns `/.nojekyll`, `/.gitignore`, `/package.json` (dev only, if wanted),
+  PILOT also owns `/docs/lead/**` (section G), `/.nojekyll`, `/.gitignore`, `/package.json` (dev only, if wanted),
   `/docs/shots/pilot/**`. PAINTER also owns `/docs/shots/painter/**`.
+  PHYSICS owns `/src/physics/**`, `/physics-lab.html`, `/docs/notes/physics.md`,
+  `/docs/shots/physics/**`.
   The coordinator owns `/docs/BRIEF.md`, `/docs/COORDINATOR.md`, `/tools/**`.
 - **Bootstrap done by the coordinator (one time, so neither role waits):**
   `vendor/three/` (Three.js r187, pinned: `three.module.js` + `three.core.js` + LICENSE; owned
@@ -47,7 +56,7 @@ here, write the request in your notes file and report it; the coordinator record
 ## B. Tools (verified working in this sandbox)
 
 - `node tools/shot.mjs <page?query> <out.png|out.jpg> [--w 960 --h 540] [--ready "expr"]
-  [--wait ms] [--eval "js"] [--shots N --every ms] [--root dir]`: headless Chromium (Playwright,
+  [--wait ms] [--eval "js"] [--shots N --every ms] [--root dir] [--shot-timeout ms]`: headless Chromium (Playwright,
   pre-installed; do not install another) with software WebGL2, own static server on a free port,
   prints console errors, page errors, failed and external requests, exits 1 if any.
   It waits for `window.__pcReady === true` by default: **both pages set `window.__pcReady = true`
@@ -150,6 +159,1293 @@ verified, needs for the other role, contract changes, and the next step. The coo
 records outcomes below, and resumes the role at once. A role that finishes early does not wait:
 it goes on to the next milestone's work.
 
+## F. The third role: PHYSICS (added by the owner on 2026-11-11)
+
+The owner's words: "Make 1 more agent that focuses on the physics of the game from the wind the
+grass trees sand how you interact with them how they move displace around you and around each
+other just focusing on the physics aspect from acceleration of the ship to running try to get
+the physics to be as realistic as possible with the weather as well from how rain behaves to
+storms and snow and weather on the other planets hyperfocus on making the physics for this
+agent's role".
+
+**Division of labour.** PHYSICS decides how things move: the physical models and their
+constants (forces, masses, drag, friction, stiffness, fall speeds, wind and weather behaviour).
+PILOT still decides how input becomes commands, the assist layer (auto-level, landing assist,
+cushioning), the cameras, the state machine, the frame budget, and the architecture. PAINTER
+still decides how every bit of it is drawn. PHYSICS never draws game visuals and never edits
+another role's files: it ships models, fields, and buffers; PILOT and PAINTER wire them into
+their own files.
+
+**Tie-breaks (extends section 5 of the brief).** Look: Painter. Control feel, performance,
+architecture: Pilot. Physical behaviour: Physics. Where a realistic model would make the player
+fight the controls, keep the realistic model and add or strengthen an assist on top of it,
+rather than faking the physics underneath. Still stuck after one exchange: the coordinator.
+
+**C14. Physics contract (starting shape; PHYSICS owns the final API and documents it at the top
+of `docs/notes/physics.md`).** Everything in `src/physics/**` is pure logic with no `three` and
+no DOM, on the same plain `{x,y,z}` vectors as `src/core/vec.js`, in **body-local** coordinates,
+metres and seconds, deterministic for a given seed and time, allocation-free in hot loops.
+- `src/physics/index.js`: `createPhysics({ sampleSurface, seed }) -> physics`.
+  `physics.update(dt, frame)` once per frame, called by Pilot (and by Painter in the gallery),
+  with `frame = { bodyId, time, focus (body-local point the simulation centres on), sunDir,
+  disturbers: [{ kind: 'explorer'|'ship'|'jet'|'downwash', p, v, radius, strength }] }`.
+  `physics.setQuality(0|1|2)`.
+- Environment queries (cheap, callable many times per frame):
+  `physics.air(bodyId, p) -> { density, wind: {x,y,z}, gust01, temperature }`,
+  `physics.weather(bodyId, p) -> { kind, intensity01, precipitation, wetness01, snowDepth,
+  visibility01, lightning }`,
+  `physics.ground(bodyId, unitDir) -> { material, friction, restitution, sink, drag }`.
+- Dynamics models for Pilot's controllers (pure step functions in the style of
+  `stepExplorer` / `stepFlight`): explorer body (traction, acceleration, slopes, wading, wind
+  load, jetpack) and ship body (thrust, drag, gravity, hover, landing gear, turbulence, pulse
+  acceleration). Pilot calls them from `src/player` and `src/ship` and keeps its assists on top.
+- Fields and buffers for Painter (typed arrays; Painter wraps them in textures and attributes):
+  a wind-and-disturbance field around `focus` for flora, with a GLSL chunk (exported as a
+  string) that bends a plant from that field so the shader and the CPU model agree; a ground
+  deformation field (footprints, trails, landing marks, drifts); particle buffers per kind
+  (rain, snow, dust, sand, ash, spores, leaves, spray) with positions, velocities, sizes, ages.
+- Additive hook: `world.setPhysics(physics)` (Painter implements, Pilot calls once after
+  creating both), so the world reads the fields in `world.update`.
+- Budget: all of physics within about 2 ms of CPU per frame at quality 1 on a laptop; Pilot
+  polices it.
+- Tests live next to the code (`src/physics/**/*.test.mjs`, run with
+  `node --test src/physics/`); Pilot adds that command to "every check".
+- Timing: PAINTER and PILOT finish M1 as planned and start wiring physics in during M2.
+
+## G. Lead developer: PILOT (added by the owner on 2026-11-11)
+
+The owner's words: "Make pilot also a lead developer that keeps check of the work of the others
+and makes sure we're on the right track and double checks stuff to make sure it looks good and
+works well using reference for games that already do exist that have good physics and weather
+and everything my game would need, if a lead doesn't exist already". No lead existed (the
+coordinator is a switchboard and tie-breaker, not a reviewer of the work), so PILOT is now also
+the LEAD DEVELOPER. PILOT's own role and milestones are unchanged.
+
+**The lead's files** (owned by PILOT): `/docs/lead/**`.
+- `docs/lead/REFERENCES.md`: what good looks like. For each system the game needs (on-foot
+  movement, jetpack, ship flight and landing, ground-to-space transition, wind in foliage, plants
+  parting around the player, sand and snow deformation, rain, storms, snow, weather transitions,
+  other-planet weather, water, day and night, stable painterly rendering, minimal HUD, ambience),
+  one to three existing games widely held to do it well, the specific observable behaviours that
+  make it good (timings, magnitudes, what the player sees and feels), and a concrete acceptance
+  check for our game derived from each.
+- `docs/lead/REVIEW.md`: dated reviews per role, each finding with its evidence (a screenshot
+  file, a test, a measurement) and the reference check it fails, sorted into MUST FIX (blocks
+  the milestone), SHOULD FIX, and GOOD (keep).
+- `docs/lead/TRACK.md`: the path to the brief's "Done means", as a checklist with status, how
+  each item was verified and by whom, risks, and what is off track.
+
+**Rules.**
+1. References are for behaviour and technique only. Nothing from any existing game is copied:
+   no names, characters, ships, art, music, levels, UI, or look. The look is judged against the
+   art bible (a watercolor painting), never against another game's style.
+2. The lead verifies; it does not take anyone's word. It re-runs the other roles' tests, opens
+   their pages (`gallery.html`, `physics-lab.html`) headless, studies their evidence shots, and
+   plays the integrated build.
+3. The lead never edits another role's files. It says what is wrong and why, with evidence; the
+   owner of the domain decides how to fix it. Tie-breaks are unchanged (look: Painter; physical
+   behaviour: Physics; control feel, performance, architecture: Pilot). A disagreement gets one
+   exchange in notes, then the coordinator decides.
+4. PAINTER and PHYSICS read `docs/lead/REVIEW.md` and `REFERENCES.md` at every sync and answer
+   each MUST FIX in their own notes ("fixed in <commit>" or "disagree, because ...").
+5. A role's milestone is done only when the lead's MUST FIX list for it is empty or the
+   coordinator has waived an item.
+6. The lead's own domain (controls, flight, UI, audio, integration) is reviewed by the other two
+   in their notes and by the coordinator at each milestone.
+
 ## E. Settled outcomes (log)
 
 - 2026-11-10: bootstrap as described in A. Branch for both roles: `cosmos`.
+- 2026-11-10: the owner created `zubersss/painted-cosmos`; attached as `origin`; `main` and `cosmos`
+  pushed; `tools/commit.sh` pushes after each commit. The two roles keep sharing one branch
+  (they were already mid-work in one tree; splitting now would only add merge work).
+  GitHub Pages is to be served from `main` after the M4 merge.
+- 2026-11-10: the owner switched GitHub Pages on, serving `main` at the root. It shows nothing
+  playable until the M4 merge. Address: `https://zubersss.github.io/Painted-cosmos/`.
+- 2026-11-11: the owner added a third worker, PHYSICS (section F). Ownership: `src/physics/**`,
+  `physics-lab.html`, its notes and shots. Tie-break added: physical behaviour goes to Physics;
+  realism is kept and made forgiving with assists, not faked. Same branch, same tree, same rules.
+- 2026-11-11: the owner made PILOT the lead developer as well (section G): reference benchmarks
+  from existing games, verified reviews of the other roles, a track sheet, milestone sign-off.
+- 2026-11-11: **M1, PILOT's half: met** (walk, jetpack, board, lift off to space, land, step out;
+  70 unit tests; scripted play-through passes on the stubs and inside PAINTER's forest with no
+  console errors). **PAINTER's half: open**, three MUST FIX in `docs/lead/REVIEW.md` review 1.
+  The coordinator looked at the frames itself and upholds all three (see next lines).
+- 2026-11-11: **Frame budget (PILOT's call, performance; upheld; the triangle and draw-call
+  parts were ABOLISHED BY THE OWNER later the same day, see the end of this section):** in the densest view at most
+  600 k triangles and 350 draw calls at quality 1, 300 k at quality 0, 1.2 M at quality 2;
+  `world.update` at most 5 ms a frame, `physics.update` at most 2 ms a frame, both as a worst
+  frame, not an average. Measured by PILOT's frame-cost probe.
+- 2026-11-11: **Look findings upheld by the coordinator** (PAINTER decides how): crowns must be
+  a few washes, not specks; trunks and the brook bank must not be ruler-straight; trees must not
+  stand in rows; distance bands inside the wood must fade lighter and cooler; space grain must
+  not read as black pepper.
+- 2026-11-11: additive contract changes, all in use: `spaceAltitude(body)` and `soiRadius(body)`
+  exported from `src/data/bodies.js` (Moon and Pluto: 420 m); terrain stays below
+  `radius + 0.8 * spaceAltitude(body)`; `setMood.biomeId` (the heaviest biome); `world.busy`
+  (pending build jobs; readiness), `world.setBuildBudget(ms)`, `world.getLighting()`,
+  `world.sampleObstacles` (trunks and boulders as cylinders).
+  Requested, not yet delivered: canopy height under a point (PAINTER -> PILOT, for the ship's
+  cushion); the table of which PILOT constants each PHYSICS constant replaces (PHYSICS -> PILOT).
+- 2026-11-11: `tools/shot.mjs` has `--shot-timeout ms` (default 180000) and reports a failed
+  screenshot as a problem instead of dying.
+- 2026-11-11: debug query parameters in the game (PILOT): `stub=1`, `dynres=0`, `scale=`,
+  `quality=`, `pointerlock=0` (drag to look; use it in every headless run).
+- 2026-11-11: **PHYSICS stage P1 accepted** (`b0ad22b`; the coordinator re-ran
+  `node --test src/physics/`: 125 pass). INTEGRATION: ready. Wiring steps for PILOT and PAINTER
+  and the replacement tables are in `docs/notes/physics.md`. `physics.warmUp()` is called while
+  loading; `physics.stats.msMax` polices the 2 ms worst-frame budget.
+- 2026-11-11: **Ruling on reference checks that contradict real physics** (R-FOOT-1, -3, -4, -5,
+  R-JET-1, R-SHIP-2, R-PART-4 as answered in the PHYSICS notes). Physical behaviour is
+  PHYSICS's call and the owner asked for realism, so the model stays. The lead rewrites each
+  such check in `REFERENCES.md` as either the real behaviour (sand shortens braking and costs
+  top speed; a jet wash reaches the ground from 40 m) or a named assist target that PILOT
+  meets with PHYSICS's assist forces (`assistAccel`, `carve01`, `descentLimit`, `jetMaxRise`,
+  `airControl`, `setWindScale`). Feel is PILOT's call: PILOT chooses the assist levels.
+  Hard limits that stay whatever the physics says: the player is never trapped, never knocked
+  off their feet for good, and the ship is never uncontrollable (no fail state, brief section 1).
+- 2026-11-11: additive contract: `sampleSurface` results may carry `canopy01` (closed-canopy
+  fraction at that point, 0 in a glade) and `canopyHeight` (m). PAINTER provides them; PHYSICS
+  (wind shelter) and PILOT (ship cushion) read them. Plants carry a height and a stiffness per
+  kit for the flora chunk (`uPlantHeight`, `uStiff`).
+- 2026-11-11: **PAINTER reports M1 with the three MUST FIX answered** (`b2bfcae`, notes at
+  `6a31de3`): by its own probe 496 to 543 k triangles and 287 to 307 draw calls at quality 1
+  (was 4.23 M and 699); crowns as a few washes; leaning, broken trunks and a wandering bank;
+  trees in clumps; `canopy01` / `canopyHeight` on `sampleSurface`; `FLORA_PHYS` (plant height
+  and stiffness per kit) exported from `src/world/florakit.js`. The coordinator looked at the
+  new frames and agrees the three are fixed as far as still frames show. **M1 closes when the
+  lead's review 2 confirms the cost with its own probe in the integrated game.** PAINTER starts
+  M2 meanwhile (nobody waits).
+- 2026-11-11: look is judged at 960x540 or more with quality 1 or higher; cost is measured at
+  whatever size is fastest (PAINTER's request, upheld: at 150x84 internal pixels no painting
+  survives).
+- 2026-11-11: M2 order for PAINTER (coordinator): mars and saturn first (the M2 trip is earth,
+  mars, saturn), then the other five planets, then the remaining earth biomes; the frame budget
+  holds on every planet. Real explorer and ship models: first item of M3 at the latest.
+  Evidence shots for M2: up to 45 for PAINTER, 960x540 jpg.
+- 2026-11-11: **M1 is met.** Lead review 2 (`bc425a4`) closed PAINTER's three MUST FIX with its
+  own measurements in the integrated game: 564 k triangles and 334 draw calls standing at the
+  spawn at quality 1 (was 4.36 M and 887), 289 k at quality 0, 708 k at quality 2; brushed
+  crowns and wandering trunks and bank at 960x540. PILOT's half was met earlier; PHYSICS P1
+  accepted. Open SHOULD FIX carried into M2/M3: `world.update` worst frames 4 to 12 ms (budget
+  5), shade as dark green instead of a cool glaze, flat foreground meadow, far trunks in a line.
+- 2026-11-11: M2 so far: PILOT has pulse drive, markers, planet map, save, physics wiring,
+  canopy-aware cushion, pointer-lock fallback and a frame read-out (` key or `?stats=1`);
+  PAINTER has data-driven biomes, liquids and flora kits for every body; PHYSICS has loose
+  particles, dust devils, giants' storm tracks, ground marks and wind waves (151 tests).
+- 2026-11-11: **the container restarted once.** The working tree survived; the coordinator
+  snapshotted every role's uncommitted files (`61c8104`, `ee4c336`, `e292f19`) and resumed the
+  three agents. Background processes (servers, running tests) do not survive a restart: after
+  one, check `git status` and `git log`, re-run whatever was in flight, and keep committing often.
+- 2026-11-11: **PAINTER reports M2, first pass** (`a7d553b`): all eight planets with 4+ biomes
+  driven from `looks.js`, liquids per biome, tall kits (fungus, crystal, reeds, spire, kelp,
+  frozen wave), Saturn's rings as geometry, cloud decks and limb haze from orbit, PHYSICS's
+  flora field wired (`?physics=1` in the gallery), violet shade glaze. Its own probe puts every
+  body inside the budget at quality 1 (355 k to 567 k triangles). `sampleObstacles` returns
+  everything within a radius clamped to 60 m, unsorted. Proposed for M3: `painter.setMarks(...)`.
+- 2026-11-11: **Coordinator finding on that pass (the coordinator looked at all 41 frames):**
+  the palettes differ, the landscapes mostly do not. Many biomes are the same rolling plain
+  with scattered rocks and do not show the feature the brief names (no canyon, dunes, craters,
+  terraces, mesas, sea cliffs, snow peaks, sinkholes; lava and acid not visible). Tall kits
+  (crystals, spires, frozen waves, kelp) show facets and continuous ink outlines and read as
+  low-poly, against the art bible ("not low-poly", "no visible facets", silhouettes never
+  ruler-straight). **PAINTER's M2 is not accepted yet: a second pass on landforms and on
+  faceted kits comes before M3.** How is PAINTER's call; that each biome shows its named
+  feature is the brief's requirement and the coordinator holds it.
+- 2026-11-11: **PHYSICS stage P2 accepted** (`0f56a40`; the coordinator re-ran the tests: 158
+  pass). Every world has its own weather with a lab preset (`physics-lab.html?planet=...`); all
+  particle kinds filled (ballistic in vacuum); ground rims, filled prints, pad prints, scour;
+  canopy wakes and crown coupling; wind waves with `physics.water` (GLSL + JS twin); lava and
+  cloud-froth liquids; `cmd.brake`; lift-off on the gear; every biome id mapped, with a test.
+  Shader against JS: max 2.5 mm on a 2 m tip. Worst reproducible frame 0.29 to 0.51 ms.
+  Default seed is now 18 (a thunderstorm crosses the Earth spawn at 10:40 to 13:20).
+- 2026-11-11: rulings on PHYSICS's questions. (1) Ground words: `ochre_basins` stays dust and
+  `nitrogen_dunes` stays snow (physical behaviour is PHYSICS's call). (2) Cloud seas carry the
+  explorer as a light froth, so nobody is stranded (no fail state); PAINTER and PILOT may ask
+  for a different depth, not for sinking. (3) `fog01`, `dust01`, `haze01` and
+  `precipitation.intensity01` changed meaning in P2; read the notes before using them.
+- 2026-11-11: **Division of labour for drawing the physics** (coordinator; PAINTER is the
+  bottleneck and nothing of the weather is in the picture yet). PHYSICS builds optional draw
+  kits under `src/physics/three/`: three.js geometry, attribute layout and per-frame updates
+  for rain, snow, loose particles, ground marks and the water surface, each taking a material
+  factory. PAINTER supplies the materials (its wash chunks, its MRT outputs), decides the look,
+  adds the objects under the body roots in `world.update`, and may replace any kit with its own.
+  The pure core of `src/physics` stays three-free; only `src/physics/three/` imports three.
+- 2026-11-11: **PILOT's M2 accepted** (`f9f5ab2`; the coordinator re-ran
+  `node --test tests/*.test.mjs`: 92 pass). Pulse drive with self-braking, targets, markers,
+  planet map (M), save, frame read-out (` key or `?stats=1`), pointer-lock fallback; PHYSICS
+  fully wired (bodies, gear, lift-off, brake, friction sites, default seed 18); ship rides above
+  the canopy; 39 of 40 landings on ten bodies (one honest refusal at a Jupiter ledge); the
+  earth, mars, saturn trip passes in the painted worlds at 960x540 quality 1 (459 km in 70.7 s,
+  888 km in 94.9 s) with a reload that continues from the save. New query parameters:
+  `?stats`, `?fresh`, `?save`, `?stub=physics`.
+  **M2 as a whole closes when PAINTER's second pass lands and the lead's review 4 has no MUST
+  FIX**; landings and the trip are re-run after that pass.
+- 2026-11-11: PILOT's conditions for PHYSICS's draw kits (architecture, upheld): the pure core
+  stays three-free; body-local placement; at most 60 k triangles and 12 draw calls for all kits
+  together; draw order is PAINTER's.
+- 2026-11-11: **M4 tooling found.** `gh` GraphQL commands (`gh pr create`, `gh pr list`) are
+  blocked in this sandbox, but the REST API works and the session has push and admin rights:
+  open the pull request with `gh api repos/zubersss/painted-cosmos/pulls -f title=... -f
+  head=cosmos -f base=main -f body=...` and merge it with `gh api -X PUT
+  repos/zubersss/painted-cosmos/pulls/<n>/merge -f merge_method=merge`. Only at M4, only once.
+- 2026-11-11: **PAINTER's M2 second pass came back incomplete** (`0291097`): by its own count 17
+  of 33 biome frames show their named feature, 11 partly, 5 not at all (`saturn-gold_islands`,
+  `mercury-shadow_craters`, `jupiter-hanging_gardens`, `neptune-ice_spires`,
+  `earth-desert_canyon`). Not re-probed for cost; `world.busy` fix untested; orbit frames not
+  opened. The coordinator's own look agrees and adds: ground strokes smear into long radial
+  streaks near the camera on several bodies, and Mars' frost cracks read as hexagonal tiles.
+- 2026-11-11: **PAINTER agent replaced, same role.** The first PAINTER agent reported that it
+  was at the limit of its working context and asked for a fresh run. A fresh PAINTER agent takes
+  over the role with the same ownership and rules, starting from `docs/BRIEF.md` (sections 6 and
+  7 are now stored there too), this file, `docs/notes/painter.md` and the code. Still three
+  workers; the old PAINTER agent is retired and must not be resumed.
+- 2026-11-11: PAINTER's material contract for PHYSICS's draw kits is in `docs/notes/painter.md`
+  (two opaque targets, `pcWrite`, PAINTER's chunks, a vertex chunk giving `pcKitPosition()`).
+- 2026-11-11: **PHYSICS stage P3 accepted** (`ea6efdc`; the coordinator re-ran the tests: 175
+  pass). Draw kits under `src/physics/three/` fit PAINTER's material contract (a vertex chunk
+  with `pcKitPosition()` and two varyings per kind, opaque with `discard`; at most 12 draw
+  calls and 31 k triangles with every buffer full; `kits.update(bodyRoot, camera, heightPx)`).
+  Rain shelter and drips, a sea that no longer tiles from the air, a wake field. Worst
+  reproducible `physics.update` frame 0.38 to 0.92 ms. The integrated game was played in the
+  browser on Earth, Mars and Neptune (seven findings in its notes). Not done: a branch rate in
+  trees; shader agreement inside PAINTER's `PROP_VERT`; kits with PAINTER's real chunks.
+  Water uniforms changed type to vec4 (groups and wakes added); nothing had wired them.
+- 2026-11-11: **P4 plan (coordinator):** so that PHYSICS does not wait for PAINTER, it proves
+  the kits, the flora chunk and the water chunk inside the real painted pipeline in its own
+  lab, using only PAINTER's public exports (`createPainter`, `createWorld`, `makeWashMaterial`,
+  `RENDERER_OPTIONS`), and hands PAINTER a material factory that is known to work, with frames.
+  How rain is drawn (a thin streak in an opaque pass will alias and crawl) is PAINTER's
+  decision; PHYSICS prototypes the options there and shows them. PAINTER's first M3 item is
+  wiring the kits (weather in the picture), then the real explorer and ship.
+- 2026-11-11: **PHYSICS stage P4 accepted as reported** (`c5f8088`, 175 tests). The lab runs
+  inside the real painted pipeline (`physics-lab.html?painted=1`, source
+  `src/physics/three/painted-lab.js`, public exports only) with a reference
+  `makeKitMaterial(kind, info)` that works with PAINTER's chunks, both targets and the post
+  pass. Honest verdicts on its six painted frames: rain reads (as broad strokes) and footprints
+  read; snow, the Mars dust storm and Neptune's sea fail; grass parting unjudged. Measured: the
+  post pass erases marks under about 3 internal pixels, so thin or stippled rain only adds
+  shimmer; **broad strokes are the only rain that is there**. Storm kit cost 0.1 to 0.2 ms,
+  4 to 5 draw calls, 3.2 k triangles. Not done: agreement inside `PROP_VERT`, branch rate, drifts.
+- 2026-11-11: **Finding (PHYSICS, upheld by the coordinator after looking at the frames): kits
+  alone cannot paint weather.** A storm with a sunny sky is not a storm. PAINTER's sky, haze,
+  sheet, ground wash and liquid material must read `physics.here.weather` and the wave chunk.
+  Six gaps in PAINTER's contract are listed in `docs/notes/physics.md` (uniform constructor for
+  `FRAG_PARS`, chunks re-exported from `index.js`, a way to glaze instead of bringing ink, the
+  3 px floor of the post pass, the wave chunk on PAINTER's liquid, weather in sky and haze).
+  This is PAINTER's first M3 block: weather in the picture.
+- 2026-11-11: **PHYSICS stage P5, first step** (`a4214d6`; the coordinator re-ran the tests: 178
+  pass): `src/physics/sky.js`, `physics.here.sky` and `physics.sky(weather?, out?)`: eleven
+  numbers from 0 to 1 that a painter needs (`cloud`, `overcast`, `haze`, `fog`, `dust`, `wet`,
+  `snow`, `rain`, `snowfall`, `storm`, `flash`), continuous in time (only `flash` moves more
+  than 0.1 in a second). PAINTER reads these instead of `physics.here.weather`; PILOT may pass
+  them through `setMood` as an additive field. The rest of P5 is not done.
+- 2026-11-11: **PHYSICS agent replaced, same role.** The first PHYSICS agent reported that it
+  was at the limit of its working context and asked to be replaced; its notes open with a
+  hand-over section. A fresh PHYSICS agent takes over with the same ownership and rules. Still
+  three workers; the old PHYSICS agent is retired and must not be resumed.
+- 2026-11-11: PAINTER now exports `makePaintUniforms` and the scene chunks publicly for kits
+  built outside its tree (`ebd9b4d`): gaps 1 and 2 of PHYSICS's list.
+- 2026-11-11: **PILOT's M3 half is in place** (`08cc1f1`; the coordinator re-ran
+  `node --test tests/*.test.mjs`: 93 pass): vistas found within 14 m with a chime and a save,
+  sketchbook (B), procedural audio (wind, rain, thunder on its delay, ship, jetpack, footsteps,
+  a pad per planet, UI sounds; `?audio=0`), title and help card (H), read-outs on paper slips,
+  a look hint, start at tier 1 and scale 0.75 and climb, per-world flight pace from air
+  density, `setMood.sky` (PHYSICS's eleven numbers), `tests/m3check.mjs`, and `tests/tour.mjs`
+  (every biome of every body in the integrated game at 960x540, quality 1; sheets in
+  `docs/lead/evidence/tour-<body>.jpg`; one body per process). Not verified: nobody has heard
+  the audio; most tour frames were "(unsettled)" because `world.busy` did not reach 0; painted
+  browser runs not repeated after M3; HUD and markers still the fallback look.
+- 2026-11-11: **PILOT agent replaced, same role (lead duty included).** The first PILOT agent
+  reported that it was at the limit of its working context; `docs/notes/pilot.md` opens with a
+  handover and the lead files stand alone. A fresh PILOT takes over with the same ownership
+  and rules. Still three workers; the old PILOT agent is retired and must not be resumed.
+  All three roles are now on their second agent.
+- 2026-11-11: **PHYSICS stage P5, items 1 to 3 accepted** (`5acf86a`; the coordinator re-ran the
+  tests: 191 pass). (1) Every particle carries `mat` and every mark its material (index into
+  `physics.data.MATERIAL_IDS`, 15 names), passed to kits as `vPcMat`. (2) The sea for PAINTER's
+  liquid: `physics.glsl.water` gives height, slope, crest direction, `crest01`, `foam01`, surf
+  and the normal through `uPhysWaterSea`; JS twin `physics.fields.water.sample(p)`; chunk
+  against twin 0.06 mm in GL; the patch kit is off by default. (3) Kits survive the post pass:
+  size floor in PAINTER's internal pixels with thinning that keeps cover, snow shown in a 9 m
+  cell round the eye, dust sized from the dust in the air; `kits.update` takes
+  `painter.info.internalHeight`. Painted-lab verdicts by PHYSICS, shared by the coordinator:
+  snow reads as a flurry on a sunny meadow and dust as a dry-brush band under a clear sky;
+  **neither is a storm until PAINTER's sky, haze and ground read `setMood.sky`.** Not done:
+  silhouette agreement test in `PROP_VERT`, branch rate in trees, drifts, crawl of the snow cell.
+- 2026-11-11: PHYSICS's integration order for PAINTER (its notes, "For PAINTER"): section E
+  (sky, haze, ground wash read `setMood.sky`), section D (wave chunk in the liquid material),
+  section C (lift `makeKitMaterial`, a 16-colour palette per biome indexed by `vPcMat`), then
+  grass blades visible near the eye (the push field is live; the meadow shows no blades to
+  part). Also asked: a region id the post pass keeps crisp (splash rings are erased).
+- 2026-11-11: **The second PHYSICS agent also reached its context limit after one stage and is
+  replaced by a third in the same role.** Fresh agents are told to budget their reading.
+- 2026-11-11: **Ruling: the painted UI theme moves to PILOT** (the coordinator; PAINTER is the
+  critical path and carries M2, weather in the picture, the real models, space and the art
+  pass). PILOT builds the theme under `src/ui/**` to art-bible rule 8, all generated in code:
+  torn-paper panels, ink-and-wash icons, hand-lettered type, painted planet markers, cursor,
+  loading. Look stays PAINTER's call: PAINTER reviews the theme and PILOT changes what it asks.
+  `src/art/ui.css` and `painter.setMarks` are no longer owed by PAINTER (it may still offer
+  them). Palette and paper constants come from PAINTER's public data (`src/data/looks.js`).
+- 2026-11-11: **PAINTER's M2, third pass (second PAINTER agent, `334eb16`): the coordinator lifts
+  its finding.** The coordinator opened all eight contact sheets: the named landforms are there
+  (Earth's snow massif over the alpine meadow, banded canyon with a butte, sea-cliff headland;
+  Mars' strata; Jupiter's banded globe with the Great Red Spot, vine curtains, a table island in
+  the cloud sea; Saturn's islands in cloud with the ring arc; Mercury's crater bowl; Venus'
+  terraces, lava and fogged mesas; Uranus' teal pool; Neptune's stacks), the radial ground
+  streaks and hex-tile cracks are gone, and the frames read as watercolours. PAINTER's own
+  count: 28 of 33 yes, 5 partly (`mars-dry_riverbeds`, `jupiter-lightning_plains`,
+  `uranus-ice_shelves`, `uranus-frozen_waves`, `neptune-aurora_tundra`; three of those wait
+  for weather and sky effects). Its probe: every planet inside the budget at quality 0, 1 and 2
+  (Earth's wetland at the edge at quality 0); `world.busy` tested reaching 0; 19 world tests.
+  Still weak, for the M3 art pass: bare foregrounds, flat facets on Mercury's crystals and
+  Neptune's kelp, grey-green distant cliffs on warm planets, hard cast shadows in the autumn
+  wood in the game, the toy explorer and ship.
+  **M2 closes when the lead's review 4 (in the game: cost, landings, trip, tour) has no MUST FIX.**
+- 2026-11-11: additive contract from that pass: `world.findBiome(bodyId, biomeId)` returns
+  `{ unitDir, yaw, pitch }` (the stand: where to arrive in a biome); the first vista of each
+  biome carries `yaw` and `pitch`; `world.sampleObstacles(..., soft)` can list bushes; spawns
+  moved on every body except Earth (Jupiter spawns on a sky-island); when the smoothed frame
+  time is above 80 ms `world.update` may take up to 30 % of the frame for building (4 ms at
+  real frame rates).
+- 2026-11-11: **the second PAINTER agent reported being past two thirds of its capacity and is
+  replaced by a third in the same role** (stopped by the coordinator so that two PAINTERs never
+  write at once). M3 for PAINTER starts with weather in the picture.
+- 2026-11-11: **PHYSICS stage P6 accepted** (third PHYSICS agent, `b146000`; the coordinator
+  re-ran the tests: 208 pass; PILOT's 102 pass on it). (1) Crawl measured mark by mark at 60 Hz
+  and removed: blizzard pops 11.7 a second to 0, dust-storm billows 7.6 to 0, rain strokes
+  vanishing whole 85.8 to 0.8; particles carry `left` and fade; snow lives in its own 8 m box
+  round the eye (`frame.eye` in `physics.update`). (2) Two real bugs fixed: particles were
+  published on the tangent plane of the frame's anchor (rain ended up to 18 m above the ground
+  380 m from where a session began), and weather entered over the sea bed (no rain over deep
+  water). (3) Branch sway (`pcPhysBranch`, no new texture) and drifts (`physics.fields.drift`:
+  snow and sand gather in the lee and in hollows, scoured from windward faces). (4) The game
+  played on six worlds: the bodies obey the models; what is physically off is in the assists
+  (one turn rate of 42 deg/s on every world, cruise speeds bunched, feet never leaving the
+  ground, every jetpack fall ending at 7 m/s, an empty first second of throttle). Five optional
+  one-line levers for PILOT are in its notes (`eye`, `carveAccel`, `speedScale` with `brake`,
+  `assistAccel` by gravity, `softFallSpeed` 4). Worst frame 0.36 to 1.01 ms. Not done: the
+  silhouette test in `PROP_VERT`; flake tumble and dust-tuft shape.
+- 2026-11-11: the third PHYSICS agent has about a quarter of its context left. **The PHYSICS
+  role pauses until PAINTER's weather block is reported**; a fresh PHYSICS agent then tunes the
+  marks, waves, branches and drifts against the painted picture and re-flies PILOT's levers.
+- 2026-11-11: coordinator's recommendation on the levers (feel is PILOT's call): take them. The
+  brief gives every planet its own "gravity feel" and the owner asked for realism; today every
+  world but Venus flies and walks the same.
+- 2026-11-11: **Weather is in the picture: PAINTER's M3 block 1 accepted** (third PAINTER agent,
+  `9d9caf1`, notes `b243609`). The coordinator opened the storm, blizzard, dust-storm and gale
+  frames (`docs/shots/painter/wx-*.jpg`): sky, haze, light and sheet follow the sky numbers in
+  each world's own pigment; ground and flora take wet and fresh snow; the liquid takes PHYSICS's
+  wave chunk; PHYSICS's kits are drawn with PAINTER's materials; near grass leans away from the
+  explorer (one clump) and lies over under the ship's wash. Cost with weather on stays inside
+  the budget (551 k triangles, 301 calls in the storm at the Earth spawn; kits 5 calls, 3.4 k).
+  The blizzard frame is the best of them. Open: rain is opaque pale sticks that cross (no
+  glaze); grass is sparse tufts, not a sward; lightning never seen; branches, drifts and the
+  instanced kits not wired; crawl of the kits through the post pass not measured; granulation
+  in dark washes (storm skies, dark sea, space) still reads as black pepper at 960x540.
+- 2026-11-11: additive contract from that block: `world.setPhysics(physics, opts?)` builds and
+  draws PHYSICS's kits itself (**PILOT must not create kits**; `{ kits: false }` turns them
+  off; `world.kits` has the counts); `world.setWeather(sky | null)` forces the sky numbers;
+  `world.setFreshSnow(x)`; the world reads `physics.here.sky` directly (`setMood.sky` still
+  supplies `flash`); region ids 6 (small crisp marks) and 7 (things in the air);
+  `src/render/kitmat.js`.
+- 2026-11-11: **Ruling on snow** (PAINTER asked). Upheld as PAINTER draws it: only fresh snow is
+  laid over the painted ground (it gathers while snow falls and melts after), never more than
+  PHYSICS's cover. Standing snow belongs to the terrain PAINTER has already painted. PHYSICS is
+  asked to split its number: a fresh-snow cover from recent snowfall, separate from standing
+  cover, and to keep standing cover consistent with the painted ground of each biome (a green
+  alpine meadow in fair weather is not under standing snow). Also asked of PHYSICS: falling
+  rain or snow implies a closed sky in the sky numbers (the blizzard had `cloud` 0.46).
+- 2026-11-11: the third PAINTER agent is at about 85 to 90 % of its context and is replaced by
+  a fourth; the PHYSICS role resumes with a fourth agent to tune against the picture.
+- 2026-11-11: **Lead review 4 (second PILOT agent, `99bce4a`)**, run in the game on a clean
+  export of PAINTER's `334eb16`: 114 tour frames over ten bodies at 960x540, quality 1, every
+  frame settled (`world.busy` 0 in 0.1 to 58 s), no console errors; 27 of 33 biomes show the
+  brief's landform clearly, 6 partly, none missing; cost inside the budget on every body
+  (Neptune's kelp 359 k, was 727 k) except one view; contract test 8 of 8 (39 of 40 landings,
+  one spoken refusal; the trip); landing survey 235 of 240 from a hover; the painted trip passes
+  47 checks (459 km in 69 s, 887 km in 94.9 s, reload from the save). One MUST FIX for PAINTER:
+  the vista `earth-temperate_forest-1` submits 645 k triangles and 352 draw calls at quality 1
+  (budget 600 k / 350). The coordinator re-ran PILOT's tests (102 pass) and opened the Jupiter
+  tour sheet and the theme frames.
+- 2026-11-11: **M2 is closed.** The coordinator waives the one MUST FIX as a gate for M2 (a
+  7.5 % overrun in one view) and **carries it into M3 as a MUST FIX**: with weather, the real
+  models and the near-ground layer in, the densest view of every body must be inside 600 k
+  triangles and 350 draw calls at quality 1, measured by the lead in the game. Also MUST in M3
+  (lead): the pepper in dark washes and space.
+- 2026-11-11: `R-WX-1` reworded by the lead from measurements: sky numbers may move 8 %/s on
+  Earth-like worlds and 15 %/s on the ice giants; PAINTER eases what it shows over 2 s or more.
+- 2026-11-11: PILOT's block (second agent): painted UI theme first pass in `src/ui/` (generated
+  paper with torn edges, a 76-glyph stroke font drawn in code, ink keycaps, icons, brushed ring
+  markers, cursor, loading dabs; awaits PAINTER's look review; frames `docs/shots/pilot/ui-*.jpg`),
+  sketchbook with a small sketch of the painted frame per landscape and view, touchdown on the
+  legs, rain audio by `sky.rain` and shelter, footsteps by ground material, gamepad mapping,
+  `tests/audiocheck.mjs` (22 situations, no clipping, peak -5.3 dBFS), all five PHYSICS levers,
+  `__pc.flash(frames)`. Additive: `Sim.teleport({ heading, lookPitch, firstPerson })`,
+  `getSpawn` may carry `yaw` / `pitch`, storage key `painted-cosmos.sketches`.
+  The second PILOT agent is at its context limit and is replaced by a third.
+- 2026-11-11: **PAINTER M3 block 2 (fourth agent, code `6bb6c91`, notes `afd9eef`)**. In: the
+  real explorer and ship (`src/art/models.js`; one mesh and one draw call each, were 8 and 17;
+  C10 kept; `userData.pcCaster` makes the world lay their shade), the near-ground stroke layer
+  (`src/world/nearground.js`; one instanced draw call, at most 6400 strokes; trodden blades lie
+  over and stay down, the ship's wash lays a disc), rain as a glaze (a blended pass after the
+  abstraction pass, `GLAZES` in `src/render/shared.js`), soft settling instead of pits in dark
+  washes (sheet pass), sky numbers eased with a 0.9 s time constant, `setBuildBudget(ms,
+  { fixed: true })`, a look review of the UI theme in PAINTER's notes. Cost in the gallery at
+  quality 1: Earth spawn 516 k / 280, forest easel 546 k / 299; in the game, third person at
+  the spawn, 527 k / 285 (paid for by earlier tree hand-over, `TRIM` in `src/world/flora.js`).
+  **Not re-measured in the game at the lead's vista**: the two MUST items (cost, pepper) stay
+  open until the lead measures them. Not done: branch sway and drift wiring, lightning looked
+  at, the lead's SHOULD FIX list.
+  The coordinator opened `models-game`, `models-forest`, `wx-earth-storm` at full size and
+  `models-cockpit`, `models-mars`, `models-poses`, `wx-jupiter-storm`, `wx-grass-part`,
+  `wx-grass-wash` on a sheet. Verdict: the explorer, the ship and the cockpit read as painted
+  things and are accepted; the rain glaze is accepted. **Coordinator finding (look, agrees
+  with the lead's review 5 item 5)**: on Earth's lawn the near strokes are small dark
+  hard-edged triangles, evenly spread: they read as teeth, the most digital thing in the
+  frame. Wanted: brush flicks (curved, tapering, in loose tufts, most of them close to the
+  ground's own value, a few darker accents), none on fresh snow.
+- 2026-11-11: **Lead review 5 (third PILOT agent, `caa25f3`, at `62d3529`; not a gate)**:
+  weather set of twelve frames in the game, cost at three tiers on every body
+  (`tests/cost.mjs`), `tests/all.mjs` (every check, one table). Open MUST FIX: PAINTER two
+  (cost: the forest vista 614 k at quality 1 and 306 k at quality 0, the storm at the spawn
+  after dark 606 k; pepper, worst in Neptune's sky), PHYSICS one (storms bring no wind;
+  PHYSICS reports it done in P7). PILOT's own: the camera in a thicket slides into the eyes,
+  low boulders are walked over, README complete.
+- 2026-11-11: the fourth PAINTER agent is at about 85 % of its context and is replaced by a
+  fifth. **PAINTER's order for M3 block 3** (coordinator): (1) close the two MUST items at
+  the lead's own measure (`node tests/cost.mjs --places "earth:vista:earth-temperate_forest-1"`,
+  the storm after dark; pepper in Neptune's sky, in space and in a pulse frame); (2) day-night
+  and space art pass, pulse streaks from `speed01` (the brief's M3 list); (3) the near strokes
+  as brush flicks and none on snow, the white fringe in the lightning frame, puddles as soft
+  pale sky; (4) as capacity allows, the rest of review 5's SHOULD FIX list, then branch sway
+  and drifts. A repaint of the weakest biome per planet moves to M4's critique swap.
+- 2026-11-11: **PHYSICS P7 accepted (fourth agent, `62d061a`; code `7a3df85`, `6b047dc`,
+  `e2e2d75`)**. The coordinator re-ran on a clean export of the head: `node --test
+  src/physics/` 220 pass; `node --test tests/*.test.mjs` 105 pass on the second run (the first
+  run had 2 failures with two other agents rendering: load-flaky, see below). In: rain in one
+  direction per frame, short, sparse (37 strokes in view in a thunderstorm, was 106); snow
+  flakes with their own aspect and slow turn; dust as low walls in a storm; a swell on open
+  seas and `pcPhysWaterCrestLine` / `line01` for the bare-paper crest stroke; denser splash
+  rings; grass parted about 2 m wide with a wake that closes in 30 s; a twelfth sky number
+  `sky.fresh` (fresh snow at the focus, integrated as it falls; `physics.here` is the
+  authority for `fresh` and `snow`); standing snow is the biome's `snowBase` only; rain or
+  snow closes the sky; a gale has its own sky; stateless and stateful sky agree within 1 %
+  except snow; **storms bring their own wind** (lead review 5, P1: storm 16 m/s at 10 m, dust
+  storm 20, shower 6, rain 3, ice fall 4). The game re-flown in Node with PILOT's levers on
+  six worlds (table in PHYSICS's notes, "For PILOT").
+  **Not verified by anyone**: P7.3 and P7.4 (sky, snow, storm wind) have never run in a
+  browser; nobody has walked or hovered through the windy storm in the game. PHYSICS itself
+  calls the storm wind the riskiest change of its run (two tests relaxed: hull shelter 0.25 to
+  0.5, powder count 3 to 2).
+  Open from review 5: P2 (first storm falls in the dark), P3 (Neptune's `storm_seas` never
+  storms by regime), P4 (dust in the forest air), P6 (33 m/s at two metres on Neptune's
+  coast; walking downwind slower than upwind).
+- 2026-11-11: **Rulings (PHYSICS asked).** (1) `R-WX-1`: Jupiter and Saturn count with the
+  giants (15 %/s). On the rocky worlds 8 %/s stands with one point of tolerance, because
+  PAINTER now eases what it shows with a 0.9 s time constant; Earth's 8.5 % passes. (2)
+  Process: a commit whose message begins "WIP snapshot" is a backup made by the coordinator
+  for the stop hook, possibly mid-edit. **The lead never reviews or tests a WIP snapshot**;
+  it reviews the last commit a role made itself. (3) Review 5, P6 (a wind the player cannot
+  walk in): PHYSICS owns the model, so PHYSICS gives the wind a boundary layer over rough
+  ground (10 to 15 m/s at two metres under 40 m/s aloft is what a log profile over a boulder
+  beach gives) and fixes downwind being slower than upwind, which is a fault in any model;
+  PILOT then sets how much the suit cancels (feel). Inside a wood the canopy's shelter is
+  real: the lead's 15 to 30 m/s gust check for thunderstorms (`R-STORM-5`) is measured in the
+  open at 10 m, not under trees.
+- 2026-11-11: findings relayed to PILOT from PHYSICS's re-fly: over the Moon's
+  `crater_fields` the ship hovered at 4.1 m with sink held for 90 s and never landed; cruise
+  on Mars and the Moon is 143 m/s with a 208 to 260 m turn radius and 131 to 248 m to stop;
+  two of PILOT's unit tests fail now and then under load (`tests/physics.test.mjs:27` once in
+  four for PHYSICS, two of 105 once in two for the coordinator).
+- 2026-11-11: PHYSICS P7 addendum (`c11ca37`, answering PAINTER's block 2 asks): the rain
+  share follows the rain rate (`share x (0.6 + sky.rain)`, 0.16 in a drizzle to 0.40 in a
+  downpour; PAINTER drops its 1.6 multiplier); grass pressed flat to 0.6 m from the explorer
+  and half at 0.85 m (`FLORA.flatReach` 0.25 m; one test threshold loosened for it); the
+  ship's legs have not moved. Not run in a browser. The fourth PHYSICS agent is out of
+  context and is replaced by a fifth. **PHYSICS's order for P8** (coordinator): (1) run P7.3,
+  P7.4 and the addendum in the painted lab and in PILOT's `Sim`, open the frames, fix what
+  is wrong; (2) review 5 P6: downwind slower than upwind, and a boundary layer over rough
+  ground; (3) P2: the first storm crosses the spawn in daylight at about 150 to 400 s; (4)
+  P3 and P4: Neptune's `storm_seas` storms most of the time, no dust in the forest air; (5)
+  as capacity allows, the instanced kit path, flake crawl, the silhouette request; (6) a
+  blunt critique of the other two domains for M4's swap.
+- 2026-11-11: **Lead review 5 addendum and PILOT's block (third agent, `e583f67`)**, measured
+  in the game on a clean export of `0de3fb4`. The coordinator re-ran PILOT's unit tests on a
+  clean export of the head (105 pass) and opened `weather-recheck.jpg`, `space-recheck.jpg`
+  and the four `ui-*.jpg` frames.
+  **One MUST FIX is open for M3 (PAINTER)**: the vista `earth-temperate_forest-1` is at 611 k
+  triangles / 339 draw calls at quality 1 (600 k / 350) and 304 k at quality 0 (300 k).
+  **Closed by the lead**: pepper in dark washes and space (storm sky, Neptune's sky, night,
+  space and pulse, looked at 1:1); the storm at the Earth spawn after dark (550 k / 300, was
+  606 k); PHYSICS P1 (storms bring wind: walked and flown in the browser with real keys:
+  3.5 to 4.0 m/s in every heading, a 2.5 s hop carried 4 m, the ship lands in 9 s).
+  `node tests/all.mjs --export` on `d149255`: all 13 steps pass in 33 minutes, no console
+  errors (unit 105, PHYSICS 222, PAINTER 19, the play-through 37 checks, the trip 47 checks).
+  In from PILOT: `tests/weather.mjs`, `tests/cost.mjs`, `tests/all.mjs`; the read-out's
+  `weather` line; a camera that slides into the explorer's eyes when the boom is squeezed
+  under 2.3 m; obstacles up to 1.3 m are walked over (`scrambleSample`; a boulder's `height`
+  in `sampleObstacles` decides), a suit wedged between two tall ones walks round one (Mars'
+  spawn 170 to 179 m in every heading, was 5 m in one); the UI theme's second pass with
+  PAINTER's six points (keys as wash dabs in pencil rings, brush-stroke buttons, dry-brush
+  orbits on the map, the picture stepping back to paper behind an open map or sketchbook);
+  the cockpit HUD moved so the dials show; boom 5.2 m; a stalled sink lands or says "Slow
+  down to land"; thin-air worlds fly at about 78 m/s under 60 m; wall-clock assertions only
+  with `PC_TIMING=1`; `R-WX-1` and `R-STORM-5` reworded; README complete; TRACK's "Done
+  means" line by line; a critique of both other domains in PILOT's notes.
+  Coordinator's look verdict: the menus are accepted (torn paper, hand lettering, nothing
+  reads as a web page). The lightning frame's white specks and the green flicks on the
+  snowfield are confirmed in the lead's sheet. Space reads as a wash but has no stars and a
+  border of hard dark dots.
+  **Not verified**: the tour has not been re-run since `ded1435` (before weather, models and
+  the near layer); nobody has flown to all eight planets in one browser sitting; nothing has
+  been judged in motion; the new UI frames are on stubs.
+  Additive: URL parameters `kits=0`, `weather=fair`; `__pc.setClock(t)`,
+  `__pc.info().weather`; `collideObstacles(st, list, r, { moving, dt })`;
+  `Sim.cameraSolids`, `boomRoom`, `footCam.tight01`; HUD root class `pc-cockpit`.
+- 2026-11-11: PHYSICS P8 so far (fifth agent, commits `d149255` to `de6ee88`, not yet
+  reported): boundary layer over rough ground (14 m/s at 2 m under 40 m/s at 60 m on the
+  boulder shore); the first storm crosses the Earth spawn at **160 to 320 s of play** (noon
+  to half past two; every Earth weather time is 480 s earlier than before); Neptune's storm
+  coast under a thunderstorm about 70 % of the time; no dust from wet ground; aerodynamic
+  damping so trees do not whip in a gust front.
+- 2026-11-11: the third PILOT agent is at its context limit and is replaced by a fourth.
+  **PILOT's order** (coordinator): (1) own items: the weather set on PHYSICS's new storm
+  times, all eight planets in one browser sitting, tests for the two new guards, the suit's
+  share of the wind, a word on screen when thin air limits the ship; (2) lead review 6 when
+  PAINTER and PHYSICS report (the MUST FIX, the tour, every check), which gates M3; (3) M4.
+- 2026-11-11: **PHYSICS P8 accepted (fifth agent, `7944d45`)**. The coordinator re-ran on a
+  clean export of the head: `node --test src/physics/` 226 pass, `node --test
+  tests/*.test.mjs` 105 pass; and opened the four painted-lab frames on a sheet (the storm
+  forest reads as driving rain; the blizzard is a white-out; Mars reads as a dust storm by
+  haze alone, the dust walls as a few pale blots; the Neptune frame predates the lab's rain
+  fix). In: aerodynamic damping so trees do not whip upwind in a gust front (`FLORA.aeroDamp`,
+  was up to 104 deg/s, now 10); a boundary layer by ground roughness (under 40 m/s at 60 m:
+  14 m/s at 2 m over a boulder shore, 22 over grass, 28 over flat ice, 6.6 under a canopy);
+  "downwind slower than upwind" on Neptune's coast was a 4.5 m cliff, not the wind (a test
+  holds downwind >= upwind on level ground); **Earth's weather clock starts 480 s in**
+  (`REGIMES.earth.epoch`): at the spawn fair to 120 s, first drops 140 s, thunderstorm 160
+  to 320 s (noon to half past two), clear from 340 s (for `tests/weather.mjs`: before 60,
+  storm 240, flash 244, after 390); storms of a place's own making where a biome's moisture
+  is over 1.2 (Neptune's storm coast under a thunderstorm about 70 % of the time); only dry
+  ground gives dust; `cmd.shelter01` (0 to 1, default 0: the share of the wind force on the
+  explorer that the suit cancels; PILOT's lever). Additive API; behaviour changed without a
+  call changing: Earth weather times, wind near rough ground, tree damping.
+  **Open, found by PHYSICS and not fixed**: (1) with PILOT's "obstacles up to 1.3 m are
+  ground", the point body is launched off a boulder (pure body over a 1.3 m bump: Earth run
+  1.4 m up, Mars run 2.3 m, Moon run 5.9 m and 5.1 s in the air); (2) five mechanism tests
+  still run at Earth's old weather start and fail at the new one, not looked into; (3) the
+  gust pattern races when the mean wind changes fast (up to 52 m/s2 in one frame at 30 m);
+  (4) a 2.5 s hop is carried 25 m on Neptune's coast (the lead's aim is 15 m; `shelter01`
+  is the lever). The fifth PHYSICS agent is out of context and is replaced by a sixth.
+- 2026-11-11: **Ruling: boulders, legs and launches** (physical behaviour is PHYSICS's,
+  feel is PILOT's; both asked for a decision). The explorer has legs: over any ground
+  feature shorter than a leg and a half (about 1.3 m) a walking or running body stays in
+  contact, its legs taking up the rise and fall, as a person's do; it leaves the ground only
+  by a jump, the jetpack, or a drop it cannot step down. PHYSICS builds that into the body
+  (a named part of the model, not a fudge). PILOT keeps "low boulders are ground", makes the
+  explorer clamber over them at no more than a walking pace, and until the legs are in
+  measures a run across the Moon's and Mars' boulder fields in the game and turns the
+  walk-over off there if it launches the explorer. Measure of done, for the lead: a run
+  across a boulder field on Earth, Mars and the Moon never lifts the feet more than 0.3 m
+  off the ground without a jump.
+- 2026-11-11: **PHYSICS's order for P9** (coordinator): (1) legs (the ruling above), tested
+  on Earth, Mars and the Moon over PILOT's real ground profile; (2) the five tests at the
+  old weather start: stale probe or real fault, each one; (3) the racing gust pattern; (4)
+  as capacity allows: spray off the sea in a gale, softer dust walls for PAINTER, the
+  instanced kit path, flake crawl; the Neptune lab frame re-shot and opened.
+- 2026-11-11: **OWNER'S INSTRUCTION: no triangle budget; the best possible quality.** In the
+  owner's words: "Why is there a budget for triangles get rid of that your making the best
+  possible quality gamd use your limits and try to pass then". This overrides PILOT's frame
+  budget and every ruling of mine that rests on it. From now on:
+  1. **No count of triangles or draw calls is a gate, a MUST FIX or a reason to trim**, for
+     the scene at any tier or for PHYSICS's draw kits (the 600 k / 350, 300 k, 1.2 M and
+     12 calls / 60 k figures are void). The M3 MUST FIX on the Earth forest vista is
+     withdrawn. `tests/cost.mjs` reports numbers and fails only on a console error.
+  2. **Quality is the aim and each role pushes past what it thought was its limit.** The top
+     quality tier is authored for the best picture with no cap, and it is the tier the look
+     is judged at. Anything that was thinned, shortened or handed over early to pay for the
+     budget is restored where the fuller version is the better painting (PAINTER's `TRIM` of
+     tree tiers, the 6400-stroke cap of the near ground, the density and draw distance of
+     flora and props, the fineness of terrain, the internal resolution), and then taken
+     further. A saving that costs the picture nothing (not drawing what cannot be seen) stays.
+  3. **The game starts at the best tier and at full resolution** and steps down by itself
+     only when the measured frame rate asks for it (the tiers and dynamic resolution stay, as
+     the brief's "perf tiers": they are how a weak machine still plays, and they now carry
+     the brief's frame-rate line on their own). PILOT owns that controller.
+  4. What stays, because it is smoothness and not a triangle count: `world.update` and
+     `physics.update` are still measured as worst frames (5 ms and 2 ms at real frame rates)
+     and reported; a role that needs more for a better result says so and takes it.
+  5. The cost to us: software rendering here is slower with fuller scenes. Mechanics may be
+     checked at a lower tier; the look is judged at the top tier.
+- 2026-11-11: **PAINTER M3 block 3 accepted (fifth agent; `e56d65e`, `139be13`, notes
+  `1c567a9`, last code inside the snapshot `626b086`)**. The coordinator re-ran the 19 world
+  tests on a clean export of the head (pass) and opened `night-earth`, `space-pulse`,
+  `flash`, `space-deep` (sheet) and `flicks-lawn` (full size). In: a far world that cannot
+  be seen is not drawn and one a few pixels across is a single washed ball (the lead's forest
+  vista 614 k / 341 to 537 k / 305 without touching the picture; kept, it costs nothing);
+  dark and saturated washes settle soft, the border of a dark wash is ragged in broad pieces
+  (no dotted rim); **night as its own painting** (deep indigo masses, reserved paper lights);
+  **space in layered washes with spattered stars; pulse streaks** as soft drags laid as a
+  glaze (switched by the ship model's `mode: 'pulse'`); lightning lifts the open sky to paper
+  with no fringe in the crowns; **near strokes as tufts of curved flicks** close to the
+  ground's value, none under fresh snow (`sky.fresh`); puddles soft and pale (faint);
+  Neptune's sea darkens under a closed sky. After the owner's instruction `TRIM` was restored
+  to `[1, 1]`. Additive: reads `speed01`, `inSpace01`, `sky.fresh`; a boulder's `height` in
+  `sampleObstacles` is 0.58 of its scale (its drawn top; the largest is about 1.2 m); gallery
+  `odist=`, `chase=1`, `speed01=`. Coordinator's verdict: night, space, the pulse and the
+  lightning frame pass the freeze-frame test; the lawn no longer has teeth but is now quiet
+  to the point of flat at the boom's distance.
+  Not done: the owner's quality push; PHYSICS's five picture critiques; white horses on
+  Neptune; dust in the air near the explorer; two vistas in a thicket; Mercury and Neptune
+  from orbit; Mars' dune crests; branch sway and drifts; PILOT's UI second look. Known
+  flaws: a far world between 8 and 10 px swaps from ball to terrain in one frame and one
+  behind a closing sky vanishes at overcast 0.6 without a fade; the stored frames of dawn,
+  dusk, blizzard and storm were opened one commit early. Nothing judged in motion.
+  The fifth PAINTER agent is out of context and is replaced by a sixth.
+- 2026-11-11: **M3 has no MUST FIX open** (cost withdrawn by the owner; pepper and the storm
+  wind closed by the lead). M3 closes on lead review 6: the tour and every check on the
+  head, judged at the top tier, after PAINTER's quality push and PHYSICS's legs.
+- 2026-11-11: **PAINTER's order for block 4, "the quality push"** (the owner's instruction
+  made concrete by the coordinator): at the top tier, (1) a sward that is a sward, full trees
+  as far as they still read, denser flora and props where a biome is sparse, finer near
+  terrain, a finer brush at full resolution; before and after frames, keep what is the
+  better painting; (2) PHYSICS's picture critiques (the storm's ground loses its sun, the
+  blizzard needs figure and ground, dust as a soft glaze, a swell line and white horses on
+  Neptune); (3) the far-world pop and fade; (4) the lead's remaining SHOULD FIX list.
+- 2026-11-11: **PHYSICS P9 accepted (sixth agent; `9667015` legs, `f6d0a29`, `9b708e2`)**.
+  The coordinator re-ran on a clean export of the head: `node --test src/physics/` 230 pass,
+  `node --test tests/*.test.mjs` 114 pass; no test is pinned to the old weather start.
+  **The explorer has legs** (`src/physics/explorer.js`): the mass rides at the hips on legs
+  that fold 0.45 m and reach 0.28 m and level the hips with a 0.12 s time constant; a
+  feature under the 0.73 m stroke passes under at any speed; over a taller one the body is
+  braced and clambers at the pace its hips can be raised and lowered; a face over 1.35 m met
+  in one step is a wall; with no hold or a drop beyond 1.35 m the feet leave the ground as
+  before; ground steps over 0.15 m are split so 20 Hz behaves like 60 Hz. Measured: the pure
+  body over the 1.3 m bump stays down on Earth, Mars and the Moon (was 1.4 to 5.9 m in the
+  air); through PILOT's own wrapper over 62 boulders at most 0.26 m off the ground on the
+  Moon at 20 to 60 Hz (the old body flew 1.1 m at 30 Hz); in PILOT's `Sim` on the real
+  ground at most 0.26 m (Moon), 0.03 m (Mars), 0 m (Earth). **The lead's measure (0.3 m) is
+  met by the body alone**; the walk-over stays on everywhere and PILOT needs no clamber
+  limit of its own. Behaviour changed without a call changing: a run through a dense boulder
+  field is about 4.1 m/s on Earth, 2.75 on Mars, 1.9 on the Moon (was about 7); a step down
+  of up to 0.73 m is taken in contact; a wall over 1.35 m stops the body. Additive:
+  `EXPLORER_BODY` leg constants, `st.phys.hip`, `hipV`, `clamber01`, `grip`, `brace`.
+  PILOT must keep `scrambleSample` as it is (radius raised, the normal that of the ground
+  underneath). **The five tests at the old weather start were all stale probes; none hid a
+  fault**; each now probes a place found on the game's clock. Not started: the racing gust
+  pattern, spray, softer dust walls, leaves as thin marks, the Neptune lab frame, the
+  instanced kit path; the cost of the legs in the body step is not profiled. The sixth
+  PHYSICS agent is out of context and is replaced by a seventh.
+- 2026-11-11: **PHYSICS's order for P10** (coordinator): (1) the racing gust pattern in the
+  first storm; (2) the owner's quality push on what PHYSICS hands the picture, rendered in
+  the painted lab and opened: dust as many soft walls, leaves as thin tumbling marks, spray
+  off a gale sea, a blizzard that drives; (3) the cost of the legs; (4) the instanced kit
+  path.
+- 2026-11-11: **PILOT part 1 accepted (fourth agent, `1235328`)**. The coordinator re-ran
+  PILOT's unit tests on a clean export of the head (114 pass) and opened the grand tour sheet
+  and the new weather sheet. In:
+  **All eight planets in one browser sitting** (`tests/grandtour.mjs`; clean export of
+  `5e62268`, painted world at quality 0, scale 0.5, 400x225): from the title card with real
+  keys and mouse the run walked, used the jetpack, boarded, lifted off, reached space and
+  landed and walked on Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune and Earth
+  again: 8 of 8 in 31.6 minutes (1659 s of play), no reload, no console error; record
+  `docs/lead/evidence/grandtour.json`, frames `docs/shots/pilot/grandtour.jpg`. Found and
+  fixed on the way: the pulse from Venus to Mars let go after three seconds because Mars lay
+  through Venus; the screen now says "Venus is in the way: steer round it and pulse again".
+  The Moon and Pluto were not flown.
+  **The weather set on the new storm times** (clean export of `8d2905b`, quality 1): a
+  player at the spawn sees a sunny wood until about 11:18, a slate cloud bank and first
+  slanted rain at 11:54, the storm at 13:00, a clear warm afternoon over wet ground at 15:12.
+  **The owner's instruction on PILOT's side**: the game starts at tier 2 and full
+  resolution; `src/core/dynres.js` rewritten (under 30 fps it sheds load at once, a tier with
+  it when the smallest picture could not reach 30; it climbs in single steps that back off;
+  it is not fed frames while the first view loads); `?quality=N` now PINS the tier (not
+  additive); `tests/cost.mjs` only reports; README, REVIEW, TRACK, REFERENCES carry
+  "withdrawn" marks.
+  Also: tests for the two guards (`tests/guards.test.mjs`); the suit holds off wind beyond
+  12 m/s when off the ground (`cmd.shelter01`; a 2.5 s hop on Neptune's coast is carried
+  8.6 m, was 298 m at a full burn; on the ground nothing is cancelled and a little wind shows
+  in the pace: 4.50 / 4.20 / 3.59 m/s downwind / across / upwind); calm notice slips when
+  thin air limits the ship; "Setting down on level ground 12 m away"; a trunk or boulder met
+  dead on is stepped round after 0.12 s (a 25 s walk through the home forest stops 0.1 s at
+  most in eight headings); `mood.pulse01`; `all.mjs` re-runs a failed unit file alone once;
+  eight UI frames over the real painted world at the top tier (`docs/shots/pilot/ui-*.jpg`;
+  the Earth spawn settled in 29 s at the top tier before PAINTER's push). With PHYSICS's
+  legs the feet lift 0.18 m at most on the Moon in the pure simulation; PILOT's own clamber
+  limit and walk-over switch are out again.
+  **Not verified**: the full `tests/all.mjs` has not run since the legs, the new controller
+  and PAINTER's block 3; the grand tour was not re-flown after later changes; the weather
+  set is at quality 1, not the top tier; the Moon boulder run not seen in a browser; real
+  hardware as always. The fourth PILOT agent has about a fifth of its context left and is
+  replaced by a fifth.
+- 2026-11-11: coordinator's look at the weather sheet: the storm's arrival, height, flash,
+  clearing, and the night storm and night flash all read as watercolours; the blizzard now
+  has figure and ground. Flaws for PAINTER: in `earth-arrives` a far world shows as an orange
+  dot in front of the storm cloud; Neptune's sea stays flat blue beyond the shore.
+- 2026-11-11: **PAINTER block 4, "the quality push", accepted (sixth agent; `573c10d`,
+  `aeff8a6`, `f1a395e`, notes `23dea80`)**. The coordinator re-ran on a clean export of the
+  head: 19 world tests and PILOT's 115 pass; and opened `push-spawn-before`,
+  `push-spawn-after` and `push-vista-after` at full size. In, at the top tier on Earth: the
+  ground in three rings to 240 m (tufts of flicks, flowers on stalks in drifts, grass gone to
+  seed, fallen leaves, twigs, stones and moss to 17 m; fan-brush clumps, ferns and drifts of
+  colour to 66 m; broad touches to 240 m: about 77 k marks, was 6400); full-detail trees to
+  90 m (was 52), middle tier to 190 m, far tiers to 420 and 600 m, undergrowth to 110 m,
+  twice the bushes; clearer forest air. The spawn frame went from 733 k triangles / 360 draw
+  calls to 1.36 M / 465, the forest vista from 0.74 M to 1.40 M / 489 (information, not a
+  limit). Moon and Mars made richer (289 k to 429 k; 423 k to 715 k). Weather picture: under
+  a storm nothing is lit; the snowfield stands in a cool glaze under a blue-grey veil; dust,
+  ash and sand are soft glazes; swell strokes and white horses on the far sea; far worlds
+  thin away between 8 and 12 px and are veiled by cloud before they are left out. Additive:
+  reads `mood.pulse01`; body uniform `uStorm`; looks gain `under.flowers`, `under.litter`,
+  biome `near: { flower, fern, litter }`; `world._near.mesh` is a group of three meshes;
+  nothing added to `sampleObstacles`.
+  **Coordinator's verdict: the Earth spawn is a meadow now and the forest vista is the best
+  frame this project has made** (brook, stones, reeds, poppies, a wood with a middle
+  storey); both are plainly the better painting. Weak: near flicks pair into small "V"s; the
+  handwriting changes at about 17 m.
+  **Not verified in a frame**: the blizzard with flakes, PHYSICS's dust wall under the new
+  glaze, Neptune's sea in its own hurricane, the far-world fixes (the orange dot); Venus,
+  Mercury, the giants and Pluto carry the new code and nobody has opened them. Not started:
+  the brush at full resolution, the two vistas in a thicket, Mercury and Neptune from orbit,
+  Mars' dune crests, branch sway and drifts, the explorer's face, the UI look review.
+  **Cost to our tooling**: in software rendering the top-tier forest vista took about 416 s
+  to settle after a teleport (78 s before) and the title 153 s (87 s); building itself grew
+  about 10 %. PILOT's tools need longer settle time-outs at the top tier.
+  Tier lines for the README: tier 2 full resolution, full trees to 90 m, simpler to 600 m,
+  undergrowth to 110 m, three rings of sward; tier 1 0.8 of the resolution, full trees to
+  54 m, simpler to 360 m, two rings; tier 0 0.62 of the resolution, no full-detail trees,
+  simpler to 170 m, one ring at half density, a four-sector brush, no pencil line.
+  The sixth PAINTER agent is out of context and is replaced by a seventh.
+- 2026-11-11: **PAINTER's order for block 5** (coordinator): (1) the same push on Venus,
+  Mercury, Jupiter, Saturn, Uranus, Neptune and Pluto, each opened before and after at the
+  top tier; (2) the weather picture verified in the game under PHYSICS's own weather
+  (blizzard, dust storm, Neptune's hurricane, the far world behind the storm cloud); (3) the
+  "V" pairs and the change of handwriting at 17 m; the brush at full resolution; (4) the two
+  vistas in a thicket, Mercury and Neptune from orbit, Mars' dune crests, branch sway and
+  drifts, the explorer's face; the UI look review.
+- 2026-11-11: **PHYSICS P10 accepted (seventh agent, head `bf73de5`; code in `d66f2ec` and
+  inside the snapshots `f030411`, `c04262c`)**. The coordinator re-ran on a clean export of
+  the head: `node --test src/physics/` 244 pass, `node --test tests/*.test.mjs` 115 pass; and
+  opened the four stored painted frames and `painted-proposal.jpg` on sheets.
+  **The wind near the player**: the 52 m/s2 frame was three faults, none of them the gust
+  shape: the wake of the stand upwind switched stands in one frame when the wind veered
+  (86 / 123 / 51 m/s2 at 2 / 10 / 30 m at the real spawn; 452 m/s2 for a walker in the
+  forest), the gust pattern raced through the air by up to 30 m/s, and the storm's outflow
+  hopped with the grid. Now 7.2 / 10.3 / 20.2 m/s2 at the spawn through the first storm and
+  13 m/s2 for the walker; six tests in `air.test.mjs` hold it.
+  **The weather marks**: dust fed as fast as the wind empties the box (470 marks, six in ten
+  low veils 11:1, opacity and softness per vertex); blowing sand and snow leave the ground in
+  streamers (snow on the ground is now blown by the wind); leaves are thin tumbling marks
+  torn off with the fourth power of the wind; the sea makes its own spray (spume from 9 m/s,
+  surf where the water is shallower than 1.3 wave heights); snow in wind is a level stroke in
+  bands. The painted lab had drawn every mark twice since PAINTER wired the kits into the
+  world; it now shows the game's picture alone (`kits=painter`) or PHYSICS's stand-in
+  (`kits=lab`). Legs cost 22 to 37 us a step (median), p99 under 0.15 ms: nothing changed.
+  `expand: 'gpu'` is unused and marked so. `physics.update` medians 0.67 to 1.30 ms on the
+  loaded machine. Additive: `physics.here.blown { sand, snow, spume, surf }`, draw options
+  and kit attributes (`aPcVeil`, `vPcData.y/.z/.w`). Tests changed: one tolerance widened
+  with reason (a fluttering flake against a calm-air reference), the kit budget test only
+  reports, three probes rewritten; nine added.
+  **Coordinator's verdict on the frames, agreeing with PHYSICS's own**: in the game's
+  picture the Mars dust storm is a hazy dune with nothing in the air and the leaves are a
+  few specks; in PHYSICS's stand-in the dust is soft low veils at several depths with the
+  explorer half veiled, plainly the better picture. The blizzard works in the game's picture
+  (level white strokes over a blue snowfield). Spray has not been seen in any frame.
+  Neptune's far sea is flat pale grey although PAINTER's gate is fully open on PHYSICS's
+  numbers (Hs 2.77 m, whitecap cover 0.15 at 40 to 55 s at the `storm_seas` stand).
+- 2026-11-11: **Ruling (look, after one exchange between the roles): the dust glaze and the
+  leaves.** PAINTER's dust glaze reads PHYSICS's per-vertex opacity, softness and
+  puff-or-streamer (`vPcData.y`, `.z`, `.w`) so that veils read as veils (the stand-in's
+  eight-line shader in `src/physics/three/painted-lab.js` is the reference for the result,
+  PAINTER's hand decides the stroke); leaves are laid so the pass that erases thin marks
+  does not eat them; the skim of blowing sand and snow is given weight. This is item 2 of
+  PAINTER's block 5 and is wanted before review 6.
+- 2026-11-11: **PHYSICS's order for P11** (coordinator): everything PHYSICS moves has only
+  ever been judged in stills or in Node. (1) Spray seen in a picture. (2) Filmstrips at a
+  fixed step, in the painted lab with the game's kits, of each thing that moves (grass in a
+  breeze and a gust and parting round the walker; a tree in the gust front; rain; snow
+  bands and the ground skim; dust veils; leaves; waves and surf; the ship's downwash; the
+  explorer walking, clambering and landing from a jump; the ship settling on its legs),
+  opened, with a verdict each on jitter, popping, sliding, things frozen, pace; fix what is
+  wrong. (3) The gust pattern's sharpness against what masts measure. (4) `physics.update`
+  at the top tier.
+- 2026-11-11: **PAINTER block 5 accepted (seventh agent; `cf2058a`, `84a6d93`, `59e3731`,
+  `3af362b`, `c0e6d03`, notes `4c2cf51`)**. The coordinator re-ran on a clean export of the
+  head: 19 world tests and PILOT's 115 pass; and opened the before and after pair of all
+  seven worlds and the Mars dust frame on two sheets. In: a fault from block 4 fixed (the
+  cloud shell of every banded world did not compile since `uStorm` was added; its uniform is
+  now `uSpot`); on Venus, Mercury, Jupiter, Saturn, Uranus, Neptune and Pluto the ground has
+  second and third washes in patches, crust and stones lie in drifts, tall growth is of all
+  ages, non-forest spawns with tall growth have a 15 m clearing; the dust glaze reads
+  PHYSICS's veil fields; leaves are a glaze; Neptune's sea is a deep body to the horizon
+  under its storm (haze was swallowing it); no orange dot in `earth-arrives`; on Earth the
+  tufts lean one way and the seam at 17 m is gone. Triangles at the spawns now 0.78 M
+  (Uranus) to 1.63 M (Pluto); settle 137 to 283 s here (information).
+  **Coordinator's verdict, world by world**: Neptune (from kelp straps across the lens to a
+  clearing with tussocks at four depths and a flowered moss floor) and Mercury (from a wall
+  of blades to a field to the horizon) are large gains; Jupiter is a green meadow now but
+  nothing in the first view says "island in a sea of cloud"; Pluto is richer and busy;
+  Uranus was the best and barely changed; **Venus is still a grey stony plain with no lava
+  and no fungal tower in the first view, and Saturn is still the palest and emptiest, with
+  no rings in its sky**. None is at the standard of the Earth forest vista. The dust veils
+  are there but faint.
+  Not seen: any second or third biome after the push; any world from orbit since the cloud
+  shell was repaired; leaves, sand skim and blown snow blowing. Not started: the brush at
+  full resolution, the two vistas in a thicket, Mercury and Neptune from orbit, Mars' dune
+  crests, branch sway and drifts, the explorer's face, the UI look review.
+  Contract: `sampleObstacles` returns more (spires on Pluto; more boulders on Venus,
+  Mercury, Pluto, Uranus; obstacles near the Mercury, Neptune, Jupiter and Saturn spawns
+  moved by the clearing). The world test "sampleSurface stays cheap on every body" is a
+  wall-clock test with a 50 us limit and fails under load (57 us on Uranus beside renders;
+  6 to 13 us alone). The seventh PAINTER agent is out of context and is replaced by an eighth.
+- 2026-11-11: **Plan to the end** (coordinator). PAINTER's block 6 is the last art block
+  before lead review 6: (1) each world's idea in its first view (Venus, Saturn, Jupiter
+  first), (2) worlds from orbit, (3) the weather leftovers, (4) the brush, (5) the short
+  list. Then review 6 (every check on the head; the tour at tier 1 for coverage and at the
+  top tier for the spawn and first vista of each body; the motion set), M3 closes, M4's
+  critique swap fixes the worst of what review 6 finds, and PILOT opens and merges the one
+  pull request.
+- 2026-11-11: **PHYSICS P11 accepted (eighth agent, head `6d588d6`; `2c6b25b`, `05856b9`)**.
+  The coordinator re-ran on a clean export of the head: `node --test src/physics/` 245 of
+  246 in the full run at a load of 13 (the known frame-budget timing test in
+  `loose.test.mjs`; its file alone passes 20 of 20, twice); `node --test tests/*.test.mjs`
+  115 pass; and opened the strips of grass in the storm and of the jump.
+  **A filmstrip tool**: `node src/physics/three/film.mjs <subject>|all|list [--root <export>]
+  [--out dir] [--quality 2]`: the painted lab with the game's kits, the clock stepped at a
+  fixed rate, one sheet and one JSON of numbers per subject; 21 subjects defined, 15 strips
+  stored in `docs/shots/physics/motion-*.jpg`.
+  **Seen and fixed**: grass in a breeze was frozen (0.01 degrees in 0.8 s) and in a storm the
+  whole meadow leaned as one sheet: blades now flutter on three trains of small eddies
+  carried by the wind (2 to 7 degrees in a breeze; neighbours a metre apart at 58, 50 and
+  30 to 45 degrees in the storm); trunks stood pinned at their limit in the storm: now as
+  stiff as measured trees (3 degrees at 8 m/s, 12 at 20); a jump landed on straight legs and
+  lost half its forward speed: the legs now fold 0.31 m and straighten in half a second and
+  the speed is kept. Rain stays in the world when the camera turns; the blizzard's bands and
+  skim are right.
+  **The gust pattern against masts**: the earlier suspicion (twice too sharp) is refuted; at
+  equal intensity the model was 0.6 of Kaimal's spectrum at one second, with a quarter too
+  much variance at 15 to 60 s and clipped gust tops. Now four octaves: turbulence intensity
+  0.173 to 0.179 (target 0.172), gust factor 1.37 to 1.44 (masts 1.4 to 1.6), shares by
+  period within 0.07 of Kaimal from ten minutes to one second.
+  `physics.update` medians at quality 2: 1.02 to 2.21 ms on the loaded machine.
+  Behaviour changed without a call changing: `physics.air()` at a point changes up to three
+  times as fast; trunks lean a third as far; grass near the eye flutters; a landing no
+  longer brakes the walker and `st.phys.hip` runs negative for half a second after one;
+  `uPhysWave.z`, `.w`, `uPhysWavePhase.w` are flutter phases.
+  **Not seen or not done**: spray in a picture; a clamber; waves on a shore; seven of the
+  fifteen strips judged from numbers only (tree after the fix, run, jetpack, the three ship
+  strips, dust, leaves); the gust front not re-filmed. **Faults found, open**: the ship's
+  descent stalls for a second between 1.3 and 1.0 m; the wind at the focus steps 0.4 m/s
+  when the near field re-anchors; particles near a wood ride a wind 2 to 3 m/s faster than
+  `physics.air` at their height; the wind's direction never wobbles; on Neptune's storm
+  coast (yaw 236 from the `storm_seas` stand, 34 to 42 s) a pale rectangle with straight
+  edges stands in the sky, the sea does not visibly heave at 2.77 m, the foam rim is frozen
+  (PAINTER's); the run reaches 6.1 m/s where 7.4 is asked (PILOT's to judge).
+  The eighth PHYSICS agent is out of context and is replaced by a ninth.
+- 2026-11-11: **PHYSICS's order for P12, the last stage before review 6** (coordinator):
+  (1) the four open faults (descent stall, re-anchor step, particles' wind near a wood,
+  cross-wind turbulence); (2) the strips not yet opened, opened and judged, and the three
+  subjects never seen (a clamber, waves on a shore, spray); (3) why Neptune's sea does not
+  heave in the picture, with PAINTER told exactly what to change.
+- 2026-11-11: **PILOT part 1 accepted (fifth agent, `54ba154`)**. The coordinator re-ran
+  PILOT's unit tests on a clean export of the head (116 pass) and opened the motion sheets of
+  the arrival and the walk. In:
+  **Every check on the head**: `node tests/all.mjs` on a clean export of `da6d42d`: all 13
+  steps pass in 42 minutes (unit 114, PHYSICS 230, world 19, static, eight browser runs;
+  painted steps at quality 0). After PILOT's last fixes only five steps were re-run (pass).
+  **The Moon and Pluto landed on** in a browser (`grandtour --bodies moon,pluto`): ten of ten
+  bodies. Fixed on the way: arriving at the Moon said "Moon is in the way".
+  **The Moon boulder run in the game** (`tests/boulderrun.mjs`, real keys, 63 low boulders
+  within 28 m): no boulder lifts the feet more than 0.16 m; pace 5.7 to 6.6 m/s; a run over
+  a crater rim onto a 36 degree wall sails 2.4 s over ground that fell 6.7 m away.
+  **The motion instrument** (`tests/motion.mjs`, `tests/motionlib.mjs`; `__pc.hold(true)`,
+  `__pc.step(dt, n)`): eight scenes at the top tier, 960x540, sheets in
+  `docs/lead/evidence/motion-<scene>.jpg`, numbers in `motion.json`. What holds: standing
+  still, the sky, the paper border and the ground wash do not move (0.30 % of the picture
+  changes per frame, all of it crowns and grass); the same instant repainted is identical;
+  in a slow turn detail stays with the world (no shower door); the pulse is steady.
+  **Faults**: arriving at an unpainted place the whole canopy appears in one frame (+575 k
+  triangles) and the ground arrives in pieces for the next second; tiers change in one frame
+  (the triangle count jumps by more than 2000 in 10 of 47 walk frames, largest 50 k; two
+  swaps visible in flight); a near poppy is a flat hard-edged disc; splash rings are thin
+  white line ellipses. All strips predate PHYSICS P11 and must be re-shot for review 6.
+  **The first ten minutes**: at the top tier only the opening was played (a frame takes
+  about 15 s here); the whole leg to standing on Mars ran at quality 0 (26 beats, 202 s of
+  play, passed). The sward is whole at "click to begin"; no camera cut through 13 changes
+  of state. Fixed: the "Board ship" prompt lay across the explorer's legs; "Land here" was
+  offered three seconds after lift-off; a note on the map at first space. Open: crowns
+  between the lens and the figure hide the explorer when jetpacking among trees.
+  PILOT's answers on feel, from the game: the run reaches 7.48 m/s at 1.23 s (good as it
+  is); the jetpack is capped by PILOT's wrapper (2.5 s of Space is an apex of 22.7 m, the
+  whole tank 54 m, touchdown at 4.0 m/s); no stall in the ship's last metres in the game.
+  Also: settle counted in game frames; the tour and weather set default to the top tier;
+  `tour --first 1`; `tests/cleantree.sh` (a clean tree from each role's own last commit);
+  a hiss for blown sand and snow and a wash for surf from `physics.here.blown`. Additive:
+  `__pc.hold`, `__pc.step`, `sim.pulse.dest`; the explorer's `animate` receives `hip`,
+  `clamber01`, `grounded`; HUD class `pc-foot3`.
+  Not verified: the full `all.mjs` and the grand tour, trip and survey since PAINTER's
+  block 5 moved obstacles; the top tier beyond the opening; real hardware as always. The
+  fifth PILOT agent is at its context limit; a sixth takes review 6.
+- 2026-11-11: **Ruling (PILOT asked): the boulder measure.** A run that goes over a crater
+  rim or any drop it cannot step down is a fall, as the ruling on legs already says. The
+  measure for review 6 reads: no boulder lifts the feet more than 0.3 m, and the body is
+  never thrown upward more than 0.3 m, without a jump.
+- 2026-11-11: **PAINTER block 6 accepted (eighth agent; `5edf80c`, `ad17d2c`, some files in
+  the snapshot `2f4a7b6`)**. The coordinator re-ran on a clean export of the head: 19 world
+  tests and PILOT's 116 pass; and opened the before and after pair of Venus, Saturn and
+  Jupiter. In: **each of the three says its world in one look**: Venus lands on the bank of
+  a lava river with a grove of old fungal towers on the skyline and a basalt spire; Saturn
+  has its rings as a great pale arc across the sky over a gold meadow; Jupiter stands on a
+  bench between island cliffs under cream and orange belts running to a vanishing point.
+  All three spawns moved (data in `src/data/looks.js`; Venus to a lava bank in the same
+  biome, Saturn from latitude 12 to -31 on another gold island, Jupiter to a bench on the
+  first island), each on levelled ground with a level berth for the ship 16 m off;
+  `world.getSpawn` returns `yaw` and `pitch` for them. The cloud sea cannot be seen from a
+  level landing on these small worlds (its horizon lies 12 degrees below eye level and the
+  island's rim hides it), so the far deck is painted into the sky.
+  The lead's motion faults, **in code and not seen in motion**: each tree washes in over
+  0.55 s and a tree changing tier cross-fades; undergrowth cells wash in; near flowers have
+  a lobed edge; splash rings are a soft broken glaze; strokes between the lens and the
+  figure part; the explorer folds its knees by `hip`. `world.busy` stays above 0 for 0.65 s
+  after the last arrival. Orbit: the limb thins in proportion to a world's air (Neptune's
+  bright rim gone), one outline for Earth's cloud, a gold ring with its division; Mercury is
+  still a dull grey ball and no body shows a dark side in the gallery's orbit view. Dust
+  veil gain 1.5 to 2.6; rain strokes heavier. The timed world test asserts only with
+  `PC_TIMING=1`.
+  Coordinator's verdict: Venus is the largest single gain of the push; Saturn's arc works
+  though the wash under it is muddy; Jupiter's sky says Jupiter and its ground says valley.
+  Not done: the build order after a landing, the ground arriving in pieces, near strokes
+  growing in; leaves, sand skim and blown snow seen blowing; Neptune's far sea, the pale
+  rectangle in its sky, the sea's heave and the frozen foam rim; the track through grass;
+  the brush; the two vistas in a thicket; Mars' dune crests; branch sway and drifts; the
+  explorer's face; the UI look review. The eighth PAINTER agent is out of context and is
+  replaced by a ninth.
+- 2026-11-11: **Review 6 starts now** (coordinator), in two halves so that nobody waits:
+  the sixth PILOT agent begins with what depends least on PHYSICS's last stage (the
+  mechanics on the moved spawns and changed obstacles; the tour), and does the motion set,
+  the weather set and every check when PHYSICS reports. PAINTER's ninth agent works on the
+  known motion and weather faults meanwhile and takes review 6's findings as they come.
+- 2026-11-11: **PHYSICS P12 accepted (ninth agent, head `a0630e4`; `3406da1`, `f0b58ea`,
+  `40161ba`)**. The coordinator re-ran on a clean export of the head: `node --test
+  src/physics/` 253 pass, `node --test tests/*.test.mjs` 117 pass; and opened the strips of
+  the clamber and of the spray. Fixed, each held by a test:
+  (1) **the ship's descent hung** above the gear because the thrusters' ground cushion
+  cancelled the flight computer's whole velocity error; the computer now allows for the
+  cushion (`SHIP_BODY.groundComp`) and the cushion fades with air density (none in a vacuum):
+  1.6 to 1.0 m in 0.78 s (was 2.12 s). The game's own landing is unchanged (within 8 mm
+  frame by frame in PILOT's `motion.mjs --only landing`); the hang came through the lab.
+  (2) **the wind stepped when the near field re-anchored** (0.38 to 0.61 m/s in that frame):
+  four geometric causes removed; now 0.007 to 0.009 m/s against 0.030 in any other frame.
+  (3) **particles near a wood rode another wind** (up to 3.5 m/s off): every node of the
+  wind grid has its own profile, used by `physics.air` and the particles alike; the largest
+  difference is 0.39 m/s.
+  (4) **cross-wind turbulence** on the same four octaves: lateral over along-wind intensity
+  0.77 to 0.79, within 0.06 of Kaimal's lateral spectrum; the direction wanders 8 degrees
+  rms over grass at 10 m.
+  (5) **the kick after stepping off a boulder** (+0.9 to +1.5 m/s, over a second in the air
+  on the Moon): now +0.2 to +0.35 m/s and 0.02 m of rise.
+  Seen for the first time: a clamber (the figure shortens on the face, crosses the top at
+  2.3 to 2.7 m/s, in contact throughout); spray (level pale dashes over the surf, 160
+  growing to 580 drops; with rain shown it cannot be told from rain).
+  **Findings from the strips**: the run has no bob at all (the hips move 0.01 m: the
+  explorer glides); the jetpack descent is five seconds at one speed and reads as floating;
+  the hovering hull hangs dead level in gusts; birches read as still in a 1.2 s window in
+  the storm; 190 leaves in the air are a handful of one-pixel specks; dust puffs near the
+  eye flicker for single frames; the gust front does not read as a wave in the sparse
+  meadow; a run on the Moon is checked from 5.3 to 2.0 m/s in one frame at a 1 m boulder.
+  **Neptune's coast, the cause found**: PHYSICS's chunk gives the right moving height
+  (1.0 m at 60 m out, 1.3 to 1.5 m at 250 m); PAINTER's liquid vertex shader removes it:
+  the carry distance is taken from the first, short wave train (flat from 64 m out), the
+  shoal factor flattens the foreground, and the swash mask depends on still depth alone
+  (frozen foam). PHYSICS added `pcPhysWaterLong` and `pcPhysWaterRunup` (a run-up of about
+  9 m up and down a 0.07 beach over a 5.4 s period) for PAINTER to wire. The straight-edged
+  pale forms in the sky are PAINTER's. Additive API; behaviour changed without a call
+  changing is listed in PHYSICS's notes.
+  The ninth PHYSICS agent is out of context and is replaced by a tenth.
+- 2026-11-11: **PHYSICS's order for P13** (coordinator), while review 6 runs: (1) a gait:
+  the hips rise and fall with each stride and the cadence follows speed and gravity, with
+  footfall events, so the run no longer glides; a crouch before a jump; (2) the jetpack's
+  descent, the hull in gusts and the hard check at a boulder on the Moon, each judged with
+  PILOT's levers in mind; (3) trees and leaves that read in a storm; (4) the Earth shore
+  seen; then review 6's findings as they come.
+- 2026-11-11: **PHYSICS P13 accepted (tenth agent; `60423e0` gait, `d2d0006`, `52fd659`,
+  `2e6ce74`)**. The coordinator re-ran on a clean export of the head: `node --test
+  src/physics/` 262 pass, `node --test tests/*.test.mjs` 117 pass; and opened the walk strip
+  (the stand-in figure plainly steps, two legs scissoring, the torso lower at mid-stance).
+  **A gait**: the body PILOT tuned (`st.p`, `st.v`) is the stride's mean and is untouched
+  (the same commands with two stride phases give the same place and velocity to the last
+  digit). Within the stride: gait and step length by dynamic similarity (Froude number, leg
+  0.9 m: a walk below 0.5, so under 2.0 m/s on Earth and 1.0 m/s on the Moon); the walk an
+  inverted pendulum, the run a spring-mass with a ballistic flight under the planet's own
+  gravity. Earth at 4.2 m/s: steps of 1.41 m, 3.0 a second, 36 % of the time in flight, a
+  bob of 6.8 cm; the Moon at 4.2 m/s: 2.27 m, 1.85 a second, 61 % in flight. Footfalls with
+  moment, place, foot and force. A crouch of 0.12 s before a jump (`cmd.jumpCrouch`; the
+  feet leave 0.12 s after the command, height unchanged). PILOT's "walk" of 4.2 m/s is by
+  its gait a run.
+  **Three judgements**: the descent brake eases in (largest change of acceleration in a step
+  9 to under 1.2 m/s2; the five seconds at one speed were the lab's limit, the game's is
+  PILOT's wrapper); `buffetAngle` now carries the wind's moments on the hull against an
+  attitude hold (roll 0.2 to 0.7 degrees in 6.5 to 10 m/s gusts, 0.9 to 4.8 in 14 to
+  26 m/s; a new `.yaw`); at a boulder's face the legs take the body's speed up over a stride
+  (2.2 m/s lost in one step before, 0.5 now, at 7.4 m/s on the Moon).
+  **To wire, PILOT**: pass `phys.ride` (hip plus stride bob) where `hip` is passed, with
+  `stride`, `footDown`, `feet`, `surge`, `crouch01`, `gait`; keep the camera on `st.p`;
+  footsteps from `phys.footfall` when `phys.steps` changes; `rotateY(buf.yaw)` on the drawn
+  hull. **To wire, PAINTER**: boots placed by `feet`, hips hung by `ride`, no walk cycle on
+  its own clock, the swinging leg's knee folded; `pcPhysBranch` is called nowhere in
+  `src/world` or `src/render`, so no branch moves in the game (the three lines are in
+  PHYSICS's notes); leaves as dabs of at least 8 px.
+  **Not done**: branches (their swing is tied to the trunk's lean, which P11 made stiff:
+  7 cm at the tip where a gale gives 0.3 to 0.6 m); leaves (five to ten times the count in
+  a gale); the Earth shore seen only before PAINTER wired the run-up (the water's edge does
+  not move); the jetpack, hover and Moon clamber strips not re-filmed. The tenth PHYSICS
+  agent is out of context and is replaced by an eleventh.
+- 2026-11-11: **PHYSICS's order for P14** (coordinator): (1) branches driven by their own
+  wind load, proved in a stand-in crown; leaves that can be seen in a gale; (2) the shore
+  once PAINTER has wired the run-up; the three strips not re-filmed; then review 6's
+  findings.
+- 2026-11-11: **The owner switched the session's model** and asked to continue without
+  redoing finished work. The three running agents (PILOT 6 in review 6, PAINTER 9 in block
+  7, PHYSICS 11 in P14) were asked to finish the item in hand, commit, write a handover and
+  report; their committed work stands. Every agent started from here runs on the new model
+  at extra-high effort (the coordinator's reading of the owner's "extra"). Coordinator
+  commits carry the new attribution line.
+- 2026-11-11: **All three agents were stopped by the old model's usage limit** within a
+  minute of each other, before any wrote a handover: PILOT 6 (review 6, first half),
+  PAINTER 9 (block 7), PHYSICS 11 (P14). Their uncommitted files were already in the
+  coordinator's backups (`6b900e6` PAINTER, `df35355` PHYSICS, `1186819` PILOT). The
+  coordinator stopped their orphaned browser runs by process id and checked the head on a
+  clean export: PHYSICS 263, world 19, PILOT 117 pass. Left behind and carried forward, not
+  redone: PILOT 6's draft of review 6's first half (`/home/user/.pc-scratch/pilot/run6/
+  review-mech.md`: survey 235/240, every spawn 10/10, painted trip PASS, grand tour 8/8 and
+  Moon and Pluto 2/2, on the commits it names) and its top-tier tour sheets of Venus and
+  Saturn; PAINTER 9's `b022507` (block 7 part 1: wash-in of ground, growth and near strokes,
+  arrival held as paper then up over 1.3 s, water by PHYSICS's recipe with run-up, spray,
+  leaves, rings, dust fade, walker's track; unverified) and its unfinished gait and branch
+  wiring (the branch define is not switched on); PHYSICS 11's unfinished crown model
+  (`pcPhysCrown`, `plantCrown`; tests pass; unjudged).
+  Successors started on the new model at extra-high effort: PILOT 7 (record the first half,
+  wire the gait, footfalls and hull yaw, the rest of the tour and the look; the second half
+  of review 6 on the coordinator's message), PAINTER 10 (verify and finish block 7: motion,
+  Neptune's coast, weather; the gait in the figure; branches on), PHYSICS 12 (judge, finish
+  and prove the crown model and tell PAINTER what to wire; leaves; the shore; three strips).
+- 2026-11-11: **PHYSICS P14 item 1 accepted (twelfth agent, `1a7ed8c`)**. The coordinator
+  re-ran on a clean export of the head: `node --test src/physics/` 265 pass, `node --test
+  tests/*.test.mjs` 123 pass; and opened the stand-in birch in the storm (the trunk leans
+  about 8 degrees, the foliage masses change shape out of step with each other: a living
+  crown, sheltered rather than violent). **Branches**: the eleventh agent's crown model had
+  the right sizes but the wrong motion (tips at 0.2 to 0.8 Hz, three branches of a crown in
+  step); now each branch also rings at its own frequency on four shared clock lines (0.72,
+  1.01, 1.43, 2.02 Hz, uniform `uPhysBranchClock`), weighted by its own natural frequency
+  and damping, with phases from its id and place; the eddy trains are only the slow part.
+  A 3.5 m branch: 7 cm in a breeze at its own 1.03 Hz, 0.49 m in the storm's height, 0.61 m
+  at the gust front; quick swings of neighbouring branches correlate -0.3 to 0.5. In the
+  game's wood the crowns feel 11 to 18 m/s in the storm (tips stream 0.12 to 0.26 m); they
+  may be sheltered up to twice too much (flagged, not changed). Lab `crown=`; strips
+  `crown-breeze`, `crown-gust`, `crown-storm`. One test rewritten (the breeze check demanded
+  the fault), one relaxed with reason (0.45 to 0.6, by construction of the new cap).
+  **PAINTER must wire** (top of "For PAINTER" in PHYSICS's notes): `uPhysBranchClock` in
+  `PHYS` in `src/render/shared.js`; per-vertex `aBranchId` and `aLeaf01` on tree geometry;
+  `pcPhysCrown` (not `pcPhysBranch`) in the tree vertex shader. Nothing moves in the game
+  until then. Not done: leaves, the shore, the three strips, the sheltering check. The
+  twelfth PHYSICS agent stopped near the end of its context; a thirteenth takes the rest.
+
+### 2026-11-11 OWNER'S INSTRUCTION: multi-agent workflows for the tough parts
+The owner: "Use ultra code on extra high on opus when your working on tough parts that need it." Read as: the coordinator may run multi-agent workflows (finders, adversarial verifiers, synthesis) on Opus at extra-high effort for the hard problems. The three roles stay the only workers that change the game; a workflow's agents are read-only instruments (clean export, scratch under /home/user/.pc-scratch/sweep, one browser at a time on this 4-CPU box), and what they confirm goes to the owning role as a fix list.
+First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader cannot show: GLSL portability on real drivers (ANGLE/D3D11, Mesa, Metal, Firefox), the integrated-GPU frame time at 1080p from the top tier and whether dynres and tier stepping catch it, first-run robustness (no WebGL2, context loss, storage blocked, long tab hide, keyboard layouts, README vs bindings). Each finding is attacked by a verifier before it reaches a role. Planned second use: the M4 critique swap.
+
+### 2026-11-11 PHYSICS P15 accepted (thirteenth agent); a broken head found and fixed; rulings
+- P15 accepted: leaves from what the wood sheds with inflow from upwind, litter, tumble (6f9fdd8); the shore seen, run-up 0.5-1.9 m Earth breeze, 1.5-7.3 m Neptune (413b846); crowns not sheltered twice, one wake shape wakeAt (6d5c02a); three strips re-filmed (3199860); hand-over 3ed8d03. 268 physics tests pass on a clean export (coordinator's run).
+- INCIDENT, reported by PAINTER 10: 6d5c02a made physics/flora.js import air.js while air.js read FLORA at load time (HF0). In the browser the entry order is flora.glsl.js -> flora.js -> air.js, so FLORA was in its temporal dead zone and EVERY real module fell back to PILOT's stub ("not usable yet ... using the stub"). Node tests import in another order and passed. Heads 6d5c02a, 1d036eb, 8de65de are broken in the browser. The coordinator made HF0 lazy (computed on first use); PHYSICS's pathspec commit 3199860 carried it. Proved: loading src/physics/flora.glsl.js alone in Node throws at 6d5c02a and every src/physics/*.js loads alone at 3ed8d03. The hardening sweep's exports were made after the fix (its shader dump has no stub warning).
+- Guards ordered: PHYSICS adds a test that loads every physics module alone as the entry, in a fresh process (catches the class); PILOT makes the browser checks fail when the real game falls back to a stub. PILOT redoes only the tour sheets made from a broken head.
+- RULING (fetch, physical behaviour = PHYSICS): yes, the sea state comes from the fetch measured upwind over the water that is there (capped by the biome's), and the depth limits it. Neptune's storm_seas coast faces a lagoon dry 160 m out; whether that coast should face open sea so the surf stays is a look and world decision for PAINTER.
+- RULING (Moon run checked at the boulder face, 5.4 -> 2.1 m/s in 0.125 s): physical behaviour, so PHYSICS's. A face the explorer can step or clamber onto costs the energy of the climb, not the run; a face too high stops the body by contact, which is allowed. If the code lives in src/player, PHYSICS writes the exact change for PILOT.
+- The coordinator edits a role's files only to unblock a broken head, and says so.
+
+### 2026-11-11 PILOT 7 accepted; OWNER'S ORDER: the art pass as a multi-agent workflow
+- PILOT 7 accepted: review 6 first half on record (c8745f0); explorer steps wired (7a8e0c6, code in f86bd1b); sketch slip waits for the explorer to set off; stub guard (88079f6: window.__pc.info().fallback, tests/browser.mjs fallbackProblem fails every browser instrument on a fall-back; unit 125); the tour stopped part-way for the art pass (e047e7b): six bodies at the top tier, three weakest first views Mercury, the Moon, Mars; nine findings for PAINTER in REVIEW "Review 6, the tour". Left for after the art pass: all.mjs on a clean tree, the top-tier tour of all ten bodies and the tier-1 coverage tour, motion and weather sets, the Moon boulder run, settle times.
+- OWNER'S ORDER (verbatim intent): "ultracode. Run this task as a dynamic workflow with exactly 4 parallel subagents: an art pass across every planet and biome. Split into 4 subagents by planet group: (1) earth; (2) mercury, venus, mars; (3) jupiter, saturn; (4) uranus, neptune." Each edits only its own planets' files inside PAINTER's folders (split first if biomes share a file), never the shared watercolour pipeline, PILOT's or PHYSICS's files; brings every biome up to the freeze-frame test (palette, terrain shapes, flora, sky, weather, motion); before/after shots per biome, reverts what looks worse. Then cross-verification against the art bible, same-painter consistency across planets, fixes, a run with no console errors, commit, push, report.
+- Done by the coordinator before the workflow: src/data/looks.js split into src/data/looks/common.js (paper, pigments, sky keys, B/P/PM helpers) and one file per body (src/data/looks/<body>.js); looks.js keeps the same exports and assembles LOOKS. Proved identical: JSON of LOOKS and the helpers' outputs byte-equal before and after (40730 bytes); every file loads alone in Node; world 19 and unit 123 pass on a clean export with the split. tools/commit.sh has a new role 'art' (src/data/looks, docs/shots/art), so PAINTER's commits no longer sweep the art pass's files.
+- Choices logged: the Moon goes with group 1 (Earth's system) and Pluto with group 4 (the outer ice), so every landable body's biomes are covered; their files are separate. Fields the art agents may not touch: seed, seaLevel, phys (PHYSICS's input), sites (spawn, easels and tests depend on them). PAINTER 10 keeps to shared code during the pass. On this 4-CPU machine the workflow runtime runs at most two agents at once, so the four art agents run two at a time.
+
+### 2026-11-11 PHYSICS P16 (fourteenth agent) reported; rulings
+- Reported: the import cycle removed (wakeAt and WAKE in wind.js; air.js re-exports; lazy HF0 kept) and src/physics/load.test.mjs (every physics module loaded alone as the entry in a fresh process, plus no static import cycle among the 49 modules; fails on 6d5c02a, passes on the head) (dc4e3f5); the fetch measured over the real water by five radials (SPM 1984) with depth-limited growth, cached per place and compass sixteenth (dc4e3f5); the Moon run: the face brace no longer checks the run, the runner reads the ground ahead and slows within its grip to the pace it can cross at (af7f0aa). Physics 275, unit 125 (its runs). Strip motion-sea-out-neptune opened by the coordinator: a storm coast still (dark sky, a spout, rain, a white chop on the lagoon); the big surf is gone.
+- RULING (the 0.3 m rule): kept. A runner slowing before a rock it must clamber is what a person does; no boulder launches the body without a jump. The look-ahead stays on.
+- RULING (the coasts): the physics is right; the coasts must face their sea. Neptune's storm_seas stand faces a lagoon dry 120-170 m out with the storm winds from E/ENE; Earth's sea_coast stand faces a pool under 50 m with the wind offshore. After the art pass, PAINTER makes both coast biomes face open water (at least 2 km of fetch at about 20 m deep toward the storm wind, by the terrain recipe or the stand), so a storm's surf comes back by the physics. Not given to the art pass: sites and terrain topology are outside its remit and its base (8f23067) predates the fetch.
+- PHYSICS's next agent is started when the hardening sweep reports, so it takes those findings with P13/P14's open items in one block (and the machine's CPU stays with the art pass meanwhile).
+- P16 ACCEPTED: on a clean export of af7f0aa (coordinator's run) physics 275 pass, unit 125 pass.
+
+### 2026-11-11 Hardening sweep reported (docs/lead/HARDENING.md)
+- 7 agents (3 finders: GLSL portability, integrated-GPU cost, first-run robustness; 3 adversarial verifiers; 1 synthesis). 22 findings survived verification, 20 after merging duplicates, 19 open: 2 broken, 8 degraded, 9 minor. No blank-screen finding survived. Refuted: derivatives after discard (Mesa demotes), the landing cancel (by design). Already fixed in the tree: uPhysBranchClock bound (56c0333).
+- Broken: audio never started inside a user gesture (Safari silent all session; gamepad-only Chrome silent); a non-standard pad (HOTAS, pedals resting at +-1) taken as the right stick spins the camera and starts the title card.
+- Degraded: no shader prewarm (mid-game compile stalls on ANGLE-D3D11, each also fires the dynres panic); dynres over-reacts to single hitches; pointer lock lost for the session after Esc (Chrome's 1.25 s cooldown); dynres reads a refresh cap (Energy Saver, Low Power Mode, 50 Hz panels) as load and pins tier 0 for good; no EXT_clip_control (Firefox) means gl_FragDepth in every scene shader (no early-Z, about 2.9x fragments); keys by position but labels in QWERTY (AZERTY: M never opens the map); flick filter drops pointer lock at 30-40 fps; no output pixel cap (4K at 150 % pins the floor picture).
+- Owners: PILOT 17 (fix list P1-P15 in HARDENING.md, with a Node-tested dynres candidate diff in scratch), PAINTER A1 (log depth written in the vertex shader) and A2 (prewarm hooks), PHYSICS none (one confirmation: a storm at quality 2 within budget once physics follows the tier).
+- RULING (output pixel cap; performance = PILOT, the owner wants the best picture): cap the drawing buffer at 3.7 MP (about 2560x1440), not 2.3 MP: a 1080p screen and Retina laptops at DPR 1.5 keep every pixel, a 4K monitor draws at about 1440p and is stretched.
+- Gaps stated plainly in HARDENING.md section 3: no real frame rate, no real driver compile times, no real ANGLE backends, no Firefox, no Safari, no real input devices, no context loss on hardware; never run end to end in the sweep.
+
+### 2026-11-11 PAINTER block 7 accepted (tenth agent)
+- Accepted: item 1 verified on clean exports at the top tier (motion walk pass, fill 0 pops from 498, whole arrival soft over 1.2 s, Neptune sea heaves and runs up; the pale straight-edged forms in Neptune's sky were far headlands lost in a near-white mist under a storm cloud, fixed in src/world/index.js: the mist takes the storm's grey and the low sky takes the mist; Mars dust storm veils the explorer, G.uAirNear) (194171b); item 2 the explorer steps by PHYSICS's feet (two-bone legs, ride, surge, stride; gallery gait=, stride=, grav=); item 3 branches wired (uPhysBranchClock in PHYS, aBranchId, aLeaf01, pcPhysCrown on near and mid tiers) (6bcfc73, 7509a6e). Coordinator opened crown-storm-after.jpg: the sky holes between foliage masses change shape frame to frame. Its final check: a clean export of 59bfb1b loads at the Earth spawn, every module real, no console error; world 19, unit 125.
+- Weak and owned: white horses do not show (now explained: P16's fetch gives Hs 0.21 m at storm_seas; the coast fix after the art pass brings the surf back); the near headland's vertical end; the blizzard's ruled crest; the gallery run not re-filmed after the heel change; item 4 (the brush, two walled vistas, Mercury from orbit, Mars' dune crests, the explorer's face, the UI look review). Its questions on the meadow dust puff and a bobAt export went to PHYSICS 15.
+- PAINTER 11 started on Opus extra-high: A2 prewarm hooks, A1 log depth in the vertex shader, then the coasts and the rest after the art pass.
+
+### 2026-11-12 PILOT 8 and PHYSICS 15 (P17) accepted
+- PILOT 8 accepted (932cd9d, b990e8b, 085d5e1, 64cfd5f): hardening P1-P15, gaps 12 and 16. Sound starts only inside a click, tap or key press; only standard-layout pads are read (chosen over learning rest values: a trigger passes through 0); the review's dynres candidate adopted with a 2.5 ms jitter limit and "capped at N fps" in the read-out; physics quality follows the tier (0, 1, 2 measured); prewarm behind the loading card (0 materials without a program at ready, 0 compiled after ready, with PAINTER's hooks 320 ms); pointer-lock refusals near a release ask for a click (the review's scale-everything proposal failed lockcheck, so only the spike limit scales; three 180-degree flicks keep the lock at 20-60 fps); keys by position for movement, by letter for actions; drawing buffer capped at 3.7 MP; P9-P15; no float colour buffers shows a sentence unless painter.floatFallback; a save while swimming comes back afloat. Not run: the painted steps of all.mjs (the art pass has the machine); review 6's second half waits for the art pass.
+- PHYSICS 15 (P17) accepted (d186b65): quality 2 fits (worst storm, a run into a tall wood, 1.93 ms main-thread CPU for physics.update; Neptune coast 0.82, blizzard 1.50, Mars dust 1.27); cheaper than head through a de-optimisation (-0 from Math.round rebuilt FloraField's push step every other frame), split hot loops, a scratch ground query, cheaper maths; garbage halved; a boulder met off the middle of the path is ghost-run at trial paces so the runner eases to the fastest clean crossing (no brace and no hold at 0-0.55 m off on Moon, Mars, Earth; feet never leave the ground); no boot puff on a living sward or bare rock (KICK.stepDust); bobAt and strideBob exported for PAINTER's gait pose.
+- Coordinator's check on a clean export of d186b65: physics 279 pass, unit 140 pass, every physics, art, world and play module loads alone (no TDZ).
+- Open: P13/P14 items (sea one state round the focus; waves do not turn to the longest fetch; nothing under 1 s in the gust pattern; strips tree-gust, clamber-walk-moon and the storm frame unopened; the lab stand-in has no knee); the air grid's ~400 KB a frame of garbage; the changed suite not re-run under PC_TIMING=1. PHYSICS 16 started on Opus extra-high, Node only until the art pass releases the machine.
+- Relayed to PAINTER 11: check a landing on another world after ready; warm each tier's post passes once; A1; low-priority 8-bit fallback for the float targets; gaitPose uses strideBob.
+- OWNER (2026-11-12): asked why only 2 art agents run at once and why PHYSICS is code-only. Answered: the workflow runtime caps concurrent agents at CPUs - 2 = 2 on this 4-CPU machine (no GPU, so each headless browser renders WebGL on the CPU; load about 13; memory not a limit); PHYSICS code-only is the coordinator's priority rule. Owner: "continue as is". PHYSICS stays Node-only until the art pass ends.
+
+### 2026-11-12 PHYSICS 16 (P18) accepted
+- Accepted (c1c8e2c, 45338f0, f6eaa17, 5f480bf): a sea map (seamap.js): every node of two grids round the focus (16 m inner, 128 m outer to 2 km) has its own fetch (11 radials plus a 24-radial far rose), depth, wind sea, whitecaps and share of the swell; the wind sea turns toward its longest fetch and refracts and shoals near shore (a lagoon behind a barrier Hs 0.07 m beside an open shore 0.43 m in a 21 m/s gale); 0.06-0.17 ms a frame. Sub-second gusts (wind.js gustSubAt, Kaimal-weighted, scaled by local turbulence intensity, averaged over a receiver's size): under 1 s the wind went from 0.002 of its variance to 0.7-1.0 of Kaimal's share. The air grid's garbage 383 -> 39 KB a frame, bit-identical by checksum over 4.69 million numbers (the figures in 45338f0's message are wrong and corrected in the notes). The lab stand-in has a knee (Node geometry only). src/physics/coast.mjs reports fetch, depth, Hs, white % and wave direction at each coast stand with PASS / NOT YET.
+- Coordinator's check on a clean export of 5f480bf: physics 288 pass, unit 140 pass, every module in src/physics, art, world, play, render and data loads alone; coast.mjs runs: Earth sea_coast NOT YET, Neptune storm_seas NOT YET (Hs 0.71 m 80 m out on 0.8 km of fetch; target 3.23 m, 15 % white over 2.5 km at 20 m).
+- Not verified: the sea map's GLSL was never compiled (PAINTER wires it: two uniforms and a texture in shared.js, PC_PHYS_SEA_MAP, the local sea in the water shader; until then the picture is P16's); no picture of P18 was made; the strips tree-gust and clamber-walk-moon and the storm frame unfilmed; PC_TIMING not re-run (load 13-16 throughout).
+- PHYSICS 17 is started when the art pass releases the machine (its remaining work needs a browser). Relayed to PAINTER 11: wire the sea map with the coast fix after the art pass, and run coast.mjs until PASS.
+
+### 2026-11-12 PAINTER 11 accepted; RULING on Neptune's coast
+- Accepted (90025a3, 46fcbf8, 8b058d7; parts carried by the coordinator's snapshots 0b76f2c, d874259, 5b083c1): A3 (uPhysBranchClock bound and moving); A2 prewarm hooks (world.prewarm, painter.prewarm with each tier's brush passes and the sheet; renderer.outputColorSpace linear so a compile outside the scene pass builds the drawn programs, pixels equal; 0 shaders compiled mid-game through day, night, storm, tier 0, ship, space and arrivals on six worlds; with PILOT's own caller 0 after ready landing on Mars, Mercury, the Moon, Pluto, Saturn); A1 (with EXT_clip_control hidden 37 programs link, no fragment shader writes gl_FragDepth, checked by following the #ifs; close shots without holes or z-fighting); gap 17 (reversed smoothstep edges and atan(0,0)); gap 12 (an 8-bit packed fallback; painter.floatFallback = true; float and 8-bit frames look the same, opened by the coordinator); gaitPose uses strideBob; the run re-filmed after the heel change; the explorer's face shaded (still an egg at 4 m, opened by the coordinator: slight).
+- Coordinator's check on a clean export of 8b058d7: world 19, unit 140, physics 288, static rules, every module loads alone.
+- Noted: the art pass's Earth broadleaf scale 1.25 failed world test 15 on two snapshots (a671ca7, 9b5c941); a later snapshot fixed it. The art pass's final head must pass the world tests.
+- RULING (Neptune storm_seas, PAINTER asks: accept about 1.5 km of fetch, or open water toward the biome's edge; look = PAINTER, physics = PHYSICS, put to the coordinator): open the water. A storm coast is a vista the painting needs, and the surf must come from real fetch, not a raised number. PAINTER 12 opens water in the storm_seas coast terrain toward the biome's eastern edge, keeping the ice spires biome whole, and picks a beach facing it. The fetch clause of coast.mjs is the means; Hs and white at 80 m out are the ends: if 2 km cannot be had without breaking the next biome, the coordinator may accept less only on coast.mjs's measured Hs and white passing, with a frame opened. Earth sea_coast: the 2067 m beach 1.26 km south of the old stand, moved in src/art/easels.js STANDS (sites unchanged).
+- PAINTER 12 starts when the art pass ends (the coast terrain and Neptune's look file are group 4's during the pass): sea map wiring, both coasts to PASS, the cliff walls (the headland's vertical end, the combed stripes behind Earth's pool), the blizzard's ruled crest, then item 4.
+- OWNER (2026-11-12): asked how long the art pass will take (estimate given: about 10 h more, 8-13 h, finishing near 12:00 UTC) and whether it can go faster without losing quality (answered: only by moving the remaining stages to extra cloud sessions on other machines, saving about 3-4 h with the risk of stopping the workflow between stages). Owner: "continue as is". The workflow runs unchanged.
+
+### 2026-11-12 PILOT 9 (lead review 7, code) accepted; PHYSICS 17 started on its findings
+- Accepted (33abe08, d5bc467): Review 7 (code) in docs/lead/REVIEW.md with proving scripts in docs/lead/evidence/review7/. MUST FIX (PHYSICS): the off-path ghost run (explorer.js ghostCrosses) overwrites the walker's own scratch _dir and _gnd mid-step: off the x-z plane a run through boulders gains radial speed while grounded and strays off its line, and wrong materials are reported for footsteps, sink and dust. SHOULD FIX (PHYSICS): SeaMap.rebase leaves the published target in the old frame (crests slide 14-17 m after each re-anchor); the shown sea map jumps when a build lands after the focus moved (blend band in whole cells, new nodes snap, outer level snaps after a re-anchor). Nothing to fix in PAINTER 11. PILOT's explorer now asks the air as a 0.5 m receiver at its own velocity.
+- Coordinator's check on a clean export of d5bc467: unit 140, physics 288; ghostfield.mjs reproduces finding 1 on the head: off the plane radial speed while grounded 0.74 m/s (Earth) and 0.58 m/s (Moon), 0.23 and 0.81 m off the line, 17 steps with the wrong material (11-17 even in the P17 test's plane).
+- PHYSICS 17 started on Opus extra-high, Node only: the three findings, each proven with PILOT's scripts before and after. Its browser items (strips, PC_TIMING) go to a later agent once the art pass frees the machine.
+
+### 2026-11-12 PHYSICS 17 (P19) accepted; art pass groups 1 and 2 done
+- Accepted (976b954, 40f8f7d, b5db96b, 1f07803): review 7 finding 1 fixed structurally (the step's scratch is one set passed to every function; the walker and the ghost each own one; the reported material, friction, sink and dust are the ground where the step ends); 1b found while proving it: a close row of boulders made the ghost start in mid-air so every trial failed and the run crawled (Earth 0.50 -> 2.34 m/s, Moon 1.03 -> 1.74 m/s past the first boulder; a lone boulder unchanged in 72 runs); finding 2 (SeaMap.rebase moves the published target; crest slide after a re-anchor 14.6/17.1 m -> 2.2/2.0 m, typical 2.4 m); finding 3 (the blend band a rectangle with continuously moving edges, new uniform uPhysSeaBand; new nodes ease from what was shown; the outer level resampled after a re-anchor; steps over 0.02 m or 2.9 degrees 9 -> 0). The ghost's worst CPU in one frame 0.75 -> 0.15 ms.
+- Coordinator's check on a clean export of 1f07803: unit 140, physics 291, world 19; ghostfield.mjs at all six places and both gravities: radial speed while grounded 0, off the line 0, wrong-material steps 0, steps in the air 0 (worst step loss 0.55/0.52 m/s, the legs taking a face at their limit, allowed by P13); seamap-seams.mjs: 0 steps over the limit, 0 on build frames, warp after re-anchors 2.21 and 1.95 m against 2.36 m typical.
+- Open (P19 notes): a close row still hides the next face from high on the previous boulder (met braced, allowed); the re-anchor is a pure translation only near the anchor on a 4 km world; physics.water() switches to the far estimate beyond 1024 m (0.1 m step); no GLSL compiled. PAINTER's sea-map wiring must copy uPhysSeaBand too (For PAINTER, P19).
+- Art pass: groups 1 (earth) and 2 (inner) returned; groups 3 (giants) and 4 (ice) running.
+
+### 2026-11-12 The art pass returned (owner's order)
+- Workflow wf_1e083b58-6f0 completed: 14 agents (4 painters by group, 4 cross-verifiers, 1 same-painter judge, fixers, 1 integrator), 13.4 h, 0 errors. Commit 5f12995 (plus moon.js and mars.js carried earlier by the coordinator's art snapshots). 36 of 42 biomes improved, 1 unchanged (venus/fungal_towers), 5 reverted to base (earth/sea_coast, earth/misty_wetland, saturn/crystal_reeds, uranus/frozen_waves, neptune/aurora_tundra). Every change is look data in src/data/looks/<body>.js; common.js and looks.js untouched; the art commits touched only src/data/looks/ and docs/shots/art/ (coordinator checked every [art] commit's files).
+- The full report is saved as docs/lead/ARTPASS.md (integration report, judge, verdicts, fixers), with the contact sheet docs/shots/art/sheet.jpg and 42 before/after pairs.
+- Coordinator's check on a clean export of 5f12995: world 19, unit 140, physics 291, static rules, every module loads alone; the contact sheet opened and read: one hand across the planets (paper light, a light key, granulated skies, small darks, few boulders a step below their ground).
+- The art role is closed: src/data/looks/ and docs/shots/art/ go back to PAINTER (tools/commit.sh painter).
+- The weakest biomes after the pass, as the integrator ranked them: earth/misty_wetland, venus/lava_rivers, mercury/crystal_gardens, neptune/aurora_tundra, uranus/frozen_waves, moon/rilles, earth/temperate_forest, saturn/gold_islands, pluto/long_shadow_plain, earth/sea_coast. Most causes are shared code (the shadow glaze swamping local colour, boulder shape, the night key, per-body skies, airless haze, stands and views, coast terrain), which the data-only pass could not touch; they go to PAINTER 12.
+- Coordinator's browser check on a clean export of 5f12995 (own script, one sitting, top tier, 640x360): the spawn and then all ten bodies by teleport at hour 11, each settled (8.7-23.1 s), info().fallback empty on every body (render, world, art, physics real; ui stub by design), 0 console errors, 0 page errors, 0 failed or external requests, window.__pc.errors empty. Frames opened: every body renders. The Mercury arrival's saturated violet boulders are still in view (flagged to PAINTER 12 and PILOT 10).
+- Reported to the owner: improved and weakest biomes (the art pass order is fulfilled).
+
+### 2026-11-12 PHYSICS 18 (P20) accepted; incident: shared scratch; rulings
+- Accepted (95f79cc, 38a3266, 22df990): PC_TIMING suite 291/291 at load 3.8-5.9 (q2 gale in a tall wood 1.39 ms CPU; Neptune loose frame 1.45 ms against 1.5, close); twelve strips filmed and opened (tree-gust, clamber walk/side/row on the Moon, grass and trees under a second in the game, the storm frame passes the freeze-frame test, Moon boulder runs, floating on Neptune and Earth); the Moon boulder run in the game: thrown up at most 0.172 m, no boulder lifts the feet more than 0.1 m (PILOT's boulderrun.mjs still fails three flights off 37-44 degree crater walls, replayed in Node with the boulders removed: the same flights, real physics); fixed: the near field's re-anchor on every world (Moon 30 m out 2.31 -> 0.29 m), the floating explorer rides the drawn sea (correlation 0.04 -> 0.945), the sea is there on arrival (8 s off a gale coast 0.16 -> 1.06 m), no rain rings on a sea above Hs 0.5 m.
+- Coordinator's check on a clean export of 22df990: world 19, unit 142, physics 296, every module loads alone; coast.mjs PASS at both stands (Earth sea_coast, Neptune storm_seas) on the head.
+- INCIDENT: subagents share the coordinator's scratchpad folder; PHYSICS 18's first export to <scratchpad>/exp wiped the coordinator's exp/art while the coordinator's ten-body visit ran. That visit's "all passed" is therefore not trusted; the coordinator re-runs it on 5f12995 from a private folder (/home/user/.pc-scratch/coordinator/). From now on every agent works only in /home/user/.pc-scratch/<role>/ and the coordinator in /home/user/.pc-scratch/coordinator/.
+- RULING (the 0.3 m rule and crater walls; physical behaviour = PHYSICS): the rule is about boulders; a run at 6 m/s off a 37-44 degree crater wall on the Moon leaves the ground because no runner can follow an edge sharper than about 29 m radius at that pace in that gravity. Kept. PILOT changes boulderrun.mjs to count a flight against a boulder only where the ground did not fall away by more than the boulder's height plus the limit (PHYSICS's two lines).
+- RULING (a ship landed on water; feel = PILOT, physical behaviour = PHYSICS): a hull at rest on water floats, so it heaves and pitches with the drawn sea, averaged over its size. PILOT implements in the ship with physics.water() and a receiver the hull's size; PHYSICS supplies the numbers if asked.
+- Open, PHYSICS next: the hard brace at a face or concave slope the read-ahead misses (the legs take the whole speed, not only the part into the slope); the close row; rain rings on grass; the float strips re-filmed after the arrival fix. PAINTER: splash rings softer, airless dust drawn as a fan of grains, spray blots near the lens, Neptune's near-black cliff slab, Earth's combed headland stripes.
+- Coordinator's ten-body visit RE-RUN on 5f12995 from a private folder (/home/user/.pc-scratch/coordinator/visit-5f12995, git archive of the commit; nothing else writes there): ready after 320 s at load 12 (a first try timed out at 300 s), then the spawn and all ten bodies settled (10-35 s each), info().fallback empty on every body, 0 console errors, 0 page errors, 0 failed or external requests, window.__pc.errors empty; frames opened, every body renders. The report to the owner stands.
+
+### 2026-11-12 PAINTER 12 accepted; RULING: the Moon is tidally locked, Earth hangs fixed
+- Accepted (c08dddb, 418ac5b, e866f6e, 994074a; parts in the coordinator's snapshots db64b86, 50414f0): PHYSICS's sea map wired and compiled (uPhysSeaBand too; every shader links, no console message); both coast stands PASS coast.mjs (Earth sea_coast: a new island beach 2.4 km north facing ESE, its own storm checked with coastReport; Neptune storm_seas: a new coast-terrain key t.open opens a reach 2.3 km long and 34 m deep toward the eastern edge, the ice spires biome untouched, the stand on a beach 390 m south facing east, the easel on the cliff top; no seed, seaLevel, phys or sites changed); Earth's cliff barcode gone; Neptune's stacks crowned and skirted, dark rock kept off black; boulders broken and cleaved, collision matching the drawing; no boulder or shard within 6 m of a landing (Mercury's violet crowd and Mars' lozenge gone); venus/lava_rivers stand on the bank looking up the river; moon/rilles stand on the rim; the night key floor (Mercury 23 h land L 8.4 -> 21-25); misty_wetland's sky pales; no halftone on near shallows; an aurora by day over Neptune's tundra; the blizzard crest broken; airless haze (small); PILOT's review 6b obstacle queries and arrival.mjs.
+- Coordinator's check on a clean export of 994074a: world 19, unit 146, physics 296, every module loads alone; coast.mjs PASS at both stands. Frames opened: p12-coasts.jpg (the new Earth stand reads as an open-sea painting) and p12-neptune-aurora-storm.jpg (the aurora is faint green veils; the storm stack is grey now but still one big smooth flat-sided block, the storm sky carries ruled horizontal dashes, and white horses are scarce in that frame).
+- Weak and owned (PAINTER 13): narrow headlands came out up to 23 m lower (Earth's easel lost its near hill), a regression; the autumn crowns and Mercury's crystals (leaf washes and the twilight dusk key, wish 4); Venus' lava reads as a leopard print; Neptune's storm stack and sky dashes; splash rings, lens spray and airless kicked dust never seen in a frame; Earth's storm not re-filmed after P20; item 4.
+- RULING (the Moon facing Earth; PAINTER said it depends on the clock): it does not. In src/data/bodies.js the Moon's orbitPeriod equals its dayLength (3600 s) in the same sense, so it is tidally locked: the coordinator computed Earth's direction in the Moon's own frame over t = 0..10000 s and it stays at (-0.891, +-0.03, -0.453) (the 0.03 is libration from the axial tilt). Earth hangs fixed in the near side's sky. PAINTER 13 moves the Moon's arrival and stands to the near hemisphere so Earth stands in view, facing it; the coordinator authorises changing the Moon's sites for this (PILOT checks the tests that depend on them). Nothing in the clock changes.
+- Neptune's season (axialTilt 0.49 flip, PILOT's file): PAINTER says yes for the look; PILOT decides on feel and architecture and implements if no objection.
+
+### 2026-11-12 PHYSICS 19 (P21) accepted; rulings
+- Accepted (3cd06dc, 243c187): the brace made physical (a missed face pushes along its own normal: the legs take only the speed into it, the soles hold the sideways push, the speed along the face is kept; a run onto a slope keeps v cos^2 within 2 %; the Moon crater rim case 6.95 -> 1.95 m/s became 6.95 -> 4.09 at worst); the legs' base no longer sinks between close boulders (Moon close row slowest 1.74 -> 2.38 m/s); no rain splash on grass, moss, litter, sand, dust, ash, gravel or snow, wet rock and mud unchanged (512/512/221 -> 0); float strips re-filmed and right (Neptune Hs 2.97-4.87 m 15 s after arriving); the floating explorer copies the shader's 0.06 m shallow lift; coast.mjs's target is now duration-limited (what the same wind history raises over 2.5 km of 20 m water by the game's growth law: Neptune 4.19 -> 2.96 m, Earth 0.68 -> 0.52 m).
+- Coordinator's check on a clean export of 243c187: world 19, unit 147, physics 300, every module loads alone; coast.mjs PASS at both stands with the new targets (Neptune 3.51 m also cleared the old mark); ghostfield.mjs all zeros (worst step loss 0.39-0.47 m/s).
+- RULING (coast.mjs target, Decision 56): accepted. A sea grows with how long the wind has blown as well as with fetch (duration-limited growth); a target the squall cannot raise is not physics. Both stands passed under the old target too, so no goal moved to rescue a failure.
+- RULING (the close row; PHYSICS asks to redefine a clean crossing, which moves P16/P17's tested numbers): allowed. The tests guard what the player feels: speed lost per step, braces, feet on the ground, the 0.3 m rule and no flights off boulders. A new standard is kept only if those hold or improve across every measured case (single boulders, off-path, close and spread rows, Moon, Mars, Earth); P16/P17 tests may change their numbers where the notes say why.
+- Open, PHYSICS 20: the arrival sea from the wind's history (a player arriving before a squall's peak sees 6.04 m where one who stood through it sees 3.51 m); the Moon boulder's hold over the top (7.15 -> 2.52 m/s in the game strip, the read-ahead held no pace); a 43 degree hill on Mars and Earth read as a face and run at 1.1-1.2 m/s; feet leave the ground over rim crests met at speed (a 0.31 m flight, 0.01 over the limit, where the ground falls away: allowed by the crater-wall ruling, but the walker should read crests); the close row standard; PC_TIMING when the load allows.
+
+### 2026-11-12 PHYSICS 20 (P22) accepted
+- Accepted (e20f900, a7e47c7, b2aa445): the Moon boulder's hold over the top gone (the explorer keeps the ground ahead as a row of samples and limits how fast the hips rise and fall: the strip case 7.15 -> 2.52 m/s on top became 7.40 m/s throughout, no brace, no hold; 23 of 24 field numbers better; feet off at most 0.21 -> 0.05 m); three read-ahead faults fixed; crests read (pace limit sqrt(2(g+grip) stroke)/(s1+s2) with a 0.92 margin; boulderrun replayed in Node: thrown up 0 in all eight headings, feet off in one of eight off a 56 degree wall falling 4.47 m; the cost is pace, 5.0-6.2 -> 3.0-6.0 m/s mean at the site); a 43 degree hill is a hill, not a face (slowest on it 1.07-1.26 -> 4.16-4.23 m/s); the close-row standard measured and kept (no new standard held in every case); the arrival sea from the last 360 s of wind (Neptune arriving before the peak 6.04 -> 3.69 m, standing through it 3.70 m).
+- Coordinator's check on a clean export of b2aa445: world 19, unit 148, physics 305, every module loads alone; coast.mjs PASS at both stands; ghostfield.mjs all zeros (worst step loss 0.26 Earth, 0.52 Moon).
+- For PILOT: src/core/sim.js obstaclesNear radius 9 -> 16 m (the read-ahead looks 12-13 m out at a lunar run). Relayed to PILOT 10.
+- Open: the hold on the descent off a small rim (4.70 -> 1.98 m/s in the film); crests are read as sharp corners, so rounded brows slow the run more than they need to (feel: the slowing before crater rims may be heavy); three Moon row numbers slightly worse; PC_TIMING not run (load 9-14); game-float-earth and the grass strips not re-filmed. PHYSICS 21 started on these.
+
+### 2026-11-12 PAINTER 13 accepted
+- Accepted (d93944b, 7a51d42; parts in snapshots 97b6641, aaa0d8a, 67874a1): the headland regression fixed and the barcode's real cause found (the land stepped 10-20 m within a metre where the cliff line's wobble was high; an even ramp with a ledge, crags on the face only, the rise brought in over the land's first 2 m; steps over 8 m in a metre around the easel 104 -> 0; the near hill 41 m); the Moon's arrival and four stands on the near side facing Earth (Earth 14-20 degrees up; sites unchanged, every biome already reached the near side); Neptune's big stack stepped with a broken crown; the storm sky's ruled dashes were the rain (strokes now vary, taper and break); dark rock under a storm key dense indigo; white horses were a rendering problem (under the brush's 3 px, removed), now at least 3 px and broken along the crest, read from the water and the beach; splash rings faint and soft; lens spray wisps; airless dust a fan of dark flecks; autumn crowns in their own colour under half the cool glaze; Mercury's crystals catch light through their bodies (rose and lilac, not one ultramarine); Venus' lava crust in rafts and along the banks cut by lines of fire; a cooler twilight key (small).
+- Coordinator's check on a clean export of 7a51d42: world 19, unit 148, physics 305, every module loads alone; coast.mjs PASS at both stands. Frames opened: p13-moon-arrival (Earth stands in the upper third over the arrival and the mare stand) and p13-neptune-stack (the stack stepped and crowned, the rain no longer ruled, surf at the beach).
+- Found: Ephemeris.setSunHour spins a tidally locked body without turning its orbit, so booting on the Moon or any teleport with an hour moves Earth out of the Moon's sky (normal play from Earth does not). PILOT fixes it (orbitShift turned with the spin for a locked body, kept by save.js; exact code in painter.md "For PILOT (13)").
+- For PHYSICS: at Neptune's storm stand the explorer once measured 141.4 m/s of wind, was blown 19 m and began climbing the cliff (clock 245 after a set to 222); at 237 and 247 the wind was 14.3 m/s. Relayed to PHYSICS 21.
+- Weak: the stack's values barely change under the storm key; the rille reads as a pale shallow dip; some round crust spots on Venus; each near autumn crown one flat mass; Earth's white horses sparse; item 6 not done. PAINTER 14 started (finishing block).
+
+### 2026-11-12 PHYSICS 21 (P23) accepted; RULING on knife edges; MILESTONE 3 CLOSED
+- PHYSICS 21 accepted (f656310, feef4e0): the gale (Neptune's 141 m/s is a real output of the gust model, sigma/U about 0.4 on a 60-75 m/s squall; once the wind's push passes half the body's weight the walker gets low, reads the wind at 0.4 m, adds hands and knees, and the suit's thrusters push back what the soles cannot hold beyond 60 % of grip, up to the jetpack's 1700 N; blown 41 m up the cliff -> 0.00 m; walking out of the storm still works); the rounded-crest law measured (v^2 = (g + grip)(R + 2 stroke/turn^2)) but not shipped; PC_TIMING at load 7.97: 306 pass, every timing check ok (walk 0.756 ms, q2 gale 1.20 ms CPU, Neptune 1.42 ms); six strips filmed and opened (the gale strip opened by the coordinator: the explorer holds the waterline through the squall).
+- Coordinator's check on a clean export of feef4e0: world 19, unit 150, physics 306, every module loads alone, coast.mjs PASS at both stands.
+- RULING (knife edges at crater rims; feel = PILOT, physical behaviour = PHYSICS; PILOT's verdict "too heavy: keep 4.5 m/s or more and let the runner leave the ground" against the coordinator's instruction to keep contact wherever P22 measured it): PILOT's version. Replace P22's knife-edge pace law with "don't throw the runner up": the 0.3 m rule stays (thrown up 0 in every heading), and a runner may leave the ground where the ground truly falls away (the crater-wall ruling), which on the Moon is honest low-gravity physics. Measured by PHYSICS at the site: mean pace 4.25/4.88/2.96 -> 5.04/5.68/3.29 m/s, thrown up 0, flights of 2.2-4.3 m off 53-55 degree walls. PHYSICS 22 ships it with tests and checks the descent hold under it.
+- MILESTONE 3 CLOSED. PILOT 10's review 6 (second half), docs/lead/REVIEW.md section 6: every M3 item MET (motion: wind, water, weather, day-night; space washes; painted UI theme; the art pass; HUD; sketchbook and vistas; audio measured; performance tiers as logic; title screen and help card); MUST FIX open: none. all.mjs 13 of 13 passed in a clean tree; the grand tour passed 8 of 8 in one sitting (a new player from the title card: walk, jetpack, board, space, land on all eight planets, every landing on the first E, no console error, 39 minutes); the top-tier tour of all ten bodies settled with no console error. SHOULD FIX carried to M4 (look, PAINTER): Pluto's and Mercury's arrival boulders, night at quality 0, Neptune's stacks, Mars from orbit, Saturn's walled vista, foliage edges in specks, flat flower ellipses, Venus' arrival, Uranus' one value range. Not measurable here: frame rate on an integrated GPU, sound as heard, real mouse and pad.
+- M4 plan: PAINTER 14 finishes its block (first ten minutes, arrivals); then the critique swap (each role plays the whole game and writes a blunt critique of the others' domains), the worst issues fixed, then PILOT merges, runs every check, opens one PR cosmos -> main and merges it.
+
+### 2026-11-12 PHYSICS 22 (P24) accepted
+- Accepted (681e9d2, c4d2242): the knife-edge ruling shipped (wayCrest's knife-edge pace law v = sqrt(2 g legFold) x crestMargin / s1; mean pace at the boulderrun site 4.25/4.88/2.96 -> 5.04/5.68/3.29 m/s in headings 0/180/315, the other five unchanged; thrown up 0.000 in all eight headings; two flights off ground that falls away, 4.05 m off a 53 degree wall and 2.22 m off a 55 degree wall); new test 'P24 the knife edge' (the run reaches the edge above 3 m/s on the Moon, Mars and Earth, thrown up at most 0.15 m); motion-game-moon-boulder re-filmed and opened, the same as P23 (it meets no knife edge in 3 s).
+- Coordinator's check on a clean export of c4d2242: world 19, unit 150, physics 307, every module loads alone, coast.mjs PASS at both stands, ghostfield.mjs all zeros.
+- Not done (measured; risk too high for a finishing block): the descent hold off the small rim (now 3.84 -> 1.27 m/s; P21's hold on the way down caps the pace at about 1.2 m/s where the ground a look ahead is within a clamber; the fix lets the hold go where the ground truly falls away, which touches the hold that keeps contact over boulders); the edge pace (about 3.5 m/s on the Moon, not the law's 6.3); heading 315 without boulders 3.17 -> 2.68 m/s; the Moon rows. Left to the M4 critique swap to rank against everything else.
+
+### 2026-11-12 PILOT 10 accepted; M4 begins: the critique swap
+- PILOT 10 accepted (9c93e77, a0e3fb1, dc876f9, a46b6ee, 2af3e51, ce7e69d, c95bd4e, 6f79340, 7a510be): review 6 second half and M3's verdict (logged above); the world's own clock drives every hour PILOT sets; Saturn's whole ring from orbit; the arrival steps off boulders; a landed ship floats on the drawn sea; the swim camera smoothed; boulderrun reclassified per the ruling; Neptune's axialTilt -0.49 (spawn sun 2 -> 36 degrees; orbits unchanged); ship berths out of the surf; the third-person camera keeps the feet in frame under a rise; the 16 m obstacle look-up; a locked body's orbit turns with its spin (Earth stays within 2.3 degrees in the Moon's sky when an hour is set, was up to 178.5). Unit 150. Feel verdict on rim slowing: acceptable at 4.6-6.1 m/s, too heavy where it drops to 3 m/s (the knife-edge ruling, shipped in P24, answers the worst of it).
+- Open for PILOT: the landing chase camera sits inside birch crowns as the ship sets down (372 pops in the landing motion set).
+- M4 (the brief): "Each session plays the whole game and writes a blunt critique of the other's domain. Fix the worst issues. Pilot merges Painter's final branch, runs every check, opens one pull request to main, and merges it." With three roles, each critiques the other two: PILOT 11 (PAINTER's look and PHYSICS's behaviour) and PHYSICS 23 (PILOT's feel and PAINTER's motion) start now; PAINTER critiques PILOT's and PHYSICS's domains once PAINTER 14's finishing block ends. Critiques go to docs/lead/CRITIQUE.md (one section per critic). Then each owner fixes its worst items; then PILOT ships.
+
+### 2026-11-12 PHYSICS 23 (P25) accepted: critique of PILOT and PAINTER; RULING on white water
+- Accepted (bb2a427, 2f924cd): docs/lead/CRITIQUE-PHYSICS.md with 98 evidence files in docs/shots/physics/critique/ (two real-game runs from the title card and by teleport, no console or game error; Node replays for the numbers). FIX FOR SHIP, PHYSICS on PILOT: (1) the ship jumps 16 m up in one frame at the end of every lift-off under trees (the free-flight clamp puts the hull on the crowns), including the first lift-off; (2) the landing assist brakes 46 -> 14 m/s in 0.4 s (18 g), a slow E lurches at 4.4 g then drops at 13 m/s into the wood; (3) the ground assist rewrites the hull's velocity after PHYSICS moved it (one-frame jolts of 16-35 g; a 22 g climb at a 60 degree slope with the nose down), and the chase camera fixed to the hull shows every jolt; (4) cameras through crowns (the foot camera on the jetpack; the landing camera fixed in b0e9aba, not filmed); (5) swimming is an upright glide. FIX FOR SHIP, PHYSICS on PAINTER: (1) the figure ignores the wind (PHYSICS leans 23-33 degrees in Neptune's squall; the scarf and coat hang still; PILOT's figure.js must pass the lean on); (2) no swimming pose; (3) crowns from inside are flat green slabs; (4) the storm sea reads calm at quality 1; (5) the falling pose is used on the way up an arc. Own fix: no boot puff in the spawn glade (a forest floor is litter only under closed cover).
+- Coordinator's check on a clean export of 2f924cd: world 19, unit 152, physics 308, every module loads alone.
+- RULING (white water capped at 15 %; physical behaviour = PHYSICS, look = PAINTER): lift the cap. At hurricane force the sea is almost all foam and streaks (Beaufort 12), and a 75 m/s squall is beyond that; a whitecap law (Monahan-type, coverage rising with about U^3.4) saturating toward full coverage is the physics. PHYSICS changes it with coast.mjs's targets by the same law; PAINTER paints whatever fraction comes as broken foam, streaks and spray, never a flat white area, and judges it in an opened frame. In the fix round, low risk first.
+- PHYSICS's top five on PILOT relayed to PILOT 11 for its own-side fixes now.
+
+### 2026-11-13 Usage limit; OWNER: continue on the new model at extra-high effort, workflows for the hard parts
+- PILOT 11 and PAINTER 14 were cut off by the account's weekly limit on the old model (2026-11-12, about 22:15 UTC); the container restarted afterwards. Nothing was lost: the working tree was clean and in sync (the coordinator's snapshots 45c5176, 8809fff, 76d8182 hold PAINTER 14's work; PILOT 11's commits b0e9aba, 904b6fe hold its camera fix, its partial critique docs/lead/CRITIQUE.md and its instruments in docs/lead/evidence/pilot11/).
+- OWNER (2026-11-13): continue, with every agent on the newer model at extra-high effort, and multi-agent workflows for the hard parts. Successors are fresh agents (the cut-off ones are not resumed on the old model).
+- Coordinator's check on a clean export of 76d8182 after the restart: world 19, unit 152, physics 308, every module loads alone, coast.mjs PASS at both stands.
+- MUST FIX found by PILOT 11's critique and reproduced by the coordinator on the head (docs/lead/evidence/pilot11/wallrun.mjs, Earth sea_coast): THE EXPLORER RUNS UP CLIFFS. Shift+W into a 70-79 degree face climbs 49-50 m at 5.6-6.0 m/s in three of eight headings. A regression bisected by PILOT to PHYSICS P22 (e20f900, "the way, seen"); no physics test catches it. PHYSICS 24 starts on it now.
+- Where M4 stands: PHYSICS's critique is in (CRITIQUE-PHYSICS.md); PILOT's is partial (three items on PHYSICS, nothing yet on PAINTER); PAINTER's is not written; PAINTER 14's finishing block has no hand-over.
+- Plan (workflow "m4-critique-fix"): the two missing critiques finished in parallel; then a fix round per role on its FIX FOR SHIP items (each role edits only its own paths and commits with tools/commit.sh); each role's fixes checked by an independent, adversarial verifier on clean exports; what fails verification goes back to the fixer; last, an integration run (every check, a ten-body visit) and a blind new-player play-test. The ship step (PILOT runs every check, opens one PR cosmos -> main, merges) stays outside the workflow, on the coordinator's explicit message after its own verification.
+- Started (2026-11-13 01:20 UTC): PHYSICS 24 on the cliff-run regression, the white-water cap, the sudden checks on arrival ground and the figure's state; and the workflow m4-critique-fix (run wf_6c419efc-378): critic:PILOT and critic:PAINTER in parallel, then per role fix -> independent adversarial verify -> re-fix, then an integration run (every check, a ten-body visit) and a blind new-player play-test. The workflow runtime runs two agents at a time on this machine. Each role edits only its own paths; verifiers, the integrator and the new player edit nothing.
+
+### 2026-11-13 PHYSICS 24 (P26) accepted: the cliff run fixed, the white-water cap lifted
+- Accepted (ee39533, a70d668, 4338242, 526883f). (1) MUST FIX closed: the explorer no longer runs up cliffs. Cause: since P22 the legs are "at work" at the foot of every rise, and the limbs' hold (no gravity along the face) was given to anything standing out of the ground, a cliff as much as a boulder. Fix: a wall (a facet steeper than the limbs scramble, any ground to 47 degrees, rock to 53.5 on Earth, 57 on Mars, 62 on the Moon, from which the ground goes on up more than a clamber) gives no hold and no step; a runner who sees one stops at its foot. Three new tests, each failing on the head. (2) The white-water cap lifted per the ruling: cover = max(the steepness law, 1 - exp(-whitecap01 x 3.84e-6 Ue^3.41)); Earth 15 m/s 5.2 % (as before), 30 m/s 33.5 %, 55 m/s 96.3 %; Neptune's squall 100 %; coast.mjs's targets by the same law. (3) The figure's state documented in one place and extended (leanV, relWind, swim, stroke, vUp, airTime, arc, wall). (4) Wading throws about five times the spray at a run.
+- Coordinator's check on a clean export of 526883f: world 19, unit 152, physics 314, every module loads alone, coast.mjs PASS at both stands, ghostfield.mjs all zeros (worst step loss 0.26 / 0.52 as before), and PILOT's wallrun.mjs: Earth sea_coast 0.2 / 0.2 / 0.2 m gained on ground over 50 degrees (the head: 49.9 / 49.0 / 49.7), desert_canyon 1.1 / 0.2 m (30.7 / 24.4), every other heading 0.0. Both strips opened: motion-game-cliff-earth.jpg (the explorer stands at the foot of the face from the first second to the twelfth) and motion-game-gale-neptune-p26.jpg.
+- Open, PAINTER: the lifted cap is in the numbers and not in the picture. With the field's white share at 100 %, Neptune's squall sea is the same dark indigo with a few white dashes (the strip opened; the coordinator agrees). Relayed to the PAINTER fixer at the top of docs/notes/painter.md.
+- Open, PHYSICS (measured, not fixed; for the workflow's PHYSICS fixer): Pluto's spawn check (heading 135, 1.27 m/s: the crest law's stale trend at a summit; the tried fix throws the runner up 0.26 and 0.47 m at boulderrun heading 315, so it was not shipped); Neptune storm_seas still drifts 5.9 m along a 53-58 degree face (35.0 before); a 43 degree hill is still run at 6.15 m/s level on Earth where the legs' power gives 4.35; PILOT 12's new items (the rain stall on a wet bank, Neptune's storm throwing a hovering ship, first-storm timing, the swimming glide, weather names).
+- Open, PILOT: Mercury's spawn check (heading 0, 1.58 m/s) is collideObstacles on a 2.2 m column, not PHYSICS'; the figure's state to pass to the model with a 'swim' mode; timeBudget: false in the Node instruments (with the budget on, a run that enters the water does not repeat to the digit). Relayed at the top of docs/notes/pilot.md.
+- Noted: PHYSICS 24's four commits carry no attribution trailer (it read the no-model-name rule as forbidding it). Left as they are: rewriting pushed history under running agents is the greater risk.
+- The workflow: critic:PAINTER finished (aaf28cf: docs/lead/CRITIQUE-PAINTER.md, 17 items on PILOT, 10 on PHYSICS, 71 evidence pictures, the whole game played at the top tier with no console error); critic:PILOT (the twelfth PILOT agent) is still writing (two interim commits 90bb703, cf7711c). The fix round starts when it returns.
+
+### 2026-11-13 Container restart at 05:08 UTC; the workflow resumed
+- The critique swap is complete: critic:PILOT returned (336070e: docs/lead/CRITIQUE.md whole, 'PILOT on PAINTER' 14 items and 'PILOT on PHYSICS', evidence in docs/lead/evidence/pilot12/); critic:PAINTER returned earlier (aaf28cf). With PHYSICS 23's CRITIQUE-PHYSICS.md, each role has critiqued the other two.
+- The fix round began at 04:09 UTC (fix:PILOT, the thirteenth PILOT agent; fix:PAINTER, the sixteenth PAINTER agent). At 05:08 UTC the container restarted (cause not known; the second restart of the project) and stopped the workflow with both fixers an hour in. Nothing was lost: the working tree survived on disk; finished commits dea95fb (PILOT: PHYSICS' body state reaches the drawn figure) and b579366 (PAINTER: night in its own key); the work in progress is in the coordinator's snapshots 3f13484, 8418918 (before the restart) and 3def4e7, c03bce6 (after it).
+- Resumed (05:20 UTC) as the same run (wf_6c419efc-378, task we0wclnde): the two critics' results come from the journal; the fixers are fresh successors, each told what its predecessor finished, which snapshot commits hold half-done edits (finish and prove, or revert), where its scratch is, and to commit each finished item at once and keep its hand-over current, since a restart can come at any time. The PHYSICS fixer is told PHYSICS 24 has finished and was verified.
+- OWNER (2026-11-13, standing instruction, not to be acted on now): when the current model's usage runs out, switch over to the next model down at extra-high effort. For the coordinator this means: agents cut off by a usage limit are replaced by fresh successors started on that model at extra-high effort (the Agent tool's model and effort; in a workflow, the agent call's model option), with the same hand-over rules as after the last limit. The coordinator cannot change its own session's model: if the limit stops the coordinator too, the owner switches the session, and the workflow is then resumed from its journal.
+
+### 2026-11-13 M4 fix round: where it stands at 12:20 UTC; second container restart (10:19 UTC)
+- FIX ROUND, all three roles returned (results in the workflow's journal; a copy at /home/user/.pc-scratch/coordinator/m4-journal-results.json):
+  - PILOT (fourteenth agent; b289c21, 7ee3620, f7b757a, 52e74d1, 6cfab48, da9a49f, 507486f): 19 items claimed, among them PHYSICS' body state to the drawn figure; the 16 m jump at the end of a lift-off under trees (16.25 -> 0.00 m); the landing assist (largest step 3.10 -> 0.23 m/s, descent 12.98 -> 6.00 m/s); the ground assist (8.55 -> 0.40 m/s); swimming; boarding (fastest turn 130 -> 65 degrees a second); the jetpack's refill; HUD wrapping; stepping out no longer frames the wing (hull over a sixth of the frame in 52 -> 1 of 52 landings); the sketchbook draws a kept frame as a sketch; a view is offered at an easel; the clock (first sunset 7.4 -> 11.2 minutes in, a new game starts at 8 h); slips keyed to night and space; the title card. Not fixed, named: 6.5 g turns (left as the ship's feel), the cockpit's eye point, Mercury's column, a 640 px HUD scale.
+  - PAINTER (sixteenth and seventeenth agents; b579366, 608b687, 70aec16, 7d27bf4, e784574, a8437ca, 1aa9718): night in its own key; the storm and mist key with rain that can be seen; round worlds from orbit, Neptune's belts, Pluto's heart; Jupiter's arrival palette (in part); the figure (wind lean, swim pose, arc pose); crowns at the lens break into dabs; the storm sea shows the lifted white share (Neptune's squall a pale driven sea with streaks); Uranus' arrival (value spread 14.8 -> 25.9); the grey-violet band below space; the arrival veil no longer blanks the picture for a fast ship. Not fixed, named: Jupiter's first view has no island edge (needs a new spawn), Pluto's long shadows, crisp white horses on Earth's coast.
+  - PHYSICS (twenty-fifth agent; 141997f, 33786a9, 9917fab, 9addf0b, a686a98; hand-over P27): rain no longer stops a walk dead on a bank; the first day is fair, the first storm at the second noon, no evening mist, the ground dries; the ship holds in Neptune's squall; the figure is handed the gust; snow strokes capped at the lens; a swimmer and a wader mark the water; weather names in a gale. Eleven new tests, each failing before its fix. Not fixed, named: the fair day's motion floor (built, measured, lost in the drawing: for PAINTER); the scramble at Neptune's storm coast (4.5 / 2.2 / 6.0 m); the checks at rims and boulder rows (Pluto's spawn); swimming as a stroke.
+- VERIFY (independent, adversarial, on clean exports):
+  - PAINTER: 8 of 9 hold; one fails with three regressions, two of them serious: THE WALK AND THE RUN WERE BROKEN (a variable in the leg's code hid the swim weight: ankles up to 0.7 m out of place on land) and TRUNKS NEAR THE EYE WERE CUT INTO FLOATING BLOCKS. RE-FIX (eighteenth PAINTER agent; 5de71a7, 91fd6bf, 7265ff0): all three fixed, with a new guard in src/world/figure.test.mjs that reads the ankles from the model; world 22, unit 181, physics 324.
+  - PILOT: 15 of 19 hold; four fail and nine regressions, two MAJOR: the new crown rule for the foot camera cuts the third-person view into the explorer's eyes on every walk in a wood (figure not drawn in 143 of 720 steps of the first walk of a new game; 0 before the round) and on stepping out at Earth's, Saturn's and Neptune's spawns. Also: the target's label on the ship when the nose is 3 to 8 degrees off; Pluto's jetpack still never comes down with burn-and-coast (and the README says it cannot happen); a swimmer asked to turn about swims backward 5.8 s; assisted landings take twice as long (9.9 s for 4.7 s, by design); the easel's walk can carry the explorer over a cliff. The RE-FIX was eight minutes in when the container restarted.
+  - PHYSICS: the verifier was 27 minutes in at the restart.
+- SECOND RESTART (10:19:29 UTC; the session came back at 12:10): both agents' running commands were killed in the same second (exit 137), then nothing more was written. Most likely the machine ran out of memory (16 GB, no swap; a top-tier browser, two Node suites and a world-building instrument at once), and the kernel's killer took the session's own process. Not proven: the old container's logs are gone. Disk is not the cause (11 GB free of about 40).
+- Measures: (1) a watchdog (/home/user/.pc-scratch/coordinator/memwatch.sh, started detached) logs memory every 15 s to /home/user/.pc-scratch/coordinator/mem.log, which survives a restart, and ends the largest browser process (else the largest Node process that is not the session) when under 1.3 GB is free; (2) every agent started from now on is told: one browser at a time and closed when its frames are taken, never two suites at once, free -m before a browser.
+- Resumed at 12:17 UTC (the same run, task win73533w): from the journal come both critiques, the three fix rounds, verify:PAINTER, verify:PILOT and refix:PAINTER; started afresh are refix:PILOT (told of its predecessor's half-done edits in the coordinator's snapshot 6e550ce, with which 2 of 181 unit tests fail: finish and prove or revert; the foot camera's crown rule may be taken out if it cannot be made right) and verify:PHYSICS (may reuse its predecessor's exports and scripts).
+- For the ship step (the final PILOT agent, after the workflow): move the weather and motion films' clocks by PHYSICS' +1530 s (tests/weather.mjs, tests/motion.mjs; neither is part of all.mjs); Mercury's column at the spawn; the README's line on the jetpack; then every check, one PR, merge.
+- OWNER (2026-11-13 12:21 UTC): "Switch to opus 5.5 extra on ultracode for the rest of what's left." The owner switched the session's model; the coordinator stopped the running workflow (its two live agents, refix:PILOT and verify:PHYSICS, had run four minutes and only read) and resumed it on the new model at extra-high effort: the workflow's agents take the session's model, so every agent from here runs on it, and every finished agent's result still comes from the journal. The remaining work (the PILOT re-fix, the PHYSICS verify, the integration run, the blind play-test, and after the coordinator's own check the ship step) runs as workflows. The PILOT re-fix also moves the weather and motion films' clocks by PHYSICS' +1530 s.
+- Note on the resume (12:25 UTC): the first resume on the new model also re-ran PAINTER's finished re-fix pass, because the workflow matches cached calls in call order and the PHYSICS verify (with a changed prompt) came first. Stopped within three minutes (nothing written); the script now takes a finished pass's result from the coordinator's args. Running now on the new model: refix:PILOT and verify:PHYSICS only.
+
+### 2026-11-13 The M4 workflow finished (15:30 UTC); the blind play-test; a last fix round before ship
+- RE-FIX on the new model: PILOT (seventeenth agent; 51cdda2, 1146112, 5fd7a0a, 246fce6, b1831e2, bafcfc7): both MAJOR regressions fixed (the foot camera's crown rule now in the air only, never under 3 m, crowns by plant kit: no eye view on walks; the explorer in frame on stepping out at every spawn); Pluto's jetpack now comes down; labels stay off the ship; a swimmer turns about in 0.75 s; the easel's walk stops short of cliffs; the films' weather clocks moved by +1530 s. Not fixed, named: the landing camera beside a crown for 1.5 s (four attempts reverted); assisted landings twice as long (by design). PHYSICS verify: 9 of 9 hold; one minor regression (descents on wet or soft slopes slowed by P27's short steps) fixed by the twenty-sixth PHYSICS agent (da44e1f, a new test).
+- INTEGRATION on a clean export of 3d38bb2 (confirmed by the coordinator's own run on a clean export: world 22, unit 184, physics 325, coast.mjs PASS at both stands, ghostfield all zeros, wallrun 0.2 / 0.2 / 0.2 m): world 22, unit 184, physics 325; coast.mjs PASS at both stands; ghostfield all zeros; wallrun 0.2 / 0.2 / 0.2 and 1.1 / 0.2 m; every module loads alone; node tests/all.mjs ALL 13 PASSED in a clean tree (42 minutes); the ten-body visit clean (no console, page or request error, fallback empty, every arrival on foot and grounded).
+- BLIND NEW PLAYER (README only, real keys and mouse at 960x540, 3 h 45 min, 0 console errors): started in Earth's forest, walked, ran, waded, jetpacked over the canopy, boarded, lifted off, reached space, used the map; LANDED ON ONLY 3 OF THE 8 OTHER WORLDS (Mars, Venus, Uranus). Broken for a new player: "F Pulse to Saturn" is offered while the mark is off-screen and F then flies along the nose, away (three times); in deep space after re-boarding on Venus the mouse no longer steered and the target above could not be brought ahead (25 minutes and a reload); pointer lock's drag fallback re-captured the pointer on every click and a pitched-up camera was saved. Confusing: no way to find the parked ship on foot; a pulse dropping out at a world in the way without a word. Ugly: stair-stepped figure and ship at tier 0 and half scale; Mars at night, Uranus' fog and Venus' haze nearly one flat colour. Best moment: dawn on Mars. The coordinator opened eight of its frames (the pulse prompt with Saturn's mark above, Mars by night and at dawn, Venus, Uranus at both tiers, the jetpack over the canopy) and agrees.
+- RULING: "Done means" says a new player lands on all eight planets; the play-test shows that is not yet true for a new player, so the game does not ship yet. One more fix round, the last: workflow m4-preship (run wf_ab67bba1-148, task wxvcqc56v), on the new model at extra-high effort: PILOT (the pulse goes where the course says, with a test from Earth's orbit to every planet with the mark behind, above and beside; steering in deep space and after re-boarding; the pointer-lock fallback; a slip pointing to the parked ship; HUD overlaps; the README; Mercury's column; then the grand tour) and PAINTER (the column of leaf dabs in Earth's alpine_meadow sky at quality 2, found by the PHYSICS verifier; soft silhouettes at half scale; value structure in Uranus' fog, Mars' night and Venus' haze) in parallel; each verified adversarially and re-fixed once; then the integrator (every check, all.mjs, the grand tour, a top-tier ten-body visit with every frame opened) and a second blind player whose goal is all eight planets. After it the coordinator's own check, then the ship step.
+
+### 2026-11-13 The pre-ship round; the second blind player; the last fixes (22:40 UTC)
+- PRE-SHIP ROUND (workflow m4-preship, run wf_ab67bba1-148): PILOT (eighteenth and nineteenth agents; b0710fe, 5ba725f, 22120b9, 015bc21, 23e7c81, da7d587, 37e7573, 45629a7): the pulse goes where the course says (F turns the ship onto the course, then pulses; never into or round the chosen world); steering above the air; C sinks; pointer lock's fallback holds; a slip points to the parked ship; HUD overlaps; Mercury's column; the grand tour PASSED 8 of 8 twice. PAINTER (nineteenth and twentieth agents; 8c7d603, 25074de, 18c1e33, 4bbbae4, d9f0ea4, db31c96): the column of leaf dabs in Earth's alpine sky; soft silhouettes at half scale; value structure in Uranus' fog, Mars' night and Venus' haze. Both verified adversarially; the findings re-fixed once.
+- INTEGRATOR on a clean export of 45629a7: world 25, unit 202, physics 325, coast.mjs PASS, ghostfield all zeros; the grand tour passed; the TOP-TIER ten-body visit clean (every world settled, no console, page or request error, fallback empty; the coordinator opened all ten frames: each a watercolour inside its paper border). BUT node tests/all.mjs FAILED two steps, m3 and painted-m3, on one check: "the first landscape walked gets a sketch: []". The coordinator reproduced it on the head and bisected it with tests/m3check.mjs on clean exports: b0710fe passes, 45629a7 fails; the change between is PILOT's 5ba725f (SKETCH_SLIP.shipWait 30 -> 45 s and a levelView when the lock is judged thrown). The pre-ship PILOT rounds had not run all.mjs.
+- SECOND BLIND PLAYER (README only, real keys and mouse, 960x540, 0 console errors): LANDED ON AND WALKED ON ALL EIGHT PLANETS (Earth, then Mercury, Venus, Mars, Jupiter, Saturn, Neptune, Uranus) in about 1 h 35 min of play. "Done means"' landing item is met for a new player. It met: the first Space hold after boarding ignored once; other worlds' labels shown through Venus' atmosphere; about 15 minutes stuck in a slot canyon on Mars with the camera jammed into the walls; dark spires that seem to hang above Saturn's horizon; hard-edged dark-blue polygons at the frame corners on Neptune (a freeze-frame fail; the coordinator opened the frames and agrees); Uranus the dullest world. Best: the canyon on Mars, Jupiter's banded sky, Venus' mushroom forest.
+- OWNER (22:10 UTC): "use whatever it has now and continue with the rest": the play-test was stopped after 1 h 40 min with the landing goal met; its log and frames are in /home/user/.pc-scratch/verify/player2/.
+- LAST FIXES (workflow m4-last-fixes, run wf_382773db-47c, task wsxqrmx9n): PILOT fixes the failing m3 check first and must end with all.mjs ALL PASSED in a clean tree, then the player's small items if safe; PAINTER the Neptune polygons and Saturn's spires if safe; each verified adversarially, re-fixed or reverted once. Then the coordinator's own check, then the ship step.
+- Bisect finished (22:21 UTC): 5ba725f itself FAILS the check, b0710fe before it passes: the regression is 5ba725f's (logs in /home/user/.pc-scratch/coordinator/bisect/).
+
+### 2026-11-14 The last fixes; fourth container restart (01:31 UTC)
+- LAST FIXES, results so far (run wf_382773db-47c): PILOT (twentieth agent; 3066381, 3cfd184, c1d36c9, a539086): the m3 regression's cause found (the first view puts the hull in the middle of the frame 16 m off, and 5ba725f's longer wait for the hull outlived the wanted page, so the page never came): the kept frame is now painted without the ship and the wait is gone; the first Space hold after boarding; other worlds' labels below the edge of the air; README's sentence on "a place to land"; the arrow for a place behind; each with a test that fails on 45629a7; tests/all.mjs ALL 13 PASSED on 3cfd184 in a clean tree. The canyon camera not reproduced, not touched. PAINTER (twenty-first and twenty-second agents; 0112e5e, 5fd389b, 0a92d45, 0bc7b64): Neptune's hard-edged polygons at the frame corners were the eye inside an ice spire (now hollow and soft from inside); Saturn's hanging spires were the far forms of trunkless kinds (now seated). Still open, named: a hard-edged slab beside a slim Neptune spire seen from outside at quality 0 (there before; no small safe fix).
+- VERIFY: PAINTER 1 of 2 holds in full (the outside slab above), one minor side effect; PILOT every fixed item holds, BUT the verifier found all.mjs's painted-trip step failing in a clean tree in two of three runs on a539086 (and on 45629a7): the script's bump count never reset between legs, and over Saturn's honey_mist the game offered "Land here" and then answered E with "Too steep to land here" eight times running (48 of 520 hover spots there). The coordinator rules the second a fault of the GAME as well as of the script: a new player must not be offered a landing that is then refused.
+- FOURTH RESTART (01:31:29 UTC; back at 01:32): the PILOT re-fix (twenty-first agent) was cut off after 15 minutes; its edits are in the coordinator's snapshot 97e5949. The memory log shows 14.7 GB available at the moment of the restart and never under 13.4 GB since the watchdog started: the restarts are NOT running out of memory; their cause is outside this container. The watchdog is restarted (it logs only).
+- Resumed (01:40 UTC) as the same run: PAINTER's finished re-fix passed in from the journal; the PILOT re-fix restarted as a successor (finish or revert 97e5949; make "Land here" honest with a test; painted-trip three times; all.mjs once in a clean tree, ALL PASSED). Then the coordinator's own check, then the ship step.

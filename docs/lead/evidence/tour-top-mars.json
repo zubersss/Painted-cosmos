@@ -1,0 +1,62 @@
+{
+ "label": "clean tree: PAINTER and PHYSICS as of 5efc7f4 (the art-pass head), PILOT 9c93e77; top tier",
+ "size": "960x540",
+ "quality": 2,
+ "hour": 10,
+ "settleLimit": 3600,
+ "unsettled": 0,
+ "frames": [
+  {
+   "kind": "biome",
+   "id": "spawn",
+   "name": "the spawn",
+   "alsoVista": null,
+   "settledSeconds": 158.2,
+   "settledFrames": 43,
+   "tris": 597131,
+   "calls": 331,
+   "worldWorstMs": 707.1,
+   "physicsWorstMs": 277.8,
+   "stoodIn": "dry_riverbeds",
+   "moved": 0,
+   "found": null,
+   "flags": []
+  },
+  {
+   "kind": "vista",
+   "id": "mars-rust_canyons-1",
+   "name": "Rust Canyons",
+   "alsoVista": null,
+   "settledSeconds": 156.8,
+   "settledFrames": 40,
+   "tris": 393445,
+   "calls": 260,
+   "worldWorstMs": 835.7,
+   "physicsWorstMs": 277.8,
+   "stoodIn": "rust_canyons",
+   "moved": 0,
+   "found": true,
+   "at": {
+    "liquid": 0,
+    "slopeDeg": 13.4,
+    "biome": "rust_canyons",
+    "radius": 3068.864790382551
+   },
+   "flags": []
+  },
+  {
+   "kind": "orbit",
+   "id": "orbit",
+   "name": "from orbit",
+   "alsoVista": null,
+   "settledSeconds": 7.8,
+   "settledFrames": 9,
+   "tris": 60961,
+   "calls": 31,
+   "worldWorstMs": 835.7,
+   "stoodIn": null,
+   "moved": 0,
+   "flags": []
+  }
+ ]
+}

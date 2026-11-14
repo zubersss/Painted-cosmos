@@ -1,0 +1,8 @@
+lift-off at the spawn (Space, 14 s): largest velocity step 0.08 m/s (0.51 g) at 21.13 s; vertical 0.08 m/s (0.51 g); largest move beyond the velocity 16.25 m at 23.22 s; vUp -0.00..4.62 m/s; height over the ground -0.02..26.21 m ; free flight after 3.57 s at 24.80 m
+low flight, nose 12 degrees down, 20 s at full throttle: largest velocity step 8.55 m/s (52.31 g) at 59.00 s; vertical 8.55 m/s (52.31 g); largest move beyond the velocity 0.07 m at 59.00 s; vUp -8.12..73.97 m/s; height over the ground 5.60..42.49 m ; speed 45.52..86.75 m/s; bounces 0
+  before E: speed 46.02 hAG 13.04 prompt "Land here" canLand true
+  0.02 s: "Setting down on level ground 12 m away" state LANDING
+E at full speed low over the wood: largest velocity step 3.10 m/s (18.97 g) at 42.68 s; vertical -0.74 m/s (4.51 g); largest move beyond the velocity 0.03 m at 42.68 s; vUp -12.98..-0.73 m/s; height over the ground 0.11..35.95 m ; LANDED after 5.13 s
+  before E: speed 2.15 hAG 17.18 h 29.31 canLand true
+E at a hover over the wood: largest velocity step 1.20 m/s (7.32 g) at 52.68 s; vertical -0.80 m/s (4.89 g); largest move beyond the velocity 0.01 m at 52.68 s; vUp -12.88..0.30 m/s; height over the ground -0.12..29.33 m ; LANDED after 4.80 s; touch at -0.81 m/s
+hovering 20 m up in Neptune's squall, no input, 20 s: largest velocity step 3.12 m/s (19.09 g) at 225.35 s; vertical 3.12 m/s (19.09 g); largest move beyond the velocity 0.03 m at 225.35 s; vUp -8.95..19.44 m/s; height over the ground 4.38..46.29 m ; bounces 0

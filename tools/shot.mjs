@@ -11,6 +11,8 @@
 //   --eval "js"           JS to run in the page after ready (may be repeated; each may return a promise)
 //   --shots N --every ms  capture N screenshots spaced by ms (out-0.png, out-1.png, ...)
 //   --quality 88          jpeg quality
+//   --shot-timeout 180000 max ms for one screenshot (the painted world in software GL can need
+//                         more than Playwright's 30 s default for a single frame)
 //   --root dir            serve this directory instead of the repo root (e.g. a clean export of HEAD)
 //   --allow-errors        do not exit 1 on console errors
 // Prints console errors / page errors / failed requests. Exit code 1 if there were any.
@@ -67,10 +69,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     catch (e) { problems.push('eval failed: ' + e.message); }
   }
   const n = Number(opt.shots || 1);
+  const shotTimeout = Number(opt['shot-timeout'] || 180000);
   for (let i = 0; i < n; i++) {
     const file = n === 1 ? out : out.replace(/\.(png|jpe?g)$/, `-${i}.$1`);
-    await page.screenshot(/\.jpe?g$/.test(file) ? { path: file, type: 'jpeg', quality: Number(opt.quality || 88) } : { path: file });
-    console.log('wrote', file);
+    try {
+      await page.screenshot(/\.jpe?g$/.test(file)
+        ? { path: file, type: 'jpeg', quality: Number(opt.quality || 88), timeout: shotTimeout }
+        : { path: file, timeout: shotTimeout });
+      console.log('wrote', file);
+    } catch (e) { ok = false; problems.push('SCREENSHOT FAILED (' + file + '): ' + String(e.message).split('\n')[0]); break; }
     if (i < n - 1) await page.waitForTimeout(Number(opt.every || 500));
   }
   await close();

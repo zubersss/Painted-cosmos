@@ -1,0 +1,122 @@
+{
+ "label": "clean export of 0de3fb4",
+ "size": "960x540",
+ "weather": "fair, no kits",
+ "budgets": {
+  "0": "300 k",
+  "1": "600 k, 350 calls",
+  "2": "1.2 M"
+ },
+ "rows": [
+  {
+   "place": "earth:vista:earth-temperate_forest-1",
+   "quality": 0,
+   "tris": 303860,
+   "calls": 190,
+   "over": true,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "earth:spawn:spawn",
+   "quality": 0,
+   "tris": 272038,
+   "calls": 179,
+   "over": false,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "mercury:vista:mercury-crystal_gardens-2",
+   "quality": 0,
+   "tris": 216803,
+   "calls": 167,
+   "over": false,
+   "settled": true,
+   "boom": 0.8,
+   "tight01": 1,
+   "explorerShown": false
+  },
+  {
+   "place": "venus:vista:venus-fungal_towers-2",
+   "quality": 0,
+   "tris": 207934,
+   "calls": 132,
+   "over": false,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "jupiter:vista:jupiter-hanging_gardens-2",
+   "quality": 0,
+   "tris": 231010,
+   "calls": 135,
+   "over": false,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "earth:vista:earth-temperate_forest-1",
+   "quality": 1,
+   "tris": 610650,
+   "calls": 339,
+   "over": true,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "earth:spawn:spawn",
+   "quality": 1,
+   "tris": 545589,
+   "calls": 294,
+   "over": false,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "mercury:vista:mercury-crystal_gardens-2",
+   "quality": 1,
+   "tris": 420256,
+   "calls": 326,
+   "over": false,
+   "settled": true,
+   "boom": 0.8,
+   "tight01": 1,
+   "explorerShown": false
+  },
+  {
+   "place": "venus:vista:venus-fungal_towers-2",
+   "quality": 1,
+   "tris": 547379,
+   "calls": 265,
+   "over": false,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  },
+  {
+   "place": "jupiter:vista:jupiter-hanging_gardens-2",
+   "quality": 1,
+   "tris": 508106,
+   "calls": 238,
+   "over": false,
+   "settled": true,
+   "boom": 5.2,
+   "tight01": 0,
+   "explorerShown": true
+  }
+ ]
+}
