@@ -4,6 +4,10 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 ## Hand-over, LAST FIX ROUND (twentieth PILOT agent; started about 22:25 UTC 2026-11-13; kept current after every item)
 
+**State at the end of the round (00:15 UTC 2026-11-14):** item 0 (the m3 regression) and items (1), (2), (3), (5) done,
+committed and proven; item (4) not fixed (not reproduced); `node tests/all.mjs --export` on `3cfd184`: ALL 13 PASSED.
+Nothing of PILOT's is half-done or uncommitted. Commits: `3066381`, `3cfd184`, `c1d36c9` (notes), and this hand-over.
+
 Read this first; the nineteenth's hand-over just below holds for everything not named here. The task: the m3
 regression first (tests/all.mjs failed on `45629a7`, steps m3 and painted-m3), then the second blind player's small
 items (1) to (5) if small and safe, then `node tests/all.mjs` in a clean tree. Scratch:
@@ -94,7 +98,13 @@ zeros. First code commit `3066381`: checks on a clean export of `e56a93f` with i
 zeros (worst step loss 0.26 / 0.52 as always); the painted game at quality 0 loads with no console error, fallback
 `[]` (the probes). Commits: `3066381` (items 0, 1, 2, 3, 5), `3cfd184` (item 5 corrected: behind over the ground), and
 the hand-over. `node tests/all.mjs --export` on `3066381`: ALL 13 PASSED (`docs/shots/pilot/last/all-mjs-3066381.txt`);
-on `3cfd184` (with PAINTER's `0112e5e`, `5fd389b`): RUNNING.
+on `3cfd184` (with PAINTER's `0112e5e`, `5fd389b`; the code of the tree as it ships unless someone commits after):
+**ALL 13 PASSED** (`docs/shots/pilot/last/all-mjs-3cfd184.txt`, `-table.json`): unit 208, physics-unit 325, world-unit
+30, static, play-stub 39 checks, play-physics 39, trip-stub 50, m3 33, lock 14, audio, painted-play 39, painted-trip 50,
+painted-m3 33. Not checkable here (all.mjs says so): a real GPU's frame rate, a real mouse under pointer lock, a real
+gamepad, how the sound sounds. Not verified by me: the top tier (quality 2) in the game with this round's code (the
+probes and films ran at quality 0); items (2) and (5) only by teleporting the ship over Mars, not in a full flight.
+Scratch: `/home/user/.pc-scratch/pilot/last/` (`head/` and `all/export/` clean exports; the `t*` trees deleted).
 
 ## Hand-over, PRE-SHIP RE-FIX pass (nineteenth PILOT agent; started about 19:15 UTC 2026-11-13; kept current after every item)
 
