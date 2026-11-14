@@ -9,7 +9,11 @@ accept, each with proof. Scratch: `/home/user/.pc-scratch/pilot/r1/rf/` (`mkex.s
 working files; `head/`: HEAD alone; `mapsweep.mjs`: the touch chart's names over 200 clock times; logs). First commit's
 parent: `3cd414b`.
 
-**State (in progress):**
+**State (19:05 UTC): all three fixed and committed in `64f447a`** (checks on a clean export before it: unit 251,
+world 43, physics 325, coast 2 of 2 PASS, ghostfield 6 of 6 all zeros, the real game loads with no console error and
+`fallback` empty). Running after it, one browser at a time (`rf/chain3.sh`, log `rf/chain3.log`): the touch loop with a
+landing given back, the painted trip with one given back on each world, then `node tests/all.mjs --export --out
+rf/all`, then three plain painted trips. Their results go here when done. Items:
 - **RF-A, W1.2's gate (painted-trip 2 of 3 on 3cd414b):** fixed in the tests (`tests/trip.mjs`, `tests/touch.mjs`,
   `tests/browser.mjs` giveLandingBack, `tests/landingback.test.mjs`). The cause, as the verifier said: a landing that
   BEGAN and was then given back by the game ("No level ground here", `src/ship/flight.js` stepLanding's 'blocked',
@@ -51,8 +55,12 @@ parent: `3cd414b`.
   heap. **Browser sweep** (`rf/mapsweep.mjs`, 200 clock times per profile, the ink measured in the page with
   letterPath, halo included; `rf/sweep/head2.log` on 3cd414b, the final version's log below): 3cd414b: names on names
   404 pairs at 400x225, 25 on the iPhone 14, 12 on the Pixel 7, 4 on the iPad; names on another world's dot 494 / 24 /
-  14 / 10; names off the chart 261 / 6 / 3 / 1. Frames OPENED: `rf/sweep/head2-iphone14-400.jpg` ('Moon' over 'Uranus',
-  'Jupiter' on Earth's dot) and the same clock after the fix (names apart; Jupiter's name left off at 400x225).
+  14 / 10; names off the chart 261 / 6 / 3 / 1. `64f447a` (`rf/sweep/fix3.log`): names on names 0 / 0 / 0 / 0, on another
+  world's dot 0, touching their own dot 0, off the chart 0; names left off 265 in 158 of 200 layouts at 400x225, 16 in
+  15 on the iPhone 14, 5 on the Pixel 7, 2 on the iPad; sizes at 400x225: 1298 at 11.5, 216 at 10.25, 221 at 9; no page
+  error. Frames OPENED, the same clock before and after: `rf/sweep/head2-iphone14-400.jpg` ('Moon' over 'Uranus',
+  'Jupiter' on Earth's dot) and `fix3-iphone14-400.jpg` (nine names apart, each by its dot, 'Uranus' at 9 px,
+  Jupiter's name left off); `head2-iphone14.jpg` and `fix3-iphone14.jpg` (all ten names, apart, in both).
 - **The 'a place to land' label on the throttle gauge at 400x225: judged, not changed.** The labels' rule
   (`src/ui/layout.js` placeMust, the pre-ship R3 ruling) keeps every label off a control on a touch screen (the slips,
   the tabs, the buttons: hard) and lets a label that must show lie on as little of a gauge or a notice (soft) as it can
