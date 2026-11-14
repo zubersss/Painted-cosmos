@@ -529,8 +529,9 @@ export function findLandingSite(p, sample, T = SHIP, obstacles = null, holds = n
   return best;
 }
 
-export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = null, here = false) {
-  const site = findLandingSite(st.p, sample, T, obstacles, holds, here);
+// `found` (optional): a site findLandingSite already chose (the one the prompt was offered for).
+export function beginLanding(st, sample, T = SHIP, obstacles = null, holds = null, here = false, found = null) {
+  const site = found || findLandingSite(st.p, sample, T, obstacles, holds, here);
   if (!site) return false;
   st.landing = { ...site, phase: 'glide', t: 0 };
   st.liftoff = null;

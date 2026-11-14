@@ -18,7 +18,7 @@ import {
   CAMERA, VIEW_PITCH, createFootCamera, lookFootCamera, updateFootCamera, createShipCamera, updateShipCamera, blendPose, boomRoom, crownDistance, crownShape,
 } from '../player/camera.js';
 import {
-  SHIP, stepFlight, beginLiftoff, beginLanding, stepLanding, stepLanded, restOnSurface, floorAt,
+  SHIP, stepFlight, beginLiftoff, beginLanding, findLandingSite, stepLanding, stepLanded, restOnSurface, floorAt,
 } from '../ship/flight.js';
 import { PULSE, arrivalRadius, createPulse, pulseAdvice, courseAdvice, stepPulseSpeed, pulseEta, courseDir } from '../ship/pulse.js';
 
@@ -1439,20 +1439,23 @@ export class Sim {
       if (stalled && sh.speed >= 5 && this._firstStep && !this.notice) this.say(this.slowWord(env));
       const settle = I.down('KeyC') && sh.speed < 5 && (sh.altGround < SHIP.minClearance + 1.2 || stalled);
       if (settle) this._sink = null;
-      const asked = pressed('KeyE') && !slowing && this.landable();
+      // (landable(1): E on the prompt shown a frame ago lands, see landSite)
+      const asked = pressed('KeyE') && !slowing && this.landable(1);
       if (asked && sh.speed > LAND_BEGIN_SPEED && !settle) {
         this._landWish = { t: 0 };
         this.say('Slowing down to land', 3);
       } else if (asked || settle || (slowing && sh.speed <= LAND_BEGIN_SPEED)) {
         this._landWish = null;
         const trees = this.obstaclesNear(this.shFrame.id, sh.p, 80);
-        // With PHYSICS, a site is good when the ground's friction will hold the parked ship.
         const id = this.shFrame.id;
-        const holds = this.physics ? (dir, g) => {
-          const G = this.physics.ground(id, dir, this._ground || (this._ground = {}));
-          return Math.tan(g.slope) < 0.8 * (G.friction || 0.6);
-        } : null;
-        if (beginLanding(sh, this.sampler(id), undefined, trees, holds, settle)) {
+        let begun = beginLanding(sh, this.sampler(id), undefined, trees, this.landHolds(id), settle);
+        // Nothing under the hull holds, but the prompt was offered: land on the ground it was
+        // offered for (found a moment ago, or, after slowing down, the last seen on the way).
+        if (!begun && (asked || slowing)) {
+          const site = this.landSite(false, slowing ? Infinity : 1);
+          begun = !!site && beginLanding(sh, null, undefined, null, null, false, site);
+        }
+        if (begun) {
           this.canopy = []; this.sm.dispatch(EV.beginLanding);
           // The assist picks level, open ground and glides to it. When that is more than a few
           // metres from where the ship hovered (trees, a slope), the screen says so: the
@@ -1463,8 +1466,10 @@ export class Sim {
         }
         else { this.say('Too steep to land here'); this.emit('too-steep'); }
       } else if (pressed('KeyE') && !slowing) {
-        // E without the prompt: never silence. Say what the landing is waiting for.
-        this.say(sh.altGround > LAND_PROMPT_ALTITUDE ? `Come down below ${LAND_PROMPT_ALTITUDE} m to land` : this.slowWord(env));
+        // E without the prompt: never silence. Say what the landing is waiting for (low and
+        // slow enough but no ground near that will hold the ship: the prompt was not offered).
+        if (this.landGate()) { this.say('Too steep to land here: fly on to level ground'); this.emit('too-steep'); }
+        else this.say(sh.altGround > LAND_PROMPT_ALTITUDE ? `Come down below ${LAND_PROMPT_ALTITUDE} m to land` : this.slowWord(env));
       }
     }
   }
@@ -1513,13 +1518,48 @@ export class Sim {
     }
   }
 
-  landable() {
+  // "Land here" is offered only where E will start a landing: low and slow enough (landGate)
+  // and over ground the landing assist will set the ship down on (landSite). (M4's re-fix: over
+  // Saturn's honey_mist the prompt was up and E answered "Too steep to land here".)
+  landable(slack = 0) {
+    this._landOk = this.landGate() && !!this.landSite(false, slack);
+    return this._landOk;
+  }
+
+  landGate() {
     // Once the prompt is up it stays up through a little more height and speed (15 m, 10 m/s),
     // so it does not flicker over rough ground and E pressed on the prompt lands.
     const k = this._landOk ? 1 : 0;
-    this._landOk = this.shFrame.kind === 'body' && this.shFrame.rotating && !this.sh.liftoff
+    return this.shFrame.kind === 'body' && this.shFrame.rotating && !this.sh.liftoff
       && canBeginLanding(this.sm.state, this.sh.altGround - 15 * k, this.sh.speed - 10 * k);
-    return this._landOk;
+  }
+
+  // With PHYSICS, a site is good when the ground's friction will hold the parked ship.
+  landHolds(id) {
+    return this.physics ? (dir, g) => {
+      const G = this.physics.ground(id, dir, this._ground || (this._ground = {}));
+      return Math.tan(g.slope) < 0.8 * (G.friction || 0.6);
+    } : null;
+  }
+
+  // The ground the landing assist would choose from here: the search E makes (about 5 to 9 ms on
+  // the real worlds, so looked for at most every 0.3 s of game time or 10 m of travel; `fresh`
+  // looks now). A site found a moment ago still counts for a little while: 1 s and 20 m for
+  // the prompt, more with `slack` (E: 2 s and 50 m, so E pressed on a prompt shown a frame
+  // earlier always lands, the ship moves at most about 21 m a frame; after slowing down to
+  // land: the last site seen, however far back).
+  landSite(fresh = false, slack = 0) {
+    const sh = this.sh, id = this.shFrame.id, c = this._site;
+    let site;
+    if (!fresh && c && c.id === id && Math.abs(this.t - c.t) < 0.3 && len(sub(c.p, sh.p)) < 10) site = c.site;
+    else {
+      site = findLandingSite(sh.p, this.sampler(id), SHIP, this.obstaclesNear(id, sh.p, 80), this.landHolds(id), false);
+      this._site = { id, t: this.t, p: { ...sh.p }, site };
+      if (site) this._siteKept = this._site;
+    }
+    if (site) return site;
+    const k = this._siteKept;
+    return k && k.id === id && this.t >= k.t && this.t - k.t < 1 + slack && len(sub(k.p, sh.p)) < 20 + 30 * slack ? k.site : null;
   }
 
   // ---- camera ------------------------------------------------------------------------------------
