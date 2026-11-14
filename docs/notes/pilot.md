@@ -6,10 +6,12 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 
 **Read this first.** The lane's commits were checked by an independent verifier; this pass fixes exactly what it did not
 accept, each with proof. Scratch: `/home/user/.pc-scratch/pilot/r1/rf/` (`mkex.sh`: a clean export of HEAD with PILOT's
-working files; `head/`: HEAD alone; `mapsweep.mjs`: the touch chart's names over 200 clock times; logs). First commit's
-parent: `3cd414b`.
+working files; `mapsweep.mjs`: the touch chart's names over 200 clock times in the browser; `evalnames.mjs`,
+`unclear3.mjs`: the same in Node, old and new; `load.mjs`; the logs and frames named below; the exports themselves are
+deleted). Commits: `64f447a` (the code and tests of all three items), `ca3a56a`, `7fece2f` and the last one (notes and
+evidence only). First commit's parent: `3cd414b`.
 
-**State (20:25 UTC): all three fixed and committed in `64f447a`** (checks on a clean export before it: unit 251,
+**State (20:50 UTC, DONE): all three fixed and committed in `64f447a`** (checks on a clean export before it: unit 251,
 world 43, physics 325, coast 2 of 2 PASS, ghostfield 6 of 6 all zeros, the real game loads with no console error and
 `fallback` empty). **`node tests/all.mjs --export` on `ca3a56a` (that code and the notes) in a clean tree: ALL 17
 PASSED** (unit 251, physics 325, world 43, coast 2 of 2, ghostfield 6 of 6 zeros, static, play-stub 39, play-physics
@@ -18,7 +20,11 @@ on), painted-m3 33, painted-touch 68; table `docs/shots/pilot/r1/all-mjs-ca3a56a
 map at 400x225 (`rf/all/painted-touch/loop-iphone14-painted-map.jpg`, OPENED): all ten names apart, each by its dot,
 Mars ringed; its touch map at the iPhone 14's size (`rf/all/touch/loop-iphone14-map.jpg`, OPENED): the same. In the
 painted-touch run the 'a place to land' label over Mars lay on no control and on 1899 px2 of the throttle gauge (of its
-3850): see the judged item below. Nothing of PILOT's is half-done or uncommitted. Items:
+3850): see the judged item below. **Then three plain painted trips** (the verifier's command, `node tests/trip.mjs
+--query 'scale=0.5&quality=0' --w 400 --h 225`, on a clean export of the final code, `rf/ptrip-1..3.log`): PASSED,
+PASSED, PASSED (401, 411, 354 game s; none of the three happened to meet a landing given back or "Too steep": the
+forced runs above are what run that path). With all.mjs's own painted-trip: 4 of 4 plain, and the forced one. The
+scratch exports are deleted. Nothing of PILOT's is half-done or uncommitted. Items:
 - **RF-A, W1.2's gate (painted-trip 2 of 3 on 3cd414b):** fixed in the tests (`tests/trip.mjs`, `tests/touch.mjs`,
   `tests/browser.mjs` giveLandingBack, `tests/landingback.test.mjs`). The cause, as the verifier said: a landing that
   BEGAN and was then given back by the game ("No level ground here", `src/ship/flight.js` stepLanding's 'blocked',
