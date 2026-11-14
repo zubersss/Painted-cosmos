@@ -20,6 +20,11 @@ before/after pair: t, raw bands, halo share, dE76 per region, L* percentiles, bo
 **State:** W2.1 COMMITTED (`9d8c0ba`), W2.2 COMMITTED (`afe8c40`; numbers below). Nothing of mine is
 half-done in the tree. Part 2 of the lane (W2.3 free wins, W2.4 post savings, W2.5 anti-aliasing) is not begun.
 
+Final checks on a clean export of `3138a65` (my last code-bearing state plus PILOT's W3.1): world 30, unit 225, physics
+325, coast PASS at both stands, ghostfield 6 of 6 all zeros; the real game from that export (`tools/shot.mjs`, 960x540):
+no console or page error, `__pc.info().fallback` empty (its screenshot timed out in SwiftShader at 180 s, the tool's own
+limit). My exports under `/home/user/.pc-scratch/painter/r1/trees/` are deleted; the runs (`st-*`), frames and sheets stay.
+
 ### For other roles (from this part of the lane)
 - PILOT (tiers, W6): the old brush and old sheet come back whenever the scene is drawn under 0.6 of the sheet's size
   (`index.js`: `post.inH < 0.6 * post.outH`). Today dynres can still reach that in play (q1 x 0.5, q0 x 0.5); with the
