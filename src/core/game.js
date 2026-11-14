@@ -13,6 +13,7 @@ import { V, len, scale } from './vec.js';
 import { pulseEta, arrivalRadius } from '../ship/pulse.js';
 import { SKETCH, SKETCH_SLIP, biomeKey, vistaKey, sketchHand } from './sketches.js';
 import { figureArgs, hullTrim, hasFootfalls, footLoudness } from '../player/figure.js';
+import { portraitFov } from '../player/camera.js';
 import { words } from './words.js';
 
 const NO_KEYS = { down: () => false, axis: () => 0 };
@@ -184,10 +185,13 @@ export class Game {
     cam.quaternion.set(v.camQ.x, v.camQ.y, v.camQ.z, v.camQ.w);
     const planes = cameraPlanes(v.view, v.clearance, farthestExtent(v.camU, items));
     const P = this._planes;
+    // (held upright the view keeps 60 degrees across: src/player/camera.js portraitFov)
+    this._viewFov = v.fov;
+    const fov = portraitFov(v.fov, cam.aspect);
     if (Math.abs(planes.near - P.near) > P.near * 0.02 || Math.abs(planes.far - P.far) > P.far * 0.02
-        || Math.abs(v.fov - P.fov) > 0.01 || cam.aspect !== P.aspect) {
-      cam.near = planes.near; cam.far = planes.far; cam.fov = v.fov;
-      P.near = planes.near; P.far = planes.far; P.fov = v.fov; P.aspect = cam.aspect;
+        || Math.abs(fov - P.fov) > 0.01 || cam.aspect !== P.aspect) {
+      cam.near = planes.near; cam.far = planes.far; cam.fov = fov;
+      P.near = planes.near; P.far = planes.far; P.fov = fov; P.aspect = cam.aspect;
       cam.updateProjectionMatrix();
     }
     cam.updateMatrixWorld();
@@ -404,6 +408,14 @@ export class Game {
     } catch { return null; } finally {
       if (hide) { for (const o of out) o.visible = true; try { this.repaint(); } catch { /* the next frame repaints */ } }
     }
+  }
+
+  // The picture laid again for a new size while the game is paused (a phone turned upright: main.js):
+  // the view's field fitted to the new aspect, then painted as it stands.
+  repaintFitted() {
+    const cam = this.camera;
+    if (this._viewFov) { cam.fov = portraitFov(this._viewFov, cam.aspect); this._planes.fov = cam.fov; this._planes.aspect = cam.aspect; cam.updateProjectionMatrix(); }
+    this.repaint();
   }
 
   // Paint the frame again as it stands; no time passes. The world goes first: it lays the shade
@@ -737,7 +749,17 @@ export class Game {
       `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}${d && d.capMs ? `   capped at ${(1000 / d.capMs).toFixed(0)} fps` : ''}`,
       `world ${s.worldMs.toFixed(1)} ms (worst ${Math.max(0, ...s.worldWindow).toFixed(1)})   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
       this.weatherText(k),
-    ].join('\n');
+    ].concat(this.deviceText()).join('\n');
+  }
+
+  // The device preset (W3.5, src/core/preset.js), the drawing buffer, the anti-aliasing and the
+  // depth (reversed where EXT_clip_control exists, else logarithmic): what the owner reads off a
+  // phone (plan, section 6). main.js fills this.device.
+  deviceText() {
+    const d = this.device;
+    if (!d) return [];
+    const aa = typeof d.aa === 'function' ? d.aa() : d.aa;
+    return [`device ${d.preset}   ${d.w}x${d.h} (${(+d.ratio).toFixed(2)} px per css px of ${(+d.deviceRatio).toFixed(2)})   AA ${aa || 'none'}   depth ${d.depth || '-'}`];
   }
 
   // What the weather is doing and what its marks cost (the world draws PHYSICS' kits itself:

@@ -7,7 +7,9 @@
 //   node tests/touch.mjs --part input --devices iphone14,pixel7,ipadpro11
 //   node tests/touch.mjs --part loop          the whole loop by touch only (iPhone 14, stubs)
 //   node tests/touch.mjs --part loop --painted  the same in the painted world at q0, 400x225
-//   node tests/touch.mjs --part all           input, then the loop on stubs (tests/all.mjs step 'touch')
+//   node tests/touch.mjs --part platform      W3.4 and W3.5: the presets, the buffer, the read-out, the
+//                                             upright views, fullscreen, the wake lock, the manifest
+//   node tests/touch.mjs --part all           input, platform, then the loop on stubs (tests/all.mjs step 'touch')
 //   [--root DIR] [--out DIR] [--query "..."] [--keep]
 //
 // part input (W3.1's acceptance): a tap starts the game with no compatibility mouse event and
@@ -43,7 +45,8 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes('--' + n);
 const val = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const DEVICES = { iphone14: 'iPhone 14 landscape', pixel7: 'Pixel 7 landscape', ipadpro11: 'iPad Pro 11 landscape' };
+const DEVICES = { iphone14: 'iPhone 14 landscape', pixel7: 'Pixel 7 landscape', ipadpro11: 'iPad Pro 11 landscape',
+  'iphone14-up': 'iPhone 14', 'ipadpro11-up': 'iPad Pro 11' };
 const part = val('part', 'input');
 const root = path.resolve(val('root', repo));
 const out = path.resolve(val('out', '/home/user/.pc-scratch/pilot/touch'));
@@ -61,7 +64,15 @@ const COUNTER = `(() => {
     document.addEventListener(t, (e) => { const k = t + (e.pointerType ? ':' + e.pointerType : ''); c[k] = (c[k] || 0) + 1; }, { capture: true, passive: true });
 })();`;
 
-async function open(deviceName, query, override = {}) {
+// An iPhone's Safari has no fullscreen for a page's elements (only for a video): the iPhone
+// profiles model that (Chromium itself would grant it).
+const NO_ELEMENT_FULLSCREEN = `(() => {
+  try { Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: () => false, configurable: true }); } catch {}
+  try { delete Element.prototype.requestFullscreen; Element.prototype.requestFullscreen = undefined; } catch {}
+  try { Element.prototype.webkitRequestFullscreen = undefined; } catch {}
+})();`;
+
+async function open(deviceName, query, override = {}, inits = []) {
   const srv = await startServer(0, root);
   const browser = await pw.chromium.launch({ args: GL_ARGS });
   const dev = deviceName === 'desktop' ? { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, ...override }
@@ -69,6 +80,7 @@ async function open(deviceName, query, override = {}) {
   delete dev.defaultBrowserType;
   const ctx = await browser.newContext(dev);
   await ctx.addInitScript(COUNTER);
+  for (const s of inits) await ctx.addInitScript(s);
   const page = await ctx.newPage();
   page.setDefaultTimeout(1800000);
   const problems = [];
@@ -156,6 +168,7 @@ const lettering = (page) => page.evaluate(() => {
     while (e && e.id !== 'pc-hud') { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') { shown = false; break; } e = e.parentElement; }
     if (!shown) continue;
     const d = svg.querySelector('desc');
+    if (!d) continue;                                  // a drawing (the close corner's cross), not lettering
     // (a lettering without data-size, before W3.3: its words, no size)
     out.push({ t: d ? d.textContent : '', size: svg.dataset.size ? +(+svg.dataset.size * r.height / +svg.getAttribute('height')).toFixed(2) : null,
       sheet: svg.closest('.pc-map') ? 'map' : svg.closest('.pc-book') ? 'book' : svg.closest('.pc-start') ? 'card' : 'hud' });
@@ -334,6 +347,112 @@ async function partInput(device) {
 
 function until(r, pred, s) { return r.until(pred, s); }
 
+// ---- part platform: W3.4 and W3.5 on each profile ---------------------------------------------------
+// The preset (phone, tablet, desktop), the drawing buffer, the tier it starts at and the read-out's
+// device line; the first touch's requests (fullscreen, the sideways lock), the wake lock, the
+// manifest; an upright iPad's view (60 degrees across or more); an upright phone's slip over the
+// waiting picture, gone when it is turned sideways. Every unsupported call fails silently: no
+// console error in any run.
+const PLATFORM = {
+  iphone14: { preset: 'phone', buffer: [Math.floor(750 * 1.25), Math.floor(340 * 1.25)], tier: 1 },
+  pixel7: { preset: 'phone', buffer: [Math.floor(863 * 1.25), Math.floor(360 * 1.25)], tier: 1 },
+  ipadpro11: { preset: 'tablet', maxPixels: 1.6e6, tier: 2 },
+  'ipadpro11-up': { preset: 'tablet', maxPixels: 1.6e6, tier: 2, upright: 'view' },
+  'iphone14-up': { preset: 'phone', tier: 1, upright: 'slip' },
+  desktop: { preset: 'desktop', buffer: [1920, 1080], tier: 2 },
+};
+async function partPlatform(device) {
+  log(`=== ${device}: the platform and the preset (W3.4, W3.5) ===`);
+  const want = PLATFORM[device];
+  // no ?quality: the preset chooses the tier (?dynres=0 holds it there for the reading)
+  const q = val('query', 'stub=render,world,art') + '&dynres=0&fresh=1&save=0&body=earth&time=11';
+  const iphone = /^iphone/.test(device);
+  const r = await open(device, q, device === 'desktop' ? { viewport: { width: 1920, height: 1080 } } : {}, iphone ? [NO_ELEMENT_FULLSCREEN] : []);
+  const { page, fingers, info, gameWait, sleep, size } = r;
+  const W = size.w, H = size.h;
+  const rec = { device, size };
+  try {
+    let i = await info();
+    // (read off the page itself where the code before W3.5 has no device line: the canvas, the camera)
+    const raw = await page.evaluate(() => ({ w: window.__pc.renderer.domElement.width, h: window.__pc.renderer.domElement.height, fov: window.__pc.camera.fov, aspect: window.__pc.camera.aspect }));
+    i.device = { preset: 'none', ...(i.device || {}), w: raw.w, h: raw.h, fov: +raw.fov.toFixed(2), aspect: +raw.aspect.toFixed(4) };
+    i.platform = i.platform || {};
+    rec.device = i.device; rec.quality = i.quality;
+    check(i.device.preset === want.preset, `${size.w}x${size.h} css at ${size.dpr}: the ${i.device.preset} preset (${want.preset} wanted)`);
+    if (want.buffer) check(i.device.w === want.buffer[0] && i.device.h === want.buffer[1], `W3.5: the drawing buffer ${i.device.w}x${i.device.h} (${want.buffer.join('x')} wanted: ${device === 'desktop' ? 'the window, every pixel' : 'css size x 1.25'})`);
+    if (want.maxPixels) check(i.device.w * i.device.h <= want.maxPixels, `W3.5: the drawing buffer ${i.device.w}x${i.device.h} = ${(i.device.w * i.device.h / 1e6).toFixed(2)} MP (at most ${(want.maxPixels / 1e6).toFixed(1)}; ${(Math.floor(size.w * Math.min(size.dpr, 1.5)) * Math.floor(size.h * Math.min(size.dpr, 1.5)) / 1e6).toFixed(2)} MP before)`);
+    check(i.quality === want.tier, `W3.5: it starts at tier ${i.quality} (${want.tier} wanted)`);
+    const stats = await page.evaluate(() => window.__pc.game.statsText().split('\n').find((l) => /^device /.test(l)) || 'no device line');
+    rec.readout = stats;
+    check(new RegExp('^device ' + want.preset + '\\b').test(stats) && /AA \S+/.test(stats) && /depth (reversed|logarithmic|standard)/.test(stats), `W3.5: the read-out names the preset, the AA and the depth: "${stats}"`);
+    // the manifest: read by the browser itself, no icon files, relative addresses
+    const man = await r.cdp.send('Page.getAppManifest').catch((e) => ({ error: e.message }));
+    let parsed = null; try { parsed = JSON.parse(man.data || 'null'); } catch { parsed = null; }
+    rec.manifest = { url: man.url, errors: man.errors, name: parsed && parsed.name };
+    check(!!man.url && /src\/ui\/manifest\.webmanifest$/.test(man.url) && (man.errors || []).length === 0 && parsed && parsed.name === 'Painted Cosmos' && Array.isArray(parsed.icons) && parsed.icons.length === 0 && !/\/\//.test(parsed.start_url),
+      `W3.4: the manifest is found and parses with no error, no icon files (${man.url}; errors ${JSON.stringify(man.errors || man.error)})`);
+    if (want.upright === 'slip') {
+      // a phone held upright: the slip over the waiting picture; the game does not go on under it
+      const sh = await page.evaluate(() => { const e = document.querySelector('.pc-turn'), q = e ? e.getBoundingClientRect() : { width: 0, height: 0 }; return { shown: !!window.__pc.game.hud.uprightShown, w: q.width, h: q.height, words: e ? e.textContent : '(no slip)', up: !!window.__pc.info().upright }; });
+      rec.slip = sh;
+      check(sh.shown && sh.w > 100 && sh.up, `W3.4: held upright, the slip shows: "${sh.words}" (${Math.round(sh.w)}x${Math.round(sh.h)})`);
+      await fingers.tap(W * 0.5, H * 0.7);
+      const t0 = (await info()).t;
+      await sleep(2500);
+      const t1 = (await info()).t;
+      check(t1 === t0, `W3.4: and the game waits under it (game clock ${t0.toFixed(2)} -> ${t1.toFixed(2)} s over 2.5 s)`);
+      await page.screenshot({ path: path.join(out, `platform-${device}-slip.jpg`), type: 'jpeg', quality: 85, timeout: 300000 });
+      await page.setViewportSize({ width: 750, height: 340 });
+      await sleep(1500);
+      const back = await page.evaluate(() => ({ shown: window.__pc.game.hud.uprightShown, t: window.__pc.info().t }));
+      await gameWait(0.5);
+      const t2 = (await info()).t;
+      check(!back.shown && t2 > t1, `W3.4: turned sideways, the slip goes and the game goes on (game clock ${t1.toFixed(2)} -> ${t2.toFixed(2)})`);
+    } else {
+      if (device !== 'desktop') {
+        await fingers.tap(W * 0.62, H * 0.42);
+        await gameWait(0.6);
+      } else { await page.mouse.click(W / 2, H / 2); await gameWait(0.6); }
+      i = await info();
+      i.platform = i.platform || {};
+      check(await page.evaluate(() => window.__pc.game.started), 'the game begins');
+      rec.platform = i.platform;
+      if (device === 'desktop') {
+        check(i.platform.fullscreen === 'not asked' && i.platform.wakeLock === 'not asked', `W3.4: the desktop asks for nothing (fullscreen ${i.platform.fullscreen}, wake lock ${i.platform.wakeLock})`);
+      } else {
+        // (an iPhone: no fullscreen for a page, said nowhere; elsewhere asked, and Chromium grants it)
+        if (iphone) check(i.platform.fullscreen === 'unsupported', `W3.4: an iPhone has no whole screen for a page: ${i.platform.fullscreen}, nothing said (the sideways lock: ${i.platform.orientation})`);
+        else check(i.platform.fullscreen === 'granted' || i.platform.fullscreen === 'refused', `W3.4: the first touch asked for the whole screen: ${i.platform.fullscreen} (the sideways lock: ${i.platform.orientation})`);
+        await gameWait(0.5);
+        i = await info();
+        i.platform = i.platform || {};
+        check(i.platform.wakeLock && i.platform.wakeLock !== 'not asked', `W3.4: the wake lock while playing by touch: ${i.platform.wakeLock}`);
+        const vp = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+        check(vp.w === W && vp.h === H, `the window kept its size (${vp.w}x${vp.h})`);
+      }
+      if (want.upright === 'view') {
+        const cam = await page.evaluate(() => ({ fov: window.__pc.camera.fov, aspect: window.__pc.camera.aspect }));
+        i.device = { ...i.device, fov: +cam.fov.toFixed(2), aspect: +cam.aspect.toFixed(4) };
+        const fh = 2 * Math.atan(Math.tan(i.device.fov * Math.PI / 360) * i.device.aspect) * 180 / Math.PI;
+        rec.view = { vfov: i.device.fov, aspect: i.device.aspect, hfov: +fh.toFixed(2) };
+        check(fh >= 60 - 0.05, `W3.4: an iPad held upright sees ${fh.toFixed(1)} degrees across (at least 60; 42 before), vertical ${i.device.fov} at aspect ${i.device.aspect}`);
+        await page.screenshot({ path: path.join(out, `platform-${device}.jpg`), type: 'jpeg', quality: 85, timeout: 300000 });
+      }
+      if (device === 'iphone14') {
+        // iOS (an iPhone's user agent): the Home Screen hint, once, a few seconds into the game
+        const tw = Date.now();
+        let said = null;
+        while (Date.now() - tw < 240000 && !said) { i = await info(); i.platform = i.platform || {}; if (i.platform.homeScreenHint === 'shown') said = await page.evaluate(() => document.querySelector('.pc-notice').textContent); else await sleep(500); }
+        rec.homeScreen = { state: i.platform.homeScreenHint, said };
+        check(!!said && /Add to Home Screen/.test(said), `W3.4: iOS: "${said}" (${i.platform.homeScreenHint}, at game time ${i.t.toFixed(1)} s)`);
+      }
+    }
+  } catch (e) { fails.push(`${device}: platform: exception: ` + (e && e.stack ? e.stack : e)); }
+  await r.close();
+  check(r.problems.length === 0, `${device}: no console errors, page errors, failed or external requests` + (r.problems.length ? ': ' + [...new Set(r.problems)].slice(0, 5).join(' | ') : ''));
+  return rec;
+}
+
 // ---- the desktop: no touch layer, the mouse as before ---------------------------------------------
 async function partDesktop() {
   log('=== desktop 1280x720 (no touch): the touch layer stays away ===');
@@ -428,7 +547,17 @@ async function partLoop() {
   }
   // W3.3: the smallest lettering of a sheet on the screen (11 css px or more)
   rec.lettering = {};
+  // (held on a phone or a tablet at its own size; a window under 300 css px tall, the painted run's 400 x 225, is
+  // smaller than any phone held sideways at full screen: there the help card is scaled to fit, as on a desktop,
+  // and its size is recorded, not judged: PILOT notes, W3.3 ruling 8)
   async function letteringCheck(stage, sheet) {
+    if (H < 300) {
+      const l = (await lettering(page)).filter((x) => x.sheet === sheet && x.size != null);
+      const min = l.length ? Math.min(...l.map((x) => x.size)) : 0;
+      rec.lettering[stage] = { min, n: l.length, judged: false };
+      log(`  (${stage}: the smallest lettering on the ${sheet} ${min.toFixed(2)} css px in a ${W}x${H} window: recorded, not judged under 300 px)`);
+      return;
+    }
     const l = (await lettering(page)).filter((x) => x.sheet === sheet);
     let sizes = l.map((x) => (x.size == null ? 0 : x.size));
     if (sheet === 'map') sizes = sizes.concat((await page.evaluate(() => window.__pc.map.labelSizes())).map((x) => x.size));
@@ -704,8 +833,11 @@ try {
   if (part === 'input' || part === 'all') {
     for (const d of val('devices', 'iphone14,pixel7,ipadpro11,desktop').split(',')) summary.runs.push(d === 'desktop' ? await partDesktop() : await partInput(d));
   }
+  if (part === 'platform' || part === 'all') {
+    for (const d of val('platform-devices', 'iphone14,pixel7,ipadpro11,ipadpro11-up,iphone14-up,desktop').split(',')) summary.runs.push(await partPlatform(d));
+  }
   if (part === 'loop' || part === 'all') summary.runs.push(await partLoop());
-  if (!['input', 'loop', 'all'].includes(part)) { console.error('unknown part: ' + part); process.exit(2); }
+  if (!['input', 'platform', 'loop', 'all'].includes(part)) { console.error('unknown part: ' + part); process.exit(2); }
 } catch (e) { fails.push('exception: ' + (e && e.stack ? e.stack : e)); }
 summary.fails = fails;
 summary.seconds = Math.round((Date.now() - t0) / 1000);

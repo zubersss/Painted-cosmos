@@ -64,15 +64,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-hud .pc-notice { transition: opacity 0.5s ease, bottom 0.4s ease; }
 .pc-hud .pc-gauges { transition: bottom 0.4s ease; }
 .pc-hud.pc-cockpit .pc-stats { top: 21%; }
-/* The frame read-out (top left, about 110 px tall) is up: what is lettered across the top of the
+/* The frame read-out (top left, about 130 px tall) is up: what is lettered across the top of the
    sheet (the hint, a notice on foot) goes under it (M4's blind play-test: the read-out lay over the
    pointer-lock message). */
 /* A new page's slip is up in the top right corner: a notice on foot, lettered across the top,
    moves to the left of it (the grand tour at 400 x 225: "A view to find 3.0 km..." under the slip). */
 .pc-hud.pc-foot3.pc-sketching .pc-notice { margin: 0 auto 0 7%; }
-.pc-hud.pc-stats-on .pc-hint { top: calc(9% + 116px); }
-.pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 116px); }
-.pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 116px); }
+.pc-hud.pc-stats-on .pc-hint { top: calc(9% + 134px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 134px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 134px); }
 
 /* ---- prompt: a key in ink, an action in the hand ---- */
 /* A key is a loose dab of wash with a broken pencil ring round it (PAINTER's look review):
@@ -311,7 +311,7 @@ html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select:
 /* the read-out leaves the lower left (the left thumb's side, and in a short window the buttons'
    row) for the top left, under the tabs */
 .pc-hud.pc-touch .pc-readout { bottom: auto; top: calc(var(--pc-st) + 68px); left: calc(var(--pc-sl) + 14px); }
-.pc-hud.pc-touch.pc-stats-on .pc-readout { top: calc(var(--pc-st) + 68px + 124px); }
+.pc-hud.pc-touch.pc-stats-on .pc-readout { top: calc(var(--pc-st) + 68px + 142px); }
 /* The corner that closes a sheet (the map, the sketchbook, the help card), 44 css px on the screen
    whatever the sheet's scale, and the map's 'set course' slip. Touch only. */
 .pc-close { display: none; position: absolute; top: 0; right: 0; z-index: 3; width: calc(46px / var(--pc-fit, 1)); height: calc(46px / var(--pc-fit, 1));
@@ -392,8 +392,23 @@ html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select:
    one line under it; the line that says how to open the book is left out. */
 @media (max-height: 520px) {
   .pc-hud.pc-touch .pc-newsketch { width: 196px; right: calc(var(--pc-sr) + 12px); top: calc(var(--pc-st) + 64px); padding: 5px 7px 6px;
-    display: grid; grid-template-columns: 74px 1fr; column-gap: 8px; align-items: center; }
+    display: grid; grid-template-columns: 74px minmax(0, 1fr); column-gap: 8px; align-items: center; }
   .pc-hud.pc-touch .pc-newsketch img { grid-row: 1 / span 2; width: 74px; }
   .pc-hud.pc-touch .pc-newsketch b { margin-top: 0; }
   .pc-hud.pc-touch .pc-newsketch-how { display: none; }
 }
+/* (and in a window under 300 px tall, words only: its name and where it went, under the tabs' row) */
+@media (max-height: 300px) {
+  .pc-hud.pc-touch .pc-newsketch { display: block; width: 168px; top: calc(var(--pc-st) + 52px); right: calc(var(--pc-sr) + 8px); }
+  .pc-hud.pc-touch .pc-newsketch img { display: none; }
+  .pc-hud.pc-touch.pc-sketching .pc-hint { visibility: hidden; }
+}
+/* A phone held upright (W3.4): the game waits; one slip over the picture asks for it to be turned
+   sideways, and nothing else of the interface is up. */
+.pc-turn { display: none; }
+.pc-hud.pc-upright > :not(.pc-turn) { visibility: hidden; }
+.pc-hud.pc-upright .pc-turn { display: flex; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-1.2deg);
+  flex-direction: column; align-items: center; gap: 10px; padding: 16px 24px 14px; color: var(--pc-dark); isolation: isolate; width: max-content; max-width: 80%; }
+.pc-turn::before { content: ''; position: absolute; inset: -4px; z-index: -1; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.16), inset 0 0 18px rgba(88, 68, 53, 0.14);
+  filter: url(#pc-rag) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(2px 5px 10px rgba(35, 42, 69, 0.25)); }

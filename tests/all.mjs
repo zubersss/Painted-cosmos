@@ -54,7 +54,7 @@ const STEPS = [
   { id: 'trip-stub', what: 'Earth, Mars, Saturn in one sitting, reload from the save (stubs)', cmd: ['node', 'tests/trip.mjs', '--out', path.join(out, 'trip-stub')], min: 20 },
   { id: 'm3', what: 'milestone 3: title card, sketchbook and sketches, vistas, gamepad, tiers', cmd: ['node', 'tests/m3check.mjs', '--out', path.join(out, 'm3')], min: 15 },
   { id: 'lock', what: 'pointer lock and the drag-to-look fallback', cmd: ['node', 'tests/lockcheck.mjs', '--out', path.join(out, 'lock')], min: 10 },
-  { id: 'touch', what: 'touch: the stick, the look, the pinch and the buttons on three phone and tablet profiles, a desktop page, then the whole loop by touch (stubs)', cmd: ['node', 'tests/touch.mjs', '--part', 'all', '--out', path.join(out, 'touch')], min: 30 },
+  { id: 'touch', what: 'touch: the stick, the look, the pinch and the buttons on three phone and tablet profiles, a desktop page; the presets, the buffer, the read-out, the upright views, fullscreen, the wake lock and the manifest; then the whole loop by touch (stubs), every string on the screen free of keys', cmd: ['node', 'tests/touch.mjs', '--part', 'all', '--out', path.join(out, 'touch')], min: 60 },
   { id: 'audio', what: 'the sound, measured (no clipping, no clicks, no DC)', cmd: ['node', 'tests/audiocheck.mjs'], min: 10 },
   { id: 'painted-play', what: 'play-through in the painted world', cmd: ['node', 'tests/playthrough.mjs', '--query', painted + '&fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-play')], min: 40 },
   { id: 'painted-trip', what: 'Earth, Mars, Saturn in the painted world, reload from the save', cmd: ['node', 'tests/trip.mjs', '--query', painted, '--w', '400', '--h', '225', '--out', path.join(out, 'painted-trip')], min: 60 },

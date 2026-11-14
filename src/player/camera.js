@@ -9,6 +9,21 @@ import {
   clamp, mix, damp, qLook, qSlerp, qRotate, lerp,
 } from '../core/vec.js';
 
+// A screen held upright (a tablet; a phone in a window taller than wide) keeps at least MIN_HFOV
+// degrees across (W3.4): the vertical field of view, given for a landscape screen, is widened in
+// proportion to what the aspect takes away (a 58 degree view on an upright iPad Pro 11 was 42
+// degrees across). Effects that widen the view (the ship at speed) widen it as before, on top.
+// Nothing changes on a screen wider than about 1.04 to 1 (every desktop window and landscape screen).
+export const MIN_HFOV = 60;
+export function portraitFov(vfovDeg, aspect, base = 58) {
+  if (!(aspect > 0) || !(vfovDeg > 0)) return vfovDeg;
+  const k = Math.tan((MIN_HFOV * Math.PI) / 360) / (aspect * Math.tan((base * Math.PI) / 360));
+  if (k <= 1) return vfovDeg;
+  return Math.min(150, (Math.atan(Math.tan((vfovDeg * Math.PI) / 360) * k) * 360) / Math.PI);
+}
+// The view across, in degrees, of a vertical field vfovDeg on a screen of this aspect.
+export const horizontalFov = (vfovDeg, aspect) => (Math.atan(Math.tan((vfovDeg * Math.PI) / 360) * aspect) * 360) / Math.PI;
+
 // The view pitch a session starts with, and the view is taken back to after a pointer lock
 // that threw it about (rad: 26 degrees down, 17 up).
 export const VIEW_PITCH = Object.freeze([-0.45, 0.3]);

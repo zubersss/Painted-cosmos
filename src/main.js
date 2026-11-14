@@ -13,6 +13,8 @@
 //   stats=1                          show the frame read-out (also the ` key)
 //   fresh=1                          forget the saved game       save=0   do not save
 //   audio=0                          silence
+//   preset=phone|tablet|desktop      the device preset (src/core/preset.js; chosen from the
+//                                    pointer and the screen without it)   fullscreen=0   never ask
 //   kits=0                           no weather marks (rain, snow, dust)   weather=fair   a clear sky, always
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
@@ -26,14 +28,27 @@ import { createBook } from './ui/book.js';
 import { createAudio } from './audio/audio.js';
 import { readSave, restore, clearSave, AutoSave } from './core/save.js';
 import { SketchStore } from './core/sketches.js';
+import { choosePreset, bufferSize } from './core/preset.js';
+import { attachPlatform } from './core/platform.js';
 
 // Every static import has loaded: index.html's watchdog stands down (hardening review P14).
 window.__pcBooting = true;
 
 const params = new URLSearchParams(location.search);
-// The most pixels the drawing buffer may have (the coordinator's ruling, 2026-11-11: 3.7 MP,
-// about 2560x1440).
-const OUTPUT_MAX_PIXELS = 3.7e6;
+// The device preset (W3.5, src/core/preset.js): the desktop draws at up to 1.5 device pixels per
+// css pixel and 3.7 MP (the coordinator's ruling, 2026-11-11: about 2560x1440); a phone or a
+// tablet at up to 1.25 (a tablet at most 1.6 MP), and a phone starts at tier 1.
+const PRESET = (() => {
+  let coarse = false;
+  try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch { /* no media queries: the desktop */ }
+  const scr = window.screen || {};
+  return choosePreset({ coarse, touchPoints: navigator.maxTouchPoints || ('ontouchstart' in window ? 1 : 0),
+    screenW: scr.width || window.innerWidth, screenH: scr.height || window.innerHeight, ask: params.get('preset') });
+})();
+// A phone held upright: the game waits under a slip that asks for it to be turned (W3.4). A
+// tablet plays upright (its view keeps 60 degrees across: src/player/camera.js portraitFov).
+const isUpright = () => PRESET.id === 'phone' && window.innerHeight > window.innerWidth;
+let upright = false;
 const canvas = document.getElementById('pc-canvas');
 const loading = document.getElementById('pc-loading');
 
@@ -134,7 +149,7 @@ async function boot() {
   // HUD's controls; shown only once a finger touches, or on a phone or a tablet from the start.
   const touch = attachTouch(input, canvas);
   hud.bindTouch(touch);
-  // Resolution: the output is capped at OUTPUT_MAX_PIXELS (resize, below); the controller
+  // Resolution: the output is capped by the preset (resize, below); the controller
   // scales the scene inside that.
   const dyn = new DynamicResolution({
     enabled: params.get('dynres') !== '0',
@@ -144,7 +159,8 @@ async function boot() {
     // tier (the resolution still adapts); ?scale= chooses where the resolution starts;
     // ?dynres=0 pins both.
     scale: params.has('scale') ? Number(params.get('scale')) : 1,
-    quality: params.has('quality') ? Number(params.get('quality')) : 2,
+    // (a phone starts a tier down: the preset; the controller may climb from there)
+    quality: params.has('quality') ? Number(params.get('quality')) : PRESET.tier,
     minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
     maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
   });
@@ -167,7 +183,8 @@ async function boot() {
   };
   for (const t of ['pointerdown', 'mousedown', 'keydown', 'touchend', 'click']) document.addEventListener(t, wake, { capture: true });
   // A hidden tab stops the frame loop: silence the mix rather than freeze it (src/audio/audio.js).
-  document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); else audio.resume(); });
+  // (and while a phone is held upright the game waits, silent: see tick)
+  document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); else if (!upright) audio.resume(); });
   // The sketchbook's pictures live beside the save (their own key); ?save=0 keeps them in memory.
   const sketches = new SketchStore(storage && params.get('save') !== '0' ? storage : null);
   if (params.get('fresh') === '1') sketches.clear();
@@ -192,18 +209,35 @@ async function boot() {
     try { physics.warmUp({ bodyId: game.sim.bodyId, time: game.sim.t, focus: game.sim.ex.p }); } catch { /* optional */ }
   }
 
-  // The drawing buffer: the window's pixels at up to 1.5 device pixels per CSS pixel, and at
-  // most OUTPUT_MAX_PIXELS (about 2560x1440; the coordinator's ruling on hardening review P7):
-  // a 1080p screen and a Retina laptop keep every pixel, a 4K monitor draws about 1440p and the
-  // browser stretches it (the paper composite runs at this size whatever the render scale).
+  // The drawing buffer: the window's pixels at up to the preset's device pixels per CSS pixel,
+  // and at most its pixels (the desktop: 1.5 and 3.7 MP, about 2560x1440, the coordinator's
+  // ruling on hardening review P7: a 1080p screen and a Retina laptop keep every pixel, a 4K
+  // monitor draws about 1440p and the browser stretches it; a phone 1.25; a tablet 1.25 and
+  // 1.6 MP). The paper composite runs at this size whatever the render scale.
+  const depthMode = renderer.capabilities && renderer.capabilities.reversedDepthBuffer ? 'reversed'
+    : renderer.capabilities && renderer.capabilities.logarithmicDepthBuffer ? 'logarithmic' : 'standard';
+  let ctxAA = false;
+  try { const a = renderer.getContext().getContextAttributes(); ctxAA = !!(a && a.antialias); } catch { /* none */ }
+  // (the read-out's line about the device: the preset, the buffer, the anti-aliasing and the depth)
+  // (PAINTER's W2.5: painter.info.aa is the scene pass's MSAA samples, 0 for none)
+  const aaMode = () => {
+    try {
+      const m = typeof painter.aaMode === 'function' ? painter.aaMode() : painter.aaMode;
+      if (m) return String(m);
+      const n = painter.info && typeof painter.info.aa === 'number' ? painter.info.aa : null;
+      if (n > 0) return `msaa ${n}x`;
+    } catch { /* the painter cannot say */ }
+    return ctxAA ? 'msaa (canvas)' : 'none';
+  };
+  game.device = { preset: PRESET.id, ratio: 1, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode };
   function resize() {
-    const css = Math.max(1, canvas.clientWidth * canvas.clientHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(OUTPUT_MAX_PIXELS / css));
-    const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-    camera.aspect = w / h;
+    const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET);
+    camera.aspect = b.w / b.h;
     camera.updateProjectionMatrix();
-    painter.resize(w, h);
+    painter.resize(b.w, b.h);
+    Object.assign(game.device, { ratio: b.ratio, deviceRatio: window.devicePixelRatio || 1, w: b.w, h: b.h });
+    // a phone turned upright while the game waits: the picture under the slip is laid again
+    if (isUpright() && window.__pcReady) { try { game.repaintFitted(); } catch { /* the next frame paints */ } }
   }
   window.addEventListener('resize', resize);
   resize();
@@ -236,9 +270,16 @@ async function boot() {
   // ?clock=even: every world turns at its own even rate (the game's clock is uneven: slow dusks
   // and dawns, short nights; an instrument that sets an hour and lets the clock run wants it even).
   if (params.get('clock') === 'even') sim.unevenClock = false;
+  // The platform (W3.4, src/core/platform.js): fullscreen and the sideways lock on the first
+  // touch, the wake lock while playing by touch, the silent switch, iOS's Home Screen hint.
+  const platform = attachPlatform({
+    touch, started: () => game.started, storage, enabled: params.get('fullscreen') !== '0',
+    notice: (text) => { game.uiNotice = text; game.uiNoticeUntil = performance.now() + 9000; },
+  });
   const debug = {
-    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, touch, using: prov.using, note: debugNote, gl,
-    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount) }),
+    game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, touch, platform, using: prov.using, note: debugNote, gl,
+    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount),
+      device: { ...game.device, aa: aaMode(), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(4) }, platform: { ...platform.state }, upright }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
     setTimeScale: (k) => { sim.timeScale = Math.max(0, Math.min(20, k)); },
@@ -276,7 +317,19 @@ async function boot() {
     const dtMs = now - last;
     last = now;
     if (dtMs <= 0 || held) return;
+    // A phone held upright (W3.4): a slip asks for it to be turned sideways, and once the first view
+    // is ready the game waits under it (no time passes, no sound); what the fingers did meanwhile
+    // is dropped when it is turned back.
+    const up = isUpright();
+    if (up !== upright) {
+      upright = up;
+      hud.setUpright(up);
+      if (up) audio.pause();
+      else { if (!document.hidden) audio.resume(); dyn.rest(); judged = 0; input.take(0); }
+    }
+    if (up && window.__pcReady) return;
     game.frame(dtMs / 1000);
+    platform.frame(now / 1000);
     // The controller judges frames only once the first view is on the paper (loading and the
     // first settle are not the machine's pace), and not the first second after that.
     if (window.__pcReady) judged += dtMs / 1000;

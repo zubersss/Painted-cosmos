@@ -8,11 +8,9 @@ Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `
 `f9cf6fe` (PAINTER's W2.3, after this lane's `77b9d9e`). Scratch: `/home/user/.pc-scratch/pilot/r1/p3/`. Parts 1 and 2
 (W1, W3.1, W3.2) are below, done.
 
-**State:** W3.3 DONE (its commit: the code tested on `/home/user/.pc-scratch/pilot/r1/p3/ex`, a clean export of
-`fb40efe` with the W3.3 files). W3.4 and W3.5 are written (saved in `/home/user/.pc-scratch/pilot/r1/p3/wip/` while
-the W3.3 commit was made, then put back) and being proved; then the loop by touch with every new check (stubs and
-painted), the README section and `node tests/all.mjs --export`. Two small W3.3 follow-ups go with the W3.4 commit:
-the sketch slip's name wrapped to its column on a short screen, and words only under 300 px.
+**State:** W3.3 DONE (`ac0a84a`). W3.4 and W3.5 DONE (one commit after it: they share `main.js`'s resize and tick
+and the test's platform part), with the README section for phones and tablets and the loop by touch (stubs and
+painted) carrying every new check. Last: `node tests/all.mjs --export` in a clean tree, then this hand-over's end.
 
 ### W3.3 phone layouts and words
 
@@ -84,7 +82,12 @@ the sketch slip's name wrapped to its column on a short screen, and words only u
   schematic: a moon's place off its planet was never to scale). (6) `name(code)` has a pad mode too (the pad's
   buttons by their standard names, used once the pad is the last hand on the game); the title card is lettered before
   any pad is touched, so the desktop's first words are always the keys'. (7) A sentence about a control the fingers do
-  not have (the stroll on C, the mouse's capture) is not said by touch at all.
+  not have (the stroll on C, the mouse's capture) is not said by touch at all. (8) The 11 px floor is held at the phones'
+  and the tablet's own sizes (iPhone 14 750x340, Pixel 7 863x360, iPad Pro 11; a phone held sideways at full screen
+  is 300 css px tall or more). In a window under 300 px tall (the painted runs' 400x225) the map and the book still
+  letter 11.5 px (measured: 11.50 and 11.50 there), but the help card's seven rows cannot fit at that size without
+  scrolling or paging, so it is scaled to fit as on a desktop (6.8 css px measured at 400x225); the test records it
+  there and does not judge it. Paging the help card for very short windows is left (not asked by the plan).
 
 ### W3.4 platform and W3.5 the phone and tablet preset, part 1
 
@@ -101,6 +104,80 @@ the sketch slip's name wrapped to its column on a short screen, and words only u
   `src/ui/hud.js` (`setUpright`: the slip "turn the phone sideways to play" with a phone drawn turning),
   `src/ui/theme.css` (the slip; room for the read-out's sixth line), `tests/preset.test.mjs` (4),
   `tests/platform.test.mjs` (6), `tests/touch.mjs --part platform`.
+- **How it plays:** on a phone or a tablet the first touch asks for the whole screen and then for the screen kept
+  sideways (Android, an iPad; asked once, a refusal says nothing); an iPhone has no whole screen for a page, so 8 s into
+  the first game it says once "For the whole screen: Share, then Add to Home Screen" (not from the Home Screen, not when
+  the whole screen was given); the screen is kept awake while the game is played by touch; Safari's audio session is
+  set to playback (sound with the silent switch on, iOS 17+). A phone held upright: a slip "turn the phone sideways to
+  play" (a phone drawn turning) over the picture, the game waiting under it (no time, no sound; the picture laid again
+  at the new size), and on with it when turned back. A tablet plays upright, its view keeping 60 degrees across. The
+  picture: a phone (coarse pointer, touch points, short screen side under 500 css px) draws at 1.25 px per css px and
+  starts at tier 1; a tablet at 1.25 and at most 1.6 MP, tier 2; the desktop as before (1.5, 3.7 MP, tier 2). The
+  read-out's last line: `device phone   937x425 (1.25 px per css px of 3.00)   AA none   depth reversed`.
+- **Acceptance, measured** (`node tests/touch.mjs --part platform` on a clean export of `ac0a84a` with these files;
+  first run `touch-platform.log`: 4 profiles PASS, 2 checks failed and were fixed (below); the iPhone profiles again,
+  `touch-platform2.log`: PASSED):
+  - **iPhone 14 landscape: buffer 937x425 = css size x 1.25** (1125x510 before), the phone preset, tier 1; **Pixel 7:
+    1078x450** (1294x540 before), tier 1; **iPad Pro 11: 1492x1042 = 1.55 MP** (1791x1251 = 2.24 MP before), tier 2;
+    **a desktop 1920x1080 window keeps 1920x1080**, tier 2. The read-out names the preset, the AA (`none` today: PAINTER's
+    MSAA, W2.5, can say its mode through `painter.aaMode`) and the depth (`reversed` in this Chromium).
+  - **iPad Pro 11 upright: 60.0 degrees across** (vertical 79.16 at aspect 0.698; 42.3 before). Frame OPENED:
+    `docs/shots/pilot/r1/platform-w34-upright.jpg` (right: the upright iPad sees the ship beside the explorer).
+  - **Phone upright: the slip shows** ("turn the phone sideways to play", 333x116 css px) and the game waits under it
+    (game clock 8.05 -> 8.05 s over 2.5 s); turned sideways, the slip goes and the clock runs (8.05 -> 9.57). Frame
+    OPENED: the same sheet, left.
+  - **The manifest:** Chromium's own `Page.getAppManifest` finds `src/ui/manifest.webmanifest` and parses it with no
+    error; no icon files; relative addresses. **The static rules still pass.**
+  - **Fullscreen and the lock:** asked at the first touch on the Pixel 7 and the iPad (headless Chromium grants both,
+    the window keeps its size); on the iPhone profiles (with an iPhone's lack of element fullscreen modelled: no
+    `requestFullscreen`, `fullscreenEnabled` false) `unsupported`, nothing said, and the Home Screen hint shows ("For
+    the whole screen: Share, then Add to Home Screen"). **The wake lock:** asked on every touch profile (headless
+    Chromium refuses it: `refused`, silent). **The desktop asks for nothing.** **No console error in any run.**
+  - Unit: `tests/platform.test.mjs` (6: the requests in order, once; refusals, throws and missing APIs silent and not
+    asked again, no rejection left unhandled; the wake lock asked again when the page comes back; the audio session;
+    the hint once ever, 8 s in, never on Android, from the Home Screen or with the whole screen given),
+    `tests/preset.test.mjs` (4: the presets, the buffers, main.js wired to them, the upright field). Both fail on the
+    commit before (their modules do not exist there).
+  - **Fixed with this commit, from W3.3's commit (`ac0a84a`):** its `tests/touch.mjs` was changed after its proof run (to
+    read lettering without `data-size` on the old code, for the before run) and then also measured the close corner's
+    drawn cross as a lettering of size 0, so its loop failed its three lettering checks falsely (the W3.3 proof run used
+    the version before that change). The measure now skips drawings (no `desc`). Also with this commit (W3.3's): the
+    sketch slip's name wrapped to its own column on a short screen (it ran off the slip), words only under 300 px, the
+    hint hidden under it there.
+  - First run's two failures, fixed: (1) on the iPhone profile Chromium granted fullscreen, so the hint was rightly not
+    needed but the test wanted it: the iPhone profiles now model Safari's missing element fullscreen, and the hint rule
+    says "not needed" when the whole screen was given (it had said "standalone"); (2) the upright phone's test could not
+    turn the window while it was fullscreen: the same model.
+  - **Before** (the same platform part against a clean export of `d22ea35`, the commit before this one): FAILS 21 checks
+    (`touch-platform-before.log`): iPhone 14 buffer **1125x510**, tier 2, no device line, no manifest; iPad Pro 11
+    upright **2.24 MP**, **42.3 degrees across**; an upright phone: no slip, the game runs on (9.55 -> 10.55 s).
+  - **The loop by touch with every check (W3.2's and W3.3's) on this code:** stubs, iPhone 14: **PASSED** (363 s,
+    `touch-loop3.log`); **the painted world at q0 400x225: PASSED** (439 s on a clean export of `d22ea35` with these
+    files, PAINTER's W2.5 included: a 67 s pulse, arrived 6.7 km off Mars, landed by touch, no console error, `fallback`
+    empty; `touch-painted2.log`). Its frames OPENED: `docs/shots/pilot/r1/touch-w345-painted-loop.jpg` (landed, flying,
+    the map, "Pulse to Mars", "Land here", the book, the help card, "Board ship" on Mars). Seen there, at 400x225 only
+    (a window smaller than a phone at full screen): the map's chart is small beside its 200 px column and its names
+    crowd (Moon on Neptune, Jupiter on Mercury); the book's page has room only for the world's name under a four-line
+    foot; the help card is scaled to fit (6.8 px). The map's column is made narrower in narrow windows next (tested
+    by all.mjs's painted-touch step).
+- **Checks on a clean export of `d22ea35` with these files:** unit **244** (234 + preset 4 + platform 6), physics 325,
+  world 43, coast PASS at both stands, ghostfield 6 of 6 all zeros, static rules hold; the painted loop's page: no
+  console error, `fallback` empty. Numbers of every run: `docs/shots/pilot/r1/touch-w345-runs.json`.
+- **Rulings (W3.4, W3.5):** (1) The manifest lives in `src/ui/` (not the root): `tools/commit.sh pilot` commits no
+  new root file; its `start_url` and `scope` are `../../`, relative, so GitHub Pages' sub-path works. If the
+  coordinator wants it at the root: move it, set both to `./`, and change the link in `index.html` (pilot's file).
+  (2) Fullscreen and the lock are asked for on the first touch only where the touch layer is up (never on a desktop),
+  once; `?fullscreen=0` turns it off. (3) The wake lock is asked for only while playing by touch (a desktop keeps its
+  screen awake by its own input). (4) An upright phone's game waits only once the first view is ready (it loads under
+  the slip); a tap there is not dropped from `input.used` (it begins the game once turned), but its keys are. (5) The
+  upright field keeps 60 degrees across by widening the vertical view in proportion (the ship's wider views at speed
+  widen too); it touches nothing wider than about 1.04 to 1. (6) The phone/tablet split uses the screen's short side
+  (stable when turned), the window's where there is no screen; the plan's "coarse pointer" also needs touch points
+  (a coarse pointer without touch is a TV remote, the desktop). (7) The read-out's AA: PAINTER's `painter.info.aa`
+  (the scene pass's samples, W2.5: `msaa 4x` on a desktop at tiers 2 and 1, `none` on touch and at tier 0) or a
+  `painter.aaMode` if PAINTER ever adds one.
+- **README:** a section "Phones and tablets" (the whole screen, upright, the picture's preset, sound, a table of the
+  touch controls, what was never tried), the read-out's sixth line, `?preset=` and `?fullscreen=0`.
 
 ## Hand-over, RELEASE 1, PILOT lane part 2: W3.1 (gesture guard, touch input) and W3.2 (touch HUD) (started 10:00 UTC 2026-11-14; kept current)
 

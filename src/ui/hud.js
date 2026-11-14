@@ -53,6 +53,13 @@ export function createHud(root) {
   const freshHow = el('span', 'pc-label pc-newsketch-how', fresh);
   let freshTimer = 0;
   const readout = el('div', 'pc-readout pc-label', root);
+  // A phone held upright (W3.4): one slip over the waiting picture, a phone drawn turning sideways.
+  const turn = el('div', 'pc-turn', root);
+  turn.insertAdjacentHTML('beforeend', '<svg class="pc-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="48" viewBox="0 0 64 48" aria-hidden="true">'
+    + '<rect x="6" y="6" width="20" height="34" rx="4" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45" filter="url(#pc-rough)"/>'
+    + '<rect x="24" y="20" width="34" height="20" rx="4" fill="rgba(77,96,178,0.16)" stroke="currentColor" stroke-width="1.5" filter="url(#pc-rough)"/>'
+    + '<path d="M22 8C34 6 42 10 45 17M40.6 14.2L45.4 17.6L46.4 11.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  el('span', '', turn, 'turn the phone sideways to play', SIZE.prompt);
   const dot = el('div', 'pc-reticle', root);
   // ---- the touch controls (src/core/touch.js; shown only while the touch layer is up) --------
   // The stick's ring where the left thumb is (a faint one where it would be, while no thumb is
@@ -315,7 +322,9 @@ export function createHud(root) {
     showSketch(url, title, sub, seconds = 6) {
       freshImg.src = url;
       // (a long name is wrapped to the slip: "Alpine Meadow and Snow Peaks" ran off it and off the screen)
-      const room = Math.max(120, (fresh.clientWidth || 160) - 14);
+      // (on a short touch screen the sketch lies beside its name, theme.css: the name's own column)
+      let room = Math.max(120, (fresh.clientWidth || 160) - 14);
+      try { if (getComputedStyle(fresh).display === 'grid') room = Math.max(90, freshTitle.clientWidth - 4); } catch { /* no styles: the slip's width */ }
       ink(freshTitle, wrapLettering(title || '', SIZE.body, room), SIZE.body);
       // (its first line says where the page went, the rest how to open the book: a short screen
       // shows the first only, theme.css)
@@ -360,6 +369,9 @@ export function createHud(root) {
       }
     },
     get touchShown() { return root.classList.contains('pc-touch'); },
+    // A phone held upright: the slip that asks for it to be turned, over the waiting picture.
+    setUpright(on) { root.classList.toggle('pc-upright', !!on); },
+    get uprightShown() { return root.classList.contains('pc-upright'); },
     // (the first time the card is put away the game has begun: from then on it is the help card, whole)
     showStart(on) {
       if (!on) card.classList.remove('pc-title-only');
