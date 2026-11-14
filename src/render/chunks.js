@@ -103,6 +103,9 @@ vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, 
 // pcFp: the pixel's footprint on the land in metres, set at the top of a material's main, before any discard
 // (pcFp = pcFootprint(vBody);); a material that does not set it keeps every mark exactly as before.
 float pcFp = 0.0;
+// (R1 re-fix) pcDist: the view distance in metres, set beside pcFp by a material that lays the leaf shadow from afar
+// (pcDappleL: its far octaves); 0 keeps it as it was
+float pcDist = 0.0;
 float pcFootprint(vec3 p) { vec3 a = dFdx(p), b = dFdy(p); return sqrt(max(dot(a, a), dot(b, b))); }
 // What of a uNoise3D channel read at p / sc lies inside the pixel, as a variance: (the channel's variance, the squared
 // size in texels at which half of it is averaged away), measured on the 64^3 noise's own mip chain (texgen.js
@@ -215,18 +218,33 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
 // flecks do, a few centimetres a second. (It used to be projected through the planet's centre: on a
 // world 4 km in radius with a day of 25 minutes the flecks ran over the forest floor at 17 m/s.)
 // (what of the leaf shadow lies inside the pixel, as a variance: its two channels at 13 m and 4.1 m, weights 0.68 and 0.32)
-float pcDappleSub() { return 0.4624 * pcSub(13.0, PC_NRG) + 0.1024 * pcSub(4.1, PC_NRG); }
+// (R1 re-fix: the 4.1 m channel repeats every 4.1 m; from about 1.6 m a pixel, 1 km up, its repeat is under three pixels
+// and what the mip level leaves of it is a regular lattice. It eases to its mean from 0.20 to 0.40 of its repeat a pixel
+// (nothing changes at 400 m), its whole variance counted inside the pixel, so the share of the floor in sun is kept.)
+float pcDappleE() { return smoothstep(0.20, 0.40, pcFp / 4.1); }
+// (R1 re-fix: the leaf shadow's 13 m channel, its cells 3.25 m, was a hatch of one- and two-pixel dashes from 1 km, in the
+// design itself (the same hatch in a render at 4x, box-filtered down) and in the picture: a mark finer than a brush
+// can lay. Far off it is laid at twice its size for each doubling of the distance past 500 m (the terrain's brush marks
+// keep their size on the sheet the same way), the two sizes cross-faded, each thresholded on its own so the share of
+// sun is the same at every size: flecks of a few pixels, never a hatch. Under 500 m nothing changes.)
+vec3 pcDappleOct() { float ld = log2(max(pcDist / 500.0, 1.0)), l0 = floor(ld); return vec3(13.0 * exp2(l0), smoothstep(0.2, 0.8, ld - l0), 0.0); }
+float pcDappleSub() { vec3 o = pcDappleOct(); return 0.4624 * pcSub(o.x * (1.0 + o.y), PC_NRG) + 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE()); }
 float pcDappleL(vec3 bodyPos, float canopy, float lift) {
   vec3 pp = bodyPos + uSunDirL * (lift / max(dot(normalize(bodyPos), uSunDirL), 0.22));
-  float a = texture(uNoise3D, pp / 13.0).r;
-  float b = texture(uNoise3D, pp / 4.1 + 0.37).g;
-  float v = a * 0.68 + b * 0.32;
+  vec3 o = pcDappleOct();
+  float b = mix(texture(uNoise3D, pp / 4.1 + 0.37).g, 0.5, pcDappleE());
   float th = mix(0.05, 0.585, canopy);
   // mostly a crisp-edged glaze, here and there feathered where the wash was still wet
   float w = mix(0.012, 0.075, smoothstep(0.55, 0.75, texture(uNoise3D, pp / 23.0 + 0.7).b));
   // under an overcast nothing casts a shadow: only the dimness under the canopy is left
   // (R1 W2.1: from the air the flecks are finer than the pixel; there they ease to the share of the floor in sun)
-  return mix(pcStepF(th - w, th + w, v, pcDappleSub()), 1.0 - 0.42 * canopy, uWx.x);
+  // (the 13 m channel read with the place's own gradients over its own scale: the scale steps with the distance, and the
+  // screen's derivative across a step would read the coarsest level along it; at 13 m it is the read as it always was)
+  vec3 dpx = dFdx(pp), dpy = dFdy(pp);
+  float subB = 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE());
+  float s = pcStepF(th - w, th + w, textureGrad(uNoise3D, pp / o.x, dpx / o.x, dpy / o.x).r * 0.68 + b * 0.32, 0.4624 * pcSub(o.x, PC_NRG) + subB);
+  if (o.y > 0.001) s = mix(s, pcStepF(th - w, th + w, textureGrad(uNoise3D, pp / (2.0 * o.x), dpx / (2.0 * o.x), dpy / (2.0 * o.x)).r * 0.68 + b * 0.32, 0.4624 * pcSub(2.0 * o.x, PC_NRG) + subB), o.y);
+  return mix(s, 1.0 - 0.42 * canopy, uWx.x);
 }
 float pcDapple(vec3 bodyPos, float canopy) { return pcDappleL(bodyPos, canopy, 8.0); }
 

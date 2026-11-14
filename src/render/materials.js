@@ -110,6 +110,7 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1: every mark below is laid as the pixel sees it, chunks.js)
+  pcDist = length(vView);         // (R1 re-fix: the leaf shadow's far octaves, chunks.js)
   vec3 nV = normalize(vNV);
   vec3 nL = normalize(vNL);
   float dist = length(vView);
@@ -870,6 +871,7 @@ varying float vFog;
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
+  pcDist = length(vView);         // (R1 re-fix: the leaf shadow's far octaves, chunks.js)
   float part = vData.y;
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
