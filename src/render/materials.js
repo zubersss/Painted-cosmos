@@ -109,6 +109,7 @@ uniform vec2 uRound;      // x: how far from the ground the eye is, as the relie
 uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place, w its size (0: none)
 void main() {
   #include <logdepthbuf_fragment>
+  pcFp = pcFootprint(vBody);      // (R1 W2.1: every mark below is laid as the pixel sees it, chunks.js)
   vec3 nV = normalize(vNV);
   vec3 nL = normalize(vNL);
   float dist = length(vView);
@@ -127,6 +128,7 @@ void main() {
   vec4 ma = texture(uNoise3D, q / 2.3 + 0.13), mb = texture(uNoise3D, q / 4.6 + 0.13);
   vec4 fa = texture(uNoise3D, q / 0.61 + 0.57), fb = texture(uNoise3D, q / 1.22 + 0.57);
   float markFade = 1.0 - smoothstep(150.0, 520.0, dist);
+  float ms = exp2(l0);       // (the marks' octave, metres per unit of q: what of each pattern lies inside the pixel scales with it)
 
   // far away the forest floor reads as its canopy: one broad soft wash
   vec3 c = mix(vCol2, vCol.rgb, mid);
@@ -135,16 +137,18 @@ void main() {
   float d = 1.0 + (n1.r - 0.5) * 0.75 + (n2.g - 0.5) * 0.40 * near;
   // broken colour: darker touches of the brush inside the wash
   // (soft-edged and of uneven size: touches laid into a damp wash, not a pattern of dots)
-  float dab = mix(smoothstep(0.50, 0.66, ma.r * 0.72 + ma.a * 0.28), smoothstep(0.50, 0.66, mb.r * 0.72 + mb.a * 0.28), lf) * markFade;
+  float dab = mix(pcStepF(0.50, 0.66, ma.r * 0.72 + ma.a * 0.28, 0.5184 * pcSub(2.3 * ms, PC_NRG) + 0.0784 * pcSub(2.3 * ms, PC_NA)),
+                  pcStepF(0.50, 0.66, mb.r * 0.72 + mb.a * 0.28, 0.5184 * pcSub(4.6 * ms, PC_NRG) + 0.0784 * pcSub(4.6 * ms, PC_NA)), lf) * markFade;
   d += dab * 0.30 * (1.0 - vPar.x * 0.5);
   // small crisp marks: grass, twigs, grit, laid with the tip of the brush
-  float flick = mix(smoothstep(0.668, 0.70, fa.g * 0.72 + ma.b * 0.28), smoothstep(0.668, 0.70, fb.g * 0.72 + mb.b * 0.28), lf) * markFade;
+  float flick = mix(pcStepF(0.668, 0.70, fa.g * 0.72 + ma.b * 0.28, 0.5184 * pcSub(0.61 * ms, PC_NRG) + 0.0784 * pcSub(2.3 * ms, PC_NB)),
+                    pcStepF(0.668, 0.70, fb.g * 0.72 + mb.b * 0.28, 0.5184 * pcSub(1.22 * ms, PC_NRG) + 0.0784 * pcSub(4.6 * ms, PC_NB)), lf) * markFade;
   d += flick * 0.50 * (0.25 + 1.25 * vPar.x) * smoothstep(1.5, 7.0, dist);    // grit shows on rough ground, hardly at all on smooth sand or ice
   // neighbouring pigments run into each other: drifts of green and of warm earth
   vec3 hueA = c * uHueA;
   vec3 hueB = c * uHueB;
-  c = mix(c, hueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
-  c = mix(c, hueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * mid);
+  c = mix(c, hueA, pcStepF(0.50, 0.72, n1.b, pcSub(31.0, PC_NB)) * 0.8);
+  c = mix(c, hueB, pcStepF(0.52, 0.74, n2.r, pcSub(6.3, PC_NRG)) * 0.6 * mid);
 
   // strata: beds of unequal thickness that follow the height, strongest on steep faces
   float steep = smoothstep(0.05, 0.38, 1.0 - dot(nL, normalize(vBody)));
@@ -179,12 +183,14 @@ void main() {
     vec3 wp = vAnch + (n2.rgb - 0.5) * 2.2 + (ma.rgb - 0.5) * 0.5;
     float a1 = pcTri8(wp, nL, 1.0 / 16.0).a;
     float w1 = 0.035 + 0.075 * n1.b;
-    float fine = 1.0 - smoothstep(w1 * 0.35, w1, a1);
-    fine *= smoothstep(0.36, 0.50, n2.b + (n1.g - 0.5) * 0.7);
+    // (R1 W2.1: the atlas' cell field changes by about 17 a tile, so 1.1 a metre at 1/16 and 0.27 at 1/64; its cells
+    // are 16/11 and 64/11 m; a line covers about 1.8 times its mean width of the land, texgen.js genStrokes)
+    float fine = pcLineF(w1 * 0.35, w1, a1, 1.1 * pcFp, 1.45, 1.8);
+    fine *= pcStepF(0.36, 0.50, n2.b + (n1.g - 0.5) * 0.7, pcSub(6.3, PC_NB) + 0.49 * pcSub(31.0, PC_NRG));
     vec3 wp2 = vAnch + (n1.rgb - 0.5) * 11.0 + (n2.rgb - 0.5) * 2.0;
     float a2 = pcTri8(wp2, nL, 1.0 / 64.0).a;
-    float big = 1.0 - smoothstep(0.012, 0.045 + 0.05 * n2.r, a2);
-    big *= smoothstep(0.30, 0.46, n1.g + (n2.b - 0.5) * 0.5);
+    float big = pcLineF(0.012, 0.045 + 0.05 * n2.r, a2, 0.27 * pcFp, 5.8, 1.8);
+    big *= pcStepF(0.30, 0.46, n1.g + (n2.b - 0.5) * 0.5, pcSub(31.0, PC_NRG) + 0.25 * pcSub(6.3, PC_NB));
     float crack = max(fine * near * 0.75, big * mix(0.55, 1.0, near) * mid);
     if (vPar.w > 0.0) c = pcDensity(c, 1.0 + crack * vPar.w * 2.2 * (1.0 - snowC * 0.8));
     else c = mix(c, mix(vec3(0.98, 0.52, 0.20), vec3(1.0, 0.86, 0.50), fine * near), clamp(crack * -vPar.w * 1.5, 0.0, 0.92));
@@ -194,10 +200,21 @@ void main() {
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float x = dot(nV, sunV) * 0.5 + 0.5;
   if (near > 0.0) sunny = min(sunny, 1.0 - pcCast(vBody, (ma.g - 0.5) * 0.34 + (n2.b - 0.5) * 0.16));
-  x = mix(min(x, 0.44) - (1.0 - smoothstep(0.30, 0.50, n1.g)) * 0.22 * vPar.z, x, sunny);
-  x += (n1.g - 0.5) * 0.10 + (mix(fa.b, fb.b, lf) - 0.5) * 0.06 * near;
-  float lvl = pcLevel(x, 0.045);
-  c = pcTone(c, lvl);
+  float xn = (n1.g - 0.5) * 0.10 + (mix(fa.b, fb.b, lf) - 0.5) * 0.06 * near;
+  float xS = min(x, 0.44) - (1.0 - smoothstep(0.30, 0.50, n1.g)) * 0.22 * vPar.z + xn, xL = x + xn;
+  // (R1 W2.1: the light's steps no sharper than the pixel; and where the leaf shadow is finer than the pixel, the shade
+  // and the sunlit wash are each laid in their own share of it: the light read at the mixed value was one middle step,
+  // not the floor's mean colour)
+  float fwL = fwidth(xL);
+  float lvl = pcLevelF(mix(xS, xL, sunny), 0.045, fwL);
+  vec3 cT = pcTone(c, lvl);
+  float fk = smoothstep(0.0002, 0.0016, pcDappleSub());
+  if (fk > 0.001) {
+    float lvL = pcLevelF(xL, 0.045, fwL);
+    cT = mix(cT, mix(pcTone(c, pcLevelF(xS, 0.045, fwL)), pcTone(c, lvL), sunny), fk);
+    lvl = mix(lvl, lvL, fk);
+  }
+  c = cT;
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
   // (PAINTER 14: a sun fleck on the floor of a wood is the picture's light: where the sun gets through the canopy the
   // wash is laid thin, nearly bare paper warmed by the light. The reference forest had no paper anywhere: its flecks
@@ -205,11 +222,14 @@ void main() {
   // worlds (a canopy under 0.55: fungus, kelp, groves) are not touched.)
   // (a patch of sun is laid thinner, and its heart (the same pattern read at a higher threshold) thinnest, so a fleck
   // goes from a pale sunlit green at its edge to nearly paper in its middle; the floor keeps its shade)
-  float fleck = sunny * (0.55 + 0.45 * pcDappleL(vBody, vPar.z * 1.08, 8.0)) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
+  // (R1 W2.1: the heart lies inside the patch, so 0.55 of the patch plus 0.45 of its heart: the same where both are
+  // drawn, and the right share where they are finer than the pixel)
+  float fleck = (0.55 * sunny + 0.45 * min(pcDappleL(vBody, vPar.z * 1.08, 8.0), sunny)) * smoothstep(0.55, 0.90, vPar.z) * smoothstep(2.3, 2.85, lvl) * uDayness * (1.0 - uWx.x) * (1.0 - snowC);
   c = mix(c, mix(c, vec3(1.0), 0.55) * uLight, fleck * 0.8);
 
   // dry brush on rough ground: the brush skips, paper sparkles through in small broken flecks
-  float dryM = mix(smoothstep(0.60, 0.69, fa.b * 0.62 + fa.r * 0.38), smoothstep(0.60, 0.69, fb.b * 0.62 + fb.r * 0.38), lf);
+  float dryM = mix(pcStepF(0.60, 0.69, fa.b * 0.62 + fa.r * 0.38, 0.3844 * pcSub(0.61 * ms, PC_NB) + 0.1444 * pcSub(0.61 * ms, PC_NRG)),
+                   pcStepF(0.60, 0.69, fb.b * 0.62 + fb.r * 0.38, 0.3844 * pcSub(1.22 * ms, PC_NB) + 0.1444 * pcSub(1.22 * ms, PC_NRG)), lf);
   c = mix(c, vec3(1.0), dryM * vPar.x * markFade * (0.24 + 0.16 * lvl));
   // standing water after rain: small pale shapes of sky lying in the flats near the eye
   // (a puddle is a pale, soft-edged piece of sky: it runs into the wet ground round it, with
@@ -847,6 +867,7 @@ varying float vAbove;
 varying float vFog;
 void main() {
   #include <logdepthbuf_fragment>
+  pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
   float part = vData.y;
   vec3 nV = normalize(vNV);
   if (!gl_FrontFacing) nV = -nV;
@@ -1026,7 +1047,7 @@ void main() {
     float lvl = pcLevel(x, 0.12);
     c = pcTone(c, lvl);
     if (uGem > 0.5) c = mix(c, vec3(0.99, 0.985, 0.97), smoothstep(0.72, 0.92, rimR + (nr.b - 0.5) * 0.3) * smoothstep(1.6, 2.6, lvl) * 0.6);
-    float dryM = smoothstep(0.60, 0.70, nf.b * 0.6 + nf.r * 0.4);
+    float dryM = pcStepF(0.60, 0.70, nf.b * 0.6 + nf.r * 0.4, 0.36 * pcSub(0.55, PC_NB) + 0.16 * pcSub(0.55, PC_NRG));
     c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));
     id = 3.0 + seed * 0.9;
   }
@@ -1448,6 +1469,7 @@ varying float vLoad;
 varying float vKind;
 void main() {
   #include <logdepthbuf_fragment>
+  pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js)
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
   // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks
   vec4 n2 = texture(uNoise3D, vBody * vec3(7.0, 2.0, 7.0) + vS.z * 3.0);

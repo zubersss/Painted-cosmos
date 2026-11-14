@@ -4,7 +4,72 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of the LAST FIXES' RE-FIX pass (twenty-second PAINTER agent; READ THIS FIRST)
+## Hand-over of RELEASE 1, W2.1 and W2.2 (sharp from the ship; READ THIS FIRST; kept current after every item)
+
+The owner's request after play: much sharper (the ground seen from the ship, "not some blurry blobs"), smoother, mobile,
+without losing quality. The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (sections 0, 2, 4 W2, 5). This lane, part 1: W2.1
+(prefilter the procedural marks by the pixel footprint) and W2.2 (reverse the abstraction brush; wobble on edges only).
+Began 05:01 UTC 2026-11-14 on head `0efcc3b` (render code the same as the live game and as the plan's base `784183b`).
+
+Scratch: `/home/user/.pc-scratch/painter/r1/` (`bin/` = the sharpness audit's harness copied, port 9461, frames in
+`frames/`, plus `alias2.py` (alias index A, 1x vs 2x box-filtered), `cmp.py` (the quality guard's numbers for a
+before/after pair: t, raw bands, halo share, dE76 per region, L* percentiles, border strip, mean differences) and `run.sh`
+(every station, q2 1280x720, A at E_150_45, E_400_90, E_1000_45, E_1000_90); `trees/base` an export of the head;
+`node/mipstats.mjs`, `node/crackstats.mjs` the noise statistics the prefilter's constants come from).
+
+**State:** W2.1 COMMITTED (the commit after `2df378d`; its numbers below). W2.2 drafted in scratch (`w22/post.js` with
+full-size statistics for the near brush, `w22/post-halfstats.js` without, `w22/index.js`), NOT in the tree; its design
+experiments are running in PILOT's harness (`st-w21b`, experiments w1..w8 added to the scratch tree's copy of
+`tests/stationlib/stations.mjs` only, plus a scratch station `E_150_45_night`, the plan's W2.2 night station that the
+harness lacks). Next: choose the near brush from `st-w21b`, write W2.2 into the tree, run every station, commit.
+
+- **The audit's harness did not hold the game's loop** (`__pc.hold` is never called in its `inpage.js`/`stations.py`):
+  between the 1x and the 2x render of its alias index the game ran some frames and the view moved about 5 px (measured
+  at E_1000_90: the 2x reference's best match is 5 px to the side; the fine bands of the two uncorrelated). Its A numbers
+  (and mine from it before 07:15, `logs/alias2.jsonl`) are void; PILOT's harness holds the loop, and my copy of the audit
+  harness now does too (`bin/stations.py`). Its t, lapvar and band numbers are good (all views from one render).
+
+### W2.1 what was done (chunks.js, materials.js)
+- `pcFp` (the pixel's footprint on the land, metres: the longer of the two screen derivatives of the body position, the
+  axis the hardware's mip level follows), set at the top of TERRAIN_FRAG, PROP_FRAG and NEAR_FRAG before any discard;
+  materials that do not set it (orbit.js, the kits, PHYSICS' lab) keep every mark exactly as before.
+- `pcSub(scale, k)`: the variance of a uNoise3D channel that lies inside the pixel = k.x s^2/(s^2 + k.y), s = texels per
+  pixel. Fitted to the 64^3 noise's own mip chain (`node/mipstats.mjs`): R and G (0.0191, 100), B (0.0163, 25), A
+  (0.0550, 56). `pcStepF(e0, e1, v, sub)`: the threshold's half width h -> sqrt(h^2 + 1.4 sub): the same mean share,
+  softer as the pattern goes under the pixel. `pcLineF`: the cracks (a distance field's thin line), widened by its
+  change across the pixel and keeping its cover, laid as its mean cover past its cells (`node/crackstats.mjs`: grad 17
+  a tile, cover 1.8 x the mean width). `pcLevelF`: the light's steps no narrower than fwidth of the light value.
+- Terrain: the leaf shadow, the dabs, flicks, dry brush, the two hue drifts, the cracks and their masks; the light: where
+  the leaf shadow is finer than the pixel (`fk` from pcDappleSub) the shade and the sunlit wash are toned each on its own
+  and mixed by the sunny share (the light read at the mixed value was one middle step, so the far floor's colour moved);
+  the fleck's heart as 0.55 patch + 0.45 min(heart, patch) (equal where drawn, the right share where not). Props: the
+  leaf shadow, the rocks' dry brush. Near strokes: the leaf shadow.
+- The factor 1.4 (was 3.5 as first written): measured at E_1000_90 on one held page against the design supersampled 16
+  times (W2.1 off, 4x, box-filtered down; `bin/truth.py`): error 0.63 as drawn, 0.54 at 6, 0.48 at 3.5, 0.42 at 1.5;
+  the plan's 2x alias index A 0.358 at 3.5, 0.322 at 1.5, 0.3185 at 1.2; raw lapvar 199 at 3.5, 324 at 1.5, 366 at
+  1.2 (the plan's bound 350; the supersampled design's own lapvar is 675). A and lapvar pull opposite ways there; 1.4
+  sits between. Tried and not kept: the noise read one mip level coarser (lod +1, the pixel's Nyquist emptied): A 0.65
+  (too soft against the 2x reference); n1/n2 alone one level coarser: A 0.365 (worse); an explicit mip level for the
+  leaf shadow (to rule out SwiftShader's 3D level): no change.
+
+### W2.1 numbers (q2 1280x720; PILOT's harness for A; the baseline `tests/baselines/stations-784183b.json`)
+- At factor 3.5 (PILOT's harness, run `st-w21`): raw A E_400_90 0.402 -> 0.31, E_1000_45 0.630 -> 0.40, E_1000_90
+  0.533 -> 0.36; raw lapvar E_1000_45 372.6 -> 59.7, E_1000_90 1082 -> 199; draw calls and triangles unchanged at every
+  station; final t, halo unchanged (today's brush). At 1.5 (my held page): A E_1000_45 0.378, E_1000_90 0.322, E_400_90
+  0.320 (ground alone 0.246: the rest is the trees' silhouettes, W2.5's MSAA); lapvar 97, 324. The final run at 1.4 is
+  `st-w21b` (numbers go here when it ends).
+- Raw b3 within 10 % (E_1000_90 25.0 -> 24.4, E_1000_45 33.6 -> 34.0), raw land dE76 1.18 / 1.58 (at most 2); E_foot
+  b1/b2 -0.6 / +0.1 %, E_50_45 -1.9 / -0.8 % (within 5 %) (audit harness, my base run vs W2.1 at 3.5).
+- **Not met: A at most 0.6 x baseline.** E_1000_45 0.378 (target 0.378) and E_1000_90 0.32 (0.320) sit on the line at
+  1.4-1.5; E_400_90 0.32 against 0.241: its ground alone is 0.246, the trees' edges are geometry (W2.5). See above for
+  why A and the lapvar bound cannot both be cleared with margin by this filter.
+- Crops opened: `docs/shots/painter/r1/w21-raw-crops-before-after.jpg` (E_1000_45: the rows of dashes gone; E_1000_90 a
+  fine stipple left in the shaded wood; E_400_90 softer edges), `w21-k3.5-harness-crops.jpg`,
+  `w21-E_1000_90-k-variants.jpg`.
+- Checks on a clean export of `2df378d` with these files: world 30, unit 216, physics 325, coast PASS at both stands,
+  ghostfield 6 of 6 all zeros; the pages of the session: no console error (harness problems list empty).
+
+## Hand-over of the LAST FIXES' RE-FIX pass (twenty-second PAINTER agent)
 
 The verifier of the last fixes accepted item 2 and found item 1 partly fixed (the eye inside a spire: fixed and confirmed;
 a hard-edged slab beside a slim Neptune spire seen from OUTSIDE it, the descent's last frame `q0_dsc4`, still there, the
