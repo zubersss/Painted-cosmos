@@ -148,9 +148,11 @@ brief in section 4a (a filter in `post.js`) is **under review and not to be buil
 **Decided by the owner on 2026-11-15:** the whole clip is the target (no favourite part); the
 cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
-**The plan is written (section 4a) and has been put to the owner. Next, on the owner's go
-(section 2, items 10, 13 and 14): cut `look-proto` from `main` and build pieces 1 to 3 up to
-checkpoint 1.** Nothing starts before that. The desktop's top tier is where the prototype is
+**IN PROGRESS since 2026-11-15 (the owner's go): the coordinator is building pieces 1 to 3 of
+section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
+for the owner.** If this session was cut off: read `git log origin/look-proto`, the newest
+section of the log, and the note at the top of `docs/notes/painter.md` on that branch; work that
+is committed there is safe, nothing of it is live. The desktop's top tier is where the prototype is
 built and judged (section 2, item 17); the phone follows after approval. Still to be asked
 again: roughly which desktop the owner has (the preview page will be tried on it), and which
 phone.
