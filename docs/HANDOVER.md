@@ -92,6 +92,11 @@ everything is pushed. This session has read the handover and run nothing (no che
 work organised. Then the plan is agreed with the owner in chat. Nothing starts before that, and
 the order below may change with it.
 
+**Proposed to the owner, not yet answered:** a mixed team of models (the top model for rendering,
+the explorer, physics and all verifying; smaller models for small, checkable chores). It would
+amend section 2, item 2. See the log's entry "Planning with the owner: other tools, and which
+model does what".
+
 | Branch | What it holds |
 | --- | --- |
 | `main` | **Live.** At `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
