@@ -58,13 +58,17 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
    make our own worlds and figure, not a copy of that game.
 6. **A new explorer (not started).**
    - No hat: bare head.
-   - A grey cloak in place of the cream coat and red scarf. It moves with the wind and the run
-     (PHYSICS already gives `relWind`, lean, gale crouch and so on in the figure's state) and
-     covers the jetpack, with the jets under the hem.
+   - A **blue-grey** cloak (the owner's choice of 2026-11-15, replacing plain grey: it stands out
+     in warm scenes and takes each world's light) in place of the cream coat and red scarf. It
+     moves with the wind and the run (PHYSICS already gives `relWind`, lean, gale crouch and so
+     on in the figure's state) and covers the jetpack, with the jets under the hem.
    - A lantern at the hip, dark by day, flickering on at dusk and off at dawn.
    - The lantern's warm pool of light is painted into the ground's and plants' shading, not a
      real three.js light (too costly).
-   - Optionally the hood goes up in snow and storms (not yet confirmed by the owner).
+   - The hood goes up in snow and storms; the head is bare otherwise (confirmed by the owner on
+     2026-11-15).
+   - No cabins or shelters for now (the owner, 2026-11-15): the lantern gives the warm light at
+     night, and the look comes first.
 7. **Merging.** The owner merges, or tells the session to merge a specific pull request. The
    session's permission check refuses a merge the owner has not asked for in that session; do not
    work round it.
@@ -115,11 +119,14 @@ section). The main finding: the clip's strokes are painted on the world's surfac
 over the picture as a filter, and its look rests first on light and colour. So the prototype
 brief in section 4a (a filter in `post.js`) is **under review and not to be built as written**.
 
-**Waiting on the owner (section 2, items 10 and 13):** which of the coordinator's calls they
-disagree with (the method, the cloak's colour, shelters or none). Then the coordinator reads the
-rendering code, without changing it, and writes a one-page plan for the owner's go. Nothing
+**Decided by the owner on 2026-11-15:** the whole clip is the target (no favourite part); the
+cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
+
+**Next (section 2, items 10 and 13):** the coordinator reads the rendering code, without
+changing it, and writes a one-page plan; the owner then gives the go or changes it. Nothing
 starts before that. The owner plays mostly on a phone, then on a desktop: the phone is the test
-device from the first prototype on.
+device from the first prototype on. Still to be asked again: which phone, and roughly which
+desktop.
 
 **Agreed in principle by the owner ("we should do it right?"), not yet the word to start (see
 the log's last three sections). Next: the references and the owner's device, then a one-page

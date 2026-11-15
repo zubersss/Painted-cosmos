@@ -107,9 +107,11 @@ then the surface; a filter alone would not cross it.
   stroke would be a field or a clump of trees with a crisp edge, which serves "see where I'm
   landing". Stroke size has to follow distance in steps so it never shrinks to noise or grows to
   blobs.
-- **The cloak's colour.** In the clip the cloak is the opposite colour of the scene, which is
-  why the figure stands out. Plain grey would stand out less. Suggested: a blue-grey that takes
-  each world's light, with the lantern as the warm accent. The owner decides.
+- **The cloak's colour (decided by the owner: blue-grey).** In the clip the cloak is the
+  opposite colour of the scene, which is why the figure stands out. Plain grey would stand out
+  less. So: a blue-grey that takes each world's light, with the lantern as the warm accent.
+- **Also decided by the owner:** the whole clip is the target, with no favourite part; no cabins
+  or shelters for now; the hood goes up in snow and storms.
 - **Risks.** A bigger job than a filter (every world's surfaces get new shading). The clip shows
   three small hand-built scenes; this game has ten planets built by rule. Prove it on one or two
   scenes first (Earth's autumn woodland and Neptune's aurora tundra already exist). The game's
