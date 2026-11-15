@@ -19,11 +19,14 @@ export const FLORA_PHYS = {
 class Builder {
   // (PHYSICS' crown, P14: `aBranchId` one number for every vertex of a branch and the foliage it carries, -1 on the
   // trunk; `aLeaf01` 1 on foliage. `branch` is the number the next tube or blob is laid with)
-  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; this.br = []; this.lf = []; this.branch = -1; }
+  // (`aCard`, the oil look's leaves: the centre of the leaf a vertex belongs to, so the shader can light a leaf whole;
+  // on everything else the vertex's own place. `card` is the centre the next vertices are laid with.)
+  constructor() { this.p = []; this.n = []; this.m = []; this.uv = []; this.d = []; this.idx = []; this.br = []; this.lf = []; this.cd = []; this.branch = -1; this.card = null; }
   get count() { return this.p.length / 3; }
   vert(px, py, pz, nx, ny, nz, mx, my, mz, u, v, sway, part, shade, hash) {
     this.p.push(px, py, pz); this.n.push(nx, ny, nz); this.m.push(mx, my, mz); this.uv.push(u, v); this.d.push(sway, part, shade, hash);
-    this.br.push(this.branch); this.lf.push(part === 1 || part === 3 ? 1 : 0);
+    this.br.push(this.branch); this.lf.push(part === 1 || part === 3 || part === 5 ? 1 : 0);
+    if (this.card) this.cd.push(this.card[0], this.card[1], this.card[2]); else this.cd.push(px, py, pz);
     return this.p.length / 3 - 1;
   }
   tri(a, b, c) { this.idx.push(a, b, c); }
@@ -36,6 +39,7 @@ class Builder {
     g.setAttribute('aData', new THREE.BufferAttribute(new Float32Array(this.d), 4));
     g.setAttribute('aBranchId', new THREE.BufferAttribute(new Float32Array(this.br), 1));
     g.setAttribute('aLeaf01', new THREE.BufferAttribute(new Float32Array(this.lf), 1));
+    g.setAttribute('aCard', new THREE.BufferAttribute(new Float32Array(this.cd), 3));
     g.setIndex(this.count > 65535 ? new THREE.BufferAttribute(new Uint32Array(this.idx), 1) : new THREE.BufferAttribute(new Uint16Array(this.idx), 1));
     g.computeBoundingSphere();
     return g;
@@ -108,6 +112,49 @@ function blob(B, c, rx, ry, rz, rnd, opts) {
   for (let i = 0; i < I.n; i += 3) B.tri(base + i, base + i + 1, base + i + 2);
 }
 
+// LEAVES AS STROKES (the oil look; the owner's overhaul 2, docs/HANDOVER.md 4a-2 on r2). The reference clip's crowns
+// are not lumps: they are separate leaf-shaped pieces of flat colour on dark branches, with the sky between them. Here a
+// mass of foliage is a cloud of such pieces: each a flat lozenge pointed at both ends (two triangles: its outline is
+// geometry, so it is crisp at any size and needs no cut-out), most near the skin of the mass and a few inside, lying
+// every way and drooping a little, facing more or less out of the mass. part 5; `aCard` carries each leaf's centre.
+//   o.n how many, o.len / o.wid a leaf's length and width (m), o.massC / o.massK the crown's centre and how far a
+//   leaf's light follows the crown's roundness, o.shade0 / o.shadeK the shade of the inner leaves, o.droop
+function leafCards(B, c, rx, ry, rz, rnd, opts) {
+  const o = Object.assign({ n: 80, len: 0.42, wid: 0.17, part: 5, massC: null, massK: 0.6, sway: 0.6, shade0: 0, shadeK: 0.7, droop: 0.3 }, opts || {});
+  B.branch = o.branch != null ? o.branch : (rnd() * 7.13) % 1;
+  const mc = o.massC || c;
+  for (let i = 0; i < o.n; i++) {
+    let x, y, z, l2;
+    do { x = rnd() * 2 - 1; y = rnd() * 2 - 1; z = rnd() * 2 - 1; l2 = x * x + y * y + z * z; } while (l2 > 1 || l2 < 0.02);
+    const l = Math.sqrt(l2), k = Math.pow(l, 0.35) / l;      // pushed toward the skin
+    x *= k; y *= k; z *= k;
+    const px = c.x + x * rx, py = c.y + y * ry - o.droop * (x * x + z * z) * ry, pz = c.z + z * rz;
+    let ax = rnd() * 2 - 1, ay = (rnd() * 2 - 1) * 0.6 - 0.25, az = rnd() * 2 - 1;
+    const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+    const ox = x + (rnd() - 0.5) * 0.9, oy = y + 0.35 + (rnd() - 0.5) * 0.9, oz = z + (rnd() - 0.5) * 0.9;
+    let sx = ay * oz - az * oy, sy = az * ox - ax * oz, sz = ax * oy - ay * ox, sl = Math.hypot(sx, sy, sz);
+    if (sl < 1e-4) { sx = 1; sy = 0; sz = 0; sl = 1; }
+    sx /= sl; sy /= sl; sz /= sl;
+    const nx = sy * az - sz * ay, ny = sz * ax - sx * az, nz = sx * ay - sy * ax;
+    const L = o.len * (0.7 + 0.6 * rnd()) * 0.5, W = o.wid * (0.7 + 0.6 * rnd()) * 0.5;
+    let mx = px - mc.x, my = py - mc.y, mz = pz - mc.z;
+    const ml = Math.hypot(mx, my, mz) || 1;
+    mx = nx + (mx / ml - nx) * o.massK; my = ny + (my / ml - ny) * o.massK; mz = nz + (mz / ml - nz) * o.massK;
+    const m2 = Math.hypot(mx, my, mz) || 1; mx /= m2; my /= m2; mz /= m2;
+    const shade = Math.min(1, Math.max(0, o.shade0 + o.shadeK * (1 - l) + 0.25 * (0.5 - y * 0.5)));
+    const hash = rnd();
+    B.card = [px, py, pz];
+    // (the widest point a little toward the stalk, as a leaf's is)
+    const wx = px - ax * L * 0.2, wy = py - ay * L * 0.2, wz = pz - az * L * 0.2;
+    const v0 = B.vert(px - ax * L, py - ay * L, pz - az * L, nx, ny, nz, mx, my, mz, -1, 0, o.sway, o.part, shade, hash);
+    const v1 = B.vert(wx + sx * W, wy + sy * W, wz + sz * W, nx, ny, nz, mx, my, mz, 0, 1, o.sway, o.part, shade, hash);
+    const v2 = B.vert(px + ax * L, py + ay * L, pz + az * L, nx, ny, nz, mx, my, mz, 1, 0, o.sway, o.part, shade, hash);
+    const v3 = B.vert(wx - sx * W, wy - sy * W, wz - sz * W, nx, ny, nz, mx, my, mz, 0, -1, o.sway, o.part, shade, hash);
+    B.tri(v0, v1, v2); B.tri(v0, v2, v3);
+    B.card = null;
+  }
+}
+
 // A single tapered stroke (grass blade, fern frond): a ribbon that arches outward.
 function stroke(B, root, dir, len, width, arch, rnd, opts) {
   const o = Object.assign({ segs: 3, part: 2, hash: rnd(), sway: 0.25, leaf: 0, twist: 0 }, opts || {});
@@ -158,8 +205,8 @@ export function birchGeometry(seed, lod, spec) {
     // a few thin dark branches reaching into the crown (each its own number; a mass of foliage within 2.2 m of a
     // branch's tip is carried by it and swings with it, the others are branches of their own hidden in the wash)
     const tips = [];
-    for (let k = 0; k < 3; k++) {
-      const t0 = (sl ? 0.62 + 0.11 * k : 0.40 + 0.16 * k) + rnd() * 0.06, p0 = at(t0);
+    for (let k = 0; k < (sl ? 6 : 3); k++) {
+      const t0 = (sl ? 0.60 + 0.065 * k : 0.40 + 0.16 * k) + rnd() * 0.06, p0 = at(t0);
       const ang = rnd() * 6.283, len = (sl ? 1.5 : 1.9) + rnd() * 1.8;
       const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * 0.5, p0.z + Math.sin(ang) * len * 0.55);
       const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * 0.78, p0.z + Math.sin(ang) * len);
@@ -177,11 +224,14 @@ export function birchGeometry(seed, lod, spec) {
       const r = sl ? 1.3 + rnd() * 0.8 : 1.9 + rnd() * 1.0;
       let bid = ((k + 3) * 0.618034 + 0.13) % 1, bd = 2.2;
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
-      blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
+      // (the oil look's slender tree: the mass is leaves, one by one, florakit.js leafCards; else one lumpy wash)
+      if (sl) leafCards(B, c, r * 1.2, r * 0.85, r * 1.2, rnd, { n: 90, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
+      else blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
   } else if (sl) {
-    blob(B, V(top.x * 0.8 + 0.4, H * 0.76, top.z * 0.8), 2.3, 1.9, 2.2, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });
-    blob(B, V(top.x * 0.95 - 0.3, H * 0.93, top.z * 0.95 + 0.2), 2.0, 1.8, 2.1, rnd, { massC: crownC, massK: 0.4, sway: 0.9, shade0: 0.0, shadeK: 0.6, droop: 0.2, noise: 0.3, uvScale: 4 });
+    // (farther off: fewer leaves, each twice the size, so the crown is still leaves and still as full)
+    leafCards(B, V(top.x * 0.8 + 0.4, H * 0.76, top.z * 0.8), 2.5, 2.0, 2.4, rnd, { n: 70, len: 0.85, wid: 0.34, massC: crownC, massK: 0.6, sway: 0.7 });
+    leafCards(B, V(top.x * 0.95 - 0.3, H * 0.93, top.z * 0.95 + 0.2), 2.2, 1.9, 2.3, rnd, { n: 60, len: 0.85, wid: 0.34, massC: crownC, massK: 0.6, sway: 0.9 });
   } else {
     blob(B, V(top.x * 0.7 + 0.5, H * 0.60, top.z * 0.7), 3.2, 2.5, 3.0, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });
     blob(B, V(top.x * 0.9 - 0.4, H * 0.84, top.z * 0.9 + 0.3), 2.7, 2.3, 2.8, rnd, { massC: crownC, massK: 0.4, sway: 0.9, shade0: 0.0, shadeK: 0.6, droop: 0.2, noise: 0.3, uvScale: 4 });
@@ -217,12 +267,14 @@ export function pineGeometry(seed, lod, spec) {
       const r = (sl ? 2.7 - 2.0 * Math.pow(t, 0.85) : 3.9 - 3.0 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3);
       const off = (1 - t) * 0.6;
       const c = V(lean * (y / H) * (y / H) + (rnd() - 0.5) * off, y, lz * (y / H) * (y / H) + (rnd() - 0.5) * off);
+      if (sl) { leafCards(B, c, r, Math.max(r * 0.36 + 0.2, gap * 0.45), r, rnd, { n: 46, len: 0.62, wid: 0.15, massC: crownC, massK: 0.5, sway: 0.35 + 0.5 * t, shade0: 0.1 + 0.2 * (1 - t), shadeK: 0.7, droop: 0.9 }); continue; }
       blob(B, c, r, Math.max(r * 0.42 + 0.25, gap * (sl ? 0.45 : 0.7)), r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: 4 });
     }
-    blob(B, V(lean, H * 0.99, lz), 0.55, 1.4, 0.55, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2, taper: 0.6 });
+    if (sl) leafCards(B, V(lean, H * 0.99, lz), 0.6, 1.3, 0.6, rnd, { n: 22, len: 0.6, wid: 0.15, massC: crownC, massK: 0.4, sway: 0.9 });
+    else blob(B, V(lean, H * 0.99, lz), 0.55, 1.4, 0.55, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2, taper: 0.6 });
   } else if (sl) {
-    blob(B, V(lean * 0.6, H * 0.72, lz * 0.6), 2.6, H * 0.13, 2.5, rnd, { massC: crownC, massK: 0.3, sway: 0.4, shade0: 0.2, shadeK: 0.75, droop: 0.5, noise: 0.26, taper: 0.45, uvScale: 5 });
-    blob(B, V(lean * 0.9, H * 0.90, lz * 0.9), 1.8, H * 0.12, 1.7, rnd, { massC: crownC, massK: 0.3, sway: 0.8, shade0: 0.0, shadeK: 0.7, droop: 0.3, noise: 0.24, taper: 0.85, uvScale: 5 });
+    leafCards(B, V(lean * 0.6, H * 0.72, lz * 0.6), 2.6, H * 0.13, 2.5, rnd, { n: 80, len: 1.1, wid: 0.30, massC: crownC, massK: 0.5, sway: 0.4, droop: 0.6 });
+    leafCards(B, V(lean * 0.9, H * 0.90, lz * 0.9), 1.8, H * 0.12, 1.7, rnd, { n: 50, len: 1.1, wid: 0.30, massC: crownC, massK: 0.5, sway: 0.8, droop: 0.4 });
   } else {
     blob(B, V(lean * 0.4, H * 0.56, lz * 0.4), 3.8, H * 0.21, 3.6, rnd, { massC: crownC, massK: 0.3, sway: 0.4, shade0: 0.2, shadeK: 0.75, droop: 0.5, noise: 0.26, taper: 0.45, uvScale: 5 });
     blob(B, V(lean * 0.8, H * 0.83, lz * 0.8), 2.4, H * 0.20, 2.3, rnd, { massC: crownC, massK: 0.3, sway: 0.8, shade0: 0.0, shadeK: 0.7, droop: 0.3, noise: 0.24, taper: 0.85, uvScale: 5 });
@@ -299,8 +351,20 @@ export function fernGeometry(seed) {
   return B.build();
 }
 
-export function bushGeometry(seed) {
+export function bushGeometry(seed, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  if (spec && spec.oil) {
+    // (the oil look: a sapling: thin stems that fork, and leaves one by one, as the young trees on the clip's floor)
+    const h = 1.0 + rnd() * 0.5, lx = (rnd() - 0.5) * 0.3, lz = (rnd() - 0.5) * 0.3;
+    tube(B, [V(0, 0, 0), V(lx * 0.5, h * 0.5, lz * 0.5), V(lx, h, lz)], [0.022, 0.016, 0.008], 4, { part: 0, shade: 0.8, sway0: 0.1, swayK: 0.3, swayH: h, hash: rnd() });
+    for (let k = 0; k < 3; k++) {
+      const a = k * 2.2 + rnd(), y0 = h * (0.35 + 0.2 * k), r = 0.3 + rnd() * 0.25;
+      tube(B, [V(lx * y0 / h, y0, lz * y0 / h), V(Math.cos(a) * r, y0 + 0.28, Math.sin(a) * r)], [0.012, 0.005], 3, { part: 0, shade: 0.8, sway0: 0.3, hash: rnd() });
+      leafCards(B, V(Math.cos(a) * r, y0 + 0.30, Math.sin(a) * r), 0.30, 0.24, 0.30, rnd, { n: 16, len: 0.24, wid: 0.11, massC: V(0, h * 0.6, 0), massK: 0.4, sway: 0.5, shadeK: 0.3 });
+    }
+    leafCards(B, V(lx, h + 0.05, lz), 0.26, 0.22, 0.26, rnd, { n: 14, len: 0.24, wid: 0.11, massC: V(0, h * 0.6, 0), massK: 0.4, sway: 0.6, shadeK: 0.3 });
+    return B.build();
+  }
   const cc = V(0, 0.5, 0);
   for (let i = 0; i < 2; i++) {
     const ang = i * 2.6 + rnd(), rr = 0.3 + rnd() * 0.3, r = 0.62 + rnd() * 0.3;

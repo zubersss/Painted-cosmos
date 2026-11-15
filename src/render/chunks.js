@@ -242,6 +242,9 @@ float pcFogAmount(float dist) {
     dist *= mix(uOilC.w, 1.6, clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0));
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
+  #ifdef PC_OIL
+    f = f * f * (3.0 - 2.0 * f);      // (thin near the eye, where colour and detail must stand whole; thick far off)
+  #endif
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;

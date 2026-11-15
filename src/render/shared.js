@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { genNoise3D, genStrokes, genPaper } from './texgen.js';
 import { PAPER, hexToRgb } from '../data/looks.js';
+import { MODE } from '../data/mode.js';
 
 let _tex = null;
 export function getTextures() {
@@ -70,6 +71,7 @@ export const G = {
 const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
 export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
+MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
 export const OIL = {
   // THE STROKES ARE THE OWNER'S STYLE 5 (2026-11-15: leaf dabs lying every way, the clip's own way, a little thinner than
   // the clip's). The five other styles tried at checkpoint 1 are gone; the thin strokes are kept for bark, the tiles
@@ -84,7 +86,7 @@ export const OIL = {
   // x: the power on the haze key (near 1: a pale, high air, as the clip's)   y: the glow of the air toward the sun
   //    z: 0 strokes off (the colour and light only) .. 1 on   w: how much farther off the air takes a thing on the
   //    ground than in the watercolour (the wood's depth; eased to 1.6 as the eye rises and the air thins)
-  uOilC: { value: new THREE.Vector4(1.15, 0.8, _qn('strokes', 1), 5.0) },
+  uOilC: { value: new THREE.Vector4(1.15, 0.8, _qn('strokes', 1), 4.0) },
   // the shade (chunks.js pcTone): x the cool key's gain over the body colour   y the sky's own fill in it (added)
   //    z the green left in the key (under 1: the shade leans to violet)   w the tiles' line: how light it is
   uOilD: { value: new THREE.Vector4(1.0, 0.10, 0.90, 1.3) },

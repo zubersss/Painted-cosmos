@@ -52,8 +52,8 @@ const CREAM = hex('#e4d4ae'), HEM = hex('#b79a70'), INK = hex('#3d4056'), TROUSE
 const PACK = hex('#6c7b8d'), ROLL = hex('#efe6cf'), COPPER = hex('#a9683f'), RED = hex('#c8452e');
 const FLESH = hex('#e9c9a6'), CHEEK = hex('#e3a68c'), BROW = hex('#9e8288'), HAIR = hex('#5b4634'), GLASS = hex('#8eaab6'), OCHRE = hex('#c9914e');
 const SEPIA = hex('#6f4e3a'), KEEL = hex('#86674b'), FLAME0 = [1, 0.99, 0.94], FLAME1 = hex('#f6c871'), FLAME2 = hex('#e79a52');
-// (the wanderer, the oil look's explorer: a blue-grey cloak with a pale trimmed hem)
-const CLOAK = hex('#7f93b8'), CLOAK_D = hex('#5c6f96'), TRIM = hex('#d9c9a0');
+// (the wanderer, the oil look's explorer: a rich blue cloak (the owner, 2026-11-15) with a pale trimmed hem)
+const CLOAK = hex('#4a6ad0'), CLOAK_D = hex('#33489c'), TRIM = hex('#e2d2a4');
 
 // ---- geometry kit: lofted soft forms into one buffer ------------------------------------------
 function makeBuilder() {

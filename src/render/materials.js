@@ -22,6 +22,9 @@ float pcFogAmountV(float dist) {
     dist *= mix(uOilC.w, 1.6, clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0));     // (as chunks.js pcFogAmount)
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
+  #ifdef PC_OIL
+    f = f * f * (3.0 - 2.0 * f);
+  #endif
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
@@ -198,7 +201,7 @@ void main() {
     vec3 rnd, rnd2; vec2 ds; float cov, has2;
     pcDabLayer(ch, dlx, dly, w, vec3(uOilS.z, 0.12, 1.0), vBody, 4.0 * wpx * uOilS.w * (L == 1 ? 2.0 : 1.0), L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
-    float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid;
+    float fk = clamp(canopy * 1.6, 0.0, 0.88) * gMid;      // (under trees the floor is nearly all fallen leaves, with the earth dark between)
     vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl);
     acc = mix(acc, mix(mix(acc, p2, has2), p1, cov), uOilC.z);
   }
@@ -808,6 +811,10 @@ attribute float aLeaf01;   // (trees) 1 on foliage
 attribute vec3 aMass;     // soft "mass" normal of the whole crown
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
 attribute float aBorn;    // per instance: when it came into this mesh (the wash clock, s); negative: when it left (it is being lifted out)
+#ifdef PC_OIL
+attribute vec3 aCard;     // (the oil look's leaves, florakit.js leafCards: the centre of the leaf this vertex belongs to; elsewhere the vertex's own place)
+varying vec3 vCardB;      // that centre on the body: a leaf is lit, shaded and lamp-lit whole
+#endif
 #ifdef PC_FAR
   attribute vec2 aInst2;  // species index into the far tables
   varying float vSpecies;
@@ -956,6 +963,7 @@ void main() {
   #ifdef PC_OIL
     vMassO = aMass;
     vScaleO = length(im[0].xyz);
+    vCardB = vBody - (ir * (position - aCard)) * vis;       // (the leaf moves as one piece: its centre is this far from the vertex)
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
@@ -1007,6 +1015,7 @@ varying float vFog;
 #ifdef PC_OIL
 varying vec3 vMassO;
 varying float vScaleO;
+varying vec3 vCardB;
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -1075,7 +1084,29 @@ void main() {
   // so it never turns with the eye); a dab too near the outline, or where the sky shows through, is left out whole.
   // (the clip's floor is a carpet of leaves with a tuft here and there: most blades and fronds are not laid)
   if (part > 1.5 && part < 2.5 && fract(seed * 7.77 + 0.31) > uOilG.y * uGroundK.y) discard;
-  if (part < 1.5) {
+  if (part > 4.5) {
+    // ---- a leaf (florakit.js leafCards): one piece of flat colour, its outline the geometry's own; in the sun or in
+    // the shade WHOLE (everything is asked at the leaf's centre), each leaf its own colour of the tree's three
+    float h = vData.w;
+    vec3 r3 = vec3(h, fract(h * 13.7), fract(h * 5.1));
+    float hue = vInst.x + (h - 0.5) * 1.7;
+    vec3 cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
+    cs = mix(cs, leafC, clamp(vData.z * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
+    cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0), 0.7);
+    vec3 mV = normalize(vMassV);
+    float xs_ = (dot(mV, sunV) * 0.5 + 0.5) * (1.0 - vData.z * 0.35);
+    // (the sun behind a crown comes through its leaves: those glow)
+    xs_ = max(xs_, pow(max(dot(-V, sunV), 0.0), 1.5) * (0.6 + 0.4 * r3.x));
+    xs_ *= mix(0.50, 1.0, pcSunAt(vCardB, canopy * 0.4, 8.0 - vAbove, 0.3));
+    xs_ += (r3.z - 0.5) * 0.25;
+    xs_ = max(xs_, 0.30 + 0.15 * r3.x);
+    float lvl = pcLevel(xs_, 0.03);
+    // (a leaf's shade is its own colour laid heavier with half the cool key over it, never the key's mud)
+    vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+    c = pcLamp(mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl)), cs, vCardB, r3.y);
+    wet = 0.0;
+    id = 4.0 + fract(seed * 7.0 + h * 0.37) * 0.9;
+  } else if (part < 1.5) {
     bool isBark = part < 0.5;
     // (some trees of a kind are dark-barked: their own pair of bark washes, and their marks run along the stem)
     float dk = step(fract(seed * 5.31 + 0.17), uOilDark.x - 0.001);

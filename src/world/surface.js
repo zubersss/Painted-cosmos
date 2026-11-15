@@ -11,6 +11,7 @@
 
 import { BODIES } from '../data/bodies.js';
 import { LOOKS, pig, dilute, mixc } from '../data/looks.js';
+import { MODE } from '../data/mode.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
 import { dirToFace } from './cubesphere.js';
 import { EASELS, STANDS } from '../art/easels.js';
@@ -148,6 +149,8 @@ class Surface {
           p.canopyB = dilute(mixc(pig('hookersGreen'), pig('ultramarine'), 0.22), 0.20);
         }
       }
+      // (the oil look: a biome may give any of these outright, its `oil.pal`: the owner's "colours that pop"; data/mode.js)
+      if (MODE.oil && bi.oil && bi.oil.pal) for (const k of Object.keys(bi.oil.pal)) p[k] = bi.oil.pal[k];
       return p;
     });
   }
