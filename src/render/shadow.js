@@ -59,6 +59,26 @@ void main() {
 }
 `;
 
+// THE FIGURES' OWN SHADOWS (the overhaul plan's eighth piece: the clip's figure throws a real shadow). The explorer and
+// the ship are drawn with their own shader, each part moved by its bone (materials.js FIG_VERT: uPart); here they are
+// drawn into the map the same way, with the same bones, after the plants. (The soft blot they laid on the ground,
+// chunks.js pcCast, gives way to this while the map is on.)
+const FIG_SH_VERT = /* glsl */`
+uniform mat4 uPart[PC_PARTS];
+uniform float uInv;
+attribute float aPart;
+varying float vS;
+void main() {
+  vec4 mv = modelViewMatrix * (uPart[int(aPart + 0.5)] * vec4(position, 1.0));
+  vS = -mv.z * uInv;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const FIG_SH_FRAG = /* glsl */`
+varying float vS;
+void main() { gl_FragColor = vec4(vS, 0.0, 0.0, 1.0); }
+`;
+
 // THE AIR'S SHADE (for the light in the air, post.js OIL_FRAG). The map itself is too fine for the air: under a crown
 // it changes from texel to texel, leaf by leaf, and a line of sight that asked it sixteen times came out as grain (seen
 // in the first stills of the shafts). So the map is taken down once a frame to a quarter of its size: for each block of
@@ -115,6 +135,7 @@ export class ShadowMap {
     this._cam = new THREE.Vector3(); this._up = new THREE.Vector3(); this._f = new THREE.Vector3();
     this._X = new THREE.Vector3(); this._Y = new THREE.Vector3(); this._Z = new THREE.Vector3(); this._c = new THREE.Vector3();
     this._m = new THREE.Matrix4(); this._white = new THREE.Color(1, 1, 1); this._keep = new THREE.Color();
+    this._figMats = new Map();
   }
 
   // Draw the map for this frame (before the scene pass). Leaves OIL.uShM / uShK set; uShK.x 0 where there is none.
@@ -161,6 +182,26 @@ export class ShadowMap {
     const ov = scene.overrideMaterial;
     scene.overrideMaterial = this.mat;
     try { renderer.render(scene, cam); } finally { scene.overrideMaterial = ov; }
+    // the figures (whatever in the scene is marked as a caster and is drawn by bones)
+    for (const o of scene.children) {
+      if (!o.visible || !o.userData || !o.userData.pcCaster) continue;
+      const swapped = [];
+      o.traverse((m) => {
+        const src = m.isMesh && m.material && m.material.uniforms && m.material.uniforms.uPart ? m.material : null;
+        if (!src) return;
+        let sm = this._figMats.get(src);
+        if (!sm) {
+          sm = new THREE.ShaderMaterial({ name: 'pc-shadow-figure', defines: { PC_PARTS: src.defines.PC_PARTS }, uniforms: { uPart: src.uniforms.uPart, uInv: this.mat.uniforms.uInv },
+            vertexShader: FIG_SH_VERT, fragmentShader: FIG_SH_FRAG, side: THREE.DoubleSide });
+          this._figMats.set(src, sm);
+        }
+        swapped.push([m, src]); m.material = sm;
+      });
+      if (!swapped.length) continue;
+      cam.layers.enableAll();
+      const au = renderer.autoClear; renderer.autoClear = false;
+      try { renderer.render(o, cam); } finally { for (const [m, src] of swapped) m.material = src; cam.layers.set(SHADOW_LAYER); renderer.autoClear = au; }
+    }
     if (SHADOW.shaft * k > 0.004) { renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam); }
     renderer.setClearColor(this._keep, prevA);
     renderer.setRenderTarget(prevT);

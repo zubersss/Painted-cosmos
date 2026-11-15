@@ -274,6 +274,8 @@ html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select:
 .pc-tbtn-brake { width: 52px; height: 52px; right: calc(var(--pc-sr) + 24px); bottom: calc(var(--pc-sb) + 100px); }
 .pc-hud.pc-t-foot .pc-tbtn-jump, .pc-hud.pc-t-landed .pc-tbtn-jump, .pc-hud.pc-t-fly .pc-tbtn-jump, .pc-hud.pc-t-landing .pc-tbtn-jump,
 .pc-hud.pc-t-fly .pc-tbtn-sink, .pc-hud.pc-t-fly .pc-tbtn-brake, .pc-hud.pc-t-pulse .pc-tbtn-brake { display: flex; }
+/* the wanderer in its own flight (the oil look's explorer): rise and sink */
+.pc-hud.pc-t-wing .pc-tbtn-jump, .pc-hud.pc-t-wing .pc-tbtn-sink { display: flex; }
 /* The stick: a pencilled ring where the left thumb came down, a dab of wash under the thumb;
    while no thumb is down, a faint ring where one would go. */
 .pc-stick, .pc-stick-rest { position: absolute; width: 0; height: 0; pointer-events: none; }

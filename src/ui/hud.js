@@ -4,6 +4,7 @@
 import { installTheme, ink, ringPath, iconSvg, touchIconSvg, SIZE, CLOSE_SVG } from './paint.js';
 import { layoutMarks, ringSize, wrapLettering } from './layout.js';
 import { name as controlName, words } from '../core/words.js';
+import { MODE } from '../data/mode.js';      // (the wanderer has no jetpack: it flies by itself, and the words say so)
 
 // The title card's line of the controls a newcomer needs (src/core/words.js letters it for the
 // keyboard, the fingers or the pad).
@@ -13,7 +14,7 @@ const TOUCH_HELP = [
   ['stick', 'the left thumb walks', 'in the ship: turn, throttle'],
   ['drag', 'drag on the right: look', 'in the ship: the nose'],
   ['pinch', 'pinch: the camera', 'nearer, farther'],
-  ['jump', 'jump, hold for the jetpack', 'in the ship: rise'],
+  ['jump', MODE.wanderer ? 'jump, hold to fly' : 'jump, hold for the jetpack', MODE.wanderer ? 'flying: rise, and sink beside it' : 'in the ship: rise'],
   ['buttons', 'in the ship: sink, brake', ''],
   ['slip', 'tap a slip: board, land,', 'step out, pulse'],
   ['tabs', 'the tabs: map, sketchbook,', 'help, view'],
@@ -143,7 +144,7 @@ export function createHud(root) {
   // Keys named by code are relabelled for the player's keyboard layout (setKeyLabels; the
   // walking keys are by position, so on AZERTY "W A S D" reads "Z Q S D").
   const rows = [
-    [['KeyW', 'KeyA', 'KeyS', 'KeyD'], 'walk'], ['Shift', 'run'], [['KeyC'], 'stroll / pace'], ['Space', 'jump, hold for the jetpack'],
+    [['KeyW', 'KeyA', 'KeyS', 'KeyD'], 'walk'], ['Shift', 'run'], [['KeyC'], MODE.wanderer ? 'stroll / pace; flying: sink' : 'stroll / pace'], ['Space', MODE.wanderer ? 'jump, hold to fly; flying: rise' : 'jump, hold for the jetpack'],
     ['mouse', 'look (click the picture)'], ['wheel', 'camera nearer / farther'],
     [['KeyE'], 'board, land, step out'], [['KeyV'], 'first / third person'],
     ['in the ship', ''], ['Space', 'lift off, rise'], [['KeyC'], 'sink'], [['KeyW', 'KeyS'], 'throttle'], [['KeyA', 'KeyD'], 'turn'],

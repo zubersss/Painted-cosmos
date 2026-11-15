@@ -183,22 +183,35 @@ void main() {
   vec3 c, leaf; float lvl, snowC, canopy;
   vec3 acc;
   if (uGroundK.x > 0.5) {
-    // a world of snow and ice: a course of tiles with a light edge, as the clip's snow (this world's uGroundK; the tiles
-    // run along the land, their rows on the contours of a slope, and are about three strokes wide)
+    // a world of snow and ice: LONG THIN STROKES THAT RUN WITH THE LAND, as the clip's snow is laid (its night frames,
+    // looked at again for the overhaul plan's night: flowing streaks of turquoise, blue and near white, no line between
+    // them). The rows lie on the contours of a slope. Two layers an octave apart: a stroke of the finer one is there or
+    // it is not, whole (asked at its own centre), and where it is not the coarser shows. (Before: a course of tiles
+    // with a light edge, which stood as a pavement of outlined stones: the stills after overhauls 1 and 2.)
     vec2 chT = vec2(ch.x, ch.y + 1.4 * (length(vBody) - uBodyR));
     vec3 upT = normalize(vBody);
     vec2 dtx = vec2(dlx.x, dlx.y + 1.4 * dot(upT, gBdx)), dty = vec2(dly.x, dly.y + 1.4 * dot(upT, gBdy));
-    vec2 ot = pcStrokeOct(dist * 3.0, uOilPx.z * 3.0);
-    float goneT = smoothstep(0.15, 0.85, ot.y);
-    gBc = vBody;
-    acc = pcLamp(pcTone(mix(vCol2, vCol.rgb, gMid), 2.2), mix(vCol2, vCol.rgb, gMid), vBody, 0.5);
-    for (int L = 1; L >= 0; L--) {
-      float w = ot.x * (L == 1 ? 2.0 : 1.0);
-      vec3 rnd; vec2 ds; float cov;
-      pcStrokeLayer(chT, dtx, dty, w, uOilB.w, vBody, 12.0 * wpx * uOilB.w * (L == 1 ? 2.0 : 1.0), rnd, ds, cov);
-      pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
-      acc = pcLay(acc, pcGroundPaint(c, leaf, 0.0, rnd, snowC, lvl), cov, L == 0 ? step(goneT, rnd.z) : 1.0);
+    vec4 ot = pcStrokeOct4(dist * 1.5, uOilPx.z * 1.5);
+    vec2 lgT = vec2(dFdx(ot.w), dFdy(ot.w));
+    vec3 r0, n0, r1, n1; vec2 ds0, ds1; float own0, own1;
+    pcThinLayer(chT, dtx, dty, ot.x, 7.0, vBody, 14.0 * wpx * 7.0, 9.0, r0, ds0, own0, n0);
+    pcThinLayer(chT, dtx, dty, ot.x * 2.0, 7.0, vBody, 28.0 * wpx * 7.0, 9.0, r1, ds1, own1, n1);
+    float fr0 = ot.w - ot.z;
+    bool fine = r0.z >= smoothstep(0.15, 0.85, fr0 + dot(lgT, ds0));
+    bool fineN = n0.z >= smoothstep(0.15, 0.85, fr0);
+    vec3 pc0 = vec3(0.0), pc1 = vec3(0.0);
+    if (!fine || (own0 < 0.999 && !fineN)) {
+      // the coarser layer here: its stroke, and the stroke beside it over the pixel at their edge
+      pcGroundAt(ds1, ot.x * 2.0, r1, c, lvl, snowC, leaf, canopy);
+      pc1 = pcGroundPaint(c, leaf, 0.0, r1, snowC, lvl + (r1.x - 0.5) * 0.9);
+      if (own1 < 0.999) pc1 = mix(pcGroundPaint(c, leaf, 0.0, n1, snowC, lvl + (n1.x - 0.5) * 0.9), pc1, own1);
     }
+    if (fine) {
+      pcGroundAt(ds0, ot.x, r0, c, lvl, snowC, leaf, canopy);
+      pc0 = pcGroundPaint(c, leaf, 0.0, r0, snowC, lvl + (r0.x - 0.5) * 0.9);
+      if (own0 < 0.999) pc0 = mix(fineN ? pcGroundPaint(c, leaf, 0.0, n0, snowC, lvl + (n0.x - 0.5) * 0.9) : pc1, pc0, own0);
+    }
+    acc = fine ? pc0 : pc1;
   } else {
   // leaf dabs (the owner's style 5), in three layers an octave apart and LAID FROM THE TOP DOWN: the finest (its dabs
   // left out one by one toward the next octave), the middle one whole, the coarsest coming in under them, so that at the
@@ -790,15 +803,23 @@ void main() {
   #ifdef PC_OIL
   {
     // water in strokes: short thin dashes lying along the water (the world's own chart, so they stay where they are),
-    // a share of them a step lighter, carrying the sky's light as the clip's water carries its aurora, a share a step
-    // deeper, nothing drawn between two
+    // a share of them a step lighter and carrying the sky's colour, a share a step deeper, nothing drawn between two.
+    // (The overhaul plan's seventh piece: toward the sun or the moon a share of the dashes are the light itself, a path
+    // of broken marks; under an aurora, by night, a share are its green, as the clip's lake carries its aurora. The
+    // chart's derivatives come from a position measured from the eye: chunks.js pcGroundChartD.)
     vec2 wch = pcGroundChart(vBody, uBodyR);
-    vec2 wdx = dFdx(wch), wdy = dFdy(wch);
+    vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
     vec2 woc = pcStrokeOct(dist * 1.6, uOilPx.z * 1.6);
     vec3 wr1, wr2; vec2 wds; float wown;
     pcThinLayer(wch, wdx, wdy, woc.x, 6.0, vBody, 40.0, 4.0, wr1, wds, wown, wr2);
-    vec3 cdeep = pcDensity(c, 1.4), clight = mix(c, vec3(1.0), 0.24);
+    vec3 cdeep = pcDensity(c, 1.4), clight = mix(c, mix(skyc, vec3(1.0), 0.25), 0.45);
+    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), 22.0) * max(uDayness, uMoon) * (1.0 - uWx.x);
+    vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
+    float wau = uAuroraK * (1.0 - uDayness);
     vec3 w1 = wr1.x > 0.62 ? clight : (wr1.x < 0.30 ? cdeep : c), w2 = wr2.x > 0.62 ? clight : (wr2.x < 0.30 ? cdeep : c);
+    w1 = wr1.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr1.z * 31.7))) : w1;
+    w2 = wr2.z < 0.34 * wau ? mix(vec3(0.10, 0.74, 0.60), vec3(0.24, 0.96, 0.56), step(0.5, fract(wr2.z * 31.7))) : w2;
+    w1 = wr1.y < wsp * 1.2 ? wsun : w1; w2 = wr2.y < wsp * 1.2 ? wsun : w2;
     c = mix(w2, w1, wown);
   }
   #endif
@@ -1178,6 +1199,11 @@ void main() {
     // stem they shrank under the pixel a few metres off and every trunk was a flat slab. A crown's leaves are never
     // under about three and a half pixels wide: thinner, and a far crown was a stipple of single pixels)
     float dabK = max(uOilS.w * 0.9, 2.2 * uOilS.z / max(uOilA.x, 0.5));
+    #ifdef PC_FAR
+      // (a far tree's crown is one small mass: with dabs the size of the ground's it was four or five flat patches, a
+      // faceted lump from the air; smaller leaves, so a crown is a cluster of them, as the near trees are)
+      dabK *= 0.62;
+    #endif
     vec4 o4c = pcStrokeOct4(vd * (0.85 + 0.3 * seed) * dabK, 0.05);
     vec3 oc = isBark ? vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed), 0.004), 1.0) : vec3(o4c.xy, 1.0);
     // (a crown's dabs come and go whole, each asked at its own centre: chunks.js pcDabLayer)
@@ -1663,15 +1689,22 @@ void main() {
     // the figure in strokes: thin streaks that run down the cloth and along the limbs (the figure's own up), each a
     // little lighter or darker, warmer or cooler than the next, with nothing drawn between them; fine, because the
     // figure is what the eye reads first. The chart is the figure's own space, laid along whichever side the form faces.
+    // (The overhaul plan's eighth piece: the colour under the streaks carries no grain of its own (the wash's drifting
+    // pigment made every streak speckled), only the slow folds; a piece marked dry 1 (a strip of the cloak, models.js)
+    // is one flat piece of paint with no streaks; and where the form turns from the eye on the sun's side its edge
+    // takes the light: a rim.)
     vec3 fox = dFdx(vObj), foy = dFdy(vObj);
     vec3 fna = abs(normalize(vNO));
     vec2 fch, fdx, fdy;
     if (fna.x >= fna.z) { fch = vObj.yz; fdx = fox.yz; fdy = foy.yz; } else { fch = vObj.yx; fdx = fox.yx; fdy = foy.yx; }
-    vec2 foc = pcStrokeOct(length(vView) * 0.8, 0.004);
+    vec2 foc = pcStrokeOct(length(vView) * 0.8, 0.006);
     vec3 fr1, fr2; vec2 fds; float fown;
     pcThinLayer(fch, fdx, fdy, foc.x, 5.0, vObj, 40.0, 2.0, fr1, fds, fown, fr2);
-    vec3 t1 = pcTone(pcDabTint(c, fr1, 0.0), lvl + (fr1.z - 0.5) * 0.5), t2 = pcTone(pcDabTint(c, fr2, 0.0), lvl + (fr2.z - 0.5) * 0.5);
-    lit = mix(t2, t1, fown);
+    vec3 co = pcWetWash(pcDensity(vCol, 1.0 + (smoothstep(0.42, 0.62, fold) - 0.45) * 0.30 * (1.0 - max(vMat.z, 0.0))), 0.7);
+    float sunF = dot(nV, sunV);
+    float lvo = pcLevel(sunF * 0.5 + 0.5, 0.05) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness;
+    vec3 t1 = pcTone(pcDabTint(co, fr1, 0.0), lvo + (fr1.z - 0.5) * 0.5), t2 = pcTone(pcDabTint(co, fr2, 0.0), lvo + (fr2.z - 0.5) * 0.5);
+    lit = vMat.x > 0.985 ? pcTone(co, lvo) : mix(t2, t1, fown);
   }
   #else
   // dry brush: the loaded brush skips on the lit side and paper sparkles through

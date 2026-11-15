@@ -102,6 +102,8 @@ uniform mat4 uShM;
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
 uniform vec4 uLamp;
+uniform vec4 uLampF;
+uniform float uAuroraK;
 uniform vec4 uGroundK;
 uniform highp sampler2D uDabP;    // the dabs laid once (dabtex.js): a texel a dab
 uniform highp sampler2D uDabId;   // and which dabs can lie on each texel of the tile
@@ -218,7 +220,10 @@ vec3 pcTone(vec3 c, float level) {
   // (measured against the clip's frames after overhauls 1 and 2: its shadow on the leaf floor is a plum, about
   // (0.37, 0.19, 0.22), blue over green; ours was a red-brown, (0.52, 0.25, 0.12). So two fifths of a shade is a violet
   // at the shade's own value, whatever the thing's colour)
-  vec3 g1 = mix(pcDensity(g0, 1.15), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * vec3(1.10, 0.80, 1.25), 0.42) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
+  // (the violet is the cool key's own hue, its green drawn down: a plum by a day's violet key, a deep blue by a night's
+  // teal one; a fixed violet turned a teal night's shadows purple)
+  vec3 shH = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(1.12, 0.84, 0.84);      // (by day about (1.12, 0.73, 1.12): a plum, red and blue level; with more blue the trunks' shade stood indigo)
+  vec3 g1 = mix(pcDensity(g0, 1.15), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * shH, 0.42) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
   vec3 g2 = pcDensity(g1, 1.7);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
@@ -371,11 +376,26 @@ float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
 vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
   if (uLamp.w < 0.01) return paint;
   float d = length(body - uLamp.xyz) + (r - 0.5) * 1.1;
-  float k = uLamp.w * (1.0 - smoothstep(1.0, 6.5, d));
+  float k = uLamp.w * (1.0 - smoothstep(0.5, 5.6, d));
   if (k < 0.004) return paint;
-  vec3 warm = min(mix(pcDensity(wash, 1.2) * vec3(1.35, 0.90, 0.42) + vec3(0.10, 0.045, 0.0), vec3(1.0, 0.72, 0.30) * (0.75 + 0.5 * dot(wash, vec3(0.3, 0.5, 0.2))), 0.45), vec3(1.0));
-  vec3 ring = mix(paint, warm, 0.5) * vec3(0.90, 1.10, 0.78);
-  return k > 0.5 ? mix(ring, warm, smoothstep(0.5, 0.85, k)) : mix(paint, ring, smoothstep(0.0, 0.5, k));
+  // (the wanderer's own shadow by the lantern, as in the clip's night: a dark streak on the lit snow from the feet away
+  // from the lantern, widening as it goes; a stroke lies in it or out of it whole)
+  if (uLampF.w > 0.5) {
+    vec3 upL = normalize(uLamp.xyz);
+    vec3 la = uLampF.xyz - uLamp.xyz; la -= upL * dot(la, upL);
+    vec3 ld = la / max(length(la), 1e-3);
+    vec3 lq = body - uLampF.xyz; lq -= upL * dot(lq, upL);
+    float ls = dot(lq, ld), lside = length(lq - ld * ls);
+    k *= 1.0 - 0.9 * step(-0.08 + (r - 0.5) * 0.08, ls) * step(lside, (0.12 + (r - 0.5) * 0.06) * (1.0 + max(ls, 0.0) / 0.55));
+  }
+  // (the pool is laid in rings of strokes, as the clip's is: orange at the feet, then yellow, then a yellow-green where
+  // the warm light runs into the night's own colour, then the night; one flat mustard out to three metres stood as a
+  // disc: the stills after overhauls 1 and 2)
+  float wl = dot(wash, vec3(0.3, 0.5, 0.2));
+  vec3 orange = min(mix(pcDensity(wash, 1.2) * vec3(1.35, 0.90, 0.42) + vec3(0.10, 0.045, 0.0), vec3(1.0, 0.64, 0.22) * (0.75 + 0.5 * wl), 0.5), vec3(1.0));
+  vec3 yellow = min(orange * vec3(0.98, 1.24, 1.30) + vec3(0.0, 0.03, 0.03), vec3(1.0));
+  vec3 green = mix(paint, yellow, 0.5) * vec3(0.80, 1.12, 0.86);
+  return k > 0.76 ? orange : k > 0.52 ? yellow : k > 0.28 ? green : k > 0.10 ? mix(paint, green, 0.5) : paint;
 }
 // The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
 // (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.
@@ -405,6 +425,9 @@ float pcCast(vec3 bodyPos, float rag) {
   vec3 up = normalize(bodyPos);
   for (int i = 0; i < 2; i++) {
     float k = i == 0 ? uCastK.x : uCastK.y;
+    #ifdef PC_OIL
+      k *= 1.0 - uShK.x;      // (the oil look: while the shadow map is on the figures throw their real shadows into it, shadow.js)
+    #endif
     if (k < 0.004) continue;
     vec4 A = uCast[i * 2], B = uCast[i * 2 + 1];
     vec3 dd = bodyPos - A.xyz;

@@ -634,6 +634,7 @@ uniform vec4 uShaft;
 uniform vec3 uShaftC;
 uniform vec3 uSunV;
 uniform vec2 uTanHalf;
+uniform vec4 uLampV;
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
@@ -674,8 +675,19 @@ void main() {
     col += uShaftC * (uShaft.x * F * ph * (dl > 0.0 ? dl : 0.6 * dl));
     col = max(col, vec3(0.0));
   }
+  // the lantern's own glow: a small warm light in the air round it, laid over what stands at or behind it (light
+  // added: no neighbour of the pixel is read)
+  float lglow = 0.0;
+  if (uLampV.w > 0.01 && uLampV.z < -0.1) {
+    vec2 lo = ((vUv * 2.0 - 1.0) * uTanHalf - uLampV.xy / -uLampV.z) * -uLampV.z;
+    lglow = exp(-dot(lo, lo) / 0.05) * step(-uLampV.z - 0.4, exp2(pcAuxDec(texture(tAux, vUv)).z) - 1.0) * uLampV.w;
+    col = min(col + vec3(1.0, 0.70, 0.30) * lglow * 0.6, vec3(1.0));
+  }
   float lamp = 0.0;
   if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, pcAuxDec(texture(tAux, vUv)).w);
+  // (and by night what is warm is a light or is lit by one: the lantern's pool on the snow keeps its orange, as a
+  // lamp's glass does; the night's cool key over it turned the pool to mustard)
+  lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
   col *= mix(uGrade, vec3(1.0), lamp);
   // lightning: for a frame or two everything light goes lighter
   col = mix(col, vec3(1.0), clamp(uWxSheet.y * smoothstep(0.25, 0.75, dot(col, W)) * 0.6, 0.0, 0.9));
@@ -822,7 +834,7 @@ export class Post {
     this.mOil = fsMaterial(OIL_FRAG, { tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
       uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8,
       uShAir: OIL.uShAir, uShV: OIL.uShV, uShaft: OIL.uShaft, uShaftC: OIL.uShaftC, uSunV: OIL.uSunV,
-      uTanHalf: { value: new THREE.Vector2(1, 1) } });
+      uTanHalf: { value: new THREE.Vector2(1, 1) }, uLampV: OIL.uLampV });
     this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`

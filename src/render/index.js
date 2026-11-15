@@ -5,7 +5,8 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals } from './shared.js';
+const _lv = new THREE.Vector3();
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 import { ShadowMap } from './shadow.js';
@@ -179,6 +180,12 @@ export function createPainter(renderer) {
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;
     if (shadow) shadow.render(renderer, scene, camera);
+    if (LOOK.oil) {
+      // (the lantern's glow in the air, post.js OIL_FRAG: where the lantern is in the eye's space, and how strong)
+      const L = OIL.uLamp.value, V = OIL.uLampV.value;
+      if (L.w > 0.01 && SHADOW.root) { _lv.set(L.x, L.y, L.z).applyMatrix4(SHADOW.root.matrixWorld).applyMatrix4(camera.matrixWorldInverse); V.set(_lv.x, _lv.y, _lv.z, L.w); }
+      else V.w = 0;
+    }
     post.beginScene();
     swapForeign(scene);
     // glazes sit out the scene pass and are laid over the brushed picture afterwards

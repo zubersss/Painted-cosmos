@@ -276,7 +276,7 @@ export function pineGeometry(seed, lod, spec) {
       const r = (sl ? 2.7 - 2.0 * Math.pow(t, 0.85) : 3.9 - 3.0 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3);
       const off = (1 - t) * 0.6;
       const c = V(lean * (y / H) * (y / H) + (rnd() - 0.5) * off, y, lz * (y / H) * (y / H) + (rnd() - 0.5) * off);
-      if (sl) { leafCards(B, c, r, Math.max(r * 0.36 + 0.2, gap * 0.45), r, rnd, { n: 46, len: 0.62, wid: 0.15, massC: crownC, massK: 0.5, sway: 0.35 + 0.5 * t, shade0: 0.1 + 0.2 * (1 - t), shadeK: 0.7, droop: 0.9 }); continue; }
+      if (sl) { leafCards(B, c, r, Math.max(r * 0.36 + 0.2, gap * 0.45), r, rnd, { n: 62, len: 0.70, wid: 0.19, massC: crownC, massK: 0.5, sway: 0.35 + 0.5 * t, shade0: 0.1 + 0.2 * (1 - t), shadeK: 0.7, droop: 0.9 }); continue; }
       blob(B, c, r, Math.max(r * 0.42 + 0.25, gap * (sl ? 0.45 : 0.7)), r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: 4 });
     }
     if (sl) leafCards(B, V(lean, H * 0.99, lz), 0.6, 1.3, 0.6, rnd, { n: 22, len: 0.6, wid: 0.15, massC: crownC, massK: 0.4, sway: 0.9 });

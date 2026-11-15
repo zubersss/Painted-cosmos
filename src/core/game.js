@@ -696,7 +696,7 @@ export class Game {
     if (hud.setTouch) {
       hud.setTouch(touchOn ? {
         on: true, idle: tp.idle(performance.now() / 1000), stick: tp.stick,
-        mode: st === S.ON_FOOT ? (sim.easel ? 'board' : 'foot') : st === S.BOARDING ? 'board' : st === S.LANDED ? 'landed'
+        mode: st === S.ON_FOOT ? (sim.easel ? 'board' : sim.ex.flying ? 'wing' : 'foot') : st === S.BOARDING ? 'board' : st === S.LANDED ? 'landed'
           : st === S.PULSE ? 'pulse' : st === S.LANDING ? 'landing' : 'fly',
       } : null);
     }

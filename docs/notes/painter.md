@@ -60,8 +60,24 @@ blur at all; colours that pop with no detail lost; the cloak a rich blue; no jet
   ground's laying `ground: 'tiles'`).
 - `src/world/leaffall.js` (falling leaves), `src/world/sky.js` (the sky under `PC_OIL`: gold through the golden hours,
   the aurora in upright strokes, night dashes), `src/world/index.js` (the shadow's and the lantern's state, the air).
-- `src/art/models.js` (`wandererParts`: cloak, hood, lantern, no jets; the flying pose), `src/player/explorer.js`
-  (the flight: Space lifts, W goes where the view looks, C sinks, no fuel), `tests/flycheck.mjs`.
+- `src/art/models.js` (`wandererParts`: hood, lantern, no jets; the flying pose; THE CLOAK IN STRIPS, overhaul 8:
+  `cloakRow` hangs three rows of thin pointed ribbons over a dark lining, each one flat blue of `CLOAK_BLUES`, marked
+  `dry: 1`, which `FIG_FRAG` paints as one flat piece with no streaks; a rim of light where the form turns from the eye
+  on the sun's side), `src/player/explorer.js` (the flight: Space lifts, W goes where the view looks, C sinks, no fuel),
+  `tests/flycheck.mjs`; the words and the touch buttons for the flight (`src/ui/hud.js`, `theme.css` `pc-t-wing`,
+  `src/core/game.js`, `sim.js`: all behind `MODE.wanderer`).
+- THE NIGHT (overhauls 6 to 8, after the clip's night frames): a world's own night keys in the oil look
+  (`look.oil.night`, read in `world/index.js blendKeys`; Neptune's is a deep green-blue: nothing in the clip's night is
+  violet); the shade's hue is the cool key's own (`pcTone`: a plum by day, a deep blue by a teal night); snow in long
+  strokes that run with the land (`TERRAIN_FRAG`, `uGroundK.x`, a look's `oil.ground: 'flow'`; the outlined tiles are
+  gone from the ground, `pcBrick` is unused); the aurora in thin pointed strokes with a level foot (`sky.js`); the
+  lantern's pool in rings of orange, yellow and yellow-green strokes and the wanderer's own shadow in it (`pcLamp`,
+  `uLampF`); by night what is warm is kept out of the night's cool key (`OIL_FRAG`).
+- THE FIGURES' REAL SHADOWS: `shadow.js` draws whatever is marked `pcCaster` and is moved by bones (`uPart`) into the
+  shadow map with those bones; `pcCast`'s soft blot gives way while the map is on.
+- WATER (overhaul 7, first pass, not yet seen in a still): the dashes carry the sky's colour, a path of broken marks
+  of the light toward the sun or the moon, and by night under an aurora a share of them its green (`uAuroraK`).
+- CLOUDS (overhaul 6, first pass, not yet seen against an open sky): flat two-tone shapes with clean edges.
 - `tools/lab.mjs`: the look lab (see its header): one long-lived headless page on the painter's gallery. In software
   GL the first frame after a load compiles the shaders: eight to eleven minutes at 1280x720; every frame after takes
   20 to 60 s. **A background process is stopped by the session after two hours:** start the lab inside the job that
@@ -76,17 +92,19 @@ motion. The baked strokes cut the stills' time here by nought to a fifth only, b
 other work (the shadow pass, the leaves' vertices); the pixel's own work on the ground fell from 36 dabs tried and two
 layers shaded to about two dabs and 1.3 layers. Only the owner's desktop can say whether it plays.
 
-**Not done yet (the overhaul plan's order).** 6 the sky (still the watercolour's with patches; the aurora's lower edge is
-in steps). 7 water. 8 the figure (the cloak as strips, a rim of light, the lantern's glow and shadow, the figure into
-the shadow map). 9 every world by the pattern of the autumn wood and the aurora tundra; rocks, cliffs and strata in
-strokes (a boulder still paints as a wash with a nibbled edge); PHYSICS' kits (`src/render/kitmat.js` is not
-registered); the touch control for "sink", the game's words that still say "jetpack".
+**Not done yet (the overhaul plan's order).** Overhauls 6 to 8 have a first pass each (above); what is still owed in
+them: the sky by day against an open horizon and the night sky's streaks judged in stills; water judged in stills
+(a lake by night, the stream in the wood), a foam line at the shore; the lantern's own glow in the air. 9 every world
+by the pattern of the autumn wood and the aurora tundra; rocks, cliffs and strata in strokes (a boulder still paints
+as a wash with a nibbled edge); PHYSICS' kits (`src/render/kitmat.js` is not registered); the README still says
+"jetpack" (to be changed when the look goes live); the play-tests still fly the old explorer.
 
 **Known faults.**
 - From the air the far crowns are lumps with flat facets and clearings a flat yellow: the far tree (`PC_FAR`) and the
   far ground are not the look yet.
-- The tiles (snow worlds) still bend their chart by a slow noise and carry a stroke's centre by derivatives: a tile at
-  a shadow's edge may come out in dots, as the dabs did before their centres were made exact.
+- The snow's long strokes (and bark, the figure, water: every `pcThinLayer`) bend their chart by a slow noise and carry
+  a stroke's centre by derivatives: a stroke at a shadow's edge may come out in dots, as the dabs did before their
+  centres were made exact. Not seen on the tundra (few shadows there).
 - The ground's chart has a seam along the twelve edges of the cube, and a crown's chart one where the axis its mass
   faces most changes: strokes are cut straight there. Not seen in the prototype's scenes.
 - The dab tile repeats every 32 cells: only places and shapes repeat (colour and light come from the world), and it

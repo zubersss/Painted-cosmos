@@ -56,8 +56,8 @@ export function createWorld(scene) {
     scene.add(root);
     bodies.set(id, root);
     const bu = makeBodyUniforms();
-    // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'tiles' for worlds of snow and ice)
-    { const lk = getLook(id); if (lk && lk.oil) { if (lk.oil.ground === 'tiles') bu.uGroundK.value.x = 1; if (lk.oil.grass != null) bu.uGroundK.value.y = lk.oil.grass; } }
+    // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'flow' (long strokes that run with the land) for worlds of snow and ice)
+    { const lk = getLook(id); if (lk && lk.oil) { if (lk.oil.ground === 'flow') bu.uGroundK.value.x = 1; if (lk.oil.grass != null) bu.uGroundK.value.y = lk.oil.grass; } }
     bu.uBodyR.value = BODIES[id].radius;
     const look = getLook(id);
     if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }
@@ -211,7 +211,8 @@ export function createWorld(scene) {
   function blendKeys(look, wDay, wDawn, wDusk, wNight) {
     const s = look.sky;
     for (const f of Object.keys(tmpKey)) {
-      const a = s.day[f], b = s.dawn[f], c = s.dusk[f], d = s.night[f];
+      // (the oil look may give a world its own night: the look's oil.night, key by key)
+      const a = s.day[f], b = s.dawn[f], c = s.dusk[f], d = (LOOK.oil && look.oil && look.oil.night && look.oil.night[f]) || s.night[f];
       tmpKey[f].set(
         a[0] * wDay + b[0] * wDawn + c[0] * wDusk + d[0] * wNight,
         a[1] * wDay + b[1] * wDawn + c[1] * wDusk + d[1] * wNight,
@@ -552,6 +553,7 @@ export function createWorld(scene) {
       skyU.uCamL.value.copy(st.camLocal);
       skyU.uSkyZenith.value.copy(tmpKey.zenith);
       if (skyU.uAurora) skyU.uAurora.value.x = aur * (1 - space01);
+      OIL.uAuroraK.value = aur * (1 - space01);
       // (leaves in the air of an autumn wood, while the eye is among the trees: none from the ship above them)
       if (leafFall) leafFall.update(cameraPos, active.root, _camL, bu, fall * (1 - space01) * (1 - THREE.MathUtils.smoothstep(camR - (here.radius || body.radius), 18, 40)));
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
@@ -612,7 +614,7 @@ export function createWorld(scene) {
     const K = G.uCastK.value, U = G.uCast.value;
     K.set(0, 0);
     SHADOW.root = null; SHADOW.strength = 0;
-    OIL.uLamp.value.w = 0;
+    OIL.uLamp.value.w = 0; OIL.uLampF.value.w = 0;
     if (!active) return;
     // (by night the moon throws the shade: uSunDirL is then the moon's direction; nothing is thrown in the middle of twilight)
     const moon = active.bu.uMoon.value, mk = Math.abs(2 * moon - 1);
@@ -644,6 +646,8 @@ export function createWorld(scene) {
         const lp = o.userData.lamp;
         _ct.set(lp[0], lp[1], lp[2]); o.updateWorldMatrix(true, false); o.localToWorld(_ct); active.root.worldToLocal(_ct);
         OIL.uLamp.value.set(_ct.x, _ct.y, _ct.z, THREE.MathUtils.smoothstep(1 - active.bu.uDayness.value, 0.25, 0.8));
+        // (and where the wanderer stands: by the lantern's light it throws a shadow of its own, away from the lantern)
+        OIL.uLampF.value.set(_cp.x, _cp.y, _cp.z, 1);
       }
       _cu.copy(_cp).divideScalar(r);
       const ground = sampleSurfacePure(active.id, _cu.x, _cu.y, _cu.z).radius, h = Math.max(0, r - ground);

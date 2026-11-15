@@ -22,6 +22,7 @@ import {
 } from '../ship/flight.js';
 import { PULSE, arrivalRadius, createPulse, pulseAdvice, courseAdvice, stepPulseSpeed, pulseEta, courseDir } from '../ship/pulse.js';
 import { words } from './words.js';
+import { MODE } from '../data/mode.js';
 
 export const FEEL = Object.freeze({
   mouseFoot: 0.0023,         // rad per pixel on foot
@@ -1486,7 +1487,7 @@ export class Sim {
     const liq = env && env.liquidOf && ex.surface ? env.liquidOf(ex.surface) : null;
     if (!liq || !(liq.viscosity > 1)) return;                 // water and froth do not hold anyone
     this._bogSaid = true;
-    this.say(`The ${liq.name || 'liquid'} is thick: hold {Space} and the jetpack lifts you out`, 7);
+    this.say(MODE.wanderer ? `The ${liq.name || 'liquid'} is thick: hold {Space} and you rise out of it` : `The ${liq.name || 'liquid'} is thick: hold {Space} and the jetpack lifts you out`, 7);
   }
 
   slowWord(env) {

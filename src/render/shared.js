@@ -100,7 +100,8 @@ export const OIL = {
   // (x is 0 since the overhaul plan's fifth piece: the watercolour's near strokes are shapes cut out of cards, a fan of
   // blades as one card with a notched top: in flat paint they stood on the floor as notched slabs. The oil look's floor
   // is its leaf dabs, tufts of real blades, saplings and small leafy plants.)
-  uOilG: { value: new THREE.Vector4(0.0, 0.45, 0, 0) },
+  // (y was 0.45 while the blades were the watercolour's stiff spikes; they are tufts now, and four in five are kept)
+  uOilG: { value: new THREE.Vector4(0.0, 0.8, 0, 0) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
   // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three
@@ -116,6 +117,9 @@ export const OIL = {
   // the wanderer's lantern: where it is (the body's own space) and how strong its pool of light is now (0 by day):
   // laid into the ground's and the plants' strokes (chunks.js pcLamp), not a light in the scene
   uLamp: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uAuroraK: { value: 0 },        // how strong the aurora overhead is (0: none): the water's dashes carry its green by night (materials.js WATER_FRAG)
+  uLampV: { value: new THREE.Vector4(0, 0, -1, 0) },     // the lantern in the eye's space (set every frame, render/index.js), w how strong: its glow in the air
+  uLampF: { value: new THREE.Vector4(0, 0, 0, 0) },      // where the wanderer stands (the body's space), w 1 while it does: its shadow by the lantern's light
   // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (both set every
   // frame)   z: the smallest stroke's width, m (nearer than where that is uOilA.x pixels, strokes keep this width on
   // the land and grow on the screen, as the clip's do)   w: (not in use)
