@@ -177,8 +177,10 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
 **IN PROGRESS since 2026-11-15 (the owner's go): the coordinator is building pieces 1 to 3 of
 section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
-for the owner.** Pieces 1 to 3 are built. **Checkpoint 1 is passed: the owner chose style 5 and asked for the
-clip to be matched very closely (section 2, item 20), and said to continue.** The coordinator is
+for the owner.** **WAITING FOR THE OWNER (2026-11-15): the overhaul plan in section 4a-2 has been put to the
+owner; nothing new is built until the owner answers (section 2, item 22).**
+Pieces 1 to 3 are built. Checkpoint 1 is passed: the owner chose style 5 and asked for the
+clip to be matched very closely (section 2, item 20), and said to continue. The coordinator is
 now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
 clip's, real cast shadows, falling leaves and the flicker, the night with snow, lantern and
 aurora, the explorer), toward checkpoint 2. The station numbers of checkpoint 1 are in the log:
@@ -310,6 +312,35 @@ the setting in the game's menu; release 2's phone findings; the blind players; t
   session cannot see the owner's usage meter.
 - If the top model runs out mid-way: every piece is committed when done and written up here, but
   pieces 2 and 3 should be finished on it.
+
+### 4a-2. The overhaul plan (put to the owner 2026-11-15; WAITING for the owner's word)
+
+The owner asked what still holds the look back and what a plan to fix it entails (section 2,
+item 22). Audit: the clip's frames beside the stills of `look-proto` at `d8bd753`. Built so far
+there: style 5 (leaf dabs), real cast shadows, the slender wood, the pale gold air and the look's
+own golden hours, falling leaves, the wanderer with cloak, hood and lantern, the lantern's pool,
+snow in tiles, the aurora in strokes (see the painter's notes on that branch).
+
+**What holds it back, most first.**
+
+| # | Overhaul | Why (what the clip has and we lack) | What it entails | Taken from |
+| --- | --- | --- | --- | --- |
+| 1 | **Colour as paint** | The clip's colours are pure and strong; ours are converted from pale watercolour washes and come out brown and muted, and every shade turns the same maroon-violet | Each world's colours given outright as paint (a small palette: light, local, shade for ground, leaf, bark, sky, water); shade that keeps a thing's own hue; the air thin near the eye and thick far off; a last pass that deepens darks and lifts saturation without touching edges | The clip; Van Gogh (opposite colours side by side); No Man's Sky (three colours key a world); Tiny Glade (orange, violet, blue) |
+| 2 | **Foliage rebuilt** | The clip's crowns are dark crooked branches carrying separate leaf-shaped pieces, with bright sky between; ours are lumps with leaves painted on, pale and far | Trees built again: branches as tubes, leaves as leaf-shaped cards in clusters (a few hundred a tree near by, fewer and larger farther off, one patch from the ship); each leaf one flat colour, lit or shaded whole; the same for saplings and bushes. Their shadows fall dappled by themselves | The clip; Tom Thomson (a tree as one patch from the air); Klimt (each trunk its own marks) |
+| 3 | **Strokes baked** | The strokes are worked out afresh for every pixel: too slow to play, and they flicker from the ship (checkpoint 1's numbers) | The dabs and tiles drawn once into textures at start-up and read from there, filtered by distance: the same picture, many times cheaper, steady under a moving eye | Release 1's lesson (patterns filtered to the pixel) |
+| 4 | **Light in the air** | The clip has shafts of light through its haze and a glow round the sun | Shafts worked out from the shadow map along each line of sight (light added in the air; no blur of the picture) | Firewatch; Arise |
+| 5 | **Grass and floor** | The clip's floor has tufts of long lit blades, saplings, a few flowers, and leaves of many sizes; ours has stiff spikes and one size of leaf | Tufts as blade-shaped strokes in painted colours; leaf sizes and kinds varied; bare paths and moss as their own strokes so the land reads | The clip; Klimt (cool flecks in a warm carpet); Breath of the Wild (paths read) |
+| 6 | **Sky** | Still the watercolour's sky with patches on it | A painted sky: clouds as a few big shapes, the sun's glow, night strokes that follow the wind, stars; rings and planets bold | Sohlberg; Sea of Thieves; No Man's Sky; the clip's night |
+| 7 | **Water** | Still the watercolour's water with dashes on it | Flat dashes that carry the sky's colours, the sun's or the aurora's path as broken marks, a foam line at the shore | The clip's night; Sea of Thieves; Rime |
+| 8 | **The figure** | The clip's cloak is made of stroke-shaped strips with a ragged edge and is the strongest colour in the frame; ours is a smooth cone with streaks, greyer | The cloak as overlapping strips that lift in the wind; a rim of light; the lantern's own glow and the shadow it throws; (the owner to say whether the blue may be richer) | The clip; Journey; Ori |
+| 9 | **Every world** | Only Earth's autumn wood and Neptune's tundra are tuned | Each of the ten worlds given its palette and stroke settings by the pattern proved on these two; rocks, cliffs and strata in strokes | No Man's Sky; The Pathless (a landmark and one accent a region) |
+
+**Order.** 1 and 2 first (they decide how close the picture is), then 3 (it decides whether it
+can be played and whether it flickers), 4 and 5, then 6 to 8; 9 is pattern work for a session on
+the next model down. A checkpoint with stills after 1 and 2, and again after 3 to 5.
+
+**What it will not do.** Match the clip's scenes one for one: the clip shows three small
+hand-made places, this game makes ten planets by rule. Show motion: only the owner's desktop can.
 
 ### 4b. Release 2 (on approval or in parallel)
 
