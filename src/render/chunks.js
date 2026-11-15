@@ -103,6 +103,8 @@ uniform highp sampler2D uShTex;
 uniform vec4 uShK;
 uniform vec4 uLamp;
 uniform vec4 uGroundK;
+uniform highp sampler2D uDabP;    // the dabs laid once (dabtex.js): a texel a dab
+uniform highp sampler2D uDabId;   // and which dabs can lie on each texel of the tile
 #endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
 vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
@@ -213,7 +215,10 @@ vec3 pcTone(vec3 c, float level) {
   // (and the sky's own light, added: without it a shadow on an orange floor is brown; with it, maroon and violet)
   vec3 g0 = b * shC * uOilD.x;
   // (a shade is deep, but not a purer colour than the thing in the light: a fifth of it goes to its own grey)
-  vec3 g1 = mix(pcDensity(g0, 1.15), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * vec3(1.02, 0.96, 1.06), 0.2) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 1.0) * uOilD.y * (0.35 + 0.65 * uDayness);
+  // (measured against the clip's frames after overhauls 1 and 2: its shadow on the leaf floor is a plum, about
+  // (0.37, 0.19, 0.22), blue over green; ours was a red-brown, (0.52, 0.25, 0.12). So two fifths of a shade is a violet
+  // at the shade's own value, whatever the thing's colour)
+  vec3 g1 = mix(pcDensity(g0, 1.15), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * vec3(1.10, 0.80, 1.25), 0.42) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
   vec3 g2 = pcDensity(g1, 1.7);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
@@ -257,7 +262,8 @@ float pcFogAmount(float dist) {
 #ifdef PC_OIL
 // (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
 // changes a thing's colour in flat steps and never softens its edge)
-vec3 pcOilHaze(vec3 h) { return mix(pow(h, vec3(uOilC.x)), vec3(1.0, 0.93, 0.74), 0.7 * pcGold()); }
+// (the gold air a step deeper than it was: the clip's far air reads about (0.77, 0.69, 0.60), ours was nearly white)
+vec3 pcOilHaze(vec3 h) { return mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold()); }
 vec3 pcAtmos(vec3 c, float f) { return mix(c, pcOilHaze(uHaze), f); }
 vec3 pcAtmosWash(vec3 c, float f) {
 #else
@@ -374,14 +380,18 @@ vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
 // The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
 // (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.
 float pcSunAt(vec3 bodyPos, float canopy, float lift, float w) {
-  float dap = pcDappleS(bodyPos, canopy, lift, w);
-  if (uShK.x < 0.004) return dap;
-  vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
-  vec2 a = abs(q.xy);
-  float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
-  if (inside < 0.004) return dap;
-  float lit = step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r);
-  return mix(dap, lit, inside);
+  if (uShK.x >= 0.004) {
+    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+    vec2 a = abs(q.xy);
+    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+    if (inside >= 0.004) {
+      float lit = step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r);
+      // (well inside the map's square the pattern is not worked out at all)
+      if (inside > 0.996) return lit;
+      return mix(pcDappleS(bodyPos, canopy, lift, w), lit, inside);
+    }
+  }
+  return pcDappleS(bodyPos, canopy, lift, w);
 }
 #endif
 
@@ -466,6 +476,15 @@ vec2 pcStrokeOct(float dist, float w0) {
   float l = log2(max(want / w0, 1.0)), l0 = floor(l);
   return vec2(w0 * exp2(l0), l - l0);
 }
+// The same with the octave's own numbers, for strokes that come and go whole (pcDabs): x the finer layer's width, y how
+// far toward the coarser, z the octave's number, w the distance's own number before it is cut to octaves (it runs on
+// smoothly over the land, so its screen derivatives carry it to a stroke's centre).
+vec4 pcStrokeOct4(float dist, float w0) {
+  float want = max(dist, 0.05) * uOilPx.x * uOilA.x * uOilPx.y / 720.0;
+  want *= 1.0 + 0.7 * clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 1300.0, 0.0, 1.0);
+  float lu = log2(want / w0), l0 = floor(max(lu, 0.0));
+  return vec4(w0 * exp2(l0), max(lu, 0.0) - l0, l0, lu);
+}
 // The same for a surface whose strokes may not grow past wmax (m): bark, a blade. x the finer layer's width, y how far
 // toward the coarser, z 1 while a stroke is still a few pixels wide .. 0 where the strokes have shrunk under the pixel
 // (there the surface is laid in its mean colour: nothing finer than a pixel is drawn).
@@ -517,55 +536,77 @@ void pcStrokeLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, 
 // reference's forest floor is not a course of tiles: it is leaf-shaped dabs, pointed at both ends, lying every way, one
 // over another, with no line between them. A layer of dabs: two in every cell of a grid one dab wide, each anywhere in
 // its cell, turned its own way, a little longer or shorter; where two lie over one another the one with the higher
-// number is on top. p: the chart in half dab lengths (a cell). shape: x a dab's length over its width, y how far the dabs agree in
-// direction (0 every way .. 1 all along the chart's first axis), z how pointed (1 a leaf .. 0 a blunt stroke).
-// gone: the share of the dabs not laid (the finer layer, toward the next octave). Out: the dab on top (its numbers, its
-// centre, how many pixels inside its edge the pixel lies: 0 where no dab lies) and the numbers of the next one under it.
-void pcDabs(vec2 p, vec3 shape, vec2 spx, float gone, out vec3 rnd1, out vec2 ctr1, out float e1, out vec3 rnd2, out float has2) {
-  vec2 cell = floor(p);
-  float pri1 = -1.0, pri2 = -1.0;
-  e1 = 0.0; has2 = 0.0; rnd1 = vec3(0.5); rnd2 = vec3(0.5); ctr1 = p;
-  vec2 ipx = 1.0 / max(spx, vec2(1e-6));
-  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) for (int k = 0; k < 2; k++) {
-    vec2 c = cell + vec2(float(i), float(j));
-    vec3 h = pcHash3(c + float(k) * 31.7);
-    vec3 g = fract(h.zxy * vec3(43.37, 17.71, 29.13) + h.yzx * 7.19);     // (three more numbers from the first three)
-    if (g.z < gone) continue;
-    vec2 o = c + h.xy;
-    // (its direction: any way, or near the chart's first axis)
-    vec2 dir = normalize(mix(vec2(g.x - 0.5, fract(g.x * 7.7) - 0.5) + 1e-4, vec2(1.0, (g.x - 0.5) * 0.6), shape.y));
-    float cs = dir.x, sn = dir.y;
-    vec2 d = p - o;
-    vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
-    // (a dab is as long as its cell, a little more or less, and shape.x times narrower)
-    float a = 0.62 + 0.36 * g.y, b = a / shape.x * (0.8 + 0.4 * fract(g.y * 7.3));
-    float t = q.x / a;
-    if (abs(t) >= 1.0) continue;
-    float t2 = t * t;
-    float inside = b * mix(1.0 - t2 * t2, 1.0 - t2, shape.z) - abs(q.y);
-    if (inside <= 0.0) continue;
-    // (how far inside the edge, in pixels: across the dab, and from its ends)
-    float ePx = min(inside * length(vec2(-sn, cs) * ipx), (a - abs(q.x)) * length(vec2(cs, sn) * ipx));
-    float pri = h.z;
-    if (pri > pri1) { pri2 = pri1; rnd2 = rnd1; has2 = step(0.0, pri2); pri1 = pri; rnd1 = vec3(g.x, fract(g.y * 3.7), h.z); ctr1 = o; e1 = ePx; }
-    else if (pri > pri2) { pri2 = pri; rnd2 = vec3(g.x, fract(g.y * 3.7), h.z); has2 = 1.0; }
-  }
+// number is on top.
+// THE LAYER IS LAID ONCE (dabtex.js; the overhaul plan's "strokes baked"): the dabs of a tile of PC_DAB_N cells, and for
+// every texel of it the four topmost dabs that can lie there. A pixel reads its texel and tries those (most often one or
+// two of them), where it
+// tried eighteen with their random numbers before. The picture is the same kind; a pixel's work is a fraction.
+// A DAB COMES AND GOES WHOLE: toward the next octave of the distance the finer layer's dabs are left out one by one, each
+// by its own number. Whether a dab is there is asked at the dab's centre (the distance's number carried there), so no
+// dab is cut where the answer changes across it, and a dab that is about to go has first grown small: nothing pops
+// under a moving eye (checkpoint 1's flicker from the ship).
+#define PC_DAB_N 32.0
+#define PC_DAB_T 32.0
+// One of a texel's four. code: which of the eighteen round the cell; p: the chart in cells; asp: a dab's length over
+// its width; dpx, dpy: the chart's screen derivatives; oc: the distance's number at the pixel less the octave's, and
+// its screen derivatives (pcStrokeOct4); ab: the share left out is ab.x + ab.y * (how far toward the next octave).
+bool pcDabHit(float code, vec2 cell, vec2 p, float asp, vec2 dpx, vec2 dpy, vec2 ipx, float lim, vec3 oc, vec2 ab, out vec3 rnd, out vec2 o, out vec2 ds, out float ePx) {
+  float k = mod(code, 2.0), ij = floor(code * 0.5 + 0.01);
+  vec2 c = cell + vec2(mod(ij, 3.0), floor(ij / 3.0 + 0.01)) - 1.0;
+  vec2 cw = mod(c, PC_DAB_N);
+  vec4 P = texelFetch(uDabP, ivec2(int(cw.x + 0.5) * 2 + int(k + 0.5), int(cw.y + 0.5)), 0);
+  o = c + P.xy;
+  vec2 d = p - o;
+  ds = pcChartToPx(-d, dpx, dpy, lim);
+  // (is it there: its number against the share left out where its centre lies; near going, it is small)
+  float gone = clamp(ab.x + ab.y * smoothstep(0.15, 0.85, oc.x + dot(oc.yz, ds)), 0.0, 1.0);
+  float sz = clamp((P.a - gone * 1.12 + 0.12) / 0.12, 0.0, 1.0);
+  if (sz <= 0.0) return false;
+  sz = sqrt(sz);
+  float cs = cos(P.z), sn = sin(P.z);
+  vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
+  // (a dab is as long as its cell, a little more or less, and asp times narrower: dabtex.js dabSize)
+  float a = (0.62 + 0.36 * fract(P.a * 16.0)), b = a / asp * (0.8 + 0.4 * fract(P.a * 256.0));
+  a *= sz; b *= sz;
+  float t = q.x / a;
+  if (abs(t) >= 1.0) return false;
+  float inside = b * (1.0 - t * t) - abs(q.y);
+  if (inside <= 0.0) return false;
+  // (how far inside the edge, in pixels: across the dab, and from its ends)
+  ePx = min(inside * length(vec2(-sn, cs) * ipx), (a - abs(q.x)) * length(vec2(cs, sn) * ipx));
+  // (its own three numbers, from where it lies on the world: the tile repeats, a dab's colour does not)
+  rnd = pcHash3(c + k * 31.7);
+  return true;
 }
-// One layer of dabs over a chart (see pcStrokeLayer for the arguments; w: a dab's width, m). Out: the top dab's numbers,
-// the pixels from here to its centre and how much of the pixel it covers (a clean edge a pixel wide), and the numbers
-// of the dab under it (has2: whether there is one).
-void pcDabLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, vec3 shape, vec3 bendP, float lim, float gone,
-                out vec3 rnd1, out vec2 ds, out float cov1, out vec3 rnd2, out float has2) {
-  vec2 wn = (texture(uNoise3D, bendP / (w * 34.0) + 0.19).rg - 0.5) * 3.0;
-  vec2 p = ch / w + wn;
-  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
-  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
-  vec2 ctr = p; float e1 = 0.0;
-  rnd1 = vec3(0.5); rnd2 = vec3(0.5); has2 = 0.0;
-  // (where every dab is left out nothing is looked for; no derivative is taken past this point)
-  if (gone < 0.995) pcDabs(p, shape, spx, gone, rnd1, ctr, e1, rnd2, has2);
-  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
-  cov1 = clamp(e1, 0.0, 1.0);
+// One layer of dabs over a chart. ch: the chart (m); dcx, dcy: its screen derivatives; w: a dab's cell (half its
+// length, m); asp: its length over its width; lim: the farthest a centre is looked for (pixels); oc, ab: see pcDabHit.
+// Out: the top dab's numbers, its centre on the chart (m: the SAME for every pixel of the dab, to the last bit), the
+// pixels from here to that centre and how much of the pixel the dab covers (a clean edge a pixel wide; 0: no dab here),
+// and the numbers of the dab under it (has2: whether there is one).
+// (The dabs' chart is not bent by a slow noise as the tiles' is: dabs lie every way and have no rows to hide, and with
+// no bend a dab's centre is known exactly. A centre carried there by derivatives differed by a centimetre or two from
+// pixel to pixel, and under a crown, where the shadow map changes from texel to texel, half the pixels of a dab found
+// it in the sun and half in the shade: a dab of dots, seen in the first stills of the baked strokes.)
+// (No derivative is taken in here: it may be called inside a branch.)
+void pcDabLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, float lim, vec3 oc, vec2 ab,
+                out vec3 rnd1, out vec2 ctr, out vec2 ds, out float cov1, out vec3 rnd2, out float has2) {
+  vec2 p = ch / w;
+  vec2 dpx = dcx / w, dpy = dcy / w;
+  vec2 ipx = 1.0 / max(vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y))), vec2(1e-6));
+  rnd1 = vec3(0.5); rnd2 = vec3(0.5); has2 = 0.0; cov1 = 0.0; ds = vec2(0.0); ctr = ch;
+  if (ab.x >= 0.999 && ab.y >= 0.0) return;
+  vec2 cell = floor(p);
+  vec2 tf = min(floor((p - cell) * PC_DAB_T), PC_DAB_T - 1.0);
+  vec4 ids = floor(texelFetch(uDabId, ivec2(mod(cell, PC_DAB_N) * PC_DAB_T + tf + 0.5), 0) * 255.0 + 0.5);
+  vec3 r; vec2 o, dsc; float e; bool got = false;
+  for (int s = 0; s < 4; s++) {
+    float code = ids[s];
+    if (code > 17.5) break;
+    if (pcDabHit(code, cell, p, asp, dpx, dpy, ipx, lim, oc, ab, r, o, dsc, e)) {
+      if (!got) { rnd1 = r; ctr = o * w; ds = dsc; cov1 = clamp(e, 0.0, 1.0); got = true; if (cov1 >= 0.999) break; }
+      else { rnd2 = r; has2 = 1.0; break; }
+    }
+  }
 }
 // A dab's own colour from the wash it is laid in: heavier or lighter, toward the warm or toward the cool.
 // leafy: 0 ground, rock, bark .. 1 leaves, which stray farther: here and there one is red, or still green.
@@ -635,6 +676,25 @@ vec2 pcGroundChart(vec3 body, float R) {
   vec3 a = abs(body);
   vec3 q = a.x >= a.y && a.x >= a.z ? vec3(body.y, body.z, a.x) : a.y >= a.z ? vec3(body.z, body.x, a.y) : vec3(body.x, body.y, a.z);
   return R * atan(q.xy, vec2(q.z));
+}
+// How the ground's chart changes for a change db of the place (the same laying as pcGroundChart). A derivative of the
+// chart is NOT taken from the chart itself: the body's own coordinates are kilometres, known to half a millimetre, and
+// their difference from one pixel to the next is a few millimetres near the eye: a tenth of it noise. The place's
+// derivative is taken from a position measured from the eye (a varying of its own) and carried through here.
+vec2 pcGroundChartD(vec3 body, vec3 db, float R) {
+  vec3 a = abs(body);
+  vec3 q, dq;
+  if (a.x >= a.y && a.x >= a.z) { q = vec3(body.y, body.z, a.x); dq = vec3(db.y, db.z, db.x * sign(body.x)); }
+  else if (a.y >= a.z) { q = vec3(body.z, body.x, a.y); dq = vec3(db.z, db.x, db.y * sign(body.y)); }
+  else { q = vec3(body.x, body.y, a.z); dq = vec3(db.x, db.y, db.z * sign(body.z)); }
+  return R * (q.z * dq.xy - q.xy * dq.z) / (q.z * q.z + q.xy * q.xy);
+}
+// The way from the body's centre to the place whose chart is ch, on the face that body lies on (pcGroundChart undone).
+vec3 pcGroundUnchart(vec3 body, vec2 ch, float R) {
+  vec3 a = abs(body);
+  vec2 t = tan(ch / R);
+  vec3 d = a.x >= a.y && a.x >= a.z ? vec3(sign(body.x), t.x, t.y) : a.y >= a.z ? vec3(t.y, sign(body.y), t.x) : vec3(t.x, t.y, sign(body.z));
+  return normalize(d);
 }
 // A noise channel read for a stroke of width w (m) at its centre: no derivative is taken there (the centre jumps from
 // stroke to stroke), the level is the stroke's own size, so what is finer than the stroke is averaged.

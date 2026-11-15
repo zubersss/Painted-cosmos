@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { genNoise3D, genStrokes, genPaper } from './texgen.js';
 import { PAPER, hexToRgb } from '../data/looks.js';
 import { MODE } from '../data/mode.js';
+import { getDabTextures } from './dabtex.js';
 
 let _tex = null;
 export function getTextures() {
@@ -96,10 +97,22 @@ export const OIL = {
   // what grows on the ground: x the share of the near ground's strokes kept (the clip's floor is a carpet of leaves
   //    with tufts of grass here and there, not a sward)   y the share of the undergrowth's blades and fronds kept
   //    z 1 while the scene pass is multisampled (set every frame)
-  uOilG: { value: new THREE.Vector4(0.18, 0.45, 0, 0) },
+  // (x is 0 since the overhaul plan's fifth piece: the watercolour's near strokes are shapes cut out of cards, a fan of
+  // blades as one card with a notched top: in flat paint they stood on the floor as notched slabs. The oil look's floor
+  // is its leaf dabs, tufts of real blades, saplings and small leafy plants.)
+  uOilG: { value: new THREE.Vector4(0.0, 0.45, 0, 0) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
+  // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three
+  uDabP: { value: null }, uDabId: { value: null },
   uShTex: { value: null }, uShM: { value: new THREE.Matrix4() }, uShK: { value: new THREE.Vector4(0, 0, 0, 0.86) },
+  // LIGHT IN THE AIR (the overhaul plan's fourth piece; post.js OIL_FRAG): the eye's own space to the shadow map's
+  // square, the way to the sun in the eye's space, the lit air's colour, and x how strong the shafts are (0: none),
+  // y the air's density (1/m), z how far along a line of sight the air is followed (m), w the lit share taken as the
+  // air's mean (a line with more of its air in the sun is lighter than the picture as painted, one with less darker)
+  uShAir: { value: null },      // (the shadow map taken down for the air: shadow.js AIR_FRAG)
+  uShV: { value: new THREE.Matrix4() }, uSunV: { value: new THREE.Vector3(0, 1, 0) }, uShaftC: { value: new THREE.Vector3(1, 0.86, 0.58) },
+  uShaft: { value: new THREE.Vector4(0, 0.01, 110, 0.55) },
   // the wanderer's lantern: where it is (the body's own space) and how strong its pool of light is now (0 by day):
   // laid into the ground's and the plants' strokes (chunks.js pcLamp), not a light in the scene
   uLamp: { value: new THREE.Vector4(0, 0, 0, 0) },
@@ -111,7 +124,8 @@ export const OIL = {
 
 // What the shadow map needs from the world each frame (shadow.js): the body the eye is on (its root in the scene), the
 // way to its sun in its own space, and how strong a shadow is now (none under a closed sky or in the middle of twilight).
-export const SHADOW = { root: null, sunDirL: new THREE.Vector3(0, 1, 0), strength: 0 };
+// (air: the density of the air on the ground, 1/m, and shaft: how strong the light in the air is, for the shafts)
+export const SHADOW = { root: null, sunDirL: new THREE.Vector3(0, 1, 0), strength: 0, air: 0, shaft: 0 };
 // (a tool may reach every painted material ever made: tools/lab.mjs swaps their shaders without a reload)
 export const MATERIALS = new Set();
 export function register(m, kind, opts) {
@@ -136,6 +150,7 @@ export function ensureGlobals() {
   const t = getTextures();
   G.uNoise3D.value = t.noise3D;
   G.uStrokeTex.value = t.strokes;
+  if (LOOK.oil && !OIL.uDabP.value) { const d = getDabTextures(OIL.uOilS.value.z, 0.12); OIL.uDabP.value = d.par; OIL.uDabId.value = d.id; }
   return G;
 }
 

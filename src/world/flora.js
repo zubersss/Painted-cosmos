@@ -98,7 +98,7 @@ export class Flora {
     for (const k of ['far', 'bush', 'rock']) if (this.mats[k]) this.mats[k].userData.pcCasts = true;
     this.kit = {
       far: farTreeGeometry(5),
-      grass: grassGeometry(31), patch: grassPatchGeometry(37), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
+      grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71), shard: shardGeometry(91),
     };
   }
@@ -130,7 +130,8 @@ export class Flora {
   }
   _palette(bi) {
     let m = this.pal.get(bi);
-    if (!m) { m = this._underMats(Object.assign({}, this.U, this.S.biomes[bi].under), '-' + bi); this.pal.set(bi, m); }
+    // (the oil look may give a biome's undergrowth its own colours: the biome's oil.under, laid over its washes)
+    if (!m) { const b = this.S.biomes[bi]; m = this._underMats(Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null), '-' + bi); this.pal.set(bi, m); }
     return m;
   }
 

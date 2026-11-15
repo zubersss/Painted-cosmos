@@ -718,7 +718,7 @@ class Surface {
     if (lq !== NOLQ && h < lq) { const L = this.liq[bidx].color; b.r2 = L[0]; b.g2 = L[1]; b.b2 = L[2]; }
     b.dry = T.gloss ? 0.95 : dry; b.wet = wet;
     const dens = (bi.tallD || 0) * grow;
-    b.trees = dens; b.birch = bi.tallMix == null ? 0.5 : bi.tallMix;
+    b.trees = dens; b.birch = MODE.oil && bi.oil && bi.oil.tallMix != null ? bi.oil.tallMix : bi.tallMix == null ? 0.5 : bi.tallMix;      // (the oil look may shift a wood's mix of kinds: the biome's oil.tallMix)
     b.canopy = dens * 0.8 * this.shade[bidx];
     b.under = bi.small ? (lq !== NOLQ && h < lq ? 0 : meadow) : 0;
     b.rock = k === 'alpine' ? t : 0; b.s = c.baseReady ? c.s : 1e9; b.glade = 1; b.aux = crk || T.crack || 0;

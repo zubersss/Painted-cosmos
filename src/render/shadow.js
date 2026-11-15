@@ -59,6 +59,28 @@ void main() {
 }
 `;
 
+// THE AIR'S SHADE (for the light in the air, post.js OIL_FRAG). The map itself is too fine for the air: under a crown
+// it changes from texel to texel, leaf by leaf, and a line of sight that asked it sixteen times came out as grain (seen
+// in the first stills of the shafts). So the map is taken down once a frame to a quarter of its size: for each block of
+// sixteen texels, the share that something shades, and how far from the sun that something is on average (times the
+// share); mipmapped and read smoothly, so the air's light is smooth and the picture's edges stay the painted ones.
+const AIR_VERT = /* glsl */`
+void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }
+`;
+const AIR_FRAG = /* glsl */`
+uniform highp sampler2D tSh;
+void main() {
+  ivec2 b = ivec2(gl_FragCoord.xy) * 4;
+  float c = 0.0, d = 0.0;
+  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) {
+    float z = texelFetch(tSh, b + ivec2(i, j), 0).r;
+    float k = step(z, 0.999);
+    c += k; d += k * z;
+  }
+  gl_FragColor = vec4(c / 16.0, d / 16.0, 0.0, 1.0);
+}
+`;
+
 export class ShadowMap {
   constructor(renderer, opts) {
     const o = opts || {};
@@ -80,6 +102,15 @@ export class ShadowMap {
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
     });
     OIL.uShTex.value = this.rt.texture;
+    // (the air's shade: see AIR_FRAG)
+    this.rtAir = new THREE.WebGLRenderTarget(this.size / 4, this.size / 4, { type: THREE.HalfFloatType, format: THREE.RGFormat, depthBuffer: false });
+    this.rtAir.texture.minFilter = THREE.LinearMipmapLinearFilter; this.rtAir.texture.magFilter = THREE.LinearFilter; this.rtAir.texture.generateMipmaps = true;
+    this.airMat = new THREE.ShaderMaterial({ name: 'pc-shadow-air', uniforms: { tSh: { value: this.rt.texture } }, vertexShader: AIR_VERT, fragmentShader: AIR_FRAG, depthTest: false, depthWrite: false });
+    const tri = new THREE.BufferGeometry();
+    tri.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+    this.airTri = new THREE.Mesh(tri, this.airMat); this.airTri.frustumCulled = false;
+    this.airCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    OIL.uShAir.value = this.rtAir.texture;
     this._q = new THREE.Quaternion(); this._qi = new THREE.Quaternion();
     this._cam = new THREE.Vector3(); this._up = new THREE.Vector3(); this._f = new THREE.Vector3();
     this._X = new THREE.Vector3(); this._Y = new THREE.Vector3(); this._Z = new THREE.Vector3(); this._c = new THREE.Vector3();
@@ -89,7 +120,7 @@ export class ShadowMap {
   // Draw the map for this frame (before the scene pass). Leaves OIL.uShM / uShK set; uShK.x 0 where there is none.
   render(renderer, scene, camera) {
     const K = OIL.uShK.value;
-    K.x = 0;
+    K.x = 0; OIL.uShaft.value.x = 0;
     const root = SHADOW.root, k = SHADOW.strength;
     if (!this.ok || !root || !(k > 0.01)) return false;
     // everything in the body's own space
@@ -130,13 +161,19 @@ export class ShadowMap {
     const ov = scene.overrideMaterial;
     scene.overrideMaterial = this.mat;
     try { renderer.render(scene, cam); } finally { scene.overrideMaterial = ov; }
+    if (SHADOW.shaft * k > 0.004) { renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam); }
     renderer.setClearColor(this._keep, prevA);
     renderer.setRenderTarget(prevT);
     // x how strong, y the bias (0.3 m toward the sun), z a texel of the square, w where the square's answer gives way
     K.set(k, 0.3 / (2 * D), 1 / this.size, 0.86);
+    // for the light in the air (post.js OIL_FRAG): the eye's space to the square, and the way to the sun in the eye's space
+    root.updateMatrixWorld(); camera.updateMatrixWorld();
+    OIL.uShV.value.copy(root.matrixWorld).invert().multiply(camera.matrixWorld).premultiply(OIL.uShM.value);
+    OIL.uSunV.value.copy(Z).applyQuaternion(q).transformDirection(camera.matrixWorldInverse);
+    OIL.uShaft.value.x = SHADOW.shaft * k; OIL.uShaft.value.y = SHADOW.air;
     this.frames++;
     return true;
   }
 
-  dispose() { if (this.rt) this.rt.dispose(); if (this.mat) this.mat.dispose(); }
+  dispose() { if (this.rt) this.rt.dispose(); if (this.mat) this.mat.dispose(); if (this.rtAir) this.rtAir.dispose(); if (this.airMat) this.airMat.dispose(); }
 }

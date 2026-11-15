@@ -185,7 +185,9 @@ function V(x, y, z) { return new THREE.Vector3(x, y, z); }
 export function birchGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   const sl = !!(spec && spec.slender);
-  const H = sl ? 16 + rnd() * 4.5 : 10.5 + rnd() * 2.5;
+  // (the oil look's tree stood 16 to 20 m with its crown out of the picture: the clip's trees are about twelve metres,
+  // their boughs beginning a few metres up, so the crowns fill the top of a view from the ground)
+  const H = sl ? 11.5 + rnd() * 4 : 10.5 + rnd() * 2.5;
   // no two trunks alike: lean, an S-bend, and small kinks from ring to ring
   const lk = sl ? 0.45 : 1;
   const lean = (rnd() - 0.5) * 2.4 * lk, bend = (rnd() - 0.5) * 2.2 * lk, lz = (rnd() - 0.5) * 1.6 * lk, ph = rnd() * 3;
@@ -199,39 +201,46 @@ export function birchGeometry(seed, lod, spec) {
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.5, swayH: H, hash: rnd() });
   const top = pts[segs];
-  const crownC = V(top.x * 0.85, H * (sl ? 0.84 : 0.72), top.z * 0.85);
+  const crownC = V(top.x * 0.85, H * (sl ? 0.76 : 0.72), top.z * 0.85);
   const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
   if (lod === 0) {
     // a few thin dark branches reaching into the crown (each its own number; a mass of foliage within 2.2 m of a
     // branch's tip is carried by it and swings with it, the others are branches of their own hidden in the wash)
     const tips = [];
-    for (let k = 0; k < (sl ? 6 : 3); k++) {
-      const t0 = (sl ? 0.60 + 0.065 * k : 0.40 + 0.16 * k) + rnd() * 0.06, p0 = at(t0);
-      const ang = rnd() * 6.283, len = (sl ? 1.5 : 1.9) + rnd() * 1.8;
-      const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * 0.5, p0.z + Math.sin(ang) * len * 0.55);
-      const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * 0.78, p0.z + Math.sin(ang) * len);
+    for (let k = 0; k < (sl ? 9 : 3); k++) {
+      // (the oil look's tree, the overhaul plan's fifth piece: nine boughs from under half its height up, the low ones
+      // long and nearly level, each carrying leaves at its end: the clip's crowns begin low and fill the upper half
+      // of the picture; six short boughs near the top left the wood's roof thin and far)
+      const t0 = (sl ? 0.34 + 0.068 * k : 0.40 + 0.16 * k) + rnd() * 0.06, p0 = at(t0);
+      const low = sl ? 1 - k / 8 : 0;
+      const ang = sl ? k * 2.4 + rnd() * 1.1 : rnd() * 6.283, len = sl ? 1.7 + 1.5 * low + rnd() * 1.5 : 1.9 + rnd() * 1.8;
+      const rise = sl ? 0.78 - 0.42 * low : 0.78;
+      const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * rise * 0.64, p0.z + Math.sin(ang) * len * 0.55);
+      const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * rise, p0.z + Math.sin(ang) * len);
       const bid = (k * 0.618034 + 0.13) % 1;
       tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd(), branch: bid });
       tips.push([p2, bid]);
+      if (sl) { const r = 1.0 + 0.5 * low + rnd() * 0.4; leafCards(B, V(p2.x, p2.y + 0.2, p2.z), r * 1.15, r * 0.62, r * 1.15, rnd, { n: 84, len: 0.52, wid: 0.22, branch: bid, massC: crownC, massK: 0.5, sway: 0.6 + 0.4 * (p2.y / H), shade0: 0.1 * low, shadeK: 0.5 }); }
     }
     // crown: a handful of large overlapping washes
     const nBlobs = sl ? 5 + ((rnd() * 2) | 0) : 6 + ((rnd() * 2) | 0);
     for (let k = 0; k < nBlobs; k++) {
-      const t0 = sl ? 0.68 + 0.36 * (k / (nBlobs - 1)) : 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(t0);
-      const spread = sl ? Math.max(0.2, (1.0 - Math.abs(t0 - 0.84) * 2.6)) * 2.0 + 0.2 : Math.max(0.2, (1.0 - Math.abs(t0 - 0.70) * 1.7)) * 2.3 + 0.2;
+      const t0 = sl ? 0.60 + 0.44 * (k / (nBlobs - 1)) : 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(t0);
+      const spread = sl ? Math.max(0.2, (1.0 - Math.abs(t0 - 0.78) * 2.2)) * 2.2 + 0.2 : Math.max(0.2, (1.0 - Math.abs(t0 - 0.70) * 1.7)) * 2.3 + 0.2;
       const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd());
       const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? (t0 - 1) * H : 0), p0.z + Math.sin(ang) * rr);
       const r = sl ? 1.3 + rnd() * 0.8 : 1.9 + rnd() * 1.0;
       let bid = ((k + 3) * 0.618034 + 0.13) % 1, bd = 2.2;
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
       // (the oil look's slender tree: the mass is leaves, one by one, florakit.js leafCards; else one lumpy wash)
-      if (sl) leafCards(B, c, r * 1.2, r * 0.85, r * 1.2, rnd, { n: 130, len: 0.48, wid: 0.19, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
+      if (sl) leafCards(B, c, r * 1.3, r * 0.85, r * 1.3, rnd, { n: 130, len: 0.52, wid: 0.22, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
       else blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
   } else if (sl) {
     // (farther off: fewer leaves, each twice the size, so the crown is still leaves and still as full)
-    leafCards(B, V(top.x * 0.8 + 0.4, H * 0.76, top.z * 0.8), 2.5, 2.0, 2.4, rnd, { n: 70, len: 0.85, wid: 0.34, massC: crownC, massK: 0.6, sway: 0.7 });
-    leafCards(B, V(top.x * 0.95 - 0.3, H * 0.93, top.z * 0.95 + 0.2), 2.2, 1.9, 2.3, rnd, { n: 60, len: 0.85, wid: 0.34, massC: crownC, massK: 0.6, sway: 0.9 });
+    leafCards(B, V(top.x * 0.6 + 0.3, H * 0.58, top.z * 0.6 - 0.2), 3.6, 1.5, 3.5, rnd, { n: 70, len: 1.0, wid: 0.42, massC: crownC, massK: 0.5, sway: 0.6, shade0: 0.1 });
+    leafCards(B, V(top.x * 0.8 + 0.4, H * 0.76, top.z * 0.8), 3.0, 2.0, 2.9, rnd, { n: 80, len: 0.95, wid: 0.40, massC: crownC, massK: 0.6, sway: 0.7 });
+    leafCards(B, V(top.x * 0.95 - 0.3, H * 0.93, top.z * 0.95 + 0.2), 2.4, 1.9, 2.5, rnd, { n: 60, len: 0.95, wid: 0.40, massC: crownC, massK: 0.6, sway: 0.9 });
   } else {
     blob(B, V(top.x * 0.7 + 0.5, H * 0.60, top.z * 0.7), 3.2, 2.5, 3.0, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });
     blob(B, V(top.x * 0.9 - 0.4, H * 0.84, top.z * 0.9 + 0.3), 2.7, 2.3, 2.8, rnd, { massC: crownC, massK: 0.4, sway: 0.9, shade0: 0.0, shadeK: 0.6, droop: 0.2, noise: 0.3, uvScale: 4 });
@@ -291,8 +300,18 @@ export function farTreeGeometry(seed) {
   return B.build();
 }
 
-export function grassGeometry(seed) {
+export function grassGeometry(seed, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  if (spec && spec.oil) {
+    // (the oil look, the overhaul plan's fifth piece: a TUFT, as on the clip's forest floor: blades from one root that
+    // fan out, a few of them long and nearly upright, the rest shorter and arching over)
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * 6.283 + rnd() * 0.9, dir = V(Math.cos(ang), 0, Math.sin(ang)), r0 = rnd() * 0.045, long = i % 3 === 0;
+      stroke(B, V(dir.x * r0, 0, dir.z * r0), dir, (long ? 0.52 : 0.26) + rnd() * 0.30, 0.015 + rnd() * 0.011, long ? 0.08 + rnd() * 0.22 : 0.25 + rnd() * 0.45, rnd, { segs: 3, sway: 0.6 });
+    }
+    return B.build();
+  }
   const n = 6;
   for (let i = 0; i < n; i++) {
     const ang = (i / n) * 6.283 + rnd() * 0.8;
@@ -308,15 +327,25 @@ export function grassGeometry(seed) {
 // strokes the width of a brush tip. Each blade keeps its own root (in aMass.xz, metres from
 // the patch centre) so that PHYSICS' push field bends blade by blade: the sward parts round
 // a walker instead of leaning as one piece.
-export function grassPatchGeometry(seed) {
+export function grassPatchGeometry(seed, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   const n = 12;
   const roots = [];
+  // (the oil look: the patch is two tufts, each six blades fanning from its own root, not twelve blades strewn over it;
+  // the same count and order of strokes, so the low tier's five blades and each blade's own root hold as they did)
+  const oil = !!(spec && spec.oil), tc = oil ? [V(-0.28 + rnd() * 0.2, -0.04, 0.1 + rnd() * 0.3), V(0.30 + rnd() * 0.2, -0.04, -0.35 + rnd() * 0.3)] : null;
   for (let i = 0; i < n; i++) {
     const ang = rnd() * 6.283, rr = 0.10 + 0.82 * Math.sqrt((i + 0.5) / n);
-    const root = V(Math.cos(ang + i * 2.4) * rr, -0.04, Math.sin(ang + i * 2.4) * rr);
-    const da = rnd() * 6.283, dir = V(Math.cos(da), 0, Math.sin(da));
-    stroke(B, root, dir, 0.36 + rnd() * 0.32, 0.019 + rnd() * 0.011, 0.25 + rnd() * 0.55, rnd, { segs: 2, sway: 0.5 });
+    let root = V(Math.cos(ang + i * 2.4) * rr, -0.04, Math.sin(ang + i * 2.4) * rr);
+    let da = rnd() * 6.283, len = 0.36 + rnd() * 0.32, wid = 0.019 + rnd() * 0.011, arch = 0.25 + rnd() * 0.55;
+    if (oil) {
+      const t = tc[i % 2], k = (i >> 1), long = k % 3 === 0;
+      da = (k / 6) * 6.283 + (i % 2) * 0.5 + (da - 3.14) * 0.14;
+      root = V(t.x + Math.cos(da) * 0.03, -0.04, t.z + Math.sin(da) * 0.03);
+      len = (long ? 0.58 : 0.30) + (len - 0.36); wid = 0.016 + (wid - 0.019); arch = long ? 0.06 + arch * 0.3 : arch;
+    }
+    const dir = V(Math.cos(da), 0, Math.sin(da));
+    stroke(B, root, dir, len, wid, arch, rnd, { segs: 2, sway: 0.5 });
     roots.push(root);
   }
   const g = B.build();
@@ -340,8 +369,18 @@ export function reedGeometry(seed) {
   return B.build();
 }
 
-export function fernGeometry(seed) {
+export function fernGeometry(seed, spec) {
   const rnd = mulberry32(seed), B = new Builder();
+  if (spec && spec.oil) {
+    // (the oil look: a low leafy plant, its leaves one by one (leafCards), as the small plants of the clip's forest
+    // floor. The fern's seven broad fronds, each one flat colour, stood side-on as a notched slab: seen in the stills
+    // after overhauls 1 and 2.)
+    for (let i = 0; i < 5; i++) {
+      const ang = (i / 5) * 6.283 + rnd() * 0.8, r = 0.10 + rnd() * 0.20, y = 0.10 + rnd() * 0.20;
+      leafCards(B, V(Math.cos(ang) * r, y, Math.sin(ang) * r), 0.17, 0.07, 0.17, rnd, { n: 5, len: 0.25, wid: 0.115, massC: V(0, 0.05, 0), massK: 0.35, sway: 0.3, shade0: 0.0, shadeK: 0.25, droop: 0.2 });
+    }
+    return B.build();
+  }
   const n = 7;
   for (let i = 0; i < n; i++) {
     const ang = (i / n) * 6.283 + rnd() * 0.5;

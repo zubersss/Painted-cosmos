@@ -620,6 +620,18 @@ export function createWorld(scene) {
     // (the oil look's shadow map, render/shadow.js: thrown by the same light, none under a closed sky or from space)
     SHADOW.root = active.root; SHADOW.sunDirL.copy(sunL);
     SHADOW.strength = (1 - ov) * day * (1 - Math.min(1, (active.bu.uFog.value.w || 0) * 4));
+    // (the light in the air, post.js OIL_FRAG: the air's density on the ground as chunks.js pcFogAmount has it, the lit
+    // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)
+    {
+      const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
+      SHADOW.air = fx * (k4 + (1.6 - k4) * Math.min(1, Math.max(0, (reach - 200) / 400)));
+      const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
+      const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.36, 0.80);
+      const gold = lowSun * active.bu.uDayness.value * (1 - moon) * (1 - ov);
+      const L = active.bu.uLight.value;
+      OIL.uShaftC.value.set(L.x * L.x, L.y * L.y, L.z * L.z).lerp(_ct.set(1.0, 0.82, 0.50), 0.75 * gold);
+      SHADOW.shaft = moon > 0.5 ? 0 : (0.55 + 0.45 * lowSun);
+    }
     for (const o of scene.children) {
       const kind = o.userData && o.userData.pcCaster;
       if (!kind || !o.visible) continue;

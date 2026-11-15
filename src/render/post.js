@@ -628,11 +628,52 @@ uniform vec4 uWxSheet;
 uniform float uNight;
 uniform float uLaid;
 uniform vec4 uOilC;
+uniform sampler2D uShAir;
+uniform mat4 uShV;
+uniform vec4 uShaft;
+uniform vec3 uShaftC;
+uniform vec3 uSunV;
+uniform vec2 uTanHalf;
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
 void main() {
   vec3 col = texture(tAbs, vUv).rgb;
+  // LIGHT IN THE AIR (the overhaul plan's fourth piece): the clip's wood has shafts of light in its haze. The air on the
+  // pixel's line of sight is followed out to what it shows (sixteen places, closer together near the eye); at each the
+  // shadow map, taken down and smoothed for the air (shadow.js AIR_FRAG), says how much of the sun reaches it, and the
+  // same map read very coarsely says how much reaches the air round about. A line with more of its air in the sun than
+  // the air round about is lighter by the light's colour, one with less a little darker, and toward the sun more so:
+  // the picture's own brightness is not moved. It is light added to the picture as painted: no neighbour of the pixel
+  // is read, no edge is touched, and the air's light itself is smooth (asked of the fine map with a start that differed
+  // from pixel to pixel it came out as grain: the first stills of the shafts).
+  if (uShaft.x > 0.004) {
+    float vz = exp2(pcAuxDec(texture(tAux, vUv)).z) - 1.0;
+    vec3 ray = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0);
+    float rl = length(ray);
+    float tEnd = min(vz, uShaft.z / rl);
+    float S = 0.0, A = 0.0;
+    for (int i = 0; i < 16; i++) {
+      float u = (float(i) + 0.5) / 16.0, t = tEnd * u * u;
+      vec3 q = (uShV * vec4(ray * t, 1.0)).xyz;
+      vec2 a = abs(q.xy);
+      float d = 0.0;
+      if (max(a.x, a.y) < 0.97) {
+        vec2 suv = q.xy * 0.5 + 0.5;
+        vec2 f1 = textureLod(uShAir, suv, 1.0).rg, f5 = textureLod(uShAir, suv, 5.0).rg;
+        float z1 = f1.g / max(f1.r, 1e-3), z5 = f5.g / max(f5.r, 1e-3);
+        d = f5.r * smoothstep(z5 - 0.002, z5 + 0.004, q.z) - f1.r * smoothstep(z1 - 0.002, z1 + 0.004, q.z);
+        d *= 1.0 - smoothstep(0.80, 0.97, max(a.x, a.y));
+      }
+      float wgt = exp(-uShaft.y * t * rl) * u;
+      S += wgt * d; A += wgt;
+    }
+    float dl = S / max(A, 1e-5);
+    float F = 1.0 - exp(-uShaft.y * tEnd * rl);
+    float ph = 0.40 + 1.4 * pow(max(dot(ray / rl, uSunV), 0.0), 3.0);
+    col += uShaftC * (uShaft.x * F * ph * (dl > 0.0 ? dl : 0.6 * dl));
+    col = max(col, vec3(0.0));
+  }
   float lamp = 0.0;
   if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, pcAuxDec(texture(tAux, vUv)).w);
   col *= mix(uGrade, vec3(1.0), lamp);
@@ -779,7 +820,9 @@ export class Post {
     this.mPaper.name = 'paper-bake';
     this.oil = LOOK.oil;
     this.mOil = fsMaterial(OIL_FRAG, { tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
-      uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8 });
+      uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8,
+      uShAir: OIL.uShAir, uShV: OIL.uShV, uShaft: OIL.uShaft, uShaftC: OIL.uShaftC, uSunV: OIL.uSunV,
+      uTanHalf: { value: new THREE.Vector2(1, 1) } });
     this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`
@@ -943,6 +986,9 @@ export class Post {
   // The oil look's passes (shared.js LOOK): the scene as painted, the glazes over it, last frame kept for the water, the
   // last key. No brush, no pooling, no pencil, no paper.
   _finishOil(glazes, camera) {
+    // (the view's angle, for the light in the air: a pixel's line of sight in the eye's space)
+    const pe = camera.projectionMatrix.elements;
+    this.mOil.uniforms.uTanHalf.value.set(1 / Math.max(pe[0], 1e-6), 1 / Math.max(pe[5], 1e-6));
     // (the region through the resolve, before anything reads it, as in the watercolour's passes)
     if (this.samples) this._pass(this.mAuxFix, this.rtAux);
     const m = this.mCopy;

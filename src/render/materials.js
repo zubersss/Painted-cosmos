@@ -81,11 +81,17 @@ varying vec4 vCol;
 varying vec3 vCol2;
 varying vec4 vPar;
 varying vec3 vUpV;
+#ifdef PC_OIL
+varying vec3 vRel;        // the place measured from the eye, in the body's axes: small numbers, so its screen derivatives are exact (chunks.js pcGroundChartD)
+#endif
 void main() {
   float d = distance(position, uCamLocal);
   float m = max(clamp((d - uMorph.x) / (uMorph.y - uMorph.x), 0.0, 1.0), uMorph.z);
   vec3 p = position + aMorph * m;
   vBody = p + uOrigin;
+  #ifdef PC_OIL
+    vRel = p - uCamLocal;
+  #endif
   vAnch = p + uAnchor;
   vec3 nrm = normalize(normal + aNormalP * m);
   vNL = nrm;
@@ -125,13 +131,15 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
 // trees a share of the dabs take the canopy's colour: the leaves that have fallen.
 // (Tried at checkpoint 1 and dropped by the owner's choice: thin strokes along the land, tiles; in the history.)
 // (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
+varying vec3 vRel;
 vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV, gBc;
+vec3 gCtrB;       // a dab's own place on the body (set before pcGroundAt; x > 1e20: none, the place is carried from the pixel)
 vec4 gCdx, gCdy, gPdx, gPdy;
 float gMid;
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
-  vec3 Bc = vBody + gBdx * ds.x + gBdy * ds.y;
+  vec3 Bc = gCtrB.x > 1e20 ? vBody + gBdx * ds.x + gBdy * ds.y : gCtrB;
   vec4 colC = clamp(vCol + gCdx * ds.x + gCdy * ds.y, 0.0, 1.0);
   vec3 col2C = clamp(vCol2 + gC2dx * ds.x + gC2dy * ds.y, 0.0, 1.0);
   vec4 parC = vPar + gPdx * ds.x + gPdy * ds.y;
@@ -164,8 +172,9 @@ void main() {
   gSunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   gMid = 1.0 - smoothstep(120.0, 420.0, dist);
   vec2 ch = pcGroundChart(vBody, uBodyR);
-  vec2 dlx = dFdx(ch), dly = dFdy(ch);
-  gBdx = dFdx(vBody); gBdy = dFdy(vBody);
+  gBdx = dFdx(vRel); gBdy = dFdy(vRel);
+  vec2 dlx = pcGroundChartD(vBody, gBdx, uBodyR), dly = pcGroundChartD(vBody, gBdy, uBodyR);
+  gCtrB = vec3(1e30);
   gCdx = dFdx(vCol); gCdy = dFdy(vCol);
   gC2dx = dFdx(vCol2); gC2dy = dFdy(vCol2);
   gPdx = dFdx(vPar); gPdy = dFdy(vPar);
@@ -177,7 +186,8 @@ void main() {
     // a world of snow and ice: a course of tiles with a light edge, as the clip's snow (this world's uGroundK; the tiles
     // run along the land, their rows on the contours of a slope, and are about three strokes wide)
     vec2 chT = vec2(ch.x, ch.y + 1.4 * (length(vBody) - uBodyR));
-    vec2 dtx = dFdx(chT), dty = dFdy(chT);
+    vec3 upT = normalize(vBody);
+    vec2 dtx = vec2(dlx.x, dlx.y + 1.4 * dot(upT, gBdx)), dty = vec2(dly.x, dly.y + 1.4 * dot(upT, gBdy));
     vec2 ot = pcStrokeOct(dist * 3.0, uOilPx.z * 3.0);
     float goneT = smoothstep(0.15, 0.85, ot.y);
     gBc = vBody;
@@ -190,20 +200,43 @@ void main() {
       acc = pcLay(acc, pcGroundPaint(c, leaf, 0.0, rnd, snowC, lvl), cov, L == 0 ? step(goneT, rnd.z) : 1.0);
     }
   } else {
-  // leaf dabs (the owner's style 5). Under them the ground's own colour, the light and the leaf shadow as the pixel has them
-  vec2 oc = pcStrokeOct(dist * uOilS.w, uOilPx.z * uOilS.w);
-  float gone = smoothstep(0.15, 0.85, oc.y);
-  float x0 = dot(nV, gSunV) * 0.5 + 0.5;
-  float sun0 = min(pcSunAt(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(max(length(gBdx), length(gBdy)), oc.x * 0.5)), 1.0 - pcCast(vBody, 0.0));
-  acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
-  for (int L = 1; L >= 0; L--) {
-    float w = oc.x * (L == 1 ? 2.0 : 1.0);
-    vec3 rnd, rnd2; vec2 ds; float cov, has2;
-    pcDabLayer(ch, dlx, dly, w, vec3(uOilS.z, 0.12, 1.0), vBody, 4.0 * wpx * uOilS.w * (L == 1 ? 2.0 : 1.0), L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
+  // leaf dabs (the owner's style 5), in three layers an octave apart and LAID FROM THE TOP DOWN: the finest (its dabs
+  // left out one by one toward the next octave), the middle one whole, the coarsest coming in under them, so that at the
+  // step of an octave nothing changes: the middle layer is then the finest, and the coarsest the middle. (Leaves of
+  // many sizes, the overhaul plan's fifth piece: a third of the finest layer's dabs are never laid, so dabs twice and
+  // four times the size show between them, as the big leaves among the small on the clip's floor.) A pixel
+  // a dab covers whole stops there: most pixels work out one layer, where they worked out two and the ground under them
+  // before (the overhaul plan's "strokes baked", chunks.js). Under the last dab the ground's own colour, the light and
+  // the leaf shadow as the pixel has them.
+  vec4 o4 = pcStrokeOct4(dist * uOilS.w, uOilPx.z * uOilS.w);
+  vec3 ocl = vec3(o4.w - o4.z, dFdx(o4.w), dFdy(o4.w));
+  float lw = max(length(gBdx), length(gBdy));
+  // (a dab's own place: where its centre's chart lies on the sphere, at the ground's height carried there)
+  float rB = length(vBody);
+  vec3 upB = vBody / rB;
+  float rdx = dot(upB, gBdx), rdy = dot(upB, gBdy);
+  acc = vec3(0.0);
+  float rem = 1.0;
+  for (int L = 0; L < 3; L++) {
+    if (rem < 0.004) break;
+    float ws = L == 0 ? 1.0 : L == 1 ? 2.0 : 4.0, w = o4.x * ws;
+    vec3 rnd, rnd2; vec2 ds, ctr; float cov, has2;
+    pcDabLayer(ch, dlx, dly, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
+               L == 0 ? vec2(0.35, 0.65) : L == 1 ? vec2(0.0, 0.35) : vec2(1.0, -1.0), rnd, ctr, ds, cov, rnd2, has2);
+    if (cov <= 0.0) continue;
+    gCtrB = pcGroundUnchart(vBody, ctr, uBodyR) * (rB + rdx * ds.x + rdy * ds.y);
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
     float fk = clamp(canopy * 1.6, 0.0, 0.88) * gMid;      // (under trees the floor is nearly all fallen leaves, with the earth dark between)
-    vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl);
-    acc = mix(acc, mix(mix(acc, p2, has2), p1, cov), uOilC.z);
+    acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
+    rem *= 1.0 - cov;
+    if (has2 > 0.5 && rem >= 0.004) { acc += rem * pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl); rem = 0.0; }
+  }
+  gCtrB = vec3(1e30);
+  if (rem >= 0.004 || uOilC.z < 0.999) {
+    float x0 = dot(nV, gSunV) * 0.5 + 0.5;
+    float sun0 = min(pcSunAt(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5)), 1.0 - pcCast(vBody, 0.0));
+    vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+    acc = mix(bare, acc + rem * bare, uOilC.z);
   }
   }
   float f = pcFogAmount(dist * pcFogBank(vBody));
@@ -846,6 +879,7 @@ varying float vFog;
 #ifdef PC_OIL
 varying vec3 vMassO;      // the crown's mass normal in the plant's own space: which way a crown's chart is laid
 varying float vScaleO;    // the plant's size (its instance's scale): its own space times this is metres
+varying vec3 vRelO;       // the place measured from the eye, in the body's axes (its screen derivatives are exact)
 #endif
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -944,6 +978,9 @@ void main() {
     vec3 wp = (im * vec4((lp + sw) * vis, 1.0)).xyz;
   #endif
   vBody = wp + uOrigin;
+  #ifdef PC_OIL
+    vRelO = wp - uCamLocal;
+  #endif
   #ifdef USE_INSTANCING
     vAbove = dot(wp - io, normalize(io + uOrigin));
   #else
@@ -1015,6 +1052,7 @@ varying float vFog;
 #ifdef PC_OIL
 varying vec3 vMassO;
 varying float vScaleO;
+varying vec3 vRelO;
 varying vec3 vCardB;
 #endif
 void main() {
@@ -1140,10 +1178,13 @@ void main() {
     // stem they shrank under the pixel a few metres off and every trunk was a flat slab. A crown's leaves are never
     // under about three and a half pixels wide: thinner, and a far crown was a stipple of single pixels)
     float dabK = max(uOilS.w * 0.9, 2.2 * uOilS.z / max(uOilA.x, 0.5));
-    vec3 oc = isBark ? vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed), 0.004), 1.0) : vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed) * dabK, 0.05), 1.0);
+    vec4 o4c = pcStrokeOct4(vd * (0.85 + 0.3 * seed) * dabK, 0.05);
+    vec3 oc = isBark ? vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed), 0.004), 1.0) : vec3(o4c.xy, 1.0);
+    // (a crown's dabs come and go whole, each asked at its own centre: chunks.js pcDabLayer)
+    vec3 ocl = vec3(o4c.w - o4c.z, dFdx(o4c.w), dFdy(o4c.w));
     float gone = smoothstep(0.15, 0.85, oc.y), fine = oc.z;
     vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
-    vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vBody), bdy = dFdy(vBody);
+    vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vRelO), bdy = dFdy(vRelO);      // (the place's derivatives from a position measured from the eye: the body's own coordinates are too coarse to difference, chunks.js pcGroundChartD)
     float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
     float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
     vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.16), pcLevel(xb0, 0.04)) : pcTone(pcDensity(leafC, 1.5), 0.7);
@@ -1151,12 +1192,12 @@ void main() {
     for (int L = 1; L >= 0; L--) {
       float w = oc.x * (L == 1 ? 2.0 : 1.0);
       float lim = 4.0 * wpxP * (L == 1 ? 2.0 : 1.0);
-      vec3 rnd, rnd2; vec2 ds; float cov, has2;
+      vec3 rnd, rnd2; vec2 ds, ctrD; float cov, has2;
       // (bark: long thin streaks that run with the stem or round it, nothing drawn between them; a crown: thin leaves,
       // lying every way)
       // (streaks that run with the stem are long; those that run round it are short, so the stem still turns in the light)
       if (isBark) { float ba = along ? 9.0 : 3.2; pcThinLayer(ch + seed * 37.0, dcx, dcy, w, ba, vObj + seed * 11.0, lim * ba, 2.0, rnd, ds, cov, rnd2); has2 = 1.0; }
-      else pcDabLayer(ch + seed * 37.0, dcx, dcy, w, vec3(uOilS.z, 0.10, 1.0), vObj + seed * 11.0, lim * 3.0, L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
+      else pcDabLayer(ch + seed * 37.0, dcx, dcy, w, uOilS.z, lim * 3.0, ocl, L == 0 ? vec2(0.0, 1.0) : vec2(0.0), rnd, ctrD, ds, cov, rnd2, has2);
       vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
       vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
       if (!gl_FrontFacing) nVc = -nVc;
