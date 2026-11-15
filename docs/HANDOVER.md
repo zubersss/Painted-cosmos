@@ -143,11 +143,11 @@ brief in section 4a (a filter in `post.js`) is **under review and not to be buil
 **Decided by the owner on 2026-11-15:** the whole clip is the target (no favourite part); the
 cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
-**Next (section 2, items 10, 13 and 14), each step on the owner's go:** first go: the
-coordinator reads the rendering code, without changing it, and writes a one-page plan that names
-which reference guides which part; second go: building starts. Nothing starts before that. The owner plays mostly on a phone, then on a desktop: the phone is the test
-device from the first prototype on. Still to be asked again: which phone, and roughly which
-desktop.
+**The plan is written (section 4a) and has been put to the owner. Next, on the owner's go
+(section 2, items 10, 13 and 14): cut `look-proto` from `main` and build pieces 1 to 3 up to
+checkpoint 1.** Nothing starts before that. The owner plays mostly on a phone, then on a
+desktop: the phone is the test device from the first prototype on. Still to be asked again:
+which phone, and roughly which desktop.
 
 **Agreed in principle by the owner ("we should do it right?"), not yet the word to start (see
 the log's last three sections). Next: the references and the owner's device, then a one-page
@@ -187,49 +187,84 @@ plan for the owner's go:**
 
 ## 4. What to do next
 
-### 4a. The prototype (about 3-5 hours; nothing goes live)
+### 4a. The new look: the plan (written 2026-11-15; waiting for the owner's go to build)
 
-**Under review since 2026-11-15 (see section 3): do not build this as written.**
+This replaces the earlier brief (a filter in `post.js`), which would not have given the look.
+Read `docs/references/README.md` first: the sort, the recipe and the crispness rule bind this
+work.
 
-**Branch.** Cut a new branch `style-proto` from `main`. `r2`'s half-done code is unverified, so
-the stills must compare against the live look. All of it sits behind a URL switch (`?paint=oil`;
-`?paint=clean` for no paint pass). The default look stays unchanged.
+**What the code is today** (read on `main` at `5e85754`, nothing changed):
+- Every colour in the painter is the transmittance of a wash over paper: nothing is brighter
+  than paper and distance fades to paper (`src/data/looks/common.js`, `src/render/chunks.js`).
+  The game is pale by construction; the clip's opaque, saturated paint needs its own colour path.
+- Light is laid in four soft steps by two shared functions (`pcLevel`, `pcTone` in `chunks.js`)
+  that every material calls: one place to change how everything is lit.
+- **There are no cast shadows.** Leaf shade is a noise pattern laid along the sun (`pcDapple`);
+  the explorer and the ship lay a soft blot (`pcCast`). The clip's long trunk shadows have no
+  counterpart.
+- The ground's marks already keep their size on the screen as distance grows, in octaves that
+  cross-fade, each mark filtered to the pixel (`TERRAIN_FRAG`, `pcStepF`, `pcSub`: release 1's
+  work). The new strokes build on this.
+- Six families of material (terrain, water, plants and rocks, generic wash, figure, near-ground
+  blades in `src/render/materials.js`), the sky (`src/world/sky.js`, which already has an
+  aurora) and PHYSICS' weather kits (`src/render/kitmat.js`).
+- Plants are built in code from tubes, blobs and stroke-shaped pieces (`src/world/florakit.js`).
+- The post passes (`src/render/post.js`): the brush, pooling, pencil edges, the paper sheet.
+  The new look drops them for a plain finish, which is also cheaper.
+- The explorer is one mesh built in code with a rig (`src/art/models.js`); its coat is already
+  blown by PHYSICS' wind; a glass that lights at night exists for the ship's lamp.
+- `tests/stations.mjs` measures sharpness, aliasing and flicker at fixed camera stations.
 
-**Owner: PAINTER.**
+**Branch and switch.** A new branch `look-proto` from `main`. Everything behind `?look=oil`; the
+default look does not change. Nothing goes live. Whether the new look replaces the watercolour
+or sits beside it as a setting is decided by the owner after the stills.
 
-**The oil-paint pass** (`src/render/post.js` and friends):
-- Edge-following brush strokes, for example an anisotropic Kuwahara filter steered by the
-  structure tensor, plus a subtle canvas or impasto texture lit from the sun's side.
-- **The stroke size is a fixed small number of pixels. Never let it grow with distance:** that
-  was the cause of the blur the owner complained about (see the plan and release 1).
-- A richer grade: deeper shadows, warm/cool contrast, saturated autumn golds and night blues.
-- Screen-space light shafts from a low sun.
-- Canvas in place of paper and the torn border.
+**Who.** The coordinator builds it itself on the top model, one piece at a time, with no
+workflow. One independent verifier agent at each checkpoint: it edits nothing, runs the suites
+and the station measurements on a clean export, opens the stills and holds them against the
+crispness rule and the reference notes.
 
-**The explorer** (`src/art/models.js`):
-- No hat; the grey cloak and the hip lantern (section 2.6).
-- The night switch from the world's clock (`Ephemeris.sunHour` and the night key).
-- The lantern's pool as uniforms in the terrain and plant materials.
+**The order: the hard parts first, while the top model is available.**
 
-**The stills,** side by side with today's look, at the top tier, 1280x720:
-- the Earth forest by day (and an autumn wood);
-- a Mars canyon;
-- a snowy night with an aurora and the lantern lit (Neptune's aurora_tundra, or Earth's alpine
-  meadow at night);
-- from the ship at 150 m and 1 km over Earth's forest;
-- the explorer close up, by day and by night, standing and running.
+| # | Piece | Guided by | Hard? |
+| --- | --- | --- | --- |
+| 1 | **Colour and light.** Opaque paint in place of washes over paper, in the shared functions: warm light, cool violet shade, deep darks; distance steps toward the sky's colour and never softens an edge; three colours that key the world | The clip; Van Gogh's Falling Autumn Leaves (colours only); Firewatch; No Man's Sky | Medium |
+| 2 | **Strokes on the surfaces.** A stroke field made once at start-up. Each stroke one flat colour with a clean edge, running the way its surface runs (along the slope on the ground, up a trunk, with the wind in the sky). Light and shade decided stroke by stroke. The world's ground colour showing between strokes | The clip; Tom Thomson; Klimt; The Long Dark's brushed planks | **Hardest** |
+| 3 | **From the ship.** Strokes re-form in steps as the eye rises: leaves, then trees as single patches, then woods and fields. Each stroke switches whole; no soft blend of two layers. Paths, water and trees stay told apart | Tom Thomson's Autumn Foliage; Breath of the Wild; The Pathless; Europa | **Hard** |
+| 4 | **Shadows.** Real cast shadows near the eye (trees, the explorer, the ship); farther out the leaf-shade pattern drawn long by a low sun. Shadows blue-violet, their edges cut along the strokes. Phones get the real ones only if the count of work allows | The clip; Firewatch's orange forest; Arise | **Hard** |
+| 5 | **Night and sky.** Night in blue with the snow lightest; the aurora in upright strokes; sky strokes that follow the game's wind; the lantern's pool laid into the ground's and plants' shading | Sohlberg; The Pathless's snowy valley; the clip | Medium |
+| 6 | **The explorer.** Bare head; a blue-grey cloak with a trimmed hem over the jetpack, moved by PHYSICS' wind; the hood up in snow and storms; a lantern at the hip, lit from dusk to dawn; a rim of light | The clip's figure; Journey; No Man's Sky; Ori | Medium |
+| 7 | **Phones.** The picture at the screen's full size; the cost counted (draw calls, texture reads); an unlisted preview page for the owner's phone | Release 2's W6 | Medium |
 
-**Checks:**
-- `tests/stations.mjs` (quick set at q2): the ground from the ship is at least as sharp as
-  release 1's (final land t1/t2 about 1.0 at 150 m and 1 km).
-- No console error; the unit suites green.
+**Two checkpoints, each a stop for the owner.**
 
-**Stop and show the owner.** Copy the stills to the session's scratchpad and send them. The
-full version follows only on approval:
-- every world tuned;
-- the switch in the game's settings;
-- phone performance;
-- then merge with release 2.
+- **Checkpoint 1 (pieces 1 to 3, the riskiest):** Earth's autumn woodland with a low sun, on
+  foot and from the ship at 150 m and 1 km, beside today's game, at two or three stroke sizes.
+  With the numbers: sharpness at least release 1's from the ship (`tests/stations.mjs`, final
+  land t1/t2 about 1.0), flicker no worse. The owner picks the stroke size and how strong the
+  colour is, or sends it back.
+- **Checkpoint 2 (pieces 4 to 7):** the same wood with real shadows; Neptune's aurora tundra at
+  night with the lantern lit; the explorer close up by day and by night, standing, running, hood
+  up. Then the unlisted preview page, which needs the owner's word because it is published
+  through `main` (as a separate folder; the live game is not touched).
+
+**After the owner approves the prototype (work that follows a proven pattern, so a session on
+the next model down can do it):** each world's colour key and stroke settings, world by world,
+by a written recipe; water; leaves, snow and motes in the air; footprints, glints, landmarks;
+the setting in the game's menu; release 2's phone findings; the blind players; the merge.
+
+**Risks, said plainly.**
+- Clean-edged strokes can shimmer far away. Release 1's filtering is the defence, and the
+  flicker measurement is the judge.
+- The ground stores its colour at the corners of its triangles, so a far stroke cannot always
+  be one perfectly flat colour.
+- Real shadows may cost too much on phones; the long leaf-shade pattern is the fallback.
+- It is a bigger job than a filter: the prototype converts the ground, the plants, the figure
+  and the sky for two scenes. Water, the weather kits and eight more worlds come after.
+- A rough guess at the cost: about half of what release 1 took, over the two checkpoints. The
+  session cannot see the owner's usage meter.
+- If the top model runs out mid-way: every piece is committed when done and written up here, but
+  pieces 2 and 3 should be finished on it.
 
 ### 4b. Release 2 (on approval or in parallel)
 
