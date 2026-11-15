@@ -12,6 +12,9 @@ the state from `git log`, the last section of `docs/COORDINATOR.md`, the hand-ov
 
 ## 0. How to start a session
 
+`CLAUDE.md` at the root (on `main` once pull request #3 is merged, and on `r2`) tells every new session to do
+the steps below by itself, so the owner can just type "continue".
+
 1. Use the repository `zubersss/Painted-cosmos` and check out the working branch:
    `git fetch origin && git checkout r2`. This file and the latest log live on `r2`, not on
    `main`.
