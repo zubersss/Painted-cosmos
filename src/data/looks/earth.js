@@ -39,7 +39,7 @@ export default {
         // (the oil look, after the owner's reference clip: a floor of yellow and orange leaves on dark warm earth, the
         // canopy's yellows and oranges pure; washes still, which the shaders lay as paint)
         oil: { pal: { low: [0.60, 0.42, 0.30], mid: [0.68, 0.48, 0.30], high: [0.64, 0.46, 0.33], litter: [0.95, 0.80, 0.28], canopyA: [0.96, 0.88, 0.30], canopyB: [0.94, 0.62, 0.24],
-          grassLight: [0.86, 0.88, 0.36], grassMid: [0.72, 0.80, 0.34], moss: [0.56, 0.68, 0.32], mud: [0.50, 0.38, 0.30] } } }),
+          grassLight: [0.90, 0.84, 0.40], grassMid: [0.78, 0.78, 0.36], moss: [0.56, 0.68, 0.32], mud: [0.50, 0.38, 0.30] } } }),
     B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
       ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
       ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 },

@@ -96,7 +96,7 @@ export const OIL = {
   // what grows on the ground: x the share of the near ground's strokes kept (the clip's floor is a carpet of leaves
   //    with tufts of grass here and there, not a sward)   y the share of the undergrowth's blades and fronds kept
   //    z 1 while the scene pass is multisampled (set every frame)
-  uOilG: { value: new THREE.Vector4(0.30, 0.45, 0, 0) },
+  uOilG: { value: new THREE.Vector4(0.18, 0.45, 0, 0) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
   uShTex: { value: null }, uShM: { value: new THREE.Matrix4() }, uShK: { value: new THREE.Vector4(0, 0, 0, 0.86) },

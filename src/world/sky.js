@@ -229,7 +229,7 @@ void main() {
     }
   }
   #ifdef PC_OIL
-    shade *= 0.25;      // (the oil look: a cloud is a light shape; its shaded side, laid as a wash, was a dark ring in opaque paint)
+    shade = 0.0;        // (the oil look: a cloud is a light shape; its shaded side, laid as a wash, was a dark ring in opaque paint)
   #endif
   // (at night a cloud is a pale shape lifted out of the wash, not bare paper: paper is kept for the stars)
   vec3 cl = mix(mix(mix(uSkyHorizon, vec3(1.0), 0.22), vec3(1.0), uAtmo.y), uCloudShade, shade * 0.9);
@@ -313,8 +313,8 @@ void main() {
     col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
     col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
-    float gold = (1.0 - smoothstep(0.20, 0.55, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x);
-    col = mix(col, vec3(1.0, 0.93, 0.74), gold * mix(0.75, 0.35, smoothstep(0.0, 0.6, e)));
+    float gold = (1.0 - smoothstep(0.36, 0.80, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x);
+    col = mix(col, vec3(1.0, 0.94, 0.76), gold * mix(0.88, 0.60, smoothstep(0.0, 0.7, e)));
     {
       // the night sky is painted, not left flat: short thin dashes a step lighter than the wash, in rows that waver
       // across the sky (the clip's night sky is streaked all over with them)

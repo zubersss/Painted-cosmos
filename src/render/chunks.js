@@ -196,7 +196,7 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // (the golden hours: with the sun under about thirty degrees the oil look's light is gold and its air a pale gold,
 // whatever the hour's own keys say: the owner's reference clip stands in that light with the sun still well up, its
 // shadows about twice as long as what throws them and half the forest floor in the sun)
-float pcGold() { return (1.0 - smoothstep(0.20, 0.55, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }
+float pcGold() { return (1.0 - smoothstep(0.36, 0.80, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }
 vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.80, 0.48), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
@@ -206,12 +206,14 @@ vec3 pcTone(vec3 c, float level) {
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
   // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
   // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
-  vec3 lit = pcDensity(c, mix(1.0, uOilA.y, 0.42)) * mix(vec3(1.0), sunC, 0.6) * uOilB.x;
+  vec3 lit = pcDensity(c, mix(1.0, uOilA.y, 0.42)) * mix(vec3(1.0), sunC, 0.42) * uOilB.x;
   vec3 loc = b * mix(vec3(1.0), sunC, 0.45);
   // (the shade is the cool key over the body colour, with a quarter of the key's own hue at the body's value: a
   // multiply alone takes an orange floor to brown, and the reference's shadows on its leaf carpet are maroon and violet)
   // (and the sky's own light, added: without it a shadow on an orange floor is brown; with it, maroon and violet)
-  vec3 g1 = pcDensity(b * shC * uOilD.x, 1.25) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 1.0) * uOilD.y * (0.35 + 0.65 * uDayness);
+  vec3 g0 = b * shC * uOilD.x;
+  // (a shade is deep, but not a purer colour than the thing in the light: a fifth of it goes to its own grey)
+  vec3 g1 = mix(pcDensity(g0, 1.15), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * vec3(1.02, 0.96, 1.06), 0.2) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 1.0) * uOilD.y * (0.35 + 0.65 * uDayness);
   vec3 g2 = pcDensity(g1, 1.7);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));

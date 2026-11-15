@@ -225,7 +225,7 @@ export function birchGeometry(seed, lod, spec) {
       let bid = ((k + 3) * 0.618034 + 0.13) % 1, bd = 2.2;
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
       // (the oil look's slender tree: the mass is leaves, one by one, florakit.js leafCards; else one lumpy wash)
-      if (sl) leafCards(B, c, r * 1.2, r * 0.85, r * 1.2, rnd, { n: 90, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
+      if (sl) leafCards(B, c, r * 1.2, r * 0.85, r * 1.2, rnd, { n: 130, len: 0.48, wid: 0.19, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
       else blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
   } else if (sl) {

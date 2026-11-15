@@ -644,7 +644,7 @@ void main() {
   // colours that pop (the owner, 2026-11-15): every colour pushed from its grey, the dull ones most and the pure ones
   // hardly, so nothing clips; a pixel's own colour only, no neighbour is read: no edge is touched
   float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
-  col = clamp(mix(vec3(lw), col, 1.0 + 0.42 * (1.0 - sat)), 0.0, 1.0);
+  col = clamp(mix(vec3(lw), col, 1.0 + 0.28 * (1.0 - sat)), 0.0, 1.0);
   col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
