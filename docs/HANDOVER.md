@@ -147,6 +147,11 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     [rebuild] will do better work im okay with that". Rebuild a part from zero where the
     watercolour's design holds the match back (foliage, grass, sky, water, each world's colours);
     keep the world itself (planets, land, physics, flight, interface).
+22. **Colours that pop, no detail lost; the plan first, then the owner's word (2026-11-15).** The
+    owner asked for an audit of everything that holds the look back, fixes and overhauls, "the
+    colors to pop but the details to not be lost", and to be told what the plan entails before
+    being asked what to do next. The plan is put to the owner and nothing new is built on it
+    until the owner answers.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
