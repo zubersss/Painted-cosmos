@@ -22,15 +22,17 @@ export const RENDERER_OPTIONS = {
   logarithmicDepthBuffer: true,
 };
 
-// Internal resolution per quality tier (multiplied by setRenderScale), and Kuwahara sectors.
-const TIERS = [
-  { scale: 0.62, sectors: 4, graphite: 0.0 },
-  { scale: 0.80, sectors: 8, graphite: 0.40 },
-  { scale: 1.00, sectors: 8, graphite: 0.40 },
+// Internal resolution per quality tier (multiplied by setRenderScale), Kuwahara sectors, pencil, and (R1 W2.2) the near
+// brush's radius in internal pixels.
+// (R2 W7.3, docs/lead/SHARP-SMOOTH-PLAN.md rulings 5 and 1: the tiers differ by what they draw, not by blur. They drew at
+// 0.62 and 0.80 of the sheet's size, so the lowest tier was a 1.6x enlargement before the resolution controller took
+// anything: now 0.75 and 0.85, and the lowest tier's near brush a single pixel. What the lower tiers save is geometry,
+// the brush's sectors and the pencil; the resolution controller's floor (PILOT's W6.1) keeps the pixels.)
+export const TIERS = [
+  { scale: 0.75, sectors: 4, graphite: 0.0, brush: 1.0 },
+  { scale: 0.85, sectors: 8, graphite: 0.40, brush: 1.4 },
+  { scale: 1.00, sectors: 8, graphite: 0.40, brush: 1.4 },
 ];
-
-// (R1 W2.2) the near brush's radius, internal pixels
-const BRUSH_PX = 1.4;
 
 // (R1 W2.5, re-fix) anti-aliasing is part of the tier (docs/lead/SHARP-SMOOTH-PLAN.md, ruling 4): MSAA on the scene
 // pass at tiers 2 and 1 on a desktop; at tier 0 and on a phone or tablet (a coarse pointer with touch: their GPUs pay
@@ -159,7 +161,7 @@ export function createPainter(renderer) {
     // (R1 W2.2: the near brush in internal pixels, broader by night, capped at 2 px in the shader; the old brush, which
     // grew with the distance, only where the scene is drawn under 0.6 of the sheet's size: post.js ABS_FRAG)
     const br = post.absUniforms.uBrushR.value;
-    br.x = BRUSH_PX * (1 + 0.45 * night); br.y = PINNED && post.inH < 0.6 * post.outH ? 1 : 0;
+    br.x = TIERS[quality].brush * (1 + 0.45 * night); br.y = PINNED && post.inH < 0.6 * post.outH ? 1 : 0;
     post.sheetUniforms.uSheetOld.value = br.y;
     MOTION.speed01 = +mood.speed01 || 0; MOTION.space01 = +mood.inSpace01 || 0;
     PREV.body = mood.bodyId == null ? null : mood.bodyId;
