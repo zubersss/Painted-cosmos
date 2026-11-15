@@ -19,6 +19,9 @@ function cell(kind, S, face, ix, iy) {
   return v;
 }
 export function treeCell(S, face, ix, iy) { return cell('t', S, face, ix, iy); }
+// (R2 W7.1) only the trees of a tree cell whose rank is under pmax (the far canopy's thinning; not cached: the far cell
+// that asks keeps it); the whole cell, from the cache, where pmax is 1 or more
+export function treeCellThin(S, face, ix, iy, pmax) { return pmax >= 1 ? cell('t', S, face, ix, iy) : placeTrees(S, face, TREE_LEVEL, ix, iy, TREE_GRID, pmax); }
 export function hasCell(kind, S, face, ix, iy) { return caches[kind].has(S.id + ':' + face + ':' + ix + ':' + iy); }
 export function underCell(S, face, ix, iy) { return cell('u', S, face, ix, iy); }
 

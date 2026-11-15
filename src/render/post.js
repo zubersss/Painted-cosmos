@@ -388,7 +388,7 @@ const vec3 W = vec3(0.3, 0.5, 0.2);
 // together are under 2 % of the whole, left out and the rest renormalised), held inside the range of the taps round it
 // (no ringing at a step), then RCAS (AMD FidelityFX FSR 1's robust contrast-adaptive sharpening) from four reads a texel
 // of the scene each way: the most sharpening each pixel can take without any channel leaving the range of those five,
-// times `sharp`. Nine reads a sheet pixel where the picture is enlarged; one, as before, where it is not.
+// times sharp. Nine reads a sheet pixel where the picture is enlarged; one, as before, where it is not.
 vec4 pcEnlarge(sampler2D t, vec2 uv, vec2 tx, float sharp) {
   vec2 st = uv / tx - 0.5, i = floor(st), f = st - i, f2 = f * f, f3 = f2 * f;
   vec2 w0 = -0.5 * f3 + f2 - 0.5 * f, w1 = 1.5 * f3 - 2.5 * f2 + 1.0, w2 = -1.5 * f3 + 2.0 * f2 + 0.5 * f, w3 = 0.5 * f3 - 0.5 * f2;

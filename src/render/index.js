@@ -158,10 +158,11 @@ export function createPainter(renderer) {
     post.sheetUniforms.uPig.value.w = graphite * (1 - 0.75 * night);
     const ub = post.absUniforms.uBrush.value;
     ub.x = 0.0036 * (1 + 0.45 * night); ub.y = 0.0085 * (1 + 0.30 * night); ub.z = 0.013 * (1 + 0.5 * night);
-    // (R1 W2.2: the near brush in internal pixels, broader by night, capped at 2 px in the shader; the old brush, which
+    // (R1 W2.2: the near brush in internal pixels, broader by night (R2 W7.3: but a single pixel at the lowest tier, by
+    // night too), capped at 2 px in the shader; the old brush, which
     // grew with the distance, only where the scene is drawn under 0.6 of the sheet's size: post.js ABS_FRAG)
     const br = post.absUniforms.uBrushR.value;
-    br.x = TIERS[quality].brush * (1 + 0.45 * night); br.y = PINNED && post.inH < 0.6 * post.outH ? 1 : 0;
+    br.x = TIERS[quality].brush * (quality > 0 ? 1 + 0.45 * night : 1); br.y = PINNED && post.inH < 0.6 * post.outH ? 1 : 0;
     post.sheetUniforms.uSheetOld.value = br.y;
     MOTION.speed01 = +mood.speed01 || 0; MOTION.space01 = +mood.inSpace01 || 0;
     PREV.body = mood.bodyId == null ? null : mood.bodyId;

@@ -20,10 +20,16 @@ function cellSeed(face, level, ix, iy, salt) {
   return ((hash3i(ix, iy, face * 31 + level, salt) * 4294967296) | 0);
 }
 
+// (R2 W7.1) A tree's rank in the far canopy's thinning: from its seed (as stored, a 32-bit float), 0..1. The far canopy
+// keeps the trees whose rank is under a share that falls with the distance (flora.js, materials.js PROP_VERT PC_FAR).
+export const treeRank = (seed) => (Math.fround(seed) * 13.37) % 1;
+
 // Trees of one chunk. Returns { count, data } with STRIDE floats per tree.
 // Two candidates per grid cell, thinned by a clump field, so trunks gather in groups with
 // irregular gaps between them instead of standing in rows.
-export function placeTrees(S, face, level, ix, iy, grid) {
+// (R2 W7.1) pmax under 1: only the trees whose rank is under it, exactly as the whole placement gives them (the far
+// canopy beyond the thinning distance needs only a few in a hundred of a cell's trees: the rest are not sampled at all)
+export function placeTrees(S, face, level, ix, iy, grid, pmax = 1) {
   if (!_s || _s.w.length < S.nB) _s = makeSample(S.nB);
   const s = _s, R = S.R;
   const span = 2 / (1 << level), u0 = -1 + ix * span, v0 = -1 + iy * span;
@@ -34,6 +40,7 @@ export function placeTrees(S, face, level, ix, iy, grid) {
     for (let a = 0; a < grid; a++) {
       for (let c = 0; c < 2; c++) {
         const k = c * 7;
+        if (pmax < 1 && treeRank(hash3i(a, b, 6 + k, seed)) >= pmax) continue;
         const r1 = hash3i(a, b, 1 + k, seed), r2 = hash3i(a, b, 2 + k, seed), r3 = hash3i(a, b, 3 + k, seed), r4 = hash3i(a, b, 4 + k, seed), r5 = hash3i(a, b, 5 + k, seed);
         faceToDir(face, u0 + span * (a + r1) / grid, v0 + span * (b + r2) / grid, _d);
         const x = _d[0], y = _d[1], z = _d[2];
@@ -65,6 +72,7 @@ export function placeTrees(S, face, level, ix, iy, grid) {
     const w = _s.w;
     for (let b = 0; b < grid; b++) {
       for (let a = 0; a < grid * 3; a++) {
+        if (pmax < 1 && treeRank(hash3i(a, b, 26, seed)) >= pmax) continue;
         const r1 = hash3i(a, b, 21, seed), r2 = hash3i(a, b, 22, seed), r3 = hash3i(a, b, 23, seed), r5 = hash3i(a, b, 25, seed);
         faceToDir(face, u0 + span * (a + r1) / (grid * 3), v0 + span * (b + r2) / grid, _d);
         const x = _d[0], y = _d[1], z = _d[2];
