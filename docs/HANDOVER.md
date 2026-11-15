@@ -81,6 +81,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
       made together with the owner in chat, before anything starts. For the work ahead this comes
       before item 1: section 4 below is the last session's proposal, not an order.
     - Log every new instruction from the owner in `docs/COORDINATOR.md` and in this section.
+11. **No ultracode unless it is needed; keep usage down; be candid (2026-11-15).**
+    - The owner does not want multi-agent workflows ("ultracode"). Run one only if it is truly
+      needed, and tell the owner so plainly first, with the reason. This amends item 2.
+    - If a message's wording makes the harness offer a workflow while the owner is saying they
+      do not want one, the owner's meaning wins: run nothing.
+    - "Dont be afraid or quick to please": give the plain truth, including when an earlier
+      proposal was too much.
+    - The owner has two accounts. The other one's usage resets on 2026-11-19.
 
 ## 3. State right now (update this before you stop)
 
@@ -92,11 +100,12 @@ everything is pushed. This session has read the handover and run nothing (no che
 work organised. Then the plan is agreed with the owner in chat. Nothing starts before that, and
 the order below may change with it.
 
-**Discussed with the owner, not yet answered:** whether to mix models. The coordinator first
-proposed a mixed team, then advised against it as over-engineering (a few per cent saved at
-most): keep every agent that writes or judges the game on the top model at extra-high effort
-(section 2, item 2 unchanged), and let the coordinator run the mechanical steps itself. See the
-log's entry "Planning with the owner: other tools, and which model does what".
+**Discussed with the owner, not yet agreed (see the log's last two sections):**
+- Models: no mixing (it would save a few per cent at most). Everything that writes or judges
+  the game runs on the top model at extra-high effort.
+- Set-up, lean, with no workflow: the coordinator builds the prototype itself, one piece at a
+  time; one independent verifier agent after each finished piece; the owner judges the stills
+  (one build shown at two or three settings, side by side).
 
 | Branch | What it holds |
 | --- | --- |
