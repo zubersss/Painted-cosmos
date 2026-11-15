@@ -97,6 +97,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
       lighting or art direction another way, and say why.
     - The measure: the moving-painting look, which the owner likes most, together with a better
       and smoother game.
+    - The style should be the game's own. The moving painting is the favourite, not a fixed
+      target: "if we can get something thats unique and still look good il also be happy". Mark
+      for each reference whether taking it makes the game more like something that already
+      exists, or more its own. The owner and the coordinator judge this together.
     - Give the owner that view and talk it through; the owner may reject any of it. Nothing
       starts until the owner gives the go.
 
