@@ -89,6 +89,9 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     - "Dont be afraid or quick to please": give the plain truth, including when an earlier
       proposal was too much.
     - The owner has two accounts. The other one's usage resets on 2026-11-19.
+12. **The best possible quality comes first (2026-11-15).** "I want my game to look the best."
+    Spend usage wherever it buys quality and nowhere else. When the coordinator thinks another
+    idea is better than the owner's or the plan's, it says so.
 
 ## 3. State right now (update this before you stop)
 
@@ -103,9 +106,14 @@ the order below may change with it.
 **Discussed with the owner, not yet agreed (see the log's last two sections):**
 - Models: no mixing (it would save a few per cent at most). Everything that writes or judges
   the game runs on the top model at extra-high effort.
-- Set-up, lean, with no workflow: the coordinator builds the prototype itself, one piece at a
-  time; one independent verifier agent after each finished piece; the owner judges the stills
-  (one build shown at two or three settings, side by side).
+- Set-up, with no workflow: the coordinator builds the main line itself, one piece at a time.
+  Single agents are added only where they buy quality: two or three truly different ways of
+  making the paint look, as stills for the owner to pick; an independent critic that compares
+  every set of stills with the references; an independent verifier after each finished piece.
+- Three changes to section 4a that the coordinator put to the owner: judge the look in motion on
+  the owner's phone through a private preview, not only in stills; take one or two scenes all
+  the way instead of a thin filter over five; and set the order of the look and release 2's
+  phone work by the device the owner mostly plays on (asked, not yet answered).
 
 | Branch | What it holds |
 | --- | --- |
