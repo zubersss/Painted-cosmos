@@ -129,6 +129,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     strokes smaller and almost exactly like the video reference these are too wide and too
     outlined." The clip's strokes are the measure of size and shape: leaf-shaped dabs lying every
     way on the forest floor, long streaks on trunks, no line drawn round a stroke.
+19. **Thinner than the clip; six styles to choose from (2026-11-15).** "Try to get them thinner
+    then the video actually just copy how the lines are used but optimize it for our game."
+    Then: six styles from the thinnest to the widest, the widest no wider than the clip's
+    strokes; two that follow the clip's own way with thinner strokes, four that explore other
+    ways; the owner chooses. They are `STYLES` in `src/render/shared.js` on `look-proto`
+    (`&style=1..6`).
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
