@@ -4,7 +4,65 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of RELEASE 1, RE-FIX pass of the PAINTER lane (READ THIS FIRST; kept current after every item)
+## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
+
+Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
+the references and the crispness rule are on branch `r2`: `docs/HANDOVER.md` (sections 2 and 4a) and
+`docs/references/README.md`. Read those before touching the look. Built by the coordinator itself (no workflow).
+
+**What it is.** `?look=oil` paints the same world in opaque paint with strokes laid on the surfaces themselves, after the
+owner's reference clip. Without the flag nothing changes: the switch is the compile-time define `PC_OIL` in every painted
+material (`src/render/shared.js`: `LOOK`, `OIL`, `register`), and the watercolour's code paths are untouched.
+
+**What is built (pieces 1 to 3 of the plan), file by file.**
+- `src/render/shared.js`: `LOOK.oil` from the address; the dials `OIL.uOilA..uOilD`, `uOilPx` (each documented there),
+  shared by reference by every material; `register(material, kind, opts)`: every make function calls it, it sets the
+  define and records how the material was made (for the lab's swap).
+- `src/render/chunks.js` (`FRAG_PARS`, under `PC_OIL`): `pcTone` as opaque paint (body colour by `pcDensity`, the lights
+  laid lighter and yellower, the shade the cool key with its green drawn down plus the sky's fill); `pcLevel` remapped so
+  a low sun still lights what faces it; `pcAtmos*` toward the air's own colour with a glow toward the sun, the distance
+  taken `uOilC.w` times farther; `pcDappleS` (the leaf shadow for one stroke: a clean edge, drawn long under a low sun),
+  and `pcDappleL` made to call it so every surface reads one shadow. The strokes: `pcStrokeOct` (a stroke is `uOilA.x`
+  pixels wide wherever it is: octaves of the distance), `pcDabs` / `pcDabLayer` (leaf-shaped dabs lying every way, two
+  in a cell, the one with the higher number on top, a clean edge a pixel wide, no line between), `pcDabTint`,
+  `pcGroundChart` (a world's ground as metres on the cube's face), `pcChartToPx` (from a pixel to a stroke's centre),
+  `pcNoiseS` (noise read for a stroke: no derivative at a centre). Also kept, not in use now: `pcBrick` /
+  `pcStrokeLayer` / `pcLay` (a course of tiles with hairlines: the first version; the owner found it "too wide and too
+  outlined"; it is the right form for the clip's snow, which is a mosaic of tiles with light edges).
+- `src/render/materials.js`: `TERRAIN_FRAG` has its own `main` under `PC_OIL` (the ground under two layers of dabs, each
+  dab's paint worked out at its own centre; under trees many dabs take the canopy's colour: fallen leaves); `PROP_FRAG`
+  has an oil branch for bark (long streaks on the tube's own chart) and crowns (dabs on a chart of the whole crown,
+  `vMassO`; a dab at the outline or where the sky shows is left out whole). Blades, accents and rocks take the oil light
+  through `pcTone` but have no strokes of their own yet. Water, the generic wash, the figure and the near-ground blades:
+  the oil light only.
+- `src/render/post.js`: `_finishOil` and `OIL_FRAG`: the scene as painted, the glazes, last frame kept for the water, the
+  world's last key, a gentle S over the values. No brush, pooling, pencil or paper pass runs.
+- `src/render/index.js`: `uOilPx` set every frame; `setLook({ oil: { uOilA: [...], ... } })`.
+- `src/world/sky.js`: the sky's washes as body colour under `PC_OIL`.
+- `tools/lab.mjs`: the look lab (see its header). `node tools/lab.mjs serve` (in the background), then
+  `open '/gallery.html?body=earth&biome=autumn_woodland&time=17.2&quality=2&cam=trees&ui=0&t=0&wx=fair&look=oil' 960 540`,
+  `grab out.png`, `eval '<js>'`. The gallery loads in 15 s; the first frame after a load compiles the shaders (about six
+  minutes in software GL with the dabs), every frame after takes 40 s at 960x540. The dials are uniforms: turn them from
+  `eval` through any material's `uniforms.uOilA` and grab again, with no reload.
+  `swap` crashed the page the one time it was tried (not looked into); a reload is the safe way.
+
+**Not done yet (in the plan's order).** Piece 4: real cast shadows (there are none: the leaf shadow is a pattern).
+Piece 5: night and sky (the night's key is only the old grade multiplied in `OIL_FRAG`; the sky has no strokes; the
+aurora is the watercolour's). Piece 6: the explorer (still the old figure in the new light). Then, by pattern: strokes
+for rocks, blades and water; strata, cracks, puddles, the trodden track and a world's great marking on the oil ground;
+PHYSICS' kits (`src/render/kitmat.js` is not registered: its materials still paint as washes); each world's dials.
+
+**Known faults.**
+- Cost. A dab layer looks at 18 dabs a pixel and the ground and the plants lay two layers each. Fine for a first
+  picture on a desktop GPU, not measured on one, too slow for a phone. The cure is known (the dabs baked into a texture
+  made at start-up) and belongs with the phone work.
+- The ground's chart has a seam along the twelve edges of the cube (every 6.3 km on a 4 km world): the dabs are cut
+  there. Not seen in the prototype's scenes; to be made ragged with a little noise in the choice of face.
+- A crown's chart is a ball of fixed size (1.9 m): a much larger or smaller mass gets larger or smaller dabs.
+- The leaf shadow's edge follows the noise, so shadows are round blots, not the long bars of trunks. Piece 4.
+- A dab's edge against another dab of the same layer is exact only for the top two (the third under them is not known).
+
+## Hand-over of RELEASE 1, RE-FIX pass of the PAINTER lane (the watercolour; kept current after every item)
 
 The verifier did not accept W2.1, W2.2, W2.4, W2.5 and listed nine regressions (the task text of this pass; its evidence
 under `/home/user/.pc-scratch/verify/r1-painter/`). This pass fixes them with proof, or shows by a measurement why a
