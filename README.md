@@ -11,7 +11,7 @@ and nothing can go wrong: the ship will not let you crash and the explorer canno
 **In the browser:** <https://zubersss.github.io/Painted-cosmos/> (GitHub Pages, served from the
 `main` branch). A desktop browser with WebGL 2 is needed (a current Chrome, Edge, Firefox or
 Safari 16.4 or newer; the page says so in a sentence if yours cannot run it); a keyboard and
-mouse, or a gamepad.
+mouse, or a gamepad; or a phone or a tablet held sideways, played by touch.
 
 **From a copy of this repository:** the game is plain ES modules with no build step and makes
 no network requests once loaded. Serve the folder with any static server and open it:
@@ -93,6 +93,8 @@ cannot map) is not used, and the game says so once. Browsers do not let a gamepa
 sound: click or press a key once (the game reminds you). Not tried with a real pad: the
 mapping is tested with a simulated one.
 
+**By touch** on a phone or a tablet: see "Phones and tablets" below.
+
 The game saves itself when you land, when you step out, and every 20 seconds on foot, and
 continues from there on the next visit. Add `?fresh=1` to the address to start again on Earth.
 
@@ -122,6 +124,44 @@ is made in code (wind that follows the real wind, rain, thunder, the ship, the j
 footsteps, a quiet pad per planet); `?audio=0` turns it off. It starts with your first click
 or key press (browsers allow no sound before one) and goes quiet while the tab is hidden.
 
+## Phones and tablets
+
+Open the same address on the phone or the tablet and hold it sideways. The touch controls are
+there from the start (on any screen they come up at the first touch; a key or the mouse puts
+them away again), and nothing on the screen names a key or the mouse while they are.
+
+- **The whole screen.** On Android and on an iPad the first touch asks the browser for the
+  whole screen and to keep it sideways (a browser may refuse; nothing else changes then). An
+  iPhone has no whole screen for a web page: the game says once "For the whole screen: Share,
+  then Add to Home Screen", and opened from the Home Screen it plays without the browser's bars.
+  The screen is kept awake while you play (a pulse to Mars takes a minute untouched).
+- **Held upright**, a phone shows a slip asking to be turned sideways and the game waits under
+  it; a tablet plays upright, its view widened to keep 60 degrees across.
+- **The picture** on a phone or a tablet is drawn at up to 1.25 pixels per screen point (a
+  tablet at most 1.6 million pixels), and a phone starts a quality tier down; the game climbs
+  from there when the frames allow. Opened with `?stats=1` (the frame read-out has no touch
+  control), its last line names the device preset, the drawing buffer, the anti-aliasing and
+  the depth mode (reversed or logarithmic).
+- **Sound** plays with the iPhone's silent switch on where Safari allows it (iOS 17 and later).
+
+| Touch | On foot | In the ship |
+| --- | --- | --- |
+| a thumb on the left of the picture (a stick wherever it lands) | walk; at the edge of its ring, run | turn; up and down move the throttle |
+| drag anywhere else | look round | point the nose |
+| two fingers, pinched | camera nearer / farther | |
+| round button lower right | jump; hold it for the jetpack | rise (sink and brake beside it) |
+| the slips over the buttons | board ship, stand at the easel | lift off, step out, land here, cancel landing, pulse to a world, stop turning, drop out of pulse |
+| tabs, top left | the map, the sketchbook, the help card (the controls drawn), first / third person | the map, the sketchbook, the help card, cockpit / chase |
+| on the map | tap a world to set a course ("set course for ..." puts the map away) | |
+| on the sketchbook | swipe across the page to turn it; tap a world's tab | |
+| any sheet | its corner or a tap outside it closes it; the help card goes at a tap anywhere | |
+
+The controls fade after four seconds untouched; everything stays inside the notch and the home
+bar's margins. **Never tried on a real phone or tablet** (only Chromium's iPhone 14, Pixel 7 and
+iPad Pro 11 profiles with scripted fingers): how the stick and the look feel, whether a thumb
+covers the explorer, Safari's gestures, the Home Screen, the whole-screen and sideways requests,
+the wake lock, the silent switch and the frame rate on a phone are all unknown.
+
 ## Is it fast enough on my machine?
 
 The target is 60 frames a second at 1080p on a laptop's built-in graphics, and never under 30.
@@ -149,7 +189,8 @@ follow the tier too, so a lower tier eases the processor as well.
 **The size of the picture.** The game draws at the window's size, at up to 1.5 pixels per
 point on a high-density screen, and at most about 2560x1440 (3.7 million pixels): a 1080p
 screen and a Retina laptop keep every pixel, a 4K monitor is painted at about 1440p and
-enlarged by the browser.
+enlarged by the browser. A phone or a tablet draws at up to 1.25 pixels per point (a tablet at
+most 1.6 million pixels), and a phone starts at tier 1 ("Phones and tablets" above).
 
 **The quality tiers.** There is no triangle budget: the high tier is the painting as it is
 meant to be seen, and the lower tiers exist so that a weaker machine still plays.
@@ -169,7 +210,7 @@ with it: at 0.50 the picture is painted at half size and enlarged, which softens
 stays and only the resolution adapts. `?quality=0&scale=0.5&dynres=0` pins both.
 
 **The read-out.** Press the backquote key `` ` `` (or add `?stats=1` to the address). It shows
-five lines:
+six lines:
 
 | Line | What it says | What to look for |
 | --- | --- | --- |
@@ -178,6 +219,7 @@ five lines:
 | `render scale`, `quality tier` | what the game has settled on; `(pinned)` if the address fixed them; `capped at N fps` when it found the screen or the browser holding the frame rate | 1.00 and tier 2 on a machine that copes |
 | `world`, `physics` | milliseconds a frame spent building the landscape and stepping the physical models, with their worst recent frame | a few milliseconds each; a long `world` worst is a hitch while new ground is built |
 | `weather` | what the weather's own marks cost (rain, snow, dust, ripples: "kits"), and what the sky is doing | `fair`, or for example `overcast 0.94  rain 0.92  storm 0.84  wet 0.96` |
+| `device` | the preset (`desktop`, `tablet`, `phone`), the drawing buffer and its pixels per point, the anti-aliasing, the depth buffer (`reversed`, or `logarithmic` where the browser lacks the extension for it) | a phone at 1.25; `logarithmic` depth costs the graphics card more |
 
 If `frame` sits above 17 ms with the scale at 0.50 and the tier at 0, the machine cannot hold
 60 frames a second in that view.
@@ -196,6 +238,9 @@ scripted input. These things have never been checked on a real machine by anyone
   button and dragging; that fallback is tested.
 - **A real gamepad, other keyboard layouts.** The standard mapping is tested with a simulated
   pad only; AZERTY, Dvorak and Colemak with simulated key events.
+- **A real phone or tablet.** Touch is tested with Chromium's iPhone 14, Pixel 7 and iPad Pro
+  11 profiles and scripted fingers; never on iOS Safari or a real device, so the feel of the
+  stick and the look, Safari's gestures and the frame rate on a phone are not known.
 - **Safari and Firefox.** Only Chromium was run here: the rule that sound starts on a click,
   frame-rate caps and a change of screen scale are written to the browsers' documented
   behaviour, not observed in them.
@@ -220,6 +265,8 @@ scripted input. These things have never been checked on a real machine by anyone
 | `card=0` | no title card (for captures) |
 | `fresh=1` / `save=0` | forget the saved game / never save |
 | `stub=physics` | turn the physical models off (the explorer and ship then move by simple rules) |
+| `preset=phone` | the device preset (`phone`, `tablet` or `desktop`; chosen from the pointer and the screen without it) |
+| `fullscreen=0` | never ask for the whole screen or the sideways lock on a touch screen |
 
 ## Checks
 
@@ -240,6 +287,10 @@ The steps, which can also be run by hand:
                                      # that continues from the save
     node tests/m3check.mjs           # title card, look hint, sketchbook and its sketches, a view found
     node tests/lockcheck.mjs         # pointer lock and the drag-to-look fallback
+    node tests/touch.mjs --part all  # touch on phone and tablet profiles (stick, look, pinch,
+                                     # buttons; no zoom, no pointer lock), then the whole loop
+                                     # played by touch; --part loop --painted: the same loop in
+                                     # the painted world
     node tests/audiocheck.mjs        # the sound, measured: every situation rendered through the game's
                                      # own audio graph and checked for level, clipping, DC, clicks
 

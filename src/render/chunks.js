@@ -94,6 +94,45 @@ uniform float uAux8;
 vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
 vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
 
+// The marks as the pixel sees them (PAINTER, R1 W2.1 of docs/lead/SHARP-SMOOTH-PLAN.md). A mark (the leaf shadow, a
+// touch, a fleck of grit) is a threshold on a noise channel. Where the pattern is finer than the pixel the noise is read
+// from a mip level that has averaged it, but the threshold made it hard again: from the ship the far floor was rows of
+// dashes and camouflage blotches, hidden only while the brush repainted every far pixel. Here a threshold is widened by
+// what of its channel lies inside the pixel, so a mark finer than the pixel eases to the share of the pixel it covers:
+// the same mean (the same palette), no new edges. Near the eye nothing changes.
+// pcFp: the pixel's footprint on the land in metres, set at the top of a material's main, before any discard
+// (pcFp = pcFootprint(vBody);); a material that does not set it keeps every mark exactly as before.
+float pcFp = 0.0;
+// (R1 re-fix) pcDist: the view distance in metres, set beside pcFp by a material that lays the leaf shadow from afar
+// (pcDappleL: its far octaves); 0 keeps it as it was
+float pcDist = 0.0;
+float pcFootprint(vec3 p) { vec3 a = dFdx(p), b = dFdy(p); return sqrt(max(dot(a, a), dot(b, b))); }
+// What of a uNoise3D channel read at p / sc lies inside the pixel, as a variance: (the channel's variance, the squared
+// size in texels at which half of it is averaged away), measured on the 64^3 noise's own mip chain (texgen.js
+// genNoise3D: R and G alike, B finer, A the billows; docs/notes/painter.md, R1).
+const vec2 PC_NRG = vec2(0.0191, 100.0), PC_NB = vec2(0.0163, 25.0), PC_NA = vec2(0.0550, 56.0);
+float pcSub(float sc, vec2 k) { float s = 64.0 * pcFp / sc; s *= s; return k.x * s / (s + k.y); }
+// smoothstep(e0, e1, v) widened by sub (the pcSub of each channel in v times its weight squared): the soft edge and the
+// spread inside the pixel add as variances, so the mean share is kept. (1.4: a smoothstep as wide as a normal spread of
+// sd s is about 1.9 s each side, 3.5 s^2; the mip level's box already averages most of that, and against the design
+// supersampled 16 times (W2.1 off, 4x, box-filtered down) a full 3.5 was too soft: at E_1000_90 the error to it fell
+// from 0.63 (the marks as drawn) to 0.48 at 3.5 and 0.42 at 1.5. The plan's lapvar bound there (350, the supersampled
+// design's own is 675) sets the floor: 1.2 gave 366.)
+float pcStepF(float e0, float e1, float v, float sub) {
+  float m = 0.5 * (e0 + e1), h = 0.5 * (e1 - e0);
+  h = sqrt(h * h + 1.4 * sub);
+  return smoothstep(m - h, m + h, v);
+}
+// A thin line of a distance field (1 - smoothstep(e0, e1, a), a >= 0 its distance): widened by gpx, how much a changes
+// across the pixel, keeping how much of the land the line covers; past the size of its cells (cell, metres) it is laid
+// as that cover (cov per unit of the line's width).
+float pcLineF(float e0, float e1, float a, float gpx, float cell, float cov) {
+  float m = 0.5 * (e0 + e1), h = 0.5 * (e1 - e0);
+  float h2 = sqrt(h * h + 0.25 * gpx * gpx), m2 = max(m, h2);
+  float l = (1.0 - smoothstep(m2 - h2, m2 + h2, a)) * (m / m2);
+  return mix(l, cov * m, smoothstep(0.15, 0.6, pcFp / cell));
+}
+
 // Pigment density model: heavier pigment grows richer, not muddier.
 vec3 pcDensity(vec3 c, float d) {
   return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0);
@@ -122,6 +161,9 @@ float pcLevel(float x, float soft) {
        + smoothstep(0.50 - soft, 0.50 + soft, x)
        + smoothstep(0.76 - soft, 0.76 + soft, x);
 }
+// (R1 W2.1) the same, its steps' edges no narrower than the pixel sees them: fw, how much x changes across the pixel
+// (fwidth, taken where the flow is uniform); 0 is pcLevel itself
+float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * soft + 0.25 * fw * fw)); }
 
 // Layer the washes for a light level:
 //   3 sunlit: the local wash diluted so paper shows, warmed by the light
@@ -175,16 +217,34 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
 // through the point meets that level: one pattern along a ray, and it drifts with the sun as real sun
 // flecks do, a few centimetres a second. (It used to be projected through the planet's centre: on a
 // world 4 km in radius with a day of 25 minutes the flecks ran over the forest floor at 17 m/s.)
+// (what of the leaf shadow lies inside the pixel, as a variance: its two channels at 13 m and 4.1 m, weights 0.68 and 0.32)
+// (R1 re-fix: the 4.1 m channel repeats every 4.1 m; from about 1.6 m a pixel, 1 km up, its repeat is under three pixels
+// and what the mip level leaves of it is a regular lattice. It eases to its mean from 0.20 to 0.40 of its repeat a pixel
+// (nothing changes at 400 m), its whole variance counted inside the pixel, so the share of the floor in sun is kept.)
+float pcDappleE() { return smoothstep(0.20, 0.40, pcFp / 4.1); }
+// (R1 re-fix: the leaf shadow's 13 m channel, its cells 3.25 m, was a hatch of one- and two-pixel dashes from 1 km, in the
+// design itself (the same hatch in a render at 4x, box-filtered down) and in the picture: a mark finer than a brush
+// can lay. Far off it is laid at twice its size for each doubling of the distance past 500 m (the terrain's brush marks
+// keep their size on the sheet the same way), the two sizes cross-faded, each thresholded on its own so the share of
+// sun is the same at every size: flecks of a few pixels, never a hatch. Under 500 m nothing changes.)
+vec3 pcDappleOct() { float ld = log2(max(pcDist / 500.0, 1.0)), l0 = floor(ld); return vec3(13.0 * exp2(l0), smoothstep(0.2, 0.8, ld - l0), 0.0); }
+float pcDappleSub() { vec3 o = pcDappleOct(); return 0.4624 * pcSub(o.x * (1.0 + o.y), PC_NRG) + 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE()); }
 float pcDappleL(vec3 bodyPos, float canopy, float lift) {
   vec3 pp = bodyPos + uSunDirL * (lift / max(dot(normalize(bodyPos), uSunDirL), 0.22));
-  float a = texture(uNoise3D, pp / 13.0).r;
-  float b = texture(uNoise3D, pp / 4.1 + 0.37).g;
-  float v = a * 0.68 + b * 0.32;
+  vec3 o = pcDappleOct();
+  float b = mix(texture(uNoise3D, pp / 4.1 + 0.37).g, 0.5, pcDappleE());
   float th = mix(0.05, 0.585, canopy);
   // mostly a crisp-edged glaze, here and there feathered where the wash was still wet
   float w = mix(0.012, 0.075, smoothstep(0.55, 0.75, texture(uNoise3D, pp / 23.0 + 0.7).b));
   // under an overcast nothing casts a shadow: only the dimness under the canopy is left
-  return mix(smoothstep(th - w, th + w, v), 1.0 - 0.42 * canopy, uWx.x);
+  // (R1 W2.1: from the air the flecks are finer than the pixel; there they ease to the share of the floor in sun)
+  // (the 13 m channel read with the place's own gradients over its own scale: the scale steps with the distance, and the
+  // screen's derivative across a step would read the coarsest level along it; at 13 m it is the read as it always was)
+  vec3 dpx = dFdx(pp), dpy = dFdy(pp);
+  float subB = 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE());
+  float s = pcStepF(th - w, th + w, textureGrad(uNoise3D, pp / o.x, dpx / o.x, dpy / o.x).r * 0.68 + b * 0.32, 0.4624 * pcSub(o.x, PC_NRG) + subB);
+  if (o.y > 0.001) s = mix(s, pcStepF(th - w, th + w, textureGrad(uNoise3D, pp / (2.0 * o.x), dpx / (2.0 * o.x), dpy / (2.0 * o.x)).r * 0.68 + b * 0.32, 0.4624 * pcSub(2.0 * o.x, PC_NRG) + subB), o.y);
+  return mix(s, 1.0 - 0.42 * canopy, uWx.x);
 }
 float pcDapple(vec3 bodyPos, float canopy) { return pcDappleL(bodyPos, canopy, 8.0); }
 
@@ -240,6 +300,8 @@ vec4 pcTri8(vec3 p, vec3 n, float scale) {
 
 void pcWrite(vec3 col, float wet, vec3 nV, float viewZ, float id) {
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(wet, 0.0, 1.0));
-  pcAux = pcAuxEnc(vec4(nV.xy, log2(1.0 + max(viewZ, 0.0)), id));
+  // (R1 W2.5: .y carries the region squared, not the normal's y, which nothing read: after a multisample resolve
+  // y - w^2 says whether the samples under a pixel lay on more than one region, post.js AUXFIX_FRAG)
+  pcAux = pcAuxEnc(vec4(nV.x, uAux8 > 0.5 ? nV.y : id * id, log2(1.0 + max(viewZ, 0.0)), id));
 }
 `;

@@ -5,12 +5,14 @@
 //   node tests/all.mjs                 (the tree this script lives in, as it is)
 //   node tests/all.mjs --only unit,static     --skip painted-trip     --list
 //
-// Steps: the three unit suites (PILOT's, PHYSICS', PAINTER's), the static rules of the brief
+// Steps: the three unit suites (PILOT's, PHYSICS', PAINTER's), PHYSICS' coast report and the
+// explorer's ghost run (review 7) judged on their printed numbers, the static rules of the brief
 // (no build step, relative URLs only, no external assets, Three.js from /vendor, storage in
 // try/catch), then the scripted browser runs in headless Chromium, one at a time (two at once
 // make each other flaky on this machine): play-through on stubs, with PHYSICS, and in the
 // painted world; the Earth, Mars, Saturn trip on stubs and in the painted world; milestone 3's
-// checks; pointer lock and its fallback; the sound, measured. Every browser run fails on any
+// checks; pointer lock and its fallback; touch on phone and tablet profiles, and the loop played
+// by touch on stubs and in the painted world; the sound, measured. Every browser run fails on any
 // console error, page error, failed request or request that leaves the page's own server.
 // Exit code 0 only if every step that ran passed. Logs: one file per step in --out.
 //
@@ -44,16 +46,20 @@ const STEPS = [
   { id: 'unit', what: 'PILOT\'s unit tests (simulation, flight, camera, save, sketchbook, contract with the real worlds)', cmd: ['node', '--test', 'tests/'], shell: 'node --test tests/*.test.mjs', min: 15 },
   { id: 'physics-unit', what: 'PHYSICS\' unit tests', cmd: ['node', '--test', 'src/physics/'], min: 20 },   // 291 tests: 145 in 5 min at a load of 18 (2026-11-12)
   { id: 'world-unit', what: 'PAINTER\'s unit tests', shell: 'node --test src/world/*.test.mjs', min: 10 },
+  { id: 'coast', what: 'PHYSICS\' coast report: the sea at both coast stands meets its marks (src/physics/coast.mjs)', cmd: ['node', 'src/physics/coast.mjs'], min: 10, judge: judgeCoast },
+  { id: 'ghostfield', what: 'the explorer\'s ghost run through a boulder row, three places, two gravities: all zeros (review 7)', cmd: ['node', 'docs/lead/evidence/review7/ghostfield.mjs'], min: 5, judge: judgeGhostfield },
   { id: 'static', what: 'the brief\'s static rules', fn: staticRules },
   { id: 'play-stub', what: 'play-through on the stubs (walk, jetpack, board, orbit, land, step out)', cmd: ['node', 'tests/playthrough.mjs', '--out', path.join(out, 'play-stub')], min: 15 },
   { id: 'play-physics', what: 'play-through on the stubs with PHYSICS', cmd: ['node', 'tests/playthrough.mjs', '--query', 'stub=render,world,art&fresh=1', '--out', path.join(out, 'play-physics')], min: 15 },
   { id: 'trip-stub', what: 'Earth, Mars, Saturn in one sitting, reload from the save (stubs)', cmd: ['node', 'tests/trip.mjs', '--out', path.join(out, 'trip-stub')], min: 20 },
   { id: 'm3', what: 'milestone 3: title card, sketchbook and sketches, vistas, gamepad, tiers', cmd: ['node', 'tests/m3check.mjs', '--out', path.join(out, 'm3')], min: 15 },
   { id: 'lock', what: 'pointer lock and the drag-to-look fallback', cmd: ['node', 'tests/lockcheck.mjs', '--out', path.join(out, 'lock')], min: 10 },
+  { id: 'touch', what: 'touch: the stick, the look, the pinch and the buttons on three phone and tablet profiles, a desktop page; the presets, the buffer, the read-out, the upright views, fullscreen, the wake lock and the manifest; then the whole loop by touch (stubs), every string on the screen free of keys', cmd: ['node', 'tests/touch.mjs', '--part', 'all', '--out', path.join(out, 'touch')], min: 60 },
   { id: 'audio', what: 'the sound, measured (no clipping, no clicks, no DC)', cmd: ['node', 'tests/audiocheck.mjs'], min: 10 },
   { id: 'painted-play', what: 'play-through in the painted world', cmd: ['node', 'tests/playthrough.mjs', '--query', painted + '&fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-play')], min: 40 },
   { id: 'painted-trip', what: 'Earth, Mars, Saturn in the painted world, reload from the save', cmd: ['node', 'tests/trip.mjs', '--query', painted, '--w', '400', '--h', '225', '--out', path.join(out, 'painted-trip')], min: 60 },
   { id: 'painted-m3', what: 'milestone 3\'s checks in the painted world', cmd: ['node', 'tests/m3check.mjs', '--query', 'fresh=1', '--w', '400', '--h', '225', '--out', path.join(out, 'painted-m3')], min: 40 },
+  { id: 'painted-touch', what: 'the whole loop by touch in the painted world (q0, 400x225, the iPhone 14 profile)', cmd: ['node', 'tests/touch.mjs', '--part', 'loop', '--painted', '--out', path.join(out, 'painted-touch')], min: 60 },
 ];
 if (flag('list')) { for (const s of STEPS) console.log(s.id.padEnd(14), s.what); process.exit(0); }
 const only = val('only', ''), skip = val('skip', '');
@@ -77,6 +83,8 @@ for (const s of steps) {
     fs.writeFileSync(path.join(out, s.id + '.log'), text);
     ok = r.status === 0;
     detail = summarise(text, ok, r);
+    // A step whose script prints its verdict but does not (or not fully) say it in its exit code.
+    if (s.judge && !(r.error && r.error.code === 'ETIMEDOUT')) ({ ok, detail } = s.judge(text, r.status));
     // Three agents render on this machine: a unit test with a clock in it can fail in the full
     // run and pass alone. Before the table calls it a failure, the files that failed are run
     // once more, alone. (The table says so; the first run's log is kept.)
@@ -125,6 +133,27 @@ function summarise(text, ok, r) {
   const bad = lines.filter((l) => /FAIL:/.test(l));
   if (!ok) return (bad[0] || lines.filter((l) => l.trim()).slice(-1)[0] || 'no output').trim().slice(0, 150);
   return oks ? `${oks} checks` : (lines.filter((l) => /PASSED|DONE/.test(l)).slice(-1)[0] || 'passed').trim().slice(0, 90);
+}
+
+// coast.mjs: one verdict line per stand ("=>  PASS" or "=>  NOT YET"); both stands (Earth's sea
+// coast, Neptune's storm seas) must pass, and the script's exit code must agree.
+function judgeCoast(text, status) {
+  const v = text.split('\n').filter((l) => /=>\s+(PASS|NOT YET)\s*$/.test(l));
+  const pass = v.filter((l) => /=>\s+PASS\s*$/.test(l)).length;
+  const ok = status === 0 && v.length >= 2 && pass === v.length;
+  return { ok, detail: `${pass} of ${v.length} stands PASS` + (status !== 0 ? ` (exit ${status})` : '') };
+}
+
+// ghostfield.mjs prints one JSON record per place and gravity (three places, two gravities). All
+// zeros: no radial speed while grounded, nothing off the line, no wrong material, no step in the
+// air. (The worst step loss is the legs at their limit, 0.26 and 0.52 m/s; reported, not judged.)
+function judgeGhostfield(text, status) {
+  const recs = [...text.matchAll(/\{"worstStepLoss"[^}]*\}/g)].map((m) => JSON.parse(m[0]));
+  const keys = ['radialWhileGrounded', 'offLine', 'wrongMaterialSteps', 'stepsInAir'];
+  const bad = recs.filter((r) => keys.some((k) => r[k] !== 0));
+  const ok = status === 0 && recs.length >= 6 && bad.length === 0;
+  const loss = recs.length ? Math.max(...recs.map((r) => r.worstStepLoss)) : null;
+  return { ok, detail: `${recs.length - bad.length} of ${recs.length} runs all zeros (worst step loss ${loss} m/s)` + (bad.length ? `; not zero: ${JSON.stringify(bad[0])}` : '') + (status !== 0 ? ` (exit ${status})` : '') };
 }
 
 // The rules of the brief that can be read off the files.

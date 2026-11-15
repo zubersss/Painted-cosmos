@@ -3,14 +3,20 @@
 // land, step out; twice. Then reload the page and check the game continues from its save.
 //
 // Usage: node tests/trip.mjs [--out dir] [--keep] [--w 640 --h 360] [--query "..."] [--root dir]
+//        [--block-landings N]   (on each world the first N landings are given back on the way down, on purpose)
 // Default query runs Pilot's stub visuals with PHYSICS wired in.
-import { RAD, MOUSE_FOOT, parseArgs, startRun, finish } from './browser.mjs';
+import { RAD, MOUSE_FOOT, parseArgs, startRun, finish, giveLandingBack } from './browser.mjs';
 
 const opt = parseArgs({ out: '/home/user/.pc-scratch/pilot/trip', w: 640, h: 360, query: 'stub=render,world,art' });
 opt.query += '&dynres=0&pointerlock=0&card=0&fresh=1';      // (the reload at the end drops every fresh=1)
 const run = await startRun(opt);
 const { page, check, info, shot, look, gameWait, until, holdPitch, aimShipAt, log } = run;
 const summary = { legs: [], timings: {} };
+// --block-landings N: on each world the first N landings that begin are given back on the way
+// down, as the game does over a ledge (see the landing below). `seen` lists every landing given
+// back, on purpose or not.
+const blocks = { asked: Number(opt['block-landings'] || 0), left: 0, done: 0, seen: [] };
+summary.landingsGivenBack = blocks.seen;
 const alt = (x) => (x.ship.altitude == null ? 1e9 : x.ship.altitude);
 
 async function chooseOnMap(id, shotName, keepAs) {
@@ -36,6 +42,14 @@ async function leg(to, n) {
   let i = await info();
   const from = i.body;
   log(`LEG ${n}: ${from} -> ${to}`);
+  // Bumps are counted for this leg alone (the ship's count runs from the page's start: one bump
+  // on the first leg used to fail the second leg's check too), and by stretch, so a failure says
+  // where it happened.
+  const bump = { n: (i.ship && i.ship.bounces) || 0, where: [] };
+  const bumpsIn = (x, stretch) => {
+    const b = (x && x.ship && x.ship.bounces) || 0;
+    if (b > bump.n) { bump.where.push(`${b - bump.n} in ${stretch}`); bump.n = b; }
+  };
   // ---- to the ship, up, out ----------------------------------------------------------------
   if (i.state === 'ON_FOOT') {
     await look((i.shipBearingDeg * RAD) / MOUSE_FOOT, 0);
@@ -53,6 +67,7 @@ async function leg(to, n) {
   await page.keyboard.up('KeyW');
   i = await until((x) => x.state === 'SPACE', 180, holdPitch(50));
   check(i.state === 'SPACE', 'reached space above ' + from);
+  bumpsIn(i, 'the climb from ' + from);
   i = await until((x) => alt(x) > x.ship.spaceAlt * 3, 120, holdPitch(50));
   // ---- choose, aim, pulse ---------------------------------------------------------------------
   const target = await chooseOnMap(to, n === 1 ? 'm2-map' : null, 'm2-map');
@@ -89,6 +104,7 @@ async function leg(to, n) {
   await page.keyboard.up('KeyW');
   i = await until((x) => x.state === 'ATMOSPHERE', 300, holdPitch(-58));
   check(i.state === 'ATMOSPHERE', 'entered the atmosphere of ' + to);
+  bumpsIn(i, 'the way to ' + to + "'s air");
   // A world not yet walked on shows where it would set a newcomer down (a ring, or an arrow at
   // the picture's edge when the place is round the curve or out of the picture).
   const site = (i.marks || []).find((m) => m.label === 'a place to land');
@@ -102,15 +118,45 @@ async function leg(to, n) {
     if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
   });
   check(i.ship.canLand, 'landing prompt over ' + to);
-  // Press E on the prompt, as a player does: if the prompt had gone by the time the key
-  // arrived (rough ground at two frames a second), wait for it and press again.
-  for (let tries = 0; tries < 8; tries++) {
+  bumpsIn(i, 'the descent to the landing prompt');
+  blocks.left = blocks.asked;
+  // Press E on the prompt, as a player does, and see the landing through. It can fail to set
+  // down three ways, each met in a run, and the script does what a player does:
+  //   - the prompt had gone by the time the key arrived (rough ground at two frames a second):
+  //     wait for it and press again;
+  //   - "Too steep to land here": no ground near enough holds the parked ship (with PHYSICS, a
+  //     slope its friction will not hold; it looks up to 45 m round): fly on and try again
+  //     (pressing E on the same hover failed over Saturn's honey_mist eight times running: the
+  //     verifier's runs on a539086 and 45629a7);
+  //   - the landing began and was given back on the way down, "No level ground here" (the
+  //     assist's glide met a ledge over a slope: sim.js, stepLanding's 'blocked'; the ship is
+  //     left hovering a few metres up with the prompt still offered): fly on and try again (the
+  //     script used to wait 90 s for a landing that had ended: the verifier's run 2 of 3 on
+  //     3cd414b over Saturn).
+  // Flying on: about 4 s at full throttle, nose level (the ground assist keeps the hull off a
+  // rising slope), 100 to 150 m along, then down to the prompt again. --block-landings N gives
+  // the first N landings on each world back on purpose (tests/browser.mjs giveLandingBack).
+  let landed = false;
+  for (let tries = 0; tries < 8 && !landed; tries++) {
     await page.keyboard.press('KeyE');
     i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED', 2.5);
     // (M4: E at speed slows the ship first; the assist begins when it has)
     if (i.state === 'ATMOSPHERE' && i.prompt === 'Cancel landing') i = await until((x) => x.state === 'LANDING' || x.state === 'LANDED' || x.prompt !== 'Cancel landing', 40);
-    if (i.state === 'LANDING' || i.state === 'LANDED') break;
-    run.log('  (E did not start a landing: ' + (i.notice || 'no prompt at that moment') + '; trying again)');
+    let givenBack = false;
+    if (i.state === 'LANDING' || i.state === 'LANDED') {
+      if (i.state === 'LANDING' && blocks.left > 0 && await giveLandingBack(page)) { blocks.left--; blocks.done++; log('  (--block-landings: this landing given back on purpose, as the game does on a ledge)'); }
+      i = await until((x) => x.state !== 'LANDING', 90);
+      if (i.state === 'LANDED') { landed = true; break; }
+      if (i.state === 'LANDING') break;                // (still descending after 90 s: the check below says so)
+      givenBack = true;
+      blocks.seen.push(to + ': ' + (i.notice || i.state));
+      log('  (the landing was given back: ' + (i.notice || i.state) + '; flying on)');
+    } else log('  (E did not start a landing: ' + (i.notice || 'no prompt at that moment') + '; trying again)');
+    if (givenBack || /steep/i.test(i.notice || '')) {
+      await page.keyboard.down('KeyW');
+      await until(() => false, 4, holdPitch(0));
+      await page.keyboard.up('KeyW');
+    }
     i = await until((x) => x.ship.canLand, 120, async (x) => {
       await holdPitch(x.ship.altGround > 110 ? -18 : -7)(x);
       if (x.ship.throttle < 0.18) { await page.keyboard.down('KeyW'); await run.sleep(120); await page.keyboard.up('KeyW'); }
@@ -119,7 +165,8 @@ async function leg(to, n) {
   }
   i = await until((x) => x.state === 'LANDED', 90);
   check(i.state === 'LANDED', 'landed on ' + to);
-  check(i.ship.bounces === 0, 'no bumps');
+  bumpsIn(i, 'the landing');
+  check(bump.where.length === 0, 'no bumps' + (bump.where.length ? ' (' + bump.where.join(', ') + ')' : ''));
   await gameWait(1);
   await page.keyboard.press('KeyE');
   i = await until((x) => x.state === 'ON_FOOT', 6);
@@ -143,6 +190,7 @@ try {
   await page.mouse.click(run.cx, run.cy);
   await leg('mars', 1);
   await leg('saturn', 2);
+  if (blocks.asked) check(blocks.done === 2 * blocks.asked, `--block-landings: ${blocks.done} of ${2 * blocks.asked} landings given back on purpose (${blocks.asked} on each world), and the ship landed after each`);
   i = await info();
   check(JSON.stringify(Object.keys(i.visited).sort()) === JSON.stringify(['earth', 'mars', 'saturn']), 'three worlds in the sketchbook: ' + Object.keys(i.visited).join(', '));
   summary.timings.gameSeconds = +i.t.toFixed(0);

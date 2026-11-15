@@ -1,0 +1,20 @@
+node tests/all.mjs --export on ca3a56a (64f447a's code + notes), 2026-11-14 19:14-20:20 UTC
+exported ca3a56a to /home/user/.pc-scratch/pilot/r1/rf/all/export
+PASS  unit             118 s  pass 251, fail 0
+PASS  physics-unit     193 s  pass 325, fail 0
+PASS  world-unit        21 s  pass 43, fail 0
+PASS  coast              9 s  2 of 2 stands PASS
+PASS  ghostfield         0 s  6 of 6 runs all zeros (worst step loss 0.52 m/s)
+PASS  static             0 s  all rules hold
+PASS  play-stub        175 s  39 checks
+PASS  play-physics     184 s  39 checks
+PASS  trip-stub        402 s  50 checks
+PASS  m3                82 s  33 checks
+PASS  lock              45 s  14 checks
+PASS  touch            775 s  222 checks
+PASS  audio             24 s  PASSED
+PASS  painted-play     334 s  39 checks
+PASS  painted-trip     469 s  50 checks
+PASS  painted-m3       755 s  33 checks
+PASS  painted-touch    399 s  68 checks
+ALL 17 PASSED

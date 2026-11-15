@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { Sim, FEEL } from '../src/core/sim.js';
 import { S } from '../src/core/state.js';
 import { SHIP } from '../src/ship/flight.js';
+import { words } from '../src/core/words.js';
 import { stubSurface, stubSpawn } from '../src/core/stubs/surface.js';
 import { cross, reject, qRotate, add } from '../src/core/vec.js';
 import { Pad, play, makeWorld, V, norm, dot, sub, scale, len } from './helpers.mjs';
@@ -148,7 +149,8 @@ test('with physics: thin-air worlds say why the ship runs fast, turns wide and w
     const each = () => {
       const err = (40 - sim.sh.altGround) * 0.4 - sim.info().ship.pitchDeg;
       pad.dy -= Math.max(-40, Math.min(40, (err * RAD / FEEL.mouseShip) * 0.12));
-      const n = sim.notice ? sim.notice.text : null;
+      // (as the keyboard reads it: a notice that names a control is written with tokens, src/core/words.js)
+      const n = sim.notice ? words(sim.notice.text) : null;
       if (n && n !== last) said.push(n);
       last = n;
     };

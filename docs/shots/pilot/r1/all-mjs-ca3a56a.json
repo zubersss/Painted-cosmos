@@ -1,0 +1,125 @@
+{
+ "label": "exported ca3a56a to /home/user/.pc-scratch/pilot/r1/rf/all/export",
+ "when": "2026-11-14T20:20:59.338Z",
+ "rows": [
+  {
+   "id": "unit",
+   "ok": true,
+   "sec": 118,
+   "detail": "pass 251, fail 0",
+   "what": "PILOT's unit tests (simulation, flight, camera, save, sketchbook, contract with the real worlds)"
+  },
+  {
+   "id": "physics-unit",
+   "ok": true,
+   "sec": 193,
+   "detail": "pass 325, fail 0",
+   "what": "PHYSICS' unit tests"
+  },
+  {
+   "id": "world-unit",
+   "ok": true,
+   "sec": 21,
+   "detail": "pass 43, fail 0",
+   "what": "PAINTER's unit tests"
+  },
+  {
+   "id": "coast",
+   "ok": true,
+   "sec": 9,
+   "detail": "2 of 2 stands PASS",
+   "what": "PHYSICS' coast report: the sea at both coast stands meets its marks (src/physics/coast.mjs)"
+  },
+  {
+   "id": "ghostfield",
+   "ok": true,
+   "sec": 0,
+   "detail": "6 of 6 runs all zeros (worst step loss 0.52 m/s)",
+   "what": "the explorer's ghost run through a boulder row, three places, two gravities: all zeros (review 7)"
+  },
+  {
+   "id": "static",
+   "ok": true,
+   "sec": 0,
+   "detail": "all rules hold",
+   "what": "the brief's static rules"
+  },
+  {
+   "id": "play-stub",
+   "ok": true,
+   "sec": 175,
+   "detail": "39 checks",
+   "what": "play-through on the stubs (walk, jetpack, board, orbit, land, step out)"
+  },
+  {
+   "id": "play-physics",
+   "ok": true,
+   "sec": 184,
+   "detail": "39 checks",
+   "what": "play-through on the stubs with PHYSICS"
+  },
+  {
+   "id": "trip-stub",
+   "ok": true,
+   "sec": 402,
+   "detail": "50 checks",
+   "what": "Earth, Mars, Saturn in one sitting, reload from the save (stubs)"
+  },
+  {
+   "id": "m3",
+   "ok": true,
+   "sec": 82,
+   "detail": "33 checks",
+   "what": "milestone 3: title card, sketchbook and sketches, vistas, gamepad, tiers"
+  },
+  {
+   "id": "lock",
+   "ok": true,
+   "sec": 45,
+   "detail": "14 checks",
+   "what": "pointer lock and the drag-to-look fallback"
+  },
+  {
+   "id": "touch",
+   "ok": true,
+   "sec": 775,
+   "detail": "222 checks",
+   "what": "touch: the stick, the look, the pinch and the buttons on three phone and tablet profiles, a desktop page; the presets, the buffer, the read-out, the upright views, fullscreen, the wake lock and the manifest; then the whole loop by touch (stubs), every string on the screen free of keys"
+  },
+  {
+   "id": "audio",
+   "ok": true,
+   "sec": 24,
+   "detail": "PASSED",
+   "what": "the sound, measured (no clipping, no clicks, no DC)"
+  },
+  {
+   "id": "painted-play",
+   "ok": true,
+   "sec": 334,
+   "detail": "39 checks",
+   "what": "play-through in the painted world"
+  },
+  {
+   "id": "painted-trip",
+   "ok": true,
+   "sec": 469,
+   "detail": "50 checks",
+   "what": "Earth, Mars, Saturn in the painted world, reload from the save"
+  },
+  {
+   "id": "painted-m3",
+   "ok": true,
+   "sec": 755,
+   "detail": "33 checks",
+   "what": "milestone 3's checks in the painted world"
+  },
+  {
+   "id": "painted-touch",
+   "ok": true,
+   "sec": 399,
+   "detail": "68 checks",
+   "what": "the whole loop by touch in the painted world (q0, 400x225, the iPhone 14 profile)"
+  }
+ ]
+}

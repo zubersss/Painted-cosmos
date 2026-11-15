@@ -1,0 +1,39 @@
+exported 8811ca4 to /home/user/.pc-scratch/pilot/r1/allrun/export
+07:13:50 unit ... pass (119 s) pass 216, fail 0
+07:15:49 physics-unit ... pass (190 s) pass 325, fail 0
+07:18:59 world-unit ... pass (17 s) pass 30, fail 0
+07:19:17 coast ... pass (9 s) 2 of 2 stands PASS
+07:19:25 ghostfield ... pass (0 s) 6 of 6 runs all zeros (worst step loss 0.52 m/s)
+07:19:26 static ... pass (0 s) all rules hold
+07:19:26 play-stub ... pass (179 s) 39 checks
+07:22:25 play-physics ... pass (187 s) 39 checks
+07:25:32 trip-stub ... pass (402 s) 50 checks
+07:32:14 m3 ... pass (82 s) 33 checks
+07:33:36 lock ... pass (50 s) 14 checks
+07:34:27 audio ... pass (22 s) PASSED
+07:34:49 painted-play ... pass (343 s) 39 checks
+07:40:32 painted-trip ... pass (481 s) 50 checks
+07:48:33 painted-m3 ... pass (618 s) 33 checks
+
+==============================================================================
+Painted Cosmos: every check, exported 8811ca4 to /home/user/.pc-scratch/pilot/r1/allrun/export
+==============================================================================
+PASS  unit            119 s  pass 216, fail 0
+PASS  physics-unit    190 s  pass 325, fail 0
+PASS  world-unit       17 s  pass 30, fail 0
+PASS  coast             9 s  2 of 2 stands PASS
+PASS  ghostfield        0 s  6 of 6 runs all zeros (worst step loss 0.52 m/s)
+PASS  static            0 s  all rules hold
+PASS  play-stub       179 s  39 checks
+PASS  play-physics    187 s  39 checks
+PASS  trip-stub       402 s  50 checks
+PASS  m3               82 s  33 checks
+PASS  lock             50 s  14 checks
+PASS  audio            22 s  PASSED
+PASS  painted-play    343 s  39 checks
+PASS  painted-trip    481 s  50 checks
+PASS  painted-m3      618 s  33 checks
+------------------------------------------------------------------------------
+ALL 15 PASSED
+Not checked here, and not checkable in this sandbox: frame rate on a real GPU, a real mouse
+under pointer lock, a real gamepad, how the sound sounds.

@@ -1,0 +1,12 @@
+{
+  "name": "Painted Cosmos",
+  "short_name": "Painted Cosmos",
+  "description": "A watercolour to walk into: walk, fly and land on every world of a painted solar system.",
+  "start_url": "../../index.html",
+  "scope": "../../",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#f4efe4",
+  "theme_color": "#f4efe4",
+  "icons": []
+}

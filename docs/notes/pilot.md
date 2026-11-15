@@ -2,6 +2,742 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, RELEASE 1, PILOT RE-FIX pass (the verifier's findings on the lane; started 18:00 UTC 2026-11-14; kept current)
+
+**Read this first.** The lane's commits were checked by an independent verifier; this pass fixes exactly what it did not
+accept, each with proof. Scratch: `/home/user/.pc-scratch/pilot/r1/rf/` (`mkex.sh`: a clean export of HEAD with PILOT's
+working files; `mapsweep.mjs`: the touch chart's names over 200 clock times in the browser; `evalnames.mjs`,
+`unclear3.mjs`: the same in Node, old and new; `load.mjs`; the logs and frames named below; the exports themselves are
+deleted). Commits: `64f447a` (the code and tests of all three items), `ca3a56a`, `7fece2f` and the last one (notes and
+evidence only). First commit's parent: `3cd414b`.
+
+**State (20:50 UTC, DONE): all three fixed and committed in `64f447a`** (checks on a clean export before it: unit 251,
+world 43, physics 325, coast 2 of 2 PASS, ghostfield 6 of 6 all zeros, the real game loads with no console error and
+`fallback` empty). **`node tests/all.mjs --export` on `ca3a56a` (that code and the notes) in a clean tree: ALL 17
+PASSED** (unit 251, physics 325, world 43, coast 2 of 2, ghostfield 6 of 6 zeros, static, play-stub 39, play-physics
+39, trip-stub 50, m3 33, lock 14, touch 222, audio, painted-play 39, painted-trip 50 (it met "Too steep" once and flew
+on), painted-m3 33, painted-touch 68; table `docs/shots/pilot/r1/all-mjs-ca3a56a.txt` and `.json`). Its painted-touch
+map at 400x225 (`rf/all/painted-touch/loop-iphone14-painted-map.jpg`, OPENED): all ten names apart, each by its dot,
+Mars ringed; its touch map at the iPhone 14's size (`rf/all/touch/loop-iphone14-map.jpg`, OPENED): the same. In the
+painted-touch run the 'a place to land' label over Mars lay on no control and on 1899 px2 of the throttle gauge (of its
+3850): see the judged item below. **Then three plain painted trips** (the verifier's command, `node tests/trip.mjs
+--query 'scale=0.5&quality=0' --w 400 --h 225`, on a clean export of the final code, `rf/ptrip-1..3.log`): PASSED,
+PASSED, PASSED (401, 411, 354 game s; none of the three happened to meet a landing given back or "Too steep": the
+forced runs above are what run that path). With all.mjs's own painted-trip: 4 of 4 plain, and the forced one. The
+scratch exports are deleted. Nothing of PILOT's is half-done or uncommitted. Items:
+- **RF-A, W1.2's gate (painted-trip 2 of 3 on 3cd414b):** fixed in the tests (`tests/trip.mjs`, `tests/touch.mjs`,
+  `tests/browser.mjs` giveLandingBack, `tests/landingback.test.mjs`). The cause, as the verifier said: a landing that
+  BEGAN and was then given back by the game ("No level ground here", `src/ship/flight.js` stepLanding's 'blocked',
+  `src/core/sim.js` line 488) was waited on for 90 s. Now the scripts wait for the landing to END (`state !== 'LANDING'`)
+  and, if it was given back, fly on (4 s full throttle, nose level) and come down to the prompt again, as on "Too steep".
+  `--block-landings N` gives the first N landings (on each world, in the trip) back on purpose, the way the game does,
+  so the path runs every time it is asked for. Proof: the code before the fix (3cd414b's trip.mjs) with the same
+  injection FAILS exactly as the verifier's run 2 did: "landed on mars" after the 90 s wait, then "standing on", "the
+  sketchbook has", 10 failures in all (`rf/trip-before-inject.log`); with the fix, on a clean export of the final
+  code: the stub trip with one landing given back on each world PASSED (`rf/trip-stub-block1.log`), the painted trip
+  (q0, 400x225, the all.mjs command plus `--block-landings 1`) PASSED: given back over Mars and over Saturn, flown on,
+  landed 14 s and 40 s later, 50 checks (`rf/ptrip-block.log`; its Saturn frame `rf/ptrip-block/m2-saturn.jpg`
+  OPENED: the explorer on Saturn, the ship 12 m off); the touch loop on stubs (iPhone 14) with its landing over Mars
+  given back PASSED (`rf/touch-loop-block.log`; the label over Mars on no control, on no gauge).
+- **RF-B, the upright field on a desktop window:** the plan asks it of a tablet held upright, so the game now asks it only
+  on the phone and tablet presets (`Game.fieldOfView`, `src/core/game.js`); a desktop window keeps 58 degrees whatever
+  its shape, as before release 1 (the verifier: 600x900 gave 81.8). Unit: `tests/preset.test.mjs` (the desktop at
+  600x900 keeps every field; the tablet and the phone are widened as before); browser: `tests/touch.mjs --part platform`
+  on the desktop now resizes to 600x900 and checks the field. Run on the export (`--platform-devices
+  desktop,ipadpro11-up`, `rf/platform.log`): PASSED; "a desktop window of 600x900: the vertical field 58.00 degrees (the
+  view's own 58.00; 58.00 at 1920x1080), not widened" (3cd414b: 81.8, the verifier's `desk/head.json`); the iPad held
+  upright still sees 60.0 degrees across (vertical 79.16). The real game (q0) loads on a desktop page and on the iPhone
+  14 profile with no console error and `fallback` empty (`rf/load-desktop.log`, `rf/load-iphone.log`).
+- **RF-C, the touch chart's names at 400x225:** fixed (`src/ui/layout.js` placeChartNames and chartNameBox,
+  `src/ui/map.js` chartDots / chartNameList, `tests/chartnames.test.mjs`). The cause: with all four sides of its dot
+  taken a name fell back to its first side, over whatever was there, and its test box missed the halo and the
+  descenders by about 2 px. Now: the box is the ink as drawn (checked against letterPath's own points); a name tries its
+  four sides, then 16 directions on six rings out to 32 px from its dot, only where it lies nearer the EDGE of its own
+  dot than of any other (by 3 px beyond 9 px off its own: a name is read as the dot's it lies by; a try without this
+  rule put 'Jupiter' by Mercury, and one measured to the dots' centres put 'Uranus' nearer Pluto's dot); a name in the
+  way may move to another clear place; on a chart under 260 px tall (a window under about 300 px: smaller than any
+  phone held sideways; the painted runs' 400x225) a crowded name may be lettered down to 9 css px; with no room even
+  then it is left off (its dot stays, a tap names it in the line), never the chosen world's name or yours (those may go
+  out to 54 px and, with nothing better, lie where another dot is as near). Placement is cached while the dots stand
+  still (they creep a fraction of a pixel a second); 2-5 ms a placement in Node.
+  **Measured** over 400 clock times on the real chart (the unit test; scratch `evalnames.mjs` / `unclear3.mjs`): names
+  on names or on dots in 0 layouts at 212x189 (the chart of the 400x225 window), 482x300 (iPhone 14), 561x320 (Pixel 7)
+  and 1138x678 (iPad Pro 11), against names on names in every layout with the old placement (box test: 1431 pairs at
+  212x189, 202 at the iPhone 14). The cost: at the phones and the tablet every name at its full size, one name left off
+  where dots clump (two worlds drawn on one spot, three outer worlds in a knot) in 19 of 400 layouts on the iPhone 14,
+  10 on the Pixel 7, 3 on the iPad; at 212x189, 457 names of 4000 left off (280 layouts, at most 5 in one) and about
+  1000 lettered between 9 and 10.25 css px: names apart, each by its own dot, some left off, rather than all ten in a
+  heap. **Browser sweep** (`rf/mapsweep.mjs`, 200 clock times per profile, the ink measured in the page with
+  letterPath, halo included; `rf/sweep/head2.log` on 3cd414b, the final version's log below): 3cd414b: names on names
+  404 pairs at 400x225, 25 on the iPhone 14, 12 on the Pixel 7, 4 on the iPad; names on another world's dot 494 / 24 /
+  14 / 10; names off the chart 261 / 6 / 3 / 1. `64f447a` (`rf/sweep/fix3.log`): names on names 0 / 0 / 0 / 0, on another
+  world's dot 0, touching their own dot 0, off the chart 0; names left off 265 in 158 of 200 layouts at 400x225, 16 in
+  15 on the iPhone 14, 5 on the Pixel 7, 2 on the iPad; sizes at 400x225: 1298 at 11.5, 216 at 10.25, 221 at 9; no page
+  error. Frames OPENED, the same clock before and after: `rf/sweep/head2-iphone14-400.jpg` ('Moon' over 'Uranus',
+  'Jupiter' on Earth's dot) and `fix3-iphone14-400.jpg` (nine names apart, each by its dot, 'Uranus' at 9 px,
+  Jupiter's name left off); `head2-iphone14.jpg` and `fix3-iphone14.jpg` (all ten names, apart, in both).
+- **The 'a place to land' label on the throttle gauge at 400x225: judged, not changed.** The labels' rule
+  (`src/ui/layout.js` placeMust, the pre-ship R3 ruling) keeps every label off a control on a touch screen (the slips,
+  the tabs, the buttons: hard) and lets a label that must show lie on as little of a gauge or a notice (soft) as it can
+  when no clear place lies within 40 px, rather than float away from its mark. In the 400x225 window the right column
+  is the gauge (y 40-62), the 'Land here' slip (y 90-135) and the three buttons: the 28 px between the gauge and the
+  slip, less the 4 px the rule keeps round each, cannot hold a two-line label 40 px tall, so it takes the gauge's end:
+  the rule doing what it was ruled to do, in a window smaller than any phone. At the phones' and the tablet's own
+  sizes the label lies clear (the verifier's own frames `loop-iphone14-land-here.jpg`, `loop-pixel7-land-here.jpg`,
+  opened). `tests/touch.mjs` (the loop, over Mars) now measures the labels as drawn and fails if one lies on a control;
+  the cover of a gauge is recorded (`landHereLabels` in the run's summary). The arrow on the 'Land here' slip predates
+  the lane (the verifier found it in an older desktop frame): not this pass's.
+- **The 1280x720 screenshot timeout:** not attributed to PILOT by the verifier and not investigated here (the page
+  itself reported started, no console error, fallback empty).
+
+**Rulings of this pass (logged):** (1) The upright field is gated on the preset rather than kept for every tall window
+and the comment corrected: the plan asks it of a tablet held upright and the lane claimed every desktop window
+unchanged; a wider field for a tall desktop window may well be better, but that is a change for the lead to ask for.
+(2) On the touch chart a name that has no clear place by its own dot is left off rather than drawn on another name or
+by another world's dot (the desktop's marks already do this: "a world whose name has no room keeps its ring"); the
+chosen world's name and the name of the world you are at always show. (3) Names on a chart under 260 px tall may be
+lettered down to 9 css px (the 11 px floor is W3.3's at the phones' and the tablet's sizes; the help card is already
+scaled to fit under 300 px). (4) The 'a place to land' label on the gauge at 400x225 is the labels' rule working as
+ruled (R3), in a window smaller than any phone: left, and now measured.
+
+**For other roles:** nothing to do. (For the verifier: `node tests/trip.mjs --query 'scale=0.5&quality=0' --w 400 --h
+225 --block-landings 1` runs the given-back path on both worlds every time; `node tests/touch.mjs --part loop
+--block-landings 1` the same by touch; the "before" was 3cd414b's tests/trip.mjs with one `giveLandingBack(page)` call
+added after the E loop.)
+
+## Hand-over, RELEASE 1, PILOT lane part 3: W3.3 (phone layouts and words), W3.4 (platform), W3.5 (the phone preset) (started 12:20 UTC 2026-11-14; kept current)
+
+**Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3" items 3, 4, 5. First commit's parent:
+`fb40efe` (PAINTER's W2.4). Scratch: `/home/user/.pc-scratch/pilot/r1/p3/` (`look.mjs`, `load.mjs`, `slip.mjs`, `mkex.sh`:
+a clean export of HEAD with PILOT's working files laid over it). Parts 1 and 2 (W1, W3.1, W3.2) are below, done.
+
+**State (15:30 UTC): W3.3, W3.4 and W3.5 DONE and committed; the README has its section for phones and tablets.
+`node tests/all.mjs --export` on `c426212` (a clean tree): ALL 17 PASSED** (unit 244, physics 325, world 43, coast 2 of
+2 stands, ghostfield 6 of 6 all zeros, static, play-stub 39, play-physics 39, trip-stub 50, m3 33, lock 14, touch 220
+checks in 840 s (input on three profiles and a desktop, the platform part on six, the loop on stubs), audio,
+painted-play 39, painted-trip 50, painted-m3 33, painted-touch 67; table `docs/shots/pilot/r1/all-mjs-c426212.txt`).
+Its painted-touch frame of the map at 400x225 (`touch-w33-map-400x225-c426212.jpg`, OPENED): the names lie apart with
+the narrower column (`c426212`'s follow-up). Nothing of PILOT's is half-done or uncommitted. Commits of this part:
+
+| Commit | What |
+| --- | --- |
+| `ac0a84a` | W3.3: `src/core/words.js` (one `name(code)`, sentences with tokens lettered for keys, touch or pad), the touch map, book and help card, the title card inside the top edge, the short sketch slip; `tests/words.test.mjs` |
+| `8b050e3` | W3.4 and W3.5 together (shared `main.js` resize and tick): `src/core/preset.js`, `src/core/platform.js`, `src/ui/manifest.webmanifest`, the metas, the upright slip and field, the read-out's device line; `tests/preset.test.mjs`, `tests/platform.test.mjs`, `tests/touch.mjs --part platform`; README "Phones and tablets"; fixes W3.3's test measure |
+| `c426212` | W3.3 follow-up: the map's column narrower in windows under 480 px wide |
+
+**The acceptance, item by item** (details and every number in the sections below):
+- **W3.3:** title card top **8.0** css px on the iPhone 14 and the Pixel 7 (**-13.1** before); smallest lettering on
+  the map, the book and the help card **11.50** css px (iPhone 14, Pixel 7, iPad Pro 11; 6-7 before); Earth and the
+  Moon **46** css px apart (8.5 before), a world taken within 26 css px; the book's strip **44** px (15); no string on
+  the screen by touch names a key or the mouse (every stage of the loop; the title card says "tap to begin"); the
+  desktop's strings word for word as before (`tests/words.test.mjs`, 21 sentences).
+- **W3.4:** the static rules pass; no console error in any run (every unsupported call is silent); iPad Pro 11
+  upright **60.0** degrees across (42.3 before); an upright phone shows the slip and waits under it; the manifest is
+  read by Chromium with no error.
+- **W3.5:** iPhone 14 landscape buffer **937x425 = css x 1.25** (1125x510 before), tier 1; iPad Pro 11 **1.55 MP**
+  (2.24 before); a desktop 1920x1080 window keeps **1920x1080**; the read-out names the preset, the AA and the depth.
+- **The loop by touch** (walk to the ship, board, lift off, climb, map, Mars, set course, pulse, descend, land, step
+  out, book, help) on the iPhone 14 profile: stubs **PASSED**, painted world q0 400x225 **PASSED**, with every W3.2 and
+  W3.3 check at every stage.
+
+**Not done, and why** (also in the sections below):
+- In a window under 300 css px tall (smaller than any phone held sideways at full screen; the painted runs' 400x225)
+  the help card is scaled to fit (6.8 css px measured) and the book's page is cramped under a four-line foot: the 11 px
+  floor is held, and tested, at the phones' and the tablet's own sizes. Paging the help card for such windows: left.
+- The ship's edge arrow can still sit beside the "Board ship" slip at the right edge (W3.2's note): not this lane's
+  items; left.
+- Only Chromium's emulation was run: Safari's fullscreen (none on an iPhone, an iPad's), the sideways lock, the wake
+  lock (headless Chromium refuses it), the audio session (Safari only), the Home Screen, the touch feel and a phone's
+  frame rate are unverified (README "Phones and tablets"; plan section 6 asks the owner).
+
+**For other roles:**
+- PAINTER: the read-out's AA comes from `painter.info.aa` (W2.5's samples): it shows `msaa 4x` / `none`. Nothing to do.
+- Coordinator: the manifest is `src/ui/manifest.webmanifest` because `tools/commit.sh pilot` commits no new root file;
+  to have it at the root, add `manifest.webmanifest` to pilot's paths in `tools/commit.sh` (then PILOT moves it, sets
+  `start_url`/`scope` to `./` and changes the link in `index.html`). Optional: `tools/serve.mjs` could serve
+  `.webmanifest` as `application/manifest+json` (Chromium parses it anyway: checked).
+
+**For the next PILOT part (W6):** the preset is `src/core/preset.js` (`PRESETS`, `choosePreset`, `bufferSize`): W6.2's
+0.75 floor and even pacing go with it; the read-out's device line is `Game.deviceText()`; the touch test's platform
+part reads `__pc.info().device` and `.platform`.
+
+### W3.3 phone layouts and words
+
+- **Files:** `src/core/words.js` (new: `name(code, mode)` and `words(text, mode)`, the one place a control is named;
+  modes `keys` (the desktop, every string as it always read), `touch` (no key, no mouse) and `pad`), `src/core/sim.js`
+  (the said strings that name a control written with tokens: `'Turn stopped: {KeyF} turns onto the course again'`;
+  `info().notice` gives the keys form), `src/core/game.js` (`wordMode()`, `say()`: notices, the hint, the card's
+  status and the sketch slip lettered for the hand on the game; `hud.setWords`), `src/core/input.js` (`lastDevice`:
+  keys or pad), `src/ui/hud.js` (the title card's line and status by mode, the help card's touch drawing, the title
+  card kept inside the top edge, the help card a sheet under the tabs that a tap puts away, the sketch slip's 'how'
+  line apart), `src/ui/map.js` (the touch chart: fills the sheet, drawn at its own size, names 11.5 css px or more
+  placed off each other, a world taken within 26 css px, a moon 46 css px from its planet; `spotOnScreen`,
+  `labelSizes`), `src/ui/book.js` (touch: nothing under 11.5 css px, the tabs a 44 px strip beside the title that
+  slides, the page scrolls, tiles sized to the page), `src/ui/paint.js` (`data-size` on every lettering, `measureInk`,
+  `touchIconSvg`), `src/ui/theme.css` (the touch sheets, the touch help card, the short sketch slip), `src/main.js`
+  (`{click} to begin`, the sheets' word mode), `tests/words.test.mjs` (new, 7), `tests/guards.test.mjs` (reads the
+  keys form of a notice), `tests/touch.mjs` (the W3.3 checks below).
+- **How it plays by touch:** the title card says "tap to begin" and "the left thumb walks · a drag on the right
+  looks / tap "Board ship" at the ship · ? shows the controls", and sits inside the top edge; the map fills the screen
+  (on a phone held sideways the chart on the left, its title, its line and the 'set course' slip in a column on the
+  right), names lettered 11.5 css px or more and kept off each other, Earth and the Moon 46 css px apart; the
+  sketchbook fills the screen, its name and the worlds' tabs in one 44 px strip along the top (sliding where they do not
+  fit), the page under it; the help card is the touch controls drawn small, each with what it does, a sheet under the
+  tabs that a tap anywhere puts away; every notice that names a control names the touch control ("Hold brake to slow
+  it", "Turn stopped: the pulse slip turns onto the course again"), and what has no touch control (the stroll, the
+  mouse's capture) is not said. A new page's slip on a short screen is small (the sketch beside its name, the 'how to
+  open the book' line left out; words only under 300 px). The desktop reads every string as before.
+- **Acceptance, measured** (`node tests/touch.mjs --part all` on a clean export of `fb40efe` with the W3.3 files:
+  **PASSED**, 1200 s, log `/home/user/.pc-scratch/pilot/r1/p3/touch-all.log`; W3.1/W3.2's checks all still pass):
+  - **Title card top** 8.0 css px on the iPhone 14 and on the Pixel 7 (115 on the iPad Pro 11); on a clean export of
+    `fb40efe` the same check FAILS: **-13.1** (`touch-before.log`).
+  - **Smallest lettering** on the map **11.50** css px (12 strings, the names on the chart included), on the book
+    **11.50** (16), on the help card **11.50** (8), measured on the screen (cap height `data-size` x the svg's scale) at
+    the loop's stages on the iPhone 14; the same on the Pixel 7 and the iPad Pro 11 (scratch run `look.mjs`: map 11.5,
+    book 11.5, help 11.5; names 11.5, 11.5, 15.4). Before: about 6 css px on the map, 6-7 in the help card, 4-6 in the
+    book (the mobile audit's frames; the sheets were scaled 0.58-0.65).
+  - **Earth and the Moon** 46.0 css px apart on the chart (8.5 before); a tap 18 css px off the Moon's dot takes the
+    Moon; a world is taken within 26 css px of its dot (MAP_TOUCH.hit; the plan: 22 or more).
+  - **The book's tab strip** 44 css px tall (15 before).
+  - **No touch-mode string names a key or the mouse:** every lettered string on the screen checked at all 14 stages of
+    the loop (14 to 23 strings a stage) and the title card on three profiles: none. Before (`fb40efe`): the title card
+    by touch says "click to begin" and "W A S D walk · the mouse looks / E boards the ship · H shows every key" (FAIL).
+    Unit: `tests/words.test.mjs` scans every sentence the source puts on the screen (say, notices, the hint, the
+    card's status, the mouse's messages, the sheets' lines): by touch none names a key (or it is not said).
+  - **Desktop strings unchanged:** `tests/words.test.mjs` holds 21 sentences, as the game now writes them, to the exact
+    desktop strings of before (`'Turn stopped: F turns onto the course again'`, the title card's line, "click to
+    begin", "H closes this card", the map's and the book's lines, the mouse's messages), and the AZERTY letters; the
+    desktop page of `--part input` (no touch layer, pointer lock as before); `tests/layout.test.mjs` unchanged.
+  - Frames, OPENED: the map (chart left, column right, Mars chosen), the book, the help card's drawing and the title card
+    on the iPhone 14 (`look.mjs`, scratch); the painted world's title card by touch on the iPhone 14 profile and the
+    desktop's at 640x360 ("click to begin", the keys) (`load-w33-*.png`); the compact sketch slip on the iPhone and at
+    400x225 (`docs/shots/pilot/r1/touch-w33-sketch-slip.jpg`; first try: the name ran off the slip, fixed by wrapping
+    it to its column: that fix and the words-only slip under 300 px are in the W3.4 commit). Sheets in the repository:
+    `docs/shots/pilot/r1/touch-w33-iphone14-sheets.jpg` (title, map, book, help on the iPhone 14),
+    `touch-w33-pixel7-ipad.jpg` (the Pixel 7's map and help card, the iPad Pro 11's map and book), both OPENED; every run's
+    numbers `touch-w33-runs.json`.
+- **Checks on a clean export of `fb40efe` with the W3.3 files:** unit **234** (227 + words 7), physics 325, world 38,
+  coast PASS at both stands, ghostfield 6 of 6 all zeros, static rules hold; the real game (q0) loads on the iPhone 14
+  profile (touch words) and on a desktop page (keys words) with no console error and `fallback` empty.
+- **Rulings (W3.3):** (1) "lettering" is measured as the hand lettering's cap height (`SIZE`, css px) times its scale on
+  the screen, the unit the mobile audit's "about 6 px" used; 11 css px of cap height is about a 15 px font. (2) The
+  11 px floor holds on touch screens (the sheets are laid out for a phone there and never scaled down); the desktop's
+  sheets are as they were (desktop unchanged). (3) "A drawing of the touch controls": each control drawn small (the
+  stick's ring with a thumb, a finger dragging, a pinch, the round buttons, a slip, the tabs) beside what it does, as
+  the desktop card sets a key beside its action; a drawing of a whole screen with labels did not fit 11 px lettering on
+  a phone. (4) The help card on touch is a sheet that takes the finger (a tap on it puts it away) and lies under the
+  tabs (it lay over the VIEW tab); the title card is left to the fingers' first tap as before. (5) A world is taken
+  within 26 css px (the desktop's 26 chart units) and Earth's Moon is drawn 46 css px off it on touch (the map is a
+  schematic: a moon's place off its planet was never to scale). (6) `name(code)` has a pad mode too (the pad's
+  buttons by their standard names, used once the pad is the last hand on the game); the title card is lettered before
+  any pad is touched, so the desktop's first words are always the keys'. (7) A sentence about a control the fingers do
+  not have (the stroll on C, the mouse's capture) is not said by touch at all. (8) The 11 px floor is held at the phones'
+  and the tablet's own sizes (iPhone 14 750x340, Pixel 7 863x360, iPad Pro 11; a phone held sideways at full screen
+  is 300 css px tall or more). In a window under 300 px tall (the painted runs' 400x225) the map and the book still
+  letter 11.5 px (measured: 11.50 and 11.50 there), but the help card's seven rows cannot fit at that size without
+  scrolling or paging, so it is scaled to fit as on a desktop (6.8 css px measured at 400x225); the test records it
+  there and does not judge it. Paging the help card for very short windows is left (not asked by the plan).
+
+### W3.4 platform and W3.5 the phone and tablet preset, part 1
+
+- **Files:** `src/core/platform.js` (new: fullscreen and then the sideways lock on the first touch, asked once, every
+  refusal silent; the Screen Wake Lock while playing by touch, asked again when the page comes back;
+  `navigator.audioSession.type = 'playback'`; iOS's "For the whole screen: Share, then Add to Home Screen" once ever,
+  8 s into the game, remembered under `painted-cosmos.home-screen-hint`; `?fullscreen=0` asks nothing), `src/ui/manifest.webmanifest`
+  (new: relative `start_url`/`scope` `../../`, `display: fullscreen`, `orientation: landscape`, the paper's colour,
+  `icons: []`), `index.html` (`theme-color`, `mobile-web-app-capable`, the `apple-mobile-web-app-*` metas, the manifest
+  link), `src/player/camera.js` (`portraitFov`, `horizontalFov`: held upright the view keeps 60 degrees across),
+  `src/core/game.js` (the field from `portraitFov`; `repaintFitted`; the read-out's `device` line), `src/core/preset.js`
+  (new: `choosePreset`, `bufferSize`, `PRESETS`), `src/main.js` (the preset sizes the buffer and starts the tier;
+  `?preset=`; the platform; a phone held upright: the slip, the game waits, the picture laid again under it),
+  `src/ui/hud.js` (`setUpright`: the slip "turn the phone sideways to play" with a phone drawn turning),
+  `src/ui/theme.css` (the slip; room for the read-out's sixth line), `tests/preset.test.mjs` (4),
+  `tests/platform.test.mjs` (6), `tests/touch.mjs --part platform`.
+- **How it plays:** on a phone or a tablet the first touch asks for the whole screen and then for the screen kept
+  sideways (Android, an iPad; asked once, a refusal says nothing); an iPhone has no whole screen for a page, so 8 s into
+  the first game it says once "For the whole screen: Share, then Add to Home Screen" (not from the Home Screen, not when
+  the whole screen was given); the screen is kept awake while the game is played by touch; Safari's audio session is
+  set to playback (sound with the silent switch on, iOS 17+). A phone held upright: a slip "turn the phone sideways to
+  play" (a phone drawn turning) over the picture, the game waiting under it (no time, no sound; the picture laid again
+  at the new size), and on with it when turned back. A tablet plays upright, its view keeping 60 degrees across. The
+  picture: a phone (coarse pointer, touch points, short screen side under 500 css px) draws at 1.25 px per css px and
+  starts at tier 1; a tablet at 1.25 and at most 1.6 MP, tier 2; the desktop as before (1.5, 3.7 MP, tier 2). The
+  read-out's last line: `device phone   937x425 (1.25 px per css px of 3.00)   AA none   depth reversed`.
+- **Acceptance, measured** (`node tests/touch.mjs --part platform` on a clean export of `ac0a84a` with these files;
+  first run `touch-platform.log`: 4 profiles PASS, 2 checks failed and were fixed (below); the iPhone profiles again,
+  `touch-platform2.log`: PASSED):
+  - **iPhone 14 landscape: buffer 937x425 = css size x 1.25** (1125x510 before), the phone preset, tier 1; **Pixel 7:
+    1078x450** (1294x540 before), tier 1; **iPad Pro 11: 1492x1042 = 1.55 MP** (1791x1251 = 2.24 MP before), tier 2;
+    **a desktop 1920x1080 window keeps 1920x1080**, tier 2. The read-out names the preset, the AA (`none` today: PAINTER's
+    MSAA, W2.5, can say its mode through `painter.aaMode`) and the depth (`reversed` in this Chromium).
+  - **iPad Pro 11 upright: 60.0 degrees across** (vertical 79.16 at aspect 0.698; 42.3 before). Frame OPENED:
+    `docs/shots/pilot/r1/platform-w34-upright.jpg` (right: the upright iPad sees the ship beside the explorer).
+  - **Phone upright: the slip shows** ("turn the phone sideways to play", 333x116 css px) and the game waits under it
+    (game clock 8.05 -> 8.05 s over 2.5 s); turned sideways, the slip goes and the clock runs (8.05 -> 9.57). Frame
+    OPENED: the same sheet, left.
+  - **The manifest:** Chromium's own `Page.getAppManifest` finds `src/ui/manifest.webmanifest` and parses it with no
+    error; no icon files; relative addresses. **The static rules still pass.**
+  - **Fullscreen and the lock:** asked at the first touch on the Pixel 7 and the iPad (headless Chromium grants both,
+    the window keeps its size); on the iPhone profiles (with an iPhone's lack of element fullscreen modelled: no
+    `requestFullscreen`, `fullscreenEnabled` false) `unsupported`, nothing said, and the Home Screen hint shows ("For
+    the whole screen: Share, then Add to Home Screen"). **The wake lock:** asked on every touch profile (headless
+    Chromium refuses it: `refused`, silent). **The desktop asks for nothing.** **No console error in any run.**
+  - Unit: `tests/platform.test.mjs` (6: the requests in order, once; refusals, throws and missing APIs silent and not
+    asked again, no rejection left unhandled; the wake lock asked again when the page comes back; the audio session;
+    the hint once ever, 8 s in, never on Android, from the Home Screen or with the whole screen given),
+    `tests/preset.test.mjs` (4: the presets, the buffers, main.js wired to them, the upright field). Both fail on the
+    commit before (their modules do not exist there).
+  - **Fixed with this commit, from W3.3's commit (`ac0a84a`):** its `tests/touch.mjs` was changed after its proof run (to
+    read lettering without `data-size` on the old code, for the before run) and then also measured the close corner's
+    drawn cross as a lettering of size 0, so its loop failed its three lettering checks falsely (the W3.3 proof run used
+    the version before that change). The measure now skips drawings (no `desc`). Also with this commit (W3.3's): the
+    sketch slip's name wrapped to its own column on a short screen (it ran off the slip), words only under 300 px, the
+    hint hidden under it there.
+  - First run's two failures, fixed: (1) on the iPhone profile Chromium granted fullscreen, so the hint was rightly not
+    needed but the test wanted it: the iPhone profiles now model Safari's missing element fullscreen, and the hint rule
+    says "not needed" when the whole screen was given (it had said "standalone"); (2) the upright phone's test could not
+    turn the window while it was fullscreen: the same model.
+  - **Before** (the same platform part against a clean export of `d22ea35`, the commit before this one): FAILS 21 checks
+    (`touch-platform-before.log`): iPhone 14 buffer **1125x510**, tier 2, no device line, no manifest; iPad Pro 11
+    upright **2.24 MP**, **42.3 degrees across**; an upright phone: no slip, the game runs on (9.55 -> 10.55 s).
+  - **The loop by touch with every check (W3.2's and W3.3's) on this code:** stubs, iPhone 14: **PASSED** (363 s,
+    `touch-loop3.log`); **the painted world at q0 400x225: PASSED** (439 s on a clean export of `d22ea35` with these
+    files, PAINTER's W2.5 included: a 67 s pulse, arrived 6.7 km off Mars, landed by touch, no console error, `fallback`
+    empty; `touch-painted2.log`). Its frames OPENED: `docs/shots/pilot/r1/touch-w345-painted-loop.jpg` (landed, flying,
+    the map, "Pulse to Mars", "Land here", the book, the help card, "Board ship" on Mars). Seen there, at 400x225 only
+    (a window smaller than a phone at full screen): the map's chart is small beside its 200 px column and its names
+    crowd (Moon on Neptune, Jupiter on Mercury); the book's page has room only for the world's name under a four-line
+    foot; the help card is scaled to fit (6.8 px). The map's column is narrower in windows under 480 px wide (the
+    commit after: 140 px), and the chart then has room for its names (stubs at 400x225, frame opened in scratch:
+    `look400/`); proved by all.mjs's painted-touch step.
+- **Checks on a clean export of `d22ea35` with these files:** unit **244** (234 + preset 4 + platform 6), physics 325,
+  world 43, coast PASS at both stands, ghostfield 6 of 6 all zeros, static rules hold; the painted loop's page: no
+  console error, `fallback` empty. Numbers of every run: `docs/shots/pilot/r1/touch-w345-runs.json`.
+- **Rulings (W3.4, W3.5):** (1) The manifest lives in `src/ui/` (not the root): `tools/commit.sh pilot` commits no
+  new root file; its `start_url` and `scope` are `../../`, relative, so GitHub Pages' sub-path works. If the
+  coordinator wants it at the root: move it, set both to `./`, and change the link in `index.html` (pilot's file).
+  (2) Fullscreen and the lock are asked for on the first touch only where the touch layer is up (never on a desktop),
+  once; `?fullscreen=0` turns it off. (3) The wake lock is asked for only while playing by touch (a desktop keeps its
+  screen awake by its own input). (4) An upright phone's game waits only once the first view is ready (it loads under
+  the slip); a tap there is not dropped from `input.used` (it begins the game once turned), but its keys are. (5) The
+  upright field keeps 60 degrees across by widening the vertical view in proportion (the ship's wider views at speed
+  widen too); it touches nothing wider than about 1.04 to 1. (6) The phone/tablet split uses the screen's short side
+  (stable when turned), the window's where there is no screen; the plan's "coarse pointer" also needs touch points
+  (a coarse pointer without touch is a TV remote, the desktop). (7) The read-out's AA: PAINTER's `painter.info.aa`
+  (the scene pass's samples, W2.5: `msaa 4x` on a desktop at tiers 2 and 1, `none` on touch and at tier 0) or a
+  `painter.aaMode` if PAINTER ever adds one.
+- **README:** a section "Phones and tablets" (the whole screen, upright, the picture's preset, sound, a table of the
+  touch controls, what was never tried), the read-out's sixth line, `?preset=` and `?fullscreen=0`.
+
+## Hand-over, RELEASE 1, PILOT lane part 2: W3.1 (gesture guard, touch input) and W3.2 (touch HUD) (started 10:00 UTC 2026-11-14; kept current)
+
+**Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W3". This part is W3.1 and W3.2; W3.3
+(phone layouts and words), W3.4 (platform) and W3.5 (the phone preset) are part 3. First commit's parent: `0902c56`.
+Scratch: `/home/user/.pc-scratch/pilot/r1/touch/`.
+
+**State at the end of this part (about 11:58 UTC): W3.1 DONE (`290780b`), W3.2 DONE (`dfb4701`, its last proofs in
+the notes commit after it).** Nothing of PILOT's is half-done or uncommitted. Commits of this part: `290780b` (W3.1),
+`dfb4701` (W3.2), and a notes-only commit with the final runs.
+
+**For part 3 (W3.3 phone layouts and words, W3.4 platform, W3.5 the phone preset):** the touch layer is in
+`src/core/touch.js` (`TOUCH` holds every feel number), the touch HUD in `src/ui/hud.js` (`setTouch`, `control`,
+the tabs, the slips in `setPrompt`) and at the end of `src/ui/theme.css` (all touch rules are under `.pc-hud.pc-touch`
+or `.pc-touchui`, so the desktop is untouched). `hud.touchShown` / `__pc.touch.shown` say whether it is up. The
+browser test is `tests/touch.mjs` (`--part input|loop|all`, `--painted`); its `measure()` checks hit areas and the
+subject box at each stage and is where W3.3's lettering sizes can be measured too. Known, left for W3.3: the touch
+words (title card "click to begin", the help card's keys and "H closes this card", the map's "click a world, or use
+the arrow keys", the book's "arrow keys turn the page, B closes"), the map's world radius and names (Earth and the
+Moon 8.5 css px apart on the iPhone), the book's tab strip (15 px tall), the help card partly over the VIEW tab at
+the iPhone's size, the ship's edge arrow beside the "Board ship" slip at the right edge.
+
+### W3.2 the touch HUD: prompts become buttons (DONE)
+
+- **Files:** `src/core/state.js` (`promptFor` gives each prompt its action's `code`/`code2`: KeyE, Space, KeyF; the
+  lettered `key` unchanged), `src/ui/hud.js` (on touch each prompt slip is a button that taps its code, no key
+  lettered; the tabs MAP, SKETCHBOOK, HELP, VIEW in the top left, 44 css px square; the help card's close corner;
+  the tabs and buttons are kept clear of the markers' labels), `src/ui/map.js` (close corner, a 'set course for
+  <world>' slip under the chart that puts the map away, the sheet fitted with the slip on touch, the slip lettered at
+  12 px or more on the screen), `src/ui/book.js` (close corner; a swipe of 48 css px or more across the page turns
+  it, with the paper's sound), `src/ui/paint.js` (a map icon: a chart folded in three; `CLOSE_SVG`, a pencilled
+  cross), `src/ui/theme.css` (the slips in the right thumb's arc 48 px tall, two high, over the round buttons; the
+  tabs; the gauges at the top on touch; the hint and the foot notice under the tabs; the close corners 46 px on the
+  screen whatever the sheet's scale; a short-window layout under 300 px tall: the buttons in one row, the gauges
+  at the top right), `src/core/game.js` (a tap on the picture puts away an open map or book, or the help card),
+  `src/main.js` (the sheets' corners press through the pad), `src/core/touch.js` (a tap is timed by the events' own
+  time stamps, the activity by the page's clock), `tests/touch.mjs --part loop` (and `--painted`), `tests/all.mjs`
+  steps `touch` and `painted-touch`, `README.md` (how to play by touch; what was never tried on a real phone).
+- **How it plays:** on a touch screen the slips of the prompt ("Board ship", "Lift off" / "Step out", "Land here",
+  "Cancel landing", "Pulse to Mars", "Stop turning", "Drop out of pulse") sit in the right thumb's arc over the round
+  buttons, 48 css px tall, the first nearest the thumb, two at most (LANDED), lettered without a key; a tap on one
+  is its key's press (a tap only: a slip that vanishes under the finger cannot leave Space held and the ship rising).
+  The map's world is picked by a tap as before (the course is set by the pick); the 'set course for Mars' slip
+  under the chart puts the map away. Each sheet has a pencilled close corner (46 css px on the screen at any scale)
+  and goes away at a tap on the picture outside it; the help card goes at a tap anywhere on it. The controls (the
+  buttons, the tabs, the stick's ring) fade to 35 % after 4 s untouched; the prompt slips do not fade. All placed
+  with `env(safe-area-inset-*)`. Desktop: none of it shows (`.pc-touchui`, the corners and the slip are
+  `display:none` without `.pc-touch`; the prompt keeps its key and its place).
+
+- **Acceptance, measured** (`tests/touch.mjs`, CDP touch only: not one key pressed, no mouse event; on clean
+  exports of `e87f6be` with the W3.2 files):
+  - **The whole loop by touch, iPhone 14 landscape, stubs with PHYSICS: PASSED** (`--part all`, 1040 s with the
+    input part): a tap begins; the VIEW tab changes the view; walked to the ship by the stick (a second finger
+    steering by the look) in 2.6 s of game time; "Board ship" slip boards; "Lift off" lifts off; the stick's
+    throttle and a nose-up drag climb above the air; the MAP tab opens the map, a tap on Mars sets the course (463
+    km), "set course for Mars" puts it away; its corner and a tap outside it close it; "Pulse to Mars" turns the ship
+    onto the course and pulses (68 s), arrives 6.9 km off; nose down and the stick's throttle into the air of Mars,
+    to the landing prompt; "Land here" lands; "Step out": on foot on Mars; the SKETCHBOOK tab opens the book at Mars,
+    a swipe left turns to Jupiter and right back, its corner and a tap outside close it; the HELP tab shows the help
+    card, a tap on it puts it away, its corner too; no pointer lock asked for, 0 pointercancel, 0 keydown.
+  - **The same loop in the painted world, q0, 400x225 (the iPhone 14 profile on a window of that size): PASSED**
+    twice: on the code before the read-out moved (553 s) and on the final code of `dfb4701` (460 s; arrived 6.8 km
+    off Mars after a 67 s pulse, landed in Mars' dry riverbeds; no console error, `fallback` empty).
+  - **The loop on the Pixel 7 landscape profile, stubs: PASSED** (427 s, final code): every hit area 44 px or more at
+    13 stages, no control in the subject box at the 9 played ones, every control inside the safe area.
+  - **Before:** the same loop on a clean export of `290780b` (W3.1 only) FAILS: one control on the screen (JUMP), no
+    tab to tap (the script stops there: `docs/shots/pilot/r1/touch-w32-runs.json`, `before290780b`).
+  - **Every hit area at least 44 css px:** at 13 stages (on foot; with an iPhone's safe area; at the ship; landed;
+    flying; the map open; the map with a course; in space; the pulse; over Mars; on foot on Mars; the book open; the
+    help card) every control measured: the smallest 44 px (the tabs), the round buttons 72/56/52, the slips 48 tall,
+    the close corners 46 on the screen (at the sheets' 0.6 scale).
+  - **On a phone, no control in the subject box** (x 30-70 %, y 55-100 %) at all 9 checks where the picture is
+    played (8 stages of the loop, and on foot with the safe area), on the iPhone 14 and the Pixel 7 profiles.
+  - **The safe area** (CDP `Emulation.setSafeAreaInsetsOverride` 47 / 47 / 21, an iPhone held sideways): every
+    control inside it.
+  - **The fade:** 4.6 s untouched, the controls go to 0.35; a touch brings them back.
+  - **W3.1's input part again on the W3.2 code** (`--part all`): all three profiles and the desktop page PASS (33.6
+    degrees for 120 px, 9.0-9.7 m walked, jump 2.2-6.0 m, jetpack 22.6-23.4 m, scale 1, nose 14.9 degrees,
+    throttle 0 -> 1).
+  - **The desktop is unchanged:** the desktop page of `--part input` (no touch layer, pointer lock as before);
+    `tests/layout.test.mjs` in the unit suite; **m3check PASSED** (33 checks: the title card, the look hint, the
+    sketchbook, the help card, the gamepad, a view found, the reload) and **lockcheck PASSED**, both on the final code.
+  - Frames, OPENED: `docs/shots/pilot/r1/touch-w32-loop-iphone14.jpg` (landed with "Step out" over "Lift off" and
+    RISE; flying, the controls faded, the read-out under the tabs; the map with "set course for Mars"; in space with
+    "Pulse to Mars", BRAKE, SINK, RISE; over Mars with "Land here"; the help card with its corner),
+    `touch-w32-painted-a.jpg`, `-b.jpg` (the painted world at 400x225 on the final code: landed, flying with the
+    controls faded, the map's slip, "Pulse to Mars", "Land here" with "a place to land" lettered above the slip, the
+    book, the help card, "Board ship"; in the run before, the read-out lay against BRAKE at the lower left and "a place
+    to land" over the "Land here" slip, which is why the read-out moved and the controls became hard keep-outs).
+    Numbers: `touch-w32-runs.json`.
+  - Unit: `tests/touch.test.mjs` 11 (two new: a tap timed by its events' stamps; every prompt names its code),
+    `tests/vista.test.mjs` updated (the prompt now carries `code`).
+- **Checks on a clean export of `dfb4701`** (PAINTER's uncommitted `src/world`, `src/render` are not in it): unit
+  **227** (225 + 2), physics 325, world 30, coast PASS at both stands, ghostfield all zeros, static rules hold; the
+  painted loop ran the real game with no console error and `fallback` empty; m3check, lockcheck, the Pixel 7 loop and
+  the painted loop ran on a tree identical in code to `dfb4701` (checked: only docs differ).
+- **Rulings (W3.2):** (1) "Every hit area at least 44 css px" is read as the touch controls this item adds (the
+  round buttons, the slips, the tabs, the close corners, the 'set course' slip); the book's tab strip (15 css px
+  tall on the iPhone) and the map's world radius are W3.3's, with their own numbers there. (2) The subject box (x
+  30-70 %, y 55-100 %) is judged while the picture is played; with the map or the book open the sheet covers the
+  picture (the 'set course' slip sits at the sheet's foot, in the box) and the touch HUD is hidden. (3) The help
+  card's tab is HELP only: the game does not pause behind the card, as on the desktop (the world goes on there too).
+  (4) The slips always stand 166 css px over the bottom (over BRAKE's place, even on foot): a slip 48 px tall then
+  ends above 55 % of the height on the iPhone 14 (340 px) and the Pixel 7 (360 px), so no slip can reach the subject
+  box whatever its width or the safe area's. (5) On touch the gauges go to the top middle (to the top right in a window
+  under 300 px tall): at the bottom middle the throttle ran under SINK (frame opened in W3.1's run). (6) A tap on the
+  picture is timed by the events' own time stamps (a real touch screen stamps them; a frame that runs long must not
+  make a tap a hold), the last activity (the fade, a mouse event made up from a touch) by the page's clock; the test
+  stamps its CDP events as a touch screen would (CDP waits for the page to take each event, so an unstamped lift is
+  stamped a slow frame later: 1 to 7 s in the painted world here). (7) On touch the read-out moves to the top left under
+  the tabs (W3.3 names it; done here because the short window's row of buttons ran into it at the lower left, and
+  the lower left is the left thumb's).
+- **Not done here (W3.3's, part 3):** the words on touch (the title card says "click to begin", the help card lists
+  keys and "H closes this card", the map "click a world, or use the arrow keys", the book "arrow keys turn the page,
+  B closes"); the map's world radius and names, the book's tab strip, the help drawing; the
+  edge arrow of "the ship" can sit beside the "Board ship" slip at the right edge (seen in the frames).
+
+### W3.1 the gesture guard and touch input (DONE)
+
+- **Files:** `src/core/touch.js` (new: `TOUCH` constants, `TouchPad` the fingers as numbers, `attachTouch` the DOM
+  wiring), `src/core/input.js` (`input.touch` merged in `take()`, `axis()`, `down()` the way the gamepad is; a mouse
+  event made up from a touch never drags or asks for pointer lock: `fromTouch`), `index.html` (viewport
+  `viewport-fit=cover`, `maximum-scale=1, user-scalable=no`), `src/ui/theme.css` (the guard: `touch-action:none` on
+  html, body and the canvas, `overscroll-behavior:none`, user-select, touch-callout and tap-highlight off; the touch
+  controls' look), `src/ui/hud.js` (the stick's ring and the round paper buttons JUMP/RISE 72 px, SINK 56, BRAKE 52,
+  `bindTouch`, `setTouch`), `src/core/game.js` (`setTouch` each frame: which buttons, the fade, the stick; the hint
+  says "drag on the right to look around" on touch), `src/main.js` (`attachTouch(input, canvas)`, `__pc.touch`),
+  `tests/touch.test.mjs` (9 tests), `tests/touch.mjs` (browser, `--part input`).
+- **How it works:** a finger on the left 40 % of the picture is a floating stick (centre where it lands, 56 px full,
+  8 px dead zone, the centre follows a thumb past the rim; at the rim (0.92) for 0.25 s it runs on foot); elsewhere a
+  relative drag looks (0.28 degrees per css px on foot, `LOOK_GAIN` = 2.12 mouse px per css px, so the nose turns at
+  FEEL.mouseShip's rate, about 0.21 degrees per px); a second finger beside the look finger pinches the camera boom
+  (60 px of spread = one wheel notch); a control (hud.js) presses a code while held (JUMP/RISE = Space, SINK = C,
+  BRAKE = X) or taps it (W3.2's prompts and tabs: only the edge, so a slip that vanishes under the finger cannot leave
+  a key held). Taps on the picture reach the game in `take().taps` (W3.2 closes panels with them). Shown on the
+  first touch or from the start with `(pointer: coarse)` and touch points; hidden by a key press or a real mouse move
+  (over 24 px, more than 1 s after a touch; a 0-movement hover move does not count). Without touch nothing shows and
+  nothing changes (`.pc-touchui` is `display:none`).
+- **Acceptance, measured** (`node tests/touch.mjs --part input`: Playwright's iPhone 14, Pixel 7 and iPad Pro 11
+  landscape profiles, CDP touch, stubs with PHYSICS; and a desktop 1280x720 page). All three profiles PASS:
+  a tap starts the game with **0** compatibility mouse events (mousedown, mouseup, click) and 0 pointer-lock
+  requests; a 120 px drag turns the view **33.6 degrees** with **0** pointercancel; the stick held 2.5 s (2.9-3.2 s of
+  game time by the time the finger lifts) walks **8.7-10.1 m** (2.8 m/s at 40 px deflection), held at the rim it runs
+  at 7.2 m/s; JUMP tapped **1.9-2.4 m** up, held 2 s the jetpack **19.7-23.7 m**; stick and look at once **18.9-31.8 m**
+  and 23.5 degrees; a pinch leaves `visualViewport.scale` **1** and moves the boom 5.20 -> 6.27 m; in the ship (160 m)
+  a 90 px drag up lifts the nose **0 -> 14.9 degrees**, stick right turns it **87-100 degrees** in 1.5 s, stick up opens
+  the throttle **0 -> 1.00**; no console error. Desktop: no touch layer (`display:none`, JUMP 0 px wide), a click
+  asks for pointer lock as before. (The audit's live patch: 39.5 degrees, 15.3 m at 4.22 m/s, 18.5 m, scale 1.)
+  The same script on a clean export of `0902c56` FAILS 9 checks (mousedown 1 and a pointer lock from the tap, 0.0
+  degrees with a pointercancel, 0.0 m walked, no JUMP). Evidence: `docs/shots/pilot/r1/touch-w31-input.json` (every
+  number, before and after), `touch-w31-iphone14-ship.jpg` (OPENED: the paper buttons rise/sink/brake in the right
+  corner, the stick's resting ring at the left).
+- **Unchanged and green:** `tests/input.test.mjs` + `tests/gamepad.test.mjs` 13 pass, `tests/lockcheck.mjs` PASSED.
+- **Checks** on a clean export of `0902c56` with these files (PAINTER's uncommitted `src/render` left out): unit
+  **225** (216 + touch 9), physics 325, world 30, coast PASS at both stands, ghostfield all zeros, static rules hold,
+  lockcheck PASSED; the real game (q0, 640x360, desktop) loads with no console error, `fallback` empty, no touch layer.
+- **Rulings (W3.1):** (1) the look gain is per css px, not per screen width: the plan's "about 200 degrees per screen
+  width" and "120 px turns 30 degrees or more" disagree on the Pixel 7 (863 px: 28 degrees) and the iPad (1194 px:
+  20 degrees); a thumb's travel is a physical distance and a css px is about the same size on a phone and a tablet,
+  so 0.28 degrees per px (210 degrees across the iPhone 14). (2) The round buttons JUMP/RISE, SINK, BRAKE came with
+  W3.1, not W3.2: W3.1's own acceptance (jump, jetpack) needs one. (3) `user-scalable=no, maximum-scale=1` are in the
+  viewport besides `viewport-fit=cover` (Chrome on Android honours them; iOS ignores them, the gesture events and
+  `touch-action` do it there). (4) In the ship the stick does not run (Shift is the run on foot only, as the pad's).
+  (5) Playwright's profiles report `maxTouchPoints` 1: the coarse-pointer test asks for at least one.
+- **For the feel (only a phone can tell):** gain 0.28 degrees per px, dead zone 8 px, rim 0.92 for 0.25 s, pinch 60 px a
+  notch: all in `TOUCH` at the top of `src/core/touch.js`.
+
+## Hand-over, RELEASE 1 of the sharp-smooth plan, PILOT lane part 1: W1 (the gate) (started 05:00 UTC 2026-11-14; kept current)
+
+**Read this first.** The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W1 = section 4 "PILOT · W1 Gate", the quality guard =
+section 5). This part of the lane is W1 only (W1.1 the station harness, W1.2 a green gate); W3 (touch) comes next.
+Scratch: `/home/user/.pc-scratch/pilot/r1/`. First commit's parent: `0efcc3b` (the coordinator's log; under it `56382c2`,
+the coordinator's WIP snapshot of `tests/stationlib/metrics.mjs` and `png.mjs`, the port begun by the agent before the
+04:59 restart, which this agent continued). Commits of this part: `419074c` (W1.2), `2355594` (W1.1 harness), `8811ca4`
+(harness reproduces; baseline q2 1280x720), `7a41b0c`, `2df378d` (W1.2 proof), `64dda38` (two runs agree), and the
+rest of the baseline after them.
+
+**State at the end of this part (about 09:50 UTC): W1 DONE.** Nothing of PILOT's is half-done or uncommitted (PAINTER's
+uncommitted `src/render` files in the shared tree are PAINTER's W2.2 work in progress).
+
+- **W1.1 the station harness: DONE.** `tests/stations.mjs` + `tests/stationlib/` (inpage.js, stations.mjs, metrics.mjs,
+  png.mjs) + `tests/stationmetrics.test.mjs` (8 tests). Reproduces the plan's numbers on a clean export of 784183b:
+  E_150_45 raw land lapvar 520.9 (520-525), final t1/t2 0.04/0.25, x26 1.14/1.13 (1.15/1.14), raw A 0.447, E_1000_90 441
+  calls / 669,283 triangles (table below). Two identical runs agree (518 numbers, 0 outside the rule; below). How to
+  run a station set: the section "HOW TO RUN A STATION SET" below.
+- **W1.1b the baseline: DONE.** `tests/baselines/stations-784183b.json`: q2 at 1280x720 (25 stations, with A, F, taps),
+  q2 at 1920x1080, q1 and q0 at 1280x720 (24 stations each, with F and taps; q1/q0 also against the q2 raw, `vsRef`), and
+  the iPhone 14 landscape profile (E_foot, E_150_45; today's behaviour: q2, DPR capped 1.5, buffer 1125x510; the phone
+  preset of W3.5 does not exist yet). Sheets in `docs/shots/pilot/baseline/`, every one OPENED.
+- **W1.2 a green gate: DONE.** `419074c`; painted-trip 3 of 3; `node tests/all.mjs --export` on `8811ca4` ALL 15 PASSED.
+
+**Rulings of mine logged here (each explained where it is used below):** the harness pins the game clock at 120 s and
+the wash clock at 100 (the clock study); the halo share's 0.5 % bound is read on the abstraction output, the final's
+share is compared with its baseline (the paper alone puts 11-16 % of the land over the line); "two runs agree to two
+decimals" is read as normalised measures within 0.005, magnitudes within 1 %, masks under 5000 pixels not judged; the
+storm station uses tests/weather.mjs' forced storm sky at hour 11 with no rain marks; Neptune's station looks along
+heading 0; W2.2's night station `E_150_45_night` (hour 23) was added last (PAINTER asked for it in its notes) and
+baselined alone; the counted sheet reads are 16 an output pixel at native size (the audit's 17 counted the
+enlargement branch's read); `1c406e2`'s game change (honest 'Land here') was not restored with the trip fixes.
+
+**For whoever comes next (W3, touch, is the rest of this lane):** the plan's W1.2 also names later steps `touch` and
+`stations-quick` for `tests/all.mjs`: `stations-quick` should run `node tests/stations.mjs --set quick` on the
+export and judge it with the section 5 thresholds once W2 has landed (`--compare tests/baselines/stations-784183b.json
+--strict` exits 1 on any flag; today every station flags the halo rule, which W2.2 is meant to fix). A quick set takes
+about 15 min (10 min of page load).
+
+### W1.1 reproduction (clean export of 784183b, q2 1280x720; `/home/user/.pc-scratch/pilot/r1/st-repro1/`, sheet and crops opened)
+
+| Number | Plan / audit | This harness |
+| --- | --- | --- |
+| E_150_45 final land t1 / t2 / t3 | 0.04 / 0.25 / 0.68 | 0.04 / 0.25 / 0.68 |
+| E_150_45 abstraction output t1 / t2 | 0.05 / 0.24-0.25 | 0.05 / 0.24 |
+| E_150_45 x26 (far brush off, wobble 0.3) final land t1 / t2 | 1.15 / 1.14 | 1.14 / 1.13 |
+| E_150_45 x21 (far brush off) / x23 (x26 + RCAS 0.5) | 0.67 / 1.03, 1.30 / 1.16 | 0.66 / 1.02, 1.29 / 1.15 |
+| E_150_45 raw A (aliasing index) | 0.447 | 0.444 |
+| E_150_45 cost | 450 calls, 910,623 triangles | 450, 910,623 |
+| E_1000_90 cost | 441 calls, 669,283 triangles | 441, 669,283 |
+| E_150_45 raw land lapvar | 520-525 | 555.9 with the game clock at 900 s; **520.9** with it at 120 s (the baseline run) |
+
+The raw lapvar was the one miss of the first commit (`2355594`, game clock pinned at 900 s), now resolved (the clock
+study below; the harness pins 120 s since `8811ca4`). The audit's harness did not hold the loop and left the game's
+clocks where they were; this one pins the game clock, the painter's wash clock (100) and renders once before the
+measured render. A pixel difference of this raw frame against the audit's
+(same camera to the millimetre): crowns' edges everywhere (the trees sway with the clocks) and the stream (the water
+reflects the frame before: here the same view, in the audit a frame of the game's own camera, since its loop ran
+between grabs). The lead's two placements in one page differed by 0.4 % (520.75, 522.62).
+
+**Clock study** (`/home/user/.pc-scratch/pilot/r1/bin/clockstudy.mjs`, log `clockstudy.log`; one page of 784183b, E_150_45,
+raw land lapvar): the audit's way (no clock set, no warm render; the game clock at 14 s, as a fresh page stands) 521.0,
+with a warm render 522.7; the wash clock at 0, 37, 100, 250, 523, 1000, 2000: 524.8, 524.9, 524.0, 524.5, 525.5, 525.8,
+526.0 (1 %); the GAME clock at 120 s 522.0, 400 s 526.9, 900 s 554.5 (the wind and what sways with it move with the
+game clock). Final t1/t2 0.043/0.25 in every case. Ruling: the harness pins the game clock at 120 s (early, as the
+audit's stations were; deterministic) and the wash clock at 100. (The study's run was stopped by the shell's time limit
+after the 400 s point; the 1500 s and 3000 s points were not taken. Its page was not held: the game clock crept about
+1 s between grabs; the harness holds it.)
+
+**Two runs agree** (W1.1 acceptance; `docs/shots/pilot/r1/two-runs-diff.txt`): `--set quick` (E_foot, E_150_45,
+E_1000_45, with taps, flicker and alias) run twice on fresh pages of 784183b, compared with `--diff`: 518 numbers, 0
+outside the rule: the normalised measures (t1-t3, shares, A, F, halo) within 0.0026 (rule: 0.005, half a unit of the
+second decimal), cost identical, CIELAB within 0.5, the absolute magnitudes (lapvar, b1-b3) within 0.86 %. My reading
+of "agree to 2 decimals on every metric", logged as a ruling: lapvar and the bands are magnitudes in the hundreds and
+tens (two decimals of 190.7 would be 0.003 %), so they are held to 1 %; and a mask under 5000 pixels is not judged (at
+E_foot the ground 30-150 m off is 771 pixels of stream bank where the water and the grass move from run to run: t1
+there 0.310 / 0.316). What still moves between runs: the stream's water and single grass blades at E_foot (a pixel
+difference: 1.8 % of pixels over 8/255; 0.4 % at E_150_45), state the game builds up in the real frames before
+`__pcReady`, which no clock pin reaches. The quick run against the baseline run (where E_150_45 and E_1000_45 come
+after eight other stations): 1 number outside, E_foot raw ground lapvar 1.04 %.
+
+### W1.1b The baseline of 784183b: `tests/baselines/stations-784183b.json`
+
+Measured with this harness on a clean export of `784183b` (the same game code as the live game and as HEAD before R1),
+q2, 1280x720, all 24 stations, with taps, flicker and alias (run `/home/user/.pc-scratch/pilot/r1/base-q2-1280/`, 21 min
+of stations after a 10 min load; no console error, fallback empty). Sheets, OPENED (every station's final and raw, and
+1:1 crops of the land): `docs/shots/pilot/baseline/q2-1280x720-sheet.jpg`, `q2-1280x720-crops.jpg`; one line a station:
+`q2-1280x720-summary.txt`. What they show: the raw scene has every crown, trunk and path; the final has blobs from
+150 m up; at 1 km the raw ground is rows of dashes (the dapple aliasing W2.1 removes). The sharpness audit's summary
+reproduced station by station within about 3 % in raw lapvar (E_foot 190.6 / 185.0, E_150_90 423.1 / 435.9, E_400_45
+409.2 / 408.8, E_1000_90 1082.2 / 1086.0) and to two decimals in the final t1/t2 at all twenty.
+
+| Station | raw land lapvar | final land t1 / t2 / t3 | halo % abs / final | A raw / abs | F raw / abs | calls / triangles | foliage share |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| E_foot | 190.6 | 0.30 / 0.72 / 0.91 | 1.6 / 2.2 | 0.525 / 0.438 | 0.464 / 0.390 | 462 / 1456987 | 0.29 |
+| E_50_45 | 237.5 | 0.22 / 0.60 / 0.88 | 4.2 / 4.3 | 0.421 / 0.272 | 0.407 / 0.265 | 509 / 1290599 | 0.46 |
+| E_50_90 | 208.7 | 0.31 / 0.74 / 0.94 | 2.3 / 3.4 | 0.395 / 0.254 | 0.386 / 0.244 | 365 / 1021177 | 0.30 |
+| E_150_45 | 520.9 | 0.04 / 0.25 / 0.68 | 11.6 / 11.3 | 0.447 / 0.251 | 0.417 / 0.211 | 450 / 910623 | 0.31 |
+| E_150_90 | 423.1 | 0.08 / 0.33 / 0.71 | 12.2 / 11.5 | 0.386 / 0.226 | 0.347 / 0.191 | 492 / 1006015 | 0.24 |
+| E_400_45 | 409.2 | 0.01 / 0.15 / 0.64 | 7.8 / 7.7 | 0.474 / 0.356 | 0.323 / 0.256 | 299 / 462758 | 0.03 |
+| E_400_90 | 604.3 | 0.01 / 0.13 / 0.59 | 16.3 / 15.9 | 0.402 / 0.286 | 0.329 / 0.223 | 538 / 822388 | 0.08 |
+| E_1000_45 | 372.6 | 0.01 / 0.37 / 0.79 | 3.4 / 3.6 | 0.630 / 0.322 | 0.344 / 0.223 | 97 / 164643 | 0.00 |
+| E_1000_90 | 1082.2 | 0.00 / 0.14 / 0.73 | 3.0 / 3.2 | 0.533 / 0.459 | 0.367 / 0.276 | 441 / 669283 | 0.00 |
+| M_foot | 38.2 | 0.34 / 0.71 / 0.88 | 1.1 / 2.8 | 0.472 / 0.361 | 0.423 / 0.290 | 292 / 452645 | 0.00 |
+| M_50_45 | 48.8 | 0.26 / 0.57 / 0.84 | 0.6 / 1.1 | 0.423 / 0.330 | 0.443 / 0.354 | 253 / 398942 | 0.00 |
+| M_50_90 | 53.3 | 0.38 / 0.74 / 0.93 | 0.4 / 1.2 | 0.436 / 0.342 | 0.381 / 0.307 | 149 / 257290 | 0.00 |
+| M_150_45 | 19.2 | 0.13 / 0.44 / 0.71 | 2.2 / 2.9 | 0.284 / 0.181 | 0.312 / 0.178 | 272 / 377970 | 0.00 |
+| M_150_90 | 26.3 | 0.11 / 0.33 / 0.63 | 0.8 / 1.0 | 0.381 / 0.299 | 0.363 / 0.298 | 237 / 343062 | 0.00 |
+| M_400_45 | 15.7 | 0.09 / 0.29 / 0.68 | 3.2 / 3.6 | 0.215 / 0.204 | 0.139 / 0.182 | 205 / 289391 | 0.00 |
+| M_400_90 | 10.8 | 0.13 / 0.34 / 0.61 | 2.7 / 3.2 | 0.235 / 0.195 | 0.191 / 0.198 | 291 / 405739 | 0.00 |
+| M_1000_45 | 36.0 | 0.05 / 0.37 / 0.77 | 1.1 / 1.3 | 0.249 / 0.256 | 0.162 / 0.194 | 56 / 115591 | 0.00 |
+| M_1000_90 | 33.7 | 0.04 / 0.23 / 0.67 | 1.6 / 1.8 | 0.232 / 0.288 | 0.144 / 0.217 | 180 / 373495 | 0.00 |
+| S_150_45 | 38.8 | 0.06 / 0.30 / 0.68 | 3.3 / 3.9 | 0.336 / 0.212 | 0.376 / 0.217 | 302 / 512286 | 0.00 |
+| S_150_90 | 38.5 | 0.07 / 0.34 / 0.70 | 0.7 / 1.1 | 0.427 / 0.325 | 0.441 / 0.335 | 371 / 724630 | 0.01 |
+| E_foot_night | 144.3 | 0.18 / 0.44 / 0.58 | 2.4 / 1.0 | 0.558 / 0.503 | 0.485 / 0.432 | 490 / 1492056 | 0.29 |
+| E_150_45_dusk | 281.1 | 0.03 / 0.15 / 0.44 | 11.1 / 7.6 | 0.448 / 0.257 | 0.407 / 0.232 | 451 / 910624 | 0.31 |
+| E_150_45_storm | 97.4 | 0.03 / 0.20 / 0.54 | 6.1 / 5.0 | 0.417 / 0.237 | 0.468 / 0.261 | 450 / 910623 | 0.31 |
+| N_150_45 | 103.6 | 0.05 / 0.26 / 0.63 | 2.6 / 3.1 | 0.454 / 0.282 | 0.501 / 0.291 | 311 / 703081 | 0.01 |
+
+**E_150_45_night** (W2.2's night station, hour 23; added after the run above and baselined alone on a fresh page, run
+`base-q2-1280-night/`, sheet `q2-1280x720-night-sheet.jpg`, OPENED: the raw scene has every crown, the final a dark blue
+blur): raw land lapvar 446.8, final land t1/t2/t3 0.02/0.09/0.36 (W2.2's target t2 >= 0.9), halo abs/final 16.2/11.4 %,
+A raw/abs 0.449/0.285, F raw/abs 0.397/0.238, 451 calls / 910,624 triangles.
+
+**q2 at 1920x1080** (run `/home/user/.pc-scratch/pilot/r1/base-q2-1920/`, 21 min of stations after a 16 min load; no
+console error, fallback empty; sheet `docs/shots/pilot/baseline/q2-1920x1080-sheet.jpg`, shrunk to 1000 px wide, OPENED;
+`q2-1920x1080-summary.txt`): the brush is a fraction of the frame's height, so more pixels buy no detail from the air:
+E_150_45 final land t1/t2 0.02/0.11 (0.04/0.25 at 720p), E_400_90 0.00/0.03, E_1000_90 0.00/0.03, E_foot 0.19/0.57,
+M_150_45 0.07/0.27, S_150_45 0.02/0.17; the same draw calls and triangles as at 720p; post reads 63.2 M a frame (the
+same reads per pixel). No A at this size (its reference would be 3840x2160).
+
+**q1 and q0 at 1280x720** (runs `base-q1-1280/` and `base-q0-1280/`, 6 and 5 min of stations; no console error,
+fallback empty; sheets `q1-1280x720-sheet.jpg`, `q0-1280x720-sheet.jpg`, shrunk, OPENED: at q0 the forest from 150 m
+is the purple canopy wash with no trees, as the audit found). Internal size 1024x576 (q1) and 794x446 (q0), enlarged to
+1280x720 by the sheet (22 reads an output pixel there: 16 + 6 in the enlargement branch). The finals are also measured
+against the q2 run's raw scene (`node tests/stations.mjs --reref <run> --ref <q2 run>`, offline from the frames; key
+`vsRef` in the baseline), the plan's tier measure. Final land t1/t2 against the q2 raw, foliage share, calls/triangles:
+
+| Station | q1 | q0 |
+| --- | --- | --- |
+| E_foot | 0.20 / 0.58, 0.25, 315 / 735228 | 0.04 / 0.20, 0.17, 169 / 265350 |
+| E_150_45 | 0.03 / 0.18, 0.20, 277 / 469046 | 0.02 / 0.13, 0.01, 136 / 160718 |
+| E_400_90 | 0.01 / 0.09, 0.00, 297 / 432886 | 0.01 / 0.09, 0.00, 162 / 191310 |
+| E_1000_45 | 0.01 / 0.37, 0.00, 76 / 127043 | 0.01 / 0.28, 0.00, 47 / 69913 |
+| M_150_45 | 0.12 / 0.43, 0.00, 177 / 301942 | 0.10 / 0.41, 0.00, 79 / 139468 |
+
+(The audit's tiers-all: E_150_45 t2 0.18 (q1) and 0.12 (q0), E_foot 0.53 and 0.17, M_150_45 0.43 and 0.40; costs at
+E_150_45 277 / 469k and 136 / 161k: reproduced.)
+
+**The phone profile** (`--device iphone14`: Playwright's iPhone 14 landscape, 750x340 css at DPR 3; run `base-phone/`;
+sheet and crops `iphone14-sheet.jpg`, `iphone14-crops.jpg`, OPENED): today the game draws it at q2 with the DPR capped
+at 1.5, a 1125x510 buffer; E_foot final land t1/t2 0.36/0.83, raw lapvar 231.7, 489 calls / 1,513,359 triangles; E_150_45
+0.10/0.48, 663.6, 470 / 956,829; 17.5 M post reads a frame. W3.5's preset (DPR 1.25, tier 1) does not exist yet, so these
+are the phone's "before".
+
+Post reads counted (`--taps`), every station: prep 4 per half-size pixel, abstraction 13 per pixel (13 on far land),
+keep 2 per half-size pixel, sheet 16 per output pixel: 28.1 M reads a frame at 1280x720. The halo share of today's
+abstraction output is high where its brush is wide (11-16 % from 150-400 m up): the measure counts a blur's spread as
+well as overshoot, so it means "no false sharpness" only where the output follows the raw scene (x26's: 0.02 %).
+The 1000 m stations: the ship is above the edge of the air there (state SPACE, the world turns under it while the
+world settles), so the ground under it is a few hundred metres from the 150 m stations' (E: autumn_woodland, 969 m up;
+M: dry_riverbeds, 1004 m), as in the audit's runs; with the clocks pinned it is the same ground every run.
+
+### W1.1 The station harness: HOW TO RUN A STATION SET (for PAINTER and whoever measures a picture)
+
+One browser, one page, the loop held; numbers in Node. Always measure a CLEAN EXPORT, never the shared working tree:
+
+    tools/export-head.sh /home/user/.pc-scratch/<role>/r1/after          # or: git archive <sha> | tar -x -C <dir>
+    node tests/stations.mjs --root /home/user/.pc-scratch/<role>/r1/after --set quick --tier q2 --size 1280x720 \
+         --taps --out /home/user/.pc-scratch/<role>/r1/st-after
+    node tests/stations.mjs --compare tests/baselines/stations-784183b.json --with /home/user/.pc-scratch/<role>/r1/st-after
+    node tests/stations.mjs --sheet <before-run-dir>,<after-run-dir> --labels before,after --out <dir>/before-after.jpg
+
+- `--set`: `quick` (E_foot, E_150_45, E_1000_45), `audit` (the sharpness audit's twenty), `earth`, `air`, `all` (25),
+  `phone` (with `--device iphone14`), station names or regular expressions, comma separated (`--set 'E_150_45,M_.*_90'`);
+  the stations always run in the list's order. `--tier q2|q1|q0` (render scale 1), `--size WxH` (or `--device
+  iphone14|pixel7|ipadpro11`, Playwright's landscape profiles).
+- Extras: `--taps` (post passes' texture reads per pixel, counted in instrumented copies of their shaders, as they
+  run: per pass, per frame, and the abstraction pass on far land), `--flicker` (F, one more render), `--alias` (A: two
+  more renders at twice the size; slow), `--exp x21,x26,x23` (post experiments on the held scene, measured against the
+  station's own raw scene; `--exp-abs` also keeps their v5).
+- A run writes `run.json` (every number), `summary.txt` (one line a station, the audit's format plus halo, cost, A, F,
+  taps), `frames/<station>_v<k>.png` (v0 final, v1 raw scene, v3 depth, v4 regions, v5 abstraction output; lossless),
+  `sheet.jpg` (final | raw per station) and `crops.jpg` (1:1 crops of the land). OPEN the sheets and crops.
+- `--compare` prints the guard's rules (plan section 5) per station: ok or FLAG (an item's own exceptions apply, e.g.
+  W2.1's raw b1, W7.1's budget). `--baseline OUT.json --commit SHA --from DIR[,DIR]` collects runs into a baseline file.
+  `--diff DIR_A,DIR_B` compares two runs number by number; `--reref DIR --ref Q2DIR` measures a lower tier's finals
+  against the q2 run's raw scene (offline, from the frames). The baseline's frames (lossless) stay in
+  `/home/user/.pc-scratch/pilot/r1/base-*/frames/` for a before/after `--sheet`.
+- Timing on this machine (SwiftShader): the page loads in 4 to 6 min at q2 1280x720; a station takes about a minute
+  plus the extras (see the run's `secs`). Free memory first (`free -m`); one browser of yours at a time.
+- Determinism: the harness fixes the game clock (120 s) and the painter's wash clock (100) at every station, sets the
+  hour again after the settle, and renders once before the measured render (the water reflects the frame before).
+- Measures (tests/stationlib/metrics.mjs, a number-for-number port of the audit's metrics.py: on the audit's own frames
+  of E_150_45 the largest difference over 144 numbers is 6e-5; tests/stationmetrics.test.mjs holds metrics.py's numbers
+  on a synthetic set): lapvar, b1 b2 b3 (2-6, 6-16, 16-40 px), t1 t2 t3 (transfer of the raw scene's own detail) over
+  the land, the ground, the ground by view distance (0-30, 30-150, 150-600, 600+ m), the foliage, the props; region
+  shares; CIELAB mean and L* 10/50/90 per region (final and raw); the paper border strip's mean colour; cost (draw calls
+  and triangles over every pass, renderer.info).
+- HALO SHARE, a ruling of mine (the plan names the measure, not the view): pixels overshooting the raw scene's 3x3 range
+  by more than 8/255 after the raw is carried to the output's tone (a straight line fitted on both blurred by 4 px).
+  On the FINAL sheet the paper's grain, granulation and edge pooling alone put about 16 % of the land over the line at
+  E_150_45 even with the far brush off (the lead's x26 frames: 16.6 %; its abstraction output: 0.02 %), so the plan's
+  "halo share at most 0.5 %" is read on the abstraction output (`halo.abs`); the final's share is recorded and compared
+  with its baseline, and an RCAS raises it (x23: 23 % against x26's 16.6 %).
+- F (flicker): the projection is shifted by 0.25 px (nothing in the world moves), the fine-band change the shift does
+  not explain over the fine band of the still frame. The run records `rawWrongWay` (the same with the sign flipped) as
+  a check of the shift's direction: it must be larger. A: the same view at twice the size box-filtered down is the
+  reference (the audit's alias.py); on the final the screen-space paper confounds it (the audit's note), so read A on
+  v1 and v5.
+- Post reads counted (`--taps`) at q2, native size: prep 4 per half-size pixel, abstraction 13 per pixel (far land 13),
+  keep 2 per half-size pixel, sheet 16 per output pixel (the audit's static count said 17: one read is in the
+  enlargement branch, not taken at native size).
+
+### W1.2 A green gate (test-only; the game is not touched)
+
+- `tests/trip.mjs` and `tests/loop.test.mjs` restored from `d874a8c` (the trip fixes were made in `97e5949`; `1c406e2` and
+  `d874a8c` carry the same files): bumps counted per leg and by stretch (the ship's count runs from the page's start: one
+  bump on the first leg failed the second leg's "no bumps" too); on "Too steep to land here" the script flies on as a
+  player does (4 s at full throttle, nose level: 100 to 150 m) before coming down again (it pressed E on the same hover
+  eight times over Saturn's honey_mist). The loop test's two messages say what is checked; assertions unchanged. NOT
+  restored: `1c406e2`'s game change (sim.js, flight.js: the honest 'Land here' over steep ground) and its test
+  `landprompt.test.mjs`: game code, not part of W1.2 (the plan says test-only); the shipped game still offers 'Land here'
+  over 48 of 520 hover spots on honey_mist and then says 'Too steep'.
+- `tests/all.mjs`: two new steps after the unit suites, `coast` (`src/physics/coast.mjs`; both stands must print
+  "=>  PASS" and the exit code agree) and `ghostfield` (`docs/lead/evidence/review7/ghostfield.mjs`, which always exits 0:
+  judged on its six JSON lines, radial speed while grounded, off the line, wrong material and steps in the air all 0;
+  the worst step loss 0.26 / 0.52 m/s is printed, not judged). Both judges checked against made-up failing output (a
+  stand NOT YET, a missing stand, one non-zero, a missing run: each FAIL). `--only coast,ghostfield` on the tree: 2 of 2
+  stands PASS, 6 of 6 runs all zeros.
+- Checks on a clean export of `0efcc3b` with these files: unit 208, physics 325, world 30, coast PASS at both stands,
+  ghostfield all zeros.
+- **painted-trip 3 of 3** (`node tests/all.mjs --export --only painted-trip`, one after another, 06:49-07:14 UTC, PAINTER's
+  browser running beside it): run 1 on a clean export of `2355594` PASS (492 s, 50 checks), runs 2 and 3 on `8811ca4`
+  PASS (470 s, 489 s, 50 checks each). Logs: `docs/shots/pilot/r1/painted-trip-run{1,2,3}.txt`. Said plainly: in none of
+  the three did the ship bump or the game say "Too steep", so the two restored paths were not exercised by these runs
+  (they guard against what failed the verifier's runs on `a539086` and `45629a7`).
+- **`node tests/all.mjs --export` on `8811ca4`: ALL 15 PASSED** (07:13-07:59 UTC; unit 216, physics 325, world 30, coast
+  2 of 2 stands, ghostfield 6 of 6 all zeros, static, play-stub 39, play-physics 39, trip-stub 50, m3 33, lock 14, audio,
+  painted-play 39, painted-trip 50 (a fourth pass), painted-m3 33). Table: `docs/shots/pilot/r1/all-mjs-8811ca4.txt`.
+  W1.2 is DONE. (`stations-quick` and `touch` steps: later, as the plan says; stations-quick takes the section 5
+  thresholds once W2 has landed.)
+
 ## SHIPPED STATE (coordinator, 2026-11-14 ~02:00 UTC; read this first)
 
 The owner chose to ship the last fully checked code rather than wait for the re-fix pass below. That pass (the

@@ -250,7 +250,9 @@ export function createWorld(scene) {
     // the thunderstorm at the Earth spawn was 24 k triangles and 13 draw calls of nothing).
     let hzn = -1, closedSky = false, farVeil = 0;
     if (active) {
-      active.root.updateMatrixWorld(true);
+      // (R1 W2.3: the root's own world matrix, and its parents'; not every mesh under it, which the renderer brings up to
+      // date itself before it draws: two forced walks of the whole tree a frame were a quarter of world.update)
+      active.root.updateWorldMatrix(true, false);
       _camL.copy(cameraPos); active.root.worldToLocal(_camL);
       if (!active.camPrev) active.camPrev = new THREE.Vector3(1e9, 0, 0);
       // (arrival.js: a leap the frame before does not explain; a fast ship at a low frame rate is not an arrival)
@@ -274,7 +276,7 @@ export function createWorld(scene) {
     }
     for (const st of state.values()) {
       const root = st.root;
-      root.updateMatrixWorld(true);
+      root.updateWorldMatrix(true, false);
       // tier 2: the world itself; 1: a dab (one small washed ball: what a brush makes of a disc a
       // few pixels across, where the terrain was 14 k to 25 k triangles); 0: nothing
       let tier = 2;

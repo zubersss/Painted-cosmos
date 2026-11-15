@@ -64,15 +64,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pc-pap
 .pc-hud .pc-notice { transition: opacity 0.5s ease, bottom 0.4s ease; }
 .pc-hud .pc-gauges { transition: bottom 0.4s ease; }
 .pc-hud.pc-cockpit .pc-stats { top: 21%; }
-/* The frame read-out (top left, about 110 px tall) is up: what is lettered across the top of the
+/* The frame read-out (top left, about 130 px tall) is up: what is lettered across the top of the
    sheet (the hint, a notice on foot) goes under it (M4's blind play-test: the read-out lay over the
    pointer-lock message). */
 /* A new page's slip is up in the top right corner: a notice on foot, lettered across the top,
    moves to the left of it (the grand tour at 400 x 225: "A view to find 3.0 km..." under the slip). */
 .pc-hud.pc-foot3.pc-sketching .pc-notice { margin: 0 auto 0 7%; }
-.pc-hud.pc-stats-on .pc-hint { top: calc(9% + 116px); }
-.pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 116px); }
-.pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 116px); }
+.pc-hud.pc-stats-on .pc-hint { top: calc(9% + 134px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-notice { top: calc(9% + 134px); }
+.pc-hud.pc-stats-on.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(15.5% + 134px); }
 
 /* ---- prompt: a key in ink, an action in the hand ---- */
 /* A key is a loose dab of wash with a broken pencil ring round it (PAINTER's look review):
@@ -241,3 +241,178 @@ kbd::after { content: ''; position: absolute; z-index: -1; inset: -2px -3px -2px
 .pc-newsketch img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; mix-blend-mode: multiply; }
 .pc-newsketch b { display: block; margin-top: 7px; font-weight: normal; }
 .pc-newsketch span { display: block; margin-top: 1px; }
+
+/* ---- touch (W3 of the sharp-smooth plan: src/core/touch.js, the touch controls in hud.js) ----
+   The gesture guard: the page itself never scrolls, zooms, selects text or calls up a callout;
+   the picture and the controls keep every touch (none of it changes anything for a mouse). */
+html, body { overscroll-behavior: none; touch-action: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+#pc-canvas { touch-action: none; }
+/* (viewport-fit=cover: the picture runs under a phone's notch and rounded corners; the controls
+   keep inside the safe area) */
+:root { --pc-sl: env(safe-area-inset-left, 0px); --pc-sr: env(safe-area-inset-right, 0px);
+  --pc-st: env(safe-area-inset-top, 0px); --pc-sb: env(safe-area-inset-bottom, 0px); }
+/* Nothing of the touch layer exists for the eye until a finger has touched (or the device is a
+   phone or a tablet): the desktop HUD is the desktop HUD. */
+.pc-touchui { display: none; }
+.pc-hud.pc-touch .pc-touchui { display: block; position: absolute; inset: 0; }
+.pc-touchui > * { transition: opacity 0.9s ease; }
+/* unused for four seconds, the controls fade back to a third, so the painting is the painting */
+.pc-hud.pc-touch.pc-idle .pc-touchui > * { opacity: 0.35; }
+/* The round paper buttons in the right thumb's arc: JUMP (RISE in the ship) in the corner, SINK
+   beside it, BRAKE over it. */
+.pc-tbtn { position: absolute; display: none; align-items: center; justify-content: center; box-sizing: border-box;
+  border-radius: 50%; pointer-events: auto; touch-action: none; color: var(--pc-dark); isolation: isolate; }
+.pc-tbtn::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 50%;
+  background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px; background-color: var(--pc-key, #fff); background-blend-mode: multiply;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.18), inset 0 0 16px rgba(88, 68, 53, 0.16);
+  filter: url(#pc-rag-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* held down: the paper takes a wash */
+.pc-tbtn.pc-down::before { box-shadow: inset 0 0 0 1.5px rgba(47, 58, 93, 0.42), inset 0 0 24px rgba(77, 96, 178, 0.42); }
+.pc-tbtn-jump { width: 72px; height: 72px; right: calc(var(--pc-sr) + 14px); bottom: calc(var(--pc-sb) + 14px); }
+.pc-tbtn-sink { width: 56px; height: 56px; right: calc(var(--pc-sr) + 100px); bottom: calc(var(--pc-sb) + 14px); }
+.pc-tbtn-brake { width: 52px; height: 52px; right: calc(var(--pc-sr) + 24px); bottom: calc(var(--pc-sb) + 100px); }
+.pc-hud.pc-t-foot .pc-tbtn-jump, .pc-hud.pc-t-landed .pc-tbtn-jump, .pc-hud.pc-t-fly .pc-tbtn-jump, .pc-hud.pc-t-landing .pc-tbtn-jump,
+.pc-hud.pc-t-fly .pc-tbtn-sink, .pc-hud.pc-t-fly .pc-tbtn-brake, .pc-hud.pc-t-pulse .pc-tbtn-brake { display: flex; }
+/* The stick: a pencilled ring where the left thumb came down, a dab of wash under the thumb;
+   while no thumb is down, a faint ring where one would go. */
+.pc-stick, .pc-stick-rest { position: absolute; width: 0; height: 0; pointer-events: none; }
+.pc-stick { left: 0; top: 0; display: none; }
+.pc-stick.pc-on { display: block; }
+.pc-stick-rest { left: calc(var(--pc-sl) + 14% + 56px); bottom: calc(var(--pc-sb) + 24% + 56px); opacity: 0.45; }
+.pc-stick.pc-on ~ .pc-stick-rest, .pc-hud.pc-t-board .pc-stick-rest, .pc-hud.pc-t-pulse .pc-stick-rest { display: none; }
+.pc-stick::before, .pc-stick-rest::before { content: ''; position: absolute; left: -56px; top: -56px; width: 112px; height: 112px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(244, 239, 228, 0.16) 0%, rgba(244, 239, 228, 0.08) 70%, rgba(77, 96, 178, 0.16) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(35, 42, 69, 0.5), 0 0 0 1px rgba(244, 239, 228, 0.35); filter: url(#pc-rough); }
+.pc-stick i { position: absolute; left: -21px; top: -21px; width: 42px; height: 42px; border-radius: 46% 54% 50% 50% / 52% 48% 54% 46%;
+  background: radial-gradient(ellipse at 44% 42%, rgba(77, 96, 178, 0.3) 0%, rgba(77, 96, 178, 0.48) 60%, rgba(47, 58, 93, 0.7) 100%); filter: url(#pc-wash); }
+/* The prompts are buttons on a touch screen (W3.2): slips 48 css px tall in the right thumb's arc,
+   over the round buttons, the first nearest the thumb, two at most one over the other. No key
+   is lettered on them. */
+.pc-hud.pc-touch .pc-prompt { left: auto; right: calc(var(--pc-sr) + 14px); bottom: calc(var(--pc-sb) + 166px);
+  flex-direction: column-reverse; align-items: flex-end; justify-content: flex-start; gap: 8px; }
+.pc-hud.pc-touch .pc-prompt .pc-button { pointer-events: auto; touch-action: none; box-sizing: border-box; min-height: 48px; min-width: 64px;
+  padding: 2px 20px 0; justify-content: center; }
+.pc-hud.pc-touch .pc-prompt .pc-button.pc-down::before, .pc-tab.pc-down::before, .pc-close:active::before {
+  box-shadow: inset 0 0 0 1.5px rgba(47, 58, 93, 0.42), inset 0 0 22px rgba(77, 96, 178, 0.4); }
+/* The tabs in the top left corner: the map, the sketchbook, the help card, the view. */
+.pc-tabs { position: absolute; left: calc(var(--pc-sl) + 14px); top: calc(var(--pc-st) + 14px); display: flex; gap: 8px; }
+.pc-tab { position: relative; width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  pointer-events: auto; touch-action: none; isolation: isolate; color: var(--pc-dark); }
+.pc-tab::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 7px 11px 6px 12px / 11px 7px 12px 6px;
+  background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px; background-color: var(--pc-key, #fff); background-blend-mode: multiply;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.18), inset 0 0 12px rgba(88, 68, 53, 0.15);
+  filter: url(#pc-rag-b) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(1px 3px 5px rgba(35, 42, 69, 0.22)); }
+/* With the tabs across the top, what is lettered there moves under them; the gauges go to the top
+   (the right thumb's buttons and the slips have the lower right; the figure the lower middle). */
+.pc-hud.pc-touch .pc-hint, .pc-hud.pc-touch.pc-foot3 .pc-notice, .pc-hud.pc-touch .pc-stats { top: calc(var(--pc-st) + 68px); }
+.pc-hud.pc-touch.pc-foot3 .pc-hint.pc-on ~ .pc-notice { top: calc(var(--pc-st) + 108px); }
+.pc-hud.pc-touch .pc-gauges { bottom: auto; top: calc(var(--pc-st) + 18px); left: 50%; right: auto; transform: translateX(-50%); }
+/* the read-out leaves the lower left (the left thumb's side, and in a short window the buttons'
+   row) for the top left, under the tabs */
+.pc-hud.pc-touch .pc-readout { bottom: auto; top: calc(var(--pc-st) + 68px); left: calc(var(--pc-sl) + 14px); }
+.pc-hud.pc-touch.pc-stats-on .pc-readout { top: calc(var(--pc-st) + 68px + 142px); }
+/* The corner that closes a sheet (the map, the sketchbook, the help card), 44 css px on the screen
+   whatever the sheet's scale, and the map's 'set course' slip. Touch only. */
+.pc-close { display: none; position: absolute; top: 0; right: 0; z-index: 3; width: calc(46px / var(--pc-fit, 1)); height: calc(46px / var(--pc-fit, 1));
+  padding: calc(12px / var(--pc-fit, 1)); box-sizing: border-box; pointer-events: auto; touch-action: none; color: var(--pc-dark); isolation: isolate; }
+.pc-close::before { content: ''; position: absolute; inset: calc(4px / var(--pc-fit, 1)); z-index: -1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(77, 96, 178, 0.10) 0%, rgba(77, 96, 178, 0.16) 70%, rgba(47, 58, 93, 0.22) 100%); filter: url(#pc-wash); }
+.pc-hud.pc-touch .pc-map .pc-close, .pc-hud.pc-touch .pc-book .pc-close, .pc-hud.pc-touch .pc-start.pc-on:not(.pc-title-only) .pc-close { display: block; }
+.pc-map-go { display: none; }
+.pc-hud.pc-touch .pc-map-go { display: inline-flex; visibility: hidden; box-sizing: border-box; min-height: calc(50px / var(--pc-fit, 1)); min-width: calc(66px / var(--pc-fit, 1));
+  margin: 4px auto 0; padding: 2px 22px 0; justify-content: center; pointer-events: auto; touch-action: none; }
+.pc-hud.pc-touch .pc-map.pc-has-course .pc-map-go { visibility: visible; }
+/* (a slip on the open sheet is paper, as the sheet is, whatever the sky's key) */
+.pc-map-go::before { background-color: #fff; box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.22), inset 0 0 16px rgba(77, 96, 178, 0.18); }
+/* A short window (a phone held sideways in a small browser, the test runs at 400 x 225): the
+   round buttons in one row along the bottom, the slips over them, the gauges at the top right. */
+@media (max-height: 300px) {
+  .pc-tbtn-jump { right: calc(var(--pc-sr) + 8px); bottom: calc(var(--pc-sb) + 8px); }
+  .pc-tbtn-sink { right: calc(var(--pc-sr) + 88px); bottom: calc(var(--pc-sb) + 8px); }
+  .pc-tbtn-brake { right: calc(var(--pc-sr) + 152px); bottom: calc(var(--pc-sb) + 10px); }
+  .pc-hud.pc-touch .pc-prompt { right: calc(var(--pc-sr) + 8px); bottom: calc(var(--pc-sb) + 88px); gap: 6px; }
+  .pc-tabs { left: calc(var(--pc-sl) + 8px); top: calc(var(--pc-st) + 8px); gap: 4px; }
+  .pc-hud.pc-touch .pc-gauges { top: calc(var(--pc-st) + 8px); left: auto; right: calc(var(--pc-sr) + 8px); transform: none; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .pc-hud.pc-touch .pc-gauge > b { width: 64px; }
+  .pc-hud.pc-touch .pc-hint, .pc-hud.pc-touch.pc-foot3 .pc-notice, .pc-hud.pc-touch .pc-stats { top: calc(var(--pc-st) + 58px); }
+  .pc-hud.pc-touch .pc-readout { top: calc(var(--pc-st) + 58px); left: calc(var(--pc-sl) + 8px); }
+  .pc-stick-rest { left: calc(var(--pc-sl) + 10% + 56px); bottom: calc(var(--pc-sb) + 14% + 56px); }
+}
+
+/* ---- phone and tablet layouts (W3.3): the sheets at their own size, lettered 11 css px or more ----
+   On a touch screen the map and the sketchbook fill the screen inside the safe area (a margin of
+   10 px is left round them: a tap there, on the picture, puts them away); nothing is scaled down. */
+.pc-map-chart { display: block; }
+.pc-hud.pc-touch .pc-map, .pc-hud.pc-touch .pc-book { left: calc(var(--pc-sl) + 10px); right: calc(var(--pc-sr) + 10px);
+  top: calc(var(--pc-st) + 10px); bottom: calc(var(--pc-sb) + 10px); width: auto; transform: none; box-sizing: border-box; }
+.pc-hud.pc-touch .pc-map { padding: 12px 18px 12px; }
+.pc-hud.pc-touch .pc-map.pc-on { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "title" "chart" "line" "go"; justify-items: center; align-items: center; row-gap: 4px; }
+.pc-hud.pc-touch .pc-map > .pc-title { grid-area: title; margin: 0; }
+.pc-hud.pc-touch .pc-map-chart { grid-area: chart; position: relative; justify-self: stretch; align-self: stretch; min-width: 0; min-height: 0; }
+.pc-hud.pc-touch .pc-map-chart canvas { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
+.pc-hud.pc-touch .pc-map-line { grid-area: line; justify-self: stretch; display: flex; justify-content: center; }
+.pc-hud.pc-touch .pc-map-go { grid-area: go; margin: 2px auto 0; }
+/* a phone held sideways: the chart on the left, its title, its line and the slip in a column on the
+   right (under the close corner) */
+@media (max-height: 520px) {
+  .pc-hud.pc-touch .pc-map.pc-on { grid-template-columns: minmax(0, 1fr) minmax(200px, 30%); grid-template-rows: 40px auto minmax(0, 1fr) auto;
+    grid-template-areas: "chart ." "chart title" "chart line" "chart go"; column-gap: 12px; padding: 10px 12px; }
+  .pc-hud.pc-touch .pc-map-go { margin: 6px auto 4px; }
+}
+/* (a window under 480 px wide: the column narrower, the chart the larger share) */
+@media (max-height: 520px) and (max-width: 480px) {
+  .pc-hud.pc-touch .pc-map.pc-on { grid-template-columns: minmax(0, 1fr) 140px; column-gap: 8px; padding: 8px 10px; }
+}
+/* The sketchbook: its name and the worlds' tabs in one strip along the top, the tabs 44 css px tall,
+   sliding sideways where they do not fit (left of the close corner); the page under them takes the
+   rest and scrolls up and down when full; a swipe across it turns it. */
+.pc-hud.pc-touch .pc-book { padding: 8px 14px 8px; }
+.pc-hud.pc-touch .pc-book.pc-on { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) auto;
+  grid-template-areas: "head tabs" "page page" "foot foot"; column-gap: 14px; row-gap: 4px; }
+.pc-hud.pc-touch .pc-book-head { grid-area: head; margin: 0; padding: 0 0 4px; align-self: center; background: none; }
+.pc-hud.pc-touch .pc-book-body { display: contents; }
+.pc-hud.pc-touch .pc-book-tabs { grid-area: tabs; flex-direction: row; gap: 2px; min-height: 44px; margin-right: 44px; overflow-x: auto; overflow-y: hidden;
+  touch-action: pan-x; scrollbar-width: none; overscroll-behavior: contain; align-self: center; }
+.pc-hud.pc-touch .pc-book-tabs::-webkit-scrollbar { display: none; }
+.pc-hud.pc-touch .pc-book-tab { flex: none; min-height: 44px; box-sizing: border-box; padding: 4px 11px 2px; touch-action: pan-x; }
+.pc-hud.pc-touch .pc-book-page { grid-area: page; height: auto; min-height: 0; overflow-x: hidden; overflow-y: auto; touch-action: pan-y;
+  overscroll-behavior: contain; padding-top: 6px; background: var(--pc-rule) left top / 100% 6px no-repeat; }
+.pc-hud.pc-touch .pc-book-world { margin-bottom: 4px; }
+.pc-hud.pc-touch .pc-book-foot { grid-area: foot; margin-top: 2px; padding-top: 7px; }
+/* The help card on a touch screen: the touch controls drawn small, each with what it does, in place
+   of the keys; no title (the title card has it); a sheet under the tabs that a tap puts away. */
+.pc-help-touch { display: none; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) .pc-help { display: none; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) .pc-help-touch { display: grid; grid-template-columns: auto auto; gap: 8px 18px; margin-top: 12px;
+  color: var(--pc-dark); }
+.pc-help-touch > span { display: flex; align-items: center; gap: 9px; min-height: 36px; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) { width: auto; padding: 16px 22px 16px; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) > .pc-title, .pc-hud.pc-touch .pc-start:not(.pc-title-only) > .pc-sub { display: none; }
+.pc-hud.pc-touch .pc-start:not(.pc-title-only) .pc-status { margin-top: 2px; }
+.pc-hud.pc-touch .pc-start.pc-on:not(.pc-title-only) { pointer-events: auto; touch-action: none; }
+/* A new page's slip on a short screen (a phone held sideways): small, the sketch beside its name,
+   one line under it; the line that says how to open the book is left out. */
+@media (max-height: 520px) {
+  .pc-hud.pc-touch .pc-newsketch { width: 196px; right: calc(var(--pc-sr) + 12px); top: calc(var(--pc-st) + 64px); padding: 5px 7px 6px;
+    display: grid; grid-template-columns: 74px minmax(0, 1fr); column-gap: 8px; align-items: center; }
+  .pc-hud.pc-touch .pc-newsketch img { grid-row: 1 / span 2; width: 74px; }
+  .pc-hud.pc-touch .pc-newsketch b { margin-top: 0; }
+  .pc-hud.pc-touch .pc-newsketch-how { display: none; }
+}
+/* (and in a window under 300 px tall, words only: its name and where it went, under the tabs' row) */
+@media (max-height: 300px) {
+  .pc-hud.pc-touch .pc-newsketch { display: block; width: 168px; top: calc(var(--pc-st) + 52px); right: calc(var(--pc-sr) + 8px); }
+  .pc-hud.pc-touch .pc-newsketch img { display: none; }
+  .pc-hud.pc-touch.pc-sketching .pc-hint { visibility: hidden; }
+}
+/* A phone held upright (W3.4): the game waits; one slip over the picture asks for it to be turned
+   sideways, and nothing else of the interface is up. */
+.pc-turn { display: none; }
+.pc-hud.pc-upright > :not(.pc-turn) { visibility: hidden; }
+.pc-hud.pc-upright .pc-turn { display: flex; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-1.2deg);
+  flex-direction: column; align-items: center; gap: 10px; padding: 16px 24px 14px; color: var(--pc-dark); isolation: isolate; width: max-content; max-width: 80%; }
+.pc-turn::before { content: ''; position: absolute; inset: -4px; z-index: -1; background: var(--pc-paper) var(--pc-paper-img); background-size: 192px 192px;
+  box-shadow: inset 0 0 0 1px rgba(88, 68, 53, 0.16), inset 0 0 18px rgba(88, 68, 53, 0.14);
+  filter: url(#pc-rag) drop-shadow(0 1px 1px rgba(35, 42, 69, 0.35)) drop-shadow(2px 5px 10px rgba(35, 42, 69, 0.25)); }

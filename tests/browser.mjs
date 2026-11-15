@@ -100,6 +100,31 @@ export async function startRun(opt) {
   return { page, problems, close, baseUrl, fails, log, check, info, sleep, shot, look, gameWait, until, holdPitch, aimShipAt, cx, cy, W, H };
 }
 
+// A landing the game began and then gave back on the way down (sim.js, stepLanding's 'blocked':
+// the assist's glide met a ledge and the ground under the hull is a slope; the game says "No
+// level ground here" and the ship hovers, the prompt still up). It happens by chance, where the
+// glide goes: the verifier met it over Saturn in one painted trip of three. The scripted runs
+// see a landing through and fly on when it is given back (tests/trip.mjs, tests/touch.mjs);
+// `--block-landings N` gives their first N landings back on purpose, so that path is run every
+// time it is asked for. This does, between two frames, what Sim.step does on 'blocked': the hull
+// stops, the landing is dropped, the state goes back to ATMOSPHERE, the notice is said (the hull
+// is left where it is, a few metres to 10 m up). Not in the landing gear's last metre. Resolves
+// true when it gave one back.
+export const BLOCKED_NOTICE = 'No level ground here: try a little further on';
+export function giveLandingBack(page) {
+  return page.evaluate((said) => {
+    const s = window.__pc.sim, sh = s.sh;
+    if (s.sm.state !== 'LANDING' || !sh.landing || sh.landing.gear) return false;
+    sh.v = { x: 0, y: 0, z: 0 };
+    sh.speed = 0;
+    sh.landing = null;
+    s.sm.dispatch('abortLanding');
+    s.say(said);
+    s.emit('too-steep');
+    return s.sm.state === 'ATMOSPHERE';
+  }, BLOCKED_NOTICE);
+}
+
 // Wait until the world has had nothing left to build for `calm` frames in a row. Counted in
 // game frames as well as in seconds: in software rendering a top-tier frame takes five to nine
 // seconds, and a slow machine must not read as a slow game. Gives up after maxFrames frames

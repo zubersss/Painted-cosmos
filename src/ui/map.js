@@ -2,7 +2,9 @@
 // use the arrow keys) to choose where the pulse drive should take you; M or Enter closes it.
 // Drawn in code on a 2D canvas; names and the line under the chart are lettered by hand.
 import { BODIES, BODY_IDS } from '../data/bodies.js';
-import { ink, inkOnCanvas, SIZE } from './paint.js';
+import { ink, inkOnCanvas, SIZE, CLOSE_SVG } from './paint.js';
+import { words } from '../core/words.js';
+import { wrapLettering, placeChartNames } from './layout.js';
 
 const INK = '#232a45', SEPIA = '#584435';
 // Mock pigments per body (the painted palettes are Painter's; these only tell the dots apart).
@@ -11,6 +13,67 @@ const TINT = {
   jupiter: '#d9b98c', saturn: '#dcc88e', uranus: '#9fd0c6', neptune: '#7f97cf', pluto: '#c9bfc9',
 };
 const W = 680, H = 400;
+// On a touch screen (W3.3) the chart fills the screen and is drawn at its own size in css px:
+// the names lettered at TOUCH.name css px at least, a world taken by a finger within TOUCH.hit css
+// px of its dot, and a moon drawn TOUCH.moon css px from its planet, so that Earth and the Moon
+// are two places for a finger, not one (8.5 css px apart on a phone at the sheet's old scale).
+// On a chart under smallChart css px tall (a window under about 300 px tall: smaller than any phone
+// held sideways; the painted runs' 400x225) a name with no room at that size may be lettered down
+// to nameSmall css px (the help card is scaled to fit there too).
+export const MAP_TOUCH = Object.freeze({ name: 11.5, hit: 26, moon: 46, maxRatio: 1.35, nameSmall: 9, smallChart: 260 });
+
+// Orbit radius on the chart: compressed so Mercury and Pluto both fit.
+const R = (m) => 26 + 150 * Math.log(1 + m / 60e3) / Math.log(1 + 1180e3 / 60e3) * 1.15;
+// Where each world's dot lies on the canvas (css px), and how big it is. Pure: the chart draws
+// it, and tests/chartnames.test.mjs lays the names of real clock times out from it.
+// view: { sx, sy, ox, oy, touch } (createMap's layout()); positions: { id: { x, y, z } }.
+export function chartDots(positions, view) {
+  const V = view, sm = Math.min(V.sx, V.sy), cx = W / 2, cy = H / 2 + 4;
+  const X = (x) => V.ox + x * V.sx, Y = (y) => V.oy + y * V.sy;
+  const out = [];
+  for (const id of BODY_IDS) {
+    const b = BODIES[id];
+    const p = positions[id];
+    const pp = b.parent ? positions[b.parent] : null;
+    const base = pp || p;
+    const ang = Math.atan2(base.x, base.z);
+    const r = R(Math.hypot(base.x, base.z));
+    let x = X(cx + Math.sin(ang) * r * 1.55), y = Y(cy - Math.cos(ang) * r);
+    // (a moon is drawn off its planet toward where it is: on a touch screen far enough for a finger)
+    let mdx = 0, mdy = 0;
+    if (pp) {
+      const a2 = Math.atan2(p.x - pp.x, p.z - pp.z), off = V.touch ? Math.max(13 * sm, MAP_TOUCH.moon) : 13;
+      mdx = Math.sin(a2); mdy = -Math.cos(a2);
+      x += mdx * off; y += mdy * off;
+    }
+    const size = (pp ? 3.2 : 4 + b.radius / 900) * (V.touch ? Math.max(1, sm) : 1);
+    out.push({ id, name: b.name, x, y, size, moon: !!pp, mdx, mdy, parent: b.parent || null });
+  }
+  return out;
+}
+// The names to place on the touch chart (src/ui/layout.js placeChartNames), from chartDots: the
+// chosen world first and a size larger; a moon's name on its far side from its planet, its
+// planet's on the other; what lies round a dot (the chosen world's ring, the tick by the world
+// you are at) kept clear as part of it. A name with no room anywhere is left off (its dot stays,
+// and a tap names it in the line), never the chosen world's or that of the world you are at.
+export function chartNameList(dots, view, selected, here) {
+  const sm = Math.min(view.sx, view.sy), size = Math.max(MAP_TOUCH.name, 9.2 * sm), big = size + 1.2;
+  const moonOf = {};
+  for (const n of dots) if (n.moon) moonOf[n.parent] = n;
+  const side = (m, flip) => {
+    const o = m.mdy > 0.3 ? ['down', 'right', 'left', 'up'] : m.mdy < -0.3 ? ['up', 'right', 'left', 'down'] : m.mdx > 0 ? ['right', 'up', 'down', 'left'] : ['left', 'up', 'down', 'right'];
+    if (!flip) return o;
+    const opp = { up: 'down', down: 'up', right: 'left', left: 'right' };
+    return m.mdy > 0.3 || m.mdy < -0.3 ? [opp[o[0]], 'left', 'right', o[0]] : [opp[o[0]], 'up', 'down', o[0]];
+  };
+  const small = view.h < MAP_TOUCH.smallChart;
+  return dots.slice().sort((a, b) => (b.id === selected) - (a.id === selected)).map((n) => ({
+    id: n.id, name: n.name, x: n.x, y: n.y, s: n.id === selected ? big : size,
+    sMin: small ? MAP_TOUCH.nameSmall + (n.id === selected ? 1.2 : 0) : undefined, mayHide: n.id !== selected && n.id !== here,
+    r: n.id === selected ? n.size + 6.5 : n.id === here ? n.size + 7 : n.size, rd: n.size,
+    prefer: n.moon ? side(n, false) : moonOf[n.id] ? side(moonOf[n.id], true) : ['up', 'down', 'right', 'left'],
+  }));
+}
 
 function el(tag, cls, parent, text) {
   const e = document.createElement(tag);
@@ -20,23 +83,56 @@ function el(tag, cls, parent, text) {
   return e;
 }
 
-export function createMap(root, { onSelect } = {}) {
+// press(code): on a touch screen (W3.2) the corner that closes the sheet and the 'set course'
+// slip press the map's key (the game puts the sheet away on it; the course is set by the pick).
+// mode(): which hand is on the game ('keys', 'touch', 'pad': src/core/words.js), for the line.
+export function createMap(root, { onSelect, press, mode } = {}) {
   const panel = el('div', 'pc-panel pc-map', root);
   ink(el('div', 'pc-title', panel), 'the system', SIZE.head + 3, { rough: true, tracking: 1.1 });
-  const canvas = el('canvas', '', panel);
+  const chart = el('div', 'pc-map-chart', panel);
+  const canvas = el('canvas', '', chart);
   canvas.width = W * 2; canvas.height = H * 2;
   const line = el('div', 'pc-label pc-map-line', panel);
+  const go = el('div', 'pc-button pc-map-go', panel);
+  const close = el('div', 'pc-close', panel);
+  close.innerHTML = CLOSE_SVG;
+  for (const e of [go, close]) {
+    e.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
+    e.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); if (press) press('KeyM'); });
+  }
   const g = canvas.getContext('2d');
-  let open = false, spots = [], selected = null, here = null, last = null;
+  let open = false, spots = [], selected = null, here = null, last = null, goSize = SIZE.prompt;
+  // How the chart's 680 x 400 lie on the canvas: k canvas px per css px, (sx, sy) css px per chart
+  // unit, (ox, oy) the chart's corner in css px. The desktop: the canvas is the chart, at 2x.
+  const DESK = Object.freeze({ k: 2, sx: 1, sy: 1, ox: 0, oy: 0, w: W, h: H, touch: false });
+  let view = DESK, labelSizes = [];
+  const touchOn = () => root.classList.contains('pc-touch');
+  const sayMode = () => (touchOn() ? 'touch' : (mode && mode()) || 'keys');
+  // (re)fit the canvas to its box: on a touch screen the box is the sheet's (theme.css), and the
+  // chart is stretched to it up to MAP_TOUCH.maxRatio one way, centred the other
+  function layout() {
+    if (!touchOn()) {
+      if (view !== DESK) { view = DESK; canvas.width = W * 2; canvas.height = H * 2; }
+      return;
+    }
+    const r = chart.getBoundingClientRect();
+    const cw = Math.max(80, Math.round(r.width)), ch = Math.max(60, Math.round(r.height));
+    const k = Math.min(2, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
+    let sx = cw / W, sy = ch / H;
+    if (sx > sy * MAP_TOUCH.maxRatio) sx = sy * MAP_TOUCH.maxRatio;
+    if (sy > sx * MAP_TOUCH.maxRatio) sy = sx * MAP_TOUCH.maxRatio;
+    view = { k, sx, sy, ox: (cw - W * sx) / 2, oy: (ch - H * sy) / 2, w: cw, h: ch, touch: true };
+    if (canvas.width !== Math.round(cw * k) || canvas.height !== Math.round(ch * k)) { canvas.width = Math.round(cw * k); canvas.height = Math.round(ch * k); }
+  }
 
-  // Orbit radius on the chart: compressed so Mercury and Pluto both fit.
-  const R = (m) => 26 + 150 * Math.log(1 + m / 60e3) / Math.log(1 + 1180e3 / 60e3) * 1.15;
   const wob = (i, k) => Math.sin(i * 12.9898 + k * 78.233) * 0.5 + 0.5;
 
   function draw(data) {
     last = data;
-    g.setTransform(2, 0, 0, 2, 0, 0);
-    g.clearRect(0, 0, W, H);                         // the chart is drawn straight on the panel's paper
+    const V = view, sm = Math.min(V.sx, V.sy), lw = V.touch ? Math.max(1, sm) : 1;
+    const X = (x) => V.ox + x * V.sx, Y = (y) => V.oy + y * V.sy;
+    g.setTransform(V.k, 0, 0, V.k, 0, 0);
+    g.clearRect(0, 0, V.w, V.h);                     // the chart is drawn straight on the panel's paper
     const cx = W / 2, cy = H / 2 + 4;
     // Orbits: pencilled freehand. Each is pulled round in three or four strokes that do not
     // quite meet and do not quite keep their distance; where two strokes overlap the line is
@@ -60,10 +156,10 @@ export function createMap(root, { onSelect } = {}) {
         let px = 0, py = 0;
         for (let i = 0; i <= steps; i++) {
           const u = i / steps, a = a0 + (a1 - a0) * u, q = r * rad(a) * lift;
-          const x = cx + ox + Math.cos(a) * q * 1.55, y = cy + oy + Math.sin(a) * q;
+          const x = X(cx + ox + Math.cos(a) * q * 1.55), y = Y(cy + oy + Math.sin(a) * q);
           if (i && wob(n * 7 + k, 90 + i) > 0.1) {
             const press = Math.sin(Math.PI * Math.min(1, u * 1.15)) ** 0.7 * (0.75 + 0.5 * wob(n * 3 + k, 130 + (i >> 2)));
-            g.strokeStyle = `rgba(90, 80, 72, ${(alpha * (0.55 + 0.45 * press)).toFixed(2)})`; g.lineWidth = 0.35 + heavy * press;
+            g.strokeStyle = `rgba(90, 80, 72, ${(alpha * (0.55 + 0.45 * press)).toFixed(2)})`; g.lineWidth = (0.35 + heavy * press) * lw;
             g.beginPath(); g.moveTo(px, py); g.lineTo(x, y); g.stroke();
           }
           px = x; py = y;
@@ -71,20 +167,14 @@ export function createMap(root, { onSelect } = {}) {
       }
     });
     // The sun: bare paper with a warm halo.
-    const halo = g.createRadialGradient(cx, cy, 2, cx, cy, 30);
+    const hr = V.touch ? 30 * Math.max(0.75, sm) : 30, scx = X(cx), scy = Y(cy);
+    const halo = g.createRadialGradient(scx, scy, 2, scx, scy, hr);
     halo.addColorStop(0, 'rgba(244,239,228,1)'); halo.addColorStop(0.35, 'rgba(240,200,120,0.55)'); halo.addColorStop(1, 'rgba(240,200,120,0)');
-    g.fillStyle = halo; g.beginPath(); g.arc(cx, cy, 30, 0, Math.PI * 2); g.fill();
+    g.fillStyle = halo; g.beginPath(); g.arc(scx, scy, hr, 0, Math.PI * 2); g.fill();
     spots = [];
-    for (const id of BODY_IDS) {
+    const dots = chartDots(data.positions, V);
+    for (const { id, x, y, size, moon: pp } of dots) {
       const b = BODIES[id];
-      const p = data.positions[id];
-      const pp = b.parent ? data.positions[b.parent] : null;
-      const base = pp || p;
-      const ang = Math.atan2(base.x, base.z);
-      const r = R(Math.hypot(base.x, base.z));
-      let x = cx + Math.sin(ang) * r * 1.55, y = cy - Math.cos(ang) * r;
-      if (pp) { const a2 = Math.atan2(p.x - pp.x, p.z - pp.z); x += Math.sin(a2) * 13; y -= Math.cos(a2) * 13; }
-      const size = pp ? 3.2 : 4 + b.radius / 900;
       // A dab of wash: not round, thin in the middle, the pigment pooled along its edge; then
       // a pen line most of the way round, a little off register.
       const k = BODY_IDS.indexOf(id), tint = TINT[id] || '#bbbbbb';
@@ -107,13 +197,50 @@ export function createMap(root, { onSelect } = {}) {
         g.strokeStyle = '#b5553c'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x - size - 9, y + size + 7); g.lineTo(x - size - 3, y + size + 2); g.stroke();
         g.beginPath(); g.moveTo(x - size - 9, y + size + 7); g.lineTo(x - size - 2, y + size + 8); g.stroke();
       }
-      // A moon's name goes under its dot so it does not sit on its planet's name.
-      inkOnCanvas(g, b.name, x, pp ? y + size + 13 : y - size - 7, id === selected ? 10.4 : 9.2, { align: 'center', color: id === selected ? INK : SEPIA, halo: 'rgba(244, 239, 228, 0.7)', seed: 2 });
-      spots.push({ id, x, y, size });
+      if (!V.touch) {
+        // A moon's name goes under its dot so it does not sit on its planet's name.
+        inkOnCanvas(g, b.name, x, pp ? y + size + 13 : y - size - 7, id === selected ? 10.4 : 9.2, { align: 'center', color: id === selected ? INK : SEPIA, halo: 'rgba(244, 239, 228, 0.7)', seed: 2 });
+      }
+      // (spots in the chart's units, as they always were; sx, sy: in css px on the canvas)
+      spots.push({ id, x: (x - V.ox) / V.sx, y: (y - V.oy) / V.sy, size, sx: x, sy: y });
     }
+    labelSizes = [];
+    if (V.touch) placeNames(dots, V);
     const t = data.target;
-    ink(line, t ? `${t.name}: ${fmt(t.distance)} away, about ${Math.max(1, Math.round(t.eta))} s by pulse drive`
-      : 'click a world, or use the arrow keys, to set a course', SIZE.body);
+    const said = t ? `${t.name}: ${fmt(t.distance)} away, about ${Math.max(1, Math.round(t.eta))} s by pulse drive`
+      : words('click a world, or use the arrow keys, to set a course', sayMode()) || '';
+    // (on a touch screen the line and the slip are wrapped to their column)
+    const col = V.touch ? Math.max(140, line.clientWidth || 0) : 0;
+    ink(line, col ? wrapLettering(said, SIZE.body, col) : said, SIZE.body, V.touch ? { align: 'center' } : {});
+    panel.classList.toggle('pc-has-course', !!t);
+    if (t) ink(go, col ? wrapLettering('set course for ' + t.name, goSize, Math.max(120, col - 46)) : 'set course for ' + t.name, goSize, V.touch ? { align: 'center' } : {});
+  }
+
+  // The names on a touch screen, lettered at MAP_TOUCH.name css px or more: each where its ink lies
+  // on no other name and no dot (src/ui/layout.js placeChartNames: above, below, then beside its
+  // dot, then at its corners; a moon's on its far side from its planet, its planet's on the
+  // other: chartNameList), the chosen world first.
+  // (the worlds creep across the chart a fraction of a pixel a second: the names are placed again
+  // only when a dot has moved half a pixel, the choice or the size has changed)
+  let placedKey = '', placed = null;
+  function placeNames(dots, V) {
+    const items = chartNameList(dots, V, selected, here);
+    const key = V.w + 'x' + V.h + '|' + selected + '|' + here + '|' + items.map((n) => Math.round(n.x * 2) + ',' + Math.round(n.y * 2)).join(';');
+    if (key !== placedKey) { placed = placeChartNames(items, { w: V.w, h: V.h }); placedKey = key; }
+    for (const p of placed) {
+      if (p.hidden) continue;
+      const n = items.find((q) => q.id === p.id);
+      inkOnCanvas(g, n.name, p.x, p.y, p.s, { align: 'center', color: n.id === selected ? INK : SEPIA, halo: 'rgba(244, 239, 228, 0.75)', seed: 2 });
+      labelSizes.push({ id: n.id, size: p.s, x: p.x, y: p.y, box: p.box, clear: p.clear });
+    }
+  }
+
+  // A finger's tap on the chart (css px from the canvas' corner): the nearest world within
+  // MAP_TOUCH.hit css px of its dot (not the one you are at).
+  function touchPick(px, py) {
+    let best = null, bd = MAP_TOUCH.hit;
+    for (const s of spots) { const d = Math.hypot(s.sx - px, s.sy - py); if (d < bd && s.id !== here) { bd = d; best = s.id; } }
+    if (best) pick(best);
   }
 
   function pick(id) {
@@ -122,7 +249,23 @@ export function createMap(root, { onSelect } = {}) {
     if (last) draw({ ...last, target: last.targetOf ? last.targetOf(id) : last.target });
   }
 
+  // A finger: its own pointer event, and no mouse event made up from it (touchstart cancelled).
+  canvas.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    const r = canvas.getBoundingClientRect();
+    if (view.touch) touchPick(e.clientX - r.left, e.clientY - r.top);
+    else {
+      // (a touch on the desktop's chart: the same rule as the mouse, in the chart's units)
+      const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
+      let best = null, bd = 26;
+      for (const s of spots) { const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; best = s.id; } }
+      if (best && best !== here) pick(best);
+    }
+    e.stopPropagation();
+  });
   canvas.addEventListener('mousedown', (e) => {
+    if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
     const r = canvas.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
     let best = null, bd = 26;
@@ -131,20 +274,36 @@ export function createMap(root, { onSelect } = {}) {
     e.stopPropagation();
   });
 
+  // A turned phone, a resized window: the open chart is fitted again.
+  if (typeof window !== 'undefined') window.addEventListener('resize', () => { if (open && last) { layout(); draw(last); } });
+
   return {
     get open() { return open; },
     get selected() { return selected; },
     spots: () => spots.map((s) => ({ ...s })),
+    // where a world is on the screen (client css px), and the names' sizes (css px) on a touch screen
+    spotOnScreen(id) {
+      const s = spots.find((q) => q.id === id), r = canvas.getBoundingClientRect();
+      if (!s) return null;
+      return view.touch ? { x: r.left + s.sx, y: r.top + s.sy } : { x: r.left + (s.x / W) * r.width, y: r.top + (s.y / H) * r.height };
+    },
+    labelSizes: () => labelSizes.map((l) => ({ ...l })),
+    get touchLayout() { return view.touch; },
     canvas,
     // data: { positions: { id: {x,y,z} }, here, target: { name, distance, eta } | null, targetOf(id) }
     show(data) {
       open = true; here = data.here; selected = data.selected || null;
-      panel.style.setProperty('--pc-fit', String(Math.min(1, window.innerWidth / 780, window.innerHeight / 520)));
+      // (on a touch screen the sheet fills the screen at its own size, theme.css: no scale)
+      const touch = touchOn();
+      panel.style.setProperty('--pc-fit', touch ? '1' : String(Math.min(1, window.innerWidth / 780, window.innerHeight / 520)));
+      goSize = SIZE.prompt;
       panel.classList.add('pc-on');
+      layout();
       draw(data);
     },
     hide() { open = false; panel.classList.remove('pc-on'); },
-    refresh(data) { if (open) { here = data.here; draw(data); } },
+    refresh(data) { if (open) { here = data.here; layout(); draw(data); } },
+    get courseSlip() { return go; },
     // Arrow keys step through the worlds in order from the sun.
     step(dir) {
       const ids = BODY_IDS.filter((id) => id !== here);

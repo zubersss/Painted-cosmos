@@ -1,8 +1,23 @@
 // Minimal HUD: one prompt line, a jetpack gauge, a throttle gauge, a quiet read-out, markers
 // for the worlds, the title and help card. Everything on it is painted (src/ui/paint.js):
 // torn paper slips, hand lettering, ink rings; src/ui/theme.css lays it out.
-import { installTheme, ink, ringPath, iconSvg, SIZE } from './paint.js';
+import { installTheme, ink, ringPath, iconSvg, touchIconSvg, SIZE, CLOSE_SVG } from './paint.js';
 import { layoutMarks, ringSize, wrapLettering } from './layout.js';
+import { name as controlName, words } from '../core/words.js';
+
+// The title card's line of the controls a newcomer needs (src/core/words.js letters it for the
+// keyboard, the fingers or the pad).
+const FIRST = '{KeyW KeyA KeyS KeyD} walk   \u00b7   the mouse looks\n{KeyE} boards the ship   \u00b7   {KeyH} shows every key';
+// The help card on a touch screen (W3.3): the touch controls drawn small, each with what it does.
+const TOUCH_HELP = [
+  ['stick', 'the left thumb walks', 'in the ship: turn, throttle'],
+  ['drag', 'drag on the right: look', 'in the ship: the nose'],
+  ['pinch', 'pinch: the camera', 'nearer, farther'],
+  ['jump', 'jump, hold for the jetpack', 'in the ship: rise'],
+  ['buttons', 'in the ship: sink, brake', ''],
+  ['slip', 'tap a slip: board, land,', 'step out, pulse'],
+  ['tabs', 'the tabs: map, sketchbook,', 'help, view'],
+];
 
 // el(tag, class, parent, text, size): `text` is lettered by hand at `size` (cap height, px).
 function el(tag, cls, parent, text, size) {
@@ -35,14 +50,86 @@ export function createHud(root) {
   const freshImg = el('img', '', fresh); freshImg.alt = ''; freshImg.draggable = false;
   const freshTitle = el('b', '', fresh);
   const freshSub = el('span', 'pc-label', fresh);
+  const freshHow = el('span', 'pc-label pc-newsketch-how', fresh);
   let freshTimer = 0;
   const readout = el('div', 'pc-readout pc-label', root);
+  // A phone held upright (W3.4): one slip over the waiting picture, a phone drawn turning sideways.
+  const turn = el('div', 'pc-turn', root);
+  turn.insertAdjacentHTML('beforeend', '<svg class="pc-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="48" viewBox="0 0 64 48" aria-hidden="true">'
+    + '<rect x="6" y="6" width="20" height="34" rx="4" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45" filter="url(#pc-rough)"/>'
+    + '<rect x="24" y="20" width="34" height="20" rx="4" fill="rgba(77,96,178,0.16)" stroke="currentColor" stroke-width="1.5" filter="url(#pc-rough)"/>'
+    + '<path d="M22 8C34 6 42 10 45 17M40.6 14.2L45.4 17.6L46.4 11.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  el('span', '', turn, 'turn the phone sideways to play', SIZE.prompt);
   const dot = el('div', 'pc-reticle', root);
+  // ---- the touch controls (src/core/touch.js; shown only while the touch layer is up) --------
+  // The stick's ring where the left thumb is (a faint one where it would be, while no thumb is
+  // down), and round paper buttons in the right thumb's arc that press the keys' codes: JUMP
+  // (RISE in the ship) 72 css px across, SINK 56, BRAKE 52. A tap on JUMP jumps, a hold is the
+  // jetpack; in the ship RISE and SINK are held, BRAKE too.
+  const touchUi = el('div', 'pc-touchui', root);
+  const stick = el('div', 'pc-stick', touchUi);
+  const stickDab = el('i', '', stick);
+  el('div', 'pc-stick-rest', touchUi);
+  const arc = el('div', 'pc-arc', touchUi);
+  let touchPad = null, touchMode = '';
+  const tnow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // A control: a finger on it presses `code` (held while the finger stays, or a tap only), and
+  // the finger is its own (captured: it does not become the stick or the look).
+  const control = (e, code, hold) => {
+    e.dataset.code = code;
+    e.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
+    e.addEventListener('pointerdown', (ev) => {
+      ev.stopPropagation();
+      if (!touchPad) return;
+      try { e.setPointerCapture(ev.pointerId); } catch { /* still pressed */ }
+      if (hold) touchPad.press(code, ev.pointerId, tnow()); else touchPad.tap(code, tnow());
+      e.classList.add('pc-down');
+    });
+    const up = (ev) => { if (touchPad) touchPad.release(ev.pointerId); e.classList.remove('pc-down'); };
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) e.addEventListener(t, up);
+    return e;
+  };
+  const tbtn = (cls, code, word) => {
+    const b = control(el('div', 'pc-tbtn ' + cls, arc), code, true);
+    b._word = el('span', '', b, word, SIZE.small);
+    return b;
+  };
+  const jumpBtn = tbtn('pc-tbtn-jump', 'Space', 'jump');
+  tbtn('pc-tbtn-sink', 'KeyC', 'sink');
+  tbtn('pc-tbtn-brake', 'KeyX', 'brake');
+  // Tabs in the top left corner, 44 css px square (W3.2): the map, the sketchbook, the help
+  // card, the view (first or third person; cockpit or chase). Each is a tap of its key.
+  const tabs = el('div', 'pc-tabs', touchUi);
+  const tab = (code, inner, name) => {
+    const t = control(el('div', 'pc-tab', tabs), code, false);
+    t.setAttribute('aria-label', name);
+    if (typeof inner === 'string' && inner.startsWith('<')) t.insertAdjacentHTML('beforeend', inner);
+    else el('span', '', t, inner, SIZE.head);
+    return t;
+  };
+  tab('KeyM', iconSvg('map', 24, '#4d60b2'), 'map');
+  tab('KeyB', iconSvg('book', 24), 'sketchbook');
+  tab('KeyH', '?', 'help');
+  tab('KeyV', iconSvg('view', 24, '#4d60b2'), 'view');
+  // The prompts' keys by name, for a prompt that does not say its code.
+  const CODE = { E: 'KeyE', SPACE: 'Space', F: 'KeyF' };
+  let touchOn = false;
+  // Which hand is on the game, for the words (src/core/words.js): 'keys', 'touch' or 'pad'.
+  let wordMode = 'keys', inShip = false;
+  const say = (t) => words(t, wordMode, { labels, inShip });
   const card = el('div', 'pc-panel pc-start', root);
+  // (on a touch screen the help card is a sheet: a tap anywhere on it puts it away, as a tap on the
+  // picture does; theme.css lets it take the finger only then, never as the title card)
+  control(card, 'KeyH', false);
+  // (on a touch screen the help card has a corner to close it by; a tap anywhere does too)
+  const cardClose = control(el('div', 'pc-close', card), 'KeyH', false);
+  cardClose.insertAdjacentHTML('beforeend', CLOSE_SVG);
+  cardClose.setAttribute('aria-label', 'close');
   ink(el('div', 'pc-title', card), 'Painted Cosmos', SIZE.title, { rough: true, tracking: 1.12 });
   const sub = el('div', 'pc-label pc-sub', card, 'a watercolour to walk into', SIZE.prompt);
   // One line that says what the card is waiting for: the paper while loading, then a click.
   const status = el('div', 'pc-status', card);
+  let statusTpl = '{click} to begin';
   const statusText = el('span', '', status, 'click to begin', SIZE.prompt);
   status.insertAdjacentHTML('beforeend', '<i class="pc-dabs"><b></b><b></b><b></b></i>');
   // The title is the title (PAINTER's critique 7: "the title card is the manual, and it covers the
@@ -50,7 +137,7 @@ export function createHud(root) {
   // name, the line under it, the stroke that says "click to begin" and one line of the keys a
   // newcomer needs; the painting is open under it. The whole list of keys is the same card on H.
   const first = el('div', 'pc-label pc-first', card);
-  const firstLine = () => ink(first, `${keyName(['KeyW', 'KeyA', 'KeyS', 'KeyD'])} walk   \u00b7   the mouse looks\n${keyName(['KeyE'])} boards the ship   \u00b7   ${keyName(['KeyH'])} shows every key`, SIZE.small, { align: 'center' });
+  const firstLine = () => ink(first, say(FIRST) || '', SIZE.small, { align: 'center' });
   card.classList.add('pc-title-only');
   const help = el('div', 'pc-help pc-label', card);
   // Keys named by code are relabelled for the player's keyboard layout (setKeyLabels; the
@@ -64,7 +151,7 @@ export function createHud(root) {
     ['anywhere', ''], [['KeyB'], 'sketchbook'], [['KeyH'], 'this card'], ['backquote', 'frame read-out'], ['pad', 'a gamepad works too'],
   ];
   let labels = {};
-  function keyName(k) { return Array.isArray(k) ? k.map((c) => labels[c] || c.slice(3)).join(' ') : k; }
+  function keyName(k) { return Array.isArray(k) ? k.map((c) => controlName(c, 'keys', { labels })).join(' ') : k; }
   const promptKey = (k) => (typeof k === 'string' && k.length === 1 && labels['Key' + k]) || k;
   const keyEls = [];
   for (const [k, t] of rows) {
@@ -74,12 +161,31 @@ export function createHud(root) {
     if (Array.isArray(k)) keyEls.push([kb, k]);
     el('span', '', row, t, SIZE.body);
   }
+  // On a touch screen the same card shows the touch controls instead (theme.css: .pc-touch).
+  const helpTouch = el('div', 'pc-help-touch pc-label', card);
+  for (const [icon, a, b] of TOUCH_HELP) {
+    const row = el('span', '', helpTouch);
+    row.insertAdjacentHTML('beforeend', touchIconSvg(icon));
+    el('span', '', row, b ? a + '\n' + b : a, SIZE.body);
+  }
 
   firstLine();
   // Keep the start card inside small windows.
   // (measured, not assumed: the card's laid-out size is not changed by the scale itself)
-  const fit = () => card.style.setProperty('--pc-fit', String(Math.min(1,
-    window.innerWidth / ((card.offsetWidth || 608) + 36), window.innerHeight / ((card.offsetHeight || 500) + 44))));
+  // The title card (small, in the upper third) is kept inside the top edge: at 26 % of a window
+  // 340 px tall its top was 13 px above it (W3.3). On a touch screen the help card lies under the
+  // tabs (a tap on it puts it away; it must not lie over them).
+  const fit = () => {
+    const W = window.innerWidth, H = window.innerHeight, w = card.offsetWidth || 608, h = card.offsetHeight || 500;
+    const titleOnly = card.classList.contains('pc-title-only'), sheet = touchOn && !titleOnly;
+    const top = sheet ? 64 : 0;
+    // (the sheet on a touch screen keeps its lettering at its own size where it can: 10 px spare)
+    const k = sheet ? Math.min(1, (W - 24) / w, (H - top - 10) / h) : Math.min(1, W / (w + 36), (H - top) / (h + 44));
+    card.style.setProperty('--pc-fit', String(k));
+    if (titleOnly) card.style.top = Math.max(0.26 * H, (h * k) / 2 + 8) + 'px';
+    else if (sheet) card.style.top = (top + Math.max(h * k, (H - top - 10)) / 2) + 'px';
+    else card.style.top = '';
+  };
   window.addEventListener('resize', fit);
   fit();
 
@@ -93,9 +199,12 @@ export function createHud(root) {
   let slips = [], slipTick = 0;
   const slipRects = () => {
     const out = [];
-    const take = (e) => { const r = e.getBoundingClientRect(); if (r.width > 0) out.push({ x0: r.left - 5, y0: r.top - 4, x1: r.right + 5, y1: r.bottom + 4, soft: true }); };
-    if (prompt.classList.contains('pc-on')) for (const b of prompt.children) take(b);
-    for (const e of [notice, hint, fuel, thr, readout, fresh]) if (e.classList.contains('pc-on')) take(e);
+    // (on a touch screen the slips and the buttons are controls: no label lies on one, even a label
+    // that must show; the others are soft: a label that must show and has nowhere else may)
+    const take = (e, hard) => { const r = e.getBoundingClientRect(); if (r.width > 0) out.push({ x0: r.left - 5, y0: r.top - 4, x1: r.right + 5, y1: r.bottom + 4, soft: !hard }); };
+    if (prompt.classList.contains('pc-on')) for (const b of prompt.children) take(b, touchOn);
+    for (const e of [notice, hint, fuel, thr, readout, fresh]) if (e.classList.contains('pc-on')) take(e, false);
+    if (touchOn) for (const e of touchUi.querySelectorAll('.pc-tab, .pc-tbtn')) take(e, true);
     return out;
   };
   // The widest a line of a notice or the hint may be lettered, for this window: on foot in third
@@ -103,16 +212,23 @@ export function createHud(root) {
   const lineRoom = (share) => Math.max(140, Math.min(640, (window.innerWidth || 1280) * share - 36));
   return {
     root,
+    // On a touch screen (W3.2) each slip is a button: a tap presses its action's code (a tap, not
+    // a hold: the slip may go away under the finger); no key is lettered on it.
     setPrompt(p) {
-      const key = p ? `${p.key}|${p.text}|${p.key2 || ''}|${p.text2 || ''}` : '';
+      const key = p ? `${p.key}|${p.text}|${p.key2 || ''}|${p.text2 || ''}|${touchOn ? 'touch' : wordMode}` : '';
       if (key === lastPrompt) return;
       lastPrompt = key;
       prompt.innerHTML = '';
       prompt.classList.toggle('pc-on', !!p);
       if (!p) return;
-      const add = (k, t) => { const s = el('span', 'pc-button', prompt); el('kbd', '', s, promptKey(k), SIZE.key); el('span', '', s, t, SIZE.prompt); };
-      add(p.key, p.text);
-      if (p.key2) add(p.key2, p.text2);
+      const add = (k, t, code) => {
+        const s = el('span', 'pc-button', prompt);
+        if (touchOn) { control(s, code || CODE[k] || k, false); s.classList.add('pc-slip'); }
+        else el('kbd', '', s, (wordMode === 'pad' && controlName(code || CODE[k] || k, 'pad', { inShip })) || promptKey(k), SIZE.key);
+        el('span', '', s, t, SIZE.prompt);
+      };
+      add(p.key, p.text, p.code);
+      if (p.key2) add(p.key2, p.text2, p.code2);
     },
     promptText() { return lastPrompt; },
     // Key names for this keyboard layout ({ KeyW: 'Z', ... } from src/core/input.js keyLabels).
@@ -120,10 +236,24 @@ export function createHud(root) {
       labels = map || {};
       for (const [kb, k] of keyEls) ink(kb, keyName(k), SIZE.key);
       firstLine();
+      ink(statusText, say(statusTpl) || '', SIZE.prompt);
       lastPrompt = '';                    // the next prompt is drawn afresh with the new names
       fit();
     },
     keyLabel: (code) => labels[code] || code.slice(3),
+    get labels() { return labels; },
+    // Which hand is on the game ('keys', 'touch', 'pad': src/core/words.js) and whether it is in the
+    // ship (the touch layer's jump is rise there): the card's lines and the prompt are lettered anew.
+    setWords(mode, ship = false) {
+      const m = mode === 'touch' || mode === 'pad' ? mode : 'keys';
+      if (m === wordMode && !!ship === inShip) return;
+      wordMode = m; inShip = !!ship;
+      firstLine();
+      ink(statusText, say(statusTpl) || '', SIZE.prompt);
+      lastPrompt = null;
+      fit();
+    },
+    get wordMode() { return wordMode; },
     setFuel(f, show) {
       fuel.classList.toggle('pc-on', !!show);
       fuelBar.style.width = Math.round(f * 100) + '%';
@@ -192,9 +322,15 @@ export function createHud(root) {
     showSketch(url, title, sub, seconds = 6) {
       freshImg.src = url;
       // (a long name is wrapped to the slip: "Alpine Meadow and Snow Peaks" ran off it and off the screen)
-      const room = Math.max(120, (fresh.clientWidth || 160) - 14);
+      // (on a short touch screen the sketch lies beside its name, theme.css: the name's own column)
+      let room = Math.max(120, (fresh.clientWidth || 160) - 14);
+      try { if (getComputedStyle(fresh).display === 'grid') room = Math.max(90, freshTitle.clientWidth - 4); } catch { /* no styles: the slip's width */ }
       ink(freshTitle, wrapLettering(title || '', SIZE.body, room), SIZE.body);
-      ink(freshSub, wrapLettering(sub || '', SIZE.tiny, room), SIZE.tiny);
+      // (its first line says where the page went, the rest how to open the book: a short screen
+      // shows the first only, theme.css)
+      const [where, ...how] = String(sub || '').split('\n');
+      ink(freshSub, wrapLettering(where, SIZE.tiny, room), SIZE.tiny);
+      ink(freshHow, how.length ? wrapLettering(how.join('\n'), SIZE.tiny, room) : '', SIZE.tiny);
       fresh.classList.add('pc-on');
       root.classList.add('pc-sketching');
       clearTimeout(freshTimer);
@@ -208,6 +344,34 @@ export function createHud(root) {
       root.classList.toggle('pc-stats-on', !!text);
       if (text && text !== lastStats) { lastStats = text; stats.textContent = text; }
     },
+    // The touch layer's pad (src/core/touch.js), for the touch controls to press.
+    bindTouch(pad) { touchPad = pad || null; },
+    // t: null (no touch layer: the desktop HUD, untouched) or { on, idle (fade the controls),
+    // mode ('foot', 'board', 'landed', 'fly', 'pulse', 'landing': which buttons show), stick
+    // (the stick's centre cx, cy and its thumb x, y in css px, or null) }.
+    setTouch(t) {
+      const on = !!(t && t.on);
+      if (on !== touchOn) { touchOn = on; root.classList.toggle('pc-touch', on); lastPrompt = null; fit(); }
+      if (!on) return;
+      root.classList.toggle('pc-idle', !!t.idle);
+      const mode = t.mode || 'foot';
+      if (mode !== touchMode) {
+        if (touchMode) root.classList.remove('pc-t-' + touchMode);
+        root.classList.add('pc-t-' + mode);
+        touchMode = mode;
+        ink(jumpBtn._word, mode === 'foot' ? 'jump' : 'rise', SIZE.small);
+      }
+      const s = t.stick;
+      stick.classList.toggle('pc-on', !!s);
+      if (s) {
+        stick.style.transform = `translate(${s.cx.toFixed(1)}px, ${s.cy.toFixed(1)}px)`;
+        stickDab.style.transform = `translate(${(s.x - s.cx).toFixed(1)}px, ${(s.y - s.cy).toFixed(1)}px)`;
+      }
+    },
+    get touchShown() { return root.classList.contains('pc-touch'); },
+    // A phone held upright: the slip that asks for it to be turned, over the waiting picture.
+    setUpright(on) { root.classList.toggle('pc-upright', !!on); },
+    get uprightShown() { return root.classList.contains('pc-upright'); },
     // (the first time the card is put away the game has begun: from then on it is the help card, whole)
     showStart(on) {
       if (!on) card.classList.remove('pc-title-only');
@@ -217,8 +381,10 @@ export function createHud(root) {
     get startShown() { return card.classList.contains('pc-on'); },
     setSubtitle(text) { ink(sub, text, SIZE.prompt); },
     // The card's one line of status ("preparing the paper...", "click to begin", "H closes this card").
+    // (written with the tokens of src/core/words.js: "{click} to begin", "{KeyH} closes this card")
     setStartStatus(text, waiting = false) {
-      ink(statusText, text, SIZE.prompt);
+      statusTpl = text;
+      ink(statusText, say(text) || '', SIZE.prompt);
       status.classList.toggle('pc-wait', !!waiting);
     },
     // While the first view is being built only the title card shows, on the bare sheet.

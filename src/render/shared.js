@@ -61,6 +61,11 @@ export const G = {
   uAux8: { value: 0 },
 };
 
+// (R1 W2.4) whether water was drawn in this frame's scene pass (the water material says so as it is drawn), and the world
+// the eye is on (index.js, from the mood): the post passes keep last frame's painting for its reflections on a world
+// once its water has been drawn there (post.js finish)
+export const PREV = { water: false, body: null };
+
 // Things laid as a GLAZE over the painted scene (rain): objects whose material blends. They are
 // left out of the scene pass and drawn after the abstraction pass, straight onto the brushed
 // picture, so a stroke stays a stroke: transparent, darker than a light sky, lighter than a

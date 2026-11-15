@@ -1,0 +1,69 @@
+exported 2355594 to /home/user/.pc-scratch/pilot/r1/trip1/export
+06:49:27 painted-trip ... pass (492 s) 50 checks
+
+==============================================================================
+Painted Cosmos: every check, exported 2355594 to /home/user/.pc-scratch/pilot/r1/trip1/export
+==============================================================================
+PASS  painted-trip    492 s  50 checks
+------------------------------------------------------------------------------
+ALL 1 PASSED
+Not checked here, and not checkable in this sandbox: frame rate on a real GPU, a real mouse
+under pointer lock, a real gamepad, how the sound sounds.
+
+---- step log ----
+06:50:05   ok: every module the run asked for is the real one: {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"}
+06:50:05 ready. providers: {"render":"real","world":"real","art":"real","physics":"real","ui":"stub"}
+06:50:05   ok: starts on foot on Earth
+06:50:05 LEG 1: earth -> mars
+06:50:18   ok: in the ship on earth
+06:51:04   ok: reached space above earth
+06:51:17   ok: M opens the map
+06:51:22   ok: clicking mars on the map sets the course (460 km)
+06:51:22   ok: M closes the map
+06:51:31   ok: nose on mars (off by -1.2, -1.9 deg)
+06:51:31   ok: prompt: Pulse to Mars
+06:51:31   ok: the target marker is on screen near the nose: {"kind":"target","label":"Mars","x":196,"y":112,"r":1}
+06:51:34   ok: F engages the pulse drive
+06:52:44   ok: the drive lets go by itself
+06:52:44   ok: arrived: mars is 6.9 km away (was 460 km)
+06:52:44   ok: pulse speed reached 12472 m/s
+06:52:52   ok: flying in the frame of mars: mars:orbit
+06:53:02   ok: entered the atmosphere of mars
+06:53:02   ok: a mark shows a place to land on mars: {"kind":"edge","label":"a place to land","x":47,"y":125,"r":0}
+06:53:10   ok: landing prompt over mars
+06:53:22   ok: landed on mars
+06:53:22   ok: no bumps
+06:53:28   ok: standing on mars (rust_canyons)
+06:53:28   ok: the sketchbook has mars: ["rust_canyons"]
+06:53:35   leg done: {"from":"earth","to":"mars","km":460,"pulseSeconds":69.3,"vMax":12472,"arrivedAt":170}
+06:53:35 LEG 2: mars -> saturn
+06:53:48   ok: in the ship on mars
+06:54:05   ok: reached space above mars
+06:54:10   ok: M opens the map
+06:54:10   ok: clicking saturn on the map sets the course (888 km)
+06:54:11   ok: M closes the map
+06:54:22   ok: nose on saturn (off by -1.2, -2.1 deg)
+06:54:22   ok: prompt: Pulse to Saturn
+06:54:22   ok: the target marker is on screen near the nose: {"kind":"target","label":"Saturn","x":197,"y":114,"r":1}
+06:54:23   ok: F engages the pulse drive
+06:55:58   ok: the drive lets go by itself
+06:55:58   ok: arrived: saturn is 10.4 km away (was 888 km)
+06:55:58   ok: pulse speed reached 17501 m/s
+06:56:07   ok: flying in the frame of saturn: saturn:orbit
+06:56:19   ok: entered the atmosphere of saturn
+06:56:19   ok: a mark shows a place to land on saturn: {"kind":"edge","label":"a place to land","x":353,"y":125,"r":0}
+06:56:33   ok: landing prompt over saturn
+06:56:48   ok: landed on saturn
+06:56:48   ok: no bumps
+06:56:54   ok: standing on saturn (honey_mist)
+06:56:54   ok: the sketchbook has saturn: ["honey_mist"]
+06:57:01   leg done: {"from":"mars","to":"saturn","km":888,"pulseSeconds":95.2,"vMax":17501,"arrivedAt":363}
+06:57:01   ok: three worlds in the sketchbook: earth, mars, saturn
+06:57:03   ok: frame read-out: 210 ms, 178074 triangles, 71 calls
+06:57:15   ok: autosave wrote the visit to Saturn
+06:57:15   ok: one sitting: the page was never reloaded during the trip
+06:57:31   ok: after a reload the game continues on Saturn: saturn ON_FOOT
+06:57:31   ok: the sketchbook survived the reload
+06:57:31   ok: standing on the ground after loading
+06:57:38   ok: no console errors, page errors, failed or external requests
+06:57:38 PASSED {"gameSeconds":364}

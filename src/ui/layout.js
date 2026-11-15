@@ -154,3 +154,151 @@ export function layoutMarks(list, view) {
   }
   return list;
 }
+
+// The names on the touch chart (src/ui/map.js). Each name is placed where its ink, the halo
+// included, lies on no world's dot and on no other name, and inside the chart: tried first on the
+// sides `prefer` lists (up, down, right, left), right by its dot; then round its dot in sixteen
+// directions, a little further out each round (CHART_NAMES.rings), and only where it lies nearer
+// the edge of its own dot than of any other (by closeMargin px when it is within close px of its
+// own, by nearer px further out: a name is read as the dot's it lies by); the first clear place is
+// taken.
+// With none, a name in the way may move to another clear place of its own; then (on a small chart)
+// a smaller size is tried; then a name that may be left off is, and the others take the place that
+// covers least (a dot counts four times a name). The re-fix pass of release 1: with all four
+// sides taken a name fell back to its first side, over another name ('Mercury' touching 'Saturn'
+// on the 400x225 chart), and the box it was tested with missed the halo and the descenders by
+// about 2 px.
+// list: [{ id, name, x, y (the dot's centre, css px), r (what round the dot is kept clear: its
+// radius, or its ring's), rd (the dot's own radius, when r is more), s (the lettering's cap
+// height), sMin (optional: it may be lettered as small as this where it has no room at s), mayHide
+// (optional: with no clear place at all it is left off), prefer: ['up', ...] }], the chosen world
+// first. bounds: { w, h }. Returns, in the
+// list's order, [{ id, x, y (the name's centre and baseline, for inkOnCanvas), s (the size it
+// takes), box: { x0, y0, x1, y1 } (its ink with the halo), clear (true: it touches nothing),
+// hidden (true: left off) }].
+export const CHART_NAMES = Object.freeze({ pad: 2, dotPad: 1.5, gap: 1, nearer: 3, close: 9, closeMargin: 0, rings: [2, 6, 11, 17, 24, 32], mustRings: [42, 54] });
+// The ink of a name as letterPath and inkOnCanvas draw it (centred on x, baseline y): the
+// lettering's width, its ascent and descent, the halo (its pen width + 3) and the pixel the pen's
+// start is rounded to.
+export function chartNameBox(name, s, x, y) {
+  const k = s / 10, w = measureLettering(name, s), halo = (Math.max(1.05, s * 0.118) + 3) / 2 + 0.5;
+  return { x0: x - w / 2 - 1.5 - halo, x1: x + w / 2 + 1.5 + halo, y0: y - LETTERING.ascent * k - halo, y1: y + LETTERING.descent * k + halo };
+}
+export function placeChartNames(list, bounds) {
+  const C = CHART_NAMES;
+  const dots = list.map((n) => ({ x: n.x, y: n.y, r: n.r * 1.1 + C.dotPad }));
+  const area = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+  const near = (b, x, y) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
+  const grow = (b) => ({ x0: b.x0 - C.gap, y0: b.y0 - C.gap, x1: b.x1 + C.gap, y1: b.y1 + C.gap });
+  const onDots = (b) => { let c = 0; for (const d of dots) if (near(b, d.x, d.y) < d.r) c += 4 * Math.PI * d.r * d.r; return c; };
+  const inside = (b) => b.x0 >= 0 && b.y0 >= 0 && b.x1 <= bounds.w && b.y1 <= bounds.h;
+  const DIRS = { up: -Math.PI / 2, down: Math.PI / 2, right: 0, left: Math.PI };
+  // Every place each name may take, in its order of preference: at its own size first, round its
+  // dot; then (where it may be lettered smaller, n.sMin) a size between and its smallest. Only
+  // boxes inside the chart; with none, its first place pulled in.
+  const places = list.map((n) => {
+    const sizes = n.sMin && n.sMin < n.s ? [n.s, (n.s + n.sMin) / 2, n.sMin] : [n.s];
+    const all = [];
+    let first = null;
+    for (const s of sizes) {
+      const b0 = chartNameBox(n.name, s, 0, 0);          // extents about (0, 0): x0, y0 < 0 < x1, y1
+      const hw = (b0.x1 - b0.x0) / 2, hh = (b0.y1 - b0.y0) / 2, mx = (b0.x0 + b0.x1) / 2, my = (b0.y0 + b0.y1) / 2;
+      // the place (centre, baseline) whose box lies `gap` px off the dot's clear circle in direction a
+      const toward = (a, gap) => {
+        const ux = Math.cos(a), uy = Math.sin(a), want = n.r + gap;
+        let lo = 0, hi = want + hw + hh;
+        for (let i = 0; i < 16; i++) {
+          const t = (lo + hi) / 2, dx = Math.max(Math.abs(ux * t) - hw, 0), dy = Math.max(Math.abs(uy * t) - hh, 0);
+          if (Math.hypot(dx, dy) < want) lo = t; else hi = t;
+        }
+        return [n.x + ux * hi - mx, n.y + uy * hi - my];
+      };
+      const prefer = (n.prefer && n.prefer.length ? n.prefer : ['up', 'down', 'right', 'left']).filter((k) => k in DIRS);
+      const a0 = DIRS[prefer[0]];
+      const at = prefer.map((k) => toward(DIRS[k], C.pad));
+      for (const g of n.mayHide ? C.rings : C.rings.concat(C.mustRings)) {
+        // sixteen directions, the ones nearest the first side first (a name that must show, a
+        // little further out still)
+        for (let k = 0; k < 16; k++) at.push(toward(a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 8), g));
+      }
+      const box = (c) => ({ x0: c[0] + b0.x0, x1: c[0] + b0.x1, y0: c[1] + b0.y0, y1: c[1] + b0.y1 });
+      // (and nearer its own dot than any other, or it names the wrong world: the reader takes a
+      // name for the dot it lies by)
+      const own = (b) => {
+        const e0 = near(b, n.x, n.y) - (n.rd || n.r), margin = e0 <= C.close ? C.closeMargin : C.nearer;
+        return list.every((m) => m === n || near(b, m.x, m.y) - (m.rd || m.r) > e0 + margin);
+      };
+      for (const c of at) { const b = box(c); if (inside(b) && own(b)) all.push({ c, b, s }); }
+      // (a name that must show may, with nothing better, lie where another dot is as near)
+      if (!n.mayHide) for (const c of at) { const b = box(c); if (inside(b) && !own(b)) all.push({ c, b, s, far: true }); }
+      if (!first) { const c = [Math.max(-b0.x0, Math.min(bounds.w - b0.x1, at[0][0])), Math.max(-b0.y0, Math.min(bounds.h - b0.y1, at[0][1]))]; first = { c, b: box(c), s }; }
+    }
+    for (const q of all) q.dots = onDots(q.b);
+    // (no place at all: the first, pulled into the chart; for a name that may be left off, as
+    // one that covers a dot, so that it is: it would lie by another world's dot)
+    if (!all.length) { first.dots = n.mayHide ? Infinity : onDots(first.b); all.push(first); }
+    return all;
+  });
+  // The chosen world first, then the others that must show, then the most hemmed in (the most
+  // dots near): the inner worlds, round the sun, have the least room.
+  const crowd = list.map((n) => list.reduce((a, m) => a + (Math.hypot(m.x - n.x, m.y - n.y) < 70 ? 1 : 0), 0));
+  const must = (i) => (i === 0 ? 2 : list[i].mayHide ? 0 : 1);
+  const order = list.map((n, i) => i).sort((a, b) => must(b) - must(a) || crowd[b] - crowd[a] || a - b);
+  const at = new Array(list.length).fill(null);          // the place each name has taken
+  const hitsNames = (b, skip) => { const g = grow(b), out = []; for (let i = 0; i < at.length; i++) if (i !== skip && at[i] && area(g, at[i].b) > 0) out.push(i); return out; };
+  const coverOf = (q, skip) => { const g = grow(q.b); let c = q.dots; for (let i = 0; i < at.length; i++) if (i !== skip && at[i]) c += area(g, at[i].b); return c; };
+  const clearPlace = (i) => places[i].find((q) => q.dots === 0 && hitsNames(q.b, i).length === 0);
+  // A clear place whose names in the way can each move to another clear place of their own
+  // (not the chosen world's): they move, and this name takes it.
+  const shove = (i) => {
+    for (const c of places[i]) {
+      if (c.dots) continue;
+      const inWay = hitsNames(c.b, i);
+      if (!inWay.length || inWay.length > 3 || inWay.includes(order[0])) continue;
+      const keep = inWay.map((j) => at[j]), before = at[i];
+      at[i] = c;
+      for (const j of inWay) at[j] = null;
+      let ok = true;
+      for (const j of inWay) { const m = clearPlace(j); if (!m) { ok = false; break; } at[j] = m; }
+      if (ok) return c;
+      inWay.forEach((j, k) => { at[j] = keep[k]; });
+      at[i] = before;
+    }
+    return null;
+  };
+  const leastBad = (i) => places[i].reduce((best, c) => (coverOf(c, i) < coverOf(best, i) ? c : best), places[i][0]);
+  for (const i of order) at[i] = clearPlace(i) || shove(i) || leastBad(i);
+  // A second look at the names left on something: what moved since may have made room.
+  for (let round = 0; round < 2; round++) {
+    for (const i of order) {
+      if (at[i].dots === 0 && hitsNames(at[i].b, i).length === 0) continue;
+      const was = at[i];
+      at[i] = null;
+      at[i] = clearPlace(i) || shove(i) || was;
+    }
+  }
+  // A name with no clear place left that may be left off (n.mayHide) is: its dot stays, and a tap
+  // on it names it in the sheet's line (the desktop's marks do the same: a world whose name has no
+  // room keeps its ring). The others lie where they cover least.
+  const hidden = new Array(list.length).fill(false);
+  const isClear = (i) => at[i].dots === 0 && hitsNames(at[i].b, i).length === 0;
+  // (the last placed are left off first: one left off may clear a name placed before it)
+  for (const i of order.slice().reverse()) {
+    if (!list[i].mayHide || isClear(i)) continue;
+    hidden[i] = true;
+    at[i] = null;
+  }
+  for (const i of order) {
+    if (hidden[i] || isClear(i)) continue;
+    const was = at[i];
+    at[i] = null;
+    at[i] = clearPlace(i) || was;
+    // (a name that must show, the chosen world's or yours, still on another: that one is left off)
+    if (!isClear(i)) for (const j of hitsNames(at[i].b, i)) if (list[j].mayHide) { hidden[j] = true; at[j] = null; }
+  }
+  return list.map((n, i) => {
+    const q = at[i];
+    if (hidden[i] || !q) return { id: n.id, hidden: true, x: 0, y: 0, s: 0, box: null, clear: true };
+    return { id: n.id, x: q.c[0], y: q.c[1], s: q.s, box: q.b, clear: q.dots === 0 && hitsNames(q.b, i).length === 0 };
+  });
+}

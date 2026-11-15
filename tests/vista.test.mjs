@@ -49,7 +49,7 @@ test('M4 a view not yet drawn within 150 m is marked; walking up to it finds it 
   assert.ok(sim.vistas.earth.v1, 'found');
   assert.match(sim.notice.text, /A view for the sketchbook: The first view/);
   play(sim, pad, 0.1);
-  assert.deepEqual(sim.promptNow, { key: 'E', text: 'Stand at the easel' });
+  assert.deepEqual(sim.promptNow, { key: 'E', code: 'KeyE', text: 'Stand at the easel' });   // (code: the touch slip's key, W3.2)
   assert.ok(dist(sim, vistas[0].unitDir) < VISTA_RANGE + 0.5);
   // walking on out of reach takes the offer away; the mark is still there, the view is still found
   const off = norm(add(norm(sim.ex.p), scale(sim.footCam.viewFwd, 60 / len(sim.ex.p))));

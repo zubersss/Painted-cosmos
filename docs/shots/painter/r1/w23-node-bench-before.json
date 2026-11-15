@@ -1,0 +1,138 @@
+{
+ "root": "/home/user/.pc-scratch/painter/r1/trees/base",
+ "Q": 2,
+ "BUDGET": 5,
+ "SPEED": 15,
+ "mx": [
+  {
+   "name": "stand",
+   "frames": 600,
+   "worldMs": 329.2,
+   "matrixMs": 176,
+   "share": 53.5
+  },
+  {
+   "name": "walk 4.2 m/s",
+   "frames": 1800,
+   "worldMs": 2648.2,
+   "matrixMs": 662.4,
+   "share": 25
+  },
+  {
+   "name": "fly 150 m at 56 m/s",
+   "frames": 1800,
+   "worldMs": 5610.6,
+   "matrixMs": 600.5,
+   "share": 10.7
+  }
+ ],
+ "ground0": {
+  "cells": 104,
+  "laid": 104,
+  "meshes": 275,
+  "drawn": 275,
+  "tris": 393010,
+  "seeable": 142,
+  "seeableUnlaid": 0,
+  "queue": 0
+ },
+ "at1000": {
+  "cells": 104,
+  "laid": 104,
+  "meshes": 275,
+  "drawn": 275,
+  "tris": 393010,
+  "seeable": 0,
+  "seeableUnlaid": 0,
+  "queue": 0
+ },
+ "descent": [
+  {
+   "alt": 400,
+   "cells": 104,
+   "laid": 104,
+   "meshes": 275,
+   "drawn": 275,
+   "tris": 393010,
+   "seeable": 0,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 200,
+   "cells": 104,
+   "laid": 104,
+   "meshes": 275,
+   "drawn": 275,
+   "tris": 393010,
+   "seeable": 0,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 150,
+   "cells": 104,
+   "laid": 104,
+   "meshes": 275,
+   "drawn": 275,
+   "tris": 393010,
+   "seeable": 0,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 110,
+   "cells": 104,
+   "laid": 104,
+   "meshes": 275,
+   "drawn": 275,
+   "tris": 393010,
+   "seeable": 48,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 50,
+   "cells": 104,
+   "laid": 104,
+   "meshes": 275,
+   "drawn": 275,
+   "tris": 393010,
+   "seeable": 105,
+   "seeableUnlaid": 0,
+   "queue": 0
+  },
+  {
+   "alt": 10,
+   "cells": 104,
+   "laid": 104,
+   "meshes": 275,
+   "drawn": 275,
+   "tris": 393010,
+   "seeable": 141,
+   "seeableUnlaid": 0,
+   "queue": 0
+  }
+ ],
+ "touchdown": {
+  "cells": 104,
+  "laid": 104,
+  "meshes": 275,
+  "drawn": 275,
+  "tris": 393010,
+  "seeable": 142,
+  "seeableUnlaid": 0,
+  "queue": 0
+ },
+ "touchdownFrames": 3994,
+ "settled": {
+  "cells": 104,
+  "laid": 104,
+  "meshes": 275,
+  "drawn": 275,
+  "tris": 393010,
+  "seeable": 142,
+  "seeableUnlaid": 0,
+  "queue": 0
+ }
+}

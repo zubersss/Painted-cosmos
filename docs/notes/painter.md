@@ -4,7 +4,569 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of the LAST FIXES' RE-FIX pass (twenty-second PAINTER agent; READ THIS FIRST)
+## Hand-over of RELEASE 1, RE-FIX pass of the PAINTER lane (READ THIS FIRST; kept current after every item)
+
+The verifier did not accept W2.1, W2.2, W2.4, W2.5 and listed nine regressions (the task text of this pass; its evidence
+under `/home/user/.pc-scratch/verify/r1-painter/`). This pass fixes them with proof, or shows by a measurement why a
+finding does not hold, and says plainly what is not fixed. Began 17:00 UTC 2026-11-14 on head `3cd414b`.
+Commits: `5faee9f` (part A: post.js, index.js, shared.js, tests), `55fb1c2` (part B: chunks.js, materials.js),
+`26ea990` (part C: post.js, the laid targets laid again after any resize; it also carried the first evidence files), then
+notes. My first commit's parent: `ca3a56a` (PILOT's).
+
+Scratch: `/home/user/.pc-scratch/painter/r1/rf/`. `bin/lab.mjs`: one browser on PILOT's station page, kept open while a
+series of commands runs (each command a Node module in `cmd*/`, its result in `cmd*/*.out`, the log `lab*.log`);
+`bin/abhelp.mjs`: the head's Post (a copy of the head's post.js put into the lab tree only, as `post_head.js`) run on the
+same held scene as the new one: exact before/after of the post passes; `bin/mhelp.mjs`: PILOT's metrics on captures;
+`node/b2truth.mjs` (bands of frames), `node/blurpal.mjs` (the guard's palette rule on a blurred final). Runs: `cmd/` (lab
+1, on the head plus the first code), `cmd2/` (lab 2, the near-final code), `cmd4/` (lab 4, `55fb1c2`), `cmd5/` (lab 5,
+`26ea990`), `cmd3/` (the phone run, iPhone 14 emulation, the controller free); the station runs `st-final/` (PILOT's
+harness on a clean export of `26ea990`, guard `st-final/guard.txt`) and `st-final-55fb1c2/` (before part C).
+
+**STATE:** done (22:00 UTC). All code committed (`5faee9f`, `55fb1c2`, `26ea990`); nothing of mine is half-done in the tree.
+Checks on a clean export of the code: world 47/47, unit 251/251, physics 325/325, coast.mjs PASS at both stands,
+ghostfield.mjs 6 of 6 all zeros (physics, coast and ghostfield on `55fb1c2`'s code; `26ea990` touched post.js and a
+world test only, world and unit rerun on it). PILOT's harness on a clean export of `26ea990`, all 25 stations, q2
+1280x720, `--alias --flicker --taps`: `st-final/`, no page problem; guard against the baseline
+`docs/shots/painter/r1/rf-guard-26ea990-vs-784183b.txt` (38 flags at 18 stations, every one a "look" flag: the colour
+of small regions and the L* percentiles, below; no detail, false-sharpness or cost flag), every number
+`docs/shots/painter/r1/rf-table-26ea990.txt`, frames before/after opened (`rf-before-after-q2-1280.jpg`,
+`rf-1km-dashes-before-after-3x.jpg`: the verifier's head run against `st-final-55fb1c2/`, made before part C, whose
+numbers agree with `26ea990`'s to the second decimal at every station).
+
+### W2.1 the prefilter (verifier: A at the 0.6 lines, the old-brush mean at 1 km, the 1:1 dashes, the b2 floor)
+- **The 1 km dashes are in the design, not an aliasing left over.** A 16x supersampled render of the marks as drawn (W2.1
+  off, 4x each way, box-filtered down: `w21/E_1000_*_truth4x_v1.png`, `cmd/008-truth`) shows the same hatch. It is the leaf
+  shadow's 13 m channel (its noise cells 3.25 m: one or two pixels from 1 km): knocked out, the hatch is gone; the 4.1 m
+  channel eased to its mean, unchanged (`cmd/004e`, `w21/`). **Fixed in the design** (chunks.js pcDappleOct, `55fb1c2`):
+  past 500 m the 13 m channel is laid at twice its size for each doubling of the distance (the terrain's brush marks keep
+  their size on the sheet the same way), the two sizes cross-faded, each thresholded on its own (the share of sun the same
+  at every size), read with the place's own gradients (textureGrad: the scale steps with the distance); under 500 m
+  nothing changes. The 4.1 m channel eases to its mean from 0.20 to 0.40 of its repeat a pixel (from 0.12-0.30 first:
+  that raised A at E_400_90, 0.2925 -> 0.3052; at 0.20-0.40 it is unchanged there). Frames opened at 1:1 and 3x
+  (`w21/E_1000_*_a26_v0.png` against `_asis_`, and the station run's): flecks of a few pixels, no rows of dashes.
+- **A** (raw, lab 2 `cmd2/104-oct`, against 2x box): E_1000_90 0.3205 -> **0.210** (line 0.3198), E_1000_45 0.3789 ->
+  **0.249** (line 0.3778); E_400_90 **0.293, NOT MET** (line 0.2412). What E_400_90's A is made of (`cmd/004b-amap`):
+  77 % of the error energy on the ground, a fine speckle along the leaf shadow's ragged edges at 0.65 m a pixel, which the
+  2x render resolves. Tried: the leaf shadow knocked out (A 0.63: the reference has it), its far octaves from 350 or 300 m
+  (A 0.356, 0.372: worse), every mark's threshold read on a footprint 1.5 or 2 times wider (0.268, 0.263, at the cost of
+  lapvar 345 -> 278 and b2 39.9 -> 38.8), wider thresholds (k 5: 0.289). None reaches 0.241; left.
+- **b2 floor (rule 1) at 1 km: met with the far octaves** (lab 2): E_1000_90 raw b2 33.6 (floor 0.95 x 26.7 = 25.4),
+  E_1000_45 25.5 (floor 21.3), E_400_45 26.8 (floor 25.7). And the finding's reference: the 16x supersampled design has b2
+  23.7 / 21.2 / 25.9 at E_1000_90 / E_1000_45 / E_400_45, the baseline 26.7 / 22.4 / 27.0: the baseline's extra b2 was
+  aliasing (the truth itself fails the floor at 1 km); the head's raw had been within 3 % of the truth. With the octaves the
+  new design's 16x truth (`cmd2/105-truth`) has b2 33.4 / 25.9 against today's 33.6 / 25.5: no aliasing energy left.
+- **"Final frames change by at most 1/255 on average under today's brush": not met, and it should not be.** The old
+  brush's final at 1 km carries the aliasing's bias: the 16x supersampled design is darker than the baseline by 4.2-5.5
+  levels (R G) at 1 km and 2.3-2.6 at 400 m (`cmd/008-truth`, mean RGB over the land); the head's W2.1 lay between them.
+  With the far octaves the raw land at 1 km is 3-4.5 levels under the baseline and within 1-3 levels of its own 16x truth
+  (`cmd2/105-truth`). The plan's own W2.1 colour rule (raw land dE76 at most 2): met: raw land dE76 at most 1.63 (E_1000_45; 1.44 at E_1000_90, 0.64 at E_400_45, under 0.3 elsewhere). The
+plan's "raw b3 within +-10 %": E_1000_90 +11.6 %, E_1000_45 +4.0 % (up: the far octaves' flecks are coarser than the
+hatch; within 1 % of the new design's own 16x truth), elsewhere within 1.6 %. E_foot and E_50_45 raw b1/b2: -4.6/-0.8 %
+and -3.6/-0.7 % (within 5 %).
+
+### W2.2 the brush (verifier: night t2, halo, palette, L*)
+- **Halo of the abstraction output: fixed.** It was all the wet-in-wet bleed (bleed off: 0.000 %). The bleed keeps its
+  colour but its step in value is capped at 6/255 (post.js ABS): E_1000_45 0.70 % -> **0**, storm 0.82 % -> **0.003 %**
+  (`cmd/002d`), the mean colour of the output within 0.1 level, the abstraction output's t2 up (0.89 -> 0.93 at 1 km);
+  frames opened (`halo/`): the far mountain's wash as before, the storm's crowns a little crisper. Station run: the abstraction output's halo share is 0.000 % at 22 stations, 0.001 % (S_150_45), 0.003 % (storm), 0.005 %
+(E_foot_night).
+- **Night t2: fixed.** The night's last glaze (0.70, 0.76, 0.94 on Earth) darkened the whole sheet, the marks with it
+  (grade set to 1: t2 0.935; `cmd/003-night`). The glaze is laid over the broad washes only (the pooling's surround) and
+  the detail weighted twice (it still holds part of the 6-16 px band): E_150_45 night t2 0.70 -> **0.936**, t1 0.99,
+  land dE 1.71 (`cmd/002f`); by day the grade is 1 and nothing changes (the A/B is 0 there). Frames opened (`night/`):
+  the wood and its gaps readable, still the nocturne's indigo. Station run: E_150_45 night final land t1 1.02, t2 **0.94** (was 0.70), land dE76 0.80 against the baseline (dusk 1.08/0.98).
+- **Palette (mean colour per region within dE 3).** The moves come from the brush turn, not from the raw scene or the
+  palette: the OLD brush and sheet laid over today's raw scene give the baseline's colours (E_400_90 land 0.31, ground
+  0.52, foliage 0.22, water 0.13; M_150_90 props 0.12, foliage 0.06; `cmd/006-palette`). Of what the sharp picture moved,
+  the edge pooling was most: over the sharp picture every small mark took the wide pool and the rim. **Changed:** the wide
+  pool from a step of 0.02 up and the rim from a gradient of 0.10 (post.js SHEET): E_400_90 land 2.90 -> 1.54, ground 3.04
+  -> 2.0, foliage 3.28 -> 2.28, E_1000_90 land 3.29 -> 2.27 (`cmd2/106-pool`), t1/t2 still 1.09-1.16; frames opened
+  (`w21n/*_pool_*`): the same picture a shade lighter. Station run: every land, ground and foliage region on Earth within 3 (E_400_90 land 1.54, ground 2.00, foliage 2.27;
+E_1000_90 land 2.28, ground 2.25; were 3.10, 3.23, 3.41 and 3.3); over 3 only regions of 0.06-1.25 % of the frame:
+E_400_90's stream (963 pixels) 4.30, E_50_45's props (1,416) 4.19, M_150_45 props/foliage (549/858 pixels) 10.9/9.2,
+M_150_90 (1,161/831) 13.4/12.4, S_150_45 foliage (2,515) 13.5, N_150_45 foliage (11,508) 15.5.
+  **Not changed (shown not to hold as a palette shift):** small regions (Mars props/foliage 13-16, Saturn and Neptune
+  foliage 16-18, E_50_45 props 6.7, E_400_90's stream 4-5): a few hundred pixels at class edges whose baseline colour was
+  the neighbours' colour the old brush smeared in (the old brush over today's raw gives 0.06-0.13 there); and the L*
+  10/50/90 percentiles: a picture with t2 near 1 has a wider spread of values than one at t2 0.2 by its nature (L10
+  darker, L90 lighter, L50 within 1-3); blurring today's final by a 3 px Gaussian brings most stations within 3
+  (`node/blurpal.mjs` on the verifier's st-head-q2: E_150_45 3 flags -> 0, E_400_45 2 -> 0, E_1000_45 3 -> 0, dusk 3 -> 0,
+  night 3 -> 0). The rule t2 >= 0.95 and the rule L* within 3 of a blurred baseline cannot both hold.
+
+### W2.4 post savings (verifier: sheet reads 19 > 11, post reads, the 8-bit path not run)
+- **The sheet reads 9 times a pixel** (10 by night, under a storm or a world's glaze; was 19): the paper laid once per
+  size into three targets (half floats: the tremor and the border's terms; ph pmidR ploR skD; 8-bit: the grain's four),
+  three fetches (were two fetches and two live reads); the washes' value at a few pixels, its surround and its change in x
+  and y from a new half-size pool pass (two reads, were seven); the outline test and the pencil's line from a new edges
+  pass at the scene's size (two fetches, were six reads of the region target; the line is precomputed four ways and the
+  sheet picks the one its old reads 1.5 texels over gave: `src/world/sheetreads.test.mjs` proves the pick on 20,000
+  random points); the region where the picture is read only where something reads it (night, storm, lightning, a world's
+  glaze). A first version packed the paper into one RGBA32UI word (one fetch): PILOT's read counter has no overload for an
+  integer sampler and the instrumented sheet failed to compile (console error), so float targets it is.
+- **Post reads a frame** (lab 2 `cmd2/101-ab`, 1280x720 q2, per output pixel): near stations E_foot 30.98, E_50 31.2,
+  E_150_90 31.3, M_50/M_150_90 30.5 against the baseline's 30.5 plus W2.5's region pass (1.0-1.5): within it at every
+  station (margins 0.5-1.0); far stations E_400_90 23.3, E_1000_45 23.0 (-24 %, the plan asked about -22 %); E_150_45
+  28.7 (-6 %). The brush's two paper reads are laid once per size in full floats (one fetch at near pixels, was two; in
+  8 bits the bleed's colour, a ratio of two small sums where a wash is barely wet, moved visibly: lab 2 `101b`, `101c`),
+  and the bleed is not read where the pixel is dry. Station run: post reads a frame (M at 1280x720; baseline 28.11 at every station, the verifier's head in brackets): E_foot 28.55
+(32.65), E_50_45 28.73 (32.88), E_150_90 28.83 (32.98), M_50_45 28.17 (32.31), M_150_90 28.13 (32.28): +0.1 to +2.6 %
+over the baseline, each under W2.5's region pass (0.9-1.35 M); E_150_45 26.44 (-6 %); 400 m and 1 km 20.7-21.5 (-24 to
+-26 %, the plan's -22 % met there, not at the near stations). Sheet 9 reads a pixel (10 by night, dusk and storm); no
+keep pass at the eight Mars stations.
+- **The same picture?** The restructure is exact but for the half-size pool (lab 5 `cmd5/501`, the committed code at
+  `26ea990` against the head's post.js of `3cd414b` on the same held scene, this pass's intended changes (the bleed's cap,
+  the pooling's two floors) patched out of the new): with the pool's three values read as the head read them, within
+  1/255 everywhere but 1-2 pixels a station (max 1-4/255; one pixel at 25 at M_foot, 8 at S_150_90), mean 0.002-0.005;
+  as committed, the pool's values interpolated between half-size texels differ from the head's exact reads: mean 0.26
+  (E_foot), 0.34 (E_50_45), 0.47 (E_150_45), 0.59 (E_400_90), 0.17 (E_1000_45), 0.09-0.13 (Mars, Saturn, Neptune),
+  0.2-1.7 % of pixels over 2/255, a few hundred over 8/255 (max 38-71) at edges (`ab5/*_diffx32.png`). The pool's lod 0.6
+  is 60 % the quarter-size level, whose bilinear kinks fall between the half-size texels, so no half-size table of it is
+  exact; the exact reads cost five more reads a pixel, which the near stations' budget has not got. **NOT within 1/255
+  everywhere**; the frames side by side are the same picture (`docs/shots/painter/r1/rf-before-after-q2-1280.jpg`).
+  Found on the way (part C): the brush's paper (and the sheet's) were keyed by size, so a size changed and changed back
+  with no frame between (the harness's settle at every station) drew with cleared targets; laid again after any resize
+  now (test in postsave.test.mjs), and the baked brush paper then equals its live reads in effect (`cmd5/502`: 0).
+- **The 8-bit fallback, run in the browser** (lab 2 `cmd2/107-fallback`: a second Post built as on a machine without
+  float targets, the same as `?float=0`, the held scene drawn through it): no console error, its sheet reads the paper
+  live (12 reads), frames opened (`fallback/`): the same picture as the float path's, a mean of 0.2-2.0/255 from it (8-bit
+  region, depth and pool by design).
+
+### W2.5 anti-aliasing (verifier: raw b1 within 5 %, F at most 0.8 x, post AA not built)
+- **Post AA built** (post.js FXAA_FRAG, index.js): FXAA's nine reads a pixel of the scene on the abstraction output,
+  where no samples are drawn: tier 0, a touch device (coarse pointer), `?aa=post`; at a desktop tier the MSAA budget
+  failing (4K) falls back to it too. Its edge threshold is FXAA's own (an eighth of the brightest, at least 1/16).
+  `painter.info.postAA`, `painter.aaMode()` ('msaa 4x' | 'post (fxaa)' | 'none': PILOT's read-out reads it). q0
+  (`cmd2/103-postaa`): the final's F E_foot 0.411 -> 0.364, M_foot 0.372 -> 0.298, E_150_45 0.099 -> 0.092; frames
+  opened at 3x (`postaa/`): the hat's brim and the figure's outline lose their stair-steps. The raw scene's F cannot move
+  (the pass is after it). Phone run (`cmd3/201-phone`, iPhone 14 landscape emulation, the real game with the controller
+  free, no pins): `painter.aaMode()` 'post (fxaa)' and info.postAA true at every sample, aa 0.
+- **Raw b1 within 5 %: shown not to hold as a loss.** Against the supersampled reference (one sample at 2x, box-filtered
+  down; `cmd/005-b1`): MSAA's b1 is -5.1 % (M_foot), +1.8 % (S_150_90), +4.9 % (storm), +4.3 % (N_150_45) from it; one
+  sample is +0.8 to +10.4 % above it. The baseline's b1 was aliasing energy; at M_foot MSAA does lose 5 % in the 2-6 px
+  band to the outlines of Mars' stones (the reference keeps more of the ground's own texture at its half footprint).
+- **F at most 0.8 x the baseline raw's: NOT MET** at 9 of 22 air stations (station run: E_50_45 0.359 against 0.325,
+  E_50_90 0.343/0.309, E_150_90 0.286/0.278, M_150_45 0.254/0.250, M_400_45 0.114/0.111, dusk 0.330/0.325, storm
+  0.392/0.375, N_150_45 0.424/0.400, E_150_45 night 0.318/0.317; E_150_45 on the line, 0.334). The props' light steps prefiltered (pcLevelF)
+  change raw F by 0.3 % (`cmd/007`); what flickers is the crowns' leaf cut-outs, discards, which MSAA cannot smooth.
+  Alpha-to-coverage would, but it takes its coverage from the colour target's alpha, which is the wetness: moving the
+  wetness out of it is a change to every material's output and to the post's reads; left for W7.
+
+### The regressions
+1. Post cost at near stations: fixed (W2.4 above).
+2. Final F at 50-150 m: shown to be the raw's. The final's F is the raw's or under it (E_50_45 0.33 against 0.36 raw;
+   `cmd/007b`); the wobble switching at edges adds nothing (an even 0.3 px wobble: the same F), the fine pooling 4 %
+   (pooling off: 0.321). The old brush's final scored 0.25 because it blurred the detail the raw scene draws.
+3. Colour past the guard's bounds: see W2.2's palette above (the large regions fixed, the small ones and L* shown).
+4. b2 below the floor at 1 km: fixed by the far octaves (W2.1 above), and the finding's baseline was aliased.
+5. The 1 km dash and hatch: fixed in the design (W2.1 above).
+6. The halo share: fixed (W2.2 above).
+7. The old brush in play: fixed (index.js). The old brush and sheet only where the URL pins the resolution (`?scale=` or
+   `?dynres=0`: the tests' pinned low runs, unchanged); the resolution controller's low steps draw the new brush's picture,
+   enlarged by the soft cubic. Phone run (`cmd3/201-phone`): the controller went q1 x 0.79 (592x269 for 937x425) and
+   then q0 x 0.5 (290x132), uBrushR.y 0 and uSheetOld 0 at every sample (the new brush); the frame
+   (`phone/game-phone.png`, opened): the figure, trees and ship clear but soft, a 3.2x enlargement of a 290x132 picture
+   (the old blots are gone; the softness at this scale is the resolution's, which W6's floor at 0.67-0.75 addresses).
+8. No AA on phones, tablets, tier 0: fixed (post AA above).
+9. (a) The keep pass's first frame: the keep pass runs on a world once its water has been drawn there, every frame while
+   the eye stays on that world (PREV.body from the mood, shared.js), so water coming back into view reflects at once;
+   Mars never keeps it (the station run's taps: no keep pass at the Mars stations). Only the first water a world ever shows
+   (or the first frame after a resize) reflects nothing for a frame. Test: postsave.test.mjs. (b) The AA budget is
+   reckoned on the tier's full size, not the controller's current scale: at 1920x1080 q2 two samples at every scale, the
+   multisampled target resized, not rebuilt (aaregion.test.mjs).
+
+### For other roles and the lead
+- PILOT (the harness): `tests/stationlib/inpage.js` names the new passes 'pool', 'edges', 'post-aa', 'brush-paper',
+  'paper-bake'; the counter has no overload for integer samplers (usampler2D/isampler2D), which is why the paper is not
+  one RGBA32UI fetch; adding `pcTapFetch(highp usampler2D, ivec2, int)` returning uvec4 would allow it later.
+- PILOT (W6, the controller): `painter.aaMode()` for the read-out; the MSAA samples no longer change with the render
+  scale; post AA where no samples. The old brush is no longer reachable from the controller (only the URL pins).
+- The lead: E_400_90's raw A (0.293 against 0.241) and the canopy stations' raw F are this lane's misses; the reasons and
+  what was tried are above. The guard's L* percentile rule and its small-region colours flag the sharp picture by its
+  nature (measured above); a minimum region share and a percentile rule read on a blurred copy would judge colour, not
+  sharpness.
+
+## Hand-over of RELEASE 1, part 2: W2.3, W2.4, W2.5 (the lane's part 2; the re-fix pass above supersedes it where they differ)
+
+The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (W2 items 3-5, section 5). Part 1 (W2.1, W2.2) is the section after this one.
+Began 10:50 UTC 2026-11-14 on head `e87f6be`. Scratch: `/home/user/.pc-scratch/painter/r1/` (`trees/`: the exports I
+measured, base plus each item's files and clean exports for the checks, deleted at the end; `w23/bench.mjs`
+the Node world bench for W2.3; `bin/ab.mjs` the in-page A/B driver on PILOT's harness page (`--mode under`: the frame as
+drawn against the same held frame with every undergrowth mesh the range test left out shown; `--mode post`: this tree's
+post passes against the BASE tree's sheet and backdrop on the same held scene; `--mode msaa`: the region view with MSAA
+and the rule against the same view drawn with one sample), `bin/basesrc.mjs` (a tree's post shader sources from its own
+Post class), `bin/runcmp.mjs` (two station runs: cost and frames), `bin/diffimg.py`; runs `st-w23`, `ab-w24`, ...).
+
+**STATE (end of part 2): W2.3 `f9cf6fe`, W2.4 `fb40efe`, W2.5 `d22ea35`, all COMMITTED.** Nothing of mine is half-done
+in the tree. What was not met, and why, is with each item's numbers and gathered in "For other roles and the lead".
+Final checks on a clean export of `d22ea35` (with PILOT's W3.3, `trees/final`): world 43, unit 234, physics 325,
+coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the real game from that export (`tools/shot.mjs`, q2
+pinned, 960x540): no console error, `__pc.info().fallback` empty, `painter.info.aa` 4, depth 'reversed-z'; its frame
+30 s after ready OPENED (`docs/shots/painter/r1/w25-final-game-q2-msaa.jpg`: the spawn as it should be; a frame taken at
+ready is pale, the arrival's picture still coming up from the paper).
+My first commit's parent: `77b9d9e` (PILOT's, made after I began on `e87f6be`).
+
+### W2.3 free wins: what was done (src/world/flora.js, src/world/index.js; test src/world/undergrowth.test.mjs)
+- **Undergrowth and grass cells by the distance from the eye, at every height.** Their strokes are drawn only while the
+  root is nearer than the mesh's reach (PROP_VERT: `uLod.y x (1 + (seed - 0.5) uLod.z)`, at most `lod[1] x (1 + lod[2]/2)`
+  times the tier's range scale: grass 43.5 m, ferns 137.5 m at q2), yet the cells were picked on the ground under the
+  eye, built only below 400 m and never let go above it: from the ship at 150 m every one was built and submitted for
+  nothing, and at 1 km the cells of the last low pass stayed. Now `_wanted(..., reach)` keeps the old walk at the ground
+  but wants a cell only while its ground (origin) lies within its reach (the old radius: reach + margin) of the eye
+  itself; beyond reach plus the old margin a cell is let go at any height (and taken off the build queue). The walk
+  is skipped while the eye is higher above the ground under it than reach + 250 m (RELIEF: a hill that high within the
+  reach is a cliff). Where cells were looked at and not wanted, their places are cached (`_origins`, cleared past 4096).
+- **A mesh is submitted only while a stroke of it can be seen** (`_showUnder`, every frame and on release): the box round
+  its roots (`rootC`, `rootR`, made with the instances) against its reach; where the box straddles the reach, root by
+  root. Held cells stay hidden, the bushes stay out at tier 0 (as before).
+- **The forced matrix walks**: `world.update` called `root.updateMatrixWorld(true)` for the active body and again for
+  every body, every frame: two forced walks of every mesh (the renderer walks them again before it draws). Now
+  `root.updateWorldMatrix(true, false)`: the root's own matrix (game.js already sets it each frame); its meshes are
+  brought up to date by the renderer, as before.
+- **Not done: "upload only the per-patch uniforms instead of uniformsNeedUpdate"** (terrain.js, flora.js). Three r187
+  offers no way to upload a few uniforms of a program from onBeforeRender (it runs before the program is bound), and its
+  setters cache every value, so the flag costs a walk of the material's uniform list in JS, not GL calls. Left; not in
+  this part's brief.
+
+### W2.3 numbers
+- PILOT's harness, q2 1280x720, all 25 stations (`st-w23`, the head plus these files) against W2.2's run (`st-w22d`):
+  draw calls / triangles at E_1000_90 442 / 669,284 -> **139 / 233,608** (plan: at most 160 / 260k; the lead's
+  reproduction 138 / 233,607); E_150_45 451 / 910,624 -> 283 / 655,924; E_150_90 493 -> 232; E_400_90 539 / 822k -> 236
+  / 387k; E_foot 463 -> 414 (meshes with no stroke in reach were drawn on foot too); M_150_90 238 -> 158; S_150_90 372 ->
+  251; N_150_45 312 -> 188. Every station fewer or equal (`docs/shots/painter/r1/w23-cost-and-frames-vs-w22.txt`).
+  Final land t1/t2/t3, raw lapvar and the bands the same at every station to the harness's two decimals.
+- Node world bench (`w23/bench.mjs`, q2, Earth, budget 5 ms; `docs/shots/painter/r1/w23-node-bench-before.json`,
+  `-after.json`): matrix walks' share of world.update standing 53.5 % -> 5.9 % (0.29 -> 0.015 ms a frame; what is left
+  is the thirteen roots' own matrices and their getWorldPosition calls), walking 4.2 m/s 25.0 % -> **1.2 %**, flying at
+  150 m 10.7 % -> 0.5 % (plan: at most 5 % of world.update; the audit's 24.7 % was its whole bench, my walking figure
+  matches it). Undergrowth on a scripted descent from 1 km at 15 m/s (cells built / laid, meshes submitted): before 104
+  cells and 275 meshes at every height (393k triangles submitted at 1 km, 0 strokes seen); after 0 cells at 1 km and at
+  400 m, 29 cells and **0 meshes submitted at 150 m**, at 110 m 47 cells laid and every mesh with a stroke in reach laid
+  and submitted (48 of 48), touchdown 103 laid cells against 104 before (**-1 %**, plan within 10 %), submitted 142
+  meshes (the 142 with a stroke in reach; before 275).
+- Test `src/world/undergrowth.test.mjs` (4): on foot a mesh is submitted exactly when a stroke of it can be seen; 150 m
+  up none submitted, 1 km up none kept; the descent: laid by 110 m, as many cells at touchdown as on a standing start;
+  world.update updates no mesh's matrix (2,686 a frame before). FAILS 4 of 4 on the head I began on (`e87f6be`).
+- Frames: every station before | after OPENED (`docs/shots/painter/r1/w23-before-after-q2-1280-1..4.jpg`): the same
+  pictures. Between two runs the frames differ only where the game's state moves from page to page (crowns swaying in
+  PHYSICS' field, the stream): `w23-cost-and-frames-vs-w22.txt`. The exact check is in-page:
+- **In-page A/B** (`bin/ab.mjs --mode under`, run `ab-w24`, the W2.4 tree, which holds these files): at each station the
+  held frame as drawn, then every undergrowth mesh the range test left out shown and the frame drawn again. Shown: 122
+  meshes at E_foot, 183 at E_50_45/90, 247 at E_150_45/90 (none built at 400 m and 1 km). Outside the water (region 2
+  grown by 4 px) the final frames differ by **at most 2/255** (E_foot 6 pixels over 1/255; E_50 none; E_150 one pixel),
+  which is the page's own noise floor: at E_400 and E_1000, where nothing was shown and nothing changed, two renders
+  differ by up to 2-3/255 near the water (the water reflects the frame before, and the wet-in-wet bleed spreads it a
+  few pixels; the lead's reproduction saw the same 2/255). The region view is identical everywhere. Undergrowth meshes
+  submitted at E_150_45 and E_150_90: **0** (plan: 0; 98 before).
+- Checks on a clean export of `e87f6be` with these files (`trees/chk23`): world 34 (30 + the 4 new), unit 225, physics
+  325, coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the station run's page and the A/B page: no
+  console error, fallback empty. `tests/all.mjs`' painted-play and painted-m3 are run at the end of this part, on the
+  last state (one browser at a time).
+
+### W2.4 post savings with the same picture: what was done (src/render/post.js, shared.js, materials.js; test src/world/postsave.test.mjs)
+- **The backdrop pass is gone.** It drew a triangle over the whole scene target writing white and (normal 0, log depth
+  20, region 0); `beginScene` now clears the target white and clears the second attachment alone with
+  `gl.clearBufferfv(COLOR, 1, ...)` to that value (the 8-bit fallback: its packed value 0.5, 0.5, 20/32, 0).
+- **Last frame's painting is kept only while there is water** (`PREV.water`, shared.js; the water material says so in its
+  onBeforeRender): the keep pass (half size, 2 reads a pixel) runs in a frame where water was drawn and in the frame
+  after; where it did not run the frame before, `uPrevOn` is 0 and the water reflects nothing for that one frame
+  rather than an old picture (the same as the first frame after a resize already did). A held frame is unchanged.
+- **The paper is laid once per size.** Of the sheet's six reads of the paper texture, the two the tremor is taken from
+  (plo, pmid) stay live: the tremor moves where the picture and the region target are read, and the region is read
+  without filtering, so a half float's rounding of the offset moved a few pencil pixels by up to 4/255 in a first
+  version that baked the offset (4 pixels of 921,600 at E_foot; that version is gone). The other four (paper, psoft,
+  pfine, pmed) depend only on the pixel and the sheet's size: laid by PAPER_FRAG into two targets at the sheet's size
+  (RGBA16F: the paper's value, the dark wash's dry-edge measure without its live part, and the two terms the paper adds
+  to the ragged border, small numbers where a half float is finest; RGBA8: the grain's three) and read back with two
+  `texelFetch`. Laid again when the size, uBoil or the border's settings change; not on the 8-bit fallback (the sheet
+  reads the paper itself there, `PC_PAPER_BAKED` undefined). The sheet's code reads the paper through PAPER_LIVE and
+  PAPER_STATIC, the same text in the bake and in the live path.
+- Memory: the two targets are 12 bytes a pixel of the sheet (1920x1080: 23.7 MiB; 1280x720: 10.5 MiB; 1266x585: 8.5
+  MiB). Whether two full-size fetches beat four reads of a small cached texture on a phone's bandwidth is not measurable
+  here; the live path stays (PC_PAPER_BAKED undefined, as on the 8-bit fallback, `post.paperBaked`): W6 can choose it
+  per device with a one-line switch at the Post's construction.
+
+### W2.4 numbers
+- **The same picture** (in-page A/B, `bin/ab.mjs --mode post`, run `ab-w24`: this tree's post passes against the base's
+  sheet and backdrop on the same held scene, all 25 stations; `docs/shots/painter/r1/w24-ab-summary.txt`): outside the
+  water every station's final frame is **within 1/255** (max 1, mean 0.006-0.011/255: rounding); on Mars, Saturn and
+  Neptune, the whole frame within 1/255. In and round the water of the Earth stations up to 2-3/255 at a few pixels
+  (E_1000_45 184 pixels, E_1000_90 128): there the raw scene itself differs by as much (the B render is one more round
+  of the reflection's feedback), not the post passes. The region view identical everywhere. Diff maps OPENED:
+  `w24-ab-diff-same-held-scene.jpg` (six stations, |diff| x32: speckle of 1/255 only).
+  A first version that also laid the tremor's paper put 4 pixels of E_foot at 2-4/255 (pencil texels flipped by the
+  half float's rounding of the offset): the tremor's reads were made live again before this run.
+- **Reads** (PILOT's --taps instrument, post passes): the sheet 21 -> **19** reads an output pixel (plan: 17 -> at most
+  11, NOT met: W2.2 added the edge test's 4 reads and the pooling's 4 at the washes' scale, and with the same picture
+  only the paper's reads can go); post reads a frame at 1280x720: near stations 33.6 -> 31.8 M, far stations 25.3 -> 23.5
+  M, and on a world without water also the keep pass (0.46 M, 2 reads a half-size pixel) and always the backdrop's
+  full-size write (12 bytes a pixel, no reads). At 1920x1080 (the same reads per pixel): near 75.7 -> 71.6 M, far
+  57.0 -> 52.9 M (the plan's 147 -> 115 M was the performance audit's model, which counted differently; PILOT's harness
+  counted 63.2 M at 784183b at that size). The phone at 1266x585 (sheet only): 15.6 -> 14.1 M.
+- Test `src/world/postsave.test.mjs` (4): no backdrop pass, the clears and their values; the keep pass only with water
+  and the frame after, and uPrevOn; the paper laid once per size (again on resize and on a border change), its targets'
+  types; the 8-bit fallback reads the paper itself and clears to the packed value. FAILS 4 of 4 on `f9cf6fe`.
+- Checks on a clean export of `f9cf6fe` with these files (`trees/chk24`): world 38, unit 227, physics 325, coast.mjs
+  PASS at both stands, ghostfield.mjs 6 of 6 all zeros; the A/B page (this tree): no console error, fallback empty.
+
+### W2.5 anti-aliasing: what was done (src/render/post.js, index.js, chunks.js; test src/world/aaregion.test.mjs)
+- **MSAA on the scene pass** (`Post.setAA(n)`, `_sceneTarget(samples)`): a second scene target with 4 (or 2) samples, made
+  only when asked and dropped when not; three draws it into multisampled renderbuffers and resolves both colour
+  attachments after the scene pass; the depth is a multisampled 32-bit float renderbuffer (the reversed-Z needs float;
+  three takes the format from the target's DepthTexture type, so the single-sample depth texture stays attached and
+  unused), neither resolved (`resolveDepthBuffer: false`) nor kept after the pass (`storeMultisampledDepthBuffer: false`,
+  invalidated). Every reader of the scene's targets is pointed at the ones in use (`_bindScene`: prep, full prep, brush,
+  sheet, keep, the debug views, the glazes' `G.uSceneAux` / `G.uSceneCol`). Not on the 8-bit fallback.
+- **The region through the resolve (the plan's new risk 1).** An average of regions is not a region: half sky (0) and
+  half foliage (4) resolved to 2, water. `pcWrite` (chunks.js) now writes the region squared into aux.y (it held the view
+  normal's y, which nothing read; the sky already writes 0 there and region 0), so after the resolve `y - w^2` is the
+  spread of the regions under the pixel. AUXFIX_FRAG (one pass at the scene's size, into `rtAux`, before anything reads
+  the second target): a pixel whose samples lay on one region (spread under 0.12; half floats keep a pure pixel under
+  0.07) is kept as resolved (its depth and normal the mean of its samples on one surface); a mixed pixel takes the whole
+  aux of the neighbour nearest it in depth among the pure ones (3x3, then the 5x5 ring); with none, the region its
+  samples' spread points to (w2/w, exact when one of the regions is the sky). So the region, depth and normal every
+  reader sees are a real surface's, as with one sample; only the colour is the resolve's.
+- **The tier's samples** (index.js): MSAA at tiers 2 and 1, not at tier 0 and not on a touch device with a coarse
+  pointer (its GPU pays for samples in bandwidth; ruling 4 says post AA on phones until a real phone shows MSAA holds).
+  Four samples while what they add (colour 4, region 8, depth 4 bytes a sample, and the repaired region 8 bytes a
+  pixel: 72 bytes a pixel at 4x) stays under 100 MiB, else two (40 bytes), else none: 1280x720 at q2 4x (63 MiB);
+  1920x1080 at q2 2x (79 MiB; 4x would be 142 MiB); 1920x1080 at q1 4x (91 MiB). The plan's rule for over 100 MB was
+  "pack aux into RGBA8 while MSAA is on": not taken, the 8-bit pack holds the log depth in 1/8 steps of log2 metres,
+  coarser than the brush's, the edge test's and the pencil's thresholds, so the picture would change; fewer samples
+  keep it. `painter.setAA('auto'|'off'|'msaa'|'msaa2')`, `?aa=0|msaa|2` read by index.js; `painter.info.aa` (samples
+  drawn) and `painter.info.depth` ('reversed-z' | 'log' | 'standard') for the stats line. 'post' AA is not built.
+
+### W2.5 numbers (PILOT's harness, q2 1280x720, all 25 stations with A, F and taps: run `st-w25`; the region check: run
+`ab-w25`; tables `docs/shots/painter/r1/w25-table.txt`, `w25-region-check.txt`, guard `w25-guard-vs-w23.txt`)
+- **Aliasing index A (raw scene)**: E_150_45 0.447 (base) -> 0.397 (one sample, after W2.1) -> **0.350** (plan at most
+  0.40: met; the live MSAA patch had 0.397); E_400_90 0.402 -> 0.321 -> **0.293** (plan at most 0.85 x base = 0.342:
+  met). Elsewhere: E_foot 0.521 -> 0.461, E_50_45 0.413 -> 0.372, M_foot 0.452 -> 0.368, S_150_45 0.336 -> 0.254; at 1 km
+  unchanged (0.378, 0.320: no geometry edges there, the land's own marks are W2.1's). A of the abstraction output at most
+  the baseline raw's at every station (guard).
+- **The region honest through the resolve** (`bin/ab.mjs --mode msaa`, run `ab-w25`: the region view with MSAA and the
+  rule against the same held view drawn with one sample, all 25 stations; `w25-region-check.txt`): pixels whose region
+  is none of their 3x3 one-sample neighbours **0 to 0.008 %** (plan at most 0.05 %: met; the most, E_150_45 at night, 73
+  pixels, in the canopy; not examined one by one); **no water** away from water at any station (plan:
+  none); 0.04-2 % of pixels take the other side of an edge than one sample did. OPENED: `w25-region-view-E150-crop.jpg`
+  (the two region views alike; the differences are edge pixels).
+- **Raw b1/b2 within 5 %** (against the one-sample run `st-w23`): b2 within 1.1 % at every station (no blur); b1 +0.1 to
+  -5.1 % at 19 of 25, NOT met at M_foot -5.9 %, M_50_45 -5.7 %, M_50_90 -5.7 %, S_150_90 -6.2 % (and E_150_45_storm -5.1,
+  N_150_45 -5.0 on the line): the 2-6 px band is where a stair-stepped edge has its energy, and on Mars' and Saturn's
+  plain ground the spires', rocks' and cliffs' outlines are a good part of it; the crops show the outlines smooth, no
+  softer marks.
+- **Flicker index F (raw) at most 0.8 x the baseline raw's at every air station**: met at 12 of 22 (E_400 0.63/0.66,
+  E_1000 0.41, M_50 0.74/0.76, M_150_90 0.74, M_400_90 0.77, M_1000 0.69/0.74, S_150 0.71/0.76, ...); NOT met at 10:
+  E_50_45 0.89, E_50_90 0.89, E_150_90 0.83, E_150_45 0.80 (0.8004, on the line), M_150_45 0.81, M_400_45 0.82,
+  E_150_45_dusk 0.81, storm 0.84, N_150_45 0.85, E_150_45_night 0.80 (0.8033). What still flickers there is inside surfaces and
+  at cut-outs: the crowns' leaf cut-outs are discards, which MSAA does not smooth (alpha-to-coverage would take its
+  coverage from the colour target's alpha, which is the wetness), and the crowns' own marks (W2.1 prefiltered the
+  ground's marks, the leaf shadow and the near strokes, not every crown mark). The plan: "shader aliasing is item 1's
+  job, not MSAA's"; left for W7.
+- Look against the one-sample run (`st-w23`, the guard's rules): only the two halo flags W2.2 already had (abstraction
+  output at E_1000_45 0.70 %, storm 0.82 %; were 0.72 / 0.95): every region's mean colour, L* percentiles, the border
+  strip, detail and cost within the rules. Final land t1/t2 the same or a hair higher (E_foot 0.84/1.03 -> 0.86/1.03,
+  M_foot 0.90 -> 0.94: measured against a raw scene with fewer stair steps).
+- **Cost**: draw calls and triangles unchanged (the scene is drawn once); the region pass 1.0-1.5 reads a pixel (0.9-1.35
+  M a frame at 1280x720; post reads E_foot 31.3 -> 32.6 M), the item's stated cost. **Extra target memory at 1920x1080**:
+  the auto policy draws 2 samples there, 79 MiB (4 samples would be 142 MiB, over the plan's 100 MB); at 1280x720 4
+  samples, 63 MiB; at 1920x1080 q1 4 samples, 91 MiB. Real GPUs' bandwidth for this: not measurable here.
+- Frames OPENED: every station one sample | MSAA (`w25-before-after-q2-1280-1..3.jpg`: the same pictures at sheet scale) and 1:1
+  crops at 2x of ten stations, raw and final (`w25-crops-2x-1..3.jpg`): the figure's hat and outline, Mars' spires,
+  Saturn's cliff and Neptune's spires lose their stair steps; crowns' outlines smoother, their leaf cut-outs still
+  stepped; no rim, halo or dark edge round any silhouette (the region rule keeps the brush, the pooling and the pencil
+  on real surfaces).
+- Test `src/world/aaregion.test.mjs` (5): pcWrite writes the region squared, the sky and the clear agree; the rule runs
+  before every reader and the glazes read its output; the shader's rule read and mirrored on made pictures drawn with 4
+  samples (edges between every pair of regions at seven angles, lines a quarter pixel wide, three regions meeting): no
+  repaired pixel takes a region not among its one-sample neighbours, no water away from water (the plain resolve has
+  some: checked); the tier's samples (4 at 1280x720 q2, 2 at 1920x1080 q2, 4 at 1920x1080 q1, 0 at q0, the overrides),
+  the depth unresolved and not kept, 32-bit float. FAILS 5 of 5 on `fb40efe`.
+- Checks on a clean export of `fb40efe` with these files (`trees/chk25`, so with W2.3 and W2.4): world 43, unit 227,
+  physics 325, coast.mjs PASS at both stands, ghostfield.mjs 6 of 6 all zeros; `tests/all.mjs --only
+  static,painted-play,painted-m3` in that tree: ALL 3 PASSED (static rules hold, painted-play 39 checks, painted-m3 33
+  checks; these run at q0 half scale: no MSAA there); the station run's and the region check's pages (q2, 4 samples): no
+  console error, fallback empty. Not run in a browser: q1, `?aa=` in the URL, a touch profile (the policy is covered by
+  the test, with a stand-in renderer).
+
+### For other roles and the lead (from this part of the lane)
+- PILOT (tiers, W6; the stats line): `painter.info.aa` is the samples drawn (4, 2 or 0) and `painter.info.depth` the depth
+  mode ('reversed-z' where EXT_clip_control exists, else 'log'); `painter.setAA('auto'|'off'|'msaa'|'msaa2')` and the URL
+  `?aa=0|msaa|2` (read in render/index.js, since the painter builds the targets; move it to main.js if you prefer: one
+  line, `if (q.aa) painter.setAA(q.aa)`). MSAA is the tier's: the controller should drop it (setAA('off')) before it
+  drops pixels, as ruling 4 says. On a touch device with a coarse pointer the painter draws no MSAA (no post AA either:
+  'post' is not built; ruling 4's phone post AA is open for W6/W7). The budget rule (4 samples under 100 MiB of extra
+  targets, else 2) is in index.js (AA_MB); at 1920x1080 q2 it gives 2 samples.
+- PILOT (the harness): `tests/stationlib/inpage.js` still names a 'backdrop' pass (post.mBackdrop is gone: harmless);
+  the new passes show as 'region-resolve' and 'paper-bake' (the latter only in a frame that lays the paper) in `--taps`.
+  Two renders of a held frame differ near the water by up to 3/255 (the reflection reads the frame before): an in-page
+  A/B must mask it (my `bin/ab.mjs` grows region 2 by 4 px).
+- PILOT/PHYSICS: the scene target's aux.y is now the region squared (pcWrite), no longer the view normal's y; nothing in
+  the tree read it (searched: post passes, sky.js, kitmat.js, PHYSICS' lab).
+- The lead: W2.4's sheet reads (19, plan 11) and W2.5's flicker index at the canopy stations (10 of 22 air stations over
+  0.8 x) and raw b1 on Mars' and Saturn's plain ground (4 stations at -5.7 to -6.2 %) are the misses of this part; the
+  reasons are with the numbers above. The phone question for the paper bake (two full-size fetches against four cached
+  reads) and for MSAA's bandwidth can only be answered on the owner's devices (plan section 6).
+
+## Hand-over of RELEASE 1, W2.1 and W2.2 (part 1 of the lane; done; part 2 is the section above)
+
+The owner's request after play: much sharper (the ground seen from the ship, "not some blurry blobs"), smoother, mobile,
+without losing quality. The plan: `docs/lead/SHARP-SMOOTH-PLAN.md` (sections 0, 2, 4 W2, 5). This lane, part 1: W2.1
+(prefilter the procedural marks by the pixel footprint) and W2.2 (reverse the abstraction brush; wobble on edges only).
+Began 05:01 UTC 2026-11-14 on head `0efcc3b` (render code the same as the live game and as the plan's base `784183b`).
+
+Scratch: `/home/user/.pc-scratch/painter/r1/` (`bin/` = the sharpness audit's harness copied, port 9461, frames in
+`frames/`, plus `alias2.py` (alias index A, 1x vs 2x box-filtered), `cmp.py` (the quality guard's numbers for a
+before/after pair: t, raw bands, halo share, dE76 per region, L* percentiles, border strip, mean differences) and `run.sh`
+(every station, q2 1280x720, A at E_150_45, E_400_90, E_1000_45, E_1000_90); `trees/base` an export of the head;
+`node/mipstats.mjs`, `node/crackstats.mjs` the noise statistics the prefilter's constants come from).
+
+**State:** W2.1 COMMITTED (`9d8c0ba`), W2.2 COMMITTED (`afe8c40`; numbers below). Nothing of mine is
+half-done in the tree. Part 2 of the lane (W2.3 free wins, W2.4 post savings, W2.5 anti-aliasing) is not begun.
+
+Final checks on a clean export of `3138a65` (my last code-bearing state plus PILOT's W3.1): world 30, unit 225, physics
+325, coast PASS at both stands, ghostfield 6 of 6 all zeros; the real game from that export (`tools/shot.mjs`, 960x540):
+no console or page error, `__pc.info().fallback` empty (its screenshot timed out in SwiftShader at 180 s, the tool's own
+limit). My exports under `/home/user/.pc-scratch/painter/r1/trees/` are deleted; the runs (`st-*`), frames and sheets stay.
+
+### For other roles (from this part of the lane)
+- PILOT (tiers, W6): the old brush and old sheet come back whenever the scene is drawn under 0.6 of the sheet's size
+  (`index.js`: `post.inH < 0.6 * post.outH`). Today dynres can still reach that in play (q1 x 0.5, q0 x 0.5); with the
+  plan's resolution floor (0.67, W6) only the URL pins reach it, as the plan intends. Until then a slow machine sees the
+  brush change style when the controller drops that low.
+- PILOT (the guard, `tests/stations.mjs --compare`): its L* 10/50/90 rule flags nearly every station once the brush
+  stops averaging (a sharp picture has a wider spread of values than a blurred one); the plan's W2.2 acceptance names
+  the mean colour only. Its region means also flag tiny regions (a few hundred pixels of props or foliage at class edges
+  on Mars, Saturn, Neptune). A minimum region share for the colour rule would read better. The `--sheet` mode needs
+  `thumbs/` in the before run's directory (I copied the baseline run's).
+- The lead: the leaf shadow's fine hatch at 1 km straight down (above) is a choice between the 2x alias index and that
+  texture; and the two halo misses are the wet-in-wet bleed I kept as part of the washes.
+- Part 2 of this lane (W2.3, W2.4, W2.5) is not begun. W2.4 should count the sheet at 21 reads now (was 16) and the
+  new full-size prep pass (one read a pixel, one mip chain); W2.5's aux readers now include the sheet's edge test (3 aux
+  reads, class change and depth step) as well as the graphite line.
+
+### W2.2 what was done (post.js, index.js)
+- **The brush turned round** (ABS_FRAG): keep = mix(near keep, 1, far) (near keep as before: 0.30 ground and foliage,
+  0.72 props and figures, 0.92 marks, 0.85 lights); the radius is in internal pixels, `BRUSH_PX` 1.4 (index.js), broader
+  by night (x1.45, the night factor now only on the near brush), capped at 2 px, 0 far; where keep >= 0.995 the
+  rotation tap and the 8 sector taps are not read (far land: 4 reads a pixel, was 13, counted by PILOT's --taps). The
+  near brush's statistics come from a new full-size prep (PREPF_FRAG into `rtFull`, colour and luma squared, mipmapped;
+  drawn only while the near brush is in use): from the half-size prep (a 4 px box at its finest) a 1.4 px brush was a 4 px
+  blur and E_foot's t1 was 0.56. The half-size prep stays for the bleed and the pooling.
+- **The old brush below 0.6 of the sheet's size** (only a pinned scale reaches it after R4; today also dynres at its
+  lowest scales): `uBrushR.y` / `uSheetOld` = internal height < 0.6 x output: the old ABS path (far radius, far pixels
+  repainted) and the old sheet (wobble everywhere, the old per-pixel pooling), exactly as before (the tests' pinned
+  q0/0.5 runs: static, painted-play, painted-m3 run on it, below).
+- **The wobble on edges only** (SHEET_FRAG): 0.3 px (`uWobIn`, px at 1080p like uPig.z) inside a wash, the full 2.6 px
+  where an edge is: a value step at the wash's scale (the half-size prep at lod 0.6 against lod 2.2, 0.05-0.12), a
+  depth step (log2 depth 0.3-0.8 across 2 px), the sky, the water or a figure/ship meeting something else, and the
+  ragged border. A first, wider test (trunks and every crown's depth step counted) took t1 from 0.95 to 0.74 at
+  E_150_45 for little visible tremor; the 0.3 px everywhere variant (no edge wobble) is within 0.02 of the kept one in the
+  air (it differs at M_foot: 1.09 against 0.90).
+- **The pooling at the washes' scale** (SHEET_FRAG): the wide pool and the edge gradient are read on the half-size prep
+  (lod 0.6, the old blots' scale) instead of the brushed picture's own pixels, and the pixel against that few-pixel
+  picture pools both ways (`uPoolFine` 2.0, clamp 0.08): read on the scene's own pixels, as the brush no longer repaints
+  them, every fine mark from the air took a pool and a dark rim and the far land went 3-5.6 dE76 darker (run a: E_400_90
+  land 5.63, E_1000_90 5.08, E_150_45 4.14); one-sided at the washes' scale alone it kept the colour (2.9 at most) but t1
+  fell to 0.74-0.88 (run b); the two-sided fine term gives the sharpness back with no mean (run c/d).
+- Sheet reads 16 -> 21 a pixel (the edge test 4, the pooling's prep reads); total post reads a frame at 1280x720: far
+  stations 28.1 M -> 25.3 M, near stations 28.1 M -> 33.1 M (the full-size prep). W2.4 is where the sheet's reads go down.
+
+### W2.2 numbers (PILOT's harness, q2 1280x720, all 25 stations, run `st-w22d` on a clean export of `0902c56` + post.js
+and index.js; guard against `tests/baselines/stations-784183b.json`: `docs/shots/painter/r1/w22-guard-compare.txt`,
+one line a station: `w22-summary-q2-1280.txt`)
+- Final land t1 / t2 (plan: at least 0.9 / 0.95 at every 150 m, 400 m, 1 km station on Earth, Mars, Saturn): E_150_45
+  1.10/1.13, E_150_90 1.10/1.11, E_400_45 1.18/1.19, E_400_90 1.16/1.19, E_1000_45 1.18/1.05, E_1000_90 1.15/1.18,
+  M_150_45 1.21/1.18, M_150_90 1.14/1.19, M_400_45 1.27/1.17, M_400_90 1.25/1.16, M_1000_45 1.23/1.22, M_1000_90
+  1.24/1.23, S_150_45 1.09/1.09, S_150_90 0.98/1.04: ALL MET (baseline 0.00-0.13 / 0.13-0.44). t1 at most 1.4: met
+  everywhere (largest 1.27).
+- On foot (plan: t1 0.6, t2 0.85): E_foot 0.84/1.03 (0.30/0.72), M_foot 0.90/1.09 (0.34/0.71): MET.
+- Halo of the abstraction output at most 0.5 %: met at 23 of 25; E_1000_45 0.72 % (baseline 3.4) and E_150_45_storm
+  0.95 % (6.1): NOT MET, both the wet-in-wet bleed (kept: the washes) at the 2-3 km limb and under the rain; no brush at
+  all gives the same 0.72 %.
+- Palette, mean colour per region within dE76 3: land and ground within 3 at every station but E_400_90 (land 3.13,
+  ground 2.93): the brush's averaging lifted the darkest marks, the sharp picture restores them (L10 53 -> 39, L50 62.7
+  -> 61.9). Larger dE in tiny regions only: props/foliage slivers on Mars (14-18), Saturn and Neptune foliage (16-18,
+  share 0.00-0.01), E_50_45 props 7.5 (share 0.00), E_400_90 water 5.2 (a narrow stream): pixels at class edges that
+  the old brush filled with the neighbours' colour. The guard's L* 10/50/90 rule flags most stations: the sharp picture
+  has a wider spread of values than a blurred one (L10 darker, L90 lighter) by its nature; the plan's W2.2 acceptance
+  names the mean colour only.
+- Paper border strip: 0.00-0.03/255 at every station (at most 2): MET.
+- Abstraction reads per far pixel 13 -> 4: MET.
+- E_150_45 at night t2 at least 0.9: NOT MET, 0.70 (baseline 0.09); the abstraction output's is 0.92: the rest is the
+  night key itself (its toe and pigment load lay the darks together by design, PAINTER 16), not the brush.
+- The guard's detail rule (raw b2 at least 0.95 x baseline) flags E_400_45, E_1000_45, E_1000_90 (b2 -6 to -15 %): that
+  is W2.1's prefilter at the 6-16 px band (the rows of dashes' band), not W2.2.
+- Frames OPENED: every station before | after (`w22-before-after-q2-1280-1..5.jpg`), 1:1 crops (`w22-before-after-
+  crops-1.jpg`, `-2.jpg` opened; `-3..5` made the same way), the pooling scale (`w22-pooling-scale.jpg`). From 150 m
+  every crown, trunk, the path and the clearings are there; Mars' strata and spires crisp from 1 km; the paper, the
+  washes, the border and the palette as before. Left for the lead: at E_1000_90 (and faintly E_1000_45) the leaf
+  shadow's fine diagonal hatch shows on the shaded wood (W2.1's factor 1.4: the design's 3.25 m lattice at the pixel's
+  Nyquist); reading the leaf shadow one mip level coarser removes it but takes the 2x alias index from 0.32 to 0.65 (the
+  2x reference keeps the hatch). The trees' stair-stepped edges at 1:1 are geometry: W2.5's MSAA.
+- Checks on a clean export of `0902c56` with post.js and index.js: world 30, unit 216, physics 325, coast PASS at both
+  stands, ghostfield 6 of 6 all zeros; `tests/all.mjs --only static,painted-play,painted-m3` in that tree: ALL 3 PASSED
+  (static rules hold, painted-play 39 checks, painted-m3 33 checks); every station page: no console error, fallback
+  empty (the harness's problems list empty, every system real).
+
+### W2.2 design experiments (PILOT's harness on the W2.1 tree, `st-w21b`, post passes patched on the held scene)
+Half-size statistics for the near brush (`w22/post-halfstats.js`), edge-only wobble, measured against each station's own
+raw scene (final land t1/t2; halo read on the abstraction output):
+- w1 (near brush 1.4 px, wobble 0.3 inside, full on edges): E_foot 0.55/0.91, E_50_45 0.77/1.04, E_150_45 0.93/1.09,
+  E_400_90 1.14/1.18, E_1000_45 1.23/1.09 (halo 0.72 %), E_1000_90 1.20/1.25, M_foot 0.73/1.04, M_150_45 1.11/1.13,
+  S_150_45 1.05/1.07, E_150_45_night 0.56/0.64. The radius hardly matters (1.0, 1.4, 2.0 alike: the half-size prep is a
+  4 px box at its finest); no near brush at all: E_foot 0.83/0.99; near keep 0.5: E_foot 0.62/0.93; wobble 0.3
+  everywhere: E_foot 0.70/0.95, E_150_45 1.15/1.15. Frames opened (`sheets/w22exp-E150.jpg`): from 150 m every crown,
+  trunk, the path and the clearing are there, the paper, the washes and the border as before.
+- So: E_foot misses t1 0.6 with half-size statistics (hence the full-size prep in the draft, `w22/post.js`), the edge
+  test fires on much of the foot frame (t1 0.55 against 0.70 with the 0.3 px wobble everywhere), E_1000_45's halo
+  (0.72 % with no brush at all) is the wet-in-wet bleed of the far air, and the night station's t2 0.64 is the night key
+  itself (no brush: 0.65; the abstraction output 0.91): the night's toe and pigment load lay the darks together by
+  design (the M4 night key), which the plan's 0.9 would undo.
+- Running: `st-w22a`, the draft (full-size statistics) at all 25 stations with variants e2..e7 (edge test thresholds,
+  silhouettes and border only, near keep 0.5, half-size statistics, wobble 0.3 everywhere).
+
+### W2.1 what was done (chunks.js, materials.js)
+- `pcFp` (the pixel's footprint on the land, metres: the longer of the two screen derivatives of the body position, the
+  axis the hardware's mip level follows), set at the top of TERRAIN_FRAG, PROP_FRAG and NEAR_FRAG before any discard;
+  materials that do not set it (orbit.js, the kits, PHYSICS' lab) keep every mark exactly as before.
+- `pcSub(scale, k)`: the variance of a uNoise3D channel that lies inside the pixel = k.x s^2/(s^2 + k.y), s = texels per
+  pixel. Fitted to the 64^3 noise's own mip chain (`node/mipstats.mjs`): R and G (0.0191, 100), B (0.0163, 25), A
+  (0.0550, 56). `pcStepF(e0, e1, v, sub)`: the threshold's half width h -> sqrt(h^2 + 1.4 sub): the same mean share,
+  softer as the pattern goes under the pixel. `pcLineF`: the cracks (a distance field's thin line), widened by its
+  change across the pixel and keeping its cover, laid as its mean cover past its cells (`node/crackstats.mjs`: grad 17
+  a tile, cover 1.8 x the mean width). `pcLevelF`: the light's steps no narrower than fwidth of the light value.
+- Terrain: the leaf shadow, the dabs, flicks, dry brush, the two hue drifts, the cracks and their masks; the light: where
+  the leaf shadow is finer than the pixel (`fk` from pcDappleSub) the shade and the sunlit wash are toned each on its own
+  and mixed by the sunny share (the light read at the mixed value was one middle step, so the far floor's colour moved);
+  the fleck's heart as 0.55 patch + 0.45 min(heart, patch) (equal where drawn, the right share where not). Props: the
+  leaf shadow, the rocks' dry brush. Near strokes: the leaf shadow.
+- The factor 1.4 (was 3.5 as first written): measured at E_1000_90 on one held page against the design supersampled 16
+  times (W2.1 off, 4x, box-filtered down; `bin/truth.py`): error 0.63 as drawn, 0.54 at 6, 0.48 at 3.5, 0.42 at 1.5;
+  the plan's 2x alias index A 0.358 at 3.5, 0.322 at 1.5, 0.3185 at 1.2; raw lapvar 199 at 3.5, 324 at 1.5, 366 at
+  1.2 (the plan's bound 350; the supersampled design's own lapvar is 675). A and lapvar pull opposite ways there; 1.4
+  sits between. Tried and not kept: the noise read one mip level coarser (lod +1, the pixel's Nyquist emptied): A 0.65
+  (too soft against the 2x reference); n1/n2 alone one level coarser: A 0.365 (worse); an explicit mip level for the
+  leaf shadow (to rule out SwiftShader's 3D level): no change.
+
+### W2.1 numbers (q2 1280x720; PILOT's harness for A; the baseline `tests/baselines/stations-784183b.json`)
+- At factor 3.5 (PILOT's harness, run `st-w21`): raw A E_400_90 0.402 -> 0.31, E_1000_45 0.630 -> 0.40, E_1000_90
+  0.533 -> 0.36; raw lapvar E_1000_45 372.6 -> 59.7, E_1000_90 1082 -> 199; draw calls and triangles unchanged at every
+  station; final t, halo unchanged (today's brush). At 1.5 (my held page): A E_1000_45 0.378, E_1000_90 0.322, E_400_90
+  0.320 (ground alone 0.246: the rest is the trees' silhouettes, W2.5's MSAA); lapvar 97, 324. The final run at 1.4 is
+  `st-w21b`: raw A E_400_90 0.321, E_1000_45 0.3782, E_1000_90 0.3200 (the 0.6 x baseline lines are 0.241, 0.3780,
+  0.3198); raw land lapvar E_1000_45 100.7, E_1000_90 336.8 (bounds 150, 350); raw b3 28.2 / 34.2 / 24.5; calls and
+  triangles equal to the baseline's at every station.
+- Raw b3 within 10 % (E_1000_90 25.0 -> 24.4, E_1000_45 33.6 -> 34.0), raw land dE76 1.18 / 1.58 (at most 2); E_foot
+  b1/b2 -0.6 / +0.1 %, E_50_45 -1.9 / -0.8 % (within 5 %) (audit harness, my base run vs W2.1 at 3.5).
+- **Not met: A at most 0.6 x baseline.** E_1000_45 0.378 (target 0.378) and E_1000_90 0.32 (0.320) sit on the line at
+  1.4-1.5; E_400_90 0.32 against 0.241: its ground alone is 0.246, the trees' edges are geometry (W2.5). See above for
+  why A and the lapvar bound cannot both be cleared with margin by this filter.
+- Crops opened: `docs/shots/painter/r1/w21-raw-crops-before-after.jpg` (E_1000_45: the rows of dashes gone; E_1000_90 a
+  fine stipple left in the shaded wood; E_400_90 softer edges), `w21-k3.5-harness-crops.jpg`,
+  `w21-E_1000_90-k-variants.jpg`.
+- Checks on a clean export of `2df378d` with these files: world 30, unit 216, physics 325, coast PASS at both stands,
+  ghostfield 6 of 6 all zeros; the pages of the session: no console error (harness problems list empty).
+
+## Hand-over of the LAST FIXES' RE-FIX pass (twenty-second PAINTER agent)
 
 The verifier of the last fixes accepted item 2 and found item 1 partly fixed (the eye inside a spire: fixed and confirmed;
 a hard-edged slab beside a slim Neptune spire seen from OUTSIDE it, the descent's last frame `q0_dsc4`, still there, the
