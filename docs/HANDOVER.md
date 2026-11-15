@@ -12,7 +12,7 @@ the state from `git log`, the last section of `docs/COORDINATOR.md`, the hand-ov
 
 ## 0. How to start a session
 
-`CLAUDE.md` at the root (on `main` once pull request #3 is merged, and on `r2`) tells every new session to do
+`CLAUDE.md` at the root (on `main` since pull request #3 was merged, and on `r2`) tells every new session to do
 the steps below by itself, so the owner can just type "continue".
 
 1. Use the repository `zubersss/Painted-cosmos` and check out the working branch:
@@ -74,15 +74,27 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
    - The owner's email is private.
    - No model names in commit messages, PR text or code, except the attribution lines the
      session's own instructions require.
+10. **Plan with the owner before anything starts (2026-11-15, to the second account's session).**
+    - "Do NOT start any work yet: no agents, no workflows, no code changes." This holds until the
+      owner says go.
+    - The owner will send style references and how the work is to be organised. The plan is then
+      made together with the owner in chat, before anything starts. For the work ahead this comes
+      before item 1: section 4 below is the last session's proposal, not an order.
+    - Log every new instruction from the owner in `docs/COORDINATOR.md` and in this section.
 
 ## 3. State right now (update this before you stop)
 
-Last updated 2026-11-15 by the coordinator on the first account. Everything is paused: nothing is
-running, the working tree is clean, and everything is pushed.
+Last updated 2026-11-15 (11:20 UTC) by the coordinator on the second account, which took over
+from the first. Everything is still paused: nothing is running, the working tree is clean, and
+everything is pushed. This session has read the handover and run nothing (no checks either).
+
+**Waiting on the owner (section 2, item 10):** the style references and how the owner wants the
+work organised. Then the plan is agreed with the owner in chat. Nothing starts before that, and
+the order below may change with it.
 
 | Branch | What it holds |
 | --- | --- |
-| `main` | **Live.** Release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset. Before that, M4's whole game (PR #1, `be90864`). |
+| `main` | **Live.** At `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
 | `cosmos` | Frozen at `3e46e80`: release 1's code, the same as `main`. Do not work on it. |
 | `r2` | **The working branch.** Release 1, the logs, this file, `tools/workflows/`, and release 2's half-done work as "WIP snapshot" commits only. No release-2 item was finished or verified. On a clean export of `r2`: world tests 56 pass and 1 fail ("MSAA belongs to the tier..."), unit 259, physics 325. |
 
