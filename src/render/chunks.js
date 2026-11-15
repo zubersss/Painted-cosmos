@@ -101,6 +101,8 @@ uniform vec4 uOilPx;
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
+uniform vec4 uLamp;
+uniform vec4 uGroundK;
 #endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
 vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
@@ -347,6 +349,18 @@ float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
   float th = mix(0.05, 0.585, canopy);
   float s = smoothstep(th - 0.015, th + 0.015, a * 0.68 + b * 0.32);
   return mix(s, 1.0 - 0.42 * canopy, uWx.x);
+}
+// The lantern's pool (the wanderer's, by night): a stroke within a few metres of the lantern is painted in its warm
+// light, whole; at the pool's edge, where the warm light runs into the night's blue, a ring of strokes between the two
+// (yellow-green on snow, as in the clip). paint: the stroke as the night has it; wash: its own colour; r: its number.
+vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
+  if (uLamp.w < 0.01) return paint;
+  float d = length(body - uLamp.xyz) + (r - 0.5) * 1.1;
+  float k = uLamp.w * (1.0 - smoothstep(1.0, 6.5, d));
+  if (k < 0.004) return paint;
+  vec3 warm = min(pcDensity(wash, 1.3) * vec3(1.30, 0.86, 0.40) + vec3(0.10, 0.045, 0.0), vec3(1.0));
+  vec3 ring = mix(paint, warm, 0.5) * vec3(0.90, 1.10, 0.78);
+  return k > 0.5 ? mix(ring, warm, smoothstep(0.5, 0.85, k)) : mix(paint, ring, smoothstep(0.0, 0.5, k));
 }
 // The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
 // (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.

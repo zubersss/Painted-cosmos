@@ -145,11 +145,27 @@ void main() {
     float ray = texture(uNoise3D, vec3(ha.xz * 16.0, ha.y * 16.0) + vec3(0.0, uTime * 0.004, 0.0)).g;
     ray = 0.40 + 0.60 * smoothstep(0.35, 0.70, ray);                                  // rays: streaks up the curtain
     float hgt = 0.22 + 0.25 * fb.b;
+  #ifdef PC_OIL
+    // (the oil look, after the owner's reference clip: the curtain is laid in upright strokes, each its own height, a
+    // clean edge to every one; green, with blue and a line of magenta along the foot, and it is the brightest paint in
+    // the night's picture)
+    float az = atan(ha.z, ha.x);
+    float si = floor(az * 64.0 + fa.b * 5.0);
+    float sr = fract(sin(si * 12.9898) * 43758.5453), sr2 = fract(sin(si * 78.233) * 12543.123);
+    float bot = e0 + 0.035 * (sr2 - 0.5), top = bot + hgt * (0.35 + 0.85 * sr);
+    float k = step(bot, e) * step(e, top) * fold * step(0.25, sr + sr2);
+    vec3 ac = mix(vec3(0.92, 0.36, 0.84), vec3(0.22, 0.56, 1.0), step(bot + 0.006, e));
+    ac = mix(ac, vec3(0.20, 1.0, 0.52), step(bot + 0.016 + 0.02 * sr, e));
+    ac = mix(ac, vec3(0.10, 0.80, 0.56), step(mix(bot, top, 0.55), e));
+    ac = mix(ac, vec3(0.08, 0.55, 0.52), step(mix(bot, top, 0.82), e));
+    sky = mix(sky, ac, clamp(k * uAurora.x * (0.30 + 0.70 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.97));
+  #else
     float k = smoothstep(e0 - 0.012, e0 + 0.02, e) * (1.0 - smoothstep(e0 + 0.04, e0 + hgt, e)) * fold * ray;
     // (pale viridian at the lower edge lifted out of the blue, violet where the rays fade: it has to stand against the
     // middle of the sky, where the wash is deep; low down the sky is near paper and a pale curtain is lost in it)
     vec3 ac = mix(vec3(0.66, 0.93, 0.78), vec3(0.80, 0.68, 0.93), smoothstep(e0, e0 + hgt * 0.8, e));
     sky = mix(sky, ac, clamp(k * uAurora.x * (0.62 + 0.36 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.85));
+  #endif
   }
 
   // ---- a sea of cloud seen from one of its islands: beyond the island's rim the cloud tops
@@ -293,6 +309,18 @@ void main() {
     // against a sky nearly white with light. In space the sky is as it was.)
     col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
     col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
+    {
+      // the night sky is painted, not left flat: short thin dashes a step lighter than the wash, in rows that waver
+      // across the sky (the clip's night sky is streaked all over with them)
+      vec3 hh = normalize(d - up * e + up * 1e-4);
+      float az2 = atan(hh.z, hh.x);
+      float rowf = e * 44.0 + 2.2 * sin(az2 * 3.0 + 1.3) + 1.1 * sin(az2 * 7.0);
+      float row = floor(rowf), hx = fract(sin(row * 91.7) * 43758.5453);
+      float along = az2 * (10.0 + 8.0 * hx) + hx * 40.0;
+      float hs = fract(sin((floor(along) + row * 57.0) * 12.9898) * 43758.5453);
+      float dash = step(0.55, hs) * step(abs(fract(rowf) - 0.5), 0.07 + 0.09 * hs) * step(0.06, fract(along)) * step(fract(along), 0.55 + 0.4 * hs);
+      col = mix(col, min(col * 1.25 + vec3(0.05, 0.10, 0.10), vec3(1.0)), dash * (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * step(0.02, e) * 0.8);
+    }
   #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)

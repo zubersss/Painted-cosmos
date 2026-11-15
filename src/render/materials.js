@@ -42,6 +42,7 @@ function baseUniforms(bodyU, own) {
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear, uAux8: G.uAux8,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
     uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx, uRound: b.uRound || G.uRound0, uHeart: b.uHeart || G.uHeart0, uFogBank: b.uFogBank || G.uFogBank0,
+    uGroundK: b.uGroundK || G.uGroundK0,
     ...OIL,
   }, own || {});
 }
@@ -121,7 +122,7 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
 // trees a share of the dabs take the canopy's colour: the leaves that have fallen.
 // (Tried at checkpoint 1 and dropped by the owner's choice: thin strokes along the land, tiles; in the history.)
 // (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
-vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV;
+vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV, gBc;
 vec4 gCdx, gCdy, gPdx, gPdy;
 float gMid;
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
@@ -144,13 +145,14 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
   leaf = pcDensity(col2C, 1.15);
   canopy = parC.z;
+  gBc = Bc;
 }
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
 vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl) {
   float f = step(1.0 - fk, fract(rnd.z * 13.7));
   vec3 k = pcDabTint(mix(c, leaf, f), rnd, f);
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
-  return pcTone(k, lvl);
+  return pcLamp(pcTone(k, lvl), k, gBc, rnd.y);
 }
 void main() {
   #include <logdepthbuf_fragment>
@@ -167,12 +169,30 @@ void main() {
   gNvdx = dFdx(vNV); gNvdy = dFdy(vNV); gNldx = dFdx(vNL); gNldy = dFdy(vNL);
   float wpx = uOilA.x * uOilPx.y / 720.0;
   vec3 c, leaf; float lvl, snowC, canopy;
+  vec3 acc;
+  if (uGroundK.x > 0.5) {
+    // a world of snow and ice: a course of tiles with a light edge, as the clip's snow (this world's uGroundK; the tiles
+    // run along the land, their rows on the contours of a slope, and are about three strokes wide)
+    vec2 chT = vec2(ch.x, ch.y + 1.4 * (length(vBody) - uBodyR));
+    vec2 dtx = dFdx(chT), dty = dFdy(chT);
+    vec2 ot = pcStrokeOct(dist * 3.0, uOilPx.z * 3.0);
+    float goneT = smoothstep(0.15, 0.85, ot.y);
+    gBc = vBody;
+    acc = pcLamp(pcTone(mix(vCol2, vCol.rgb, gMid), 2.2), mix(vCol2, vCol.rgb, gMid), vBody, 0.5);
+    for (int L = 1; L >= 0; L--) {
+      float w = ot.x * (L == 1 ? 2.0 : 1.0);
+      vec3 rnd; vec2 ds; float cov;
+      pcStrokeLayer(chT, dtx, dty, w, uOilB.w, vBody, 12.0 * wpx * uOilB.w * (L == 1 ? 2.0 : 1.0), rnd, ds, cov);
+      pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
+      acc = pcLay(acc, pcGroundPaint(c, leaf, 0.0, rnd, snowC, lvl), cov, L == 0 ? step(goneT, rnd.z) : 1.0);
+    }
+  } else {
   // leaf dabs (the owner's style 5). Under them the ground's own colour, the light and the leaf shadow as the pixel has them
   vec2 oc = pcStrokeOct(dist * uOilS.w, uOilPx.z * uOilS.w);
   float gone = smoothstep(0.15, 0.85, oc.y);
   float x0 = dot(nV, gSunV) * 0.5 + 0.5;
   float sun0 = min(pcSunAt(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(max(length(gBdx), length(gBdy)), oc.x * 0.5)), 1.0 - pcCast(vBody, 0.0));
-  vec3 acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+  acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
   for (int L = 1; L >= 0; L--) {
     float w = oc.x * (L == 1 ? 2.0 : 1.0);
     vec3 rnd, rnd2; vec2 ds; float cov, has2;
@@ -181,6 +201,7 @@ void main() {
     float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid;
     vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl);
     acc = mix(acc, mix(mix(acc, p2, has2), p1, cov), uOilC.z);
+  }
   }
   float f = pcFogAmount(dist * pcFogBank(vBody));
   vec3 cOut = pcAtmosV(acc, f, vView);
@@ -1112,6 +1133,7 @@ void main() {
         xs_ += (rnd.x - 0.5) * 0.10 * fine;
         float lvl = pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
         vec3 l1 = mix(pcTone(k1, lvl), pcTone(k1, max(lvl, 1.0) * 0.5 + 1.0), pk), l2 = mix(pcTone(k2, lvl), pcTone(k2, max(lvl, 1.0) * 0.5 + 1.0), pk);
+        l1 = pcLamp(l1, k1, Bc, rnd.y); l2 = pcLamp(l2, k2, Bc, rnd2.y);
         vec3 lay = mix(l2, l1, cov);
         if (L == 1) acc = mix(acc, lay, fine * uOilC.z);
         else {
@@ -1143,7 +1165,7 @@ void main() {
         // (a crown's shade is its own colour laid heavier with half the cool key over it: the key alone over an orange
         // crown is mud; light comes through leaves)
         vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
-        vec3 lit = mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl));
+        vec3 lit = pcLamp(mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl)), cs, Bc, rnd.y);
         acc = mix(acc, lit, cov * there * uOilC.z);
         accA = max(accA, there * cov);
       }
@@ -1546,10 +1568,27 @@ void main() {
   float x = dot(nV, sunV) * 0.5 + 0.5 + (n1.g - 0.5) * 0.20 + (n2.a - 0.5) * 0.08;
   float lvl = pcLevel(x, 0.085);
   vec3 lit = pcTone(c, lvl);
+  #ifdef PC_OIL
+  {
+    // the figure in strokes: thin streaks that run down the cloth and along the limbs (the figure's own up), each a
+    // little lighter or darker, warmer or cooler than the next, with nothing drawn between them; fine, because the
+    // figure is what the eye reads first. The chart is the figure's own space, laid along whichever side the form faces.
+    vec3 fox = dFdx(vObj), foy = dFdy(vObj);
+    vec3 fna = abs(normalize(vNO));
+    vec2 fch, fdx, fdy;
+    if (fna.x >= fna.z) { fch = vObj.yz; fdx = fox.yz; fdy = foy.yz; } else { fch = vObj.yx; fdx = fox.yx; fdy = foy.yx; }
+    vec2 foc = pcStrokeOct(length(vView) * 0.8, 0.004);
+    vec3 fr1, fr2; vec2 fds; float fown;
+    pcThinLayer(fch, fdx, fdy, foc.x, 5.0, vObj, 40.0, 2.0, fr1, fds, fown, fr2);
+    vec3 t1 = pcTone(pcDabTint(c, fr1, 0.0), lvl + (fr1.z - 0.5) * 0.5), t2 = pcTone(pcDabTint(c, fr2, 0.0), lvl + (fr2.z - 0.5) * 0.5);
+    lit = mix(t2, t1, fown);
+  }
+  #else
   // dry brush: the loaded brush skips on the lit side and paper sparkles through
   vec4 st = pcTri(vObj * uFig.z, normalize(vNO), 0.5);
   float dryM = smoothstep(0.56, 0.70, st.r * 0.8 + st.b * 0.3) * smoothstep(0.45, 0.60, n2.r);
   lit = mix(lit, vec3(1.0), dryM * vMat.x * 0.16 * clamp(lvl - 1.0, 0.0, 1.5));
+  #endif
   // (aMat.z: 0..1 a light of its own, a flame or a lantern, not modelled by the sun; below 0: glass that is lit from
   // within when the light goes: a cabin lamp, warm paper with a touch of quinacridone gold, the one warm thing in a night)
   float lampN = max(-vMat.z, 0.0) * (1.0 - uDayness);

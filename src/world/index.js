@@ -16,7 +16,7 @@ import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
-import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK } from '../render/shared.js';
+import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
@@ -56,6 +56,8 @@ export function createWorld(scene) {
     scene.add(root);
     bodies.set(id, root);
     const bu = makeBodyUniforms();
+    // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'tiles' for worlds of snow and ice)
+    { const lk = getLook(id); if (lk && lk.oil && lk.oil.ground === 'tiles') bu.uGroundK.value.x = 1; }
     bu.uBodyR.value = BODIES[id].radius;
     const look = getLook(id);
     if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }
@@ -610,6 +612,7 @@ export function createWorld(scene) {
     const K = G.uCastK.value, U = G.uCast.value;
     K.set(0, 0);
     SHADOW.root = null; SHADOW.strength = 0;
+    OIL.uLamp.value.w = 0;
     if (!active) return;
     // (by night the moon throws the shade: uSunDirL is then the moon's direction; nothing is thrown in the middle of twilight)
     const moon = active.bu.uMoon.value, mk = Math.abs(2 * moon - 1);
@@ -624,6 +627,12 @@ export function createWorld(scene) {
       _cp.copy(o.position); active.root.worldToLocal(_cp);
       const r = _cp.length();
       if (!(r > 1)) continue;
+      if (i === 0 && o.userData.lamp) {
+        // (the wanderer's lantern, the oil look: its pool of light by night, chunks.js pcLamp; it comes on through dusk)
+        const lp = o.userData.lamp;
+        _ct.set(lp[0], lp[1], lp[2]); o.updateWorldMatrix(true, false); o.localToWorld(_ct); active.root.worldToLocal(_ct);
+        OIL.uLamp.value.set(_ct.x, _ct.y, _ct.z, THREE.MathUtils.smoothstep(1 - active.bu.uDayness.value, 0.25, 0.8));
+      }
       _cu.copy(_cp).divideScalar(r);
       const ground = sampleSurfacePure(active.id, _cu.x, _cu.y, _cu.z).radius, h = Math.max(0, r - ground);
       if (h > 60) continue;
