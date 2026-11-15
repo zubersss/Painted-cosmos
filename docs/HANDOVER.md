@@ -135,6 +135,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     strokes; two that follow the clip's own way with thinner strokes, four that explore other
     ways; the owner chooses. They are `STYLES` in `src/render/shared.js` on `look-proto`
     (`&style=1..6`).
+20. **Style 5, and the clip matched "almost to the tea" (2026-11-15, at checkpoint 1).** "Do
+    style 5 but make sure your making it the same as the reference video almost to the tea you
+    can change up ground materials like the grass or snow if it helps you get closer ... same
+    for everything else." The style is 5 (leaf dabs lying every way). The clip's LOOK is the
+    target, matched closely: light, colour, strokes, shadows, air, grass, snow. The game's own
+    materials and content may be changed to get there. Items 5, 6, 16 and 17 still bind: our own
+    world and figure, no blur, the desktop first.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
@@ -160,12 +167,13 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
 **IN PROGRESS since 2026-11-15 (the owner's go): the coordinator is building pieces 1 to 3 of
 section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
-for the owner.** Pieces 1 to 3 are built, in SIX styles for the owner to choose from (section 2,
-item 19). **CHECKPOINT 1 WAS PUT TO THE OWNER on 2026-11-15 (the sheets were sent in chat; they
-are not kept in the repository): waiting for the owner's choice of style.** Then, on the chosen
-style: one independent verifier, `tests/all.mjs`, the other five styles removed, and pieces 4 to
-6. The station numbers for today's look and for styles 1 and 6 were being taken when this was
-written (see the log's last section for whether they came back). If this session was cut off: read `git log origin/look-proto`, the newest
+for the owner.** Pieces 1 to 3 are built. **Checkpoint 1 is passed: the owner chose style 5 and asked for the
+clip to be matched very closely (section 2, item 20), and said to continue.** The coordinator is
+now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
+clip's, real cast shadows, falling leaves and the flicker, the night with snow, lantern and
+aurora, the explorer), toward checkpoint 2. The station numbers of checkpoint 1 are in the log:
+the oil look is far sharper than release 1 from the ship, and its flicker index is worse (the
+look's open fault, to be treated). If this session was cut off: read `git log origin/look-proto`, the newest
 section of the log, and the note at the top of `docs/notes/painter.md` on that branch; work that
 is committed there is safe, nothing of it is live. The desktop's top tier is where the prototype is
 built and judged (section 2, item 17); the phone follows after approval. Still to be asked
