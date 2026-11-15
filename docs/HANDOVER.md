@@ -160,7 +160,9 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
 **IN PROGRESS since 2026-11-15 (the owner's go): the coordinator is building pieces 1 to 3 of
 section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
-for the owner.** If this session was cut off: read `git log origin/look-proto`, the newest
+for the owner.** Pieces 1 to 3 are built, in SIX styles for the owner to choose from (section 2,
+item 19); checkpoint 1 is the owner's choice among them. Still owed at that checkpoint: the
+station numbers for the oil look against today's, `tests/all.mjs`, and one independent verifier. If this session was cut off: read `git log origin/look-proto`, the newest
 section of the log, and the note at the top of `docs/notes/painter.md` on that branch; work that
 is committed there is safe, nothing of it is live. The desktop's top tier is where the prototype is
 built and judged (section 2, item 17); the phone follows after approval. Still to be asked
