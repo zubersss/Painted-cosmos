@@ -103,7 +103,9 @@ everything is pushed. This session has read the handover and run nothing (no che
 work organised. Then the plan is agreed with the owner in chat. Nothing starts before that, and
 the order below may change with it.
 
-**Discussed with the owner, not yet agreed (see the log's last two sections):**
+**Agreed in principle by the owner ("we should do it right?"), not yet the word to start (see
+the log's last three sections). Next: the references and the owner's device, then a one-page
+plan for the owner's go:**
 - Models: no mixing (it would save a few per cent at most). Everything that writes or judges
   the game runs on the top model at extra-high effort.
 - Set-up, with no workflow: the coordinator builds the main line itself, one piece at a time.
