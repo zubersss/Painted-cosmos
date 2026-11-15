@@ -142,6 +142,11 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     target, matched closely: light, colour, strokes, shadows, air, grass, snow. The game's own
     materials and content may be changed to get there. Items 5, 6, 16 and 17 still bind: our own
     world and figure, no blur, the desktop first.
+21. **A rebuild is allowed where it does better work (2026-11-15).** The owner asked whether the
+    paint should start from zero instead of building on the watercolour, and said "if a
+    [rebuild] will do better work im okay with that". Rebuild a part from zero where the
+    watercolour's design holds the match back (foliage, grass, sky, water, each world's colours);
+    keep the world itself (planets, land, physics, flight, interface).
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
