@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, ensureGlobals } from './shared.js';
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
 
@@ -166,6 +166,11 @@ export function createPainter(renderer) {
     // (PILOT's mood.pulse01, 0 to 1: the pulse drive spooling up and dropping out; without it the ship model's mode says so)
     MOTION.given = typeof mood.pulse01 === 'number' ? Math.max(0, Math.min(1, mood.pulse01)) : null;
     post.sheetUniforms.uWxSheet.value.set(WX.key, Math.max(WX.flash, mood.sky && !WX.forced ? mood.sky.flash || 0 : 0), 0, 0);
+    if (LOOK.oil) {
+      // (the angle one pixel of the scene pass takes: the oil look's strokes are sized on the screen, chunks.js)
+      const pe = camera.projectionMatrix.elements;
+      OIL.uOilPx.value.set(2 / (Math.max(pe[5], 1e-6) * Math.max(post.inH, 2)), post.inH, 0, 0);
+    }
     const prevTarget = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;
@@ -224,6 +229,8 @@ export function createPainter(renderer) {
       if (o.border != null) u.uBorder.value.w = o.border ? 1 : 0;
       if (o.abstraction != null) a.uAbstraction.value = o.abstraction;
       if (o.bleed != null) a.uBrush.value.w = o.bleed;
+      // (the oil look's dials, shared.js OIL: { oil: { uOilA: [..], uOilB: [..], uOilC: [..] } })
+      if (o.oil) for (const k in o.oil) if (OIL[k]) OIL[k].value.fromArray(o.oil[k]);
     },
     info,
     // (for instruments only: the post passes themselves, so that a study can read a pass or try a shader in a running page)

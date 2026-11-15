@@ -12,7 +12,7 @@
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
 // the painting (wash variation, strokes, light) is anchored in the world by the materials.
 import * as THREE from 'three';
-import { getTextures, G, PREV } from './shared.js';
+import { getTextures, G, PREV , LOOK, OIL } from './shared.js';
 
 const FS_VERT = /* glsl */`
 varying vec2 vUv;
@@ -616,6 +616,36 @@ void main() {
 }
 `;
 
+// THE OIL LOOK'S LAST PASS (shared.js LOOK): the scene as the materials painted it, with no brush, no pooling, no pencil
+// and no paper over it, so nothing here can soften an edge. What it does: the picture comes up from the dark canvas on
+// an arrival; the world's last key (dusk gold, night blue) is laid over everything but the lights; a little more depth
+// in the darks. Where the scene is drawn smaller than the screen it is enlarged plainly.
+const OIL_FRAG = /* glsl */`
+uniform sampler2D tAbs;
+uniform highp sampler2D tAux;
+uniform vec3 uGrade;
+uniform vec4 uWxSheet;
+uniform float uNight;
+uniform float uLaid;
+uniform vec4 uOilC;
+varying vec2 vUv;
+${AUX_DEC}
+const vec3 W = vec3(0.3, 0.5, 0.2);
+void main() {
+  vec3 col = texture(tAbs, vUv).rgb;
+  float lamp = 0.0;
+  if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, pcAuxDec(texture(tAux, vUv)).w);
+  col *= mix(uGrade, vec3(1.0), lamp);
+  // lightning: for a frame or two everything light goes lighter
+  col = mix(col, vec3(1.0), clamp(uWxSheet.y * smoothstep(0.25, 0.75, dot(col, W)) * 0.6, 0.0, 0.9));
+  // a gentle S over the values: the darks a step deeper, the lights kept
+  vec3 s = col * col * (3.0 - 2.0 * col);
+  col = mix(col, s, 0.35);
+  col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}
+`;
+
 function fsMaterial(frag, uniforms, extra) {
   return new THREE.ShaderMaterial(Object.assign({
     uniforms, vertexShader: FS_VERT, fragmentShader: frag,
@@ -743,6 +773,10 @@ export class Post {
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms, this.paperBaked ? { defines: { PC_PAPER_BAKED: 1 } } : null);
     this.mPaper = fsMaterial(PAPERS_FRAG, { tPaper: this.sheetUniforms.tPaper, uOutRes: this.sheetUniforms.uOutRes, uBoil: this.sheetUniforms.uBoil, uBorder: this.sheetUniforms.uBorder });
     this.mPaper.name = 'paper-bake';
+    this.oil = LOOK.oil;
+    this.mOil = fsMaterial(OIL_FRAG, { tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
+      uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8 });
+    this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`
       uniform sampler2D tA; uniform highp sampler2D tB; uniform int uMode; varying vec2 vUv;
@@ -861,6 +895,7 @@ export class Post {
   finish(glazes, camera) {
     // (R1 W2.5) the region through the resolve, before anything reads it
     if (this.samples) this._pass(this.mAuxFix, this.rtAux);
+    if (this.oil) return this._finishOil(glazes, camera);
     this._pass(this.mPrep, this.rtHalf);
     // (the near brush's statistics, at the scene's own size: not drawn where the old brush is in use)
     if (this.absUniforms.uBrushR.value.y < 0.5 && this.absUniforms.uAbstraction.value > 0) this._pass(this.mPrepF, this.rtFull);
@@ -899,6 +934,29 @@ export class Post {
       if (this.paperBaked) this._paper();
       this._pass(this.mSheet, null);
     }
+  }
+
+  // The oil look's passes (shared.js LOOK): the scene as painted, the glazes over it, last frame kept for the water, the
+  // last key. No brush, no pooling, no pencil, no paper.
+  _finishOil(glazes, camera) {
+    const m = this.mCopy;
+    m.uniforms.uMode.value = 1; m.uniforms.tA.value = this.rtScene.textures[0];
+    this._pass(m, this.rtAbs);
+    if (glazes && glazes.length) {
+      const r = this.renderer;
+      r.setRenderTarget(this.rtAbs);
+      for (const o of glazes) { o.visible = true; r.render(o, camera); }
+    }
+    if (this.postAA) this._pass(this.mFxaa, this.rtAA);
+    const water = PREV.water;
+    if (water) { this.waterSeen = true; this.waterBody = PREV.body; }
+    if (water || (this.waterSeen && this.waterBody === PREV.body)) { this._pass(this.mKeep, this.rtPrev); this.prevFrames++; } else this.prevFrames = 0;
+    G.uPrevOn.value = this.prevFrames >= 1 ? 1 : 0;
+    if (this.debugView) {
+      m.uniforms.uMode.value = this.debugView === 5 ? 1 : this.debugView;
+      m.uniforms.tA.value = this.debugView === 5 ? this.rtAbs.texture : this.rtScene.textures[0];
+      this._pass(m, null);
+    } else this._pass(this.mOil, null);
   }
 
   // The brush's passes that are not drawn every frame laid once into a 2 x 2 sheet (PILOT's P3), so that

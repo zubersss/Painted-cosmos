@@ -61,6 +61,37 @@ export const G = {
   uAux8: { value: 0 },
 };
 
+// THE LOOK. The default is the watercolour. `?look=oil` (docs/HANDOVER.md 4a, the owner's reference clip) paints the same
+// world in opaque paint: body colour, a warm light and a cool shade, strokes laid on the surfaces themselves, no paper
+// and no brush passes. It is a compile-time switch (the define PC_OIL in every painted material), so the watercolour's
+// shaders are, with it off, exactly what they were. The uniforms below are the oil look's dials, shared by reference
+// by every material; `&stroke=` (a multiple of the stroke's size) and painter.setLook({ oil: {...} }) turn them.
+const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
+const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
+export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
+export const OIL = {
+  // x: a stroke's width on the screen (pixels at 720 lines; it is scaled with the picture's height)
+  // y: how much richer than a wash the body colour is (pcDensity)   z, w: the powers that turn the pale light and glaze
+  //    keys of the watercolour into the oil's warm light and cool shade
+  uOilA: { value: new THREE.Vector4(13 * _qn('stroke', 1), 1.9, 2.0, 2.2) },
+  // x: the sunlit paint's gain   y: the gap between strokes (a share of a stroke's width)   z: how far a stroke's colour
+  //    strays from its neighbours'   w: the ridge of paint at a stroke's edge
+  uOilB: { value: new THREE.Vector4(1.12, 0.07, 1.0, 0.5) },
+  // x: the power on the haze key   y: the glow of the air toward the sun   z: 0 strokes off (the colour and light only)
+  //    .. 1 on   w: spare
+  uOilC: { value: new THREE.Vector4(1.8, 0.7, _qn('strokes', 1), 0) },
+  // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (set every frame)
+  uOilPx: { value: new THREE.Vector4(0.0015, 720, 0, 0) },
+};
+// (a tool may reach every painted material ever made: tools/lab.mjs swaps their shaders without a reload)
+export const MATERIALS = new Set();
+export function register(m, kind, opts) {
+  m.userData.pcMake = { kind, opts: opts || null };
+  if (LOOK.oil) { m.defines = m.defines || {}; m.defines.PC_OIL = 1; }
+  if (typeof window !== 'undefined') { MATERIALS.add(m); window.__pcMaterials = MATERIALS; }
+  return m;
+}
+
 // (R1 W2.4) whether water was drawn in this frame's scene pass (the water material says so as it is drawn), and the world
 // the eye is on (index.js, from the mood): the post passes keep last frame's painting for its reflections on a world
 // once its water has been drawn there (post.js finish)

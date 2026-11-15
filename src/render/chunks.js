@@ -90,6 +90,12 @@ uniform float uStorm;
 uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
 layout(location = 1) out highp vec4 pcAux;
 uniform float uAux8;
+#ifdef PC_OIL
+uniform vec4 uOilA;    // the oil look's dials (shared.js OIL)
+uniform vec4 uOilB;
+uniform vec4 uOilC;
+uniform vec4 uOilPx;
+#endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
 vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
 vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
@@ -168,7 +174,31 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // Layer the washes for a light level:
 //   3 sunlit: the local wash diluted so paper shows, warmed by the light
 //   2 local colour   1 one cool glaze   0 two glazes, pigment pooling
+#ifdef PC_OIL
+// THE OIL LOOK'S LIGHT (docs/references/README.md: warm light against cool shade, deep darks, nothing diluted toward
+// paper). A wash's transmittance becomes a body colour by laying it heavier (richer, never greyer); the watercolour's
+// pale light and glaze keys, raised to a power, are the oil's warm light and its cool, violet shade.
+vec3 pcOilSunC() { return pow(uLight, vec3(uOilA.z)); }
+vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)); }
+vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
 vec3 pcTone(vec3 c, float level) {
+  vec3 b = pcBody(c);
+  vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
+  vec3 lit = b * sunC * uOilB.x;
+  vec3 loc = b * mix(vec3(1.0), sunC, 0.45);
+  // (the shade is the cool key over the body colour, with a quarter of the key's own hue at the body's value: a
+  // multiply alone takes an orange floor to brown, and the reference's shadows on its leaf carpet are maroon and violet)
+  vec3 g1 = mix(b * shC, shC * dot(b, vec3(0.3, 0.5, 0.2)) * 1.25, 0.25);
+  vec3 g2 = pcDensity(g1, 1.7);
+  vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
+  r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
+  r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
+  return r;
+}
+vec3 pcToneWash(vec3 c, float level) {
+#else
+vec3 pcTone(vec3 c, float level) {
+#endif
   vec3 lit = mix(c, vec3(1.0), 0.30) * uLight;
   vec3 g1 = c * uGlaze;
   // (the deepest step is the same cool glaze over the local colour with the pigment pooled heavier, not a second
@@ -191,7 +221,15 @@ float pcFogAmount(float dist) {
 }
 
 // Each distance band is lighter, cooler, lower in contrast; the far end is bare paper.
+#ifdef PC_OIL
+// (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
+// changes a thing's colour in flat steps and never softens its edge)
+vec3 pcOilHaze(vec3 h) { return pow(h, vec3(uOilC.x)); }
+vec3 pcAtmos(vec3 c, float f) { return mix(c, pcOilHaze(uHaze), f); }
+vec3 pcAtmosWash(vec3 c, float f) {
+#else
 vec3 pcAtmos(vec3 c, float f) {
+#endif
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62 * (1.0 - uAirNear.x));   // (dust is warm: it does not cool)
   return mix(cool, uHaze, f);
@@ -204,7 +242,18 @@ vec3 pcHazeAt(vec3 viewPos) {
   float e = clamp(dot(normalize(viewPos), mat3(viewMatrix) * uUpW), 0.0, 1.0);
   return mix(uHaze, uHazeUp.rgb, uHazeUp.a * smoothstep(0.03, 0.20, e));
 }
+#ifdef PC_OIL
 vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
+  vec3 h = pcOilHaze(pcHazeAt(viewPos));
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
+  h = mix(h, min(pcOilSunC() * 1.06, vec3(1.0)), toward * uOilC.y);
+  return mix(c, h, f);
+}
+vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {
+#else
+vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
+#endif
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62 * (1.0 - uAirNear.x));   // (dust is warm: it does not cool)
   return mix(cool, pcHazeAt(viewPos), f);

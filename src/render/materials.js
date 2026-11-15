@@ -3,7 +3,7 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
-import { G, PHYS, PHYSW, PREV, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { G, PHYS, PHYSW, PREV, OIL, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK } from './chunks.js';
@@ -36,6 +36,7 @@ function baseUniforms(bodyU, own) {
     uTime: G.uTime, uNoise3D: G.uNoise3D, uStrokeTex: G.uStrokeTex, uCast: G.uCast, uCastK: G.uCastK, uAirNear: G.uAirNear, uAux8: G.uAux8,
     uSunDirW: b.uSunDirW, uSunDirL: b.uSunDirL, uGlaze: b.uGlaze, uLight: b.uLight, uHaze: b.uHaze, uHazeUp: b.uHazeUp || G.uNoHazeUp, uUpW: b.uUpW || G.uUpW0,
     uFog: b.uFog, uDayness: b.uDayness, uMoon: b.uMoon || G.uMoon0, uStorm: b.uStorm, uHueA: b.uHueA, uHueB: b.uHueB, uBodyR: b.uBodyR, uWx: b.uWx, uRound: b.uRound || G.uRound0, uHeart: b.uHeart || G.uHeart0, uFogBank: b.uFogBank || G.uFogBank0,
+    ...OIL,
   }, own || {});
 }
 
@@ -300,7 +301,7 @@ export function makeTerrainMaterial(bodyU) {
     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
   });
   m.userData.pcPainted = true;
-  return m;
+  return register(m, 'terrain');
 }
 
 // ------------------------------------------------------------------------------------------
@@ -669,7 +670,7 @@ export function makeWaterMaterial(bodyU, skyU) {
   m.userData.pcPainted = true;
   // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
   m.onBeforeRender = () => { PREV.water = true; };
-  return m;
+  return register(m, 'water');
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1110,7 +1111,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
-  return m;
+  return register(m, 'prop', opts);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1247,7 +1248,7 @@ export function makeWashMaterial(opts = {}) {
     side: opts.side == null ? THREE.FrontSide : opts.side,
   });
   m.userData.pcPainted = true;
-  return m;
+  return register(m, 'wash', opts);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1341,7 +1342,7 @@ export function makeFigureMaterial(opts = {}) {
     side: opts.side == null ? THREE.FrontSide : opts.side,
   });
   m.userData.pcPainted = true;
-  return m;
+  return register(m, 'figure', opts);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1533,7 +1534,7 @@ export function makeNearMaterial(bodyU) {
     side: THREE.DoubleSide,
   });
   m.userData.pcPainted = true;
-  return m;
+  return register(m, 'near');
 }
 
 // Re-point a material's light uniforms at a body's (so an object standing on a planet is lit

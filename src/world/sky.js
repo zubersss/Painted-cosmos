@@ -2,7 +2,7 @@
 // One full-screen triangle drawn last at the far plane. Everything is evaluated per view ray in
 // the active body's local frame, so clouds and wash variation are anchored to the planet.
 import * as THREE from 'three';
-import { G, ensureGlobals } from '../render/shared.js';
+import { G, OIL, register, ensureGlobals } from '../render/shared.js';
 import { RING_PROFILE } from './orbit.js';
 
 const SKY_VERT = /* glsl */`
@@ -46,6 +46,10 @@ varying vec3 vDirL;
 varying vec3 vDirW;
 layout(location = 1) out highp vec4 pcAux;
 uniform float uAux8;
+#ifdef PC_OIL
+uniform vec4 uOilA;
+uniform vec4 uOilC;
+#endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 ${RING_PROFILE}
@@ -284,6 +288,10 @@ void main() {
     starOK = mix(night, 1.0, inSp) * (1.0 - clamp(halo * 1.6, 0.0, 1.0));
   }
 
+  #ifdef PC_OIL
+    // (the oil look: the sky's washes as body colour, the same step every other surface takes; chunks.js pcBody)
+    col = dens(clamp(col, 0.0, 1.0), uOilA.y);
+  #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
 }
@@ -311,6 +319,7 @@ export function makeSkyUniforms() {
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },
     uBodyInv: { value: new THREE.Matrix3() },
+    ...OIL,
   };
 }
 
@@ -446,6 +455,7 @@ export function makeSky(uniforms) {
     depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth,
   });
   mat.userData.pcPainted = true;
+  register(mat, 'sky');
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'pc-sky';
   mesh.frustumCulled = false;
