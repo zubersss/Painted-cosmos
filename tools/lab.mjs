@@ -98,7 +98,13 @@ async function serve() {
     page.on('pageerror', (e) => problems.push('pageerror: ' + String(e.stack || e.message).slice(0, 1500)));
     page.on('requestfailed', (r) => problems.push('requestfailed: ' + r.url()));
   };
-  const take = () => { const p = problems; problems = []; return p; };
+  // (one line per kind of problem: a shader that does not compile says so once for every material built from it)
+  const take = () => {
+    const seen = new Set(), out = [];
+    for (const q of problems) { const m = /ERROR: [^\n]*/.exec(q); const k = m ? m[0] : q.slice(0, 200); if (!seen.has(k)) { seen.add(k); out.push(q.slice(0, 900)); } }
+    problems = [];
+    return out.slice(0, 6);
+  };
   // (the state file is removed only by the lab that wrote it: an older lab still closing must not take a newer one's)
   const forget = () => { try { if (JSON.parse(fs.readFileSync(STATE, 'utf8')).pid === process.pid) fs.unlinkSync(STATE); } catch {} };
   const SWAP = async (v) => {

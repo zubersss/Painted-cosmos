@@ -132,14 +132,8 @@ void main() {
   vec3 acc = pcTone(mix(vCol2, vCol.rgb, mid), 0.55);
   for (int L = 1; L >= 0; L--) {
     float w = oc.x * (L == 1 ? 2.0 : 1.0);
-    vec3 wq = vBody / (w * 30.0) + 0.19;
-    vec2 wn = (texture(uNoise3D, wq).rg - 0.5) * 4.4;
-    vec2 p = ch / w + wn;
-    vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
-    vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
-    vec3 rnd; vec2 ctr; float ePx;
-    pcBrick(p, 2.3, spx, rnd, ctr, ePx);
-    vec2 ds = pcChartToPx(ctr - p, dpx, dpy, 4.0 * wpx * (L == 1 ? 2.0 : 1.0));
+    vec3 rnd; vec2 ds; float cov;
+    pcStrokeLayer(ch, dcx, dcy, w, 2.0, vBody, 4.0 * wpx * (L == 1 ? 2.0 : 1.0), rnd, ds, cov);
     vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
     vec4 colC = clamp(vCol + cdx * ds.x + cdy * ds.y, 0.0, 1.0);
     vec3 col2C = clamp(vCol2 + c2dx * ds.x + c2dy * ds.y, 0.0, 1.0);
@@ -164,8 +158,7 @@ void main() {
     float xS = min(x, 0.44) - 0.10 * parC.z, xL = x + (rnd.z - 0.5) * 0.10;
     float lvl = pcLevel(mix(xS, xL, sunny), 0.03);
     vec3 lit = pcTone(c, lvl);
-    float a = pcStrokeCover(ePx) * (L == 0 ? step(gone, rnd.z) : 1.0);
-    acc = mix(acc, lit, a * uOilC.z);
+    acc = pcLay(acc, lit, cov, L == 0 ? step(gone, rnd.z) : 1.0);
   }
   float f = pcFogAmount(dist * pcFogBank(vBody));
   vec3 c = pcAtmosV(acc, f, vView);
@@ -996,6 +989,103 @@ void main() {
   vec3 c; float wet = 0.05; float id = 3.0; float x;
   vec3 upV = normalize(normalMatrix * normalize(vBody));   // the planet's up, for snow lying on things
 
+  #ifdef PC_OIL
+  // THE OIL LOOK'S PLANTS (chunks.js, "the oil look's strokes"): bark and crowns in two layers of strokes, as the ground.
+  // Bark: the chart is the tube's own (round it, along it), the strokes run the way the bark's marks do. A crown: the
+  // chart is the mass's own space, flattened along whichever axis the face looks down most (taken from the face itself,
+  // so it never turns with the eye); a dab too near the outline, or where the sky shows through, is left out whole.
+  if (part < 1.5) {
+    bool isBark = part < 0.5;
+    float wpxP = uOilA.x * uOilPx.y / 720.0;
+    vec3 odx = dFdx(vObj), ody = dFdy(vObj);
+    vec2 ch, dcx, dcy;
+    if (isBark) {
+      // (uBarkP.y: 0 the marks run round the stem, 1 along it)
+      vec2 uvm = vec2(vUv.y, vUv.x * 1.1);
+      ch = uBarkP.y > 0.5 ? uvm : uvm.yx;
+      vec2 ux = dFdx(vUv), uy = dFdy(vUv);
+      vec2 mx = vec2(ux.y, ux.x * 1.1), my = vec2(uy.y, uy.x * 1.1);
+      dcx = uBarkP.y > 0.5 ? mx : mx.yx; dcy = uBarkP.y > 0.5 ? my : my.yx;
+    } else {
+      vec3 fn = abs(cross(odx, ody));
+      if (fn.x >= fn.y && fn.x >= fn.z) { ch = vObj.zy; dcx = odx.zy; dcy = ody.zy; }
+      else if (fn.y >= fn.z) { ch = vObj.xz; dcx = odx.xz; dcy = ody.xz; }
+      else { ch = vObj.xy; dcx = odx.xy; dcy = ody.xy; }
+    }
+    // (bark's strokes stay small: a trunk is a few of them across, and far off it is its own colour, whole; a crown's
+    // dabs are a little over half the ground's strokes)
+    vec3 oc = isBark ? pcStrokeOctCap(vd * (0.85 + 0.3 * seed), 0.012, 0.045) : vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed) * 0.62, 0.05), 1.0);
+    float gone = smoothstep(0.15, 0.85, oc.y), fine = oc.z;
+    vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
+    vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vBody), bdy = dFdy(vBody);
+    float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
+    vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.5), 0.8) : pcTone(pcDensity(leafC, 1.5), 0.7);
+    float accA = isBark ? 1.0 : 0.0;
+    float lvlK = 0.0;
+    for (int L = 1; L >= 0; L--) {
+      float w = oc.x * (L == 1 ? 2.0 : 1.0);
+      vec3 rnd; vec2 ds; float cov;
+      pcStrokeLayer(ch + seed * 37.0, dcx, dcy, w, isBark ? 3.4 : 1.5, vObj + seed * 11.0, 4.0 * wpxP * (L == 1 ? 2.0 : 1.0), rnd, ds, cov);
+      vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
+      vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
+      if (!gl_FrontFacing) nVc = -nVc;
+      vec3 Vc = normalize(-(vView + vwdx * ds.x + vwdy * ds.y));
+      vec4 nA = pcNoiseS(Bc, 9.0, w);
+      float present = L == 0 ? step(gone, rnd.z) : 1.0;
+      vec3 cs; float xs_;
+      if (isBark) {
+        // a stroke is the bark's light wash or one of its dark marks, whole; the foot of the stem and a thin branch are dark
+        float markP = mix(0.10, 0.42, clamp((0.72 - uBarkP.x) * 4.0, 0.0, 1.0));
+        float mark = mix(markP, step(1.0 - markP, rnd.x), fine);
+        float base = 1.0 - smoothstep(0.0, uBarkP.z, vUv.y + (rnd.y - 0.5) * 1.1 * fine);
+        float twig = smoothstep(0.0, 1.0, vData.z);
+        #ifdef PC_FAR
+          mark = step(0.7, rnd.x); base = 0.0;
+        #endif
+        cs = mix(barkA, barkB, clamp(max(max(mark, base * 0.9), twig), 0.0, 1.0));
+        cs = pcWetWash(pcDensity(cs, 1.0 + ((rnd.y - 0.5) * 0.8 * fine + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
+        cs *= mix(vec3(1.0), mix(vec3(1.06, 0.99, 0.90), vec3(0.90, 0.92, 1.10), rnd.z), 0.5 * uOilB.z * fine);
+        xs_ = dot(nVc, sunV) * 0.5 + 0.5;
+        xs_ *= mix(0.55 + 0.30 * pale, 1.0, pcDappleS(Bc, canopy * 0.8, 8.0 - vAbove, w));
+        xs_ += (rnd.x - 0.5) * 0.10 * fine;
+        float lvl = pcLevel(xs_, 0.03);
+        vec3 lit = mix(pcTone(cs, lvl), pcTone(cs, max(lvl, 1.0) * 0.5 + 1.0), pale * 0.45 * max(uDayness, uMoon));
+        acc = pcLay(acc, lit, mix(1.0, cov, fine), present);
+      } else {
+        vec3 mVc = normalize(vMassV + mvdx * ds.x + mvdy * ds.y);
+        // the outline is ragged by whole dabs, and the sky shows through where whole dabs are left out
+        float rim = 1.0 - abs(dot(nVc, Vc));
+        float cut = smoothstep(0.34, 0.94, rim) * uLeafP.x + uLeafP.y * smoothstep(0.50, 0.74, nA.r) * 0.9;
+        float there = step(cut, rnd.z * 0.8 + 0.2 * rnd.x + 0.12) * present;
+        float hue = vInst.x + (rnd.x - 0.5) * 1.5 + (vData.w - 0.5) * 0.7 + (nA.b - 0.5) * 0.5;
+        cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
+        cs = mix(cs, leafC, clamp(vData.z * 0.75 + (rnd.y - 0.5) * 0.5, 0.0, 1.0));
+        cs = pcWetWash(pcDensity(cs, 1.0 + ((rnd.y - 0.5) * 0.9 + (nA.r - 0.5) * 0.4) * uOilB.z + vInst.y * 0.5), 0.7);
+        float snowF = pcSnowCover(dot(mVc, upV) * 0.5 + 0.5, rnd.x * 0.6 + nA.g * 0.4, vData.z * 0.8);
+        cs = mix(cs, mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.y * 0.6), snowF);
+        xs_ = dot(mVc, sunV) * 0.5 + 0.5;
+        xs_ = xs_ * (1.0 - vData.z * 0.42 * (1.0 - snowF));
+        // (the sun behind a crown comes through its leaves: those dabs glow)
+        float through = pow(max(dot(-Vc, sunV), 0.0), 1.5);
+        xs_ = max(xs_, through * (0.55 + 0.45 * rnd.x));
+        xs_ *= mix(0.62, 1.0, pcDappleS(Bc, canopy * 0.6, 8.0 - vAbove, w));
+        xs_ += (vData.w - 0.5) * 0.22 + (rnd.y - 0.5) * 0.20;
+        xs_ = max(xs_, 0.30 + 0.18 * rnd.x + (vData.w - 0.5) * 0.14);
+        float lvl = pcLevel(xs_, 0.03);
+        // (a crown's shade is its own colour laid heavier with half the cool key over it: the key alone over an orange
+        // crown is mud; light comes through leaves)
+        vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+        vec3 lit = mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl));
+        acc = pcLay(acc, lit, cov, there);
+        accA = max(accA, there * step(0.5, cov));
+      }
+    }
+    if (accA < 0.5) discard;
+    c = acc;
+    wet = 0.0;
+    id = isBark ? 3.0 + seed * 0.9 : 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
+  } else
+  #endif
   if (part < 0.5) {
     // ---- bark: a pale or warm wash with dry-brushed marks
     float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));

@@ -94,6 +94,7 @@ uniform float uAux8;
 uniform vec4 uOilA;    // the oil look's dials (shared.js OIL)
 uniform vec4 uOilB;
 uniform vec4 uOilC;
+uniform vec4 uOilD;
 uniform vec4 uOilPx;
 #endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
@@ -195,7 +196,8 @@ vec3 pcTone(vec3 c, float level) {
   vec3 loc = b * mix(vec3(1.0), sunC, 0.45);
   // (the shade is the cool key over the body colour, with a quarter of the key's own hue at the body's value: a
   // multiply alone takes an orange floor to brown, and the reference's shadows on its leaf carpet are maroon and violet)
-  vec3 g1 = mix(b * shC, shC * dot(b, vec3(0.3, 0.5, 0.2)) * 1.25, 0.25);
+  // (and the sky's own light, added: without it a shadow on an orange floor is brown; with it, maroon and violet)
+  vec3 g1 = mix(b * shC * uOilD.x, shC * dot(b, vec3(0.3, 0.5, 0.2)) * 1.3, uOilD.z) + pow(uGlaze, vec3(3.0)) * uOilD.y * (0.35 + 0.65 * uDayness);
   vec3 g2 = pcDensity(g1, 1.7);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
@@ -220,6 +222,9 @@ vec3 pcTone(vec3 c, float level) {
 
 // Atmospheric perspective in soft stacked bands. Returns 0..1.
 float pcFogAmount(float dist) {
+  #ifdef PC_OIL
+    dist *= uOilC.w;
+  #endif
   float f = 1.0 - exp(-dist * uFog.x);
   float q = f * uFog.y;
   float fl = floor(q);
@@ -381,8 +386,10 @@ vec3 pcHash3(vec2 p) {
 // chart's units, and how far inside its edge the pixel lies, in pixels.
 void pcBrick(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float edgePx) {
   float row = floor(p.y);
-  float sh = pcHash3(vec2(row, 7.31)).x * 17.0 + 0.5 * row;
-  float x = p.x / asp + sh;
+  vec3 hr = pcHash3(vec2(row, 7.31));
+  float sh = hr.x * 17.0 + 0.5 * row;
+  // (the joints lean, each row its own way: a stroke ends where the brush was lifted, not on a ruled line)
+  float x = (p.x + (p.y - row - 0.5) * (hr.z - 0.5) * 1.3) / asp + sh;
   float col = floor(x);
   const float J = 0.56;
   float jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J;
@@ -401,6 +408,20 @@ vec2 pcStrokeOct(float dist, float w0) {
   float l = log2(max(want / w0, 1.0)), l0 = floor(l);
   return vec2(w0 * exp2(l0), l - l0);
 }
+// The same for a surface whose strokes may not grow past wmax (m): bark, a blade. x the finer layer's width, y how far
+// toward the coarser, z 1 while a stroke is still a few pixels wide .. 0 where the strokes have shrunk under the pixel
+// (there the surface is laid in its mean colour: nothing finer than a pixel is drawn).
+vec3 pcStrokeOctCap(float dist, float w0, float wmax) {
+  vec2 o = pcStrokeOct(dist, w0);
+  if (o.x >= wmax) { o.x = wmax; o.y = 0.0; }
+  float px = o.x / (max(dist, 0.05) * uOilPx.x);
+  return vec3(o, smoothstep(1.3, 3.4, px));
+}
+// A stroke (its paint, and how much of the pixel it covers) laid over what is already there: in the hairline round
+// a stroke what lies under shows a step darker, never lighter (two layers lit apart made bright cracks in a shade).
+vec3 pcLay(vec3 under, vec3 paint, float cover, float present) {
+  return mix(under * mix(1.0, uOilD.w, present * (1.0 - cover)), paint, cover * present * uOilC.z);
+}
 // How much of the pixel a stroke covers, from how far inside its edge it lies (pixels): a clean edge one pixel wide,
 // with a hairline between two strokes for what lies under them.
 float pcStrokeCover(float edgePx) {
@@ -416,6 +437,23 @@ vec2 pcChartToPx(vec2 dc, vec2 dpx, vec2 dpy, float lim) {
   vec2 ds = vec2(dpy.y * dc.x - dpy.x * dc.y, -dpx.y * dc.x + dpx.x * dc.y) / det;
   float l = length(ds);
   return l > lim ? ds * (lim / l) : ds;
+}
+// One layer of strokes over a chart. ch: the chart (m); dcx, dcy: its screen derivatives; w: a stroke's width (m); asp:
+// its length over its width; bendP: a place the chart's slow bend is anchored to (m); lim: the farthest a centre is
+// looked for (pixels). Out: the stroke's three numbers, the pixels from here to its centre, how much of the pixel it
+// covers. (Everything here that takes a screen derivative runs for every pixel alike: call it outside any branch.)
+void pcStrokeLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, out vec3 rnd, out vec2 ds, out float cover) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * 34.0) + 0.19).rg - 0.5) * 5.6;
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  // (and the rows themselves waver)
+  float wv = 0.83 * p.x + 1.7 * sin(0.61 * p.y);
+  p.y += 0.22 * sin(wv);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr; float ePx;
+  pcBrick(p, asp, spx, rnd, ctr, ePx);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+  cover = pcStrokeCover(ePx);
 }
 // The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
 // the same place has the same chart from every patch of terrain and at every height. body: body-local metres.
