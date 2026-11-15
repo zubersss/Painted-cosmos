@@ -108,6 +108,73 @@ ${FLORA_GLSL}
 uniform float uPhysOn;
 uniform vec2 uRound;      // x: how far from the ground the eye is, as the relief is drawn in (0 on the ground .. 0.75 from orbit)
 uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place, w its size (0: none)
+#ifdef PC_OIL
+// THE GROUND IN THE OIL LOOK (chunks.js, "the oil look's strokes"). Two layers of strokes an octave apart, the coarser
+// under the finer; each stroke's paint is worked out at its own centre (the ground's washes, the light, the leaf shadow)
+// and laid flat; under both, in the hairlines, the ground's colour a step deeper.
+// (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
+void main() {
+  #include <logdepthbuf_fragment>
+  float dist = length(vView);
+  vec3 nV = normalize(vNV);
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float mid = 1.0 - smoothstep(120.0, 420.0, dist);
+  vec2 ch = pcGroundChart(vBody, uBodyR);
+  vec2 dcx = dFdx(ch), dcy = dFdy(ch);
+  vec3 bdx = dFdx(vBody), bdy = dFdy(vBody);
+  vec4 cdx = dFdx(vCol), cdy = dFdy(vCol);
+  vec3 c2dx = dFdx(vCol2), c2dy = dFdy(vCol2);
+  vec4 pdx = dFdx(vPar), pdy = dFdy(vPar);
+  vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), nldx = dFdx(vNL), nldy = dFdy(vNL);
+  vec2 oc = pcStrokeOct(dist, 0.045);
+  float gone = smoothstep(0.15, 0.85, oc.y);        // the share of the finer layer's strokes not laid at this distance
+  float wpx = uOilA.x * uOilPx.y / 720.0;
+  vec3 acc = pcTone(mix(vCol2, vCol.rgb, mid), 0.55);
+  for (int L = 1; L >= 0; L--) {
+    float w = oc.x * (L == 1 ? 2.0 : 1.0);
+    vec3 wq = vBody / (w * 30.0) + 0.19;
+    vec2 wn = (texture(uNoise3D, wq).rg - 0.5) * 4.4;
+    vec2 p = ch / w + wn;
+    vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+    vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+    vec3 rnd; vec2 ctr; float ePx;
+    pcBrick(p, 2.3, spx, rnd, ctr, ePx);
+    vec2 ds = pcChartToPx(ctr - p, dpx, dpy, 4.0 * wpx * (L == 1 ? 2.0 : 1.0));
+    vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
+    vec4 colC = clamp(vCol + cdx * ds.x + cdy * ds.y, 0.0, 1.0);
+    vec3 col2C = clamp(vCol2 + c2dx * ds.x + c2dy * ds.y, 0.0, 1.0);
+    vec4 parC = vPar + pdx * ds.x + pdy * ds.y;
+    vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y), nLc = normalize(vNL + nldx * ds.x + nldy * ds.y);
+    // the ground's washes at the stroke: far away the forest floor is its canopy
+    vec3 c = mix(col2C, colC.rgb, mid);
+    vec4 n1 = pcNoiseS(Bc, 31.0, w), n2 = pcNoiseS(Bc + 0.21 * 6.3, 6.3, w);
+    c = mix(c, c * uHueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
+    c = mix(c, c * uHueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * mid);
+    // each stroke strays from its neighbours: heavier or lighter, and a little toward the warm or toward the cool
+    c = pcDensity(c, 1.0 + ((rnd.x - 0.5) * 0.9 + (n1.r - 0.5) * 0.5) * uOilB.z);
+    c *= mix(vec3(1.0), mix(vec3(1.07, 1.0, 0.88), vec3(0.90, 0.97, 1.10), rnd.y), 0.55 * uOilB.z);
+    float upf = dot(nLc, normalize(Bc));
+    float snowC = pcSnowCover(upf, rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
+    c = pcWetWash(c, 1.0 - snowC);
+    c = mix(c, mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
+    // the light, a stroke at a time: in the sun or in the leaf shadow whole
+    float x = dot(nVc, sunV) * 0.5 + 0.5;
+    float sunny = pcDappleS(Bc, parC.z * mix(0.82, 1.0, mid), 8.0, w);
+    sunny = min(sunny, 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
+    float xS = min(x, 0.44) - 0.10 * parC.z, xL = x + (rnd.z - 0.5) * 0.10;
+    float lvl = pcLevel(mix(xS, xL, sunny), 0.03);
+    vec3 lit = pcTone(c, lvl);
+    float a = pcStrokeCover(ePx) * (L == 0 ? step(gone, rnd.z) : 1.0);
+    acc = mix(acc, lit, a * uOilC.z);
+  }
+  float f = pcFogAmount(dist * pcFogBank(vBody));
+  vec3 c = pcAtmosV(acc, f, vView);
+  vec3 upV = normalize(vUpV);
+  float limb = pow(1.0 - clamp(dot(upV, normalize(-vView)), 0.0, 1.0), 2.5) * uFog.w;
+  c = mix(c, pcOilHaze(uHaze), limb);
+  pcWrite(c, 0.0, nV, -vView.z, 1.0);
+}
+#else
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1: every mark below is laid as the pixel sees it, chunks.js)
@@ -288,6 +355,7 @@ void main() {
   wet = max(wet, smoothstep(0.0, 0.25, pud));      // a puddle's edge is wet in wet
   pcWrite(c, wet, nV, -vView.z, 1.0);
 }
+#endif
 `;
 
 export function makeTerrainMaterial(bodyU) {

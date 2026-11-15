@@ -146,6 +146,13 @@ vec3 pcDensity(vec3 c, float d) {
 
 // Light in four soft value steps. x in 0..1 -> level in 0..3.
 float pcLevel(float x, float soft) {
+  #ifdef PC_OIL
+    // (the oil look: a low sun still lights what faces it at all. The watercolour's steps follow the angle, so under a
+    // sun ten degrees up the flat ground is local colour at best; the reference's wood at that hour is bright gold where
+    // the sun reaches and violet where it does not. What faces the sun even a little is lit, what is turned or shaded
+    // is not, and the angle only settles the few forms in between.)
+    x = 0.30 + 0.62 * smoothstep(-0.10, 0.30, 2.0 * x - 1.0);
+  #endif
   float xs = mix(0.37 + x * 0.30, x, uDayness);   // night with no moon (an airless world, the far side seen from space): a dim, even light, nothing near black
   // Night on the ground is a picture in its own key (PAINTER 16, the M4 critique's first item: night was the day's picture
   // under a dark veil, one value from sky to boots). The moon stands where the sun is not (a full moon), the world hands
@@ -296,6 +303,28 @@ float pcDappleL(vec3 bodyPos, float canopy, float lift) {
   return mix(s, 1.0 - 0.42 * canopy, uWx.x);
 }
 float pcDapple(vec3 bodyPos, float canopy) { return pcDappleL(bodyPos, canopy, 8.0); }
+#ifdef PC_OIL
+// The leaf shadow for one stroke of the oil look (width w, read at the stroke's centre: no derivative is taken there):
+// the same pattern as pcDappleL, with a clean edge, so a stroke lies in the sun or in the shade whole. Under a low sun
+// the pattern is drawn out along the sun's bearing, as the shadows of trunks and crowns are: up to five times at
+// eleven degrees and under.
+float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
+  vec3 up = normalize(bodyPos);
+  float se = dot(up, uSunDirL);
+  vec3 pp = bodyPos + uSunDirL * (lift / max(se, 0.22));
+  vec3 hd = uSunDirL - up * se;
+  float hl = length(hd);
+  if (hl > 1e-4) {
+    float stretch = clamp(hl / max(se, 0.02), 1.0, 5.0);
+    pp -= (hd / hl) * dot(pp, hd / hl) * (1.0 - 1.0 / stretch);
+  }
+  float a = textureLod(uNoise3D, pp / 13.0, log2(max(64.0 * w / 13.0, 1.0))).r;
+  float b = textureLod(uNoise3D, pp / 4.1 + 0.37, log2(max(64.0 * w / 4.1, 1.0))).g;
+  float th = mix(0.05, 0.585, canopy);
+  float s = smoothstep(th - 0.015, th + 0.015, a * 0.68 + b * 0.32);
+  return mix(s, 1.0 - 0.42 * canopy, uWx.x);
+}
+#endif
 
 // The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
 // them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any
@@ -329,6 +358,76 @@ float pcSnowCover(float upness, float rag, float shelter) {
   float th = mix(1.12, 0.40, uWx.z) + shelter * 0.22;
   return smoothstep(th, th + 0.10, upness * 0.62 + rag * 0.42) * step(0.004, uWx.z);
 }
+
+#ifdef PC_OIL
+// ---- THE OIL LOOK'S STROKES -------------------------------------------------------------------------------------------
+// A stroke is a patch of ONE flat colour with a clean edge, laid on the surface itself (docs/references/README.md, "what
+// the clip does" and the crispness rule): it stays where it is when the eye moves and it is smaller far off. The strokes
+// of a surface are a course of bricks over a chart of it (two coordinates in metres that lie in the surface): rows one
+// stroke wide, each brick a stroke long, every row shifted and every joint moved at random, the chart itself bent by a
+// slow noise so that no row runs straight. Everything that colours a stroke is read at the stroke's own centre, so the
+// stroke is flat; its edge is drawn from the chart's screen derivatives, a pixel wide at any size and any slant.
+//
+// The size: a stroke is meant to be uOilA.x pixels wide (at 720 lines) wherever it is, so the strokes are laid in
+// octaves of the distance, each twice the size of the last. Between two octaves no two layers are blended: a stroke of
+// the finer layer is there or it is not (each by its own number), and where it is not, the coarser layer shows.
+vec3 pcHash3(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.xxy + q.yzz) * q.zyx);
+}
+// One layer. p: the chart in units of a stroke's width; asp: a stroke's length over its width; sx, sy: chart units a
+// pixel along the chart's two axes (from its screen derivatives). Out: the stroke's three numbers, its centre in the
+// chart's units, and how far inside its edge the pixel lies, in pixels.
+void pcBrick(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float edgePx) {
+  float row = floor(p.y);
+  float sh = pcHash3(vec2(row, 7.31)).x * 17.0 + 0.5 * row;
+  float x = p.x / asp + sh;
+  float col = floor(x);
+  const float J = 0.56;
+  float jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J;
+  float jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J;
+  if (x < jl) { col -= 1.0; jr = jl; jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J; }
+  else if (x > jr) { col += 1.0; jl = jr; jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J; }
+  rnd = pcHash3(vec2(col + 0.37, row + 0.71));
+  ctr = vec2((0.5 * (jl + jr) - sh) * asp, row + 0.5);
+  float ex = min(x - jl, jr - x) * asp / max(spx.x, 1e-6);
+  float ey = min(p.y - row, row + 1.0 - p.y) / max(spx.y, 1e-6);
+  edgePx = min(ex, ey);
+}
+// The octave of the distance: x the finer layer's stroke width (m), y how far toward the coarser one (0..1).
+vec2 pcStrokeOct(float dist, float w0) {
+  float want = max(dist, 0.05) * uOilPx.x * uOilA.x * uOilPx.y / 720.0;     // metres wide to be that many pixels
+  float l = log2(max(want / w0, 1.0)), l0 = floor(l);
+  return vec2(w0 * exp2(l0), l - l0);
+}
+// How much of the pixel a stroke covers, from how far inside its edge it lies (pixels): a clean edge one pixel wide,
+// with a hairline between two strokes for what lies under them.
+float pcStrokeCover(float edgePx) {
+  float g = max(0.5 * uOilB.y * uOilA.x * uOilPx.y / 720.0, 0.35);
+  return smoothstep(g - 0.6, g + 0.6, edgePx);
+}
+// A value known at the pixel, carried to a point ds pixels away along the surface (a stroke's centre).
+#define PC_AT(v, ds) ((v) + dFdx(v) * (ds).x + dFdy(v) * (ds).y)
+// The pixels from here to a place dc chart units away (dpx, dpy: the chart's screen derivatives), kept inside lim px.
+vec2 pcChartToPx(vec2 dc, vec2 dpx, vec2 dpy, float lim) {
+  float det = dpx.x * dpy.y - dpx.y * dpy.x;
+  if (abs(det) < 1e-12) return vec2(0.0);
+  vec2 ds = vec2(dpy.y * dc.x - dpy.x * dc.y, -dpx.y * dc.x + dpx.x * dc.y) / det;
+  float l = length(ds);
+  return l > lim ? ds * (lim / l) : ds;
+}
+// The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
+// the same place has the same chart from every patch of terrain and at every height. body: body-local metres.
+vec2 pcGroundChart(vec3 body, float R) {
+  vec3 a = abs(body);
+  vec3 q = a.x >= a.y && a.x >= a.z ? vec3(body.y, body.z, a.x) : a.y >= a.z ? vec3(body.z, body.x, a.y) : vec3(body.x, body.y, a.z);
+  return R * atan(q.xy, vec2(q.z));
+}
+// A noise channel read for a stroke of width w (m) at its centre: no derivative is taken there (the centre jumps from
+// stroke to stroke), the level is the stroke's own size, so what is finer than the stroke is averaged.
+vec4 pcNoiseS(vec3 p, float scale, float w) { return textureLod(uNoise3D, p / scale, log2(max(64.0 * w / scale, 1.0))); }
+#endif
 
 // Triplanar lookup into the stroke atlas (p in metres, anchored; n body-local normal).
 vec4 pcTri(vec3 p, vec3 n, float scale) {
