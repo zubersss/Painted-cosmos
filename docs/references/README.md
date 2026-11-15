@@ -31,9 +31,10 @@ to upload it again to the session that needs it.
 pictures (paintings and other games) and eleven links on painterly rendering.
 
 **What was seen by eye.** The clip (a frame every half second, and four sets of consecutive
-frames to judge motion), the seven frames, and one linked picture (Rime). The other 34 pictures
-and the rendering pages could not be opened from the cloud session (its network settings refuse
-those sites). They are sorted from knowledge of the works, not from the exact picture.
+frames to judge motion), the seven frames, and 32 of the 35 linked pictures, each opened and
+looked at on its own once the owner had widened the session's network access. Not opened: the
+two Afremov pictures and the Sky picture (their sites refuse automated access), and the eleven
+rendering links (judged from knowledge).
 
 **The measure (the owner's words, docs/HANDOVER.md section 2, items 12 and 13).** The
 moving-painting look first; a game that also looks better and runs smoother; a style that is the
@@ -60,47 +61,61 @@ game's own.
 light, little cast shadow, low contrast. The distance to the clip is mostly light and colour,
 then the surface; a filter alone would not cross it.
 
-### The sort, second pass: the best to take from each
+### The sort, by eye: every linked picture opened (third pass)
 
-The owner asked for a second pass (2026-11-15): not one thing from each reference but the best
-it has to give, so that the game looks as good as the clip without copying it, with additions of
-its own from all the others. The owner declined to open the picture sites to the session, so
-this pass rests on the clip (seen), Rime (seen) and knowledge of the other works. Five verdicts
-moved from "leave" to "in part" (Afremov, Ori, Eastshade, South of Midnight, Clair Obscur): each
-has something worth taking once its main look is set aside.
+The owner widened the session's network access on 2026-11-15 and asked for each linked picture
+to be opened and judged by eye against the clip, which stays the main target ("really close to
+that", with the owner's own spin). 32 of the 35 were opened and looked at one by one. Three were
+refused by their own sites and are judged from knowledge only: both Afremov pictures and the Sky
+picture. This table replaces the two earlier passes, which rested mostly on memory.
 
-| Reference | Verdict | The best to take | Leave |
-| --- | --- | --- | --- |
-| The clip: autumn forest | Take | A low sun, light shafts, haze that steps the far trunks back in three or four planes. Gold light against violet trunks and shadows; a few white birches for rhythm. A leaf carpet of strokes; bands of light and shadow that lead the eye into the wood; tufts at the feet of trunks. A canopy that glows where the sun comes through it. A few large, slow leaves in the air | Its exact scene |
-| The clip: aurora night | Take | Snow that takes the sky's colour. The lantern's pool, which mixes through yellow-green at its edge like paint. Shadows with colour (blue-violet, never grey). Sky strokes that flow; the aurora in upright strokes with a magenta fringe. Mountains as two or three flat planes. Water in dashes that carry the aurora. Footprints in the snow | Its exact scene |
-| The clip: the figure | Take | A cloak made of strokes with a ragged hem that billows at a run; the lantern; one strong outline | The hat (owner). Colour: blue-grey (owner) |
-| The clip: cabin from outside | Parked | Warm windows against cold snow; snow strokes that run down the roof | No shelters for now (owner) |
-| The clip: cabin interior | Leave | | Indoor scene; every colour at full strength |
-| 11-11: Memories Retold | In part | Stroke size by importance: fine where the player must read (the figure, a path, a landing place), broad and loose elsewhere. Edges that are lost where they do not matter and kept where they do. Lamps and fire as thick bright paint. A palette that changes with the place and the mood | Strokes that re-form every frame (they shimmer); its softness |
-| Tom Thomson (two) | Take | A warm ground colour left showing between the strokes, which ties a picture together. Slabs of pure colour laid side by side, unblended. Big simple shapes: a dark screen of trees before a bright distance. Far hills as flat bands. Sky and water painted with as much body as the land | |
-| Van Gogh (three) | Take | A stroke habit for each thing: dashes along the ground, strokes up a trunk, strokes that swirl in the sky, strokes that spread outward in foliage. Opposite colours side by side (orange leaves, blue-violet trunks). Dark contour lines that keep shapes clear. Dappled light as separate dabs. A path seen from above through a screen of trunks | |
-| Klimt: Birch Forest | In part | A leaf carpet of very many small dabs that vary in hue. Each trunk patterned in its own way (birch marks, moss). The rhythm of trunk spacing | No depth, no direction of light |
-| Leonid Afremov (two) | In part | Night reflections: lights mirrored in wet ground, ice or water as upright streaks of broken colour. A lamp's glow as a mosaic of warm strokes. Shadows built of several pure hues | Every colour at full strength everywhere |
-| Harald Sohlberg: Winter Night | Take | Night in one family of blue with the whole range from dark to light, the snow the lightest thing: night is blue, not dark. Dark trees that frame the view. One bright point of light. Crisp contours | |
-| Firewatch (two) | Take | Depth as five or six flat steps of colour toward the sky. A designed palette for each time of day, few hues each. Tree outlines simplified but true to the kind of tree. Shafts at low sun. Cheap to draw | Flat, strokeless surfaces |
-| The Long Dark: aurora | Take | Brushed textures on simple shapes, which is strokes on the world in a shipped game. Snow as a canvas for the light (pink at dawn, blue in shade, green under the aurora). Dark pines on bright snow. Weather as mood: fog, falling snow | |
-| The Long Dark: two interiors | Parked | Fire as the one warm light in the cold: carried here by the lantern | Indoor scenes |
-| Breath of the Wild | Take | Paths, water and trees told apart by colour and lightness from the air. Places of interest that glow and can be seen from far, by day and by night. Hills that hide and then reveal what lies behind. Far land that fades in colour but keeps crisp shapes | Cel shading |
-| The Pathless (three) | Take | Big clean outlines that read at speed. A small palette for each region with one strong accent. White fog over the ground for depth. Wind and speed shown as streaks. A landmark in each region seen from anywhere | Smooth surfaces |
-| Europa; Aloft | In part | Wind moving over grass as waves seen from the air. Patches of flowers as colour in green land. Clouds as painted masses at flying height. A great planet in the sky | Soft looks close to what the game has |
-| Arise | In part | A palette for each chapter. Floating motes and gentle shafts. Trees as big simple masses | Smooth surfaces |
-| Skyward Sword HD | In part | A colour identity for each region. Far things as dabs, done so that each dab is a real feature with a crisp edge | Far things dissolved into blur |
-| Journey | Take | A figure designed as an outline first, with trailing cloth that carries the motion. Glints on sand and snow. A landmark that is always in view. A palette for each chapter. Low sun behind everything on a long slide | |
-| Sky: Children of the Light | In part | The cape as the figure's character: how it flutters, glides and settles. Warm light carried through a blue world. Clouds one flies through | Soft glow over everything |
-| Ori and the Will of the Wisps | In part | A rim of light on the figure so it reads against any background. Light that leads the player to what matters. Motes in the air. Near foliage that frames the view | Glow and bloom that soften the picture; side-on 2D |
-| Sea of Thieves | In part | Light glowing through wave crests. The sun's glitter path. Sunset skies as the main picture, with clouds as big painted shapes | Its heavy water simulation |
-| Rime (seen) | In part | Rock in two or three clear planes of light and shade. A white landmark that draws the eye. A small strong accent on the figure. Foam lines at the shore | Smooth surfaces |
-| Tiny Glade; Firewatch lookout | In part | Warm light bounced into shadows. Nothing quite straight: the hand-made wobble. A lit lookout as a landmark at dusk | The blur of a miniature |
-| South of Midnight | In part | Grass and leaves that glow when the low sun is behind them. Hand-made unevenness in shapes | Near-photographic detail |
-| Eastshade | In part | Views composed to be looked at and painted: a near frame, a subject, far layers. This serves the game's own sketchbook. A sun that stays low | Realistic 3D without brushwork |
-| No Man's Sky (two) | In part | Three colours that key each planet (sky, land, water). The air's colour changing on the way down from space. Rings and planets in the sky. Plant outlines that differ from planet to planet | Busy, noisy surfaces |
-| Clair Obscur: Expedition 33 | In part | Strong darks with bright accents. One strange, memorable landmark. Petals adrift | Near-photographic detail |
-| The rendering links (not opened; from knowledge) | Take | Light worked out once for each stroke, so a stroke is one flat colour. Outlines broken with stroke-shaped pieces so edges look brushed. Stroke size by depth and importance | Strokes placed on the screen and re-made each frame |
+**Fits** means the picture is of the clip's family (crisp strokes or patches, strong light,
+opposite colours) or shows how to carry that look somewhere the clip never goes. **In part**
+means one or two things are worth taking but its surface is not the clip's. **Does not fit**
+means its look pulls away from the clip.
+
+| # | Picture | Verdict | Take | Leave |
+| --- | --- | --- | --- | --- |
+| 3 | Tom Thomson: Autumn, Algonquin Park | Fits | Thick slabs, one colour each. Orange leaves, dark upright trunks, violet rocks, a strip of deep blue water as the opposite colour. The sky painted thick between the branches, as a shape of its own | |
+| 4 | Tom Thomson: Autumn Foliage | Fits | A hillside where each tree is one crisp patch (orange, yellow, red) with dark pointed firs between: the model for a forest seen from the ship | |
+| 5 | Van Gogh: The Mulberry Tree | Fits | Strokes that flow over the ground along its slope and curl outward in the leaves. Orange against deep blue. The tree's shadow in blue-violet | |
+| 8 | Van Gogh: Falling Autumn Leaves | Fits | Blue trunks on an orange ground with dark outlines: the clip's forest colours exactly. Leaves in the air as a few yellow dashes. The path seen from above | |
+| 9 | Klimt: Birch Forest | Fits | The leaf carpet: very many small orange dabs with cool blue-green flecks among them, which make the orange glow. Each trunk marked in its own way; far trunks thinner and bluer | Its flat light |
+| 6 | Van Gogh: Trees and Undergrowth | Fits | Dappled light as separate dabs. A bright clearing seen beyond dark trunks. Flowers as dabs. The guide for green woods | |
+| 26 | Sohlberg: Winter Night in the Mountains | Fits | Night in one family of blue. The snow mountains the lightest thing in the picture. One star. Dark bare trees framing the view | |
+| 24 | The Pathless: snowy valley | Fits | A blue night seen from the air that still reads: snow lighter than its shadows, trees as small pale marks, a landmark on a peak, shafts of light, falling snow | Smooth surfaces |
+| 12 | The Pathless: red forest in fog | Fits | Teal fog between trunks under red leaves: the fog in the opposite colour of the foliage. Pale trunks with chunky flakes of bark. A wood seen from above | Smooth surfaces |
+| 20 | Europa: over aurora valleys | Fits | Nearly this game's own moment: a figure on a jetpack above a valley, under an aurora, a planet in the sky. Trees as dark crisp shapes on lighter ground, ruins as landmarks | Its soft surfaces |
+| 22 | Breath of the Wild: paraglide | Fits | Far hills stepping back into gold haze. A river that glitters and leads the eye. Landmarks on the high points. Cliffs in clear planes | Cel shading |
+| 14 | Firewatch: orange forest | Fits | The sun behind the trees with shafts. Tree shadows lying across the path. Clean outlines. One tint over the whole picture | Flat surfaces |
+| 28 | Journey | Fits | The figure as the strongest colour in a pale hazy world. A trimmed hem on the robe. A far landmark with a light on it | |
+| 34 | No Man's Sky: planet and ring | Fits | Three colours that key a world (pink sky, turquoise water, violet land). A ringed planet with its rings across the whole sky. A glowing accent on the figure's back | |
+| 33 | No Man's Sky: amber forest | Fits | A world keyed by an unexpected ground colour (red grass under amber leaves). Blue haze between dark trunks. Rings in the sky. One violet accent | The clutter of props |
+| 19 | Sea of Thieves: sunset water | Fits | The sun's path on the water as broken dashes of gold on dark teal. An island as a flat shape in the haze | Its realistic water |
+| 23 | The Pathless: canopy flight | In part | A red figure in a green world: the figure in the opposite colour. Needles as layered fans. Leaves in the air | Smooth surfaces |
+| 30 | Tiny Glade: autumn cottage | In part | A palette: orange leaves, violet flowers, blue accents. A canopy of leaf clusters lit at their edges | The blur of a miniature; the cottage (no shelters for now) |
+| 11 | Arise: autumn woods | In part | Pools of sunlight on grass, with spiky blades dark against them. Big trunks framing the view. Shafts | One colour only; glow that softens everything |
+| 7 | Skyward Sword HD | In part | Bark painted in several soft hues (violet, green, cream), as the clip's trunks are. A light shaft | Its smooth, plain ground |
+| 15 | South of Midnight | In part | The sun peeking through a dark mass of trees, with haze around it. A carpet of flowers | Near-photographic detail |
+| 17 | Firewatch: lookout (an interior) | In part | Through the windows: hills in flat orange steps and pine outlines | The room itself |
+| 18 | Ori and the Will of the Wisps | In part | Dusk on snow: violet-blue snow under a pink and orange sky. Dark branches framing the view | Glow and blur over everything; side-on 2D |
+| 21 | Aloft | In part | Clouds below the flyer as soft masses. One huge feature in the sky | Plain surfaces |
+| 32 | Rime | In part | Rock in two or three clear planes of light and shade. A white landmark tower | Smooth surfaces |
+| 35 | Clair Obscur: Expedition 33 | In part | A strange landmark in the sky (shards flying out from one point). The figure dark against a bright haze. A cyan glow against warm earth | Near-photographic detail |
+| 16 | The Long Dark: aurora | In part | The aurora as upright rays in violet and green over stars | Its ground: almost black, nothing reads. The clip's night is readable |
+| 29, 31 | The Long Dark: two interiors | In part (principle) | One warm light in a cold dark room, falling off fast: carried here by the lantern. In 31 the planks are painted with visible brush strokes: strokes on surfaces in a shipped game | Indoor scenes |
+| 1 | 11-11: painted footbridge | In part | Warm haze with the sun behind. One red flower as an accent. Petals in the air | Its softness: every edge is fuzzy. The clip is far crisper |
+| 2 | 11-11: figure in firelight | Does not fit | Fire as thick bright paint | Smeared and hard to read |
+| 13 | Eastshade | Does not fit | A carpet of flowers; trees in an accent colour | Realistic bark, moss and grass: the opposite of a painted surface |
+| 10, 25 | Afremov (two; not opened) | In part (from knowledge) | Lights mirrored in wet ground or ice as streaks; a lamp's glow as a mosaic | Every colour at full strength everywhere |
+| 27 | Sky: Children of the Light (not opened) | In part (from knowledge) | How a cape moves | Soft glow over everything |
+
+**What seeing the pictures changed.** 11-11 dropped: both pictures are soft or smeared, the
+opposite of the clip's crisp strokes. The Long Dark's aurora picture is too dark below the sky
+to guide a readable night. The Firewatch lookout is an interior. Rising: Thomson's Autumn
+Foliage (each tree one patch: the forest from the ship), The Pathless's snowy valley (a blue
+night from the air that reads), Europa (this game's own moment), and No Man's Sky (colour keys
+and rings). Van Gogh's Falling Autumn Leaves has the clip's forest colours exactly.
 
 ### The recipe: the clip's look, made the game's own
 
@@ -136,6 +151,19 @@ in the one-page plan; the first six are meant for the prototype.
 13. Views composed for the sketchbook (Eastshade).
 14. Planets and rings painted boldly in the sky; the air's colour changing on the way down
     (No Man's Sky, Europa).
+
+**Added after seeing the pictures:**
+
+- The sky painted thick between branches, as shapes of its own (Thomson).
+- Cool flecks in a warm leaf carpet, and the fog in the opposite colour of the leaves (Klimt,
+  The Pathless).
+- From the ship: each tree one crisp patch, dark firs between (Thomson); at night, snow lighter
+  than its shadows and trees as pale marks (The Pathless).
+- Pools of sunlight on grass and tree shadows across paths (Arise, Firewatch).
+- A trimmed hem on the cloak and the lantern as the glowing accent on the figure (Journey, No
+  Man's Sky).
+- Saturn's rings across the whole sky (No Man's Sky); the sun's path on water as broken dashes
+  (Sea of Thieves, Breath of the Wild).
 
 ### The coordinator's ideas from the sort (put to the owner; not agreed yet)
 
