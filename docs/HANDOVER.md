@@ -92,6 +92,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 12. **The best possible quality comes first (2026-11-15).** "I want my game to look the best."
     Spend usage wherever it buys quality and nowhere else. When the coordinator thinks another
     idea is better than the owner's or the plan's, it says so.
+13. **Sort the references before planning from them (2026-11-15).**
+    - For each reference the owner sends, decide whether it helps this game or would pull its
+      lighting or art direction another way, and say why.
+    - The measure: the moving-painting look, which the owner likes most, together with a better
+      and smoother game.
+    - Give the owner that view and talk it through; the owner may reject any of it. Nothing
+      starts until the owner gives the go.
 
 ## 3. State right now (update this before you stop)
 
