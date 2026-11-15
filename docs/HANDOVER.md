@@ -107,6 +107,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
       exists, or more its own. The owner and the coordinator judge this together.
     - Give the owner that view and talk it through; the owner may reject any of it. Nothing
       starts until the owner gives the go.
+    - **The clip is the main target:** "i want it to look like that but with my own spin on it
+      but really close to that". The other references serve that look and add the game's own
+      touches; they do not pull it away from the clip.
+    - The owner cares that each linked picture is judged by eye. The cloud session's network
+      settings refuse the picture sites, and the environment tools could not change that (see
+      the log, 2026-11-15); the owner can widen Network access in the environment's settings.
     - Use every reference that fits, not the clip alone. Each one marked take or take in part
       in `docs/references/README.md` guides the part it serves (land from the air, night, water,
       the figure, the planets), and the plan names which guides which.
