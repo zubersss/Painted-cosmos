@@ -3,18 +3,24 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
-import { G, PHYS, PHYSW, PREV, OIL, register, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { G, PHYS, PHYSW, PREV, OIL, LOOK, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK } from './chunks.js';
 
 const FOG_VERT = /* glsl */`
+#ifdef PC_OIL
+uniform vec4 uOilC;
+#endif
 uniform vec4 uFog;
 uniform vec2 uAirNear;
 uniform highp sampler3D uNoise3D;
 uniform vec2 uFogBank;
 ${FOG_BANK}
 float pcFogAmountV(float dist) {
+  #ifdef PC_OIL
+    dist *= mix(uOilC.w, 1.6, clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0));     // (as chunks.js pcFogAmount)
+  #endif
   float f = 1.0 - exp(-dist * uFog.x);
   float q = f * uFog.y;
   float fl = floor(q);
@@ -109,15 +115,11 @@ uniform float uPhysOn;
 uniform vec2 uRound;      // x: how far from the ground the eye is, as the relief is drawn in (0 on the ground .. 0.75 from orbit)
 uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place, w its size (0: none)
 #ifdef PC_OIL
-// THE GROUND IN THE OIL LOOK (chunks.js: "the oil look's strokes", "thin strokes", "dabs"; shared.js: STYLES). The ground
-// is laid one of three ways, by the style (uOilS.x; a uniform, so each way's screen derivatives are sound):
-//   0  thin strokes that run along the land (across a slope their rows lie on the contours), two layers an octave apart,
-//      nothing drawn between two strokes;
-//   1  leaf dabs lying every way, as the clip's forest floor: the ground's own colour under two layers of them;
-//   2  a course of tiles with a light edge, as the clip's snow.
-// Whichever way, a stroke's paint is worked out at its own centre (the ground's washes there, the light, the leaf
-// shadow) and laid flat, and under trees a share of the strokes take the canopy's colour: the leaves that have fallen.
-// Over 0 and 2, near the eye, those leaves are also drawn one by one (uOilS.y).
+// THE GROUND IN THE OIL LOOK (chunks.js: "the oil look's strokes", "dabs"). Leaf dabs lying every way, as the clip's
+// forest floor (the owner's style 5): the ground's own colour under two layers of them, an octave apart. A dab's paint
+// is worked out at its own centre (the ground's washes there, the light, the leaf shadow) and laid flat, and under
+// trees a share of the dabs take the canopy's colour: the leaves that have fallen.
+// (Tried at checkpoint 1 and dropped by the owner's choice: thin strokes along the land, tiles; in the history.)
 // (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
 vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV;
 vec4 gCdx, gCdy, gPdx, gPdy;
@@ -138,9 +140,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   snowC = pcSnowCover(dot(nLc, normalize(Bc)), rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
   // the light, a stroke at a time: in the sun or in the leaf shadow whole
   float x = dot(nVc, gSunV) * 0.5 + 0.5;
-  float sunny = min(pcDappleS(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
+  float sunny = min(pcSunAt(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
-  leaf = pcDensity(col2C, 0.9);
+  leaf = pcDensity(col2C, 1.15);
   canopy = parC.z;
 }
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
@@ -157,77 +159,28 @@ void main() {
   gSunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   gMid = 1.0 - smoothstep(120.0, 420.0, dist);
   vec2 ch = pcGroundChart(vBody, uBodyR);
-  vec2 chT = vec2(ch.x, ch.y + 1.4 * (length(vBody) - uBodyR));
-  vec2 dcx = dFdx(chT), dcy = dFdy(chT), dlx = dFdx(ch), dly = dFdy(ch);
+  vec2 dlx = dFdx(ch), dly = dFdy(ch);
   gBdx = dFdx(vBody); gBdy = dFdy(vBody);
   gCdx = dFdx(vCol); gCdy = dFdy(vCol);
   gC2dx = dFdx(vCol2); gC2dy = dFdy(vCol2);
   gPdx = dFdx(vPar); gPdy = dFdy(vPar);
   gNvdx = dFdx(vNV); gNvdy = dFdy(vNV); gNldx = dFdx(vNL); gNldy = dFdy(vNL);
   float wpx = uOilA.x * uOilPx.y / 720.0;
-  // the fallen leaves are drawn one by one while a leaf is a few pixels long
-  float LEAF = uOilPx.w;
-  float leafVis = smoothstep(1.6, 3.6, LEAF / (max(dist, 0.05) * uOilPx.x)) * uOilS.y * step(uOilS.x, 0.5) + 0.0;
-  if (uOilS.x > 1.5) leafVis = smoothstep(1.6, 3.6, LEAF / (max(dist, 0.05) * uOilPx.x)) * uOilS.y;
-  vec3 acc = vec3(0.0);
   vec3 c, leaf; float lvl, snowC, canopy;
-  if (uOilS.x < 0.5) {
-    // ---- 0: thin strokes
-    vec2 oc = pcStrokeOct(dist, uOilPx.z);
-    float gone = smoothstep(0.15, 0.85, oc.y);
-    for (int L = 1; L >= 0; L--) {
-      float w = oc.x * (L == 1 ? 2.0 : 1.0);
-      vec3 rnd, rndN; vec2 ds; float own;
-      pcThinLayer(chT, dcx, dcy, w, uOilB.w, vBody, 4.0 * wpx * uOilB.w * (L == 1 ? 2.0 : 1.0), 9.0, rnd, ds, own, rndN);
-      pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
-      float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid * (1.0 - 0.55 * leafVis);
-      vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rndN, snowC, lvl);
-      if (L == 1) acc = mix(p2, p1, own);
-      else {
-        // (a stroke of the finer layer is laid or it is not; where it is not, the coarser one shows)
-        float here = step(gone, rnd.x * 0.999), there = step(gone, rndN.x * 0.999);
-        vec3 lay = here > 0.5 ? mix(mix(acc, p2, there), p1, own) : mix(mix(acc, p2, there), acc, own);
-        acc = mix(acc, lay, uOilC.z);
-      }
-    }
-  } else if (uOilS.x < 1.5) {
-    // ---- 1: leaf dabs. Under them the ground's own colour, the light and the leaf shadow as the pixel has them
-    vec2 oc = pcStrokeOct(dist * uOilS.w, uOilPx.z * uOilS.w);
-    float gone = smoothstep(0.15, 0.85, oc.y);
-    float x0 = dot(nV, gSunV) * 0.5 + 0.5;
-    float sun0 = min(pcDappleS(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(max(length(gBdx), length(gBdy)), oc.x * 0.5)), 1.0 - pcCast(vBody, 0.0));
-    acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
-    for (int L = 1; L >= 0; L--) {
-      float w = oc.x * (L == 1 ? 2.0 : 1.0);
-      vec3 rnd, rnd2; vec2 ds; float cov, has2;
-      pcDabLayer(ch, dlx, dly, w, vec3(uOilS.z, 0.12, 1.0), vBody, 4.0 * wpx * uOilS.w * (L == 1 ? 2.0 : 1.0), L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
-      pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
-      float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid;
-      vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl);
-      acc = mix(acc, mix(mix(acc, p2, has2), p1, cov), uOilC.z);
-    }
-  } else {
-    // ---- 2: tiles with a light edge
-    vec2 oc = pcStrokeOct(dist, uOilPx.z);
-    float gone = smoothstep(0.15, 0.85, oc.y);
-    acc = pcTone(mix(vCol2, vCol.rgb, gMid), 1.6);
-    for (int L = 1; L >= 0; L--) {
-      float w = oc.x * (L == 1 ? 2.0 : 1.0);
-      vec3 rnd; vec2 ds; float cov;
-      pcStrokeLayer(chT, dcx, dcy, w, uOilB.w, vBody, 4.0 * wpx * uOilB.w * (L == 1 ? 2.0 : 1.0), rnd, ds, cov);
-      pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
-      float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid * (1.0 - 0.55 * leafVis);
-      acc = pcLay(acc, pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), cov, L == 0 ? step(gone, rnd.z) : 1.0);
-    }
-  }
-  if (leafVis > 0.004) {
-    // the leaves, one by one, over the strokes or the tiles
+  // leaf dabs (the owner's style 5). Under them the ground's own colour, the light and the leaf shadow as the pixel has them
+  vec2 oc = pcStrokeOct(dist * uOilS.w, uOilPx.z * uOilS.w);
+  float gone = smoothstep(0.15, 0.85, oc.y);
+  float x0 = dot(nV, gSunV) * 0.5 + 0.5;
+  float sun0 = min(pcSunAt(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(max(length(gBdx), length(gBdy)), oc.x * 0.5)), 1.0 - pcCast(vBody, 0.0));
+  vec3 acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+  for (int L = 1; L >= 0; L--) {
+    float w = oc.x * (L == 1 ? 2.0 : 1.0);
     vec3 rnd, rnd2; vec2 ds; float cov, has2;
-    float fallen = clamp(vPar.z * 1.25, 0.0, 0.62) * gMid;
-    pcDabLayer(ch, dlx, dly, LEAF, vec3(uOilS.z, 0.08, 1.0), vBody, 60.0, 1.0 - fallen * leafVis * 1.25, rnd, ds, cov, rnd2, has2);
-    pcGroundAt(ds, LEAF, rnd, c, lvl, snowC, leaf, canopy);
-    vec3 p1 = pcGroundPaint(leaf, leaf, 1.0, rnd, snowC, lvl), p2 = pcGroundPaint(leaf, leaf, 1.0, rnd2, snowC, lvl);
-    acc = mix(acc, mix(mix(acc, p2, has2), p1, cov), uOilC.z * step(0.001, cov + has2));
+    pcDabLayer(ch, dlx, dly, w, vec3(uOilS.z, 0.12, 1.0), vBody, 4.0 * wpx * uOilS.w * (L == 1 ? 2.0 : 1.0), L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
+    pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
+    float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid;
+    vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl);
+    acc = mix(acc, mix(mix(acc, p2, has2), p1, cov), uOilC.z);
   }
   float f = pcFogAmount(dist * pcFogBank(vBody));
   vec3 cOut = pcAtmosV(acc, f, vView);
@@ -983,6 +936,11 @@ uniform vec4 uLeafP;   // raggedness, sky holes, dab scale, wetness
 uniform vec3 uAccent;
 uniform float uCanopy;
 uniform float uGem;       // 1: a crystal or a splinter of ice or glass, lit through its body (PAINTER 13)
+#ifdef PC_OIL
+uniform vec4 uOilDark;    // x: the share of this kind's trees whose bark is the dark pair below (the oil look's woods)
+uniform vec3 uOilDarkA;
+uniform vec3 uOilDarkB;
+#endif
 uniform mat3 normalMatrix;
 #ifdef PC_FAR
   uniform vec3 uFarA[8];
@@ -1068,6 +1026,7 @@ void main() {
     leafA = uFarA[si]; leafB = uFarB[si]; leafC = uFarC[si]; barkA = uFarBarkA[si]; barkB = uFarBarkB[si];
   #endif
   vec3 c; float wet = 0.05; float id = 3.0; float x;
+  float oilCover = 1.0;
   vec3 upV = normalize(normalMatrix * normalize(vBody));   // the planet's up, for snow lying on things
 
   #ifdef PC_OIL
@@ -1075,8 +1034,14 @@ void main() {
   // Bark: the chart is the tube's own (round it, along it), the strokes run the way the bark's marks do. A crown: the
   // chart is the mass's own space, flattened along whichever axis the face looks down most (taken from the face itself,
   // so it never turns with the eye); a dab too near the outline, or where the sky shows through, is left out whole.
+  // (the clip's floor is a carpet of leaves with a tuft here and there: most blades and fronds are not laid)
+  if (part > 1.5 && part < 2.5 && fract(seed * 7.77 + 0.31) > uOilG.y) discard;
   if (part < 1.5) {
     bool isBark = part < 0.5;
+    // (some trees of a kind are dark-barked: their own pair of bark washes, and their marks run along the stem)
+    float dk = step(fract(seed * 5.31 + 0.17), uOilDark.x - 0.001);
+    barkA = mix(barkA, uOilDarkA, dk); barkB = mix(barkB, uOilDarkB, dk);
+    bool along = uBarkP.y > 0.5 || dk > 0.5;
     float wpxP = uOilA.x * uOilPx.y / 720.0;
     vec3 odx = dFdx(vObj), ody = dFdy(vObj);
     vec2 ch, dcx, dcy;
@@ -1084,10 +1049,10 @@ void main() {
       // (uBarkP.y: 0 the marks run round the stem, 1 along it; the tube's own chart, in metres or near enough: along
       // it the plant's own units, round it one turn taken as 1.1 of them)
       vec2 uvm = vec2(vUv.y, vUv.x * 1.1) * vScaleO;
-      ch = uBarkP.y > 0.5 ? uvm : uvm.yx;
+      ch = along ? uvm : uvm.yx;
       vec2 ux = dFdx(vUv), uy = dFdy(vUv);
       vec2 mx = vec2(ux.y, ux.x * 1.1) * vScaleO, my = vec2(uy.y, uy.x * 1.1) * vScaleO;
-      dcx = uBarkP.y > 0.5 ? mx : mx.yx; dcy = uBarkP.y > 0.5 ? my : my.yx;
+      dcx = along ? mx : mx.yx; dcy = along ? my : my.yx;
     } else {
       // (a crown's chart: the crown's own space in metres, laid flat along whichever axis the MASS faces most there, so
       // it is one chart over a whole side of the crown, whatever its triangles, and a leaf is the same size on a
@@ -1110,7 +1075,7 @@ void main() {
     vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
     vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vBody), bdy = dFdy(vBody);
     float pale = smoothstep(0.55, 0.9, dot(barkA, vec3(0.333)));
-    float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcDappleS(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
+    float xb0 = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.55 + 0.30 * pale, 1.0, pcSunAt(vBody, canopy * 0.8, 8.0 - vAbove, oc.x));
     vec3 acc = isBark ? pcTone(mix(barkA, barkB, 0.16), pcLevel(xb0, 0.04)) : pcTone(pcDensity(leafC, 1.5), 0.7);
     float accA = isBark ? 1.0 : 0.0;
     for (int L = 1; L >= 0; L--) {
@@ -1120,7 +1085,7 @@ void main() {
       // (bark: long thin streaks that run with the stem or round it, nothing drawn between them; a crown: thin leaves,
       // lying every way)
       // (streaks that run with the stem are long; those that run round it are short, so the stem still turns in the light)
-      if (isBark) { float ba = uBarkP.y > 0.5 ? 9.0 : 3.2; pcThinLayer(ch + seed * 37.0, dcx, dcy, w, ba, vObj + seed * 11.0, lim * ba, 2.0, rnd, ds, cov, rnd2); has2 = 1.0; }
+      if (isBark) { float ba = along ? 9.0 : 3.2; pcThinLayer(ch + seed * 37.0, dcx, dcy, w, ba, vObj + seed * 11.0, lim * ba, 2.0, rnd, ds, cov, rnd2); has2 = 1.0; }
       else pcDabLayer(ch + seed * 37.0, dcx, dcy, w, vec3(uOilS.z, 0.10, 1.0), vObj + seed * 11.0, lim * 3.0, L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
       vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
       vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
@@ -1130,7 +1095,7 @@ void main() {
       vec3 cs; float xs_;
       if (isBark) {
         // a streak is the bark's light wash or one of its dark marks, whole; the foot of the stem and a thin branch are dark
-        float markP = mix(0.10, 0.42, clamp((0.72 - uBarkP.x) * 4.0, 0.0, 1.0));
+        float markP = mix(mix(0.10, 0.42, clamp((0.72 - uBarkP.x) * 4.0, 0.0, 1.0)), 0.34, dk);
         float base = 1.0 - smoothstep(0.0, uBarkP.z, vUv.y + (rnd.y - 0.5) * 1.1 * fine);
         float twig = smoothstep(0.0, 1.0, vData.z);
         float m1 = mix(markP, step(1.0 - markP, rnd.x), fine), m2 = mix(markP, step(1.0 - markP, rnd2.x), fine);
@@ -1140,10 +1105,10 @@ void main() {
         vec3 k1 = mix(barkA, barkB, clamp(max(max(m1, base * 0.9), twig), 0.0, 1.0)), k2 = mix(barkA, barkB, clamp(max(max(m2, base * 0.9), twig), 0.0, 1.0));
         k1 = pcWetWash(pcDensity(k1, 1.0 + ((rnd.y - 0.5) * 1.5 * fine + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
         k2 = pcWetWash(pcDensity(k2, 1.0 + ((rnd2.y - 0.5) * 1.5 * fine + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
-        k1 *= mix(vec3(1.0), mix(vec3(1.10, 0.97, 0.82), vec3(0.84, 0.88, 1.14), rnd.z), 0.8 * uOilB.z * fine);
-        k2 *= mix(vec3(1.0), mix(vec3(1.10, 0.97, 0.82), vec3(0.84, 0.88, 1.14), rnd2.z), 0.8 * uOilB.z * fine);
+        k1 *= mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd.z), 0.7 * uOilB.z * fine);
+        k2 *= mix(vec3(1.0), mix(vec3(1.12, 0.96, 0.80), vec3(0.90, 0.90, 1.08), rnd2.z), 0.7 * uOilB.z * fine);
         xs_ = dot(nVc, sunV) * 0.5 + 0.5;
-        xs_ *= mix(0.55 + 0.30 * pale, 1.0, pcDappleS(Bc, canopy * 0.8, 8.0 - vAbove, w));
+        xs_ *= mix(0.55 + 0.30 * pale, 1.0, pcSunAt(Bc, canopy * 0.8, 8.0 - vAbove, w));
         xs_ += (rnd.x - 0.5) * 0.10 * fine;
         float lvl = pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
         vec3 l1 = mix(pcTone(k1, lvl), pcTone(k1, max(lvl, 1.0) * 0.5 + 1.0), pk), l2 = mix(pcTone(k2, lvl), pcTone(k2, max(lvl, 1.0) * 0.5 + 1.0), pk);
@@ -1171,7 +1136,7 @@ void main() {
         // (the sun behind a crown comes through its leaves: those glow)
         float through = pow(max(dot(-Vc, sunV), 0.0), 1.5);
         xs_ = max(xs_, through * (0.55 + 0.45 * rnd.x));
-        xs_ *= mix(0.62, 1.0, pcDappleS(Bc, canopy * 0.6, 8.0 - vAbove, w));
+        xs_ *= mix(0.62, 1.0, pcSunAt(Bc, canopy * 0.6, 8.0 - vAbove, w));
         xs_ += (vData.w - 0.5) * 0.22 + (rnd.y - 0.5) * 0.20;
         xs_ = max(xs_, 0.30 + 0.18 * rnd.x + (vData.w - 0.5) * 0.14);
         float lvl = pcLevel(xs_, 0.03);
@@ -1180,11 +1145,15 @@ void main() {
         vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
         vec3 lit = mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl));
         acc = mix(acc, lit, cov * there * uOilC.z);
-        accA = max(accA, there * step(0.5, cov));
+        accA = max(accA, there * cov);
       }
     }
-    if (accA < 0.5) discard;
+    // (a crown's outline, leaf by leaf: with the scene multisampled a leaf's edge takes the share of the pixel it covers
+    // (alpha to coverage: the material asks for it, makePropMaterial), which is what keeps the outline still under a
+    // moving eye; with one sample a leaf is there or it is not)
+    if (accA < (uOilG.z > 0.5 ? 0.06 : 0.5)) discard;
     c = acc;
+    oilCover = accA;
     wet = 0.0;
     id = isBark ? 3.0 + seed * 0.9 : 4.0 + fract(seed * 7.0 + vData.w * 0.37) * 0.9;
   } else
@@ -1319,6 +1288,9 @@ void main() {
   }
   c = pcAtmosV(c, vFog, vView);
   wet = max(max(wet, vFog * 0.85), uWx.w * smoothstep(10.0, 90.0, vd) * 0.9);
+  #ifdef PC_OIL
+    wet = oilCover;       // (the oil look has no wet paint: the first target's alpha is the pixel's cover, for alpha to coverage)
+  #endif
   pcWrite(c, wet, nV, -vView.z, id);
 }
 `;
@@ -1339,6 +1311,9 @@ export function makePropMaterial(bodyU, opts = {}) {
     uAccent: v3(opts.accent, [0.85, 0.29, 0.17]),
     uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
     uGem: { value: opts.gem ? 1 : 0 },
+    // (the oil look: opts.oilDark = [share, [bark light], [bark dark]])
+    uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
+    uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
   const defines = {};
   if (opts.phys) {
@@ -1372,7 +1347,9 @@ export function makePropMaterial(bodyU, opts = {}) {
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
-  return register(m, 'prop', opts);
+  register(m, 'prop', opts);
+  if (LOOK.oil) m.alphaToCoverage = true;       // (a crown's leaves at its outline: PROP_FRAG, the oil branch)
+  return m;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1736,6 +1713,10 @@ varying float vKind;
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js)
+  #ifdef PC_OIL
+    // (the clip's floor is a carpet of leaves with a tuft here and there, not a sward: most of the near strokes are not laid)
+    if (fract(vS.z * 13.37 + 0.11) > uOilG.x) discard;
+  #endif
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
   // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks
   vec4 n2 = texture(uNoise3D, vBody * vec3(7.0, 2.0, 7.0) + vS.z * 3.0);
@@ -1776,7 +1757,9 @@ void main() {
   x = mix(min(x, 0.44), x, sunny) + (n1.g - 0.5) * 0.10;
   float lvl = pcLevel(x, 0.05);
   c = pcTone(c, lvl);
+  #ifndef PC_OIL
   c = mix(c, c * vec3(0.84, 0.83, 1.04), (1.0 - sunny) * 0.55);
+  #endif
   c = pcAtmosV(c, vFog, vView);
   // the accents are left as the brush drew them; the rest belong to the ground's wash, and
   // the farther rings' touches are softer still

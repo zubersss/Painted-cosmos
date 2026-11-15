@@ -96,7 +96,11 @@ uniform vec4 uOilB;
 uniform vec4 uOilC;
 uniform vec4 uOilD;
 uniform vec4 uOilS;
+uniform vec4 uOilG;
 uniform vec4 uOilPx;
+uniform mat4 uShM;
+uniform highp sampler2D uShTex;
+uniform vec4 uShK;
 #endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
 vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
@@ -227,7 +231,9 @@ vec3 pcTone(vec3 c, float level) {
 // Atmospheric perspective in soft stacked bands. Returns 0..1.
 float pcFogAmount(float dist) {
   #ifdef PC_OIL
-    dist *= uOilC.w;
+    // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
+    // read, so the thickening eases off as the air's own reach grows with the eye's height)
+    dist *= mix(uOilC.w, 1.6, clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0));
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
   float q = f * uFog.y;
@@ -263,7 +269,7 @@ vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
   vec3 h = pcOilHaze(pcHazeAt(viewPos));
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
   float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
-  h = mix(h, min(pcOilSunC() * 1.06, vec3(1.0)), toward * uOilC.y);
+  h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
   return mix(c, h, f);
 }
 vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {
@@ -296,9 +302,10 @@ vec3 pcDappleOct() { float ld = log2(max(pcDist / 500.0, 1.0)), l0 = floor(ld); 
 float pcDappleSub() { vec3 o = pcDappleOct(); return 0.4624 * pcSub(o.x * (1.0 + o.y), PC_NRG) + 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE()); }
 #ifdef PC_OIL
 float pcDappleS(vec3 bodyPos, float canopy, float lift, float w);
-// (the oil look: one leaf shadow for everything, the strokes' own, as the pixel sees it; a blade of grass in a patch of
+float pcSunAt(vec3 bodyPos, float canopy, float lift, float w);
+// (the oil look: one shadow for everything, the strokes' own, as the pixel sees it; a blade of grass in a patch of
 // sun on the painted floor stood in the watercolour pattern's shade)
-float pcDappleL(vec3 bodyPos, float canopy, float lift) { return pcDappleS(bodyPos, canopy, lift, max(pcFp, 0.02)); }
+float pcDappleL(vec3 bodyPos, float canopy, float lift) { return pcSunAt(bodyPos, canopy, lift, max(pcFp, 0.02)); }
 float pcDappleLWash(vec3 bodyPos, float canopy, float lift) {
 #else
 float pcDappleL(vec3 bodyPos, float canopy, float lift) {
@@ -340,6 +347,18 @@ float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
   float th = mix(0.05, 0.585, canopy);
   float s = smoothstep(th - 0.015, th + 0.015, a * 0.68 + b * 0.32);
   return mix(s, 1.0 - 0.42 * canopy, uWx.x);
+}
+// The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
+// (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.
+float pcSunAt(vec3 bodyPos, float canopy, float lift, float w) {
+  float dap = pcDappleS(bodyPos, canopy, lift, w);
+  if (uShK.x < 0.004) return dap;
+  vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+  vec2 a = abs(q.xy);
+  float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+  if (inside < 0.004) return dap;
+  float lit = step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r);
+  return mix(dap, lit, inside);
 }
 #endif
 

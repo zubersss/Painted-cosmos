@@ -16,7 +16,8 @@ import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
-import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK } from '../render/shared.js';
+import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
 
@@ -39,6 +40,10 @@ export function createWorld(scene) {
   scene.add(skyGlaze);
   GLAZES.push(skyGlaze);
   let glazeWhy = '';
+
+  // (the oil look: leaves falling through the air of an autumn wood, leaffall.js)
+  const leafFall = LOOK.oil ? makeLeafFall(null) : null;
+  if (leafFall) scene.add(leafFall.mesh);
 
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
@@ -406,11 +411,12 @@ export function createWorld(scene) {
       } else SHEET.laid = 1;     // (in slow frames a share of the frame, like the terrain)
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
-      let mist = 0, twi = 0, aur = 0, bank = 0;
+      let mist = 0, twi = 0, aur = 0, bank = 0, fall = 0;
       for (const b of look.biomes) {
         const w = here.biomeWeights[b.id];
         if (!w) continue;
         aur += w * (b.aurora || 0);
+        fall += w * (b.autumn ? 1 : 0);
         bank += w * (b.bank != null ? b.bank : (look.bank || 0));      // (PAINTER 19: a thick fog lies in banks, chunks.js pcFogBank)
         let m = b.mist || 1;
         // fog lying in the low ground: thick below its level, clear above it
@@ -544,6 +550,8 @@ export function createWorld(scene) {
       skyU.uCamL.value.copy(st.camLocal);
       skyU.uSkyZenith.value.copy(tmpKey.zenith);
       if (skyU.uAurora) skyU.uAurora.value.x = aur * (1 - space01);
+      // (leaves in the air of an autumn wood, while the eye is among the trees: none from the ship above them)
+      if (leafFall) leafFall.update(cameraPos, active.root, _camL, bu, fall * (1 - space01) * (1 - THREE.MathUtils.smoothstep(camR - (here.radius || body.radius), 18, 40)));
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
@@ -601,10 +609,14 @@ export function createWorld(scene) {
   function castShade(active) {
     const K = G.uCastK.value, U = G.uCast.value;
     K.set(0, 0);
+    SHADOW.root = null; SHADOW.strength = 0;
     if (!active) return;
     // (by night the moon throws the shade: uSunDirL is then the moon's direction; nothing is thrown in the middle of twilight)
     const moon = active.bu.uMoon.value, mk = Math.abs(2 * moon - 1);
     const sunL = active.bu.uSunDirL.value, ov = active.bu.uWx.value.x, day = moon > 0.5 ? mk * 0.8 : active.bu.uDayness.value * mk;
+    // (the oil look's shadow map, render/shadow.js: thrown by the same light, none under a closed sky or from space)
+    SHADOW.root = active.root; SHADOW.sunDirL.copy(sunL);
+    SHADOW.strength = (1 - ov) * day * (1 - Math.min(1, (active.bu.uFog.value.w || 0) * 4));
     for (const o of scene.children) {
       const kind = o.userData && o.userData.pcCaster;
       if (!kind || !o.visible) continue;

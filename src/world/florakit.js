@@ -132,30 +132,35 @@ function V(x, y, z) { return new THREE.Vector3(x, y, z); }
 
 // ---------------------------------------------------------------------------------------------
 // lod: 0 full (near), 1 medium (two washes and a trunk)
-export function birchGeometry(seed, lod) {
+// (spec.slender, the oil look's woods: a tall straight stem, bare for two thirds of its height, under a small thin crown,
+// so that from the ground a wood is its trunks against the air, as in the owner's reference clip. Without it the
+// tree is exactly what it was: the slender form draws its own numbers only where it differs.)
+export function birchGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
-  const H = 10.5 + rnd() * 2.5;
+  const sl = !!(spec && spec.slender);
+  const H = sl ? 16 + rnd() * 4.5 : 10.5 + rnd() * 2.5;
   // no two trunks alike: lean, an S-bend, and small kinks from ring to ring
-  const lean = (rnd() - 0.5) * 2.4, bend = (rnd() - 0.5) * 2.2, lz = (rnd() - 0.5) * 1.6, ph = rnd() * 3;
+  const lk = sl ? 0.45 : 1;
+  const lean = (rnd() - 0.5) * 2.4 * lk, bend = (rnd() - 0.5) * 2.2 * lk, lz = (rnd() - 0.5) * 1.6 * lk, ph = rnd() * 3;
   const segs = lod === 0 ? 9 : 3, sides = lod === 0 ? 7 : 4;
   const pts = [], rad = [];
   for (let i = 0; i <= segs; i++) {
     const t = i / segs, y = t * H;
     const kink = lod ? 0 : 0.09;
     pts.push(V(lean * t * t + bend * Math.sin(t * 3.1 + ph) * 0.32 * t + (rnd() - 0.5) * kink, y, lz * t * t + bend * Math.cos(t * 2.3 + ph) * 0.2 * t + (rnd() - 0.5) * kink));
-    rad.push((0.225 - 0.165 * Math.pow(t, 0.75)) * (i === 0 ? 1.5 : 1) * (0.86 + rnd() * 0.3));
+    rad.push((sl ? 0.165 - 0.105 * Math.pow(t, 0.8) : 0.225 - 0.165 * Math.pow(t, 0.75)) * (i === 0 ? (sl ? 1.3 : 1.5) : 1) * (0.86 + rnd() * 0.3));
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.5, swayH: H, hash: rnd() });
   const top = pts[segs];
-  const crownC = V(top.x * 0.85, H * 0.72, top.z * 0.85);
+  const crownC = V(top.x * 0.85, H * (sl ? 0.84 : 0.72), top.z * 0.85);
   const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
   if (lod === 0) {
     // a few thin dark branches reaching into the crown (each its own number; a mass of foliage within 2.2 m of a
     // branch's tip is carried by it and swings with it, the others are branches of their own hidden in the wash)
     const tips = [];
     for (let k = 0; k < 3; k++) {
-      const t0 = 0.40 + 0.16 * k + rnd() * 0.06, p0 = at(t0);
-      const ang = rnd() * 6.283, len = 1.9 + rnd() * 1.8;
+      const t0 = (sl ? 0.62 + 0.11 * k : 0.40 + 0.16 * k) + rnd() * 0.06, p0 = at(t0);
+      const ang = rnd() * 6.283, len = (sl ? 1.5 : 1.9) + rnd() * 1.8;
       const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * 0.5, p0.z + Math.sin(ang) * len * 0.55);
       const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * 0.78, p0.z + Math.sin(ang) * len);
       const bid = (k * 0.618034 + 0.13) % 1;
@@ -163,17 +168,20 @@ export function birchGeometry(seed, lod) {
       tips.push([p2, bid]);
     }
     // crown: a handful of large overlapping washes
-    const nBlobs = 6 + ((rnd() * 2) | 0);
+    const nBlobs = sl ? 5 + ((rnd() * 2) | 0) : 6 + ((rnd() * 2) | 0);
     for (let k = 0; k < nBlobs; k++) {
-      const t0 = 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(t0);
-      const spread = Math.max(0.2, (1.0 - Math.abs(t0 - 0.70) * 1.7)) * 2.3 + 0.2;
+      const t0 = sl ? 0.68 + 0.36 * (k / (nBlobs - 1)) : 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(t0);
+      const spread = sl ? Math.max(0.2, (1.0 - Math.abs(t0 - 0.84) * 2.6)) * 2.0 + 0.2 : Math.max(0.2, (1.0 - Math.abs(t0 - 0.70) * 1.7)) * 2.3 + 0.2;
       const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd());
       const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? (t0 - 1) * H : 0), p0.z + Math.sin(ang) * rr);
-      const r = 1.9 + rnd() * 1.0;
+      const r = sl ? 1.3 + rnd() * 0.8 : 1.9 + rnd() * 1.0;
       let bid = ((k + 3) * 0.618034 + 0.13) % 1, bd = 2.2;
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
       blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
+  } else if (sl) {
+    blob(B, V(top.x * 0.8 + 0.4, H * 0.76, top.z * 0.8), 2.3, 1.9, 2.2, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });
+    blob(B, V(top.x * 0.95 - 0.3, H * 0.93, top.z * 0.95 + 0.2), 2.0, 1.8, 2.1, rnd, { massC: crownC, massK: 0.4, sway: 0.9, shade0: 0.0, shadeK: 0.6, droop: 0.2, noise: 0.3, uvScale: 4 });
   } else {
     blob(B, V(top.x * 0.7 + 0.5, H * 0.60, top.z * 0.7), 3.2, 2.5, 3.0, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });
     blob(B, V(top.x * 0.9 - 0.4, H * 0.84, top.z * 0.9 + 0.3), 2.7, 2.3, 2.8, rnd, { massC: crownC, massK: 0.4, sway: 0.9, shade0: 0.0, shadeK: 0.6, droop: 0.2, noise: 0.3, uvScale: 4 });
@@ -181,9 +189,10 @@ export function birchGeometry(seed, lod) {
   return B.build();
 }
 
-export function pineGeometry(seed, lod) {
+export function pineGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
-  const H = 14 + rnd() * 4;
+  const sl = !!(spec && spec.slender);      // (the oil look's woods: a tall bare stem under a high, narrow crown; see birchGeometry)
+  const H = sl ? 19 + rnd() * 5 : 14 + rnd() * 4;
   const lean = (rnd() - 0.5) * 1.0, lz = (rnd() - 0.5) * 0.7;
   const segs = lod === 0 ? 6 : 2, sides = lod === 0 ? 7 : 4;
   const pts = [], rad = [];
@@ -191,26 +200,29 @@ export function pineGeometry(seed, lod) {
     const t = i / segs;
     const kink = lod ? 0 : 0.07;
     pts.push(V(lean * t * t + (rnd() - 0.5) * kink, t * H, lz * t * t + (rnd() - 0.5) * kink));
-    rad.push((0.32 - 0.27 * Math.pow(t, 0.9)) * (i === 0 ? 1.4 : 1) * (0.88 + rnd() * 0.24));
+    rad.push((sl ? 0.24 - 0.18 * Math.pow(t, 0.9) : 0.32 - 0.27 * Math.pow(t, 0.9)) * (i === 0 ? (sl ? 1.3 : 1.4) : 1) * (0.88 + rnd() * 0.24));
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.35, swayH: H, hash: rnd() });
-  const crownC = V(lean * 0.5, H * 0.62, lz * 0.4);
+  const crownC = V(lean * 0.5, H * (sl ? 0.80 : 0.62), lz * 0.4);
   if (lod === 0) {
     for (let k = 0; k < 2; k++) {
-      const y = H * (0.20 + 0.09 * k + rnd() * 0.04), ang = rnd() * 6.283, len = 0.6 + rnd() * 0.9;
+      const y = H * ((sl ? 0.40 : 0.20) + 0.09 * k + rnd() * 0.04), ang = rnd() * 6.283, len = 0.6 + rnd() * 0.9;
       tube(B, [V(0, y, 0), V(Math.cos(ang) * len, y + 0.1, Math.sin(ang) * len)], [0.045, 0.012], 4, { part: 0, shade: 0.7, hash: rnd() });
     }
     const tiers = 6;
     const gap = (H * 0.60) / (tiers - 1);
     for (let k = 0; k < tiers; k++) {
       const t = k / (tiers - 1);
-      const y = H * (0.36 + 0.60 * t);
-      const r = (3.9 - 3.0 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3);
+      const y = H * (sl ? 0.62 + 0.36 * t : 0.36 + 0.60 * t);
+      const r = (sl ? 2.7 - 2.0 * Math.pow(t, 0.85) : 3.9 - 3.0 * Math.pow(t, 0.85)) * (0.85 + rnd() * 0.3);
       const off = (1 - t) * 0.6;
       const c = V(lean * (y / H) * (y / H) + (rnd() - 0.5) * off, y, lz * (y / H) * (y / H) + (rnd() - 0.5) * off);
-      blob(B, c, r, Math.max(r * 0.42 + 0.25, gap * 0.7), r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: 4 });
+      blob(B, c, r, Math.max(r * 0.42 + 0.25, gap * (sl ? 0.45 : 0.7)), r * (0.9 + rnd() * 0.2), rnd, { massC: crownC, massK: 0.35, sway: 0.35 + 0.5 * t, shade0: 0.12 + 0.25 * (1 - t), shadeK: 0.8, droop: 0.9, noise: 0.28, uvScale: 4 });
     }
     blob(B, V(lean, H * 0.99, lz), 0.55, 1.4, 0.55, rnd, { massC: crownC, massK: 0.3, sway: 0.9, shade0: 0.0, uvScale: 2, taper: 0.6 });
+  } else if (sl) {
+    blob(B, V(lean * 0.6, H * 0.72, lz * 0.6), 2.6, H * 0.13, 2.5, rnd, { massC: crownC, massK: 0.3, sway: 0.4, shade0: 0.2, shadeK: 0.75, droop: 0.5, noise: 0.26, taper: 0.45, uvScale: 5 });
+    blob(B, V(lean * 0.9, H * 0.90, lz * 0.9), 1.8, H * 0.12, 1.7, rnd, { massC: crownC, massK: 0.3, sway: 0.8, shade0: 0.0, shadeK: 0.7, droop: 0.3, noise: 0.24, taper: 0.85, uvScale: 5 });
   } else {
     blob(B, V(lean * 0.4, H * 0.56, lz * 0.4), 3.8, H * 0.21, 3.6, rnd, { massC: crownC, massK: 0.3, sway: 0.4, shade0: 0.2, shadeK: 0.75, droop: 0.5, noise: 0.26, taper: 0.45, uvScale: 5 });
     blob(B, V(lean * 0.8, H * 0.83, lz * 0.8), 2.4, H * 0.20, 2.3, rnd, { massC: crownC, massK: 0.3, sway: 0.8, shade0: 0.0, shadeK: 0.7, droop: 0.3, noise: 0.24, taper: 0.85, uvScale: 5 });

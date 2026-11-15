@@ -289,8 +289,10 @@ void main() {
   }
 
   #ifdef PC_OIL
-    // (the oil look: the sky's washes as body colour, the same step every other surface takes; chunks.js pcBody)
-    col = dens(clamp(col, 0.0, 1.0), uOilA.y);
+    // (the oil look: the sky's washes a little richer, and toward a sun in the air a pale glow: the clip's wood stands
+    // against a sky nearly white with light. In space the sky is as it was.)
+    col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
+    col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
   #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
