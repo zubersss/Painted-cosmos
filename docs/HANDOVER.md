@@ -58,8 +58,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
    make our own worlds and figure, not a copy of that game.
 6. **A new explorer (not started).**
    - No hat: bare head.
-   - A **blue-grey** cloak (the owner's choice of 2026-11-15, replacing plain grey: it stands out
-     in warm scenes and takes each world's light) in place of the cream coat and red scarf. It
+   - A **rich blue** cloak (the owner, 2026-11-15: first grey, then blue-grey, then "make the
+     cloak richer blue": it is the strongest colour in the picture, as in the clip) in place of the cream coat and red scarf. It
      moves with the wind and the run (PHYSICS already gives `relWind`, lean, gale crouch and so
      on in the figure's state) and covers the jetpack, with the jets under the hem.
    - A lantern at the hip, dark by day, flickering on at dusk and off at dawn.
@@ -177,8 +177,9 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
 **IN PROGRESS since 2026-11-15 (the owner's go): the coordinator is building pieces 1 to 3 of
 section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
-for the owner.** **WAITING FOR THE OWNER (2026-11-15): the overhaul plan in section 4a-2 has been put to the
-owner; nothing new is built until the owner answers (section 2, item 22).**
+for the owner.** **IN PROGRESS (the owner's go of 2026-11-15, "Go ahead in that order and make the cloak richer
+blue"): the overhaul plan in section 4a-2, in its order. The coordinator builds it on
+`look-proto`; the next stop for the owner is the stills after overhauls 1 and 2.**
 Pieces 1 to 3 are built. Checkpoint 1 is passed: the owner chose style 5 and asked for the
 clip to be matched very closely (section 2, item 20), and said to continue. The coordinator is
 now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
@@ -313,7 +314,7 @@ the setting in the game's menu; release 2's phone findings; the blind players; t
 - If the top model runs out mid-way: every piece is committed when done and written up here, but
   pieces 2 and 3 should be finished on it.
 
-### 4a-2. The overhaul plan (put to the owner 2026-11-15; WAITING for the owner's word)
+### 4a-2. The overhaul plan (approved by the owner 2026-11-15: "Go ahead in that order")
 
 The owner asked what still holds the look back and what a plan to fix it entails (section 2,
 item 22). Audit: the clip's frames beside the stills of `look-proto` at `d8bd753`. Built so far
