@@ -14,53 +14,73 @@ the references and the crispness rule are on branch `r2`: `docs/HANDOVER.md` (se
 owner's reference clip. Without the flag nothing changes: the switch is the compile-time define `PC_OIL` in every painted
 material (`src/render/shared.js`: `LOOK`, `OIL`, `register`), and the watercolour's code paths are untouched.
 
+**The owner's word on the strokes so far** (each logged on `r2`): the first version, a course of outlined tiles, was "too
+wide and too outlined"; then "thinner than the video ... copy how the lines are used but optimize it for our game"; then
+six styles to choose from, thinnest to widest, none wider than the clip's, two following the clip's way and four
+exploring. So: `STYLES` in `src/render/shared.js`, `&style=1..6` (default 2), also `window.__pcStyle(n)` in a running
+page: 1 Hairline, 2 Fine flow, 3 Leaf dabs thin (the clip's way), 4 Tiles with a light edge, 5 Leaf dabs a little thinner
+than the clip (the clip's way), 6 Layered: fine strokes under bold leaves. They differ by dials only (uniforms), so one
+page shows all six. **The owner has not chosen yet.** When they have, the others can go.
+
 **What is built (pieces 1 to 3 of the plan), file by file.**
-- `src/render/shared.js`: `LOOK.oil` from the address; the dials `OIL.uOilA..uOilD`, `uOilPx` (each documented there),
-  shared by reference by every material; `register(material, kind, opts)`: every make function calls it, it sets the
-  define and records how the material was made (for the lab's swap).
+- `src/render/shared.js`: `LOOK.oil` from the address; the dials `OIL.uOilA..uOilD`, `uOilS` (the style: how the ground
+  is laid), `uOilPx` (each documented there), shared by reference by every material; `STYLES` and `setStyle`;
+  `register(material, kind, opts)`: every make function calls it, it sets the define `PC_OIL` and records how the
+  material was made.
 - `src/render/chunks.js` (`FRAG_PARS`, under `PC_OIL`): `pcTone` as opaque paint (body colour by `pcDensity`, the lights
   laid lighter and yellower, the shade the cool key with its green drawn down plus the sky's fill); `pcLevel` remapped so
   a low sun still lights what faces it; `pcAtmos*` toward the air's own colour with a glow toward the sun, the distance
   taken `uOilC.w` times farther; `pcDappleS` (the leaf shadow for one stroke: a clean edge, drawn long under a low sun),
-  and `pcDappleL` made to call it so every surface reads one shadow. The strokes: `pcStrokeOct` (a stroke is `uOilA.x`
-  pixels wide wherever it is: octaves of the distance), `pcDabs` / `pcDabLayer` (leaf-shaped dabs lying every way, two
-  in a cell, the one with the higher number on top, a clean edge a pixel wide, no line between), `pcDabTint`,
-  `pcGroundChart` (a world's ground as metres on the cube's face), `pcChartToPx` (from a pixel to a stroke's centre),
-  `pcNoiseS` (noise read for a stroke: no derivative at a centre). Also kept, not in use now: `pcBrick` /
-  `pcStrokeLayer` / `pcLay` (a course of tiles with hairlines: the first version; the owner found it "too wide and too
-  outlined"; it is the right form for the clip's snow, which is a mosaic of tiles with light edges).
-- `src/render/materials.js`: `TERRAIN_FRAG` has its own `main` under `PC_OIL` (the ground under two layers of dabs, each
-  dab's paint worked out at its own centre; under trees many dabs take the canopy's colour: fallen leaves); `PROP_FRAG`
-  has an oil branch for bark (long streaks on the tube's own chart) and crowns (dabs on a chart of the whole crown,
-  `vMassO`; a dab at the outline or where the sky shows is left out whole). Blades, accents and rocks take the oil light
-  through `pcTone` but have no strokes of their own yet. Water, the generic wash, the figure and the near-ground blades:
-  the oil light only.
+  and `pcDappleL` made to call it so every surface reads one shadow. The strokes, three kinds:
+  `pcThin` / `pcThinLayer` (long thin strokes in rows of unequal width, nothing drawn between two strokes: each gives way
+  to its neighbour over one pixel, and the neighbour's numbers are returned so both colours are known);
+  `pcDabs` / `pcDabLayer` (leaf-shaped dabs lying every way, two in a cell, the one with the higher number on top, the one
+  under it known too); `pcBrick` / `pcStrokeLayer` / `pcLay` (a course of tiles with a line between: style 4 lays the
+  line LIGHT, as the clip's snow has it). Shared: `pcStrokeOct` (a stroke is `uOilA.x` pixels wide wherever it is, in
+  octaves of the distance, but never thinner on the land than its floor: nearer than that it grows on the screen, as the
+  clip's do), `pcDabTint`, `pcGroundChart` (a world's ground as metres on the cube's face), `pcChartToPx` (from a pixel
+  to a stroke's centre), `pcNoiseS` (noise read for a stroke: no derivative at a centre).
+- `src/render/materials.js`: `TERRAIN_FRAG` has its own `main` under `PC_OIL`: the ground laid one of three ways by
+  `uOilS.x` (thin strokes along the land, their rows on the contours of a slope; leaf dabs; tiles), each stroke's paint
+  worked out at its own centre by `pcGroundAt` and `pcGroundPaint`; under trees a share of the strokes take the canopy's
+  colour (fallen leaves), and over the thin strokes and the tiles the leaves are also drawn one by one near the eye.
+  `PROP_FRAG` has an oil branch for bark (thin streaks on the tube's own chart, in metres: `vScaleO`) and crowns (thin
+  leaf dabs on the crown's own space in metres, laid flat along the axis the mass faces most; a leaf at the outline or
+  where the sky shows is left out whole). Blades, accents and rocks take the oil light through `pcTone` but have no
+  strokes of their own yet. Water, the generic wash, the figure and the near-ground blades: the oil light only.
 - `src/render/post.js`: `_finishOil` and `OIL_FRAG`: the scene as painted, the glazes, last frame kept for the water, the
   world's last key, a gentle S over the values. No brush, pooling, pencil or paper pass runs.
-- `src/render/index.js`: `uOilPx` set every frame; `setLook({ oil: { uOilA: [...], ... } })`.
+- `src/render/index.js`: `uOilPx.xy` set every frame; `setLook({ oil: { uOilA: [...], ... } })`.
 - `src/world/sky.js`: the sky's washes as body colour under `PC_OIL`.
-- `tools/lab.mjs`: the look lab (see its header). `node tools/lab.mjs serve` (in the background), then
-  `open '/gallery.html?body=earth&biome=autumn_woodland&time=17.2&quality=2&cam=trees&ui=0&t=0&wx=fair&look=oil' 960 540`,
-  `grab out.png`, `eval '<js>'`. The gallery loads in 15 s; the first frame after a load compiles the shaders (about six
-  minutes in software GL with the dabs), every frame after takes 40 s at 960x540. The dials are uniforms: turn them from
-  `eval` through any material's `uniforms.uOilA` and grab again, with no reload.
-  `swap` crashed the page the one time it was tried (not looked into); a reload is the safe way.
+- `tests/stations.mjs`: `--query look=oil&style=2` measures the oil look at the same stations.
+- `tools/lab.mjs`: the look lab (see its header): one long-lived headless page on the painter's gallery
+  (`gallery.html` loads in 15 s; the game takes minutes). `serve`, then
+  `open '/gallery.html?body=earth&biome=autumn_woodland&time=17.2&quality=2&cam=trees&ui=0&t=0&wx=fair&look=oil' 1280 720`,
+  `grab out.png`, `eval '<js>'`. In software GL the first frame after a load compiles the shaders: about ELEVEN MINUTES
+  at 1280x720 with the strokes in; every frame after takes 25 to 75 s. The dials are uniforms: turn them from `eval`
+  (`window.__pcStyle(3)`, or any material's `uniforms.uOilA.value`) and grab again, with no reload.
+  **A background process is stopped by the session after two hours:** start the lab inside the job that needs it and
+  close it at the end (a still job that found the lab gone lost a whole run). `swap` crashed the page the one time it
+  was tried (not looked into); a reload is the safe way.
 
-**Not done yet (in the plan's order).** Piece 4: real cast shadows (there are none: the leaf shadow is a pattern).
-Piece 5: night and sky (the night's key is only the old grade multiplied in `OIL_FRAG`; the sky has no strokes; the
-aurora is the watercolour's). Piece 6: the explorer (still the old figure in the new light). Then, by pattern: strokes
-for rocks, blades and water; strata, cracks, puddles, the trodden track and a world's great marking on the oil ground;
-PHYSICS' kits (`src/render/kitmat.js` is not registered: its materials still paint as washes); each world's dials.
+**Checks on `caa9831`:** unit 251 of 251, world 47 of 47, physics 325 of 325 (the default look's code paths are behind
+`#ifdef PC_OIL` / `LOOK.oil` and unchanged). Not yet run: the station numbers for the oil look, `tests/all.mjs`.
+
+**Not done yet (in the plan's order).** Piece 4: real cast shadows (there are none: the leaf shadow is a pattern, so
+shadows are round blots, not the long bars of trunks). Piece 5: night and sky (the night's key is only the old grade
+multiplied in `OIL_FRAG`; the sky has no strokes; the aurora is the watercolour's). Piece 6: the explorer (still the old
+figure in the new light). Then, by pattern: strokes for rocks, blades and water; strata, cracks, puddles, the trodden
+track and a world's great marking on the oil ground; PHYSICS' kits (`src/render/kitmat.js` is not registered: its
+materials still paint as washes); each world's dials.
 
 **Known faults.**
-- Cost. A dab layer looks at 18 dabs a pixel and the ground and the plants lay two layers each. Fine for a first
-  picture on a desktop GPU, not measured on one, too slow for a phone. The cure is known (the dabs baked into a texture
-  made at start-up) and belongs with the phone work.
-- The ground's chart has a seam along the twelve edges of the cube (every 6.3 km on a 4 km world): the dabs are cut
-  there. Not seen in the prototype's scenes; to be made ragged with a little noise in the choice of face.
-- A crown's chart is a ball of fixed size (1.9 m): a much larger or smaller mass gets larger or smaller dabs.
-- The leaf shadow's edge follows the noise, so shadows are round blots, not the long bars of trunks. Piece 4.
-- A dab's edge against another dab of the same layer is exact only for the top two (the third under them is not known).
+- Cost. A dab layer looks at 18 dabs a pixel; the ground lays two layers of strokes and one of leaves, the plants two.
+  Fine for stills, not measured on a real GPU, too slow for a phone. The cure is known (the strokes baked into a
+  texture made at start-up) and belongs with the work after the owner's choice.
+- The ground's chart has a seam along the twelve edges of the cube (every 6.3 km on a 4 km world), and a crown's chart
+  one where the axis its mass faces most changes: strokes are cut straight there. Not seen in the prototype's scenes.
+- A stroke's edge against another of the same layer is exact only for the top two dabs (the third under them is not
+  known).
 
 ## Hand-over of RELEASE 1, RE-FIX pass of the PAINTER lane (the watercolour; kept current after every item)
 
