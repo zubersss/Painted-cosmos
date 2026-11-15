@@ -228,6 +228,9 @@ void main() {
       belly = smoothstep(th + 0.06, th + 0.50, v + (c2 - 0.5) * 0.25);
     }
   }
+  #ifdef PC_OIL
+    shade *= 0.25;      // (the oil look: a cloud is a light shape; its shaded side, laid as a wash, was a dark ring in opaque paint)
+  #endif
   // (at night a cloud is a pale shape lifted out of the wash, not bare paper: paper is kept for the stars)
   vec3 cl = mix(mix(mix(uSkyHorizon, vec3(1.0), 0.22), vec3(1.0), uAtmo.y), uCloudShade, shade * 0.9);
   cl = dens(cl, 1.0 + (n2.r - 0.5) * 0.8);
@@ -309,17 +312,23 @@ void main() {
     // against a sky nearly white with light. In space the sky is as it was.)
     col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
     col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
+    // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
+    float gold = (1.0 - smoothstep(0.20, 0.55, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x);
+    col = mix(col, vec3(1.0, 0.93, 0.74), gold * mix(0.75, 0.35, smoothstep(0.0, 0.6, e)));
     {
       // the night sky is painted, not left flat: short thin dashes a step lighter than the wash, in rows that waver
       // across the sky (the clip's night sky is streaked all over with them)
       vec3 hh = normalize(d - up * e + up * 1e-4);
       float az2 = atan(hh.z, hh.x);
-      float rowf = e * 44.0 + 2.2 * sin(az2 * 3.0 + 1.3) + 1.1 * sin(az2 * 7.0);
+      // (the rows waver by a slow noise as well as by the bearing, so that they do not read as rings round the zenith;
+      // three dashes in ten are laid, each its own length and lightness)
+      float wv = texture(uNoise3D, d * 0.9 + 0.37).r;
+      float rowf = e * 38.0 + 2.2 * sin(az2 * 3.0 + 1.3) + 1.1 * sin(az2 * 7.0) + 5.0 * wv;
       float row = floor(rowf), hx = fract(sin(row * 91.7) * 43758.5453);
-      float along = az2 * (10.0 + 8.0 * hx) + hx * 40.0;
+      float along = az2 * (7.0 + 9.0 * hx) + hx * 40.0;
       float hs = fract(sin((floor(along) + row * 57.0) * 12.9898) * 43758.5453);
-      float dash = step(0.55, hs) * step(abs(fract(rowf) - 0.5), 0.07 + 0.09 * hs) * step(0.06, fract(along)) * step(fract(along), 0.55 + 0.4 * hs);
-      col = mix(col, min(col * 1.25 + vec3(0.05, 0.10, 0.10), vec3(1.0)), dash * (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * step(0.02, e) * 0.8);
+      float dash = step(0.70, hs) * step(abs(fract(rowf) - 0.5), 0.06 + 0.07 * hx) * step(0.06, fract(along)) * step(fract(along), 0.35 + 0.55 * hx);
+      col = mix(col, min(col * 1.2 + vec3(0.03, 0.08, 0.08), vec3(1.0)), dash * (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.03, 0.12, e) * (0.4 + 0.5 * hs));
     }
   #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));

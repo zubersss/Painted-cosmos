@@ -193,7 +193,11 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // THE OIL LOOK'S LIGHT (docs/references/README.md: warm light against cool shade, deep darks, nothing diluted toward
 // paper). A wash's transmittance becomes a body colour by laying it heavier (richer, never greyer); the watercolour's
 // pale light and glaze keys, raised to a power, are the oil's warm light and its cool, violet shade.
-vec3 pcOilSunC() { return pow(uLight, vec3(uOilA.z)); }
+// (the golden hours: with the sun under about thirty degrees the oil look's light is gold and its air a pale gold,
+// whatever the hour's own keys say: the owner's reference clip stands in that light with the sun still well up, its
+// shadows about twice as long as what throws them and half the forest floor in the sun)
+float pcGold() { return (1.0 - smoothstep(0.20, 0.55, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }
+vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.80, 0.48), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
 vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
@@ -248,7 +252,7 @@ float pcFogAmount(float dist) {
 #ifdef PC_OIL
 // (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
 // changes a thing's colour in flat steps and never softens its edge)
-vec3 pcOilHaze(vec3 h) { return pow(h, vec3(uOilC.x)); }
+vec3 pcOilHaze(vec3 h) { return mix(pow(h, vec3(uOilC.x)), vec3(1.0, 0.93, 0.74), 0.7 * pcGold()); }
 vec3 pcAtmos(vec3 c, float f) { return mix(c, pcOilHaze(uHaze), f); }
 vec3 pcAtmosWash(vec3 c, float f) {
 #else
@@ -358,7 +362,7 @@ vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
   float d = length(body - uLamp.xyz) + (r - 0.5) * 1.1;
   float k = uLamp.w * (1.0 - smoothstep(1.0, 6.5, d));
   if (k < 0.004) return paint;
-  vec3 warm = min(pcDensity(wash, 1.3) * vec3(1.30, 0.86, 0.40) + vec3(0.10, 0.045, 0.0), vec3(1.0));
+  vec3 warm = min(mix(pcDensity(wash, 1.2) * vec3(1.35, 0.90, 0.42) + vec3(0.10, 0.045, 0.0), vec3(1.0, 0.72, 0.30) * (0.75 + 0.5 * dot(wash, vec3(0.3, 0.5, 0.2))), 0.45), vec3(1.0));
   vec3 ring = mix(paint, warm, 0.5) * vec3(0.90, 1.10, 0.78);
   return k > 0.5 ? mix(ring, warm, smoothstep(0.5, 0.85, k)) : mix(paint, ring, smoothstep(0.0, 0.5, k));
 }
@@ -450,6 +454,10 @@ void pcBrick(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float 
 // The octave of the distance: x the finer layer's stroke width (m), y how far toward the coarser one (0..1).
 vec2 pcStrokeOct(float dist, float w0) {
   float want = max(dist, 0.05) * uOilPx.x * uOilA.x * uOilPx.y / 720.0;     // metres wide to be that many pixels
+  // (from the ship the strokes are laid broader, up to 1.7 times from where the air's reach has grown to a kilometre and
+  // a half: a stroke is then a clump of trees or a patch of a field, and fewer of them lie at the size of a pixel, where
+  // they flickered under a moving eye; checkpoint 1's flicker index, the log on r2)
+  want *= 1.0 + 0.7 * clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 1300.0, 0.0, 1.0);
   float l = log2(max(want / w0, 1.0)), l0 = floor(l);
   return vec2(w0 * exp2(l0), l - l0);
 }

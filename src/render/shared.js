@@ -45,7 +45,7 @@ export const G = {
   uMoon0: { value: 0 },
   uFogBank0: { value: new THREE.Vector2(0, 150) },     // (a material without a body: no banks)
   uRound0: { value: new THREE.Vector2(0, 4000) }, uHeart0: { value: new THREE.Vector4(0, 1, 0, 0) },
-  uGroundK0: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uGroundK0: { value: new THREE.Vector4(0, 1, 0, 0) },
   // the near air (x how much of what stands at distance y metres it veils, rising as 1 - exp(-d / y)): a dust storm
   // veils the explorer at the eye's own distance, which the far washes' stacked bands cannot (the world sets it)
   uAirNear: { value: new THREE.Vector2(0, 9) },
@@ -159,7 +159,7 @@ export function makeBodyUniforms() {
     uRound: { value: new THREE.Vector2(0, 4000) },                       // from orbit the limb closes on the mean sphere: x how far the relief is drawn in (0 on the ground .. 0.75), y the datum radius (chunks.js pcRound)
     uWx: { value: new THREE.Vector4(0, 0, 0, 0) },                       // weather: x overcast (flat cool light), y wet ground, z snow cover, w veil (rain or snow in the air)
     uFogBank: { value: new THREE.Vector2(0, 150) },                      // a thick fog lies in banks (PAINTER 19): x how much (0 none), y the drifts' measure (m); chunks.js pcFogBank
-    uGroundK: { value: new THREE.Vector4(0, 0, 0, 0) },                  // the oil look: x how this world's ground is laid: 0 leaf dabs, 1 tiles with a light edge (snow and ice)
+    uGroundK: { value: new THREE.Vector4(0, 1, 0, 0) },                  // the oil look: x how this world's ground is laid: 0 leaf dabs, 1 tiles with a light edge (snow and ice); y the share of the oil look's blades and near strokes this world keeps (1: all of them; a look's oil.grass)
   };
 }
 

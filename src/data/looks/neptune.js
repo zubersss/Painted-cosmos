@@ -19,7 +19,7 @@ export default {
   // streaks at 0.15, and no sunlit wash on the deck (`matte`): no arc is lighter than the wash beside it)
   deck: { height: 310, belts: 6, wobble: 0.11, a: [0.50, 0.62, 0.93], b: [0.33, 0.42, 0.80], streaks: 0.15, wet: 0.6, axis: [-0.707, 0.707, 0], matte: 1 },
   // (the oil look: this world's ground is laid as tiles with a light edge, the snow of the owner's reference clip)
-  oil: { ground: 'tiles' },
+  oil: { ground: 'tiles', grass: 0.25 },
   sky: mkSky([0.34, 0.46, 0.84], [0.82, 0.89, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
   flora: {
     tall: [

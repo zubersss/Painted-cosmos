@@ -226,15 +226,16 @@ function wandererParts(B, X, Z, ringsY) {
     seg: 14, lump: 0.008, col: (p) => mixc(CLOAK, CLOAK_D, 0.35 + 0.4 * noise3(p[0] * 9, p[1] * 5, p[2] * 9)),
     warp: (p) => (p[2] < -0.05 ? [p[0], p[1], -0.05 + (p[2] + 0.05) * 0.14] : p),
   });
-  // 12 the lantern at the right hip: a dark frame, a glass that is lit when the light goes, a strap to the belt
+  // 12 the lantern at the right hip, on a strap from the belt, clear of the cloak: a dark frame, a glass that is lit when
+  // the light goes
   B.part = 12;
-  const lx = 0.290, lz = -0.03;
-  B.capsule([lx, 0.955, lz], [lx, 0.845, lz], 0.036, 0.036, { seg: 8, col: GLASS, glow: -1, wet: 0.4, lump: 0, mid: 0 });
-  B.blob([lx, 0.975, lz], 0.047, 0.017, 0.047, { seg: 8, rings: 4, col: INK, lump: 0 });
-  B.blob([lx, 0.826, lz], 0.045, 0.015, 0.045, { seg: 8, rings: 4, col: INK, lump: 0 });
-  B.path([[lx - 0.030, 0.985, lz], [lx - 0.020, 1.032, lz], [lx + 0.020, 1.032, lz], [lx + 0.030, 0.985, lz]], 0.007, { seg: 5, col: INK, lump: 0 });
-  B.path([[0.215, 1.03, -0.02], [lx, 1.038, lz]], 0.008, { seg: 5, col: SEPIA, lump: 0 });
-  return { lamp: [lx, 0.90, lz] };
+  const lx = 0.345, lz = -0.02;
+  B.capsule([lx, 0.815, lz], [lx, 0.715, lz], 0.046, 0.046, { seg: 8, col: GLASS, glow: -1, wet: 0.4, lump: 0, mid: 0 });
+  B.blob([lx, 0.842, lz], 0.058, 0.020, 0.058, { seg: 8, rings: 4, col: INK, lump: 0 });
+  B.blob([lx, 0.690, lz], 0.055, 0.018, 0.055, { seg: 8, rings: 4, col: INK, lump: 0 });
+  B.path([[lx - 0.036, 0.852, lz], [lx - 0.024, 0.905, lz], [lx + 0.024, 0.905, lz], [lx + 0.036, 0.852, lz]], 0.008, { seg: 5, col: INK, lump: 0 });
+  B.path([[0.225, 1.02, -0.02], [0.30, 0.97, lz], [lx, 0.908, lz]], 0.008, { seg: 5, col: SEPIA, lump: 0 });
+  return { lamp: [lx, 0.76, lz] };
 }
 
 export function createExplorer() {
@@ -321,7 +322,7 @@ export function createExplorer() {
     { name: 'thighL', parent: 'torso', pivot: [-0.095, 0.89, 0] }, { name: 'thighR', parent: 'torso', pivot: [0.095, 0.89, 0] },
     { name: 'shinL', parent: 'thighL', pivot: [-0.095, 0.48, 0] }, { name: 'shinR', parent: 'thighR', pivot: [0.095, 0.48, 0] },
     { name: 'jet', parent: 'torso', pivot: wander ? [0, 0.50, 0.21] : [0, 0.935, 0.235] },
-    ...(wander ? [{ name: 'hood', parent: 'head', pivot: [0, 1.47, 0.05] }, { name: 'lantern', parent: 'torso', pivot: [0.290, 1.038, -0.03] }] : []),
+    ...(wander ? [{ name: 'hood', parent: 'head', pivot: [0, 1.47, 0.05] }, { name: 'lantern', parent: 'torso', pivot: [0.345, 0.908, -0.02] }] : []),
   ], mat.uniforms.uPart.value);
   const b = rig.bones;
 

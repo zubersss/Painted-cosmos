@@ -57,7 +57,7 @@ export function createWorld(scene) {
     bodies.set(id, root);
     const bu = makeBodyUniforms();
     // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'tiles' for worlds of snow and ice)
-    { const lk = getLook(id); if (lk && lk.oil && lk.oil.ground === 'tiles') bu.uGroundK.value.x = 1; }
+    { const lk = getLook(id); if (lk && lk.oil) { if (lk.oil.ground === 'tiles') bu.uGroundK.value.x = 1; if (lk.oil.grass != null) bu.uGroundK.value.y = lk.oil.grass; } }
     bu.uBodyR.value = BODIES[id].radius;
     const look = getLook(id);
     if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }

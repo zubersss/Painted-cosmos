@@ -467,6 +467,9 @@ void main() {
 
 const WATER_FRAG = /* glsl */`
 ${FRAG_PARS}
+#ifdef PC_OIL
+uniform float uBodyR;
+#endif
 uniform vec3 uSkyZenith;
 uniform vec3 uSkyHorizon;
 uniform vec3 uReflDark;
@@ -748,6 +751,21 @@ void main() {
   // swallow the far water whole, strokes and all, and a storm sea painted as a pale blank is
   // no sea; the painter keeps it darker than the sky to the horizon and lets the stacks go pale)
   // (and what glows is seen through the haze: lava keeps its fire into the distance)
+  #ifdef PC_OIL
+  {
+    // water in strokes: short thin dashes lying along the water (the world's own chart, so they stay where they are),
+    // a share of them a step lighter, carrying the sky's light as the clip's water carries its aurora, a share a step
+    // deeper, nothing drawn between two
+    vec2 wch = pcGroundChart(vBody, uBodyR);
+    vec2 wdx = dFdx(wch), wdy = dFdy(wch);
+    vec2 woc = pcStrokeOct(dist * 1.6, uOilPx.z * 1.6);
+    vec3 wr1, wr2; vec2 wds; float wown;
+    pcThinLayer(wch, wdx, wdy, woc.x, 6.0, vBody, 40.0, 4.0, wr1, wds, wown, wr2);
+    vec3 cdeep = pcDensity(c, 1.4), clight = mix(c, vec3(1.0), 0.24);
+    vec3 w1 = wr1.x > 0.62 ? clight : (wr1.x < 0.30 ? cdeep : c), w2 = wr2.x > 0.62 ? clight : (wr2.x < 0.30 ? cdeep : c);
+    c = mix(w2, w1, wown);
+  }
+  #endif
   float f = pcFogAmount(dist) * (1.0 - 0.45 * farSea) * (1.0 - 0.6 * vLiqP.x);
   c = pcAtmosV(c, f, vView);
   pcWrite(c, mix(mix(0.7, 0.22, white), 1.0, vLiqP.y), normalize(normalMatrix * up), -vView.z, 2.0);
@@ -1056,7 +1074,7 @@ void main() {
   // chart is the mass's own space, flattened along whichever axis the face looks down most (taken from the face itself,
   // so it never turns with the eye); a dab too near the outline, or where the sky shows through, is left out whole.
   // (the clip's floor is a carpet of leaves with a tuft here and there: most blades and fronds are not laid)
-  if (part > 1.5 && part < 2.5 && fract(seed * 7.77 + 0.31) > uOilG.y) discard;
+  if (part > 1.5 && part < 2.5 && fract(seed * 7.77 + 0.31) > uOilG.y * uGroundK.y) discard;
   if (part < 1.5) {
     bool isBark = part < 0.5;
     // (some trees of a kind are dark-barked: their own pair of bark washes, and their marks run along the stem)
@@ -1754,7 +1772,7 @@ void main() {
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js)
   #ifdef PC_OIL
     // (the clip's floor is a carpet of leaves with a tuft here and there, not a sward: most of the near strokes are not laid)
-    if (fract(vS.z * 13.37 + 0.11) > uOilG.x) discard;
+    if (fract(vS.z * 13.37 + 0.11) > uOilG.x * uGroundK.y) discard;
   #endif
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
   // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks
