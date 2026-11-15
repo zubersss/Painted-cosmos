@@ -775,6 +775,9 @@ varying vec4 vInst;
 varying float vWash;      // 1: fully laid; below: the strokes are still arriving (negative: being lifted out)
 varying float vAbove;     // metres above the plant's foot (the sun flecks on a trunk continue the ground's)
 varying float vFog;
+#ifdef PC_OIL
+varying vec3 vMassO;      // the crown's mass normal in the plant's own space: the chart a crown's dabs are laid on
+#endif
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
 // pushing through them (C14). Without it, this gentle sway stands in.
@@ -888,6 +891,9 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(wp + pcRound(io + uOrigin), 1.0);     // (a thing stands on the ground where the ground is drawn)
   vView = mv.xyz;
   vUv = uv; vData = aData; vInst = inst;
+  #ifdef PC_OIL
+    vMassO = aMass;
+  #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
@@ -930,6 +936,9 @@ varying vec4 vInst;
 varying float vWash;
 varying float vAbove;
 varying float vFog;
+#ifdef PC_OIL
+varying vec3 vMassO;
+#endif
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
@@ -1007,14 +1016,21 @@ void main() {
       vec2 mx = vec2(ux.y, ux.x * 1.1), my = vec2(uy.y, uy.x * 1.1);
       dcx = uBarkP.y > 0.5 ? mx : mx.yx; dcy = uBarkP.y > 0.5 ? my : my.yx;
     } else {
-      vec3 fn = abs(cross(odx, ody));
-      if (fn.x >= fn.y && fn.x >= fn.z) { ch = vObj.zy; dcx = odx.zy; dcy = ody.zy; }
-      else if (fn.y >= fn.z) { ch = vObj.xz; dcx = odx.xz; dcy = ody.xz; }
-      else { ch = vObj.xy; dcx = odx.xy; dcy = ody.xy; }
+      // (a crown's chart: the way its mass faces, in its own space, as metres round a ball of about the crown's size:
+      // one chart over the whole crown, whatever its triangles; taken from the faces themselves it gave every triangle
+      // its own strokes, and from the air a crown was a cut gem)
+      vec3 md = normalize(vMassO);
+      vec3 ma = abs(md);
+      vec3 mq = ma.x >= ma.y && ma.x >= ma.z ? vec3(md.y, md.z, ma.x) : ma.y >= ma.z ? vec3(md.z, md.x, ma.y) : vec3(md.x, md.y, ma.z);
+      ch = 1.9 * atan(mq.xy, vec2(mq.z)) + vData.w * 23.0;
+      dcx = dFdx(ch); dcy = dFdy(ch);
+      // (across the seam of two faces of that chart the derivative is the jump itself: there the last good one stands in)
+      float exd = max(vd, 0.05) * uOilPx.x * 1.3;      // (about what the chart changes by in a pixel, facing the eye)
+      if (max(length(dcx), length(dcy)) > 12.0 * exd + 0.02) { dcx = vec2(exd, 0.0); dcy = vec2(0.0, exd); }
     }
     // (bark's strokes stay small: a trunk is a few of them across, and far off it is its own colour, whole; a crown's
     // dabs are a little over half the ground's strokes)
-    vec3 oc = isBark ? pcStrokeOctCap(vd * (0.85 + 0.3 * seed), 0.012, 0.045) : vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed) * 0.62, 0.05), 1.0);
+    vec3 oc = isBark ? pcStrokeOctCap(vd * (0.85 + 0.3 * seed), 0.012, 0.045) : vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed) * 0.8, 0.05), 1.0);
     float gone = smoothstep(0.15, 0.85, oc.y), fine = oc.z;
     vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
     vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vBody), bdy = dFdy(vBody);
@@ -1055,8 +1071,8 @@ void main() {
         vec3 mVc = normalize(vMassV + mvdx * ds.x + mvdy * ds.y);
         // the outline is ragged by whole dabs, and the sky shows through where whole dabs are left out
         float rim = 1.0 - abs(dot(nVc, Vc));
-        float cut = smoothstep(0.34, 0.94, rim) * uLeafP.x + uLeafP.y * smoothstep(0.50, 0.74, nA.r) * 0.9;
-        float there = step(cut, rnd.z * 0.8 + 0.2 * rnd.x + 0.12) * present;
+        float cut = smoothstep(0.30, 0.90, rim) * uLeafP.x + uLeafP.y * (0.30 + 0.75 * smoothstep(0.46, 0.72, nA.r));
+        float there = step(cut, rnd.z * 0.8 + 0.2 * rnd.x + 0.10) * present;
         float hue = vInst.x + (rnd.x - 0.5) * 1.5 + (vData.w - 0.5) * 0.7 + (nA.b - 0.5) * 0.5;
         cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
         cs = mix(cs, leafC, clamp(vData.z * 0.75 + (rnd.y - 0.5) * 0.5, 0.0, 1.0));

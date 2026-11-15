@@ -73,16 +73,16 @@ export const OIL = {
   // x: a stroke's width on the screen (pixels at 720 lines; it is scaled with the picture's height)
   // y: how much richer than a wash the body colour is (pcDensity)   z, w: the powers that turn the pale light and glaze
   //    keys of the watercolour into the oil's warm light and cool shade
-  uOilA: { value: new THREE.Vector4(13 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
+  uOilA: { value: new THREE.Vector4(11 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
   // x: the sunlit paint's gain   y: the gap between strokes (a share of a stroke's width)   z: how far a stroke's colour
   //    strays from its neighbours'   w: the ridge of paint at a stroke's edge
   uOilB: { value: new THREE.Vector4(1.12, 0.03, 1.0, 0.5) },
   // x: the power on the haze key   y: the glow of the air toward the sun   z: 0 strokes off (the colour and light only)
   //    .. 1 on   w: how much farther off the air takes a thing than in the watercolour (the wood's depth)
-  uOilC: { value: new THREE.Vector4(1.8, 0.7, _qn('strokes', 1), 1.7) },
+  uOilC: { value: new THREE.Vector4(1.8, 0.7, _qn('strokes', 1), 3.2) },
   // the shade (chunks.js pcTone): x the cool key's gain over the body colour   y the sky's own fill in it (violet, added)
-  //    z how much of the key's hue stands in for the body's   w how dark the hairline between two strokes is
-  uOilD: { value: new THREE.Vector4(0.92, 0.20, 0.10, 0.55) },
+  //    z the green left in the key (under 1: the shade leans to violet)   w how dark the hairline between two strokes is
+  uOilD: { value: new THREE.Vector4(1.0, 0.22, 0.84, 0.78) },
   // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (set every frame)
   uOilPx: { value: new THREE.Vector4(0.0015, 720, 0, 0) },
 };

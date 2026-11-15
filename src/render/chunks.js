@@ -187,17 +187,20 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // paper). A wash's transmittance becomes a body colour by laying it heavier (richer, never greyer); the watercolour's
 // pale light and glaze keys, raised to a power, are the oil's warm light and its cool, violet shade.
 vec3 pcOilSunC() { return pow(uLight, vec3(uOilA.z)); }
-vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)); }
+// (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
+vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
 vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
 vec3 pcTone(vec3 c, float level) {
   vec3 b = pcBody(c);
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
-  vec3 lit = b * sunC * uOilB.x;
+  // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
+  // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
+  vec3 lit = pcDensity(c, mix(1.0, uOilA.y, 0.42)) * mix(vec3(1.0), sunC, 0.6) * uOilB.x;
   vec3 loc = b * mix(vec3(1.0), sunC, 0.45);
   // (the shade is the cool key over the body colour, with a quarter of the key's own hue at the body's value: a
   // multiply alone takes an orange floor to brown, and the reference's shadows on its leaf carpet are maroon and violet)
   // (and the sky's own light, added: without it a shadow on an orange floor is brown; with it, maroon and violet)
-  vec3 g1 = mix(b * shC * uOilD.x, shC * dot(b, vec3(0.3, 0.5, 0.2)) * 1.3, uOilD.z) + pow(uGlaze, vec3(3.0)) * uOilD.y * (0.35 + 0.65 * uDayness);
+  vec3 g1 = pcDensity(b * shC * uOilD.x, 1.25) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 1.0) * uOilD.y * (0.35 + 0.65 * uDayness);
   vec3 g2 = pcDensity(g1, 1.7);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
