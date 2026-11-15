@@ -92,10 +92,11 @@ everything is pushed. This session has read the handover and run nothing (no che
 work organised. Then the plan is agreed with the owner in chat. Nothing starts before that, and
 the order below may change with it.
 
-**Proposed to the owner, not yet answered:** a mixed team of models (the top model for rendering,
-the explorer, physics and all verifying; smaller models for small, checkable chores). It would
-amend section 2, item 2. See the log's entry "Planning with the owner: other tools, and which
-model does what".
+**Discussed with the owner, not yet answered:** whether to mix models. The coordinator first
+proposed a mixed team, then advised against it as over-engineering (a few per cent saved at
+most): keep every agent that writes or judges the game on the top model at extra-high effort
+(section 2, item 2 unchanged), and let the coordinator run the mechanical steps itself. See the
+log's entry "Planning with the owner: other tools, and which model does what".
 
 | Branch | What it holds |
 | --- | --- |
