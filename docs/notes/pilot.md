@@ -2,6 +2,28 @@
 
 Branch: `cosmos` (shared with PAINTER and PHYSICS, one working tree). Commits: `tools/commit.sh pilot`.
 
+## Hand-over, RELEASE 2, PILOT lane part 1: W6.1 (resolution floor, measured steps), W6.2 (phone preset part 2: floor, even pacing), W6.3 (sketch capture off the frame) (started 2026-11-15 on branch `r2` at `0edb971`; kept current)
+
+**Read this first.** Plan: `docs/lead/SHARP-SMOOTH-PLAN.md` section 4 "PILOT · W6" items 1-3, rulings 4 and 5. Branch
+`r2` (NOT `cosmos`). First commit's parent: `0edb971`. Scratch: `/home/user/.pc-scratch/pilot/r2/` (`w61/`: the dynsim
+model runs `model.mjs` / `trace.mjs`, the previous controller `dynres-old.js` and `before/` (the new floor tests run on it)).
+
+**State:** W6.1 code written (src/core/dynres.js, src/main.js, src/core/preset.js `floor`, src/core/game.js read-out,
+tests/dynres-floor.test.mjs); checks running. W6.2 and W6.3 not begun.
+
+**For PAINTER (W7.3, the tier shares; the policy is PILOT's, the constants PAINTER's):**
+- The controller now works on internal = tier share x render scale, floor 0.67 (0.75 on phones and tablets). It needs
+  the shares: please add one line to the painter object in `src/render/index.js`: `tierShares: TIERS.map((t) => t.scale),`
+  (main.js prefers it; without it main.js reads them off `painter.info.internalHeight` at render scale 1, tier by tier, at
+  boot: `tierSharesOf` in src/core/dynres.js, which works today but is a probe).
+- A tier whose share is under the floor can only be drawn at render scale 1 (setRenderScale clamps at 1): with today's
+  TIERS q0 (0.62) is under both floors, q1 (0.80) is fine on a desktop and needs scale 0.94 on a phone. W7.3's
+  [0.75, 0.85, 1.0] puts every tier at or over both floors (q0 on a phone exactly at 0.75 at scale 1). Please keep
+  q0's share >= 0.75 so the phone's lowest tier is not under its floor.
+- The ladder on a desktop is q2 (MSAA) -> q1 (MSAA) -> q1 with `setAA('post')` -> q0 (the plan's "geometry, then MSAA");
+  the controller calls `painter.setAA('auto' | 'post')` only on a desktop without `?aa=` or `?quality=` in the URL.
+
+
 ## Hand-over, RELEASE 1, PILOT RE-FIX pass (the verifier's findings on the lane; started 18:00 UTC 2026-11-14; kept current)
 
 **Read this first.** The lane's commits were checked by an independent verifier; this pass fixes exactly what it did not
