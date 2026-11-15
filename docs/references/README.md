@@ -60,37 +60,82 @@ game's own.
 light, little cast shadow, low contrast. The distance to the clip is mostly light and colour,
 then the surface; a filter alone would not cross it.
 
-### The sort
+### The sort, second pass: the best to take from each
 
-| Reference | Verdict | Take | Leave |
+The owner asked for a second pass (2026-11-15): not one thing from each reference but the best
+it has to give, so that the game looks as good as the clip without copying it, with additions of
+its own from all the others. The owner declined to open the picture sites to the session, so
+this pass rests on the clip (seen), Rime (seen) and knowledge of the other works. Five verdicts
+moved from "leave" to "in part" (Afremov, Ori, Eastshade, South of Midnight, Clair Obscur): each
+has something worth taking once its main look is set aside.
+
+| Reference | Verdict | The best to take | Leave |
 | --- | --- | --- | --- |
-| The clip: autumn forest (3 frames) | Take | Light, haze, long shadows, warm against violet, the leaf carpet of strokes, falling leaves | Its exact scene |
-| The clip: aurora night (2 frames) | Take | Blue-green night with one warm pool of lantern light; strokes across snow, water and sky | Its exact scene |
-| The clip: the figure | Take | A cloak made of strokes, the lantern, a strong simple outline | The hat (owner); its colour is the owner's choice |
-| The clip: cabin from outside | In part | Warm windows against cold snow | Only if the owner wants shelters in the worlds |
+| The clip: autumn forest | Take | A low sun, light shafts, haze that steps the far trunks back in three or four planes. Gold light against violet trunks and shadows; a few white birches for rhythm. A leaf carpet of strokes; bands of light and shadow that lead the eye into the wood; tufts at the feet of trunks. A canopy that glows where the sun comes through it. A few large, slow leaves in the air | Its exact scene |
+| The clip: aurora night | Take | Snow that takes the sky's colour. The lantern's pool, which mixes through yellow-green at its edge like paint. Shadows with colour (blue-violet, never grey). Sky strokes that flow; the aurora in upright strokes with a magenta fringe. Mountains as two or three flat planes. Water in dashes that carry the aurora. Footprints in the snow | Its exact scene |
+| The clip: the figure | Take | A cloak made of strokes with a ragged hem that billows at a run; the lantern; one strong outline | The hat (owner). Colour: blue-grey (owner) |
+| The clip: cabin from outside | Parked | Warm windows against cold snow; snow strokes that run down the roof | No shelters for now (owner) |
 | The clip: cabin interior | Leave | | Indoor scene; every colour at full strength |
-| Van Gogh: Mulberry Tree, Undergrowth, Falling Autumn Leaves | Take | Strokes that follow the form; opposite colours side by side | |
-| Tom Thomson: Autumn, Algonquin Park; Autumn Foliage | Take | Bold flat patches and simple strong shapes: the best guide for land seen from the air | |
-| Harald Sohlberg: Winter Night in the Mountains | Take | A night that is blue and clear to read, with one warm point | |
-| Firewatch (two pictures) | Take | Depth from layers of haze and colour; low sun. Cheap to draw, so it also serves speed | Its flat, strokeless surfaces |
-| Breath of the Wild: paraglide | Take | Land that reads from the air: landmarks, clear zones of colour, soft far haze | Its cel shading |
-| The Pathless (three pictures) | Take | Shapes that read at speed and in flight; fog for depth | Its smooth surfaces |
-| Journey | Take | The figure as one strong outline; the cloth carries the motion | |
-| The Long Dark: aurora | Take | Aurora over snow; hand-painted surfaces | |
-| 11-11: Memories Retold (two pictures) | In part | The richness of a painting that moves | Strokes that re-form all the time (they shimmer, against "smooth"); its softness |
-| Klimt: Birch Forest | In part | The leaf carpet of dabs; the birch trunks | Its flatness: no depth, no direction of light |
-| Skyward Sword HD | In part | Dabs of colour up close | Far things dissolved into blobs: this is the blur the owner complained of from the ship |
-| No Man's Sky (two pictures) | In part | One strong colour key for each planet; great bodies in the sky | Busy, noisy surfaces |
-| Sea of Thieves: sunset water | In part | Sunset colour on water; the sun's glitter path | Its heavy water simulation |
-| Rime (seen) | In part | Clean outlines; a landmark that draws the eye | Smooth, strokeless surfaces |
-| Arise; Europa; Aloft | In part | Light shafts, mood, how land is composed from the air | Soft looks, close to what the game already has |
-| Sky: Children of the Light | In part | How a cape moves | Soft glow over everything |
-| Tiny Glade; Firewatch lookout | In part | Warm windows in a cool dusk | The blur of a miniature; only if shelters are wanted |
-| Leonid Afremov (two pictures) | Leave | | Every colour at full strength everywhere: nowhere for the eye to rest, and the land stops reading |
-| Ori and the Will of the Wisps | Leave | | Glow and bloom over everything soften the picture; a side-on 2D composition |
-| South of Midnight; Clair Obscur: Expedition 33 | Leave | | Beauty that rests on near-photographic detail and lighting; a browser game cannot match it and would lose the painted look trying |
-| Eastshade | Leave (the look) | Its spirit: a calm game of looking | Realistic 3D with no brushwork |
-| The Long Dark: two interiors | Leave | | Indoor scenes |
+| 11-11: Memories Retold | In part | Stroke size by importance: fine where the player must read (the figure, a path, a landing place), broad and loose elsewhere. Edges that are lost where they do not matter and kept where they do. Lamps and fire as thick bright paint. A palette that changes with the place and the mood | Strokes that re-form every frame (they shimmer); its softness |
+| Tom Thomson (two) | Take | A warm ground colour left showing between the strokes, which ties a picture together. Slabs of pure colour laid side by side, unblended. Big simple shapes: a dark screen of trees before a bright distance. Far hills as flat bands. Sky and water painted with as much body as the land | |
+| Van Gogh (three) | Take | A stroke habit for each thing: dashes along the ground, strokes up a trunk, strokes that swirl in the sky, strokes that spread outward in foliage. Opposite colours side by side (orange leaves, blue-violet trunks). Dark contour lines that keep shapes clear. Dappled light as separate dabs. A path seen from above through a screen of trunks | |
+| Klimt: Birch Forest | In part | A leaf carpet of very many small dabs that vary in hue. Each trunk patterned in its own way (birch marks, moss). The rhythm of trunk spacing | No depth, no direction of light |
+| Leonid Afremov (two) | In part | Night reflections: lights mirrored in wet ground, ice or water as upright streaks of broken colour. A lamp's glow as a mosaic of warm strokes. Shadows built of several pure hues | Every colour at full strength everywhere |
+| Harald Sohlberg: Winter Night | Take | Night in one family of blue with the whole range from dark to light, the snow the lightest thing: night is blue, not dark. Dark trees that frame the view. One bright point of light. Crisp contours | |
+| Firewatch (two) | Take | Depth as five or six flat steps of colour toward the sky. A designed palette for each time of day, few hues each. Tree outlines simplified but true to the kind of tree. Shafts at low sun. Cheap to draw | Flat, strokeless surfaces |
+| The Long Dark: aurora | Take | Brushed textures on simple shapes, which is strokes on the world in a shipped game. Snow as a canvas for the light (pink at dawn, blue in shade, green under the aurora). Dark pines on bright snow. Weather as mood: fog, falling snow | |
+| The Long Dark: two interiors | Parked | Fire as the one warm light in the cold: carried here by the lantern | Indoor scenes |
+| Breath of the Wild | Take | Paths, water and trees told apart by colour and lightness from the air. Places of interest that glow and can be seen from far, by day and by night. Hills that hide and then reveal what lies behind. Far land that fades in colour but keeps crisp shapes | Cel shading |
+| The Pathless (three) | Take | Big clean outlines that read at speed. A small palette for each region with one strong accent. White fog over the ground for depth. Wind and speed shown as streaks. A landmark in each region seen from anywhere | Smooth surfaces |
+| Europa; Aloft | In part | Wind moving over grass as waves seen from the air. Patches of flowers as colour in green land. Clouds as painted masses at flying height. A great planet in the sky | Soft looks close to what the game has |
+| Arise | In part | A palette for each chapter. Floating motes and gentle shafts. Trees as big simple masses | Smooth surfaces |
+| Skyward Sword HD | In part | A colour identity for each region. Far things as dabs, done so that each dab is a real feature with a crisp edge | Far things dissolved into blur |
+| Journey | Take | A figure designed as an outline first, with trailing cloth that carries the motion. Glints on sand and snow. A landmark that is always in view. A palette for each chapter. Low sun behind everything on a long slide | |
+| Sky: Children of the Light | In part | The cape as the figure's character: how it flutters, glides and settles. Warm light carried through a blue world. Clouds one flies through | Soft glow over everything |
+| Ori and the Will of the Wisps | In part | A rim of light on the figure so it reads against any background. Light that leads the player to what matters. Motes in the air. Near foliage that frames the view | Glow and bloom that soften the picture; side-on 2D |
+| Sea of Thieves | In part | Light glowing through wave crests. The sun's glitter path. Sunset skies as the main picture, with clouds as big painted shapes | Its heavy water simulation |
+| Rime (seen) | In part | Rock in two or three clear planes of light and shade. A white landmark that draws the eye. A small strong accent on the figure. Foam lines at the shore | Smooth surfaces |
+| Tiny Glade; Firewatch lookout | In part | Warm light bounced into shadows. Nothing quite straight: the hand-made wobble. A lit lookout as a landmark at dusk | The blur of a miniature |
+| South of Midnight | In part | Grass and leaves that glow when the low sun is behind them. Hand-made unevenness in shapes | Near-photographic detail |
+| Eastshade | In part | Views composed to be looked at and painted: a near frame, a subject, far layers. This serves the game's own sketchbook. A sun that stays low | Realistic 3D without brushwork |
+| No Man's Sky (two) | In part | Three colours that key each planet (sky, land, water). The air's colour changing on the way down from space. Rings and planets in the sky. Plant outlines that differ from planet to planet | Busy, noisy surfaces |
+| Clair Obscur: Expedition 33 | In part | Strong darks with bright accents. One strange, memorable landmark. Petals adrift | Near-photographic detail |
+| The rendering links (not opened; from knowledge) | Take | Light worked out once for each stroke, so a stroke is one flat colour. Outlines broken with stroke-shaped pieces so edges look brushed. Stroke size by depth and importance | Strokes placed on the screen and re-made each frame |
+
+### The recipe: the clip's look, made the game's own
+
+**The base, from the clip.** Strokes on the world's surfaces; a low strong sun with cast shadows
+and haze; warm light against cool shadow; one opposite accent; a blue, readable night.
+
+**What the other references add** (sources in brackets). A proposal, to be set against the code
+in the one-page plan; the first six are meant for the prototype.
+
+1. **Paint that re-forms from a leaf to orbit.** Stroke size follows height in steps and
+   importance: fine where one must read, broad elsewhere, every stroke crisp (11-11, Tom Thomson,
+   Skyward Sword done crisply, Breath of the Wild, The Pathless). The clip never leaves the
+   ground; this is the game's own.
+2. **A ground colour for each planet showing between the strokes** (Tom Thomson), with three
+   colours that key the planet (No Man's Sky, Journey, Firewatch).
+3. **A stroke habit for each thing** (Van Gogh): dashes on the ground, strokes up trunks, upright
+   strokes in the aurora, and sky strokes that follow the game's real wind. The wind already
+   exists in the physics; no reference has that.
+4. **Night:** blue with the snow lightest (Sohlberg), snow lit by the aurora (The Long Dark),
+   the lantern's pool as a mosaic of warm strokes, mirrored in ice and water (Afremov).
+5. **The figure:** outline first (Journey), a rim of light so it always reads (Ori), the cape's
+   motion (Sky), the lantern as the one warm accent.
+6. **Low-sun glow:** leaves and grass lit from behind (South of Midnight, the clip), warm light
+   bounced into shadows (Tiny Glade), shadows with colour.
+7. Depth as flat steps of colour (Firewatch): cheap, so it suits phones.
+8. Land told apart from the air by colour and lightness: paths, water, trees (Breath of the
+   Wild); a landmark in each region (The Pathless, Rime, Clair Obscur).
+9. Water: light through wave crests, a glitter path (Sea of Thieves), foam lines (Rime).
+10. Living air: leaves, snow, motes (the clip, Ori, Arise); wind shown as streaks in flight
+    (Aloft, The Pathless).
+11. Glints on snow and sand (Journey); footprints in snow (the clip).
+12. Brushed outlines (the rendering links, the clip); hand-made unevenness (Tiny Glade).
+13. Views composed for the sketchbook (Eastshade).
+14. Planets and rings painted boldly in the sky; the air's colour changing on the way down
+    (No Man's Sky, Europa).
 
 ### The coordinator's ideas from the sort (put to the owner; not agreed yet)
 
