@@ -70,22 +70,52 @@ const _qs = (() => { try { return new URLSearchParams(location.search); } catch 
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
 export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
 export const OIL = {
-  // x: a stroke's width on the screen (pixels at 720 lines; it is scaled with the picture's height)
+  // x: a thin stroke's width on the screen (pixels at 720 lines; it is scaled with the picture's height). A leaf dab
+  //    is about three of these long
   // y: how much richer than a wash the body colour is (pcDensity)   z, w: the powers that turn the pale light and glaze
   //    keys of the watercolour into the oil's warm light and cool shade
-  uOilA: { value: new THREE.Vector4(8 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
-  // x: the sunlit paint's gain   y: the gap between strokes (a share of a stroke's width)   z: how far a stroke's colour
-  //    strays from its neighbours'   w: the ridge of paint at a stroke's edge
-  uOilB: { value: new THREE.Vector4(1.12, 0.03, 1.0, 0.5) },
+  uOilA: { value: new THREE.Vector4(4.6 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
+  // x: the sunlit paint's gain   y: (the tiles' hairline, not in use)   z: how far a stroke's colour strays from its
+  //    neighbours'   w: a thin stroke's length over its width
+  uOilB: { value: new THREE.Vector4(1.12, 0.03, 1.0, 5.0) },
   // x: the power on the haze key   y: the glow of the air toward the sun   z: 0 strokes off (the colour and light only)
   //    .. 1 on   w: how much farther off the air takes a thing than in the watercolour (the wood's depth)
   uOilC: { value: new THREE.Vector4(1.8, 0.7, _qn('strokes', 1), 3.2) },
   // the shade (chunks.js pcTone): x the cool key's gain over the body colour   y the sky's own fill in it (violet, added)
   //    z the green left in the key (under 1: the shade leans to violet)   w how dark the hairline between two strokes is
   uOilD: { value: new THREE.Vector4(1.0, 0.22, 0.84, 0.78) },
-  // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (set every frame)
-  uOilPx: { value: new THREE.Vector4(0.0015, 720, 0, 0) },
+  // THE STYLE (the owner asked for six to choose from, 2026-11-15: STYLES below).
+  // x: how the ground is laid: 0 thin strokes that run along the land, 1 leaf dabs lying every way (the clip's forest
+  //    floor), 2 a course of tiles with a light edge (the clip's snow)   y: fallen leaves drawn one by one over the
+  //    strokes or the tiles (0 none .. 1)   z: a leaf dab's length over its width   w: a dab's cell (half its length)
+  //    in stroke widths
+  uOilS: { value: new THREE.Vector4(0, 1, 2.8, 1.8) },
+  // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (both set every
+  // frame)   z: the smallest stroke's width, m (nearer than where that is uOilA.x pixels, strokes keep this width on
+  // the land and grow on the screen, as the clip's do)   w: half the length of a fallen leaf, m
+  uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.012, 0.085) },
 };
+// Six styles, from the thinnest strokes to the widest (none wider than the clip's). `&style=1..6` picks one; the
+// default is 2. Two follow the clip's own way of painting (3 and 5: leaf dabs lying every way), thinner than it; four
+// try other ways. Each is a set of the dials above: [uOilA.x, uOilB.y, uOilB.w, uOilD.w, uOilS..., uOilPx.z, uOilPx.w].
+export const STYLES = {
+  1: { name: 'Hairline', A: 2.6, gap: 0.03, asp: 8.0, edge: 1.0, S: [0, 0.7, 3.4, 2.2], w0: 0.006, leaf: 0.065 },
+  2: { name: 'Fine flow', A: 3.8, gap: 0.03, asp: 6.0, edge: 1.0, S: [0, 1.0, 3.0, 2.0], w0: 0.010, leaf: 0.085 },
+  3: { name: 'Leaf dabs, thin (the clip\'s way)', A: 3.6, gap: 0.03, asp: 6.0, edge: 1.0, S: [1, 0, 3.2, 2.5], w0: 0.020, leaf: 0.085 },
+  4: { name: 'Tiles with a light edge', A: 6.5, gap: 0.07, asp: 2.6, edge: 1.3, S: [2, 0.5, 2.6, 1.6], w0: 0.030, leaf: 0.085 },
+  5: { name: 'Leaf dabs (the clip\'s way, a little thinner)', A: 4.6, gap: 0.03, asp: 5.0, edge: 1.0, S: [1, 0, 2.4, 2.6], w0: 0.027, leaf: 0.085 },
+  6: { name: 'Layered: fine strokes under bold leaves', A: 4.6, gap: 0.03, asp: 5.0, edge: 1.0, S: [0, 1.0, 2.2, 2.6], w0: 0.012, leaf: 0.115 },
+};
+export function setStyle(n) {
+  const st = STYLES[n]; if (!st) return false;
+  const k = _qn('stroke', 1);
+  OIL.uOilA.value.x = st.A * k; OIL.uOilB.value.y = st.gap; OIL.uOilB.value.w = st.asp; OIL.uOilD.value.w = st.edge;
+  OIL.uOilS.value.fromArray(st.S); OIL.uOilPx.value.z = st.w0 * k; OIL.uOilPx.value.w = st.leaf;
+  LOOK.style = n;
+  return true;
+}
+setStyle(_qn('style', 2));
+if (typeof window !== 'undefined') window.__pcStyle = setStyle;
 // (a tool may reach every painted material ever made: tools/lab.mjs swaps their shaders without a reload)
 export const MATERIALS = new Set();
 export function register(m, kind, opts) {

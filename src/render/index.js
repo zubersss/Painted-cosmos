@@ -169,7 +169,7 @@ export function createPainter(renderer) {
     if (LOOK.oil) {
       // (the angle one pixel of the scene pass takes: the oil look's strokes are sized on the screen, chunks.js)
       const pe = camera.projectionMatrix.elements;
-      OIL.uOilPx.value.set(2 / (Math.max(pe[5], 1e-6) * Math.max(post.inH, 2)), post.inH, 0, 0);
+      OIL.uOilPx.value.x = 2 / (Math.max(pe[5], 1e-6) * Math.max(post.inH, 2)); OIL.uOilPx.value.y = post.inH;
     }
     const prevTarget = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;

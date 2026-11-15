@@ -95,6 +95,7 @@ uniform vec4 uOilA;    // the oil look's dials (shared.js OIL)
 uniform vec4 uOilB;
 uniform vec4 uOilC;
 uniform vec4 uOilD;
+uniform vec4 uOilS;
 uniform vec4 uOilPx;
 #endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
@@ -470,7 +471,7 @@ void pcStrokeLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, 
 // reference's forest floor is not a course of tiles: it is leaf-shaped dabs, pointed at both ends, lying every way, one
 // over another, with no line between them. A layer of dabs: two in every cell of a grid one dab wide, each anywhere in
 // its cell, turned its own way, a little longer or shorter; where two lie over one another the one with the higher
-// number is on top. p: the chart in dab widths. shape: x a dab's length over its width, y how far the dabs agree in
+// number is on top. p: the chart in half dab lengths (a cell). shape: x a dab's length over its width, y how far the dabs agree in
 // direction (0 every way .. 1 all along the chart's first axis), z how pointed (1 a leaf .. 0 a blunt stroke).
 // gone: the share of the dabs not laid (the finer layer, toward the next octave). Out: the dab on top (its numbers, its
 // centre, how many pixels inside its edge the pixel lies: 0 where no dab lies) and the numbers of the next one under it.
@@ -490,7 +491,8 @@ void pcDabs(vec2 p, vec3 shape, vec2 spx, float gone, out vec3 rnd1, out vec2 ct
     float cs = dir.x, sn = dir.y;
     vec2 d = p - o;
     vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
-    float a = min(0.5 * shape.x * (0.70 + 0.45 * g.y), 0.98), b = 0.5 * (0.72 + 0.50 * fract(g.y * 7.3));
+    // (a dab is as long as its cell, a little more or less, and shape.x times narrower)
+    float a = 0.62 + 0.36 * g.y, b = a / shape.x * (0.8 + 0.4 * fract(g.y * 7.3));
     float t = q.x / a;
     if (abs(t) >= 1.0) continue;
     float t2 = t * t;
@@ -512,8 +514,10 @@ void pcDabLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, vec3 shape, vec3 bendP, fl
   vec2 p = ch / w + wn;
   vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
   vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
-  vec2 ctr; float e1;
-  pcDabs(p, shape, spx, gone, rnd1, ctr, e1, rnd2, has2);
+  vec2 ctr = p; float e1 = 0.0;
+  rnd1 = vec3(0.5); rnd2 = vec3(0.5); has2 = 0.0;
+  // (where every dab is left out nothing is looked for; no derivative is taken past this point)
+  if (gone < 0.995) pcDabs(p, shape, spx, gone, rnd1, ctr, e1, rnd2, has2);
   ds = pcChartToPx(ctr - p, dpx, dpy, lim);
   cov1 = clamp(e1, 0.0, 1.0);
 }
@@ -526,6 +530,56 @@ vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {
   c *= mix(vec3(1.0), vec3(1.12, 0.66, 0.50), leafy * step(0.90, odd) * uOilB.z);
   c *= mix(vec3(1.0), vec3(0.86, 1.06, 0.62), leafy * step(odd, 0.07) * uOilB.z);
   return clamp(c, 0.0, 1.0);
+}
+// THIN STROKES (the owner, 2026-11-15: "thinner than the video ... copy how the lines are used"). A course of long thin
+// strokes that run the way the surface runs, with nothing drawn between them: where two meet, each gives way to the
+// other over one pixel. p: the chart in stroke widths (the strokes run along its first axis); asp: length over width.
+// Out: the stroke's numbers and centre, how much of the pixel is its own (1 inside, a half on its edge), and the
+// numbers of the stroke that has the rest.
+void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float own, out vec3 rndN) {
+  // (the rows are of unequal width)
+  p.y += 0.27 * sin(1.7 * p.y + 0.9 * sin(0.21 * p.x));
+  float row = floor(p.y);
+  vec3 hr = pcHash3(vec2(row, 7.31));
+  float sh = hr.x * 17.0 + 0.5 * row;
+  const float J = 0.6, LEAN = 2.6;
+  float x = (p.x + (p.y - row - 0.5) * (hr.z - 0.5) * LEAN) / asp + sh;
+  float col = floor(x);
+  float jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J;
+  float jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J;
+  if (x < jl) { col -= 1.0; jr = jl; jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J; }
+  else if (x > jr) { col += 1.0; jl = jr; jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J; }
+  rnd = pcHash3(vec2(col + 0.37, row + 0.71));
+  ctr = vec2((0.5 * (jl + jr) - sh) * asp, row + 0.5);
+  vec2 ipx = 1.0 / max(spx, vec2(1e-6));
+  float eL = (x - jl) * asp * ipx.x, eR = (jr - x) * asp * ipx.x, eB = (p.y - row) * ipx.y, eT = (row + 1.0 - p.y) * ipx.y;
+  float e = min(min(eL, eR), min(eB, eT));
+  own = clamp(0.5 + e, 0.0, 1.0);
+  rndN = rnd;
+  if (e < 0.5) {
+    if (e == eL) rndN = pcHash3(vec2(col - 1.0 + 0.37, row + 0.71));
+    else if (e == eR) rndN = pcHash3(vec2(col + 1.0 + 0.37, row + 0.71));
+    else {
+      float rN = e == eB ? row - 1.0 : row + 1.0;
+      vec3 hN = pcHash3(vec2(rN, 7.31));
+      float xN = (p.x + (p.y - rN - 0.5) * (hN.z - 0.5) * LEAN) / asp + hN.x * 17.0 + 0.5 * rN;
+      float cN = floor(xN);
+      float l2 = cN + (pcHash3(vec2(cN, rN)).y - 0.5) * J;
+      if (xN < l2) cN -= 1.0;
+      else if (xN > cN + 1.0 + (pcHash3(vec2(cN + 1.0, rN)).y - 0.5) * J) cN += 1.0;
+      rndN = pcHash3(vec2(cN + 0.37, rN + 0.71));
+    }
+  }
+}
+// One layer of thin strokes over a chart (the arguments as pcStrokeLayer's; w: a stroke's width, m).
+void pcThinLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, out vec3 rnd, out vec2 ds, out float own, out vec3 rndN) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * 60.0) + 0.19).rg - 0.5) * 9.0;
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr;
+  pcThin(p, asp, spx, rnd, ctr, own, rndN);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
 }
 // The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
 // the same place has the same chart from every patch of terrain and at every height. body: body-local metres.
