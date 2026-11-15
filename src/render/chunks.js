@@ -293,7 +293,15 @@ float pcDappleE() { return smoothstep(0.20, 0.40, pcFp / 4.1); }
 // sun is the same at every size: flecks of a few pixels, never a hatch. Under 500 m nothing changes.)
 vec3 pcDappleOct() { float ld = log2(max(pcDist / 500.0, 1.0)), l0 = floor(ld); return vec3(13.0 * exp2(l0), smoothstep(0.2, 0.8, ld - l0), 0.0); }
 float pcDappleSub() { vec3 o = pcDappleOct(); return 0.4624 * pcSub(o.x * (1.0 + o.y), PC_NRG) + 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE()); }
+#ifdef PC_OIL
+float pcDappleS(vec3 bodyPos, float canopy, float lift, float w);
+// (the oil look: one leaf shadow for everything, the strokes' own, as the pixel sees it; a blade of grass in a patch of
+// sun on the painted floor stood in the watercolour pattern's shade)
+float pcDappleL(vec3 bodyPos, float canopy, float lift) { return pcDappleS(bodyPos, canopy, lift, max(pcFp, 0.02)); }
+float pcDappleLWash(vec3 bodyPos, float canopy, float lift) {
+#else
 float pcDappleL(vec3 bodyPos, float canopy, float lift) {
+#endif
   vec3 pp = bodyPos + uSunDirL * (lift / max(dot(normalize(bodyPos), uSunDirL), 0.22));
   vec3 o = pcDappleOct();
   float b = mix(texture(uNoise3D, pp / 4.1 + 0.37).g, 0.5, pcDappleE());
@@ -474,11 +482,12 @@ void pcDabs(vec2 p, vec3 shape, vec2 spx, float gone, out vec3 rnd1, out vec2 ct
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) for (int k = 0; k < 2; k++) {
     vec2 c = cell + vec2(float(i), float(j));
     vec3 h = pcHash3(c + float(k) * 31.7);
-    vec3 g = pcHash3(c.yx + 57.3 + float(k) * 11.1);
+    vec3 g = fract(h.zxy * vec3(43.37, 17.71, 29.13) + h.yzx * 7.19);     // (three more numbers from the first three)
     if (g.z < gone) continue;
     vec2 o = c + h.xy;
-    float ang = mix((g.x - 0.5) * 3.14159, (g.x - 0.5) * 0.6, shape.y);
-    float cs = cos(ang), sn = sin(ang);
+    // (its direction: any way, or near the chart's first axis)
+    vec2 dir = normalize(mix(vec2(g.x - 0.5, fract(g.x * 7.7) - 0.5) + 1e-4, vec2(1.0, (g.x - 0.5) * 0.6), shape.y));
+    float cs = dir.x, sn = dir.y;
     vec2 d = p - o;
     vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
     float a = min(0.5 * shape.x * (0.70 + 0.45 * g.y), 0.98), b = 0.5 * (0.72 + 0.50 * fract(g.y * 7.3));
@@ -509,9 +518,14 @@ void pcDabLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, vec3 shape, vec3 bendP, fl
   cov1 = clamp(e1, 0.0, 1.0);
 }
 // A dab's own colour from the wash it is laid in: heavier or lighter, toward the warm or toward the cool.
-vec3 pcDabTint(vec3 c, vec3 rnd) {
+// leafy: 0 ground, rock, bark .. 1 leaves, which stray farther: here and there one is red, or still green.
+vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {
   c = pcDensity(c, 1.0 + (rnd.x - 0.5) * 1.1 * uOilB.z);
-  return c * mix(vec3(1.0), mix(vec3(1.10, 0.98, 0.80), vec3(0.88, 0.97, 1.10), rnd.y), 0.6 * uOilB.z);
+  c *= mix(vec3(1.0), mix(vec3(1.10, 0.98, 0.80), vec3(0.88, 0.97, 1.10), rnd.y), 0.6 * uOilB.z);
+  float odd = fract(rnd.y * 17.3);
+  c *= mix(vec3(1.0), vec3(1.12, 0.66, 0.50), leafy * step(0.90, odd) * uOilB.z);
+  c *= mix(vec3(1.0), vec3(0.86, 1.06, 0.62), leafy * step(odd, 0.07) * uOilB.z);
+  return clamp(c, 0.0, 1.0);
 }
 // The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
 // the same place has the same chart from every patch of terrain and at every height. body: body-local metres.

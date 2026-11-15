@@ -161,8 +161,9 @@ void main() {
     // the dab on top and the one under it: each its own colour of the same ground, in the same light
     vec3 leaf = pcDensity(col2C, 0.9);
     float fallen = clamp(parC.z * 1.25, 0.0, 0.62) * mid;
-    vec3 c1 = pcDabTint(mix(c, leaf, step(1.0 - fallen, fract(rnd.z * 13.7))), rnd);
-    vec3 c2 = pcDabTint(mix(c, leaf, step(1.0 - fallen, fract(rnd2.z * 13.7))), rnd2);
+    float f1 = step(1.0 - fallen, fract(rnd.z * 13.7)), f2 = step(1.0 - fallen, fract(rnd2.z * 13.7));
+    vec3 c1 = pcDabTint(mix(c, leaf, f1), rnd, f1);
+    vec3 c2 = pcDabTint(mix(c, leaf, f2), rnd2, f2);
     vec3 snowP = mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6);
     c1 = mix(pcWetWash(c1, 1.0 - snowC), snowP, snowC); c2 = mix(pcWetWash(c2, 1.0 - snowC), snowP, snowC);
     vec3 p1 = pcTone(c1, lvl), p2 = pcTone(c2, lvl);
@@ -1069,8 +1070,8 @@ void main() {
           mark = step(0.7, rnd.x); base = 0.0;
         #endif
         cs = mix(barkA, barkB, clamp(max(max(mark, base * 0.9), twig), 0.0, 1.0));
-        cs = pcWetWash(pcDensity(cs, 1.0 + ((rnd.y - 0.5) * 0.8 * fine + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
-        cs *= mix(vec3(1.0), mix(vec3(1.06, 0.99, 0.90), vec3(0.90, 0.92, 1.10), rnd.z), 0.5 * uOilB.z * fine);
+        cs = pcWetWash(pcDensity(cs, 1.0 + ((rnd.y - 0.5) * 1.5 * fine + (nA.r - 0.5) * 0.5) * uOilB.z), 0.9);
+        cs *= mix(vec3(1.0), mix(vec3(1.10, 0.97, 0.82), vec3(0.84, 0.88, 1.14), rnd.z), 0.8 * uOilB.z * fine);
         xs_ = dot(nVc, sunV) * 0.5 + 0.5;
         xs_ *= mix(0.55 + 0.30 * pale, 1.0, pcDappleS(Bc, canopy * 0.8, 8.0 - vAbove, w));
         xs_ += (rnd.x - 0.5) * 0.10 * fine;
@@ -1086,7 +1087,7 @@ void main() {
         float hue = vInst.x + (rnd.x - 0.5) * 1.5 + (vData.w - 0.5) * 0.7 + (nA.b - 0.5) * 0.5;
         cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
         cs = mix(cs, leafC, clamp(vData.z * 0.75 + (rnd.y - 0.5) * 0.5, 0.0, 1.0));
-        cs = pcWetWash(pcDensity(cs, 1.0 + ((rnd.y - 0.5) * 0.9 + (nA.r - 0.5) * 0.4) * uOilB.z + vInst.y * 0.5), 0.7);
+        cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + (nA.r - 0.5) * 0.4 * uOilB.z + vInst.y * 0.5), rnd, 1.0), 0.7);
         float snowF = pcSnowCover(dot(mVc, upV) * 0.5 + 0.5, rnd.x * 0.6 + nA.g * 0.4, vData.z * 0.8);
         cs = mix(cs, mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.y * 0.6), snowF);
         xs_ = dot(mVc, sunV) * 0.5 + 0.5;
