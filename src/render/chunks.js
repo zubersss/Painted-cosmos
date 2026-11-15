@@ -458,6 +458,61 @@ void pcStrokeLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, 
   ds = pcChartToPx(ctr - p, dpx, dpy, lim);
   cover = pcStrokeCover(ePx);
 }
+// DABS (the owner's word on the first stills: "too wide and too outlined ... almost exactly like the video"). The
+// reference's forest floor is not a course of tiles: it is leaf-shaped dabs, pointed at both ends, lying every way, one
+// over another, with no line between them. A layer of dabs: two in every cell of a grid one dab wide, each anywhere in
+// its cell, turned its own way, a little longer or shorter; where two lie over one another the one with the higher
+// number is on top. p: the chart in dab widths. shape: x a dab's length over its width, y how far the dabs agree in
+// direction (0 every way .. 1 all along the chart's first axis), z how pointed (1 a leaf .. 0 a blunt stroke).
+// gone: the share of the dabs not laid (the finer layer, toward the next octave). Out: the dab on top (its numbers, its
+// centre, how many pixels inside its edge the pixel lies: 0 where no dab lies) and the numbers of the next one under it.
+void pcDabs(vec2 p, vec3 shape, vec2 spx, float gone, out vec3 rnd1, out vec2 ctr1, out float e1, out vec3 rnd2, out float has2) {
+  vec2 cell = floor(p);
+  float pri1 = -1.0, pri2 = -1.0;
+  e1 = 0.0; has2 = 0.0; rnd1 = vec3(0.5); rnd2 = vec3(0.5); ctr1 = p;
+  vec2 ipx = 1.0 / max(spx, vec2(1e-6));
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) for (int k = 0; k < 2; k++) {
+    vec2 c = cell + vec2(float(i), float(j));
+    vec3 h = pcHash3(c + float(k) * 31.7);
+    vec3 g = pcHash3(c.yx + 57.3 + float(k) * 11.1);
+    if (g.z < gone) continue;
+    vec2 o = c + h.xy;
+    float ang = mix((g.x - 0.5) * 3.14159, (g.x - 0.5) * 0.6, shape.y);
+    float cs = cos(ang), sn = sin(ang);
+    vec2 d = p - o;
+    vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
+    float a = min(0.5 * shape.x * (0.70 + 0.45 * g.y), 0.98), b = 0.5 * (0.72 + 0.50 * fract(g.y * 7.3));
+    float t = q.x / a;
+    if (abs(t) >= 1.0) continue;
+    float t2 = t * t;
+    float inside = b * mix(1.0 - t2 * t2, 1.0 - t2, shape.z) - abs(q.y);
+    if (inside <= 0.0) continue;
+    // (how far inside the edge, in pixels: across the dab, and from its ends)
+    float ePx = min(inside * length(vec2(-sn, cs) * ipx), (a - abs(q.x)) * length(vec2(cs, sn) * ipx));
+    float pri = h.z;
+    if (pri > pri1) { pri2 = pri1; rnd2 = rnd1; has2 = step(0.0, pri2); pri1 = pri; rnd1 = vec3(g.x, fract(g.y * 3.7), h.z); ctr1 = o; e1 = ePx; }
+    else if (pri > pri2) { pri2 = pri; rnd2 = vec3(g.x, fract(g.y * 3.7), h.z); has2 = 1.0; }
+  }
+}
+// One layer of dabs over a chart (see pcStrokeLayer for the arguments; w: a dab's width, m). Out: the top dab's numbers,
+// the pixels from here to its centre and how much of the pixel it covers (a clean edge a pixel wide), and the numbers
+// of the dab under it (has2: whether there is one).
+void pcDabLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, vec3 shape, vec3 bendP, float lim, float gone,
+                out vec3 rnd1, out vec2 ds, out float cov1, out vec3 rnd2, out float has2) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * 34.0) + 0.19).rg - 0.5) * 3.0;
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr; float e1;
+  pcDabs(p, shape, spx, gone, rnd1, ctr, e1, rnd2, has2);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+  cov1 = clamp(e1, 0.0, 1.0);
+}
+// A dab's own colour from the wash it is laid in: heavier or lighter, toward the warm or toward the cool.
+vec3 pcDabTint(vec3 c, vec3 rnd) {
+  c = pcDensity(c, 1.0 + (rnd.x - 0.5) * 1.1 * uOilB.z);
+  return c * mix(vec3(1.0), mix(vec3(1.10, 0.98, 0.80), vec3(0.88, 0.97, 1.10), rnd.y), 0.6 * uOilB.z);
+}
 // The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
 // the same place has the same chart from every patch of terrain and at every height. body: body-local metres.
 vec2 pcGroundChart(vec3 body, float R) {

@@ -73,7 +73,7 @@ export const OIL = {
   // x: a stroke's width on the screen (pixels at 720 lines; it is scaled with the picture's height)
   // y: how much richer than a wash the body colour is (pcDensity)   z, w: the powers that turn the pale light and glaze
   //    keys of the watercolour into the oil's warm light and cool shade
-  uOilA: { value: new THREE.Vector4(11 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
+  uOilA: { value: new THREE.Vector4(8 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
   // x: the sunlit paint's gain   y: the gap between strokes (a share of a stroke's width)   z: how far a stroke's colour
   //    strays from its neighbours'   w: the ridge of paint at a stroke's edge
   uOilB: { value: new THREE.Vector4(1.12, 0.03, 1.0, 0.5) },
