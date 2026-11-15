@@ -116,6 +116,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     - Use every reference that fits, not the clip alone. Each one marked take or take in part
       in `docs/references/README.md` guides the part it serves (land from the air, night, water,
       the figure, the planets), and the plan names which guides which.
+15. **The hard parts first (2026-11-15).** The owner has the top model for a limited time and
+    will go on with the next model down when it runs out. The plan puts the hardest and most
+    quality-critical work first, and leaves for later what a session on the next model can do by
+    following a proven pattern (the top model builds the machine; later sessions feed it).
+16. **No blur at all (2026-11-15).** "I dont want it to be blurry at all I hate the blur the
+    most." The clip is the standard for crispness. The crispness rule in
+    `docs/references/README.md` binds every piece of work on the look: from the painters take
+    colour and direction, never the thick rough paint; no smoothing filter, no soft blending, no
+    blur effects; the full screen size on phones; sharpness measured with `tests/stations.mjs`.
 14. **Say what is planned before each go (2026-11-15).** "Let me know what your planning to do rn
     before I give you to go dont do anything." Even reading the code for the plan waits for the
     owner's go. Logging the owner's instructions goes on as always.

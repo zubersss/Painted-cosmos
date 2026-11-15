@@ -76,12 +76,12 @@ means its look pulls away from the clip.
 
 | # | Picture | Verdict | Take | Leave |
 | --- | --- | --- | --- | --- |
-| 3 | Tom Thomson: Autumn, Algonquin Park | Fits | Thick slabs, one colour each. Orange leaves, dark upright trunks, violet rocks, a strip of deep blue water as the opposite colour. The sky painted thick between the branches, as a shape of its own | |
+| 3 | Tom Thomson: Autumn, Algonquin Park | Fits (colour and shapes only) | Patches of one colour each. Orange leaves, dark upright trunks, violet rocks, a strip of deep blue water as the opposite colour. The sky between the branches as a shape of its own | The thick, rough paint: see the crispness rule |
 | 4 | Tom Thomson: Autumn Foliage | Fits | A hillside where each tree is one crisp patch (orange, yellow, red) with dark pointed firs between: the model for a forest seen from the ship | |
-| 5 | Van Gogh: The Mulberry Tree | Fits | Strokes that flow over the ground along its slope and curl outward in the leaves. Orange against deep blue. The tree's shadow in blue-violet | |
-| 8 | Van Gogh: Falling Autumn Leaves | Fits | Blue trunks on an orange ground with dark outlines: the clip's forest colours exactly. Leaves in the air as a few yellow dashes. The path seen from above | |
+| 5 | Van Gogh: The Mulberry Tree | Fits (colour and direction only) | The direction of the strokes: along the ground's slope, outward in the leaves. Orange against deep blue. The tree's shadow in blue-violet | The thick, swirling, rough paint, which reads as blotchy: see the crispness rule |
+| 8 | Van Gogh: Falling Autumn Leaves | Fits (colour and shapes only) | Blue trunks on an orange ground with dark outlines: the clip's forest colours exactly. Leaves in the air as a few yellow dashes. The path seen from above | The rough paint surface |
 | 9 | Klimt: Birch Forest | Fits | The leaf carpet: very many small orange dabs with cool blue-green flecks among them, which make the orange glow. Each trunk marked in its own way; far trunks thinner and bluer | Its flat light |
-| 6 | Van Gogh: Trees and Undergrowth | Fits | Dappled light as separate dabs. A bright clearing seen beyond dark trunks. Flowers as dabs. The guide for green woods | |
+| 6 | Van Gogh: Trees and Undergrowth | Fits (light only) | Dappled light as separate marks. A bright clearing seen beyond dark trunks. The guide for green woods | Its speckle over everything, which is too busy to read |
 | 26 | Sohlberg: Winter Night in the Mountains | Fits | Night in one family of blue. The snow mountains the lightest thing in the picture. One star. Dark bare trees framing the view | |
 | 24 | The Pathless: snowy valley | Fits | A blue night seen from the air that still reads: snow lighter than its shadows, trees as small pale marks, a landmark on a peak, shafts of light, falling snow | Smooth surfaces |
 | 12 | The Pathless: red forest in fog | Fits | Teal fog between trunks under red leaves: the fog in the opposite colour of the foliage. Pale trunks with chunky flakes of bark. A wood seen from above | Smooth surfaces |
@@ -109,6 +109,26 @@ means its look pulls away from the clip.
 | 13 | Eastshade | Does not fit | A carpet of flowers; trees in an accent colour | Realistic bark, moss and grass: the opposite of a painted surface |
 | 10, 25 | Afremov (two; not opened) | In part (from knowledge) | Lights mirrored in wet ground or ice as streaks; a lamp's glow as a mosaic | Every colour at full strength everywhere |
 | 27 | Sky: Children of the Light (not opened) | In part (from knowledge) | How a cape moves | Soft glow over everything |
+
+### The crispness rule (the owner, 2026-11-15)
+
+"I dont want it to be blurry at all I hate the blur the most." The owner asked whether Van Gogh's
+blotchy, blurry-looking paint would ruin the smooth, crisp look. It would, if his paint were
+copied. So:
+
+- **The clip is the standard for crispness.** Its strokes are flat patches with clean edges, not
+  thick swirls.
+- **From every painter take colour, the direction of strokes and the design of shapes. Never the
+  thick, rough, swirling surface of the paint.**
+- No smoothing filter over the picture. No soft blending between strokes. No depth-of-field
+  blur, no glow that softens, no motion blur. Haze changes colour with distance; it does not
+  soften edges.
+- Strokes stay fine wherever one must read: the figure, a path, the ground one is about to land
+  on. A stroke simplifies; it must never smear.
+- The picture is drawn at the screen's full size on phones too. A small picture enlarged is
+  blur.
+- Measured, not judged by feel alone: `tests/stations.mjs` already measures sharpness; the new
+  look must be at least as sharp as release 1 from the ship.
 
 **What seeing the pictures changed.** 11-11 dropped: both pictures are soft or smeared, the
 opposite of the clip's crisp strokes. The Long Dark's aurora picture is too dark below the sky
