@@ -183,7 +183,9 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
 for the owner.** **IN PROGRESS (the owner's go of 2026-11-15, "Go ahead in that order and make the cloak richer
 blue"): the overhaul plan in section 4a-2, in its order. The coordinator builds it on
-`look-proto`; the next stop for the owner is the stills after overhauls 1 and 2.**
+`look-proto`. The stills after overhauls 1 and 2 were sent on 2026-11-15 (the coordinator's
+reading of them is in the log's newest section); overhaul 3 (strokes baked: `src/render/dabtex.js`)
+is being built and checked; then 4 and 5, then stills again.**
 Pieces 1 to 3 are built. Checkpoint 1 is passed: the owner chose style 5 and asked for the
 clip to be matched very closely (section 2, item 20), and said to continue. The coordinator is
 now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
