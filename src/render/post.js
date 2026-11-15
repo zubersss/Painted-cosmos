@@ -12,7 +12,7 @@
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
 // the painting (wash variation, strokes, light) is anchored in the world by the materials.
 import * as THREE from 'three';
-import { getTextures, G, PREV , LOOK, OIL } from './shared.js';
+import { getTextures, G, PREV, LOOK, OIL } from './shared.js';
 
 const FS_VERT = /* glsl */`
 varying vec2 vUv;
@@ -893,9 +893,9 @@ export class Post {
 
   // glazes: objects drawn over the brushed picture (see shared.js GLAZES), with the scene's camera
   finish(glazes, camera) {
+    if (this.oil) return this._finishOil(glazes, camera);
     // (R1 W2.5) the region through the resolve, before anything reads it
     if (this.samples) this._pass(this.mAuxFix, this.rtAux);
-    if (this.oil) return this._finishOil(glazes, camera);
     this._pass(this.mPrep, this.rtHalf);
     // (the near brush's statistics, at the scene's own size: not drawn where the old brush is in use)
     if (this.absUniforms.uBrushR.value.y < 0.5 && this.absUniforms.uAbstraction.value > 0) this._pass(this.mPrepF, this.rtFull);
@@ -939,6 +939,8 @@ export class Post {
   // The oil look's passes (shared.js LOOK): the scene as painted, the glazes over it, last frame kept for the water, the
   // last key. No brush, no pooling, no pencil, no paper.
   _finishOil(glazes, camera) {
+    // (the region through the resolve, before anything reads it, as in the watercolour's passes)
+    if (this.samples) this._pass(this.mAuxFix, this.rtAux);
     const m = this.mCopy;
     m.uniforms.uMode.value = 1; m.uniforms.tA.value = this.rtScene.textures[0];
     this._pass(m, this.rtAbs);

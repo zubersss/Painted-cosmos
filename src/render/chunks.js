@@ -572,8 +572,10 @@ void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float o
   }
 }
 // One layer of thin strokes over a chart (the arguments as pcStrokeLayer's; w: a stroke's width, m).
-void pcThinLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, out vec3 rnd, out vec2 ds, out float own, out vec3 rndN) {
-  vec2 wn = (texture(uNoise3D, bendP / (w * 60.0) + 0.19).rg - 0.5) * 9.0;
+// bend: how far the slow noise bends the rows, in stroke widths (9: the ground's flow, whose strokes swell and thin with
+// it to about twice and half their width; 2: bark, whose streaks keep their width)
+void pcThinLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, float bend, out vec3 rnd, out vec2 ds, out float own, out vec3 rndN) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * 60.0) + 0.19).rg - 0.5) * bend;
   vec2 p = ch / w + wn;
   vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
   vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));

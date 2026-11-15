@@ -178,7 +178,7 @@ void main() {
     for (int L = 1; L >= 0; L--) {
       float w = oc.x * (L == 1 ? 2.0 : 1.0);
       vec3 rnd, rndN; vec2 ds; float own;
-      pcThinLayer(chT, dcx, dcy, w, uOilB.w, vBody, 4.0 * wpx * uOilB.w * (L == 1 ? 2.0 : 1.0), rnd, ds, own, rndN);
+      pcThinLayer(chT, dcx, dcy, w, uOilB.w, vBody, 4.0 * wpx * uOilB.w * (L == 1 ? 2.0 : 1.0), 9.0, rnd, ds, own, rndN);
       pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
       float fk = clamp(canopy * 1.25, 0.0, 0.62) * gMid * (1.0 - 0.55 * leafVis);
       vec3 p1 = pcGroundPaint(c, leaf, fk, rnd, snowC, lvl), p2 = pcGroundPaint(c, leaf, fk, rndN, snowC, lvl);
@@ -845,7 +845,8 @@ varying float vWash;      // 1: fully laid; below: the strokes are still arrivin
 varying float vAbove;     // metres above the plant's foot (the sun flecks on a trunk continue the ground's)
 varying float vFog;
 #ifdef PC_OIL
-varying vec3 vMassO;      // the crown's mass normal in the plant's own space: the chart a crown's dabs are laid on
+varying vec3 vMassO;      // the crown's mass normal in the plant's own space: which way a crown's chart is laid
+varying float vScaleO;    // the plant's size (its instance's scale): its own space times this is metres
 #endif
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -962,6 +963,7 @@ void main() {
   vUv = uv; vData = aData; vInst = inst;
   #ifdef PC_OIL
     vMassO = aMass;
+    vScaleO = length(im[0].xyz);
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
@@ -1007,6 +1009,7 @@ varying float vAbove;
 varying float vFog;
 #ifdef PC_OIL
 varying vec3 vMassO;
+varying float vScaleO;
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -1078,28 +1081,31 @@ void main() {
     vec3 odx = dFdx(vObj), ody = dFdy(vObj);
     vec2 ch, dcx, dcy;
     if (isBark) {
-      // (uBarkP.y: 0 the marks run round the stem, 1 along it)
-      vec2 uvm = vec2(vUv.y, vUv.x * 1.1);
+      // (uBarkP.y: 0 the marks run round the stem, 1 along it; the tube's own chart, in metres or near enough: along
+      // it the plant's own units, round it one turn taken as 1.1 of them)
+      vec2 uvm = vec2(vUv.y, vUv.x * 1.1) * vScaleO;
       ch = uBarkP.y > 0.5 ? uvm : uvm.yx;
       vec2 ux = dFdx(vUv), uy = dFdy(vUv);
-      vec2 mx = vec2(ux.y, ux.x * 1.1), my = vec2(uy.y, uy.x * 1.1);
+      vec2 mx = vec2(ux.y, ux.x * 1.1) * vScaleO, my = vec2(uy.y, uy.x * 1.1) * vScaleO;
       dcx = uBarkP.y > 0.5 ? mx : mx.yx; dcy = uBarkP.y > 0.5 ? my : my.yx;
     } else {
-      // (a crown's chart: the way its mass faces, in its own space, as metres round a ball of about the crown's size:
-      // one chart over the whole crown, whatever its triangles; taken from the faces themselves it gave every triangle
-      // its own strokes, and from the air a crown was a cut gem)
-      vec3 md = normalize(vMassO);
-      vec3 ma = abs(md);
-      vec3 mq = ma.x >= ma.y && ma.x >= ma.z ? vec3(md.y, md.z, ma.x) : ma.y >= ma.z ? vec3(md.z, md.x, ma.y) : vec3(md.x, md.y, ma.z);
-      ch = 1.9 * atan(mq.xy, vec2(mq.z)) + vData.w * 23.0;
-      dcx = dFdx(ch); dcy = dFdy(ch);
-      // (across the seam of two faces of that chart the derivative is the jump itself: there the last good one stands in)
-      float exd = max(vd, 0.05) * uOilPx.x * 1.3;      // (about what the chart changes by in a pixel, facing the eye)
-      if (max(length(dcx), length(dcy)) > 12.0 * exd + 0.02) { dcx = vec2(exd, 0.0); dcy = vec2(0.0, exd); }
+      // (a crown's chart: the crown's own space in metres, laid flat along whichever axis the MASS faces most there, so
+      // it is one chart over a whole side of the crown, whatever its triangles, and a leaf is the same size on a
+      // sapling and on a far tree drawn large. Tried: the way the mass faces as metres round a ball of fixed size: a
+      // far tree's crown, twice that ball, got leaves twice too large, a handful to a crown, and from the air every
+      // crown was a few flat patches. The chart's derivatives are taken of all three layings before one is chosen.)
+      vec3 po = vObj * vScaleO, pox = odx * vScaleO, poy = ody * vScaleO;
+      vec3 ma = abs(normalize(vMassO));
+      if (ma.x >= ma.y && ma.x >= ma.z) { ch = po.zy; dcx = pox.zy; dcy = poy.zy; }
+      else if (ma.y >= ma.z) { ch = po.xz; dcx = pox.xz; dcy = poy.xz; }
+      else { ch = po.xy; dcx = pox.xy; dcy = poy.xy; }
+      ch += vData.w * 23.0;
     }
-    // (bark's streaks stay thin: a trunk is many of them across, and far off it is its own colour, whole; a crown's
-    // leaves are dabs about three stroke widths long)
-    vec3 oc = isBark ? pcStrokeOctCap(vd * (0.85 + 0.3 * seed), 0.004, 0.0035 * uOilA.x) : vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed) * uOilS.w * 0.9, 0.05), 1.0);
+    // (bark's streaks are a stroke wide on the screen at every distance, as the ground's are: capped at a width on the
+    // stem they shrank under the pixel a few metres off and every trunk was a flat slab. A crown's leaves are never
+    // under about three and a half pixels wide: thinner, and a far crown was a stipple of single pixels)
+    float dabK = max(uOilS.w * 0.9, 2.2 * uOilS.z / max(uOilA.x, 0.5));
+    vec3 oc = isBark ? vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed), 0.004), 1.0) : vec3(pcStrokeOct(vd * (0.85 + 0.3 * seed) * dabK, 0.05), 1.0);
     float gone = smoothstep(0.15, 0.85, oc.y), fine = oc.z;
     vec3 nvdx = dFdx(vNV), nvdy = dFdy(vNV), mvdx = dFdx(vMassV), mvdy = dFdy(vMassV);
     vec3 vwdx = dFdx(vView), vwdy = dFdy(vView), bdx = dFdx(vBody), bdy = dFdy(vBody);
@@ -1113,7 +1119,8 @@ void main() {
       vec3 rnd, rnd2; vec2 ds; float cov, has2;
       // (bark: long thin streaks that run with the stem or round it, nothing drawn between them; a crown: thin leaves,
       // lying every way)
-      if (isBark) { pcThinLayer(ch + seed * 37.0, dcx, dcy, w, 9.0, vObj + seed * 11.0, lim * 9.0, rnd, ds, cov, rnd2); has2 = 1.0; }
+      // (streaks that run with the stem are long; those that run round it are short, so the stem still turns in the light)
+      if (isBark) { float ba = uBarkP.y > 0.5 ? 9.0 : 3.2; pcThinLayer(ch + seed * 37.0, dcx, dcy, w, ba, vObj + seed * 11.0, lim * ba, 2.0, rnd, ds, cov, rnd2); has2 = 1.0; }
       else pcDabLayer(ch + seed * 37.0, dcx, dcy, w, vec3(uOilS.z, 0.10, 1.0), vObj + seed * 11.0, lim * 3.0, L == 0 ? gone : 0.0, rnd, ds, cov, rnd2, has2);
       vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
       vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
