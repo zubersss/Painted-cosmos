@@ -1601,3 +1601,13 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - SAID PLAINLY: not in these stills: real cast shadows (the shade is still round blots), the night, the new explorer, strokes on grass blades, rocks and water; the strokes are too heavy to draw to be played as they are (the cure is known); motion cannot be judged in this container; no view from 1 km in this round.
 - ORDER CHANGED, and why: the station numbers are being taken now for today's look and for the thinnest and the widest styles (1 and 6: the flicker index speaks to the choice); the independent verifier and `tests/all.mjs` wait for the owner's choice, so that one style is verified and not six of which five will go.
 - WAITING for the owner: which style or styles; what to change.
+- THE NUMBERS came back (tests/stations.mjs in the real game on a clean export of look-proto 64ac4c8; q2, 1280x720, the Earth spawn at hour 11, the land's final picture; no console error in any run):
+
+  | Station | | Today (release 1) | Oil, style 1 (thinnest) | Oil, style 6 (widest) |
+  | --- | --- | --- | --- | --- |
+  | E_150_45 | lapvar | 339 | 1786 | 1287 |
+  | E_150_45 | flicker F | 0.32 | 0.56 | 0.50 |
+  | E_1000_45 | lapvar | 100 | 935 | 625 |
+  | E_1000_45 | flicker F | 0.10 | 0.42 | 0.36 |
+
+  READING: sharpness is well over release 1's from the ship (the plan's bar: at least release 1's): 3.8 to 5.3 times the edge detail at 150 m, 6 to 9 times at 1 km; part of that is the stronger colour, not edges alone. FLICKER IS WORSE, and this is the open fault of the look: the share of the fine detail that pops under a quarter-pixel pan is 1.6 to 1.75 times today's at 150 m and about 4 times at 1 km (where today's land is nearly featureless). Wider strokes help only a little (6 against 1). Expect shimmer in motion from high up until it is treated. Likely sources, not yet proven: leaves left out whole at a crown's outline (a hard cut-out inside the shader, which multisampling does not smooth), and strokes two to five pixels wide. Cures to try on the chosen style: the cut-outs given a pixel-wide edge (alpha to coverage, or a covered share in place of the discard), strokes held wider with height, the finer layer faded by cover in place of by whole strokes. The draw calls and triangles are those of release 1 (281 against 285; the strokes cost in the shader, not in geometry).
