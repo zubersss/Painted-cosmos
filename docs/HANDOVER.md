@@ -110,9 +110,16 @@ Last updated 2026-11-15 (11:20 UTC) by the coordinator on the second account, wh
 from the first. Everything is still paused: nothing is running, the working tree is clean, and
 everything is pushed. This session has read the handover and run nothing (no checks either).
 
-**Waiting on the owner (section 2, item 10):** the style references and how the owner wants the
-work organised. Then the plan is agreed with the owner in chat. Nothing starts before that, and
-the order below may change with it.
+**The references have arrived and are sorted** (`docs/references/README.md`, and the log's last
+section). The main finding: the clip's strokes are painted on the world's surfaces, not laid
+over the picture as a filter, and its look rests first on light and colour. So the prototype
+brief in section 4a (a filter in `post.js`) is **under review and not to be built as written**.
+
+**Waiting on the owner (section 2, items 10 and 13):** which of the coordinator's calls they
+disagree with (the method, the cloak's colour, shelters or none). Then the coordinator reads the
+rendering code, without changing it, and writes a one-page plan for the owner's go. Nothing
+starts before that. The owner plays mostly on a phone, then on a desktop: the phone is the test
+device from the first prototype on.
 
 **Agreed in principle by the owner ("we should do it right?"), not yet the word to start (see
 the log's last three sections). Next: the references and the owner's device, then a one-page
@@ -153,6 +160,8 @@ plan for the owner's go:**
 ## 4. What to do next
 
 ### 4a. The prototype (about 3-5 hours; nothing goes live)
+
+**Under review since 2026-11-15 (see section 3): do not build this as written.**
 
 **Branch.** Cut a new branch `style-proto` from `main`. `r2`'s half-done code is unverified, so
 the stills must compare against the live look. All of it sits behind a URL switch (`?paint=oil`;
