@@ -6,7 +6,8 @@
 //   -> pool (half res)             (R1 re-fix) the washes' value at a few pixels and its surround, and its gradient
 //   -> edges (internal res)        (R1 re-fix) where an outline is, and the pencil's line, from the region target
 //   -> [post AA (internal res)]    (R1 re-fix) a light FXAA where the scene is drawn with one sample (tier 0, phones)
-//   -> sheet (output res)          wobble, pigment pooling at wash edges, granulation in the
+//   -> sheet (output res)          (R2 W7.2) the picture enlarged by Catmull-Rom and RCAS where the scene is drawn
+//                                  smaller than the sheet; wobble, pigment pooling at wash edges, granulation in the
 //                                  paper grain, graphite underdrawing, ragged border, paper
 //
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
@@ -375,18 +376,37 @@ uniform vec4 uWxSheet;    // weather: x value key (heavier pigment under a storm
 uniform float uNight;     // the night key: 0 day .. 1 night on the ground
 uniform float uNightNear; // the world's own deeper night wash over the near land (a look's nightNear; 0 on most worlds)
 uniform float uLaid;      // 1 the picture is on the paper; 0 bare paper; between: it comes up from the paper as one
+uniform float uRcas;      // (R2 W7.2) RCAS's strength where the picture is enlarged (pcEnlarge)
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
-// The picture read through a smooth cubic B-spline: four bilinear taps (PAINTER 19, below)
-vec4 pcCubic(sampler2D t, vec2 uv, vec2 texel) {
-  vec2 st = uv / texel - 0.5, i = floor(st), f = st - i, f2 = f * f, f3 = f2 * f;
-  vec2 w0 = (-f3 + 3.0 * f2 - 3.0 * f + 1.0) / 6.0, w1 = (3.0 * f3 - 6.0 * f2 + 4.0) / 6.0;
-  vec2 w2 = (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0) / 6.0, w3 = f3 / 6.0;
-  vec2 g0 = w0 + w1, g1 = w2 + w3;
-  vec2 h0 = (i - 0.5 + w1 / g0) * texel, h1 = (i + 1.5 + w3 / g1) * texel;
-  return g0.y * (g0.x * texture(t, h0) + g1.x * texture(t, vec2(h1.x, h0.y)))
-       + g1.y * (g0.x * texture(t, vec2(h0.x, h1.y)) + g1.x * texture(t, h1));
+// (R2 W7.2) The picture enlarged where the scene is drawn smaller than the sheet (docs/lead/SHARP-SMOOTH-PLAN.md W7.2).
+// It was read through a cubic B-spline at a place the paper shook by half a pixel of the scene (PAINTER 19): the
+// B-spline is an average, not an interpolation (a texel's own value is never given back: a third of it goes to its
+// neighbours), so every enlargement was a blur on top of the enlargement. Now: Catmull-Rom, which passes through every
+// texel and is as sharp as a cubic can be, read with five bilinear taps (the four corner taps of the nine, whose weights
+// together are under 2 % of the whole, left out and the rest renormalised), held inside the range of the taps round it
+// (no ringing at a step), then RCAS (AMD FidelityFX FSR 1's robust contrast-adaptive sharpening) from four reads a texel
+// of the scene each way: the most sharpening each pixel can take without any channel leaving the range of those five,
+// times `sharp`. Nine reads a sheet pixel where the picture is enlarged; one, as before, where it is not.
+vec4 pcEnlarge(sampler2D t, vec2 uv, vec2 tx, float sharp) {
+  vec2 st = uv / tx - 0.5, i = floor(st), f = st - i, f2 = f * f, f3 = f2 * f;
+  vec2 w0 = -0.5 * f3 + f2 - 0.5 * f, w1 = 1.5 * f3 - 2.5 * f2 + 1.0, w2 = -1.5 * f3 + 2.0 * f2 + 0.5 * f, w3 = 0.5 * f3 - 0.5 * f2;
+  vec2 w12 = w1 + w2;
+  vec2 p12 = (i + 0.5 + w2 / w12) * tx, p0 = (i - 0.5) * tx, p3 = (i + 2.5) * tx;
+  vec4 cC = texture(t, p12);
+  vec4 a = texture(t, vec2(p12.x, p0.y)) * (w12.x * w0.y) + texture(t, vec2(p0.x, p12.y)) * (w0.x * w12.y) + cC * (w12.x * w12.y)
+         + texture(t, vec2(p3.x, p12.y)) * (w3.x * w12.y) + texture(t, vec2(p12.x, p3.y)) * (w12.x * w3.y);
+  a /= w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
+  vec3 b = texture(t, uv - vec2(0.0, tx.y)).rgb, d = texture(t, uv - vec2(tx.x, 0.0)).rgb;
+  vec3 fr = texture(t, uv + vec2(tx.x, 0.0)).rgb, h = texture(t, uv + vec2(0.0, tx.y)).rgb;
+  vec3 mn = min(min(min(b, d), min(fr, h)), cC.rgb), mx = max(max(max(b, d), max(fr, h)), cC.rgb);
+  vec3 e = clamp(a.rgb, mn, mx);
+  vec3 hitMin = mn / (4.0 * mx + 1e-4);
+  vec3 hitMax = (1.0 - mx) / (4.0 * mn - 4.0 - 1e-4);
+  vec3 lobeC = max(-hitMin, hitMax);
+  float lobe = max(-0.1875, min(max(lobeC.r, max(lobeC.g, lobeC.b)), 0.0)) * sharp;
+  return vec4((lobe * (b + d + fr + h) + e) / (4.0 * lobe + 1.0), clamp(a.a, 0.0, 1.0));
 }
 void main() {
   float sc = max(uOutRes.y / 1080.0, 0.62);
@@ -431,19 +451,14 @@ void main() {
   }
   vec2 wob = w0 * mix(uWobIn, uPig.z, edgeW) * sc / uOutRes;
   vec2 uv = vUv + wob;
-  // (PAINTER 19, the soft enlargement. At the lowest tier at half scale the scene is drawn at under a third of the
-  // sheet's size, and a plain bilinear lookup enlarged every stair of an aliased edge into a block three pixels a
-  // side: the figure and the ship were the most digital things on the page. Where the scene is drawn small it is
-  // read through a smooth cubic, at a place the paper's tooth shakes by about half a pixel of the scene: a stair
-  // becomes a soft edge with a little of the hand's tremor in it. At full size nothing here changes.)
+  // (R2 W7.2: where the scene is drawn smaller than the sheet, the picture is enlarged by Catmull-Rom and sharpened by
+  // RCAS, pcEnlarge above; the sharpening comes in over the first 12 % of enlargement, so a step of the resolution
+  // controller just under full size changes the picture by little. PAINTER 19's soft enlargement, a B-spline at a place
+  // the paper's tooth shook, is gone: it was a blur (at the controller's pick the land kept 0.06 to 0.22 of the scene's
+  // finest detail); the stair-steps it softened are the anti-aliasing's to take now (MSAA, or the post AA at tier 0 and
+  // on phones, before this). At full size the picture is read with one tap exactly as before.)
   float up = uOutRes.y * uInTexel.y;                       // sheet pixels to one pixel of the scene
-  float soft = smoothstep(1.15, 1.9, up);
-  vec2 shake = vec2(0.0);
-  if (soft > 0.0) {
-    shake = (vec2(texture(tPaper, puv * 0.83 + 0.21, 0.4).r, texture(tPaper, puv * 0.71 + 0.63, 0.4).r) - 0.5) * 2.0 * uInTexel * 0.6 * soft;
-    uv += shake;
-  }
-  vec4 c = soft > 0.0 ? mix(texture(tAbs, uv), pcCubic(tAbs, uv, uInTexel), soft) : texture(tAbs, uv);
+  vec4 c = up > 1.0005 ? pcEnlarge(tAbs, uv, uInTexel, uRcas * smoothstep(1.0, 1.12, up)) : texture(tAbs, uv);
   vec3 col = c.rgb;
   float wet = c.a;
   // (what lies here: the region, and whether it is a light of its own: a lamp, a flame, a lit cabin, region 8; such a
@@ -559,7 +574,7 @@ void main() {
 
   // graphite underdrawing on major silhouettes: faint, broken, catching the paper tooth
   // (R1 re-fix: the line as EDGE_FRAG drew it at the texel this point lies in, the way the reads 1.5 px over fall)
-  vec2 guv = vUv + wob * 0.4 + shake + vec2(1.4, -0.9) * sc / uOutRes;      // (shake: the pencil follows the soft enlargement)
+  vec2 guv = vUv + wob * 0.4 + vec2(1.4, -0.9) * sc / uOutRes;
   vec2 gt = guv * vec2(isz);
   vec4 L4 = texelFetch(tLine, clamp(ivec2(floor(gt)), ivec2(0), isz - 1), 0);
   vec2 gf = step(0.5, fract(gt));
@@ -615,6 +630,9 @@ void main() {
   gl_FragColor = vec4(outc, 1.0);
 }
 `;
+
+// (R2 W7.2) RCAS's strength where the picture is enlarged (the plan's 0.5; FSR 1's lobe times this)
+export const RCAS = 0.5;
 
 function fsMaterial(frag, uniforms, extra) {
   return new THREE.ShaderMaterial(Object.assign({
@@ -738,6 +756,7 @@ export class Post {
       uBoil: { value: new THREE.Vector2(0, 0) },
       uWxSheet: { value: new THREE.Vector4(0, 0, 0, 0) },
       uNight: { value: 0 }, uNightNear: { value: 0 }, uLaid: { value: 1 }, uAux8: G.uAux8,
+      uRcas: { value: RCAS },
     };
     Object.assign(this.sheetUniforms, { tPap0: { value: this.rtPaper.textures[0] }, tPap1: { value: this.rtPaper.textures[1] }, tPap2: { value: this.rtPaper.textures[2] } });
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms, this.paperBaked ? { defines: { PC_PAPER_BAKED: 1 } } : null);
