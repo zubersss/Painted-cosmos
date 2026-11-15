@@ -215,11 +215,7 @@ function wandererParts(B, X, Z, ringsY) {
     B.capsule([s * 0.095, 0.48, 0], [s * 0.095, 0.11, 0.008], 0.069, 0.060, { seg: 9, col: (p) => mixc(INK, TROUSER, sstep(0.22, 0.34, p[1])), lump: 0.005 });
     B.blob([s * 0.097, 0.062, -0.042], 0.074, 0.062, 0.128, { seg: 9, rings: 5, col: INK, lump: 0.004, dry: 0.25 });
   }
-  // 10 the two jets, under the hem
-  B.part = 10;
-  for (const s of [-1, 1]) {
-    B.path([[s * 0.17, 0.50, 0.210], [s * 0.17, 0.43, 0.212], [s * 0.17, 0.31, 0.217], [s * 0.17, 0.16, 0.224]], (i) => [0.034, 0.058, 0.046, 0.018][i], { seg: 7, lump: 0, glow: 1, wet: 0.9, cap: 0.5, col: (p) => (p[1] > 0.41 ? mixc(FLAME1, FLAME0, sstep(0.41, 0.47, p[1])) : mixc(FLAME2, FLAME1, sstep(0.16, 0.41, p[1]))) });
-  }
+  // (10, the jets: the wanderer has none: it flies by itself. The bone is kept, empty, so the rig is the same.)
   // 11 the hood (drawn up: the bone shrinks it into the cowl in fair weather); its front is cut back to frame the face
   B.part = 11;
   B.loft(ringsY([[1.44, 0.108, 0.104, 0, 0.022], [1.50, 0.142, 0.152, 0, 0.032], [1.60, 0.152, 0.166, 0, 0.036], [1.69, 0.136, 0.150, 0, 0.042], [1.745, 0.086, 0.100, 0, 0.052], [1.762, 0.03, 0.04, 0, 0.06]]), {
@@ -332,7 +328,7 @@ export function createExplorer() {
   // (forward, to the right), the gale's crouch, the air past the body (a unit direction and its load on cloth), the swim's pace
   const W = { lf: 0, lr: 0, hk: 0, load: 0, x: 0, y: 0, z: 0, gust: 0, sp: 0 };
   const num = (v, d) => (Number.isFinite(v) ? v : d || 0);
-  let t = 0, ph = 0, jetS = 0, first = true, fallT = 0, hood = 0;
+  let t = 0, ph = 0, jetS = 0, first = true, fallT = 0, hood = 0, fly = 0;
   function animate(state, dt) {
     const s = state || {};
     dt = Math.max(0, Math.min(0.1, dt || 0)); t += dt;
@@ -510,6 +506,24 @@ export function createExplorer() {
       hood += (want - hood) * (snapNow ? 1 : 1 - Math.exp(-2.2 * dt));
       const hs = Math.max(0.001, hood);
       b.hood.scale.set(0.55 + 0.45 * hs, hs, 0.55 + 0.45 * hs);
+    }
+    if (wander) {
+      // FLIGHT (the owner: "flight like superman"; PILOT's `fly01`, player/explorer.js). At a hover the figure hangs
+      // upright and easy; with speed the body comes level, the right arm reaches ahead, the left lies back along the
+      // side, the legs trail together and the head looks where it goes. The cloak, hung from the shoulders, lies
+      // back along the body by itself.
+      const fw = clamp01(num(s.fly01));
+      fly += (fw - fly) * (snapNow ? 1 : 1 - Math.exp(-6 * dt));
+      if (fly > 0.002) {
+        const go = fly * sstep(2.5, 13, speed), ease = (bone, ax, v, kk) => { bone.rotation[ax] += (v - bone.rotation[ax]) * kk; };
+        ease(b.torso, 'x', -1.30 + 0.05 * Math.sin(t * 2.1), go);
+        ease(b.head, 'x', 1.02, go);
+        ease(b.armR, 'x', 2.82, go); ease(b.armR, 'z', 0.06, go);
+        ease(b.armL, 'x', 0.18, go); ease(b.armL, 'z', -0.14, go);
+        ease(b.thighL, 'x', 0.05 + 0.03 * Math.sin(t * 3.1), fly); ease(b.thighR, 'x', -0.04 + 0.03 * Math.sin(t * 3.1 + 2), fly);
+        ease(b.shinL, 'x', 0.10, fly); ease(b.shinR, 'x', 0.05, fly);
+        ease(b.skirt, 'x', 0.10 + 0.06 * Math.sin(t * 8.3), go);
+      }
     }
     if (b.lantern) {
       // the lantern swings from its strap with the stride

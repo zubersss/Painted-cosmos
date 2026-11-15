@@ -417,7 +417,7 @@ export class Sim {
     } else if (st === S.ON_FOOT) {
       if (first && inp.edges.has('KeyV')) this.footCam.firstPerson = !this.footCam.firstPerson;
       // C: a stroll (a true walking gait) in place of the usual easy lope; Shift still runs.
-      if (pressed('KeyC')) {
+      if (pressed('KeyC') && !this.ex.flying) {       // (in the wanderer's flight C sinks: player/explorer.js)
         this.stroll = !this.stroll;
         this.say(this.stroll ? 'Strolling: {KeyC} for the usual pace' : 'The usual pace', 2.5);
       }
@@ -430,6 +430,7 @@ export class Sim {
         stroll: !!this.stroll,
         jump: pressed('Space'),
         jet: I.down('Space'),
+        sink: I.down('KeyC'), lookPitch: this.footCam.pitch,       // (the wanderer's flight)
         viewFwd: this.footCam.viewFwd,
         faceView: this.footCam.firstPerson,
       }, h, this.explorerEnv(this.bodyId));
