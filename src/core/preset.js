@@ -5,18 +5,20 @@
 // short side is under 500 css px is a phone; with a short side of 500 or more, a tablet; anything
 // else the desktop, exactly as before.
 //
-//   preset    pixels per css px   most pixels   starts at
-//   desktop   1.5                 3.7 MP        tier 2 (the coordinator's ruling on P7, unchanged)
-//   tablet    1.25                1.6 MP        tier 2
-//   phone     1.25                3.7 MP        tier 1
+//   preset    pixels per css px   most pixels   starts at   resolution floor (R2 W6.1, W6.2)
+//   desktop   1.5                 3.7 MP        tier 2      0.67 of the output (the coordinator's ruling on P7, unchanged)
+//   tablet    1.25                1.6 MP        tier 2      0.75
+//   phone     1.25                3.7 MP        tier 1      0.75
+// The floor: the scene is never drawn under that share of the buffer (internal = tier share x render
+// scale, src/core/dynres.js); under it the controller sheds a tier, never pixels.
 //
 // The URL can name one (?preset=phone|tablet|desktop: for a test on a desktop browser); ?quality=
 // still pins the tier, ?scale= the render scale.
 
 export const PRESETS = Object.freeze({
-  desktop: Object.freeze({ id: 'desktop', dpr: 1.5, maxPixels: 3.7e6, tier: 2 }),
-  tablet: Object.freeze({ id: 'tablet', dpr: 1.25, maxPixels: 1.6e6, tier: 2 }),
-  phone: Object.freeze({ id: 'phone', dpr: 1.25, maxPixels: 3.7e6, tier: 1 }),
+  desktop: Object.freeze({ id: 'desktop', dpr: 1.5, maxPixels: 3.7e6, tier: 2, floor: 0.67 }),
+  tablet: Object.freeze({ id: 'tablet', dpr: 1.25, maxPixels: 1.6e6, tier: 2, floor: 0.75 }),
+  phone: Object.freeze({ id: 'phone', dpr: 1.25, maxPixels: 3.7e6, tier: 1, floor: 0.75 }),
 });
 export const PHONE_SHORT_SIDE = 500;      // css px: under this a touch screen is a phone
 

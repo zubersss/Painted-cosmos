@@ -5,9 +5,10 @@
 //   stub=1 | stub=render,world,art   force stubs        real=1 | real=...   try real modules
 //   body=<id>  time=<hours>          where and when to start
 //   clock=even                       no uneven clock (slow dusk and dawn, short night): for instruments
-//   quality=<0|1|2>  pin the quality tier;  scale=<0.25..1>  where the resolution starts;
+//   quality=<0|1|2>  pin the quality tier;  scale=<0.25..1>  where the resolution starts (and, under
+//   the preset's floor, the lowest it may go: the tests' painted runs);
 //   dynres=0   pin both (for screenshots). Without any of them: best tier, full resolution,
-//   and the controller steps down only when the frame rate asks.
+//   and the controller steps down only when the frame rate asks, never under the floor.
 //   pointerlock=0                    drag to look instead of locking the pointer
 //   card=0                           no start card (for captures)
 //   stats=1                          show the frame read-out (also the ` key)
@@ -21,7 +22,7 @@ import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
 import { Input, keyLabels } from './core/input.js';
 import { attachTouch } from './core/touch.js';
-import { DynamicResolution } from './core/dynres.js';
+import { DynamicResolution, tierSharesOf, RUNGS, RUNGS_MSAA } from './core/dynres.js';
 import { createHud } from './ui/hud.js';
 import { createMap } from './ui/map.js';
 import { createBook } from './ui/book.js';
@@ -151,6 +152,7 @@ async function boot() {
   hud.bindTouch(touch);
   // Resolution: the output is capped by the preset (resize, below); the controller
   // scales the scene inside that.
+  const pinScale = params.has('scale') ? Number(params.get('scale')) : null;
   const dyn = new DynamicResolution({
     enabled: params.get('dynres') !== '0',
     // Start at the best picture (top tier, full resolution) and give some of it up only when
@@ -158,11 +160,15 @@ async function boot() {
     // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the
     // tier (the resolution still adapts); ?scale= chooses where the resolution starts;
     // ?dynres=0 pins both.
-    scale: params.has('scale') ? Number(params.get('scale')) : 1,
+    scale: pinScale != null && pinScale > 0 ? pinScale : 1,
     // (a phone starts a tier down: the preset; the controller may climb from there)
     quality: params.has('quality') ? Number(params.get('quality')) : PRESET.tier,
     minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
     maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
+    // R2 W6.1: the scene is never drawn under the preset's floor (0.67 of the buffer; 0.75 on a
+    // phone or a tablet); a ?scale= under it is a pin the floor gives way to (the tests' runs).
+    floor: PRESET.floor,
+    scaleFloor: pinScale != null && pinScale > 0 && pinScale < 1 ? pinScale : null,
   });
   const storage = safeStorage();
   // (on a touch screen a sheet's corner presses its key, as the touch HUD's tabs do)
@@ -250,7 +256,14 @@ async function boot() {
     } catch { /* an old browser: the resize event will have to do */ }
   };
   watchDpr();
+  // The tiers' shares of the buffer (PAINTER's constants: said by the painter, or read off it at
+  // render scale 1), and the ladder: on a desktop MSAA is a rung of its own below the tier that
+  // has it, so the controller sheds the geometry first, then MSAA, then the next tier (W6.1). Not
+  // when the URL pins the tier or the anti-aliasing (?quality=, ?aa=: the tests' choices hold).
+  const ladder = PRESET.id === 'desktop' && !painter.isStub && typeof painter.setAA === 'function' && !params.has('aa') && !params.has('quality') ? RUNGS_MSAA : RUNGS;
+  dyn.configure({ shares: tierSharesOf(painter, game.device.h, { scale: dyn.scale, quality: dyn.quality }), rungs: ladder });
   if (painter.setRenderScale) painter.setRenderScale(dyn.scale);
+  if (dyn.aa && painter.setAA) painter.setAA(dyn.aa);
   painter.setQuality(dyn.quality);
   // PHYSICS' particle counts and sampling follow the tier too (hardening review P8): a tier
   // drop then sheds CPU as well as pixels, and the top tier gets its full storms.
@@ -278,7 +291,8 @@ async function boot() {
   });
   const debug = {
     game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, touch, platform, using: prov.using, note: debugNote, gl,
-    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount),
+    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality,
+      internal: +dyn.internal.toFixed(3), floor: dyn.floor, aaRung: dyn.aa || null, shares: dyn.shares.slice(), settled: worldSettled(world, game.frameCount),
       device: { ...game.device, aa: aaMode(), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(4) }, platform: { ...platform.state }, upright }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
@@ -336,6 +350,7 @@ async function boot() {
     const r = judged > 1 ? dyn.frame(dtMs) : { changed: false };
     if (r.changed) {
       if (painter.setRenderScale) painter.setRenderScale(r.scale);
+      if (r.aa && painter.setAA) painter.setAA(r.aa);
       painter.setQuality(r.quality);
       if (physics && physics.setQuality) physics.setQuality(r.quality);
     }

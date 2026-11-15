@@ -756,7 +756,7 @@ export class Game {
     return [
       `frame  ${s.frameMs.toFixed(1)} ms   worst ${worst.toFixed(0)} ms   ${fps.toFixed(0)} fps`,
       `scene  ${k(s.tris)} triangles   ${s.calls} draw calls`,
-      `render scale ${d ? d.scale.toFixed(2) : '1.00'}   quality tier ${d ? d.quality : '-'}${d && !d.enabled ? '  (pinned)' : ''}${d && d.capMs ? `   capped at ${(1000 / d.capMs).toFixed(0)} fps` : ''}`,
+      `render scale ${d ? d.scale.toFixed(2) : '1.00'}${d && d.internal != null ? ` (drawn at ${d.internal.toFixed(2)} of the buffer, floor ${(+d.floor).toFixed(2)})` : ''}   quality tier ${d ? d.quality : '-'}${d && d.aa === 'post' ? ' without MSAA' : ''}${d && !d.enabled ? '  (pinned)' : ''}${d && d.capMs ? `   capped at ${(1000 / d.capMs).toFixed(0)} fps` : ''}`,
       `world ${s.worldMs.toFixed(1)} ms (worst ${Math.max(0, ...s.worldWindow).toFixed(1)})   physics ${sim.physics ? sim.physicsMs.toFixed(1) + ' ms (worst ' + (sim.physicsWorstMs || 0).toFixed(1) + ')' : 'off'}`,
       this.weatherText(k),
     ].concat(this.deviceText()).join('\n');
