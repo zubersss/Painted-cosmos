@@ -125,6 +125,11 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     `docs/references/README.md` binds every piece of work on the look: from the painters take
     colour and direction, never the thick rough paint; no smoothing filter, no soft blending, no
     blur effects; the full screen size on phones; sharpness measured with `tests/stations.mjs`.
+17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
+    quality focus on the desktop then." The top tier on a desktop gets the best version of every
+    piece, and no technique is chosen for the phone's sake. The phone gets the same look with
+    cheaper settings afterwards and stays playable (item 4); it never holds the desktop back.
+    The prototype is built and judged on the desktop's top tier.
 14. **Say what is planned before each go (2026-11-15).** "Let me know what your planning to do rn
     before I give you to go dont do anything." Even reading the code for the plan waits for the
     owner's go. Logging the owner's instructions goes on as always.
@@ -145,9 +150,10 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 
 **The plan is written (section 4a) and has been put to the owner. Next, on the owner's go
 (section 2, items 10, 13 and 14): cut `look-proto` from `main` and build pieces 1 to 3 up to
-checkpoint 1.** Nothing starts before that. The owner plays mostly on a phone, then on a
-desktop: the phone is the test device from the first prototype on. Still to be asked again:
-which phone, and roughly which desktop.
+checkpoint 1.** Nothing starts before that. The desktop's top tier is where the prototype is
+built and judged (section 2, item 17); the phone follows after approval. Still to be asked
+again: roughly which desktop the owner has (the preview page will be tried on it), and which
+phone.
 
 **Agreed in principle by the owner ("we should do it right?"), not yet the word to start (see
 the log's last three sections). Next: the references and the owner's device, then a one-page
@@ -231,10 +237,13 @@ crispness rule and the reference notes.
 | 1 | **Colour and light.** Opaque paint in place of washes over paper, in the shared functions: warm light, cool violet shade, deep darks; distance steps toward the sky's colour and never softens an edge; three colours that key the world | The clip; Van Gogh's Falling Autumn Leaves (colours only); Firewatch; No Man's Sky | Medium |
 | 2 | **Strokes on the surfaces.** A stroke field made once at start-up. Each stroke one flat colour with a clean edge, running the way its surface runs (along the slope on the ground, up a trunk, with the wind in the sky). Light and shade decided stroke by stroke. The world's ground colour showing between strokes | The clip; Tom Thomson; Klimt; The Long Dark's brushed planks | **Hardest** |
 | 3 | **From the ship.** Strokes re-form in steps as the eye rises: leaves, then trees as single patches, then woods and fields. Each stroke switches whole; no soft blend of two layers. Paths, water and trees stay told apart | Tom Thomson's Autumn Foliage; Breath of the Wild; The Pathless; Europa | **Hard** |
-| 4 | **Shadows.** Real cast shadows near the eye (trees, the explorer, the ship); farther out the leaf-shade pattern drawn long by a low sun. Shadows blue-violet, their edges cut along the strokes. Phones get the real ones only if the count of work allows | The clip; Firewatch's orange forest; Arise | **Hard** |
+| 4 | **Shadows.** Real cast shadows near the eye (trees, the explorer, the ship), built for the desktop without compromise; farther out the leaf-shade pattern drawn long by a low sun. Shadows blue-violet, their edges cut along the strokes | The clip; Firewatch's orange forest; Arise | **Hard** |
 | 5 | **Night and sky.** Night in blue with the snow lightest; the aurora in upright strokes; sky strokes that follow the game's wind; the lantern's pool laid into the ground's and plants' shading | Sohlberg; The Pathless's snowy valley; the clip | Medium |
 | 6 | **The explorer.** Bare head; a blue-grey cloak with a trimmed hem over the jetpack, moved by PHYSICS' wind; the hood up in snow and storms; a lantern at the hip, lit from dusk to dawn; a rim of light | The clip's figure; Journey; No Man's Sky; Ori | Medium |
-| 7 | **Phones.** The picture at the screen's full size; the cost counted (draw calls, texture reads); an unlisted preview page for the owner's phone | Release 2's W6 | Medium |
+
+Phones are not part of the prototype (section 2, item 17: the desktop sets the look). The same
+look with cheaper settings, the picture at the screen's full size and the count of its cost come
+after the owner approves the prototype, with release 2's phone work.
 
 **Two checkpoints, each a stop for the owner.**
 
@@ -243,10 +252,10 @@ crispness rule and the reference notes.
   With the numbers: sharpness at least release 1's from the ship (`tests/stations.mjs`, final
   land t1/t2 about 1.0), flicker no worse. The owner picks the stroke size and how strong the
   colour is, or sends it back.
-- **Checkpoint 2 (pieces 4 to 7):** the same wood with real shadows; Neptune's aurora tundra at
+- **Checkpoint 2 (pieces 4 to 6):** the same wood with real shadows; Neptune's aurora tundra at
   night with the lantern lit; the explorer close up by day and by night, standing, running, hood
-  up. Then the unlisted preview page, which needs the owner's word because it is published
-  through `main` (as a separate folder; the live game is not touched).
+  up. Then the unlisted preview page for the owner's desktop, which needs the owner's word
+  because it is published through `main` (as a separate folder; the live game is not touched).
 
 **After the owner approves the prototype (work that follows a proven pattern, so a session on
 the next model down can do it):** each world's colour key and stroke settings, world by world,
@@ -258,7 +267,8 @@ the setting in the game's menu; release 2's phone findings; the blind players; t
   flicker measurement is the judge.
 - The ground stores its colour at the corners of its triangles, so a far stroke cannot always
   be one perfectly flat colour.
-- Real shadows may cost too much on phones; the long leaf-shade pattern is the fallback.
+- Real shadows may cost too much on phones; there the long leaf-shade pattern stands in. The
+  desktop keeps the real ones.
 - It is a bigger job than a filter: the prototype converts the ground, the plants, the figure
   and the sky for two scenes. Water, the weather kits and eight more worlds come after.
 - A rough guess at the cost: about half of what release 1 took, over the two checkpoints. The
