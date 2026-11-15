@@ -125,6 +125,11 @@ copied. So:
   soften edges.
 - Strokes stay fine wherever one must read: the figure, a path, the ground one is about to land
   on. A stroke simplifies; it must never smear.
+- **Strokes are small and have no outline** (the owner on the first peek, 2026-11-15: "too wide
+  and too outlined"). Measured on the clip, in a frame 576 px wide: the forest floor is
+  leaf-shaped dabs 6 to 15 px long, pointed at both ends, lying every way, one over another, each
+  its own colour, with no line between them; trunks are long streaks 2 to 5 px wide; the snow is
+  a mosaic of tiles 12 to 25 px across whose edges are light, never dark.
 - The picture is drawn at the screen's full size on phones too. A small picture enlarged is
   blur.
 - Measured, not judged by feel alone: `tests/stations.mjs` already measures sharpness; the new

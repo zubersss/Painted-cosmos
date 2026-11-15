@@ -125,6 +125,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     `docs/references/README.md` binds every piece of work on the look: from the painters take
     colour and direction, never the thick rough paint; no smoothing filter, no soft blending, no
     blur effects; the full screen size on phones; sharpness measured with `tests/stations.mjs`.
+18. **Strokes small, like the clip, with no outlines (2026-11-15, on the first peek).** "Make the
+    strokes smaller and almost exactly like the video reference these are too wide and too
+    outlined." The clip's strokes are the measure of size and shape: leaf-shaped dabs lying every
+    way on the forest floor, long streaks on trunks, no line drawn round a stroke.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
