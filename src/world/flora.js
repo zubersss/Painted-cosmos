@@ -4,8 +4,9 @@
 // in the tier its own distance puts it in.
 //   tier 0  near: the full tree (about 650 triangles)
 //   tier 1  mid: a trunk and two washes (about 180 triangles)
-//   far     one shared 26-triangle form for every species; beyond the thinning distance only
-//           one tree in three is kept and drawn larger ("fewer, larger, softer strokes")
+//   far     one shared 26-triangle form for every species, out to 2 km at every tier (R2 W7.1); beyond the
+//           thinning distance a share of the trees that falls with the square of the distance is kept, each
+//           drawn wider by the inverse root of it ("fewer, larger, softer strokes": the same canopy)
 // Tiers are assigned per tree on the CPU whenever the camera has moved a few metres, into
 // dynamic instance buffers, so nothing is drawn collapsed. Undergrowth lives in 25 m cells,
 // one mesh per kind, and grows in stroke by stroke as you approach.
@@ -15,18 +16,28 @@ import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
 import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
-import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
+import { treeCell, treeCellThin, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G } from '../render/shared.js';
 
-// tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
-const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
+// tier ranges in metres at quality 2; the near and middle tiers scaled by RANGE_SCALE at lower tiers
+const T0 = 90, T1 = 190;      // (were 52, 128 while there was a triangle budget)
 const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget)
 const RELIEF = 250;            // (R1 W2.3) metres the ground in an undergrowth cell's reach may stand above the ground under the eye
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
+// (R2 W7.1, docs/lead/SHARP-SMOOTH-PLAN.md ruling 6: the far canopy at every tier, out to 2 km. It ended at 600 m at the
+// top tier and, scaled by RANGE_SCALE, at 360 m and 168 m below it: from the ship at the lowest tier the forest was the
+// terrain's canopy wash, and above about 200 m the trees were gone. Now the far forms come from the same placement at
+// every tier and only the near and middle tiers scale; what the tiers trade is how soon the canopy thins.)
+const FAR_MAX = 2000;          // m: the far forms are drawn out to here (fading over its last tenth), at every tier
+const THIN = [250, 330, 420];  // m, per tier: beyond it the canopy keeps a share (THIN / d)^2 of its trees, each wider by the inverse root (materials.js PROP_VERT, PC_FAR)
+const KEEP_M = 0.75;           // a tree is put in its far mesh while the share is over this much of its rank (the shader fades it in as the share passes its rank)
+const FAR_SPLIT = 700, FAR_OV = 15;   // m: inner far cells hold the forms nearer than FAR_SPLIT, outer cells those beyond, overlapping by FAR_OV each way (the same form in both: nothing shows the seam)
+const FAR_DL = 2, XFAR_DL = 3;        // levels above the tree cells: inner far cells 4 x 4 tree cells (196 m on Earth), outer 8 x 8 (393 m)
+const HEADROOM = 1.5;          // a far cell holds the trees under this much more of the share it needs, so that it is not placed again every few metres
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
 const HOLD_MAX = 6;                    // seconds a built cell waits at most for its ground to be on the paper
-const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
+const RANK = { far: 0, xfar: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01'];     // (the last two: trees only, PHYSICS' crown)
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
@@ -35,7 +46,8 @@ const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungu
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
 const _Y = new THREE.Vector3(0, 1, 0);
-const _ff = {}, _dd = [0, 0, 0], _laid = [false, false, false, false];
+const _ff = {}, _dd = [0, 0, 0];
+const FAR_BAND = { lo: 0, hi: FAR_SPLIT + FAR_OV }, XFAR_BAND = { lo: FAR_SPLIT - FAR_OV, hi: Infinity };
 
 export class Flora {
   constructor(bodyId, root, bodyUniforms) {
@@ -45,13 +57,13 @@ export class Flora {
     this.group.name = 'flora-' + bodyId;
     root.add(this.group);
     this.camLocal = new THREE.Vector3();
-    this.treeChunks = new Map(); this.farChunks = new Map(); this.underChunks = new Map(); this.under2Chunks = new Map();
+    this.treeChunks = new Map(); this.farChunks = new Map(); this.xfarChunks = new Map(); this.underChunks = new Map(); this.under2Chunks = new Map();
     this.treeList = [];
     this.queue = [];
     this.lastTreeEval = new THREE.Vector3(1e9, 0, 0); this.lastUnderEval = new THREE.Vector3(1e9, 0, 0);
     this.treeSize = nodeSize(this.R, TREE_LEVEL); this.underSize = nodeSize(this.R, UNDER_LEVEL);
-    this.farSize = this.treeSize * 2;       // far trees are batched in cells twice as large
-    this.rangeScale = 1; this.lastScale = -1;
+    this.farSize = this.treeSize * (1 << FAR_DL); this.xfarSize = this.treeSize * (1 << XFAR_DL);     // far trees are batched in larger cells (R2 W7.1)
+    this.rangeScale = 1; this.lastScale = -1; this.thinD = THIN[2];
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -62,7 +74,7 @@ export class Flora {
     this.starved = 0;
     this.hidden = false;
     this.prof = { wanted: 0, build: 0, retier: 0 };
-    this.est = { near: 1.0, far: 1.0, under: 2.5, under2: 2.5 };   // what one build step of each kind has been costing, ms
+    this.est = { near: 1.0, far: 1.0, xfar: 1.0, under: 2.5, under2: 2.5 };   // what one build step of each kind has been costing, ms
 
     this.bodyUniforms = bodyUniforms;
     this.look = this.S.look.flora || { tall: [], under: null };
@@ -146,10 +158,11 @@ export class Flora {
     mesh.count = 0;
     mesh.position.copy(chunk.origin);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
-    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + 24);
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + (far ? 60 : 24));     // (the far forms drawn wider far off reach out of their cell)
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
-      const u = material.uniforms, k = flora.rangeScale;
+      const u = material.uniforms, k = far ? 1 : flora.rangeScale;      // (R2 W7.1: the far forms' range is the same at every tier)
+      if (u.uThin) u.uThin.value.x = flora.thinD;
       u.uOrigin.value.copy(origin);
       u.uCamLocal.value.copy(camRel.subVectors(flora.camLocal, origin));
       u.uLod.value.set(lodv.x * k, lodv.y * k, lodv.z, lodv.w);
@@ -169,18 +182,21 @@ export class Flora {
   // ---- trees ----------------------------------------------------------------------------------
   _buildTrees(chunk) {
     let n = 0, d;
-    if (chunk.kind === 'far') {
-      // the four tree cells under this far cell, concatenated
-      const parts = [];
+    if (chunk.band) {
+      // (R2 W7.1) the tree cells under this far cell, as placed step by step (chunk.next: each the whole cell, or only
+      // the trees whose rank is under the share the cell needs), concatenated
+      const parts = chunk.next, N = 1 << chunk.dl;
       // (which tree cell each tree came from: while that cell's own trees are not laid, the far form stands in for them)
       chunk.partEnd = []; chunk.partKey = [];
-      for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) {
-        const t = treeCell(this.S, chunk.face, chunk.ix * 2 + a, chunk.iy * 2 + b); parts.push(t); n += t.count;
-        chunk.partEnd.push(n); chunk.partKey.push(chunk.face * 1e8 + (chunk.ix * 2 + a) * 1e4 + chunk.iy * 2 + b);
+      for (let q = 0; q < parts.length; q++) {
+        n += parts[q].count;
+        chunk.partEnd.push(n); chunk.partKey.push(chunk.face * 1e8 + (chunk.ix * N + (q % N)) * 1e4 + chunk.iy * N + ((q / N) | 0));
       }
       d = new Float32Array(n * INST_STRIDE);
       let o = 0;
       for (const t of parts) { d.set(t.data.subarray(0, t.count * INST_STRIDE), o); o += t.count * INST_STRIDE; }
+      chunk.pHeld = chunk.pTarget; chunk.next = null;
+      chunk.laidBuf = new Uint8Array(parts.length);
     } else {
       const t = treeCell(this.S, chunk.face, chunk.ix, chunk.iy);
       n = t.count; d = t.data;
@@ -210,7 +226,7 @@ export class Flora {
       _m.compose(_p.sub(chunk.origin), _q, _s.set(girth, sc, girth));
       _m.toArray(chunk.mat, i * 16);
       chunk.rel[i * 3] = _p.x; chunk.rel[i * 3 + 1] = _p.y; chunk.rel[i * 3 + 2] = _p.z;
-      if (chunk.kind === 'far') add('2', i, this.kit.far, this.mats.far, true);
+      if (chunk.band) add('2', i, this.kit.far, this.mats.far, true);
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
         add('0:' + kind + ':' + v, i, sp.geo0[v], sp.mat);
@@ -237,7 +253,9 @@ export class Flora {
     return v;
   }
 
-  _retier(chunk, force) {
+  // adopt (R2 W7.1, a far cell placed again with more of its trees): the trees it held before keep their place on the
+  // paper (no wash: they are taken into the new mesh as laid)
+  _retier(chunk, force, adopt) {
     const n = chunk.n;
     if (!n) return;
     const now = this.washNow, prev = chunk.prev, since = chunk.since;
@@ -248,25 +266,27 @@ export class Flora {
     // 600 k triangles): full trees and middle trees hand over a little sooner
     const trim0 = QUALITY.level === 1 ? TRIM[0] : 1, trim1 = QUALITY.level === 1 ? TRIM[1] : 1;
     let changed = false;
-    // a far cell: are the trees of its four tree cells laid? Where they are not (not built yet, or waiting
+    // an inner far cell: are the trees of its tree cells laid? Where they are not (not built yet, or waiting
     // for their ground), the far form stands in at any distance, and changes hands when they come
     let pe = null, laid = null, part = 0;
     if (chunk.kind === 'far') {
-      pe = chunk.partEnd; laid = _laid;
-      for (let q = 0; q < 4; q++) { const nc = this.treeChunks.get(chunk.partKey[q]); laid[q] = !!(nc && nc.built && !nc.held && !nc.dead); }
+      pe = chunk.partEnd; laid = chunk.laidBuf;
+      for (let q = 0; q < laid.length; q++) { const nc = this.treeChunks.get(chunk.partKey[q]); laid[q] = nc && nc.built && !nc.held && !nc.dead ? 1 : 0; }
     }
+    // (R2 W7.1) the far band this cell draws, and the canopy's share at a distance: (THIN / d)^2
+    const lo = chunk.band ? chunk.band.lo : 0, hi = chunk.band ? chunk.band.hi : Infinity, th2 = this.thinD * this.thinD;
     for (let i = 0; i < n; i++) {
       const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       const seed = d[i * INST_STRIDE + 7];
-      const j = (1 + (seed - 0.5) * JIT) * k;
+      const jj = 1 + (seed - 0.5) * JIT, j = jj * k;
       let t;
       if (dist < T0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
       else if (dist < T1 * j * trim1) t = 1;
-      else if (dist < T_THIN * j) t = 2;
-      else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
+      else if (dist >= lo && dist < hi && dist < FAR_MAX * jj && (seed * 13.37) % 1 < Math.min(1, th2 / (dist * dist)) / KEEP_M) t = 2;
       else t = -1;
       if (pe) { while (i >= pe[part]) part++; if (t >= 0 && t < 2 && !laid[part]) t = 2; }
+      if (adopt && adopt[i]) { tier[i] = prev[i] = t; since[i] = -1e9; continue; }
       if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
     }
     chunk.tierPos.copy(this.camLocal);
@@ -279,26 +299,24 @@ export class Flora {
       const want = g.tierKey === '0' ? 0 : g.tierKey === '1' ? 1 : 2;
       let c = 0;
       const list = g.list;
-      const inTier = (t) => t === want || (want === 2 && t === 3);
-      // (a far tree that only changes between plain and thinned stays in its mesh; a tree that left this mesh a moment ago is still in it, being lifted out)
+      const inTier = (t) => t === want;
+      // (a tree that left this mesh a moment ago is still in it, being lifted out)
       const leaving = (i) => now - since[i] < WASH_T && inTier(prev[i]) && !inTier(tier[i]);
       for (let a = 0; a < list.length; a++) { const i = list[a]; if (inTier(tier[i]) || leaving(i)) c++; }
       if (c === 0) { if (g.mesh) { g.mesh.count = 0; g.mesh.visible = false; } continue; }
-      if (!g.mesh) g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
+      if (!g.mesh) g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, FAR_MAX, JIT, 0.9] : [0, 1e7, 0, 0.999], g.far);
       const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null, ab = mesh.userData.born.array;
       let w = 0;
       for (let a = 0; a < list.length; a++) {
         const i = list[a], out = !inTier(tier[i]);
-        const t = out ? prev[i] : tier[i];
         if (out && !leaving(i)) continue;
         // when it came (it washes in), or when it left (it is lifted out); one that only changed within the mesh keeps its place
         ab[w] = out ? -Math.max(since[i], 1e-3) : (inTier(prev[i]) ? 0 : since[i]);
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
         if (g.far) {
-          // the unit far tree: size it to the species; thinned ones stand in for three
+          // the unit far tree: size it to the species (R2 W7.1: the thinned canopy's trees are widened in the shader, by the distance)
           const fd = this.species[d[o + 5]].far;
-          const big = t === 3 ? 1.5 : 1;
-          const sxz = fd[0] * big, sy = fd[1] * (t === 3 ? 1.15 : 1);
+          const sxz = fd[0], sy = fd[1];
           for (let q = 0; q < 4; q++) { im[wo + q] = mat[mo + q] * sxz; im[wo + 4 + q] = mat[mo + 4 + q] * sy; im[wo + 8 + q] = mat[mo + 8 + q] * sxz; im[wo + 12 + q] = mat[mo + 12 + q]; }
           ib[w * 2] = d[o + 5]; ib[w * 2 + 1] = 0;
         } else {
@@ -411,7 +429,9 @@ export class Flora {
   // shrinks each away by its root's distance), and they were built and submitted all the same, and kept at any height
   // (98 draws of nothing at 150 m, 303 at 1 km). Walked only while the eye is near enough the ground for any cell to
   // be in reach; a cell beyond reach by more than the old margin is let go at any height.
-  _wanted(level, size, radius, map, kind, reach) {
+  // (R2 W7.1) `hole` (the outer far cells): a cell wholly nearer than that many metres is not wanted (the inner cells
+  // draw everything there).
+  _wanted(level, size, radius, map, kind, reach, hole) {
     const R = this.R, cam = this.camLocal;
     const c = _up.copy(cam).normalize();
     const e = new THREE.Vector3().crossVectors(_Y, c); if (e.lengthSq() < 1e-6) e.set(1, 0, 0); e.normalize();
@@ -441,9 +461,13 @@ export class Flora {
         if (reach != null) { if (this._origins.size > 4096) this._origins.clear(); this._origins.set(key, origin); }
       }
       if (reach != null && origin.distanceTo(cam) - size * 0.75 > reach) continue;
+      if (hole != null && !map.has(key) && origin.distanceTo(cam) + size * 0.75 < hole) continue;
       seen.add(key);
       if (!map.has(key)) {
-        map.set(key, { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far', origin, meshes: [], built: false, queued: false, dead: false });
+        const ch = { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far' || kind === 'xfar', origin, meshes: [], built: false, queued: false, dead: false };
+        // (R2 W7.1) a far cell: its band, its level above the tree cells, and the share of its trees it holds
+        if (kind === 'far' || kind === 'xfar') Object.assign(ch, { band: kind === 'far' ? FAR_BAND : XFAR_BAND, dl: kind === 'far' ? FAR_DL : XFAR_DL, pHeld: 0, pTarget: 0, next: null, pi: 0, stale: false });
+        map.set(key, ch);
       }
     }
     for (const [key, ch] of map) {
@@ -472,7 +496,7 @@ export class Flora {
     if (ch.isTree) {
       this._retier(ch);
       // the far forms that stood in for these trees are lifted out as the trees are laid
-      if (ch.kind === 'near') { const far = this.farChunks.get(ch.face * 1e8 + (ch.ix >> 1) * 1e4 + (ch.iy >> 1)); if (far && far.built && !far.held && !far.dead) this._retier(far); }
+      if (ch.kind === 'near') { const far = this.farChunks.get(ch.face * 1e8 + (ch.ix >> FAR_DL) * 1e4 + (ch.iy >> FAR_DL)); if (far && far.built && !far.held && !far.dead) this._retier(far); }
     } else {
       for (const m of ch.meshes) m.userData.laid = now;
       this._showUnder(ch);
@@ -508,9 +532,34 @@ export class Flora {
   }
 
   // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
+  // (R2 W7.1) the share of a far cell's trees it must hold: the canopy's share at the nearest of its trees can be, over
+  // KEEP_M (a tree goes into its mesh before the shader starts to show it)
+  _farNeed(ch) {
+    const d = Math.max(ch.origin.distanceTo(this.camLocal) - ch.size * 0.75, ch.band.lo, T1 * this.rangeScale * (1 - JIT * 0.5), 1);
+    return Math.min(1, (this.thinD * this.thinD) / (d * d) / KEEP_M);
+  }
+  // (R2 W7.1) a far cell placed again with more of its trees (the eye came nearer): built anew in the same update, the
+  // trees it held before taken over as laid, the new ones washed in (the shader shows them only as the share reaches them)
+  _rebuildFar(ch) {
+    const old = ch.pHeld, d0 = ch.data;
+    for (const m of ch.meshes) {
+      this.group.remove(m);
+      for (const k of SHARED) m.geometry.deleteAttribute(k);
+      m.geometry.setIndex(null); m.geometry.dispose(); m.dispose();
+    }
+    ch.meshes.length = 0;
+    this._buildTrees(ch);
+    const d = ch.data, n = ch.n, adopt = new Uint8Array(n);
+    for (let i = 0; i < n; i++) adopt[i] = old >= 1 || (d[i * INST_STRIDE + 7] * 13.37) % 1 < old ? 1 : 0;
+    ch.stale = false;
+    this._retier(ch, true, adopt);
+    return d0;
+  }
+
   update(camLocal, active, budgetMs, now) {
     this.camLocal.copy(camLocal);
     this.rangeScale = RANGE_SCALE[QUALITY.level] || 1;
+    this.thinD = THIN[QUALITY.level] || THIN[2];
     if (now != null) this.washNow = now;
     else { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
     const alt = camLocal.length() - this.R;
@@ -532,14 +581,22 @@ export class Flora {
       this.lastScale = k; this.lastTreeEval.set(1e9, 0, 0); this.lastUnderEval.set(1e9, 0, 0);
       for (const ch of this.treeChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
       for (const ch of this.farChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
+      for (const ch of this.xfarChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
     }
     if (this.lastTreeEval.distanceTo(camLocal) > 20) {
       this.lastTreeEval.copy(camLocal);
       if (this.species.length) {
         this._wanted(TREE_LEVEL, this.treeSize, T1 * k * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
-        this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * k * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
+        // (R2 W7.1) the far canopy: inner cells out to the split, outer cells from it to 2 km, at every tier
+        this._wanted(TREE_LEVEL - FAR_DL, this.farSize, FAR_SPLIT + FAR_OV + this.farSize * 0.75, this.farChunks, 'far');
+        this._wanted(TREE_LEVEL - XFAR_DL, this.xfarSize, FAR_MAX * (1 + JIT * 0.5) + this.xfarSize * 0.75, this.xfarChunks, 'xfar', null, FAR_SPLIT - FAR_OV);
+        // a far cell the eye has come nearer to is placed again with more of its trees
+        for (const map of [this.farChunks, this.xfarChunks]) for (const ch of map.values()) {
+          if (!ch.built || ch.dead || ch.queued || ch.held) continue;
+          if (ch.stale || this._farNeed(ch) > ch.pHeld + 1e-6) { ch.stale = true; ch.queued = true; this.queue.push(ch); }
+        }
       }
-      this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
+      this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()), Array.from(this.xfarChunks.values()));
     }
     if (this.lastUnderEval.distanceTo(camLocal) > 8) {
       this.lastUnderEval.copy(camLocal);
@@ -568,22 +625,36 @@ export class Flora {
       let built = 0;
       while (q.length) {
         const ch = q[q.length - 1];
-        if (ch.dead || ch.built) { q.pop(); ch.queued = false; continue; }
+        if (ch.dead || (ch.built && !ch.stale)) { q.pop(); ch.queued = false; continue; }
         // start a step only if it is likely to fit in what is left of the slice (the first
         // step of a full slice always goes ahead, so the queue cannot stall)
         const el = performance.now() - t0, est = this.est[ch.kind];
         if (el + est > budgetMs && (built > 0 || budgetMs < 2.5) && !(built === 0 && this.starved > 12 && budgetMs > 0)) break;
         const ts = performance.now();
+        // (R2 W7.1) a far cell is assembled from its tree cells, one placed per step (the whole cell from the cache, or
+        // only the trees whose rank is under the share the cell needs), so no single step is long; then built (or, placed
+        // again with more of its trees, built anew in place)
+        if (ch.band) {
+          if (!ch.next) { ch.pTarget = Math.min(1, this._farNeed(ch) * HEADROOM); if (ch.pTarget > 0.999) ch.pTarget = 1; ch.next = []; ch.pi = 0; }
+          const N = 1 << ch.dl;
+          if (ch.pi < N * N) {
+            ch.next.push(treeCellThin(this.S, ch.face, ch.ix * N + (ch.pi % N), ch.iy * N + ((ch.pi / N) | 0), ch.pTarget));
+            ch.pi++; built++;
+            this.est[ch.kind] += (Math.min(8, performance.now() - ts) - this.est[ch.kind]) * 0.2;
+            continue;
+          }
+          q.pop(); ch.queued = false;
+          if (ch.built) this._rebuildFar(ch);
+          else { this._buildTrees(ch); ch.built = true; this._hold(ch); }
+          built++;
+          continue;
+        }
         // big cells are assembled from four placement cells: prepare one missing cell per
         // step, so no single step is long
-        if (ch.kind === 'far' || ch.kind === 'under2') {
-          const ck = ch.kind === 'far' ? 't' : 'u';
+        if (ch.kind === 'under2') {
           let missing = false;
           for (let b = 0; b < 2 && !missing; b++) for (let a = 0; a < 2 && !missing; a++) {
-            if (!hasCell(ck, this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b)) {
-              if (ck === 't') treeCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b); else underCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b);
-              missing = true;
-            }
+            if (!hasCell('u', this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b)) { underCell(this.S, ch.face, ch.ix * 2 + a, ch.iy * 2 + b); missing = true; }
           }
           if (missing) { built++; this.est[ch.kind] += (Math.min(8, performance.now() - ts) - this.est[ch.kind]) * 0.2; continue; }
         }

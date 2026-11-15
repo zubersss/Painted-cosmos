@@ -115,7 +115,9 @@ void main() {
   vec3 nL = normalize(vNL);
   float dist = length(vView);
   float near = 1.0 - smoothstep(18.0, 80.0, dist);
-  float mid = 1.0 - smoothstep(120.0, 420.0, dist);
+  // (R2 W7.1: the floor's own wash out to where the far canopy ends; it was the canopy's wash from 420 m, where no tree was
+  // drawn beyond 600 m at the top tier and 168 m at the lowest. The far forms stand on it out to 2 km now, at every tier.)
+  float mid = 1.0 - smoothstep(700.0, 2000.0, dist);
 
   vec4 n1 = texture(uNoise3D, vBody / 31.0);
   vec4 n2 = texture(uNoise3D, vBody / 6.3 + 0.21);
@@ -128,7 +130,7 @@ void main() {
   vec3 q = vBody * exp2(-l0);
   vec4 ma = texture(uNoise3D, q / 2.3 + 0.13), mb = texture(uNoise3D, q / 4.6 + 0.13);
   vec4 fa = texture(uNoise3D, q / 0.61 + 0.57), fb = texture(uNoise3D, q / 1.22 + 0.57);
-  float markFade = 1.0 - smoothstep(150.0, 520.0, dist);
+  float markFade = 1.0 - smoothstep(900.0, 2600.0, dist);     // (R2 W7.1: the marks were gone from 520 m; laid as the pixel sees them since R1 W2.1)
   float ms = exp2(l0);       // (the marks' octave, metres per unit of q: what of each pattern lies inside the pixel scales with it)
 
   // far away the forest floor reads as its canopy: one broad soft wash
@@ -691,6 +693,7 @@ attribute float aBorn;    // per instance: when it came into this mesh (the wash
   uniform float uFarTaper[8];
   uniform float uFarTrunk[8];
   uniform float uFarDrop[8];
+  uniform vec2 uThin;     // (R2 W7.1) x the far canopy's thinning distance (m, the tier's): beyond it a share (x / d)^2 is kept
 #endif
 #ifdef PC_HOLLOW
   uniform vec4 uHollow;   // a spire's form in its own units: x girth at the foot, y height, z lean of the top along +Z (of the height)
@@ -774,6 +777,17 @@ void main() {
     vec3 rockP = mix(vec3(lp.x * 1.5, (lp.y - 0.30) * 1.45, lp.z * 1.5), vec3(lp.x * 1.5, (yb - 0.566) * 2.23, lp.z * 1.5), foot);
     lp = mix(lp * mix(uFarTrunk[fsi], 1.0, crown), rockP, crown * (1.0 - uFarTrunk[fsi]));
     lp.y -= uFarDrop[fsi] * 0.97;                                   // hanging kinds: the wash falls below its root
+    // (R2 W7.1, docs/lead/SHARP-SMOOTH-PLAN.md ruling 6: the far canopy at every tier, out to 2 km. Beyond the thinning
+    // distance uThin.x the canopy keeps a share (uThin.x / d)^2 of its trees, each drawn wider by the inverse root of it,
+    // so a stretch of forest holds the same canopy and every far form is about the same size on the sheet at any
+    // distance: fewer, larger, softer strokes, never a stipple. Which trees: those whose rank (from the seed, as
+    // flora.js and floraplace.js reckon it) is under the share. A tree whose rank the share is passing shrinks away into
+    // its foot over a band (and grows back the same way): nothing pops, as the camera nears or leaves.)
+    float pT = min(1.0, uThin.x * uThin.x / max(di * di, 1.0));
+    float rk = fract(inst.z * 13.37);
+    vis *= clamp((pT - rk) / (0.3 * rk + 0.02), 0.0, 1.0);
+    float sT = inversesqrt(pT);
+    lp.xz *= sT; lp.y *= pow(sT, 0.4);
   #endif
   vec3 sw = pcSway(aData.x, inst.z * 6.283 + dot(io, vec3(0.11, 0.07, 0.13))) / max(length(im[0].xyz), 0.001);
   #ifdef PC_PHYS
@@ -1101,6 +1115,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     own.uFarTaper = { value: pad(opts.far.map((f) => f.taper || 0)) };
     own.uFarTrunk = { value: pad(opts.far.map((f) => (f.trunk ? 1 : 0))) };
     own.uFarDrop = { value: pad(opts.far.map((f) => (f.drop ? 1 : 0))) };
+    own.uThin = { value: new THREE.Vector2(420, 0) };       // (R2 W7.1: set by flora.js for the tier)
   }
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
