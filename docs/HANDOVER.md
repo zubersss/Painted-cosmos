@@ -61,7 +61,7 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
    - A **rich blue** cloak (the owner, 2026-11-15: first grey, then blue-grey, then "make the
      cloak richer blue": it is the strongest colour in the picture, as in the clip) in place of the cream coat and red scarf. It
      moves with the wind and the run (PHYSICS already gives `relWind`, lean, gale crouch and so
-     on in the figure's state) and covers the jetpack, with the jets under the hem.
+     on in the figure's state). No jetpack under it (item 23).
    - A lantern at the hip, dark by day, flickering on at dusk and off at dawn.
    - The lantern's warm pool of light is painted into the ground's and plants' shading, not a
      real three.js light (too costly).
@@ -152,6 +152,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     colors to pop but the details to not be lost", and to be told what the plan entails before
     being asked what to do next. The plan is put to the owner and nothing new is built on it
     until the owner answers.
+23. **No jetpack: the explorer flies like Superman (2026-11-15).** "Get rid of the jetpack just
+    make it flight like superman." The new explorer has no jetpack and no fuel; it flies by
+    itself (Space up, W where the view looks, C down, Shift fast, hands off hovers). Built on
+    `look-proto` for the new explorer; the ship still carries it between worlds.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
