@@ -232,7 +232,10 @@ thinner strips on the cloak and the aurora as light; both are done and seen; the
 colours of ice and snow, darker, its strokes as the clip's (item 25), and for the night sky's
 streaks and the snow's strokes as the reference's (item 26), then for smooth snow in thin
 strokes and for trees on the snowfield (item 27): done and seen, the stills sent.
-`look-proto` is at b8ae2a2 (the full check ran before the last commits, which touch the oil
+`look-proto` is at e228a9f (a checkpoint: `CLAUDE.md` now carries a map of the project; the
+owner asked for a list of the three riskiest parts of the code and said to WAIT for their go-ahead
+before fixing any: the list is in the log's entry of 2026-11-16 and nothing of it is to be touched
+until they say so). Before that checkpoint it was at b8ae2a2 (the full check ran before the last commits, which touch the oil
 look's paths only; the unit and world suites were run on the head); `node tests/all.mjs --export` PASSED all seventeen steps on it (thirteen on 5c77830, the
 four painted-world runs on efb0fc6; later commits changed the oil look's paths only, with the unit
 and world suites run again). WAITING FOR THE OWNER, asked twice: whether to put the look on a page
