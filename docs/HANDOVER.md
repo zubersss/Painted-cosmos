@@ -165,6 +165,11 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     fading upward): this is the one soft thing in the picture, by the owner's own word; the
     crispness rule (16) stands for everything else. Work goes on without stopping for approval;
     the owner is asked only when something is needed from them.
+25. **Snow is the colour of ice and snow, not bright, not many-coloured (2026-11-16).** "I also
+    dont like how Bright the snow area is why is the snow colorful fix it and shade it the color
+    of ice and snow and make the lines closer to the ice in the reference." Snow and ice are laid
+    in white, pale blue, blue and blue-grey only, a step darker than they were, and their strokes
+    follow the snow and ice of the reference clip's night frames.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
