@@ -227,6 +227,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 34. **"Open the pull request" (2026-11-16).** Pull request #5 (`look-proto` into `main`: the
     forest's speed, the autumn wood, the rivers, the speed test) was opened at the owner's word.
     The owner merges it; the session does not.
+35. **After pull request #5, on the phone: "feels bad ... blurry and blotchy" (2026-11-16, with the
+    speed test's table and a recording).** "lt feels bad playing it now most of the things haven't
+    rendered and it looks blurry and blotchy make the graphics look better and make it run
+    better". The owner merged #5 and played with the phone's OWN settings. So: the look must be
+    SHARP on the phone (no blur, item 16, holds there too), things must not go missing, and it
+    must run better. The table's numbers and what they mean are in the log.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
