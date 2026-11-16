@@ -1885,3 +1885,9 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - PUSHED on `look-proto` as 064266e ([painter]) and e0ed127 ([pilot]). NOT LIVE: no pull request is open; the owner has not been asked for one yet.
 - NOT KNOWN, said plainly: how many pictures a second the phone will draw now. The picture is 1.56 times the pixels it was at best, and the lighter paint, the coarser mesh and the drawing order pull the other way; I expect about the same 28 to 30 with a far sharper picture, and I may be wrong either way. The second table decides what is cut next. If the phone cannot hold 30 at this size, the next step is a sharp enlargement of a smaller picture in the last pass (not the browser's soft stretch).
 
+### 2026-11-16 OWNER: "Open pull request". Pull request #6 opened (`look-proto` into `main`)
+- OWNER (verbatim): "Open pull request".
+- DONE: pull request #6, https://github.com/zubersss/Painted-cosmos/pull/6 : `look-proto` (e0ed127: the phone's sharp picture and lighter paint, the ground's mesh by picture height, trees to the haze, the rivers' second form, the speed test's second form) into `main` (b7c2d29). Two commits ahead, none behind. Its text says what was wrong on the phone, what changes, what was checked (0 pixels differ in the default game in six scenes; unit 251, world 47, physics 325) and what was not (nothing measured on a phone; the full check still running when it was opened). NOT MERGED: the owner merges (standing instruction 7).
+- THE FULL CHECK (`node tests/all.mjs --export`) was started on e0ed127 as the pull request was opened; its result is to be added to the pull request's text and told to the owner.
+- AFTER THE MERGE the owner is to run the second speed test (`?look=oil&bench=1&body=earth&time=15.4`) and send the table, then play with the phone's own settings (`?look=oil&body=earth&time=15.4`).
+

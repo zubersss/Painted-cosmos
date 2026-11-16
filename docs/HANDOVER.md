@@ -237,6 +237,9 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     the river and its paths." One wide winding river, tributaries that fork like a tree and thin
     away to nothing, sand bars and islands, plain to see from the air (the sheets are described
     in `docs/references/README.md`).
+37. **"Open pull request" (2026-11-16).** Pull request #6 (`look-proto` into `main`: the phone's
+    sharp picture and lighter paint, the rivers' second form, the speed test's second form) was
+    opened at the owner's word. The owner merges it; the session does not.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
@@ -255,8 +258,8 @@ been patched a dozen times; the log has the history).
 b7c2d29). The owner played #5 on their phone (a Samsung Galaxy S23 Ultra) with the phone's own
 settings and said "it feels bad ... most of the things haven't rendered and it looks blurry and
 blotchy" (section 2, item 35), sent the speed test's table, and two sheets of river references
-(item 36). The answer to both is BUILT AND PUSHED ON `look-proto` (e0ed127) BUT NOT LIVE: no
-pull request is open for it.
+(item 36). The answer to both is BUILT AND PUSHED ON `look-proto` (e0ed127) BUT NOT LIVE: it
+is PULL REQUEST #6, open, waiting for the owner to merge it.
 
 **What the phone taught** (the log has the table and the reasoning): on its own settings the
 phone drew the look at 822 x 384, then the controller (which asked for 60 pictures a second and
@@ -272,7 +275,7 @@ pixels different in six scenes; unit 251, world 47, physics 325. NOT run on this
 check (`node tests/all.mjs --export`, an hour): run it before a pull request is merged.
 
 **What is waited for from the owner:**
-1. To say whether to open the pull request (they merge it themselves).
+1. To merge PULL REQUEST #6 (opened at their word, 2026-11-16).
 2. Then the SECOND speed table from the phone (`?look=oil&bench=1&body=earth&time=15.4`), and
    how it looks and runs with the phone's own settings (`?look=oil&body=earth&time=15.4`).
 3. Their go-ahead before any of the three riskiest parts of the code is touched (below).
