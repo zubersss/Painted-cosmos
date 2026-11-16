@@ -408,8 +408,9 @@ vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
   float wl = dot(wash, vec3(0.3, 0.5, 0.2));
   vec3 orange = min(mix(pcDensity(wash, 1.2) * vec3(1.35, 0.90, 0.42) + vec3(0.10, 0.045, 0.0), vec3(1.0, 0.64, 0.22) * (0.75 + 0.5 * wl), 0.5), vec3(1.0));
   vec3 yellow = min(orange * vec3(0.98, 1.22, 1.28) + vec3(0.0, 0.03, 0.03), vec3(1.0));
-  orange *= 0.90 + 0.16 * fract(r * 7.3); yellow *= 0.92 + 0.12 * fract(r * 5.1);
-  vec3 pale = mix(paint, vec3(1.0, 0.90, 0.66), 0.42);
+  // (an ochre and a tan, not a pure orange and yellow: the clip's lantern lays a warm, quiet light on its snow)
+  orange *= vec3(0.86, 0.72, 0.78) * (0.90 + 0.16 * fract(r * 7.3)); yellow *= vec3(0.84, 0.78, 0.92) * (0.92 + 0.12 * fract(r * 5.1));
+  vec3 pale = mix(paint, vec3(0.84, 0.76, 0.58), 0.45);
   return k > 0.74 ? orange : k > 0.48 ? yellow : k > 0.24 ? pale : paint;
 }
 // The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place

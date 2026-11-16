@@ -56,8 +56,8 @@ export function createWorld(scene) {
     scene.add(root);
     bodies.set(id, root);
     const bu = makeBodyUniforms();
-    // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'flow' (long strokes that run with the land) for worlds of snow and ice)
-    { const lk = getLook(id); if (lk && lk.oil) { if (lk.oil.ground === 'flow') bu.uGroundK.value.x = 1; if (lk.oil.grass != null) bu.uGroundK.value.y = lk.oil.grass; } }
+    // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'flow' (long strokes that run with the land) for worlds of ice, 'snow' (short broad strokes in the colours of ice and snow) for a world of snow)
+    { const lk = getLook(id); if (lk && lk.oil) { if (lk.oil.ground === 'flow') bu.uGroundK.value.x = 1; if (lk.oil.ground === 'snow') { bu.uGroundK.value.x = 1; bu.uGroundK.value.z = 1; } if (lk.oil.grass != null) bu.uGroundK.value.y = lk.oil.grass; } }
     bu.uBodyR.value = BODIES[id].radius;
     const look = getLook(id);
     if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }

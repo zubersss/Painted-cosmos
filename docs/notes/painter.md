@@ -122,8 +122,13 @@ is set:
 - every `broadleaf` species, on every world, has its crown in leaves one by one in the oil look (`flora.js` adds
   `leafy: 1, double: 1`; `florakit.js birchGeometry` `leafy`: the tree's own form, `leafCards` where it had `blob`s).
   A species' `oil` entry may still make it `slender` (Earth's three).
-- the ground's laying, per world: a look's `oil.ground: 'flow'` (long strokes that run with the land): Neptune, Uranus,
-  Pluto. Everything else is leaf dabs.
+- the ground's laying, per world: a look's `oil.ground: 'flow'` (long strokes that run with the land): Uranus, Pluto;
+  `'snow'`: Neptune (the owner, 2026-11-16: "I also dont like how Bright the snow area is why is the snow colorful fix
+  it and shade it the color of ice and snow and make the lines closer to the ice in the reference"): short broad knife
+  strokes in slow swirls, and where the ground's wash is pale the stroke's paint goes through `pcIce` (`TERRAIN_FRAG`):
+  its value picks from ONE ramp of ice colours (deep blue, slate, pale blue, blue-white), darker by night, each stroke
+  its own value, one in ten a step paler, and it never strays toward a warm colour. Everything else is leaf dabs.
+  DO NOT let snow take `pcDabTint`'s warm and cool straying again: on near-white it is a pastel confetti.
 - a biome's `oil.pal` (its colours given outright as paint), `oil.under` (undergrowth colours), `oil.tallMix` (the
   wood's mix of kinds): the autumn wood, the green wood (the game's first place), the aurora tundra.
 - a world's own night: a look's `oil.night` (Neptune's teal).

@@ -176,6 +176,31 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   return pcLamp(pcTone(k, lvl), k, gBc, rnd.y);
 }
+// SNOW AND ICE (the owner, 2026-11-16: "I also dont like how Bright the snow area is why is the snow colorful fix it and
+// shade it the color of ice and snow and make the lines closer to the ice in the reference"). A stroke of snow is laid
+// in the colours of ice and snow ONLY: its paint as the light has it gives a value, and the value picks the colour from
+// one ramp: a deep blue, a slate blue, a pale blue, a blue-white; a step darker than it was, and darker again by night
+// (the clip's night snow is a slate blue with paler strokes in it, nothing in it glaring). A stroke strays only between
+// a greyer and a bluer blue, never toward a warm colour: made to stray warm and cool as a floor of leaves is, near-white
+// snow was a confetti of cream, pink, lilac and yellow-green.
+vec3 pcIce(vec3 t, vec3 rnd) {
+  // (each stroke well its own value, a third of the ramp lighter or darker than the next: with a twelfth the snow was
+  // one flat pale sheet and no stroke showed; by night two fifths of the day's value: a slate blue)
+  float l = min(dot(t, vec3(0.3, 0.5, 0.2)), 1.0) * mix(0.48, 0.68, uDayness) + (rnd.x - 0.5) * 0.30 + 0.22 * step(0.90, rnd.z);      // (one stroke in ten a step paler: the clip's snow has pale strokes lying in its blue)
+  const vec3 deep = vec3(0.15, 0.22, 0.37), slate = vec3(0.39, 0.50, 0.65), pale = vec3(0.70, 0.80, 0.89), white = vec3(0.90, 0.94, 0.97);
+  vec3 c = l < 0.34 ? mix(deep, slate, clamp(l / 0.34, 0.0, 1.0)) : l < 0.68 ? mix(slate, pale, (l - 0.34) / 0.34) : mix(pale, white, clamp((l - 0.68) / 0.30, 0.0, 1.0));
+  return mix(c, vec3(dot(c, vec3(0.3, 0.5, 0.2))) * vec3(0.93, 0.99, 1.07), 0.40 * rnd.y);
+}
+// One long stroke's paint on a world laid in them: the ground's own, or, on a world of snow (uGroundK.z) where the
+// ground's wash is pale, snow's.
+vec3 pcFlowPaint(vec3 c, vec3 leaf, vec3 rnd, float snowC, float lvl) {
+  vec3 p = pcGroundPaint(c, leaf, 0.0, rnd, snowC, lvl);
+  if (uGroundK.z < 0.5) return p;
+  float sn = smoothstep(0.60, 0.78, dot(c, vec3(0.3, 0.5, 0.2)));
+  if (sn < 0.004) return p;
+  vec3 k = pcDensity(c, 1.0 + (rnd.x - 0.5) * 0.4);
+  return mix(p, pcLamp(pcIce(pcTone(k, lvl), rnd), k, gBc, rnd.y), sn);
+}
 void main() {
   #include <logdepthbuf_fragment>
   float dist = length(vView);
@@ -207,12 +232,16 @@ void main() {
     // they went under the pixel and a mountain side was a speckle of single pixels: the survey of the worlds, Pluto's
     // lilac mountains and Uranus' ice shelves)
     float rowsPx = length(vec2(dtx.y, dty.y));
-    vec4 ot = pcStrokeOct4(clamp(rowsPx / max(uOilPx.x, 1e-6), dist, dist * 6.0) * 2.0, uOilPx.z * 2.0);
+    // (on a world of snow the strokes are the clip's: short flat strokes of a broad knife, three or four times as long
+    // as they are wide and about three strokes wide, lying in slow swirls; long thin ribbons in wide arcs were not its
+    // snow: the owner's "make the lines closer to the ice in the reference")
+    float fW = mix(2.0, 2.9, uGroundK.z), fA = mix(8.0, 3.6, uGroundK.z), fB = mix(-34.0, -52.0, uGroundK.z);
+    vec4 ot = pcStrokeOct4(clamp(rowsPx / max(uOilPx.x, 1e-6), dist, dist * 6.0) * fW, uOilPx.z * fW);
     vec2 lgT = vec2(dFdx(ot.w), dFdy(ot.w));
     vec3 r0, n0, r1, n1; vec2 ds0, ds1; float own0, own1;
     // (long strokes in slow wide arcs: laid in quick waves, flat snow read as open water: the critic, on the first night)
-    pcThinLayer(chT, dtx, dty, ot.x, 8.0, vBody, 14.0 * wpx * 8.0, -34.0, r0, ds0, own0, n0);
-    pcThinLayer(chT, dtx, dty, ot.x * 2.0, 8.0, vBody, 28.0 * wpx * 8.0, -34.0, r1, ds1, own1, n1);
+    pcThinLayer(chT, dtx, dty, ot.x, fA, vBody, 14.0 * wpx * 8.0, fB, r0, ds0, own0, n0);
+    pcThinLayer(chT, dtx, dty, ot.x * 2.0, fA, vBody, 28.0 * wpx * 8.0, fB, r1, ds1, own1, n1);
     float fr0 = ot.w - ot.z;
     bool fine = r0.z >= smoothstep(0.15, 0.85, fr0 + dot(lgT, ds0));
     bool fineN = n0.z >= smoothstep(0.15, 0.85, fr0);
@@ -220,13 +249,13 @@ void main() {
     if (!fine || (own0 < 0.999 && !fineN)) {
       // the coarser layer here: its stroke, and the stroke beside it over the pixel at their edge
       pcGroundAt(ds1, ot.x * 2.0, r1, c, lvl, snowC, leaf, canopy);
-      pc1 = pcGroundPaint(c, leaf, 0.0, r1, snowC, lvl + (r1.x - 0.5) * 0.9);
-      if (own1 < 0.999) pc1 = mix(pcGroundPaint(c, leaf, 0.0, n1, snowC, lvl + (n1.x - 0.5) * 0.9), pc1, own1);
+      pc1 = pcFlowPaint(c, leaf, r1, snowC, lvl + (r1.x - 0.5) * 0.9);
+      if (own1 < 0.999) pc1 = mix(pcFlowPaint(c, leaf, n1, snowC, lvl + (n1.x - 0.5) * 0.9), pc1, own1);
     }
     if (fine) {
       pcGroundAt(ds0, ot.x, r0, c, lvl, snowC, leaf, canopy);
-      pc0 = pcGroundPaint(c, leaf, 0.0, r0, snowC, lvl + (r0.x - 0.5) * 0.9);
-      if (own0 < 0.999) pc0 = mix(fineN ? pcGroundPaint(c, leaf, 0.0, n0, snowC, lvl + (n0.x - 0.5) * 0.9) : pc1, pc0, own0);
+      pc0 = pcFlowPaint(c, leaf, r0, snowC, lvl + (r0.x - 0.5) * 0.9);
+      if (own0 < 0.999) pc0 = mix(fineN ? pcFlowPaint(c, leaf, n0, snowC, lvl + (n0.x - 0.5) * 0.9) : pc1, pc0, own0);
     }
     acc = fine ? pc0 : pc1;
   } else {
