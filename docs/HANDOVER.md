@@ -233,6 +233,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     better". The owner merged #5 and played with the phone's OWN settings. So: the look must be
     SHARP on the phone (no blur, item 16, holds there too), things must not go missing, and it
     must run better. The table's numbers and what they mean are in the log.
+36. **Rivers after two sheets of references (2026-11-16).** "Uses these as a reference for making
+    the river and its paths." One wide winding river, tributaries that fork like a tree and thin
+    away to nothing, sand bars and islands, plain to see from the air (the sheets are described
+    in `docs/references/README.md`).
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with

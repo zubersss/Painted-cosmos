@@ -321,3 +321,28 @@ mist at the end of the path.
 **What is not taken:** the thick ridged paint of several of them (the look has flat strokes), their softness where
 they are soft, and anything that would need hand-made scenery (these worlds are built by rule).
 
+## Two sheets of rivers from the air (the owner, 2026-11-16): for the river and its paths
+
+Sent with the words "Uses these as a reference for making the river and its paths". Twenty small views in flat colour
+(third parties'; not in the repository): green forest in rounded clumps, lighter green and sand-yellow open ground,
+blue water.
+
+**Sheet one (ten views from higher and higher up).** One main river winds down the whole picture in long smooth
+S-bends. It is WIDE where it is near (several tree-crowns across) and narrows steadily upstream until it is a thread
+at the horizon. Thin tributaries join it from both sides, each one FORKING into finer and finer threads, like the
+veins of a leaf; the higher the view, the more the land is covered by that fine network.
+
+**Sheet two (ten closer views).**
+- Meanders: broad loops, with pale SAND BARS lying inside each bend and a thin second channel cutting behind a bar.
+- Braids: where the river is widest it runs in two to four arms round long lens-shaped islands of sand and grass.
+- Tributaries as TREES: a thicker stem at the river, forking two or three times, every fork thinner, ending in tips.
+- A DELTA: at open water the river fans into a dozen arms that widen toward the shore.
+- Lakes and pools the river runs through; a confluence of two rivers of like size.
+- Colour: deep blue in the middle of the wide water, lighter blue in the narrow arms and at the edges; banks of
+  yellow-green and sand; the forest dark and the open ground light, so the water's path is always plain.
+
+**What is taken:** the hierarchy of widths (one wide river, thin tributaries, thinner twigs that end); the tree form of
+the tributaries; sand bars and islands; the smooth long bends; the river plain from high up. **Not taken yet (said
+plainly):** the delta, which needs the meeting of river and sea worked out, and the flat poster colouring (the look
+has its own paint).
+
