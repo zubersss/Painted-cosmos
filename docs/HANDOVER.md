@@ -193,20 +193,21 @@ section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoi
 for the owner.** **IN PROGRESS (the owner's go of 2026-11-15, "Go ahead in that order and make the cloak richer
 blue"): the overhaul plan in section 4a-2, in its order. The coordinator builds it on
 `look-proto`. STATE ON 2026-11-16: overhauls 1 to 5 are built and seen; 6 (sky, night), 7 (water)
-and 8 (the figure: the cloak in strips, real shadows, the lantern, the flight's words) have a first
-pass each, seen except the water; an independent critic read the stills against the clip and its
-findings were worked through (the log's sections of 2026-11-16 list them one by one, with what was
-done and what was not). The checkpoint's ten stills went to the owner on 2026-11-16 from
-`look-proto` f2f84b6 (the branch is at 5c77830). WAITING FOR THE OWNER: their word on those
-stills, and whether to put the look on a page they can open on their desktop (a pull request into
-`main` that adds the look behind `?look=oil`, the live game unchanged without it; only on the
-owner's word, and only after `tests/all.mjs` has passed on `look-proto`). NEXT IN THE PLAN if the
-owner says go on: what is left of 6 to 8 (the stream and water by night, rocks, the sky by day),
-the view from the air, then 9 (every world by the pattern of the autumn wood and the aurora
-tundra: the look data's `oil` entries, `docs/notes/painter.md` on `look-proto` says how). If this
-session was cut off: `git log origin/look-proto`, the log's newest sections, and the note at the top
-of `docs/notes/painter.md` on that branch; work not yet pushed, if any, was on the local branch
-`look-dev` in `/home/user/pc-dev` (lost with the container: the log describes it).**
+and 8 (the figure) have a first pass each; an independent critic's findings were worked through;
+the checkpoint's stills went to the owner, WHO APPROVED THE LOOK ("I like the look so far keep it
+up") and asked for two things (section 2, item 24): thinner strips on the cloak (done and seen)
+and the aurora as light, not stripes (done, seen once, strengthened, to be seen again). The owner
+said to go on and to come back only when something is needed. NOW: a survey of every world in
+the oil look (stills in the scratch folder, described in the log), then overhaul 9 (each world's
+`oil` entries by the pattern of the autumn wood and the aurora tundra; `docs/notes/painter.md`
+on `look-proto` says how), the view from the air, the stream. OWED: the last four steps of
+`tests/all.mjs` (the painted-world runs; the first thirteen passed on 5c77830). NEEDED FROM THE
+OWNER, asked once and not yet answered: whether to put the look on a page they can open on their
+desktop (a pull request into `main` that adds it behind `?look=oil`, the live game unchanged
+without it); only there can speed and motion be judged. If this session was cut off: `git log
+origin/look-proto`, the log's newest sections, and the top of `docs/notes/painter.md` on that
+branch; work not yet pushed, if any, was on the local branch `look-dev` in `/home/user/pc-dev`
+(lost with the container: the log describes it).**
 Pieces 1 to 3 are built. Checkpoint 1 is passed: the owner chose style 5 and asked for the
 clip to be matched very closely (section 2, item 20), and said to continue. The coordinator is
 now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
