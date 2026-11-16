@@ -238,24 +238,38 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** THE NEW LOOK IS LIVE BEHIND `?look=oil` since 2026-11-16 10:10 UTC: the owner
-merged pull request #4 themselves (`main` at 1cd885f). Without the flag the live game is the
-watercolour game, identical pixel for pixel (proved in six places before the merge). The owner
-is trying the look on their phone, a Samsung Galaxy S23 Ultra, with the top-quality address
-(section 2, item 32).
+**In one line:** the new look is LIVE behind `?look=oil` since 2026-11-16 (pull request #4,
+`main` at 1cd885f). The owner played it on their phone (a Samsung Galaxy S23 Ultra): the snow
+world liked, THE FOREST SLOW (about 9 pictures a second at the pinned top settings) AND NOT AS
+PRETTY, and rivers wanted with tributaries (section 2, item 33; 23 new reference pictures, all
+of autumn woods, in `docs/references/README.md`). The answer to that is BUILT AND PUSHED ON
+`look-proto` BUT NOT LIVE: it waits for a pull request the owner has to ask for.
 
-**What is waited for:** the owner's report from the phone: does it run smoothly, how does it
-look in motion (flicker, shimmer), does the phone run hot. Nothing here could judge any of
-that. What they say decides the next work: if it is slow, the phone's cheaper settings (item
-17) and the look's cost come first; if it flickers, the flicker from the ship.
+**What is on `look-proto` beyond `main`** (the log's last section has the whole account, the
+painter's notes on that branch the file-by-file one):
+- Speed: a tree's detail follows its size on the screen, far trees follow the air, a far tree
+  keeps a share of its leaves. Measured in software at the phone's picture size: the forest's
+  frame about half of what it was, a quarter of the triangles. Not measured on any real device.
+- The look of the wood after the new pictures: the explorer lands in the AUTUMN wood; each tree
+  its own colour (yellow, orange, red), conifers in groups; a floor of grass with the near
+  blades, flowers and fallen leaves back in the oil hand; smaller rounder leaves; blue water.
+- Rivers (Earth, oil look only): channels that split round islands and rejoin, pools, side
+  streams that fork into the rivers.
+- `?bench=1`: a speed test that leaves a table on the screen for the owner to photograph.
+- The default (watercolour) game: unit 251, world 47, physics 325 pass; compared pixel for
+  pixel with `main` in six places (see the log for the result).
 
-**Where new work goes now:** `look-proto` was brought forward to `main` (they are the same
-commit). New look work is built on the local branch `look-dev` (work tree `/home/user/pc-dev`,
-lost with the container) and pushed on `look-proto`; it reaches the live game only through a
-new pull request the owner asks for. A LESSON KEPT: before a pull request into `main`, prove
-that the watercolour game is unchanged BY PICTURES (the same views from `main` and from the
-branch, compared pixel for pixel, `main` against itself first), not by reading the diff: that
-comparison found every default tree's boughs a few millimetres off (cured before the merge).
+**What is waited for from the owner:**
+1. To say whether to open the pull request that takes this to the live game (they must merge
+   it themselves to try it on the phone).
+2. Then, from the phone: the table of `?bench=1` (a photograph of the screen), and how the wood
+   looks and runs to them.
+3. Their go-ahead before any of the three riskiest parts of the code is touched (below).
+
+**Where new work goes:** built on the local branch `look-dev` (work tree `/home/user/pc-dev`,
+lost with the container), pushed on `look-proto`. A LESSON KEPT: before a pull request into
+`main`, prove that the watercolour game is unchanged BY PICTURES (the same views from the old
+code and the new, compared pixel for pixel), not by reading the diff.
 
 **The look, where it stands** (`look-proto`; the file-by-file account is `docs/notes/painter.md`
 on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`):
@@ -271,15 +285,17 @@ on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`)
 - Measured from the ship: about three times as sharp as the live game, and more flicker under a
   slow pan (0.41 against 0.32 at 150 m; 0.23 against 0.10 at 1 km).
 
-**Waiting for the owner:**
-1. Their report from trying the look on their phone (above).
+**Waiting for the owner (the same list, with the standing one):**
+1. The pull request, then the phone's speed table and their eye (above).
 2. Their go-ahead before any of the THREE RISKIEST PARTS of the code is touched (section 2,
    item 28; the list is in the log, "OWNER: finish the task in hand, then five steps"): the shader
    code's tangle, the new look's lack of automatic checks and its global switches, and the three
    branches that have grown apart.
 
 **If the owner says "continue" or "resume"** (and gives nothing else): go on with the look on
-`look-dev`, in this order: the trees of the snow in the other snowy places (the owner's "start
+`look-dev`, in this order: what is still wrong in the wood (rivers faint from high up; the far
+land beyond the trees a mosaic of large dabs; dark flowers and stalks in the sward's shade; the
+green wood, which has had little of this care); then: the trees of the snow in the other snowy places (the owner's "start
 adding"; only Neptune's tundra has them); the firs' needles, angular near the eye; the open
 points of the survey (Venus' lava at a low angle, Pluto's ridges, the far snow's level strokes,
 the wood from the air); then, once the owner has judged the look on their desktop, the phone's
@@ -292,7 +308,7 @@ motion (`CLAUDE.md`, "In a cloud session there is no graphics card").
 | --- | --- |
 | `main` | **Live.** At `1cd885f`: the new look behind `?look=oil` (PR #4, merged by the owner 2026-11-16), on top of `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
 | `cosmos` | Frozen at `3e46e80`: release 1's code, the same as `main`. Do not work on it. |
-| `look-proto` | **Where new look work is pushed.** The same commit as `main` since the merge of PR #4; anything pushed here later is not live until a new pull request is merged. |
+| `look-proto` | **Where new look work is pushed.** `main` plus the forest's speed, the autumn wood's look, the rivers and the speed test (2026-11-16); NOT LIVE until a new pull request is merged. |
 | `r2` | **The working branch.** Release 1, the logs, this file, `tools/workflows/`, and release 2's half-done work as "WIP snapshot" commits only. No release-2 item was finished or verified. On a clean export of `r2`: world tests 56 pass and 1 fail ("MSAA belongs to the tier..."), unit 259, physics 325. |
 
 **Waiting, in the owner's order:**
