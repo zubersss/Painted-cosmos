@@ -170,6 +170,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     of ice and snow and make the lines closer to the ice in the reference." Snow and ice are laid
     in white, pale blue, blue and blue-grey only, a step darker than they were, and their strokes
     follow the snow and ice of the reference clip's night frames.
+26. **The night sky's streaks and the snow's strokes as the reference's (2026-11-16).** "Make the
+    lines on the sky at night time near the northern lights closer to the lights in the
+    references not the lights but the patterns in the sky and make the snow strokes look closer
+    to the reference like its actually been painted on the ground like the reference." The
+    aurora stays; the streaks in the night sky follow the clip's sky; snow reads as paint laid
+    on the ground, as the clip's.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
