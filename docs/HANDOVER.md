@@ -176,6 +176,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     to the reference like its actually been painted on the ground like the reference." The
     aurora stays; the streaks in the night sky follow the clip's sky; snow reads as paint laid
     on the ground, as the clip's.
+27. **Snow smooth, in many thin strokes, no ridges; snow trees (2026-11-16, with a picture).** "Make
+    the snow lines thinner and more frequent and get rid of the deep ridges between them it looks
+    like tiles make it closer to this photo and can you start adding trees like this as well in
+    the snowy areas." The picture (a watercolour of a snowy night; described in
+    `docs/references/README.md`) gives the snow (smooth pale drifts, softly shaded, a few thin
+    lines) and the trees (snow-laden firs, bare slender violet-blue trees). The relief on snow
+    strokes (item 26's first answer) is withdrawn. No blur (16) still stands: the picture's
+    softness is not taken.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with

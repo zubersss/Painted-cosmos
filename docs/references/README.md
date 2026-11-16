@@ -214,3 +214,21 @@ in the one-page plan; the first six are meant for the prototype.
   three small hand-built scenes; this game has ten planets built by rule. Prove it on one or two
   scenes first (Earth's autumn woodland and Neptune's aurora tundra already exist). The game's
   rendering code has not been read yet.
+
+## A later reference from the owner (2026-11-16): a snowy night in watercolour
+
+Sent with the words "make it closer to this photo and can you start adding trees like this as well in the snowy areas"
+(the picture itself is not in the repository; it is a third party's painting).
+
+What it shows: a full moon in a violet-blue night sky with falling flakes; a slope of smooth pale snow in soft drifts,
+nearly white under the moon, shaded pale blue and lavender in broad soft areas, with a few thin faint lines along the
+drifts and no hard marks; dark green firs, full to the ground, each bough loaded with snow; a few bare slender trees,
+their stems pale violet-blue, their branches thin and bare.
+
+What is taken from it: THE SNOW (smooth, pale, softly shaded from drift to drift; thin lines, many of them, with little
+difference between neighbours; nothing that reads as tiles or ridges) and THE TREES of a snowfield (snow-laden firs in
+groups with open snow between, bare slender trees among them).
+
+What is not taken: its softness. It is a wet watercolour, and the look's first rule is the crispness rule above: no
+blur. Smoothness comes from many thin flat strokes that differ little, not from soft edges.
+
