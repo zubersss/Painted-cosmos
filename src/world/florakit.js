@@ -292,7 +292,10 @@ export function birchGeometry(seed, lod, spec) {
       const low = sl ? 1 - k / 8 : 0;
       const ang = sl ? k * 2.4 + rnd() * 1.1 : rnd() * 6.283, len = sl ? 1.7 + 1.5 * low + rnd() * 1.5 : 1.9 + rnd() * 1.8;
       const rise = sl ? 0.78 - 0.42 * low : 0.78;
-      const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * rise * 0.64, p0.z + Math.sin(ang) * len * 0.55);
+      // (the default tree's bough bends at exactly half its rise, as it always did: written as 0.78 * 0.64 it was 0.4992,
+      // every bough of the watercolour game's trees a few millimetres lower: found by comparing the watercolour game's
+      // picture on `main` and on this branch pixel for pixel, before the pull request)
+      const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * (sl ? rise * 0.64 : 0.5), p0.z + Math.sin(ang) * len * 0.55);
       const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * rise, p0.z + Math.sin(ang) * len);
       const bid = (k * 0.618034 + 0.13) % 1;
       tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd(), branch: bid });
