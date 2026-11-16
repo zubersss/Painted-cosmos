@@ -187,6 +187,16 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     A second picture followed ("And this one": a pastel of a bare winter wood): its thin, close,
     slanting hatched strokes of pale snow and its bare dark slender trees with twiggy crowns are
     taken the same way.
+28. **A summary in `CLAUDE.md`, a checkpoint, and a list of the three riskiest parts; fix nothing
+    until told (2026-11-16).** "Do not stop or abandon your current task. Finish it first. When
+    it's done, do these in order, without changing any game code: 1. Tell me what rendering tech
+    this game uses ... 2. Give me a short overview of how the code is organized ... 3. Create a
+    CLAUDE.md file in the project root that summarizes the structure, the tech used, how to run
+    the game, and any conventions you've been following ... 4. Commit everything to git with a
+    clear message as a checkpoint. 5. List the 3 messiest or riskiest parts of the code, but
+    don't fix them yet. Wait for my go-ahead." The existing `CLAUDE.md` rules were kept and the
+    summary added under them. THE THREE PARTS LISTED IN STEP 5 ARE NOT TO BE FIXED WITHOUT THE
+    OWNER'S GO-AHEAD (they are named in the log's entry of that date).
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
@@ -220,8 +230,9 @@ look (no errors) and what the survey showed wrong was cured. THE OWNER APPROVED 
 checkpoint ("I like the look so far keep it up") and asked for two things (section 2, item 24):
 thinner strips on the cloak and the aurora as light; both are done and seen; then for snow in the
 colours of ice and snow, darker, its strokes as the clip's (item 25), and for the night sky's
-streaks and the snow's strokes as the reference's (item 26): done and seen, the stills sent.
-`look-proto` is at e18688b (the full check ran before the last commits, which touch the oil
+streaks and the snow's strokes as the reference's (item 26), then for smooth snow in thin
+strokes and for trees on the snowfield (item 27): done and seen, the stills sent.
+`look-proto` is at b8ae2a2 (the full check ran before the last commits, which touch the oil
 look's paths only; the unit and world suites were run on the head); `node tests/all.mjs --export` PASSED all seventeen steps on it (thirteen on 5c77830, the
 four painted-world runs on efb0fc6; later commits changed the oil look's paths only, with the unit
 and world suites run again). WAITING FOR THE OWNER, asked twice: whether to put the look on a page
