@@ -602,7 +602,7 @@ export function createWorld(scene) {
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0); du.uMoon.value = 0;
       lighting.bodyId = null; lighting.space01 = 1;
     }
-    castShade(active);
+    castShade(active, cameraPos);
     lastActive = active ? active.id : null;
   }
 
@@ -610,7 +610,7 @@ export function createWorld(scene) {
   // away from the sun (a pool right under them when the sky is closed), fading as they rise.
   // They are found in the scene by userData.pcCaster (src/art/models.js); nothing to wire.
   const _cp = new THREE.Vector3(), _cu = new THREE.Vector3(), _ct = new THREE.Vector3(), _ca = new THREE.Vector3(), _cq = new THREE.Quaternion();
-  function castShade(active) {
+  function castShade(active, cameraPos) {
     const K = G.uCastK.value, U = G.uCast.value;
     K.set(0, 0);
     SHADOW.root = null; SHADOW.strength = 0;
@@ -621,6 +621,11 @@ export function createWorld(scene) {
     const sunL = active.bu.uSunDirL.value, ov = active.bu.uWx.value.x, day = moon > 0.5 ? mk * 0.8 : active.bu.uDayness.value * mk;
     // (the oil look's shadow map, render/shadow.js: thrown by the same light, none under a closed sky or from space)
     SHADOW.root = active.root; SHADOW.sunDirL.copy(sunL);
+    { // (the eye's height over the land: the shadow map's square lies on the land under the eye, render/shadow.js)
+      _cp.copy(cameraPos); active.root.worldToLocal(_cp);
+      const rc = _cp.length();
+      if (rc > 1) { _cu.copy(_cp).divideScalar(rc); const sp = sampleSurfacePure(active.id, _cu.x, _cu.y, _cu.z); SHADOW.alt = Math.max(0, rc - Math.max(sp.radius, sp.liquidRadius || 0)); } else SHADOW.alt = 0;
+    }
     SHADOW.strength = (1 - ov) * day * (1 - Math.min(1, (active.bu.uFog.value.w || 0) * 4));
     // (the light in the air, post.js OIL_FRAG: the air's density on the ground as chunks.js pcFogAmount has it, the lit
     // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)

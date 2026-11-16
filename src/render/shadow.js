@@ -114,7 +114,7 @@ export class ShadowMap {
     const o = opts || {};
     const ex = renderer.extensions;
     this.ok = !!(ex && ex.has && ex.has('EXT_color_buffer_float'));
-    this.size = o.size || 2048; this.R = o.range || 90; this.D = 400;
+    this.size = o.size || 2048; this.R = o.range || 90; this.R0 = this.R; this.D = 400;
     this.rt = null; this.frames = 0;
     if (!this.ok) return;
     this.rt = new THREE.WebGLRenderTarget(this.size, this.size, { type: THREE.FloatType, format: THREE.RedFormat, depthBuffer: true });
@@ -165,11 +165,19 @@ export class ShadowMap {
     const f = this._f.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(qi);
     f.addScaledVector(up, -f.dot(up));
     if (f.lengthSq() > 1e-6) f.normalize(); else f.set(0, 0, 0);
-    const c = this._c.copy(camL).addScaledVector(f, this.R * 0.4);
+    // FROM THE AIR the square lies on the LAND under the eye, not round the eye (from 150 m up with a low sun the land
+    // in view fell outside it, and the wood from the ship had no shadows at all), and it is larger the higher the eye:
+    // 90 m to each side on the ground, then 127, 180, 255, 360 (in steps, so that the texels a shadow is cut on change
+    // seldom; SHADOW.alt: the eye's height over the land, from the world)
+    const alt = Math.max(0, SHADOW.alt || 0);
+    let R = this.R0;
+    while (R < 359 && alt * 1.5 > R) R *= Math.SQRT2;
+    if (R !== this.R) { this.R = R; const sc = this.cam; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix(); }
+    const c = this._c.copy(camL).addScaledVector(up, -alt).addScaledVector(f, this.R * 0.4);
     const tx = (2 * this.R) / this.size;
     const cx = Math.round(c.dot(X) / tx) * tx, cy = Math.round(c.dot(Y) / tx) * tx, cz = c.dot(Z);
     c.set(0, 0, 0).addScaledVector(X, cx).addScaledVector(Y, cy).addScaledVector(Z, cz);
-    const R = this.R, D = this.D;
+    const D = this.D;
     // body-local -> (x, y in -1..1 over the square; z: 0 at the sun's side .. 1), as chunks.js pcSunAt reads it
     OIL.uShM.value.set(
       X.x / R, X.y / R, X.z / R, -cx / R,

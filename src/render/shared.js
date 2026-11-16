@@ -132,7 +132,7 @@ export const OIL = {
 // What the shadow map needs from the world each frame (shadow.js): the body the eye is on (its root in the scene), the
 // way to its sun in its own space, and how strong a shadow is now (none under a closed sky or in the middle of twilight).
 // (air: the density of the air on the ground, 1/m, and shaft: how strong the light in the air is, for the shafts)
-export const SHADOW = { root: null, sunDirL: new THREE.Vector3(0, 1, 0), strength: 0, air: 0, shaft: 0 };
+export const SHADOW = { root: null, sunDirL: new THREE.Vector3(0, 1, 0), strength: 0, air: 0, shaft: 0, alt: 0 };      // (alt: the eye's height over the land, m)
 // (a tool may reach every painted material ever made: tools/lab.mjs swaps their shaders without a reload)
 export const MATERIALS = new Set();
 export function register(m, kind, opts) {
