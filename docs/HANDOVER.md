@@ -256,8 +256,9 @@ painter's notes on that branch the file-by-file one):
 - Rivers (Earth, oil look only): channels that split round islands and rejoin, pools, side
   streams that fork into the rivers.
 - `?bench=1`: a speed test that leaves a table on the screen for the owner to photograph.
-- The default (watercolour) game: unit 251, world 47, physics 325 pass; compared pixel for
-  pixel with `main` in six places (see the log for the result).
+- The default (watercolour) game: compared pixel for pixel with `main` in six places, 0 pixels
+  differ; the full check (`node tests/all.mjs --export`) on `look-proto`'s head 9b1a70a: all 17
+  passed.
 
 **What is waited for from the owner:**
 1. To say whether to open the pull request that takes this to the live game (they must merge
