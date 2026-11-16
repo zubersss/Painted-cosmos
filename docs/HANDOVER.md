@@ -224,6 +224,9 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     forest must run smoothly on the phone; (b) its look is refined after the new pictures
     (described in `docs/references/README.md`), the clip still the main target; (c) rivers
     branch: tributaries, channels that split and rejoin, side rivers of their own.
+34. **"Open the pull request" (2026-11-16).** Pull request #5 (`look-proto` into `main`: the
+    forest's speed, the autumn wood, the rivers, the speed test) was opened at the owner's word.
+    The owner merges it; the session does not.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
@@ -243,7 +246,7 @@ been patched a dozen times; the log has the history).
 world liked, THE FOREST SLOW (about 9 pictures a second at the pinned top settings) AND NOT AS
 PRETTY, and rivers wanted with tributaries (section 2, item 33; 23 new reference pictures, all
 of autumn woods, in `docs/references/README.md`). The answer to that is BUILT AND PUSHED ON
-`look-proto` BUT NOT LIVE: it waits for a pull request the owner has to ask for.
+`look-proto` BUT NOT LIVE: it is PULL REQUEST #5, open, waiting for the owner to merge it.
 
 **What is on `look-proto` beyond `main`** (the log's last section has the whole account, the
 painter's notes on that branch the file-by-file one):
@@ -261,8 +264,9 @@ painter's notes on that branch the file-by-file one):
   passed.
 
 **What is waited for from the owner:**
-1. To say whether to open the pull request that takes this to the live game (they must merge
-   it themselves to try it on the phone).
+1. To merge PULL REQUEST #5 (opened at their word, 2026-11-16; all checks in its text). Once
+   it is merged, give them the two addresses: the wood with the phone's own settings
+   (`?look=oil&body=earth&time=15.4`) and the speed test (`?look=oil&bench=1&body=earth&time=15.4`).
 2. Then, from the phone: the table of `?bench=1` (a photograph of the screen), and how the wood
    looks and runs to them.
 3. Their go-ahead before any of the three riskiest parts of the code is touched (below).
