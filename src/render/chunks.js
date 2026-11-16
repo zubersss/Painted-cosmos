@@ -202,7 +202,7 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // (the golden hours: with the sun under about thirty degrees the oil look's light is gold and its air a pale gold,
 // whatever the hour's own keys say: the owner's reference clip stands in that light with the sun still well up, its
 // shadows about twice as long as what throws them and half the forest floor in the sun)
-float pcGold() { return (1.0 - smoothstep(0.36, 0.80, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }
+float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }      // (gold until the sun stands well over thirty degrees: with the sun at thirty the wood's floor has broad pools of light, as the clip's, and the air must still be gold there)
 vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
@@ -422,7 +422,7 @@ float pcSunAt(vec3 bodyPos, float canopy, float lift, float w) {
   return pcDappleS(bodyPos, canopy, lift, w);
 }
 // The sun on the GROUND for one stroke, from the shadow map taken down and smoothed (shadow.js AIR_FRAG: the share of a
-// patch about half a metre across that something shades). A stroke is in the shade where more than about four tenths
+// patch about half a metre across that something shades). A stroke is in the shade where more than about a half
 // of its patch is, each stroke by its own number a little sooner or later. So the canopy throws masses of shade with
 // pools of light between them, and no single leaf's gap is a fleck of light: asked of the fine map, the floor under a
 // crown was a spatter of single lit dabs, and the shadows of bare trunks, ruled lines (the critic's "bar code").
@@ -435,7 +435,7 @@ float pcSunAtSoft(vec3 bodyPos, float canopy, float lift, float w, float r) {
     if (inside >= 0.004) {
       vec2 f = textureLod(uShAir, q.xy * 0.5 + 0.5, 0.5).rg;
       float cov = f.r * step(f.g / max(f.r, 1e-3) - 0.0006, q.z);
-      float lit = step(cov, 0.30 + 0.24 * r);
+      float lit = step(cov, 0.40 + 0.26 * r);
       if (inside > 0.996) return lit;
       return mix(pcDappleS(bodyPos, canopy, lift, w), lit, inside);
     }

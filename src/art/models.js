@@ -204,7 +204,7 @@ function cloakRow(B, n, yTop, yBot, w, rag, lift, seed, a0) {
     const y1 = yBot + rag * (r1 - 0.4), len = yTop - y1, pts = [];
     for (let k = 0; k <= 3; k++) { const t = k / 3, y = yTop - len * t; pts.push(cloakAt(a + da * t, y, lift * (0.4 + 1.0 * t) + (i % 2) * 0.006)); }
     const col = CLOAK_BLUES[(i * 3 + ((r2 * 5) | 0) + seed) % CLOAK_BLUES.length];
-    B.path(pts, (k) => [[w * 0.80, 0.005], [w, 0.007], [w * 0.94, 0.007], [w * 0.55, 0.005]][k], { seg: 6, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.7, ref: [-Math.sin(a), 0, Math.cos(a)] });
+    B.path(pts, (k) => [[w * 0.86, 0.005], [w, 0.007], [w * 0.92, 0.007], [w * 0.42, 0.005]][k], { seg: 6, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.25, ref: [-Math.sin(a), 0, Math.cos(a)] });
   }
 }
 function wandererParts(B, X, Z, ringsY) {
@@ -254,7 +254,7 @@ function wandererParts(B, X, Z, ringsY) {
     for (let i = 0; i < n; i++) {
       const x = (i - (n - 1) / 2) * 0.072 * (0.75 + 0.12 * tier), w = 0.040, len = 0.26 + 0.05 * ((i * 7 + tier) % 3);
       const pts = []; for (let k = 0; k <= 3; k++) { const t = k / 3; pts.push([x * (1 + 0.10 * t), y0 - len * t, zt + 0.030 * t + 0.014]); }
-      B.path(pts, (k) => [[w * 0.80, 0.005], [w, 0.007], [w * 0.94, 0.007], [w * 0.55, 0.005]][k], { seg: 6, col: CLOAK_BLUES[(i * 5 + tier * 3 + 1) % CLOAK_BLUES.length], even: 1, lump: 0, dry: 1, wet: 0, cap: 0.7, ref: X });
+      B.path(pts, (k) => [[w * 0.86, 0.005], [w, 0.007], [w * 0.92, 0.007], [w * 0.42, 0.005]][k], { seg: 6, col: CLOAK_BLUES[(i * 5 + tier * 3 + 1) % CLOAK_BLUES.length], even: 1, lump: 0, dry: 1, wet: 0, cap: 0.25, ref: X });
     }
   }
   // 6..9 legs: thigh, shin and boot

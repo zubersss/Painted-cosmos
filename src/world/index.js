@@ -628,7 +628,7 @@ export function createWorld(scene) {
       const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
       SHADOW.air = fx * (k4 + (1.6 - k4) * Math.min(1, Math.max(0, (reach - 200) / 400)));
       const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
-      const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.36, 0.80);
+      const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.48, 0.86);
       const gold = lowSun * active.bu.uDayness.value * (1 - moon) * (1 - ov);
       const L = active.bu.uLight.value;
       OIL.uShaftC.value.set(L.x * L.x, L.y * L.y, L.z * L.z).lerp(_ct.set(1.0, 0.82, 0.50), 0.75 * gold);

@@ -77,7 +77,19 @@ blur at all; colours that pop with no detail lost; the cloak a rich blue; no jet
   shadow map with those bones; `pcCast`'s soft blot gives way while the map is on.
 - WATER (overhaul 7, first pass, not yet seen in a still): the dashes carry the sky's colour, a path of broken marks
   of the light toward the sun or the moon, and by night under an aurora a share of them its green (`uAuroraK`).
-- CLOUDS (overhaul 6, first pass, not yet seen against an open sky): flat two-tone shapes with clean edges.
+- THE SKY (overhaul 6): by day flat bands from the horizon to the zenith with wandering edges (no wash turbulence, no
+  backruns: they were smudges and rings in opaque paint); clouds flat shapes with clean edges, two tones by day, one a
+  step lighter than the sky by night; the night sky two layers of dense fine streaks.
+- AFTER THE INDEPENDENT CRITIC (2026-11-16; the log on `r2` has its findings one by one): the ground's strokes ask a
+  SMOOTHED shadow (`pcSunAtSoft`: the shadow map taken down, `uShAir`; plants and the base still ask the fine map), so
+  the canopy throws masses and pools, not a spatter of single lit dabs; a dab never comes under 0.58 of its size (the
+  youngest dabs were dots); dabs are laid larger at a low angle (`graze` in `TERRAIN_FRAG`: a hatching of lines a pixel
+  high on a far level floor); the wood's palette moved toward gold and its shade to a violet umber; bark dark, lit by
+  the sun only, in long streaks; the air's reach 2.7 times the watercolour's (was 4) and the glow toward the sun 0.5
+  (was 0.8); a conifer one tree in thirty in the autumn wood (`oil.tallMix` 1.5); six-cornered leaves on small plants
+  (`leafCards` `round`); the figure's light in flat half-tone steps; the cloak six tiers of short narrow strips in a
+  wider bell; the aurora one ribbon of flames (`pcAuroraRays` in `sky.js`); the tundra a pale snowfield (`oil.pal`)
+  in long strokes with a slow wide bend (`pcThinLayer` with a negative bend).
 - `tools/lab.mjs`: the look lab (see its header): one long-lived headless page on the painter's gallery. In software
   GL the first frame after a load compiles the shaders: eight to eleven minutes at 1280x720; every frame after takes
   20 to 60 s. **A background process is stopped by the session after two hours:** start the lab inside the job that

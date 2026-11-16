@@ -268,6 +268,7 @@ class Surface {
     b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open, 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
+    if (MODE.oil && bi.oil && bi.oil.tallMix != null) b.birch = bi.oil.tallMix;      // (the oil look may set a wood's mix of kinds outright: the biome's oil.tallMix)
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s), 0, 1);
     b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines

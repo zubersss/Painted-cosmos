@@ -22,7 +22,7 @@ export default {
   // (and its night is the clip's: a deep green-blue sky, turquoise snow with deep blue shade; measured on the clip's
   // night frames, where nothing is violet)
   oil: { ground: 'flow', grass: 0.25,
-    night: { zenith: [0.03, 0.17, 0.19], horizon: [0.08, 0.29, 0.32], haze: [0.08, 0.27, 0.32], glaze: [0.40, 0.60, 0.86], light: [0.82, 0.96, 0.98], grade: [0.80, 0.94, 0.95] } },
+    night: { zenith: [0.03, 0.17, 0.19], horizon: [0.08, 0.29, 0.32], haze: [0.08, 0.27, 0.32], glaze: [0.40, 0.60, 0.86], light: [0.70, 0.92, 0.96], grade: [0.78, 0.93, 0.95] } },
   sky: mkSky([0.34, 0.46, 0.84], [0.82, 0.89, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
   flora: {
     tall: [

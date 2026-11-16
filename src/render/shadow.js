@@ -26,8 +26,10 @@ uniform float uInv;
 varying float vS;
 varying vec3 vCell;
 varying float vPart;
+varying float vLeafH;
 void main() {
   vec3 p = position;
+  vLeafH = aData.w;
   float sc = 1.0;
   #ifdef USE_INSTANCING
     // each plant is in a near mesh and a far one, and the painted shader draws the one whose range the eye is in:
@@ -48,13 +50,19 @@ void main() {
 `;
 const FRAG = /* glsl */`
 uniform float uThin;
+uniform float uThinLeaf;
 varying float vS;
 varying vec3 vCell;
 varying float vPart;
+varying float vLeafH;
 float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 void main() {
   // a crown is not a solid: the light comes through it in pieces (each about a third of a metre: a bough's worth)
   if (vPart > 0.5 && vPart < 1.5 && h3(floor(vCell * 2.8)) < uThin) discard;
+  // (and a crown of separate leaves: only a share of its leaves throw a shadow, each leaf whole (its own number), or a
+  // full crown shades its whole floor: with every leaf throwing, a wood in leaf was nine parts shade; the clip's floor
+  // is about half in the sun)
+  if (vPart > 4.5 && vLeafH < uThinLeaf) discard;
   gl_FragColor = vec4(vS, 0.0, 0.0, 1.0);
 }
 `;
@@ -117,7 +125,7 @@ export class ShadowMap {
       name: 'pc-shadow',
       uniforms: {
         uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() }, uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
-        uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 },
+        uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 }, uThinLeaf: { value: 0.55 },
       },
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
     });

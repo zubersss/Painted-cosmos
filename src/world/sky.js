@@ -190,7 +190,7 @@ void main() {
     float aStr = uAurora.x * (0.30 + 0.70 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x);
     vec3 ac; float k = pcAuroraRays(az, e, e0, hgA, 44.0, 0.0, fa.b * 3.0, 1.0, ac);
     sky = mix(sky, ac, clamp(k * aStr, 0.0, 0.97));
-    k = pcAuroraRays(az, e, e0, hgA * 1.25, 150.0, 17.0, fa.b * 9.0, 0.45, ac);
+    k = pcAuroraRays(az, e, e0, hgA * 0.95, 104.0, 17.0, fa.b * 9.0, 0.40, ac);
     sky = mix(sky, min(ac * 1.08 + 0.04, vec3(1.0)), clamp(k * aStr, 0.0, 0.97));
   #else
     float k = smoothstep(e0 - 0.012, e0 + 0.02, e) * (1.0 - smoothstep(e0 + 0.04, e0 + hgt, e)) * fold * ray;
@@ -359,7 +359,7 @@ void main() {
     col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
     col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
-    float gold = (1.0 - smoothstep(0.36, 0.80, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x);
+    float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x);
     col = mix(col, vec3(1.0, 0.94, 0.76), gold * mix(0.88, 0.60, smoothstep(0.0, 0.7, e)));
     {
       // the night sky is painted, not left flat: short thin dashes a step lighter than the wash, in rows that waver
