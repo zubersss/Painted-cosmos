@@ -239,3 +239,41 @@ hatched strokes, with small blue shadows at the feet of the trunks. Taken from i
 (it shows them best) and the bare dark trees of a snowy wood. Not taken: the grain of the pastel (the look has no
 grain) and its softness.
 
+## Three more from the owner (2026-11-16): autumn woods, for the forest
+
+Sent after the owner tried the look on the phone, with the words "the forest one could stil use alot of work ... the
+look wasn't as pretty as the snow one or as well done refine the look further uses these new photos as references as
+well for it". All three are third parties' paintings and are not in the repository. The clip stays the main target
+(the owner, the same day: "still use the reference video as well"); these three say what the WOOD should be.
+
+**1. A sunlit autumn wood on grass (oil).** Big dark trunks in the foreground, forked low, with bare dark boughs
+reaching wide across the picture; the leaves are small dabs of orange, amber and yellow, hung in loose clusters with
+sky and mist showing between them, never a solid mass. The ground is GRASS, not litter: fine short upright strokes,
+blue-green and deep green in the shade, bright yellow-green where the sun falls, in long patches of light between the
+trees' shadows; tiny dots of yellow and pale flowers scattered over it. Far trees are pale blue-violet stems in a
+pale mist, with a blue hill behind. What is taken: the grass in upright blades with the sun lying on it in patches,
+the cool blue-green of its shade, the dots of flowers; the trees' build (a heavy dark stem, boughs seen through the
+leaves, leaves in clusters of small dabs); the pale blue distance.
+
+**2. A path under a great oak, into a glowing mist (oil).** The whole foreground in deep shade: dark green-black
+grass with blades standing against the light, and a track of two ruts covered in red fallen leaves. One great tree at
+the right, its dark limbs spread over the whole top of the picture, hung with russet and gold leaf clusters; a small
+full green tree in the middle, lit from behind; beyond, the air itself glows pale yellow and white. What is taken: the
+DESIGN OF THE LIGHT (a dark frame of shade round a bright, warm, misty middle distance; things in front as dark
+shapes against the glow); fallen leaves as red and russet dabs gathered on the bare ground of a path; the great
+spreading tree. What is not taken: its softness (the mist's glow is a flat step of pale colour in this look, not a
+blur).
+
+**3. A cottage under a huge autumn tree (gouache, an illustration).** A thick trunk in long flowing strokes of brown
+and ochre, leaning over the whole picture; the crown made of many separate small dabs, orange, yellow, cream and red
+over a darker mass; the ground strewn with fallen leaves in the same colours as distinct small dabs; small red
+toadstools, pale feathery ferns, a pale bush. What is taken: the crown and the fallen leaves as MANY SMALL SEPARATE
+DABS in several warm colours over a darker ground (this is the look's own leaf dab, style 5, at its best); the bark in
+long flowing strokes; small bright things among the leaves (toadstools, pale ferns). What is not taken: the cottage
+(no shelters for now, by the owner's word) and the storybook flatness.
+
+**What the three agree on, and the game's wood did not have** (seen in the owner's recording from the phone: thin
+sparse green birches, an olive-brown floor of dabs, flat lime patches of sun, a stream like a canal): AUTUMN colour
+(orange, amber, yellow, russet) against DARK stems; trees with weight, boughs and clustered leaves; GRASS in blades
+with the sun on it; a warm pale glow in the distance and deep cool shade in front.
+
