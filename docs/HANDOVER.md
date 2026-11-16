@@ -205,6 +205,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     shading and the trees. Where they pull apart the snow sits between them.
 30. **"Resume work" (2026-11-16).** Read as: go on with the look. Not a go-ahead for the three
     riskiest parts (item 28: still waiting) and not a yes to a desktop page (still not answered).
+31. **Yes to the pull request for the look (2026-11-16).** "Yes, open the pull request that adds
+    the look behind ?look=oil." A pull request from `look-proto` into `main` is opened; the
+    owner merges it (or asks for it to be merged) when they choose. After the merge the look is
+    at the live address with `?look=oil` added; without the flag the game is as before.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
