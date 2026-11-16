@@ -179,9 +179,9 @@ const mixc = (a, b, t) => lerp3(a, b, clamp01(t));
 // THE CLOAK IN STRIPS (the overhaul plan's eighth piece). The clip's cloak is made of long stroke-shaped strips, one
 // over another like a bird's feathers, each one flat blue, with a ragged edge where they end; it is the strongest
 // colour in the picture. Ours was a smooth cone with fine streaks drawn on it and a pale hem. So the cone is now a dark
-// lining, and over it hang three rows of strips (each a thin flat ribbon with a pointed end, a piece of geometry of
+// lining, and over it hang tiers of strips (each a thin flat ribbon with a blunt end, a piece of geometry of
 // its own: `dry: 1` marks it for the shader, materials.js FIG_FRAG, which paints it as one flat piece), the lowest
-// row ending at many heights. The profile is the cone's own: [height, half width, half depth, how far back].
+// tier ending at many heights. The profile is the cone's own: [height, half width, half depth, how far back].
 // (a wide bell: the clip's cloak stands out from the body and is widest at its hem)
 const CLOAK_PROFILE = [[1.47, 0.110, 0.100, 0.012], [1.36, 0.255, 0.180, 0.022], [1.26, 0.262, 0.232, 0.036], [1.12, 0.268, 0.262, 0.042], [1.03, 0.280, 0.276, 0.040], [0.94, 0.300, 0.298, 0.042],
   [0.80, 0.336, 0.336, 0.046], [0.64, 0.372, 0.376, 0.050], [0.50, 0.398, 0.404, 0.054], [0.38, 0.412, 0.420, 0.056]];
@@ -194,17 +194,24 @@ function cloakAt(a, y, out) {
   const r = rx + out, q = rz + out;
   return [Math.cos(a) * r, y, cz + Math.sin(a) * q];
 }
-// one tier: n short narrow strips round the cloak from yTop down to about yBot (each its own length), w their half
-// width. A strip is widest a little under its top and ends in a blunt point; its top lies under the tier above.
-function cloakRow(B, n, yTop, yBot, w, rag, lift, seed, a0) {
+// one tier: n THIN strips round the cloak, hung at yTop and about len long (each its own length), w their half width.
+// (The owner, 2026-11-16: "the cloak looks clunky thinner stripes would help or more stripes to make it flow easier".
+// So a strip is under four centimetres wide and seven or eight times as long, there are about six hundred of them in
+// nine tiers, each lying over two tiers below it, each with a slight sway of its own down its length and lifting a
+// little from the cloak at its tip: long strokes that run down the cloak, not scales.)
+function cloakRow(B, n, yTop, len0, w, rag, lift, seed, a0, flare) {
   for (let i = 0; i < n; i++) {
     const h1 = (Math.sin((i + 1) * 12.9898 + seed * 78.233) * 43758.5453) % 1, r1 = h1 < 0 ? h1 + 1 : h1;
     const h2 = (Math.sin((i + 1) * 39.3467 + seed * 11.135) * 24634.6345) % 1, r2 = h2 < 0 ? h2 + 1 : h2;
-    const a = a0 + ((i + 0.5 * (r1 - 0.5)) / n) * Math.PI * 2, da = (r2 - 0.5) * 0.07;
-    const y1 = yBot + rag * (r1 - 0.4), len = yTop - y1, pts = [];
-    for (let k = 0; k <= 3; k++) { const t = k / 3, y = yTop - len * t; pts.push(cloakAt(a + da * t, y, lift * (0.4 + 1.0 * t) + (i % 2) * 0.006)); }
-    const col = CLOAK_BLUES[(i * 3 + ((r2 * 5) | 0) + seed) % CLOAK_BLUES.length];
-    B.path(pts, (k) => [[w * 0.86, 0.005], [w, 0.007], [w * 0.92, 0.007], [w * 0.42, 0.005]][k], { seg: 6, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.25, ref: [-Math.sin(a), 0, Math.cos(a)] });
+    const a = a0 + ((i + 0.7 * (r1 - 0.5)) / n) * Math.PI * 2, da = (r2 - 0.5) * 0.10, sway = (r1 - 0.5) * 0.05;
+    const len = len0 * (0.78 + 0.44 * r2) + rag * r1, pts = [];
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4, y = Math.max(0.36, yTop - len * t);
+      pts.push(cloakAt(a + da * t + sway * Math.sin(t * 3.14), y, lift * (0.35 + 0.9 * t) + (flare || 0) * t * t + (i % 3) * 0.004));
+    }
+    const c0 = CLOAK_BLUES[(i * 3 + ((r2 * 5) | 0) + seed) % CLOAK_BLUES.length], c1 = CLOAK_BLUES[(i * 5 + seed * 3 + 2) % CLOAK_BLUES.length];
+    const col = mixc(c0, c1, r1 * 0.5);
+    B.path(pts, (k) => [[w * 0.80, 0.004], [w, 0.005], [w, 0.005], [w * 0.86, 0.005], [w * 0.36, 0.004]][k], { seg: 4, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.3, ref: [-Math.sin(a), 0, Math.cos(a)] });
   }
 }
 function wandererParts(B, X, Z, ringsY) {
@@ -215,13 +222,16 @@ function wandererParts(B, X, Z, ringsY) {
   B.loft(ringsY([[1.00, 0.212, 0.214, 0, 0.034], [1.12, 0.224, 0.226, 0, 0.040], [1.26, 0.244, 0.214, 0, 0.034], [1.36, 0.250, 0.172, 0, 0.020], [1.42, 0.172, 0.126, 0, 0.010], [1.465, 0.086, 0.080]]), { seg: 16, col: cloak, lump: 0.012 });
   { const pts = []; for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; pts.push([Math.cos(a) * 0.100, 1.455 + Math.sin(a * 2) * 0.008 + Math.max(0, Math.sin(a)) * 0.016, Math.sin(a) * 0.094 + 0.014]); }
     B.path(pts, 0.046, { seg: 7, closed: true, col: CLOAK_D, lump: 0.006, dry: 0.3 }); }
-  // (two tiers over the shoulders, on the torso's bone; the tops of the first lie under the cowl)
-  cloakRow(B, 18, 1.26, 1.06, 0.040, 0.05, 0.010, 2, 0.11);
-  cloakRow(B, 14, 1.445, 1.22, 0.040, 0.05, 0.014, 1, 0.24);
+  // (three tiers over the shoulders, on the torso's bone, the lowest laid first; the tops of the highest lie under the cowl)
+  cloakRow(B, 50, 1.20, 0.24, 0.019, 0.04, 0.008, 3, 0.05, 0);
+  cloakRow(B, 44, 1.33, 0.26, 0.019, 0.04, 0.011, 2, 0.11, 0);
+  cloakRow(B, 34, 1.455, 0.26, 0.019, 0.04, 0.014, 1, 0.24, 0);
   // 1 head: bare; the face takes the light, the hair a soft cap
   B.part = 1;
   B.blob([0, 1.585, 0], 0.112, 0.125, 0.118, { seg: 14, rings: 11, col: (p) => (p[2] < -0.03 && p[1] < 1.632 ? mixc(FLESH, CHEEK, sstep(0.03, 0.08, Math.abs(p[0])) * sstep(1.625, 1.57, p[1]) * 0.75) : HAIR), lump: 0.004, dry: 0.2 });
-  B.blob([0, 1.668, 0.030], 0.119, 0.072, 0.128, { seg: 12, rings: 7, col: (p) => mixc(HAIR, SEPIA, noise3(p[0] * 20, p[1] * 9, p[2] * 20) * 0.6), lump: 0.010, dry: 0.4 });
+  // (the hair one form over the crown and down to the nape: as a shallow cap on the head it had a rim, and with its
+  // streaks it read as a knitted hat; the owner's figure is bare-headed)
+  B.blob([0, 1.622, 0.046], 0.123, 0.118, 0.126, { seg: 12, rings: 9, col: (p) => mixc(HAIR, SEPIA, noise3(p[0] * 20, p[1] * 9, p[2] * 20) * 0.6), lump: 0.008, dry: 0.4 });
   // 2, 3 arms: dark sleeves from under the cloak, a pale hand
   for (const s of [-1, 1]) {
     B.part = s < 0 ? 2 : 3;
@@ -241,20 +251,22 @@ function wandererParts(B, X, Z, ringsY) {
   });
   // (four tiers down the fall, on its bone, laid from the hem up so that each lies over the one below it; the lowest
   // ends at many heights: the cloak's ragged edge)
-  cloakRow(B, 30, 0.60, 0.40, 0.040, 0.10, 0.008, 6, 0.07);
-  cloakRow(B, 28, 0.78, 0.56, 0.040, 0.06, 0.012, 5, 0.19);
-  cloakRow(B, 25, 0.95, 0.73, 0.040, 0.06, 0.012, 4, 0.02);
-  cloakRow(B, 22, 1.10, 0.90, 0.040, 0.05, 0.012, 3, 0.15);
+  cloakRow(B, 74, 0.58, 0.22, 0.019, 0.10, 0.006, 9, 0.07, 0.030);
+  cloakRow(B, 72, 0.69, 0.28, 0.019, 0.07, 0.008, 8, 0.19, 0.022);
+  cloakRow(B, 68, 0.80, 0.30, 0.019, 0.05, 0.010, 7, 0.02, 0.014);
+  cloakRow(B, 64, 0.91, 0.30, 0.019, 0.05, 0.011, 6, 0.15, 0.008);
+  cloakRow(B, 60, 1.01, 0.30, 0.019, 0.05, 0.012, 5, 0.09, 0.004);
+  cloakRow(B, 56, 1.11, 0.30, 0.019, 0.05, 0.012, 4, 0.21, 0);
   // 5 the back panel, which streams on the air (the scarf's bone)
   B.part = 5;
   B.path([[0, 1.43, 0.13], [0, 1.40, 0.225], [0, 1.25, 0.282], [0, 1.02, 0.310], [0, 0.80, 0.338], [0, 0.60, 0.360]], (i) => [[0.10, 0.020], [0.17, 0.022], [0.215, 0.020], [0.236, 0.018], [0.226, 0.016], [0.150, 0.012]][i], { seg: 10, col: cloak, lump: 0.006, ref: X, dry: 0.3 });
-  // (and its own strips: four short tiers down the back, each over the one below, which stream with it)
-  for (let tier = 3; tier >= 0; tier--) {
-    const n = 5 + (tier % 2), y0 = 1.40 - tier * 0.20, zt = 0.262 + tier * 0.036 + (tier === 0 ? -0.012 : 0);
+  // (and its own strips: six tiers of thin ones down the back, each over the two below, which stream with it)
+  for (let tier = 5; tier >= 0; tier--) {
+    const n = 9 + (tier % 2), y0 = 1.41 - tier * 0.135, zt = 0.262 + tier * 0.024 + (tier === 0 ? -0.012 : 0);
     for (let i = 0; i < n; i++) {
-      const x = (i - (n - 1) / 2) * 0.072 * (0.75 + 0.12 * tier), w = 0.040, len = 0.26 + 0.05 * ((i * 7 + tier) % 3);
-      const pts = []; for (let k = 0; k <= 3; k++) { const t = k / 3; pts.push([x * (1 + 0.10 * t), y0 - len * t, zt + 0.030 * t + 0.014]); }
-      B.path(pts, (k) => [[w * 0.86, 0.005], [w, 0.007], [w * 0.92, 0.007], [w * 0.42, 0.005]][k], { seg: 6, col: CLOAK_BLUES[(i * 5 + tier * 3 + 1) % CLOAK_BLUES.length], even: 1, lump: 0, dry: 1, wet: 0, cap: 0.25, ref: X });
+      const x = (i - (n - 1) / 2) * 0.040 * (0.80 + 0.10 * tier), w = 0.019, len = 0.26 + 0.06 * ((i * 7 + tier) % 3), sw = ((i * 13 + tier * 5) % 7 - 3) * 0.004;
+      const pts = []; for (let k = 0; k <= 4; k++) { const t = k / 4; pts.push([x * (1 + 0.10 * t) + sw * Math.sin(t * 3.14), y0 - len * t, zt + 0.030 * t + 0.014 + (i % 2) * 0.004]); }
+      B.path(pts, (k) => [[w * 0.80, 0.004], [w, 0.005], [w, 0.005], [w * 0.86, 0.005], [w * 0.36, 0.004]][k], { seg: 4, col: mixc(CLOAK_BLUES[(i * 5 + tier * 3 + 1) % CLOAK_BLUES.length], CLOAK_BLUES[(i * 3 + tier) % CLOAK_BLUES.length], 0.3), even: 1, lump: 0, dry: 1, wet: 0, cap: 0.3, ref: X });
     }
   }
   // 6..9 legs: thigh, shin and boot

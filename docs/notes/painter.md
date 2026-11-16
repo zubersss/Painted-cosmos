@@ -17,6 +17,12 @@ material (`src/render/shared.js`: `LOOK`, `OIL`, `register`), and the watercolou
 `src/data/mode.js` (`MODE.oil`, `MODE.wanderer`) carries the switch to the data, the surface and the player code, which
 must not load the page's modules.
 
+**The owner on the checkpoint of 2026-11-16:** the look is approved ("I like the look so far keep it up"); the cloak
+was "clunky" and wants thinner or more strips so that it flows (done: about six hundred thin strips in nine tiers,
+`cloakRow` in `src/art/models.js`); the aurora read as "stripes instead of lights like the reference" (done: it is
+LIGHT ADDED TO THE SKY and soft, `pcAuroraLight` in `src/world/sky.js`: the one soft thing in the picture, by the
+owner's word; the crispness rule stands for everything else); go on without stopping for approval.
+
 **The owner's choices so far** (each logged on `r2`): STYLE 5, leaf dabs lying every way, a little thinner than the
 clip's (the five other styles are gone); match the clip very closely, changing ground and plants where that helps; no
 blur at all; colours that pop with no detail lost; the cloak a rich blue; no jetpack, the explorer flies by itself.
@@ -90,7 +96,7 @@ blur at all; colours that pop with no detail lost; the cloak a rich blue; no jet
   the sun only, in long streaks; the air's reach 2.7 times the watercolour's (was 4) and the glow toward the sun 0.5
   (was 0.8); a conifer one tree in thirty in the autumn wood (`oil.tallMix` 1.5); six-cornered leaves on small plants
   (`leafCards` `round`); the figure's light in flat half-tone steps; the cloak six tiers of short narrow strips in a
-  wider bell; the aurora one ribbon of flames (`pcAuroraRays` in `sky.js`); the tundra a pale snowfield (`oil.pal`)
+  wider bell; the aurora one ribbon of flames (since replaced: see the owner on the checkpoint); the tundra a pale snowfield (`oil.pal`)
   in long strokes with a slow wide bend (`pcThinLayer` with a negative bend).
 - `tools/lab.mjs`: the look lab (see its header): one long-lived headless page on the painter's gallery. In software
   GL the first frame after a load compiles the shaders: eight to eleven minutes at 1280x720; every frame after takes

@@ -626,7 +626,7 @@ export function createWorld(scene) {
     // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)
     {
       const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
-      SHADOW.air = fx * (k4 + (1.6 - k4) * Math.min(1, Math.max(0, (reach - 200) / 400)));
+      SHADOW.air = fx * (k4 + (2.4 - k4) * Math.min(1, Math.max(0, (reach - 200) / 400)));
       const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
       const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.48, 0.86);
       const gold = lowSun * active.bu.uDayness.value * (1 - moon) * (1 - ov);

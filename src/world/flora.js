@@ -99,7 +99,7 @@ export class Flora {
     this.kit = {
       far: farTreeGeometry(5),
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
-      rock: rockGeometry(61), flower: flowerGeometry(71), shard: shardGeometry(91),
+      rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
   }
 

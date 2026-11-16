@@ -256,11 +256,15 @@ float pcFogAmount(float dist) {
   #ifdef PC_OIL
     // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
     // read, so the thickening eases off as the air's own reach grows with the eye's height)
-    dist *= mix(uOilC.w, 1.6, clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0));
+    // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
+    // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
+    // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0);
+    dist *= mix(uOilC.w, 2.4, pcHigh);
   #endif
   float f = 1.0 - exp(-dist * uFog.x);
   #ifdef PC_OIL
-    f = f * f * (3.0 - 2.0 * f);      // (thin near the eye, where colour and detail must stand whole; thick far off)
+    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);      // (on the ground: thin near the eye, where colour and detail must stand whole; thick far off)
   #endif
   float q = f * uFog.y;
   float fl = floor(q);

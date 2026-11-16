@@ -463,9 +463,12 @@ export function rockGeometry(seed) {
   return B.build();
 }
 
-export function flowerGeometry(seed) {
+export function flowerGeometry(seed, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   const n = 5;
+  // (the oil look: a flower's head is a small round touch of pure colour, a single dab; a five-pointed head the size
+  // of a hand, in flat paint, was a red star standing in the grass)
+  const oil = !!(spec && spec.oil);
   for (let i = 0; i < n; i++) {
     const ang = rnd() * 6.283, rr = rnd() * 0.28, h = 0.28 + rnd() * 0.3;
     const x = Math.cos(ang) * rr, z = Math.sin(ang) * rr;
@@ -473,12 +476,12 @@ export function flowerGeometry(seed) {
     stroke(B, V(x * 0.6, 0, z * 0.6), dir, h, 0.012, 0.25, rnd, { segs: 2, sway: 0.5 });
     // the head: a small cupped touch with five lobes (petals), its tips lifted and a little ragged, tilted to face
     // out from the clump (it was a flat hexagon: seen from above a red disc, seen across the meadow a red dash)
-    const c = V(x * 0.6 + dir.x * h * 0.3, h * 0.96, z * 0.6 + dir.z * h * 0.3), s = 0.055 + rnd() * 0.04;
+    const c = V(x * 0.6 + dir.x * h * 0.3, h * 0.96, z * 0.6 + dir.z * h * 0.3), s = (0.055 + rnd() * 0.04) * (oil ? 0.62 : 1);
     const base = B.count, hh = rnd(), a0 = rnd() * 6.283, tl = 0.35 + rnd() * 0.3;
     const ring = 10;
     B.vert(c.x, c.y + s * 0.15, c.z, 0, 1, 0, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh);
     for (let k = 0; k < ring; k++) {
-      const a = a0 + (k / ring) * 6.283, lobe = k % 2 === 0 ? 1.0 + rnd() * 0.15 : 0.42 + rnd() * 0.12, r = s * lobe;
+      const a = a0 + (k / ring) * 6.283, lobe = k % 2 === 0 ? 1.0 + rnd() * 0.15 : (oil ? 0.84 : 0.42) + rnd() * 0.12, r = s * lobe;
       const lx = Math.cos(a) * r, lz = Math.sin(a) * r, ly = (k % 2 === 0 ? 0.35 : 0.12) * s + (lx * dir.x + lz * dir.z) * tl;
       B.vert(c.x + lx, c.y + ly, c.z + lz, Math.cos(a) * 0.45 + dir.x * tl, 0.85, Math.sin(a) * 0.45 + dir.z * tl, 0, 1, 0, 0.5, 1, 0.5, 3, 0, hh);
     }
