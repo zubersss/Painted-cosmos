@@ -234,6 +234,10 @@ has asked for it to be put where they can try it: PULL REQUEST #4 IS OPEN
   comparison of the watercolour game on `main` and on the branch has been looked at; the log's
   newest entries say whether both are done. If a new session finds it still a draft: run those two
   on the head, then mark it ready (or say in it what failed).
+- A LESSON FROM IT: that the live game is unchanged is PROVED BY PICTURES (the same view of the
+  watercolour game from `main` and from the branch, compared pixel for pixel; `main` against itself
+  first), not by reading the diff: the comparison found every default tree's boughs a few
+  millimetres off on the branch (cured in 31aa59f), which reading the code had missed.
 - NOBODY MERGES IT BUT THE OWNER (or a session the owner tells to, in that session).
 - After the merge: the address to give the owner is the live one with `?look=oil` on the end
   (`https://zubersss.github.io/Painted-cosmos/?look=oil`; a place and hour can be added:
