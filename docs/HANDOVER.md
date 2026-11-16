@@ -224,16 +224,15 @@ Last written afresh 2026-11-16 by the coordinator on the second account (the ear
 been patched a dozen times; the log has the history).
 
 **In one line:** the new painted look is built on branch `look-proto`, the owner likes it and
-has asked for it to be put where they can try it: PULL REQUEST #4 IS OPEN
+has asked for it to be put where they can try it: PULL REQUEST #4 IS OPEN AND READY
 (https://github.com/zubersss/Painted-cosmos/pull/4, `look-proto` into `main`, the look behind
 `?look=oil`). It is the owner's to merge.
 
 **The pull request.**
-- Opened as a draft at the owner's word (section 2, item 31). It is marked ready when
-  `node tests/all.mjs --export` has passed on the branch's head and a picture-for-picture
-  comparison of the watercolour game on `main` and on the branch has been looked at; the log's
-  newest entries say whether both are done. If a new session finds it still a draft: run those two
-  on the head, then mark it ready (or say in it what failed).
+- Opened at the owner's word (section 2, item 31) and READY since 2026-11-16 08:37 UTC: on its
+  head (`look-proto` 31aa59f) `node tests/all.mjs --export` passed all 17 steps, and the
+  watercolour game drawn from `main` and from the head is identical pixel for pixel in six
+  places. If its head ever moves, both are to be done again before it is called ready.
 - A LESSON FROM IT: that the live game is unchanged is PROVED BY PICTURES (the same view of the
   watercolour game from `main` and from the branch, compared pixel for pixel; `main` against itself
   first), not by reading the diff: the comparison found every default tree's boughs a few
