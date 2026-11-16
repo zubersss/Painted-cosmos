@@ -209,6 +209,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     the look behind ?look=oil." A pull request from `look-proto` into `main` is opened; the
     owner merges it (or asks for it to be merged) when they choose. After the merge the look is
     at the live address with `?look=oil` added; without the flag the game is as before.
+32. **The owner's phone is a Samsung Galaxy S23 Ultra; they asked for the top-quality link
+    (2026-11-16).** "I have a Samsung 23 ultra and give me the top quality settings link." Given:
+    the live address with `?look=oil&preset=desktop&quality=2&dynres=0` (what each part does is
+    in the log). The desktop they play on is still not known.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
@@ -223,28 +227,24 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new painted look is built on branch `look-proto`, the owner likes it and
-has asked for it to be put where they can try it: PULL REQUEST #4 IS OPEN AND READY
-(https://github.com/zubersss/Painted-cosmos/pull/4, `look-proto` into `main`, the look behind
-`?look=oil`). It is the owner's to merge.
+**In one line:** THE NEW LOOK IS LIVE BEHIND `?look=oil` since 2026-11-16 10:10 UTC: the owner
+merged pull request #4 themselves (`main` at 1cd885f). Without the flag the live game is the
+watercolour game, identical pixel for pixel (proved in six places before the merge). The owner
+is trying the look on their phone, a Samsung Galaxy S23 Ultra, with the top-quality address
+(section 2, item 32).
 
-**The pull request.**
-- Opened at the owner's word (section 2, item 31) and READY since 2026-11-16 08:37 UTC: on its
-  head (`look-proto` 31aa59f) `node tests/all.mjs --export` passed all 17 steps, and the
-  watercolour game drawn from `main` and from the head is identical pixel for pixel in six
-  places. If its head ever moves, both are to be done again before it is called ready.
-- A LESSON FROM IT: that the live game is unchanged is PROVED BY PICTURES (the same view of the
-  watercolour game from `main` and from the branch, compared pixel for pixel; `main` against itself
-  first), not by reading the diff: the comparison found every default tree's boughs a few
-  millimetres off on the branch (cured in 31aa59f), which reading the code had missed.
-- NOBODY MERGES IT BUT THE OWNER (or a session the owner tells to, in that session).
-- After the merge: the address to give the owner is the live one with `?look=oil` on the end
-  (`https://zubersss.github.io/Painted-cosmos/?look=oil`; a place and hour can be added:
-  `&body=neptune&time=23`). Ask them how it runs and how it looks in motion: nothing could be
-  judged of either here. Ask again roughly which desktop and which phone they have.
-- While it is open, do not push further commits to `look-proto` without saying so in the pull
-  request (they would go live with the merge). New look work goes on the local branch
-  `look-dev` (work tree `/home/user/pc-dev`, lost with the container) or a new pushed branch.
+**What is waited for:** the owner's report from the phone: does it run smoothly, how does it
+look in motion (flicker, shimmer), does the phone run hot. Nothing here could judge any of
+that. What they say decides the next work: if it is slow, the phone's cheaper settings (item
+17) and the look's cost come first; if it flickers, the flicker from the ship.
+
+**Where new work goes now:** `look-proto` was brought forward to `main` (they are the same
+commit). New look work is built on the local branch `look-dev` (work tree `/home/user/pc-dev`,
+lost with the container) and pushed on `look-proto`; it reaches the live game only through a
+new pull request the owner asks for. A LESSON KEPT: before a pull request into `main`, prove
+that the watercolour game is unchanged BY PICTURES (the same views from `main` and from the
+branch, compared pixel for pixel, `main` against itself first), not by reading the diff: that
+comparison found every default tree's boughs a few millimetres off (cured before the merge).
 
 **The look, where it stands** (`look-proto`; the file-by-file account is `docs/notes/painter.md`
 on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`):
@@ -261,7 +261,7 @@ on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`)
   slow pan (0.41 against 0.32 at 150 m; 0.23 against 0.10 at 1 km).
 
 **Waiting for the owner:**
-1. To merge pull request #4 (when it is marked ready) and try the page.
+1. Their report from trying the look on their phone (above).
 2. Their go-ahead before any of the THREE RISKIEST PARTS of the code is touched (section 2,
    item 28; the list is in the log, "OWNER: finish the task in hand, then five steps"): the shader
    code's tangle, the new look's lack of automatic checks and its global switches, and the three
@@ -279,9 +279,9 @@ motion (`CLAUDE.md`, "In a cloud session there is no graphics card").
 
 | Branch | What it holds |
 | --- | --- |
-| `main` | **Live.** At `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
+| `main` | **Live.** At `1cd885f`: the new look behind `?look=oil` (PR #4, merged by the owner 2026-11-16), on top of `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
 | `cosmos` | Frozen at `3e46e80`: release 1's code, the same as `main`. Do not work on it. |
-| `look-proto` | **The new look** (`?look=oil`), the new explorer and its flight, cut from `main` at `5e85754`. Not live. Pull request #4 into `main` is open. |
+| `look-proto` | **Where new look work is pushed.** The same commit as `main` since the merge of PR #4; anything pushed here later is not live until a new pull request is merged. |
 | `r2` | **The working branch.** Release 1, the logs, this file, `tools/workflows/`, and release 2's half-done work as "WIP snapshot" commits only. No release-2 item was finished or verified. On a clean export of `r2`: world tests 56 pass and 1 fail ("MSAA belongs to the tier..."), unit 259, physics 325. |
 
 **Waiting, in the owner's order:**
