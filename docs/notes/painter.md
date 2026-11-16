@@ -75,8 +75,10 @@ blur at all; colours that pop with no detail lost; the cloak a rich blue; no jet
   `uLampF`); by night what is warm is kept out of the night's cool key (`OIL_FRAG`).
 - THE FIGURES' REAL SHADOWS: `shadow.js` draws whatever is marked `pcCaster` and is moved by bones (`uPart`) into the
   shadow map with those bones; `pcCast`'s soft blot gives way while the map is on.
-- WATER (overhaul 7, first pass, not yet seen in a still): the dashes carry the sky's colour, a path of broken marks
-  of the light toward the sun or the moon, and by night under an aurora a share of them its green (`uAuroraK`).
+- WATER (overhaul 7, first pass): long thin dashes that carry the sky's colour, a path of broken marks of the light
+  toward the sun or the moon, and by night under an aurora a share of them its green (`uAuroraK`). Seen only as the
+  wood's stream, which was pale and faceted with short dashes (they are long and thin since; not yet seen again). In a
+  still there is no last frame, so the stream shows no reflections; the game keeps one (`post.js _finishOil`).
 - THE SKY (overhaul 6): by day flat bands from the horizon to the zenith with wandering edges (no wash turbulence, no
   backruns: they were smudges and rings in opaque paint); clouds flat shapes with clean edges, two tones by day, one a
   step lighter than the sky by night; the night sky two layers of dense fine streaks.
@@ -107,8 +109,9 @@ layers shaded to about two dabs and 1.3 layers. Only the owner's desktop can say
 **Not done yet (the overhaul plan's order).** Overhauls 6 to 8 have a first pass each (above); what is still owed in
 them: the sky by day against an open horizon and the night sky's streaks judged in stills; water judged in stills
 (a lake by night, the stream in the wood), a foam line at the shore; the lantern's own glow in the air. 9 every world
-by the pattern of the autumn wood and the aurora tundra; rocks, cliffs and strata in strokes (a boulder still paints
-as a wash with a nibbled edge); PHYSICS' kits (`src/render/kitmat.js` is not registered); the README still says
+by the pattern of the autumn wood and the aurora tundra; cliffs and strata in strokes (a boulder is planes of flat
+paint now, `PROP_FRAG`'s rock branch under `PC_OIL`, built but not yet seen in a still; a crystal goes the same way
+and wants its own look); flowers are big star-shaped pieces; the view from the air; PHYSICS' kits (`src/render/kitmat.js` is not registered); the README still says
 "jetpack" (to be changed when the look goes live); the play-tests still fly the old explorer.
 
 **Known faults.**

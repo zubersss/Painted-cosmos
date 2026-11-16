@@ -819,10 +819,12 @@ void main() {
     // chart's derivatives come from a position measured from the eye: chunks.js pcGroundChartD.)
     vec2 wch = pcGroundChart(vBody, uBodyR);
     vec2 wdx = pcGroundChartD(vBody, -dFdx(vToCam), uBodyR), wdy = pcGroundChartD(vBody, -dFdy(vToCam), uBodyR);
-    vec2 woc = pcStrokeOct(dist * 1.6, uOilPx.z * 1.6);
+    vec2 woc = pcStrokeOct(dist * 1.1, uOilPx.z * 1.1);
     vec3 wr1, wr2; vec2 wds; float wown;
-    pcThinLayer(wch, wdx, wdy, woc.x, 6.0, vBody, 40.0, 4.0, wr1, wds, wown, wr2);
-    vec3 cdeep = pcDensity(c, 1.4), clight = mix(c, mix(skyc, vec3(1.0), 0.25), 0.45);
+    // (long thin dashes, and the deep ones well deeper: short and all pale, a stream was a strip of pale flat patches,
+    // "low-poly ice": the critic)
+    pcThinLayer(wch, wdx, wdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
+    vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, mix(skyc, vec3(1.0), 0.25), 0.45);
     float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), 22.0) * max(uDayness, uMoon) * (1.0 - uWx.x);
     vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
     float wau = uAuroraK * (1.0 - uDayness);
@@ -1409,6 +1411,26 @@ void main() {
     wet = 0.35;
     id = 4.0 + seed * 0.9;
   } else {
+    #ifdef PC_OIL
+    // ---- a boulder in the oil look: planes of flat paint. Its cleaved faces are each one piece, a little its own colour
+    // (a face's number comes from the way it looks, in the stone's own space), lit whole, in half-tone steps; no
+    // nibbled edge, no grain. On a world of snow, and under snow anywhere, what faces up is snow. (As a wash it stood in
+    // the oil look as a smooth-shaded lump: the critic.)
+    {
+      vec3 nb = normalize(vMassO);
+      float fh = fract(sin(dot(floor(nb * 3.0 + 0.5), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+      c = mix(barkA, barkB, clamp(vData.z * 0.7 + (fh - 0.5) * 0.5, 0.0, 1.0));
+      c = pcWetWash(pcDensity(c, 1.0 + (fh - 0.5) * 0.5), 0.8);
+      float upF = dot(nV, upV);
+      float snowR = max(pcSnowCover(upF * 0.5 + 0.5, fh, 0.0), uGroundK.x * step(0.55, upF));
+      c = mix(c, vec3(0.92, 0.95, 0.98), snowR);
+      x = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.45, 1.0, pcSunAt(vBody, canopy, 8.0 - vAbove, 0.3));
+      float lvlR = floor(pcLevel(x, 0.04) * 2.0 + 0.5) * 0.5;
+      if (uGem > 0.5) lvlR = max(lvlR, 1.5);      // (a crystal is lit through: none of its faces goes to the deep step)
+      c = pcLamp(pcTone(c, lvlR), c, vBody, fh);
+      id = 3.0 + seed * 0.9;
+    }
+    #else
     // ---- rock: pale granulating wash, paper on top, pooled dark at the base
     // the silhouette is nibbled and the tones wander: a wash, not a faceted solid
     vec4 nr = texture(uNoise3D, vBody / 2.3 + 0.3);
@@ -1433,6 +1455,7 @@ void main() {
     float dryM = pcStepF(0.60, 0.70, nf.b * 0.6 + nf.r * 0.4, 0.36 * pcSub(0.55, PC_NB) + 0.16 * pcSub(0.55, PC_NRG));
     c = mix(c, vec3(1.0), dryM * 0.5 * near * (0.3 + 0.25 * lvl));
     id = 3.0 + seed * 0.9;
+    #endif
   }
   c = pcAtmosV(c, vFog, vView);
   wet = max(max(wet, vFog * 0.85), uWx.w * smoothstep(10.0, 90.0, vd) * 0.9);
