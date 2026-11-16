@@ -188,7 +188,7 @@ and 8 (the figure: the cloak in strips, real shadows, the lantern, the flight's 
 pass each, seen except the water; an independent critic read the stills against the clip and its
 findings were worked through (the log's sections of 2026-11-16 list them one by one, with what was
 done and what was not). The checkpoint's ten stills went to the owner on 2026-11-16 from
-`look-proto` f2f84b6 (the branch is at 3f3d4ed). WAITING FOR THE OWNER: their word on those
+`look-proto` f2f84b6 (the branch is at 5c77830). WAITING FOR THE OWNER: their word on those
 stills, and whether to put the look on a page they can open on their desktop (a pull request into
 `main` that adds the look behind `?look=oil`, the live game unchanged without it; only on the
 owner's word, and only after `tests/all.mjs` has passed on `look-proto`). NEXT IN THE PLAN if the
