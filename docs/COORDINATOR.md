@@ -1891,3 +1891,8 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - THE FULL CHECK (`node tests/all.mjs --export`) was started on e0ed127 as the pull request was opened; its result is to be added to the pull request's text and told to the owner.
 - AFTER THE MERGE the owner is to run the second speed test (`?look=oil&bench=1&body=earth&time=15.4`) and send the table, then play with the phone's own settings (`?look=oil&body=earth&time=15.4`).
 
+### 2026-11-16 The owner merged pull request #6. OWNER: "Give me a link that forces top settings"
+- THE OWNER MERGED PULL REQUEST #6 (`main` is at fd4a499): the phone's sharp picture, the lighter paint, the rivers' second form and the speed test's second form are live behind `?look=oil`. `look-proto` is the same code; brought forward to `main`.
+- OWNER (verbatim): "Give me a link that forces top settings".
+- GIVEN: `https://zubersss.github.io/Painted-cosmos/?look=oil&preset=desktop&quality=2&dynres=0&lite=0&aa=msaa&body=earth&time=15.4` . What each part forces: `preset=desktop` the desktop's picture size on the phone (1.5 picture pixels to a screen point: about 1235 x 576 on the S23 Ultra, where the phone's own settings give 1029 x 480); `quality=2` the top tier; `dynres=0` nothing may step down; `lite=0` the full paint, not the phone's lighter one; `aa=msaa` the 4-sample edge smoothing a desktop gets (a touch device gets none by itself). SAID WITH IT: this is the heaviest the game can be made and will be slow on the phone (the first play at these settings held 9 pictures a second in the wood, before the tree cuts); it is for seeing the look at its best, not for playing. The speed test's table from the phone's OWN settings is still what decides the next work.
+
