@@ -16,6 +16,8 @@
 //   preset=phone|tablet|desktop      the device preset (src/core/preset.js; chosen from the
 //                                    pointer and the screen without it)   fullscreen=0   never ask
 //   kits=0                           no weather marks (rain, snow, dust)   weather=fair   a clear sky, always
+//   bench=1                          a speed test on this device: the same view drawn ten ways, the table left on the
+//                                    screen (src/core/bench.js); no start card, the resolution controller off
 import * as THREE from 'three';
 import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
@@ -30,6 +32,7 @@ import { readSave, restore, clearSave, AutoSave } from './core/save.js';
 import { SketchStore } from './core/sketches.js';
 import { choosePreset, bufferSize } from './core/preset.js';
 import { attachPlatform } from './core/platform.js';
+import { attachBench } from './core/bench.js';
 
 // Every static import has loaded: index.html's watchdog stands down (hardening review P14).
 window.__pcBooting = true;
@@ -152,7 +155,7 @@ async function boot() {
   // Resolution: the output is capped by the preset (resize, below); the controller
   // scales the scene inside that.
   const dyn = new DynamicResolution({
-    enabled: params.get('dynres') !== '0',
+    enabled: params.get('dynres') !== '0' && !params.has('bench'),
     // Start at the best picture (top tier, full resolution) and give some of it up only when
     // the measured frame time asks: under 30 fps the controller sheds load within a second or
     // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the
@@ -255,7 +258,7 @@ async function boot() {
   // PHYSICS' particle counts and sampling follow the tier too (hardening review P8): a tier
   // drop then sheds CPU as well as pixels, and the top tier gets its full storms.
   if (physics && physics.setQuality) physics.setQuality(dyn.quality);
-  const showCard = params.get('card') !== '0';
+  const showCard = params.get('card') !== '0' && !params.has('bench');
   hud.showStart(showCard);
   if (!showCard) { game.started = true; game.hintOn = false; }
   else {
@@ -304,6 +307,7 @@ async function boot() {
   };
   let held = false;
   window.__pc = debug;
+  if (params.has('bench')) attachBench(debug);
   window.addEventListener('error', (e) => debug.errors.push(String(e.message)));
 
   let last = performance.now();
