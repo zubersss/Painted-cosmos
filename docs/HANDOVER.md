@@ -197,6 +197,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     don't fix them yet. Wait for my go-ahead." The existing `CLAUDE.md` rules were kept and the
     summary added under them. THE THREE PARTS LISTED IN STEP 5 ARE NOT TO BE FIXED WITHOUT THE
     OWNER'S GO-AHEAD (they are named in the log's entry of that date).
+29. **The reference clip still counts beside the new pictures (2026-11-16).** "But still use the
+    reference video as well." The owner's two pictures of snow (item 27) are added to the
+    references; they do not replace the clip, which stays the main target (items 13, 20). For
+    snow: the clip gives the night's colours, the sky, the aurora, the lantern's pool and
+    strokes one can see sweeping in arcs; the pictures give thin, many strokes with no ridges, soft
+    shading and the trees. Where they pull apart the snow sits between them.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
