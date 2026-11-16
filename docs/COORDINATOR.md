@@ -1699,3 +1699,18 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - WHAT CANNOT BE KNOWN HERE, said to the owner again: how fast the look runs on a real graphics card and how it looks in motion.
 - RUNNING as this is written: the station numbers of the oil look after its flicker treatments (the two from-the-ship stations of checkpoint 1); then `tests/all.mjs` on a clean export of look-proto (the default look and the game's play-through, about an hour), which must pass before any talk of a preview through `main`.
 
+### 2026-11-16 The oil look's station numbers after its flicker treatments; the flight seen; the full check started
+- STATION NUMBERS (the real game, top tier, 1280x720, the two from-the-ship stations of checkpoint 1; look-proto 3f3d4ed; software renderer):
+
+  | Station | | Release 1 (the live game) | Oil at checkpoint 1 (thinnest, widest style) | Oil now |
+  | --- | --- | --- | --- | --- |
+  | E_150_45 | sharpness (lapvar) | 339 | 1786, 1287 | 1044 |
+  | E_150_45 | flicker F | 0.32 | 0.56, 0.50 | 0.41 |
+  | E_1000_45 | sharpness (lapvar) | 100 | 935, 625 | 342 |
+  | E_1000_45 | flicker F | 0.10 | 0.42, 0.36 | 0.23 |
+
+  READING: the flicker index has come down by about a quarter at 150 m and by nearly a half at 1 km (dabs that come and go whole and never start as dots, a third layer so that nothing changes at an octave's step, strokes broader from the ship and at a low angle, leaves' edges by cover). It is STILL ABOVE the live game's (0.41 against 0.32; 0.23 against 0.10): a crisp picture of small flat strokes moves more under a quarter-pixel pan than a soft wash does, and part of that is the look itself. Sharpness is three times the live game's at both heights (less than at checkpoint 1, because the strokes are broader from the ship). Triangles at 150 m: 1.0 million (0.66 at checkpoint 1): the leaves. Whether any of it shows as flicker to the eye can only be judged in motion on the owner's desktop.
+- THE FLIGHT, seen from the side over the snowfield (look-proto 5c77830): the body level, the right arm ahead, the legs trailing, the cloak lying along the back, no jets, its own shadow on the snow; at a hover the figure hangs upright with the cloak's back panel on the wind. Sent to the owner.
+- BOULDERS as planes of flat paint and the water's long thin dashes compile and draw (seen on the snowfield: the boulders carry snow on top); the stream in the wood has not been taken again.
+- STARTED: `node tests/all.mjs --export` on look-proto 5c77830 (the default look, every suite and the scripted play-throughs; about an hour). Its result goes in the next entry.
+
