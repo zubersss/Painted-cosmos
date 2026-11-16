@@ -232,3 +232,10 @@ groups with open snow between, bare slender trees among them).
 What is not taken: its softness. It is a wet watercolour, and the look's first rule is the crispness rule above: no
 blur. Smoothness comes from many thin flat strokes that differ little, not from soft edges.
 
+A second picture came with it ("And this one"; also a third party's, not in the repository): a pastel of a bare winter
+wood in falling snow. Slender dark trunks, plum and brown-violet, in groups, each ending in a haze of fine bare twigs;
+pale air full of flakes; snow in pale white, mint and pale blue with a little lavender, laid in thin, close, slanting
+hatched strokes, with small blue shadows at the feet of the trunks. Taken from it: the snow's thin frequent strokes
+(it shows them best) and the bare dark trees of a snowy wood. Not taken: the grain of the pastel (the look has no
+grain) and its softness.
+
