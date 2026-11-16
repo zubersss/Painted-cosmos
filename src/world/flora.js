@@ -567,12 +567,17 @@ export class Flora {
     // to their full range. In steps, so that the tiers are not re-sorted with every metre climbed.
     let ts = this.rangeScale, fs = this.rangeScale;
     if (LOOK.oil && !TREES_FULL) {
+      // (a tree's ranges are never under the middle tier's: the low tier's 0.28, with the picture's 0.5 on top, left
+      // a tree its form for a dozen metres; the low tier still draws no full trees at all)
+      ts = Math.max(ts, RANGE_SCALE[1]);
       const sk = Math.min(1, Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20));
       const vis = this.S.look && this.S.look.visibility ? this.S.look.visibility[0] : 1e4;
       const air = Math.min(1, Math.max(0.5, Math.round((vis * 2 / T_FAR + (SHADOW.alt || 0) / 60) * 8) / 8));
       // (and from the air the far trees reach farther, up to twice: there are no near trees to pay for up there, and the
       // wood ended a few hundred metres off in bare painted ground)
-      ts *= sk; fs *= Math.max(sk, 0.75) * air * (1 + Math.round(Math.min(1, (SHADOW.alt || 0) / 220) * 4) / 4);
+      // (on every tier: the far tree is the cheapest thing in the wood, and at the middle tier on a phone the two cuts
+      // together ended the trees 170 m off, bare hills behind: "most of the things haven't rendered", the owner)
+      ts *= sk; fs = Math.max(sk, 0.75) * air * (1 + Math.round(Math.min(1, (SHADOW.alt || 0) / 220) * 4) / 4);
     }
     this.treeScale = ts; this.farScale = fs;
     if (now != null) this.washNow = now;

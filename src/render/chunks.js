@@ -97,6 +97,7 @@ uniform vec4 uOilC;
 uniform vec4 uOilD;
 uniform vec4 uOilS;
 uniform vec4 uOilG;
+uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
 uniform vec4 uOilPx;
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
@@ -376,6 +377,16 @@ float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
     float stretch = clamp(hl / max(se, 0.02), 1.0, 5.0);
     pp -= (hd / hl) * dot(pp, hd / hl) * (1.0 - 1.0 / stretch);
   }
+  #ifdef PC_OIL
+    // (under a sky fully grey there is no leaf shadow to look up; and the lighter paint reads the pattern's broad
+    // part only: two lookups into the noise for every stroke were a large share of a phone's frame)
+    if (uWx.x > 0.985) return 1.0 - 0.42 * canopy;
+    if (uOilL.x > 0.5) {
+      float a1 = textureLod(uNoise3D, pp / 13.0, log2(max(64.0 * w / 13.0, 1.0))).r;
+      float th1 = mix(0.05, 0.585, canopy);
+      return mix(smoothstep(th1 - 0.015, th1 + 0.015, a1), 1.0 - 0.42 * canopy, uWx.x);
+    }
+  #endif
   float a = textureLod(uNoise3D, pp / 13.0, log2(max(64.0 * w / 13.0, 1.0))).r;
   float b = textureLod(uNoise3D, pp / 4.1 + 0.37, log2(max(64.0 * w / 4.1, 1.0))).g;
   float th = mix(0.05, 0.585, canopy);
