@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN } from './shared.js';
 const _lv = new THREE.Vector3();
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
@@ -101,6 +101,7 @@ export function createPainter(renderer) {
 
   function resize(w, h) {
     outW = Math.max(2, w | 0); outH = Math.max(2, h | 0);
+    SCREEN.outW = outW; SCREEN.outH = outH;
     renderer.setPixelRatio(1);
     renderer.setSize(outW, outH, false);
     applySize();
@@ -250,6 +251,12 @@ export function createPainter(renderer) {
     // true where the browser cannot draw into float targets and the painting runs on 8-bit ones (post.js)
     floatFallback: post.floatFallback,
     _shadow: shadow,
+    // (PILOT's speed test, src/core/bench.js: the shadow pass, or only the light in the air, switched off and on again)
+    _bench(o) {
+      if (!o) return;
+      if (shadow && o.shadow != null) { if (shadow._ok0 == null) shadow._ok0 = shadow.ok; shadow.ok = !!o.shadow && shadow._ok0; }
+      if (o.shaft != null) SHADOW.shaftK = o.shaft ? 1 : 0;
+    },
     dispose() { post.dispose(); if (shadow) shadow.dispose(); },
   };
 }

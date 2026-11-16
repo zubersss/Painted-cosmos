@@ -46,6 +46,37 @@ class Builder {
   }
 }
 
+// THE OIL LOOK'S LEAVES BY DISTANCE (flora.js, materials.js PROP_VERT: uLeafLod). A crown of leaves laid one by one
+// is some 1,500 leaves, 3,000 triangles; a wood drew three and a half million of them every frame, twice (the picture
+// and the shadow map), and the owner's phone drew nine pictures a second. Far off, a share of the leaves is drawn and
+// each a little larger, so the crown stays as full: every leaf has a number (aData.w), and the leaves with the highest
+// numbers are the ones kept. Here the triangles are put in that order (everything that is not a leaf first, then the
+// leaves from the highest number down), so that a mesh draws only the first part of its index and the rest costs
+// nothing at all. Only the order of the triangles changes; called for the oil look's trees alone.
+export function sortLeafCards(geo) {
+  const idx = geo.index.array, d = geo.attributes.aData.array, nT = idx.length / 3;
+  const rest = [], cards = [];
+  for (let t = 0; t < nT; t++) { const part = d[idx[t * 3] * 4 + 1]; if (part > 4.5 && part < 6.5) cards.push(t); else rest.push(t); }
+  if (!cards.length) return geo;
+  const hOf = (t) => d[idx[t * 3] * 4 + 3];
+  cards.sort((p, q) => hOf(q) - hOf(p) || p - q);
+  const out = new idx.constructor(idx.length);
+  let o = 0;
+  for (const t of rest) { out[o++] = idx[t * 3]; out[o++] = idx[t * 3 + 1]; out[o++] = idx[t * 3 + 2]; }
+  const base = o, hs = new Float32Array(cards.length);
+  for (let i = 0; i < cards.length; i++) { const t = cards[i]; hs[i] = hOf(t); out[o++] = idx[t * 3]; out[o++] = idx[t * 3 + 1]; out[o++] = idx[t * 3 + 2]; }
+  geo.setIndex(new THREE.BufferAttribute(out, 1));
+  geo.userData.leaf = { base, hs };
+  return geo;
+}
+// How much of a sorted index to draw so that every leaf whose number is over `thr` is drawn.
+export function leafDrawCount(leaf, thr) {
+  const hs = leaf.hs;
+  let lo = 0, hi = hs.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (hs[m] > thr) lo = m + 1; else hi = m; }
+  return leaf.base + lo * 3;
+}
+
 // A tube along a path of points with radii. Normals are radial (smooth).
 function tube(B, pts, radii, sides, opts) {
   const o = Object.assign({ part: 0, shade: 0, hash: 0.5, sway0: 0, swayK: 0, swayH: 1, vScale: 1, v0: 0, cap: true }, opts || {});
@@ -300,7 +331,7 @@ export function birchGeometry(seed, lod, spec) {
       const bid = (k * 0.618034 + 0.13) % 1;
       tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd(), branch: bid });
       tips.push([p2, bid]);
-      if (sl) { const r = 1.0 + 0.5 * low + rnd() * 0.4; leafCards(B, V(p2.x, p2.y + 0.2, p2.z), r * 1.15, r * 0.62, r * 1.15, rnd, { n: 84, len: 0.52, wid: 0.22, branch: bid, massC: crownC, massK: 0.5, sway: 0.6 + 0.4 * (p2.y / H), shade0: 0.1 * low, shadeK: 0.5 }); }
+      if (sl) { const r = 1.0 + 0.5 * low + rnd() * 0.4; leafCards(B, V(p2.x, p2.y + 0.2, p2.z), r * 1.15, r * 0.62, r * 1.15, rnd, { n: 104, len: 0.42, wid: 0.21, round: 1, branch: bid, massC: crownC, massK: 0.5, sway: 0.6 + 0.4 * (p2.y / H), shade0: 0.1 * low, shadeK: 0.5 }); }
     }
     // crown: a handful of large overlapping washes
     const nBlobs = sl ? 5 + ((rnd() * 2) | 0) : 6 + ((rnd() * 2) | 0);
@@ -313,7 +344,7 @@ export function birchGeometry(seed, lod, spec) {
       let bid = ((k + 3) * 0.618034 + 0.13) % 1, bd = 2.2;
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
       // (the oil look's slender tree: the mass is leaves, one by one, florakit.js leafCards; else one lumpy wash)
-      if (sl) leafCards(B, c, r * 1.3, r * 0.85, r * 1.3, rnd, { n: 130, len: 0.52, wid: 0.22, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
+      if (sl) leafCards(B, c, r * 1.3, r * 0.85, r * 1.3, rnd, { n: 160, len: 0.42, wid: 0.21, round: 1, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
       else if (leafy) leafCards(B, c, r * 1.10, r * 0.78, r * 1.05, rnd, { n: 200, len: 0.62, wid: 0.28, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05, shadeK: 0.6 });      // (two hundred to a bough: with 125 a broad crown was a thin scatter, Saturn's island trees)
       else blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }

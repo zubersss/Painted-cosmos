@@ -15,7 +15,9 @@ export default {
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
   // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
-  oil: { gold: 1 },
+  // (and in the oil look the explorer lands in the autumn wood: the first site and the first autumn site change places)
+  // (rivers: the oil look's river system, src/world/surface.js _riversOil: channels that split and rejoin, pools, side streams)
+  oil: { gold: 1, sites: { 0: 'autumn_woodland', 4: 'temperate_forest' }, rivers: 1, leaves: 0.5 },
   flora: {
     tall: [
       { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.76, 0.85, 0.42], [0.58, 0.75, 0.36], [0.40, 0.58, 0.42]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5],
@@ -26,7 +28,8 @@ export default {
         oil: { slender: 1, double: 1, bark: [[0.50, 0.38, 0.36], [0.36, 0.26, 0.30]] } },
       { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.96, 0.82, 0.32], [0.93, 0.64, 0.28], [0.80, 0.54, 0.34]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5] ,
         // (the oil look: slender, its crown high and thin; seven in ten are dark-barked, the rest stay birches)
-        oil: { slender: 1, double: 1, leaf: [[0.97, 0.90, 0.30], [0.95, 0.68, 0.24], [0.88, 0.42, 0.24]], leafP: [0.9, 0.52, 1.0, 0.28], dark: [0.7, [0.50, 0.38, 0.36], [0.36, 0.26, 0.30]] } },
+        // (fam: each tree keeps to its own part of yellow, orange and this red: the owner's references of 2026-11-16)
+        oil: { slender: 1, double: 1, leaf: [[0.98, 0.88, 0.26], [0.96, 0.62, 0.20], [0.80, 0.40, 0.22]], fam: [0.86, 0.27, 0.16, 1], farD: [15.5, 12.4, 0], leafP: [0.9, 0.52, 1.0, 0.28], dark: [0.7, [0.50, 0.38, 0.36], [0.36, 0.26, 0.30]] } },
     ],
     under: { leaf: [[0.80, 0.85, 0.38], [0.54, 0.71, 0.31], [0.35, 0.51, 0.31]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.78, 0.75, 0.72], [0.42, 0.39, 0.44]],
       // the sward's own washes (src/world/nearground.js): what the flower drifts are of (poppy, ox-eye, buttercup, harebell), what lies under the trees
@@ -46,13 +49,17 @@ export default {
         under: { leaf: [[0.92, 0.82, 0.40], [0.80, 0.64, 0.34], [0.66, 0.54, 0.38]], bush: [[0.90, 0.66, 0.34], [0.72, 0.46, 0.30], [0.58, 0.44, 0.36]] },
         // (the oil look, after the owner's reference clip: a floor of yellow and orange leaves on dark warm earth, the
         // canopy's yellows and oranges pure; washes still, which the shaders lay as paint)
-        oil: { pal: { low: [0.58, 0.42, 0.34], mid: [0.66, 0.48, 0.34], high: [0.62, 0.46, 0.36], litter: [0.97, 0.88, 0.34], canopyA: [0.97, 0.92, 0.36], canopyB: [0.95, 0.76, 0.28],
-          grassLight: [0.90, 0.84, 0.40], grassMid: [0.78, 0.78, 0.36], moss: [0.56, 0.68, 0.32], mud: [0.50, 0.38, 0.30] },
+        // (2026-11-16, after the owner's references of autumn woods: the floor is GRASS, green in the stands and bright
+        // yellow-green in the glades, with the leaves strewn on it; wider glades; conifers in groups among the broadleaves)
+        oil: { pal: { low: [0.58, 0.42, 0.34], mid: [0.66, 0.48, 0.34], high: [0.62, 0.46, 0.36], litter: [0.96, 0.78, 0.30], canopyA: [0.98, 0.86, 0.30], canopyB: [0.94, 0.62, 0.24],
+          grassLight: [0.84, 0.87, 0.32], grassMid: [0.64, 0.75, 0.30], moss: [0.44, 0.62, 0.30], mud: [0.56, 0.50, 0.34] }, glade: [0.10, 0.46],
+          // (clearer air than the planet's 185 m: the trees a stone's throw off keep their colour, the far ones go pale)
+          over: { mist: 1.4 },
           // (the clip's wood is broadleaves in autumn leaf with a white birch here and there: nearly nine trees in ten;
           // its tufts and small plants are yellow-green in the sun and deep green in the shade)
           // (tallMix over 1: the groves of conifers go too; a conifer is one tree in thirty. With 0.88 whole stands were
           // still conifers, and three of the wood's stills had no autumn leaf overhead at all: the critic)
-          tallMix: 1.5, under: { leaf: [[0.90, 0.90, 0.38], [0.66, 0.78, 0.32], [0.40, 0.54, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } } }),
+          tallMix: [1.5, 1.05], under: { leaf: [[0.84, 0.90, 0.34], [0.58, 0.78, 0.30], [0.34, 0.54, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } } }),
     B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
       ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
       ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 },

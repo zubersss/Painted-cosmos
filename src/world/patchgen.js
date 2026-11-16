@@ -58,8 +58,12 @@ export function stepPatch(job, deadline) {
   const u0 = -1 + ix * span, v0 = -1 + iy * span, du = span / N;
   let minH = job.minH, maxH = job.maxH, anyWater = job.anyWater;
   // 1. sample the surface on the apron grid, a row at a time
+  // (S.foot: how far apart this patch's samples lie, in metres, while they are taken: the oil look's surface draws a
+  // river into the far colour as wide as that, so that a river is still a line on the land from high up, where the
+  // samples are coarser than the river is wide; nothing else reads it, and it is 0 for every other caller)
+  S.foot = du * R * 0.785;
   for (let j = job.row; j < E; j++) {
-    if (j > job.row && performance.now() >= deadline) { job.row = j; job.minH = minH; job.maxH = maxH; job.anyWater = anyWater; return null; }
+    if (j > job.row && performance.now() >= deadline) { job.row = j; job.minH = minH; job.maxH = maxH; job.anyWater = anyWater; S.foot = 0; return null; }
     for (let i = 0; i < E; i++) {
       const k = j * E + i;
       faceToDir(face, u0 + (i - 1) * du, v0 + (j - 1) * du, _d);
@@ -80,6 +84,7 @@ export function stepPatch(job, deadline) {
     }
   }
   job.row = E;
+  S.foot = 0;
   // 2. origin: the patch centre, so vertex coordinates stay small
   const kc = (1 + N / 2) * E + (1 + N / 2);
   const ox = _px[kc], oy = _py[kc], oz = _pz[kc];

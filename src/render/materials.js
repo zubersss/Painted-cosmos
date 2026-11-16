@@ -174,7 +174,13 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
   vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
-  return pcLamp(pcTone(k, lvl), k, gBc, rnd.y);
+  // (GRASS in the shade is a deep green, its own colour laid heavier with half the cool key over it, as a leaf's shade
+  // is; under the key whole a shaded meadow was a violet-brown floor: the owner's references of 2026-11-16 have the
+  // shade on grass blue-green. Only where the stroke's wash is green; earth, litter, rock and snow shade as they did.)
+  vec3 tn = pcTone(k, lvl);
+  float grn = smoothstep(0.02, 0.10, k.g - max(k.r, k.b)) * (1.0 - snowC);
+  if (grn > 0.0) tn = mix(tn, mix(pcBody(pcDensity(k, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80, tn, smoothstep(1.2, 2.0, lvl)), grn);
+  return pcLamp(tn, k, gBc, rnd.y);
 }
 // SNOW AND ICE (the owner, 2026-11-16, in three steps: "I also dont like how Bright the snow area is why is the snow
 // colorful fix it and shade it the color of ice and snow"; then strokes as paint laid on, with ridges, which the owner
@@ -375,7 +381,9 @@ void main() {
     if (cov <= 0.0) continue;
     gCtrB = pcGroundUnchart(vBody, ctr, uBodyR) * (rB + rdx * ds.x + rdy * ds.y);
     pcGroundAt(ds, w, rnd, c, lvl, snowC, leaf, canopy);
-    float fk = clamp(canopy * 1.6, 0.0, 0.88) * gMid;      // (under trees the floor is nearly all fallen leaves, with the earth dark between)
+    // (under trees the floor is nearly all fallen leaves, with the earth dark between: the clip's. A world may keep
+    // more of its grass there, uGroundK.w: the owner's later references have grass under the trees and leaves strewn on it)
+    float fk = clamp(canopy * 1.6, 0.0, 0.88) * gMid * (uGroundK.w > 0.0 ? uGroundK.w : 1.0);
     acc += rem * cov * pcGroundPaint(c, leaf, fk, rnd, snowC, lvl);
     rem *= 1.0 - cov;
     if (has2 > 0.5 && rem >= 0.004) { acc += rem * pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl); rem = 0.0; }
@@ -950,8 +958,12 @@ void main() {
     // (long thin dashes, and the deep ones well deeper: short and all pale, a stream was a strip of pale flat patches,
     // "low-poly ice": the critic)
     pcThinLayer(wch, wdx, wdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
+    // (water is deeper and bluer than the air over it: looking toward the sun a stream took the pale sky whole and a
+    // wide share of its dashes were the sun's own, and the river was a pale gravel road through the grass: the stills
+    // of 2026-11-16. Its body is half the water's own wash laid heavy and blue, whatever the sky gives it, and the sun's path is a narrow run of marks.)
+    c = mix(c, pcDensity(vLiq.rgb, 1.9) * vec3(0.80, 0.95, 1.06), 0.55 * (1.0 - vLiqP.x) * (1.0 - vLiqP.y));
     vec3 cdeep = pcDensity(c, 2.1) * vec3(0.90, 0.92, 1.0), clight = mix(c, mix(skyc, vec3(1.0), 0.25), 0.45);
-    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), 22.0) * max(uDayness, uMoon) * (1.0 - uWx.x);
+    float wsp = pow(max(dot(reflect(-normalize(vToCam), up), uSunDirL), 0.0), 56.0) * 0.6 * max(uDayness, uMoon) * (1.0 - uWx.x);
     vec3 wsun = min(mix(pcOilSunC(), vec3(1.0), 0.35) * 1.06, vec3(1.0));
     float wau = uAuroraK * (1.0 - uDayness);
     vec3 w1 = wr1.x > 0.62 ? clight : (wr1.x < 0.30 ? cdeep : c), w2 = wr2.x > 0.62 ? clight : (wr2.x < 0.30 ? cdeep : c);
@@ -1040,6 +1052,7 @@ varying vec3 vMassO;      // the crown's mass normal in the plant's own space: w
 varying float vScaleO;    // the plant's size (its instance's scale): its own space times this is metres
 varying vec3 vRelO;       // the place measured from the eye, in the body's axes (its screen derivatives are exact)
 varying float vCardD;     // how far the eye is from the centre of the leaf this vertex belongs to (the same at all its corners)
+uniform vec4 uLeafLod;    // the trees' leaves by distance (flora.js): x the distance within which every leaf is drawn (0: off), y the least share kept
 #endif
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -1087,6 +1100,18 @@ void main() {
   // strokes at the edge of their range shrink away instead of popping
   float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di));
   vec3 lp = position;
+  #ifdef PC_OIL
+    // LEAVES BY DISTANCE (flora.js, florakit.js sortLeafCards): beyond uLeafLod.x a tree keeps a share of its leaves, those
+    // with the highest numbers, and each kept leaf is larger by as much as keeps the crown as full. A leaf at the edge of
+    // the share shrinks into its own centre over a few metres, so none appears or goes in one frame.
+    vec3 cardO = position - aCard;
+    if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
+      float e = (1.0 - keep) * 1.06 - 0.03;
+      cardO *= smoothstep(e - 0.03, e + 0.03, aData.w) * min(inversesqrt(keep), 2.4);
+      lp = aCard + cardO;
+    }
+  #endif
   #ifdef PC_FAR
     vSpecies = aInst2.x;
     int fsi = int(aInst2.x + 0.5);
@@ -1160,7 +1185,7 @@ void main() {
   #ifdef PC_OIL
     vMassO = aMass;
     vScaleO = length(im[0].xyz);
-    vCardB = vBody - (ir * (position - aCard)) * vis;       // (the leaf moves as one piece: its centre is this far from the vertex)
+    vCardB = vBody - (ir * cardO) * vis;       // (the leaf moves as one piece: its centre is this far from the vertex)
     vCardD = length(vCardB - uOrigin - uCamLocal);
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
@@ -1182,9 +1207,11 @@ uniform vec3 uAccent;
 uniform float uCanopy;
 uniform float uGem;       // 1: a crystal or a splinter of ice or glass, lit through its body (PAINTER 13)
 #ifdef PC_OIL
+uniform vec4 uLeafFam;    // the oil look: each tree its own colour (rgb the third colour of the wood, a red; a how far each tree keeps to its own part of yellow, orange, red)
 uniform float uOilKind;   // the oil look: 0 a tree in leaf; 1 a tree of the snow, its boughs loaded (snow on what faces up); 2 a bare tree: its "leaves" are twigs
 #ifdef PC_FAR
   uniform float uFarKind[8];
+  uniform vec4 uFarFam[8];
 #endif
 uniform vec4 uOilDark;    // x: the share of this kind's trees whose bark is the dark pair below (the oil look's woods)
 uniform vec3 uOilDarkA;
@@ -1279,9 +1306,24 @@ void main() {
   #endif
   #ifdef PC_OIL
     float kindO = uOilKind;
+    vec4 famO = uLeafFam;
     #ifdef PC_FAR
       kindO = uFarKind[si];
+      famO = uFarFam[si];
     #endif
+    // EACH TREE ITS OWN COLOUR (the owner's references of 2026-11-16, an autumn forest from the air and from the ground:
+    // one crown yellow, the next orange, the next red; never one even gold). The wood's colours are a run from its
+    // first leaf colour (yellow) through its second (orange) to a third (red, famO.rgb); each tree, by its own number,
+    // keeps to a short piece of that run: four in ten in the yellows, four in the ambers and oranges, two in the reds.
+    if (famO.a > 0.0) {
+      float tf = fract(vInst.z * 9.73 + 0.37);
+      float cF = tf < 0.4 ? tf * 0.5 : (tf < 0.8 ? 0.3 + (tf - 0.4) * 0.75 : 0.75 + (tf - 0.8) * 1.25);
+      float a0 = clamp(cF - 0.13, 0.0, 1.0), b0 = clamp(cF + 0.13, 0.0, 1.0);
+      vec3 pa = a0 < 0.5 ? mix(leafA, leafB, a0 * 2.0) : mix(leafB, famO.rgb, a0 * 2.0 - 1.0);
+      vec3 pb = b0 < 0.5 ? mix(leafA, leafB, b0 * 2.0) : mix(leafB, famO.rgb, b0 * 2.0 - 1.0);
+      leafA = mix(leafA, pa, famO.a); leafB = mix(leafB, pb, famO.a);
+      leafC = mix(leafC, mix(pb, leafC, 0.55) * vec3(0.92, 0.80, 0.84), famO.a);
+    }
     float snowyO = step(0.5, kindO) * step(kindO, 1.5), twigO = step(1.5, kindO);
     // (a leaf at the lens is a slab across the picture: within two and a half to four and a half metres of the eye, each
     // leaf by its own number, the leaves of a tree are not laid, whole: the eye stands in a ragged window. Of a tree of
@@ -1635,6 +1677,8 @@ export function makePropMaterial(bodyU, opts = {}) {
     uGem: { value: opts.gem ? 1 : 0 },
     // (the oil look: opts.oilDark = [share, [bark light], [bark dark]])
     uOilKind: { value: opts.oilKind || 0 },
+    uLeafLod: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uLeafFam: { value: new THREE.Vector4().fromArray(opts.oilFam || [0, 0, 0, 0]) },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
@@ -1662,6 +1706,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     own.uFarTrunk = { value: pad(opts.far.map((f) => (f.trunk ? 1 : 0))) };
     own.uFarDrop = { value: pad(opts.far.map((f) => (f.drop ? 1 : 0))) };
     own.uFarKind = { value: pad(opts.far.map((f) => f.kind || 0)) };
+    own.uFarFam = { value: pad(opts.far.map((f) => new THREE.Vector4().fromArray(f.fam || [0, 0, 0, 0]))) };
   }
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),
@@ -1974,6 +2019,9 @@ varying float vFlat;
 varying float vAcc;
 varying float vLoad;
 varying float vKind;
+#ifdef PC_OIL
+varying vec3 vRootB;   // the stroke's root on the body: the oil look lights a stroke whole, from there
+#endif
 void main() {
   float t = position.y, side = position.x, h = iPar.z, kind = iPar.y;
   bool flick = kind > 1.5 && kind < 3.5;
@@ -2049,6 +2097,9 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(wp, 1.0);
   vView = mv.xyz;
   vCol = iCol.rgb; vS = vec4(t, side, h, iExt.x);
+  #ifdef PC_OIL
+    vRootB = root + uOrigin;
+  #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
   ${VERT_END}
@@ -2068,12 +2119,62 @@ varying float vFlat;
 varying float vAcc;
 varying float vLoad;
 varying float vKind;
+#ifdef PC_OIL
+varying vec3 vRootB;
+#endif
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js)
   #ifdef PC_OIL
-    // (the clip's floor is a carpet of leaves with a tuft here and there, not a sward: most of the near strokes are not laid)
+    // THE OIL LOOK'S SWARD (the owner's references of 2026-11-16: the wood's floor is GRASS, fine upright strokes, deep
+    // green in the shade and bright yellow-green where the sun lies, with flowers and fallen leaves as small dabs).
+    // The near ground's strokes stand on the world as they do in the watercolour (nearground.js); here each is ONE flat
+    // piece of paint with a clean edge: a blade a lancet, a tuft a comb of blades, a flower's head a round touch, a
+    // fallen leaf a pointed oval; in the sun or in the shade WHOLE (the light is asked at its root), and a share of
+    // the blades a step lighter toward the tip, where the light catches them. Nothing broken, nothing dry-brushed.
+    // (uOilG.x: the share of the strokes laid, by each one's number; uGroundK.y: a world's own share)
     if (fract(vS.z * 13.37 + 0.11) > uOilG.x * uGroundK.y) discard;
+    {
+      vec3 r3o = vec3(vS.z, fract(vS.z * 13.7), fract(vS.z * 5.1));
+      if (vKind > 4.5) {
+        vec2 q = vec2(vS.y, vS.x * 2.0 - 1.0);
+        if (vKind > 5.5 ? abs(q.x) > (1.0 - q.y * q.y) * 0.92 : dot(q, q) > 0.94) discard;
+      } else if (vKind > 3.5) {
+        float u = vS.y * 0.5 + 0.5, hz = vS.z;
+        float nb = 5.0 + floor(fract(hz * 5.37) * 5.0);
+        float b1 = u * nb + hz * 7.0 + 0.4 * sin(u * 9.0 + hz * 30.0), b2 = u * nb * 0.37 + hz * 3.0;
+        float h1 = 0.30 + 0.70 * fract(sin(floor(b1) * 12.9898 + hz * 78.233) * 43758.5453);
+        float h2 = 0.55 + 0.45 * fract(sin(floor(b2) * 39.3468 + hz * 11.135) * 24634.6345);
+        // (a tuft is its blades, each a lancet from the foot to its own height, lower at the tuft's sides, with a little
+        // air between them: laid as one body with a notched top, a tuft in flat paint was a notched slab on the floor)
+        float hi = (0.34 + 0.66 * h1 * h2) * (1.0 - 0.5 * vS.y * vS.y);
+        if (vS.x > hi || abs(fract(b1) - 0.5) > 0.43 * pow(max(1.0 - vS.x / hi, 0.0), 0.6)) discard;
+        r3o = fract(r3o + h1 * vec3(0.37, 0.61, 0.83));      // (each blade of the tuft its own number: its own tone)
+      }
+      vec3 nVo = normalize(vNV);
+      vec3 sunVo = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+      float xo = dot(nVo, sunVo) * 0.5 + 0.5;
+      float sunO = min(pcSunAt(vRootB, vS.w * 0.8, 8.0, 0.3), 1.0 - pcCast(vRootB, (r3o.x - 0.5) * 0.3));
+      float lv = pcLevel(mix(min(xo, 0.44) - 0.10 * vS.w, xo + (r3o.z - 0.5) * 0.12, sunO), 0.03);
+      // (a third of the strokes a step deeper, and a blade's upper part a step lighter in the sun: a sward all of one
+      // tone is a flat patch)
+      lv -= step(0.66, fract(r3o.x * 11.1)) * 0.6 * step(1.5, lv);
+      if (vKind < 4.5 && vS.x > 0.42 + 0.3 * r3o.y) lv += 0.8 * sunO;
+      // (a stroke's wash is never darker than a middle one: the watercolour's deep washes, laid as flat paint in the
+      // shade, were black thorns all over the wood's floor; in the shade a blade is a deep green)
+      vec3 kc = vCol;
+      float kl = dot(kc, vec3(0.3, 0.5, 0.2));
+      kc = mix(kc, kc * (0.52 / max(kl, 0.08)), smoothstep(0.52, 0.30, kl) * 0.85);
+      vec3 ko = pcDabTint(pcDensity(kc, 1.0 + (r3o.x - 0.5) * 0.25), r3o, 0.0);
+      ko = mix(ko, vec3(1.0), uWx.z * smoothstep(0.35, 0.9, vS.x) * 0.8);
+      // (in the shade a stroke is its own colour laid heavier with half the cool key over it, as a leaf's is: the key
+      // whole made the grass of a shaded bank a violet brown)
+      vec3 deepO = pcBody(pcDensity(ko, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+      vec3 co = pcLamp(mix(deepO, pcTone(ko, lv), smoothstep(1.2, 2.0, lv)), ko, vRootB, r3o.y);
+      co = pcAtmosV(co, vFog, vView);
+      pcWrite(co, 0.0, nVo, -vView.z, 4.0 + vS.z * 0.9);
+      return;
+    }
   #endif
   vec4 n1 = texture(uNoise3D, vBody / 2.9 + 0.11);
   // the loaded brush: pigment pools where the stroke starts, the tip is drier and breaks

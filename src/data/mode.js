@@ -10,6 +10,9 @@ export const MODE = { oil: false, get wanderer() { return this.oil; } };
 // plant that exist only in the oil look (`flora.tallOil`: appended to `flora.tall`), and a biome may change any of
 // its own fields for it (`oil.over`; in it `tallOil: [a, b]` names two of the look's oil-only kinds, as `tall` names
 // two of its kinds). First use: the firs and bare trees of Neptune's snowfield (the owner, 2026-11-16).
+// A look may also give some of its hand-placed sites another biome for the oil look (`oil.sites`: { index: biome id }):
+// Earth's first site, where the explorer lands, is the AUTUMN wood in the oil look (the owner's references for the
+// wood are all of autumn, and the first play of the look on a phone landed in the green wood: 2026-11-16).
 export function overlayOil(LOOKS) {
   for (const id of Object.keys(LOOKS)) {
     const L = LOOKS[id];
@@ -17,6 +20,7 @@ export function overlayOil(LOOKS) {
     L._oilLaid = true;
     const base = L.flora && L.flora.tall ? L.flora.tall.length : 0;
     if (L.flora && L.flora.tallOil) L.flora.tall = (L.flora.tall || []).concat(L.flora.tallOil);
+    if (L.oil && L.oil.sites && L.sites) for (const k of Object.keys(L.oil.sites)) if (L.sites[+k]) L.sites[+k] = [L.sites[+k][0], L.sites[+k][1], L.oil.sites[k]];
     for (const b of L.biomes || []) {
       const o = b.oil && b.oil.over;
       if (!o) continue;
