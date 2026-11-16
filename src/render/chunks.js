@@ -389,8 +389,8 @@ vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
   if (uLamp.w < 0.01) return paint;
   // (a modest pool, a few metres across, whose edge is broken stroke by stroke into the night: each stroke takes its
   // distance a metre and a half nearer or farther by its own number)
-  float d = length(body - uLamp.xyz) + (r - 0.5) * 1.5;
-  float k = uLamp.w * (1.0 - smoothstep(0.3, 3.4, d));
+  float d = length(body - uLamp.xyz) + (r - 0.5) * 1.0;
+  float k = uLamp.w * (1.0 - smoothstep(0.2, 5.4, d));
   if (k < 0.004) return paint;
   // (the wanderer's own shadow by the lantern, as in the clip's night: a dark streak on the lit snow from the feet away
   // from the lantern, widening as it goes; a stroke lies in it or out of it whole)
@@ -402,16 +402,17 @@ vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
     float ls = dot(lq, ld), lside = length(lq - ld * ls);
     k *= 1.0 - 0.9 * step(-0.08 + (r - 0.5) * 0.08, ls) * step(lside, (0.12 + (r - 0.5) * 0.06) * (1.0 + max(ls, 0.0) / 0.55));
   }
-  // (the pool: orange at the feet, yellow round it, then strokes of a pale warm light among the night's own, then the
-  // night. Laid before this: one flat mustard out to three metres (a disc), then broad rings with a yellow-green one
-  // (toxic, and banded: the critic's words; the clip's pool has no green in it).)
+  // THE POOL, AS THE CLIP'S (looked at again beside ours when the owner said "but still use the reference video as
+  // well", 2026-11-16): a warm, QUIET light, cream and pale gold at the feet, that dies away over five metres through
+  // tan into the night's own colour; no hard ring anywhere, and nothing in it a pure orange. Every stroke is still one
+  // flat colour: how far the light has taken it is asked at its own centre, a little more or less by its own number,
+  // so the falling-off is made of whole strokes. (Laid before this: a flat mustard disc; broad rings with a yellow-green
+  // one; then two hard steps of saturated orange and yellow, which beside the clip was a traffic sign on the snow.)
   float wl = dot(wash, vec3(0.3, 0.5, 0.2));
-  vec3 orange = min(mix(pcDensity(wash, 1.2) * vec3(1.35, 0.90, 0.42) + vec3(0.10, 0.045, 0.0), vec3(1.0, 0.64, 0.22) * (0.75 + 0.5 * wl), 0.5), vec3(1.0));
-  vec3 yellow = min(orange * vec3(0.98, 1.22, 1.28) + vec3(0.0, 0.03, 0.03), vec3(1.0));
-  // (an ochre and a tan, not a pure orange and yellow: the clip's lantern lays a warm, quiet light on its snow)
-  orange *= vec3(0.86, 0.72, 0.78) * (0.90 + 0.16 * fract(r * 7.3)); yellow *= vec3(0.84, 0.78, 0.92) * (0.92 + 0.12 * fract(r * 5.1));
-  vec3 pale = mix(paint, vec3(0.84, 0.76, 0.58), 0.45);
-  return k > 0.74 ? orange : k > 0.48 ? yellow : k > 0.24 ? pale : paint;
+  vec3 warm = min(mix(pcDensity(wash, 1.15) * vec3(1.24, 0.93, 0.56) + vec3(0.06, 0.03, 0.0), vec3(0.97, 0.79, 0.45) * (0.80 + 0.35 * wl), 0.5), vec3(1.0));      // (a gold, as the clip's; a step yellower and it was lemon)
+  warm *= 0.92 + 0.13 * fract(r * 7.3);
+  float kk = clamp(k * 1.12 + (fract(r * 5.1) - 0.5) * 0.22, 0.0, 1.0);
+  return mix(paint, warm, kk * kk * (3.0 - 2.0 * kk) * 0.94);
 }
 // The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
 // (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.

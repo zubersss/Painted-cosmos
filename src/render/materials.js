@@ -187,7 +187,10 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
 // slate blue, a pale blue, a blue-white. A stroke strays only a hair toward lavender or toward mint, never toward a
 // warm colour: made to stray warm and cool as a floor of leaves is, near-white snow was a pastel confetti.
 vec3 pcIce(vec3 t, vec3 rnd, float dr) {
-  float l = min(dot(t, vec3(0.3, 0.5, 0.2)), 1.0) * mix(0.60, 0.72, uDayness) + (rnd.x - 0.5) * 0.10 + 0.07 * step(0.88, rnd.z) + 0.30 * dr;
+  // (how far a stroke differs from the next: between the clip's snow, whose strokes stand clearly apart, and the
+  // pictures', which is nearly smooth: the owner, after the pictures: "but still use the reference video as well". And
+  // by night the clip's slate blue with paler strokes lying in it, not the pictures' pale sheet.)
+  float l = min(dot(t, vec3(0.3, 0.5, 0.2)), 1.0) * mix(0.55, 0.72, uDayness) + (rnd.x - 0.5) * 0.17 + 0.13 * step(0.86, rnd.z) + 0.28 * dr;
   const vec3 deep = vec3(0.19, 0.22, 0.40), slate = vec3(0.42, 0.50, 0.68), pale = vec3(0.72, 0.80, 0.90), white = vec3(0.92, 0.95, 0.98);
   vec3 c = l < 0.34 ? mix(deep, slate, clamp(l / 0.34, 0.0, 1.0)) : l < 0.68 ? mix(slate, pale, (l - 0.34) / 0.34) : mix(pale, white, clamp((l - 0.68) / 0.30, 0.0, 1.0));
   float q = fract(rnd.y * 5.3);

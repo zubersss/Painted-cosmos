@@ -135,6 +135,11 @@ is set:
   clean edge and differing little from the next, NO ridge or dark line between them; a slow shading from drift to
   drift read at the stroke's centre (`pcIce`'s `dr`, from `pcFlowPaint`). The relief described next (`pcImpasto`) was
   the answer before that and is GONE; `pcSnowLayer`, the exact placement, stays.
+  THE CLIP STILL COUNTS (the owner, right after: "but still use the reference video as well"): the pictures are added
+  to the clip, not put in its place. On snow the clip gives the night's colours, strokes one can see sweeping in arcs
+  and the lantern's light (`pcLamp`: a quiet cream-gold that dies away over five metres through whole strokes, no ring,
+  no pure orange); the pictures give thin, many strokes with no ridges and the soft shading. `pcIce`'s stroke-to-stroke
+  difference sits between the two on purpose.
   THE TREES OF THE SNOW (the same message: "start adding trees like this as well in the snowy areas"): kinds that
   exist only in the oil look. `src/data/mode.js overlayOil` (called once from `render/shared.js` when the look is on)
   appends a look's `flora.tallOil` to its `flora.tall` and lays a biome's `oil.over` over the biome (`tallOil: [a, b]`
