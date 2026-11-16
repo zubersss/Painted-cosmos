@@ -684,14 +684,17 @@ vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {
 // other over one pixel. p: the chart in stroke widths (the strokes run along its first axis); asp: length over width.
 // Out: the stroke's numbers and centre, how much of the pixel is its own (1 inside, a half on its edge), and the
 // numbers of the stroke that has the rest.
-void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float own, out vec3 rndN) {
+// (pcThinR: the same with rag, how ragged a stroke's two ends are (0: cut straight; 0.09: the uneven end a loaded
+// knife leaves), and uv out: where in its stroke the pixel lies, x along it and y across it, each 0..1)
+void pcThinR(vec2 p, float asp, vec2 spx, float rag, out vec3 rnd, out vec2 ctr, out float own, out vec3 rndN, out vec2 uv) {
   // (the rows are of unequal width)
   p.y += 0.27 * sin(1.7 * p.y + 0.9 * sin(0.21 * p.x));
   float row = floor(p.y);
   vec3 hr = pcHash3(vec2(row, 7.31));
   float sh = hr.x * 17.0 + 0.5 * row;
   const float J = 0.6, LEAN = 2.6;
-  float x = (p.x + (p.y - row - 0.5) * (hr.z - 0.5) * LEAN) / asp + sh;
+  float vr = p.y - row;
+  float x = (p.x + (vr - 0.5) * (hr.z - 0.5) * LEAN) / asp + sh + rag * (0.7 * sin(vr * 7.0 + hr.y * 6.283) + 0.3 * sin(vr * 15.0 + hr.x * 9.0));      // (a slow wave and a quicker one: an end drawn off by the knife; quick waves alone were a comb of little steps)
   float col = floor(x);
   float jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J;
   float jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J;
@@ -699,6 +702,7 @@ void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float o
   else if (x > jr) { col += 1.0; jl = jr; jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J; }
   rnd = pcHash3(vec2(col + 0.37, row + 0.71));
   ctr = vec2((0.5 * (jl + jr) - sh) * asp, row + 0.5);
+  uv = vec2((x - jl) / max(jr - jl, 1e-4), vr);
   vec2 ipx = 1.0 / max(spx, vec2(1e-6));
   float eL = (x - jl) * asp * ipx.x, eR = (jr - x) * asp * ipx.x, eB = (p.y - row) * ipx.y, eT = (row + 1.0 - p.y) * ipx.y;
   float e = min(min(eL, eR), min(eB, eT));
@@ -719,6 +723,7 @@ void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float o
     }
   }
 }
+void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float own, out vec3 rndN) { vec2 uv; pcThinR(p, asp, spx, 0.0, rnd, ctr, own, rndN, uv); }
 // One layer of thin strokes over a chart (the arguments as pcStrokeLayer's; w: a stroke's width, m).
 // bend: how far the slow noise bends the rows, in stroke widths (9: the ground's flow, whose strokes swell and thin with
 // it to about twice and half their width; 2: bark, whose streaks keep their width)
@@ -732,6 +737,19 @@ void pcThinLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, fl
   vec2 ctr;
   pcThin(p, asp, spx, rnd, ctr, own, rndN);
   ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+}
+// The same, for strokes that are painted as THINGS LAID ON (snow, materials.js): rag as pcThinR's; out as well where in
+// its stroke the pixel lies (uv) and how many pixels wide the stroke is there (pxW).
+void pcThinLayerUV(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, float bend, float rag,
+                   out vec3 rnd, out vec2 ds, out float own, out vec3 rndN, out vec2 uv, out float pxW) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * (bend < 0.0 ? 300.0 : 60.0)) + 0.19).rg - 0.5) * abs(bend);
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr;
+  pcThinR(p, asp, spx, rag, rnd, ctr, own, rndN, uv);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+  pxW = 1.0 / max(spx.y, 1e-6);
 }
 // The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
 // the same place has the same chart from every patch of terrain and at every height. body: body-local metres.

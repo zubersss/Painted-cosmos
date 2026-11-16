@@ -231,7 +231,7 @@ function wandererParts(B, X, Z, ringsY) {
   B.blob([0, 1.585, 0], 0.112, 0.125, 0.118, { seg: 14, rings: 11, col: (p) => (p[2] < -0.03 && p[1] < 1.632 ? mixc(FLESH, CHEEK, sstep(0.03, 0.08, Math.abs(p[0])) * sstep(1.625, 1.57, p[1]) * 0.75) : HAIR), lump: 0.004, dry: 0.2 });
   // (the hair one form over the crown and down to the nape: as a shallow cap on the head it had a rim, and with its
   // streaks it read as a knitted hat; the owner's figure is bare-headed)
-  B.blob([0, 1.622, 0.046], 0.123, 0.118, 0.126, { seg: 12, rings: 9, col: (p) => mixc(HAIR, SEPIA, noise3(p[0] * 20, p[1] * 9, p[2] * 20) * 0.6), lump: 0.008, dry: 0.4 });
+  B.blob([0, 1.602, 0.040], 0.125, 0.140, 0.130, { seg: 12, rings: 9, col: (p) => mixc(HAIR, SEPIA, noise3(p[0] * 20, p[1] * 9, p[2] * 20) * 0.6), lump: 0.008, dry: 0.4 });      // (down to the cowl: the head's own back showed under it as a band)
   // 2, 3 arms: dark sleeves from under the cloak, a pale hand
   for (const s of [-1, 1]) {
     B.part = s < 0 ? 2 : 3;

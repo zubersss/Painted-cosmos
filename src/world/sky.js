@@ -385,25 +385,40 @@ void main() {
     float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
     col = mix(col, vec3(1.0, 0.94, 0.76), gold * mix(0.88, 0.60, smoothstep(0.0, 0.7, e)));
     {
-      // the night sky is painted, not left flat: short thin dashes a step lighter than the wash, in rows that waver
-      // across the sky (the clip's night sky is streaked all over with them)
-      vec3 hh = normalize(d - up * e + up * 1e-4);
-      float az2 = atan(hh.z, hh.x);
-      // (the rows waver by a slow noise as well as by the bearing, so that they do not read as rings round the zenith;
-      // three dashes in ten are laid, each its own length and lightness)
-      // (the clip's night sky is streaked all over, densely and finely, the streaks swirling: two layers of rows, each
-      // bent by a slow noise, about half of their dashes laid, every dash thin and of its own length and lightness)
-      vec4 wv4 = texture(uNoise3D, d * 0.9 + 0.37);
-      for (int L = 0; L < 2; L++) {
-        float wv = L == 0 ? wv4.r : wv4.b, fq = L == 0 ? 52.0 : 31.0;
-        float rowf = e * fq + 2.2 * sin(az2 * 3.0 + 1.3 + float(L) * 2.1) + 1.1 * sin(az2 * 7.0) + 9.0 * wv + float(L) * 0.37;
-        float row = floor(rowf), hx = fract(sin((row + float(L) * 71.0) * 91.7) * 43758.5453);
-        float along = az2 * (9.0 + 12.0 * hx) + hx * 40.0 + 3.0 * wv4.g;
-        float hs = fract(sin((floor(along) + row * 57.0) * 12.9898) * 43758.5453);
-        float fwr = max(fwidth(rowf), 1e-4);
-        float thin = smoothstep(-fwr, fwr, (0.05 + 0.07 * hx) - abs(fract(rowf) - 0.5));
-        float dash = step(0.48, hs) * thin * step(0.04, fract(along)) * step(fract(along), 0.40 + 0.55 * hx);
-        col = mix(col, min(col * 1.25 + vec3(0.02, 0.07, 0.07), vec3(1.0)), dash * (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.03, 0.12, e) * (0.35 + 0.6 * hs));
+      // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
+      // closer to the ... references ... the patterns in the sky"). The clip's night sky, looked at closely: LONG, THIN,
+      // NEARLY STRAIGHT streaks of pale cyan on the dark, lying almost level, some rising a little to one side and some
+      // falling, so that they cross one another at shallow angles; of every length, from a short touch to a third of
+      // the picture; each drawn to a point at both ends; thicker and brighter here, a hair there. So: four families of
+      // streaks, each a set of level lines about an axis of its own that leans a little from straight up (a family's
+      // lines lie level on one side of the sky and lean one way or the other elsewhere, and two families cross at a
+      // shallow angle); along a line, streaks of the line's own length with gaps between; bent only very gently by a
+      // slow noise. (Laid before this: short dashes in rows bent by a quick noise: curls and worms, not the clip's.)
+      vec3 ta = normalize(cross(up, vec3(0.31, 0.74, 0.59))), tb = cross(up, ta);
+      vec4 wv4 = texture(uNoise3D, d * 0.7 + 0.37);
+      float nightK = (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.02, 0.10, e);
+      if (nightK > 0.004) {
+        for (int L = 0; L < 4; L++) {
+          float fl = float(L);
+          vec2 lean = L == 0 ? vec2(0.16, 0.05) : L == 1 ? vec2(-0.11, 0.19) : L == 2 ? vec2(0.04, -0.27) : vec2(-0.30, -0.10);
+          vec3 ax = normalize(up + ta * lean.x + tb * lean.y);
+          vec3 a1 = normalize(ta - ax * dot(ta, ax)), a2 = cross(ax, a1);
+          float fq = L == 0 ? 64.0 : L == 1 ? 47.0 : L == 2 ? 83.0 : 38.0;
+          float rowf = dot(d, ax) * fq + 1.6 * (L < 2 ? wv4.r : wv4.b) + fl * 0.37;
+          float row = floor(rowf), hx = fract(sin((row + fl * 71.0) * 91.7) * 43758.5453), hy = fract(sin((row + fl * 13.0) * 37.3) * 24634.63);
+          // (a line's streaks: from one in a sixth of the sky round to a dozen, the longest on few lines)
+          float along = atan(dot(d, a2), dot(d, a1)) * (1.0 + 11.0 * hx * hx) + hy * 40.0;
+          float seg = floor(along), ft = along - seg;
+          float hs = fract(sin((seg + row * 57.0 + fl * 19.0) * 12.9898) * 43758.5453), hl = fract(hs * 7.31 + hx);
+          float a0 = 0.04 + 0.20 * hl, a1e = a0 + 0.30 + 0.62 * hs * (1.0 - a0 - 0.30);
+          float sp = (ft - a0) / max(a1e - a0, 1e-3);
+          // (drawn to a point at both ends; one to three pixels thick, whatever the lens)
+          float taper = smoothstep(0.0, 0.30, sp) * smoothstep(0.0, 0.30, 1.0 - sp);
+          float fwr = max(fwidth(rowf), 1e-4);
+          float wid = (0.45 + 0.75 * hl * hl) * fwr * taper;
+          float cov = smoothstep(-0.5 * fwr, 0.5 * fwr, wid - abs(rowf - row - 0.5)) * step(0.0, sp) * step(sp, 1.0) * step(0.42, fract(hs * 3.7 + hy));
+          col = mix(col, mix(col, vec3(0.40, 0.80, 0.78), 0.30 + 0.55 * hl), cov * nightK * (0.45 + 0.55 * hs));
+        }
       }
     }
   #endif

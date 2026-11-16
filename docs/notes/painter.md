@@ -129,6 +129,18 @@ is set:
   its value picks from ONE ramp of ice colours (deep blue, slate, pale blue, blue-white), darker by night, each stroke
   its own value, one in ten a step paler, and it never strays toward a warm colour. Everything else is leaf dabs.
   DO NOT let snow take `pcDabTint`'s warm and cool straying again: on near-white it is a pastel confetti.
+  SNOW AS PAINT LAID ON (the owner, 2026-11-16: "make the snow strokes look closer to the reference like its actually
+  been painted on the ground"): each stroke is a slab with a bright ridge along one long edge, a dark line along the
+  other, the brush's hairs down its length and an uneven end (`pcImpasto`, `pcThinR`'s `rag` and `uv`), and it sweeps
+  in arcs. A stroke is lit, shaded and lamp-lit WHOLE, so its centre must be the same to the millimetre from all its
+  pixels: `pcSnowLayer` reads the swirl's noise exactly (`pcBend8`: eight texels, a smooth weight, its slope from the
+  same eight) and finds the centre by Newton's rule on the plain chart of the sphere. Found from each pixel by the
+  chart's screen derivatives (`pcThinLayer`, still used by bark, the figure, water and the ice worlds' ground) the
+  centre differs from pixel to pixel near the eye, and every edge decided at the centre is a stipple of dots there.
+- THE NIGHT SKY'S STREAKS (the owner, same day: "the patterns in the sky" as the reference's): long, thin, nearly
+  straight streaks drawn to a point at both ends, in four families, each a set of level lines about an axis that leans
+  a little from straight up, so that two families cross at a shallow angle (`sky.js`, under `PC_OIL`). Short dashes in
+  bent rows were curls and worms.
 - a biome's `oil.pal` (its colours given outright as paint), `oil.under` (undergrowth colours), `oil.tallMix` (the
   wood's mix of kinds): the autumn wood, the green wood (the game's first place), the aurora tundra.
 - a world's own night: a look's `oil.night` (Neptune's teal).
