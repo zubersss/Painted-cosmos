@@ -220,91 +220,71 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 ## 3. State right now (update this before you stop)
 
-Last updated 2026-11-15 (11:20 UTC) by the coordinator on the second account, which took over
-from the first. Everything is still paused: nothing is running, the working tree is clean, and
-everything is pushed. This session has read the handover and run nothing (no checks either).
+Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
+been patched a dozen times; the log has the history).
 
-**The references have arrived and are sorted** (`docs/references/README.md`, and the log's last
-section). The main finding: the clip's strokes are painted on the world's surfaces, not laid
-over the picture as a filter, and its look rests first on light and colour. So the prototype
-brief in section 4a (a filter in `post.js`) is **under review and not to be built as written**.
+**In one line:** the new painted look is built on branch `look-proto`, the owner likes it and
+has asked for it to be put where they can try it: PULL REQUEST #4 IS OPEN
+(https://github.com/zubersss/Painted-cosmos/pull/4, `look-proto` into `main`, the look behind
+`?look=oil`). It is the owner's to merge.
 
-**Decided by the owner on 2026-11-15:** the whole clip is the target (no favourite part); the
-cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
+**The pull request.**
+- Opened as a draft at the owner's word (section 2, item 31). It is marked ready when
+  `node tests/all.mjs --export` has passed on the branch's head and a picture-for-picture
+  comparison of the watercolour game on `main` and on the branch has been looked at; the log's
+  newest entries say whether both are done. If a new session finds it still a draft: run those two
+  on the head, then mark it ready (or say in it what failed).
+- NOBODY MERGES IT BUT THE OWNER (or a session the owner tells to, in that session).
+- After the merge: the address to give the owner is the live one with `?look=oil` on the end
+  (`https://zubersss.github.io/Painted-cosmos/?look=oil`; a place and hour can be added:
+  `&body=neptune&time=23`). Ask them how it runs and how it looks in motion: nothing could be
+  judged of either here. Ask again roughly which desktop and which phone they have.
+- While it is open, do not push further commits to `look-proto` without saying so in the pull
+  request (they would go live with the merge). New look work goes on the local branch
+  `look-dev` (work tree `/home/user/pc-dev`, lost with the container) or a new pushed branch.
 
-**IN PROGRESS since 2026-11-15 (the owner's go): the coordinator is building pieces 1 to 3 of
-section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
-for the owner.** **IN PROGRESS (the owner's go of 2026-11-15, "Go ahead in that order and make the cloak richer
-blue"): the overhaul plan in section 4a-2, in its order. The coordinator builds it on
-`look-proto`. STATE ON 2026-11-16 (end of the session's work): overhauls 1 to 8 are built and seen;
-9 (every world) is through its first round: all forty biomes on ten worlds were drawn in the oil
-look (no errors) and what the survey showed wrong was cured. THE OWNER APPROVED THE LOOK at the
-checkpoint ("I like the look so far keep it up") and asked for two things (section 2, item 24):
-thinner strips on the cloak and the aurora as light; both are done and seen; then for snow in the
-colours of ice and snow, darker, its strokes as the clip's (item 25), and for the night sky's
-streaks and the snow's strokes as the reference's (item 26), then for smooth snow in thin
-strokes and for trees on the snowfield (item 27): done and seen, the stills sent.
-PULL REQUEST #4 (`look-proto` into `main`, the look behind `?look=oil`) IS OPEN AS A DRAFT since
-2026-11-16 at the owner's word (item 31): https://github.com/zubersss/Painted-cosmos/pull/4 . It is
-marked ready when `node tests/all.mjs --export` has passed on the branch's head (the log's newest
-entry says whether it has); THE OWNER MERGES IT, nobody else. After the merge the address to give
-them is the live one with `?look=oil` added. Do not push more commits to `look-proto` while the
-pull request is open without saying so in it (they would go live with the merge): new look work
-goes on the local branch `look-dev` or a new branch until the owner has tried the page.
-`look-proto` is at 515c094 (item 29: the clip used beside the pictures: the lantern's light and
-the snow's strokes brought back toward the clip, seen); one commit earlier, e228a9f, is a checkpoint ( `CLAUDE.md` now carries a map of the project; the
-owner asked for a list of the three riskiest parts of the code and said to WAIT for their go-ahead
-before fixing any: the list is in the log's entry of 2026-11-16 and nothing of it is to be touched
-until they say so). Before that checkpoint it was at b8ae2a2 (the full check ran before the last commits, which touch the oil
-look's paths only; the unit and world suites were run on the head); `node tests/all.mjs --export` PASSED all seventeen steps on it (thirteen on 5c77830, the
-four painted-world runs on efb0fc6; later commits changed the oil look's paths only, with the unit
-and world suites run again). WAITING FOR THE OWNER, asked twice: whether to put the look on a page
-they can open on their desktop: a pull request into `main` that adds it behind `?look=oil` (the
-live game unchanged without the flag), merged only on their word. Only there can speed and motion
-be judged; that is the largest unknown left. IF THE OWNER SAYS YES: open the pull request from
-`look-proto` into `main` (run `tests/all.mjs --export` on the head first), ask the owner to merge,
-and give them the address with `?look=oil`. IF THEY SAY GO ON WITHOUT IT: the open points in the
-log's newest section (Venus' lava at a low angle, the wood from the air, flicker from the ship,
-Pluto's ridges), then the phone's cheaper settings (section 2, item 17). How each world's settings
-are given is in `docs/notes/painter.md` on `look-proto` ("OVERHAUL 9"). If this session was cut
-off: `git log origin/look-proto` and the log's newest sections; nothing is unpushed.**
-Pieces 1 to 3 are built. Checkpoint 1 is passed: the owner chose style 5 and asked for the
-clip to be matched very closely (section 2, item 20), and said to continue. The coordinator is
-now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
-clip's, real cast shadows, falling leaves and the flicker, the night with snow, lantern and
-aurora, the explorer), toward checkpoint 2. The station numbers of checkpoint 1 are in the log:
-the oil look is far sharper than release 1 from the ship, and its flicker index is worse (the
-look's open fault, to be treated). If this session was cut off: read `git log origin/look-proto`, the newest
-section of the log, and the note at the top of `docs/notes/painter.md` on that branch; work that
-is committed there is safe, nothing of it is live. The desktop's top tier is where the prototype is
-built and judged (section 2, item 17); the phone follows after approval. Still to be asked
-again: roughly which desktop the owner has (the preview page will be tried on it), and which
-phone.
+**The look, where it stands** (`look-proto`; the file-by-file account is `docs/notes/painter.md`
+on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`):
+- The overhaul plan of section 4a-2: 1 to 8 built and seen; 9 (every world) through a first
+  round: all forty biomes draw, and what a survey of them showed wrong was cured.
+- The owner's word since the checkpoint, each done and seen (section 2, items 24 to 29): the
+  cloak in many thin strips; the aurora as light; snow in the colours of ice and snow; the night
+  sky's streaks as the clip's; snow smooth, in thin close strokes with no ridges; snow-laden
+  firs and bare trees on Neptune's snowfield; the clip still the main target beside the two
+  pictures of snow.
+- Checks: unit 251, world 47 on the head; the full check passed in full on earlier commits and
+  is being run again on the head for the pull request.
+- Measured from the ship: about three times as sharp as the live game, and more flicker under a
+  slow pan (0.41 against 0.32 at 150 m; 0.23 against 0.10 at 1 km).
 
-**Agreed in principle by the owner ("we should do it right?"), not yet the word to start (see
-the log's last three sections). Next: the references and the owner's device, then a one-page
-plan for the owner's go:**
-- Models: no mixing (it would save a few per cent at most). Everything that writes or judges
-  the game runs on the top model at extra-high effort.
-- Set-up, with no workflow: the coordinator builds the main line itself, one piece at a time.
-  Single agents are added only where they buy quality: two or three truly different ways of
-  making the paint look, as stills for the owner to pick; an independent critic that compares
-  every set of stills with the references; an independent verifier after each finished piece.
-- Three changes to section 4a that the coordinator put to the owner: judge the look in motion on
-  the owner's phone through a private preview, not only in stills; take one or two scenes all
-  the way instead of a thin filter over five; and set the order of the look and release 2's
-  phone work by the device the owner mostly plays on (asked, not yet answered).
+**Waiting for the owner:**
+1. To merge pull request #4 (when it is marked ready) and try the page.
+2. Their go-ahead before any of the THREE RISKIEST PARTS of the code is touched (section 2,
+   item 28; the list is in the log, "OWNER: finish the task in hand, then five steps"): the shader
+   code's tangle, the new look's lack of automatic checks and its global switches, and the three
+   branches that have grown apart.
+
+**If the owner says "continue" or "resume"** (and gives nothing else): go on with the look on
+`look-dev`, in this order: the trees of the snow in the other snowy places (the owner's "start
+adding"; only Neptune's tundra has them); the firs' needles, angular near the eye; the open
+points of the survey (Venus' lava at a low angle, Pluto's ridges, the far snow's level strokes,
+the wood from the air); then, once the owner has judged the look on their desktop, the phone's
+cheaper settings (item 17). Say what is planned in a line before starting; show stills.
+
+**What a session here cannot know:** speed on a real graphics card, and how anything looks in
+motion (`CLAUDE.md`, "In a cloud session there is no graphics card").
 
 | Branch | What it holds |
 | --- | --- |
 | `main` | **Live.** At `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
 | `cosmos` | Frozen at `3e46e80`: release 1's code, the same as `main`. Do not work on it. |
+| `look-proto` | **The new look** (`?look=oil`), the new explorer and its flight, cut from `main` at `5e85754`. Not live. Pull request #4 into `main` is open. |
 | `r2` | **The working branch.** Release 1, the logs, this file, `tools/workflows/`, and release 2's half-done work as "WIP snapshot" commits only. No release-2 item was finished or verified. On a clean export of `r2`: world tests 56 pass and 1 fail ("MSAA belongs to the tier..."), unit 259, physics 325. |
 
 **Waiting, in the owner's order:**
 
-1. **The prototype of the new look and the new explorer** (section 2, items 5 and 6). The owner
-   chose "start the prototype", then paused before it began. Nothing has been done.
+1. **The new look and the new explorer** (section 2, items 5 and 6): built, see above; pull
+   request #4.
 2. **Release 2** of `docs/lead/SHARP-SMOOTH-PLAN.md`: every tier and every device sharp, and
    fewer stutters.
 3. **Release 3** of the same plan: building and streaming off the main thread.
