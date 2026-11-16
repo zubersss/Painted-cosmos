@@ -213,6 +213,17 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     (2026-11-16).** "I have a Samsung 23 ultra and give me the top quality settings link." Given:
     the live address with `?look=oil&preset=desktop&quality=2&dynres=0` (what each part does is
     in the log). The desktop they play on is still not known.
+33. **After the phone: the snow world liked; the forest slow and behind; rivers (2026-11-16, with
+    two screen recordings and three pictures, then twenty more).** "i liked the look of the snow
+    world one but I feel like the forest one could stil use alot of work it was choppy and slow
+    turning felt slow it felt laggy the look wasn't as pretty as the snow one or as well done
+    refine the look further uses these new photos as references as well for it and the river
+    could use more tributaries make it split off into many with diverting paths that connect and
+    run off into there own rivers like real life". Then: "Here use these as reference if its
+    gonna help" (twenty pictures of autumn forest from the air and the ground). So: (a) the
+    forest must run smoothly on the phone; (b) its look is refined after the new pictures
+    (described in `docs/references/README.md`), the clip still the main target; (c) rivers
+    branch: tributaries, channels that split and rejoin, side rivers of their own.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with

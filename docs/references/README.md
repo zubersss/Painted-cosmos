@@ -277,3 +277,47 @@ sparse green birches, an olive-brown floor of dabs, flat lime patches of sun, a 
 (orange, amber, yellow, russet) against DARK stems; trees with weight, boughs and clustered leaves; GRASS in blades
 with the sun on it; a warm pale glow in the distance and deep cool shade in front.
 
+## Twenty more from the owner (2026-11-16): the autumn forest from the air and from the ground
+
+Sent a little later with the words "Here use these as reference if its gonna help". Third parties' pictures (several
+look machine-made, in thick oil); none is in the repository. They are used where they help; the clip stays the main
+target for the hand (flat crisp strokes, no blur, no thick rough paint: the crispness rule).
+
+**From high up (seven pictures, one a sheet of six views marked 5,000 to 25,000 m).** A whole country of autumn
+forest to a horizon of blue-violet hills, some with snow, under a sky of warm cumulus in flat patches. The forest is
+a patchwork: stands of orange, amber, yellow and red broadleaves, DARK GREEN CONIFERS between and among them (a
+third to a half of the trees), and OPEN MEADOWS of bright yellow-green grass that the rivers run through. RIVERS
+wind in long S-bends, widen into still LAKES that mirror the sky (pale blue with cloud shapes in them), split round
+islands, take side streams and thin away into the distance; their banks are soft, grass down to the water, a pale
+line of shore here and there. Low white cloud lies in rags in the hollows. Rock outcrops, grey-violet, stand out of
+the trees. The higher the view, the smaller and more even the marks, the bluer and paler the land toward the horizon.
+
+**From a few hundred metres (six pictures).** Each tree is one crown: a round head of small leaf dabs in ONE colour
+family (this tree yellow, the next orange, the next red, a green one here and there), lit on the sun's side and
+shaded cool on the other, on a dark stem seen from above, with its shadow lying on the grass beside it. Between the
+stands: glades of yellow-green grass flecked with pale flowers, earth PATHS winding through, brooks with pale STONES
+along both banks and white water over them, grey-violet boulders. Conifers as dark narrow cones in groups.
+
+**From the ground (five pictures).** A slope of grass in upright strokes, deep green in the shade and bright
+yellow-green in the sun, strewn with yellow flowers and fallen leaves; a dirt path, or a brook with stones and
+reflections; in front, heavy DARK TRUNKS that fork into boughs and twigs, hung with small separate leaf dabs in
+orange, amber and yellow with the sky between them; young saplings in red; beyond, more trees stepping back paler
+into a blue-violet hill and a sky with flat white clouds.
+
+**Two oils of a path in a green wood** (one is the second of the three above, the other a sister picture): deep
+shade in front, the path strewn with red leaves, tall grass catching the light along its edges, and a pale glowing
+mist at the end of the path.
+
+**What is taken.**
+- The wood's COLOUR: each tree its own warm colour (yellow, amber, orange, red), dark conifers and a few green trees
+  among them for contrast, never one even gold.
+- The wood's FLOOR: grass, bright in the sun and deep in the shade, with flowers and fallen leaves as small dabs;
+  leaf litter under the densest stands; paths and bare earth where there is a reason.
+- The TREE: a dark forking stem with weight, the crown a head of small separate dabs, lit one side.
+- The LAND: glades and meadows between the stands (the forest is not one unbroken roof), rock outcrops.
+- The WATER: rivers that wind, widen into pools and lakes, split and rejoin, take side streams; grass to the water's
+  edge, stones along a brook.
+- The DISTANCE: blue-violet hills, paler with distance, warm flat clouds.
+**What is not taken:** the thick ridged paint of several of them (the look has flat strokes), their softness where
+they are soft, and anything that would need hand-made scenery (these worlds are built by rule).
+
