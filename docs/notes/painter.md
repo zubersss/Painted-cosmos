@@ -75,6 +75,41 @@ behind the look's switch:
 maroon flowers and stalks in the shade of the sward; the far land beyond the trees' range is a mosaic of large dabs;
 nothing of it has been seen in motion or on a real graphics card.
 
+**After the owner's SECOND play on the phone (2026-11-16, pull request #5 merged; the phone's own settings; the
+speed test's first table and a recording; "it feels bad ... most of the things haven't rendered and it looks blurry
+and blotchy"). What the table said and what was wrong is in the log on `r2`. In short: the phone's own settings drew
+the look at 822 x 384 and then the controller halved that and dropped a tier, because it asks for 60 pictures a second
+and the phone gave 28; the look's strokes are sized in picture pixels, so every stroke was a blotch; a softening
+filter (FXAA) ran on top; and the morning's tree ranges, right for a sharp small picture, stacked with the low tier's
+and ended the wood a few dozen metres off. Built for that, all behind the look's switch:
+- **The picture is not drawn small** (`render/index.js` `applySize`: every tier draws the whole canvas in the oil
+  look; `main.js`: the controller's floor is 0.85 of the size on a phone or tablet, 0.8 on a desktop, and on a phone
+  or tablet it asks for 30 pictures a second, not 60). **No softening filter on a touch device** in the oil look.
+- **The lighter paint** (`shared.js` `uOilL.x`; on for touch devices, `?lite=0|1` pins it): the ground in two layers
+  of dabs where it has three, no noise looked up for a dab's hue (`pcGroundAt`) nor for a plant's wash, the leaf
+  shadow's pattern from one lookup where it had two, and none at all under a grey sky (`pcDappleS`). SEEN in stills
+  at the phone's picture size: the same picture to the eye.
+- **The ground's mesh follows the picture's height** (`terrain.js` `update`: `splitK`): 380,000 triangles where it had
+  615,000 at the phone's size, most of which were smaller than a pixel. **The ground is drawn last** (`renderOrder`
+  5), so that ground hidden behind plants is not painted where the graphics card can skip it.
+- **Trees**: a tree's ranges are never under the middle tier's; the far trees reach the haze on every tier.
+- **The speed test's second form** (`core/bench.js`): thirteen rows that are questions (the lighter paint against the
+  full one; the ground one flat colour; the plants one flat colour; without trees, small plants, near grass, ground,
+  water; without the light in the air, without shadows; half size; the low tier), and a header that says how the depth
+  is kept (reversed or logarithmic: with the second nothing hidden is skipped, and the cure is another), whether the
+  sun was out, the script's own time and the draw calls and triangles of a frame.
+- **The rivers, second form** (after the owner's two sheets of rivers from the air; `surface.js` `_riversOil`, `_sfO`,
+  `_sf3`): the main river is the line of a field four times as broad as the default stream's (`_sfO`; `oil.riverAt`
+  moves it so that it passes the first landing): ONE long river, eleven to twenty-two metres wide and more in a pool,
+  with pale SAND BARS along one side for stretches (`c.bar`: bare, no trees), a second arm round islands and a third
+  that swings wide. Tributaries are TREES: side streams (the second field) that end at the river, thick where they
+  join and a thread far from it, and their twigs (a third field, `_sf3`), which end at a side stream and are gone
+  within a hundred metres of it. Drawn as maps in Node first.
+**Not known:** whether any of this makes the phone fast enough; the second table is how that is found out. **Next, if
+the table says so:** a sharp enlargement of a small picture in the last pass (the phone's screen is three times the
+picture's size each way, and the browser's own stretch is soft); the plants' cost, which does not follow the picture's
+size.
+
 **What is built, file by file.**
 - `src/render/shared.js`: `LOOK.oil`; the dials `OIL.uOilA..uOilG`, `uOilPx`, the shadow map's uniforms, `uLamp`, the
   dab textures `uDabP`/`uDabId`, the light in the air `uShV`/`uSunV`/`uShaftC`/`uShaft` (each documented there);

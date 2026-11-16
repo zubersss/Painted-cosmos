@@ -106,6 +106,13 @@ export const OIL = {
   // (y was 0.45 while the blades were the watercolour's stiff spikes; they are tufts now, and four in five are kept)
   // (w: how far the world the eye is on takes the look's golden hours, chunks.js pcGold: a look's `oil.gold`, set by the world)
   uOilG: { value: new THREE.Vector4(_qn('sward', 1.0), 1.0, 0, 1) },
+  // THE LIGHTER PAINT, for phones (the owner's S23 Ultra, 2026-11-16: its own speed test showed the ground's paint to be
+  // the one cost that follows the picture's size, 15 ms of a 36 ms frame at a third of a megapixel).
+  //    x 1: the lighter paint: the ground in two layers of dabs where it has three, no noise looked up for a dab's hue or
+  //         its leaf shadow under a grey sky, bark and crowns in one layer. Set by the painter from the tier and the kind
+  //         of device (render/index.js); ?lite=0|1 pins it.
+  //    y for the speed test only (core/bench.js): 1 the ground one flat colour, 2 the plants one flat colour
+  uOilL: { value: new THREE.Vector4(0, 0, 0, 0) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
   // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three

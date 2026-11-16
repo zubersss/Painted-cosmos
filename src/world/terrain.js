@@ -8,7 +8,7 @@ import { getSurface } from './surface.js';
 import { buildPatchData, beginPatch, stepPatch, patchIndices, PATCH_N } from './patchgen.js';
 import { faceToDir, nodeSize, FACES } from './cubesphere.js';
 import { makeTerrainMaterial, makeWaterMaterial } from '../render/materials.js';
-import { QUALITY } from '../render/shared.js';
+import { QUALITY, LOOK, SCREEN } from '../render/shared.js';
 
 const SPLIT_BY_QUALITY = [0.68, 1.12, 1.25];   // a node splits when the camera is nearer than this * its size
 const MORPH_A = 0.76;       // morph band: [MORPH_A, MORPH_B] * the distance at which it merges
@@ -98,6 +98,9 @@ export class PlanetTerrain {
     g.setIndex(sharedIndex());
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), d.boundR);
     const mesh = new THREE.Mesh(g, this.material);
+    // (the oil look: the ground is drawn AFTER the plants, the near strokes, the figures and the water, so that where
+    // the graphics card can tell beforehand that a pixel of ground is hidden, its paint, the costliest, is not worked out)
+    if (LOOK.oil) mesh.renderOrder = 5;
     mesh.position.set(d.origin[0], d.origin[1], d.origin[2]);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     mesh.visible = false;
@@ -242,6 +245,11 @@ export class PlanetTerrain {
     this.now = now == null ? this.now + 1e3 : now;
     this.instant = !!instant;
     this.splitK = SPLIT_BY_QUALITY[QUALITY.level] || 1.12;
+    // (THE OIL LOOK ON A SMALL PICTURE: the ground's mesh was as fine on a phone's 480 lines as on a desktop's 1080: 615,000
+    // triangles for a third of a million pixels, most of them smaller than a pixel, each one still shaded as a block of
+    // four with the costliest shader in the game. A node splits a little later the lower the picture, never later than
+    // the low tier's own rule. In steps of a twentieth, so that the mesh is not rebuilt as a window is dragged.)
+    if (LOOK.oil) this.splitK = Math.max(SPLIT_BY_QUALITY[0], this.splitK * Math.min(1, Math.max(0.7, Math.round(SCREEN.outH / 1080 * 20) / 20 + 0.25)));
     this.boostK = QUALITY.level === 0 ? 0.15 : 1;     // the low tier spends little on cliffs
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();

@@ -150,7 +150,9 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   vec4 parC = vPar + gPdx * dsA.x + gPdy * dsA.y;
   vec3 nVc = normalize(vNV + gNvdx * dsA.x + gNvdy * dsA.y), nLc = normalize(vNL + gNldx * dsA.x + gNldy * dsA.y);
   c = mix(col2C, colC.rgb, gMid);                  // (far away the forest floor is its canopy)
-  vec4 n1 = pcNoiseS(Bc, 31.0, w), n2 = pcNoiseS(Bc + 0.21 * 6.3, 6.3, w);
+  // (the lighter paint looks up no noise for a dab: its hue and weight vary by the dab's own numbers alone, pcGroundPaint)
+  vec4 n1 = vec4(0.5), n2 = vec4(0.5);
+  if (uOilL.x < 0.5) { n1 = pcNoiseS(Bc, 31.0, w); n2 = pcNoiseS(Bc + 0.21 * 6.3, 6.3, w); }
   c = mix(c, c * uHueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
   c = mix(c, c * uHueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * gMid);
   c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.5 * uOilB.z);
@@ -372,8 +374,12 @@ void main() {
   float rdx = dot(upB, gBdx), rdy = dot(upB, gBdy);
   acc = vec3(0.0);
   float rem = 1.0;
+  // (the speed test's flat ground: no strokes at all, shared.js uOilL.y; the lighter paint: two layers, the coarsest
+  // left to the ground's own colour)
+  if (uOilL.y > 0.5 && uOilL.y < 1.5) rem = 0.0;
   for (int L = 0; L < 3; L++) {
     if (rem < 0.004) break;
+    if (L == 2 && uOilL.x > 0.5) break;
     float ws = L == 0 ? 1.0 : L == 1 ? 2.0 : 4.0, w = o4.x * ws;
     vec3 rnd, rnd2; vec2 ds, ctr; float cov, has2;
     pcDabLayer(ch, dlx, dly, w, uOilS.z, 4.0 * wpx * uOilS.w * ws, ocl,
@@ -389,7 +395,8 @@ void main() {
     if (has2 > 0.5 && rem >= 0.004) { acc += rem * pcGroundPaint(c, leaf, fk, rnd2, snowC, lvl); rem = 0.0; }
   }
   gCtrB = vec3(1e30);
-  if (rem >= 0.004 || uOilC.z < 0.999) {
+  if (uOilL.y > 0.5 && uOilL.y < 1.5) acc = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), 2.0);
+  else if (rem >= 0.004 || uOilC.z < 0.999) {
     float x0 = dot(nV, gSunV) * 0.5 + 0.5;
     float sun0 = min(pcSunAtSoft(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5), 0.5), 1.0 - pcCast(vBody, 0.0));
     vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
@@ -1257,7 +1264,13 @@ void main() {
   if (!gl_FrontFacing) nV = -nV;
   vec3 V = normalize(-vView);
   vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
-  vec4 n1 = texture(uNoise3D, vBody / 9.0);
+  #ifdef PC_OIL
+    // (the lighter paint: no noise for a plant's wash; and the speed test's flat plants, shared.js uOilL.y)
+    vec4 n1 = uOilL.x > 0.5 ? vec4(0.5) : texture(uNoise3D, vBody / 9.0);
+    if (uOilL.y > 1.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+  #else
+    vec4 n1 = texture(uNoise3D, vBody / 9.0);
+  #endif
   float seed = vInst.z;
   float canopy = vInst.w * uCanopy;
   float vd = length(vView);
@@ -1431,7 +1444,7 @@ void main() {
       vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
       if (!gl_FrontFacing) nVc = -nVc;
       vec3 Vc = normalize(-(vView + vwdx * ds.x + vwdy * ds.y));
-      vec4 nA = pcNoiseS(Bc, 9.0, w);
+      vec4 nA = uOilL.x > 0.5 ? vec4(0.5) : pcNoiseS(Bc, 9.0, w);
       vec3 cs; float xs_;
       if (isBark) {
         // a streak is the bark's light wash or one of its dark marks, whole; the foot of the stem and a thin branch are dark
