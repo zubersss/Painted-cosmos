@@ -208,6 +208,9 @@ export function birchGeometry(seed, lod, spec) {
     rad.push((sl ? 0.165 - 0.105 * Math.pow(t, 0.8) : 0.225 - 0.165 * Math.pow(t, 0.75)) * (i === 0 ? (sl ? 1.3 : 1.5) : 1) * (0.86 + rnd() * 0.3));
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.5, swayH: H, hash: rnd() });
+  // (the oil look's tree: a foot. The stem spreads into the ground over its lowest half metre and goes on under it;
+  // ending square on the floor it stood as a post set on a plane: the critic)
+  if (sl && lod === 0) tube(B, [V(pts[0].x, -0.25, pts[0].z), V(pts[0].x, 0.03, pts[0].z), V(pts[0].x + (pts[1].x - pts[0].x) * 0.3, 0.55, pts[0].z + (pts[1].z - pts[0].z) * 0.3)], [rad[0] * 2.3, rad[0] * 1.6, rad[0] * 0.98], sides, { part: 0, swayK: 0, swayH: H, hash: rnd() });
   const top = pts[segs];
   const crownC = V(top.x * 0.85, H * (sl ? 0.76 : 0.72), top.z * 0.85);
   const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
@@ -270,6 +273,9 @@ export function pineGeometry(seed, lod, spec) {
     rad.push((sl ? 0.24 - 0.18 * Math.pow(t, 0.9) : 0.32 - 0.27 * Math.pow(t, 0.9)) * (i === 0 ? (sl ? 1.3 : 1.4) : 1) * (0.88 + rnd() * 0.24));
   }
   tube(B, pts, rad, sides, { part: 0, swayK: 0.35, swayH: H, hash: rnd() });
+  // (the oil look's tree: a foot. The stem spreads into the ground over its lowest half metre and goes on under it;
+  // ending square on the floor it stood as a post set on a plane: the critic)
+  if (sl && lod === 0) tube(B, [V(pts[0].x, -0.25, pts[0].z), V(pts[0].x, 0.03, pts[0].z), V(pts[0].x + (pts[1].x - pts[0].x) * 0.3, 0.55, pts[0].z + (pts[1].z - pts[0].z) * 0.3)], [rad[0] * 2.3, rad[0] * 1.6, rad[0] * 0.98], sides, { part: 0, swayK: 0, swayH: H, hash: rnd() });
   const crownC = V(lean * 0.5, H * (sl ? 0.80 : 0.62), lz * 0.4);
   if (lod === 0) {
     for (let k = 0; k < 2; k++) {

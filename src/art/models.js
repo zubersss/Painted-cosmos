@@ -573,6 +573,9 @@ export function createExplorer() {
         ease(b.thighL, 'x', 0.05 + 0.03 * Math.sin(t * 3.1), fly); ease(b.thighR, 'x', -0.04 + 0.03 * Math.sin(t * 3.1 + 2), fly);
         ease(b.shinL, 'x', 0.10, fly); ease(b.shinR, 'x', 0.05, fly);
         ease(b.skirt, 'x', 0.10 + 0.06 * Math.sin(t * 8.3), go);
+        // (the back panel lies along the back in level flight, fluttering a little: on the upright jet's rule it stood
+        // up from the shoulders like a mast, seen in the first side-on still of the flight)
+        ease(b.scarf, 'x', 0.05 + 0.05 * Math.sin(t * 9.1), go); ease(b.scarf, 'z', 0.03 * Math.sin(t * 7.3), go);
       }
     }
     if (b.lantern) {

@@ -125,7 +125,7 @@ export class ShadowMap {
       name: 'pc-shadow',
       uniforms: {
         uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() }, uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
-        uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 }, uThinLeaf: { value: 0.55 },
+        uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 }, uThinLeaf: { value: 0.66 },
       },
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
     });
