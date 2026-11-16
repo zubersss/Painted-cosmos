@@ -192,22 +192,23 @@ cloak is blue-grey; no shelters for now; the hood goes up in snow and storms.
 section 4a on branch `look-proto` (cut from `main` at `5e85754`), up to checkpoint 1, then stops
 for the owner.** **IN PROGRESS (the owner's go of 2026-11-15, "Go ahead in that order and make the cloak richer
 blue"): the overhaul plan in section 4a-2, in its order. The coordinator builds it on
-`look-proto`. STATE ON 2026-11-16: overhauls 1 to 5 are built and seen; 6 (sky, night), 7 (water)
-and 8 (the figure) have a first pass each; an independent critic's findings were worked through;
-the checkpoint's stills went to the owner, WHO APPROVED THE LOOK ("I like the look so far keep it
-up") and asked for two things (section 2, item 24): thinner strips on the cloak (done and seen)
-and the aurora as light, not stripes (done, seen once, strengthened, to be seen again). The owner
-said to go on and to come back only when something is needed. NOW: a survey of every world in
-the oil look (stills in the scratch folder, described in the log), then overhaul 9 (each world's
-`oil` entries by the pattern of the autumn wood and the aurora tundra; `docs/notes/painter.md`
-on `look-proto` says how), the view from the air, the stream. OWED: the last four steps of
-`tests/all.mjs` (the painted-world runs; the first thirteen passed on 5c77830). NEEDED FROM THE
-OWNER, asked once and not yet answered: whether to put the look on a page they can open on their
-desktop (a pull request into `main` that adds it behind `?look=oil`, the live game unchanged
-without it); only there can speed and motion be judged. If this session was cut off: `git log
-origin/look-proto`, the log's newest sections, and the top of `docs/notes/painter.md` on that
-branch; work not yet pushed, if any, was on the local branch `look-dev` in `/home/user/pc-dev`
-(lost with the container: the log describes it).**
+`look-proto`. STATE ON 2026-11-16 (end of the session's work): overhauls 1 to 8 are built and seen;
+9 (every world) is through its first round: all forty biomes on ten worlds were drawn in the oil
+look (no errors) and what the survey showed wrong was cured. THE OWNER APPROVED THE LOOK at the
+checkpoint ("I like the look so far keep it up") and asked for two things (section 2, item 24):
+thinner strips on the cloak and the aurora as light; both are done and seen. `look-proto` is at
+b48d188; `node tests/all.mjs --export` PASSED all seventeen steps on it (thirteen on 5c77830, the
+four painted-world runs on efb0fc6; later commits changed the oil look's paths only, with the unit
+and world suites run again). WAITING FOR THE OWNER, asked twice: whether to put the look on a page
+they can open on their desktop: a pull request into `main` that adds it behind `?look=oil` (the
+live game unchanged without the flag), merged only on their word. Only there can speed and motion
+be judged; that is the largest unknown left. IF THE OWNER SAYS YES: open the pull request from
+`look-proto` into `main` (run `tests/all.mjs --export` on the head first), ask the owner to merge,
+and give them the address with `?look=oil`. IF THEY SAY GO ON WITHOUT IT: the open points in the
+log's newest section (Venus' lava at a low angle, the wood from the air, flicker from the ship,
+Pluto's ridges), then the phone's cheaper settings (section 2, item 17). How each world's settings
+are given is in `docs/notes/painter.md` on `look-proto` ("OVERHAUL 9"). If this session was cut
+off: `git log origin/look-proto` and the log's newest sections; nothing is unpushed.**
 Pieces 1 to 3 are built. Checkpoint 1 is passed: the owner chose style 5 and asked for the
 clip to be matched very closely (section 2, item 20), and said to continue. The coordinator is
 now on the steps listed in the log's section "OWNER chose style 5" (the forest made as the
