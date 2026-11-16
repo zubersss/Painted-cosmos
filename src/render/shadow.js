@@ -23,6 +23,9 @@ uniform vec3 uOrigin;     // (set by the plants' own onBeforeRender, as for thei
 uniform vec3 uCamLocal;
 uniform vec4 uLod;
 uniform float uInv;
+attribute vec3 aCard;     // (trees: the centre of the leaf a vertex belongs to, florakit.js)
+uniform vec4 uLeafLod;    // (trees: leaves by distance, flora.js: x the distance within which every leaf is drawn, 0 off; y the least share)
+uniform float uThinLeaf;
 varying float vS;
 varying vec3 vCell;
 varying float vPart;
@@ -39,7 +42,16 @@ void main() {
     float j = 1.0 + (aInst.z - 0.5) * uLod.z;
     float vis = step(uLod.x * j, di) * (1.0 - smoothstep(uLod.y * j * uLod.w, uLod.y * j, di));
     sc = length(instanceMatrix[0].xyz);
-    p = io + (mat3(instanceMatrix) * position) * vis;
+    vec3 lp = position;
+    // (LEAVES BY DISTANCE, as materials.js PROP_VERT. Of a crown's leaves only the share 1 - uThinLeaf throws a shadow
+    // at all (FRAG below); far off fewer still are drawn, each larger, so that the crown's shade stays as deep.)
+    if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
+      float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
+      float shr = 1.0 - uThinLeaf;
+      float fs = min(shr, keep * 0.5);
+      lp = aCard + (position - aCard) * step(1.0 - fs, aData.w) * min(sqrt(shr / max(fs, 0.01)), 2.6);
+    }
+    p = io + (mat3(instanceMatrix) * lp) * vis;
   #endif
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vS = -mv.z * uInv;
@@ -125,7 +137,7 @@ export class ShadowMap {
       name: 'pc-shadow',
       uniforms: {
         uOrigin: { value: new THREE.Vector3() }, uCamLocal: { value: new THREE.Vector3() }, uLod: { value: new THREE.Vector4(0, 1e9, 0, 0.9) },
-        uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 }, uThinLeaf: { value: 0.66 },
+        uInv: { value: 1 / (2 * this.D) }, uThin: { value: 0.6 }, uThinLeaf: { value: 0.66 }, uLeafLod: { value: new THREE.Vector4(0, 0, 0, 0) },
       },
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
     });
@@ -228,7 +240,7 @@ export class ShadowMap {
     root.updateMatrixWorld(); camera.updateMatrixWorld();
     OIL.uShV.value.copy(root.matrixWorld).invert().multiply(camera.matrixWorld).premultiply(OIL.uShM.value);
     OIL.uSunV.value.copy(Z).applyQuaternion(q).transformDirection(camera.matrixWorldInverse);
-    OIL.uShaft.value.x = SHADOW.shaft * k; OIL.uShaft.value.y = SHADOW.air;
+    OIL.uShaft.value.x = SHADOW.shaft * k * (SHADOW.shaftK == null ? 1 : SHADOW.shaftK); OIL.uShaft.value.y = SHADOW.air;
     this.frames++;
     return true;
   }

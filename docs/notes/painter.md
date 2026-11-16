@@ -27,6 +27,54 @@ owner's word; the crispness rule stands for everything else); go on without stop
 clip's (the five other styles are gone); match the clip very closely, changing ground and plants where that helps; no
 blur at all; colours that pop with no detail lost; the cloak a rich blue; no jetpack, the explorer flies by itself.
 
+**After the owner's first play on a phone (2026-11-16; the log on `r2` has the whole account).** The look went live
+behind `?look=oil` (pull request #4) and the owner played it on a Samsung S23 Ultra at the pinned top settings: the
+snow world liked (about 35 pictures a second), the FOREST "choppy and slow" (about 9) and "not as pretty as the snow
+one"; rivers wanted with tributaries, "split off into many with diverting paths that connect". 23 new pictures of
+autumn woods and forests from the air came with it (`docs/references/README.md` on `r2`). What was built for that, all
+behind the look's switch:
+- **Trees by their size on the screen** (`src/world/flora.js` `update`: `treeScale`, `farScale`; `SCREEN` in
+  `shared.js`, written by the painter's `resize`). The tiers' ranges (full tree to 90 m, middle to 190 m, far to
+  600 m) were made for a desktop's picture; on a phone's 618 lines they scale by 0.55, never under 0.5. The far trees
+  also follow the air (from the ground to twice the world's ground visibility, Earth 370 m; from the air up to twice
+  their range). `?trees=full` gives the old ranges and no leaf thinning, for comparisons.
+- **Leaves by distance** (`florakit.js` `sortLeafCards`, `leafDrawCount`; `materials.js` `PROP_VERT` `uLeafLod`;
+  `shadow.js` `VERT`; `flora.js` `_instanced`). A tree's leaf cards are put in the order of their numbers (aData.w);
+  beyond a quarter of the full tree's range a share of them is drawn, the highest numbers, each larger by as much as
+  keeps the crown as full (to a fifth at the end of the range); a leaf at the edge of the share shrinks into its own
+  centre. A mesh draws only as much of its index as its nearest tree needs (`geometry.setDrawRange` in
+  `onBeforeRender`, per pass: the shadow pass, where only a third of the leaves throw a shadow at all, draws fewer
+  still, larger). MEASURED in software drawing at the phone's picture size: see the log.
+- **The landing wood is the autumn wood** (`data/mode.js` `overlayOil`: a look's `oil.sites`; `earth.js`): the first
+  site and the first autumn site change places in the oil look.
+- **Each tree its own colour** (`PROP_FRAG` `uLeafFam` / `uFarFam`; a species' `oil.fam = [r, g, b, strength]`): a
+  tree keeps to a short piece of the run yellow, orange, red by its own number (four in ten yellow, four orange, two
+  red), near and far. Conifers stand in groups among the broadleaves (`oil.tallMix` as a pair, `surface.js`
+  `_forest`), glades are wider (`oil.glade`), the air clearer (`oil.over.mist`).
+- **The floor is grass** (`earth.js` autumn `oil.pal`; a look's `oil.leaves`: the share of fallen-leaf dabs under
+  trees, `uGroundK.w`). THE SWARD IS BACK (`uOilG.x` 1; `?sward=0` turns it off): the near ground's strokes
+  (`nearground.js`, unchanged) painted in the oil hand in `NEAR_FRAG` under `PC_OIL`: each stroke one flat piece with
+  a clean edge, lit WHOLE from its root (`vRootB`), a tuft cut into separate lancet blades each its own tone, a
+  flower a round touch, a fallen leaf a pointed oval; never darker than a middle wash; its shade its own colour laid
+  heavier with half the cool key (the same for GREEN ground dabs, `pcGroundPaint`: shaded grass is deep green, not
+  violet-brown).
+- **Leaves smaller and rounder near the eye** (`florakit.js` `birchGeometry`, the slender tree: 104 and 160 six-cornered
+  leaves a bough where there were 84 and 130 kites, a fifth shorter).
+- **The rivers** (`surface.js` `_riversOil`, `_sf2`; a look's `oil.rivers`; Earth only): the stream's line becomes a
+  system: the main channel (8 m) wanders off its line and a second keeps it (islands), a third swings wide, pools up
+  to six times the width and deeper, and side streams (the lines of a second field, taken at a different level on
+  either side of a river so that every meeting is a fork) in narrower valleys. It returns the same "distance to the
+  nearest water" the recipes read, so banks, beds, trees and colours follow. From the air a river is drawn into the
+  far colour as wide as the ground's samples lie apart (`patchgen.js` `S.foot`). Scratch maps of the system were
+  drawn in Node before any browser was opened (described in the log).
+- **Water is blue** (`WATER_FRAG` under `PC_OIL`): half the water's own wash laid heavy and blue whatever the sky
+  gives; the sun's path a narrow run of marks (it was a wide pale sheet: "a gravel road").
+- **A speed test for a real device** (PILOT's `src/core/bench.js`, `?bench=1`; the painter's `_bench`): the same view
+  drawn ten ways, the table left on the screen for the owner to photograph.
+**Still wrong after this pass:** rivers are only faint from high up; the meadow from above is a little lemon; dark
+maroon flowers and stalks in the shade of the sward; the far land beyond the trees' range is a mosaic of large dabs;
+nothing of it has been seen in motion or on a real graphics card.
+
 **What is built, file by file.**
 - `src/render/shared.js`: `LOOK.oil`; the dials `OIL.uOilA..uOilG`, `uOilPx`, the shadow map's uniforms, `uLamp`, the
   dab textures `uDabP`/`uDabId`, the light in the air `uShV`/`uSunV`/`uShaftC`/`uShaft` (each documented there);

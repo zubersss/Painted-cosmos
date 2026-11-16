@@ -13,16 +13,18 @@ import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
-import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
+import { FLORA_PHYS, TALL_KITS, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
-import { QUALITY, G, LOOK } from '../render/shared.js';
+import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
 import { SHADOW_LAYER } from '../render/shadow.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
 const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
 const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget)
 const RELIEF = 250;            // (R1 W2.3) metres the ground in an undergrowth cell's reach may stand above the ground under the eye
+// (?trees=full: the oil look's trees as they were before their detail followed the screen, for comparisons)
+const TREES_FULL = typeof location !== 'undefined' && /[?&]trees=full\b/.test(location.search || '');
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -52,7 +54,7 @@ export class Flora {
     this.lastTreeEval = new THREE.Vector3(1e9, 0, 0); this.lastUnderEval = new THREE.Vector3(1e9, 0, 0);
     this.treeSize = nodeSize(this.R, TREE_LEVEL); this.underSize = nodeSize(this.R, UNDER_LEVEL);
     this.farSize = this.treeSize * 2;       // far trees are batched in cells twice as large
-    this.rangeScale = 1; this.lastScale = -1;
+    this.rangeScale = 1; this.treeScale = 1; this.farScale = 1; this.lastScale = -1;
     this.lastLaid = -10; this.washNow = 1; this._washWall = 0;
     this.lastRelease = -10;
     this.held = [];                    // cells that are built and wait for their ground (see update)
@@ -79,13 +81,16 @@ export class Flora {
     // (and in the oil look every broadleaf's crown is leaves one by one: florakit.js `leafy`)
     const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, sp.kit === 'broadleaf' ? { leafy: 1, double: 1 } : null, sp.oil) : sp));
     this.species = TALL.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null });
       mat.userData.pcCasts = true;
       const gen = TALL_KITS[sp.kit];
       const fd = sp.farD || (sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit]);      // (farD: a kind's own far size [across, high, taper]: the oil look's trees of the snow)
-      return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
+      // (the oil look: a tree's leaves in the order of their numbers, so that far off only a share of them is drawn:
+      // florakit.js sortLeafCards)
+      const lf = LOOK.oil ? sortLeafCards : (g) => g;
+      return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer' };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
@@ -93,7 +98,7 @@ export class Flora {
     this.mats = Object.assign({
       far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
-        far: TALL.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
+        far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
       }) : null,
     }, this._underMats(U, ''));
     for (const k of ['far', 'bush', 'rock']) if (this.mats[k]) this.mats[k].userData.pcCasts = true;
@@ -144,6 +149,7 @@ export class Flora {
     const g = new THREE.BufferGeometry();
     for (const k of SHARED) if (geo.attributes[k]) g.setAttribute(k, geo.attributes[k]);
     g.setIndex(geo.index);
+    if (geo.userData.leaf) g.userData.leaf = geo.userData.leaf;
     const inst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     g.setAttribute('aInst', inst);
     const born = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
@@ -159,10 +165,33 @@ export class Flora {
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), chunk.size * 0.75 + 24);
     const origin = chunk.origin, flora = this, camRel = new THREE.Vector3(), lodv = new THREE.Vector4().fromArray(lod);
     mesh.onBeforeRender = function (renderer, scene, camera, geometry, material) {
-      const u = material.uniforms, k = flora.rangeScale;
+      // (a tree's ranges follow its size on the screen in the oil look, and the far trees the air they are seen through: update())
+      const u = material.uniforms, k = far ? flora.farScale : chunk.isTree ? flora.treeScale : flora.rangeScale;
       u.uOrigin.value.copy(origin);
       u.uCamLocal.value.copy(camRel.subVectors(flora.camLocal, origin));
       u.uLod.value.set(lodv.x * k, lodv.y * k, lodv.z, lodv.w);
+      if (u.uLeafLod) {
+        // LEAVES BY DISTANCE (florakit.js sortLeafCards; materials.js PROP_VERT and shadow.js draw by the same rule): x the
+        // distance within which a tree keeps every leaf, y the least share it keeps. The mesh draws only as much of its
+        // index as its NEAREST tree needs (how near that was when the trees were last sorted into tiers, less what the
+        // eye has moved since).
+        const L = mesh.userData.leafLod, lf = geometry.userData.leaf;
+        if (L) {
+          const d0 = L[0] * flora.treeScale;
+          u.uLeafLod.value.set(d0, L[1], 0, 0);
+          if (lf) {
+            const dn = Math.max(0.01, (mesh.userData.dNear || 0) - (chunk.tierPos ? chunk.tierPos.distanceTo(flora.camLocal) : 1e9));
+            const keep = Math.min(1, Math.max(L[1], Math.pow(d0 / dn, 1.2)));
+            let thr = (1 - keep) * 1.06 - 0.06;
+            // (the shadow pass: of a crown's leaves only a share throws a shadow at all, shadow.js uThinLeaf)
+            if (u.uThinLeaf) thr = 1 - Math.min(1 - u.uThinLeaf.value, keep * 0.5) - 0.02;
+            geometry.setDrawRange(0, leafDrawCount(lf, thr));
+          }
+        } else {
+          u.uLeafLod.value.set(0, 0, 0, 0);
+          if (lf) geometry.setDrawRange(0, Infinity);
+        }
+      }
       if (u.uWashIn) u.uWashIn.value.set(flora.washNow, mesh.userData.laid, WASH_T);
       if (u.uFocus) u.uFocus.value.copy(flora._focus(renderer, camera));
       if (u.uPlantHeight && mesh.userData.plantH) u.uPlantHeight.value = mesh.userData.plantH;
@@ -199,6 +228,7 @@ export class Flora {
     chunk.mat = new Float32Array(n * 16);
     chunk.rel = new Float32Array(n * 3);
     chunk.tier = new Int8Array(n).fill(-2);
+    chunk.dist = new Float32Array(n);
     chunk.prev = new Int8Array(n).fill(-2); chunk.since = new Float32Array(n); chunk.washUntil = 0;
     // groups: which trees can appear in which mesh
     const groups = {};
@@ -251,7 +281,7 @@ export class Flora {
     const n = chunk.n;
     if (!n) return;
     const now = this.washNow, prev = chunk.prev, since = chunk.since;
-    const k = this.rangeScale;
+    const k = this.treeScale, kf = this.farScale, dist01 = chunk.dist;
     const cx = this.camLocal.x - chunk.origin.x, cy = this.camLocal.y - chunk.origin.y, cz = this.camLocal.z - chunk.origin.z;
     const d = chunk.data, rel = chunk.rel, tier = chunk.tier, lowQ = QUALITY.level === 0;
     // the middle tier pays for the near ground, the explorer and the ship (the frame budget of
@@ -268,13 +298,15 @@ export class Flora {
     for (let i = 0; i < n; i++) {
       const dx = rel[i * 3] - cx, dy = rel[i * 3 + 1] - cy, dz = rel[i * 3 + 2] - cz;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      dist01[i] = dist;
       const seed = d[i * INST_STRIDE + 7];
       const j = (1 + (seed - 0.5) * JIT) * k;
+      const jf = kf === k ? j : (1 + (seed - 0.5) * JIT) * kf;      // (the far trees' own scale in the oil look; the same number as j without it)
       let t;
       if (dist < T0 * j * trim0) t = lowQ ? 1 : 0;      // the low tier draws no full trees
       else if (dist < T1 * j * trim1) t = 1;
-      else if (dist < T_THIN * j) t = 2;
-      else if (dist < T_FAR * j && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
+      else if (dist < T_THIN * jf) t = 2;
+      else if (dist < T_FAR * jf && (seed * 13.37) % 1 < 0.34) t = 3;   // thinned: one in three, drawn larger
       else t = -1;
       if (pe) { while (i >= pe[part]) part++; if (t >= 0 && t < 2 && !laid[part]) t = 2; }
       if (t !== tier[i]) { prev[i] = tier[i]; since[i] = now; tier[i] = t; changed = true; }
@@ -294,13 +326,19 @@ export class Flora {
       const leaving = (i) => now - since[i] < WASH_T && inTier(prev[i]) && !inTier(tier[i]);
       for (let a = 0; a < list.length; a++) { const i = list[a]; if (inTier(tier[i]) || leaving(i)) c++; }
       if (c === 0) { if (g.mesh) { g.mesh.count = 0; g.mesh.visible = false; } continue; }
-      if (!g.mesh) g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
+      if (!g.mesh) {
+        g.mesh = this._instanced(chunk, g.geo, g.mat, list.length, g.far ? [0, T_FAR, JIT, 0.88] : [0, 1e7, 0, 0.999], g.far);
+        // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
+        // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
+        if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24 * T0, 0.2] : [T0, 0.35];
+      }
       const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null, ab = mesh.userData.born.array;
-      let w = 0;
+      let w = 0, dNear = 1e9;
       for (let a = 0; a < list.length; a++) {
         const i = list[a], out = !inTier(tier[i]);
         const t = out ? prev[i] : tier[i];
         if (out && !leaving(i)) continue;
+        if (dist01[i] < dNear) dNear = dist01[i];
         // when it came (it washes in), or when it left (it is lifted out); one that only changed within the mesh keeps its place
         ab[w] = out ? -Math.max(since[i], 1e-3) : (inTier(prev[i]) ? 0 : since[i]);
         const o = i * INST_STRIDE, mo = i * 16, wo = w * 16;
@@ -317,7 +355,7 @@ export class Flora {
         ia[w * 4] = d[o + 8]; ia[w * 4 + 1] = d[o + 9]; ia[w * 4 + 2] = d[o + 7]; ia[w * 4 + 3] = d[o + 10];
         w++;
       }
-      mesh.count = w; mesh.visible = true;
+      mesh.count = w; mesh.visible = true; mesh.userData.dNear = dNear;
       mesh.instanceMatrix.needsUpdate = true; mesh.userData.inst.needsUpdate = true; mesh.userData.born.needsUpdate = true;
       if (ib) mesh.userData.inst2.needsUpdate = true;
     }
@@ -521,6 +559,22 @@ export class Flora {
   update(camLocal, active, budgetMs, now) {
     this.camLocal.copy(camLocal);
     this.rangeScale = RANGE_SCALE[QUALITY.level] || 1;
+    // THE OIL LOOK'S TREES BY THEIR SIZE ON THE SCREEN. The tiers' ranges were made for a desktop's picture (1080 lines and
+    // more); on a phone's (some 600 lines) a tree at 90 m is a third the height in pixels, and its 3,000 triangles were
+    // more than its pixels. So a tree's ranges follow the picture's height (never under half), and it changes form at the
+    // same size on the screen everywhere. The FAR trees also follow the air: from the ground they are drawn to twice the
+    // world's visibility at ground level and no farther (Earth: 370 m; beyond that the air has taken them), from the air
+    // to their full range. In steps, so that the tiers are not re-sorted with every metre climbed.
+    let ts = this.rangeScale, fs = this.rangeScale;
+    if (LOOK.oil && !TREES_FULL) {
+      const sk = Math.min(1, Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20));
+      const vis = this.S.look && this.S.look.visibility ? this.S.look.visibility[0] : 1e4;
+      const air = Math.min(1, Math.max(0.5, Math.round((vis * 2 / T_FAR + (SHADOW.alt || 0) / 60) * 8) / 8));
+      // (and from the air the far trees reach farther, up to twice: there are no near trees to pay for up there, and the
+      // wood ended a few hundred metres off in bare painted ground)
+      ts *= sk; fs *= Math.max(sk, 0.75) * air * (1 + Math.round(Math.min(1, (SHADOW.alt || 0) / 220) * 4) / 4);
+    }
+    this.treeScale = ts; this.farScale = fs;
     if (now != null) this.washNow = now;
     else { const w = performance.now(); this.washNow += this._washWall ? Math.min(0.1, Math.max(0.02, (w - this._washWall) / 1000)) : 0; this._washWall = w; }
     const alt = camLocal.length() - this.R;
@@ -534,20 +588,20 @@ export class Flora {
       return;
     }
     if (!this.ready) this._init();
-    const k = this.rangeScale;
+    const k = this.rangeScale, kt = this.treeScale, kq = k + kt * 8 + this.farScale * 64;
     const t0 = performance.now();
     const prof = this.prof;
-    if (k !== this.lastScale) {
+    if (kq !== this.lastScale) {
       // quality changed: re-evaluate everything
-      this.lastScale = k; this.lastTreeEval.set(1e9, 0, 0); this.lastUnderEval.set(1e9, 0, 0);
+      this.lastScale = kq; this.lastTreeEval.set(1e9, 0, 0); this.lastUnderEval.set(1e9, 0, 0);
       for (const ch of this.treeChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
       for (const ch of this.farChunks.values()) if (ch.tierPos) ch.tierPos.set(1e9, 0, 0);
     }
     if (this.lastTreeEval.distanceTo(camLocal) > 20) {
       this.lastTreeEval.copy(camLocal);
       if (this.species.length) {
-        this._wanted(TREE_LEVEL, this.treeSize, T1 * k * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
-        this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * k * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
+        this._wanted(TREE_LEVEL, this.treeSize, T1 * kt * (1 + JIT * 0.5) + this.treeSize * 0.75, this.treeChunks, 'near');
+        this._wanted(TREE_LEVEL - 1, this.farSize, T_FAR * this.farScale * (1 + JIT * 0.5) + this.farSize * 0.75, this.farChunks, 'far');
       }
       this.treeList = Array.from(this.treeChunks.values()).concat(Array.from(this.farChunks.values()));
     }
@@ -622,7 +676,7 @@ export class Flora {
     // re-tier: chunks near a tier boundary react to a few metres of travel, far ones to more
     if (!spent) {
       const list = this.treeList, n = list.length;
-      const nearR = T1 * k * (1 + JIT * 0.5) + this.treeSize;
+      const nearR = T1 * kt * (1 + JIT * 0.5) + this.treeSize;
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
         if (!ch.built || !ch.n || ch.held) continue;

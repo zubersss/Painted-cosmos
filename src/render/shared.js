@@ -105,7 +105,7 @@ export const OIL = {
   // is its leaf dabs, tufts of real blades, saplings and small leafy plants.)
   // (y was 0.45 while the blades were the watercolour's stiff spikes; they are tufts now, and four in five are kept)
   // (w: how far the world the eye is on takes the look's golden hours, chunks.js pcGold: a look's `oil.gold`, set by the world)
-  uOilG: { value: new THREE.Vector4(0.0, 1.0, 0, 1) },
+  uOilG: { value: new THREE.Vector4(_qn('sward', 1.0), 1.0, 0, 1) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
   // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three
@@ -184,6 +184,7 @@ export function makeBodyUniforms() {
     uRound: { value: new THREE.Vector2(0, 4000) },                       // from orbit the limb closes on the mean sphere: x how far the relief is drawn in (0 on the ground .. 0.75), y the datum radius (chunks.js pcRound)
     uWx: { value: new THREE.Vector4(0, 0, 0, 0) },                       // weather: x overcast (flat cool light), y wet ground, z snow cover, w veil (rain or snow in the air)
     uFogBank: { value: new THREE.Vector2(0, 150) },                      // a thick fog lies in banks (PAINTER 19): x how much (0 none), y the drifts' measure (m); chunks.js pcFogBank
+    // (w: how much of the floor under trees is fallen leaves, of what it was: a look's `oil.leaves`; 0 reads as 1)
     uGroundK: { value: new THREE.Vector4(0, 1, 0, 0) },                  // the oil look: x how this world's ground is laid: 0 leaf dabs, 1 long strokes that run with the land (ice); z 1 a world of snow: short broad strokes in the colours of ice and snow (materials.js pcIce); y the share of the oil look's blades and near strokes this world keeps (1: all of them; a look's oil.grass)
   };
 }
@@ -216,6 +217,9 @@ export const MOTION = { speed01: 0, space01: 0, pulse: false, pulseAt: -1, pulse
 // Quality tier (0 low, 1 medium, 2 high): set by the painter, read by the world to scale how
 // far flora is drawn.
 export const QUALITY = { level: 1 };
+// (the full size of the picture in pixels, whatever the resolution controller is doing: the painter's resize writes it.
+// The oil look sets a tree's detail by its size on the screen: src/world/flora.js)
+export const SCREEN = { outW: 1920, outH: 1080 };
 
 // PHYSICS' flora field (COORDINATOR C14): three float textures and their uniforms, shared by
 // every plant material. The world fills them from physics.fields.flora each frame; until then

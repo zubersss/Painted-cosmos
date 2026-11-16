@@ -199,6 +199,7 @@ class Surface {
     // field is divided by its gradient; a looser pseudo distance far away).
     const cf = this._sf(x, y, z);
     const K = 640 / 1.25;
+    if (MODE.oil && this.look.oil && this.look.oil.rivers) { c.s = this._riversOil(c, cf, K); return; }
     let s = Math.abs(cf) * K;
     if (s < 95) {
       let ux, uy, uz;
@@ -212,6 +213,81 @@ class Surface {
       s = st + (s - st) * smoothstep(55, 95, s);
     }
     c.s = s;
+  }
+
+  // THE OIL LOOK'S RIVERS (the owner, 2026-11-16: "the river could use more tributaries make it split off into many
+  // with diverting paths that connect and run off into there own rivers like real life"). The default game's stream is
+  // one line of even width. Here the same line is a RIVER SYSTEM, and the land is shaped by the distance to its
+  // nearest water exactly as before (the recipes read c.s), so banks, beds, trees and colours follow by themselves:
+  //   - the main channel wanders off its line to one side for a stretch and a second channel keeps the line: the river
+  //     SPLITS round an island and REJOINS (islands up to some fifteen metres across, a hundred long);
+  //   - a third channel leaves the second and swings wide, up to some forty metres more, before it comes back: a long
+  //     island of wood between two arms;
+  //   - the main channel WIDENS into pools (up to six times its width) and narrows again;
+  //   - SIDE STREAMS: the lines of a second, finer field. Each runs from one river to the next and ends where it meets
+  //     one (on either side of a river the lines are taken at a different level of the field, so no line crosses a
+  //     river: every meeting is a fork), narrower than the river, in a narrower valley of its own.
+  // Returns the distance to the nearest water, in the terms the recipes expect: under the nominal half width (2.5 m)
+  // inside a channel, whatever the channel's own width; beyond it, metres from the water's edge (a side stream's
+  // valley counted 2.2 times as far, so the hills close in on it sooner).
+  _riversOil(c, cf, K) {
+    const R = this.R, x = c.x, y = c.y, z = c.z, nA = this.nA.n3, nC = this.nC.n3, W = 2.5;
+    let ux, uy, uz;
+    if (Math.abs(y) < 0.9) { ux = -z; uy = 0; uz = x; } else { ux = 0; uy = z; uz = -y; }
+    const l = 1 / Math.sqrt(ux * ux + uy * uy + uz * uz); ux *= l; uy *= l; uz *= l;
+    const vx = y * uz - z * uy, vy = z * ux - x * uz, vz = x * uy - y * ux;
+    const e = 2.0, eR = e / R;
+    // how far the main line is, with its side (true distance near it: the field over its slope)
+    const raw = Math.abs(cf) * K;
+    let a = raw;
+    if (raw < 150) {
+      const c1 = this._sf(x + ux * eR, y + uy * eR, z + uz * eR), c2 = this._sf(x + vx * eR, y + vy * eR, z + vz * eR);
+      const g = Math.sqrt((c1 - cf) * (c1 - cf) + (c2 - cf) * (c2 - cf)) / e;
+      const st = Math.abs(cf) / Math.max(g, 0.42 / K);
+      a = st + (raw - st) * smoothstep(100, 150, raw);
+    }
+    const sd = cf < 0 ? -a : a;
+    let best = 1e9;
+    // a channel `si` metres away, `k` times the nominal width, its valley `g` times as narrow
+    const lay = (si, k, g) => {
+      const w = k * W;
+      // (a narrow channel is the nominal one scaled down; a wide one keeps true metres at its edges, so its shore is as
+      // even as the brook's: scaled, the shore's small wobble grew with the width and a pool's edge was a ragged fringe)
+      let d = si < w ? (k <= 1 ? si / k : Math.max(0, si - (w - W))) : W + (si - w) * g;
+      if (k < 0.3) d += (1 - smoothstep(0.02, 0.3, k)) * 260;
+      if (d < best) best = d;
+    };
+    if (a < 135) {
+      const near = 1 - smoothstep(95, 135, a);
+      const fb = R / 190, fc = R / 520, fp = R / 310;
+      const n1 = nC(x * fb + 71.3, y * fb - 9.1, z * fb + 4.7), n3 = nA(x * fc - 33.1, y * fc + 17.9, z * fc + 61.2);
+      const pool = smoothstep(0.30, 0.62, nA(x * fp + 9.9, y * fp + 55.5, z * fp - 27.3)) * near;
+      const p1 = Math.max(0, n1 - 0.12) * 52 * near, p2 = Math.max(0, -n1 - 0.12) * 52 * near, p3 = Math.max(0, n3 - 0.08) * 85 * near;
+      // (the river itself some eight metres across where the default game's brook is five, its second arm five, its third four)
+      lay(Math.abs(sd - p1), 1.6 + 5 * pool, 1);
+      lay(Math.abs(sd + p2), 1.0, 1);
+      if (p3 > 0.01) lay(Math.abs(sd + p2 + p3), 0.75, 1.3);
+      c.pool = pool;
+    } else { lay(a, 1.6, 1); c.pool = 0; }
+    // the side streams
+    const K2 = 330 / 1.25, t0 = this._sf2(x, y, z), lv = cf > 0 ? 0 : 0.22, tf = t0 - lv;
+    let ts = Math.abs(tf) * K2;
+    if (ts < 70) {
+      const t1 = this._sf2(x + ux * eR, y + uy * eR, z + uz * eR), t2 = this._sf2(x + vx * eR, y + vy * eR, z + vz * eR);
+      const g2 = Math.sqrt((t1 - t0) * (t1 - t0) + (t2 - t0) * (t2 - t0)) / e;
+      const tt = Math.abs(tf) / Math.max(g2, 0.42 / K2);
+      ts = tt + (ts - tt) * smoothstep(45, 70, ts);
+      const ft = R / 260;
+      lay(ts, 0.34 + 0.22 * (0.5 + 0.5 * nC(x * ft - 15.5, y * ft + 28.4, z * ft + 3.3)), 2.2);
+    } else lay(ts, 0.45, 2.2);
+    return best;
+  }
+
+  _sf2(x, y, z) {
+    const R = this.R, fw = R / 150, f1 = R / 330;
+    const wa = this.nBn.n3(x * fw - 8.5, y * fw + 2.2, z * fw + 31.0) * 0.22;
+    const wb = this.nBn.n3(x * fw + 14.1, y * fw - 6.6, z * fw + 9.4) * 0.22;
+    return this.nA.n3(x * f1 + wa - 17.5, y * f1 + wb + 63.3, z * f1 - wa * 0.6 - 28.5);
   }
 
   _sf(x, y, z) {
@@ -235,7 +311,8 @@ class Surface {
     const fs = R / 160;
     const w0 = 2.5 + 0.9 * nC(x * fs + 2.2, y * fs, z * fs - 7.7);
     let hb;
-    if (s < w0) { const t = s / w0; hb = -0.4 - 0.55 * (1 - t * t); }
+    // (the oil look's rivers: a pool is deeper than the brook, up to waist deep in its middle; c.pool from _riversOil)
+    if (s < w0) { const t = s / w0; hb = -0.4 - (0.55 + (c.pool ? 0.7 * c.pool : 0)) * (1 - t * t); }
     else hb = -0.4 + 1.05 * smoothstep(w0, w0 + 4.0, s) + 0.55 * smoothstep(w0 + 3, w0 + 15, s);
     const rise = smoothstep(w0 + 2, 95, s);
     const f1 = R / 350, f2 = R / 98, f3 = R / 15.5, f4 = R / 3.4;
@@ -251,7 +328,10 @@ class Surface {
     b.lq = L - 0.4;
     if (!full) return;
     const fg = R / 125, fp = R / 270, fv = R / 26;
-    const glade = smoothstep(0.24, 0.62, nA(x * fg + 61.0, y * fg + 3.0, z * fg - 17.0));
+    // (the oil look may open a wood: the biome's oil.glade = [from, to] in place of 0.24, 0.62: more and wider glades of
+    // grass between the stands, as the owner's references of a forest from the air have)
+    const gl = MODE.oil && bi.oil && bi.oil.glade ? bi.oil.glade : null;
+    const glade = smoothstep(gl ? gl[0] : 0.24, gl ? gl[1] : 0.62, nA(x * fg + 61.0, y * fg + 3.0, z * fg - 17.0));
     const pz = smoothstep(-0.12, 0.34, nA(x * fp - 23.0, y * fp + 41.0, z * fp + 9.0) + (b.h - L) * 0.018 - 0.1) * smoothstep(7, 30, s);
     const v1 = nC(x * fv - 3.0, y * fv, z * fv + 21.0);
     set3(b, pal.grassMid);
@@ -268,7 +348,10 @@ class Surface {
     b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open, 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
-    if (MODE.oil && bi.oil && bi.oil.tallMix != null) b.birch = bi.oil.tallMix;      // (the oil look may set a wood's mix of kinds outright: the biome's oil.tallMix)
+    // (the oil look may set a wood's mix of kinds: the biome's oil.tallMix. A number: the share of the first kind, everywhere.
+    // A pair [a, d]: a on broadleaf ground, a - d on conifer ground, so the second kind stands in GROUPS among the first
+    // and never as a whole stand: dark conifers among the autumn crowns, the owner's references of 2026-11-16)
+    if (MODE.oil && bi.oil && bi.oil.tallMix != null) { const tm = bi.oil.tallMix; b.birch = typeof tm === 'number' ? tm : clamp(tm[0] - pz * tm[1], 0.04, 1.5); }
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s), 0, 1);
     b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines
@@ -277,8 +360,15 @@ class Surface {
     b.r2 = b.r + ((ca[0] + (cb[0] - ca[0]) * k) * dv - b.r) * cz;
     b.g2 = b.g + ((ca[1] + (cb[1] - ca[1]) * k) * dv - b.g) * cz;
     b.b2 = b.b + ((ca[2] + (cb[2] - ca[2]) * k) * dv - b.b) * cz;
-    const wl = smoothstep(w0 + 1.2, w0 - 0.6, s);
-    b.r2 += (0.80 - b.r2) * wl; b.g2 += (0.87 - b.g2) * wl; b.b2 += (0.93 - b.b2) * wl;
+    // (the oil look's rivers show from the air: drawn into the far colour as wide as the samples lie apart, patchgen.js
+    // S.foot, and in the blue of water seen from above, where the default game's stream is a thin pale line)
+    if (MODE.oil && this.look.oil && this.look.oil.rivers) {
+      const wl = smoothstep(w0 + 1.2 + (this.foot || 0) * 0.8, w0 - 0.6, s) * 0.92;
+      b.r2 += (0.42 - b.r2) * wl; b.g2 += (0.62 - b.g2) * wl; b.b2 += (0.86 - b.b2) * wl;
+    } else {
+      const wl = smoothstep(w0 + 1.2, w0 - 0.6, s);
+      b.r2 += (0.80 - b.r2) * wl; b.g2 += (0.87 - b.g2) * wl; b.b2 += (0.93 - b.b2) * wl;
+    }
   }
 
   // Impact craters, scattered on a grid of cells laid over each face of the cube-sphere (one
