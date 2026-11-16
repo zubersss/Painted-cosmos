@@ -244,6 +244,13 @@ thinner strips on the cloak and the aurora as light; both are done and seen; the
 colours of ice and snow, darker, its strokes as the clip's (item 25), and for the night sky's
 streaks and the snow's strokes as the reference's (item 26), then for smooth snow in thin
 strokes and for trees on the snowfield (item 27): done and seen, the stills sent.
+PULL REQUEST #4 (`look-proto` into `main`, the look behind `?look=oil`) IS OPEN AS A DRAFT since
+2026-11-16 at the owner's word (item 31): https://github.com/zubersss/Painted-cosmos/pull/4 . It is
+marked ready when `node tests/all.mjs --export` has passed on the branch's head (the log's newest
+entry says whether it has); THE OWNER MERGES IT, nobody else. After the merge the address to give
+them is the live one with `?look=oil` added. Do not push more commits to `look-proto` while the
+pull request is open without saying so in it (they would go live with the merge): new look work
+goes on the local branch `look-dev` or a new branch until the owner has tried the page.
 `look-proto` is at 515c094 (item 29: the clip used beside the pictures: the lantern's light and
 the snow's strokes brought back toward the clip, seen); one commit earlier, e228a9f, is a checkpoint ( `CLAUDE.md` now carries a map of the project; the
 owner asked for a list of the three riskiest parts of the code and said to WAIT for their go-ahead
