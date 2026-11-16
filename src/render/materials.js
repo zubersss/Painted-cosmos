@@ -140,10 +140,15 @@ float gMid;
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
   vec3 Bc = gCtrB.x > 1e20 ? vBody + gBdx * ds.x + gBdy * ds.y : gCtrB;
-  vec4 colC = clamp(vCol + gCdx * ds.x + gCdy * ds.y, 0.0, 1.0);
-  vec3 col2C = clamp(vCol2 + gC2dx * ds.x + gC2dy * ds.y, 0.0, 1.0);
-  vec4 parC = vPar + gPdx * ds.x + gPdy * ds.y;
-  vec3 nVc = normalize(vNV + gNvdx * ds.x + gNvdy * ds.y), nLc = normalize(vNL + gNldx * ds.x + gNldy * ds.y);
+  // (the ground's washes and the way it faces are carried toward the stroke's centre by at most two dozen pixels: a
+  // long stroke's centre can lie hundreds of pixels off, and on a mountain side, where both change from facet to
+  // facet, what was carried that far was nonsense: strokes of cyan, black and white on Pluto's lilac mountains, the
+  // survey of the worlds)
+  vec2 dsA = ds * min(1.0, 24.0 / max(length(ds), 1e-3));
+  vec4 colC = clamp(vCol + gCdx * dsA.x + gCdy * dsA.y, 0.0, 1.0);
+  vec3 col2C = clamp(vCol2 + gC2dx * dsA.x + gC2dy * dsA.y, 0.0, 1.0);
+  vec4 parC = vPar + gPdx * dsA.x + gPdy * dsA.y;
+  vec3 nVc = normalize(vNV + gNvdx * dsA.x + gNvdy * dsA.y), nLc = normalize(vNL + gNldx * dsA.x + gNldy * dsA.y);
   c = mix(col2C, colC.rgb, gMid);                  // (far away the forest floor is its canopy)
   vec4 n1 = pcNoiseS(Bc, 31.0, w), n2 = pcNoiseS(Bc + 0.21 * 6.3, 6.3, w);
   c = mix(c, c * uHueA, smoothstep(0.50, 0.72, n1.b) * 0.8);
@@ -194,10 +199,15 @@ void main() {
     // them). The rows lie on the contours of a slope. Two layers an octave apart: a stroke of the finer one is there or
     // it is not, whole (asked at its own centre), and where it is not the coarser shows. (Before: a course of tiles
     // with a light edge, which stood as a pavement of outlined stones: the stills after overhauls 1 and 2.)
-    vec2 chT = vec2(ch.x, ch.y + 1.4 * (length(vBody) - uBodyR));
+    vec2 chT = vec2(ch.x, ch.y + 0.8 * (length(vBody) - uBodyR));
     vec3 upT = normalize(vBody);
-    vec2 dtx = vec2(dlx.x, dlx.y + 1.4 * dot(upT, gBdx)), dty = vec2(dly.x, dly.y + 1.4 * dot(upT, gBdy));
-    vec4 ot = pcStrokeOct4(dist * 2.0, uOilPx.z * 2.0);
+    vec2 dtx = vec2(dlx.x, dlx.y + 0.8 * dot(upT, gBdx)), dty = vec2(dly.x, dly.y + 0.8 * dot(upT, gBdy));
+    // (a stroke's width on the screen is taken from how fast its rows go by there, not from the distance alone: on a
+    // steep face the rows crowd (the height is in the chart), and at a low angle they are squeezed; sized by distance
+    // they went under the pixel and a mountain side was a speckle of single pixels: the survey of the worlds, Pluto's
+    // lilac mountains and Uranus' ice shelves)
+    float rowsPx = length(vec2(dtx.y, dty.y));
+    vec4 ot = pcStrokeOct4(clamp(rowsPx / max(uOilPx.x, 1e-6), dist, dist * 6.0) * 2.0, uOilPx.z * 2.0);
     vec2 lgT = vec2(dFdx(ot.w), dFdy(ot.w));
     vec3 r0, n0, r1, n1; vec2 ds0, ds1; float own0, own1;
     // (long strokes in slow wide arcs: laid in quick waves, flat snow read as open water: the critic, on the first night)

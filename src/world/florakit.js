@@ -248,7 +248,7 @@ export function birchGeometry(seed, lod, spec) {
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
       // (the oil look's slender tree: the mass is leaves, one by one, florakit.js leafCards; else one lumpy wash)
       if (sl) leafCards(B, c, r * 1.3, r * 0.85, r * 1.3, rnd, { n: 130, len: 0.52, wid: 0.22, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
-      else if (leafy) leafCards(B, c, r * 1.15, r * 0.80, r * 1.10, rnd, { n: 125, len: 0.58, wid: 0.25, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05, shadeK: 0.6 });
+      else if (leafy) leafCards(B, c, r * 1.10, r * 0.78, r * 1.05, rnd, { n: 200, len: 0.62, wid: 0.28, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05, shadeK: 0.6 });      // (two hundred to a bough: with 125 a broad crown was a thin scatter, Saturn's island trees)
       else blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
   } else if (sl) {
