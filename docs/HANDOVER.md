@@ -238,7 +238,8 @@ thinner strips on the cloak and the aurora as light; both are done and seen; the
 colours of ice and snow, darker, its strokes as the clip's (item 25), and for the night sky's
 streaks and the snow's strokes as the reference's (item 26), then for smooth snow in thin
 strokes and for trees on the snowfield (item 27): done and seen, the stills sent.
-`look-proto` is at e228a9f (a checkpoint: `CLAUDE.md` now carries a map of the project; the
+`look-proto` is at 515c094 (item 29: the clip used beside the pictures: the lantern's light and
+the snow's strokes brought back toward the clip, seen); one commit earlier, e228a9f, is a checkpoint ( `CLAUDE.md` now carries a map of the project; the
 owner asked for a list of the three riskiest parts of the code and said to WAIT for their go-ahead
 before fixing any: the list is in the log's entry of 2026-11-16 and nothing of it is to be touched
 until they say so). Before that checkpoint it was at b8ae2a2 (the full check ran before the last commits, which touch the oil
