@@ -22,7 +22,7 @@ export default {
   // (and its night is the clip's: a deep green-blue sky, turquoise snow with deep blue shade; measured on the clip's
   // night frames, where nothing is violet)
   oil: { ground: 'flow', grass: 0.25,
-    night: { zenith: [0.07, 0.30, 0.31], horizon: [0.16, 0.44, 0.45], haze: [0.15, 0.42, 0.45], glaze: [0.42, 0.62, 0.86], light: [0.66, 0.93, 0.96], grade: [0.72, 0.92, 0.93] } },
+    night: { zenith: [0.03, 0.17, 0.19], horizon: [0.08, 0.29, 0.32], haze: [0.08, 0.27, 0.32], glaze: [0.40, 0.60, 0.86], light: [0.82, 0.96, 0.98], grade: [0.80, 0.94, 0.95] } },
   sky: mkSky([0.34, 0.46, 0.84], [0.82, 0.89, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
   flora: {
     tall: [
@@ -57,6 +57,10 @@ export default {
     // (aurora_tundra: tried thinner grass, frost polygons and lichen patches; the bared ground showed the
     // kelp wood's indigo wrack as ink blots, then with pale lichens it read as before: reverted to the base)
     B('aurora_tundra', 'Aurora Tundra', 'flat', ['viridian', 'neutralTint', 'cobaltBlue', 'mint', 'indigo'], 'lemonYellow', ['neutralTint', 'viridian', 'cobaltBlue'],
-      { t: { amp: 12, ponds: 1, crack: 0.3 }, aurora: 1, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 } }),
+      { t: { amp: 12, ponds: 1, crack: 0.3 }, aurora: 1, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 },
+        // (the oil look: the tundra under the aurora is a snowfield, as the clip's night is: pale, nearly white in the
+        // light, so that the night's own key makes it cyan and its shade blue; its own blue-green ground, laid as paint
+        // in long strokes, read as open water)
+        oil: { pal: { low: [0.88, 0.94, 0.96], mid: [0.92, 0.96, 0.97], high: [0.84, 0.92, 0.96] } } }),
   ],
 };

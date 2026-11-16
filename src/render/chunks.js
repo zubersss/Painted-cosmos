@@ -101,8 +101,10 @@ uniform vec4 uOilPx;
 uniform mat4 uShM;
 uniform highp sampler2D uShTex;
 uniform vec4 uShK;
+uniform sampler2D uShAir;
 uniform vec4 uLamp;
 uniform vec4 uLampF;
+uniform vec4 uLampV;
 uniform float uAuroraK;
 uniform vec4 uGroundK;
 uniform highp sampler2D uDabP;    // the dabs laid once (dabtex.js): a texel a dab
@@ -201,7 +203,7 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // whatever the hour's own keys say: the owner's reference clip stands in that light with the sun still well up, its
 // shadows about twice as long as what throws them and half the forest floor in the sun)
 float pcGold() { return (1.0 - smoothstep(0.36, 0.80, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }
-vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.80, 0.48), 0.75 * pcGold()); }
+vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
 vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
@@ -210,7 +212,9 @@ vec3 pcTone(vec3 c, float level) {
   vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
   // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
   // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
-  vec3 lit = pcDensity(c, mix(1.0, uOilA.y, 0.42)) * mix(vec3(1.0), sunC, 0.42) * uOilB.x;
+  // (the light's own colour takes three tenths of a lit paint, not four: under the golden hours' light every lit leaf
+  // went to orange-red, and the clip's lit floor is gold and yellow with orange in it)
+  vec3 lit = pcDensity(c, mix(1.0, uOilA.y, 0.42)) * mix(vec3(1.0), sunC, 0.30) * uOilB.x;
   vec3 loc = b * mix(vec3(1.0), sunC, 0.45);
   // (the shade is the cool key over the body colour, with a quarter of the key's own hue at the body's value: a
   // multiply alone takes an orange floor to brown, and the reference's shadows on its leaf carpet are maroon and violet)
@@ -223,7 +227,8 @@ vec3 pcTone(vec3 c, float level) {
   // (the violet is the cool key's own hue, its green drawn down: a plum by a day's violet key, a deep blue by a night's
   // teal one; a fixed violet turned a teal night's shadows purple)
   vec3 shH = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(1.12, 0.84, 0.84);      // (by day about (1.12, 0.73, 1.12): a plum, red and blue level; with more blue the trunks' shade stood indigo)
-  vec3 g1 = mix(pcDensity(g0, 1.15), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * shH, 0.42) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
+  // (deeper, and half of it the key's hue: the floor's shadows were a wine red where the clip's are a violet umber)
+  vec3 g1 = mix(pcDensity(g0, 1.35), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * shH * 0.92, 0.50) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
   vec3 g2 = pcDensity(g1, 1.7);
   vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
   r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
@@ -375,8 +380,10 @@ float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
 // (yellow-green on snow, as in the clip). paint: the stroke as the night has it; wash: its own colour; r: its number.
 vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
   if (uLamp.w < 0.01) return paint;
-  float d = length(body - uLamp.xyz) + (r - 0.5) * 1.1;
-  float k = uLamp.w * (1.0 - smoothstep(0.5, 5.6, d));
+  // (a modest pool, a few metres across, whose edge is broken stroke by stroke into the night: each stroke takes its
+  // distance a metre and a half nearer or farther by its own number)
+  float d = length(body - uLamp.xyz) + (r - 0.5) * 1.5;
+  float k = uLamp.w * (1.0 - smoothstep(0.3, 3.4, d));
   if (k < 0.004) return paint;
   // (the wanderer's own shadow by the lantern, as in the clip's night: a dark streak on the lit snow from the feet away
   // from the lantern, widening as it goes; a stroke lies in it or out of it whole)
@@ -388,14 +395,15 @@ vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
     float ls = dot(lq, ld), lside = length(lq - ld * ls);
     k *= 1.0 - 0.9 * step(-0.08 + (r - 0.5) * 0.08, ls) * step(lside, (0.12 + (r - 0.5) * 0.06) * (1.0 + max(ls, 0.0) / 0.55));
   }
-  // (the pool is laid in rings of strokes, as the clip's is: orange at the feet, then yellow, then a yellow-green where
-  // the warm light runs into the night's own colour, then the night; one flat mustard out to three metres stood as a
-  // disc: the stills after overhauls 1 and 2)
+  // (the pool: orange at the feet, yellow round it, then strokes of a pale warm light among the night's own, then the
+  // night. Laid before this: one flat mustard out to three metres (a disc), then broad rings with a yellow-green one
+  // (toxic, and banded: the critic's words; the clip's pool has no green in it).)
   float wl = dot(wash, vec3(0.3, 0.5, 0.2));
   vec3 orange = min(mix(pcDensity(wash, 1.2) * vec3(1.35, 0.90, 0.42) + vec3(0.10, 0.045, 0.0), vec3(1.0, 0.64, 0.22) * (0.75 + 0.5 * wl), 0.5), vec3(1.0));
-  vec3 yellow = min(orange * vec3(0.98, 1.24, 1.30) + vec3(0.0, 0.03, 0.03), vec3(1.0));
-  vec3 green = mix(paint, yellow, 0.5) * vec3(0.80, 1.12, 0.86);
-  return k > 0.76 ? orange : k > 0.52 ? yellow : k > 0.28 ? green : k > 0.10 ? mix(paint, green, 0.5) : paint;
+  vec3 yellow = min(orange * vec3(0.98, 1.22, 1.28) + vec3(0.0, 0.03, 0.03), vec3(1.0));
+  orange *= 0.90 + 0.16 * fract(r * 7.3); yellow *= 0.92 + 0.12 * fract(r * 5.1);
+  vec3 pale = mix(paint, vec3(1.0, 0.90, 0.66), 0.42);
+  return k > 0.74 ? orange : k > 0.48 ? yellow : k > 0.24 ? pale : paint;
 }
 // The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
 // (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.
@@ -407,6 +415,27 @@ float pcSunAt(vec3 bodyPos, float canopy, float lift, float w) {
     if (inside >= 0.004) {
       float lit = step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r);
       // (well inside the map's square the pattern is not worked out at all)
+      if (inside > 0.996) return lit;
+      return mix(pcDappleS(bodyPos, canopy, lift, w), lit, inside);
+    }
+  }
+  return pcDappleS(bodyPos, canopy, lift, w);
+}
+// The sun on the GROUND for one stroke, from the shadow map taken down and smoothed (shadow.js AIR_FRAG: the share of a
+// patch about half a metre across that something shades). A stroke is in the shade where more than about four tenths
+// of its patch is, each stroke by its own number a little sooner or later. So the canopy throws masses of shade with
+// pools of light between them, and no single leaf's gap is a fleck of light: asked of the fine map, the floor under a
+// crown was a spatter of single lit dabs, and the shadows of bare trunks, ruled lines (the critic's "bar code").
+// r: the stroke's number.
+float pcSunAtSoft(vec3 bodyPos, float canopy, float lift, float w, float r) {
+  if (uShK.x >= 0.004) {
+    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+    vec2 a = abs(q.xy);
+    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+    if (inside >= 0.004) {
+      vec2 f = textureLod(uShAir, q.xy * 0.5 + 0.5, 0.5).rg;
+      float cov = f.r * step(f.g / max(f.r, 1e-3) - 0.0006, q.z);
+      float lit = step(cov, 0.30 + 0.24 * r);
       if (inside > 0.996) return lit;
       return mix(pcDappleS(bodyPos, canopy, lift, w), lit, inside);
     }
@@ -585,7 +614,8 @@ bool pcDabHit(float code, vec2 cell, vec2 p, float asp, vec2 dpx, vec2 dpy, vec2
   float gone = clamp(ab.x + ab.y * smoothstep(0.15, 0.85, oc.x + dot(oc.yz, ds)), 0.0, 1.0);
   float sz = clamp((P.a - gone * 1.12 + 0.12) / 0.12, 0.0, 1.0);
   if (sz <= 0.0) return false;
-  sz = sqrt(sz);
+  // (it comes at a little over half its size and grows: grown from nothing, the youngest dabs were clusters of dots)
+  sz = mix(0.58, 1.0, sz);
   float cs = cos(P.z), sn = sin(P.z);
   vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
   // (a dab is as long as its cell, a little more or less, and asp times narrower: dabtex.js dabSize)
@@ -637,8 +667,8 @@ vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {
   c = pcDensity(c, 1.0 + (rnd.x - 0.5) * 1.1 * uOilB.z);
   c *= mix(vec3(1.0), mix(vec3(1.10, 0.98, 0.80), vec3(0.88, 0.97, 1.10), rnd.y), 0.6 * uOilB.z);
   float odd = fract(rnd.y * 17.3);
-  c *= mix(vec3(1.0), vec3(1.12, 0.66, 0.50), leafy * step(0.90, odd) * uOilB.z);
-  c *= mix(vec3(1.0), vec3(0.86, 1.06, 0.62), leafy * step(odd, 0.07) * uOilB.z);
+  c *= mix(vec3(1.0), vec3(1.12, 0.66, 0.50), leafy * step(0.93, odd) * uOilB.z);
+  c *= mix(vec3(1.0), vec3(0.78, 1.06, 0.52), leafy * step(odd, 0.13) * uOilB.z);
   return clamp(c, 0.0, 1.0);
 }
 // THIN STROKES (the owner, 2026-11-15: "thinner than the video ... copy how the lines are used"). A course of long thin
@@ -684,8 +714,10 @@ void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float o
 // One layer of thin strokes over a chart (the arguments as pcStrokeLayer's; w: a stroke's width, m).
 // bend: how far the slow noise bends the rows, in stroke widths (9: the ground's flow, whose strokes swell and thin with
 // it to about twice and half their width; 2: bark, whose streaks keep their width)
+// (bend below 0: a SLOW, WIDE bend, minus that many stroke widths over a reach five times as long: the strokes sweep in
+// long arcs, as wind-laid snow does, where the quick bend makes them ripple as water does)
 void pcThinLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, float bend, out vec3 rnd, out vec2 ds, out float own, out vec3 rndN) {
-  vec2 wn = (texture(uNoise3D, bendP / (w * 60.0) + 0.19).rg - 0.5) * bend;
+  vec2 wn = (texture(uNoise3D, bendP / (w * (bend < 0.0 ? 300.0 : 60.0)) + 0.19).rg - 0.5) * abs(bend);
   vec2 p = ch / w + wn;
   vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
   vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));

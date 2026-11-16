@@ -36,7 +36,7 @@ void main() {
   float a = h * 50.0 + t * (0.8 + 1.4 * fract(h * 9.1));
   vec3 a1 = normalize(vec3(sin(a), 0.35 * cos(a * 0.7), cos(a)));
   vec3 a2 = normalize(cross(a1, normalize(vec3(cos(a * 0.6), 1.0, sin(a * 0.5)))));
-  float size = 0.075 + 0.07 * fract(h * 11.3);
+  float size = 0.12 + 0.10 * fract(h * 11.3);
   // none at the lens, none at the cube's faces (a leaf does not pop as the cube wraps), and only this hour's share
   float edge = max(abs(rel.x), max(abs(rel.y), abs(rel.z))) / Lc;
   float keep = smoothstep(0.6, 1.6, length(rel)) * (1.0 - smoothstep(0.40, 0.49, edge)) * step(fract(h * 13.7), uLeafK.x - 0.001);
@@ -69,7 +69,8 @@ void main() {
   #else
     float sun = 1.0;
   #endif
-  vec3 c = pcTone(col, mix(1.1, 2.8, sun) - 0.5 * abs(vQ.y));
+  // (one flat piece each, bright in the sun and its own colour in the shade: small and dark they were flecks)
+  vec3 c = pcTone(col, mix(1.7, 2.9, sun));
   c = pcAtmosV(c, pcFogAmount(length(vView)), vView);
   pcWrite(c, 1.0, normalize(vNV), -vView.z, 7.0 + fract(vH * 3.3) * 0.9);
 }

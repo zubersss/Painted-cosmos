@@ -202,7 +202,8 @@ export class ShadowMap {
       const au = renderer.autoClear; renderer.autoClear = false;
       try { renderer.render(o, cam); } finally { for (const [m, src] of swapped) m.material = src; cam.layers.set(SHADOW_LAYER); renderer.autoClear = au; }
     }
-    if (SHADOW.shaft * k > 0.004) { renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam); }
+    // (the map taken down and smoothed: for the light in the air and for the ground's strokes, chunks.js pcSunAtSoft)
+    renderer.setRenderTarget(this.rtAir); renderer.render(this.airTri, this.airCam);
     renderer.setClearColor(this._keep, prevA);
     renderer.setRenderTarget(prevT);
     // x how strong, y the bias (0.3 m toward the sun), z a texel of the square, w where the square's answer gives way

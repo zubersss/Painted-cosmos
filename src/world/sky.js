@@ -53,6 +53,28 @@ uniform vec4 uOilC;
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 ${RING_PROFILE}
+#ifdef PC_OIL
+// One row of an aurora's rays in the oil look: strokes side by side along the horizon, each broad at its foot and drawn
+// to a point at its own height, as a flame is; from the foot up: a line of magenta, a band of blue, a core of nearly
+// white green, green, a deeper green, and blue-violet at the tips. az: the bearing; e: the height in the sky; bot: the
+// curtain's foot; hgt: how high its rays may reach; n: strokes to a radian; keep: the share of strokes laid.
+// Out: the ray's paint; returns how much of the pixel it covers (every edge a pixel wide).
+float pcAuroraRays(float az, float e, float bot, float hgt, float n, float sd0, float wob, float keep, out vec3 ac) {
+  float ax = az * n + wob, si = floor(ax), sx = ax - si - 0.5;
+  float sr = fract(sin((si + sd0) * 12.9898) * 43758.5453), sr2 = fract(sin((si + sd0) * 78.233) * 12543.123);
+  float top = bot + hgt * (0.25 + 1.1 * sr * sr);
+  float tt = clamp((e - bot) / max(top - bot, 1e-4), 0.0, 1.0);
+  float hw = 0.5 * (1.0 - tt * tt) * (0.72 + 0.28 * sr2);
+  float fwx = min(fwidth(ax), 0.5), fwe = max(fwidth(e), 1e-5);
+  float k = smoothstep(-fwx, fwx, hw - abs(sx)) * smoothstep(-fwe, fwe, e - bot) * step(e, top) * step(1.0 - keep, fract(sr * 7.1 + sr2));
+  ac = mix(vec3(0.95, 0.38, 0.86), vec3(0.24, 0.60, 1.0), smoothstep(0.003, 0.005, e - bot));
+  ac = mix(ac, vec3(0.80, 1.0, 0.82), smoothstep(0.009, 0.012, e - bot));
+  ac = mix(ac, mix(vec3(0.22, 1.0, 0.50), vec3(0.45, 1.0, 0.58), sr2), step(0.08 + 0.10 * sr, tt));
+  ac = mix(ac, vec3(0.10, 0.80, 0.58), step(0.45 + 0.2 * sr2, tt));
+  ac = mix(ac, vec3(0.22, 0.42, 0.92), step(0.76 + 0.12 * sr, tt));
+  return k;
+}
+#endif
 
 void main() {
   vec3 d = normalize(vDirL);
@@ -76,8 +98,19 @@ void main() {
   float turb = (n1.r - 0.5) * 0.9 + (n2.g - 0.5) * 0.35;
   float bf = n1.a + (n2.b - 0.5) * 0.10;
   float back = smoothstep(0.84, 0.90, bf) * (1.0 - smoothstep(0.90, 0.95, bf));
+  #ifdef PC_OIL
+    // (the oil look, the overhaul plan's sixth piece: the sky is laid in broad flat bands from the horizon to the zenith,
+    // their edges wandering and a pixel wide; a wash's turbulence and its backruns, in opaque paint, were smudges and
+    // rings in the sky: the stills of the open sky. Under a closed sky the heavy wash keeps its turbulence.)
+    float tb = t * 6.0 + (n1.r - 0.5) * 1.7 + (n2.g - 0.5) * 0.35;
+    float tbi = floor(tb), fwb = max(fwidth(tb), 1e-4);
+    float tq = clamp((tbi + smoothstep(0.5 - fwb, 0.5 + fwb, tb - tbi)) / 6.0, 0.0, 1.0);
+    sky = mix(mix(uSkyZenith, uSkyHorizon, tq), uSkyHorizon, toward * 0.65);
+    sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * 1.7 * oc);
+  #else
   sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * (1.0 + oc * 0.7) + back * 0.38 * (1.0 - t));
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
+  #endif
   // below the horizon (seen from high up): haze
   sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
 
@@ -146,26 +179,19 @@ void main() {
     ray = 0.40 + 0.60 * smoothstep(0.35, 0.70, ray);                                  // rays: streaks up the curtain
     float hgt = 0.22 + 0.25 * fb.b;
   #ifdef PC_OIL
-    // (the oil look, after the owner's reference clip: the curtain is laid in thin upright strokes, each its own height
-    // and each drawn to a point at its top, as a flame is; green, deepest where it is highest, with blue and a line of
-    // magenta along the foot; and it is the brightest paint in the night's picture. The first laying, broad strokes with
-    // square ends, stood as a row of blocks with a stepped foot: seen in the stills after overhauls 1 and 2. Every edge
-    // here is drawn a pixel wide.)
+    // (the oil look, after the owner's reference clip: the aurora is ONE RIBBON along the horizon, never broken off: a
+    // row of broad flames side by side, high where the curtain is strong and low between, with a second row of thin
+    // bright rays over it; a level wavy foot; and it is the brightest paint in the night's picture. Laid before this:
+    // broad strokes with square ends (a row of blocks), then separate combs of hairlines (bar codes, the critic's word
+    // for them: the stills after overhauls 3 to 5).)
     float az = atan(ha.z, ha.x);
     e0 = 0.105 + 0.11 * fa.g + 0.04 * (fb.r - 0.5);              // (its foot lower in the oil look: six to thirteen degrees up, in a level view's upper half)
-    float ax = az * 150.0 + fa.b * 9.0, si = floor(ax), sx = ax - si - 0.5;
-    float sr = fract(sin(si * 12.9898) * 43758.5453), sr2 = fract(sin(si * 78.233) * 12543.123);
-    float bot = e0 + 0.006 * (sr2 - 0.5), top = bot + hgt * (0.30 + 1.05 * sr * sr);
-    float tt = clamp((e - bot) / max(top - bot, 1e-4), 0.0, 1.0);
-    // (a stroke's half width: full at its foot, drawn in to nothing at its top)
-    float hw = 0.5 * (1.0 - tt * tt * tt) * (0.80 + 0.20 * sr2);
-    float fwx = min(fwidth(ax), 0.5), fwe = max(fwidth(e), 1e-5);
-    float k = smoothstep(-fwx, fwx, hw - abs(sx)) * smoothstep(-fwe, fwe, e - bot) * step(e, top) * fold * step(0.22, sr + sr2);
-    vec3 ac = mix(vec3(0.95, 0.38, 0.86), vec3(0.24, 0.60, 1.0), smoothstep(0.004, 0.007, e - bot));
-    ac = mix(ac, mix(vec3(0.22, 1.0, 0.50), vec3(0.55, 1.0, 0.62), sr2 * 0.6), smoothstep(0.012 + 0.014 * sr, 0.016 + 0.014 * sr, e - bot));
-    ac = mix(ac, vec3(0.10, 0.82, 0.56), step(0.42 + 0.2 * sr2, tt));
-    ac = mix(ac, vec3(0.07, 0.56, 0.54), step(0.74 + 0.1 * sr, tt));
-    sky = mix(sky, ac, clamp(k * uAurora.x * (0.30 + 0.70 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.97));
+    float hgA = hgt * 1.5 * (0.16 + 0.84 * fold);
+    float aStr = uAurora.x * (0.30 + 0.70 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x);
+    vec3 ac; float k = pcAuroraRays(az, e, e0, hgA, 44.0, 0.0, fa.b * 3.0, 1.0, ac);
+    sky = mix(sky, ac, clamp(k * aStr, 0.0, 0.97));
+    k = pcAuroraRays(az, e, e0, hgA * 1.25, 150.0, 17.0, fa.b * 9.0, 0.45, ac);
+    sky = mix(sky, min(ac * 1.08 + 0.04, vec3(1.0)), clamp(k * aStr, 0.0, 0.97));
   #else
     float k = smoothstep(e0 - 0.012, e0 + 0.02, e) * (1.0 - smoothstep(e0 + 0.04, e0 + hgt, e)) * fold * ray;
     // (pale viridian at the lower edge lifted out of the blue, violet where the rays fade: it has to stand against the
@@ -233,10 +259,11 @@ void main() {
         // (the oil look, the overhaul plan's sixth piece: a cloud is a few big flat shapes with clean edges, a pixel
         // wide: a light one, and on the side away from the sun a second, a step deeper; no wet lower edge, no fine
         // curl, no grain in it)
-        v = c1 * 0.70 + c2 * 0.30;
+        v = c1 * 0.82 + c2 * 0.18;
         float fwv = max(fwidth(v), 1e-4);
         cloud = smoothstep(-fwv, fwv, v - (th + 0.035));
-        shade = smoothstep(-fwv, fwv, toSun - v - 0.02) * 0.42;
+        // (by night a cloud has no second tone: lit by nothing, its deeper side stood in a dark sky as a blot with a pale rim)
+        shade = smoothstep(-fwv, fwv, toSun - v - 0.02) * 0.42 * uAtmo.y;
       #endif
       float fade = rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0;
       cloud *= fade;
@@ -249,6 +276,9 @@ void main() {
   vec3 cl = mix(mix(mix(uSkyHorizon, vec3(1.0), 0.22), vec3(1.0), uAtmo.y), uCloudShade, shade * 0.9);
   #ifndef PC_OIL
   cl = dens(cl, 1.0 + (n2.r - 0.5) * 0.8);
+  #else
+  // (the oil look by night: a cloud is a flat shape one step lighter than the sky it lies in)
+  cl = mix(mix(sky, uSkyHorizon, 0.55), cl, uAtmo.y);
   #endif
   // under an overcast the cloud is no longer bare paper: it is the wash itself, in heavy masses
   // with dark bellies; their torn edges stay pale, where the light still comes through
@@ -338,13 +368,20 @@ void main() {
       float az2 = atan(hh.z, hh.x);
       // (the rows waver by a slow noise as well as by the bearing, so that they do not read as rings round the zenith;
       // three dashes in ten are laid, each its own length and lightness)
-      float wv = texture(uNoise3D, d * 0.9 + 0.37).r;
-      float rowf = e * 38.0 + 2.2 * sin(az2 * 3.0 + 1.3) + 1.1 * sin(az2 * 7.0) + 5.0 * wv;
-      float row = floor(rowf), hx = fract(sin(row * 91.7) * 43758.5453);
-      float along = az2 * (7.0 + 9.0 * hx) + hx * 40.0;
-      float hs = fract(sin((floor(along) + row * 57.0) * 12.9898) * 43758.5453);
-      float dash = step(0.58, hs) * step(abs(fract(rowf) - 0.5), 0.04 + 0.05 * hx) * step(0.04, fract(along)) * step(fract(along), 0.45 + 0.50 * hx);
-      col = mix(col, min(col * 1.2 + vec3(0.03, 0.08, 0.08), vec3(1.0)), dash * (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.03, 0.12, e) * (0.4 + 0.5 * hs));
+      // (the clip's night sky is streaked all over, densely and finely, the streaks swirling: two layers of rows, each
+      // bent by a slow noise, about half of their dashes laid, every dash thin and of its own length and lightness)
+      vec4 wv4 = texture(uNoise3D, d * 0.9 + 0.37);
+      for (int L = 0; L < 2; L++) {
+        float wv = L == 0 ? wv4.r : wv4.b, fq = L == 0 ? 52.0 : 31.0;
+        float rowf = e * fq + 2.2 * sin(az2 * 3.0 + 1.3 + float(L) * 2.1) + 1.1 * sin(az2 * 7.0) + 9.0 * wv + float(L) * 0.37;
+        float row = floor(rowf), hx = fract(sin((row + float(L) * 71.0) * 91.7) * 43758.5453);
+        float along = az2 * (9.0 + 12.0 * hx) + hx * 40.0 + 3.0 * wv4.g;
+        float hs = fract(sin((floor(along) + row * 57.0) * 12.9898) * 43758.5453);
+        float fwr = max(fwidth(rowf), 1e-4);
+        float thin = smoothstep(-fwr, fwr, (0.05 + 0.07 * hx) - abs(fract(rowf) - 0.5));
+        float dash = step(0.48, hs) * thin * step(0.04, fract(along)) * step(fract(along), 0.40 + 0.55 * hx);
+        col = mix(col, min(col * 1.25 + vec3(0.02, 0.07, 0.07), vec3(1.0)), dash * (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.03, 0.12, e) * (0.35 + 0.6 * hs));
+      }
     }
   #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));

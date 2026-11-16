@@ -152,7 +152,7 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   snowC = pcSnowCover(dot(nLc, normalize(Bc)), rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
   // the light, a stroke at a time: in the sun or in the leaf shadow whole
   float x = dot(nVc, gSunV) * 0.5 + 0.5;
-  float sunny = min(pcSunAt(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
+  float sunny = min(pcSunAtSoft(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w, fract(rnd.y * 5.7)), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
   leaf = pcDensity(col2C, 1.15);
   canopy = parC.z;
@@ -161,7 +161,13 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
 // One stroke's paint from that: its own colour (a fallen leaf's, for the share fk of the strokes), the snow, the light.
 vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl) {
   float f = step(1.0 - fk, fract(rnd.z * 13.7));
-  vec3 k = pcDabTint(mix(c, leaf, f), rnd, f);
+  // (bare ground and grass, where no leaf has fallen: a dab is the ground's colour or one of its two neighbouring
+  // pigments, and a share of the dabs are laid a step deeper; lit grass all of one colour was a flat lemon patch,
+  // in a clearing and from the air: the stills after overhauls 3 to 5)
+  float gq = fract(rnd.y * 23.3);
+  vec3 cg = gq > 0.72 ? c * uHueA : gq < 0.24 ? c * uHueB : c;
+  lvl -= (1.0 - f) * step(0.58, fract(rnd.x * 11.1)) * 0.9 * step(1.5, lvl);
+  vec3 k = pcDabTint(mix(cg, leaf, f), rnd, f);
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   return pcLamp(pcTone(k, lvl), k, gBc, rnd.y);
 }
@@ -191,11 +197,12 @@ void main() {
     vec2 chT = vec2(ch.x, ch.y + 1.4 * (length(vBody) - uBodyR));
     vec3 upT = normalize(vBody);
     vec2 dtx = vec2(dlx.x, dlx.y + 1.4 * dot(upT, gBdx)), dty = vec2(dly.x, dly.y + 1.4 * dot(upT, gBdy));
-    vec4 ot = pcStrokeOct4(dist * 1.5, uOilPx.z * 1.5);
+    vec4 ot = pcStrokeOct4(dist * 2.0, uOilPx.z * 2.0);
     vec2 lgT = vec2(dFdx(ot.w), dFdy(ot.w));
     vec3 r0, n0, r1, n1; vec2 ds0, ds1; float own0, own1;
-    pcThinLayer(chT, dtx, dty, ot.x, 7.0, vBody, 14.0 * wpx * 7.0, 9.0, r0, ds0, own0, n0);
-    pcThinLayer(chT, dtx, dty, ot.x * 2.0, 7.0, vBody, 28.0 * wpx * 7.0, 9.0, r1, ds1, own1, n1);
+    // (long strokes in slow wide arcs: laid in quick waves, flat snow read as open water: the critic, on the first night)
+    pcThinLayer(chT, dtx, dty, ot.x, 8.0, vBody, 14.0 * wpx * 8.0, -34.0, r0, ds0, own0, n0);
+    pcThinLayer(chT, dtx, dty, ot.x * 2.0, 8.0, vBody, 28.0 * wpx * 8.0, -34.0, r1, ds1, own1, n1);
     float fr0 = ot.w - ot.z;
     bool fine = r0.z >= smoothstep(0.15, 0.85, fr0 + dot(lgT, ds0));
     bool fineN = n0.z >= smoothstep(0.15, 0.85, fr0);
@@ -221,7 +228,10 @@ void main() {
   // a dab covers whole stops there: most pixels work out one layer, where they worked out two and the ground under them
   // before (the overhaul plan's "strokes baked", chunks.js). Under the last dab the ground's own colour, the light and
   // the leaf shadow as the pixel has them.
-  vec4 o4 = pcStrokeOct4(dist * uOilS.w, uOilPx.z * uOilS.w);
+  // (seen at a low angle a dab is squeezed flat on the screen: far across a level floor the dabs were lines a pixel
+  // high, a hatching; so the dabs are laid larger the lower the angle, up to three times)
+  float graze = inversesqrt(max(abs(dot(nV, normalize(-vView))), 0.11));
+  vec4 o4 = pcStrokeOct4(dist * uOilS.w * graze, uOilPx.z * uOilS.w);
   vec3 ocl = vec3(o4.w - o4.z, dFdx(o4.w), dFdy(o4.w));
   float lw = max(length(gBdx), length(gBdy));
   // (a dab's own place: where its centre's chart lies on the sphere, at the ground's height carried there)
@@ -247,7 +257,7 @@ void main() {
   gCtrB = vec3(1e30);
   if (rem >= 0.004 || uOilC.z < 0.999) {
     float x0 = dot(nV, gSunV) * 0.5 + 0.5;
-    float sun0 = min(pcSunAt(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5)), 1.0 - pcCast(vBody, 0.0));
+    float sun0 = min(pcSunAtSoft(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5), 0.5), 1.0 - pcCast(vBody, 0.0));
     vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
     acc = mix(bare, acc + rem * bare, uOilC.z);
   }
@@ -1222,7 +1232,7 @@ void main() {
       // (bark: long thin streaks that run with the stem or round it, nothing drawn between them; a crown: thin leaves,
       // lying every way)
       // (streaks that run with the stem are long; those that run round it are short, so the stem still turns in the light)
-      if (isBark) { float ba = along ? 9.0 : 3.2; pcThinLayer(ch + seed * 37.0, dcx, dcy, w, ba, vObj + seed * 11.0, lim * ba, 2.0, rnd, ds, cov, rnd2); has2 = 1.0; }
+      if (isBark) { float ba = along ? 15.0 : 3.2; pcThinLayer(ch + seed * 37.0, dcx, dcy, w, ba, vObj + seed * 11.0, lim * ba, 2.0, rnd, ds, cov, rnd2); has2 = 1.0; }
       else pcDabLayer(ch + seed * 37.0, dcx, dcy, w, uOilS.z, lim * 3.0, ocl, L == 0 ? vec2(0.0, 1.0) : vec2(0.0), rnd, ctrD, ds, cov, rnd2, has2);
       vec3 Bc = vBody + bdx * ds.x + bdy * ds.y;
       vec3 nVc = normalize(vNV + nvdx * ds.x + nvdy * ds.y);
@@ -1703,8 +1713,18 @@ void main() {
     vec3 co = pcWetWash(pcDensity(vCol, 1.0 + (smoothstep(0.42, 0.62, fold) - 0.45) * 0.30 * (1.0 - max(vMat.z, 0.0))), 0.7);
     float sunF = dot(nV, sunV);
     float lvo = pcLevel(sunF * 0.5 + 0.5, 0.05) + 0.9 * smoothstep(0.50, 0.85, rim) * smoothstep(0.0, 0.5, sunF) * uDayness;
+    // (the light in flat steps, half a tone each, with clean edges between them: a limb shaded smoothly from light to
+    // dark was a rendered cylinder, the one soft gradient on the figure)
+    lvo = floor(lvo * 2.0 + 0.5) * 0.5;
     vec3 t1 = pcTone(pcDabTint(co, fr1, 0.0), lvo + (fr1.z - 0.5) * 0.5), t2 = pcTone(pcDabTint(co, fr2, 0.0), lvo + (fr2.z - 0.5) * 0.5);
     lit = vMat.x > 0.985 ? pcTone(co, lvo) : mix(t2, t1, fown);
+    // (the lantern's light on the figure itself, by night: the side toward the lantern is warm, in two flat steps)
+    if (uLampV.w > 0.01) {
+      vec3 toL = uLampV.xyz - vView;
+      float dl = length(toL), fl = uLampV.w * (1.0 - smoothstep(0.25, 1.5, dl)) * smoothstep(-0.1, 0.5, dot(nV, toL / max(dl, 1e-3)));
+      vec3 warmF = min(pcDensity(vCol, 1.1) * vec3(1.45, 0.92, 0.50) + vec3(0.12, 0.05, 0.0), vec3(1.0));
+      lit = fl > 0.55 ? warmF : fl > 0.22 ? mix(lit, warmF, 0.5) : lit;
+    }
   }
   #else
   // dry brush: the loaded brush skips on the lit side and paper sparkles through

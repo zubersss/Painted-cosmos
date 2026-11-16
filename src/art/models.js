@@ -182,8 +182,9 @@ const mixc = (a, b, t) => lerp3(a, b, clamp01(t));
 // lining, and over it hang three rows of strips (each a thin flat ribbon with a pointed end, a piece of geometry of
 // its own: `dry: 1` marks it for the shader, materials.js FIG_FRAG, which paints it as one flat piece), the lowest
 // row ending at many heights. The profile is the cone's own: [height, half width, half depth, how far back].
-const CLOAK_PROFILE = [[1.44, 0.150, 0.118, 0.010], [1.36, 0.250, 0.172, 0.020], [1.26, 0.244, 0.214, 0.034], [1.12, 0.224, 0.226, 0.040], [1.03, 0.210, 0.212, 0.032], [0.94, 0.232, 0.234, 0.036],
-  [0.80, 0.268, 0.272, 0.042], [0.64, 0.298, 0.306, 0.046], [0.50, 0.318, 0.330, 0.050], [0.38, 0.326, 0.340, 0.052]];
+// (a wide bell: the clip's cloak stands out from the body and is widest at its hem)
+const CLOAK_PROFILE = [[1.47, 0.110, 0.100, 0.012], [1.36, 0.255, 0.180, 0.022], [1.26, 0.262, 0.232, 0.036], [1.12, 0.268, 0.262, 0.042], [1.03, 0.280, 0.276, 0.040], [0.94, 0.300, 0.298, 0.042],
+  [0.80, 0.336, 0.336, 0.046], [0.64, 0.372, 0.376, 0.050], [0.50, 0.398, 0.404, 0.054], [0.38, 0.412, 0.420, 0.056]];
 const CLOAK_BLUES = [hex('#4a6ad0'), hex('#3d5cc8'), hex('#2f49b4'), hex('#5b7ce0'), hex('#27409e'), hex('#4a6ad0'), hex('#7d98ee'), hex('#33489c')];
 function cloakAt(a, y, out) {
   const T = CLOAK_PROFILE;
@@ -193,17 +194,17 @@ function cloakAt(a, y, out) {
   const r = rx + out, q = rz + out;
   return [Math.cos(a) * r, y, cz + Math.sin(a) * q];
 }
-// one row: n strips round the cloak from yTop down to about yBot (each its own length), w their half width
+// one tier: n short narrow strips round the cloak from yTop down to about yBot (each its own length), w their half
+// width. A strip is widest a little under its top and ends in a blunt point; its top lies under the tier above.
 function cloakRow(B, n, yTop, yBot, w, rag, lift, seed, a0) {
   for (let i = 0; i < n; i++) {
     const h1 = (Math.sin((i + 1) * 12.9898 + seed * 78.233) * 43758.5453) % 1, r1 = h1 < 0 ? h1 + 1 : h1;
     const h2 = (Math.sin((i + 1) * 39.3467 + seed * 11.135) * 24634.6345) % 1, r2 = h2 < 0 ? h2 + 1 : h2;
-    const a = a0 + ((i + 0.25 * (r1 - 0.5)) / n) * Math.PI * 2, da = (r2 - 0.5) * 0.10;
-    const y1 = yBot + rag * (r1 - 0.35), len = yTop - y1, pts = [];
-    for (let k = 0; k <= 4; k++) { const t = k / 4, y = yTop - len * t; pts.push(cloakAt(a + da * t, y, lift * (0.55 + 0.9 * t) + (i % 2) * 0.007)); }
+    const a = a0 + ((i + 0.5 * (r1 - 0.5)) / n) * Math.PI * 2, da = (r2 - 0.5) * 0.07;
+    const y1 = yBot + rag * (r1 - 0.4), len = yTop - y1, pts = [];
+    for (let k = 0; k <= 3; k++) { const t = k / 3, y = yTop - len * t; pts.push(cloakAt(a + da * t, y, lift * (0.4 + 1.0 * t) + (i % 2) * 0.006)); }
     const col = CLOAK_BLUES[(i * 3 + ((r2 * 5) | 0) + seed) % CLOAK_BLUES.length];
-    // (a strip ends in a blunt point, as a stroke of a loaded brush does: drawn to a needle it stood as a row of daggers)
-    B.path(pts, (k) => [[w * 0.72, 0.006], [w, 0.008], [w * 1.04, 0.008], [w * 0.92, 0.007], [w * 0.50, 0.005]][k], { seg: 6, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.9, ref: [-Math.sin(a), 0, Math.cos(a)] });
+    B.path(pts, (k) => [[w * 0.80, 0.005], [w, 0.007], [w * 0.94, 0.007], [w * 0.55, 0.005]][k], { seg: 6, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.7, ref: [-Math.sin(a), 0, Math.cos(a)] });
   }
 }
 function wandererParts(B, X, Z, ringsY) {
@@ -214,7 +215,9 @@ function wandererParts(B, X, Z, ringsY) {
   B.loft(ringsY([[1.00, 0.212, 0.214, 0, 0.034], [1.12, 0.224, 0.226, 0, 0.040], [1.26, 0.244, 0.214, 0, 0.034], [1.36, 0.250, 0.172, 0, 0.020], [1.42, 0.172, 0.126, 0, 0.010], [1.465, 0.086, 0.080]]), { seg: 16, col: cloak, lump: 0.012 });
   { const pts = []; for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; pts.push([Math.cos(a) * 0.100, 1.455 + Math.sin(a * 2) * 0.008 + Math.max(0, Math.sin(a)) * 0.016, Math.sin(a) * 0.094 + 0.014]); }
     B.path(pts, 0.046, { seg: 7, closed: true, col: CLOAK_D, lump: 0.006, dry: 0.3 }); }
-  cloakRow(B, 13, 1.425, 1.04, 0.066, 0.10, 0.012, 1, 0.24);      // (the row over the shoulders, on the torso's bone)
+  // (two tiers over the shoulders, on the torso's bone; the tops of the first lie under the cowl)
+  cloakRow(B, 18, 1.26, 1.06, 0.040, 0.05, 0.010, 2, 0.11);
+  cloakRow(B, 14, 1.445, 1.22, 0.040, 0.05, 0.014, 1, 0.24);
   // 1 head: bare; the face takes the light, the hair a soft cap
   B.part = 1;
   B.blob([0, 1.585, 0], 0.112, 0.125, 0.118, { seg: 14, rings: 11, col: (p) => (p[2] < -0.03 && p[1] < 1.632 ? mixc(FLESH, CHEEK, sstep(0.03, 0.08, Math.abs(p[0])) * sstep(1.625, 1.57, p[1]) * 0.75) : HAIR), lump: 0.004, dry: 0.2 });
@@ -227,7 +230,7 @@ function wandererParts(B, X, Z, ringsY) {
   }
   // 4 the cloak's fall: to the calf behind, the knee in front; the hem trimmed pale and cut in tongues
   B.part = 4;
-  B.loft(ringsY([[1.03, 0.204, 0.206, 0, 0.030], [0.94, 0.232, 0.234, 0, 0.036], [0.80, 0.268, 0.272, 0, 0.042], [0.64, 0.298, 0.306, 0, 0.046], [0.50, 0.318, 0.330, 0, 0.050], [0.455, 0.312, 0.324, 0, 0.050], [0.53, 0.16, 0.16, 0, 0.03]]), {
+  B.loft(ringsY([[1.05, 0.262, 0.258, 0, 0.038], [0.94, 0.288, 0.286, 0, 0.042], [0.80, 0.324, 0.324, 0, 0.046], [0.64, 0.360, 0.364, 0, 0.050], [0.52, 0.384, 0.390, 0, 0.054], [0.475, 0.378, 0.384, 0, 0.054], [0.55, 0.16, 0.16, 0, 0.03]]), {
     seg: 24, lump: 0.014, cap: 0.0,
     col: (p, t) => (t > 0.9 ? mixc(INK, CLOAK_D, 0.4) : cloak(p)),
     warp: (p, a, t) => {
@@ -236,17 +239,23 @@ function wandererParts(B, X, Z, ringsY) {
       return [p[0] * wave, p[1] + k * (0.10 * Math.max(0, -p[2] / 0.3) + 0.020 * Math.sin(4 * a + 1.3)) + k * k * 0.05 * tooth, p[2] * wave];
     },
   });
-  cloakRow(B, 17, 1.14, 0.70, 0.060, 0.12, 0.010, 2, 0.05);       // (the middle row and the low one, on the fall's bone)
-  cloakRow(B, 26, 0.86, 0.45, 0.052, 0.12, 0.012, 3, 0.19);
+  // (four tiers down the fall, on its bone, laid from the hem up so that each lies over the one below it; the lowest
+  // ends at many heights: the cloak's ragged edge)
+  cloakRow(B, 30, 0.60, 0.40, 0.040, 0.10, 0.008, 6, 0.07);
+  cloakRow(B, 28, 0.78, 0.56, 0.040, 0.06, 0.012, 5, 0.19);
+  cloakRow(B, 25, 0.95, 0.73, 0.040, 0.06, 0.012, 4, 0.02);
+  cloakRow(B, 22, 1.10, 0.90, 0.040, 0.05, 0.012, 3, 0.15);
   // 5 the back panel, which streams on the air (the scarf's bone)
   B.part = 5;
   B.path([[0, 1.43, 0.13], [0, 1.40, 0.225], [0, 1.25, 0.282], [0, 1.02, 0.310], [0, 0.80, 0.338], [0, 0.60, 0.360]], (i) => [[0.10, 0.020], [0.17, 0.022], [0.215, 0.020], [0.236, 0.018], [0.226, 0.016], [0.150, 0.012]][i], { seg: 10, col: cloak, lump: 0.006, ref: X, dry: 0.3 });
-  // (and its own strips: two rows down the back, the upper over the lower, which stream with it)
-  for (let i = 0; i < 11; i++) {
-    const up = i < 5, x = up ? (i - 2) * 0.078 : (i - 7.5) * 0.068, w = 0.050;
-    const y0 = up ? 1.40 : 1.06, yb = up ? 0.92 + 0.05 * ((i * 7) % 3) : 0.55 + 0.06 * ((i * 5) % 4), z0 = up ? 0.250 : 0.322, z1 = up ? 0.345 : 0.376;
-    const pts = []; for (let k = 0; k <= 4; k++) { const t = k / 4; pts.push([x * (0.6 + 0.45 * t), y0 + (yb - y0) * t, z0 + (z1 - z0) * Math.pow(t, 0.7) + (up ? 0.012 : 0)]); }
-    B.path(pts, (k) => [[w * 0.72, 0.006], [w, 0.008], [w * 1.04, 0.008], [w * 0.92, 0.007], [w * 0.50, 0.005]][k], { seg: 6, col: CLOAK_BLUES[(i * 5 + 1) % CLOAK_BLUES.length], even: 1, lump: 0, dry: 1, wet: 0, cap: 0.9, ref: X });
+  // (and its own strips: four short tiers down the back, each over the one below, which stream with it)
+  for (let tier = 3; tier >= 0; tier--) {
+    const n = 5 + (tier % 2), y0 = 1.40 - tier * 0.20, zt = 0.262 + tier * 0.036 + (tier === 0 ? -0.012 : 0);
+    for (let i = 0; i < n; i++) {
+      const x = (i - (n - 1) / 2) * 0.072 * (0.75 + 0.12 * tier), w = 0.040, len = 0.26 + 0.05 * ((i * 7 + tier) % 3);
+      const pts = []; for (let k = 0; k <= 3; k++) { const t = k / 3; pts.push([x * (1 + 0.10 * t), y0 - len * t, zt + 0.030 * t + 0.014]); }
+      B.path(pts, (k) => [[w * 0.80, 0.005], [w, 0.007], [w * 0.94, 0.007], [w * 0.55, 0.005]][k], { seg: 6, col: CLOAK_BLUES[(i * 5 + tier * 3 + 1) % CLOAK_BLUES.length], even: 1, lump: 0, dry: 1, wet: 0, cap: 0.7, ref: X });
+    }
   }
   // 6..9 legs: thigh, shin and boot
   for (const s of [-1, 1]) {
@@ -266,12 +275,12 @@ function wandererParts(B, X, Z, ringsY) {
   // 12 the lantern at the right hip, on a strap from the belt, clear of the cloak: a dark frame, a glass that is lit when
   // the light goes
   B.part = 12;
-  const lx = 0.345, lz = -0.02;
+  const lx = 0.445, lz = -0.03;      // (clear of the cloak's bell, which is wider now)
   B.capsule([lx, 0.815, lz], [lx, 0.715, lz], 0.046, 0.046, { seg: 8, col: GLASS, glow: -1, wet: 0.4, lump: 0, mid: 0 });
   B.blob([lx, 0.842, lz], 0.058, 0.020, 0.058, { seg: 8, rings: 4, col: INK, lump: 0 });
   B.blob([lx, 0.690, lz], 0.055, 0.018, 0.055, { seg: 8, rings: 4, col: INK, lump: 0 });
   B.path([[lx - 0.036, 0.852, lz], [lx - 0.024, 0.905, lz], [lx + 0.024, 0.905, lz], [lx + 0.036, 0.852, lz]], 0.008, { seg: 5, col: INK, lump: 0 });
-  B.path([[0.225, 1.02, -0.02], [0.30, 0.97, lz], [lx, 0.908, lz]], 0.008, { seg: 5, col: SEPIA, lump: 0 });
+  B.path([[0.26, 1.04, -0.02], [0.36, 0.975, lz], [lx, 0.908, lz]], 0.008, { seg: 5, col: SEPIA, lump: 0 });
   return { lamp: [lx, 0.76, lz] };
 }
 
@@ -359,7 +368,7 @@ export function createExplorer() {
     { name: 'thighL', parent: 'torso', pivot: [-0.095, 0.89, 0] }, { name: 'thighR', parent: 'torso', pivot: [0.095, 0.89, 0] },
     { name: 'shinL', parent: 'thighL', pivot: [-0.095, 0.48, 0] }, { name: 'shinR', parent: 'thighR', pivot: [0.095, 0.48, 0] },
     { name: 'jet', parent: 'torso', pivot: wander ? [0, 0.50, 0.21] : [0, 0.935, 0.235] },
-    ...(wander ? [{ name: 'hood', parent: 'head', pivot: [0, 1.47, 0.05] }, { name: 'lantern', parent: 'torso', pivot: [0.345, 0.908, -0.02] }] : []),
+    ...(wander ? [{ name: 'hood', parent: 'head', pivot: [0, 1.47, 0.05] }, { name: 'lantern', parent: 'torso', pivot: [0.445, 0.908, -0.03] }] : []),
   ], mat.uniforms.uPart.value);
   const b = rig.bones;
 
