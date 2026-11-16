@@ -201,8 +201,10 @@ blue"): the overhaul plan in section 4a-2, in its order. The coordinator builds 
 9 (every world) is through its first round: all forty biomes on ten worlds were drawn in the oil
 look (no errors) and what the survey showed wrong was cured. THE OWNER APPROVED THE LOOK at the
 checkpoint ("I like the look so far keep it up") and asked for two things (section 2, item 24):
-thinner strips on the cloak and the aurora as light; both are done and seen. `look-proto` is at
-b48d188; `node tests/all.mjs --export` PASSED all seventeen steps on it (thirteen on 5c77830, the
+thinner strips on the cloak and the aurora as light; both are done and seen; then for snow in the
+colours of ice and snow, darker, its strokes as the clip's (item 25): done and seen, the stills
+sent. `look-proto` is at 16f105e (the full check ran before the last three commits, which touch
+the oil look's paths only; the world suite was run on each); `node tests/all.mjs --export` PASSED all seventeen steps on it (thirteen on 5c77830, the
 four painted-world runs on efb0fc6; later commits changed the oil look's paths only, with the unit
 and world suites run again). WAITING FOR THE OWNER, asked twice: whether to put the look on a page
 they can open on their desktop: a pull request into `main` that adds it behind `?look=oil` (the
