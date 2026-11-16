@@ -199,10 +199,13 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // THE OIL LOOK'S LIGHT (docs/references/README.md: warm light against cool shade, deep darks, nothing diluted toward
 // paper). A wash's transmittance becomes a body colour by laying it heavier (richer, never greyer); the watercolour's
 // pale light and glaze keys, raised to a power, are the oil's warm light and its cool, violet shade.
+// (uOilG.w: how far THIS WORLD takes the golden hours: all the way on Earth, whose wood is the clip's; a third on the
+// others, which keep their own skies and airs: with the full gold every world's sky was the same cream at a low sun:
+// the survey of the worlds)
 // (the golden hours: with the sun under about thirty degrees the oil look's light is gold and its air a pale gold,
 // whatever the hour's own keys say: the owner's reference clip stands in that light with the sun still well up, its
 // shadows about twice as long as what throws them and half the forest floor in the sun)
-float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x); }      // (gold until the sun stands well over thirty degrees: with the sun at thirty the wood's floor has broad pools of light, as the clip's, and the air must still be gold there)
+float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x) * uOilG.w; }      // (gold until the sun stands well over thirty degrees: with the sun at thirty the wood's floor has broad pools of light, as the clip's, and the air must still be gold there)
 vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
 // (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
 vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }

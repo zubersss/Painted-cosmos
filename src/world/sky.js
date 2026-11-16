@@ -49,6 +49,7 @@ uniform float uAux8;
 #ifdef PC_OIL
 uniform vec4 uOilA;
 uniform vec4 uOilC;
+uniform vec4 uOilG;
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
@@ -326,6 +327,19 @@ void main() {
     vec3 dw = normalize(vDirW);
     vec4 s1 = texture(uNoise3D, dw * 0.9 + 0.4);
     vec4 s2 = texture(uNoise3D, dw * 2.9);
+  #ifdef PC_OIL
+    // (the oil look: space is laid in flat shapes with clean edges, a pixel wide: a deep indigo ground, a lighter blue
+    // drift over part of it, a violet one, and a few pale clouds of stars' dust; no wet edge, no bloom, no salt: as
+    // washes they were the one soft, blotted thing left in the picture: the survey of the worlds, the Moon's sky)
+    float d1 = s1.r * 0.7 + s2.g * 0.3, d2 = s1.g * 0.7 + s2.r * 0.3, d3 = s1.b * 0.65 + s2.b * 0.35;
+    float w1 = max(fwidth(d1), 1e-4), w2 = max(fwidth(d2), 1e-4), w3 = max(fwidth(d3), 1e-4);
+    vec3 sp = vec3(0.070, 0.085, 0.240);
+    sp = mix(sp, vec3(0.110, 0.140, 0.340), smoothstep(-w1, w1, d1 - 0.50));
+    sp = mix(sp, vec3(0.150, 0.190, 0.420), smoothstep(-w1, w1, d1 - 0.62));
+    sp = mix(sp, vec3(0.230, 0.150, 0.400), smoothstep(-w2, w2, d2 - 0.60));
+    sp = mix(sp, vec3(0.330, 0.240, 0.520), smoothstep(-w2, w2, d2 - 0.70));
+    sp = mix(sp, vec3(0.360, 0.420, 0.660), smoothstep(-w3, w3, d3 - 0.70));
+  #else
     vec3 sp = mix(vec3(0.20, 0.24, 0.45), vec3(0.34, 0.37, 0.52), s1.r);
     sp = mix(sp, vec3(0.42, 0.33, 0.57), smoothstep(0.55, 0.80, s1.g) * 0.6);          // a violet nebula drift, wet in wet
     sp = dens(sp, 1.0 + (s2.g - 0.5) * 0.9 + (s1.b - 0.5) * 0.7);
@@ -340,6 +354,7 @@ void main() {
     vec4 sa = texture(uNoise3D, dw * 6.3 + 0.2);
     float salt = smoothstep(0.66, 0.80, sa.r * 0.6 + s2.b * 0.4);                         // salt: pale crystalline blooms
     sp = mix(sp, vec3(0.62, 0.66, 0.82), salt * 0.50);
+  #endif
     float sunS = 1.0 - smoothstep(uAtmo.z * 0.82, uAtmo.z, ang);
     sp = mix(sp, vec3(1.0, 0.985, 0.93), clamp(halo, 0.0, 1.0));
     sp = mix(sp, vec3(1.0), sunS);
@@ -367,7 +382,7 @@ void main() {
     col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
     col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
-    float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x);
+    float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
     col = mix(col, vec3(1.0, 0.94, 0.76), gold * mix(0.88, 0.60, smoothstep(0.0, 0.7, e)));
     {
       // the night sky is painted, not left flat: short thin dashes a step lighter than the wash, in rows that waver

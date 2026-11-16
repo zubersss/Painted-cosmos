@@ -112,6 +112,25 @@ motion. The baked strokes cut the stills' time here by nought to a fifth only, b
 other work (the shadow pass, the leaves' vertices); the pixel's own work on the ground fell from 36 dabs tried and two
 layers shaded to about two dabs and 1.3 layers. Only the owner's desktop can say whether it plays.
 
+**OVERHAUL 9, every world (begun 2026-11-16 with a survey: thirteen biomes on ten worlds drawn from one page, the
+scratch tool `survey.sh`, described in the log on `r2`).** Most worlds already held up in the oil look with no settings
+of their own (the colour model, the strokes and the shadows are general). What the survey called for, and where each
+is set:
+- a world's share of the look's golden hours: a look's top-level `oil.gold` (1 on Earth; 0.33 where none is given),
+  read in `world/index.js` into `OIL.uOilG.w`, used by `pcGold()` and the sky. With the full gold everywhere every
+  world's sky was the same cream at a low sun.
+- every `broadleaf` species, on every world, has its crown in leaves one by one in the oil look (`flora.js` adds
+  `leafy: 1, double: 1`; `florakit.js birchGeometry` `leafy`: the tree's own form, `leafCards` where it had `blob`s).
+  A species' `oil` entry may still make it `slender` (Earth's three).
+- the ground's laying, per world: a look's `oil.ground: 'flow'` (long strokes that run with the land): Neptune, Uranus,
+  Pluto. Everything else is leaf dabs.
+- a biome's `oil.pal` (its colours given outright as paint), `oil.under` (undergrowth colours), `oil.tallMix` (the
+  wood's mix of kinds): the autumn wood, the green wood (the game's first place), the aurora tundra.
+- a world's own night: a look's `oil.night` (Neptune's teal).
+- space is laid in flat shapes with clean edges (`sky.js`, under `PC_OIL`): as washes it was the one soft, blotted
+  thing left (the Moon's sky).
+To give another biome its own colours, copy the pattern of `autumn_woodland` in `src/data/looks/earth.js`.
+
 **Not done yet (the overhaul plan's order).** Overhauls 6 to 8 have a first pass each (above); what is still owed in
 them: the sky by day against an open horizon and the night sky's streaks judged in stills; water judged in stills
 (a lake by night, the stream in the wood), a foam line at the shore; the lantern's own glow in the air. 9 every world

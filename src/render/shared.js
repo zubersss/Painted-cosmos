@@ -103,7 +103,8 @@ export const OIL = {
   // blades as one card with a notched top: in flat paint they stood on the floor as notched slabs. The oil look's floor
   // is its leaf dabs, tufts of real blades, saplings and small leafy plants.)
   // (y was 0.45 while the blades were the watercolour's stiff spikes; they are tufts now, and four in five are kept)
-  uOilG: { value: new THREE.Vector4(0.0, 1.0, 0, 0) },
+  // (w: how far the world the eye is on takes the look's golden hours, chunks.js pcGold: a look's `oil.gold`, set by the world)
+  uOilG: { value: new THREE.Vector4(0.0, 1.0, 0, 1) },
   // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
   //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
   // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three

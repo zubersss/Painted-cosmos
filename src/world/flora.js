@@ -76,7 +76,8 @@ export class Flora {
     const bodyUniforms = this.bodyUniforms, L = this.look;
     // (the oil look may give a kind its own form and washes: a species' `oil` entry, laid over it; where trees stand,
     // their sizes and what the explorer bumps into stay the species' own: floraplace.js, obstacles.js)
-    const TALL = L.tall.map((sp) => (LOOK.oil && sp.oil ? Object.assign({}, sp, sp.oil) : sp));
+    // (and in the oil look every broadleaf's crown is leaves one by one: florakit.js `leafy`)
+    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, sp.kit === 'broadleaf' ? { leafy: 1, double: 1 } : null, sp.oil) : sp));
     this.species = TALL.map((sp, i) => {
       const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)

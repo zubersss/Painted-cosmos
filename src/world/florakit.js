@@ -193,6 +193,9 @@ function V(x, y, z) { return new THREE.Vector3(x, y, z); }
 export function birchGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   const sl = !!(spec && spec.slender);
+  // (spec.leafy, the oil look on every world: the tree's own form, its crown in leaves one by one (leafCards) where it
+  // had lumpy washes: laid in dabs, those stood as brown lumps with dark seams, on Saturn's islands and in every wood)
+  const leafy = !!(spec && spec.leafy) && !sl;
   // (the oil look's tree stood 16 to 20 m with its crown out of the picture: the clip's trees are about twelve metres,
   // their boughs beginning a few metres up, so the crowns fill the top of a view from the ground)
   const H = sl ? 11.5 + rnd() * 4 : 10.5 + rnd() * 2.5;
@@ -245,6 +248,7 @@ export function birchGeometry(seed, lod, spec) {
       for (const [tp, id] of tips) { const dd = tp.distanceTo(c); if (dd < bd) { bd = dd; bid = id; } }
       // (the oil look's slender tree: the mass is leaves, one by one, florakit.js leafCards; else one lumpy wash)
       if (sl) leafCards(B, c, r * 1.3, r * 0.85, r * 1.3, rnd, { n: 130, len: 0.52, wid: 0.22, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.0, shadeK: 0.6 });
+      else if (leafy) leafCards(B, c, r * 1.15, r * 0.80, r * 1.10, rnd, { n: 125, len: 0.58, wid: 0.25, branch: bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05, shadeK: 0.6 });
       else blob(B, c, r, r * (0.66 + rnd() * 0.2), r * (0.85 + rnd() * 0.3), rnd, { branch: bid, massC: crownC, massK: 0.55, sway: 0.7 + 0.5 * (c.y / H), shade0: 0.05 + 0.3 * (1 - (c.y - H * 0.45) / (H * 0.6)), droop: 0.25, uvScale: 3.4 });
     }
   } else if (sl) {
@@ -252,6 +256,9 @@ export function birchGeometry(seed, lod, spec) {
     leafCards(B, V(top.x * 0.6 + 0.3, H * 0.58, top.z * 0.6 - 0.2), 3.6, 1.5, 3.5, rnd, { n: 70, len: 1.0, wid: 0.42, massC: crownC, massK: 0.5, sway: 0.6, shade0: 0.1 });
     leafCards(B, V(top.x * 0.8 + 0.4, H * 0.76, top.z * 0.8), 3.0, 2.0, 2.9, rnd, { n: 80, len: 0.95, wid: 0.40, massC: crownC, massK: 0.6, sway: 0.7 });
     leafCards(B, V(top.x * 0.95 - 0.3, H * 0.93, top.z * 0.95 + 0.2), 2.4, 1.9, 2.5, rnd, { n: 60, len: 0.95, wid: 0.40, massC: crownC, massK: 0.6, sway: 0.9 });
+  } else if (leafy) {
+    leafCards(B, V(top.x * 0.7 + 0.5, H * 0.60, top.z * 0.7), 3.3, 2.5, 3.1, rnd, { n: 95, len: 1.05, wid: 0.46, massC: crownC, massK: 0.5, sway: 0.7, shade0: 0.1 });
+    leafCards(B, V(top.x * 0.9 - 0.4, H * 0.84, top.z * 0.9 + 0.3), 2.8, 2.3, 2.9, rnd, { n: 80, len: 1.05, wid: 0.46, massC: crownC, massK: 0.5, sway: 0.9 });
   } else {
     blob(B, V(top.x * 0.7 + 0.5, H * 0.60, top.z * 0.7), 3.2, 2.5, 3.0, rnd, { massC: crownC, massK: 0.4, sway: 0.7, shade0: 0.25, shadeK: 0.7, droop: 0.2, noise: 0.3, uvScale: 4 });
     blob(B, V(top.x * 0.9 - 0.4, H * 0.84, top.z * 0.9 + 0.3), 2.7, 2.3, 2.8, rnd, { massC: crownC, massK: 0.4, sway: 0.9, shade0: 0.0, shadeK: 0.6, droop: 0.2, noise: 0.3, uvScale: 4 });

@@ -14,9 +14,13 @@ export default {
   deck: { height: 560 },
   visibility: [185, 2600],   // metres at ground level, and from high up
   sky: EARTH_SKY,
+  // (the oil look: Earth takes the look's golden hours whole: its wood is the owner's reference clip's)
+  oil: { gold: 1 },
   flora: {
     tall: [
-      { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.76, 0.85, 0.42], [0.58, 0.75, 0.36], [0.40, 0.58, 0.42]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5] },
+      { kit: 'broadleaf', scale: 1.25, vary: 1, bark: [[0.975, 0.965, 0.945], [0.27, 0.24, 0.26]], leaf: [[0.76, 0.85, 0.42], [0.58, 0.75, 0.36], [0.40, 0.58, 0.42]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.85, 0.34, 1.0, 0.28], wind: 0.10, far: [13.5, 11.8, 0], obs: [0.34, 11.5],
+        // (the oil look: the green wood's tree as the autumn wood's, in leaf: slender, half of them dark-barked)
+        oil: { slender: 1, double: 1, leaf: [[0.80, 0.92, 0.36], [0.54, 0.80, 0.30], [0.30, 0.58, 0.30]], leafP: [0.9, 0.52, 1.0, 0.28], dark: [0.5, [0.50, 0.38, 0.36], [0.36, 0.26, 0.30]] } },
       { kit: 'conifer', bark: [[0.74, 0.54, 0.42], [0.40, 0.28, 0.25]], leaf: [[0.44, 0.62, 0.43], [0.31, 0.51, 0.44], [0.24, 0.34, 0.42]], barkP: [0.50, 1, 0.9, 0.6], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.05, far: [14.5, 16.5, 0.8], obs: [0.40, 16] ,
         // (the oil look, docs/HANDOVER.md 4a on r2: a tall bare stem, dark and violet, under a high narrow crown)
         oil: { slender: 1, double: 1, bark: [[0.50, 0.38, 0.36], [0.36, 0.26, 0.30]] } },
@@ -31,7 +35,11 @@ export default {
   biomes: [
     B('temperate_forest', 'Temperate Forest', 'forest',
       ['sapGreen', 'hookersGreen', 'quinGold', 'burntSienna', 'rawUmber', 'ultramarine', 'cobaltViolet'], 'cadScarlet',
-      ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1], mist: 0.72 }),      // (less air than the planet's 185 m: the back of the wood steps toward the paper in bands; PAINTER 14: 0.95 -> 0.72, the wood's depths and the sky over it go paler)
+      ['sapGreen', 'quinGold', 'rawUmber'], { tall: [0, 1], mist: 0.72,
+        // (the oil look: a green wood in the autumn wood's hand: a floor of moss and grass greens over warm earth with
+        // last year's leaves in it, the canopy's greens pure; one tree in six a conifer)
+        oil: { pal: { low: [0.56, 0.46, 0.34], mid: [0.60, 0.52, 0.34], high: [0.58, 0.50, 0.36], litter: [0.80, 0.70, 0.36], canopyA: [0.74, 0.88, 0.36], canopyB: [0.46, 0.74, 0.32],
+          grassLight: [0.82, 0.90, 0.38], grassMid: [0.58, 0.78, 0.34], moss: [0.44, 0.64, 0.32], mud: [0.48, 0.40, 0.32] }, tallMix: 0.84 } }),      // (less air than the planet's 185 m: the back of the wood steps toward the paper in bands; PAINTER 14: 0.95 -> 0.72, the wood's depths and the sky over it go paler)
     B('autumn_woodland', 'Autumn Woodland', 'forest',
       ['quinGold', 'burntSienna', 'cadOrange', 'rawUmber', 'oliveGreen', 'ultramarine', 'cobaltViolet'], 'alizarin',
       ['quinGold', 'burntSienna', 'rawUmber'], { autumn: 1, tall: [2, 1], liquid: { color: [0.68, 0.78, 0.84], refl: 0.72 },
