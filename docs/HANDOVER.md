@@ -156,6 +156,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     make it flight like superman." The new explorer has no jetpack and no fuel; it flies by
     itself (Space up, W where the view looks, C down, Shift fast, hands off hovers). Built on
     `look-proto` for the new explorer; the ship still carries it between worlds.
+24. **The checkpoint is approved; thinner strips on the cloak; the aurora as light (2026-11-16).**
+    "I like the look so far keep it up the cloak looks clunky thinner stripes would help or more
+    stripes to make it flow easier i also like the night and the tundra but the northern lights
+    look like stripes instead of lights like the reference otherwise everything looking good
+    continue working and tell me the next time you need something." The cloak gets many thin
+    strips so that it flows. The aurora must read as light, as the clip's does (soft, glowing,
+    fading upward): this is the one soft thing in the picture, by the owner's own word; the
+    crispness rule (16) stands for everything else. Work goes on without stopping for approval;
+    the owner is asked only when something is needed from them.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
