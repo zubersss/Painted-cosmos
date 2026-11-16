@@ -156,6 +156,15 @@ async function boot() {
   // scales the scene inside that.
   const dyn = new DynamicResolution({
     enabled: params.get('dynres') !== '0' && !params.has('bench'),
+    // (the oil look: the picture is never drawn much under its full size. Its strokes are sized in the picture's
+    // pixels; halved and stretched over a phone's screen they were "blurry and blotchy" (the owner, 2026-11-16: at 28
+    // pictures a second the controller, which asks for 60, had halved the picture and dropped to the low tier, and
+    // still did not reach 60). On a phone or a tablet the controller asks for 30 pictures a second, not 60, and gives
+    // up at most a sixth of the picture's size; on a desktop a fifth, still asking for 60. A slow device keeps a sharp
+    // picture and loses pictures a second.)
+    tuning: params.get('look') !== 'oil' ? undefined
+      : PRESET.id === 'desktop' ? { minScale: 0.8 }
+        : { minScale: 0.85, targetMs: 33.3, highMs: 37, lowMs: 27, panicMs: 62, tierUpMs: 22 },
     // Start at the best picture (top tier, full resolution) and give some of it up only when
     // the measured frame time asks: under 30 fps the controller sheds load within a second or
     // two, and it climbs back by careful steps (src/core/dynres.js). ?quality=0|1|2 pins the
