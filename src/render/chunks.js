@@ -90,6 +90,26 @@ uniform float uStorm;
 uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
 layout(location = 1) out highp vec4 pcAux;
 uniform float uAux8;
+#ifdef PC_OIL
+uniform vec4 uOilA;    // the oil look's dials (shared.js OIL)
+uniform vec4 uOilB;
+uniform vec4 uOilC;
+uniform vec4 uOilD;
+uniform vec4 uOilS;
+uniform vec4 uOilG;
+uniform vec4 uOilPx;
+uniform mat4 uShM;
+uniform highp sampler2D uShTex;
+uniform vec4 uShK;
+uniform sampler2D uShAir;
+uniform vec4 uLamp;
+uniform vec4 uLampF;
+uniform vec4 uLampV;
+uniform float uAuroraK;
+uniform vec4 uGroundK;
+uniform highp sampler2D uDabP;    // the dabs laid once (dabtex.js): a texel a dab
+uniform highp sampler2D uDabId;   // and which dabs can lie on each texel of the tile
+#endif
 // (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
 vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
 vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
@@ -140,6 +160,13 @@ vec3 pcDensity(vec3 c, float d) {
 
 // Light in four soft value steps. x in 0..1 -> level in 0..3.
 float pcLevel(float x, float soft) {
+  #ifdef PC_OIL
+    // (the oil look: a low sun still lights what faces it at all. The watercolour's steps follow the angle, so under a
+    // sun ten degrees up the flat ground is local colour at best; the reference's wood at that hour is bright gold where
+    // the sun reaches and violet where it does not. What faces the sun even a little is lit, what is turned or shaded
+    // is not, and the angle only settles the few forms in between.)
+    x = 0.30 + 0.62 * smoothstep(-0.10, 0.30, 2.0 * x - 1.0);
+  #endif
   float xs = mix(0.37 + x * 0.30, x, uDayness);   // night with no moon (an airless world, the far side seen from space): a dim, even light, nothing near black
   // Night on the ground is a picture in its own key (PAINTER 16, the M4 critique's first item: night was the day's picture
   // under a dark veil, one value from sky to boots). The moon stands where the sun is not (a full moon), the world hands
@@ -168,7 +195,53 @@ float pcLevelF(float x, float soft, float fw) { return pcLevel(x, sqrt(soft * so
 // Layer the washes for a light level:
 //   3 sunlit: the local wash diluted so paper shows, warmed by the light
 //   2 local colour   1 one cool glaze   0 two glazes, pigment pooling
+#ifdef PC_OIL
+// THE OIL LOOK'S LIGHT (docs/references/README.md: warm light against cool shade, deep darks, nothing diluted toward
+// paper). A wash's transmittance becomes a body colour by laying it heavier (richer, never greyer); the watercolour's
+// pale light and glaze keys, raised to a power, are the oil's warm light and its cool, violet shade.
+// (uOilG.w: how far THIS WORLD takes the golden hours: all the way on Earth, whose wood is the clip's; a third on the
+// others, which keep their own skies and airs: with the full gold every world's sky was the same cream at a low sun:
+// the survey of the worlds)
+// (the golden hours: with the sun under about thirty degrees the oil look's light is gold and its air a pale gold,
+// whatever the hour's own keys say: the owner's reference clip stands in that light with the sun still well up, its
+// shadows about twice as long as what throws them and half the forest floor in the sun)
+float pcGold() { return (1.0 - smoothstep(0.48, 0.86, dot(uSunDirW, uUpW))) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x) * uOilG.w; }      // (gold until the sun stands well over thirty degrees: with the sun at thirty the wood's floor has broad pools of light, as the clip's, and the air must still be gold there)
+vec3 pcOilSunC() { return mix(pow(uLight, vec3(uOilA.z)), vec3(1.0, 0.84, 0.52), 0.75 * pcGold()); }
+// (the cool key with its green drawn down: a shade leans to violet and maroon, not to slate)
+vec3 pcOilShadeC() { return pow(uGlaze, vec3(uOilA.w)) * vec3(1.0, uOilD.z, 1.0); }
+vec3 pcBody(vec3 c) { return pcDensity(c, uOilA.y); }
 vec3 pcTone(vec3 c, float level) {
+  vec3 b = pcBody(c);
+  vec3 sunC = pcOilSunC(), shC = pcOilShadeC();
+  // (the lights are laid in lighter, yellower paint than the local colour, as a painter mixes them: the body colour's
+  // full weight under a warm light turned every sunlit leaf and every sunlit patch of the floor to one orange)
+  // (the light's own colour takes three tenths of a lit paint, not four: under the golden hours' light every lit leaf
+  // went to orange-red, and the clip's lit floor is gold and yellow with orange in it)
+  vec3 lit = pcDensity(c, mix(1.0, uOilA.y, 0.42)) * mix(vec3(1.0), sunC, 0.30) * uOilB.x;
+  vec3 loc = b * mix(vec3(1.0), sunC, 0.45);
+  // (the shade is the cool key over the body colour, with a quarter of the key's own hue at the body's value: a
+  // multiply alone takes an orange floor to brown, and the reference's shadows on its leaf carpet are maroon and violet)
+  // (and the sky's own light, added: without it a shadow on an orange floor is brown; with it, maroon and violet)
+  vec3 g0 = b * shC * uOilD.x;
+  // (a shade is deep, but not a purer colour than the thing in the light: a fifth of it goes to its own grey)
+  // (measured against the clip's frames after overhauls 1 and 2: its shadow on the leaf floor is a plum, about
+  // (0.37, 0.19, 0.22), blue over green; ours was a red-brown, (0.52, 0.25, 0.12). So two fifths of a shade is a violet
+  // at the shade's own value, whatever the thing's colour)
+  // (the violet is the cool key's own hue, its green drawn down: a plum by a day's violet key, a deep blue by a night's
+  // teal one; a fixed violet turned a teal night's shadows purple)
+  vec3 shH = shC / max(dot(shC, vec3(0.3, 0.5, 0.2)), 1e-3) * vec3(1.12, 0.84, 0.84);      // (by day about (1.12, 0.73, 1.12): a plum, red and blue level; with more blue the trunks' shade stood indigo)
+  // (deeper, and half of it the key's hue: the floor's shadows were a wine red where the clip's are a violet umber)
+  vec3 g1 = mix(pcDensity(g0, 1.35), vec3(dot(g0, vec3(0.3, 0.5, 0.2))) * shH * 0.92, 0.50) + pow(uGlaze, vec3(3.0)) * vec3(1.0, 0.8, 0.75) * uOilD.y * (0.35 + 0.65 * uDayness);      // (the sky's fill less blue than the key: on a dark thing it is most of the shade, and the trunks stood indigo)
+  vec3 g2 = pcDensity(g1, 1.7);
+  vec3 r = mix(g2, g1, clamp(level, 0.0, 1.0));
+  r = mix(r, loc, clamp(level - 1.0, 0.0, 1.0));
+  r = mix(r, lit, clamp(level - 2.0, 0.0, 1.0));
+  return r;
+}
+vec3 pcToneWash(vec3 c, float level) {
+#else
+vec3 pcTone(vec3 c, float level) {
+#endif
   vec3 lit = mix(c, vec3(1.0), 0.30) * uLight;
   vec3 g1 = c * uGlaze;
   // (the deepest step is the same cool glaze over the local colour with the pigment pooled heavier, not a second
@@ -183,7 +256,19 @@ vec3 pcTone(vec3 c, float level) {
 
 // Atmospheric perspective in soft stacked bands. Returns 0..1.
 float pcFogAmount(float dist) {
+  #ifdef PC_OIL
+    // (the clip's wood stands in a thick pale air: a trunk thirty metres off is half gone. From the ship the land must
+    // read, so the thickening eases off as the air's own reach grows with the eye's height)
+    // (from the air the land must still go back into the air's colour toward the horizon: at 1.6 times, with the curve
+    // below, the land a kilometre off stood as strong as the land underfoot, and the wood from the ship was one flat
+    // sheet of colour: the stills from 150 m. So 2.4 times there, and the curve only on the ground.)
+    float pcHigh = clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 400.0, 0.0, 1.0);
+    dist *= mix(uOilC.w, 2.4, pcHigh);
+  #endif
   float f = 1.0 - exp(-dist * uFog.x);
+  #ifdef PC_OIL
+    f = mix(f * f * (3.0 - 2.0 * f), f, pcHigh);      // (on the ground: thin near the eye, where colour and detail must stand whole; thick far off)
+  #endif
   float q = f * uFog.y;
   float fl = floor(q);
   f = (fl + smoothstep(0.15, 0.85, q - fl)) / uFog.y;
@@ -191,7 +276,16 @@ float pcFogAmount(float dist) {
 }
 
 // Each distance band is lighter, cooler, lower in contrast; the far end is bare paper.
+#ifdef PC_OIL
+// (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
+// changes a thing's colour in flat steps and never softens its edge)
+// (the gold air a step deeper than it was: the clip's far air reads about (0.77, 0.69, 0.60), ours was nearly white)
+vec3 pcOilHaze(vec3 h) { return mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold()); }
+vec3 pcAtmos(vec3 c, float f) { return mix(c, pcOilHaze(uHaze), f); }
+vec3 pcAtmosWash(vec3 c, float f) {
+#else
 vec3 pcAtmos(vec3 c, float f) {
+#endif
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62 * (1.0 - uAirNear.x));   // (dust is warm: it does not cool)
   return mix(cool, uHaze, f);
@@ -204,7 +298,18 @@ vec3 pcHazeAt(vec3 viewPos) {
   float e = clamp(dot(normalize(viewPos), mat3(viewMatrix) * uUpW), 0.0, 1.0);
   return mix(uHaze, uHazeUp.rgb, uHazeUp.a * smoothstep(0.03, 0.20, e));
 }
+#ifdef PC_OIL
 vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
+  vec3 h = pcOilHaze(pcHazeAt(viewPos));
+  vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+  float toward = pow(max(dot(normalize(viewPos), sunV), 0.0), 3.0) * uDayness * (1.0 - uMoon) * (1.0 - uWx.x);
+  h = mix(h, min(mix(pcOilSunC(), vec3(1.0), 0.5) * 1.05, vec3(1.0)), toward * uOilC.y);
+  return mix(c, h, f);
+}
+vec3 pcAtmosVWash(vec3 c, float f, vec3 viewPos) {
+#else
+vec3 pcAtmosV(vec3 c, float f, vec3 viewPos) {
+#endif
   float l = dot(c, vec3(0.3, 0.5, 0.2));
   vec3 cool = mix(c, vec3(l) * vec3(0.86, 0.95, 1.10), min(1.0, f * 1.6) * 0.62 * (1.0 - uAirNear.x));   // (dust is warm: it does not cool)
   return mix(cool, pcHazeAt(viewPos), f);
@@ -229,7 +334,16 @@ float pcDappleE() { return smoothstep(0.20, 0.40, pcFp / 4.1); }
 // sun is the same at every size: flecks of a few pixels, never a hatch. Under 500 m nothing changes.)
 vec3 pcDappleOct() { float ld = log2(max(pcDist / 500.0, 1.0)), l0 = floor(ld); return vec3(13.0 * exp2(l0), smoothstep(0.2, 0.8, ld - l0), 0.0); }
 float pcDappleSub() { vec3 o = pcDappleOct(); return 0.4624 * pcSub(o.x * (1.0 + o.y), PC_NRG) + 0.1024 * mix(pcSub(4.1, PC_NRG), PC_NRG.x, pcDappleE()); }
+#ifdef PC_OIL
+float pcDappleS(vec3 bodyPos, float canopy, float lift, float w);
+float pcSunAt(vec3 bodyPos, float canopy, float lift, float w);
+// (the oil look: one shadow for everything, the strokes' own, as the pixel sees it; a blade of grass in a patch of
+// sun on the painted floor stood in the watercolour pattern's shade)
+float pcDappleL(vec3 bodyPos, float canopy, float lift) { return pcSunAt(bodyPos, canopy, lift, max(pcFp, 0.02)); }
+float pcDappleLWash(vec3 bodyPos, float canopy, float lift) {
+#else
 float pcDappleL(vec3 bodyPos, float canopy, float lift) {
+#endif
   vec3 pp = bodyPos + uSunDirL * (lift / max(dot(normalize(bodyPos), uSunDirL), 0.22));
   vec3 o = pcDappleOct();
   float b = mix(texture(uNoise3D, pp / 4.1 + 0.37).g, 0.5, pcDappleE());
@@ -247,6 +361,97 @@ float pcDappleL(vec3 bodyPos, float canopy, float lift) {
   return mix(s, 1.0 - 0.42 * canopy, uWx.x);
 }
 float pcDapple(vec3 bodyPos, float canopy) { return pcDappleL(bodyPos, canopy, 8.0); }
+#ifdef PC_OIL
+// The leaf shadow for one stroke of the oil look (width w, read at the stroke's centre: no derivative is taken there):
+// the same pattern as pcDappleL, with a clean edge, so a stroke lies in the sun or in the shade whole. Under a low sun
+// the pattern is drawn out along the sun's bearing, as the shadows of trunks and crowns are: up to five times at
+// eleven degrees and under.
+float pcDappleS(vec3 bodyPos, float canopy, float lift, float w) {
+  vec3 up = normalize(bodyPos);
+  float se = dot(up, uSunDirL);
+  vec3 pp = bodyPos + uSunDirL * (lift / max(se, 0.22));
+  vec3 hd = uSunDirL - up * se;
+  float hl = length(hd);
+  if (hl > 1e-4) {
+    float stretch = clamp(hl / max(se, 0.02), 1.0, 5.0);
+    pp -= (hd / hl) * dot(pp, hd / hl) * (1.0 - 1.0 / stretch);
+  }
+  float a = textureLod(uNoise3D, pp / 13.0, log2(max(64.0 * w / 13.0, 1.0))).r;
+  float b = textureLod(uNoise3D, pp / 4.1 + 0.37, log2(max(64.0 * w / 4.1, 1.0))).g;
+  float th = mix(0.05, 0.585, canopy);
+  float s = smoothstep(th - 0.015, th + 0.015, a * 0.68 + b * 0.32);
+  return mix(s, 1.0 - 0.42 * canopy, uWx.x);
+}
+// The lantern's pool (the wanderer's, by night): a stroke within a few metres of the lantern is painted in its warm
+// light, whole; at the pool's edge, where the warm light runs into the night's blue, a ring of strokes between the two
+// (yellow-green on snow, as in the clip). paint: the stroke as the night has it; wash: its own colour; r: its number.
+vec3 pcLamp(vec3 paint, vec3 wash, vec3 body, float r) {
+  if (uLamp.w < 0.01) return paint;
+  // (a modest pool, a few metres across, whose edge is broken stroke by stroke into the night: each stroke takes its
+  // distance a metre and a half nearer or farther by its own number)
+  float d = length(body - uLamp.xyz) + (r - 0.5) * 1.0;
+  float k = uLamp.w * (1.0 - smoothstep(0.2, 5.4, d));
+  if (k < 0.004) return paint;
+  // (the wanderer's own shadow by the lantern, as in the clip's night: a dark streak on the lit snow from the feet away
+  // from the lantern, widening as it goes; a stroke lies in it or out of it whole)
+  if (uLampF.w > 0.5) {
+    vec3 upL = normalize(uLamp.xyz);
+    vec3 la = uLampF.xyz - uLamp.xyz; la -= upL * dot(la, upL);
+    vec3 ld = la / max(length(la), 1e-3);
+    vec3 lq = body - uLampF.xyz; lq -= upL * dot(lq, upL);
+    float ls = dot(lq, ld), lside = length(lq - ld * ls);
+    k *= 1.0 - 0.9 * step(-0.08 + (r - 0.5) * 0.08, ls) * step(lside, (0.12 + (r - 0.5) * 0.06) * (1.0 + max(ls, 0.0) / 0.55));
+  }
+  // THE POOL, AS THE CLIP'S (looked at again beside ours when the owner said "but still use the reference video as
+  // well", 2026-11-16): a warm, QUIET light, cream and pale gold at the feet, that dies away over five metres through
+  // tan into the night's own colour; no hard ring anywhere, and nothing in it a pure orange. Every stroke is still one
+  // flat colour: how far the light has taken it is asked at its own centre, a little more or less by its own number,
+  // so the falling-off is made of whole strokes. (Laid before this: a flat mustard disc; broad rings with a yellow-green
+  // one; then two hard steps of saturated orange and yellow, which beside the clip was a traffic sign on the snow.)
+  float wl = dot(wash, vec3(0.3, 0.5, 0.2));
+  vec3 warm = min(mix(pcDensity(wash, 1.15) * vec3(1.24, 0.93, 0.56) + vec3(0.06, 0.03, 0.0), vec3(0.97, 0.79, 0.45) * (0.80 + 0.35 * wl), 0.5), vec3(1.0));      // (a gold, as the clip's; a step yellower and it was lemon)
+  warm *= 0.92 + 0.13 * fract(r * 7.3);
+  float kk = clamp(k * 1.12 + (fract(r * 5.1) - 0.5) * 0.22, 0.0, 1.0);
+  return mix(paint, warm, kk * kk * (3.0 - 2.0 * kk) * 0.94);
+}
+// The sun at a place on the body, for one stroke (1 in the sun .. 0 in the shade): where the shadow map covers the place
+// (shadow.js), what the map says, whole; beyond its square, and when there is no map, the leaf shadow's pattern.
+float pcSunAt(vec3 bodyPos, float canopy, float lift, float w) {
+  if (uShK.x >= 0.004) {
+    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+    vec2 a = abs(q.xy);
+    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+    if (inside >= 0.004) {
+      float lit = step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r);
+      // (well inside the map's square the pattern is not worked out at all)
+      if (inside > 0.996) return lit;
+      return mix(pcDappleS(bodyPos, canopy, lift, w), lit, inside);
+    }
+  }
+  return pcDappleS(bodyPos, canopy, lift, w);
+}
+// The sun on the GROUND for one stroke, from the shadow map taken down and smoothed (shadow.js AIR_FRAG: the share of a
+// patch about half a metre across that something shades). A stroke is in the shade where more than about a half
+// of its patch is, each stroke by its own number a little sooner or later. So the canopy throws masses of shade with
+// pools of light between them, and no single leaf's gap is a fleck of light: asked of the fine map, the floor under a
+// crown was a spatter of single lit dabs, and the shadows of bare trunks, ruled lines (the critic's "bar code").
+// r: the stroke's number.
+float pcSunAtSoft(vec3 bodyPos, float canopy, float lift, float w, float r) {
+  if (uShK.x >= 0.004) {
+    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+    vec2 a = abs(q.xy);
+    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+    if (inside >= 0.004) {
+      vec2 f = textureLod(uShAir, q.xy * 0.5 + 0.5, 0.5).rg;
+      float cov = f.r * step(f.g / max(f.r, 1e-3) - 0.0006, q.z);
+      float lit = step(cov, 0.40 + 0.26 * r);
+      if (inside > 0.996) return lit;
+      return mix(pcDappleS(bodyPos, canopy, lift, w), lit, inside);
+    }
+  }
+  return pcDappleS(bodyPos, canopy, lift, w);
+}
+#endif
 
 // The shade the explorer and the ship lay on the ground: a soft-edged glaze under and beside
 // them (0 none .. 1 full), so they stand on the land instead of floating over it. rag: any
@@ -258,6 +463,9 @@ float pcCast(vec3 bodyPos, float rag) {
   vec3 up = normalize(bodyPos);
   for (int i = 0; i < 2; i++) {
     float k = i == 0 ? uCastK.x : uCastK.y;
+    #ifdef PC_OIL
+      k *= 1.0 - uShK.x;      // (the oil look: while the shadow map is on the figures throw their real shadows into it, shadow.js)
+    #endif
     if (k < 0.004) continue;
     vec4 A = uCast[i * 2], B = uCast[i * 2 + 1];
     vec3 dd = bodyPos - A.xyz;
@@ -280,6 +488,300 @@ float pcSnowCover(float upness, float rag, float shelter) {
   float th = mix(1.12, 0.40, uWx.z) + shelter * 0.22;
   return smoothstep(th, th + 0.10, upness * 0.62 + rag * 0.42) * step(0.004, uWx.z);
 }
+
+#ifdef PC_OIL
+// ---- THE OIL LOOK'S STROKES -------------------------------------------------------------------------------------------
+// A stroke is a patch of ONE flat colour with a clean edge, laid on the surface itself (docs/references/README.md, "what
+// the clip does" and the crispness rule): it stays where it is when the eye moves and it is smaller far off. The strokes
+// of a surface are a course of bricks over a chart of it (two coordinates in metres that lie in the surface): rows one
+// stroke wide, each brick a stroke long, every row shifted and every joint moved at random, the chart itself bent by a
+// slow noise so that no row runs straight. Everything that colours a stroke is read at the stroke's own centre, so the
+// stroke is flat; its edge is drawn from the chart's screen derivatives, a pixel wide at any size and any slant.
+//
+// The size: a stroke is meant to be uOilA.x pixels wide (at 720 lines) wherever it is, so the strokes are laid in
+// octaves of the distance, each twice the size of the last. Between two octaves no two layers are blended: a stroke of
+// the finer layer is there or it is not (each by its own number), and where it is not, the coarser layer shows.
+vec3 pcHash3(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.xxy + q.yzz) * q.zyx);
+}
+// One layer. p: the chart in units of a stroke's width; asp: a stroke's length over its width; sx, sy: chart units a
+// pixel along the chart's two axes (from its screen derivatives). Out: the stroke's three numbers, its centre in the
+// chart's units, and how far inside its edge the pixel lies, in pixels.
+void pcBrick(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float edgePx) {
+  float row = floor(p.y);
+  vec3 hr = pcHash3(vec2(row, 7.31));
+  float sh = hr.x * 17.0 + 0.5 * row;
+  // (the joints lean, each row its own way: a stroke ends where the brush was lifted, not on a ruled line)
+  float x = (p.x + (p.y - row - 0.5) * (hr.z - 0.5) * 1.3) / asp + sh;
+  float col = floor(x);
+  const float J = 0.56;
+  float jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J;
+  float jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J;
+  if (x < jl) { col -= 1.0; jr = jl; jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J; }
+  else if (x > jr) { col += 1.0; jl = jr; jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J; }
+  rnd = pcHash3(vec2(col + 0.37, row + 0.71));
+  ctr = vec2((0.5 * (jl + jr) - sh) * asp, row + 0.5);
+  float ex = min(x - jl, jr - x) * asp / max(spx.x, 1e-6);
+  float ey = min(p.y - row, row + 1.0 - p.y) / max(spx.y, 1e-6);
+  edgePx = min(ex, ey);
+}
+// The octave of the distance: x the finer layer's stroke width (m), y how far toward the coarser one (0..1).
+vec2 pcStrokeOct(float dist, float w0) {
+  float want = max(dist, 0.05) * uOilPx.x * uOilA.x * uOilPx.y / 720.0;     // metres wide to be that many pixels
+  // (from the ship the strokes are laid broader, up to 1.7 times from where the air's reach has grown to a kilometre and
+  // a half: a stroke is then a clump of trees or a patch of a field, and fewer of them lie at the size of a pixel, where
+  // they flickered under a moving eye; checkpoint 1's flicker index, the log on r2)
+  want *= 1.0 + 0.7 * clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 1300.0, 0.0, 1.0);
+  float l = log2(max(want / w0, 1.0)), l0 = floor(l);
+  return vec2(w0 * exp2(l0), l - l0);
+}
+// The same with the octave's own numbers, for strokes that come and go whole (pcDabs): x the finer layer's width, y how
+// far toward the coarser, z the octave's number, w the distance's own number before it is cut to octaves (it runs on
+// smoothly over the land, so its screen derivatives carry it to a stroke's centre).
+vec4 pcStrokeOct4(float dist, float w0) {
+  float want = max(dist, 0.05) * uOilPx.x * uOilA.x * uOilPx.y / 720.0;
+  want *= 1.0 + 0.7 * clamp((1.0 / max(uFog.x, 1e-6) - 200.0) / 1300.0, 0.0, 1.0);
+  float lu = log2(want / w0), l0 = floor(max(lu, 0.0));
+  return vec4(w0 * exp2(l0), max(lu, 0.0) - l0, l0, lu);
+}
+// The same for a surface whose strokes may not grow past wmax (m): bark, a blade. x the finer layer's width, y how far
+// toward the coarser, z 1 while a stroke is still a few pixels wide .. 0 where the strokes have shrunk under the pixel
+// (there the surface is laid in its mean colour: nothing finer than a pixel is drawn).
+vec3 pcStrokeOctCap(float dist, float w0, float wmax) {
+  vec2 o = pcStrokeOct(dist, w0);
+  if (o.x >= wmax) { o.x = wmax; o.y = 0.0; }
+  float px = o.x / (max(dist, 0.05) * uOilPx.x);
+  return vec3(o, smoothstep(1.3, 3.4, px));
+}
+// A stroke (its paint, and how much of the pixel it covers) laid over what is already there: in the hairline round
+// a stroke what lies under shows a step darker, never lighter (two layers lit apart made bright cracks in a shade).
+vec3 pcLay(vec3 under, vec3 paint, float cover, float present) {
+  return mix(under * mix(1.0, uOilD.w, present * (1.0 - cover)), paint, cover * present * uOilC.z);
+}
+// How much of the pixel a stroke covers, from how far inside its edge it lies (pixels): a clean edge one pixel wide,
+// with a hairline between two strokes for what lies under them.
+float pcStrokeCover(float edgePx) {
+  float g = max(0.5 * uOilB.y * uOilA.x * uOilPx.y / 720.0, 0.35);
+  return smoothstep(g - 0.6, g + 0.6, edgePx);
+}
+// A value known at the pixel, carried to a point ds pixels away along the surface (a stroke's centre).
+#define PC_AT(v, ds) ((v) + dFdx(v) * (ds).x + dFdy(v) * (ds).y)
+// The pixels from here to a place dc chart units away (dpx, dpy: the chart's screen derivatives), kept inside lim px.
+vec2 pcChartToPx(vec2 dc, vec2 dpx, vec2 dpy, float lim) {
+  float det = dpx.x * dpy.y - dpx.y * dpy.x;
+  if (abs(det) < 1e-12) return vec2(0.0);
+  vec2 ds = vec2(dpy.y * dc.x - dpy.x * dc.y, -dpx.y * dc.x + dpx.x * dc.y) / det;
+  float l = length(ds);
+  return l > lim ? ds * (lim / l) : ds;
+}
+// One layer of strokes over a chart. ch: the chart (m); dcx, dcy: its screen derivatives; w: a stroke's width (m); asp:
+// its length over its width; bendP: a place the chart's slow bend is anchored to (m); lim: the farthest a centre is
+// looked for (pixels). Out: the stroke's three numbers, the pixels from here to its centre, how much of the pixel it
+// covers. (Everything here that takes a screen derivative runs for every pixel alike: call it outside any branch.)
+void pcStrokeLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, out vec3 rnd, out vec2 ds, out float cover) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * 34.0) + 0.19).rg - 0.5) * 5.6;
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  // (and the rows themselves waver)
+  float wv = 0.83 * p.x + 1.7 * sin(0.61 * p.y);
+  p.y += 0.22 * sin(wv);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr; float ePx;
+  pcBrick(p, asp, spx, rnd, ctr, ePx);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+  cover = pcStrokeCover(ePx);
+}
+// DABS (the owner's word on the first stills: "too wide and too outlined ... almost exactly like the video"). The
+// reference's forest floor is not a course of tiles: it is leaf-shaped dabs, pointed at both ends, lying every way, one
+// over another, with no line between them. A layer of dabs: two in every cell of a grid one dab wide, each anywhere in
+// its cell, turned its own way, a little longer or shorter; where two lie over one another the one with the higher
+// number is on top.
+// THE LAYER IS LAID ONCE (dabtex.js; the overhaul plan's "strokes baked"): the dabs of a tile of PC_DAB_N cells, and for
+// every texel of it the four topmost dabs that can lie there. A pixel reads its texel and tries those (most often one or
+// two of them), where it
+// tried eighteen with their random numbers before. The picture is the same kind; a pixel's work is a fraction.
+// A DAB COMES AND GOES WHOLE: toward the next octave of the distance the finer layer's dabs are left out one by one, each
+// by its own number. Whether a dab is there is asked at the dab's centre (the distance's number carried there), so no
+// dab is cut where the answer changes across it, and a dab that is about to go has first grown small: nothing pops
+// under a moving eye (checkpoint 1's flicker from the ship).
+#define PC_DAB_N 32.0
+#define PC_DAB_T 32.0
+// One of a texel's four. code: which of the eighteen round the cell; p: the chart in cells; asp: a dab's length over
+// its width; dpx, dpy: the chart's screen derivatives; oc: the distance's number at the pixel less the octave's, and
+// its screen derivatives (pcStrokeOct4); ab: the share left out is ab.x + ab.y * (how far toward the next octave).
+bool pcDabHit(float code, vec2 cell, vec2 p, float asp, vec2 dpx, vec2 dpy, vec2 ipx, float lim, vec3 oc, vec2 ab, out vec3 rnd, out vec2 o, out vec2 ds, out float ePx) {
+  float k = mod(code, 2.0), ij = floor(code * 0.5 + 0.01);
+  vec2 c = cell + vec2(mod(ij, 3.0), floor(ij / 3.0 + 0.01)) - 1.0;
+  vec2 cw = mod(c, PC_DAB_N);
+  vec4 P = texelFetch(uDabP, ivec2(int(cw.x + 0.5) * 2 + int(k + 0.5), int(cw.y + 0.5)), 0);
+  o = c + P.xy;
+  vec2 d = p - o;
+  ds = pcChartToPx(-d, dpx, dpy, lim);
+  // (is it there: its number against the share left out where its centre lies; near going, it is small)
+  float gone = clamp(ab.x + ab.y * smoothstep(0.15, 0.85, oc.x + dot(oc.yz, ds)), 0.0, 1.0);
+  float sz = clamp((P.a - gone * 1.12 + 0.12) / 0.12, 0.0, 1.0);
+  if (sz <= 0.0) return false;
+  // (it comes at a little over half its size and grows: grown from nothing, the youngest dabs were clusters of dots)
+  sz = mix(0.58, 1.0, sz);
+  float cs = cos(P.z), sn = sin(P.z);
+  vec2 q = vec2(cs * d.x + sn * d.y, cs * d.y - sn * d.x);
+  // (a dab is as long as its cell, a little more or less, and asp times narrower: dabtex.js dabSize)
+  float a = (0.62 + 0.36 * fract(P.a * 16.0)), b = a / asp * (0.8 + 0.4 * fract(P.a * 256.0));
+  a *= sz; b *= sz;
+  float t = q.x / a;
+  if (abs(t) >= 1.0) return false;
+  float inside = b * (1.0 - t * t) - abs(q.y);
+  if (inside <= 0.0) return false;
+  // (how far inside the edge, in pixels: across the dab, and from its ends)
+  ePx = min(inside * length(vec2(-sn, cs) * ipx), (a - abs(q.x)) * length(vec2(cs, sn) * ipx));
+  // (its own three numbers, from where it lies on the world: the tile repeats, a dab's colour does not)
+  rnd = pcHash3(c + k * 31.7);
+  return true;
+}
+// One layer of dabs over a chart. ch: the chart (m); dcx, dcy: its screen derivatives; w: a dab's cell (half its
+// length, m); asp: its length over its width; lim: the farthest a centre is looked for (pixels); oc, ab: see pcDabHit.
+// Out: the top dab's numbers, its centre on the chart (m: the SAME for every pixel of the dab, to the last bit), the
+// pixels from here to that centre and how much of the pixel the dab covers (a clean edge a pixel wide; 0: no dab here),
+// and the numbers of the dab under it (has2: whether there is one).
+// (The dabs' chart is not bent by a slow noise as the tiles' is: dabs lie every way and have no rows to hide, and with
+// no bend a dab's centre is known exactly. A centre carried there by derivatives differed by a centimetre or two from
+// pixel to pixel, and under a crown, where the shadow map changes from texel to texel, half the pixels of a dab found
+// it in the sun and half in the shade: a dab of dots, seen in the first stills of the baked strokes.)
+// (No derivative is taken in here: it may be called inside a branch.)
+void pcDabLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, float lim, vec3 oc, vec2 ab,
+                out vec3 rnd1, out vec2 ctr, out vec2 ds, out float cov1, out vec3 rnd2, out float has2) {
+  vec2 p = ch / w;
+  vec2 dpx = dcx / w, dpy = dcy / w;
+  vec2 ipx = 1.0 / max(vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y))), vec2(1e-6));
+  rnd1 = vec3(0.5); rnd2 = vec3(0.5); has2 = 0.0; cov1 = 0.0; ds = vec2(0.0); ctr = ch;
+  if (ab.x >= 0.999 && ab.y >= 0.0) return;
+  vec2 cell = floor(p);
+  vec2 tf = min(floor((p - cell) * PC_DAB_T), PC_DAB_T - 1.0);
+  vec4 ids = floor(texelFetch(uDabId, ivec2(mod(cell, PC_DAB_N) * PC_DAB_T + tf + 0.5), 0) * 255.0 + 0.5);
+  vec3 r; vec2 o, dsc; float e; bool got = false;
+  for (int s = 0; s < 4; s++) {
+    float code = ids[s];
+    if (code > 17.5) break;
+    if (pcDabHit(code, cell, p, asp, dpx, dpy, ipx, lim, oc, ab, r, o, dsc, e)) {
+      if (!got) { rnd1 = r; ctr = o * w; ds = dsc; cov1 = clamp(e, 0.0, 1.0); got = true; if (cov1 >= 0.999) break; }
+      else { rnd2 = r; has2 = 1.0; break; }
+    }
+  }
+}
+// A dab's own colour from the wash it is laid in: heavier or lighter, toward the warm or toward the cool.
+// leafy: 0 ground, rock, bark .. 1 leaves, which stray farther: here and there one is red, or still green.
+vec3 pcDabTint(vec3 c, vec3 rnd, float leafy) {
+  c = pcDensity(c, 1.0 + (rnd.x - 0.5) * 1.1 * uOilB.z);
+  c *= mix(vec3(1.0), mix(vec3(1.10, 0.98, 0.80), vec3(0.88, 0.97, 1.10), rnd.y), 0.6 * uOilB.z);
+  float odd = fract(rnd.y * 17.3);
+  c *= mix(vec3(1.0), vec3(1.12, 0.66, 0.50), leafy * step(0.93, odd) * uOilB.z);
+  c *= mix(vec3(1.0), vec3(0.78, 1.06, 0.52), leafy * step(odd, 0.13) * uOilB.z);
+  return clamp(c, 0.0, 1.0);
+}
+// THIN STROKES (the owner, 2026-11-15: "thinner than the video ... copy how the lines are used"). A course of long thin
+// strokes that run the way the surface runs, with nothing drawn between them: where two meet, each gives way to the
+// other over one pixel. p: the chart in stroke widths (the strokes run along its first axis); asp: length over width.
+// Out: the stroke's numbers and centre, how much of the pixel is its own (1 inside, a half on its edge), and the
+// numbers of the stroke that has the rest.
+// (pcThinR: the same with rag, how ragged a stroke's two ends are (0: cut straight; 0.09: the uneven end a loaded
+// knife leaves), and uv out: where in its stroke the pixel lies, x along it and y across it, each 0..1)
+void pcThinR(vec2 p, float asp, vec2 spx, float rag, out vec3 rnd, out vec2 ctr, out float own, out vec3 rndN, out vec2 uv) {
+  // (the rows are of unequal width)
+  p.y += 0.27 * sin(1.7 * p.y + 0.9 * sin(0.21 * p.x));
+  float row = floor(p.y);
+  vec3 hr = pcHash3(vec2(row, 7.31));
+  float sh = hr.x * 17.0 + 0.5 * row;
+  const float J = 0.6, LEAN = 2.6;
+  float vr = p.y - row;
+  float x = (p.x + (vr - 0.5) * (hr.z - 0.5) * LEAN) / asp + sh + rag * (0.7 * sin(vr * 7.0 + hr.y * 6.283) + 0.3 * sin(vr * 15.0 + hr.x * 9.0));      // (a slow wave and a quicker one: an end drawn off by the knife; quick waves alone were a comb of little steps)
+  float col = floor(x);
+  float jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J;
+  float jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J;
+  if (x < jl) { col -= 1.0; jr = jl; jl = col + (pcHash3(vec2(col, row)).y - 0.5) * J; }
+  else if (x > jr) { col += 1.0; jl = jr; jr = col + 1.0 + (pcHash3(vec2(col + 1.0, row)).y - 0.5) * J; }
+  rnd = pcHash3(vec2(col + 0.37, row + 0.71));
+  ctr = vec2((0.5 * (jl + jr) - sh) * asp, row + 0.5);
+  uv = vec2((x - jl) / max(jr - jl, 1e-4), vr);
+  vec2 ipx = 1.0 / max(spx, vec2(1e-6));
+  float eL = (x - jl) * asp * ipx.x, eR = (jr - x) * asp * ipx.x, eB = (p.y - row) * ipx.y, eT = (row + 1.0 - p.y) * ipx.y;
+  float e = min(min(eL, eR), min(eB, eT));
+  own = clamp(0.5 + e, 0.0, 1.0);
+  rndN = rnd;
+  if (e < 0.5) {
+    if (e == eL) rndN = pcHash3(vec2(col - 1.0 + 0.37, row + 0.71));
+    else if (e == eR) rndN = pcHash3(vec2(col + 1.0 + 0.37, row + 0.71));
+    else {
+      float rN = e == eB ? row - 1.0 : row + 1.0;
+      vec3 hN = pcHash3(vec2(rN, 7.31));
+      float xN = (p.x + (p.y - rN - 0.5) * (hN.z - 0.5) * LEAN) / asp + hN.x * 17.0 + 0.5 * rN;
+      float cN = floor(xN);
+      float l2 = cN + (pcHash3(vec2(cN, rN)).y - 0.5) * J;
+      if (xN < l2) cN -= 1.0;
+      else if (xN > cN + 1.0 + (pcHash3(vec2(cN + 1.0, rN)).y - 0.5) * J) cN += 1.0;
+      rndN = pcHash3(vec2(cN + 0.37, rN + 0.71));
+    }
+  }
+}
+void pcThin(vec2 p, float asp, vec2 spx, out vec3 rnd, out vec2 ctr, out float own, out vec3 rndN) { vec2 uv; pcThinR(p, asp, spx, 0.0, rnd, ctr, own, rndN, uv); }
+// One layer of thin strokes over a chart (the arguments as pcStrokeLayer's; w: a stroke's width, m).
+// bend: how far the slow noise bends the rows, in stroke widths (9: the ground's flow, whose strokes swell and thin with
+// it to about twice and half their width; 2: bark, whose streaks keep their width)
+// (bend below 0: a SLOW, WIDE bend, minus that many stroke widths over a reach five times as long: the strokes sweep in
+// long arcs, as wind-laid snow does, where the quick bend makes them ripple as water does)
+void pcThinLayer(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, float bend, out vec3 rnd, out vec2 ds, out float own, out vec3 rndN) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * (bend < 0.0 ? 300.0 : 60.0)) + 0.19).rg - 0.5) * abs(bend);
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr;
+  pcThin(p, asp, spx, rnd, ctr, own, rndN);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+}
+// The same, for strokes that are painted as THINGS LAID ON (snow, materials.js): rag as pcThinR's; out as well where in
+// its stroke the pixel lies (uv) and how many pixels wide the stroke is there (pxW).
+void pcThinLayerUV(vec2 ch, vec2 dcx, vec2 dcy, float w, float asp, vec3 bendP, float lim, float bend, float rag,
+                   out vec3 rnd, out vec2 ds, out float own, out vec3 rndN, out vec2 uv, out float pxW) {
+  vec2 wn = (texture(uNoise3D, bendP / (w * (bend < 0.0 ? 300.0 : 60.0)) + 0.19).rg - 0.5) * abs(bend);
+  vec2 p = ch / w + wn;
+  vec2 dpx = dcx / w + dFdx(wn), dpy = dcy / w + dFdy(wn);
+  vec2 spx = vec2(length(vec2(dpx.x, dpy.x)), length(vec2(dpx.y, dpy.y)));
+  vec2 ctr;
+  pcThinR(p, asp, spx, rag, rnd, ctr, own, rndN, uv);
+  ds = pcChartToPx(ctr - p, dpx, dpy, lim);
+  pxW = 1.0 / max(spx.y, 1e-6);
+}
+// The chart of a world's ground: metres along the sphere on the face of the cube the place lies on (equal angles), so
+// the same place has the same chart from every patch of terrain and at every height. body: body-local metres.
+vec2 pcGroundChart(vec3 body, float R) {
+  vec3 a = abs(body);
+  vec3 q = a.x >= a.y && a.x >= a.z ? vec3(body.y, body.z, a.x) : a.y >= a.z ? vec3(body.z, body.x, a.y) : vec3(body.x, body.y, a.z);
+  return R * atan(q.xy, vec2(q.z));
+}
+// How the ground's chart changes for a change db of the place (the same laying as pcGroundChart). A derivative of the
+// chart is NOT taken from the chart itself: the body's own coordinates are kilometres, known to half a millimetre, and
+// their difference from one pixel to the next is a few millimetres near the eye: a tenth of it noise. The place's
+// derivative is taken from a position measured from the eye (a varying of its own) and carried through here.
+vec2 pcGroundChartD(vec3 body, vec3 db, float R) {
+  vec3 a = abs(body);
+  vec3 q, dq;
+  if (a.x >= a.y && a.x >= a.z) { q = vec3(body.y, body.z, a.x); dq = vec3(db.y, db.z, db.x * sign(body.x)); }
+  else if (a.y >= a.z) { q = vec3(body.z, body.x, a.y); dq = vec3(db.z, db.x, db.y * sign(body.y)); }
+  else { q = vec3(body.x, body.y, a.z); dq = vec3(db.x, db.y, db.z * sign(body.z)); }
+  return R * (q.z * dq.xy - q.xy * dq.z) / (q.z * q.z + q.xy * q.xy);
+}
+// The way from the body's centre to the place whose chart is ch, on the face that body lies on (pcGroundChart undone).
+vec3 pcGroundUnchart(vec3 body, vec2 ch, float R) {
+  vec3 a = abs(body);
+  vec2 t = tan(ch / R);
+  vec3 d = a.x >= a.y && a.x >= a.z ? vec3(sign(body.x), t.x, t.y) : a.y >= a.z ? vec3(t.y, sign(body.y), t.x) : vec3(t.x, t.y, sign(body.z));
+  return normalize(d);
+}
+// A noise channel read for a stroke of width w (m) at its centre: no derivative is taken there (the centre jumps from
+// stroke to stroke), the level is the stroke's own size, so what is finer than the stroke is averaged.
+vec4 pcNoiseS(vec3 p, float scale, float w) { return textureLod(uNoise3D, p / scale, log2(max(64.0 * w / scale, 1.0))); }
+#endif
 
 // Triplanar lookup into the stroke atlas (p in metres, anchored; n body-local normal).
 vec4 pcTri(vec3 p, vec3 n, float scale) {

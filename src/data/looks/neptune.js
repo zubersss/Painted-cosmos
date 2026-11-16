@@ -18,6 +18,11 @@ export default {
   // ecliptic alike; six belts with less push at their edges, the dark belt a step lighter (0.27, 0.35, 0.74 before), the
   // streaks at 0.15, and no sunlit wash on the deck (`matte`): no arc is lighter than the wash beside it)
   deck: { height: 310, belts: 6, wobble: 0.11, a: [0.50, 0.62, 0.93], b: [0.33, 0.42, 0.80], streaks: 0.15, wet: 0.6, axis: [-0.707, 0.707, 0], matte: 1 },
+  // (the oil look: this world's ground is laid in long strokes that run with the land, the snow of the owner's reference clip)
+  // (and its night is the clip's: a deep green-blue sky, turquoise snow with deep blue shade; measured on the clip's
+  // night frames, where nothing is violet)
+  oil: { ground: 'snow', grass: 0.25,
+    night: { zenith: [0.03, 0.17, 0.19], horizon: [0.08, 0.29, 0.32], haze: [0.08, 0.27, 0.32], glaze: [0.40, 0.60, 0.86], light: [0.70, 0.92, 0.96], grade: [0.78, 0.93, 0.95] } },
   sky: mkSky([0.34, 0.46, 0.84], [0.82, 0.89, 0.98], { glaze: [0.60, 0.64, 0.88], light: [0.95, 0.97, 1.0] }),
   flora: {
     tall: [
@@ -26,6 +31,15 @@ export default {
       { kit: 'kelp', scale: 1.1, vary: 1, double: 1, bark: [[0.52, 0.46, 0.82], [0.20, 0.20, 0.46]], leaf: [[0.78, 0.72, 0.94], [0.48, 0.44, 0.80], [0.20, 0.21, 0.48]], leafP: [0.6, 0.1, 1.0, 0.7], wind: 0.5, far: [5, 10, 0.5], obs: [0.4, 9] },
       // the ice spires: paper on the windward faces, a deep cobalt glaze on the lee
       { kit: 'spire', scale: 2.1, slim: 1, bark: [[0.92, 0.96, 0.99], [0.30, 0.42, 0.78]], leaf: [[0.92, 0.96, 0.99], [0.66, 0.76, 0.94], [0.30, 0.42, 0.78]], far: [5, 14, 0.9], obs: [1.4, 13] },
+    ],
+    // THE TREES OF THE SNOW (the oil look only: data/mode.js overlayOil; the owner's two pictures of 2026-11-16, described
+    // in docs/references/README.md on r2): a fir, dark green and full to the ground, every bough loaded with snow; a
+    // bare slender tree ending in a haze of twigs, its stem pale violet-blue, or (six in ten) dark plum. Their "leaf"
+    // washes: the fir's needles; the bare tree's twigs.
+    tallOil: [
+      { kit: 'conifer', fir: 1, snowy: 1, double: 1, bark: [[0.50, 0.40, 0.42], [0.28, 0.22, 0.28]], leaf: [[0.40, 0.60, 0.44], [0.28, 0.50, 0.42], [0.20, 0.36, 0.40]], barkP: [0.50, 1, 0.9, 0.6], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.05, farD: [5.2, 8.6, 0.86], obs: [0.30, 8.5] },
+      { kit: 'broadleaf', bare: 1, double: 1, bark: [[0.80, 0.78, 0.94], [0.46, 0.40, 0.66]], leaf: [[0.56, 0.46, 0.60], [0.42, 0.32, 0.48], [0.30, 0.22, 0.36]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.9, 0.5, 1.0, 0.25], wind: 0.09,
+        dark: [0.6, [0.46, 0.34, 0.44], [0.24, 0.16, 0.26]], farD: [3.4, 8.0, 0.30], obs: [0.22, 8] },
     ],
     under: { leaf: [[0.62, 0.74, 0.70], [0.44, 0.58, 0.66], [0.30, 0.40, 0.58]], accent: [0.92, 0.90, 0.50], bush: [[0.52, 0.60, 0.80], [0.38, 0.44, 0.70], [0.24, 0.28, 0.54]], rock: [[0.50, 0.52, 0.62], [0.22, 0.24, 0.36]], shard: [[0.92, 0.96, 0.99], [0.56, 0.70, 0.92]],
       // the kelp wood's floor: wrack torn off by the gales, sea pinks and pale stars in drifts, lichen
@@ -52,6 +66,11 @@ export default {
     // (aurora_tundra: tried thinner grass, frost polygons and lichen patches; the bared ground showed the
     // kelp wood's indigo wrack as ink blots, then with pale lichens it read as before: reverted to the base)
     B('aurora_tundra', 'Aurora Tundra', 'flat', ['viridian', 'neutralTint', 'cobaltBlue', 'mint', 'indigo'], 'lemonYellow', ['neutralTint', 'viridian', 'cobaltBlue'],
-      { t: { amp: 12, ponds: 1, crack: 0.3 }, aurora: 1, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 } }),
+      { t: { amp: 12, ponds: 1, crack: 0.3 }, aurora: 1, liquid: { color: [0.50, 0.62, 0.86], refl: 0.85 }, small: { grass: 0.45, bush: 0.04, rock: 0.03, flower: 0.05 },
+        // (the oil look: the tundra under the aurora is a snowfield, as the clip's night is: pale, nearly white in the
+        // light, so that the night's own key makes it cyan and its shade blue; its own blue-green ground, laid as paint
+        // in long strokes, read as open water)
+        // (and in the oil look trees stand on it, in groups with open snow between: firs, and bare trees among them)
+        oil: { pal: { low: [0.88, 0.94, 0.96], mid: [0.92, 0.96, 0.97], high: [0.84, 0.92, 0.96] }, over: { tallOil: [0, 1], tallD: 0.30, tallMix: 0.55 } } }),
   ],
 };

@@ -11,6 +11,7 @@
 
 import { BODIES } from '../data/bodies.js';
 import { LOOKS, pig, dilute, mixc } from '../data/looks.js';
+import { MODE } from '../data/mode.js';
 import { makeNoise, hashString, hash3i, smoothstep, clamp } from './noise.js';
 import { dirToFace } from './cubesphere.js';
 import { EASELS, STANDS } from '../art/easels.js';
@@ -148,6 +149,8 @@ class Surface {
           p.canopyB = dilute(mixc(pig('hookersGreen'), pig('ultramarine'), 0.22), 0.20);
         }
       }
+      // (the oil look: a biome may give any of these outright, its `oil.pal`: the owner's "colours that pop"; data/mode.js)
+      if (MODE.oil && bi.oil && bi.oil.pal) for (const k of Object.keys(bi.oil.pal)) p[k] = bi.oil.pal[k];
       return p;
     });
   }
@@ -265,6 +268,7 @@ class Surface {
     b.trees = clamp((1 - 0.82 * glade) * (1 - rk) * open, 0, 1);
     b.canopy = clamp(b.trees * 1.05 + (1 - open) * 0.35, 0, 1);
     b.birch = clamp(0.74 - pz * 0.72 + 0.3 * (1 - smoothstep(6, 18, s)), 0.06, 1);
+    if (MODE.oil && bi.oil && bi.oil.tallMix != null) b.birch = bi.oil.tallMix;      // (the oil look may set a wood's mix of kinds outright: the biome's oil.tallMix)
     b.under = clamp((0.45 + 0.55 * glade) * (1 - rk * 0.7) * smoothstep(w0 + 0.1, w0 + 1.2, s), 0, 1);
     b.rock = rk; b.s = s; b.glade = glade; b.aux = 0; b.strata = 0; b.lip = 0;
     // far colour: the canopy seen from outside (pines cooler and darker), streams as pale lines
@@ -715,7 +719,7 @@ class Surface {
     if (lq !== NOLQ && h < lq) { const L = this.liq[bidx].color; b.r2 = L[0]; b.g2 = L[1]; b.b2 = L[2]; }
     b.dry = T.gloss ? 0.95 : dry; b.wet = wet;
     const dens = (bi.tallD || 0) * grow;
-    b.trees = dens; b.birch = bi.tallMix == null ? 0.5 : bi.tallMix;
+    b.trees = dens; b.birch = MODE.oil && bi.oil && bi.oil.tallMix != null ? bi.oil.tallMix : bi.tallMix == null ? 0.5 : bi.tallMix;      // (the oil look may shift a wood's mix of kinds: the biome's oil.tallMix)
     b.canopy = dens * 0.8 * this.shade[bidx];
     b.under = bi.small ? (lq !== NOLQ && h < lq ? 0 : meadow) : 0;
     b.rock = k === 'alpine' ? t : 0; b.s = c.baseReady ? c.s : 1e9; b.glade = 1; b.aux = crk || T.crack || 0;

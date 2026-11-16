@@ -1,7 +1,9 @@
 // Painted Cosmos: uniforms and textures shared by every painted material. OWNER: PAINTER.
 import * as THREE from 'three';
 import { genNoise3D, genStrokes, genPaper } from './texgen.js';
-import { PAPER, hexToRgb } from '../data/looks.js';
+import { PAPER, hexToRgb, LOOKS } from '../data/looks.js';
+import { MODE, overlayOil } from '../data/mode.js';
+import { getDabTextures } from './dabtex.js';
 
 let _tex = null;
 export function getTextures() {
@@ -45,6 +47,7 @@ export const G = {
   uMoon0: { value: 0 },
   uFogBank0: { value: new THREE.Vector2(0, 150) },     // (a material without a body: no banks)
   uRound0: { value: new THREE.Vector2(0, 4000) }, uHeart0: { value: new THREE.Vector4(0, 1, 0, 0) },
+  uGroundK0: { value: new THREE.Vector4(0, 1, 0, 0) },
   // the near air (x how much of what stands at distance y metres it veils, rising as 1 - exp(-d / y)): a dust storm
   // veils the explorer at the eye's own distance, which the far washes' stacked bands cannot (the world sets it)
   uAirNear: { value: new THREE.Vector2(0, 9) },
@@ -61,6 +64,85 @@ export const G = {
   uAux8: { value: 0 },
 };
 
+// THE LOOK. The default is the watercolour. `?look=oil` (docs/HANDOVER.md 4a, the owner's reference clip) paints the same
+// world in opaque paint: body colour, a warm light and a cool shade, strokes laid on the surfaces themselves, no paper
+// and no brush passes. It is a compile-time switch (the define PC_OIL in every painted material), so the watercolour's
+// shaders are, with it off, exactly what they were. The uniforms below are the oil look's dials, shared by reference
+// by every material; `&stroke=` (a multiple of the stroke's size) and painter.setLook({ oil: {...} }) turn them.
+const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
+const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
+export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
+MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
+if (LOOK.oil) overlayOil(LOOKS);      // (the oil look's own kinds of plant and where they stand: data/mode.js)
+export const OIL = {
+  // THE STROKES ARE THE OWNER'S STYLE 5 (2026-11-15: leaf dabs lying every way, the clip's own way, a little thinner than
+  // the clip's). The five other styles tried at checkpoint 1 are gone; the thin strokes are kept for bark, the tiles
+  // for snow.
+  // x: a stroke's width on the screen (pixels at 720 lines; it is scaled with the picture's height); a leaf dab is about
+  //    uOilS.w of these to a cell   y: how much richer than a wash the body colour is (pcDensity)   z, w: the powers
+  //    that turn the pale light and glaze keys of the watercolour into the oil's warm light and cool shade
+  uOilA: { value: new THREE.Vector4(4.6 * _qn('stroke', 1), 1.9, 2.0, 1.15) },
+  // x: the sunlit paint's gain   y: the tiles' line (a share of a tile's width)   z: how far a stroke's colour strays
+  //    from its neighbours'   w: a tile's length over its width
+  uOilB: { value: new THREE.Vector4(1.12, 0.07, 1.0, 2.6) },
+  // x: the power on the haze key (near 1: a pale, high air, as the clip's)   y: the glow of the air toward the sun
+  //    z: 0 strokes off (the colour and light only) .. 1 on   w: how much farther off the air takes a thing on the
+  //    ground than in the watercolour (the wood's depth; eased to 1.6 as the eye rises and the air thins)
+  // (w was 4.0 and y 0.8: a trunk thirty metres off was half gone, and toward the sun the air burnt to white: the
+  // critic's "wash-out"; the clip's trunks stay dark much deeper into its haze)
+  uOilC: { value: new THREE.Vector4(1.15, 0.5, _qn('strokes', 1), 2.7) },
+  // the shade (chunks.js pcTone): x the cool key's gain over the body colour   y the sky's own fill in it (added)
+  //    z the green left in the key (under 1: the shade leans to violet)   w the tiles' line: how light it is
+  uOilD: { value: new THREE.Vector4(1.0, 0.10, 0.90, 1.3) },
+  // x: (not in use)   y: (not in use)   z: a leaf dab's length over its width   w: a dab's cell (half its length) in
+  //    stroke widths
+  uOilS: { value: new THREE.Vector4(1, 0, 2.4, 2.6) },
+  // what grows on the ground: x the share of the near ground's strokes kept (the clip's floor is a carpet of leaves
+  //    with tufts of grass here and there, not a sward)   y the share of the undergrowth's blades and fronds kept
+  //    z 1 while the scene pass is multisampled (set every frame)
+  // (x is 0 since the overhaul plan's fifth piece: the watercolour's near strokes are shapes cut out of cards, a fan of
+  // blades as one card with a notched top: in flat paint they stood on the floor as notched slabs. The oil look's floor
+  // is its leaf dabs, tufts of real blades, saplings and small leafy plants.)
+  // (y was 0.45 while the blades were the watercolour's stiff spikes; they are tufts now, and four in five are kept)
+  // (w: how far the world the eye is on takes the look's golden hours, chunks.js pcGold: a look's `oil.gold`, set by the world)
+  uOilG: { value: new THREE.Vector4(0.0, 1.0, 0, 1) },
+  // the cast shadows (shadow.js): the map, the body's own space to the map's square, and x how strong (0: no map this
+  //    frame), y the bias, z a texel, w where the map's answer gives way to the leaf shadow's pattern
+  // the leaf dabs laid once (dabtex.js; made in ensureGlobals from uOilS.z): a texel a dab, and each texel's topmost three
+  uDabP: { value: null }, uDabId: { value: null },
+  uShTex: { value: null }, uShM: { value: new THREE.Matrix4() }, uShK: { value: new THREE.Vector4(0, 0, 0, 0.86) },
+  // LIGHT IN THE AIR (the overhaul plan's fourth piece; post.js OIL_FRAG): the eye's own space to the shadow map's
+  // square, the way to the sun in the eye's space, the lit air's colour, and x how strong the shafts are (0: none),
+  // y the air's density (1/m), z how far along a line of sight the air is followed (m), w the lit share taken as the
+  // air's mean (a line with more of its air in the sun is lighter than the picture as painted, one with less darker)
+  uShAir: { value: null },      // (the shadow map taken down for the air: shadow.js AIR_FRAG)
+  uShV: { value: new THREE.Matrix4() }, uSunV: { value: new THREE.Vector3(0, 1, 0) }, uShaftC: { value: new THREE.Vector3(1, 0.86, 0.58) },
+  uShaft: { value: new THREE.Vector4(0, 0.01, 110, 0.55) },
+  // the wanderer's lantern: where it is (the body's own space) and how strong its pool of light is now (0 by day):
+  // laid into the ground's and the plants' strokes (chunks.js pcLamp), not a light in the scene
+  uLamp: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uAuroraK: { value: 0 },        // how strong the aurora overhead is (0: none): the water's dashes carry its green by night (materials.js WATER_FRAG)
+  uLampV: { value: new THREE.Vector4(0, 0, -1, 0) },     // the lantern in the eye's space (set every frame, render/index.js), w how strong: its light on the figure itself (materials.js FIG_FRAG; a soft glow in the air round it was tried and taken out: the one soft edge in the picture)
+  uLampF: { value: new THREE.Vector4(0, 0, 0, 0) },      // where the wanderer stands (the body's space), w 1 while it does: its shadow by the lantern's light
+  // x: the angle one pixel of the scene pass takes (radians)   y: the scene pass's height in pixels (both set every
+  // frame)   z: the smallest stroke's width, m (nearer than where that is uOilA.x pixels, strokes keep this width on
+  // the land and grow on the screen, as the clip's do)   w: (not in use)
+  uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.027 * _qn('stroke', 1), 0.085) },
+};
+
+// What the shadow map needs from the world each frame (shadow.js): the body the eye is on (its root in the scene), the
+// way to its sun in its own space, and how strong a shadow is now (none under a closed sky or in the middle of twilight).
+// (air: the density of the air on the ground, 1/m, and shaft: how strong the light in the air is, for the shafts)
+export const SHADOW = { root: null, sunDirL: new THREE.Vector3(0, 1, 0), strength: 0, air: 0, shaft: 0, alt: 0 };      // (alt: the eye's height over the land, m)
+// (a tool may reach every painted material ever made: tools/lab.mjs swaps their shaders without a reload)
+export const MATERIALS = new Set();
+export function register(m, kind, opts) {
+  m.userData.pcMake = { kind, opts: opts || null };
+  if (LOOK.oil) { m.defines = m.defines || {}; m.defines.PC_OIL = 1; }
+  if (typeof window !== 'undefined') { MATERIALS.add(m); window.__pcMaterials = MATERIALS; }
+  return m;
+}
+
 // (R1 W2.4) whether water was drawn in this frame's scene pass (the water material says so as it is drawn), and the world
 // the eye is on (index.js, from the mood): the post passes keep last frame's painting for its reflections on a world
 // once its water has been drawn there (post.js finish)
@@ -76,6 +158,7 @@ export function ensureGlobals() {
   const t = getTextures();
   G.uNoise3D.value = t.noise3D;
   G.uStrokeTex.value = t.strokes;
+  if (LOOK.oil && !OIL.uDabP.value) { const d = getDabTextures(OIL.uOilS.value.z, 0.12); OIL.uDabP.value = d.par; OIL.uDabId.value = d.id; }
   return G;
 }
 
@@ -101,6 +184,7 @@ export function makeBodyUniforms() {
     uRound: { value: new THREE.Vector2(0, 4000) },                       // from orbit the limb closes on the mean sphere: x how far the relief is drawn in (0 on the ground .. 0.75), y the datum radius (chunks.js pcRound)
     uWx: { value: new THREE.Vector4(0, 0, 0, 0) },                       // weather: x overcast (flat cool light), y wet ground, z snow cover, w veil (rain or snow in the air)
     uFogBank: { value: new THREE.Vector2(0, 150) },                      // a thick fog lies in banks (PAINTER 19): x how much (0 none), y the drifts' measure (m); chunks.js pcFogBank
+    uGroundK: { value: new THREE.Vector4(0, 1, 0, 0) },                  // the oil look: x how this world's ground is laid: 0 leaf dabs, 1 long strokes that run with the land (ice); z 1 a world of snow: short broad strokes in the colours of ice and snow (materials.js pcIce); y the share of the oil look's blades and near strokes this world keeps (1: all of them; a look's oil.grass)
   };
 }
 

@@ -13,6 +13,8 @@ export default {
   // (the ground's two drifts of neighbouring pigment: toward aqua and toward blue; the default
   // warm drift turned the mint ice yellow-green)
   hue: [[0.95, 1.0, 0.96], [0.92, 0.95, 1.0]],
+  // (the oil look: a world of ice: its ground is laid in long strokes that run with the land, as Neptune's snow)
+  oil: { ground: 'flow' },
   sky: mkSky([0.60, 0.86, 0.84], [0.93, 0.985, 0.96], { glaze: [0.64, 0.74, 0.88], light: [0.97, 1.0, 0.96] }),
   flora: {
     tall: [

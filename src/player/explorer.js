@@ -2,6 +2,7 @@
 // Pure (no three). Everything is in the body-local (rotating) frame of the planet, so the
 // ground carries you with it. The world is seen only through `env.sample(unitDir)`, which is
 // the contract's sampleSurface bound to the current body.
+import { MODE } from '../data/mode.js';
 import {
   V, add, sub, scale, addScaled, dot, len, norm, reject, tangent, clampLen, cross,
   clamp01, mix, damp, rotateAround,
@@ -38,6 +39,13 @@ export const EXPLORER = Object.freeze({
                              // however slowly, kept a light world's explorer up for ever with burn-and-coast
                              // (Pluto: burn to half, coast, relight under 8 m: 42 relights in 1200 s, never down)
   jetStartDelay: 0.16,       // hold Space this long after a jump before the jetpack lights
+  // THE WANDERER FLIES BY ITSELF (data/mode.js `wanderer`; the owner: "get rid of the jetpack just make it flight like
+  // superman"): no fuel. Space held off the ground lifts into flight; W goes where the view looks, climbing or diving
+  // with it; Space rises, C sinks, Shift is fast; with the hands off it hovers; it ends on the ground or in water.
+  flySpeed: 16,              // m/s along the view
+  flyFast: 34,               // m/s with Shift
+  flyRise: 9,                // m/s up on Space
+  flySink: 9,                // m/s down on C
   terminalFall: 24,          // m/s: falls stay gentle, there is no fall damage
   softFallHeight: 3,         // metres above ground where a fast fall is cushioned
   softFallSpeed: 4,          // m/s touchdown speed after cushioning (a hop ends on bent knees)
@@ -280,15 +288,28 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const floating = !wasGrounded && !!st.phys && st.phys.submerged01 > 0.35;
   const f = tangent(input.viewFwd || st.fwd, up, st.fwd);
   const right = cross(f, up);
-  const wish = clampLen(add(scale(f, input.moveZ || 0), scale(right, input.moveX || 0)), 1);
-  const maxSpeed = input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
-
   // (afloat there is nothing to push off from: a swimmer does not hop, PHYSICS saw one rise at 2 m/s
   // from open water; held, Space lights the jetpack, which lifts them out)
   let jump = false;
   if (input.jump && wasGrounded && !floating) { jump = true; st.jumpHeld = 0; }
   if (input.jet) st.jumpHeld += dt; else st.jumpHeld = 0;
-  const jetOn = !!input.jet && (!wasGrounded || jump) && st.jumpHeld >= T.jetStartDelay && st.fuel > 0;
+  let jetOn = !!input.jet && (!wasGrounded || jump) && st.jumpHeld >= T.jetStartDelay && st.fuel > 0;
+  // The wanderer's flight (EXPLORER.flySpeed, above). It is flown on PHYSICS' own jet: the throttle open, and the
+  // climb governor's speed the climb that is wished (0: a hover), so the body model, its air and its soft landing are
+  // all still in force; only the tank is gone.
+  const superFly = MODE.wanderer;
+  if (superFly) {
+    if (jetOn) st.flying = true;
+    else if (st.flying && ((wasGrounded && !input.jet) || floating)) st.flying = false;
+    jetOn = !!st.flying;
+  }
+  const flying = superFly && jetOn;
+  // (the view's pitch, from where the foot camera rests (0.12 rad down) and past a small dead band: level flight is
+  // level without holding the mouse just so)
+  const rawPitch = flying && Number.isFinite(input.lookPitch) ? input.lookPitch + 0.12 : 0;
+  const lookPitch = Math.max(-1.2, Math.min(1.2, Math.abs(rawPitch) < 0.09 ? 0 : rawPitch - Math.sign(rawPitch) * 0.09));
+  const wish = clampLen(add(scale(f, (input.moveZ || 0) * (flying && input.moveZ > 0 ? Math.cos(lookPitch) : 1)), scale(right, input.moveX || 0)), 1);
+  const maxSpeed = flying ? (input.run ? T.flyFast : T.flySpeed) : input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
 
   const cmd = st.cmd || (st.cmd = { wish: V(), jump: false, jet: 0, jetMaxRise: T.jetMaxRise, descentLimit: 0, airControl: 1 });
   // The suit's share of the wind (feel, on PHYSICS' lever cmd.shelter01). On the ground the
@@ -311,11 +332,16 @@ function stepExplorerBodied(st, input, dt, env, T) {
     }
   }
   cmd.wish.x = wish.x * maxSpeed * pace; cmd.wish.y = wish.y * maxSpeed * pace; cmd.wish.z = wish.z * maxSpeed * pace;
+  // (in flight, with the keys let go, the wish is to stand still in the air: the body model steers only toward a wish
+  // it is given, so it is given the smallest one, and a little more authority than a jetpack's to stop and turn by)
+  if (flying && wish.x === 0 && wish.y === 0 && wish.z === 0) { cmd.wish.x = f.x * 1e-3; cmd.wish.y = f.y * 1e-3; cmd.wish.z = f.z * 1e-3; }
+  cmd.airControl = flying ? 1.5 : 1;
   cmd.jump = jump;
   // The fold before the push (PHYSICS P13): seen from a stand, short from a run's stride.
   cmd.jumpCrouch = st.phys && st.phys.gait === 2 ? T.jumpCrouchRun : T.jumpCrouch;
   cmd.jet = jetOn ? 1 : 0;
   cmd.jetMaxRise = jetRiseCap(env.gravity, T);
+  if (flying) cmd.jetMaxRise = (input.jet ? T.flyRise : 0) - (input.sink ? T.flySink : 0) + Math.sin(lookPitch) * maxSpeed * Math.max(0, input.moveZ || 0);
   // Suit thrusters help the boots start and stop (PHYSICS' named assist force): without them a
   // 100 kg explorer at this pace takes 0.6 s and 1.2 m to stop on grass.
   // The suit's help scales with the world's gravity: light worlds let you slide a little. When
@@ -339,6 +365,11 @@ function stepExplorerBodied(st, input, dt, env, T) {
   st.jetting = use > 0.05;
   if (st.jetting) { st.fuel = Math.max(0, st.fuel - (use * dt) / T.jetFuelSeconds); st.sinceJet = 0; } else st.sinceJet += dt;
   st.jet01 = mix(st.jet01, st.jetting ? 1 : 0, damp(12, dt));
+  if (superFly) {
+    // (no tank and no burner's roar: `fly01` is the figure's flying pose, `jet01` stays 0 for the sound)
+    st.fuel = 1; st.jetting = flying && !st.grounded;
+    st.fly01 = mix(st.fly01 || 0, st.jetting ? 1 : 0, damp(7, dt)); st.jet01 = 0;
+  }
   st.airTime = st.grounded ? 0 : st.airTime + dt;
   st.slope = s2.slope;
   st.surface = s2;

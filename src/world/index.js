@@ -16,7 +16,8 @@ import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
-import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater } from '../render/shared.js';
+import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL } from '../render/shared.js';
+import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
 
@@ -40,6 +41,10 @@ export function createWorld(scene) {
   GLAZES.push(skyGlaze);
   let glazeWhy = '';
 
+  // (the oil look: leaves falling through the air of an autumn wood, leaffall.js)
+  const leafFall = LOOK.oil ? makeLeafFall(null) : null;
+  if (leafFall) scene.add(leafFall.mesh);
+
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
   sun.position.set(0, 0, 0);
@@ -51,6 +56,8 @@ export function createWorld(scene) {
     scene.add(root);
     bodies.set(id, root);
     const bu = makeBodyUniforms();
+    // (the oil look: how this world's ground is laid, a look's `oil.ground`: 'flow' (long strokes that run with the land) for worlds of ice, 'snow' (short broad strokes in the colours of ice and snow) for a world of snow)
+    { const lk = getLook(id); if (lk && lk.oil) { if (lk.oil.ground === 'flow') bu.uGroundK.value.x = 1; if (lk.oil.ground === 'snow') { bu.uGroundK.value.x = 1; bu.uGroundK.value.z = 1; } if (lk.oil.grass != null) bu.uGroundK.value.y = lk.oil.grass; } }
     bu.uBodyR.value = BODIES[id].radius;
     const look = getLook(id);
     if (id !== 'earth') { const hu = look.hue || [[1.0, 0.94, 0.86], [0.92, 0.93, 1.0]]; bu.uHueA.value.fromArray(hu[0]); bu.uHueB.value.fromArray(hu[1]); }
@@ -204,7 +211,8 @@ export function createWorld(scene) {
   function blendKeys(look, wDay, wDawn, wDusk, wNight) {
     const s = look.sky;
     for (const f of Object.keys(tmpKey)) {
-      const a = s.day[f], b = s.dawn[f], c = s.dusk[f], d = s.night[f];
+      // (the oil look may give a world its own night: the look's oil.night, key by key)
+      const a = s.day[f], b = s.dawn[f], c = s.dusk[f], d = (LOOK.oil && look.oil && look.oil.night && look.oil.night[f]) || s.night[f];
       tmpKey[f].set(
         a[0] * wDay + b[0] * wDawn + c[0] * wDusk + d[0] * wNight,
         a[1] * wDay + b[1] * wDawn + c[1] * wDusk + d[1] * wNight,
@@ -406,11 +414,12 @@ export function createWorld(scene) {
       } else SHEET.laid = 1;     // (in slow frames a share of the frame, like the terrain)
       // some biomes are mistier than others: blend the visibility by what is under the camera
       // and some lie in a lasting twilight (a ring's shadow, a storm wall, a crater that never sees the sun)
-      let mist = 0, twi = 0, aur = 0, bank = 0;
+      let mist = 0, twi = 0, aur = 0, bank = 0, fall = 0;
       for (const b of look.biomes) {
         const w = here.biomeWeights[b.id];
         if (!w) continue;
         aur += w * (b.aurora || 0);
+        fall += w * (b.autumn ? 1 : 0);
         bank += w * (b.bank != null ? b.bank : (look.bank || 0));      // (PAINTER 19: a thick fog lies in banks, chunks.js pcFogBank)
         let m = b.mist || 1;
         // fog lying in the low ground: thick below its level, clear above it
@@ -544,6 +553,9 @@ export function createWorld(scene) {
       skyU.uCamL.value.copy(st.camLocal);
       skyU.uSkyZenith.value.copy(tmpKey.zenith);
       if (skyU.uAurora) skyU.uAurora.value.x = aur * (1 - space01);
+      OIL.uAuroraK.value = aur * (1 - space01);
+      // (leaves in the air of an autumn wood, while the eye is among the trees: none from the ship above them)
+      if (leafFall) leafFall.update(cameraPos, active.root, _camL, bu, fall * (1 - space01) * (1 - THREE.MathUtils.smoothstep(camR - (here.radius || body.radius), 18, 40)));
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
@@ -590,7 +602,7 @@ export function createWorld(scene) {
       du.uSunDirW.value.copy(skyU.uSunDirL.value); du.uFog.value.set(1e-7, 6, 0, 0); du.uMoon.value = 0;
       lighting.bodyId = null; lighting.space01 = 1;
     }
-    castShade(active);
+    castShade(active, cameraPos);
     lastActive = active ? active.id : null;
   }
 
@@ -598,13 +610,38 @@ export function createWorld(scene) {
   // away from the sun (a pool right under them when the sky is closed), fading as they rise.
   // They are found in the scene by userData.pcCaster (src/art/models.js); nothing to wire.
   const _cp = new THREE.Vector3(), _cu = new THREE.Vector3(), _ct = new THREE.Vector3(), _ca = new THREE.Vector3(), _cq = new THREE.Quaternion();
-  function castShade(active) {
+  function castShade(active, cameraPos) {
     const K = G.uCastK.value, U = G.uCast.value;
     K.set(0, 0);
+    SHADOW.root = null; SHADOW.strength = 0;
+    OIL.uLamp.value.w = 0; OIL.uLampF.value.w = 0;
     if (!active) return;
     // (by night the moon throws the shade: uSunDirL is then the moon's direction; nothing is thrown in the middle of twilight)
     const moon = active.bu.uMoon.value, mk = Math.abs(2 * moon - 1);
     const sunL = active.bu.uSunDirL.value, ov = active.bu.uWx.value.x, day = moon > 0.5 ? mk * 0.8 : active.bu.uDayness.value * mk;
+    // (the oil look's shadow map, render/shadow.js: thrown by the same light, none under a closed sky or from space)
+    SHADOW.root = active.root; SHADOW.sunDirL.copy(sunL);
+    { // (the eye's height over the land: the shadow map's square lies on the land under the eye, render/shadow.js)
+      _cp.copy(cameraPos); active.root.worldToLocal(_cp);
+      const rc = _cp.length();
+      if (rc > 1) { _cu.copy(_cp).divideScalar(rc); const sp = sampleSurfacePure(active.id, _cu.x, _cu.y, _cu.z); SHADOW.alt = Math.max(0, rc - Math.max(sp.radius, sp.liquidRadius || 0)); } else SHADOW.alt = 0;
+    }
+    SHADOW.strength = (1 - ov) * day * (1 - Math.min(1, (active.bu.uFog.value.w || 0) * 4));
+    // (the light in the air, post.js OIL_FRAG: the air's density on the ground as chunks.js pcFogAmount has it, the lit
+    // air the light's own colour, gold through the look's golden hours; by the sun only, and strongest when it is low)
+    {
+      const fx = active.bu.uFog.value.x, reach = 1 / Math.max(fx, 1e-6), k4 = OIL.uOilC.value.w;
+      SHADOW.air = fx * (k4 + (2.4 - k4) * Math.min(1, Math.max(0, (reach - 200) / 400)));
+      const se = active.bu.uSunDirW.value.dot(active.bu.uUpW.value);
+      const lowSun = 1 - THREE.MathUtils.smoothstep(se, 0.48, 0.86);
+      // (how far this world takes the golden hours: a look's oil.gold; all the way on Earth, a third elsewhere)
+      const lk = getLook(active.id), goldK = lk && lk.oil && lk.oil.gold != null ? lk.oil.gold : 0.33;
+      OIL.uOilG.value.w = goldK;
+      const gold = lowSun * active.bu.uDayness.value * (1 - moon) * (1 - ov) * goldK;
+      const L = active.bu.uLight.value;
+      OIL.uShaftC.value.set(L.x * L.x, L.y * L.y, L.z * L.z).lerp(_ct.set(1.0, 0.82, 0.50), 0.75 * gold);
+      SHADOW.shaft = moon > 0.5 ? 0 : (0.55 + 0.45 * lowSun);
+    }
     for (const o of scene.children) {
       const kind = o.userData && o.userData.pcCaster;
       if (!kind || !o.visible) continue;
@@ -612,6 +649,14 @@ export function createWorld(scene) {
       _cp.copy(o.position); active.root.worldToLocal(_cp);
       const r = _cp.length();
       if (!(r > 1)) continue;
+      if (i === 0 && o.userData.lamp) {
+        // (the wanderer's lantern, the oil look: its pool of light by night, chunks.js pcLamp; it comes on through dusk)
+        const lp = o.userData.lamp;
+        _ct.set(lp[0], lp[1], lp[2]); o.updateWorldMatrix(true, false); o.localToWorld(_ct); active.root.worldToLocal(_ct);
+        OIL.uLamp.value.set(_ct.x, _ct.y, _ct.z, THREE.MathUtils.smoothstep(1 - active.bu.uDayness.value, 0.25, 0.8));
+        // (and where the wanderer stands: by the lantern's light it throws a shadow of its own, away from the lantern)
+        OIL.uLampF.value.set(_cp.x, _cp.y, _cp.z, 1);
+      }
       _cu.copy(_cp).divideScalar(r);
       const ground = sampleSurfacePure(active.id, _cu.x, _cu.y, _cu.z).radius, h = Math.max(0, r - ground);
       if (h > 60) continue;

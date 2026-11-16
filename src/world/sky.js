@@ -2,7 +2,7 @@
 // One full-screen triangle drawn last at the far plane. Everything is evaluated per view ray in
 // the active body's local frame, so clouds and wash variation are anchored to the planet.
 import * as THREE from 'three';
-import { G, ensureGlobals } from '../render/shared.js';
+import { G, OIL, register, ensureGlobals } from '../render/shared.js';
 import { RING_PROFILE } from './orbit.js';
 
 const SKY_VERT = /* glsl */`
@@ -46,9 +46,49 @@ varying vec3 vDirL;
 varying vec3 vDirW;
 layout(location = 1) out highp vec4 pcAux;
 uniform float uAux8;
+#ifdef PC_OIL
+uniform vec4 uOilA;
+uniform vec4 uOilC;
+uniform vec4 uOilG;
+#endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 ${RING_PROFILE}
+#ifdef PC_OIL
+// THE AURORA AS LIGHT (the owner, 2026-11-16, of the aurora laid as a ribbon of hard-edged flames: "the northern lights
+// look like stripes instead of lights like the reference"). The clip's aurora glows: a bright core along its foot, rays
+// that are soft at their sides and die away upward into the dark, a little colour under the foot, and no drawn edge
+// anywhere. So here it is LIGHT ADDED TO THE SKY, and it is soft: the one soft thing in the oil look's picture, by the
+// owner's word (the crispness rule stands for everything else). Rays at three scales along the horizon, each with its
+// own brightness and reach, run softly into their neighbours.
+float pcAuH(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+vec2 pcAuRay(float ax, float sd0) {
+  float i = floor(ax), f = ax - i;
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(vec2(pcAuH(i + sd0), pcAuH(i + sd0 + 57.3)), vec2(pcAuH(i + 1.0 + sd0), pcAuH(i + 58.3 + sd0)), f);
+}
+// az: the bearing; e: the height in the sky; e0: the curtain's foot; hgt: how high its rays may reach; fold: how strong
+// the curtain is along this bearing (0..1). Returns the light to add.
+vec3 pcAuroraLight(float az, float e, float e0, float hgt, float fold, float wob) {
+  float up = e - e0, fk = 0.30 + 0.70 * fold;
+  vec2 r1 = pcAuRay(az * 26.0 + wob, 0.0), r2 = pcAuRay(az * 110.0 + wob * 3.0, 31.0), r3 = pcAuRay(az * 330.0, 77.0);
+  float reach = hgt * (0.22 + 0.78 * r1.y * r1.y) * (0.50 + 0.50 * r2.y) * (0.30 + 0.70 * fold);
+  float tt = up / max(reach, 1e-4);
+  float ray = (0.35 + 0.65 * r2.x) * (0.70 + 0.30 * r3.x) * (0.45 + 0.55 * r1.x);
+  float body = 1.0 - smoothstep(0.0, 1.0, tt);
+  body *= body;
+  float foot = smoothstep(-0.010, 0.002, up);
+  float core = exp(-max(up, 0.0) / 0.012);
+  float I = foot * (body * ray + 0.9 * core * (0.5 + 0.5 * r2.x)) * fk;
+  vec3 col = mix(vec3(0.16, 1.0, 0.50), vec3(0.10, 0.78, 0.66), smoothstep(0.15, 0.70, tt));
+  col = mix(col, vec3(0.36, 0.40, 1.0), smoothstep(0.55, 1.0, tt) * 0.85);
+  col = mix(col, vec3(0.82, 1.0, 0.86), core * 0.8);
+  vec3 L = col * I;
+  L += vec3(0.85, 0.30, 0.80) * exp(-abs(up + 0.004) / 0.004) * 0.45 * (0.4 + 0.6 * r2.x) * fk;
+  L += vec3(0.10, 0.55, 0.36) * exp(-max(up, 0.0) / (hgt * 0.9)) * smoothstep(-0.06, 0.0, up) * 0.22 * fk;
+  return L;
+}
+#endif
 
 void main() {
   vec3 d = normalize(vDirL);
@@ -72,8 +112,19 @@ void main() {
   float turb = (n1.r - 0.5) * 0.9 + (n2.g - 0.5) * 0.35;
   float bf = n1.a + (n2.b - 0.5) * 0.10;
   float back = smoothstep(0.84, 0.90, bf) * (1.0 - smoothstep(0.90, 0.95, bf));
+  #ifdef PC_OIL
+    // (the oil look, the overhaul plan's sixth piece: the sky is laid in broad flat bands from the horizon to the zenith,
+    // their edges wandering and a pixel wide; a wash's turbulence and its backruns, in opaque paint, were smudges and
+    // rings in the sky: the stills of the open sky. Under a closed sky the heavy wash keeps its turbulence.)
+    float tb = t * 6.0 + (n1.r - 0.5) * 1.7 + (n2.g - 0.5) * 0.35;
+    float tbi = floor(tb), fwb = max(fwidth(tb), 1e-4);
+    float tq = clamp((tbi + smoothstep(0.5 - fwb, 0.5 + fwb, tb - tbi)) / 6.0, 0.0, 1.0);
+    sky = mix(mix(uSkyZenith, uSkyHorizon, tq), uSkyHorizon, toward * 0.65);
+    sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * 1.7 * oc);
+  #else
   sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * (1.0 + oc * 0.7) + back * 0.38 * (1.0 - t));
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
+  #endif
   // below the horizon (seen from high up): haze
   sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
 
@@ -141,11 +192,22 @@ void main() {
     float ray = texture(uNoise3D, vec3(ha.xz * 16.0, ha.y * 16.0) + vec3(0.0, uTime * 0.004, 0.0)).g;
     ray = 0.40 + 0.60 * smoothstep(0.35, 0.70, ray);                                  // rays: streaks up the curtain
     float hgt = 0.22 + 0.25 * fb.b;
+  #ifdef PC_OIL
+    // (the oil look: the aurora is light added to the sky, see pcAuroraLight above. Laid before this, each seen in
+    // stills and each wrong: broad strokes with square ends (a row of blocks), separate combs of hairlines (bar codes),
+    // one ribbon of hard-edged flames (stripes, the owner's word).)
+    float az = atan(ha.z, ha.x);
+    e0 = 0.105 + 0.11 * fa.g + 0.04 * (fb.r - 0.5);              // (its foot lower in the oil look: six to thirteen degrees up, in a level view's upper half)
+    float aStr = uAurora.x * (0.30 + 0.70 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x);
+    vec3 aL = clamp(pcAuroraLight(az, e, e0, hgt * 2.3, fold, fa.b * 3.0) * aStr * 1.45, 0.0, 1.0);      // (taller and brighter than its first laying as light, whose rays were short and dim beside the clip's)
+    sky = 1.0 - (1.0 - sky) * (1.0 - aL);
+  #else
     float k = smoothstep(e0 - 0.012, e0 + 0.02, e) * (1.0 - smoothstep(e0 + 0.04, e0 + hgt, e)) * fold * ray;
     // (pale viridian at the lower edge lifted out of the blue, violet where the rays fade: it has to stand against the
     // middle of the sky, where the wash is deep; low down the sky is near paper and a pale curtain is lost in it)
     vec3 ac = mix(vec3(0.66, 0.93, 0.78), vec3(0.80, 0.68, 0.93), smoothstep(e0, e0 + hgt * 0.8, e));
     sky = mix(sky, ac, clamp(k * uAurora.x * (0.62 + 0.36 * (1.0 - uAtmo.y)) * (1.0 - oc) * (1.0 - uAtmo.x), 0.0, 0.85));
+  #endif
   }
 
   // ---- a sea of cloud seen from one of its islands: beyond the island's rim the cloud tops
@@ -202,15 +264,31 @@ void main() {
       cloud = smoothstep(th - 0.02, th + 0.09, v);
       float toSun = texture(uNoise3D, q + uSunDirL * 0.09).r * 0.60 + texture(uNoise3D, (q + uSunDirL * 0.09) * 2.7 + 0.31).g * 0.28 + c3 * 0.12;
       shade = smoothstep(0.0, 0.10, toSun - v + 0.02) * smoothstep(th + 0.02, th + 0.16, v);
+      #ifdef PC_OIL
+        // (the oil look, the overhaul plan's sixth piece: a cloud is a few big flat shapes with clean edges, a pixel
+        // wide: a light one, and on the side away from the sun a second, a step deeper; no wet lower edge, no fine
+        // curl, no grain in it)
+        v = c1 * 0.82 + c2 * 0.18;
+        float fwv = max(fwidth(v), 1e-4);
+        cloud = smoothstep(-fwv, fwv, v - (th + 0.035));
+        // (by night a cloud has no second tone: lit by nothing, its deeper side stood in a dark sky as a blot with a pale rim)
+        shade = smoothstep(-fwv, fwv, toSun - v - 0.02) * 0.42 * uAtmo.y;
+      #endif
       float fade = rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0;
       cloud *= fade;
       body = smoothstep(th + 0.02, th + 0.30, v);
       belly = smoothstep(th + 0.06, th + 0.50, v + (c2 - 0.5) * 0.25);
     }
   }
+
   // (at night a cloud is a pale shape lifted out of the wash, not bare paper: paper is kept for the stars)
   vec3 cl = mix(mix(mix(uSkyHorizon, vec3(1.0), 0.22), vec3(1.0), uAtmo.y), uCloudShade, shade * 0.9);
+  #ifndef PC_OIL
   cl = dens(cl, 1.0 + (n2.r - 0.5) * 0.8);
+  #else
+  // (the oil look by night: a cloud is a flat shape one step lighter than the sky it lies in)
+  cl = mix(mix(sky, uSkyHorizon, 0.22), cl, uAtmo.y);      // (barely: small pale shapes in a dark sky were stray marks)
+  #endif
   // under an overcast the cloud is no longer bare paper: it is the wash itself, in heavy masses
   // with dark bellies; their torn edges stay pale, where the light still comes through
   // (PAINTER 16/17, the M4 critique: under Earth's thunderstorm the closed sky was the darkest thing in the picture, its
@@ -249,6 +327,19 @@ void main() {
     vec3 dw = normalize(vDirW);
     vec4 s1 = texture(uNoise3D, dw * 0.9 + 0.4);
     vec4 s2 = texture(uNoise3D, dw * 2.9);
+  #ifdef PC_OIL
+    // (the oil look: space is laid in flat shapes with clean edges, a pixel wide: a deep indigo ground, a lighter blue
+    // drift over part of it, a violet one, and a few pale clouds of stars' dust; no wet edge, no bloom, no salt: as
+    // washes they were the one soft, blotted thing left in the picture: the survey of the worlds, the Moon's sky)
+    float d1 = s1.r * 0.7 + s2.g * 0.3, d2 = s1.g * 0.7 + s2.r * 0.3, d3 = s1.b * 0.65 + s2.b * 0.35;
+    float w1 = max(fwidth(d1), 1e-4), w2 = max(fwidth(d2), 1e-4), w3 = max(fwidth(d3), 1e-4);
+    vec3 sp = vec3(0.070, 0.085, 0.240);
+    sp = mix(sp, vec3(0.110, 0.140, 0.340), smoothstep(-w1, w1, d1 - 0.50));
+    sp = mix(sp, vec3(0.150, 0.190, 0.420), smoothstep(-w1, w1, d1 - 0.62));
+    sp = mix(sp, vec3(0.230, 0.150, 0.400), smoothstep(-w2, w2, d2 - 0.60));
+    sp = mix(sp, vec3(0.330, 0.240, 0.520), smoothstep(-w2, w2, d2 - 0.70));
+    sp = mix(sp, vec3(0.360, 0.420, 0.660), smoothstep(-w3, w3, d3 - 0.70));
+  #else
     vec3 sp = mix(vec3(0.20, 0.24, 0.45), vec3(0.34, 0.37, 0.52), s1.r);
     sp = mix(sp, vec3(0.42, 0.33, 0.57), smoothstep(0.55, 0.80, s1.g) * 0.6);          // a violet nebula drift, wet in wet
     sp = dens(sp, 1.0 + (s2.g - 0.5) * 0.9 + (s1.b - 0.5) * 0.7);
@@ -263,6 +354,7 @@ void main() {
     vec4 sa = texture(uNoise3D, dw * 6.3 + 0.2);
     float salt = smoothstep(0.66, 0.80, sa.r * 0.6 + s2.b * 0.4);                         // salt: pale crystalline blooms
     sp = mix(sp, vec3(0.62, 0.66, 0.82), salt * 0.50);
+  #endif
     float sunS = 1.0 - smoothstep(uAtmo.z * 0.82, uAtmo.z, ang);
     sp = mix(sp, vec3(1.0, 0.985, 0.93), clamp(halo, 0.0, 1.0));
     sp = mix(sp, vec3(1.0), sunS);
@@ -284,6 +376,52 @@ void main() {
     starOK = mix(night, 1.0, inSp) * (1.0 - clamp(halo * 1.6, 0.0, 1.0));
   }
 
+  #ifdef PC_OIL
+    // (the oil look: the sky's washes a little richer, and toward a sun in the air a pale glow: the clip's wood stands
+    // against a sky nearly white with light. In space the sky is as it was.)
+    col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
+    col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
+    // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
+    float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
+    col = mix(col, vec3(1.0, 0.94, 0.76), gold * mix(0.88, 0.60, smoothstep(0.0, 0.7, e)));
+    {
+      // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
+      // closer to the ... references ... the patterns in the sky"). The clip's night sky, looked at closely: LONG, THIN,
+      // NEARLY STRAIGHT streaks of pale cyan on the dark, lying almost level, some rising a little to one side and some
+      // falling, so that they cross one another at shallow angles; of every length, from a short touch to a third of
+      // the picture; each drawn to a point at both ends; thicker and brighter here, a hair there. So: four families of
+      // streaks, each a set of level lines about an axis of its own that leans a little from straight up (a family's
+      // lines lie level on one side of the sky and lean one way or the other elsewhere, and two families cross at a
+      // shallow angle); along a line, streaks of the line's own length with gaps between; bent only very gently by a
+      // slow noise. (Laid before this: short dashes in rows bent by a quick noise: curls and worms, not the clip's.)
+      vec3 ta = normalize(cross(up, vec3(0.31, 0.74, 0.59))), tb = cross(up, ta);
+      vec4 wv4 = texture(uNoise3D, d * 0.7 + 0.37);
+      float nightK = (1.0 - uAtmo.y) * (1.0 - uAtmo.x) * smoothstep(0.02, 0.10, e);
+      if (nightK > 0.004) {
+        for (int L = 0; L < 4; L++) {
+          float fl = float(L);
+          vec2 lean = L == 0 ? vec2(0.16, 0.05) : L == 1 ? vec2(-0.11, 0.19) : L == 2 ? vec2(0.04, -0.27) : vec2(-0.30, -0.10);
+          vec3 ax = normalize(up + ta * lean.x + tb * lean.y);
+          vec3 a1 = normalize(ta - ax * dot(ta, ax)), a2 = cross(ax, a1);
+          float fq = L == 0 ? 64.0 : L == 1 ? 47.0 : L == 2 ? 83.0 : 38.0;
+          float rowf = dot(d, ax) * fq + 1.6 * (L < 2 ? wv4.r : wv4.b) + fl * 0.37;
+          float row = floor(rowf), hx = fract(sin((row + fl * 71.0) * 91.7) * 43758.5453), hy = fract(sin((row + fl * 13.0) * 37.3) * 24634.63);
+          // (a line's streaks: from one in a sixth of the sky round to a dozen, the longest on few lines)
+          float along = atan(dot(d, a2), dot(d, a1)) * (1.0 + 11.0 * hx * hx) + hy * 40.0;
+          float seg = floor(along), ft = along - seg;
+          float hs = fract(sin((seg + row * 57.0 + fl * 19.0) * 12.9898) * 43758.5453), hl = fract(hs * 7.31 + hx);
+          float a0 = 0.04 + 0.20 * hl, a1e = a0 + 0.30 + 0.62 * hs * (1.0 - a0 - 0.30);
+          float sp = (ft - a0) / max(a1e - a0, 1e-3);
+          // (drawn to a point at both ends; one to three pixels thick, whatever the lens)
+          float taper = smoothstep(0.0, 0.30, sp) * smoothstep(0.0, 0.30, 1.0 - sp);
+          float fwr = max(fwidth(rowf), 1e-4);
+          float wid = (0.45 + 0.75 * hl * hl) * fwr * taper;
+          float cov = smoothstep(-0.5 * fwr, 0.5 * fwr, wid - abs(rowf - row - 0.5)) * step(0.0, sp) * step(sp, 1.0) * step(0.42, fract(hs * 3.7 + hy));
+          col = mix(col, mix(col, vec3(0.40, 0.80, 0.78), 0.30 + 0.55 * hl), cov * nightK * (0.45 + 0.55 * hs));
+        }
+      }
+    }
+  #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
 }
@@ -311,6 +449,7 @@ export function makeSkyUniforms() {
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },
     uBodyInv: { value: new THREE.Matrix3() },
+    ...OIL,
   };
 }
 
@@ -446,6 +585,7 @@ export function makeSky(uniforms) {
     depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth,
   });
   mat.userData.pcPainted = true;
+  register(mat, 'sky');
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'pc-sky';
   mesh.frustumCulled = false;

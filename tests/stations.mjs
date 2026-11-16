@@ -11,7 +11,7 @@
 // picture panned 0.25 px), the post passes' texture reads per pixel, counted in instrumented copies of
 // their shaders (--taps), post experiments on the held scene (--exp x26,...).
 //
-//   node tests/stations.mjs [--root DIR] [--set quick] [--tier q2] [--size 1280x720] [--device iphone14]
+//   node tests/stations.mjs [--root DIR] [--set quick] [--tier q2] [--size 1280x720] [--device iphone14] [--query look=oil]
 //        [--out DIR] [--label TEXT] [--alias] [--flicker] [--taps] [--exp x21,x26] [--views 0,1,3,4,5]
 //   node tests/stations.mjs --compare BASE.json[:KEY] --with RUNDIR       the guard's rules, no browser
 //   node tests/stations.mjs --baseline OUT.json --commit SHA --from RUNDIR[,RUNDIR...]   collect runs
@@ -73,7 +73,8 @@ async function run() {
   const out = path.resolve(val('out', `/home/user/.pc-scratch/pilot/stations/${tierName}-${device || size}`));
   fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
   fs.mkdirSync(path.join(out, 'thumbs'), { recursive: true });
-  const query = `quality=${tier.q}&scale=${tier.scale}&dynres=0&weather=fair&kits=0&card=0&fresh=1&save=0&audio=0&pointerlock=0&body=earth&time=11`;
+  // (--query: more of the address, for a look behind a switch: `--query look=oil` measures the oil look at the same stations)
+  const query = `quality=${tier.q}&scale=${tier.scale}&dynres=0&weather=fair&kits=0&card=0&fresh=1&save=0&audio=0&pointerlock=0&body=earth&time=11` + (val('query', '') ? '&' + val('query') : '');
   const label = val('label', `${path.basename(root)} ${tierName} ${device || size}`);
   const runFile = path.join(out, 'run.json');
   const result = { label, root, when: new Date().toISOString(), config: { tier: tierName, size, device: device || null, query, views, alias: flag('alias'), flicker: flag('flicker'), taps: flag('taps'), exps }, stations: {} };

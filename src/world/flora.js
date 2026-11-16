@@ -16,7 +16,8 @@ import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED
 import { FLORA_PHYS, TALL_KITS, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
-import { QUALITY, G } from '../render/shared.js';
+import { QUALITY, G, LOOK } from '../render/shared.js';
+import { SHADOW_LAYER } from '../render/shadow.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
 const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
@@ -28,7 +29,7 @@ const WASH_T = 0.55;                   // seconds a new thing takes to wash in, 
 const HOLD_MAX = 6;                    // seconds a built cell waits at most for its ground to be on the paper
 const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
 const JIT = 0.3;                       // each tree switches tier at its own distance
-const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01'];     // (the last two: trees only, PHYSICS' crown)
+const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01', 'aCard'];     // (the last two: trees only, PHYSICS' crown)
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
 const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
 
@@ -73,12 +74,17 @@ export class Flora {
   _init() {
     this.ready = true;
     const bodyUniforms = this.bodyUniforms, L = this.look;
-    this.species = L.tall.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+    // (the oil look may give a kind its own form and washes: a species' `oil` entry, laid over it; where trees stand,
+    // their sizes and what the explorer bumps into stay the species' own: floraplace.js, obstacles.js)
+    // (and in the oil look every broadleaf's crown is leaves one by one: florakit.js `leafy`)
+    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, sp.kit === 'broadleaf' ? { leafy: 1, double: 1 } : null, sp.oil) : sp));
+    this.species = TALL.map((sp, i) => {
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null });
+      mat.userData.pcCasts = true;
       const gen = TALL_KITS[sp.kit];
-      const fd = sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit];
+      const fd = sp.farD || (sp.kit === 'crystal' && sp.thin ? [1.8, 8, 0.9] : FAR_DIMS[sp.kit]);      // (farD: a kind's own far size [across, high, taper]: the oil look's trees of the snow)
       return { mat, geo0: [gen(11 + i * 10, 0, sp), gen(12 + i * 10, 0, sp)], geo1: gen(13 + i * 10, 1, sp), far: fd, pine: sp.kit === 'conifer' };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
@@ -87,13 +93,14 @@ export class Flora {
     this.mats = Object.assign({
       far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
-        far: L.tall.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine' })),
+        far: TALL.map((sp, i) => ({ leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
       }) : null,
     }, this._underMats(U, ''));
+    for (const k of ['far', 'bush', 'rock']) if (this.mats[k]) this.mats[k].userData.pcCasts = true;
     this.kit = {
       far: farTreeGeometry(5),
-      grass: grassGeometry(31), patch: grassPatchGeometry(37), fern: fernGeometry(41), reed: reedGeometry(81), bush: bushGeometry(51),
-      rock: rockGeometry(61), flower: flowerGeometry(71), shard: shardGeometry(91),
+      grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
+      rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
   }
 
@@ -117,14 +124,15 @@ export class Flora {
       under: makePropMaterial(bodyUniforms, { name: 'under' + tag, leafA: U.leaf[0], leafB: U.leaf[1], leafC: U.leaf[2], accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5 }),
       // near grass: the same washes, each blade bent about its own root
       patch: makePropMaterial(bodyUniforms, { name: 'patch' + tag, leafA: U.leaf[1], leafB: U.leaf[2], leafC: U.leaf[2].map((x) => x - (x - x * x) * 0.6), accent: U.accent, wind: 0.07, doubleSide: true, phys: 'full', stiff: 0, plantHeight: 0.5, bladeRoot: true }),
-      bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
+      bush: makePropMaterial(bodyUniforms, { name: 'bush' + tag, doubleSide: LOOK.oil, leafA: U.bush[0], leafB: U.bush[1], leafC: U.bush[2], leafP: [0.85, 0.3, 1.0, 0.25], wind: 0.04, phys: 'lite', stiff: FLORA_PHYS.bush.stiffness, plantHeight: FLORA_PHYS.bush.height }),
       rock: makePropMaterial(bodyUniforms, { name: 'rock' + tag, barkA: U.rock[0], barkB: U.rock[1], wind: 0 }),
       shard: makePropMaterial(bodyUniforms, { name: 'shard' + tag, barkA: sh[0], barkB: sh[1], wind: 0, gem: !!U.shard }),
     };
   }
   _palette(bi) {
     let m = this.pal.get(bi);
-    if (!m) { m = this._underMats(Object.assign({}, this.U, this.S.biomes[bi].under), '-' + bi); this.pal.set(bi, m); }
+    // (the oil look may give a biome's undergrowth its own colours: the biome's oil.under, laid over its washes)
+    if (!m) { const b = this.S.biomes[bi]; m = this._underMats(Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null), '-' + bi); this.pal.set(bi, m); }
     return m;
   }
 
@@ -143,6 +151,8 @@ export class Flora {
     let inst2 = null;
     if (far) { inst2 = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2); g.setAttribute('aInst2', inst2); }
     const mesh = new THREE.InstancedMesh(g, mat, cap);
+    // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
+    if (mat.userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
     mesh.count = 0;
     mesh.position.copy(chunk.origin);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();

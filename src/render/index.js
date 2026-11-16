@@ -5,9 +5,11 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, ensureGlobals } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals } from './shared.js';
+const _lv = new THREE.Vector3();
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
+import { ShadowMap } from './shadow.js';
 
 // additive exports for materials written outside the painter (PHYSICS' draw kits): the three
 // GLSL chunks of the scene pass and the uniforms they need
@@ -60,6 +62,8 @@ export function createPainter(renderer) {
   ensureGlobals();
   // (?float=0: the 8-bit fallback's path on a machine that has float targets, for tests)
   const post = new Post(renderer, { floatFallback: !!(QS && QS.get('float') === '0') });
+  // (the oil look's cast shadows: `&shadow=0` turns them off, `&shadow=4096` or another size sets the map's)
+  const shadow = LOOK.oil && !(QS && QS.get('shadow') === '0') ? new ShadowMap(renderer, { size: QS && +QS.get('shadow') > 256 ? +QS.get('shadow') : 2048 }) : null;
   let quality = 1, renderScale = 1, outW = 2, outH = 2, graphite = 0.4;
   const mood = { bodyId: null, biomeWeights: null, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0 };
   const swapped = [], glazed = [];
@@ -166,9 +170,22 @@ export function createPainter(renderer) {
     // (PILOT's mood.pulse01, 0 to 1: the pulse drive spooling up and dropping out; without it the ship model's mode says so)
     MOTION.given = typeof mood.pulse01 === 'number' ? Math.max(0, Math.min(1, mood.pulse01)) : null;
     post.sheetUniforms.uWxSheet.value.set(WX.key, Math.max(WX.flash, mood.sky && !WX.forced ? mood.sky.flash || 0 : 0), 0, 0);
+    if (LOOK.oil) {
+      // (the angle one pixel of the scene pass takes: the oil look's strokes are sized on the screen, chunks.js)
+      const pe = camera.projectionMatrix.elements;
+      OIL.uOilPx.value.x = 2 / (Math.max(pe[5], 1e-6) * Math.max(post.inH, 2)); OIL.uOilPx.value.y = post.inH;
+      OIL.uOilG.value.z = post.samples ? 1 : 0;       // (whether the scene is multisampled: a leaf's edge by cover, materials.js)
+    }
     const prevTarget = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;
+    if (shadow) shadow.render(renderer, scene, camera);
+    if (LOOK.oil) {
+      // (the lantern's glow in the air, post.js OIL_FRAG: where the lantern is in the eye's space, and how strong)
+      const L = OIL.uLamp.value, V = OIL.uLampV.value;
+      if (L.w > 0.01 && SHADOW.root) { _lv.set(L.x, L.y, L.z).applyMatrix4(SHADOW.root.matrixWorld).applyMatrix4(camera.matrixWorldInverse); V.set(_lv.x, _lv.y, _lv.z, L.w); }
+      else V.w = 0;
+    }
     post.beginScene();
     swapForeign(scene);
     // glazes sit out the scene pass and are laid over the brushed picture afterwards
@@ -224,12 +241,15 @@ export function createPainter(renderer) {
       if (o.border != null) u.uBorder.value.w = o.border ? 1 : 0;
       if (o.abstraction != null) a.uAbstraction.value = o.abstraction;
       if (o.bleed != null) a.uBrush.value.w = o.bleed;
+      // (the oil look's dials, shared.js OIL: { oil: { uOilA: [..], uOilB: [..], uOilC: [..] } })
+      if (o.oil) for (const k in o.oil) if (OIL[k]) OIL[k].value.fromArray(o.oil[k]);
     },
     info,
     // (for instruments only: the post passes themselves, so that a study can read a pass or try a shader in a running page)
     _post: post,
     // true where the browser cannot draw into float targets and the painting runs on 8-bit ones (post.js)
     floatFallback: post.floatFallback,
-    dispose() { post.dispose(); },
+    _shadow: shadow,
+    dispose() { post.dispose(); if (shadow) shadow.dispose(); },
   };
 }

@@ -12,7 +12,7 @@
 // Only paper effects live in screen space (grain, wobble, border). Everything that belongs to
 // the painting (wash variation, strokes, light) is anchored in the world by the materials.
 import * as THREE from 'three';
-import { getTextures, G, PREV } from './shared.js';
+import { getTextures, G, PREV, LOOK, OIL } from './shared.js';
 
 const FS_VERT = /* glsl */`
 varying vec2 vUv;
@@ -616,6 +616,84 @@ void main() {
 }
 `;
 
+// THE OIL LOOK'S LAST PASS (shared.js LOOK): the scene as the materials painted it, with no brush, no pooling, no pencil
+// and no paper over it, so nothing here can soften an edge. What it does: the picture comes up from the dark canvas on
+// an arrival; the world's last key (dusk gold, night blue) is laid over everything but the lights; a little more depth
+// in the darks. Where the scene is drawn smaller than the screen it is enlarged plainly.
+const OIL_FRAG = /* glsl */`
+uniform sampler2D tAbs;
+uniform highp sampler2D tAux;
+uniform vec3 uGrade;
+uniform vec4 uWxSheet;
+uniform float uNight;
+uniform float uLaid;
+uniform vec4 uOilC;
+uniform sampler2D uShAir;
+uniform mat4 uShV;
+uniform vec4 uShaft;
+uniform vec3 uShaftC;
+uniform vec3 uSunV;
+uniform vec2 uTanHalf;
+varying vec2 vUv;
+${AUX_DEC}
+const vec3 W = vec3(0.3, 0.5, 0.2);
+void main() {
+  vec3 col = texture(tAbs, vUv).rgb;
+  // LIGHT IN THE AIR (the overhaul plan's fourth piece): the clip's wood has shafts of light in its haze. The air on the
+  // pixel's line of sight is followed out to what it shows (sixteen places, closer together near the eye); at each the
+  // shadow map, taken down and smoothed for the air (shadow.js AIR_FRAG), says how much of the sun reaches it, and the
+  // same map read very coarsely says how much reaches the air round about. A line with more of its air in the sun than
+  // the air round about is lighter by the light's colour, one with less a little darker, and toward the sun more so:
+  // the picture's own brightness is not moved. It is light added to the picture as painted: no neighbour of the pixel
+  // is read, no edge is touched, and the air's light itself is smooth (asked of the fine map with a start that differed
+  // from pixel to pixel it came out as grain: the first stills of the shafts).
+  if (uShaft.x > 0.004) {
+    float vz = exp2(pcAuxDec(texture(tAux, vUv)).z) - 1.0;
+    vec3 ray = vec3((vUv * 2.0 - 1.0) * uTanHalf, -1.0);
+    float rl = length(ray);
+    float tEnd = min(vz, uShaft.z / rl);
+    float S = 0.0, A = 0.0;
+    for (int i = 0; i < 16; i++) {
+      float u = (float(i) + 0.5) / 16.0, t = tEnd * u * u;
+      vec3 q = (uShV * vec4(ray * t, 1.0)).xyz;
+      vec2 a = abs(q.xy);
+      float d = 0.0;
+      if (max(a.x, a.y) < 0.97) {
+        vec2 suv = q.xy * 0.5 + 0.5;
+        vec2 f1 = textureLod(uShAir, suv, 1.0).rg, f5 = textureLod(uShAir, suv, 5.0).rg;
+        float z1 = f1.g / max(f1.r, 1e-3), z5 = f5.g / max(f5.r, 1e-3);
+        d = f5.r * smoothstep(z5 - 0.002, z5 + 0.004, q.z) - f1.r * smoothstep(z1 - 0.002, z1 + 0.004, q.z);
+        d *= 1.0 - smoothstep(0.80, 0.97, max(a.x, a.y));
+      }
+      float wgt = exp(-uShaft.y * t * rl) * u;
+      S += wgt * d; A += wgt;
+    }
+    float dl = S / max(A, 1e-5);
+    float F = 1.0 - exp(-uShaft.y * tEnd * rl);
+    float ph = 0.40 + 1.4 * pow(max(dot(ray / rl, uSunV), 0.0), 3.0);
+    col += uShaftC * (uShaft.x * F * ph * (dl > 0.0 ? dl : 0.6 * dl));
+    col = max(col, vec3(0.0));
+  }
+  float lamp = 0.0;
+  if (uNight > 0.003 || uGrade != vec3(1.0)) lamp = step(7.95, pcAuxDec(texture(tAux, vUv)).w);
+  // (and by night what is warm is a light or is lit by one: the lantern's pool on the snow keeps its orange, as a
+  // lamp's glass does; the night's cool key over it turned the pool to mustard)
+  lamp = max(lamp, smoothstep(0.10, 0.32, col.r - col.b) * uNight);
+  col *= mix(uGrade, vec3(1.0), lamp);
+  // lightning: for a frame or two everything light goes lighter
+  col = mix(col, vec3(1.0), clamp(uWxSheet.y * smoothstep(0.25, 0.75, dot(col, W)) * 0.6, 0.0, 0.9));
+  // a gentle S over the values: the darks a step deeper, the lights kept
+  vec3 s = col * col * (3.0 - 2.0 * col);
+  col = mix(col, s, 0.35);
+  // colours that pop (the owner, 2026-11-15): every colour pushed from its grey, the dull ones most and the pure ones
+  // hardly, so nothing clips; a pixel's own colour only, no neighbour is read: no edge is touched
+  float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
+  col = clamp(mix(vec3(lw), col, 1.0 + 0.28 * (1.0 - sat)), 0.0, 1.0);
+  col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}
+`;
+
 function fsMaterial(frag, uniforms, extra) {
   return new THREE.ShaderMaterial(Object.assign({
     uniforms, vertexShader: FS_VERT, fragmentShader: frag,
@@ -743,6 +821,12 @@ export class Post {
     this.mSheet = fsMaterial(SHEET_FRAG, this.sheetUniforms, this.paperBaked ? { defines: { PC_PAPER_BAKED: 1 } } : null);
     this.mPaper = fsMaterial(PAPERS_FRAG, { tPaper: this.sheetUniforms.tPaper, uOutRes: this.sheetUniforms.uOutRes, uBoil: this.sheetUniforms.uBoil, uBorder: this.sheetUniforms.uBorder });
     this.mPaper.name = 'paper-bake';
+    this.oil = LOOK.oil;
+    this.mOil = fsMaterial(OIL_FRAG, { tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
+      uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8,
+      uShAir: OIL.uShAir, uShV: OIL.uShV, uShaft: OIL.uShaft, uShaftC: OIL.uShaftC, uSunV: OIL.uSunV,
+      uTanHalf: { value: new THREE.Vector2(1, 1) } });
+    this.mOil.name = 'oil-finish';
     this.debugView = 0;
     this.mCopy = fsMaterial(/* glsl */`
       uniform sampler2D tA; uniform highp sampler2D tB; uniform int uMode; varying vec2 vUv;
@@ -859,6 +943,7 @@ export class Post {
 
   // glazes: objects drawn over the brushed picture (see shared.js GLAZES), with the scene's camera
   finish(glazes, camera) {
+    if (this.oil) return this._finishOil(glazes, camera);
     // (R1 W2.5) the region through the resolve, before anything reads it
     if (this.samples) this._pass(this.mAuxFix, this.rtAux);
     this._pass(this.mPrep, this.rtHalf);
@@ -899,6 +984,34 @@ export class Post {
       if (this.paperBaked) this._paper();
       this._pass(this.mSheet, null);
     }
+  }
+
+  // The oil look's passes (shared.js LOOK): the scene as painted, the glazes over it, last frame kept for the water, the
+  // last key. No brush, no pooling, no pencil, no paper.
+  _finishOil(glazes, camera) {
+    // (the view's angle, for the light in the air: a pixel's line of sight in the eye's space)
+    const pe = camera.projectionMatrix.elements;
+    this.mOil.uniforms.uTanHalf.value.set(1 / Math.max(pe[0], 1e-6), 1 / Math.max(pe[5], 1e-6));
+    // (the region through the resolve, before anything reads it, as in the watercolour's passes)
+    if (this.samples) this._pass(this.mAuxFix, this.rtAux);
+    const m = this.mCopy;
+    m.uniforms.uMode.value = 1; m.uniforms.tA.value = this.rtScene.textures[0];
+    this._pass(m, this.rtAbs);
+    if (glazes && glazes.length) {
+      const r = this.renderer;
+      r.setRenderTarget(this.rtAbs);
+      for (const o of glazes) { o.visible = true; r.render(o, camera); }
+    }
+    if (this.postAA) this._pass(this.mFxaa, this.rtAA);
+    const water = PREV.water;
+    if (water) { this.waterSeen = true; this.waterBody = PREV.body; }
+    if (water || (this.waterSeen && this.waterBody === PREV.body)) { this._pass(this.mKeep, this.rtPrev); this.prevFrames++; } else this.prevFrames = 0;
+    G.uPrevOn.value = this.prevFrames >= 1 ? 1 : 0;
+    if (this.debugView) {
+      m.uniforms.uMode.value = this.debugView === 5 ? 1 : this.debugView;
+      m.uniforms.tA.value = this.debugView === 5 ? this.rtAbs.texture : this.rtScene.textures[0];
+      this._pass(m, null);
+    } else this._pass(this.mOil, null);
   }
 
   // The brush's passes that are not drawn every frame laid once into a 2 x 2 sheet (PILOT's P3), so that

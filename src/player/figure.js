@@ -20,6 +20,7 @@ export function figureArgs(ex, lookPitch, out = {}, air = null) {
   const ph = ex.phys || null;
   const ride = ph ? num(ph.ride, num(ph.hip)) : 0;
   out.mode = ex.mode; out.speed = ex.speed; out.jet01 = ex.jet01; out.lookPitch = lookPitch;
+  out.fly01 = ex.fly01 || 0;      // (the wanderer's own flight, player/explorer.js: 0..1 while it flies)
   out.hip = ride;
   out.ride = ride;
   out.clamber01 = ph ? num(ph.clamber01) : 0;

@@ -11,7 +11,7 @@
 // parts are moved by a matrix palette (render/materials.js, makeFigureMaterial).
 import * as THREE from 'three';
 import { makeFigureMaterial } from '../render/materials.js';
-import { MOTION, G } from '../render/shared.js';
+import { MOTION, G, LOOK, WX } from '../render/shared.js';
 
 // ---- small vector and noise helpers ---------------------------------------------------------
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -52,6 +52,8 @@ const CREAM = hex('#e4d4ae'), HEM = hex('#b79a70'), INK = hex('#3d4056'), TROUSE
 const PACK = hex('#6c7b8d'), ROLL = hex('#efe6cf'), COPPER = hex('#a9683f'), RED = hex('#c8452e');
 const FLESH = hex('#e9c9a6'), CHEEK = hex('#e3a68c'), BROW = hex('#9e8288'), HAIR = hex('#5b4634'), GLASS = hex('#8eaab6'), OCHRE = hex('#c9914e');
 const SEPIA = hex('#6f4e3a'), KEEL = hex('#86674b'), FLAME0 = [1, 0.99, 0.94], FLAME1 = hex('#f6c871'), FLAME2 = hex('#e79a52');
+// (the wanderer, the oil look's explorer: a rich blue cloak (the owner, 2026-11-15) with a pale trimmed hem)
+const CLOAK = hex('#4a6ad0'), CLOAK_D = hex('#33489c'), TRIM = hex('#e2d2a4');
 
 // ---- geometry kit: lofted soft forms into one buffer ------------------------------------------
 function makeBuilder() {
@@ -65,7 +67,7 @@ function makeBuilder() {
     const lump = o.lump == null ? 0.012 : o.lump, freq = o.freq || 3.3, seed = (base * 0.371) % 19;
     const dry = o.dry == null ? 0.5 : o.dry, wet = o.wet == null ? 0.12 : o.wet, glow = o.glow || 0;
     const put = (p, c, t, a, ring) => {
-      const cc = col(p, t, a, ring), j = glow > 0 ? 1 : 0.93 + 0.14 * noise3(p[0] * 2.1 + seed, p[1] * 2.1, p[2] * 2.1 + 7.7);
+      const cc = col(p, t, a, ring), j = glow > 0 || o.even ? 1 : 0.93 + 0.14 * noise3(p[0] * 2.1 + seed, p[1] * 2.1, p[2] * 2.1 + 7.7);
       P.push(p[0], p[1], p[2]); C.push(Math.min(1, cc[0] * j), Math.min(1, cc[1] * j), Math.min(1, cc[2] * j)); M.push(dry, wet, glow); Q.push(B.part);
     };
     for (let i = 0; i < n; i++) {
@@ -168,11 +170,139 @@ const mixc = (a, b, t) => lerp3(a, b, clamp01(t));
 // The explorer: a travelling painter. Broad soft hat, long canvas coat, a pack with a rolled
 // sheet on top and two small jet bottles, a red scarf.
 // =================================================================================================
+// THE WANDERER (the oil look's explorer; the owner, 2026-11-15, docs/HANDOVER.md section 2 item 6 on branch r2): no hat,
+// a bare head; a blue-grey cloak in place of the coat and the scarf, over the pack, the jets under its hem, a pale
+// trimmed hem cut in tongues like brush strokes; its back panel streams on the air as the scarf's tail did (the same
+// bone); a hood that comes up in snow and storms; a lantern at the right hip whose glass is dark by day and lit when
+// the light goes (the figure material's lamp glass). The same rig and the same animation as the painter's figure: only
+// the parts' shapes differ, and two parts are added (11 the hood, 12 the lantern).
+// THE CLOAK IN STRIPS (the overhaul plan's eighth piece). The clip's cloak is made of long stroke-shaped strips, one
+// over another like a bird's feathers, each one flat blue, with a ragged edge where they end; it is the strongest
+// colour in the picture. Ours was a smooth cone with fine streaks drawn on it and a pale hem. So the cone is now a dark
+// lining, and over it hang tiers of strips (each a thin flat ribbon with a blunt end, a piece of geometry of
+// its own: `dry: 1` marks it for the shader, materials.js FIG_FRAG, which paints it as one flat piece), the lowest
+// tier ending at many heights. The profile is the cone's own: [height, half width, half depth, how far back].
+// (a wide bell: the clip's cloak stands out from the body and is widest at its hem)
+const CLOAK_PROFILE = [[1.47, 0.110, 0.100, 0.012], [1.36, 0.255, 0.180, 0.022], [1.26, 0.262, 0.232, 0.036], [1.12, 0.268, 0.262, 0.042], [1.03, 0.280, 0.276, 0.040], [0.94, 0.300, 0.298, 0.042],
+  [0.80, 0.336, 0.336, 0.046], [0.64, 0.372, 0.376, 0.050], [0.50, 0.398, 0.404, 0.054], [0.38, 0.412, 0.420, 0.056]];
+const CLOAK_BLUES = [hex('#4a6ad0'), hex('#3d5cc8'), hex('#2f49b4'), hex('#5b7ce0'), hex('#27409e'), hex('#4a6ad0'), hex('#7d98ee'), hex('#33489c')];
+function cloakAt(a, y, out) {
+  const T = CLOAK_PROFILE;
+  let i = 0;
+  while (i < T.length - 2 && y < T[i + 1][0]) i++;
+  const k = clamp01((T[i][0] - y) / (T[i][0] - T[i + 1][0])), rx = T[i][1] + (T[i + 1][1] - T[i][1]) * k, rz = T[i][2] + (T[i + 1][2] - T[i][2]) * k, cz = T[i][3] + (T[i + 1][3] - T[i][3]) * k;
+  const r = rx + out, q = rz + out;
+  return [Math.cos(a) * r, y, cz + Math.sin(a) * q];
+}
+// one tier: n THIN strips round the cloak, hung at yTop and about len long (each its own length), w their half width.
+// (The owner, 2026-11-16: "the cloak looks clunky thinner stripes would help or more stripes to make it flow easier".
+// So a strip is under four centimetres wide and seven or eight times as long, there are about six hundred of them in
+// nine tiers, each lying over two tiers below it, each with a slight sway of its own down its length and lifting a
+// little from the cloak at its tip: long strokes that run down the cloak, not scales.)
+function cloakRow(B, n, yTop, len0, w, rag, lift, seed, a0, flare) {
+  for (let i = 0; i < n; i++) {
+    const h1 = (Math.sin((i + 1) * 12.9898 + seed * 78.233) * 43758.5453) % 1, r1 = h1 < 0 ? h1 + 1 : h1;
+    const h2 = (Math.sin((i + 1) * 39.3467 + seed * 11.135) * 24634.6345) % 1, r2 = h2 < 0 ? h2 + 1 : h2;
+    const a = a0 + ((i + 0.7 * (r1 - 0.5)) / n) * Math.PI * 2, da = (r2 - 0.5) * 0.10, sway = (r1 - 0.5) * 0.05;
+    const len = len0 * (0.78 + 0.44 * r2) + rag * r1, pts = [];
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4, y = Math.max(0.36, yTop - len * t);
+      pts.push(cloakAt(a + da * t + sway * Math.sin(t * 3.14), y, lift * (0.35 + 0.9 * t) + (flare || 0) * t * t + (i % 3) * 0.004));
+    }
+    const c0 = CLOAK_BLUES[(i * 3 + ((r2 * 5) | 0) + seed) % CLOAK_BLUES.length], c1 = CLOAK_BLUES[(i * 5 + seed * 3 + 2) % CLOAK_BLUES.length];
+    const col = mixc(c0, c1, r1 * 0.5);
+    B.path(pts, (k) => [[w * 0.80, 0.004], [w, 0.005], [w, 0.005], [w * 0.86, 0.005], [w * 0.36, 0.004]][k], { seg: 4, col, even: 1, lump: 0, dry: 1, wet: 0, cap: 0.3, ref: [-Math.sin(a), 0, Math.cos(a)] });
+  }
+}
+function wandererParts(B, X, Z, ringsY) {
+  // (the lining under the strips: the deep blue, darker toward the hem)
+  const cloak = (p) => mixc(CLOAK_D, INK, clamp01(sstep(1.30, 0.50, p[1]) * 0.28 + (noise3(p[0] * 7, p[1] * 3, p[2] * 7) - 0.5) * 0.15));
+  // 0 torso: the cloak over the shoulders and the pack, a cowl round the neck
+  B.part = 0;
+  B.loft(ringsY([[1.00, 0.212, 0.214, 0, 0.034], [1.12, 0.224, 0.226, 0, 0.040], [1.26, 0.244, 0.214, 0, 0.034], [1.36, 0.250, 0.172, 0, 0.020], [1.42, 0.172, 0.126, 0, 0.010], [1.465, 0.086, 0.080]]), { seg: 16, col: cloak, lump: 0.012 });
+  { const pts = []; for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; pts.push([Math.cos(a) * 0.100, 1.455 + Math.sin(a * 2) * 0.008 + Math.max(0, Math.sin(a)) * 0.016, Math.sin(a) * 0.094 + 0.014]); }
+    B.path(pts, 0.046, { seg: 7, closed: true, col: CLOAK_D, lump: 0.006, dry: 0.3 }); }
+  // (three tiers over the shoulders, on the torso's bone, the lowest laid first; the tops of the highest lie under the cowl)
+  cloakRow(B, 50, 1.20, 0.24, 0.019, 0.04, 0.008, 3, 0.05, 0);
+  cloakRow(B, 44, 1.33, 0.26, 0.019, 0.04, 0.011, 2, 0.11, 0);
+  cloakRow(B, 34, 1.455, 0.26, 0.019, 0.04, 0.014, 1, 0.24, 0);
+  // 1 head: bare; the face takes the light, the hair a soft cap
+  B.part = 1;
+  B.blob([0, 1.585, 0], 0.112, 0.125, 0.118, { seg: 14, rings: 11, col: (p) => (p[2] < -0.03 && p[1] < 1.632 ? mixc(FLESH, CHEEK, sstep(0.03, 0.08, Math.abs(p[0])) * sstep(1.625, 1.57, p[1]) * 0.75) : HAIR), lump: 0.004, dry: 0.2 });
+  // (the hair one form over the crown and down to the nape: as a shallow cap on the head it had a rim, and with its
+  // streaks it read as a knitted hat; the owner's figure is bare-headed)
+  B.blob([0, 1.602, 0.040], 0.125, 0.140, 0.130, { seg: 12, rings: 9, col: (p) => mixc(HAIR, SEPIA, noise3(p[0] * 20, p[1] * 9, p[2] * 20) * 0.6), lump: 0.008, dry: 0.4 });      // (down to the cowl: the head's own back showed under it as a band)
+  // 2, 3 arms: dark sleeves from under the cloak, a pale hand
+  for (const s of [-1, 1]) {
+    B.part = s < 0 ? 2 : 3;
+    B.path([[s * 0.222, 1.385, 0], [s * 0.232, 1.33, 0], [s * 0.252, 1.12, -0.012], [s * 0.255, 0.95, -0.045], [s * 0.252, 0.875, -0.062]], (i) => [0.03, 0.066, 0.060, 0.052, 0.044][i], { seg: 9, col: (p) => mixc(CLOAK_D, INK, 0.35 + sstep(1.0, 0.86, p[1]) * 0.3), lump: 0.006 });
+    B.blob([s * 0.252, 0.842, -0.068], 0.040, 0.050, 0.044, { seg: 8, rings: 5, col: FLESH, lump: 0.003, dry: 0.2 });
+  }
+  // 4 the cloak's fall: to the calf behind, the knee in front; the hem trimmed pale and cut in tongues
+  B.part = 4;
+  B.loft(ringsY([[1.05, 0.262, 0.258, 0, 0.038], [0.94, 0.288, 0.286, 0, 0.042], [0.80, 0.324, 0.324, 0, 0.046], [0.64, 0.360, 0.364, 0, 0.050], [0.52, 0.384, 0.390, 0, 0.054], [0.475, 0.378, 0.384, 0, 0.054], [0.55, 0.16, 0.16, 0, 0.03]]), {
+    seg: 24, lump: 0.014, cap: 0.0,
+    col: (p, t) => (t > 0.9 ? mixc(INK, CLOAK_D, 0.4) : cloak(p)),
+    warp: (p, a, t) => {
+      const k = sstep(0.95, 0.47, p[1]), wave = 1 + k * 0.08 * Math.sin(3 * a + 0.4);
+      const tooth = Math.abs((((a * 11) / (2 * Math.PI)) % 1 + 1) % 1 - 0.5) * 2 - 0.5;       // eleven tongues round the hem
+      return [p[0] * wave, p[1] + k * (0.10 * Math.max(0, -p[2] / 0.3) + 0.020 * Math.sin(4 * a + 1.3)) + k * k * 0.05 * tooth, p[2] * wave];
+    },
+  });
+  // (four tiers down the fall, on its bone, laid from the hem up so that each lies over the one below it; the lowest
+  // ends at many heights: the cloak's ragged edge)
+  cloakRow(B, 74, 0.58, 0.22, 0.019, 0.10, 0.006, 9, 0.07, 0.030);
+  cloakRow(B, 72, 0.69, 0.28, 0.019, 0.07, 0.008, 8, 0.19, 0.022);
+  cloakRow(B, 68, 0.80, 0.30, 0.019, 0.05, 0.010, 7, 0.02, 0.014);
+  cloakRow(B, 64, 0.91, 0.30, 0.019, 0.05, 0.011, 6, 0.15, 0.008);
+  cloakRow(B, 60, 1.01, 0.30, 0.019, 0.05, 0.012, 5, 0.09, 0.004);
+  cloakRow(B, 56, 1.11, 0.30, 0.019, 0.05, 0.012, 4, 0.21, 0);
+  // 5 the back panel, which streams on the air (the scarf's bone)
+  B.part = 5;
+  B.path([[0, 1.43, 0.13], [0, 1.40, 0.225], [0, 1.25, 0.282], [0, 1.02, 0.310], [0, 0.80, 0.338], [0, 0.60, 0.360]], (i) => [[0.10, 0.020], [0.17, 0.022], [0.215, 0.020], [0.236, 0.018], [0.226, 0.016], [0.150, 0.012]][i], { seg: 10, col: cloak, lump: 0.006, ref: X, dry: 0.3 });
+  // (and its own strips: six tiers of thin ones down the back, each over the two below, which stream with it)
+  for (let tier = 5; tier >= 0; tier--) {
+    const n = 9 + (tier % 2), y0 = 1.41 - tier * 0.135, zt = 0.262 + tier * 0.024 + (tier === 0 ? -0.012 : 0);
+    for (let i = 0; i < n; i++) {
+      const x = (i - (n - 1) / 2) * 0.040 * (0.80 + 0.10 * tier), w = 0.019, len = 0.26 + 0.06 * ((i * 7 + tier) % 3), sw = ((i * 13 + tier * 5) % 7 - 3) * 0.004;
+      const pts = []; for (let k = 0; k <= 4; k++) { const t = k / 4; pts.push([x * (1 + 0.10 * t) + sw * Math.sin(t * 3.14), y0 - len * t, zt + 0.030 * t + 0.014 + (i % 2) * 0.004]); }
+      B.path(pts, (k) => [[w * 0.80, 0.004], [w, 0.005], [w, 0.005], [w * 0.86, 0.005], [w * 0.36, 0.004]][k], { seg: 4, col: mixc(CLOAK_BLUES[(i * 5 + tier * 3 + 1) % CLOAK_BLUES.length], CLOAK_BLUES[(i * 3 + tier) % CLOAK_BLUES.length], 0.3), even: 1, lump: 0, dry: 1, wet: 0, cap: 0.3, ref: X });
+    }
+  }
+  // 6..9 legs: thigh, shin and boot
+  for (const s of [-1, 1]) {
+    B.part = s < 0 ? 6 : 7;
+    B.capsule([s * 0.095, 0.90, 0], [s * 0.095, 0.48, 0], 0.088, 0.070, { seg: 9, col: TROUSER, lump: 0.006 });
+    B.part = s < 0 ? 8 : 9;
+    B.capsule([s * 0.095, 0.48, 0], [s * 0.095, 0.11, 0.008], 0.069, 0.060, { seg: 9, col: (p) => mixc(INK, TROUSER, sstep(0.22, 0.34, p[1])), lump: 0.005 });
+    B.blob([s * 0.097, 0.062, -0.042], 0.074, 0.062, 0.128, { seg: 9, rings: 5, col: INK, lump: 0.004, dry: 0.25 });
+  }
+  // (10, the jets: the wanderer has none: it flies by itself. The bone is kept, empty, so the rig is the same.)
+  // 11 the hood (drawn up: the bone shrinks it into the cowl in fair weather); its front is cut back to frame the face
+  B.part = 11;
+  B.loft(ringsY([[1.44, 0.108, 0.104, 0, 0.022], [1.50, 0.142, 0.152, 0, 0.032], [1.60, 0.152, 0.166, 0, 0.036], [1.69, 0.136, 0.150, 0, 0.042], [1.745, 0.086, 0.100, 0, 0.052], [1.762, 0.03, 0.04, 0, 0.06]]), {
+    seg: 14, lump: 0.008, col: (p) => mixc(CLOAK, CLOAK_D, 0.35 + 0.4 * noise3(p[0] * 9, p[1] * 5, p[2] * 9)),
+    warp: (p) => (p[2] < -0.05 ? [p[0], p[1], -0.05 + (p[2] + 0.05) * 0.14] : p),
+  });
+  // 12 the lantern at the right hip, on a strap from the belt, clear of the cloak: a dark frame, a glass that is lit when
+  // the light goes
+  B.part = 12;
+  const lx = 0.445, lz = -0.03;      // (clear of the cloak's bell, which is wider now)
+  B.capsule([lx, 0.815, lz], [lx, 0.715, lz], 0.046, 0.046, { seg: 8, col: GLASS, glow: -1, wet: 0.4, lump: 0, mid: 0 });
+  B.blob([lx, 0.842, lz], 0.058, 0.020, 0.058, { seg: 8, rings: 4, col: INK, lump: 0 });
+  B.blob([lx, 0.690, lz], 0.055, 0.018, 0.055, { seg: 8, rings: 4, col: INK, lump: 0 });
+  B.path([[lx - 0.036, 0.852, lz], [lx - 0.024, 0.905, lz], [lx + 0.024, 0.905, lz], [lx + 0.036, 0.852, lz]], 0.008, { seg: 5, col: INK, lump: 0 });
+  B.path([[0.26, 1.04, -0.02], [0.36, 0.975, lz], [lx, 0.908, lz]], 0.008, { seg: 5, col: SEPIA, lump: 0 });
+  return { lamp: [lx, 0.76, lz] };
+}
+
 export function createExplorer() {
   const B = makeBuilder();
   const X = [1, 0, 0], Z = [0, 0, 1];
   const ringsY = (rows) => rows.map((r) => ({ c: [r[3] || 0, r[0], r[4] || 0], u: X, v: Z, ru: r[1], rv: r[2], e: r[5] || 2.2 }));
   const coat = (p) => (p[1] > 0.985 && p[1] < 1.045 ? SEPIA : mixc(CREAM, HEM, sstep(1.05, 0.55, p[1]) * 0.85));
+  const wander = LOOK.oil ? wandererParts(B, X, Z, ringsY) : null;
+  if (!wander) {
 
   // 0 torso: upper coat, collar, scarf round the neck, pack, rolled sheet, jet bottles
   B.part = 0;
@@ -232,11 +362,14 @@ export function createExplorer() {
     B.path([[s * 0.19, 0.935, 0.235], [s * 0.19, 0.86, 0.237], [s * 0.19, 0.72, 0.242], [s * 0.19, 0.56, 0.25]], (i) => [0.034, 0.058, 0.046, 0.018][i], { seg: 7, lump: 0, glow: 1, wet: 0.9, cap: 0.5, col: (p) => (p[1] > 0.84 ? mixc(FLAME1, FLAME0, sstep(0.84, 0.9, p[1])) : mixc(FLAME2, FLAME1, sstep(0.56, 0.84, p[1]))) });
   }
 
-  const mat = makeFigureMaterial({ parts: 11, scale: 0.42, pooling: 0.55, stroke: 2.6 });
+  }      // (the painter's own parts, above; the wanderer's are wandererParts')
+
+  const mat = makeFigureMaterial({ parts: wander ? 13 : 11, scale: 0.42, pooling: 0.55, stroke: 2.6 });
   const mesh = new THREE.Mesh(B.build([0, 0.95, 0], 1.9), mat);
   mesh.name = 'explorer-figure';
   const g = new THREE.Group(); g.name = 'explorer'; g.add(mesh);
-  g.userData.height = 1.82; g.userData.pcCaster = 'explorer';
+  g.userData.height = wander ? 1.75 : 1.82; g.userData.pcCaster = 'explorer';
+  if (wander) g.userData.lamp = wander.lamp;      // (where the lantern is, the figure's own space: the world lays its pool of light, world/index.js)
 
   const rig = makeRig([
     { name: 'torso', pivot: [0, 0.90, 0] },
@@ -246,7 +379,8 @@ export function createExplorer() {
     { name: 'scarf', parent: 'torso', pivot: [-0.065, 1.44, 0.17] },
     { name: 'thighL', parent: 'torso', pivot: [-0.095, 0.89, 0] }, { name: 'thighR', parent: 'torso', pivot: [0.095, 0.89, 0] },
     { name: 'shinL', parent: 'thighL', pivot: [-0.095, 0.48, 0] }, { name: 'shinR', parent: 'thighR', pivot: [0.095, 0.48, 0] },
-    { name: 'jet', parent: 'torso', pivot: [0, 0.935, 0.235] },
+    { name: 'jet', parent: 'torso', pivot: wander ? [0, 0.50, 0.21] : [0, 0.935, 0.235] },
+    ...(wander ? [{ name: 'hood', parent: 'head', pivot: [0, 1.47, 0.05] }, { name: 'lantern', parent: 'torso', pivot: [0.445, 0.908, -0.03] }] : []),
   ], mat.uniforms.uPart.value);
   const b = rig.bones;
 
@@ -256,7 +390,7 @@ export function createExplorer() {
   // (forward, to the right), the gale's crouch, the air past the body (a unit direction and its load on cloth), the swim's pace
   const W = { lf: 0, lr: 0, hk: 0, load: 0, x: 0, y: 0, z: 0, gust: 0, sp: 0 };
   const num = (v, d) => (Number.isFinite(v) ? v : d || 0);
-  let t = 0, ph = 0, jetS = 0, first = true, fallT = 0;
+  let t = 0, ph = 0, jetS = 0, first = true, fallT = 0, hood = 0, fly = 0;
   function animate(state, dt) {
     const s = state || {};
     dt = Math.max(0, Math.min(0.1, dt || 0)); t += dt;
@@ -427,6 +561,40 @@ export function createExplorer() {
     const boil = hash3(Math.floor(t * 8), 3.3, 1.7);
     const fs = jetS * (0.78 + 0.34 * boil);
     b.jet.scale.set(jetS > 0.02 ? 0.7 + 0.5 * jetS : 0.001, Math.max(0.001, fs), jetS > 0.02 ? 0.7 + 0.5 * jetS : 0.001);
+    if (b.hood) {
+      // the hood comes up in falling snow and in a storm (the sky's numbers, render/shared.js WX), and goes down after
+      const sk = WX.forced || WX.mood;
+      const want = s.hood != null ? clamp01(s.hood) : sk ? clamp01(Math.max(num(sk.snowfall), num(sk.storm)) * 3 - 0.25) : 0;
+      hood += (want - hood) * (snapNow ? 1 : 1 - Math.exp(-2.2 * dt));
+      const hs = Math.max(0.001, hood);
+      b.hood.scale.set(0.55 + 0.45 * hs, hs, 0.55 + 0.45 * hs);
+    }
+    if (wander) {
+      // FLIGHT (the owner: "flight like superman"; PILOT's `fly01`, player/explorer.js). At a hover the figure hangs
+      // upright and easy; with speed the body comes level, the right arm reaches ahead, the left lies back along the
+      // side, the legs trail together and the head looks where it goes. The cloak, hung from the shoulders, lies
+      // back along the body by itself.
+      const fw = clamp01(num(s.fly01));
+      fly += (fw - fly) * (snapNow ? 1 : 1 - Math.exp(-6 * dt));
+      if (fly > 0.002) {
+        const go = fly * sstep(2.5, 13, speed), ease = (bone, ax, v, kk) => { bone.rotation[ax] += (v - bone.rotation[ax]) * kk; };
+        ease(b.torso, 'x', -1.30 + 0.05 * Math.sin(t * 2.1), go);
+        ease(b.head, 'x', 1.02, go);
+        ease(b.armR, 'x', 2.82, go); ease(b.armR, 'z', 0.06, go);
+        ease(b.armL, 'x', 0.18, go); ease(b.armL, 'z', -0.14, go);
+        ease(b.thighL, 'x', 0.05 + 0.03 * Math.sin(t * 3.1), fly); ease(b.thighR, 'x', -0.04 + 0.03 * Math.sin(t * 3.1 + 2), fly);
+        ease(b.shinL, 'x', 0.10, fly); ease(b.shinR, 'x', 0.05, fly);
+        ease(b.skirt, 'x', 0.10 + 0.06 * Math.sin(t * 8.3), go);
+        // (the back panel lies along the back in level flight, fluttering a little: on the upright jet's rule it stood
+        // up from the shoulders like a mast, seen in the first side-on still of the flight)
+        ease(b.scarf, 'x', 0.05 + 0.05 * Math.sin(t * 9.1), go); ease(b.scarf, 'z', 0.03 * Math.sin(t * 7.3), go);
+      }
+    }
+    if (b.lantern) {
+      // the lantern swings from its strap with the stride
+      b.lantern.rotation.x = (0.10 + 0.16 * w.run) * Math.sin(2 * ph + 0.9) * w.walk * grounded + 0.25 * w.fall;
+      b.lantern.rotation.z = -0.05 + 0.05 * Math.sin(ph + 0.3) * w.walk * grounded;
+    }
     rig.update();
   }
   animate({ mode: 'idle' }, 0);

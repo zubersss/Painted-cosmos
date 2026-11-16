@@ -345,7 +345,8 @@ function gaitPose(dt) {
 function placeExplorer(side, dt) {
   placeModel(explorer, Math.sin(state.yaw) * MP.dist + Math.cos(state.yaw) * side, Math.cos(state.yaw) * MP.dist - Math.sin(state.yaw) * side, MP.lift, MP.face);
   if (dt != null && GAIT) explorer.animate({ ...gaitPose(frozenT != null ? 0 : dt), lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
-  else if (dt != null) explorer.animate({ mode: MP.pose, speed: MP.speed == null ? undefined : MP.speed, phase: MP.phase == null ? undefined : MP.phase, jet01: MP.pose === 'jet' ? MP.jet : 0, lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
+  // (pose=fly: the wanderer's own flight, the oil look: PILOT's mode 'jet' with fly01; &speed= sets how level it lies)
+  else if (dt != null) explorer.animate({ mode: MP.pose === 'fly' ? 'jet' : MP.pose, fly01: MP.pose === 'fly' ? 1 : 0, speed: MP.speed == null ? undefined : MP.speed, phase: MP.phase == null ? undefined : MP.phase, jet01: MP.pose === 'jet' ? MP.jet : 0, lookPitch: MP.epitch, snap: frozenT != null }, frozenT != null ? 0 : dt);
 }
 let cockpit = null;
 function placeShip(dt) {

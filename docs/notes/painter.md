@@ -4,7 +4,192 @@ Branch: `cosmos` (shared with PILOT and PHYSICS, one working tree). Commits: `to
 This file was rewritten by the second PAINTER agent (the first ran out of working context). The
 first agent's record of M1 is kept at the end ("Earlier answers").
 
-## Hand-over of RELEASE 1, RE-FIX pass of the PAINTER lane (READ THIS FIRST; kept current after every item)
+## Hand-over of THE OIL LOOK, prototype on branch `look-proto` (READ THIS FIRST; kept current)
+
+Branch: `look-proto`, cut from `main` at `5e85754`. Nothing here is live. The plan, the owner's instructions, the sort of
+the references and the crispness rule are on branch `r2`: `docs/HANDOVER.md` (section 2, and 4a-2: the overhaul plan the
+owner approved) and `docs/references/README.md`. Read those before touching the look. Built by the coordinator itself
+(no workflow). The log of every decision is `docs/COORDINATOR.md` on `r2`.
+
+**What it is.** `?look=oil` paints the same world in opaque paint with strokes laid on the surfaces themselves, after the
+owner's reference clip. Without the flag nothing changes: the switch is the compile-time define `PC_OIL` in every painted
+material (`src/render/shared.js`: `LOOK`, `OIL`, `register`), and the watercolour's code paths are untouched.
+`src/data/mode.js` (`MODE.oil`, `MODE.wanderer`) carries the switch to the data, the surface and the player code, which
+must not load the page's modules.
+
+**The owner on the checkpoint of 2026-11-16:** the look is approved ("I like the look so far keep it up"); the cloak
+was "clunky" and wants thinner or more strips so that it flows (done: about six hundred thin strips in nine tiers,
+`cloakRow` in `src/art/models.js`); the aurora read as "stripes instead of lights like the reference" (done: it is
+LIGHT ADDED TO THE SKY and soft, `pcAuroraLight` in `src/world/sky.js`: the one soft thing in the picture, by the
+owner's word; the crispness rule stands for everything else); go on without stopping for approval.
+
+**The owner's choices so far** (each logged on `r2`): STYLE 5, leaf dabs lying every way, a little thinner than the
+clip's (the five other styles are gone); match the clip very closely, changing ground and plants where that helps; no
+blur at all; colours that pop with no detail lost; the cloak a rich blue; no jetpack, the explorer flies by itself.
+
+**What is built, file by file.**
+- `src/render/shared.js`: `LOOK.oil`; the dials `OIL.uOilA..uOilG`, `uOilPx`, the shadow map's uniforms, `uLamp`, the
+  dab textures `uDabP`/`uDabId`, the light in the air `uShV`/`uSunV`/`uShaftC`/`uShaft` (each documented there);
+  `SHADOW` (what the world tells the shadow map each frame); `register(material, kind, opts)`.
+- `src/render/dabtex.js` (overhaul 3, "strokes baked"): the layer of leaf dabs laid ONCE at start-up as a tile of 32 x 32
+  cells: `par`, a float texel a dab (place in its cell, turn, number); `id`, 32 texels a cell, the four topmost dabs
+  that can lie on each texel. Checked against a brute-force search (the scratch tool `dabcheck.mjs`, described in the
+  log): the top dab is among the four at 99.98 % of places.
+- `src/render/chunks.js` (`FRAG_PARS`, under `PC_OIL`): the paint (`pcBody`, `pcTone`: lit, local and shade paints; the
+  shade is two fifths a violet at its own value, measured against the clip; `pcGold`: the look's golden hours;
+  `pcOilHaze`, `pcAtmosV`); the shadow (`pcSunAt`: the shadow map inside its square, the old pattern `pcDappleS`
+  outside); the lantern's pool (`pcLamp`); the strokes: `pcDabLayer` / `pcDabHit` (the baked dabs: a pixel reads its
+  texel and tries one or two dabs; a dab comes and goes WHOLE, asked at its own centre, and grows small before it
+  goes; its edge is still drawn here, a pixel wide), `pcThin` / `pcThinLayer` (thin streaks: bark, the figure, water),
+  `pcBrick` / `pcStrokeLayer` / `pcLay` (tiles with a light edge: snow worlds), `pcStrokeOct` / `pcStrokeOct4` (a
+  stroke's size on the screen, in octaves of the distance), `pcGroundChart` with `pcGroundChartD` (its derivative, from
+  a position measured from the eye) and `pcGroundUnchart` (a dab's exact place on the body from its centre's chart).
+  RULE LEARNT THE HARD WAY: never take a screen derivative of `vBody` or of anything made from it (kilometres, known
+  to half a millimetre: a tenth of the difference between two pixels is noise near the eye); use `vRel` / `vRelO`.
+- `src/render/materials.js`: `TERRAIN_FRAG` has its own `main` under `PC_OIL`: tiles on snow worlds (`uGroundK.x`),
+  else three layers of leaf dabs an octave apart LAID FROM THE TOP DOWN (a pixel stops at the first dab that covers
+  it whole; a third of the finest layer is never laid, so leaves of three sizes show), each dab's paint worked out at
+  its own exact centre by `pcGroundAt` and `pcGroundPaint`. `PROP_FRAG`: leaf cards (part 5: a leaf is one flat colour,
+  lit whole at its centre `vCardB`), bark in thin streaks, far crowns in dabs; blades thinned by `uOilG.y`.
+  `FIG_FRAG`, `NEAR_FRAG`, `WATER_FRAG`: thin streaks and the oil light.
+- `src/render/shadow.js`: the shadow map (plants only, 2048 texels over 180 m round the eye, laid in the body's space,
+  moved in whole texels), and what the light in the air needs.
+- `src/render/post.js`: `_finishOil` and `OIL_FRAG`: the scene as painted, the glazes, last frame kept for the water,
+  LIGHT IN THE AIR (overhaul 4: sixteen places along each line of sight asked of the shadow map; light added or taken,
+  no neighbour read), the world's last key, a gentle S, the saturation lift. No brush, pooling, pencil or paper pass.
+- `src/world/florakit.js`: `leafCards` (crowns, needles, saplings and floor plants as separate leaf-shaped pieces;
+  attribute `aCard`), the slender tree forms (`spec.slender`; overhaul 5: nine boughs from under half the height, a
+  fuller crown), grass as tufts and the near patch as two tufts, the fern as a low leafy plant (all only with
+  `spec.oil`; the default kits draw the same random numbers as before).
+- `src/world/flora.js`, `src/world/surface.js`, `src/data/looks/*.js`: a species' or a biome's `oil` entry laid over
+  it in the oil look (form, bark, leaves, palette `pal`, undergrowth colours `under`, the wood's mix `tallMix`, the
+  ground's laying `ground: 'tiles'`).
+- `src/world/leaffall.js` (falling leaves), `src/world/sky.js` (the sky under `PC_OIL`: gold through the golden hours,
+  the aurora in upright strokes, night dashes), `src/world/index.js` (the shadow's and the lantern's state, the air).
+- `src/art/models.js` (`wandererParts`: hood, lantern, no jets; the flying pose; THE CLOAK IN STRIPS, overhaul 8:
+  `cloakRow` hangs three rows of thin pointed ribbons over a dark lining, each one flat blue of `CLOAK_BLUES`, marked
+  `dry: 1`, which `FIG_FRAG` paints as one flat piece with no streaks; a rim of light where the form turns from the eye
+  on the sun's side), `src/player/explorer.js` (the flight: Space lifts, W goes where the view looks, C sinks, no fuel),
+  `tests/flycheck.mjs`; the words and the touch buttons for the flight (`src/ui/hud.js`, `theme.css` `pc-t-wing`,
+  `src/core/game.js`, `sim.js`: all behind `MODE.wanderer`).
+- THE NIGHT (overhauls 6 to 8, after the clip's night frames): a world's own night keys in the oil look
+  (`look.oil.night`, read in `world/index.js blendKeys`; Neptune's is a deep green-blue: nothing in the clip's night is
+  violet); the shade's hue is the cool key's own (`pcTone`: a plum by day, a deep blue by a teal night); snow in long
+  strokes that run with the land (`TERRAIN_FRAG`, `uGroundK.x`, a look's `oil.ground: 'flow'`; the outlined tiles are
+  gone from the ground, `pcBrick` is unused); the aurora in thin pointed strokes with a level foot (`sky.js`); the
+  lantern's pool in rings of orange, yellow and yellow-green strokes and the wanderer's own shadow in it (`pcLamp`,
+  `uLampF`); by night what is warm is kept out of the night's cool key (`OIL_FRAG`).
+- THE FIGURES' REAL SHADOWS: `shadow.js` draws whatever is marked `pcCaster` and is moved by bones (`uPart`) into the
+  shadow map with those bones; `pcCast`'s soft blot gives way while the map is on.
+- WATER (overhaul 7, first pass): long thin dashes that carry the sky's colour, a path of broken marks of the light
+  toward the sun or the moon, and by night under an aurora a share of them its green (`uAuroraK`). Seen only as the
+  wood's stream, which was pale and faceted with short dashes (they are long and thin since; not yet seen again). In a
+  still there is no last frame, so the stream shows no reflections; the game keeps one (`post.js _finishOil`).
+- THE SKY (overhaul 6): by day flat bands from the horizon to the zenith with wandering edges (no wash turbulence, no
+  backruns: they were smudges and rings in opaque paint); clouds flat shapes with clean edges, two tones by day, one a
+  step lighter than the sky by night; the night sky two layers of dense fine streaks.
+- AFTER THE INDEPENDENT CRITIC (2026-11-16; the log on `r2` has its findings one by one): the ground's strokes ask a
+  SMOOTHED shadow (`pcSunAtSoft`: the shadow map taken down, `uShAir`; plants and the base still ask the fine map), so
+  the canopy throws masses and pools, not a spatter of single lit dabs; a dab never comes under 0.58 of its size (the
+  youngest dabs were dots); dabs are laid larger at a low angle (`graze` in `TERRAIN_FRAG`: a hatching of lines a pixel
+  high on a far level floor); the wood's palette moved toward gold and its shade to a violet umber; bark dark, lit by
+  the sun only, in long streaks; the air's reach 2.7 times the watercolour's (was 4) and the glow toward the sun 0.5
+  (was 0.8); a conifer one tree in thirty in the autumn wood (`oil.tallMix` 1.5); six-cornered leaves on small plants
+  (`leafCards` `round`); the figure's light in flat half-tone steps; the cloak six tiers of short narrow strips in a
+  wider bell; the aurora one ribbon of flames (since replaced: see the owner on the checkpoint); the tundra a pale snowfield (`oil.pal`)
+  in long strokes with a slow wide bend (`pcThinLayer` with a negative bend).
+- `tools/lab.mjs`: the look lab (see its header): one long-lived headless page on the painter's gallery. In software
+  GL the first frame after a load compiles the shaders: eight to eleven minutes at 1280x720; every frame after takes
+  20 to 60 s. **A background process is stopped by the session after two hours:** start the lab inside the job that
+  needs it and close it at the end. `swap` crashed the page once; a reload is the safe way.
+
+**Checks:** unit 251 of 251 and world 47 of 47 on the tree with overhauls 3 to 5 (the default look's code paths are
+behind `#ifdef PC_OIL` / `LOOK.oil` and unchanged). Not yet run on the oil look after its flicker treatments: the
+station numbers (`tests/stations.mjs --query look=oil`), `tests/all.mjs`.
+
+**What the software renderer cannot tell.** How fast the look runs on a real graphics card, and how it looks in
+motion. The baked strokes cut the stills' time here by nought to a fifth only, because this machine's frame is mostly
+other work (the shadow pass, the leaves' vertices); the pixel's own work on the ground fell from 36 dabs tried and two
+layers shaded to about two dabs and 1.3 layers. Only the owner's desktop can say whether it plays.
+
+**OVERHAUL 9, every world (begun 2026-11-16 with a survey: thirteen biomes on ten worlds drawn from one page, the
+scratch tool `survey.sh`, described in the log on `r2`).** Most worlds already held up in the oil look with no settings
+of their own (the colour model, the strokes and the shadows are general). What the survey called for, and where each
+is set:
+- a world's share of the look's golden hours: a look's top-level `oil.gold` (1 on Earth; 0.33 where none is given),
+  read in `world/index.js` into `OIL.uOilG.w`, used by `pcGold()` and the sky. With the full gold everywhere every
+  world's sky was the same cream at a low sun.
+- every `broadleaf` species, on every world, has its crown in leaves one by one in the oil look (`flora.js` adds
+  `leafy: 1, double: 1`; `florakit.js birchGeometry` `leafy`: the tree's own form, `leafCards` where it had `blob`s).
+  A species' `oil` entry may still make it `slender` (Earth's three).
+- the ground's laying, per world: a look's `oil.ground: 'flow'` (long strokes that run with the land): Uranus, Pluto;
+  `'snow'`: Neptune (the owner, 2026-11-16: "I also dont like how Bright the snow area is why is the snow colorful fix
+  it and shade it the color of ice and snow and make the lines closer to the ice in the reference"): short broad knife
+  strokes in slow swirls, and where the ground's wash is pale the stroke's paint goes through `pcIce` (`TERRAIN_FRAG`):
+  its value picks from ONE ramp of ice colours (deep blue, slate, pale blue, blue-white), darker by night, each stroke
+  its own value, one in ten a step paler, and it never strays toward a warm colour. Everything else is leaf dabs.
+  DO NOT let snow take `pcDabTint`'s warm and cool straying again: on near-white it is a pastel confetti.
+  SNOW IS SMOOTH (the owner's LAST word on it, 2026-11-16, with two pictures described in `docs/references/README.md`
+  on `r2`: "make the snow lines thinner and more frequent and get rid of the deep ridges between them it looks like
+  tiles make it closer to this photo"): thin strokes, many and close (eleven times as long as wide), each flat with a
+  clean edge and differing little from the next, NO ridge or dark line between them; a slow shading from drift to
+  drift read at the stroke's centre (`pcIce`'s `dr`, from `pcFlowPaint`). The relief described next (`pcImpasto`) was
+  the answer before that and is GONE; `pcSnowLayer`, the exact placement, stays.
+  THE CLIP STILL COUNTS (the owner, right after: "but still use the reference video as well"): the pictures are added
+  to the clip, not put in its place. On snow the clip gives the night's colours, strokes one can see sweeping in arcs
+  and the lantern's light (`pcLamp`: a quiet cream-gold that dies away over five metres through whole strokes, no ring,
+  no pure orange); the pictures give thin, many strokes with no ridges and the soft shading. `pcIce`'s stroke-to-stroke
+  difference sits between the two on purpose.
+  THE TREES OF THE SNOW (the same message: "start adding trees like this as well in the snowy areas"): kinds that
+  exist only in the oil look. `src/data/mode.js overlayOil` (called once from `render/shared.js` when the look is on)
+  appends a look's `flora.tallOil` to its `flora.tall` and lays a biome's `oil.over` over the biome (`tallOil: [a, b]`
+  there names two of those kinds). Neptune's `aurora_tundra` has a FIR (`kit: 'conifer', fir: 1, snowy: 1`:
+  `florakit.js firGeometry`: tiers of needles one by one with snow lying on them, pale pieces of their own, part 6) and
+  a BARE TREE (`kit: 'broadleaf', bare: 1`: `bareGeometry`: a stem, forking boughs, and twigs as thin slivers one by
+  one, painted in the kind's "leaf" washes). In `PROP_FRAG`: `uOilKind` / `uFarKind[]` (1 snowy: what faces up on the
+  far tree is snow; 2 twigs: no leaf strays, no light through, the far tree a thin haze), part 6 in snow's colours, and
+  a ragged WINDOW in a tree's leaves within a few metres of the eye (`vCardD`: a leaf at the lens was a slab across the
+  picture). To give another snowy place these trees, add the two kinds to its look's `tallOil` and an `oil.over` to
+  the biome.
+  (WITHDRAWN, kept for the record) SNOW AS PAINT LAID ON (the owner, 2026-11-16: "make the snow strokes look closer to the reference like its actually
+  been painted on the ground"): each stroke is a slab with a bright ridge along one long edge, a dark line along the
+  other, the brush's hairs down its length and an uneven end (`pcImpasto`, `pcThinR`'s `rag` and `uv`), and it sweeps
+  in arcs. A stroke is lit, shaded and lamp-lit WHOLE, so its centre must be the same to the millimetre from all its
+  pixels: `pcSnowLayer` reads the swirl's noise exactly (`pcBend8`: eight texels, a smooth weight, its slope from the
+  same eight) and finds the centre by Newton's rule on the plain chart of the sphere. Found from each pixel by the
+  chart's screen derivatives (`pcThinLayer`, still used by bark, the figure, water and the ice worlds' ground) the
+  centre differs from pixel to pixel near the eye, and every edge decided at the centre is a stipple of dots there.
+- THE NIGHT SKY'S STREAKS (the owner, same day: "the patterns in the sky" as the reference's): long, thin, nearly
+  straight streaks drawn to a point at both ends, in four families, each a set of level lines about an axis that leans
+  a little from straight up, so that two families cross at a shallow angle (`sky.js`, under `PC_OIL`). Short dashes in
+  bent rows were curls and worms.
+- a biome's `oil.pal` (its colours given outright as paint), `oil.under` (undergrowth colours), `oil.tallMix` (the
+  wood's mix of kinds): the autumn wood, the green wood (the game's first place), the aurora tundra.
+- a world's own night: a look's `oil.night` (Neptune's teal).
+- space is laid in flat shapes with clean edges (`sky.js`, under `PC_OIL`): as washes it was the one soft, blotted
+  thing left (the Moon's sky).
+To give another biome its own colours, copy the pattern of `autumn_woodland` in `src/data/looks/earth.js`.
+
+**Not done yet (the overhaul plan's order).** Overhauls 6 to 8 have a first pass each (above); what is still owed in
+them: the sky by day against an open horizon and the night sky's streaks judged in stills; water judged in stills
+(a lake by night, the stream in the wood), a foam line at the shore; the lantern's own glow in the air. 9 every world
+by the pattern of the autumn wood and the aurora tundra; cliffs and strata in strokes (a boulder is planes of flat
+paint now, `PROP_FRAG`'s rock branch under `PC_OIL`, built but not yet seen in a still; a crystal goes the same way
+and wants its own look); flowers are big star-shaped pieces; the view from the air; PHYSICS' kits (`src/render/kitmat.js` is not registered); the README still says
+"jetpack" (to be changed when the look goes live); the play-tests still fly the old explorer.
+
+**Known faults.**
+- From the air the far crowns are lumps with flat facets and clearings a flat yellow: the far tree (`PC_FAR`) and the
+  far ground are not the look yet.
+- The snow's long strokes (and bark, the figure, water: every `pcThinLayer`) bend their chart by a slow noise and carry
+  a stroke's centre by derivatives: a stroke at a shadow's edge may come out in dots, as the dabs did before their
+  centres were made exact. Not seen on the tundra (few shadows there).
+- The ground's chart has a seam along the twelve edges of the cube, and a crown's chart one where the axis its mass
+  faces most changes: strokes are cut straight there. Not seen in the prototype's scenes.
+- The dab tile repeats every 32 cells: only places and shapes repeat (colour and light come from the world), and it
+  has not been seen in a still.
+
+## Hand-over of RELEASE 1, RE-FIX pass of the PAINTER lane (the watercolour; kept current after every item)
 
 The verifier did not accept W2.1, W2.2, W2.4, W2.5 and listed nine regressions (the task text of this pass; its evidence
 under `/home/user/.pc-scratch/verify/r1-painter/`). This pass fixes them with proof, or shows by a measurement why a
