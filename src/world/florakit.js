@@ -190,6 +190,69 @@ function V(x, y, z) { return new THREE.Vector3(x, y, z); }
 // (spec.slender, the oil look's woods: a tall straight stem, bare for two thirds of its height, under a small thin crown,
 // so that from the ground a wood is its trunks against the air, as in the owner's reference clip. Without it the
 // tree is exactly what it was: the slender form draws its own numbers only where it differs.)
+// A FIR OF THE SNOW (the oil look only; the owner's reference pictures of 2026-11-16, described in
+// docs/references/README.md on r2: dark green firs, full to the ground, every bough loaded with snow). A straight stem
+// and tiers of drooping boughs from near the ground to the tip: each tier its needles one by one (leafCards), with
+// snow lying on it: pale pieces of their own (part 6), each larger than a needle. Farther off (lod 1): fewer tiers,
+// larger pieces.
+export function firGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 6.5 + rnd() * 4.5, lean = (rnd() - 0.5) * 0.5, lz = (rnd() - 0.5) * 0.4;
+  const segs = lod === 0 ? 4 : 2, sides = lod === 0 ? 6 : 4, pts = [], rad = [];
+  for (let i = 0; i <= segs; i++) { const t = i / segs; pts.push(V(lean * t * t, t * H, lz * t * t)); rad.push((0.17 - 0.15 * t) * (i === 0 ? 1.4 : 1)); }
+  tube(B, pts, rad, sides, { part: 0, swayK: 0.3, swayH: H, hash: rnd() });
+  if (lod === 0) tube(B, [V(0, -0.25, 0), V(0, 0.03, 0), V(pts[1].x * 0.3, 0.45, pts[1].z * 0.3)], [rad[0] * 2.0, rad[0] * 1.5, rad[0] * 0.98], sides, { part: 0, swayK: 0, swayH: H, hash: rnd() });
+  const crownC = V(lean * 0.4, H * 0.45, lz * 0.4), Rb = H * (0.25 + rnd() * 0.06);
+  // (twelve tiers of small needles near by: with nine tiers of larger ones the fir was thin, and near the eye its
+  // needles were shards)
+  const tiers = lod === 0 ? 12 : 6, big = lod === 0 ? 1 : 1.8;
+  for (let k = 0; k < tiers; k++) {
+    const t = k / (tiers - 1), y = H * (0.09 + 0.87 * t);
+    const r = (Rb * Math.pow(1 - t, 0.85) + 0.16) * (0.9 + rnd() * 0.2), ry = r * 0.20 + 0.10;
+    const c = V(lean * (y / H) * (y / H), y, lz * (y / H) * (y / H));
+    leafCards(B, c, r, ry, r, rnd, { n: Math.round(lod === 0 ? 30 + 80 * (1 - t) : 12 + 30 * (1 - t)), len: 0.46 * big, wid: 0.17 * big, massC: crownC, massK: 0.5, sway: 0.25 + 0.4 * t, shade0: 0.12 + 0.22 * (1 - t), shadeK: 0.6, droop: 1.5 });
+    // (the snow on the bough: on its upper side, out to three quarters of its reach)
+    leafCards(B, V(c.x, c.y + ry * 0.8, c.z), r * 0.78, ry * 0.30, r * 0.78, rnd, { n: Math.round(lod === 0 ? 10 + 26 * (1 - t) : 4 + 10 * (1 - t)), len: 0.58 * big, wid: 0.30 * big, part: 6, massC: crownC, massK: 0.2, sway: 0.25 + 0.4 * t, shade0: 0, shadeK: 0, droop: 1.5, round: 1 });
+  }
+  return B.build();
+}
+
+// A BARE TREE OF THE SNOW (the oil look only; the same two pictures: slender stems in groups, each ending in a haze of
+// fine bare twigs). A slender stem that bends a little, boughs from a third of its height that fork, and at the
+// boughs' ends the twigs: thin slivers one by one (leafCards, painted in the kind's "leaf" washes, which are its twigs'
+// colours), so that a crown is a haze of fine strokes and no tube is thinner than the pixel can carry.
+export function bareGeometry(seed, lod) {
+  const rnd = mulberry32(seed), B = new Builder();
+  const H = 6.0 + rnd() * 3.5, lean = (rnd() - 0.5) * 1.2, lz = (rnd() - 0.5) * 0.9, ph = rnd() * 3;
+  const segs = lod === 0 ? 7 : 3, sides = lod === 0 ? 6 : 4, pts = [], rad = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    pts.push(V(lean * t * t + 0.25 * Math.sin(t * 3.1 + ph) * t, t * H, lz * t * t + 0.18 * Math.cos(t * 2.3 + ph) * t));
+    rad.push((0.115 - 0.090 * Math.pow(t, 0.8)) * (i === 0 ? 1.3 : 1));
+  }
+  tube(B, pts, rad, sides, { part: 0, swayK: 0.5, swayH: H, hash: rnd() });
+  if (lod === 0) tube(B, [V(pts[0].x, -0.25, pts[0].z), V(pts[0].x, 0.03, pts[0].z), V(pts[0].x + (pts[1].x - pts[0].x) * 0.3, 0.45, pts[0].z + (pts[1].z - pts[0].z) * 0.3)], [rad[0] * 2.1, rad[0] * 1.5, rad[0] * 0.98], sides, { part: 0, swayK: 0, swayH: H, hash: rnd() });
+  const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
+  const crownC = V(pts[segs].x * 0.8, H * 0.75, pts[segs].z * 0.8);
+  const nb = lod === 0 ? 9 : 5, big = lod === 0 ? 1 : 1.6;
+  for (let k = 0; k < nb; k++) {
+    const up = k / (nb - 1), t0 = 0.34 + 0.62 * up + rnd() * 0.03, p0 = at(t0), ang = k * 2.4 + rnd() * 1.2;
+    const len = (1.9 - 1.1 * up) * (0.8 + 0.4 * rnd()), rise = 0.85 + 0.35 * up;
+    const p1 = V(p0.x + Math.cos(ang) * len * 0.50, p0.y + len * rise * 0.50, p0.z + Math.sin(ang) * len * 0.50);
+    const p2 = V(p0.x + Math.cos(ang) * len * 0.85, p0.y + len * rise * 1.05, p0.z + Math.sin(ang) * len * 0.85);
+    const bid = (k * 0.618034 + 0.13) % 1;
+    tube(B, [p0, p1, p2], [0.042, 0.028, 0.016], 4, { part: 0, shade: 0.5, sway0: 0.4, hash: rnd(), branch: bid });
+    if (lod === 0) for (let j = 0; j < 2; j++) {
+      const a2 = ang + (j ? 1.0 : -0.9) + (rnd() - 0.5) * 0.5, l2 = 0.55 + rnd() * 0.5, q0 = p1.clone().lerp(p2, 0.25 + 0.4 * j);
+      tube(B, [q0, V(q0.x + Math.cos(a2) * l2 * 0.6, q0.y + l2 * 0.85, q0.z + Math.sin(a2) * l2 * 0.6)], [0.020, 0.012], 3, { part: 0, shade: 0.5, sway0: 0.6, hash: rnd(), branch: bid });
+    }
+    // (the twigs at the bough's end and round it)
+    leafCards(B, V(p2.x, p2.y + 0.15, p2.z), 0.75 * big, 0.62 * big, 0.75 * big, rnd, { n: lod === 0 ? 40 : 16, len: 0.62 * big, wid: 0.040 * big, branch: bid, massC: crownC, massK: 0.3, sway: 0.6 + 0.3 * up, shade0: 0, shadeK: 0.3, droop: -0.2 });
+  }
+  leafCards(B, V(pts[segs].x, H + 0.2, pts[segs].z), 0.5 * big, 0.6 * big, 0.5 * big, rnd, { n: lod === 0 ? 26 : 10, len: 0.6 * big, wid: 0.040 * big, massC: crownC, massK: 0.3, sway: 0.9, shade0: 0, shadeK: 0.3, droop: -0.2 });
+  return B.build();
+}
+
 export function birchGeometry(seed, lod, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   const sl = !!(spec && spec.slender);
@@ -657,6 +720,7 @@ export function shardGeometry(seed) {
 }
 
 export const TALL_KITS = {
-  broadleaf: birchGeometry, conifer: pineGeometry, fungus: fungusGeometry,
+  // (the oil look's trees of the snow are forms of their own: a `fir` conifer, a `bare` broadleaf)
+  broadleaf: (seed, lod, spec) => (spec && spec.bare ? bareGeometry(seed, lod) : birchGeometry(seed, lod, spec)), conifer: (seed, lod, spec) => (spec && spec.fir ? firGeometry(seed, lod) : pineGeometry(seed, lod, spec)), fungus: fungusGeometry,
   crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: (seed, lod, spec) => spireGeometry(seed, lod, spec), kelp: kelpGeometry, wave: waveGeometry, vine: vineGeometry,
 };

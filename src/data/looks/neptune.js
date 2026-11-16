@@ -32,6 +32,15 @@ export default {
       // the ice spires: paper on the windward faces, a deep cobalt glaze on the lee
       { kit: 'spire', scale: 2.1, slim: 1, bark: [[0.92, 0.96, 0.99], [0.30, 0.42, 0.78]], leaf: [[0.92, 0.96, 0.99], [0.66, 0.76, 0.94], [0.30, 0.42, 0.78]], far: [5, 14, 0.9], obs: [1.4, 13] },
     ],
+    // THE TREES OF THE SNOW (the oil look only: data/mode.js overlayOil; the owner's two pictures of 2026-11-16, described
+    // in docs/references/README.md on r2): a fir, dark green and full to the ground, every bough loaded with snow; a
+    // bare slender tree ending in a haze of twigs, its stem pale violet-blue, or (six in ten) dark plum. Their "leaf"
+    // washes: the fir's needles; the bare tree's twigs.
+    tallOil: [
+      { kit: 'conifer', fir: 1, snowy: 1, double: 1, bark: [[0.50, 0.40, 0.42], [0.28, 0.22, 0.28]], leaf: [[0.40, 0.60, 0.44], [0.28, 0.50, 0.42], [0.20, 0.36, 0.40]], barkP: [0.50, 1, 0.9, 0.6], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.05, farD: [5.2, 8.6, 0.86], obs: [0.30, 8.5] },
+      { kit: 'broadleaf', bare: 1, double: 1, bark: [[0.80, 0.78, 0.94], [0.46, 0.40, 0.66]], leaf: [[0.56, 0.46, 0.60], [0.42, 0.32, 0.48], [0.30, 0.22, 0.36]], barkP: [0.675, 0, 1.3, 0.25], leafP: [0.9, 0.5, 1.0, 0.25], wind: 0.09,
+        dark: [0.6, [0.46, 0.34, 0.44], [0.24, 0.16, 0.26]], farD: [3.4, 8.0, 0.30], obs: [0.22, 8] },
+    ],
     under: { leaf: [[0.62, 0.74, 0.70], [0.44, 0.58, 0.66], [0.30, 0.40, 0.58]], accent: [0.92, 0.90, 0.50], bush: [[0.52, 0.60, 0.80], [0.38, 0.44, 0.70], [0.24, 0.28, 0.54]], rock: [[0.50, 0.52, 0.62], [0.22, 0.24, 0.36]], shard: [[0.92, 0.96, 0.99], [0.56, 0.70, 0.92]],
       // the kelp wood's floor: wrack torn off by the gales, sea pinks and pale stars in drifts, lichen
       flowers: [[0.92, 0.54, 0.68], [0.93, 0.91, 0.52], [0.90, 0.94, 0.99]], litter: [[0.48, 0.40, 0.70], [0.32, 0.28, 0.54], [0.60, 0.66, 0.72]], crust: [[0.74, 0.88, 0.82], [0.26, 0.26, 0.48], [0.80, 0.78, 0.92]] },
@@ -61,6 +70,7 @@ export default {
         // (the oil look: the tundra under the aurora is a snowfield, as the clip's night is: pale, nearly white in the
         // light, so that the night's own key makes it cyan and its shade blue; its own blue-green ground, laid as paint
         // in long strokes, read as open water)
-        oil: { pal: { low: [0.88, 0.94, 0.96], mid: [0.92, 0.96, 0.97], high: [0.84, 0.92, 0.96] } } }),
+        // (and in the oil look trees stand on it, in groups with open snow between: firs, and bare trees among them)
+        oil: { pal: { low: [0.88, 0.94, 0.96], mid: [0.92, 0.96, 0.97], high: [0.84, 0.92, 0.96] }, over: { tallOil: [0, 1], tallD: 0.30, tallMix: 0.55 } } }),
   ],
 };

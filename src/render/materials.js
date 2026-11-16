@@ -176,54 +176,37 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   k = mix(pcWetWash(k, 1.0 - snowC), mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.x * 0.6), snowC);
   return pcLamp(pcTone(k, lvl), k, gBc, rnd.y);
 }
-// SNOW AND ICE (the owner, 2026-11-16: "I also dont like how Bright the snow area is why is the snow colorful fix it and
-// shade it the color of ice and snow and make the lines closer to the ice in the reference"). A stroke of snow is laid
-// in the colours of ice and snow ONLY: its paint as the light has it gives a value, and the value picks the colour from
-// one ramp: a deep blue, a slate blue, a pale blue, a blue-white; a step darker than it was, and darker again by night
-// (the clip's night snow is a slate blue with paler strokes in it, nothing in it glaring). A stroke strays only between
-// a greyer and a bluer blue, never toward a warm colour: made to stray warm and cool as a floor of leaves is, near-white
-// snow was a confetti of cream, pink, lilac and yellow-green.
-// PAINT LAID ON (the owner, 2026-11-16: "make the snow strokes look closer to the reference like its actually been
-// painted on the ground"). The clip's snow, looked at closely, is impasto: each stroke is a slab of paint left by a
-// knife or a loaded brush, lying over the one beside it like a shingle: a bright ridge along one long edge, where the
-// paint stands up and takes the light, a dark line along the other, where the next stroke's edge shades it, the hairs
-// of the brush drawn down its length, and an uneven end. rel: how much lighter (over 0) or darker the pixel is than
-// its stroke's own paint, from where in the stroke it lies (uv: x along, y across) and how many pixels wide the stroke
-// is (pxW): every line of it is drawn a pixel sharp, and the hairs only on a stroke broad enough to carry them.
-float pcImpasto(vec2 uv, float pxW, vec3 rnd) {
-  float ridge = smoothstep(-0.5, 0.5, (0.10 + 0.06 * rnd.y - uv.y) * pxW);
-  float lee = smoothstep(-0.5, 0.5, (uv.y - 0.90 + 0.05 * rnd.x) * pxW);
-  // (the ridge is brightest in the middle of the stroke's length and dies toward its ends)
-  ridge *= 0.45 + 0.55 * smoothstep(0.0, 0.25, uv.x) * smoothstep(0.0, 0.25, 1.0 - uv.x);
-  float b = floor(uv.y * 7.0 + rnd.z * 5.0);
-  float hair = (fract(sin(b * 12.9898 + rnd.x * 78.233) * 43758.5453) - 0.5) * smoothstep(20.0, 44.0, pxW);
-  // (the ridge and its shade only on a stroke a dozen pixels wide and more: on far strokes they were a ruling of lines)
-  float nearK = smoothstep(7.0, 15.0, pxW);
-  return clamp((1.25 * ridge - 1.0 * lee) * nearK + 0.55 * hair, -1.3, 1.5);
-}
-vec3 pcIce(vec3 t, vec3 rnd, float rel) {
-  // (each stroke well its own value, a third of the ramp lighter or darker than the next: with a twelfth the snow was
-  // one flat pale sheet and no stroke showed; by night two fifths of the day's value: a slate blue)
-  float l = min(dot(t, vec3(0.3, 0.5, 0.2)), 1.0) * mix(0.48, 0.68, uDayness) + (rnd.x - 0.5) * 0.30 + 0.22 * step(0.90, rnd.z) + 0.17 * rel;      // (one stroke in ten a step paler: the clip's snow has pale strokes lying in its blue; rel: the stroke's own relief, pcImpasto)
-  const vec3 deep = vec3(0.15, 0.22, 0.37), slate = vec3(0.39, 0.50, 0.65), pale = vec3(0.70, 0.80, 0.89), white = vec3(0.90, 0.94, 0.97);
+// SNOW AND ICE (the owner, 2026-11-16, in three steps: "I also dont like how Bright the snow area is why is the snow
+// colorful fix it and shade it the color of ice and snow"; then strokes as paint laid on, with ridges, which the owner
+// read as tiles; then, with two pictures of snow, a watercolour and a pastel: "make the snow lines thinner and more
+// frequent and get rid of the deep ridges between them it looks like tiles make it closer to this photo"). So: snow
+// is SMOOTH. Many thin strokes lying close, each one flat colour with a clean edge, each differing only a little from
+// the next, with NO ridge and no dark line between them; the shading runs slowly from drift to drift (dr: a slow field
+// read at the stroke's centre), pale where the light lies and a soft blue in the hollows and the shadows. The colours
+// are those of ice and snow only: one ramp, picked by the stroke's value: a deep blue leaning a little to violet, a
+// slate blue, a pale blue, a blue-white. A stroke strays only a hair toward lavender or toward mint, never toward a
+// warm colour: made to stray warm and cool as a floor of leaves is, near-white snow was a pastel confetti.
+vec3 pcIce(vec3 t, vec3 rnd, float dr) {
+  float l = min(dot(t, vec3(0.3, 0.5, 0.2)), 1.0) * mix(0.60, 0.72, uDayness) + (rnd.x - 0.5) * 0.10 + 0.07 * step(0.88, rnd.z) + 0.30 * dr;
+  const vec3 deep = vec3(0.19, 0.22, 0.40), slate = vec3(0.42, 0.50, 0.68), pale = vec3(0.72, 0.80, 0.90), white = vec3(0.92, 0.95, 0.98);
   vec3 c = l < 0.34 ? mix(deep, slate, clamp(l / 0.34, 0.0, 1.0)) : l < 0.68 ? mix(slate, pale, (l - 0.34) / 0.34) : mix(pale, white, clamp((l - 0.68) / 0.30, 0.0, 1.0));
-  return mix(c, vec3(dot(c, vec3(0.3, 0.5, 0.2))) * vec3(0.93, 0.99, 1.07), 0.40 * rnd.y);
+  float q = fract(rnd.y * 5.3);
+  return c * (q > 0.84 ? vec3(1.02, 0.985, 1.025) : q < 0.16 ? vec3(0.975, 1.015, 1.0) : vec3(1.0));
 }
 // One long stroke's paint on a world laid in them: the ground's own, or, on a world of snow (uGroundK.z) where the
 // ground's wash is pale, snow's.
-vec3 pcFlowPaint(vec3 c, vec3 leaf, vec3 rnd, float snowC, float lvl, float rel) {
+vec3 pcFlowPaint(vec3 c, vec3 leaf, vec3 rnd, float snowC, float lvl) {
   vec3 p = pcGroundPaint(c, leaf, 0.0, rnd, snowC, lvl);
   if (uGroundK.z < 0.5) return p;
   float sn = smoothstep(0.60, 0.78, dot(c, vec3(0.3, 0.5, 0.2)));
   if (sn < 0.004) return p;
   vec3 k = pcDensity(c, 1.0 + (rnd.x - 0.5) * 0.4);
-  vec3 q = pcLamp(pcIce(pcTone(k, lvl), rnd, rel), k, gBc, rnd.y);
-  // (in the lantern's light the stroke keeps its relief: its ridge lighter, its far edge deeper)
-  q *= 1.0 + 0.11 * rel * step(0.12, q.r - q.b);
-  return mix(p, clamp(q, 0.0, 1.0), sn);
+  // (the drifts: a slow field and a quicker one, read at the stroke's own centre)
+  float dr = textureLod(uNoise3D, gBc / 34.0 + 0.41, 0.0).g * 0.7 + textureLod(uNoise3D, gBc / 11.0 + 0.17, 0.0).b * 0.3 - 0.5;
+  return mix(p, pcLamp(pcIce(pcTone(k, lvl), rnd, dr), k, gBc, rnd.y), sn);
 }
-// SNOW'S STROKES, EACH IN ITS EXACT PLACE. A stroke of snow is a slab of paint with a ridge, hairs and an uneven end
-// (pcImpasto), lit, shaded and lamp-lit WHOLE: so all its pixels must agree to the millimetre on where its centre is.
+// SNOW'S STROKES, EACH IN ITS EXACT PLACE. A stroke of snow is lit, shaded and lamp-lit WHOLE: so all its pixels must
+// agree to the millimetre on where its centre is.
 // The strokes' chart is bent into slow swirls by a noise; found from each pixel by the chart's screen derivatives, a
 // stroke's centre came out differently from pixel to pixel (worst near the eye, where a pixel is a fiftieth of a
 // texel of that noise and the texture's own filtering moves in steps: its derivative there is noise), and the edge
@@ -231,7 +214,7 @@ vec3 pcFlowPaint(vec3 c, vec3 leaf, vec3 rnd, float snowC, float lvl, float rel)
 // of snow as paint laid on. So here the bend is read exactly (eight texels, a smooth weight, its slope known from
 // the same eight), the chart is the plain chart of the sphere (no height in it), and the centre is found by two steps
 // of Newton's rule from the pixel: its place on the chart, then on the body.
-#define PC_SNOW_K 330.0      // the swirl's measure: the bend's noise repeats every this many stroke widths
+#define PC_SNOW_K 830.0      // the swirl's measure: the bend's noise repeats every this many stroke widths (about twenty-six metres on the ground)
 void pcBend8(vec3 q, out vec2 wn, out vec2 gx, out vec2 gy, out vec2 gz) {
   vec3 t = q * 64.0 - 0.5, i = floor(t), f = t - i;
   vec3 u = f * f * (3.0 - 2.0 * f), du = 6.0 * f * (1.0 - f);
@@ -309,24 +292,21 @@ void main() {
     // them). The rows lie on the contours of a slope. Two layers an octave apart: a stroke of the finer one is there or
     // it is not, whole (asked at its own centre), and where it is not the coarser shows. (Before: a course of tiles
     // with a light edge, which stood as a pavement of outlined stones: the stills after overhauls 1 and 2.)
-    vec3 r0, n0, r1, n1; vec2 ds0, ds1, uv0, uv1, lgT; float own0, own1, pw0, pw1, rel0 = 0.0, rel1 = 0.0;
+    vec3 r0, n0, r1, n1; vec2 ds0, ds1, uv0, uv1, lgT; float own0, own1, pw0, pw1;
     vec3 ctrB0 = vec3(1e30), ctrB1 = vec3(1e30);
     vec4 ot;
     if (uGroundK.z > 0.5) {
-      // A WORLD OF SNOW: the clip's snow, looked at closely: short broad strokes as of a knife, three or four times as
-      // long as wide, lying in slow swirls, each a slab of paint laid on (pcImpasto), each in its exact place
-      // (pcSnowLayer). Seen at a low angle they are laid larger, by the root of how far the land is squeezed there:
-      // neither a hatching of slivers nor long level bands.
+      // A WORLD OF SNOW (see pcIce): thin strokes, many and close, about eleven times as long as they are wide, slanting
+      // with a slow swirl as the pastel's hatching does; each in its exact place (pcSnowLayer). Seen at a low angle they
+      // are laid larger, by the root of how far the land is squeezed there: neither a hatching of slivers nor long
+      // level bands. (Before: short broad slabs with a ridge and a dark far edge: tiles, the owner's word.)
       float grz = inversesqrt(max(abs(dot(nV, normalize(-vView))), 0.11));
-      ot = pcStrokeOct4(dist * grz * 2.9, uOilPx.z * 2.9);
+      ot = pcStrokeOct4(dist * grz * 1.15, uOilPx.z * 1.15);
       lgT = vec2(dFdx(ot.w), dFdy(ot.w));
       float hB = length(vBody) - uBodyR; vec3 upS = normalize(vBody);
       vec2 hD = vec2(dot(upS, gBdx), dot(upS, gBdy));
-      // (the swirl bends the rows by fifty stroke widths: with thirty the rows lay level across the whole picture, like
-      // ripples on water; the clip's strokes sweep round in arcs)
-      pcSnowLayer(ch, dlx, dly, ot.x, 3.4, 50.0, 0.07, 14.0 * wpx * 8.0, hB, hD, r0, ds0, own0, n0, uv0, pw0, ctrB0);
-      pcSnowLayer(ch, dlx, dly, ot.x * 2.0, 3.4, 50.0, 0.07, 28.0 * wpx * 8.0, hB, hD, r1, ds1, own1, n1, uv1, pw1, ctrB1);
-      rel0 = pcImpasto(uv0, pw0, r0); rel1 = pcImpasto(uv1, pw1, r1);
+      pcSnowLayer(ch, dlx, dly, ot.x, 11.0, 92.0, 0.04, 14.0 * wpx * 8.0, hB, hD, r0, ds0, own0, n0, uv0, pw0, ctrB0);
+      pcSnowLayer(ch, dlx, dly, ot.x * 2.0, 11.0, 92.0, 0.04, 28.0 * wpx * 8.0, hB, hD, r1, ds1, own1, n1, uv1, pw1, ctrB1);
     } else {
     vec2 chT = vec2(ch.x, ch.y + 0.8 * (length(vBody) - uBodyR));
     vec3 upT = normalize(vBody);
@@ -342,6 +322,7 @@ void main() {
     pcThinLayerUV(chT, dtx, dty, ot.x, 8.0, vBody, 14.0 * wpx * 8.0, -34.0, 0.0, r0, ds0, own0, n0, uv0, pw0);
     pcThinLayerUV(chT, dtx, dty, ot.x * 2.0, 8.0, vBody, 28.0 * wpx * 8.0, -34.0, 0.0, r1, ds1, own1, n1, uv1, pw1);
     }
+    float kV = 1.0 - 0.75 * uGroundK.z;      // (how far a stroke's light strays from its neighbours': on snow a quarter of what it is on ice)
     float fr0 = ot.w - ot.z;
     bool fine = r0.z >= smoothstep(0.15, 0.85, fr0 + dot(lgT, ds0));
     bool fineN = n0.z >= smoothstep(0.15, 0.85, fr0);
@@ -350,14 +331,14 @@ void main() {
       // the coarser layer here: its stroke, and the stroke beside it over the pixel at their edge
       gCtrB = ctrB1;
       pcGroundAt(ds1, ot.x * 2.0, r1, c, lvl, snowC, leaf, canopy);
-      pc1 = pcFlowPaint(c, leaf, r1, snowC, lvl + (r1.x - 0.5) * 0.9, rel1);
-      if (own1 < 0.999) pc1 = mix(pcFlowPaint(c, leaf, n1, snowC, lvl + (n1.x - 0.5) * 0.9, 0.0), pc1, own1);
+      pc1 = pcFlowPaint(c, leaf, r1, snowC, lvl + (r1.x - 0.5) * 0.9 * kV);
+      if (own1 < 0.999) pc1 = mix(pcFlowPaint(c, leaf, n1, snowC, lvl + (n1.x - 0.5) * 0.9 * kV), pc1, own1);
     }
     if (fine) {
       gCtrB = ctrB0;
       pcGroundAt(ds0, ot.x, r0, c, lvl, snowC, leaf, canopy);
-      pc0 = pcFlowPaint(c, leaf, r0, snowC, lvl + (r0.x - 0.5) * 0.9, rel0);
-      if (own0 < 0.999) pc0 = mix(fineN ? pcFlowPaint(c, leaf, n0, snowC, lvl + (n0.x - 0.5) * 0.9, 0.0) : pc1, pc0, own0);
+      pc0 = pcFlowPaint(c, leaf, r0, snowC, lvl + (r0.x - 0.5) * 0.9 * kV);
+      if (own0 < 0.999) pc0 = mix(fineN ? pcFlowPaint(c, leaf, n0, snowC, lvl + (n0.x - 0.5) * 0.9 * kV) : pc1, pc0, own0);
     }
     acc = fine ? pc0 : pc1;
     gCtrB = vec3(1e30);
@@ -1055,6 +1036,7 @@ varying float vFog;
 varying vec3 vMassO;      // the crown's mass normal in the plant's own space: which way a crown's chart is laid
 varying float vScaleO;    // the plant's size (its instance's scale): its own space times this is metres
 varying vec3 vRelO;       // the place measured from the eye, in the body's axes (its screen derivatives are exact)
+varying float vCardD;     // how far the eye is from the centre of the leaf this vertex belongs to (the same at all its corners)
 #endif
 
 // MOTION. With PHYSICS' field (uPhysOn) plants bend as loaded stems: wind, gusts, things
@@ -1176,6 +1158,7 @@ void main() {
     vMassO = aMass;
     vScaleO = length(im[0].xyz);
     vCardB = vBody - (ir * (position - aCard)) * vis;       // (the leaf moves as one piece: its centre is this far from the vertex)
+    vCardD = length(vCardB - uOrigin - uCamLocal);
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
@@ -1196,6 +1179,10 @@ uniform vec3 uAccent;
 uniform float uCanopy;
 uniform float uGem;       // 1: a crystal or a splinter of ice or glass, lit through its body (PAINTER 13)
 #ifdef PC_OIL
+uniform float uOilKind;   // the oil look: 0 a tree in leaf; 1 a tree of the snow, its boughs loaded (snow on what faces up); 2 a bare tree: its "leaves" are twigs
+#ifdef PC_FAR
+  uniform float uFarKind[8];
+#endif
 uniform vec4 uOilDark;    // x: the share of this kind's trees whose bark is the dark pair below (the oil look's woods)
 uniform vec3 uOilDarkA;
 uniform vec3 uOilDarkB;
@@ -1229,6 +1216,7 @@ varying vec3 vMassO;
 varying float vScaleO;
 varying vec3 vRelO;
 varying vec3 vCardB;
+varying float vCardD;
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -1286,6 +1274,18 @@ void main() {
     int si = int(vSpecies + 0.5);
     leafA = uFarA[si]; leafB = uFarB[si]; leafC = uFarC[si]; barkA = uFarBarkA[si]; barkB = uFarBarkB[si];
   #endif
+  #ifdef PC_OIL
+    float kindO = uOilKind;
+    #ifdef PC_FAR
+      kindO = uFarKind[si];
+    #endif
+    float snowyO = step(0.5, kindO) * step(kindO, 1.5), twigO = step(1.5, kindO);
+    // (a leaf at the lens is a slab across the picture: within two and a half to four and a half metres of the eye, each
+    // leaf by its own number, the leaves of a tree are not laid, whole: the eye stands in a ragged window. Of a tree of
+    // the snow, whose boughs come down to the ground, at any height; of the others above head height, as their crowns'
+    // washes are thinned: the eye stood inside a fir and the picture was a dozen dark shards)
+    if (part > 4.5 && (kindO > 0.5 || vAbove > 1.7) && vCardD < 2.5 + 2.0 * fract(vData.w * 7.3)) discard;
+  #endif
   vec3 c; float wet = 0.05; float id = 3.0; float x;
   float oilCover = 1.0;
   vec3 upV = normalize(normalMatrix * normalize(vBody));   // the planet's up, for snow lying on things
@@ -1305,11 +1305,15 @@ void main() {
     float hue = vInst.x + (h - 0.5) * 1.7;
     vec3 cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
     cs = mix(cs, leafC, clamp(vData.z * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
-    cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0), 0.7);
+    cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twigO), 0.7);
+    // (part 6: snow lying on a bough, florakit.js firGeometry: a pale piece of its own, in the colours of snow)
+    bool snowP = part > 5.5;
+    if (snowP) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
     vec3 mV = normalize(vMassV);
     float xs_ = (dot(mV, sunV) * 0.5 + 0.5) * (1.0 - vData.z * 0.35);
-    // (the sun behind a crown comes through its leaves: those glow)
-    xs_ = max(xs_, pow(max(dot(-V, sunV), 0.0), 1.5) * (0.6 + 0.4 * r3.x));
+    // (the sun behind a crown comes through its leaves: those glow; not through twigs, and snow takes the sky's light)
+    xs_ = max(xs_, pow(max(dot(-V, sunV), 0.0), 1.5) * (0.6 + 0.4 * r3.x) * (1.0 - twigO));
+    if (snowP) xs_ = max(xs_, 0.58 + 0.2 * r3.y);
     xs_ *= mix(0.50, 1.0, pcSunAt(vCardB, canopy * 0.4, 8.0 - vAbove, 0.3));
     xs_ += (r3.z - 0.5) * 0.25;
     xs_ = max(xs_, 0.30 + 0.15 * r3.x);
@@ -1415,13 +1419,15 @@ void main() {
         vec3 mVc = normalize(vMassV + mvdx * ds.x + mvdy * ds.y);
         // the outline is ragged by whole leaves, and the sky shows through where whole leaves are left out
         float rim = 1.0 - abs(dot(nVc, Vc));
-        float cut = smoothstep(0.30, 0.90, rim) * uLeafP.x + uLeafP.y * (0.30 + 0.75 * smoothstep(0.46, 0.72, nA.r));
+        float cut = smoothstep(0.30, 0.90, rim) * uLeafP.x + uLeafP.y * (0.30 + 0.75 * smoothstep(0.46, 0.72, nA.r)) + 0.50 * twigO;      // (a bare tree far off: a thin haze of twigs, the sky through most of it)
         float there = step(cut, fract(rnd.z * 9.1) * 0.8 + 0.2 * rnd.x + 0.10);
         float hue = vInst.x + (rnd.x - 0.5) * 1.5 + (vData.w - 0.5) * 0.7 + (nA.b - 0.5) * 0.5;
         cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
         cs = mix(cs, leafC, clamp(vData.z * 0.75 + (rnd.y - 0.5) * 0.5, 0.0, 1.0));
-        cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + (nA.r - 0.5) * 0.4 * uOilB.z + vInst.y * 0.5), rnd, 1.0), 0.7);
+        cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + (nA.r - 0.5) * 0.4 * uOilB.z + vInst.y * 0.5), rnd, 1.0 - twigO), 0.7);
         float snowF = pcSnowCover(dot(mVc, upV) * 0.5 + 0.5, rnd.x * 0.6 + nA.g * 0.4, vData.z * 0.8);
+        // (a tree of the snow: what faces up is loaded, whatever the weather)
+        snowF = max(snowF, snowyO * smoothstep(0.50, 0.62, dot(mVc, upV) * 0.5 + 0.5 + (rnd.x - 0.5) * 0.30));
         cs = mix(cs, mix(vec3(0.94, 0.955, 1.0), vec3(0.86, 0.90, 1.0), rnd.y * 0.6), snowF);
         xs_ = dot(mVc, sunV) * 0.5 + 0.5;
         xs_ = xs_ * (1.0 - vData.z * 0.42 * (1.0 - snowF));
@@ -1625,6 +1631,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     uCanopy: { value: opts.canopy == null ? 1.0 : opts.canopy },
     uGem: { value: opts.gem ? 1 : 0 },
     // (the oil look: opts.oilDark = [share, [bark light], [bark dark]])
+    uOilKind: { value: opts.oilKind || 0 },
     uOilDark: { value: new THREE.Vector4(opts.oilDark ? opts.oilDark[0] : 0, 0, 0, 0) },
     uOilDarkA: v3(opts.oilDark && opts.oilDark[1], [0.5, 0.4, 0.4]), uOilDarkB: v3(opts.oilDark && opts.oilDark[2], [0.2, 0.15, 0.2]),
   };
@@ -1651,6 +1658,7 @@ export function makePropMaterial(bodyU, opts = {}) {
     own.uFarTaper = { value: pad(opts.far.map((f) => f.taper || 0)) };
     own.uFarTrunk = { value: pad(opts.far.map((f) => (f.trunk ? 1 : 0))) };
     own.uFarDrop = { value: pad(opts.far.map((f) => (f.drop ? 1 : 0))) };
+    own.uFarKind = { value: pad(opts.far.map((f) => f.kind || 0)) };
   }
   const m = new THREE.ShaderMaterial({
     name: 'pc-prop-' + (opts.name || ''),

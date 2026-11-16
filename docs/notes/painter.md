@@ -129,7 +129,24 @@ is set:
   its value picks from ONE ramp of ice colours (deep blue, slate, pale blue, blue-white), darker by night, each stroke
   its own value, one in ten a step paler, and it never strays toward a warm colour. Everything else is leaf dabs.
   DO NOT let snow take `pcDabTint`'s warm and cool straying again: on near-white it is a pastel confetti.
-  SNOW AS PAINT LAID ON (the owner, 2026-11-16: "make the snow strokes look closer to the reference like its actually
+  SNOW IS SMOOTH (the owner's LAST word on it, 2026-11-16, with two pictures described in `docs/references/README.md`
+  on `r2`: "make the snow lines thinner and more frequent and get rid of the deep ridges between them it looks like
+  tiles make it closer to this photo"): thin strokes, many and close (eleven times as long as wide), each flat with a
+  clean edge and differing little from the next, NO ridge or dark line between them; a slow shading from drift to
+  drift read at the stroke's centre (`pcIce`'s `dr`, from `pcFlowPaint`). The relief described next (`pcImpasto`) was
+  the answer before that and is GONE; `pcSnowLayer`, the exact placement, stays.
+  THE TREES OF THE SNOW (the same message: "start adding trees like this as well in the snowy areas"): kinds that
+  exist only in the oil look. `src/data/mode.js overlayOil` (called once from `render/shared.js` when the look is on)
+  appends a look's `flora.tallOil` to its `flora.tall` and lays a biome's `oil.over` over the biome (`tallOil: [a, b]`
+  there names two of those kinds). Neptune's `aurora_tundra` has a FIR (`kit: 'conifer', fir: 1, snowy: 1`:
+  `florakit.js firGeometry`: tiers of needles one by one with snow lying on them, pale pieces of their own, part 6) and
+  a BARE TREE (`kit: 'broadleaf', bare: 1`: `bareGeometry`: a stem, forking boughs, and twigs as thin slivers one by
+  one, painted in the kind's "leaf" washes). In `PROP_FRAG`: `uOilKind` / `uFarKind[]` (1 snowy: what faces up on the
+  far tree is snow; 2 twigs: no leaf strays, no light through, the far tree a thin haze), part 6 in snow's colours, and
+  a ragged WINDOW in a tree's leaves within a few metres of the eye (`vCardD`: a leaf at the lens was a slab across the
+  picture). To give another snowy place these trees, add the two kinds to its look's `tallOil` and an `oil.over` to
+  the biome.
+  (WITHDRAWN, kept for the record) SNOW AS PAINT LAID ON (the owner, 2026-11-16: "make the snow strokes look closer to the reference like its actually
   been painted on the ground"): each stroke is a slab with a bright ridge along one long edge, a dark line along the
   other, the brush's hairs down its length and an uneven end (`pcImpasto`, `pcThinR`'s `rag` and `uv`), and it sweeps
   in arcs. A stroke is lit, shaded and lamp-lit WHOLE, so its centre must be the same to the millimetre from all its

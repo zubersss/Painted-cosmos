@@ -1,8 +1,8 @@
 // Painted Cosmos: uniforms and textures shared by every painted material. OWNER: PAINTER.
 import * as THREE from 'three';
 import { genNoise3D, genStrokes, genPaper } from './texgen.js';
-import { PAPER, hexToRgb } from '../data/looks.js';
-import { MODE } from '../data/mode.js';
+import { PAPER, hexToRgb, LOOKS } from '../data/looks.js';
+import { MODE, overlayOil } from '../data/mode.js';
 import { getDabTextures } from './dabtex.js';
 
 let _tex = null;
@@ -73,6 +73,7 @@ const _qs = (() => { try { return new URLSearchParams(location.search); } catch 
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
 export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
+if (LOOK.oil) overlayOil(LOOKS);      // (the oil look's own kinds of plant and where they stand: data/mode.js)
 export const OIL = {
   // THE STROKES ARE THE OWNER'S STYLE 5 (2026-11-15: leaf dabs lying every way, the clip's own way, a little thinner than
   // the clip's). The five other styles tried at checkpoint 1 are gone; the thin strokes are kept for bark, the tiles
