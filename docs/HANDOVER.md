@@ -203,6 +203,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     snow: the clip gives the night's colours, the sky, the aurora, the lantern's pool and
     strokes one can see sweeping in arcs; the pictures give thin, many strokes with no ridges, soft
     shading and the trees. Where they pull apart the snow sits between them.
+30. **"Resume work" (2026-11-16).** Read as: go on with the look. Not a go-ahead for the three
+    riskiest parts (item 28: still waiting) and not a yes to a desktop page (still not answered).
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
