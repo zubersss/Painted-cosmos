@@ -2171,3 +2171,4 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - MEASURED (Node): a gust in an autumn wood throws about 300 leaves, 210 of them from above three metres, 125 of dust, and two branches down; a whirl 540 leaves, 640 high, five branches. The physics' frame 0.31 ms with nothing cast and 1.70 ms with a tornado, a stilled place, a ball and a gust every half second (it was 1.27; the test's limit is 2.5).
 - A CHOICE MADE FOR THE OWNER (28): a snapped branch is a thing that falls, not a change to the tree: the crown it came from is not thinned (the trees' meshes are shared by hundreds of trees). Nobody can tell from the picture, and it costs nothing.
 - TESTS: physics 343, unit 262. NOT YET SEEN in the game: the stills come next, with the far-tree work.
+- THE FULL CHECK ON `main` AT v12 (ba4e0a5, the powers live): ALL 17 PASSED. The gate's last step after the merge; nothing to undo.
