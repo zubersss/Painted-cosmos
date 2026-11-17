@@ -919,9 +919,17 @@ export class Loose {
       } else if (s.kind === KIND.orb) {
         // a ball: strokes turning close round its middle, at its own height, each gone in half a second (the air
         // they ride runs in to the middle: older ones would all lie there in a knot)
-        const el = (rng() * 2 - 1) * 1.1, R = (0.7 + rng() * 0.9) * Math.cos(el), a = rng() * 6.2831853;
-        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = Math.max(0.15, s.height + Math.sin(el) * 1.3);
-        ve = -Math.sin(a) * W.orbSwirl; vn = Math.cos(a) * W.orbSwirl; vu = 0; life = 0.035;
+        const a = rng() * 6.2831853;
+        if (rng() < 0.3) {
+          // (three in ten begin farther out and low, and are drawn in on a spiral: the ball is seen to gather)
+          const R = 2.4 + rng() * 2.8;
+          x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.2 + rng() * 1.1;
+          ve = -Math.sin(a) * 3 - Math.cos(a) * 5; vn = Math.cos(a) * 3 - Math.sin(a) * 5; vu = 0.4; life = 0.07;
+        } else {
+          const el = (rng() * 2 - 1) * 1.1, R = (0.7 + rng() * 0.9) * Math.cos(el);
+          x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = Math.max(0.15, s.height + Math.sin(el) * 1.3);
+          ve = -Math.sin(a) * W.orbSwirl; vn = Math.cos(a) * W.orbSwirl; vu = 0; life = 0.035;
+        }
       } else if (s.kind === KIND.vortex) {
         // a column: strokes turning round the core and climbing it, gone before they are flung far
         const R = s.radius * (0.35 + 0.9 * rng()), a = rng() * 6.2831853;

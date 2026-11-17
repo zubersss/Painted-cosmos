@@ -67,7 +67,7 @@ export const WINDPOWER = Object.freeze({
   // THE AIR MADE VISIBLE: pale strokes that ride each source (loose.js: grains of the leaf kind in the colours of snow
   // and ice, short-lived), strokes a second at full strength. Without them a gust over turf or rock moved nothing
   // that could be seen: the first stills of the powers.
-  wispGust: 170, wispOrb: 170, wispVortex: 240, wispZone: 70,
+  wispGust: 170, wispOrb: 220, wispVortex: 240, wispZone: 70,
 });
 
 function blank() {
