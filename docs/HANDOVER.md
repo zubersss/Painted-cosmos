@@ -320,9 +320,8 @@ of the phone's 40), and the phone must say so before the look is touched for it.
 - `powers` holds `main` at v9 (merged in). THE FULL CHECK passed at 1ef4bc6 (a to d) and at
   0af0a8f (with move water and v9). After that TWO REAL FAULTS were found by pressing the
   touch button with real touch events and mended (62578d7: the button did not answer a finger;
-  a whirl broke the physics among real dust devils); the full check's run on 62578d7 is
-  recorded in the log's last entry: read it before anything is said to be finished or merged.
-  (7c6829e, the head, adds only a note in `docs/POWERS.md`.)
+  a whirl broke the physics among real dust devils), and THE FULL CHECK PASSED AGAIN ON THE
+  HEAD, 7c6829e (17 of 17). Nothing of the powers is waiting on a check.
 - THE LESSON OF THOSE TWO FAULTS: stills made by calling the powers' code prove the picture,
   not the hand. Anything the owner will touch must be pressed here with real touch events
   first: `/home/user/.pc-scratch/look/pw/touchshot.mjs` in the session that made it (a browser
