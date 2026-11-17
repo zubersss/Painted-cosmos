@@ -319,7 +319,10 @@ been patched a dozen times; the log has the history).
 standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9, v10 and v11
 changed NOTHING OF THE LOOK: they are the speed test (now its sixth form, 21 rows), an
 experimental cheaper far tree behind `?fartree=cards`, and the scene's objects placed once a
-frame (a twentieth of the script). `look-proto` equals `main`.
+frame (a twentieth of the script). `look-proto` is ONE COMMIT AHEAD of `main` (c058526: a calmer
+forest floor behind `?floor=calm`, shown to the owner as "A or B", not merged: if they say B, make
+it the autumn wood's own colours in `src/data/looks/earth.js` and take it through the gate; if A,
+remove the commit's switch or leave it).
 
 **The phone's speed, where it stands** (the log of 2026-11-17 has the tables and the reasoning):
 - With the live far trees (lumps) the far trees are HALF THE PHONE'S FRAME (44 ms as set, 23
@@ -337,6 +340,21 @@ frame (a twentieth of the script). `look-proto` equals `main`.
   rows split the far trees' cost (shadow pass or picture, drawn first or last) and time the two
   far trees in the same run; and their eye on `?look=oil&fartree=cards`. Then: either the leafy
   far tree becomes the phone's look (the owner's call), or the lump's real cost is found and cut.
+
+**WHAT THE OWNER HAS BEEN ASKED AND HAS NOT YET ANSWERED (2026-11-17, evening):**
+1. One photograph of SPEED TEST 6 from the phone (`…/?look=oil&bench=1`, label v11). Read rows 2
+   to 9 (the far trees: flat, gone, out of the shadow pass, only in it, drawn first, drawn last,
+   the other form) against the "as set" before them, and rows 16 to 18 (the shadow pass).
+2. Their eye on the leafier cheap far tree (`…/?look=oil&fartree=cards&body=earth&time=15.4`):
+   could it be the phone's look? (On the phone its plainer version ran at 36.5 a second against
+   22.5.)
+3. THE WORD TO MERGE THE POWERS (asked four times; each time: keep working). When it comes:
+   compare `main` and `powers` by pictures again (nine scenes, without the flag), open the pull
+   request `powers` -> `main`, merge, run the full check on `main`; the phone's address is then
+   the game's own with `?look=oil&powers=1`.
+4. The forest's floor: A (live) or B (`floor=calm`).
+GIVE THE OWNER LINKS AS PLAIN ADDRESSES ON THEIR OWN LINES (inside code marks a phone may not
+let one tap them: they had to ask again).
 
 **THE ELEMENTAL POWERS (section 2, item 42): branch `powers`, behind `?powers=1`, NOT MERGED
 (the owner: "I'll say when").** Wind was built in the owner's absence (2026-11-17).
