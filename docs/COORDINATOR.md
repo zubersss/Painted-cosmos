@@ -2049,3 +2049,4 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - AFTER the merge: the full check on `main` (94d44ca) was started at once; its result is in the next entry. Then `main` was merged into `powers` (0af0a8f, no conflict) and the full check queued on that head.
 - FOR THE OWNER'S PHONE (when they are back): the speed test `…/?look=oil&bench=1` once as it is, and once more with `&fartree=cards` added. The first table's rows 5 and 6 say what the far trees' paint and shapes cost on the phone; the second says what the plainer tree would win.
 - THE FULL CHECK ON `main` AT v9 (94d44ca): ALL 17 PASSED (the gate's last step; nothing to undo).
+- THE FULL CHECK ON `powers` AT 0af0a8f (wind a to e, with `main` at v9 merged in): ALL 17 PASSED (unit 257, physics 340, world 47; the scripted play-throughs; touch 222 checks). The owner's rule "The full check must still pass" holds for everything of the powers that is built.
