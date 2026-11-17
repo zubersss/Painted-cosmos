@@ -299,6 +299,22 @@ settings for a computer with a basic built-in chip, the version label. `look-pro
 `main`. WAITED FOR: the owner's speed tables from the phone and the Lenovo on v8, and how it
 looks and plays.
 
+**THE ELEMENTAL POWERS (section 2, item 42): branch `powers`, behind `?powers=1`, NOT MERGED
+(the owner: "I'll say when").** Wind is being built in the owner's absence (2026-11-17).
+- Read first: `docs/POWERS.md` ON BRANCH `powers` (the design note for the whole system; wind as
+  built; the plans and costs for "move water" and "wind knife"), then the log's sections of
+  2026-11-17 on the powers ("CHOICES MADE FOR THE OWNER").
+- What exists there: `src/physics/powers.js` (the explorer's wind as a short list of shapes: a
+  jet, a zone, an orb, a vortex) taken by the air at a point, the plants' field, the loose things
+  and the rain and snow through the door the dust devils use; `src/core/powers.js` (the hands,
+  the aim, five abilities: gust, gather, quicken, still, whirl); `src/ui/powers.js` (the touch
+  button and its fan); the explorer's cast gesture; tests `src/physics/powers.test.mjs` (11) and
+  `tests/powers.test.mjs` (5).
+- Its state, what was seen, what is left and what the owner must decide are in the log's last
+  section on the powers and in the summary given to the owner.
+- IT CANNOT BE TRIED ON THE PHONE UNTIL IT IS MERGED (the site serves `main`). It is safe to
+  merge when the owner says: off by default, nothing loaded without the flag.
+
 **What the phone has taught** (the log has the three tables and the reasoning):
 - Its own settings drew the look tiny and the controller shrank it further: cured in #6 (the
   picture is not drawn small in the oil look; a phone is asked for 30 pictures a second).
