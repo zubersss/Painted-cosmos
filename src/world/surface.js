@@ -152,6 +152,7 @@ class Surface {
       }
       // (the oil look: a biome may give any of these outright, its `oil.pal`: the owner's "colours that pop"; data/mode.js)
       if (MODE.oil && bi.oil && bi.oil.pal) for (const k of Object.keys(bi.oil.pal)) p[k] = bi.oil.pal[k];
+      if (MODE.oil && MODE.calm && bi.oil && bi.oil.palCalm) for (const k of Object.keys(bi.oil.palCalm)) p[k] = bi.oil.palCalm[k];
       return p;
     });
   }

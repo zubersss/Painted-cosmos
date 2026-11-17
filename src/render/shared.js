@@ -73,6 +73,7 @@ const _qs = (() => { try { return new URLSearchParams(location.search); } catch 
 const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
 export const LOOK = { oil: !!(_qs && _qs.get('look') === 'oil') };
 MODE.oil = LOOK.oil;      // (for the look data and the surface, which do not load this module: data/mode.js)
+MODE.calm = LOOK.oil && !!(_qs && _qs.get('floor') === 'calm');      // (a calmer forest floor, to compare: data/looks/earth.js)
 if (LOOK.oil) overlayOil(LOOKS);      // (the oil look's own kinds of plant and where they stand: data/mode.js)
 export const OIL = {
   // THE STROKES ARE THE OWNER'S STYLE 5 (2026-11-15: leaf dabs lying every way, the clip's own way, a little thinner than

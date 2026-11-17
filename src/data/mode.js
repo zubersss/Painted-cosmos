@@ -3,7 +3,7 @@
 // render/shared.js sets `oil` once, when it is loaded, from the address (`?look=oil`); everything else only reads it.
 // `wanderer`: the new explorer (bare head, cloak, lantern; it flies by itself, no jetpack: the owner, 2026-11-15). For
 // the prototype it comes with the oil look; read this, not `oil`, wherever the explorer's own behaviour is meant.
-export const MODE = { oil: false, get wanderer() { return this.oil; } };
+export const MODE = { oil: false, calm: false, get wanderer() { return this.oil; } };
 
 // THE OIL LOOK'S OWN CONTENT, laid over the looks ONCE when the look is switched on (render/shared.js calls this; with
 // the look off nothing is touched, so the default game's worlds are what they were). A look may name kinds of tall
@@ -25,6 +25,8 @@ export function overlayOil(LOOKS) {
       const o = b.oil && b.oil.over;
       if (!o) continue;
       Object.assign(b, o);
+      // (?floor=calm: a look's calmer variant of the same fields, for a side-by-side the owner chooses from)
+      if (MODE.calm && b.oil.overCalm) Object.assign(b, b.oil.overCalm);
       if (o.tallOil) { b.tall = o.tallOil.map((k) => base + k); delete b.tallOil; }
     }
   }
