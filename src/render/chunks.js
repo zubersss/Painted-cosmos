@@ -64,96 +64,12 @@ export const VERT_END = /* glsl */`
 #endif
 `;
 
-export const FRAG_PARS = /* glsl */`
-#include <common>
-#include <logdepthbuf_pars_fragment>
-#if defined(USE_LOGARITHMIC_DEPTH_BUFFER) && !defined(PC_FRAG_LOGDEPTH)
-  #undef USE_LOGARITHMIC_DEPTH_BUFFER
-#endif
-uniform highp sampler3D uNoise3D;
-uniform vec2 uFogBank;
-${FOG_BANK}
-uniform sampler2D uStrokeTex;
-uniform vec3 uSunDirW;
-uniform vec3 uSunDirL;
-uniform vec3 uGlaze;
-uniform vec3 uLight;
-uniform vec3 uHaze;
-uniform vec4 uHazeUp;  // under a closed sky: rgb the sky's own wash overhead, a how far the far air takes it high in the view (0: one haze at every height)
-uniform vec3 uUpW;     // up at the eye, scene space
-uniform vec4 uFog;
-uniform vec2 uAirNear;  // the near air: x its share at distance y (m), see shared.js
-uniform float uTime;
-uniform float uDayness;
-uniform float uMoon;   // the night's light on the ground: 0 the sun is the light .. 1 the moon is (the world then hands the moon's direction in uSunDir*)
-uniform float uStorm;
-uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
-layout(location = 1) out highp vec4 pcAux;
-uniform float uAux8;
-#ifdef PC_OIL
-uniform vec4 uOilA;    // the oil look's dials (shared.js OIL)
-uniform vec4 uOilB;
-uniform vec4 uOilC;
-uniform vec4 uOilD;
-uniform vec4 uOilS;
-uniform vec4 uOilG;
-uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
-uniform vec4 uOilPx;
-uniform mat4 uShM;
-uniform highp sampler2D uShTex;
-uniform vec4 uShK;
-uniform sampler2D uShAir;
-uniform vec4 uLamp;
-uniform vec4 uLampF;
-uniform vec4 uLampV;
-uniform float uAuroraK;
-uniform vec4 uGroundK;
-uniform highp sampler2D uDabP;    // the dabs laid once (dabtex.js): a texel a dab
-uniform highp sampler2D uDabId;   // and which dabs can lie on each texel of the tile
-#endif
-// (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
-vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
-vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
-
-// The marks as the pixel sees them (PAINTER, R1 W2.1 of docs/lead/SHARP-SMOOTH-PLAN.md). A mark (the leaf shadow, a
-// touch, a fleck of grit) is a threshold on a noise channel. Where the pattern is finer than the pixel the noise is read
-// from a mip level that has averaged it, but the threshold made it hard again: from the ship the far floor was rows of
-// dashes and camouflage blotches, hidden only while the brush repainted every far pixel. Here a threshold is widened by
-// what of its channel lies inside the pixel, so a mark finer than the pixel eases to the share of the pixel it covers:
-// the same mean (the same palette), no new edges. Near the eye nothing changes.
-// pcFp: the pixel's footprint on the land in metres, set at the top of a material's main, before any discard
-// (pcFp = pcFootprint(vBody);); a material that does not set it keeps every mark exactly as before.
-float pcFp = 0.0;
-// (R1 re-fix) pcDist: the view distance in metres, set beside pcFp by a material that lays the leaf shadow from afar
-// (pcDappleL: its far octaves); 0 keeps it as it was
-float pcDist = 0.0;
-float pcFootprint(vec3 p) { vec3 a = dFdx(p), b = dFdy(p); return sqrt(max(dot(a, a), dot(b, b))); }
-// What of a uNoise3D channel read at p / sc lies inside the pixel, as a variance: (the channel's variance, the squared
-// size in texels at which half of it is averaged away), measured on the 64^3 noise's own mip chain (texgen.js
-// genNoise3D: R and G alike, B finer, A the billows; docs/notes/painter.md, R1).
-const vec2 PC_NRG = vec2(0.0191, 100.0), PC_NB = vec2(0.0163, 25.0), PC_NA = vec2(0.0550, 56.0);
-float pcSub(float sc, vec2 k) { float s = 64.0 * pcFp / sc; s *= s; return k.x * s / (s + k.y); }
-// smoothstep(e0, e1, v) widened by sub (the pcSub of each channel in v times its weight squared): the soft edge and the
-// spread inside the pixel add as variances, so the mean share is kept. (1.4: a smoothstep as wide as a normal spread of
-// sd s is about 1.9 s each side, 3.5 s^2; the mip level's box already averages most of that, and against the design
-// supersampled 16 times (W2.1 off, 4x, box-filtered down) a full 3.5 was too soft: at E_1000_90 the error to it fell
-// from 0.63 (the marks as drawn) to 0.48 at 3.5 and 0.42 at 1.5. The plan's lapvar bound there (350, the supersampled
-// design's own is 675) sets the floor: 1.2 gave 366.)
-float pcStepF(float e0, float e1, float v, float sub) {
-  float m = 0.5 * (e0 + e1), h = 0.5 * (e1 - e0);
-  h = sqrt(h * h + 1.4 * sub);
-  return smoothstep(m - h, m + h, v);
-}
-// A thin line of a distance field (1 - smoothstep(e0, e1, a), a >= 0 its distance): widened by gpx, how much a changes
-// across the pixel, keeping how much of the land the line covers; past the size of its cells (cell, metres) it is laid
-// as that cover (cov per unit of the line's width).
-float pcLineF(float e0, float e1, float a, float gpx, float cell, float cov) {
-  float m = 0.5 * (e0 + e1), h = 0.5 * (e1 - e0);
-  float h2 = sqrt(h * h + 0.25 * gpx * gpx), m2 = max(m, h2);
-  float l = (1.0 - smoothstep(m2 - h2, m2 + h2, a)) * (m / m2);
-  return mix(l, cov * m, smoothstep(0.15, 0.6, pcFp / cell));
-}
-
+// THE PAINT ITSELF (pigment density, the light's steps, the tone of a wash at a light level), as a piece of its own:
+// the fragment shaders take it where it always stood (FRAG_PARS, below: the text they compile is what it was), and the
+// oil look's plants take it into their VERTEX shader as well (materials.js PROP_VERT), where a leaf's paint is worked
+// out once a leaf and not once a pixel. It needs only uniforms: uDayness, uMoon, uWx, uStorm, uLight, uGlaze, uSunDirW,
+// uUpW and, in the oil look, uOilA, uOilB, uOilD, uOilG.
+export const PAINT = /* glsl */`
 // Pigment density model: heavier pigment grows richer, not muddier.
 vec3 pcDensity(vec3 c, float d) {
   return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0);
@@ -255,6 +171,99 @@ vec3 pcTone(vec3 c, float level) {
   return r;
 }
 
+`;
+
+export const FRAG_PARS = /* glsl */`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+#if defined(USE_LOGARITHMIC_DEPTH_BUFFER) && !defined(PC_FRAG_LOGDEPTH)
+  #undef USE_LOGARITHMIC_DEPTH_BUFFER
+#endif
+uniform highp sampler3D uNoise3D;
+uniform vec2 uFogBank;
+${FOG_BANK}
+uniform sampler2D uStrokeTex;
+uniform vec3 uSunDirW;
+uniform vec3 uSunDirL;
+uniform vec3 uGlaze;
+uniform vec3 uLight;
+uniform vec3 uHaze;
+uniform vec4 uHazeUp;  // under a closed sky: rgb the sky's own wash overhead, a how far the far air takes it high in the view (0: one haze at every height)
+uniform vec3 uUpW;     // up at the eye, scene space
+uniform vec4 uFog;
+uniform vec2 uAirNear;  // the near air: x its share at distance y (m), see shared.js
+uniform float uTime;
+uniform float uDayness;
+uniform float uMoon;   // the night's light on the ground: 0 the sun is the light .. 1 the moon is (the world then hands the moon's direction in uSunDir*)
+uniform float uStorm;
+uniform vec4 uWx;      // weather: x overcast, y wet, z snow cover, w veil (rain or snow in the air)
+layout(location = 1) out highp vec4 pcAux;
+uniform float uAux8;
+#ifdef PC_OIL
+uniform vec4 uOilA;    // the oil look's dials (shared.js OIL)
+uniform vec4 uOilB;
+uniform vec4 uOilC;
+uniform vec4 uOilD;
+uniform vec4 uOilS;
+uniform vec4 uOilG;
+uniform vec4 uOilL;    // x 1: the lighter paint (phones); y the speed test's flat modes (shared.js)
+uniform vec4 uOilPx;
+uniform mat4 uShM;
+uniform highp sampler2D uShTex;
+uniform vec4 uShK;
+uniform sampler2D uShAir;
+uniform vec4 uLamp;
+uniform vec4 uLampF;
+uniform vec4 uLampV;
+uniform float uAuroraK;
+uniform vec4 uGroundK;
+uniform highp sampler2D uDabP;    // the dabs laid once (dabtex.js): a texel a dab
+uniform highp sampler2D uDabId;   // and which dabs can lie on each texel of the tile
+#endif
+// (the 8-bit fallback, shared.js uAux8: normal to 0..1, log depth over 32, the region over 8 with its hash kept off the next class)
+vec4 pcAuxEnc(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 0.5 + 0.5, a.z / 32.0, (floor(a.w + 0.001) + fract(a.w + 0.001) * 0.9) / 8.0) : a; }
+vec4 pcAuxDec(vec4 a) { return uAux8 > 0.5 ? vec4(a.xy * 2.0 - 1.0, a.z * 32.0, a.w * 8.0 + 0.02) : a; }
+
+// The marks as the pixel sees them (PAINTER, R1 W2.1 of docs/lead/SHARP-SMOOTH-PLAN.md). A mark (the leaf shadow, a
+// touch, a fleck of grit) is a threshold on a noise channel. Where the pattern is finer than the pixel the noise is read
+// from a mip level that has averaged it, but the threshold made it hard again: from the ship the far floor was rows of
+// dashes and camouflage blotches, hidden only while the brush repainted every far pixel. Here a threshold is widened by
+// what of its channel lies inside the pixel, so a mark finer than the pixel eases to the share of the pixel it covers:
+// the same mean (the same palette), no new edges. Near the eye nothing changes.
+// pcFp: the pixel's footprint on the land in metres, set at the top of a material's main, before any discard
+// (pcFp = pcFootprint(vBody);); a material that does not set it keeps every mark exactly as before.
+float pcFp = 0.0;
+// (R1 re-fix) pcDist: the view distance in metres, set beside pcFp by a material that lays the leaf shadow from afar
+// (pcDappleL: its far octaves); 0 keeps it as it was
+float pcDist = 0.0;
+float pcFootprint(vec3 p) { vec3 a = dFdx(p), b = dFdy(p); return sqrt(max(dot(a, a), dot(b, b))); }
+// What of a uNoise3D channel read at p / sc lies inside the pixel, as a variance: (the channel's variance, the squared
+// size in texels at which half of it is averaged away), measured on the 64^3 noise's own mip chain (texgen.js
+// genNoise3D: R and G alike, B finer, A the billows; docs/notes/painter.md, R1).
+const vec2 PC_NRG = vec2(0.0191, 100.0), PC_NB = vec2(0.0163, 25.0), PC_NA = vec2(0.0550, 56.0);
+float pcSub(float sc, vec2 k) { float s = 64.0 * pcFp / sc; s *= s; return k.x * s / (s + k.y); }
+// smoothstep(e0, e1, v) widened by sub (the pcSub of each channel in v times its weight squared): the soft edge and the
+// spread inside the pixel add as variances, so the mean share is kept. (1.4: a smoothstep as wide as a normal spread of
+// sd s is about 1.9 s each side, 3.5 s^2; the mip level's box already averages most of that, and against the design
+// supersampled 16 times (W2.1 off, 4x, box-filtered down) a full 3.5 was too soft: at E_1000_90 the error to it fell
+// from 0.63 (the marks as drawn) to 0.48 at 3.5 and 0.42 at 1.5. The plan's lapvar bound there (350, the supersampled
+// design's own is 675) sets the floor: 1.2 gave 366.)
+float pcStepF(float e0, float e1, float v, float sub) {
+  float m = 0.5 * (e0 + e1), h = 0.5 * (e1 - e0);
+  h = sqrt(h * h + 1.4 * sub);
+  return smoothstep(m - h, m + h, v);
+}
+// A thin line of a distance field (1 - smoothstep(e0, e1, a), a >= 0 its distance): widened by gpx, how much a changes
+// across the pixel, keeping how much of the land the line covers; past the size of its cells (cell, metres) it is laid
+// as that cover (cov per unit of the line's width).
+float pcLineF(float e0, float e1, float a, float gpx, float cell, float cov) {
+  float m = 0.5 * (e0 + e1), h = 0.5 * (e1 - e0);
+  float h2 = sqrt(h * h + 0.25 * gpx * gpx), m2 = max(m, h2);
+  float l = (1.0 - smoothstep(m2 - h2, m2 + h2, a)) * (m / m2);
+  return mix(l, cov * m, smoothstep(0.15, 0.6, pcFp / cell));
+}
+
+${PAINT}
 // Atmospheric perspective in soft stacked bands. Returns 0..1.
 float pcFogAmount(float dist) {
   #ifdef PC_OIL

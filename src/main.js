@@ -30,23 +30,58 @@ import { createBook } from './ui/book.js';
 import { createAudio } from './audio/audio.js';
 import { readSave, restore, clearSave, AutoSave } from './core/save.js';
 import { SketchStore } from './core/sketches.js';
-import { choosePreset, bufferSize } from './core/preset.js';
+import { choosePreset, bufferSize, BASIC_GPU } from './core/preset.js';
 import { attachPlatform } from './core/platform.js';
 import { attachBench } from './core/bench.js';
+import { BUILD } from './core/build.js';
 
 // Every static import has loaded: index.html's watchdog stands down (hardening review P14).
 window.__pcBooting = true;
 
 const params = new URLSearchParams(location.search);
+// The version on the screen, and a newer one fetched when the site has it (the oil look only; src/core/build.js).
+if (params.get('look') === 'oil') {
+  const tag = document.createElement('div');
+  tag.id = 'pc-build';
+  tag.textContent = BUILD;
+  tag.style.cssText = 'position:fixed;left:50%;bottom:2px;transform:translateX(-50%);z-index:60;font:9px/1.2 system-ui,sans-serif;color:#fff;opacity:.6;text-shadow:0 0 2px #000,0 0 2px #000;pointer-events:none';
+  const put = () => document.body && document.body.appendChild(tag);
+  if (document.body) put(); else window.addEventListener('DOMContentLoaded', put);
+  fetch('./build.txt?t=' + Date.now(), { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => {
+    const live = t.trim();
+    if (!live || live === BUILD) return;
+    let tried = null;
+    try { tried = sessionStorage.getItem('pc-renewed'); } catch { /* no storage */ }
+    if (tried === live) { tag.textContent = BUILD + ' (an older version: close this tab and open the game again)'; return; }
+    try { sessionStorage.setItem('pc-renewed', live); } catch { /* no storage */ }
+    tag.textContent = 'a newer version is here: loading it';
+    // every file this page loaded, fetched past the browser's store, then the page again
+    const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => u.startsWith(location.origin) && /\.(js|mjs|css|html|json)(\?|$)/.test(u));
+    urls.push(location.origin + location.pathname);
+    Promise.all(urls.map((u) => fetch(u, { cache: 'reload' }).catch(() => null))).then(() => location.reload());
+  }).catch(() => { /* offline, or no build.txt: nothing to do */ });
+}
 // The device preset (W3.5, src/core/preset.js): the desktop draws at up to 1.5 device pixels per
 // css pixel and 3.7 MP (the coordinator's ruling, 2026-11-11: about 2560x1440); a phone or a
 // tablet at up to 1.25 (a tablet at most 1.6 MP), and a phone starts at tier 1.
+// (the oil look only: is the graphics chip a basic built-in one? Asked of a throwaway context, before the game's own.)
+function basicGpu() {
+  if (params.get('look') !== 'oil') return false;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const e = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    const name = e ? String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) : '';
+    const lose = gl && gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+    return BASIC_GPU.test(name);
+  } catch { return false; }
+}
 const PRESET = (() => {
   let coarse = false;
   try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch { /* no media queries: the desktop */ }
   const scr = window.screen || {};
   return choosePreset({ coarse, touchPoints: navigator.maxTouchPoints || ('ontouchstart' in window ? 1 : 0),
-    screenW: scr.width || window.innerWidth, screenH: scr.height || window.innerHeight, ask: params.get('preset') });
+    screenW: scr.width || window.innerWidth, screenH: scr.height || window.innerHeight, ask: params.get('preset') || (!coarse && basicGpu() ? 'laptop' : null) });
 })();
 // A phone held upright: the game waits under a slip that asks for it to be turned (W3.4). A
 // tablet plays upright (its view keeps 60 degrees across: src/player/camera.js portraitFov).

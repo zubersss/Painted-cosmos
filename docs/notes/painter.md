@@ -110,6 +110,28 @@ the table says so:** a sharp enlargement of a small picture in the last pass (th
 picture's size each way, and the browser's own stretch is soft); the plants' cost, which does not follow the picture's
 size.
 
+**After the phone's SECOND speed table (2026-11-16; the new code, 1028 x 480, the lighter paint; the log on `r2`
+has the table).** With the plants in one flat colour the phone drew 61 pictures a second, as set 26: THE PLANTS' PAINT
+IS 23 ms OF A 39 ms FRAME, nearly all of it the trees'. The ground's paint is 3 ms; the script 11 ms. Built for that:
+- **A leaf's paint once a leaf** (`PROP_VERT`, under `PC_OIL`, after `vCardD`; `chunks.js` `PAINT`): a leaf card's
+  colour, light and tone are worked out in the VERTEX shader from what is the same at all its corners (its centre at
+  rest `cB`, its numbers `aData`, its tree `inst`, the crown's mass `aMass`) and handed on as `vLeafC.rgb` (toned) and
+  `vLeafK.rgb` (its own colour, for the lantern); `PROP_FRAG`'s leaf branch only lays it and calls `pcLamp`. The
+  paint's functions (`pcDensity`, `pcLevel`, `pcTone` and the oil look's keys) are the piece `PAINT`, which
+  `FRAG_PARS` includes where they stood and `PROP_VERT` includes too; `pcDabTintV`, `pcWetWashV` are copies of
+  `pcDabTint`, `pcWetWash` (keep them alike), `pcSunAtV` is `pcSunAt` with a leaf's own number where the fragment
+  shader reads the noise outside the shadow map's square. `vCardD` and `vScaleO` ride in the two new varyings' fourth
+  parts (`#define`), so the count of varyings is what it was. SEEN: the wood at the phone's size, the same picture.
+  NOT YET per leaf: the bark's streaks and the far trees' crowns (painted across a surface, two layers of strokes
+  each): the next table says what they cost.
+- **The rivers flow** (`surface.js` `_riversOil`: `c.fu`, `c.fv`, the current in the place's two tangent axes, along
+  the winning channel's line; tributaries toward the river; `sample` hands them on as `o.fu`, `o.fv`; `patchgen.js`
+  puts them in the two spare bytes of the water's `aLiqP`; `WATER_VERT`/`WATER_FRAG` `vFlow`): the water's dashes are
+  laid along the current and slid with the clock, in patches twenty-six metres across with wavy bounds; where two
+  currents that disagree are blended (a meeting of waters) the water is laid still. SEEN from above at two moments:
+  the dashes lie along the channel and have moved. Still wrong: a faint seam where two patches meet.
+- **The version on the screen** (PILOT's `core/build.js`, `build.txt`): change both with every pull request.
+
 **What is built, file by file.**
 - `src/render/shared.js`: `LOOK.oil`; the dials `OIL.uOilA..uOilG`, `uOilPx`, the shadow map's uniforms, `uLamp`, the
   dab textures `uDabP`/`uDabId`, the light in the air `uShV`/`uSunV`/`uShaftC`/`uShaft` (each documented there);

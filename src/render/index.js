@@ -53,6 +53,8 @@ const AA_URL = QS ? QS.get('aa') : null;
 // the old blots (outside a page, the tests' stand-in renderers, the old rule stands)
 const PINNED = QS ? QS.has('scale') || QS.get('dynres') === '0' : true;
 const LITE_PIN = QS && QS.has('lite') ? (QS.get('lite') === '0' ? 0 : 1) : null;
+// (a graphics chip's name that says it is a basic built-in one; core/preset.js keeps the same list: keep the two alike)
+const BASIC_GPU = /Intel.*(U?HD Graphics|Iris)/i;
 
 const GRADES = [   // hour, sheet grade (used only when no world has published one)
   [0, [0.42, 0.48, 0.70]], [4.5, [0.42, 0.48, 0.70]], [6, [1.0, 0.965, 0.955]], [8, [1, 1, 1]],
@@ -64,6 +66,14 @@ export function createPainter(renderer) {
   // (?float=0: the 8-bit fallback's path on a machine that has float targets, for tests)
   const post = new Post(renderer, { floatFallback: !!(QS && QS.get('float') === '0') });
   // (the oil look's cast shadows: `&shadow=0` turns them off, `&shadow=4096` or another size sets the map's)
+  // A LIGHT DEVICE in the oil look: a touch device, or a computer whose graphics chip is a basic built-in one (by its
+  // name, or ?preset=laptop). It takes the lighter paint and no edge smoothing of either kind.
+  let LIGHT = false;
+  if (LOOK.oil) {
+    let name = '';
+    try { const gl = renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); name = e ? String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) : ''; } catch { /* not told */ }
+    LIGHT = TOUCH || BASIC_GPU.test(name) || !!(QS && QS.get('preset') === 'laptop');
+  }
   const shadow = LOOK.oil && !(QS && QS.get('shadow') === '0') ? new ShadowMap(renderer, { size: QS && +QS.get('shadow') > 256 ? +QS.get('shadow') : 2048 }) : null;
   let quality = 1, renderScale = 1, outW = 2, outH = 2, graphite = 0.4;
   const mood = { bodyId: null, biomeWeights: null, timeOfDay: 12, altitude01: 0, inSpace01: 0, speed01: 0 };
@@ -91,7 +101,7 @@ export function createPainter(renderer) {
     // tiers are as they were.)
     const t = LOOK.oil ? { scale: 1.0, sectors: t0.sectors, graphite: t0.graphite } : t0;
     // (the lighter paint on a touch device, shared.js uOilL; ?lite=0|1 pins it)
-    if (LOOK.oil) OIL.uOilL.value.x = LITE_PIN != null ? LITE_PIN : TOUCH ? 1 : 0;
+    if (LOOK.oil) OIL.uOilL.value.x = LITE_PIN != null ? LITE_PIN : LIGHT ? 1 : 0;
     post.sectors = t.sectors;
     graphite = t.graphite; post.sheetUniforms.uPig.value.w = graphite;
     post.setSize(outW, outH, Math.min(1, Math.max(0.3, t.scale * renderScale)));
@@ -101,11 +111,11 @@ export function createPainter(renderer) {
     let n = 0;
     if (aaMode === 'msaa') n = 4;
     else if (aaMode === 'msaa2') n = 2;
-    else if (aaMode === 'auto' && quality >= 1 && !TOUCH) n = mb(4) <= AA_MB ? 4 : mb(2) <= AA_MB ? 2 : 0;
+    else if (aaMode === 'auto' && quality >= 1 && !TOUCH && !LIGHT) n = mb(4) <= AA_MB ? 4 : mb(2) <= AA_MB ? 2 : 0;
     post.setAA(n);
     // (the oil look on a touch device has no smoothing filter at all: the light post filter softens every stroke's edge,
     // and the phone's screen then stretches the picture three times over: blur on blur, against the look's first rule)
-    post.setPostAA(aaMode === 'post' || (aaMode === 'auto' && post.samples === 0 && !(LOOK.oil && TOUCH)));
+    post.setPostAA(aaMode === 'post' || (aaMode === 'auto' && post.samples === 0 && !LIGHT));
     info.internalWidth = post.inW; info.internalHeight = post.inH; info.quality = quality; info.aa = post.samples; info.postAA = post.postAA;
   }
 

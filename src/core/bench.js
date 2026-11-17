@@ -17,6 +17,8 @@
 // The header also says how the depth is kept (reversed or logarithmic: with the second, nothing hidden is skipped), the
 // script's own time a frame (the CPU's share) and the draw calls and triangles of a frame.
 
+import { BUILD } from './build.js';
+
 export function attachBench(pc) {
   const el = document.createElement('pre');
   el.id = 'pc-bench';
@@ -30,10 +32,12 @@ export function attachBench(pc) {
   // the script's own time and the frame's draw calls, taken round the game's frame while a row is measured
   const acc = { ms: 0, n: 0, calls: 0, tris: 0 };
   const frame0 = pc.game.frame.bind(pc.game);
+  // (the renderer's own count starts afresh at each of a frame's passes: every pass is added up here)
+  const render0 = R.render.bind(R);
+  R.render = (sc, cam) => { render0(sc, cam); acc.calls += R.info.render.calls; acc.tris += R.info.render.triangles; };
   pc.game.frame = (dt) => {
-    const auto = R.info.autoReset; R.info.autoReset = false; R.info.reset();
     const t = performance.now();
-    try { return frame0(dt); } finally { acc.ms += performance.now() - t; acc.n++; acc.calls += R.info.render.calls; acc.tris += R.info.render.triangles; R.info.autoReset = auto; }
+    try { return frame0(dt); } finally { acc.ms += performance.now() - t; acc.n++; }
   };
   // the pictures a second over `ms`, by the browser's own frame clock, and the longest wait between two
   const measure = (ms) => new Promise((resolve) => {
@@ -52,7 +56,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 2: photograph this screen and send it\n' +
+    return 'PAINTED COSMOS SPEED TEST 3, ' + BUILD + ': photograph this screen and send it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -79,6 +83,8 @@ export function attachBench(pc) {
       ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true }), 1000],
       ['picture at half size', () => P.setRenderScale && P.setRenderScale(0.5), () => P.setRenderScale && P.setRenderScale(1), 1500],
       ['low tier', () => P.setQuality(0), () => P.setQuality(tier0), 3500],
+      // (the first row once more: a phone slows as it warms, and the second table's later rows were slower than its first)
+      ['as set, once more', null, null, 3500],
     ];
     const rows = [];
     let r0 = null;
