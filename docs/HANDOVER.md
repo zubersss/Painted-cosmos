@@ -281,6 +281,10 @@ BUT NOT LIVE: no pull request is open for them.
   the first row at the end.
 - Where the time goes at 1028 x 480: plants' paint 23 ms, script 11 ms, ground's paint 3 ms.
 
+**The owner's machines:** the phone is a Samsung Galaxy S23 Ultra (Adreno 740). The computer is
+a Lenovo with 8 GB of memory (said 2026-11-16; model and graphics chip not known: the speed
+test's header would name the chip if the owner opens the test's link on it).
+
 **What is waited for from the owner:**
 1. To say whether to open the pull request for `look-proto` (they merge it themselves).
 2. Then, after waiting until the label at the bottom of the screen says `v7`, the THIRD speed
