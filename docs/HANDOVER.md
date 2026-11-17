@@ -282,6 +282,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     bought nothing; the far trees' crowns and the bark are the cost; the phone slows hard as it
     warms (40 ms to 69 ms in fifty seconds). Seen in the recording: dark blots on shaded ground,
     a loud lemon floor, pale lumps for far trees. Next after the powers.
+44. **The snow world's link at high settings; "keep working though don't stop" (2026-11-17).**
+    "Give me the link to the snow world at high settings keep working though don't stop." Given:
+    the top-settings link with `body=neptune&time=23` (in the log). The four questions put to
+    the owner in the powers' summary were not answered; "keep working" is read as: go on by the
+    standing instructions, which makes the wind knife (item 42, f) the next work. NOT a word to
+    merge the powers (item 42: "I'll say when").
+
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
