@@ -314,15 +314,23 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` at version `v9 (17 Nov)` (pull requests
-#4 to #9; `main` at 94d44ca; #7, #8 and #9 were opened and merged by the session on the owner's
-standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9 changed NOTHING OF
-THE LOOK: it added two rows to the speed test ("far trees one flat colour", "no far trees") and an
-experimental cheaper far tree behind `?fartree=cards` (seen here: cheaper and PLAINER, not good
-enough to be the look). `look-proto` equals `main`. WAITED FOR FROM THE OWNER: (1) their word on
-the powers (below); (2) the speed test's fourth table from the phone, once as it is and once with
-`&fartree=cards`: measured here the far trees' crowns are nearly all of the plants' paint (23 ms
-of the phone's 40), and the phone must say so before the look is touched for it.
+**In one line:** the new look is LIVE behind `?look=oil` at version `v10 (17 Nov)` (pull requests
+#4 to #10; `main` at 0fbfa61; #7 to #10 were opened and merged by the session on the owner's
+standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9 and v10 changed
+NOTHING OF THE LOOK: they are the speed test (now its fifth form) and an experimental cheaper
+far tree behind `?fartree=cards`. `look-proto` equals `main`.
+
+**The phone's speed, where it stands** (the log of 2026-11-17 has the tables and the reasoning):
+- With the live far trees (lumps) the far trees are HALF THE PHONE'S FRAME (44 ms as set, 23
+  without them), and NOT through the paint in their own pixels (laid flat they cost the same).
+  The build machine's software drawing said the opposite, twice: IT CANNOT BE TRUSTED FOR WHY
+  SOMETHING IS SLOW ON THE PHONE, only the phone's own table can.
+- The experimental far tree of flat pieces ran at 36.5 pictures a second against 22.5. It was
+  too plain; v10 makes it leafier (a dark core under shingled leaves). NOT YET TIMED on the phone.
+- WAITED FOR FROM THE OWNER: one table of SPEED TEST 5 (`?look=oil&bench=1`, label v10): its
+  rows split the far trees' cost (shadow pass or picture, drawn first or last) and time the two
+  far trees in the same run; and their eye on `?look=oil&fartree=cards`. Then: either the leafy
+  far tree becomes the phone's look (the owner's call), or the lump's real cost is found and cut.
 
 **THE ELEMENTAL POWERS (section 2, item 42): branch `powers`, behind `?powers=1`, NOT MERGED
 (the owner: "I'll say when").** Wind was built in the owner's absence (2026-11-17).
