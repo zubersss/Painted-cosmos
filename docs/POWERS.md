@@ -100,8 +100,8 @@ Fire never spreads and never burns the wood down: there is nothing to lose.
 
 ## Wind, as built (2026-11-17)
 
-Five abilities on the keys `1` to `5` and on the touch fan, in this order: **gust**, **gather**,
-**quicken**, **still**, **whirl** (wind control is two of them: a hidden second gesture is not found
+Six abilities on the keys `1` to `6` and on the touch fan, in this order: **gust**, **gather**,
+**quicken**, **still**, **whirl**, **part** (move water: below) (wind control is two of them: a hidden second gesture is not found
 on a phone). A press of the touch button casts at once, or holds; sliding the thumb off the button
 opens the fan, and letting go on a word chooses it and casts it. The aim is shown by a small mark
 in the middle of the picture while a power is held (the ring painted on the ground, above, is not
@@ -134,7 +134,8 @@ it shows only in what stops moving.
 
 ## Move water and the wind knife: the plans and their cost
 
-Both are plans. The owner asked for the plan and its cost first.
+The owner asked for the plan and its cost first, then the simplest version. MOVE WATER IS BUILT in
+its simplest version (below, after its plan); THE WIND KNIFE IS A PLAN.
 
 ### Move water ("push water out of my path")
 
@@ -170,6 +171,24 @@ not answer it (the game has none that would).
 *The risk.* It touches the water's vertex shader, which is one of the three risky parts (the
 shader code). The change is a few lines behind its own switch; it must be seen in a still on the
 river and on the sea before it is called done.
+
+*As built (2026-11-17, the simplest version; ability six, "part").* While the power is held, a
+channel 3.4 m wide runs out 14 m along the way the explorer looks, beginning a step and a half
+behind them, and goes with them as they walk and turn; let go, it closes from the far end inward
+in a second and a half. The three pieces are as planned: the water's face is pressed down to its
+bed and cut away in the channel and heaped a hand's breadth along its walls (`WATER_VERT`, behind
+the define `PC_POWERS`, which is set only with `?powers=1`); the explorer's ground has no water on
+the channel's floor (`src/core/sim.js` `explorerEnv`: one comparison a sample without the powers);
+spray is thrown off the water along the two walls and strokes of air fly along the floor. The
+channel is one shape for all three (`partShape`, `src/physics/powers.js`).
+SEEN in stills on the brook by the landing place (0.86 m deep there): a trench across the water
+with sloping walls of water, the bed and its fallen leaves showing, the explorer standing dry on
+it (depth at the feet 0.00 m; 0.87 m two seconds after letting go). MEASURED: the game's script
+for a frame 2.97 ms with the channel held, about 3 ms without: nothing that can be measured.
+NOT SEEN: deeper water, where the explorer swims (none within 30 m of the landing place); the sea;
+how it looks as it opens and closes. One channel is drawn at a time (a closing one vanishes if a
+new one is opened at once). The walls are as coarse as the water's mesh (a point every three
+quarters of a metre near the explorer).
 
 ### The wind knife ("a blade of wind that cuts down a tree, which falls and stays felled")
 
