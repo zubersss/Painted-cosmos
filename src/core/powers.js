@@ -47,6 +47,7 @@ export class Powers {
     this.note = '';             // one word for the HUD when something cannot be done here
     this.active = false;        // the powers can be used now (on foot, on a world)
     this.keys = { cast: false, pad: false, mouse: false, touch: false };
+    this.onCast = null;         // called with the ability's id when one is cast (the sound)
   }
 
   pick(i) { if (i >= 0 && i < ABILITIES.length && i !== this.ability) { this._drop(); this.ability = i; } }
@@ -124,7 +125,7 @@ export class Powers {
     try { const s = sim.sampleSurface(sim.bodyId, d); if (s) r = Math.max(s.radius || 0, s.liquidRadius || 0) || r; } catch { /* level with the explorer */ }
     return { x: d.x * r, y: d.y * r, z: d.z * r };
   }
-  _cast(sim) { this.casts++; if (sim.ex) sim.ex.casting = 1; }
+  _cast(sim) { this.casts++; if (sim.ex) sim.ex.casting = 1; if (this.onCast) this.onCast(ABILITIES[this.ability].id); }   // (onCast: the sound, main.js)
 }
 
 // The hands: a key, the right mouse button, a gamepad's bumpers. (The touch button is ui/powers.js, which sets

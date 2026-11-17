@@ -16,10 +16,12 @@ function fakeSim({ pitch = -0.12, state = S.ON_FOOT } = {}) {
 const step = (p, sim, n = 1, dt = 1 / 60) => { for (let i = 0; i < n; i++) p.update(dt, sim); };
 
 test('a press casts a gust from the hands along the view; holding does not repeat it', () => {
-  const p = new Powers(), sim = fakeSim();
+  const p = new Powers(), sim = fakeSim(), said = [];
+  p.onCast = (id) => said.push(id);
   step(p, sim, 3); assert.equal(p.winds.count, 0, 'nothing until asked');
   p.down = true; step(p, sim, 4);
   assert.equal(p.winds.count, 1); assert.equal(p.casts, 1);
+  assert.deepEqual(said, ['gust'], 'the cast is said once, by its name (the sound)');
   const s = p.winds[0];
   assert.equal(s.kind, KIND.jet);
   assert.ok(Math.abs(s.dz - 1) < 1e-6 && Math.abs(s.dx) < 1e-6, 'along the view, level');
