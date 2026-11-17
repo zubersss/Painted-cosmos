@@ -311,12 +311,16 @@ looks and plays.
   "wind knife"), then the log's sections of 2026-11-17 on the powers ("CHOICES MADE FOR THE
   OWNER", fourteen of them: the owner has not yet read or answered them).
 - BUILT AND SEEN IN STILLS: a. gust, b. gather and carry, c. wind control (quicken; still),
-  d. tornado ("whirl"). e. MOVE WATER and f. WIND KNIFE ARE PLANS WITH COSTS ONLY (the owner:
-  "It's fine if e and f are only plans when I get back").
+  d. tornado ("whirl"), and e. MOVE WATER in its simplest version (ability six, "part": hold
+  and the water parts along the way the explorer looks; they walk the bed). f. THE WIND KNIFE
+  IS A PLAN WITH ITS COST ONLY (the owner: "It's fine if e and f are only plans when I get
+  back").
+- THE FULL CHECK passed on `powers` at 1ef4bc6 (a to d). IT MUST BE RUN AGAIN on the head
+  that has move water (e5ba4b9 or later) before anything is said to be finished or merged.
 - What exists there: `src/physics/powers.js` (the explorer's wind as a short list of shapes: a
   jet, a zone, an orb, a vortex) taken by the air at a point, the plants' field, the loose things
   and the rain and snow through the door the dust devils use; `src/core/powers.js` (the hands,
-  the aim, five abilities: gust, gather, quicken, still, whirl; a sound for each cast);
+  the aim, six abilities: gust, gather, quicken, still, whirl, part; a sound for each cast);
   `src/ui/powers.js` (the touch button and its fan); the explorer's cast gesture; the wind drawn
   as white strokes of air (`src/physics/three/expand.js`, option `wisp`; `src/physics/loose.js`
   `_wisps`); tests `src/physics/powers.test.mjs` (12), `src/physics/kits.test.mjs` (one for the
