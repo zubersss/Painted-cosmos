@@ -17,7 +17,15 @@ export const PRESETS = Object.freeze({
   desktop: Object.freeze({ id: 'desktop', dpr: 1.5, maxPixels: 3.7e6, tier: 2 }),
   tablet: Object.freeze({ id: 'tablet', dpr: 1.25, maxPixels: 1.6e6, tier: 2 }),
   phone: Object.freeze({ id: 'phone', dpr: 1.25, maxPixels: 3.7e6, tier: 1 }),
+  // (a computer whose graphics chip is a basic built-in one: only ever chosen by main.js for the oil look, from the
+  // chip's name, or by ?preset=laptop. The owner's own, an Intel UHD of 2022, drew the oil look's wood at 9 pictures a
+  // second on the desktop's settings: 1920 x 997, the top tier, 2-sample smoothing. One picture pixel to a screen point,
+  // 1.3 MP at most, the middle tier.)
+  laptop: Object.freeze({ id: 'laptop', dpr: 1.0, maxPixels: 1.3e6, tier: 1 }),
 });
+// A graphics chip's name (WEBGL_debug_renderer_info) that says it is a basic built-in one: Intel's HD, UHD and Iris.
+// (render/index.js keeps the same list for the painter's own choices: keep the two alike.)
+export const BASIC_GPU = /Intel.*(U?HD Graphics|Iris)/i;
 export const PHONE_SHORT_SIDE = 500;      // css px: under this a touch screen is a phone
 
 // env: { coarse (matchMedia('(pointer: coarse)')), touchPoints (navigator.maxTouchPoints),

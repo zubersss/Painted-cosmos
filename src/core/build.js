@@ -5,4 +5,4 @@
 // merging it, the site had not yet been renewed, and the old version was judged in the new one's place (2026-11-16).
 // And where the site's `build.txt` names a newer version than the code the browser kept, the page fetches its files
 // afresh and loads again, once (main.js).
-export const BUILD = 'v7 (16 Nov)';
+export const BUILD = 'v8 (17 Nov)';
