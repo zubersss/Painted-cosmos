@@ -7,6 +7,8 @@
 //   an ORB    gather and carry: air drawn in to one point and turned round it, which holds what is loose in a ball
 //   a VORTEX  a tornado: handed to the game as one more dust devil (features.js), so that all that answers a dust
 //             devil answers it
+//   a PART    move water: a wall of wind held along a line, under which the water is parted (the painter presses its
+//             face down there; the explorer's ground has no water there: partedAt)
 // It is given to the systems that already take the dust devils' wind in the same way: the air at a point (air.js
 // airAt), the plants' field (flora.js) and the loose things (loose.js). Each of them asks powerWind() for what the
 // list adds at a point, exactly, as it asks devilWind(): nothing is put on the wind grid, whose nodes are 16 m apart.
@@ -16,7 +18,7 @@
 // physics places the list in its frame once a frame (placeWinds), and whoever owns the list ages it (stepWinds).
 import { smoothstep } from './util.js';
 
-export const KIND = Object.freeze({ jet: 1, zone: 2, orb: 3, vortex: 4 });
+export const KIND = Object.freeze({ jet: 1, zone: 2, orb: 3, vortex: 4, part: 5 });
 
 export const WINDPOWER = Object.freeze({
   max: 6,                 // sources alive at once (a new one takes the oldest's place)
@@ -51,6 +53,15 @@ export const WINDPOWER = Object.freeze({
   vortexHeight: 22,       // m
   vortexLife: 16,         // s
   vortexFade: 2.2,        // s
+  // move water: the parted channel
+  partHalf: 1.7,          // m: half its width
+  partReach: 14,          // m: its full length
+  partBack: 1.5,          // m: it begins this far behind the explorer
+  partOpen: 16,           // m/s: how fast it runs out when held ...
+  partClose: 9,           // ... and closes again, from the far end inward, when let go
+  partWind: 8,            // m/s along it
+  partSpray: 130,         // drops a second thrown off the water along its two walls (loose.js)
+  wispPart: 50,           // strokes of air a second along it
   // what a source lifts off the ground under it (loose.js), in grains a second at full strength
   liftGust: 150, liftOrb: 70, liftVortex: 90,
   // THE AIR MADE VISIBLE: pale strokes that ride each source (loose.js: grains of the leaf kind in the colours of snow
@@ -62,7 +73,7 @@ export const WINDPOWER = Object.freeze({
 function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,
     speed: 0, radius: 0, reach: 0, spread: 0, front: 0, pulse: 0, height: 0, gain: 1, push: 0, up: 0, spin: 1, held: false,
-    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0 };
+    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0 };
 }
 
 // The list. `count` sources are alive, in slots 0 .. count - 1.
@@ -123,9 +134,44 @@ export function castVortex(S, bodyId, p, spin = 1) {
   s.height = W.vortexHeight; s.spin = spin < 0 ? -1 : 1;
   return s;
 }
+// Move water: a channel that begins at p (on the water or the ground, body-local) and runs along d; held until released.
+// While held it runs out to its full length; let go, it closes from the far end inward and is gone (stepWinds).
+export function castPart(S, bodyId, p, d) {
+  const s = take(S, KIND.part, bodyId, p, d), W = WINDPOWER;
+  s.life = 1e9; s.held = true; s.radius = W.partHalf; s.reach = W.partReach; s.speed = W.partWind; s.len = 0; s.strength = 1;
+  return s;
+}
 export function moveWind(s, p) { s.px = p.x; s.py = p.y; s.pz = p.z; }
+// Turns a source to lie along d (levelled at its own place).
+export function turnWind(s, d) {
+  const r = Math.hypot(s.px, s.py, s.pz) || 1, ux = s.px / r, uy = s.py / r, uz = s.pz / r;
+  const k = d.x * ux + d.y * uy + d.z * uz, ax = d.x - ux * k, ay = d.y - uy * k, az = d.z - uz * k, l = Math.hypot(ax, ay, az);
+  if (l > 1e-6) { s.dx = ax / l; s.dy = ay / l; s.dz = az / l; }
+}
+// Is the water parted at (x, y, z) (body-local)? 0: no .. 1: wholly (the channel's floor; its walls are in between).
+// The painter presses the water's face down by the same shape (render/materials.js WATER_VERT, PC_POWERS).
+export function partedAt(S, bodyId, x, y, z) {
+  let m = 0;
+  for (let i = 0; i < S.count; i++) {
+    const s = S[i];
+    if (s.kind !== KIND.part || s.bodyId !== bodyId || !(s.len > 0)) continue;
+    const rx = x - s.px, ry = y - s.py, rz = z - s.pz, a = rx * s.dx + ry * s.dy + rz * s.dz;
+    if (a < -1.2 || a > s.len) continue;
+    let cx = rx - s.dx * a, cy = ry - s.dy * a, cz = rz - s.dz * a;
+    const r = Math.hypot(s.px, s.py, s.pz) || 1, ux = s.px / r, uy = s.py / r, uz = s.pz / r, k = cx * ux + cy * uy + cz * uz;
+    cx -= ux * k; cy -= uy * k; cz -= uz * k;
+    const c = Math.hypot(cx, cy, cz), v = partShape(a, c, s.len, s.radius);
+    if (v > m) m = v;
+  }
+  return m;
+}
+// The channel's shape: a metres along it, c metres to its side, its length now and its half width. 1 on its floor.
+// (The same lines, in GLSL, are in WATER_VERT.)
+export function partShape(a, c, len, half) {
+  return (1 - smoothstep(half - 0.5, half, c)) * smoothstep(-1.2, 0, a) * (1 - smoothstep(len - 1.5, len, a));
+}
 // A held source is let go: it fades out over its fade time.
-export function releaseWind(s) { if (s && s.held) { s.held = false; s.life = s.age + s.fade; } }
+export function releaseWind(s) { if (s && s.held) { s.held = false; if (s.kind !== KIND.part) s.life = s.age + s.fade; } }   // (a part closes by its length: stepWinds)
 
 // Ages the list by dt and drops what is over. Each source's `strength` (0..1) is its coming and going.
 export function stepWinds(S, dt) {
@@ -134,6 +180,11 @@ export function stepWinds(S, dt) {
     const s = S[i];
     s.age += dt;
     if (!(s.age < s.life)) continue;
+    if (s.kind === KIND.part) {
+      s.len = s.held ? Math.min(s.reach, s.len + WINDPOWER.partOpen * dt) : s.len - WINDPOWER.partClose * dt;
+      if (!(s.len > 0)) continue;
+      s.strength = 1;
+    } else
     if (s.kind === KIND.jet) s.strength = 1 - smoothstep(s.life * 0.6, s.life, s.age);
     else s.strength = (s.fade > 0 ? smoothstep(0, s.fade, s.age) : 1) * (s.held ? 1 : 1 - smoothstep(s.life - s.fade, s.life, s.age));
     if (n !== i) { const t = S[n]; S[n] = s; S[i] = t; }
@@ -197,6 +248,18 @@ export function powerWind(S, x, z, hz, o, minR = 0) {
       // and curled round its own line: the air turns about the gust's axis as it goes (seen from behind, a blast is
       // strokes wheeling round the aim; without the curl it is dots flying away)
       if (s.curl > 0) { const t = U * s.curl, hy = (hz - s.axis) / w; o[0] += t * hy * s.dn; o[1] -= t * hy * s.de; o[2] += t * cw; }
+      any = true;
+    } else if (s.kind === KIND.part) {
+      // a steady wind along the channel, between its walls
+      const a = rx * s.de + rz * s.dn;
+      if (a < -1.2 || a > s.len + 1) continue;
+      const c = rz * s.de - rx * s.dn;
+      let w = s.radius; if (w < minR) w = minR;
+      const cw = c / w;
+      if (cw > 2 || cw < -2 || hz > 6) continue;
+      const U = s.speed * Math.exp(-cw * cw) * smoothstep(-1.2, 0, a) * (1 - smoothstep(s.len - 1.5, s.len + 1, a)) * (hz > 3 ? 1 - (hz - 3) / 3 : 1);
+      if (U < 0.05) continue;
+      o[0] += U * s.de; o[1] += U * s.dn;
       any = true;
     } else if (s.kind === KIND.zone) {
       let R = s.radius; if (R < minR) R = minR;

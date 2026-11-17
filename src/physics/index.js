@@ -698,6 +698,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // How far a body's real prevailing wind is scaled down for play (data.WINDS[body].scale).
     setWindScale,
     get time() { return time; },
+    get winds() { return winds; },       // the explorer's wind this frame (powers.js), or null: the painter reads the parted channel from it
     air, weather, ground, bindEnv,
     water: waterAt,
     sky: (weather, out) => skyNumbers(weather || here.weather, out),   // the same numbers for any weather() result

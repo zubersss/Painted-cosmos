@@ -828,6 +828,24 @@ export class Loose {
       if (!s.placed || !(s.strength > 0.05)) continue;
       if (Math.abs(s.x - fx) > Rr + 40 || Math.abs(s.z - fz) > Rr + 40) continue;
       if (s.kind === KIND.zone) { this._wisps(s, h, near, fx, fz, groundY, Rr); continue; }
+      if (s.kind === KIND.part) {
+        // move water: spray thrown off the water along the channel's two walls, and strokes of air along it
+        this._wisps(s, h, near, fx, fz, groundY, Rr);
+        s.carry += W.partSpray * h;
+        let guard = 32;
+        while (s.carry >= 1 && guard-- > 0) {
+          s.carry -= 1;
+          const a = rng() * s.len, side = rng() < 0.5 ? -1 : 1, c = side * (s.radius + 0.1 + 0.4 * rng());
+          const x = s.x + s.de * a - s.dn * c, z = s.z + s.dn * a + s.de * c;
+          if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+          const gp = this._ground(near, x, z, groundY, wet01, snowDepth);
+          if (!(gp.liquid > 0.05)) continue;
+          const out = 1.2 + 1.6 * rng();
+          this.emit('spray', x, gp.h + gp.liquid + 0.05, z, -s.dn * side * out + s.de * 2.5, 1.6 + 2.2 * rng(), s.de * side * out + s.dn * 2.5, 0.8, 0.9, gp.mat);
+          if (rng() < 0.08) P._event(frame, x, gp.h + gp.liquid, z, EVENT.ripple, 0.5 + 0.4 * rng(), 0.3);
+        }
+        continue;
+      }
       const rate = s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex;
       s.carry += rate * s.strength * h;
       // the air itself, as pale strokes riding it (WINDPOWER.wisp*)
@@ -875,7 +893,7 @@ export class Loose {
   // with nothing loose on it, of a gathered ball, and of a whirl's column.
   _wisps(s, h, near, fx, fz, groundY, Rr) {
     const rng = this.rng, W = WINDPOWER;
-    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : (s.gain > 1 ? W.wispZone : 0);
+    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : s.kind === KIND.part ? W.wispPart : (s.gain > 1 ? W.wispZone : 0);
     if (!(rate > 0)) return;
     s.wisp = (s.wisp || 0) + rate * s.strength * h;
     let guard = 48;
@@ -893,6 +911,11 @@ export class Loose {
         const U = s.speed * s.strength / (1 + 1.2 * a / s.reach);
         ve = s.de * U * 0.85; vn = s.dn * U * 0.85; vu = 0.6 * rng();
         if (s.curl > 0) { const cw = c / w, t = U * s.curl * Math.exp(-cw * cw), hy = (y - s.axis) / w; ve += t * hy * s.dn; vn -= t * hy * s.de; vu += t * cw; }
+      } else if (s.kind === KIND.part) {
+        // along the parted channel, low between its walls
+        const a = rng() * s.len * 0.8, c = (rng() * 2 - 1) * s.radius * 0.7;
+        x = s.x + s.de * a - s.dn * c; z = s.z + s.dn * a + s.de * c; y = 0.3 + rng() * 1.6;
+        ve = s.de * s.speed; vn = s.dn * s.speed; vu = 0; life = 0.06;
       } else if (s.kind === KIND.orb) {
         // a ball: strokes turning close round its middle, at its own height, each gone in half a second (the air
         // they ride runs in to the middle: older ones would all lie there in a knot)

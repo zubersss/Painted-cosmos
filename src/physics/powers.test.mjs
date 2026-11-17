@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
-import { makeWinds, castGust, castZone, castOrb, castVortex, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
+import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
 import { LocalFrame } from './near.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm } from './testworld.mjs';
@@ -222,6 +222,57 @@ test('a stilled place: the air at the explorer is nearly still while it lasts', 
   const calm = w.physics.here.air.speed;
   assert.ok(before > 1, 'there was a wind: ' + before.toFixed(1));
   assert.ok(calm < before * 0.1 + 0.2, 'stilled: ' + before.toFixed(1) + ' -> ' + calm.toFixed(2) + ' m/s');
+});
+
+test('move water: a held channel runs out along the aim, parts the water on its floor, and closes from the far end when let go', () => {
+  const R = BODIES.earth.radius, p = V(0, 0, R), f = frameAt('earth', p), S = makeWinds(), W = WINDPOWER;
+  const n = V(f.nx, f.ny, f.nz), e = V(f.ex, f.ey, f.ez);
+  const part = castPart(S, 'earth', p, n);
+  assert.equal(part.kind, KIND.part); assert.equal(part.len, 0);
+  const at = (north, east) => partedAt(S, 'earth', p.x + n.x * north + e.x * east, p.y + n.y * north + e.y * east, p.z + n.z * north + e.z * east);
+  assert.equal(at(3, 0), 0, 'nothing is parted before it has run out');
+  for (let i = 0; i < 30; i++) stepWinds(S, 1 / 60);                       // half a second: 8 m
+  assert.ok(Math.abs(part.len - 0.5 * W.partOpen) < 1e-6, 'it runs out at partOpen: ' + part.len);
+  assert.equal(at(3, 0), 1, 'the floor is dry 3 m along');
+  assert.equal(at(3, W.partHalf + 0.1), 0, 'the water stands beyond the wall');
+  assert.ok(at(3, W.partHalf - 0.25) > 0 && at(3, W.partHalf - 0.25) < 1, 'the wall is in between');
+  assert.equal(at(part.len + 0.5, 0), 0, 'and beyond its end'); assert.equal(at(-1.5, 0), 0, 'and behind its start');
+  assert.equal(at(3, 0), partShape(3, 0, part.len, W.partHalf), 'partedAt is partShape (the painter draws the same shape)');
+  for (let i = 0; i < 120; i++) stepWinds(S, 1 / 60);
+  assert.equal(part.len, W.partReach, 'held, it stays at its full length');
+  // it goes where it is moved and turned, and no cast takes a held one's place
+  moveWind(part, V(p.x + e.x * 20, p.y + e.y * 20, p.z + e.z * 20)); turnWind(part, e);
+  assert.equal(at(3, 0), 0); assert.equal(at(0, 23), 1, 'moved 20 m east and turned east: dry 3 m along it there');
+  for (let i = 0; i < 9; i++) castGust(S, 'earth', p, n);
+  assert.ok(S.count <= W.max && [...Array(S.count).keys()].some((i) => S[i] === part), 'the held channel is still in the list');
+  // it carries a wind along itself
+  placeWinds(S, frameAt('earth', V(p.x + e.x * 20, p.y + e.y * 20, p.z + e.z * 20)), 'earth');
+  const o = new Float64Array(4);
+  for (let i = 0; i < S.count; i++) if (S[i] !== part) S[i].strength = 0;
+  powerWind(S, 5, 0, 1, o);
+  assert.ok(o[0] > W.partWind * 0.8 && Math.abs(o[1]) < 0.01, 'a wind along it between its walls: ' + o[0].toFixed(1));
+  powerWind(S, 5, W.partHalf * 2.5, 1, o); assert.equal(o[0], 0, 'and none outside them');
+  // let go: it closes from the far end inward and is gone
+  releaseWind(part);
+  for (let i = 0; i < 30; i++) stepWinds(S, 1 / 60);
+  assert.ok(Math.abs(part.len - (W.partReach - 0.5 * W.partClose)) < 1e-6, 'closing at partClose: ' + part.len);
+  assert.equal(at(0, 23), 1, 'still dry near its start'); assert.equal(at(0, 20 + W.partReach - 1), 0, 'the far end has closed');
+  for (let i = 0; i < 120; i++) stepWinds(S, 1 / 60);
+  assert.ok(![...Array(S.count).keys()].some((i) => S[i] === part && S[i].kind === KIND.part), 'and it is gone');
+  assert.equal(at(0, 23), 0);
+});
+
+test('move water: over water the channel throws spray off its two walls and carries strokes of air; over land no spray', () => {
+  for (const [sea, want] of [[1.2, true], [0, false]]) {
+    const w = setup('earth', 'alpine_meadow', { sea }), S = makeWinds();
+    run(w, 1, S);
+    const { n } = axes(w), sp = w.physics.particles.spray, lf = w.physics.particles.leaves, s0 = sp._n, l0 = lf._n;
+    castPart(S, w.bodyId, add(w.focus, n, -1.5), n);
+    run(w, 1.5, S);
+    if (want) assert.ok(sp._n > s0 + 40, 'spray off the walls: ' + (sp._n - s0)); else assert.ok(sp._n <= s0 + 2, 'no water, no spray: ' + (sp._n - s0));
+    let pale = 0; for (let i = 0; i < lf._n; i++) if (lf.mat[i] < 200) pale++;
+    assert.ok(pale > 8, 'strokes of air along it: ' + pale + ' (leaves before: ' + l0 + ')');
+  }
 });
 
 test('the cost: a frame of physics with every kind of wind at work costs little more than one without', () => {
