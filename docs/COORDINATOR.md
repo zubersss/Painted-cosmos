@@ -2133,3 +2133,8 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - AFTER the merge: the full check on `main` (a13850e) started at once; its result is in the next entry.
 - ASKED OF THE OWNER (unchanged, now for v11): one photograph of the speed test's table; their eye on `?look=oil&fartree=cards`; their word on merging the powers.
 - THE FULL CHECK ON `main` AT v11 (a13850e): ALL 17 PASSED (the gate's last step; nothing to undo).
+
+### 2026-11-17 THE WIND, two more touches, seen (on `powers`, NOT merged)
+- A STILLED PLACE IS SEEN TO FALL STILL: for its first 1.2 s strokes stand round its rim, drift in, sink and are gone ("still" was the one ability with nothing of its own to see). SEEN in the game page: white strokes round a wide ring 0.6 s after the cast (23 of them counted), none 2.6 s after.
+- A WORD WHEN AN ABILITY CAN DO NOTHING HERE (promised in the design note, not built until now): "no tree in reach" for the knife, "no water here" for the channel (which is then only a wind along the ground). SEEN: the knife cast at open ground felled nothing and the screen read "wind: knife · no tree in reach".
+- `main` at v11 merged into `powers`; tests: unit 262, world 47, physics 342. Commits on `powers`: [physics] the hush, [pilot] 16e8611, [coordinator] the note. The full check on this head was started; its result is in the next entry.
