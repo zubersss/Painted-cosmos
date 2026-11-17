@@ -450,7 +450,9 @@ function facetCore(B, c, rx, ry, rz, rnd, opts) {
     mx = nx + (mx - nx) * o.massK; my = ny + (my - ny) * o.massK; mz = nz + (mz - nz) * o.massK; l = Math.hypot(mx, my, mz) || 1; mx /= l; my /= l; mz /= l;
     // (one tone for the whole core, taken at the crown's middle, and dark: it is the shade inside the crown that the
     // leaves stand on. A tone of its own for every face was a cut gem, plain polygons)
-    const yy = (a[3] + b[3] + d[3]) / 3, shade = Math.min(1, Math.max(0, o.shade0 + o.shadeK * (0.5 - yy * 0.5))), hash = coreHash;
+    // (shade 2, where every other piece has 0 .. 1: the mark of the inside of a crown; PROP_VERT lays such a piece in
+    // the crown's deep tone whatever the sun)
+    const shade = 2, hash = coreHash;
     B.card = [c.x, c.y, c.z];
     const v0 = B.vert(a[0], a[1], a[2], nx, ny, nz, mx, my, mz, -1, 0, o.sway, 5, shade, hash);
     const v1 = B.vert(b[0], b[1], b[2], nx, ny, nz, mx, my, mz, 0, 1, o.sway, 5, shade, hash);
@@ -459,12 +461,50 @@ function facetCore(B, c, rx, ry, rz, rnd, opts) {
     B.card = null;
   }
 }
+// Leaves laid like shingles over a crown: n flat leaf-shaped pieces spread evenly over the skin, each facing more or
+// less outward (so none is seen edge-on, as a third of the leaf cards scattered every way are), pushed out a little by
+// its own amount, with its own tone (aCard is its own centre: PROP_VERT paints each once, at its centre). With a dark
+// core behind them they cover the crown as the lump's dabs do, in pieces about a dab's size at a far tree's distance.
+function shingles(B, c, rx, ry, rz, rnd, opts) {
+  const o = Object.assign({ n: 40, len: 0.24, wid: 0.19, tilt: 0.45, out: 0.07, sway: 0.05, shade0: 0.0, shadeK: 0.45, part: 5 }, opts || {});
+  B.branch = (rnd() * 7.13) % 1;
+  const ga = Math.PI * (3 - Math.sqrt(5)), ph = rnd() * 6.28;
+  for (let i = 0; i < o.n; i++) {
+    // a point of an even spiral over the sphere, jittered
+    const y = 1 - 2 * (i + 0.5) / o.n + (rnd() - 0.5) * 0.08, rr = Math.sqrt(Math.max(0, 1 - y * y)), a = ph + i * ga + (rnd() - 0.5) * 0.3;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr, push = 1 + o.out * (rnd() * 2 - 0.6);
+    const px = c.x + x * rx * push, py = c.y + y * ry * push, pz = c.z + z * rz * push;
+    // outward, tilted its own way
+    let nx = x / rx, ny = y / ry, nz = z / rz; let l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    const mx = nx, my = ny, mz = nz;
+    nx += (rnd() - 0.5) * o.tilt; ny += (rnd() - 0.5) * o.tilt; nz += (rnd() - 0.5) * o.tilt; l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    // its long side: any way across the skin (a leaf hangs a little: more down than up)
+    let ax = rnd() - 0.5, ay = rnd() - 0.75, az = rnd() - 0.5;
+    const k = ax * nx + ay * ny + az * nz; ax -= nx * k; ay -= ny * k; az -= nz * k; l = Math.hypot(ax, ay, az) || 1; ax /= l; ay /= l; az /= l;
+    const sx = ny * az - nz * ay, sy = nz * ax - nx * az, sz = nx * ay - ny * ax;
+    const L = o.len * (0.75 + 0.5 * rnd()) * 0.5, W = o.wid * (0.75 + 0.5 * rnd()) * 0.5;
+    const shade = Math.min(1, Math.max(0, o.shade0 + o.shadeK * (0.5 - y * 0.5) + 0.12 * (rnd() - 0.5))), hash = rnd();
+    B.card = [px, py, pz];
+    const wx = px - ax * L * 0.2, wy = py - ay * L * 0.2, wz = pz - az * L * 0.2;
+    const v0 = B.vert(px - ax * L, py - ay * L, pz - az * L, nx, ny, nz, mx, my, mz, -1, 0, o.sway, o.part, shade, hash);
+    const v1 = B.vert(wx + sx * W, wy + sy * W, wz + sz * W, nx, ny, nz, mx, my, mz, 0, 1, o.sway, o.part, shade, hash);
+    const v2 = B.vert(px + ax * L, py + ay * L, pz + az * L, nx, ny, nz, mx, my, mz, 1, 0, o.sway, o.part, shade, hash);
+    const v3 = B.vert(wx - sx * W, wy - sy * W, wz - sz * W, nx, ny, nz, mx, my, mz, 0, -1, o.sway, o.part, shade, hash);
+    B.tri(v0, v1, v2); B.tri(v0, v2, v3);
+    B.card = null;
+  }
+}
+// (fourth form, 2026-11-17, after the phone's tables: the tree of flat pieces ran at 36.5 pictures a second where the
+// lump ran at 22.5, and looked too plain to be the look: a one-tone core with a few leaves on it. Now: the dark core,
+// FORTY-SIX SHINGLED LEAVES over it, each in its own tone, with the dark between them, and ten leaves standing out of
+// it for the outline.)
 export function farCardGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
   tube(B, [V(0, 0, 0), V(0.01, 0.52, 0)], [0.020, 0.012], 3, { part: 0, swayK: 0.02, swayH: 1, hash: 0.5 });
   const c = V(0, 0.66, 0);
-  facetCore(B, c, 0.20, 0.285, 0.20, rnd);
-  leafCards(B, c, 0.27, 0.36, 0.27, rnd, { n: 26, len: 0.16, wid: 0.10, massC: c, massK: 0.75, sway: 0.05, shade0: 0.0, shadeK: 0.4, droop: 0.15 });
+  facetCore(B, c, 0.19, 0.27, 0.19, rnd);
+  shingles(B, c, 0.245, 0.335, 0.245, rnd, { n: 46, len: 0.215, wid: 0.165 });
+  leafCards(B, c, 0.27, 0.36, 0.27, rnd, { n: 10, len: 0.16, wid: 0.10, massC: c, massK: 0.75, sway: 0.05, shade0: 0.0, shadeK: 0.4, droop: 0.15 });
   return B.build();
 }
 
