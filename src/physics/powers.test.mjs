@@ -357,3 +357,28 @@ test('the cost: a frame of physics with every kind of wind at work costs little 
   console.log('physics a frame: ' + base.toFixed(3) + ' ms without, ' + busy.toFixed(3) + ' ms with a tornado, a zone, a ball and a gust every half second (' + cast + ' gusts)');
   assert.ok(busy < base + 2.5, 'under 2.5 ms more a frame: ' + base.toFixed(2) + ' -> ' + busy.toFixed(2));
 });
+
+test('the explorer\'s wind lays a stand over the way it is sent, further than any gale bends a tree, and the wood stands up again after', () => {
+  const w = setup('earth', 'autumn_woodland'), S = makeWinds();
+  run(w, 2, S);
+  const F = w.physics.fields.flora, { n, e } = axes(w);
+  const at = (north) => { const o = {}, q = add(w.focus, n, north); F.plantBend(q, 1, o); return { ang: o.angle || 0, e: o.e || 0, n: o.n || 0 }; };
+  const quiet = at(8);
+  assert.ok(quiet.ang < 0.1, 'a quiet wood barely leans: ' + (quiet.ang * 57.3).toFixed(1) + ' degrees');
+  // sent north: the trees lean north, and further than a real tree's own limit (FLORA.stiffMax)
+  castGust(S, w.bodyId, add(w.focus, n, 1), n, 1, 2);
+  let worst = quiet;
+  run(w, 2, S, () => { const b = at(8); if (b.ang > worst.ang) worst = b; });
+  assert.ok(worst.ang > 0.45, 'laid over by the gust: ' + (worst.ang * 57.3).toFixed(1) + ' degrees');
+  assert.ok(worst.n > 0 && Math.abs(worst.e) < worst.n * 0.4, 'and the lean is the way the wind was sent (north)');
+  // sent east from the same spot: they lean east
+  const S2 = makeWinds();
+  castGust(S2, w.bodyId, add(w.focus, e, 1), e, 1, 2);
+  let worstE = { ang: 0, e: 0, n: 0 };
+  run(w, 2, S2, () => { const o = {}, q = add(w.focus, e, 8); F.plantBend(q, 1, o); if ((o.angle || 0) > worstE.ang) worstE = { ang: o.angle, e: o.e, n: o.n }; });
+  assert.ok(worstE.ang > 0.45 && worstE.e > 0 && Math.abs(worstE.n) < worstE.e * 0.4, 'laid over to the east instead: ' + (worstE.ang * 57.3).toFixed(1) + ' degrees');
+  // and when the explorer's wind is gone the wood stands as it did, under its own weather
+  run(w, 6, S2);
+  const after = at(8);
+  assert.ok(after.ang < 0.12, 'standing again: ' + (after.ang * 57.3).toFixed(1) + ' degrees');
+});

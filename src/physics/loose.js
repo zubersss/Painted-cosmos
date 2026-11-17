@@ -178,7 +178,9 @@ const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
 const _wl = {};
 const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
-const I_WOOD = MATERIAL_INDEX.mud != null ? MATERIAL_INDEX.mud : MATERIAL_INDEX.soil;      // (a snapped branch's ink: the darkest brown the ground has)
+const I_WOOD = MATERIAL_INDEX.mud != null ? MATERIAL_INDEX.mud : MATERIAL_INDEX.soil;
+// (a cast made bigger throws about more in proportion to the ground it covers, not to its radius: powers.js sizeOf)
+const sizeRate = (s) => (s.size > 1 ? Math.min(6, s.size * s.size * 0.65 + 0.35) : 1);      // (a snapped branch's ink: the darkest brown the ground has)
 const I_ICE = MATERIAL_INDEX.ice != null ? MATERIAL_INDEX.ice : MATERIAL_INDEX.snow;      // (the wisps of the explorer's wind: powers.js)
 
 export class Loose {
@@ -847,7 +849,7 @@ export class Loose {
         }
         continue;
       }
-      const rate = s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex;
+      const rate = (s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex) * sizeRate(s);
       s.carry += rate * s.strength * h;
       // the air itself, as pale strokes riding it (WINDPOWER.wisp*); the crowns it goes through, losing leaves and
       // now and then a branch (WINDPOWER.tear*, snap*)
@@ -900,7 +902,7 @@ export class Loose {
     const rng = this.rng, W = WINDPOWER, cov = _covL;
     const rate = s.kind === KIND.jet ? W.tearGust : s.kind === KIND.orb ? W.tearOrb : s.kind === KIND.vortex ? W.tearVortex : s.kind === KIND.part ? W.tearPart : 0;
     if (!(rate > 0)) return;
-    s.tear = (s.tear || 0) + rate * s.strength * h;
+    s.tear = (s.tear || 0) + rate * sizeRate(s) * s.strength * h;
     let guard = 40;
     while (s.tear >= 1 && guard-- > 0) {
       s.tear -= 1;
@@ -962,7 +964,7 @@ export class Loose {
     const hush = s.kind === KIND.zone && !(s.gain > 1) && s.age < W.hushTime;      // (a place being stilled, in its first moments)
     const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : s.kind === KIND.part ? W.wispPart : (s.gain > 1 ? W.wispZone : hush ? W.wispHush : 0);
     if (!(rate > 0)) return;
-    s.wisp = (s.wisp || 0) + rate * (hush ? 1 : s.strength) * h;
+    s.wisp = (s.wisp || 0) + rate * sizeRate(s) * (hush ? 1 : s.strength) * h;
     let guard = 48;
     while (s.wisp >= 1 && guard-- > 0) {
       s.wisp -= 1;
