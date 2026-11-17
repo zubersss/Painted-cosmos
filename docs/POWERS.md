@@ -18,6 +18,18 @@ name of any show or game is used.)
 
 One power button, one aim, four abilities at a time.
 
+**How big.** The hand goes down on the power and THE CIRCLE GROWS, to four times its width in a
+little over two seconds; letting go casts it at that size, and a tap is the smallest and casts at
+once. Everything of the cast follows the size: how far and wide it reaches, how hard it blows,
+how much it throws about, and how many branches it takes. A ball or a channel that is being held
+grows in the hand. The word on the screen says how big it is being made.
+
+**What the wind does to the wood.** A real trunk leans about seventeen degrees in the worst gale
+and no further, and the world's own weather never passes that. The explorer's wind is not weather:
+while any of it is alive a plant may be laid over much further (two and a half times), so a gust
+lays a stand over the way it was sent and a quickened place holds it there. When the wind is gone
+the wood stands up again.
+
 **Aim.** A power acts where the player looks: the point on the ground under the middle of the
 screen, out to the power's own reach. While the power button is held, a ring painted on the ground
 shows the place and the size of what will happen. Nothing else is aimed: no cursor to steer.
