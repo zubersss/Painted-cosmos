@@ -224,6 +224,28 @@ test('a stilled place: the air at the explorer is nearly still while it lasts', 
   assert.ok(calm < before * 0.1 + 0.2, 'stilled: ' + before.toFixed(1) + ' -> ' + calm.toFixed(2) + ' m/s');
 });
 
+test('a whirl among the game\'s own dust devils: its record is a whole devil, and a real devil can take its slot after it', async () => {
+  const { makeDevil, devilsNear } = await import('./features.js');
+  const p = V(0, 0, BODIES.mars.radius), f = frameAt('mars', p), S = makeWinds();
+  castVortex(S, 'mars', p, 1); stepWinds(S, 1); placeWinds(S, f, 'mars');
+  const devils = []; devils.count = 0;
+  windsToDevils(S, devils);
+  assert.equal(devils.count, 1);
+  assert.deepEqual(Object.keys(devils[0]).sort(), Object.keys(makeDevil()).sort(), 'the same fields as one of the game\'s own');
+  assert.ok(Math.abs(devils[0].p.z - p.z) < 1e-6 && devils[0].radius === WINDPOWER.vortexRadius, 'its foot and its size');
+  // the game's own devils write into every field of whatever lies in the list: they must be able to
+  const D = devils[0]; D.p.x = 1; D.age = 2; D.life = 3; D.id = 4;
+  // and a whole frame of the physics with a whirl on a world of dust devils goes through, again and again
+  const w = setup('mars', 'desert_canyon'), S2 = makeWinds();
+  run(w, 1, S2);
+  castVortex(S2, w.bodyId, add(w.focus, axes(w).n, 12), 1);
+  run(w, 2, S2);
+  for (let i = 0; i < 200; i++) stepWinds(S2, 0.1);                 // the whirl is over; its slot is the game's again
+  run(w, 2, S2);
+  assert.ok(w.physics.features.devils.count >= 0, 'the physics still runs');
+  void devilsNear;
+});
+
 test('move water: a held channel runs out along the aim, parts the water on its floor, and closes from the far end when let go', () => {
   const R = BODIES.earth.radius, p = V(0, 0, R), f = frameAt('earth', p), S = makeWinds(), W = WINDPOWER;
   const n = V(f.nx, f.ny, f.nz), e = V(f.ex, f.ey, f.ez);

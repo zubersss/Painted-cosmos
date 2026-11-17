@@ -293,9 +293,12 @@ export function windsToDevils(S, devils) {
   for (let i = 0; i < S.count; i++) {
     const s = S[i];
     if (s.kind !== KIND.vortex || !s.placed || !(s.strength > 0)) continue;
-    const D = devils[devils.count] || (devils[devils.count] = {});
+    // (a whole record, as features.js makeDevil makes it: the game's own devils take these slots again in a later frame
+    // and write into every field. A bare {} here broke the physics the first time a real dust devil came by after a
+    // whirl: found on a page with real touch events, 2026-11-17; powers.test.mjs holds it.)
+    const D = devils[devils.count] || (devils[devils.count] = { x: 0, z: 0, p: { x: 0, y: 0, z: 0 }, radius: 0, height: 0, speed: 0, up: 0, spin: 1, strength: 0, age: 0, life: 0, id: 0 });
     D.x = s.x; D.z = s.z; D.radius = s.radius; D.speed = s.speed; D.up = s.up; D.spin = s.spin; D.strength = s.strength; D.height = s.height;
-    D.player = true;
+    D.p.x = s.px; D.p.y = s.py; D.p.z = s.pz; D.age = s.age; D.life = s.life; D.id = 0x70770000 + i;
     devils.count++;
   }
 }
