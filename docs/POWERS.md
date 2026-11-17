@@ -112,6 +112,26 @@ apart). It goes in beside it, by the door the dust devils use: a short list of s
 (`src/physics/powers.js`) that the air at a point, the plants' field, the loose things and the rain
 and snow each ask exactly. The whirl is handed on as a dust devil.
 
+**How the wind is seen.** Moving air has no colour, so each of the explorer's winds carries pale
+strokes of its own: light grains that ride the air, in the colours of snow and ice, each drawn as a
+narrow stroke as long as the grain flies in a tenth of a second (two and a half metres at most),
+lying along its flight. A gust also turns about its own line as it goes (a curl, nine tenths of its
+speed one width out), so from behind, where the player stands, a blast is strokes wheeling round
+the aim and not dots flying away; and the leaves, dust and grass under it are turned with it. The
+strokes are drawn by the painter of the falling leaves, with no new pass and no new texture
+(`src/physics/three/expand.js`, option `wisp`; only with `?powers=1`).
+A gathered ball does not draw the air into its very middle: inside its core the air only turns,
+so what it gathers goes round it a metre out, as a ball, and is not packed into a knot.
+
+**What is heard.** Each cast has a short sound of its own, made in code like the game's other
+sounds (a rush for a gust, a low roar for a whirl, a soft breath for the quickened and the stilled
+place). There is no sound that lasts while a whirl stands or a ball is held: not built.
+
+**What is not built.** The ring painted on the ground at the aim (a mark in the middle of the
+picture stands for it); a lasting sound; a word on the screen when an ability can do nothing
+here; the choice of element (there is only wind). A stilled place has nothing of its own to see:
+it shows only in what stops moving.
+
 ## Move water and the wind knife: the plans and their cost
 
 Both are plans. The owner asked for the plan and its cost first.
