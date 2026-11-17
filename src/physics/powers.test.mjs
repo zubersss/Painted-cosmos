@@ -42,7 +42,13 @@ test('a gust is a pulse that runs out along the aim, widens, and is gone', () =>
   // at 0.4 s the front is 10.4 m out: strong just behind it, nothing well ahead of it
   const near = at(0.4, 9, 0), ahead = at(0.4, 20, 0);
   assert.ok(near[1] > 12, 'wind along the aim behind the front: ' + near[1].toFixed(1));
-  assert.ok(Math.abs(near[0]) < 0.5, 'and none across it on the axis');
+  assert.ok(Math.abs(at(0.4, 9, 0, WINDPOWER.gustAxis)[0]) < 0.05, 'and none across it on its own line (' + WINDPOWER.gustAxis + ' m up)');
+  // it turns about its own line: over the line the air goes one way across, under it the other; to one side of
+  // the line it rises, to the other it sinks (taking the ground's own lift away: the two sides differ)
+  const over = at(0.4, 9, 0, WINDPOWER.gustAxis + 1)[0], under = at(0.4, 9, 0, WINDPOWER.gustAxis - 1)[0];
+  assert.ok(over * under < 0 && Math.abs(over) > 2, 'the air turns about the line: ' + over.toFixed(1) + ' over it, ' + under.toFixed(1) + ' under');
+  const east = at(0.4, 9, 1.5, WINDPOWER.gustAxis)[2], west = at(0.4, 9, -1.5, WINDPOWER.gustAxis)[2];
+  assert.ok(Math.abs(east - west) > 4, 'rising on one side, sinking on the other: ' + east.toFixed(1) + ', ' + west.toFixed(1));
   assert.ok(Math.hypot(ahead[0], ahead[1]) < 0.3, 'none yet 10 m ahead of the front: ' + ahead[1].toFixed(2));
   assert.ok(near[2] > 1, 'it blows upward at the ground: ' + near[2].toFixed(1));
   assert.ok(at(0.4, 9, 0, 8)[1] < near[1] * 0.2, 'and is weak 8 m up');

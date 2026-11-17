@@ -44,6 +44,32 @@ test('a streak is the drop\'s path during the exposure, as wide as asked, facing
   assert.ok(len(sub(V(o2, 5), V(o2, 4))) > DRAW.rain.width * 0.99);
 });
 
+test('(the powers) a stroke of air: a grain in a ground ink is laid along its flight, head at the grain; without D.wisp nothing changes', () => {
+  const eye = makeEye(); eye.z = 10; eye.fx = 0; eye.fy = 0; eye.fz = 0; eye.radius = 24; eye.pix = 0.002;
+  // two grains flying east at 15 m/s, old enough to be whole: the first in the ink of a ground material, the second a leaf
+  const b = buf([{ p: [1, 2, 0], v: [15, 0, 0], age: 1 }, { p: [-2, 2, 0], v: [15, 0, 0], age: 1 }]);
+  b.mat = new Uint8Array([3, 255]);
+  const plain = new Float32Array(24), same = new Float32Array(24), out = new Float32Array(24);
+  expandDabs(b, DRAW.leaves, eye, plain);
+  const noMat = { ...b, mat: undefined }; expandDabs(noMat, { ...DRAW.leaves, wisp: 0.11 }, eye, same);
+  assert.deepEqual(Array.from(same), Array.from(plain), 'no inks in the buffer: no strokes');
+  const D = { ...DRAW.leaves, wisp: 0.11, wispMax: 2.4, wispWide: 0.3 };
+  expandDabs(b, D, eye, out);
+  // the leaf is laid exactly as before
+  assert.deepEqual(Array.from(out.subarray(12)), Array.from(plain.subarray(12)), 'the leaf beside it is untouched');
+  // the stroke: 15 m/s x 0.11 s = 1.65 m long, lying east-west, its head (the east end) at the grain
+  const c = [0, 1, 2, 3].map((k) => V(out, k)), long = len(sub(c[1], c[0])), wide = len(sub(c[3], c[0]));
+  assert.ok(Math.abs(long - 1.65) < 1e-3, 'as long as it flies in D.wisp seconds: ' + long);
+  assert.ok(wide < 0.2 * long && wide > 0.02, 'and narrow: ' + wide);
+  assert.ok(Math.abs(sub(c[1], c[0])[0] - long) < 1e-3, 'along its flight (east)');
+  assert.ok(Math.abs((c[1][0] + c[2][0]) / 2 - 1) < 1e-3 && Math.abs((c[1][1] + c[2][1]) / 2 - 2) < 1e-3, 'head at the grain');
+  // never longer than D.wispMax, and a grain flying straight at the eye is still a finite mark
+  b.vel.set([60, 0, 0], 0); expandDabs(b, D, eye, out);
+  assert.ok(Math.abs(len(sub(V(out, 1), V(out, 0))) - 2.4) < 1e-3, 'capped');
+  b.vel.set([0, 0, 15], 0); b.pos.set([0, 0, 0], 0); expandDabs(b, D, eye, out);
+  for (let k = 0; k < 12; k++) assert.ok(Number.isFinite(out[k]), 'finite when it flies at the eye');
+});
+
 test('a dab faces the picture, grows in from nothing, and shrinks to nothing at the edge of the volume', () => {
   const eye = makeEye(); eye.z = 10; eye.fx = 0; eye.fy = 0; eye.fz = 0; eye.radius = 24;
   const b = buf([{ p: [1, 2, 0], age: 5 }, { p: [1, 2, 0], age: 0 }, { p: [24, 0, 0], age: 5 }, { p: [21.6, 0, 0], age: 5 }, { p: [3, 0, 0], age: DRAW.snow.fadeIn / 2 }]);

@@ -881,7 +881,9 @@ export class Loose {
     let guard = 48;
     while (s.wisp >= 1 && guard-- > 0) {
       s.wisp -= 1;
-      let x, z, y, ve, vn, vu, life = 0.14, size = 4.0;
+      // (life: a share of a leaf's 6 to 14 s. They are light: a third of a leaf's size falls a quarter as fast, so a
+      // stroke rides the air it is in and does not drop out of it; what is drawn does not go by this size.)
+      let x, z, y, ve, vn, vu, life = 0.12;
       if (s.kind === KIND.jet) {
         const f = Math.min(s.front * s.age, s.reach);
         if (s.age * s.front > s.reach + s.pulse) { s.wisp = 0; break; }
@@ -890,22 +892,26 @@ export class Loose {
         x = s.x + s.de * a - s.dn * c; z = s.z + s.dn * a + s.de * c; y = 0.25 + rng() * 2.0;
         const U = s.speed * s.strength / (1 + 1.2 * a / s.reach);
         ve = s.de * U * 0.85; vn = s.dn * U * 0.85; vu = 0.6 * rng();
+        if (s.curl > 0) { const cw = c / w, t = U * s.curl * Math.exp(-cw * cw), hy = (y - s.axis) / w; ve += t * hy * s.dn; vn -= t * hy * s.de; vu += t * cw; }
       } else if (s.kind === KIND.orb) {
-        const R = 1.2 + rng() * 4.5, a = rng() * 6.2831853;
-        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.3 + rng() * 2.4;
-        ve = -Math.sin(a) * 4; vn = Math.cos(a) * 4; vu = 0; life = 0.3; size = 3.0;
+        // a ball: strokes turning close round its middle, at its own height, each gone in half a second (the air
+        // they ride runs in to the middle: older ones would all lie there in a knot)
+        const el = (rng() * 2 - 1) * 1.1, R = (0.7 + rng() * 0.9) * Math.cos(el), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = Math.max(0.15, s.height + Math.sin(el) * 1.3);
+        ve = -Math.sin(a) * W.orbSwirl; vn = Math.cos(a) * W.orbSwirl; vu = 0; life = 0.035;
       } else if (s.kind === KIND.vortex) {
-        const R = s.radius * (0.45 + 1.0 * rng()), a = rng() * 6.2831853;
-        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.2 + rng() * rng() * 9;
-        ve = -Math.sin(a) * s.speed * s.spin * 0.7; vn = Math.cos(a) * s.speed * s.spin * 0.7; vu = s.up * 0.6; life = 0.34; size = 4.0;
+        // a column: strokes turning round the core and climbing it, gone before they are flung far
+        const R = s.radius * (0.35 + 0.9 * rng()), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.2 + rng() * rng() * 11;
+        ve = -Math.sin(a) * s.speed * s.spin * 0.8; vn = Math.cos(a) * s.speed * s.spin * 0.8; vu = s.up * 0.7; life = 0.085;
       } else {
         const R = s.radius * Math.sqrt(rng()), a = rng() * 6.2831853;
-        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.4 + rng() * 4;
-        ve = s.de * s.push; vn = s.dn * s.push; vu = 0; life = 0.22; size = 3.0;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.3 + rng() * 3.2;
+        ve = s.de * s.push; vn = s.dn * s.push; vu = 0; life = 0.2;
       }
       if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
       const gy = near ? near.heightAt(x, z, groundY) : groundY;
-      if (!this.emit('leaves', x, gy + y, z, ve, vu, vn, size, life * (0.7 + 0.6 * rng()), rng() < 0.7 ? I_SNOW : I_ICE)) { s.wisp = 0; break; }
+      if (!this.emit('leaves', x, gy + y, z, ve, vu, vn, 0.35, life * (0.7 + 0.6 * rng()), rng() < 0.7 ? I_SNOW : I_ICE)) { s.wisp = 0; break; }
     }
   }
 

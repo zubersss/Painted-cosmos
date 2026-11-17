@@ -29,6 +29,7 @@ export const WINDPOWER = Object.freeze({
   gustSpread: 0.16,       // ... growing by this for each metre run (5.4 m to each side at the end)
   gustLife: 2.4,          // s: after this the air is as it was
   gustLift: 0.24,         // the share of the pulse's speed that blows upward at the ground (what lifts leaves and dust)
+  gustCurl: 0.9, gustAxis: 1.2,   // the gust turns about its own line: the turning's share of the pulse's speed one width out, and the line's height (m)
   gustHeight: 2.6,        // m: full strength up to here (growing a little with the distance), fading above
   // wind control
   zoneRadius: 14,         // m
@@ -55,13 +56,13 @@ export const WINDPOWER = Object.freeze({
   // THE AIR MADE VISIBLE: pale strokes that ride each source (loose.js: grains of the leaf kind in the colours of snow
   // and ice, short-lived), strokes a second at full strength. Without them a gust over turf or rock moved nothing
   // that could be seen: the first stills of the powers.
-  wispGust: 170, wispOrb: 60, wispVortex: 150, wispZone: 26,
+  wispGust: 170, wispOrb: 170, wispVortex: 240, wispZone: 70,
 });
 
 function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,
     speed: 0, radius: 0, reach: 0, spread: 0, front: 0, pulse: 0, height: 0, gain: 1, push: 0, up: 0, spin: 1, held: false,
-    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0 };
+    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0 };
 }
 
 // The list. `count` sources are alive, in slots 0 .. count - 1.
@@ -99,6 +100,7 @@ export function castGust(S, bodyId, p, d, power = 1) {
   const s = take(S, KIND.jet, bodyId, p, d), W = WINDPOWER;
   s.life = W.gustLife; s.speed = W.gustSpeed * power; s.front = W.gustFront; s.reach = W.gustReach; s.pulse = W.gustPulse;
   s.radius = W.gustRadius; s.spread = W.gustSpread; s.height = W.gustHeight; s.up = W.gustLift; s.strength = 1;
+  s.curl = W.gustCurl; s.axis = W.gustAxis;
   return s;
 }
 // Wind control at p (on the ground): mode 'calm' stills the wind there, 'quicken' speeds it (and adds some along d).
@@ -192,6 +194,9 @@ export function powerWind(S, x, z, hz, o, minR = 0) {
       const fan = 0.22 * cw;
       o[0] += U * (s.de - s.dn * fan); o[1] += U * (s.dn + s.de * fan);
       o[2] += U * s.up * (hz < 3 ? 1 - hz / 3 : 0);
+      // and curled round its own line: the air turns about the gust's axis as it goes (seen from behind, a blast is
+      // strokes wheeling round the aim; without the curl it is dots flying away)
+      if (s.curl > 0) { const t = U * s.curl, hy = (hz - s.axis) / w; o[0] += t * hy * s.dn; o[1] -= t * hy * s.de; o[2] += t * cw; }
       any = true;
     } else if (s.kind === KIND.zone) {
       let R = s.radius; if (R < minR) R = minR;
@@ -207,7 +212,9 @@ export function powerWind(S, x, z, hz, o, minR = 0) {
       const W = WINDPOWER, rc = W.orbCore, ir = r > 1e-3 ? 1 / r : 0, k = s.strength;
       // drawn in from all round (strongest two core radii out, nothing at the middle or at the rim), turned round
       // the ball, and held at its height: up under it, down over it
-      const g = (r / (2 * rc)) * Math.exp(1 - r / (2 * rc)) * (1 - smoothstep(s.radius * 0.6, s.radius + minR, r));
+      // (and not inside the core: there the air only turns, so what is drawn in goes round the ball at its core's
+      // radius and is not packed into a knot at its middle)
+      const g = (r / (2 * rc)) * Math.exp(1 - r / (2 * rc)) * (1 - smoothstep(s.radius * 0.6, s.radius + minR, r)) * smoothstep(0.7 * rc, 1.7 * rc, r);
       const sw = (r < rc ? r / rc : rc / r) * W.orbSwirl, dy = s.height - hz;
       o[0] += (-rx * ir * s.speed * g - rz * ir * sw) * k; o[1] += (-rz * ir * s.speed * g + rx * ir * sw) * k;
       o[2] += (dy > 2 ? 2 : dy < -2 ? -2 : dy) * 2.6 * (1 - smoothstep(rc * 1.5, rc * 5, r)) * k;
