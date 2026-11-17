@@ -296,13 +296,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` at version `v8.1 (17 Nov)` (pull requests
-#4 to #8; `main` at 82803f2; #7 was opened and merged by the session on the owner's standing word,
-section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v8 carries: a leaf's paint once a
-leaf (the answer to the phone's table: the trees' paint was 23 of 39 ms), the rivers that flow,
-settings for a computer with a basic built-in chip, the version label. `look-proto` equals
-`main`. WAITED FOR: the owner's speed tables from the phone and the Lenovo on v8, and how it
-looks and plays.
+**In one line:** the new look is LIVE behind `?look=oil` at version `v9 (17 Nov)` (pull requests
+#4 to #9; `main` at 94d44ca; #7, #8 and #9 were opened and merged by the session on the owner's
+standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9 changed NOTHING OF
+THE LOOK: it added two rows to the speed test ("far trees one flat colour", "no far trees") and an
+experimental cheaper far tree behind `?fartree=cards` (seen here: cheaper and PLAINER, not good
+enough to be the look). `look-proto` equals `main`. WAITED FOR FROM THE OWNER: (1) their word on
+the powers (below); (2) the speed test's fourth table from the phone, once as it is and once with
+`&fartree=cards`: measured here the far trees' crowns are nearly all of the plants' paint (23 ms
+of the phone's 40), and the phone must say so before the look is touched for it.
 
 **THE ELEMENTAL POWERS (section 2, item 42): branch `powers`, behind `?powers=1`, NOT MERGED
 (the owner: "I'll say when").** Wind was built in the owner's absence (2026-11-17).
@@ -315,8 +317,9 @@ looks and plays.
   and the water parts along the way the explorer looks; they walk the bed). f. THE WIND KNIFE
   IS A PLAN WITH ITS COST ONLY (the owner: "It's fine if e and f are only plans when I get
   back").
-- THE FULL CHECK passed on `powers` at 1ef4bc6 (a to d). IT MUST BE RUN AGAIN on the head
-  that has move water (e5ba4b9 or later) before anything is said to be finished or merged.
+- `powers` holds `main` at v9 (merged in, 0af0a8f). THE FULL CHECK passed at 1ef4bc6 (a to
+  d); its run on 0af0a8f (with move water and v9) is recorded in the log's last entries: read
+  them before anything is said to be finished or merged.
 - What exists there: `src/physics/powers.js` (the explorer's wind as a short list of shapes: a
   jet, a zone, an orb, a vortex) taken by the air at a point, the plants' field, the loose things
   and the rain and snow through the door the dust devils use; `src/core/powers.js` (the hands,
