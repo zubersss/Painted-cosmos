@@ -98,3 +98,21 @@ test('M4 on the jetpack in a glade, up past the crowns and down again: the lens 
   assert.ok(narrow.inCrownLong <= 3, 'and then the boom is footBoomMin (frames longer: ' + narrow.inCrownLong + ')');
   assert.ok(narrow.end > CAMERA.boom - 0.4, 'and whole again on the ground: ' + narrow.end.toFixed(2));
 });
+
+test('flying over a wood: a trunk is in the camera\'s way while you walk among the trees, and not when you are above them', () => {
+  // (the owner, 2026-11-17: "when im flying high my camera seems to glitch". Every trunk was handed to the camera as a
+  // ball AT THE EXPLORER'S OWN HEIGHT, which is right on foot; in flight it lifted the whole wood up to meet them, and
+  // at 53 m the boom slammed from 5.2 m to 1.2 m and back as the view passed over trunks that were not there.)
+  const spawn = norm(stubSpawn('earth').unitDir), R = stubSurface('earth', spawn).radius;
+  const up = spawn, east = norm(cross(V(0, 1, 0), up)), north = norm(cross(up, east));
+  const at = (e, n) => norm(add(scale(up, R), add(scale(east, e), scale(north, n))));
+  const trees = [[2.5, 0], [-3, 1.5], [0, 3]].map(([e, n]) => ({ unitDir: at(e, n), radius: 0.4, height: 14, kind: 'tree' }));
+  const sim = new Sim({ sampleSurface: stubSurface, getSpawn: (id) => stubSpawn(id).unitDir, sampleObstacles: () => trees });
+  const feet = scale(spawn, R);
+  // (the ship stands near the spawn and is a camera solid of its own: count only the trunks, which are thin)
+  const trunks = (alt) => { sim.ex.altitude = alt; return sim.cameraSolids(feet, trees).filter((o) => o.radius < 1).length; };
+  assert.equal(trunks(0), 3, 'on foot among them: all three are in the way');
+  assert.equal(trunks(8), 3, 'half way up a 14 m trunk: still in the way');
+  assert.equal(trunks(40), 0, 'flying well above the wood: none of them');
+  assert.equal(trunks(400), 0, 'and high over it: none');
+});
