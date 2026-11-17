@@ -104,9 +104,11 @@ Seven abilities on the keys `1` to `7` and on the touch fan, in this order: **gu
 **quicken**, **still**, **whirl**, **part** (move water: below), **knife** (the wind knife: below) (wind control is two of them: a hidden second gesture is not found
 on a phone). On the touch button a tap casts (when the thumb lifts); an ability
 that is held (gather, part) begins the moment the thumb is down; sliding the thumb off the button
-opens the fan, and letting go on a word chooses it and casts it. The aim is shown by a small mark
-in the middle of the picture while a power is held (the ring painted on the ground, above, is not
-built: it needs a new painted thing).
+opens the fan, and letting go on a word chooses it and casts it. The aim is shown by A RING ON THE GROUND WHERE THE
+POWER WILL ACT, as wide as what it will do there (a whirl's core, a quickened place's fourteen
+metres, a gust's width at that distance), lying as the ground lies to the eye; it is there before
+the cast and stronger while a power is held. It is drawn by the interface over the picture, not
+painted into the world (so it does not hide behind a tree).
 
 The player's wind does not go onto the wind grid of `src/physics/air.js` (its nodes are 16 m
 apart). It goes in beside it, by the door the dust devils use: a short list of shapes
@@ -131,11 +133,11 @@ place). There is no sound that lasts while a whirl stands or a ball is held: not
 **Touched as the owner will touch it (2026-11-17).** The button and the fan were pressed with real
 touch events on a phone-sized screen (823 x 384): a tap casts once, the fan opens with its
 words, a word is chosen and cast. That first try found the button dead to a finger and a whirl
-breaking the physics among real dust devils; both are mended and held by tests. The fan's seven words lie on an arc from
-straight above the button round to its left, clear of the jump button under it.
+breaking the physics among real dust devils; both are mended and held by tests. The fan's seven words lie in a column beside
+the button, on its left, 32 px apart and clear of the jump button under it (on an arc the top
+words lay over each other).
 
-**What is not built.** The ring painted on the ground at the aim (a mark in the middle of the
-picture stands for it); a lasting sound; a word on the screen when an ability can do nothing
+**What is not built.** A lasting sound; a word on the screen when an ability can do nothing
 here; the choice of element (there is only wind). A stilled place has nothing of its own to see:
 it shows only in what stops moving.
 
@@ -234,8 +236,10 @@ right tree is chosen, it is felled once, it is kept in the save and found again)
 
 *As built (2026-11-17, the simplest version; ability seven, "knife").* A thin straight gust
 leaves the hands; the first tree within 18 m whose trunk is within 1.2 m of the aim's line is cut:
-when the blade reaches it, it goes over away from the explorer, slowly at first and fast at the
-end, in a second and a half, and lies with its crown on the ground. The four pieces are as
+when the blade reaches it, it goes over away from the explorer AND TO ITS OWN SIDE OF THE AIM (forty
+degrees off: straight away, the fall was hidden behind the tree itself from where the player
+stands), slowly at first and fast at the end, in a second and a half, and lies with its crown on
+the ground. The four pieces are as
 planned. The felled trees are one small list (`src/data/felled.js`), each tree named by its own
 place in the placement data, so its near form, its far form and the obstacles all know it again
 without a search. The trees' renderer lays a felled tree down about its foot
