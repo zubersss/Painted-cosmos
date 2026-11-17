@@ -317,9 +317,17 @@ of the phone's 40), and the phone must say so before the look is touched for it.
   and the water parts along the way the explorer looks; they walk the bed). f. THE WIND KNIFE
   IS A PLAN WITH ITS COST ONLY (the owner: "It's fine if e and f are only plans when I get
   back").
-- `powers` holds `main` at v9 (merged in, 0af0a8f). THE FULL CHECK passed at 1ef4bc6 (a to
-  d); its run on 0af0a8f (with move water and v9) is recorded in the log's last entries: read
-  them before anything is said to be finished or merged.
+- `powers` holds `main` at v9 (merged in). THE FULL CHECK passed at 1ef4bc6 (a to d) and at
+  0af0a8f (with move water and v9). After that TWO REAL FAULTS were found by pressing the
+  touch button with real touch events and mended (62578d7: the button did not answer a finger;
+  a whirl broke the physics among real dust devils); the full check's run on 62578d7 is
+  recorded in the log's last entry: read it before anything is said to be finished or merged.
+  (7c6829e, the head, adds only a note in `docs/POWERS.md`.)
+- THE LESSON OF THOSE TWO FAULTS: stills made by calling the powers' code prove the picture,
+  not the hand. Anything the owner will touch must be pressed here with real touch events
+  first: `/home/user/.pc-scratch/look/pw/touchshot.mjs` in the session that made it (a browser
+  with a touch screen, 823 x 384; `QUERY='stub=render,world,art&powers=1...'` opens in six
+  seconds for the mechanics, the painted page in four minutes for the picture).
 - What exists there: `src/physics/powers.js` (the explorer's wind as a short list of shapes: a
   jet, a zone, an orb, a vortex) taken by the air at a point, the plants' field, the loose things
   and the rain and snow through the door the dust devils use; `src/core/powers.js` (the hands,
@@ -330,6 +338,10 @@ of the phone's 40), and the phone must say so before the look is touched for it.
   stroke) and `tests/powers.test.mjs` (5).
 - NOT KNOWN: how it looks in motion, how it feels on the phone, how it sounds. The gathered ball
   is the weakest in the picture. Only the owner's phone can say.
+- WHAT THE OWNER MUST DECIDE (asked in the summary given to them, not yet answered): whether to
+  merge the powers so that the phone can try them; whether the white strokes of air are right;
+  whether the wind knife is wanted next or the phone's speed first; and the twenty choices made
+  for them in the log.
 - IT CANNOT BE TRIED ON THE PHONE UNTIL IT IS MERGED (the site serves `main`). It is safe to
   merge when the owner says: off by default, nothing loaded without the flag. The address then:
   the game's own with `?look=oil&powers=1` added.
