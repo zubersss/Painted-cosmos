@@ -305,20 +305,30 @@ settings for a computer with a basic built-in chip, the version label. `look-pro
 looks and plays.
 
 **THE ELEMENTAL POWERS (section 2, item 42): branch `powers`, behind `?powers=1`, NOT MERGED
-(the owner: "I'll say when").** Wind is being built in the owner's absence (2026-11-17).
+(the owner: "I'll say when").** Wind was built in the owner's absence (2026-11-17).
 - Read first: `docs/POWERS.md` ON BRANCH `powers` (the design note for the whole system; wind as
-  built; the plans and costs for "move water" and "wind knife"), then the log's sections of
-  2026-11-17 on the powers ("CHOICES MADE FOR THE OWNER").
+  built, how it is seen and heard, what is not built; the plans and costs for "move water" and
+  "wind knife"), then the log's sections of 2026-11-17 on the powers ("CHOICES MADE FOR THE
+  OWNER", fourteen of them: the owner has not yet read or answered them).
+- BUILT AND SEEN IN STILLS: a. gust, b. gather and carry, c. wind control (quicken; still),
+  d. tornado ("whirl"). e. MOVE WATER and f. WIND KNIFE ARE PLANS WITH COSTS ONLY (the owner:
+  "It's fine if e and f are only plans when I get back").
 - What exists there: `src/physics/powers.js` (the explorer's wind as a short list of shapes: a
   jet, a zone, an orb, a vortex) taken by the air at a point, the plants' field, the loose things
   and the rain and snow through the door the dust devils use; `src/core/powers.js` (the hands,
-  the aim, five abilities: gust, gather, quicken, still, whirl); `src/ui/powers.js` (the touch
-  button and its fan); the explorer's cast gesture; tests `src/physics/powers.test.mjs` (11) and
-  `tests/powers.test.mjs` (5).
-- Its state, what was seen, what is left and what the owner must decide are in the log's last
-  section on the powers and in the summary given to the owner.
+  the aim, five abilities: gust, gather, quicken, still, whirl; a sound for each cast);
+  `src/ui/powers.js` (the touch button and its fan); the explorer's cast gesture; the wind drawn
+  as white strokes of air (`src/physics/three/expand.js`, option `wisp`; `src/physics/loose.js`
+  `_wisps`); tests `src/physics/powers.test.mjs` (12), `src/physics/kits.test.mjs` (one for the
+  stroke) and `tests/powers.test.mjs` (5).
+- NOT KNOWN: how it looks in motion, how it feels on the phone, how it sounds. The gathered ball
+  is the weakest in the picture. Only the owner's phone can say.
 - IT CANNOT BE TRIED ON THE PHONE UNTIL IT IS MERGED (the site serves `main`). It is safe to
-  merge when the owner says: off by default, nothing loaded without the flag.
+  merge when the owner says: off by default, nothing loaded without the flag. The address then:
+  the game's own with `?look=oil&powers=1` added.
+- The stills script is `/home/user/.pc-scratch/look/pw/run5.sh` in the session that made it (not
+  in the repository): it opens the game page with the lab, casts through `window.__pc.sim.powers`
+  (`pick(i)`, `down = true`), steps the game and takes stills.
 
 **What the phone has taught** (the log has the three tables and the reasoning):
 - Its own settings drew the look tiny and the controller shrank it further: cured in #6 (the
