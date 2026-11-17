@@ -318,15 +318,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` at version `v11 (17 Nov)` (pull requests
-#4 to #11; `main` at a13850e; #7 to #11 were opened and merged by the session on the owner's
-standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9, v10 and v11
-changed NOTHING OF THE LOOK: they are the speed test (now its sixth form, 21 rows), an
-experimental cheaper far tree behind `?fartree=cards`, and the scene's objects placed once a
-frame (a twentieth of the script). `look-proto` is ONE COMMIT AHEAD of `main` (c058526: a calmer
-forest floor behind `?floor=calm`, shown to the owner as "A or B", not merged: if they say B, make
-it the autumn wood's own colours in `src/data/looks/earth.js` and take it through the gate; if A,
-remove the commit's switch or leave it).
+**In one line:** `main` is at `v12 (17 Nov)` (ba4e0a5; pull requests #4 to #12; #7 to #12 were
+opened and merged by the session: #7 to #11 on the owner's standing word, section 2 item 41, #12
+on their own "Merge the powers", item 47). LIVE BEHIND SWITCHES: the new look (`?look=oil`) and
+THE ELEMENTAL POWERS, WIND (`?powers=1`: seven abilities). THE PHONE IS THE MAIN TARGET (item
+40). Also behind switches: the speed test (`bench=1`, its sixth form), an experimental cheaper
+far tree (`fartree=cards`). `powers` equals `main`. `look-proto` is `main` and ONE COMMIT MORE
+(a calmer forest floor behind `?floor=calm`, shown to the owner as "A or B", not merged: if they
+say B, make it the autumn wood's own colours in `src/data/looks/earth.js` and take it through
+the gate; if A, drop the commit).
 
 **The phone's speed, where it stands** (the log of 2026-11-17 has the tables and the reasoning):
 - With the live far trees (lumps) the far trees are HALF THE PHONE'S FRAME (44 ms as set, 23
@@ -352,16 +352,18 @@ remove the commit's switch or leave it).
 2. Their eye on the leafier cheap far tree (`…/?look=oil&fartree=cards&body=earth&time=15.4`):
    could it be the phone's look? (On the phone its plainer version ran at 36.5 a second against
    22.5.)
-3. THE WORD TO MERGE THE POWERS (asked four times; each time: keep working). When it comes:
-   compare `main` and `powers` by pictures again (nine scenes, without the flag), open the pull
-   request `powers` -> `main`, merge, run the full check on `main`; the phone's address is then
-   the game's own with `?look=oil&powers=1`.
+3. HOW THE WIND LOOKS, FEELS AND SOUNDS ON THE PHONE (merged 2026-11-17, v12:
+   `…/?look=oil&powers=1`): nobody has seen it in motion, felt it under a thumb or heard it.
+   Things the session doubts and has said so: whether the white strokes of air are too bold;
+   the gathered ball (the weakest in stills); the sounds (never heard).
 4. The forest's floor: A (live) or B (`floor=calm`).
 GIVE THE OWNER LINKS AS PLAIN ADDRESSES ON THEIR OWN LINES (inside code marks a phone may not
 let one tap them: they had to ask again).
 
-**THE ELEMENTAL POWERS (section 2, item 42): branch `powers`, behind `?powers=1`, NOT MERGED
-(the owner: "I'll say when").** Wind was built in the owner's absence (2026-11-17).
+**THE ELEMENTAL POWERS (section 2, items 42 and 47): MERGED INTO `main` (v12), behind
+`?powers=1`.** Wind was built on 2026-11-17 and merged the same day at the owner's word. The
+owner has NOT YET PLAYED IT: their first words about how it looks and feels on the phone decide
+what is refined next. Water, earth and fire are only described (no code: item 42).
 - Read first: `docs/POWERS.md` ON BRANCH `powers` (the design note for the whole system; wind as
   built, how it is seen and heard, what is not built; the plans and costs for "move water" and
   "wind knife"), then the log's sections of 2026-11-17 on the powers ("CHOICES MADE FOR THE
@@ -373,11 +375,9 @@ let one tap them: they had to ask again).
   game). Seven abilities on keys 1 to 7 and on the touch fan (a column of words beside the
   button). A ring on the ground shows where a power will act before it is cast; a stilled
   place is seen to fall still; the screen says when an ability can do nothing here.
-- `powers` holds `main` at v11 (merged in). THE FULL CHECK PASSES ON 16e8611 (17 of 17; the
-  head d575a01 adds only a note) and, without the flag, the branch draws what `main` draws (0
-  pixels differ in nine scenes, compared at the wind knife's commit; later commits touch only
-  the powers' own files). IT IS READY TO MERGE THE MOMENT THE OWNER SAYS SO; they have not (asked three times:
-  each time they said to keep working).
+- Before the merge: the full check passed on the branch (17 of 17) and, without the flag, it
+  drew what `main` drew (the default game: 0 pixels differ in six scenes). The full check on
+  `main` after the merge is recorded in the log's last entry on v12.
 - THE LESSON OF TWO FAULTS FOUND LATE (a dead touch button; a whirl breaking the physics among
   real dust devils): stills made by calling the powers' code prove the picture, not the hand.
   Anything the owner will touch is pressed here with real touch events first:
@@ -394,13 +394,11 @@ let one tap them: they had to ask again).
   stroke) and `tests/powers.test.mjs` (5).
 - NOT KNOWN: how it looks in motion, how it feels on the phone, how it sounds. The gathered ball
   is the weakest in the picture. Only the owner's phone can say.
-- WHAT THE OWNER MUST DECIDE (asked in the summary given to them, not yet answered): whether to
-  merge the powers so that the phone can try them; whether the white strokes of air are right;
-  whether the wind knife is wanted next or the phone's speed first; and the twenty choices made
-  for them in the log.
-- IT CANNOT BE TRIED ON THE PHONE UNTIL IT IS MERGED (the site serves `main`). It is safe to
-  merge when the owner says: off by default, nothing loaded without the flag. The address then:
-  the game's own with `?look=oil&powers=1` added.
+- THE CHOICES MADE FOR THE OWNER while they were away (twenty-seven, numbered in the log's
+  entries of 2026-11-17 on the powers) have not been read back to them one by one: each can be
+  changed in a line when they say what they do not like.
+- The address: the game's own with `?look=oil&powers=1` (or `?powers=1` alone for the
+  watercolour game).
 - The stills script is `/home/user/.pc-scratch/look/pw/run5.sh` in the session that made it (not
   in the repository): it opens the game page with the lab, casts through `window.__pc.sim.powers`
   (`pick(i)`, `down = true`), steps the game and takes stills.
