@@ -53,6 +53,10 @@ export default {
         // yellow-green in the glades, with the leaves strewn on it; wider glades; conifers in groups among the broadleaves)
         oil: { pal: { low: [0.58, 0.42, 0.34], mid: [0.66, 0.48, 0.34], high: [0.62, 0.46, 0.36], litter: [0.96, 0.78, 0.30], canopyA: [0.98, 0.86, 0.30], canopyB: [0.94, 0.62, 0.24],
           grassLight: [0.84, 0.87, 0.32], grassMid: [0.64, 0.75, 0.30], moss: [0.44, 0.62, 0.30], mud: [0.56, 0.50, 0.34] }, glade: [0.10, 0.46],
+          // (?floor=calm, 2026-11-17: the glades' grass was a loud lemon in the owner's recording of v8.1. A calmer floor to
+          // set beside it: the sunlit grass an olive gold, the tufts with it. Not the look until the owner picks it.)
+          palCalm: { grassLight: [0.78, 0.76, 0.38], grassMid: [0.58, 0.66, 0.32] },
+          overCalm: { under: { leaf: [[0.80, 0.80, 0.40], [0.56, 0.68, 0.33], [0.33, 0.50, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } },
           // (clearer air than the planet's 185 m: the trees a stone's throw off keep their colour, the far ones go pale)
           over: { mist: 1.4 },
           // (the clip's wood is broadleaves in autumn leaf with a white birch here and there: nearly nine trees in ten;

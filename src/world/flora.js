@@ -26,9 +26,12 @@ const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget
 const RELIEF = 250;            // (R1 W2.3) metres the ground in an undergrowth cell's reach may stand above the ground under the eye
 // (?trees=full: the oil look's trees as they were before their detail followed the screen, for comparisons)
 const TREES_FULL = typeof location !== 'undefined' && /[?&]trees=full\b/.test(location.search || '');
-// (?fartree=cards: AN EXPERIMENT for the speed test. The oil look's far trees built of flat pieces painted once a piece,
-// florakit.js farCardGeometry, in place of the lump painted for every pixel. Cheaper and plainer; off unless asked for.)
-const FAR_CARDS = typeof location !== 'undefined' && /[?&]fartree=cards\b/.test(location.search || '');
+// THE OIL LOOK'S FAR TREE is built of flat pieces, each painted once (florakit.js farCardGeometry): on the owner's phone
+// it costs as little as having no far trees at all, where the lump painted for every pixel was 3.6 ms of an 18 ms frame
+// (speed test 6, 2026-11-17), and across a river the lump read as a smooth orange blob where this reads as leaves.
+// (?fartree=lump: the lump, as it was until 2026-11-17, for comparisons.)
+const FAR_LUMP = typeof location !== 'undefined' && /[?&]fartree=lump\b/.test(location.search || '');
+const FAR_CARDS = !FAR_LUMP;
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -109,7 +112,11 @@ export class Flora {
         far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
       }) : null,
     }, this._underMats(U, ''));
-    for (const k of ['far', 'bush', 'rock']) if (this.mats[k]) this.mats[k].userData.pcCasts = true;
+    // (the FAR trees cast no shadow in the oil look: on the owner's phone their drawing from the sun was 2.8 ms of a
+    // 18 ms frame, nearly all of what the far trees cost at all (speed test 6, 2026-11-17), and a far tree stands
+    // beyond 57 m at the phone's settings, where the shadow square's 90 m reach is nearly spent and its texels are
+    // metres wide: what is lost is a smudge at the edge of the lit ground. Checked in stills before it was kept.)
+    for (const k of ['far', 'bush', 'rock']) if (this.mats[k] && !(LOOK.oil && k === 'far')) this.mats[k].userData.pcCasts = true;
     this.kit = {
       far: farTreeGeometry(5),
       // (the oil look's far tree for the kinds that are trees in leaf: a stem and leaf cards, florakit.js)
