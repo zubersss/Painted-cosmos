@@ -42,9 +42,9 @@ The rules above come first. This part is a map; the state of the work is always 
 ## How to run and check it
 
     node tools/serve.mjs 8080          # then open http://127.0.0.1:8080/
-    node --test tests/*.test.mjs       # the game's unit tests (251)
+    node --test tests/*.test.mjs       # the game's unit tests (262)
     node --test src/world/*.test.mjs   # the world and painter tests (47)
-    node --test src/physics/           # the physics tests (325)
+    node --test src/physics/           # the physics tests (342)
     node tests/all.mjs --export        # everything, on a clean copy of the last commit: 17 steps,
                                        # about an hour, scripted play-throughs in a headless browser
 
@@ -52,8 +52,11 @@ The rules above come first. This part is a map; the state of the work is always 
   tier), `/gallery.html?body=earth&biome=autumn_woodland&time=15.4` (the painter's gallery: a
   free camera over any world; it loads in seconds where the game takes minutes). The full list
   of parameters is at the top of `src/main.js` and `src/art/gallery.js`.
-- **The new look** (branch `look-proto` only): add `look=oil` to any address. Without it the
-  game is exactly the watercolour game.
+- **The new look** (live on `main` since 2026-11-16): add `look=oil` to any address. Without it
+  the game is exactly the watercolour game.
+- **The elemental powers** (live on `main` since 2026-11-17, wind only): add `powers=1`. Without
+  it nothing of the powers is loaded. `bench=1` (with `look=oil`) is the speed test for a real
+  device: it leaves a table on the screen to be photographed.
 - **In a cloud session there is no graphics card.** The browser draws in software: the first
   picture after a page loads takes 4 to 10 minutes (shaders compiling), each one after that 10
   to 60 seconds. Run ONE browser at a time. A background process is stopped after two hours.
@@ -68,7 +71,8 @@ The rules above come first. This part is a map; the state of the work is always 
 | --- | --- |
 | `main` | The live game (GitHub Pages serves it). Changes only through pull requests the owner asks to merge. |
 | `r2` | Where a session starts. The logs, the handover, the references' notes; also half-done "release 2" work as WIP snapshots (not finished, not verified). |
-| `look-proto` | The new painted look (`?look=oil`), the new explorer and its flight, built on `main`. Not live. |
+| `look-proto` | Where the look's next change is made ready for a pull request: `main` plus whatever is waiting (see the handover). |
+| `powers` | Where the elemental powers were built; merged into `main` on 2026-11-17 and kept for their further work. |
 | `cosmos` | Frozen copy of release 1. Do not work on it. |
 
 ## How the code is laid out
@@ -77,19 +81,19 @@ Four "roles" own the folders (the split is enforced by `tools/commit.sh`):
 
 | Folder | Role | What is in it |
 | --- | --- | --- |
-| `src/core/` | PILOT | The game itself. `game.js` (the frame loop's top), `sim.js` (the big state of play: walking, boarding, flying, landing), `state.js` (the states and their prompts), `input.js` / `touch.js` / `gamepad.js`, `save.js`, `orbits.js` (where the planets are), `dynres.js` (steps quality down when frames are slow), `providers.js` (swaps real modules for simple stand-ins in `stubs/` for tests). |
+| `src/core/` | PILOT | The game itself. `game.js` (the frame loop's top), `sim.js` (the big state of play: walking, boarding, flying, landing), `state.js` (the states and their prompts), `input.js` / `touch.js` / `gamepad.js`, `save.js`, `orbits.js` (where the planets are), `dynres.js` (steps quality down when frames are slow), `providers.js` (swaps real modules for simple stand-ins in `stubs/` for tests), `powers.js` (the elemental powers, the player's side: the hands, the aim, the abilities; loaded only with `?powers=1`), `bench.js` (the speed test), `build.js` (the version shown on the screen: change it and `build.txt` with every pull request). |
 | `src/player/` | PILOT | `explorer.js` (how the figure moves; on `look-proto` also the flight), `camera.js`, `figure.js` (what the figure's model is told to do). |
 | `src/ship/` | PILOT | `flight.js` (the ship), `pulse.js` (travel between worlds). |
-| `src/ui/` | PILOT | `hud.js` (prompts, gauges, touch buttons, help), `map.js`, `book.js` (the sketchbook), `theme.css`. |
+| `src/ui/` | PILOT | `hud.js` (prompts, gauges, touch buttons, help), `map.js`, `book.js` (the sketchbook), `theme.css`, `powers.js` (the powers' touch button, its list of words, the aim's ring). |
 | `src/audio/` | PILOT | `audio.js`: every sound, made in code. |
 | `src/render/` | PAINTER | How things are drawn. `materials.js` (every surface's shader: ground, water, plants, figures), `chunks.js` (shader pieces they share: light, air, strokes), `post.js` (the passes after the scene), `shared.js` (uniforms and switches every material shares), `index.js` (the painter: one frame), `texgen.js` (textures made at start-up). On `look-proto` also `shadow.js` (cast shadows) and `dabtex.js` (the leaf dabs laid once). |
 | `src/world/` | PAINTER | The planets. `surface.js` (the shape and colours of the land at any point), `terrain.js` / `patchgen.js` / `cubesphere.js` (the ground's mesh), `flora.js` (which plants are drawn where and at what detail), `florakit.js` (the plants' shapes), `floraplace.js` (where plants stand), `sky.js`, `orbit.js` (worlds seen from space), `index.js` (the world's own frame: light, weather, air). |
 | `src/art/` | PAINTER | `models.js` (the explorer and the ship, built in code), `gallery.js` (the gallery page). |
-| `src/data/` | PAINTER / PILOT | `bodies.js` (the planets' sizes and orbits), `looks/<world>.js` (each world's colours, plants and places: pure data), `looks.js` (gathers them). On `look-proto`: `mode.js` (the new look's switch for data and play code). |
-| `src/physics/` | PHYSICS | Wind, weather, water, the explorer's body, the ship's body, plants bending. Self-contained, with its own tests beside each file. |
+| `src/data/` | PAINTER / PILOT | `bodies.js` (the planets' sizes and orbits), `looks/<world>.js` (each world's colours, plants and places: pure data), `looks.js` (gathers them), `mode.js` (the switches that data and play code read: the oil look, the powers), `felled.js` (the trees the wind knife has felled: shared by the play code, the saved game and the world). |
+| `src/physics/` | PHYSICS | Wind, weather, water, the explorer's body, the ship's body, plants bending. Self-contained, with its own tests beside each file. `powers.js`: the wind the explorer makes, a short list of shapes of moving air that the air, the plants, the loose things and the rain all ask. |
 | `tests/` | PILOT | Unit tests (`*.test.mjs`) and scripted browser runs (`playthrough.mjs`, `trip.mjs`, `touch.mjs`, `stations.mjs` for sharpness and flicker, `all.mjs` runs everything). |
 | `tools/` | COORDINATOR | `serve.mjs`, `commit.sh`, `export-head.sh`, `lab.mjs`. |
-| `docs/` | | `HANDOVER.md` (start here), `COORDINATOR.md` (the log of every instruction and decision), `references/README.md` (what the owner's reference pictures show and what is taken from each), `notes/painter.md`, `pilot.md`, `physics.md` (each role's working notes), `lead/` (plans and reviews). |
+| `docs/` | | `HANDOVER.md` (start here), `COORDINATOR.md` (the log of every instruction and decision), `POWERS.md` (the elemental powers: the design for all four, wind as built, what is not built), `references/README.md` (what the owner's reference pictures show and what is taken from each), `notes/painter.md`, `pilot.md`, `physics.md` (each role's working notes), `lead/` (plans and reviews). |
 
 ## The new look in one paragraph (branch `look-proto`)
 
@@ -100,6 +104,18 @@ the look sits behind `#ifdef PC_OIL`, `LOOK.oil` or `MODE.oil`, so the watercolo
 untouched without the flag. The file-by-file account, what the owner has decided about it, and
 what is still wrong are in `docs/notes/painter.md` on that branch ("Hand-over of THE OIL
 LOOK"). Read that before touching the look.
+
+## The elemental powers in one paragraph
+
+`?powers=1` gives the explorer the wind: seven abilities (gust, gather, quicken, still, whirl,
+part water, knife), cast where the view looks. The player's wind is a short list of plain shapes
+of moving air (`src/physics/powers.js`) handed to the systems that already took the dust devils'
+wind, so the world's own leaves, dust, spray, plants and cloak answer it; nothing is drawn for
+every pixel. It is seen as white strokes of air laid by the falling leaves' own painter. Without
+the flag no module of the powers is loaded. Water, earth and fire are only described
+(`docs/POWERS.md`): the owner said not to start their code. Anything the owner will touch on the
+phone is pressed here with real touch events before it is called seen (a still made by calling
+the code proves the picture, not the hand).
 
 ## Conventions
 
@@ -121,4 +137,10 @@ LOOK"). Read that before touching the look.
   grain; strokes small, with no outlines; colours that pop without losing detail; the desktop
   sets the look and the phone follows with cheaper settings.
 - **Plain words.** The owner is not a programmer: explain in plain language, say plainly when
-  something is not good or not known, and tell them when something is needed from them.
+  something is not good or not known, and tell them when something is needed from them. Give
+  them links as plain addresses on their own lines (they read on a phone).
+- **A result is read only from this run's own files.** A log left by an earlier run of the same
+  name has been read as today's once (2026-11-17): check a log's time and its own last line.
+- **The build machine draws in software and has been wrong twice about why the phone is slow.**
+  For speed on a device, ask the device (`bench=1`); for script time this machine is a fair
+  stand-in.
