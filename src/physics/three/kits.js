@@ -120,7 +120,9 @@ export function createWeatherKit(physics, { makeMaterial, kinds = PARTICLES.kind
     const D = { ...DRAW[kind], ...(draw[kind] || {}) };
     const cap = buf.capacity || buf.pos.length / 3;
     let geo, posA = null, colA = null, matA = null, veilA = null, uniforms = null;
-    const inked = !!INKED[kind] && !!buf.mat;
+    // (D.inked: a kind may be given the ground-material inks by whoever draws it: the leaves, when the explorer's wind is
+    // on: its pale strokes of air are grains of the leaf kind in the inks of snow and ice, physics/powers.js)
+    const inked = (!!INKED[kind] || !!D.inked) && !!buf.mat;
     if (gpu) {
       geo = new THREE.InstancedBufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3));

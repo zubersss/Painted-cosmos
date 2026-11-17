@@ -36,11 +36,15 @@ import { choosePreset, bufferSize, BASIC_GPU } from './core/preset.js';
 import { attachPlatform } from './core/platform.js';
 import { attachBench } from './core/bench.js';
 import { BUILD } from './core/build.js';
+import { MODE } from './data/mode.js';
 
 // Every static import has loaded: index.html's watchdog stands down (hardening review P14).
 window.__pcBooting = true;
 
 const params = new URLSearchParams(location.search);
+// (the elemental powers, ?powers=1: said to the modules that must know before they make anything; the powers' own code is
+// loaded further down, and only then)
+if (params.has('powers') && params.get('powers') !== '0') MODE.powers = true;
 // The version on the screen (the oil look only; src/core/build.js). (v7 and v8 also asked the site for `build.txt` and
 // fetched the page's files afresh when it named a newer version: that is a request at run time, which the brief's
 // static rules forbid (tests/all.mjs staticRules); the full check found it after the merge, and it was taken out.)

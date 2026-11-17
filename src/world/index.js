@@ -19,6 +19,7 @@ import { isArrival } from './arrival.js';
 import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
+import { MODE } from '../data/mode.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -165,7 +166,7 @@ export function createWorld(scene) {
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)
-      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10 };
+      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10, inked: MODE.powers };      // (inked: the powers' pale strokes of air, physics/three/kits.js)
       // (spray as flecks of 4 px was a glitter over the surf: a soft pale blot half a metre wide, never under 14 px,
       // so that the drops off a crest run together into a wisp, and a storm's spray is told from its rain)
       draw.spray = { ...D.spray, width: 0.5, exposure: 0.05, maxLen: 1.0, minPx: 14 };

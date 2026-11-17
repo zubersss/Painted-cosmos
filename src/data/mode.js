@@ -3,7 +3,8 @@
 // render/shared.js sets `oil` once, when it is loaded, from the address (`?look=oil`); everything else only reads it.
 // `wanderer`: the new explorer (bare head, cloak, lantern; it flies by itself, no jetpack: the owner, 2026-11-15). For
 // the prototype it comes with the oil look; read this, not `oil`, wherever the explorer's own behaviour is meant.
-export const MODE = { oil: false, get wanderer() { return this.oil; } };
+// `powers`: the elemental powers are on (main.js sets it from the address, ?powers=1, before anything is made; docs/POWERS.md).
+export const MODE = { oil: false, powers: false, get wanderer() { return this.oil; } };
 
 // THE OIL LOOK'S OWN CONTENT, laid over the looks ONCE when the look is switched on (render/shared.js calls this; with
 // the look off nothing is touched, so the default game's worlds are what they were). A look may name kinds of tall
