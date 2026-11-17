@@ -261,6 +261,21 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     booting; the full check straight after; undo at once if it fails). A LATER SESSION asks the
     owner once whether this still stands (`CLAUDE.md` says "only when the owner asks in that
     session", and was not changed). This amends item 7.
+42. **The elemental powers, wind first (2026-11-17; the owner away for several hours).** The
+    explorer will control wind, water, earth and fire; the feel of airbending (the feel only, no
+    characters or symbols of any show); no combat, no enemies, no fail state. First a design note
+    in `docs/` for the whole system (element choice and triggers on touch, keyboard, gamepad;
+    the phone is the main target). Then WIND, in order: a gust, b gather and carry, c wind
+    control (faster, or dead calm), d tornado, e move water (plan and cost first), f wind knife
+    that fells a tree (plan and cost first); each finished before the next. The player's wind
+    goes into the shared air field (`src/physics/air.js`) if that is the right way. RULES: a new
+    branch off `main` behind `?powers=1`, off by default; DO NOT MERGE IT INTO `main` until the
+    owner says (this overrides item 41 for this work); unused it costs nothing, in use a small
+    fixed cost, measured; automatic tests like the physics tests; the full check still passes;
+    the three riskiest parts touched only as far as wind strictly needs; no code for the other
+    elements. Do not wait for the owner: choose, log each choice, keep going. Before stopping:
+    commit, push, handover, and a short summary with stills, how to try it on the phone, and
+    what is needed from the owner. The whole text is in the log.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with

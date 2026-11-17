@@ -1937,3 +1937,20 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - THE FULL CHECK (`node tests/all.mjs --export`) was started on the merged head straight after; its result is to be added here and told to the owner. If it fails: undo by a new pull request at once.
 - ASKED OF THE OWNER: on the phone and on the Lenovo, check that the bottom of the screen says v8, run the speed test (`?look=oil&bench=1&body=earth&time=15.4`) and send both tables; then play (`?look=oil&body=earth&time=15.4&fresh=1`) and say how it looks and feels.
 
+### 2026-11-17 OWNER: away for several hours; START THE ELEMENTAL POWERS, WIND FIRST, on a new branch behind `?powers=1`; do not merge
+- OWNER (verbatim, whole):
+  "New instruction from the owner. I'll be away for several hours and can't test, so don't wait for me: make reasonable choices, log each one, and keep going.
+  GOAL: start the elemental powers. The explorer will eventually control wind, water, earth and fire, each with several abilities. Build WIND first. The feel I want is the airbending in Avatar: The Last Airbender (the feel only, not its characters or symbols): the explorer shapes the air and the world nearby answers. Everything that wind should move must move: leaves, dust, sand, snow, rain, grass, trees, water, the cloak, loose things.
+  1. First write a short design note in docs/ for the whole powers system: how the player picks an element and triggers abilities on touch (the phone is the main target), keyboard and gamepad, and a few abilities for each element. No combat, no enemies, no fail state.
+  2. Then build wind, in this order. The game already has a shared air field (src/physics/air.js). If it's the right way, feed the player's wind into it so the systems that already read it respond. Say so if it isn't.
+  a. Gust: a push of wind where I aim. Lifts and carries leaves, dust, sand and snow, bends plants, ruffles water.
+  b. Gather and carry: pick up leaves, snow or dust around me and move them where I aim.
+  c. Wind control: speed the wind up in an area I choose, or slow it to a dead calm.
+  d. Tornado: a whirlwind I place that pulls in and throws around whatever is loose near it.
+  e. Move water: push water out of my path. Write the plan and its cost first, then build the simplest version that looks right.
+  f. Wind knife: a blade of wind that cuts down a tree, which falls and stays felled. Plan and cost first, then the simplest version.
+  Finish each one properly before starting the next. It's fine if e and f are only plans when I get back.
+  3. Rules: - Work on a new branch off main, behind a flag (?powers=1), off by default. - Do NOT merge this into main while I'm away, even though you normally merge on auto. I'll say when. - Unused, the powers must cost nothing. In use, a small fixed cost. Measure script time and count the work, because speed on the phone is still an open problem. - Add automatic tests for the mechanics, like the existing physics tests. The full check must still pass. - Don't touch the three riskiest parts beyond what wind strictly needs, and don't start code for the other elements.
+  4. Before you stop, or when usage runs low: commit, push, update the handover, and leave me a short summary: what you built, what you decided for me, stills of each ability, how to try it on my phone, and what you need from me."
+- READ AS: exactly as written. The branch is `powers`, cut from `main` (288493c, v8). The flag is `?powers=1`. NOTHING OF IT IS MERGED into `main` until the owner says so (this overrides the standing word on merging for this work). Every choice made in the owner's absence is logged below under "CHOICES MADE FOR THE OWNER", one line each.
+
