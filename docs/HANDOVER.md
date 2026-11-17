@@ -300,6 +300,10 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 46. **Top-quality links, one for the forest and one for the snow (2026-11-17).** "Give me top
     quality link one for  forest and one for snow." Given: the top-settings link (item 38's)
     with `body=earth&time=15.4` and with `body=neptune&time=23` (in the log).
+47. **"Merge the powers" (2026-11-17).** The word item 42 waited for. The powers (wind, seven
+    abilities) are merged into `main` behind `?powers=1` by the session's gate; the log has the
+    steps and their results. The other elements (water, earth, fire) are still only described
+    in `docs/POWERS.md`: no code for them (item 42: "don't start code for the other elements").
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
