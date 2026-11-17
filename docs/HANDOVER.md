@@ -314,11 +314,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` at version `v10 (17 Nov)` (pull requests
-#4 to #10; `main` at 0fbfa61; #7 to #10 were opened and merged by the session on the owner's
-standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9 and v10 changed
-NOTHING OF THE LOOK: they are the speed test (now its fifth form) and an experimental cheaper
-far tree behind `?fartree=cards`. `look-proto` equals `main`.
+**In one line:** the new look is LIVE behind `?look=oil` at version `v11 (17 Nov)` (pull requests
+#4 to #11; `main` at a13850e; #7 to #11 were opened and merged by the session on the owner's
+standing word, section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v9, v10 and v11
+changed NOTHING OF THE LOOK: they are the speed test (now its sixth form, 21 rows), an
+experimental cheaper far tree behind `?fartree=cards`, and the scene's objects placed once a
+frame (a twentieth of the script). `look-proto` equals `main`.
 
 **The phone's speed, where it stands** (the log of 2026-11-17 has the tables and the reasoning):
 - With the live far trees (lumps) the far trees are HALF THE PHONE'S FRAME (44 ms as set, 23
@@ -327,7 +328,12 @@ far tree behind `?fartree=cards`. `look-proto` equals `main`.
   SOMETHING IS SLOW ON THE PHONE, only the phone's own table can.
 - The experimental far tree of flat pieces ran at 36.5 pictures a second against 22.5. It was
   too plain; v10 makes it leafier (a dark core under shingled leaves). NOT YET TIMED on the phone.
-- WAITED FOR FROM THE OWNER: one table of SPEED TEST 5 (`?look=oil&bench=1`, label v10): its
+- THE SCRIPT (10 ms of the phone's frame) has no single large thing in it: three hundred draw
+  calls' bookkeeping, the physics' air, the world. For script time this machine is a fair
+  stand-in for the phone (9.2 ms here); the tools are `/home/user/.pc-scratch/look/pw/prof.mjs`,
+  `draws.mjs`, `walks.mjs` in the session that made them. One frame at a phone's size: 244 draw
+  calls, 900k triangles; the shadow pass is 55 of the calls and 323k of the triangles.
+- WAITED FOR FROM THE OWNER: one table of SPEED TEST 6 (`?look=oil&bench=1`, label v11): its
   rows split the far trees' cost (shadow pass or picture, drawn first or last) and time the two
   far trees in the same run; and their eye on `?look=oil&fartree=cards`. Then: either the leafy
   far tree becomes the phone's look (the owner's call), or the lump's real cost is found and cut.
