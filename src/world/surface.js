@@ -241,8 +241,13 @@ class Surface {
     // how far the main line is, with its side (true distance near it: the field over its slope)
     const raw = Math.abs(cf) * K;
     let a = raw;
+    // (the fields' slopes along the two tangent axes, kept for the current's direction: THE WATER FLOWS, the owner,
+    // 2026-11-16: "the rivers should be moving with the flow of the current same for the art of it". A river runs along
+    // its line, always the same way round; a side stream and a twig run along theirs TOWARD the river.)
+    let gu = 0, gv = 0, hu = 0, hv = 0, ku = 0, kv = 0, win = 0;
     if (raw < 190) {
       const c1 = this._sfO(x + ux * eR, y + uy * eR, z + uz * eR), c2 = this._sfO(x + vx * eR, y + vy * eR, z + vz * eR);
+      gu = (c1 - cf) / e; gv = (c2 - cf) / e;
       const g = Math.sqrt((c1 - cf) * (c1 - cf) + (c2 - cf) * (c2 - cf)) / e;
       const st = Math.abs(cf) / Math.max(g, 0.42 / K);
       a = st + (raw - st) * smoothstep(130, 190, raw);
@@ -250,13 +255,13 @@ class Surface {
     const sd = cf < 0 ? -a : a;
     let best = 1e9, bar = 0, deep = 0;
     // a channel `si` metres away, `k` times the nominal width, its valley `g` times as narrow
-    const lay = (si, k, g) => {
+    const lay = (si, k, g, who) => {
       const w = k * W;
       // (a narrow channel is the nominal one scaled down; a wide one keeps true metres at its edges, so its shore is as
       // even as the brook's: scaled, the shore's small wobble grew with the width and a pool's edge was a ragged fringe)
       let d = si < w ? (k <= 1 ? si / k : Math.max(0, si - (w - W))) : W + (si - w) * g;
       if (k < 0.3) d += (1 - smoothstep(0.02, 0.3, k)) * 260;
-      if (d < best) { best = d; bar = 0; if (si < w) deep = Math.min(1, Math.max(0, (k - 1) / 3)); }
+      if (d < best) { best = d; bar = 0; win = who || 0; if (si < w) deep = Math.min(1, Math.max(0, (k - 1) / 3)); }
     };
     // THE RIVER (second form, after the owner's two sheets of rivers from the air, 2026-11-16: one WIDE river in long
     // bends, far wider than what joins it; pale SAND BARS along it; arms round islands; tributaries that fork like a
@@ -277,7 +282,7 @@ class Surface {
       const barW = Math.max(0, Math.abs(ns) - 0.12) * 46 * near;
       if (barW > 0.5 && si > w && (u > 0) === (ns > 0)) {
         const out = si - w, d = W + Math.min(out, barW) * 0.2 + Math.max(0, out - barW);
-        if (d < best) { best = d; bar = (1 - smoothstep(barW * 0.75, barW, out)) * smoothstep(0, 1.2, out); }
+        if (d < best) { best = d; win = 0; bar = (1 - smoothstep(barW * 0.75, barW, out)) * smoothstep(0, 1.2, out); }
       } else lay(si, kM, 1);
       // a second arm keeps the line while the river is off it (an island), a third swings wide and comes back
       lay(Math.abs(sd + p2), 0.9 + 0.12 * kM, 1);
@@ -291,12 +296,13 @@ class Surface {
     const kT = 0.30 + 0.75 * (1 - smoothstep(30, 900, a));
     if (ts < 70) {
       const t1 = this._sf2(x + ux * eR, y + uy * eR, z + uz * eR), t2 = this._sf2(x + vx * eR, y + vy * eR, z + vz * eR);
+      hu = (t1 - t0) / e; hv = (t2 - t0) / e;
       const g2 = Math.sqrt((t1 - t0) * (t1 - t0) + (t2 - t0) * (t2 - t0)) / e;
       const tt = Math.abs(tf) / Math.max(g2, 0.42 / K2);
       ts = tt + (ts - tt) * smoothstep(45, 70, ts);
     }
     const parent = Math.min(a, ts);      // how far the nearest river or side stream is (before the twigs)
-    lay(ts, kT, 2.2);
+    lay(ts, kT, 2.2, 1);
     // Then their TWIGS: the lines of a third field, finer still, taken at a level that changes across every river and
     // every side stream, so each ends where it meets one; a twig is a metre or two across where it joins and gone within
     // a hundred metres of its parent.
@@ -305,13 +311,31 @@ class Surface {
       let qs = Math.abs(qf) * K3;
       if (qs < 45) {
         const q1 = this._sf3(x + ux * eR, y + uy * eR, z + uz * eR), q2 = this._sf3(x + vx * eR, y + vy * eR, z + vz * eR);
+        ku = (q1 - q0) / e; kv = (q2 - q0) / e;
         const g3 = Math.sqrt((q1 - q0) * (q1 - q0) + (q2 - q0) * (q2 - q0)) / e;
         const qt = Math.abs(qf) / Math.max(g3, 0.42 / K3);
         qs = qt + (qs - qt) * smoothstep(28, 45, qs);
-        lay(qs, 0.52 * (1 - smoothstep(12, 115, parent)), 3.0);
+        lay(qs, 0.52 * (1 - smoothstep(12, 115, parent)), 3.0, 2);
       }
     }
     c.pool = deep; c.bar = bar;
+    // the current where there is water or nearly (in the two tangent axes of this place, as patchgen hands it to the
+    // water's mesh): along the winning channel's own line
+    c.fu = 0; c.fv = 0;
+    if (best < W + 3) {
+      let du = win === 0 ? gu : win === 1 ? hu : ku, dv = win === 0 ? gv : win === 1 ? hv : kv;
+      if (win !== 0 && gu === 0 && gv === 0) {
+        const c1 = this._sfO(x + ux * eR, y + uy * eR, z + uz * eR), c2 = this._sfO(x + vx * eR, y + vy * eR, z + vz * eR);
+        gu = (c1 - cf) / e; gv = (c2 - cf) / e;
+      }
+      const dl = Math.hypot(du, dv);
+      if (dl > 1e-12) {
+        let fu = -dv / dl, fv = du / dl;
+        // (a tributary runs toward the river: the way along its line on which the river's field falls toward zero)
+        if (win !== 0 && (fu * gu + fv * gv) * (cf > 0 ? 1 : -1) > 0) { fu = -fu; fv = -fv; }
+        c.fu = fu; c.fv = fv;
+      }
+    }
     return best;
   }
 
@@ -876,6 +900,7 @@ class Surface {
     const top = this.biomeWeights(x, y, z, w);
     o.top = top;
     const c = this._ctx; c.x = x; c.y = y; c.z = z; c.baseReady = false;
+    c.fu = 0; c.fv = 0;
     const b = this._b;
     let h = 0;
     const gw = this._gw, gl = this._gl;
@@ -924,6 +949,8 @@ class Surface {
     }
     o.h = h;
     o.lq = lq;
+    // (the oil look's rivers: the current where there is water, in this place's two tangent axes: _riversOil)
+    o.fu = c.fu; o.fv = c.fv;
     if (full && this.clearings.length) {
       for (const cl of this.clearings) {
         const dx = x - cl.x, dy = y - cl.y, dz = z - cl.z;

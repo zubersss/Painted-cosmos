@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
-import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK } from './chunks.js';
+import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT } from './chunks.js';
 
 const FOG_VERT = /* glsl */`
 #ifdef PC_OIL
@@ -625,6 +625,9 @@ varying vec3 vView;
 varying float vDepth;
 varying vec4 vLiq;
 varying vec2 vLiqP;
+#ifdef PC_OIL
+varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
+#endif
 varying vec3 vWake;
 // PHYSICS' sea: the surface rises and falls with its wave trains and wakes (C14)
 #define PC_PHYS_NO_WAKE
@@ -658,6 +661,9 @@ void main() {
   vToCam = uCamLocal - p;
   vDepth = aDepth;
   vLiq = aLiq; vLiqP = aLiqP.xy;
+  #ifdef PC_OIL
+    vFlow = aLiqP.zw;
+  #endif
   vec4 mv = modelViewMatrix * vec4(p + pcRound(vBody), 1.0);
   vView = mv.xyz;
   gl_Position = projectionMatrix * mv;
@@ -685,6 +691,9 @@ varying vec3 vView;
 varying float vDepth;
 varying vec4 vLiq;
 varying vec2 vLiqP;
+#ifdef PC_OIL
+varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
+#endif
 varying vec3 vWake;
 #define PC_PHYS_NO_WAKE
 ${WATER_GLSL}
@@ -964,7 +973,31 @@ void main() {
     vec3 wr1, wr2; vec2 wds; float wown;
     // (long thin dashes, and the deep ones well deeper: short and all pale, a stream was a strip of pale flat patches,
     // "low-poly ice": the critic)
-    pcThinLayer(wch, wdx, wdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
+    // THE CURRENT (the owner, 2026-11-16: "the rivers should be moving with the flow of the current same for the art
+    // of it"). Where the water has a current its dashes are laid ALONG it and run WITH it: the chart is turned to the
+    // current's own direction about the middle of a patch some twenty-six metres across (patches with wavy bounds, each
+    // with its own dashes and its own pace, 0.9 to 1.4 m a second), and slid along it with the clock. Within a patch the
+    // direction is the pixel's own, so the dashes curve with a bend. Still water (a lake, the sea) is laid as before.
+    vec2 sch = wch, sdx = wdx, sdy = wdy;
+    if (vFlow.x + vFlow.y > 0.004) {
+      vec2 fl = vFlow * (255.0 / 127.0) - (128.0 / 127.0);
+      // (a current is a full-length arrow at every point of the mesh; where two that disagree are blended across a
+      // triangle, at a meeting of waters, the blend is short and turns from pixel to pixel: there the water is laid
+      // still, as an eddy is, or its dashes would be a stipple)
+      if (dot(fl, fl) > 0.56) {
+        vec3 upF = normalize(vBody);
+        vec3 Uf = normalize(abs(upF.y) < 0.9 ? vec3(-upF.z, 0.0, upF.x) : vec3(0.0, upF.z, -upF.y));
+        vec2 fc = pcGroundChartD(vBody, Uf * fl.x + cross(upF, Uf) * fl.y, uBodyR);
+        fc /= max(length(fc), 1e-6);
+        vec2 nc = vec2(-fc.y, fc.x);
+        vec2 cellF = floor(wch / 26.0 + 0.30 * vec2(sin(wch.y * 0.23), sin(wch.x * 0.19)) + 0.5);
+        vec2 relF = wch - cellF * 26.0;
+        float hf = fract(sin(dot(cellF, vec2(12.9898, 78.233))) * 43758.5453);
+        sch = vec2(dot(relF, fc) - uTime * (0.9 + 0.5 * hf) + hf * 173.0, dot(relF, nc) + hf * 91.0);
+        sdx = vec2(dot(wdx, fc), dot(wdx, nc)); sdy = vec2(dot(wdy, fc), dot(wdy, nc));
+      }
+    }
+    pcThinLayer(sch, sdx, sdy, woc.x, 11.0, vBody, 60.0, 4.0, wr1, wds, wown, wr2);
     // (water is deeper and bluer than the air over it: looking toward the sun a stream took the pale sky whole and a
     // wide share of its dashes were the sun's own, and the river was a pale gravel road through the grass: the stills
     // of 2026-11-16. Its body is half the water's own wash laid heavy and blue, whatever the sky gives it, and the sun's path is a narrow run of marks.)
@@ -1056,9 +1089,62 @@ varying float vAbove;     // metres above the plant's foot (the sun flecks on a 
 varying float vFog;
 #ifdef PC_OIL
 varying vec3 vMassO;      // the crown's mass normal in the plant's own space: which way a crown's chart is laid
-varying float vScaleO;    // the plant's size (its instance's scale): its own space times this is metres
 varying vec3 vRelO;       // the place measured from the eye, in the body's axes (its screen derivatives are exact)
-varying float vCardD;     // how far the eye is from the centre of the leaf this vertex belongs to (the same at all its corners)
+// A LEAF'S PAINT, ONCE A LEAF (2026-11-16; the owner's phone, its own speed test: with the plants in one flat colour it
+// drew 61 pictures a second, as set 26: the plants' paint, worked out for every pixel of every leaf, was 23 ms of a
+// 39 ms frame). A leaf is one flat piece of colour, lit or shaded WHOLE: everything about it is known at its centre.
+// So it is worked out here, in the vertex shader, the same at all the leaf's corners, and the fragment shader only
+// lays it (and the lantern's light over it, by night). The picture is the same.
+varying vec4 vLeafC;      // rgb the leaf's paint, toned to its light; a: how far the eye is from the leaf's centre (was vCardD)
+varying vec4 vLeafK;      // rgb the leaf's own colour before the light (for the lantern); a: the plant's size (was vScaleO)
+#define vCardD vLeafC.a
+#define vScaleO vLeafK.a
+uniform vec3 uSunDirW;
+uniform vec3 uGlaze;
+uniform vec3 uLight;
+uniform vec3 uUpW;
+uniform float uDayness;
+uniform float uMoon;
+uniform float uStorm;
+uniform vec4 uWx;
+uniform vec4 uOilA;
+uniform vec4 uOilB;
+uniform vec4 uOilD;
+uniform vec4 uOilG;
+uniform mat4 uShM;
+uniform highp sampler2D uShTex;
+uniform vec4 uShK;
+uniform vec3 uLeafA;
+uniform vec3 uLeafB;
+uniform vec3 uLeafC;
+uniform vec4 uLeafFam;
+uniform float uOilKind;
+uniform float uCanopy;
+${PAINT}
+// (chunks.js pcDabTint and pcWetWash, as they stand there)
+vec3 pcDabTintV(vec3 c, vec3 rnd, float leafy) {
+  c = pcDensity(c, 1.0 + (rnd.x - 0.5) * 1.1 * uOilB.z);
+  c *= mix(vec3(1.0), mix(vec3(1.10, 0.98, 0.80), vec3(0.88, 0.97, 1.10), rnd.y), 0.6 * uOilB.z);
+  float odd = fract(rnd.y * 17.3);
+  c *= mix(vec3(1.0), vec3(1.12, 0.66, 0.50), leafy * step(0.93, odd) * uOilB.z);
+  c *= mix(vec3(1.0), vec3(0.78, 1.06, 0.52), leafy * step(odd, 0.13) * uOilB.z);
+  return clamp(c, 0.0, 1.0);
+}
+vec3 pcWetWashV(vec3 c, float amt) {
+  return pcDensity(c * mix(vec3(1.0), vec3(0.95, 0.96, 0.99), uWx.y * amt), 1.0 + 0.62 * uWx.y * amt);
+}
+// (chunks.js pcSunAt: the shadow map inside its square. Outside it the fragment shader reads a pattern from the noise;
+// a leaf takes its own number in the pattern's place: the same share of leaves in the sun)
+float pcSunAtV(vec3 bodyPos, float canopy, float r) {
+  float pat = mix(step(mix(0.05, 0.585, canopy), r), 1.0 - 0.42 * canopy, uWx.x);
+  if (uShK.x >= 0.004) {
+    vec3 q = (uShM * vec4(bodyPos, 1.0)).xyz;
+    vec2 a = abs(q.xy);
+    float inside = (1.0 - smoothstep(uShK.w, 0.97, max(a.x, a.y))) * uShK.x;
+    if (inside >= 0.004) return mix(pat, step(q.z - uShK.y, textureLod(uShTex, q.xy * 0.5 + 0.5, 0.0).r), inside);
+  }
+  return pat;
+}
 uniform vec4 uLeafLod;    // the trees' leaves by distance (flora.js): x the distance within which every leaf is drawn (0: off), y the least share kept
 #endif
 
@@ -1194,6 +1280,45 @@ void main() {
     vScaleO = length(im[0].xyz);
     vCardB = vBody - (ir * cardO) * vis;       // (the leaf moves as one piece: its centre is this far from the vertex)
     vCardD = length(vCardB - uOrigin - uCamLocal);
+    vLeafC.rgb = vec3(0.0); vLeafK.rgb = vec3(0.0);
+    if (aData.y > 4.5) {
+      // (from what is the same at every corner of the leaf: its centre at rest, its numbers, its tree)
+      float hL = aData.w;
+      vec3 r3 = vec3(hL, fract(hL * 13.7), fract(hL * 5.1));
+      vec3 cB = (im * vec4(aCard * vis, 1.0)).xyz + uOrigin;
+      vec3 cV = (modelViewMatrix * vec4(cB - uOrigin + pcRound(io + uOrigin), 1.0)).xyz;
+      vec3 lA = uLeafA, lB = uLeafB, lC = uLeafC;
+      if (uLeafFam.a > 0.0) {
+        // (each tree its own colour: the same run as PROP_FRAG lays for the crowns)
+        float tf = fract(inst.z * 9.73 + 0.37);
+        float cF = tf < 0.4 ? tf * 0.5 : (tf < 0.8 ? 0.3 + (tf - 0.4) * 0.75 : 0.75 + (tf - 0.8) * 1.25);
+        float a0 = clamp(cF - 0.13, 0.0, 1.0), b0 = clamp(cF + 0.13, 0.0, 1.0);
+        vec3 pa = a0 < 0.5 ? mix(lA, lB, a0 * 2.0) : mix(lB, uLeafFam.rgb, a0 * 2.0 - 1.0);
+        vec3 pb = b0 < 0.5 ? mix(lA, lB, b0 * 2.0) : mix(lB, uLeafFam.rgb, b0 * 2.0 - 1.0);
+        vec3 lC0 = lC;
+        lA = mix(lA, pa, uLeafFam.a); lB = mix(lB, pb, uLeafFam.a);
+        lC = mix(lC0, mix(pb, lC0, 0.55) * vec3(0.92, 0.80, 0.84), uLeafFam.a);
+      }
+      float twigL = step(1.5, uOilKind);
+      float hueL = inst.x + (hL - 0.5) * 1.7;
+      vec3 cs = mix(lA, lB, clamp(0.5 + hueL * 0.5, 0.0, 1.0));
+      cs = mix(cs, lC, clamp(aData.z * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
+      cs = pcWetWashV(pcDabTintV(pcDensity(cs, 1.0 + inst.y * 0.4), r3, 1.0 - twigL), 0.7);
+      bool snowL = aData.y > 5.5;
+      if (snowL) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
+      vec3 mVL = normalize(normalMatrix * (ir * aMass));
+      vec3 sunVL = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+      float xl = (dot(mVL, sunVL) * 0.5 + 0.5) * (1.0 - aData.z * 0.35);
+      xl = max(xl, pow(max(dot(normalize(cV), sunVL), 0.0), 1.5) * (0.6 + 0.4 * r3.x) * (1.0 - twigL));
+      if (snowL) xl = max(xl, 0.58 + 0.2 * r3.y);
+      xl *= mix(0.50, 1.0, pcSunAtV(cB, inst.w * uCanopy * 0.4, r3.z));
+      xl += (r3.z - 0.5) * 0.25;
+      xl = max(xl, 0.30 + 0.15 * r3.x);
+      float lvL = pcLevel(xl, 0.03);
+      vec3 deepL = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
+      vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
+      vLeafK.rgb = cs;
+    }
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
   gl_Position = projectionMatrix * mv;
@@ -1250,10 +1375,12 @@ varying float vAbove;
 varying float vFog;
 #ifdef PC_OIL
 varying vec3 vMassO;
-varying float vScaleO;
 varying vec3 vRelO;
 varying vec3 vCardB;
-varying float vCardD;
+varying vec4 vLeafC;
+varying vec4 vLeafK;
+#define vCardD vLeafC.a
+#define vScaleO vLeafK.a
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -1358,27 +1485,10 @@ void main() {
   if (part > 4.5) {
     // ---- a leaf (florakit.js leafCards): one piece of flat colour, its outline the geometry's own; in the sun or in
     // the shade WHOLE (everything is asked at the leaf's centre), each leaf its own colour of the tree's three
+    // (worked out once a leaf, in the vertex shader: PROP_VERT, "a leaf's paint, once a leaf"; here only the lantern's
+    // light is laid over it, by night)
     float h = vData.w;
-    vec3 r3 = vec3(h, fract(h * 13.7), fract(h * 5.1));
-    float hue = vInst.x + (h - 0.5) * 1.7;
-    vec3 cs = mix(leafA, leafB, clamp(0.5 + hue * 0.5, 0.0, 1.0));
-    cs = mix(cs, leafC, clamp(vData.z * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
-    cs = pcWetWash(pcDabTint(pcDensity(cs, 1.0 + vInst.y * 0.4), r3, 1.0 - twigO), 0.7);
-    // (part 6: snow lying on a bough, florakit.js firGeometry: a pale piece of its own, in the colours of snow)
-    bool snowP = part > 5.5;
-    if (snowP) cs = mix(vec3(0.95, 0.97, 1.0), vec3(0.80, 0.87, 0.98), r3.x * 0.7);
-    vec3 mV = normalize(vMassV);
-    float xs_ = (dot(mV, sunV) * 0.5 + 0.5) * (1.0 - vData.z * 0.35);
-    // (the sun behind a crown comes through its leaves: those glow; not through twigs, and snow takes the sky's light)
-    xs_ = max(xs_, pow(max(dot(-V, sunV), 0.0), 1.5) * (0.6 + 0.4 * r3.x) * (1.0 - twigO));
-    if (snowP) xs_ = max(xs_, 0.58 + 0.2 * r3.y);
-    xs_ *= mix(0.50, 1.0, pcSunAt(vCardB, canopy * 0.4, 8.0 - vAbove, 0.3));
-    xs_ += (r3.z - 0.5) * 0.25;
-    xs_ = max(xs_, 0.30 + 0.15 * r3.x);
-    float lvl = pcLevel(xs_, 0.03);
-    // (a leaf's shade is its own colour laid heavier with half the cool key over it, never the key's mud)
-    vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
-    c = pcLamp(mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl)), cs, vCardB, r3.y);
+    c = pcLamp(vLeafC.rgb, vLeafK.rgb, vCardB, fract(h * 13.7));
     wet = 0.0;
     id = 4.0 + fract(seed * 7.0 + h * 0.37) * 0.9;
   } else if (part < 1.5) {
