@@ -289,6 +289,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     standing instructions, which makes the wind knife (item 42, f) the next work. NOT a word to
     merge the powers (item 42: "I'll say when").
 
+45. **Both speed tables (v9) from the phone; "let's just keep working on refining the performance
+    and the wind" (2026-11-17).** The two tables and their reading are in the log. In short: with
+    the lumps the far trees are half the phone's frame (44 ms, 23 without them), but NOT through
+    the paint in their own pixels (flat, they cost the same): the build machine was wrong about
+    why. The experimental far tree (`?fartree=cards`) ran at 36.5 a second against 22.5. The
+    speed test's finer rows cannot be trusted as they are (the screen's 8.3 ms beat, heat,
+    shaders rebuilt while a row is timed). Standing instruction: KEEP REFINING THE PERFORMANCE
+    AND THE WIND. Still no word to merge the powers.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
