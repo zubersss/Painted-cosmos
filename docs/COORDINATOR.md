@@ -1977,3 +1977,13 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - This merge is NOT the powers (which the owner forbade to merge while away): it is the undoing of a fault in what was already live.
 - For the owner: a page that shows an older version name than expected must now be loaded again by hand (close the tab, open it again); the game no longer does that by itself.
 
+### 2026-11-17 OWNER (while away): the third speed table from the phone on v8.1 and a play recording; "it looks better now and runs better but could still use alot of work"
+- OWNER (verbatim): "Here is the test and a Playtest it looks better now and runs better but could still use alot of work".
+- THE TABLE ("SPEED TEST 3, v8.1 (17 Nov)"; Adreno 740; reversed-z; sun out; 1028 x 480; tier 1; no smoothing; the lighter paint; script 10.1 ms, 288 draw calls, 823,000 triangles a frame): as set 25.1 a second (40 ms); the full paint 23.2; ground one flat colour 23.6; PLANTS ONE FLAT COLOUR 58.1 (17 ms); NO TREES 84.7 (12 ms); then slower and slower (51, 52, 46, 51, 45, 50 ms; half size 31; low tier 54); AS SET ONCE MORE, AT THE END: 14.4 a second (69 ms).
+- THE RECORDING (v8.1 on the phone's own settings, 11.7 s): 23 pictures a second on average. The picture is sharp now, the wood stands whole to the haze, the river is there.
+- READ, plainly:
+  1. THE LEAF CHANGE OF v8 BOUGHT NOTHING ON THE PHONE: 25.6 a second before it, 25.1 after; the plants in one flat colour 61 before, 58 after. A leaf's paint per pixel was not the cost. I said beforehand that I could not tell how much of the 23 ms was leaves; it was close to none. What is left in "the plants' paint" is the BARK of the near trunks and the CROWNS OF THE FAR TREES (at the phone's settings a tree is a far tree from 57 m: nearly all of the wood in view), each painted in two layers of strokes for every pixel, tree behind tree. That is the next cut, and this time it is to be MEASURED HERE FIRST (the same view with the far trees hidden, with the near trees hidden, timed in software), before anything is built.
+  2. THE PHONE SLOWS AS IT WARMS, HARD: the same row took 40 ms at the start and 69 ms fifty seconds later. What the owner plays at is the warm speed, not the first row. The load has to come down far enough that the phone does not heat: this matters more than any single row.
+  3. Seen in the recording, to be worked on: dark round blots on the shaded ground (the near ground's fallen leaves and stones, laid nearly black in shade: they read as holes); the lit floor is one loud lemon yellow; the far trees are pale lumps.
+- ORDER: the owner's standing instruction of the same day (the powers, wind) goes on first, as told; the phone's speed and these faults of the look are next after it.
+
