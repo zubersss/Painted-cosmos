@@ -8,16 +8,17 @@
 //   casts or holds the chosen ability by adding a shape of moving air to the list (physics/powers.js),
 //   and ages the list. The physics takes the list from sim (f.winds) and everything that reads the air answers.
 // Nothing here draws, and nothing here moves a leaf: the world's own systems do.
-import { makeWinds, castGust, castZone, castOrb, castVortex, moveWind, releaseWind, stepWinds } from '../physics/powers.js';
+import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
 
-// The abilities of wind, in the order of the keys 1 .. 5 and of the touch fan. hold: it lasts while the hand is down.
+// The abilities of wind, in the order of the keys 1 .. 6 and of the touch fan. hold: it lasts while the hand is down.
 export const ABILITIES = Object.freeze([
   { id: 'gust', word: 'gust', hold: false },
   { id: 'gather', word: 'gather', hold: true },
   { id: 'quicken', word: 'quicken', hold: false },
   { id: 'still', word: 'still', hold: false },
   { id: 'whirl', word: 'whirl', hold: false },
+  { id: 'part', word: 'part', hold: true },
 ]);
 
 export const POWERS = Object.freeze({
@@ -42,6 +43,7 @@ export class Powers {
     this._was = false;
     this._wait = 0;
     this.orb = null;            // the gathered ball, while held
+    this.part = null;           // the parted channel (move water), while held
     this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, from: { x: 0, y: 0, z: 0 } };
     this.casts = 0;             // how many casts so far (for tests and the read-out)
     this.note = '';             // one word for the HUD when something cannot be done here
@@ -50,7 +52,7 @@ export class Powers {
     this.onCast = null;         // called with the ability's id when one is cast (the sound)
   }
 
-  pick(i) { if (i >= 0 && i < ABILITIES.length && i !== this.ability) { this._drop(); this.ability = i; } }
+  pick(i) { if (i >= 0 && i < ABILITIES.length && i !== this.ability) { this._drop(); this._close(); this.ability = i; } }
   next() { this.pick((this.ability + 1) % ABILITIES.length); }
 
   // the gathered ball is let go where it is (thrown along the aim if it holds anything worth throwing)
@@ -60,6 +62,12 @@ export class Powers {
     releaseWind(o);
     if (sim && this.aim.ok) castGust(this.winds, sim.bodyId, { x: o.px, y: o.py, z: o.pz }, this.aim.fwd, 0.8);
   }
+
+  // the parted channel is let go: it closes from its far end inward (physics/powers.js stepWinds)
+  _close() { if (this.part) { releaseWind(this.part); this.part = null; } }
+  // Is the water parted at the place d (a unit vector from the body's centre) where its face is at radius r?
+  // (sim.js asks, for the explorer's ground: on the channel's floor there is no water to wade or swim in)
+  dry(bodyId, d, r) { return this.winds.count > 0 && partedAt(this.winds, bodyId, d.x * r, d.y * r, d.z * r) > 0.5; }
 
   // Where the power acts: from the explorer along the view, level, and as far out as the view looks down.
   _aim(sim) {
@@ -93,7 +101,7 @@ export class Powers {
     this._was = down;
     if (this._wait > 0) this._wait -= dt;
     if (sim.ex && sim.ex.casting > 0) sim.ex.casting = Math.max(0, sim.ex.casting - dt / POWERS.castPose);
-    if (this.active && (down || this.orb)) {
+    if (this.active && (down || this.orb || this.part)) {
       const A = this._aim(sim), ab = ABILITIES[this.ability];
       if (A.ok) {
         if (ab.id === 'gather') {
@@ -104,6 +112,10 @@ export class Powers {
             const dx = to.x - o.px, dy = to.y - o.py, dz = to.z - o.pz, l = Math.hypot(dx, dy, dz), m = Math.min(1, POWERS.orbSpeed * dt / (l || 1));
             moveWind(o, { x: o.px + dx * m, y: o.py + dy * m, z: o.pz + dz * m });
           }
+        } else if (ab.id === 'part') {
+          // the channel begins just behind the explorer and lies along the aim: it goes where they go and look
+          if (pressed && !this.part) { this.part = castPart(W, sim.bodyId, this._orbAt(sim, -WINDPOWER.partBack), A.fwd); this._cast(sim); }
+          if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); }
         } else if (pressed && this._wait <= 0) {
           if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd);
           else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken');
@@ -115,6 +127,7 @@ export class Powers {
       }
     }
     if (this.orb && (released || !this.active)) this._drop(this.active ? sim : null);
+    if (this.part && (released || !this.active)) this._close();
     if (W.count > 0) stepWinds(W, dt);
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }

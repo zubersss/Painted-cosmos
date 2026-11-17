@@ -70,7 +70,27 @@ test('only on foot; never more than the limit; five abilities in the order of th
   const sim = fakeSim();
   for (let k = 0; k < 20; k++) { p.down = false; step(p, sim, 20); p.down = true; step(p, sim, 2); }
   assert.ok(p.winds.count <= WINDPOWER.max);
-  assert.deepEqual(ABILITIES.map((a) => a.id), ['gust', 'gather', 'quicken', 'still', 'whirl']);
+  assert.deepEqual(ABILITIES.map((a) => a.id), ['gust', 'gather', 'quicken', 'still', 'whirl', 'part']);
+});
+
+test('part water: held, a channel goes with the explorer along the view and its floor is dry; let go, it closes', () => {
+  const p = new Powers(), sim = fakeSim();
+  p.pick(5); p.down = true; step(p, sim, 60);
+  assert.ok(p.part && p.winds.count === 1 && p.winds[0].kind === KIND.part, 'one channel, held');
+  assert.equal(p.part.len, WINDPOWER.partReach, 'run out to its full length in a second');
+  assert.ok(Math.abs(p.part.pz + WINDPOWER.partBack) < 1e-6 && Math.abs(p.part.dz - 1) < 1e-6, 'it begins just behind the explorer and lies along the view');
+  const at = (x, z) => { const l = Math.hypot(x, R, z); return p.dry('earth', { x: x / l, y: R / l, z: z / l }, l); };
+  assert.ok(at(0, 5), 'dry 5 m ahead'); assert.ok(at(0, 0), 'dry under the explorer');
+  assert.ok(!at(4, 5), 'water 4 m to the side'); assert.ok(!at(0, 20), 'and beyond its reach');
+  // it follows the explorer and the view
+  sim.ex.p = { x: 10, y: R, z: 0 }; sim.footCam.viewFwd = { x: 1, y: 0, z: 0 }; step(p, sim, 2);
+  assert.ok(Math.abs(p.part.dx - 1) < 1e-3 && Math.abs(p.part.px - (10 - WINDPOWER.partBack)) < 0.02, 'moved and turned with them');
+  assert.ok(at(15, 0) && !at(0, 5), 'the dry floor is where they look now');
+  // let go: it closes; another ability chosen while held closes it too
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.part, null); assert.equal(p.winds.count, 1, 'still closing');
+  step(p, sim, 60 * 2); assert.equal(p.winds.count, 0, 'closed and gone'); assert.ok(!at(15, 0));
+  p.down = true; step(p, sim, 10); assert.ok(p.part); p.pick(0); assert.equal(p.part, null, 'choosing another ability lets it go');
 });
 
 test('without ?powers=1 nothing of the powers is loaded: main.js imports them only behind the flag', () => {

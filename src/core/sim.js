@@ -1055,7 +1055,11 @@ export class Sim {
     let env = this._envs[bodyId];
     if (!env) {
       // The explorer's ground: the world's, with low boulders as rises to walk over.
-      env = { sample: scrambleSample(this.sampler(bodyId), () => this.nearObstacles), gravity: BODIES[bodyId].gravity };
+      const ground = scrambleSample(this.sampler(bodyId), () => this.nearObstacles);
+      // (the powers, move water: on the floor of a parted channel there is no water to wade or swim in. Without the
+      // powers this is one comparison a sample.)
+      const sample = (d) => { const g = ground(d), pw = this.powers; return pw && g && g.liquidRadius > g.radius && pw.dry(bodyId, d, g.liquidRadius) ? { ...g, liquidRadius: 0 } : g; };
+      env = { sample, gravity: BODIES[bodyId].gravity };
       if (this.physics) {
         this.physics.bindEnv(bodyId, env);
         env.bodyStep = this.physics.explorer.step;
