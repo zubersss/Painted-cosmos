@@ -137,9 +137,12 @@ breaking the physics among real dust devils; both are mended and held by tests. 
 the button, on its left, 32 px apart and clear of the jump button under it (on an arc the top
 words lay over each other).
 
-**What is not built.** A lasting sound; a word on the screen when an ability can do nothing
-here; the choice of element (there is only wind). A stilled place has nothing of its own to see:
-it shows only in what stops moving.
+A stilled place is seen to fall still: for its first second strokes stand round its rim, drift in
+a little, sink and are gone. And when an ability can do nothing here the screen says so beside
+its name for a moment: "no tree in reach" (the knife), "no water here" (the channel, which is
+then only a wind along the ground).
+
+**What is not built.** A lasting sound; the choice of element (there is only wind).
 
 ## Move water and the wind knife: the plans and their cost
 
