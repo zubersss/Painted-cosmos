@@ -250,6 +250,17 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     the OLD version: the site had not been renewed; the log has the proof.) So: the cost is cut
     where the picture does not change, the water's strokes lie along the current and move with
     it.
+40. **The phone is the main target (2026-11-17).** "i agree about the phone": the Samsung Galaxy
+    S23 Ultra sets the look and the speed; the computer (a Lenovo, a basic built-in chip) follows
+    with cheaper settings. This REPLACES item 17.
+41. **Pull requests opened and merged by the session (2026-11-17).** "also start doing the pull
+    request and merge on auto when you need it". A standing permission given in that session:
+    when a version is ready to be tried on the owner's machines, the session opens the pull
+    request into `main` and merges it itself. The gate it keeps before doing so is in the log
+    (the default game unchanged by pictures, the three test suites, the default game's page
+    booting; the full check straight after; undo at once if it fails). A LATER SESSION asks the
+    owner once whether this still stands (`CLAUDE.md` says "only when the owner asks in that
+    session", and was not changed). This amends item 7.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
