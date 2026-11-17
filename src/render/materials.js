@@ -1144,6 +1144,13 @@ uniform vec3 uLeafC;
 uniform vec4 uLeafFam;
 uniform float uOilKind;
 uniform float uCanopy;
+#ifdef PC_FAR
+  uniform vec3 uFarA[8];
+  uniform vec3 uFarB[8];
+  uniform vec3 uFarC[8];
+  uniform vec4 uFarFam[8];
+  uniform float uFarKind[8];
+#endif
 ${PAINT}
 // (chunks.js pcDabTint and pcWetWash, as they stand there)
 vec3 pcDabTintV(vec3 c, vec3 rnd, float leafy) {
@@ -1222,6 +1229,7 @@ void main() {
     // with the highest numbers, and each kept leaf is larger by as much as keeps the crown as full. A leaf at the edge of
     // the share shrinks into its own centre over a few metres, so none appears or goes in one frame.
     vec3 cardO = position - aCard;
+    vec3 cardC = aCard;       // (the leaf's centre in the plant's own space; a far tree's is moved by its taper, below)
     if (uLeafLod.x > 0.0 && aData.y > 4.5 && aData.y < 6.5) {
       float keep = clamp(pow(uLeafLod.x / max(di, 0.01), 1.2), uLeafLod.y, 1.0);
       float e = (1.0 - keep) * 1.06 - 0.03;
@@ -1233,7 +1241,14 @@ void main() {
     vSpecies = aInst2.x;
     int fsi = int(aInst2.x + 0.5);
     float crown = step(0.5, aData.y);
+    #ifdef PC_OIL
+      // (a far tree of flat pieces, florakit.js farCardGeometry: each corner is drawn in toward the stem by the taper at
+      // its own height in the crown, 0.30 to 1.02 of the tree; the piece's paint is taken at its tapered centre)
+      if (aData.y > 4.5) { float tk = uFarTaper[fsi]; cardC.xz *= 1.0 - tk * clamp((aCard.y - 0.30) / 0.72, 0.0, 1.0); lp.xz *= 1.0 - tk * clamp((position.y - 0.30) / 0.72, 0.0, 1.0); }
+      else lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;
+    #else
     lp.xz *= 1.0 - uFarTaper[fsi] * uv.y * crown;                 // pines, spires: taper to a point
+    #endif
     // rock-like kinds have no trunk: the form stands on the ground
     // (the last fixes, the second blind player on Saturn: that form was the crown's blob set down on its lowest point, a
     // spindle standing on its tip, and far off, where the tip was lost in the haze, Saturn's spires and the crystals hung
@@ -1309,21 +1324,25 @@ void main() {
       // (from what is the same at every corner of the leaf: its centre at rest, its numbers, its tree)
       float hL = aData.w;
       vec3 r3 = vec3(hL, fract(hL * 13.7), fract(hL * 5.1));
-      vec3 cB = (im * vec4(aCard * vis, 1.0)).xyz + uOrigin;
+      vec3 cB = (im * vec4(cardC * vis, 1.0)).xyz + uOrigin;
       vec3 cV = (modelViewMatrix * vec4(cB - uOrigin + pcRound(io + uOrigin), 1.0)).xyz;
-      vec3 lA = uLeafA, lB = uLeafB, lC = uLeafC;
-      if (uLeafFam.a > 0.0) {
+      vec3 lA = uLeafA, lB = uLeafB, lC = uLeafC; vec4 famL = uLeafFam; float kindL = uOilKind;
+      #ifdef PC_FAR
+        // (far trees of every kind share one mesh: the kind's own washes, as PROP_FRAG takes them)
+        lA = uFarA[fsi]; lB = uFarB[fsi]; lC = uFarC[fsi]; famL = uFarFam[fsi]; kindL = uFarKind[fsi];
+      #endif
+      if (famL.a > 0.0) {
         // (each tree its own colour: the same run as PROP_FRAG lays for the crowns)
         float tf = fract(inst.z * 9.73 + 0.37);
         float cF = tf < 0.4 ? tf * 0.5 : (tf < 0.8 ? 0.3 + (tf - 0.4) * 0.75 : 0.75 + (tf - 0.8) * 1.25);
         float a0 = clamp(cF - 0.13, 0.0, 1.0), b0 = clamp(cF + 0.13, 0.0, 1.0);
-        vec3 pa = a0 < 0.5 ? mix(lA, lB, a0 * 2.0) : mix(lB, uLeafFam.rgb, a0 * 2.0 - 1.0);
-        vec3 pb = b0 < 0.5 ? mix(lA, lB, b0 * 2.0) : mix(lB, uLeafFam.rgb, b0 * 2.0 - 1.0);
+        vec3 pa = a0 < 0.5 ? mix(lA, lB, a0 * 2.0) : mix(lB, famL.rgb, a0 * 2.0 - 1.0);
+        vec3 pb = b0 < 0.5 ? mix(lA, lB, b0 * 2.0) : mix(lB, famL.rgb, b0 * 2.0 - 1.0);
         vec3 lC0 = lC;
-        lA = mix(lA, pa, uLeafFam.a); lB = mix(lB, pb, uLeafFam.a);
-        lC = mix(lC0, mix(pb, lC0, 0.55) * vec3(0.92, 0.80, 0.84), uLeafFam.a);
+        lA = mix(lA, pa, famL.a); lB = mix(lB, pb, famL.a);
+        lC = mix(lC0, mix(pb, lC0, 0.55) * vec3(0.92, 0.80, 0.84), famL.a);
       }
-      float twigL = step(1.5, uOilKind);
+      float twigL = step(1.5, kindL);
       float hueL = inst.x + (hL - 0.5) * 1.7;
       vec3 cs = mix(lA, lB, clamp(0.5 + hueL * 0.5, 0.0, 1.0));
       cs = mix(cs, lC, clamp(aData.z * 0.55 + (r3.y - 0.5) * 0.6, 0.0, 1.0));
@@ -1418,7 +1437,12 @@ void main() {
   #ifdef PC_OIL
     // (the lighter paint: no noise for a plant's wash; and the speed test's flat plants, shared.js uOilL.y)
     vec4 n1 = uOilL.x > 0.5 ? vec4(0.5) : texture(uNoise3D, vBody / 9.0);
+    // (uOilL.y 2: every plant one flat colour; 3: only the far trees, to tell their paint from their shapes)
+    #ifdef PC_FAR
     if (uOilL.y > 1.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    #else
+    if (uOilL.y > 1.5 && uOilL.y < 2.5) { pcWrite(vData.y > 4.5 ? uLeafA * 0.7 : uBarkB, 0.0, nV, -vView.z, 3.0); return; }
+    #endif
   #else
     vec4 n1 = texture(uNoise3D, vBody / 9.0);
   #endif

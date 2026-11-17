@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
-import { FLORA_PHYS, TALL_KITS, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
+import { FLORA_PHYS, TALL_KITS, farCardGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
@@ -25,6 +25,9 @@ const UNDER_FAR = 110, GRASS_NEAR = 15;                  // (60 under the budget
 const RELIEF = 250;            // (R1 W2.3) metres the ground in an undergrowth cell's reach may stand above the ground under the eye
 // (?trees=full: the oil look's trees as they were before their detail followed the screen, for comparisons)
 const TREES_FULL = typeof location !== 'undefined' && /[?&]trees=full\b/.test(location.search || '');
+// (?fartree=cards: AN EXPERIMENT for the speed test. The oil look's far trees built of flat pieces painted once a piece,
+// florakit.js farCardGeometry, in place of the lump painted for every pixel. Cheaper and plainer; off unless asked for.)
+const FAR_CARDS = typeof location !== 'undefined' && /[?&]fartree=cards\b/.test(location.search || '');
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
@@ -90,7 +93,9 @@ export class Flora {
       // (the oil look: a tree's leaves in the order of their numbers, so that far off only a share of them is drawn:
       // florakit.js sortLeafCards)
       const lf = LOOK.oil ? sortLeafCards : (g) => g;
-      return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer' };
+      return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer',
+        // (far off it is drawn as leaf cards, not as a lump: the trees in leaf of the oil look; ?fartree=lump: as it was)
+        cardFar: LOOK.oil && FAR_CARDS && (sp.kit === 'broadleaf' || sp.kit === 'conifer') };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
@@ -104,6 +109,8 @@ export class Flora {
     for (const k of ['far', 'bush', 'rock']) if (this.mats[k]) this.mats[k].userData.pcCasts = true;
     this.kit = {
       far: farTreeGeometry(5),
+      // (the oil look's far tree for the kinds that are trees in leaf: a stem and leaf cards, florakit.js)
+      farCards: LOOK.oil && FAR_CARDS ? farCardGeometry(6) : null,
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
@@ -250,7 +257,7 @@ export class Flora {
       _m.compose(_p.sub(chunk.origin), _q, _s.set(girth, sc, girth));
       _m.toArray(chunk.mat, i * 16);
       chunk.rel[i * 3] = _p.x; chunk.rel[i * 3 + 1] = _p.y; chunk.rel[i * 3 + 2] = _p.z;
-      if (chunk.kind === 'far') add('2', i, this.kit.far, this.mats.far, true);
+      if (chunk.kind === 'far') { const cf = this.species[d[o + 5]] && this.species[d[o + 5]].cardFar; add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true); }
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
         add('0:' + kind + ':' + v, i, sp.geo0[v], sp.mat);
