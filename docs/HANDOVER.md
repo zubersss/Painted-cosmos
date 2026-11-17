@@ -338,25 +338,26 @@ far tree behind `?fartree=cards`. `look-proto` equals `main`.
   built, how it is seen and heard, what is not built; the plans and costs for "move water" and
   "wind knife"), then the log's sections of 2026-11-17 on the powers ("CHOICES MADE FOR THE
   OWNER", fourteen of them: the owner has not yet read or answered them).
-- BUILT AND SEEN IN STILLS: a. gust, b. gather and carry, c. wind control (quicken; still),
-  d. tornado ("whirl"), and e. MOVE WATER in its simplest version (ability six, "part": hold
-  and the water parts along the way the explorer looks; they walk the bed). f. THE WIND KNIFE
-  IS A PLAN WITH ITS COST ONLY (the owner: "It's fine if e and f are only plans when I get
-  back").
-- `powers` holds `main` at v9 (merged in). THE FULL CHECK passed at 1ef4bc6 (a to d) and at
-  0af0a8f (with move water and v9). After that TWO REAL FAULTS were found by pressing the
-  touch button with real touch events and mended (62578d7: the button did not answer a finger;
-  a whirl broke the physics among real dust devils), and THE FULL CHECK PASSED AGAIN ON THE
-  HEAD, 7c6829e (17 of 17). Nothing of the powers is waiting on a check.
-- THE LESSON OF THOSE TWO FAULTS: stills made by calling the powers' code prove the picture,
-  not the hand. Anything the owner will touch must be pressed here with real touch events
-  first: `/home/user/.pc-scratch/look/pw/touchshot.mjs` in the session that made it (a browser
-  with a touch screen, 823 x 384; `QUERY='stub=render,world,art&powers=1...'` opens in six
-  seconds for the mechanics, the painted page in four minutes for the picture).
+- BUILT AND SEEN IN STILLS, ALL SIX OF THE OWNER'S LIST: a. gust, b. gather and carry, c. wind
+  control (quicken; still), d. tornado ("whirl"), e. move water ("part": hold and the water
+  parts along the way the explorer looks; they walk the bed), f. the wind knife ("knife": the
+  first tree along the aim is cut, falls to its own side and stays felled, also in the saved
+  game). Seven abilities on keys 1 to 7 and on the touch fan (a column of words beside the
+  button). A ring on the ground shows where a power will act before it is cast.
+- `powers` holds `main` at v10 (merged in, aa23fbb). THE FULL CHECK PASSES ON aa23fbb (17 of
+  17) and, without the flag, the branch draws what `main` draws (0 pixels differ in nine
+  scenes). IT IS READY TO MERGE THE MOMENT THE OWNER SAYS SO; they have not (asked three times:
+  each time they said to keep working).
+- THE LESSON OF TWO FAULTS FOUND LATE (a dead touch button; a whirl breaking the physics among
+  real dust devils): stills made by calling the powers' code prove the picture, not the hand.
+  Anything the owner will touch is pressed here with real touch events first:
+  `/home/user/.pc-scratch/look/pw/touchshot.mjs` in the session that made it (a browser with a
+  touch screen, 823 x 384; `QUERY='stub=render,world,art&powers=1...'` opens in six seconds for
+  the mechanics, the painted page in four minutes for the picture).
 - What exists there: `src/physics/powers.js` (the explorer's wind as a short list of shapes: a
   jet, a zone, an orb, a vortex) taken by the air at a point, the plants' field, the loose things
   and the rain and snow through the door the dust devils use; `src/core/powers.js` (the hands,
-  the aim, six abilities: gust, gather, quicken, still, whirl, part; a sound for each cast);
+  the aim, seven abilities: gust, gather, quicken, still, whirl, part, knife; a sound for each cast);
   `src/ui/powers.js` (the touch button and its fan); the explorer's cast gesture; the wind drawn
   as white strokes of air (`src/physics/three/expand.js`, option `wisp`; `src/physics/loose.js`
   `_wisps`); tests `src/physics/powers.test.mjs` (12), `src/physics/kits.test.mjs` (one for the
