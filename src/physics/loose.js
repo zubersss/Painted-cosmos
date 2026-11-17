@@ -178,6 +178,7 @@ const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
 const _wl = {};
 const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
+const I_ICE = MATERIAL_INDEX.ice != null ? MATERIAL_INDEX.ice : MATERIAL_INDEX.snow;      // (the wisps of the explorer's wind: powers.js)
 
 export class Loose {
   constructor(particles) {
@@ -824,10 +825,13 @@ export class Loose {
     const rng = this.rng, P = this.P, Rr = PARTICLES.radius, W = WINDPOWER, cov = _covL;
     for (let k = 0; k < winds.count; k++) {
       const s = winds[k];
-      if (!s.placed || !(s.strength > 0.05) || s.kind === KIND.zone) continue;
+      if (!s.placed || !(s.strength > 0.05)) continue;
       if (Math.abs(s.x - fx) > Rr + 40 || Math.abs(s.z - fz) > Rr + 40) continue;
+      if (s.kind === KIND.zone) { this._wisps(s, h, near, fx, fz, groundY, Rr); continue; }
       const rate = s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex;
       s.carry += rate * s.strength * h;
+      // the air itself, as pale strokes riding it (WINDPOWER.wisp*)
+      this._wisps(s, h, near, fx, fz, groundY, Rr);
       let guard = 64;
       while (s.carry >= 1 && guard-- > 0) {
         s.carry -= 1;
@@ -863,6 +867,45 @@ export class Loose {
         if (gp.repose > 0 && q < 0.5) { this.emit('sand', x, gy + 0.02, z, ve, vu, vn, 1, 0.8, gp.mat); continue; }
         if (q < gp.dust + 0.12) this.emit('dust', x, gy + 0.05 + rng() * 0.3, z, ve, vu, vn, gp.dust > 0.1 ? 1.3 : 0.8, gp.dust > 0.1 ? 1.1 : 0.5, gp.mat);
       }
+    }
+  }
+
+  // Pale strokes of air for one source: grains of the leaf kind (light, tumbling, carried by the air they are in), in
+  // the ground-material colours of snow and ice, a second or two of life. They are what is seen of a gust over ground
+  // with nothing loose on it, of a gathered ball, and of a whirl's column.
+  _wisps(s, h, near, fx, fz, groundY, Rr) {
+    const rng = this.rng, W = WINDPOWER;
+    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : (s.gain > 1 ? W.wispZone : 0);
+    if (!(rate > 0)) return;
+    s.wisp = (s.wisp || 0) + rate * s.strength * h;
+    let guard = 48;
+    while (s.wisp >= 1 && guard-- > 0) {
+      s.wisp -= 1;
+      let x, z, y, ve, vn, vu, life = 0.14, size = 4.0;
+      if (s.kind === KIND.jet) {
+        const f = Math.min(s.front * s.age, s.reach);
+        if (s.age * s.front > s.reach + s.pulse) { s.wisp = 0; break; }
+        const a = f - rng() * s.pulse, w = s.radius + s.spread * (a > 0 ? a : 0), c = (rng() * 2 - 1) * w;
+        if (a < 0.3) continue;
+        x = s.x + s.de * a - s.dn * c; z = s.z + s.dn * a + s.de * c; y = 0.25 + rng() * 2.0;
+        const U = s.speed * s.strength / (1 + 1.2 * a / s.reach);
+        ve = s.de * U * 0.85; vn = s.dn * U * 0.85; vu = 0.6 * rng();
+      } else if (s.kind === KIND.orb) {
+        const R = 1.2 + rng() * 4.5, a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.3 + rng() * 2.4;
+        ve = -Math.sin(a) * 4; vn = Math.cos(a) * 4; vu = 0; life = 0.3; size = 3.0;
+      } else if (s.kind === KIND.vortex) {
+        const R = s.radius * (0.45 + 1.0 * rng()), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.2 + rng() * rng() * 9;
+        ve = -Math.sin(a) * s.speed * s.spin * 0.7; vn = Math.cos(a) * s.speed * s.spin * 0.7; vu = s.up * 0.6; life = 0.34; size = 4.0;
+      } else {
+        const R = s.radius * Math.sqrt(rng()), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.4 + rng() * 4;
+        ve = s.de * s.push; vn = s.dn * s.push; vu = 0; life = 0.22; size = 3.0;
+      }
+      if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+      const gy = near ? near.heightAt(x, z, groundY) : groundY;
+      if (!this.emit('leaves', x, gy + y, z, ve, vu, vn, size, life * (0.7 + 0.6 * rng()), rng() < 0.7 ? I_SNOW : I_ICE)) { s.wisp = 0; break; }
     }
   }
 

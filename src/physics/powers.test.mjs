@@ -152,6 +152,24 @@ test('a gust lifts what lies loose and carries it along the aim: dust off dry gr
   }
 });
 
+test('the air is seen: over ground with nothing loose on it a gust still carries pale strokes, and they are gone in seconds', () => {
+  const w = setup('mercury', 'obsidian_fields'), S = makeWinds();
+  const E = setup('earth', 'alpine_meadow');
+  for (const x of [E]) {
+    run(x, 2, S);
+    const { n } = axes(x), b = x.physics.particles.leaves, n0 = b._n;
+    castGust(S, x.bodyId, add(x.focus, n, 1), n);
+    let most = 0;
+    run(x, 0.8, S, () => { most = Math.max(most, b._n); });
+    assert.ok(most > n0 + 60, 'strokes of air in the gust: ' + (most - n0));
+    let pale = 0; for (let i = 0; i < b._n; i++) if (b.mat[i] < 200) pale++;
+    assert.ok(pale > 50, 'in the colours of snow and ice, not of leaves: ' + pale);
+    run(x, 5, S);
+    assert.ok(b._n < n0 + 12, 'and gone again: ' + b._n + ' (there were ' + n0 + ')');
+  }
+  void w;
+});
+
 test('gather: the leaves of a wood floor are drawn into the ball and held round it, and go where it is carried', () => {
   const w = setup('earth', 'autumn_woodland'), S = makeWinds();
   run(w, 2, S);
