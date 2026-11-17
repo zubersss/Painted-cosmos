@@ -590,6 +590,16 @@ export function createExplorer() {
         ease(b.scarf, 'x', 0.05 + 0.05 * Math.sin(t * 9.1), go); ease(b.scarf, 'z', 0.03 * Math.sin(t * 7.3), go);
       }
     }
+    // THE CAST (the elemental powers, core/powers.js: `cast01`, 1 falling to 0 over half a second; 0 always without
+    // ?powers=1): both arms thrown forward at chest height, the right a little the higher, the body after them
+    {
+      const c = clamp01(num(s.cast01));
+      if (c > 0.002) {
+        const k = c * c * (3 - 2 * c), to = (bone, ax, v) => { bone.rotation[ax] += (v - bone.rotation[ax]) * k; };
+        to(b.armR, 'x', 1.62); to(b.armL, 'x', 1.38); to(b.armR, 'z', -0.10); to(b.armL, 'z', 0.10);
+        b.torso.rotation.x -= 0.12 * k;
+      }
+    }
     if (b.lantern) {
       // the lantern swings from its strap with the stride
       b.lantern.rotation.x = (0.10 + 0.16 * w.run) * Math.sin(2 * ph + 0.9) * w.walk * grounded + 0.25 * w.fall;

@@ -20,6 +20,7 @@ export function figureArgs(ex, lookPitch, out = {}, air = null) {
   const ph = ex.phys || null;
   const ride = ph ? num(ph.ride, num(ph.hip)) : 0;
   out.mode = ex.mode; out.speed = ex.speed; out.jet01 = ex.jet01; out.lookPitch = lookPitch;
+  out.cast01 = ex.casting || 0;   // (the elemental powers, core/powers.js: 1 falling to 0 as a power is cast; 0 without them)
   out.fly01 = ex.fly01 || 0;      // (the wanderer's own flight, player/explorer.js: 0..1 while it flies)
   out.hip = ride;
   out.ride = ride;
