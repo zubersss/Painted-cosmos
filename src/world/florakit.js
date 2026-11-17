@@ -418,6 +418,56 @@ export function farTreeGeometry(seed) {
   return B.build();
 }
 
+// AN EXPERIMENT, NOT THE LOOK: drawn only when the address says ?fartree=cards (flora.js), so that the owner's phone
+// can time it against the lump (the speed test, once with and once without). SEEN here beside the lump (the gallery,
+// oil, tier 1, 1280 x 600): a picture costs 11 to 13 parts in a hundred less, and the far wood is PLAINER: crowns of
+// one flat tone with a few leaves on them, where the lump's crowns are dabbed all over. Not good enough to be the look.
+// THE OIL LOOK'S FAR TREE (2026-11-17). The far tree above is a lump of 26 triangles whose crown is painted in two
+// layers of leaf dabs for every pixel it covers, tree behind tree: measured in the game at the phone's settings (the same
+// view with the far crowns laid in one flat colour), that painting was nineteen parts in twenty of the plants' paint, and
+// on the owner's phone the plants' paint was 23 ms of a 40 ms frame. This one is painted as the near tree's leaves are,
+// once a piece and not once a pixel (materials.js PROP_VERT, "a leaf's paint, once a leaf"): a stem, a SOLID DARK CORE
+// of twenty flat faces in one tone (the shade inside the crown), and twenty-six LEAF CARDS standing on and out of it.
+// (Thirty cards and no core were tried first: cheaper still, and seen from the air the wood was confetti, no crowns.)
+// In the far tree's own unit shape: flora.js sizes it to its kind, PROP_VERT tapers a conifer's by height.
+function facetCore(B, c, rx, ry, rz, rnd, opts) {
+  const o = Object.assign({ noise: 0.22, massK: 0.5, sway: 0.05, shade0: 0.72, shadeK: 0.25 }, opts || {});
+  B.branch = (rnd() * 7.13) % 1;
+  const coreHash = rnd();
+  const I = ico(0), ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28, P = [];
+  for (let i = 0; i < I.n; i++) {
+    const x = I.p[i * 3], y = I.p[i * 3 + 1], z = I.p[i * 3 + 2];
+    const k = 1 + o.noise * (Math.sin(x * 3.1 + ph1) * Math.sin(y * 2.7 + ph2) + 0.6 * Math.sin(z * 4.3 + ph3 + x * 1.9));
+    P.push([c.x + x * rx * k, c.y + y * ry * k, c.z + z * rz * k, y]);
+  }
+  for (let i = 0; i < I.n; i += 3) {
+    const a = P[i], b = P[i + 1], d = P[i + 2];
+    const cx = (a[0] + b[0] + d[0]) / 3, cy = (a[1] + b[1] + d[1]) / 3, cz = (a[2] + b[2] + d[2]) / 3;
+    let nx = (b[1] - a[1]) * (d[2] - a[2]) - (b[2] - a[2]) * (d[1] - a[1]), ny = (b[2] - a[2]) * (d[0] - a[0]) - (b[0] - a[0]) * (d[2] - a[2]), nz = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]);
+    let l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    let mx = cx - c.x, my = cy - c.y, mz = cz - c.z; l = Math.hypot(mx, my, mz) || 1; mx /= l; my /= l; mz /= l;
+    if (nx * mx + ny * my + nz * mz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    mx = nx + (mx - nx) * o.massK; my = ny + (my - ny) * o.massK; mz = nz + (mz - nz) * o.massK; l = Math.hypot(mx, my, mz) || 1; mx /= l; my /= l; mz /= l;
+    // (one tone for the whole core, taken at the crown's middle, and dark: it is the shade inside the crown that the
+    // leaves stand on. A tone of its own for every face was a cut gem, plain polygons)
+    const yy = (a[3] + b[3] + d[3]) / 3, shade = Math.min(1, Math.max(0, o.shade0 + o.shadeK * (0.5 - yy * 0.5))), hash = coreHash;
+    B.card = [c.x, c.y, c.z];
+    const v0 = B.vert(a[0], a[1], a[2], nx, ny, nz, mx, my, mz, -1, 0, o.sway, 5, shade, hash);
+    const v1 = B.vert(b[0], b[1], b[2], nx, ny, nz, mx, my, mz, 0, 1, o.sway, 5, shade, hash);
+    const v2 = B.vert(d[0], d[1], d[2], nx, ny, nz, mx, my, mz, 1, 0, o.sway, 5, shade, hash);
+    B.tri(v0, v1, v2);
+    B.card = null;
+  }
+}
+export function farCardGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  tube(B, [V(0, 0, 0), V(0.01, 0.52, 0)], [0.020, 0.012], 3, { part: 0, swayK: 0.02, swayH: 1, hash: 0.5 });
+  const c = V(0, 0.66, 0);
+  facetCore(B, c, 0.20, 0.285, 0.20, rnd);
+  leafCards(B, c, 0.27, 0.36, 0.27, rnd, { n: 26, len: 0.16, wid: 0.10, massC: c, massK: 0.75, sway: 0.05, shade0: 0.0, shadeK: 0.4, droop: 0.15 });
+  return B.build();
+}
+
 export function grassGeometry(seed, spec) {
   const rnd = mulberry32(seed), B = new Builder();
   if (spec && spec.oil) {
