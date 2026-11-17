@@ -2106,3 +2106,4 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - AFTER the merge: the full check on `main` (0fbfa61) started at once; its result is in the next entry.
 - ASKED OF THE OWNER: one table from `…/?look=oil&bench=1` once the label says v10; and a look at `…/?look=oil&fartree=cards` to say whether the leafier far tree could be the look on the phone.
 - OWNER (2026-11-17, a little later, verbatim): "Can I get the links ??". The two top-quality links were given again, each on its own line as a plain address (the first time they were inside code marks, which a phone may not let one tap), with the speed test's link (`?look=oil&bench=1`) and the leafier far tree's (`?look=oil&fartree=cards&body=earth&time=15.4`). LESSON FOR THE NEXT SESSION: give the owner links as plain addresses on their own lines.
+- THE FULL CHECK ON `main` AT v10 (0fbfa61): ALL 17 PASSED (the gate's last step; nothing to undo).
