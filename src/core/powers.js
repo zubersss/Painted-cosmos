@@ -57,6 +57,7 @@ export class Powers {
     this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, from: { x: 0, y: 0, z: 0 }, size: 0 };
     this.casts = 0;             // how many casts so far (for tests and the read-out)
     this.note = '';             // one word for the HUD when something cannot be done here
+    this._noteT = 0;
     this.active = false;        // the powers can be used now (on foot, on a world)
     this.keys = { cast: false, pad: false, mouse: false, touch: false };
     this.onCast = null;         // called with the ability's id when one is cast (the sound)
@@ -75,6 +76,9 @@ export class Powers {
     if (sim && this.aim.ok) castGust(this.winds, sim.bodyId, { x: o.px, y: o.py, z: o.pz }, this.aim.fwd, 0.8);
   }
 
+  // A word for the screen when an ability could do nothing here (ui/powers.js shows it beside the ability's name for a
+  // moment): the note and how long it still stands.
+  _say(word) { this.note = word; this._noteT = 1.8; }
   // the parted channel is let go: it closes from its far end inward (physics/powers.js stepWinds)
   _close() { if (this.part) { releaseWind(this.part); this.part = null; } }
   // Is the water parted at the place d (a unit vector from the body's centre) where its face is at radius r?
@@ -104,6 +108,7 @@ export class Powers {
         }
       }
     }
+    if (!best) this._say('no tree in reach');
     if (best) {
       // it goes over away from the explorer and to its own side of the aim (straight away, the fall is hidden behind
       // the tree itself from where the explorer stands: seen in the stills of 2026-11-17)
@@ -149,6 +154,7 @@ export class Powers {
     const pressed = down && !this._was, released = !down && this._was;
     this._was = down;
     if (this._wait > 0) this._wait -= dt;
+    if (this._noteT > 0) { this._noteT -= dt; if (!(this._noteT > 0)) this.note = ''; }
     if (sim.ex && sim.ex.casting > 0) sim.ex.casting = Math.max(0, sim.ex.casting - dt / POWERS.castPose);
     // (the aim is worked out every frame the powers can be used, cast or not: the mark on the screen shows where a
     // power will act before it is cast, ui/powers.js. One sample of the ground a frame.)
@@ -167,7 +173,13 @@ export class Powers {
           }
         } else if (ab.id === 'part') {
           // the channel begins just behind the explorer and lies along the aim: it goes where they go and look
-          if (pressed && !this.part) { this.part = castPart(W, sim.bodyId, this._orbAt(sim, -WINDPOWER.partBack), A.fwd); this._cast(sim); }
+          if (pressed && !this.part) {
+            this.part = castPart(W, sim.bodyId, this._orbAt(sim, -WINDPOWER.partBack), A.fwd); this._cast(sim);
+            // (no water within the channel's reach: it is only a wind along the ground, and says so)
+            let wet = false;
+            for (const k of [2, 6, 11]) { try { const g = sim.sampleSurface(sim.bodyId, unit(add(sim.ex.p, A.fwd, k))); if (g && g.liquidRadius > g.radius) wet = true; } catch { /* unknown: say nothing */ wet = true; } }
+            if (!wet) this._say('no water here');
+          }
           if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); }
         } else if (pressed && this._wait <= 0) {
           if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd);

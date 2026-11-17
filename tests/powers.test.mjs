@@ -93,6 +93,22 @@ test('part water: held, a channel goes with the explorer along the view and its 
   p.down = true; step(p, sim, 10); assert.ok(p.part); p.pick(0); assert.equal(p.part, null, 'choosing another ability lets it go');
 });
 
+test('a word when an ability can do nothing here: the knife with no tree in reach, the channel with no water', () => {
+  const p = new Powers(), sim = fakeSim();
+  assert.equal(p.note, '');
+  p.pick(ABILITIES.findIndex((a) => a.id === 'knife')); p.tapOnce = true; step(p, sim, 1);
+  assert.equal(p.casts, 1); assert.equal(p.fells, 0); assert.equal(p.note, 'no tree in reach');
+  step(p, sim, 60); assert.equal(p.note, 'no tree in reach', 'it stands for a moment');
+  step(p, sim, 60 * 2); assert.equal(p.note, '', 'and goes');
+  p.pick(ABILITIES.findIndex((a) => a.id === 'part')); p.down = true; step(p, sim, 2);
+  assert.ok(p.part, 'the channel is still made (a wind along the ground)'); assert.equal(p.note, 'no water here');
+  p.down = false; step(p, sim, 60 * 3);
+  // over water it says nothing
+  const wet = fakeSim(); wet.sampleSurface = () => ({ radius: R, liquidRadius: R + 1 });
+  const q = new Powers(); q.pick(ABILITIES.findIndex((a) => a.id === 'part')); q.down = true; step(q, wet, 2);
+  assert.equal(q.note, '');
+});
+
 test('a tap from the touch button is one cast, however slow the frames are', () => {
   const p = new Powers(), sim = fakeSim();
   p.tapOnce = true; step(p, sim, 1, 0.5);                    // one frame of half a second sees it

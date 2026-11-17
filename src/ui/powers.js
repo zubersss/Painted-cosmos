@@ -85,8 +85,8 @@ export function attachPowersUi(powers, root) {
   powers.onFrame = (p) => {
     const on = p.active;
     if (on !== shown) { shown = on; root.classList.toggle('pc-pw-live', on); root.classList.toggle('pc-pw-on', on && coarse); }
-    const w = ABILITIES[p.ability].word;
-    if (w !== wordNow) { wordNow = w; btn.textContent = w; word.textContent = 'wind: ' + w; }
+    const w = ABILITIES[p.ability].word, shown2 = w + (p.note ? '|' + p.note : '');
+    if (shown2 !== wordNow) { wordNow = shown2; btn.textContent = w; word.textContent = 'wind: ' + w + (p.note ? '  \u00b7  ' + p.note : ''); }
     root.classList.toggle('pc-pw-held', on && (p.keys.touch || p.keys.cast || p.keys.mouse || p.keys.pad || !!p.orb || !!p.part));
     // THE AIM MARK: a ring on the ground where the chosen power will act, as wide as what it will do there, lying as
     // the ground lies to the eye; there before the cast, stronger while a power is held. (p.project: main.js; without
