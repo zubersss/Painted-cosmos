@@ -100,8 +100,8 @@ Fire never spreads and never burns the wood down: there is nothing to lose.
 
 ## Wind, as built (2026-11-17)
 
-Six abilities on the keys `1` to `6` and on the touch fan, in this order: **gust**, **gather**,
-**quicken**, **still**, **whirl**, **part** (move water: below) (wind control is two of them: a hidden second gesture is not found
+Seven abilities on the keys `1` to `7` and on the touch fan, in this order: **gust**, **gather**,
+**quicken**, **still**, **whirl**, **part** (move water: below), **knife** (the wind knife: below) (wind control is two of them: a hidden second gesture is not found
 on a phone). On the touch button a tap casts (when the thumb lifts); an ability
 that is held (gather, part) begins the moment the thumb is down; sliding the thumb off the button
 opens the fan, and letting go on a word chooses it and casts it. The aim is shown by a small mark
@@ -129,10 +129,10 @@ sounds (a rush for a gust, a low roar for a whirl, a soft breath for the quicken
 place). There is no sound that lasts while a whirl stands or a ball is held: not built.
 
 **Touched as the owner will touch it (2026-11-17).** The button and the fan were pressed with real
-touch events on a phone-sized screen (823 x 384): a tap casts once, the fan opens with its six
+touch events on a phone-sized screen (823 x 384): a tap casts once, the fan opens with its
 words, a word is chosen and cast. That first try found the button dead to a finger and a whirl
-breaking the physics among real dust devils; both are mended and held by tests. On the smallest
-screens the last word of the fan ("part") lies partly over the jump button.
+breaking the physics among real dust devils; both are mended and held by tests. The fan's seven words lie on an arc from
+straight above the button round to its left, clear of the jump button under it.
 
 **What is not built.** The ring painted on the ground at the aim (a mark in the middle of the
 picture stands for it); a lasting sound; a word on the screen when an ability can do nothing
@@ -141,8 +141,8 @@ it shows only in what stops moving.
 
 ## Move water and the wind knife: the plans and their cost
 
-The owner asked for the plan and its cost first, then the simplest version. MOVE WATER IS BUILT in
-its simplest version (below, after its plan); THE WIND KNIFE IS A PLAN.
+The owner asked for the plan and its cost first, then the simplest version. BOTH ARE BUILT in their
+simplest versions (each below, after its plan).
 
 ### Move water ("push water out of my path")
 
@@ -231,3 +231,25 @@ do not grow back.
 *The risk.* It touches `src/world/flora.js`, which the trees' speed work also changed lately; and
 the saved game. Neither is one of the three risky parts. A test can check the mechanics (the
 right tree is chosen, it is felled once, it is kept in the save and found again).
+
+*As built (2026-11-17, the simplest version; ability seven, "knife").* A thin straight gust
+leaves the hands; the first tree within 18 m whose trunk is within 1.2 m of the aim's line is cut:
+when the blade reaches it, it goes over away from the explorer, slowly at first and fast at the
+end, in a second and a half, and lies with its crown on the ground. The four pieces are as
+planned. The felled trees are one small list (`src/data/felled.js`), each tree named by its own
+place in the placement data, so its near form, its far form and the obstacles all know it again
+without a search. The trees' renderer lays a felled tree down about its foot
+(`src/world/flora.js` `_layTree`, `_fall`); its trunk is no longer in what the explorer and the
+ship bump into (`src/world/obstacles.js`); the saved game keeps the list (`src/core/save.js`: a
+field written only when a tree has been felled; a save without it is as it always was).
+SEEN in stills in the autumn wood: from the side, the trunk leaning at 1.35 s and the tree lying
+at 2.7 s, its crown on the ground; from behind (where the player stands) it falls away and reads
+less. MEASURED: while a tree falls the game's script is about 5 ms a frame against 3 (its two
+patches of the wood are written again each frame for a second and a half); nothing after it
+lies, and nothing at all with no tree felled.
+NOT SEEN: the far form of a felled tree picked out in a still (it uses the same placement; at
+80 m it could not be told from the trees round it); a felled tree after the game is closed and
+opened again in a browser (the saved game's round trip is tested in Node, not seen). As planned:
+no stump, no log, the lying trunk is not something to trip over, the fallen crown still sways in
+the wind, and on a slope the tree lies along the level, not along the ground. At most 400 trees
+are kept (the oldest stands again).
