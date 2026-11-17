@@ -297,6 +297,9 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     speed test's finer rows cannot be trusted as they are (the screen's 8.3 ms beat, heat,
     shaders rebuilt while a row is timed). Standing instruction: KEEP REFINING THE PERFORMANCE
     AND THE WIND. Still no word to merge the powers.
+46. **Top-quality links, one for the forest and one for the snow (2026-11-17).** "Give me top
+    quality link one for  forest and one for snow." Given: the top-settings link (item 38's)
+    with `body=earth&time=15.4` and with `body=neptune&time=23` (in the log).
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
