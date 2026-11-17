@@ -257,8 +257,9 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     request and merge on auto when you need it". A standing permission given in that session:
     when a version is ready to be tried on the owner's machines, the session opens the pull
     request into `main` and merges it itself. The gate it keeps before doing so is in the log
-    (the default game unchanged by pictures, the three test suites, the default game's page
-    booting; the full check straight after; undo at once if it fails). A LATER SESSION asks the
+    (the default game unchanged by pictures, the three test suites, `node tests/all.mjs --only
+    static,unit`, the default game's page booting; the full check straight after; undo at once
+    if it fails: it did once, v8's request at run time, undone as v8.1). A LATER SESSION asks the
     owner once whether this still stands (`CLAUDE.md` says "only when the owner asks in that
     session", and was not changed). This amends item 7.
 42. **The elemental powers, wind first (2026-11-17; the owner away for several hours).** The
@@ -290,8 +291,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` at version `v8 (17 Nov)` (pull requests
-#4 to #7; `main` at 288493c; #7 was opened and merged by the session on the owner's standing word,
+**In one line:** the new look is LIVE behind `?look=oil` at version `v8.1 (17 Nov)` (pull requests
+#4 to #8; `main` at 82803f2; #7 was opened and merged by the session on the owner's standing word,
 section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v8 carries: a leaf's paint once a
 leaf (the answer to the phone's table: the trees' paint was 23 of 39 ms), the rivers that flow,
 settings for a computer with a basic built-in chip, the version label. `look-proto` equals
