@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
+import { MATERIAL_INDEX } from './ground.js';
 import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
 import { LocalFrame } from './near.js';
 import { BODIES } from '../data/bodies.js';
@@ -295,6 +296,34 @@ test('move water: over water the channel throws spray off its two walls and carr
     let pale = 0; for (let i = 0; i < lf._n; i++) if (lf.mat[i] < 200) pale++;
     assert.ok(pale > 8, 'strokes of air along it: ' + pale + ' (leaves before: ' + l0 + ')');
   }
+});
+
+test('a gust through a wood tears leaves out of the crowns, raises dust, and snaps a branch or two; over bare ground none of it', () => {
+  const I_WOOD = MATERIAL_INDEX.mud;
+  // (high: only the wood's own leaves three metres up and more, not the pale strokes of air, which fly at any height)
+  const look = (b) => { let high = 0, wood = 0, leaf = 0; for (let i = 0; i < b._n; i++) { const m = b.mat[i]; if (m === I_WOOD) { wood++; continue; } if (m < 200) continue; leaf++; if (b._p[i * 3 + 1] > 3) high++; } return { high, wood, leaf }; };
+  // a wood: leaves come down from the height they grew at, dust comes up, and a branch snaps
+  const w = setup('earth', 'autumn_woodland'), S = makeWinds();
+  run(w, 2, S);
+  const b = w.physics.particles.leaves, du = w.physics.particles.dust, before = look(b), d0 = du._n;
+  castGust(S, w.bodyId, add(w.focus, axes(w).n, 1), axes(w).n);
+  let mostHigh = 0, mostWood = 0;
+  run(w, 1.6, S, () => { const o = look(b); mostHigh = Math.max(mostHigh, o.high); mostWood = Math.max(mostWood, o.wood); });
+  const after = look(b);
+  assert.ok(after.leaf > before.leaf + 120, 'leaves in the air: ' + (after.leaf - before.leaf));
+  assert.ok(mostHigh > before.high + 80, 'and most of them from the crowns, three metres up and more: ' + mostHigh);
+  assert.ok(du._n > d0 + 25, 'dust raised off the floor too: ' + (du._n - d0));
+  assert.ok(mostWood >= WINDPOWER.snapPieces && mostWood <= WINDPOWER.snapMax * WINDPOWER.snapPieces,
+    'one or two branches snapped, no more: ' + mostWood + ' pieces of ' + WINDPOWER.snapPieces);
+  // bare ground with no canopy: nothing is torn and no branch snaps
+  const m = setup('mercury', 'obsidian_fields'), S2 = makeWinds();
+  run(m, 2, S2);
+  const mb = m.physics.particles.leaves, m0 = look(mb);
+  castGust(S2, m.bodyId, add(m.focus, axes(m).n, 1), axes(m).n);
+  let mw = 0, mh = 0;
+  run(m, 1.6, S2, () => { const o = look(mb); mw = Math.max(mw, o.wood); mh = Math.max(mh, o.high - m0.high); });
+  assert.equal(mw, 0, 'no branch where there are no trees');
+  assert.ok(mh < 25, 'and nothing torn from a crown that is not there: ' + mh);
 });
 
 test('a stilled place is seen to fall still: strokes round its rim in its first second, none after', () => {

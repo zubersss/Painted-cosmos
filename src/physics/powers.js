@@ -63,7 +63,16 @@ export const WINDPOWER = Object.freeze({
   partSpray: 130,         // drops a second thrown off the water along its two walls (loose.js)
   wispPart: 50,           // strokes of air a second along it
   // what a source lifts off the ground under it (loose.js), in grains a second at full strength
-  liftGust: 150, liftOrb: 70, liftVortex: 90,
+  // (2026-11-17, the owner: "fly leaves around and dust around when i use it". Three times what it was, and a gust
+  // raises a puff of dust off any ground, not only dry ground.)
+  liftGust: 420, liftOrb: 180, liftVortex: 260,
+  // LEAVES TORN FROM THE CROWNS the wind goes through, in leaves a second at full strength (loose.js _tear): the wood's
+  // own leaves, thrown with the wind at the height they grew at. Nothing where there is no canopy.
+  tearGust: 260, tearOrb: 90, tearVortex: 220, tearPart: 0,
+  // A BRANCH SNAPS (the owner: "some branches should snap and fall off"). snapChance: the share of the crowns a cast
+  // goes through that lose one; snapMax: how many a single cast can break; snapPieces: the pieces one branch falls as;
+  // snapLeaves: the leaves that come down with it.
+  snapChance: 0.5, snapMax: 2, snapVortex: 5, snapPieces: 3, snapLeaves: 26,
   // THE AIR MADE VISIBLE: pale strokes that ride each source (loose.js: grains of the leaf kind in the colours of snow
   // and ice, short-lived), strokes a second at full strength. Without them a gust over turf or rock moved nothing
   // that could be seen: the first stills of the powers.
@@ -74,7 +83,7 @@ export const WINDPOWER = Object.freeze({
 function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,
     speed: 0, radius: 0, reach: 0, spread: 0, front: 0, pulse: 0, height: 0, gain: 1, push: 0, up: 0, spin: 1, held: false,
-    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0 };
+    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0, snap: 0, tear: 0 };
 }
 
 // The list. `count` sources are alive, in slots 0 .. count - 1.
@@ -112,7 +121,7 @@ export function castGust(S, bodyId, p, d, power = 1) {
   const s = take(S, KIND.jet, bodyId, p, d), W = WINDPOWER;
   s.life = W.gustLife; s.speed = W.gustSpeed * power; s.front = W.gustFront; s.reach = W.gustReach; s.pulse = W.gustPulse;
   s.radius = W.gustRadius; s.spread = W.gustSpread; s.height = W.gustHeight; s.up = W.gustLift; s.strength = 1;
-  s.curl = W.gustCurl; s.axis = W.gustAxis;
+  s.curl = W.gustCurl; s.axis = W.gustAxis; s.snap = W.snapMax * power;
   return s;
 }
 // Wind control at p (on the ground): mode 'calm' stills the wind there, 'quicken' speeds it (and adds some along d).
@@ -132,7 +141,7 @@ export function castOrb(S, bodyId, p) {
 export function castVortex(S, bodyId, p, spin = 1) {
   const s = take(S, KIND.vortex, bodyId, p, null), W = WINDPOWER;
   s.life = W.vortexLife; s.fade = W.vortexFade; s.radius = W.vortexRadius; s.speed = W.vortexSpeed; s.up = W.vortexUp;
-  s.height = W.vortexHeight; s.spin = spin < 0 ? -1 : 1;
+  s.height = W.vortexHeight; s.spin = spin < 0 ? -1 : 1; s.snap = W.snapVortex;
   return s;
 }
 // Move water: a channel that begins at p (on the water or the ground, body-local) and runs along d; held until released.
