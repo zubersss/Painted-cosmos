@@ -68,6 +68,7 @@ export const WINDPOWER = Object.freeze({
   // and ice, short-lived), strokes a second at full strength. Without them a gust over turf or rock moved nothing
   // that could be seen: the first stills of the powers.
   wispGust: 170, wispOrb: 220, wispVortex: 240, wispZone: 70,
+  wispHush: 90, hushTime: 1.2,   // a stilled place: strokes a second round its rim while it falls still, and for how long (s)
 });
 
 function blank() {

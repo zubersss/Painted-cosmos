@@ -297,6 +297,23 @@ test('move water: over water the channel throws spray off its two walls and carr
   }
 });
 
+test('a stilled place is seen to fall still: strokes round its rim in its first second, none after', () => {
+  const w = setup('earth', 'alpine_meadow'), S = makeWinds();
+  run(w, 1, S);
+  const { n } = axes(w), b = w.physics.particles.leaves;
+  const pale = () => { let k = 0; for (let i = 0; i < b._n; i++) if (b.mat[i] < 200) k++; return k; };
+  const p0 = pale();
+  castZone(S, w.bodyId, add(w.focus, n, 4), n, 'calm');
+  run(w, 0.8, S);
+  const during = pale();
+  assert.ok(during > p0 + 30, 'strokes while it falls still: ' + (during - p0));
+  // they stand round the rim, not in the middle
+  let rim = 0, mid = 0; for (let i = 0; i < b._n; i++) { if (!(b.mat[i] < 200)) continue; const r = Math.hypot(b._p[i * 3], b._p[i * 3 + 2] - 4); if (r > WINDPOWER.zoneRadius * 0.6) rim++; else mid++; }
+  assert.ok(rim > mid * 3, 'round its rim: ' + rim + ' at the rim, ' + mid + ' inside');
+  run(w, 5, S);
+  assert.ok(pale() <= p0 + 3, 'and none once it is still: ' + pale());
+});
+
 test('the cost: a frame of physics with every kind of wind at work costs little more than one without', () => {
   const w = setup('earth', 'autumn_woodland'), S = makeWinds();
   run(w, 3, S);

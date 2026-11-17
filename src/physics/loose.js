@@ -893,9 +893,10 @@ export class Loose {
   // with nothing loose on it, of a gathered ball, and of a whirl's column.
   _wisps(s, h, near, fx, fz, groundY, Rr) {
     const rng = this.rng, W = WINDPOWER;
-    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : s.kind === KIND.part ? W.wispPart : (s.gain > 1 ? W.wispZone : 0);
+    const hush = s.kind === KIND.zone && !(s.gain > 1) && s.age < W.hushTime;      // (a place being stilled, in its first moments)
+    const rate = s.kind === KIND.jet ? W.wispGust : s.kind === KIND.orb ? W.wispOrb : s.kind === KIND.vortex ? W.wispVortex : s.kind === KIND.part ? W.wispPart : (s.gain > 1 ? W.wispZone : hush ? W.wispHush : 0);
     if (!(rate > 0)) return;
-    s.wisp = (s.wisp || 0) + rate * s.strength * h;
+    s.wisp = (s.wisp || 0) + rate * (hush ? 1 : s.strength) * h;
     let guard = 48;
     while (s.wisp >= 1 && guard-- > 0) {
       s.wisp -= 1;
@@ -935,6 +936,11 @@ export class Loose {
         const R = s.radius * (0.35 + 0.9 * rng()), a = rng() * 6.2831853;
         x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.2 + rng() * rng() * 11;
         ve = -Math.sin(a) * s.speed * s.spin * 0.8; vn = Math.cos(a) * s.speed * s.spin * 0.8; vu = s.up * 0.7; life = 0.085;
+      } else if (hush) {
+        // a stilled place: strokes round its rim that drift in a little and sink, and are gone: the air is seen to settle
+        const R = s.radius * (0.82 + 0.2 * rng()), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.6 + rng() * 2.6;
+        ve = -Math.cos(a) * 1.6; vn = -Math.sin(a) * 1.6; vu = -0.9; life = 0.09;
       } else {
         const R = s.radius * Math.sqrt(rng()), a = rng() * 6.2831853;
         x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R; y = 0.3 + rng() * 3.2;
