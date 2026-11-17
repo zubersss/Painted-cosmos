@@ -349,10 +349,12 @@ frame (a twentieth of the script). `look-proto` equals `main`.
   parts along the way the explorer looks; they walk the bed), f. the wind knife ("knife": the
   first tree along the aim is cut, falls to its own side and stays felled, also in the saved
   game). Seven abilities on keys 1 to 7 and on the touch fan (a column of words beside the
-  button). A ring on the ground shows where a power will act before it is cast.
-- `powers` holds `main` at v10 (merged in, aa23fbb). THE FULL CHECK PASSES ON aa23fbb (17 of
-  17) and, without the flag, the branch draws what `main` draws (0 pixels differ in nine
-  scenes). IT IS READY TO MERGE THE MOMENT THE OWNER SAYS SO; they have not (asked three times:
+  button). A ring on the ground shows where a power will act before it is cast; a stilled
+  place is seen to fall still; the screen says when an ability can do nothing here.
+- `powers` holds `main` at v11 (merged in). THE FULL CHECK PASSES ON 16e8611 (17 of 17; the
+  head d575a01 adds only a note) and, without the flag, the branch draws what `main` draws (0
+  pixels differ in nine scenes, compared at the wind knife's commit; later commits touch only
+  the powers' own files). IT IS READY TO MERGE THE MOMENT THE OWNER SAYS SO; they have not (asked three times:
   each time they said to keep working).
 - THE LESSON OF TWO FAULTS FOUND LATE (a dead touch button; a whirl breaking the physics among
   real dust devils): stills made by calling the powers' code prove the picture, not the hand.
