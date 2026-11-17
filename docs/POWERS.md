@@ -102,7 +102,8 @@ Fire never spreads and never burns the wood down: there is nothing to lose.
 
 Six abilities on the keys `1` to `6` and on the touch fan, in this order: **gust**, **gather**,
 **quicken**, **still**, **whirl**, **part** (move water: below) (wind control is two of them: a hidden second gesture is not found
-on a phone). A press of the touch button casts at once, or holds; sliding the thumb off the button
+on a phone). On the touch button a tap casts (when the thumb lifts); an ability
+that is held (gather, part) begins the moment the thumb is down; sliding the thumb off the button
 opens the fan, and letting go on a word chooses it and casts it. The aim is shown by a small mark
 in the middle of the picture while a power is held (the ring painted on the ground, above, is not
 built: it needs a new painted thing).
@@ -126,6 +127,12 @@ so what it gathers goes round it a metre out, as a ball, and is not packed into 
 **What is heard.** Each cast has a short sound of its own, made in code like the game's other
 sounds (a rush for a gust, a low roar for a whirl, a soft breath for the quickened and the stilled
 place). There is no sound that lasts while a whirl stands or a ball is held: not built.
+
+**Touched as the owner will touch it (2026-11-17).** The button and the fan were pressed with real
+touch events on a phone-sized screen (823 x 384): a tap casts once, the fan opens with its six
+words, a word is chosen and cast. That first try found the button dead to a finger and a whirl
+breaking the physics among real dust devils; both are mended and held by tests. On the smallest
+screens the last word of the fan ("part") lies partly over the jump button.
 
 **What is not built.** The ring painted on the ground at the aim (a mark in the middle of the
 picture stands for it); a lasting sound; a word on the screen when an ability can do nothing
