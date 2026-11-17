@@ -5,6 +5,7 @@
 import { placeTrees, placeUnder, INST_STRIDE, U_ROCK, U_BUSH } from './floraplace.js';
 import { getSurface } from './surface.js';
 import { dirToFace } from './cubesphere.js';
+import { FELLED, felledAt } from '../data/felled.js';
 
 export const TREE_LEVEL = 7, UNDER_LEVEL = 8, TREE_GRID = 9, UNDER_GRID = 17;
 
@@ -50,6 +51,8 @@ function cellsAround(S, x, y, z, radius, level, out) {
 
 const _cells = [];
 // -> [{ unitDir: {x,y,z}, radius (m), height (m), kind: 'tree' | 'rock' }] within `radius` metres
+// (a tree also carries `p`, its own place in the placement data: the name the felled list knows it by, data/felled.js;
+// and a tree the explorer's wind has felled is not listed: its trunk no longer stands in the way)
 // soft === true also lists bushes (kind 'bush'): nothing to collide with, but in the way of a view
 export function sampleObstaclesPure(bodyId, dx, dy, dz, radius, soft) {
   const S = getSurface(bodyId);
@@ -63,7 +66,9 @@ export function sampleObstaclesPure(bodyId, dx, dy, dz, radius, soft) {
     const px = data[o], py = data[o + 1], pz = data[o + 2], pl = 1 / Math.hypot(px, py, pz);
     const ex = px * pl - x, ey = py * pl - y, ez = pz * pl - z;
     if (ex * ex + ey * ey + ez * ez > r2) return;
-    res.push({ unitDir: { x: px * pl, y: py * pl, z: pz * pl }, radius: r, height: h, kind });
+    const ob = { unitDir: { x: px * pl, y: py * pl, z: pz * pl }, radius: r, height: h, kind };
+    if (kind === 'tree') ob.p = { x: px, y: py, z: pz };
+    res.push(ob);
   };
   cellsAround(S, x, y, z, rad, TREE_LEVEL, _cells);
   for (let i = 0; i < _cells.length; i += 3) {
@@ -71,6 +76,7 @@ export function sampleObstaclesPure(bodyId, dx, dy, dz, radius, soft) {
     for (let k = 0; k < t.count; k++) {
       const o = k * INST_STRIDE, sc = t.data[o + 3], sp = specs[t.data[o + 5]], ob = (sp && sp.obs) || [0.3, 10], ks = (sp && sp.scale) || 1;
       if (sp && sp.noObs) continue;                  // trailing plants: nothing to bump into
+      if (FELLED.size && felledAt(bodyId, t.data[o], t.data[o + 1], t.data[o + 2])) continue;      // (the powers: felled)
       add(t.data, o, ob[0] * sc / ks, ob[1] * sc / ks, 'tree');
     }
   }

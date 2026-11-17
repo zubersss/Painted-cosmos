@@ -24,6 +24,7 @@
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
 import { devilWind } from './features.js';
+import { powerWind } from './powers.js';
 import { wakeAt } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
@@ -196,6 +197,7 @@ const _s = new Float64Array(12);
 const _coef = new Float64Array(8);
 const _tmp2 = new Float64Array(2);
 const _dwf = new Float64Array(3);
+const _pwf = new Float64Array(4);
 
 // Coefficients of the exact oscillator step for (w, z, dt): [a11, a12, a21, a22].
 function oscCoef(w, z, dt, o, i) {
@@ -291,7 +293,7 @@ export class FloraField {
   //   frame: LocalFrame.  air: AirGrid (already updated this frame).  near: TerrainGrid of the
   //   near field (2 m nodes) or null.  rho: air density at the focus.  (fx, fz): focus in grid
   //   coordinates.  disturbers: frame.disturbers (see index.js).  quality: 0 | 1 | 2.
-  update(dt, frame, air, near, rho, fx, fz, disturbers, quality, devils) {
+  update(dt, frame, air, near, rho, fx, fz, disturbers, quality, devils, winds) {
     const N = this.N, cell = this.cell, M = this.M, nc = this.nearCell;
     if (this.frameVersion !== frame.version) {
       this.frameVersion = frame.version; this.reset();
@@ -328,6 +330,7 @@ export class FloraField {
     const bend = this.bend, vel = this._vel, wind = this.wind;
     let gsum = 0, se = 0, sn = 0, tsum = 0, sce = 0, scn = 0;
     const swirl = !!devils && devils.count > 0;
+    const blown = !!winds && winds.count > 0;      // (the wind the explorer makes, powers.js)
     for (let j = 0; j < N; j++) {
       const z = (this.cj + j - N / 2 + 0.5) * cell;
       for (let i = 0; i < N; i++) {
@@ -340,6 +343,9 @@ export class FloraField {
         // a dust devil in the field: its swirl bends the plants round it (divided by the height
         // factor because the vortex is given at plant height already)
         if (swirl && devilWind(devils, x, z, 0.5, _dwf)) { we += _dwf[0] / (hs > 0.05 ? hs : 0.05); wn += _dwf[1] / (hs > 0.05 ? hs : 0.05); }
+        // the explorer's wind: given at plant height too; a source narrower than the field's nodes lie apart is taken
+        // as wide as that, so a gust between two nodes still bends the plants it passes
+        if (blown && powerWind(winds, x, z, 0.5, _pwf, cell * 0.6)) { const ih = 1 / (hs > 0.05 ? hs : 0.05); we = we * _pwf[3] + _pwf[0] * ih; wn = wn * _pwf[3] + _pwf[1] * ih; }
         const sp = Math.sqrt(we * we + wn * wn);
         // load = q / qRef along the wind, at the height each class lives at
         // (P15) the crowns (the stiff class, at the canopy's top or stiffHeight) take the lee of taller trees upwind as it

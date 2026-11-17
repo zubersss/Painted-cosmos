@@ -607,6 +607,9 @@ export class Sim {
   updatePhysics(dt) {
     const physics = this.physics;
     if (!physics) return;
+    // (the elemental powers, core/powers.js: there only with ?powers=1; the hands, the aim, the list of the explorer's wind)
+    const powers = this.powers;
+    if (powers) powers.update(dt, this);
     const st = this.sm.state;
     const out = this._disturbers;
     out.length = 0;
@@ -627,6 +630,7 @@ export class Sim {
       bodyId, time: this.t, focus, eye,
       sunDir: bodyId ? this.eph.sunDirLocal(bodyId, this.t) : null,
       disturbers: out,
+      winds: powers ? powers.winds : null,
     });
     const ms = now() - t0;
     this.physicsMs += (ms - this.physicsMs) * 0.1;
@@ -1051,7 +1055,11 @@ export class Sim {
     let env = this._envs[bodyId];
     if (!env) {
       // The explorer's ground: the world's, with low boulders as rises to walk over.
-      env = { sample: scrambleSample(this.sampler(bodyId), () => this.nearObstacles), gravity: BODIES[bodyId].gravity };
+      const ground = scrambleSample(this.sampler(bodyId), () => this.nearObstacles);
+      // (the powers, move water: on the floor of a parted channel there is no water to wade or swim in. Without the
+      // powers this is one comparison a sample.)
+      const sample = (d) => { const g = ground(d), pw = this.powers; return pw && g && g.liquidRadius > g.radius && pw.dry(bodyId, d, g.liquidRadius) ? { ...g, liquidRadius: 0 } : g; };
+      env = { sample, gravity: BODIES[bodyId].gravity };
       if (this.physics) {
         this.physics.bindEnv(bodyId, env);
         env.bodyStep = this.physics.explorer.step;

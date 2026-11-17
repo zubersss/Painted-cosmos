@@ -18,6 +18,7 @@ import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
 import { SHADOW_LAYER } from '../render/shadow.js';
+import { FELLED, FELL, felledAt, fallingOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
 const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
@@ -41,6 +42,7 @@ const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungu
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
 const _Y = new THREE.Vector3(0, 1, 0);
+const _ft = [0, 0, 0, 1], _falling = [];      // (the powers: a felled tree's turn; the trees falling now)
 const _ff = {}, _dd = [0, 0, 0], _laid = [false, false, false, false];
 
 export class Flora {
@@ -214,6 +216,56 @@ export class Flora {
   }
 
   // ---- trees ----------------------------------------------------------------------------------
+  // One tree's place in its patch (chunk.mat, chunk.rel): where it stands, upright with its own lean and girth; and,
+  // if the explorer's wind has felled it (the powers, data/felled.js), turned about its foot as far as its fall has gone.
+  _layTree(chunk, i) {
+    const d = chunk.data, o = i * INST_STRIDE;
+    _p.set(d[o], d[o + 1], d[o + 2]);
+    _up.copy(_p).normalize();
+    _q.setFromUnitVectors(_Y, _up);
+    const lean = d[o + 11], yaw = d[o + 4];
+    _q2.setFromEuler(_e.set(lean * Math.cos(yaw * 3.0), yaw, lean * Math.sin(yaw * 3.0), 'YXZ'));
+    _q.multiply(_q2);
+    if (FELLED.size) {
+      const F = felledAt(this.S.id, d[o], d[o + 1], d[o + 2]);
+      if (F) { fallTurn(_up.x, _up.y, _up.z, F, _ft); _q.premultiply(_q2.set(_ft[0], _ft[1], _ft[2], _ft[3])); }
+    }
+    const sc = d[o + 3];
+    // trunks and crowns vary in girth as well as height
+    const girth = sc * (0.82 + 0.4 * ((d[o + 7] * 7.31) % 1));
+    _m.compose(_p.sub(chunk.origin), _q, _s.set(girth, sc, girth));
+    _m.toArray(chunk.mat, i * 16);
+    chunk.rel[i * 3] = _p.x; chunk.rel[i * 3 + 1] = _p.y; chunk.rel[i * 3 + 2] = _p.z;
+  }
+  // (the powers, the wind knife) The trees that are falling now: each goes a little further over, and every loaded
+  // patch that holds it (its near patch and its far one) has that tree laid again and its meshes written again this
+  // frame. A second and a half for each felled tree; nothing at all when none is falling.
+  _fall(now) {
+    const dt = this._fallT != null ? Math.min(0.1, Math.max(0, now - this._fallT)) : 0;
+    this._fallT = now;
+    const list = fallingOn(this.S.id, _falling);
+    for (const F of list) {
+      F.f = Math.min(1, F.f + dt / FELL.time);
+      this._relay(F);
+    }
+    // (a tree felled, or a saved game's trees put back, since the last frame: those already lying are laid too)
+    if (this._fellV !== FELLED.version) { this._fellV = FELLED.version; for (const ch of this.treeChunks.values()) this._relayAll(ch); for (const ch of this.farChunks.values()) this._relayAll(ch); }
+    this._fallingNow = list.length > 0;
+  }
+  _relay(F) {
+    for (const map of [this.treeChunks, this.farChunks]) for (const ch of map.values()) {
+      if (!ch.built || !ch.n || ch.dead || !ch.mat) continue;
+      const dx = ch.origin.x - F.x, dy = ch.origin.y - F.y, dz = ch.origin.z - F.z, r = ch.size * 1.5 + 30;
+      if (dx * dx + dy * dy + dz * dz > r * r) continue;
+      const d = ch.data;
+      for (let i = 0, o = 0; i < ch.n; i++, o += INST_STRIDE) if (d[o] === F.x && d[o + 1] === F.y && d[o + 2] === F.z) { this._layTree(ch, i); ch.refill = true; break; }
+    }
+  }
+  _relayAll(ch) {
+    if (!ch.built || !ch.n || ch.dead || !ch.mat) return;
+    const d = ch.data;
+    for (let i = 0, o = 0; i < ch.n; i++, o += INST_STRIDE) if (felledAt(this.S.id, d[o], d[o + 1], d[o + 2])) { this._layTree(ch, i); ch.refill = true; }
+  }
   _buildTrees(chunk) {
     let n = 0, d;
     if (chunk.kind === 'far') {
@@ -246,18 +298,7 @@ export class Flora {
     };
     for (let i = 0; i < n; i++) {
       const o = i * INST_STRIDE;
-      _p.set(d[o], d[o + 1], d[o + 2]);
-      _up.copy(_p).normalize();
-      _q.setFromUnitVectors(_Y, _up);
-      const lean = d[o + 11], yaw = d[o + 4];
-      _q2.setFromEuler(_e.set(lean * Math.cos(yaw * 3.0), yaw, lean * Math.sin(yaw * 3.0), 'YXZ'));
-      _q.multiply(_q2);
-      const sc = d[o + 3];
-      // trunks and crowns vary in girth as well as height
-      const girth = sc * (0.82 + 0.4 * ((d[o + 7] * 7.31) % 1));
-      _m.compose(_p.sub(chunk.origin), _q, _s.set(girth, sc, girth));
-      _m.toArray(chunk.mat, i * 16);
-      chunk.rel[i * 3] = _p.x; chunk.rel[i * 3 + 1] = _p.y; chunk.rel[i * 3 + 2] = _p.z;
+      this._layTree(chunk, i);
       if (chunk.kind === 'far') { const cf = this.species[d[o + 5]] && this.species[d[o + 5]].cardFar; add(cf ? '2c' : '2', i, cf ? this.kit.farCards : this.kit.far, this.mats.far, true); }
       else {
         const kind = d[o + 5], v = d[o + 6] % 2, sp = this.species[kind];
@@ -584,6 +625,9 @@ export class Flora {
   // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
   update(camLocal, active, budgetMs, now) {
     this.camLocal.copy(camLocal);
+    // (the powers, the wind knife: trees that are falling, or were felled since the last frame. With none ever felled:
+    // one comparison.)
+    if (FELLED.size && (this._fallingNow || this._fellV !== FELLED.version)) this._fall(now); else this._fallT = now;
     this.rangeScale = RANGE_SCALE[QUALITY.level] || 1;
     // THE OIL LOOK'S TREES BY THEIR SIZE ON THE SCREEN. The tiers' ranges were made for a desktop's picture (1080 lines and
     // more); on a phone's (some 600 lines) a tree at 90 m is a third the height in pixels, and its 3,000 triangles were
@@ -711,6 +755,7 @@ export class Flora {
       for (let c = 0; c < n; c++) {
         const ch = list[(this.retierCursor + c) % n];
         if (!ch.built || !ch.n || ch.held) continue;
+        if (ch.refill) { ch.refill = false; this._retier(ch, true); continue; }      // (the powers: a tree in it is falling, or has been felled)
         if (ch.washUntil && this.washNow > ch.washUntil) { this._retier(ch, true); continue; }
         const moved = ch.tierPos.distanceTo(camLocal);
         if (moved < 3) continue;

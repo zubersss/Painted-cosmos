@@ -121,7 +121,8 @@ function shapeOf(kind, info) {
   if (kind === 'rain') return SHAPES.rain;
   if (kind === 'snow') return SHAPES.flake;
   if (kind === 'dust' || kind === 'ash' || kind === 'sand') return info.veil ? SHAPES.veil : kind === 'sand' ? SHAPES.sandStreak : SHAPES.puff;
-  if (kind === 'leaves') return SHAPES.leaf;
+  // (the powers: with the leaves' kit inked, a grain in a ground material's ink is a stroke of air, pale and of one tone)
+  if (kind === 'leaves') return SHAPES.leaf + (info.inked ? ' if (vPcMat < 200.0) { c = mix(ink, vec3(1.0, 1.0, 0.98), 0.4); ga *= 0.86; }' : '');
   if (kind === 'spray') return SHAPES.spume;
   return SHAPES[info.shape] || SHAPES.dab;
 }

@@ -228,6 +228,15 @@ export function createAudio({ enabled = true, context = null } = {}) {
       [0, 0.13, 0.3].forEach((dly, i) => setTimeout(() => burst(2300 + i * 350, 1.6, 0.045, 0.11 + i * 0.03), dly * 1000));
     }
     else if (type === 'land') burst(120, 0.7, 0.25, 0.5, 'lowpass');
+    // (the powers, ?powers=1: fired by core/powers.js when a wind is cast; never without the flag)
+    else if (type === 'gust') { burst(620, 0.6, 0.2, 0.6); burst(2100, 0.5, 0.06, 0.4, 'highpass'); }
+    else if (type === 'gather') { burst(480, 1.1, 0.12, 0.8); burst(1300, 0.9, 0.05, 0.5); }
+    else if (type === 'quicken') burst(1100, 0.4, 0.1, 1.3);
+    else if (type === 'still') burst(420, 0.5, 0.08, 1.0, 'lowpass');
+    else if (type === 'whirl') { burst(240, 0.8, 0.2, 1.8, 'lowpass'); burst(860, 0.7, 0.09, 1.2); }
+    else if (type === 'part') burst(700, 0.5, 0.12, 1.4);
+    else if (type === 'knife') { burst(2600, 1.6, 0.14, 0.22, 'highpass'); burst(900, 1.0, 0.1, 0.3); }
+    else if (type === 'timber') { burst(1500, 0.8, 0.1, 0.5); setTimeout(() => burst(105, 0.7, 0.3, 0.8, 'lowpass'), 1250); }      // a tree goes over, and lands
     else if (type === 'bounce') burst(160, 1.2, 0.2, 0.35, 'lowpass');
     else if (type === 'found') {
       [0, 0.16, 0.34].forEach((dly, i) => {
