@@ -25,6 +25,7 @@ import { BODIES } from '../data/bodies.js';
 import { PARTICLES, EVENT, publish } from './particles.js';
 import { clamp01, smoothstep, noise3, fsin, fcos } from './util.js';
 import { snowTransport01 } from './drift.js';
+import { powerWind, KIND, WINDPOWER } from './powers.js';
 
 // species: row of atmosphere.SPECIES for the fall speed.  life: [min, max] seconds.
 // puff: seconds for which a kicked or blown grain is carried by the parcel of air thrown up with
@@ -172,6 +173,7 @@ export const BLOWN = Object.freeze({
 });
 
 const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
+const _pwl = new Float64Array(4), _covL = {};
 const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
 const _wl = {};
 const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
@@ -260,7 +262,7 @@ export class Loose {
   //   disturbers (frame.disturbers), sigma (turbulence at the focus, m/s), wet01, snowDepth,
   //   dust01 (airborne dust of the weather), sandy01 (how much loose sand the wind can move),
   //   devils: [{ x, z (grid), radius, speed, up, spin, strength, height }] (features.js) or null.
-  update(dt, frame, air, near, fx, fy, fz, groundY, wx, rho, cover, bodyId, g, time, disturbers, sigma, wet01, snowDepth, devils) {
+  update(dt, frame, air, near, fx, fy, fz, groundY, wx, rho, cover, bodyId, g, time, disturbers, sigma, wet01, snowDepth, devils, winds) {
     const P = this.P, rng = this.rng, h = dt > 0.1 ? 0.1 : dt;
     const Rr = PARTICLES.radius;
     this._T = wx ? wx.temperature : 288;
@@ -471,6 +473,8 @@ export class Loose {
           }
         }
       }
+      // the wind the explorer makes (powers.js) lifts what lies loose under it
+      if (winds && winds.count > 0) this._windLift(winds, h, frame, air, near, fx, fz, groundY, wet01, snowDepth);
     }
 
     // ---- emitters: bodies and jets ---------------------------------------------------------------
@@ -569,11 +573,12 @@ export class Loose {
     // fly (on-stack replacement) and never the whole: per particle, what it called stayed calls, each number handed
     // over in a fresh heap box (half a megabyte of garbage a frame in a blizzard, measured). A method of one loop is
     // optimised whole and its lookups inlined. The arithmetic is the same, line for line.
-    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils);
+    const blown = winds && winds.count > 0 ? winds : null;
+    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils, blown);
   }
 
   // One kind's step (see update, "motion").
-  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils) {
+  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils, winds) {
     const P = this.P, Rr = PARTICLES.radius, wv = P._wv, ht = P._ht, wtx = P._wtx, wtz = P._wtz;
     const K = LOOSE[name], b = P.buffers[name];
     b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
@@ -623,6 +628,8 @@ export class Loose {
           wn += (dx * ir * D.spin - dz * ir * 0.35) * D.speed * f;
           wu += D.up * D.strength * (r < rc * 1.5 ? 1 : rc * 1.5 / r);
         }
+        // the wind the explorer makes (powers.js): a gust carries it, a stilled place lets it fall, a gathered ball holds it
+        if (winds && powerWind(winds, x, z, hz, _pwl)) { we = we * _pwl[3] + _pwl[0]; wn = wn * _pwl[3] + _pwl[1]; wu = wu * _pwl[3] + _pwl[2]; }
         // weight, then drag toward the air (implicit; no drag at all when vt is "infinite")
         let rx = vx - we, ry = vy - g * h - wu, rz = vz - wn;
         const sl = Math.sqrt(rx * rx + ry * ry + rz * rz), m = vt < 1e4 ? 1 / (1 + g / (vt * vt) * sl * h) : 1;
@@ -808,6 +815,57 @@ export class Loose {
   }
 
   // Powder kicked up from snow joins the snow buffer (it falls like any other flake).
+  // WHAT THE EXPLORER'S WIND LIFTS (powers.js). Under a gust's pulse, round a gathered ball and at a tornado's foot,
+  // what lies loose on the ground there is thrown up into the moving air, by what the ground is: spray and a ring off
+  // water, powder off snow, leaves off a wood's floor, sand and dust off dry loose ground; off bare rock, wet ground or
+  // turf, nothing but a little pale dust (so that the air is seen to move at all). A fixed rate for each source
+  // (WINDPOWER.liftGust and its fellows, grains a second), so the cost of a cast is known beforehand.
+  _windLift(winds, h, frame, air, near, fx, fz, groundY, wet01, snowDepth) {
+    const rng = this.rng, P = this.P, Rr = PARTICLES.radius, W = WINDPOWER, cov = _covL;
+    for (let k = 0; k < winds.count; k++) {
+      const s = winds[k];
+      if (!s.placed || !(s.strength > 0.05) || s.kind === KIND.zone) continue;
+      if (Math.abs(s.x - fx) > Rr + 40 || Math.abs(s.z - fz) > Rr + 40) continue;
+      const rate = s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex;
+      s.carry += rate * s.strength * h;
+      let guard = 64;
+      while (s.carry >= 1 && guard-- > 0) {
+        s.carry -= 1;
+        let x, z, ve, vn, vu;
+        if (s.kind === KIND.jet) {
+          // just behind the pulse's front, across its width there
+          const f = Math.min(s.front * s.age, s.reach);
+          if (f >= s.reach && s.age * s.front > s.reach + s.pulse * 2) { s.carry = 0; break; }
+          const a = f - rng() * s.pulse * 0.8, w = s.radius + s.spread * (a > 0 ? a : 0), c = (rng() * 2 - 1) * w * 1.2;
+          if (a < 0.5) continue;
+          x = s.x + s.de * a - s.dn * c; z = s.z + s.dn * a + s.de * c;
+          const U = s.speed * s.strength / (1 + 1.2 * a / s.reach) * Math.exp(-(c / w) * (c / w));
+          ve = s.de * U * 0.55; vn = s.dn * U * 0.55; vu = U * (0.10 + 0.22 * rng());
+        } else {
+          const R = s.kind === KIND.orb ? s.radius * (0.25 + 0.6 * rng()) : s.radius * (0.4 + 1.6 * rng()), a = rng() * 6.2831853;
+          x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
+          const sp = s.kind === KIND.orb ? 2.5 : s.speed * 0.5;
+          ve = -Math.sin(a) * sp * s.spin - Math.cos(a) * sp * 0.4; vn = Math.cos(a) * sp * s.spin - Math.sin(a) * sp * 0.4; vu = 1.2 + 2.2 * rng();
+        }
+        if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+        const gp = this._ground(near, x, z, groundY, wet01, snowDepth), gy = gp.h;
+        if (gp.liquid > 0.05) {
+          // water: spray off its face, and a ring now and then (the water is ruffled)
+          this.emit('spray', x, gy + gp.liquid + 0.03, z, ve * 0.6, vu * 0.9 + 0.6, vn * 0.6, 0.7, 0.8, gp.mat);
+          if (rng() < 0.12) P._event(frame, x, gy + gp.liquid, z, EVENT.ripple, 0.55 + 0.4 * rng(), 0.3);
+          continue;
+        }
+        if (snowDepth > 0.03) { this._emitSnow(x, gy + 0.05, z, ve, vu * 1.3, vn); continue; }
+        // a wood's floor: its fallen leaves
+        const lf = air.coverNear(x, z, cov) ? Math.min(1, 4 * (cov.leaves || 0)) * (0.3 + 0.7 * cov.canopy01) : 0;
+        const q = rng();
+        if (q < lf * (1 - smoothstep(0.2, 0.6, wet01))) { this.emit('leaves', x, gy + 0.05, z, ve, vu * 1.5 + 0.8, vn, 0.9); continue; }
+        if (gp.repose > 0 && q < 0.5) { this.emit('sand', x, gy + 0.02, z, ve, vu, vn, 1, 0.8, gp.mat); continue; }
+        if (q < gp.dust + 0.12) this.emit('dust', x, gy + 0.05 + rng() * 0.3, z, ve, vu, vn, gp.dust > 0.1 ? 1.3 : 0.8, gp.dust > 0.1 ? 1.1 : 0.5, gp.mat);
+      }
+    }
+  }
+
   _emitSnow(x, y, z, vx, vy, vz) {
     const b = this.P.buffers.snow, cap = PARTICLES.capacity.snow[this.P.quality];
     if (b._n >= cap) return false;
