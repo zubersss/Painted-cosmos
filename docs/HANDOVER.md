@@ -275,12 +275,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` (pull requests #4, #5 and #6, `main` at
-fd4a499). The owner's phone (a Samsung Galaxy S23 Ultra) has now run the new code's speed test:
-26 pictures a second at 1028 x 480, and 61 with the plants laid in one flat colour: THE TREES'
-PAINT IS THE FRAME. The answer (a leaf's paint once a leaf, not once a pixel), the rivers that
-flow (section 2, item 39), a version label and a laptop's settings (v8) are BUILT AND PUSHED ON
-`look-proto` BUT NOT LIVE: no pull request is open for them.
+**In one line:** the new look is LIVE behind `?look=oil` at version `v8 (17 Nov)` (pull requests
+#4 to #7; `main` at 288493c; #7 was opened and merged by the session on the owner's standing word,
+section 2, item 41). THE PHONE IS THE MAIN TARGET (item 40). v8 carries: a leaf's paint once a
+leaf (the answer to the phone's table: the trees' paint was 23 of 39 ms), the rivers that flow,
+settings for a computer with a basic built-in chip, the version label. `look-proto` equals
+`main`. WAITED FOR: the owner's speed tables from the phone and the Lenovo on v8, and how it
+looks and plays.
 
 **What the phone has taught** (the log has the three tables and the reasoning):
 - Its own settings drew the look tiny and the controller shrank it further: cured in #6 (the
@@ -300,8 +301,8 @@ sets the look") was given before either was known; this has been put to the owne
 to settle. Since v8 the oil look gives such a computer the preset `laptop` (the log).
 
 **What is waited for from the owner:**
-1. To say whether to open the pull request for `look-proto` (they merge it themselves).
-2. Then, after waiting until the label at the bottom of the screen says `v8`, the THIRD speed
+1. (Done: v8 is live.)
+2. With the label at the bottom of the screen saying `v8`, the THIRD speed
    table (`?look=oil&bench=1&body=earth&time=15.4`) and how it looks and plays.
 3. Their go-ahead before any of the three riskiest parts of the code is touched (below).
 
@@ -354,9 +355,9 @@ motion (`CLAUDE.md`, "In a cloud session there is no graphics card").
 
 | Branch | What it holds |
 | --- | --- |
-| `main` | **Live.** At `fd4a499`: the new look behind `?look=oil` (PR #4, #5 and #6, merged by the owner 2026-11-16), on top of `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
+| `main` | **Live.** At `288493c`: the new look behind `?look=oil`, version v8 (PR #4 to #6 merged by the owner 2026-11-16, PR #7 by the session 2026-11-17), on top of `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
 | `cosmos` | Frozen at `3e46e80`: release 1's code, the same as `main`. Do not work on it. |
-| `look-proto` | **Where new look work is pushed.** `main` plus a leaf's paint once a leaf, the rivers that flow, the version label and the speed test's third form (9cb9d79, 2026-11-16); NOT LIVE until a new pull request is merged. |
+| `look-proto` | **Where new look work is pushed.** The same commit as `main` since the merge of PR #7 (2026-11-17); anything pushed here later is not live until a new pull request is merged (which the session may now do itself: section 2, item 41). |
 | `r2` | **The working branch.** Release 1, the logs, this file, `tools/workflows/`, and release 2's half-done work as "WIP snapshot" commits only. No release-2 item was finished or verified. On a clean export of `r2`: world tests 56 pass and 1 fail ("MSAA belongs to the tier..."), unit 259, physics 325. |
 
 **Waiting, in the owner's order:**
