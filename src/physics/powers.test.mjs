@@ -152,6 +152,42 @@ test('a gust lifts what lies loose and carries it along the aim: dust off dry gr
   }
 });
 
+test('gather: the leaves of a wood floor are drawn into the ball and held round it, and go where it is carried', () => {
+  const w = setup('earth', 'autumn_woodland'), S = makeWinds();
+  run(w, 2, S);
+  const { n, e } = axes(w), b = w.physics.particles.leaves;
+  const near = (cx, cz, r) => { let k = 0; for (let i = 0; i < b._n; i++) { const dx = b._p[i * 3] - cx, dz = b._p[i * 3 + 2] - cz; if (dx * dx + dz * dz < r * r) k++; } return k; };
+  const before = near(0, 4, 3);
+  const orb = castOrb(S, w.bodyId, add(w.focus, n, 4));
+  run(w, 2.5, S);
+  const held = near(0, 4, 3);
+  assert.ok(held > before + 15, 'leaves within 3 m of the ball: ' + before + ' -> ' + held);
+  // carried 10 m east over two seconds: the crowd goes with it
+  for (let i = 0; i < 120; i++) { moveWind(orb, add(add(w.focus, n, 4), e, 10 * (i + 1) / 120)); run(w, 1 / 60, S); }
+  run(w, 0.8, S);
+  const there = near(10, 4, 3.5), left = near(0, 4, 3);
+  assert.ok(there > 12 && there > left, 'they went with the ball: ' + there + ' round it, ' + left + ' left behind');
+});
+
+test('a whirl lifts the leaves at its foot and turns them round itself', () => {
+  const w = setup('earth', 'autumn_woodland'), S = makeWinds();
+  run(w, 2, S);
+  const { n } = axes(w), b = w.physics.particles.leaves, n0 = b._n;
+  castVortex(S, w.bodyId, add(w.focus, n, 12), 1);
+  run(w, 4, S);
+  // round the foot (grid 0, 12): how many, how high, and which way they turn (positive: with its spin)
+  let k = 0, turn = 0, high = 0;
+  for (let i = 0; i < b._n; i++) {
+    const dx = b._p[i * 3], dz = b._p[i * 3 + 2] - 12, r = Math.hypot(dx, dz);
+    if (r > 12 || r < 0.3) continue;
+    k++; turn += (-dz * b._v[i * 3] + dx * b._v[i * 3 + 2]) / r; if (b.hag[i] > 4) high++;
+  }
+  assert.ok(b._n > n0 + 40 && k > 40, 'leaves in the air round it: ' + k + ' (the wood had ' + n0 + ' flying)');
+  assert.ok(turn / k > 1, 'turning with it, ' + (turn / k).toFixed(1) + ' m/s on average');
+  assert.ok(high > 5, 'and carried up: ' + high + ' over 4 m');
+  assert.equal(w.physics.features.devils.count >= 1, true, 'the game sees it as a dust devil');
+});
+
 test('a stilled place: the air at the explorer is nearly still while it lasts', () => {
   const w = setup('earth', 'sea_coast'), S = makeWinds();
   run(w, 2, S);
