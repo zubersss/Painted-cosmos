@@ -16,6 +16,8 @@
 //   preset=phone|tablet|desktop      the device preset (src/core/preset.js; chosen from the
 //                                    pointer and the screen without it)   fullscreen=0   never ask
 //   kits=0                           no weather marks (rain, snow, dust)   weather=fair   a clear sky, always
+//   powers=1                         the elemental powers (wind): docs/POWERS.md; off without it, and then nothing of
+//                                    them is loaded
 //   bench=1                          a speed test on this device: the same view drawn ten ways, the table left on the
 //                                    screen (src/core/bench.js); no start card, the resolution controller off
 import * as THREE from 'three';
@@ -314,6 +316,15 @@ async function boot() {
   }
 
   const sim = game.sim;
+  // The elemental powers (?powers=1; docs/POWERS.md): loaded only when asked for.
+  if (params.has('powers') && params.get('powers') !== '0') {
+    Promise.all([import('./core/powers.js'), import('./ui/powers.js')]).then(([core, ui]) => {
+      const powers = new core.Powers();
+      core.attachPowerInputs(powers, window);
+      ui.attachPowersUi(powers, hudRoot);
+      sim.powers = powers;
+    }).catch((e) => console.warn('powers: ' + ((e && e.message) || e)));
+  }
   // ?clock=even: every world turns at its own even rate (the game's clock is uneven: slow dusks
   // and dawns, short nights; an instrument that sets an hour and lets the clock run wants it even).
   if (params.get('clock') === 'even') sim.unevenClock = false;

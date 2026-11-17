@@ -607,6 +607,9 @@ export class Sim {
   updatePhysics(dt) {
     const physics = this.physics;
     if (!physics) return;
+    // (the elemental powers, core/powers.js: there only with ?powers=1; the hands, the aim, the list of the explorer's wind)
+    const powers = this.powers;
+    if (powers) powers.update(dt, this);
     const st = this.sm.state;
     const out = this._disturbers;
     out.length = 0;
@@ -627,6 +630,7 @@ export class Sim {
       bodyId, time: this.t, focus, eye,
       sunDir: bodyId ? this.eph.sunDirLocal(bodyId, this.t) : null,
       disturbers: out,
+      winds: powers ? powers.winds : null,
     });
     const ms = now() - t0;
     this.physicsMs += (ms - this.physicsMs) * 0.1;
