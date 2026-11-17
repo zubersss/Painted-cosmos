@@ -2132,3 +2132,4 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - THE GATE, each step before the merge and each read from this run's own files: the default game, six scenes, 0 pixels differ; the oil look, three scenes, 0 pixels differ in every one; unit 251, world 47, physics 325; the static rules; the default page opens with no error; speed test 6 runs its 21 rows in the test browser with no error.
 - AFTER the merge: the full check on `main` (a13850e) started at once; its result is in the next entry.
 - ASKED OF THE OWNER (unchanged, now for v11): one photograph of the speed test's table; their eye on `?look=oil&fartree=cards`; their word on merging the powers.
+- THE FULL CHECK ON `main` AT v11 (a13850e): ALL 17 PASSED (the gate's last step; nothing to undo).
