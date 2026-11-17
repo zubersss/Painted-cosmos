@@ -72,7 +72,8 @@ test('in the real forest: the knife fells the first tree along the aim, its trun
   assert.ok(F, 'that tree, or one nearer on the same line');
   const any = fallingOn('earth'); assert.equal(any.length, 1);
   const G = any[0], away = G.dx * sim.footCam.viewFwd.x + G.dy * sim.footCam.viewFwd.y + G.dz * sim.footCam.viewFwd.z;
-  assert.ok(away > 0.99, 'it falls away from the explorer, along the aim');
+  assert.ok(Math.abs(away - Math.cos(POWERS.knifeSide)) < 0.02 && away > 0.5, 'it falls away from the explorer, and to one side of the aim (so the fall is seen): ' + away.toFixed(2));
+  assert.ok(Math.abs(G.dx * here.x + G.dy * here.y + G.dz * here.z) < 0.02, 'level');
   assert.ok(G.f <= 0, 'and begins when the blade reaches it');
   // its trunk is no longer in what the game bumps into; the others still are
   const after = sampleObstaclesPure('earth', here.x, here.y, here.z, 16).filter((o) => o.kind === 'tree');

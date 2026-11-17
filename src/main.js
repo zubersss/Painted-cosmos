@@ -315,6 +315,21 @@ async function boot() {
       const powers = new core.Powers();
       core.attachPowerInputs(powers, window);
       ui.attachPowersUi(powers, hudRoot);
+      // (where a place on the world lies on the screen, for the aim mark of ui/powers.js: its spot in css pixels, how
+      // many pixels a metre is there, and how flat a ring on the ground lies to the eye)
+      const _pv = new THREE.Vector3(), _pu = new THREE.Vector3(), _pc = new THREE.Vector3();
+      powers.project = (q) => {
+        const root = world && world.bodies && world.bodies.get ? world.bodies.get(sim.bodyId) : null;
+        if (!root) return null;
+        _pv.set(q.x, q.y, q.z).applyQuaternion(root.quaternion).add(root.position);
+        _pu.set(q.x, q.y, q.z).normalize().applyQuaternion(root.quaternion);
+        _pc.copy(_pv).sub(camera.position);
+        const flat = Math.abs(_pc.dot(_pu)) / (_pc.length() || 1);
+        _pv.applyMatrix4(camera.matrixWorldInverse);
+        if (_pv.z > -0.5) return null;
+        const el = renderer.domElement, w = el.clientWidth || 1, h = el.clientHeight || 1, k = (h / 2) / (-_pv.z * Math.tan((camera.fov * Math.PI) / 360));
+        return { x: w / 2 + _pv.x * k, y: h / 2 - _pv.y * k, k, flat: Math.min(1, Math.max(0.12, flat)) };
+      };
       let fells = 0;
       powers.onCast = (id) => { if (!audio) return; audio.event(id); if (powers.fells !== fells) { fells = powers.fells; audio.event('timber'); } };
       sim.powers = powers;

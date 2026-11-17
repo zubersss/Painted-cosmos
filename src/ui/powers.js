@@ -28,9 +28,10 @@ const CSS = `
 .pc-pw-word { position: absolute; left: 50%; bottom: calc(var(--pc-sb, 0px) + 14px); transform: translateX(-50%); padding: 4px 10px; border-radius: 11px;
   font: 600 12px/1 Georgia, 'Times New Roman', serif; color: #2f3a5d; background: rgba(250, 246, 236, 0.78); pointer-events: none; display: none; }
 .pc-pw-live .pc-pw-word { display: block; }
-.pc-pw-mark { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; pointer-events: none; display: none;
+.pc-pw-mark { position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; pointer-events: none; display: none; opacity: 0.55;
   box-shadow: 0 0 0 1.5px rgba(250, 246, 236, 0.9), 0 0 0 3px rgba(47, 58, 93, 0.35); }
-.pc-pw-held .pc-pw-mark { display: block; }
+.pc-pw-live .pc-pw-mark { display: block; }
+.pc-pw-held .pc-pw-mark { opacity: 1; }
 `;
 
 export function attachPowersUi(powers, root) {
@@ -38,11 +39,14 @@ export function attachPowersUi(powers, root) {
   const style = doc.createElement('style'); style.textContent = CSS; doc.head.appendChild(style);
   const el = (cls, text) => { const e = doc.createElement('div'); e.className = cls; if (text) e.textContent = text; root.appendChild(e); return e; };
   const btn = el('pc-pw-btn'), fan = el('pc-pw-fan'), word = el('pc-pw-word'), mark = el('pc-pw-mark');
-  // the fan: the abilities on an arc up and to the left of the button (away from the screen's edge and from "jump")
-  const R = 104, tabs = ABILITIES.map((a, i) => {
+  // the fan: the abilities beside the button, on its left (away from the screen's edge and from "jump")
+  // (a column to the left of the button, bowed a little toward the thumb's arc and set higher than the button, clear
+  // of "jump" under it; 32 px from word to word, so no two overlap however many there are. An arc was tried first:
+  // with seven words the top ones lay side by side over each other. Seen on a phone-sized screen, 2026-11-17.)
+  const NA = ABILITIES.length, MID = (NA - 1) / 2, tabs = ABILITIES.map((a, i) => {
     const t = doc.createElement('div'); t.className = 'pc-pw-tab'; t.textContent = a.word;
-    const ang = (90 + i * (125 / Math.max(1, ABILITIES.length - 1))) * Math.PI / 180;      // 90 .. 215 degrees: straight up, round to the left and a little down (clear of "jump", which is under the button)
-    t._x = Math.cos(ang) * R; t._y = -Math.sin(ang) * R;
+    const k = MID > 0 ? (i - MID) / MID : 0;
+    t._x = -88 - 16 * (1 - k * k); t._y = (i - MID) * 32 - 30;
     t.style.transform = `translate(calc(-50% + ${t._x.toFixed(0)}px), calc(-50% + ${t._y.toFixed(0)}px))`;
     fan.appendChild(t); return t;
   });
@@ -77,13 +81,27 @@ export function attachPowersUi(powers, root) {
     } else if (!open && e.type === 'pointerup' && !ABILITIES[powers.ability].hold) powers.tapOnce = true;      // a tap
   };
   btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up);
-  let shown = null, wordNow = '';
+  let shown = null, wordNow = '', markKey = '';
   powers.onFrame = (p) => {
     const on = p.active;
     if (on !== shown) { shown = on; root.classList.toggle('pc-pw-live', on); root.classList.toggle('pc-pw-on', on && coarse); }
     const w = ABILITIES[p.ability].word;
     if (w !== wordNow) { wordNow = w; btn.textContent = w; word.textContent = 'wind: ' + w; }
-    root.classList.toggle('pc-pw-held', on && (p.keys.touch || p.keys.cast || p.keys.mouse || p.keys.pad || !!p.orb));
+    root.classList.toggle('pc-pw-held', on && (p.keys.touch || p.keys.cast || p.keys.mouse || p.keys.pad || !!p.orb || !!p.part));
+    // THE AIM MARK: a ring on the ground where the chosen power will act, as wide as what it will do there, lying as
+    // the ground lies to the eye; there before the cast, stronger while a power is held. (p.project: main.js; without
+    // it, or with the aim behind the eye, no mark.)
+    const s = on && p.aim.ok && p.project ? p.project(p.aim.p) : null;
+    if (s) {
+      const rx = Math.max(7, Math.min(280, p.aim.size * s.k)), ry = Math.max(4, rx * s.flat);
+      const key = Math.round(s.x) + ',' + Math.round(s.y) + ',' + Math.round(rx) + ',' + Math.round(ry);
+      if (key !== markKey) {
+        markKey = key;
+        mark.style.width = (2 * rx).toFixed(0) + 'px'; mark.style.height = (2 * ry).toFixed(0) + 'px';
+        mark.style.transform = 'translate(' + (s.x - rx).toFixed(0) + 'px, ' + (s.y - ry).toFixed(0) + 'px)';
+        mark.style.visibility = 'visible';
+      }
+    } else if (markKey !== '') { markKey = ''; mark.style.visibility = 'hidden'; }
   };
   return { btn, fan, word, mark };
 }

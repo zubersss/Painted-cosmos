@@ -34,9 +34,15 @@ export const POWERS = Object.freeze({
   castPose: 0.5,          // s: how long the explorer's cast shows (figure state: sim.ex.casting, 1 .. 0)
   knifeReach: 18,         // m: how far the wind knife cuts
   knifeWidth: 1.2,        // m: a trunk this near the aim's line (and its own radius more) is cut
+  knifeSide: 0.7,         // rad: how far to its own side of the aim a cut tree falls (0: straight away from the explorer)
 });
 
 const add = (a, b, k) => ({ x: a.x + b.x * k, y: a.y + b.y * k, z: a.z + b.z * k });
+// How wide what an ability does is at the aim (m, its radius on the ground `dist` metres out): the ring of the aim mark.
+const AIM_SIZE = {
+  gust: (d) => WINDPOWER.gustRadius + WINDPOWER.gustSpread * d, gather: () => WINDPOWER.orbCore * 1.4, quicken: () => WINDPOWER.zoneRadius,
+  still: () => WINDPOWER.zoneRadius, whirl: () => WINDPOWER.vortexRadius, part: () => WINDPOWER.partHalf, knife: () => 0.7,
+};
 const unit = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
 export class Powers {
@@ -48,7 +54,7 @@ export class Powers {
     this._wait = 0;
     this.orb = null;            // the gathered ball, while held
     this.part = null;           // the parted channel (move water), while held
-    this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, from: { x: 0, y: 0, z: 0 } };
+    this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, from: { x: 0, y: 0, z: 0 }, size: 0 };
     this.casts = 0;             // how many casts so far (for tests and the read-out)
     this.note = '';             // one word for the HUD when something cannot be done here
     this.active = false;        // the powers can be used now (on foot, on a world)
@@ -98,7 +104,16 @@ export class Powers {
         }
       }
     }
-    if (best && fellTree(sim.bodyId, best.p.x, best.p.y, best.p.z, f.x, f.y, f.z, bd / WINDPOWER.gustFront)) this.fells++;
+    if (best) {
+      // it goes over away from the explorer and to its own side of the aim (straight away, the fall is hidden behind
+      // the tree itself from where the explorer stands: seen in the stills of 2026-11-17)
+      const rx = best.p.x - p.x, ry = best.p.y - p.y, rz = best.p.z - p.z;
+      const sx = f.y * up.z - f.z * up.y, sy = f.z * up.x - f.x * up.z, sz = f.x * up.y - f.y * up.x;      // the aim's right
+      let side = rx * sx + ry * sy + rz * sz;
+      side = Math.abs(side) > 0.12 ? Math.sign(side) : ((Math.abs(best.p.x) * 7.31) % 1 > 0.5 ? 1 : -1);
+      const c = Math.cos(POWERS.knifeSide), n = Math.sin(POWERS.knifeSide) * side;
+      if (fellTree(sim.bodyId, best.p.x, best.p.y, best.p.z, f.x * c + sx * n, f.y * c + sy * n, f.z * c + sz * n, bd / WINDPOWER.gustFront)) this.fells++;
+    }
     return best;
   }
 
@@ -135,8 +150,12 @@ export class Powers {
     this._was = down;
     if (this._wait > 0) this._wait -= dt;
     if (sim.ex && sim.ex.casting > 0) sim.ex.casting = Math.max(0, sim.ex.casting - dt / POWERS.castPose);
+    // (the aim is worked out every frame the powers can be used, cast or not: the mark on the screen shows where a
+    // power will act before it is cast, ui/powers.js. One sample of the ground a frame.)
+    if (this.active) { const A = this._aim(sim), id = ABILITIES[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) : 0; }
+    else this.aim.ok = false;
     if (this.active && (down || this.orb || this.part)) {
-      const A = this._aim(sim), ab = ABILITIES[this.ability];
+      const A = this.aim, ab = ABILITIES[this.ability];
       if (A.ok) {
         if (ab.id === 'gather') {
           if (pressed && !this.orb) { this.orb = castOrb(W, sim.bodyId, this._orbAt(sim, POWERS.orbAhead)); this._cast(sim); }
