@@ -97,6 +97,7 @@ export class Flora {
       const lf = LOOK.oil ? sortLeafCards : (g) => g;
       return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer',
         // (far off it is drawn as leaf cards, not as a lump: the trees in leaf of the oil look; ?fartree=lump: as it was)
+        canCard: sp.kit === 'broadleaf' || sp.kit === 'conifer',
         cardFar: LOOK.oil && FAR_CARDS && (sp.kit === 'broadleaf' || sp.kit === 'conifer') };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
@@ -488,6 +489,24 @@ export class Flora {
       make(lists.rock, this.kit.rock, M.rock, [0, UNDER_FAR, 0.3, 0.85], 0);
       make(lists.shard, this.kit.shard, M.shard, [0, UNDER_FAR, 0.3, 0.85], 0);
     }
+  }
+
+  // (PILOT's speed test, core/bench.js) The far trees' form swapped while the game runs: the lump, or the flat pieces of
+  // ?fartree=cards. Every far patch is dropped and built again in its turn; the caller waits for the world to settle.
+  // Returns which form is now drawn (true: flat pieces), or null where there is nothing to swap (not the oil look).
+  setFarCards(on) {
+    if (!LOOK.oil || !this.ready) return null;
+    on = !!on;
+    const now = this.species.some((sp) => sp.cardFar);
+    if (on === now) return now;
+    if (on && !this.kit.farCards) this.kit.farCards = farCardGeometry(6);
+    for (const sp of this.species) sp.cardFar = on && sp.canCard;
+    for (const [key, ch] of this.farChunks) {
+      if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+      this._disposeChunk(ch); this.farChunks.delete(key);
+    }
+    this.lastTreeEval.set(1e9, 0, 0);
+    return on;
   }
 
   _disposeChunk(chunk) {
