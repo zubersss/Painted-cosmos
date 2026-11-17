@@ -122,6 +122,14 @@ void main() {
 `;
 
 export class ShadowMap {
+  // (PILOT's speed test, core/bench.js) The square the shadows are drawn into, made another size while the game runs:
+  // what a smaller square costs and saves is the device's to say. 2048 is the look's own.
+  setSize(n) {
+    n = Math.max(256, Math.min(4096, n | 0));
+    if (!this.ok || !this.rt || n === this.size) return this.size;
+    this.size = n; this.rt.setSize(n, n); this.rtAir.setSize(n / 4, n / 4);
+    return n;
+  }
   constructor(renderer, opts) {
     const o = opts || {};
     const ex = renderer.extensions;
@@ -237,7 +245,8 @@ export class ShadowMap {
     // x how strong, y the bias (0.3 m toward the sun), z a texel of the square, w where the square's answer gives way
     K.set(k, 0.3 / (2 * D), 1 / this.size, 0.86);
     // for the light in the air (post.js OIL_FRAG): the eye's space to the square, and the way to the sun in the eye's space
-    root.updateMatrixWorld(); camera.updateMatrixWorld();
+    // (the body's root and the eye are in the scene, and the scene has just been walked and placed for the sun's
+    // camera: they are up to date. Walking the root's whole subtree again here was a third of a frame's placing.)
     OIL.uShV.value.copy(root.matrixWorld).invert().multiply(camera.matrixWorld).premultiply(OIL.uShM.value);
     OIL.uSunV.value.copy(Z).applyQuaternion(q).transformDirection(camera.matrixWorldInverse);
     OIL.uShaft.value.x = SHADOW.shaft * k * (SHADOW.shaftK == null ? 1 : SHADOW.shaftK); OIL.uShaft.value.y = SHADOW.air;

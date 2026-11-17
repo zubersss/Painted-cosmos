@@ -200,7 +200,12 @@ export function createPainter(renderer) {
     const prevTarget = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;
+    // (the shadow pass walks the whole scene and places every object in it; the scene pass that follows would walk and
+    // place them all again, though nothing has moved in between: when the shadow pass has drawn this frame, the scene
+    // pass takes the places as they are. Counted at a phone's size: 872 objects were placed 2.8 times a frame, now once.)
+    const sf0 = shadow ? shadow.frames : 0;
     if (shadow) shadow.render(renderer, scene, camera);
+    const placed = !!shadow && shadow.frames !== sf0 && scene.matrixWorldAutoUpdate === true;
     if (LOOK.oil) {
       // (the lantern's glow in the air, post.js OIL_FRAG: where the lantern is in the eye's space, and how strong)
       const L = OIL.uLamp.value, V = OIL.uLampV.value;
@@ -212,9 +217,11 @@ export function createPainter(renderer) {
     // glazes sit out the scene pass and are laid over the brushed picture afterwards
     glazed.length = 0;
     for (const o of GLAZES) if (o.visible && o.parent) { o.visible = false; glazed.push(o); }
+    if (placed) scene.matrixWorldAutoUpdate = false;
     try {
       renderer.render(scene, camera);
     } finally {
+      if (placed) scene.matrixWorldAutoUpdate = true;
       restoreForeign();
     }
     post.finish(glazed, camera);
@@ -276,6 +283,7 @@ export function createPainter(renderer) {
       if (!o) return;
       if (shadow && o.shadow != null) { if (shadow._ok0 == null) shadow._ok0 = shadow.ok; shadow.ok = !!o.shadow && shadow._ok0; }
       if (o.shaft != null) SHADOW.shaftK = o.shaft ? 1 : 0;
+      if (shadow && o.shadowSize != null) { if (shadow._size0 == null) shadow._size0 = shadow.size; shadow.setSize(o.shadowSize > 0 ? o.shadowSize : shadow._size0); }
       // (the lighter paint on or off, and the flat modes: shared.js uOilL)
       if (o.lite != null) OIL.uOilL.value.x = o.lite ? 1 : 0;
       if (o.flat != null) OIL.uOilL.value.y = +o.flat || 0;

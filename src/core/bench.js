@@ -22,6 +22,8 @@
 // the one before it. The questions are about the far trees: their paint, their shapes, the shadow pass or the picture,
 // first or last in the order of drawing, and the lump against the tree of flat pieces IN THE SAME RUN (the form is
 // swapped while the test runs). Then the other plants, the light, the paint.
+// SIXTH FORM (2026-11-17): two more rows about the shadow pass, which is a third of a frame's triangles at a phone's
+// size (the trees drawn again from the sun, into a square 2048 wide): the square half as wide, and the trees out of it.
 // The header also says how the depth is kept (reversed or logarithmic: with the second, nothing hidden is skipped), the
 // script's own time a frame (the CPU's share) and the draw calls and triangles of a frame.
 
@@ -83,7 +85,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 5, ' + BUILD + ': photograph this screen and send it\n' +
+    return 'PAINTED COSMOS SPEED TEST 6, ' + BUILD + ': photograph this screen and send it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -97,6 +99,7 @@ export function attachBench(pc) {
     const hasB = typeof P._bench === 'function', lite0 = !!P.lite;
     const B = (o) => hasB && P._bench(o);
     const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(o.material.name || '')) fn(o); });
+    const treeMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-(tall|far)/.test(o.material.name || '')) fn(o); });
     const flora = () => (pc.world && pc.world._flora) || null;
     // (the far trees' form swapped while the test runs, world/flora.js setFarCards: the two forms are then timed in the
     // same minute, on a phone as warm for the one as for the other)
@@ -128,6 +131,8 @@ export function attachBench(pc) {
       [AS, null, null],
       // the light and the paint (each settles first: its shaders are built again)
       ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
+      ['shadows drawn half as fine', () => B({ shadowSize: 1024 }), () => B({ shadowSize: 0 })],
+      ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
       [AS + ', last', null, null],
