@@ -178,6 +178,7 @@ const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
 const _wl = {};
 const _gq = new Float64Array(4);     // (P17) x, z in; ground height, liquid level out (near.js TerrainGrid.groundQ)
 const I_DUST = MATERIAL_INDEX.dust, I_SNOW = MATERIAL_INDEX.snow;
+const I_WOOD = MATERIAL_INDEX.mud != null ? MATERIAL_INDEX.mud : MATERIAL_INDEX.soil;      // (a snapped branch's ink: the darkest brown the ground has)
 const I_ICE = MATERIAL_INDEX.ice != null ? MATERIAL_INDEX.ice : MATERIAL_INDEX.snow;      // (the wisps of the explorer's wind: powers.js)
 
 export class Loose {
@@ -848,8 +849,10 @@ export class Loose {
       }
       const rate = s.kind === KIND.jet ? W.liftGust : s.kind === KIND.orb ? W.liftOrb * (s.age < 2.5 ? 1 : 0.15) : W.liftVortex;
       s.carry += rate * s.strength * h;
-      // the air itself, as pale strokes riding it (WINDPOWER.wisp*)
+      // the air itself, as pale strokes riding it (WINDPOWER.wisp*); the crowns it goes through, losing leaves and
+      // now and then a branch (WINDPOWER.tear*, snap*)
       this._wisps(s, h, near, fx, fz, groundY, Rr);
+      this._tear(s, h, frame, air, near, fx, fz, groundY, Rr);
       let guard = 64;
       while (s.carry >= 1 && guard-- > 0) {
         s.carry -= 1;
@@ -881,10 +884,73 @@ export class Loose {
         // a wood's floor: its fallen leaves
         const lf = air.coverNear(x, z, cov) ? Math.min(1, 4 * (cov.leaves || 0)) * (0.3 + 0.7 * cov.canopy01) : 0;
         const q = rng();
-        if (q < lf * (1 - smoothstep(0.2, 0.6, wet01))) { this.emit('leaves', x, gy + 0.05, z, ve, vu * 1.5 + 0.8, vn, 0.9); continue; }
-        if (gp.repose > 0 && q < 0.5) { this.emit('sand', x, gy + 0.02, z, ve, vu, vn, 1, 0.8, gp.mat); continue; }
-        if (q < gp.dust + 0.12) this.emit('dust', x, gy + 0.05 + rng() * 0.3, z, ve, vu, vn, gp.dust > 0.1 ? 1.3 : 0.8, gp.dust > 0.1 ? 1.1 : 0.5, gp.mat);
+        // (a wood's floor gives three grains in four as leaves and the rest as a brown puff: under the old shares a leafy
+        // wood raised no dust at all, and the owner asked to see dust fly too. Off any ground, a gust raises a puff.)
+        if (q < lf * 0.75 * (1 - smoothstep(0.2, 0.6, wet01))) { this.emit('leaves', x, gy + 0.05, z, ve, vu * 1.5 + 0.8, vn, 0.9); continue; }
+        if (gp.repose > 0 && q < 0.8) { this.emit('sand', x, gy + 0.02, z, ve, vu, vn, 1, 0.8, gp.mat); continue; }
+        this.emit('dust', x, gy + 0.05 + rng() * 0.3, z, ve, vu, vn, gp.dust > 0.1 ? 1.3 : 0.95, gp.dust > 0.1 ? 1.1 : 0.7, gp.mat);
       }
+    }
+  }
+
+  // LEAVES TORN FROM THE CROWNS the explorer's wind goes through, and the branch that now and then snaps with them
+  // (the owner, 2026-11-17: "fly leaves around and dust around when i use it ... some branches should snap and fall
+  // off as well"). Where there is no canopy over the place the wind passes, nothing happens here.
+  _tear(s, h, frame, air, near, fx, fz, groundY, Rr) {
+    const rng = this.rng, W = WINDPOWER, cov = _covL;
+    const rate = s.kind === KIND.jet ? W.tearGust : s.kind === KIND.orb ? W.tearOrb : s.kind === KIND.vortex ? W.tearVortex : s.kind === KIND.part ? W.tearPart : 0;
+    if (!(rate > 0)) return;
+    s.tear = (s.tear || 0) + rate * s.strength * h;
+    let guard = 40;
+    while (s.tear >= 1 && guard-- > 0) {
+      s.tear -= 1;
+      let x, z, ve, vn, vu;
+      if (s.kind === KIND.jet) {
+        const f = Math.min(s.front * s.age, s.reach);
+        if (s.age * s.front > s.reach + s.pulse * 1.5) { s.tear = 0; break; }
+        const a = f - rng() * s.pulse, w = s.radius + s.spread * (a > 0 ? a : 0), c = (rng() * 2 - 1) * w * 1.3;
+        if (a < 0.5) continue;
+        x = s.x + s.de * a - s.dn * c; z = s.z + s.dn * a + s.de * c;
+        const U = s.speed * s.strength / (1 + 1.2 * a / s.reach);
+        ve = s.de * U * 0.8; vn = s.dn * U * 0.8; vu = 0.5 + 1.5 * rng();
+      } else if (s.kind === KIND.vortex) {
+        const R = s.radius * (0.5 + 2.2 * rng()), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
+        ve = -Math.sin(a) * s.speed * s.spin * 0.8 - Math.cos(a) * 2; vn = Math.cos(a) * s.speed * s.spin * 0.8 - Math.sin(a) * 2; vu = s.up * 0.5;
+      } else {
+        const R = s.radius * (0.3 + 0.8 * rng()), a = rng() * 6.2831853;
+        x = s.x + Math.cos(a) * R; z = s.z + Math.sin(a) * R;
+        ve = -Math.sin(a) * 4; vn = Math.cos(a) * 4; vu = 0.4;
+      }
+      if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+      if (!air.coverNear(x, z, cov)) continue;
+      const can = cov.canopy01 || 0, top = cov.canopyHeight || 0;
+      if (!(can > 0.05) || !(top > 2)) continue;                       // no crown here
+      if (rng() > can) continue;                                        // thin canopy, fewer leaves
+      const gy = near ? near.heightAt(x, z, groundY) : groundY;
+      const y = gy + top * (0.45 + 0.55 * rng());
+      if (!this.emit('leaves', x, y, z, ve, vu, vn, 1.0, 1.0)) { s.tear = 0; break; }
+      // a branch: the wind takes one from a crown it is strong in, and it comes down with its own leaves
+      if (s.snap > 0 && rng() < W.snapChance * h * 8) {
+        s.snap--;
+        this._branch(x, gy + top * (0.5 + 0.4 * rng()), z, ve, vn);
+      }
+    }
+  }
+
+  // One branch snapped out of a crown: a few long dark pieces that tumble down and lie, and the leaves that fall with
+  // them. The pieces are grains of the leaf kind in the ground's darkest brown, which the painter lays as long strokes
+  // (render/three/expand.js, option wisp: only with the powers on).
+  _branch(x, y, z, ve, vn) {
+    const rng = this.rng, W = WINDPOWER;
+    for (let i = 0; i < W.snapPieces; i++) {
+      const k = 0.25 + 0.5 * rng();
+      this.emit('leaves', x + (rng() - 0.5) * 0.6, y + (rng() - 0.5) * 0.5, z + (rng() - 0.5) * 0.6,
+        ve * k + (rng() - 0.5) * 1.5, -1.5 - 2 * rng(), vn * k + (rng() - 0.5) * 1.5, 3.2 + 1.6 * rng(), 1.3, I_WOOD);
+    }
+    for (let i = 0; i < W.snapLeaves; i++) {
+      const a = rng() * 6.2831853, r = rng() * 1.3;
+      this.emit('leaves', x + Math.cos(a) * r, y + (rng() - 0.5) * 1.2, z + Math.sin(a) * r, ve * 0.5 + Math.cos(a) * 2, -0.5 + rng(), vn * 0.5 + Math.sin(a) * 2, 1.0, 0.9);
     }
   }
 
