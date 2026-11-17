@@ -50,6 +50,7 @@ export class Powers {
     this.active = false;        // the powers can be used now (on foot, on a world)
     this.keys = { cast: false, pad: false, mouse: false, touch: false };
     this.onCast = null;         // called with the ability's id when one is cast (the sound)
+    this.tapOnce = false;       // set by the touch button: one press, seen by the next frame however long that frame is
   }
 
   pick(i) { if (i >= 0 && i < ABILITIES.length && i !== this.ability) { this._drop(); this._close(); this.ability = i; } }
@@ -96,7 +97,8 @@ export class Powers {
     const W = this.winds;
     if (this.pollPad) this.pollPad();
     this.active = sim.sm.state === S.ON_FOOT && !!sim.bodyId && !sim.easel;
-    const down = this.active && (this.down || this.keys.cast || this.keys.pad || this.keys.mouse || this.keys.touch);
+    const tap = this.tapOnce; this.tapOnce = false;
+    const down = this.active && (this.down || this.keys.cast || this.keys.pad || this.keys.mouse || this.keys.touch || tap);
     const pressed = down && !this._was, released = !down && this._was;
     this._was = down;
     if (this._wait > 0) this._wait -= dt;

@@ -93,6 +93,23 @@ test('part water: held, a channel goes with the explorer along the view and its 
   p.down = true; step(p, sim, 10); assert.ok(p.part); p.pick(0); assert.equal(p.part, null, 'choosing another ability lets it go');
 });
 
+test('a tap from the touch button is one cast, however slow the frames are', () => {
+  const p = new Powers(), sim = fakeSim();
+  p.tapOnce = true; step(p, sim, 1, 0.5);                    // one frame of half a second sees it
+  assert.equal(p.casts, 1); assert.equal(p.tapOnce, false, 'taken');
+  step(p, sim, 3, 0.5); assert.equal(p.casts, 1, 'and it is not held: no second cast');
+  p.tapOnce = true; step(p, sim, 1, 0.5); assert.equal(p.casts, 2, 'the next tap casts again');
+});
+
+test('the touch button takes the finger: the HUD lets touches through to the picture, so the button must ask for them', () => {
+  const ui = fs.readFileSync(new URL('../src/ui/powers.js', import.meta.url), 'utf8');
+  const rule = /\.pc-pw-btn \{([^}]*)\}/.exec(ui);
+  assert.ok(rule && /pointer-events:\s*auto/.test(rule[1]), '.pc-pw-btn has pointer-events: auto');
+  assert.ok(/touch-action:\s*none/.test(rule[1]), 'and no scroll or zoom starts on it');
+  const theme = fs.readFileSync(new URL('../src/ui/theme.css', import.meta.url), 'utf8');
+  assert.ok(/\.pc-hud \{[^}]*pointer-events:\s*none/.test(theme), '(the HUD layer lets them through: that is why)');
+});
+
 test('without ?powers=1 nothing of the powers is loaded: main.js imports them only behind the flag', () => {
   const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.ok(!/^import .*powers/m.test(main), 'no static import of the powers in main.js');

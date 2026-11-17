@@ -9,9 +9,12 @@
 // are added here, so that nothing of the powers is in the page without the flag.
 import { ABILITIES } from '../core/powers.js';
 
+// (pointer-events: auto on the button: the HUD's layer lets a finger through to the picture, theme.css .pc-hud, and each
+// of its own buttons takes it back. Without it the button was drawn and a finger on it turned the view: found with real
+// touch events in a browser, 2026-11-17; tests/powers.test.mjs holds it.)
 const CSS = `
 .pc-pw-btn { position: absolute; display: none; align-items: center; justify-content: center; box-sizing: border-box; width: 64px; height: 64px;
-  right: calc(var(--pc-sr, 0px) + 18px); bottom: calc(var(--pc-sb, 0px) + 98px); border-radius: 50%; touch-action: none; user-select: none;
+  right: calc(var(--pc-sr, 0px) + 18px); bottom: calc(var(--pc-sb, 0px) + 98px); border-radius: 50%; pointer-events: auto; touch-action: none; user-select: none;
   -webkit-user-select: none; font: 600 13px/1 Georgia, 'Times New Roman', serif; color: #2f3a5d; letter-spacing: .02em;
   background: rgba(250, 246, 236, 0.86); box-shadow: inset 0 0 0 1.5px rgba(47, 58, 93, 0.35), 0 1px 5px rgba(20, 24, 40, 0.25); }
 .pc-pw-btn.pc-down { background: rgba(226, 232, 250, 0.94); box-shadow: inset 0 0 0 1.5px rgba(47, 58, 93, 0.5), inset 0 0 22px rgba(77, 96, 178, 0.4); }
@@ -58,18 +61,20 @@ export function attachPowersUi(powers, root) {
     if (pid != null) return;
     pid = e.pointerId; const r = btn.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; sel = -1; open = false;
     try { btn.setPointerCapture(pid); } catch { /* old browsers */ }
-    btn.classList.add('pc-down'); powers.keys.touch = true; e.preventDefault();
+    // (an ability that is held begins under the thumb at once; one that is cast is cast when the thumb lifts, so that
+    // sliding off the button to open the fan does not cast it first)
+    btn.classList.add('pc-down'); powers.keys.touch = !!ABILITIES[powers.ability].hold; e.preventDefault();
   });
   btn.addEventListener('pointermove', (e) => { if (e.pointerId === pid) choose(e.clientX, e.clientY); });
   const up = (e) => {
     if (e.pointerId !== pid) return;
     pid = null; btn.classList.remove('pc-down'); fan.classList.remove('pc-open'); tabs.forEach((t) => t.classList.remove('pc-sel'));
+    powers.keys.touch = false;
     if (open && sel >= 0) {
       powers.pick(sel);
       // chosen in the fan: cast it once now (an ability that is held waits for the next press)
-      if (!ABILITIES[sel].hold) { powers.keys.touch = true; setTimeout(() => { powers.keys.touch = false; }, 60); return; }
-    }
-    powers.keys.touch = false;
+      if (!ABILITIES[sel].hold) powers.tapOnce = true;
+    } else if (!open && e.type === 'pointerup' && !ABILITIES[powers.ability].hold) powers.tapOnce = true;      // a tap
   };
   btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up);
   let shown = null, wordNow = '';
