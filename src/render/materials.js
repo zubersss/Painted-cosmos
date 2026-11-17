@@ -4,6 +4,7 @@
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
 import { G, PHYS, PHYSW, PREV, OIL, LOOK, register, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
 import { VERT_PARS, VERT_END, FRAG_PARS, FOG_BANK, PAINT } from './chunks.js';
@@ -629,6 +630,10 @@ varying vec2 vLiqP;
 varying vec2 vFlow;      // the current (surface.js _riversOil), two bytes about 128/255; 0, 0: still water
 #endif
 varying vec3 vWake;
+#ifdef PC_POWERS
+uniform vec4 uPwChanA;   // the parted channel (the powers, move water): its start from the eye (body axes), its half width (0: none)
+uniform vec4 uPwChanB;   // the way it runs (unit), its length now (m)
+#endif
 // PHYSICS' sea: the surface rises and falls with its wave trains and wakes (C14)
 #define PC_PHYS_NO_WAKE
 ${WATER_GLSL}
@@ -658,8 +663,25 @@ void main() {
   // laid a breath higher there, so the bed shows only through its own wash; the edge is still drawn by the discard)
   p += normalize(vBody) * 0.06 * (1.0 - smoothstep(0.05, 0.40, aDepth));
   vBody = p + uOrigin;
-  vToCam = uCamLocal - p;
   vDepth = aDepth;
+  #ifdef PC_POWERS
+    // MOVE WATER: in the parted channel the water's face is pressed down to its bed and cut away, and heaped a
+    // hand's breadth along the two walls. (Measured from the eye, exactly: a planet-sized coordinate is too coarse.
+    // The shape is physics/powers.js partShape, which the explorer's footing asks too.)
+    if (uPwChanA.w > 0.0 && aDepth > 0.0) {
+      vec3 pr = (p - uCamLocal) - uPwChanA.xyz, pu = normalize(vBody);
+      float pa = dot(pr, uPwChanB.xyz);
+      vec3 ps = pr - uPwChanB.xyz * pa; ps -= pu * dot(ps, pu);
+      float pc = length(ps), ph = uPwChanA.w;
+      float pl = smoothstep(-1.2, 0.0, pa) * (1.0 - smoothstep(uPwChanB.w - 1.5, uPwChanB.w, pa));
+      float part = (1.0 - smoothstep(ph - 0.5, ph, pc)) * pl;
+      float lip = smoothstep(ph - 0.3, ph + 0.2, pc) * (1.0 - smoothstep(ph + 0.2, ph + 1.8, pc)) * pl;
+      p += pu * (0.16 * lip - (aDepth + 0.05) * part);
+      vDepth = mix(aDepth, -0.6, part);
+      vBody = p + uOrigin;
+    }
+  #endif
+  vToCam = uCamLocal - p;
   vLiq = aLiq; vLiqP = aLiqP.xy;
   #ifdef PC_OIL
     vFlow = aLiqP.zw;
@@ -1036,6 +1058,8 @@ export function makeWaterMaterial(bodyU, skyU) {
     defines: { PC_PHYS_SEA_MAP: 1 },
     vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
   });
+  // (the powers, ?powers=1: the water is compiled with the parted channel; without the flag its program is as it was)
+  if (MODE.powers) { m.defines.PC_POWERS = 1; m.uniforms.uPwChanA = G.uPwChanA; m.uniforms.uPwChanB = G.uPwChanB; }
   m.userData.pcPainted = true;
   // (R1 W2.4: water drawn in this frame wants last frame's painting kept for the next: post.js finish)
   m.onBeforeRender = () => { PREV.water = true; };

@@ -148,6 +148,21 @@ export function createWorld(scene) {
       if (w > 0) KIT_PALETTE[i].set(r / w, g / w, b / w);
     }
   }
+  // (the powers, move water) The parted channel, for the water's vertex program (shared.js uPwChanA, uPwChanB): where
+  // it begins FROM THE EYE and the way it runs, in the body's axes, read from the physics' list of the explorer's wind
+  // (a shape of kind 5: physics/powers.js KIND.part). One channel is drawn: the first in the list.
+  function setParted(st) {
+    const A = G.uPwChanA.value, W = physics && physics.winds;
+    A.w = 0;
+    if (!W) return;
+    for (let i = 0; i < W.count; i++) {
+      const s = W[i];
+      if (s.kind !== 5 || s.bodyId !== st.id || !(s.len > 0.02)) continue;
+      A.set(s.px - st.camLocal.x, s.py - st.camLocal.y, s.pz - st.camLocal.z, s.radius);
+      G.uPwChanB.value.set(s.dx, s.dy, s.dz, s.len);
+      return;
+    }
+  }
   function buildKits() {
     if (!physics || !kitsWanted || kits) return;
     const P = physics;
@@ -312,6 +327,7 @@ export function createWorld(scene) {
       // camera in body-local coordinates
       st.camLocal.copy(cameraPos);
       root.worldToLocal(st.camLocal);
+      if (MODE.powers && st === active) setParted(st);      // (the powers, move water)
       // (from orbit the limb closes on the mean sphere: chunks.js pcRound. Full relief to a third of a radius up, a quarter
       // of it from 0.8 radii (at a third Earth's alpine range still stood off the limb as a bump); about the sea's level where the world has one, so a coast stays a coast)
       { const R = st.body.radius; st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * 0.35, R * 0.8), R + (st.look.seaLevel || 0)); }
