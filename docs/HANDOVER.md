@@ -243,6 +243,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 38. **"Give me a link that forces top settings" (2026-11-16, after merging pull request #6).**
     Given: `?look=oil&preset=desktop&quality=2&dynres=0&lite=0&aa=msaa` (what each part forces is
     in the log). For seeing the look at its best; it is slow on the phone.
+39. **Smoother without losing quality; the rivers flow (2026-11-16, with two speed tables and a
+    recording).** "it ran better on my phone but the look was still awful keep working on it
+    figure out what you could do to make run smoother without losing quality also the rivers
+    should be moving with the flow of the current same for the art of it". (The look judged was
+    the OLD version: the site had not been renewed; the log has the proof.) So: the cost is cut
+    where the picture does not change, the water's strokes lie along the current and move with
+    it.
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
@@ -257,44 +264,42 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
 been patched a dozen times; the log has the history).
 
-**In one line:** the new look is LIVE behind `?look=oil` (pull requests #4 and #5, `main` at
-b7c2d29). The owner played #5 on their phone (a Samsung Galaxy S23 Ultra) with the phone's own
-settings and said "it feels bad ... most of the things haven't rendered and it looks blurry and
-blotchy" (section 2, item 35), sent the speed test's table, and two sheets of river references
-(item 36). The answer to both is LIVE since the owner merged PULL REQUEST #6 (`main` at
-fd4a499); `look-proto` is the same code.
+**In one line:** the new look is LIVE behind `?look=oil` (pull requests #4, #5 and #6, `main` at
+fd4a499). The owner's phone (a Samsung Galaxy S23 Ultra) has now run the new code's speed test:
+26 pictures a second at 1028 x 480, and 61 with the plants laid in one flat colour: THE TREES'
+PAINT IS THE FRAME. The answer (a leaf's paint once a leaf, not once a pixel), the rivers that
+flow (section 2, item 39) and a version label are BUILT AND PUSHED ON `look-proto` (9cb9d79)
+BUT NOT LIVE: no pull request is open for them.
 
-**What the phone taught** (the log has the table and the reasoning): on its own settings the
-phone drew the look at 822 x 384, then the controller (which asked for 60 pictures a second and
-got 28) halved the picture and dropped a tier. The look's strokes are sized in picture pixels:
-small picture, blotches. So in the oil look the picture is no longer drawn small, a phone is
-asked for 30 not 60, and the cost is cut elsewhere (a lighter paint, a coarser ground mesh).
-
-**What is on `look-proto` beyond `main`:** the sharp-picture policy, the lighter paint, the
-ground's mesh by picture height, trees to the haze on every tier, the speed test's second form
-(`?bench=1`: thirteen rows and a header that says how the depth is kept), and the rivers'
-second form (one long wide river, sand bars, tributaries as trees). Checked: the default game 0
-pixels different in six scenes; unit 251, world 47, physics 325. NOT run on this head: the full
-check (`node tests/all.mjs --export`, an hour): run it before a pull request is merged.
+**What the phone has taught** (the log has the three tables and the reasoning):
+- Its own settings drew the look tiny and the controller shrank it further: cured in #6 (the
+  picture is not drawn small in the oil look; a phone is asked for 30 pictures a second).
+- Twice the owner judged an OLD version minutes after merging (the site takes some minutes to
+  renew): the version is now on the screen (`src/core/build.js`, `build.txt`: CHANGE BOTH with
+  every pull request) and a stale page reloads itself.
+- A phone slows as it warms: only the speed test's first rows compare; its third form repeats
+  the first row at the end.
+- Where the time goes at 1028 x 480: plants' paint 23 ms, script 11 ms, ground's paint 3 ms.
 
 **What is waited for from the owner:**
-1. (Done: pull request #6 merged by the owner, 2026-11-16.)
-2. Then the SECOND speed table from the phone (`?look=oil&bench=1&body=earth&time=15.4`), and
-   how it looks and runs with the phone's own settings (`?look=oil&body=earth&time=15.4`).
+1. To say whether to open the pull request for `look-proto` (they merge it themselves).
+2. Then, after waiting until the label at the bottom of the screen says `v7`, the THIRD speed
+   table (`?look=oil&bench=1&body=earth&time=15.4`) and how it looks and plays.
 3. Their go-ahead before any of the three riskiest parts of the code is touched (below).
 
-**What the second table decides** (read its header first): `depth log` means the phone skips
-nothing hidden, and the cure is the depth, not the paint. Otherwise: "ground one flat colour"
-against "as set" is the ground paint's cost; "plants one flat colour" against "no trees" and "no
-small plants" splits the plants' cost into paint and geometry. If the phone cannot hold 30 at
-1029 x 480, the next step is a sharp enlargement of a smaller picture in the last pass (the
-browser's own stretch is soft).
+**What the third table decides:** "plants one flat colour" against "as set" is what the bark and
+the far crowns still cost per pixel (the leaves no longer do). If it is still large: the bark's
+streaks and the far crowns need the same cure or one layer of strokes on phones. If the frame is
+near the script's own time (11 ms): the script is next (the painter's draw calls, the physics).
+If the phone has room to spare: a larger picture on phones, or a sharp enlargement in the last
+pass (the screen is three times the picture's size each way).
 
 **Where new work goes:** built on the local branch `look-dev` (work tree `/home/user/pc-dev`,
-lost with the container), pushed on `look-proto`. A LESSON KEPT: before a pull request into
-`main`, prove that the watercolour game is unchanged BY PICTURES, not by reading the diff. A
-SECOND LESSON (2026-11-16): judge a change for the phone AT THE PHONE'S OWN SETTINGS (`preset=phone`,
-a window of 823 x 384), not at the desktop's settings pinned.
+lost with the container), pushed on `look-proto`. LESSONS KEPT: (1) before a pull request into
+`main`, prove that the watercolour game is unchanged BY PICTURES, not by reading the diff; (2)
+judge a change for the phone AT THE PHONE'S OWN SETTINGS (`preset=phone`, a window of 823 x 384);
+(3) ask the device before cutting: the speed test's flat rows found in one run what two rounds
+of guessing had missed.
 
 **The look, where it stands** (`look-proto`; the file-by-file account is `docs/notes/painter.md`
 on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`):
@@ -311,7 +316,7 @@ on that branch, "Hand-over of THE OIL LOOK"; the map of the code is `CLAUDE.md`)
   slow pan (0.41 against 0.32 at 150 m; 0.23 against 0.10 at 1 km).
 
 **Waiting for the owner (the same list, with the standing one):**
-1. Whether to open the pull request; then the phone's second table and their eye (above).
+1. Whether to open the pull request; then the phone's third table and their eye (above).
 2. Their go-ahead before any of the THREE RISKIEST PARTS of the code is touched (section 2,
    item 28; the list is in the log, "OWNER: finish the task in hand, then five steps"): the shader
    code's tangle, the new look's lack of automatic checks and its global switches, and the three
@@ -331,9 +336,9 @@ motion (`CLAUDE.md`, "In a cloud session there is no graphics card").
 
 | Branch | What it holds |
 | --- | --- |
-| `main` | **Live.** At `b7c2d29`: the new look behind `?look=oil` (PR #4 and PR #5, merged by the owner 2026-11-16), on top of `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
+| `main` | **Live.** At `fd4a499`: the new look behind `?look=oil` (PR #4, #5 and #6, merged by the owner 2026-11-16), on top of `5e85754`: release 1, merged as `f551198` (PR #2): sharp ground from the ship at the top tier, touch controls, a phone preset; plus `CLAUDE.md` (PR #3, merged). Before that, M4's whole game (PR #1, `be90864`). |
 | `cosmos` | Frozen at `3e46e80`: release 1's code, the same as `main`. Do not work on it. |
-| `look-proto` | **Where new look work is pushed.** `main` plus the phone's sharp picture and lighter paint, the speed test's second form and the rivers' second form (e0ed127, 2026-11-16); NOT LIVE until a new pull request is merged. |
+| `look-proto` | **Where new look work is pushed.** `main` plus a leaf's paint once a leaf, the rivers that flow, the version label and the speed test's third form (9cb9d79, 2026-11-16); NOT LIVE until a new pull request is merged. |
 | `r2` | **The working branch.** Release 1, the logs, this file, `tools/workflows/`, and release 2's half-done work as "WIP snapshot" commits only. No release-2 item was finished or verified. On a clean export of `r2`: world tests 56 pass and 1 fail ("MSAA belongs to the tier..."), unit 259, physics 325. |
 
 **Waiting, in the owner's order:**
