@@ -304,6 +304,16 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     abilities) are merged into `main` behind `?powers=1` by the session's gate; the log has the
     steps and their results. The other elements (water, earth, fire) are still only described
     in `docs/POWERS.md`: no code for them (item 42: "don't start code for the other elements").
+48. **The v13 table and five new instructions (2026-11-17, evening).** "Keep working on the
+    performance I want it to look good from far away as well as run well and also make the wind
+    powers more powerful let me be able to increase to circle to much bigger sizes and I should
+    be able to make trees bend towards the direction I send the wind whatever direction I decide
+    too and make the me have an option to fly even faster and when im flying high my camera
+    seems to glitch." Five pieces: the camera's glitch when flying high (a bug); an option to
+    fly faster; the aim's circle growable to much bigger sizes; trees bending the way the wind
+    is sent; performance that keeps the far view good. The v13 table could not be read (the same
+    row between 28 and 52 ms): THE SPEED TEST MUST HOLD THE GAME STILL FIRST.
+
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
