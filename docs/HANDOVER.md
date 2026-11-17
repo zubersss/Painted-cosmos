@@ -268,8 +268,8 @@ been patched a dozen times; the log has the history).
 fd4a499). The owner's phone (a Samsung Galaxy S23 Ultra) has now run the new code's speed test:
 26 pictures a second at 1028 x 480, and 61 with the plants laid in one flat colour: THE TREES'
 PAINT IS THE FRAME. The answer (a leaf's paint once a leaf, not once a pixel), the rivers that
-flow (section 2, item 39) and a version label are BUILT AND PUSHED ON `look-proto` (9cb9d79)
-BUT NOT LIVE: no pull request is open for them.
+flow (section 2, item 39), a version label and a laptop's settings (v8) are BUILT AND PUSHED ON
+`look-proto` BUT NOT LIVE: no pull request is open for them.
 
 **What the phone has taught** (the log has the three tables and the reasoning):
 - Its own settings drew the look tiny and the controller shrank it further: cured in #6 (the
@@ -281,13 +281,16 @@ BUT NOT LIVE: no pull request is open for them.
   the first row at the end.
 - Where the time goes at 1028 x 480: plants' paint 23 ms, script 11 ms, ground's paint 3 ms.
 
-**The owner's machines:** the phone is a Samsung Galaxy S23 Ultra (Adreno 740). The computer is
-a Lenovo with 8 GB of memory (said 2026-11-16; model and graphics chip not known: the speed
-test's header would name the chip if the owner opens the test's link on it).
+**The owner's machines:** the phone is a Samsung Galaxy S23 Ultra (Adreno 740): 26 pictures a
+second in the wood at 1028 x 480 (v6). The computer is a Lenovo with 8 GB of memory and an Intel
+UHD built-in chip (12th generation): 8.7 a second at the desktop's settings (v6), its script's
+own time 25 ms a frame. THE PHONE IS THE STRONGER MACHINE. Standing instruction 17 ("the desktop
+sets the look") was given before either was known; this has been put to the owner and is theirs
+to settle. Since v8 the oil look gives such a computer the preset `laptop` (the log).
 
 **What is waited for from the owner:**
 1. To say whether to open the pull request for `look-proto` (they merge it themselves).
-2. Then, after waiting until the label at the bottom of the screen says `v7`, the THIRD speed
+2. Then, after waiting until the label at the bottom of the screen says `v8`, the THIRD speed
    table (`?look=oil&bench=1&body=earth&time=15.4`) and how it looks and plays.
 3. Their go-ahead before any of the three riskiest parts of the code is touched (below).
 
