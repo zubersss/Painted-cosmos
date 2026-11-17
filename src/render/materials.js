@@ -1333,6 +1333,9 @@ void main() {
       xl *= mix(0.50, 1.0, pcSunAtV(cB, inst.w * uCanopy * 0.4, r3.z));
       xl += (r3.z - 0.5) * 0.25;
       xl = max(xl, 0.30 + 0.15 * r3.x);
+      // (a piece marked as the inside of a crown, shade 2: the core of a far tree of flat pieces, florakit.js facetCore.
+      // It is laid in the deep tone whatever the sun: the dark the leaves stand on. Nothing else has a shade over 1.)
+      if (aData.z > 1.5) xl = 0.2;
       float lvL = pcLevel(xl, 0.03);
       vec3 deepL = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
