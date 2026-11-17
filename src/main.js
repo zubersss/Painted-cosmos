@@ -16,6 +16,8 @@
 //   preset=phone|tablet|desktop      the device preset (src/core/preset.js; chosen from the
 //                                    pointer and the screen without it)   fullscreen=0   never ask
 //   kits=0                           no weather marks (rain, snow, dust)   weather=fair   a clear sky, always
+//   powers=1                         the elemental powers (wind): docs/POWERS.md; off without it, and then nothing of
+//                                    them is loaded
 //   bench=1                          a speed test on this device: the same view drawn ten ways, the table left on the
 //                                    screen (src/core/bench.js); no start card, the resolution controller off
 import * as THREE from 'three';
@@ -34,11 +36,15 @@ import { choosePreset, bufferSize, BASIC_GPU } from './core/preset.js';
 import { attachPlatform } from './core/platform.js';
 import { attachBench } from './core/bench.js';
 import { BUILD } from './core/build.js';
+import { MODE } from './data/mode.js';
 
 // Every static import has loaded: index.html's watchdog stands down (hardening review P14).
 window.__pcBooting = true;
 
 const params = new URLSearchParams(location.search);
+// (the elemental powers, ?powers=1: said to the modules that must know before they make anything; the powers' own code is
+// loaded further down, and only then)
+if (params.has('powers') && params.get('powers') !== '0') MODE.powers = true;
 // The version on the screen (the oil look only; src/core/build.js). (v7 and v8 also asked the site for `build.txt` and
 // fetched the page's files afresh when it named a newer version: that is a request at run time, which the brief's
 // static rules forbid (tests/all.mjs staticRules); the full check found it after the merge, and it was taken out.)
@@ -303,6 +309,32 @@ async function boot() {
   }
 
   const sim = game.sim;
+  // The elemental powers (?powers=1; docs/POWERS.md): loaded only when asked for.
+  if (params.has('powers') && params.get('powers') !== '0') {
+    Promise.all([import('./core/powers.js'), import('./ui/powers.js')]).then(([core, ui]) => {
+      const powers = new core.Powers();
+      core.attachPowerInputs(powers, window);
+      ui.attachPowersUi(powers, hudRoot);
+      // (where a place on the world lies on the screen, for the aim mark of ui/powers.js: its spot in css pixels, how
+      // many pixels a metre is there, and how flat a ring on the ground lies to the eye)
+      const _pv = new THREE.Vector3(), _pu = new THREE.Vector3(), _pc = new THREE.Vector3();
+      powers.project = (q) => {
+        const root = world && world.bodies && world.bodies.get ? world.bodies.get(sim.bodyId) : null;
+        if (!root) return null;
+        _pv.set(q.x, q.y, q.z).applyQuaternion(root.quaternion).add(root.position);
+        _pu.set(q.x, q.y, q.z).normalize().applyQuaternion(root.quaternion);
+        _pc.copy(_pv).sub(camera.position);
+        const flat = Math.abs(_pc.dot(_pu)) / (_pc.length() || 1);
+        _pv.applyMatrix4(camera.matrixWorldInverse);
+        if (_pv.z > -0.5) return null;
+        const el = renderer.domElement, w = el.clientWidth || 1, h = el.clientHeight || 1, k = (h / 2) / (-_pv.z * Math.tan((camera.fov * Math.PI) / 360));
+        return { x: w / 2 + _pv.x * k, y: h / 2 - _pv.y * k, k, flat: Math.min(1, Math.max(0.12, flat)) };
+      };
+      let fells = 0;
+      powers.onCast = (id) => { if (!audio) return; audio.event(id); if (powers.fells !== fells) { fells = powers.fells; audio.event('timber'); } };
+      sim.powers = powers;
+    }).catch((e) => console.warn('powers: ' + ((e && e.message) || e)));
+  }
   // ?clock=even: every world turns at its own even rate (the game's clock is uneven: slow dusks
   // and dawns, short nights; an instrument that sets an hour and lets the clock run wants it even).
   if (params.get('clock') === 'even') sim.unevenClock = false;

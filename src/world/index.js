@@ -19,6 +19,7 @@ import { isArrival } from './arrival.js';
 import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
+import { MODE } from '../data/mode.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -147,6 +148,21 @@ export function createWorld(scene) {
       if (w > 0) KIT_PALETTE[i].set(r / w, g / w, b / w);
     }
   }
+  // (the powers, move water) The parted channel, for the water's vertex program (shared.js uPwChanA, uPwChanB): where
+  // it begins FROM THE EYE and the way it runs, in the body's axes, read from the physics' list of the explorer's wind
+  // (a shape of kind 5: physics/powers.js KIND.part). One channel is drawn: the first in the list.
+  function setParted(st) {
+    const A = G.uPwChanA.value, W = physics && physics.winds;
+    A.w = 0;
+    if (!W) return;
+    for (let i = 0; i < W.count; i++) {
+      const s = W[i];
+      if (s.kind !== 5 || s.bodyId !== st.id || !(s.len > 0.02)) continue;
+      A.set(s.px - st.camLocal.x, s.py - st.camLocal.y, s.pz - st.camLocal.z, s.radius);
+      G.uPwChanB.value.set(s.dx, s.dy, s.dz, s.len);
+      return;
+    }
+  }
   function buildKits() {
     if (!physics || !kitsWanted || kits) return;
     const P = physics;
@@ -165,7 +181,7 @@ export function createWorld(scene) {
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)
-      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10 };
+      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10, inked: MODE.powers, ...(MODE.powers ? { wisp: 0.11, wispMin: 0.8, wispMax: 2.4, wispWide: 0.3 } : null) };      // (inked: the powers' pale strokes of air, physics/three/kits.js)
       // (spray as flecks of 4 px was a glitter over the surf: a soft pale blot half a metre wide, never under 14 px,
       // so that the drops off a crest run together into a wisp, and a storm's spray is told from its rain)
       draw.spray = { ...D.spray, width: 0.5, exposure: 0.05, maxLen: 1.0, minPx: 14 };
@@ -311,6 +327,7 @@ export function createWorld(scene) {
       // camera in body-local coordinates
       st.camLocal.copy(cameraPos);
       root.worldToLocal(st.camLocal);
+      if (MODE.powers && st === active) setParted(st);      // (the powers, move water)
       // (from orbit the limb closes on the mean sphere: chunks.js pcRound. Full relief to a third of a radius up, a quarter
       // of it from 0.8 radii (at a third Earth's alpine range still stood off the limb as a bump); about the sea's level where the world has one, so a coast stays a coast)
       { const R = st.body.radius; st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * 0.35, R * 0.8), R + (st.look.seaLevel || 0)); }

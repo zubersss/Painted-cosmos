@@ -30,6 +30,7 @@ import { ATMOSPHERES } from './atmosphere.js';
 import { heightFactor, WIND } from './wind.js';
 import { AIR, wakeAt } from './air.js';
 import { makeRng, clamp01, smoothstep, fsin, fcos } from './util.js';
+import { powerWind } from './powers.js';
 
 export const PARTICLES = Object.freeze({
   kinds: ['rain', 'snow', 'hail', 'dust', 'sand', 'ash', 'spores', 'leaves', 'spray'],
@@ -63,6 +64,7 @@ export const PARTICLES = Object.freeze({
 
 // Event kinds in the ring buffer.
 export const EVENT = Object.freeze({ splash: 0, ripple: 1, settle: 2, bounce: 3 });
+const _pwp = new Float64Array(4);
 
 function makeBuffer(cap) {
   return {
@@ -380,7 +382,11 @@ export class Particles {
     }
     // weight, then drag relative to the air (implicit). wu: the air's own rise or fall where
     // it flows over sloping ground (snow only; below)
-    const wu = snowy ? b._wu[i] : 0;
+    let wu = snowy ? b._wu[i] : 0;
+    // the wind the explorer makes (powers.js; index.js sets this.winds, or null): a gust slants the rain, a stilled place
+    // lets it fall straight
+    const pw = this.winds;
+    if (pw && powerWind(pw, x, z, hz, _pwp)) { we = we * _pwp[3] + _pwp[0]; wn = wn * _pwp[3] + _pwp[1]; wu = wu * _pwp[3] + _pwp[2]; }
     let rx = V[o] - we, ry = V[o + 1] - g * h - wu, rz = V[o + 2] - wn;
     const m = 1 / (1 + g / (vt * vt) * Math.sqrt(rx * rx + ry * ry + rz * rz) * h);
     rx *= m; ry *= m; rz *= m;

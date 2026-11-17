@@ -20,6 +20,7 @@ import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
+import { placeWinds, windsToDevils } from './powers.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01, smoothstep } from './util.js';
@@ -72,6 +73,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const particles = new Particles(seed, 1);
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
+  let winds = null;                 // the explorer's wind this frame (powers.js), or null
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField(SHIP_BODY.legs);
   const drift = new DriftField();
@@ -179,7 +181,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const fp = f && f.focus;
     if (!bodyId || !fp || !(fp.x === fp.x && fp.y === fp.y && fp.z === fp.z) || Math.hypot(fp.x, fp.y, fp.z) < 1) {
       // deep space, or nothing to centre on: the near field sleeps
-      if (active) { particles.clear(); devils.count = 0; active = null; here.bodyId = null; }
+      if (active) { particles.clear(); devils.count = 0; winds = null; active = null; here.bodyId = null; }
       stats.ms = now() - t0; return;
     }
     focus.x = fp.x; focus.y = fp.y; focus.z = fp.z;
@@ -245,11 +247,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     _denv.rho = airDensity(bodyId, r - body.radius);
     devilsNear(bodyId, fp.x, fp.y, fp.z, time, seed, _denv, frame, devils);
     features.devils = devils;
+    // the wind the explorer makes (powers.js; the game hands the list in f.winds, or nothing): placed in the frame, its
+    // tornadoes added to the devils. With no list, `winds` is null and every system below makes one comparison.
+    winds = f.winds && f.winds.count > 0 && placeWinds(f.winds, frame, bodyId) ? f.winds : null;
+    if (winds) windsToDevils(winds, devils);
     // (P18: felt by a point moving with the focus: the sub-second eddies it meets too often fade)
     if (dt > 0 && focusPrev.ok && Math.hypot(fp.x - focusPrev.x, fp.y - focusPrev.y, fp.z - focusPrev.z) < 100) { const k = 1 - Math.exp(-dt / 0.1); focusV.vx += ((fp.x - focusPrev.x) / dt - focusV.vx) * k; focusV.vy += ((fp.y - focusPrev.y) / dt - focusV.vy) * k; focusV.vz += ((fp.z - focusPrev.z) / dt - focusV.vz) * k; }
     else if (!(dt > 0 && focusPrev.ok)) { focusV.vx = 0; focusV.vy = 0; focusV.vz = 0; }
     focusPrev.x = fp.x; focusPrev.y = fp.y; focusPrev.z = fp.z; focusPrev.ok = true;
-    airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils, focusV);
+    airAt(bodyId, fp.x, fp.y, fp.z, time, seed, airGrid, frame, sunDir, Math.max(2, fy - gh), here.air, devils, focusV, winds);
     _wenv.moist = cover.moist; _wenv.fog = cover.fog; _wenv.snowBase = cover.snowBase; _wenv.dT = cover.dT; _wenv.dustSource = cover.dustSource;
     // (the weather answers the large-scale wind here, not the gusty wind at the focus: fog does not come and go
     // with a three-second gust, and physics.weather() anywhere, any time, then says what physics.here says: P7)
@@ -286,7 +292,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // fields and particles
     const t3 = now();
     const dist = f.disturbers || null;
-    flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality, devils);
+    flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality, devils, winds);
     const t4 = now();
     skyNumbers(here.weather, here.sky);        // the weather as a painter needs it (sky.js)
     // the hull keeps the rain off what is under it
@@ -307,8 +313,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     { const S = _splash; for (let k = 0; k < S.length; k++) S[k] = splashOn(k, moist.wetness01, moist.snowDepth);
       particles.splashOf = S; particles.splashCover = near.cover; particles.splashCW = near.CW; particles.splashSlot = 8;
       const n = near.nearest(fx, fz); particles.splashHere = n >= 0 && near.cover ? S[near.cover[n * near.CW + 8] | 0] : 0; }
+    particles.winds = winds;
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
-    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils);
+    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
     { const U = Math.hypot(airGrid.cwe, airGrid.cwn), snow = moist.snowDepth;
       driftSnow = snow > 0.01;
@@ -439,7 +446,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // know it (the explorer and the ship do).
   // recv (optional, P18): what feels the air, { size (m), vx, vy, vz (m/s, body-local) } (air.js airAt)
   function air(bodyId, p, out, height, recv) {
-    return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {}, bodyId === active ? devils : null, recv || null);
+    return airAt(bodyId, p.x, p.y, p.z, time, seed, bodyId === active ? airGrid : null, frame, bodyId === active ? sunDir : null, height, out || {}, bodyId === active ? devils : null, recv || null, bodyId === active ? winds : null);
   }
 
   // (P22) the large-scale wind at the place the sea's history is read for (as coast.mjs reads it), m/s at 10 m
@@ -691,6 +698,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // How far a body's real prevailing wind is scaled down for play (data.WINDS[body].scale).
     setWindScale,
     get time() { return time; },
+    get winds() { return winds; },       // the explorer's wind this frame (powers.js), or null: the painter reads the parted channel from it
     air, weather, ground, bindEnv,
     water: waterAt,
     sky: (weather, out) => skyNumbers(weather || here.weather, out),   // the same numbers for any weather() result

@@ -314,6 +314,10 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   // laid with its short side reversed while the leaf shows its other side (cos(turn) < 0), so its winding turns over
   // with it and a material that colours by gl_FrontFacing (PAINTER's two-toned leaf) flickers as the leaf tumbles
   const TU = flip > 0 && buf.turn && buf.turn.length >= n ? buf.turn : null;
+  // (the powers) D.wisp (s): a grain that carries a ground material's ink (buf.mat < 200: the pale strokes of the
+  // explorer's wind, loose.js) is laid as a stroke of air: as long as it flies in D.wisp seconds (D.wispMin .. D.wispMax m),
+  // D.wispWide of its size wide. Without D.wisp nothing here is any different.
+  const wisp = D.wisp > 0 && M ? D.wisp : 0, wispMax = D.wispMax || 2.4, wispMin = D.wispMin || 0, wispWide = D.wispWide || 0.3;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
     const age = A[i];
@@ -342,16 +346,27 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
       shr *= 1 - band * (1 - smooth01((v + 0.25) / 0.5));
     }
     // the floor: f times larger than it is, so one in f^2 is drawn (unless the physics leaves room)
-    if (least > 0 && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), shr * Math.min(1, roomy * f * f)); }
+    const wsp = wisp > 0 && M[i] < 200;
+    if (least > 0 && !wsp && least * dist > h) { const far = least * dist, f = h / far; h = far * thinned(own01(S[i]), shr * Math.min(1, roomy * f * f)); }
     else if (shr < 1) h *= thinned(own01(S[i]), shr);
     if (most > 0 && h > most * dist) h = most * dist;
     const full = h;                                               // its size before the edge and the fades take from it
     if (dist < nearD) h *= smooth01((dist / nearD - 0.4) / 0.6);
     h *= edge >= 0 ? edge : edgeScale(px, py, pz, eye);
-    if (fin > 0 && age < fin) h *= age / fin;
+    if (fin > 0 && age < fin) h *= wsp ? Math.min(1, age / (0.3 * fin)) : age / fin;
     if (fout > 0 && L[i] < fout) h *= L[i] > 0 ? L[i] / fout : 0;
     let ax = eye.rx, ay = eye.ry, az = eye.rz, bx = eye.ux, by = eye.uy, bz = eye.uz, la = h, lb = h;
-    if (spin !== 0) {
+    if (wsp) {
+      // a stroke of air: a ribbon along the way the grain flies, turned to face the eye, its head where the grain is
+      const vx = V[o], vy = V[o + 1], vz = V[o + 2], sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      const fk = full > 0 ? h / full : 0, len = Math.min(wispMax, Math.max(sp * wisp, wispMin, 1.6 * full));
+      if (sp > 0.2) { ax = vx / sp; ay = vy / sp; az = vz / sp; }
+      bx = ay * tz - az * ty; by = az * tx - ax * tz; bz = ax * ty - ay * tx;        // across it, in the picture
+      const bl = Math.sqrt(bx * bx + by * by + bz * bz);
+      if (bl > 1e-3 * dist) { bx /= bl; by /= bl; bz /= bl; } else { bx = eye.ux; by = eye.uy; bz = eye.uz; }
+      la = 0.5 * len * fk; lb = fk > 0 ? Math.max(full * wispWide * fk, 0.75 * eye.pix * dist) : 0;
+      px -= ax * la; py -= ay * la; pz -= az * la;
+    } else if (spin !== 0) {
       // each particle keeps its own phase (its size is its own and travels with it)
       let a = age * spin + S[i] * 51413.7;
       if (aspect < 1) {

@@ -62,6 +62,10 @@ export const G = {
   // second target (normal, log depth, region) and last frame's depth are then 8-bit, so they are written packed into
   // 0..1 (pcAuxEnc) and unpacked where they are read (pcAuxDec); 0 everywhere else: nothing changes (see post.js)
   uAux8: { value: 0 },
+  // (the powers, move water: the parted channel. A: where it begins, FROM THE EYE, in the body's axes, and its half
+  // width (m; 0: there is none). B: the way it runs (unit, the body's axes) and its length now (m). Set by the world
+  // each frame from the physics' list of the explorer's wind; read only by the water compiled with PC_POWERS.)
+  uPwChanA: { value: new THREE.Vector4(0, 0, 0, 0) }, uPwChanB: { value: new THREE.Vector4(0, 0, 1, 0) },
 };
 
 // THE LOOK. The default is the watercolour. `?look=oil` (docs/HANDOVER.md 4a, the owner's reference clip) paints the same

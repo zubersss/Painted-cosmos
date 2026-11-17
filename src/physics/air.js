@@ -15,6 +15,7 @@ import { TerrainGrid, scrollField } from './near.js';
 import { coverAt } from './ground.js';
 import { FLORA } from './flora.js';
 import { devilWind } from './features.js';
+import { powerWind } from './powers.js';
 import { clamp, clamp01, smoothstep } from './util.js';
 
 // (P15) The wind left at height z (m) in the lee of trees of height wkH that leave wk of it near the ground: whole up
@@ -463,6 +464,7 @@ export function aloftFactor(bodyId, z) {
 
 const _s = {};
 const _dw = new Float64Array(3);
+const _pw = new Float64Array(4);
 const _sub = new Float64Array(4);
 
 // The air at body-local point (px,py,pz).
@@ -474,7 +476,7 @@ const _sub = new Float64Array(4);
 // viscosity (Pa s), altitude (m above the base radius), height (m above ground used), near (bool).
 // recv (optional, P18): what feels the air there, { size (m), vx, vy, vz (its velocity, body-local m/s) }: the sub-second
 // eddies smaller than it are averaged away and those it meets too often fade (wind.js gustSubAt). Without it: a point at rest.
-export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, o = {}, devils = null, recv = null) {
+export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, o = {}, devils = null, recv = null, winds = null) {
   const body = BODIES[bodyId], atm = ATMOSPHERES[bodyId];
   const r = Math.hypot(px, py, pz) || 1;
   const ux = px / r, uy = py / r, uz = pz / r;
@@ -530,6 +532,8 @@ export function airAt(bodyId, px, py, pz, t, seed, grid, frame, sunDir, height, 
     let we = we0, wn = wn0;
     // a dust devil close by: its swirl, inflow and updraught are added exactly, not from the grid
     if (devils && devils.count > 0 && devilWind(devils, x, z, zh, _dw)) { we += _dw[0]; wn += _dw[1]; wu += _dw[2]; }
+    // the wind the explorer makes (powers.js: a gust, a place stilled or quickened, a ball of gathered air), exactly too
+    if (winds && winds.count > 0 && powerWind(winds, x, z, zh, _pw)) { we = we * _pw[3] + _pw[0]; wn = wn * _pw[3] + _pw[1]; wu = wu * _pw[3] + _pw[2]; }
     // (P12) the grid's wind is in the frame's axes, the tangent plane at the ANCHOR. Here, up to 384 m
     // away on a 4 km sphere, that plane is tilted 5.5 degrees to the ground: a 7 m/s wind blew 0.7 m/s
     // into or out of the hill, and stopped doing so in one frame when the frame re-anchored. Turn it
