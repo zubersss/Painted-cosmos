@@ -56,7 +56,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 3, ' + BUILD + ': photograph this screen and send it\n' +
+    return 'PAINTED COSMOS SPEED TEST 4, ' + BUILD + ': photograph this screen and send it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -74,6 +74,8 @@ export function attachBench(pc) {
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 }), 1200],
       ['ground one flat colour', () => B({ flat: 1 }), () => B({ flat: 0 }), 1000],
       ['plants one flat colour', () => B({ flat: 2 }), () => B({ flat: 0 }), 1000],
+      ['far trees one flat colour', () => B({ flat: 3 }), () => B({ flat: 0 }), 1000],
+      ['no far trees', () => show(/^pc-prop-far/, false), () => show(/^pc-prop-far/, true), 1000],
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true), 1000],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true), 1000],
       ['no near grass', () => show(/^pc-near/, false), () => show(/^pc-near/, true), 1000],
