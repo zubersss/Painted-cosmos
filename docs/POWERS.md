@@ -97,3 +97,91 @@ Fire never spreads and never burns the wood down: there is nothing to lose.
   and written in `docs/COORDINATOR.md`.
 - **The mechanics are tested** like the rest of the physics (`src/physics/powers.test.mjs`).
 - **What stays** (a felled tree) is kept in the saved game; everything else is weather: it passes.
+
+## Wind, as built (2026-11-17)
+
+Five abilities on the keys `1` to `5` and on the touch fan, in this order: **gust**, **gather**,
+**quicken**, **still**, **whirl** (wind control is two of them: a hidden second gesture is not found
+on a phone). A press of the touch button casts at once, or holds; sliding the thumb off the button
+opens the fan, and letting go on a word chooses it and casts it. The aim is shown by a small mark
+in the middle of the picture while a power is held (the ring painted on the ground, above, is not
+built: it needs a new painted thing).
+
+The player's wind does not go onto the wind grid of `src/physics/air.js` (its nodes are 16 m
+apart). It goes in beside it, by the door the dust devils use: a short list of shapes
+(`src/physics/powers.js`) that the air at a point, the plants' field, the loose things and the rain
+and snow each ask exactly. The whirl is handed on as a dust devil.
+
+## Move water and the wind knife: the plans and their cost
+
+Both are plans. The owner asked for the plan and its cost first.
+
+### Move water ("push water out of my path")
+
+*What the player sees.* While the ability is held, a wall of wind runs out ahead of the explorer
+and the water there is pushed aside: a channel three metres wide and up to fourteen long, its bed
+showing, the water heaped a little along its two sides with spray blowing off them; the explorer
+walks through on the bed. Let go, and the water closes again from the far end inward.
+
+*How.* Three small pieces, none of them a fluid simulation.
+1. **The water's face is pressed down in the channel** (`WATER_VERT`, `src/render/materials.js`):
+   a vertex of the water's mesh inside the channel is lowered toward the bed (its own depth is
+   already carried with it, `aDepth`), and one within a metre outside is raised a hand's breadth.
+   The channel is two uniforms (where it starts and how it runs; its length, width and how far
+   open it is). The mesh near the explorer has a vertex every three quarters of a metre: fine
+   enough for a three-metre channel, too coarse for a narrower one.
+2. **The explorer stands on the bed** (`src/core/sim.js`, where the depth of water at the feet is
+   worked out): inside the open channel the depth is taken as nothing, so the explorer walks and
+   does not swim. One comparison a frame.
+3. **Spray and rings along the walls**: the channel is one more shape in the list of the
+   explorer's wind (a jet that is held), so the loose-things system throws spray off the water it
+   lies on, as a gust does now.
+
+*Cost.* Unused: nothing in the frame; the water's shader is compiled with the channel only when
+the address says `?powers=1` (a compile-time switch, as the oil look's is). In use: a dozen
+operations more for each vertex of the water (some tens of thousands of vertices, no more pixels),
+and the spray of one held jet (about 150 grains a second). No new pass, no new texture.
+
+*What it will not do.* The water does not flow round the channel or pile up behind it, a river is
+not dammed, and the channel does not follow a slope: it is a dent in the water's face, not moved
+water. From high above, where the mesh is coarse, it will look blunt. Fish, boats and waves do
+not answer it (the game has none that would).
+
+*The risk.* It touches the water's vertex shader, which is one of the three risky parts (the
+shader code). The change is a few lines behind its own switch; it must be seen in a still on the
+river and on the sea before it is called done.
+
+### The wind knife ("a blade of wind that cuts down a tree, which falls and stays felled")
+
+*What the player sees.* A thin gust, flat like a blade, leaves the hands; the first tree it meets
+within twenty metres is cut near its foot, leans, falls away from the explorer over a second and a
+half, and lies there, its crown on the ground. It stays felled when the player walks away and
+comes back, and after the game is closed and opened again.
+
+*How.* Four pieces.
+1. **Which tree**: the game already knows where the trunks stand, for walking into them
+   (`sampleObstacles`). The first trunk within a metre and a half of the aim's line is the one.
+2. **That it is felled** is kept in a small list (the tree's place, the way it fell, when):
+   in the game's state, and in the saved game (`src/core/save.js`, one new field).
+3. **It is drawn fallen** (`src/world/flora.js`, where each tree's place in its mesh is written):
+   a felled tree's place is turned about its foot to lie along the way it fell; while it is
+   falling, its patch of the wood is written again each frame (a second and a half), then left.
+   The same place serves the picture and the shadows, in all three of its forms (full, middle,
+   far), so it is felled from every distance.
+4. **It no longer stands in the way**: the felled trunk is taken out of what the explorer and the
+   ship bump into. (The lying trunk is not something to trip over in the simplest version.)
+   A blade is also one more shape in the wind list: it lifts leaves along its path.
+
+*Cost.* Unused, or with no tree felled: nothing (one comparison where a patch of the wood is
+written). A felled tree: a few numbers in the save, a lookup in a small table when its patch is
+written (which happens only when the eye moves, as now), and for the second and a half of the
+fall one patch written each frame (some dozens of trees: well under a millisecond).
+
+*What it will not do.* No stump is left and no log is cut: the whole tree lies down. The fallen
+crown does not break or settle on uneven ground: it turns as one stiff thing, so on a steep slope
+it may hang in the air or sink in. The wind's sway still moves a fallen crown's leaves. Trees
+do not grow back.
+
+*The risk.* It touches `src/world/flora.js`, which the trees' speed work also changed lately; and
+the saved game. Neither is one of the three risky parts. A test can check the mechanics (the
+right tree is chosen, it is felled once, it is kept in the save and found again).
