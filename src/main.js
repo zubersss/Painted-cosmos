@@ -315,7 +315,8 @@ async function boot() {
       const powers = new core.Powers();
       core.attachPowerInputs(powers, window);
       ui.attachPowersUi(powers, hudRoot);
-      powers.onCast = (id) => { if (audio) audio.event(id); };
+      let fells = 0;
+      powers.onCast = (id) => { if (!audio) return; audio.event(id); if (powers.fells !== fells) { fells = powers.fells; audio.event('timber'); } };
       sim.powers = powers;
     }).catch((e) => console.warn('powers: ' + ((e && e.message) || e)));
   }

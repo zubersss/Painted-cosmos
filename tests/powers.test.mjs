@@ -70,7 +70,7 @@ test('only on foot; never more than the limit; five abilities in the order of th
   const sim = fakeSim();
   for (let k = 0; k < 20; k++) { p.down = false; step(p, sim, 20); p.down = true; step(p, sim, 2); }
   assert.ok(p.winds.count <= WINDPOWER.max);
-  assert.deepEqual(ABILITIES.map((a) => a.id), ['gust', 'gather', 'quicken', 'still', 'whirl', 'part']);
+  assert.deepEqual(ABILITIES.map((a) => a.id), ['gust', 'gather', 'quicken', 'still', 'whirl', 'part', 'knife']);
 });
 
 test('part water: held, a channel goes with the explorer along the view and its floor is dry; let go, it closes', () => {

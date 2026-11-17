@@ -4,7 +4,8 @@
 // What is kept: where the explorer and the ship are (only ever written while on foot or
 // landed, so a save is always a safe place to stand), the clock and each body's spin, the
 // chosen target, and the sketchbook (bodies and biomes visited). Worlds are not saved: they
-// are the same on every visit by construction.
+// are the same on every visit by construction. (One thing of a world is kept: the trees the explorer's
+// wind has felled, data/felled.js; the field is written only when there are any.)
 import { BODIES } from '../data/bodies.js';
 import { S } from './state.js';
 import { bodyFrame } from './frames.js';
@@ -12,6 +13,7 @@ import { createExplorerState, EXPLORER } from '../player/explorer.js';
 import { createFootCamera, createShipCamera, VIEW_PITCH } from '../player/camera.js';
 import { createShipState } from '../ship/flight.js';
 import { norm, len, tangent, qNorm, qRotate, V } from './vec.js';
+import { FELLED, felledRows, felledLoad } from '../data/felled.js';
 
 export const SAVE_KEY = 'painted-cosmos.save';
 export const SAVE_VERSION = 1;
@@ -39,6 +41,7 @@ export function snapshot(sim) {
     target: sim.target, targetLocked: sim.targetLocked === true,
     visited: Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)])),
     vistas: Object.fromEntries(Object.entries(sim.vistas || {}).map(([k, v]) => [k, Object.keys(v)])),
+    ...(FELLED.size ? { felled: felledRows() } : null),
   };
 }
 
@@ -114,6 +117,7 @@ export function restore(sim, d) {
     if (!BODIES[id] || !Array.isArray(list)) continue;
     sim.vistas[id] = Object.fromEntries(list.filter((b) => typeof b === 'string').map((b) => [b, true]));
   }
+  felledLoad(d.felled);               // (the trees felled by the explorer's wind: none in a save without the field)
   sim.transition = null;
   sim.pulse = null;
   sim.sm.force(d.state);

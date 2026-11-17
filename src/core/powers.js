@@ -10,8 +10,9 @@
 // Nothing here draws, and nothing here moves a leaf: the world's own systems do.
 import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
+import { fellTree } from '../data/felled.js';
 
-// The abilities of wind, in the order of the keys 1 .. 6 and of the touch fan. hold: it lasts while the hand is down.
+// The abilities of wind, in the order of the keys 1 .. 7 and of the touch fan. hold: it lasts while the hand is down.
 export const ABILITIES = Object.freeze([
   { id: 'gust', word: 'gust', hold: false },
   { id: 'gather', word: 'gather', hold: true },
@@ -19,6 +20,7 @@ export const ABILITIES = Object.freeze([
   { id: 'still', word: 'still', hold: false },
   { id: 'whirl', word: 'whirl', hold: false },
   { id: 'part', word: 'part', hold: true },
+  { id: 'knife', word: 'knife', hold: false },
 ]);
 
 export const POWERS = Object.freeze({
@@ -30,6 +32,8 @@ export const POWERS = Object.freeze({
   orbReach: 18,           // m: how far out a ball can be carried
   gustEvery: 0.28,        // s: the least time between two gusts (a hand's stroke)
   castPose: 0.5,          // s: how long the explorer's cast shows (figure state: sim.ex.casting, 1 .. 0)
+  knifeReach: 18,         // m: how far the wind knife cuts
+  knifeWidth: 1.2,        // m: a trunk this near the aim's line (and its own radius more) is cut
 });
 
 const add = (a, b, k) => ({ x: a.x + b.x * k, y: a.y + b.y * k, z: a.z + b.z * k });
@@ -51,6 +55,7 @@ export class Powers {
     this.keys = { cast: false, pad: false, mouse: false, touch: false };
     this.onCast = null;         // called with the ability's id when one is cast (the sound)
     this.tapOnce = false;       // set by the touch button: one press, seen by the next frame however long that frame is
+    this.fells = 0;             // trees felled so far by the wind knife (for tests and the read-out)
   }
 
   pick(i) { if (i >= 0 && i < ABILITIES.length && i !== this.ability) { this._drop(); this._close(); this.ability = i; } }
@@ -69,6 +74,33 @@ export class Powers {
   // Is the water parted at the place d (a unit vector from the body's centre) where its face is at radius r?
   // (sim.js asks, for the explorer's ground: on the channel's floor there is no water to wade or swim in)
   dry(bodyId, d, r) { return this.winds.count > 0 && partedAt(this.winds, bodyId, d.x * r, d.y * r, d.z * r) > 0.5; }
+
+  // The wind knife: a thin straight gust, and the first tree it meets along the aim is felled (data/felled.js: the
+  // world lays it down and takes its trunk out of the way; the saved game keeps it). It falls away from the explorer,
+  // when the blade reaches it. With no tree in reach it is only the gust.
+  _knife(sim) {
+    const A = this.aim, p = sim.ex.p, up = unit(p), f = A.fwd;
+    const blade = castGust(this.winds, sim.bodyId, A.from, f, 0.9);
+    blade.radius = 0.45; blade.spread = 0.03; blade.curl = 0; blade.height = 1.8;
+    let best = null, bd = 1e9;
+    if (sim.sampleObstacles) {
+      // (two small discs along the aim: asked for one wide disc the world's list misses things, sim.js)
+      for (const k of [0.28, 0.75]) {
+        let list = null;
+        try { list = sim.sampleObstacles(sim.bodyId, unit(add(p, f, POWERS.knifeReach * k)), POWERS.knifeReach * 0.5); } catch { list = null; }
+        for (const ob of list || []) {
+          if (ob.kind !== 'tree' || !ob.p) continue;
+          const rx = ob.p.x - p.x, ry = ob.p.y - p.y, rz = ob.p.z - p.z, a = rx * f.x + ry * f.y + rz * f.z;
+          if (a < 1 || a > POWERS.knifeReach || a >= bd) continue;
+          const h = rx * up.x + ry * up.y + rz * up.z;
+          if (Math.hypot(rx - f.x * a - up.x * h, ry - f.y * a - up.y * h, rz - f.z * a - up.z * h) > POWERS.knifeWidth + (ob.radius || 0)) continue;
+          best = ob; bd = a;
+        }
+      }
+    }
+    if (best && fellTree(sim.bodyId, best.p.x, best.p.y, best.p.z, f.x, f.y, f.z, bd / WINDPOWER.gustFront)) this.fells++;
+    return best;
+  }
 
   // Where the power acts: from the explorer along the view, level, and as far out as the view looks down.
   _aim(sim) {
@@ -123,6 +155,7 @@ export class Powers {
           else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken');
           else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm');
           else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1);
+          else if (ab.id === 'knife') this._knife(sim);
           this._wait = POWERS.gustEvery;
           this._cast(sim);
         }

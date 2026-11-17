@@ -39,9 +39,9 @@ export function attachPowersUi(powers, root) {
   const el = (cls, text) => { const e = doc.createElement('div'); e.className = cls; if (text) e.textContent = text; root.appendChild(e); return e; };
   const btn = el('pc-pw-btn'), fan = el('pc-pw-fan'), word = el('pc-pw-word'), mark = el('pc-pw-mark');
   // the fan: the abilities on an arc up and to the left of the button (away from the screen's edge and from "jump")
-  const R = 92, tabs = ABILITIES.map((a, i) => {
+  const R = 104, tabs = ABILITIES.map((a, i) => {
     const t = doc.createElement('div'); t.className = 'pc-pw-tab'; t.textContent = a.word;
-    const ang = (100 + i * (150 / Math.max(1, ABILITIES.length - 1))) * Math.PI / 180;      // 100 .. 250 degrees: up, round to the left and down
+    const ang = (90 + i * (125 / Math.max(1, ABILITIES.length - 1))) * Math.PI / 180;      // 90 .. 215 degrees: straight up, round to the left and a little down (clear of "jump", which is under the button)
     t._x = Math.cos(ang) * R; t._y = -Math.sin(ang) * R;
     t.style.transform = `translate(calc(-50% + ${t._x.toFixed(0)}px), calc(-50% + ${t._y.toFixed(0)}px))`;
     fan.appendChild(t); return t;
