@@ -8,7 +8,7 @@
 //   casts or holds the chosen ability by adding a shape of moving air to the list (physics/powers.js),
 //   and ages the list. The physics takes the list from sim (f.winds) and everything that reads the air answers.
 // Nothing here draws, and nothing here moves a leaf: the world's own systems do.
-import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
+import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, growWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
 import { fellTree } from '../data/felled.js';
 
@@ -56,6 +56,12 @@ export class Powers {
     this.part = null;           // the parted channel (move water), while held
     this.aim = { ok: false, p: { x: 0, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, dist: 0, from: { x: 0, y: 0, z: 0 }, size: 0 };
     this.casts = 0;             // how many casts so far (for tests and the read-out)
+    // HOLD TO GROW IT (the owner, 2026-11-17): while the power is held the circle grows from 1 to WINDPOWER.sizeMax
+    // over chargeTime seconds, and letting go casts it at that size. A tap is the smallest and casts at once.
+    this.charge = 0;            // 0 .. 1 while the hand is down
+    this.size = 1;              // 1 .. sizeMax: what the next cast (or the ball being held) is made to
+    this._armed = null;         // the ability the hand went down on (it is cast when the hand lifts)
+    this._wasTap = false;       // the press came from the touch button's tap: the smallest cast, whatever the frame
     this.note = '';             // one word for the HUD when something cannot be done here
     this._noteT = 0;
     this.active = false;        // the powers can be used now (on foot, on a world)
@@ -88,22 +94,23 @@ export class Powers {
   // The wind knife: a thin straight gust, and the first tree it meets along the aim is felled (data/felled.js: the
   // world lays it down and takes its trunk out of the way; the saved game keeps it). It falls away from the explorer,
   // when the blade reaches it. With no tree in reach it is only the gust.
-  _knife(sim) {
+  _knife(sim, size = 1) {
     const A = this.aim, p = sim.ex.p, up = unit(p), f = A.fwd;
-    const blade = castGust(this.winds, sim.bodyId, A.from, f, 0.9);
-    blade.radius = 0.45; blade.spread = 0.03; blade.curl = 0; blade.height = 1.8;
+    const blade = castGust(this.winds, sim.bodyId, A.from, f, 0.9, size);
+    blade.radius = 0.45 * size; blade.spread = 0.03; blade.curl = 0; blade.height = 1.8 * size;
+    const reach = POWERS.knifeReach * (0.7 + 0.3 * size), wide = POWERS.knifeWidth * size;
     let best = null, bd = 1e9;
     if (sim.sampleObstacles) {
       // (two small discs along the aim: asked for one wide disc the world's list misses things, sim.js)
       for (const k of [0.28, 0.75]) {
         let list = null;
-        try { list = sim.sampleObstacles(sim.bodyId, unit(add(p, f, POWERS.knifeReach * k)), POWERS.knifeReach * 0.5); } catch { list = null; }
+        try { list = sim.sampleObstacles(sim.bodyId, unit(add(p, f, reach * k)), reach * 0.5); } catch { list = null; }
         for (const ob of list || []) {
           if (ob.kind !== 'tree' || !ob.p) continue;
           const rx = ob.p.x - p.x, ry = ob.p.y - p.y, rz = ob.p.z - p.z, a = rx * f.x + ry * f.y + rz * f.z;
-          if (a < 1 || a > POWERS.knifeReach || a >= bd) continue;
+          if (a < 1 || a > reach || a >= bd) continue;
           const h = rx * up.x + ry * up.y + rz * up.z;
-          if (Math.hypot(rx - f.x * a - up.x * h, ry - f.y * a - up.y * h, rz - f.z * a - up.z * h) > POWERS.knifeWidth + (ob.radius || 0)) continue;
+          if (Math.hypot(rx - f.x * a - up.x * h, ry - f.y * a - up.y * h, rz - f.z * a - up.z * h) > wide + (ob.radius || 0)) continue;
           best = ob; bd = a;
         }
       }
@@ -158,42 +165,55 @@ export class Powers {
     if (sim.ex && sim.ex.casting > 0) sim.ex.casting = Math.max(0, sim.ex.casting - dt / POWERS.castPose);
     // (the aim is worked out every frame the powers can be used, cast or not: the mark on the screen shows where a
     // power will act before it is cast, ui/powers.js. One sample of the ground a frame.)
-    if (this.active) { const A = this._aim(sim), id = ABILITIES[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) : 0; }
+    // the circle grows while the hand is down, and goes back to the smallest when it lifts. A TAP (the touch button's
+    // one-frame press) is always the smallest, however long that frame was.
+    if (tap) this._wasTap = true;
+    if (down && !this._wasTap) this.charge = Math.min(1, this.charge + dt / WINDPOWER.chargeTime);
+    this.size = 1 + this.charge * (WINDPOWER.sizeMax - 1);
+    if (this.active) { const A = this._aim(sim), id = ABILITIES[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0; }
     else this.aim.ok = false;
-    if (this.active && (down || this.orb || this.part)) {
+    if (this.active && (down || released || this.orb || this.part)) {
       const A = this.aim, ab = ABILITIES[this.ability];
       if (A.ok) {
         if (ab.id === 'gather') {
-          if (pressed && !this.orb) { this.orb = castOrb(W, sim.bodyId, this._orbAt(sim, POWERS.orbAhead)); this._cast(sim); }
+          if (pressed && !this.orb) { this.orb = castOrb(W, sim.bodyId, this._orbAt(sim, POWERS.orbAhead), this.size); this._cast(sim); }
           if (this.orb && down) {
             // the ball follows the aim, no faster than a hand could carry it
             const to = this._orbAt(sim, Math.min(A.dist, POWERS.orbReach)), o = this.orb;
             const dx = to.x - o.px, dy = to.y - o.py, dz = to.z - o.pz, l = Math.hypot(dx, dy, dz), m = Math.min(1, POWERS.orbSpeed * dt / (l || 1));
             moveWind(o, { x: o.px + dx * m, y: o.py + dy * m, z: o.pz + dz * m });
+            growWind(o, this.size);                // (held: the ball grows in the hand)
           }
         } else if (ab.id === 'part') {
           // the channel begins just behind the explorer and lies along the aim: it goes where they go and look
           if (pressed && !this.part) {
-            this.part = castPart(W, sim.bodyId, this._orbAt(sim, -WINDPOWER.partBack), A.fwd); this._cast(sim);
+            this.part = castPart(W, sim.bodyId, this._orbAt(sim, -WINDPOWER.partBack), A.fwd, this.size); this._cast(sim);
             // (no water within the channel's reach: it is only a wind along the ground, and says so)
             let wet = false;
             for (const k of [2, 6, 11]) { try { const g = sim.sampleSurface(sim.bodyId, unit(add(sim.ex.p, A.fwd, k))); if (g && g.liquidRadius > g.radius) wet = true; } catch { /* unknown: say nothing */ wet = true; } }
             if (!wet) this._say('no water here');
           }
-          if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); }
-        } else if (pressed && this._wait <= 0) {
-          if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd);
-          else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken');
-          else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm');
-          else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1);
-          else if (ab.id === 'knife') this._knife(sim);
-          this._wait = POWERS.gustEvery;
-          this._cast(sim);
+          if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); growWind(this.part, this.size); }
+        } else {
+          // the hand goes down on it and the circle grows; it is cast when the hand lifts (a tap: the smallest, at once)
+          if (pressed) this._armed = ab.id;
+          if (released && this._armed === ab.id && this._wait <= 0) {
+            const k = this._wasTap ? 1 : this.size;
+            if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd, 1, k);
+            else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken', k);
+            else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm', k);
+            else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, k);
+            else if (ab.id === 'knife') this._knife(sim, k);
+            this._wait = POWERS.gustEvery;
+            this._cast(sim);
+          }
+          if (released) this._armed = null;
         }
       }
     }
     if (this.orb && (released || !this.active)) this._drop(this.active ? sim : null);
     if (this.part && (released || !this.active)) this._close();
+    if (!down) { this.charge = 0; this._armed = null; this._wasTap = false; }
     if (W.count > 0) stepWinds(W, dt);
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }

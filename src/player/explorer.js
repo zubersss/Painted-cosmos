@@ -43,7 +43,10 @@ export const EXPLORER = Object.freeze({
   // superman"): no fuel. Space held off the ground lifts into flight; W goes where the view looks, climbing or diving
   // with it; Space rises, C sinks, Shift is fast; with the hands off it hovers; it ends on the ground or in water.
   flySpeed: 16,              // m/s along the view
-  flyFast: 34,               // m/s with Shift
+  flyFast: 34,               // m/s with Shift (on a phone: the walk stick held at its rim)
+  // AND FASTER STILL (the owner, 2026-11-17: "make the me have an option to fly even faster"): hold the fast flight
+  // and it builds from flyFast to flySurge over surgeIn seconds, and falls back over surgeOut when the hand eases.
+  flySurge: 78, surgeIn: 4.5, surgeOut: 1.2,
   flyRise: 9,                // m/s up on Space
   flySink: 9,                // m/s down on C
   terminalFall: 24,          // m/s: falls stay gentle, there is no fall damage
@@ -309,7 +312,11 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const rawPitch = flying && Number.isFinite(input.lookPitch) ? input.lookPitch + 0.12 : 0;
   const lookPitch = Math.max(-1.2, Math.min(1.2, Math.abs(rawPitch) < 0.09 ? 0 : rawPitch - Math.sign(rawPitch) * 0.09));
   const wish = clampLen(add(scale(f, (input.moveZ || 0) * (flying && input.moveZ > 0 ? Math.cos(lookPitch) : 1)), scale(right, input.moveX || 0)), 1);
-  const maxSpeed = flying ? (input.run ? T.flyFast : T.flySpeed) : input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
+  // (the surge: how long the fast flight has been held, 0 .. 1 of the way to flySurge)
+  if (flying && input.run && (input.moveZ || 0) > 0.2) st.surge01 = Math.min(1, (st.surge01 || 0) + dt / T.surgeIn);
+  else st.surge01 = Math.max(0, (st.surge01 || 0) - dt / T.surgeOut);
+  const flyTop = T.flyFast + (T.flySurge - T.flyFast) * (st.surge01 || 0);
+  const maxSpeed = flying ? (input.run ? flyTop : T.flySpeed) : input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
 
   const cmd = st.cmd || (st.cmd = { wish: V(), jump: false, jet: 0, jetMaxRise: T.jetMaxRise, descentLimit: 0, airControl: 1 });
   // The suit's share of the wind (feel, on PHYSICS' lever cmd.shelter01). On the ground the

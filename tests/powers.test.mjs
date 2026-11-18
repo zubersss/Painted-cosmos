@@ -15,11 +15,13 @@ function fakeSim({ pitch = -0.12, state = S.ON_FOOT } = {}) {
 }
 const step = (p, sim, n = 1, dt = 1 / 60) => { for (let i = 0; i < n; i++) p.update(dt, sim); };
 
-test('a press casts a gust from the hands along the view; holding does not repeat it', () => {
+test('the hand goes down and the circle grows; the lift casts one gust from the hands along the view', () => {
   const p = new Powers(), sim = fakeSim(), said = [];
   p.onCast = (id) => said.push(id);
   step(p, sim, 3); assert.equal(p.winds.count, 0, 'nothing until asked');
   p.down = true; step(p, sim, 4);
+  assert.equal(p.winds.count, 0, 'held, not yet cast'); assert.ok(p.size > 1, 'and the circle is growing: ' + p.size.toFixed(2));
+  p.down = false; step(p, sim, 2);
   assert.equal(p.winds.count, 1); assert.equal(p.casts, 1);
   assert.deepEqual(said, ['gust'], 'the cast is said once, by its name (the sound)');
   const s = p.winds[0];
@@ -27,10 +29,10 @@ test('a press casts a gust from the hands along the view; holding does not repea
   assert.ok(Math.abs(s.dz - 1) < 1e-6 && Math.abs(s.dx) < 1e-6, 'along the view, level');
   assert.ok(Math.abs(s.pz - POWERS.ahead) < 1e-6 && Math.abs(s.py - (R + POWERS.hands)) < 1e-6, 'from the hands, a step ahead');
   assert.ok(sim.ex.casting < 1 && sim.ex.casting >= 0, 'the explorer shows the cast for a moment');
-  p.down = false; step(p, sim, 2); p.down = true; step(p, sim, 2);
-  assert.equal(p.casts, 1, 'a second press too soon after the first is the same stroke');
-  p.down = false; step(p, sim, 30); p.down = true; step(p, sim, 2);
-  assert.equal(p.casts, 2, 'a new press, a new gust');
+  p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  assert.equal(p.casts, 1, 'a second cast too soon after the first is the same stroke');
+  step(p, sim, 30); p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  assert.equal(p.casts, 2, 'a new press and lift, a new gust');
   step(p, sim, 60 * 4); assert.equal(p.winds.count, 0, 'and the air is left as it was');
 });
 
@@ -38,13 +40,15 @@ test('the aim lies farther out the more level the view; wind control and the whi
   const far = new Powers(), near = new Powers();
   far.pick(2); near.pick(4);
   const sf = fakeSim({ pitch: -0.12 }), sn = fakeSim({ pitch: -0.9 });
-  far.down = true; near.down = true; step(far, sf, 2); step(near, sn, 2);
+  // (the hand goes down, the circle grows, the lift casts it: hold to grow, let go to cast)
+  const cast = (p, sim) => { p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2); };
+  cast(far, sf); cast(near, sn);
   const a = far.winds[0], b = near.winds[0];
   assert.equal(a.kind, KIND.zone); assert.ok(a.gain > 1, 'quicken');
   assert.equal(b.kind, KIND.vortex);
   assert.ok(a.pz > 24 && a.pz <= POWERS.aimFar, 'a level view: far out, ' + a.pz.toFixed(1) + ' m');
   assert.ok(Math.abs(b.pz - POWERS.aimNear) < 0.5, 'looking down: near, ' + b.pz.toFixed(1) + ' m');
-  const still = new Powers(); still.pick(3); still.down = true; step(still, fakeSim(), 2);
+  const still = new Powers(); still.pick(3); cast(still, fakeSim());
   assert.equal(still.winds[0].gain, 0, 'still: a dead calm');
 });
 
@@ -75,28 +79,29 @@ test('only on foot; never more than the limit; five abilities in the order of th
 
 test('part water: held, a channel goes with the explorer along the view and its floor is dry; let go, it closes', () => {
   const p = new Powers(), sim = fakeSim();
-  p.pick(5); p.down = true; step(p, sim, 60);
+  p.pick(5); p.down = true; step(p, sim, 150);
   assert.ok(p.part && p.winds.count === 1 && p.winds[0].kind === KIND.part, 'one channel, held');
-  assert.equal(p.part.len, WINDPOWER.partReach, 'run out to its full length in a second');
+  assert.equal(p.part.len, p.part.reach, 'run out to its full length in a second');
+  assert.ok(p.part.reach >= WINDPOWER.partReach, 'and held, it is at least its own reach: ' + p.part.reach.toFixed(1) + ' m');
   assert.ok(Math.abs(p.part.pz + WINDPOWER.partBack) < 1e-6 && Math.abs(p.part.dz - 1) < 1e-6, 'it begins just behind the explorer and lies along the view');
   const at = (x, z) => { const l = Math.hypot(x, R, z); return p.dry('earth', { x: x / l, y: R / l, z: z / l }, l); };
   assert.ok(at(0, 5), 'dry 5 m ahead'); assert.ok(at(0, 0), 'dry under the explorer');
-  assert.ok(!at(4, 5), 'water 4 m to the side'); assert.ok(!at(0, 20), 'and beyond its reach');
+  assert.ok(!at(p.part.radius + 2, 5), 'water beyond its wall (it is ' + p.part.radius.toFixed(1) + ' m to each side, held)'); assert.ok(!at(0, p.part.reach + 3), 'and beyond its reach');
   // it follows the explorer and the view
   sim.ex.p = { x: 10, y: R, z: 0 }; sim.footCam.viewFwd = { x: 1, y: 0, z: 0 }; step(p, sim, 2);
   assert.ok(Math.abs(p.part.dx - 1) < 1e-3 && Math.abs(p.part.px - (10 - WINDPOWER.partBack)) < 0.02, 'moved and turned with them');
-  assert.ok(at(15, 0) && !at(0, 5), 'the dry floor is where they look now');
+  assert.ok(at(14, 0) && !at(0, 5), 'the dry floor is where they look now');
   // let go: it closes; another ability chosen while held closes it too
   p.down = false; step(p, sim, 2);
   assert.equal(p.part, null); assert.equal(p.winds.count, 1, 'still closing');
-  step(p, sim, 60 * 2); assert.equal(p.winds.count, 0, 'closed and gone'); assert.ok(!at(15, 0));
+  step(p, sim, 60 * 5); assert.equal(p.winds.count, 0, 'closed and gone (the longer it was held, the longer it takes)'); assert.ok(!at(15, 0));
   p.down = true; step(p, sim, 10); assert.ok(p.part); p.pick(0); assert.equal(p.part, null, 'choosing another ability lets it go');
 });
 
 test('a word when an ability can do nothing here: the knife with no tree in reach, the channel with no water', () => {
   const p = new Powers(), sim = fakeSim();
   assert.equal(p.note, '');
-  p.pick(ABILITIES.findIndex((a) => a.id === 'knife')); p.tapOnce = true; step(p, sim, 1);
+  p.pick(ABILITIES.findIndex((a) => a.id === 'knife')); p.tapOnce = true; step(p, sim, 2);
   assert.equal(p.casts, 1); assert.equal(p.fells, 0); assert.equal(p.note, 'no tree in reach');
   step(p, sim, 60); assert.equal(p.note, 'no tree in reach', 'it stands for a moment');
   step(p, sim, 60 * 2); assert.equal(p.note, '', 'and goes');
@@ -111,10 +116,10 @@ test('a word when an ability can do nothing here: the knife with no tree in reac
 
 test('a tap from the touch button is one cast, however slow the frames are', () => {
   const p = new Powers(), sim = fakeSim();
-  p.tapOnce = true; step(p, sim, 1, 0.5);                    // one frame of half a second sees it
+  p.tapOnce = true; step(p, sim, 2, 0.5);                    // one frame of half a second sees it
   assert.equal(p.casts, 1); assert.equal(p.tapOnce, false, 'taken');
   step(p, sim, 3, 0.5); assert.equal(p.casts, 1, 'and it is not held: no second cast');
-  p.tapOnce = true; step(p, sim, 1, 0.5); assert.equal(p.casts, 2, 'the next tap casts again');
+  p.tapOnce = true; step(p, sim, 2, 0.5); assert.equal(p.casts, 2, 'the next tap casts again');
 });
 
 test('the touch button takes the finger: the HUD lets touches through to the picture, so the button must ask for them', () => {

@@ -66,7 +66,7 @@ test('in the real forest: the knife fells the first tree along the aim, its trun
   sim.footCam.viewFwd = unit({ x: r.x - here.x * k, y: r.y - here.y * k, z: r.z - here.z * k });
   const p = new Powers(), knife = ABILITIES.findIndex((a) => a.id === 'knife');
   assert.equal(knife, 6, 'the seventh ability');
-  p.pick(knife); p.tapOnce = true; p.update(1 / 60, sim);
+  p.pick(knife); p.tapOnce = true; p.update(1 / 60, sim); p.update(1 / 60, sim);   // (down, then the lift casts it)
   assert.equal(p.fells, 1, 'one tree felled'); assert.equal(p.casts, 1);
   const F = felledAt('earth', tree.p.x, tree.p.y, tree.p.z);
   assert.ok(F, 'that tree, or one nearer on the same line');
@@ -80,7 +80,7 @@ test('in the real forest: the knife fells the first tree along the aim, its trun
   assert.equal(after.length, trees.length - 1);
   assert.ok(!after.some((o) => o.p.x === G.x && o.p.y === G.y && o.p.z === G.z), 'the felled one is gone from the list');
   // a second cut along the same line takes the next tree or none, never the same one
-  p.tapOnce = false; p.update(0.5, sim); p.tapOnce = true; p.update(1 / 60, sim);
+  p.tapOnce = false; p.update(0.5, sim); p.tapOnce = true; p.update(1 / 60, sim); p.update(1 / 60, sim);
   assert.ok(p.fells === 1 || p.fells === 2); assert.equal(FELLED.size, p.fells);
   // the saved game keeps them; a new game given that save has them lying; a save without any has no such field
   const snap = JSON.parse(JSON.stringify(snapshot(sim)));
