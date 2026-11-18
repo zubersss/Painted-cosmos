@@ -98,7 +98,14 @@ export const OIL = {
   uOilC: { value: new THREE.Vector4(1.15, 0.5, _qn('strokes', 1), 2.7) },
   // the shade (chunks.js pcTone): x the cool key's gain over the body colour   y the sky's own fill in it (added)
   //    z the green left in the key (under 1: the shade leans to violet)   w the tiles' line: how light it is
-  uOilD: { value: new THREE.Vector4(1.0, 0.10, 0.90, 1.3) },
+  // (?shadefill= and ?shadegreen=, 2026-11-18: the art pass against the owner's twenty oil paintings. Measured on a
+  // rendered still of the game's own wood, the game's DARKS ARE LURID WHERE THE REFERENCES' ARE NEUTRAL: a trunk's
+  // deepest pixels came out at saturation 0.93 against the references' 0.33, the conifers 0.95 against 0.31, the grass
+  // in shade 0.93 against 0.49. That one difference is most of why the references read as oil paint and the game as
+  // poster paint. y is how much of the sky's own light falls into a shade, which lifts it and takes the colour out of
+  // it; z is how much green is left in the cool key, so under 1 a shade leans violet. Both are left at what they were
+  // until a still says what they should be.)
+  uOilD: { value: new THREE.Vector4(1.0, _qn('shadefill', 0.10), _qn('shadegreen', 0.90), 1.3) },
   // x: (not in use)   y: (not in use)   z: a leaf dab's length over its width   w: a dab's cell (half its length) in
   //    stroke widths
   uOilS: { value: new THREE.Vector4(1, 0, 2.4, 2.6) },
