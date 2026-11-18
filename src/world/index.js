@@ -68,6 +68,8 @@ export function createWorld(scene) {
       flora: null,
       forcedTime: null,
       camLocal: new THREE.Vector3(0, BODIES[id].radius * 4, 0),
+      // WHERE THE EYE IS GOING, and how fast (worked out from the eye's own motion: see the lead below)
+      camWas: null, camVel: new THREE.Vector3(), lead: new THREE.Vector3(),
       found: new Set(), ring: null, dab: null, farTier: 2, dabFade: 0,
       // how far the limb thins into the world's haze when seen from space: a world with little or no air keeps its
       // own wash to the edge (a pale rim on a dark ball reads as glass), looks.js `limb` says otherwise
@@ -105,6 +107,28 @@ export function createWorld(scene) {
   }
 
   let budgetMs = 5;
+  // THE LOOK-AHEAD while flying (the owner, 2026-11-18). LEAD_T: how many seconds ahead of the eye the world is
+  // built for. LEAD_MAX: the farthest that point may ever be, so that a very fast ship cannot ask for ground half a
+  // world away. LEAD_MIN: the speed under which there is no lead at all (a walker is 4 m/s and a sprint 9, so this
+  // is well clear of anything on foot). LEAD_SMOOTH: how long the speed takes to follow a change, so that a turn
+  // does not whip the lead about. LEAD_CAP: a speed above this is a jump between worlds, a teleport or an arrival,
+  // not travel, and is thrown away.
+  // (THE BUILDING SHARE IS NOT RAISED WITH SPEED. It was, by up to three times, and the world's own budget test
+  //  caught it at once: arriving on a world the camera moves a long way in one frame, the speed reads enormous, and
+  //  a frame that should spend 5 ms spent 12.4. The slice is there to protect the frame and must not be spent to
+  //  cover for arriving late. Being EARLIER is the fix, and that is all the lead is: the same work, in a better
+  //  order. If the owner's phone still shows the world arriving after the ship, the measurement will say so and the
+  //  share is raised then, deliberately, with a number from the device.)
+  // (?lead=: how many seconds ahead, so a before-and-after pair can be measured without touching the code.
+  //  0 is the world exactly as it was, building only for where the eye already is. PC_LEAD does the same for the
+  //  harnesses, which have no address to read.)
+  const LEAD_T = (() => {
+    let v = 2.6;
+    try { const q = new URLSearchParams(location.search).get('lead'); if (q != null && isFinite(+q)) v = Math.max(0, Math.min(8, +q)); } catch { /* no address */ }
+    try { if (typeof process !== 'undefined' && process.env && process.env.PC_LEAD != null && isFinite(+process.env.PC_LEAD)) v = Math.max(0, Math.min(8, +process.env.PC_LEAD)); } catch { /* not node */ }
+    return v;
+  })();
+  const LEAD_MAX = 900, LEAD_MIN = 14, LEAD_SMOOTH = 0.35, LEAD_CAP = 400;
   // The wash clock (s): what washes in, eases and grows runs on it. It follows the game's own frame time
   // while the game's clock runs (a test that steps the clock sees what a player sees at that pace) and the
   // wall's when the game's clock stands (so a held picture still settles).
@@ -327,6 +351,24 @@ export function createWorld(scene) {
       // camera in body-local coordinates
       st.camLocal.copy(cameraPos);
       root.worldToLocal(st.camLocal);
+      // THE LEAD: a point LEAD_T seconds ahead of the eye along its own travel (the owner, 2026-11-18: "I want
+      // things to be there before you get there even if your flying fast"). It is worked out HERE, from where the
+      // eye was last frame, because nothing else in the world is told the ship's speed; it is smoothed over about a
+      // third of a second so that a turn does not whip it about, and it is capped so that it can never ask for the
+      // far side of a world. Under LEAD_MIN metres a second -- walking, standing, drifting -- there is no lead at
+      // all and every decision below is the one it always was. The lead decides only WHAT IS BUILT AND WHEN, never
+      // what is drawn or how: uCamLocal, the tiers, every range and every shader still see the eye itself.
+      if (st.camWas) {
+        const idt = dt > 1e-4 ? 1 / dt : 0;
+        _v.copy(st.camLocal).sub(st.camWas).multiplyScalar(idt);
+        if (_v.lengthSq() > LEAD_CAP * LEAD_CAP) _v.set(0, 0, 0);   // a jump between worlds, a teleport, an arrival: not travel
+        const k = Math.min(1, dt / LEAD_SMOOTH);
+        st.camVel.lerp(_v, k);
+      } else st.camWas = new THREE.Vector3();
+      st.camWas.copy(st.camLocal);
+      const spd = st.camVel.length();
+      st.leadOn = LEAD_T > 0 && spd > LEAD_MIN;
+      if (st.leadOn) st.lead.copy(st.camVel).multiplyScalar(Math.min(LEAD_T, LEAD_MAX / spd)).add(st.camLocal);
       if (MODE.powers && st === active) setParted(st);      // (the powers, move water)
       // (the powers, fire: which few of the record's scorch marks the ground paints, for the world the eye is on.
       //  Once a frame, before the ground is drawn, exactly as the water's channel above.)
@@ -365,13 +407,15 @@ export function createWorld(scene) {
       // share of the frame instead of a fixed few milliseconds, or nothing would ever settle)
       const tb = performance.now(), slice = (wallDt > 80 && !fixedSlice ? Math.max(budgetMs, Math.min(220, wallDt * 0.3)) : budgetMs) * 0.8;
       if (st.flora && !st.flora.groundReady) st.flora.groundReady = (f, u, v) => veil.on || st.terrain.settledAt(f, u, v);
+      const lead = isActive && st.leadOn ? st.lead : null;
+      const sliceF = slice;
       if (isActive && st.flora && (frameNo & 1) && st.flora.queue.length > 0 && st.terrain.busy > 0) {
-        st.flora.update(st.camLocal, true, slice, washNow);
-        st.terrain.update(st.camLocal, Math.max(0, slice - (performance.now() - tb)), washNow, veil.on);
+        st.flora.update(st.camLocal, true, sliceF, washNow, lead);
+        st.terrain.update(st.camLocal, Math.max(0, sliceF - (performance.now() - tb)), washNow, veil.on, lead);
       } else {
-        st.terrain.update(st.camLocal, isActive ? slice : 0, washNow, veil.on);
+        st.terrain.update(st.camLocal, isActive ? sliceF : 0, washNow, veil.on, lead);
         if (isActive) { const tt = performance.now() - tb; if (tt > prof.terrain) prof.terrain = tt; }
-        if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, slice - (performance.now() - tb)) : 0, washNow);
+        if (st.flora) st.flora.update(st.camLocal, isActive, isActive ? Math.max(0, sliceF - (performance.now() - tb)) : 0, washNow, lead);
       }
       if (!isActive) {
         if (st.near) st.near.update(st.camLocal, false);

@@ -73,6 +73,8 @@ export class Flora {
     this.group.name = 'flora-' + bodyId;
     root.add(this.group);
     this.camLocal = new THREE.Vector3();
+    this.lead = new THREE.Vector3();        // where the eye is going (world/index.js): what is built, never what is drawn
+    this.leadOn = false;
     this.treeChunks = new Map(); this.farChunks = new Map(); this.underChunks = new Map(); this.under2Chunks = new Map();
     this.treeList = [];
     this.queue = [];
@@ -294,7 +296,9 @@ export class Flora {
     if (n) {
       let k = this._fallK | 0;
       if (k >= n) k = 0;
-      for (let i = 0; i < n; i++) list[i].f = Math.min(1, list[i].f + dt / FELL.time);
+      // (how far over each tree is, and how far back up a tree that is growing again, are BOTH clocked by the record
+      //  itself now -- data/felled.js healFelled -- so a wood falls and comes back on a world nobody is watching.
+      //  This lays what the record says; it does not move anything.)
       for (let i = 0; i < n && did < FALL_RELAY; i++) {
         const F = list[(k + i) % n];
         if (F.f <= 0) continue;                 // still waiting for the wave: it stands, and is drawn standing
@@ -599,13 +603,32 @@ export class Flora {
   // (98 draws of nothing at 150 m, 303 at 1 km). Walked only while the eye is near enough the ground for any cell to
   // be in reach; a cell beyond reach by more than the old margin is let go at any height.
   _wanted(level, size, radius, map, kind, reach) {
-    const R = this.R, cam = this.camLocal;
+    const seen = new Set();
+    this._wantAround(this.camLocal, level, size, radius, map, kind, reach, seen);
+    // AND WHAT IS COMING (the owner, 2026-11-18: "I want things to be there before you get there even if your flying
+    // fast"). The same walk a second time, round a point a few seconds ahead of the eye, so the trees of the ground
+    // the ship is flying towards are asked for NOW and are standing by the time it arrives. Nothing is DROPPED by
+    // this second walk -- the letting-go below is still reckoned from the eye itself, so nothing near the player is
+    // ever taken away to pay for what is ahead -- and with no lead (standing, walking, another world) it does not
+    // happen at all and the wood is exactly the wood it was.
+    if (this.leadOn) this._wantAround(this.lead, level, size, radius * 0.8, map, kind, reach, seen);
+    for (const [key, ch] of map) {
+      if (seen.has(key)) continue;
+      if (ch.origin.distanceTo(this.camLocal) > (reach != null ? reach + size * 0.75 : radius) + size * 2.2) {
+        if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+        this._disposeChunk(ch); map.delete(key);
+      }
+    }
+    for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
+  }
+
+  _wantAround(cam, level, size, radius, map, kind, reach, seen) {
+    const R = this.R;
     const c = _up.copy(cam).normalize();
     const e = new THREE.Vector3().crossVectors(_Y, c); if (e.lengthSq() < 1e-6) e.set(1, 0, 0); e.normalize();
     const n = new THREE.Vector3().crossVectors(c, e);
     const step = size * 0.5, cells = 1 << level;
     let K = Math.ceil(radius / step);
-    const seen = new Set();
     if (reach != null) {
       const above = cam.length() - R - this.S.heightAt(c.x, c.y, c.z);
       if (above > reach + size * 0.75 + RELIEF) K = -1;
@@ -633,14 +656,6 @@ export class Flora {
         map.set(key, { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far', origin, meshes: [], built: false, queued: false, dead: false });
       }
     }
-    for (const [key, ch] of map) {
-      if (seen.has(key)) continue;
-      if (ch.origin.distanceTo(cam) > (reach != null ? reach + size * 0.75 : radius) + size * 2.2) {
-        if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
-        this._disposeChunk(ch); map.delete(key);
-      }
-    }
-    for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
   }
 
   // A cell is built when its turn comes and laid on the paper when its ground is there as it will stay
@@ -695,8 +710,10 @@ export class Flora {
   }
 
   // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
-  update(camLocal, active, budgetMs, now) {
+  update(camLocal, active, budgetMs, now, lead) {
     this.camLocal.copy(camLocal);
+    this.leadOn = !!lead;
+    if (lead) this.lead.copy(lead);
     // (the powers, the wind knife: trees that are falling, or were felled since the last frame. With none ever felled:
     // one comparison.)
     if (FELLED.size && (this._fallingNow || this._fellV !== FELLED.version)) this._fall(now); else this._fallT = now;
@@ -789,8 +806,9 @@ export class Flora {
     // build queue: nearest first; always allowed one item when nothing was built for a while
     let spent = false;
     if (this.queue.length) {
-      const q = this.queue, cam = this.camLocal;
-      for (const ch of q) ch.dist = ch.origin.distanceTo(cam);
+      const q = this.queue, cam = this.camLocal, lead = this.leadOn ? this.lead : null;
+      // (what is COMING counts as near, so the queue builds it before the ship is over it)
+      for (const ch of q) { const d = ch.origin.distanceTo(cam); ch.dist = lead ? Math.min(d, ch.origin.distanceTo(lead)) : d; }
       q.sort((a, b) => (b.rank - a.rank) || (b.dist - a.dist));     // pop() takes the far masses first, then the nearest
       let built = 0;
       while (q.length) {

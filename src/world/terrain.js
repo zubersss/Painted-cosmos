@@ -72,6 +72,10 @@ export class PlanetTerrain {
     this.frame = 0; this.now = 0; this.easing = false;
     this.camLocal = new THREE.Vector3(0, this.R * 3, 0);
     this.camDir = new THREE.Vector3(0, 1, 0);
+    // where the eye is GOING (world/index.js works it out from the eye's own motion): see _nodeDist
+    this.lead = new THREE.Vector3(0, this.R * 3, 0);
+    this.leadDir = new THREE.Vector3(0, 1, 0);
+    this.leadOn = false;
     this.visible = [];
     this.patchCount = 0;
     this.detail = true;        // false: only the six root patches (far bodies)
@@ -176,8 +180,8 @@ export class PlanetTerrain {
   // Distance from the camera to the nearest point of a node: clamp the camera's position in
   // the face's (u, v) to the node's rectangle. Far tighter than a bounding sphere, which is
   // what keeps the patch count low.
-  _nodeDist(node) {
-    const f = FACES[node.face], c = this.camDir;
+  _distFrom(node, pos, dir) {
+    const f = FACES[node.face], c = dir;
     const dn = c.x * f.n[0] + c.y * f.n[1] + c.z * f.n[2];
     if (dn > 0.2) {
       let u = Math.atan((c.x * f.u[0] + c.y * f.u[1] + c.z * f.u[2]) / dn) * (4 / Math.PI);
@@ -186,10 +190,23 @@ export class PlanetTerrain {
       v = v < node.v0 ? node.v0 : v > node.v1 ? node.v1 : v;
       faceToDir(node.face, u, v, _dir);
       const r = node.avgR;
-      const dx = this.camLocal.x - _dir[0] * r, dy = this.camLocal.y - _dir[1] * r, dz = this.camLocal.z - _dir[2] * r;
+      const dx = pos.x - _dir[0] * r, dy = pos.y - _dir[1] * r, dz = pos.z - _dir[2] * r;
       return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
-    return Math.max(0, _v.copy(this.camLocal).sub(node.center).length() - node.boundR);
+    return Math.max(0, _v.copy(pos).sub(node.center).length() - node.boundR);
+  }
+  // HOW NEAR THIS GROUND IS -- to the eye, or to WHERE THE EYE IS GOING, whichever is nearer (the owner,
+  // 2026-11-18: "I want things to be there before you get there even if your flying fast"). The ground splits to its
+  // finer mesh when it is near, and at 170 m/s the ship arrived before the splitting did, so the land under it was
+  // still the coarse form and grew its detail while the player watched. Reckoning the distance from a point a few
+  // seconds ahead as well means the ground that is COMING splits now and is finished by the time the ship is over
+  // it. Nothing of the picture changes: this decides only WHEN a patch is built, never how it is drawn, and with no
+  // lead (standing still, walking, or a world that is not the one the eye is on) it is the one distance it was.
+  _nodeDist(node) {
+    const d = this._distFrom(node, this.camLocal, this.camDir);
+    if (!this.leadOn) return d;
+    const a = this._distFrom(node, this.lead, this.leadDir);
+    return a < d ? a : d;
   }
 
   // Is the ground at a place (cube face, u, v) on the paper as it will stay: drawn at the level its distance
@@ -240,7 +257,7 @@ export class PlanetTerrain {
   // camLocal: camera position in this body's local frame. budgetMs: time allowed for building.
   // now: the wash clock (s); without it the ground does not ease (every patch is in its own look at once).
   // instant: nothing eases (the picture is held while the land is laid: an arrival).
-  update(camLocal, budgetMs, now, instant) {
+  update(camLocal, budgetMs, now, instant, lead) {
     this.frame++;
     this.now = now == null ? this.now + 1e3 : now;
     this.instant = !!instant;
@@ -253,6 +270,8 @@ export class PlanetTerrain {
     this.boostK = QUALITY.level === 0 ? 0.15 : 1;     // the low tier spends little on cliffs
     this.camLocal.copy(camLocal);
     this.camDir.copy(camLocal).normalize();
+    this.leadOn = !!lead;
+    if (lead) { this.lead.copy(lead); this.leadDir.copy(lead).normalize(); }
     for (const n of this.visible) { n.mesh.visible = false; if (n.water) n.water.visible = false; }
     this.visible.length = 0;
     for (const r of this.roots) this._select(r, false);
