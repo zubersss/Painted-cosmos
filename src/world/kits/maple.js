@@ -20,7 +20,7 @@
 // Nothing here has been SEEN. It was built and measured, never looked at: no browser was run. maple.test.mjs builds it
 // at many seeds and prints its numbers, which is the only account of its shape there is.
 // For FLORA_PHYS when this kit is wired in: height about 10 m, stiffness 1 (it is a tree).
-import { Builder, tube, leafCards, V } from '../florakit.js';
+import { Builder, tube, leafCards, V } from '../kitbuild.js';
 import { mulberry32 } from '../noise.js';
 
 // lod: 0 full (near), 1 medium (the trunk, the main limbs, and one large clump on each)
@@ -117,7 +117,12 @@ export function mapleGeometry(seed, lod, spec) {
   // The leaves. A fixed number for the whole tree, shared out by clump size, so a seed with many limb ends gets many
   // small clumps and one with few gets fuller ones, and both cost the same. Near by they are the six-cornered card
   // (four triangles); far off fewer and larger plain lozenges (two), as the other kits thin their crowns by distance.
-  const total = near ? 600 : 260;
+  // (2026-11-18, SEEN: the first still of these trees in the wood had crowns you could see straight through - they
+  //  read as bare winter armatures with a few leaves, where the references are dense and the limbs show at the edges
+  //  and through gaps. The cause was the triangle budget this kit was built to, 3000 near, which was set without
+  //  looking at THE TREE IT REPLACES: the old broadleaf is 7,242 triangles near. So these crowns were 2.7 times too
+  //  thin. The count below is raised to sit beside the old tree's own cost, not beside a number picked in the air.)
+  const total = near ? 1680 : 260;
   let wsum = 0;
   for (const q of clumps) wsum += q.r * q.r;
   for (const q of clumps) {

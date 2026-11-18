@@ -36,7 +36,7 @@
 // Nothing here has been SEEN. It was built and measured on a machine with no graphics card; no browser was run, so
 // there is no still of it, and the numbers in aspen.test.mjs are the only account of its shape there is.
 // For FLORA_PHYS when this kit is wired in: height about 16 m (the tallest stem and its crown), stiffness 1 (a tree).
-import { Builder, tube, leafCards, V } from '../florakit.js';
+import { Builder, tube, leafCards, V } from '../kitbuild.js';
 import { mulberry32 } from '../noise.js';
 
 // lod: 0 full (near), 1 medium (every stem, two limbs each, no forks, and fewer larger leaves)
@@ -55,7 +55,12 @@ export function aspenGeometry(seed, lod, spec) {
   // The whole stand's leaves, shared out at the end over however many limb ends the seed happened to grow (by the
   // square of each puff's size), so a stand of seven stems costs about what a stand of three does and one tree of
   // this kind costs about what the next one does.
-  const totalCards = near ? 500 : 200;
+  // (2026-11-18, SEEN: the first still of these trees in the wood had crowns you could see straight through - they
+  //  read as bare winter armatures with a few leaves, where the references are dense and the limbs show at the edges
+  //  and through gaps. The cause was the triangle budget this kit was built to, 3000 near, which was set without
+  //  looking at THE TREE IT REPLACES: the old broadleaf is 7,242 triangles near. So these crowns were 2.7 times too
+  //  thin. The count below is raised to sit beside the old tree's own cost, not beside a number picked in the air.)
+  const totalCards = near ? 1550 : 200;
 
   const tubes = [], stems = [], clumps = [];      // what was laid, written down for the test: see the end of the file
   for (let k = 0; k < nS; k++) {

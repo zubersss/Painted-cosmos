@@ -31,6 +31,29 @@ export default {
         // (fam: each tree keeps to its own part of yellow, orange and this red: the owner's references of 2026-11-16)
         oil: { slender: 1, double: 1, leaf: [[0.98, 0.88, 0.26], [0.96, 0.62, 0.20], [0.80, 0.40, 0.22]], fam: [0.86, 0.27, 0.16, 1], farD: [15.5, 12.4, 0], leafP: [0.9, 0.52, 1.0, 0.28], dark: [0.7, [0.50, 0.38, 0.36], [0.36, 0.26, 0.30]] } },
     ],
+    // (2026-11-18, the owner: "Give the trees more branches as well and more versions of them ... the Christmas tree
+    // looking ones".) FOUR KINDS THAT ONLY THE OIL LOOK SEES (data/mode.js appends `tallOil` to `tall` and a biome
+    // names which of them it wants). Each is built in its own file under world/kits/ with real limbs that fork.
+    // The dark ones matter as much as the bright: in the owner's twenty paintings the deep conifer green is a
+    // twentieth of all the paint at brightness 0.26, and it is what makes the oranges sing. In the game's own
+    // aerial still it was 0.6 per cent, because a conifer here was one tree in thirty.
+    tallOil: [
+      // 0: THE BROAD MAPLE, the tree their autumn references are mostly made of. The autumn wood's own leaf washes,
+      //    which measured close to the references already (gold 0.69 against their 0.68, amber 0.71 against 0.72).
+      { kit: 'maple', scale: 1.2, vary: 1, bark: [[0.52, 0.40, 0.36], [0.30, 0.22, 0.24]], leaf: [[0.98, 0.88, 0.26], [0.96, 0.62, 0.20], [0.80, 0.40, 0.22]],
+        barkP: [0.62, 0, 1.2, 0.3], leafP: [0.9, 0.52, 1.0, 0.28], wind: 0.11, far: [13.5, 11.8, 0], obs: [0.42, 11.5],
+        fam: [0.86, 0.27, 0.16, 1], farD: [15.5, 12.4, 0] },
+      // 1: THE SPRUCE - the "Christmas tree". Its needles are set at the references' own deep green (0.31 saturation,
+      //    0.26 brightness), not the bright green the old conifer wore at 0.62.
+      { kit: 'spruce', scale: 1.1, bark: [[0.40, 0.30, 0.28], [0.24, 0.18, 0.19]], leaf: [[0.30, 0.38, 0.26], [0.22, 0.30, 0.21], [0.15, 0.21, 0.17]],
+        barkP: [0.50, 1, 0.9, 0.6], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.05, far: [14.5, 16.5, 0.8], obs: [0.40, 16] },
+      // 2: THE ASPEN STAND - pale verticals in groups; 4 per cent of all the paint in their references is pale trunk.
+      { kit: 'aspen', scale: 1.15, vary: 1, bark: [[0.90, 0.89, 0.86], [0.34, 0.31, 0.30]], leaf: [[0.96, 0.86, 0.30], [0.90, 0.68, 0.24], [0.68, 0.46, 0.26]],
+        barkP: [0.70, 0, 1.3, 0.22], leafP: [0.9, 0.46, 1.0, 0.26], wind: 0.14, far: [13.0, 11.0, 0], obs: [0.30, 11] },
+      // 3: THE TALL PINE - bare below two thirds of its height, so the eye sees through the wood.
+      { kit: 'tallpine', scale: 1.2, bark: [[0.46, 0.33, 0.28], [0.26, 0.19, 0.18]], leaf: [[0.34, 0.42, 0.28], [0.25, 0.33, 0.23], [0.17, 0.23, 0.18]],
+        barkP: [0.52, 1, 0.95, 0.55], leafP: [0.9, 0.18, 1.0, 0.25], wind: 0.06, far: [15.5, 17.5, 0.8], obs: [0.38, 17] },
+    ],
     under: { leaf: [[0.80, 0.85, 0.38], [0.54, 0.71, 0.31], [0.35, 0.51, 0.31]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.78, 0.75, 0.72], [0.42, 0.39, 0.44]],
       // the sward's own washes (src/world/nearground.js): what the flower drifts are of (poppy, ox-eye, buttercup, harebell), what lies under the trees
       flowers: [[0.86, 0.29, 0.17], [0.97, 0.96, 0.90], [0.96, 0.83, 0.28], [0.62, 0.55, 0.88]], litter: [[0.82, 0.64, 0.34], [0.68, 0.43, 0.26], [0.47, 0.31, 0.25]] },
@@ -58,12 +81,16 @@ export default {
           palCalm: { grassLight: [0.78, 0.76, 0.38], grassMid: [0.58, 0.66, 0.32] },
           overCalm: { under: { leaf: [[0.80, 0.80, 0.40], [0.56, 0.68, 0.33], [0.33, 0.50, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } },
           // (clearer air than the planet's 185 m: the trees a stone's throw off keep their colour, the far ones go pale)
-          over: { mist: 1.4 },
+          over: { mist: 1.4, tallOil: [0, 1] },      // (the broad maple and the spruce: see flora.tallOil above)
           // (the clip's wood is broadleaves in autumn leaf with a white birch here and there: nearly nine trees in ten;
           // its tufts and small plants are yellow-green in the sun and deep green in the shade)
           // (tallMix over 1: the groves of conifers go too; a conifer is one tree in thirty. With 0.88 whole stands were
           // still conifers, and three of the wood's stills had no autumn leaf overhead at all: the critic)
-          tallMix: [1.5, 1.05], under: { leaf: [[0.84, 0.90, 0.34], [0.58, 0.78, 0.30], [0.34, 0.54, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } } }),
+          // (2026-11-18: was [1.5, 1.05], which put a conifer at one tree in thirty - and the rendered still then
+          //  measured conifers at 0.6 per cent of the aerial picture against 5.1 in the owner's paintings. A plain
+          //  0.85 makes about one tree in six a spruce everywhere, and floraplace.js's own grove field still swings
+          //  that from none to most of a stand, so there are groves of dark among the orange as the references show.)
+          tallMix: 0.85, under: { leaf: [[0.84, 0.90, 0.34], [0.58, 0.78, 0.30], [0.34, 0.54, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } } }),
     B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
       ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
       ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 },

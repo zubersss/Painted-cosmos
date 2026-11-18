@@ -26,7 +26,7 @@
 // (florakit's `stroke` is not used here: a stroke is rooted on the ground and arches up from it, which suits grass and
 // fronds; a needle spray hangs anywhere in the air, so it is leafCards' lozenges, pointed at both ends, as the fir's
 // needles are.)
-import { Builder, tube, leafCards, V } from '../florakit.js';
+import { Builder, tube, leafCards, V } from '../kitbuild.js';
 import { mulberry32 } from '../noise.js';
 
 // lod 0 full (near), 1 cheap (far). spec.slender: the oil look's woods want a taller, narrower tree, as the other

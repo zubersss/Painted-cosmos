@@ -41,7 +41,7 @@
 // the needle of the fir and of the old pine both, and it is the one used here.)
 //
 // For FLORA_PHYS when this kit is wired in: height about 20 m, stiffness 1 (it is a tree).
-import { Builder, tube, leafCards, V } from '../florakit.js';
+import { Builder, tube, leafCards, V } from '../kitbuild.js';
 import { mulberry32 } from '../noise.js';
 
 // lod: 0 full (near), 1 cheap (far: the trunk, the limbs without their forks, and one plate at each limb's end -- a
