@@ -357,9 +357,62 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     before I give you to go dont do anything." Even reading the code for the plan waits for the
     owner's go. Logging the owner's instructions goes on as always.
 
+52. **The phone's table of 18 November, speed test 8, is the first one that measures anything**
+    (the owner pasted it as text; every earlier table either hit the 60-a-second cap or drifted).
+    S23 Ultra, Adreno 740, picture 1028 x 480 of a 3086 x 1440 screen, tier 1, the lighter paint,
+    250 calls, 902k triangles, script 7.1 to 14.6 ms. The five "as set" rows read 32.9, 34.0, 32.9,
+    34.0, 34.0: **the wood runs at 30 a second and nothing is capped.**
+    - **All the trees are half the frame: 16.2 ms of 33.** Of that, **the PLANTS' PAINT alone is
+      11.7 ms** - every leaf and branch still drawn, just painted one flat colour. That is the one
+      biggest thing in the frame and the next place the work goes.
+    - Far trees 10.3 ms; near trees 6.7; small plants 2.3; the full paint +4.0. **Shadows, all of
+      them, cost 0.2 ms - they are free, and could be made BETTER for nothing.**
+    - **Drawing the far trees LAST is -1.2 ms, free** (drawn first is +2.3). Applied.
+    - The old lump far trees would be **+6.9 ms**: the leafy far tree is settled on a real device.
+    - Sharpness: as it is 33 ms; half again as sharp 55 (18 a second); twice 92 (11); **every pixel
+      of the screen 161 ms = 6.2 a second.** Fitting those: about **18 ms fixed** (script and
+      geometry) **plus about 16 ms for each picture's worth of pixels**. SO THE WHOLE SCREEN IS NOT
+      REACHABLE AT THIS LOOK; the honest target is HALF AGAIN AS SHARP AT 30 A SECOND, which needs
+      the per-pixel cost roughly halved.
+    - Measured beside it with `tools/overdraw.mjs` at the same picture size: **a pixel is painted
+      6.49 times over**; the far trees 2.10 of that with a self-lap of 9.94 (104,362 pixels covered,
+      1,036,911 fragments painted into them, 17,249 on top at the end).
+    - CAUTION: this run's view has 902k triangles where speed test 7's had 501k - a denser spot in
+      the wood. The two tables are NOT the same picture and must not be read against each other.
+
 ## 3. State right now (update this before you stop)
 
-Head rewritten 2026-11-18 (the v12 text it replaced is in the log).
+Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
+
+**`main` IS AT v16 (18 Nov) PLUS PULL REQUEST #17** (the speed test's copy button). THE LABEL ON THE
+SCREEN STILL SAYS v16 because #17 did not bump it: bump `src/core/build.js` AND `build.txt` with
+EVERY merge, including the small ones. The owner has the live speed test at
+`https://zubersss.github.io/Painted-cosmos/?look=oil&bench=1` and has already sent its table back.
+
+**`look-proto` CARRIES v18-TO-BE: 25 commits, NOT YET GATED AND NOT MERGED.** What is on it:
+- THE FIRE, wired and mended. It says in plain words why it will not take (`fuelAt` hands back a
+  `why`, carried onto the patch and said on screen), a spark FALLS SHORT along the aim onto the
+  first ground that will burn, fire has an ULTIMATE, and a burnt wood survives a reload.
+  MEASURED, in Node on the real Earth: the spawn's own wood takes a fire -- leaves, fuel 0.60, dry
+  -- and a size-3 cast grew to 64 patches in forty seconds. What refused the six casts of the
+  morning was THE RIVER the spawn stands on. **A FIRE HAS STILL NOT BEEN SEEN IN THE GAME.**
+- THE FOUR NEW TREES really standing (all four now, not two), the far wood with its leaves back,
+  the sky with cloud form and nothing but the sun left paper white, the fire's own art and the
+  light it throws, the ring picker reading the list in the hand with a thumb's route to the
+  element, `tools/overdraw.mjs`, and the twelve faults the six-dimension review found.
+- THREE SUITES GREEN on it: unit 299, world and kits 82, physics 376.
+
+**THE SIX-DIMENSION REVIEW OF 18 NOVEMBER IS THE MOST IMPORTANT THING IN THIS FILE.** Twelve
+agents read the then-nineteen unmerged commits and tried to refute each other; **six merge-blockers
+and six more faults, and NOT ONE FINDING WAS REFUTED.** All twelve are fixed. The log has every
+one with its measurement. THE LESSON: an agent's own measurement is a draft, and nothing built
+here has yet survived an independent reading. Run that review before every merge of this size.
+
+**THE PHONE IS AT 30 A SECOND IN THE WOOD AND NOTHING IS CAPPED** (speed test 8, section 2 item
+52). All the trees are half the frame; the PLANTS' PAINT ALONE IS 11.7 ms of 33. The whole
+3086 x 1440 screen is 161 ms = 6 a second and is NOT REACHABLE at this look: the honest target is
+half again as sharp at 30 a second, which needs the per-pixel cost roughly halved. That is the
+next piece of work, and only the device can say where it goes.
 
 **ON `look-proto`, NOT YET MERGED (18 Nov, after v16):** the art pass's first changes - the far air leans blue
 (measured onto the references' own numbers), a shoulder so nothing clips to paper white, the resolution
