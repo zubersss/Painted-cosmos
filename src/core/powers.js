@@ -10,12 +10,13 @@
 // Nothing here draws, and nothing here moves a leaf: the world's own systems do.
 import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, growWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
-import { fellTree, felledAt } from '../data/felled.js';
+import { fellTree, felledAt, healFelled } from '../data/felled.js';
 // FIRE (the second element; docs/POWERS-FIRE.md). The list of burning patches lives here with the winds; the physics
 // steps it, because only the physics knows what is underfoot and what the wind is there. What the fire leaves behind
 // goes into the record that lasts, exactly as a felled tree does.
 import { makeFires, douseFires, clearBurns, FIRE, FUEL } from '../physics/fire.js';
-import { scorch, meltIce, deepenMelt } from '../data/burnt.js';
+import { scorch, meltIce, deepenMelt, healBurnt } from '../data/burnt.js';
+import { stripStep } from '../data/stripped.js';
 
 // WHY A FIRE WOULD NOT TAKE, in the words the player sees. The key is what the world handed back
 // (src/physics/index.js fuelAt, `why`); anything not listed falls back to the old catch-all.
@@ -114,6 +115,23 @@ export class Powers {
   // WHAT THE FIRE BURNED IN THE FRAME JUST GONE, written into the record that lasts (data/burnt.js), the way the
   // knife writes down a felled tree. The physics fills these rows while it steps the fire, so they are read one
   // frame later, which nothing can see. If they were not read they would pile up and the fire would say so (F.lost).
+  // WHAT THE PLAYER BROKE, GROWING BACK (the owner, 2026-11-18: "make sure that felled woods or burnt areas
+  // eventually do return to normal so it isn't taking up memory"). All three lasting records of damage are the
+  // powers' own doing, so they are healed here and nowhere else: without ?powers=1 none of this is even loaded, and
+  // with it, on nearly every frame of a game, these three calls walk an empty record and return at once. A felled
+  // tree stands again, a scorch greens, a burnt crown comes back into leaf, melted ice fills in, and a crown the
+  // wind tore bare refills -- each out of the player's sight, or after twice as long if they stay to watch. The
+  // record is dropped the moment it is clean, so every one of them is bounded by TIME as well as by count, which is
+  // the owner's own reason for asking.
+  // (stripStep was written with the stripping record and called by NOTHING until now, so a bare crown stayed bare
+  //  for ever: found while wiring this.)
+  _heal(dt, sim) {
+    const p = sim && sim.ex ? sim.ex.p : null;
+    healFelled(dt, p);
+    healBurnt(dt, p);
+    stripStep(dt);
+  }
+
   _keepBurns() {
     const B = this.fires.burns;
     if (!B.count) return;
@@ -324,6 +342,7 @@ export class Powers {
     const W = this.winds;
     if (this.pollPad) this.pollPad();
     this._keepBurns();
+    this._heal(dt, sim);
     // A fire is left burning when the explorer walks away: it is the world's now. A fire on a world they have LEFT
     // is put out, because nothing of a live fire is saved and its patches would otherwise burn on where nobody can
     // see them. What it had already burned is written down first (douseFires reports it).

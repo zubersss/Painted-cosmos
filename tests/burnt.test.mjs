@@ -8,7 +8,7 @@ import {
   scorch, charMore, burntAt, scorchesOn,
   burnCrown, burntCrownAt, burningOn, burntCrownsOn,
   meltIce, deepenMelt, meltedAt, meltedBare, meltedThrough, meltsOn,
-  burntRows, burntLoad,
+  burntRows, burntLoad, healBurnt,
 } from '../src/data/burnt.js';
 
 const R = 6371000;            // a place on an Earth-sized body, in the body's own coordinates
@@ -334,4 +334,39 @@ test('reading is quick with a hundred marks on the list (the world asks many tim
   assert.ok(full < 1, 'a full record is still quick to read: ' + full.toFixed(3) + ' ms the thousand');
   assert.ok(full < many * 3 + 0.05, 'and six times the marks is not six times the work: ' + (full / many).toFixed(2) + ' times');
   burntLoad([]);
+});
+
+test('A BURNT PLACE GREENS AGAIN (owner, 2026-11-18): the scorch fades, the crown comes back into leaf, the ice fills in', () => {
+  burntLoad([]);
+  const p = { x: 0, y: 6371000, z: 0 };
+  scorch('earth', 0, 6371000, 3, 3, 1);                 // right beside the explorer
+  scorch('earth', 600, 6371000, 0, 3, 1);               // well away from them
+  burnCrown('earth', 620, 6371000, 0);
+  const m = meltIce('mars', 0, 3389500, 0, 3); deepenMelt(m, 2);
+  const step = (secs, at) => { for (let i = 0; i < Math.ceil(secs * 2); i++) healBurnt(0.5, at); };
+  step(BURN.life - 4, p);
+  assert.equal(BURNT.scorches, 2, 'nothing fades before its time');
+  assert.equal(BURNT.crowns, 1);
+  step(BURN.fade + 20, p);
+  assert.equal(BURNT.scorches, 1, 'the far scorch is gone and the one at their feet is not: ' + BURNT.scorches);
+  assert.equal(BURNT.crowns, 0, 'and that tree is in leaf again');
+  assert.ok(burntAt('earth', 0, 6371000, 3) > 0.3, 'the ground they are standing on is still black');
+  // it heals too, once it has waited twice as long, even with the player beside it
+  step(BURN.life + BURN.fade + 20, p);
+  assert.equal(BURNT.scorches, 0, 'everything the fire blackened has greened again');
+  assert.equal(burntAt('earth', 0, 6371000, 3), 0);
+  assert.equal(BURNT.size, 0, 'the whole record is empty again, which is the memory the owner asked about');
+
+  // AND THE ICE FILLS IN, on its own clock: a hollow takes BURN.freeze to fill whatever its depth, so a 2 m melt
+  // does not vanish in four seconds while a 100 m one takes four minutes.
+  burntLoad([]);
+  const shallow = meltIce('mars', 0, 3389500, 0, 3); deepenMelt(shallow, 2);
+  const deep = meltIce('mars', 500, 3389500, 0, 3); deepenMelt(deep, 80);
+  step(BURN.life + 1, null);
+  assert.equal(BURNT.melts, 2, 'neither has filled in before its time');
+  step(BURN.freeze * 0.45, null);
+  assert.equal(BURNT.melts, 2, 'and they fill at the same pace, not by depth: ' + shallow.d.toFixed(2) + ' m and ' + deep.d.toFixed(1) + ' m');
+  assert.ok(Math.abs(shallow.d / 2 - deep.d / 80) < 0.08, 'both about half filled');
+  step(BURN.freeze * 0.7, null);
+  assert.equal(BURNT.melts, 0, 'and then the ice is whole again');
 });
