@@ -11,6 +11,11 @@
 import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, growWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
 import { fellTree } from '../data/felled.js';
+// FIRE (the second element; docs/POWERS-FIRE.md). The list of burning patches lives here with the winds; the physics
+// steps it, because only the physics knows what is underfoot and what the wind is there. What the fire leaves behind
+// goes into the record that lasts, exactly as a felled tree does.
+import { makeFires, douseFires, clearBurns, FIRE, FUEL } from '../physics/fire.js';
+import { scorch, meltIce, deepenMelt } from '../data/burnt.js';
 
 // The abilities of wind, in the order of the keys 1 .. 7 and of the touch fan. hold: it lasts while the hand is down.
 export const ABILITIES = Object.freeze([
@@ -21,6 +26,13 @@ export const ABILITIES = Object.freeze([
   { id: 'whirl', word: 'whirl', hold: false },
   { id: 'part', word: 'part', hold: true },
   { id: 'knife', word: 'knife', hold: false },
+]);
+
+// FIRE'S abilities, the second element (docs/POWERS-FIRE.md part 1). A SEPARATE frozen list, not more of the wind's:
+// tests/powers.test.mjs holds ABILITIES above to exactly the wind's seven, and the fan of words, the keys and the
+// element button all read whichever list is current. Only `kindle` is built; melt, embers and snuff are named there.
+export const FIRE_ABILITIES = Object.freeze([
+  { id: 'kindle', word: 'kindle', hold: false },
 ]);
 
 export const POWERS = Object.freeze({
@@ -35,6 +47,8 @@ export const POWERS = Object.freeze({
   knifeReach: 18,         // m: how far the wind knife cuts
   knifeWidth: 1.2,        // m: a trunk this near the aim's line (and its own radius more) is cut
   knifeSide: 0.7,         // rad: how far to its own side of the aim a cut tree falls (0: straight away from the explorer)
+  meltPerHeat: 0.25,      // m of ice gone for each second of full flame on it (fire.js reports the heat; how deep
+                          // that goes is the game's own judgement, and this number is a guess for the owner to see)
 });
 
 const add = (a, b, k) => ({ x: a.x + b.x * k, y: a.y + b.y * k, z: a.z + b.z * k });
@@ -42,6 +56,9 @@ const add = (a, b, k) => ({ x: a.x + b.x * k, y: a.y + b.y * k, z: a.z + b.z * k
 const AIM_SIZE = {
   gust: (d) => WINDPOWER.gustRadius + WINDPOWER.gustSpread * d, gather: () => WINDPOWER.orbCore * 1.4, quicken: () => WINDPOWER.zoneRadius,
   still: () => WINDPOWER.zoneRadius, whirl: () => WINDPOWER.vortexRadius, part: () => WINDPOWER.partHalf, knife: () => 0.7,
+  // fire: the ring shows the first patch the fire is set down in (physics/fire.js FIRE.litRadius, which is
+  // 1.4 m for a tap and 3.8 m held to the full; the size below multiplies this)
+  kindle: () => FIRE.litRadius * 0.5,
 };
 const unit = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
@@ -75,10 +92,47 @@ export class Powers {
     this.onCast = null;         // called with the ability's id when one is cast (the sound)
     this.tapOnce = false;       // set by the touch button: one press, seen by the next frame however long that frame is
     this.fells = 0;             // trees felled so far by the wind knife (for tests and the read-out)
+    // THE FIRE (docs/POWERS-FIRE.md). sim.js hands this list to the physics on the frame, beside the winds.
+    this.fires = makeFires();
+    this.fireCasts = 0;         // how many fires have been lit (for tests and the read-out)
+    this._fireBody = null;      // the world its patches are burning on
+    this.list = ABILITIES;      // the element in the hand: ABILITIES (wind) or FIRE_ABILITIES
+    this.element = 0;           // 0 wind, 1 fire (setElement below)
   }
 
-  pick(i) { if (i >= 0 && i < ABILITIES.length && i !== this.ability) { this._drop(); this._close(); this.ability = i; } }
-  next() { this.pick((this.ability + 1) % ABILITIES.length); }
+  // WHAT THE FIRE BURNED IN THE FRAME JUST GONE, written into the record that lasts (data/burnt.js), the way the
+  // knife writes down a felled tree. The physics fills these rows while it steps the fire, so they are read one
+  // frame later, which nothing can see. If they were not read they would pile up and the fire would say so (F.lost).
+  _keepBurns() {
+    const B = this.fires.burns;
+    if (!B.count) return;
+    for (let i = 0; i < B.count; i++) {
+      const b = B[i];
+      if (b.kind === FUEL.ice) {
+        // the row says how much heat has gone into this place IN ALL, and only ever grows, so the depth we want is
+        // that heat turned into metres; the mark's own depth says how much of it is already down there
+        const m = meltIce(b.bodyId, b.px, b.py, b.pz, b.radius);
+        if (m) deepenMelt(m, b.heat * POWERS.meltPerHeat - m.d);
+      } else {
+        scorch(b.bodyId, b.px, b.py, b.pz, b.radius, b.burnt);
+      }
+    }
+    clearBurns(this.fires);
+  }
+
+  pick(i) { if (i >= 0 && i < this.list.length && i !== this.ability) { this._drop(); this._close(); this.ability = i; } }
+  // (2026-11-18) THE ELEMENT IN THE HAND: 0 the wind's seven, 1 the fire's. Without this the fire is wired to
+  // everything and reachable by nobody, which is what it was for an hour after the wiring went in. Whatever is
+  // being held is dropped first, so swapping element never leaves a ball or a channel alive with nothing holding it.
+  setElement(n) {
+    const want = n ? FIRE_ABILITIES : ABILITIES;
+    if (want === this.list) return;
+    this._drop(); this._close(); this.cancelHold();
+    this.list = want; this.ability = 0; this.element = n ? 1 : 0;
+    this._say(n ? 'fire' : 'wind');
+  }
+  nextElement() { this.setElement(this.element ? 0 : 1); }
+  next() { this.pick((this.ability + 1) % this.list.length); }
 
   // the gathered ball is let go where it is (thrown along the aim if it holds anything worth throwing)
   _drop(sim) {
@@ -236,6 +290,12 @@ export class Powers {
   update(dt, sim) {
     const W = this.winds;
     if (this.pollPad) this.pollPad();
+    this._keepBurns();
+    // A fire is left burning when the explorer walks away: it is the world's now. A fire on a world they have LEFT
+    // is put out, because nothing of a live fire is saved and its patches would otherwise burn on where nobody can
+    // see them. What it had already burned is written down first (douseFires reports it).
+    if (this.fires.count > 0 && sim.bodyId && this._fireBody && sim.bodyId !== this._fireBody) douseFires(this.fires);
+    if (sim.bodyId) this._fireBody = sim.bodyId;
     this.active = sim.sm.state === S.ON_FOOT && !!sim.bodyId && !sim.easel;
     const tap = this.tapOnce; this.tapOnce = false;
     const down = this.active && (this.down || this.keys.cast || this.keys.pad || this.keys.mouse || this.keys.touch || tap);
@@ -257,10 +317,10 @@ export class Powers {
     const wasReady = this.ultReady;
     this.ultReady = this.ult >= 1;
     if (this.ultReady && !wasReady) this._say('ULTIMATE ready - let go');
-    if (this.active) { const A = this._aim(sim), id = ABILITIES[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0; }
+    if (this.active) { const A = this._aim(sim), id = this.list[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0; }
     else this.aim.ok = false;
     if (this.active && (down || released || this.orb || this.part)) {
-      const A = this.aim, ab = ABILITIES[this.ability];
+      const A = this.aim, ab = this.list[this.ability];
       if (A.ok) {
         if (ab.id === 'gather') {
           if (pressed && !this.orb) { this.orb = castOrb(W, sim.bodyId, this._orbAt(sim, POWERS.orbAhead), this.size); this._cast(sim); }
@@ -292,6 +352,7 @@ export class Powers {
             else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm', k);
             else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, k);
             else if (ab.id === 'knife') this._knife(sim, k);
+            else if (ab.id === 'kindle') this._kindle(sim, k);
             this._wait = POWERS.gustEvery;
             this._cast(sim);
           }
@@ -306,13 +367,23 @@ export class Powers {
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }
 
+  // KINDLE: fire is set down where the view looks, and spreads through whatever will burn (the owner's "spawn").
+  // The physics lights it, because only the physics can say what is underfoot at that place.
+  _kindle(sim, size = 1) {
+    const f = sim.physics && sim.physics.lightFire ? sim.physics.lightFire(this.fires, sim.bodyId, this.aim.p, size) : null;
+    if (!f) { this._say('no room for another fire'); return null; }
+    this.fireCasts++;
+    if (f.kind === FUEL.none) this._say('nothing here will burn');
+    return f;
+  }
+
   _orbAt(sim, ahead) {
     const A = this.aim, p = sim.ex.p, up = unit(p), q = add(p, A.fwd, ahead), d = unit(q);
     let r = Math.hypot(p.x, p.y, p.z);
     try { const s = sim.sampleSurface(sim.bodyId, d); if (s) r = Math.max(s.radius || 0, s.liquidRadius || 0) || r; } catch { /* level with the explorer */ }
     return { x: d.x * r, y: d.y * r, z: d.z * r };
   }
-  _cast(sim) { this.casts++; if (sim.ex) sim.ex.casting = 1; if (this.onCast) this.onCast(ABILITIES[this.ability].id); }   // (onCast: the sound, main.js)
+  _cast(sim) { this.casts++; if (sim.ex) sim.ex.casting = 1; if (this.onCast) this.onCast(this.list[this.ability].id); }   // (onCast: the sound, main.js)
 }
 
 // The hands: a key, the right mouse button, a gamepad's bumpers. (The touch button is ui/powers.js, which sets
@@ -321,6 +392,7 @@ export function attachPowerInputs(powers, target = window) {
   const kd = (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'KeyQ') powers.keys.cast = true;
+    else if (e.code === 'KeyG') powers.nextElement();       // (G: the element in the hand, wind or fire)
     else if (/^Digit[1-9]$/.test(e.code)) powers.pick(+e.code.slice(5) - 1);
   };
   const ku = (e) => { if (e.code === 'KeyQ') powers.keys.cast = false; };

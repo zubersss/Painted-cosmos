@@ -262,7 +262,7 @@ export function attachPowersUi(powers, root) {
     if (flashT && spid == null && (nowMs() > flashT || !on)) { flashT = 0; closeRing(); }
     // (how big the cast is being made, while the hand holds it: the owner asked to grow the circle)
     const big = p.size > 1.12 ? '  ×' + p.size.toFixed(1) : '';
-    const w = ABILITIES[p.ability].word, shown2 = w + big + (p.note ? '|' + p.note : '');
+    const w = (p.list && p.list[p.ability] ? p.list[p.ability] : ABILITIES[p.ability]).word, shown2 = w + big + (p.note ? '|' + p.note : '');   // (the word follows the element in the hand: wind or fire)
     if (shown2 !== wordNow) { wordNow = shown2; btn.textContent = w; word.textContent = 'wind: ' + w + big + (p.note ? '  ·  ' + p.note : ''); }
     root.classList.toggle('pc-pw-held', on && (p.keys.touch || p.keys.cast || p.keys.mouse || p.keys.pad || !!p.orb || !!p.part));
     // THE AIM MARK: a ring on the ground where the chosen power will act, as wide as what it will do there, lying as

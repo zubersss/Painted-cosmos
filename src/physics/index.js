@@ -21,6 +21,8 @@ import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { placeWinds, windsToDevils } from './powers.js';
+import { placeFires, stepFires, lightFire as litFire, FUEL } from './fire.js';
+import { burntAt } from '../data/burnt.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01, smoothstep } from './util.js';
@@ -74,6 +76,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
   let winds = null;                 // the explorer's wind this frame (powers.js), or null
+  let fires = null;                 // the fire the explorer has lit this frame (fire.js), or null
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField(SHIP_BODY.legs);
   const drift = new DriftField();
@@ -160,6 +163,69 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     return o;
   }
 
+  // ---- the two things a fire asks of the world (fire.js) --------------------------------------------------------
+  // Built once, so that stepping a fire makes nothing. fire.js knows nothing of trees, water or ice: it asks these.
+  const _fg = { sink: 0, imprint: 0, loose: 0, dust: 0, mat: 0, h: 0 };    // the ground under a patch (groundOfGrid)
+  const _fcov = {};                                   // the cover there (the leaves on the floor, the crowns over it)
+  const _fair = {};                                   // the air there (airAt fills .wind, body-local)
+  const _fd = new Float64Array(3);
+  // Which grounds carry a fire, and as what. Dry turf and heath burn; a forest floor's litter flares; moss
+  // smoulders. Bare rock, sand, dust, gravel, glass, crystal, mud, a stream's bed and ground already burnt to ash
+  // never catch. (These numbers are a first guess for the owner to judge, not a measurement: nothing about a fire
+  // GOING OUT rests on them -- fire.js now ends a fire on its own memory.)
+  const FUEL_OF = { grass: FUEL.ground, litter: FUEL.leaves, moss: FUEL.undergrowth, soil: FUEL.none };
+  const fireCtx = {
+    // WILL ANYTHING BURN HERE? The place comes in body-local and goes back on the ground, because only the near
+    // grid knows how high the land is there.
+    fuelAt(bodyId, px, py, pz, out) {
+      out.kind = FUEL.none; out.fuel = 0; out.wet = 1;
+      if (bodyId !== active) return;                        // another world: nothing of ours burns there
+      const x = frame.lx(px, py, pz), z = frame.lz(px, py, pz);
+      // WHERE THE GROUND HERE IS KNOWN FROM. Under the explorer, the near grid: 32 m of it, two metres to a node,
+      // and it knows what the ground is MADE of, so ice melts and dry turf catches. Further out, the wind grid:
+      // 272 m of it, sixteen metres to a node, which knows the height, the standing water and the wood over it but
+      // not the material. Beyond that the physics has looked at nothing, and A FIRE MAY NOT SPREAD INTO GROUND
+      // NOBODY HAS LOOKED AT: it stops at the edge of what is known, which is also what happens when the player
+      // walks away from their own fire (the grids follow the explorer).
+      let h, lq, mat = -1;
+      if (near.known(x, z)) { groundOfGrid(x, z, _fg); h = _fg.h; lq = near.liquidAt(x, z); mat = _fg.mat; }
+      else if (airGrid.terrain.known(x, z)) { h = airGrid.terrain.heightAt(x, z, NaN); lq = airGrid.terrain.liquidAt(x, z); }
+      else return;
+      if (!(h === h)) return;
+      frame.dir(x, z, _fd);                                 // the patch burns on the floor, not in the air
+      const rr = frame.r0 + h;
+      out.px = _fd[0] * rr; out.py = _fd[1] * rr; out.pz = _fd[2] * rr;
+      if (lq === lq && lq > h - 0.02) return;               // standing water: a fire stops at its edge
+      if (burntAt(bodyId, out.px, out.py, out.pz) > 0.35) return;   // burnt before: there is nothing left here
+      out.wet = clamp01(moist.wetness01 + Math.min(1, moist.snowDepth * 6));
+      // ICE AND SNOW MELT instead of burning (the owner's words, 2026-11-18). Only the near grid knows the ground
+      // well enough to say so, which is why melting is a thing that happens where the explorer is standing.
+      if (mat === MATERIAL_INDEX.ice || mat === MATERIAL_INDEX.snow) { out.kind = FUEL.ice; out.wet = 0; return; }
+      // and what there is to burn: the crowns and undergrowth of a wood, else the leaves on its floor, else the
+      // ground itself where it is the kind that burns (the same three numbers the wind's leaf-tearing reads,
+      // loose.js _tear)
+      const known = airGrid.coverNear(x, z, _fcov);
+      const canopy = known ? (_fcov.canopy01 || 0) : 0, leaves = known ? (_fcov.leaves || 0) : 0;
+      if (canopy > 0.12) { out.kind = FUEL.undergrowth; out.fuel = clamp01(0.35 + canopy); }
+      else if (leaves > 0.08) { out.kind = FUEL.leaves; out.fuel = clamp01(leaves * 4); }
+      else if (mat >= 0) { const k = FUEL_OF[MATERIAL_IDS[mat]] || FUEL.none; if (k !== FUEL.none) { out.kind = k; out.fuel = 0.45; } }
+    },
+    // AND WHAT IS THE WIND HERE, in the body's own axes. airAt answers exactly that, with the dust devils and the
+    // player's own wind already in it, so a gust fans a fire and a stilled place starves one with nothing new.
+    windAt(s, out) {
+      airAt(active, s.px, s.py, s.pz, time, seed, airGrid, frame, sunDir, 1.2, _fair, devils, null, winds);
+      out[0] = _fair.wind.x; out[1] = _fair.wind.y; out[2] = _fair.wind.z;
+    },
+    // Rain puts a fire out. The ground's wetness here, and the rain that is actually reaching the ground now, which
+    // wets a flame sooner than it wets the ground. (0.09 a millimetre an hour is a guess: drizzle lets a fire burn,
+    // steady rain reaches fire.js FIRE.wetStop, a storm drowns it at once. The owner's eyes settle it.)
+    dampAt() {
+      const pr = here.weather.precipitation;
+      const rain = pr && pr.rate > 0 ? pr.rate * (1 - (pr.frozen01 || 0)) * (pr.reachesGround01 == null ? 1 : pr.reachesGround01) : 0;
+      return clamp01(moist.wetness01 + rain * 0.09);
+    },
+  };
+
   function sun01At(bodyId, ux, uy, uz) {
     return sunDir && bodyId === active ? ux * sunDir.x + uy * sunDir.y + uz * sunDir.z : null;
   }
@@ -181,7 +247,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const fp = f && f.focus;
     if (!bodyId || !fp || !(fp.x === fp.x && fp.y === fp.y && fp.z === fp.z) || Math.hypot(fp.x, fp.y, fp.z) < 1) {
       // deep space, or nothing to centre on: the near field sleeps
-      if (active) { particles.clear(); devils.count = 0; winds = null; active = null; here.bodyId = null; }
+      if (active) { particles.clear(); devils.count = 0; winds = null; fires = null; active = null; here.bodyId = null; }
       stats.ms = now() - t0; return;
     }
     focus.x = fp.x; focus.y = fp.y; focus.z = fp.z;
@@ -288,6 +354,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       moist.freshSnow = fresh; moist.snowDepth = (moist.standing || 0) + fresh;
     }
     here.weather.wetness01 = moist.wetness01; here.weather.snowDepth = moist.snowDepth; here.weather.freshSnow = moist.freshSnow;
+
+    // THE FIRE THE EXPLORER HAS LIT (fire.js; the game hands the list in f.fires, or nothing). It is stepped here,
+    // and not where the wind is stepped, because this is the first point in the frame where everything it asks
+    // about is current: the ground grid, the air grid, the player's wind placed in the frame, and the wetness and
+    // the snow. With no list, `fires` is null and this is one comparison.
+    if (f.fires && f.fires.count > 0) stepFires(f.fires, dt, fireCtx);
+    fires = f.fires && f.fires.count > 0 && placeFires(f.fires, frame, bodyId) ? f.fires : null;
 
     // fields and particles
     const t3 = now();
@@ -698,6 +771,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // How far a body's real prevailing wind is scaled down for play (data.WINDS[body].scale).
     setWindScale,
     get time() { return time; },
+    // THE ABILITY LIGHTS A FIRE (core/powers.js, behind ?powers=1). The list belongs to the game (fire.js makeFires)
+    // and comes in on the frame; lighting one is here because only the physics can say what is underfoot there.
+    lightFire(F, bodyId, p, size) { return litFire(F, bodyId, p, size, bodyId === active ? fireCtx : null); },
+    get fires() { return fires; },       // the fire alight this frame (fire.js), or null: whoever paints the flames,
+                                         // the smoke and the light reads it, and fireAt(F, x, z) asks where it burns
     get winds() { return winds; },       // the explorer's wind this frame (powers.js), or null: the painter reads the parted channel from it
     air, weather, ground, bindEnv,
     water: waterAt,

@@ -189,3 +189,23 @@ test('an ordinary cast is not an ultimate, and letting go early never fells a st
   assert.equal(p.ults, 0, 'no ultimate');
   assert.equal(FELLED.size, 0, 'and not one tree laid down by an ordinary gust');
 });
+
+test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the element swaps, and kindle lights a fire through the physics', () => {
+  const p = new Powers(), sim = fakeSim();
+  assert.equal(p.list[p.ability].id, 'gust', 'the wind is in the hand to begin with');
+  p.nextElement();
+  assert.equal(p.element, 1);
+  assert.equal(p.list[p.ability].id, 'kindle', 'and now the fire is');
+  assert.equal(p.list.length, 1, 'fire has one ability built; the rest are named in docs/POWERS-FIRE.md');
+  // the physics is what lights it, because only it knows what is underfoot there
+  let asked = null;
+  sim.physics = { lightFire: (fires, bodyId, at, size) => { asked = { bodyId, at, size }; return { kind: 1 }; } };
+  p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  assert.ok(asked, 'the physics was asked to light it');
+  assert.equal(asked.bodyId, 'earth');
+  assert.equal(p.fireCasts, 1, 'one fire lit');
+  // and swapping back drops everything the fire was holding
+  p.nextElement();
+  assert.equal(p.list[p.ability].id, 'gust');
+  assert.equal(p.charge, 0, 'and nothing is left charged across the swap');
+});
