@@ -373,7 +373,11 @@ export class Powers {
     const f = sim.physics && sim.physics.lightFire ? sim.physics.lightFire(this.fires, sim.bodyId, this.aim.p, size) : null;
     if (!f) { this._say('no room for another fire'); return null; }
     this.fireCasts++;
+    // (2026-11-18, after looking: a fire lit at the owner's own riverside spawn lit, burned one patch and went out,
+    //  and the screen said nothing at all, so there was no way to tell a broken fire from a damp wood. It says now.)
     if (f.kind === FUEL.none) this._say('nothing here will burn');
+    else if (f.wet >= FIRE.wetStop * 0.8) this._say('too damp to catch');
+    else if (!(f.fuel > 0.25)) this._say('too little here to carry it');
     return f;
   }
 

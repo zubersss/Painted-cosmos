@@ -27,7 +27,10 @@ for (let i = 0; i < 16; i++) KIT_PALETTE.push(new THREE.Vector3(0.72, 0.64, 0.52
 
 // The palette of one biome: 16 washes, by PHYSICS' material names. `pal` is the biome's
 // prepared ground washes (surface.pal: low, mid, high), `liquid` its liquid colour if any.
-const MATS = ['grass', 'soil', 'litter', 'mud', 'sand', 'dust', 'gravel', 'rock', 'snow', 'ice', 'ash', 'glass', 'crystal', 'moss', 'bed'];
+// (the powers, fire) 'flame' is the sixteenth slot: the ground is made of fifteen things and the spare one is the
+// flame's and the embers' own ink (physics/loose.js I_FLAME). The same in every biome, so the world's blend across
+// the biomes under the camera leaves it alone.
+const MATS = ['grass', 'soil', 'litter', 'mud', 'sand', 'dust', 'gravel', 'rock', 'snow', 'ice', 'ash', 'glass', 'crystal', 'moss', 'bed', 'flame'];
 const mx = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 export function biomeInks(pal, liquid) {
   const earth = mx(pal.mid, pal.high, 0.45), stone = mx(pal.high, [0.78, 0.78, 0.82], 0.35), paper = [0.975, 0.98, 0.985];
@@ -37,6 +40,7 @@ export function biomeInks(pal, liquid) {
     gravel: stone, rock: stone, glass: mx(stone, [0.40, 0.42, 0.52], 0.4), crystal: mx(stone, [1, 1, 1], 0.3),
     snow: paper, ice: mx(paper, [0.84, 0.90, 0.96], 0.5), ash: mx(earth, [0.50, 0.49, 0.50], 0.65),
     bed: liquid ? mx(liquid, [1, 1, 1], 0.45) : mx(earth, [0.34, 0.29, 0.28], 0.4),
+    flame: [1.0, 0.60, 0.22],      // (the powers, fire: a starting orange, NOT YET LOOKED AT in a still)
   };
   const out = [];
   for (let i = 0; i < 16; i++) out.push(of[MATS[i]] || earth);

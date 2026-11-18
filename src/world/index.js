@@ -16,7 +16,7 @@ import { makeSky, makeSkyUniforms, makeSkyGlaze } from './sky.js';
 import { Flora } from './flora.js';
 import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
-import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL } from '../render/shared.js';
+import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL, syncBurnt } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { MODE } from '../data/mode.js';
@@ -328,6 +328,9 @@ export function createWorld(scene) {
       st.camLocal.copy(cameraPos);
       root.worldToLocal(st.camLocal);
       if (MODE.powers && st === active) setParted(st);      // (the powers, move water)
+      // (the powers, fire: which few of the record's scorch marks the ground paints, for the world the eye is on.
+      //  Once a frame, before the ground is drawn, exactly as the water's channel above.)
+      if (MODE.powers && MODE.oil && st === active) syncBurnt(st.id, st.camLocal);
       // (from orbit the limb closes on the mean sphere: chunks.js pcRound. Full relief to a third of a radius up, a quarter
       // of it from 0.8 radii (at a third Earth's alpine range still stood off the limb as a bump); about the sea's level where the world has one, so a coast stays a coast)
       { const R = st.body.radius; st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * 0.35, R * 0.8), R + (st.look.seaLevel || 0)); }

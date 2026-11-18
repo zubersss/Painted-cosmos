@@ -3,7 +3,7 @@
 // value-stepped light, cool glaze shadows, dry-brush sparkle, banded aerial perspective. The
 // post passes (post.js) then treat the result as wet paint on paper.
 import * as THREE from 'three';
-import { G, PHYS, PHYSW, PREV, OIL, LOOK, register, ensureGlobals, makeBodyUniforms } from './shared.js';
+import { G, PHYS, PHYSW, PREV, OIL, LOOK, BURNPAINT, register, ensureGlobals, makeBodyUniforms } from './shared.js';
 import { MODE } from '../data/mode.js';
 import { FLORA_GLSL } from '../physics/flora.glsl.js';
 import { WATER_GLSL } from '../physics/water.js';
@@ -55,6 +55,30 @@ function baseUniforms(bodyU, own) {
 // outside this file: makePaintUniforms(bodyUniforms?, own?) -> uniforms object. Pass the
 // body's uniforms (world.bodyUniforms(id)) to be lit and hazed like that body.
 export function makePaintUniforms(bodyU, own) { return baseUniforms(bodyU, own); }
+
+// WHAT THE FIRE LEFT, IN A MATERIAL'S PROGRAM (the powers, fire; the record is src/data/burnt.js, the few marks the
+// painter holds and how they are chosen are in shared.js BURNPAINT).
+// THIS IS THE GUARD THAT KEEPS THE LIVE GAME EXACTLY AS IT IS, and it is one line: a program is compiled with the
+// define PC_FIRE only when the powers are switched on (`?powers=1`, which sets MODE.powers in main.js before anything
+// is made) AND the oil look is on (`?look=oil`). Without BOTH, no define is set, none of the uniforms is attached, and
+// every one of the shaders below is character for character the program it was -- so the watercolour game cannot
+// differ by a pixel, with or without the powers flag. Everything of the scorch in the shader text sits inside
+// `#ifdef PC_FIRE`.
+// `marks`: true for the ground, which needs the list of burnt places; false for the plants, which are told which
+// crowns burned by a number of their own instead (PROP_VERT aBurnt) and need only the dials.
+function addFire(m, marks) {
+  if (!(MODE.powers && LOOK.oil)) return m;
+  m.defines = m.defines || {};
+  m.defines.PC_FIRE = 1;
+  m.uniforms.uBurnK = BURNPAINT.uBurnK;
+  if (marks) {
+    m.defines.PC_BURN_N = BURNPAINT.slots;      // (one number in shared.js sets both the arrays and the shader's loops)
+    m.defines.PC_BURN_G = BURNPAINT.groups;
+    m.uniforms.uBurnN = BURNPAINT.uBurnN; m.uniforms.uBurnBall = BURNPAINT.uBurnBall;
+    m.uniforms.uBurnG = BURNPAINT.uBurnG; m.uniforms.uBurnA = BURNPAINT.uBurnA; m.uniforms.uBurnB = BURNPAINT.uBurnB;
+  }
+  return m;
+}
 
 // ------------------------------------------------------------------------------------------
 // Terrain
@@ -137,6 +161,75 @@ vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV, gBc;
 vec3 gCtrB;       // a dab's own place on the body (set before pcGroundAt; x > 1e20: none, the place is carried from the pixel)
 vec4 gCdx, gCdy, gPdx, gPdy;
 float gMid;
+#ifdef PC_FIRE
+// WHERE THE FIRE HAS BEEN (the powers, fire; the record is src/data/burnt.js, and shared.js BURNPAINT says which few
+// of its marks are handed down here and why). A mark is a CAPSULE -- the line the fire crept along, as wide as its
+// flame was -- and it is held as:
+//   uBurnA[i]   xyz the middle of that line, IN THE BODY'S OWN AXES    w how far to the side the fire reached (m)
+//   uBurnB[i]   xyz from that middle to one end of the line (m)        w how black it went (0 .. 1)
+//   uBurnG[g]   a ball round each four of marks, xyz its middle, w its radius;  uBurnBall: one round the whole lot
+// THE PLACES ARE THE BODY'S OWN, not the eye's, and they are compared against vBody, which is the body's own too
+// (TERRAIN_VERT above). A middle measured from the eye, tested against vBody, would be out by wherever the camera
+// stands -- kilometres -- and every burn would land nowhere near the fire that made it. A world is only kilometres
+// across, so a metre held this way is good to a fraction of a millimetre: far finer than a brush stroke.
+uniform vec4 uBurnK;
+uniform float uBurnN;
+uniform vec4 uBurnBall;
+uniform vec4 uBurnG[PC_BURN_G];
+uniform vec4 uBurnA[PC_BURN_N];
+uniform vec4 uBurnB[PC_BURN_N];
+// How burnt the ground is at a place: 0 clean, 1 burnt right out. Blackest along the middle of a mark and fading to
+// nothing at its rim, which is the SAME reading the record itself gives (data/burnt.js fade; uBurnK.y is that file's
+// own BURN.core, handed down so the two cannot drift), so what is painted and what the play code believes about a
+// patch of ground are one thing.
+// What it costs: with nothing burnt (or the scorch turned off), one comparison. On clean ground, one ball. Standing
+// in a burn, that ball, the fours' own balls, and the four capsules of each four whose ball the place falls inside:
+// MEASURED over a fire that had run three hundred metres, 2.7 capsule tests a place and 8 at worst, of 32 held.
+float pcBurntAt(vec3 P) {
+  if (uBurnN < 0.5 || uBurnK.x <= 0.0) return 0.0;              // nothing has burned, or ?burn=0: one comparison and out
+  vec3 q = P - uBurnBall.xyz;
+  if (dot(q, q) > uBurnBall.w * uBurnBall.w) return 0.0;        // nowhere near any burn: one ball and out
+  float most = 0.0;
+  for (int g = 0; g < PC_BURN_G; g++) {
+    if (float(g) * 4.0 >= uBurnN) break;
+    vec4 ball = uBurnG[g];
+    vec3 qg = P - ball.xyz;
+    if (dot(qg, qg) > ball.w * ball.w) continue;                // this four of marks is too far off: all four skipped
+    for (int k = 0; k < 4; k++) {
+      int i = g * 4 + k;
+      if (float(i) >= uBurnN) break;
+      vec4 A = uBurnA[i], B = uBurnB[i];
+      vec3 a = P - A.xyz;
+      // how far the place is from the mark's line: along the line where it lies beside it, and from the nearer end
+      // where it lies past one. (A mark the fire never crept out of has both ends in one place: hh is then 0, the
+      // clamp holds t at 0, and this is the plain distance to that place -- a circle, with no branch needed.)
+      float hh = dot(B.xyz, B.xyz);
+      float t = clamp(dot(a, B.xyz), -hh, hh) / max(hh, 1e-8);
+      vec3 off = a - B.xyz * t;
+      float d2 = dot(off, off), r = A.w;
+      if (d2 >= r * r) continue;
+      most = max(most, B.w * (1.0 - smoothstep(r * uBurnK.y, r, sqrt(d2))));
+    }
+  }
+  return most * uBurnK.x;      // (uBurnK.x is 1 as chosen, so this IS the record's own reading; ?burn= turns it down)
+}
+// How much of the black ONE STROKE takes: the whole of it, or none, by the stroke's own number against how burnt the
+// place it lies on is. That is what makes the rim of a burn a scatter of black strokes among unburnt ones -- ragged,
+// as a fire really leaves it -- and not a drawn circle with a soft edge. In the middle of a mark every stroke takes it.
+float pcCharTake(vec3 rnd, float burnt) { return smoothstep(-0.10, 0.10, burnt - fract(rnd.z * 4.7) * 0.9); }
+// THE SCORCH, AS BLACK PAINT LAID OVER THE GROUND AND NOT AS A STAIN UNDER IT. The stroke's own paint is taken to a
+// cold charcoal AT ITS OWN VALUE: the light of the place is kept, so a burn in the sun is not the same black as one in
+// the shade and the land is still modelled through it, while the colour is taken out of it. The stroke stays a stroke
+// -- it keeps its own weight and its own stray of value -- which is what makes a burnt patch read as paint laid on.
+// A stroke here and there is the pale grey of ash, three times its neighbours' value: without them a big burn reads
+// as a hole cut in the picture rather than as ground. Nothing goes to flat black; the look does not allow one.
+vec3 pcSoot(vec3 paint, float stray, float ash) {
+  float v = dot(paint, vec3(0.3, 0.5, 0.2));
+  vec3 s = vec3(v) * vec3(0.88, 0.88, 1.12) * (0.20 + 0.16 * stray);
+  s = mix(s, min(s * 3.2, vec3(0.52, 0.50, 0.50)), step(0.88, fract(ash * 7.1)));
+  return clamp(s * uBurnK.w, 0.0, 1.0);
+}
+#endif
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
 void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float snowC, out vec3 leaf, out float canopy) {
@@ -183,6 +276,19 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
   vec3 tn = pcTone(k, lvl);
   float grn = smoothstep(0.02, 0.10, k.g - max(k.r, k.b)) * (1.0 - snowC);
   if (grn > 0.0) tn = mix(tn, mix(pcBody(pcDensity(k, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80, tn, smoothstep(1.2, 2.0, lvl)), grn);
+  #ifdef PC_FIRE
+    // (the powers, fire) WHERE THE FIRE PASSED, THIS STROKE IS LAID IN CHARCOAL instead of its own colour. It is asked
+    // at the STROKE'S OWN CENTRE (gBc, which is where this stroke's paint is worked out anyway), so the edge of a burn
+    // follows the strokes and is ragged by whole strokes, never a circle drawn on the ground.
+    // Snow and ice do not char: where there is snow the fire melts instead, which is the record's other half.
+    float burnt = pcBurntAt(gBc) * (1.0 - snowC);
+    if (burnt > 0.001) {
+      float take = pcCharTake(rnd, burnt) * (1.0 - uBurnK.z);     // (uBurnK.z: a breath of what burned is left under the black)
+      vec3 soot = pcSoot(tn, rnd.x, rnd.y);
+      tn = mix(tn, soot, take);
+      k = mix(k, soot, take);                                     // (so the lantern lights the charcoal, not the green that was there)
+    }
+  #endif
   return pcLamp(tn, k, gBc, rnd.y);
 }
 // SNOW AND ICE (the owner, 2026-11-16, in three steps: "I also dont like how Bright the snow area is why is the snow
@@ -401,6 +507,13 @@ void main() {
     float x0 = dot(nV, gSunV) * 0.5 + 0.5;
     float sun0 = min(pcSunAtSoft(vBody, vPar.z * mix(0.82, 1.0, gMid), 8.0, max(lw, o4.x * 0.5), 0.5), 1.0 - pcCast(vBody, 0.0));
     vec3 bare = pcTone(pcDensity(mix(vCol2, vCol.rgb, gMid), 1.15), pcLevel(mix(min(x0, 0.44) - 0.10 * vPar.z, x0, sun0), 0.05));
+    #ifdef PC_FIRE
+      // (the powers, fire) The ground that shows BETWEEN the strokes is charred too, or a burnt patch would show its
+      // old green through the gaps between its black strokes. This one is a smooth wash and not a stroke, so it takes
+      // the black smoothly, and it is asked at the pixel's own place, which is where that ground is.
+      float bareB = pcBurntAt(vBody);
+      if (bareB > 0.001) bare = mix(bare, pcSoot(bare, 0.5, 0.5), bareB * (1.0 - uBurnK.z));
+    #endif
     acc = mix(bare, acc + rem * bare, uOilC.z);
   }
   }
@@ -606,6 +719,8 @@ export function makeTerrainMaterial(bodyU) {
     vertexShader: TERRAIN_VERT, fragmentShader: TERRAIN_FRAG,
   });
   m.userData.pcPainted = true;
+  // (the powers, fire: the ground goes black where the fire passed. Only with ?powers=1 and ?look=oil; see addFire.)
+  addFire(m, true);
   return register(m, 'terrain');
 }
 
@@ -1079,6 +1194,15 @@ attribute float aLeaf01;   // (trees) 1 on foliage
 attribute vec3 aMass;     // soft "mass" normal of the whole crown
 attribute vec4 aInst;     // per instance: x hue, y value, z seed, w canopy shade at its foot
 attribute float aBorn;    // per instance: when it came into this mesh (the wash clock, s); negative: when it left (it is being lifted out)
+#ifdef PC_FIRE
+// (the powers, fire) PER INSTANCE: HOW FAR THIS PLANT'S CROWN HAS BURNED. 0 untouched, 1 burnt right out. A crown that
+// has caught but not yet taken is kept below 0 in the record (data/burnt.js burnCrown), so it is clamped here. The
+// world fills it for the trees that have burned and leaves it at 0 for every other plant (world/flora.js), and a mesh
+// with no such numbers at all reads 0 (makePropMaterial sets that as its default), so nothing else is touched.
+attribute float aBurnt;
+varying float vBurnt;
+uniform vec4 uBurnK;      // the scorch's dials (shared.js BURNPAINT): x how light the charcoal is laid, z how much of its own colour is left
+#endif
 #ifdef PC_OIL
 attribute vec3 aCard;     // (the oil look's leaves, florakit.js leafCards: the centre of the leaf this vertex belongs to; elsewhere the vertex's own place)
 varying vec3 vCardB;      // that centre on the body: a leaf is lit, shaded and lamp-lit whole
@@ -1205,6 +1329,9 @@ void main() {
     mat4 im = mat4(1.0);
     vec4 inst = vec4(0.0, 0.0, 0.5, 0.7);
     vWash = 1.0;
+  #endif
+  #ifdef PC_FIRE
+    vBurnt = clamp(aBurnt, 0.0, 1.0);      // (the powers, fire: how far this plant's crown has burned)
   #endif
   vec3 io = im[3].xyz;
   float di = distance(io, uCamLocal);
@@ -1364,6 +1491,19 @@ void main() {
       vec3 deepL = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
       vLeafC.rgb = mix(deepL, pcTone(cs, lvL), smoothstep(1.2, 2.0, lvL));
       vLeafK.rgb = cs;
+      #ifdef PC_FIRE
+        // (the powers, fire) A LEAF ON A CROWN THAT HAS BURNED GOES BLACK BEFORE IT GOES ALTOGETHER. Its paint is taken
+        // to a cold charcoal at its own value, the same charcoal the ground's strokes take (TERRAIN_FRAG pcSoot), so
+        // the crown and the floor under it are burnt in one colour. The leaves themselves are then dropped one WHOLE
+        // leaf at a time as the burning goes on (PROP_FRAG), so a crown thins as it burns and is bare at the end.
+        if (vBurnt > 0.001) {
+          float sv = dot(vLeafC.rgb, vec3(0.3, 0.5, 0.2));
+          vec3 soot = clamp(vec3(sv) * vec3(0.88, 0.88, 1.12) * (0.20 + 0.16 * r3.x) * uBurnK.w, 0.0, 1.0);
+          float kb = vBurnt * uBurnK.x * (1.0 - uBurnK.z);
+          vLeafC.rgb = mix(vLeafC.rgb, soot, kb);
+          vLeafK.rgb = mix(vLeafK.rgb, soot, kb);      // (and the lantern lights the charcoal, not the leaf that was there)
+        }
+      #endif
     }
   #endif
   vFog = pcFogAmountV(di * pcFogBank(vBody));      // (PAINTER 19: a thick fog lies in banks)
@@ -1428,6 +1568,20 @@ varying vec4 vLeafK;
 #define vCardD vLeafC.a
 #define vScaleO vLeafK.a
 #endif
+#ifdef PC_FIRE
+varying float vBurnt;     // (the powers, fire) 0 this plant is untouched .. 1 its crown has burned right out
+uniform vec4 uBurnK;
+// The same cold charcoal the ground's strokes are laid in (TERRAIN_FRAG pcSoot: the paint's own value kept, so the
+// light of the place still reads, its colour taken out, a stroke here and there the pale grey of ash). It is written
+// out again here because the ground and the plants share no chunk of their own; if a third program ever wants it, it
+// belongs in chunks.js beside pcTone.
+vec3 pcSoot(vec3 paint, float stray, float ash) {
+  float v = dot(paint, vec3(0.3, 0.5, 0.2));
+  vec3 s = vec3(v) * vec3(0.88, 0.88, 1.12) * (0.20 + 0.16 * stray);
+  s = mix(s, min(s * 3.2, vec3(0.52, 0.50, 0.50)), step(0.88, fract(ash * 7.1)));
+  return clamp(s * uBurnK.w, 0.0, 1.0);
+}
+#endif
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
@@ -1490,6 +1644,22 @@ void main() {
     wn = clamp((wn - 0.5) * 1.5 + 0.5, 0.02, 0.98);
     if (vWash >= 0.0 ? wn > vWash : wn < 1.0 + vWash) discard;
   }
+  #ifdef PC_FIRE
+    // (the powers, fire) A CROWN THAT HAS BURNED LOSES ITS LEAVES, and what is left of the tree is bare and black.
+    // The leaves go one WHOLE leaf at a time, each leaf by its own number, so a crown thins as it burns rather than
+    // fading as one piece; a crown laid as broad washes instead of leaves (part 1) goes in ragged patches, the way a
+    // wash is laid just above. The trunk and the branches stay standing: a burnt tree is not a felled one.
+    // (named apart from the "gone" the crowns' own strokes use further down, which is a different thing: no
+    //  backtick is allowed in a shader comment -- it would end the text the shader is written in)
+    float burnGone = vBurnt * uBurnK.x;      // (?burn=0: no sign of the fire at all, for a before-and-after pair of stills)
+    if (burnGone > 0.001) {
+      if (part > 4.5) { if (fract(vData.w * 3.17 + 0.41) < burnGone) discard; }
+      else if (part > 0.5 && part < 1.5) {
+        float bq = texture(uNoise3D, vBody / 1.7).b * 0.6 + texture(uNoise3D, vBody / 0.5).g * 0.4;
+        if (bq < burnGone) discard;
+      }
+    }
+  #endif
   vec3 leafA = uLeafA, leafB = uLeafB, leafC = uLeafC, barkA = uBarkA, barkB = uBarkB;
   #ifdef PC_FAR
     int si = int(vSpecies + 0.5);
@@ -1824,6 +1994,16 @@ void main() {
     id = 3.0 + seed * 0.9;
     #endif
   }
+  #ifdef PC_FIRE
+    // (the powers, fire) WHAT THE FIRE LEFT STANDING IS SCORCHED. The trunk and the branches of a burnt tree are
+    // charred -- less than the crown was, because bark chars where leaves burn away -- so the tree is left a black
+    // skeleton. A leaf has its own charcoal laid once a leaf (PROP_VERT), so it is left alone here. Nothing else
+    // carries a burnt number, so grass, ferns and stones are untouched.
+    if (vBurnt > 0.001 && part < 4.5) {
+      float kb = vBurnt * uBurnK.x * (1.0 - uBurnK.z) * (part < 0.5 ? 0.66 : 1.0);
+      c = mix(c, pcSoot(c, fract(seed * 3.37), fract(vData.w * 5.9)), kb);
+    }
+  #endif
   c = pcAtmosV(c, vFog, vView);
   wet = max(max(wet, vFog * 0.85), uWx.w * smoothstep(10.0, 90.0, vd) * 0.9);
   #ifdef PC_OIL
@@ -1890,6 +2070,12 @@ export function makePropMaterial(bodyU, opts = {}) {
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.userData.pcPainted = true;
+  // (the powers, fire: a crown that has burned is left bare and black. The plants need no list of burnt places -- each
+  // instance carries its own number, PROP_VERT aBurnt -- so only the dials are attached. A mesh that has no such
+  // numbers (grass, ferns, stones, and the trees until the world fills them) reads 0 for every instance, which is
+  // "untouched": Three hands the program that 0 itself from the default below, rather than leaving it to chance.)
+  addFire(m, false);
+  if (m.defines && m.defines.PC_FIRE) m.defaultAttributeValues.aBurnt = [0];
   register(m, 'prop', opts);
   if (LOOK.oil) m.alphaToCoverage = true;       // (a crown's leaves at its outline: PROP_FRAG, the oil branch)
   return m;

@@ -9,6 +9,7 @@ import { devilsNear, devilWind, makeDevil, DEVILS } from './features.js';
 import { LocalFrame } from './near.js';
 import { EVENT, PARTICLES } from './particles.js';
 import { MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE } from './ground.js';
+import { SPECIES } from './atmosphere.js';
 import { MARK_STRIDE } from './deform.js';
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm, len, dot, timing } from './testworld.mjs';
@@ -674,4 +675,160 @@ test('M4 a leaf\'s turn, as it is handed over, goes no faster than a turn and a 
   console.log(`# M4 leaves in the autumn wood: ${tracked} leaf-steps followed, the fastest turn handed over ${worst.toFixed(1)} rad/s (${(worst / 6.2832).toFixed(2)} turns a second; before M4 about ten), ${turning} of them turning faster than 3 rad/s`);
   assert.ok(tracked > 500 && turning > 20, `leaves are in the air and turning: ${tracked}, ${turning}`);
   assert.ok(worst <= 9.42 + 0.05, `the fastest turn: ${worst.toFixed(2)} rad/s`);
+});
+
+// ---- FIRE: the flame, the smoke and the embers (loose.js FLAME; the fire itself is fire.js) ---------------------
+// Nobody has LOOKED at any of this. These tests say where the marks are, how many of them there are and what they
+// cost; whether a fire looks like a fire is for the owner's own eyes on the owner's own machine.
+const I_FLAME = MATERIAL_IDS.length, I_SMOKE = MATERIAL_INDEX.ash, I_STEAM = MATERIAL_INDEX.snow;
+// Every leaf-kind grain in the air, with its ink, its height over the ground and how it is flying.
+function airGrains(w) {
+  const L = w.physics.particles.leaves, out = [];
+  for (let i = 0; i < L.count; i++) {
+    const x = L.pos[i * 3] + L.origin.x, y = L.pos[i * 3 + 1] + L.origin.y, z = L.pos[i * 3 + 2] + L.origin.z;
+    const u = { x: x / len(V(x, y, z)), y: y / len(V(x, y, z)), z: z / len(V(x, y, z)) };
+    const v = V(L.vel[i * 3], L.vel[i * 3 + 1], L.vel[i * 3 + 2]);
+    out.push({ mat: L.mat[i], size: L.size[i], h: len(V(x, y, z)) - w.R, up: dot(v, u), v, p: V(x, y, z) });
+  }
+  return out;
+}
+// A fire list of made-up patches, as fire.js hands them over once placeFires has put them in the grid.
+function patches(list) { const F = list.slice(); F.count = list.length; return F; }
+const patch = (o) => Object.assign({ placed: true, x: 0, z: 0, y: 0, radius: 2, r0: 2, heat: 1, ash: false, ashAge: 0, melt: 0, size: 1, wx: 0, wy: 0, wz: 0 }, o);
+
+test('fire: its flame, smoke and embers are strokes of air laid by the leaves\' own painter, low flame and a leaning column of smoke over it', async () => {
+  const { makeFires } = await import('./fire.js');
+  const { FLAME } = await import('./loose.js');
+  const w = setup('earth', 'autumn_woodland');
+  const F = makeFires(7);
+  // the one line the game adds (index.js: `particles.fires = fires`), and the fire list on the frame
+  w.physics.particles.system.fires = F;
+  const burn = (secs) => { for (let i = 0; i < Math.round(secs * 60); i++) { w.t += 1 / 60; w.physics.update(1 / 60, { bodyId: w.bodyId, time: w.t, focus: w.focus, sunDir: w.up, fires: F }); F.burns.count = 0; } };
+  burn(1);
+  const before = airGrains(w);
+  assert.ok(!before.some((g) => g.mat === I_FLAME || g.mat === I_SMOKE), 'before anything is lit, no grain of the air is a flame or smoke');
+  assert.ok(w.physics.lightFire(F, w.bodyId, w.focus, 3), 'a fire is lit in the wood');
+  burn(3);
+  const g = airGrains(w), flame = g.filter((q) => q.mat === I_FLAME), smoke = g.filter((q) => q.mat === I_SMOKE);
+  console.log(`# fire: ${flame.length} flame and ember strokes, ${smoke.length} of smoke, of ${g.length} grains of the air in the box`);
+  assert.ok(flame.length > 20, 'the flame is there: ' + flame.length);
+  assert.ok(smoke.length > 20, 'and the smoke: ' + smoke.length);
+  // the flame is low and rising; the smoke goes far higher
+  const fh = flame.map((q) => q.h).sort((a, b) => a - b), sh = smoke.map((q) => q.h).sort((a, b) => a - b);
+  assert.ok(fh[Math.floor(fh.length * 0.9)] < 4, 'nine in ten of the flame is under 4 m: ' + fh[Math.floor(fh.length * 0.9)].toFixed(2));
+  assert.ok(sh[sh.length - 1] > 2 * fh[fh.length - 1] || sh[sh.length - 1] > 8, `the smoke rises far above the flame: ${sh[sh.length - 1].toFixed(1)} m against ${fh[fh.length - 1].toFixed(1)} m`);
+  assert.ok(flame.filter((q) => q.up > 0).length > flame.length * 0.6, 'most of the flame is going up');
+  // EMBERS. They share the flame's ink (there is one spare ink, not two), so they are told apart by what only they
+  // can be: a grain heavier than any flame grain is made (emit sizes a grain by its kind's own spread x the size
+  // asked for, so nothing of flameSize can be bigger than this), and thrown up faster than a flame ever is.
+  // Counted over two seconds, not in one frame: an ember rises fast for a fifth of a second and then arcs over.
+  const emberSize = SPECIES.leaf.d * 1.5 * FLAME.flameSize;
+  let embers = 0, flames = 0, fastest = 0;
+  for (let k = 0; k < 120; k++) {
+    burn(1 / 60);
+    for (const q of airGrains(w)) {
+      if (q.mat !== I_FLAME) continue;
+      if (q.size > emberSize + 1e-9) embers++; else flames++;
+      if (q.up > fastest) fastest = q.up;
+    }
+  }
+  console.log(`# fire: over two seconds, ${embers} ember sightings against ${flames} of flame; the fastest thing thrown up ${fastest.toFixed(1)} m/s (a flame is never over ${(FLAME.flameUp * 1.25).toFixed(1)})`);
+  assert.ok(embers > 20, 'embers are thrown: ' + embers);
+  assert.ok(embers < flames * 0.5, 'and they are the few, not the many: ' + embers + ' against ' + flames);
+  assert.ok(fastest > FLAME.flameUp * 1.3, 'thrown up faster than any flame: ' + fastest.toFixed(1) + ' m/s');
+  // the smoke leans downwind: its middle is downwind of the fire's own middle
+  const fr = w.physics.fields.frame, air = w.physics.fields.air;
+  const u = Math.hypot(air.cwe, air.cwn), ue = air.cwe / u, un = air.cwn / u;
+  const along = (q) => (dot(V(q.p.x - w.focus.x, q.p.y - w.focus.y, q.p.z - w.focus.z), V(fr.ex, fr.ey, fr.ez))) * ue
+    + (dot(V(q.p.x - w.focus.x, q.p.y - w.focus.y, q.p.z - w.focus.z), V(fr.nx, fr.ny, fr.nz))) * un;
+  const mf = flame.reduce((a, q) => a + along(q), 0) / flame.length, msm = smoke.reduce((a, q) => a + along(q), 0) / smoke.length;
+  console.log(`# fire: wind ${u.toFixed(1)} m/s; the flame's middle ${mf.toFixed(2)} m along the wind, the smoke's ${msm.toFixed(2)} m`);
+  assert.ok(msm > mf, `the smoke lies downwind of the flame: ${msm.toFixed(2)} m against ${mf.toFixed(2)} m`);
+  // and no grain of fire is a leaf's own ink or a wisp of wind, nor the other way about
+  for (const q of g) assert.ok(q.mat === I_FLAME || q.mat === I_SMOKE || q.mat === MATERIAL_NONE || q.mat === MATERIAL_INDEX.mud || q.mat === MATERIAL_INDEX.soil || q.mat === I_STEAM || q.mat === MATERIAL_INDEX.ice, 'an ink the air may carry: ' + q.mat);
+  // the fire put out: the smoke goes on a while, then everything of it is gone
+  const { douseFires } = await import('./fire.js');
+  douseFires(F); burn(0.5);
+  assert.ok(airGrains(w).some((q) => q.mat === I_SMOKE), 'burnt-out ground is still smoking half a second later');
+  w.physics.particles.system.fires = null;      // (what index.js does when nothing is alight any more)
+  burn(2.5);
+  assert.ok(!airGrains(w).some((q) => q.mat === I_FLAME || q.mat === I_SMOKE), 'and a little later nothing of the fire is in the air');
+});
+
+test('fire: a hard cap on the grains it may use, nothing at all once the leaves have half the buffer, and a burnt-out patch that still smokes', async () => {
+  const { Loose, FLAME } = await import('./loose.js'); const { Particles, PARTICLES } = await import('./particles.js');
+  const frame = { ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: 1 };      // (east and north of a flat test frame)
+  const near = { heightAt: (x, z, fallback) => fallback };
+  const make = () => { const L = new Loose(new Particles(5, 1)); L._terminal('earth', 1.2, 288); return L; };
+  const cap = PARTICLES.capacity.leaves[1], room = cap * FLAME.share;
+  const inks = (b) => { const o = {}; for (let i = 0; i < b._n; i++) { const k = b.mat[i]; o[k] = (o[k] || 0) + 1; } return o; };
+  // THE CAP: a fire of 64 patches all at the cap, stepped for a minute of frames with nothing ever retired
+  let L = make();
+  const big = patches(Array.from({ length: 64 }, (_, i) => patch({ x: Math.cos(i) * 18, z: Math.sin(i) * 18, radius: 2.8, r0: 2.8, size: 4, wx: 6, wz: 2 })));
+  for (let i = 0; i < 3600; i++) L._fire(big, 1 / 60, frame, near, 0, 0, PARTICLES.radius);
+  const b = L.P.buffers.leaves;
+  assert.ok(b._n <= room + 1, `a fire never has more than ${FLAME.share} of the leaf buffer: ${b._n} of ${cap}`);
+  assert.ok(b._n >= room - 1, 'and with nothing retiring it does fill its share: ' + b._n);
+  // HOW FAST IT FILLS: the three ceilings, in grains a second
+  L = make();
+  let n = 0; for (let i = 0; i < 60; i++) { L.P.buffers.leaves._n = 0; L._fire(big, 1 / 60, frame, near, 0, 0, PARTICLES.radius); n += L.P.buffers.leaves._n; }
+  const want = cap * (FLAME.flameShare / FLAME.flameLife + FLAME.smokeShare / FLAME.smokeLife + FLAME.emberShare / FLAME.emberLife);
+  console.log(`# fire at its cap makes ${n} grains a second; the three ceilings together allow ${want.toFixed(0)}`);
+  assert.ok(n > want * 0.8 && n <= want * 1.02, `at its ceiling: ${n} against ${want.toFixed(0)}`);
+  // ONE CAMPFIRE is a campfire and not a forest fire
+  L = make();
+  const camp = patches([patch({})]);
+  let c = 0; for (let i = 0; i < 60; i++) { L.P.buffers.leaves._n = 0; L._fire(camp, 1 / 60, frame, near, 0, 0, PARTICLES.radius); c += L.P.buffers.leaves._n; }
+  console.log(`# one campfire (a patch 2 m wide) makes ${c} grains a second`);
+  assert.ok(c > 60 && c < want * 0.4, `a campfire asks for far less than the ceiling: ${c} against ${want.toFixed(0)}`);
+  // THE LEAVES KEEP THEIR ROOM: with the buffer over `share` full of a gale's leaves, a fire makes nothing
+  L = make();
+  for (let i = 0; i < room + 20; i++) L.emit('leaves', 0, 10, 0, 0, 0, 0);
+  const was = L.P.buffers.leaves._n;
+  for (let i = 0; i < 600; i++) L._fire(big, 1 / 60, frame, near, 0, 0, PARTICLES.radius);
+  assert.equal(L.P.buffers.leaves._n, was, 'a fire takes no room from the leaves of a gale');
+  // A BURNT-OUT PATCH STILL SMOKES, and nothing of it flames
+  L = make();
+  const ash = patches([patch({ heat: 0, ash: true, ashAge: 1 })]);
+  for (let i = 0; i < 120; i++) L._fire(ash, 1 / 60, frame, near, 0, 0, PARTICLES.radius);
+  let got = inks(L.P.buffers.leaves);
+  assert.ok((got[I_SMOKE] || 0) > 5, 'ground that has burnt out goes on smoking: ' + JSON.stringify(got));
+  assert.equal(got[I_FLAME], undefined, 'and has no flame left: ' + JSON.stringify(got));
+  // ... but not for ever: once the ash is cold (FLAME.smokeAfter) there is nothing
+  L = make();
+  const cold = patches([patch({ heat: 0, ash: true, ashAge: FLAME.smokeAfter + 0.1 })]);
+  for (let i = 0; i < 600; i++) L._fire(cold, 1 / 60, frame, near, 0, 0, PARTICLES.radius);
+  assert.equal(L.P.buffers.leaves._n, 0, 'cold ash makes nothing');
+  // MELTING ICE sends up steam, not smoke (fire.js puts all a patch's heat into the ice there)
+  L = make();
+  const ice = patches([patch({ melt: 2 })]);
+  for (let i = 0; i < 120; i++) L._fire(ice, 1 / 60, frame, near, 0, 0, PARTICLES.radius);
+  got = inks(L.P.buffers.leaves);
+  assert.ok((got[I_STEAM] || 0) > 5 && got[I_SMOKE] === undefined, 'over melting ice it is white steam: ' + JSON.stringify(got));
+  // NOTHING PLACED IN THIS FRAME (the fire is on another world, or 400 m away): nothing is made
+  L = make();
+  const away = patches([patch({ placed: false }), patch({ x: 300, z: 0 })]);
+  for (let i = 0; i < 600; i++) L._fire(away, 1 / 60, frame, near, 0, 0, PARTICLES.radius);
+  assert.equal(L.P.buffers.leaves._n, 0, 'a fire that is not in this frame, or is far outside the box, makes nothing');
+});
+
+test('fire: what it costs -- nothing a frame with nothing burning, and the emitter\'s own time with a fire at its cap', async () => {
+  const { Loose } = await import('./loose.js'); const { Particles, PARTICLES } = await import('./particles.js');
+  const frame = { ex: 1, ey: 0, ez: 0, nx: 0, ny: 0, nz: 1 }, near = { heightAt: (x, z, f) => f };
+  const L = new Loose(new Particles(5, 1)); L._terminal('earth', 1.2, 288);
+  const big = patches(Array.from({ length: 64 }, (_, i) => patch({ x: Math.cos(i) * 18, z: Math.sin(i) * 18, radius: 2.8, r0: 2.8, size: 4, wx: 6, wz: 2 })));
+  const b = L.P.buffers.leaves;
+  const med = (f, n) => { const m = []; for (let k = 0; k < n; k++) { const t0 = process.hrtime.bigint(); f(); m.push(Number(process.hrtime.bigint() - t0) / 1e6); } m.sort((p, q) => p - q); return m[n >> 1]; };
+  for (let k = 0; k < 2000; k++) { b._n = 0; L._fire(big, 1 / 60, frame, near, 0, 0, PARTICLES.radius); }        // warm up
+  const full = med(() => { b._n = 0; L._fire(big, 1 / 60, frame, near, 0, 0, PARTICLES.radius); }, 8001);
+  const none = patches([]);
+  const empty = med(() => L._fire(none, 1 / 60, frame, near, 0, 0, PARTICLES.radius), 8001);
+  console.log(`# fire costs: the emitter with a full fire (64 patches) ${full.toFixed(4)} ms a frame; with the list handed over but empty ${(empty * 1000).toFixed(1)} ns`);
+  timing(full < 0.03, `the emitter with a full fire: ${full.toFixed(4)} ms`);
+  timing(empty < 0.0005, `the emitter with an empty list: ${(empty * 1000).toFixed(1)} ns`);
+  // and with NO list at all it is one comparison in update: the real physics never enters any of this
+  const w = setup('earth', 'autumn_woodland'); run(w, 2);
+  assert.ok(w.physics.particles.system.fires == null, 'with no fire the particle system holds no fire list');
+  run(w, 3);
+  assert.ok(!airGrains(w).some((q) => q.mat === I_FLAME || q.mat === I_SMOKE), 'and the watercolour game puts no flame or smoke in the air');
 });

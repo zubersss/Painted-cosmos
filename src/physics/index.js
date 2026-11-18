@@ -387,6 +387,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       particles.splashOf = S; particles.splashCover = near.cover; particles.splashCW = near.CW; particles.splashSlot = 8;
       const n = near.nearest(fx, fz); particles.splashHere = n >= 0 && near.cover ? S[near.cover[n * near.CW + 8] | 0] : 0; }
     particles.winds = winds;
+    // (the powers, fire) and the fire alight this frame, for the flame, the smoke and the embers the loose things
+    // lay (physics/loose.js FLAME). Null while nothing burns, and then the emitter is one comparison.
+    particles.fires = fires;
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
     loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
