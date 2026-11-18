@@ -99,7 +99,8 @@ export const sizeOf = (k) => (k > 1 ? (k < WINDPOWER.sizeMax ? k : WINDPOWER.siz
 function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,
     speed: 0, radius: 0, reach: 0, spread: 0, front: 0, pulse: 0, height: 0, gain: 1, push: 0, up: 0, spin: 1, held: false,
-    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0, snap: 0, tear: 0, size: 1 };
+    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0, snap: 0, tear: 0, size: 1,
+    bends: false };   // (bends: this source may lay a stand of trees over. Only the gust ability sets it: owner, 2026-11-18)
 }
 
 // The list. `count` sources are alive, in slots 0 .. count - 1.
@@ -133,8 +134,12 @@ function take(S, kind, bodyId, p, d) {
 }
 
 // A gust from p (body-local, at the hands) along d (body-local, any length). power 0..1 scales its speed.
-export function castGust(S, bodyId, p, d, power = 1, size = 1) {
+// `bends`: whether this gust may lay a stand of trees over past the limit a real trunk has. The owner asked
+// (2026-11-18) that ONE ability bend the trees, so only the gust ability itself passes true: the wind knife's blade
+// and the small puff of the cast gesture are gusts too, and they leave the wood standing.
+export function castGust(S, bodyId, p, d, power = 1, size = 1, bends = false) {
   const s = take(S, KIND.jet, bodyId, p, d), W = WINDPOWER, k = sizeOf(size);
+  s.bends = !!bends;
   s.life = W.gustLife * (0.8 + 0.2 * k); s.speed = W.gustSpeed * power * (0.75 + 0.25 * k); s.front = W.gustFront; s.reach = W.gustReach * (0.5 + 0.5 * k);
   s.radius = W.gustRadius * k; s.spread = W.gustSpread * (0.7 + 0.3 * k); s.pulse = W.gustPulse * (0.7 + 0.3 * k);
   s.height = W.gustHeight * (0.6 + 0.4 * k); s.up = W.gustLift; s.strength = 1;
@@ -234,6 +239,12 @@ export function stepWinds(S, dt) {
 // physics. A source on another body, or too far to matter, is marked not placed and adds nothing.
 export function placeWinds(S, frame, bodyId) {
   let any = false;
+  // (2026-11-18) ...and the whole list's bounds in grid x, z while we are walking it, so that powerWind can answer
+  // "nothing here" in two comparisons. The field, the plants, the loose things and the rain each ask of their own
+  // points: measured at 5,448 asks in one frame with a power held, 942 of them at points no source could reach.
+  // The vortices are left out of the bounds on purpose: they do not act in powerWind at all (they go as dust devils),
+  // so a whirl on its own leaves the bounds empty and every ask ends at the first comparison.
+  let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
   for (let i = 0; i < S.count; i++) {
     const s = S[i];
     s.placed = s.bodyId === bodyId && frame.bodyId === bodyId;
@@ -243,7 +254,19 @@ export function placeWinds(S, frame, bodyId) {
     s.de = s.dx * frame.ex + s.dy * frame.ey + s.dz * frame.ez; s.dn = s.dx * frame.nx + s.dy * frame.ny + s.dz * frame.nz;
     if (Math.abs(s.x) > 400 || Math.abs(s.z) > 400) { s.placed = false; continue; }
     any = true;
+    // how far this source can possibly reach from its own middle, across the ground (the least half-width `minR`,
+    // which varies by caller, is added at the test instead). Each line is that kind's own cut-off in powerWind.
+    let R = 0;
+    if (s.kind === KIND.jet) R = s.reach + 7 + 2.4 * (s.radius + s.spread * (s.reach > 0 ? s.reach : 0));
+    else if (s.kind === KIND.part) R = s.len + 2.2 + 2 * s.radius;
+    else if (s.kind === KIND.zone || s.kind === KIND.orb) R = s.radius;
+    else continue;                                        // a vortex: nothing in powerWind
+    if (s.x - R < bx0) bx0 = s.x - R;
+    if (s.x + R > bx1) bx1 = s.x + R;
+    if (s.z - R < bz0) bz0 = s.z - R;
+    if (s.z + R > bz1) bz1 = s.z + R;
   }
+  S.bany = bx0 <= bx1; S.bx0 = bx0; S.bx1 = bx1; S.bz0 = bz0; S.bz1 = bz1;
   return any;
 }
 
@@ -254,6 +277,14 @@ export function placeWinds(S, frame, bodyId) {
 // Returns true when anything was added or changed. The vortices are not in here: they go as dust devils (windsToDevils).
 export function powerWind(S, x, z, hz, o, minR = 0) {
   o[0] = 0; o[1] = 0; o[2] = 0; o[3] = 1;
+  // (2026-11-18) outside everything the list can reach, in two comparisons (placeWinds keeps the bounds; the widest
+  // any cut-off opens with the caller's least half-width is 2.4 of it, so 3 is given away). A list whose bounds were
+  // never taken (powerWind called without placeWinds, as some tests do) is walked in full as before.
+  if (S.bany !== undefined) {
+    if (!S.bany) return false;
+    const pad = 3 * minR;
+    if (x < S.bx0 - pad || x > S.bx1 + pad || z < S.bz0 - pad || z > S.bz1 + pad) return false;
+  }
   let any = false;
   for (let i = 0; i < S.count; i++) {
     const s = S[i];
@@ -321,6 +352,13 @@ export function powerWind(S, x, z, hz, o, minR = 0) {
     }
   }
   return any;
+}
+
+// Is any wind alive that may lay the trees over? (The owner's rule of 2026-11-18: one ability, the gust.) The trees'
+// lean limit is lifted only while this is true; every other power still stirs a wood, but cannot lay it down.
+export function windsBend(S) {
+  for (let i = 0; i < S.count; i++) { const s = S[i]; if (s.bends && s.placed && s.strength > 0) return true; }
+  return false;
 }
 
 // The vortices, as dust devils: appended to the game's own list (features.js devilsNear fills it first each frame).
