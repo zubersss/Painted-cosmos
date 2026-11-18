@@ -361,6 +361,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18 (the v12 text it replaced is in the log).
 
+**THE FULL CHECK ON `main` AT v15: ALL 17 PASSED** (started 02:15, finished 03:27 on 18 November; the log is
+`/home/user/.pc-scratch/look/full_v15.log`, read from its own last line). It covers v13's and v14's code as well.
+What it cannot check is written at its end: frame rate on a real graphics card, a real mouse under pointer lock, a
+real gamepad, how the sound sounds.
+
+**v16 IS BUILT AND GATED BUT NOT YET MERGED** (branch `look-proto`): only one ability bends the trees (the gust), a
+third stage of flight to 170 m/s, three cuts to the painter and the world that cost nothing on screen, `?dpr=` and
+`?best=1`, and four new speed-test rows that RAISE the load.
+
 **In one line:** `main` is at `v15 (18 Nov)` (5d6cf88; pull requests #4 to #15, #7 onwards opened
 and merged by the session on the owner's standing word and their own "merge the powers"). LIVE
 BEHIND SWITCHES: the new look (`?look=oil`), THE ELEMENTAL POWERS, WIND (`?powers=1`, seven
