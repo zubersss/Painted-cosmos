@@ -1545,7 +1545,12 @@ export class Sim {
     const list = obstacles || this.obstaclesNear(this.bodyId, p, 12);
     if (list.length) {
       const r = len(p) + CAMERA.pivotHeight;
-      for (const o of list) if (o.height > CAMERA.pivotHeight) out.push({ p: scale(o.unitDir, r), radius: o.radius + 0.3 });
+      // (THE CAMERA'S GLITCH IN FLIGHT, the owner 2026-11-17: a trunk is given to the camera as a ball at the
+      // EXPLORER'S OWN height, which is right while they walk among the trees. Flying over the wood it lifted every
+      // trunk up to meet them: at 53 m the boom slammed from 5.2 m to 1.2 m and back as the view passed over phantom
+      // trunks in open air. A trunk is only in the way while the camera is still below its top.)
+      const alt = this.ex && this.ex.altitude > 0 ? this.ex.altitude : 0;
+      for (const o of list) if (o.height > CAMERA.pivotHeight && alt < o.height + CAMERA.pivotHeight) out.push({ p: scale(o.unitDir, r), radius: o.radius + 0.3 });
     }
     return out;
   }

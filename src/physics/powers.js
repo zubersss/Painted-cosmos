@@ -21,6 +21,17 @@ import { smoothstep } from './util.js';
 export const KIND = Object.freeze({ jet: 1, zone: 2, orb: 3, vortex: 4, part: 5 });
 
 export const WINDPOWER = Object.freeze({
+  // HOW BIG A CAST CAN BE MADE (the owner, 2026-11-17: "let me be able to increase to circle to much bigger sizes"):
+  // the player holds the power and the circle grows from 1 to sizeMax over chargeTime seconds; letting go casts it at
+  // that size. Everything of the cast grows with it: how wide it reaches, how hard it blows, and how much it throws.
+  sizeMax: 4, chargeTime: 2.2,
+  // HOW HARD THE PLAYER'S WIND LEANS THE PLANTS (the owner, 2026-11-17: "I should be able to make trees bend towards
+  // the direction I send the wind"). The world's own gales bend a tree by its own rule; the explorer's wind counts for
+  // this much more than its speed alone would, so that a gust visibly lays a stand over the way it was sent.
+  plantGain: 1.8,
+  // and how much further than a real tree ever bends the explorer's wind may lay one over (1 = a real tree's own
+  // limit, which is 17 degrees for a trunk; this is a wind nobody's weather makes)
+  plantLean: 2.6,
   max: 6,                 // sources alive at once (a new one takes the oldest's place)
   // the gust
   gustSpeed: 24,          // m/s in the middle of the pulse as it leaves the hands (a strong gale; a walker's lean is 15)
@@ -82,10 +93,13 @@ export const WINDPOWER = Object.freeze({
   wispHush: 90, hushTime: 1.2,   // a stilled place: strokes a second round its rim while it falls still, and for how long (s)
 });
 
+// A cast's size, kept between 1 (a tap) and WINDPOWER.sizeMax (held to the full).
+export const sizeOf = (k) => (k > 1 ? (k < WINDPOWER.sizeMax ? k : WINDPOWER.sizeMax) : 1);
+
 function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,
     speed: 0, radius: 0, reach: 0, spread: 0, front: 0, pulse: 0, height: 0, gain: 1, push: 0, up: 0, spin: 1, held: false,
-    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0, snap: 0, tear: 0 };
+    x: 0, z: 0, de: 0, dn: 1, y: 0, placed: false, carry: 0, curl: 0, axis: 0, len: 0, snap: 0, tear: 0, size: 1 };
 }
 
 // The list. `count` sources are alive, in slots 0 .. count - 1.
@@ -119,41 +133,51 @@ function take(S, kind, bodyId, p, d) {
 }
 
 // A gust from p (body-local, at the hands) along d (body-local, any length). power 0..1 scales its speed.
-export function castGust(S, bodyId, p, d, power = 1) {
-  const s = take(S, KIND.jet, bodyId, p, d), W = WINDPOWER;
-  s.life = W.gustLife; s.speed = W.gustSpeed * power; s.front = W.gustFront; s.reach = W.gustReach; s.pulse = W.gustPulse;
-  s.radius = W.gustRadius; s.spread = W.gustSpread; s.height = W.gustHeight; s.up = W.gustLift; s.strength = 1;
-  s.curl = W.gustCurl; s.axis = W.gustAxis; s.snap = W.snapMax * power;
+export function castGust(S, bodyId, p, d, power = 1, size = 1) {
+  const s = take(S, KIND.jet, bodyId, p, d), W = WINDPOWER, k = sizeOf(size);
+  s.life = W.gustLife * (0.8 + 0.2 * k); s.speed = W.gustSpeed * power * (0.75 + 0.25 * k); s.front = W.gustFront; s.reach = W.gustReach * (0.5 + 0.5 * k);
+  s.radius = W.gustRadius * k; s.spread = W.gustSpread * (0.7 + 0.3 * k); s.pulse = W.gustPulse * (0.7 + 0.3 * k);
+  s.height = W.gustHeight * (0.6 + 0.4 * k); s.up = W.gustLift; s.strength = 1;
+  s.curl = W.gustCurl; s.axis = W.gustAxis; s.snap = Math.round(W.snapMax * power * k); s.size = k;
   return s;
 }
 // Wind control at p (on the ground): mode 'calm' stills the wind there, 'quicken' speeds it (and adds some along d).
-export function castZone(S, bodyId, p, d, mode) {
-  const s = take(S, KIND.zone, bodyId, p, d), W = WINDPOWER;
-  s.life = W.zoneLife; s.fade = W.zoneFade; s.radius = W.zoneRadius; s.height = W.zoneHeight;
+export function castZone(S, bodyId, p, d, mode, size = 1) {
+  const s = take(S, KIND.zone, bodyId, p, d), W = WINDPOWER, k = sizeOf(size);
+  s.life = W.zoneLife; s.fade = W.zoneFade; s.radius = W.zoneRadius * k; s.height = W.zoneHeight * (0.6 + 0.4 * k); s.size = k;
   if (mode === 'calm') { s.gain = 0; s.push = 0; } else { s.gain = W.quickenGain; s.push = W.quickenPush; }
   return s;
 }
 // Gather: a ball of turning air at p (held until released). Move it with moveWind(); end it with releaseWind().
-export function castOrb(S, bodyId, p) {
-  const s = take(S, KIND.orb, bodyId, p, null), W = WINDPOWER;
-  s.life = 1e9; s.fade = 0.5; s.held = true; s.radius = W.orbRadius; s.speed = W.orbIn; s.height = W.orbHeight;
+export function castOrb(S, bodyId, p, size = 1) {
+  const s = take(S, KIND.orb, bodyId, p, null), W = WINDPOWER, k = sizeOf(size);
+  s.life = 1e9; s.fade = 0.5; s.held = true; s.radius = W.orbRadius * k; s.speed = W.orbIn; s.height = W.orbHeight * (0.7 + 0.3 * k); s.size = k;
   return s;
 }
 // A tornado at p (on the ground).
-export function castVortex(S, bodyId, p, spin = 1) {
-  const s = take(S, KIND.vortex, bodyId, p, null), W = WINDPOWER;
-  s.life = W.vortexLife; s.fade = W.vortexFade; s.radius = W.vortexRadius; s.speed = W.vortexSpeed; s.up = W.vortexUp;
-  s.height = W.vortexHeight; s.spin = spin < 0 ? -1 : 1; s.snap = W.snapVortex;
+export function castVortex(S, bodyId, p, spin = 1, size = 1) {
+  const s = take(S, KIND.vortex, bodyId, p, null), W = WINDPOWER, k = sizeOf(size);
+  s.life = W.vortexLife; s.fade = W.vortexFade; s.radius = W.vortexRadius * k; s.speed = W.vortexSpeed * (0.8 + 0.2 * k); s.up = W.vortexUp * (0.8 + 0.2 * k);
+  s.height = W.vortexHeight * (0.6 + 0.4 * k); s.spin = spin < 0 ? -1 : 1; s.snap = Math.round(W.snapVortex * k); s.size = k;
   return s;
 }
 // Move water: a channel that begins at p (on the water or the ground, body-local) and runs along d; held until released.
 // While held it runs out to its full length; let go, it closes from the far end inward and is gone (stepWinds).
-export function castPart(S, bodyId, p, d) {
-  const s = take(S, KIND.part, bodyId, p, d), W = WINDPOWER;
-  s.life = 1e9; s.held = true; s.radius = W.partHalf; s.reach = W.partReach; s.speed = W.partWind; s.len = 0; s.strength = 1;
+export function castPart(S, bodyId, p, d, size = 1) {
+  const s = take(S, KIND.part, bodyId, p, d), W = WINDPOWER, k = sizeOf(size);
+  s.life = 1e9; s.held = true; s.radius = W.partHalf * k; s.reach = W.partReach * (0.7 + 0.3 * k); s.speed = W.partWind; s.len = 0; s.strength = 1; s.size = k;
   return s;
 }
 export function moveWind(s, p) { s.px = p.x; s.py = p.y; s.pz = p.z; }
+// A held source (a gathered ball, a parted channel) grown while the hand stays down.
+export function growWind(s, size) {
+  const W = WINDPOWER, k = sizeOf(size);
+  if (!s || k === s.size) return s;
+  s.size = k;
+  if (s.kind === KIND.orb) { s.radius = W.orbRadius * k; s.height = W.orbHeight * (0.7 + 0.3 * k); }
+  else if (s.kind === KIND.part) { s.radius = W.partHalf * k; s.reach = W.partReach * (0.7 + 0.3 * k); }
+  return s;
+}
 // Turns a source to lie along d (levelled at its own place).
 export function turnWind(s, d) {
   const r = Math.hypot(s.px, s.py, s.pz) || 1, ux = s.px / r, uy = s.py / r, uz = s.pz / r;

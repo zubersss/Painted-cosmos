@@ -24,7 +24,7 @@
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
 import { devilWind } from './features.js';
-import { powerWind } from './powers.js';
+import { powerWind, WINDPOWER } from './powers.js';
 import { wakeAt } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
@@ -331,6 +331,17 @@ export class FloraField {
     let gsum = 0, se = 0, sn = 0, tsum = 0, sce = 0, scn = 0;
     const swirl = !!devils && devils.count > 0;
     const blown = !!winds && winds.count > 0;      // (the wind the explorer makes, powers.js)
+    // HOW FAR A PLANT MAY BE LAID OVER. A real tree's trunk leans 17 degrees in the worst gale and no further
+    // (FLORA.stiffMax, measured trees): the world's own weather never gets past it. The explorer's wind is not
+    // weather, and the owner asked to lay a stand over the way they send it (2026-11-17), so while any of their wind
+    // is alive the limit is lifted toward WINDPOWER.plantLean times itself, and eased back when it is gone. One
+    // number for the whole field: the GLSL twin reads it from the same uniform (flora.glsl.js uPhysShape).
+    {
+      const want = blown ? 1 : 0, k = want > this._lean01 ? 1 - Math.exp(-dt * 6) : 1 - Math.exp(-dt * 1.6);
+      this._lean01 = (this._lean01 || 0) + (want - (this._lean01 || 0)) * k;
+      const g = 1 + (WINDPOWER.plantLean - 1) * this._lean01;
+      this.uniforms.uPhysShape[1] = FLORA.softMax * g; this.uniforms.uPhysShape[3] = FLORA.stiffMax * g;
+    }
     for (let j = 0; j < N; j++) {
       const z = (this.cj + j - N / 2 + 0.5) * cell;
       for (let i = 0; i < N; i++) {
@@ -345,7 +356,9 @@ export class FloraField {
         if (swirl && devilWind(devils, x, z, 0.5, _dwf)) { we += _dwf[0] / (hs > 0.05 ? hs : 0.05); wn += _dwf[1] / (hs > 0.05 ? hs : 0.05); }
         // the explorer's wind: given at plant height too; a source narrower than the field's nodes lie apart is taken
         // as wide as that, so a gust between two nodes still bends the plants it passes
-        if (blown && powerWind(winds, x, z, 0.5, _pwf, cell * 0.6)) { const ih = 1 / (hs > 0.05 ? hs : 0.05); we = we * _pwf[3] + _pwf[0] * ih; wn = wn * _pwf[3] + _pwf[1] * ih; }
+        // (WINDPOWER.plantGain: the explorer's wind leans a plant harder than its speed alone would, so a gust lays a
+        // stand over the way it was sent; the world's own weather is untouched)
+        if (blown && powerWind(winds, x, z, 0.5, _pwf, cell * 0.6)) { const ih = WINDPOWER.plantGain / (hs > 0.05 ? hs : 0.05); we = we * _pwf[3] + _pwf[0] * ih; wn = wn * _pwf[3] + _pwf[1] * ih; }
         const sp = Math.sqrt(we * we + wn * wn);
         // load = q / qRef along the wind, at the height each class lives at
         // (P15) the crowns (the stiff class, at the canopy's top or stiffHeight) take the lee of taller trees upwind as it
@@ -585,7 +598,7 @@ export class FloraField {
     }
     const load = Math.hypot(le, ln);
     const flex = FLORA.softFlex + (FLORA.stiffFlex - FLORA.softFlex) * stiff01;
-    const amax = FLORA.softMax + (FLORA.stiffMax - FLORA.softMax) * stiff01;
+    const U = this.uniforms.uPhysShape, amax = U[1] + (U[3] - U[1]) * stiff01;
     let ang = amax * (1 - Math.exp(-flex * load));
     ang = ang + (FLORA.flatAngle - ang) * flat;
     const k = load > 1e-6 ? ang / load : 0;
@@ -611,7 +624,7 @@ export class FloraField {
     const le = b[0] + (b[2] - b[0]) * stiff01, ln = b[1] + (b[3] - b[1]) * stiff01;
     const load = Math.hypot(le, ln);
     const flex = FLORA.softFlex + (FLORA.stiffFlex - FLORA.softFlex) * stiff01;
-    const amax = FLORA.softMax + (FLORA.stiffMax - FLORA.softMax) * stiff01;
+    const U = this.uniforms.uPhysShape, amax = U[1] + (U[3] - U[1]) * stiff01;
     const ang = amax * (1 - Math.exp(-flex * load));
     const k = load > 1e-6 ? ang / load : 0;
     o.e = le * k; o.n = ln * k; o.angle = ang; o.load = load;
