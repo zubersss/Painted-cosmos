@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { Powers, ABILITIES, POWERS } from '../src/core/powers.js';
 import { KIND, WINDPOWER } from '../src/physics/powers.js';
 import { S } from '../src/core/state.js';
+import { FELLED, felledAt, felledLoad } from '../src/data/felled.js';
 
 const R = 4000;
 function fakeSim({ pitch = -0.12, state = S.ON_FOOT } = {}) {
@@ -139,4 +140,52 @@ test('without ?powers=1 nothing of the powers is loaded: main.js imports them on
     const s = fs.readFileSync(new URL(f, import.meta.url), 'utf8');
     assert.ok(!/from '\.\.?\/[a-z/]*powers\.js'/.test(s), f + ' does not import the powers');
   }
+});
+
+test('THE ULTIMATE (owner, 2026-11-18): holding past the full circle runs a second charge, and letting go then lays a whole stand down', () => {
+  // a stand of 40 trees scattered over 30 m in front of the explorer, as the world would hand them over
+  const trees = [];
+  for (let i = 0; i < 40; i++) {
+    const a = (i * 2.399963), r = 2 + (i % 7) * 4.1;
+    trees.push({ kind: 'tree', radius: 0.4, height: 14, p: { x: Math.sin(a) * r, y: R, z: 14 + Math.cos(a) * r } });
+  }
+  const sim = fakeSim();
+  sim.sampleObstacles = () => trees;
+  const p = new Powers();
+  felledLoad([]);                                  // a clean slate: no tree felled yet
+  p.down = true;
+  step(p, sim, Math.ceil(WINDPOWER.chargeTime * 60) + 4);
+  assert.ok(p.charge >= 1, 'the circle is full: ' + p.charge.toFixed(2));
+  assert.ok(!p.ultReady, 'and the ultimate is NOT ready on the first charge alone');
+  assert.ok(p.ult > 0, 'the second charge has begun: ' + p.ult.toFixed(2));
+  step(p, sim, Math.ceil(WINDPOWER.ultTime * 60) + 4);
+  assert.ok(p.ultReady, 'held on, the ultimate is ready');
+  const before = FELLED.size;
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.ults, 1, 'one ultimate cast');
+  const laid = FELLED.size - before;
+  assert.ok(laid > 10, 'a blast lays a whole section of wood down: ' + laid + ' trees');
+  assert.ok(laid <= WINDPOWER.ultFellMax, 'and never more than its own limit: ' + laid);
+  // the wave: the near trees go over first, the far ones later
+  const waits = [];
+  // (the blast's middle is half its length down the aim, not where the trees happen to be clustered)
+  const cz = WINDPOWER.ultGustLen * 0.5;
+  for (const t of trees) { const F = felledAt('earth', t.p.x, t.p.y, t.p.z); if (F) waits.push({ d: Math.hypot(t.p.x, t.p.z - cz), f: F.f }); }
+  waits.sort((a, b) => a.d - b.d);
+  assert.ok(waits.length > 10 && waits[0].f > waits[waits.length - 1].f, 'the near ones are further over than the far ones (the fall travels outward): nearest ' + waits[0].f.toFixed(3) + ', farthest ' + waits[waits.length - 1].f.toFixed(3));
+  console.log('THE GUST\'S ULTIMATE: ' + laid + ' trees laid down, the nearest at ' + waits[0].d.toFixed(1) + ' m and the farthest at ' + waits[waits.length - 1].d.toFixed(1) + ' m');
+});
+
+test('an ordinary cast is not an ultimate, and letting go early never fells a stand', () => {
+  const trees = [];
+  for (let i = 0; i < 20; i++) trees.push({ kind: 'tree', radius: 0.4, height: 14, p: { x: (i % 5) * 3 - 6, y: R, z: 10 + ((i / 5) | 0) * 4 } });
+  const sim = fakeSim();
+  sim.sampleObstacles = () => trees;
+  const p = new Powers();
+  felledLoad([]);
+  p.down = true;
+  step(p, sim, Math.ceil(WINDPOWER.chargeTime * 60) + 4);     // full circle, but no second charge
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.ults, 0, 'no ultimate');
+  assert.equal(FELLED.size, 0, 'and not one tree laid down by an ordinary gust');
 });

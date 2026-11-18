@@ -25,6 +25,18 @@ export const WINDPOWER = Object.freeze({
   // the player holds the power and the circle grows from 1 to sizeMax over chargeTime seconds; letting go casts it at
   // that size. Everything of the cast grows with it: how wide it reaches, how hard it blows, and how much it throws.
   sizeMax: 4, chargeTime: 2.2,
+  // (2026-11-18, the owner: "make a ultimate abilities for all of them where when you hold it down it does a super
+  //  version of that abilitie".) THE ULTIMATE IS THE SAME GESTURE CARRIED ON. Holding fills the circle in
+  //  chargeTime; keep holding and a second charge runs for ultTime more, and letting go then casts the super
+  //  version. Nothing new to press, and it is the same on a phone, a keyboard and a pad - the rule every power
+  //  here has been held to. An ultimate is cast at ultSize, which is past sizeMax on purpose: sizeOf lets a cast
+  //  marked `ult` through to it.
+  ultTime: 1.9, ultSize: 9,
+  ultFellMax: 60,          // trees one ultimate may lay down (the felled list holds 400 in all)
+  ultWave: 24,             // m/s: how fast the falling travels outward, so a wood goes over as a wave and not at once
+  ultKnifeR: 26,           // m: the wide cut of the knife's ultimate
+  ultWhirlR: 34,           // m: the tornado's reach
+  ultGustR: 30, ultGustLen: 70,   // m: the blast's half-width and how far down the aim it flattens
   // HOW HARD THE PLAYER'S WIND LEANS THE PLANTS (the owner, 2026-11-17: "I should be able to make trees bend towards
   // the direction I send the wind"). The world's own gales bend a tree by its own rule; the explorer's wind counts for
   // this much more than its speed alone would, so that a gust visibly lays a stand over the way it was sent.
@@ -93,8 +105,9 @@ export const WINDPOWER = Object.freeze({
   wispHush: 90, hushTime: 1.2,   // a stilled place: strokes a second round its rim while it falls still, and for how long (s)
 });
 
-// A cast's size, kept between 1 (a tap) and WINDPOWER.sizeMax (held to the full).
-export const sizeOf = (k) => (k > 1 ? (k < WINDPOWER.sizeMax ? k : WINDPOWER.sizeMax) : 1);
+// A cast's size, kept between 1 (a tap) and WINDPOWER.sizeMax (held to the full) - or up to ultSize for an ultimate,
+// which is the second charge and is meant to be past every ordinary limit.
+export const sizeOf = (k) => (k > 1 ? (k < WINDPOWER.sizeMax ? k : k <= WINDPOWER.ultSize ? k : WINDPOWER.ultSize) : 1);
 
 function blank() {
   return { kind: 0, bodyId: null, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, age: 0, life: 0, fade: 0, strength: 0,

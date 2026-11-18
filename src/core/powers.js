@@ -60,6 +60,12 @@ export class Powers {
     // over chargeTime seconds, and letting go casts it at that size. A tap is the smallest and casts at once.
     this.charge = 0;            // 0 .. 1 while the hand is down
     this.size = 1;              // 1 .. sizeMax: what the next cast (or the ball being held) is made to
+    // (2026-11-18, the owner: "make a ultimate abilities for all of them where when you hold it down it does a
+    //  super version".) THE SECOND CHARGE. Once the circle is full, keeping the hand down fills this one over
+    //  WINDPOWER.ultTime, and letting go then casts the ultimate instead. Nothing new to press.
+    this.ult = 0;               // 0 .. 1, and only after charge has reached 1
+    this.ultReady = false;      // the hand may now let go on an ultimate (the ring and the word say so)
+    this.ults = 0;              // how many have been cast (for the log and the tests)
     this._armed = null;         // the ability the hand went down on (it is cast when the hand lifts)
     this._wasTap = false;       // the press came from the touch button's tap: the smallest cast, whatever the frame
     this.note = '';             // one word for the HUD when something cannot be done here
@@ -129,6 +135,76 @@ export class Powers {
     return best;
   }
 
+  // (2026-11-18, the owner: an ultimate that "cuts down multiple trees in a large area", "rips tens of trees in the
+  // air", or "knocks a whole section of forest down".) EVERY TREE WITHIN `radius` OF A PLACE GOES OVER: 'away' from
+  // the explorer, 'out' from the middle of the ring, or 'in' toward it. The far ones go over a little later -
+  // WINDPOWER.ultWave metres a second - so a wood falls as a wave travelling outward instead of all in one frame,
+  // which is both truer to look at and kinder to the frame, since every felling is work for the trees' renderer.
+  _fellArea(sim, c, radius, how) {
+    if (!sim.sampleObstacles || !sim.bodyId || !c) return 0;
+    const W = WINDPOWER, p = sim.ex.p, up = unit(p), f = this.aim.fwd;
+    const s3 = unit({ x: f.y * up.z - f.z * up.y, y: f.z * up.x - f.x * up.z, z: f.x * up.y - f.y * up.x });   // the aim's right
+    // (several looks across the area: asked for one wide disc the world's list misses things - the knife found that)
+    const picks = [[0, 0]];
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.2831853; picks.push([Math.cos(a) * radius * 0.62, Math.sin(a) * radius * 0.62]); }
+    const seen = new Set(), found = [];
+    for (const [a, b] of picks) {
+      const q = add(add(c, f, a), s3, b);
+      let list = null;
+      try { list = sim.sampleObstacles(sim.bodyId, unit(q), radius * 0.6); } catch { list = null; }
+      for (const ob of list || []) {
+        if (ob.kind !== 'tree' || !ob.p) continue;
+        const dx = ob.p.x - c.x, dy = ob.p.y - c.y, dz = ob.p.z - c.z, d = Math.hypot(dx, dy, dz);
+        if (!(d <= radius)) continue;
+        const key = ((ob.p.x * 100) | 0) + '|' + ((ob.p.y * 100) | 0) + '|' + ((ob.p.z * 100) | 0);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        found.push({ ob, d, dx, dy, dz });
+      }
+    }
+    found.sort((A2, B2) => A2.d - B2.d);          // the near ones go first, so the wave travels outward
+    let n = 0;
+    for (const t of found) {
+      if (n >= W.ultFellMax) break;
+      let vx, vy, vz;
+      if (how === 'in') { vx = -t.dx; vy = -t.dy; vz = -t.dz; }
+      else if (how === 'out') { vx = t.dx; vy = t.dy; vz = t.dz; }
+      else { vx = t.ob.p.x - p.x; vy = t.ob.p.y - p.y; vz = t.ob.p.z - p.z; }
+      if (!(Math.hypot(vx, vy, vz) > 1e-3)) { vx = f.x; vy = f.y; vz = f.z; }
+      if (fellTree(sim.bodyId, t.ob.p.x, t.ob.p.y, t.ob.p.z, vx, vy, vz, t.d / W.ultWave)) { n++; this.fells++; }
+    }
+    return n;
+  }
+
+  // THE ULTIMATE of each ability: the super version, cast by letting go once the second charge is full. Every one of
+  // the seven has one, as the owner asked; the three they named by name are the gust, the whirl and the knife.
+  _ultimate(sim, id) {
+    const W = WINDPOWER, A = this.aim, K = W.ultSize;
+    this.ults++;
+    let felled = 0;
+    if (id === 'gust') {
+      castGust(this.winds, sim.bodyId, A.from, A.fwd, 1, K, true);
+      felled = this._fellArea(sim, add(sim.ex.p, A.fwd, W.ultGustLen * 0.5), W.ultGustR, 'away');
+      this._say(felled ? 'the blast flattens ' + felled + ' trees' : 'the blast tears through');
+    } else if (id === 'whirl') {
+      castVortex(this.winds, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, K);
+      felled = this._fellArea(sim, A.p, W.ultWhirlR, 'out');
+      this._say(felled ? 'the tornado takes ' + felled + ' trees' : 'the tornado roars');
+    } else if (id === 'knife') {
+      this._knife(sim, W.sizeMax);
+      felled = this._fellArea(sim, add(sim.ex.p, A.fwd, W.ultKnifeR * 0.6), W.ultKnifeR, 'away');
+      this._say(felled ? 'the blade cuts ' + felled + ' trees' : 'no tree in reach');
+    } else if (id === 'quicken' || id === 'still') {
+      castZone(this.winds, sim.bodyId, A.p, A.fwd, id === 'still' ? 'calm' : 'quicken', K);
+      this._say(id === 'still' ? 'a great hush' : 'a great quickening');
+    } else {
+      // gather and part are HELD, not let go: their ultimate is that they go on growing past every ordinary limit
+      // while the hand stays down (see growWind above). Nothing is cast here.
+      this._say('held to its utmost');
+    }
+    return felled;
+  }
+
   // Where the power acts: from the explorer along the view, level, and as far out as the view looks down.
   _aim(sim) {
     const A = this.aim, cam = sim.footCam, ex = sim.ex;
@@ -168,8 +244,14 @@ export class Powers {
     // the circle grows while the hand is down, and goes back to the smallest when it lifts. A TAP (the touch button's
     // one-frame press) is always the smallest, however long that frame was.
     if (tap) this._wasTap = true;
-    if (down && !this._wasTap) this.charge = Math.min(1, this.charge + dt / WINDPOWER.chargeTime);
+    if (down && !this._wasTap) {
+      this.charge = Math.min(1, this.charge + dt / WINDPOWER.chargeTime);
+      if (this.charge >= 1) this.ult = Math.min(1, this.ult + dt / WINDPOWER.ultTime);
+    }
     this.size = 1 + this.charge * (WINDPOWER.sizeMax - 1);
+    const wasReady = this.ultReady;
+    this.ultReady = this.ult >= 1;
+    if (this.ultReady && !wasReady) this._say('ULTIMATE ready - let go');
     if (this.active) { const A = this._aim(sim), id = ABILITIES[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0; }
     else this.aim.ok = false;
     if (this.active && (down || released || this.orb || this.part)) {
@@ -182,7 +264,7 @@ export class Powers {
             const to = this._orbAt(sim, Math.min(A.dist, POWERS.orbReach)), o = this.orb;
             const dx = to.x - o.px, dy = to.y - o.py, dz = to.z - o.pz, l = Math.hypot(dx, dy, dz), m = Math.min(1, POWERS.orbSpeed * dt / (l || 1));
             moveWind(o, { x: o.px + dx * m, y: o.py + dy * m, z: o.pz + dz * m });
-            growWind(o, this.size);                // (held: the ball grows in the hand)
+            growWind(o, this.ultReady ? WINDPOWER.ultSize : this.size);   // (held: the ball grows in the hand, and past every ordinary limit once the second charge is full: the gather's own ultimate)
           }
         } else if (ab.id === 'part') {
           // the channel begins just behind the explorer and lies along the aim: it goes where they go and look
@@ -193,13 +275,14 @@ export class Powers {
             for (const k of [2, 6, 11]) { try { const g = sim.sampleSurface(sim.bodyId, unit(add(sim.ex.p, A.fwd, k))); if (g && g.liquidRadius > g.radius) wet = true; } catch { /* unknown: say nothing */ wet = true; } }
             if (!wet) this._say('no water here');
           }
-          if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); growWind(this.part, this.size); }
+          if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); growWind(this.part, this.ultReady ? WINDPOWER.ultSize : this.size); }   // (the channel's ultimate is the same: held past full, it opens far wider)
         } else {
           // the hand goes down on it and the circle grows; it is cast when the hand lifts (a tap: the smallest, at once)
           if (pressed) this._armed = ab.id;
           if (released && this._armed === ab.id && this._wait <= 0) {
             const k = this._wasTap ? 1 : this.size;
-            if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd, 1, k, true);   // (true: THE one ability that lays trees over, owner 2026-11-18)
+            if (this.ultReady) this._ultimate(sim, ab.id);
+            else if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd, 1, k, true);   // (true: THE one ability that lays trees over, owner 2026-11-18)
             else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken', k);
             else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm', k);
             else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, k);
@@ -213,7 +296,7 @@ export class Powers {
     }
     if (this.orb && (released || !this.active)) this._drop(this.active ? sim : null);
     if (this.part && (released || !this.active)) this._close();
-    if (!down) { this.charge = 0; this._armed = null; this._wasTap = false; }
+    if (!down) { this.charge = 0; this.ult = 0; this.ultReady = false; this._armed = null; this._wasTap = false; }
     if (W.count > 0) stepWinds(W, dt);
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }
