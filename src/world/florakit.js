@@ -16,7 +16,7 @@ export const FLORA_PHYS = {
   birch: { height: 13, stiffness: 1 }, pine: { height: 18, stiffness: 1 }, farTree: { height: 1, stiffness: 1 },
 };
 
-class Builder {
+export class Builder {
   // (PHYSICS' crown, P14: `aBranchId` one number for every vertex of a branch and the foliage it carries, -1 on the
   // trunk; `aLeaf01` 1 on foliage. `branch` is the number the next tube or blob is laid with)
   // (`aCard`, the oil look's leaves: the centre of the leaf a vertex belongs to, so the shader can light a leaf whole;
@@ -78,7 +78,7 @@ export function leafDrawCount(leaf, thr) {
 }
 
 // A tube along a path of points with radii. Normals are radial (smooth).
-function tube(B, pts, radii, sides, opts) {
+export function tube(B, pts, radii, sides, opts) {
   const o = Object.assign({ part: 0, shade: 0, hash: 0.5, sway0: 0, swayK: 0, swayH: 1, vScale: 1, v0: 0, cap: true }, opts || {});
   B.branch = o.branch != null ? o.branch : o.swayH > 1.5 ? -1 : (o.hash * 7.13) % 1;     // (a trunk carries -1; any other tube is its own branch)
   const rings = [];
@@ -114,7 +114,7 @@ function ico(detail) {
   }
   return _ico[detail];
 }
-function blob(B, c, rx, ry, rz, rnd, opts) {
+export function blob(B, c, rx, ry, rz, rnd, opts) {
   const o = Object.assign({ detail: 1, part: 1, noise: 0.22, rough: 0, ledge: 0, ledgeF: 9, droop: 0, massC: null, massK: 0.6, sway: 0.5, shade0: 0, shadeK: 0.7, hash: rnd(), uvScale: 3, flatBottom: 0, taper: 0, uvT: false }, opts || {});
   B.branch = o.branch != null ? o.branch : (o.hash * 7.13) % 1;     // (a mass of foliage is its own branch unless given one)
   const I = ico(o.detail);
@@ -150,7 +150,7 @@ function blob(B, c, rx, ry, rz, rnd, opts) {
 // every way and drooping a little, facing more or less out of the mass. part 5; `aCard` carries each leaf's centre.
 //   o.n how many, o.len / o.wid a leaf's length and width (m), o.massC / o.massK the crown's centre and how far a
 //   leaf's light follows the crown's roundness, o.shade0 / o.shadeK the shade of the inner leaves, o.droop
-function leafCards(B, c, rx, ry, rz, rnd, opts) {
+export function leafCards(B, c, rx, ry, rz, rnd, opts) {
   const o = Object.assign({ n: 80, len: 0.42, wid: 0.17, part: 5, massC: null, massK: 0.6, sway: 0.6, shade0: 0, shadeK: 0.7, droop: 0.3, round: 0 }, opts || {});
   B.branch = o.branch != null ? o.branch : (rnd() * 7.13) % 1;
   const mc = o.massC || c;
@@ -195,7 +195,7 @@ function leafCards(B, c, rx, ry, rz, rnd, opts) {
 }
 
 // A single tapered stroke (grass blade, fern frond): a ribbon that arches outward.
-function stroke(B, root, dir, len, width, arch, rnd, opts) {
+export function stroke(B, root, dir, len, width, arch, rnd, opts) {
   const o = Object.assign({ segs: 3, part: 2, hash: rnd(), sway: 0.25, leaf: 0, twist: 0 }, opts || {});
   B.branch = o.branch != null ? o.branch : -1;
   const side = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
@@ -214,7 +214,7 @@ function stroke(B, root, dir, len, width, arch, rnd, opts) {
   }
 }
 
-function V(x, y, z) { return new THREE.Vector3(x, y, z); }
+export function V(x, y, z) { return new THREE.Vector3(x, y, z); }
 
 // ---------------------------------------------------------------------------------------------
 // lod: 0 full (near), 1 medium (two washes and a trunk)
