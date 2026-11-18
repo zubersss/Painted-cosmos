@@ -314,6 +314,11 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     is sent; performance that keeps the far view good. The v13 table could not be read (the same
     row between 28 and 52 ms): THE SPEED TEST MUST HOLD THE GAME STILL FIRST.
 
+49. **"You decide when to use ultracode ive given you full access" (2026-11-17).** The many-agent
+    mode is the session's choice now (it replaces item 11's "not unless truly needed"). The
+    session's reading: the bottleneck is the ONE software-drawing test browser, so many agents
+    would only queue for it; the mode is for work that is parallel and needs no browser.
+
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
