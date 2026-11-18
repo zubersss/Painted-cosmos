@@ -47,6 +47,12 @@ export const EXPLORER = Object.freeze({
   // AND FASTER STILL (the owner, 2026-11-17: "make the me have an option to fly even faster"): hold the fast flight
   // and it builds from flyFast to flySurge over surgeIn seconds, and falls back over surgeOut when the hand eases.
   flySurge: 78, surgeIn: 4.5, surgeOut: 1.2,
+  // AND A THIRD STAGE (the owner, 2026-11-18: "add a even faster flying mode"): keep holding past the surge and it
+  // goes on building, to flyRush over rushIn seconds more, and falls back over rushOut. Nothing new to press: the
+  // longer the hand stays down the faster it goes. flyRush is set by what the world can stream, not by taste - at
+  // 170 m/s a far cell (98 m) passes in under a second; the test `a rushing flight does not outrun the world` flies
+  // it and asks the ground to be there the whole way.
+  flyRush: 170, rushIn: 6, rushOut: 2.2,
   flyRise: 9,                // m/s up on Space
   flySink: 9,                // m/s down on C
   terminalFall: 24,          // m/s: falls stay gentle, there is no fall damage
@@ -312,10 +318,16 @@ function stepExplorerBodied(st, input, dt, env, T) {
   const rawPitch = flying && Number.isFinite(input.lookPitch) ? input.lookPitch + 0.12 : 0;
   const lookPitch = Math.max(-1.2, Math.min(1.2, Math.abs(rawPitch) < 0.09 ? 0 : rawPitch - Math.sign(rawPitch) * 0.09));
   const wish = clampLen(add(scale(f, (input.moveZ || 0) * (flying && input.moveZ > 0 ? Math.cos(lookPitch) : 1)), scale(right, input.moveX || 0)), 1);
-  // (the surge: how long the fast flight has been held, 0 .. 1 of the way to flySurge)
-  if (flying && input.run && (input.moveZ || 0) > 0.2) st.surge01 = Math.min(1, (st.surge01 || 0) + dt / T.surgeIn);
-  else st.surge01 = Math.max(0, (st.surge01 || 0) - dt / T.surgeOut);
-  const flyTop = T.flyFast + (T.flySurge - T.flyFast) * (st.surge01 || 0);
+  // (the surge: how long the fast flight has been held. 0 .. 1 is the way to flySurge, 1 .. 2 the way on to flyRush;
+  // each stage has its own building and falling time, so the fast flight still arrives in four and a half seconds
+  // and the rush takes six more on top of it.)
+  {
+    const s0 = st.surge01 || 0;
+    if (flying && input.run && (input.moveZ || 0) > 0.2) st.surge01 = Math.min(2, s0 + dt / (s0 < 1 ? T.surgeIn : T.rushIn));
+    else st.surge01 = Math.max(0, s0 - dt / (s0 > 1 ? T.rushOut : T.surgeOut));
+  }
+  const su = st.surge01 || 0;
+  const flyTop = su <= 1 ? T.flyFast + (T.flySurge - T.flyFast) * su : T.flySurge + (T.flyRush - T.flySurge) * (su - 1);
   const maxSpeed = flying ? (input.run ? flyTop : T.flySpeed) : input.run ? T.runSpeed : input.stroll ? T.strollSpeed : T.walkSpeed;
 
   const cmd = st.cmd || (st.cmd = { wish: V(), jump: false, jet: 0, jetMaxRise: T.jetMaxRise, descentLimit: 0, airControl: 1 });

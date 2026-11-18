@@ -24,7 +24,7 @@
 import { clamp, clamp01, smoothstep, oscStep, TAU } from './util.js';
 import { scrollField } from './near.js';
 import { devilWind } from './features.js';
-import { powerWind, WINDPOWER } from './powers.js';
+import { powerWind, windsBend, WINDPOWER } from './powers.js';
 import { wakeAt } from './wind.js';    // (P16: from wind.js, not air.js; air.js imports this module, and the cycle broke the browser in 6d5c02a)
 
 export const FLORA = Object.freeze({
@@ -336,8 +336,11 @@ export class FloraField {
     // weather, and the owner asked to lay a stand over the way they send it (2026-11-17), so while any of their wind
     // is alive the limit is lifted toward WINDPOWER.plantLean times itself, and eased back when it is gone. One
     // number for the whole field: the GLSL twin reads it from the same uniform (flora.glsl.js uPhysShape).
+    // (2026-11-18, the owner: ONE ABILITY BENDS THE TREES.) Until today any of the explorer's wind lifted the limit,
+    // so a stilled place or a gathered ball laid the wood over as well. Now only a gust does (powers.js `bends`);
+    // the others still stir and push a wood, but no further than a gale would.
     {
-      const want = blown ? 1 : 0, k = want > this._lean01 ? 1 - Math.exp(-dt * 6) : 1 - Math.exp(-dt * 1.6);
+      const want = blown && windsBend(winds) ? 1 : 0, k = want > this._lean01 ? 1 - Math.exp(-dt * 6) : 1 - Math.exp(-dt * 1.6);
       this._lean01 = (this._lean01 || 0) + (want - (this._lean01 || 0)) * k;
       const g = 1 + (WINDPOWER.plantLean - 1) * this._lean01;
       this.uniforms.uPhysShape[1] = FLORA.softMax * g; this.uniforms.uPhysShape[3] = FLORA.stiffMax * g;

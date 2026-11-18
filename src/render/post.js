@@ -890,15 +890,22 @@ export class Post {
     this.rtScene1.setSize(inW, inH);
     if (this.rtSceneMS) this.rtSceneMS.setSize(inW, inH);
     this.rtAux.setSize(inW, inH);
-    this.rtHalf.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
-    this.rtFull.setSize(inW, inH);
     this.rtAbs.setSize(inW, inH);
-    this.rtAbsP.setSize(inW, inH);
-    this.rtPool.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
-    this.rtEdge.setSize(inW, inH);
     this.rtAA.setSize(inW, inH);
     this.rtPrev.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
-    if (this.paperBaked) this.rtPaper.setSize(outW, outH);
+    // (2026-11-18) THE BRUSH'S OWN TARGETS ARE NEVER WRITTEN IN THE OIL LOOK: _finishOil's passes are the region
+    // resolve, the copy (when a glaze needs it), the glazes, the post AA, the keep and the last pass. These six were
+    // still being made at the full size and re-made at every step of the quality: 118 MB at 1080p, 36 MB at a phone's
+    // size, held and never read. They stay at 2 x 2 so that every material naming their textures still compiles and
+    // warm() still lays the brush's passes, and the watercolour game keeps every one of them at full size.
+    if (!this.oil) {
+      this.rtHalf.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
+      this.rtFull.setSize(inW, inH);
+      this.rtAbsP.setSize(inW, inH);
+      this.rtPool.setSize(Math.max(1, inW >> 1), Math.max(1, inH >> 1));
+      this.rtEdge.setSize(inW, inH);
+      if (this.paperBaked) this.rtPaper.setSize(outW, outH);
+    }
     // (R1 re-fix: a resized target loses what was laid in it; laid again at the next frame whatever the size is then: a
     // size that changed and changed back before a frame was drawn (the station harness's settle does it, so can a tier
     // and a scale changed in one step) kept the old key and drew with a cleared target)
@@ -995,9 +1002,27 @@ export class Post {
     // (the region through the resolve, before anything reads it, as in the watercolour's passes)
     if (this.samples) this._pass(this.mAuxFix, this.rtAux);
     const m = this.mCopy;
-    m.uniforms.uMode.value = 1; m.uniforms.tA.value = this.rtScene.textures[0];
-    this._pass(m, this.rtAbs);
-    if (glazes && glazes.length) {
+    // (2026-11-18) THE COPY OF THE WHOLE PICTURE IS ONLY FOR THE GLAZES. They read the scene's own colour
+    // (G.uSceneCol, set in _bindScene) and blend into a target that is not the one they read, so they need rtAbs to
+    // blend into; the post AA reads rtAbs as its input; the debug views show it. With no glaze visible and no post AA
+    // (the ordinary daylight frame, and ALWAYS on a touch device, where setAA gives 0 samples and setPostAA false)
+    // the copy is a whole screen read and written for nothing: 2.07 M texels at 1080p, 0.63 M at a phone's size, one
+    // of the three full-screen passes between the scene and the canvas. Then the last pass reads the scene's own
+    // colour instead. It is the same picture, not a near one: rtScene.textures[0] and rtAbs are both unsigned byte,
+    // both the same size, both linear-filtered (_sceneTarget, line 744), and the copy's own shader is
+    // `vec4(texture(tA, vUv).rgb, 1.0)` while OIL_FRAG and the keep pass read nothing but .rgb.
+    const glazed = !!(glazes && glazes.length);
+    const direct = !glazed && !this.postAA && !this.debugView;
+    if (direct) {
+      const col = this.rtScene.textures[0];
+      this.sheetUniforms.tAbs.value = col; this.mKeep.uniforms.tAbs.value = col;
+    } else {
+      m.uniforms.uMode.value = 1; m.uniforms.tA.value = this.rtScene.textures[0];
+      this._pass(m, this.rtAbs);
+      this.sheetUniforms.tAbs.value = this.postAA ? this.rtAA.texture : this.rtAbs.texture;
+      this.mKeep.uniforms.tAbs.value = this.rtAbs.texture;
+    }
+    if (glazed) {
       const r = this.renderer;
       r.setRenderTarget(this.rtAbs);
       for (const o of glazes) { o.visible = true; r.render(o, camera); }

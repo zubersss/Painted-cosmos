@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { register } from 'node:module';
-import { PRESETS, choosePreset, bufferSize } from '../src/core/preset.js';
+import { PRESETS, choosePreset, bufferSize, MAX_PIXELS } from '../src/core/preset.js';
 import { portraitFov, horizontalFov, CAMERA } from '../src/player/camera.js';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,10 +64,36 @@ test('the drawing buffer: iPhone 14 at 1.25, iPad Pro 11 at most 1.6 MP, the des
   assert.ok(big.w * big.h <= 1.6e6);
 });
 
+test('?dpr= raises or lowers the picture pixels to the screen point, and never past the screen itself', () => {
+  // the owner's S23 Ultra: 823 x 384 points at 3.75 device pixels each. The phone preset gives 1.25.
+  const plain = bufferSize(823, 384, 3.75, PRESETS.phone);
+  assert.equal(plain.ratio, 1.25);
+  assert.deepEqual([plain.w, plain.h], [1028, 480], 'the picture the owner photographed');
+  const sharp = bufferSize(823, 384, 3.75, PRESETS.phone, 2.5);
+  assert.equal(sharp.ratio, 2.5);
+  assert.deepEqual([sharp.w, sharp.h], [2057, 960], 'twice as sharp each way, four times the pixels');
+  // never more picture pixels than the screen has points to show them
+  assert.equal(bufferSize(823, 384, 1.5, PRESETS.phone, 4).ratio, 1.5, 'held at the screen\'s own ratio');
+  // THE WHOLE SCREEN: the owner asked whether the game can draw their phone's own 3086 x 1440 (2026-11-18). It can:
+  // an asked-for sharpness is not held back by the preset's limit on pixels in all, only by the screen itself.
+  const whole = bufferSize(823, 384, 3.75, PRESETS.phone, 3.75);
+  assert.deepEqual([whole.w, whole.h], [3086, 1440], 'every pixel the screen has');
+  assert.ok(whole.w * whole.h > PRESETS.phone.maxPixels, 'past the preset\'s own 3.7 MP, on purpose');
+  // but never past what a phone could hold as drawing targets at all
+  const silly = bufferSize(2000, 1200, 8, PRESETS.phone, 8);
+  assert.ok(silly.w * silly.h <= MAX_PIXELS + 1, 'held at MAX_PIXELS: ' + silly.w + 'x' + silly.h);
+  // 0, or nothing at all, is exactly the game as it was
+  assert.deepEqual(bufferSize(823, 384, 3.75, PRESETS.phone, 0), plain);
+});
+
 test('main.js sizes the buffer by the preset and starts the controller at its tier', () => {
   const m = fs.readFileSync(path.join(repo, 'src/main.js'), 'utf8');
-  assert.match(m, /bufferSize\(canvas\.clientWidth, canvas\.clientHeight, window\.devicePixelRatio \|\| 1, PRESET\)/);
-  assert.match(m, /quality: params\.has\('quality'\) \? Number\(params\.get\('quality'\)\) : PRESET\.tier/);
+  assert.match(m, /bufferSize\(canvas\.clientWidth, canvas\.clientHeight, window\.devicePixelRatio \|\| 1, PRESET, DPR_PIN\)/);
+  // (?dpr=: the pin may only be what the address asked for, between 0 and 4, and 0 means "leave the preset alone")
+  assert.match(m, /const DPR_PIN = Math\.max\(0, Math\.min\(4, \+params\.get\('dpr'\) \|\| \(BEST_PIN \? window\.devicePixelRatio \|\| 0 : 0\)\)\)/);
+  // the tier still comes from the preset unless the address asks otherwise (?quality=, or ?best=1 for the top one)
+  assert.match(m, /quality: params\.has\('quality'\) \? Number\(params\.get\('quality'\)\) : BEST_PIN \? 2 : PRESET\.tier/);
+  assert.match(m, /const BEST_PIN = !!\(params\.get\('best'\) && params\.get\('best'\) !== '0'\)/);
   assert.ok(!/Math\.min\(window\.devicePixelRatio \|\| 1, 1\.5/.test(m), 'no second, fixed cap');
 });
 

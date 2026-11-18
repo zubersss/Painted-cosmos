@@ -5,6 +5,7 @@ import { createPhysics } from './index.js';
 import { MATERIAL_INDEX } from './ground.js';
 import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
 import { LocalFrame } from './near.js';
+import { FLORA } from './flora.js';          // (the trees' own lean limit, for the one-ability rule)
 import { BODIES } from '../data/bodies.js';
 import { makeWorld, V, norm } from './testworld.mjs';
 
@@ -366,14 +367,14 @@ test('the explorer\'s wind lays a stand over the way it is sent, further than an
   const quiet = at(8);
   assert.ok(quiet.ang < 0.1, 'a quiet wood barely leans: ' + (quiet.ang * 57.3).toFixed(1) + ' degrees');
   // sent north: the trees lean north, and further than a real tree's own limit (FLORA.stiffMax)
-  castGust(S, w.bodyId, add(w.focus, n, 1), n, 1, 2);
+  castGust(S, w.bodyId, add(w.focus, n, 1), n, 1, 2, true);
   let worst = quiet;
   run(w, 2, S, () => { const b = at(8); if (b.ang > worst.ang) worst = b; });
   assert.ok(worst.ang > 0.45, 'laid over by the gust: ' + (worst.ang * 57.3).toFixed(1) + ' degrees');
   assert.ok(worst.n > 0 && Math.abs(worst.e) < worst.n * 0.4, 'and the lean is the way the wind was sent (north)');
   // sent east from the same spot: they lean east
   const S2 = makeWinds();
-  castGust(S2, w.bodyId, add(w.focus, e, 1), e, 1, 2);
+  castGust(S2, w.bodyId, add(w.focus, e, 1), e, 1, 2, true);
   let worstE = { ang: 0, e: 0, n: 0 };
   run(w, 2, S2, () => { const o = {}, q = add(w.focus, e, 8); F.plantBend(q, 1, o); if ((o.angle || 0) > worstE.ang) worstE = { ang: o.angle, e: o.e, n: o.n }; });
   assert.ok(worstE.ang > 0.45 && worstE.e > 0 && Math.abs(worstE.n) < worstE.e * 0.4, 'laid over to the east instead: ' + (worstE.ang * 57.3).toFixed(1) + ' degrees');
@@ -381,4 +382,30 @@ test('the explorer\'s wind lays a stand over the way it is sent, further than an
   run(w, 6, S2);
   const after = at(8);
   assert.ok(after.ang < 0.12, 'standing again: ' + (after.ang * 57.3).toFixed(1) + ' degrees');
+});
+
+test('ONE ABILITY BENDS THE TREES (owner, 2026-11-18): a quickened place, a gathered ball and a wind knife stir a wood but never lay it over', () => {
+  const w = setup('earth', 'autumn_woodland'), F = w.physics.fields.flora, { n } = axes(w);
+  const at = (north) => { const o = {}; F.plantBend(add(w.focus, n, north), 1, o); return o.angle || 0; };
+  run(w, 2, makeWinds());
+  // what a real trunk may do under any weather: FLORA.stiffMax, 17 degrees
+  const limit = FLORA.stiffMax + 1e-6;
+  for (const [name, cast] of [
+    ['a quickened place', (S) => castZone(S, w.bodyId, add(w.focus, n, 6), n, 'quicken', 3)],
+    ['a stilled place', (S) => castZone(S, w.bodyId, add(w.focus, n, 6), n, 'calm', 3)],
+    ['a gathered ball', (S) => castOrb(S, w.bodyId, add(w.focus, n, 6), 3)],
+    ['the knife\'s blade', (S) => castGust(S, w.bodyId, add(w.focus, n, 1), n, 0.9, 3)],
+  ]) {
+    const S = makeWinds();
+    cast(S);
+    let worst = 0;
+    run(w, 2.5, S, () => { const a = at(6); if (a > worst) worst = a; });
+    assert.ok(worst <= limit, name + ' leaves the wood within a real tree\'s own limit: ' + (worst * 57.3).toFixed(1) + ' degrees, limit ' + (limit * 57.3).toFixed(1));
+  }
+  // and the one that does bend them still does, from the same place
+  const S = makeWinds();
+  castGust(S, w.bodyId, add(w.focus, n, 1), n, 1, 3, true);
+  let worst = 0;
+  run(w, 2.5, S, () => { const a = at(6); if (a > worst) worst = a; });
+  assert.ok(worst > limit * 1.5, 'the gust ability still lays them right over: ' + (worst * 57.3).toFixed(1) + ' degrees');
 });

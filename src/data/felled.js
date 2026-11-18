@@ -45,6 +45,16 @@ export function fallingOn(bodyId, out = []) {
   return out;
 }
 
+// Every felled tree of one body, falling or already lying, into `out`. (The trees' renderer asks for this when the
+// list has changed, so that it can lay each felled tree where it stands instead of asking of every tree it holds
+// whether it is felled: with one tree felled that was 291 chunks' worth of walking, 25 ms in the frame the player is
+// watching the tree go over.)
+export function felledOn(bodyId, out = []) {
+  out.length = 0;
+  if (M.size) for (const F of M.values()) if (F.bodyId === bodyId) out.push(F);
+  return out;
+}
+
 // How a felled tree is turned from standing: a turn about the level line across its fall, through its foot.
 // (ux, uy, uz): up at the tree (unit); F: its record. Fills out[0..3] with the quaternion x, y, z, w.
 export function fallTurn(ux, uy, uz, F, out) {

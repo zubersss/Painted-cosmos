@@ -22,6 +22,11 @@
 // the one before it. The questions are about the far trees: their paint, their shapes, the shadow pass or the picture,
 // first or last in the order of drawing, and the lump against the tree of flat pieces IN THE SAME RUN (the form is
 // swapped while the test runs). Then the other plants, the light, the paint.
+// EIGHTH FORM (2026-11-18): THREE ROWS THAT RAISE THE LOAD. The seventh form's first table came back reading 16.7 ms
+// on eleven rows in a row - the phone's own 60-a-second cap, not the game - so those rows measured nothing but the
+// screen. The last rows now draw the picture half again and twice as sharp (and twice as sharp with the full paint),
+// which breaks the cap and shows what the game really costs, and how much room the owner's phone has to spare.
+//
 // SEVENTH FORM (2026-11-17): THE GAME IS HELD STILL while the rows are timed (the explorer, the view and the clock
 // are put back after every frame). Two tables before this one could not be read: the explorer had drifted down a river
 // and walked on, so each row saw its own picture, and the same row read between 28 and 52 ms.
@@ -31,6 +36,7 @@
 // script's own time a frame (the CPU's share) and the draw calls and triangles of a frame.
 
 import { BUILD } from './build.js';
+import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
 
 export function attachBench(pc) {
   const el = document.createElement('pre');
@@ -105,7 +111,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 7, ' + BUILD + ': photograph this screen and send it\n' +
+    return 'PAINTED COSMOS SPEED TEST 8, ' + BUILD + ': photograph this screen and send it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -129,6 +135,27 @@ export function attachBench(pc) {
     const swapFar = async (on) => {
       const f = flora();
       if (!f || !f.setFarCards || f.setFarCards(on) == null) return;
+      await wait(400);
+      if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
+    };
+    // (the eighth form) The picture drawn larger and shown in the same place on the screen: `k` times as many pixels
+    // each way, so k x k times as many in all. This is what ?dpr= does for a whole run; here it is one row, so that the
+    // sharper picture and the one the phone is given today are timed in the same minute on an equally warm phone.
+    const canvas0 = { w: R.domElement.width, h: R.domElement.height };
+    // How much sharper the picture would be if every pixel of the screen were drawn (the owner's question of
+    // 2026-11-18: "Can the game draw for 3086 x 1440 pixels??"). The picture is canvas0.w pixels across a box of
+    // clientWidth points, so it is drawn at canvas0.w / clientWidth pixels to the point today, and the screen has
+    // devicePixelRatio of them. Held at 4 and at what preset.js allows, so a screen nobody has met cannot ask for
+    // a picture no phone could hold.
+    const kWhole = (() => {
+      const css = R.domElement.clientWidth || canvas0.w, dev = window.devicePixelRatio || 1;
+      const k = Math.max(1, Math.min(4, (dev * css) / Math.max(1, canvas0.w)));
+      const px = canvas0.w * canvas0.h * k * k;
+      return px > MAX_PIXELS ? Math.sqrt(MAX_PIXELS / Math.max(1, canvas0.w * canvas0.h)) : k;
+    })();
+    const sharpen = async (k) => {
+      if (typeof P.resize !== 'function') return;
+      P.resize(Math.max(2, Math.round(canvas0.w * k)), Math.max(2, Math.round(canvas0.h * k)));
       await wait(400);
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
@@ -157,6 +184,16 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
+      [AS, null, null],
+      // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
+      // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
+      // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's
+      // sharpness until the cap breaks, and what they then read is the game's real speed. They are last because they
+      // are the dearest and a phone is warmest at the end.
+      ['the picture half again as sharp', () => sharpen(1.5), () => sharpen(1)],
+      ['the picture twice as sharp', () => sharpen(2), () => sharpen(1)],
+      ['every pixel the screen has', () => sharpen(kWhole), () => sharpen(1)],
+      ['every pixel, full paint', async () => { await sharpen(kWhole); B({ lite: !lite0 }); }, async () => { B({ lite: lite0 }); await sharpen(1); }],
       [AS + ', last', null, null],
     ];
     const rows = [];

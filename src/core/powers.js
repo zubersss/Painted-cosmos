@@ -199,7 +199,7 @@ export class Powers {
           if (pressed) this._armed = ab.id;
           if (released && this._armed === ab.id && this._wait <= 0) {
             const k = this._wasTap ? 1 : this.size;
-            if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd, 1, k);
+            if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd, 1, k, true);   // (true: THE one ability that lays trees over, owner 2026-11-18)
             else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken', k);
             else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm', k);
             else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, k);

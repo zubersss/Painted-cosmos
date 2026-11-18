@@ -1,0 +1,489 @@
+// !! NOT WIRED INTO THE GAME (2026-11-18). Built and tested; nothing calls it yet. Three small additions wire it
+// !! (they are listed in docs/COORDINATOR.md), but DO NOT MAKE THEM until this is settled:
+// !!   A FIRE IN AN ORDINARY WOOD NEVER GOES OUT AS THINGS STAND. This file keeps no memory of where it has
+// !!   burned beyond the 11 seconds its ash sits in the list, and leans on the game's fuel function to answer
+// !!   "nothing here" over ground already burnt. The record meant to carry that, src/data/burnt.js, keeps 300
+// !!   marks, while one 44 m wood writes 302 of them and an 80 m wood 899. Measured by an independent reader:
+// !!   a 44 m wood still burning after five minutes with 2,219 patches caught and 6,237 marks forgotten; the
+// !!   same wood with an uncapped record went out by itself in 71 seconds. Also: lightFire does not yet refuse
+// !!   a place that is not a real number, so a bad aim writes a not-a-number into the record.
+// Painted Cosmos physics: the fire the explorer lights, and how it runs (the elemental powers, fire; docs/POWERS.md).
+// OWNER: PHYSICS. Pure (no three, no page, no DOM): Node loads it in the tests beside it.
+//
+// THE OWNER'S WORDS that asked for this (2026-11-18): fire should be "able to spread once its spwan by a magical
+// ability", "the place it leaves behind actually gets burnt if its the leaves or ground", and where there is ice it
+// "melts away to reveal ground or if there's is no ground it just keeps melting away".
+//
+// WHAT THIS FILE IS. The fire is A SHORT LIST OF SMALL BURNING PATCHES, at most FIRE.max of them at once, built the
+// same way as the wind the explorer makes (powers.js): plain records with a place, a width, an age and how much fuel
+// is left under them, stepped once a frame, which the rest of the game then asks about. Nothing here is a grid and
+// nothing here is worked out for every pixel.
+//   A patch is about two metres across, so a fire is a chain of them: the ability lights one, each patch lights its
+// neighbours, and each one burns out behind the ones it lit. That is why a fire leaves A RING OR A FRONT and not a
+// growing disc -- the middle has already gone out. A patch that has burned out is kept a little while as ash, so the
+// front cannot turn round and walk back into its own ashes.
+//
+// WHAT THIS FILE DOES NOT DO. It draws nothing: no flame, no smoke, no light (the painter's work). It keeps nothing:
+// the lasting record of what is burnt and what has melted is src/data/burnt.js, which this file does not import and
+// must not. And it does not know where a tree stands, where the dry grass is or where the water is. The game tells
+// it that through two functions it is handed, which is the whole of what it needs to know about the world:
+//
+//   ctx.fuelAt(bodyId, px, py, pz, out)
+//     "Will anything burn here?" The place is in the body's own axes, on the ground. The world fills `out`:
+//       out.kind   what is there to burn: FUEL.leaves, FUEL.undergrowth, FUEL.ground, FUEL.ice,
+//                  or FUEL.none for water, bare rock, deep snow, a road -- anything that will not catch.
+//       out.fuel   0..1, how much of it there is (a thick wood is 1, a few dry stalks 0.2).
+//       out.wet    0..1, how damp the place is. At FIRE.wetStop and above nothing catches at all: that is how
+//                  rain, wet ground and the sea edge stop a fire without this file knowing what any of them are.
+//       out.px/py/pz  come in as the place asked about and may be MOVED by the world onto its own ground, since
+//                  only the world knows the height of the land there. Whatever comes back is where the patch burns.
+//     What the function returns is not read: only `out` is.
+//
+//   ctx.windAt(patch, out)
+//     The wind at that patch, IN THE BODY'S OWN AXES, in metres a second: out[0], out[1], out[2]. The physics has
+//     the world's wind and the player's wind in the near field's grid axes (east, north, up), so it turns them into
+//     the body's axes on the way in -- one line with the frame it already holds:
+//       out[0] = we*f.ex + wn*f.nx;  out[1] = we*f.ey + wn*f.ny;  out[2] = we*f.ez + wn*f.nz;
+//     A patch asks again only every FIRE.windEvery seconds (the wind does not turn faster than matters to a fire),
+//     and each patch asks on its own beat, so the cost is spread over the frames.
+//
+//   ctx.dampAt(patch)  -- not required. 0..1, how damp the patch's place is NOW. Without it a fire already alight
+//     burns on through a shower; with it, rain puts a fire out. Asked every FIRE.dampEvery seconds per patch.
+//
+// WHAT IT TELLS THE GAME BACK. An ARRAY THE CALLER READS AND CLEARS: F.burns, with F.burns.count rows in use (the
+// rows are reused, so reading them allocates nothing). Each row is one place that has burned or melted:
+//   { bodyId, px, py, pz, radius, kind, burnt, heat, done, gen, id }
+//     px,py,pz,radius  where it was and how wide, in the body's own axes
+//     kind             what burned there: FUEL.leaves, FUEL.undergrowth, FUEL.ground, or FUEL.ice for melting
+//     burnt            0..1, the share of what was there that has gone BY NOW (it only ever rises for a place, so a
+//                      reader can simply take the newest row it sees for that place)
+//     heat             for ice only: how much heat has gone into the ice here, in seconds of full flame. How deep
+//                      that melts, and whether ground or more ice is underneath, is the world's business, not ours.
+//     done             true on the last row about that place: it is finished, the fire has moved on
+//     gen              how many patches back to the place the ability lit it (0 = lit by hand)
+//     id               the patch's own number. All the rows about one burning of one place share it, so a reader
+//                      never mistakes a place that burns again much later (a wood grown back) for the same fire.
+// The caller reads the rows each frame and calls clearBurns(F). If it does not, rows stop being added at
+// FIRE.burnsMax and F.lost counts what was missed, so a reader that falls behind is loud about it instead of quiet.
+//
+// Fire is weather: it passes, and nothing of this list goes into the saved game (docs/POWERS.md). What stays is the
+// burnt and melted record, which is kept elsewhere.
+//
+// TWO THINGS A CALLER HAS TO KNOW.
+//   This file HAS NO MEMORY. It only knows that a place is burnt for as long as the ash of that patch is still in
+// the list (FIRE.ashLife seconds), which is enough for the front to walk away and not come back. After that the
+// slot is reused and this file has forgotten. So THE FUEL FUNCTION MUST ANSWER FUEL.none WHERE THE LASTING RECORD
+// SAYS THE GROUND IS ALREADY BURNT -- otherwise a fire will come back over its own ashes and burn for ever. That
+// record is the game's (src/data/burnt.js). The tests beside this file stand a plain one in for it, which is how
+// they show a fire dying out once it has eaten the wood it was lit in.
+//   A RECORD IS NOT A HANDLE. lightFire returns the patch so that the ability can read it at once, but the slot is
+// used again by later fires, so nothing should hold on to it for long. Keep its `id` instead and compare that.
+import { clamp01, smoothstep, hash3, eastNorth } from './util.js';
+
+// What can be under a patch. (FUEL.ground means ground that will burn -- dry grass, turf, heath. Bare rock, sand,
+// water and wet mud are FUEL.none: the fire reaches them and stops, which is what the owner asked for.)
+export const FUEL = Object.freeze({ none: 0, leaves: 1, undergrowth: 2, ground: 3, ice: 4 });
+
+export const FIRE = Object.freeze({
+  // HOW MANY PATCHES AT ONCE. The hard cap the task asks for, so that a wood cannot fill the frame with fire.
+  // A fire is a front, not a disc: patches 2 m wide standing side by side make a ring some 45 m across at this
+  // count, which is a big fire in view, and the ash of the patches just behind the front takes slots too. If a
+  // bigger fire is ever wanted this is the one number to raise, and the cost rises with it, straight in line.
+  max: 64,
+  burnsMax: 96,           // rows of "this burned" kept if the caller is slow to read them (then F.lost counts)
+  sizeMax: 4,             // the cast's size, as the wind has (powers.js): a tap is 1, held to the full is 4
+
+  litRadius: 2.0,         // m: how wide one burning patch is (a cast at size 1)
+  spread: 2.2,            // m: how far from a patch its neighbour catches, across the wind
+  near: 0.75,             // a new patch is refused this near (times the other's width) to one already there or to
+                          // its ash: that is what keeps the fire a front and stops it burning the same place twice
+  reach: 120,             // m: how far from the place it was lit one casting may run before it stops passing on
+
+  catchTime: 0.45,        // s: a new patch comes up to its full flame over this
+  dieTime: 1.1,           // s: and falls away over this once there is nothing left under it
+  ashLife: 11,            // s: how long the ash of a burnt-out patch is kept (long enough for the front to be well
+                          // away before its slot can be used again)
+  maxLife: 40,            // s: a backstop. No patch lives longer than this, whatever the fuel says.
+  bareLife: 1.6,          // s: lit where nothing will burn, the ability's own flame shows for a moment and is gone
+
+  // HOW LONG THE FUEL LASTS under one patch at full flame in still air, in seconds, by kind. Leaves flare and are
+  // gone; undergrowth smoulders longest; dry ground is quick but there is little of it.
+  burnTime: Object.freeze([0, 7, 12, 8, 0]),
+  // AND HOW READILY EACH PASSES THE FIRE ON (it divides the wait below): leaves carry a fire fastest.
+  quick: Object.freeze([0, 1.4, 1.0, 1.2, 0]),
+
+  seedTime: 2.6,          // s: the wait before a patch lights its next neighbour, across the wind in still air
+  tryTime: 0.25,          // s: and the short wait when it looks somewhere and finds nothing there to burn
+  seeds: 4,               // neighbours one patch may light in its life (at size 1)
+
+  // THE WIND CARRIES IT. Two things happen, and both are the wind's doing:
+  windLean: 0.9,          // every way a patch looks is pulled this far downwind (at a full wind), so the fire leans
+  windRate: 2.2,          // and the neighbour downwind catches this many times sooner than the one across the wind
+  backRate: 0.25,         // ... while the one upwind waits this much longer than across: a fire creeps against a
+                          // wind, it does not run (in a full gale it stops going upwind at all, which is true)
+  windCap: 16,            // m/s: the wind at which the lean and the hurry are full
+  windFan: 0.045,         // per m/s: and the wind fans a patch, so it eats its own fuel faster and dies sooner
+
+  wetStop: 0.55,          // 0..1 damp: at this and above nothing catches, and a patch alight goes out
+  wetSlow: 0.8,           // and below it, damp fuel burns this much slower at worst
+
+  // ICE DOES NOT BURN, IT MELTS. A patch on ice has no fuel: the ability's own fire keeps it alive for iceLife and
+  // all its heat goes into the ice. The hole opens out to iceRadius as it melts. How deep that goes, and what is
+  // under the ice, is the world's business: this file only says how much heat went in where.
+  iceLife: 8,             // s
+  iceRadius: 4.5,         // m: how wide the melted place grows by the end
+  iceHeat: 1,             // heat (in seconds of full flame) one patch puts into the ice each second
+
+  reportEvery: 0.34,      // of a patch's fuel: a row is added when this much more has gone, not one a frame
+  meltEvery: 1.0,         // and for ice, every this much heat
+  windEvery: 0.12,        // s: how often one patch asks for the wind again
+  dampEvery: 0.5,         // s: and how often it asks whether its place has turned damp (if the game says how)
+});
+
+// A cast's size, kept between 1 (a tap) and FIRE.sizeMax (held to the full). The same rule as the wind's.
+export const sizeOf = (k) => (k > 1 ? (k < FIRE.sizeMax ? k : FIRE.sizeMax) : 1);
+
+// The wheel of directions a patch looks along, as (east, north) pairs: a fine wheel, walked in steps of SPOKESTEP,
+// which share no factor with it, so a patch sweeps every way round before it repeats and neighbouring patches do
+// not all look the same way (that would make a fire grow as a square).
+const SPOKEN = 24, SPOKESTEP = 7;
+const SPOKES = new Float64Array(SPOKEN * 2);
+for (let i = 0; i < SPOKEN; i++) { const a = (i / SPOKEN) * Math.PI * 2; SPOKES[i * 2] = Math.cos(a); SPOKES[i * 2 + 1] = Math.sin(a); }
+
+// Scratch, made once: nothing in the stepping path below allocates.
+const _en = new Float64Array(6);          // east and north at a patch
+const _w = new Float64Array(3);           // the wind handed back to us
+const _d = new Float64Array(4);           // a direction we are looking along: east, north, its length, its lean
+const _f = { kind: 0, fuel: 0, wet: 0, px: 0, py: 0, pz: 0 };    // what the world says is under a place
+
+// Empties a record in place. (powers.js writes a fresh blank over a wind source, which is fine because the player
+// casts a few times a minute; a fire lights its neighbours many times a second, so here nothing is made at all.)
+function wipe(s) {
+  s.kind = 0; s.bodyId = null;
+  s.px = 0; s.py = 0; s.pz = 0;           // where it burns (the body's own axes, on the ground)
+  s.ox = 0; s.oy = 0; s.oz = 0;           // and where the whole fire was lit, so we know how far it has run
+  s.radius = 0; s.r0 = 0;
+  s.heat = 0;                             // 0..1 how fiercely it burns now
+  s.fuel = 0; s.fuel0 = 0; s.sent = 0;    // what is left under it, what it had, how much we have reported
+  s.melt = 0; s.msent = 0;                // heat put into ice here, and how much of that we have reported
+  s.wet = 0; s.age = 0; s.life = 0; s.ash = false; s.ashAge = 0;
+  s.seeds = 0; s.spoke = 0; s.seedT = 0; s.gen = 0; s.reach = 0;
+  s.wx = 0; s.wy = 0; s.wz = 0; s.wt = 0; s.dampT = 0;    // the wind at it (body axes) and the two little clocks
+  s.size = 1; s.id = 0; s._sp01 = 0;              // _sp01: how strong the wind at it was, 0..1 (set while stepping)
+  s.placed = false; s.x = 0; s.z = 0; s.y = 0;            // its place in the near field's grid (placeFires)
+  return s;
+}
+
+// The list. `count` patches are in slots 0 .. count - 1, some of them ash.
+export function makeFires(seed = 1) {
+  const F = [];
+  for (let i = 0; i < FIRE.max; i++) F.push(wipe({}));
+  F.count = 0; F.seed = seed; F.lit = 0; F.time = 0;
+  F.asks = 0;                 // how many times we have asked the world what is underfoot (the world's own cost)
+  F.lost = 0;                 // rows of "this burned" that were dropped because the caller had not read them
+  F.burns = [];
+  F.burns.count = 0;
+  for (let i = 0; i < FIRE.burnsMax; i++) F.burns.push({ bodyId: null, px: 0, py: 0, pz: 0, radius: 0, kind: 0, burnt: 0, heat: 0, done: false, gen: 0, id: 0 });
+  return F;
+}
+
+// A free slot, or the slot of the ash that has been dead longest (which is the furthest behind the front), or null
+// when every slot holds live fire. Returning null is the cap doing its work: the fire stops widening.
+function take(F) {
+  if (F.count < FIRE.max) return F[F.count++];
+  let k = -1, a = -1;
+  for (let i = 0; i < F.count; i++) if (F[i].ash && F[i].ashAge > a) { a = F[i].ashAge; k = i; }
+  return k < 0 ? null : F[k];
+}
+
+// Asks the world what is under a place, into _f. Afterwards _f.kind is what will burn there (FUEL.none for
+// nothing at all) and _f.px/py/pz is where the world says that place really is on its own ground. With no fuel
+// function given (some tests) the answer is "nothing here".
+function ask(F, bodyId, px, py, pz, ctx) {
+  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz;
+  if (ctx && ctx.fuelAt) {
+    F.asks++;
+    ctx.fuelAt(bodyId, px, py, pz, _f);
+    if (!(Number.isFinite(_f.px) && Number.isFinite(_f.py) && Number.isFinite(_f.pz))) { _f.px = px; _f.py = py; _f.pz = pz; }
+  }
+  _f.kind = _f.kind | 0;
+  _f.wet = Number.isFinite(_f.wet) ? clamp01(_f.wet) : 0;
+  if (!(_f.fuel > 0) && _f.kind !== FUEL.ice) _f.kind = FUEL.none;
+  if (_f.wet >= FIRE.wetStop) _f.kind = FUEL.none;      // too damp to catch: rain, wet ground, the sea edge
+  return _f.kind;
+}
+// Sets a patch up from the last answer in _f: where it really burns, what is under it, how long that will last.
+function settle(s) {
+  s.px = _f.px; s.py = _f.py; s.pz = _f.pz;
+  s.kind = _f.kind; s.wet = _f.wet;
+  if (s.kind === FUEL.ice) { s.fuel = 0; s.fuel0 = 0; s.life = FIRE.iceLife * (0.7 + 0.3 * s.size); }
+  else if (s.kind !== FUEL.none) { s.fuel0 = clamp01(_f.fuel); s.fuel = s.fuel0; s.life = FIRE.maxLife; }
+  else { s.fuel0 = 0; s.fuel = 0; s.life = FIRE.bareLife; }   // nothing to burn: the ability's own flame, for a moment
+  return s;
+}
+
+// ONE OF THE WAYS A PATCH LOOKS, LEANED DOWNWIND. i: which spoke of the wheel; hE, hN: the way the wind blows
+// (level, unit); sp01: how strong it is, 0..1. Written into _d: the direction east and north, how long the leaned
+// arrow came out (longer downwind, short upwind, which is how far the next patch is set), and its lean (1 straight
+// downwind, -1 straight into the wind, which is how long the next patch takes to catch).
+function spokeAt(i, hE, hN, sp01) {
+  const b = FIRE.windLean * sp01, k = i * 2;
+  let vE = SPOKES[k] + hE * b, vN = SPOKES[k + 1] + hN * b;
+  let L = Math.hypot(vE, vN);
+  if (L < 1e-4) { vE = hE; vN = hN; L = 1; }     // straight into a full wind: there is nowhere to go but with it
+  _d[0] = vE / L; _d[1] = vN / L; _d[2] = L;
+  _d[3] = _d[0] * hE + _d[1] * hN;
+  return _d;
+}
+// How long this patch waits before the neighbour along that spoke catches. Downwind it is soon, upwind it is long.
+function waitFor(s, lean) {
+  const q = FIRE.quick[s.kind] || 1;
+  let r = 1 + FIRE.windRate * s._sp01 * lean;
+  if (r < FIRE.backRate) r = FIRE.backRate;
+  return FIRE.seedTime / (r * q);
+}
+
+// Steps the list by dt. ctx holds the two functions above (and dampAt if the game has one). Returns how many
+// patches are in the list, ash and all.
+export function stepFires(F, dt, ctx) {
+  if (!F.count) return 0;
+  F.time += dt;
+  const n0 = F.count;                      // a patch lit this frame takes its first step in the next one
+  for (let i = 0; i < n0; i++) {
+    const s = F[i];
+    if (s.ash) { s.ashAge += dt; continue; }
+    s.age += dt;
+
+    // the wind at it, on its own beat
+    s.wt -= dt;
+    if (s.wt <= 0) {
+      s.wt = FIRE.windEvery;
+      if (ctx && ctx.windAt) {
+        _w[0] = 0; _w[1] = 0; _w[2] = 0;
+        ctx.windAt(s, _w);
+        if (Number.isFinite(_w[0]) && Number.isFinite(_w[1]) && Number.isFinite(_w[2])) { s.wx = _w[0]; s.wy = _w[1]; s.wz = _w[2]; }
+      }
+    }
+    // and whether its place has turned damp under it (only if the game says how)
+    if (ctx && ctx.dampAt) {
+      s.dampT -= dt;
+      if (s.dampT <= 0) { s.dampT = FIRE.dampEvery; const w = ctx.dampAt(s); if (Number.isFinite(w)) s.wet = clamp01(w); }
+    }
+
+    // east and north at the patch, and the wind there as a level direction and a speed
+    const r = Math.hypot(s.px, s.py, s.pz) || 1, ux = s.px / r, uy = s.py / r, uz = s.pz / r;
+    eastNorth(ux, uy, uz, _en);
+    const wE = s.wx * _en[0] + s.wy * _en[1] + s.wz * _en[2], wN = s.wx * _en[3] + s.wy * _en[4] + s.wz * _en[5];
+    const ws = Math.hypot(wE, wN);
+    const sp01 = ws > FIRE.windCap ? 1 : ws / FIRE.windCap;
+    const hE = ws > 1e-4 ? wE / ws : 0, hN = ws > 1e-4 ? wN / ws : 0;
+    s._sp01 = sp01;
+
+    // HOW FIERCELY IT BURNS NOW: it comes up to a full flame over catchTime and falls away over dieTime.
+    // Is it going out? A flame with nothing under it is the ability's own: it lives its short life and goes,
+    // whether the place is wet or dry, so the player always sees that the cast happened. A flame with something
+    // under it goes out when that has gone (ice has none: it melts for its own time) or if its place turns damp.
+    const out = s.age >= s.life ||
+      (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (s.kind !== FUEL.ice && !(s.fuel > 0))));
+    s.heat += out ? -dt / FIRE.dieTime : dt / FIRE.catchTime;
+    if (s.heat > 1) s.heat = 1;
+
+    if (s.kind === FUEL.ice) {
+      // it melts instead of burning, and the melted place opens out while it does
+      s.melt += dt * s.heat * FIRE.iceHeat;
+      const f = s.age < s.life ? s.age / s.life : 1;
+      s.radius = s.r0 + (FIRE.iceRadius * (0.6 + 0.4 * s.size) - s.r0) * f;
+      if (s.melt - s.msent >= FIRE.meltEvery) report(F, s, false);
+    } else if (s.fuel > 0 && s.heat > 0) {
+      // the fuel goes, faster in a wind (which fans it) and slower where it is damp
+      const fan = 1 + FIRE.windFan * ws, damp = 1 - FIRE.wetSlow * s.wet;
+      const bt = FIRE.burnTime[s.kind] || 1;
+      s.fuel -= dt * s.heat * fan * (damp > 0.1 ? damp : 0.1) / bt;
+      if (s.fuel < 0) s.fuel = 0;
+      const gone = s.fuel0 > 0 ? (s.fuel0 - s.fuel) / s.fuel0 : 1;
+      if (gone - s.sent >= FIRE.reportEvery) report(F, s, false);
+    }
+
+    // it is out. Its ash is kept a little while, so that the front cannot turn round and walk back into the place
+    // it has just burnt. A patch that never had anything to burn leaves no ash: there is nothing there to guard.
+    if (s.heat <= 0 && out) {
+      s.heat = 0;
+      s.ash = true;
+      s.ashAge = s.kind === FUEL.none ? FIRE.ashLife + 1 : 0;
+      if (s.kind !== FUEL.none) report(F, s, true);
+      continue;
+    }
+
+    // IT SPREADS. Well alight, with neighbours left to light, it looks one way at a time. Ice passes nothing on
+    // (there is nothing in ice to carry a fire), and nor does a patch with nothing under it.
+    if (s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
+      s.seedT -= dt;
+      if (s.seedT <= 0) {
+        const caught = sow(F, s, ctx, _en, hE, hN, sp01);
+        s.spoke = (s.spoke + SPOKESTEP) % SPOKEN;
+        if (caught) { s.seeds--; s.seedT = waitFor(s, spokeAt(s.spoke, hE, hN, sp01)[3]); }
+        else s.seedT = FIRE.tryTime;         // nothing there: it looks somewhere else in a moment
+      }
+    }
+  }
+  // the ash that is long cold gives its slot back (the same shuffle stepWinds does in powers.js)
+  let n = 0;
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    if (s.ash && s.ashAge > FIRE.ashLife) continue;
+    if (n !== i) { const t = F[n]; F[n] = s; F[i] = t; }
+    n++;
+  }
+  F.count = n;
+  return n;
+}
+
+// Is there anything burning (or lately burnt) within `lim` of a place? This is what keeps a fire a FRONT: the only
+// places left to catch are outside the patches already there, so the fire walks outward and the middle goes out.
+function busy(F, bodyId, qx, qy, qz) {
+  for (let i = 0; i < F.count; i++) {
+    const o = F[i];
+    if (o.bodyId !== bodyId) continue;
+    const bx = qx - o.px, by = qy - o.py, bz = qz - o.pz, lim = FIRE.near * (o.radius > o.r0 ? o.radius : o.r0);
+    if (bx * bx + by * by + bz * bz < lim * lim) return true;
+  }
+  return false;
+}
+
+// One look along one spoke: is there something out there to burn, and is the place free? Lights it if so.
+// The order of the tests is the order of their cost: our own arithmetic first, then the world's fuel function
+// (which is the dear one), and a record is taken only once we know a fire really catches there.
+function sow(F, s, ctx, en, hE, hN, sp01) {
+  const d = spokeAt(s.spoke, hE, hN, sp01);
+  const dE = d[0], dN = d[1], L = d[2];
+  const step = FIRE.spread * (0.7 + 0.3 * L) * (0.85 + 0.15 * s.size);
+  const qx = s.px + (en[0] * dE + en[3] * dN) * step;
+  const qy = s.py + (en[1] * dE + en[4] * dN) * step;
+  const qz = s.pz + (en[2] * dE + en[5] * dN) * step;
+  // one casting burns itself out within `reach` of where it was lit: it does not cross the world
+  const ax = qx - s.ox, ay = qy - s.oy, az = qz - s.oz;
+  if (ax * ax + ay * ay + az * az > s.reach * s.reach) return false;
+  if (busy(F, s.bodyId, qx, qy, qz)) return false;
+  if (ask(F, s.bodyId, qx, qy, qz, ctx) === FUEL.none) return false;      // water, rock, wet ground: it stops here
+  // the world may have moved the place onto its own ground, so look again that it is still free
+  if ((_f.px !== qx || _f.py !== qy || _f.pz !== qz) && busy(F, s.bodyId, _f.px, _f.py, _f.pz)) return false;
+  const t = take(F);
+  if (!t) return false;                     // the cap: the fire already has as many patches as it may have
+  wipe(t);
+  t.bodyId = s.bodyId;
+  t.ox = s.ox; t.oy = s.oy; t.oz = s.oz;
+  t.size = s.size; t.gen = s.gen + 1; t.reach = s.reach;
+  t.id = ++F.lit;
+  t.r0 = FIRE.litRadius * (0.7 + 0.3 * s.size); t.radius = t.r0;
+  t.seeds = Math.round(FIRE.seeds * (0.7 + 0.3 * s.size));
+  t.spoke = Math.floor(hash3(t.id, 3, 11, F.seed) * SPOKEN) % SPOKEN;
+  t._sp01 = sp01;
+  t.wx = s.wx; t.wy = s.wy; t.wz = s.wz;    // it knows the wind its parent knew until it asks for itself
+  settle(t);
+  t.seedT = waitFor(t, spokeAt(t.spoke, hE, hN, sp01)[3]);
+  return true;
+}
+
+// Adds a row to F.burns: one place that has burned (or, for ice, taken this much heat). `done`: it is finished.
+function report(F, s, done) {
+  const B = F.burns;
+  if (B.count >= FIRE.burnsMax) { F.lost++; s.sent = s.fuel0 > 0 ? (s.fuel0 - s.fuel) / s.fuel0 : 1; s.msent = s.melt; return null; }
+  const b = B[B.count++];
+  b.bodyId = s.bodyId; b.px = s.px; b.py = s.py; b.pz = s.pz; b.radius = s.radius;
+  b.kind = s.kind; b.gen = s.gen; b.done = !!done; b.id = s.id;
+  b.burnt = s.kind === FUEL.ice ? 0 : (s.fuel0 > 0 ? (s.fuel0 - s.fuel) / s.fuel0 : 1);
+  b.heat = s.melt;
+  s.sent = b.burnt; s.msent = s.melt;
+  return b;
+}
+// The caller reads F.burns[0 .. count-1] each frame and then calls this.
+export function clearBurns(F) { F.burns.count = 0; F.lost = 0; }
+
+// THE ABILITY LIGHTS A FIRE at p (the body's own axes, on the ground). size 1..FIRE.sizeMax as the wind's casts are.
+// Returns the patch, or null when every slot is full of live fire. A fire is lit even where nothing will burn: the
+// ability's own flame shows for a moment and dies, which is how the player learns that wet ground will not take.
+export function lightFire(F, bodyId, p, size = 1, ctx = null) {
+  const s = take(F);
+  if (!s) return null;
+  const k = sizeOf(size);
+  wipe(s);
+  s.bodyId = bodyId;
+  s.px = p.x; s.py = p.y; s.pz = p.z;
+  s.size = k; s.id = ++F.lit; s.gen = 0;
+  s.reach = FIRE.reach * (0.6 + 0.4 * k);
+  s.r0 = FIRE.litRadius * (0.7 + 0.3 * k); s.radius = s.r0;
+  s.seeds = Math.round(FIRE.seeds * (0.7 + 0.3 * k));
+  s.spoke = Math.floor(hash3(s.id, 3, 11, F.seed) * SPOKEN) % SPOKEN;
+  s._sp01 = 0;
+  ask(F, bodyId, p.x, p.y, p.z, ctx);
+  settle(s);
+  s.ox = s.px; s.oy = s.py; s.oz = s.pz;        // after settle: the world may have moved it onto its own ground
+  s.seedT = FIRE.seedTime / (FIRE.quick[s.kind] || 1);
+  return s;
+}
+
+// Puts the list in the near field's grid (x, z in metres, as placeWinds does in powers.js), and keeps the whole
+// list's bounds, so that a reader can answer "nothing burning here" in two comparisons.
+export function placeFires(F, frame, bodyId) {
+  let any = false, bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    s.placed = s.bodyId === bodyId && frame.bodyId === bodyId;
+    if (!s.placed) continue;
+    s.x = frame.lx(s.px, s.py, s.pz); s.z = frame.lz(s.px, s.py, s.pz);
+    s.y = Math.hypot(s.px, s.py, s.pz) - frame.r0;
+    if (Math.abs(s.x) > 400 || Math.abs(s.z) > 400) { s.placed = false; continue; }
+    any = true;
+    const R = s.radius > s.r0 ? s.radius : s.r0;
+    if (s.x - R < bx0) bx0 = s.x - R;
+    if (s.x + R > bx1) bx1 = s.x + R;
+    if (s.z - R < bz0) bz0 = s.z - R;
+    if (s.z + R > bz1) bz1 = s.z + R;
+  }
+  F.bany = bx0 <= bx1; F.bx0 = bx0; F.bx1 = bx1; F.bz0 = bz0; F.bz1 = bz1;
+  return any;
+}
+
+// How fiercely it is burning at grid (x, z): 0 nowhere near, 1 in the heart of a patch. For whoever wants it -- the
+// smoke and embers of the loose things, the light the painter adds, the explorer feeling the heat.
+// placeFires must have been called this frame, or there is nothing in the grid to find and this answers 0.
+export function fireAt(F, x, z) {
+  if (!F.count) return 0;
+  if (F.bany !== undefined) {
+    if (!F.bany) return 0;
+    if (x < F.bx0 || x > F.bx1 || z < F.bz0 || z > F.bz1) return 0;
+  }
+  let m = 0;
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    if (s.ash || !s.placed || !(s.heat > 0)) continue;
+    const rx = x - s.x, rz = z - s.z, R = s.radius;
+    const d2 = rx * rx + rz * rz;
+    if (d2 > R * R) continue;
+    const h = s.heat * (1 - smoothstep(R * 0.45, R, Math.sqrt(d2)));
+    if (h > m) m = h;
+  }
+  return m;
+}
+
+// Is anything actually alight (as against ash waiting for its slot back)? One walk of a short list, for the systems
+// that would otherwise do real work: no smoke to make, no light to add, when nothing burns.
+export function anyBurning(F) {
+  for (let i = 0; i < F.count; i++) if (!F[i].ash && F[i].heat > 0) return true;
+  return false;
+}
+
+// Puts a fire out: the whole list, or one body's fires. (The ability may want to call off its own fire; a session
+// that leaves a body wants its fires gone.) The places that had begun to burn are reported as finished first.
+export function douseFires(F, bodyId = null) {
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    if (bodyId && s.bodyId !== bodyId) continue;
+    if (!s.ash && s.kind !== FUEL.none) report(F, s, true);
+    s.ash = true; s.ashAge = FIRE.ashLife + 1;
+  }
+  let n = 0;
+  for (let i = 0; i < F.count; i++) { const s = F[i]; if (s.ash && s.ashAge > FIRE.ashLife) continue; if (n !== i) { const t = F[n]; F[n] = s; F[i] = t; } n++; }
+  F.count = n;
+  return n;
+}

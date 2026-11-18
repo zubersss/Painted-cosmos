@@ -52,7 +52,11 @@ const AA_URL = QS ? QS.get('aa') : null;
 // pinned low runs): in play the resolution controller's low steps draw the new brush's sharp picture, enlarged, never
 // the old blots (outside a page, the tests' stand-in renderers, the old rule stands)
 const PINNED = QS ? QS.has('scale') || QS.get('dynres') === '0' : true;
-const LITE_PIN = QS && QS.has('lite') ? (QS.get('lite') === '0' ? 0 : 1) : null;
+// (?best=1, 2026-11-18, the owner: "make jt even higher quality". One word for all of it: the picture at every pixel
+// the screen has (main.js DPR_PIN), the full paint rather than the phone's lighter one, and the top tier. ?lite=
+// still wins where both are given, so any one piece can be taken back on its own.)
+const BEST = !!(QS && QS.get('best') && QS.get('best') !== '0');
+const LITE_PIN = QS && QS.has('lite') ? (QS.get('lite') === '0' ? 0 : 1) : BEST ? 0 : null;
 // (a graphics chip's name that says it is a basic built-in one; core/preset.js keeps the same list: keep the two alike)
 const BASIC_GPU = /Intel.*(U?HD Graphics|Iris)/i;
 
