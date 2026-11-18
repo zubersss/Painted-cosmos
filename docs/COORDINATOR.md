@@ -2225,3 +2225,14 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   2. THE PHONE HAS ROOM AND IS BEING GIVEN A POOR PICTURE. 1028 x 480 upscaled to a 3086 x 1440 screen is a third of its detail; the full paint, which the phone is not given, costs at least 1.7 ms and is the ONLY thing in 21 rows that broke the cap. The owner has twice said the game looks bad on their screen: this is why, and it is a settings decision, not a drawing problem.
   3. THE CAP HIDES THE ANSWER. 16.7 means "16.7 or less": the headroom cannot be measured through it. The speed test needs rows that RAISE the load (the picture at 1.5x and 2x, the full paint, the edges) until the cap breaks.
 - SO THE WORK TURNS ROUND: the cuts found this morning are no longer about saving milliseconds for their own sake. They are the budget that pays for a sharper picture and the full paint on the owner's phone.
+
+### 2026-11-18 OWNER: fire, and better water and air ("make another agent make the physics of the game better like the water and air and also start adding fire")
+- OWNER (verbatim): "I have alot of token usage make another agent make the physics of the game better like the water and air and also start  adding fire with it being able to spread once its spwan by a magical ability and the place it leaves behind actually gets burnt if its leaves and gest burnt if its the leaves or ground ice melts away to reveal ground or if there's is no ground it just keeps melting away".
+- THIS LIFTS A STANDING RULE. Item 42 of the handover said the owner did not want water, earth or fire STARTED (`docs/POWERS.md` describes all four; only wind was built). FIRE IS NOW ASKED FOR. Water and earth are still only described.
+- READ AS FOUR PIECES OF WORK:
+  1. FIRE AS AN ABILITY: a magical cast lights a fire at a place.
+  2. IT SPREADS once lit - through what will burn, and (the session's reading, because the wind is already built) carried by the wind, the player's own gusts included.
+  3. WHAT IT LEAVES STAYS BURNT: leaves burnt off a crown, ground scorched where it passed. A lasting record, like the felled trees, kept in the saved game.
+  4. ICE MELTS: fire on ice melts it away to show the ground beneath, and where there is no ground beneath it goes on melting.
+- AND: the water and the air themselves to be made better (the owner's own words), which is a separate piece of work from the fire.
+- THE OWNER ALSO SAID THEY HAVE PLENTY OF TOKEN USAGE AND ASKED FOR AGENTS. Four were set to work at once on the parts that do not touch each other: the fire's physics as a new file of its own; the lasting record of what is burnt and melted as a new file of its own, built like `src/data/felled.js`; a read-only study of the water and the air with patches; and the design note for how the fire joins the game. None of them touches a file another is writing, and none needs the browser (which the full check holds).
