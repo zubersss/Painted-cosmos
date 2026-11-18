@@ -131,7 +131,7 @@ export class Flora {
     this.kit = {
       far: farTreeGeometry(5),
       // (the oil look's far tree for the kinds that are trees in leaf: a stem and leaf cards, florakit.js)
-      farCards: LOOK.oil && FAR_CARDS ? farCardGeometry(6) : null,
+      farCards: LOOK.oil && FAR_CARDS ? sortLeafCards(farCardGeometry(6)) : null,     // (2026-11-18: ordered for thinning, as the near and mid trees are: see below)
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
@@ -401,6 +401,21 @@ export class Flora {
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
         if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24 * T0, 0.2] : [T0, 0.35];
+        // (2026-11-18) THE FAR TREES ARE NOT THINNED BY DISTANCE, AND HERE IS THE MEASUREMENT THAT SAYS SO, because
+        // on paper it is the biggest saving left in the game and the next session will want to try it again.
+        // A study counted the far tier at 7,326,558 triangles of an 8,191,481-triangle frame from the air and
+        // recommended it; wired up and measured on the real world at the owner's own sharpness it is a LOSS:
+        //        keep           triangles (air)        shaded pixels (air)
+        //        none (today)   5,282,805              18,488,867
+        //        a quarter      2,509,407  (-52%)      28,354,673  (+53%)
+        //        0.62           3,935,285  (-26%)      20,760,563  (+12%)
+        // The reason is in the shader: when a crown's dabs are thinned, each one that is KEPT is grown to cover for
+        // the ones that went, so the painted area holds but the dabs overlap each other far more - the far tier's
+        // self-overlap went from 4.9 to 7.7. Triangles are not what costs this game at nine times the pixels; FILL
+        // is, and this trades the cheap thing for the dear one. The study measured only the triangles.
+        // (What IS kept from the attempt: the far tree's pieces are now ordered for thinning, and the dark core is
+        //  given the highest sort key so it would be the last thing dropped rather than the first - so if a future
+        //  far tree is ever made of cheaper marks that do not need growing, the machinery is already there.)
       }
       const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null, ab = mesh.userData.born.array;
       let w = 0, dNear = 1e9;
@@ -520,7 +535,7 @@ export class Flora {
     on = !!on;
     const now = this.species.some((sp) => sp.cardFar);
     if (on === now) return now;
-    if (on && !this.kit.farCards) this.kit.farCards = farCardGeometry(6);
+    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
     for (const sp of this.species) sp.cardFar = on && sp.canCard;
     for (const [key, ch] of this.farChunks) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }

@@ -253,7 +253,12 @@ export function farTreeGeometry(seed) {
 function facetCore(B, c, rx, ry, rz, rnd, opts) {
   const o = Object.assign({ noise: 0.22, massK: 0.5, sway: 0.05, shade0: 0.72, shadeK: 0.25 }, opts || {});
   B.branch = (rnd() * 7.13) % 1;
-  const coreHash = rnd();
+  // (2026-11-18) THE CORE IS KEPT LONGEST. Its faces are laid at the leaf cards' own part number, so when a far tree
+  // is thinned by distance they are sorted with the cards - and sortLeafCards keeps the HIGHEST hashes, so a core
+  // whose hash came out low (0.0023 at seed 6, the lowest of all fifty-seven pieces) would be the FIRST thing
+  // dropped, leaving loose dabs floating over the sky with no crown under them: the "confetti" this look threw out
+  // twice already. A hash of 1 puts the core at the front of the order, so it is the last thing to go.
+  const coreHash = 1;
   const I = ico(0), ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28, P = [];
   for (let i = 0; i < I.n; i++) {
     const x = I.p[i * 3], y = I.p[i * 3 + 1], z = I.p[i * 3 + 2];
