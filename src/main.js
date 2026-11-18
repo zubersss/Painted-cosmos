@@ -300,7 +300,31 @@ async function boot() {
     } catch { /* an old browser: the resize event will have to do */ }
   };
   watchDpr();
-  if (painter.setRenderScale) painter.setRenderScale(dyn.scale);
+  // (2026-11-18, the owner: "its kinda light and slow ... optimization needs to be done somewhere while keeping the
+  // looks".) GIVING BACK SHARPNESS INSTEAD OF DRAWING SMALL AND STRETCHING. When the frames are slow the resolution
+  // controller asks for a smaller picture. Its ordinary way of giving one is to draw the scene at a fraction of the
+  // canvas and stretch it back up at the end - which the oil look must never do (its strokes are sized in the
+  // picture's own pixels, and a picture at 0.8 of the canvas stretched over a phone's screen was "blurry and
+  // blotchy": the owner, on their phone), AND WHICH BARELY SAVES ANYTHING AT A PINNED SHARPNESS, because the last
+  // full-screen pass still costs every pixel of the big canvas.
+  // So where the player has ASKED for a sharpness (?dpr=, ?best=1), the controller's cut is taken off THE CANVAS
+  // ITSELF: the drawing buffer shrinks, every pass gets cheaper in proportion, one picture pixel is still one canvas
+  // pixel, and the browser makes the one clean step up to the screen. It is never taken below what the phone was
+  // given before this (the preset's own ratio), and it is rounded to quarter steps so the targets are not rebuilt
+  // for every small wobble of the frame time.
+  const applyDynScale = (sc) => {
+    if (!(DPR_PIN > 0)) { if (painter.setRenderScale) painter.setRenderScale(sc); return; }
+    const want = Math.max(PRESET.dpr, Math.round(DPR_PIN * sc * 4) / 4);
+    const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, want);
+    if (b.w !== game.device.w || b.h !== game.device.h) {
+      camera.aspect = b.w / b.h;
+      camera.updateProjectionMatrix();
+      painter.resize(b.w, b.h);
+      Object.assign(game.device, { ratio: b.ratio, w: b.w, h: b.h });
+    }
+    if (painter.setRenderScale) painter.setRenderScale(1);
+  };
+  applyDynScale(dyn.scale);
   painter.setQuality(dyn.quality);
   // PHYSICS' particle counts and sampling follow the tier too (hardening review P8): a tier
   // drop then sheds CPU as well as pixels, and the top tier gets its full storms.
@@ -412,7 +436,7 @@ async function boot() {
     if (window.__pcReady) judged += dtMs / 1000;
     const r = judged > 1 ? dyn.frame(dtMs) : { changed: false };
     if (r.changed) {
-      if (painter.setRenderScale) painter.setRenderScale(r.scale);
+      applyDynScale(r.scale);
       painter.setQuality(r.quality);
       if (physics && physics.setQuality) physics.setQuality(r.quality);
     }
