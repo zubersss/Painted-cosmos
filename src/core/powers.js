@@ -125,6 +125,10 @@ export class Powers {
   // the owner's own reason for asking.
   // (stripStep was written with the stripping record and called by NOTHING until now, so a bare crown stayed bare
   //  for ever: found while wiring this.)
+  // MEASURED in Node on the build machine (not on a device), the burnt and felled records FULL -- 600 scorches, 400
+  // burnt crowns, 400 felled trees, none of them yet old enough to heal, which is the dearest case there is:
+  // 22.2 MICROSECONDS a frame, against a phone's 33,000. With the records empty, which is every frame of an
+  // ordinary game, 38.5 ns. Nothing is allocated a frame: the list of what is whole again is kept between calls.
   _heal(dt, sim) {
     const p = sim && sim.ex ? sim.ex.p : null;
     healFelled(dt, p);

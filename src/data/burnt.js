@@ -217,6 +217,7 @@ function capped() {
 // WHAT THE FIRE LEFT, GROWING BACK. Called once a frame by whoever owns the explorer's powers (core/powers.js: this
 // record exists only because of them). `dt` seconds of play; `p` where the explorer is, or null to heal anywhere.
 // Nearly every frame of a game this walks a record that is empty and returns at once.
+const _dead = [];      // reused by healBurnt: what is whole again this frame, so nothing is allocated a frame
 export function healBurnt(dt, p = null) {
   if (!(dt > 0) || (!A.size && !C.size)) return 0;
   let gone = 0, moved = false;
@@ -226,23 +227,34 @@ export function healBurnt(dt, p = null) {
     if (p && o.age < BURN.life * 2 && Math.hypot(x - p.x, y - p.y, z - p.z) <= BURN.quiet) return false;
     return true;
   };
-  for (const m of [...A.values()]) {
+  // (the marks are collected into ONE array kept between calls, not a fresh copy of the record every frame: this
+  //  runs on every frame on which anything is burnt, and a copy of up to six hundred marks a frame is garbage the
+  //  collector has to walk. Deleting from a Map while walking it is safe in JS, but the copy was there to be plain
+  //  about it; `_dead` says the same thing and makes nothing.)
+  _dead.length = 0;
+  for (const m of A.values()) {
     if (!ready(m, m.x, m.y, m.z)) continue;
     if (m.kind === MARK.ground) {
       m.c -= dt / BURN.fade; moved = true;
-      if (m.c <= 0) { forget(m); gone++; }
+      if (m.c <= 0) _dead.push(m);
     } else {
       // the hollow fills from the bottom, and a deep one takes as long as a shallow one: `freeze` is the time to
       // fill, whatever the depth, so a 2 m melt does not vanish in four seconds while a 100 m one takes four minutes
       if (!(m.d0 > 0)) m.d0 = m.d;
       m.d -= dt / BURN.freeze * m.d0; moved = true;
-      if (m.d <= 0) { forget(m); gone++; }
+      if (m.d <= 0) _dead.push(m);
     }
   }
-  for (const [k, cr] of [...C]) {
-    if (!ready(cr, cr.x, cr.y, cr.z)) continue;
-    cr.c -= dt / BURN.fade; moved = true;
-    if (cr.c <= 0) { C.delete(k); gone++; }
+  for (const m of _dead) { forget(m); gone++; }
+  _dead.length = 0;
+  if (C.size) {
+    for (const cr of C.values()) {
+      if (!ready(cr, cr.x, cr.y, cr.z)) continue;
+      cr.c -= dt / BURN.fade; moved = true;
+      if (cr.c <= 0) _dead.push(cr);
+    }
+    for (const cr of _dead) { C.delete(crownKey(cr.bodyId, cr.x, cr.y, cr.z)); gone++; }
+    _dead.length = 0;
   }
   if (moved) BURNT.version++;
   return gone;
