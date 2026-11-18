@@ -22,6 +22,9 @@
 // the one before it. The questions are about the far trees: their paint, their shapes, the shadow pass or the picture,
 // first or last in the order of drawing, and the lump against the tree of flat pieces IN THE SAME RUN (the form is
 // swapped while the test runs). Then the other plants, the light, the paint.
+// SEVENTH FORM (2026-11-17): THE GAME IS HELD STILL while the rows are timed (the explorer, the view and the clock
+// are put back after every frame). Two tables before this one could not be read: the explorer had drifted down a river
+// and walked on, so each row saw its own picture, and the same row read between 28 and 52 ms.
 // SIXTH FORM (2026-11-17): two more rows about the shadow pass, which is a third of a frame's triangles at a phone's
 // size (the trees drawn again from the sun, into a square 2048 wide): the square half as wide, and the trees out of it.
 // The header also says how the depth is kept (reversed or logarithmic: with the second, nothing hidden is skipped), the
@@ -45,9 +48,26 @@ export function attachBench(pc) {
   // (the renderer's own count starts afresh at each of a frame's passes: every pass is added up here)
   const render0 = R.render.bind(R);
   R.render = (sc, cam) => { render0(sc, cam); acc.calls += R.info.render.calls; acc.tris += R.info.render.triangles; };
+  // THE GAME IS HELD STILL while the test runs (2026-11-17: two tables could not be read because the explorer drifted
+  // down a river and walked on while the rows were timed, so every row saw a different picture). The frame is drawn as
+  // always, and then the explorer, the view and the clock are put back where they were: nothing moves, nothing new is
+  // built, the weather does not turn. `pin` is set once the first view has settled.
+  let pin = null;
+  const takePin = () => {
+    const S = pc.sim;
+    if (!S || !S.ex || !S.footCam) return null;
+    return { t: S.t, p: { ...S.ex.p }, v: { ...S.ex.v }, fwd: { ...S.ex.fwd }, view: { ...S.footCam.viewFwd }, pitch: S.footCam.pitch, boom: S.footCam.boom };
+  };
+  const putBack = () => {
+    const S = pc.sim, k = pin;
+    if (!k || !S || !S.ex) return;
+    S.t = k.t;
+    S.ex.p = { ...k.p }; S.ex.v = { ...k.v }; S.ex.fwd = { ...k.fwd };
+    S.footCam.viewFwd = { ...k.view }; S.footCam.pitch = k.pitch; S.footCam.boom = k.boom;
+  };
   pc.game.frame = (dt) => {
     const t = performance.now();
-    try { return frame0(dt); } finally { acc.ms += performance.now() - t; acc.n++; }
+    try { return frame0(dt); } finally { acc.ms += performance.now() - t; acc.n++; if (pin) putBack(); }
   };
   // One row's frames: the time between every two pictures over `ms`, by the browser's own frame clock.
   const sample = (ms) => new Promise((resolve) => {
@@ -85,9 +105,9 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 6, ' + BUILD + ': photograph this screen and send it\n' +
+    return 'PAINTED COSMOS SPEED TEST 7, ' + BUILD + ': photograph this screen and send it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
-      'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) +
+      'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
       (r0 ? ' | script ' + r0.script.toFixed(1) + ' ms, ' + Math.round(r0.calls) + ' calls, ' + Math.round(r0.tris / 1000) + 'k triangles a frame' : '');
   };
@@ -96,6 +116,8 @@ export function attachBench(pc) {
     while (!window.__pcReady) await wait(250);
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     await wait(2500);
+    pin = takePin();                 // from here the game is held still (above)
+    if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     const hasB = typeof P._bench === 'function', lite0 = !!P.lite;
     const B = (o) => hasB && P._bench(o);
     const farMeshes = (fn) => pc.scene.traverse((o) => { if (o.isMesh && o.material && /^pc-prop-far/.test(o.material.name || '')) fn(o); });
