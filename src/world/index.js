@@ -20,7 +20,7 @@ import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_H
 import { makeLeafFall } from './leaffall.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
 import { MODE } from '../data/mode.js';
-import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial } from '../render/materials.js';
+import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial, syncFireGlow } from '../render/materials.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(), _east = new THREE.Vector3(), _north = new THREE.Vector3(), _sunTrue = new THREE.Vector3();
@@ -331,6 +331,10 @@ export function createWorld(scene) {
       // (the powers, fire: which few of the record's scorch marks the ground paints, for the world the eye is on.
       //  Once a frame, before the ground is drawn, exactly as the water's channel above.)
       if (MODE.powers && MODE.oil && st === active) syncBurnt(st.id, st.camLocal);
+      // (the powers, fire: and where a fire is burning NOW, for the warm light it throws on the ground, the plants
+      //  and the grass round it - beside the scorch above, once a frame, before the ground is drawn. With nothing
+      //  alight it is one comparison.)
+      if (MODE.powers && MODE.oil && st === active) syncFireGlow(physics && physics.particles && physics.particles.system ? physics.particles.system.fires : null, st.id, st.camLocal);
       // (from orbit the limb closes on the mean sphere: chunks.js pcRound. Full relief to a third of a radius up, a quarter
       // of it from 0.8 radii (at a third Earth's alpine range still stood off the limb as a bump); about the sea's level where the world has one, so a coast stays a coast)
       { const R = st.body.radius; st.bu.uRound.value.set(0.75 * THREE.MathUtils.smoothstep(st.camLocal.length() - R, R * 0.35, R * 0.8), R + (st.look.seaLevel || 0)); }

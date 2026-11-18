@@ -5,6 +5,15 @@ import * as THREE from 'three';
 import { G, OIL, register, ensureGlobals } from '../render/shared.js';
 import { RING_PROFILE } from './orbit.js';
 
+// The oil sky's three dials, so that a still can be compared against the one before it without touching the code.
+// They do nothing at all in the watercolour game: the shader reads them only inside #ifdef PC_OIL.
+//   ?cloudform=  how much of the painted cloud is laid: its size, its lanes and the lobes along its edges
+//                (0: the cloud exactly as it was, one flat shape with a step down one side)
+//   ?skycap=     the ceiling on the sky's value, the sun's own disc apart (1: no ceiling, the sky as it was)
+//   ?cloudlit=   how far the cloud's lit side stands from its shadowed side (0: none, the mass in one tone)
+const _qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return null; } })();
+const _qn = (k, d) => (_qs && _qs.has(k) && isFinite(+_qs.get(k)) ? +_qs.get(k) : d);
+
 const SKY_VERT = /* glsl */`
 uniform vec2 uProjScale;
 uniform mat3 uCamRot;      // camera rotation, scene space
@@ -50,11 +59,35 @@ uniform float uAux8;
 uniform vec4 uOilA;
 uniform vec4 uOilC;
 uniform vec4 uOilG;
+uniform vec4 uOilS;         // x: how far the far air leans to the blue-violet of the owner's aerial references
+uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value, z the cloud's lit side (the dials above)
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
 ${RING_PROFILE}
 #ifdef PC_OIL
+// THE COLOUR THE FAR AIR GOES TO, the same one the land is lost into (render/chunks.js pcOilHaze). Every one of the
+// eight aerial paintings the owner sent has the distance turning BLUE-VIOLET, measured at (0.48, 0.50, 0.63); ours
+// went to a warm cream, and so did the sky standing behind it. The sky low down is painted with the far air's own
+// colour now, so that the two meet instead of one being cream against the other's blue. k is how far it leans
+// (?hazeblue=, the dial the land already uses; 0 is the sky as it was).
+vec3 pcSkyFar(vec3 h, float k) { return mix(h, vec3(0.48, 0.50, 0.63), clamp(k, 0.0, 1.0)); }
+
+// NOTHING IN THE SKY IS PAPER WHITE any more, the sun's own disc and the light close round it apart. Measured on the
+// owner's twenty oil paintings: their cloud and their valley mist is a NEUTRAL grey-white at 0.78, not white, and only
+// a twentieth of all their paint is brighter than 0.85 - against half of ours in a view from the air, a quarter of it
+// pure white, and the sky is the biggest block of that white because it fills the top of the frame. This rolls the top
+// of the sky's range off and leaves everything below the knee exactly where it stood, so the blues, the bands and the
+// cloud's own steps do not move: it is the shoulder post.js lays on the whole picture, laid here on the sky alone.
+// Every channel is scaled by the same amount, so a colour keeps its hue and its strength and only its value comes down.
+vec3 pcSkyCap(vec3 c, float k) {
+  if (k >= 0.999) return c;
+  float L = max(c.r, max(c.g, c.b));
+  float knee = max(0.0, k - 0.14);
+  if (L <= knee) return c;
+  float sp = max(1e-4, k - knee);
+  return c * ((knee + sp * (1.0 - exp(-(L - knee) / sp))) / L);
+}
 // THE AURORA AS LIGHT (the owner, 2026-11-16, of the aurora laid as a ribbon of hard-edged flames: "the northern lights
 // look like stripes instead of lights like the reference"). The clip's aurora glows: a bright core along its foot, rays
 // that are soft at their sides and die away upward into the dark, a little colour under the foot, and no drawn edge
@@ -116,17 +149,38 @@ void main() {
     // (the oil look, the overhaul plan's sixth piece: the sky is laid in broad flat bands from the horizon to the zenith,
     // their edges wandering and a pixel wide; a wash's turbulence and its backruns, in opaque paint, were smudges and
     // rings in the sky: the stills of the open sky. Under a closed sky the heavy wash keeps its turbulence.)
+    //
+    // A SKY THAT IS NOT ONE COLOUR (the art pass against the owner's twenty oil paintings). The bands ran from the
+    // world's zenith key straight to its horizon key, and on Earth that second key is all but white, so the whole
+    // lower sky was one cream wash with nothing in it. Their skies do three things instead: they go DEEP overhead,
+    // pale through the middle, and end in a COOL BAND low down - the same blue-violet the far land is lost into. So
+    // the bands run through three keys now. Each world keeps its own colours: all three are made from its own two
+    // keys, so Venus stays warm, Uranus stays mint, and the hour still sets them (the keys are blended per hour in
+    // world/index.js, and a golden hour warms the band below).
+    vec3 zenO = dens(uSkyZenith, 1.0 + 0.45 * uAtmo.y * (1.0 - oc));          // more pigment overhead, by day only: the night keys are laid light on purpose
+    vec3 bandO = mix(pcSkyFar(uSkyHorizon, uOilS.x * 1.35), uSkyHorizon, 0.18);
+    vec3 midO = mix(zenO, bandO, 0.62);
     float tb = t * 6.0 + (n1.r - 0.5) * 1.7 + (n2.g - 0.5) * 0.35;
     float tbi = floor(tb), fwb = max(fwidth(tb), 1e-4);
     float tq = clamp((tbi + smoothstep(0.5 - fwb, 0.5 + fwb, tb - tbi)) / 6.0, 0.0, 1.0);
-    sky = mix(mix(uSkyZenith, uSkyHorizon, tq), uSkyHorizon, toward * 0.65);
+    // the bands still step from one key to the next with an edge a pixel wide that wanders: the look's own sky, in
+    // two stretches instead of one (the deep half of the sky, then the pale band)
+    sky = tq < 0.58 ? mix(zenO, midO, tq / 0.58) : mix(midO, bandO, (tq - 0.58) / 0.42);
+    sky = mix(sky, bandO, toward * 0.45);
     sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * 1.7 * oc);
   #else
   sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * (1.0 + oc * 0.7) + back * 0.38 * (1.0 - t));
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
   #endif
   // below the horizon (seen from high up): haze
+  #ifdef PC_OIL
+    // (the oil look: the far air's own colour, not the haze key straight. On Earth that key is all but white, and from
+    // the air the white band under the horizon - wherever the land is too far off to be drawn - was a good part of
+    // everything the measurement found over 0.85.)
+    sky = mix(sky, pcSkyFar(uHaze, uOilS.x), 1.0 - smoothstep(-0.12, 0.02, e));
+  #else
   sky = mix(sky, uHaze, 1.0 - smoothstep(-0.12, 0.02, e));
+  #endif
 
   // ---- the rings, seen from the ground: a great pale arc across the sky, laid into the wash
   // before the clouds (so clouds drift in front of it), band beside band with the sky between,
@@ -250,11 +304,79 @@ void main() {
   float b = dot(uCamL, d);
   float disc = b * b - (rc * rc - uCloud.x * uCloud.x);
   float cloud = 0.0, shade = 0.0, body = 0.0, belly = 0.5;
+  #ifdef PC_OIL
+    float oilS1 = 0.0, oilS2 = 0.0;      // the cloud's half-tone and its belly in shadow: set here, painted further down
+  #endif
   if (uCloud.y > 0.001 && disc > 0.0) {
     float tt = rc < uCloud.x ? (-b + sqrt(disc)) : (-b - sqrt(disc));
     if (tt > 0.0) {
       vec3 hp = uCamL + d * tt;
       vec3 q = hp / uCloud.z + vec3(uTime * uCloud.w, 0.0, uTime * uCloud.w * 0.6);
+  #ifdef PC_OIL
+      // CLOUD WITH FORM (the art pass against the owner's twenty oil paintings). Every one of their eight aerial
+      // pictures has substantial cloud with real form: thick rounded masses, lit on top and shadowed underneath,
+      // sitting in bands with real blue between them. Ours was two flat shapes cut out of one field of noise, so a
+      // cloud read as a piece of paper with a step down one side and no body in it at all.
+      //
+      // FIRST, SMALLER MASSES, which is why there was nothing in the sky to shade in the first place. The feature size
+      // the world hands in is 2.5 km on Earth, and the whole of the sky this shell shows from the ground - from
+      // straight up to where the shell goes under the horizon - is only 1.9 km of it. So ONE cloud was wider than the
+      // whole sky: whatever the hour, the sky overhead was all cloud or all clear, which is exactly the flat wash with
+      // nothing in it. A fifth of that size puts about four masses across the sky, which is what their pictures hold.
+      // The drift is scaled with it, so the clouds still cross the sky at the speed they did (1.5 m a second on Earth).
+      // Every world comes out the same, because every one of them shows between 0.6 and 0.9 of a feature.
+      // (the size goes with ?cloudform= as well, so that ?cloudform=0 is the cloud exactly as it was and a still of
+      //  the two can be set side by side)
+      //
+      // Four things make the form, and together they cost ONE LOOK-UP FEWER into the noise than the flat cloud did,
+      // because the finest of its three octaves is dropped: in flat paint that octave only roughened the outline, and
+      // what the eye wants along a cloud's edge is curves, not wobble.
+      //  - the mass is read twice, once as it stands and once a short way TOWARD THE LIGHT AND UPWARD, so a cloud is
+      //    lighter where the sun comes from and lighter on its top, and deepest under its own belly. Always some way
+      //    upward, because a painter's cloud is lit from above whatever the hour, and at dawn the sun is not above it.
+      //  - its paint is laid in THREE steps, not one, and each step is a contour of the mass itself, so the steps nest
+      //    inside one another the way a painter stacks light, half-tone and shadow on anything round.
+      //  - the thin edges are let be light while the thick core keeps its shadow, which is what makes a cloud look lit
+      //    through instead of cut out.
+      //  - the edges are scalloped by LOBES of one size, worked out from the hit point with three sines and no look-up
+      //    at all, and thrown out of step by the mass's own field so that they never read as a grid. They are let go
+      //    wherever the shell is seen so nearly edge-on that a lobe would be smaller than a pixel, which is where
+      //    grain and flicker come from.
+      q *= mix(1.0, 5.0, uSkyOil.x);
+      float c1 = texture(uNoise3D, q).r;
+      float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
+      float v = c1 * 0.82 + c2 * 0.18;
+      float th = 1.0 - uCloud.y;
+      vec3 ql = q + normalize(uSunDirL + normalize(hp) * 0.85) * 0.14;
+      float vl = texture(uNoise3D, ql).r * 0.82 + texture(uNoise3D, ql * 2.7 + 0.31).g * 0.18;
+      // CLOUD LANES: the masses gather in broad lanes with clear sky between them, as theirs do. The lanes are waves
+      // in one plane across the whole world, so they belong to the planet and do not turn with the eye, and they
+      // travel with the cloud. Two spacings, about 1.5 km and 600 m on Earth, so the sky has a broad band and a
+      // finer one inside it. A banded world has its own belts in the sky already and takes no lanes, and a closed
+      // sky is not broken into them either.
+      // (They take as much cloud away as they give - about a third of the sky is left clear and the rest is thicker -
+      // so every world still carries the share of cloud its look asks for.)
+      float da = dot(q, normalize(vec3(0.83, 0.21, -0.52)));
+      float lane = sin(da * 2.2 + (c1 - 0.5) * 1.3) * 0.62 + sin(da * 5.4 + (c2 - 0.5) * 2.0) * 0.38;
+      float laneK = uSkyOil.x * (1.0 - uBelt.z) * (1.0 - oc);
+      float thO = th + (0.5 - smoothstep(-0.45, 0.35, lane)) * 0.30 * laneK;
+      // the lobes: rounded bumps about a hundred metres across, a fifth of a mass, their phase thrown out by the
+      // mass's own field so they never read as a grid
+      float la = q.x * 30.0 + c1 * 6.3, lb = q.y * 34.0 + c2 * 6.3, lc = q.z * 26.0 + c1 * 4.1;
+      float lobe = sin(la) * sin(lb) * sin(lc);
+      lobe *= (1.0 - smoothstep(0.80, 2.20, max(fwidth(la), max(fwidth(lb), fwidth(lc))))) * uSkyOil.x;
+      thO -= lobe * 0.055;
+      float fwv = max(fwidth(v), 1e-4);
+      // the silhouette, with an edge a pixel wide, as everything else in this look has
+      cloud = smoothstep(-fwv, fwv, v - (thO + 0.035)) * (rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0);
+      float deep = clamp((v - thO - 0.035) / 0.16, 0.0, 1.0);          // how far into the mass this pixel lies (0 at its edge)
+      float sh = clamp(0.5 - (v - vl) * 5.0 * uSkyOil.z, 0.0, 1.0) * (0.40 + 0.60 * deep);
+      float fws = max(fwidth(sh), 1e-4);
+      oilS1 = smoothstep(-fws, fws, sh - 0.30);
+      oilS2 = smoothstep(-fws, fws, sh - 0.62);
+      body = smoothstep(thO + 0.02, thO + 0.30, v);
+      belly = smoothstep(thO + 0.06, thO + 0.50, v + (c2 - 0.5) * 0.25);
+  #else
       float c1 = texture(uNoise3D, q).r;
       float c2 = texture(uNoise3D, q * 2.7 + 0.31).g;
       float c3 = texture(uNoise3D, q * 7.3).b;
@@ -264,20 +386,11 @@ void main() {
       cloud = smoothstep(th - 0.02, th + 0.09, v);
       float toSun = texture(uNoise3D, q + uSunDirL * 0.09).r * 0.60 + texture(uNoise3D, (q + uSunDirL * 0.09) * 2.7 + 0.31).g * 0.28 + c3 * 0.12;
       shade = smoothstep(0.0, 0.10, toSun - v + 0.02) * smoothstep(th + 0.02, th + 0.16, v);
-      #ifdef PC_OIL
-        // (the oil look, the overhaul plan's sixth piece: a cloud is a few big flat shapes with clean edges, a pixel
-        // wide: a light one, and on the side away from the sun a second, a step deeper; no wet lower edge, no fine
-        // curl, no grain in it)
-        v = c1 * 0.82 + c2 * 0.18;
-        float fwv = max(fwidth(v), 1e-4);
-        cloud = smoothstep(-fwv, fwv, v - (th + 0.035));
-        // (by night a cloud has no second tone: lit by nothing, its deeper side stood in a dark sky as a blot with a pale rim)
-        shade = smoothstep(-fwv, fwv, toSun - v - 0.02) * 0.42 * uAtmo.y;
-      #endif
       float fade = rc < uCloud.x ? smoothstep(0.015, 0.20, e) : 1.0;
       cloud *= fade;
       body = smoothstep(th + 0.02, th + 0.30, v);
       belly = smoothstep(th + 0.06, th + 0.50, v + (c2 - 0.5) * 0.25);
+  #endif
     }
   }
 
@@ -286,8 +399,26 @@ void main() {
   #ifndef PC_OIL
   cl = dens(cl, 1.0 + (n2.r - 0.5) * 0.8);
   #else
-  // (the oil look by night: a cloud is a flat shape one step lighter than the sky it lies in)
-  cl = mix(mix(sky, uSkyHorizon, 0.22), cl, uAtmo.y);      // (barely: small pale shapes in a dark sky were stray marks)
+  // THE CLOUD'S THREE TONES. The owner's references measure their cloud and the mist in their valleys at a NEUTRAL
+  // grey-white of 0.78 - not white - and the side away from the light goes well below it. So: a lit top of that
+  // neutral with a breath of the world's own light in it, a half-tone, and a belly with real pigment in it leaning to
+  // the sky's own blue, so the mass sits IN the sky instead of on top of it. All three are made from the world's
+  // cloud-shadow key, which is set per world and per hour, so every world's cloud keeps its own colour and warms at
+  // dusk along with everything else.
+  vec3 cTop = mix(vec3(0.78, 0.78, 0.785), uSkyHorizon, 0.18);
+  // (both of the deeper tones are pulled a little way toward their own grey. The art pass found the game's darks LURID
+  //  where the references' are neutral - a trunk's deepest pixels at saturation 0.93 against their 0.33, which is
+  //  most of why theirs read as oil paint and ours as poster paint - and a cloud shadow made by pigment alone came out
+  //  at up to 0.71 on the warm worlds. Reckoned over every world with cloud at day, dawn and dusk, the half-tone now
+  //  sits at saturation 0.32 and the belly at 0.29, against the references' 0.33.)
+  vec3 cHalf = dens(uCloudShade, 1.85);
+  cHalf = mix(cHalf, vec3(dot(cHalf, vec3(0.3, 0.5, 0.2))), 0.12);
+  // (the belly takes a third of the sky's own middle colour before the pigment goes in, which is how a painter keeps
+  //  the shadow of a cloud inside the sky and not a hole in it)
+  vec3 cBase = mix(uCloudShade, midO, 0.35);
+  vec3 cDeep = mix(dens(cBase, 2.05), vec3(dot(cBase, vec3(0.3, 0.5, 0.2)) * 0.56), 0.24);
+  // (the oil look by night: a cloud is a flat shape one step lighter than the sky it lies in, with no lit side at all)
+  cl = mix(mix(sky, uSkyHorizon, 0.22), mix(mix(cTop, cHalf, oilS1), cDeep, oilS2), uAtmo.y);      // (barely: small pale shapes in a dark sky were stray marks)
   #endif
   // under an overcast the cloud is no longer bare paper: it is the wash itself, in heavy masses
   // with dark bellies; their torn edges stay pale, where the light still comes through
@@ -364,12 +495,26 @@ void main() {
     // from the zenith with a wet, wandering edge and a pale bloom where it stops: above the edge indigo and its stars,
     // below it the thin pale sky down to the world's rim. No star lies where its ground is not yet indigo.)
     float spA = uAtmo.x;
+  #ifdef PC_OIL
+    // (the oil look: AS THE AIR THINS THE SKY DOES NOT RUN OUT TO BARE PAPER. Paper is the watercolour's way of saying
+    // "thin air", and in opaque paint it bleached the whole upper half of every view from the air to white: this one
+    // line is a large part of why half that picture measured brighter than 0.85 where a twentieth of the owner's
+    // aerial paintings is. Thinning air DEEPENS here, toward the indigo of space, as theirs do; the pale band low
+    // down is left alone, so the horizon still reads as far-off air and not as a wall.)
+    float deepen = smoothstep(0.0, 0.8, spA) * 0.75 * uAtmo.y * (1.0 - clamp(halo, 0.0, 1.0)) * smoothstep(-0.05, 0.45, e);
+    vec3 thin = mix(col, vec3(0.16, 0.19, 0.42), deepen);
+  #else
     vec3 thin = mix(col, vec3(0.985, 0.98, 0.965), smoothstep(0.0, 0.8, spA) * 0.80 * uAtmo.y * (1.0 - clamp(halo, 0.0, 1.0)));
+  #endif
     float spWob = (s1.r - 0.5) * 0.34 + (s2.g - 0.5) * 0.14;
     float spEdge = mix(1.30, -0.60, smoothstep(0.04, 1.0, spA));
     float inSp = spA >= 0.999 ? 1.0 : smoothstep(spEdge - 0.06, spEdge + 0.20, e + spWob);
     float spBloom = (1.0 - smoothstep(0.0, 0.22, abs(e + spWob - spEdge + 0.06))) * (1.0 - inSp) * spA;
+  #ifdef PC_OIL
+    col = mix(thin, sp, inSp);      // (the oil look lays no pale bloom where space's wash stops: nothing in opaque paint blots)
+  #else
     col = mix(mix(thin, vec3(1.0), spBloom * 0.30), sp, inSp);
+  #endif
     // stars: in space everywhere but in the sun's glare; from the ground at night, above the
     // horizon haze and where no cloud lies
     float night = (1.0 - uAtmo.y) * (1.0 - cloud) * (1.0 - oc) * smoothstep(0.03, 0.30, e);
@@ -377,13 +522,18 @@ void main() {
   }
 
   #ifdef PC_OIL
-    // (the oil look: the sky's washes a little richer, and toward a sun in the air a pale glow: the clip's wood stands
-    // against a sky nearly white with light. In space the sky is as it was.)
+    // (the oil look: the sky's washes a little richer, and toward a sun in the air a warm glow. It was laid as "a sky
+    // nearly white with light", after the clip; the owner's twenty paintings say otherwise, and the measurement says
+    // so too, so the glow is warm now and not white. In space the sky is as it was.)
     col = dens(clamp(col, 0.0, 1.0), mix(1.0, uOilA.y, 0.3));
-    col = mix(col, vec3(1.0, 0.96, 0.84), pow(max(sd, 0.0), 3.0) * 0.75 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
+    // (the glow round a sun seen through the air, and the golden hours below: both were laid in paint at full white,
+    // so the sky anywhere near the sun went to paper. They keep all of their warmth and lose the white - their
+    // colours sit where the owner's references put their brightest sky - and the warm band is still strongest low
+    // down, which is where theirs is.)
+    col = mix(col, vec3(0.93, 0.87, 0.72), pow(max(sd, 0.0), 3.0) * 0.60 * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x));
     // (the golden hours, as chunks.js pcGold: the whole sky warms, most of all low down, where it meets the air's pale gold)
     float gold = (1.0 - smoothstep(0.48, 0.86, sunE)) * uAtmo.y * (1.0 - uAtmo.x) * (1.0 - uWxSky.x) * uOilG.w;
-    col = mix(col, vec3(1.0, 0.94, 0.76), gold * mix(0.88, 0.60, smoothstep(0.0, 0.7, e)));
+    col = mix(col, vec3(0.92, 0.80, 0.58), gold * mix(0.80, 0.45, smoothstep(0.0, 0.7, e)));
     {
       // THE NIGHT SKY'S STREAKS (the owner, 2026-11-16: "make the lines on the sky at night time near the northern lights
       // closer to the ... references ... the patterns in the sky"). The clip's night sky, looked at closely: LONG, THIN,
@@ -421,6 +571,9 @@ void main() {
         }
       }
     }
+    // THE CEILING, laid last of all (pcSkyCap above): the sun's own disc and the light close round it are left where
+    // they are, because the references keep their small bright sun too, and so is space, which is dark already.
+    col = mix(col, pcSkyCap(col, uSkyOil.y), (1.0 - clamp(halo * 1.2, 0.0, 1.0)) * (1.0 - sun) * (1.0 - uAtmo.x));
   #endif
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), mix(1.0, 0.45, uAtmo.x));
   pcAux = uAux8 > 0.5 ? vec4(starOK, 0.0, 20.0 / 32.0, 0.0) : vec4(starOK, 0.0, 20.0, 0.0);     // (x: where stars may lie; the sky has no normal to store)
@@ -449,6 +602,9 @@ export function makeSkyUniforms() {
     uProjScale: { value: new THREE.Vector2(1, 1) },
     uCamRot: { value: new THREE.Matrix3() },
     uBodyInv: { value: new THREE.Matrix3() },
+    // the oil sky's dials (see the top of this file). The watercolour's shader never declares this one: the
+    // preprocessor drops the line with everything else inside #ifdef PC_OIL, so it is handed to nothing.
+    uSkyOil: { value: new THREE.Vector4(_qn('cloudform', 1), _qn('skycap', 0.86), _qn('cloudlit', 1), 0) },
     ...OIL,
   };
 }

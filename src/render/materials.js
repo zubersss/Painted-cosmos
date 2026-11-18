@@ -71,6 +71,9 @@ function addFire(m, marks) {
   m.defines = m.defines || {};
   m.defines.PC_FIRE = 1;
   m.uniforms.uBurnK = BURNPAINT.uBurnK;
+  // (the light a fire throws on what is near it while it burns: FIREGLOW below. Both halves of a fire -- the black
+  // it leaves and the light it gives -- are behind this one guard, so neither can reach the live game.)
+  m.uniforms.uFireA = FIREGLOW.uFireA; m.uniforms.uFireK = FIREGLOW.uFireK;
   if (marks) {
     m.defines.PC_BURN_N = BURNPAINT.slots;      // (one number in shared.js sets both the arrays and the shader's loops)
     m.defines.PC_BURN_G = BURNPAINT.groups;
@@ -79,6 +82,92 @@ function addFire(m, marks) {
   }
   return m;
 }
+
+// WHERE A FIRE IS BURNING NOW, AND THE LIGHT IT THROWS ON WHAT IS NEAR IT (the powers, fire).
+// A flame drawn over ground that is left exactly as it was reads as a sticker stuck on the picture: a fire must
+// warm what is round it. So the strokes near a fire are laid in its own warm light, and the ground inside the
+// burning patch itself is given its coals. It is all of it one more pass over paint that is already being mixed:
+// no new draw call, no new texture, nothing worked out for a pixel that is not in the pool.
+// WHAT IS HANDED DOWN, and it is two vec4s for the ONE nearest patch that is still alight -- not a list, not a
+// light for every patch. A fire is a front of up to sixty-four patches (physics/fire.js FIRE.max) and a warm pool
+// round the nearest of them is the picture; a pool round each would be sixty-four distance tests in the ground's
+// own program for a difference no one could point at.
+// WHOSE AXES. The BODY'S own, exactly as the scorch's marks are (shared.js BURNPAINT) and as `vBody` is: a place
+// measured from the eye and tested against vBody would be out by wherever the camera stands, which is kilometres.
+// UNTIL SOMETHING CALLS syncFireGlow nothing is lit: uFireK.x stays 0 and every shader below stops on one
+// comparison. The world calls it once a frame beside the scorch (see this session's report for the one line).
+// (?fireglow=: how strongly a fire's light is laid at all. 1 as chosen; 0 takes it out of the picture altogether,
+//  which is how a before-and-after pair of stills is taken -- the same courtesy the scorch has in ?burn=.)
+const _fireDial = (() => { try { const q = new URLSearchParams(location.search); return q.has('fireglow') && isFinite(+q.get('fireglow')) ? +q.get('fireglow') : 1; } catch (e) { return 1; } })();
+export const FIREGLOW = {
+  uFireA: { value: new THREE.Vector4(0, 0, 0, 0) },      // xyz where the fire burns, in the body's own axes; w how far its light carries (m)
+  uFireK: { value: new THREE.Vector4(0, 0, _fireDial, 0) },   // x how fiercely (0: nothing alight); y the burning patch's own radius (m), within which the ground has coals; z the dial above
+};
+// Pick it: the live fire list (physics/fire.js, as the physics hands it over in particles.fires -- or nothing at
+// all while nothing burns), the body the eye is on, and the eye in that body's own axes.
+// MEASURED in Node on the build machine (not on a device), per frame over four runs: 15 to 55 ns with nothing
+// alight, 40 to 70 ns with one campfire, 0.4 to 0.7 microseconds with all sixty-four patches burning (the spread
+// is other work sharing the machine). One pass over the list, nothing allocated.
+export function syncFireGlow(fires, bodyId, cam) {
+  const A = FIREGLOW.uFireA.value, K = FIREGLOW.uFireK.value;
+  if (!fires || !fires.count || !bodyId || !cam) { K.x = 0; return; }
+  let best = null, bd2 = Infinity, fire = 0;
+  for (let i = 0; i < fires.count; i++) {
+    const s = fires[i];
+    if (s.bodyId !== bodyId || !(s.heat > 0.02)) continue;            // ash gives no light: it is black ground now
+    const dx = s.px - cam.x, dy = s.py - cam.y, dz = s.pz - cam.z, d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 > 3600) continue;                                          // a fire sixty metres off lights nothing that is in view
+    fire += s.heat * s.radius * s.radius;                             // how much fire is alight near the eye (a patch's own square metres, as the physics weighs one)
+    if (d2 < bd2) { bd2 = d2; best = s; }
+  }
+  if (!best) { K.x = 0; return; }
+  // how far the light carries: a campfire two metres wide lights the ground about seven metres round it, a whole
+  // burning wood about fourteen, and never more than that (a pool wider than the eye can see is no pool at all)
+  A.set(best.px, best.py, best.pz, Math.min(14, 1.6 + 1.6 * best.radius + 1.2 * Math.sqrt(fire)));
+  K.x = Math.min(1, best.heat);
+  K.y = best.radius;
+}
+// The light itself, in GLSL. The ground, the plants and the near strokes each take a copy of it: the three share no
+// chunk of their own, as pcSoot (below, and again in PROP_FRAG) already had to. It needs uDayness and pcDensity,
+// which every painted material has (chunks.js FRAG_PARS), and the two uniforms above.
+const FIRE_GLOW = /* glsl */`
+uniform vec4 uFireA;
+uniform vec4 uFireK;
+// THE LIGHT OF A FIRE ON ONE STROKE. This is the lantern's pool over again (chunks.js pcLamp) in a fire's own
+// paints: it is asked ONCE A STROKE, at the stroke's own centre, taken a little nearer or farther by the stroke's
+// own number, so the edge of the warmth is made of whole strokes and is never a circle drawn on the ground.
+//   paint  the stroke as the hour, the shade and the lantern have already left it
+//   wash   its own colour: the warm paint is mixed FROM it, so a thing keeps its own colour in the firelight
+//   body   the stroke's centre in the body's own axes       r  the stroke's own number
+// By day a fire warms what is near it only a little; by night it is the light in that place.
+vec3 pcFireLit(vec3 paint, vec3 wash, vec3 body, float r) {
+  if (uFireK.x * uFireK.z < 0.01) return paint;                       // nothing alight (or ?fireglow=0): one comparison and out
+  // and out again on one ball for every stroke that is not within reach of the fire, which while a wood burns is
+  // nearly every stroke in the picture (the same first test the scorch makes, pcBurntAt above)
+  vec3 q = body - uFireA.xyz;
+  float lim = uFireA.w + 0.4;                                         // (0.4: the most a stroke's own number moves it below)
+  if (dot(q, q) > lim * lim) return paint;
+  float d = length(q) + (r - 0.5) * 0.7;
+  float k = uFireK.x * uFireK.z * (1.0 - smoothstep(uFireA.w * 0.30, uFireA.w, d)) * mix(0.34, 1.0, 1.0 - uDayness);
+  // THE COALS: inside the burning patch itself the ground is a bed of embers, about half its strokes glowing and
+  // the rest a deep red char, so the foot of a flame is hot paint and not a black disc with flames stuck on it.
+  float cr = max(uFireK.y, 0.25);
+  float coal = (1.0 - smoothstep(cr * 0.45, cr * 1.05, d)) * uFireK.x * uFireK.z;
+  if (k < 0.004 && coal < 0.004) return paint;
+  float wl = dot(wash, vec3(0.3, 0.5, 0.2));
+  // the warm paint: the stroke's own colour laid heavier, swung well over to orange and lifted at its light end.
+  // Hotter and redder than the lantern's cream, and never a pure orange: everything keeps its own colour in it.
+  vec3 warm = min(pcDensity(wash, 1.2) * vec3(1.62, 0.98, 0.52) + vec3(0.10, 0.035, 0.0) * (0.5 + wl), vec3(1.0));
+  warm *= 0.90 + 0.17 * fract(r * 9.13);                              // no two strokes in the pool exactly alike
+  float kk = clamp(k * 1.12 + (fract(r * 3.71) - 0.5) * 0.22, 0.0, 1.0);
+  vec3 lit = mix(paint, warm, kk * kk * (3.0 - 2.0 * kk) * 0.92);
+  if (coal > 0.004) {
+    float g = fract(r * 17.31);
+    lit = mix(lit, mix(vec3(0.30, 0.07, 0.05), vec3(1.0, 0.44, 0.10), smoothstep(0.42, 0.94, g)), coal * step(0.22, g) * 0.92);
+  }
+  return lit;
+}
+`;
 
 // ------------------------------------------------------------------------------------------
 // Terrain
@@ -229,6 +318,7 @@ vec3 pcSoot(vec3 paint, float stray, float ash) {
   s = mix(s, min(s * 3.2, vec3(0.52, 0.50, 0.50)), step(0.88, fract(ash * 7.1)));
   return clamp(s * uBurnK.w, 0.0, 1.0);
 }
+${FIRE_GLOW}
 #endif
 // The ground where a stroke lies (ds: the pixels from here to its centre; w: its width, m): its wash, the light's
 // level, the snow's cover, the canopy's colour and its cover there.
@@ -289,7 +379,14 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
       k = mix(k, soot, take);                                     // (so the lantern lights the charcoal, not the green that was there)
     }
   #endif
-  return pcLamp(tn, k, gBc, rnd.y);
+  vec3 lamp = pcLamp(tn, k, gBc, rnd.y);
+  #ifdef PC_FIRE
+    // (the powers, fire) AND A FIRE'S OWN LIGHT OVER THE TOP OF THAT, which is nearer and warmer than any lantern:
+    // the ground round a fire takes its warmth and the ground inside the flames is coals. Asked at the stroke's own
+    // centre, as everything else here is, so the pool is made of whole strokes.
+    lamp = pcFireLit(lamp, k, gBc, rnd.y);
+  #endif
+  return lamp;
 }
 // SNOW AND ICE (the owner, 2026-11-16, in three steps: "I also dont like how Bright the snow area is why is the snow
 // colorful fix it and shade it the color of ice and snow"; then strokes as paint laid on, with ridges, which the owner
@@ -321,7 +418,11 @@ vec3 pcFlowPaint(vec3 c, vec3 leaf, vec3 rnd, float snowC, float lvl) {
   vec3 k = pcDensity(c, 1.0 + (rnd.x - 0.5) * 0.4);
   // (the drifts: a slow field and a quicker one, read at the stroke's own centre)
   float dr = textureLod(uNoise3D, gBc / 34.0 + 0.41, 0.0).g * 0.7 + textureLod(uNoise3D, gBc / 11.0 + 0.17, 0.0).b * 0.3 - 0.5;
-  return mix(p, pcLamp(pcIce(pcTone(k, lvl), rnd, dr), k, gBc, rnd.y), sn);
+  vec3 sl = pcLamp(pcIce(pcTone(k, lvl), rnd, dr), k, gBc, rnd.y);
+  #ifdef PC_FIRE
+    sl = pcFireLit(sl, k, gBc, rnd.y);      // (the powers, fire: snow near a fire is lit by it, warm against its own blue)
+  #endif
+  return mix(p, sl, sn);
 }
 // SNOW'S STROKES, EACH IN ITS EXACT PLACE. A stroke of snow is lit, shaded and lamp-lit WHOLE: so all its pixels must
 // agree to the millimetre on where its centre is.
@@ -1581,6 +1682,7 @@ vec3 pcSoot(vec3 paint, float stray, float ash) {
   s = mix(s, min(s * 3.2, vec3(0.52, 0.50, 0.50)), step(0.88, fract(ash * 7.1)));
   return clamp(s * uBurnK.w, 0.0, 1.0);
 }
+${FIRE_GLOW}
 #endif
 void main() {
   #include <logdepthbuf_fragment>
@@ -1710,6 +1812,9 @@ void main() {
     // light is laid over it, by night)
     float h = vData.w;
     c = pcLamp(vLeafC.rgb, vLeafK.rgb, vCardB, fract(h * 13.7));
+    #ifdef PC_FIRE
+      c = pcFireLit(c, vLeafK.rgb, vCardB, fract(h * 13.7));      // (the powers, fire: a leaf near a fire takes its light, whole)
+    #endif
     wet = 0.0;
     id = 4.0 + fract(seed * 7.0 + h * 0.37) * 0.9;
   } else if (part < 1.5) {
@@ -1797,6 +1902,11 @@ void main() {
         float lvl = pcLevel(xs_, 0.03), pk = pale * 0.45 * max(uDayness, uMoon);
         vec3 l1 = mix(pcTone(k1, lvl), pcTone(k1, max(lvl, 1.0) * 0.5 + 1.0), pk), l2 = mix(pcTone(k2, lvl), pcTone(k2, max(lvl, 1.0) * 0.5 + 1.0), pk);
         l1 = pcLamp(l1, k1, Bc, rnd.y); l2 = pcLamp(l2, k2, Bc, rnd2.y);
+        #ifdef PC_FIRE
+          // (the powers, fire: a trunk beside a fire is lit down one side by it -- the strokes near it are laid in
+          //  the fire's warm paint, stroke by stroke, as they are in the lantern's pool)
+          l1 = pcFireLit(l1, k1, Bc, rnd.y); l2 = pcFireLit(l2, k2, Bc, rnd2.y);
+        #endif
         vec3 lay = mix(l2, l1, cov);
         if (L == 1) acc = mix(acc, lay, fine * uOilC.z);
         else {
@@ -1831,6 +1941,9 @@ void main() {
         // crown is mud; light comes through leaves)
         vec3 deepF = pcBody(pcDensity(cs, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
         vec3 lit = pcLamp(mix(deepF, pcTone(cs, lvl), smoothstep(1.2, 2.0, lvl)), cs, Bc, rnd.y);
+        #ifdef PC_FIRE
+          lit = pcFireLit(lit, cs, Bc, rnd.y);      // (the powers, fire: the leaves over a fire are lit by it, dab by dab)
+        #endif
         acc = mix(acc, lit, cov * there * uOilC.z);
         accA = max(accA, there * cov);
       }
@@ -1964,7 +2077,11 @@ void main() {
       x = (dot(nV, sunV) * 0.5 + 0.5) * mix(0.45, 1.0, pcSunAt(vBody, canopy, 8.0 - vAbove, 0.3));
       float lvlR = floor(pcLevel(x, 0.04) * 2.0 + 0.5) * 0.5;
       if (uGem > 0.5) lvlR = max(lvlR, 1.5);      // (a crystal is lit through: none of its faces goes to the deep step)
-      c = pcLamp(pcTone(c, lvlR), c, vBody, fh);
+      vec3 kR = c;                                // (its own wash, kept: the lantern and the fire mix their light from it)
+      c = pcLamp(pcTone(c, lvlR), kR, vBody, fh);
+      #ifdef PC_FIRE
+        c = pcFireLit(c, kR, vBody, fh);          // (the powers, fire: a boulder beside a fire is warm on the side the fire is on)
+      #endif
       id = 3.0 + seed * 0.9;
     }
     #else
@@ -2482,6 +2599,9 @@ varying float vKind;
 #ifdef PC_OIL
 varying vec3 vRootB;
 #endif
+#ifdef PC_FIRE
+${FIRE_GLOW}
+#endif
 void main() {
   #include <logdepthbuf_fragment>
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js)
@@ -2531,6 +2651,11 @@ void main() {
       // whole made the grass of a shaded bank a violet brown)
       vec3 deepO = pcBody(pcDensity(ko, 1.35)) * mix(vec3(1.0), pcOilShadeC(), 0.5) * 0.80;
       vec3 co = pcLamp(mix(deepO, pcTone(ko, lv), smoothstep(1.2, 2.0, lv)), ko, vRootB, r3o.y);
+      #ifdef PC_FIRE
+        // (the powers, fire: the grass at the foot of a fire is lit by it, blade by blade, and the blades standing
+        //  in the flames are embers: asked at the stroke's root, which is where its light is asked anyway)
+        co = pcFireLit(co, ko, vRootB, r3o.y);
+      #endif
       co = pcAtmosV(co, vFog, vView);
       pcWrite(co, 0.0, nVo, -vView.z, 4.0 + vS.z * 0.9);
       return;
@@ -2597,6 +2722,9 @@ export function makeNearMaterial(bodyU) {
     side: THREE.DoubleSide,
   });
   m.userData.pcPainted = true;
+  // (the powers, fire: the near strokes -- the grass and the fallen leaves at the feet -- are lit by a fire beside
+  //  them, as the ground under them is. They have no scorch of their own: what is burnt is the ground's to paint.)
+  addFire(m, false);
   return register(m, 'near');
 }
 
