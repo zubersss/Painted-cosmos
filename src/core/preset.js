@@ -43,8 +43,16 @@ export function choosePreset(env = {}) {
 
 // The drawing buffer for a canvas of cssW x cssH css px on a screen of deviceRatio device pixels
 // per css px: { w, h, ratio } (ratio: the pixels per css px used).
-export function bufferSize(cssW, cssH, deviceRatio, preset = PRESETS.desktop) {
+// `dprPin` (?dpr=): asks for a different number of picture pixels to the screen point, in place of the preset's own.
+// (2026-11-18, from the owner's first believable speed table: their S23 Ultra holds 60 pictures a second with time to
+// spare, while the picture is drawn at 1.25 pixels to the point on a screen that has 3.75 - 1028 x 480 stretched over
+// 3086 x 1440. That, not the paint, is most of why they have twice said the game looks bad on their screen. The pin
+// lets the same phone be tried at several sharpnesses and judged by eye, since no machine here has a graphics card to
+// judge it on.) It is still held under the screen's own ratio - more picture pixels than the screen has points is
+// waste - and under the preset's limit on how many pixels in all.
+export function bufferSize(cssW, cssH, deviceRatio, preset = PRESETS.desktop, dprPin = 0) {
   const css = Math.max(1, cssW * cssH);
-  const ratio = Math.min(deviceRatio || 1, preset.dpr, Math.sqrt(preset.maxPixels / css));
+  const want = dprPin > 0 ? dprPin : preset.dpr;
+  const ratio = Math.min(deviceRatio || 1, want, Math.sqrt(preset.maxPixels / css));
   return { w: Math.max(1, Math.floor(cssW * ratio)), h: Math.max(1, Math.floor(cssH * ratio)), ratio };
 }

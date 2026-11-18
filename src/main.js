@@ -271,9 +271,12 @@ async function boot() {
     } catch { /* the painter cannot say */ }
     return ctxAA ? 'msaa (canvas)' : 'none';
   };
+  // (?dpr=: how many picture pixels to one screen point, in place of the preset's own. See preset.js bufferSize.
+  // 0 or absent leaves the preset alone, so the game is exactly as it was without it.)
+  const DPR_PIN = Math.max(0, Math.min(4, +params.get('dpr') || 0));
   game.device = { preset: PRESET.id, ratio: 1, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode };
   function resize() {
-    const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET);
+    const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, DPR_PIN);
     camera.aspect = b.w / b.h;
     camera.updateProjectionMatrix();
     painter.resize(b.w, b.h);

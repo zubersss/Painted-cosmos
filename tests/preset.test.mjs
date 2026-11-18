@@ -64,9 +64,28 @@ test('the drawing buffer: iPhone 14 at 1.25, iPad Pro 11 at most 1.6 MP, the des
   assert.ok(big.w * big.h <= 1.6e6);
 });
 
+test('?dpr= raises or lowers the picture pixels to the screen point, and never past the screen itself', () => {
+  // the owner's S23 Ultra: 823 x 384 points at 3.75 device pixels each. The phone preset gives 1.25.
+  const plain = bufferSize(823, 384, 3.75, PRESETS.phone);
+  assert.equal(plain.ratio, 1.25);
+  assert.deepEqual([plain.w, plain.h], [1028, 480], 'the picture the owner photographed');
+  const sharp = bufferSize(823, 384, 3.75, PRESETS.phone, 2.5);
+  assert.equal(sharp.ratio, 2.5);
+  assert.deepEqual([sharp.w, sharp.h], [2057, 960], 'twice as sharp each way, four times the pixels');
+  // never more picture pixels than the screen has points to show them
+  assert.equal(bufferSize(823, 384, 1.5, PRESETS.phone, 4).ratio, 1.5, 'held at the screen\'s own ratio');
+  // and never past the preset's limit on pixels in all
+  const huge = bufferSize(1600, 900, 4, PRESETS.tablet, 4);
+  assert.ok(huge.w * huge.h <= 1.6e6, 'still inside the tablet\'s 1.6 MP: ' + huge.w + 'x' + huge.h);
+  // 0, or nothing at all, is exactly the game as it was
+  assert.deepEqual(bufferSize(823, 384, 3.75, PRESETS.phone, 0), plain);
+});
+
 test('main.js sizes the buffer by the preset and starts the controller at its tier', () => {
   const m = fs.readFileSync(path.join(repo, 'src/main.js'), 'utf8');
-  assert.match(m, /bufferSize\(canvas\.clientWidth, canvas\.clientHeight, window\.devicePixelRatio \|\| 1, PRESET\)/);
+  assert.match(m, /bufferSize\(canvas\.clientWidth, canvas\.clientHeight, window\.devicePixelRatio \|\| 1, PRESET, DPR_PIN\)/);
+  // (?dpr=: the pin may only be what the address asked for, between 0 and 4, and 0 means "leave the preset alone")
+  assert.match(m, /const DPR_PIN = Math\.max\(0, Math\.min\(4, \+params\.get\('dpr'\) \|\| 0\)\)/);
   assert.match(m, /quality: params\.has\('quality'\) \? Number\(params\.get\('quality'\)\) : PRESET\.tier/);
   assert.ok(!/Math\.min\(window\.devicePixelRatio \|\| 1, 1\.5/.test(m), 'no second, fixed cap');
 });
