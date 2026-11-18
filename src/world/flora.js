@@ -44,6 +44,11 @@ const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLea
 //  is built - found by rendering, not by a test, because the tests build a tree and the game builds a WOOD.
 //  [across, high, taper]: a maple is wider than it is tall, a spruce narrow and tapering to a spike, a pine taller
 //  still and bare low down.)
+// (?treedist=, 2026-11-18: how far the tree-detail ranges may grow once the picture is taller than 1080 lines.
+//  0.8 was measured to cut the frame's triangles by a quarter on foot and a third from the air, for a handover that
+//  moves 18 m. 1 is the behaviour before this.)
+const TREE_DIST = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('treedist') : null; const n = q == null ? NaN : +q; return isFinite(n) && n >= 0.5 && n <= 1 ? n : 0.8; })();
+
 const FAR_DIMS = { maple: [15.5, 12.0, 0], spruce: [9.5, 16.0, 0.86], aspen: [12.0, 13.5, 0], tallpine: [12.0, 19.0, 0.62],
   broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
 
@@ -656,7 +661,16 @@ export class Flora {
       // (a tree's ranges are never under the middle tier's: the low tier's 0.28, with the picture's 0.5 on top, left
       // a tree its form for a dozen metres; the low tier still draws no full trees at all)
       ts = Math.max(ts, RANGE_SCALE[1]);
-      const sk = Math.min(1, Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20));
+      // (2026-11-18, the owner: "slow optimization needs to be done somewhere while keeping the looks find it".)
+      // MEASURED, and this was the thing nobody meant to do: asking for the phone's whole screen does not only cost
+      // nine times the pixels, it also makes the world draw FULL-DETAIL TREES TWICE AS FAR AWAY. This number follows
+      // the picture's height, so the old 480-line picture gave 0.5 and a 1440-line one gives 1.0 - the desktop's own
+      // detail distances, on a phone. Full trees reached 45 m; they now reach 90. Counted on the real world at
+      // 3086 x 1440: 5,096,312 triangles a frame on foot against 2,328,938 at the old size, and 8,191,481 from the
+      // air against 4,456,337. The pixels went up ninefold as asked; the triangles went up again on top of that.
+      // So past 1080 lines the growth stops at TREE_DIST. A phone's screen is small and held close, however dense
+      // it is: a tree 90 m off is a few pixels either way. ?treedist= sets it; 1 is the old behaviour.
+      const sk = Math.min(SCREEN.outH > 1080 ? TREE_DIST : 1, Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20));
       const vis = this.S.look && this.S.look.visibility ? this.S.look.visibility[0] : 1e4;
       const air = Math.min(1, Math.max(0.5, Math.round((vis * 2 / T_FAR + (SHADOW.alt || 0) / 60) * 8) / 8));
       // (and from the air the far trees reach farther, up to twice: there are no near trees to pay for up there, and the
