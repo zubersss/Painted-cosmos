@@ -41,9 +41,44 @@ import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel 
 export function attachBench(pc) {
   const el = document.createElement('pre');
   el.id = 'pc-bench';
-  el.style.cssText = 'position:fixed;left:0;top:0;right:0;margin:0;padding:6px 10px;z-index:99999;background:rgba(18,20,34,.94);color:#fff;' +
-    'font:10.5px/1.3 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;pointer-events:none';
+  // (2026-11-18, the owner: "Make the bench mark a copy and paste getting too big to screenshot". Twenty-six rows no
+  //  longer fit on a phone's screen, and the panel could not even be SELECTED - it was laid over the game with
+  //  pointer-events off so it would not eat touches. It takes touches now, its text can be selected, it scrolls when
+  //  it is taller than the screen, and the button below puts the whole table on the clipboard in one press.)
+  el.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;margin:0;padding:6px 10px 76px;z-index:99999;background:rgba(18,20,34,.94);color:#fff;' +
+    'font:10.5px/1.3 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow:auto;-webkit-overflow-scrolling:touch;' +
+    'pointer-events:auto;user-select:text;-webkit-user-select:text;touch-action:pan-y';
   document.body.appendChild(el);
+  // THE COPY BUTTON. Big enough for a thumb (a phone wants 44 px and this is 52), out of the way of the text, and it
+  // says what happened: a clipboard can be refused (an insecure page, a browser that will not), and then it selects
+  // the table instead so the owner can copy it by hand rather than being left with a button that did nothing.
+  const copyBtn = document.createElement('button');
+  copyBtn.id = 'pc-bench-copy';
+  copyBtn.textContent = 'Copy the table';
+  copyBtn.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:100000;min-height:52px;padding:0 26px;' +
+    'font:600 16px/1 system-ui,sans-serif;color:#fff;background:#2d6cdf;border:0;border-radius:26px;box-shadow:0 2px 10px rgba(0,0,0,.45);' +
+    'pointer-events:auto;touch-action:manipulation;cursor:pointer';
+  const selectTable = () => {
+    try { const r = document.createRange(); r.selectNodeContents(el); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); return true; } catch { return false; }
+  };
+  copyBtn.addEventListener('click', async () => {
+    const text = el.textContent || '';
+    let ok = false;
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch { ok = false; }
+    if (!ok) {
+      // the old way, which still works where the clipboard is refused
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); document.body.removeChild(ta);
+      } catch { ok = false; }
+    }
+    if (!ok) ok = selectTable() ? null : false;      // null: not copied, but the table is selected to copy by hand
+    copyBtn.textContent = ok === true ? 'Copied - paste it to Claude' : ok === null ? 'Selected - now copy it' : 'Could not copy: select it by hand';
+    copyBtn.style.background = ok === true ? '#1f8a4c' : '#b4521f';
+    setTimeout(() => { copyBtn.textContent = 'Copy the table'; copyBtn.style.background = '#2d6cdf'; }, 4000);
+  });
+  document.body.appendChild(copyBtn);
   const P = pc.painter, R = pc.renderer;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const mats = (re) => { const s = new Set(); pc.scene.traverse((o) => { const m = o.material; if (m && m.name && re.test(m.name)) s.add(m); }); return s; };
@@ -111,7 +146,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 8, ' + BUILD + ': photograph this screen and send it\n' +
+    return 'PAINTED COSMOS SPEED TEST 8, ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
