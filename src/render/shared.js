@@ -108,7 +108,9 @@ export const OIL = {
   uOilD: { value: new THREE.Vector4(1.0, _qn('shadefill', 0.10), _qn('shadegreen', 0.90), 1.3) },
   // x: (not in use)   y: (not in use)   z: a leaf dab's length over its width   w: a dab's cell (half its length) in
   //    stroke widths
-  uOilS: { value: new THREE.Vector4(1, 0, 2.4, 2.6) },
+  // (x: ?hazeblue=, 2026-11-18 - how far the far air leans to the blue-violet the owner's aerial references have
+  //  instead of the warm cream it goes to now. 0 is the look as it was. See chunks.js pcOilHaze.)
+  uOilS: { value: new THREE.Vector4(_qn('hazeblue', 0.35), 0, 2.4, 2.6) },
   // what grows on the ground: x the share of the near ground's strokes kept (the clip's floor is a carpet of leaves
   //    with tufts of grass here and there, not a sward)   y the share of the undergrowth's blades and fronds kept
   //    z 1 while the scene pass is multisampled (set every frame)
