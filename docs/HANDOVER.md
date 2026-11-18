@@ -405,9 +405,19 @@ EVERY merge, including the small ones. The owner has the live speed test at
 - THE FIRE, wired and mended. It says in plain words why it will not take (`fuelAt` hands back a
   `why`, carried onto the patch and said on screen), a spark FALLS SHORT along the aim onto the
   first ground that will burn, fire has an ULTIMATE, and a burnt wood survives a reload.
-  MEASURED, in Node on the real Earth: the spawn's own wood takes a fire -- leaves, fuel 0.60, dry
-  -- and a size-3 cast grew to 64 patches in forty seconds. What refused the six casts of the
-  morning was THE RIVER the spawn stands on. **A FIRE HAS STILL NOT BEEN SEEN IN THE GAME.**
+  **THE FIRE BURNS IN THE RUNNING GAME** (18 Nov, evening, the real page in the test browser, the
+  real keys): G put the fire in the hand ("in hand: kindle, element 1"); the world answered heading
+  by heading and FOUR OF TWELVE DIRECTIONS FROM THE SPAWN ARE THE RIVER (30, 60, 120, 150 deg all
+  "water"), which is exactly what was eating the morning's casts; facing 240 (fuel 1.00) one press
+  of the cast key caught and the screen said nothing, i.e. complained of nothing. Then:
+      3 s after lighting:  2 patches,  21 strokes of flame,  8 of ember, 36 of smoke
+      8 s after lighting: 12 patches, 113 strokes of flame,  2 of ember, 117 of smoke
+  A STILL AT 3 s IS IN `docs/shots` -- the fire is in it and is too small to find at 960 px, which
+  is honest and is why the numbers are here. THE PICTURE OF IT AT FULL SIZE IS THE ONE THING STILL
+  OWED; a grab was in flight when this was written.
+  (MACHINE FACT WORTH KEEPING: stepping the held game 90 frames costs 28 SECONDS here; ONE `lab
+  grab` of that page cost 34 MINUTES. The browser is not slow at playing the game, it is slow at
+  handing back a picture. Plan a render round the grabs, not round the frames.)
 - THE FOUR NEW TREES really standing (all four now, not two), the far wood with its leaves back,
   the sky with cloud form and nothing but the sun left paper white, the fire's own art and the
   light it throws, the ring picker reading the list in the hand with a thumb's route to the
