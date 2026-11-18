@@ -361,6 +361,22 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18 (the v12 text it replaced is in the log).
 
+**`main` IS AT v16 (18 Nov), pull request #16 merged.** It carries: the whole screen can be drawn (`?dpr=`,
+`?best=1`; the phone preset's 3.7 MP ceiling no longer holds back an asked-for sharpness), only the gust bends the
+trees, a third flight speed of 170 m/s, three cuts that cost nothing on screen, and four speed-test rows that RAISE
+the load. Gate: six default scenes and three oil scenes all 0 of 518,400 pixels different; unit 273, world 48,
+physics 366; the page boots; the speed test runs its 26 rows. THE FULL CHECK ON v16 HAS NOT BEEN RUN YET.
+
+**FIRE IS IN `main` AND WIRED TO NOTHING** (`src/physics/fire.js`, `src/data/burnt.js`, `docs/POWERS-FIRE.md`).
+Nothing imports any of it, so the game is unchanged. All three were broken by independent readers; the faults are
+at the top of each file and in the log. DO NOT WIRE IT until the first one is settled: a fire in an ordinary wood
+never goes out, because the record it leans on forgets faster than one fire fills it.
+
+**THE ART PASS IS THE LIVE WORK** (the owner, 18 Nov: redo the art for the sharp screen, colour from their twenty
+oil paintings, paint style from the clip, closer to realism with the strokes kept). The measured palette of those
+twenty is in `docs/references/README.md`; the five stages and the render-measure loop are in the log. Stage 1 has
+not been applied yet.
+
 **THE FULL CHECK ON `main` AT v15: ALL 17 PASSED** (started 02:15, finished 03:27 on 18 November; the log is
 `/home/user/.pc-scratch/look/full_v15.log`, read from its own last line). It covers v13's and v14's code as well.
 What it cannot check is written at its end: frame rate on a real graphics card, a real mouse under pointer lock, a
