@@ -1,10 +1,15 @@
 // Tests: the fire the explorer lights (fire.js) -- that it spreads, that the wind carries it, that it stops at
-// water and at bare rock, that it burns out behind itself, what it reports, its cap, and what a frame of it costs.
+// water and at bare rock, that it burns out behind itself, THAT IT GOES OUT, what it reports, its cap, and what a
+// frame of it costs.
 // Run: node --test src/physics/fire.test.mjs   (or node --test src/physics/ for all the physics)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeFires, lightFire, stepFires, placeFires, fireAt, clearBurns, anyBurning, douseFires, FIRE, FUEL } from './fire.js';
+import { makeFires, lightFire, stepFires, placeFires, fireAt, clearBurns, anyBurning, douseFires, fireBytes, FIRE, FUEL } from './fire.js';
 import { LocalFrame } from './near.js';
+// THE GAME'S OWN LASTING RECORD, NOT A STAND-IN. The tests at the foot of this file light fires with the real thing
+// behind them, because "does a fire go out" was once answered yes by a stand-in that never forgot anything, while
+// the real record is capped and forgets, and with it the same fire burned for ever.
+import { scorch, burntAt, burntLoad, BURNT, BURN } from '../data/burnt.js';
 
 // ---- a plain stand-in world ------------------------------------------------------------------
 // A round world of this radius, and one place on it to light fires at: the point (0, 0, R), where east is +X and
@@ -448,4 +453,135 @@ test('the empty list costs one comparison', () => {
   console.log('  nothing burning: %s ms a frame', per.toFixed(6));
   assert.equal(ctx.asks, 0, 'with no fire the world is never asked anything');
   assert.ok(per < 0.001, 'and a frame costs nothing: ' + per.toFixed(6) + ' ms');
+});
+
+// ---- IT GOES OUT ------------------------------------------------------------------------------
+// (2026-11-18. The one thing a reader measured as broken here: a fire in an ordinary wood never went out. These
+// tests light fires with the game's own record behind them, which is capped and forgets, and measure that each one
+// ends by itself. Everything above this line uses stand-ins; these do not.)
+
+// The world answered the way the game will answer it: a round stand of wood with bare rock round it, and the
+// lasting record (data/burnt.js) asked whether the floor of a place has already burned.
+// `forget`: a world that keeps no record at all -- which is also what the real record becomes once its cap is
+// passed and it starts forgetting its oldest marks. A fire must go out in that world too, on its own memory alone.
+function woodWorld(radius, forget = false) {
+  return {
+    asks: 0, winds: 0, wind: { x: 0, y: 0, z: 0 },
+    fuelAt(bodyId, px, py, pz, out) {
+      this.asks++;
+      out.fuel = 1; out.wet = 0;
+      const k = R / (Math.hypot(px, py, pz) || 1);
+      out.px = px * k; out.py = py * k; out.pz = pz * k;      // the world sets the place on its own ground
+      // Outside the stand there is bare rock. Inside it there is wood -- unless the record says this floor has
+      // already burned, which is how the game will answer it: nothing left here to catch. A mark is black right
+      // through in its core and fades to nothing at its rim (BURN.core), so a third of the way is the game's own
+      // judgement of "burnt enough"; nothing about the fire ENDING rests on the number.
+      if (Math.hypot(px, py) > radius) out.kind = FUEL.none;
+      else if (!forget && burntAt(bodyId, out.px, out.py, out.pz) > 0.35) out.kind = FUEL.none;
+      else out.kind = FUEL.leaves;
+    },
+    windAt(s, o) { this.winds++; o[0] = this.wind.x; o[1] = this.wind.y; o[2] = this.wind.z; },
+    // what the game does once a frame: read the rows the fire has left, write them into the record, clear them
+    keep(F) {
+      if (!forget) for (let i = 0; i < F.burns.count; i++) {
+        const b = F.burns[i];
+        if (b.kind !== FUEL.ice) scorch(b.bodyId, b.px, b.py, b.pz, b.radius, b.burnt);
+      }
+      clearBurns(F);
+    },
+  };
+}
+
+// Runs one fire until it is out, or until `limit` seconds have gone by. Returns what it cost.
+function burnOut(F, ctx, limit = 600) {
+  let out = -1, marks = 0, bytes = 0, mostLive = 0, lost = 0;
+  for (let i = 0; i < Math.round(limit * 60) && out < 0; i++) {
+    stepFires(F, 1 / 60, ctx);
+    lost += F.lost;
+    ctx.keep(F);
+    if (BURNT.scorches > marks) marks = BURNT.scorches;
+    const b = fireBytes(F); if (b > bytes) bytes = b;
+    const l = live(F); if (l > mostLive) mostLive = l;
+    if (F.count === 0) out = (i + 1) / 60;
+  }
+  return { out, marks, bytes, mostLive, lost };
+}
+
+test('a fire goes out by itself in a wood of any ordinary size, with the real record behind it', () => {
+  for (const across of [24, 44, 80]) {
+    burntLoad([]);
+    const F = makeFires(across), ctx = woodWorld(across / 2);
+    assert.ok(lightFire(F, BODY, at(0, 0), 2, ctx), 'it was lit');
+    const r = burnOut(F, ctx);
+    console.log('  a wood %s m across: OUT after %s s. %s patches caught, %s alight at once, %s marks on the record (of %s), %s bytes of the fire\'s own memory at its worst',
+      across, r.out < 0 ? 'NOT AT ALL' : r.out.toFixed(0), F.lit, r.mostLive, r.marks, BURN.max, r.bytes);
+    assert.ok(r.out > 0, 'the fire in a wood ' + across + ' m across went out of its own accord');
+    assert.ok(r.out > 8, 'and burned for a good while first: ' + r.out.toFixed(0) + ' s');
+    assert.equal(F.count, 0, 'nothing of it is left');
+    assert.equal(anyBurning(F), false);
+    assert.equal(fireBytes(F), 0, 'and its memory of the ground went out with it');
+    assert.ok(r.bytes > 0 && r.bytes < 12000, "the memory cost a couple of kilobytes, not more: " + r.bytes + ' bytes');
+    assert.ok(r.marks > 4 && r.marks <= BURN.max, 'the record kept where it burned: ' + r.marks + ' marks');
+    assert.equal(r.lost, 0, 'and no row of what burned was lost on the way');
+  }
+});
+
+test('a fire goes out on its own memory alone, in a world that remembers nothing', () => {
+  // THIS IS THE FAULT ITSELF. A world that offers the same wood again and again -- which the real record becomes as
+  // soon as its cap is passed, since it forgets its oldest marks -- used to leave a fire burning for ever (measured
+  // before this: a wood 44 m across still burning after five minutes, 2,219 patches caught). The fire's own memory
+  // of the ground this casting has burned is what ends it, and nothing else is helping here.
+  burntLoad([]);
+  const F = makeFires(77), ctx = woodWorld(22, true);
+  lightFire(F, BODY, at(0, 0), 2, ctx);
+  const r = burnOut(F, ctx);
+  console.log('  a wood 44 m across and a world with no memory at all: OUT after %s s, %s patches caught',
+    r.out < 0 ? 'NOT AT ALL' : r.out.toFixed(0), F.lit);
+  assert.equal(BURNT.size, 0, 'nothing was written down anywhere');
+  assert.ok(r.out > 0, 'and the fire still went out by itself');
+  assert.ok(ctx.asks > 50, 'having really asked the world about the wood: ' + ctx.asks + ' times');
+  assert.equal(F.count, 0);
+});
+
+test('a fire lit later in the same place still works', () => {
+  burntLoad([]);
+  const F = makeFires(5), ctx = woodWorld(22);
+  lightFire(F, BODY, at(0, 0), 2, ctx);
+  const first = burnOut(F, ctx);
+  assert.ok(first.out > 0, 'the first fire went out');
+  const lit0 = F.lit;
+  // the record still remembers this wood, so a second fire finds nothing left to catch: the ability's own flame
+  // shows for a moment (so the player sees the cast) and dies, and nothing spreads
+  const s = lightFire(F, BODY, at(0, 0), 2, ctx);
+  assert.ok(s, 'it is still lit');
+  assert.equal(s.kind, FUEL.none, 'but there is nothing left here to burn');
+  const again = burnOut(F, ctx, 30);
+  assert.ok(again.out > 0 && again.out < 6, 'and it is gone in a moment: ' + again.out.toFixed(1) + ' s');
+  assert.equal(F.lit, lit0 + 1, 'nothing caught from it');
+  // and when the record has forgotten this place (which is what its cap does), the same place burns again, and
+  // that fire goes out as well
+  burntLoad([]);
+  const G = makeFires(6), c2 = woodWorld(22);
+  const t = lightFire(G, BODY, at(0, 0), 2, c2);
+  assert.equal(t.kind, FUEL.leaves, 'the wood is there to burn again');
+  const third = burnOut(G, c2);
+  console.log('  the same wood burned twice: %s s the first time, %s s the second', first.out.toFixed(0), third.out.toFixed(0));
+  assert.ok(third.out > 8, 'it burned properly the second time: ' + third.out.toFixed(0) + ' s');
+  assert.equal(G.count, 0, 'and went out again');
+});
+
+test('a fire cannot be lit at a place that is not a real place', () => {
+  // (2026-11-18, found by the reader who checked fire.js) A bad aim -- a view sample that hands back a
+  // not-a-number -- used to be written into a patch, and from there into the lasting record, where it poisons a
+  // filing cell for the rest of the session.
+  burntLoad([]);
+  const F = makeFires(8), ctx = world();
+  for (const p of [{ x: NaN, y: 0, z: R }, { x: 0, y: Infinity, z: R }, { x: 0, y: 0, z: NaN }, null, undefined]) {
+    assert.equal(lightFire(F, BODY, p, 1, ctx), null, 'refused: ' + JSON.stringify(p));
+  }
+  assert.equal(lightFire(F, null, at(0, 0), 1, ctx), null, 'and nowhere in particular is refused too');
+  assert.equal(F.count, 0, 'not one patch was made');
+  assert.equal(F.lit, 0);
+  assert.equal(ctx.asks, 0, 'and the world was never even asked');
+  assert.ok(lightFire(F, BODY, at(0, 0), 1, ctx), 'while a real place is lit as it always was');
 });

@@ -64,28 +64,47 @@ test('burnt ground: it is kept, read back, soft at its edge, and its neighbours 
   assert.ok(Math.abs(charMore(s, BURN.charTime * 0.5) - 0.7) < 1e-9, 'half the charring time darkens it by half');
   charMore(s, BURN.charTime * 10);
   assert.equal(s.c, 1, 'and it never goes past black');
-  // a fire creeping along does not leave a thousand circles: a touching mark is widened, until it would be a blot
+  // A fire creeping along does not leave a thousand circles: the mark it has already made RUNS ON ALONG ITS LINE,
+  // until the stroke is as long as one stroke may be. (Before 2026-11-18 a creeping mark was a circle grown about
+  // the place that caught first, which blackened the ground to every side of the path as well.)
   burntLoad([]);
   const a = scorch('earth', ...P(), 3);
-  for (let i = 1; i <= 8; i++) scorch('earth', ...P(i), 3);      // a metre at a time along the ground
-  assert.equal(BURNT.scorches, 1, 'one mark, grown: ' + a.r.toFixed(1) + ' m');
-  assert.ok(a.r > 3 && a.r <= BURN.scorchWide);
+  for (let i = 1; i <= 8; i++) scorch('earth', ...P(i), 3);      // a metre at a time along the ground, due east
+  const lenOf = (k) => Math.hypot(k.x2 - k.x, k.y2 - k.y, k.z2 - k.z);
+  assert.equal(BURNT.scorches, 1, 'one mark, run on to ' + lenOf(a).toFixed(1) + ' m');
+  assert.ok(Math.abs(lenOf(a) - 8) < 1e-6, 'as long as the fire crept, and no longer: ' + lenOf(a).toFixed(2) + ' m');
+  assert.equal(a.r, 3, 'and no wider than the flame that made it');
   assert.ok(burntAt('earth', ...P(6)) > 0, 'the whole crept-over strip reads burnt');
+  // THE FAULT THIS SHAPE FIXES: the ground beside the path, which the fire never came near, is not blackened.
+  assert.equal(burntAt('earth', ...P(4, 3.1)), 0, 'three metres to the side of a strip eight metres long is clean');
+  assert.equal(burntAt('earth', ...P(-3.1)), 0, 'and so is the ground behind where it started');
   for (let i = 9; i <= 40; i++) scorch('earth', ...P(i), 3);     // on across the ground
-  assert.ok(BURNT.scorches > 1 && BURNT.scorches < 12, 'a long fire front is a few marks, not one blot and not forty: ' + BURNT.scorches);
-  assert.ok(scorchesOn('earth').every((k) => k.r <= BURN.scorchWide), 'none of them wider than a scorch may be');
+  assert.ok(BURNT.scorches > 1 && BURNT.scorches < 12, 'a long fire front is a few strokes, not one blot and not forty: ' + BURNT.scorches);
+  assert.ok(scorchesOn('earth').every((k) => k.r <= BURN.scorchWide && lenOf(k) <= BURN.scorchLong + 1e-6),
+    'none of them wider or longer than a scorch may be');
   assert.ok(burntAt('earth', ...P(25)) > 0, 'and the far end of the strip is burnt too');
   assert.deepEqual(scorchesOn('mars'), [], 'nothing on another body');
-  // A mark is filed in every cell its square reaches into, so a cell can hold a mark whose circle never comes near
-  // it, and two marks can share a cell. Every reader measures the real distance to each mark it finds, so neither
-  // leaves a place reading burnt when it is not. (This is also what makes it harmless that two far-apart cells can
-  // land on the same cell number.)
+  // A fire that turns a corner starts another mark, rather than swinging one stroke over ground nothing burned.
+  burntLoad([]);
+  for (let i = 0; i <= 6; i++) scorch('earth', ...P(i), 2);       // east for six metres
+  assert.equal(BURNT.scorches, 1);
+  for (let i = 1; i <= 6; i++) scorch('earth', ...P(6, i), 2);    // then north for six
+  assert.equal(BURNT.scorches, 2, 'the corner is two strokes: ' + BURNT.scorches);
+  assert.equal(burntAt('earth', ...P(1, 5)), 0, 'and the inside of the corner, never burned, is clean');
+  assert.ok(burntAt('earth', ...P(3)) > 0 && burntAt('earth', ...P(6, 3)) > 0, 'while both arms of it are burnt');
+  // A mark is filed in every cell its box reaches into, so a cell can hold a mark that never comes near it, and two
+  // marks can share a cell. Every reader measures the real distance to each mark it finds, so neither leaves a place
+  // reading burnt when it is not. (This is also what makes it harmless that two far-apart cells can land on the same
+  // cell number.)
   burntLoad([]);
   const wide = scorch('earth', ...P(), BURN.scorchWide, 1);
+  for (let i = 1; i <= BURN.scorchLong; i++) scorch('earth', ...P(i), BURN.scorchWide);
   assert.equal(wide.r, BURN.scorchWide);
-  assert.equal(burntAt('earth', ...P(13, 13)), 0, 'a corner of its square, eighteen metres from its middle, is not burnt');
-  assert.equal(burntAt('earth', ...P(0, 14.2)), 0, 'nor the edge of its square, a hand past its rim');
-  assert.ok(burntAt('earth', ...P(0, 13)) > 0, 'but thirteen metres straight out, inside the circle, is burnt');
+  assert.equal(BURNT.scorches, 1, 'one stroke as long and as wide as a scorch may be');
+  assert.equal(burntAt('earth', ...P(-5.1)), 0, 'a corner of its box, past the end of the stroke, is not burnt');
+  assert.equal(burntAt('earth', ...P(9, 5.1)), 0, 'nor a hand past its side');
+  assert.ok(burntAt('earth', ...P(9, 4.5)) > 0, 'but four and a half metres out to the side of it is burnt');
+  assert.ok(burntAt('earth', ...P(BURN.scorchLong + 4.5)) > 0, 'and so is the round cap at its far end');
   burntLoad([]);
   scorch('earth', ...P(), 2, 1);                     // two marks eight metres apart: one cell holds both
   scorch('earth', ...P(8), 2, 0.4);
@@ -188,6 +207,7 @@ test('a saved game keeps all three and comes back the same', () => {
   const tree = ['earth', 10.5, 20.25, 6371000.5];
   scorch('earth', ...P(), 3, 0.6);
   scorch('mars', 3000, 3389500, -200, 5, 1);
+  for (let i = 1; i <= 9; i++) scorch('mars', 3000 + i, 3389500, -200, 5, 1);     // a stroke the fire crept along
   const m = meltIce('earth', ...P(60), 4, 6); deepenMelt(m, 2.5);
   const h = meltIce('neptune', 0, 24620000, 0, 3); deepenMelt(h, 30);
   burnCrown(...tree); burnCrown('earth', 11.5, 20.25, 6371000.5);
@@ -202,9 +222,21 @@ test('a saved game keeps all three and comes back the same', () => {
   assert.ok(Math.abs(meltedBare('earth', ...P(60)) - before.bare) < 1e-9);
   assert.equal(meltedThrough('neptune', 0, 24620000, 0), true, 'the bottomless hole is still bottomless');
   assert.equal(burntAt('mars', 3000, 3389500, -200), 1, 'and the other body kept its own');
+  // the stroke came back as a stroke, both ends of it, and nine metres along it is still burnt
+  const mk = scorchesOn('mars')[0];
+  assert.ok(Math.abs(Math.hypot(mk.x2 - mk.x, mk.y2 - mk.y, mk.z2 - mk.z) - 9) < 0.02, 'the stroke is as long as it was');
+  assert.equal(burntAt('mars', 3009, 3389500, -200), 1, 'and its far end is burnt');
   const back = burntCrownAt(...tree);
   assert.ok(back && back.c === 1, 'a crown from a save has finished burning');
   assert.deepEqual(burntRows(), rows, 'saved again, it is the same save');
+  // A row from a save written before marks were strokes has only eight numbers in it. It comes back as a mark whose
+  // two ends are in one place, which is the plain circle it always was: nobody's saved game is thrown away.
+  burntLoad([['earth', MARK.ground, 100, R, 200, 3, 1, 0]]);
+  assert.equal(BURNT.scorches, 1);
+  const old = scorchesOn('earth')[0];
+  assert.ok(old.x2 === old.x && old.y2 === old.y && old.z2 === old.z, 'both ends in one place');
+  assert.equal(burntAt('earth', 100, R, 200), 1, 'black in the middle, as it was');
+  assert.equal(burntAt('earth', 103.1, R, 200), 0, 'and clean just outside its rim');
   // nothing has burned: there is nothing to put in the save (so an old saved game is what it always was)
   burntLoad([]);
   assert.deepEqual(burntRows(), []);
@@ -251,10 +283,11 @@ test('rubbish rows are refused, row by row', () => {
 
 test('reading is quick with a hundred marks on the list (the world asks many times a frame)', () => {
   // a fire that has spread over a patch of ground some 300 m across: a hundred scorch marks, spaced so that they
-  // stay a hundred marks and are not merged into a few
+  // stay a hundred marks and are not merged into a few. Each is a real stroke eight metres long, as a creeping
+  // fire leaves, so that what is timed is the work the game will really do.
   burntLoad([]);
   const place = (i) => [100 + (i % 10) * 30, R, 200 + Math.floor(i / 10) * 30];
-  for (let i = 0; i < 100; i++) scorch('earth', ...place(i), 3, 1);
+  for (let i = 0; i < 100; i++) for (let k = 0; k <= 8; k++) { const p = place(i); scorch('earth', p[0] + k, p[1], p[2], 3, 1); }
   assert.equal(BURNT.scorches, 100, 'a hundred marks: ' + BURNT.scorches);
   // reads spread over that patch, about a quarter of them landing on burnt ground
   const read = (i) => burntAt('earth', 100 + (i * 7.3) % 300, R, 200 + (i * 11.9) % 300);
@@ -268,11 +301,21 @@ test('reading is quick with a hundred marks on the list (the world asks many tim
     for (let k = 0; k < all.length; k++) {
       const m = all[k];
       if (m.bodyId !== 'earth') continue;
-      const dx = x - m.x, dy = y - m.y, dz = z - m.z, d2 = dx * dx + dy * dy + dz * dz;
+      // the distance to the mark's own line, which is what a capsule asks (data/burnt.js segDist2)
+      const ax = x - m.x, ay = y - m.y, az = z - m.z;
+      const bx = m.x2 - m.x, by = m.y2 - m.y, bz = m.z2 - m.z, bb = bx * bx + by * by + bz * bz;
+      let d2;
+      if (bb <= 1e-12) d2 = ax * ax + ay * ay + az * az;
+      else {
+        let t = (ax * bx + ay * by + az * bz) / bb;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        const ex = ax - bx * t, ey = ay - by * t, ez = az - bz * t;
+        d2 = ex * ex + ey * ey + ez * ez;
+      }
       if (d2 >= m.r * m.r) continue;
       const d = Math.sqrt(d2), a = m.r * BURN.core;
-      const t = d <= a ? 1 : (m.r - d) / (m.r - a);
-      const v = m.c * (d <= a ? 1 : t * t * (3 - 2 * t));
+      const t2 = d <= a ? 1 : (m.r - d) / (m.r - a);
+      const v = m.c * (d <= a ? 1 : t2 * t2 * (3 - 2 * t2));
       if (v > best) best = v;
     }
     return best;
@@ -282,13 +325,13 @@ test('reading is quick with a hundred marks on the list (the world asks many tim
   console.log('    100 marks: ' + (many * 1000).toFixed(0) + ' ns a read = ' + many.toFixed(3) + ' ms for a thousand reads; trying every mark instead: ' + (flat * 1000).toFixed(0) + ' ns a read');
   assert.ok(many < 1, 'a thousand reads over a hundred marks are a fraction of a frame: ' + many.toFixed(3) + ' ms');
   assert.ok(many < flat, 'and quicker than trying every mark: ' + (flat / many).toFixed(1) + ' times');
-  // and with the record full, where trying every mark would be three times worse again
+  // and with the record full, where trying every mark would be six times worse again
   burntLoad([]);
-  for (let i = 0; i < BURN.max; i++) scorch('earth', 100 + (i % 20) * 30, R, 200 + Math.floor(i / 20) * 30, 3, 1);
+  for (let i = 0; i < BURN.max; i++) for (let k = 0; k <= 8; k++) scorch('earth', 100 + (i % 20) * 30 + k, R, 200 + Math.floor(i / 20) * 30, 3, 1);
   assert.equal(BURNT.scorches, BURN.max);
-  const full = timeOf(20000, (i) => burntAt('earth', 100 + (i * 7.3) % 600, R, 200 + (i * 11.9) % 450));
+  const full = timeOf(20000, (i) => burntAt('earth', 100 + (i * 7.3) % 600, R, 200 + (i * 11.9) % 900));
   console.log('    ' + BURN.max + ' marks (the record full): ' + (full * 1000).toFixed(0) + ' ns a read = ' + full.toFixed(3) + ' ms for a thousand reads');
   assert.ok(full < 1, 'a full record is still quick to read: ' + full.toFixed(3) + ' ms the thousand');
-  assert.ok(full < many * 3 + 0.05, 'and three times the marks is not three times the work: ' + (full / many).toFixed(2) + ' times');
+  assert.ok(full < many * 3 + 0.05, 'and six times the marks is not six times the work: ' + (full / many).toFixed(2) + ' times');
   burntLoad([]);
 });
