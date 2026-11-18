@@ -329,3 +329,86 @@ test('P17: quality 2 (the top tier: rain 3200, leaves 6000, 12 samples a frame) 
     timing((cpuNow ? bestCpu : best) < 2.0, 'mean ' + (cpuNow ? bestCpu.toFixed(2) + ' ms of CPU' : best.toFixed(2) + ' ms'));
   } finally { setWindScale('earth', s0); }
 });
+
+// ---- (P29) THE AIR DOWN THERE -----------------------------------------------------------------
+// The waves, the plants, the loose layer and the dust devils are each worked out for one air density, and it used to be
+// the density where the FOCUS is. The air on these worlds is only a few hundred metres deep, so flying over a sea or a
+// wood thinned it away under the player (see the note by SURFACE_AIR in index.js). These three tests are what would have
+// caught that: the first two fly, the third stands still and shows that standing still is untouched.
+
+// one sea world and one wooded world, for the three tests below
+const seaWorld = (R) => makeWorld({ R: R - 60, sea: R, biome: 'sea_coast' });
+function sail(world, bodyId, dir, alt, steps = 400, dt = 1 / 30, t0 = 200) {
+  const R = BODIES[bodyId].radius;
+  const physics = createPhysics({ sampleSurface: (id, q) => world(q), seed: 18, timeBudget: false });
+  void physics.fields.water.uniforms.uPhysSeaMap;     // (the reference sea is the most exposed water about: water.js)
+  const focus = V(dir.x * (R + alt), dir.y * (R + alt), dir.z * (R + alt));
+  for (let i = 0; i < steps; i++) physics.update(dt, { bodyId, time: t0 + i * dt, focus, sunDir: dir });
+  let bend = 0; { const B = physics.fields.flora.bend; for (let i = 0; i < B.length; i++) bend += Math.abs(B[i]); }
+  return { physics, Hs: physics.fields.water.field.significant, white: physics.fields.water.field.cover, bend,
+    rho: physics.here.air.density, U: Math.hypot(physics.fields.air.cwe, physics.fields.air.cwn) };
+}
+
+test('P29 the sea is raised by the air OVER THE WATER, not by the air where the player is flying', () => {
+  const R = BODIES.earth.radius, d = norm(V(0.3, 0.6, 0.74)), world = seaWorld(R);
+  const g = sail(world, 'earth', d, 2);
+  const alts = [60, 300, 900, 1500], up = alts.map((a) => sail(world, 'earth', d, a));
+  console.log(`# the same sea in the same ${g.U.toFixed(1)} m/s wind as the focus climbs: 2 m up Hs ${g.Hs.toFixed(3)} m`
+    + up.map((h, i) => `; ${alts[i]} m up ${h.Hs.toFixed(3)} m (air at the focus ${h.rho.toFixed(3)} kg/m3)`).join(''));
+  assert.ok(g.Hs > 0.1, 'there is a sea to begin with: ' + g.Hs);
+  for (let i = 0; i < alts.length; i++) assert.ok(Math.abs(up[i].Hs - g.Hs) < 0.1 * g.Hs, `the sea from ${alts[i]} m up is the sea: ${up[i].Hs} against ${g.Hs}`);
+  // the last one is above the top of the air (Earth's ends at 800 m): the focus is in vacuum and the sea must still run
+  assert.equal(up[up.length - 1].rho, 0, 'the focus is above the air');
+  assert.ok(up[up.length - 1].Hs > 0.9 * g.Hs, 'and the sea under it is not flat: ' + up[up.length - 1].Hs);
+});
+
+test('P29 the plants are bent, and the dust devils turned, by the air at the GROUND', () => {
+  const R = BODIES.earth.radius, d = norm(V(0.31, 0.56, 0.77));
+  const wood = makeWorld({ R, biome: 'temperate_forest', stand: { dir: d, radius: 3000, canopy01: 0.8, canopyHeight: 23 } });
+  const g = sail(wood, 'earth', d, 2);
+  const alts = [300, 900, 1500], up = alts.map((a) => sail(wood, 'earth', d, a));
+  console.log(`# the wood's bend field in a ${g.U.toFixed(1)} m/s wind: 2 m up ${g.bend.toFixed(0)}`
+    + up.map((h, i) => `; ${alts[i]} m up ${h.bend.toFixed(0)} (air at the focus ${h.rho.toFixed(3)})`).join(''));
+  assert.ok(g.bend > 1, 'the canopy is bending to begin with: ' + g.bend);
+  // (the few per cent left over are the near frame's own and not the air's: its metres are metres at the focus's radius,
+  // so from 1.5 km up it lays its nodes over slightly different ground. The old physics gave 0 here.)
+  for (let i = 0; i < alts.length; i++) assert.ok(Math.abs(up[i].bend - g.bend) < 0.2 * g.bend, `the canopy from ${alts[i]} m up: ${up[i].bend} against ${g.bend}`);
+  assert.equal(up[up.length - 1].rho, 0, 'the focus is above the air');
+  assert.ok(up[up.length - 1].bend > 0.5 * g.bend, 'and the wood below it still answers the wind: ' + up[up.length - 1].bend);
+
+  // and the dust devils, which only turn where there is air: over Mars' dunes, whose air ends at 450 m
+  const Rm = BODIES.mars.radius, dm = norm(V(0.3, 0.6, 0.74)), dunes = makeWorld({ R: Rm, biome: 'dust_dunes' });
+  const devilFrames = (alt) => {
+    const physics = createPhysics({ sampleSurface: (id, q) => dunes(q), seed: 18, timeBudget: false });
+    const focus = V(dm.x * (Rm + alt), dm.y * (Rm + alt), dm.z * (Rm + alt));
+    let seen = 0, n = 0;
+    for (let i = 0; i < 900; i++) {
+      physics.update(0.1, { bodyId: 'mars', time: 2000 + i * 0.1, focus, sunDir: dm });
+      if (i > 200) { n++; if (physics.features.devils.count > 0) seen++; }
+    }
+    return { seen, n, rho: physics.here.air.density };
+  };
+  const low = devilFrames(2), high = devilFrames(700);
+  console.log(`# dust devils over Mars' dunes: 2 m up, in ${low.seen} of ${low.n} frames; 700 m up (above the air, ${high.rho} kg/m3 at the focus), in ${high.seen} of ${high.n}`);
+  assert.ok(low.seen > 0.2 * low.n, 'devils turn over the dunes: ' + low.seen + '/' + low.n);
+  assert.equal(high.rho, 0, 'the focus is above Mars\' air at 700 m');
+  assert.ok(high.seen > 0.2 * high.n, 'and they go on turning while the player flies over them: ' + high.seen + '/' + high.n);
+});
+
+test('P29 ... and NOTHING changed for a walker or a swimmer: within SURFACE_AIR of the surface the air at the focus is still the air used', () => {
+  // The sea's height goes with the square root of the air's density (water.js windSea), so in the old physics
+  // Hs / sqrt(air at the focus) was one and the same number at every height. Within the band it still is, exactly:
+  // that is the live game's sea at the shore and in the water, unmoved. Above the band it is not, which is the mend.
+  const R = BODIES.earth.radius, d = norm(V(0.3, 0.6, 0.74)), world = seaWorld(R);
+  const k = (alt) => { const s = sail(world, 'earth', d, alt); return { r: s.Hs / Math.sqrt(s.rho), Hs: s.Hs, rho: s.rho }; };
+  const band = [1, 2, 5, 9].map(k), out = k(60);
+  console.log('# Hs / sqrt(air at the focus), in the band: ' + band.map((b, i) => `${[1, 2, 5, 9][i]} m ${b.r.toFixed(6)}`).join(', ') + `; 60 m up ${out.r.toFixed(6)}`);
+  for (const b of band) assert.ok(Math.abs(b.r - band[0].r) < 1e-6 * band[0].r, 'the sea a wader stands in is the sea it always was: ' + b.r + ' against ' + band[0].r);
+  assert.ok(out.r > band[0].r * 1.02, 'and above the band it no longer follows the player up: ' + out.r);
+  // the same band, the same way, for the plants
+  const wood = makeWorld({ R, biome: 'temperate_forest', stand: { dir: d, radius: 3000, canopy01: 0.8, canopyHeight: 23 } });
+  const kb = (alt) => { const s = sail(wood, 'earth', d, alt); return s.bend / s.rho; };
+  const b1 = kb(1), b9 = kb(9);
+  console.log(`# the bend field / the air at the focus, in the band: 1 m ${b1.toFixed(4)}, 9 m ${b9.toFixed(4)}`);
+  assert.ok(Math.abs(b9 - b1) < 0.02 * b1, 'a walker\'s grass and trees bend as they always did: ' + b9 + ' against ' + b1);
+});

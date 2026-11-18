@@ -279,6 +279,11 @@ const I_ICE = MATERIAL_INDEX.ice != null ? MATERIAL_INDEX.ice : MATERIAL_INDEX.s
 // and the one-line patch for it is in this session's report.
 const I_FLAME = MATERIAL_IDS.length < 16 ? MATERIAL_IDS.length : MATERIAL_INDEX.ash;
 const I_SMOKE = MATERIAL_INDEX.ash;      // (smoke: the grey-brown the table already holds for ash)
+// (fire) AND THE EMBERS' OWN INK, the slot after the flame's. The painter paints a spark as a different MARK from a
+// tongue - tiny, very bright, with a short tail that cools behind it - and from inside the painter nothing else about
+// a grain can tell the two apart: it is handed a grain's ink and nothing else, not its size, not its speed, not even
+// its age. The painter's table has the slot (render/kitmat.js: the world's blend never touches it).
+const I_EMBER = I_FLAME + 1;
 
 export class Loose {
   constructor(particles) {
@@ -1210,7 +1215,7 @@ export class Loose {
           const gy = near ? near.heightAt(x, z, s.y) : s.y;
           const up = Fl.emberUp * (0.55 + 0.9 * rng());
           if (!this.emit('leaves', x, gy + 0.12, z, wE * Fl.emberLean + Math.cos(ang) * Fl.emberOut, up,
-            wN * Fl.emberLean + Math.sin(ang) * Fl.emberOut, Fl.emberSize, Fl.emberLife * 0.1, I_FLAME)) { C[15] = 0; break; }
+            wN * Fl.emberLean + Math.sin(ang) * Fl.emberOut, Fl.emberSize, Fl.emberLife * 0.1, I_EMBER)) { C[15] = 0; break; }
         }
       }
     }

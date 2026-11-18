@@ -304,7 +304,7 @@ function take(F) {
 // nothing at all) and _f.px/py/pz is where the world says that place really is on its own ground. With no fuel
 // function given (some tests) the answer is "nothing here".
 function ask(F, bodyId, px, py, pz, ctx) {
-  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz;
+  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz; _f.why = '';
   if (ctx && ctx.fuelAt) {
     F.asks++;
     ctx.fuelAt(bodyId, px, py, pz, _f);
@@ -319,7 +319,7 @@ function ask(F, bodyId, px, py, pz, ctx) {
 // Sets a patch up from the last answer in _f: where it really burns, what is under it, how long that will last.
 function settle(s) {
   s.px = _f.px; s.py = _f.py; s.pz = _f.pz;
-  s.kind = _f.kind; s.wet = _f.wet;
+  s.kind = _f.kind; s.wet = _f.wet; s.why = _f.why || '';
   if (s.kind === FUEL.ice) { s.fuel = 0; s.fuel0 = 0; s.life = FIRE.iceLife * (0.7 + 0.3 * s.size); }
   else if (s.kind !== FUEL.none) { s.fuel0 = clamp01(_f.fuel); s.fuel = s.fuel0; s.life = FIRE.maxLife; }
   else { s.fuel0 = 0; s.fuel = 0; s.life = FIRE.bareLife; }   // nothing to burn: the ability's own flame, for a moment

@@ -680,7 +680,7 @@ test('M4 a leaf\'s turn, as it is handed over, goes no faster than a turn and a 
 // ---- FIRE: the flame, the smoke and the embers (loose.js FLAME; the fire itself is fire.js) ---------------------
 // Nobody has LOOKED at any of this. These tests say where the marks are, how many of them there are and what they
 // cost; whether a fire looks like a fire is for the owner's own eyes on the owner's own machine.
-const I_FLAME = MATERIAL_IDS.length, I_SMOKE = MATERIAL_INDEX.ash, I_STEAM = MATERIAL_INDEX.snow;
+const I_FLAME = MATERIAL_IDS.length, I_EMBER = MATERIAL_IDS.length + 1, I_SMOKE = MATERIAL_INDEX.ash, I_STEAM = MATERIAL_INDEX.snow;
 // Every leaf-kind grain in the air, with its ink, its height over the ground and how it is flying.
 function airGrains(w) {
   const L = w.physics.particles.leaves, out = [];
@@ -727,8 +727,10 @@ test('fire: its flame, smoke and embers are strokes of air laid by the leaves\' 
   for (let k = 0; k < 120; k++) {
     burn(1 / 60);
     for (const q of airGrains(w)) {
-      if (q.mat !== I_FLAME) continue;
-      if (q.size > emberSize + 1e-9) embers++; else flames++;
+      // (2026-11-18) an ember carries AN INK OF ITS OWN now, because the painter paints a spark as a different mark
+      // from a tongue and nothing else about a grain can tell the two apart from inside the painter. It used to be
+      // told by its weight, which worked only while the two shared one ink.
+      if (q.mat === I_EMBER) embers++; else if (q.mat === I_FLAME) flames++; else continue;
       if (q.up > fastest) fastest = q.up;
     }
   }
@@ -745,14 +747,14 @@ test('fire: its flame, smoke and embers are strokes of air laid by the leaves\' 
   console.log(`# fire: wind ${u.toFixed(1)} m/s; the flame's middle ${mf.toFixed(2)} m along the wind, the smoke's ${msm.toFixed(2)} m`);
   assert.ok(msm > mf, `the smoke lies downwind of the flame: ${msm.toFixed(2)} m against ${mf.toFixed(2)} m`);
   // and no grain of fire is a leaf's own ink or a wisp of wind, nor the other way about
-  for (const q of g) assert.ok(q.mat === I_FLAME || q.mat === I_SMOKE || q.mat === MATERIAL_NONE || q.mat === MATERIAL_INDEX.mud || q.mat === MATERIAL_INDEX.soil || q.mat === I_STEAM || q.mat === MATERIAL_INDEX.ice, 'an ink the air may carry: ' + q.mat);
+  for (const q of g) assert.ok(q.mat === I_FLAME || q.mat === I_EMBER || q.mat === I_SMOKE || q.mat === MATERIAL_NONE || q.mat === MATERIAL_INDEX.mud || q.mat === MATERIAL_INDEX.soil || q.mat === I_STEAM || q.mat === MATERIAL_INDEX.ice, 'an ink the air may carry: ' + q.mat);
   // the fire put out: the smoke goes on a while, then everything of it is gone
   const { douseFires } = await import('./fire.js');
   douseFires(F); burn(0.5);
   assert.ok(airGrains(w).some((q) => q.mat === I_SMOKE), 'burnt-out ground is still smoking half a second later');
   w.physics.particles.system.fires = null;      // (what index.js does when nothing is alight any more)
   burn(2.5);
-  assert.ok(!airGrains(w).some((q) => q.mat === I_FLAME || q.mat === I_SMOKE), 'and a little later nothing of the fire is in the air');
+  assert.ok(!airGrains(w).some((q) => q.mat === I_FLAME || q.mat === I_EMBER || q.mat === I_SMOKE), 'and a little later nothing of the fire is in the air');
 });
 
 test('fire: a hard cap on the grains it may use, nothing at all once the leaves have half the buffer, and a burnt-out patch that still smokes', async () => {
@@ -830,5 +832,5 @@ test('fire: what it costs -- nothing a frame with nothing burning, and the emitt
   const w = setup('earth', 'autumn_woodland'); run(w, 2);
   assert.ok(w.physics.particles.system.fires == null, 'with no fire the particle system holds no fire list');
   run(w, 3);
-  assert.ok(!airGrains(w).some((q) => q.mat === I_FLAME || q.mat === I_SMOKE), 'and the watercolour game puts no flame or smoke in the air');
+  assert.ok(!airGrains(w).some((q) => q.mat === I_FLAME || q.mat === I_EMBER || q.mat === I_SMOKE), 'and the watercolour game puts no flame or smoke in the air');
 });
