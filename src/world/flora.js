@@ -18,7 +18,7 @@ import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
 import { SHADOW_LAYER } from '../render/shadow.js';
-import { FELLED, FELL, felledAt, fallingOn, fallTurn } from '../data/felled.js';
+import { FELLED, FELL, felledAt, fallingOn, felledOn, fallTurn } from '../data/felled.js';
 
 // tier ranges in metres at quality 2; scaled by RANGE_SCALE at lower tiers
 const T0 = 90, T1 = 190, T_THIN = 420, T_FAR = 600;      // (were 52, 128, 300, 470 while there was a triangle budget; on these small worlds the ground hides a tree beyond about 480 m unless it stands on a hill)
@@ -46,6 +46,7 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Qua
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
 const _Y = new THREE.Vector3(0, 1, 0);
 const _ft = [0, 0, 0, 1], _falling = [];      // (the powers: a felled tree's turn; the trees falling now)
+const _felledAll = [];                        // (every felled tree of this world, read when the list changes)
 const _ff = {}, _dd = [0, 0, 0], _laid = [false, false, false, false];
 
 export class Flora {
@@ -256,7 +257,15 @@ export class Flora {
       this._relay(F);
     }
     // (a tree felled, or a saved game's trees put back, since the last frame: those already lying are laid too)
-    if (this._fellV !== FELLED.version) { this._fellV = FELLED.version; for (const ch of this.treeChunks.values()) this._relayAll(ch); for (const ch of this.farChunks.values()) this._relayAll(ch); }
+    // (2026-11-18) THE LIST IS WALKED, NOT EVERY TREE OF EVERY CHUNK. This used to ask of all the trees in all the
+    // loaded cells whether each was felled (a string-keyed lookup apiece): measured at 24.9 ms in the one frame a
+    // tree is cut, four fifths of it in the far cells, which is a hitch at the very moment the player is watching the
+    // tree go over. Each felled tree is instead laid where it stands, by the same bounding test _relay already does,
+    // so one felling is 291 distance comparisons and a scan of the two or three cells that hold it.
+    if (this._fellV !== FELLED.version) {
+      this._fellV = FELLED.version;
+      for (const F of felledOn(this.S.id, _felledAll)) this._relay(F);
+    }
     this._fallingNow = list.length > 0;
   }
   _relay(F) {
@@ -267,11 +276,6 @@ export class Flora {
       const d = ch.data;
       for (let i = 0, o = 0; i < ch.n; i++, o += INST_STRIDE) if (d[o] === F.x && d[o + 1] === F.y && d[o + 2] === F.z) { this._layTree(ch, i); ch.refill = true; break; }
     }
-  }
-  _relayAll(ch) {
-    if (!ch.built || !ch.n || ch.dead || !ch.mat) return;
-    const d = ch.data;
-    for (let i = 0, o = 0; i < ch.n; i++, o += INST_STRIDE) if (felledAt(this.S.id, d[o], d[o + 1], d[o + 2])) { this._layTree(ch, i); ch.refill = true; }
   }
   _buildTrees(chunk) {
     let n = 0, d;
