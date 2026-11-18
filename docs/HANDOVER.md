@@ -361,6 +361,12 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18 (the v12 text it replaced is in the log).
 
+**ON `look-proto`, NOT YET MERGED (18 Nov, after v16):** the art pass's first changes - the far air leans blue
+(measured onto the references' own numbers), a shoulder so nothing clips to paper white, the resolution
+controller's cut taken off the canvas instead of stretching, and FOUR NEW KINDS OF TREE in the autumn wood (a
+broad maple, a spruce, an aspen stand, a tall pine) with branches that fork and show through the crown. All seen
+in rendered stills. Not gated, not merged.
+
 **`main` IS AT v16 (18 Nov), pull request #16 merged.** It carries: the whole screen can be drawn (`?dpr=`,
 `?best=1`; the phone preset's 3.7 MP ceiling no longer holds back an asked-for sharpness), only the gust bends the
 trees, a third flight speed of 170 m/s, three cuts that cost nothing on screen, and four speed-test rows that RAISE
