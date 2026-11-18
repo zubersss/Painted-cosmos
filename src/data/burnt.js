@@ -1,6 +1,8 @@
-// !! NOT WIRED INTO THE GAME YET (2026-11-18). This file is built and tested, but nothing in the game calls it: the
-// !! places that must call it are written out as a patch in the fire session's report, for the coordinator to apply.
-// !! The two faults an independent reader measured in it are both settled here:
+// WIRED INTO THE GAME (2026-11-18, the same day): core/powers.js _keepBurns writes every burning patch in here, the
+// world paints the marks (world/index.js syncBurnt), and core/save.js keeps them in the saved game beside the felled
+// trees. (The banner that stood here said it was wired to nothing and pointed at a patch to apply; it had been true
+// for a few hours and was false by the evening, which an independent reader caught. Do not trust a banner over a
+// grep.) The two faults an independent reader measured in it are both settled here:
 // !!   1. A MARK IS NOW A SHORT CAPSULE -- two ends and a radius -- and not a circle grown about its first middle.
 // !!      It grows ALONG ITS OWN LINE as the fire creeps, and never wider than a flame is (BURN.scorchWide), so a
 // !!      fire that turns a corner starts another mark instead of swelling one circle over ground it never reached.
@@ -63,6 +65,16 @@ export const BURN = Object.freeze({
   // (physics/fire.js keeps its own memory now).
   max: 600,
   maxCrowns: 400,      // burnt crowns kept (the oldest is forgotten first: that tree is green again)
+  // THE GROUND GREENS AGAIN (the owner, 2026-11-18: "make sure that felled woods or burnt areas eventually do return
+  // to normal so it isn't taking up memory"). A scorch waits `life` seconds of play, then fades over `fade`; a burnt
+  // crown waits and comes back into leaf the same way; melted ice fills in over `freeze`. It happens out of sight:
+  // nothing begins to heal until the explorer is more than `quiet` metres away, or, if they stay to watch, until it
+  // has waited twice as long. The mark is dropped the moment it is clean, so the record is bounded by TIME as well
+  // as by count -- which is the owner's own reason for asking.
+  life: 600,           // s of play before a mark starts to heal
+  fade: 150,           // s a scorch and a burnt crown take to go
+  freeze: 240,         // s melted ice takes to fill back in
+  quiet: 200,          // m: how far the explorer must be for it to happen unseen
   core: 0.55,          // the share of a mark's width that is burnt right through; from there it fades to its rim,
                        // so a scorch has a soft edge and two marks side by side read as one burnt patch
   scorchR: 3,          // m: how wide a scorch is when the fire first takes hold in a place
@@ -200,6 +212,40 @@ function forget(m) {
 }
 function capped() {
   while (A.size > BURN.max) forget(A.get(A.keys().next().value));
+}
+
+// WHAT THE FIRE LEFT, GROWING BACK. Called once a frame by whoever owns the explorer's powers (core/powers.js: this
+// record exists only because of them). `dt` seconds of play; `p` where the explorer is, or null to heal anywhere.
+// Nearly every frame of a game this walks a record that is empty and returns at once.
+export function healBurnt(dt, p = null) {
+  if (!(dt > 0) || (!A.size && !C.size)) return 0;
+  let gone = 0, moved = false;
+  const ready = (o, x, y, z) => {
+    o.age = (o.age || 0) + dt;
+    if (o.age < BURN.life) return false;
+    if (p && o.age < BURN.life * 2 && Math.hypot(x - p.x, y - p.y, z - p.z) <= BURN.quiet) return false;
+    return true;
+  };
+  for (const m of [...A.values()]) {
+    if (!ready(m, m.x, m.y, m.z)) continue;
+    if (m.kind === MARK.ground) {
+      m.c -= dt / BURN.fade; moved = true;
+      if (m.c <= 0) { forget(m); gone++; }
+    } else {
+      // the hollow fills from the bottom, and a deep one takes as long as a shallow one: `freeze` is the time to
+      // fill, whatever the depth, so a 2 m melt does not vanish in four seconds while a 100 m one takes four minutes
+      if (!(m.d0 > 0)) m.d0 = m.d;
+      m.d -= dt / BURN.freeze * m.d0; moved = true;
+      if (m.d <= 0) { forget(m); gone++; }
+    }
+  }
+  for (const [k, cr] of [...C]) {
+    if (!ready(cr, cr.x, cr.y, cr.z)) continue;
+    cr.c -= dt / BURN.fade; moved = true;
+    if (cr.c <= 0) { C.delete(k); gone++; }
+  }
+  if (moved) BURNT.version++;
+  return gone;
 }
 
 // A mark of one kind that the point falls inside, on this body: the one that covers it most. Looks in the one cell
@@ -442,12 +488,12 @@ export function burntLoad(rows) {
     if (!fine) continue;
     const kind = r[1];
     if (kind === MARK.crown) {
-      if (C.size >= BURN.maxCrowns) continue;
       C.set(crownKey(r[0], r[2], r[3], r[4]), { bodyId: r[0], x: r[2], y: r[3], z: r[4], c: 1 });
+      if (C.size > BURN.maxCrowns) C.delete(C.keys().next().value);
       continue;
     }
     if (kind !== MARK.ground && kind !== MARK.melt) continue;
-    if (!(r[5] > 0) || A.size >= BURN.max) continue;
+    if (!(r[5] > 0)) continue;
     const wide = kind === MARK.ground ? BURN.scorchWide : BURN.meltWide;
     const long = kind === MARK.ground ? BURN.scorchLong : BURN.meltLong;
     // the far end of the stroke, if the row carries one, brought back inside the longest a stroke may be
@@ -465,6 +511,12 @@ export function burntLoad(rows) {
     }
     A.set(m.id, m);
     file(m);
+    // (2026-11-18, found by an independent reader) A LOADER MUST FORGET THE SAME END PLAY FORGETS. This used to stop
+    // reading once the record was full, so a save with more rows than the cap kept the OLDEST marks and threw away
+    // the newest: the player lost the fire burning in front of them and kept the one they lit an hour ago on the
+    // other side of the world. Play evicts the oldest (capped, burnCrown), and so do the felled and stripped
+    // records; burnt was the one that disagreed.
+    capped();
   }
   BURNT.version++;
 }
