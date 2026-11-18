@@ -319,6 +319,35 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     session's reading: the bottleneck is the ONE software-drawing test browser, so many agents
     would only queue for it; the mode is for work that is parallel and needs no browser.
 
+50. **"Make the bending the trees ability only one and add a even faster flying mode also keep
+    refining the graphics I want it to look the best it can't on a Samsung s23 ultra"
+    (2026-11-18, with the v15 table).** Three things. (a) ONLY ONE ABILITY BENDS THE TREES: today
+    every cast lifts the trees' lean limit; it is to be one ability, and the rest leave the wood
+    at its natural 17 degrees. The session took that one to be THE GUST, the ability you aim and
+    send, because item 48(d) asked for trees that "bend towards the direction I send the wind";
+    one line moves it if the owner meant another. (b) A FURTHER, FASTER FLIGHT above the 78 m/s
+    surge of v15. (c) THE LOOK AT ITS BEST ON THE S23 ULTRA, which with the table below now means
+    SPENDING HEADROOM, not saving it.
+
+51. **THE v15 TABLE, AND WHAT IT SETTLES (2026-11-18).** The first table that can be believed
+    (speed test 7, "held still", Adreno 740, picture 1028 x 480, tier 1, lighter paint, 199 calls,
+    501k triangles, script 7.9 ms). ROWS 10 TO 21 ALL READ 16.7 ms = 60.0 A SECOND, middle 17,
+    longest 17. THAT IS THE PHONE'S OWN REFRESH CAP, NOT THE GAME'S SPEED: the game finishes its
+    frame with time to spare and waits. Three things follow, and they overturn a day of reasoning:
+    - THE FAR TREES ARE SETTLED AND THE ARGUMENT IS OVER. Rows 2 to 9 differ by at most 1.6 ms
+      while their own "as set" baselines wander 19.0, 20.0, 16.7: that spread is the phone warming
+      and the world streaming in, not the far trees. They cost about a millisecond either way.
+    - THE ONLY ROW THAT BREAKS THE CAP IS "THE FULL PAINT" at 18.4 ms. So the full desktop paint
+      costs at least 1.7 ms more than the lighter one the phone is given - and the phone has the
+      room for it.
+    - THE PICTURE IS DRAWN AT 1028 x 480 ON A 3086 x 1440 SCREEN: a third of the screen's own
+      detail, upscaled. THAT, not the paint, is most of why the owner has twice said it looks bad
+      on their screen.
+    HOW MUCH ROOM IS LEFT CANNOT BE SEEN THROUGH THE CAP (16.7 means "16.7 or less"). The speed
+    test must therefore gain rows that RAISE the load - the picture at 1.5x and 2x, the full paint,
+    the edges - until the cap breaks and the real headroom shows. Until then, no row at 16.7 may
+    be read as a measurement of anything.
+
 17. **The desktop sets the look (2026-11-15).** "If building it for the phone will lower the
     quality focus on the desktop then." The top tier on a desktop gets the best version of every
     piece, and no technique is chosen for the phone's sake. The phone gets the same look with
