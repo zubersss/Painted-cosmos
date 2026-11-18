@@ -631,6 +631,7 @@ export class Sim {
       sunDir: bodyId ? this.eph.sunDirLocal(bodyId, this.t) : null,
       disturbers: out,
       winds: powers ? powers.winds : null,
+      fires: powers ? powers.fires : null,          // the fire the explorer has lit (physics/fire.js), or nothing
     });
     const ms = now() - t0;
     this.physicsMs += (ms - this.physicsMs) * 0.1;

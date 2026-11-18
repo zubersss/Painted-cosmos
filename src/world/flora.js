@@ -36,11 +36,27 @@ const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers kee
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
 const HOLD_MAX = 6;                    // seconds a built cell waits at most for its ground to be on the paper
+// How many falling trees are laid again in one frame (the rest take their turn on the next): see _fall.
+const FALL_RELAY = 10;
 const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01', 'aCard'];     // (the last two: trees only, PHYSICS' crown)
 // the shared far form sized per kit: width, height (metres at instance scale 1), taper
-const FAR_DIMS = { broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
+// (2026-11-18: the four new kinds of tree. A kind with no size here has no far form at all and the wood throws as it
+//  is built - found by rendering, not by a test, because the tests build a tree and the game builds a WOOD.
+//  [across, high, taper]: a maple is wider than it is tall, a spruce narrow and tapering to a spike, a pine taller
+//  still and bare low down.)
+// (?treedist=, 2026-11-18: how far the tree-detail ranges may grow once the picture is taller than 1080 lines.
+//  0.8 was measured to cut the frame's triangles by a quarter on foot and a third from the air, for a handover that
+//  moves 18 m. 1 is the behaviour before this.)
+const TREE_DIST = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('treedist') : null; const n = q == null ? NaN : +q; return isFinite(n) && n >= 0.5 && n <= 1 ? n : 0.8; })();
+
+// WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
+// of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
+const CAN_CARD = { broadleaf: 1, conifer: 1, maple: 1, spruce: 1, aspen: 1, tallpine: 1 };
+
+const FAR_DIMS = { maple: [15.5, 12.0, 0], spruce: [9.5, 16.0, 0.86], aspen: [12.0, 13.5, 0], tallpine: [12.0, 19.0, 0.62],
+  broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
 const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3();
@@ -57,6 +73,8 @@ export class Flora {
     this.group.name = 'flora-' + bodyId;
     root.add(this.group);
     this.camLocal = new THREE.Vector3();
+    this.lead = new THREE.Vector3();        // where the eye is going (world/index.js): what is built, never what is drawn
+    this.leadOn = false;
     this.treeChunks = new Map(); this.farChunks = new Map(); this.underChunks = new Map(); this.under2Chunks = new Map();
     this.treeList = [];
     this.queue = [];
@@ -88,9 +106,9 @@ export class Flora {
     // (the oil look may give a kind its own form and washes: a species' `oil` entry, laid over it; where trees stand,
     // their sizes and what the explorer bumps into stay the species' own: floraplace.js, obstacles.js)
     // (and in the oil look every broadleaf's crown is leaves one by one: florakit.js `leafy`)
-    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, sp.kit === 'broadleaf' ? { leafy: 1, double: 1 } : null, sp.oil) : sp));
+    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.oil) : sp));
     this.species = TALL.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp' || sp.kit === 'maple' || sp.kit === 'spruce' || sp.kit === 'aspen' || sp.kit === 'tallpine', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null });
       mat.userData.pcCasts = true;
@@ -101,8 +119,12 @@ export class Flora {
       const lf = LOOK.oil ? sortLeafCards : (g) => g;
       return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer',
         // (far off it is drawn as leaf cards, not as a lump: the trees in leaf of the oil look; ?fartree=lump: as it was)
-        canCard: sp.kit === 'broadleaf' || sp.kit === 'conifer',
-        cardFar: LOOK.oil && FAR_CARDS && (sp.kit === 'broadleaf' || sp.kit === 'conifer') };
+        // (2026-11-18, found by an independent reader and re-measured: this list was left at the two old kits when the
+        //  four new ones went into the autumn wood, so 38,686 of 38,968 FAR TREES IN IT FELL BACK TO THE 26-TRIANGLE
+        //  LUMP -- the far wood went back to grey-brown blobs, and the far tier from 7,591,242 triangles to 1,011,660
+        //  at 3086x1440 from 220 m up. The leafy far tree was made the look in v13; a kit must be named here to get it.)
+        canCard: CAN_CARD[sp.kit] === 1,
+        cardFar: LOOK.oil && FAR_CARDS && CAN_CARD[sp.kit] === 1 };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
@@ -110,7 +132,7 @@ export class Flora {
     this.mats = Object.assign({
       far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
-        far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
+        far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'maple' || sp.kit === 'spruce' || sp.kit === 'aspen' || sp.kit === 'tallpine', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
       }) : null,
     }, this._underMats(U, ''));
     // (the FAR trees cast no shadow in the oil look: on the owner's phone their drawing from the sun was 2.8 ms of a
@@ -121,7 +143,7 @@ export class Flora {
     this.kit = {
       far: farTreeGeometry(5),
       // (the oil look's far tree for the kinds that are trees in leaf: a stem and leaf cards, florakit.js)
-      farCards: LOOK.oil && FAR_CARDS ? farCardGeometry(6) : null,
+      farCards: LOOK.oil && FAR_CARDS ? sortLeafCards(farCardGeometry(6)) : null,     // (2026-11-18: ordered for thinning, as the near and mid trees are: see below)
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
@@ -175,6 +197,14 @@ export class Flora {
     let inst2 = null;
     if (far) { inst2 = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2); g.setAttribute('aInst2', inst2); }
     const mesh = new THREE.InstancedMesh(g, mat, cap);
+    // THE FAR TREES ARE DRAWN LAST of the opaque things (2026-11-18, the owner's own phone, speed test 8 row 8:
+    // -1.2 ms of a 32.9 ms frame, free, and the picture cannot change - they are opaque and depth-tested, so the
+    // order of opaque geometry decides only what is shaded, never what is seen). They cover a fifth of the screen
+    // and only a sixth of that survives to be looked at (measured on the real world at the phone's own picture
+    // size: 104,362 pixels covered, 17,249 of them on top), so putting them after the ground and the near trees
+    // lets the depth test throw away most of their painting before it is done. The same table's row 7, drawn
+    // FIRST, is +2.3 ms, which is the other half of the same fact.
+    if (far) mesh.renderOrder = 9;
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
     if (mat.userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
     mesh.count = 0;
@@ -252,9 +282,29 @@ export class Flora {
     const dt = this._fallT != null ? Math.min(0.1, Math.max(0, now - this._fallT)) : 0;
     this._fallT = now;
     const list = fallingOn(this.S.id, _falling);
-    for (const F of list) {
-      F.f = Math.min(1, F.f + dt / FELL.time);
-      this._relay(F);
+    // (2026-11-18, found by an independent reader who TIMED AN ULTIMATE) A TREE IS LAID AGAIN ONLY WHILE IT IS
+    // ACTUALLY MOVING, AND ONLY SO MANY A FRAME. An ultimate fells up to sixty trees at once, each with its own wait
+    // so that the fall travels outward; every one of them used to be laid again every frame, wait and all, for the
+    // three seconds the wave took. Measured on the real world: a settled world update is 0.125 ms, the frame of the
+    // cast 2.25 ms, and the three seconds after it ran at 1.11 ms with a tail of 5 to 7 ms -- nine times the settled
+    // cost, held for three seconds, on a phone already at its cap, exactly while the player is watching. A tree
+    // still waiting (f below 0) stands where it stood and needs nothing; of those really moving, at most FALL_RELAY
+    // are laid again in any one frame, taken in turn, so sixty falling trees cost what eight do and the rest catch
+    // up on the next frame. Nothing is skipped for good: the turn comes round.
+    let did = 0;
+    const n = list.length;
+    if (n) {
+      let k = this._fallK | 0;
+      if (k >= n) k = 0;
+      // (how far over each tree is, and how far back up a tree that is growing again, are BOTH clocked by the record
+      //  itself now -- data/felled.js healFelled -- so a wood falls and comes back on a world nobody is watching.
+      //  This lays what the record says; it does not move anything.)
+      for (let i = 0; i < n && did < FALL_RELAY; i++) {
+        const F = list[(k + i) % n];
+        if (F.f <= 0) continue;                 // still waiting for the wave: it stands, and is drawn standing
+        this._relay(F); did++;
+      }
+      this._fallK = (k + Math.max(1, did)) % n;
     }
     // (a tree felled, or a saved game's trees put back, since the last frame: those already lying are laid too)
     // (2026-11-18) THE LIST IS WALKED, NOT EVERY TREE OF EVERY CHUNK. This used to ask of all the trees in all the
@@ -391,6 +441,21 @@ export class Flora {
         // (the oil look's leaves by distance: a full tree keeps every leaf within about a quarter of its range and a fifth
         // of them at its end, where the middle tree, of fewer and larger leaves, takes over; the middle tree thins on from there)
         if (LOOK.oil && !g.far && !TREES_FULL) g.mesh.userData.leafLod = g.tierKey === '0' ? [0.24 * T0, 0.2] : [T0, 0.35];
+        // (2026-11-18) THE FAR TREES ARE NOT THINNED BY DISTANCE, AND HERE IS THE MEASUREMENT THAT SAYS SO, because
+        // on paper it is the biggest saving left in the game and the next session will want to try it again.
+        // A study counted the far tier at 7,326,558 triangles of an 8,191,481-triangle frame from the air and
+        // recommended it; wired up and measured on the real world at the owner's own sharpness it is a LOSS:
+        //        keep           triangles (air)        shaded pixels (air)
+        //        none (today)   5,282,805              18,488,867
+        //        a quarter      2,509,407  (-52%)      28,354,673  (+53%)
+        //        0.62           3,935,285  (-26%)      20,760,563  (+12%)
+        // The reason is in the shader: when a crown's dabs are thinned, each one that is KEPT is grown to cover for
+        // the ones that went, so the painted area holds but the dabs overlap each other far more - the far tier's
+        // self-overlap went from 4.9 to 7.7. Triangles are not what costs this game at nine times the pixels; FILL
+        // is, and this trades the cheap thing for the dear one. The study measured only the triangles.
+        // (What IS kept from the attempt: the far tree's pieces are now ordered for thinning, and the dark core is
+        //  given the highest sort key so it would be the last thing dropped rather than the first - so if a future
+        //  far tree is ever made of cheaper marks that do not need growing, the machinery is already there.)
       }
       const mesh = g.mesh, im = mesh.instanceMatrix.array, ia = mesh.userData.inst.array, ib = g.far ? mesh.userData.inst2.array : null, ab = mesh.userData.born.array;
       let w = 0, dNear = 1e9;
@@ -510,7 +575,7 @@ export class Flora {
     on = !!on;
     const now = this.species.some((sp) => sp.cardFar);
     if (on === now) return now;
-    if (on && !this.kit.farCards) this.kit.farCards = farCardGeometry(6);
+    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
     for (const sp of this.species) sp.cardFar = on && sp.canCard;
     for (const [key, ch] of this.farChunks) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
@@ -538,13 +603,32 @@ export class Flora {
   // (98 draws of nothing at 150 m, 303 at 1 km). Walked only while the eye is near enough the ground for any cell to
   // be in reach; a cell beyond reach by more than the old margin is let go at any height.
   _wanted(level, size, radius, map, kind, reach) {
-    const R = this.R, cam = this.camLocal;
+    const seen = new Set();
+    this._wantAround(this.camLocal, level, size, radius, map, kind, reach, seen);
+    // AND WHAT IS COMING (the owner, 2026-11-18: "I want things to be there before you get there even if your flying
+    // fast"). The same walk a second time, round a point a few seconds ahead of the eye, so the trees of the ground
+    // the ship is flying towards are asked for NOW and are standing by the time it arrives. Nothing is DROPPED by
+    // this second walk -- the letting-go below is still reckoned from the eye itself, so nothing near the player is
+    // ever taken away to pay for what is ahead -- and with no lead (standing, walking, another world) it does not
+    // happen at all and the wood is exactly the wood it was.
+    if (this.leadOn) this._wantAround(this.lead, level, size, radius * 0.8, map, kind, reach, seen);
+    for (const [key, ch] of map) {
+      if (seen.has(key)) continue;
+      if (ch.origin.distanceTo(this.camLocal) > (reach != null ? reach + size * 0.75 : radius) + size * 2.2) {
+        if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
+        this._disposeChunk(ch); map.delete(key);
+      }
+    }
+    for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
+  }
+
+  _wantAround(cam, level, size, radius, map, kind, reach, seen) {
+    const R = this.R;
     const c = _up.copy(cam).normalize();
     const e = new THREE.Vector3().crossVectors(_Y, c); if (e.lengthSq() < 1e-6) e.set(1, 0, 0); e.normalize();
     const n = new THREE.Vector3().crossVectors(c, e);
     const step = size * 0.5, cells = 1 << level;
     let K = Math.ceil(radius / step);
-    const seen = new Set();
     if (reach != null) {
       const above = cam.length() - R - this.S.heightAt(c.x, c.y, c.z);
       if (above > reach + size * 0.75 + RELIEF) K = -1;
@@ -572,14 +656,6 @@ export class Flora {
         map.set(key, { key, face: _ff.face, ix, iy, size, kind, rank: RANK[kind], fu: -1 + (ix + 0.5) * span, fv: -1 + (iy + 0.5) * span, held: false, isTree: kind === 'near' || kind === 'far', origin, meshes: [], built: false, queued: false, dead: false });
       }
     }
-    for (const [key, ch] of map) {
-      if (seen.has(key)) continue;
-      if (ch.origin.distanceTo(cam) > (reach != null ? reach + size * 0.75 : radius) + size * 2.2) {
-        if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
-        this._disposeChunk(ch); map.delete(key);
-      }
-    }
-    for (const ch of map.values()) if (!ch.built && !ch.queued) { ch.queued = true; this.queue.push(ch); }
   }
 
   // A cell is built when its turn comes and laid on the paper when its ground is there as it will stay
@@ -634,8 +710,10 @@ export class Flora {
   }
 
   // budgetMs: time this call may spend building and re-tiering. now: the world's wash clock (s).
-  update(camLocal, active, budgetMs, now) {
+  update(camLocal, active, budgetMs, now, lead) {
     this.camLocal.copy(camLocal);
+    this.leadOn = !!lead;
+    if (lead) this.lead.copy(lead);
     // (the powers, the wind knife: trees that are falling, or were felled since the last frame. With none ever felled:
     // one comparison.)
     if (FELLED.size && (this._fallingNow || this._fellV !== FELLED.version)) this._fall(now); else this._fallT = now;
@@ -651,7 +729,23 @@ export class Flora {
       // (a tree's ranges are never under the middle tier's: the low tier's 0.28, with the picture's 0.5 on top, left
       // a tree its form for a dozen metres; the low tier still draws no full trees at all)
       ts = Math.max(ts, RANGE_SCALE[1]);
-      const sk = Math.min(1, Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20));
+      // (2026-11-18, the owner: "slow optimization needs to be done somewhere while keeping the looks find it".)
+      // MEASURED, and this was the thing nobody meant to do: asking for the phone's whole screen does not only cost
+      // nine times the pixels, it also makes the world draw FULL-DETAIL TREES TWICE AS FAR AWAY. This number follows
+      // the picture's height, so the old 480-line picture gave 0.5 and a 1440-line one gives 1.0 - the desktop's own
+      // detail distances, on a phone. Full trees reached 45 m; they now reach 90. Counted on the real world at
+      // 3086 x 1440: 5,096,312 triangles a frame on foot against 2,328,938 at the old size, and 8,191,481 from the
+      // air against 4,456,337. The pixels went up ninefold as asked; the triangles went up again on top of that.
+      // So past 1080 lines the growth stops at TREE_DIST. A phone's screen is small and held close, however dense
+      // it is: a tree 90 m off is a few pixels either way. ?treedist= sets it; 1 is the old behaviour.
+      // (2026-11-18, found by an independent reader) AND NO CLIFF AT 1080 LINES. Written as a step, the cap vanished
+      // the moment the picture fell to 1080, so the ranges JUMPED from 0.8 back to 1.0 as the picture got SMALLER:
+      // measured on the real world, on foot, 1081 lines drew 2,241,568 triangles in 670 calls and 1080 lines drew
+      // 3,106,332 in 730 -- 39 per cent more work for 19 per cent fewer pixels. The frame controller's ladder lands
+      // exactly there (1440, 1320, 1200, 1080, ...), so the one rung it steps down to when frames are slow was the
+      // dearest rung of all, and a slow frame made itself slower. The cap now comes in smoothly from 1080 to 1440.
+      const grow = Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20);
+      const sk = Math.min(grow, 1 + (TREE_DIST - 1) * Math.min(1, Math.max(0, (SCREEN.outH - 1080) / 360)));
       const vis = this.S.look && this.S.look.visibility ? this.S.look.visibility[0] : 1e4;
       const air = Math.min(1, Math.max(0.5, Math.round((vis * 2 / T_FAR + (SHADOW.alt || 0) / 60) * 8) / 8));
       // (and from the air the far trees reach farther, up to twice: there are no near trees to pay for up there, and the
@@ -712,8 +806,9 @@ export class Flora {
     // build queue: nearest first; always allowed one item when nothing was built for a while
     let spent = false;
     if (this.queue.length) {
-      const q = this.queue, cam = this.camLocal;
-      for (const ch of q) ch.dist = ch.origin.distanceTo(cam);
+      const q = this.queue, cam = this.camLocal, lead = this.leadOn ? this.lead : null;
+      // (what is COMING counts as near, so the queue builds it before the ship is over it)
+      for (const ch of q) { const d = ch.origin.distanceTo(cam); ch.dist = lead ? Math.min(d, ch.origin.distanceTo(lead)) : d; }
       q.sort((a, b) => (b.rank - a.rank) || (b.dist - a.dist));     // pop() takes the far masses first, then the nearest
       let built = 0;
       while (q.length) {

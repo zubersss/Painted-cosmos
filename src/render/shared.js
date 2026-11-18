@@ -4,6 +4,10 @@ import { genNoise3D, genStrokes, genPaper } from './texgen.js';
 import { PAPER, hexToRgb, LOOKS } from '../data/looks.js';
 import { MODE, overlayOil } from '../data/mode.js';
 import { getDabTextures } from './dabtex.js';
+// (the powers, fire: the lasting record of what the fire LEFT -- the scorched ground. A small module of plain numbers
+// with no three in it, read here the way world/flora.js reads the felled trees. With nothing ever burnt, every reader
+// in it is one comparison, and syncBurnt below keeps that promise.)
+import { BURN, BURNT, scorchesOn } from '../data/burnt.js';
 
 let _tex = null;
 export function getTextures() {
@@ -98,10 +102,19 @@ export const OIL = {
   uOilC: { value: new THREE.Vector4(1.15, 0.5, _qn('strokes', 1), 2.7) },
   // the shade (chunks.js pcTone): x the cool key's gain over the body colour   y the sky's own fill in it (added)
   //    z the green left in the key (under 1: the shade leans to violet)   w the tiles' line: how light it is
-  uOilD: { value: new THREE.Vector4(1.0, 0.10, 0.90, 1.3) },
+  // (?shadefill= and ?shadegreen=, 2026-11-18: the art pass against the owner's twenty oil paintings. Measured on a
+  // rendered still of the game's own wood, the game's DARKS ARE LURID WHERE THE REFERENCES' ARE NEUTRAL: a trunk's
+  // deepest pixels came out at saturation 0.93 against the references' 0.33, the conifers 0.95 against 0.31, the grass
+  // in shade 0.93 against 0.49. That one difference is most of why the references read as oil paint and the game as
+  // poster paint. y is how much of the sky's own light falls into a shade, which lifts it and takes the colour out of
+  // it; z is how much green is left in the cool key, so under 1 a shade leans violet. Both are left at what they were
+  // until a still says what they should be.)
+  uOilD: { value: new THREE.Vector4(1.0, _qn('shadefill', 0.10), _qn('shadegreen', 0.90), 1.3) },
   // x: (not in use)   y: (not in use)   z: a leaf dab's length over its width   w: a dab's cell (half its length) in
   //    stroke widths
-  uOilS: { value: new THREE.Vector4(1, 0, 2.4, 2.6) },
+  // (x: ?hazeblue=, 2026-11-18 - how far the far air leans to the blue-violet the owner's aerial references have
+  //  instead of the warm cream it goes to now. 0 is the look as it was. See chunks.js pcOilHaze.)
+  uOilS: { value: new THREE.Vector4(_qn('hazeblue', 0.35), _qn('shoulder', 0.80), 2.4, 2.6) },
   // what grows on the ground: x the share of the near ground's strokes kept (the clip's floor is a carpet of leaves
   //    with tufts of grass here and there, not a sward)   y the share of the undergrowth's blades and fronds kept
   //    z 1 while the scene pass is multisampled (set every frame)
@@ -141,6 +154,177 @@ export const OIL = {
   // the land and grow on the screen, as the clip's do)   w: (not in use)
   uOilPx: { value: new THREE.Vector4(0.0015, 720, 0.027 * _qn('stroke', 1), 0.085) },
 };
+
+// WHERE THE FIRE HAS BEEN, FOR THE GROUND'S OWN PAINT (the powers, fire; the paint itself is materials.js TERRAIN_FRAG).
+//
+// The lasting record of what the fire left is src/data/burnt.js: up to six hundred marks, each one a short CAPSULE of
+// scorched ground -- two ends, how far to the side the fire reached, and how black it went. Six hundred is far more
+// than a shader can try for every pixel it paints, so the painter holds a FEW of them, and this is how the few are
+// chosen and how a pixel decides which of those few can matter where it stands.
+//
+//   WHICH FEW. The marks nearest the EYE, picked again only when the record changes, when the eye has moved a few
+//   metres, or when the eye is on another world. A fire burns where the player is; ground farther off than these
+//   marks reach reads clean again, which is this version's plain limit and must be told to the owner: a wood burnt
+//   over hundreds of metres is not black all the way to the horizon yet.
+//
+//   WHICH OF THOSE CAN MATTER AT A GIVEN PLACE. They are written out in FOURS -- each four the mark next in line and
+//   the three whose middles lie nearest it -- and a ball is drawn round each four, with one more ball round the
+//   whole lot. A pixel tries the one big ball first: a subtraction and a dot product, and outside it nothing else is
+//   done at all. Inside it, it tries each four's ball and skips all four of that four's marks behind any ball it
+//   stands outside of. So a pixel in one burnt patch pays for that patch's marks and the fours' balls, not for every
+//   mark the ground holds, and a pixel of clean ground pays for one ball. MEASURED with the ground holding all
+//   thirty-two marks of a fire that had run over three hundred metres, at 116,000 places across it and the clean
+//   ground round it: 2.7 capsule tests a place on average and 8 at worst, of the 32 held.
+//
+//   AND NOTHING AT ALL WHEN NOTHING HAS BURNED. syncBurnt makes ONE comparison (BURNT.scorches) and returns; the
+//   shader stops on one comparison too (uBurnN); and the ground's program is compiled WITHOUT any of this unless the
+//   powers and the oil look are both switched on, so the live watercolour game holds not one instruction of it.
+//
+// WHY A UNIFORM ARRAY AND NOT A LITTLE DATA TEXTURE. A ground pixel is already reading three textures; a handful of
+// uniform numbers is cheaper to read than another sampler, costs no upload and no texture memory, and it is the way
+// the game already hands the water its parted channel (uPwChanA / uPwChanB above, materials.js PC_POWERS), so there
+// is one pattern to learn and not two. A texture would be the answer if all six hundred marks had to be on the
+// ground at once -- and that wants a grid of cells inside the texture as well, the way the record itself has one.
+// That is the next step if the owner ever asks for a wood black to the horizon.
+//
+// AND WHY THE PLACES ARE THE BODY'S OWN. A mark's middle is kept here BODY-ABSOLUTE, in the body's own axes, exactly
+// as the record keeps it, and the shader compares it against vBody, which is body-absolute too (TERRAIN_VERT). It is
+// NOT measured from the eye: a middle measured from the eye, compared with vBody, would be out by wherever the
+// camera happens to stand -- kilometres -- and every burn would land nowhere near the fire that made it. A world is
+// only kilometres across, so a body-absolute metre in one of these numbers is good to a fraction of a millimetre,
+// which is far finer than a brush stroke: the simple way round is also the right one.
+//
+// HOW MANY MARKS THE GROUND HOLDS AT ONCE, in fours. This is the one number to turn, and what limits it is how many
+// uniform numbers a program may ask for: a device promises at least 224 of them to a fragment program, the oil look's
+// ground already asks for 57, each four of marks here costs nine more, and the dials and the big ball three in all.
+// MEASURED on this working copy: at eight fours the ground's program asks for 132 of the 224, which leaves room to
+// spare on the plainest device the game supports. Thirty-two marks is about one wood forty metres across burnt right
+// out (data/burnt.js measured 38 to 41 marks for a wood that size); a bigger fire than that is painted black near the
+// eye and reads clean farther off, which is this version's limit and is written out plainly below.
+const BURN_G = 8, BURN_N = BURN_G * 4;
+export const BURNPAINT = {
+  slots: BURN_N, groups: BURN_G,
+  near: 6,            // m: how far the eye may move before the nearest marks are picked again
+  // THE SCORCH'S DIALS, so that what has not been looked at yet can be turned from the address and not from the code.
+  // x: how strongly a scorch is laid at all (`?burn=`; 1 as chosen, 0 takes it out of the picture altogether, which
+  //    is how a before-and-after pair of stills is taken)
+  // y: the share of a mark's width that is burnt right through, TAKEN FROM THE RECORD ITSELF, so what is painted and
+  //    what the play code believes about the same patch of ground cannot drift apart
+  // z: how much of the ground's own colour is left under the black where a mark is blackest
+  // w: how light the charcoal is mixed (`?charcoal=`; over 1 a grey scorch, under 1 a blacker one)
+  // (y is held a hair under 1 whatever the record says: the shader eases from the core out to the rim with a
+  //  smoothstep, which has no meaning if the two edges are the same number)
+  uBurnK: { value: new THREE.Vector4(_qn('burn', 1), Math.min(0.98, BURN.core), 0.06, _qn('charcoal', 1)) },
+  uBurnN: { value: 0 },                                     // how many marks are in the arrays (0: none, and the shader stops at once)
+  uBurnBall: { value: new THREE.Vector4(0, 0, 0, -1) },     // one ball round the lot: xyz its middle, w its radius (m)
+  uBurnG: { value: new Float32Array(BURN_G * 4) },          // and one round each four of marks, the same way
+  uBurnA: { value: new Float32Array(BURN_N * 4) },          // a mark: xyz the middle of its line (the body's axes), w how wide it burned (m)
+  uBurnB: { value: new Float32Array(BURN_N * 4) },          //   and: xyz from that middle to one end of the line, w how black it went (0..1)
+};
+
+// How far a point is from a mark's line, squared. The same reading as data/burnt.js segDist2, written out again here
+// because that one belongs to the record and is not handed out; off the ends it is the distance to the nearer end, so
+// a mark is a capsule and not an endless tube.
+function _markD2(m, x, y, z) {
+  const ax = x - m.x, ay = y - m.y, az = z - m.z;
+  const bx = m.x2 - m.x, by = m.y2 - m.y, bz = m.z2 - m.z;
+  const bb = bx * bx + by * by + bz * bz;
+  if (bb <= 1e-12) return ax * ax + ay * ay + az * az;
+  let t = (ax * bx + ay * by + az * bz) / bb;
+  if (t < 0) t = 0; else if (t > 1) t = 1;
+  const dx = ax - bx * t, dy = ay - by * t, dz = az - bz * t;
+  return dx * dx + dy * dy + dz * dz;
+}
+// How far apart two marks' middles are, squared (for gathering them into fours).
+function _midD2(a, b) {
+  const dx = (a.x + a.x2 - b.x - b.x2) * 0.5, dy = (a.y + a.y2 - b.y - b.y2) * 0.5, dz = (a.z + a.z2 - b.z - b.z2) * 0.5;
+  return dx * dx + dy * dy + dz * dz;
+}
+let _bnV = -1, _bnBody = null, _bnEx = 1e9, _bnEy = 1e9, _bnEz = 1e9;
+const _bnMarks = [], _bnPick = [], _bnDist = [], _bnTook = new Uint8Array(BURN_N), _bnFour = new Int32Array(4);
+// Picks the marks the ground will paint and fills the uniforms above. The world calls this once a frame for the body
+// the eye is on, before the ground is drawn: syncBurnt(bodyId, camLocal), the eye in that body's own axes.
+// MEASURED in Node on the build machine (not on a device): 14 to 29 ns a frame with nothing ever burnt, 50 ns a frame
+// when nothing has changed since the last one, and 17.8 us in the worst case the record allows -- its list full at six
+// hundred marks AND changing every frame, which is a fire sitting on ground it is still blackening. That worst case is
+// a tenth of one per cent of a sixty-a-second frame.
+export function syncBurnt(bodyId, cam) {
+  // NOTHING HAS EVER BURNED: one comparison and out, which is the promise data/burnt.js makes and this keeps.
+  if (!BURNT.scorches) {
+    if (BURNPAINT.uBurnN.value !== 0) { BURNPAINT.uBurnN.value = 0; BURNPAINT.uBurnBall.value.w = -1; _bnV = -1; _bnBody = null; }
+    return;
+  }
+  const ex = cam ? cam.x : 0, ey = cam ? cam.y : 0, ez = cam ? cam.z : 0;
+  const mx = ex - _bnEx, my = ey - _bnEy, mz = ez - _bnEz;
+  // the same marks stand until the record changes, the eye moves a few metres, or the eye is on another world
+  if (BURNT.version === _bnV && bodyId === _bnBody && mx * mx + my * my + mz * mz < BURNPAINT.near * BURNPAINT.near) return;
+  _bnV = BURNT.version; _bnBody = bodyId; _bnEx = ex; _bnEy = ey; _bnEz = ez;
+  // THE NEAREST FEW, NEAREST FIRST. Each mark on this world is looked at once and dropped into a list of
+  // BURN_N kept in order; the list is short and this happens only when something has changed, so there is no call
+  // for anything cleverer than looking at each in turn.
+  scorchesOn(bodyId, _bnMarks);
+  _bnPick.length = 0; _bnDist.length = 0;
+  for (let j = 0; j < _bnMarks.length; j++) {
+    const m = _bnMarks[j], d = _markD2(m, ex, ey, ez);
+    let at = _bnPick.length;
+    if (at >= BURN_N) { if (!(d < _bnDist[BURN_N - 1])) continue; at = BURN_N - 1; } else { _bnPick.push(null); _bnDist.push(0); }
+    while (at > 0 && _bnDist[at - 1] > d) { _bnDist[at] = _bnDist[at - 1]; _bnPick[at] = _bnPick[at - 1]; at--; }
+    _bnDist[at] = d; _bnPick[at] = m;
+  }
+  const n = _bnPick.length;
+  for (let i = 0; i < n; i++) _bnTook[i] = 0;
+  const A = BURNPAINT.uBurnA.value, B = BURNPAINT.uBurnB.value, Gb = BURNPAINT.uBurnG.value;
+  let w = 0, allX = 0, allY = 0, allZ = 0;
+  // IN FOURS, EACH FOUR THE FOUR NEAREST ONE ANOTHER, with a ball round it. Only the last four can hold fewer than
+  // four marks, so mark number four times g is always the first of the four the ball at g holds, and the shader needs
+  // no count of its own for each four: it stops at uBurnN.
+  for (let g = 0; g < BURN_G && w < n; g++) {
+    let seed = -1;
+    for (let i = 0; i < n; i++) if (!_bnTook[i]) { seed = i; break; }
+    if (seed < 0) break;
+    let cnt = 0;
+    _bnTook[seed] = 1; _bnFour[cnt++] = seed;
+    while (cnt < 4) {
+      let best = -1, bd = Infinity;
+      for (let i = 0; i < n; i++) {
+        if (_bnTook[i]) continue;
+        const d = _midD2(_bnPick[i], _bnPick[seed]);
+        if (d < bd) { bd = d; best = i; }
+      }
+      if (best < 0) break;
+      _bnTook[best] = 1; _bnFour[cnt++] = best;
+    }
+    // this four's middle (the mean of its marks' ends), then the radius that holds every end and its own width
+    let cx = 0, cy = 0, cz = 0;
+    for (let k = 0; k < cnt; k++) { const m = _bnPick[_bnFour[k]]; cx += m.x + m.x2; cy += m.y + m.y2; cz += m.z + m.z2; }
+    const inv = 1 / (cnt * 2); cx *= inv; cy *= inv; cz *= inv;
+    let rad = 0;
+    for (let k = 0; k < cnt; k++) {
+      const m = _bnPick[_bnFour[k]];
+      rad = Math.max(rad, Math.hypot(m.x - cx, m.y - cy, m.z - cz) + m.r, Math.hypot(m.x2 - cx, m.y2 - cy, m.z2 - cz) + m.r);
+      const o = w * 4;
+      A[o] = (m.x + m.x2) * 0.5; A[o + 1] = (m.y + m.y2) * 0.5; A[o + 2] = (m.z + m.z2) * 0.5; A[o + 3] = m.r;
+      B[o] = (m.x2 - m.x) * 0.5; B[o + 1] = (m.y2 - m.y) * 0.5; B[o + 2] = (m.z2 - m.z) * 0.5; B[o + 3] = m.c;
+      w++;
+      allX += A[o]; allY += A[o + 1]; allZ += A[o + 2];
+    }
+    const go = g * 4;
+    Gb[go] = cx; Gb[go + 1] = cy; Gb[go + 2] = cz; Gb[go + 3] = rad;
+  }
+  // and one ball round the whole lot, which is the first thing a pixel asks about
+  const ball = BURNPAINT.uBurnBall.value;
+  if (w > 0) {
+    allX /= w; allY /= w; allZ /= w;
+    let rad = 0;
+    for (let i = 0; i < w; i++) {
+      const o = i * 4, hx = B[o], hy = B[o + 1], hz = B[o + 2], r = A[o + 3];
+      const dx = A[o] - allX, dy = A[o + 1] - allY, dz = A[o + 2] - allZ;
+      rad = Math.max(rad, Math.hypot(dx + hx, dy + hy, dz + hz) + r, Math.hypot(dx - hx, dy - hy, dz - hz) + r);
+    }
+    ball.set(allX, allY, allZ, rad);
+  } else ball.set(0, 0, 0, -1);
+  BURNPAINT.uBurnN.value = w;
+}
 
 // What the shadow map needs from the world each frame (shadow.js): the body the eye is on (its root in the scene), the
 // way to its sun in its own space, and how strong a shadow is now (none under a closed sky or in the middle of twilight).

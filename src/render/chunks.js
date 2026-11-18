@@ -290,7 +290,19 @@ float pcFogAmount(float dist) {
 // (the oil look: the far end is the air's own colour, and toward the sun the air glows with the light's; the distance
 // changes a thing's colour in flat steps and never softens its edge)
 // (the gold air a step deeper than it was: the clip's far air reads about (0.77, 0.69, 0.60), ours was nearly white)
-vec3 pcOilHaze(vec3 h) { return mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold()); }
+// (2026-11-18, the art pass) THE FAR AIR'S OWN COLOUR. A rendered still of the wood from the air measured half its
+// pixels at brightness 0.93, against 0.62 in the owner's twenty oil paintings, with nothing blue in the distance at
+// all: the haze goes to a warm cream (0.95, 0.85, 0.63) at a golden hour, and from the air everything is far, so the
+// whole picture bleaches to it. Every one of their eight aerial paintings instead has the distance going BLUE-VIOLET,
+// measured at (0.48, 0.50, 0.63). uOilS.x (?hazeblue=) leans the far air that way.
+// SEEN AND MEASURED, 2026-11-18, three stills of the same aerial view: at 0 the distant hills are 0.2 per cent of
+// the picture at brightness 0.78; at 0.35 they are 2.8 per cent at 0.65, which is the owner's own 0.24 saturation
+// and 0.63 brightness almost exactly; at 0.60 they are 5.8 per cent at 0.68, past them. The whole picture's middle
+// brightness goes 0.93, 0.84, 0.78 against the references' 0.62. 0.35 IS THE DEFAULT; ?hazeblue=0 is the old look.
+vec3 pcOilHaze(vec3 h) {
+  vec3 warm = mix(pow(h, vec3(uOilC.x)), vec3(0.95, 0.85, 0.63), 0.75 * pcGold());
+  return mix(warm, vec3(0.48, 0.50, 0.63), uOilS.x);
+}
 vec3 pcAtmos(vec3 c, float f) { return mix(c, pcOilHaze(uHaze), f); }
 vec3 pcAtmosWash(vec3 c, float f) {
 #else

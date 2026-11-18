@@ -3,7 +3,7 @@
 // Run: node --test tests/felled.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FELLED, FELL, fellTree, felledAt, fallingOn, fallTurn, felledRows, felledLoad } from '../src/data/felled.js';
+import { FELLED, FELL, fellTree, felledAt, fallingOn, fallTurn, felledRows, felledLoad, healFelled } from '../src/data/felled.js';
 import { Powers, ABILITIES, POWERS } from '../src/core/powers.js';
 import { Sim } from '../src/core/sim.js';
 import { snapshot, restore, validate } from '../src/core/save.js';
@@ -95,4 +95,34 @@ test('in the real forest: the knife fells the first tree along the aim, its trun
   // and an old save (no field) clears them: that game never felled a tree
   delete snap.felled; assert.equal(restore(sim2, snap), true); assert.equal(FELLED.size, 0);
   void R;
+});
+
+test('A FELLED WOOD GROWS BACK (owner, 2026-11-18: "felled woods or burnt areas eventually do return to normal so it isn’t taking up memory")', () => {
+  felledLoad([]);
+  const p = { x: 0, y: 6371000, z: 0 };
+  // three trees: one at the explorer's feet, two far away
+  fellTree('earth', 0, 6371000, 2, 0, 0, 1);
+  fellTree('earth', 400, 6371000, 0, 1, 0, 0);
+  fellTree('earth', -500, 6371000, 0, -1, 0, 0);
+  const step = (secs, at) => { for (let i = 0; i < secs * 2; i++) healFelled(0.5, at); };
+  step(FELL.time + 1, p);                       // they finish falling
+  assert.equal(FELLED.size, 3, 'all three are lying');
+  step(FELL.life - FELL.time - 2, p);
+  assert.equal(FELLED.size, 3, 'and nothing comes back before its time');
+  // the two far ones rise once they have waited; the one at the explorer's feet does not, yet
+  step(FELL.rise + 12, p);
+  assert.equal(FELLED.size, 1, 'the two out of sight stand again: ' + FELLED.size + ' left');
+  assert.ok(felledAt('earth', 0, 6371000, 2), 'and the one the player is standing over is still down');
+  // it comes back too, once it has waited twice as long, even with the player there
+  step(FELL.life + FELL.rise + 12, p);
+  assert.equal(FELLED.size, 0, 'everything the wind laid over is standing again');
+  // and with nobody anywhere near, a tree simply comes back
+  fellTree('earth', 10, 6371000, 10, 1, 0, 0);
+  step(FELL.time + FELL.life + FELL.rise + 12, null);
+  assert.equal(FELLED.size, 0, 'with no explorer given, a tree heals wherever it stands');
+  // the version moves when one stands up, so the world lays it again
+  const v0 = FELLED.version;
+  fellTree('earth', 20, 6371000, 20, 1, 0, 0);
+  step(FELL.time + FELL.life + FELL.rise + 12, null);
+  assert.ok(FELLED.version > v0, 'the renderer is told');
 });

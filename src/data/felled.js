@@ -13,6 +13,15 @@ export const FELL = Object.freeze({
   time: 1.5,          // s: how long a tree takes to fall
   angle: 1.5,         // rad: how far it turns about its foot (a little short of lying flat: its crown rests on the ground)
   max: 400,           // trees kept (the oldest is forgotten first: it stands again)
+  // THE WOOD GROWS BACK (the owner, 2026-11-18: "make sure that felled woods or burnt areas eventually do return to
+  // normal so it isn't taking up memory"). A felled tree waits `life` seconds of play and then stands again over
+  // `rise` seconds. It is never seen to do it: a tree only begins to rise once the explorer is more than `quiet`
+  // metres from it -- farther than the full trees are drawn at all -- or, if the player simply stays beside it, once
+  // it has waited twice as long, by which time they have had a quarter of an hour to look at it. When it is up, the
+  // record is gone, which is the memory the owner asked about: the list is now bounded by TIME as well as by count.
+  life: 420,          // s of play before a felled tree may stand again
+  rise: 3.5,          // s it takes to come back up (it goes back the way it came: the same lean, run backwards)
+  quiet: 160,         // m: how far the explorer must be for it to happen out of sight
 });
 
 const M = new Map();
@@ -28,7 +37,7 @@ export function fellTree(bodyId, x, y, z, dx, dy, dz, wait = 0) {
   const k = keyOf(bodyId, x, y, z);
   if (M.has(k)) return null;
   const l = Math.hypot(dx, dy, dz) || 1;
-  const F = { bodyId, x, y, z, dx: dx / l, dy: dy / l, dz: dz / l, f: -Math.max(0, wait) / FELL.time };
+  const F = { bodyId, x, y, z, dx: dx / l, dy: dy / l, dz: dz / l, f: -Math.max(0, wait) / FELL.time, age: 0, rise: false };
   M.set(k, F);
   if (M.size > FELL.max) M.delete(M.keys().next().value);
   FELLED.version++;
@@ -37,6 +46,36 @@ export function fellTree(bodyId, x, y, z, dx, dy, dz, wait = 0) {
 
 // The record of the tree at that place, or null. f: how far its fall has gone (below 0: not begun; 1: it lies).
 export function felledAt(bodyId, x, y, z) { return M.size ? M.get(keyOf(bodyId, x, y, z)) || null : null; }
+
+// THE WOOD GROWING BACK. Called once a frame by whoever owns the explorer's powers (core/powers.js: these trees
+// exist only because of them, so with no powers this is never called and costs nothing at all). `dt` seconds of
+// play; `p` where the explorer is, or null to let every tree rise wherever it stands.
+// Returns how many stood up this frame, which is 0 on nearly every frame of a game.
+export function healFelled(dt, p = null) {
+  if (!M.size || !(dt > 0)) return 0;
+  let up = 0;
+  // The CLOCK of a fall and of a rise is clamped, so one slow frame cannot throw a tree over in a single step; the
+  // AGE is not, because a frame that took half a second really is half a second of the player's life.
+  const h = dt > 0.25 ? 0.25 : dt;
+  for (const F of M.values()) {
+    // THE FALL ITSELF IS CLOCKED HERE, not by whoever draws it. It used to be advanced inside the trees' renderer,
+    // so a tree on a world nobody was looking at never finished falling and so never began to heal, and nothing
+    // that did not draw trees could age the list at all. The renderer now only LAYS what this says.
+    if (F.f < 1 && !F.rise) { F.f += h / FELL.time; if (F.f > 1) F.f = 1; continue; }
+    F.age += dt;
+    if (!F.rise) {
+      if (F.age < FELL.life) continue;
+      // out of sight, or long past caring
+      const far = !p || Math.hypot(F.x - p.x, F.y - p.y, F.z - p.z) > FELL.quiet;
+      if (!far && F.age < FELL.life * 2) continue;
+      F.rise = true;
+    }
+    F.f -= h / FELL.rise;
+    if (F.f <= 0) { M.delete(keyOf(F.bodyId, F.x, F.y, F.z)); up++; }
+  }
+  if (up) FELLED.version++;
+  return up;
+}
 
 // The felled trees of one body that are still falling, into `out`.
 export function fallingOn(bodyId, out = []) {

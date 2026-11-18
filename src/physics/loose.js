@@ -20,7 +20,7 @@
 //   dust devils a rising helix of dust (features.js)
 import { SPECIES, terminalVelocity, meanFreePath, ATMOSPHERES } from './atmosphere.js';
 import { saltationThreshold } from './weather.js';
-import { MATERIAL_INDEX, MATERIAL_NONE, materialNow } from './ground.js';
+import { MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow } from './ground.js';
 import { BODIES } from '../data/bodies.js';
 import { PARTICLES, EVENT, publish } from './particles.js';
 import { clamp01, smoothstep, noise3, fsin, fcos } from './util.js';
@@ -172,6 +172,97 @@ export const BLOWN = Object.freeze({
   surfShare: 0.5,         // of the spray capacity per second on a beach in a full sea
 });
 
+// WHAT A FIRE LOOKS LIKE IN THE AIR (2026-11-18; the elemental powers, fire: fire.js, docs/POWERS-FIRE.md).
+// The fire itself is a short list of small burning patches: where each one burns, how wide it is, how hot it is and
+// how old. It draws nothing at all. THIS is what is drawn, and it is made the way the explorer's wind is made --
+// which is already in the game and proven (see _wisps, far below): grains of the LEAF kind, each handed a ground
+// material's ink, which makes PAINTER's leaf kit lay it as a RIBBON ALONG ITS OWN FLIGHT instead of a leaf
+// (physics/three/expand.js, its `wisp` option). So no mesh, no material and no draw call is added by any of this,
+// and nothing is worked out for a pixel.
+//   FLAME   short tongues thrown up out of the hottest patches, leaning downwind, each one gone in half a second,
+//           so a fire is a moving crowd of small marks and never one shape.
+//   SMOKE   slower and paler, sprinkled all the way up a leaning column that widens as it rises. A smoke grain does
+//           NOT climb that column: nothing here could carry one ten metres up (a grain answers the air it is in
+//           within a tenth of a second, and then it only sinks). It is BORN somewhere up the column, moving the way
+//           the smoke moves there, and is gone in a moment; the crowd of them is the plume. That is the same trick
+//           that draws the whirlwind's column (_wisps, KIND.vortex), and it is the only one that works here.
+//   EMBERS  a few heavy bright specks thrown up fast out of the fire; being heavy they hold their flight, arc over
+//           downwind and fall out, which is what makes a fire look alive.
+// THE WIND. They drift with the weather and with the player's own gusts for nothing, because every grain of the leaf
+// kind is carried by the air in the motion loop below, which already asks the wind grid and the powers. The lean
+// each one is GIVEN AT BIRTH is the wind at its own patch, which fire.js has already asked the air for (the dust
+// devils and the player's wind are folded into that), so a gust that fans a fire also bends its flames and lays its
+// smoke over, and a stilled place lets them stand up straight.
+// HOW MANY, AND WHOSE ROOM IT TAKES. So many grains a second for each square metre of fire, so that one campfire is
+// a campfire; and under a hard ceiling for the whole fire however big it grows -- flameShare, smokeShare and
+// emberShare of the leaf buffer, an eighth of it between them. On top of that nothing at all is made once the
+// buffer is more than `share` full, so the leaves of a gale and the wind's own strokes can never be crowded out by a
+// fire. The dust, the sand and the spray have their own buffers and a fire never touches them.
+// WITH NOTHING BURNING all of this costs ONE COMPARISON a frame (see update: `if (P.fires)`), because the game hands
+// the fire list over only while something is actually alight.
+// WHAT IT COST, measured on the build machine (the tests beside this file print all three): with nothing burning,
+// nothing that can be told from nought -- the whole physics frame is the same to within a microsecond or two of its
+// own noise, run both ways. One campfire: 0.03 ms on a 0.45 ms frame, about seventy more grains in the air. A forest
+// fire at the cap: 0.10 ms, about 280 more grains. Of that the making of them is 0.007 ms; all the rest is the motion
+// loop below carrying them, at the same price a leaf in a gale costs. If the owner finds a big fire thin, raise
+// flamePerM2 and flameShare; if it is dear on the phone, lower them. Those are the only two numbers that matter.
+// WHAT IS NOT HERE. No light: a fire lights the ground round it, and that is PAINTER's to add, not ours. And no
+// difference of SIZE between the three -- PAINTER draws every grain of the leaf kind the same width and no stroke
+// shorter than 0.8 m (world/index.js, draw.leaves), so flame, smoke and embers are told apart by their colour, by
+// where they are born, by how fast and which way they fly (which is what sets each stroke's length and lean) and by
+// how long they live. An ember cannot be made a small bright POINT from here; that is a change to the leaf kit.
+export const FLAME = Object.freeze({
+  share: 0.92,           // of the leaf buffer: over this, a fire makes nothing at all and waits.
+                         // (2026-11-18, FOUND BY LOOKING: a fire lit in the owner's own autumn wood drew NOTHING -
+                         //  no flame, no smoke, no ember - while it burned, and this was why. At 0.5 the fire holds
+                         //  its hand whenever the leaf buffer is half full, and an autumn wood in leaf-fall beside a
+                         //  river is exactly where it never is: the one scene the owner looks at most was the one
+                         //  scene a fire could not be seen in. The three ceilings below already bound a fire to an
+                         //  eighth of the buffer however big it grows, so the leaves of a gale were never in danger
+                         //  from it; this backstop only needs to stop a fire taking the LAST of the buffer.)
+  edge: 8,               // m: patches further than this outside the simulated box are ignored, so the budget is
+                         // spent on fire that can be seen rather than on fire over the hill
+
+  // FLAME. A tongue is born just off the ground (the painter's ribbon is drawn BACKWARDS from the grain along its
+  // flight, so a rising grain stands rooted in the fire) and thrown up fast. It is heavy for its kind on purpose:
+  // a light grain is pulled into the air's own motion within a few hundredths of a second and the tongue collapses,
+  // while a heavy one holds the flight it was given for about as long as it lives, which is what makes a tongue.
+  flamePerM2: 15,        // tongues a second for each square metre of fire at full heat (a campfire of one patch, 4
+                         // square metres, makes 60 a second: 25 in the air at once)
+  flameShare: 0.06,      // ... and never more of the leaf buffer than this, however big the fire (a forest fire 45 m
+                         // across asks for eight times the ceiling, so it sits on it: 180 tongues in the air)
+  flameLife: 0.42,       // s (each one 0.6 to 1.4 times this: see emit)
+  flameUp: 4.5,          // m/s thrown up (x 0.45 .. 1.25, and less from a patch that is not yet hot)
+  flameHigh: 1.1,        // m: how high over the fire a tongue may start
+  flameLean: 0.55,       // of the wind at the patch, carried sideways at birth: the flame leans, it is not blown flat
+  flameSize: 1.5,        // x a leaf: heavy, see above
+
+  // SMOKE. Thicker the hotter the fire, and it outlives the flame that made it: a burnt-out patch goes on smoking
+  // for smokeAfter seconds at smokeAsh of its old strength, so the ground behind a fire front still smokes.
+  smokePerM2: 12,        // puffs a second for each square metre of fire (a campfire: 48 a second, 38 in the air)
+  smokeShare: 0.06,      // ... and never more of the leaf buffer than this (a big fire: 225 a second, 180 in the air)
+  smokeLife: 0.8,        // s
+  smokeTop: 10,          // m: how far up the column reaches at full heat
+  smokeRise: 2.6,        // m/s at its foot, falling to half that at the top
+  smokeSpread: 0.22,     // m of width for each m of height
+  smokeFoot: 0.6,        // m: the column starts this far up, clear of the sloping ground under the patch
+  smokeSize: 0.7,        // x a leaf
+  smokeAfter: 8,         // s a burnt-out patch goes on smoking (its ash is kept 11 s: fire.js FIRE.ashLife)
+  smokeAsh: 0.55,        // how much of a flaming patch's smoke a burnt-out one makes
+
+  // EMBERS. Few, fast and heavy: they arc.
+  emberPerM2: 1.6,       // embers a second for each square metre of fire (a campfire: six a second, ten in the air)
+  emberShare: 0.008,     // ... and never more of the leaf buffer than this (a big fire: 15 a second, 24 in the air)
+  emberLife: 1.6,        // s
+  emberUp: 6.5,          // m/s (x 0.55 .. 1.45)
+  emberOut: 1.2,         // m/s sideways, so they leave the fire as a spray and not a jet
+  emberLean: 1.0,        // of the wind at the patch: an ember is carried off downwind
+  emberSize: 2.2,        // x a leaf: heavy enough to keep its arc for a second or two
+});
+// How much of a fire's smoke one patch is making now: while it burns, as fiercely as it burns; and for a while after
+// it has burnt out, because a black patch goes on smoking after its flame has gone (fire.js keeps it as ash).
+const smokeOf = (s) => (s.ash ? (s.ashAge < FLAME.smokeAfter ? FLAME.smokeAsh * (1 - s.ashAge / FLAME.smokeAfter) : 0) : s.heat);
+
 const _gp = { dust: 0, repose: 0, liquid: 0, h: 0, mat: MATERIAL_NONE };
 const _pwl = new Float64Array(4), _covL = {};
 const _sf = {}, _sp = new Float64Array(2), _aw = new Float64Array(2);
@@ -182,6 +273,17 @@ const I_WOOD = MATERIAL_INDEX.mud != null ? MATERIAL_INDEX.mud : MATERIAL_INDEX.
 // (a cast made bigger throws about more in proportion to the ground it covers, not to its radius: powers.js sizeOf)
 const sizeRate = (s) => (s.size > 1 ? Math.min(6, s.size * s.size * 0.65 + 0.35) : 1);      // (a snapped branch's ink: the darkest brown the ground has)
 const I_ICE = MATERIAL_INDEX.ice != null ? MATERIAL_INDEX.ice : MATERIAL_INDEX.snow;      // (the wisps of the explorer's wind: powers.js)
+// (fire) THE FLAME'S AND THE EMBERS' OWN INK. PAINTER's table of ground inks has sixteen slots and the ground is made
+// of fifteen things, so the spare slot is given to fire: nothing the ground is made of is the colour of a flame.
+// Until PAINTER fills that slot a tongue comes out in the ground's own brown -- wrong to look at, but nothing breaks,
+// and the one-line patch for it is in this session's report.
+const I_FLAME = MATERIAL_IDS.length < 16 ? MATERIAL_IDS.length : MATERIAL_INDEX.ash;
+const I_SMOKE = MATERIAL_INDEX.ash;      // (smoke: the grey-brown the table already holds for ash)
+// (fire) AND THE EMBERS' OWN INK, the slot after the flame's. The painter paints a spark as a different MARK from a
+// tongue - tiny, very bright, with a short tail that cools behind it - and from inside the painter nothing else about
+// a grain can tell the two apart: it is handed a grain's ink and nothing else, not its size, not its speed, not even
+// its age. The painter's table has the slot (render/kitmat.js: the world's blend never touches it).
+const I_EMBER = I_FLAME + 1;
 
 export class Loose {
   constructor(particles) {
@@ -196,7 +298,7 @@ export class Loose {
       b.species = LOOSE[k].species;
       this.vt[k] = 1;
     }
-    this._carry = new Float64Array(13);  // fractional emissions carried between frames
+    this._carry = new Float64Array(16);  // fractional emissions carried between frames (13, 14, 15: a fire's flame, smoke and embers)
     this.blowingSnow01 = 0;              // 0..1: how hard the wind is moving snow along the ground at the focus (a ground blizzard)
     this.spume01 = 0;                    // 0..1: how much spume the wind is tearing off the sea near the focus
     this.surf01 = 0;                     // 0..1: how hard the sea is breaking on a shore near the focus
@@ -479,6 +581,11 @@ export class Loose {
       }
       // the wind the explorer makes (powers.js) lifts what lies loose under it
       if (winds && winds.count > 0) this._windLift(winds, h, frame, air, near, fx, fz, groundY, wet01, snowDepth);
+      // THE FIRE THE EXPLORER HAS LIT (fire.js): its flame, its smoke and its embers (see FLAME above). The list
+      // reaches us the way the explorer's wind reaches the rain -- the game hands it to the physics, the physics puts
+      // it on the particle system (index.js: `particles.fires = fires`), and it is there only while something is
+      // alight. So with nothing burning anywhere this whole thing is the one comparison on the next line.
+      if (P.fires) this._fire(P.fires, h, frame, near, fx, fz, Rr);
     }
 
     // ---- emitters: bodies and jets ---------------------------------------------------------------
@@ -1017,6 +1124,100 @@ export class Loose {
       if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
       const gy = near ? near.heightAt(x, z, groundY) : groundY;
       if (!this.emit('leaves', x, gy + y, z, ve, vu, vn, 0.35, life * (0.7 + 0.6 * rng()), rng() < 0.7 ? I_SNOW : I_ICE)) { s.wisp = 0; break; }
+    }
+  }
+
+  // THE FLAME, THE SMOKE AND THE EMBERS OF A FIRE (what each of them is and why, in FLAME above). F is the fire list
+  // (fire.js), which placeFires has already put in this frame's grid, which is why every patch here has an x, a z and
+  // a y. We read it and never write to it: the burning is the fire's business, the picture is ours.
+  _fire(F, h, frame, near, fx, fz, Rr) {
+    const P = this.P, rng = this.rng, Fl = FLAME, C = this._carry;
+    const b = P.buffers.leaves, cap = PARTICLES.capacity.leaves[P.quality], room = cap * Fl.share;
+    if (b._n >= room) return;             // the leaves of a gale have the buffer: a fire takes no room from them
+    const lim = Rr + Fl.edge;
+    // HOW MUCH FIRE IS IN REACH AT ALL, as square metres of flame and of smoke. (A patch's own square metres, not
+    // pi r^2: it is only a weight, and every patch is weighed the same way.)
+    let wf = 0, ws = 0;
+    for (let i = 0; i < F.count; i++) {
+      const s = F[i];
+      if (!s.placed || Math.abs(s.x - fx) > lim || Math.abs(s.z - fz) > lim) continue;
+      const a = s.radius * s.radius;
+      wf += s.heat * a; ws += smokeOf(s) * a;
+    }
+    if (!(wf > 0) && !(ws > 0)) return;
+    // (2026-11-18) a patch of no width among smoking ones: there is nothing to share out, and 0/0 would leave the
+    // carry not-a-number and the flame and the embers gone for the rest of the session
+    if (!(wf > 0)) wf = 1;
+    if (!(ws > 0)) ws = 1;
+    // THE THREE BUDGETS: so many grains a second for each square metre of fire, and never more than the ceiling,
+    // which is a share of the buffer divided by how long one grain lives -- so the ceiling is really a count of
+    // grains in the air at once, which is the thing that has to be capped.
+    const rf = Math.min(Fl.flamePerM2 * wf, cap * Fl.flameShare / Fl.flameLife);
+    const rs = Math.min(Fl.smokePerM2 * ws, cap * Fl.smokeShare / Fl.smokeLife);
+    const re = Math.min(Fl.emberPerM2 * wf, cap * Fl.emberShare / Fl.emberLife);
+    for (let i = 0; i < F.count; i++) {
+      const s = F[i];
+      if (!s.placed || Math.abs(s.x - fx) > lim || Math.abs(s.z - fz) > lim) continue;
+      const a = s.radius * s.radius, sm = smokeOf(s), heat = s.heat;
+      // the wind at this patch, which fire.js has already asked the air for (the body's own axes), turned into this
+      // grid's east and north. The player's gusts and the dust devils are already in it.
+      const wE = s.wx * frame.ex + s.wy * frame.ey + s.wz * frame.ez;
+      const wN = s.wx * frame.nx + s.wy * frame.ny + s.wz * frame.nz;
+      // FLAME: out of the patch, up fast, leaning downwind. Born a finger off the ground, because the painter draws
+      // the ribbon backwards from the grain along its flight, so a rising tongue stands rooted in the fire.
+      if (heat > 0) {
+        C[13] += rf * heat * a / wf * h;
+        if (C[13] > 64) C[13] = 64;     // (2026-11-18) NEVER A BACKLOG: the guard below spends 64 a frame at most, and a carry grown past it outlives the fire and over-emits on the next one. Measured by a reader: 39,086 in the carry after three minutes of a wide melt at ten frames a second, and the next campfire then made 3,894 grains a second instead of 114.
+        let guard = 64;
+        while (C[13] >= 1 && guard-- > 0) {
+          C[13] -= 1;
+          if (b._n >= room) { C[13] = 0; break; }
+          const ang = rng() * 6.2831853, R = s.radius * 0.8 * Math.sqrt(rng());
+          const x = s.x + Math.cos(ang) * R, z = s.z + Math.sin(ang) * R;
+          if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+          const gy = near ? near.heightAt(x, z, s.y) : s.y;        // the ground under THIS tongue, not under the patch
+          const up = Fl.flameUp * (0.45 + 0.8 * rng()) * (0.5 + 0.5 * heat);
+          if (!this.emit('leaves', x, gy + 0.05 + rng() * rng() * Fl.flameHigh * heat, z,
+            wE * Fl.flameLean, up, wN * Fl.flameLean, Fl.flameSize, Fl.flameLife * 0.1, I_FLAME)) { C[13] = 0; break; }
+        }
+      }
+      // SMOKE: born somewhere up a leaning, widening column (FLAME, above, says why it is not carried up it). `t` is
+      // how far up; the column leans downwind by however long the smoke took to get that high, and spreads as it goes.
+      if (sm > 0) {
+        C[14] += rs * sm * a / ws * h;
+        if (C[14] > 64) C[14] = 64;     // (the same, for the smoke)
+        let guard = 64;
+        while (C[14] >= 1 && guard-- > 0) {
+          C[14] -= 1;
+          if (b._n >= room) { C[14] = 0; break; }
+          const t = rng(), top = Fl.smokeTop * (0.35 + 0.65 * sm) * (0.8 + 0.2 * s.size);
+          const hgt = top * t, rise = Fl.smokeRise * (1 - 0.5 * t), lag = hgt / Fl.smokeRise;
+          const wid = s.radius * 0.7 + Fl.smokeSpread * hgt, ang = rng() * 6.2831853, R = wid * Math.sqrt(rng());
+          const x = s.x + wE * lag + Math.cos(ang) * R, z = s.z + wN * lag + Math.sin(ang) * R;
+          if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+          // over melting ice it is steam, and white: this patch is putting all its heat into the ice (fire.js)
+          if (!this.emit('leaves', x, s.y + Fl.smokeFoot + hgt, z, wE, rise, wN, Fl.smokeSize, Fl.smokeLife * 0.1,
+            s.melt > 0 ? I_SNOW : I_SMOKE)) { C[14] = 0; break; }
+        }
+      }
+      // EMBERS: a few, thrown up fast and out a little, and heavy, so they hold the arc they are given and the wind
+      // takes them downwind as they come down.
+      if (heat > 0) {
+        C[15] += re * heat * a / wf * h;
+        if (C[15] > 16) C[15] = 16;     // (the same, for the embers, whose guard is 16)
+        let guard = 16;
+        while (C[15] >= 1 && guard-- > 0) {
+          C[15] -= 1;
+          if (b._n >= room) { C[15] = 0; break; }
+          const ang = rng() * 6.2831853, R = s.radius * 0.5 * Math.sqrt(rng());
+          const x = s.x + Math.cos(ang) * R, z = s.z + Math.sin(ang) * R;
+          if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
+          const gy = near ? near.heightAt(x, z, s.y) : s.y;
+          const up = Fl.emberUp * (0.55 + 0.9 * rng());
+          if (!this.emit('leaves', x, gy + 0.12, z, wE * Fl.emberLean + Math.cos(ang) * Fl.emberOut, up,
+            wN * Fl.emberLean + Math.sin(ang) * Fl.emberOut, Fl.emberSize, Fl.emberLife * 0.1, I_EMBER)) { C[15] = 0; break; }
+        }
+      }
     }
   }
 

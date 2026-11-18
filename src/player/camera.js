@@ -111,6 +111,15 @@ export const CROWN_KITS = Object.freeze({
   broadleaf: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
   conifer: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
   fungus: Object.freeze([0.8, 1.15, 0.45]),
+  // (2026-11-18, found by an independent reader: the four kits that went into the autumn wood were never named here,
+  //  so crownShape handed back null and the cameras took a maple whose crown measures 11.5 to 17.7 m across as a
+  //  SOLID POLE 0.7 m wide. In the oil look that wood is 85 to 97 per cent maple, so nearly every tree at the owner's
+  //  own landing site was invisible to the rule that keeps the lens out of a crown -- the very fault review 6 and M4
+  //  put this table here to mend. The numbers are the reader's own measurements of the built trees.)
+  maple: Object.freeze([0.25, 1.05, 0.60]),
+  aspen: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
+  spruce: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
+  tallpine: Object.freeze([0.60, 1.05, 0.28]),
 });
 // kit: the plant's kit when it is known (a name), undefined when it is not: then a footprint under
 // columnRadius is taken for a tree with a crown, as before.

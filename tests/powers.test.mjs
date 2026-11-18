@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { Powers, ABILITIES, POWERS } from '../src/core/powers.js';
 import { KIND, WINDPOWER } from '../src/physics/powers.js';
 import { S } from '../src/core/state.js';
+import { FELLED, felledAt, felledLoad } from '../src/data/felled.js';
 
 const R = 4000;
 function fakeSim({ pitch = -0.12, state = S.ON_FOOT } = {}) {
@@ -139,4 +140,150 @@ test('without ?powers=1 nothing of the powers is loaded: main.js imports them on
     const s = fs.readFileSync(new URL(f, import.meta.url), 'utf8');
     assert.ok(!/from '\.\.?\/[a-z/]*powers\.js'/.test(s), f + ' does not import the powers');
   }
+});
+
+test('THE ULTIMATE (owner, 2026-11-18): holding past the full circle runs a second charge, and letting go then lays a whole stand down', () => {
+  // a stand of 40 trees scattered over 30 m in front of the explorer, as the world would hand them over
+  const trees = [];
+  for (let i = 0; i < 40; i++) {
+    const a = (i * 2.399963), r = 2 + (i % 7) * 4.1;
+    trees.push({ kind: 'tree', radius: 0.4, height: 14, p: { x: Math.sin(a) * r, y: R, z: 14 + Math.cos(a) * r } });
+  }
+  const sim = fakeSim();
+  sim.sampleObstacles = () => trees;
+  const p = new Powers();
+  felledLoad([]);                                  // a clean slate: no tree felled yet
+  p.down = true;
+  step(p, sim, Math.ceil(WINDPOWER.chargeTime * 60) + 4);
+  assert.ok(p.charge >= 1, 'the circle is full: ' + p.charge.toFixed(2));
+  assert.ok(!p.ultReady, 'and the ultimate is NOT ready on the first charge alone');
+  assert.ok(p.ult > 0, 'the second charge has begun: ' + p.ult.toFixed(2));
+  step(p, sim, Math.ceil(WINDPOWER.ultTime * 60) + 4);
+  assert.ok(p.ultReady, 'held on, the ultimate is ready');
+  const before = FELLED.size;
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.ults, 1, 'one ultimate cast');
+  const laid = FELLED.size - before;
+  assert.ok(laid > 10, 'a blast lays a whole section of wood down: ' + laid + ' trees');
+  assert.ok(laid <= WINDPOWER.ultFellMax, 'and never more than its own limit: ' + laid);
+  // the wave: the near trees go over first, the far ones later
+  const waits = [];
+  // (the blast's middle is half its length down the aim, not where the trees happen to be clustered)
+  const cz = WINDPOWER.ultGustLen * 0.5;
+  for (const t of trees) { const F = felledAt('earth', t.p.x, t.p.y, t.p.z); if (F) waits.push({ d: Math.hypot(t.p.x, t.p.z - cz), f: F.f }); }
+  waits.sort((a, b) => a.d - b.d);
+  assert.ok(waits.length > 10 && waits[0].f > waits[waits.length - 1].f, 'the near ones are further over than the far ones (the fall travels outward): nearest ' + waits[0].f.toFixed(3) + ', farthest ' + waits[waits.length - 1].f.toFixed(3));
+  console.log('THE GUST\'S ULTIMATE: ' + laid + ' trees laid down, the nearest at ' + waits[0].d.toFixed(1) + ' m and the farthest at ' + waits[waits.length - 1].d.toFixed(1) + ' m');
+});
+
+test('an ordinary cast is not an ultimate, and letting go early never fells a stand', () => {
+  const trees = [];
+  for (let i = 0; i < 20; i++) trees.push({ kind: 'tree', radius: 0.4, height: 14, p: { x: (i % 5) * 3 - 6, y: R, z: 10 + ((i / 5) | 0) * 4 } });
+  const sim = fakeSim();
+  sim.sampleObstacles = () => trees;
+  const p = new Powers();
+  felledLoad([]);
+  p.down = true;
+  step(p, sim, Math.ceil(WINDPOWER.chargeTime * 60) + 4);     // full circle, but no second charge
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.ults, 0, 'no ultimate');
+  assert.equal(FELLED.size, 0, 'and not one tree laid down by an ordinary gust');
+});
+
+test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the element swaps, and kindle lights a fire through the physics', () => {
+  const p = new Powers(), sim = fakeSim();
+  assert.equal(p.list[p.ability].id, 'gust', 'the wind is in the hand to begin with');
+  p.nextElement();
+  assert.equal(p.element, 1);
+  assert.equal(p.list[p.ability].id, 'kindle', 'and now the fire is');
+  assert.equal(p.list.length, 1, 'fire has one ability built; the rest are named in docs/POWERS-FIRE.md');
+  // the physics is what lights it, because only it knows what is underfoot there
+  let asked = null;
+  sim.physics = { lightFire: (fires, bodyId, at, size) => { asked = { bodyId, at, size }; return { kind: 1 }; } };
+  p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  assert.ok(asked, 'the physics was asked to light it');
+  assert.equal(asked.bodyId, 'earth');
+  assert.equal(p.fireCasts, 1, 'one fire lit');
+  // and swapping back drops everything the fire was holding
+  p.nextElement();
+  assert.equal(p.list[p.ability].id, 'gust');
+  assert.equal(p.charge, 0, 'and nothing is left charged across the swap');
+});
+
+test('A SPARK FALLS SHORT onto ground that will burn, and says plainly when nothing will (owner, 2026-11-18: the fire at the riverside spawn)', () => {
+  // The world here: water from 9 m out, a bank that burns nearer than that. (At the owner's own
+  // spawn the aim lands on the river as often as on the bank; measured 2026-11-18, six casts, all refused.)
+  const p = new Powers(), sim = fakeSim();
+  p.nextElement();
+  const dist = (at) => Math.hypot(at.x - sim.ex.p.x, at.y - sim.ex.p.y, at.z - sim.ex.p.z);
+  let lit = null;
+  sim.physics = {
+    fuelAt: (bodyId, at, o = {}) => {
+      const d = dist(at);
+      if (d >= 9) { o.kind = 0; o.fuel = 0; o.wet = 1; o.why = 'water'; } else { o.kind = 2; o.fuel = 0.8; o.wet = 0; o.why = ''; }
+      return o;
+    },
+    lightFire: (fires, bodyId, at, size) => { lit = { x: at.x, y: at.y, z: at.z, d: dist(at) }; const o = {}; return Object.assign(o, sim.physics.fuelAt(bodyId, at, o), { fuel: o.fuel }); },
+  };
+  p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  assert.ok(lit, 'a fire was lit');
+  assert.ok(lit.d < 9, 'short of the water, not in it: ' + lit.d.toFixed(1) + ' m');
+  assert.ok(lit.d > 1, 'and not at the explorer’s own feet: ' + lit.d.toFixed(1) + ' m');
+  assert.ok(!p.note || p.note === 'fire', 'nothing complained about: ' + p.note);
+
+  // and where NOTHING near the aim will burn, the word on the screen says which thing refused it
+  const q = new Powers(), sim2 = fakeSim();
+  q.nextElement();
+  sim2.physics = {
+    fuelAt: (bodyId, at, o = {}) => { o.kind = 0; o.fuel = 0; o.wet = 1; o.why = 'water'; return o; },
+    lightFire: () => ({ kind: 0, fuel: 0, wet: 1, why: 'water' }),
+  };
+  step(q, sim2, 40);                       // past the word the element swap leaves
+  q.down = true; step(q, sim2, 2); q.down = false; step(q, sim2, 2);
+  assert.equal(q.note, 'the water will not take it', 'the screen names the water, not a vague "nothing here will burn"');
+});
+
+test('FIRE HAS AN ULTIMATE, and a hold that is taken away casts nothing (found by independent readers, 2026-11-18)', () => {
+  // (1) The headline of this version was fire, kindle is its one ability, and holding the button -- the first thing
+  //     anyone does after the screen says "ULTIMATE ready - let go" -- lit nothing whatever: the sound played, the
+  //     explorer threw the cast, and no fire existed.
+  const p = new Powers(), sim = fakeSim();
+  p.nextElement();
+  let lit = 0, size = 0;
+  sim.physics = { lightFire: (f, b, at, k) => { lit++; size = k; return { kind: 2, fuel: 0.8, wet: 0, why: '' }; } };
+  p.down = true;
+  step(p, sim, Math.ceil((WINDPOWER.chargeTime + WINDPOWER.ultTime) * 60) + 8);
+  assert.ok(p.ultReady, 'the second charge is full');
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.ults, 1, 'one ultimate cast');
+  assert.equal(lit, 1, 'and it lit a fire');
+  assert.ok(size > WINDPOWER.sizeMax, 'a great one, not an ordinary cast: ' + size);
+  assert.equal(p.note, 'a great fire is set', 'and the screen says so, not the word written for gather');
+
+  // (2) Swapping the element with the cast key still down used to read as a fresh press on the next frame, arm the
+  //     new element's first ability and cast it on release: one cast key and one element key, and a fire was lit in
+  //     the wood with permanent scorch marks that nobody asked for.
+  const q = new Powers(), sim2 = fakeSim();
+  let lit2 = 0;
+  sim2.physics = { lightFire: () => { lit2++; return { kind: 2, fuel: 0.8, wet: 0, why: '' }; } };
+  q.keys.cast = true; step(q, sim2, 60);          // a gust charging
+  q.nextElement();                                 // G, with the key still down
+  step(q, sim2, 2);
+  q.keys.cast = false; step(q, sim2, 2);           // the hand lifts
+  assert.equal(lit2, 0, 'no fire was lit by a swap');
+  assert.equal(q.casts, 0, 'and nothing was cast at all');
+  // and the hands still work afterwards
+  q.keys.cast = true; step(q, sim2, 2); q.keys.cast = false; step(q, sim2, 2);
+  assert.equal(lit2, 1, 'a fresh press still lights one');
+
+  // (3) Changing ability mid-hold abandons the hold instead of silently eating a four-second charge
+  const r = new Powers(), sim3 = fakeSim();
+  r.down = true;
+  step(r, sim3, Math.ceil((WINDPOWER.chargeTime + WINDPOWER.ultTime) * 60) + 8);
+  assert.ok(r.ultReady);
+  r.pick(4);
+  assert.ok(!r.ultReady && r.charge === 0, 'the charge is visibly let go, not kept for an ability that never earned it');
+  assert.notEqual(r.note, 'ULTIMATE ready - let go', 'and the screen stops promising it');
+  r.down = false; step(r, sim3, 2);
+  assert.equal(r.ults, 0, 'nothing was cast');
 });

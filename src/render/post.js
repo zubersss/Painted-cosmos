@@ -634,6 +634,7 @@ uniform vec4 uShaft;
 uniform vec3 uShaftC;
 uniform vec3 uSunV;
 uniform vec2 uTanHalf;
+uniform vec4 uOilS;      // (y: the shoulder's knee, see below; 1.0 is off)
 varying vec2 vUv;
 ${AUX_DEC}
 const vec3 W = vec3(0.3, 0.5, 0.2);
@@ -690,6 +691,24 @@ void main() {
   float lw = dot(col, W), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
   col = clamp(mix(vec3(lw), col, 1.0 + 0.28 * (1.0 - sat)), 0.0, 1.0);
   col = mix(vec3(0.07, 0.06, 0.09), col, smoothstep(0.0, 1.0, uLaid));
+  // (2026-11-18, the owner: "It's kinda light".) THE SHOULDER: nothing clips to paper white any more.
+  // Measured on rendered stills against the owner's twenty oil paintings: HALF the game's aerial picture was
+  // brighter than 0.85 where only 5 per cent of theirs is, and a quarter of it was pure white; in the wood a
+  // quarter was over 0.85 against 4 per cent of theirs. THE DARKS WERE ALREADY RIGHT (the game's fifth percentile
+  // 0.22 against their 0.21), so this is not an exposure change and must not be one: everything below the knee is
+  // left exactly where it was and only the top is rolled off, so the midtones, the colours and the strokes do not
+  // move. uOilS.y is the knee (?shoulder=; 1.0 is off, the look as it was).
+  // SEEN AND MEASURED, stills of both views: in the wood a knee of 0.80 takes the share of the picture brighter
+  // than 0.85 from 26 per cent to 17 (the references' 4), with the darks untouched (25 per cent under 0.35 before,
+  // 26 after) and the middle barely moved, 0.63 to 0.61. 0.80 IS THE DEFAULT.
+  // IT DOES NOT MEND THE VIEW FROM THE AIR, and that is worth writing down rather than hoping: there the same knee
+  // moves 49 per cent over 0.85 to 48, and even a knee of 0.62 only reaches 41. So the aerial picture is not
+  // clipping - it is genuinely pale all through, which is the sky and the air's own colour, and they are next.
+  if (uOilS.y < 0.999) {
+    float k = uOilS.y, sp = max(1e-4, 1.0 - k);
+    vec3 over = max(vec3(0.0), col - k);
+    col = min(col, k + sp * (1.0 - exp(-over / sp)));
+  }
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
 `;
@@ -822,7 +841,7 @@ export class Post {
     this.mPaper = fsMaterial(PAPERS_FRAG, { tPaper: this.sheetUniforms.tPaper, uOutRes: this.sheetUniforms.uOutRes, uBoil: this.sheetUniforms.uBoil, uBorder: this.sheetUniforms.uBorder });
     this.mPaper.name = 'paper-bake';
     this.oil = LOOK.oil;
-    this.mOil = fsMaterial(OIL_FRAG, { tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
+    this.mOil = fsMaterial(OIL_FRAG, { uOilS: OIL.uOilS, tAbs: this.sheetUniforms.tAbs, tAux: this.sheetUniforms.tAux, uGrade: this.sheetUniforms.uGrade, uWxSheet: this.sheetUniforms.uWxSheet,
       uNight: this.sheetUniforms.uNight, uLaid: this.sheetUniforms.uLaid, uOilC: OIL.uOilC, uAux8: G.uAux8,
       uShAir: OIL.uShAir, uShV: OIL.uShV, uShaft: OIL.uShaft, uShaftC: OIL.uShaftC, uSunV: OIL.uSunV,
       uTanHalf: { value: new THREE.Vector2(1, 1) } });

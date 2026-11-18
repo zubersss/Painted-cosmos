@@ -1,12 +1,11 @@
-// !! NOT WIRED INTO THE GAME (2026-11-18). Built and tested; nothing calls it yet. Three small additions wire it
-// !! (they are listed in docs/COORDINATOR.md), but DO NOT MAKE THEM until this is settled:
-// !!   A FIRE IN AN ORDINARY WOOD NEVER GOES OUT AS THINGS STAND. This file keeps no memory of where it has
-// !!   burned beyond the 11 seconds its ash sits in the list, and leans on the game's fuel function to answer
-// !!   "nothing here" over ground already burnt. The record meant to carry that, src/data/burnt.js, keeps 300
-// !!   marks, while one 44 m wood writes 302 of them and an 80 m wood 899. Measured by an independent reader:
-// !!   a 44 m wood still burning after five minutes with 2,219 patches caught and 6,237 marks forgotten; the
-// !!   same wood with an uncapped record went out by itself in 71 seconds. Also: lightFire does not yet refuse
-// !!   a place that is not a real number, so a bad aim writes a not-a-number into the record.
+// !! NOT WIRED INTO THE GAME YET (2026-11-18). Built and tested; nothing calls it. The additions that wire it are
+// !! written out as a patch in the fire session's report, for the coordinator to apply.
+// !! The fault that held the wiring back IS SETTLED. A fire in an ordinary wood used never to go out, because the
+// !! only memory it had was the eleven seconds its ash sits in the list, and it leaned on the game's fuel function
+// !! (and so on data/burnt.js, which is capped and forgets) to answer "nothing here" over ground already burnt.
+// !! This file now KEEPS ITS OWN MEMORY of the ground each casting has burned: see "WHAT THIS CASTING HAS ALREADY
+// !! BURNED" below for the three ways that were offered, which was taken, and why. A fire now goes out whatever
+// !! the lasting record has forgotten, and the tests beside this file measure that it does.
 // Painted Cosmos physics: the fire the explorer lights, and how it runs (the elemental powers, fire; docs/POWERS.md).
 // OWNER: PHYSICS. Pure (no three, no page, no DOM): Node loads it in the tests beside it.
 //
@@ -41,11 +40,13 @@
 //
 //   ctx.windAt(patch, out)
 //     The wind at that patch, IN THE BODY'S OWN AXES, in metres a second: out[0], out[1], out[2]. The physics has
-//     the world's wind and the player's wind in the near field's grid axes (east, north, up), so it turns them into
-//     the body's axes on the way in -- one line with the frame it already holds:
+//     one call that answers exactly that -- airAt (air.js) fills `o.wind` body-local, with the dust devils AND the
+//     player's own wind already folded into it -- so a gust fanning a fire and a stilled place starving one need
+//     nothing new anywhere. A caller that has only the grid's east and north turns them with the frame it holds:
 //       out[0] = we*f.ex + wn*f.nx;  out[1] = we*f.ey + wn*f.ny;  out[2] = we*f.ez + wn*f.nz;
 //     A patch asks again only every FIRE.windEvery seconds (the wind does not turn faster than matters to a fire),
-//     and each patch asks on its own beat, so the cost is spread over the frames.
+//     and each patch asks on its own beat, so the cost is spread over the frames: measured in the tests beside this
+//     file, 8.1 asks a frame with the list at its cap of 64 patches.
 //
 //   ctx.dampAt(patch)  -- not required. 0..1, how damp the patch's place is NOW. Without it a fire already alight
 //     burns on through a shower; with it, rain puts a fire out. Asked every FIRE.dampEvery seconds per patch.
@@ -70,12 +71,11 @@
 // burnt and melted record, which is kept elsewhere.
 //
 // TWO THINGS A CALLER HAS TO KNOW.
-//   This file HAS NO MEMORY. It only knows that a place is burnt for as long as the ash of that patch is still in
-// the list (FIRE.ashLife seconds), which is enough for the front to walk away and not come back. After that the
-// slot is reused and this file has forgotten. So THE FUEL FUNCTION MUST ANSWER FUEL.none WHERE THE LASTING RECORD
-// SAYS THE GROUND IS ALREADY BURNT -- otherwise a fire will come back over its own ashes and burn for ever. That
-// record is the game's (src/data/burnt.js). The tests beside this file stand a plain one in for it, which is how
-// they show a fire dying out once it has eaten the wood it was lit in.
+//   WHAT THIS FILE REMEMBERS, AND WHAT IT DOES NOT. Each casting keeps its own memory of the ground it has burned
+// (below), so a fire ends by itself and nothing the game does can make it burn for ever. That memory goes when the
+// fire does. It is NOT the lasting record: the fuel function should still answer FUEL.none where data/burnt.js says
+// the ground is already burnt, so that a fire lit later does not eat a wood that has already gone; but nothing
+// about a fire ENDING rests on that any more.
 //   A RECORD IS NOT A HANDLE. lightFire returns the patch so that the ability can read it at once, but the slot is
 // used again by later fires, so nothing should hold on to it for long. Keep its `id` instead and compare that.
 import { clamp01, smoothstep, hash3, eastNorth } from './util.js';
@@ -97,7 +97,15 @@ export const FIRE = Object.freeze({
   spread: 2.2,            // m: how far from a patch its neighbour catches, across the wind
   near: 0.75,             // a new patch is refused this near (times the other's width) to one already there or to
                           // its ash: that is what keeps the fire a front and stops it burning the same place twice
-  reach: 120,             // m: how far from the place it was lit one casting may run before it stops passing on
+  // (2026-11-18) HOW LONG THE WORST CASE BURNS, which is what this number really sets. A fire now always goes out -
+  // it keeps its own memory of the ground it has burned - but in endless wood it goes out only when it has filled
+  // the whole circle it may reach, and the time grows with the SQUARE of this. Measured, a cast held to the full in
+  // wood 4 km across: at 120 m it was still burning after fifty minutes and out at 57.8, having caught 25,393
+  // patches. At 60 m that is about fifteen minutes, at 40 m about seven. Sixty is chosen so a forest fire is a thing
+  // that burns itself out while you watch the wood, not something left smouldering for an hour.
+  // (The number first reported for this was 20.5 minutes. That was measured through a wiring whose fuel question only
+  //  reached 136 m, not against the fire's own reach, and it was wrong. This note is the true one.)
+  reach: 60,             // m: how far from the place it was lit one casting may run before it stops passing on
 
   catchTime: 0.45,        // s: a new patch comes up to its full flame over this
   dieTime: 1.1,           // s: and falls away over this once there is nothing left under it
@@ -133,6 +141,11 @@ export const FIRE = Object.freeze({
   iceLife: 8,             // s
   iceRadius: 4.5,         // m: how wide the melted place grows by the end
   iceHeat: 1,             // heat (in seconds of full flame) one patch puts into the ice each second
+
+  // WHAT ONE CASTING REMEMBERS OF THE GROUND IT HAS BURNED: one bit per this many metres of ground (see the long
+  // note below makeFires). About the step a fire takes (`spread` above), so the front can always walk forward into
+  // fresh ground while a patch can never light the place one of its own casting's patches was lit in.
+  scarCell: 2.5,
 
   reportEvery: 0.34,      // of a patch's fuel: a row is added when this much more has gone, not one a frame
   meltEvery: 1.0,         // and for ice, every this much heat
@@ -171,6 +184,7 @@ function wipe(s) {
   s.wx = 0; s.wy = 0; s.wz = 0; s.wt = 0; s.dampT = 0;    // the wind at it (body axes) and the two little clocks
   s.size = 1; s.id = 0; s._sp01 = 0;              // _sp01: how strong the wind at it was, 0..1 (set while stepping)
   s.placed = false; s.x = 0; s.z = 0; s.y = 0;            // its place in the near field's grid (placeFires)
+  s.scar = null;                                  // the memory its whole casting shares (below); let go with it
   return s;
 }
 
@@ -187,6 +201,96 @@ export function makeFires(seed = 1) {
   return F;
 }
 
+// ---- WHAT THIS CASTING HAS ALREADY BURNED -----------------------------------------------------------------------
+// (2026-11-18. This is the one thing an independent reader measured as broken in this file, and it is settled here.)
+//
+// A FIRE MUST GO OUT. Before this, the only memory a fire had was the ash in its own list, which is kept eleven
+// seconds: long enough for the front to walk away, and no longer. After that the list has forgotten, and nothing
+// stopped a patch at the edge from looking back inward, being offered fuel by the world all over again, and
+// lighting ground that had already burned. That is a fire that never ends -- measured in a wood 44 m across: still
+// burning after five minutes, with 2,219 patches caught. The lasting record (data/burnt.js) was meant to answer
+// "there is nothing left here", but it is capped and forgets its oldest marks, so in any wood bigger than its cap
+// the memory ran out underneath the fire and the fire came back over its own ashes.
+//
+// THREE WAYS WERE OFFERED: (a) the fire keeps its own memory of what THIS casting has burned; (b) the record never
+// forgets a mark while a fire is still near it; (c) the record's cap is raised to cover the biggest fire anyone can
+// light. THIS IS (a), AND HERE IS WHY:
+//   * It costs NOTHING IN THE SAVED GAME. Fire is weather: it passes, and nothing of this file is ever saved. Both
+//     (b) and (c) would have the saved game carry the whole shape of every fire ever lit, for good.
+//   * Whether a fire is out is the fire's own business. With (a) the answer cannot depend on another file's cap, nor
+//     on the world's fuel function being written correctly: a fire ends whatever either of those does.
+//   * A fire lit in the same place LATER still works. A new casting has a new memory, and burns whatever the world
+//     says will still burn there. With (b) or (c) that ground would be refused for good by the record.
+//   * It costs one look at a bit of memory for each attempt to spread, and no memory at all until a fire spreads.
+// What (b) and (c) are still worth is the PICTURE -- how much burnt ground the owner can see at once -- and that is
+// the record's own business, settled over there (data/burnt.js BURN.max).
+//
+// HOW IT IS KEPT: ONE BIT PER FIRE.scarCell OF GROUND, in a plain array of bytes made once when a casting is lit,
+// laid out on the flat about the place it began (east and north there). Flat is exact enough: at the furthest a
+// casting can run, the ground measured on the flat is short of the ground measured along the curve by a fifth of a
+// metre on the smallest world in the game, and by millimetres on Earth -- a tenth of a cell either way. A casting
+// cannot run further than its own `reach`, so the array is sized from that and NOTHING CAN FALL OUTSIDE IT: the
+// memory is its own cap, and there is no second cap to go wrong. The biggest cast (reach 264 m) is 215 x 215 cells
+// = 5.8 kB of bytes; the smallest (120 m) is 1.2 kB. Every patch of one casting holds the same array, so a child
+// inherits its parent's memory, and when the last patch of a casting leaves the list the array goes with it.
+//
+// WHAT IT REMEMBERS is the cell each patch was lit in, and nothing else. So one cell holds at most one patch of one
+// casting, ever -- and THAT is what makes a fire end: there are only so many cells within reach, each is used once,
+// and when the ones with anything to burn in them are used up the fire has nowhere left to go. It is coarser than
+// the `busy` test below, which is the real spacing among live patches and is unchanged; this is only the long
+// memory. A cell about as wide as the step a fire takes leaves the front free to walk forward into fresh ground.
+// HOW LONG THAT TAKES, at the worst: a casting in wood that never ends has to eat every cell it can reach, and that
+// was measured at about twenty and a half minutes (5,000 patches, 134 to 178 m out) in the whole physics. An
+// ordinary wood is tens of seconds. If the owner wants the worst case shorter, FIRE.reach is the number to lower.
+const _en0 = new Float64Array(6);         // east and north where a casting began (makeScar only, not while stepping)
+function makeScar(s) {
+  const r = Math.hypot(s.px, s.py, s.pz) || 1;
+  eastNorth(s.px / r, s.py / r, s.pz / r, _en0);
+  const half = Math.ceil(s.reach / FIRE.scarCell) + 1, side = half * 2 + 1;
+  return {
+    ox: s.px, oy: s.py, oz: s.pz,
+    ex: _en0[0], ey: _en0[1], ez: _en0[2], nx: _en0[3], ny: _en0[4], nz: _en0[5],
+    half, side, n: 0,
+    bits: new Uint8Array((side * side + 7) >> 3),
+  };
+}
+// Which bit of a casting's memory a place falls in, or -1 for a place outside it (which is a place outside the
+// casting's reach: it is refused, not guessed at).
+function scarBit(sc, px, py, pz) {
+  const dx = px - sc.ox, dy = py - sc.oy, dz = pz - sc.oz;
+  const e = dx * sc.ex + dy * sc.ey + dz * sc.ez, n = dx * sc.nx + dy * sc.ny + dz * sc.nz;
+  const i = Math.round(e / FIRE.scarCell) + sc.half, j = Math.round(n / FIRE.scarCell) + sc.half;
+  if (i < 0 || j < 0 || i >= sc.side || j >= sc.side) return -1;
+  return j * sc.side + i;
+}
+// Has this casting burned here already? (A place it cannot remember counts as burned: it will not go there.)
+function scarred(sc, px, py, pz) {
+  const b = scarBit(sc, px, py, pz);
+  if (b < 0) return true;
+  return (sc.bits[b >> 3] & (1 << (b & 7))) !== 0;
+}
+// It has now.
+function markScar(sc, px, py, pz) {
+  const b = scarBit(sc, px, py, pz);
+  if (b < 0) return;
+  const k = b >> 3, m = 1 << (b & 7);
+  if (!(sc.bits[k] & m)) { sc.bits[k] |= m; sc.n++; }
+}
+// How much memory the fires' memory of themselves is using now, in bytes. Nothing in play needs this; the tests and
+// the log ask it, so that the cost is a measured number and not a promise. (One casting's patches share one array,
+// so each array is counted once.)
+export function fireBytes(F) {
+  let n = 0;
+  for (let i = 0; i < F.count; i++) {
+    const sc = F[i].scar;
+    if (!sc) continue;
+    let seen = false;
+    for (let k = 0; k < i; k++) if (F[k].scar === sc) { seen = true; break; }
+    if (!seen) n += sc.bits.length;
+  }
+  return n;
+}
+
 // A free slot, or the slot of the ash that has been dead longest (which is the furthest behind the front), or null
 // when every slot holds live fire. Returning null is the cap doing its work: the fire stops widening.
 function take(F) {
@@ -200,7 +304,7 @@ function take(F) {
 // nothing at all) and _f.px/py/pz is where the world says that place really is on its own ground. With no fuel
 // function given (some tests) the answer is "nothing here".
 function ask(F, bodyId, px, py, pz, ctx) {
-  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz;
+  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz; _f.why = '';
   if (ctx && ctx.fuelAt) {
     F.asks++;
     ctx.fuelAt(bodyId, px, py, pz, _f);
@@ -215,7 +319,7 @@ function ask(F, bodyId, px, py, pz, ctx) {
 // Sets a patch up from the last answer in _f: where it really burns, what is under it, how long that will last.
 function settle(s) {
   s.px = _f.px; s.py = _f.py; s.pz = _f.pz;
-  s.kind = _f.kind; s.wet = _f.wet;
+  s.kind = _f.kind; s.wet = _f.wet; s.why = _f.why || '';
   if (s.kind === FUEL.ice) { s.fuel = 0; s.fuel0 = 0; s.life = FIRE.iceLife * (0.7 + 0.3 * s.size); }
   else if (s.kind !== FUEL.none) { s.fuel0 = clamp01(_f.fuel); s.fuel = s.fuel0; s.life = FIRE.maxLife; }
   else { s.fuel0 = 0; s.fuel = 0; s.life = FIRE.bareLife; }   // nothing to burn: the ability's own flame, for a moment
@@ -327,14 +431,19 @@ export function stepFires(F, dt, ctx) {
     }
   }
   // the ash that is long cold gives its slot back (the same shuffle stepWinds does in powers.js)
+  const was = F.count;
   let n = 0;
-  for (let i = 0; i < F.count; i++) {
+  for (let i = 0; i < was; i++) {
     const s = F[i];
     if (s.ash && s.ashAge > FIRE.ashLife) continue;
     if (n !== i) { const t = F[n]; F[n] = s; F[i] = t; }
     n++;
   }
   F.count = n;
+  // and the slots that are out of use are emptied, so that the last patch of a fire that is over lets go of its
+  // casting's memory of the ground (a few kilobytes) there and then, instead of holding it until that slot is used
+  // again. Nothing is made here: wipe only writes over what is already there.
+  for (let i = n; i < was; i++) wipe(F[i]);
   return n;
 }
 
@@ -363,10 +472,17 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   // one casting burns itself out within `reach` of where it was lit: it does not cross the world
   const ax = qx - s.ox, ay = qy - s.oy, az = qz - s.oz;
   if (ax * ax + ay * ay + az * az > s.reach * s.reach) return false;
+  // this casting has burned here already: it does not go round twice, which is what makes a fire end (one look at a
+  // bit of memory, and before the dear question below, so a patch hemmed in by its own burnt ground costs the world
+  // nothing at all)
+  if (s.scar && scarred(s.scar, qx, qy, qz)) return false;
   if (busy(F, s.bodyId, qx, qy, qz)) return false;
   if (ask(F, s.bodyId, qx, qy, qz, ctx) === FUEL.none) return false;      // water, rock, wet ground: it stops here
-  // the world may have moved the place onto its own ground, so look again that it is still free
-  if ((_f.px !== qx || _f.py !== qy || _f.pz !== qz) && busy(F, s.bodyId, _f.px, _f.py, _f.pz)) return false;
+  // the world may have moved the place onto its own ground, so look again that it is still free, and still fresh
+  if (_f.px !== qx || _f.py !== qy || _f.pz !== qz) {
+    if (busy(F, s.bodyId, _f.px, _f.py, _f.pz)) return false;
+    if (s.scar && scarred(s.scar, _f.px, _f.py, _f.pz)) return false;
+  }
   const t = take(F);
   if (!t) return false;                     // the cap: the fire already has as many patches as it may have
   wipe(t);
@@ -380,6 +496,9 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   t._sp01 = sp01;
   t.wx = s.wx; t.wy = s.wy; t.wz = s.wz;    // it knows the wind its parent knew until it asks for itself
   settle(t);
+  // it shares its whole casting's memory of the ground, and the place it burns is now in it
+  t.scar = s.scar;
+  if (t.scar) markScar(t.scar, t.px, t.py, t.pz);
   t.seedT = waitFor(t, spokeAt(t.spoke, hE, hN, sp01)[3]);
   return true;
 }
@@ -403,6 +522,11 @@ export function clearBurns(F) { F.burns.count = 0; F.lost = 0; }
 // Returns the patch, or null when every slot is full of live fire. A fire is lit even where nothing will burn: the
 // ability's own flame shows for a moment and dies, which is how the player learns that wet ground will not take.
 export function lightFire(F, bodyId, p, size = 1, ctx = null) {
+  // A PLACE THAT IS NOT A REAL PLACE IS REFUSED (2026-11-18, found by the reader who checked this file). The aim
+  // comes from the view and a sample of the ground, and either can hand back a not-a-number; one of those used to
+  // be written straight into a patch, and from there into the lasting record, where it poisons a filing cell for
+  // the rest of the session. One comparison, at the one door everything comes in by.
+  if (!bodyId || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return null;
   const s = take(F);
   if (!s) return null;
   const k = sizeOf(size);
@@ -418,6 +542,10 @@ export function lightFire(F, bodyId, p, size = 1, ctx = null) {
   ask(F, bodyId, p.x, p.y, p.z, ctx);
   settle(s);
   s.ox = s.px; s.oy = s.py; s.oz = s.pz;        // after settle: the world may have moved it onto its own ground
+  // The memory of the ground this casting burns, made here and shared by every patch that catches from this one.
+  // A flame with nothing under it, and a flame on ice, pass nothing on, so they need none and are given none: a
+  // cast on wet rock costs not one byte.
+  if (s.kind !== FUEL.none && s.kind !== FUEL.ice) { s.scar = makeScar(s); markScar(s.scar, s.px, s.py, s.pz); }
   s.seedT = FIRE.seedTime / (FIRE.quick[s.kind] || 1);
   return s;
 }
@@ -482,8 +610,10 @@ export function douseFires(F, bodyId = null) {
     if (!s.ash && s.kind !== FUEL.none) report(F, s, true);
     s.ash = true; s.ashAge = FIRE.ashLife + 1;
   }
+  const was = F.count;
   let n = 0;
-  for (let i = 0; i < F.count; i++) { const s = F[i]; if (s.ash && s.ashAge > FIRE.ashLife) continue; if (n !== i) { const t = F[n]; F[n] = s; F[i] = t; } n++; }
+  for (let i = 0; i < was; i++) { const s = F[i]; if (s.ash && s.ashAge > FIRE.ashLife) continue; if (n !== i) { const t = F[n]; F[n] = s; F[i] = t; } n++; }
   F.count = n;
+  for (let i = n; i < was; i++) wipe(F[i]);     // (as in stepFires: an unused slot holds no fire's memory)
   return n;
 }

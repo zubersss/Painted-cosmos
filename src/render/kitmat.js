@@ -7,6 +7,8 @@
 //   dust, sand, ash   ragged dry-brush drifts in the ink of the ground they were raised from
 //   prints, pads, scour   the ground's own wash laid darker, a paler rim on loose ground
 //   rings   crisp broken circles (region 6: the post pass keeps its hands off them)
+//   leaves  a thin tumbling lens; with the powers on, the same crowd also carries the explorer's
+//           strokes of air and A FIRE'S FLAME, SMOKE AND EMBERS (see SHAPES.fire, far below)
 import * as THREE from 'three';
 import { makePaintUniforms } from './materials.js';
 import { G } from './shared.js';
@@ -24,10 +26,28 @@ export const KIT_INK = {
 // under the camera by the world every frame
 export const KIT_PALETTE = [];
 for (let i = 0; i < 16; i++) KIT_PALETTE.push(new THREE.Vector3(0.72, 0.64, 0.52));
+// (the powers, fire) THE SEVENTEENTH SLOT IS THE EMBERS', and it is the one slot the world does not blend.
+// The world mixes the first sixteen over the biomes under the camera every frame (world/index.js kitInks counts to
+// sixteen, the number of things the ground is made of plus the flame's); this one is set here, once, because a fire
+// is the same fire on every world. A spark must be told from a flame tongue SOMEHOW, and nothing else about a grain
+// can tell them apart: both are thrown out of the same patch, both are grains of the leaf kind, and the painter is
+// given a grain's ink and nothing else -- not its size, not its speed, not its age. So the embers are given an ink
+// of their own. (The physics must hand it over: until it does, an ember carries the flame's ink and is painted as a
+// tongue. The one-line change is in this session's report.)
+KIT_PALETTE.push(new THREE.Vector3(1.0, 0.96, 0.80));
 
 // The palette of one biome: 16 washes, by PHYSICS' material names. `pal` is the biome's
 // prepared ground washes (surface.pal: low, mid, high), `liquid` its liquid colour if any.
-const MATS = ['grass', 'soil', 'litter', 'mud', 'sand', 'dust', 'gravel', 'rock', 'snow', 'ice', 'ash', 'glass', 'crystal', 'moss', 'bed'];
+// (the powers, fire) 'flame' is the sixteenth slot: the ground is made of fifteen things and the spare one is the
+// flame's own ink (physics/loose.js I_FLAME). The embers have the seventeenth, which this blend does not reach (see
+// KIT_PALETTE above). Both are the same in every biome, so the world's blend across the biomes under the camera
+// leaves them alone.
+const MATS = ['grass', 'soil', 'litter', 'mud', 'sand', 'dust', 'gravel', 'rock', 'snow', 'ice', 'ash', 'glass', 'crystal', 'moss', 'bed', 'flame'];
+// (the powers, fire) The three inks a fire's grains carry, by their place in the table above: the flame's own slot,
+// the embers' slot after the end of it (the paragraph at KIT_PALETTE says why they need one), and the ash the smoke
+// borrows -- in the crowd of leaves nothing but a fire's smoke ever carries the ash ink.
+const I_FLAME = MATS.indexOf('flame'), I_EMBER = MATS.length, I_SMOKE = MATS.indexOf('ash');
+const INK_SLOTS = I_EMBER + 1;
 const mx = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 export function biomeInks(pal, liquid) {
   const earth = mx(pal.mid, pal.high, 0.45), stone = mx(pal.high, [0.78, 0.78, 0.82], 0.35), paper = [0.975, 0.98, 0.985];
@@ -37,6 +57,11 @@ export function biomeInks(pal, liquid) {
     gravel: stone, rock: stone, glass: mx(stone, [0.40, 0.42, 0.52], 0.4), crystal: mx(stone, [1, 1, 1], 0.3),
     snow: paper, ice: mx(paper, [0.84, 0.90, 0.96], 0.5), ash: mx(earth, [0.50, 0.49, 0.50], 0.65),
     bed: liquid ? mx(liquid, [1, 1, 1], 0.45) : mx(earth, [0.34, 0.29, 0.28], 0.4),
+    // (the powers, fire) THE FLAME'S BODY COLOUR, the one paint a fire's whole ramp is mixed from (SHAPES.fire takes
+    // the root's red-brown and the tip's red off this orange, and the white-hot heart off the embers' slot above). It
+    // is the same in every biome, so the world's blend across the biomes under the camera leaves it as it is. Change
+    // the fire's hue here and the root, the body and the tip all move together.
+    flame: [1.0, 0.49, 0.09],
   };
   const out = [];
   for (let i = 0; i < 16; i++) out.push(of[MATS[i]] || earth);
@@ -105,7 +130,96 @@ const SHAPES = {
   // edge-on); laid as a glaze after the brush pass, so a mark two pixels wide is not brushed away
   // (two tones: half the leaves dark, to be seen against the sky and the meadow, half pale ochre, against the
   // wood; a leaf that turns over shows the other: it flickers as it tumbles)
-  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; float ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; float lt = abs(step(0.5, fract(vPcData.x * 7.31)) - (gl_FrontFacing ? 0.0 : 1.0)); vec3 c = mix(pcDensity(ink, 1.5 + 0.4 * vPcData.x), mix(ink, vec3(0.97, 0.86, 0.52), 0.6), lt); float w = 0.4;',
+  // (it ASSIGNS c, ga and w instead of declaring them: with the powers on the leaves' one program paints the
+  // fire as well (SHAPES.fire), and two branches of the same program cannot each declare the same three names.
+  // The arithmetic is exactly what it was.)
+  leaf: 'vec2 lp = (vPcUv - 0.5) * 2.0; ga = (1.0 - smoothstep(0.7, 1.0, abs(lp.y) / max(1e-3, 1.0 - lp.x * lp.x))) * 0.94; if (ga < 0.02 || length(vView) < 1.2) discard; float lt = abs(step(0.5, fract(vPcData.x * 7.31)) - (gl_FrontFacing ? 0.0 : 1.0)); c = mix(pcDensity(ink, 1.5 + 0.4 * vPcData.x), mix(ink, vec3(0.97, 0.86, 0.52), 0.6), lt); w = 0.4;',
+  // (the powers, fire) A FIRE, PAINTED. The physics throws three sorts of grain out of a burning patch
+  // (physics/loose.js FLAME): short TONGUES rooted in the fire and gone in half a second, SMOKE sprinkled all the way
+  // up a leaning column, and a few heavy EMBERS thrown up and carried off. All three are grains of the leaf kind
+  // carrying a ground material's ink, so the kit lays each one as a RIBBON ALONG ITS OWN FLIGHT (expand.js, its wisp
+  // option) -- and that ribbon is what lets a flame be painted as a RAMP of paint without one new number anywhere:
+  //   vPcUv.x runs from 0 at the ribbon's TAIL -- where the grain was a tenth of a second ago -- to 1 at its HEAD,
+  //     where the grain is now. For a rising tongue, 0 is down in the fuel and 1 is the tip; for an ember, 1 is the
+  //     spark and 0 the end of its trail. So the paint can be ramped from root to tip along one mark.
+  //   vPcUv.y runs across the ribbon, 0.5 along its spine. So the heart of a flame can be kept to the spine.
+  //   vPcData.x is the grain's own number and stays with it for all its life, so a torn edge and a lean belong to
+  //     the mark and travel with it instead of boiling.
+  // WHAT A PAINTER DOES WITH FIRE, and what is laid here:
+  //   A FLAME IS NOT ONE ORANGE. The dark goes down first -- a deep red-brown where the tongue leaves the fuel --
+  //   then the orange body; then, LAST AND SMALLEST, the yellow-white heart, a little way up the tongue and only
+  //   along its spine. The tip tears away red and is broken into licks, each tongue its own way, and the tongue
+  //   licks over as it rises.
+  //   SMOKE IS NOT GREY. It is warm and heavy where it leaves the fire and cool violet where it thins, and far more
+  //   transparent at its edges than in its middle. Here the mark's own thickness swings it between the two, so the
+  //   thin ends and the torn edges of every stroke are the violet ones; a crowd of them is the plume.
+  //   AN EMBER IS TINY AND VERY BRIGHT, with a short tail of its own flight: white-hot at the head, deep red behind.
+  // All four paints come from two inks: the flame's body orange and the embers' white-hot (biomeInks above).
+  // WHAT IS MISSING, and it is one number the painter is not given: HOW OLD A GRAIN IS. The leaf kit hands the
+  // fragment no age and no size (the unused instanced path has both; the game's does not), so a tongue cannot be
+  // made to die down into smoke over its own life, and an ember cannot cool from white to red as it falls -- it
+  // cools along its trail instead. It is missed less than it sounds: a grain's mark SHRINKS as it fades in and out
+  // (expand.js scales the ribbon's length and its width together), so a tongue already licks up out of the fire and
+  // dies back, and the crowd is renewed a hundred times a second.
+  fire: /* glsl */`
+    float fu = vPcUv.x, fv = (vPcUv.y - 0.5) * 2.0;                 // along the stroke (0 tail .. 1 head), across it (-1 .. 1)
+    float fh1 = fract(vPcData.x * 7.31), fh2 = fract(vPcData.x * 23.17);      // two numbers of this grain's own
+    // how many pixels wide and long this ribbon is. The painter takes away any mark much under two pixels, and a
+    // crowd of marks taken away BLINKS as it flies, so nothing below cuts a mark thinner than that: far off, a
+    // tongue and a spark are each one small bright touch, which is what they should be.
+    float fpw = 1.0 / max(fwidth(vPcUv.y), 1e-5), fpl = 1.0 / max(fwidth(vPcUv.x), 1e-5);
+    vec3 fBody = uPcInk[${I_FLAME}], fHot = uPcInk[${I_EMBER}];
+    vec3 fRoot = fBody * vec3(0.34, 0.20, 0.26), fTip = fBody * vec3(0.82, 0.38, 0.30);
+    if (length(vView) < 0.8) discard;                               // nothing right against the lens (you may stand close to a campfire)
+    if (fm == ${I_SMOKE}) {
+      // SMOKE. A torn stroke, thick along its middle and dissolving at both ends; the tear travels with it.
+      float sb = smoothstep(0.0, 0.26, fu) * (1.0 - smoothstep(0.52, 1.0, fu));
+      float snz = texture(uNoise3D, vec3(fu * 1.7 + fh1 * 31.0, vPcUv.y * 2.3, fh2 * 9.0)).r;
+      float sw = min(sb * (0.42 + 1.05 * snz), 1.0);
+      sw = max(sw, min(1.0, 1.8 / fpw) * step(0.06, sb));
+      if (abs(fv) > sw) discard;
+      float dens = (1.0 - smoothstep(0.30, 1.0, abs(fv) / max(sw, 1e-3))) * sb;
+      c = mix(mix(ink, vec3(0.42, 0.40, 0.54), 0.58), ink * vec3(1.16, 1.00, 0.86) + fRoot * 0.10, dens);
+      // (a plume of middle grey over a wood of middle browns is not in the picture at all. As the rain does, the
+      // smoke reads what lies behind it and is laid paler where that is dark, keeping its own grey against a light sky.)
+      vec3 sbg = texture(uSceneCol, gl_FragCoord.xy / uSceneRes).rgb;
+      c = mix(mix(c, vec3(0.80, 0.78, 0.82), 0.45), c, smoothstep(0.16, 0.44, dot(sbg, vec3(0.3, 0.5, 0.2))));
+      ga = 0.34 * dens;
+      w = 0.5;
+    } else if (fm == ${I_EMBER}) {
+      // AN EMBER. Only the head of the ribbon is kept: the whole stroke would read as a flame flying through the
+      // air. Never less than a few pixels of it, so a far spark is a touch and not a blink.
+      float keep = clamp(6.0 / fpl, 0.20, 1.0);
+      if (fu < 1.0 - keep) discard;
+      float et = (fu - (1.0 - keep)) / keep;                        // 0 the end of the tail .. 1 the spark itself
+      float ew = max(0.16 + 0.42 * et * et, min(1.0, 1.5 / fpw));
+      if (abs(fv) > ew) discard;
+      c = mix(mix(fRoot, fTip, smoothstep(0.05, 0.55, et)), fHot, smoothstep(0.60, 1.0, et * et));
+      ga = (0.34 + 0.64 * et) * (1.0 - smoothstep(0.72, 1.0, abs(fv) / max(ew, 1e-3)));
+      w = 0.0;
+      own = 1.0;
+    } else {
+      // A TONGUE: narrow where it leaves the fuel, fattest a quarter of the way up, torn into licks at its tip.
+      float lick = sin(fu * 2.6 + fh2 * 6.2831853 + uTime * 7.0) * 0.5 * fu * fu;      // it licks over as it rises
+      float across = abs(fv - lick);
+      float prof = smoothstep(0.0, 0.24, fu) * (1.0 - 0.90 * smoothstep(0.34, 1.0, fu));
+      prof -= smoothstep(0.42, 1.0, fu) * 0.55 * texture(uNoise3D, vec3(fu * 2.1 + fh1 * 37.0, fh2 * 11.0, 0.21)).r;
+      prof = max(prof, min(1.0, 1.8 / fpw) * step(0.04, fu));
+      if (across > prof) discard;
+      float fe = across / max(prof, 1e-3);                          // 0 on the spine .. 1 at the tongue's edge
+      // the heart: SHORT along the tongue -- a fifth of its length, low down -- and most of the spine's width
+      // across it, because the whole mark is only a hand's breadth wide and a heart kept to a tenth of that
+      // would be a third of a pixel at ten metres and would not be in the picture at all
+      float hot = smoothstep(0.03, 0.20, fu) * (1.0 - smoothstep(0.26, 0.90, fu)) * (1.0 - smoothstep(0.40, 0.95, fe));
+      c = mix(fRoot, fBody, smoothstep(0.0, 0.26, fu));             // the dark root into the orange body
+      c = mix(c, fTip, smoothstep(0.40, 1.0, fu) * 0.85);           // the body tearing away red at the tip
+      c = mix(c, fTip, 0.45 * smoothstep(0.50, 1.0, fe));           // and cooler at the outside of the tongue
+      c = mix(c, fHot, hot * hot);                                  // the heart, laid last and smallest
+      ga = (0.60 + 0.38 * hot) * (1.0 - smoothstep(0.78, 1.0, fe));
+      w = 0.0;
+      own = 1.0;
+    }
+  `,
   // a splash ring: a broken circle of paper, a little wider than the physics draws it so that
   // it is a mark and not a hairline
   // (a glaze: a soft pale arc of paper colour, broken where the brush lifted, never a white wire)
@@ -125,7 +239,17 @@ function shapeOf(kind, info) {
   // (a grain of the leaf kind that carries a ground material's ink: the powers' strokes of air, in the pale inks of
   // snow and ice, and the dark pieces of a snapped branch, in the ground's brown. The pale go paler and softer; the dark
   // keep their own colour, or a branch would be a white stroke.)
-  if (kind === 'leaves') return SHAPES.leaf + (info.inked ? ' if (vPcMat < 200.0) { float pale = smoothstep(0.42, 0.78, dot(ink, vec3(0.33))); c = mix(ink, vec3(1.0, 1.0, 0.98), 0.4 * pale); ga *= mix(1.0, 0.86, pale); }' : '');
+  // (the powers, fire: and three of those inks are a fire's -- the flame's, the embers' and the ash the smoke
+  // borrows. Those are painted as fire (SHAPES.fire); every other grain of the crowd is the leaf it always was.
+  // `own` is 1 for a mark that is its own light, which main() below keeps out of the night's key.)
+  if (kind === 'leaves') {
+    if (!info.inked) return 'vec3 c; float ga; float w;\n' + SHAPES.leaf;
+    return 'vec3 c; float ga; float w; float own = 0.0;\n'
+      + `int fm = vPcMat < 200.0 ? int(vPcMat + 0.5) : -1;\n`
+      + `if (fm == ${I_FLAME} || fm == ${I_EMBER} || fm == ${I_SMOKE}) {${SHAPES.fire}} else {\n`
+      + SHAPES.leaf
+      + ' if (vPcMat < 200.0) { float pale = smoothstep(0.42, 0.78, dot(ink, vec3(0.33))); c = mix(ink, vec3(1.0, 1.0, 0.98), 0.4 * pale); ga *= mix(1.0, 0.86, pale); }\n}';
+  }
   if (kind === 'spray') return SHAPES.spume;
   return SHAPES[info.shape] || SHAPES.dab;
 }
@@ -161,7 +285,7 @@ void main() {
     fragmentShader: `${FRAG_PARS}
 ${opts.shapeGlsl || ''}
 uniform vec3 uColor;
-uniform vec3 uPcInk[16];
+uniform vec3 uPcInk[${INK_SLOTS}];      // the ground's fifteen, the flame's and the embers' (KIT_PALETTE above)
 uniform highp sampler2D uSceneAux;
 uniform sampler2D uSceneCol;
 uniform vec2 uSceneRes;
@@ -172,7 +296,12 @@ void main() {
   // the ink: that of the ground the thing came from, where it came from the ground
   vec3 ink = vPcMat < 200.0 ? uPcInk[int(vPcMat + 0.5)] : uColor;
   ${shapeOf(kind, info)}
-  ${kind === 'rain' ? '' : 'c = pcAtmosV(pcTone(c, 2.0), pcFogAmount(length(vView)), vView);'}
+  ${kind === 'rain' ? ''
+    // (the powers, fire: a flame and an ember are LIGHTS. They are not taken down to the light of the hour as a
+    // leaf is -- a fire by night is the one warm thing in the picture -- only hazed by the air between. `own` is 1
+    // for those marks and 0 for every other grain of the crowd, which is painted exactly as it was.)
+    : kind === 'leaves' && info.inked ? 'c = pcAtmosV(mix(pcTone(c, 2.0), c, own), pcFogAmount(length(vView)), vView);'
+      : 'c = pcAtmosV(pcTone(c, 2.0), pcFogAmount(length(vView)), vView);'}
   ${info.veil && (kind === 'dust' || kind === 'ash' || kind === 'sand') ? 'c = mix(c, vec3(0.985, 0.975, 0.955), lift);' : ''}
   ${glaze ? 'if (log2(1.0 + max(-vView.z, 0.0)) > pcAuxDec(texture(uSceneAux, gl_FragCoord.xy / uSceneRes)).z + 0.01) discard; gl_FragColor = vec4(clamp(c, 0.0, 1.0), ga);' : `pcWrite(c, w, vec3(0.0, 0.0, 1.0), -vView.z, ${regionOf(kind, info).toFixed(1)});`}
 }`,

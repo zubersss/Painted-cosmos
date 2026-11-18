@@ -146,7 +146,7 @@ export function attachBench(pc) {
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
     const i = P.info || {}, c = R.domElement;
     const sun = sunOut == null ? '' : sunOut ? 'sun out (shadows drawn)' : 'sun not out (no shadows drawn)';
-    return 'PAINTED COSMOS SPEED TEST 8, ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
+    return 'PAINTED COSMOS SPEED TEST 9, ' + BUILD + ': press Copy the table at the bottom, then paste it\n' +
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
@@ -209,6 +209,16 @@ export function attachBench(pc) {
       [AS, null, null],
       // the other plants
       ['plants one flat colour', () => B({ flat: 2 }), () => B({ flat: 0 })],
+      // (NINTH FORM, 2026-11-18, after the owner's first table that measured anything: the plants' PAINT alone was
+      //  11.7 ms of a 32.9 ms frame, the single biggest thing in it, and no row said where in the paint it went.
+      //  These three cut the plant's own program at three places, each keeping every leaf and every branch where it
+      //  is. Read as gaps: "written at once" against "one flat colour" is what the footprint, the noise read and the
+      //  discards that break a crown up cost; "one flat colour" against "as set" is the paint proper; "a leaf's own
+      //  colour" tells a leaf's paint from the crowns' strokes and the bark's; "no air on the plants" asks what the
+      //  distance haze costs on every plant pixel.)
+      ['plants written at once', () => B({ flat: 4 }), () => B({ flat: 0 })],
+      ['a leaf in its own colour', () => B({ flat: 5 }), () => B({ flat: 0 })],
+      ['no air laid on the plants', () => B({ flat: 6 }), () => B({ flat: 0 })],
       ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],

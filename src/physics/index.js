@@ -21,6 +21,8 @@ import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { placeWinds, windsToDevils } from './powers.js';
+import { placeFires, stepFires, lightFire as litFire, FUEL } from './fire.js';
+import { burntAt } from '../data/burnt.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
 import { clamp01, smoothstep } from './util.js';
@@ -35,6 +37,20 @@ import {
 
 export const PHYSICS_VERSION = 2;
 const FETCH_DEFAULT = 800;     // m: fetch assumed for a sea state asked about away from the focus
+// (P29) THE AIR DOWN THERE. The waves, the plants, the loose layer and the dust devils are each worked out for ONE air
+// density, and until now that was the density at the focus: the air where the player is. The wind they are given is
+// already the wind at the ground (the grid's cwe, cwn carry no height), but the density was not - and the air on these
+// worlds is only a few hundred metres deep (Earth's ends at 800 m, Mars' at 450), so flying thinned it away under the
+// player. Measured on the game's own worlds: at Earth's sea coast in a 9 m/s wind the sea fell from 0.70 m standing on
+// the shore to 0.47 m seen from 200 m up and 0.31 m from 500 m, and over 1040 m (where Earth's air is counted as gone)
+// it was flat; Earth's temperate forest bent a quarter as far from 500 m up and not at all over 1040; and over Mars'
+// dunes, whose air is gone at 585 m, not one dust devil turned in 2199 frames at 700 m (it turns in 1743 of them now).
+// The density is now taken at the surface each field works on - the ground, or the water standing on it - and no higher
+// than this many metres over it, which is the height the wind that raises a sea is itself quoted at (windSea's U10).
+// Anyone standing on the ground, or wading, whose focus is lower than that gets the same number as before, to the last
+// digit: nothing of the ordinary case moves. (What is LOOSE now has the right air too, but little of it can be seen from
+// high up for other reasons: its particles are only simulated within PARTICLES.radius of the focus.)
+const SURFACE_AIR = 10;
 
 export const QUALITY = Object.freeze({
   samples: [4, 8, 12],        // sampleSurface calls per frame in steady state, per quality tier
@@ -74,6 +90,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
   let winds = null;                 // the explorer's wind this frame (powers.js), or null
+  let fires = null;                 // the fire the explorer has lit this frame (fire.js), or null
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField(SHIP_BODY.legs);
   const drift = new DriftField();
@@ -160,6 +177,75 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     return o;
   }
 
+  // ---- the two things a fire asks of the world (fire.js) --------------------------------------------------------
+  // Built once, so that stepping a fire makes nothing. fire.js knows nothing of trees, water or ice: it asks these.
+  const _fg = { sink: 0, imprint: 0, loose: 0, dust: 0, mat: 0, h: 0 };    // the ground under a patch (groundOfGrid)
+  const _fcov = {};                                   // the cover there (the leaves on the floor, the crowns over it)
+  const _fair = {};                                   // the air there (airAt fills .wind, body-local)
+  const _fd = new Float64Array(3);
+  // Which grounds carry a fire, and as what. Dry turf and heath burn; a forest floor's litter flares; moss
+  // smoulders. Bare rock, sand, dust, gravel, glass, crystal, mud, a stream's bed and ground already burnt to ash
+  // never catch. (These numbers are a first guess for the owner to judge, not a measurement: nothing about a fire
+  // GOING OUT rests on them -- fire.js now ends a fire on its own memory.)
+  const FUEL_OF = { grass: FUEL.ground, litter: FUEL.leaves, moss: FUEL.undergrowth, soil: FUEL.none };
+  const fireCtx = {
+    // WILL ANYTHING BURN HERE? The place comes in body-local and goes back on the ground, because only the near
+    // grid knows how high the land is there.
+    fuelAt(bodyId, px, py, pz, out) {
+      out.kind = FUEL.none; out.fuel = 0; out.wet = 1; out.why = 'off-world';
+      if (bodyId !== active) return;                        // another world: nothing of ours burns there
+      const x = frame.lx(px, py, pz), z = frame.lz(px, py, pz);
+      // WHERE THE GROUND HERE IS KNOWN FROM. Under the explorer, the near grid: 32 m of it, two metres to a node,
+      // and it knows what the ground is MADE of, so ice melts and dry turf catches. Further out, the wind grid:
+      // 272 m of it, sixteen metres to a node, which knows the height, the standing water and the wood over it but
+      // not the material. Beyond that the physics has looked at nothing, and A FIRE MAY NOT SPREAD INTO GROUND
+      // NOBODY HAS LOOKED AT: it stops at the edge of what is known, which is also what happens when the player
+      // walks away from their own fire (the grids follow the explorer).
+      let h, lq, mat = -1;
+      out.why = 'too far: nobody has looked at the ground there';
+      if (near.known(x, z)) { groundOfGrid(x, z, _fg); h = _fg.h; lq = near.liquidAt(x, z); mat = _fg.mat; }
+      else if (airGrid.terrain.known(x, z)) { h = airGrid.terrain.heightAt(x, z, NaN); lq = airGrid.terrain.liquidAt(x, z); }
+      else return;
+      out.why = 'the ground there has no height';
+      if (!(h === h)) return;
+      frame.dir(x, z, _fd);                                 // the patch burns on the floor, not in the air
+      const rr = frame.r0 + h;
+      out.px = _fd[0] * rr; out.py = _fd[1] * rr; out.pz = _fd[2] * rr;
+      out.why = 'water';
+      if (lq === lq && lq > h - 0.02) return;               // standing water: a fire stops at its edge
+      out.why = 'burnt already';
+      if (burntAt(bodyId, out.px, out.py, out.pz) > 0.35) return;   // burnt before: there is nothing left here
+      out.wet = clamp01(moist.wetness01 + Math.min(1, moist.snowDepth * 6));
+      out.why = 'bare ground';
+      // ICE AND SNOW MELT instead of burning (the owner's words, 2026-11-18). Only the near grid knows the ground
+      // well enough to say so, which is why melting is a thing that happens where the explorer is standing.
+      if (mat === MATERIAL_INDEX.ice || mat === MATERIAL_INDEX.snow) { out.kind = FUEL.ice; out.wet = 0; return; }
+      // and what there is to burn: the crowns and undergrowth of a wood, else the leaves on its floor, else the
+      // ground itself where it is the kind that burns (the same three numbers the wind's leaf-tearing reads,
+      // loose.js _tear)
+      const known = airGrid.coverNear(x, z, _fcov);
+      const canopy = known ? (_fcov.canopy01 || 0) : 0, leaves = known ? (_fcov.leaves || 0) : 0;
+      if (canopy > 0.12) { out.kind = FUEL.undergrowth; out.fuel = clamp01(0.35 + canopy); }
+      else if (leaves > 0.08) { out.kind = FUEL.leaves; out.fuel = clamp01(leaves * 4); }
+      else if (mat >= 0) { const k = FUEL_OF[MATERIAL_IDS[mat]] || FUEL.none; if (k !== FUEL.none) { out.kind = k; out.fuel = 0.45; } }
+      if (out.kind !== FUEL.none) out.why = '';
+    },
+    // AND WHAT IS THE WIND HERE, in the body's own axes. airAt answers exactly that, with the dust devils and the
+    // player's own wind already in it, so a gust fans a fire and a stilled place starves one with nothing new.
+    windAt(s, out) {
+      airAt(active, s.px, s.py, s.pz, time, seed, airGrid, frame, sunDir, 1.2, _fair, devils, null, winds);
+      out[0] = _fair.wind.x; out[1] = _fair.wind.y; out[2] = _fair.wind.z;
+    },
+    // Rain puts a fire out. The ground's wetness here, and the rain that is actually reaching the ground now, which
+    // wets a flame sooner than it wets the ground. (0.09 a millimetre an hour is a guess: drizzle lets a fire burn,
+    // steady rain reaches fire.js FIRE.wetStop, a storm drowns it at once. The owner's eyes settle it.)
+    dampAt() {
+      const pr = here.weather.precipitation;
+      const rain = pr && pr.rate > 0 ? pr.rate * (1 - (pr.frozen01 || 0)) * (pr.reachesGround01 == null ? 1 : pr.reachesGround01) : 0;
+      return clamp01(moist.wetness01 + rain * 0.09);
+    },
+  };
+
   function sun01At(bodyId, ux, uy, uz) {
     return sunDir && bodyId === active ? ux * sunDir.x + uy * sunDir.y + uz * sunDir.z : null;
   }
@@ -181,7 +267,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     const fp = f && f.focus;
     if (!bodyId || !fp || !(fp.x === fp.x && fp.y === fp.y && fp.z === fp.z) || Math.hypot(fp.x, fp.y, fp.z) < 1) {
       // deep space, or nothing to centre on: the near field sleeps
-      if (active) { particles.clear(); devils.count = 0; winds = null; active = null; here.bodyId = null; }
+      if (active) { particles.clear(); devils.count = 0; winds = null; fires = null; active = null; here.bodyId = null; }
       stats.ms = now() - t0; return;
     }
     focus.x = fp.x; focus.y = fp.y; focus.z = fp.z;
@@ -240,11 +326,19 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     if (gh !== gh) gh = r - frame.r0;
     here.groundHeight = frame.r0 + gh - body.radius;
     const fy = r - frame.r0;
+    // the surface the weather meets under the focus: the ground, or the liquid standing over it
+    // (over a deep sea the bed is far below: rain that entered 18 m over the bed fell under water)
+    let wh = gh; { let l0 = near.liquidAt(fx, fz); if (l0 !== l0) l0 = airGrid.terrain.liquidAt(fx, fz); if (l0 === l0 && l0 > wh) wh = l0; }
+    // (P29) the air the GROUND's own things work in: the plants, the loose layer, the dust devils. Taken over whatever
+    // surface is under the focus (`wh`: the ground, or the water standing on it - under a deep sea there is no air at the
+    // bed). While the focus is within SURFACE_AIR of that surface this is the very call that fills here.air.density, so a
+    // walker's and a swimmer's world is untouched; higher up it is the air down there, not the thin air they are flying in.
+    const rhoGround = fy - wh > SURFACE_AIR ? airDensity(bodyId, frame.r0 + wh - body.radius + SURFACE_AIR) : airDensity(bodyId, r - body.radius);
     const sun01 = sun01At(bodyId, ux, uy, uz);
     // dust devils near the focus (a few hashes; nothing on bodies that have none)
     _denv.dustSource = cover.dustSource * (1 - Math.min(1, moist.wetness01 * 3)) * (moist.snowDepth > 0.02 ? 0 : 1);
     _denv.sun01 = sun01; _denv.wind = Math.hypot(airGrid.cwe, airGrid.cwn); _denv.storm01 = here.weather.storm01 || 0;
-    _denv.rho = airDensity(bodyId, r - body.radius);
+    _denv.rho = rhoGround;        // (P29) a devil turns in the air at the dust, not in the air the player flies in (above the top of the air there used to be none at all, over the driest dunes)
     devilsNear(bodyId, fp.x, fp.y, fp.z, time, seed, _denv, frame, devils);
     features.devils = devils;
     // the wind the explorer makes (powers.js; the game hands the list in f.winds, or nothing): placed in the frame, its
@@ -289,19 +383,24 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     }
     here.weather.wetness01 = moist.wetness01; here.weather.snowDepth = moist.snowDepth; here.weather.freshSnow = moist.freshSnow;
 
+    // THE FIRE THE EXPLORER HAS LIT (fire.js; the game hands the list in f.fires, or nothing). It is stepped here,
+    // and not where the wind is stepped, because this is the first point in the frame where everything it asks
+    // about is current: the ground grid, the air grid, the player's wind placed in the frame, and the wetness and
+    // the snow. With no list, `fires` is null and this is one comparison.
+    if (f.fires && f.fires.count > 0) stepFires(f.fires, dt, fireCtx);
+    fires = f.fires && f.fires.count > 0 && placeFires(f.fires, frame, bodyId) ? f.fires : null;
+
     // fields and particles
     const t3 = now();
     const dist = f.disturbers || null;
-    flora.update(dt, frame, airGrid, near, here.air.density, fx, fz, dist, quality, devils, winds);
+    // (P29) the plants are bent by the air at the plants (rhoGround): their wind load goes straight with the density
+    flora.update(dt, frame, airGrid, near, rhoGround, fx, fz, dist, quality, devils, winds);
     const t4 = now();
     skyNumbers(here.weather, here.sky);        // the weather as a painter needs it (sky.js)
     // the hull keeps the rain off what is under it
     { let ns = 0; const SH = particles.shelters;
       if (dist) for (let k = 0; k < dist.length && ns < 4; k++) { const D = dist[k]; if (D.kind !== 'ship' || !D.p) continue; const o = ns * 4; SH[o] = frame.lx(D.p.x, D.p.y, D.p.z); SH[o + 1] = frame.lz(D.p.x, D.p.y, D.p.z); SH[o + 2] = Math.hypot(D.p.x, D.p.y, D.p.z) - frame.r0 + 2.2; SH[o + 3] = (D.radius || 4.2) * 0.85; ns++; }
       particles.shelterCount = ns; }
-    // the surface the weather meets under the focus: the ground, or the liquid standing over it
-    // (over a deep sea the bed is far below: rain that entered 18 m over the bed fell under water)
-    let wh = gh; { let l0 = near.liquidAt(fx, fz); if (l0 !== l0) l0 = airGrid.terrain.liquidAt(fx, fz); if (l0 === l0 && l0 > wh) wh = l0; }
     // the eye (f.eye: the camera, body-local; optional): what falls as single flakes is simulated round it.
     // (An eye far from the focus is a map or a free camera: the focus then.)
     let ecx = fx, ecz = fz;
@@ -314,8 +413,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       particles.splashOf = S; particles.splashCover = near.cover; particles.splashCW = near.CW; particles.splashSlot = 8;
       const n = near.nearest(fx, fz); particles.splashHere = n >= 0 && near.cover ? S[near.cover[n * near.CW + 8] | 0] : 0; }
     particles.winds = winds;
+    // (the powers, fire) and the fire alight this frame, for the flame, the smoke and the embers the loose things
+    // lay (physics/loose.js FLAME). Null while nothing burns, and then the emitter is one comparison.
+    particles.fires = fires;
+    // (the rain, the snow and the hail fall round the eye, so they keep the air at the focus; what is loose lies on the
+    // ground and is lifted from it, so it takes the air there: rhoGround)
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
-    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds);
+    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, rhoGround, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
     { const U = Math.hypot(airGrid.cwe, airGrid.cwn), snow = moist.snowDepth;
       driftSnow = snow > 0.01;
@@ -348,11 +452,14 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // level and far rose sample within the old gauge's ration (more while they are not known, on arrival). The reference
     // sea (the trains) is the sea of the most exposed node; the map scales and turns it everywhere else (water.js).
     let seaFetch = cover.fetch || 80, seaDepth = liqDepth, swe = airGrid.cwe, swn = airGrid.cwn;
+    // (P29) the air just over the water, which is what raises its waves (SURFACE_AIR above). Standing in the water or on
+    // the shore this is here.air.density itself, the number the sea has always been given, and no call is made for it.
+    const rhoSea = liqLevel > -1e8 && fy - liqLevel > SURFACE_AIR ? airDensity(bodyId, frame.r0 + liqLevel - body.radius + SURFACE_AIR) : here.air.density;
     stats.fetchSamples = 0; stats.msFetch = 0;
     if (liqLevel > -1e8 && coverKnown) {
       const tg = now(), known = seaMap.outer.invalid === 0 && seaMap.rose.ready;
       _sc.bodyId = bodyId; _sc.R = body.radius; _sc.level = liqLevel; _sc.we = airGrid.cwe; _sc.wn = airGrid.cwn; _sc.g = body.gravity;
-      _sc.rhoAir = here.air.density; _sc.rhoLiq = cover.liquidDensity || liquidOf(bodyId).density; _sc.dir = water.dir;
+      _sc.rhoAir = rhoSea; _sc.rhoLiq = cover.liquidDensity || liquidOf(bodyId).density; _sc.dir = water.dir;
       _sc.swellHeight = water.open > 0 ? water.swellHeight : 0; _sc.swellLength = water.open > 0 ? water.swellLength : 0;
       _sc.exposed = water.mapRead;      // (the reference moves to the most exposed water once something reads the map: water.js)
       _sc.sample = sampleActive; _sc.budget = warming ? 64 : known ? Math.max(2, QUALITY.samples[quality] >> 1) : QUALITY.samples[quality] * QUALITY.burst;
@@ -403,13 +510,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
         _sh.key = key; _sh.F = seaFetch; _sh.b = bodyId; _sh.ux = ux; _sh.uy = uy; _sh.uz = uz;
         const U0 = seaWindAt(time);
         _sh.k = U0 > 0.3 && Ur > 0.3 ? Ur / U0 : 1;
-        seaGrown(_shU, time, seaFetch, seaDepth > 0 ? seaDepth : 1e9, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, WINDS[bodyId] ? WINDS[bodyId].U : 0, _sh.o);
+        seaGrown(_shU, time, seaFetch, seaDepth > 0 ? seaDepth : 1e9, body.gravity, rhoSea, cover.liquidDensity || liquidOf(bodyId).density, WINDS[bodyId] ? WINDS[bodyId].U : 0, _sh.o);
         _sh.o.ok = Ur > 0.3;
         water.hist = _sh.o;
       }
     } else if (water.arrive <= 0) water.hist = null;
     // (until the ground under the focus has been sampled, nothing is known about the liquid here)
-    water.update(dt, frame, swe, swn, coverKnown ? liqLevel : -1e9, seaDepth, seaFetch, body.gravity, here.air.density, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
+    water.update(dt, frame, swe, swn, coverKnown ? liqLevel : -1e9, seaDepth, seaFetch, body.gravity, rhoSea, cover.liquidDensity || liquidOf(bodyId).density, fx, fz, WINDS[bodyId] ? WINDS[bodyId].U : 0);
     // the sea's own spray: spume off the breaking crests, surf on the shore (loose.js; the drops move from the next step on)
     loose.sea(dt, water, near, fx, fz, airGrid.cwe, airGrid.cwn, body.gravity, airGrid);
     here.blown.sand = loose.saltation01; here.blown.snow = loose.blowingSnow01; here.blown.spume = loose.spume01; here.blown.surf = loose.surf01; here.blown.leaves = loose.leafRate; here.blown.litter = loose.litterRate; here.blown.leafStock01 = loose.leafStock01;
@@ -698,6 +805,18 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // How far a body's real prevailing wind is scaled down for play (data.WINDS[body].scale).
     setWindScale,
     get time() { return time; },
+    // THE ABILITY LIGHTS A FIRE (core/powers.js, behind ?powers=1). The list belongs to the game (fire.js makeFires)
+    // and comes in on the frame; lighting one is here because only the physics can say what is underfoot there.
+    lightFire(F, bodyId, p, size) { return litFire(F, bodyId, p, size, bodyId === active ? fireCtx : null); },
+    // WHAT IS UNDER A PLACE, and if nothing will burn there, `why` in plain words. The same answer lightFire acts
+    // on, asked without lighting anything: the screen's word for the player, and what a test reads.
+    fuelAt(bodyId, p, out = {}) {
+      if (!p || bodyId !== active) { out.kind = FUEL.none; out.fuel = 0; out.wet = 1; out.why = 'off-world'; return out; }
+      fireCtx.fuelAt(bodyId, p.x, p.y, p.z, out);
+      return out;
+    },
+    get fires() { return fires; },       // the fire alight this frame (fire.js), or null: whoever paints the flames,
+                                         // the smoke and the light reads it, and fireAt(F, x, z) asks where it burns
     get winds() { return winds; },       // the explorer's wind this frame (powers.js), or null: the painter reads the parted channel from it
     air, weather, ground, bindEnv,
     water: waterAt,
