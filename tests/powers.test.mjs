@@ -209,3 +209,36 @@ test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the elem
   assert.equal(p.list[p.ability].id, 'gust');
   assert.equal(p.charge, 0, 'and nothing is left charged across the swap');
 });
+
+test('A SPARK FALLS SHORT onto ground that will burn, and says plainly when nothing will (owner, 2026-11-18: the fire at the riverside spawn)', () => {
+  // The world here: water from 9 m out, a bank that burns nearer than that. (At the owner's own
+  // spawn the aim lands on the river as often as on the bank; measured 2026-11-18, six casts, all refused.)
+  const p = new Powers(), sim = fakeSim();
+  p.nextElement();
+  const dist = (at) => Math.hypot(at.x - sim.ex.p.x, at.y - sim.ex.p.y, at.z - sim.ex.p.z);
+  let lit = null;
+  sim.physics = {
+    fuelAt: (bodyId, at, o = {}) => {
+      const d = dist(at);
+      if (d >= 9) { o.kind = 0; o.fuel = 0; o.wet = 1; o.why = 'water'; } else { o.kind = 2; o.fuel = 0.8; o.wet = 0; o.why = ''; }
+      return o;
+    },
+    lightFire: (fires, bodyId, at, size) => { lit = { x: at.x, y: at.y, z: at.z, d: dist(at) }; const o = {}; return Object.assign(o, sim.physics.fuelAt(bodyId, at, o), { fuel: o.fuel }); },
+  };
+  p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2);
+  assert.ok(lit, 'a fire was lit');
+  assert.ok(lit.d < 9, 'short of the water, not in it: ' + lit.d.toFixed(1) + ' m');
+  assert.ok(lit.d > 1, 'and not at the explorer’s own feet: ' + lit.d.toFixed(1) + ' m');
+  assert.ok(!p.note || p.note === 'fire', 'nothing complained about: ' + p.note);
+
+  // and where NOTHING near the aim will burn, the word on the screen says which thing refused it
+  const q = new Powers(), sim2 = fakeSim();
+  q.nextElement();
+  sim2.physics = {
+    fuelAt: (bodyId, at, o = {}) => { o.kind = 0; o.fuel = 0; o.wet = 1; o.why = 'water'; return o; },
+    lightFire: () => ({ kind: 0, fuel: 0, wet: 1, why: 'water' }),
+  };
+  step(q, sim2, 40);                       // past the word the element swap leaves
+  q.down = true; step(q, sim2, 2); q.down = false; step(q, sim2, 2);
+  assert.equal(q.note, 'the water will not take it', 'the screen names the water, not a vague "nothing here will burn"');
+});

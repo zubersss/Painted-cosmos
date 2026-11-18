@@ -17,6 +17,17 @@ import { fellTree } from '../data/felled.js';
 import { makeFires, douseFires, clearBurns, FIRE, FUEL } from '../physics/fire.js';
 import { scorch, meltIce, deepenMelt } from '../data/burnt.js';
 
+// WHY A FIRE WOULD NOT TAKE, in the words the player sees. The key is what the world handed back
+// (src/physics/index.js fuelAt, `why`); anything not listed falls back to the old catch-all.
+const FIRE_WHY = {
+  water: 'the water will not take it',
+  'too far: nobody has looked at the ground there': 'too far away to light',
+  'burnt already': 'this ground has burned already',
+  'bare ground': 'nothing here will burn',
+  'the ground there has no height': 'nothing here will burn',
+  'off-world': 'nothing here will burn',
+};
+
 // The abilities of wind, in the order of the keys 1 .. 7 and of the touch fan. hold: it lasts while the hand is down.
 export const ABILITIES = Object.freeze([
   { id: 'gust', word: 'gust', hold: false },
@@ -370,15 +381,49 @@ export class Powers {
   // KINDLE: fire is set down where the view looks, and spreads through whatever will burn (the owner's "spawn").
   // The physics lights it, because only the physics can say what is underfoot at that place.
   _kindle(sim, size = 1) {
-    const f = sim.physics && sim.physics.lightFire ? sim.physics.lightFire(this.fires, sim.bodyId, this.aim.p, size) : null;
+    const ph = sim.physics;
+    if (!ph || !ph.lightFire) return null;
+    // WHERE THE SPARK LANDS. The aim is where the view looks, and at the owner's own riverside spawn that is as
+    // often the water as the bank (2026-11-18: six casts there, every one refused). A thrown spark is not a
+    // surveyor: if the exact place will not take, it falls short, along the same line, and the first ground within
+    // the aim that will burn takes it. The world is asked, it is not guessed at (physics.fuelAt), and nothing is
+    // lit twice: this is a handful of lookups on one key press, not per frame.
+    const p = this._fireSpot(sim, this.aim.p);
+    const f = ph.lightFire(this.fires, sim.bodyId, p, size);
     if (!f) { this._say('no room for another fire'); return null; }
     this.fireCasts++;
     // (2026-11-18, after looking: a fire lit at the owner's own riverside spawn lit, burned one patch and went out,
     //  and the screen said nothing at all, so there was no way to tell a broken fire from a damp wood. It says now.)
-    if (f.kind === FUEL.none) this._say('nothing here will burn');
+    // (2026-11-18, measured: the spawn's own wood DOES take a fire -- 64 patches in forty seconds. What refused it
+    //  was the river the spawn stands on, and the word on the screen said neither. The world now hands back the
+    //  reason in plain words (physics/index.js fuelAt, `why`) and this says that instead of guessing.)
+    if (f.kind === FUEL.none) this._say(FIRE_WHY[f.why] || 'nothing here will burn');
     else if (f.wet >= FIRE.wetStop * 0.8) this._say('too damp to catch');
     else if (!(f.fuel > 0.25)) this._say('too little here to carry it');
     return f;
+  }
+
+  // The place a kindling really starts: the aim if it will burn, else the nearest ground short of it (and a step to
+  // each side) that will. Returns the aim itself when nothing near it burns, so the ability's own flame still shows
+  // and the word on the screen can say why.
+  _fireSpot(sim, aim) {
+    const ph = sim.physics;
+    if (!ph.fuelAt || !this.aim.ok) return aim;
+    const o = this._fuel || (this._fuel = {});
+    if (ph.fuelAt(sim.bodyId, aim, o).kind !== FUEL.none) return aim;
+    const from = this.aim.from, dx = aim.x - from.x, dy = aim.y - from.y, dz = aim.z - from.z;
+    const up = unit(sim.ex.p);
+    // the aim's right, for the two steps aside (the river runs along the view as often as across it)
+    let rx = dy * up.z - dz * up.y, ry = dz * up.x - dx * up.z, rz = dx * up.y - dy * up.x;
+    const rl = Math.hypot(rx, ry, rz); if (rl > 1e-6) { rx /= rl; ry /= rl; rz /= rl; }
+    const q = this._spot || (this._spot = { x: 0, y: 0, z: 0 });
+    for (const k of [0.8, 0.6, 0.45, 0.3, 0.2]) {
+      for (const side of [0, 2.5, -2.5]) {
+        q.x = from.x + dx * k + rx * side; q.y = from.y + dy * k + ry * side; q.z = from.z + dz * k + rz * side;
+        if (ph.fuelAt(sim.bodyId, q, o).kind !== FUEL.none) return q;
+      }
+    }
+    return aim;
   }
 
   _orbAt(sim, ahead) {
