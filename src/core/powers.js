@@ -93,6 +93,11 @@ export class Powers {
   _say(word) { this.note = word; this._noteT = 1.8; }
   // the parted channel is let go: it closes from its far end inward (physics/powers.js stepWinds)
   _close() { if (this.part) { releaseWind(this.part); this.part = null; } }
+  // (2026-11-18) THE HAND IS GONE, not lifted: the page lost focus, or the system took the touch away. A hold that is
+  // taken away is ABANDONED, not cast. Found by a reader driving the touch screen: without this, a hold that had
+  // charged all the way to the ultimate and was never lifted made the NEXT QUICK TAP come out as the ultimate - a tap
+  // that flattened 28 trees. `_was` goes too, or the next press is not seen as a new press at all and casts nothing.
+  cancelHold() { this._armed = null; this.charge = 0; this.ult = 0; this.ultReady = false; this._wasTap = false; this._was = false; this._drop(); this._close(); }
   // Is the water parted at the place d (a unit vector from the body's centre) where its face is at radius r?
   // (sim.js asks, for the explorer's ground: on the channel's floor there is no water to wade or swim in)
   dry(bodyId, d, r) { return this.winds.count > 0 && partedAt(this.winds, bodyId, d.x * r, d.y * r, d.z * r) > 0.5; }
@@ -322,7 +327,7 @@ export function attachPowerInputs(powers, target = window) {
   const md = (e) => { if (e.button === 2) powers.keys.mouse = true; };
   const mu = (e) => { if (e.button === 2) powers.keys.mouse = false; };
   const cm = (e) => { e.preventDefault(); };
-  const blur = () => { powers.keys.cast = powers.keys.mouse = powers.keys.pad = false; };
+  const blur = () => { powers.keys.cast = powers.keys.mouse = powers.keys.pad = powers.keys.touch = false; powers.cancelHold(); };
   target.addEventListener('keydown', kd); target.addEventListener('keyup', ku);
   target.addEventListener('mousedown', md); target.addEventListener('mouseup', mu);
   target.addEventListener('contextmenu', cm); target.addEventListener('blur', blur);
