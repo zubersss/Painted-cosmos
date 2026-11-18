@@ -412,12 +412,20 @@ EVERY merge, including the small ones. The owner has the live speed test at
   of the cast key caught and the screen said nothing, i.e. complained of nothing. Then:
       3 s after lighting:  2 patches,  21 strokes of flame,  8 of ember, 36 of smoke
       8 s after lighting: 12 patches, 113 strokes of flame,  2 of ember, 117 of smoke
-  A STILL AT 3 s IS IN `docs/shots` -- the fire is in it and is too small to find at 960 px, which
-  is honest and is why the numbers are here. THE PICTURE OF IT AT FULL SIZE IS THE ONE THING STILL
-  OWED; a grab was in flight when this was written.
-  (MACHINE FACT WORTH KEEPING: stepping the held game 90 frames costs 28 SECONDS here; ONE `lab
-  grab` of that page cost 34 MINUTES. The browser is not slow at playing the game, it is slow at
-  handing back a picture. Plan a render round the grabs, not round the frames.)
+  **AND IT HAS BEEN SEEN**: `docs/shots/fire/fire_burning_close.jpg`. Four burning patches on the
+  riverbank eight seconds after one press, the ground charred black behind the flames, embers in
+  the grass. THE TRAP THAT COST AN HOUR: the aim is 6 m out looking steeply down and 30 m looking
+  level, so a fire cast from a level view lands 25 m away and is 505 PIXELS OF A 518,400-PIXEL
+  PICTURE -- a tenth of one per cent. It was drawn the whole time. MEASURE A THING BEFORE
+  CONCLUDING IT IS MISSING: with the fire and without it, the canvas differed by exactly those 505
+  pixels, which settled in two readings what two stills could not.
+  The same run proved the SPARK FALLING SHORT in the real game without staging it: the ground the
+  view pointed at came back `kind 0, fuel 0.00` and the fire took anyway, 6.0 m away.
+  (MACHINE FACT WORTH KEEPING: stepping the held game 90 frames costs 28 SECONDS here; ONE picture
+  cost 34 minutes once and 12 another time, and READING THE CANVAS FROM INSIDE THE PAGE IS NO
+  CHEAPER -- 24 minutes -- because the cost is the pixel readback itself, not the screenshot tool.
+  The browser is not slow at playing the game; it is slow at handing back pixels. Plan a render
+  round the READBACKS: budget one or two, not six.)
 - THE FOUR NEW TREES really standing (all four now, not two), the far wood with its leaves back,
   the sky with cloud form and nothing but the sun left paper white, the fire's own art and the
   light it throws, the ring picker reading the list in the hand with a thumb's route to the
