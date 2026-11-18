@@ -380,6 +380,18 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     - CAUTION: this run's view has 902k triangles where speed test 7's had 501k - a denser spot in
       the wood. The two tables are NOT the same picture and must not be read against each other.
 
+53. **What the player breaks must grow back, and the world must be there before a fast flight
+    arrives (2026-11-18).** "Also make sure that felled woods or burnt areas eventually do return
+    to normal so it isn't taking up memory make and fix the loading in when your flying I want
+    things to be there before you get there even if your flying fast."
+    - The three records of damage (`data/felled.js`, `data/burnt.js`, `data/stripped.js`) are
+      bounded only by a CAP today, and forget the oldest mark when full. They must HEAL: a scorch
+      fades, a felled tree stands again, a bare crown comes back into leaf, after enough time.
+      That is what the owner asked for and it bounds the memory by time as well as by count.
+    - A tree coming back is SEEN, so it must not pop: it comes back the way it went.
+    - Flying at 170 m/s outruns what the world builds. Build for where the ship WILL be, and let
+      it build harder while it is moving fast.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
