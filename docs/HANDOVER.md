@@ -420,6 +420,23 @@ and six more faults, and NOT ONE FINDING WAS REFUTED.** All twelve are fixed. Th
 one with its measurement. THE LESSON: an agent's own measurement is a draft, and nothing built
 here has yet survived an independent reading. Run that review before every merge of this size.
 
+**BOTH OF THE OWNER'S ASKS OF THE EVENING ARE BUILT AND MEASURED** (section 2 item 53):
+- THE WOOD GROWS BACK. A felled tree stands again after 420 s of play, a scorch and a burnt crown
+  after 600, melted ice fills in over 240, a stripped crown refills over 240 - each only once the
+  explorer is more than 160 m away (200 for a burn), or after twice the wait if they stay to watch.
+  The record is DROPPED when the thing is whole, so every list is bounded by time as well as by
+  count. Measured with all three records FULL and nothing yet old enough: 22.2 microseconds a
+  frame; with them empty, which is every frame of an ordinary game, 38.5 ns.
+  (`stripStep` had been written with its record and CALLED BY NOTHING: a bare crown stayed bare for
+  ever. Found while wiring this.)
+- THE WORLD ARRIVES FIRST. The ground and the trees are built for a point a few seconds ahead of
+  the eye as well as for the eye. MEASURED with `src/world/rush.test.mjs`, PC_LEAD=0 against the
+  new default: at 170 m/s the thinnest moment of a flight goes from 195 to 228 patches of a
+  237-patch settled world (82 per cent to 96). THE COST: the world holds more ground while flying
+  fast (mean 212 -> 271 patches), which is more to draw and to keep; only over 14 m/s.
+  `?lead=0` is the world as it was. A slice multiplier was tried and TAKEN OUT: the world's own
+  budget test caught it spending 12.4 ms in a frame meant for 5.
+
 **THE PHONE IS AT 30 A SECOND IN THE WOOD AND NOTHING IS CAPPED** (speed test 8, section 2 item
 52). All the trees are half the frame; the PLANTS' PAINT ALONE IS 11.7 ms of 33. The whole
 3086 x 1440 screen is 161 ms = 6 a second and is NOT REACHABLE at this look: the honest target is
