@@ -258,6 +258,12 @@ function facetCore(B, c, rx, ry, rz, rnd, opts) {
   // whose hash came out low (0.0023 at seed 6, the lowest of all fifty-seven pieces) would be the FIRST thing
   // dropped, leaving loose dabs floating over the sky with no crown under them: the "confetti" this look threw out
   // twice already. A hash of 1 puts the core at the front of the order, so it is the last thing to go.
+  // (2026-11-18, found by an independent reader) THE DRAW IS KEPT AND THROWN AWAY. `rnd` is the one stream the whole
+  // far tree is built from, so dropping the core's own draw handed every one of the 46 shingles and 10 leaf cards
+  // after it the numbers that belonged to its neighbour: 284 of 292 vertices moved, the largest by about 8 m of a
+  // 12 to 15 m tree. Every far tree in the oil wood silently became a different tree, for a change that was only
+  // about SORT ORDER. One wasted random number keeps them the trees they were.
+  rnd();
   const coreHash = 1;
   const I = ico(0), ph1 = rnd() * 6.28, ph2 = rnd() * 6.28, ph3 = rnd() * 6.28, P = [];
   for (let i = 0; i < I.n; i++) {

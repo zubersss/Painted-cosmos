@@ -36,6 +36,8 @@ const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers kee
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
 const WASH_T = 0.55;                   // seconds a new thing takes to wash in, and a tree to change hands between two tiers
 const HOLD_MAX = 6;                    // seconds a built cell waits at most for its ground to be on the paper
+// How many falling trees are laid again in one frame (the rest take their turn on the next): see _fall.
+const FALL_RELAY = 10;
 const RANK = { far: 0, near: 1, under2: 2, under: 3 };   // what is built first: the far masses, the trees, then what grows under them
 const JIT = 0.3;                       // each tree switches tier at its own distance
 const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLeaf01', 'aCard'];     // (the last two: trees only, PHYSICS' crown)
@@ -48,6 +50,10 @@ const SHARED = ['position', 'normal', 'uv', 'aMass', 'aData', 'aBranchId', 'aLea
 //  0.8 was measured to cut the frame's triangles by a quarter on foot and a third from the air, for a handover that
 //  moves 18 m. 1 is the behaviour before this.)
 const TREE_DIST = (() => { const q = typeof location !== 'undefined' && location.search ? new URLSearchParams(location.search).get('treedist') : null; const n = q == null ? NaN : +q; return isFinite(n) && n >= 0.5 && n <= 1 ? n : 0.8; })();
+
+// WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
+// of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
+const CAN_CARD = { broadleaf: 1, conifer: 1, maple: 1, spruce: 1, aspen: 1, tallpine: 1 };
 
 const FAR_DIMS = { maple: [15.5, 12.0, 0], spruce: [9.5, 16.0, 0.86], aspen: [12.0, 13.5, 0], tallpine: [12.0, 19.0, 0.62],
   broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
@@ -111,8 +117,12 @@ export class Flora {
       const lf = LOOK.oil ? sortLeafCards : (g) => g;
       return { mat, geo0: [lf(gen(11 + i * 10, 0, sp)), lf(gen(12 + i * 10, 0, sp))], geo1: lf(gen(13 + i * 10, 1, sp)), far: fd, pine: sp.kit === 'conifer',
         // (far off it is drawn as leaf cards, not as a lump: the trees in leaf of the oil look; ?fartree=lump: as it was)
-        canCard: sp.kit === 'broadleaf' || sp.kit === 'conifer',
-        cardFar: LOOK.oil && FAR_CARDS && (sp.kit === 'broadleaf' || sp.kit === 'conifer') };
+        // (2026-11-18, found by an independent reader and re-measured: this list was left at the two old kits when the
+        //  four new ones went into the autumn wood, so 38,686 of 38,968 FAR TREES IN IT FELL BACK TO THE 26-TRIANGLE
+        //  LUMP -- the far wood went back to grey-brown blobs, and the far tier from 7,591,242 triangles to 1,011,660
+        //  at 3086x1440 from 220 m up. The leafy far tree was made the look in v13; a kit must be named here to get it.)
+        canCard: CAN_CARD[sp.kit] === 1,
+        cardFar: LOOK.oil && FAR_CARDS && CAN_CARD[sp.kit] === 1 };
     });
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
@@ -185,6 +195,14 @@ export class Flora {
     let inst2 = null;
     if (far) { inst2 = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2); g.setAttribute('aInst2', inst2); }
     const mesh = new THREE.InstancedMesh(g, mat, cap);
+    // THE FAR TREES ARE DRAWN LAST of the opaque things (2026-11-18, the owner's own phone, speed test 8 row 8:
+    // -1.2 ms of a 32.9 ms frame, free, and the picture cannot change - they are opaque and depth-tested, so the
+    // order of opaque geometry decides only what is shaded, never what is seen). They cover a fifth of the screen
+    // and only a sixth of that survives to be looked at (measured on the real world at the phone's own picture
+    // size: 104,362 pixels covered, 17,249 of them on top), so putting them after the ground and the near trees
+    // lets the depth test throw away most of their painting before it is done. The same table's row 7, drawn
+    // FIRST, is +2.3 ms, which is the other half of the same fact.
+    if (far) mesh.renderOrder = 9;
     // (the oil look's cast shadows, render/shadow.js: trees, bushes and stones cast; blades and flowers do not)
     if (mat.userData.pcCasts) mesh.layers.enable(SHADOW_LAYER);
     mesh.count = 0;
@@ -262,9 +280,27 @@ export class Flora {
     const dt = this._fallT != null ? Math.min(0.1, Math.max(0, now - this._fallT)) : 0;
     this._fallT = now;
     const list = fallingOn(this.S.id, _falling);
-    for (const F of list) {
-      F.f = Math.min(1, F.f + dt / FELL.time);
-      this._relay(F);
+    // (2026-11-18, found by an independent reader who TIMED AN ULTIMATE) A TREE IS LAID AGAIN ONLY WHILE IT IS
+    // ACTUALLY MOVING, AND ONLY SO MANY A FRAME. An ultimate fells up to sixty trees at once, each with its own wait
+    // so that the fall travels outward; every one of them used to be laid again every frame, wait and all, for the
+    // three seconds the wave took. Measured on the real world: a settled world update is 0.125 ms, the frame of the
+    // cast 2.25 ms, and the three seconds after it ran at 1.11 ms with a tail of 5 to 7 ms -- nine times the settled
+    // cost, held for three seconds, on a phone already at its cap, exactly while the player is watching. A tree
+    // still waiting (f below 0) stands where it stood and needs nothing; of those really moving, at most FALL_RELAY
+    // are laid again in any one frame, taken in turn, so sixty falling trees cost what eight do and the rest catch
+    // up on the next frame. Nothing is skipped for good: the turn comes round.
+    let did = 0;
+    const n = list.length;
+    if (n) {
+      let k = this._fallK | 0;
+      if (k >= n) k = 0;
+      for (let i = 0; i < n; i++) list[i].f = Math.min(1, list[i].f + dt / FELL.time);
+      for (let i = 0; i < n && did < FALL_RELAY; i++) {
+        const F = list[(k + i) % n];
+        if (F.f <= 0) continue;                 // still waiting for the wave: it stands, and is drawn standing
+        this._relay(F); did++;
+      }
+      this._fallK = (k + Math.max(1, did)) % n;
     }
     // (a tree felled, or a saved game's trees put back, since the last frame: those already lying are laid too)
     // (2026-11-18) THE LIST IS WALKED, NOT EVERY TREE OF EVERY CHUNK. This used to ask of all the trees in all the
@@ -685,7 +721,14 @@ export class Flora {
       // air against 4,456,337. The pixels went up ninefold as asked; the triangles went up again on top of that.
       // So past 1080 lines the growth stops at TREE_DIST. A phone's screen is small and held close, however dense
       // it is: a tree 90 m off is a few pixels either way. ?treedist= sets it; 1 is the old behaviour.
-      const sk = Math.min(SCREEN.outH > 1080 ? TREE_DIST : 1, Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20));
+      // (2026-11-18, found by an independent reader) AND NO CLIFF AT 1080 LINES. Written as a step, the cap vanished
+      // the moment the picture fell to 1080, so the ranges JUMPED from 0.8 back to 1.0 as the picture got SMALLER:
+      // measured on the real world, on foot, 1081 lines drew 2,241,568 triangles in 670 calls and 1080 lines drew
+      // 3,106,332 in 730 -- 39 per cent more work for 19 per cent fewer pixels. The frame controller's ladder lands
+      // exactly there (1440, 1320, 1200, 1080, ...), so the one rung it steps down to when frames are slow was the
+      // dearest rung of all, and a slow frame made itself slower. The cap now comes in smoothly from 1080 to 1440.
+      const grow = Math.max(0.5, Math.round(SCREEN.outH / 1080 * 20) / 20);
+      const sk = Math.min(grow, 1 + (TREE_DIST - 1) * Math.min(1, Math.max(0, (SCREEN.outH - 1080) / 360)));
       const vis = this.S.look && this.S.look.visibility ? this.S.look.visibility[0] : 1e4;
       const air = Math.min(1, Math.max(0.5, Math.round((vis * 2 / T_FAR + (SHADOW.alt || 0) / 60) * 8) / 8));
       // (and from the air the far trees reach farther, up to twice: there are no near trees to pay for up there, and the

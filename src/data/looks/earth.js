@@ -81,7 +81,11 @@ export default {
           palCalm: { grassLight: [0.78, 0.76, 0.38], grassMid: [0.58, 0.66, 0.32] },
           overCalm: { under: { leaf: [[0.80, 0.80, 0.40], [0.56, 0.68, 0.33], [0.33, 0.50, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } },
           // (clearer air than the planet's 185 m: the trees a stone's throw off keep their colour, the far ones go pale)
-          over: { mist: 1.4, tallOil: [0, 1] },      // (the broad maple and the spruce: see flora.tallOil above)
+          // (2026-11-18: all four, not two. The placer could only ever stand two kinds in a wood, so the aspen and the
+          //  tall pine were built at every start-up and drawn nowhere; floraplace.js now lets the grove field choose
+          //  which PAIR stands where. The maple and the spruce keep about three quarters of the wood; the rest is
+          //  stands of aspen and tall pine, which is what the owner asked for -- "as many as you want".)
+          over: { mist: 1.4, tallOil: [0, 1, 2, 3] },      // (maple, spruce, aspen, tall pine: see flora.tallOil above)
           // (the clip's wood is broadleaves in autumn leaf with a white birch here and there: nearly nine trees in ten;
           // its tufts and small plants are yellow-green in the sun and deep green in the shade)
           // (tallMix over 1: the groves of conifers go too; a conifer is one tree in thirty. With 0.88 whole stands were

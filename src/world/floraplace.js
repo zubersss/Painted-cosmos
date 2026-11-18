@@ -48,8 +48,18 @@ export function placeTrees(S, face, level, ix, iy, grid) {
         if (bi.terrain !== 'forest' && (bi.tallD || 0) < 0.36 && r3 >= 0.62 * (0.14 + 0.86 * clump) * s.trees * (0.06 + 0.94 * smoothstep(-0.30, 0.18, n3(x * fg - 4.0, y * fg + 13.0, z * fg + 7.0)) * 1.25)) continue;
         // each species keeps to its own groups: the choice follows the clump field too
         const grove = n3(x * fd + 21.0, y * fd + 4.0, z * fd - 13.0);
-        const birch = r4 < clamp(s.birch + grove * 0.55, bi.tall[0] === bi.tall[1] ? 1 : 0.04, bi.tall[0] === bi.tall[1] ? 1 : 0.97);
-        const kind = birch ? bi.tall[0] : bi.tall[1];
+        // (2026-11-18, found by an independent reader) A WOOD OF MORE THAN TWO KINDS. This chose between bi.tall[0]
+        // and bi.tall[1] and nothing else, so a biome that named four kinds had two of them built at every start-up
+        // and standing nowhere at all (the aspen and the tall pine: 26,894 triangles and two shader programs for
+        // trees no frame could hold). The grove field, WHICH IS ALREADY DRAWN, now picks which PAIR stands in this
+        // grove and the roll below chooses within it exactly as it always has: not one extra random number is taken,
+        // so every two-kind wood -- which is every wood of the live watercolour game -- is placed to the digit as
+        // before. The first pair keeps about three quarters of the wood, so adding kinds does not halve its character.
+        const np = bi.tall.length >> 1;
+        const pr = np > 1 && grove > 0.45 ? Math.min(np - 1, 1 + Math.floor(((grove - 0.45) / 0.55) * (np - 1))) : 0;
+        const ta = bi.tall[pr * 2], tb = bi.tall[pr * 2 + 1];
+        const birch = r4 < clamp(s.birch + grove * 0.55, ta === tb ? 1 : 0.04, ta === tb ? 1 : 0.97);
+        const kind = birch ? ta : tb;
         const spec = S.look.flora.tall[kind];
         const rr = R + s.h - 0.12;
         // (`vary`: a stand of all ages: most are young, the middle storey; a few are full grown, one in a while a giant)
