@@ -1686,6 +1686,15 @@ ${FIRE_GLOW}
 #endif
 void main() {
   #include <logdepthbuf_fragment>
+  #ifdef PC_OIL
+    // (THE SPEED TEST'S BISECTION OF A PLANT'S PAINT, shared.js uOilL.y, 2026-11-18. The owner's own phone says the
+    //  plants' paint is 11.7 ms of a 32.9 ms frame -- the single biggest thing in it -- and no row yet says WHERE in
+    //  the paint it goes. 4 writes a plant the instant its fragment starts: before the footprint, before the noise
+    //  read, before every discard that breaks a crown up. The gap from 4 to 2 ("plants one flat colour", which runs
+    //  all of those first) is what they cost; the gap from 2 to "as set" is the paint proper. These do nothing
+    //  whatever unless the speed test sets them.)
+    if (uOilL.y > 3.5 && uOilL.y < 4.5) { pcWrite(vec3(0.42, 0.40, 0.32), 0.0, vec3(0.0, 0.0, 1.0), -vView.z, 3.0); return; }
+  #endif
   pcFp = pcFootprint(vBody);      // (R1 W2.1, chunks.js: before any discard, where the flow is uniform)
   pcDist = length(vView);         // (R1 re-fix: the leaf shadow's far octaves, chunks.js)
   float part = vData.y;
@@ -1811,7 +1820,10 @@ void main() {
     // (worked out once a leaf, in the vertex shader: PROP_VERT, "a leaf's paint, once a leaf"; here only the lantern's
     // light is laid over it, by night)
     float h = vData.w;
-    c = pcLamp(vLeafC.rgb, vLeafK.rgb, vCardB, fract(h * 13.7));
+    // (the speed test, uOilL.y = 5: a leaf keeps every shape and every discard and is written in the colour its own
+    //  vertex already worked out, with no lantern and no fire laid over it. The gap to "as set" is what a LEAF's own
+    //  paint costs, told apart from the crowns' strokes and the bark's.)
+    c = uOilL.y > 4.5 && uOilL.y < 5.5 ? vLeafC.rgb : pcLamp(vLeafC.rgb, vLeafK.rgb, vCardB, fract(h * 13.7));
     #ifdef PC_FIRE
       c = pcFireLit(c, vLeafK.rgb, vCardB, fract(h * 13.7));      // (the powers, fire: a leaf near a fire takes its light, whole)
     #endif
@@ -2121,7 +2133,13 @@ void main() {
       c = mix(c, pcSoot(c, fract(seed * 3.37), fract(vData.w * 5.9)), kb);
     }
   #endif
-  c = pcAtmosV(c, vFog, vView);
+  // (the speed test, uOilL.y = 6: the air between is not laid on a plant at all. What that costs is a question
+  //  about every pixel of every plant, which is why it is asked here and not only of the whole picture.)
+  #ifdef PC_OIL
+    if (!(uOilL.y > 5.5 && uOilL.y < 6.5)) c = pcAtmosV(c, vFog, vView);
+  #else
+    c = pcAtmosV(c, vFog, vView);
+  #endif
   wet = max(max(wet, vFog * 0.85), uWx.w * smoothstep(10.0, 90.0, vd) * 0.9);
   #ifdef PC_OIL
     wet = oilCover;       // (the oil look has no wet paint: the first target's alpha is the pixel's cover, for alpha to coverage)
