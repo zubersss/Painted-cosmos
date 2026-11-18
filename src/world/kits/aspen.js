@@ -60,7 +60,11 @@ export function aspenGeometry(seed, lod, spec) {
   //  and through gaps. The cause was the triangle budget this kit was built to, 3000 near, which was set without
   //  looking at THE TREE IT REPLACES: the old broadleaf is 7,242 triangles near. So these crowns were 2.7 times too
   //  thin. The count below is raised to sit beside the old tree's own cost, not beside a number picked in the air.)
-  const totalCards = near ? 1550 : 200;
+  // (2026-11-18, the owner: "give the trees as much leaves as you can and make it as as best as you can".) Raised
+  //  again, above the old broadleaf's own cost this time. It is spent only on the NEAR tier, which is a handful of
+  //  trees in any frame; the far tiers, which are thousands, are left exactly as they were, so the wood gains its
+  //  fullness where the eye is and costs nothing where it is not.
+  const totalCards = near ? 2340 : 200;
 
   const tubes = [], stems = [], clumps = [];      // what was laid, written down for the test: see the end of the file
   for (let k = 0; k < nS; k++) {

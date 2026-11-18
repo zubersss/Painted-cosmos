@@ -126,11 +126,11 @@ test('both levels of detail stay inside their triangle budget', () => {
     // (2026-11-18: 3000 was a number picked in the air; the tree this one replaces, the old broadleaf,
     //  is 7,242 triangles near, and at 3000 these crowns rendered as bare winter armatures. The budget is now
     //  the old tree's own cost, which is what the wood was already paying.)
-    assert.ok(a.tri < 7400, `${a.tag}: ${a.tri} triangles`);
+    assert.ok(a.tri < 11200, `${a.tag}: ${a.tri} triangles`);
     assert.ok(b.tri < 700, `${b.tag}: ${b.tri} triangles`);
     assert.ok(b.tri < a.tri / 3, `${b.tag}: the far form is far cheaper`);
   }
-  console.log(`TRIANGLES: near ${Math.min(...t0)} to ${Math.max(...t0)} (budget 7400, the old broadleaf's own cost), far ${Math.min(...t1)} to ${Math.max(...t1)} (budget 700)`);
+  console.log(`TRIANGLES: near ${Math.min(...t0)} to ${Math.max(...t0)} (budget 11200: the owner asked for as many leaves as the trees can carry), far ${Math.min(...t1)} to ${Math.max(...t1)} (budget 700)`);
   console.log(`LEAF CARDS: near ${Math.min(...c0)} to ${Math.max(...c0)}, far ${Math.min(...c1)} to ${Math.max(...c1)}`);
 });
 
