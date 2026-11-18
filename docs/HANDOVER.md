@@ -330,18 +330,28 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 ## 3. State right now (update this before you stop)
 
-Last written afresh 2026-11-16 by the coordinator on the second account (the earlier text had
-been patched a dozen times; the log has the history).
+Head rewritten 2026-11-18 (the v12 text it replaced is in the log).
 
-**In one line:** `main` is at `v12 (17 Nov)` (ba4e0a5; pull requests #4 to #12; #7 to #12 were
-opened and merged by the session: #7 to #11 on the owner's standing word, section 2 item 41, #12
-on their own "Merge the powers", item 47). LIVE BEHIND SWITCHES: the new look (`?look=oil`) and
-THE ELEMENTAL POWERS, WIND (`?powers=1`: seven abilities). THE PHONE IS THE MAIN TARGET (item
-40). Also behind switches: the speed test (`bench=1`, its sixth form), an experimental cheaper
-far tree (`fartree=cards`). `powers` equals `main`. `look-proto` is `main` and ONE COMMIT MORE
-(a calmer forest floor behind `?floor=calm`, shown to the owner as "A or B", not merged: if they
-say B, make it the autumn wood's own colours in `src/data/looks/earth.js` and take it through
-the gate; if A, drop the commit).
+**In one line:** `main` is at `v15 (18 Nov)` (5d6cf88; pull requests #4 to #15, #7 onwards opened
+and merged by the session on the owner's standing word and their own "merge the powers"). LIVE
+BEHIND SWITCHES: the new look (`?look=oil`), THE ELEMENTAL POWERS, WIND (`?powers=1`, seven
+abilities), the speed test (`bench=1`, its SEVENTH form, which now HOLDS THE GAME STILL while it
+measures), and `fartree=lump` to bring back the old far tree. THE PHONE IS THE MAIN TARGET.
+ALL FIVE OF THE OWNER'S ASKS OF 17-18 NOVEMBER ARE NOW IN `main`: the camera's glitch in flight
+fixed, an even faster flight, a power's circle grown by holding it (to four times, with the size
+in words), the trees leaning the way the wind is sent, and the speed test held still. `look-proto`
+equals `main`; `powers` is one merge behind it.
+
+**THE FULL CHECK ON `main` AT v15** (which carries v13's, v14's and v15's code: v13's own run was
+cut short by a machine restart and v14's was stopped on purpose so this one would cover both)
+was started 02:15 on 18 November. Its log is `/home/user/.pc-scratch/look/full_v15.log` (in the
+session's scratch, NOT in the repository): read ITS OWN last line and ITS OWN time before
+believing any result from it.
+
+**A BRANCH THAT IS COMMITTED BUT NOT PUSHED IS ONE RESTART FROM GONE.** v15 sat on a local branch
+`look-dev` that was never on the remote while the machine restarted twice. It survived by luck.
+Push the working branch (`git push origin <local>:look-proto`) the moment a piece of work is
+committed, not when it is finished.
 
 **The phone's speed, where it stands** (the log of 2026-11-17 has the tables and the reasoning):
 - With the live far trees (lumps) the far trees are HALF THE PHONE'S FRAME (44 ms as set, 23
@@ -360,18 +370,22 @@ the gate; if A, drop the commit).
   far trees in the same run; and their eye on `?look=oil&fartree=cards`. Then: either the leafy
   far tree becomes the phone's look (the owner's call), or the lump's real cost is found and cut.
 
-**WHAT THE OWNER HAS BEEN ASKED AND HAS NOT YET ANSWERED (2026-11-17, evening):**
-1. One photograph of SPEED TEST 6 from the phone (`…/?look=oil&bench=1`, label v11). Read rows 2
-   to 9 (the far trees: flat, gone, out of the shadow pass, only in it, drawn first, drawn last,
-   the other form) against the "as set" before them, and rows 16 to 18 (the shadow pass).
-2. Their eye on the leafier cheap far tree (`…/?look=oil&fartree=cards&body=earth&time=15.4`):
-   could it be the phone's look? (On the phone its plainer version ran at 36.5 a second against
-   22.5.)
-3. HOW THE WIND LOOKS, FEELS AND SOUNDS ON THE PHONE (merged 2026-11-17, v12:
-   `…/?look=oil&powers=1`): nobody has seen it in motion, felt it under a thumb or heard it.
-   Things the session doubts and has said so: whether the white strokes of air are too bold;
-   the gathered ball (the weakest in stills); the sounds (never heard).
-4. The forest's floor: A (live) or B (`floor=calm`).
+**WHAT THE OWNER HAS BEEN ASKED AND HAS NOT YET ANSWERED (as of 2026-11-18, 02:00):**
+1. ONE TABLE OF SPEED TEST 7 FROM THE PHONE, the first that can be believed (`?look=oil&bench=1`,
+   label v15): it holds the explorer, the view and the clock still and says "held still" in its
+   header. Until such a table exists NO ROW of the three earlier tables can be used, and the two
+   far trees cannot be told apart. Read rows 2 to 9 (the far trees) and 16 to 18 (the shadows).
+2. THEIR EYE ON THE FAR DISTANCE: v13 made the leafy far tree the look. Does the wood across the
+   river read better or worse than before? (`?fartree=lump` shows the old one; one line to undo.)
+3. HOW THE WIND LOOKS, FEELS AND SOUNDS IN THE HAND on the phone. Still nobody's eye but stills:
+   whether the white strokes of air are too bold; the gathered ball (the weakest in stills); the
+   sounds (never heard); and now whether HOLDING a power to grow its circle feels right, and
+   whether the faster flight (78 m/s at full surge) is the right speed.
+4. The forest's floor: A (live) or B (`?floor=calm`, which IS on `main` as of v15: checked
+   2026-11-18 in `src/data/mode.js` and `src/data/looks/earth.js`, so the two can be compared on
+   the owner's own phone by adding `&floor=calm` to the address).
+5. The three riskiest parts of the code (listed for them on 2026-11-16): they said "don't fix them
+   yet, wait for my go-ahead". Still waiting.
 GIVE THE OWNER LINKS AS PLAIN ADDRESSES ON THEIR OWN LINES (inside code marks a phone may not
 let one tap them: they had to ask again).
 
