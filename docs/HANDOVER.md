@@ -396,7 +396,17 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
-**`main` IS AT v16 (18 Nov) PLUS PULL REQUEST #17** (the speed test's copy button). THE LABEL ON THE
+**`main` IS AT v18 (18 Nov), pull request #18 merged.** It carries THE FIRE AND ITS ULTIMATE, the
+four kinds of tree really standing, the far wood's leaves back, the sky's cloud form, a wood that
+grows back, the world there before a fast flight, speed test 9 and the twelve faults the
+six-dimension review found. GATE: the live watercolour game 0 pixels different of 518,400 in all
+six scenes; the oil look 431k-443k changed in three; the page boots clean; speed test 9 ran all 27
+rows (the first compile of the three new shader switches). Suites on the merged tree: unit 301,
+world and kits 82, physics 376. **THE FULL CHECK ON v18 HAS NOT BEEN RUN.**
+
+(The paragraph below is kept for the history of how main stood before #18.)
+
+**`main` WAS AT v16 (18 Nov) PLUS PULL REQUEST #17** (the speed test's copy button). THE LABEL ON THE
 SCREEN STILL SAYS v16 because #17 did not bump it: bump `src/core/build.js` AND `build.txt` with
 EVERY merge, including the small ones. The owner has the live speed test at
 `https://zubersss.github.io/Painted-cosmos/?look=oil&bench=1` and has already sent its table back.
