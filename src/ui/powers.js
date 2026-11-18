@@ -131,6 +131,12 @@ export function attachPowersUi(powers, root) {
   });
   let coarse = false;
   try { coarse = win.matchMedia('(pointer: coarse)').matches; } catch { /* a mouse */ }
+  // (?touch=1, 2026-11-18) FORCE THE THUMB'S INTERFACE ON A MACHINE THAT HAS NO THUMB. This project's own rule is
+  // that anything the owner will touch is pressed with real touch events before it is called done, and that rule
+  // had never once been kept for this screen, because the test browser is not a touch device and so the whole
+  // interface is laid out at nothing and a press lands on the canvas behind it. With this the layout can be driven
+  // and pressed here; it also lets the owner see the phone's controls on a desktop.
+  try { if (win.location && new URLSearchParams(win.location.search).get('touch') === '1') coarse = true; } catch { /* no address to read */ }
   if (!coarse) root.classList.add('pc-pw-keys');          // a keyboard: the ring names its keys
 
   // THE ONE BEFORE, which the chip's tap goes back to. It is kept here, not in the controller, so that this screen
@@ -263,7 +269,7 @@ export function attachPowersUi(powers, root) {
     // (how big the cast is being made, while the hand holds it: the owner asked to grow the circle)
     const big = p.size > 1.12 ? '  ×' + p.size.toFixed(1) : '';
     const w = (p.list && p.list[p.ability] ? p.list[p.ability] : ABILITIES[p.ability]).word, shown2 = w + big + (p.note ? '|' + p.note : '');   // (the word follows the element in the hand: wind or fire)
-    if (shown2 !== wordNow) { wordNow = shown2; btn.textContent = w; word.textContent = 'wind: ' + w + big + (p.note ? '  ·  ' + p.note : ''); }
+    if (shown2 !== wordNow) { wordNow = shown2; btn.textContent = w; word.textContent = (p.element ? 'fire: ' : 'wind: ') + w + big + (p.note ? '  ·  ' + p.note : ''); }
     root.classList.toggle('pc-pw-held', on && (p.keys.touch || p.keys.cast || p.keys.mouse || p.keys.pad || !!p.orb || !!p.part));
     // THE AIM MARK: a ring on the ground where the chosen power will act, as wide as what it will do there, lying as
     // the ground lies to the eye; there before the cast, stronger while a power is held. (p.project: main.js; without
