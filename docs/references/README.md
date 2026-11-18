@@ -346,3 +346,53 @@ the tributaries; sand bars and islands; the smooth long bends; the river plain f
 plainly):** the delta, which needs the meeting of river and sea worked out, and the flat poster colouring (the look
 has its own paint).
 
+
+## Twenty oil paintings as a COLOUR reference (the owner, 2026-11-18)
+
+**The instruction they came with (verbatim):** "It runs performance well and instead of just re sizing the leaves and
+art redo all the art from strokes to everything for the new pixel density layout use these photos as a color
+references but the paint style of the video and get closer to realism while still keeping the strokes".
+
+So: these twenty are for COLOUR. The paint style stays the clip's (the reference pack of 2026-11-15, above). The
+shapes are to go closer to real while the strokes stay strokes.
+
+**What they show.** Eight are aerial, over rolling autumn woodland with a stream winding through meadows, blue hills
+behind, low mist lying in the valleys. Ten are from the ground: a path through a wood, dappled sun on the floor, the
+canopy lit from behind. Two are quieter: a misty field edge with one big oak, and a storybook cottage under a tree
+(that last one is not the look and is set aside).
+
+**THE PALETTE, MEASURED, not judged by eye.** Every pixel of the twenty was sorted into the families the game's look
+data actually has, and the middle colour of each family taken. (The script is in the session's scratch; the numbers
+are the thing worth keeping.)
+
+| what | colour | hue | saturation | value | share of all the paint |
+| --- | --- | --- | --- | --- | --- |
+| canopy lemon / gold | `#ad9421` | 49 | 0.81 | **0.68** | 5.2 % |
+| canopy amber | `#b7731a` | 34 | 0.86 | **0.72** | 14.7 % |
+| canopy orange | `#a6541c` | 24 | 0.83 | **0.65** | 7.0 % |
+| canopy red / rust | `#96432b` | 13 | 0.71 | 0.59 | 0.8 % |
+| conifer, deep green | `#39432e` | 89 | 0.31 | **0.26** | 5.1 % |
+| meadow in sun | `#8f9229` | 62 | 0.72 | **0.57** | 1.8 % |
+| meadow in shade | `#4c542b` | 72 | 0.49 | 0.33 | 11.2 % |
+| distant hill, blue | `#7a7fa0` | 232 | 0.24 | 0.63 | 4.4 % |
+| mist and cloud | `#c7c7c8` | - | 0.00 | 0.78 | 1.3 % |
+| trunk, darkest | `#1e1b14` | 42 | 0.33 | 0.12 | 0.3 % |
+| birch trunk, pale | `#ada9ab` | - | 0.02 | 0.68 | 4.1 % |
+| water | `#66728e` | 222 | 0.28 | 0.56 | 2.8 % |
+| path, warm tan | `#91714b` | 33 | 0.48 | 0.57 | 7.8 % |
+
+**The canopy is not two colours but a spread**: hue from -3 (red) through 24 (orange), 35 (amber, the middle) to 52
+(gold) and on to 70. Saturation runs 0.60 at the tenth to 0.94 at the ninetieth, middle 0.78. Value runs 0.42 to
+0.85, middle 0.62.
+
+**THE ONE BIG THING THESE NUMBERS SAY.** The references are a MID-TO-DARK painting with bright accents. The game is
+a bright painting with a few darks. In the game's own look data the autumn wood's canopy sits at value 0.94 to 0.98
+(`canopyA` `[0.98, 0.86, 0.30]`, `canopyB` `[0.94, 0.62, 0.24]`, the tree's own leaves 0.98 / 0.96 / 0.80), its
+conifers at 0.62 and its sunlit grass at 0.87. The references put those at 0.62 to 0.72, 0.26 and 0.57. The darkest
+thing in the references is a trunk at 0.12, and the dark conifers at 0.26 are a twentieth of all the paint: THAT is
+what makes the oranges sing. Nothing in the game is that dark over that much of the picture.
+
+(Said plainly, and to be proved before it is acted on: those game numbers are BASE COLOURS, which the light then
+multiplies. Whether the picture that reaches the screen is too light is a question about the rendered picture, not
+about the data. The way to settle it is to measure a rendered still of the game's own autumn wood with the same
+script and set its families beside the table above. That is the loop this art pass runs on.)
