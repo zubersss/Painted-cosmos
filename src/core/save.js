@@ -14,9 +14,22 @@ import { createFootCamera, createShipCamera, VIEW_PITCH } from '../player/camera
 import { createShipState } from '../ship/flight.js';
 import { norm, len, tangent, qNorm, qRotate, V } from './vec.js';
 import { FELLED, felledRows, felledLoad } from '../data/felled.js';
+// (2026-11-18, found by an independent reader who burned a wood and reloaded: the fire's lasting record was written
+//  by the game and SAVED BY NOTHING, so a burnt wood came back green while a tree the wind knife felled in the same
+//  minute was still lying where it fell. The owner asked for exactly this to last. It is kept the way felled is.)
+import { BURNT, burntRows, burntLoad } from '../data/burnt.js';
 
 export const SAVE_KEY = 'painted-cosmos.save';
 export const SAVE_VERSION = 1;
+
+// (2026-11-18, found by an independent reader) A BODY ID IS A KEY OF BODIES, NOT ANYTHING ITS PROTOTYPE ANSWERS TO.
+// BODIES is a plain object, so BODIES['__proto__'] is Object.prototype and reads as true. A save holding
+// "visited": {"__proto__": [...]} passed every check, and restoring it REPLACED the prototype of sim.visited; the
+// first autosave after that threw, every frame, above everything that lifts the loading sheet -- so the game sat
+// loading for ever and the only way out, ?fresh=1, destroys the save. (Measured on a hand-made save. 17,194
+// truncated and digit-corrupted saves found no other way in, so only a hand-edited file gets here -- but it is one
+// line to close and the failure is as bad as failures get.)
+const known = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(BODIES, id);
 
 const num = (x) => typeof x === 'number' && Number.isFinite(x);
 const vec = (v) => !!v && num(v.x) && num(v.y) && num(v.z);
@@ -42,6 +55,7 @@ export function snapshot(sim) {
     visited: Object.fromEntries(Object.entries(sim.visited).map(([k, v]) => [k, Object.keys(v.biomes)])),
     vistas: Object.fromEntries(Object.entries(sim.vistas || {}).map(([k, v]) => [k, Object.keys(v)])),
     ...(FELLED.size ? { felled: felledRows() } : null),
+    ...(BURNT.size ? { burnt: burntRows() } : null),      // (the scorched ground, the burnt crowns and the melted ice)
   };
 }
 
@@ -51,8 +65,8 @@ export function validate(d) {
   if (d.version !== SAVE_VERSION) return 'version ' + d.version;
   if (!num(d.t) || d.t < 0) return 'time';
   if (d.state !== S.ON_FOOT && d.state !== S.LANDED) return 'state';
-  if (!BODIES[d.bodyId]) return 'body';
-  if (!d.ship || !BODIES[d.ship.bodyId] || !vec(d.ship.p) || !quat(d.ship.q)) return 'ship';
+  if (!known(d.bodyId)) return 'body';
+  if (!d.ship || !known(d.ship.bodyId) || !vec(d.ship.p) || !quat(d.ship.q)) return 'ship';
   if (!d.explorer || !vec(d.explorer.p) || !vec(d.explorer.fwd)) return 'explorer';
   for (const [id, body] of [[d.bodyId, d.explorer.p], [d.ship.bodyId, d.ship.p]]) {
     const r = len(body), R = BODIES[id].radius;
@@ -71,8 +85,8 @@ export function restore(sim, d) {
   const why = validate(d);
   if (why) return false;
   sim.t = d.t;
-  for (const id of Object.keys(d.spinPhase || {})) if (BODIES[id] && num(d.spinPhase[id])) sim.eph.spinPhase[id] = d.spinPhase[id];
-  for (const id of Object.keys(d.orbitShift || {})) if (BODIES[id] && num(d.orbitShift[id])) sim.eph.orbitShift[id] = d.orbitShift[id];
+  for (const id of Object.keys(d.spinPhase || {})) if (known(id) && num(d.spinPhase[id])) sim.eph.spinPhase[id] = d.spinPhase[id];
+  for (const id of Object.keys(d.orbitShift || {})) if (known(id) && num(d.orbitShift[id])) sim.eph.orbitShift[id] = d.orbitShift[id];
   const onGround = (bodyId, p) => {
     const dir = norm(p);
     const s = sim.sampler(bodyId)(dir);
@@ -105,19 +119,20 @@ export function restore(sim, d) {
   if (num(view.pitch)) sim.footCam.pitch = Math.max(VIEW_PITCH[0], Math.min(VIEW_PITCH[1], view.pitch));
   if (num(view.boom)) sim.footCam.boom = Math.max(2.2, Math.min(14, view.boom));
   sim.footCam.firstPerson = !!view.firstPerson;
-  sim.target = d.target && BODIES[d.target] ? d.target : null;
+  sim.target = known(d.target) ? d.target : null;
   sim.targetLocked = !!sim.target && !!d.targetLocked;
   sim.visited = {};
   for (const [id, list] of Object.entries(d.visited || {})) {
-    if (!BODIES[id] || !Array.isArray(list)) continue;
+    if (!known(id) || !Array.isArray(list)) continue;
     sim.visited[id] = { biomes: Object.fromEntries(list.filter((b) => typeof b === 'string').map((b) => [b, true])) };
   }
   sim.vistas = {};
   for (const [id, list] of Object.entries(d.vistas || {})) {
-    if (!BODIES[id] || !Array.isArray(list)) continue;
+    if (!known(id) || !Array.isArray(list)) continue;
     sim.vistas[id] = Object.fromEntries(list.filter((b) => typeof b === 'string').map((b) => [b, true]));
   }
   felledLoad(d.felled);               // (the trees felled by the explorer's wind: none in a save without the field)
+  burntLoad(d.burnt);                 // (and what the fire left: unconditional, so a save with no field clears it)
   sim.transition = null;
   sim.pulse = null;
   sim.sm.force(d.state);

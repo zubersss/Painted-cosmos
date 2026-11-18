@@ -242,3 +242,48 @@ test('A SPARK FALLS SHORT onto ground that will burn, and says plainly when noth
   q.down = true; step(q, sim2, 2); q.down = false; step(q, sim2, 2);
   assert.equal(q.note, 'the water will not take it', 'the screen names the water, not a vague "nothing here will burn"');
 });
+
+test('FIRE HAS AN ULTIMATE, and a hold that is taken away casts nothing (found by independent readers, 2026-11-18)', () => {
+  // (1) The headline of this version was fire, kindle is its one ability, and holding the button -- the first thing
+  //     anyone does after the screen says "ULTIMATE ready - let go" -- lit nothing whatever: the sound played, the
+  //     explorer threw the cast, and no fire existed.
+  const p = new Powers(), sim = fakeSim();
+  p.nextElement();
+  let lit = 0, size = 0;
+  sim.physics = { lightFire: (f, b, at, k) => { lit++; size = k; return { kind: 2, fuel: 0.8, wet: 0, why: '' }; } };
+  p.down = true;
+  step(p, sim, Math.ceil((WINDPOWER.chargeTime + WINDPOWER.ultTime) * 60) + 8);
+  assert.ok(p.ultReady, 'the second charge is full');
+  p.down = false; step(p, sim, 2);
+  assert.equal(p.ults, 1, 'one ultimate cast');
+  assert.equal(lit, 1, 'and it lit a fire');
+  assert.ok(size > WINDPOWER.sizeMax, 'a great one, not an ordinary cast: ' + size);
+  assert.equal(p.note, 'a great fire is set', 'and the screen says so, not the word written for gather');
+
+  // (2) Swapping the element with the cast key still down used to read as a fresh press on the next frame, arm the
+  //     new element's first ability and cast it on release: one cast key and one element key, and a fire was lit in
+  //     the wood with permanent scorch marks that nobody asked for.
+  const q = new Powers(), sim2 = fakeSim();
+  let lit2 = 0;
+  sim2.physics = { lightFire: () => { lit2++; return { kind: 2, fuel: 0.8, wet: 0, why: '' }; } };
+  q.keys.cast = true; step(q, sim2, 60);          // a gust charging
+  q.nextElement();                                 // G, with the key still down
+  step(q, sim2, 2);
+  q.keys.cast = false; step(q, sim2, 2);           // the hand lifts
+  assert.equal(lit2, 0, 'no fire was lit by a swap');
+  assert.equal(q.casts, 0, 'and nothing was cast at all');
+  // and the hands still work afterwards
+  q.keys.cast = true; step(q, sim2, 2); q.keys.cast = false; step(q, sim2, 2);
+  assert.equal(lit2, 1, 'a fresh press still lights one');
+
+  // (3) Changing ability mid-hold abandons the hold instead of silently eating a four-second charge
+  const r = new Powers(), sim3 = fakeSim();
+  r.down = true;
+  step(r, sim3, Math.ceil((WINDPOWER.chargeTime + WINDPOWER.ultTime) * 60) + 8);
+  assert.ok(r.ultReady);
+  r.pick(4);
+  assert.ok(!r.ultReady && r.charge === 0, 'the charge is visibly let go, not kept for an ability that never earned it');
+  assert.notEqual(r.note, 'ULTIMATE ready - let go', 'and the screen stops promising it');
+  r.down = false; step(r, sim3, 2);
+  assert.equal(r.ults, 0, 'nothing was cast');
+});

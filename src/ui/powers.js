@@ -93,6 +93,9 @@ const CSS = `
 /* the one in hand (so the ring always says where the player is standing) */
 .pc-pw-tab.pc-now { box-shadow: inset 0 0 0 1.6px rgba(47, 58, 93, 0.55), inset 0 0 14px rgba(77, 96, 178, 0.28); }
 /* the number of the key that does the same, for a keyboard; a phone is shown no keys */
+/* the element's own word, out to the right where no ability lies: warm, so a thumb can tell it from the seven */
+.pc-pw-el { background: rgba(250, 238, 222, 0.94); }
+.pc-pw-el.pc-sel { background: rgba(252, 226, 186, 0.99); box-shadow: inset 0 0 0 1.6px rgba(120, 66, 34, 0.6), 0 0 0 2px rgba(250, 246, 236, 0.5); }
 .pc-pw-tab > i { display: none; }
 .pc-pw-keys .pc-pw-tab > i { display: inline; font: 400 11px/1 Georgia, 'Times New Roman', serif; font-style: normal; opacity: 0.55; margin-left: 6px; }
 .pc-pw-word { position: absolute; left: 50%; bottom: calc(var(--pc-sb, 0px) + 14px); transform: translateX(-50%); padding: 4px 10px; border-radius: 11px;
@@ -122,13 +125,28 @@ export function attachPowersUi(powers, root) {
   // the chip says what a tap on it would do, in two lines: "swap" over the name of that ability
   const swapTag = doc.createElement('i'); swapTag.textContent = 'swap'; swap.appendChild(swapTag);
   const swapName = doc.createElement('span'); swap.appendChild(swapName);
-  const NA = ABILITIES.length;
+  // (2026-11-18, found by an independent reader driving this with real touch events) THE RING READS THE LIST IN THE
+  // HAND, not the wind's seven for ever. With fire in hand the button said "kindle" and the ring beside it offered
+  // gust, gather, quicken, still, whirl, part and knife -- not one of which the player had -- marked the gust as the
+  // one in hand, and every flick did nothing at all, because pick() refuses an index past the list's end. The two
+  // controls contradicted each other and the thumb got no answer.
+  let cur = powers.list || ABILITIES;
+  let NA = cur.length;
+  const tabWords = [];
   const tabs = ABILITIES.map((a, i) => {
     const t = doc.createElement('div'); t.className = 'pc-pw-tab';
-    const s = doc.createElement('span'); s.textContent = a.word; t.appendChild(s);
+    const s = doc.createElement('span'); s.textContent = a.word; t.appendChild(s); tabWords.push(s);
     const n = doc.createElement('i'); n.textContent = String(i + 1); t.appendChild(n);     // the key that does the same
     fan.appendChild(t); return t;
   });
+  // AND THE ELEMENT HAS A THUMB'S WAY TO IT. Until this it was reachable by one key on a keyboard and by nothing at
+  // all on a phone, which breaks this project's own rule that a power works the same on a phone, a keyboard and a
+  // pad. The ring's wedges only cover the half from straight up round to straight down (RING.from), so a flick out
+  // to the RIGHT was free ground: it swaps the element, and the word out there says which one it goes to.
+  const elTab = doc.createElement('div'); elTab.className = 'pc-pw-tab pc-pw-el';
+  const elWord = doc.createElement('span'); elTab.appendChild(elWord);
+  const elKey = doc.createElement('i'); elKey.textContent = 'G'; elTab.appendChild(elKey);
+  fan.appendChild(elTab);
   let coarse = false;
   try { coarse = win.matchMedia('(pointer: coarse)').matches; } catch { /* a mouse */ }
   // (?touch=1, 2026-11-18) FORCE THE THUMB'S INTERFACE ON A MACHINE THAT HAS NO THUMB. This project's own rule is
@@ -144,9 +162,21 @@ export function attachPowersUi(powers, root) {
   // a key or the pad by the next frame - and at the start it points at the second ability, so the chip does
   // something useful before anything has been changed. (If the controller grows a `swapBack` of its own one day,
   // that one is used and the two agree.)
-  let lastAb = powers.ability, prevAb = (powers.ability + 1) % NA;
-  const sayPrev = () => { swapName.textContent = ABILITIES[prevAb] ? ABILITIES[prevAb].word : ''; };
-  sayPrev();
+  let lastAb = powers.ability, prevAb = NA > 1 ? (powers.ability + 1) % NA : powers.ability;
+  const sayPrev = () => { swapName.textContent = NA > 1 && cur[prevAb] ? cur[prevAb].word : ''; };
+  // The list in the hand has changed (the element was swapped): the words, how many wedges there are, and the one
+  // the chip would go back to all follow it, so the ring can never offer an ability the player does not have.
+  const setList = (list) => {
+    cur = list || ABILITIES; NA = cur.length;
+    tabs.forEach((t, i) => {
+      t.style.display = i < NA ? '' : 'none';
+      if (i < NA && tabWords[i]) tabWords[i].textContent = cur[i].word;
+    });
+    elWord.textContent = powers.element ? 'wind' : 'fire';      // where a flick to the right goes
+    lastAb = powers.ability; prevAb = NA > 1 ? (powers.ability + 1) % NA : powers.ability;
+    sayPrev();
+  };
+  setList(cur);
   const took = () => {
     if (powers.ability === lastAb) return false;
     prevAb = lastAb; lastAb = powers.ability; sayPrev(); return true;
@@ -176,9 +206,10 @@ export function attachPowersUi(powers, root) {
     ringPlaces(ry, NA).forEach((p, i) => {
       tabs[i].style.transform = `translate(calc(-50% + ${fix(p.x + ox)}px), calc(-50% + ${fix(p.y + oy)}px))`;
     });
+    elTab.style.transform = `translate(calc(-50% + ${fix(RING.rx * 0.78 + ox)}px), calc(-50% + ${fix(oy)}px))`;   // straight out to the right
   };
   const openRing = () => { fan.classList.add('pc-open'); place(); markTabs(); };
-  const closeRing = () => { sel = -1; fan.classList.remove('pc-open'); tabs.forEach((t) => { t.classList.remove('pc-sel'); t.classList.remove('pc-now'); }); };
+  const closeRing = () => { sel = -1; fan.classList.remove('pc-open'); tabs.forEach((t) => { t.classList.remove('pc-sel'); t.classList.remove('pc-now'); }); elTab.classList.remove('pc-sel'); };
 
   // ---- the chip: a tap goes back, a flick chooses ------------------------------------------------------------
   let spid = null, scx = 0, scy = 0, sat = 0, sleft = false, flashT = 0;
@@ -194,9 +225,13 @@ export function attachPowersUi(powers, root) {
     flashT = 0; openRing();                               // at once: there is nothing to hold and wait out
     e.preventDefault();
   });
+  // Is the thumb out in the element's own wedge (to the right, past the dead zone)? The ring's own wedges never
+  // reach there, so the two can never disagree about one direction.
+  const toElement = (dx, dy) => Math.hypot(dx, dy) >= RING.dead && dx > 0 && Math.abs(dy) <= dx;
   const smove = (e) => {
     if (e.pointerId !== spid) return;
     const dx = e.clientX - scx, dy = e.clientY - scy;
+    elTab.classList.toggle('pc-sel', toElement(dx, dy));
     // once the thumb has left the chip, this press is a flick and never a tap: bringing it home again and letting go
     // is the way out of the ring, and must not be read as "go back to the one before"
     if (Math.hypot(dx, dy) >= RING.dead) sleft = true;
@@ -213,7 +248,8 @@ export function attachPowersUi(powers, root) {
     const held = nowMs() - sat, picked = out ? ringPick(dx, dy, NA) : sel;
     spid = null; swap.classList.remove('pc-down'); closeRing();
     if (e.type !== 'pointerup') return;                   // the system took the touch away: change nothing
-    if (picked >= 0) { powers.pick(picked); took(); }     // a flick: the one it pointed at, and no cast
+    if (toElement(dx, dy)) { if (powers.nextElement) { powers.nextElement(); setList(powers.list); } }   // a flick to the right: the other element
+    else if (picked >= 0) { powers.pick(picked); took(); }     // a flick: the one it pointed at, and no cast
     else if (!sleft && !out && held <= RING.tapMs) goBack();      // a tap, which never left the chip: back to the one before
   };
   swap.addEventListener('pointermove', smove);

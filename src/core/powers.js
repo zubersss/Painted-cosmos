@@ -10,7 +10,7 @@
 // Nothing here draws, and nothing here moves a leaf: the world's own systems do.
 import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, growWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
-import { fellTree } from '../data/felled.js';
+import { fellTree, felledAt } from '../data/felled.js';
 // FIRE (the second element; docs/POWERS-FIRE.md). The list of burning patches lives here with the winds; the physics
 // steps it, because only the physics knows what is underfoot and what the wind is there. What the fire leaves behind
 // goes into the record that lasts, exactly as a felled tree does.
@@ -131,7 +131,14 @@ export class Powers {
     clearBurns(this.fires);
   }
 
-  pick(i) { if (i >= 0 && i < this.list.length && i !== this.ability) { this._drop(); this._close(); this.ability = i; } }
+  // (2026-11-18, found by an independent reader) CHANGING ABILITY MID-HOLD ABANDONS THE HOLD. It used to leave the
+  // charge, the ultimate and the armed ability standing: hold for four seconds on the gust until the screen says
+  // "ULTIMATE ready - let go", flick to the whirl, let go -- and nothing at all happened, no sound, no word, while
+  // the screen went on promising the ultimate for another 1.8 s. (Wander away and back to the same ability and it
+  // survived, which is worse: the same gesture did two different things.) This is the very gesture the ring picker
+  // was built for, one thumb on the power and one on the chip, so it has to be honest: the ring now visibly
+  // collapses and the player can see what they spent.
+  pick(i) { if (i >= 0 && i < this.list.length && i !== this.ability) { this.cancelHold(); this.ability = i; } }
   // (2026-11-18) THE ELEMENT IN THE HAND: 0 the wind's seven, 1 the fire's. Without this the fire is wired to
   // everything and reachable by nobody, which is what it was for an hour after the wiring went in. Whatever is
   // being held is dropped first, so swapping element never leaves a ball or a channel alive with nothing holding it.
@@ -162,7 +169,14 @@ export class Powers {
   // taken away is ABANDONED, not cast. Found by a reader driving the touch screen: without this, a hold that had
   // charged all the way to the ultimate and was never lifted made the NEXT QUICK TAP come out as the ultimate - a tap
   // that flattened 28 trees. `_was` goes too, or the next press is not seen as a new press at all and casts nothing.
-  cancelHold() { this._armed = null; this.charge = 0; this.ult = 0; this.ultReady = false; this._wasTap = false; this._was = false; this._drop(); this._close(); }
+  // A HOLD IS ABANDONED, not finished (the page lost focus, the system took the touch away, the player swapped the
+  // element with the cast key still down). `_was` is deliberately LEFT AS IT IS: clearing it made the very next frame
+  // read a hand that had never lifted as a FRESH PRESS, which re-armed on the new element's first ability and cast it
+  // on release. Measured 2026-11-18 by an independent reader driving the real keys: press Q, charge a gust, press G to
+  // go and look at the fire, lift Q -- and a fire was lit in the wood, with permanent scorch marks, from one cast key
+  // and one element key, neither of which asked for a cast. `_was` needs no clearing here: update() sets it from the
+  // hands every frame, and `if (!down)` clears everything the moment they are really up.
+  cancelHold() { this._armed = null; this.charge = 0; this.ult = 0; this.ultReady = false; this._wasTap = false; this._drop(); this._close(); if (this.note === 'ULTIMATE ready - let go') { this.note = ''; this._noteT = 0; } }
   // Is the water parted at the place d (a unit vector from the body's centre) where its face is at radius r?
   // (sim.js asks, for the explorer's ground: on the channel's floor there is no water to wade or swim in)
   dry(bodyId, d, r) { return this.winds.count > 0 && partedAt(this.winds, bodyId, d.x * r, d.y * r, d.z * r) > 0.5; }
@@ -229,6 +243,7 @@ export class Powers {
         const key = ((ob.p.x * 100) | 0) + '|' + ((ob.p.y * 100) | 0) + '|' + ((ob.p.z * 100) | 0);
         if (seen.has(key)) continue;
         seen.add(key);
+        if (felledAt(sim.bodyId, ob.p.x, ob.p.y, ob.p.z)) continue;     // already lying: it is not felled twice, and not counted twice
         found.push({ ob, d, dx, dy, dz });
       }
     }
@@ -267,6 +282,13 @@ export class Powers {
     } else if (id === 'quicken' || id === 'still') {
       castZone(this.winds, sim.bodyId, A.p, A.fwd, id === 'still' ? 'calm' : 'quicken', K);
       this._say(id === 'still' ? 'a great hush' : 'a great quickening');
+    } else if (id === 'kindle') {
+      // (2026-11-18, found by an independent reader who HELD THE BUTTON: fire was the headline of this version, kindle
+      //  is its one ability, and a 4.1 s hold -- after the screen had promised "ULTIMATE ready - let go" -- lit
+      //  NOTHING AT ALL. The sound played, the explorer threw the cast, the cooldown was set, and no fire existed.
+      //  Holding the button is the first thing anyone does after reading that message.)
+      const f = this._kindle(sim, K);
+      if (f && f.kind !== FUEL.none) this._say('a great fire is set');
     } else {
       // gather and part are HELD, not let go: their ultimate is that they go on growing past every ordinary limit
       // while the hand stays down (see growWind above). Nothing is cast here.

@@ -314,7 +314,16 @@ async function boot() {
   // for every small wobble of the frame time.
   const applyDynScale = (sc) => {
     if (!(DPR_PIN > 0)) { if (painter.setRenderScale) painter.setRenderScale(sc); return; }
-    const want = Math.max(PRESET.dpr, Math.round(DPR_PIN * sc * 4) / 4);
+    // (2026-11-18, found by an independent reader and measured) THE FLOOR IS THE PIN, NOT THE PRESET. Written as
+    // max(PRESET.dpr, ...) this RAISED an asked-for sharpness instead of holding it: ?dpr=1 on a 2x desktop took the
+    // 1280x720 the player asked for straight up to 1920x1080 on the first frame, and ?dpr=0.75 on the basic-graphics
+    // laptop went 1440x747 -> 1920x997. The player asked for a softer, faster picture and was given a sharper,
+    // slower one, against this file's own promise that "?dpr= still wins". Worse, with the canvas pinned at the
+    // preset's own ratio the frame controller could then shed NOTHING at all: at ?dpr=1 on a desktop it drew 2.07
+    // megapixels at every rung of its ladder, where before it stepped 0.92 -> 0.59 -> 0.35 -> 0.23. A slow device
+    // simply stayed slow. Whatever the canvas cannot take off is handed back to the painter's own render scale.
+    const floor = Math.min(DPR_PIN, PRESET.dpr);
+    const want = Math.max(floor, Math.round(DPR_PIN * sc * 4) / 4);
     const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, want);
     if (b.w !== game.device.w || b.h !== game.device.h) {
       camera.aspect = b.w / b.h;
@@ -322,7 +331,7 @@ async function boot() {
       painter.resize(b.w, b.h);
       Object.assign(game.device, { ratio: b.ratio, w: b.w, h: b.h });
     }
-    if (painter.setRenderScale) painter.setRenderScale(1);
+    if (painter.setRenderScale) painter.setRenderScale(Math.min(1, (DPR_PIN * sc) / want));
   };
   applyDynScale(dyn.scale);
   painter.setQuality(dyn.quality);

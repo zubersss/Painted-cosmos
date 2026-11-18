@@ -161,9 +161,17 @@ test('ways out of the ring that change nothing: back onto the chip, out to the r
   assert.ok(!ui.tabs[3].classList.contains('pc-sel'), 'and lets it go when the thumb comes home');
   ui.swap.send('pointerup', { clientX: mid.x + 2, clientY: mid.y - 4 });
   assert.equal(nameOf(powers), 'still', 'and letting go at home changes nothing: a thumb that left the chip is a flick, never a tap');
-  // out to the right, where the screen's edge is
+  // (2026-11-18) OUT TO THE RIGHT IS THE ELEMENT NOW. It used to be dead ground -- and the element was reachable by
+  // one key on a keyboard and by nothing whatever on a phone, which broke this project's own rule that a power works
+  // the same on a phone, a keyboard and a pad. The ring's own wedges run from straight up round to straight down and
+  // never reach the right, so the two cannot disagree about a direction.
   flick(ui, mid, 0);
-  assert.equal(nameOf(powers), 'still', 'a flick at the edge chooses nothing');
+  assert.equal(powers.element, 1, 'a flick out to the right swaps the element: fire');
+  assert.equal(powers.list[powers.ability].id, 'kindle', 'and the hand now holds the fire\u2019s own ability');
+  flick(ui, mid, 0);
+  assert.equal(powers.element, 0, 'and again to come back to the wind');
+  powers.pick(3);
+  assert.equal(nameOf(powers), 'still', 'the wind\u2019s own ability is reached again');
   // held still and read for longer than a tap, then let go
   ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });
   sleep(RING.tapMs + 60);
