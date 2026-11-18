@@ -71,6 +71,9 @@ function basicGpu() {
     return BASIC_GPU.test(name);
   } catch { return false; }
 }
+// (?best=1: every pixel the screen has, the full paint and the top tier at once. The pieces are still their own
+// switches - ?dpr=, ?lite=, ?quality= - and each of those wins where both are given.)
+const BEST_PIN = !!(params.get('best') && params.get('best') !== '0');
 const PRESET = (() => {
   let coarse = false;
   try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch { /* no media queries: the desktop */ }
@@ -202,7 +205,7 @@ async function boot() {
     // ?dynres=0 pins both.
     scale: params.has('scale') ? Number(params.get('scale')) : 1,
     // (a phone starts a tier down: the preset; the controller may climb from there)
-    quality: params.has('quality') ? Number(params.get('quality')) : PRESET.tier,
+    quality: params.has('quality') ? Number(params.get('quality')) : BEST_PIN ? 2 : PRESET.tier,
     minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
     maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
   });
@@ -272,8 +275,10 @@ async function boot() {
     return ctxAA ? 'msaa (canvas)' : 'none';
   };
   // (?dpr=: how many picture pixels to one screen point, in place of the preset's own. See preset.js bufferSize.
-  // 0 or absent leaves the preset alone, so the game is exactly as it was without it.)
-  const DPR_PIN = Math.max(0, Math.min(4, +params.get('dpr') || 0));
+  // 0 or absent leaves the preset alone, so the game is exactly as it was without it.
+  // ?best=1 asks for every pixel the screen has, which is what the owner asked about on 2026-11-18: on their S23
+  // Ultra that is 3086 x 1440, nine times the pixels the phone is given today. ?dpr= still wins where both are given.)
+  const DPR_PIN = Math.max(0, Math.min(4, +params.get('dpr') || (BEST_PIN ? window.devicePixelRatio || 0 : 0)));
   game.device = { preset: PRESET.id, ratio: 1, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode };
   function resize() {
     const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, DPR_PIN);

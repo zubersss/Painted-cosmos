@@ -36,6 +36,7 @@
 // script's own time a frame (the CPU's share) and the draw calls and triangles of a frame.
 
 import { BUILD } from './build.js';
+import { MAX_PIXELS } from './preset.js';   // (the ceiling on the 'every pixel the screen has' row)
 
 export function attachBench(pc) {
   const el = document.createElement('pre');
@@ -141,6 +142,17 @@ export function attachBench(pc) {
     // each way, so k x k times as many in all. This is what ?dpr= does for a whole run; here it is one row, so that the
     // sharper picture and the one the phone is given today are timed in the same minute on an equally warm phone.
     const canvas0 = { w: R.domElement.width, h: R.domElement.height };
+    // How much sharper the picture would be if every pixel of the screen were drawn (the owner's question of
+    // 2026-11-18: "Can the game draw for 3086 x 1440 pixels??"). The picture is canvas0.w pixels across a box of
+    // clientWidth points, so it is drawn at canvas0.w / clientWidth pixels to the point today, and the screen has
+    // devicePixelRatio of them. Held at 4 and at what preset.js allows, so a screen nobody has met cannot ask for
+    // a picture no phone could hold.
+    const kWhole = (() => {
+      const css = R.domElement.clientWidth || canvas0.w, dev = window.devicePixelRatio || 1;
+      const k = Math.max(1, Math.min(4, (dev * css) / Math.max(1, canvas0.w)));
+      const px = canvas0.w * canvas0.h * k * k;
+      return px > MAX_PIXELS ? Math.sqrt(MAX_PIXELS / Math.max(1, canvas0.w * canvas0.h)) : k;
+    })();
     const sharpen = async (k) => {
       if (typeof P.resize !== 'function') return;
       P.resize(Math.max(2, Math.round(canvas0.w * k)), Math.max(2, Math.round(canvas0.h * k)));
@@ -180,7 +192,8 @@ export function attachBench(pc) {
       // are the dearest and a phone is warmest at the end.
       ['the picture half again as sharp', () => sharpen(1.5), () => sharpen(1)],
       ['the picture twice as sharp', () => sharpen(2), () => sharpen(1)],
-      ['twice as sharp, full paint', async () => { await sharpen(2); B({ lite: !lite0 }); }, async () => { B({ lite: lite0 }); await sharpen(1); }],
+      ['every pixel the screen has', () => sharpen(kWhole), () => sharpen(1)],
+      ['every pixel, full paint', async () => { await sharpen(kWhole); B({ lite: !lite0 }); }, async () => { B({ lite: lite0 }); await sharpen(1); }],
       [AS + ', last', null, null],
     ];
     const rows = [];

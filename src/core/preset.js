@@ -28,6 +28,13 @@ export const PRESETS = Object.freeze({
 export const BASIC_GPU = /Intel.*(U?HD Graphics|Iris)/i;
 export const PHONE_SHORT_SIDE = 500;      // css px: under this a touch screen is a phone
 
+// The most picture pixels an asked-for sharpness (?dpr=) may reach, whatever is asked for. The oil look holds five
+// drawing targets at the picture's size; at 4.44 MP (an S23 Ultra's whole screen) they come to about 150 MB, which
+// such a phone has. 6 MP leaves room above the owner's own screen without going somewhere no phone could follow.
+// (It is 150 MB and not 400 because the oil look stopped sizing the watercolour brush's six targets on 2026-11-18:
+// without that cut the whole screen could not have been drawn at all.)
+export const MAX_PIXELS = 6e6;
+
 // env: { coarse (matchMedia('(pointer: coarse)')), touchPoints (navigator.maxTouchPoints),
 // screenW, screenH (screen.width/height, css px; the window's size where there is no screen),
 // ask (the URL's ?preset=) }. Returns one of PRESETS.
@@ -52,7 +59,16 @@ export function choosePreset(env = {}) {
 // waste - and under the preset's limit on how many pixels in all.
 export function bufferSize(cssW, cssH, deviceRatio, preset = PRESETS.desktop, dprPin = 0) {
   const css = Math.max(1, cssW * cssH);
-  const want = dprPin > 0 ? dprPin : preset.dpr;
-  const ratio = Math.min(deviceRatio || 1, want, Math.sqrt(preset.maxPixels / css));
+  if (dprPin > 0) {
+    // An asked-for sharpness is an instruction, so the preset's own limit on pixels in all does not hold it back:
+    // that limit is a safe default for a device nobody has measured, and this one has been. (The owner, 2026-11-18:
+    // "Can the game draw for 3086x1440 pixels?? If so do it". On their S23 Ultra the preset's 3.7 MP would have
+    // stopped it at 2815 x 1313; their screen's own 3.75 pixels to the point is 3086 x 1440, which is 4.44 MP.)
+    // Two things still hold: never more picture pixels than the screen has points to show them, and never past
+    // MAX_PIXELS, which is about what a phone of 2023 can hold as drawing targets at all.
+    const r = Math.min(deviceRatio || 1, dprPin, Math.sqrt(MAX_PIXELS / css));
+    return { w: Math.max(1, Math.floor(cssW * r)), h: Math.max(1, Math.floor(cssH * r)), ratio: r };
+  }
+  const ratio = Math.min(deviceRatio || 1, preset.dpr, Math.sqrt(preset.maxPixels / css));
   return { w: Math.max(1, Math.floor(cssW * ratio)), h: Math.max(1, Math.floor(cssH * ratio)), ratio };
 }
