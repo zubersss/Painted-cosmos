@@ -210,3 +210,66 @@ test('fire: THE WIND STRENGTHENS THE FIRE, it does not only bend it (the owner, 
   // and the three dials that do it are real, not nominal
   assert.ok(FIRE.windMore > 0 && FIRE.windSeeds > 0 && FIRE.windReach > 1, 'the wind no longer drives the fire at all');
 });
+
+test('fire: ICE MELTS WHERE THERE IS NO AIR, and nothing else does (the owner, 2026-11-19)', () => {
+  // The owner asked for "more places to melt" on the ice planets. Every biome on Uranus, Neptune and Pluto is
+  // already ice or snow underfoot -- what was wrong is that a fire needs an oxidiser and those skies have none, so
+  // `airK <= 0` put every patch out on its first step, the melting ones with it. MEASURED, before and after, with
+  // the same script: a cast of size 3 on ice in an airless sky went from 0.00 heat into the ice, dead in one frame,
+  // to 7.21 heat and a hole 8.10 m across over its full 13.9 s. In Earth's air it is 13.11, unchanged by this.
+  const ice = (air) => {
+    const ctx = hill(0); ctx.air = air;
+    ctx.fuelAt = function (b, px, py, pz, out) { out.kind = FUEL.ice; out.fuel = 0; out.wet = 0; out.px = px; out.py = py; out.pz = pz; };
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 3, ctx);
+    run(F, ctx, 20);
+    let melt = 0;
+    for (let i = 0; i < F.count; i++) if (F[i].melt > melt) melt = F[i].melt;
+    return melt;
+  };
+  const warm = ice(1), cold = ice(0);
+  assert.ok(cold > 0.5, 'a cast on ice in an airless sky melted nothing: ' + cold.toFixed(2));
+  assert.ok(cold < warm, 'airless ice melted as fast as ice in full air: ' + cold.toFixed(2) + ' against ' + warm.toFixed(2));
+  assert.ok(cold > warm * 0.3, 'the airless melt is so slow as to be no use: ' + cold.toFixed(2) + ' of ' + warm.toFixed(2));
+
+  // ... and it is ICE ALONE. Leaves in the same airless sky must still do nothing at all: this is heat going into
+  // ice, not a flame that has stopped needing air.
+  const dead = hill(0); dead.air = 0;
+  const L = makeFires();
+  lightFire(L, BODY, at(0, 0), 3, dead);
+  run(L, dead, 20);
+  assert.equal(live(L), 0, 'leaves burned in an airless sky');
+  assert.equal(reach(L).north, 0, 'a fire spread in an airless sky');
+});
+
+test('fire: a melt says how much ice there is to melt, so the ground under it can be laid bare', () => {
+  // The chain the owner's "more places to melt" needs: the world says how thick the ice or the snow is
+  // (physics/index.js fuelAt, out.floor -- lying snow is a hand's depth over the biome's ground; a glacier has no
+  // floor at all), the fire carries that on every row it reports, and the record uses it to say when the ground
+  // shows (data/burnt.js meltedBare). Without it every melt was bottomless and no melt ever revealed anything.
+  const go = (floor) => {
+    const ctx = hill(0);
+    ctx.fuelAt = function (b, px, py, pz, out) {
+      out.kind = FUEL.ice; out.fuel = 0; out.wet = 0; out.floor = floor; out.px = px; out.py = py; out.pz = pz;
+    };
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 3, ctx);
+    let seen = null;
+    for (let i = 0; i < 60 * 12; i++) {
+      stepFires(F, 1 / 60, ctx);
+      for (let k = 0; k < F.burns.count; k++) if (F.burns[k].kind === FUEL.ice) seen = F.burns[k].floor;
+      clearBurns(F);
+    }
+    return seen;
+  };
+  assert.equal(go(0.35), 0.35, 'lying snow 0.35 m deep did not reach the record');
+  assert.equal(go(-1), -1, 'a glacier was given a floor it has not got');
+  // and a patch that is NOT ice carries no floor, whatever the world said
+  const ctx = hill(0);
+  ctx.fuelAt = function (b, px, py, pz, out) { out.kind = FUEL.leaves; out.fuel = 1; out.wet = 0; out.floor = 9; out.px = px; out.py = py; out.pz = pz; };
+  const F = makeFires();
+  lightFire(F, BODY, at(0, 0), 2, ctx);
+  let any = null;
+  for (let i = 0; i < 60 * 30; i++) { stepFires(F, 1 / 60, ctx); for (let k = 0; k < F.burns.count; k++) any = F.burns[k].floor; clearBurns(F); }
+  assert.equal(any, -1, 'burning leaves reported a floor of ice: ' + any);
+});

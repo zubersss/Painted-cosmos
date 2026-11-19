@@ -186,6 +186,15 @@ export const FIRE = Object.freeze({
   iceLife: 8,             // s
   iceRadius: 4.5,         // m: how wide the melted place grows by the end
   iceHeat: 1,             // heat (in seconds of full flame) one patch puts into the ice each second
+  // AND MELTING DOES NOT NEED AIR. The owner, 2026-11-19: "give the ice planets more places to melt or use my
+  // abilities". It was not that the ice worlds had no ice -- every one of their biomes is ice or snow under the
+  // explorer -- it was that `airK <= 0` put EVERY patch out on its first step, melting ones included, so on
+  // Uranus, on Neptune and on Pluto a cast opened a hole 0 m deep. A flame eats air; HEAT DOES NOT. Nothing
+  // there burns, nothing spreads, and nothing the ability lights lasts beyond its own short life -- but the heat
+  // of the cast goes into the ice as heat always has. In a thin or airless sky it carries less well (no air to
+  // carry it, only what the flame shines on the ice), so a melt there is slower, and this is how much slower it
+  // may ever get, not a measured figure:
+  iceAirless: 0.55,       // share of the full-air melting rate where the air carries nothing at all
 
   // WHAT ONE CASTING REMEMBERS OF THE GROUND IT HAS BURNED: one bit per this many metres of ground (see the long
   // note below makeFires). About the step a fire takes (`spread` above), so the front can always walk forward into
@@ -212,7 +221,7 @@ for (let i = 0; i < SPOKEN; i++) { const a = (i / SPOKEN) * Math.PI * 2; SPOKES[
 const _en = new Float64Array(6);          // east and north at a patch
 const _w = new Float64Array(3);           // the wind handed back to us
 const _d = new Float64Array(4);           // a direction we are looking along: east, north, its length, its lean
-const _f = { kind: 0, fuel: 0, wet: 0, px: 0, py: 0, pz: 0 };    // what the world says is under a place
+const _f = { kind: 0, fuel: 0, wet: 0, px: 0, py: 0, pz: 0, floor: -1 };   // what the world says is under a place
 
 // Empties a record in place. (powers.js writes a fresh blank over a wind source, which is fine because the player
 // casts a few times a minute; a fire lights its neighbours many times a second, so here nothing is made at all.)
@@ -224,6 +233,7 @@ function wipe(s) {
   s.radius = 0; s.r0 = 0;
   s.heat = 0;                             // 0..1 how fiercely it burns now
   s.fuel = 0; s.fuel0 = 0; s.sent = 0;    // what is left under it, what it had, how much we have reported
+  s.floor = -1;                           // m of ice or snow over solid ground here, or -1 where nothing of ours knows
   s.melt = 0; s.msent = 0;                // heat put into ice here, and how much of that we have reported
   s.wet = 0; s.age = 0; s.life = 0; s.ash = false; s.ashAge = 0;
   s.seeds = 0; s.spoke = 0; s.seedT = 0; s.gen = 0; s.reach = 0;
@@ -243,7 +253,7 @@ export function makeFires(seed = 1) {
   F.lost = 0;                 // rows of "this burned" that were dropped because the caller had not read them
   F.burns = [];
   F.burns.count = 0;
-  for (let i = 0; i < FIRE.burnsMax; i++) F.burns.push({ bodyId: null, px: 0, py: 0, pz: 0, radius: 0, kind: 0, burnt: 0, heat: 0, done: false, gen: 0, id: 0 });
+  for (let i = 0; i < FIRE.burnsMax; i++) F.burns.push({ bodyId: null, px: 0, py: 0, pz: 0, radius: 0, kind: 0, burnt: 0, heat: 0, floor: -1, done: false, gen: 0, id: 0 });
   return F;
 }
 
@@ -350,7 +360,7 @@ function take(F) {
 // nothing at all) and _f.px/py/pz is where the world says that place really is on its own ground. With no fuel
 // function given (some tests) the answer is "nothing here".
 function ask(F, bodyId, px, py, pz, ctx) {
-  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz; _f.why = '';
+  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz; _f.why = ''; _f.floor = -1;
   if (ctx && ctx.fuelAt) {
     F.asks++;
     ctx.fuelAt(bodyId, px, py, pz, _f);
@@ -366,6 +376,7 @@ function ask(F, bodyId, px, py, pz, ctx) {
 function settle(s) {
   s.px = _f.px; s.py = _f.py; s.pz = _f.pz;
   s.kind = _f.kind; s.wet = _f.wet; s.why = _f.why || '';
+  s.floor = Number.isFinite(_f.floor) ? _f.floor : -1;
   if (s.kind === FUEL.ice) { s.fuel = 0; s.fuel0 = 0; s.life = FIRE.iceLife * (0.7 + 0.3 * s.size); }
   else if (s.kind !== FUEL.none) { s.fuel0 = clamp01(_f.fuel); s.fuel = s.fuel0; s.life = FIRE.maxLife; }
   else { s.fuel0 = 0; s.fuel = 0; s.life = FIRE.bareLife; }   // nothing to burn: the ability's own flame, for a moment
@@ -449,14 +460,18 @@ export function stepFires(F, dt, ctx) {
     // Is it going out? A flame with nothing under it is the ability's own: it lives its short life and goes,
     // whether the place is wet or dry, so the player always sees that the cast happened. A flame with something
     // under it goes out when that has gone (ice has none: it melts for its own time) or if its place turns damp.
-    const out = s.age >= s.life || airK <= 0 ||
-      (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (s.kind !== FUEL.ice && !(s.fuel > 0))));
+    // (ICE IS THE ONE THING AIRLESSNESS DOES NOT PUT OUT: see `iceAirless` above. A melting patch lives its
+    //  iceLife whatever the sky is made of; everything else goes out at once without air to burn.)
+    const ice = s.kind === FUEL.ice;
+    const out = s.age >= s.life || (airK <= 0 && !ice) ||
+      (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (!ice && !(s.fuel > 0))));
     s.heat += out ? -dt / FIRE.dieTime : dt / FIRE.catchTime;
     if (s.heat > 1) s.heat = 1;
 
-    if (s.kind === FUEL.ice) {
-      // it melts instead of burning, and the melted place opens out while it does
-      s.melt += dt * s.heat * FIRE.iceHeat;
+    if (ice) {
+      // it melts instead of burning, and the melted place opens out while it does. Thin air carries the heat less
+      // well, so the same cast opens a shallower hole on Pluto than on Earth -- but it does open one.
+      s.melt += dt * s.heat * FIRE.iceHeat * (FIRE.iceAirless + (1 - FIRE.iceAirless) * airK);
       const f = s.age < s.life ? s.age / s.life : 1;
       s.radius = s.r0 + (FIRE.iceRadius * (0.6 + 0.4 * s.size) - s.r0) * f;
       if (s.melt - s.msent >= FIRE.meltEvery) report(F, s, false);
@@ -642,6 +657,9 @@ function report(F, s, done) {
   b.kind = s.kind; b.gen = s.gen; b.done = !!done; b.id = s.id;
   b.burnt = s.kind === FUEL.ice ? 0 : (s.fuel0 > 0 ? (s.fuel0 - s.fuel) / s.fuel0 : 1);
   b.heat = s.melt;
+  // and for a melt, HOW MUCH THERE IS TO MELT: a hand's depth of lying snow with the ground under it, or -1 where
+  // this is a glacier and nothing of ours knows how deep it goes. The record needs it to say when the ground shows.
+  b.floor = s.kind === FUEL.ice ? s.floor : -1;
   s.sent = b.burnt; s.msent = s.melt;
   return b;
 }

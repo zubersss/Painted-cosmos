@@ -224,7 +224,15 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       out.why = 'bare ground';
       // ICE AND SNOW MELT instead of burning (the owner's words, 2026-11-18). Only the near grid knows the ground
       // well enough to say so, which is why melting is a thing that happens where the explorer is standing.
-      if (mat === MATERIAL_INDEX.ice || mat === MATERIAL_INDEX.snow) { out.kind = FUEL.ice; out.wet = 0; return; }
+      // AND HOW THICK IT IS, so a melt knows where to stop (the owner, 2026-11-19: "more places to melt"). Lying
+      // SNOW is a hand's depth of it over whatever the biome's ground is, and the weather says how deep: melt that
+      // and the ground is laid bare. Ice is the GROUND here -- a glacier, a shelf, a frozen sea -- and nothing of
+      // ours knows how deep it goes, so there is no floor and it "just keeps melting away", in the owner's words.
+      if (mat === MATERIAL_INDEX.ice || mat === MATERIAL_INDEX.snow) {
+        out.kind = FUEL.ice; out.wet = 0;
+        out.floor = mat === MATERIAL_INDEX.snow ? Math.max(0.05, moist.snowDepth) : -1;
+        return;
+      }
       // and what there is to burn: the crowns and undergrowth of a wood, else the leaves on its floor, else the
       // ground itself where it is the kind that burns (the same three numbers the wind's leaf-tearing reads,
       // loose.js _tear)
