@@ -132,6 +132,18 @@ export const FIRE = Object.freeze({
   windCap: 16,            // m/s: the wind at which the lean and the hurry are full
   windFan: 0.045,         // per m/s: and the wind fans a patch, so it eats its own fuel faster and dies sooner
 
+  // ---- THE WIND MAKES A FIRE STRONGER, not merely crooked (the owner, 2026-11-19: "i want them to be able to
+  // interact with each other where WIND STRENGTHENS THE FIRE"). MEASURED before this was written, with a real gust
+  // cast at a real fire in the real physics: the gust reached the patches (131.99 m/s against 1.76 in still air),
+  // and the fire's SHAPE changed -- it stopped creeping into the wind, 17.4 m down to 6.7 -- but it was NO BIGGER
+  // AND NO FASTER: 21.1 seconds to 48 patches in still air, 22.0 with the gale on it.
+  //   The reason is that `windRate` and `backRate` above only trade one direction against another. A patch walks a
+  // wheel of 24 directions in turn, so what the downwind ones gain the upwind ones lose, and the fire merely leans.
+  // A real wind does not only bend a fire: it drives it. So three things now grow with the wind as well:
+  windMore: 0.9,          // at a full wind a patch lights its neighbours this much more often, EVERY way it looks
+  windSeeds: 1.0,         // ... and passes the fire on to this many more neighbours before it is spent
+  windReach: 1.35,        // ... and one casting runs this much further from where it was lit, wind-driven
+
   wetStop: 0.55,          // 0..1 damp: at this and above nothing catches, and a patch alight goes out
   wetSlow: 0.8,           // and below it, damp fuel burns this much slower at worst
 
@@ -378,6 +390,8 @@ function waitFor(s, lean) {
   const q = FIRE.quick[s.kind] || 1;
   let r = 1 + FIRE.windRate * s._sp01 * lean;
   if (r < FIRE.backRate) r = FIRE.backRate;
+  // and the wind drives the whole fire on, whichever way this look happens to point
+  r *= 1 + FIRE.windMore * (s._sp01 || 0);
   return FIRE.seedTime / (r * q * slopeRate(s.up));
 }
 
@@ -575,7 +589,9 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   const qz = s.pz + (en[2] * dE + en[5] * dN) * step;
   // one casting burns itself out within `reach` of where it was lit: it does not cross the world
   const ax = qx - s.ox, ay = qy - s.oy, az = qz - s.oz;
-  if (ax * ax + ay * ay + az * az > s.reach * s.reach) return false;
+  // a wind-driven fire runs further from where it was lit than a creeping one
+  const rch = s.reach * (1 + (FIRE.windReach - 1) * (s._sp01 || 0));
+  if (ax * ax + ay * ay + az * az > rch * rch) return false;
   // this casting has burned here already: it does not go round twice, which is what makes a fire end (one look at a
   // bit of memory, and before the dear question below, so a patch hemmed in by its own burnt ground costs the world
   // nothing at all)
@@ -599,7 +615,7 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   t.size = s.size; t.gen = s.gen + 1; t.reach = s.reach;
   t.id = ++F.lit;
   t.r0 = FIRE.litRadius * (0.7 + 0.3 * s.size); t.radius = t.r0;
-  t.seeds = Math.round(FIRE.seeds * (0.7 + 0.3 * s.size));
+  t.seeds = Math.round(FIRE.seeds * (0.7 + 0.3 * s.size) * (1 + FIRE.windSeeds * (sp01 || 0)));
   t.spoke = Math.floor(hash3(t.id, 3, 11, F.seed) * SPOKEN) % SPOKEN;
   t._sp01 = sp01;
   t.wx = s.wx; t.wy = s.wy; t.wz = s.wz;    // it knows the wind its parent knew until it asks for itself

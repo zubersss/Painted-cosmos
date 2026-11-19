@@ -179,3 +179,34 @@ test('fire: snuff puts out what is near it and leaves the rest burning', async (
   const m = douseNear(F, 'elsewhere', at(0, 0), 60);
   assert.equal(m, 0, 'a snuff reached across worlds');
 });
+
+test('fire: THE WIND STRENGTHENS THE FIRE, it does not only bend it (the owner, 2026-11-19)', () => {
+  // MEASURED BEFORE THIS WAS WRITTEN, with a real gust cast at a real fire through the whole physics: the gust
+  // reached the patches (131.99 m/s against 1.76 in still air) and the fire's SHAPE changed -- it stopped creeping
+  // into the wind -- but it was NO FASTER AND NO BIGGER: 21.1 s to 48 patches in still air, 22.0 with a gale on it.
+  // `windRate` and `backRate` only trade one direction against another, and a patch walks a wheel of 24 directions
+  // in turn, so what the downwind looks gain the upwind looks lose. This holds the three ways a wind now DRIVES it.
+  const go = (U) => {
+    const ctx = hill(0);
+    ctx.wind.y = U;
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 3, ctx);
+    let t12 = -1;
+    for (let i = 0; i < 60 * 40; i++) {
+      stepFires(F, 1 / 60, ctx); clearBurns(F);
+      if (t12 < 0 && F.count >= 12) t12 = i / 60;
+    }
+    const r = reach(F);
+    return { north: r.north, south: r.south, t12, n: F.count };
+  };
+  const calm = go(0), gale = go(FIRE.windCap);
+
+  assert.ok(gale.north > calm.north * 1.1,
+    'the wind did not drive it further downwind: ' + calm.north.toFixed(1) + ' m calm, ' + gale.north.toFixed(1) + ' m in a gale');
+  assert.ok(gale.t12 > 0 && gale.t12 < calm.t12,
+    'the wind did not make it spread SOONER: ' + calm.t12.toFixed(1) + ' s calm, ' + gale.t12.toFixed(1) + ' s in a gale');
+  assert.ok(gale.south < calm.south * 0.8,
+    'a fire should creep into a wind, not run: ' + calm.south.toFixed(1) + ' m calm, ' + gale.south.toFixed(1) + ' m in a gale');
+  // and the three dials that do it are real, not nominal
+  assert.ok(FIRE.windMore > 0 && FIRE.windSeeds > 0 && FIRE.windReach > 1, 'the wind no longer drives the fire at all');
+});

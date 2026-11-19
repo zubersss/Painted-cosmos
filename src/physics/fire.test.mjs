@@ -255,8 +255,14 @@ test('one casting does not run across the world', () => {
     for (let i = 0; i < f.count; i++) { const d = Math.hypot(EAST(f[i]), NORTH(f[i])); if (d > far) far = d; }
     ctx.keep(f);
   });
-  console.log('  a fire in endless wood with a 16 m/s wind got %s m from where it was lit (its limit is %s m)', far.toFixed(0), lim.toFixed(0));
-  assert.ok(far <= lim + FIRE.spread * 2, 'it stayed within its reach: ' + far.toFixed(0) + ' m of ' + lim.toFixed(0));
+  // (2026-11-19, the owner: "wind strengthens the fire".) THE LIMIT IS NOW THE WIND-DRIVEN ONE. A fire in a full
+  // gale runs FIRE.windReach times further from where it was lit than a creeping one does -- that is the point of
+  // the change, and the bound is still finite and still small: 1.35 times, not 'until it meets the sea'. This test
+  // holds the new bound, which is what keeps a casting from crossing the world.
+  const lim2 = lim * FIRE.windReach;
+  console.log('  a fire in endless wood with a 16 m/s wind got %s m from where it was lit (its limit is %s m, %s still)', far.toFixed(0), lim2.toFixed(0), lim.toFixed(0));
+  assert.ok(far <= lim2 + FIRE.spread * 2, 'it stayed within its wind-driven reach: ' + far.toFixed(0) + ' m of ' + lim2.toFixed(0));
+  assert.ok(far > lim, 'the wind did NOT drive it past its still-air reach: ' + far.toFixed(0) + ' m of ' + lim.toFixed(0));
   assert.ok(far > 40, 'and it did make a real run of it first: ' + far.toFixed(0) + ' m');
 });
 
