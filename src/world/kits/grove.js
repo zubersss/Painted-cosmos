@@ -50,12 +50,12 @@ const BASE = {
 
 export const GROVE = {
   // (the owner's numbers from the sheet are kept in the names, so a choice can be traced to the picture they saw)
-  roundmaple: Object.assign({}, BASE, { height: 10, forkAt: 0.32, boughs: 5, rise: 0.70, droopB: 0.35, spread: 0.88, arch: 0.24, boughLen: 0.34, levels: 4, stopEarly: 0.40, inner: 0.60, leafN: 1700, leafR: 0.042 }),
-  poplar: Object.assign({}, BASE, { height: 15, girth: 0.024, leader: 1, forkAt: 0.12, boughs: 22, rise: 1.05, droopB: 0.10, spread: 0.34, arch: 0.08, boughLen: 0.21, levels: 2, twigs: 3, leafN: 1500, leafR: 0.030 }),
-  oak: Object.assign({}, BASE, { height: 11, girth: 0.050, forkAt: 0.24, boughs: 5, rise: 0.56, droopB: 0.58, spread: 0.95, arch: 0.32, boughLen: 0.46, levels: 4, triple: 0.5, inner: 0.60, leafN: 2000, leafR: 0.044 }),
-  birch: Object.assign({}, BASE, { height: 13, girth: 0.017, lean: 1.3, forkAt: 0.38, boughs: 9, rise: 0.80, droopB: 0.40, spread: 0.60, arch: 0.16, boughLen: 0.26, levels: 4, twigs: 6, twigDrop: -0.45, inner: 0.6, leafN: 1800, leafR: 0.028, leafLen: 0.40 }),
-  willow: Object.assign({}, BASE, { height: 13, girth: 0.030, forkAt: 0.50, boughs: 6, rise: 0.95, droopB: 0.05, lift: 0.0, liftTo: -9, drop: -0.40, spread: 0.52, arch: -0.12, boughLen: 0.30, levels: 4, split: 0.70, taper: 0.30, twigs: 7, twigLen: 1.6, twigMax: 0.46, twigDrop: -1.3, stopEarly: 0.15, hem: 1.8, inner: 0.3, leafN: 2000, leafR: 0.028, leafLen: 0.34, leafDroop: 0.8 }),
-  sapling: Object.assign({}, BASE, { height: 5, girth: 0.030, lean: 1.2, forkAt: 0.38, boughs: 3, rise: 0.80, droopB: 0.25, spread: 0.85, arch: 0.18, boughLen: 0.40, levels: 3, stopEarly: 0.5, leafN: 520 }),
+  roundmaple: Object.assign({}, BASE, { height: 10, forkAt: 0.32, boughs: 5, rise: 0.70, droopB: 0.35, spread: 0.88, arch: 0.24, boughLen: 0.34, levels: 4, stopEarly: 0.40, inner: 0.60, leafN: 1280, leafR: 0.042 }),
+  poplar: Object.assign({}, BASE, { height: 15, girth: 0.024, leader: 1, forkAt: 0.12, boughs: 22, rise: 1.05, droopB: 0.10, spread: 0.34, arch: 0.08, boughLen: 0.21, levels: 2, twigs: 3, leafN: 1120, leafR: 0.030 }),
+  oak: Object.assign({}, BASE, { height: 11, girth: 0.050, forkAt: 0.24, boughs: 5, rise: 0.56, droopB: 0.58, spread: 0.95, arch: 0.32, boughLen: 0.46, levels: 4, triple: 0.5, inner: 0.60, leafN: 1480, leafR: 0.044 }),
+  birch: Object.assign({}, BASE, { height: 13, girth: 0.017, lean: 1.3, forkAt: 0.38, boughs: 9, rise: 0.80, droopB: 0.40, spread: 0.60, arch: 0.16, boughLen: 0.26, levels: 4, twigs: 4, twigDrop: -0.45, inner: 0.6, leafN: 1180, leafR: 0.028, leafLen: 0.40 }),
+  willow: Object.assign({}, BASE, { height: 13, girth: 0.030, forkAt: 0.50, boughs: 6, rise: 0.95, droopB: 0.05, lift: 0.0, liftTo: -9, drop: -0.40, spread: 0.52, arch: -0.12, boughLen: 0.30, levels: 4, split: 0.70, taper: 0.30, twigs: 7, twigLen: 1.6, twigMax: 0.46, twigDrop: -1.3, stopEarly: 0.15, hem: 1.8, inner: 0.3, leafN: 1500, leafR: 0.028, leafLen: 0.34, leafDroop: 0.8 }),
+  sapling: Object.assign({}, BASE, { height: 5, girth: 0.030, lean: 1.2, forkAt: 0.38, boughs: 3, rise: 0.80, droopB: 0.25, spread: 0.85, arch: 0.18, boughLen: 0.40, levels: 3, stopEarly: 0.5, leafN: 440 }),
 };
 
 // lod 0 full (near); lod 1 medium -- one level fewer, no haze of hairs, a third of the leaves in larger four-cornered
@@ -66,7 +66,11 @@ export function grow(P0, seed, lod, spec) {
   const near = lod === 0;
   const sl = !!(spec && spec.slender);
   const P = sl ? Object.assign({}, P0, { forkAt: Math.min(0.8, P0.forkAt * 1.35), boughLen: P0.boughLen * 0.84, spread: P0.spread * 0.82 }) : P0;
-  const LV = near ? P.levels : Math.max(2, P.levels - 1);
+  // THE MIDDLE TIER IS A STEM AND ITS FIRST BOUGHS, AND NOTHING ELSE. (Measured 2026-11-19 against the kits this
+  // wood used to plant: at this tier the old maple drew 84 triangles of WOOD and this grammar drew 652, the poplar
+  // 1492 -- because it went on dividing, in four- and five-sided tubes, at a size where a whole tree is a few
+  // metres on the screen. The leaves at this tier were never the cost; the branching was.)
+  const LV = near ? P.levels : 1;
   const H = P.height * (0.88 + 0.24 * rnd());
   const r0 = H * P.girth * (0.9 + 0.2 * rnd());
   const lean = (rnd() - 0.5) * P.lean, lz = (rnd() - 0.5) * P.lean * 0.7, ph = rnd() * 3;
@@ -75,7 +79,7 @@ export function grow(P0, seed, lod, spec) {
   // the stem. With a leader it runs the whole height and tapers nearly to nothing; without one it rises to the fork
   // and a little above it.
   const top = P.leader ? H : fy * 1.08;
-  const nS = P.leader ? (near ? 9 : 6) : 6, pts = [], rad = [];
+  const nS = near ? (P.leader ? 9 : 6) : 4, pts = [], rad = [];
   const axis = (t) => V(lean * t * t + 0.10 * Math.sin(t * 2.7 + ph) * t * H * 0.1, top * t, lz * t * t);
   pts.push(V(axis(0).x, -0.25, axis(0).z)); rad.push(r0 * 1.7);
   for (let i = 0; i <= nS; i++) { const t = i / nS; pts.push(axis(t));
@@ -96,10 +100,10 @@ export function grow(P0, seed, lod, spec) {
     const at = (t) => { const u = 1 - t; return V(u * u * p0.x + 2 * u * t * c.x + t * t * tip.x, u * u * p0.y + 2 * u * t * c.y + t * t * tip.y, u * u * p0.z + 2 * u * t * c.z + t * t * tip.z); };
     const divides = depth < LV && (depth < 2 || rnd() > P.stopEarly);
     const tEnd = divides ? P.split * 1.06 : 1;      // a limb ends at its fork, a whisker past it
-    const nP = depth === 1 ? (near ? 6 : 4) : P.arch < 0 ? 5 : 4;
+    const nP = near ? (depth === 1 ? 6 : P.arch < 0 ? 5 : 4) : 3;
     const pth = [], rr = [];
     for (let i = 0; i < nP; i++) { const t = i / (nP - 1) * tEnd; pth.push(at(t)); rr.push(r * (1 - (1 - P.taper) * Math.pow(t, 1.3))); }
-    const sd = near ? (depth === 1 ? 5 : depth === 2 ? 4 : 3) : (depth === 1 ? 4 : 3);
+    const sd = near ? (depth === 1 ? 5 : depth === 2 ? 4 : 3) : 3;
     tube(B, pth, rr, sd, { part: 0, shade: 0.16 + 0.12 * depth, sway0: 0.12 + 0.2 * depth, hash: rnd(), branch: bid });
 
     if (!divides) {
@@ -134,13 +138,16 @@ export function grow(P0, seed, lod, spec) {
     }
   }
 
-  for (let k = 0; k < P.boughs; k++) {
-    const up = P.boughs > 1 ? k / (P.boughs - 1) : 0.5;
+  // ... and a tree with many boughs shows only some of them at that tier: the poplar's twenty-two were 1492
+  // triangles of wood on a tree a few metres across.
+  const nB = near ? P.boughs : Math.min(P.boughs, 6);
+  for (let k = 0; k < nB; k++) {
+    const up = nB > 1 ? k / (nB - 1) : 0.5;
     // with a leader the limbs are spread up the whole stem and shorten toward the top; without one they all leave
     // within a short length above the fork
     const t0 = P.leader ? (P.forkAt + (0.95 - P.forkAt) * up) : (0.72 + 0.28 * up);
     const shrink = P.leader ? (1 - 0.72 * up) : 1;
-    const ang = k * 2.399 + (rnd() - 0.5) * 0.8;
+    const ang = k * 2.399 * (near ? 1 : P.boughs / nB) + (rnd() - 0.5) * 0.8;
     const el = P.rise - P.droopB * (1 - up) + (rnd() - 0.5) * 0.22;
     limb(axis(t0), ang, el, H * P.boughLen * shrink * (0.88 + 0.24 * rnd()), rTop * (0.82 - 0.14 * up) * (P.leader ? 0.5 + 0.5 * shrink : 1), 1, (k * 0.37) % 1);
   }
@@ -153,7 +160,14 @@ export function grow(P0, seed, lod, spec) {
   // with very many places -- the willow grows four down every one of its hanging twigs -- that floor, not leafN,
   // decided the count, and cutting leafN by a fifth changed nothing (measured, 2026-11-19: 22016 triangles before
   // and after). Dropping places until the budget can afford them is what makes leafN mean something again.
-  const want = near ? P.leafN : Math.round(P.leafN * 0.32);
+  // THE MIDDLE TIER IS THE ONE THAT COUNTS. (2026-11-19, from the owner's own phone at v21: the frame was 43 ms,
+  // 22 a second, against 16.7 ms with no trees at all -- the trees ARE the frame. Measured against the kits this
+  // wood used to plant: the near tree is a quarter dearer, but THE MIDDLE TIER WAS 168 PER CENT DEARER -- 1648
+  // triangles against 615 -- and the middle tier is drawn for far more trees than the near one. That, not the near
+  // tree, is where the 278,000 extra triangles a frame came from.)
+  // A mid tree is a few metres across on the screen. Its leaves are already laid in cards nearly twice the size,
+  // four-cornered rather than six, so a tenth of the count reads as the same mass.
+  const want = near ? P.leafN : Math.round(P.leafN * 0.10);
   const floor = near ? 3 : 2;
   const room = Math.max(8, Math.floor(want / floor));
   if (stations.length > room) {
@@ -164,10 +178,10 @@ export function grow(P0, seed, lod, spec) {
   let wsum = 0; for (const st of stations) wsum += st.w;
   for (const st of stations) {
     const n = Math.max(floor, Math.round(want * st.w / Math.max(1e-6, wsum)));
-    const r = Math.min(P.leafR * H, st.len * 1.1) * (0.7 + 0.6 * rnd()) * (near ? 1 : 1.5);
+    const r = Math.min(P.leafR * H, st.len * 1.1) * (0.7 + 0.6 * rnd()) * (near ? 1 : 2.3);
     groundUp(st.p);
     leafCards(B, st.p, r, r * 0.74, r, rnd, {
-      n, len: near ? P.leafLen : P.leafLen * 1.8, wid: (near ? P.leafLen : P.leafLen * 1.8) * 0.46,
+      n, len: near ? P.leafLen : P.leafLen * 2.6, wid: (near ? P.leafLen : P.leafLen * 2.6) * 0.46,
       round: near ? 1 : 0, branch: st.bid, massC: crownC, massK: 0.55,
       sway: 0.55 + 0.45 * Math.max(0, Math.min(1, st.p.y / H)), shade0: 0.05, shadeK: 0.6, droop: P.leafDroop,
     });
