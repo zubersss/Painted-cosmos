@@ -413,6 +413,17 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v21 (19 Nov), pull request #21 merged: THE FIRE'S REAL MECHANICS AND FIVE NEW ABILITIES.**
+ember, bellows, wall of fire, snuff, fire whirl. The fire now RUNS UPHILL (doubling every ten degrees), NEEDS AN
+OXIDISER (only Earth has one), THROWS EMBERS 4.5x downwind over any firebreak, and RAISES ITS OWN WHIRL where enough
+of it burns together in a light wind. "Putting air on a fire speeds it up" is bellows, and it is done by making real
+wind the fire already reads, not by a number. docs/POWERS.md has the table and what is NOT done. Suites on the
+merged tree: unit 306, physics 385, world and kits and season 108. All six abilities CAST IN THE RUNNING GAME.
+**STILL OWED on that instruction: every biome a milestone, and three milestones of look.** Three Earth biomes are
+looked at and their faults named in the log for 19 Nov; none is mended. And a NEGATIVE RESULT is recorded there that
+will save the next session a day: the ground's `graze` rule is NOT why steep faces look coarse -- measured twice,
+2.6% on the canyon -- and the stroke direction is the place to look instead.
+
 **`main` IS AT v20 (19 Nov), pull request #20 merged: THE FIRST PASS AT THE MOUNTAINS.** `alpine_meadow` had no oil
 block at all and has one now (so the watercolour game is untouched): peaks about twice as high with closer ridges,
 raw umber and neutral tint instead of a thinned cobalt blue, a snowline that sits ON the new peaks, and strata.

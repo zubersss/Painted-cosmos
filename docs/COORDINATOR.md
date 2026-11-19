@@ -2505,3 +2505,26 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   6. THE LOOK gets THREE milestones of upgrades.
   7. THEN merge, and give the owner a link to the NEW SPEED TEST and a link to just play.
 - SCOPE, said plainly in the handover and to the owner: this is several sessions of work, not one. The order taken is the owner's own: the fire first (it is the most detailed ask), then the biomes, then the look. Each piece is merged as it is finished, so nothing waits on the whole.
+- **THE FIRE IS DONE AND MERGED AS v21** (pull request #21). Five new abilities (ember, bellows, wall of fire, snuff,
+  fire whirl) and four mechanics the model had none of: IT RUNS UPHILL (the rate doubles every ten degrees, bounded
+  six times up and a third down), IT NEEDS AN OXIDISER (earth 1.000, venus 0.040, mars 0.001, the rest 0 — and in
+  thin air it burns SLOWER, so fuel lasts longer), EMBERS GO AHEAD OF IT 4.5x downwind (and cannot set ice alight),
+  and IT MAKES ITS OWN WEATHER (F.whirl, which wants a big burn AND A LIGHT WIND — a gale tears the column apart).
+  "Putting on a fire speeds up the fire" is bellows, done the honest way: it makes real wind through the ordinary
+  machinery, which the fire already reads, so nothing anywhere says "this fire is faster now".
+  9 new physics tests + 5 ability tests. CAST IN THE RUNNING GAME, all six, no exceptions and no console errors.
+- **A NEGATIVE RESULT, recorded so nobody spends a third session on it.** TWICE I supposed the coarse paint on steep
+  faces came from the ground's grazing-angle rule (`graze`, the ground's oil block in materials.js), which lays dabs
+  up to THREE TIMES LARGER where a surface grazes the eye. Twice I changed it and MEASURED: 9% finer strokes on the
+  mountains, **2.6% on the canyon wall** — and it changed the autumn wood by 23.6% of its pixels against a 12.3%
+  noise floor. **IT IS NOT THE CAUSE.** Reverted both times. The likeliest real cause is the STROKE DIRECTION
+  following the surface gradient, which on a wall draws long vertical smears; that is where to look next.
+- **THE THREE EARTH BIOMES LOOKED AT BUT NOT MENDED**, faults named from stills:
+  - `sea_coast`: the sea is a flat field of identical ripples to the horizon — no swell, no surf line where water
+    meets land, and NO CLIFFS in view in a place called "Sea Cliffs and Coast".
+  - `desert_canyon`: the wall is a CURTAIN OF VERTICAL SMEARS with no bed in it, though `strata: 1` is set; the
+    floor is orange-and-green confetti, far too busy and too green for a desert.
+  - `misty_wetland`: NEITHER MIST NOR STANDING WATER. A dry pebbly floor with reeds standing on it and a thread of
+    water at the horizon.
+- **STILL OWED on the owner's 19 Nov instruction:** every biome (all worlds) a milestone, and three milestones of
+  look. The fire was taken first because it was the most detailed ask.
