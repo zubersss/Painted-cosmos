@@ -53,9 +53,23 @@ const TREE_DIST = (() => { const q = typeof location !== 'undefined' && location
 
 // WHICH KITS ARE DRAWN FAR OFF AS LEAF CARDS and not as the old lump (the oil look's far tree, v13). A kit left out
 // of this is silently given the lump, which is why it sits beside FAR_DIMS: both must name every tall kit there is.
-const CAN_CARD = { broadleaf: 1, conifer: 1, maple: 1, spruce: 1, aspen: 1, tallpine: 1 };
+// which kits have a WOODEN STEM worth drawing in the branch pass, and which get a trunk on their far card.
+// (Named and exported so grove.test.mjs can hold every kit in TALL_KITS to them: a kit missing from a list like
+//  these is invisible -- on 2026-11-18 it cost the far wood 6.6 million triangles of detail and nobody could see
+//  why. A chain of `sp.kit === ...` cannot be checked by a test; a Set can.)
+export const BRANCHY = new Set(['broadleaf', 'conifer', 'fungus', 'kelp', 'maple', 'spruce', 'aspen', 'tallpine',
+  'roundmaple', 'poplar', 'oak', 'birch', 'willow', 'sapling']);
+export const FAR_TRUNK = new Set(['broadleaf', 'conifer', 'fungus', 'maple', 'spruce', 'aspen', 'tallpine',
+  'roundmaple', 'poplar', 'oak', 'birch', 'willow', 'sapling']);
 
-const FAR_DIMS = { maple: [15.5, 12.0, 0], spruce: [9.5, 16.0, 0.86], aspen: [12.0, 13.5, 0], tallpine: [12.0, 19.0, 0.62],
+export const CAN_CARD = { broadleaf: 1, conifer: 1, maple: 1, spruce: 1, aspen: 1, tallpine: 1,
+  roundmaple: 1, poplar: 1, oak: 1, birch: 1, willow: 1, sapling: 1 };
+
+export const FAR_DIMS = {
+  // (the six of 2026-11-19, kits/grove.js. MEASURED over twelve seeds at lod 0: across, high, taper)
+  roundmaple: [11.7, 7.8, 0], poplar: [7.3, 15.5, 0.30], oak: [18.1, 9.9, 0], birch: [12.3, 9.9, 0],
+  willow: [14.7, 10.3, 0], sapling: [6.4, 4.9, 0],
+  maple: [15.5, 12.0, 0], spruce: [9.5, 16.0, 0.86], aspen: [12.0, 13.5, 0], tallpine: [12.0, 19.0, 0.62],
   broadleaf: [13.5, 11.8, 0], conifer: [14.5, 16.5, 0.8], fungus: [12, 14, 0.1], crystal: [5, 6.5, 0.85], spire: [6.5, 13, 0.86], kelp: [4, 10, 0.5], wave: [11, 6.0, 0.12], vine: [7.5, 9, 0.25] };     // (PAINTER 14: a far frozen wave a long low ridge, not a cone: [8, 7.5, 0.5] stood as a row of snow peaks)
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
@@ -106,9 +120,13 @@ export class Flora {
     // (the oil look may give a kind its own form and washes: a species' `oil` entry, laid over it; where trees stand,
     // their sizes and what the explorer bumps into stay the species' own: floraplace.js, obstacles.js)
     // (and in the oil look every broadleaf's crown is leaves one by one: florakit.js `leafy`)
-    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.oil) : sp));
+    // (`oilLook`: the kits that are SHARED with the watercolour game read this to know which game they are building
+    //  for. The broadleaf and the conifer are the live game's own trees, so anything their shape gains for the oil
+    //  look -- boughs sampled off a curve rather than drawn as two straight bars -- must be behind it, or the
+    //  watercolour game changes and the pixel gate says so.)
+    const TALL = L.tall.map((sp) => (LOOK.oil ? Object.assign({}, sp, { oilLook: 1 }, sp.kit === 'broadleaf' || sp.kit === 'maple' || sp.kit === 'aspen' ? { leafy: 1, double: 1 } : null, sp.kit === 'roundmaple' || sp.kit === 'poplar' || sp.kit === 'oak' || sp.kit === 'birch' || sp.kit === 'willow' || sp.kit === 'sapling' ? { double: 1 } : null, sp.oil) : sp));
     this.species = TALL.map((sp, i) => {
-      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'kelp' || sp.kit === 'maple' || sp.kit === 'spruce' || sp.kit === 'aspen' || sp.kit === 'tallpine', stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
+      const mat = makePropMaterial(bodyUniforms, { name: 'tall-' + sp.kit + i, barkA: sp.bark[0], barkB: sp.bark[1], leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkP: sp.barkP, leafP: sp.leafP, accent: sp.accent, oilDark: sp.dark || null, oilFam: sp.fam || null, oilKind: sp.snowy ? 1 : sp.bare ? 2 : 0, wind: sp.wind == null ? 0.03 : sp.wind, doubleSide: !!sp.double, phys: sp.kit === 'vine' ? null : 'lite', branch: BRANCHY.has(sp.kit), stiff: sp.kit === 'kelp' ? 0.1 : 1, plantHeight: (FAR_DIMS[sp.kit] || [0, 10])[1], gem: sp.kit === 'crystal',
         // (the last fixes: a spire parts round an eye inside it; its girth at the foot, height and lean, florakit.js spireGeometry)
         hollow: sp.kit === 'spire' ? (sp.slim ? [1.3, 10.5, 0.3] : [2.0, 12, 0]) : null });
       mat.userData.pcCasts = true;
@@ -132,7 +150,7 @@ export class Flora {
     this.mats = Object.assign({
       far: L.tall.length ? makePropMaterial(bodyUniforms, {
         name: 'far-tree', leafP: [0.9, 0.12, 1.0, 0.45], wind: 0.04,
-        far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: sp.kit === 'broadleaf' || sp.kit === 'conifer' || sp.kit === 'fungus' || sp.kit === 'maple' || sp.kit === 'spruce' || sp.kit === 'aspen' || sp.kit === 'tallpine', drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
+        far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: FAR_TRUNK.has(sp.kit), drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
       }) : null,
     }, this._underMats(U, ''));
     // (the FAR trees cast no shadow in the oil look: on the owner's phone their drawing from the sun was 2.8 ms of a
