@@ -2493,3 +2493,15 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   has no alpine station, so there is no draw-call or triangle count for this place, before or after. Taller terrain
   plausibly costs more. **Add an alpine station first thing**, so that from here the look and the cost of a place are
   measured in the same run -- which is what "the look and performance" asks for.
+
+### 2026-11-19 OWNER: the fire deepened (5 abilities, wind feeds it, fire tornados, real spread), every biome a milestone, the look three
+- OWNER (verbatim): "Keep working on the fire and give it 5 new abilities that are fire based also make it so that putting on a fire speeds up the fire and also fire tornados can be a thing also really figure out the mechanics of how a fire spreads and starts and how it spreads and how it acts based around different environments and keep working on the rest of the worlds biomed as well every biome should get at least 1 milestone worth of upgrades and same for the graphics and looks of the game that should get 3 milestones worth of upgrades once you've done all and merged it give me the link to try the new benchmark test and one to just try it out"
+- SEVEN ASKS, read as:
+  1. FIVE NEW FIRE ABILITIES, on top of the kindle that exists.
+  2. "PUTTING ON A FIRE SPEEDS UP THE FIRE" — read as the WIND feeding a fire: the explorer's own gust on a flame makes it burn and spread faster. (The powers are wind; the fire is the second element. The two meeting is the obvious reading, and it is also the true physics.)
+  3. FIRE TORNADOS.
+  4. THE MECHANICS OF FIRE, properly: how it STARTS, how it SPREADS, and how it BEHAVES DIFFERENTLY IN DIFFERENT PLACES.
+  5. EVERY BIOME gets at least one milestone of upgrades — not just Earth's woods.
+  6. THE LOOK gets THREE milestones of upgrades.
+  7. THEN merge, and give the owner a link to the NEW SPEED TEST and a link to just play.
+- SCOPE, said plainly in the handover and to the owner: this is several sessions of work, not one. The order taken is the owner's own: the fire first (it is the most detailed ask), then the biomes, then the look. Each piece is merged as it is finished, so nothing waits on the whole.
