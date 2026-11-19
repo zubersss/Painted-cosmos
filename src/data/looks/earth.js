@@ -152,7 +152,11 @@ export default {
           //  measured conifers at 0.6 per cent of the aerial picture against 5.1 in the owner's paintings. A plain
           //  0.85 makes about one tree in six a spruce everywhere, and floraplace.js's own grove field still swings
           //  that from none to most of a stand, so there are groves of dark among the orange as the references show.)
-          tallMix: 0.85, under: { leaf: [[0.84, 0.90, 0.34], [0.58, 0.78, 0.30], [0.34, 0.54, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } } }),
+          tallMix: 0.85, under: { leaf: [[0.84, 0.90, 0.34], [0.58, 0.78, 0.30], [0.34, 0.54, 0.28]], bush: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]],
+            // (this biome makes its own undergrowth materials, so it needs its own two dresses or it keeps the
+            //  forest's and its own washes above are thrown away the moment the year turns)
+            leafSum: [[0.84, 0.90, 0.34], [0.58, 0.78, 0.30], [0.34, 0.54, 0.28]], leafAut: [[0.95, 0.84, 0.38], [0.84, 0.62, 0.30], [0.66, 0.46, 0.30]],
+            bushSum: [[0.66, 0.80, 0.36], [0.46, 0.66, 0.34], [0.26, 0.44, 0.34]], bushAut: [[0.97, 0.88, 0.36], [0.95, 0.68, 0.28], [0.84, 0.44, 0.26]] } } }),
     B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
       ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
       ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 },

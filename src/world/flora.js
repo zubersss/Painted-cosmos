@@ -241,7 +241,20 @@ export class Flora {
   _palette(bi) {
     let m = this.pal.get(bi);
     // (the oil look may give a biome's undergrowth its own colours: the biome's oil.under, laid over its washes)
-    if (!m) { const b = this.S.biomes[bi]; m = this._underMats(Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null), '-' + bi); this.pal.set(bi, m); }
+    if (!m) {
+      const b = this.S.biomes[bi];
+      const U = Object.assign({}, this.U, b.under, LOOK.oil && b.oil ? b.oil.under : null);
+      m = this._underMats(U, '-' + bi); this.pal.set(bi, m);
+      // A BIOME MAKES ITS OWN UNDERGROWTH MATERIALS, here and lazily, and they are not the ones the constructor
+      // registered: without this the trees of a wood turned from summer to autumn and THE FLOOR BENEATH THEM DID
+      // NOT. (Found by reading, after a still showed a green floor under a gold wood and it was put down to grass.)
+      if (LOOK.oil && this._turn) {
+        const add = [];
+        if (U.leafSum || U.leafAut) add.push({ mat: m.under, sum: U.leafSum || U.leaf, aut: U.leafAut || U.leaf });
+        if (m.bush && (U.bushSum || U.bushAut)) add.push({ mat: m.bush, sum: U.bushSum || U.bush, aut: U.bushAut || U.bush });
+        if (add.length) { for (const q of add) this._turn.push(q); const t = this._seasonAt; this._seasonAt = -1; this.setSeason(t < 0 ? SEASON.t : t); }
+      }
+    }
     return m;
   }
 
