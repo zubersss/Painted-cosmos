@@ -131,13 +131,24 @@ export function attachBench(pc) {
   // or the light in the air are switched (the fourth form timed those rows while they were being built: both read
   // slower than "as set"), and patches are laid again when the far trees are swapped. Calm: half a second in which no
   // frame is much longer than the middle one; eight seconds at most.
+  // (2026-11-19, from the owner's own table at v22: FOUR ROWS WERE TIMED WHILE NOTHING WAS BEING DRAWN -- "script
+  //  0.0 ms, 0 calls, 0k triangles" -- and none of them was marked NOT SETTLED, because this test only ever asked
+  //  whether the frames were STEADY, and a scene that draws nothing is the steadiest thing there is. Those rows
+  //  read 16.7 ms, the screen's own cap, and every row measured against them was nonsense: "far trees drawn first"
+  //  came out 16.9 ms FASTER than the game and "far trees cast no shadow" 15.9 ms slower. A row that draws nothing
+  //  is not a fast row, it is not a row at all.)
+  const DRAWS = 20;            // draw calls below which the picture is not really being drawn
   const calm = async () => {
     await wait(400);
     const t0 = performance.now();
     for (;;) {
       const st = stats(await sample(500));
-      if (st.n >= 4 && st.worst < Math.max(1.9 * st.mid, st.mid + 18)) return true;
-      if (performance.now() - t0 > 8000) return false;
+      if (st.n >= 4 && st.calls >= DRAWS && st.worst < Math.max(1.9 * st.mid, st.mid + 18)) return true;
+      // A WOOD TAKES LONGER TO BUILD THAN A ROW TAKES TO SETTLE. Eight seconds is plenty for the picture to steady
+      // after a switch, but not for the trees to exist at all at the start of a run -- and that is how four rows
+      // came to be timed against an empty frame. While nothing is being drawn, wait far longer.
+      const limit = st.calls >= DRAWS ? 8000 : 40000;
+      if (performance.now() - t0 > limit) return false;
     }
   };
   let sunOut = null;      // whether the shadow map was drawn while the first row was measured
@@ -243,6 +254,7 @@ export function attachBench(pc) {
     ];
     const rows = [];
     let r0 = null, base = null;
+    const bases = [];      // (2026-11-19) every "as set" row, so the table can say when it disagrees with itself
     for (let k = 0; k < steps.length; k++) {
       const [name, on, off] = steps[k];
       el.textContent = head(r0) + '\n' + rows.join('\n') + '\n... ' + (k + 1) + ' of ' + steps.length + ': ' + name;
@@ -253,15 +265,30 @@ export function attachBench(pc) {
       r.fps = 1000 / Math.max(r.mean, 1e-3);
       if (k === 0 && P._shadow) sunOut = P._shadow.frames > f0;
       if (off) { await off(); if (name.startsWith('far trees as') || name.startsWith('far trees of')) await calm(); }
-      if (!r0) r0 = r;
+      // (2026-11-19) The header quotes the first row THAT WAS REALLY DRAWING. It used to quote the first row
+      // whatever it was, and at v22 that row drew nothing, so the header described the whole game as "script
+      // 0.0 ms, 0 calls, 0k triangles a frame".
+      if (!r0 && r.calls >= DRAWS) r0 = r;
       const isBase = name.startsWith(AS);
       // (each question is set against the "as set" row before it: the phone warms through the run)
       const d = base && !isBase ? r.mean - base.mean : null;
       rows.push(String(k + 1).padStart(2) + ' ' + (name + ' ').padEnd(27, '.') + ' ' + r.mean.toFixed(1).padStart(5) + ' ms = ' + r.fps.toFixed(1).padStart(5) + ' a second' +
-        (d == null ? '          ' : '  ' + ((d >= 0 ? '+' : '') + d.toFixed(1)).padStart(6) + ' ms') + '  (middle ' + r.mid.toFixed(0) + ', longest ' + r.worst.toFixed(0) + ', script ' + r.script.toFixed(1) + (ok ? '' : ', NOT SETTLED') + ')');
-      if (isBase) base = r;
+        (d == null ? '          ' : '  ' + ((d >= 0 ? '+' : '') + d.toFixed(1)).padStart(6) + ' ms') + '  (middle ' + r.mid.toFixed(0) + ', longest ' + r.worst.toFixed(0) + ', script ' + r.script.toFixed(1) + (r.calls < DRAWS ? ', NOTHING DRAWN' : ok ? '' : ', NOT SETTLED') + ')');
+      if (isBase) { base = r; bases.push(r.mean); }
     }
-    el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)';
+    // DO THE BASELINES AGREE? Every + / - in this table is measured against the "as set" row before it, so if those
+    // rows disagree with each other the whole table is noise however steady each row looked on its own. At v22 they
+    // ran 16.7, 33.6, 31.6, 31.6, 33.5 and 50.3 ms, and the table was read as a threefold speed-up that was not
+    // there. It says so itself now.
+    let warn = '';
+    if (bases.length >= 2) {
+      const lo = Math.min(...bases), hi = Math.max(...bases);
+      if (hi > lo * 1.25) warn = '\nTHIS RUN DOES NOT AGREE WITH ITSELF: the "as set" rows ran '
+        + bases.map((b) => b.toFixed(1)).join(', ') + ' ms. Every + / - below is measured against one of those, so'
+        + ' they cannot be trusted. Run it again without touching the phone, and wait for the wood to finish'
+        + ' building before you start.';
+    }
+    el.textContent = head(r0) + '\n' + rows.join('\n') + '\ndone. (+ / - ms: against the "as set" row before it)' + warn;
     pc.bench = rows;
   };
   run().catch((e) => { el.textContent = 'speed test failed: ' + ((e && e.message) || e); });
