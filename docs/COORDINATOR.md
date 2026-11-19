@@ -2425,3 +2425,10 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - MEASURED with the references' own ruler, bare wood, three seeds each: the ten span **6.1 to 10.7**; the kits the game ships span **3.0 (aspen) to 7.6 (maple)**. The references reach 17 but were measured THROUGH their leaves, which hide the fine end and raise the figure - so 17 is the direction, not a like-for-like number, and this is said rather than claiming the target is met. (The willow reads 59 only because the ruler measures horizontal runs and its twigs hang vertically.)
 - SAID TO THE OWNER: the sheet shows SHAPE, not paint - flat fills in one warm wash, not the game's light. They are choosing silhouettes.
 - WAITING ON: which five.
+
+### 2026-11-19 OWNER picks six trees, wants them refined, and wants the forest to turn from summer to autumn
+- OWNER (verbatim): "Yes do 12374 and the widow 6 but refine them a little better and make sure the leaves change colors from summer to autumn for the forest".
+- READ AS **SIX** trees, not five: 1 round maple, 2 tall poplar, 3 great oak, 4 slender birch, 7 young sapling, and 6 the weeping willow ("the widow" = the willow). The owner wrote the first five as one number, "12374".
+- THREE ASKS IN ONE: (a) build those six as real trees; (b) "refine them a little better" - the shapes are close but not finished; (c) the forest's leaves CHANGE COLOUR from summer to autumn.
+- NOTE ON (b): the owner is looking at SHAPE drawings, so "refine" is about form. Refinement that only shows in the game's own paint cannot be judged from the sheet and must be looked at in the game.
+- NOTE ON THE WILLOW: it was said to the owner that it costs about three times what the others do. They asked for it anyway. Taken as their decision; it will be built, and where it is PLANTED will be kept sparing (by water) unless they say otherwise.

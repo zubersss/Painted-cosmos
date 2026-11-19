@@ -403,6 +403,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 - **2026-11-19, the trees:** "Also fix the branches it looks like spiders not trees go over the references for the branches as well"; then "Can't you just sketch over the reference photos? To get it the best?"; then, having sent twenty reference pictures made with ChatGPT, "Actually just use it as a reference show me 10 different looks of the trees and ill pick 5 to plant in the world". Ten looks were drawn (`docs/shots/trees/ten_looks.png`, built by `tools/treevariants.mjs` on `look-proto`) and the owner is choosing five. The five chosen become real kits in `src/world/kits/`; the other five cost nothing because none of them is a module the game loads.
 
+- **2026-11-19, the six trees and the seasons:** "Yes do 12374 and the widow 6 but refine them a little better and make sure the leaves change colors from summer to autumn for the forest". SIX trees chosen from the sheet (1 round maple, 2 tall poplar, 3 great oak, 4 slender birch, 7 young sapling, 6 weeping willow), to be refined and built as real kits, and the forest's leaves must turn from summer to autumn.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
