@@ -413,6 +413,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v22 (19 Nov), pull request #22 merged: THE TREES COST WHAT THEY USED TO AGAIN.** The owner's phone
+said 22 a second at v21 and 60 with no trees at all. It was my regression from v19, and the cause was NOT what it
+looked like: the middle tier's WOOD, not its leaves (the old maple drew 84 triangles of wood there, this grammar
+652 and the poplar 1492). The middle tier is now a stem and its first boughs and nothing else. MEASURED in the oil
+look on the same scenes: **943,393 -> 664,781 triangles standing in the wood, a 30% cut**, and unchanged from 150 m
+up where everything is already the far tier. **THE PHONE HAS NOT SAID whether it is enough -- ask for speed test 9
+again.** If it is not, the owner's own table names the next lever and it is not geometry: rows 11 and 12 are -13.5
+ms each and they are the plants' PAINT.
+
 **`main` IS AT v21 (19 Nov), pull request #21 merged: THE FIRE'S REAL MECHANICS AND FIVE NEW ABILITIES.**
 ember, bellows, wall of fire, snuff, fire whirl. The fire now RUNS UPHILL (doubling every ten degrees), NEEDS AN
 OXIDISER (only Earth has one), THROWS EMBERS 4.5x downwind over any firebreak, and RAISES ITS OWN WHIRL where enough

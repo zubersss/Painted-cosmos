@@ -2528,3 +2528,24 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
     water at the horizon.
 - **STILL OWED on the owner's 19 Nov instruction:** every biome (all worlds) a milestone, and three milestones of
   look. The fire was taken first because it was the most detailed ask.
+
+### 2026-11-19 THE PHONE'S TABLE AT v21: 22 a second, and it was my own regression
+- The owner pasted SPEED TEST 9 at v21: 43 ms a frame, 22 a second, 1178k triangles. **Row 16, "no trees", is
+  16.7 ms -- SIXTY a second.** The trees are the frame: 26.3 ms of 43.
+- **THE CAUSE WAS MINE, from v19.** Measured against the four kits the wood planted before the six went in: the mean
+  NEAR tree 6729 -> 8384 (+25%), but THE MEAN MIDDLE TREE 615 -> 1648 (+168%), and the middle tier is drawn for far
+  more trees than the near one.
+- **AND THE MIDDLE TIER WAS NOT THE LEAVES.** Split by part: the old maple drew **84 triangles of WOOD** at that
+  tier; the grove grammar drew 652, and the poplar 1492 -- it went on dividing, in four- and five-sided tubes, at a
+  size where a whole tree is a few metres on the screen. **Always split a cost by part before cutting it**: the
+  obvious suspect (leaves) was innocent, and an hour spent thinning leaves would have bought almost nothing.
+- FIXED: the middle tier is a stem and its first boughs and nothing else (no division, three sides, four stem
+  points, at most six boughs shown); its leaves are a tenth of the near count in cards 2.6x the size. The near tier
+  trimmed back to parity. Mean near 6690 (-1% against the OLD wood), mean middle 456 (-26% against it).
+- **MEASURED IN THE REAL OIL LOOK** (`tests/stations.mjs --query look=oil`, same scenes, v21 against v22), standing
+  on foot in the wood: **943,393 -> 664,781 triangles, a cut of 278,612 (30%)** -- almost exactly what the six trees
+  had added. From 150 m up it is unchanged (1,733,474 both), because everything at that height is already the far
+  tier: the saving is concentrated exactly where the player stands. MERGED as v22, pull request #22.
+- **THE NEXT TWO LEVERS ARE IN THE OWNER'S OWN TABLE** and are not geometry: rows 11 and 12, "plants one flat
+  colour" and "plants written at once", are **-13.5 ms each**. That is the plants' PAINT (task #47), and it is now
+  the biggest single thing left on the phone.
