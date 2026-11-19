@@ -160,7 +160,40 @@ export default {
     B('alpine_meadow', 'Alpine Meadow and Snow Peaks', 'alpine',
       ['sapGreen', 'lemonYellow', 'cobaltBlue', 'neutralTint', 'rawUmber', 'cobaltViolet'], 'roseMadder',
       ['sapGreen', 'neutralTint', 'cobaltBlue'], { t: { amp: 470, wl: 1000, snow: 185, dil: 0.24, patch: [{ c: [0.40, 0.54, 0.36], wl: 26, thr: 0.0, soft: 0.3, amt: 0.65 }, { c: [0.92, 0.88, 0.50], wl: 10, thr: 0.2, soft: 0.25, amt: 0.5 }] }, mist: 4.5, tall: [1, 1], tallD: 0.22, tallMix: 1, tallMax: 150, small: { grass: 0.4, flower: 0.16, rock: 0.05, bush: 0.045 },
-        under: { rock: [[0.60, 0.61, 0.66], [0.34, 0.35, 0.44]] } }),     // (granite grey with a violet shadow, a step below the turf, in the meadow's cool palette)
+        under: { rock: [[0.60, 0.61, 0.66], [0.34, 0.35, 0.44]] },     // (granite grey with a violet shadow, a step below the turf, in the meadow's cool palette)
+        // THE MOUNTAINS (the owner, 2026-11-19: "the rest of earth not just the forests starting with the mountains
+        // they should be a special focus"). In the oil look only; the watercolour game keeps the numbers above.
+        // What the first still showed, from the meadow at ten in the morning: the peaks were a DISTANT FRIEZE, barely
+        // a fifth of the picture's height, with no snow on them but one cap -- in a place the game itself calls
+        // "Alpine Meadow and SNOW PEAKS" -- and their faces read as MOTTLED CAMOUFLAGE, green and grey and violet in
+        // patches of ten to twenty-six metres, with no form at any larger size.
+        //   amp 470 -> 920, wl 1000 -> 820: the peaks stand about twice as high and their ridges are closer
+        //     together, so from the meadow they fill the view instead of edging it.
+        //   snow 185 -> 300: a snowline that sits ON the new peaks. The references ask for "the snow mountains the
+        //     lightest thing in the picture" (Sohlberg, reference 26).
+        //   strata 0.55: beds of unequal thickness following the height, strongest on steep faces (the mechanism the
+        //     canyons already use). This is what makes rock read as rock rather than as a mottled surface.
+        //   the patches' wavelengths 26 and 10 -> 110 and 40 m: at ten metres a patch is camouflage on a face a
+        //     kilometre off; at a hundred it is the mass of one buttress against the next.
+        //   SECOND LOOK (the still above the new peaks): the range read as SUGAR ICING -- cream, mint and lilac, with
+        //     nothing dark in the picture at all. Two causes, both in the numbers above:
+        //       the three ground colours are sapGreen, neutralTint and COBALT BLUE, each DILUTED a quarter toward
+        //       the paper (`dil`), so the high rock was a thinned blue; and
+        //       the snowline at 300 on peaks that now reach 960 put snow over two thirds of the mountain.
+        //     So in the oil look the high ground is RAW UMBER and NEUTRAL TINT -- rock brown into cold grey -- at a
+        //     tenth of the dilution, and the snow sits at 560, which leaves the lower half of every peak as dark
+        //     rock. The references want "the snow mountains the lightest thing in the picture" (Sohlberg), and that
+        //     asks for everything else to be DARKER, not for more white.
+        oil: { over: { ground: ['sapGreen', 'rawUmber', 'neutralTint'],
+          t: { amp: 920, wl: 820, snow: 560, dil: 0.10, strata: 0.55,
+          //   THIRD LOOK, and a fault of my own making: the slopes read as big merged blobs, and I took that for
+          //     dabs the size of a house. MEASURED, it was nothing of the kind -- a dab is 6 to 7 pixels across.
+          //     What had merged was the COLOUR: lengthening these wavelengths to 110 and 40 m (above) to kill the
+          //     camouflage gave every dab within a hundred metres of its neighbour the same wash, so they joined
+          //     into shapes the size of a buttress. 48 and 20 m is the middle ground: too long to mottle a far face,
+          //     too short to let a slope set as one colour.
+          patch: [{ c: [0.40, 0.54, 0.36], wl: 48, thr: 0.0, soft: 0.3, amt: 0.62 },
+                  { c: [0.86, 0.84, 0.56], wl: 20, thr: 0.2, soft: 0.28, amt: 0.42 }] } } } }),
     B('sea_coast', 'Sea Cliffs and Coast', 'coast',
       ['cerulean', 'ultramarine', 'viridian', 'yellowOchre', 'rawUmber', 'davysGrey'], 'cadOrange',
       ['yellowOchre', 'oliveGreen', 'davysGrey'], { t: { cliff: 52, stacks: 0.5, strata: 0.5 }, mist: 4, under: { leaf: [[0.88, 0.87, 0.52], [0.70, 0.75, 0.44], [0.46, 0.56, 0.42]] }, liquid: { color: [0.52, 0.72, 0.84], refl: 0.6 }, tall: [1, 0], tallD: 0.10, tallMix: 0.7, small: { grass: 0.45, rock: 0.05, bush: 0.05, flower: 0.03 } }),
