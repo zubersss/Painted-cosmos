@@ -179,3 +179,138 @@ test('fire: snuff puts out what is near it and leaves the rest burning', async (
   const m = douseNear(F, 'elsewhere', at(0, 0), 60);
   assert.equal(m, 0, 'a snuff reached across worlds');
 });
+
+test('fire: THE WIND STRENGTHENS THE FIRE, it does not only bend it (the owner, 2026-11-19)', () => {
+  // MEASURED BEFORE THIS WAS WRITTEN, with a real gust cast at a real fire through the whole physics: the gust
+  // reached the patches (131.99 m/s against 1.76 in still air) and the fire's SHAPE changed -- it stopped creeping
+  // into the wind -- but it was NO FASTER AND NO BIGGER: 21.1 s to 48 patches in still air, 22.0 with a gale on it.
+  // `windRate` and `backRate` only trade one direction against another, and a patch walks a wheel of 24 directions
+  // in turn, so what the downwind looks gain the upwind looks lose. This holds the three ways a wind now DRIVES it.
+  const go = (U) => {
+    const ctx = hill(0);
+    ctx.wind.y = U;
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 3, ctx);
+    let t12 = -1;
+    for (let i = 0; i < 60 * 40; i++) {
+      stepFires(F, 1 / 60, ctx); clearBurns(F);
+      if (t12 < 0 && F.count >= 12) t12 = i / 60;
+    }
+    const r = reach(F);
+    return { north: r.north, south: r.south, t12, n: F.count };
+  };
+  const calm = go(0), gale = go(FIRE.windCap);
+
+  assert.ok(gale.north > calm.north * 1.1,
+    'the wind did not drive it further downwind: ' + calm.north.toFixed(1) + ' m calm, ' + gale.north.toFixed(1) + ' m in a gale');
+  assert.ok(gale.t12 > 0 && gale.t12 < calm.t12,
+    'the wind did not make it spread SOONER: ' + calm.t12.toFixed(1) + ' s calm, ' + gale.t12.toFixed(1) + ' s in a gale');
+  assert.ok(gale.south < calm.south * 0.8,
+    'a fire should creep into a wind, not run: ' + calm.south.toFixed(1) + ' m calm, ' + gale.south.toFixed(1) + ' m in a gale');
+  // and the three dials that do it are real, not nominal
+  assert.ok(FIRE.windMore > 0 && FIRE.windSeeds > 0 && FIRE.windReach > 1, 'the wind no longer drives the fire at all');
+});
+
+test('fire: ICE MELTS WHERE THERE IS NO AIR, and nothing else does (the owner, 2026-11-19)', () => {
+  // The owner asked for "more places to melt" on the ice planets. Every biome on Uranus, Neptune and Pluto is
+  // already ice or snow underfoot -- what was wrong is that a fire needs an oxidiser and those skies have none, so
+  // `airK <= 0` put every patch out on its first step, the melting ones with it. MEASURED, before and after, with
+  // the same script: a cast of size 3 on ice in an airless sky went from 0.00 heat into the ice, dead in one frame,
+  // to 7.21 heat and a hole 8.10 m across over its full 13.9 s. In Earth's air it is 13.11, unchanged by this.
+  const ice = (air) => {
+    const ctx = hill(0); ctx.air = air;
+    ctx.fuelAt = function (b, px, py, pz, out) { out.kind = FUEL.ice; out.fuel = 0; out.wet = 0; out.px = px; out.py = py; out.pz = pz; };
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 3, ctx);
+    run(F, ctx, 20);
+    let melt = 0;
+    for (let i = 0; i < F.count; i++) if (F[i].melt > melt) melt = F[i].melt;
+    return melt;
+  };
+  const warm = ice(1), cold = ice(0);
+  assert.ok(cold > 0.5, 'a cast on ice in an airless sky melted nothing: ' + cold.toFixed(2));
+  assert.ok(cold < warm, 'airless ice melted as fast as ice in full air: ' + cold.toFixed(2) + ' against ' + warm.toFixed(2));
+  assert.ok(cold > warm * 0.3, 'the airless melt is so slow as to be no use: ' + cold.toFixed(2) + ' of ' + warm.toFixed(2));
+
+  // ... and it is ICE ALONE. Leaves in the same airless sky must still do nothing at all: this is heat going into
+  // ice, not a flame that has stopped needing air.
+  const dead = hill(0); dead.air = 0;
+  const L = makeFires();
+  lightFire(L, BODY, at(0, 0), 3, dead);
+  run(L, dead, 20);
+  assert.equal(live(L), 0, 'leaves burned in an airless sky');
+  assert.equal(reach(L).north, 0, 'a fire spread in an airless sky');
+});
+
+test('fire: a melt says how much ice there is to melt, so the ground under it can be laid bare', () => {
+  // The chain the owner's "more places to melt" needs: the world says how thick the ice or the snow is
+  // (physics/index.js fuelAt, out.floor -- lying snow is a hand's depth over the biome's ground; a glacier has no
+  // floor at all), the fire carries that on every row it reports, and the record uses it to say when the ground
+  // shows (data/burnt.js meltedBare). Without it every melt was bottomless and no melt ever revealed anything.
+  const go = (floor) => {
+    const ctx = hill(0);
+    ctx.fuelAt = function (b, px, py, pz, out) {
+      out.kind = FUEL.ice; out.fuel = 0; out.wet = 0; out.floor = floor; out.px = px; out.py = py; out.pz = pz;
+    };
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 3, ctx);
+    let seen = null;
+    for (let i = 0; i < 60 * 12; i++) {
+      stepFires(F, 1 / 60, ctx);
+      for (let k = 0; k < F.burns.count; k++) if (F.burns[k].kind === FUEL.ice) seen = F.burns[k].floor;
+      clearBurns(F);
+    }
+    return seen;
+  };
+  assert.equal(go(0.35), 0.35, 'lying snow 0.35 m deep did not reach the record');
+  assert.equal(go(-1), -1, 'a glacier was given a floor it has not got');
+  // and a patch that is NOT ice carries no floor, whatever the world said
+  const ctx = hill(0);
+  ctx.fuelAt = function (b, px, py, pz, out) { out.kind = FUEL.leaves; out.fuel = 1; out.wet = 0; out.floor = 9; out.px = px; out.py = py; out.pz = pz; };
+  const F = makeFires();
+  lightFire(F, BODY, at(0, 0), 2, ctx);
+  let any = null;
+  for (let i = 0; i < 60 * 30; i++) { stepFires(F, 1 / 60, ctx); for (let k = 0; k < F.burns.count; k++) any = F.burns[k].floor; clearBurns(F); }
+  assert.equal(any, -1, 'burning leaves reported a floor of ice: ' + any);
+});
+
+test('fire: a STILLED place smothers a fire and a QUICKENED one feeds it (the owner, 2026-11-19)', () => {
+  // The other half of "I want them to be able to interact with each other". A gust FANS a flame, which the wind's
+  // own direction and speed already said; this is about how much air there is to be fed at all. A fire in naturally
+  // still air burns perfectly well, so the moving wind alone can never say this: the game answers ctx.airScaleAt.
+  // MEASURED through the whole physics, a real zone cast over a real fire in a temperate wood (the ability at its
+  // full size): nothing cast, 64 patches and 21.0 m; STILL held over it, the fire never passed three patches alight
+  // and was out; QUICKEN held over it, 21.0 -> 35.2 m and forty-eight patches reached 0.7 s sooner.
+  const go = (scale) => {
+    const ctx = hill(0);
+    ctx.airScaleAt = () => scale;
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 4, ctx);
+    run(F, ctx, 26);
+    return { n: F.count, live: live(F), reach: reach(F).north };
+  };
+  const plain = go(1), stilled = go(0), quick = go(1.6);
+  assert.equal(stilled.live, 0, 'a fire went on burning in air nothing fresh reaches: ' + stilled.live + ' patches alight');
+  assert.ok(stilled.reach < plain.reach * 0.5,
+    'a stilled fire spread nearly as far: ' + stilled.reach.toFixed(1) + ' m against ' + plain.reach.toFixed(1));
+  assert.ok(quick.reach > plain.reach * 1.05,
+    'a quickened fire was no fiercer: ' + quick.reach.toFixed(1) + ' m against ' + plain.reach.toFixed(1));
+  // ... and a world that does not answer the question at all is exactly as it was
+  const dumb = hill(0);
+  const D = makeFires();
+  lightFire(D, BODY, at(0, 0), 4, dumb);
+  run(D, dumb, 26);
+  assert.equal(D.count, plain.n, 'a game that cannot answer airScaleAt was not left alone: ' + D.count + ' against ' + plain.n);
+
+  // AND IT DOES NOT TOUCH THE MELT. Melting is heat going into ice; heat does not need air, and a player who stills
+  // the air over their own melting fire should not find it put out.
+  const ice = hill(0);
+  ice.airScaleAt = () => 0;
+  ice.fuelAt = function (b, px, py, pz, out) { out.kind = FUEL.ice; out.fuel = 0; out.wet = 0; out.px = px; out.py = py; out.pz = pz; };
+  const I = makeFires();
+  lightFire(I, BODY, at(0, 0), 3, ice);
+  run(I, ice, 12);
+  let melt = 0;
+  for (let i = 0; i < I.count; i++) if (I[i].melt > melt) melt = I[i].melt;
+  assert.ok(melt > 0.5, 'stilling the air stopped ice melting: ' + melt.toFixed(2));
+});

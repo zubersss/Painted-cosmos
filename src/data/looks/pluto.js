@@ -20,6 +20,11 @@ export default {
   // mottled slab over half the sheet with the horizon still mid-value)
   // (the oil look: a world of ice: its ground is laid in long strokes that run with the land, as Neptune's snow)
   oil: { ground: 'flow' },
+  // A SKY LAID IN BRUSH STROKES (the owner, 2026-11-16 and again 2026-11-19: "the sky of the ice planets still needs
+  // to be streaky and painted like"). The ice worlds have no weather and almost no cloud, so the oil sky's six broad
+  // bands left a smooth wall of colour with nothing of a brush in it. 0 none, 1 full (world/sky.js pcSkyStrokes;
+  // `?skystroke=` turns it anywhere for looking). The oil look only: the watercolour sky is untouched.
+  skyStrokes: 1,
   sky: mkSky([0.50, 0.48, 0.68], [0.88, 0.86, 0.95]),
   flora: {
     // penitents: blades of old frost standing in companies, leaning one way; they throw the long shadows

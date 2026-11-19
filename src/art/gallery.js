@@ -18,10 +18,16 @@ import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { LOOKS } from '../data/looks.js';
 import { findVantage } from './vantage.js';
 import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
+import { MODE } from '../data/mode.js';
+import { meltIce, deepenMelt, scorch } from '../data/burnt.js';
 
 const P = new URLSearchParams(location.search);
 seasonFromSearch(location.search);      // (?season=, ?year=: the gallery can stand at any point in the year too)
 const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.get(k) : d);
+// ?powers=1 compiles THE FIRE'S PAINT into the materials -- the charcoal a fire leaves and the ice it melts -- which
+// in the game is behind the same flag. It must be set before the painter is made, because that is when the programs
+// are compiled (render/materials.js addFire). The gallery has no player and so no abilities: this is the paint only.
+if (P.has('powers') && P.get('powers') !== '0') MODE.powers = true;
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, ...RENDERER_OPTIONS });
@@ -287,7 +293,9 @@ addEventListener('resize', resize);
 painter.setQuality(state.quality); $('quality').value = state.quality;
 if (P.has('scale')) painter.setRenderScale(num('scale', 1));
 if (P.has('view')) { painter.setDebugView(num('view', 0)); $('view').value = num('view', 0); }
-if (P.has('look')) { const o = {}; for (const kv of P.get('look').split(',')) { const [k, v] = kv.split(':'); o[k] = +v; } painter.setLook(o); }
+// (`look=oil` is the LOOK ITSELF, read in render/shared.js before anything is made, not a list of dials: without
+//  this guard the gallery handed the painter { oil: NaN } and turned a dial to nothing at all.)
+if (P.has('look') && P.get('look') !== 'oil') { const o = {}; for (const kv of P.get('look').split(',')) { const [k, v] = kv.split(':'); o[k] = +v; } painter.setLook(o); }
 setBody(bodyId);
 // nudges for composing deterministic frames
 state.yaw += num('yaw', 0) * Math.PI / 180; state.pitch += num('pitch', 0) * Math.PI / 180;
@@ -426,5 +434,28 @@ function tick(now) {
   if (frames % 20 === 0) $('stat').textContent = `${painter.info.internalWidth}x${painter.info.internalHeight} internal, ${renderer.info.render.calls} draws, ${(renderer.info.render.triangles / 1000) | 0}k tris, alt ${L.altitude.toFixed(0)} m`;
   requestAnimationFrame(tick);
 }
-window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; } };
+// A MELTED PLACE, AND A BURNT ONE, TO LOOK AT (the owner, 2026-11-19: "give the ice planets more places to melt").
+// Needs ?powers=1 with it, or no material has the paint compiled in. Both are laid on the ground a few metres ahead
+// of where the camera ended up, which is where the eye already is:
+//   &melt=2        a hole 2 m into the ice. On a glacier, a shelf, a frozen sea there is nothing under the ice, so
+//                  it is a WELL and goes on down; &meltfloor=0.4 says there is ground 0.4 m down (lying snow), and
+//                  then the melt lays that ground bare instead.
+//   &scorch=1      a burnt place of the same size, for the two side by side.
+//   &meltr=3.5     how wide it is, and &meltd=9 how many metres ahead of the eye it is laid.
+function layMark(kind) {
+  orient();                                                   // (sets _up and _f: where the camera ended up looking)
+  const flat = _f.clone().addScaledVector(_up, -_f.dot(_up));  // forward along the ground, however far down it looks
+  if (flat.lengthSq() < 1e-6) flat.copy(_n);                   // (straight down: any level direction will do)
+  const ahead = state.pos.clone().addScaledVector(flat.normalize(), num('meltd', 9)).normalize();
+  const r = surf(ahead);
+  const p = ahead.multiplyScalar(r);
+  if (kind === 'melt') {
+    const m = meltIce(bodyId, p.x, p.y, p.z, num('meltr', 3.5), P.has('meltfloor') ? num('meltfloor', 0.4) : -1);
+    if (m) deepenMelt(m, num('melt', 2));
+  } else scorch(bodyId, p.x, p.y, p.z, num('meltr', 3.5), 1);
+  return p;
+}
+if (P.has('melt')) window.__pcMelt = layMark('melt');
+if (P.has('scorch')) window.__pcScorch = layMark('scorch');
+window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; }, layMark };
 requestAnimationFrame(tick);

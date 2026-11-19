@@ -132,6 +132,18 @@ export const FIRE = Object.freeze({
   windCap: 16,            // m/s: the wind at which the lean and the hurry are full
   windFan: 0.045,         // per m/s: and the wind fans a patch, so it eats its own fuel faster and dies sooner
 
+  // ---- THE WIND MAKES A FIRE STRONGER, not merely crooked (the owner, 2026-11-19: "i want them to be able to
+  // interact with each other where WIND STRENGTHENS THE FIRE"). MEASURED before this was written, with a real gust
+  // cast at a real fire in the real physics: the gust reached the patches (131.99 m/s against 1.76 in still air),
+  // and the fire's SHAPE changed -- it stopped creeping into the wind, 17.4 m down to 6.7 -- but it was NO BIGGER
+  // AND NO FASTER: 21.1 seconds to 48 patches in still air, 22.0 with the gale on it.
+  //   The reason is that `windRate` and `backRate` above only trade one direction against another. A patch walks a
+  // wheel of 24 directions in turn, so what the downwind ones gain the upwind ones lose, and the fire merely leans.
+  // A real wind does not only bend a fire: it drives it. So three things now grow with the wind as well:
+  windMore: 0.9,          // at a full wind a patch lights its neighbours this much more often, EVERY way it looks
+  windSeeds: 1.0,         // ... and passes the fire on to this many more neighbours before it is spent
+  windReach: 1.35,        // ... and one casting runs this much further from where it was lit, wind-driven
+
   wetStop: 0.55,          // 0..1 damp: at this and above nothing catches, and a patch alight goes out
   wetSlow: 0.8,           // and below it, damp fuel burns this much slower at worst
 
@@ -149,6 +161,15 @@ export const FIRE = Object.freeze({
   // that function a world is taken to be Earth-like, so nothing changes for a caller that does not know about it.
   airStop: 0.12,          // below this share of Earth's air, nothing catches and what is alight goes out
   airFull: 0.7,           // at and above this it burns as it would on Earth; between, it is slower and feebler
+
+  // ---- AND THE PLAYER'S OWN WIND CHANGES THE AIR A PATCH IS FED (the owner, 2026-11-19: the wind and the fire
+  // must act on each other). It is not only that a gust FANS a flame: a flame eats air, and where the player has
+  // STILLED the air nothing fresh reaches it, so it gutters and goes out; where they have QUICKENED it, it is fed.
+  // The game answers ctx.airScaleAt(patch) with that multiplier -- 1 where the player has done nothing at all, 0 in
+  // the heart of a stilled place, above 1 in a quickened one. Without that function nothing here changes.
+  // (The melt is not touched by it: melting is heat going into ice, and heat does not need air -- see iceAirless.)
+  stillStarve: 1,         // how much of a full stilling bites (1: the heart of a stilled place smothers a fire)
+  blowMax: 1.6,           // and the most a quickened place may feed one
 
   // ---- EMBERS GO AHEAD OF IT (spotting). In a strong wind a fire throws burning pieces downwind, and they start
   // new fires BEYOND the front -- over a firebreak, over a river, over a road. It is why a big fire cannot be held
@@ -174,6 +195,15 @@ export const FIRE = Object.freeze({
   iceLife: 8,             // s
   iceRadius: 4.5,         // m: how wide the melted place grows by the end
   iceHeat: 1,             // heat (in seconds of full flame) one patch puts into the ice each second
+  // AND MELTING DOES NOT NEED AIR. The owner, 2026-11-19: "give the ice planets more places to melt or use my
+  // abilities". It was not that the ice worlds had no ice -- every one of their biomes is ice or snow under the
+  // explorer -- it was that `airK <= 0` put EVERY patch out on its first step, melting ones included, so on
+  // Uranus, on Neptune and on Pluto a cast opened a hole 0 m deep. A flame eats air; HEAT DOES NOT. Nothing
+  // there burns, nothing spreads, and nothing the ability lights lasts beyond its own short life -- but the heat
+  // of the cast goes into the ice as heat always has. In a thin or airless sky it carries less well (no air to
+  // carry it, only what the flame shines on the ice), so a melt there is slower, and this is how much slower it
+  // may ever get, not a measured figure:
+  iceAirless: 0.55,       // share of the full-air melting rate where the air carries nothing at all
 
   // WHAT ONE CASTING REMEMBERS OF THE GROUND IT HAS BURNED: one bit per this many metres of ground (see the long
   // note below makeFires). About the step a fire takes (`spread` above), so the front can always walk forward into
@@ -200,7 +230,7 @@ for (let i = 0; i < SPOKEN; i++) { const a = (i / SPOKEN) * Math.PI * 2; SPOKES[
 const _en = new Float64Array(6);          // east and north at a patch
 const _w = new Float64Array(3);           // the wind handed back to us
 const _d = new Float64Array(4);           // a direction we are looking along: east, north, its length, its lean
-const _f = { kind: 0, fuel: 0, wet: 0, px: 0, py: 0, pz: 0 };    // what the world says is under a place
+const _f = { kind: 0, fuel: 0, wet: 0, px: 0, py: 0, pz: 0, floor: -1 };   // what the world says is under a place
 
 // Empties a record in place. (powers.js writes a fresh blank over a wind source, which is fine because the player
 // casts a few times a minute; a fire lights its neighbours many times a second, so here nothing is made at all.)
@@ -212,6 +242,8 @@ function wipe(s) {
   s.radius = 0; s.r0 = 0;
   s.heat = 0;                             // 0..1 how fiercely it burns now
   s.fuel = 0; s.fuel0 = 0; s.sent = 0;    // what is left under it, what it had, how much we have reported
+  s.floor = -1;                           // m of ice or snow over solid ground here, or -1 where nothing of ours knows
+  s.airM = 1;                             // what the player's wind does to the air it is fed (1: nothing)
   s.melt = 0; s.msent = 0;                // heat put into ice here, and how much of that we have reported
   s.wet = 0; s.age = 0; s.life = 0; s.ash = false; s.ashAge = 0;
   s.seeds = 0; s.spoke = 0; s.seedT = 0; s.gen = 0; s.reach = 0;
@@ -231,7 +263,7 @@ export function makeFires(seed = 1) {
   F.lost = 0;                 // rows of "this burned" that were dropped because the caller had not read them
   F.burns = [];
   F.burns.count = 0;
-  for (let i = 0; i < FIRE.burnsMax; i++) F.burns.push({ bodyId: null, px: 0, py: 0, pz: 0, radius: 0, kind: 0, burnt: 0, heat: 0, done: false, gen: 0, id: 0 });
+  for (let i = 0; i < FIRE.burnsMax; i++) F.burns.push({ bodyId: null, px: 0, py: 0, pz: 0, radius: 0, kind: 0, burnt: 0, heat: 0, floor: -1, done: false, gen: 0, id: 0 });
   return F;
 }
 
@@ -338,7 +370,7 @@ function take(F) {
 // nothing at all) and _f.px/py/pz is where the world says that place really is on its own ground. With no fuel
 // function given (some tests) the answer is "nothing here".
 function ask(F, bodyId, px, py, pz, ctx) {
-  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz; _f.why = '';
+  _f.kind = FUEL.none; _f.fuel = 0; _f.wet = 0; _f.px = px; _f.py = py; _f.pz = pz; _f.why = ''; _f.floor = -1;
   if (ctx && ctx.fuelAt) {
     F.asks++;
     ctx.fuelAt(bodyId, px, py, pz, _f);
@@ -354,6 +386,7 @@ function ask(F, bodyId, px, py, pz, ctx) {
 function settle(s) {
   s.px = _f.px; s.py = _f.py; s.pz = _f.pz;
   s.kind = _f.kind; s.wet = _f.wet; s.why = _f.why || '';
+  s.floor = Number.isFinite(_f.floor) ? _f.floor : -1;
   if (s.kind === FUEL.ice) { s.fuel = 0; s.fuel0 = 0; s.life = FIRE.iceLife * (0.7 + 0.3 * s.size); }
   else if (s.kind !== FUEL.none) { s.fuel0 = clamp01(_f.fuel); s.fuel = s.fuel0; s.life = FIRE.maxLife; }
   else { s.fuel0 = 0; s.fuel = 0; s.life = FIRE.bareLife; }   // nothing to burn: the ability's own flame, for a moment
@@ -378,6 +411,8 @@ function waitFor(s, lean) {
   const q = FIRE.quick[s.kind] || 1;
   let r = 1 + FIRE.windRate * s._sp01 * lean;
   if (r < FIRE.backRate) r = FIRE.backRate;
+  // and the wind drives the whole fire on, whichever way this look happens to point
+  r *= 1 + FIRE.windMore * (s._sp01 || 0);
   return FIRE.seedTime / (r * q * slopeRate(s.up));
 }
 
@@ -415,6 +450,12 @@ export function stepFires(F, dt, ctx) {
         ctx.windAt(s, _w);
         if (Number.isFinite(_w[0]) && Number.isFinite(_w[1]) && Number.isFinite(_w[2])) { s.wx = _w[0]; s.wy = _w[1]; s.wz = _w[2]; }
       }
+      // and what the player's own wind does to the air it is fed, asked on the same beat (see stillStarve above)
+      s.airM = 1;
+      if (ctx && ctx.airScaleAt) {
+        const m = ctx.airScaleAt(s);
+        if (Number.isFinite(m)) s.airM = m >= 1 ? (m > FIRE.blowMax ? FIRE.blowMax : m) : 1 - FIRE.stillStarve * (1 - (m > 0 ? m : 0));
+      }
     }
     // and whether its place has turned damp under it (only if the game says how)
     if (ctx && ctx.dampAt) {
@@ -435,14 +476,19 @@ export function stepFires(F, dt, ctx) {
     // Is it going out? A flame with nothing under it is the ability's own: it lives its short life and goes,
     // whether the place is wet or dry, so the player always sees that the cast happened. A flame with something
     // under it goes out when that has gone (ice has none: it melts for its own time) or if its place turns damp.
-    const out = s.age >= s.life || airK <= 0 ||
-      (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (s.kind !== FUEL.ice && !(s.fuel > 0))));
+    // (ICE IS THE ONE THING AIRLESSNESS DOES NOT PUT OUT: see `iceAirless` above. A melting patch lives its
+    //  iceLife whatever the sky is made of; everything else goes out at once without air to burn.)
+    const ice = s.kind === FUEL.ice;
+    const aK = airK * s.airM;              // the air THIS patch is fed: the world's, and what the player has done to it
+    const out = s.age >= s.life || (aK <= 0 && !ice) ||
+      (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (!ice && !(s.fuel > 0))));
     s.heat += out ? -dt / FIRE.dieTime : dt / FIRE.catchTime;
     if (s.heat > 1) s.heat = 1;
 
-    if (s.kind === FUEL.ice) {
-      // it melts instead of burning, and the melted place opens out while it does
-      s.melt += dt * s.heat * FIRE.iceHeat;
+    if (ice) {
+      // it melts instead of burning, and the melted place opens out while it does. Thin air carries the heat less
+      // well, so the same cast opens a shallower hole on Pluto than on Earth -- but it does open one.
+      s.melt += dt * s.heat * FIRE.iceHeat * (FIRE.iceAirless + (1 - FIRE.iceAirless) * airK);
       const f = s.age < s.life ? s.age / s.life : 1;
       s.radius = s.r0 + (FIRE.iceRadius * (0.6 + 0.4 * s.size) - s.r0) * f;
       if (s.melt - s.msent >= FIRE.meltEvery) report(F, s, false);
@@ -450,7 +496,7 @@ export function stepFires(F, dt, ctx) {
       // the fuel goes, faster in a wind (which fans it) and slower where it is damp
       // thin air burns slowly as well as feebly: a flame in half of Earth's air is not half a flame, it is a
       // slower one, so the fuel under it lasts longer rather than less time
-      const fan = (1 + FIRE.windFan * ws) * (0.35 + 0.65 * airK), damp = 1 - FIRE.wetSlow * s.wet;
+      const fan = (1 + FIRE.windFan * ws) * (0.35 + 0.65 * aK), damp = 1 - FIRE.wetSlow * s.wet;
       const bt = FIRE.burnTime[s.kind] || 1;
       s.fuel -= dt * s.heat * fan * (damp > 0.1 ? damp : 0.1) / bt;
       if (s.fuel < 0) s.fuel = 0;
@@ -470,7 +516,7 @@ export function stepFires(F, dt, ctx) {
 
     // IT SPREADS. Well alight, with neighbours left to light, it looks one way at a time. Ice passes nothing on
     // (there is nothing in ice to carry a fire), and nor does a patch with nothing under it.
-    if (airK > 0 && s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
+    if (aK > 0 && s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
       s.seedT -= dt;
       if (s.seedT <= 0) {
         const caught = sow(F, s, ctx, _en, hE, hN, sp01);
@@ -575,7 +621,9 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   const qz = s.pz + (en[2] * dE + en[5] * dN) * step;
   // one casting burns itself out within `reach` of where it was lit: it does not cross the world
   const ax = qx - s.ox, ay = qy - s.oy, az = qz - s.oz;
-  if (ax * ax + ay * ay + az * az > s.reach * s.reach) return false;
+  // a wind-driven fire runs further from where it was lit than a creeping one
+  const rch = s.reach * (1 + (FIRE.windReach - 1) * (s._sp01 || 0));
+  if (ax * ax + ay * ay + az * az > rch * rch) return false;
   // this casting has burned here already: it does not go round twice, which is what makes a fire end (one look at a
   // bit of memory, and before the dear question below, so a patch hemmed in by its own burnt ground costs the world
   // nothing at all)
@@ -599,7 +647,7 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   t.size = s.size; t.gen = s.gen + 1; t.reach = s.reach;
   t.id = ++F.lit;
   t.r0 = FIRE.litRadius * (0.7 + 0.3 * s.size); t.radius = t.r0;
-  t.seeds = Math.round(FIRE.seeds * (0.7 + 0.3 * s.size));
+  t.seeds = Math.round(FIRE.seeds * (0.7 + 0.3 * s.size) * (1 + FIRE.windSeeds * (sp01 || 0)));
   t.spoke = Math.floor(hash3(t.id, 3, 11, F.seed) * SPOKEN) % SPOKEN;
   t._sp01 = sp01;
   t.wx = s.wx; t.wy = s.wy; t.wz = s.wz;    // it knows the wind its parent knew until it asks for itself
@@ -626,6 +674,9 @@ function report(F, s, done) {
   b.kind = s.kind; b.gen = s.gen; b.done = !!done; b.id = s.id;
   b.burnt = s.kind === FUEL.ice ? 0 : (s.fuel0 > 0 ? (s.fuel0 - s.fuel) / s.fuel0 : 1);
   b.heat = s.melt;
+  // and for a melt, HOW MUCH THERE IS TO MELT: a hand's depth of lying snow with the ground under it, or -1 where
+  // this is a glacier and nothing of ours knows how deep it goes. The record needs it to say when the ground shows.
+  b.floor = s.kind === FUEL.ice ? s.floor : -1;
   s.sent = b.burnt; s.msent = s.melt;
   return b;
 }

@@ -989,7 +989,13 @@ export class Loose {
           if (rng() < 0.12) P._event(frame, x, gy + gp.liquid, z, EVENT.ripple, 0.55 + 0.4 * rng(), 0.3);
           continue;
         }
-        if (snowDepth > 0.03) { this._emitSnow(x, gy + 0.05, z, ve, vu * 1.3, vn); continue; }
+        // POWDER OFF SNOW -- AND OFF BARE ICE (the owner, 2026-11-19: "give the ice planets more places to melt or
+        // use my abilities"). A gust needs something to pick up or nothing is seen to happen, and on the ice worlds
+        // there was almost nothing: of their twelve biomes only four carry snow deeper than this three centimetres
+        // (ground.js snowBase: Pluto's glacier 0.02, its mountains and plain 0.01, Uranus' shelves and sinkholes
+        // 0.02), so on a glacier or a shelf a cast raised a grey puff of "dust" off ice. Ice itself gives crystals:
+        // rime, spindrift, the glitter a wind tears off a frozen surface. So snow underfoot OR ice underfoot.
+        if (snowDepth > 0.03 || gp.mat === I_SNOW || gp.mat === I_ICE) { this._emitSnow(x, gy + 0.05, z, ve, vu * 1.3, vn); continue; }
         // a wood's floor: its fallen leaves
         const lf = air.coverNear(x, z, cov) ? Math.min(1, 4 * (cov.leaves || 0)) * (0.3 + 0.7 * cov.canopy01) : 0;
         const q = rng();

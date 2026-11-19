@@ -247,6 +247,7 @@ uniform vec4 uHeart;      // a great pale marking seen from orbit: xyz its place
 // (Not carried over from the watercolour yet: strata, cracks, puddles, the trodden track, a world's great marking.)
 varying vec3 vRel;
 vec3 gBdx, gBdy, gC2dx, gC2dy, gNvdx, gNvdy, gNldx, gNldy, gSunV, gBc;
+vec3 gMark;      // (the powers, fire) what the fire has done where this stroke lies: see pcMarksAt below
 vec3 gCtrB;       // a dab's own place on the body (set before pcGroundAt; x > 1e20: none, the place is carried from the pixel)
 vec4 gCdx, gCdy, gPdx, gPdy;
 float gMid;
@@ -274,11 +275,25 @@ uniform vec4 uBurnB[PC_BURN_N];
 // What it costs: with nothing burnt (or the scorch turned off), one comparison. On clean ground, one ball. Standing
 // in a burn, that ball, the fours' own balls, and the four capsules of each four whose ball the place falls inside:
 // MEASURED over a fire that had run three hundred metres, 2.7 capsule tests a place and 8 at worst, of 32 held.
-float pcBurntAt(vec3 P) {
-  if (uBurnN < 0.5 || uBurnK.x <= 0.0) return 0.0;              // nothing has burned, or ?burn=0: one comparison and out
+// WHAT THE FIRE HAS DONE TO THE GROUND AT A PLACE, all three in one walk:
+//     x  how burnt it is: 0 clean, 1 burnt right out
+//     y  how far ICE HAS MELTED OFF IT and the ground under shows: 0 still covered, 1 bare
+//     z  how deep a MELTED WELL goes where there was nothing under the ice: 0 none, 1 as deep as it is painted
+// A MELT RIDES IN THE SAME ARRAYS AS A SCORCH (the owner, 2026-11-19: "give the ice planets more places to melt").
+// It is the same shape of mark -- a capsule, the line the flame crept along, as wide as it reached -- so it needs no
+// arrays and no uniforms of its own, and the ground's program is not one instruction dearer for the melting worlds
+// than it already was for the burning ones. The two are told apart by THE SIGN of uBurnB[i].w, which for a scorch
+// is how black it went:
+//        w  >  0      a scorch, and w is its charcoal, 0 .. 1
+//   -1 <= w <  0      a melt with ground under the ice: -w is how far that ground is laid bare, 0 .. 1
+//        w <= -2      a melt with nothing under the ice: -(w + 2) is how deep the well has gone, 0 .. 1
+// (render/shared.js syncBurnt writes that; this is the only other place that knows the encoding, and the two sit
+//  under each other's names so they cannot drift.)
+vec3 pcMarksAt(vec3 P) {
+  if (uBurnN < 0.5 || uBurnK.x <= 0.0) return vec3(0.0);        // nothing has burned, or ?burn=0: one comparison and out
   vec3 q = P - uBurnBall.xyz;
-  if (dot(q, q) > uBurnBall.w * uBurnBall.w) return 0.0;        // nowhere near any burn: one ball and out
-  float most = 0.0;
+  if (dot(q, q) > uBurnBall.w * uBurnBall.w) return vec3(0.0);  // nowhere near any mark: one ball and out
+  vec3 most = vec3(0.0);
   for (int g = 0; g < PC_BURN_G; g++) {
     if (float(g) * 4.0 >= uBurnN) break;
     vec4 ball = uBurnG[g];
@@ -297,11 +312,18 @@ float pcBurntAt(vec3 P) {
       vec3 off = a - B.xyz * t;
       float d2 = dot(off, off), r = A.w;
       if (d2 >= r * r) continue;
-      most = max(most, B.w * (1.0 - smoothstep(r * uBurnK.y, r, sqrt(d2))));
+      // the same fade from the core out to the rim for all three: it is the record's own (data/burnt.js fade)
+      float f = 1.0 - smoothstep(r * uBurnK.y, r, sqrt(d2));
+      float bw = B.w;
+      if (bw > 0.0) most.x = max(most.x, bw * f);
+      else if (bw > -1.5) most.y = max(most.y, -bw * f);
+      else most.z = max(most.z, (-bw - 2.0) * f);
     }
   }
   return most * uBurnK.x;      // (uBurnK.x is 1 as chosen, so this IS the record's own reading; ?burn= turns it down)
 }
+// How burnt the ground is at a place, which is all most of the picture wants of the three above.
+float pcBurntAt(vec3 P) { return pcMarksAt(P).x; }
 // How much of the black ONE STROKE takes: the whole of it, or none, by the stroke's own number against how burnt the
 // place it lies on is. That is what makes the rim of a burn a scatter of black strokes among unburnt ones -- ragged,
 // as a fire really leaves it -- and not a drawn circle with a soft edge. In the middle of a mark every stroke takes it.
@@ -341,10 +363,36 @@ void pcGroundAt(vec2 ds, float w, vec3 rnd, out vec3 c, out float lvl, out float
   c = mix(c, c * uHueB, smoothstep(0.52, 0.74, n2.r) * 0.6 * gMid);
   c = pcDensity(c, 1.0 + (n1.r - 0.5) * 0.5 * uOilB.z);
   snowC = pcSnowCover(dot(nLc, normalize(Bc)), rnd.z * 0.5 + n2.b * 0.3 + n1.a * 0.2, parC.z);
+  #ifdef PC_FIRE
+    // WHERE THE ICE HAS BEEN MELTED (the owner, 2026-11-19), asked once here at the stroke's own centre and used
+    // twice: here, where the snow and the ice give way, and in pcGroundPaint, where the charcoal is laid. Melting
+    // was recorded and SAVED since 2026-11-18 and never painted at all, so on the three ice worlds a cast melted a
+    // hole nobody could see; this is the other half the comment in pcGroundPaint promised.
+    //   The ice goes: the snow's cover goes with it (snowC), and the wash itself is taken DEEPER -- the same hue, a
+    // wet dark of it -- which is what also stops pcFlowPaint painting ice strokes over the hole, because that
+    // decides by how pale the wash is. A well with nothing under it goes deeper still and turns toward the cold
+    // blue of a crevasse. Both are whole strokes, so the edge of a melted place is ragged by strokes as a burn's is.
+    gMark = pcMarksAt(Bc);
+    float gone = max(gMark.y, gMark.z);
+    if (gone > 0.0) {
+      snowC *= 1.0 - gone;
+      c = mix(c, pcDensity(c, 1.0 + 1.6 * gone), gone);
+      // (the square root: a hole two metres into a glacier is already a hole. Straight depth made a two-metre well
+      //  a grey smudge that read as the shadow of a cloud -- seen, Pluto's Pale Heart Glacier, before this.)
+      c = mix(c, vec3(0.07, 0.13, 0.22), sqrt(gMark.z) * 0.72);
+    }
+  #else
+    gMark = vec3(0.0);
+  #endif
   // the light, a stroke at a time: in the sun or in the leaf shadow whole
   float x = dot(nVc, gSunV) * 0.5 + 0.5;
   float sunny = min(pcSunAtSoft(Bc, parC.z * mix(0.82, 1.0, gMid), 8.0, w, fract(rnd.y * 5.7)), 1.0 - pcCast(Bc, (rnd.x - 0.5) * 0.3));
   lvl = pcLevel(mix(min(x, 0.44) - 0.10 * parC.z, x + (rnd.z - 0.5) * 0.10, sunny), 0.03);
+  #ifdef PC_FIRE
+    // AND A HOLE IS IN ITS OWN SHADOW. Nothing else in the picture tells the eye that a dark patch on flat ground
+    // is a hole and not a stain; the light going out of it, as it does down a well, is what makes it one.
+    lvl -= sqrt(gMark.z) * 0.95 + gMark.y * 0.35;
+  #endif
   leaf = pcDensity(col2C, 1.15);
   canopy = parC.z;
   gBc = Bc;
@@ -371,7 +419,7 @@ vec3 pcGroundPaint(vec3 c, vec3 leaf, float fk, vec3 rnd, float snowC, float lvl
     // at the STROKE'S OWN CENTRE (gBc, which is where this stroke's paint is worked out anyway), so the edge of a burn
     // follows the strokes and is ragged by whole strokes, never a circle drawn on the ground.
     // Snow and ice do not char: where there is snow the fire melts instead, which is the record's other half.
-    float burnt = pcBurntAt(gBc) * (1.0 - snowC);
+    float burnt = gMark.x * (1.0 - snowC);          // (read once in pcGroundAt, at this same stroke's centre)
     if (burnt > 0.001) {
       float take = pcCharTake(rnd, burnt) * (1.0 - uBurnK.z);     // (uBurnK.z: a breath of what burned is left under the black)
       vec3 soot = pcSoot(tn, rnd.x, rnd.y);
@@ -612,8 +660,15 @@ void main() {
       // (the powers, fire) The ground that shows BETWEEN the strokes is charred too, or a burnt patch would show its
       // old green through the gaps between its black strokes. This one is a smooth wash and not a stroke, so it takes
       // the black smoothly, and it is asked at the pixel's own place, which is where that ground is.
-      float bareB = pcBurntAt(vBody);
-      if (bareB > 0.001) bare = mix(bare, pcSoot(bare, 0.5, 0.5), bareB * (1.0 - uBurnK.z));
+      vec3 bareM = pcMarksAt(vBody);
+      if (bareM.x > 0.001) bare = mix(bare, pcSoot(bare, 0.5, 0.5), bareM.x * (1.0 - uBurnK.z));
+      // and the ground between the strokes is melted where they are, or a hole in the ice would show the old
+      // pale wash through the gaps between its dark strokes
+      float goneB = max(bareM.y, bareM.z);
+      if (goneB > 0.001) {
+        bare = mix(bare, pcDensity(bare, 1.0 + 1.3 * goneB), goneB);
+        bare = mix(bare, mix(bare, vec3(0.09, 0.15, 0.26), 0.62), bareM.z);
+      }
     #endif
     acc = mix(bare, acc + rem * bare, uOilC.z);
   }

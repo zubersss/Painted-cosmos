@@ -7,7 +7,7 @@ import { getDabTextures } from './dabtex.js';
 // (the powers, fire: the lasting record of what the fire LEFT -- the scorched ground. A small module of plain numbers
 // with no three in it, read here the way world/flora.js reads the felled trees. With nothing ever burnt, every reader
 // in it is one comparison, and syncBurnt below keeps that promise.)
-import { BURN, BURNT, scorchesOn } from '../data/burnt.js';
+import { BURN, BURNT, MARK, scorchesOn, meltsOn } from '../data/burnt.js';
 
 let _tex = null;
 export function getTextures() {
@@ -215,6 +215,12 @@ export const BURNPAINT = {
   // (y is held a hair under 1 whatever the record says: the shader eases from the core out to the rim with a
   //  smoothstep, which has no meaning if the two edges are the same number)
   uBurnK: { value: new THREE.Vector4(_qn('burn', 1), Math.min(0.98, BURN.core), 0.06, _qn('charcoal', 1)) },
+  // HOW DEEP A MELTED WELL IS PAINTED AT ITS DARKEST, in metres of ice gone (the owner, 2026-11-19: "give the ice
+  // planets more places to melt"). Where there is ground under the ice the record itself says when it is bare and
+  // this is not used; where there is none -- a glacier, a shelf, a frozen sea -- the hole "just keeps melting away"
+  // as far as 120 m, and a hole deeper than a person already reads as a well, so the paint is at its darkest here
+  // and no darker below. A judgement about a picture, not a measurement.
+  meltDeep: 4,
   uBurnN: { value: 0 },                                     // how many marks are in the arrays (0: none, and the shader stops at once)
   uBurnBall: { value: new THREE.Vector4(0, 0, 0, -1) },     // one ball round the lot: xyz its middle, w its radius (m)
   uBurnG: { value: new Float32Array(BURN_G * 4) },          // and one round each four of marks, the same way
@@ -241,7 +247,17 @@ function _midD2(a, b) {
   return dx * dx + dy * dy + dz * dz;
 }
 let _bnV = -1, _bnBody = null, _bnEx = 1e9, _bnEy = 1e9, _bnEz = 1e9;
-const _bnMarks = [], _bnPick = [], _bnDist = [], _bnTook = new Uint8Array(BURN_N), _bnFour = new Int32Array(4);
+const _bnMarks = [], _bnMelts = [], _bnPick = [], _bnDist = [], _bnTook = new Uint8Array(BURN_N), _bnFour = new Int32Array(4);
+// A MARK'S LAST NUMBER, which is also what tells the shader which kind of mark it is. See the long note over
+// pcMarksAt in render/materials.js, which reads it; nowhere else knows this encoding.
+//    a scorch            how black it went, 0 .. 1 (always above zero, so the sign means what it says)
+//    a melt with ground   -(how far that ground is laid bare, 0 .. 1)
+//    a melt without       -2 - (how deep the well has gone, 0 .. 1 of BURNPAINT.meltDeep)
+function _markW(m) {
+  if (m.kind !== MARK.melt) return m.c > 1e-4 ? m.c : 1e-4;
+  if (m.floor >= 0) return -Math.max(0.02, m.floor > 1e-4 ? Math.min(1, m.d / m.floor) : 1);
+  return -2 - Math.max(0.05, Math.min(1, m.d / BURNPAINT.meltDeep));
+}
 // Picks the marks the ground will paint and fills the uniforms above. The world calls this once a frame for the body
 // the eye is on, before the ground is drawn: syncBurnt(bodyId, camLocal), the eye in that body's own axes.
 // MEASURED in Node on the build machine (not on a device): 14 to 29 ns a frame with nothing ever burnt, 50 ns a frame
@@ -250,7 +266,7 @@ const _bnMarks = [], _bnPick = [], _bnDist = [], _bnTook = new Uint8Array(BURN_N
 // a tenth of one per cent of a sixty-a-second frame.
 export function syncBurnt(bodyId, cam) {
   // NOTHING HAS EVER BURNED: one comparison and out, which is the promise data/burnt.js makes and this keeps.
-  if (!BURNT.scorches) {
+  if (!BURNT.scorches && !BURNT.melts) {
     if (BURNPAINT.uBurnN.value !== 0) { BURNPAINT.uBurnN.value = 0; BURNPAINT.uBurnBall.value.w = -1; _bnV = -1; _bnBody = null; }
     return;
   }
@@ -263,6 +279,11 @@ export function syncBurnt(bodyId, cam) {
   // BURN_N kept in order; the list is short and this happens only when something has changed, so there is no call
   // for anything cleverer than looking at each in turn.
   scorchesOn(bodyId, _bnMarks);
+  // AND THE MELTED PLACES, in the same list and the same arrays: a melt is the same shape of mark and is painted by
+  // the same walk (materials.js pcMarksAt), so the ice worlds cost the ground not one uniform more than the burning
+  // ones. They share the thirty-two slots, nearest first, which is the honest thing: what the ground can hold at
+  // once is what it can hold, whichever the fire has been doing.
+  if (BURNT.melts) { meltsOn(bodyId, _bnMelts); for (let j = 0; j < _bnMelts.length; j++) _bnMarks.push(_bnMelts[j]); }
   _bnPick.length = 0; _bnDist.length = 0;
   for (let j = 0; j < _bnMarks.length; j++) {
     const m = _bnMarks[j], d = _markD2(m, ex, ey, ez);
@@ -304,7 +325,7 @@ export function syncBurnt(bodyId, cam) {
       rad = Math.max(rad, Math.hypot(m.x - cx, m.y - cy, m.z - cz) + m.r, Math.hypot(m.x2 - cx, m.y2 - cy, m.z2 - cz) + m.r);
       const o = w * 4;
       A[o] = (m.x + m.x2) * 0.5; A[o + 1] = (m.y + m.y2) * 0.5; A[o + 2] = (m.z + m.z2) * 0.5; A[o + 3] = m.r;
-      B[o] = (m.x2 - m.x) * 0.5; B[o + 1] = (m.y2 - m.y) * 0.5; B[o + 2] = (m.z2 - m.z) * 0.5; B[o + 3] = m.c;
+      B[o] = (m.x2 - m.x) * 0.5; B[o + 1] = (m.y2 - m.y) * 0.5; B[o + 2] = (m.z2 - m.z) * 0.5; B[o + 3] = _markW(m);
       w++;
       allX += A[o]; allY += A[o + 1]; allZ += A[o + 2];
     }
