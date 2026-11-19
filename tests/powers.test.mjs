@@ -196,7 +196,11 @@ test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the elem
   p.nextElement();
   assert.equal(p.element, 1);
   assert.equal(p.list[p.ability].id, 'kindle', 'and now the fire is');
-  assert.equal(p.list.length, 1, 'fire has one ability built; the rest are named in docs/POWERS-FIRE.md');
+  // (2026-11-19, the owner: "give it 5 new abilities that are fire based". Six now, and the test names them
+  //  rather than counting them, so that a rename or a reorder is caught as well as a loss.)
+  assert.deepEqual(p.list.map((a) => a.id), ['kindle', 'ember', 'bellows', 'wall', 'snuff', 'firewhirl'],
+    'the fire does not have the six abilities it should');
+  for (const a of p.list) assert.ok(a.word && typeof a.word === 'string', a.id + ' has no word for the screen');
   // the physics is what lights it, because only it knows what is underfoot there
   let asked = null;
   sim.physics = { lightFire: (fires, bodyId, at, size) => { asked = { bodyId, at, size }; return { kind: 1 }; } };
@@ -286,4 +290,90 @@ test('FIRE HAS AN ULTIMATE, and a hold that is taken away casts nothing (found b
   assert.notEqual(r.note, 'ULTIMATE ready - let go', 'and the screen stops promising it');
   r.down = false; step(r, sim3, 2);
   assert.equal(r.ults, 0, 'nothing was cast');
+});
+
+// ---- THE FIVE NEW FIRE ABILITIES (the owner, 2026-11-19) ---------------------------------------
+// A stand-in physics that records what each one asked of it, so that what the ability DOES is held, not just that
+// it does not throw.
+function fireRig() {
+  const lit = [], doused = [];
+  let whirl = null;
+  const sim = fakeSim();
+  sim.physics = {
+    lightFire: (F, bodyId, at, size) => { lit.push({ bodyId, at: { ...at }, size }); return { kind: 1, fuel: 1, wet: 0 }; },
+    fuelAt: (bodyId, p, out = {}) => { out.kind = 1; out.fuel = 1; out.wet = 0; return out; },
+    douseNear: (F, bodyId, p, r) => { doused.push({ bodyId, p: { ...p }, r }); return 3; },
+    fireWhirl: () => whirl,
+  };
+  return { sim, lit, doused, setWhirl: (w) => { whirl = w; } };
+}
+const castOnce = (p, sim) => { p.down = true; step(p, sim, 2); p.down = false; step(p, sim, 2); };
+const pickFire = (p, id) => { p.setElement(1); const i = p.list.findIndex((a) => a.id === id); assert.ok(i >= 0, 'no ability ' + id); p.pick(i); };
+
+test('fire ember: the spark is thrown FURTHER than the aim and does not fall short', () => {
+  const { sim, lit } = fireRig();
+  const p = new Powers();
+  pickFire(p, 'ember');
+  castOnce(p, sim);
+  assert.equal(lit.length, 1, 'the ember lit nothing');
+  // it must land beyond the aim, along the same line from the explorer
+  const a = p.aim, from = a.from;
+  const aimD = Math.hypot(a.p.x - from.x, a.p.y - from.y, a.p.z - from.z);
+  const gotD = Math.hypot(lit[0].at.x - from.x, lit[0].at.y - from.y, lit[0].at.z - from.z);
+  assert.ok(gotD > aimD * 1.5, 'the spark landed at ' + gotD.toFixed(1) + ' m, barely past the aim at ' + aimD.toFixed(1));
+});
+
+test('fire bellows: it makes REAL WIND, which is how it speeds a fire up', () => {
+  // the owner asked that putting air on a fire speeds it. The honest way is to make wind the fire already reads,
+  // not a number that says "faster": so what this test holds is that a wind source appears.
+  const { sim } = fireRig();
+  const p = new Powers();
+  pickFire(p, 'bellows');
+  const before = p.winds.count;
+  castOnce(p, sim);
+  assert.ok(p.winds.count > before, 'bellows made no wind at all, so it cannot fan anything');
+});
+
+test('fire wall: a line of fire is laid ACROSS the view, not one patch at the aim', () => {
+  const { sim, lit } = fireRig();
+  const p = new Powers();
+  pickFire(p, 'wall');
+  castOnce(p, sim);
+  assert.ok(lit.length >= 3, 'a wall of ' + lit.length + ' patches is not a wall');
+  // the patches must be spread out, and across the view rather than along it
+  let most = 0;
+  for (let i = 0; i < lit.length; i++) for (let j = i + 1; j < lit.length; j++) {
+    const d = Math.hypot(lit[i].at.x - lit[j].at.x, lit[i].at.y - lit[j].at.y, lit[i].at.z - lit[j].at.z);
+    if (d > most) most = d;
+  }
+  assert.ok(most > 4, 'the wall is only ' + most.toFixed(1) + ' m from end to end');
+});
+
+test('fire snuff: it puts out what is near the aim, on this world only', () => {
+  const { sim, doused } = fireRig();
+  const p = new Powers();
+  pickFire(p, 'snuff');
+  castOnce(p, sim);
+  assert.equal(doused.length, 1, 'snuff asked the physics to put nothing out');
+  assert.equal(doused[0].bodyId, sim.bodyId);
+  assert.ok(doused[0].r > 0, 'snuff reached nowhere');
+});
+
+test('fire whirl: it needs a fire great enough, and then it turns the air where that fire is', () => {
+  const rig = fireRig();
+  const p = new Powers();
+  pickFire(p, 'firewhirl');
+  // with no fire there is nothing to turn, and no wind is made
+  const before = p.winds.count;
+  castOnce(p, rig.sim);
+  assert.equal(p.winds.count, before, 'a fire whirl turned the air with no fire under it');
+
+  // now the physics reports a column at the aim
+  const p2 = new Powers();
+  pickFire(p2, 'firewhirl');
+  p2._aim(rig.sim);
+  rig.setWhirl({ bodyId: rig.sim.bodyId, px: p2.aim.p.x, py: p2.aim.p.y, pz: p2.aim.p.z, strength: 0.8, patches: 12 });
+  const was = p2.winds.count;
+  castOnce(p2, rig.sim);
+  assert.ok(p2.winds.count > was, 'a fire whirl with a fire under it made no turning air');
 });
