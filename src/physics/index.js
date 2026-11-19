@@ -20,7 +20,7 @@ import { FLORA_GLSL } from './flora.glsl.js';
 import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
-import { placeWinds, windsToDevils } from './powers.js';
+import { placeWinds, windsToDevils, powerWind } from './powers.js';
 import { placeFires, stepFires, lightFire as litFire, douseNear as douseNearFire, FUEL } from './fire.js';
 import { burntAt } from '../data/burnt.js';
 import { skyNumbers, SKY } from './sky.js';
@@ -182,6 +182,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const _fg = { sink: 0, imprint: 0, loose: 0, dust: 0, mat: 0, h: 0 };    // the ground under a patch (groundOfGrid)
   const _fcov = {};                                   // the cover there (the leaves on the floor, the crowns over it)
   const _fair = {};                                   // the air there (airAt fills .wind, body-local)
+  const _fpw = new Float64Array(4);                   // what the player's own wind does there (powerWind; [3] is the air itself)
   const _fd = new Float64Array(3);
   // Which grounds carry a fire, and as what. Dry turf and heath burn; a forest floor's litter flares; moss
   // smoulders. Bare rock, sand, dust, gravel, glass, crystal, mud, a stream's bed and ground already burnt to ash
@@ -244,10 +245,22 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       if (out.kind !== FUEL.none) out.why = '';
     },
     // AND WHAT IS THE WIND HERE, in the body's own axes. airAt answers exactly that, with the dust devils and the
-    // player's own wind already in it, so a gust fans a fire and a stilled place starves one with nothing new.
+    // player's own wind already in it, so a gust fans a fire.
     windAt(s, out) {
       airAt(active, s.px, s.py, s.pz, time, seed, airGrid, frame, sunDir, 1.2, _fair, devils, null, winds);
       out[0] = _fair.wind.x; out[1] = _fair.wind.y; out[2] = _fair.wind.z;
+    },
+    // AND WHAT THE PLAYER HAS DONE TO THE AIR ITSELF THERE (the owner, 2026-11-19: the wind and the fire must act
+    // on each other). The wind above says which way the air MOVES; this says how much of it there is to move. A
+    // stilled place smothers a flame -- it is fed nothing fresh, which the moving wind alone cannot say, because a
+    // fire in naturally still air burns perfectly well -- and a quickened one feeds it. 1 where the player has cast
+    // nothing. This is powerWind's own fourth number, which is what every other system already reads a still by.
+    airScaleAt(s) {
+      if (!winds || !winds.count) return 1;
+      const x = frame.lx(s.px, s.py, s.pz), z = frame.lz(s.px, s.py, s.pz);
+      _fpw[0] = 0; _fpw[1] = 0; _fpw[2] = 0; _fpw[3] = 1;
+      if (!powerWind(winds, x, z, 0.6, _fpw)) return 1;      // (0.6 m: a flame's own height over the ground)
+      return _fpw[3];
     },
     // Rain puts a fire out. The ground's wetness here, and the rain that is actually reaching the ground now, which
     // wets a flame sooner than it wets the ground. (0.09 a millimetre an hour is a guess: drizzle lets a fire burn,

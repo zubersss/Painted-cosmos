@@ -273,3 +273,44 @@ test('fire: a melt says how much ice there is to melt, so the ground under it ca
   for (let i = 0; i < 60 * 30; i++) { stepFires(F, 1 / 60, ctx); for (let k = 0; k < F.burns.count; k++) any = F.burns[k].floor; clearBurns(F); }
   assert.equal(any, -1, 'burning leaves reported a floor of ice: ' + any);
 });
+
+test('fire: a STILLED place smothers a fire and a QUICKENED one feeds it (the owner, 2026-11-19)', () => {
+  // The other half of "I want them to be able to interact with each other". A gust FANS a flame, which the wind's
+  // own direction and speed already said; this is about how much air there is to be fed at all. A fire in naturally
+  // still air burns perfectly well, so the moving wind alone can never say this: the game answers ctx.airScaleAt.
+  // MEASURED through the whole physics, a real zone cast over a real fire in a temperate wood (the ability at its
+  // full size): nothing cast, 64 patches and 21.0 m; STILL held over it, the fire never passed three patches alight
+  // and was out; QUICKEN held over it, 21.0 -> 35.2 m and forty-eight patches reached 0.7 s sooner.
+  const go = (scale) => {
+    const ctx = hill(0);
+    ctx.airScaleAt = () => scale;
+    const F = makeFires();
+    lightFire(F, BODY, at(0, 0), 4, ctx);
+    run(F, ctx, 26);
+    return { n: F.count, live: live(F), reach: reach(F).north };
+  };
+  const plain = go(1), stilled = go(0), quick = go(1.6);
+  assert.equal(stilled.live, 0, 'a fire went on burning in air nothing fresh reaches: ' + stilled.live + ' patches alight');
+  assert.ok(stilled.reach < plain.reach * 0.5,
+    'a stilled fire spread nearly as far: ' + stilled.reach.toFixed(1) + ' m against ' + plain.reach.toFixed(1));
+  assert.ok(quick.reach > plain.reach * 1.05,
+    'a quickened fire was no fiercer: ' + quick.reach.toFixed(1) + ' m against ' + plain.reach.toFixed(1));
+  // ... and a world that does not answer the question at all is exactly as it was
+  const dumb = hill(0);
+  const D = makeFires();
+  lightFire(D, BODY, at(0, 0), 4, dumb);
+  run(D, dumb, 26);
+  assert.equal(D.count, plain.n, 'a game that cannot answer airScaleAt was not left alone: ' + D.count + ' against ' + plain.n);
+
+  // AND IT DOES NOT TOUCH THE MELT. Melting is heat going into ice; heat does not need air, and a player who stills
+  // the air over their own melting fire should not find it put out.
+  const ice = hill(0);
+  ice.airScaleAt = () => 0;
+  ice.fuelAt = function (b, px, py, pz, out) { out.kind = FUEL.ice; out.fuel = 0; out.wet = 0; out.px = px; out.py = py; out.pz = pz; };
+  const I = makeFires();
+  lightFire(I, BODY, at(0, 0), 3, ice);
+  run(I, ice, 12);
+  let melt = 0;
+  for (let i = 0; i < I.count; i++) if (I[i].melt > melt) melt = I[i].melt;
+  assert.ok(melt > 0.5, 'stilling the air stopped ice melting: ' + melt.toFixed(2));
+});

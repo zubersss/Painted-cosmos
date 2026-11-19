@@ -162,6 +162,15 @@ export const FIRE = Object.freeze({
   airStop: 0.12,          // below this share of Earth's air, nothing catches and what is alight goes out
   airFull: 0.7,           // at and above this it burns as it would on Earth; between, it is slower and feebler
 
+  // ---- AND THE PLAYER'S OWN WIND CHANGES THE AIR A PATCH IS FED (the owner, 2026-11-19: the wind and the fire
+  // must act on each other). It is not only that a gust FANS a flame: a flame eats air, and where the player has
+  // STILLED the air nothing fresh reaches it, so it gutters and goes out; where they have QUICKENED it, it is fed.
+  // The game answers ctx.airScaleAt(patch) with that multiplier -- 1 where the player has done nothing at all, 0 in
+  // the heart of a stilled place, above 1 in a quickened one. Without that function nothing here changes.
+  // (The melt is not touched by it: melting is heat going into ice, and heat does not need air -- see iceAirless.)
+  stillStarve: 1,         // how much of a full stilling bites (1: the heart of a stilled place smothers a fire)
+  blowMax: 1.6,           // and the most a quickened place may feed one
+
   // ---- EMBERS GO AHEAD OF IT (spotting). In a strong wind a fire throws burning pieces downwind, and they start
   // new fires BEYOND the front -- over a firebreak, over a river, over a road. It is why a big fire cannot be held
   // by a line on the ground, and it is the most alarming thing a fire does.
@@ -234,6 +243,7 @@ function wipe(s) {
   s.heat = 0;                             // 0..1 how fiercely it burns now
   s.fuel = 0; s.fuel0 = 0; s.sent = 0;    // what is left under it, what it had, how much we have reported
   s.floor = -1;                           // m of ice or snow over solid ground here, or -1 where nothing of ours knows
+  s.airM = 1;                             // what the player's wind does to the air it is fed (1: nothing)
   s.melt = 0; s.msent = 0;                // heat put into ice here, and how much of that we have reported
   s.wet = 0; s.age = 0; s.life = 0; s.ash = false; s.ashAge = 0;
   s.seeds = 0; s.spoke = 0; s.seedT = 0; s.gen = 0; s.reach = 0;
@@ -440,6 +450,12 @@ export function stepFires(F, dt, ctx) {
         ctx.windAt(s, _w);
         if (Number.isFinite(_w[0]) && Number.isFinite(_w[1]) && Number.isFinite(_w[2])) { s.wx = _w[0]; s.wy = _w[1]; s.wz = _w[2]; }
       }
+      // and what the player's own wind does to the air it is fed, asked on the same beat (see stillStarve above)
+      s.airM = 1;
+      if (ctx && ctx.airScaleAt) {
+        const m = ctx.airScaleAt(s);
+        if (Number.isFinite(m)) s.airM = m >= 1 ? (m > FIRE.blowMax ? FIRE.blowMax : m) : 1 - FIRE.stillStarve * (1 - (m > 0 ? m : 0));
+      }
     }
     // and whether its place has turned damp under it (only if the game says how)
     if (ctx && ctx.dampAt) {
@@ -463,7 +479,8 @@ export function stepFires(F, dt, ctx) {
     // (ICE IS THE ONE THING AIRLESSNESS DOES NOT PUT OUT: see `iceAirless` above. A melting patch lives its
     //  iceLife whatever the sky is made of; everything else goes out at once without air to burn.)
     const ice = s.kind === FUEL.ice;
-    const out = s.age >= s.life || (airK <= 0 && !ice) ||
+    const aK = airK * s.airM;              // the air THIS patch is fed: the world's, and what the player has done to it
+    const out = s.age >= s.life || (aK <= 0 && !ice) ||
       (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (!ice && !(s.fuel > 0))));
     s.heat += out ? -dt / FIRE.dieTime : dt / FIRE.catchTime;
     if (s.heat > 1) s.heat = 1;
@@ -479,7 +496,7 @@ export function stepFires(F, dt, ctx) {
       // the fuel goes, faster in a wind (which fans it) and slower where it is damp
       // thin air burns slowly as well as feebly: a flame in half of Earth's air is not half a flame, it is a
       // slower one, so the fuel under it lasts longer rather than less time
-      const fan = (1 + FIRE.windFan * ws) * (0.35 + 0.65 * airK), damp = 1 - FIRE.wetSlow * s.wet;
+      const fan = (1 + FIRE.windFan * ws) * (0.35 + 0.65 * aK), damp = 1 - FIRE.wetSlow * s.wet;
       const bt = FIRE.burnTime[s.kind] || 1;
       s.fuel -= dt * s.heat * fan * (damp > 0.1 ? damp : 0.1) / bt;
       if (s.fuel < 0) s.fuel = 0;
@@ -499,7 +516,7 @@ export function stepFires(F, dt, ctx) {
 
     // IT SPREADS. Well alight, with neighbours left to light, it looks one way at a time. Ice passes nothing on
     // (there is nothing in ice to carry a fire), and nor does a patch with nothing under it.
-    if (airK > 0 && s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
+    if (aK > 0 && s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
       s.seedT -= dt;
       if (s.seedT <= 0) {
         const caught = sow(F, s, ctx, _en, hE, hN, sp01);
