@@ -2549,3 +2549,25 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - **THE NEXT TWO LEVERS ARE IN THE OWNER'S OWN TABLE** and are not geometry: rows 11 and 12, "plants one flat
   colour" and "plants written at once", are **-13.5 ms each**. That is the plants' PAINT (task #47), and it is now
   the biggest single thing left on the phone.
+
+### 2026-11-19 THE v22 TABLE WAS NOT READABLE, AND THE FAULT WAS THE INSTRUMENT'S (v23)
+- The owner's speed test at v22 read 16.7 ms (SIXTY a second) in four rows whose own figures said **"script 0.0 ms,
+  0 calls, 0k triangles"**, and NONE of them was marked NOT SETTLED. The test only ever asked whether the frames were
+  STEADY -- **and a scene that draws nothing is the steadiest thing there is.** Every row measured against those was
+  nonsense: "far trees drawn first" came out 16.9 ms FASTER than the game, "far trees cast no shadow" 15.9 ms slower.
+- Its six "as set" baselines ran **16.7, 33.6, 31.6, 31.6, 33.5 and 50.3 ms** -- a table disagreeing with itself
+  threefold, and nothing in it said so.
+- **AND THE RUN WAS NOT COMPARABLE WITH v21'S ANYWAY**: the picture was 480x866 against 1028x480 (the phone was held
+  the other way round, 16% fewer pixels) and the sun was NOT OUT, so no shadows were drawn, where at v21 they were.
+  Three things changed at once with the trees. **That table cannot settle whether v22's trim worked.**
+- MENDED in v23 (pull request #23): a row under 20 draw calls is marked NOTHING DRAWN and cannot be called settled;
+  while nothing is drawn calm() waits FORTY seconds, not eight (eight is plenty for a picture to steady after a
+  switch and nowhere near enough for a wood to exist at the start of a run -- that is exactly how it happened); the
+  header quotes the first row THAT WAS REALLY DRAWING; and the table CHECKS ITS OWN BASELINES and says in plain
+  words when they disagree. Run in a browser: the header now reads 196 calls and 658k triangles where it printed
+  zeros, and 658k independently confirms v22's measured 664,781.
+- **THE LESSON, and it is the third of its kind today:** I read that table as a near-threefold speed-up before
+  checking whether it could be read at all. **An instrument that can report an empty frame as sixty a second is
+  worse than no instrument.** Check that a measurement is a measurement before taking its number.
+- **WHAT IS STILL NOT KNOWN:** whether v22's 30% triangle cut helps the phone. It needs ONE clean run at v23, with
+  the phone held the same way round as the v21 run (landscape) and the sun out.

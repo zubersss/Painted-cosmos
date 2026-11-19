@@ -413,6 +413,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v23 (19 Nov), pull request #23 merged: THE SPEED TEST TELLS THE TRUTH NOW.** The v22 table was not
+readable -- four rows were timed while NOTHING WAS BEING DRAWN and none was marked, because the test only asked
+whether frames were steady and an empty scene is the steadiest of all. Its baselines disagreed threefold. It also
+was not comparable with v21's: the phone was held the other way round and the sun was not out. **So it is still
+UNKNOWN whether v22's 30% triangle cut helps the phone, and the next thing to ask for is ONE clean run at v23,
+landscape, sun out.** The test now marks NOTHING DRAWN, waits forty seconds for a wood to build, quotes a header
+row that was really drawing, and prints a warning when its own baselines disagree.
+
 **`main` IS AT v22 (19 Nov), pull request #22 merged: THE TREES COST WHAT THEY USED TO AGAIN.** The owner's phone
 said 22 a second at v21 and 60 with no trees at all. It was my regression from v19, and the cause was NOT what it
 looked like: the middle tier's WOOD, not its leaves (the old maple drew 84 triangles of wood there, this grammar
