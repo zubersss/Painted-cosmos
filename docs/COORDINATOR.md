@@ -2638,3 +2638,16 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - **THE LESSON OF THE DAY, five times over: measure the thing, not the thing you assume.** The paint was innocent
   (0.9 ms). The leaves were innocent (already painted once per leaf). The shingles were not detail. Every one of
   those was obvious and wrong.
+
+### 2026-11-19 OWNER: wind and fire must act on each other; the ice worlds need more to melt; their sky is STILL not streaky
+- OWNER (verbatim): "Refine the wind and fire abilities even further i want them to be able to interact with each other where wind strengthens the fire and also give the ice planets more places to melt or use my abilities and the sky of the ice planets still needs to be streaky and painted like"
+- THREE ASKS:
+  1. **WIND AND FIRE ACT ON EACH OTHER**, and above all THE WIND STRENGTHENS THE FIRE. The machinery is supposed to be
+     there already (fire.js reads ctx.windAt, which is air.js airAt, which has the player's own wind folded in), and
+     `bellows` was built for exactly this on 19 Nov. **So the first job is to PROVE whether a player's gust really
+     reaches a fire, and by how much, rather than assume it: if it is already true it is too weak to notice, and if
+     it is not true it has never worked.** Measure before building.
+  2. **THE ICE WORLDS NEED MORE PLACES TO MELT OR TO USE THE ABILITIES.** Fire melts ice (FUEL.ice) and the melt is
+     wired; the complaint is that there is nowhere to do it.
+  3. **THE ICE WORLDS' SKY IS STILL NOT STREAKY AND PAINTED.** "Still" -- this has been asked before and is not done
+     or not right. (The earlier ask, 2026-11-16: "Night sky streaks and painted-on snow strokes like the clip".)

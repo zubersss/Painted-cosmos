@@ -409,6 +409,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 - **2026-11-19, the fire and everything else:** "Keep working on the fire and give it 5 new abilities that are fire based also make it so that putting on a fire speeds up the fire and also fire tornados can be a thing also really figure out the mechanics of how a fire spreads and starts and how it spreads and how it acts based around different environments and keep working on the rest of the worlds biomed as well every biome should get at least 1 milestone worth of upgrades and same for the graphics and looks of the game that should get 3 milestones worth of upgrades once you've done all and merged it give me the link to try the new benchmark test and one to just try it out". SEVEN asks; several sessions of work. Order: the fire (5 abilities, wind feeds it, fire tornados, a real spread model), then every biome, then three milestones of look. Merge each piece as it is done.
 
+- **2026-11-19, wind and fire together, and the ice worlds:** "Refine the wind and fire abilities even further i want them to be able to interact with each other where wind strengthens the fire and also give the ice planets more places to melt or use my abilities and the sky of the ice planets still needs to be streaky and painted like". Three asks: wind must visibly feed fire (MEASURE whether it already does before building anything); the ice worlds need more ice to melt and more to use the powers on; and their SKY IS STILL NOT STREAKY -- asked before, not done.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
