@@ -40,7 +40,7 @@ export async function resolve(specifier, context, next) {
 }`), import.meta.url);
 
 // the game's own switches, read at import time
-globalThis.location = { search: '?look=oil&powers=1' };
+globalThis.location = { search: '?look=oil&powers=1' + (process.env.PC_EXTRA || '') };   // (PC_EXTRA: extra switches, so a question like ?fartree=blob can be measured here)
 
 const THREE = await import('three');
 const { createWorld } = await import(pathToFileURL(path.resolve(REPO, 'src/world/index.js')).href);
