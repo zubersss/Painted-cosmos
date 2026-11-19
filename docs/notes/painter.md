@@ -3907,3 +3907,59 @@ are dropped at once; the heaviest frame of an arrival fits the building slice.
   per kit) is exported from `src/world/florakit.js`.
 - PILOT: `hatch` is on the ground 2.3 m left of the ship's centre line, `seat` at
   (0, 1.75, -1.3); `sampleObstacles` shares the placement cells with the painted flora.
+
+---
+
+## Hand-over: THE SIX TREES AND THE TURN OF THE YEAR (2026-11-19)
+
+The owner was shown ten tree shapes drawn flat (`tools/treevariants.mjs`; the sheet is
+`docs/shots/trees/ten_looks.png` on `r2`) and answered: "Yes do 12374 and the widow 6 but refine them a little
+better and make sure the leaves change colors from summer to autumn for the forest". Six trees, refined, built,
+planted; and the wood turns.
+
+### `src/world/kits/grove.js` — one grammar, six rows of numbers
+
+`roundmaple`, `poplar`, `oak`, `birch`, `willow`, `sapling`. A seventh tree costs a row of numbers, not a file, and
+a fault mended once is mended in all six. **Read the file's own header before changing any of it**: it lists the
+five rules the grammar exists to keep and what each one looked like when it was broken.
+
+The one worth repeating here, because it was the whole of the owner's complaint: **a limb ends where it divides.**
+Drawing a limb to its full length and then hanging its children partway along leaves the last third of every limb
+sticking out past the fork with nothing on it. That is the bare grey spider leg. Nothing else about thinness,
+colour or count mattered next to it.
+
+### Three faults, and how each was found — the part worth carrying forward
+
+- **The leaf floor, not `leafN`, decided a tree's cost.** A cluster has a floor of a few leaves or it is not a
+  cluster, and the willow grows four places to hang them down every hanging twig. On that tree the floor bound, so
+  cutting `leafN` by a fifth changed the triangle count *not at all*: 22016 before and after. **Found by measuring.**
+  A knob that does nothing looks exactly like a knob that is set right.
+- **Every number written by hand for the camera's crown table was wrong**, the oak's widest radius by a quarter of
+  its height. Those numbers keep the lens out of a crown, so wrong ones are the 18 Nov fault again with numbers in
+  it instead of nothing. **Found by measuring.** A number you wrote is not a measurement.
+- **The family accent (`fam`, the maple's reds) was not seasonal**, so the first summer still showed red crowns in
+  a green wood; and the forest floor's two dresses sit in the base look data, so the live watercolour game would
+  have begun turning its seasons. **Found by looking**, both of them, in the first still ever drawn of it.
+
+Measuring and looking find different kinds of fault and neither one substitutes for the other. The thinning that
+fixed the first fault stripped the willow's curtains to bare wires — which only a picture could say.
+
+### `src/data/season.js` — the year
+
+`SEASON.t` runs 0 (high summer) to 1 (deep autumn) and back, over 720 seconds of play by default. A leaf's colour
+was **already** a uniform (`uLeafA`, `uLeafB`, `uLeafC`, and the far trees' arrays), so the whole feature is three
+vectors written per material when the season moves: no define, no recompile, no second set of meshes, nothing per
+pixel and nothing per leaf. `?season=0.6` stands the year still; `?year=240` changes how long a turn takes;
+`?year=0` stops it.
+
+A plant turns only if its look data gives it **both** dresses, `leafSum` and `leafAut`. The spruce and the pines
+are given one, because a conifer does not turn. Every world but Earth's forest has one dress and costs nothing.
+
+All of it is behind `LOOK.oil`.
+
+### What has NOT been seen
+
+The six have been seen flat-filled in Node, and the wood has been seen in the gallery at both ends of the year.
+Nothing has been seen **in motion**, nothing on a real graphics card, and no device has timed them. The willow is
+the one to watch: it is the costliest of the six and it is the one whose look suffered most when its leaves were
+thinned.
