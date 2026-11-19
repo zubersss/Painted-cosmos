@@ -2397,3 +2397,16 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - **THE GATE PASSED.** The live watercolour game: SIX SCENES, 0 PIXELS DIFFERENT OF 518,400, every one. The oil look: three scenes, 431k to 443k pixels changed (the four trees and the new sky, which is what the day's work was). The default page boots to ON_FOOT with no console error. **SPEED TEST 9 RAN ALL 27 ROWS AND PRINTED ITS TABLE, which is the first time any browser compiled the three new shader switches** - the one thing that was not going to be merged unseen. Its milliseconds are meaningless here (every row says NOT SETTLED, software GL); what the gate proves is that the test runs.
 - A CONFLICT ON THE WAY, worth knowing: `main` and `look-proto` both carried the speed test's copy button - main by the cherry-pick of pull request #17, the branch by its own commit - so the one line naming the test conflicted. Resolved in favour of the NINTH form (the branch's, which has the three new rows), and THE SUITES WERE RUN AGAIN ON THE MERGED TREE before merging: unit 301, world and kits 82. A resolution is a change like any other and is not covered by tests run before it.
 - MERGED as pull request #18. The label is `v18 (18 Nov)`, and build.txt with it. (v17's label never went live: #17 was merged without bumping it, so the site showed v16 while carrying #17's code. The owner was told.)
+
+### 2026-11-19 OWNER: "it looks like spiders not trees" - the branches, against the references
+- OWNER (verbatim): "Also fix the branches it looks like spiders not trees go over the references for the branches as well".
+- READ AS: the branch work of 18 Nov (four new kits, "branches that fork and show through the crown") went too far the wrong way. Thin dark limbs radiating from a stem read as LEGS, not as a tree.
+- **WHAT THE REFERENCES ACTUALLY SAY ABOUT BRANCHES**, gathered from `docs/references/README.md` (the owner's own three autumn paintings, the twenty, and the snow pictures):
+  - "Big dark trunks in the foreground, **FORKED LOW**, with bare dark boughs **REACHING WIDE** across the picture" (autumn wood 1).
+  - "the trees' build: **a HEAVY DARK STEM**, boughs seen through the leaves, leaves in clusters of small dabs" (autumn wood 1).
+  - "One great tree at the right, its dark limbs **spread over the whole top of the picture**" (autumn wood 2).
+  - "A **THICK trunk in LONG FLOWING STROKES** of brown and ochre, leaning over the whole picture" (autumn wood 3).
+  - "heavy DARK TRUNKS that **FORK INTO BOUGHS AND TWIGS**, hung with small separate leaf dabs with the sky between them" (the twenty, from the ground).
+  - "slender dark trunks, plum and brown-violet, in groups, each **ending in a HAZE OF FINE BARE TWIGS**" (the snow pictures).
+  - And the rule written for the rivers, which is the same rule: "**the HIERARCHY OF WIDTHS** (one wide river, thin tributaries, thinner twigs that end); the tree form".
+- SO THE FAULT, named: a tree in the references is ONE HEAVY STEM that FORKS LOW into A FEW WIDE BOUGHS, each tapering and dividing again into finer twigs that end in a haze - a hierarchy of three or four widths. A spider is MANY LIMBS OF ONE WIDTH radiating evenly from a point, not tapering, each ending as a stick. That is what the game has.

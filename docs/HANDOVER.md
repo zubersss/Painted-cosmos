@@ -392,6 +392,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
     - Flying at 170 m/s outruns what the world builds. Build for where the ship WILL be, and let
       it build harder while it is moving fast.
 
+54. **"It looks like spiders not trees" (2026-11-19).** "Also fix the branches it looks like
+    spiders not trees go over the references for the branches as well." The branch work of 18 Nov
+    went the wrong way. What the references say, gathered in `docs/references/README.md`: a tree
+    is ONE HEAVY STEM that FORKS LOW into a FEW WIDE BOUGHS ("forked low", "boughs reaching wide",
+    "a heavy dark stem", "a thick trunk in long flowing strokes"), each TAPERING and dividing
+    again into finer twigs that END IN A HAZE - a HIERARCHY OF WIDTHS, the same rule written for
+    the rivers ("one wide river, thin tributaries, thinner twigs that end"). A spider is many
+    limbs of ONE width radiating evenly from a point, not tapering, each ending as a stick.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
