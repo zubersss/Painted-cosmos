@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
+import { SEASON, leafNow } from '../data/season.js';
 import { FLORA_PHYS, TALL_KITS, farCardGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
@@ -144,6 +145,22 @@ export class Flora {
         canCard: CAN_CARD[sp.kit] === 1,
         cardFar: LOOK.oil && FAR_CARDS && CAN_CARD[sp.kit] === 1 };
     });
+    // THE TURN OF THE YEAR (the owner, 2026-11-19). A leaf's colour was already a uniform, so a wood turns from
+    // summer to autumn by writing three vectors per material when the season moves -- no define, no recompile, no
+    // second set of meshes, nothing added to any shader. A species with no `leafSum`/`leafAut` in its look data has
+    // one dress and does not turn, which is every world but the forest.
+    // BEHIND THE OIL LOOK, like everything else new. Some of the two-dress data sits in the base look rather than
+    // in the oil overlay (the forest floor's), so without this line the LIVE WATERCOLOUR GAME would start turning
+    // its seasons too -- which is a change to the live game, and those only happen when the owner asks.
+    this._turn = [];
+    for (let i = 0; LOOK.oil && i < TALL.length; i++) {
+      const sp = TALL[i];
+      if (!sp.leafSum && !sp.leafAut) continue;
+      // `fam`, the family accent a kind's crowns carry (the maple's reds), is an AUTUMN colour: seen in the first
+      // summer still it left red crowns in a green wood. Its amount rides the season with everything else.
+      this._turn.push({ mat: this.species[i].mat, far: i, sum: sp.leafSum || sp.leaf, aut: sp.leafAut || sp.leaf,
+        famW: sp.fam ? (sp.fam[3] == null ? 1 : sp.fam[3]) : 0 });
+    }
     const U = L.under || { leaf: [[0.8, 0.85, 0.4], [0.55, 0.7, 0.3], [0.35, 0.5, 0.3]], accent: [0.86, 0.29, 0.17], bush: [[0.64, 0.77, 0.37], [0.45, 0.63, 0.36], [0.24, 0.41, 0.36]], rock: [[0.8, 0.79, 0.83], [0.47, 0.45, 0.55]] };
     this.U = U;
     this.pal = new Map();
@@ -153,6 +170,10 @@ export class Flora {
         far: TALL.map((sp, i) => ({ fam: sp.fam || null, leafA: sp.leaf[0], leafB: sp.leaf[1], leafC: sp.leaf[2], barkA: sp.bark[0], barkB: sp.bark[1], taper: this.species[i].far[2], trunk: FAR_TRUNK.has(sp.kit), drop: sp.kit === 'vine', kind: sp.snowy ? 1 : sp.bare ? 2 : 0 })),
       }) : null,
     }, this._underMats(U, ''));
+    if (LOOK.oil && (U.leafSum || U.leafAut)) this._turn.push({ mat: this.mats.under, sum: U.leafSum || U.leaf, aut: U.leafAut || U.leaf });
+    if (LOOK.oil && this.mats.bush && (U.bushSum || U.bushAut)) this._turn.push({ mat: this.mats.bush, sum: U.bushSum || U.bush, aut: U.bushAut || U.bush });
+    this._seasonAt = -1;
+    this.setSeason(SEASON.t);
     // (the FAR trees cast no shadow in the oil look: on the owner's phone their drawing from the sun was 2.8 ms of a
     // 18 ms frame, nearly all of what the far trees cost at all (speed test 6, 2026-11-17), and a far tree stands
     // beyond 57 m at the phone's settings, where the shadow square's 90 m reach is nearly spent and its texels are
@@ -181,6 +202,31 @@ export class Flora {
   }
 
   // The undergrowth washes: the body's, or a biome's own where it names them (looks: biome.under).
+  // Turn the year. Writes three colours per leafy material and nothing else; a whole wood costs a handful of
+  // vector writes, and only when the season has actually moved (a thousandth is below what any eye can see).
+  setSeason(t) {
+    if (!this._turn || !this._turn.length) return;
+    if (Math.abs(t - this._seasonAt) < 0.001) return;
+    this._seasonAt = t;
+    const c = [0, 0, 0];
+    for (const q of this._turn) {
+      const u = q.mat && q.mat.uniforms;
+      if (!u) continue;
+      leafNow(q.sum[0], q.aut[0], t, c); if (u.uLeafA) u.uLeafA.value.set(c[0], c[1], c[2]);
+      leafNow(q.sum[1], q.aut[1], t, c); if (u.uLeafB) u.uLeafB.value.set(c[0], c[1], c[2]);
+      leafNow(q.sum[2], q.aut[2], t, c); if (u.uLeafC) u.uLeafC.value.set(c[0], c[1], c[2]);
+      if (q.famW && u.uLeafFam) u.uLeafFam.value.w = q.famW * t;
+      // the far trees share one mesh and one material, with a colour apiece in an array
+      const f = this.mats && this.mats.far && this.mats.far.uniforms;
+      if (f && q.far != null && f.uFarA && f.uFarA.value[q.far]) {
+        leafNow(q.sum[0], q.aut[0], t, c); f.uFarA.value[q.far].set(c[0], c[1], c[2]);
+        leafNow(q.sum[1], q.aut[1], t, c); f.uFarB.value[q.far].set(c[0], c[1], c[2]);
+        leafNow(q.sum[2], q.aut[2], t, c); f.uFarC.value[q.far].set(c[0], c[1], c[2]);
+        if (q.famW && f.uFarFam && f.uFarFam.value[q.far]) f.uFarFam.value[q.far].w = q.famW * t;
+      }
+    }
+  }
+
   _underMats(U, tag) {
     const bodyUniforms = this.bodyUniforms, sh = U.shard || U.rock;
     return {
