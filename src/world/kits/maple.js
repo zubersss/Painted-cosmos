@@ -71,9 +71,27 @@ export function mapleGeometry(seed, lod, spec) {
     const bow = len * (0.06 + 0.17 * Math.max(0, 1 - Math.max(0, el) * 1.6));
     const mid = V((p0.x + tip.x) / 2, (p0.y + tip.y) / 2 + bow, (p0.z + tip.z) / 2);
     const sd = near ? (depth === 1 ? 5 : depth === 2 ? 4 : 3) : 3;
-    // a twig is a straight piece of two rings; everything thicker bows through three
-    const path = depth >= 3 ? [p0, tip] : [p0, mid, tip];
-    const rr = depth >= 3 ? [r, r * 0.45] : [r, r * 0.70, r * 0.44];
+    // (2026-11-19, the owner: "it looks like spiders not trees".) A BOUGH TAPERS. It used to leave the stem and hold
+    // its width for its whole length -- a six-metre bar of one thickness, stopping dead -- which is a leg and not a
+    // branch. The references are about nothing else: "a HEAVY DARK STEM, boughs seen through the leaves", "forked
+    // low, with bare dark boughs REACHING WIDE", "fork into BOUGHS AND TWIGS", and the rule written for the rivers
+    // and meant for both: "the HIERARCHY OF WIDTHS - one wide river, thin tributaries, thinner twigs that END".
+    // A limb now thins to a FIFTH of its own base by its tip (it was 44 per cent), and bows through four points
+    // rather than three so that the thinning reads along its length instead of in one step.
+    // AND IT IS A CURVE, NOT TWO BARS WITH A CORNER. This is the other half of the spider, and it was hiding in
+    // plain sight: `tube` joins the points it is given with STRAIGHT sections, and a bough was given three -- its
+    // foot, its middle and its tip -- so the arch everyone meant was two straight bars meeting at one hard corner
+    // half way along. That corner is a KNEE. The limb is sampled off a real curve now (a quadratic through the
+    // raised middle), four or five points along it, so it leaves the stem, bends and goes on: the references'
+    // "LONG FLOWING STROKES" and limbs that "spread over the whole top of the picture".
+    const ctl = V(mid.x * 2 - (p0.x + tip.x) * 0.5, mid.y * 2 - (p0.y + tip.y) * 0.5, mid.z * 2 - (p0.z + tip.z) * 0.5);
+    const at = (t) => { const u = 1 - t;
+      return V(u * u * p0.x + 2 * u * t * ctl.x + t * t * tip.x, u * u * p0.y + 2 * u * t * ctl.y + t * t * tip.y, u * u * p0.z + 2 * u * t * ctl.z + t * t * tip.z); };
+    const nP = depth >= 3 ? 3 : near ? 5 : 4;
+    const path = [], rr = [];
+    for (let i = 0; i < nP; i++) { const t = i / (nP - 1); path.push(at(t));
+      // the width runs from its own base to a FIFTH of it at the tip, fastest near the tip, as a bough does
+      rr.push(r * (1 - 0.80 * Math.pow(t, 1.35))); }
     // (deeper in the crown a limb is laid darker and swings more, as the branches of the other kits are)
     tube(B, path, rr, sd, { part: 0, shade: 0.25 + 0.2 * depth, sway0: 0.15 + 0.22 * depth, hash: rnd(), branch: bid });
     limbs.push({ depth, from: [p0.x, p0.y, p0.z], tip: [tip.x, tip.y, tip.z], r, len });
@@ -84,14 +102,35 @@ export function mapleGeometry(seed, lod, spec) {
       for (let i = 0; i < 2; i++) {
         // the two halves of a fork part widely - a narrow fork reads as one long branch, and its reach piles onto its
         // parent's instead of spreading the crown sideways
-        const a2 = ang + (i ? 1 : -1) * (0.60 + 0.60 * rnd());
-        // a limb that set off low turns sharply up at the fork, as the sweeping low limbs of the references do: it is
-        // what keeps the crown round instead of letting the low limbs run on outward into a pancake
-        const e2 = Math.max(-0.26, Math.min(1.36, el + (el < 0.35 ? 0.80 : -0.16) + (rnd() - 0.5) * 0.45));
+        const a2 = ang + (i ? 1 : -1) * (0.42 + 0.46 * rnd());
+        // (2026-11-19) A FORK BENDS, IT DOES NOT HINGE. A low limb used to turn up by 0.80 rad -- 46 degrees in one
+        // joint, on top of as much again sideways -- and that hard elbow is the second half of what read as a leg.
+        // The references ask for "LONG FLOWING STROKES" and limbs that "spread over the whole top of the picture".
+        // The turn is 0.44 now, and the arching below carries the rest of the lift, so the line keeps going instead
+        // of breaking. The crown still closes: the test that pins its width is unchanged.
+        const e2 = Math.max(-0.26, Math.min(1.36, el + (el < 0.35 ? 0.44 : -0.12) + (rnd() - 0.5) * 0.34));
         if (depth === 2) twigs++;
         grow(tip, a2, e2, len * (0.48 + 0.14 * rnd()), r * 0.56, depth + 1, bid);
       }
       return;
+    }
+    // A HAZE OF FINE TWIGS AT THE END, which is the last thing the references ask of a branch and the game did not
+    // have: "slender dark trunks ... each ending in a HAZE OF FINE BARE TWIGS", and "fork into boughs AND TWIGS".
+    // A limb used to stop dead at a point. Three or four hairs now spray from its tip, each a fifth of its parent's
+    // length and a third of its width, so the outline breaks up instead of ending on a full stop. They are the
+    // cheapest thing on the tree -- three rings of three sides, about a dozen triangles each -- and only near by.
+    if (near && depth >= 2) {
+      const nh = 3 + ((rnd() * 2) | 0);
+      for (let i = 0; i < nh; i++) {
+        const ah = ang + (i - (nh - 1) * 0.5) * (0.5 + 0.4 * rnd()) + (rnd() - 0.5) * 0.3;
+        const eh = Math.max(-0.5, Math.min(1.5, el + (rnd() - 0.4) * 0.8));
+        const lh = len * (0.16 + 0.12 * rnd()), rh = r * 0.30;
+        const hx = Math.cos(ah) * Math.cos(eh), hy = Math.sin(eh), hz = Math.sin(ah) * Math.cos(eh);
+        const h1 = V(tip.x + hx * lh * 0.5, tip.y + hy * lh * 0.5 + lh * 0.10, tip.z + hz * lh * 0.5);
+        const h2 = V(tip.x + hx * lh, tip.y + hy * lh + lh * 0.06, tip.z + hz * lh);
+        tube(B, [tip, h1, h2], [rh, rh * 0.5, rh * 0.18], 3, { part: 0, shade: 0.9, sway0: 0.9, hash: rnd(), branch: bid });
+        limbs.push({ depth: 4, from: [tip.x, tip.y, tip.z], tip: [h2.x, h2.y, h2.z], r: rh, len: lh });   // (written down like the rest: the kit's record is checked against the mesh)
+      }
     }
     // the end of a limb: a rounded clump of leaves, set a little beyond the tip and a little above it
     const rc = H * (near ? 0.075 : 0.135) * (0.78 + 0.45 * rnd()) * (sl ? 0.86 : 1);
