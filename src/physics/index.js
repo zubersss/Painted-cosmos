@@ -21,7 +21,7 @@ import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { placeWinds, windsToDevils } from './powers.js';
-import { placeFires, stepFires, lightFire as litFire, FUEL } from './fire.js';
+import { placeFires, stepFires, lightFire as litFire, douseNear as douseNearFire, FUEL } from './fire.js';
 import { burntAt } from '../data/burnt.js';
 import { skyNumbers, SKY } from './sky.js';
 import { DriftField, DRIFT, snowTransport01 } from './drift.js';
@@ -813,6 +813,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // THE ABILITY LIGHTS A FIRE (core/powers.js, behind ?powers=1). The list belongs to the game (fire.js makeFires)
     // and comes in on the frame; lighting one is here because only the physics can say what is underfoot there.
     lightFire(F, bodyId, p, size) { return litFire(F, bodyId, p, size, bodyId === active ? fireCtx : null); },
+    // (2026-11-19, the fire's five new abilities) Put out what burns near a place, and ask whether this fire has
+    // raised a column that could turn into a whirl (fire.js whirlCheck fills F.whirl).
+    douseNear(F, bodyId, p, r) { return douseNearFire(F, bodyId, p, r); },
+    fireWhirl(F) { return F && F.whirl ? F.whirl : null; },
+    airForFire(bodyId) { return burnableAir(bodyId); },   // 0..1, Earth's air is 1: will anything burn here at all
     // WHAT IS UNDER A PLACE, and if nothing will burn there, `why` in plain words. The same answer lightFire acts
     // on, asked without lighting anything: the screen's word for the player, and what a test reads.
     fuelAt(bodyId, p, out = {}) {
