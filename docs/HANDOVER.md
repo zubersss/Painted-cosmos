@@ -411,6 +411,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v20 (19 Nov), pull request #20 merged: THE FIRST PASS AT THE MOUNTAINS.** `alpine_meadow` had no oil
+block at all and has one now (so the watercolour game is untouched): peaks about twice as high with closer ridges,
+raw umber and neutral tint instead of a thinned cobalt blue, a snowline that sits ON the new peaks, and strata.
+MEASURED: tone spread 37.1 -> 54.7 on the lower slopes; a stroke 3.5 -> 4.9 px, the one number that went the wrong
+way. **THE MOUNTAINS' COST IS NOT MEASURED -- the station harness has no alpine station. Add one first thing**, so
+the look and the cost of a place are measured in the same run, which is what the owner's instruction asks for. The
+log for 19 Nov has the two lessons of this pass and the `graze` finding left deliberately unmended.
+
 **`main` IS AT v19 (19 Nov), pull request #19 merged.** It carries THE OWNER'S SIX TREES and THE TURN OF THE YEAR.
 `src/world/kits/grove.js` is one grammar with six rows of numbers -- round maple, tall poplar, great oak, slender
 birch, weeping willow, young sapling -- chosen by the owner off a sheet of ten. They stand in the autumn wood in

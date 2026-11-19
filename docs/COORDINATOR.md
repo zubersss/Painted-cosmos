@@ -2471,3 +2471,25 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - READ AS a standing direction, not a one-off: **the look AND the performance**, across **all of Earth's places**, and the work has been too narrowly on the woods. The MOUNTAINS come first and are to be a special focus.
 - EARTH'S PLACES, for the record: `temperate_forest`, `autumn_woodland`, `alpine_meadow` ("Alpine Meadow and Snow Peaks" — the mountains), `sea_coast`, `desert_canyon`, `misty_wetland`. Four of the six have had almost no attention in the oil look; every still the owner has been shown since 16 Nov has been of a wood.
 - NOTE ON METHOD, from today: a gate is run with `tests/stations.mjs` (the loop held), NOT `tests/capture.mjs` (not repeatable). And the stations harness also prints the COST — draw calls and triangles — so the look and the performance can be measured in the same run, which is what this instruction asks for.
+- **DONE, the first pass at the mountains, MERGED as v20 (pull request #20).** `alpine_meadow` had no oil block at
+  all; it has one now, so the watercolour game keeps every number it had. amp 470->920, wl 1000->820, the ground's
+  three colours sapGreen/neutralTint/COBALT BLUE -> sapGreen/RAW UMBER/NEUTRAL TINT, dilution 0.24->0.10, snowline
+  185->560, strata 0.55, patch wavelengths 26/10 -> 48/20 m. MEASURED on the lower slopes: tone spread 37.1 -> 54.7;
+  a stroke 3.5 -> 4.9 px, which is the number that went the wrong way.
+- **TWO LESSONS FROM THIS PASS, both about believing one's own eyes:**
+  - I read the slopes as covered in DABS THE SIZE OF A HOUSE and went hunting in the ground shader. **A dab is 6 to
+    7 pixels.** What had merged was the COLOUR, and I had caused it myself two commits earlier by lengthening the
+    patch wavelengths to 110 and 40 m. Measure the thing before chasing its cause -- the same lesson as the
+    invisible fire on 18 Nov, learned again in a new disguise.
+  - A change that LOOKED like a clear win was measured at 5.5 -> 5.0 px (nine per cent) and was then found to change
+    the AUTUMN WOOD by 23.6% of its pixels against a 12.3% noise floor. Reverted. **A still cannot tell you the size
+    of an effect; only a measurement can, and the noise floor has to be measured too.**
+- **THE FINDING LEFT FOR THE NEXT SESSION:** the ground's dabs are laid up to THREE TIMES LARGER at a grazing angle
+  (`graze`, in the ground's oil block in `src/render/materials.js`). That rule was built for a LEVEL FLOOR seen far
+  off, where a dab is squeezed to a sliver and a field of them reads as hatching. A MOUNTAINSIDE grazes the eye too
+  and is not squeezed, so every steep face in the game gets the full three times. The rule is wrong, mending it is a
+  two-line change (`1.0 + (graze - 1.0) * levelness`), and **mending it changes the forest, so ask the owner first.**
+- **NOT DONE, and it is half the instruction: THE MOUNTAINS' COST IS NOT MEASURED.** `tests/stationlib/stations.mjs`
+  has no alpine station, so there is no draw-call or triangle count for this place, before or after. Taller terrain
+  plausibly costs more. **Add an alpine station first thing**, so that from here the look and the cost of a place are
+  measured in the same run -- which is what "the look and performance" asks for.
