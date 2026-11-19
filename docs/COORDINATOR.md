@@ -2651,3 +2651,75 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
      wired; the complaint is that there is nowhere to do it.
   3. **THE ICE WORLDS' SKY IS STILL NOT STREAKY AND PAINTED.** "Still" -- this has been asked before and is not done
      or not right. (The earlier ask, 2026-11-16: "Night sky streaks and painted-on snow strokes like the clip".)
+
+#### What was found and done, 19 Nov (same session)
+
+**ASK 1, THE WIND AND THE FIRE — MEASURED FIRST, THEN MENDED.** A real gust was cast at a real fire through the
+whole physics. The gust DID reach the patches (131.99 m/s at them against 1.76 in still air), so the wiring was
+sound — and the fire was NO FASTER AND NO BIGGER for it: 21.1 seconds to 48 patches in still air, 22.0 with a gale
+on it. All a wind did was change its SHAPE (it stopped creeping upwind: 17.4 m against 6.7). The reason: `windRate`
+and `backRate` only trade one direction against another, and a patch walks a wheel of 24 directions in turn, so
+what the downwind looks gained the upwind looks lost. Three new dials make a wind DRIVE it — `windMore` (every
+look catches sooner), `windSeeds` (it passes the fire to more neighbours), `windReach` (one casting runs further).
+Re-measured: downwind 18.8 -> 23.0 m (+22%), twelve patches reached sooner, upwind 17.0 -> 10.0 m. A test holds the
+owner's own rule in their words.
+
+**ASK 2, THE ICE WORLDS — THE FAULT WAS NOT THAT THERE WAS NOWHERE TO MELT.** Every biome on Uranus, Neptune and
+Pluto is ice or snow underfoot already. What was wrong: **a fire needs an oxidiser and those skies have none, so
+`airK <= 0` put every patch out on its first step — the MELTING ones with it.** MEASURED, the same script before
+and after: a cast of size 3 on ice in an airless sky went from 0.00 heat into the ice and dead in one frame, to
+7.21 heat and a hole 8.10 m across over its full 13.9 s. Earth unchanged at 13.11. A flame eats air; HEAT DOES NOT.
+Nothing there burns, nothing spreads — but the cast's heat melts, which is what makes fire worth having on an ice
+world. (Mars' polar frost comes with it.)
+
+Three more things that ask needed:
+- **THE MELT WAS NEVER PAINTED.** It had been recorded and saved since 18 Nov and no shader has ever read it: a
+  cast melted a hole nobody could see. It now rides in the SAME uniform arrays as the scorches, told apart by the
+  sign of one number, so a melting world costs the ground not one uniform more than a burning one. SEEN on Pluto's
+  Pale Heart Glacier: a dark blue-black well in the pale lilac ice, its edge ragged by whole strokes.
+- **A MELT NOW KNOWS WHAT IS UNDER IT.** The world says how thick the ice or snow is (lying snow: a hand's depth
+  over the biome's ground; a glacier: no floor at all), the fire carries it on every row, and the record uses it,
+  so a melt on a snowfield LAYS THE GROUND BARE and one on a glacier goes on down. Tested.
+- **A GUST NOW RAISES CRYSTALS OFF BARE ICE.** Of the ice worlds' twelve biomes only four carry snow deeper than
+  the three centimetres the powder needed (Pluto's glacier 0.02 m, its mountains and plain 0.01, Uranus' shelves
+  and sinkholes 0.02), so on a glacier a cast raised a grey puff of "dust". Ice gives crystals now — rime and
+  spindrift — so the gust, the gather and the whirl all have something to show on all three worlds.
+
+**ASK 3, THE SKY.** The oil sky is laid in six broad bands with nothing inside them; on the ice worlds, which have
+no weather and almost no cloud, that is a smooth wall of colour. The sky is now laid in BRUSH STROKES: long,
+nearly level, tapered at both ends, as wide as a brush, a step deeper or lighter than the sky they lie on (never
+another colour, so Uranus stays mint and Pluto lilac), in three families crossing at shallow angles. It is the
+same construction as the night streaks the owner asked for on 16 Nov, at a quarter of the frequency and in the
+sky's own colour. Per world (`skyStrokes` in the look data, the three ice worlds only, the oil look only);
+`?skystroke=` turns it anywhere. MEASURED against the same frame with it off: 31.3% of the sky's pixels changed,
+by 8.35 of 255 on average and 78 at most. SEEN on Pluto and on Uranus.
+
+**v26 merged (pull request #26), all three asks in it.** Checks before the gate: physics 389 pass, the game's 306,
+the world's 48. (One commit message in that branch says 401 for the physics count: it is 389. The commit could not
+be amended without a force push, so the correction is here and in the pull request.)
+
+**THE OTHER HALF OF ASK 1, after the first was mended: HOW MUCH AIR THERE IS TO FEED A FIRE.** A gust FANS a
+flame, which the wind's own speed already said. But a fire in naturally still air burns perfectly well, so the
+moving wind can never say whether anything FRESH is reaching it. The game now answers ctx.airScaleAt(patch) --
+powerWind's own fourth number, the one every other system already reads a stilled place by. MEASURED through the
+whole physics with the real ability cast over a real fire in a temperate wood:
+
+| | patches | alight at 30 s | reach | to 48 patches |
+| --- | --- | --- | --- | --- |
+| nothing cast | 64 | 63 | 21.0 m | 20.3 s |
+| STILL held over it | 0 | 0 | 0.0 m | never passed three alight |
+| QUICKEN held over it | 64 | 64 | 35.2 m | 19.6 s |
+
+And on a fire ALREADY big (39 patches alight): the plain still, 14 m across, carves out only what is inside it and
+the fire grows round it; the ultimate, 56 m across, covers the whole fire and puts it out. Scale is the whole
+difference, which is a good rule for an ability. The melt is not touched by it -- heat does not need air.
+
+**THE TRAP OF THE AFTERNOON, for the next session:** a measuring harness that casts an ability and never calls
+`stepWinds` sees a wind of strength 0 and measures nothing at all. The game does that stepping in core/powers.js,
+not in the physics facade, so a harness that drives the facade must do it itself. Half an hour went on "the
+interaction does not work" when what did not work was the harness.
+
+**AND: no backtick in a shader comment -- for the THIRD time.** `pcSkyStrokes` was commented with
+backticks round a field name, which closed the template string the shader lives in, and the page died with
+"Unexpected identifier". The rule is in CLAUDE.md. `node --check src/world/sky.js` catches it in a second and is
+worth running after every shader edit.

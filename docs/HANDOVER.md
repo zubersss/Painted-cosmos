@@ -415,6 +415,33 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v26 (19 Nov), pull request #26 merged: THE WIND AND THE FIRE ACT ON EACH OTHER, THE ICE WORLDS
+ANSWER A CAST, AND THEIR SKY IS PAINTED.** The owner's three asks of 19 Nov, all three done and all three measured.
+
+1. **The wind drives the fire, both ways.** MEASURED FIRST: a real gust DID reach a real fire (131.99 m/s at the
+   patches against 1.76 in still air) and the fire was no faster and no bigger for it -- a wind only changed its
+   SHAPE, because `windRate`/`backRate` trade one direction against another across a wheel of 24. Three new dials
+   (`windMore`, `windSeeds`, `windReach`) make it DRIVE the fire: downwind 18.8 -> 23.0 m, twelve patches sooner.
+   And the other half, which the moving wind can never say: HOW MUCH AIR THERE IS TO FEED IT (`ctx.airScaleAt`).
+   A STILL smothers a fire, a QUICKEN feeds it -- 21.0 m becomes 35.2 m. On a big fire the plain still (14 m)
+   carves a hole and the fire grows round it; the ultimate (56 m) puts the whole thing out.
+2. **The ice worlds.** The fault was NOT that there was nowhere to melt: every biome on Uranus, Neptune and Pluto
+   is ice or snow underfoot. It was that a fire needs an oxidiser and those skies have none, so `airK <= 0` put
+   every patch out on its first step, the MELTING ones with it. A cast on ice in an airless sky went from 0.00
+   heat into the ice (dead in one frame) to 7.21 and a hole 8.10 m across. Earth unchanged. THE MELT HAD ALSO
+   NEVER BEEN PAINTED -- recorded and saved since 18 Nov, read by no shader -- so it is now in the same uniform
+   arrays as the scorches (told apart by the sign of one number: see `pcMarksAt`). A melt now knows what is under
+   it, so a snowfield is laid bare and a glacier goes on down. And a gust raises CRYSTALS off bare ice, where
+   before it raised a grey puff of dust.
+3. **Their sky is laid in brush strokes** (`pcSkyStrokes`, `skyStrokes` in the look data, `?skystroke=` to turn it
+   anywhere). 31.3% of the sky's pixels changed against the same frame with it off, by 8.35 of 255 on average.
+   SEEN on Pluto and on Uranus.
+
+**WHAT THE OWNER HAS NOT YET SEEN OR TIMED:** none of this has been on their device. Worth asking for: a look at
+Pluto and Uranus with `?look=oil` (the sky), and a cast of fire on an ice world with `?powers=1&look=oil`. The
+phone has still never timed `&fartree=blob` (v25).
+
+
 **`main` IS AT v25 (19 Nov), pull request #25 merged: A FAR TREE OF ONE ROUNDED CARD, opt-in as `?fartree=blob`.**
 The owner's table says the far trees' cost is TRIANGLES, not paint ("one flat colour" -0.9 ms, "as lumps" -8.7 ms),
 so the far tree is now ONE ROUNDED CARD crossed twice, painted by the look's own dab shader, with spherical normals
