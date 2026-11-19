@@ -38,13 +38,13 @@ const OUT = A.out || '/tmp/tree.png';
 // the leaves are parts 4 and 5 (florakit: a leaf card, a shingle); the wood is everything else
 const WOOD = (part) => part < 4.5;
 
-function draw(geo, px, x0, W, H, cols) {
+function draw(geo, px, x0, W, H, TURN) {
   const pos = geo.attributes.position.array, idx = geo.index ? geo.index.array : null;
   const data = geo.attributes.aData ? geo.attributes.aData.array : null;   // y: the part, z: shade
   const n = idx ? idx.length : pos.length / 3;
   // the tree's own bounds, so every kit is drawn to the same height on the page
   let yMax = 0, xMin = 1e9, xMax = -1e9;
-  for (let i = 0; i < pos.length; i += 3) { if (pos[i+1] > yMax) yMax = pos[i+1]; if (pos[i] < xMin) xMin = pos[i]; if (pos[i] > xMax) xMax = pos[i]; }
+  for (let i = 0; i < pos.length; i += 3) { if (pos[i+1] > yMax) yMax = pos[i+1]; const q = Math.hypot(pos[i], pos[i+2]); if (-q < xMin) xMin = -q; if (q > xMax) xMax = q; }
   const span = Math.max(yMax * 1.04, (xMax - xMin) * 1.04, 1e-3);
   const sc = Math.min(W * 0.92 / span, H * 0.94 / span);
   const cx = x0 + W * 0.5, by = H - 8;
@@ -66,13 +66,17 @@ function draw(geo, px, x0, W, H, cols) {
     if (data && !WOOD(data[i0 * 4 + 1])) continue;
     const shade = data ? Math.max(0, Math.min(1, data[i0 * 4 + 2])) : 0;
     const v = Math.round(20 + shade * 150);
-    const X = (i) => cx + pos[i*3] * sc, Y = (i) => by - pos[i*3+1] * sc;
+    const ca = Math.cos(TURN), sa = Math.sin(TURN);
+    const X = (i) => cx + (pos[i*3] * ca - pos[i*3+2] * sa) * sc, Y = (i) => by - pos[i*3+1] * sc;
     tri(X(i0), Y(i0), X(i1), Y(i1), X(i2), Y(i2), v);
   }
   return { height: yMax, width: xMax - xMin };
 }
 
-const cells = want.length * seeds.length;
+// (turn=: the same tree drawn from several ways round, because ONE SIDE VIEW LIES -- a bough that
+//  swings away from the eye foreshortens into a stub and reads as a right angle that is not there.)
+const TURNS = (A.turn || '0,55,110').split(',').map(Number);
+const cells = want.length * seeds.length * TURNS.length;
 const PW = W * cells;
 const px = { W: PW, a: new Uint8Array(PW * H).fill(255) };
 px.a = new Uint8Array(PW * H * 3).fill(255);
@@ -82,9 +86,11 @@ for (const kit of want) {
   if (!build) { console.log('no kit called ' + kit + '; the tall kits are: ' + Object.keys(KITS).join(', ')); continue; }
   for (const s of seeds) {
     const g = build(s, LOD, {});
-    const r = draw(g, px, k * W, W, H, null);
-    notes.push(kit + ' seed ' + s + ': ' + r.height.toFixed(1) + ' m tall, ' + r.width.toFixed(1) + ' m across');
-    k++;
+    for (const t of TURNS) {
+      const r = draw(g, px, k * W, W, H, t * Math.PI / 180);
+      if (t === TURNS[0]) notes.push(kit + ' seed ' + s + ': ' + r.height.toFixed(1) + ' m tall, ' + r.width.toFixed(1) + ' m across');
+      k++;
+    }
   }
 }
 fs.writeFileSync(OUT, writePng(px.a, PW, H, 3));
