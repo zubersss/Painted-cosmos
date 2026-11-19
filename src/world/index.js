@@ -6,6 +6,7 @@
 // Additive: busy (pending build jobs), setBuildBudget(ms), getLighting(), getBiomes(bodyId),
 //   findBiome(bodyId, biomeId), bodyUniforms(bodyId).
 import * as THREE from 'three';
+import { SEASON, stepSeason } from '../data/season.js';
 import { BODIES, BODY_IDS, SUN } from '../data/bodies.js';
 import { getLook } from '../data/looks.js';
 import { NearGround } from './nearground.js';
@@ -401,6 +402,11 @@ export function createWorld(scene) {
         cu.x = (st.look.bands ? 1 : st.look.cloud) * a01; cu.y = Math.max(900, st.body.atmosphereHeight * 3.2);
       }
       st.terrain.detail = isActive;
+      // THE TURN OF THE YEAR (the owner, 2026-11-19: the forest's leaves must go from summer to autumn). The year
+      // moves on the world being played, and every world's plants are told where it stands -- so a wood left behind
+      // and come back to has gone on turning, as it should have. setSeason does nothing at all unless the season
+      // has moved, and nothing ever on a world whose look gives its plants only one dress.
+      if (st.flora) st.flora.setSeason(isActive ? stepSeason(dt) : SEASON.t);
       // One shared time slice per frame. When terrain and flora both have work they take
       // turns at going first, so no frame pays for a full slice of each.
       // (when frames are already very slow, as in software rendering, building is given a

@@ -13,6 +13,7 @@ import { mapleGeometry } from './kits/maple.js';
 import { spruceGeometry } from './kits/spruce.js';
 import { aspenGeometry } from './kits/aspen.js';
 import { tallPineGeometry } from './kits/pine.js';
+import { groveGeometry } from './kits/grove.js';
 
 // Physical hints per kit for PHYSICS (C14): model height in metres before the instance scale,
 // and stiffness (0 = bends like grass, 1 = a tree).
@@ -92,7 +93,13 @@ export function bareGeometry(seed, lod) {
     const p1 = V(p0.x + Math.cos(ang) * len * 0.50, p0.y + len * rise * 0.50, p0.z + Math.sin(ang) * len * 0.50);
     const p2 = V(p0.x + Math.cos(ang) * len * 0.85, p0.y + len * rise * 1.05, p0.z + Math.sin(ang) * len * 0.85);
     const bid = (k * 0.618034 + 0.13) % 1;
-    tube(B, [p0, p1, p2], [0.042, 0.028, 0.016], 4, { part: 0, shade: 0.5, sway0: 0.4, hash: rnd(), branch: bid });
+    // (2026-11-19, the owner: "it looks like spiders not trees".) A BOUGH IS A CURVE, NOT TWO BARS WITH A CORNER.
+    // `tube` joins the points it is given with STRAIGHT sections, so [p0, p1, p2] is two straight bars meeting at a
+    // hard corner at p1, and that corner is what reads as a KNEE. The three points are a quadratic's worth of
+    // information already; sampling it at five gives the references' "LONG FLOWING STROKES" for one more ring.
+    // ONLY IN THE OIL LOOK: this is the watercolour game's own tree, and its boughs must not move by a millimetre
+    // (a session was caught by the pixel gate doing exactly that -- see the conifer's note below).
+    tube(B, oilCurve(p0, p1, p2, spec), oilCurveR(spec, [0.042, 0.028, 0.016]), 4, { part: 0, shade: 0.5, sway0: 0.4, hash: rnd(), branch: bid });
     if (lod === 0) for (let j = 0; j < 2; j++) {
       const a2 = ang + (j ? 1.0 : -0.9) + (rnd() - 0.5) * 0.5, l2 = 0.55 + rnd() * 0.5, q0 = p1.clone().lerp(p2, 0.25 + 0.4 * j);
       tube(B, [q0, V(q0.x + Math.cos(a2) * l2 * 0.6, q0.y + l2 * 0.85, q0.z + Math.sin(a2) * l2 * 0.6)], [0.020, 0.012], 3, { part: 0, shade: 0.5, sway0: 0.6, hash: rnd(), branch: bid });
@@ -131,7 +138,49 @@ export function birchGeometry(seed, lod, spec) {
   const top = pts[segs];
   const crownC = V(top.x * 0.85, H * (sl ? 0.76 : 0.72), top.z * 0.85);
   const at = (t) => { const f = Math.min(0.9999, Math.max(0, t)) * segs, i = Math.floor(f), k = f - i; return pts[i].clone().lerp(pts[i + 1], k); };
-  if (lod === 0) {
+  if (lod === 0 && leafy) {
+    // THE OIL LOOK'S BROADLEAF HAS A TREE'S OWN ARMATURE (2026-11-19, the owner: "it looks like spiders not trees").
+    // MEASURED before this: the oil broadleaf was 2,862 triangles a tree of which 222 WERE WOOD -- ninety-two per
+    // cent leaves and eight per cent of anything holding them up. It had THREE boughs, 6 cm thick and two metres
+    // long, while six or seven separate clumps of leaf floated round the upper stem, each merely ASSIGNED to the
+    // nearest bough tip. Nothing reached them. The watercolour game hides that under lumpy washes; the oil look
+    // draws the leaves one by one, so what is left is a stick with three hairs and a cloud. That is the spider, and
+    // it is what stands at the owner's own spawn (temperate_forest is broadleaf and conifer; the maple is elsewhere).
+    // The references ask for one thing: "a HEAVY DARK STEM, BOUGHS SEEN THROUGH THE LEAVES", "forked low, boughs
+    // reaching wide", "fork into boughs AND TWIGS", "ending in a haze of fine bare twigs". So: the clumps are
+    // settled first, and a real bough is grown OUT TO EACH ONE -- sampled off a curve so it bends instead of
+    // hinging, tapering to a fifth of its base, with a haze of fine twigs at its end inside the leaves.
+    const nBlobs = 6 + ((rnd() * 2) | 0);
+    const clumps = [];
+    for (let k = 0; k < nBlobs; k++) {
+      const t0 = 0.46 + 0.56 * (k / (nBlobs - 1)), p0 = at(t0);
+      const spread = Math.max(0.2, (1.0 - Math.abs(t0 - 0.70) * 1.7)) * 2.3 + 0.2;
+      const ang = k * 2.4 + rnd() * 1.2, rr = spread * (0.35 + 0.65 * rnd());
+      const c = V(p0.x + Math.cos(ang) * rr, p0.y + (rnd() - 0.3) * 0.7 + (t0 > 1 ? (t0 - 1) * H : 0), p0.z + Math.sin(ang) * rr);
+      clumps.push({ c, r: 1.9 + rnd() * 1.0, foot: at(Math.max(0.18, t0 - 0.30 - rnd() * 0.12)), bid: (k * 0.618034 + 0.13) % 1 });
+    }
+    // the stem's own girth where each bough leaves it, so a bough starts WIDE and the step is not a cliff
+    const rAt = (y) => { const t = Math.max(0, Math.min(1, y / H)); return (0.225 - 0.165 * Math.pow(t, 0.75)); };
+    for (const cl of clumps) {
+      const p0 = cl.foot, p2 = cl.c, r0 = Math.max(0.035, rAt(p0.y) * 0.62);
+      // the bough leaves the stem climbing and flattens as it reaches out, so the line sweeps instead of ramping
+      const mid = V((p0.x + p2.x) * 0.5, (p0.y + p2.y) * 0.5 + (p2.y - p0.y) * 0.26 + 0.25, (p0.z + p2.z) * 0.5);
+      const path = [], rr2 = [];
+      for (let i = 0; i < 5; i++) { const t = i / 4, u = 1 - t;
+        const cx = mid.x * 2 - (p0.x + p2.x) * 0.5, cy = mid.y * 2 - (p0.y + p2.y) * 0.5, cz = mid.z * 2 - (p0.z + p2.z) * 0.5;
+        path.push(V(u * u * p0.x + 2 * u * t * cx + t * t * p2.x, u * u * p0.y + 2 * u * t * cy + t * t * p2.y, u * u * p0.z + 2 * u * t * cz + t * t * p2.z));
+        rr2.push(r0 * (1 - 0.80 * Math.pow(t, 1.3))); }
+      tube(B, path, rr2, 4, { part: 0, shade: 0.55, sway0: 0.4, hash: rnd(), branch: cl.bid });
+      // and the haze of fine twigs at its end, inside the leaves, so the bough does not stop on a full stop
+      for (let j = 0; j < 3; j++) {
+        const a3 = rnd() * 6.283, e3 = 0.1 + rnd() * 0.9, lh = cl.r * (0.30 + 0.25 * rnd());
+        const hx = Math.cos(a3) * Math.cos(e3), hy = Math.sin(e3), hz = Math.sin(a3) * Math.cos(e3);
+        tube(B, [p2, V(p2.x + hx * lh * 0.5, p2.y + hy * lh * 0.5, p2.z + hz * lh * 0.5), V(p2.x + hx * lh, p2.y + hy * lh, p2.z + hz * lh)],
+          [r0 * 0.26, r0 * 0.14, r0 * 0.05], 3, { part: 0, shade: 0.95, sway0: 0.9, hash: rnd(), branch: cl.bid });
+      }
+      leafCards(B, cl.c, cl.r * 1.10, cl.r * 0.78, cl.r * 1.05, rnd, { n: 200, len: 0.62, wid: 0.28, branch: cl.bid, massC: crownC, massK: 0.6, sway: 0.7 + 0.5 * (cl.c.y / H), shade0: 0.05, shadeK: 0.6 });
+    }
+  } else if (lod === 0) {
     // a few thin dark branches reaching into the crown (each its own number; a mass of foliage within 2.2 m of a
     // branch's tip is carried by it and swings with it, the others are branches of their own hidden in the wash)
     const tips = [];
@@ -149,7 +198,7 @@ export function birchGeometry(seed, lod, spec) {
       const p1 = V(p0.x + Math.cos(ang) * len * 0.55, p0.y + len * (sl ? rise * 0.64 : 0.5), p0.z + Math.sin(ang) * len * 0.55);
       const p2 = V(p0.x + Math.cos(ang) * len, p0.y + len * rise, p0.z + Math.sin(ang) * len);
       const bid = (k * 0.618034 + 0.13) % 1;
-      tube(B, [p0, p1, p2], [0.06, 0.038, 0.014], 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd(), branch: bid });
+      tube(B, oilCurve(p0, p1, p2, spec), oilCurveR(spec, [0.06, 0.038, 0.014]), 4, { part: 0, shade: 0.8, sway0: 0.4, hash: rnd(), branch: bid });
       tips.push([p2, bid]);
       if (sl) { const r = 1.0 + 0.5 * low + rnd() * 0.4; leafCards(B, V(p2.x, p2.y + 0.2, p2.z), r * 1.15, r * 0.62, r * 1.15, rnd, { n: 104, len: 0.42, wid: 0.21, round: 1, branch: bid, massC: crownC, massK: 0.5, sway: 0.6 + 0.4 * (p2.y / H), shade0: 0.1 * low, shadeK: 0.5 }); }
     }
@@ -227,6 +276,31 @@ export function pineGeometry(seed, lod, spec) {
     blob(B, V(lean * 0.8, H * 0.83, lz * 0.8), 2.4, H * 0.20, 2.3, rnd, { massC: crownC, massK: 0.3, sway: 0.8, shade0: 0.0, shadeK: 0.7, droop: 0.3, noise: 0.24, taper: 0.85, uvScale: 5 });
   }
   return B.build();
+}
+
+// A BOUGH DRAWN AS A CURVE INSTEAD OF TWO BARS (2026-11-19). `tube` joins its points with straight sections, so a
+// bough given its foot, its middle and its tip is two bars meeting at a corner -- a knee, and the owner saw it:
+// "it looks like spiders not trees". The same three points describe a quadratic, so the curve is already there and
+// only needs sampling. Five points, which is one extra ring of the tube.
+// BEHIND THE OIL LOOK ALONE (`spec.oilLook`, set in flora.js): the broadleaf and the conifer are the LIVE
+// watercolour game's trees and their boughs may not move at all. Without the flag these two hand back exactly what
+// was passed in, so the watercolour game builds the geometry it always built, number for number.
+function oilCurve(p0, p1, p2, spec) {
+  if (!(spec && spec.oilLook)) return [p0, p1, p2];
+  const c = V(p1.x * 2 - (p0.x + p2.x) * 0.5, p1.y * 2 - (p0.y + p2.y) * 0.5, p1.z * 2 - (p0.z + p2.z) * 0.5);
+  const out = [];
+  for (let i = 0; i < 5; i++) { const t = i / 4, u = 1 - t;
+    out.push(V(u * u * p0.x + 2 * u * t * c.x + t * t * p2.x, u * u * p0.y + 2 * u * t * c.y + t * t * p2.y, u * u * p0.z + 2 * u * t * c.z + t * t * p2.z)); }
+  return out;
+}
+// and the widths to go with them: the same three the bough always had, thinned along the curve so it TAPERS to its
+// tip instead of holding one width and stopping ("the hierarchy of widths", the references' own rule for both the
+// rivers and the trees).
+function oilCurveR(spec, r3) {
+  if (!(spec && spec.oilLook)) return r3;
+  const out = [];
+  for (let i = 0; i < 5; i++) { const t = i / 4; out.push(r3[0] * (1 - (1 - r3[2] / r3[0]) * Math.pow(t, 1.3))); }
+  return out;
 }
 
 // The far tree: one unit-high form (a trunk stroke and one wash) shared by every species.
@@ -684,5 +758,8 @@ export const TALL_KITS = {
   tallpine: (seed, lod, spec) => tallPineGeometry(seed, lod, spec),
   // (the oil look's trees of the snow are forms of their own: a `fir` conifer, a `bare` broadleaf)
   broadleaf: (seed, lod, spec) => (spec && spec.bare ? bareGeometry(seed, lod) : birchGeometry(seed, lod, spec)), conifer: (seed, lod, spec) => (spec && spec.fir ? firGeometry(seed, lod) : pineGeometry(seed, lod, spec)), fungus: fungusGeometry,
+  // (2026-11-19, the owner's six from the sheet of ten: one grammar, six rows of numbers, kits/grove.js)
+  roundmaple: groveGeometry('roundmaple'), poplar: groveGeometry('poplar'), oak: groveGeometry('oak'),
+  birch: groveGeometry('birch'), willow: groveGeometry('willow'), sapling: groveGeometry('sapling'),
   crystal: (seed, lod, spec) => crystalGeometry(seed, lod, spec && spec.thin), spire: (seed, lod, spec) => spireGeometry(seed, lod, spec), kelp: kelpGeometry, wave: waveGeometry, vine: vineGeometry,
 };

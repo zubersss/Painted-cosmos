@@ -13,12 +13,14 @@ import * as THREE from 'three';
 import { createPainter, RENDERER_OPTIONS } from '../render/index.js';
 import { createWorld } from '../world/index.js';
 import { createExplorer, createShip } from './models.js';
+import { seasonFromSearch } from '../data/season.js';
 import { BODIES, BODY_IDS } from '../data/bodies.js';
 import { LOOKS } from '../data/looks.js';
 import { findVantage } from './vantage.js';
 import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
 
 const P = new URLSearchParams(location.search);
+seasonFromSearch(location.search);      // (?season=, ?year=: the gallery can stand at any point in the year too)
 const num = (k, d) => (P.has(k) && P.get(k) !== '' && isFinite(+P.get(k)) ? +P.get(k) : d);
 
 const canvas = document.getElementById('c');

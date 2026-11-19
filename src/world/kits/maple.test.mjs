@@ -90,12 +90,20 @@ test('the trunk is short and forks low into three to five main limbs, and those 
       assert.ok(l.from[1] > trunk.tip[1] * 0.68 && l.from[1] <= trunk.tip[1] + 1e-6, `${m.tag}: a main limb starts on the stem's top third`);
       assert.ok(Math.hypot(l.from[0] - trunk.tip[0], l.from[2] - trunk.tip[2]) < 0.6, `${m.tag}: a main limb starts on the stem`);
     }
-    // and every later limb starts exactly at the tip of one of the depth above it: that is what a fork is
-    for (const l of m.limbs.filter((q) => q.depth >= 2)) {
+    // and every later limb starts exactly at the tip of one of the depth above it: that is what a fork is.
+    // (Depth 4 is not a fork but the HAZE OF FINE TWIGS a limb ends in -- the references' own words -- so it sprays
+    //  from the tip of whatever limb ended, which is a depth 2 that did not fork again or a depth 3.)
+    for (const l of m.limbs.filter((q) => q.depth >= 2 && q.depth < 4)) {
       assert.ok(m.limbs.some((o) => o.depth === l.depth - 1 && d3(o.from, l.from) !== 0 && d3(o.tip, l.from) < 1e-6),
         `${m.tag}: a limb of depth ${l.depth} forks off one of depth ${l.depth - 1}`);
       assert.ok(l.r < m.limbs.find((o) => o.depth === l.depth - 1 && d3(o.tip, l.from) < 1e-6).r, `${m.tag}: a fork is thinner than what it forks from`);
     }
+    for (const l of m.limbs.filter((q) => q.depth === 4)) {
+      assert.ok(m.limbs.some((o) => (o.depth === 2 || o.depth === 3) && d3(o.tip, l.from) < 1e-6),
+        `${m.tag}: a twig of the haze sprays from the tip of a limb that ended`);
+      assert.ok(l.len < 1.4 && l.r < 0.05, `${m.tag}: a twig of the haze is fine and short: ${l.len.toFixed(2)} m, ${l.r.toFixed(3)} m thick`);
+    }
+    assert.ok((m.byDepth[4] || 0) >= 6, `${m.tag}: ${m.byDepth[4] || 0} twigs of haze, so no limb ends on a full stop`);
     assert.equal(m.byDepth[2], m.byDepth[1] * 2, `${m.tag}: each main limb forks in two`);
     assert.ok((m.byDepth[3] || 0) % 2 === 0 && (m.byDepth[3] || 0) <= 12, `${m.tag}: ${m.byDepth[3] || 0} third-order twigs`);
     assert.ok(m.ends >= 6, `${m.tag}: ${m.ends} limb ends to hang leaves on`);
@@ -110,9 +118,15 @@ test('the tubes the kit wrote down are the tubes in the mesh: the triangles add 
   // every ring of every tube and every leaf card, counted by hand here, must come to the mesh's own triangle count)
   for (const lod of [0, 1]) for (const seed of SEEDS) {
     const m = measure(seed, lod, {});
-    const sides = (d) => (lod ? 3 : d === 1 ? 5 : d === 2 ? 4 : 3);
+    const sides = (d) => (d >= 4 ? 3 : lod ? 3 : d === 1 ? 5 : d === 2 ? 4 : 3);
+    // (2026-11-19, the owner: "it looks like spiders not trees".) A limb is SAMPLED OFF A CURVE now, so it is no
+    // longer one or two straight sections: a bough is four or five points (three or four sections) and a twig three.
+    // That is the whole of the mend -- `tube` joins its points with STRAIGHT sections, so three points was an arch
+    // drawn as two bars meeting at a corner, and that corner is what read as a knee. Depth 4 is the haze of fine
+    // twigs at a limb's end, three points of three sides, near by only.
+    const segs = (d) => (d >= 4 ? 2 : d >= 3 ? 2 : lod ? 3 : 4);
     let tri = lod ? 3 * 4 * 2 : 5 * 6 * 2;                        // the trunk: its rings by its sides, two each
-    for (const l of m.limbs) if (l.depth > 0) tri += (l.depth >= 3 ? 1 : 2) * sides(l.depth) * 2;
+    for (const l of m.limbs) if (l.depth > 0) tri += segs(l.depth) * sides(l.depth) * 2;
     tri += m.cards * (lod ? 2 : 4);                               // a far card is two triangles, a near one four
     assert.equal(m.tri, tri, `${m.tag}: ${m.tri} triangles in the mesh, ${tri} counted off the record`);
   }
@@ -126,7 +140,11 @@ test('both levels of detail stay inside their triangle budget', () => {
     // (2026-11-18: 3000 was a number picked in the air; the tree this one replaces, the old broadleaf,
     //  is 7,242 triangles near, and at 3000 these crowns rendered as bare winter armatures. The budget is now
     //  the old tree's own cost, which is what the wood was already paying.)
-    assert.ok(a.tri < 11200, `${a.tag}: ${a.tri} triangles`);
+    // (2026-11-19: 11,200 was the old broadleaf's own cost and held while a limb was two straight bars. Sampling it
+    //  off a curve and spraying a haze of fine twigs at its end -- what the references ask of a branch and what the
+    //  owner asked for by name -- costs 5.6 per cent more: measured over 24 seeds, a mean of 10,555 before and
+    //  11,145 after, the dearest seed 11,428. The budget is the dearest seed and a little over.)
+    assert.ok(a.tri < 11700, `${a.tag}: ${a.tri} triangles`);
     assert.ok(b.tri < 700, `${b.tag}: ${b.tri} triangles`);
     assert.ok(b.tri < a.tri / 3, `${b.tag}: the far form is far cheaper`);
   }

@@ -120,6 +120,14 @@ export const CROWN_KITS = Object.freeze({
   aspen: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
   spruce: Object.freeze([CAMERA.crownLow, CAMERA.crownTop, CAMERA.crownWidth]),
   tallpine: Object.freeze([0.60, 1.05, 0.28]),
+  // (the six of 2026-11-19, kits/grove.js. MEASURED off the built trees over twelve seeds each: the lowest leaf,
+  //  less a margin, and the WIDEST leaf radius any of those seeds reached. Written by hand first and every one of
+  //  them was wrong -- the oak's radius by a quarter of its height -- which would have let the lens inside the
+  //  crowns these numbers exist to keep it out of. The 18 Nov fault was this table left empty; this is the same
+  //  fault with numbers in it.)
+  roundmaple: Object.freeze([0.42, 1.05, 0.87]), poplar: Object.freeze([0.17, 1.05, 0.29]),
+  oak: Object.freeze([0.30, 1.05, 1.08]), birch: Object.freeze([0.45, 1.05, 0.72]),
+  willow: Object.freeze([0.07, 1.05, 0.86]), sapling: Object.freeze([0.38, 1.05, 0.82]),
 });
 // kit: the plant's kit when it is known (a name), undefined when it is not: then a footprint under
 // columnRadius is taken for a tree with a crown, as before.
