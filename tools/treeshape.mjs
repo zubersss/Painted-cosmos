@@ -34,9 +34,15 @@ const want = (A.kit || 'maple') === 'all' ? Object.keys(KITS) : (A.kit || 'maple
 const seeds = (A.seeds || '1,2,3').split(',').map(Number);
 const LOD = +(A.lod || 0), W = +(A.w || 420), H = +(A.h || 560);
 const OUT = A.out || '/tmp/tree.png';
+// (oil=0 draws the WATERCOLOUR game's form of a shared kit; 1, the default, draws the oil look's, which is what
+//  the owner is looking at. The four new kits are the oil look's own and build the same either way.)
+const SPEC = (A.oil === '0') ? {} : { oilLook: 1, leafy: 1, double: 1 };
 
 // the leaves are parts 4 and 5 (florakit: a leaf card, a shingle); the wood is everything else
 const WOOD = (part) => part < 4.5;
+// (leaves=1: the leaves are drawn too, in a warm wash, so a LOOK can be judged and not only an
+//  armature. leaves=0, the default, is the bare wood, which is what a branch fault shows in.)
+const LEAVES = A.leaves === '1';
 
 function draw(geo, px, x0, W, H, TURN) {
   const pos = geo.attributes.position.array, idx = geo.index ? geo.index.array : null;
@@ -48,7 +54,10 @@ function draw(geo, px, x0, W, H, TURN) {
   const span = Math.max(yMax * 1.04, (xMax - xMin) * 1.04, 1e-3);
   const sc = Math.min(W * 0.92 / span, H * 0.94 / span);
   const cx = x0 + W * 0.5, by = H - 8;
-  const put = (x, y, v) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= px.W || y >= H) return; const o = (y * px.W + x) * 3; if (v < px.a[o]) { px.a[o] = v; px.a[o+1] = v; px.a[o+2] = v; } };
+  let warm = false;     // a leaf is laid in a warm wash, the wood in grey, so the two can be told apart
+  const put = (x, y, v) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= px.W || y >= H) return; const o = (y * px.W + x) * 3;
+    const r = warm ? Math.min(255, 70 + v) : v, g = warm ? Math.round(v * 0.72) : v, b = warm ? Math.round(v * 0.28) : v;
+    if (warm ? px.a[o] === 255 : v < px.a[o]) { px.a[o] = r; px.a[o+1] = g; px.a[o+2] = b; } };
   const tri = (ax, ay, bx, by2, cx2, cy, v) => {
     const x0i = Math.max(0, Math.floor(Math.min(ax, bx, cx2))), x1i = Math.min(px.W - 1, Math.ceil(Math.max(ax, bx, cx2)));
     const y0i = Math.max(0, Math.floor(Math.min(ay, by2, cy))), y1i = Math.min(H - 1, Math.ceil(Math.max(ay, by2, cy)));
@@ -61,13 +70,18 @@ function draw(geo, px, x0, W, H, TURN) {
       if (l1 >= -0.002 && l2 >= -0.002 && l1 + l2 <= 1.002) put(x, y, v);
     }
   };
-  for (let t = 0; t < n; t += 3) {
+  // the leaves first, so the wood is drawn over them and reads as the thing holding them up
+  const order = LEAVES ? [false, true] : [true];
+  for (const woodPass of order) for (let t = 0; t < n; t += 3) {
     const i0 = idx ? idx[t] : t, i1 = idx ? idx[t+1] : t+1, i2 = idx ? idx[t+2] : t+2;
-    if (data && !WOOD(data[i0 * 4 + 1])) continue;
+    const isWood = !data || WOOD(data[i0 * 4 + 1]);
+    if (isWood !== woodPass) continue;
+    if (!isWood && !LEAVES) continue;
     const shade = data ? Math.max(0, Math.min(1, data[i0 * 4 + 2])) : 0;
-    const v = Math.round(20 + shade * 150);
+    const v = isWood ? Math.round(20 + shade * 150) : Math.round(150 + shade * 70);
     const ca = Math.cos(TURN), sa = Math.sin(TURN);
     const X = (i) => cx + (pos[i*3] * ca - pos[i*3+2] * sa) * sc, Y = (i) => by - pos[i*3+1] * sc;
+    warm = !isWood;
     tri(X(i0), Y(i0), X(i1), Y(i1), X(i2), Y(i2), v);
   }
   return { height: yMax, width: xMax - xMin };
@@ -85,7 +99,7 @@ for (const kit of want) {
   const build = KITS[kit];
   if (!build) { console.log('no kit called ' + kit + '; the tall kits are: ' + Object.keys(KITS).join(', ')); continue; }
   for (const s of seeds) {
-    const g = build(s, LOD, {});
+    const g = build(s, LOD, SPEC);
     for (const t of TURNS) {
       const r = draw(g, px, k * W, W, H, t * Math.PI / 180);
       if (t === TURNS[0]) notes.push(kit + ' seed ' + s + ': ' + r.height.toFixed(1) + ' m tall, ' + r.width.toFixed(1) + ' m across');
