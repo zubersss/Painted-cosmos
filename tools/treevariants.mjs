@@ -46,7 +46,8 @@ export function growTree(P, seed) {
   const nS = P.leader ? 9 : 6, pts = [], rad = [];
   const axis = (t) => V(lean * t * t + 0.10 * Math.sin(t * 2.7 + ph) * t * H * 0.1, top * t, lz * t * t);
   pts.push(V(axis(0).x, -0.25, axis(0).z)); rad.push(r0 * 1.7);
-  for (let i = 0; i <= nS; i++) { const t = i / nS; pts.push(axis(t)); rad.push(r0 * (1 - 0.42 * Math.pow(t, 0.8))); }
+  for (let i = 0; i <= nS; i++) { const t = i / nS; pts.push(axis(t));
+    rad.push(r0 * (P.leader ? Math.max(0.03, 1 - 0.97 * Math.pow(t, 1.15)) : 1 - 0.42 * Math.pow(t, 0.8))); }
   tube(B, pts, rad, 6, { part: 0, shade: 0.34, swayK: 0.3, swayH: H, hash: rnd() });
   const rTop = r0 * 0.58;
   const groundUp = (q) => { if (q.y < 0.35) q.y = 0.35 / (1 + (0.35 - q.y) * 2.2); return q; };   // nothing hangs through the ground
@@ -63,27 +64,37 @@ export function growTree(P, seed) {
     const at = (t) => { const u = 1 - t; return V(u*u*p0.x + 2*u*t*c.x + t*t*tip.x, u*u*p0.y + 2*u*t*c.y + t*t*tip.y, u*u*p0.z + 2*u*t*c.z + t*t*tip.z); };
     const divides = depth < P.levels && (depth < 2 || rnd() > P.stopEarly);
     const tEnd = divides ? P.split * 1.06 : 1;       // a whisker past the fork, as a real one is
-    const nP = depth === 1 ? 5 : 4, pth = [], rr = [];
+    const nP = depth === 1 ? 6 : P.arch < 0 ? 5 : 4, pth = [], rr = [];
     for (let i = 0; i < nP; i++) { const t = i / (nP - 1) * tEnd; pth.push(at(t)); rr.push(r * (1 - (1 - P.taper) * Math.pow(t, 1.3))); }
-    tube(B, pth, rr, depth === 1 ? 5 : depth === 2 ? 4 : 3, { part: 0, shade: 0.2 + 0.18 * depth, sway0: 0.12 + 0.2 * depth, hash: rnd(), branch: (depth * 0.37 + ang) % 1 });
+    tube(B, pth, rr, depth === 1 ? 5 : depth === 2 ? 4 : 3, { part: 0, shade: 0.16 + 0.12 * depth, sway0: 0.12 + 0.2 * depth, hash: rnd(), branch: (depth * 0.37 + ang) % 1 });
     widest = Math.max(widest, r); finest = Math.min(finest, r * P.taper);
     if (!divides) {                        // leaves ALONG the last limbs, several to a limb
-      for (let i = 0; i < 4; i++) stations.push({ p: at(Math.min(1, 0.25 + 0.75 * (i + 0.2 + rnd() * 0.6) / 4)), r, len: len / 4 });
+      for (let i = 0; i < 5; i++) stations.push({ p: at(Math.min(1, 0.18 + 0.82 * (i + 0.2 + rnd() * 0.6) / 5)), r, len: len / 5, w: 1 });
+    } else if (depth >= 2) {               // and a few INSIDE the crown, so it is a mass and not a skin
+      for (let i = 0; i < 2; i++) stations.push({ p: at(0.45 + 0.5 * rnd()), r, len: len / 5, w: P.inner });
     }
     if (!divides) {
       // the end: a spray of fine hairs, which is where the references' fine end of the range lives
       for (let i = 0; i < P.twigs; i++) {
-        const a2 = ang + (rnd() - 0.5) * 2.4, e2 = Math.max(-1.4, Math.min(1.5, el + P.twigDrop + (rnd() - 0.45) * 1.1));
-        const lh = len * P.twigLen * (0.45 + 1.15 * rnd()), rh = r * P.taper * 0.85;
+        const a2 = ang + (rnd() - 0.5) * 2.4;
+        const e2 = P.twigDrop < -0.8 ? -1.06 - 0.44 * rnd()
+          : Math.max(-1.4, Math.min(1.5, el + P.twigDrop + (rnd() - 0.45) * 1.1));
+        let lh = len * P.twigLen * (0.45 + 1.15 * rnd());
+        const rh = r * P.taper * 0.85;
         const hx = Math.cos(a2) * Math.cos(e2), hy = Math.sin(e2), hz = Math.sin(a2) * Math.cos(e2);
         const sagK = P.twigDrop < -0.8 ? P.twigDrop * 0.35 : 0.12;   // a weeper's hair sags under itself
+        const fall = Math.max(0.05, -hy + (sagK < 0 ? -sagK * 2.6 : 0));   // how far down a metre of twig goes
+        lh = Math.min(lh, H * P.twigMax);                                          // never a limb's length again
+        if (hy < -0.3) lh = Math.min(lh, Math.max(0.2, (tip.y - P.hem) / fall));   // the curtain's hem
         const q1 = V(tip.x + hx * lh * 0.5, tip.y + hy * lh * 0.5 + lh * sagK, tip.z + hz * lh * 0.5);
         const q2 = V(tip.x + hx * lh, tip.y + hy * lh + lh * sagK * 2.6, tip.z + hz * lh);
-        tube(B, [tip, q1, q2], [rh, rh * 0.5, rh * 0.16], 3, { part: 0, shade: 0.95, sway0: 0.9, hash: rnd(), branch: (ang + i) % 1 });
+        tube(B, [tip, q1, q2], [rh, rh * 0.5, rh * 0.16], 3, { part: 0, shade: 0.68, sway0: 0.9, hash: rnd(), branch: (ang + i) % 1 });
         finest = Math.min(finest, rh * 0.16);
-        stations.push({ p: q1, r: rh, len: lh }); stations.push({ p: q2, r: rh, len: lh });
+        const ns = lh > len * 0.7 ? 4 : 2;      // a long hanging twig is leafy the whole way down
+        for (let j = 1; j <= ns; j++) { const u = j / ns;
+          stations.push({ p: V(tip.x + hx * lh * u, tip.y + hy * lh * u + lh * sagK * u * u * 2.6, tip.z + hz * lh * u), r: rh, len: lh / ns, w: 0.8 }); }
       }
-      stations.push({ p: tip, r, len });
+      stations.push({ p: tip, r, len, w: 1 });
       return;
     }
     const nC = depth === 1 ? 2 + (rnd() < P.triple ? 1 : 0) : 2;   // (reached only when it divides)
@@ -105,12 +116,14 @@ export function growTree(P, seed) {
   }
   // THE LEAVES HANG ALONG THE TWIGS, in small clusters with sky between, as the references do -- not
   // one ball on the end of each stick, which is what the game had and what reads as a lollipop.
-  const want = P.leafN, per = Math.max(3, Math.round(want / Math.max(1, stations.length)));
+  let wsum = 0; for (const st of stations) wsum += st.w;
+  const want = P.leafN;
   const crownC = V(0, H * 0.72, 0);
   for (const st of stations) {
+    const n = Math.max(3, Math.round(want * st.w / Math.max(1e-6, wsum)));
     const r = Math.min(P.leafR * H, st.len * 1.1) * (0.7 + 0.6 * rnd());
     groundUp(st.p);
-    leafCards(B, st.p, r, r * 0.74, r, rnd, { n: per, len: P.leafLen, wid: P.leafLen * 0.46, round: 1, massC: crownC, massK: 0.55, sway: 0.7, shade0: 0.05, shadeK: 0.6, droop: P.leafDroop });
+    leafCards(B, st.p, r, r * 0.74, r, rnd, { n, len: P.leafLen, wid: P.leafLen * 0.46, round: 1, massC: crownC, massK: 0.55, sway: 0.7, shade0: 0.05, shadeK: 0.6, droop: P.leafDroop });
   }
   const g = B.build();
   g.userData.stat = { H, r0, widest, finest, stations: stations.length };
@@ -120,15 +133,15 @@ export function growTree(P, seed) {
 // ---- the ten -----------------------------------------------------------------------------------
 const BASE = { height: 11, girth: 0.034, lean: 0.6, forkAt: 0.42, boughs: 4, rise: 0.55, droopB: 0.5, lift: 0.12,
   spread: 0.8, arch: 0.16, levels: 3, split: 0.62, taper: 0.22, triple: 0.3, twigs: 4, twigLen: 0.3,
-  drop: -0.10, liftTo: 0.3, twigDrop: 0, stopEarly: 0.3, leader: 0,
+  drop: -0.10, liftTo: 0.3, twigDrop: 0, stopEarly: 0.3, leader: 0, inner: 0.45, hem: 1.4, twigMax: 0.16,
   boughLen: 0.34, leafN: 900, leafR: 0.055, leafLen: 0.5, leafDroop: 0.3 };
 export const LOOKS = [
-  ['1 round maple',       { height: 10, forkAt: 0.34, boughs: 5, rise: 0.60, droopB: 0.45, spread: 0.90, arch: 0.22, boughLen: 0.30, levels: 4, stopEarly: 0.40, leafN: 1100 }],
-  ['2 tall poplar',       { height: 15, girth: 0.024, leader: 1, forkAt: 0.12, boughs: 20, rise: 1.05, droopB: 0.10, spread: 0.34, arch: 0.08, boughLen: 0.20, levels: 2, twigs: 3, leafN: 1500, leafR: 0.032 }],
-  ['3 great oak',         { height: 11, girth: 0.062, forkAt: 0.28, boughs: 4, rise: 0.52, droopB: 0.62, spread: 1.00, arch: 0.32, boughLen: 0.42, levels: 4, triple: 0.5, leafN: 1500 }],
-  ['4 slender birch',     { height: 13, girth: 0.017, lean: 1.3, forkAt: 0.55, boughs: 5, rise: 0.90, droopB: 0.30, spread: 0.52, arch: 0.12, boughLen: 0.22, levels: 4, twigs: 7, twigDrop: -0.3, leafN: 850, leafR: 0.038 }],
+  ['1 round maple',                         { height: 10, forkAt: 0.32, boughs: 5, rise: 0.70, droopB: 0.35, spread: 0.88, arch: 0.24, boughLen: 0.34, levels: 4, stopEarly: 0.40, inner: 0.60, leafN: 1700, leafR: 0.042 }],
+  ['2 tall poplar',                         { height: 15, girth: 0.024, leader: 1, forkAt: 0.12, boughs: 22, rise: 1.05, droopB: 0.10, spread: 0.34, arch: 0.08, boughLen: 0.21, levels: 2, twigs: 3, leafN: 1700, leafR: 0.030 }],
+  ['3 great oak',                         { height: 11, girth: 0.050, forkAt: 0.24, boughs: 5, rise: 0.56, droopB: 0.58, spread: 0.95, arch: 0.32, boughLen: 0.46, levels: 4, triple: 0.5, inner: 0.60, leafN: 2300, leafR: 0.044 }],
+  ['4 slender birch',                         { height: 13, girth: 0.017, lean: 1.3, forkAt: 0.38, boughs: 9, rise: 0.80, droopB: 0.40, spread: 0.60, arch: 0.16, boughLen: 0.26, levels: 4, twigs: 7, twigDrop: -0.45, inner: 0.5, leafN: 1400, leafR: 0.028, leafLen: 0.40 }],
   ['5 flat parasol',      { height: 8, forkAt: 0.72, boughs: 6, rise: -0.02, droopB: 0.02, lift: 0.22, liftTo: -0.1, drop: -0.14, spread: 1.05, arch: 0.30, boughLen: 0.55, levels: 3, stopEarly: 0.1, leafN: 1100, leafR: 0.050 }],
-  ['6 weeping willow',    { height: 13, forkAt: 0.58, boughs: 6, rise: 1.15, droopB: 0.05, lift: 0.0, liftTo: -9, drop: -0.75, spread: 0.46, arch: -0.30, boughLen: 0.30, levels: 4, split: 0.72, twigs: 8, twigLen: 2.4, twigDrop: -1.5, stopEarly: 0, leafN: 1600, leafR: 0.030, leafDroop: 0.8 }],
+  ['6 weeping willow',  { height: 13, girth: 0.030, forkAt: 0.50, boughs: 6, rise: 0.95, droopB: 0.05, lift: 0.0, liftTo: -9, drop: -0.40, spread: 0.52, arch: -0.12, boughLen: 0.30, levels: 4, split: 0.70, taper: 0.30, twigs: 8, twigLen: 1.6, twigMax: 0.46, twigDrop: -1.3, stopEarly: 0.15, hem: 1.8, inner: 0.3, leafN: 1800, leafR: 0.028, leafLen: 0.34, leafDroop: 0.8 }],
   ['7 young sapling',     { height: 5, girth: 0.030, lean: 1.2, forkAt: 0.38, boughs: 3, rise: 0.80, droopB: 0.25, spread: 0.85, arch: 0.18, boughLen: 0.40, levels: 3, stopEarly: 0.5, leafN: 420 }],
   ['8 gnarled veteran',   { height: 8, girth: 0.082, lean: 2.2, forkAt: 0.18, boughs: 4, rise: 0.30, droopB: 0.75, spread: 1.30, arch: 0.36, boughLen: 0.46, levels: 4, triple: 0.8, stopEarly: 0.45, leafN: 1000 }],
   ['9 low thicket',       { height: 6, girth: 0.022, forkAt: 0.06, boughs: 6, rise: 1.15, droopB: 0.25, spread: 0.32, arch: 0.16, boughLen: 0.52, levels: 4, twigs: 6, stopEarly: 0.35, leafN: 950, leafR: 0.038 }],
@@ -244,11 +257,13 @@ if (process.argv[1] && process.argv[1].endsWith('treevariants.mjs')) {
     const W = +(A.w || 300), H = +(A.h || 640), COLS = +(A.cols || 5);
     const seeds = (A.seeds || '3').split(',').map(Number);
     const turns = (A.turn || '0').split(',').map(Number);
-    const cells = LOOKS.length * seeds.length * turns.length;
+    const pick = A.pick ? A.pick.split(',') : null;
+    const SHOW = pick ? LOOKS.filter(([n]) => pick.includes(n.split(' ')[0])) : LOOKS;
+    const cells = SHOW.length * seeds.length * turns.length;
     const rows = Math.ceil(cells / COLS), PW = W * COLS, PH = H * rows;
     const px = { W: PW, a: new Uint8Array(PW * PH * 3).fill(255) };
     const grown = [];
-    for (const [name, P] of LOOKS) for (const s of seeds) for (const t of turns) grown.push({ name, g: growTree(P, s), t });
+    for (const [name, P] of SHOW) for (const s of seeds) for (const t of turns) grown.push({ name, g: growTree(P, s), t });
     let gy = 0, gx = 0;
     for (const q of grown) { const p = q.g.attributes.position.array, ca = Math.cos(q.t * Math.PI / 180), sa = Math.sin(q.t * Math.PI / 180);
       let lo = 1e9, hi = -1e9; for (let i = 0; i < p.length; i += 3) { if (p[i+1] > gy) gy = p[i+1]; const u = p[i] * ca - p[i+2] * sa; if (u < lo) lo = u; if (u > hi) hi = u; }
