@@ -2450,3 +2450,18 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - **AND ONE PIECE OF HOUSEKEEPING:** `src/data` held five files in no role's pathspec (`mode.js`, `felled.js`,
   `burnt.js`, `stripped.js`, and now `season.js`), each of which had to be remembered and committed by hand.
   PAINTER now owns `src/data` entire, less `bodies.js`, which stays with PILOT.
+- **MERGED as v19, pull request #19** (https://github.com/zubersss/Painted-cosmos/pull/19), under the owner's standing
+  permission of 2026-11-17. Suites on the MERGED tree: unit 301, world and kits and season 108, physics 376.
+- **THE GATE, AND WHY IT DOES NOT SAY "0 PIXELS" THIS TIME.** `tests/capture.mjs` was used first and all six scenes
+  differed. BEFORE REPORTING THAT, the same scene was captured twice FROM THE SAME UNCHANGED CODE -- and it differed
+  too, by 22 KB. The harness is not repeatable: its clock runs while it settles, so the screenshot lands on an
+  arbitrary frame, and pinning the clock with `setTimeScale(0)` did not fix it. **Those six differences proved
+  nothing**, and a session that had reported them would have reported a fault that was not there.
+  The gate was then run on the project's own held-loop harness, `tests/stations.mjs --set quick --tier q0
+  --size 640x360 --views 0 --root <tree>` (34 seconds a run), THREE runs of `main` and TWO of the branch:
+  main-vs-main differs by 32,166 to 45,793 pixels at the foot station and branch-vs-branch by 32,237, while
+  main-vs-branch is 36,002 to 43,713. Of 236 measured numbers, main-vs-branch had **0** outside the rule and
+  BRANCH-VS-BRANCH HAD **2**. The one measure that ever flags ranges 18.19-18.69 over runs of identical code, which
+  contains every main-vs-branch reading. **Two runs of the same code differ by more than main differs from the
+  branch.** That is the honest form of the claim and the next session should use this harness, not capture.mjs,
+  for a gate.
