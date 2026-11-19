@@ -2432,3 +2432,21 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
 - THREE ASKS IN ONE: (a) build those six as real trees; (b) "refine them a little better" - the shapes are close but not finished; (c) the forest's leaves CHANGE COLOUR from summer to autumn.
 - NOTE ON (b): the owner is looking at SHAPE drawings, so "refine" is about form. Refinement that only shows in the game's own paint cannot be judged from the sheet and must be looked at in the game.
 - NOTE ON THE WILLOW: it was said to the owner that it costs about three times what the others do. They asked for it anyway. Taken as their decision; it will be built, and where it is PLANTED will be kept sparing (by water) unless they say otherwise.
+- **DONE, 19 Nov.** The six are built (`src/world/kits/grove.js`, one grammar and six rows of numbers) and planted;
+  the wood turns from summer to autumn (`src/data/season.js`). Measured at lod 0 over twelve seeds: roundmaple
+  8446-11698, poplar 10100-10520, oak 9870-12730, birch 13426-15434, willow 13244-15936, sapling 2982-3590 triangles,
+  against the shipping maple's 11188. SEEN in the gallery: the same wood, camera and hour at `?season=0` and
+  `?season=1`, green and then red-gold, no console or shader error at either end
+  (`docs/shots/trees/wood_summer.png`, `wood_autumn.png`).
+- **THREE FAULTS WORTH THE NEXT SESSION'S TIME, each found a different way:**
+  - BY MEASURING: the leaf floor, not `leafN`, decided a tree's cost. A cluster has a floor of three leaves, and the
+    willow grows four places to hang them down every hanging twig, so cutting `leafN` by a fifth changed nothing at
+    all (22016 triangles before and after). Places are now thinned to what the budget affords.
+  - BY MEASURING: every number written by hand for the camera's crown table was wrong, the oak's radius by a quarter
+    of its height. They are measured off the built trees now. **A number you wrote is not a measurement.**
+  - BY LOOKING: the family accent a kind's crowns carry (`fam`, the maple's reds) was not seasonal, so the first
+    summer still had RED CROWNS IN A GREEN WOOD; and the forest floor's two dresses sit in the BASE look data, so
+    the LIVE WATERCOLOUR GAME would have begun turning its seasons. The whole mechanism is now behind `LOOK.oil`.
+- **AND ONE PIECE OF HOUSEKEEPING:** `src/data` held five files in no role's pathspec (`mode.js`, `felled.js`,
+  `burnt.js`, `stripped.js`, and now `season.js`), each of which had to be remembered and committed by hand.
+  PAINTER now owns `src/data` entire, less `bodies.js`, which stays with PILOT.

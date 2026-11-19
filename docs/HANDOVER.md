@@ -409,6 +409,17 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`look-proto` CARRIES, ON TOP OF v18: THE OWNER'S SIX TREES AND THE TURN OF THE YEAR** (19 Nov).
+`src/world/kits/grove.js` is one grammar with six rows of numbers -- round maple, tall poplar, great oak, slender
+birch, weeping willow, young sapling -- chosen by the owner off a sheet of ten. They are planted in the autumn wood
+in deliberate PAIRS (floraplace reads the list two at a time, one pair to a grove): maple with spruce, oak with
+sapling, birch with poplar. The willow stands in the misty wetland instead, because it belongs by water and costs
+half as much again to draw. `src/data/season.js` turns the year: a leaf's colour was already a uniform, so summer to
+autumn is three vectors written per material when the season moves and NOT ONE INSTRUCTION MORE IN ANY SHADER.
+`?season=0` to `?season=1`; `?year=` sets how long a turn takes (720 s by default), `?year=0` stops it. All of it is
+behind `LOOK.oil`. SEEN: the same wood, camera and hour at both ends of the year. Suites: unit 301, world 48,
+kits 54, season 6, physics unchanged. **NOT YET GATED AND NOT MERGED.**
+
 **`main` IS AT v18 (18 Nov), pull request #18 merged.** It carries THE FIRE AND ITS ULTIMATE, the
 four kinds of tree really standing, the far wood's leaves back, the sky's cloud form, a wood that
 grows back, the world there before a fast flight, speed test 9 and the twelve faults the
