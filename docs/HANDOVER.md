@@ -413,6 +413,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v24 (19 Nov), pull request #24 merged.** The owner refused shortening the far trees' reach ("No I
+dont like that find another way around it"), so the wood stays as deep. KEPT: plants no longer ask for
+alphaToCoverage where there is no multisampling (the phone has none) -- the picture is identical, 0.00% of pixels,
+and whether it buys time only the phone knows. THROWN AWAY: thinning the far trees WITHOUT growing what is kept --
+triangles -47% but fragments +62% and self-lap 9.96 -> 15.18, **because the far tree's DARK CORE has the HIGHEST
+sort key and is dropped LAST**, so thinning keeps the big mark and drops the small ones. **Do not try thinning the
+far tier again under the present sort: that is twice.** The way in is to drop the core FIRST.
+
 **`main` IS AT v23 (19 Nov), pull request #23 merged: THE SPEED TEST TELLS THE TRUTH NOW.** The v22 table was not
 readable -- four rows were timed while NOTHING WAS BEING DRAWN and none was marked, because the test only asked
 whether frames were steady and an empty scene is the steadiest of all. Its baselines disagreed threefold. It also

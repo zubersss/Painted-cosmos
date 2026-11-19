@@ -2595,3 +2595,22 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   looks like, so the owner should see it before it is kept. Rows 7 and 8 of the speed test (far trees drawn first /
   last) are only -0.8 and -0.3 ms, which says the order is NOT the fault: the cards do not write depth, so no
   ordering can let early-Z reject them. The waste has to be removed, not re-ordered.
+
+### 2026-11-19 OWNER: "No I dont like that find another way around it" — the far trees stay (v24)
+- The owner REFUSED pulling the far trees in. The wood stays as deep. Two other ways tried.
+- **KEPT: every painted plant had `alphaToCoverage` and never had it taken away.** On the phone the picture is
+  drawn with NO multisampling ("edges none" in the test's own header), so every plant in the game asked for a
+  multisampling feature that CANNOT DO ANYTHING -- and on a tile GPU, coverage that depends on the shader is one of
+  the things that turns off early rejection of hidden pixels, which is exactly what the far trees need (1,000,333
+  of their 1,002,637 fragments are hidden). Now set from `post.samples`, the same signal the shader already reads.
+  MEASURED: the picture is IDENTICAL, 0.00% of pixels, as it must be. Whether it buys time, only the phone knows.
+- **THROWN AWAY, and worth more than the fix.** The far trees are painted TEN LAYERS DEEP, so thinning ought to be
+  free: drop two thirds and three layers still cover. The 18 Nov attempt measured thinning as a loss because each
+  kept leaf is GROWN by 1/sqrt(keep), which holds the painted area constant; so this time it was thinned WITHOUT
+  growing -- the one thing that attempt never tried. **STILL A LOSS AND WORSE: triangles -47%, fragments +62%,
+  self-lap 9.96 -> 15.18.**
+  THE REASON is in flora.js's own 18 Nov note three lines below: **the far tree's DARK CORE has the HIGHEST sort
+  key, so it is the LAST thing dropped.** Thinning therefore drops small leaf cards and KEEPS THE BIG CORE, the
+  average mark grows, and the fill rises. The machinery is right and THE SORT ORDER IS UPSIDE DOWN for this.
+- **SO THE WAY IN, for whoever takes it next:** make the far tree's core the FIRST thing dropped, not the last, or
+  build a far tree of marks that need no growing. Do not thin it again under the present sort -- that is twice now.
