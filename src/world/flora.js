@@ -14,7 +14,7 @@ import { getSurface } from './surface.js';
 import { dirToFace, faceToDir, nodeSize } from './cubesphere.js';
 import { INST_STRIDE, U_GRASS, U_FERN, U_BUSH, U_ROCK, U_FLOWER, U_STONE, U_REED, U_SHARD } from './floraplace.js';
 import { SEASON, leafNow } from '../data/season.js';
-import { FLORA_PHYS, TALL_KITS, farCardGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
+import { FLORA_PHYS, TALL_KITS, farCardGeometry, farBlobGeometry, sortLeafCards, leafDrawCount, farTreeGeometry, grassGeometry, grassPatchGeometry, reedGeometry, fernGeometry, bushGeometry, rockGeometry, flowerGeometry, shardGeometry } from './florakit.js';
 import { makePropMaterial } from '../render/materials.js';
 import { treeCell, underCell, hasCell, TREE_LEVEL, UNDER_LEVEL } from './obstacles.js';
 import { QUALITY, G, LOOK, SCREEN, SHADOW } from '../render/shared.js';
@@ -32,6 +32,9 @@ const TREES_FULL = typeof location !== 'undefined' && /[?&]trees=full\b/.test(lo
 // (speed test 6, 2026-11-17), and across a river the lump read as a smooth orange blob where this reads as leaves.
 // (?fartree=lump: the lump, as it was until 2026-11-17, for comparisons.)
 const FAR_LUMP = typeof location !== 'undefined' && /[?&]fartree=lump\b/.test(location.search || '');
+// (2026-11-19) `?fartree=blob`: the far tree as ONE CARD with spherical normals, painted by the look's own dab
+// shader -- 10 triangles against 138. Opt-in, so the wood that ships is untouched until the owner has seen it.
+const FAR_BLOB = typeof location !== 'undefined' && /[?&]fartree=blob\b/.test(location.search || '');
 const FAR_CARDS = !FAR_LUMP;
 const RANGE_SCALE = [0.28, 0.6, 1.0];                    // (the lower tiers keep the ranges they had)
 const TRIM = [1, 1];          // (was [0.82, 0.88] to pay for a triangle budget; the owner withdrew the budget: trees hand over where they read best)
@@ -182,7 +185,7 @@ export class Flora {
     this.kit = {
       far: farTreeGeometry(5),
       // (the oil look's far tree for the kinds that are trees in leaf: a stem and leaf cards, florakit.js)
-      farCards: LOOK.oil && FAR_CARDS ? sortLeafCards(farCardGeometry(6)) : null,     // (2026-11-18: ordered for thinning, as the near and mid trees are: see below)
+      farCards: LOOK.oil && FAR_CARDS ? sortLeafCards(FAR_BLOB ? farBlobGeometry(6) : farCardGeometry(6)) : null,     // (2026-11-18: ordered for thinning, as the near and mid trees are: see below)
       grass: grassGeometry(31, { oil: LOOK.oil }), patch: grassPatchGeometry(37, { oil: LOOK.oil }), fern: fernGeometry(41, { oil: LOOK.oil }), reed: reedGeometry(81), bush: bushGeometry(51, { oil: LOOK.oil }),
       rock: rockGeometry(61), flower: flowerGeometry(71, { oil: LOOK.oil }), shard: shardGeometry(91),
     };
@@ -652,7 +655,7 @@ export class Flora {
     on = !!on;
     const now = this.species.some((sp) => sp.cardFar);
     if (on === now) return now;
-    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
+    if (on && !this.kit.farCards) this.kit.farCards = sortLeafCards(FAR_BLOB ? farBlobGeometry(6) : farCardGeometry(6));   // (ordered for thinning here too, or the speed test's swap loses it)
     for (const sp of this.species) sp.cardFar = on && sp.canCard;
     for (const [key, ch] of this.farChunks) {
       if (ch.queued) { const qi = this.queue.indexOf(ch); if (qi >= 0) this.queue.splice(qi, 1); ch.queued = false; }
