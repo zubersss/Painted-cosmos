@@ -2614,3 +2614,27 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   average mark grows, and the fill rises. The machinery is right and THE SORT ORDER IS UPSIDE DOWN for this.
 - **SO THE WAY IN, for whoever takes it next:** make the far tree's core the FIRST thing dropped, not the last, or
   build a far tree of marks that need no growing. Do not thin it again under the present sort -- that is twice now.
+
+### 2026-11-19 THE FAR TREE AS ONE ROUNDED CARD (v25): five things tried, four measured losses, one that works
+- The owner refused a shorter view and asked for "something great". The answer was named on 17 Nov and never
+  started: "not a plainer tree but a cheaper WAY TO PAINT THE SAME DABBED CROWN".
+- **WHAT THE TABLE SAYS THE COST IS, and it is not what anyone assumed:** "far trees one flat colour" saves 0.9 ms,
+  so THE PAINT IS NOT THE COST; "far trees as lumps" (26 triangles) saves 8.7 ms, so THE TRIANGLES ARE. 138
+  triangles x 3,853 far trees = half a million tiny triangles binned by a tile GPU before a pixel is drawn.
+- **THE FAR TREE IS NOW ONE ROUNDED CARD, crossed twice, painted by the look's OWN dab shader.** No new material:
+  the oil branch already lays dabs on whatever surface it is given. SPHERICAL NORMALS round it in the light; a
+  SIX-CORNERED outline makes it a crown (the first try was two crossed RECTANGLES and the wood from the air was a
+  field of straight-edged patches -- the dab shader paints across what it is given, it does not cut a crown out of
+  a square). MEASURED on foot: triangles 531,714 -> 53,942 (-90%), fragments 1,002,637 -> 570,881 (-43%), self-lap
+  9.96 -> 5.87, pixels covered 100,619 -> 97,325 (the wood has NOT thinned). Whole frame -20% triangles, -14%
+  fragments. OPT-IN as `?fartree=blob`; the owner decides, and their own reference argues for it ("from the ship:
+  each tree one crisp patch, dark firs between", Thomson).
+- **THE FOUR THAT FAILED, each measured, so nobody repeats them:**
+  1. thinning the far tree AT RANDOM (18 Nov): triangles -52%, shaded pixels +53%.
+  2. thinning it WITHOUT growing what is kept (19 Nov): triangles -47%, fragments +62%, self-lap 9.96 -> 15.18.
+  3. thinning it SHINGLES-FIRST, core kept (19 Nov): triangles -70% and THE WOOD WENT TO DARK BROWN BLOBS from the
+     air. **The shingles ARE the leaf colour; the core is the shadow beneath them.** Seen, not reasoned.
+  4. alphaToCoverage off where there is no multisampling (19 Nov): picture identical, no measurable gain.
+- **THE LESSON OF THE DAY, five times over: measure the thing, not the thing you assume.** The paint was innocent
+  (0.9 ms). The leaves were innocent (already painted once per leaf). The shingles were not detail. Every one of
+  those was obvious and wrong.

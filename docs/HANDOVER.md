@@ -413,6 +413,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v25 (19 Nov), pull request #25 merged: A FAR TREE OF ONE ROUNDED CARD, opt-in as `?fartree=blob`.**
+The owner's table says the far trees' cost is TRIANGLES, not paint ("one flat colour" -0.9 ms, "as lumps" -8.7 ms),
+so the far tree is now ONE ROUNDED CARD crossed twice, painted by the look's own dab shader, with spherical normals
+to round it and a six-cornered outline so it is a crown and not a square. MEASURED on foot: triangles -90%,
+fragments -43%, self-lap 9.96 -> 5.87, and the wood still covers the same pixels. Whole frame -20% / -14%.
+**THE PHONE HAS NOT TIMED IT: ask for speed test 9 with `&fartree=blob` added.** Four other things were tried
+today and measured as losses; they are in the log for 19 Nov with their numbers, and none should be tried again.
+
 **`main` IS AT v24 (19 Nov), pull request #24 merged.** The owner refused shortening the far trees' reach ("No I
 dont like that find another way around it"), so the wood stays as deep. KEPT: plants no longer ask for
 alphaToCoverage where there is no multisampling (the phone has none) -- the picture is identical, 0.00% of pixels,
