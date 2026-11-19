@@ -179,7 +179,7 @@ export class Powers {
       if (b.kind === FUEL.ice) {
         // the row says how much heat has gone into this place IN ALL, and only ever grows, so the depth we want is
         // that heat turned into metres; the mark's own depth says how much of it is already down there
-        const m = meltIce(b.bodyId, b.px, b.py, b.pz, b.radius);
+        const m = meltIce(b.bodyId, b.px, b.py, b.pz, b.radius, b.floor == null ? -1 : b.floor);
         if (m) deepenMelt(m, b.heat * POWERS.meltPerHeat - m.d);
       } else {
         scorch(b.bodyId, b.px, b.py, b.pz, b.radius, b.burnt);
@@ -498,7 +498,11 @@ export class Powers {
     // (2026-11-18, measured: the spawn's own wood DOES take a fire -- 64 patches in forty seconds. What refused it
     //  was the river the spawn stands on, and the word on the screen said neither. The world now hands back the
     //  reason in plain words (physics/index.js fuelAt, `why`) and this says that instead of guessing.)
-    if (f.kind === FUEL.none) this._say(FIRE_WHY[f.why] || 'nothing here will burn');
+    // (2026-11-19: on ice it said "too little here to carry it", because ice has no fuel. It is not a failure --
+    //  ice is the one ground that answers a flame by MELTING -- and on the three ice worlds that wrong word was
+    //  the only thing the player ever heard. It says what is happening instead.)
+    if (f.kind === FUEL.ice) this._say('the ice melts');
+    else if (f.kind === FUEL.none) this._say(FIRE_WHY[f.why] || 'nothing here will burn');
     else if (f.wet >= FIRE.wetStop * 0.8) this._say('too damp to catch');
     else if (!(f.fuel > 0.25)) this._say('too little here to carry it');
     return f;
