@@ -43,9 +43,37 @@ export const ABILITIES = Object.freeze([
 // FIRE'S abilities, the second element (docs/POWERS-FIRE.md part 1). A SEPARATE frozen list, not more of the wind's:
 // tests/powers.test.mjs holds ABILITIES above to exactly the wind's seven, and the fan of words, the keys and the
 // element button all read whichever list is current. Only `kindle` is built; melt, embers and snuff are named there.
+// (2026-11-19, the owner: "give it 5 new abilities that are fire based ... also make it so that putting on a fire
+//  speeds up the fire and also fire tornados can be a thing".) Six now, in the order of the keys 1..6:
+//    kindle   set a fire where you look
+//    ember    throw a spark FURTHER, over water, over a gap, over a road -- it does not fall short
+//    bellows  put air on a fire: a hard short gust at the aim, which the fire's own wind reading picks up and
+//             which therefore fans it, speeds its spread and makes it eat its fuel faster. This is the owner's
+//             "putting on a fire speeds up the fire", and it is done the honest way -- by making real wind, not
+//             by a number that says "this fire is faster now".
+//    wall     lay a line of fire across the view: a burning barrier, or a backfire to starve a front
+//    snuff    put out everything burning near the aim: the power that can start a forest fire can stop one
+//    whirl    raise a fire whirl where a fire is already big enough to make its own column (physics F.whirl)
 export const FIRE_ABILITIES = Object.freeze([
   { id: 'kindle', word: 'kindle', hold: false },
+  { id: 'ember', word: 'ember', hold: false },
+  { id: 'bellows', word: 'bellows', hold: false },
+  { id: 'wall', word: 'wall of fire', hold: false },
+  { id: 'snuff', word: 'snuff', hold: false },
+  { id: 'firewhirl', word: 'fire whirl', hold: false },
 ]);
+
+// What the five new ones are worth, all in one place so the owner can see and change them.
+export const FIREPOWER = Object.freeze({
+  emberFar: 2.1,          // times the ordinary aim: how much further a thrown spark reaches
+  bellowsPower: 1.6,      // the gust bellows makes, against an ordinary gust
+  bellowsSize: 3,         // and at what size
+  wallSpan: 9,            // m: how wide a wall of fire is laid
+  wallStep: 2.6,          // m between the patches it is laid in
+  snuffR: 7,              // m: how far out a snuff reaches
+  snuffUlt: 16,           // m: and held to the full
+  whirlR: 10,             // m: a fire whirl must find its fire within this of the aim
+});
 
 export const POWERS = Object.freeze({
   hands: 1.15,            // m above the feet: where a gust leaves
@@ -71,6 +99,13 @@ const AIM_SIZE = {
   // fire: the ring shows the first patch the fire is set down in (physics/fire.js FIRE.litRadius, which is
   // 1.4 m for a tap and 3.8 m held to the full; the size below multiplies this)
   kindle: () => FIRE.litRadius * 0.5,
+  // (the five of 2026-11-19) the ember's ring is the spark itself; bellows shows the gust it makes; the wall shows
+  // its own span; snuff shows how far it reaches; the whirl shows the ground a turning column would take.
+  ember: () => FIRE.litRadius * 0.5,
+  bellows: (d) => WINDPOWER.gustRadius + WINDPOWER.gustSpread * d,
+  wall: () => FIREPOWER.wallSpan * 0.5,
+  snuff: () => FIREPOWER.snuffR,
+  firewhirl: () => WINDPOWER.vortexRadius,
 };
 const unit = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
@@ -311,6 +346,22 @@ export class Powers {
       //  Holding the button is the first thing anyone does after reading that message.)
       const f = this._kindle(sim, K);
       if (f && f.kind !== FUEL.none) this._say('a great fire is set');
+    } else if (id === 'ember') {
+      // held to the full: a handful of sparks thrown out along the view, not one
+      let lit = 0;
+      for (let i = 0; i < 5; i++) if (this._ember(sim, K, 0.55 + i * 0.18)) lit++;
+      this._say(lit ? 'a shower of sparks: ' + lit + ' caught' : 'the sparks find nothing');
+    } else if (id === 'bellows') {
+      this._bellows(sim, W.sizeMax, 2.2);
+      this._say('the air roars into it');
+    } else if (id === 'wall') {
+      const n = this._wall(sim, K, 2);
+      this._say(n ? 'a wall of fire, ' + n + ' long' : 'nothing here will carry a wall');
+    } else if (id === 'snuff') {
+      const n = this._snuff(sim, FIREPOWER.snuffUlt);
+      this._say(n ? 'the fires go out: ' + n : 'nothing was burning');
+    } else if (id === 'firewhirl') {
+      this._fireWhirl(sim, W.sizeMax, true);
     } else {
       // gather and part are HELD, not let go: their ultimate is that they go on growing past every ordinary limit
       // while the hand stays down (see growWind above). Nothing is cast here.
@@ -409,6 +460,11 @@ export class Powers {
             else if (ab.id === 'whirl') castVortex(W, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, k);
             else if (ab.id === 'knife') this._knife(sim, k);
             else if (ab.id === 'kindle') this._kindle(sim, k);
+            else if (ab.id === 'ember') this._ember(sim, k);
+            else if (ab.id === 'bellows') this._bellows(sim, k);
+            else if (ab.id === 'wall') this._wall(sim, k);
+            else if (ab.id === 'snuff') this._snuff(sim, FIREPOWER.snuffR);
+            else if (ab.id === 'firewhirl') this._fireWhirl(sim, k);
             this._wait = POWERS.gustEvery;
             this._cast(sim);
           }
@@ -446,6 +502,98 @@ export class Powers {
     else if (f.wet >= FIRE.wetStop * 0.8) this._say('too damp to catch');
     else if (!(f.fuel > 0.25)) this._say('too little here to carry it');
     return f;
+  }
+
+  // ---- THE FIVE NEW FIRE ABILITIES (the owner, 2026-11-19) -------------------------------------------------
+
+  // EMBER: a spark thrown FURTHER than a kindling and, unlike one, it does not fall short. A kindling that cannot
+  // find ground steps back toward you until it does; a thrown spark goes where it is thrown, over the water, over
+  // the road, over the gap. That is the whole difference between them and it is the reason to have both.
+  // `far`: where along the throw it lands, 1 being the full reach (the ultimate throws a handful at different reaches).
+  _ember(sim, size = 1, far = 1) {
+    const ph = sim.physics;
+    if (!ph || !ph.lightFire || !this.aim.ok) return null;
+    const A = this.aim, from = A.from;
+    const dx = A.p.x - from.x, dy = A.p.y - from.y, dz = A.p.z - from.z;
+    const k = FIREPOWER.emberFar * far;
+    const p = { x: from.x + dx * k, y: from.y + dy * k, z: from.z + dz * k };
+    const f = ph.lightFire(this.fires, sim.bodyId, p, size);
+    if (!f) { this._say('no room for another fire'); return null; }
+    this.fireCasts++;
+    if (far === 1) {
+      if (f.kind === FUEL.none) this._say(FIRE_WHY[f.why] || 'the spark finds nothing to burn');
+      else if (f.wet >= FIRE.wetStop * 0.8) this._say('the spark hisses out');
+    }
+    return f.kind !== FUEL.none ? f : null;
+  }
+
+  // BELLOWS: THE OWNER'S "putting on a fire speeds up the fire", done honestly. It makes a hard short gust at the
+  // aim through the ordinary wind machinery -- so the air it makes is the same air the fire already reads through
+  // physics/fire.js ctx.windAt, and the fire is fanned, leans downwind, spreads faster that way and eats its fuel
+  // sooner, all by the rules that were already there. Nothing anywhere says "this fire is now faster".
+  // It is a wind, so it works on a fire someone else lit, on a wood, and on nothing at all.
+  _bellows(sim, size = 1, power = 1) {
+    if (!this.aim.ok) return;
+    const A = this.aim;
+    castGust(this.winds, sim.bodyId, A.from, A.fwd, FIREPOWER.bellowsPower * power, Math.max(size, FIREPOWER.bellowsSize), false);
+    this.casts++;
+  }
+
+  // WALL OF FIRE: a line of kindlings laid ACROSS the view rather than one at the aim -- a barrier to put between
+  // yourself and something, or a backfire laid in front of a front to starve it. `grow` widens it (the ultimate).
+  // Returns how many of them caught.
+  _wall(sim, size = 1, grow = 1) {
+    const ph = sim.physics;
+    if (!ph || !ph.lightFire || !this.aim.ok) return 0;
+    const A = this.aim;
+    // across the view, level: the aim's forward turned a quarter turn about the explorer's own up
+    const up = unit(sim.ex.p), f = A.fwd;
+    let sx = up.y * f.z - up.z * f.y, sy = up.z * f.x - up.x * f.z, sz = up.x * f.y - up.y * f.x;
+    const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+    const span = FIREPOWER.wallSpan * grow, step = FIREPOWER.wallStep;
+    const n = Math.max(2, Math.round(span / step));
+    let lit = 0;
+    for (let i = 0; i < n; i++) {
+      const t = (i / (n - 1) - 0.5) * span;
+      const p = { x: A.p.x + sx * t, y: A.p.y + sy * t, z: A.p.z + sz * t };
+      const q = ph.lightFire(this.fires, sim.bodyId, p, size);
+      if (!q) break;                                  // the list is full: the wall is as long as it could be
+      if (q.kind !== FUEL.none) lit++;
+    }
+    this.fireCasts++;
+    if (grow === 1) this._say(lit ? 'a wall of fire' : 'nothing here will carry a wall');
+    return lit;
+  }
+
+  // SNUFF: put out everything burning within `r` of the aim. The counterweight to all of the above: a power that
+  // can set a wood alight needs one that can stop it, and without this the fire is only a way of spoiling a world.
+  _snuff(sim, r) {
+    const ph = sim.physics;
+    if (!ph || !ph.douseNear || !this.aim.ok) return 0;
+    const n = ph.douseNear(this.fires, sim.bodyId, this.aim.p, r);
+    this.fireCasts++;
+    this._say(n ? (n === 1 ? 'the fire is out' : n + ' fires are out') : 'nothing burning here');
+    return n;
+  }
+
+  // FIRE WHIRL (the owner: "fire tornados can be a thing"). The physics says when a fire has gathered enough of
+  // itself in one place, in air still enough, to raise a turning column (physics/fire.js whirlCheck -> F.whirl).
+  // This ability takes that column and makes it real: a vortex in the wind at the fire's own middle, which then
+  // throws the fire outward the way a real one does -- because the vortex IS wind, and the fire reads the wind.
+  // Without a fire big enough it says so and nothing happens: it is a thing you earn by building a fire first.
+  _fireWhirl(sim, size = 1, great = false) {
+    const ph = sim.physics;
+    if (!ph || !ph.fireWhirl) return null;
+    const w = ph.fireWhirl(this.fires);
+    if (!w || w.bodyId !== sim.bodyId) { this._say('no fire great enough to turn'); return null; }
+    if (this.aim.ok) {
+      const dx = w.px - this.aim.p.x, dy = w.py - this.aim.p.y, dz = w.pz - this.aim.p.z;
+      if (dx * dx + dy * dy + dz * dz > FIREPOWER.whirlR * FIREPOWER.whirlR) { this._say('the fire is too far to turn'); return null; }
+    }
+    castVortex(this.winds, sim.bodyId, { x: w.px, y: w.py, z: w.pz }, this.casts % 2 ? -1 : 1, great ? WINDPOWER.sizeMax : size);
+    this.casts++;
+    this._say(great ? 'a tower of fire' : 'the fire turns');
+    return w;
   }
 
   // The place a kindling really starts: the aim if it will burn, else the nearest ground short of it (and a step to
