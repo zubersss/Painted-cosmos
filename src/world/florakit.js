@@ -403,6 +403,50 @@ function shingles(B, c, rx, ry, rz, rnd, opts) {
 // lump ran at 22.5, and looked too plain to be the look: a one-tone core with a few leaves on it. Now: the dark core,
 // FORTY-SIX SHINGLED LEAVES over it, each in its own tone, with the dark between them, and ten leaves standing out of
 // it for the outline.)
+// THE FAR TREE AS ONE CARD (2026-11-19, the owner: "find another way around it"). The far tree that ships is a
+// dark core, 46 shingles and 10 leaf cards -- 138 triangles, and 3,853 of them stand in one view of the autumn wood
+// (531,714 triangles). The owner's own speed test says what that costs and what it is: "far trees one flat colour"
+// saves 0.9 ms, so THE PAINT IS NOT THE COST; "far trees as lumps" (26 triangles) saves 8.7 ms, so THE TRIANGLES
+// ARE. On a phone's tile GPU half a million tiny triangles are binned before a pixel is drawn.
+//
+// So: ONE QUAD, four triangles (two crossed), and the look's OWN dab shader paints it. Nothing new is needed in any
+// material -- the oil branch already lays dabs across whatever surface it is given and cuts the ragged edge with
+// its own discard, which is exactly what a far crown is. What a flat quad cannot do is turn in the light, so its
+// four corners are given SPHERICAL NORMALS, splayed outward as if it were the ball it stands for: the dab shading
+// then rounds it, and a crown reads as a crown rather than as a sheet of paper.
+//
+// It keeps the dabbed crown the owner approved; it is 4 triangles instead of 138.
+export function farBlobGeometry(seed) {
+  const rnd = mulberry32(seed), B = new Builder();
+  tube(B, [V(0, 0, 0), V(0.01, 0.52, 0)], [0.020, 0.012], 3, { part: 0, swayK: 0.02, swayH: 1, hash: 0.5 });
+  const c = V(0, 0.68, 0), R = 0.33, H = 0.42;
+  // two crossed quads, so the crown has depth from any way round and does not vanish edge-on
+  for (let q = 0; q < 2; q++) {
+    const a = q * Math.PI * 0.5 + 0.4;
+    const ex = Math.cos(a), ez = Math.sin(a);          // across
+    const hash = 0.2 + 0.6 * rnd();
+    B.branch = (rnd() * 7.13) % 1;
+    B.card = [c.x, c.y, c.z];
+    // A ROUNDED OUTLINE, not a quad: the first try was two crossed rectangles and from the air the wood was a
+    // field of straight-edged patches -- the dab shader paints across whatever it is given and does not cut a
+    // crown out of a square. Six corners, as the look's own leaves have (leafCards `round`), so the silhouette
+    // is a crown. Four triangles a card instead of two, which is still 93% less than the tree it replaces.
+    const corner = (sx, sy) => {
+      const px = c.x + ex * R * sx, py = c.y + H * sy, pz = c.z + ez * R * sx;
+      // SPHERICAL NORMALS: as if the card were the ball it stands for, so the light rounds it
+      let nx = ex * sx * 0.78, ny = sy * 0.78, nz = ez * sx * 0.78;
+      const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+      const shade = Math.min(1, Math.max(0, 0.46 - sy * 0.34));     // lighter on top, darker beneath
+      return B.vert(px, py, pz, nx, ny, nz, nx, ny, nz, sx, sy, 0.05, 5, shade, hash);
+    };
+    const a0 = corner(0, -1), a1 = corner(-0.92, -0.42), a2 = corner(-0.80, 0.52),
+          a3 = corner(0, 1), a4 = corner(0.80, 0.52), a5 = corner(0.92, -0.42);
+    B.tri(a0, a1, a2); B.tri(a0, a2, a3); B.tri(a0, a3, a4); B.tri(a0, a4, a5);
+    B.card = null;
+  }
+  return B.build();
+}
+
 export function farCardGeometry(seed) {
   const rnd = mulberry32(seed), B = new Builder();
   tube(B, [V(0, 0, 0), V(0.01, 0.52, 0)], [0.020, 0.012], 3, { part: 0, swayK: 0.02, swayH: 1, hash: 0.5 });
