@@ -9,7 +9,7 @@
 //   physics.ship.step(...) / physics.ship.gear(...)
 //   physics.fields.flora / physics.fields.deform / physics.particles.rain ... / physics.glsl.flora
 import { BODIES } from '../data/bodies.js';
-import { ATMOSPHERES, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
+import { ATMOSPHERES, burnableAir, airDensity, airTemperature, liquidOf, gravityAt, fallSpeed, terminalVelocity, SPECIES, bluntTerminal } from './atmosphere.js';
 import { WINDS, WIND, setWindScale, windLarge } from './wind.js';
 import { weatherAt, weatherWind, moistureAt, cellsAt, DEFAULT_SEED, WEATHER, REGIMES, saltationThreshold } from './weather.js';
 import { liquidAt, BIOME_LIQUID, groundAt, coverAt, MATERIALS, MATERIAL_IDS, MATERIAL_INDEX, MATERIAL_NONE, materialNow, BIOMES, GROUND, holdAngle, iceFriction, splashOn } from './ground.js';
@@ -189,6 +189,11 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   // GOING OUT rests on them -- fire.js now ends a fire on its own memory.)
   const FUEL_OF = { grass: FUEL.ground, litter: FUEL.leaves, moss: FUEL.undergrowth, soil: FUEL.none };
   const fireCtx = {
+    // WILL ANYTHING BURN IN THIS WORLD'S AIR? (2026-11-19, the owner: how a fire "acts based around different
+    // environments".) A fire needs an oxidiser, and of the worlds here only Earth has one. On Mars and Venus the
+    // air is what a fire is already finished with; on the Moon there is none. So the same cast that sets a wood
+    // alight on Earth gutters out elsewhere, and the player is told why (core/powers.js FIRE_WHY).
+    airAt(bodyId) { return burnableAir(bodyId); },
     // WILL ANYTHING BURN HERE? The place comes in body-local and goes back on the ground, because only the near
     // grid knows how high the land is there.
     fuelAt(bodyId, px, py, pz, out) {

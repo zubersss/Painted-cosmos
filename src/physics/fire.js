@@ -135,6 +135,39 @@ export const FIRE = Object.freeze({
   wetStop: 0.55,          // 0..1 damp: at this and above nothing catches, and a patch alight goes out
   wetSlow: 0.8,           // and below it, damp fuel burns this much slower at worst
 
+  // ---- IT RUNS UPHILL (2026-11-19, the owner: "really figure out the mechanics of how a fire spreads"). After the
+  // wind this is the biggest thing a real fire does, and the model had none of it. A flame leans against the slope
+  // above it, so the fuel up there is dried and heated before the fire arrives, and the fire climbs; going down it
+  // has to work against that and it creeps. The rule of thumb used by people who fight them is that the rate
+  // DOUBLES FOR EVERY TEN DEGREES of upslope, which is what `slopeDouble` is (tan 10 degrees = 0.176).
+  slopeDouble: 0.176,     // the rise over the run that doubles the rate
+  slopeMax: 6,            // ... and the most it may be multiplied by, up a cliff
+  slopeMin: 0.35,         // ... and the least, running downhill
+
+  // ---- IT NEEDS AIR. On a world with no air, or air with nothing in it that will burn, nothing catches at all --
+  // and the ability's own flame should not pretend otherwise. The game answers ctx.airAt(bodyId) with 0..1; without
+  // that function a world is taken to be Earth-like, so nothing changes for a caller that does not know about it.
+  airStop: 0.12,          // below this share of Earth's air, nothing catches and what is alight goes out
+  airFull: 0.7,           // at and above this it burns as it would on Earth; between, it is slower and feebler
+
+  // ---- EMBERS GO AHEAD OF IT (spotting). In a strong wind a fire throws burning pieces downwind, and they start
+  // new fires BEYOND the front -- over a firebreak, over a river, over a road. It is why a big fire cannot be held
+  // by a line on the ground, and it is the most alarming thing a fire does.
+  spotFrom: 0.45,         // of the full wind: below this the wind cannot carry an ember
+  spotOdds: 0.16,         // the chance a look throws an ember instead of stepping to its neighbour, at a full wind
+  spotStep: 4.5,          // ... and an ember lands this many times the ordinary step downwind
+  spotSpread: 0.5,        // rad: how wide the throw scatters either side of downwind
+
+  // ---- A FIRE MAKES ITS OWN WEATHER (the owner: "fire tornados can be a thing"). Where many patches burn close
+  // together the air over them rises hard, and air drawn in from every side around a rising column has to turn: a
+  // FIRE WHIRL. This file does not make one -- it says WHEN AND WHERE the conditions are there, in F.whirl, and the
+  // game's own powers decide what to do about it. Whirls want a big steady burn and a LIGHT wind: a gale tears the
+  // column apart before it can turn, which is why `whirlWind` is an upper bound and not a lower one.
+  whirlN: 9,              // burning patches within whirlR of each other before a column can form
+  whirlR: 9,              // m
+  whirlWind: 0.55,        // of the full wind: above this the column is torn apart and no whirl forms
+  whirlHold: 1.4,         // s the conditions must hold before it is called a whirl
+
   // ICE DOES NOT BURN, IT MELTS. A patch on ice has no fuel: the ability's own fire keeps it alive for iceLife and
   // all its heat goes into the ice. The hole opens out to iceRadius as it melts. How deep that goes, and what is
   // under the ice, is the world's business: this file only says how much heat went in where.
@@ -172,6 +205,7 @@ const _f = { kind: 0, fuel: 0, wet: 0, px: 0, py: 0, pz: 0 };    // what the wor
 // Empties a record in place. (powers.js writes a fresh blank over a wind source, which is fine because the player
 // casts a few times a minute; a fire lights its neighbours many times a second, so here nothing is made at all.)
 function wipe(s) {
+  s.up = 0; s.spot = false;
   s.kind = 0; s.bodyId = null;
   s.px = 0; s.py = 0; s.pz = 0;           // where it burns (the body's own axes, on the ground)
   s.ox = 0; s.oy = 0; s.oz = 0;           // and where the whole fire was lit, so we know how far it has run
@@ -344,14 +378,28 @@ function waitFor(s, lean) {
   const q = FIRE.quick[s.kind] || 1;
   let r = 1 + FIRE.windRate * s._sp01 * lean;
   if (r < FIRE.backRate) r = FIRE.backRate;
-  return FIRE.seedTime / (r * q);
+  return FIRE.seedTime / (r * q * slopeRate(s.up));
+}
+
+// How much faster a fire goes for the slope it is crossing: the rate doubles for every ten degrees of upslope and
+// halves going down, bounded both ways. `up` is the rise over the run, as a patch was reached across it.
+export function slopeRate(up) {
+  if (!(up === up)) return 1;
+  const k = Math.pow(2, up / FIRE.slopeDouble);
+  return k > FIRE.slopeMax ? FIRE.slopeMax : k < FIRE.slopeMin ? FIRE.slopeMin : k;
 }
 
 // Steps the list by dt. ctx holds the two functions above (and dampAt if the game has one). Returns how many
 // patches are in the list, ash and all.
 export function stepFires(F, dt, ctx) {
-  if (!F.count) return 0;
+  if (!F.count) { F.whirl = null; F.whirlT = 0; return 0; }
   F.time += dt;
+  // The air on this world, asked once a frame and not once a patch: it does not change under a fire.
+  F.air = ctx && ctx.airAt ? clamp01(ctx.airAt(F[0].bodyId)) : 1;
+  const airK = F.air <= FIRE.airStop ? 0
+    : F.air >= FIRE.airFull ? 1
+    : (F.air - FIRE.airStop) / (FIRE.airFull - FIRE.airStop);
+  F.airK = airK;
   const n0 = F.count;                      // a patch lit this frame takes its first step in the next one
   for (let i = 0; i < n0; i++) {
     const s = F[i];
@@ -387,7 +435,7 @@ export function stepFires(F, dt, ctx) {
     // Is it going out? A flame with nothing under it is the ability's own: it lives its short life and goes,
     // whether the place is wet or dry, so the player always sees that the cast happened. A flame with something
     // under it goes out when that has gone (ice has none: it melts for its own time) or if its place turns damp.
-    const out = s.age >= s.life ||
+    const out = s.age >= s.life || airK <= 0 ||
       (s.kind !== FUEL.none && (s.wet >= FIRE.wetStop || (s.kind !== FUEL.ice && !(s.fuel > 0))));
     s.heat += out ? -dt / FIRE.dieTime : dt / FIRE.catchTime;
     if (s.heat > 1) s.heat = 1;
@@ -400,7 +448,9 @@ export function stepFires(F, dt, ctx) {
       if (s.melt - s.msent >= FIRE.meltEvery) report(F, s, false);
     } else if (s.fuel > 0 && s.heat > 0) {
       // the fuel goes, faster in a wind (which fans it) and slower where it is damp
-      const fan = 1 + FIRE.windFan * ws, damp = 1 - FIRE.wetSlow * s.wet;
+      // thin air burns slowly as well as feebly: a flame in half of Earth's air is not half a flame, it is a
+      // slower one, so the fuel under it lasts longer rather than less time
+      const fan = (1 + FIRE.windFan * ws) * (0.35 + 0.65 * airK), damp = 1 - FIRE.wetSlow * s.wet;
       const bt = FIRE.burnTime[s.kind] || 1;
       s.fuel -= dt * s.heat * fan * (damp > 0.1 ? damp : 0.1) / bt;
       if (s.fuel < 0) s.fuel = 0;
@@ -420,7 +470,7 @@ export function stepFires(F, dt, ctx) {
 
     // IT SPREADS. Well alight, with neighbours left to light, it looks one way at a time. Ice passes nothing on
     // (there is nothing in ice to carry a fire), and nor does a patch with nothing under it.
-    if (s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
+    if (airK > 0 && s.seeds > 0 && s.heat >= 0.55 && s.kind !== FUEL.ice && s.kind !== FUEL.none && ctx && ctx.fuelAt) {
       s.seedT -= dt;
       if (s.seedT <= 0) {
         const caught = sow(F, s, ctx, _en, hE, hN, sp01);
@@ -444,7 +494,47 @@ export function stepFires(F, dt, ctx) {
   // casting's memory of the ground (a few kilobytes) there and then, instead of holding it until that slot is used
   // again. Nothing is made here: wipe only writes over what is already there.
   for (let i = n; i < was; i++) wipe(F[i]);
+  whirlCheck(F, dt);
   return n;
+}
+
+// ---- A FIRE MAKES ITS OWN WEATHER ----------------------------------------------------------------------------
+// (the owner, 2026-11-19: "fire tornados can be a thing"). Where enough patches burn close together the air over
+// them rises hard, and the air drawn in to replace it from every side has to turn. This says only WHEN AND WHERE
+// the conditions are there -- F.whirl -- and for how long they have held. Nothing is made and nothing is drawn: the
+// game's own powers decide what a whirl is. Two passes over at most 64 patches, so it costs nothing worth counting.
+//
+// A whirl wants a BIG STEADY BURN and a LIGHT WIND. That the wind must be light is the part people get wrong: a
+// gale tears the rising column apart before it can turn, which is why real fire whirls are seen in the lee of a
+// ridge and in the quiet heart of a big fire, not out on a windy flank.
+function whirlCheck(F, dt) {
+  let cx = 0, cy = 0, cz = 0, live = 0, wind = 0;
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    if (s.ash || !(s.heat > 0.5) || s.kind === FUEL.none || s.kind === FUEL.ice) continue;
+    cx += s.px; cy += s.py; cz += s.pz; wind += s._sp01 || 0; live++;
+  }
+  if (live < FIRE.whirlN) { F.whirl = null; F.whirlT = 0; return; }
+  cx /= live; cy /= live; cz /= live; wind /= live;
+  if (wind > FIRE.whirlWind) { F.whirl = null; F.whirlT = 0; return; }   // a gale tears the column apart
+  let near = 0;
+  const R2 = FIRE.whirlR * FIRE.whirlR;
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    if (s.ash || !(s.heat > 0.5) || s.kind === FUEL.none || s.kind === FUEL.ice) continue;
+    const dx = s.px - cx, dy = s.py - cy, dz = s.pz - cz;
+    if (dx * dx + dy * dy + dz * dz <= R2) near++;
+  }
+  if (near < FIRE.whirlN) { F.whirl = null; F.whirlT = 0; return; }
+  F.whirlT += dt;
+  if (F.whirlT < FIRE.whirlHold) { F.whirl = null; return; }             // it must hold before it is called one
+  const w = F.whirl || (F.whirl = { bodyId: null, px: 0, py: 0, pz: 0, strength: 0, patches: 0, held: 0 });
+  w.bodyId = F[0] ? F[0].bodyId : null;
+  w.px = cx; w.py = cy; w.pz = cz;
+  w.patches = near;
+  w.held = F.whirlT;
+  // how hard it turns: more of the fire gathered in one place, and the stiller the air, the stronger the column
+  w.strength = clamp01((near - FIRE.whirlN) / (FIRE.whirlN * 2)) * (1 - wind / FIRE.whirlWind) * (0.5 + 0.5 * (F.airK == null ? 1 : F.airK));
 }
 
 // Is there anything burning (or lately burnt) within `lim` of a place? This is what keeps a fire a FRONT: the only
@@ -463,9 +553,23 @@ function busy(F, bodyId, qx, qy, qz) {
 // The order of the tests is the order of their cost: our own arithmetic first, then the world's fuel function
 // (which is the dear one), and a record is taken only once we know a fire really catches there.
 function sow(F, s, ctx, en, hE, hN, sp01) {
-  const d = spokeAt(s.spoke, hE, hN, sp01);
-  const dE = d[0], dN = d[1], L = d[2];
-  const step = FIRE.spread * (0.7 + 0.3 * L) * (0.85 + 0.15 * s.size);
+  let d = spokeAt(s.spoke, hE, hN, sp01);
+  let dE = d[0], dN = d[1];
+  const L = d[2];
+  let step = FIRE.spread * (0.7 + 0.3 * L) * (0.85 + 0.15 * s.size);
+  // AN EMBER GOES AHEAD OF IT. In a strong wind a look may be thrown far downwind instead of stepped to the
+  // neighbour: that is how a fire crosses a firebreak, a road or a river, and no line on the ground holds a big one.
+  let spot = false;
+  if (sp01 >= FIRE.spotFrom && (hE || hN)) {
+    const roll = hash3(s.id, s.spoke + 61, F.lit + 7, F.seed);
+    if (roll < FIRE.spotOdds * sp01) {
+      const a = (hash3(s.id, s.spoke + 131, F.lit + 29, F.seed) - 0.5) * 2 * FIRE.spotSpread;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      dE = hE * ca - hN * sa; dN = hE * sa + hN * ca;
+      step *= FIRE.spotStep;
+      spot = true;
+    }
+  }
   const qx = s.px + (en[0] * dE + en[3] * dN) * step;
   const qy = s.py + (en[1] * dE + en[4] * dN) * step;
   const qz = s.pz + (en[2] * dE + en[5] * dN) * step;
@@ -478,6 +582,10 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   if (s.scar && scarred(s.scar, qx, qy, qz)) return false;
   if (busy(F, s.bodyId, qx, qy, qz)) return false;
   if (ask(F, s.bodyId, qx, qy, qz, ctx) === FUEL.none) return false;      // water, rock, wet ground: it stops here
+  // AN EMBER CANNOT SET ICE ALIGHT. A burning piece carried on the wind lands on ice and goes out; only the
+  // ability's own fire, cast deliberately, melts. (Found by the test beside this file the moment embers were added:
+  // the melting ran 14.9 m into an ice sheet that a fire is supposed to stop at the edge of.)
+  if (spot && _f.kind === FUEL.ice) return false;
   // the world may have moved the place onto its own ground, so look again that it is still free, and still fresh
   if (_f.px !== qx || _f.py !== qy || _f.pz !== qz) {
     if (busy(F, s.bodyId, _f.px, _f.py, _f.pz)) return false;
@@ -499,6 +607,12 @@ function sow(F, s, ctx, en, hE, hN, sp01) {
   // it shares its whole casting's memory of the ground, and the place it burns is now in it
   t.scar = s.scar;
   if (t.scar) markScar(t.scar, t.px, t.py, t.pz);
+  // THE SLOPE IT WAS REACHED ACROSS. The world has put the new place on its own ground, so the rise over the run is
+  // known here and nowhere else; the new patch carries it, and seeds that much sooner or later for it.
+  const rHere = Math.hypot(s.px, s.py, s.pz), rThere = Math.hypot(t.px, t.py, t.pz);
+  t.up = step > 1e-3 ? (rThere - rHere) / step : 0;
+  if (!(t.up === t.up)) t.up = 0;
+  t.spot = spot;
   t.seedT = waitFor(t, spokeAt(t.spoke, hE, hN, sp01)[3]);
   return true;
 }
@@ -603,6 +717,27 @@ export function anyBurning(F) {
 
 // Puts a fire out: the whole list, or one body's fires. (The ability may want to call off its own fire; a session
 // that leaves a body wants its fires gone.) The places that had begun to burn are reported as finished first.
+// PUT OUT WHAT IS BURNING NEAR A PLACE (2026-11-19, for the fire's `snuff`: the owner asked for five new fire
+// abilities, and a power that can start a forest fire needs one that can stop it). Everything within `r` of p is
+// reported as finished and turned to ash, so the lasting record takes it and the front cannot walk back through.
+// Returns how many patches were put out.
+export function douseNear(F, bodyId, p, r) {
+  if (!bodyId || !p || !(r > 0)) return 0;
+  const r2 = r * r;
+  let n = 0;
+  for (let i = 0; i < F.count; i++) {
+    const s = F[i];
+    if (s.ash || s.bodyId !== bodyId) continue;
+    const dx = s.px - p.x, dy = s.py - p.y, dz = s.pz - p.z;
+    if (dx * dx + dy * dy + dz * dz > r2) continue;
+    if (s.kind !== FUEL.none) report(F, s, true);
+    s.ash = true; s.ashAge = 0; s.heat = 0; s.fuel = 0;
+    n++;
+  }
+  if (n) { F.whirl = null; F.whirlT = 0; }
+  return n;
+}
+
 export function douseFires(F, bodyId = null) {
   for (let i = 0; i < F.count; i++) {
     const s = F[i];

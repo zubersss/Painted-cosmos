@@ -80,6 +80,24 @@ export function scaleHeight(bodyId) {
 }
 
 // Air density (kg/m^3) at `altitude` metres above the base radius. Smooth, never negative.
+// WILL A FIRE BURN IN THIS AIR? (2026-11-19, the owner: "how it acts based around different environments".)
+// A fire needs an OXIDISER, not merely air. Of the worlds in this game only Earth has one: nitrogen and oxygen.
+// Carbon dioxide is what a fire is already finished with, and hydrogen and helium have nothing to take an
+// electron; so on Mars, on Venus and on every gas giant a flame has nothing to eat, and in a vacuum it has not
+// even that. Returned as a share of Earth's, thinned by how thin the air itself is, because a fire in half an
+// atmosphere is a slower, feebler fire.
+//   This is what src/physics/fire.js asks through ctx.airAt, and it is the whole of why the same cast that sets
+//   a wood alight on Earth gutters and dies on Mars and does nothing at all on the Moon.
+const OXIDISER = Object.freeze({ 'N2/O2': 1, CO2: 0.04, 'H2/He': 0, 'H2/He/CH4': 0, vacuum: 0 });
+export function burnableAir(bodyId) {
+  const a = ATMOSPHERES[bodyId];
+  if (!a || !(a.rho0 > 0)) return 0;
+  const ox = OXIDISER[a.gas] != null ? OXIDISER[a.gas] : 0;
+  if (!(ox > 0)) return 0;
+  const thin = a.rho0 / 1.225;                       // against Earth's air at its surface
+  return ox * (thin > 1 ? 1 : thin);
+}
+
 export function airDensity(bodyId, altitude) {
   const a = ATMOSPHERES[bodyId];
   if (!a || a.rho0 <= 0) return 0;
