@@ -5,7 +5,7 @@
 // Additive: setTime(seconds), setDebugView(n), setLook({...}), info, dispose().
 import * as THREE from 'three';
 import { Post } from './post.js';
-import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN } from './shared.js';
+import { G, SHEET, WX, QUALITY, FRAME_HOOKS, GLAZES, MOTION, PREV, LOOK, OIL, SHADOW, ensureGlobals, SCREEN, MATERIALS } from './shared.js';
 const _lv = new THREE.Vector3();
 import { makeWashMaterial, makePaintUniforms, standInFor, bindBodyUniforms, defaultBodyUniforms } from './materials.js';
 import { VERT_PARS, VERT_END, FRAG_PARS } from './chunks.js';
@@ -117,6 +117,18 @@ export function createPainter(renderer) {
     else if (aaMode === 'msaa2') n = 2;
     else if (aaMode === 'auto' && quality >= 1 && !TOUCH && !LIGHT) n = mb(4) <= AA_MB ? 4 : mb(2) <= AA_MB ? 2 : 0;
     post.setAA(n);
+    // ALPHA-TO-COVERAGE IS ONLY WORTH ANYTHING WHERE THERE ARE SAMPLES TO COVER. (2026-11-19.) Every painted prop
+    // material was given it the moment the oil look was on, and never had it taken away -- so on a phone, where the
+    // picture is drawn with NO multisampling at all ("edges none" in the speed test's header), every plant in the
+    // game was drawn with a multisampling feature that cannot do anything. It is not free: on a tile GPU, coverage
+    // that depends on the shader is one of the things that turns off the hardware's early rejection of hidden
+    // pixels, and the far trees' fragments are nine tenths hidden.
+    //   This does not change the picture where there ARE samples (it is set exactly as before), and where there are
+    // none it cannot change the picture, because with one sample alpha-to-coverage has no effect by definition.
+    {
+      const want = post.samples > 0;
+      for (const m of MATERIALS) if (m.userData.pcMake && m.userData.pcMake.kind === 'prop' && !!m.alphaToCoverage !== want) m.alphaToCoverage = want;
+    }
     // (the oil look on a touch device has no smoothing filter at all: the light post filter softens every stroke's edge,
     // and the phone's screen then stretches the picture three times over: blur on blur, against the look's first rule)
     post.setPostAA(aaMode === 'post' || (aaMode === 'auto' && post.samples === 0 && !LIGHT));
