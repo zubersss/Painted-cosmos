@@ -25,14 +25,17 @@ const SEEDS = [3, 9, 17, 23, 41];
 // oak 9870-12730, birch 13426-15434, willow 13244-15936, sapling 2982-3590. The kit the game already
 // ships, for comparison, is the maple at 11188. A budget is a ceiling with room in it, to catch a
 // regression -- not a number anything was tuned to hit.
-const BUDGET = { roundmaple: 13000, poplar: 12000, oak: 14000, birch: 17000, willow: 17500, sapling: 4200 };
+const BUDGET = { roundmaple: 10000, poplar: 10500, oak: 11500, birch: 12000, willow: 13500, sapling: 3600 };
 const SIZE = {   // [least height, most height, least across, most across] in metres, MEASURED over twelve seeds
-  roundmaple: [6, 10, 9, 13],   // 6.9-8.8 m tall, 9.2-11.7 m across
-  poplar: [13, 19, 5, 9],       // 13.9-17.1, 5.2-7.3
-  oak: [9, 13, 13, 19],         // 9.1-11.2, 13.4-17.0
-  birch: [8, 13, 9, 13],        // 8.7-11.0, 9.4-11.7
-  willow: [9, 13, 10, 16],      // 9.2-11.6, 10.4-14.8
-  sapling: [4, 7, 4, 8],        // 4.2-5.7, 4.8-6.7
+  // (re-measured 2026-11-19 after the leaf counts were cut for the owner's phone: with fewer leaves the HIGHEST
+  //  LEAF sits a little lower, so the oak's floor moved 9 -> 8 m and the willow's with it. The ranges are measured,
+  //  not loosened to fit.)
+  roundmaple: [6, 10, 9, 13],   // 6.8-8.9 m tall, 9.0-11.6 m across
+  poplar: [13, 19, 5, 9],       // 13.8-17.2, 5.3-7.3
+  oak: [8, 13, 13, 18],         // 8.9-11.3, 13.3-16.7
+  birch: [8, 13, 9, 13],        // 8.4-11.8, 9.0-12.0
+  willow: [8, 13, 10, 16],      // 8.8-11.4, 10.4-14.3
+  sapling: [4, 7, 4, 8],        // 4.1-5.8, 4.9-6.5
 };
 function spanOf(g) {
   const p = g.attributes.position.array;
@@ -68,7 +71,9 @@ for (const kind of Object.keys(GROVE)) {
       const t0 = g0.index.count / 3, t1 = g1.index.count / 3;
       assert.ok(t0 <= BUDGET[kind], kind + ' seed ' + seed + ' is ' + t0 + ' triangles near, over its ' + BUDGET[kind]);
       // the middle tier must be a real saving: it is drawn far more often than the near one
-      assert.ok(t1 < t0 * 0.45, kind + ' middle tier is ' + t1 + ' of ' + t0 + ' triangles, not a saving');
+      // (2026-11-19: the middle tier is now a STEM AND ITS FIRST BOUGHS and nothing else, after the owner's phone
+      //  measured 22 frames a second at v21. It must be a TENTH of the near tree, not merely less than half.)
+      assert.ok(t1 < t0 * 0.12, kind + ' middle tier is ' + t1 + ' of ' + t0 + ' triangles, not the saving it must be');
       const s = spanOf(g0), [hLo, hHi, wLo, wHi] = SIZE[kind];
       assert.ok(s.hi >= hLo && s.hi <= hHi, kind + ' seed ' + seed + ' is ' + s.hi.toFixed(1) + ' m tall, outside ' + hLo + '-' + hHi);
       assert.ok(s.across >= wLo && s.across <= wHi, kind + ' seed ' + seed + ' is ' + s.across.toFixed(1) + ' m across, outside ' + wLo + '-' + wHi);
