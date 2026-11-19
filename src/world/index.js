@@ -130,6 +130,13 @@ export function createWorld(scene) {
     return v;
   })();
   const LEAD_MAX = 900, LEAD_MIN = 14, LEAD_SMOOTH = 0.35, LEAD_CAP = 400;
+  // `?skystroke=` : how strongly EVERY world's sky is laid in brush strokes, over whatever its own look asks for
+  // (0 none, 1 as the ice worlds have it). null: each world's own. For looking at it; the worlds' own numbers are
+  // in data/looks/<world>.js.
+  const SKY_STROKE = (() => {
+    try { const q = new URLSearchParams(location.search).get('skystroke'); if (q != null && isFinite(+q)) return Math.max(0, Math.min(1.5, +q)); } catch { /* no address */ }
+    return null;
+  })();
   // The wash clock (s): what washes in, eases and grows runs on it. It follows the game's own frame time
   // while the game's clock runs (a test that steps the clock sees what a player sees at that pace) and the
   // wall's when the game's clock stands (so a held picture still settles).
@@ -641,6 +648,10 @@ export function createWorld(scene) {
       { const rg = st.look.rings; if (rg) { skyU.uRingS.value.set(body.radius * rg.inner, body.radius * rg.outer, 1 - THREE.MathUtils.smoothstep(space01, 0.55, 0.9), 0); skyU.uRingC.value.fromArray(rg.color); } else skyU.uRingS.value.z = 0; }
       // (and a banded world's belts, a cloud sea's far reach: looks.js `skyBelts` [belts, wander, strength], `seaDeck` [top (m), strength, heads])
       { const sb = st.look.skyBelts, sd = st.look.seaDeck; if (sb) skyU.uBelt.value.set(sb[0], sb[1], sb[2], 0); else skyU.uBelt.value.z = 0; if (sd) skyU.uSeaC.value.set(sd[0], sd[1], sd[2] == null ? 1 : sd[2], 0); else skyU.uSeaC.value.y = 0; }
+      // AND HOW STRONGLY THIS WORLD'S SKY IS LAID IN BRUSH STROKES (looks.js `skyStrokes`, 0..1; the oil look only,
+      // world/sky.js pcSkyStrokes). The ice worlds have no weather and no cloud, so without this their sky is a
+      // smooth wall of colour; `?skystroke=` overrides it anywhere, for looking.
+      { const ss = SKY_STROKE != null ? SKY_STROKE : (LOOK.oil ? st.look.skyStrokes || 0 : 0); skyU.uSkyOil.value.w = ss; }
       st.root.getWorldQuaternion(_q);
       skyU.uBodyInv.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(_q.invert()));
       SHEET.grade.copy(tmpKey.grade).lerp(new THREE.Vector3(1, 1, 1), space01);

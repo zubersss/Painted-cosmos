@@ -15,6 +15,11 @@ export default {
   hue: [[0.95, 1.0, 0.96], [0.92, 0.95, 1.0]],
   // (the oil look: a world of ice: its ground is laid in long strokes that run with the land, as Neptune's snow)
   oil: { ground: 'flow' },
+  // A SKY LAID IN BRUSH STROKES (the owner, 2026-11-16 and again 2026-11-19: "the sky of the ice planets still needs
+  // to be streaky and painted like"). The ice worlds have no weather and almost no cloud, so the oil sky's six broad
+  // bands left a smooth wall of colour with nothing of a brush in it. 0 none, 1 full (world/sky.js pcSkyStrokes;
+  // `?skystroke=` turns it anywhere for looking). The oil look only: the watercolour sky is untouched.
+  skyStrokes: 1,
   sky: mkSky([0.60, 0.86, 0.84], [0.93, 0.985, 0.96], { glaze: [0.64, 0.74, 0.88], light: [0.97, 1.0, 0.96] }),
   flora: {
     tall: [

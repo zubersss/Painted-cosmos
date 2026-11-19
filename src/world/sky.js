@@ -64,6 +64,56 @@ uniform vec4 uSkyOil;       // x cloud shaping, y the ceiling on the sky's value
 #endif
 
 vec3 dens(vec3 c, float d) { return clamp(c - (c - c * c) * (d - 1.0), 0.0, 1.0); }
+#ifdef PC_OIL
+// A SKY LAID IN BRUSH STROKES (the owner, twice: 2026-11-16 and again 2026-11-19, "the sky of the ice planets still
+// needs to be streaky and painted like"). The oil sky was laid in six broad bands with nothing inside them, and on
+// the ice worlds -- where there is no weather, no cloud and nothing else in the sky at all -- that left a smooth
+// wall of colour: a gradient, not paint. This lays the strokes a brush would leave in it.
+//
+// WHAT A STROKE IS: long, nearly level, tapered to nothing at both ends, as wide as a brush and not a hairline, and
+// a step DEEPER or LIGHTER than the sky it lies on -- never another colour, so every world keeps its own (Uranus
+// stays mint, Pluto stays lilac). Several families of them cross at shallow angles, as a sky laid in one sitting
+// does; each family is a set of level lines about an axis of its own that leans a little from straight up, and
+// along a line the strokes come and go with gaps between.
+//
+// It is the SAME construction as the night sky's streaks below the owner asked for in November -- families of level
+// lines, segments along them, tapered -- at a quarter of their frequency and in the sky's own colour instead of the
+// aurora's cyan. The two are deliberately alike: it is one hand painting.
+//
+// k: how strongly (0 none; the world's own, data/looks/<world>.js skyStrokes, through uSkyOil.w).
+vec3 pcSkyStrokes(vec3 sky, vec3 d, vec3 up, float k, vec4 wv) {
+  if (k < 0.002) return sky;
+  vec3 ta = normalize(cross(up, vec3(0.31, 0.74, 0.59))), tb = cross(up, ta);
+  vec3 col = sky;
+  for (int L = 0; L < 3; L++) {
+    float fl = float(L);
+    vec2 lean = L == 0 ? vec2(0.13, 0.04) : L == 1 ? vec2(-0.09, 0.15) : vec2(0.05, -0.21);
+    vec3 ax = normalize(up + ta * lean.x + tb * lean.y);
+    vec3 a1 = normalize(ta - ax * dot(ta, ax)), a2 = cross(ax, a1);
+    float fq = L == 0 ? 15.0 : L == 1 ? 11.0 : 19.0;          // (a row every few degrees: a brush, not a comb)
+    float rowf = dot(d, ax) * fq + 0.9 * (L < 2 ? wv.r : wv.b) + fl * 0.41;
+    float row = floor(rowf);
+    float hx = fract(sin((row + fl * 71.0) * 91.7) * 43758.5453), hy = fract(sin((row + fl * 13.0) * 37.3) * 24634.63);
+    // along the line: a few long strokes with gaps, the longest on few lines
+    float along = atan(dot(d, a2), dot(d, a1)) * (1.0 + 3.5 * hx * hx) + hy * 40.0;
+    float seg = floor(along), ft = along - seg;
+    float hs = fract(sin((seg + row * 57.0 + fl * 19.0) * 12.9898) * 43758.5453), hl = fract(hs * 7.31 + hx);
+    float a0 = 0.03 + 0.22 * hl, a1e = a0 + 0.34 + 0.60 * hs * (1.0 - a0 - 0.34);
+    float sp = (ft - a0) / max(a1e - a0, 1e-3);
+    float taper = smoothstep(0.0, 0.34, sp) * smoothstep(0.0, 0.34, 1.0 - sp);
+    // as wide as a brush: a share of the gap between lines, never thinner than a pixel of the screen
+    float fwr = max(fwidth(rowf), 1e-4);
+    float wid = max((0.10 + 0.26 * hl) * taper, 0.0);
+    float cov = smoothstep(-0.5 * fwr, 0.5 * fwr, wid - abs(rowf - row - 0.5)) * step(0.0, sp) * step(sp, 1.0) * step(0.22, fract(hs * 3.7 + hy));
+    // deeper or lighter by the stroke's own draw, as a loaded brush and a dry one leave different paint
+    // (MEASURED at half these numbers, Pluto's Pale Heart Glacier at noon: a quarter of the sky's pixels moved, by
+    //  3.5 of 255 on average -- there, but not to be SEEN, and the owner has asked for a painted sky twice.)
+    float dp = hs < 0.52 ? 1.0 + (0.22 + 0.50 * hl) : 1.0 - (0.17 + 0.36 * hl);
+    col = mix(col, dens(col, dp), cov * k);
+  }
+  return col;
+}
+#endif
 ${RING_PROFILE}
 #ifdef PC_OIL
 // THE COLOUR THE FAR AIR GOES TO, the same one the land is lost into (render/chunks.js pcOilHaze). Every one of the
@@ -168,6 +218,10 @@ void main() {
     sky = tq < 0.58 ? mix(zenO, midO, tq / 0.58) : mix(midO, bandO, (tq - 0.58) / 0.42);
     sky = mix(sky, bandO, toward * 0.45);
     sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * 1.7 * oc);
+    // AND THE BRUSH'S OWN STROKES IN IT (the owner: the ice worlds' sky must be streaky and painted). Laid on the
+    // bands and under everything else, so cloud, rings and the aurora still pass in front of them. Fading out close
+    // to the horizon, where the air itself takes over, and gone under a closed sky, where there is cloud to look at.
+    sky = pcSkyStrokes(sky, d, up, uSkyOil.w * (1.0 - oc) * smoothstep(-0.02, 0.10, e) * (1.0 - uAtmo.x), n2);
   #else
   sky = dens(sky, 1.0 + turb * (1.0 - t * 0.7) * (1.0 + oc * 0.7) + back * 0.38 * (1.0 - t));
   sky = mix(sky, vec3(1.0), smoothstep(0.90, 0.97, bf) * 0.22 * (1.0 - t));
@@ -604,6 +658,8 @@ export function makeSkyUniforms() {
     uBodyInv: { value: new THREE.Matrix3() },
     // the oil sky's dials (see the top of this file). The watercolour's shader never declares this one: the
     // preprocessor drops the line with everything else inside #ifdef PC_OIL, so it is handed to nothing.
+    // (w: how strongly the sky is laid in brush strokes -- the world's own `skyStrokes`, set per body in
+    //  world/index.js; `?skystroke=` turns it anywhere, which is how it was looked at)
     uSkyOil: { value: new THREE.Vector4(_qn('cloudform', 1), _qn('skycap', 0.86), _qn('cloudlit', 1), 0) },
     ...OIL,
   };
