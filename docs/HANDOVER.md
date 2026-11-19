@@ -405,6 +405,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 - **2026-11-19, the six trees and the seasons:** "Yes do 12374 and the widow 6 but refine them a little better and make sure the leaves change colors from summer to autumn for the forest". SIX trees chosen from the sheet (1 round maple, 2 tall poplar, 3 great oak, 4 slender birch, 7 young sapling, 6 weeping willow), to be refined and built as real kits, and the forest's leaves must turn from summer to autumn.
 
+- **2026-11-19, the rest of Earth:** "Keep on working on the look and performance and the rest of earth not just the forests starting with the mountains they should be a special focus". A STANDING direction: the look and the performance together, across all six of Earth's places, and the mountains (`alpine_meadow`) first and foremost. Four of the six have had almost no attention in the oil look.
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).

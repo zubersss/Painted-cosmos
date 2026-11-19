@@ -2465,3 +2465,9 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   contains every main-vs-branch reading. **Two runs of the same code differ by more than main differs from the
   branch.** That is the honest form of the claim and the next session should use this harness, not capture.mjs,
   for a gate.
+
+### 2026-11-19 OWNER: the rest of Earth, not just the forests — the mountains first
+- OWNER (verbatim): "Keep on working on the look and performance and the rest of earth not just the forests starting with the mountains they should be a special focus".
+- READ AS a standing direction, not a one-off: **the look AND the performance**, across **all of Earth's places**, and the work has been too narrowly on the woods. The MOUNTAINS come first and are to be a special focus.
+- EARTH'S PLACES, for the record: `temperate_forest`, `autumn_woodland`, `alpine_meadow` ("Alpine Meadow and Snow Peaks" — the mountains), `sea_coast`, `desert_canyon`, `misty_wetland`. Four of the six have had almost no attention in the oil look; every still the owner has been shown since 16 Nov has been of a wood.
+- NOTE ON METHOD, from today: a gate is run with `tests/stations.mjs` (the loop held), NOT `tests/capture.mjs` (not repeatable). And the stations harness also prints the COST — draw calls and triangles — so the look and the performance can be measured in the same run, which is what this instruction asks for.
