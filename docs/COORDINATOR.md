@@ -2571,3 +2571,27 @@ First use: hardening sweep (run wf_790ce070-443), the failures SwiftShader canno
   worse than no instrument.** Check that a measurement is a measurement before taking its number.
 - **WHAT IS STILL NOT KNOWN:** whether v22's 30% triangle cut helps the phone. It needs ONE clean run at v23, with
   the phone held the same way round as the v21 run (landscape) and the sun out.
+
+### 2026-11-19 THE v23 TABLE IS CLEAN, AND IT SAYS THE TREE TRIM WORKED
+- Same conditions as v21 at last (picture 1028x480, sun out, tier 1), no row flagged, baselines agreeing.
+  **LIKE FOR LIKE: 45.0 -> 35.6 ms a frame, 22.2 -> 28.1 a second; 1178k -> 946k triangles (-20%).**
+  Trees' own cost (row 16) **26.3 -> 17.4 ms (-34%)**; near trees (row 15) **20.0 -> 11.2 ms (-44%)**. v22 worked.
+- **WHAT IS LEFT, of a 35.6 ms frame:** the plants' PAINT 11.7 ms (rows 11 and 12, both) = **a third of the frame**;
+  trees in all 17.4 ms; far trees 8.4; small plants 2.8; shadows now only 1.2.
+- **A SPECULATIVE FIX TRIED AND THROWN AWAY.** I supposed the plants' paint was the crowns' two layers of dabs and
+  skipped the fine layer where its dabs fall under a pixel. The picture did not change **by a single pixel** -- and
+  nor did it when the skip was FORCED ON for every plant pixel in the view. **The leaves are not painted by that
+  loop at all:** an earlier session already moved a tree's paint to ONCE PER LEAF rather than per pixel (task #22).
+  Reverted. (Useful by-product: with `&t=0` the gallery is bit-deterministic between grabs, which the earlier
+  12.3% noise floor was not -- use `t=0` for any A/B from now on.)
+- **AND THEN THE REAL ANSWER, from `tools/overdraw.mjs` (no browser needed), on foot in the autumn wood at
+  1028x480:** the frame draws **3,059,089 fragments on a 493k-pixel screen -- SIX TIMES OVER**. Of that:
+  - **trees far: 1,002,637 fragments, ending up on top of 18,499 pixels.** That is FIFTY-FOUR FRAGMENTS DRAWN FOR
+    EVERY PIXEL THAT SURVIVES, with a self-lap of 9.96 -- the far trees' own cards cover each other ten deep -- and
+    1,000,333 of their pixels are behind something nearer.
+  - near-ground strokes 655,354 (self-lap 4.47); near trees 635,457 (3.24); ground 467,938; mid trees 278,688.
+  - The far tier reaches **197 m, then one in three to 281 m**, in a wood you cannot see eighty metres into.
+- **SO THE NEXT LEVER IS THE FAR TREES' REACH AND THEIR SELF-LAP, not the dab shader.** It changes what the horizon
+  looks like, so the owner should see it before it is kept. Rows 7 and 8 of the speed test (far trees drawn first /
+  last) are only -0.8 and -0.3 ms, which says the order is NOT the fault: the cards do not write depth, so no
+  ordering can let early-Z reject them. The waste has to be removed, not re-ordered.
