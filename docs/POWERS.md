@@ -272,3 +272,33 @@ opened again in a browser (the saved game's round trip is tested in Node, not se
 no stump, no log, the lying trunk is not something to trip over, the fallen crown still sways in
 the wind, and on a slope the tree lies along the level, not along the ground. At most 400 trees
 are kept (the oldest stands again).
+
+---
+
+## FIRE, as it stands on 2026-11-19 (the owner: five new abilities, wind feeding it, fire tornados, real mechanics)
+
+### The six abilities
+
+| key | word | what it does |
+| --- | --- | --- |
+| 1 | kindle | sets a fire where you look. If the exact spot will not take, the spark falls short along the same line until it finds ground that will. |
+| 2 | ember | throws a spark FURTHER, and unlike a kindling it does NOT fall short: it goes where it is thrown, over water, over a road, over a gap. Held to the full, five sparks at different reaches. |
+| 3 | bellows | puts air on a fire. It makes a hard gust through the ORDINARY wind machinery, so the air it makes is the air the fire already reads: the fire is fanned, leans downwind, spreads that way faster and eats its fuel sooner, all by rules that were already there. Works on a fire someone else lit. |
+| 4 | wall of fire | lays a line of fire ACROSS the view: a barrier, or a backfire laid in front of a front to starve it. |
+| 5 | snuff | puts out everything burning near the aim (7 m, or 16 m held to the full). The counterweight to the rest: a power that can set a wood alight needs one that can stop it. |
+| 6 | fire whirl | the owner's fire tornado. Takes a column the fire has already raised and makes it real. With no fire great enough it says so: it is a thing you earn by building a fire first. |
+
+### How a fire behaves, and why
+
+- **It starts** where there is fuel that is not too damp, and only there. The world answers what is underfoot and WHY NOT in plain words, and the screen says it.
+- **It spreads** as a FRONT, not a disc: each patch lights its neighbours and burns out behind them.
+- **The wind carries it**: every direction it looks is pulled downwind, the neighbour downwind catches 2.2x sooner, the one upwind 4x slower, and the wind fans it so it eats its fuel faster. In a full gale it stops going upwind at all, which is true of real fires.
+- **It runs uphill.** The rate DOUBLES FOR EVERY TEN DEGREES of upslope and halves going down, bounded at six times and a third. After the wind this is the biggest thing a real fire does.
+- **Embers go ahead of it.** In a strong wind a look may be thrown four and a half times as far downwind. That is how a fire crosses a firebreak, and why no line on the ground holds a big one. An ember cannot set ICE alight.
+- **It needs an oxidiser, not merely air.** Of the worlds here only Earth has one (`atmosphere.js burnableAir`: earth 1.000, venus 0.040, mars 0.001, the rest 0). On Mars the air is what a fire is already finished with; on the Moon there is none. In thin air a flame burns SLOWER as well as feebler, so the fuel lasts longer.
+- **It makes its own weather.** Enough patches burning close together in air still enough raise a turning column. A whirl wants a LIGHT wind: a gale tears the column apart, which is why real fire whirls are seen in the quiet heart of a big fire and not on a windy flank.
+- **Rain and wet ground put it out**; ice does not burn, it melts, and the melted place opens out as it goes.
+
+### What is NOT done
+
+Nothing of the fire has been seen in MOTION. Its cost on a real device has not been measured. And the decision that **fire works only on Earth** is the honest physics but a real restriction on play: if the owner would rather the flame were magical everywhere, that is one number in `atmosphere.js` and they only have to say so.
