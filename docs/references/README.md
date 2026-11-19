@@ -396,3 +396,54 @@ what makes the oranges sing. Nothing in the game is that dark over that much of 
 multiplies. Whether the picture that reaches the screen is too light is a question about the rendered picture, not
 about the data. The way to settle it is to measure a rendered still of the game's own autumn wood with the same
 script and set its families beside the table above. That is the loop this art pass runs on.)
+
+## The branches, measured (2026-11-19) — twenty pictures the owner made with ChatGPT
+
+The owner, 2026-11-19: "Also fix the branches it looks like spiders not trees go over the references for the
+branches as well", then "Can't you just sketch over the reference photos? To get it the best?" and "I made these
+with chat gpt the photo references". THEY ARE THE OWNER'S OWN, made to order, so they may be measured freely; they
+are still not committed (the repository is public and it is not the place for pictures), and NOTHING IS TRACED. A
+trace gives one silhouette; the game needs a tree from every angle, at a dozen sizes, bending in wind. What is taken
+is NUMBERS.
+
+**WHAT THEY SHOW, in words.** Aerial ones: a whole country of round crowns, each tree one colour family, dark stems
+beneath, meadows and a winding brook. From the ground: big DARK trunks, often leaning or curving, that rise clear
+and then throw boughs which ARCH up and outward across the top of the picture; every bough divides again and again
+into a dense NETWORK of fine twigs; the leaves hang in loose clusters ALONG those twigs with sky showing through,
+never as a solid mass. The darker, more photographic ones (a green lane with a red-leaf path) are the same build
+with heavier trunks still.
+
+**WHAT THEY SHOW, in numbers.** Measured where the answer cannot be faked: only where wood stands DARK AGAINST
+BRIGHT SKY, in the top 42 per cent of seven pictures that have sky in them, taking the horizontal run of every dark
+stroke as that stroke's width, in thousandths of the picture's width. 56,235 strokes. (A first pass over all twenty
+whole pictures was THROWN AWAY: its mask called 44 to 93 per cent of some pictures "wood" because they are dark
+paintings and it was catching shadowed grass. A measurement that is obviously wrong is worth nothing.)
+
+| | 25th | median | 75th | 90th | 95th | 99th | widest |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| the references | 2.1 | **4.3** | 9.3 | 21.4 | 36.0 | **72.7** | 184 |
+
+The seven agree closely (each one's 99th against its own median: 26, 33, 33, 28, 31, 29, 43).
+
+**AND THE GAME, WITH THE SAME RULER** (tools/treeshape.mjs draws a tree's wood dark on white; the same run-length
+measure, the cell's width standing for the picture's):
+
+| | median | 90th | 99th | **99th / median** |
+| --- | --- | --- | --- | --- |
+| the references | 4.3 | 21.4 | 72.7 | **17.0** |
+| the game's maple | 10.0 | 32.5 | 61.8 | **6.2** |
+| the game's broadleaf (oil) | 10.0 | 27.5 | 40.0 | **4.0** |
+
+**SO THE FAULT IS A NUMBER.** The references span a factor of SEVENTEEN from the typical twig to the trunk; the
+game spans four to six. And the game's MEDIAN stroke is more than twice as wide as the references': HALF THE WOOD
+IN THE REFERENCES IS FINER THAN ANYTHING THE GAME DRAWS AT ALL. That is what "spiders not trees" is: too few
+widths, and nothing at the fine end. A spider has legs of one width; a tree has a trunk, boughs, branches, twigs
+and a haze.
+
+**WHAT IS TAKEN:** the target is 99th / median of about 17, reached by ADDING THE FINE END -- many more and much
+finer twigs -- and NOT by fattening trunks, which would only make the picture heavier. Also: the fork is HIGH in
+these pictures (the trunk rises clear before the boughs leave), the boughs ARCH strongly rather than ramping, and
+the leaves hang along the twigs with sky between them.
+
+**WHAT IS NOT TAKEN:** these were made by a machine from a prompt, not photographed from life, so they are evidence
+about PROPORTION and HIERARCHY and not about botany. Where one of them has got a tree wrong, it is not copied.
