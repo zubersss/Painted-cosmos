@@ -2723,3 +2723,44 @@ interaction does not work" when what did not work was the harness.
 backticks round a field name, which closed the template string the shader lives in, and the page died with
 "Unexpected identifier". The rule is in CLAUDE.md. `node --check src/world/sky.js` catches it in a second and is
 worth running after every shader edit.
+
+### 2026-11-20 OWNER: the v26 speed table, and "a top quality load with things looking good even from a distance"
+- OWNER (verbatim, with the table): "i want to to look like a top quality load with things looking good even from a distance"
+- **WHAT THE TABLE SAYS, AND IT IS NOT WHAT IT LOOKS LIKE.** Twenty-four of its twenty-nine rows read `-0.0 ms`.
+  No far trees: -0.0. No trees at all: -0.0. No shadows: -0.0. No plants: -0.0. The full paint instead of the
+  lighter one: -0.0. That is not "nothing costs anything": it is **a test asking questions it cannot hear the
+  answers to.** The phone is held at 60 a second by its own display, and no row can read faster than 16.7 ms.
+  Three tables have now been read this way.
+- **THE ONLY ROWS THAT SAY ANYTHING are the four that make the picture sharper**, and they say a lot. Fitted:
+
+  | picture | pixels | frame | a second |
+  | --- | --- | --- | --- |
+  | as it draws now, 1028x480 | 0.49 MP | 16.7 (capped) | 60 |
+  | half again as sharp, 1542x720 | 1.11 MP | 20.0 | 50 |
+  | twice as sharp, 2056x960 | 1.97 MP | 29.6 | 33.8 |
+  | every pixel the screen has, 3086x1440 | 4.44 MP | 54.6 | 18.3 |
+
+  A straight line through the three uncapped ones: **10.4 ms for every million picture pixels, plus 8.5 ms that
+  does not depend on the picture at all** (it predicts the middle row to 0.6 ms). At the size it draws now that is
+  13.6 ms of a 16.7 ms frame: **there is about 3 ms of room, and it was being thrown away.**
+- **AND THE 8.5 ms IS THE SCRIPT.** The table's own header says script 9.6 ms, 350 draw calls, 571k triangles. So
+  the phone's frame is more than half CPU. Sharpness is bought by cutting that, not by cutting what is drawn.
+- **WHY IT LOOKS SOFT AT A DISTANCE:** the picture is 1028 pixels across and the screen is 3086. Everything is
+  stretched three times. That is the first and biggest part of the owner's complaint, and it is not a question of
+  trees or paint at all.
+- **TWO THINGS BUILT FROM THIS (v27):**
+  1. **THE SHARPENING LADDER** (`src/core/dynres.js`, `src/main.js`). A device with room above sixty a second is
+     given MORE PICTURE, a quarter of a pixel to the screen point at a time, on the canvas itself and never by
+     stretching. It climbs only from full scale and the top tier, after seconds of proof, and a rung is the FIRST
+     thing given back when anything goes wrong -- before the picture is shrunk and before a tier is dropped. It
+     only ever spends room above SIXTY a second, so it never trades smoothness for sharpness on a device that has
+     settled for less. `?sharpen=N` stands it on a rung to be judged by eye; `?sharpen=0` turns it off.
+  2. **THE SPEED TEST CAN SEE PAST THE CAP** (`src/core/bench.js`). Before the rows it asks the device two
+     questions -- does it show a spread, and does it go faster with fewer pixels -- and if the answer to both is no
+     it draws the picture sharper until the frame is clearly off the line and asks every question THERE, saying so
+     in the header. The four sharpness rows are still measured from the real size.
+- **THREE FAULTS THE LADDER'S OWN TESTS FOUND, each now written into the code:** judged against the budget
+  stretched to a cap it had settled for, a phone stuck at 30 a second climbed four rungs for nothing; one rung too
+  far cost the WHOLE ladder, because a frame a hair past the refresh is shown 33 ms late, which is over the panic
+  line; and while a rung was being given back the ordinary controller shed the picture AND a tier, which then took
+  two minutes to come back. The rule now is: nothing else is shed while the ladder still has a rung to give.

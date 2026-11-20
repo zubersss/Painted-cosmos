@@ -411,9 +411,36 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 - **2026-11-19, wind and fire together, and the ice worlds:** "Refine the wind and fire abilities even further i want them to be able to interact with each other where wind strengthens the fire and also give the ice planets more places to melt or use my abilities and the sky of the ice planets still needs to be streaky and painted like". Three asks: wind must visibly feed fire (MEASURE whether it already does before building anything); the ice worlds need more ice to melt and more to use the powers on; and their SKY IS STILL NOT STREAKY -- asked before, not done.
 
+- **2026-11-20, top quality and good at a distance:** with speed test 9 at v26, "i want to to look like a top quality
+  load with things looking good even from a distance". A STANDING direction about the picture itself. What the table
+  actually says: twenty-four of its twenty-nine rows read -0.0 ms because the phone is held at 60 a second by its own
+  display, so the test could not hear its own answers; the only rows that cost anything were the sharper ones, and
+  from them the frame is **10.4 ms a megapixel plus 8.5 ms that is not the picture at all** (the script: 9.6 ms, 350
+  draw calls). THE PICTURE IS 1028 ACROSS ON A SCREEN OF 3086 -- stretched three times, which is most of why it looks
+  soft far off. So: give the room to SHARPNESS (the ladder, v27), and buy more of it by cutting the script, not by
+  cutting what is drawn. **Do not cut content for speed on this phone until a table says content costs something.**
+
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
+
+**`main` IS AT v27 (20 Nov), pull request #27 merged: THE PICTURE SHARPENS ITSELF TO WHAT THE DEVICE CAN HOLD.**
+The owner's v26 table said almost nothing -- 24 of its 29 rows read -0.0 ms, because their phone is held at 60 a
+second by its display and the test could not hear its own answers. The four rows that DO say something give the
+phone's frame as **10.4 ms a megapixel plus 8.5 ms that is not the picture at all** (the script: 9.6 ms, 350 draw
+calls). At the size it draws, 13.6 ms of a 16.7 ms frame: there was about 3 ms of room being thrown away, while
+the picture was 1028 across on a screen of 3086.
+- **THE LADDER** (core/dynres.js, main.js): a rung is a quarter of a picture pixel to the screen point, taken on
+  the canvas and never by stretching. Climbed from full scale and the top tier only, spending ONLY room above
+  sixty a second; a rung is the first thing given back and nothing else is shed while one stands. SEEN in the real
+  game at 3.75 pixels to the point: 1028x480 -> 1440x672 at two rungs. `?sharpen=N` pins a rung, `?sharpen=0` off.
+- **THE SPEED TEST CAN HEAR** (core/bench.js): it now finds out whether the device is held at its refresh (a
+  spread in the frame times, and whether fewer pixels help) and, if it is, asks every question at a sharper size
+  and says so in the header. Two new rows ask where the draw calls are (the ground is 61 of 245 and the water 39).
+- **WAITING ON THE OWNER:** a v27 table (it will now have numbers in it), and their eye on `?sharpen=1`, `2`, `3`
+  to say which rung looks right. **Do not cut content for speed on that phone until a table says content costs
+  something:** at the size it draws, nothing did.
+
 
 **`main` IS AT v26 (19 Nov), pull request #26 merged: THE WIND AND THE FIRE ACT ON EACH OTHER, THE ICE WORLDS
 ANSWER A CAST, AND THEIR SKY IS PAINTED.** The owner's three asks of 19 Nov, all three done and all three measured.
