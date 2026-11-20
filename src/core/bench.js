@@ -152,6 +152,17 @@ export function attachBench(pc) {
     }
   };
   let sunOut = null;      // whether the shadow map was drawn while the first row was measured
+  // SEEING PAST THE DISPLAY'S CAP (the owner's table of 2026-11-19, v26). Their phone holds 60 a second with room
+  // to spare, so every row of that table read "-0.0 ms" -- no far trees, no trees at all, no shadows, no plants,
+  // the full paint, all the same 16.7 ms, because a display that waits for its refresh cannot show anything
+  // faster and the test was asking questions it could not hear the answers to. A test that cannot tell two things
+  // apart is worse than no test: it was read for three versions as "nothing costs anything".
+  // So: before the rows, the test finds out whether this device is held at its refresh, and if it is, it draws the
+  // picture sharper until the frame is clearly off the cap and asks every question THERE. The costs are then of a
+  // bigger picture than the device draws -- the header says so plainly -- but they are real costs, and the order
+  // and the size of them is what the questions are for.
+  let MK = 1;             // how much sharper each way the questions are asked (1: not capped, asked as drawn)
+  let capMs = 0;          // the frame interval the device is held at, if it is held at one
   const head = (r0) => {
     let gpu = '?';
     try { const gl = R.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); if (e) gpu = String(gl.getParameter(e.UNMASKED_RENDERER_WEBGL)); } catch { /* not told */ }
@@ -161,10 +172,14 @@ export function attachBench(pc) {
       gpu.slice(0, 64) + ' | depth ' + (i.depth || '?') + ' | ' + sun + '\n' +
       'picture ' + (i.internalWidth || c.width) + 'x' + (i.internalHeight || c.height) + ' | screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1).toFixed(2) + (pin ? ' | held still' : ' | NOT HELD') +
       ' | tier ' + i.quality + ' | edges ' + (P.aaMode ? P.aaMode() : '?') + ' | paint ' + (P.lite ? 'lighter' : 'full') +
-      (r0 ? ' | script ' + r0.script.toFixed(1) + ' ms, ' + Math.round(r0.calls) + ' calls, ' + Math.round(r0.tris / 1000) + 'k triangles a frame' : '');
+      (r0 ? ' | script ' + r0.script.toFixed(1) + ' ms, ' + Math.round(r0.calls) + ' calls, ' + Math.round(r0.tris / 1000) + 'k triangles a frame' : '') +
+      (MK > 1 ? '\nTHE QUESTIONS BELOW WERE ASKED WITH THE PICTURE ' + MK.toFixed(2) + ' TIMES AS SHARP EACH WAY, because at the\n'
+        + 'size this device draws it is held at ' + (1000 / Math.max(capMs, 1e-3)).toFixed(0) + ' a second and NOTHING could be told apart: every row read -0.0 ms.\n'
+        + 'So the + / - below are real costs, but of a picture ' + (MK * MK).toFixed(1) + ' times the one it draws. Rows 24 on are back at that size.' : '');
   };
   const run = async () => {
     el.textContent = 'speed test: waiting for the first view...';
+    // (MK and capMs are filled by the probe below, before the rows; head() reads them.)
     while (!window.__pcReady) await wait(250);
     if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     await wait(2500);
@@ -206,6 +221,32 @@ export function attachBench(pc) {
       if (pc.settle) await Promise.race([pc.settle(12), wait(20000)]);
     };
     const AS = 'as set';
+    // ---- IS THIS DEVICE HELD AT ITS REFRESH? (see MK at the top of this file) ----------------------------------
+    // Two questions, because one is not enough: a device that is really drawing shows a spread in its frame times
+    // AND goes faster when it is given fewer pixels. One held at its refresh does neither, and nor does one whose
+    // frame is all script. Either way the questions below must be asked somewhere the answers can be heard.
+    {
+      await calm();
+      const a = stats(await sample(1400));
+      capMs = a.mean;
+      await sharpen(0.7);                          // half the pixels (0.7 of them each way)
+      const b = stats(await sample(1200));
+      await sharpen(1);
+      const freed = (a.mean - b.mean) / Math.max(a.mean, 1e-3);
+      // (a sample that caught almost no frames says nothing at all -- a machine drawing in software takes tens of
+      //  seconds a frame -- and must not be read as "held at its refresh" and then asked to draw nine times the
+      //  pixels. So: four frames in each sample, and a frame time that is a frame time.)
+      if (a.n >= 4 && b.n >= 4 && capMs > 1 && capMs < 60 && freed < 0.07) {
+        for (const k of [1.5, 2, 2.5, 3]) {
+          if (k > kWhole + 1e-6) break;
+          await sharpen(k);
+          MK = k;
+          const c = stats(await sample(1200));
+          if (c.mean > capMs * 1.3) break;         // clearly off the line: ask everything here
+        }
+        if (MK <= 1) await sharpen(1);
+      }
+    }
     const steps = [
       [AS, null, null],
       // the far trees: their paint, their shapes, which pass, which place in the order of drawing, which form
@@ -233,6 +274,13 @@ export function attachBench(pc) {
       ['no near trees', () => show(/^pc-prop-tall/, false), () => show(/^pc-prop-tall/, true)],
       ['no trees', () => show(/^pc-prop-(tall|far)/, false), () => show(/^pc-prop-(tall|far)/, true)],
       ['no small plants', () => show(/^pc-prop-(?!tall|far)/, false), () => show(/^pc-prop-(?!tall|far)/, true)],
+      // (2026-11-20) WHERE THE DRAW CALLS ARE. The table's header says 350 of them and 9.6 ms of script, and a draw
+      // call costs a phone's processor something like twenty millionths of a second, so the two numbers are most
+      // likely the same number. Counted in the painter's gallery on one frame of the autumn wood: 245 draws, of
+      // which THE GROUND IS 61 AND THE WATER 39 -- a hundred of them, more than all the plants and trees together.
+      // These two rows say what each is worth on a real device.
+      ['no water drawn', () => show(/^pc-water/, false), () => show(/^pc-water/, true)],
+      ['no ground drawn', () => show(/^pc-terrain/, false), () => show(/^pc-terrain/, true)],
       [AS, null, null],
       // the light and the paint (each settles first: its shaders are built again)
       ['no shadows at all', () => B({ shadow: false }), () => B({ shadow: true })],
@@ -240,7 +288,9 @@ export function attachBench(pc) {
       ['trees cast no shadow', () => treeMeshes((o) => o.layers.disable(2)), () => treeMeshes((o) => o.layers.enable(2))],
       ['no light in the air', () => B({ shaft: false }), () => B({ shaft: true })],
       [lite0 ? 'the full paint' : 'the lighter paint', () => B({ lite: !lite0 }), () => B({ lite: lite0 })],
-      [AS, null, null],
+      // (back to the size the device really draws, so the four rows below are measured from IT and not from
+      //  whatever sharper size the questions above had to be asked at: see MK at the top of this file)
+      [AS, () => sharpen(1), null],
       // (EIGHTH FORM, 2026-11-18) ROWS THAT MAKE THE GAME WORK HARDER, not easier. The owner's first believable table
       // read 16.7 ms = 60.0 a second on eleven rows running: that is the phone's own screen refusing to go faster, not
       // the game's speed, and under such a cap no row can be told from another. These rows raise the picture's

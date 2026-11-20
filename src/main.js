@@ -25,14 +25,14 @@ import { loadProviders } from './core/providers.js';
 import { Game } from './core/game.js';
 import { Input, keyLabels } from './core/input.js';
 import { attachTouch } from './core/touch.js';
-import { DynamicResolution } from './core/dynres.js';
+import { DynamicResolution, DYNRES } from './core/dynres.js';
 import { createHud } from './ui/hud.js';
 import { createMap } from './ui/map.js';
 import { createBook } from './ui/book.js';
 import { createAudio } from './audio/audio.js';
 import { readSave, restore, clearSave, AutoSave } from './core/save.js';
 import { SketchStore } from './core/sketches.js';
-import { choosePreset, bufferSize, BASIC_GPU } from './core/preset.js';
+import { choosePreset, bufferSize, BASIC_GPU, MAX_PIXELS } from './core/preset.js';
 import { attachPlatform } from './core/platform.js';
 import { attachBench } from './core/bench.js';
 import { BUILD } from './core/build.js';
@@ -212,6 +212,11 @@ async function boot() {
     quality: params.has('quality') ? Number(params.get('quality')) : BEST_PIN ? 2 : PRESET.tier,
     minQuality: params.has('quality') ? Number(params.get('quality')) : 0,
     maxQuality: params.has('quality') ? Number(params.get('quality')) : 2,
+    // THE SHARPENING LADDER (the owner's speed table of 2026-11-19: their phone draws 1028 x 480 for a screen of
+    // 3086 x 1440, holds 60 a second with room to spare, and looks soft). How many rungs this screen has in it is
+    // worked out in resize() below, once the canvas has a size; 0 until then, which is the game as it was.
+    // ?dpr= or ?best=1 is an instruction about sharpness, so the ladder stands aside; ?sharpen=0 turns it off.
+    sharpMax: 0,
   });
   const storage = safeStorage();
   // (on a touch screen a sheet's corner presses its key, as the touch HUD's tabs do)
@@ -283,13 +288,33 @@ async function boot() {
   // ?best=1 asks for every pixel the screen has, which is what the owner asked about on 2026-11-18: on their S23
   // Ultra that is 3086 x 1440, nine times the pixels the phone is given today. ?dpr= still wins where both are given.)
   const DPR_PIN = Math.max(0, Math.min(4, +params.get('dpr') || (BEST_PIN ? window.devicePixelRatio || 0 : 0)));
-  game.device = { preset: PRESET.id, ratio: 1, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode };
+  game.device = { preset: PRESET.id, ratio: 1, deviceRatio: window.devicePixelRatio || 1, w: 0, h: 0, depth: depthMode, aa: aaMode, sharp: 0 };
+  // THE SHARPENING LADDER'S CEILING, in picture pixels to the screen point. Never more than the screen itself has
+  // (more picture pixels than points is waste), never past what this kind of device may hold as drawing targets
+  // (the preset's own limit and MAX_PIXELS), and nothing at all where the player has asked for a sharpness or
+  // turned it off. Worked out afresh on every resize, because turning a phone changes the box.
+  // ?sharpen=0 turns the ladder off; ?sharpen=N stands it on rung N and does not climb (one rung is a quarter of a
+  // picture pixel to the screen point), which is how a rung is judged by eye on a real device without waiting for
+  // the ladder to find it. The ladder may still give a pinned rung back if the frames go wrong: that is a safety.
+  const SHARP_PIN = params.has('sharpen') ? Math.max(0, Math.min(12, +params.get('sharpen') || 0)) : 0;
+  const LADDER_OFF = params.get('sharpen') === '0' || DPR_PIN > 0;
+  const ladderRungs = () => {
+    if (LADDER_OFF) return 0;
+    const css = Math.max(1, canvas.clientWidth * canvas.clientHeight);
+    const ceil = Math.min(window.devicePixelRatio || 1, Math.sqrt(Math.min(PRESET.maxPixels, MAX_PIXELS) / css));
+    const rungs = Math.max(0, Math.floor((ceil - PRESET.dpr) / DYNRES.sharpStep + 1e-6));
+    return SHARP_PIN > 0 ? Math.min(SHARP_PIN, rungs) : rungs;
+  };
+  let curSharp = 0;              // the rung the ladder stands on now (dynres decides; this applies it)
+  const dprNow = () => (DPR_PIN > 0 ? DPR_PIN : curSharp > 0 ? PRESET.dpr + DYNRES.sharpStep * curSharp : 0);
   function resize() {
-    const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, DPR_PIN);
+    const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, dprNow());
     camera.aspect = b.w / b.h;
     camera.updateProjectionMatrix();
     painter.resize(b.w, b.h);
-    Object.assign(game.device, { ratio: b.ratio, deviceRatio: window.devicePixelRatio || 1, w: b.w, h: b.h });
+    dyn.sharpMax = ladderRungs();
+    if (curSharp > dyn.sharpMax) { curSharp = dyn.sharpMax; dyn.sharp = curSharp; }
+    Object.assign(game.device, { ratio: b.ratio, deviceRatio: window.devicePixelRatio || 1, w: b.w, h: b.h, sharp: curSharp });
     // a phone turned upright while the game waits: the picture under the slip is laid again
     if (isUpright() && window.__pcReady) { try { game.repaintFitted(); } catch { /* the next frame paints */ } }
   }
@@ -316,8 +341,25 @@ async function boot() {
   // pixel, and the browser makes the one clean step up to the screen. It is never taken below what the phone was
   // given before this (the preset's own ratio), and it is rounded to quarter steps so the targets are not rebuilt
   // for every small wobble of the frame time.
-  const applyDynScale = (sc) => {
-    if (!(DPR_PIN > 0)) { if (painter.setRenderScale) painter.setRenderScale(sc); return; }
+  const applyDynScale = (sc, sharp = curSharp) => {
+    // THE LADDER, where there is no asked-for sharpness: a rung is a quarter of a picture pixel to the screen
+    // point, taken on THE CANVAS ITSELF -- never by the painter drawing small and stretching, which the oil look
+    // must not do. Rung 0 is exactly the picture the device was given before this existed.
+    if (!(DPR_PIN > 0)) {
+      const want = Math.max(0, Math.min(dyn.sharpMax, sharp | 0));
+      if (want !== curSharp || (want > 0 && !game.device.w)) {
+        curSharp = want;
+        const b = bufferSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1, PRESET, dprNow());
+        if (b.w !== game.device.w || b.h !== game.device.h) {
+          camera.aspect = b.w / b.h;
+          camera.updateProjectionMatrix();
+          painter.resize(b.w, b.h);
+          Object.assign(game.device, { ratio: b.ratio, w: b.w, h: b.h, sharp: curSharp });
+        } else game.device.sharp = curSharp;
+      }
+      if (painter.setRenderScale) painter.setRenderScale(sc);
+      return;
+    }
     // (2026-11-18, found by an independent reader and measured) THE FLOOR IS THE PIN, NOT THE PRESET. Written as
     // max(PRESET.dpr, ...) this RAISED an asked-for sharpness instead of holding it: ?dpr=1 on a 2x desktop took the
     // 1280x720 the player asked for straight up to 1920x1080 on the first frame, and ?dpr=0.75 on the basic-graphics
@@ -337,7 +379,8 @@ async function boot() {
     }
     if (painter.setRenderScale) painter.setRenderScale(Math.min(1, (DPR_PIN * sc) / want));
   };
-  applyDynScale(dyn.scale);
+  if (SHARP_PIN > 0) dyn.sharp = Math.min(SHARP_PIN, dyn.sharpMax);
+  applyDynScale(dyn.scale, dyn.sharp);
   painter.setQuality(dyn.quality);
   // PHYSICS' particle counts and sampling follow the tier too (hardening review P8): a tier
   // drop then sheds CPU as well as pixels, and the top tier gets its full storms.
@@ -391,7 +434,7 @@ async function boot() {
   });
   const debug = {
     game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, touch, platform, using: prov.using, note: debugNote, gl,
-    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, settled: worldSettled(world, game.frameCount),
+    info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, sharp: dyn.sharp, sharpMax: dyn.sharpMax, settled: worldSettled(world, game.frameCount),
       device: { ...game.device, aa: aaMode(), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(4) }, platform: { ...platform.state }, upright }),
     teleport: (o) => sim.teleport(o),
     aimAt: (id) => sim.aimAt(id),
@@ -449,7 +492,7 @@ async function boot() {
     if (window.__pcReady) judged += dtMs / 1000;
     const r = judged > 1 ? dyn.frame(dtMs) : { changed: false };
     if (r.changed) {
-      applyDynScale(r.scale);
+      applyDynScale(r.scale, r.sharp);
       painter.setQuality(r.quality);
       if (physics && physics.setQuality) physics.setQuality(r.quality);
     }

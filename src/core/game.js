@@ -769,7 +769,10 @@ export class Game {
     const d = this.device;
     if (!d) return [];
     const aa = typeof d.aa === 'function' ? d.aa() : d.aa;
-    return [`device ${d.preset}   ${d.w}x${d.h} (${(+d.ratio).toFixed(2)} px per css px of ${(+d.deviceRatio).toFixed(2)})   AA ${aa || 'none'}   depth ${d.depth || '-'}`];
+    // (`sharper +N`: how many rungs of the sharpening ladder this device has climbed. core/dynres.js: a device
+    //  with room above sixty a second is given more picture, a quarter of a pixel to the point at a time.)
+    const rung = (d.sharp | 0) > 0 ? `   sharper +${d.sharp | 0}` : '';
+    return [`device ${d.preset}   ${d.w}x${d.h} (${(+d.ratio).toFixed(2)} px per css px of ${(+d.deviceRatio).toFixed(2)})${rung}   AA ${aa || 'none'}   depth ${d.depth || '-'}`];
   }
 
   // What the weather is doing and what its marks cost (the world draws PHYSICS' kits itself:

@@ -3,7 +3,8 @@
 // a reload of several minutes in software GL.
 //
 //   node tools/lab.mjs serve                      start the lab (keeps running; prints its port)
-//   node tools/lab.mjs open '<path?query>' [w h]  load a page and wait until it says it is ready
+//   node tools/lab.mjs open '<path?query>' [w h] [dsf]  load a page and wait until it says it is ready
+//                                                 (dsf: device pixels to the css point, as a phone's 3 or 4; 1)
 //   node tools/lab.mjs eval '<js>'                run JS in the page (may return a promise); prints the result
 //   node tools/lab.mjs shot <out.png|jpg>         a screenshot of the page (slow in software GL: the compositor's)
 //   node tools/lab.mjs grab <out.png> [frames]    hold the page's loop, step it `frames` times (default 1) and write
@@ -45,7 +46,7 @@ async function client(op, rest) {
   let st;
   try { st = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch { console.error('the lab is not running (node tools/lab.mjs serve)'); process.exit(2); }
   const body = { op };
-  if (op === 'open') { body.url = rest[0] || '/gallery.html'; body.w = +rest[1] || 0; body.h = +rest[2] || 0; }
+  if (op === 'open') { body.url = rest[0] || '/gallery.html'; body.w = +rest[1] || 0; body.h = +rest[2] || 0; body.dsf = +rest[3] || 1; }
   if (op === 'eval') body.js = rest[0];
   if (op === 'shot') body.out = path.resolve(rest[0] || 'shot.png');
   if (op === 'grab') { body.out = path.resolve(rest[0] || 'grab.png'); body.frames = +rest[1] || 1; }
@@ -81,9 +82,12 @@ async function serve() {
   const base = `http://127.0.0.1:${files.address().port}`;
   const browser = await chromium.launch({ args: GL_ARGS });
   let page = null, problems = [], ver = 0;
-  const newPage = async (w, h) => {
+  // dsf: how many device pixels the screen has to one css point (window.devicePixelRatio in the page). 1 unless
+  // asked for. A phone has 3 or 4 of them, and the game's sharpening ladder (core/dynres.js) can only be seen on a
+  // page that says so, because a screen with one pixel to the point has nothing to gain by being drawn sharper.
+  const newPage = async (w, h, dsf) => {
     if (page) await page.close().catch(() => {});
-    page = await browser.newPage({ viewport: { width: w || 1280, height: h || 720 }, deviceScaleFactor: 1 });
+    page = await browser.newPage({ viewport: { width: w || 1280, height: h || 720 }, deviceScaleFactor: Math.max(1, Math.min(4, +dsf || 1)) });
     page.setDefaultTimeout(0);
     // the page's loop can be held: while __labHold is set a requested frame waits until __labStep runs it
     await page.addInitScript(() => {
@@ -153,7 +157,7 @@ async function serve() {
       let b; try { b = JSON.parse(d); } catch { return done({ ok: false, error: 'bad json' }); }
       try {
         if (b.op === 'open') {
-          await newPage(b.w, b.h);
+          await newPage(b.w, b.h, b.dsf);
           await page.goto(base + (b.url.startsWith('/') ? b.url : '/' + b.url));
           await page.waitForFunction('window.__pcReady === true', null, { timeout: 0, polling: 500 });
           return done({ ok: true, result: 'ready ' + b.url });
