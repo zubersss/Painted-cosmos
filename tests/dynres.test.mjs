@@ -172,3 +172,96 @@ test('provider plan: stubs by default until a module is flagged ready; URL can f
   assert.deepEqual(planProviders('?real=world,art', none), { ...every('stub'), world: 'real', art: 'real' });
   assert.equal(planProviders('?stub=1&real=1', none).render, 'stub', 'stub wins when both are given');
 });
+
+// ---- THE SHARPNESS LADDER (the owner's speed table of 2026-11-19, v26) -----------------------------------------
+// Their S23 Ultra reads -0.0 ms for every row of the speed test, because its display holds it at 60 a second and
+// nothing can be told apart under that cap. The only rows that cost anything were the sharper ones. So a device
+// with room is given MORE PICTURE. A rung is a quarter of a picture pixel to the screen point.
+//
+// The machine here is the owner's own, fitted from their four sharpness rows: 8.5 ms that does not depend on the
+// picture, plus 10.4 ms for every million picture pixels, with the display holding anything under 16.7 at 16.7 and
+// anything over it a whole interval late (which is what a display really does, and is what makes a rung too far
+// obvious at once).
+function phone({ dpr0 = 1.25, css = 823 * 384, fixed = 8.5, perMP = 10.4 } = {}) {
+  return (sharp) => {
+    const mp = css * (dpr0 + 0.25 * sharp) ** 2 / 1e6;
+    const ms = fixed + perMP * mp;
+    return ms <= 1000 / 60 ? 1000 / 60 : Math.ceil(ms / (1000 / 60)) * (1000 / 60);   // a missed refresh waits for the next
+  };
+}
+function climb(ctrl, cost, seconds, hitchMs = 0) {
+  let t = 0, worstHeld = 0;
+  let last = ctrl.sharp;
+  while (t < seconds) {
+    let ms = cost(ctrl.sharp);
+    if (hitchMs && ctrl.sharp !== last) { ms = hitchMs; last = ctrl.sharp; }   // rebuilding the targets costs one frame
+    ctrl.frame(ms);
+    if (cost(ctrl.sharp) <= 1000 / 60 && ctrl.sharp > worstHeld) worstHeld = ctrl.sharp;
+    t += ms / 1000;
+  }
+  return worstHeld;
+}
+
+test('dynres: with no rungs offered, nothing about the picture changes (every device until the caller asks)', () => {
+  const c = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2 });
+  assert.equal(c.sharpMax, 0);
+  const cost = phone();
+  for (let i = 0; i < 60 * 60; i++) c.frame(cost(0));
+  assert.equal(c.sharp, 0, 'a rung was climbed that was never offered');
+  assert.equal(c.sharpChanges, 0);
+});
+
+test('dynres: the owner`s phone climbs to the sharpest picture it can hold at 60, and no further', () => {
+  // ten rungs are offered (1.25 -> 3.75, the screen`s own). By the fit, 1.50 costs 15.9 ms and holds; 1.75 costs
+  // 18.5 and misses the refresh, so it is shown 33.3 ms late and must be given back at once.
+  const c = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
+  const cost = phone();
+  climb(c, cost, 600);
+  assert.equal(c.sharp, 1, 'it did not settle on the one rung that holds 60: ' + c.sharp + ' rungs');
+  assert.ok(cost(c.sharp) <= 1000 / 60 + 1e-9, 'it settled on a picture the phone cannot hold at 60');
+  assert.ok(cost(c.sharp + 1) > 1000 / 60, 'it stopped short: the next rung would have held too');
+  assert.ok(c.sharpChanges >= 2, 'it never tried the rung above: ' + c.sharpChanges + ' changes');
+});
+
+test('dynres: a slower phone is left where it is, and a faster one climbs further', () => {
+  const slow = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
+  climb(slow, phone({ fixed: 13 }), 600);
+  assert.equal(slow.sharp, 0, 'a phone with no room to spare was given a sharper picture: ' + slow.sharp);
+  // (this one found a real fault: judged against the budget STRETCHED to the cap it had settled for, a phone stuck
+  //  at 30 a second climbed four rungs for nothing, because a display shows the same 33 ms however much picture is
+  //  drawn until the moment it drops to 20. The ladder is judged against the real sixty-a-second line instead.)
+
+  const fast = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
+  climb(fast, phone({ fixed: 3, perMP: 4 }), 900);
+  assert.ok(fast.sharp >= 3, 'a phone with plenty of room climbed only ' + fast.sharp + ' rungs');
+});
+
+test('dynres: a rung is the first thing given back when the frames go wrong, and a panic takes the whole ladder', () => {
+  const c = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
+  climb(c, phone({ fixed: 3, perMP: 4 }), 900);
+  const was = c.sharp, scale0 = c.scale, q0 = c.quality;
+  assert.ok(was >= 2, 'nothing to give back: ' + was);
+  // the world turns heavy (a wood, weather, a fire): one rung goes, and the scale and the tier are not touched yet
+  let r = null;
+  for (let i = 0; i < 40 && (!r || r.sharp === was); i++) r = c.frame(24);
+  assert.equal(r.sharp, was - 1, 'the sharpest rung was not the first thing given back');
+  assert.equal(r.scale, scale0, 'the picture was shrunk before the sharpening was given back');
+  assert.equal(r.quality, q0, 'the tier went before the sharpening did');
+  // and a real panic gives back half the ladder at a time, so a tall one is empty in a second or two -- and the
+  // picture and the tier are still untouched at the moment the last rung goes, because the sharpening is the one
+  // thing in the frame that is not the game itself.
+  let emptiedAt = null;
+  for (let i = 0; i < 60 && !emptiedAt; i++) { const q = c.frame(70); if (q.sharp === 0) emptiedAt = q; }
+  assert.ok(emptiedAt, 'a panic never emptied the ladder: ' + c.sharp + ' rungs left');
+  assert.ok(c.changes < 40, 'the ladder was emptied one rung at a time, not by halves');
+  assert.equal(emptiedAt.scale, scale0, 'the picture was shrunk before the ladder was empty');
+  assert.equal(emptiedAt.quality, q0, 'a tier went before the ladder was empty');
+});
+
+test('dynres: one rebuilt-targets hitch a rung does not send it back down', () => {
+  // changing the canvas rebuilds five drawing targets: one slow frame. That is a hitch, not load.
+  const c = new DynamicResolution({ scale: 1, quality: 2, maxQuality: 2, sharpMax: 10 });
+  const held = climb(c, phone({ fixed: 3, perMP: 4 }), 900, 300);
+  assert.ok(c.sharp >= 2, 'the hitch of its own rebuilding stopped it climbing: ' + c.sharp);
+  assert.ok(held >= c.sharp, 'it settled above what it can hold');
+});

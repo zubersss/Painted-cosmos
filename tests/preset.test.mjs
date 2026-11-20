@@ -88,7 +88,12 @@ test('?dpr= raises or lowers the picture pixels to the screen point, and never p
 
 test('main.js sizes the buffer by the preset and starts the controller at its tier', () => {
   const m = fs.readFileSync(path.join(repo, 'src/main.js'), 'utf8');
-  assert.match(m, /bufferSize\(canvas\.clientWidth, canvas\.clientHeight, window\.devicePixelRatio \|\| 1, PRESET, DPR_PIN\)/);
+  // (2026-11-20: the buffer's sharpness is no longer the pin alone. It is dprNow(), which is the pin where the
+  //  address asked for one and otherwise the sharpening ladder's current rung -- 0, the preset's own, until the
+  //  device has shown it has room above sixty a second. core/dynres.js.)
+  assert.match(m, /bufferSize\(canvas\.clientWidth, canvas\.clientHeight, window\.devicePixelRatio \|\| 1, PRESET, dprNow\(\)\)/);
+  assert.match(m, /const dprNow = \(\) => \(DPR_PIN > 0 \? DPR_PIN : /, 'an asked-for sharpness must still win over the ladder');
+  assert.match(m, /const LADDER_OFF = params\.get\('sharpen'\) === '0' \|\| DPR_PIN > 0/, 'the ladder must stand aside for ?dpr= and ?sharpen=0');
   // (?dpr=: the pin may only be what the address asked for, between 0 and 4, and 0 means "leave the preset alone")
   assert.match(m, /const DPR_PIN = Math\.max\(0, Math\.min\(4, \+params\.get\('dpr'\) \|\| \(BEST_PIN \? window\.devicePixelRatio \|\| 0 : 0\)\)\)/);
   // the tier still comes from the preset unless the address asks otherwise (?quality=, or ?best=1 for the top one)
