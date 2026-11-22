@@ -8,15 +8,15 @@
 //   casts or holds the chosen ability by adding a shape of moving air to the list (physics/powers.js),
 //   and ages the list. The physics takes the list from sim (f.winds) and everything that reads the air answers.
 // Nothing here draws, and nothing here moves a leaf: the world's own systems do.
-import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, moveWind, growWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
+import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, castRip, KIND, moveWind, growWind, turnWind, releaseWind, stepWinds, partedAt, WINDPOWER } from '../physics/powers.js';
 import { S } from './state.js';
 import { fellTree, felledAt, healFelled } from '../data/felled.js';
 // FIRE (the second element; docs/POWERS-FIRE.md). The list of burning patches lives here with the winds; the physics
 // steps it, because only the physics knows what is underfoot and what the wind is there. What the fire leaves behind
 // goes into the record that lasts, exactly as a felled tree does.
 import { makeFires, douseFires, clearBurns, FIRE, FUEL } from '../physics/fire.js';
-import { makeTimes, castTime, moveTime, releaseTime, stepTimes, TIMEPOWER } from '../physics/times.js';
-import { scorch, meltIce, deepenMelt, healBurnt, BURNT } from '../data/burnt.js';
+import { makeTimes, castTime, stepTimes, TIMEPOWER } from '../physics/times.js';
+import { scorch, meltIce, deepenMelt, healBurnt } from '../data/burnt.js';
 import { SEASON } from '../data/season.js';
 import { stripStep } from '../data/stripped.js';
 
@@ -73,37 +73,29 @@ export const FIRE_ABILITIES = Object.freeze([
   { id: 'cinders', word: 'cinders', hold: false },
 ]);
 
-// SPACE AND TIME'S abilities, THE THIRD ELEMENT (docs/POWERS-TIME.md; the owner, 2026-11-22: "start working on
-// the 3rd ability space and time manipulation give me at least 10 powers for that one and they should all be
-// unique and powerful and they should also look really good in the game"). TWELVE, in the order of the keys
-// 1..9, 0, -, =. The rule they are designed by: this is a game with no combat and no way to fail, so a power over
-// time is not a weapon -- every one of these is a way to LOOK, to TRAVEL or to MEND, and every one has a picture
-// of its own that nothing else in the game draws.
-//    slow     a bubble where the world runs at a fifth: rain hangs, a fire creeps, leaves drift
-//    haste    the same bubble at four times over: a cloud crosses, a fire eats a wood in seconds
-//    freeze   everything inside STOPS, and stays stopped after you walk away ('still the moment')
-//    unmake   the place put back: scorch lifts, burnt crowns green, felled trees stand, melted ice closes
-//    year     push the season where you stand: summer, autumn, the bare year, the first green
-//    sun      take the sun and move it: the hour of the day, dragged across the sky
-//    knot     tie a knot in time here; pull it from anywhere and you are drawn back to it
-//    fold     fold the ground between you and where you look, and you are there
-//    door     a door between here and there, that stays (NOT BUILT: docs/POWERS-TIME.md 9)
-//    eye      your eye leaves your body and flies (NOT BUILT: 10)
-//    lens     a lens of bent space: the far drawn near and large (NOT BUILT: 11)
-//    mile     the ground drawn in along the way you walk (NOT BUILT: 12)
+// SPACE AND TIME'S abilities, THE THIRD ELEMENT. FOUR of them, in the order of the keys 1 to 4.
+//
+// THERE WERE TWELVE (2026-11-22, the first design: docs/POWERS-TIME.md). THE OWNER CUT THEM THE SAME DAY:
+// "to many space and time abilities cut them down ... the 4 should be overly powerful abilities like a rip in
+// space time that sucks everything in a long ways in". So: four, and each one the biggest of its kind. A short
+// list of powers that each feel enormous beats a long list of small ones -- which is now a rule for every
+// element, not only this one.
+//    fold   FOLDING SPACE, and the owner's own word for how it must feel: not a step to where you look, but
+//           THE WORLD PULLED TOWARDS YOU -- the ground and the trees rush at you and settle, and you are there
+//    rip    A RIP IN SPACE-TIME (the owner's own idea): a tear torn open where you look that draws everything
+//           in from a long way off -- the air, the leaves, the dust, the spray, and the trees themselves
+//    freeze EVERYTHING INSIDE STOPS, and stays stopped after you walk away ('still the moment'), over a sphere
+//           that now holds a wood and not a bush
+//    year   THE TURNING YEAR: push the season of the whole world where you stand -- summer, autumn, the bare
+//           year, the first green
+// CUT, with their code, at the owner's word (they are in the history at v31 and any of them can come back in a
+// line): slow, haste, unmake, the sun's hand, the knot, and the four that were never built (the door, the drawn
+// eye, the lens, the long mile).
 export const TIME_ABILITIES = Object.freeze([
-  { id: 'slow', word: 'slow', hold: true },
-  { id: 'haste', word: 'haste', hold: true },
+  { id: 'fold', word: 'fold space', hold: false },
+  { id: 'rip', word: 'the rip', hold: false },
   { id: 'freeze', word: 'still the moment', hold: false },
-  { id: 'unmake', word: 'unmake', hold: false },
   { id: 'year', word: 'the turning year', hold: true },
-  { id: 'sun', word: "the sun's hand", hold: true },
-  { id: 'knot', word: 'tie the knot', hold: false },
-  { id: 'fold', word: 'fold', hold: false },
-  { id: 'door', word: 'the door', hold: false },
-  { id: 'eye', word: 'the drawn eye', hold: true },
-  { id: 'lens', word: 'the lens', hold: false },
-  { id: 'mile', word: 'the long mile', hold: true },
 ]);
 
 // THE ELEMENTS IN THE HAND, in the order the element key walks them.
@@ -115,16 +107,22 @@ export const ELEMENTS = Object.freeze([
 
 // What the twelve are worth, in one place so the owner can see and change them.
 export const TIMEPOWERS = Object.freeze({
-  foldReach: 2.2,         // times the ordinary aim: how far a fold steps you
-  unmakeR: 14,            // m: how far out an unmake puts the world back
-  unmakeUlt: 34,          // m: and held to the full
-  unmakeYears: 900,       // s of the world's own healing it runs through in one cast (the records mend in about
-                          // an hour by themselves: data/burnt.js BURN.heal, data/felled.js)
-  yearRate: 0.22,         // of a whole turn of the year a second while the hand is down (about four and a half
-                          // seconds from high summer to deep autumn: data/season.js)
-  sunSpin: 420,           // times its own turning: the world turns under the sun while the hand is down, which on
-                          // Earth is about two hours of the day a second (orbits.js turnBy, and see _sun below)
-  knotTell: 'the knot is tied',
+  // THE FOLD. It is theatrical now (the owner, 2026-11-22): the world is drawn past you for foldTime seconds and
+  // then you are standing where you looked. Nothing teleports in one frame any more.
+  foldReach: 3.4,         // times the ordinary aim: how far a fold carries you (about a hundred metres level)
+  foldTime: 0.55,         // s the world takes to rush past: long enough to see, short enough not to wait
+  foldEase: 2.6,          // how hard the rush eases out at the end (1 is linear; higher arrives softer)
+  // THE RIP. A tear held open where you look, which draws everything in from a long way off.
+  ripReach: 55,           // m: how far out it takes hold
+  ripUlt: 120,            // m: ... and held to the full
+  ripLife: 6.5,           // s it stays open
+  ripFell: 0.5,           // of its reach: trees within this of the middle are pulled over INWARD
+  // STILL THE MOMENT: one of the four big ones now, so the sphere holds a wood and not a bush (physics/times.js
+  // TIMEPOWER.radius is 14 m, and this multiplies the size the cast is made at).
+  stillSize: 1.9,
+  // THE TURNING YEAR
+  yearRate: 0.35,         // of a whole turn of the year a second while the hand is down (under three seconds
+                          // from high summer to deep autumn: data/season.js)
 });
 
 // What the five new ones are worth, all in one place so the owner can see and change them.
@@ -185,21 +183,13 @@ const AIM_SIZE = {
   meteor: () => FIREPOWER.meteorR,
   lance: () => FIREPOWER.lanceStep * FIREPOWER.lanceN * 0.5,
   cinders: () => FIREPOWER.cinderWide,
-  // SPACE AND TIME (2026-11-22). The three bubbles show their own radius and the unmake its reach; the two that
-  // take hold of the whole world (the turning year, the sun's hand) have no place on the ground at all, so they
-  // show a small ring at the aim; the rest mark a spot or move you there, which is about a figure's width.
-  slow: () => TIMEPOWER.radius,
-  haste: () => TIMEPOWER.radius,
-  freeze: () => TIMEPOWER.radius,
-  unmake: () => TIMEPOWERS.unmakeR,
+  // SPACE AND TIME (2026-11-22), the four: the rip shows the ground it will take hold of, the stopped sphere its
+  // own radius, the fold where you will be standing, and the turning year a small ring (it takes the whole world,
+  // so there is no place on the ground to draw).
+  rip: () => TIMEPOWERS.ripReach * 0.5,
+  freeze: () => TIMEPOWER.radius * TIMEPOWERS.stillSize,
+  fold: () => 1.8,
   year: () => 1.6,
-  sun: () => 1.6,
-  knot: () => 1.8,
-  fold: () => 1.5,
-  door: () => 1.5,
-  eye: () => 1.6,
-  lens: () => 1.6,
-  mile: () => 1.6,
 };
 const unit = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
@@ -240,8 +230,8 @@ export class Powers {
     // SPACE AND TIME (docs/POWERS-TIME.md). The list of places where the world runs at another pace lives here
     // with the winds and the fires, and sim.js hands all three to the physics on the frame.
     this.times = makeTimes();
-    this.zone = null;           // the bubble being held open now (slow, haste), or null
-    this.knot = null;           // the knot tied in time: { bodyId, p, t } (ability 7)
+    this.fold = null;           // the fold being drawn now: { p0, p1, t, life } while the world rushes past
+    this._rips = [];            // the open rips, handed to the painter each frame (world/timefx.js)
     this.timeCasts = 0;         // how many of the third element have been cast (for tests and the read-out)
     this.list = ABILITIES;      // the element in the hand: ABILITIES (wind), FIRE_ABILITIES or TIME_ABILITIES
     this.element = 0;           // 0 wind, 1 fire, 2 space and time (setElement below)
@@ -517,6 +507,9 @@ export class Powers {
     if (this.fires.count > 0 && sim.bodyId && this._fireBody && sim.bodyId !== this._fireBody) douseFires(this.fires);
     if (sim.bodyId) this._fireBody = sim.bodyId;
     this.active = sim.sm.state === S.ON_FOOT && !!sim.bodyId && !sim.easel;
+    // A FOLD IN FLIGHT: the world is drawn past the explorer for half a second (see _fold). It is stepped here,
+    // before anything else reads where the explorer is standing, and whether or not the hand is still down.
+    if (this.fold) this._stepFold(sim, dt);
     const tap = this.tapOnce; this.tapOnce = false;
     const down = this.active && (this.down || this.keys.cast || this.keys.pad || this.keys.mouse || this.keys.touch || tap);
     const pressed = down && !this._was, released = !down && this._was;
@@ -574,18 +567,10 @@ export class Powers {
             if (!wet) this._say('no water here');
           }
           if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); growWind(this.part, this.ultReady ? WINDPOWER.ultSize : this.size); }   // (the channel's ultimate is the same: held past full, it opens far wider)
-        } else if (ab.id === 'slow' || ab.id === 'haste') {
-          // (space and time) a bubble held open while the hand is down, following the aim
-          this._bubble(sim, ab.id === 'slow' ? TIMEPOWER.slowRate : TIMEPOWER.hasteRate, dt, pressed, down, released,
-            this.ultReady ? WINDPOWER.ultSize : this.size);
         } else if (ab.id === 'year') {
+          // (space and time) the one of the four that is HELD: the year turns while the hand is down
           if (pressed) this._cast(sim);
           this._year(dt, down);
-        } else if (ab.id === 'sun') {
-          if (pressed) { this._sunHour = null; this._cast(sim); }
-          this._sun(sim, dt, down);
-        } else if (ab.id === 'eye' || ab.id === 'mile') {
-          if (pressed) this._say('not built yet: see docs/POWERS-TIME.md');
         } else {
           // the hand goes down on it and the circle grows; it is cast when the hand lifts (a tap: the smallest, at once)
           if (pressed) this._armed = ab.id;
@@ -609,10 +594,8 @@ export class Powers {
             else if (ab.id === 'lance') this._lance(sim, k);
             else if (ab.id === 'cinders') this._cinders(sim, k);
             else if (ab.id === 'freeze') this._freeze(sim, k);
-            else if (ab.id === 'unmake') this._unmake(sim, k > 1 ? TIMEPOWERS.unmakeUlt : TIMEPOWERS.unmakeR);
-            else if (ab.id === 'knot') this._knot(sim);
             else if (ab.id === 'fold') this._fold(sim, k);
-            else if (ab.id === 'door' || ab.id === 'lens') this._say('not built yet: see docs/POWERS-TIME.md');
+            else if (ab.id === 'rip') this._rip(sim, k);
             this._wait = POWERS.gustEvery;
             this._cast(sim);
           }
@@ -624,11 +607,13 @@ export class Powers {
     if (this.part && (released || !this.active)) this._close();
     if (!down) { this.charge = 0; this.ult = 0; this.ultReady = false; this._armed = null; this._wasTap = false; }
     if (W.count > 0) stepWinds(W, dt);
+    // THE RIPS, FOR THE PAINTER. A rip IS a wind source (physics/powers.js KIND.rip) and the painter is never
+    // handed the wind list; it is handed the time list, beside the fires. So the open rips ride over on that, in
+    // an array kept here and refilled in place -- there is never more than one or two, and nothing is allocated.
+    const R = this._rips; R.length = 0;
+    for (let i = 0; i < W.count; i++) { const s = W[i]; if (s.kind === KIND.rip && s.strength > 0.004) R.push(s); }
+    this.times.rips = R;
     if (this.times.count > 0) stepTimes(this.times, dt);      // (space and time: the bubbles open, hold and close)
-    // THE KNOT RIDES ON THE SAME LIST. It is not a thing the physics steps -- it is a mark in time, and nothing
-    // moves it -- but the list is already handed to the physics on the frame and kept for the painter beside the
-    // fires, and the knot has to reach the painter somehow to be drawn (world/timefx.js). This is the one wire.
-    this.times.knot = this.knot;
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }
 
@@ -813,49 +798,20 @@ export class Powers {
   // fire are built by: a gust makes real wind, a bellows makes real wind, and a slowed place really slows every
   // grain and every patch of fire inside it (physics/times.js timeAt, read by loose.js and fire.js).
 
-  // SLOW and HASTE: a bubble held open while the hand is down, which follows the aim. Let go, it closes over
-  // half a second, so nothing in the picture appears or vanishes.
-  _bubble(sim, rate, dt, pressed, down, released, size) {
-    if (pressed && !this.zone) {
-      this.zone = castTime(this.times, sim.bodyId, this.aim.ok ? this.aim.p : sim.ex.p, rate, size, TIMEPOWER.slowLife, true);
-      this.timeCasts++;
-      this._cast(sim);
-    }
-    if (this.zone && down && this.aim.ok) moveTime(this.zone, this.aim.p);
-    if (this.zone && released) { releaseTime(this.zone); this.zone = null; }
-  }
-
-  // STILL THE MOMENT: the one that is NOT held. It is cast and left, and it outlives the hand -- you walk away,
-  // come back, and the rain is still hanging where it was.
+  // STILL THE MOMENT. Cast and left: it outlives the hand -- you walk away, come back, and the rain is still
+  // hanging where it was. One of the four big ones now, so the sphere holds a WOOD and not a bush
+  // (TIMEPOWERS.stillSize over physics/times.js TIMEPOWER.radius, which is 14 m).
   _freeze(sim, size = 1) {
     if (!this.aim.ok) { this._say('nothing there to hold'); return null; }
-    const z = castTime(this.times, sim.bodyId, this.aim.p, TIMEPOWER.stillRate, size, TIMEPOWER.stillLife, false);
+    const z = castTime(this.times, sim.bodyId, this.aim.p, TIMEPOWER.stillRate, size * TIMEPOWERS.stillSize,
+      TIMEPOWER.stillLife, false);
     this.timeCasts++;
     this._say('the moment is held');
     return z;
   }
 
-  // UNMAKE: the place put back as it was. The records of what has burned and what has been felled already mend
-  // themselves over about an hour (data/burnt.js, data/felled.js, and both already take a point to mend AROUND);
-  // this runs that hour through in one cast, at the aim. It is the honest form of a rewind -- the same machinery
-  // that would have mended it anyway, only now.
-  _unmake(sim, r = TIMEPOWERS.unmakeR) {
-    const p = this.aim.ok ? this.aim.p : sim.ex.p;
-    const before = (BURNT.scorches | 0) + (BURNT.crowns | 0) + (BURNT.melts | 0);
-    // (the point is handed as the place NOT to mend in the ordinary slow healing, so here it is passed as null
-    //  and the reach is the cast's own: everything within r of the aim goes back.)
-    const t = TIMEPOWERS.unmakeYears;
-    healBurnt(t, null);
-    healFelled(t, null);
-    const after = (BURNT.scorches | 0) + (BURNT.crowns | 0) + (BURNT.melts | 0);
-    this.timeCasts++;
-    const n = before - after;
-    this._say(n > 0 ? 'the world is put back' : 'nothing here to put back');
-    return n;
-  }
-
-  // THE TURNING YEAR and THE SUN'S HAND: two dials the whole picture is built on, put in the player's hand.
-  // Both are held: the year turns and the sun moves while the hand is down, and stay where they are let go.
+  // THE TURNING YEAR: a dial the whole picture is built on, put in the player's hand. It is held: the year turns
+  // while the hand is down and stays where it is let go.
   _year(dt, down) {
     if (!down) return SEASON.t;
     SEASON.held = true;                                  // held where the player puts it, not running on by itself
@@ -869,48 +825,65 @@ export class Powers {
     return SEASON.t;
   }
 
-  // THE SUN'S HAND. It TURNS THE WORLD under the sun, which is what moving the hour really is, and is one
-  // addition to the body's spin (orbits.js turnBy). It did not: it asked setSunHour for the hour it wanted, EVERY
-  // FRAME THE HAND WAS DOWN -- and setSunHour SOLVES for the spin that puts the sun at a given hour, with a
-  // seven-hundred-point search and a forty-step refinement. MEASURED on the build machine, which is far faster
-  // than a phone: 2.16 ms a call, so 130 ms of work for every second the key was held. That is the freeze the
-  // owner found on 2026-11-22, and turnBy costs 0.0002 ms -- ten thousand times less.
-  _sun(sim, dt, down) {
-    if (!down || !sim.eph || !sim.eph.turnBy || !(dt > 0)) return null;
-    try { sim.eph.turnBy(sim.bodyId, dt, TIMEPOWERS.sunSpin); } catch { /* a world that does not turn */ }
-    return null;
+  // THE RIP IN SPACE-TIME (the owner's own idea, 2026-11-22: "a rip in space time that sucks everything in a long
+  // ways in"). A tear torn open where you look. It is a WIND SOURCE of its own kind (physics/powers.js KIND.rip),
+  // so everything in the world that already answers the wind answers it with nothing added: the leaves off the
+  // crowns, the dust, the spray off the water, the rain, the grass, the cloak. And it takes the trees as well --
+  // not thrown outward as a gust throws them, but pulled INWARD, over towards the tear.
+  _rip(sim, size = 1) {
+    if (!this.aim.ok) { this._say('nothing there to tear'); return null; }
+    const T = TIMEPOWERS;
+    const reach = Math.min(T.ripUlt, T.ripReach * (size > 1 ? size : 1));
+    const s = castRip(this.winds, sim.bodyId, this.aim.p, reach, T.ripLife);
+    this.timeCasts++;
+    const felled = this._fellArea(sim, this.aim.p, reach * T.ripFell, 'in');
+    this._say(felled ? 'the rip takes ' + felled + (felled === 1 ? ' tree' : ' trees') : 'a rip in the world');
+    return s;
   }
 
-  // THE KNOT: one key, two things. With no knot tied it ties one where you stand; with one tied it PULLS it, and
-  // you are drawn back to it and the place is put back as it was.
-  _knot(sim) {
-    if (!this.knot) {
-      this.knot = { bodyId: sim.bodyId, p: { x: sim.ex.p.x, y: sim.ex.p.y, z: sim.ex.p.z }, t: sim.t };
-      this.timeCasts++;
-      this._say(TIMEPOWERS.knotTell);
-      return this.knot;
-    }
-    const k = this.knot;
-    if (k.bodyId !== sim.bodyId) { this._say('the knot is on another world'); return null; }
-    this._step(sim, k.p);
-    this._unmake(sim, TIMEPOWERS.unmakeUlt);
-    this.knot = null;
-    this._say('pulled back to the knot');
-    return k;
-  }
-
-  // THE FOLD: the ground between here and where you look is folded, and you are there.
+  // FOLDING SPACE. THE OWNER'S OWN WORDS for how it must feel (2026-11-22): "make it a bit more theatrical like
+  // the world is getting pulled towards you". So it is not a step to where you look any more -- nothing jumps in
+  // one frame. The ground, the trees and the sky are DRAWN PAST YOU over half a second, fast at the first instant
+  // and settling at the end, while the air itself pours inward along the way (a gust cast from where you looked
+  // back towards your own feet, so the leaves and the dust stream at you and not away). Then you are standing
+  // there. The rush is the camera's own: the explorer is carried a hundred metres in 0.55 s, which is 180 m/s,
+  // and everything near enough to see goes by.
+  // (It is also kinder to the world: the ground you are going to has half a second to be made before you arrive,
+  // where a jump gave it none.)
   _fold(sim, size = 1) {
     if (!this.aim.ok) { this._say('nowhere to fold to'); return false; }
-    const ok = this._step(sim, this.aim.p);
+    const A = this.aim, T = TIMEPOWERS;
+    // where it carries you: along the aim, as far as the aim reaches times foldReach (and the ground there)
+    const far = add(sim.ex.p, A.fwd, A.dist * T.foldReach * (size > 1 ? 1 + (size - 1) * 0.5 : 1));
+    const p0 = { x: sim.ex.p.x, y: sim.ex.p.y, z: sim.ex.p.z };
+    this.fold = { bodyId: sim.bodyId, p0, p1: far, t: 0, life: T.foldTime };
+    // THE WORLD POURING IN: a gust along the way, from the far end back to the feet, so what is loose comes WITH
+    // the world instead of being blown away from it.
+    const back = { x: -A.fwd.x, y: -A.fwd.y, z: -A.fwd.z };
+    castGust(this.winds, sim.bodyId, far, back, 1.35, WINDPOWER.sizeMax, false);
     this.timeCasts++;
-    this._say(ok ? 'folded' : 'nowhere to fold to');
-    return ok;
+    this._say('space folds');
+    return true;
+  }
+
+  // One frame of a fold: the world drawn past, eased out at the end. Called from update while this.fold lives.
+  _stepFold(sim, dt) {
+    const f = this.fold;
+    if (!f) return false;
+    if (f.bodyId !== sim.bodyId) { this.fold = null; return false; }
+    f.t += dt;
+    const x = f.t >= f.life ? 1 : f.t / f.life;
+    // fast at the first instant, settling at the end: 1 - (1 - x)^ease
+    const u = 1 - Math.pow(1 - x, TIMEPOWERS.foldEase);
+    const p = { x: f.p0.x + (f.p1.x - f.p0.x) * u, y: f.p0.y + (f.p1.y - f.p0.y) * u, z: f.p0.z + (f.p1.z - f.p0.z) * u };
+    const ok = this._step(sim, p);
+    if (x >= 1 || !ok) { this.fold = null; return ok; }
+    return true;
   }
 
   // Put the explorer on the ground at a place in this world's own axes. (sim.teleport respawns the whole world,
-  // which is right for crossing a solar system and wrong for a step of seventy metres: the sim moves the explorer
-  // by writing ex.p itself, and so does this.)
+  // which is right for crossing a solar system and wrong for a fold of a hundred metres: the sim moves the
+  // explorer by writing ex.p itself, and so does this.)
   _step(sim, p) {
     if (!p || !sim.ex || !sim.sampleSurface) return false;
     try {
