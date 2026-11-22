@@ -450,6 +450,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (the powers, fire) and the fire alight this frame, for the flame, the smoke and the embers the loose things
     // lay (physics/loose.js FLAME). Null while nothing burns, and then the emitter is one comparison.
     particles.fires = fires;
+    // (the powers, space and time) and the places where the world runs at another pace, for the painter's own
+    // bubbles (world/timefx.js). The physics does not draw; it only says where they are.
+    particles.times = times;
     // (the rain, the snow and the hail fall round the eye, so they keep the air at the focus; what is loose lies on the
     // ground and is lifted from it, so it takes the air there: rhoGround)
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
