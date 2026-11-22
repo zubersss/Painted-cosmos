@@ -191,3 +191,57 @@ are the painter's next piece of work on this element, and until they are done th
 *seen*. The project's own rule: built is not seen.
 
 (The table is filled in as each is finished and SEEN. "Built" is not "seen": the project's own rule.)
+
+---
+
+## v31, 22 Nov: the freeze, and why nine abilities killed the game
+
+The owner: *"The spacetime powers freeze the game everytime I open it find out why and fix it."* They were right,
+and it was worse than they could see.
+
+**What it was.** The aim mark's ring is sized from a table of one function per ability in `src/core/powers.js`
+(`AIM_SIZE`). The table held the wind's seven and six of the fire's nine. **Nine abilities had no entry at all** —
+the fire's meteor, lance and cinders, and all twelve of space and time. With one of them in hand, this line
+
+    A.size = AIM_SIZE[id](A.dist) * ...
+
+threw a TypeError **every frame**, inside `powers.update`, inside `sim.frame`, inside `game.frame`. The frame
+stopped there: the world was never stepped, nothing was painted, no sound was made. And because the loop asks for
+the next frame *before* it runs this one (`main.js` `tick`), nothing fell over and nothing was reported on the
+screen — the game simply stopped, with the last complete picture still up, and stayed stopped. A dead freeze with
+no way out.
+
+**The fix, both halves.** Every ability now has a ring of its own (the three bubbles show their own radius, the
+unmake its reach, the two that take the whole world a small ring at the aim, the rest about a figure's width),
+**and** the lookup can no longer throw: an unknown ability shows an ordinary ring. `tests/powers.test.mjs` walks
+every ability of every element through that line — aimed, tapped, held, and held past the ultimate — so a tenth
+one cannot be added without the tests saying so.
+
+**Found beside it.** Held past "ULTIMATE ready", those same nine said *"held to its utmost"* and then **cast
+nothing at all**: `_ultimate` knew eleven ids and its `else` was written for the two that are *held open* (gather,
+part). Now an ability with no ultimate of its own is cast in the ordinary way at the greatest size
+(`Powers.hasUlt`), so a long hold on the unmake or the freeze gives the big one and not silence.
+
+**And one more, mended while the UI was rebuilt:** the word at the foot of the screen asked a question with two
+answers (`p.element ? 'fire' : 'wind'`), so every space-time power was announced as **fire**. It reads the
+element's own name now.
+
+**Measured in the real game** (the lab, Earth's riverside, every ability of all three elements driven through the
+game's own frame): 0 throws, and the worst single frame of any ability is 19.4 ms of script on the build machine,
+which draws in software — in line with the ordinary frame there (8–14 ms). Nothing in space and time stalls.
+
+## And the picker: a panel of words, not a ring of directions
+
+The ring gave each ability its own direction out of the chip, thirty degrees apart over the half of the screen
+from straight up round to straight down. That holds **seven**. Space and time has **twelve**: the eighth to
+twelfth came out in the same directions as the first ones, so five of these powers were reachable by a key and by
+**nothing at all on a phone**.
+
+It is a panel now: tiles with the words on them, 112 by 38 px, up and to the left of the chip, in columns of six.
+Hold the chip, slide onto the one you want, let go. Twelve of them are two columns read top to bottom; the wind's
+seven are two columns of four. On a short screen the panel takes another column rather than shrinking the tiles.
+Everything else is as it was: the tap on the chip still swaps the last two, the keys (1–9, 0, -, =) and the pad
+still choose, and the element still lies out to the right where no tile is — its own tile lifted clear of the
+power button, which it used to sit on top of, half off a 390 px phone.
+
+Seen at 390 by 844 in a real browser with made-up pointer events. **Not yet pressed by a finger on a real phone.**
