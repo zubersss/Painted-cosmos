@@ -419,6 +419,18 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   tree (`?fartree=blob`) buys nothing**. The fire was found, by photographing it for the first time, to be drawn as
   a field of pale straws; see the log for the four faults and their fixes.
 
+- **2026-11-22, the third element is SPACE AND TIME:** "Give it cooler abilities as well the fire and also start
+  working on the 3rd ability space and time manipulation give me at least 10 powers for that one and they should
+  all be unique and powerful and they should also look really good in the game". NOT water or earth, which
+  `docs/POWERS.md` had pencilled in as three and four. Twelve are designed in `docs/POWERS-TIME.md`; eight were
+  built at v29 and painted at v30. The fire went from six abilities to nine.
+
+- **2026-11-22, the art is drawn originally:** "Now make the designs for these powers actually look cool make
+  sure the art is drawn originally as well unless you can find pre-made stuff then go on ahead". THERE IS NO
+  PRE-MADE STUFF AND THERE MUST NOT BE: every mark in this game is made by its own code, there is not one picture
+  file in the repository, and CLAUDE.md forbids committing other people's pictures. A STANDING rule for every new
+  power: **it is not finished until it has a picture of its own, drawn here.**
+
 - **2026-11-20, top quality and good at a distance:** with speed test 9 at v26, "i want to to look like a top quality
   load with things looking good even from a distance". A STANDING direction about the picture itself. What the table
   actually says: twenty-four of its twenty-nine rows read -0.0 ms because the phone is held at 60 a second by its own
@@ -431,6 +443,23 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
+
+**`main` IS AT v30 (22 Nov), pull request #30 merged: THE THIRD ELEMENT IS PAINTED.**
+`src/world/timefx.js` draws, all in code:
+- **THE BUBBLE** of a slowed, hastened or stopped place: a ball of air with its EDGE PAINTED -- a broad band of
+  brush marks with gaps between them, drifting round it. Slow a pale blue; haste a warm gold with the marks
+  smeared along the brush's way; **still a cold white with hairline cracks and NO drift at all**. All three SEEN
+  over the owner's own river.
+- **THE KNOT**: three crossed strokes standing on the ground, pointed at both ends, beating slowly.
+**THE FAULT THAT TOOK TWO HOURS, and the rule it leaves.** A translucent thing in this painter is a GLAZE -- and
+**a glaze material that is not in the `GLAZES` list is never drawn at all**; even in the list the bubble stayed
+invisible. What worked was giving the idea up and laying it in the SCENE pass as MARKS WITH GAPS, the way the
+leaves in the air are, because the gaps are what make an edge soft here. **A new translucent thing takes the
+leaves' path first and the glaze path only if it must.** (And `?time=` is the gallery's own hour of day: the
+bubble's parameter had to be `?bubble=slow|haste|still`.)
+**STILL NOT DRAWN of the third element:** the fold's tunnel and the lift of the unmake. The four unbuilt powers
+(the door, the drawn eye, the lens, the long mile) are named and say so plainly when cast.
+
 
 **`main` IS AT v29 (22 Nov), pull request #29 merged: THE THIRD ELEMENT IS SPACE AND TIME.**
 The owner, 22 Nov: "Give it cooler abilities as well the fire and also start working on the 3rd ability space and
