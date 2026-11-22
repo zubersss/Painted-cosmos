@@ -227,20 +227,31 @@ export const FLAME = Object.freeze({
   // flight, so a rising grain stands rooted in the fire) and thrown up fast. It is heavy for its kind on purpose:
   // a light grain is pulled into the air's own motion within a few hundredths of a second and the tongue collapses,
   // while a heavy one holds the flight it was given for about as long as it lives, which is what makes a tongue.
-  flamePerM2: 15,        // tongues a second for each square metre of fire at full heat (a campfire of one patch, 4
-                         // square metres, makes 60 a second: 25 in the air at once)
-  flameShare: 0.06,      // ... and never more of the leaf buffer than this, however big the fire (a forest fire 45 m
-                         // across asks for eight times the ceiling, so it sits on it: 180 tongues in the air)
-  flameLife: 0.42,       // s (each one 0.6 to 1.4 times this: see emit)
-  flameUp: 4.5,          // m/s thrown up (x 0.45 .. 1.25, and less from a patch that is not yet hot)
-  flameHigh: 1.1,        // m: how high over the fire a tongue may start
+  // (2026-11-22, the owner: "change up the fire animation it doesnt feel violent enough". More tongues, thrown
+  //  harder and higher, and -- the thing that matters most -- IN SURGES: see flameSurge below.)
+  flamePerM2: 26,        // tongues a second for each square metre of fire at full heat (a campfire of one patch, 4
+                         // square metres, makes 104 a second: 42 in the air at once; it was 15)
+  flameShare: 0.11,      // ... and never more of the leaf buffer than this, however big the fire (a forest fire 45 m
+                         // across asks for many times the ceiling, so it sits on it; it was 0.06)
+  flameLife: 0.40,       // s (each one 0.6 to 1.4 times this: see emit)
+  flameUp: 6.2,          // m/s thrown up (x 0.45 .. 1.25, and less from a patch that is not yet hot; it was 4.5:
+                         // the ribbon is drawn backwards along the flight, so this IS how tall a tongue stands)
+  flameHigh: 1.35,       // m: how high over the fire a tongue may start
   flameLean: 0.55,       // of the wind at the patch, carried sideways at birth: the flame leans, it is not blown flat
-  flameSize: 1.5,        // x a leaf: heavy, see above
+  flameSize: 4.5,        // x a leaf: heavy, see above -- AND WIDE, which is what the painter draws the stroke at.
+                         // (SEEN, 2026-11-22: at 1.5 a fire was a scatter of thin stubs standing on a brightly lit
+                         //  bank -- the light read as a fire and the flames did not. A tongue has to be fat enough
+                         //  that a crowd of them is a MASS with gaps torn in it, not a row of straws. 2.2 was
+                         //  tried and SEEN, by painting the tongues magenta to be sure which marks they were: a
+                         //  tongue a fifth of a metre across and the painter's shortest stroke, 0.8 m, long is a
+                         //  BLADE OF GRASS. At 4.5 it is half a metre across, which is a flame's own proportion.)
 
   // SMOKE. Thicker the hotter the fire, and it outlives the flame that made it: a burnt-out patch goes on smoking
   // for smokeAfter seconds at smokeAsh of its old strength, so the ground behind a fire front still smokes.
   smokePerM2: 12,        // puffs a second for each square metre of fire (a campfire: 48 a second, 38 in the air)
-  smokeShare: 0.06,      // ... and never more of the leaf buffer than this (a big fire: 225 a second, 180 in the air)
+  smokeShare: 0.045,     // ... and never more of the leaf buffer than this. (It was 0.06, and with the flame's own
+                         // share raised the smoke could outnumber the fire in the air: counted in the gallery, 181
+                         // puffs against 310 tongues, and a fire should not be mostly smoke at its foot.)
   smokeLife: 0.8,        // s
   smokeTop: 10,          // m: how far up the column reaches at full heat
   smokeRise: 2.6,        // m/s at its foot, falling to half that at the top
@@ -251,14 +262,31 @@ export const FLAME = Object.freeze({
   smokeAsh: 0.55,        // how much of a flaming patch's smoke a burnt-out one makes
 
   // EMBERS. Few, fast and heavy: they arc.
-  emberPerM2: 1.6,       // embers a second for each square metre of fire (a campfire: six a second, ten in the air)
-  emberShare: 0.008,     // ... and never more of the leaf buffer than this (a big fire: 15 a second, 24 in the air)
+  emberPerM2: 1.9,       // embers a second for each square metre of fire (a campfire: eight a second; it was 1.6.
+                         // 2.4 was tried and SEEN: with the spark drawn as its whole flight they filled the picture)
+  emberShare: 0.012,     // ... and never more of the leaf buffer than this (it was 0.008)
   emberLife: 1.6,        // s
-  emberUp: 6.5,          // m/s (x 0.55 .. 1.45)
+  emberUp: 7.6,          // m/s (x 0.55 .. 1.45; it was 6.5: a fire that spits)
   emberOut: 1.2,         // m/s sideways, so they leave the fire as a spray and not a jet
   emberLean: 1.0,        // of the wind at the patch: an ember is carried off downwind
   emberSize: 2.2,        // x a leaf: heavy enough to keep its arc for a second or two
+
+  // IT SURGES. A fire does not burn evenly: it gathers and leaps, and that is most of what makes one look violent
+  // rather than decorative. Each patch has its OWN beat, from three rates that do not divide into each other with
+  // the patch's own number for a phase, so a wide fire BOILS all over instead of breathing in and out as one lamp.
+  // It multiplies how many tongues a patch throws, how hard it throws them and how high they start, all together,
+  // which is what a leap is. 1 on average, so a fire is no bigger than it was -- only far less even.
+  surgeA: 0.30, surgeB: 0.22, surgeC: 0.14,       // how much of each beat
+  surgeRa: 6.1, surgeRb: 2.7, surgeRc: 13.7,      // and how fast, in radians a second
+  surgeLow: 0.30, surgeHigh: 1.70,                // held between these
 });
+// How hard one patch is leaping now (see the surge dials above). `t` is the physics' own clock in seconds.
+export function flameSurge(s, t) {
+  const F = FLAME, p = ((s.id || 1) % 977) * 0.618;
+  const k = 1 + F.surgeA * Math.sin(t * F.surgeRa + p * 12.9) + F.surgeB * Math.sin(t * F.surgeRb + p * 7.3)
+    + F.surgeC * Math.sin(t * F.surgeRc + p * 3.1);
+  return k < F.surgeLow ? F.surgeLow : k > F.surgeHigh ? F.surgeHigh : k;
+}
 // How much of a fire's smoke one patch is making now: while it burns, as fiercely as it burns; and for a while after
 // it has burnt out, because a black patch goes on smoking after its flame has gone (fire.js keeps it as ash).
 const smokeOf = (s) => (s.ash ? (s.ashAge < FLAME.smokeAfter ? FLAME.smokeAsh * (1 - s.ashAge / FLAME.smokeAfter) : 0) : s.heat);
@@ -1158,7 +1186,11 @@ export class Loose {
     // THE THREE BUDGETS: so many grains a second for each square metre of fire, and never more than the ceiling,
     // which is a share of the buffer divided by how long one grain lives -- so the ceiling is really a count of
     // grains in the air at once, which is the thing that has to be capped.
-    const rf = Math.min(Fl.flamePerM2 * wf, cap * Fl.flameShare / Fl.flameLife);
+    // (the surge below multiplies a patch's rate, so the ceiling is kept as a ceiling of its own and the surge is
+    //  held under it: a fire already at its budget leaps in SPEED and HEIGHT and not in how many grains it takes,
+    //  which is the one thing it may not do. A campfire, far under the ceiling, surges in all three.)
+    const rfRate = Fl.flamePerM2 * wf, rfCap = cap * Fl.flameShare / Fl.flameLife;
+    const rf = Math.min(rfRate, rfCap);
     const rs = Math.min(Fl.smokePerM2 * ws, cap * Fl.smokeShare / Fl.smokeLife);
     const re = Math.min(Fl.emberPerM2 * wf, cap * Fl.emberShare / Fl.emberLife);
     for (let i = 0; i < F.count; i++) {
@@ -1172,7 +1204,8 @@ export class Loose {
       // FLAME: out of the patch, up fast, leaning downwind. Born a finger off the ground, because the painter draws
       // the ribbon backwards from the grain along its flight, so a rising tongue stands rooted in the fire.
       if (heat > 0) {
-        C[13] += rf * heat * a / wf * h;
+        const sg = flameSurge(s, F.time || 0);            // how hard THIS patch is leaping now (see FLAME.surge*)
+        C[13] += Math.min(rfRate * sg, rfCap) * heat * a / wf * h;
         if (C[13] > 64) C[13] = 64;     // (2026-11-18) NEVER A BACKLOG: the guard below spends 64 a frame at most, and a carry grown past it outlives the fire and over-emits on the next one. Measured by a reader: 39,086 in the carry after three minutes of a wide melt at ten frames a second, and the next campfire then made 3,894 grains a second instead of 114.
         let guard = 64;
         while (C[13] >= 1 && guard-- > 0) {
@@ -1182,8 +1215,8 @@ export class Loose {
           const x = s.x + Math.cos(ang) * R, z = s.z + Math.sin(ang) * R;
           if (Math.abs(x - fx) > Rr || Math.abs(z - fz) > Rr) continue;
           const gy = near ? near.heightAt(x, z, s.y) : s.y;        // the ground under THIS tongue, not under the patch
-          const up = Fl.flameUp * (0.45 + 0.8 * rng()) * (0.5 + 0.5 * heat);
-          if (!this.emit('leaves', x, gy + 0.05 + rng() * rng() * Fl.flameHigh * heat, z,
+          const up = Fl.flameUp * (0.45 + 0.8 * rng()) * (0.5 + 0.5 * heat) * (0.70 + 0.40 * sg);
+          if (!this.emit('leaves', x, gy + 0.05 + rng() * rng() * Fl.flameHigh * heat * sg, z,
             wE * Fl.flameLean, up, wN * Fl.flameLean, Fl.flameSize, Fl.flameLife * 0.1, I_FLAME)) { C[13] = 0; break; }
         }
       }

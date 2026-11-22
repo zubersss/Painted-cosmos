@@ -47,6 +47,9 @@ const MATS = ['grass', 'soil', 'litter', 'mud', 'sand', 'dust', 'gravel', 'rock'
 // the embers' slot after the end of it (the paragraph at KIT_PALETTE says why they need one), and the ash the smoke
 // borrows -- in the crowd of leaves nothing but a fire's smoke ever carries the ash ink.
 const I_FLAME = MATS.indexOf('flame'), I_EMBER = MATS.length, I_SMOKE = MATS.indexOf('ash');
+// ... and the world hands those two on to PHYSICS' ribbon maker (three/expand.js D.fireMat / D.smokeMat), so that a
+// tongue and a puff of smoke are laid WIDER than a strand of air. See world/index.js draw.leaves.
+export const FIRE_MATS = Object.freeze({ flame: I_FLAME, ember: I_EMBER, smoke: I_SMOKE });
 const INK_SLOTS = I_EMBER + 1;
 const mx = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 export function biomeInks(pal, liquid) {
@@ -183,13 +186,23 @@ const SHAPES = {
       // (a plume of middle grey over a wood of middle browns is not in the picture at all. As the rain does, the
       // smoke reads what lies behind it and is laid paler where that is dark, keeping its own grey against a light sky.)
       vec3 sbg = texture(uSceneCol, gl_FragCoord.xy / uSceneRes).rgb;
-      c = mix(mix(c, vec3(0.80, 0.78, 0.82), 0.45), c, smoothstep(0.16, 0.44, dot(sbg, vec3(0.3, 0.5, 0.2))));
+      // ... BY DAY. (SEEN, 2026-11-22, a fire burning in the gallery at nine at night: 181 puffs of smoke against a
+      // dark wood were every one of them laid 45 % toward pale lavender, and the fire -- 310 tongues of it -- was
+      // hidden INSIDE a thicket of pale standing strokes. It read as a field of straws, and that is most of why the
+      // owner says the fire does not feel violent. A night fire's smoke is dark and takes the fire's own red from
+      // below; only a daylit plume needs lifting off a dark wood to be seen at all.)
+      c = mix(mix(c, vec3(0.80, 0.78, 0.82), 0.45 * uDayness), c, smoothstep(0.16, 0.44, dot(sbg, vec3(0.3, 0.5, 0.2))));
+      c = mix(c, mix(c, fRoot, 0.55) * 0.72, (1.0 - uDayness) * dens);
       ga = 0.34 * dens;
       w = 0.5;
     } else if (fm == ${I_EMBER}) {
       // AN EMBER. Only the head of the ribbon is kept: the whole stroke would read as a flame flying through the
       // air. Never less than a few pixels of it, so a far spark is a touch and not a blink.
-      float keep = clamp(6.0 / fpl, 0.20, 1.0);
+      // (SEEN, 2026-11-22, in the painter's own gallery with a fire burning: at a phone's picture size the whole
+      //  ribbon was being kept -- 6 / fpl came out over 1 -- and a spark an inch long became a PALE STRAW a second
+      //  and a half long. A crowd of them standing on a burning bank read as reeds, not as fire. A spark is a
+      //  spark: never more than this share of its own flight, however small the picture.)
+      float keep = clamp(6.0 / fpl, 0.10, 0.40);
       if (fu < 1.0 - keep) discard;
       float et = (fu - (1.0 - keep)) / keep;                        // 0 the end of the tail .. 1 the spark itself
       float ew = max(0.16 + 0.42 * et * et, min(1.0, 1.5 / fpw));
@@ -200,21 +213,40 @@ const SHAPES = {
       own = 1.0;
     } else {
       // A TONGUE: narrow where it leaves the fuel, fattest a quarter of the way up, torn into licks at its tip.
-      float lick = sin(fu * 2.6 + fh2 * 6.2831853 + uTime * 7.0) * 0.5 * fu * fu;      // it licks over as it rises
+      // IT WHIPS (the owner, 2026-11-22: "change up the fire animation it doesnt feel violent enough"). One slow
+      // sine read as a flag waving in a breeze. A tongue of fire snaps over, tears, and snaps back, so there are
+      // two beats now that do not divide into each other -- a fast one a tongue lives through about once, and a
+      // slower one it only sees part of -- each with this grain's own phase, and both growing toward the tip so
+      // that the root stays rooted in the fuel and only the free end is thrown about.
+      float lick = (sin(fu * 3.4 + fh2 * 6.2831853 + uTime * 15.0) * 0.44
+                  + sin(fu * 1.7 + fh1 * 6.2831853 + uTime * 6.3) * 0.33) * fu * fu;
       float across = abs(fv - lick);
-      float prof = smoothstep(0.0, 0.24, fu) * (1.0 - 0.90 * smoothstep(0.34, 1.0, fu));
-      prof -= smoothstep(0.42, 1.0, fu) * 0.55 * texture(uNoise3D, vec3(fu * 2.1 + fh1 * 37.0, fh2 * 11.0, 0.21)).r;
-      prof = max(prof, min(1.0, 1.8 / fpw) * step(0.04, fu));
+      float profT = smoothstep(0.0, 0.22, fu) * (1.0 - 0.90 * smoothstep(0.34, 1.0, fu));
+      // and it tears into separate licks, in two sizes: the big tear that breaks the tip into tongues of its own,
+      // and a finer one that ragges their edges. (It was one tear beginning at 0.42, which left the top half of
+      // every tongue a smooth leaf shape -- the thing that made a crowd of them read as decoration.)
+      profT -= smoothstep(0.22, 1.0, fu) * 0.82 * texture(uNoise3D, vec3(fu * 5.3 + fh1 * 37.0, fh2 * 11.0, 0.21 + uTime * 0.9)).r;
+      profT -= smoothstep(0.42, 1.0, fu) * 0.40 * texture(uNoise3D, vec3(fu * 14.0 + fh2 * 13.0, fh1 * 29.0, 0.63 + uTime * 1.9)).g;
+      // the painter keeps no mark under about two pixels, so a far tongue is widened to that. HOW FAR IT HAD TO BE
+      // WIDENED is what thin says: 1 where the tongue is its own width, 0 where it is only the thinnest mark that
+      // will be kept. (SEEN, 2026-11-22: without this the heart -- the white-hot core -- was laid at full strength
+      // on a tongue two pixels wide, so the centre pixel of every far flame was WHITE. A burning bank read as a
+      // field of pale straws. The heart belongs to a tongue wide enough to have one.)
+      float prof = max(profT, min(1.0, 1.8 / fpw) * step(0.04, fu));
+      float thin = clamp(profT / max(prof, 1e-4), 0.0, 1.0);
       if (across > prof) discard;
       float fe = across / max(prof, 1e-3);                          // 0 on the spine .. 1 at the tongue's edge
       // the heart: SHORT along the tongue -- a fifth of its length, low down -- and most of the spine's width
       // across it, because the whole mark is only a hand's breadth wide and a heart kept to a tenth of that
       // would be a third of a pixel at ten metres and would not be in the picture at all
-      float hot = smoothstep(0.03, 0.20, fu) * (1.0 - smoothstep(0.26, 0.90, fu)) * (1.0 - smoothstep(0.40, 0.95, fe));
+      // (SEEN, 2026-11-22: with the tongue widened to a flame's own proportions the heart, which had been a white
+      //  pixel in a thin stick, became a WHITE BODY with an orange rim -- a crowd of candle flames. It is the
+      //  hottest INCH of a tongue, not the whole of it: lower, shorter and kept to the spine.)
+      float hot = smoothstep(0.02, 0.11, fu) * (1.0 - smoothstep(0.13, 0.40, fu)) * (1.0 - smoothstep(0.22, 0.62, fe)) * thin;
       c = mix(fRoot, fBody, smoothstep(0.0, 0.26, fu));             // the dark root into the orange body
-      c = mix(c, fTip, smoothstep(0.40, 1.0, fu) * 0.85);           // the body tearing away red at the tip
+      c = mix(c, fTip, smoothstep(0.32, 1.0, fu) * 0.95);           // the body tearing away red at the tip
       c = mix(c, fTip, 0.45 * smoothstep(0.50, 1.0, fe));           // and cooler at the outside of the tongue
-      c = mix(c, fHot, hot * hot);                                  // the heart, laid last and smallest
+      c = mix(c, fHot, hot * hot * 0.82);                           // the heart, laid last and smallest
       ga = (0.60 + 0.38 * hot) * (1.0 - smoothstep(0.78, 1.0, fe));
       w = 0.0;
       own = 1.0;

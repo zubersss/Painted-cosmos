@@ -19,6 +19,7 @@ import { LOOKS } from '../data/looks.js';
 import { findVantage } from './vantage.js';
 import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
 import { MODE } from '../data/mode.js';
+import { makeFires, clearBurns, FUEL } from '../physics/fire.js';
 import { meltIce, deepenMelt, scorch } from '../data/burnt.js';
 
 const P = new URLSearchParams(location.search);
@@ -269,6 +270,13 @@ if (P.has('fresh')) world.setFreshSnow(num('fresh', 1));   // snow already falle
 // PHYSICS in the gallery (?physics=1): wind, gusts and bending plants from src/physics
 let wtime = num('wtime', 0), preroll = num('pre', 0);
 let physics = null;
+// A FIRE TO LOOK AT (?fire=N with ?physics=1&powers=1&look=oil): a fire of size N is lit on the ground ahead of
+// the camera on the first frame the physics is ready, and burns from there. The painter has had no way to
+// photograph a flame without playing the game to one, which is why the fire's own look went three versions
+// without being seen (the owner, 2026-11-22: "change up the fire animation it doesnt feel violent enough").
+// ?fired=<m> how far ahead it is lit (9), ?firet=<s> how long it is burned before the first frame (3).
+const fires = P.has('fire') ? makeFires() : null;
+let fireLit = false, fireTries = 0;
 const physicsWanted = P.get('physics') === '1';
 if (physicsWanted) {
   import('../physics/index.js').then((m) => {
@@ -406,14 +414,37 @@ function tick(now) {
     setDisturbers(0);
     if (P.get('push') === '0') disturbers.length = 0;
     const L0 = world.getLighting();
-    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers };
+    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers, fires };
     // pre-roll: let the weather fall for a while before the first frame, ending at wtime
     for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; setDisturbers(preroll); if (P.get('push') === '0') disturbers.length = 0; physics.update(1 / 30, fr); }
     setDisturbers(0);
     if (P.get('push') === '0') disturbers.length = 0;
     fr.time = wtime;
-    physics.update(frozenT != null ? 0 : dt, fr);
-    if (frozenT == null) wtime += dt;
+    // light it once the physics has a world under it, then burn it for a while so it is a fire and not a spark
+    // (it is TRIED every frame until something catches: lit on the first frame the physics exists, the near grid
+    //  has not yet looked at the ground, so the cast lands on "nobody has looked there", burns for its half second
+    //  and goes out -- which is exactly what happened the first time, and the stills had no fire in them.)
+    if (fires && !fireLit && physics.lightFire && fireTries++ < 600) {
+      orient();
+      const flat = _f.clone().addScaledVector(_up, -_f.dot(_up));
+      if (flat.lengthSq() < 1e-6) flat.copy(_n);
+      const ahead = state.pos.clone().addScaledVector(flat.normalize(), num('fired', 9)).normalize();
+      const p = ahead.multiplyScalar(surf(ahead));
+      const f0 = physics.lightFire(fires, bodyId, { x: p.x, y: p.y, z: p.z }, num('fire', 3));
+      if (f0 && f0.kind !== FUEL.none) {
+        fireLit = true;
+        for (let i = 0, n = Math.round(num('firet', 3) * 30); i < n; i++) { fr.time = wtime + i / 30; physics.update(1 / 30, fr); clearBurns(fires); }
+        fr.time = wtime;
+      }
+    }
+    // THE PHYSICS IS NEVER HANDED A HUGE STEP. On a machine drawing in software a frame takes tens of seconds, and
+    // a thirty-second step throws every grain of a fire half a kilometre and retires it before anything is drawn:
+    // the first stills taken of the new flame had no flame in them at all, only embers scattered over the river.
+    // A tenth of a second at most, so what is photographed is a moment of the fire and not a minute of it.
+    const pdt = frozenT != null ? 0 : Math.min(dt, 0.1);
+    physics.update(pdt, fr);
+    if (fires) clearBurns(fires);
+    wtime += pdt;
   }
   world.update(dt, camera.position, bodyId);
   if (!settled) {
@@ -457,5 +488,5 @@ function layMark(kind) {
 }
 if (P.has('melt')) window.__pcMelt = layMark('melt');
 if (P.has('scorch')) window.__pcScorch = layMark('scorch');
-window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; }, layMark };
+window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; }, layMark, fires, get fireLit() { return fireLit; } };
 requestAnimationFrame(tick);

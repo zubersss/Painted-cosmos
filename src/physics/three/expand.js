@@ -318,6 +318,14 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
   // explorer's wind, loose.js) is laid as a stroke of air: as long as it flies in D.wisp seconds (D.wispMin .. D.wispMax m),
   // D.wispWide of its size wide. Without D.wisp nothing here is any different.
   const wisp = D.wisp > 0 && M ? D.wisp : 0, wispMax = D.wispMax || 2.4, wispMin = D.wispMin || 0, wispWide = D.wispWide || 0.3;
+  // (the powers, fire) AND TWO KINDS OF GRAIN GET A RIBBON OF THEIR OWN SHAPE. Every grain of this crowd was laid
+  // the same width -- D.size, through wispWide -- which for a strand of air is right and for A TONGUE OF FIRE is
+  // not: 8 cm across and 80 cm long is a blade of grass, and a burning bank was a field of them. (SEEN,
+  // 2026-11-22, by painting the tongues magenta to be sure which marks they were; the owner, the same day: "change
+  // up the fire animation it doesnt feel violent enough".) D.fireMat / D.smokeMat say which material each is, and
+  // the two pairs below how much wider and longer than a strand of air. Without them nothing here is any different.
+  const fireMat = D.fireMat == null ? -1 : D.fireMat, fireWide = D.fireWide || wispWide, fireLong = D.fireLong || 1;
+  const smokeMat = D.smokeMat == null ? -1 : D.smokeMat, smokeWide = D.smokeWide || wispWide, smokeLong = D.smokeLong || 1;
   for (let i = 0, o = 0, q = 0; i < n; i++, o += 3, q += 12) {
     let px = P[o], py = P[o + 1], pz = P[o + 2];
     const age = A[i];
@@ -359,12 +367,15 @@ export function expandDabs(buf, D, eye, out, size = D.size, room = 1) {
     if (wsp) {
       // a stroke of air: a ribbon along the way the grain flies, turned to face the eye, its head where the grain is
       const vx = V[o], vy = V[o + 1], vz = V[o + 2], sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
-      const fk = full > 0 ? h / full : 0, len = Math.min(wispMax, Math.max(sp * wisp, wispMin, 1.6 * full));
+      const mi = M[i];
+      const wW = mi === fireMat ? fireWide : mi === smokeMat ? smokeWide : wispWide;
+      const wL = mi === fireMat ? fireLong : mi === smokeMat ? smokeLong : 1;
+      const fk = full > 0 ? h / full : 0, len = Math.min(wispMax * wL, Math.max(sp * wisp, wispMin * wL, 1.6 * full));
       if (sp > 0.2) { ax = vx / sp; ay = vy / sp; az = vz / sp; }
       bx = ay * tz - az * ty; by = az * tx - ax * tz; bz = ax * ty - ay * tx;        // across it, in the picture
       const bl = Math.sqrt(bx * bx + by * by + bz * bz);
       if (bl > 1e-3 * dist) { bx /= bl; by /= bl; bz /= bl; } else { bx = eye.ux; by = eye.uy; bz = eye.uz; }
-      la = 0.5 * len * fk; lb = fk > 0 ? Math.max(full * wispWide * fk, 0.75 * eye.pix * dist) : 0;
+      la = 0.5 * len * fk; lb = fk > 0 ? Math.max(full * wW * fk, 0.75 * eye.pix * dist) : 0;
       px -= ax * la; py -= ay * la; pz -= az * la;
     } else if (spin !== 0) {
       // each particle keeps its own phase (its size is its own and travels with it)
