@@ -431,6 +431,13 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   file in the repository, and CLAUDE.md forbids committing other people's pictures. A STANDING rule for every new
   power: **it is not finished until it has a picture of its own, drawn here.**
 
+- **2026-11-22, A TEN-STEP UPGRADE (ultracode):** "Refine it even further specifically the looks do a 10 step up
+  grade using ultracode i want better lighting better physics for the powers and specifically better looks i want
+  things to look high quality and fully rendered even from 300 yards away". THREE THINGS: the lighting, the
+  physics of the powers, and **the look at 275 metres -- it must read as fully rendered there, not sharpen as you
+  walk towards it.** Run as a multi-agent workflow at the owner's word. A STANDING measure it adds: **the test of
+  the look is now what a still taken at 275 m shows, not what the near ground shows.**
+
 - **2026-11-22, FOUR space-time powers and not twelve:** "to many space and time abilities cut them down into
   folding space should be one of them but make it a bit more theatrical like the world is getting pulled towards
   you the 4 should be overly powerful abilities like a rip in space time that sucks everything in a long ways in

@@ -2977,3 +2977,16 @@ same fault the element button was built to mend. It also asked the thumb to lear
   was used bare inside the GLSL. **`material.program` reads false for a material that failed to compile** -- that
   is the one honest signal this project has had out of it, and the note of 2026-11-22 calling it misleading was
   wrong about this case.
+
+### 2026-11-22 OWNER: a ten-step upgrade of the look, the lighting and the powers' physics
+- OWNER (verbatim): "Refine it even further specifically the looks do a 10 step up grade using ultracode i want
+  better lighting better physics for the powers and specifically better looks i want things to look high quality
+  and fully rendered even from 300 yards away"
+- **READ AS:** a TEN-STEP upgrade, run as a multi-agent workflow (the owner's word "ultracode"), of three things:
+  **(1) the lighting**, **(2) the physics of the powers**, and **(3) the look at distance -- a thing 275 metres
+  off must read as high quality and FULLY RENDERED, not as a smudge that sharpens as you walk to it.**
+- The 300 yards is the measurable part of it and the hardest: 275 m is past the near ground, past the first tree
+  tier and into the thinned one, and on these worlds it is close to the horizon on flat ground.
+- Run as: READ (what the lighting, the distance and the powers' physics really do now) -> DESIGN (three
+  independent ten-step plans, judged, one synthesised) -> BUILD (one agent per step, one file each, no two in the
+  same file) -> SEE IT (the coordinator alone drives the one browser this machine may run).
