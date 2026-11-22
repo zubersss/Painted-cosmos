@@ -431,6 +431,15 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   file in the repository, and CLAUDE.md forbids committing other people's pictures. A STANDING rule for every new
   power: **it is not finished until it has a picture of its own, drawn here.**
 
+- **2026-11-22, the freeze and the picker:** "The spacetime powers freeze the game everytime I open it find out
+  why and fix it also change the ui for the powers I want it to be simpler to pick stuff and for it to still be
+  easy to understand". Both done at v31. The freeze was a table of one function per ability (`AIM_SIZE`) that had
+  no entry for NINE of the twenty-one, so those threw inside the frame and the game stopped dead with the last
+  picture up. A STANDING rule it leaves: **anything keyed by ability id must be walked by a test over every
+  ability of every element** -- `tests/powers.test.mjs` now does, and that is what keeps a tenth new power from
+  killing the game. The picker is a PANEL OF WORDS (tiles you read), not a ring of directions, because a ring
+  holds seven and space and time has twelve.
+
 - **2026-11-20, top quality and good at a distance:** with speed test 9 at v26, "i want to to look like a top quality
   load with things looking good even from a distance". A STANDING direction about the picture itself. What the table
   actually says: twenty-four of its twenty-nine rows read -0.0 ms because the phone is held at 60 a second by its own
@@ -443,6 +452,40 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
+
+**v31 (22 Nov) IS READY ON `look-proto`: THE FREEZE IS MENDED AND THE POWERS ARE PICKED FROM A LIST OF WORDS.**
+The owner, 22 Nov: *"The spacetime powers freeze the game everytime I open it find out why and fix it also change
+the ui for the powers I want it to be simpler to pick stuff and for it to still be easy to understand."*
+
+- **THE FREEZE, measured and mended.** The aim mark's ring is sized from a table of one function per ability
+  (`AIM_SIZE`, `src/core/powers.js`). It had the wind's seven and six of the fire's nine: **nine abilities had no
+  entry** -- the fire's meteor, lance and cinders, and all twelve of space and time. With one of them in hand
+  `AIM_SIZE[id](d)` threw a TypeError **every frame**, inside `powers.update` -> `sim.frame` -> `game.frame`. The
+  frame stopped at that line: the world was never stepped and nothing was painted. And because `main.js tick`
+  asks for the next frame BEFORE running this one, there was no fall-over and nothing on the screen -- the game
+  just stopped with the last complete picture up, for ever.
+- **SEEN AFTER THE FIX, in the real game** (the lab, all 21 abilities of all 3 elements driven through the game's
+  own frame): **0 throws**, worst single frame 19.4 ms of script against 8-14 ms for an ordinary frame on this
+  software-drawing machine. Nothing in space and time stalls.
+- **THE RULE IT LEAVES (standing):** anything keyed by ability id must be walked by a test over EVERY ability of
+  EVERY element. `tests/powers.test.mjs` now does that twice over (aimed, tapped, held, held past the ultimate).
+- **FOUND BESIDE IT:** held past "ULTIMATE ready", those same nine said "held to its utmost" and **cast nothing**.
+  Now an ability with no ultimate of its own is cast in the ordinary way at the greatest size (`Powers.hasUlt`).
+  And the sun's hand called `orbits.setSunHour` every frame while held -- 2.16 ms a call here, 130 ms of work for
+  every second held; it turns the body's spin instead (`turnBy`, 0.0002 ms).
+- **THE PICKER IS A PANEL OF WORDS.** The ring gave each ability its own direction, 30 degrees apart over half the
+  screen: that holds SEVEN, and space and time has TWELVE, so five of them came out in the same directions as the
+  first five and were reachable by a key and **by nothing at all on a phone**. Now: tiles with the words on them,
+  112 by 38 px, up and left of the chip in columns of six. Hold the chip, slide onto the word, let go. A short
+  screen takes another COLUMN rather than shrinking the tiles. **SEEN at 390 by 844 in a real browser** (the
+  twelve in two columns; the wind's seven in two columns of four).
+- **THREE MORE FAULTS MENDED, all seen:** the element key and the pad changed the hand without telling the panel
+  (twelve words of the wrong element, picked by position); the word at the foot of the screen read
+  `p.element ? 'fire' : 'wind'`, so every space-time power was announced as **fire**; and the element's own tile
+  was drawn level with the chip and sat **half off a 390 px phone, on top of the power button**.
+- **WHAT IS LEFT:** nobody has pressed the panel with a FINGER on a real phone. That is the owner's to do, and
+  the one thing that can call it done.
+
 
 **`main` IS AT v30 (22 Nov), pull request #30 merged: THE THIRD ELEMENT IS PAINTED.**
 `src/world/timefx.js` draws, all in code:

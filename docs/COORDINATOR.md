@@ -2880,3 +2880,45 @@ the painter's next piece of work on this element.
   must.**
 - **ONE MORE TRAP:** `?time=` is the gallery's HOUR OF DAY and has been since the first version of that page; the
   bubble's own parameter had to be `?bubble=slow|haste|still`. An hour of 15.4 was being read as a kind of bubble.
+
+### 2026-11-22 OWNER: the space-time powers freeze the game, and a simpler way to pick a power
+- OWNER (verbatim): "The spacetime powers freeze the game everytime I open it find out why and fix it also change
+  the ui for the powers I want it to be simpler to pick stuff and for it to still be easy to understand"
+
+**THE FREEZE: FOUND, AND IT WAS WORSE THAN THE OWNER COULD SEE.** The aim mark's ring is sized from a table of one
+function per ability in `src/core/powers.js` (`AIM_SIZE`). The table had the wind's seven and six of the fire's
+nine. **Nine abilities had no entry at all** -- the fire's meteor, lance and cinders (added the same day) and ALL
+TWELVE of space and time -- so with one of them in hand `AIM_SIZE[id](A.dist)` threw a TypeError every frame,
+inside `powers.update`, inside `sim.frame`, inside `game.frame`. The frame stopped at that line: the world was
+never stepped and nothing was painted. And because the loop asks for the next frame BEFORE it runs this one
+(`main.js` tick), there was no error on the screen and no fall-over -- the game simply stopped, with the last
+complete picture still up, for ever. A dead freeze with no way out, every time, for nine of the twenty-one
+abilities. (It was found in the lab by driving the real game's frame with every ability in hand, not by reading.)
+- **The fix**, both halves: every ability now has a ring of its own in the table (the bubbles show their own
+  radius, the unmake its reach, the world-wide two a small ring at the aim), AND the lookup can no longer throw --
+  an unknown ability shows an ordinary ring. `tests/powers.test.mjs` now walks EVERY ability of EVERY element
+  through that line: aimed, tapped, held, and held past the ultimate.
+- **FOUND BESIDE IT, and mended:** held past "ULTIMATE ready", those same nine abilities said "held to its utmost"
+  and then **cast nothing at all**. `_ultimate` only knew eleven ids and its `else` was written for the two that
+  are held open (gather, part). Now an ability with no ultimate of its own is cast in the ordinary way at the
+  greatest size (`Powers.hasUlt`), and a second test holds that for all twenty-one.
+- **THE LESSON (and the third trap of its kind this week):** a table keyed by ability id is a place where adding an
+  ability silently breaks the game. There are now tests that walk all three lists; any new ability must be added
+  to a list and nothing else, and those tests will say so if it is not.
+
+**THE UI: A PANEL OF WORDS INSTEAD OF A RING OF DIRECTIONS** (`src/ui/powers.js`). The ring put each ability at its
+own angle out of the chip, thirty degrees apart over the half of the screen from straight up round to straight
+down: that holds SEVEN and no more. Space and time has TWELVE, so wedges eight to twelve came out in the same
+directions as the first ones and those five were reachable by a key and **by nothing at all on a phone** -- the
+same fault the element button was built to mend. It also asked the thumb to learn a direction for each.
+- Now: the abilities are TILES with their words on them, 112 by 38 px, laid up and to the LEFT of the chip in
+  columns of six. The wind's seven are a column and a bit; the twelve of space and time are two columns read top
+  to bottom. Hold the chip, slide onto the one you want, let go. Nothing to learn and nothing to aim at: it is a
+  list you read.
+- On a short screen the panel takes another COLUMN rather than shrinking the tiles, so a target never becomes a
+  sliver (the old code shrank them to 21 px, which was found by the test asking for a thumb's width).
+- Everything else is unchanged on purpose: the chip's tap still swaps the last two, the element still lies out to
+  the RIGHT where no tile is, the panel still opens the instant the thumb lands, and the keys (1-9, 0, -, =) and
+  the pad still choose.
+- **STILL NOT PRESSED BY A HAND.** Driven by made-up pointer events (11 tests) and seen in a real browser with
+  `?touch=1`. A finger on a phone is the only thing that can call it done.
