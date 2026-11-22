@@ -2930,3 +2930,22 @@ same fault the element button was built to mend. It also asked the thumb to lear
   finger on a phone: that is the owner's to do.**
 - A note for the next session: `tools/commit.sh` puts the role in front of the message, so do NOT start the
   message with `[pilot]` yourself (one commit this session reads `[pilot] [pilot] v31: ...`).
+
+### 2026-11-22 OWNER: four space-time powers, not twelve; the fold made theatrical; load the far world sooner
+- OWNER (verbatim): "to many space and time abilities cut them down into folding space should be one of them but
+  make it a bit more theatrical like the world is getting pulled towards you the 4 should be overly powerful
+  abilities like a rip in space time that sucks everything in a long ways in but also keep working on the
+  performance and look of the game I want things far away to be loaded in before I even get there"
+- **READ AS FOUR INSTRUCTIONS:**
+  1. **FOUR, not twelve.** Space and time is cut down to four, and each of the four is to feel OVERLY POWERFUL.
+  2. **FOLDING SPACE IS ONE OF THEM, and theatrical:** not a step to where you look -- **the world is pulled
+     towards you**. The owner's own words for how it should feel.
+  3. **ONE OF THE FOUR IS A RIP IN SPACE-TIME** that sucks everything in from a long way off. The owner's idea,
+     given as the example of what "overly powerful" means.
+  4. **STANDING, AGAIN: performance and look.** And one new, specific thing: **the far world is to be there
+     before the player arrives** -- no watching it build as you come.
+- **THE FOUR, chosen here and open to the owner's correction (one line to change):** `fold space`, `the rip`,
+  `still the moment`, `the turning year`. Travel, force, time stopped, the world's own year -- four different
+  kinds of power, each the biggest of its kind. **CUT:** slow, haste, unmake, the sun's hand, the knot, and the
+  four that were never built (the door, the drawn eye, the lens, the long mile). Their code goes with them; it is
+  in the history at v31 and any one of them can come back.

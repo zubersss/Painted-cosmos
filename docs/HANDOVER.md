@@ -431,6 +431,16 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
   file in the repository, and CLAUDE.md forbids committing other people's pictures. A STANDING rule for every new
   power: **it is not finished until it has a picture of its own, drawn here.**
 
+- **2026-11-22, FOUR space-time powers and not twelve:** "to many space and time abilities cut them down into
+  folding space should be one of them but make it a bit more theatrical like the world is getting pulled towards
+  you the 4 should be overly powerful abilities like a rip in space time that sucks everything in a long ways in
+  but also keep working on the performance and look of the game I want things far away to be loaded in before I
+  even get there". Four instructions: (1) cut space and time to FOUR, each OVERLY POWERFUL; (2) folding space
+  stays and is made THEATRICAL -- the world is pulled towards you, not a step to where you look; (3) one of the
+  four is a RIP IN SPACE-TIME that sucks everything in from a long way; (4) standing: keep at the performance and
+  the look, and **the far world is to be loaded before the player gets there**. A STANDING rule it adds for every
+  element from now on: **a short list of powers that each feel enormous beats a long list of small ones.**
+
 - **2026-11-22, the freeze and the picker:** "The spacetime powers freeze the game everytime I open it find out
   why and fix it also change the ui for the powers I want it to be simpler to pick stuff and for it to still be
   easy to understand". Both done at v31. The freeze was a table of one function per ability (`AIM_SIZE`) that had
