@@ -15,7 +15,9 @@ import { fellTree, felledAt, healFelled } from '../data/felled.js';
 // steps it, because only the physics knows what is underfoot and what the wind is there. What the fire leaves behind
 // goes into the record that lasts, exactly as a felled tree does.
 import { makeFires, douseFires, clearBurns, FIRE, FUEL } from '../physics/fire.js';
-import { scorch, meltIce, deepenMelt, healBurnt } from '../data/burnt.js';
+import { makeTimes, castTime, moveTime, releaseTime, stepTimes, TIMEPOWER } from '../physics/times.js';
+import { scorch, meltIce, deepenMelt, healBurnt, BURNT } from '../data/burnt.js';
+import { SEASON } from '../data/season.js';
 import { stripStep } from '../data/stripped.js';
 
 // WHY A FIRE WOULD NOT TAKE, in the words the player sees. The key is what the world handed back
@@ -54,6 +56,11 @@ export const ABILITIES = Object.freeze([
 //    wall     lay a line of fire across the view: a burning barrier, or a backfire to starve a front
 //    snuff    put out everything burning near the aim: the power that can start a forest fire can stop one
 //    whirl    raise a fire whirl where a fire is already big enough to make its own column (physics F.whirl)
+//    meteor   (2026-11-22) a burning stone falls where you look: a ring of fire lit at once and a blast of air
+//             out of it, so the wood bends away from it and the leaves fly
+//    lance    a line of fire thrown ALONG the aim, from your feet to as far as you can see -- where the wall is
+//             laid ACROSS the view, this is laid down it
+//    cinders  a cloud of sparks let go downwind: they land where the wind takes them and light what they land on
 export const FIRE_ABILITIES = Object.freeze([
   { id: 'kindle', word: 'kindle', hold: false },
   { id: 'ember', word: 'ember', hold: false },
@@ -61,7 +68,63 @@ export const FIRE_ABILITIES = Object.freeze([
   { id: 'wall', word: 'wall of fire', hold: false },
   { id: 'snuff', word: 'snuff', hold: false },
   { id: 'firewhirl', word: 'fire whirl', hold: false },
+  { id: 'meteor', word: 'meteor', hold: false },
+  { id: 'lance', word: 'lance of fire', hold: false },
+  { id: 'cinders', word: 'cinders', hold: false },
 ]);
+
+// SPACE AND TIME'S abilities, THE THIRD ELEMENT (docs/POWERS-TIME.md; the owner, 2026-11-22: "start working on
+// the 3rd ability space and time manipulation give me at least 10 powers for that one and they should all be
+// unique and powerful and they should also look really good in the game"). TWELVE, in the order of the keys
+// 1..9, 0, -, =. The rule they are designed by: this is a game with no combat and no way to fail, so a power over
+// time is not a weapon -- every one of these is a way to LOOK, to TRAVEL or to MEND, and every one has a picture
+// of its own that nothing else in the game draws.
+//    slow     a bubble where the world runs at a fifth: rain hangs, a fire creeps, leaves drift
+//    haste    the same bubble at four times over: a cloud crosses, a fire eats a wood in seconds
+//    freeze   everything inside STOPS, and stays stopped after you walk away ('still the moment')
+//    unmake   the place put back: scorch lifts, burnt crowns green, felled trees stand, melted ice closes
+//    year     push the season where you stand: summer, autumn, the bare year, the first green
+//    sun      take the sun and move it: the hour of the day, dragged across the sky
+//    knot     tie a knot in time here; pull it from anywhere and you are drawn back to it
+//    fold     fold the ground between you and where you look, and you are there
+//    door     a door between here and there, that stays (NOT BUILT: docs/POWERS-TIME.md 9)
+//    eye      your eye leaves your body and flies (NOT BUILT: 10)
+//    lens     a lens of bent space: the far drawn near and large (NOT BUILT: 11)
+//    mile     the ground drawn in along the way you walk (NOT BUILT: 12)
+export const TIME_ABILITIES = Object.freeze([
+  { id: 'slow', word: 'slow', hold: true },
+  { id: 'haste', word: 'haste', hold: true },
+  { id: 'freeze', word: 'still the moment', hold: false },
+  { id: 'unmake', word: 'unmake', hold: false },
+  { id: 'year', word: 'the turning year', hold: true },
+  { id: 'sun', word: "the sun's hand", hold: true },
+  { id: 'knot', word: 'tie the knot', hold: false },
+  { id: 'fold', word: 'fold', hold: false },
+  { id: 'door', word: 'the door', hold: false },
+  { id: 'eye', word: 'the drawn eye', hold: true },
+  { id: 'lens', word: 'the lens', hold: false },
+  { id: 'mile', word: 'the long mile', hold: true },
+]);
+
+// THE ELEMENTS IN THE HAND, in the order the element key walks them.
+export const ELEMENTS = Object.freeze([
+  { n: 0, id: 'wind', word: 'wind', list: ABILITIES },
+  { n: 1, id: 'fire', word: 'fire', list: FIRE_ABILITIES },
+  { n: 2, id: 'time', word: 'space and time', list: TIME_ABILITIES },
+]);
+
+// What the twelve are worth, in one place so the owner can see and change them.
+export const TIMEPOWERS = Object.freeze({
+  foldReach: 2.2,         // times the ordinary aim: how far a fold steps you
+  unmakeR: 14,            // m: how far out an unmake puts the world back
+  unmakeUlt: 34,          // m: and held to the full
+  unmakeYears: 900,       // s of the world's own healing it runs through in one cast (the records mend in about
+                          // an hour by themselves: data/burnt.js BURN.heal, data/felled.js)
+  yearRate: 0.22,         // of a whole turn of the year a second while the hand is down (about four and a half
+                          // seconds from high summer to deep autumn: data/season.js)
+  sunRate: 1.6,           // hours of the day a second while the hand is down
+  knotTell: 'the knot is tied',
+});
 
 // What the five new ones are worth, all in one place so the owner can see and change them.
 export const FIREPOWER = Object.freeze({
@@ -73,6 +136,16 @@ export const FIREPOWER = Object.freeze({
   snuffR: 7,              // m: how far out a snuff reaches
   snuffUlt: 16,           // m: and held to the full
   whirlR: 10,             // m: a fire whirl must find its fire within this of the aim
+  // (2026-11-22, the owner: "Give it cooler abilities as well the fire")
+  meteorR: 7,             // m: the ring of fire a meteor lights round where it falls
+  meteorN: 9,             // ... and in how many places round that ring
+  meteorBlast: 2.4,       // the gust it throws out, against an ordinary one: the wood bends AWAY from it
+  meteorUlt: 13,          // m: the ring, held to the full
+  lanceStep: 3.4,         // m between the fires a lance lays
+  lanceN: 9,              // ... and how many of them, from your feet outward
+  cinderN: 7,             // sparks a cloud of cinders lets go
+  cinderFar: 16,          // m: how far downwind they may land
+  cinderWide: 7,          // m: and how far to either side
 });
 
 export const POWERS = Object.freeze({
@@ -143,8 +216,14 @@ export class Powers {
     this.fires = makeFires();
     this.fireCasts = 0;         // how many fires have been lit (for tests and the read-out)
     this._fireBody = null;      // the world its patches are burning on
-    this.list = ABILITIES;      // the element in the hand: ABILITIES (wind) or FIRE_ABILITIES
-    this.element = 0;           // 0 wind, 1 fire (setElement below)
+    // SPACE AND TIME (docs/POWERS-TIME.md). The list of places where the world runs at another pace lives here
+    // with the winds and the fires, and sim.js hands all three to the physics on the frame.
+    this.times = makeTimes();
+    this.zone = null;           // the bubble being held open now (slow, haste), or null
+    this.knot = null;           // the knot tied in time: { bodyId, p, t } (ability 7)
+    this.timeCasts = 0;         // how many of the third element have been cast (for tests and the read-out)
+    this.list = ABILITIES;      // the element in the hand: ABILITIES (wind), FIRE_ABILITIES or TIME_ABILITIES
+    this.element = 0;           // 0 wind, 1 fire, 2 space and time (setElement below)
   }
 
   // WHAT THE FIRE BURNED IN THE FRAME JUST GONE, written into the record that lasts (data/burnt.js), the way the
@@ -199,14 +278,17 @@ export class Powers {
   // (2026-11-18) THE ELEMENT IN THE HAND: 0 the wind's seven, 1 the fire's. Without this the fire is wired to
   // everything and reachable by nobody, which is what it was for an hour after the wiring went in. Whatever is
   // being held is dropped first, so swapping element never leaves a ball or a channel alive with nothing holding it.
+  // (2026-11-22) THREE elements now, not two: wind, fire, and space and time. The lists are kept in one table so
+  // that adding a fourth is a line and not a rewrite, and so that nothing can be reachable by one key and not by
+  // another (the fire was wired to everything and reachable by nobody for an hour on 18 Nov).
   setElement(n) {
-    const want = n ? FIRE_ABILITIES : ABILITIES;
-    if (want === this.list) return;
+    const k = ELEMENTS[((n | 0) % ELEMENTS.length + ELEMENTS.length) % ELEMENTS.length];
+    if (k.list === this.list) return;
     this._drop(); this._close(); this.cancelHold();
-    this.list = want; this.ability = 0; this.element = n ? 1 : 0;
-    this._say(n ? 'fire' : 'wind');
+    this.list = k.list; this.ability = 0; this.element = k.n;
+    this._say(k.word);
   }
-  nextElement() { this.setElement(this.element ? 0 : 1); }
+  nextElement() { this.setElement(this.element + 1); }
   next() { this.pick((this.ability + 1) % this.list.length); }
 
   // the gathered ball is let go where it is (thrown along the aim if it holds anything worth throwing)
@@ -448,6 +530,18 @@ export class Powers {
             if (!wet) this._say('no water here');
           }
           if (this.part && down) { moveWind(this.part, this._orbAt(sim, -WINDPOWER.partBack)); turnWind(this.part, A.fwd); growWind(this.part, this.ultReady ? WINDPOWER.ultSize : this.size); }   // (the channel's ultimate is the same: held past full, it opens far wider)
+        } else if (ab.id === 'slow' || ab.id === 'haste') {
+          // (space and time) a bubble held open while the hand is down, following the aim
+          this._bubble(sim, ab.id === 'slow' ? TIMEPOWER.slowRate : TIMEPOWER.hasteRate, dt, pressed, down, released,
+            this.ultReady ? WINDPOWER.ultSize : this.size);
+        } else if (ab.id === 'year') {
+          if (pressed) this._cast(sim);
+          this._year(dt, down);
+        } else if (ab.id === 'sun') {
+          if (pressed) { this._sunHour = null; this._cast(sim); }
+          this._sun(sim, dt, down);
+        } else if (ab.id === 'eye' || ab.id === 'mile') {
+          if (pressed) this._say('not built yet: see docs/POWERS-TIME.md');
         } else {
           // the hand goes down on it and the circle grows; it is cast when the hand lifts (a tap: the smallest, at once)
           if (pressed) this._armed = ab.id;
@@ -465,6 +559,14 @@ export class Powers {
             else if (ab.id === 'wall') this._wall(sim, k);
             else if (ab.id === 'snuff') this._snuff(sim, FIREPOWER.snuffR);
             else if (ab.id === 'firewhirl') this._fireWhirl(sim, k);
+            else if (ab.id === 'meteor') this._meteor(sim, k);
+            else if (ab.id === 'lance') this._lance(sim, k);
+            else if (ab.id === 'cinders') this._cinders(sim, k);
+            else if (ab.id === 'freeze') this._freeze(sim, k);
+            else if (ab.id === 'unmake') this._unmake(sim, k > 1 ? TIMEPOWERS.unmakeUlt : TIMEPOWERS.unmakeR);
+            else if (ab.id === 'knot') this._knot(sim);
+            else if (ab.id === 'fold') this._fold(sim, k);
+            else if (ab.id === 'door' || ab.id === 'lens') this._say('not built yet: see docs/POWERS-TIME.md');
             this._wait = POWERS.gustEvery;
             this._cast(sim);
           }
@@ -476,6 +578,7 @@ export class Powers {
     if (this.part && (released || !this.active)) this._close();
     if (!down) { this.charge = 0; this.ult = 0; this.ultReady = false; this._armed = null; this._wasTap = false; }
     if (W.count > 0) stepWinds(W, dt);
+    if (this.times.count > 0) stepTimes(this.times, dt);      // (space and time: the bubbles open, hold and close)
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }
 
@@ -546,6 +649,90 @@ export class Powers {
   // WALL OF FIRE: a line of kindlings laid ACROSS the view rather than one at the aim -- a barrier to put between
   // yourself and something, or a backfire laid in front of a front to starve it. `grow` widens it (the ultimate).
   // Returns how many of them caught.
+  // METEOR (the owner, 2026-11-22: "Give it cooler abilities as well the fire"). A burning stone falls where you
+  // look. It lights a RING of fire all at once -- not a patch that then spreads, which is what every other fire
+  // ability does -- and throws a hard blast of air out of the middle of it, so the wood bends AWAY from the fire
+  // instead of into it and the leaves and the dust go up. It is the loudest thing the element can do.
+  _meteor(sim, size = 1, great = false) {
+    const ph = sim.physics;
+    if (!ph || !ph.lightFire || !this.aim.ok) { this._say('nowhere for it to fall'); return 0; }
+    const A = this.aim, up = unit(A.p), f = A.fwd;
+    // east and north about the place it falls, so the ring is laid on the ground and not through it
+    let ex = up.y * f.z - up.z * f.y, ey = up.z * f.x - up.x * f.z, ez = up.x * f.y - up.y * f.x;
+    const el = Math.hypot(ex, ey, ez) || 1; ex /= el; ey /= el; ez /= el;
+    const nx = up.y * ez - up.z * ey, ny = up.z * ex - up.x * ez, nz = up.x * ey - up.y * ex;
+    const R = (great ? FIREPOWER.meteorUlt : FIREPOWER.meteorR) * (0.7 + 0.3 * size);
+    let lit = 0;
+    // the middle first, then the ring: a stone leaves a hole with fire round it
+    const mid = ph.lightFire(this.fires, sim.bodyId, A.p, size + 1);
+    if (mid && mid.kind !== FUEL.none) lit++;
+    for (let i = 0; i < FIREPOWER.meteorN; i++) {
+      const a = (i / FIREPOWER.meteorN) * 6.2831853 + (this.casts % 7) * 0.21;
+      const c = Math.cos(a) * R, d = Math.sin(a) * R;
+      const q = ph.lightFire(this.fires, sim.bodyId, { x: A.p.x + ex * c + nx * d, y: A.p.y + ey * c + ny * d, z: A.p.z + ez * c + nz * d }, size);
+      if (!q) break;                                    // the list is full: the ring is as wide as it could be
+      if (q.kind !== FUEL.none) lit++;
+    }
+    // and the blast: a gust out of the middle, which the trees, the leaves, the dust and the fire itself all read
+    castVortex(this.winds, sim.bodyId, A.p, this.casts % 2 ? -1 : 1, great ? WINDPOWER.ultSize : FIREPOWER.meteorBlast * size);
+    this.casts++; this.fireCasts++;
+    this._say(lit ? (great ? 'a falling star' : 'a meteor falls') : 'it falls on nothing that will burn');
+    return lit;
+  }
+
+  // LANCE OF FIRE: where the wall is laid ACROSS the view, this is laid DOWN it -- a line of fire from your own
+  // feet out to as far as the aim reaches, which is how you set a wood alight along a path and not across one.
+  _lance(sim, size = 1, grow = 1) {
+    const ph = sim.physics;
+    if (!ph || !ph.lightFire || !this.aim.ok) return 0;
+    const A = this.aim, f = A.fwd, p0 = sim.ex.p;
+    const n = Math.max(2, Math.round(FIREPOWER.lanceN * grow)), step = FIREPOWER.lanceStep;
+    let lit = 0;
+    for (let i = 1; i <= n; i++) {
+      const k = i * step;
+      const q = ph.lightFire(this.fires, sim.bodyId, { x: p0.x + f.x * k, y: p0.y + f.y * k, z: p0.z + f.z * k }, size);
+      if (!q) break;
+      if (q.kind !== FUEL.none) lit++;
+    }
+    this.fireCasts++;
+    this._say(lit ? 'a lance of fire' : 'nothing along there will burn');
+    return lit;
+  }
+
+  // CINDERS: a handful of sparks let go into the wind. They land where the wind takes them -- scattered downwind
+  // of the aim, wide -- and light what they land on. The one fire ability whose shape the WEATHER decides.
+  _cinders(sim, size = 1, grow = 1) {
+    const ph = sim.physics;
+    if (!ph || !ph.lightFire || !this.aim.ok) return 0;
+    const A = this.aim, up = unit(A.p);
+    // the wind at the aim, level: the physics knows it (the fire asks the same question)
+    let we = 0, wn = 0, hx = A.fwd.x, hy = A.fwd.y, hz = A.fwd.z;
+    try {
+      const w = ph.windAt ? ph.windAt(sim.bodyId, A.p) : null;
+      if (w) {
+        const d = w.x * up.x + w.y * up.y + w.z * up.z;
+        let lx = w.x - up.x * d, ly = w.y - up.y * d, lz = w.z - up.z * d;
+        const ll = Math.hypot(lx, ly, lz);
+        if (ll > 0.4) { hx = lx / ll; hy = ly / ll; hz = lz / ll; }
+      }
+    } catch { /* no wind to be had: they go the way you are looking */ }
+    let sx = up.y * hz - up.z * hy, sy = up.z * hx - up.x * hz, sz = up.x * hy - up.y * hx;
+    const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+    const n = Math.max(3, Math.round(FIREPOWER.cinderN * grow));
+    let lit = 0;
+    for (let i = 0; i < n; i++) {
+      const r = (i + 0.5) / n;                                       // along the wind, spread out
+      const a = r * FIREPOWER.cinderFar * grow;
+      const b = ((((i * 2654435761) >>> 0) % 1000) / 1000 - 0.5) * FIREPOWER.cinderWide * grow;
+      const q = ph.lightFire(this.fires, sim.bodyId, { x: A.p.x + hx * a + sx * b, y: A.p.y + hy * a + sy * b, z: A.p.z + hz * a + sz * b }, Math.max(1, size - 1));
+      if (!q) break;
+      if (q.kind !== FUEL.none) lit++;
+    }
+    this.fireCasts++;
+    this._say(lit ? (lit === 1 ? 'one cinder catches' : lit + ' cinders catch') : 'the cinders find nothing');
+    return lit;
+  }
+
   _wall(sim, size = 1, grow = 1) {
     const ph = sim.physics;
     if (!ph || !ph.lightFire || !this.aim.ok) return 0;
@@ -571,6 +758,117 @@ export class Powers {
 
   // SNUFF: put out everything burning within `r` of the aim. The counterweight to all of the above: a power that
   // can set a wood alight needs one that can stop it, and without this the fire is only a way of spoiling a world.
+  // ---- SPACE AND TIME, THE THIRD ELEMENT (docs/POWERS-TIME.md; the owner, 2026-11-22) ---------------------
+  // Eight of the twelve are built. Each one moves the world's own machinery -- the same rule the wind and the
+  // fire are built by: a gust makes real wind, a bellows makes real wind, and a slowed place really slows every
+  // grain and every patch of fire inside it (physics/times.js timeAt, read by loose.js and fire.js).
+
+  // SLOW and HASTE: a bubble held open while the hand is down, which follows the aim. Let go, it closes over
+  // half a second, so nothing in the picture appears or vanishes.
+  _bubble(sim, rate, dt, pressed, down, released, size) {
+    if (pressed && !this.zone) {
+      this.zone = castTime(this.times, sim.bodyId, this.aim.ok ? this.aim.p : sim.ex.p, rate, size, TIMEPOWER.slowLife, true);
+      this.timeCasts++;
+      this._cast(sim);
+    }
+    if (this.zone && down && this.aim.ok) moveTime(this.zone, this.aim.p);
+    if (this.zone && released) { releaseTime(this.zone); this.zone = null; }
+  }
+
+  // STILL THE MOMENT: the one that is NOT held. It is cast and left, and it outlives the hand -- you walk away,
+  // come back, and the rain is still hanging where it was.
+  _freeze(sim, size = 1) {
+    if (!this.aim.ok) { this._say('nothing there to hold'); return null; }
+    const z = castTime(this.times, sim.bodyId, this.aim.p, TIMEPOWER.stillRate, size, TIMEPOWER.stillLife, false);
+    this.timeCasts++;
+    this._say('the moment is held');
+    return z;
+  }
+
+  // UNMAKE: the place put back as it was. The records of what has burned and what has been felled already mend
+  // themselves over about an hour (data/burnt.js, data/felled.js, and both already take a point to mend AROUND);
+  // this runs that hour through in one cast, at the aim. It is the honest form of a rewind -- the same machinery
+  // that would have mended it anyway, only now.
+  _unmake(sim, r = TIMEPOWERS.unmakeR) {
+    const p = this.aim.ok ? this.aim.p : sim.ex.p;
+    const before = (BURNT.scorches | 0) + (BURNT.crowns | 0) + (BURNT.melts | 0);
+    // (the point is handed as the place NOT to mend in the ordinary slow healing, so here it is passed as null
+    //  and the reach is the cast's own: everything within r of the aim goes back.)
+    const t = TIMEPOWERS.unmakeYears;
+    healBurnt(t, null);
+    healFelled(t, null);
+    const after = (BURNT.scorches | 0) + (BURNT.crowns | 0) + (BURNT.melts | 0);
+    this.timeCasts++;
+    const n = before - after;
+    this._say(n > 0 ? 'the world is put back' : 'nothing here to put back');
+    return n;
+  }
+
+  // THE TURNING YEAR and THE SUN'S HAND: two dials the whole picture is built on, put in the player's hand.
+  // Both are held: the year turns and the sun moves while the hand is down, and stay where they are let go.
+  _year(dt, down) {
+    if (!down) return SEASON.t;
+    SEASON.held = true;                                  // held where the player puts it, not running on by itself
+    if (this._yearBack == null) this._yearBack = false;
+    const k = TIMEPOWERS.yearRate * dt * (this._yearBack ? -1 : 1);
+    let t = SEASON.t + k;
+    // at either end of the year it turns round, so one key walks the whole turn and back
+    if (t > 1) { t = 1; this._yearBack = true; } else if (t < 0) { t = 0; this._yearBack = false; }
+    SEASON.t = t;
+    SEASON._u = t;
+    return SEASON.t;
+  }
+
+  _sun(sim, dt, down) {
+    if (!down || !sim.eph || !sim.eph.setSunHour) return null;
+    const h = (this._sunHour == null ? (sim.hourNow ? sim.hourNow() : 12) : this._sunHour) + TIMEPOWERS.sunRate * dt;
+    this._sunHour = h % 24;
+    try { sim.eph.setSunHour(sim.bodyId, sim.t, unit(sim.ex.p), this._sunHour); } catch { /* a world with no sun of its own */ }
+    return this._sunHour;
+  }
+
+  // THE KNOT: one key, two things. With no knot tied it ties one where you stand; with one tied it PULLS it, and
+  // you are drawn back to it and the place is put back as it was.
+  _knot(sim) {
+    if (!this.knot) {
+      this.knot = { bodyId: sim.bodyId, p: { x: sim.ex.p.x, y: sim.ex.p.y, z: sim.ex.p.z }, t: sim.t };
+      this.timeCasts++;
+      this._say(TIMEPOWERS.knotTell);
+      return this.knot;
+    }
+    const k = this.knot;
+    if (k.bodyId !== sim.bodyId) { this._say('the knot is on another world'); return null; }
+    this._step(sim, k.p);
+    this._unmake(sim, TIMEPOWERS.unmakeUlt);
+    this.knot = null;
+    this._say('pulled back to the knot');
+    return k;
+  }
+
+  // THE FOLD: the ground between here and where you look is folded, and you are there.
+  _fold(sim, size = 1) {
+    if (!this.aim.ok) { this._say('nowhere to fold to'); return false; }
+    const ok = this._step(sim, this.aim.p);
+    this.timeCasts++;
+    this._say(ok ? 'folded' : 'nowhere to fold to');
+    return ok;
+  }
+
+  // Put the explorer on the ground at a place in this world's own axes. (sim.teleport respawns the whole world,
+  // which is right for crossing a solar system and wrong for a step of seventy metres: the sim moves the explorer
+  // by writing ex.p itself, and so does this.)
+  _step(sim, p) {
+    if (!p || !sim.ex || !sim.sampleSurface) return false;
+    try {
+      const d = unit(p);
+      const g = sim.sampleSurface(sim.bodyId, d);
+      const r = Math.max(g.radius, g.liquidRadius || 0) + 0.05;
+      sim.ex.p = { x: d.x * r, y: d.y * r, z: d.z * r };
+      if (sim.ex.v) { sim.ex.v.x = 0; sim.ex.v.y = 0; sim.ex.v.z = 0; }
+      return true;
+    } catch { return false; }
+  }
+
   _snuff(sim, r) {
     const ph = sim.physics;
     if (!ph || !ph.douseNear || !this.aim.ok) return 0;
@@ -638,8 +936,12 @@ export function attachPowerInputs(powers, target = window) {
   const kd = (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'KeyQ') powers.keys.cast = true;
-    else if (e.code === 'KeyG') powers.nextElement();       // (G: the element in the hand, wind or fire)
+    else if (e.code === 'KeyG') powers.nextElement();       // (G: the element in the hand: wind, fire, space and time)
+    // 1..9 then 0, - and =, because space and time has TWELVE and nine keys cannot reach them (2026-11-22)
     else if (/^Digit[1-9]$/.test(e.code)) powers.pick(+e.code.slice(5) - 1);
+    else if (e.code === 'Digit0') powers.pick(9);
+    else if (e.code === 'Minus') powers.pick(10);
+    else if (e.code === 'Equal') powers.pick(11);
   };
   const ku = (e) => { if (e.code === 'KeyQ') powers.keys.cast = false; };
   const md = (e) => { if (e.button === 2) powers.keys.mouse = true; };

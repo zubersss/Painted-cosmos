@@ -168,6 +168,10 @@ test('ways out of the ring that change nothing: back onto the chip, out to the r
   flick(ui, mid, 0);
   assert.equal(powers.element, 1, 'a flick out to the right swaps the element: fire');
   assert.equal(powers.list[powers.ability].id, 'kindle', 'and the hand now holds the fire\u2019s own ability');
+  // (2026-11-22: THREE elements, so the flick walks wind -> fire -> space and time -> wind)
+  flick(ui, mid, 0);
+  assert.equal(powers.element, 2, 'a third flick reaches space and time');
+  assert.equal(powers.list[powers.ability].id, 'slow', 'and the hand holds its first ability');
   flick(ui, mid, 0);
   assert.equal(powers.element, 0, 'and again to come back to the wind');
   powers.pick(3);
