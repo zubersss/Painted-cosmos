@@ -189,8 +189,8 @@ export function attachPowersUi(powers, root) {
   });
   // AND THE ELEMENT HAS A THUMB'S WAY TO IT. Until this it was reachable by one key on a keyboard and by nothing at
   // all on a phone, which breaks this project's own rule that a power works the same on a phone, a keyboard and a
-  // pad. The ring's wedges only cover the half from straight up round to straight down (RING.from), so a flick out
-  // to the RIGHT was free ground: it swaps the element, and the word out there says which one it goes to.
+  // pad. Every ability tile is drawn to the LEFT of the chip (ringPlaces), so a slide out to the RIGHT is free
+  // ground: it swaps the element, and the tile out there says which one it goes to.
   const elTab = doc.createElement('div'); elTab.className = 'pc-pw-tab pc-pw-el';
   const elWord = doc.createElement('span'); elTab.appendChild(elWord);
   const elKey = doc.createElement('i'); elKey.textContent = 'G'; elTab.appendChild(elKey);
