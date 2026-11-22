@@ -19,6 +19,7 @@ import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
 import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL, syncBurnt } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
+import { makeTimeFx } from './timefx.js';
 import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE, FIRE_MATS } from '../render/kitmat.js';
 import { MODE } from '../data/mode.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial, syncFireGlow } from '../render/materials.js';
@@ -46,6 +47,13 @@ export function createWorld(scene) {
   // (the oil look: leaves falling through the air of an autumn wood, leaffall.js)
   const leafFall = LOOK.oil ? makeLeafFall(null) : null;
   if (leafFall) scene.add(leafFall.mesh);
+  // (the powers, space and time: the bubble of a slowed, hastened or stopped place, and the knot tied in time.
+  //  Behind BOTH flags, as the fire's own paint is, so the game without the powers holds not one instruction of
+  //  it and the watercolour game cannot see it at all. world/timefx.js.)
+  const timeFx = LOOK.oil && MODE.powers ? makeTimeFx(null) : null;
+  // (NOT a glaze: the bubble is laid in MARKS with gaps between them, in the scene pass, the same path the leaves
+  //  in the air take -- see world/timefx.js. It was built as a glaze first and was invisible for it.)
+  if (timeFx) { scene.add(timeFx.mesh); scene.add(timeFx.knot); }
 
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
@@ -641,6 +649,11 @@ export function createWorld(scene) {
       OIL.uAuroraK.value = aur * (1 - space01);
       // (leaves in the air of an autumn wood, while the eye is among the trees: none from the ship above them)
       if (leafFall) leafFall.update(cameraPos, active.root, _camL, bu, fall * (1 - space01) * (1 - THREE.MathUtils.smoothstep(camR - (here.radius || body.radius), 18, 40)));
+      // (the powers, space and time: the bubble of a slowed, hastened or stopped place, and the knot tied in
+      //  time. The list is the player's own, handed to the physics on the frame and kept on its particle system
+      //  beside the fires -- world/timefx.js, physics/times.js.)
+      if (timeFx) timeFx.update(cameraPos, active.root, _camL, bu,
+        physics && physics.particles && physics.particles.system ? physics.particles.system.times : null, active.id);
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
