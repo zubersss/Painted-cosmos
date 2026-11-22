@@ -314,6 +314,7 @@ test('the element changed by a key or the pad: the panel re-reads its words and 
     frame(powers, sim);
     assert.deepEqual(words(), powers.list.map((a) => a.word), name + ': the tiles are not this element\'s own');
     assert.ok(ui.word.textContent.startsWith(name + ': '), 'the foot of the screen says: ' + ui.word.textContent);
+    assert.equal(ui.word.textContent.indexOf(name, 1), -1, 'the element is named twice over: ' + ui.word.textContent);
     assert.ok(ui.fan.classList.contains('pc-open'), name + ': the panel shows itself, so a key player sees the swap');
   }
   // and twelve abilities get twelve tiles, not seven

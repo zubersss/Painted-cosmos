@@ -392,7 +392,10 @@ export function attachPowersUi(powers, root) {
     if (shown2 !== wordNow) {
       wordNow = shown2; btn.textContent = w;
       const en = (ELEMENTS[p.element | 0] || ELEMENTS[0]).word;
-      word.textContent = en + ': ' + w + big + (p.note ? '  \u00b7  ' + p.note : '');
+      // (the note said when the element is swapped IS the element's name, and the line already begins with it:
+      //  without this it read "space and time: slow - space and time". Seen in the game, 2026-11-22.)
+      const note = p.note && p.note !== en ? '  \u00b7  ' + p.note : '';
+      word.textContent = en + ': ' + w + big + note;
     }
     root.classList.toggle('pc-pw-held', on && (p.keys.touch || p.keys.cast || p.keys.mouse || p.keys.pad || !!p.orb || !!p.part));
     // THE AIM MARK: a ring on the ground where the chosen power will act, as wide as what it will do there, lying as
