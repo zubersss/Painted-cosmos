@@ -463,8 +463,8 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
-**v32 (22 Nov) IS READY ON `look-proto`: SPACE AND TIME IS FOUR OVERLY POWERFUL ABILITIES, AND THE WORLD IS
-BUILT AHEAD OF A WALKER.**
+**`main` IS AT v32 (22 Nov), pull request #32 merged: SPACE AND TIME IS FOUR OVERLY POWERFUL ABILITIES, AND THE
+WORLD IS BUILT AHEAD OF A WALKER.**
 The owner, 22 Nov: *"to many space and time abilities cut them down into folding space should be one of them but
 make it a bit more theatrical like the world is getting pulled towards you the 4 should be overly powerful
 abilities like a rip in space time that sucks everything in a long ways in but also keep working on the
@@ -486,6 +486,10 @@ performance and look of the game I want things far away to be loaded in before I
   cells held. `src/world/walk.test.mjs`.
 - **A TRAP MENDED AND WORTH KEEPING:** a shader that fails to compile shows `material.program === false`. It is
   NOT a misleading signal, whatever the v30 note says -- it was right both times it was doubted.
+- **THE WHOLE GAME DRIVEN AFTER THE MERGE:** every one of the twenty abilities of all three elements cast through
+  the real game's own frame in the lab, **0 throws**; the worst single frame is the fold at 19.4 ms of script on
+  this software-drawing machine (it carries you a hundred metres and the world builds as it goes), against 5 to
+  17 ms for the rest.
 
 
 **`main` IS AT v31 (22 Nov), pull request #31 merged: THE FREEZE IS MENDED AND THE POWERS ARE PICKED FROM A LIST OF WORDS.**
