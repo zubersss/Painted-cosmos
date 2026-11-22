@@ -426,9 +426,9 @@ export function slopeRate(up) {
 
 // Steps the list by dt. ctx holds the two functions above (and dampAt if the game has one). Returns how many
 // patches are in the list, ash and all.
-export function stepFires(F, dt, ctx) {
+export function stepFires(F, dt0, ctx) {
   if (!F.count) { F.whirl = null; F.whirlT = 0; return 0; }
-  F.time += dt;
+  F.time += dt0;
   // The air on this world, asked once a frame and not once a patch: it does not change under a fire.
   F.air = ctx && ctx.airAt ? clamp01(ctx.airAt(F[0].bodyId)) : 1;
   const airK = F.air <= FIRE.airStop ? 0
@@ -438,6 +438,10 @@ export function stepFires(F, dt, ctx) {
   const n0 = F.count;                      // a patch lit this frame takes its first step in the next one
   for (let i = 0; i < n0; i++) {
     const s = F[i];
+    // (the powers, space and time) HOW FAST THE WORLD RUNS AT THIS PATCH. 1 where the player has cast nothing,
+    // and with no answer at all it is the world's own step: a fire inside a slowed bubble creeps, inside a
+    // stopped one it stands as a sculpture of itself, and inside a hastened one it eats a wood in seconds.
+    const dt = ctx && ctx.rateAt ? dt0 * ctx.rateAt(s) : dt0;
     if (s.ash) { s.ashAge += dt; continue; }
     s.age += dt;
 
@@ -540,7 +544,7 @@ export function stepFires(F, dt, ctx) {
   // casting's memory of the ground (a few kilobytes) there and then, instead of holding it until that slot is used
   // again. Nothing is made here: wipe only writes over what is already there.
   for (let i = n; i < was; i++) wipe(F[i]);
-  whirlCheck(F, dt);
+  whirlCheck(F, dt0);
   return n;
 }
 

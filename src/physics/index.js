@@ -21,6 +21,7 @@ import { Particles, PARTICLES, EVENT } from './particles.js';
 import { Loose, LOOSE, KICK, WADE } from './loose.js';
 import { devilsNear, DEVILS } from './features.js';
 import { placeWinds, windsToDevils, powerWind } from './powers.js';
+import { placeTimes, timeAtBody } from './times.js';
 import { placeFires, stepFires, lightFire as litFire, douseNear as douseNearFire, FUEL } from './fire.js';
 import { burntAt } from '../data/burnt.js';
 import { skyNumbers, SKY } from './sky.js';
@@ -90,6 +91,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
   const loose = new Loose(particles);
   const devils = []; devils.count = 0;
   let winds = null;                 // the explorer's wind this frame (powers.js), or null
+  let times = null;                 // and the places where the world runs at another pace (times.js), or null
   let fires = null;                 // the fire the explorer has lit this frame (fire.js), or null
   const _denv = { dustSource: 0, sun01: null, wind: 0, storm01: 0, we: 0, wn: 0, rho: 0 };
   const deform = new DeformField(SHIP_BODY.legs);
@@ -262,6 +264,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
       if (!powerWind(winds, x, z, 0.6, _fpw)) return 1;      // (0.6 m: a flame's own height over the ground)
       return _fpw[3];
     },
+    // AND HOW FAST THE WORLD RUNS AT THIS PATCH (the third element, times.js): 1 where nothing has been cast.
+    // A fire inside a stopped place stands as a sculpture of itself and does not burn its fuel away.
+    rateAt(s) { return times ? timeAtBody(times, s.px, s.py, s.pz) : 1; },
     // Rain puts a fire out. The ground's wetness here, and the rain that is actually reaching the ground now, which
     // wets a flame sooner than it wets the ground. (0.09 a millimetre an hour is a guess: drizzle lets a fire burn,
     // steady rain reaches fire.js FIRE.wetStop, a storm drowns it at once. The owner's eyes settle it.)
@@ -371,6 +376,9 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // tornadoes added to the devils. With no list, `winds` is null and every system below makes one comparison.
     winds = f.winds && f.winds.count > 0 && placeWinds(f.winds, frame, bodyId) ? f.winds : null;
     if (winds) windsToDevils(winds, devils);
+    // (the powers, space and time) and the places where the world runs at another pace (times.js). The game hands
+    // the list in f.times, or nothing; with no list every asker below makes one comparison.
+    times = f.times && f.times.count > 0 && placeTimes(f.times, frame, bodyId) ? f.times : null;
     // (P18: felt by a point moving with the focus: the sub-second eddies it meets too often fade)
     if (dt > 0 && focusPrev.ok && Math.hypot(fp.x - focusPrev.x, fp.y - focusPrev.y, fp.z - focusPrev.z) < 100) { const k = 1 - Math.exp(-dt / 0.1); focusV.vx += ((fp.x - focusPrev.x) / dt - focusV.vx) * k; focusV.vy += ((fp.y - focusPrev.y) / dt - focusV.vy) * k; focusV.vz += ((fp.z - focusPrev.z) / dt - focusV.vz) * k; }
     else if (!(dt > 0 && focusPrev.ok)) { focusV.vx = 0; focusV.vy = 0; focusV.vz = 0; }
@@ -445,7 +453,7 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (the rain, the snow and the hail fall round the eye, so they keep the air at the focus; what is loose lies on the
     // ground and is lifted from it, so it takes the air there: rhoGround)
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);
-    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, rhoGround, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds);
+    loose.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, rhoGround, cover, bodyId, body.gravity, time, dist, here.air.turbulence, moist.wetness01, moist.snowDepth, devils, winds, times);
     // drifts: what lies loose on level ground here, how hard the wind moves it, and what stands in its way
     { const U = Math.hypot(airGrid.cwe, airGrid.cwn), snow = moist.snowDepth;
       driftSnow = snow > 0.01;
@@ -839,6 +847,13 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     douseNear(F, bodyId, p, r) { return douseNearFire(F, bodyId, p, r); },
     fireWhirl(F) { return F && F.whirl ? F.whirl : null; },
     airForFire(bodyId) { return burnableAir(bodyId); },   // 0..1, Earth's air is 1: will anything burn here at all
+    // THE WIND AT A PLACE, in the body's own axes (the powers' cinders ask it, to let their sparks go downwind).
+    // Null off this world or before the first frame; the dust devils and the player's own wind are already in it.
+    windAt(bodyId, p) {
+      if (!active || bodyId !== active || !p) return null;
+      airAt(active, p.x, p.y, p.z, time, seed, airGrid, frame, sunDir, 1.5, _fair, devils, null, winds);
+      return _fair.wind;
+    },
     // WHAT IS UNDER A PLACE, and if nothing will burn there, `why` in plain words. The same answer lightFire acts
     // on, asked without lighting anything: the screen's word for the player, and what a test reads.
     fuelAt(bodyId, p, out = {}) {

@@ -30,7 +30,7 @@
 //
 // NOT PRESSED BY A HAND YET. This was built and driven by made-up pointer events in Node (tests/powersui.test.mjs);
 // no finger has been on it. It must be pressed on a real phone before anyone calls it done.
-import { ABILITIES } from '../core/powers.js';
+import { ABILITIES, ELEMENTS } from '../core/powers.js';
 
 // THE RING, in numbers. The seven lie 30 degrees apart, from straight up (the first) round through the left to
 // straight down (the last): the whole left half of the screen, which is where a right thumb on the chip can reach,
@@ -133,10 +133,16 @@ export function attachPowersUi(powers, root) {
   let cur = powers.list || ABILITIES;
   let NA = cur.length;
   const tabWords = [];
-  const tabs = ABILITIES.map((a, i) => {
+  // AS MANY WEDGES AS THE LONGEST LIST (2026-11-22: space and time has twelve, where the wind has seven. Built
+  // from the wind's seven, the fan showed seven of the twelve and the last five were reachable by a key and by
+  // nothing on a phone -- the same fault the element button was made to mend in the first place.)
+  const MOST = Math.max(...ELEMENTS.map((e) => e.list.length));
+  const KEYWORD = (i) => (i < 9 ? String(i + 1) : i === 9 ? '0' : i === 10 ? '-' : '=');
+  const tabs = Array.from({ length: MOST }, (unused, i) => {
+    const a = (powers.list || ABILITIES)[i] || { word: '' };
     const t = doc.createElement('div'); t.className = 'pc-pw-tab';
     const s = doc.createElement('span'); s.textContent = a.word; t.appendChild(s); tabWords.push(s);
-    const n = doc.createElement('i'); n.textContent = String(i + 1); t.appendChild(n);     // the key that does the same
+    const n = doc.createElement('i'); n.textContent = KEYWORD(i); t.appendChild(n);        // the key that does the same
     fan.appendChild(t); return t;
   });
   // AND THE ELEMENT HAS A THUMB'S WAY TO IT. Until this it was reachable by one key on a keyboard and by nothing at
@@ -172,7 +178,8 @@ export function attachPowersUi(powers, root) {
       t.style.display = i < NA ? '' : 'none';
       if (i < NA && tabWords[i]) tabWords[i].textContent = cur[i].word;
     });
-    elWord.textContent = powers.element ? 'wind' : 'fire';      // where a flick to the right goes
+    // where a flick to the right goes: the NEXT element round, whichever that is
+    elWord.textContent = (ELEMENTS[((powers.element | 0) + 1) % ELEMENTS.length] || ELEMENTS[0]).word;
     lastAb = powers.ability; prevAb = NA > 1 ? (powers.ability + 1) % NA : powers.ability;
     sayPrev();
   };

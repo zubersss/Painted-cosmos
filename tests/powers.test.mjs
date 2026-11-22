@@ -198,8 +198,10 @@ test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the elem
   assert.equal(p.list[p.ability].id, 'kindle', 'and now the fire is');
   // (2026-11-19, the owner: "give it 5 new abilities that are fire based". Six now, and the test names them
   //  rather than counting them, so that a rename or a reorder is caught as well as a loss.)
-  assert.deepEqual(p.list.map((a) => a.id), ['kindle', 'ember', 'bellows', 'wall', 'snuff', 'firewhirl'],
-    'the fire does not have the six abilities it should');
+  // (2026-11-22, the owner: "Give it cooler abilities as well the fire". Nine now.)
+  assert.deepEqual(p.list.map((a) => a.id),
+    ['kindle', 'ember', 'bellows', 'wall', 'snuff', 'firewhirl', 'meteor', 'lance', 'cinders'],
+    'the fire does not have the nine abilities it should');
   for (const a of p.list) assert.ok(a.word && typeof a.word === 'string', a.id + ' has no word for the screen');
   // the physics is what lights it, because only it knows what is underfoot there
   let asked = null;
@@ -208,10 +210,58 @@ test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the elem
   assert.ok(asked, 'the physics was asked to light it');
   assert.equal(asked.bodyId, 'earth');
   assert.equal(p.fireCasts, 1, 'one fire lit');
-  // and swapping back drops everything the fire was holding
+  // and the element key walks THREE now (2026-11-22: space and time is the third), round to the wind again
   p.nextElement();
+  assert.equal(p.element, 2);
+  assert.equal(p.list[p.ability].id, 'slow', 'space and time is the third element');
+  p.nextElement();
+  assert.equal(p.element, 0);
   assert.equal(p.list[p.ability].id, 'gust');
   assert.equal(p.charge, 0, 'and nothing is left charged across the swap');
+});
+
+test('SPACE AND TIME is the third element, and has the twelve the owner asked for (2026-11-22)', async () => {
+  const { TIME_ABILITIES, ELEMENTS } = await import('../src/core/powers.js');
+  // "give me at least 10 powers for that one and they should all be unique and powerful"
+  assert.ok(TIME_ABILITIES.length >= 10, 'the owner asked for at least ten: there are ' + TIME_ABILITIES.length);
+  assert.deepEqual(TIME_ABILITIES.map((a) => a.id),
+    ['slow', 'haste', 'freeze', 'unmake', 'year', 'sun', 'knot', 'fold', 'door', 'eye', 'lens', 'mile'],
+    'the twelve of space and time are not what docs/POWERS-TIME.md says they are');
+  // every one has a word for the screen, and no two share an id with another element (the dispatch is BY id, so
+  // a clash would cast the wrong power: `still` was the wind's and nearly became this element's as well)
+  const seen = new Set();
+  for (const el of ELEMENTS) for (const a of el.list) {
+    assert.ok(a.word && typeof a.word === 'string', a.id + ' has no word for the screen');
+    assert.ok(!seen.has(a.id), 'two elements both have an ability called ' + a.id + ': the dispatch is by id');
+    seen.add(a.id);
+  }
+  assert.equal(ELEMENTS.length, 3);
+  assert.equal(ELEMENTS[2].list, TIME_ABILITIES);
+});
+
+test('space and time: a slowed place really slows the world in it, and nothing outside it (2026-11-22)', async () => {
+  const { makeTimes, castTime, stepTimes, placeTimes, timeAt, TIMEPOWER } = await import('../src/physics/times.js');
+  const T = makeTimes();
+  assert.equal(timeAt(T, 0, 0), 1, 'with nothing cast the world runs at its own pace');
+  const frame = { lx: (x) => x, lz: (x, y, z) => z, ly: () => 0, r0: 0 };
+  castTime(T, 'earth', { x: 0, y: 0, z: 0 }, TIMEPOWER.slowRate, 1, TIMEPOWER.slowLife, false);
+  for (let i = 0; i < 60; i++) stepTimes(T, 1 / 60);     // let it open
+  placeTimes(T, frame, 'earth');
+  assert.ok(timeAt(T, 0, 0) < 0.3, 'the middle of a slowed place is not slow: ' + timeAt(T, 0, 0));
+  assert.equal(timeAt(T, 400, 0), 1, 'a place four hundred metres off was slowed too');
+  // it closes by itself, and gives its slot back
+  for (let i = 0; i < 60 * 20; i++) stepTimes(T, 1 / 60);
+  assert.equal(T.count, 0, 'a bubble outlived its life: ' + T.count);
+  assert.equal(timeAt(T, 0, 0), 1);
+
+  // ... and a STOPPED place stops it altogether, and outlives the hand that cast it
+  const S2 = makeTimes();
+  castTime(S2, 'earth', { x: 0, y: 0, z: 0 }, TIMEPOWER.stillRate, 1, TIMEPOWER.stillLife, false);
+  for (let i = 0; i < 60; i++) stepTimes(S2, 1 / 60);
+  placeTimes(S2, frame, 'earth');
+  assert.ok(timeAt(S2, 0, 0) < 0.02, 'a stopped place still runs: ' + timeAt(S2, 0, 0));
+  for (let i = 0; i < 60 * 20; i++) stepTimes(S2, 1 / 60);
+  assert.equal(S2.count, 1, 'a stopped place did not outlive the hand that cast it');
 });
 
 test('A SPARK FALLS SHORT onto ground that will burn, and says plainly when nothing will (owner, 2026-11-18: the fire at the riverside spawn)', () => {

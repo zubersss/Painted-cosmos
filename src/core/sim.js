@@ -632,6 +632,7 @@ export class Sim {
       disturbers: out,
       winds: powers ? powers.winds : null,
       fires: powers ? powers.fires : null,          // the fire the explorer has lit (physics/fire.js), or nothing
+      times: powers ? powers.times : null,          // and the places where the world runs at another pace (physics/times.js)
     });
     const ms = now() - t0;
     this.physicsMs += (ms - this.physicsMs) * 0.1;
