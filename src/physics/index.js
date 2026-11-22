@@ -453,6 +453,10 @@ export function createPhysics({ sampleSurface, seed = DEFAULT_SEED, timeBudget =
     // (the powers, space and time) and the places where the world runs at another pace, for the painter's own
     // bubbles (world/timefx.js). The physics does not draw; it only says where they are.
     particles.times = times;
+    // ... and THE RIPS, which need no placing and are not time zones at all: they are wind sources (powers.js
+    // KIND.rip) that the painter has to see. The zones' own wire above is left alone on purpose -- it is null
+    // when nothing is open, and loose.js asks it per GRAIN, so a rip must not make it non-null for nothing.
+    particles.rips = f.times && f.times.rips ? f.times.rips : null;
     // (the rain, the snow and the hail fall round the eye, so they keep the air at the focus; what is loose lies on the
     // ground and is lifted from it, so it takes the air there: rhoGround)
     particles.update(dt, frame, airGrid, near, fx, fy, fz, wh, here.weather, here.air.density, cover, bodyId, body.gravity, time, ecx, ecz);

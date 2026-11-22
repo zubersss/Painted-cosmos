@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPhysics } from './index.js';
 import { MATERIAL_INDEX } from './ground.js';
-import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
+import { makeWinds, castGust, castZone, castOrb, castVortex, castPart, castRip, partedAt, partShape, turnWind, moveWind, releaseWind, stepWinds, placeWinds, powerWind, windsToDevils, WINDPOWER, KIND } from './powers.js';
 import { LocalFrame } from './near.js';
 import { FLORA } from './flora.js';          // (the trees' own lean limit, for the one-ability rule)
 import { BODIES } from '../data/bodies.js';
@@ -408,4 +408,35 @@ test('ONE ABILITY BENDS THE TREES (owner, 2026-11-18): a quickened place, a gath
   let worst = 0;
   run(w, 2.5, S, () => { const a = at(6); if (a > worst) worst = a; });
   assert.ok(worst > limit * 1.5, 'the gust ability still lays them right over: ' + (worst * 57.3).toFixed(1) + ' degrees');
+});
+
+// THE RIP IN SPACE-TIME (the owner, 2026-11-22: "a rip in space time that sucks everything in a long ways in").
+// What makes it the owner's rip and not a bigger gathered ball: the draw does not die away with distance. It is
+// at full strength out to most of its reach, so standing fifty metres off you are already being taken.
+test('a rip draws everything in from a long way off, turns and lifts at the tear, and closes by itself', () => {
+  const p = V(0, 0, BODIES.earth.radius), f = frameAt('earth', p), S = makeWinds(), o = new Float64Array(4);
+  const R = 55;
+  castRip(S, 'earth', p, R, 6.5);
+  for (let i = 0; i < 90; i++) stepWinds(S, 1 / 60);        // let it tear open
+  placeWinds(S, f, 'earth');
+  // a long way out to the east, and still drawn hard back to the middle (west is -o[0])
+  powerWind(S, 40, 0, 2, o);
+  assert.ok(o[0] < -20, 'at 40 m the air is barely drawn in: ' + o[0].toFixed(1));
+  powerWind(S, 10, 0, 2, o);
+  const near = o[0];
+  powerWind(S, 40, 0, 2, o);
+  assert.ok(o[0] < near * 0.6, 'the draw falls away with distance like a ball: near ' + near.toFixed(1) + ' far ' + o[0].toFixed(1));
+  // round it as well as in
+  powerWind(S, 20, 0, 2, o);
+  assert.ok(Math.abs(o[1]) > 0.5, 'nothing turns round the tear: ' + o[1].toFixed(2));
+  // and lifted into it at the middle
+  powerWind(S, 1, 0, 2, o);
+  assert.ok(o[2] > 4, 'nothing is lifted into the tear: ' + o[2].toFixed(1));
+  // nothing at all beyond its reach
+  assert.equal(powerWind(S, R + 6, 0, 2, o), false, 'it reaches past its own rim');
+  // nor high above it (a crown is taken, a cloud is not)
+  assert.equal(powerWind(S, 10, 0, WINDPOWER.ripTall * 1.5, o), false, 'it reaches to the clouds');
+  // it is not held: it closes by itself and gives its slot back
+  for (let i = 0; i < 60 * 9; i++) stepWinds(S, 1 / 60);
+  assert.equal(S.count, 0, 'a rip outlived its life: ' + S.count);
 });

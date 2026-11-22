@@ -18,7 +18,7 @@
 // physics places the list in its frame once a frame (placeWinds), and whoever owns the list ages it (stepWinds).
 import { smoothstep } from './util.js';
 
-export const KIND = Object.freeze({ jet: 1, zone: 2, orb: 3, vortex: 4, part: 5 });
+export const KIND = Object.freeze({ jet: 1, zone: 2, orb: 3, vortex: 4, part: 5, rip: 6 });
 
 export const WINDPOWER = Object.freeze({
   // HOW BIG A CAST CAN BE MADE (the owner, 2026-11-17: "let me be able to increase to circle to much bigger sizes"):
@@ -69,6 +69,19 @@ export const WINDPOWER = Object.freeze({
   orbIn: 9,               // m/s: the draw toward it at its strongest (some two core radii out)
   orbSwirl: 7,            // m/s round it at the core's edge
   orbHeight: 1.5,         // m above the ground: where the ball is held
+  // THE RIP IN SPACE-TIME (space and time's second power; the owner, 2026-11-22: "a rip in space time that sucks
+  // everything in a long ways in"). It is a wind source like the rest, so everything in the world that already
+  // answers the wind answers it -- but where a gathered ball reaches nine metres, this reaches fifty-five, and a
+  // hundred and twenty held to the full. The draw does not die away with distance the way the ball's does: it is
+  // at FULL STRENGTH out to ripHold of its reach and only eases over the last of it, which is what makes it feel
+  // like being taken rather than blown.
+  ripDraw: 30,            // m/s: the air drawn in, at full strength
+  ripSwirl: 13,           // m/s: and round the tear, at the tear's own edge
+  ripCore: 3.5,           // m: the tear itself, where the air turns and lifts instead of pouring in
+  ripUp: 11,              // m/s: lifted into it, near the middle
+  ripTall: 34,            // m: above this the draw eases off (a crown is taken, a cloud is not)
+  ripHold: 0.62,          // of the reach: full strength within this, eased to nothing at the rim
+  ripFade: 1.1,           // s it takes to tear open, and to close again (nothing appears or vanishes)
   // the tornado (a devil's numbers, features.js DEVILS, scaled up)
   vortexRadius: 2.6,      // m: the core
   vortexSpeed: 17,        // m/s at the core's edge
@@ -186,6 +199,15 @@ export function castPart(S, bodyId, p, d, size = 1) {
   s.life = 1e9; s.held = true; s.radius = W.partHalf * k; s.reach = W.partReach * (0.7 + 0.3 * k); s.speed = W.partWind; s.len = 0; s.strength = 1; s.size = k;
   return s;
 }
+// A RIP torn open at p (body-local), drawing everything in from `reach` metres for `life` seconds. Nothing holds
+// it: it is cast and it closes by itself.
+export function castRip(S, bodyId, p, reach = 55, life = 6.5) {
+  const s = take(S, KIND.rip, bodyId, p, null), W = WINDPOWER;
+  s.life = life; s.fade = W.ripFade; s.radius = reach > 1 ? reach : 1; s.speed = W.ripDraw;
+  s.up = W.ripUp; s.height = W.ripTall; s.size = s.radius / 55;
+  return s;
+}
+
 export function moveWind(s, p) { s.px = p.x; s.py = p.y; s.pz = p.z; }
 // A held source (a gathered ball, a parted channel) grown while the hand stays down.
 export function growWind(s, size) {
@@ -272,7 +294,7 @@ export function placeWinds(S, frame, bodyId) {
     let R = 0;
     if (s.kind === KIND.jet) R = s.reach + 7 + 2.4 * (s.radius + s.spread * (s.reach > 0 ? s.reach : 0));
     else if (s.kind === KIND.part) R = s.len + 2.2 + 2 * s.radius;
-    else if (s.kind === KIND.zone || s.kind === KIND.orb) R = s.radius;
+    else if (s.kind === KIND.zone || s.kind === KIND.orb || s.kind === KIND.rip) R = s.radius;
     else continue;                                        // a vortex: nothing in powerWind
     if (s.x - R < bx0) bx0 = s.x - R;
     if (s.x + R > bx1) bx1 = s.x + R;
@@ -361,6 +383,21 @@ export function powerWind(S, x, z, hz, o, minR = 0) {
       const sw = (r < rc ? r / rc : rc / r) * W.orbSwirl, dy = s.height - hz;
       o[0] += (-rx * ir * s.speed * g - rz * ir * sw) * k; o[1] += (-rz * ir * s.speed * g + rx * ir * sw) * k;
       o[2] += (dy > 2 ? 2 : dy < -2 ? -2 : dy) * 2.6 * (1 - smoothstep(rc * 1.5, rc * 5, r)) * k;
+      any = true;
+    } else if (s.kind === KIND.rip) {
+      const R = s.radius, r = Math.sqrt(rx * rx + rz * rz);
+      if (r > R + minR) continue;
+      const W = WINDPOWER, rc = W.ripCore, ir = r > 1e-3 ? 1 / r : 0;
+      const k = s.strength * (1 - smoothstep(s.height, s.height * 1.4, hz));
+      if (k < 0.01) continue;
+      // POURED IN FROM A LONG WAY OFF: full strength within ripHold of the reach, eased to nothing at the rim,
+      // and nothing inside the tear itself -- there the air only turns and lifts, so what arrives is not packed
+      // into a knot at the middle.
+      const g = (1 - smoothstep(R * W.ripHold, R, r)) * smoothstep(rc * 0.3, rc * 1.3, r);
+      const sw = (r < rc ? r / rc : rc / r) * W.ripSwirl;
+      o[0] += (-rx * ir * s.speed * g - rz * ir * sw) * k;
+      o[1] += (-rz * ir * s.speed * g + rx * ir * sw) * k;
+      o[2] += s.up * (1 - smoothstep(rc, rc * 4.5, r)) * k;
       any = true;
     }
   }
