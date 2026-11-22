@@ -2922,3 +2922,11 @@ same fault the element button was built to mend. It also asked the thumb to lear
   the pad still choose.
 - **STILL NOT PRESSED BY A HAND.** Driven by made-up pointer events (11 tests) and seen in a real browser with
   `?touch=1`. A finger on a phone is the only thing that can call it done.
+- **MERGED: pull request #31, `main` is at v31.** The freeze (nine abilities with no entry in the aim-ring table,
+  throwing inside the frame and stopping the game dead), the four faults found beside it, and the panel of words.
+  Three suites pass (317 / 48 / 389). Seen over the real game at 844 by 390 as well as standalone at 390 by 844;
+  two more faults were caught in that in-game picture and mended before the merge (five unplaced tiles when the
+  element changes with the panel open; the foot of the screen naming the element twice). **Not pressed by a
+  finger on a phone: that is the owner's to do.**
+- A note for the next session: `tools/commit.sh` puts the role in front of the message, so do NOT start the
+  message with `[pilot]` yourself (one commit this session reads `[pilot] [pilot] v31: ...`).

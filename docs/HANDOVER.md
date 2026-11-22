@@ -453,7 +453,7 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
-**v31 (22 Nov) IS READY ON `look-proto`: THE FREEZE IS MENDED AND THE POWERS ARE PICKED FROM A LIST OF WORDS.**
+**`main` IS AT v31 (22 Nov), pull request #31 merged: THE FREEZE IS MENDED AND THE POWERS ARE PICKED FROM A LIST OF WORDS.**
 The owner, 22 Nov: *"The spacetime powers freeze the game everytime I open it find out why and fix it also change
 the ui for the powers I want it to be simpler to pick stuff and for it to still be easy to understand."*
 
@@ -483,6 +483,11 @@ the ui for the powers I want it to be simpler to pick stuff and for it to still 
   (twelve words of the wrong element, picked by position); the word at the foot of the screen read
   `p.element ? 'fire' : 'wind'`, so every space-time power was announced as **fire**; and the element's own tile
   was drawn level with the chip and sat **half off a 390 px phone, on top of the power button**.
+- **AND SEEN OVER THE REAL GAME** (the autumn wood at 844 by 390, the thumb holding the chip while the element key
+  put space and time in hand): the twelve in two columns, clear of the map and book buttons, the element's tile
+  above the power button, the label reading v31. Two faults were caught in that picture and mended: the five
+  unplaced tiles above, and the foot of the screen reading "space and time: slow - space and time", because the
+  note said on an element swap IS the element's name.
 - **WHAT IS LEFT:** nobody has pressed the panel with a FINGER on a real phone. That is the owner's to do, and
   the one thing that can call it done.
 
