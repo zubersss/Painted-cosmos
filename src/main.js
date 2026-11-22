@@ -441,6 +441,7 @@ async function boot() {
   });
   const debug = {
     game, sim, world, painter, renderer, scene, camera, dyn, physics, map, book, audio, storage, sketches, touch, platform, using: prov.using, note: debugNote, gl,
+    get powers() { return sim.powers || null; },   // (the elemental powers, for the harnesses and the lab: ?powers=1 only)
     info: () => ({ ...game.info(), using: prov.using, fallback: prov.fallback, fps: debug.fps, frames: game.frameCount, scale: dyn.scale, quality: dyn.quality, sharp: dyn.sharp, sharpMax: dyn.sharpMax, settled: worldSettled(world, game.frameCount),
       device: { ...game.device, aa: aaMode(), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(4) }, platform: { ...platform.state }, upright }),
     teleport: (o) => sim.teleport(o),

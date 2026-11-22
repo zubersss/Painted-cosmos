@@ -122,7 +122,8 @@ export const TIMEPOWERS = Object.freeze({
                           // an hour by themselves: data/burnt.js BURN.heal, data/felled.js)
   yearRate: 0.22,         // of a whole turn of the year a second while the hand is down (about four and a half
                           // seconds from high summer to deep autumn: data/season.js)
-  sunRate: 1.6,           // hours of the day a second while the hand is down
+  sunSpin: 420,           // times its own turning: the world turns under the sun while the hand is down, which on
+                          // Earth is about two hours of the day a second (orbits.js turnBy, and see _sun below)
   knotTell: 'the knot is tied',
 });
 
@@ -179,6 +180,26 @@ const AIM_SIZE = {
   wall: () => FIREPOWER.wallSpan * 0.5,
   snuff: () => FIREPOWER.snuffR,
   firewhirl: () => WINDPOWER.vortexRadius,
+  // (the three of 2026-11-22) the ring of fire a meteor lights, the length of the line a lance lays, and how wide
+  // a cloud of cinders falls.
+  meteor: () => FIREPOWER.meteorR,
+  lance: () => FIREPOWER.lanceStep * FIREPOWER.lanceN * 0.5,
+  cinders: () => FIREPOWER.cinderWide,
+  // SPACE AND TIME (2026-11-22). The three bubbles show their own radius and the unmake its reach; the two that
+  // take hold of the whole world (the turning year, the sun's hand) have no place on the ground at all, so they
+  // show a small ring at the aim; the rest mark a spot or move you there, which is about a figure's width.
+  slow: () => TIMEPOWER.radius,
+  haste: () => TIMEPOWER.radius,
+  freeze: () => TIMEPOWER.radius,
+  unmake: () => TIMEPOWERS.unmakeR,
+  year: () => 1.6,
+  sun: () => 1.6,
+  knot: () => 1.8,
+  fold: () => 1.5,
+  door: () => 1.5,
+  eye: () => 1.6,
+  lens: () => 1.6,
+  mile: () => 1.6,
 };
 const unit = (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
@@ -402,6 +423,16 @@ export class Powers {
 
   // THE ULTIMATE of each ability: the super version, cast by letting go once the second charge is full. Every one of
   // the seven has one, as the owner asked; the three they named by name are the gust, the whirl and the knife.
+  // WHICH ABILITIES HAVE AN ULTIMATE OF THEIR OWN. The rest are cast in the ordinary way at the greatest size
+  // instead (see update below) -- which is what they did BEFORE 2026-11-22, when holding any of the nine newest
+  // ones past "ULTIMATE ready" said "held to its utmost" and then cast NOTHING AT ALL: the hand came up, the sound
+  // played, and the world was untouched. (Found while mending the freeze, by holding every ability of all three
+  // elements to the full in tests/powers.test.mjs.)
+  static hasUlt(id) {
+    return id === 'gust' || id === 'whirl' || id === 'knife' || id === 'quicken' || id === 'still'
+      || id === 'kindle' || id === 'ember' || id === 'bellows' || id === 'wall' || id === 'snuff' || id === 'firewhirl';
+  }
+
   _ultimate(sim, id) {
     const W = WINDPOWER, A = this.aim, K = W.ultSize;
     this.ults++;
@@ -506,7 +537,20 @@ export class Powers {
     const wasReady = this.ultReady;
     this.ultReady = this.ult >= 1;
     if (this.ultReady && !wasReady) this._say('ULTIMATE ready - let go');
-    if (this.active) { const A = this._aim(sim), id = this.list[this.ability].id; A.size = A.ok ? AIM_SIZE[id](A.dist) * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0; }
+    if (this.active) {
+      // THE FREEZE THE OWNER FOUND (2026-11-22: "The spacetime powers freeze the game everytime I open it").
+      // This line used to read AIM_SIZE[id](A.dist) with no guard, and NINE of the abilities had no entry in that
+      // table: the fire's meteor, lance and cinders, and all twelve of space and time. Picking any of them threw a
+      // TypeError here -- inside powers.update, inside sim.frame, inside game.frame -- so the frame stopped dead
+      // before the world was stepped or anything was painted. The loop asks for the next frame before it runs this
+      // one (main.js tick), so the game did not fall over with an error on the screen: it simply stopped, every
+      // frame, for ever, with the last complete picture still up. That is a freeze with no way out of it.
+      // Two things now stand in its way: every ability has a ring above, and an unknown one shows an ordinary ring
+      // instead of throwing. tests/powers.test.mjs walks every ability of every element through this line.
+      const A = this._aim(sim), id = this.list[this.ability].id, ring = AIM_SIZE[id];
+      const base = ring ? ring(A.dist) : 2;
+      A.size = A.ok ? base * (id === 'gust' || id === 'knife' ? 1 + (this.size - 1) * 0.6 : this.size) : 0;
+    }
     else this.aim.ok = false;
     if (this.active && (down || released || this.orb || this.part)) {
       const A = this.aim, ab = this.list[this.ability];
@@ -546,8 +590,10 @@ export class Powers {
           // the hand goes down on it and the circle grows; it is cast when the hand lifts (a tap: the smallest, at once)
           if (pressed) this._armed = ab.id;
           if (released && this._armed === ab.id && this._wait <= 0) {
-            const k = this._wasTap ? 1 : this.size;
-            if (this.ultReady) this._ultimate(sim, ab.id);
+            // held past full: the ones with an ultimate of their own do that, and every other is cast in the
+            // ordinary way at the greatest size (never nothing at all: Powers.hasUlt above)
+            const k = this._wasTap ? 1 : this.ultReady ? WINDPOWER.ultSize : this.size;
+            if (this.ultReady && Powers.hasUlt(ab.id)) this._ultimate(sim, ab.id);
             else if (ab.id === 'gust') castGust(W, sim.bodyId, A.from, A.fwd, 1, k, true);   // (true: THE one ability that lays trees over, owner 2026-11-18)
             else if (ab.id === 'quicken') castZone(W, sim.bodyId, A.p, A.fwd, 'quicken', k);
             else if (ab.id === 'still') castZone(W, sim.bodyId, A.p, A.fwd, 'calm', k);
@@ -823,12 +869,16 @@ export class Powers {
     return SEASON.t;
   }
 
+  // THE SUN'S HAND. It TURNS THE WORLD under the sun, which is what moving the hour really is, and is one
+  // addition to the body's spin (orbits.js turnBy). It did not: it asked setSunHour for the hour it wanted, EVERY
+  // FRAME THE HAND WAS DOWN -- and setSunHour SOLVES for the spin that puts the sun at a given hour, with a
+  // seven-hundred-point search and a forty-step refinement. MEASURED on the build machine, which is far faster
+  // than a phone: 2.16 ms a call, so 130 ms of work for every second the key was held. That is the freeze the
+  // owner found on 2026-11-22, and turnBy costs 0.0002 ms -- ten thousand times less.
   _sun(sim, dt, down) {
-    if (!down || !sim.eph || !sim.eph.setSunHour) return null;
-    const h = (this._sunHour == null ? (sim.hourNow ? sim.hourNow() : 12) : this._sunHour) + TIMEPOWERS.sunRate * dt;
-    this._sunHour = h % 24;
-    try { sim.eph.setSunHour(sim.bodyId, sim.t, unit(sim.ex.p), this._sunHour); } catch { /* a world with no sun of its own */ }
-    return this._sunHour;
+    if (!down || !sim.eph || !sim.eph.turnBy || !(dt > 0)) return null;
+    try { sim.eph.turnBy(sim.bodyId, dt, TIMEPOWERS.sunSpin); } catch { /* a world that does not turn */ }
+    return null;
   }
 
   // THE KNOT: one key, two things. With no knot tied it ties one where you stand; with one tied it PULLS it, and

@@ -75,33 +75,47 @@ const flick = (ui, mid, deg, d = 70, ms = 0) => {
   ui.swap.send('pointerup', { clientX: mid.x + Math.cos(a) * d, clientY: mid.y - Math.sin(a) * d });
 };
 const sleep = (ms) => { const t = Date.now() + ms; while (Date.now() < t) { /* the clock is the only one here */ } };
+// (2026-11-22) THE PANEL, not a ring: the thumb lands on the chip and slides onto the TILE it wants. This goes to
+// tile i of a list of n, as ringPlaces lays it, and lifts there.
+const toTile = (ui, mid, i, n) => {
+  // the thumb down first: that is what lays the panel out for THIS screen, and the tiles are read where they lie
+  ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });
+  const p = ringPlaces(undefined, n)[i];
+  ui.swap.send('pointermove', { clientX: mid.x + p.x, clientY: mid.y + p.y });
+  ui.swap.send('pointerup', { clientX: mid.x + p.x, clientY: mid.y + p.y });
+};
 const nameOf = (p) => ABILITIES[p.ability].id;
 
-test('the direction of the flick is the choice: seven wedges, up through the left to down, and nothing out to the right', () => {
-  // (up is the first ability and down the last; dy is positive downward, as a browser gives it)
-  assert.equal(ringPick(0, -70), 0, 'straight up: the first');
-  assert.equal(ringPick(-50, -50), 2, 'up and left at 45 degrees: the third');
-  assert.equal(ringPick(-70, 0), 3, 'straight left: the middle one');
-  assert.equal(ringPick(-60, 34), 4, 'down and left');
-  assert.equal(ringPick(-50, 50), 5, 'the line between two of them falls to the lower one (45 degrees down and left)');
-  assert.equal(ringPick(0, 70), 6, 'straight down: the last');
-  assert.equal(ringPick(70, 0), -1, 'out to the right, where the screen ends: nothing');
-  assert.equal(ringPick(50, 50), -1, 'down and right, over "jump": nothing');
-  assert.equal(ringPick(0, -RING.dead + 2), -1, 'still on the chip: nothing');
-  assert.equal(ringPick(0, -RING.dead - 1), 0, 'a flick of 23 px is enough');
-  // every one of the seven is reachable, and each wedge is 30 degrees wide: 15 either side of its own direction
-  for (let i = 0; i < ABILITIES.length; i++) {
-    const deg = RING.from + i * RING.step;
-    for (const off of [-14, -7, 0, 7, 14]) {
-      const a = (deg + off) * Math.PI / 180;
-      for (const d of [25, 60, 132, 300]) assert.equal(ringPick(Math.cos(a) * d, -Math.sin(a) * d), i, `${ABILITIES[i].word} at ${off} degrees, ${d} px out`);
+test('the panel of named tiles: every one reachable, a thumb-sized target, and nothing out to the right', () => {
+  // (the owner, 2026-11-22: "I want it to be simpler to pick stuff and for it to still be easy to understand".
+  //  The ring of directions held SEVEN -- thirty degrees apart over half the screen -- and space and time has
+  //  TWELVE: five of them came out in the same directions as the first five and were reachable by nothing at all
+  //  on a phone. Tiles with words on them are read, not remembered.)
+  const ROOM = 240, WIDE = 696;                 // what the phone below gives: 240 px above the chip, 696 to its left
+  for (const n of [7, 9, 12]) {
+    const places = ringPlaces(ROOM, n, WIDE);
+    assert.equal(places.length, n);
+    for (let i = 0; i < n; i++) {
+      const p = places[i];
+      assert.equal(ringPick(p.x, p.y, n, ROOM, WIDE), i, 'tile ' + i + ' of ' + n + ' is not where it is drawn');
+      // its own corners belong to it as well: a thumb need not hit the middle
+      assert.equal(ringPick(p.x - p.w * 0.45, p.y - p.h * 0.4, n, ROOM, WIDE), i, 'the corner of tile ' + i + ' of ' + n);
+      assert.equal(ringPick(p.x + p.w * 0.45, p.y + p.h * 0.4, n, ROOM, WIDE), i, 'the far corner of tile ' + i + ' of ' + n);
+      assert.ok(p.w >= 44 && p.h >= 24, 'tile ' + i + ' is ' + p.w + ' by ' + p.h + ': a phone wants 44 across');
+      assert.ok(p.x < 0, 'the tiles lie to the LEFT of the chip, so the element keeps the right');
     }
+    // no two tiles claim the same place
+    const seen = new Set();
+    for (const p of places) { const k = Math.round(p.x) + ',' + Math.round(p.y); assert.ok(!seen.has(k), 'two tiles in one place'); seen.add(k); }
   }
-  // what that is worth as a target: at the radius the words are drawn, each wedge is this wide across
-  const across = 2 * RING.rx * Math.sin(RING.step / 2 * Math.PI / 180);
-  assert.ok(across >= 44, `each wedge is ${across.toFixed(0)} px across where the words are (a phone wants 44)`);
-  // and the wedge does not end there: it runs on to the edge of the screen
-  assert.equal(ringPick(-420, -30), 3, 'far out it is still the same choice');
+  assert.equal(ringPick(70, 0, 7, ROOM, WIDE), -1, 'out to the right, where the element lies: no tile');
+  assert.equal(ringPick(0, 0, 7, ROOM, WIDE), -1, 'still on the chip: nothing');
+  assert.equal(ringPick(-2000, -2000, 7, ROOM, WIDE), -1, 'off the panel altogether: nothing');
+  // the twelve of space and time stand in two columns of six, read top to bottom
+  const twelve = ringPlaces(ROOM, 12, WIDE);
+  assert.ok(twelve[0].y < twelve[5].y, 'the first six run DOWN the first column');
+  assert.ok(twelve[6].x > twelve[0].x, 'and the second six are the next column over');
+  assert.ok(Math.abs(twelve[6].y - twelve[0].y) < 1, 'the two columns start at the same height');
 });
 
 test('the ring opens on the instant the thumb lands, with the ability in hand marked', () => {
@@ -112,10 +126,16 @@ test('the ring opens on the instant the thumb lands, with the ability in hand ma
   assert.ok(ui.tabs[powers.ability].classList.contains('pc-now'), 'the one in hand is marked');
   assert.ok(ui.swap.classList.contains('pc-down'), 'and the chip shows it is pressed');
   // the words are hung round the chip's middle, as far out as the screen allows
+  // the tiles are laid up and to the left of the chip, each at its own size
   const put = ui.tabs.map((t) => t.style.transform);
-  assert.ok(/-50% \+ 0px/.test(put[0]) && /-50% \+ -96px/.test(put[0]), 'the first straight up: ' + put[0]);
-  assert.ok(/-50% \+ -132px/.test(put[3]) && /\+ 0px\)/.test(put[3]), 'the middle one straight left: ' + put[3]);
-  assert.ok(/-50% \+ 96px/.test(put[6]), 'the last straight down: ' + put[6]);
+  for (let i = 0; i < ABILITIES.length; i++) assert.ok(/translate\(calc\(-50% \+ -\d/.test(put[i]), 'tile ' + i + ' is not to the left: ' + put[i]);
+  assert.ok(parseFloat(ui.tabs[0].style.width) >= 44, 'a tile is drawn at its own width');
+  // THE ELEMENT'S TILE is up and to the right: out of the ability tiles' half of the screen, and lifted clear of
+  // the power button, which sits level with the chip and to its right (seen half off a 390 px phone, 2026-11-22)
+  const el = ui.fan.children[ui.fan.children.length - 1].style.transform;
+  const ex = parseFloat(/-50% \+ (-?[\d.]+)px/.exec(el)[1]), ey = parseFloat(/-50% \+ (-?[\d.]+)px\)\)$/.exec(el)[1]);
+  assert.ok(ex > RING.dead && ex <= RING.elX, 'the element tile is out to the right: ' + el);
+  assert.ok(ey <= RING.elY, 'and lifted above the power button: ' + el);
   ui.swap.send('pointerup', { clientX: mid.x, clientY: mid.y });
   assert.ok(!ui.fan.classList.contains('pc-open'), 'and it is gone when the thumb lifts');
 });
@@ -123,13 +143,13 @@ test('the ring opens on the instant the thumb lands, with the ability in hand ma
 test('a flick picks that ability and casts nothing; the thumb need not be accurate, only in the right direction', () => {
   const { powers, ui, mid, sim } = fitted();
   assert.equal(nameOf(powers), 'gust');
-  flick(ui, mid, RING.from + 6 * RING.step - 11);          // straight down, 11 degrees out: the seventh
+  toTile(ui, mid, 6, ABILITIES.length);                    // the seventh tile
   assert.equal(nameOf(powers), 'knife');
   assert.equal(powers.casts, 0, 'choosing is not casting');
   assert.equal(powers.keys.touch, false); assert.equal(powers.tapOnce, false);
   frame(powers, sim, 3);
   assert.equal(powers.winds.count, 0, 'and nothing was put in the air');
-  flick(ui, mid, RING.from + RING.step, 24);               // a flick of 24 px, up and to the left: the second
+  toTile(ui, mid, 1, ABILITIES.length);                    // the second tile
   assert.equal(nameOf(powers), 'gather');
   frame(powers, sim);
   assert.equal(ui.btn.textContent, 'gather', 'the button carries the name of what it will cast');
@@ -137,7 +157,7 @@ test('a flick picks that ability and casts nothing; the thumb need not be accura
 
 test('a tap on the chip goes back to the ability before, and a second tap comes again: one press each way', () => {
   const { powers, ui, mid } = fitted();
-  flick(ui, mid, RING.from + 4 * RING.step);               // to the fifth, the whirl
+  toTile(ui, mid, 4, ABILITIES.length);                    // the fifth tile, the whirl
   assert.equal(nameOf(powers), 'whirl');
   const tap = () => { ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y }); ui.swap.send('pointerup', { clientX: mid.x, clientY: mid.y }); };
   tap();
@@ -151,11 +171,12 @@ test('a tap on the chip goes back to the ability before, and a second tap comes 
 
 test('ways out of the ring that change nothing: back onto the chip, out to the right, a long read, a lost touch', () => {
   const { powers, ui, mid } = fitted();
-  flick(ui, mid, RING.from + 3 * RING.step);               // straight left: the fourth, "still"
+  toTile(ui, mid, 3, ABILITIES.length);                    // the fourth tile, "still"
   assert.equal(nameOf(powers), 'still');
   // out and then back onto the chip
+  const p3 = ringPlaces(undefined, ABILITIES.length)[3];
   ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });
-  ui.swap.send('pointermove', { clientX: mid.x - 90, clientY: mid.y });
+  ui.swap.send('pointermove', { clientX: mid.x + p3.x, clientY: mid.y + p3.y });
   assert.ok(ui.tabs[3].classList.contains('pc-sel'), 'it was pointing at one');
   ui.swap.send('pointermove', { clientX: mid.x + 2, clientY: mid.y - 4 });
   assert.ok(!ui.tabs[3].classList.contains('pc-sel'), 'and lets it go when the thumb comes home');
@@ -191,11 +212,10 @@ test('ways out of the ring that change nothing: back onto the chip, out to the r
 
 test('the browser says the capture was lost after the lift: the choice is made once, not twice', () => {
   const { powers, ui, mid } = fitted();
-  ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });
-  ui.swap.send('pointermove', { clientX: mid.x - 90, clientY: mid.y });
-  ui.swap.send('pointerup', { clientX: mid.x - 90, clientY: mid.y });
+  toTile(ui, mid, 3, ABILITIES.length);                    // the fourth tile, "still"
   assert.equal(nameOf(powers), 'still');
-  ui.swap.send('lostpointercapture', { clientX: mid.x - 90, clientY: mid.y });
+  const p3 = ringPlaces(undefined, ABILITIES.length)[3];
+  ui.swap.send('lostpointercapture', { clientX: mid.x + p3.x, clientY: mid.y + p3.y });
   assert.equal(nameOf(powers), 'still', 'the second word from the browser is ignored (it would have swapped back)');
 });
 
@@ -254,10 +274,13 @@ test('the words of the ring are only a legend: they take no touches, and the rin
   assert.ok(/touch-action:\s*none/.test(chip[1]), 'and no scroll or zoom starts on it');
   assert.ok(/width:\s*72px/.test(chip[1]) && /height:\s*48px/.test(chip[1]), 'and it is 72 by 48 px: no thumb misses that');
   // the drawing may shrink to fit; the wedges are the same angles whatever it does
-  const flat = ringPlaces(40), full = ringPlaces();
-  assert.ok(Math.abs(flat[0].y) === 40 && Math.abs(full[0].y) === RING.ry, 'the ring can be flattened');
-  assert.equal(flat[3].x.toFixed(0), full[3].x.toFixed(0), 'and its reach to the left is unchanged');
-  assert.equal(ringPick(0, -30), 0, 'the flick up is the first ability however the ring is drawn');
+  const flat = ringPlaces(40, 7, 696), full = ringPlaces(240, 7, 696);
+  assert.ok(flat[0].h < full[0].h || flat.length === full.length, 'a short screen still lays out every tile');
+  assert.ok(flat.every((p) => p.y > -120), 'on a 40 px screen the panel does not run off the top: ' + flat[0].y);
+  assert.ok(flat[0].w >= 44, 'and a tile is still wide enough for a thumb');
+  // (a short screen trades rows for COLUMNS rather than shrinking the tiles, so the panel is wider there: that is
+  //  the point of it. What must hold is that every tile is still a thumb's target and still on the screen.)
+  assert.equal(ringPick(full[0].x, full[0].y, 7, 240, 696), 0, 'the first tile is the first ability');
 });
 
 test('if the controller is given a `swapBack` of its own, the chip uses that one and the two agree', () => {
@@ -267,11 +290,34 @@ test('if the controller is given a `swapBack` of its own, the chip uses that one
   powers.prev = 1; powers.swapBack = function () { this.pick(this.prev); };
   const pick = powers.pick.bind(powers);
   powers.pick = function (i) { if (i !== this.ability) this.prev = this.ability; pick(i); };
-  flick(ui, mid, RING.from + 2 * RING.step);               // to the third, "quicken"
+  toTile(ui, mid, 2, ABILITIES.length);                    // the third tile, "quicken"
   assert.equal(nameOf(powers), 'quicken');
   assert.equal(powers.prev, 0, 'the controller kept the one before');
   ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });
   ui.swap.send('pointerup', { clientX: mid.x, clientY: mid.y });
   assert.equal(nameOf(powers), 'gust', 'and the tap went back through it');
   assert.equal(ui.swap.children[1].textContent, 'quicken', 'the chip now offers the one just left');
+});
+
+// (2026-11-22) THE PANEL MUST FOLLOW THE HAND, whoever changed it. The flick to the right told the panel to
+// re-read the list; the element KEY and the pad did not, so they left the previous element's twelve words on the
+// screen with the thumb picking by position. And the word at the foot of the screen asked a question with two
+// answers (`p.element ? 'fire' : 'wind'`), so space and time was called "fire".
+test('the element changed by a key or the pad: the panel re-reads its words and the foot of the screen names it', () => {
+  const { powers, ui, sim } = fitted();
+  frame(powers, sim);
+  const words = () => ui.tabs.filter((t) => t.style.display !== 'none').map((t) => t.children[0].textContent);
+  assert.match(ui.word.textContent, /^wind: /, 'the wind to begin with: ' + ui.word.textContent);
+  assert.deepEqual(words(), powers.list.map((a) => a.word));
+  for (const name of ['fire', 'space and time', 'wind']) {
+    powers.nextElement();                       // as the element key or the pad does, NOT this screen's own flick
+    frame(powers, sim);
+    assert.deepEqual(words(), powers.list.map((a) => a.word), name + ': the tiles are not this element\'s own');
+    assert.ok(ui.word.textContent.startsWith(name + ': '), 'the foot of the screen says: ' + ui.word.textContent);
+    assert.ok(ui.fan.classList.contains('pc-open'), name + ': the panel shows itself, so a key player sees the swap');
+  }
+  // and twelve abilities get twelve tiles, not seven
+  powers.nextElement(); powers.nextElement(); frame(powers, sim);
+  assert.equal(powers.list.length, 12);
+  assert.equal(words().length, 12, 'twelve tiles for the twelve of space and time');
 });

@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { Powers, ABILITIES, POWERS } from '../src/core/powers.js';
+import { Powers, ABILITIES, ELEMENTS, POWERS } from '../src/core/powers.js';
 import { KIND, WINDPOWER } from '../src/physics/powers.js';
 import { S } from '../src/core/state.js';
 import { FELLED, felledAt, felledLoad } from '../src/data/felled.js';
@@ -426,4 +426,70 @@ test('fire whirl: it needs a fire great enough, and then it turns the air where 
   const was = p2.winds.count;
   castOnce(p2, rig.sim);
   assert.ok(p2.winds.count > was, 'a fire whirl with a fire under it made no turning air');
+});
+
+// ============================================================================================================
+// THE FREEZE THE OWNER FOUND (2026-11-22: "The spacetime powers freeze the game everytime I open it"), and the
+// guard against another one like it.
+//
+// What it was: the aim mark's ring is sized from a table of one function per ability, and the table had entries
+// for the wind's seven and six of the fire's nine. The fire's meteor, lance and cinders and ALL TWELVE of space
+// and time had none, so `AIM_SIZE[id](A.dist)` threw a TypeError the moment one of them was in hand -- inside
+// powers.update, inside sim.frame, inside game.frame. The frame stopped there: the world was never stepped and
+// nothing was painted. Because the loop asks for the next frame BEFORE it runs this one (main.js tick), there was
+// no error on the screen and no fall-over, only a game that stopped dead and stayed stopped. Nine of the twenty-one
+// abilities did it, every time, and no test here ever held one.
+//
+// So: every ability of every element, held and let go, at a tap, at an ordinary hold and held past the ultimate.
+// Nothing here may throw, and every one must have a ring to show for itself.
+test('every ability of every element can be aimed, held and cast without throwing: a frame must never stop', () => {
+  assert.ok(ELEMENTS.length >= 3, 'three elements by now');
+  for (const el of ELEMENTS) {
+    for (let i = 0; i < el.list.length; i++) {
+      const id = el.list[i].id, where = el.id + '/' + id;
+      // (a world that turns, for the sun's hand; no physics, which is the hardest case: every ability must give up
+      //  quietly when the world cannot answer, not throw)
+      const sim = fakeSim();
+      sim.eph = { turnBy: () => true };
+      const p = new Powers();
+      while (p.element !== el.n) p.nextElement();
+      p.pick(i);
+      assert.equal(p.list[i].id, id, where + ': the list in hand is not the element\'s own');
+      // standing with it in hand: the aim mark must have a ring, and a sane one
+      step(p, sim, 2);
+      assert.ok(p.aim.ok, where + ': no aim');
+      assert.ok(p.aim.size > 0 && p.aim.size < 400, where + ': the ring of the aim mark is ' + p.aim.size);
+      // a tap
+      p.tapOnce = true; step(p, sim, 2); step(p, sim, 20);
+      // an ordinary hold
+      p.down = true; step(p, sim, 12); p.down = false; step(p, sim, 12);
+      // and held past "ULTIMATE ready" (the clock is the step's own dt, so this is seconds of holding)
+      p.down = true; step(p, sim, 40, 0.2);
+      assert.equal(p.ultReady, true, where + ': a long hold never reaches the ultimate');
+      p.down = false; step(p, sim, 12);
+      // (the four of space and time that are only designed so far say so and cast nothing: docs/POWERS-TIME.md)
+      const unbuilt = id === 'eye' || id === 'mile' || id === 'door' || id === 'lens';
+      if (!unbuilt) assert.ok(p.casts > 0, where + ': nothing was ever cast');
+      step(p, sim, 90);                         // and it all runs out again without a word
+    }
+  }
+});
+
+// And the one thing the freeze turned up beside itself: holding an ability past full must do SOMETHING.
+test('held past the ultimate, an ability with no ultimate of its own is still cast, at the greatest size', () => {
+  for (const el of ELEMENTS) {
+    for (const ab of el.list) {
+      const has = Powers.hasUlt(ab.id);
+      if (ab.hold) continue;                    // gather and part are held open: their ultimate is the holding
+      if (ab.id === 'eye' || ab.id === 'mile' || ab.id === 'door' || ab.id === 'lens') continue;   // not built yet
+      const sim = fakeSim(); sim.eph = { turnBy: () => true };
+      const p = new Powers();
+      while (p.element !== el.n) p.nextElement();
+      p.pick(el.list.indexOf(ab));
+      p.down = true; step(p, sim, 40, 0.2);
+      p.down = false; step(p, sim, 4);
+      assert.ok(p.casts >= 1, el.id + '/' + ab.id + ': held to the full and nothing was cast');
+      if (has) assert.ok(p.ults > 0, el.id + '/' + ab.id + ': its own ultimate was not used');
+    }
+  }
 });
