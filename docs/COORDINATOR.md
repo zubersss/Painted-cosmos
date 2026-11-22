@@ -2764,3 +2764,46 @@ worth running after every shader edit.
   far cost the WHOLE ladder, because a frame a hair past the refresh is shown 33 ms late, which is over the panic
   line; and while a rung was being given back the ordinary controller shed the picture AND a tier, which then took
   two minutes to come back. The rule now is: nothing else is shed while the ladder still has a rung to give.
+
+### 2026-11-22 OWNER: the v27 table; keep at the performance and the distance; THE FIRE MUST FEEL VIOLENT
+- OWNER (verbatim, with the table): "Keep working on the performance and making further looking things load and look good and also change up the fire animation it doesnt feel violent enough"
+- **THE v27 TABLE WORKED.** The probe found the cap and asked every question at twice the sharpness, and for the
+  first time the rows differ from each other. It also fired its own warning: the "as set" rows ran 24.4, 20.8,
+  20.6, 20.7, 16.7, 16.7 ms, so the + / - cannot be fully trusted. TWO reasons, both now mended:
+  1. The phone was still warming at row 1 (24.4 against the 20.7 it settled at).
+  2. **SOMETHING RESIZED THE PICTURE IN THE MIDDLE OF THE RUN.** From row 24 on every row read 16.7 ms whatever
+     was asked, and one of them said the FULL paint was 4 ms faster than the lighter one, which cannot be true.
+     A phone fires a resize for its own reasons -- the address bar sliding away as the panel is scrolled is
+     enough -- and that put the picture back to its own size without the test knowing. The test now HOLDS the
+     size while it asks (main.js game.holdPictureSize) and gives it back at the end.
+- **WHAT THE READABLE ROWS SAY,** at twice the sharpness, against an "as set" of 20.7 ms:
+
+  | row | ms | and the script |
+  | --- | --- | --- |
+  | no far trees | -2.2 | 12.8 -> 9.8 |
+  | far trees only as shadows | -2.0 | 12.8 -> 9.8 |
+  | far trees drawn first | +5.9 | the order matters more than anything else in the table |
+  | far trees of flat pieces (`?fartree=blob`) | -0.1 | **the cheap far tree buys nothing: do not switch to it** |
+  | **no water drawn** | **+0.0** | **the water's 39 draw calls cost NOTHING: leave it alone** |
+  | no ground / no small plants / plants one colour / no light in the air | -4.0 each | all four hit the 16.7 floor, so each is worth AT LEAST that |
+- **SO THE FAR TREES ARE THE BIGGEST SINGLE THING IN THE SCRIPT: 3 ms of a 9.6 ms frame.** Not their triangles
+  (the flat-pieces row says triangles are free) -- their DRAW CALLS. Counted in the gallery: 28 far-tree meshes
+  of 245 draws. The next cut is fewer, larger far cells. NOT STARTED THIS SESSION.
+- **THE FIRE: FOUND BY LOOKING, and it was not what I expected.** The gallery got a fire of its own (`?fire=N`
+  with `?physics=1&powers=1`), because the painter had no way to photograph a flame without playing the game to
+  one -- which is why the fire's look went three versions unseen. With it:
+  1. **A TONGUE OF FIRE WAS BEING DRAWN AS A BLADE OF GRASS.** Every grain of the falling-leaf crowd is laid the
+     same width (`draw.leaves` size 0.27 m, through `wispWide` 0.3): 8 cm across and 80 cm long. A burning bank
+     was a field of pale standing straws. Proved by painting the tongues magenta to be sure which marks they
+     were. The flame and the smoke now get a ribbon of their own shape (three/expand.js fireMat / smokeMat).
+  2. **THE HEART WAS EATING THE TONGUE.** The white-hot core was laid at full strength on a mark two pixels wide,
+     so the centre pixel of every far flame was WHITE; and once the tongues were widened the heart became a white
+     BODY with an orange rim -- a crowd of candle flames. It is the hottest inch of a tongue now, and is scaled
+     away on a tongue too thin to have one.
+  3. **A SPARK WAS A STRAW.** `keep = 6 / pixel-length` came out over 1 at a phone's picture size, so the whole
+     second-and-a-half flight of an ember was drawn instead of its head. Held to 0.4 of it.
+  4. **A NIGHT FIRE'S SMOKE WAS PALE LAVENDER.** The rule that lifts smoke off a dark wood so it can be seen by
+     day was running at night too: 181 puffs laid 45% toward white, hiding 310 tongues inside them.
+  Then the fire itself: tongues fatter, more of them, thrown harder and higher; a WHIP with two beats instead of
+  one slow sine; the tip torn in two sizes; **each patch SURGES on its own beat** so a wide fire boils instead of
+  breathing as one lamp; and **the light flickers** (it was a steady lamp while the tongues moved).

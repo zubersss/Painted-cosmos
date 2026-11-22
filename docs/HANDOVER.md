@@ -411,6 +411,14 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 - **2026-11-19, wind and fire together, and the ice worlds:** "Refine the wind and fire abilities even further i want them to be able to interact with each other where wind strengthens the fire and also give the ice planets more places to melt or use my abilities and the sky of the ice planets still needs to be streaky and painted like". Three asks: wind must visibly feed fire (MEASURE whether it already does before building anything); the ice worlds need more ice to melt and more to use the powers on; and their SKY IS STILL NOT STREAKY -- asked before, not done.
 
+- **2026-11-22, the fire must feel violent, and keep at the rest:** with speed test 9 at v27, "Keep working on the
+  performance and making further looking things load and look good and also change up the fire animation it doesnt
+  feel violent enough". THREE standing things: the performance; **distant things must LOAD and look good**; and the
+  fire must read as violent. The v27 table's readable rows say the FAR TREES are the biggest single item in the
+  script (3 ms of 9.6, in draw calls and not triangles) and that **the water costs nothing** and **the cheap far
+  tree (`?fartree=blob`) buys nothing**. The fire was found, by photographing it for the first time, to be drawn as
+  a field of pale straws; see the log for the four faults and their fixes.
+
 - **2026-11-20, top quality and good at a distance:** with speed test 9 at v26, "i want to to look like a top quality
   load with things looking good even from a distance". A STANDING direction about the picture itself. What the table
   actually says: twenty-four of its twenty-nine rows read -0.0 ms because the phone is held at 60 a second by its own
@@ -423,6 +431,28 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 ## 3. State right now (update this before you stop)
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
+
+**`main` IS AT v28 (22 Nov), pull request #28 merged: THE FIRE IS A FIRE AND NOT A FIELD OF STRAWS.**
+The owner, 22 Nov: "change up the fire animation it doesnt feel violent enough". The gallery got a fire of its own
+(`?fire=N` with `?physics=1&powers=1&look=oil`) and the fire was photographed for the first time. FOUR FAULTS, all
+found by looking and none of them what was expected:
+1. **A tongue of fire was drawn as A BLADE OF GRASS** -- every grain of the falling-leaf crowd is laid the same
+   width, so a tongue was 8 cm across and 80 cm long. Proved by painting the tongues magenta.
+2. **The heart was eating the tongue** -- the white core at full strength on a two-pixel mark made every far flame
+   white; widened, it made a crowd of candle flames.
+3. **A spark was a straw** -- the share of an ember's flight that is drawn came out over 1 at a phone's size.
+4. **A night fire's smoke was pale lavender** -- the day rule that lifts a plume off a dark wood ran at night too.
+Then the fire itself: its own ribbon shape, a two-beat whip, a torn tip, a per-patch SURGE, more and harder
+tongues, and a FLICKERING LIGHT (it was a steady lamp while the tongues flew). SEEN; how it MOVES is the owner's
+to judge.
+**And the speed test holds the picture's size** while it asks its questions: a phone's own resize had silently put
+it back in the middle of the v27 run, which is why that table's last eight rows all read 16.7 ms.
+
+**WHAT THE v27 TABLE SAYS TO DO NEXT (not started):** the FAR TREES are the biggest single item in the script,
+**3 ms of a 9.6 ms frame, in draw calls and not triangles** (28 far-tree meshes of 245 draws, counted in the
+gallery). Cut their draw count with fewer, larger far cells. **The water costs NOTHING (+0.0) -- leave it alone.
+The cheap far tree `?fartree=blob` buys NOTHING (-0.1) -- do not switch to it.**
+
 
 **`main` IS AT v27 (20 Nov), pull request #27 merged: THE PICTURE SHARPENS ITSELF TO WHAT THE DEVICE CAN HOLD.**
 The owner's v26 table said almost nothing -- 24 of its 29 rows read -0.0 ms, because their phone is held at 60 a
