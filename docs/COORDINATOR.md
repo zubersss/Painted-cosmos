@@ -2857,3 +2857,26 @@ the painter's next piece of work on this element.
 2. **No double quote in a message passed to `tools/commit.sh`** — the same fault as the backtick, and it cost the
    third element's own commit message, which was cut off at the owner's first quoted word. (Backticks were the
    lesson of 19 and 22 Nov; quotes are this one. The message is lost; the account is here and in the pull request.)
+
+### 2026-11-22 OWNER: make the powers' designs actually look cool, and draw the art originally
+- OWNER (verbatim): "Now make the designs for these powers actually look cool make sure the art is drawn originally as well unless you can find pre-made stuff then go on ahead"
+- **ON "PRE-MADE STUFF": THERE IS NONE TO FIND, AND THERE MUST NOT BE.** Every mark in this game is made by its own
+  code -- there is not one picture file in the repository, and CLAUDE.md forbids committing other people's
+  pictures. So it is all drawn originally, which is also the only way a thing can look like it belongs in this
+  look: a bought sprite of a time bubble would be the one object in the game that is not paint.
+- **WHAT WAS DRAWN (`src/world/timefx.js`, PAINTER, behind both flags):**
+  - **THE BUBBLE** of a slowed, hastened or stopped place: a ball of air with its EDGE PAINTED, the rim a broad
+    band of brush marks with gaps between them that drift round it. Three paints: slow a pale blue, haste a warm
+    gold with the marks smeared along the way the brush went, **still a cold white with hairline cracks of light
+    and no drift at all** -- the one mark in the game with no motion in it, because the place it holds has none.
+    SEEN, all three, over the owner's own river.
+  - **THE KNOT** tied in time: three crossed strokes standing on the ground, pointed at both ends, beating slowly.
+- **TWO HOURS WENT ON ONE FAULT, and it is worth writing down.** The bubble was built as a GLAZE -- paint laid
+  over the finished picture -- because that is what a translucent thing is in this painter. **A glaze material
+  that is not in the `GLAZES` list is never drawn at all**, and even once it was in the list it stayed invisible.
+  What finally worked was giving it up: the bubble is laid in the SCENE pass as MARKS WITH GAPS, exactly as the
+  leaves in the air are, and the gaps are what make its edge soft. That is also more like this look than a wash
+  would have been. **A new translucent thing should take the leaves' path first and the glaze path only if it
+  must.**
+- **ONE MORE TRAP:** `?time=` is the gallery's HOUR OF DAY and has been since the first version of that page; the
+  bubble's own parameter had to be `?bubble=slow|haste|still`. An hour of 15.4 was being read as a kind of bubble.
