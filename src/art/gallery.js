@@ -21,6 +21,7 @@ import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
 import { MODE } from '../data/mode.js';
 import { makeFires, clearBurns, FUEL } from '../physics/fire.js';
 import { makeTimes, castTime, stepTimes, TIMEPOWER } from '../physics/times.js';
+import { makeWinds, castRip, stepWinds } from '../physics/powers.js';
 import { meltIce, deepenMelt, scorch } from '../data/burnt.js';
 
 const P = new URLSearchParams(location.search);
@@ -282,8 +283,11 @@ let fireLit = false, fireTries = 0;
 // ground ahead of the camera and held open, so the painter can photograph what the third element looks like
 // without playing the game to it. ?timed=<m> how far ahead (9), ?timer=<m> how wide (the power's own).
 // (NOT ?time=, which is this page's own hour of the day and has been since the first version of it.)
-// ?knot=1 ties the knot in time where the camera stands, so that mark can be looked at too.
-const times = P.has('bubble') || P.has('knot') ? makeTimes() : null;
+// ?rip=1 tears a RIP IN SPACE-TIME on the ground ahead instead (?ripr=<m> how far it reaches, 55): the tear
+// itself and the strokes of air running into it are drawn, and because it is a real wind source the leaves, the
+// dust and the spray are really drawn in -- which is the half of it that cannot be faked.
+const times = P.has('bubble') || P.has('rip') ? makeTimes() : null;
+const winds = P.has('rip') ? makeWinds() : null;
 let timeCast = false;
 const physicsWanted = P.get('physics') === '1';
 if (physicsWanted) {
@@ -422,7 +426,7 @@ function tick(now) {
     setDisturbers(0);
     if (P.get('push') === '0') disturbers.length = 0;
     const L0 = world.getLighting();
-    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers, fires, times };
+    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers, fires, times, winds };
     // pre-roll: let the weather fall for a while before the first frame, ending at wtime
     for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; setDisturbers(preroll); if (P.get('push') === '0') disturbers.length = 0; physics.update(1 / 30, fr); }
     setDisturbers(0);
@@ -450,7 +454,7 @@ function tick(now) {
     // the first stills taken of the new flame had no flame in them at all, only embers scattered over the river.
     // A tenth of a second at most, so what is photographed is a moment of the fire and not a minute of it.
     const pdt = frozenT != null ? 0 : Math.min(dt, 0.1);
-    // the bubble (and the knot), cast once the physics has a world under it and then held open for ever
+    // the bubble (or the rip), cast once the physics has a world under it and then held open for ever
     if (times && !timeCast) {
       timeCast = true;
       orient();
@@ -464,10 +468,15 @@ function tick(now) {
         const z = castTime(times, bodyId, { x: q.x, y: q.y, z: q.z }, rate, 1, 1e9, false);
         if (P.has('timer')) z.radius = num('timer', TIMEPOWER.radius);
       }
-      if (P.has('knot')) { const b = state.pos.clone().normalize().multiplyScalar(surf(state.pos.clone().normalize())); times.knot = { bodyId, p: { x: b.x, y: b.y, z: b.z }, t: 0 }; }
+      if (winds) {
+        castRip(winds, bodyId, { x: q.x, y: q.y, z: q.z }, num('ripr', 55), 1e9);
+        for (let i = 0; i < 90; i++) stepWinds(winds, 1 / 60);    // let it tear open before the first picture
+        times.rips = winds;                                       // the painter walks it for the rips (world/timefx.js)
+      }
       for (let i = 0; i < 60; i++) stepTimes(times, 1 / 60);      // let it open before the first picture
     }
     if (times) stepTimes(times, pdt);
+    if (winds) stepWinds(winds, pdt);
     physics.update(pdt, fr);
     if (fires) clearBurns(fires);
     wtime += pdt;

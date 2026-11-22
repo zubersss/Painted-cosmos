@@ -213,20 +213,24 @@ test('FIRE IS REACHABLE (owner, 2026-11-18: "Now make a fire ability"): the elem
   // and the element key walks THREE now (2026-11-22: space and time is the third), round to the wind again
   p.nextElement();
   assert.equal(p.element, 2);
-  assert.equal(p.list[p.ability].id, 'slow', 'space and time is the third element');
+  assert.equal(p.list[p.ability].id, 'fold', 'space and time is the third element');
   p.nextElement();
   assert.equal(p.element, 0);
   assert.equal(p.list[p.ability].id, 'gust');
   assert.equal(p.charge, 0, 'and nothing is left charged across the swap');
 });
 
-test('SPACE AND TIME is the third element, and has the twelve the owner asked for (2026-11-22)', async () => {
+test('SPACE AND TIME is the third element, and is the FOUR the owner cut it down to (2026-11-22)', async () => {
   const { TIME_ABILITIES, ELEMENTS } = await import('../src/core/powers.js');
-  // "give me at least 10 powers for that one and they should all be unique and powerful"
-  assert.ok(TIME_ABILITIES.length >= 10, 'the owner asked for at least ten: there are ' + TIME_ABILITIES.length);
-  assert.deepEqual(TIME_ABILITIES.map((a) => a.id),
-    ['slow', 'haste', 'freeze', 'unmake', 'year', 'sun', 'knot', 'fold', 'door', 'eye', 'lens', 'mile'],
-    'the twelve of space and time are not what docs/POWERS-TIME.md says they are');
+  // The first design had twelve ("give me at least 10 powers for that one"). The owner cut them the same day:
+  // "to many space and time abilities cut them down ... the 4 should be overly powerful abilities like a rip in
+  // space time that sucks everything in a long ways in". Folding space is one, by name, and the rip is the
+  // owner's own idea.
+  assert.equal(TIME_ABILITIES.length, 4, 'the owner asked for four: there are ' + TIME_ABILITIES.length);
+  assert.deepEqual(TIME_ABILITIES.map((a) => a.id), ['fold', 'rip', 'freeze', 'year'],
+    'the four of space and time are not what docs/POWERS-TIME.md says they are');
+  assert.ok(TIME_ABILITIES.some((a) => a.id === 'fold'), 'folding space was named by the owner and must be one');
+  assert.ok(TIME_ABILITIES.some((a) => a.id === 'rip'), 'the rip was the owner\'s own idea and must be one');
   // every one has a word for the screen, and no two share an id with another element (the dispatch is BY id, so
   // a clash would cast the wrong power: `still` was the wind's and nearly became this element's as well)
   const seen = new Set();
@@ -237,6 +241,10 @@ test('SPACE AND TIME is the third element, and has the twelve the owner asked fo
   }
   assert.equal(ELEMENTS.length, 3);
   assert.equal(ELEMENTS[2].list, TIME_ABILITIES);
+  // the ones that were cut are gone with their code, not left in the list unreachable
+  for (const gone of ['slow', 'haste', 'unmake', 'sun', 'knot', 'door', 'eye', 'lens', 'mile']) {
+    assert.ok(!seen.has(gone), gone + ' was cut by the owner but is still in a list');
+  }
 });
 
 test('space and time: a slowed place really slows the world in it, and nothing outside it (2026-11-22)', async () => {
@@ -492,4 +500,63 @@ test('held past the ultimate, an ability with no ultimate of its own is still ca
       if (has) assert.ok(p.ults > 0, el.id + '/' + ab.id + ': its own ultimate was not used');
     }
   }
+});
+
+// FOLDING SPACE, theatrical (the owner, 2026-11-22: "make it a bit more theatrical like the world is getting
+// pulled towards you"). Nothing jumps in one frame any more: the world is drawn past for about half a second.
+test('the fold draws the world past you over half a second and sets you down where you looked', async () => {
+  const { TIMEPOWERS } = await import('../src/core/powers.js');
+  const R = 4000;
+  const p = new Powers(), sim = fakeSim();
+  while (p.element !== 2) p.nextElement();
+  p.pick(0);
+  assert.equal(p.list[0].id, 'fold');
+  const start = { ...sim.ex.p };
+  p.tapOnce = true; step(p, sim, 2);
+  assert.ok(p.fold, 'no fold began');
+  // it does NOT arrive at once: a few frames in it is a little way along, not at the far end
+  const far = { ...p.fold.p1 };
+  step(p, sim, 3);
+  const d0 = Math.hypot(sim.ex.p.x - start.x, sim.ex.p.y - start.y, sim.ex.p.z - start.z);
+  const full = Math.hypot(far.x - start.x, far.y - start.y, far.z - start.z);
+  assert.ok(full > 40, 'a fold should carry you a long way: ' + full.toFixed(0) + ' m');
+  assert.ok(d0 > 0 && d0 < full * 0.75, 'the world was not drawn past, it jumped: ' + d0.toFixed(1) + ' of ' + full.toFixed(0));
+  // the air pours INWARD along the way while it runs (a gust from the far end back to the feet)
+  assert.ok(p.winds.count > 0, 'nothing pours in with the world');
+  // and by the end of its half second it is standing there, and the fold is over
+  step(p, sim, Math.ceil(TIMEPOWERS.foldTime * 60) + 4);
+  assert.equal(p.fold, null, 'the fold never ended');
+  const land = Math.hypot(sim.ex.p.x - far.x, sim.ex.p.y - far.y, sim.ex.p.z - far.z);
+  assert.ok(land < 1.5, 'it did not set you down where you looked: ' + land.toFixed(2) + ' m out');
+  assert.ok(Math.abs(Math.hypot(sim.ex.p.x, sim.ex.p.y, sim.ex.p.z) - R) < 1, 'and not on the ground');
+});
+
+// THE RIP, in the player's hand: it is a wind source of its own kind, so the world answers it with nothing added.
+test('the rip tears open a wind source that reaches tens of metres, and closes by itself', async () => {
+  const { TIMEPOWERS } = await import('../src/core/powers.js');
+  const { KIND } = await import('../src/physics/powers.js');
+  const p = new Powers(), sim = fakeSim();
+  while (p.element !== 2) p.nextElement();
+  p.pick(1);
+  assert.equal(p.list[1].id, 'rip');
+  p.tapOnce = true; step(p, sim, 2);
+  assert.equal(p.winds.count, 1, 'no rip was torn');
+  const s = p.winds[0];
+  step(p, sim, 90);                                 // it tears open over about a second (TIMEPOWER ripFade)
+  assert.equal(s.kind, KIND.rip);
+  assert.ok(Math.abs(s.radius - TIMEPOWERS.ripReach) < 1, 'the rip reaches ' + s.radius + ' m, not ' + TIMEPOWERS.ripReach);
+  assert.ok(s.radius > 40, 'a long way is the whole point of it');
+  // the painter is handed it on the time list, because a rip lives in the WIND list which the painter never sees
+  assert.ok(p.times.rips && p.times.rips.length === 1, 'the painter was not handed the rip');
+  // held to the full it is far bigger
+  const q = new Powers(), sim2 = fakeSim();
+  while (q.element !== 2) q.nextElement();
+  q.pick(1);
+  q.down = true; step(q, sim2, 40, 0.2); q.down = false; step(q, sim2, 3);
+  assert.ok(q.winds.count >= 1 && q.winds[0].radius > TIMEPOWERS.ripReach * 1.5,
+    'held to the full the rip is no bigger: ' + (q.winds[0] && q.winds[0].radius));
+  // and it is not held open: it closes
+  step(p, sim, 60 * 9);
+  assert.equal(p.winds.count, 0, 'a rip outlived its life');
+  assert.equal(p.times.rips.length, 0, 'and the painter is still being handed it');
 });

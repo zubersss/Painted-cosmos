@@ -47,13 +47,13 @@ export function createWorld(scene) {
   // (the oil look: leaves falling through the air of an autumn wood, leaffall.js)
   const leafFall = LOOK.oil ? makeLeafFall(null) : null;
   if (leafFall) scene.add(leafFall.mesh);
-  // (the powers, space and time: the bubble of a slowed, hastened or stopped place, and the knot tied in time.
+  // (the powers, space and time: the bubble of a stopped place, and the rip torn open in it.
   //  Behind BOTH flags, as the fire's own paint is, so the game without the powers holds not one instruction of
   //  it and the watercolour game cannot see it at all. world/timefx.js.)
   const timeFx = LOOK.oil && MODE.powers ? makeTimeFx(null) : null;
   // (NOT a glaze: the bubble is laid in MARKS with gaps between them, in the scene pass, the same path the leaves
   //  in the air take -- see world/timefx.js. It was built as a glaze first and was invisible for it.)
-  if (timeFx) { scene.add(timeFx.mesh); scene.add(timeFx.knot); }
+  if (timeFx) { scene.add(timeFx.mesh); scene.add(timeFx.rip); }
 
   const sun = new THREE.Object3D();
   sun.name = 'pc-sun';
@@ -137,7 +137,13 @@ export function createWorld(scene) {
     try { if (typeof process !== 'undefined' && process.env && process.env.PC_LEAD != null && isFinite(+process.env.PC_LEAD)) v = Math.max(0, Math.min(8, +process.env.PC_LEAD)); } catch { /* not node */ }
     return v;
   })();
-  const LEAD_MAX = 900, LEAD_MIN = 14, LEAD_SMOOTH = 0.35, LEAD_CAP = 400;
+  // (2026-11-22, THE OWNER: "I want things far away to be loaded in before I even get there".) LEAD_MIN was 14
+  // m/s -- a flying speed -- so a player ON FOOT had no look-ahead at all and the world was built round where
+  // they already stood, evenly in every direction, half of it behind them. It is 1.2 m/s now, which is a slow
+  // walk, and the lead is never SHORTER than LEAD_NEAR metres, because 2.6 seconds at walking pace is ten metres
+  // and ten metres is nothing. The work is the same work: it is the ORDER that changes, and what is in front is
+  // built before what is behind.
+  const LEAD_MAX = 900, LEAD_MIN = 1.2, LEAD_NEAR = 55, LEAD_SMOOTH = 0.35, LEAD_CAP = 400;
   // `?skystroke=` : how strongly EVERY world's sky is laid in brush strokes, over whatever its own look asks for
   // (0 none, 1 as the ice worlds have it). null: each world's own. For looking at it; the worlds' own numbers are
   // in data/looks/<world>.js.
@@ -388,7 +394,7 @@ export function createWorld(scene) {
       st.camWas.copy(st.camLocal);
       const spd = st.camVel.length();
       st.leadOn = LEAD_T > 0 && spd > LEAD_MIN;
-      if (st.leadOn) st.lead.copy(st.camVel).multiplyScalar(Math.min(LEAD_T, LEAD_MAX / spd)).add(st.camLocal);
+      if (st.leadOn) st.lead.copy(st.camVel).multiplyScalar(Math.min(Math.max(LEAD_T, LEAD_NEAR / spd), LEAD_MAX / spd)).add(st.camLocal);
       if (MODE.powers && st === active) setParted(st);      // (the powers, move water)
       // (the powers, fire: which few of the record's scorch marks the ground paints, for the world the eye is on.
       //  Once a frame, before the ground is drawn, exactly as the water's channel above.)
@@ -649,11 +655,13 @@ export function createWorld(scene) {
       OIL.uAuroraK.value = aur * (1 - space01);
       // (leaves in the air of an autumn wood, while the eye is among the trees: none from the ship above them)
       if (leafFall) leafFall.update(cameraPos, active.root, _camL, bu, fall * (1 - space01) * (1 - THREE.MathUtils.smoothstep(camR - (here.radius || body.radius), 18, 40)));
-      // (the powers, space and time: the bubble of a slowed, hastened or stopped place, and the knot tied in
+      // (the powers, space and time: the bubble of a stopped place, and the rip torn open in
       //  time. The list is the player's own, handed to the physics on the frame and kept on its particle system
       //  beside the fires -- world/timefx.js, physics/times.js.)
-      if (timeFx) timeFx.update(cameraPos, active.root, _camL, bu,
-        physics && physics.particles && physics.particles.system ? physics.particles.system.times : null, active.id);
+      if (timeFx) {
+        const psys = physics && physics.particles && physics.particles.system ? physics.particles.system : null;
+        timeFx.update(cameraPos, active.root, _camL, bu, psys ? psys.times : null, active.id, psys ? psys.rips : null);
+      }
       skyU.uSkyHorizon.value.copy(tmpKey.horizon);
       skyU.uHaze.value.copy(tmpKey.haze);
       skyU.uCloudShade.value.copy(tmpKey.cloudShade);
@@ -874,7 +882,15 @@ export function createWorld(scene) {
     // Force the weather in the picture (gallery, tests): PHYSICS' eleven sky numbers, or null
     // to go back to what PHYSICS (or PILOT's setMood.sky) says.
     setWeather(sky) { WX.forced = sky ? Object.assign({ cloud: 0, overcast: 0, haze: 1, fog: 0, dust: 0, wet: 0, snow: 0, rain: 0, snowfall: 0, storm: 0, flash: 0 }, sky) : null; },
-    getStats() { const st = state.get(lastActive); return st ? { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy } : null; },
+    getStats(p, r) {
+      const st = state.get(lastActive);
+      if (!st) return null;
+      // (the plants as well as the ground: a world can keep every patch of its ground and still have the WOOD
+      //  arrive late, which is what a player sees. world/flora.js standing(), walked only when asked.)
+      const f = st.flora ? st.flora.standing(p, r) : { cells: 0, meshes: 0 };
+      return { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy,
+        cells: f.cells, meshes: f.meshes, floraQueue: st.flora ? st.flora.busy : 0 };
+    },
     sky,
   };
 }

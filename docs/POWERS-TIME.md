@@ -1,5 +1,28 @@
 # THE THIRD ELEMENT: SPACE AND TIME
 
+> ## IT IS **FOUR** POWERS, NOT TWELVE (the owner, 22 Nov, the same day)
+>
+> *"to many space and time abilities cut them down into folding space should be one of them but make it a bit
+> more theatrical like the world is getting pulled towards you the 4 should be overly powerful abilities like a
+> rip in space time that sucks everything in a long ways in"*
+>
+> **THE FOUR, in the order of the keys 1 to 4:**
+>
+> | key | power | what it is |
+> | --- | --- | --- |
+> | 1 | **fold space** | the world is DRAWN PAST YOU for half a second and you are standing a hundred metres on |
+> | 2 | **the rip** | a tear torn open where you look that draws everything in from fifty-five metres, and a hundred and twenty held to the full |
+> | 3 | **still the moment** | everything inside a sphere stops, and stays stopped after you walk away |
+> | 4 | **the turning year** | the season of the whole world, turned by hand |
+>
+> **CUT, with their code:** slow, haste, unmake, the sun's hand, the knot, and the four that were never built
+> (the door, the drawn eye, the lens, the long mile). They are in the history at v31 and any of them can come
+> back in a line. **The rule it leaves, for every element: a short list of powers that each feel enormous beats
+> a long list of small ones.**
+>
+> Everything below this line is the FIRST design, of twelve, kept for its ideas and for the four that survived.
+> Where it says "the twelve", read "the four".
+
 The owner, 2026-11-22: *"start working on the 3rd ability space and time manipulation give me at least 10 powers
 for that one and they should all be unique and powerful and they should also look really good in the game"*.
 
@@ -167,32 +190,24 @@ camera's bob and the physics' own steps stay as they are.
 
 ---
 
-## What is built so far
+## What is built, after the cut of 22 November
 
 | | power | key | built |
 | --- | --- | --- | --- |
-| 1 | slow | 1 | **yes** — a real time field (`src/physics/times.js`), read by every loose grain and every patch of fire |
-| 2 | haste | 2 | **yes** — the same field above 1 |
-| 3 | still the moment | 3 | **yes** — rate 0, and it outlives the hand that cast it |
-| 4 | unmake | 4 | **yes** — the records' own healing run through at a place |
-| 5 | the turning year | 5 | **yes** — `SEASON.t` in the hand, and it turns round at either end of the year |
-| 6 | the sun's hand | 6 | **yes** — the hour dragged across the sky |
-| 7 | the knot | 7 | **yes** — tie it, then pull it from anywhere on the world |
-| 8 | the fold | 8 | **yes** — a step of as far as the aim reaches |
-| 9 | the door | 9 | not yet — it needs the scene drawn a second time from the other mouth |
-| 10 | the drawn eye | 0 | not yet — the eye must be untied from the explorer |
-| 11 | the lens | - | not yet — the door's own machinery with a narrow camera |
-| 12 | the long mile | = | not yet |
+| 1 | fold space | 1 | **yes, and theatrical** — the world is drawn past you over 0.55 s (`TIMEPOWERS.foldTime`), fast at the first instant and settling at the end, with the air pouring inward along the way. About a hundred metres, which is 180 m/s: everything near enough to see goes by |
+| 2 | the rip | 2 | **yes** — a wind source of its own kind (`physics/powers.js` `KIND.rip`), 55 m of reach and 120 held to the full, at full strength out to 62 per cent of it; the trees inside half of it are pulled over INWARD; drawn as a tear with a torn lip and the air running into it (`world/timefx.js`) |
+| 3 | still the moment | 3 | **yes** — rate 0, and it outlives the hand that cast it. 14 m at the smallest and 46 m held to the full, where it used to be 7 m and 20 |
+| 4 | the turning year | 4 | **yes** — `SEASON.t` in the hand, turning round at either end of the year |
 
-**What is NOT yet done for the eight that are built: their own pictures.** The time field really runs — a leaf
-inside a slowed bubble drifts while the one beside it falls, and a fire inside a stopped one stands still — but
-the RIM of a bubble is not drawn yet, and nor is the tunnel of the fold or the knot's own standing light. Those
-are the painter's next piece of work on this element, and until they are done the powers are *felt* and not
-*seen*. The project's own rule: built is not seen.
+**SEEN, not only built:** the rip was photographed in the gallery over the owner's own river
+(`gallery.html?...&rip=1&physics=1&powers=1&look=oil`), a black lens-shaped tear about 8 m tall on the bank with
+a violet-white torn lip, and the spray off the water drawn in towards it. The fold is held by a test (it does not
+jump, it lands where you looked, it ends) but **has not been seen in motion** — nothing on this machine can show
+half a second of motion, and that is the owner's to judge.
 
-(The table is filled in as each is finished and SEEN. "Built" is not "seen": the project's own rule.)
-
----
+**What the cut took away:** the bubble of a SLOWED or HASTENED place is no longer castable, though the machinery
+(`physics/times.js`, a rate per place that every loose grain and every patch of fire reads) is still there and is
+what "still the moment" is built on. The gallery can still show all three: `?bubble=slow|haste|still`.
 
 ## v31, 22 Nov: the freeze, and why nine abilities killed the game
 

@@ -23,8 +23,10 @@ export const TIMEPOWER = Object.freeze({
   slowRate: 0.2,           // how fast the world runs inside a SLOW bubble
   hasteRate: 4.0,          // ... inside a HASTE one
   stillRate: 0.0,          // ... and inside a STILL one
-  radius: 7,               // m: a bubble's own radius at size 1
-  ultRadius: 20,           // m: and held to the full
+  // (2026-11-22: space and time was cut to FOUR OVERLY POWERFUL abilities, and the stopped place is one of them.
+  //  It was 7 m -- a bush. It is 14 m now at the smallest, and 46 m held to the full, which is a wood.)
+  radius: 14,              // m: a bubble's own radius at size 1
+  ultRadius: 46,           // m: and held to the full
   rim: 0.22,               // of the radius: the band at the edge where the rate eases back to the world's own,
                            // so nothing crosses a hard line and jumps
   slowLife: 6,             // s a slow or haste bubble lasts once let go
@@ -74,7 +76,9 @@ export function castTime(T, bodyId, p, rate, size = 1, life = TIMEPOWER.slowLife
   s.live = true; s.bodyId = bodyId;
   s.px = p.x; s.py = p.y; s.pz = p.z;
   s.placed = false;
-  s.radius = (k > 1 ? TIMEPOWER.ultRadius : TIMEPOWER.radius) * (k > 1 ? 1 : 1);
+  // (it used to be a STEP: the ordinary radius or the ultimate's, and nothing between, so growing the circle did
+  //  nothing at all until the very top. It grows with the circle now, up to the ultimate's.)
+  s.radius = Math.min(TIMEPOWER.ultRadius, TIMEPOWER.radius * k);
   s.rate = Math.max(TIMEPOWER.rateMin, Math.min(TIMEPOWER.rateMax, rate));
   s.size = k; s.age = 0; s.life = life; s.fade = TIMEPOWER.fade; s.held = held; s.strength = 0;
   s.id = nextId++;

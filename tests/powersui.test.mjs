@@ -192,7 +192,7 @@ test('ways out of the ring that change nothing: back onto the chip, out to the r
   // (2026-11-22: THREE elements, so the flick walks wind -> fire -> space and time -> wind)
   flick(ui, mid, 0);
   assert.equal(powers.element, 2, 'a third flick reaches space and time');
-  assert.equal(powers.list[powers.ability].id, 'slow', 'and the hand holds its first ability');
+  assert.equal(powers.list[powers.ability].id, 'fold', 'and the hand holds its first ability');
   flick(ui, mid, 0);
   assert.equal(powers.element, 0, 'and again to come back to the wind');
   powers.pick(3);
@@ -317,10 +317,10 @@ test('the element changed by a key or the pad: the panel re-reads its words and 
     assert.equal(ui.word.textContent.indexOf(name, 1), -1, 'the element is named twice over: ' + ui.word.textContent);
     assert.ok(ui.fan.classList.contains('pc-open'), name + ': the panel shows itself, so a key player sees the swap');
   }
-  // and twelve abilities get twelve tiles, not seven
+  // and the four of space and time get four tiles, not the wind's seven
   powers.nextElement(); powers.nextElement(); frame(powers, sim);
-  assert.equal(powers.list.length, 12);
-  assert.equal(words().length, 12, 'twelve tiles for the twelve of space and time');
+  assert.equal(powers.list.length, 4);
+  assert.equal(words().length, 4, 'four tiles for the four of space and time');
 });
 
 // (2026-11-22, seen in the real game) THE ELEMENT CHANGED WHILE THE THUMB WAS HOLDING THE PANEL OPEN. The words
@@ -330,18 +330,19 @@ test('the element changes while the panel is open: every tile of the new list is
   const { powers, ui, sim, mid } = fitted();
   ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });   // the thumb holds it open
   assert.ok(ui.fan.classList.contains('pc-open'));
-  powers.nextElement(); powers.nextElement(); frame(powers, sim);    // ... and a key puts space and time in hand
-  assert.equal(powers.list.length, 12);
+  powers.nextElement(); frame(powers, sim);                          // ... and a key puts the fire's nine in hand
+  assert.equal(powers.list.length, 9);
   const shown = ui.tabs.filter((t) => t.style.display !== 'none');
-  assert.equal(shown.length, 12);
+  assert.equal(shown.length, 9);
   for (let i = 0; i < shown.length; i++) {
     assert.ok(parseFloat(shown[i].style.width) >= 44, 'tile ' + i + ' has no width: ' + shown[i].style.width);
     assert.ok(parseFloat(shown[i].style.height) >= 24, 'tile ' + i + ' has no height: ' + shown[i].style.height);
     assert.ok(/translate\(calc\(-50% \+ -\d/.test(shown[i].style.transform), 'tile ' + i + ' is not placed: ' + shown[i].style.transform);
   }
   // and the thumb can reach the last of them straight away
-  const p11 = ringPlaces(undefined, 12)[11];
-  ui.swap.send('pointermove', { clientX: mid.x + p11.x, clientY: mid.y + p11.y });
-  ui.swap.send('pointerup', { clientX: mid.x + p11.x, clientY: mid.y + p11.y });
-  assert.equal(powers.list[powers.ability].id, powers.list[11].id, 'the twelfth could not be chosen');
+  const last = powers.list.length - 1;
+  const pl = ringPlaces(undefined, powers.list.length)[last];
+  ui.swap.send('pointermove', { clientX: mid.x + pl.x, clientY: mid.y + pl.y });
+  ui.swap.send('pointerup', { clientX: mid.x + pl.x, clientY: mid.y + pl.y });
+  assert.equal(powers.ability, last, 'the last of them could not be chosen');
 });
