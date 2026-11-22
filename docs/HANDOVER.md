@@ -463,6 +463,31 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**v32 (22 Nov) IS READY ON `look-proto`: SPACE AND TIME IS FOUR OVERLY POWERFUL ABILITIES, AND THE WORLD IS
+BUILT AHEAD OF A WALKER.**
+The owner, 22 Nov: *"to many space and time abilities cut them down into folding space should be one of them but
+make it a bit more theatrical like the world is getting pulled towards you the 4 should be overly powerful
+abilities like a rip in space time that sucks everything in a long ways in but also keep working on the
+performance and look of the game I want things far away to be loaded in before I even get there."*
+
+- **THE FOUR:** `fold space`, `the rip`, `still the moment`, `the turning year`. Cut with their code: slow,
+  haste, unmake, the sun's hand, the knot, and the four never built. **The rule it leaves, for every element: a
+  short list of powers that each feel enormous beats a long list of small ones.**
+- **THE FOLD** draws the world past you for 0.55 s instead of stepping you (`TIMEPOWERS.foldTime`), with a gust
+  from the far end back to your feet so the leaves stream AT you. Held by a test; **not seen in motion.**
+- **THE RIP** is a wind source of its own kind (`physics/powers.js` `KIND.rip`): 55 m of reach, 120 held to the
+  full, at full strength out to 62 per cent of it, the trees inside half of it pulled over INWARD. **SEEN** over
+  the owner's river. Drawn in `world/timefx.js` (the knot's buffer, which the cut freed).
+- **STILL THE MOMENT** is 14 m at the smallest and 46 m at the full, where it was 7 and 20, and the radius grows
+  WITH the circle instead of stepping only at the very top.
+- **THE WALKER'S WORLD:** `LEAD_MIN` was 14 m/s (a flying speed) so on foot there was no look-ahead at all. It is
+  1.2 m/s now and the lead is never nearer than 55 m. MEASURED, off and on: 4 m/s, the wood 3 s ahead 44.3 ->
+  48.4 cells standing, queue 7.8 -> 1.9; 9 m/s, 42.0 -> 47.9, queue 33.5 -> 17.2; the cost is 3 per cent more
+  cells held. `src/world/walk.test.mjs`.
+- **A TRAP MENDED AND WORTH KEEPING:** a shader that fails to compile shows `material.program === false`. It is
+  NOT a misleading signal, whatever the v30 note says -- it was right both times it was doubted.
+
+
 **`main` IS AT v31 (22 Nov), pull request #31 merged: THE FREEZE IS MENDED AND THE POWERS ARE PICKED FROM A LIST OF WORDS.**
 The owner, 22 Nov: *"The spacetime powers freeze the game everytime I open it find out why and fix it also change
 the ui for the powers I want it to be simpler to pick stuff and for it to still be easy to understand."*

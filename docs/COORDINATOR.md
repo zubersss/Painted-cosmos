@@ -2949,3 +2949,31 @@ same fault the element button was built to mend. It also asked the thumb to lear
   kinds of power, each the biggest of its kind. **CUT:** slow, haste, unmake, the sun's hand, the knot, and the
   four that were never built (the door, the drawn eye, the lens, the long mile). Their code goes with them; it is
   in the history at v31 and any one of them can come back.
+
+- **DONE at v32 (`look-proto`), all four parts of the instruction:**
+  1. **FOUR, not twelve.** `fold space`, `the rip`, `still the moment`, `the turning year`. The other eight are
+     gone with their code (and the knot's drawing with them). Tests hold the list and that nothing cut is still
+     reachable.
+  2. **THE FOLD IS THEATRICAL.** It does not step you to where you look any more: the world is DRAWN PAST YOU
+     for 0.55 s, fast at the first instant and settling at the end, while a gust cast from the far end back to
+     your own feet pours the leaves and the dust AT you. A hundred metres in half a second is 180 m/s. A test
+     holds that it does not jump, that it lands where you looked, and that it ends. **NOT SEEN IN MOTION** --
+     nothing here can show half a second of motion, and the owner is the only one who can judge it.
+  3. **THE RIP** is a wind source of its own kind (`KIND.rip`), so everything that already answers the wind
+     answers it: 55 m of reach, 120 held to the full, at FULL STRENGTH out to 62 per cent of it (which is what
+     makes it feel like being taken rather than blown), and the trees inside half of it pulled over INWARD.
+     **SEEN** in the gallery over the owner's own river: a black lens-shaped tear with a violet-white torn lip,
+     the spray off the water drawn into it. Three stills on the way: a twenty-metre column, a feathered ribbon,
+     then a tear.
+  4. **THE WORLD IS BUILT AHEAD OF A WALKER.** The look-ahead of 18 Nov only worked above 14 m/s -- a flying
+     speed -- so on foot the world was built evenly in every direction, half of it behind the player. MEASURED
+     on this machine, the walking lead off and on: at 4 m/s the wood three seconds ahead goes from 44.3 to 48.4
+     cells standing (least 41 -> 42) and the build queue from 7.8 to 1.9; at a 9 m/s sprint from 42.0 to 47.9
+     (least 35 -> 43) and 33.5 to 17.2. The whole cost is 3 per cent more cells held. `src/world/walk.test.mjs`
+     keeps it, beside the flight's own `rush.test.mjs`.
+- **TWO FAULTS WORTH KEEPING** (both found by looking, neither by reasoning): the rip's first tear was built
+  ENTIRELY UNDERGROUND, because everything in this painter is eye-relative and `normalize(theThing)` is the way
+  from the EYE to it, not up; and its shader would not compile at all, because `QUADS` is a JavaScript number and
+  was used bare inside the GLSL. **`material.program` reads false for a material that failed to compile** -- that
+  is the one honest signal this project has had out of it, and the note of 2026-11-22 calling it misleading was
+  wrong about this case.
