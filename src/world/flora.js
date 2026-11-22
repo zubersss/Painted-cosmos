@@ -264,6 +264,24 @@ export class Flora {
   // (still busy while a wash is being laid: a frame taken when this reaches 0 shows nothing half arrived)
   get busy() { return this.queue.length + (this.group.visible ? this.held.length + (this.washNow - this.lastLaid < WASH_T + 0.1 ? 1 : 0) : 0); }
 
+  // HOW MUCH OF THE WOOD IS STANDING: cells built and not thrown away, and the meshes of them being drawn. For
+  // measuring whether the plants keep up with a player who is moving (the owner, 2026-11-22: "I want things far
+  // away to be loaded in before I even get there"). Walked only when something asks: it is for harnesses and the
+  // read-out, not for the frame.
+  standing(p, r) {
+    let cells = 0, meshes = 0;
+    const r2 = r != null ? r * r : 0;
+    for (const map of [this.treeChunks, this.farChunks, this.underChunks, this.under2Chunks]) {
+      for (const ch of map.values()) {
+        if (!ch.built || ch.dead) continue;
+        if (p && ch.origin.distanceToSquared(p) > r2) continue;    // only the cells about a place (a harness asking
+        cells++;                                                   // whether the ground AHEAD is standing yet)
+        for (const m of ch.meshes) if (m.visible) meshes++;
+      }
+    }
+    return { cells, meshes };
+  }
+
   // An InstancedMesh with room for `cap` instances that shares the kit geometry's buffers.
   _instanced(chunk, geo, mat, cap, lod, far) {
     const g = new THREE.BufferGeometry();

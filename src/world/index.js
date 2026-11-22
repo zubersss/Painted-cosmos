@@ -137,7 +137,13 @@ export function createWorld(scene) {
     try { if (typeof process !== 'undefined' && process.env && process.env.PC_LEAD != null && isFinite(+process.env.PC_LEAD)) v = Math.max(0, Math.min(8, +process.env.PC_LEAD)); } catch { /* not node */ }
     return v;
   })();
-  const LEAD_MAX = 900, LEAD_MIN = 14, LEAD_SMOOTH = 0.35, LEAD_CAP = 400;
+  // (2026-11-22, THE OWNER: "I want things far away to be loaded in before I even get there".) LEAD_MIN was 14
+  // m/s -- a flying speed -- so a player ON FOOT had no look-ahead at all and the world was built round where
+  // they already stood, evenly in every direction, half of it behind them. It is 1.2 m/s now, which is a slow
+  // walk, and the lead is never SHORTER than LEAD_NEAR metres, because 2.6 seconds at walking pace is ten metres
+  // and ten metres is nothing. The work is the same work: it is the ORDER that changes, and what is in front is
+  // built before what is behind.
+  const LEAD_MAX = 900, LEAD_MIN = 1.2, LEAD_NEAR = 55, LEAD_SMOOTH = 0.35, LEAD_CAP = 400;
   // `?skystroke=` : how strongly EVERY world's sky is laid in brush strokes, over whatever its own look asks for
   // (0 none, 1 as the ice worlds have it). null: each world's own. For looking at it; the worlds' own numbers are
   // in data/looks/<world>.js.
@@ -388,7 +394,7 @@ export function createWorld(scene) {
       st.camWas.copy(st.camLocal);
       const spd = st.camVel.length();
       st.leadOn = LEAD_T > 0 && spd > LEAD_MIN;
-      if (st.leadOn) st.lead.copy(st.camVel).multiplyScalar(Math.min(LEAD_T, LEAD_MAX / spd)).add(st.camLocal);
+      if (st.leadOn) st.lead.copy(st.camVel).multiplyScalar(Math.min(Math.max(LEAD_T, LEAD_NEAR / spd), LEAD_MAX / spd)).add(st.camLocal);
       if (MODE.powers && st === active) setParted(st);      // (the powers, move water)
       // (the powers, fire: which few of the record's scorch marks the ground paints, for the world the eye is on.
       //  Once a frame, before the ground is drawn, exactly as the water's channel above.)
@@ -876,7 +882,15 @@ export function createWorld(scene) {
     // Force the weather in the picture (gallery, tests): PHYSICS' eleven sky numbers, or null
     // to go back to what PHYSICS (or PILOT's setMood.sky) says.
     setWeather(sky) { WX.forced = sky ? Object.assign({ cloud: 0, overcast: 0, haze: 1, fog: 0, dust: 0, wet: 0, snow: 0, rain: 0, snowfall: 0, storm: 0, flash: 0 }, sky) : null; },
-    getStats() { const st = state.get(lastActive); return st ? { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy } : null; },
+    getStats(p, r) {
+      const st = state.get(lastActive);
+      if (!st) return null;
+      // (the plants as well as the ground: a world can keep every patch of its ground and still have the WOOD
+      //  arrive late, which is what a player sees. world/flora.js standing(), walked only when asked.)
+      const f = st.flora ? st.flora.standing(p, r) : { cells: 0, meshes: 0 };
+      return { patches: st.terrain.patchCount, visible: st.terrain.visible.length, queue: st.terrain.busy,
+        cells: f.cells, meshes: f.meshes, floraQueue: st.flora ? st.flora.busy : 0 };
+    },
     sky,
   };
 }
