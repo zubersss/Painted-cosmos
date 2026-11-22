@@ -19,7 +19,7 @@ import { makeRing, makeCloudShell } from './orbit.js';
 import { isArrival } from './arrival.js';
 import { G, GLAZES, MOTION, makeBodyUniforms, SHEET, WX, PHYSW, QUALITY, FRAME_HOOKS, skyNow, syncPhysFlora, syncPhysWater , SHADOW, LOOK, OIL, syncBurnt } from '../render/shared.js';
 import { makeLeafFall } from './leaffall.js';
-import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE } from '../render/kitmat.js';
+import { makeKitMaterial, biomeInks, KIT_INK, KIT_PALETTE, FIRE_MATS } from '../render/kitmat.js';
 import { MODE } from '../data/mode.js';
 import { defaultBodyUniforms, makeWashMaterial, makeNearMaterial, syncFireGlow } from '../render/materials.js';
 
@@ -213,7 +213,11 @@ export function createWorld(scene) {
       draw.snow = { ...D.snow, size: 0.07, minPx: 3.5, maxPx: 6.5, varySize: 0.5 };
       // (leaves in a gust were a handful of one-pixel specks: thin tumbling marks a hand long, never under 10 px;
       // spray a short fleck, half as long as the rain's stroke)
-      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10, inked: MODE.powers, ...(MODE.powers ? { wisp: 0.11, wispMin: 0.8, wispMax: 2.4, wispWide: 0.3 } : null) };      // (inked: the powers' pale strokes of air, physics/three/kits.js)
+      // (inked: the powers' pale strokes of air, physics/three/kits.js. fire*/smoke*: a TONGUE and a PUFF are laid
+      //  wider and longer than a strand of air -- at the strand's own width a tongue was 8 cm across and 80 cm
+      //  long, a blade of grass, and a burning bank was a field of them: seen 2026-11-22, three/expand.js.)
+      draw.leaves = { ...D.leaves, size: 0.27, minPx: 10, inked: MODE.powers, ...(MODE.powers ? { wisp: 0.11, wispMin: 0.8, wispMax: 2.4, wispWide: 0.3,
+        fireMat: FIRE_MATS.flame, fireWide: 1.5, fireLong: 1.25, smokeMat: FIRE_MATS.smoke, smokeWide: 2.2, smokeLong: 1.1 } : null) };
       // (spray as flecks of 4 px was a glitter over the surf: a soft pale blot half a metre wide, never under 14 px,
       // so that the drops off a crest run together into a wisp, and a storm's spray is told from its rain)
       draw.spray = { ...D.spray, width: 0.5, exposure: 0.05, maxLen: 1.0, minPx: 14 };

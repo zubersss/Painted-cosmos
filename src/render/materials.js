@@ -123,8 +123,16 @@ export function syncFireGlow(fires, bodyId, cam) {
   if (!best) { K.x = 0; return; }
   // how far the light carries: a campfire two metres wide lights the ground about seven metres round it, a whole
   // burning wood about fourteen, and never more than that (a pool wider than the eye can see is no pool at all)
-  A.set(best.px, best.py, best.pz, Math.min(14, 1.6 + 1.6 * best.radius + 1.2 * Math.sqrt(fire)));
-  K.x = Math.min(1, best.heat);
+  // AND IT FLICKERS (the owner, 2026-11-22: "change up the fire animation it doesnt feel violent enough"). A fire
+  // that lit the ground with a steady lamp was the quietest thing about it: the tongues moved and the light did
+  // not. Three beats that do not divide into each other -- a tremble, a swing and a slow surge where the whole
+  // fire leaps -- so the pattern does not repeat inside the time anyone watches it. The POOL breathes with it as
+  // well as the light, because a fire's reach grows when it leaps. One multiply a frame; nothing in any shader.
+  const t = fires.time || 0;
+  const flick = 0.86 + 0.10 * Math.sin(t * 17.3) + 0.08 * Math.sin(t * 7.1 + 1.7) + 0.16 * Math.sin(t * 2.3 + 0.6);
+  const f01 = flick < 0.3 ? 0.3 : flick > 1.25 ? 1.25 : flick;
+  A.set(best.px, best.py, best.pz, Math.min(14, 1.6 + 1.6 * best.radius + 1.2 * Math.sqrt(fire)) * (0.90 + 0.14 * f01));
+  K.x = Math.min(1, best.heat * f01);
   K.y = best.radius;
 }
 // The light itself, in GLSL. The ground, the plants and the near strokes each take a copy of it: the three share no
