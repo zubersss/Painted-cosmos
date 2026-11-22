@@ -25,6 +25,7 @@ import { BODIES } from '../data/bodies.js';
 import { PARTICLES, EVENT, publish } from './particles.js';
 import { clamp01, smoothstep, noise3, fsin, fcos } from './util.js';
 import { snowTransport01 } from './drift.js';
+import { timeAt } from './times.js';
 import { powerWind, KIND, WINDPOWER } from './powers.js';
 
 // species: row of atmosphere.SPECIES for the fall speed.  life: [min, max] seconds.
@@ -396,7 +397,7 @@ export class Loose {
   //   disturbers (frame.disturbers), sigma (turbulence at the focus, m/s), wet01, snowDepth,
   //   dust01 (airborne dust of the weather), sandy01 (how much loose sand the wind can move),
   //   devils: [{ x, z (grid), radius, speed, up, spin, strength, height }] (features.js) or null.
-  update(dt, frame, air, near, fx, fy, fz, groundY, wx, rho, cover, bodyId, g, time, disturbers, sigma, wet01, snowDepth, devils, winds) {
+  update(dt, frame, air, near, fx, fy, fz, groundY, wx, rho, cover, bodyId, g, time, disturbers, sigma, wet01, snowDepth, devils, winds, times) {
     const P = this.P, rng = this.rng, h = dt > 0.1 ? 0.1 : dt;
     const Rr = PARTICLES.radius;
     this._T = wx ? wx.temperature : 288;
@@ -713,11 +714,14 @@ export class Loose {
     // over in a fresh heap box (half a megabyte of garbage a frame in a blizzard, measured). A method of one loop is
     // optimised whole and its lookups inlined. The arithmetic is the same, line for line.
     const blown = winds && winds.count > 0 ? winds : null;
-    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils, blown);
+    // (the powers, space and time) the places where the world runs at another pace: null while there are none,
+    // and then every grain's own step is the world's own (physics/times.js timeAt)
+    const slowed = times && times.any ? times : null;
+    for (let kk = 0; kk < LOOSE_KINDS.length; kk++) this._move(LOOSE_KINDS[kk], h, frame, air, near, fx, fz, groundY, g, sigma, devils, blown, slowed);
   }
 
   // One kind's step (see update, "motion").
-  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils, winds) {
+  _move(name, h, frame, air, near, fx, fz, groundY, g, sigma, devils, winds, times) {
     const P = this.P, Rr = PARTICLES.radius, wv = P._wv, ht = P._ht, wtx = P._wtx, wtz = P._wtz;
     const K = LOOSE[name], b = P.buffers[name];
     b.origin.x = frame.ox; b.origin.y = frame.oy; b.origin.z = frame.oz;
@@ -730,7 +734,12 @@ export class Loose {
     for (let i = 0; i < alive; i++) {
       const o = i * 3;
       let x = Pp[o], y = Pp[o + 1], z = Pp[o + 2];
-      const age = AG[i] + h;
+      // (the powers, space and time) HOW FAST THE WORLD RUNS WHERE THIS GRAIN IS. 1 everywhere the player has
+      // cast nothing, and with no list at all this is one comparison for the whole crowd (physics/times.js).
+      // It scales the grain's OWN step, so a leaf inside a slowed bubble drifts while the one beside it falls,
+      // and inside a stopped one it hangs in the air and stays there.
+      const hg = times === null ? h : h * timeAt(times, x, z);
+      const age = AG[i] + hg;
       let dead = age > LF[i] || Math.abs(x - fx) > Rr + 6 || Math.abs(z - fz) > Rr + 6;
       let vx = V[o], vy = V[o + 1], vz = V[o + 2];
       let left = LF[i] - age;                                   // what is left of its life
@@ -770,18 +779,18 @@ export class Loose {
         // the wind the explorer makes (powers.js): a gust carries it, a stilled place lets it fall, a gathered ball holds it
         if (winds && powerWind(winds, x, z, hz, _pwl)) { we = we * _pwl[3] + _pwl[0]; wn = wn * _pwl[3] + _pwl[1]; wu = wu * _pwl[3] + _pwl[2]; }
         // weight, then drag toward the air (implicit; no drag at all when vt is "infinite")
-        let rx = vx - we, ry = vy - g * h - wu, rz = vz - wn;
-        const sl = Math.sqrt(rx * rx + ry * ry + rz * rz), m = vt < 1e4 ? 1 / (1 + g / (vt * vt) * sl * h) : 1;
+        let rx = vx - we, ry = vy - g * hg - wu, rz = vz - wn;
+        const sl = Math.sqrt(rx * rx + ry * ry + rz * rz), m = vt < 1e4 ? 1 / (1 + g / (vt * vt) * sl * hg) : 1;
         rx *= m; ry *= m; rz *= m;
         vx = we + rx; vy = wu + ry; vz = wn + rz;
-        x += vx * h; y += vy * h; z += vz * h;
+        x += vx * hg; y += vy * hg; z += vz * hg;
         // (P15) a leaf turns about its long side at its slip through the air (BLOWN.leafRo): end over end, or rocking
         // (P17: own in [0, 1), so `own * k % 1` is own * k less its floor, exactly; the slip is the one just damped)
         if (TU) {
           const own = ph * 0.15915494, f7 = own * 7.31, w0 = 2 * (ro0 + roD * (f7 - Math.floor(f7))) * sl * m / (0.6 * SZ[i]), w = w0 > BLOWN.leafTurnMax ? BLOWN.leafTurnMax : w0;
           const f3 = own * 3.7, f13 = own * 13.1;
-          if (f3 - Math.floor(f3) < K.tumble) { let t = TP[i] + (f13 - Math.floor(f13) < 0.5 ? -w : w) * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = t; }
-          else { const f5 = own * 5.3; let t = TP[i] + 0.5 * w * h; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = (rk0 + rkD * (f5 - Math.floor(f5))) * fsin(t); }
+          if (f3 - Math.floor(f3) < K.tumble) { let t = TP[i] + (f13 - Math.floor(f13) < 0.5 ? -w : w) * hg; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = t; }
+          else { const f5 = own * 5.3; let t = TP[i] + 0.5 * w * hg; t -= 6.2831853 * Math.floor(t / 6.2831853); TP[i] = t; TU[i] = (rk0 + rkD * (f5 - Math.floor(f5))) * fsin(t); }
         }
         // the ground
         HG[i] = y - groundY;
@@ -806,7 +815,7 @@ export class Loose {
           } else if (K.lands) {
             // it will land first: its height over the ground, at the rate that has been closing (particles.js)
             const alt = y - gy, a0 = b._alt[i]; b._alt[i] = alt;
-            const rate = a0 < 1e8 ? b._rate[i] + ((a0 - alt) / h - b._rate[i]) * (h < 0.15 ? h / 0.15 : 1) : -vy; b._rate[i] = rate;
+            const rate = a0 < 1e8 ? b._rate[i] + ((a0 - alt) / Math.max(hg, 1e-6) - b._rate[i]) * (hg < 0.15 ? hg / 0.15 : 1) : -vy; b._rate[i] = rate;
             if (rate > 0.05) { const tl = alt / rate; if (tl < left) left = tl; }
           }
         }
