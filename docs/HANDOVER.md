@@ -432,6 +432,26 @@ These were given in chat over several days. They override `docs/BRIEF.md` where 
 
 Head rewritten 2026-11-18, evening (the morning's text and the v12 text it replaced are in the log).
 
+**`main` IS AT v29 (22 Nov), pull request #29 merged: THE THIRD ELEMENT IS SPACE AND TIME.**
+The owner, 22 Nov: "Give it cooler abilities as well the fire and also start working on the 3rd ability space and
+time manipulation give me at least 10 powers for that one". TWELVE are designed (`docs/POWERS-TIME.md`), EIGHT
+are built and do real work; the fire went from six abilities to nine.
+- **THE RULE THIS ELEMENT IS DESIGNED BY:** no combat, no way to fail, so a power over time is not a weapon --
+  every one of the twelve is a way to LOOK, to TRAVEL or to MEND, and each has a picture nothing else draws.
+- **BUILT:** slow, haste, still the moment (`src/physics/times.js`: every loose grain and every patch of fire
+  keeps the pace of the PLACE IT IS IN -- a global slow would have been one line and would not have been the
+  power); unmake (the records' own healing run through at a place); the turning year; the sun's hand; the knot
+  (tie it, pull it from anywhere); the fold (a step to where you look).
+- **NAMED, NOT BUILT:** the door, the drawn eye, the lens, the long mile. They say so when cast.
+- **NEW FIRES:** meteor (a RING of fire lit at once and a blast of air out of it), lance (a line down the view),
+  cinders (sparks let go into the wind, landing where the weather takes them).
+- **THE NEXT PIECE OF WORK ON THIS ELEMENT IS THE PICTURES.** The time field runs, but a bubble's RIM, the fold's
+  tunnel and the knot's standing light are NOT DRAWN: these eight are felt and not yet seen.
+- **TWO TRAPS:** the ability dispatch is BY ID, so two elements may not share one (a test holds it); and NO
+  DOUBLE QUOTE in a message passed to `tools/commit.sh` -- it cut this element's own commit message in half, the
+  same way a backtick breaks a shader.
+
+
 **`main` IS AT v28 (22 Nov), pull request #28 merged: THE FIRE IS A FIRE AND NOT A FIELD OF STRAWS.**
 The owner, 22 Nov: "change up the fire animation it doesnt feel violent enough". The gallery got a fire of its own
 (`?fire=N` with `?physics=1&powers=1&look=oil`) and the fire was photographed for the first time. FOUR FAULTS, all

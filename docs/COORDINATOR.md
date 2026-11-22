@@ -2807,3 +2807,53 @@ worth running after every shader edit.
   Then the fire itself: tongues fatter, more of them, thrown harder and higher; a WHIP with two beats instead of
   one slow sine; the tip torn in two sizes; **each patch SURGES on its own beat** so a wide fire boils instead of
   breathing as one lamp; and **the light flickers** (it was a steady lamp while the tongues moved).
+
+### 2026-11-22 OWNER: cooler fire abilities, and THE THIRD ELEMENT — SPACE AND TIME
+- OWNER (verbatim): "Give it cooler abilities as well the fire and also start working on the 3rd ability space and time manipulation give me at least 10 powers for that one and they should all be unique and powerful and they should also look really good in the game"
+- TWO ASKS:
+  1. **MORE AND COOLER FIRE ABILITIES** on top of the six built on 19 Nov (kindle, ember, bellows, wall, snuff,
+     fire whirl).
+  2. **THE THIRD ELEMENT IS SPACE AND TIME** -- not water or earth, which `docs/POWERS.md` had pencilled in as
+     three and four. At least TEN powers, each unique, each powerful, and all of them good to look at. The design
+     is `docs/POWERS-TIME.md`; the element is the third in the hand (the G key, the touch fan's element button).
+- **THE RULE THIS ELEMENT IS DESIGNED BY:** this is a game with no combat and no way to fail, so a power over time
+  is not a weapon -- it is a way to LOOK, to TRAVEL and to MEND. Every one of the twelve does one of those three,
+  and every one of them has a picture of its own that nothing else in the game draws.
+
+#### What was built, 22 Nov (same session)
+
+**THE THIRD ELEMENT IS IN THE HAND.** `docs/POWERS-TIME.md` holds the twelve and what each is for; the element
+key (G, and the touch fan's element button) now walks THREE, from one table so a fourth is a line and not a
+rewrite. Twelve abilities needed twelve keys (1..9, 0, -, =) and twelve wedges on the fan, which had been built
+for the wind's seven and showed seven of the twelve.
+
+**EIGHT OF THE TWELVE DO REAL WORK,** every one of them through the world's own machinery:
+- **slow / haste / still the moment** — `src/physics/times.js`, a short list of zones the same shape as the
+  wind's. **Every loose grain and every patch of fire keeps the pace of the PLACE IT IS IN**, so a leaf inside a
+  slowed bubble drifts while the one beside it falls, and a fire inside a stopped one stands as a sculpture and
+  does not burn its fuel away. A global slow would have been one line and would not have been the power: the
+  picture of this element is that time is different in one place, and that only exists if every grain asks where
+  it is. With nothing cast it is one comparison.
+- **unmake** — the records' own healing (`data/burnt.js`, `data/felled.js`) run through at a place. The honest
+  form of a rewind: the same machinery that would have mended it in an hour.
+- **the turning year** — `SEASON.t` in the hand, turning round at either end of the year.
+- **the sun's hand** — the hour dragged across the sky.
+- **the knot** — one key, two things: tie it where you stand, pull it from anywhere on the world.
+- **the fold** — the ground between you and the aim folded, and you are there.
+Four are named and say so plainly when cast: the door, the drawn eye, the lens, the long mile.
+
+**AND THREE COOLER FIRES, to nine:** meteor (a RING of fire lit at once and a blast of air out of the middle, so
+the wood bends away from it), lance (a line laid DOWN the view where the wall is laid across it), and cinders (a
+handful of sparks let go into the wind, landing where the WEATHER takes them -- the one fire ability whose shape
+the wind decides).
+
+**WHAT IS NOT DONE, and must be said plainly: THE PICTURES.** The time field really runs, but a bubble's rim, the
+fold's tunnel and the knot's own standing light are not drawn. These eight are FELT and not yet SEEN. That is
+the painter's next piece of work on this element.
+
+**TWO TRAPS FOR THE NEXT SESSION:**
+1. The ability dispatch is **by id**, so two elements may not share one. `still` was the wind's and nearly became
+   space and time's as well; the time one is `freeze` with the word "still the moment", and a test now holds it.
+2. **No double quote in a message passed to `tools/commit.sh`** — the same fault as the backtick, and it cost the
+   third element's own commit message, which was cut off at the owner's first quoted word. (Backticks were the
+   lesson of 19 and 22 Nov; quotes are this one. The message is lost; the account is here and in the pull request.)
