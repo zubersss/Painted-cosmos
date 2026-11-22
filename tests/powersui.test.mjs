@@ -321,3 +321,26 @@ test('the element changed by a key or the pad: the panel re-reads its words and 
   assert.equal(powers.list.length, 12);
   assert.equal(words().length, 12, 'twelve tiles for the twelve of space and time');
 });
+
+// (2026-11-22, seen in the real game) THE ELEMENT CHANGED WHILE THE THUMB WAS HOLDING THE PANEL OPEN. The words
+// followed, but only the first seven tiles had ever been placed and sized: the other five sat in a heap on the
+// chip at no size at all, because the panel was only ever laid out as it opened.
+test('the element changes while the panel is open: every tile of the new list is placed and sized', () => {
+  const { powers, ui, sim, mid } = fitted();
+  ui.swap.send('pointerdown', { clientX: mid.x, clientY: mid.y });   // the thumb holds it open
+  assert.ok(ui.fan.classList.contains('pc-open'));
+  powers.nextElement(); powers.nextElement(); frame(powers, sim);    // ... and a key puts space and time in hand
+  assert.equal(powers.list.length, 12);
+  const shown = ui.tabs.filter((t) => t.style.display !== 'none');
+  assert.equal(shown.length, 12);
+  for (let i = 0; i < shown.length; i++) {
+    assert.ok(parseFloat(shown[i].style.width) >= 44, 'tile ' + i + ' has no width: ' + shown[i].style.width);
+    assert.ok(parseFloat(shown[i].style.height) >= 24, 'tile ' + i + ' has no height: ' + shown[i].style.height);
+    assert.ok(/translate\(calc\(-50% \+ -\d/.test(shown[i].style.transform), 'tile ' + i + ' is not placed: ' + shown[i].style.transform);
+  }
+  // and the thumb can reach the last of them straight away
+  const p11 = ringPlaces(undefined, 12)[11];
+  ui.swap.send('pointermove', { clientX: mid.x + p11.x, clientY: mid.y + p11.y });
+  ui.swap.send('pointerup', { clientX: mid.x + p11.x, clientY: mid.y + p11.y });
+  assert.equal(powers.list[powers.ability].id, powers.list[11].id, 'the twelfth could not be chosen');
+});

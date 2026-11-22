@@ -226,6 +226,11 @@ export function attachPowersUi(powers, root) {
     lastAb = powers.ability; prevAb = NA > 1 ? (powers.ability + 1) % NA : powers.ability;
     elNow = powers.element | 0;
     sayPrev();
+    // AND IF THE PANEL IS OPEN WHILE THIS HAPPENS, LAY IT OUT AGAIN. (2026-11-22, seen in the real game: with the
+    // thumb holding the chip, the element key put twelve words on the screen but only the first SEVEN had ever
+    // been given a place and a size -- the other five sat in a heap on the chip itself, at no size at all, because
+    // nothing had placed them since the list grew. place() used to be called only when the panel opens.)
+    if (fan.classList.contains('pc-open')) { place(); markTabs(); }
   };
   setList(cur);
   const took = () => {
