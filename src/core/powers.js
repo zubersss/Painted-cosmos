@@ -579,6 +579,10 @@ export class Powers {
     if (!down) { this.charge = 0; this.ult = 0; this.ultReady = false; this._armed = null; this._wasTap = false; }
     if (W.count > 0) stepWinds(W, dt);
     if (this.times.count > 0) stepTimes(this.times, dt);      // (space and time: the bubbles open, hold and close)
+    // THE KNOT RIDES ON THE SAME LIST. It is not a thing the physics steps -- it is a mark in time, and nothing
+    // moves it -- but the list is already handed to the physics on the frame and kept for the painter beside the
+    // fires, and the knot has to reach the painter somehow to be drawn (world/timefx.js). This is the one wire.
+    this.times.knot = this.knot;
     if (this.onFrame) this.onFrame(this);          // (the touch button and the word on the screen: ui/powers.js)
   }
 
