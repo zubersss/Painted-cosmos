@@ -20,6 +20,7 @@ import { findVantage } from './vantage.js';
 import { gaitOf, strideBob, EXPLORER_BODY } from '../physics/explorer.js';
 import { MODE } from '../data/mode.js';
 import { makeFires, clearBurns, FUEL } from '../physics/fire.js';
+import { makeTimes, castTime, stepTimes, TIMEPOWER } from '../physics/times.js';
 import { meltIce, deepenMelt, scorch } from '../data/burnt.js';
 
 const P = new URLSearchParams(location.search);
@@ -277,6 +278,13 @@ let physics = null;
 // ?fired=<m> how far ahead it is lit (9), ?firet=<s> how long it is burned before the first frame (3).
 const fires = P.has('fire') ? makeFires() : null;
 let fireLit = false, fireTries = 0;
+// A BUBBLE OF TIME TO LOOK AT (?bubble=slow|haste|still with ?physics=1&powers=1&look=oil): one is cast on the
+// ground ahead of the camera and held open, so the painter can photograph what the third element looks like
+// without playing the game to it. ?timed=<m> how far ahead (9), ?timer=<m> how wide (the power's own).
+// (NOT ?time=, which is this page's own hour of the day and has been since the first version of it.)
+// ?knot=1 ties the knot in time where the camera stands, so that mark can be looked at too.
+const times = P.has('bubble') || P.has('knot') ? makeTimes() : null;
+let timeCast = false;
 const physicsWanted = P.get('physics') === '1';
 if (physicsWanted) {
   import('../physics/index.js').then((m) => {
@@ -414,7 +422,7 @@ function tick(now) {
     setDisturbers(0);
     if (P.get('push') === '0') disturbers.length = 0;
     const L0 = world.getLighting();
-    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers, fires };
+    const fr = { bodyId, time: wtime, focus: up.multiplyScalar(groundRadius(up)), eye: state.pos, sunDir: world.bodyUniforms(bodyId).uSunDirL.value, disturbers, fires, times };
     // pre-roll: let the weather fall for a while before the first frame, ending at wtime
     for (; preroll > 0; preroll -= 1 / 30) { fr.time = wtime - preroll; setDisturbers(preroll); if (P.get('push') === '0') disturbers.length = 0; physics.update(1 / 30, fr); }
     setDisturbers(0);
@@ -442,6 +450,24 @@ function tick(now) {
     // the first stills taken of the new flame had no flame in them at all, only embers scattered over the river.
     // A tenth of a second at most, so what is photographed is a moment of the fire and not a minute of it.
     const pdt = frozenT != null ? 0 : Math.min(dt, 0.1);
+    // the bubble (and the knot), cast once the physics has a world under it and then held open for ever
+    if (times && !timeCast) {
+      timeCast = true;
+      orient();
+      const flat = _f.clone().addScaledVector(_up, -_f.dot(_up));
+      if (flat.lengthSq() < 1e-6) flat.copy(_n);
+      const ahead = state.pos.clone().addScaledVector(flat.normalize(), num('timed', 9)).normalize();
+      const q = ahead.multiplyScalar(surf(ahead));
+      const kind = P.get('bubble') || '';
+      if (kind) {
+        const rate = kind === 'haste' ? TIMEPOWER.hasteRate : kind === 'still' ? TIMEPOWER.stillRate : TIMEPOWER.slowRate;
+        const z = castTime(times, bodyId, { x: q.x, y: q.y, z: q.z }, rate, 1, 1e9, false);
+        if (P.has('timer')) z.radius = num('timer', TIMEPOWER.radius);
+      }
+      if (P.has('knot')) { const b = state.pos.clone().normalize().multiplyScalar(surf(state.pos.clone().normalize())); times.knot = { bodyId, p: { x: b.x, y: b.y, z: b.z }, t: 0 }; }
+      for (let i = 0; i < 60; i++) stepTimes(times, 1 / 60);      // let it open before the first picture
+    }
+    if (times) stepTimes(times, pdt);
     physics.update(pdt, fr);
     if (fires) clearBurns(fires);
     wtime += pdt;
@@ -488,5 +514,5 @@ function layMark(kind) {
 }
 if (P.has('melt')) window.__pcMelt = layMark('melt');
 if (P.has('scorch')) window.__pcScorch = layMark('scorch');
-window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; }, layMark, fires, get fireLit() { return fireLit; } };
+window.__pcGallery = { state, world, painter, camera, renderer, scene, get physics() { return physics; }, layMark, fires, times, get fireLit() { return fireLit; } };
 requestAnimationFrame(tick);
